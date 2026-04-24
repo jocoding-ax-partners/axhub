@@ -79,14 +79,23 @@ jobs:
             cosign sign-blob --yes --output-signature="${f}.sig" "${f}"
           done
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            bin/axhub-helpers-*
-            bin/checksums.txt
-            bin/manifest.json
-            bin/*.sig
+      - name: Upload release assets (gh CLI, sequential — avoids race)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Create release if not exists; else continue and just upload to it.
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" \
+                 --repo "$GITHUB_REPOSITORY" \
+                 --title "$TAG" \
+                 --notes "Automated release. See CHANGELOG.md for details. Verify with: bash scripts/release/verify-release.sh $TAG"
+          # Upload all assets sequentially with --clobber so re-runs replace.
+          for f in bin/axhub-helpers-* bin/checksums.txt bin/manifest.json bin/*.sig; do
+            [ -f "$f" ] || continue
+            echo "Uploading $f"
+            gh release upload "$TAG" "$f" --repo "$GITHUB_REPOSITORY" --clobber
+          done
 
   e2e-staging:
     name: ax-hub-cli staging E2E (gated by E2E_ENABLED repo var)
