@@ -7,10 +7,7 @@
     "url": "https://jocodingax.ai"
   },
   "homepage": "https://hub-api.jocodingax.ai",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/jocoding-ax-partners/axhub-plugin-cc"
-  },
+  "repository": "https://github.com/jocoding-ax-partners/axhub.git",
   "license": "MIT",
   "keywords": [
     "axhub",
