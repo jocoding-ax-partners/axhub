@@ -294,6 +294,15 @@ async function cmdClassifyExit(_args: string[]): Promise<number> {
   const exitCode = payload.tool_response?.exit_code ?? 0;
   const stdout = payload.tool_response?.stdout ?? "";
 
+  // Exit 0: silent for non-deploy commands. Deploy create success deserves a
+  // celebration (vibe coder DX), but `axhub --version` / `auth status` /
+  // `apps list` exit 0 is just normal completion — emitting "배포 성공" would
+  // be confusing and noisy.
+  if (exitCode === 0 && !/^axhub\s+deploy\s+create\b/.test(command)) {
+    out({});
+    return 0;
+  }
+
   const entry = classify(exitCode, stdout);
 
   let systemMessage = `${entry.emotion}\n\n원인: ${entry.cause}\n\n해결: ${entry.action}`;
