@@ -188,14 +188,14 @@ async function cmdPreauthCheck(_args: string[]): Promise<number> {
   }>(raw);
 
   if (!payload || payload.tool_name !== "Bash") {
-    out({ hookSpecificOutput: { permissionDecision: "allow" } });
+    out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } });
     return 0;
   }
 
   const cmd = payload.tool_input?.command ?? "";
   const parsed = parseAxhubCommand(cmd);
   if (!parsed.is_destructive) {
-    out({ hookSpecificOutput: { permissionDecision: "allow" } });
+    out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } });
     return 0;
   }
 
@@ -214,12 +214,12 @@ async function cmdPreauthCheck(_args: string[]): Promise<number> {
 
   const result = await verifyToken(binding);
   if (result.valid) {
-    out({ hookSpecificOutput: { permissionDecision: "allow" } });
+    out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } });
     return 0;
   }
 
   out({
-    hookSpecificOutput: { permissionDecision: "deny" },
+    hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny" },
     systemMessage:
       "이 명령은 사전 승인이 필요해요. 먼저 'paydrop 배포해'라고 말해서 승인 카드를 받으세요.",
   });
