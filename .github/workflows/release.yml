@@ -47,7 +47,7 @@ jobs:
 
       - name: Install Bun
         run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.0"
+          curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.10"
           echo "$HOME/.bun/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
@@ -116,7 +116,7 @@ jobs:
 
       - name: Install Bun
         run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.0"
+          curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.10"
           echo "$HOME/.bun/bin" >> $GITHUB_PATH
       - run: bun install --frozen-lockfile
       - run: bun run test:e2e
