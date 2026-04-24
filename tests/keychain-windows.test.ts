@@ -68,6 +68,11 @@ describe("readWindowsKeychain — mocked-runner pre-mortem coverage", () => {
     expect(result.token).toBeUndefined();
     expect(result.error).toContain("Credential Manager");
     expect(result.error).toContain("axhub auth login");
+    expect(result.error).toContain("AXHUB_TOKEN");
+    // PS-only architecture: cmdkey /list:axhub returns exit 0 in both present/missing
+    // cases — useless as a probe. Plan v3 Fix 5 explicitly removed it from docs;
+    // runtime errors must stay aligned (no cmdkey instructions anywhere).
+    expect(result.error).not.toContain("cmdkey");
     expect((result.error ?? "").split("\n").length).toBeGreaterThanOrEqual(4);
   });
 

@@ -100,7 +100,7 @@ const ERR_NOT_FOUND =
   "Windows Credential Manager에 axhub token이 없어요.\n" +
   "원인: 'axhub auth login' 미실행 또는 다른 사용자 계정으로 로그인됨.\n" +
   "해결: PowerShell에서 'axhub auth login' 실행 후 다시 시도해주세요.\n" +
-  "다음: 그래도 안 되면 'cmdkey /list:axhub' 로 자격증명 존재 확인.";
+  "다음: 그래도 안 되면 AXHUB_TOKEN 환경변수 우회 → $env:AXHUB_TOKEN='axhub_pat_...'";
 
 const ERR_EXEC_POLICY =
   "잠깐만요.\n" +
