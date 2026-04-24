@@ -57,7 +57,8 @@ Render this verbatim when entering the token-paste flow. The numbered steps are 
 
     axhub auth login              # 브라우저 OAuth 로그인
     security find-generic-password -s axhub -w   # macOS keychain 에서 token blob 출력
-    # Linux:  secret-tool lookup service axhub
+    # Linux:    secret-tool lookup service axhub
+    # Windows:  axhub-helpers token-init 가 PowerShell + Add-Type 단일 호출로 자동 처리
 
   출력된 'go-keyring-base64:eyJ...' 한 줄을 통째로 복사하세요.
 

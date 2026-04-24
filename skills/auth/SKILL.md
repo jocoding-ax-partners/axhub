@@ -55,7 +55,7 @@ To handle auth:
    - 2순위: 별도 노트북에서 `axhub auth login` 실행 후, 그 노트북의 keychain에서 토큰 추출 → secure 채널 (Slack DM, secure email) 로 헤드리스 환경에 전달 → `export AXHUB_TOKEN=...`
    - 3순위: pasted token을 `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-install --from-stdin` 으로 `~/.config/axhub/token` 에 mode 0600 저장
 
-   **Token 자동 추출 메커니즘:** 브라우저 환경에서는 `axhub auth login` 한 번 실행 후, 헬퍼의 `token-init` 서브커맨드가 macOS keychain (또는 Linux secret-service) 에서 `axhub` CLI 가 저장한 토큰을 자동 추출합니다. vibe coder 가 별도 토큰 setup 단계를 볼 일 없습니다.
+   **Token 자동 추출 메커니즘:** 브라우저 환경에서는 `axhub auth login` 한 번 실행 후, 헬퍼의 `token-init` 서브커맨드가 macOS keychain / Linux secret-service / Windows Credential Manager (PowerShell + Add-Type 단일 호출) 에서 `axhub` CLI 가 저장한 토큰을 자동 추출합니다. vibe coder 가 별도 토큰 setup 단계를 볼 일 없습니다.
 
 5. **On `browser`** (browser available):
 

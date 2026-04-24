@@ -3,7 +3,8 @@
  *
  * Reads the axhub access_token that ax-hub-cli stores under service="axhub"
  * via zalando/keyring. macOS: `security find-generic-password -s axhub -w`;
- * Linux: `secret-tool lookup service axhub`; Windows deferred.
+ * Linux: `secret-tool lookup service axhub`; Windows: PowerShell + Add-Type
+ * PInvoke against advapi32!CredReadW (see ./keychain-windows.ts).
  *
  * Storage format: `go-keyring-base64:<base64 JSON>` where decoded JSON has
  * `{schema_version, access_token, token_type, expires_at, scopes}`.
@@ -11,6 +12,8 @@
  * Pure functions live here so tests can import without booting the helper
  * binary's main dispatch (importing index.ts triggers process.argv parsing).
  */
+
+import { readWindowsKeychain } from "./keychain-windows.ts";
 
 export const parseKeyringValue = (raw: string): string | null => {
   if (raw.length === 0) return null;
@@ -88,11 +91,6 @@ export const readKeychainToken = (): KeychainResult => {
       };
     }
   }
-  if (platform === "win32") {
-    return {
-      error:
-        "Windows에서는 현재 AXHUB_TOKEN 환경변수만 지원합니다. axhub auth login 후 토큰을 별도 안내받아 export AXHUB_TOKEN=... 으로 설정해주세요. PowerShell credential manager 통합은 다음 release에 추가될 예정입니다.",
-    };
-  }
+  if (platform === "win32") return readWindowsKeychain();
   return { error: `지원하지 않는 플랫폼: ${platform}. AXHUB_TOKEN 환경변수로 우회해주세요.` };
 };

@@ -93,7 +93,7 @@ vibe coder가 같은 회사 내 여러 노트북 (사무실 + 집) 사용 시:
 
 - **각 노트북별 독립 token 발급**: 절대 token 복사 X (HMAC 키도 각각 생성됨)
 - **deploy 권한은 단일 노트북에 한정 권장**: 여러 노트북에서 동시에 deploy 시도 → race condition + 동시-배포 차단 (validation.deployment_in_progress)
-- **headless 환경 (Codespaces, SSH)**: token-paste flow (skills/auth/SKILL.md step 4 / `skills/deploy/references/headless-flow.md`) 사용. 옵션 A — 헤드리스 환경에서 직접 `export AXHUB_TOKEN=axhub_pat_...`. 옵션 B — 브라우저 노트북에서 `axhub auth login` 후 keychain 에서 토큰 추출 (`security find-generic-password -s axhub -w` / `secret-tool lookup service axhub`) → secure 채널 (Slack DM 등) 로 전달.
+- **headless 환경 (Codespaces, SSH, Windows)**: token-paste flow (skills/auth/SKILL.md step 4 / `skills/deploy/references/headless-flow.md`) 사용. 옵션 A — 헤드리스 환경에서 직접 `export AXHUB_TOKEN=axhub_pat_...` (PowerShell: `$env:AXHUB_TOKEN='axhub_pat_...'`). 옵션 B — 브라우저 노트북에서 `axhub auth login` 후 keychain 에서 토큰 추출 (`security find-generic-password -s axhub -w` / `secret-tool lookup service axhub`) → secure 채널 (Slack DM 등) 로 전달. Windows 는 PowerShell + Credential Manager 통합으로 token-init 자동 처리됨.
 
 ---
 

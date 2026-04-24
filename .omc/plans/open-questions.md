@@ -13,3 +13,17 @@ Append-only log of unresolved decisions across plans.
 ## bug-hunt-systematic — Analyst-deferred items (none yet, pre-architect-review)
 
 (Will be appended after analyst gap-analysis pass on this plan.)
+
+## phase-9-windows-keychain-v2 - 2026-04-24
+
+- [ ] Q6: Should the v0.1.5 release ship a real Windows GitHub Actions CI runner (windows-latest) or defer to v0.1.6? — Current plan US-903 mocks spawnSync on macOS, which proves logic but not runtime. Real Windows CI catches PowerShell-version skew (5.1 vs 7.x) and wincred ABI surprises. Defer = ship faster; ship = catch fleet issues earlier.
+- [ ] Q7: Telemetry counter naming — `windows.exec_policy_blocked` vs `windows.error.exec_policy` vs `keychain.windows.exec_policy_blocked`? Existing telemetry naming convention should be checked against `usage.jsonl` schema before US-901 lands.
+- [ ] Q8: Pre-Mortem Scenario 2 (CredReadW success + empty blob) — should we add this as a 6th US-903 test case explicitly, or fold it into the existing parseKeyringValue null-handling tests in `tests/keychain.test.ts`? Decision affects final test count (348 vs 349 pass).
+- [ ] Q9: Authenticode signing of `axhub-helpers-windows-amd64.exe` for v0.1.6 — what code-signing certificate authority does jocoding-ax-partners use? Plan assumes signing is feasible; needs IT/ops confirmation before v0.1.6 EDR mitigation can ship.
+
+## phase-9-windows-keychain-v3 - 2026-04-24
+
+- [x] Q8 (RESOLVED in v3): Fix 1 chose path (a) — empty-blob is now an explicit US-903 case 6. Final test count = 349 pass / 354 total / 15 files.
+- [ ] Q10: Where exactly does `.omc/state/us-905-issue-url.txt` live in the repo? Confirm `.omc/state/` is .gitignored (transient state) so the issue URL artifact is not committed accidentally.
+- [ ] Q11: ADR follow-up "Sign Windows binary with Authenticode" assumes v0.1.6 timeline. If the cert procurement (Q9) takes > 2 weeks, EDR-blocked Windows users have AXHUB_TOKEN as the only path for that entire window. Acceptable, or push for interim mitigation (ship signed PS1 file in v0.1.5.1 patch)?
+- [ ] Q12: Pre-Mortem Scenario 2's empty-blob 4-part Korean error message #5 directs the user to re-run `axhub auth login`. Verify `axhub auth login` actually overwrites the existing Credential Manager entry on Windows (vs. failing because target already exists) — needs ax-hub-cli source spot-check before US-903 case 6 assertion text is locked.

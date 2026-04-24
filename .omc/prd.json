@@ -1,95 +1,111 @@
 {
-  "task": "Phase 8 keychain bridge: helper cmdTokenInit가 'axhub auth login --print-token' (CLI 미지원 flag) 가정 폐기하고 OS keychain 직접 read. 5 stories: helper 재작성, tests, SKILL.md, docs, v0.1.4 release. CLI 변경 없음.",
-  "createdAt": "2026-04-24T09:00:00Z",
+  "task": "Phase 9 v0.1.5 — Windows keychain bridge (PowerShell + Add-Type PInvoke against advapi32!CredReadW). Linux secret-tool branch UNTOUCHED. macOS branch UNTOUCHED. Plan: .omc/plans/phase-9-windows-keychain-v3.md (consensus-approved 2026-04-24).",
+  "createdAt": "2026-04-24T08:30:00Z",
   "stories": [
     {
-      "id": "US-801",
-      "title": "Helper cmdTokenInit 재작성 — keychain 직접 read (macOS first, Linux/Windows 단계적)",
+      "id": "US-901",
+      "title": "keychain.ts Windows branch — inline PowerShell + Add-Type PInvoke + ASCII sentinel",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "src/axhub-helpers/index.ts cmdTokenInit 재작성: 'axhub auth login --print-token' 호출 폐기. AXHUB_TOKEN env var 우선 → OS keychain shell out fallback.",
-        "macOS keychain read: spawnSync('security', ['find-generic-password', '-s', 'axhub', '-w']) → stdout trim → 'go-keyring-base64:' prefix 제거 → base64 decode → JSON parse → access_token 추출",
-        "Linux keychain read: spawnSync('secret-tool', ['lookup', 'service', 'axhub']) — secret-tool 미설치 시 graceful 안내 ('apt-get install libsecret-tools' or 'AXHUB_TOKEN env var 사용')",
-        "Windows: deferred — 명확한 Korean 안내 ('Windows는 현재 AXHUB_TOKEN env var 만 지원합니다. PowerShell credential manager 통합은 다음 release.')",
-        "Token 형식 validation (axhub_pat_* regex 그대로 유지) → ~/.config/axhub-plugin/token (mode 0600)",
-        "각 단계 실패 시 4-part Korean 메시지 (감정+원인+해결+다음액션) per error-empathy-catalog 패턴",
-        "bun test → 339+ pass / 0 fail / typecheck clean"
+        "src/axhub-helpers/keychain.ts win32 branch (currently lines 91-96 deferred error) replaced: spawn powershell.exe with single Add-Type -TypeDefinition inline C# stub for CredReadW + CredFree + CREDENTIAL struct.",
+        "PS script first line: $ErrorActionPreference = 'Stop' (PS5.1 terminating exception hardening per architect synthesis).",
+        "ASCII sentinel scheme — success: stdout 'AXHUB_OK:<base64>'. Missing credential: stdout 'ERR:NOT_FOUND'. C# compile/load failure: stderr 'ERR:LOAD_FAIL'. Locale-independent (no English stderr parsing).",
+        "TS side decodeWindowsBlob: base64 decode → UTF-8 → reuse existing parseKeyringValue (no new decoder).",
+        "readWindowsKeychain extracted into new src/axhub-helpers/keychain-windows.ts module exporting (a) PS_SCRIPT string (using String.raw to avoid template-literal interpolation of $variables), (b) async readWindowsKeychain(runner = Bun.spawnSync) function. CommandRunner type imported from preflight.ts (do not redefine).",
+        "spawnSync timeout: 8000ms (vs macOS 5000ms — accommodates PS startup latency).",
+        "5 Windows error scenarios all 4-part Korean (감정/원인/해결/다음액션): ExecutionPolicy block, NOT_FOUND, PInvoke load failure, EDR/AMSI quarantine (signal != null OR exit ∈ {-1, 0xC0000409}), spawnSync throws.",
+        "EDR error message MUST NOT instruct user to ask IT for 'EDR allowlist 추가' (SOC will reject for unsigned binary doing PInvoke). Use 'v0.1.5 코드사이닝 전 — 우리 책임. AXHUB_TOKEN 환경변수가 정식 회피 경로. v0.1.6 Authenticode 후 EDR allowlist 가능' framing.",
+        "Empty CredentialBlob → early-return ERR:NOT_FOUND (treat same as missing credential). NO new error message for empty-blob path (per Critic round 2 Fix 1 path b).",
+        "Linux secret-tool branch (keychain.ts:65-90) UNTOUCHED.",
+        "macOS security branch (keychain.ts:46-66) UNTOUCHED.",
+        "Returns { token, source: 'windows-credential-manager' } on success."
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-802",
-      "title": "tests/token-init.test.ts 갱신 — keychain bridge 검증",
+      "id": "US-902",
+      "title": "docs additive — Windows mentions added (7 edits / 6 files). Linux/macOS untouched.",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "tests/token-init.test.ts 재작성: '--print-token' 가정 검증 모두 제거",
-        "8+ assertions 새 case: (1) AXHUB_TOKEN env var 우선 사용, (2) macOS security 명령 호출 검증, (3) base64 decode + JSON parse 정확성, (4) access_token 필드 추출, (5) Linux secret-tool path 검증 (mocked), (6) Windows deferred error 메시지, (7) keychain read 실패 시 graceful AXHUB_TOKEN 안내, (8) malformed base64 에러 처리",
-        "Mock spawnSync via dependency injection 또는 Bun.$ override",
-        "macOS 환경에서 실제 security 명령 작동 smoke test (현재 user 환경에서 검증)",
-        "bun test tests/token-init.test.ts → 8+ pass / 0 fail"
+        "skills/auth/SKILL.md:55 + :58 — add Windows parallel sentence to existing macOS+Linux headless guidance. PS-only architecture aligned: 'axhub-helpers token-init 가 PowerShell 단일 호출로 자격증명을 직접 읽어옵니다.' NO cmdkey instruction (cmdkey returns exit 0 in both present/missing cases — useless for probe).",
+        "skills/deploy/references/headless-flow.md:60 — add Windows command line `# Windows: PowerShell + Add-Type 단일 호출 (axhub-helpers 가 자동 처리)` after existing macOS/Linux block.",
+        "skills/deploy/references/recovery-flows.md:87 — same Windows PS-only addition pattern.",
+        "docs/pilot/admin-rollout.ko.md:96 — Windows context added to 'headless 환경 (Codespaces, SSH)' paragraph: 'Windows: PowerShell + Credential Manager 통합'.",
+        "src/axhub-helpers/list-deployments.ts:13-16 JSDoc — add Windows mention: 'Windows PowerShell + Advapi32 CredReadW' alongside existing token discovery comment.",
+        "bin/README.md:31 — add note: 'windows-amd64.exe: PowerShell + Add-Type PInvoke against advapi32 (no Install-Module required, stock Win10/11)'.",
+        "ALL Linux + macOS existing mentions UNTOUCHED. Additive only.",
+        "Korean text grammatically natural.",
+        "bash tests/docs-link-audit.sh → Broken: 0."
       ],
       "owner": null,
-      "blockedBy": ["US-801"]
+      "blockedBy": ["US-901"]
     },
     {
-      "id": "US-803",
-      "title": "skills/auth/SKILL.md 재작성 — '--print-token' 안내 제거",
+      "id": "US-903",
+      "title": "tests/keychain-windows.test.ts — 6 mocked-runner cases + parseKeyringValue extraction",
       "priority": 3,
       "passes": true,
       "acceptanceCriteria": [
-        "skills/auth/SKILL.md: 'axhub auth login --print-token' 모든 언급 제거",
-        "Headless 환경 안내: AXHUB_TOKEN env var 직접 export 또는 다른 노트북에서 keychain export 후 secure 채널로 token 전달",
-        "token-init 작동 메커니즘 1-line 설명: 'macOS keychain (또는 Linux secret-service) 에서 axhub CLI 가 저장한 토큰 자동 추출'",
-        "Step 4 headless detection 워크플로우: --print-token 대신 keychain access 가능성 체크 (security 명령 또는 secret-tool 존재 여부)",
-        "tests/manifest.test.ts 통과 유지 (Korean prefix 형식 + length limits 그대로)"
+        "New file tests/keychain.test.ts — extracts the 8 existing parseKeyringValue tests from tests/token-init.test.ts:88-145 (move not duplicate).",
+        "tests/token-init.test.ts:88-145 parseKeyringValue describe block REMOVED (extracted to keychain.test.ts).",
+        "tests/token-init.test.ts:81-86 (Windows deferred-error 3 assertions) REPLACED with 3 new assertions: powershell.exe spawn + Add-Type + advapi32 + CredReadW present in keychain-windows.ts source (read via readFileSync).",
+        "New file tests/keychain-windows.test.ts — 6 mocked-runner test cases via injected runner: (1) success → AXHUB_OK:<base64> → token extracted, (2) ExecutionPolicy block → exit 1 + stderr matches 'execution of scripts' → 4-part Korean ExecutionPolicy message, (3) NOT_FOUND → stdout ERR:NOT_FOUND → 4-part Korean missing-credential message, (4) PInvoke load failure → stdout ERR:LOAD_FAIL → 4-part Korean PInvoke message, (5) EDR signal kill → result.signal != null OR exit ∈ {-1, 0xC0000409} → 4-part Korean EDR honesty message (no IT-allowlist instruction), (6) spawnSync throws → 4-part Korean spawn-failure message.",
+        "Test count after Phase 9: 343 (Phase 8 baseline) + 6 (windows mocks) = 349 pass / 354 total / 15 files.",
+        "bun test 2>&1 | tail -8 → '349 pass / 5 skip / 0 fail / 354 tests across 15 files'.",
+        "bunx tsc --noEmit → clean."
       ],
       "owner": null,
-      "blockedBy": ["US-801"]
+      "blockedBy": ["US-901"]
     },
     {
-      "id": "US-804",
-      "title": "docs 정리 — outreach + landing + onboarding + release docs",
+      "id": "US-905",
+      "title": "GitHub issue — format-parity v0.1.6 deferral tracking",
       "priority": 4,
       "passes": true,
       "acceptanceCriteria": [
-        "docs/RELEASE.md: '--print-token' 언급 제거",
-        "docs/marketing/landing-page.ko.md: vibe coder 흐름에서 '--print-token' 단계 제거 (자동 작동 흐름으로 단순화)",
-        "docs/pilot/onboarding-checklist.md: vibe coder day-1 walkthrough 의 token 관련 단계 단순화 (axhub auth login 한 번 + plugin 자동)",
-        "docs/marketing/outreach-email.ko.md: setup 4-step 그대로 유지 (현재 정확)",
-        "skills/deploy/references/headless-flow.md: print-token 안내 제거, AXHUB_TOKEN env var path 만 명시",
-        "bash tests/docs-link-audit.sh → Broken: 0 (link 깨짐 없음)"
+        "gh issue create — title: 'Format-parity: keychain.ts existing one-liner errors → 4-part empathy template (v0.1.6)'",
+        "Body: lists keychain.ts existing line numbers (54, 59, 62, 76, 82, 86, 93) that are one-line Korean errors NOT 4-part per error-empathy-catalog.md:76-148. Phase 9 v0.1.5 ships Windows 4-part from day one but defers existing macOS/Linux line repair to v0.1.6 to keep Phase 9 surgical.",
+        "Labels: 'format-parity', 'v0.1.6', 'deferred-from-phase-9'.",
+        "Issue URL captured to .omc/state/us-905-issue-url.txt for US-904 CHANGELOG handoff.",
+        "Issue is OPEN status in github.com/jocoding-ax-partners/axhub."
       ],
       "owner": null,
-      "blockedBy": ["US-803"]
+      "blockedBy": []
     },
     {
-      "id": "US-805",
-      "title": "v0.1.4 release — keychain bridge ship",
+      "id": "US-904",
+      "title": "v0.1.5 release ship — bump + codegen + tag + CI green + verify",
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "Version bump: package.json + .claude-plugin/{plugin,marketplace}.json 0.1.3 → 0.1.4",
-        "bun run codegen:version → 3 file 자동 sync (install.sh + index.ts + telemetry.ts)",
-        "git commit + push origin main",
-        "git tag v0.1.4 + push origin v0.1.4 → CI workflow 자동 트리거",
-        "CI conclusion: success (GitHub Actions release workflow)",
-        "bash scripts/release/verify-release.sh v0.1.4 → 'All release assets verified' (manifest sig + 5 binary sigs + sha256)",
-        "Live binary self-report: 다운로드한 v0.1.4 binary 의 'axhub-helpers version' 출력이 '0.1.4' 정확",
-        "docs/pilot/v0.1.4-verify-result.txt 캡처 + launch-readiness-checklist.md baseline 갱신"
+        "Step 1: Read .omc/state/us-905-issue-url.txt (US-905 artifact handoff).",
+        "Step 2: Substitute {US905_ISSUE_URL} placeholder in CHANGELOG entry with actual URL from step 1.",
+        "Step 3: Verify CHANGELOG.md contains valid GitHub issue URL pattern (grep -E 'https://github.com/jocoding-ax-partners/axhub/issues/[0-9]+').",
+        "Version bump: package.json + .claude-plugin/{plugin,marketplace}.json 0.1.4 → 0.1.5.",
+        "bun run codegen:version → 3 file auto-sync (install.sh + index.ts PLUGIN_VERSION + telemetry.ts).",
+        "CHANGELOG.md new v0.1.5 entry: Added (Windows keychain bridge), Unchanged (Linux secret-tool, macOS security), Deferred (v0.1.6 link to US-905 issue).",
+        "git commit + push origin main.",
+        "git tag v0.1.5 + push origin v0.1.5 → CI release workflow auto-trigger.",
+        "CI conclusion: success (5 binaries built, 5 cosign sigs, manifest signed).",
+        "bash scripts/release/verify-release.sh v0.1.5 → 'All release assets verified for jocoding-ax-partners/axhub@v0.1.5'.",
+        "Live binary self-report (downloaded windows-amd64.exe via curl): version subcommand prints 'axhub-helpers 0.1.5 (plugin v0.1.5, schema v0)'. Skip exec-on-mac if cross-platform issues — verify only via file size + sha256 match in that case.",
+        "docs/pilot/v0.1.5-verify-result.txt — capture cosign + sha256 verify output + binary size match.",
+        "docs/pilot/launch-readiness-checklist.md — baseline updated v0.1.4 → v0.1.5."
       ],
       "owner": null,
-      "blockedBy": ["US-801", "US-802", "US-803", "US-804"]
+      "blockedBy": ["US-901", "US-902", "US-903", "US-905"]
     }
   ],
   "metadata": {
-    "task_origin": "/oh-my-claudecode:ralplan 옵션a → ralph (User trace에서 'axhub auth login --print-token unknown flag' fail 발견)",
-    "phase7_predecessor": "Phase 7 ralph (v0.1.3) — token-init auto-trigger logic 작동했지만 token-init 자체가 잘못된 CLI 가정으로 broken",
+    "task_origin": "/oh-my-claudecode:ralplan + /team ralph (Phase 8 v0.1.4 successor — keychain bridge Windows expansion)",
+    "phase8_predecessor": "v0.1.4 commit d18bdb6 — macOS keychain bridge ship + Linux code-only + Windows deferred error",
+    "consensus_plan": ".omc/plans/phase-9-windows-keychain-v3.md (3 ralplan rounds: 5 critic fixes round 1 + 6 fixes round 2 + APPROVE round 3)",
     "deslop": "enabled",
     "critic": "architect",
-    "scope_note": "CLI 변경 X. 모든 fix는 plugin 측. macOS first ship. Linux/Windows 단계적 (libsecret-tools 의존성 + PowerShell 통합).",
-    "phase_9_deferred": "Windows PowerShell keychain 통합, ax-hub-cli 측 --print-token 추가 제안 (별도 issue), 실 customer pilot 실행"
+    "scope_note": "Linux/macOS branches UNTOUCHED. Windows from-scratch. CLI 변경 X. Codespaces vibe coder uses AXHUB_TOKEN env var (Linux binary preserved).",
+    "phase_10_deferred": "v0.1.6 Authenticode code-signing for Windows binary → EDR allowlist legitimization, format-parity repair (US-905 issue), Real Windows GitHub Actions runner for E2E."
   }
 }

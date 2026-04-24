@@ -29,6 +29,7 @@ bun run smoke
 
 - `axhub-helpers` (native)
 - `axhub-helpers-darwin-arm64` / `-darwin-amd64` / `-linux-amd64` / `-linux-arm64` / `-windows-amd64.exe` (release)
+  - `windows-amd64.exe`: PowerShell + Add-Type PInvoke against `advapi32!CredReadW` for keychain. No `Install-Module` required, stock Win10/11.
 
 ## Contract
 

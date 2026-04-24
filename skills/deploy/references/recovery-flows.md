@@ -84,7 +84,8 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
      터미널을 열고 다음을 실행하세요 →
        axhub auth login                                 # OAuth 로그인
        security find-generic-password -s axhub -w       # macOS keychain
-       # Linux:  secret-tool lookup service axhub
+       # Linux:    secret-tool lookup service axhub
+       # Windows:  axhub-helpers token-init 가 PowerShell + Add-Type 단일 호출로 자동 처리
 
    2단계 (출력된 'go-keyring-base64:eyJ…' 한 줄을 복사하세요. helper 가 base64 decode → access_token 추출합니다.)
 

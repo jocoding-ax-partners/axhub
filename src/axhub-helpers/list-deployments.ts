@@ -13,7 +13,8 @@
  *
  * Token source: `~/.config/axhub-plugin/token` (mode 0600), populated by
  * `axhub-helpers token-init` which reads ax-hub-cli's OS keychain entry
- * (macOS `security` / Linux `secret-tool`). AXHUB_TOKEN env var overrides.
+ * (macOS `security` / Linux `secret-tool` / Windows PowerShell + Advapi32
+ * CredReadW). AXHUB_TOKEN env var overrides.
  *
  * On missing token: exit 65 (auth) with structured Korean recovery message.
  * On 404 app: exit 67 (not found). On other API error: exit 1.

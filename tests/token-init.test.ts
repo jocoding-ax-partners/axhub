@@ -1,10 +1,8 @@
-// Tests for cmdTokenInit OS-keychain bridge + parseKeyringValue decoder.
+// Tests for cmdTokenInit OS-keychain bridge + Windows source assertions.
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-
-import { parseKeyringValue } from "../src/axhub-helpers/keychain";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const INDEX_TS = join(REPO_ROOT, "src/axhub-helpers/index.ts");
@@ -75,67 +73,15 @@ describe("AXHUB_TOKEN env var precedence + keychain bridge", () => {
     expect(content).toContain("libsecret-tools");
   });
 
-  test("Windows is explicitly deferred with Korean message", () => {
-    const content = readFileSync(KEYCHAIN_TS, "utf8");
-    expect(content).toContain("win32");
-    expect(content).toContain("Windows");
-    expect(content).toContain("AXHUB_TOKEN");
-  });
-});
-
-describe("parseKeyringValue (go-keyring-base64 decoder)", () => {
-  test("strips 'go-keyring-base64:' prefix + decodes JSON + extracts access_token", () => {
-    const json = JSON.stringify({
-      schema_version: 2,
-      access_token: "test_access_token_value_long_enough_to_pass",
-      token_type: "bearer",
-      expires_at: "2030-01-01T00:00:00Z",
-      scopes: ["read", "write"],
-    });
-    const b64 = Buffer.from(json, "utf8").toString("base64");
-    const raw = "go-keyring-base64:" + b64;
-    const result = parseKeyringValue(raw);
-    expect(result).toBe("test_access_token_value_long_enough_to_pass");
-  });
-
-  test("works without 'go-keyring-base64:' prefix (raw base64)", () => {
-    const json = JSON.stringify({ access_token: "another_test_token_value_for_assertion" });
-    const b64 = Buffer.from(json, "utf8").toString("base64");
-    const result = parseKeyringValue(b64);
-    expect(result).toBe("another_test_token_value_for_assertion");
-  });
-
-  test("returns null on empty input", () => {
-    expect(parseKeyringValue("")).toBeNull();
-  });
-
-  test("returns null on invalid base64", () => {
-    expect(parseKeyringValue("go-keyring-base64:!!!not-valid-base64@@@")).toBeNull();
-  });
-
-  test("returns null when decoded JSON has no access_token field", () => {
-    const json = JSON.stringify({ token_type: "bearer", scopes: ["read"] });
-    const b64 = Buffer.from(json, "utf8").toString("base64");
-    const raw = "go-keyring-base64:" + b64;
-    expect(parseKeyringValue(raw)).toBeNull();
-  });
-
-  test("returns null when access_token is too short (< 16 chars)", () => {
-    const json = JSON.stringify({ access_token: "short" });
-    const b64 = Buffer.from(json, "utf8").toString("base64");
-    const raw = "go-keyring-base64:" + b64;
-    expect(parseKeyringValue(raw)).toBeNull();
-  });
-
-  test("returns null when decoded payload is not valid JSON", () => {
-    const b64 = Buffer.from("not json at all", "utf8").toString("base64");
-    const raw = "go-keyring-base64:" + b64;
-    expect(parseKeyringValue(raw)).toBeNull();
-  });
-
-  test("returns null when decoded JSON is array (not object)", () => {
-    const b64 = Buffer.from(JSON.stringify(["a", "b"]), "utf8").toString("base64");
-    const raw = "go-keyring-base64:" + b64;
-    expect(parseKeyringValue(raw)).toBeNull();
+  test("Windows uses PowerShell + Add-Type PInvoke against advapi32!CredReadW", () => {
+    const KEYCHAIN_WIN = join(REPO_ROOT, "src/axhub-helpers/keychain-windows.ts");
+    const content = readFileSync(KEYCHAIN_WIN, "utf8");
+    expect(content).toContain("powershell.exe");
+    expect(content).toContain("Add-Type");
+    expect(content).toContain("advapi32.dll");
+    expect(content).toContain("CredReadW");
+    expect(content).toContain("AXHUB_OK:");
+    expect(content).toContain("ERR:NOT_FOUND");
+    expect(content).toContain("ERR:LOAD_FAIL");
   });
 });
