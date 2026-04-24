@@ -1,0 +1,82 @@
+v0.1.6 release verification — Phase 9 hotfix (cmdkey contradiction removed)
+============================================================================
+
+Verified at: 2026-04-24
+Verifier: jocoding-ax-partners (Phase 9 architect ralph)
+Tag: v0.1.6
+Commit: post-2fd6c48 (fix: v0.1.6 — ERR_NOT_FOUND no longer recommends useless cmdkey probe)
+
+Hotfix scope
+------------
+Single-line patch addressing architect Phase 9 verification finding:
+v0.1.5 keychain-windows.ts:103 ERR_NOT_FOUND last line told users to run
+'cmdkey /list:axhub' for credential presence check — but cmdkey returns exit 0
+in BOTH present and absent cases (consensus plan v3 Fix 5 explicitly removed
+cmdkey from documentation as useless probe). Runtime error catalog had the
+contradictory leftover.
+
+Fix:
+- src/axhub-helpers/keychain-windows.ts:103 — replace cmdkey instruction with
+  AXHUB_TOKEN env var fallback path
+- tests/keychain-windows.test.ts case 3 — add `not.toContain("cmdkey")`
+  regression guard at the test level
+
+CI release workflow
+-------------------
+Run ID: 24882882183
+Status: completed
+Conclusion: success
+Build job: ✓ Build cross-arch + cosign sign — all 11 steps green
+E2E job: skipped (gated by E2E_ENABLED repo var, expected)
+
+verify-release.sh v0.1.6 output
+-------------------------------
+Verified OK
+Manifest signature OK.
+Verifying each binary signature + checksum...
+OK: axhub-helpers-darwin-amd64
+OK: axhub-helpers-darwin-arm64
+OK: axhub-helpers-linux-amd64
+OK: axhub-helpers-linux-arm64
+OK: axhub-helpers-windows-amd64.exe
+---
+All release assets verified for jocoding-ax-partners/axhub@v0.1.6
+
+Live binary self-report (downloaded darwin-arm64)
+--------------------------------------------------
+$ /tmp/axhub-helpers-v016 version
+axhub-helpers 0.1.6 (plugin v0.1.6, schema v0)
+
+→ self-reports 0.1.6 (matches plugin v0.1.6) — codegen sync correct.
+
+Test baseline
+-------------
+bun test → 349 pass / 5 skip / 0 fail / 2258 expect() / 354 tests across 16 files
+                                              ^^^^ (+1 vs v0.1.5: new not.toContain guard)
+typecheck → clean
+
+What v0.1.6 changes
+-------------------
+- ERR_NOT_FOUND last line: "다음: 그래도 안 되면 'cmdkey /list:axhub' 로 자격증명 존재 확인."
+  → "다음: 그래도 안 되면 AXHUB_TOKEN 환경변수 우회 → $env:AXHUB_TOKEN='axhub_pat_...'"
+- New test guard: case 3 NOT_FOUND now asserts result.error contains AXHUB_TOKEN
+  AND not.toContain("cmdkey")
+
+What v0.1.6 does NOT change
+---------------------------
+- macOS branch (keychain.ts:48-67) — UNTOUCHED since v0.1.4
+- Linux branch (keychain.ts:68-93) — UNTOUCHED since v0.1.4
+- Windows PInvoke logic (keychain-windows.ts PS_SCRIPT, struct layout, marshalling) — IDENTICAL to v0.1.5
+- 4 of 5 Windows error messages (ExecutionPolicy / PInvoke / EDR / spawn) — IDENTICAL
+- All docs (skills/, bin/README, list-deployments JSDoc) — UNCHANGED
+- All 5 cross-arch binaries — same shape (darwin-arm64 58.3M, windows-amd64.exe 109.6M)
+
+EDR honest tradeoff (carried forward unchanged from v0.1.5)
+-----------------------------------------------------------
+windows-amd64.exe 는 Authenticode 서명 안 됨. EDR/AMSI 가 PInvoke 패턴을
+Mimikatz 로 분류해 차단할 수 있음. 4-part Korean ERR_EDR 메시지가
+AXHUB_TOKEN env var 를 정식 회피 경로로 안내. v0.1.6 (next minor) 에서
+Authenticode 서명 후 EDR allowlist 가능해질 예정.
+
+Tracked deferral: https://github.com/jocoding-ax-partners/axhub/issues/1
+(format-parity for existing macOS+Linux one-line errors → 4-part).

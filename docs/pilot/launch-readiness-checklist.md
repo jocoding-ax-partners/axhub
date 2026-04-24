@@ -79,26 +79,31 @@ GO decision by: `_____________________` (admin) + `_____________________` (jocod
 
 ---
 
-## 별첨: release verification baseline (v0.1.4)
+## 별첨: release verification baseline (v0.1.6)
 
-**Pilot 권장 release: v0.1.4** (Phase 8 keychain bridge ship — `axhub auth login --print-token` 미지원 flag 가정 폐기, helper 가 OS keychain 직접 read).
+**Pilot 권장 release: v0.1.6** (Phase 9 hotfix — Windows ERR_NOT_FOUND cmdkey instruction 제거. v0.1.5 의 doc/code self-contradiction 수정).
 
-Pilot 시작 전 plugin v0.1.4 release cosign signature + sha256 무결성 검증 결과:
+Pilot 시작 전 plugin v0.1.6 release cosign signature + sha256 무결성 검증 결과:
 
-- 검증 명령: `bash scripts/release/verify-release.sh v0.1.4`
-- 결과 캡처: `docs/pilot/v0.1.4-verify-result.txt`
-- 검증 시점: `2026-04-24 (Phase 8 ralph)`
-- 검증자: `jocoding-ax-partners (Phase 8 architect ralph)`
-- 검증 결과: **✓ All release assets verified for jocoding-ax-partners/axhub@v0.1.4** — manifest.json signature OK + 5 binary signatures OK + sha256 manifest match.
-- Live binary self-report: `axhub-helpers 0.1.4 (plugin v0.1.4, schema v0)` ✓ (codegen sync 정확)
+- 검증 명령: `bash scripts/release/verify-release.sh v0.1.6`
+- 결과 캡처: `docs/pilot/v0.1.6-verify-result.txt`
+- 검증 시점: `2026-04-24 (Phase 9 hotfix)`
+- 검증자: `jocoding-ax-partners (Phase 9 architect ralph)`
+- 검증 결과: **✓ All release assets verified for jocoding-ax-partners/axhub@v0.1.6** — manifest.json signature OK + 5 binary signatures OK + sha256 manifest match.
+- Live binary self-report (darwin-arm64): `axhub-helpers 0.1.6 (plugin v0.1.6, schema v0)` ✓
+- Windows binary smoke: 109.6M PE32+ x86-64 ✓ (실제 Windows VM 실행 검증은 다음 pilot 세션 — `docs/RELEASE.md` E1 manual checklist).
 
-이 baseline 은 pilot 진행 중 supply chain 의심 시점에 재검증 비교 기준이 됩니다.
+### v0.1.5 known tradeoff (EDR 차단 가능성)
 
-### v0.1.0 ~ v0.1.3 known limitations (참고용, history preservation)
+windows-amd64.exe 는 **Authenticode 서명 안 됨** (v0.1.6 deferred). 회사 EDR / AMSI / V3 / AhnLab / CrowdStrike 가 inline PInvoke (advapi32!CredReadW) 를 Mimikatz 패턴으로 분류해 차단할 가능성 있음. Korean 에러 메시지 (`keychain-windows.ts:ERR_EDR`) 가 이를 honest 하게 owning — `AXHUB_TOKEN` 환경변수가 v0.1.6 코드사이닝 전까지 정식 회피 경로.
+
+### v0.1.0 ~ v0.1.4 known limitations (참고용, history preservation)
 
 - **v0.1.0**: release pipeline 의 `--output-certificate` flag 누락 → cosign keyless verify 실패. v0.1.3 fix.
 - **v0.1.1**: codegen 이 install.sh 만 sync, in-binary `PLUGIN_VERSION` constants 미동기화 → self-report 거짓. v0.1.3 fix.
 - **v0.1.2**: codegen 정상화 baseline.
 - **v0.1.3**: SessionStart 자동 token-init trigger 추가했으나 `axhub auth login --print-token` 가정으로 token-init 자체가 broken (CLI 미지원 flag). v0.1.4 fix — helper 가 OS keychain 직접 read.
+- **v0.1.4**: macOS + Linux keychain bridge 만 — Windows 는 deferred error 반환. v0.1.5 fix — Windows Credential Manager 통합 추가.
+- **v0.1.5**: Windows 통합 첫 ship 했으나 ERR_NOT_FOUND 메시지가 cmdkey /list:axhub 로 자격증명 확인하라고 안내 (cmdkey 는 present/absent 둘 다 exit 0 → useless probe). v0.1.6 fix — single-line patch 으로 AXHUB_TOKEN env var path 안내로 교체.
 
-신규 install + pilot 은 **v0.1.4** 사용.
+신규 install + pilot 은 **v0.1.6** 사용.
