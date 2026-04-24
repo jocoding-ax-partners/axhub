@@ -105,12 +105,13 @@ describe("telemetry envelope shape", () => {
     expect(envelope.session_id).toBe("unknown");
   });
 
-  test("plugin_version is hardcoded 0.1.0", async () => {
+  test("plugin_version matches package.json (codegen-synced — Phase 6 US-602 follow-up)", async () => {
     process.env["AXHUB_TELEMETRY"] = "1";
     await emitMetaEnvelope({ event: "test" });
     const file = join(scratchDir, "axhub-plugin", "usage.jsonl");
     const envelope = JSON.parse(readFileSync(file, "utf8").trim());
-    expect(envelope.plugin_version).toBe("0.1.0");
+    const pkg = JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf8"));
+    expect(envelope.plugin_version).toBe(pkg.version);
   });
 
   test("custom payload fields preserved", async () => {
