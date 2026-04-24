@@ -34,9 +34,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.1.0
+      - name: Install Bun (curl install — no unzip dependency)
+        run: |
+          curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.0"
+          echo "$HOME/.bun/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -91,8 +92,9 @@ jobs:
       AXHUB_E2E_STAGING_ENDPOINT: ${{ secrets.AXHUB_E2E_STAGING_ENDPOINT }}
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.1.0
+      - name: Install Bun (curl install — no unzip dependency)
+        run: |
+          curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.0"
+          echo "$HOME/.bun/bin" >> $GITHUB_PATH
       - run: bun install --frozen-lockfile
       - run: bun run test:e2e
