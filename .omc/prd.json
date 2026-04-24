@@ -54,7 +54,7 @@
       "id": "US-604",
       "title": "v0.1.0 release verify-release.sh smoke + pilot launch-readiness checklist",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "bash scripts/release/verify-release.sh v0.1.0 → 모든 14 asset cosign signature valid + sha256 manifest match. 출력에 '14/14 verified' 또는 동등.",
         "docs/pilot/launch-readiness-checklist.md (NEW): pilot 시작 day -1 admin 점검 항목. Sections: (1) account setup (5명 vibe coder 토큰 발급 status), (2) plugin install 안내 메일 발송 status, (3) SLA on-call 배정 (4시간 response) + 대체 인원, (4) feedback 수집 채널 (Slack DM 또는 secure email) 확립, (5) day-1 walkthrough 일정 5명 × 30분 confirmed, (6) emergency rollback procedure (token revoke, plugin disable 안내) 문서화 위치 link.",

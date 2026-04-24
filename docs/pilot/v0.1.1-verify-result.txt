@@ -1,0 +1,12 @@
+Downloading release assets from jocoding-ax-partners/axhub@v0.1.1...
+Verifying manifest.json signature (cosign keyless)...
+Verified OK
+Manifest signature OK.
+Verifying each binary signature + checksum...
+OK: axhub-helpers-darwin-amd64
+OK: axhub-helpers-darwin-arm64
+OK: axhub-helpers-linux-amd64
+OK: axhub-helpers-linux-arm64
+OK: axhub-helpers-windows-amd64.exe
+---
+All release assets verified for jocoding-ax-partners/axhub@v0.1.1
