@@ -37,6 +37,7 @@ import { runPreflight } from "./preflight.ts";
 import { runResolve } from "./resolve.ts";
 import { emitMetaEnvelope } from "./telemetry.ts";
 import { runListDeployments } from "./list-deployments.ts";
+import { readKeychainToken } from "./keychain.ts";
 
 // CLI I/O primitives: stdout for protocol payloads (JSON to hooks/skills),
 // stderr for diagnostics. Avoids console.log to keep this binary's contract
@@ -100,7 +101,7 @@ const asConsentBinding = (v: unknown): ConsentBinding | null => {
   };
 };
 
-const PLUGIN_VERSION = "0.1.3";
+const PLUGIN_VERSION = "0.1.4";
 // MIN_AXHUB_CLI_VERSION + MAX_AXHUB_CLI_VERSION live in ./preflight.ts (the
 // only consumer); re-importing here would just create a stale duplicate.
 const CONSENT_TOKEN_TTL_SEC = 60;
@@ -122,7 +123,7 @@ Subcommands:
   redact           Filter: NFKC normalize + redact secrets/cross-team URLs
   list-deployments Skill: GET /api/v1/apps/{id}/deployments — fallback for missing axhub deploy list
   token-import     Skill: read axhub_pat_* from stdin, store at ~/.config/axhub-plugin/token (mode 0600)
-  token-init       Skill: 1-step setup — runs 'axhub auth login --print-token' + auto token-import
+  token-init       Skill: 1-step setup — reads token from OS keychain (macOS/Linux) or AXHUB_TOKEN env var
   version          Print version
   help             Show this message`;
 
@@ -411,44 +412,26 @@ async function cmdTokenImport(_args: string[]): Promise<number> {
 }
 
 async function cmdTokenInit(_args: string[]): Promise<number> {
-  // Phase 6 US-603: 1-step token setup. Runs `axhub auth login --print-token`
-  // (CLI handles browser OAuth + token print), captures stdout, validates
-  // axhub_pat_* shape, stores at ${XDG_CONFIG_HOME}/axhub-plugin/token via
-  // the same code path as token-import.
-  //
-  // Headless fallback: if axhub binary fails (no browser, codespace, etc.),
-  // print Korean instructions for the laptop-paste flow.
-  let result: ReturnType<typeof Bun.spawnSync>;
-  try {
-    result = Bun.spawnSync({
-      cmd: ["axhub", "auth", "login", "--print-token"],
-      stdout: "pipe",
-      stderr: "pipe",
-      timeout: 120000,
-    });
-  } catch {
-    err("token-init: 'axhub' 바이너리를 PATH에서 찾을 수 없어요. axhub CLI 먼저 설치해주세요.");
-    return 64;
+  // Token discovery: AXHUB_TOKEN env var → OS keychain (macOS/Linux) → error.
+
+  let token: string;
+  let source: string;
+  const envToken = process.env["AXHUB_TOKEN"];
+  if (envToken !== undefined && envToken.length > 0) {
+    token = envToken;
+    source = "env-AXHUB_TOKEN";
+  } else {
+    const result = readKeychainToken();
+    if (result.error !== undefined || result.token === undefined) {
+      err(`token-init: ${result.error ?? "알 수 없는 에러"}`);
+      return 65;
+    }
+    token = result.token;
+    source = result.source ?? "keychain";
   }
 
-  if (result.exitCode !== 0) {
-    const stderr = (result.stderr?.toString() ?? "").trim();
-    err(
-      "token-init: axhub auth login --print-token 실패.\n" +
-        "헤드리스 환경 (Codespaces, SSH 등) 이라면:\n" +
-        "  1단계 (브라우저 있는 노트북): axhub auth login --print-token\n" +
-        "  2단계 (출력된 axhub_pat_... 복사)\n" +
-        "  3단계 (이 환경에서): echo 'axhub_pat_...' | axhub-helpers token-import\n" +
-        (stderr.length > 0 ? `\n원본 에러: ${stderr}\n` : ""),
-    );
-    return 65;
-  }
-
-  const token = (result.stdout?.toString() ?? "").trim();
-  if (!/^axhub_pat_[A-Za-z0-9_-]{16,}$/.test(token)) {
-    err(
-      "token-init: 'axhub auth login --print-token' 출력이 token 형식이 아니에요. axhub --version 으로 CLI 정상 작동 확인 후 다시 시도해주세요.",
-    );
+  if (token.length < 16) {
+    err("token-init: 추출한 token이 너무 짧아요. axhub CLI 재로그인 후 다시 시도해주세요.");
     return 65;
   }
 
@@ -468,7 +451,8 @@ async function cmdTokenInit(_args: string[]): Promise<number> {
   }
   out({
     stored_at: path,
-    redacted_token: "axhub_pat_[redacted]",
+    source,
+    redacted_token: token.slice(0, 12) + "...[redacted]",
     next_step: "이제 /axhub:status, /axhub:logs 같은 명령이 자동으로 작동합니다.",
   });
   return 0;

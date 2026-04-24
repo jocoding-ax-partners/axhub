@@ -14,8 +14,8 @@ import { join } from "node:path";
 import { appendFile, mkdir } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 
-const PLUGIN_VERSION = "0.1.3";
-const HELPER_VERSION = "0.1.3";
+const PLUGIN_VERSION = "0.1.4";
+const HELPER_VERSION = "0.1.4";
 
 let cachedCliVersion: string | null = null;
 

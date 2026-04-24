@@ -1,32 +1,95 @@
 {
-  "task": "Phase 7 UX fix: SessionStart hook가 token-init 자동 트리거 — vibe coder가 helper token setup 단계 안 보이게. axhub CLI keychain ↔ helper file token 분리로 인한 UX gap 해결.",
-  "createdAt": "2026-04-24T08:00:00Z",
+  "task": "Phase 8 keychain bridge: helper cmdTokenInit가 'axhub auth login --print-token' (CLI 미지원 flag) 가정 폐기하고 OS keychain 직접 read. 5 stories: helper 재작성, tests, SKILL.md, docs, v0.1.4 release. CLI 변경 없음.",
+  "createdAt": "2026-04-24T09:00:00Z",
   "stories": [
     {
-      "id": "US-701",
-      "title": "SessionStart shim에서 token-init 자동 트리거 (vibe coder UX gap 닫음)",
+      "id": "US-801",
+      "title": "Helper cmdTokenInit 재작성 — keychain 직접 read (macOS first, Linux/Windows 단계적)",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "hooks/session-start.sh: binary 설치 후 추가 로직 — helper token file (~/.config/axhub-plugin/token) 부재 + axhub auth status가 user_email 반환 (valid login) → axhub-helpers token-init 자동 호출",
-        "axhub CLI 미설치 시 token-init silent skip (helper 가 axhub spawn 실패하면 graceful exit 65 — 이미 작동)",
-        "axhub 로그인 안 됨 시 (auth status code=not_logged_in) → token-init skip (helper 가 axhub auth login --print-token 자동 호출 시 브라우저 자동 열림 — UX 좋음)",
-        "이미 token file 존재 시 → SessionStart 가 token-init skip (idempotent)",
-        "AXHUB_SKIP_AUTODOWNLOAD=1 시 token-init 도 skip (보안 정책 호환)",
-        "tests/auto-download.test.sh에 새 케이스 추가: (a) token 부재 + auth valid → token-init 호출 흔적 확인, (b) token 있으면 skip, (c) AXHUB_SKIP_AUTODOWNLOAD=1 시 skip",
-        "skills/{status,logs,recover}/SKILL.md의 'token missing' fallback 메시지 단순화 — 'CC 재시작 또는 axhub auth login 한 번' (수동 token-init 안내 제거)",
+        "src/axhub-helpers/index.ts cmdTokenInit 재작성: 'axhub auth login --print-token' 호출 폐기. AXHUB_TOKEN env var 우선 → OS keychain shell out fallback.",
+        "macOS keychain read: spawnSync('security', ['find-generic-password', '-s', 'axhub', '-w']) → stdout trim → 'go-keyring-base64:' prefix 제거 → base64 decode → JSON parse → access_token 추출",
+        "Linux keychain read: spawnSync('secret-tool', ['lookup', 'service', 'axhub']) — secret-tool 미설치 시 graceful 안내 ('apt-get install libsecret-tools' or 'AXHUB_TOKEN env var 사용')",
+        "Windows: deferred — 명확한 Korean 안내 ('Windows는 현재 AXHUB_TOKEN env var 만 지원합니다. PowerShell credential manager 통합은 다음 release.')",
+        "Token 형식 validation (axhub_pat_* regex 그대로 유지) → ~/.config/axhub-plugin/token (mode 0600)",
+        "각 단계 실패 시 4-part Korean 메시지 (감정+원인+해결+다음액션) per error-empathy-catalog 패턴",
         "bun test → 339+ pass / 0 fail / typecheck clean"
       ],
       "owner": null,
       "blockedBy": []
+    },
+    {
+      "id": "US-802",
+      "title": "tests/token-init.test.ts 갱신 — keychain bridge 검증",
+      "priority": 2,
+      "passes": true,
+      "acceptanceCriteria": [
+        "tests/token-init.test.ts 재작성: '--print-token' 가정 검증 모두 제거",
+        "8+ assertions 새 case: (1) AXHUB_TOKEN env var 우선 사용, (2) macOS security 명령 호출 검증, (3) base64 decode + JSON parse 정확성, (4) access_token 필드 추출, (5) Linux secret-tool path 검증 (mocked), (6) Windows deferred error 메시지, (7) keychain read 실패 시 graceful AXHUB_TOKEN 안내, (8) malformed base64 에러 처리",
+        "Mock spawnSync via dependency injection 또는 Bun.$ override",
+        "macOS 환경에서 실제 security 명령 작동 smoke test (현재 user 환경에서 검증)",
+        "bun test tests/token-init.test.ts → 8+ pass / 0 fail"
+      ],
+      "owner": null,
+      "blockedBy": ["US-801"]
+    },
+    {
+      "id": "US-803",
+      "title": "skills/auth/SKILL.md 재작성 — '--print-token' 안내 제거",
+      "priority": 3,
+      "passes": true,
+      "acceptanceCriteria": [
+        "skills/auth/SKILL.md: 'axhub auth login --print-token' 모든 언급 제거",
+        "Headless 환경 안내: AXHUB_TOKEN env var 직접 export 또는 다른 노트북에서 keychain export 후 secure 채널로 token 전달",
+        "token-init 작동 메커니즘 1-line 설명: 'macOS keychain (또는 Linux secret-service) 에서 axhub CLI 가 저장한 토큰 자동 추출'",
+        "Step 4 headless detection 워크플로우: --print-token 대신 keychain access 가능성 체크 (security 명령 또는 secret-tool 존재 여부)",
+        "tests/manifest.test.ts 통과 유지 (Korean prefix 형식 + length limits 그대로)"
+      ],
+      "owner": null,
+      "blockedBy": ["US-801"]
+    },
+    {
+      "id": "US-804",
+      "title": "docs 정리 — outreach + landing + onboarding + release docs",
+      "priority": 4,
+      "passes": true,
+      "acceptanceCriteria": [
+        "docs/RELEASE.md: '--print-token' 언급 제거",
+        "docs/marketing/landing-page.ko.md: vibe coder 흐름에서 '--print-token' 단계 제거 (자동 작동 흐름으로 단순화)",
+        "docs/pilot/onboarding-checklist.md: vibe coder day-1 walkthrough 의 token 관련 단계 단순화 (axhub auth login 한 번 + plugin 자동)",
+        "docs/marketing/outreach-email.ko.md: setup 4-step 그대로 유지 (현재 정확)",
+        "skills/deploy/references/headless-flow.md: print-token 안내 제거, AXHUB_TOKEN env var path 만 명시",
+        "bash tests/docs-link-audit.sh → Broken: 0 (link 깨짐 없음)"
+      ],
+      "owner": null,
+      "blockedBy": ["US-803"]
+    },
+    {
+      "id": "US-805",
+      "title": "v0.1.4 release — keychain bridge ship",
+      "priority": 5,
+      "passes": false,
+      "acceptanceCriteria": [
+        "Version bump: package.json + .claude-plugin/{plugin,marketplace}.json 0.1.3 → 0.1.4",
+        "bun run codegen:version → 3 file 자동 sync (install.sh + index.ts + telemetry.ts)",
+        "git commit + push origin main",
+        "git tag v0.1.4 + push origin v0.1.4 → CI workflow 자동 트리거",
+        "CI conclusion: success (GitHub Actions release workflow)",
+        "bash scripts/release/verify-release.sh v0.1.4 → 'All release assets verified' (manifest sig + 5 binary sigs + sha256)",
+        "Live binary self-report: 다운로드한 v0.1.4 binary 의 'axhub-helpers version' 출력이 '0.1.4' 정확",
+        "docs/pilot/v0.1.4-verify-result.txt 캡처 + launch-readiness-checklist.md baseline 갱신"
+      ],
+      "owner": null,
+      "blockedBy": ["US-801", "US-802", "US-803", "US-804"]
     }
   ],
   "metadata": {
-    "task_origin": "/oh-my-claudecode:ralph - Phase 6 deferred Option A 진행 (vibe coder UX gap)",
-    "phase6_predecessor": "Phase 6 ralph closed at v0.1.2 — token-init exists but manual",
+    "task_origin": "/oh-my-claudecode:ralplan 옵션a → ralph (User trace에서 'axhub auth login --print-token unknown flag' fail 발견)",
+    "phase7_predecessor": "Phase 7 ralph (v0.1.3) — token-init auto-trigger logic 작동했지만 token-init 자체가 잘못된 CLI 가정으로 broken",
     "deslop": "enabled",
     "critic": "architect",
-    "scope_note": "1 story. SessionStart hook 만 수정. helper code 변경 X (token-init 이미 작동). v0.1.3 release 시점은 user 결정.",
-    "phase_8_deferred": "v0.1.3 release tag (SessionStart shim 변경 ship), real customer pilot, ax-hub-cli deploy list, keytar 통합"
+    "scope_note": "CLI 변경 X. 모든 fix는 plugin 측. macOS first ship. Linux/Windows 단계적 (libsecret-tools 의존성 + PowerShell 통합).",
+    "phase_9_deferred": "Windows PowerShell keychain 통합, ax-hub-cli 측 --print-token 추가 제안 (별도 issue), 실 customer pilot 실행"
   }
 }

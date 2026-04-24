@@ -478,3 +478,71 @@ UPDATED:
 - skill description Korean prefix 변경은 LLM 매칭에 영향 X (한국어로도 동일하게 trigger). 하지만 manifest test 가 영어 prefix 가정 → assertion regex 확장 필요. 다국어 plugin의 test 설계 시 미리 prefix 패턴 유연성 확보.
 - Token 분리 (axhub keychain vs helper file) 은 단기 trade-off. CLI 통합 keychain 접근에 keytar 의존성 도입 vs 사용자 1회 setup 부담. 후자 선택 — 자율 동작에 의존성 낮음.
 - Architect 권고 중 "naming rename"은 deslop scope 밖. OMC posture "preserve behavior unless asked" 따라 다음 사이클로 보류. 단순 maintainer 주석은 1줄로 즉시 추가 가능.
+
+## Iteration 9 — Phase 6 polish (4 stories from Phase 5 architect backlog)
+
+### Implemented (US-601 + US-602 + US-603 done; US-604 in-progress on CI v0.1.1 release)
+
+**US-601 — matchDestructive → matchKnownIntent rename**:
+- src/axhub-helpers/consent.ts: function rename + 3-line docstring 명시 (destructive subcommands AND read-only paths). caller in parseAxhubCommand 업데이트.
+- 0 test/source 변경 외 reference. typecheck clean. behavior 변경 X.
+
+**US-602 — codegen-install-version (package.json → bin/install.sh)**:
+- scripts/codegen-install-version.ts (NEW): VERSION_LINE_RE 정규식 매치 + writeFileSync. idempotent (이미 sync 시 no diff).
+- package.json scripts: codegen:version + smoke:full chain
+- tests/codegen-version.test.ts (NEW, 5 tests): semver 검증, idempotent, 동기화, override 보존, before/after report
+
+**US-603 — cmdTokenInit subcommand (1-step token setup)**:
+- src/axhub-helpers/index.ts: cmdTokenInit (NEW, 60 lines) — Bun.spawnSync('axhub auth login --print-token') → axhub_pat_* 정규식 검증 → token-import 와 동일 storage path. headless fallback Korean message.
+- USAGE + dispatch 등록
+- skills/{status,logs,recover}/SKILL.md cold-cache fallback: token missing 시 'axhub-helpers token-init' 1줄 setup 안내
+- tests/token-init.test.ts (NEW, 9 tests): dispatch 등록, USAGE doc, 함수 정의, axhub 호출, 정규식 정확성, headless message, storage path, 0o600/0o700 모드 parity, 정규식 직접 검증
+
+**US-604 — cosign cert fix + launch-readiness checklist (in-progress)**:
+- .github/workflows/release.yml cosign sign step: --output-certificate 추가 (Phase 4 release pipeline 의 빠진 부분 — keyless verify 가 cert 필요)
+- Upload step에 *.pem glob 추가
+- scripts/release/verify-release.sh: --certificate flag 추가 (manifest verify + per-binary verify 양쪽)
+- docs/pilot/launch-readiness-checklist.md (NEW, 109 lines): 5-section checklist (account setup, 안내 메일, SLA on-call, feedback 채널, walkthrough+rollback) + GO/NO-GO 결정 matrix + v0.1.0 verify baseline 별첨
+- v0.1.1 release tagged + pushed (run 24875613473) — CI 진행 중. 14 asset cosign signature + cert + sha256 verify 결과는 CI 완료 후 verify-release.sh v0.1.1 로 검증.
+- 발견된 Phase 4 Release pipeline bug: --output-certificate 누락 → v0.1.0 release 의 .pem 파일 부재 → cosign keyless verify 실패. v0.1.1 에서 fix.
+
+### Files changed (this iteration)
+
+NEW:
+- scripts/codegen-install-version.ts
+- tests/codegen-version.test.ts
+- tests/token-init.test.ts
+- docs/pilot/launch-readiness-checklist.md
+- docs/pilot/v0.1.0-verify-result.txt (baseline capture)
+
+UPDATED:
+- src/axhub-helpers/consent.ts (matchDestructive → matchKnownIntent rename)
+- src/axhub-helpers/index.ts (cmdTokenInit + dispatch + USAGE)
+- skills/{status,logs,recover}/SKILL.md (token-init 안내 1줄)
+- .github/workflows/release.yml (--output-certificate, *.pem upload)
+- scripts/release/verify-release.sh (--certificate flag, multi-line download)
+- bin/install.sh (codegen synced v0.1.0 → v0.1.1)
+- package.json + .claude-plugin/{plugin,marketplace}.json (version 0.1.0 → 0.1.1 + smoke:full chain extension)
+- .omc/{prd.json, progress.txt}
+
+### v0.1.1 verified + Architect ITERATE → v0.1.2 fix
+
+**v0.1.1 verify-release.sh 결과**: All assets verified (manifest sig OK + 5 binary sigs OK + sha256 match + 21 assets total per release).
+
+**Architect ITERATE (out-of-scope-but-related defect)**: PLUGIN_VERSION + HELPER_VERSION constants in src/axhub-helpers/{index,telemetry}.ts STILL "0.1.0" — codegen-install-version.ts 이 install.sh 만 처리, in-binary 상수는 미동기화. v0.1.1 binary가 self-report '0.1.0' (telemetry / session-start 메시지 모두 거짓 보고).
+
+**Iteration fix → v0.1.2 release**:
+- scripts/codegen-install-version.ts 확장: 3 file 모두 sync (install.sh + index.ts PLUGIN_VERSION + telemetry.ts PLUGIN_VERSION + HELPER_VERSION)
+- syncFile helper + TS_PLUGIN_VERSION_RE / TS_HELPER_VERSION_RE 정규식 패턴 추가
+- package.json + plugin.json + marketplace.json 0.1.1 → 0.1.2
+- bun run codegen:version → 3 files updated automatically
+- tests/telemetry.test.ts: hardcoded '0.1.0' assertion → package.json 동적 read (drift 재발 방지)
+- v0.1.2 tag pushed → CI workflow 진행 중 → verify-release.sh v0.1.2 로 확인 예정.
+
+### Phase 7 deferred backlog
+
+- 실 customer recruit + pilot 실행 (HUMAN coordination)
+- ax-hub-cli 측 'axhub deploy list' 추가 (별도 repo issue file)
+- helper token + axhub keychain 통합 (keytar 등 native dep 필요 — 마지막 옵션)
+- actions/checkout v4 → v5 (Node.js 24 deprecation 대응 — 2026-09 deadline)
+- v0.1.1 release announcement (Twitter / Korean dev 커뮤니티 / blog)

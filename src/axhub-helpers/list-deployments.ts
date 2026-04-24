@@ -11,10 +11,9 @@
  *   1. AXHUB_TOKEN env var
  *   2. ${XDG_CONFIG_HOME}/axhub-plugin/token file (mode 0600)
  *
- * Token storage NOT shared with axhub CLI's keychain — keychain access
- * requires platform-specific bindings (keytar) which Bun cross-compile does
- * not handle cleanly. Skill workflow guides user through one-time token
- * setup via `axhub auth login --print-token | axhub-helpers token-import`.
+ * Token source: `~/.config/axhub-plugin/token` (mode 0600), populated by
+ * `axhub-helpers token-init` which reads ax-hub-cli's OS keychain entry
+ * (macOS `security` / Linux `secret-tool`). AXHUB_TOKEN env var overrides.
  *
  * On missing token: exit 65 (auth) with structured Korean recovery message.
  * On 404 app: exit 67 (not found). On other API error: exit 1.
@@ -117,7 +116,7 @@ const buildAuthError = (): ListDeploymentsResult => ({
   endpoint_used: resolveEndpoint(),
   exit_code: EXIT_LIST_AUTH,
   error_code: "auth.token_missing",
-  error_message_kr: "axhub 토큰을 찾을 수 없어요. 한 번만 설정하시면 다음부터는 자동으로 작동해요:\n  axhub auth login --print-token | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-import\n또는 환경변수: export AXHUB_TOKEN=axhub_pat_...",
+  error_message_kr: "axhub 토큰을 찾을 수 없어요. 한 번만 로그인하시면 다음부터는 자동으로 작동해요:\n  axhub auth login\n또는 환경변수 우회: export AXHUB_TOKEN=axhub_pat_...",
 });
 
 export async function runListDeployments(

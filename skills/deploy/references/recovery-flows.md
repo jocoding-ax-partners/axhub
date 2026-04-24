@@ -81,13 +81,17 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
    대신 별도 노트북에서 토큰을 받아 여기에 붙여넣어 주세요.
 
    1단계 (브라우저 있는 노트북에서):
-     터미널을 열고 이 명령을 실행하세요 →
-       axhub auth login --print-token
+     터미널을 열고 다음을 실행하세요 →
+       axhub auth login                                 # OAuth 로그인
+       security find-generic-password -s axhub -w       # macOS keychain
+       # Linux:  secret-tool lookup service axhub
 
-   2단계 (출력된 토큰 문자열을 복사하세요. 보통 'axhub_pat_...' 형태입니다)
+   2단계 (출력된 'go-keyring-base64:eyJ…' 한 줄을 복사하세요. helper 가 base64 decode → access_token 추출합니다.)
 
    3단계 (지금 이 환경에서):
-     아래 입력창에 토큰을 붙여넣어 주세요. 파일로 안전하게 저장할게요.
+     아래 입력창에 그 token blob 을 붙여넣어 주세요. 0600 으로 안전하게 저장할게요.
+     (대안: 1단계 노트북에서 axhub_pat_... 평문 토큰을 이미 알고 있다면
+            export AXHUB_TOKEN=axhub_pat_... 로 바로 우회 가능)
    ```
 
 4. **Receive token via AskUserQuestion (text input).** Save to `~/.config/axhub/token` with mode 0600:
