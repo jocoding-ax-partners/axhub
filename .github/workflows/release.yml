@@ -34,7 +34,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Bun (curl install — no unzip dependency)
+      - name: Ensure unzip available (bun install dep)
+        run: |
+          if ! command -v unzip >/dev/null 2>&1; then
+            if command -v sudo >/dev/null 2>&1; then
+              sudo apt-get update -qq && sudo apt-get install -y -qq unzip
+            else
+              apt-get update -qq && apt-get install -y -qq unzip
+            fi
+          fi
+          unzip -v | head -1
+
+      - name: Install Bun
         run: |
           curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.0"
           echo "$HOME/.bun/bin" >> $GITHUB_PATH
@@ -92,7 +103,18 @@ jobs:
       AXHUB_E2E_STAGING_ENDPOINT: ${{ secrets.AXHUB_E2E_STAGING_ENDPOINT }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install Bun (curl install — no unzip dependency)
+      - name: Ensure unzip available (bun install dep)
+        run: |
+          if ! command -v unzip >/dev/null 2>&1; then
+            if command -v sudo >/dev/null 2>&1; then
+              sudo apt-get update -qq && sudo apt-get install -y -qq unzip
+            else
+              apt-get update -qq && apt-get install -y -qq unzip
+            fi
+          fi
+          unzip -v | head -1
+
+      - name: Install Bun
         run: |
           curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.0"
           echo "$HOME/.bun/bin" >> $GITHUB_PATH
