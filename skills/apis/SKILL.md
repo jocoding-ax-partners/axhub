@@ -85,4 +85,5 @@ To list APIs:
 
 For Korean trigger lexicon (apis intent): `../deploy/references/nl-lexicon.md`.
 For 4-part Korean exit templates: `../deploy/references/error-empathy-catalog.md`.
+For cross-team API scope filter and audit log format, see `references/privacy-filter.md`.
 For PLAN reference: §16.17 (apis list privacy / E13 fix), row 46 (cross-team audit log).

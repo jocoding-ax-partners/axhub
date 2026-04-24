@@ -75,7 +75,7 @@ To recover:
 
 6. **On `pick_other`.** Surface the last 5 succeeded deploys from `axhub deploy list` via AskUserQuestion. Repeat from step 3 with the chosen commit.
 
-7. **On non-zero exit from create**, route to `references/error-empathy-catalog.md`. The `validation.deployment_in_progress` case is especially relevant here (user might recover during another deploy) — follow `recovery-flows.md` ("deployment_in_progress") and offer to watch the in-flight deploy first.
+7. **On non-zero exit from create**, route to `../deploy/references/error-empathy-catalog.md`. The `validation.deployment_in_progress` case is especially relevant here (user might recover during another deploy) — follow `../deploy/references/recovery-flows.md` ("deployment_in_progress") and offer to watch the in-flight deploy first.
 
 8. **No prior succeeded deploy found.** Surface: "되돌릴 수 있는 직전 안정 배포를 못 찾았어요. 이 앱의 첫 배포이거나, 모든 이전 배포가 실패한 상태일 수 있어요. 'logs'로 현재 배포 원인 먼저 보시겠어요?"
 

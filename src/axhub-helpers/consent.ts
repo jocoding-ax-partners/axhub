@@ -28,6 +28,9 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 
 export interface ConsentBinding {
   tool_call_id: string;
+  // `deploy_logs_kill`: reserved for v0.2 signal-kill protection.
+  // Currently unreachable in v0.1.0 CLI (no `--kill` flag exists). Removing
+  // would force HMAC binding-schema migration when v0.2 ships, so keep.
   action: "deploy_create" | "update_apply" | "deploy_logs_kill" | "auth_login";
   app_id: string;
   profile: string;

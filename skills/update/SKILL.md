@@ -53,7 +53,7 @@ To handle updates:
 
    The CLI verifies the binary signature before swapping. On exit 0, render: "업그레이드 완료! v<LATEST> 깔렸어요. 새 터미널을 열거나 다시 실행하시면 됩니다."
 
-5. **On exit 66 + `update.cosign_verification_failed`.** HARD STOP. Route to `references/error-empathy-catalog.md` ("exit 66 + update.cosign_verification_failed"). Tell user:
+5. **On exit 66 + `update.cosign_verification_failed`.** HARD STOP. Route to `../deploy/references/error-empathy-catalog.md` ("exit 66 + update.cosign_verification_failed"). Tell user:
 
    > "보안 검증 실패. 절대 강제 진행하지 마세요. 회사 IT 보안팀에 즉시 알려주세요. 그동안 axhub는 현재 버전으로 계속 사용 가능해요."
 

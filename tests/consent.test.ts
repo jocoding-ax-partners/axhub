@@ -259,3 +259,36 @@ describe("parseAxhubCommand — bypass hardening (T-ADV-PARSE-1..8)", () => {
     expect(r.action).toBeUndefined();
   });
 });
+
+describe("parseAxhubCommand — deploy_logs_kill is unreachable in v0.1.0", () => {
+  // CLI v0.1.0 has no --kill flag. parseAxhubCommand should NEVER
+  // produce action: "deploy_logs_kill" for any valid v0.1.0 command surface.
+  // If this test ever fails, v0.2 has shipped --kill (or similar) and the
+  // gate must be re-implemented properly.
+  const v01Commands = [
+    "axhub apps list --json",
+    "axhub apps list --json --per-page=10",
+    "axhub apis list --json --query auth",
+    "axhub apis list --app-id 42 --json",
+    "axhub auth status --json",
+    "axhub auth login",
+    "axhub auth logout",
+    "axhub deploy create --app paydrop --branch main --commit abc123",
+    "axhub deploy create --app paydrop --branch main --commit abc123 --json",
+    "axhub deploy status dep_42 --watch --json",
+    "axhub deploy logs dep_42 --follow --source build --json",
+    "axhub deploy logs dep_42 --source build",
+    "axhub update check --json",
+    "axhub update apply --yes",
+    "axhub update apply --force --yes",
+    "axhub --version",
+    "axhub --help",
+  ];
+
+  for (const cmd of v01Commands) {
+    test(`v0.1.0 command never produces deploy_logs_kill: ${cmd.slice(0, 60)}`, () => {
+      const result = parseAxhubCommand(cmd);
+      expect(result.action).not.toBe("deploy_logs_kill");
+    });
+  }
+});

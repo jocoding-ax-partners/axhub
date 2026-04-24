@@ -72,6 +72,7 @@ const parseJson = <T>(raw: string): T | null => {
 const VALID_ACTIONS: ReadonlySet<ConsentBinding["action"]> = new Set([
   "deploy_create",
   "update_apply",
+  // reserved for v0.2 signal-kill protection; currently unreachable in v0.1.0
   "deploy_logs_kill",
   "auth_login",
 ]);
@@ -203,13 +204,17 @@ async function cmdPreauthCheck(_args: string[]): Promise<number> {
   // session so that a leaked token from one session can't authorize another.
   const tcid =
     (payload.session_id ?? "") + ":" + (payload.tool_call_id ?? "");
+  // auth_login has no app/branch/commit flags — skill mints "_" as placeholder
+  // (asConsentBinding requires non-empty strings). Mirror that here so the
+  // binding built by preauth-check matches what consent-mint signed.
+  const isIdentityAction = parsed.action === "auth_login";
   const binding: ConsentBinding = {
     tool_call_id: tcid,
     action: parsed.action!,
-    app_id: parsed.app_id ?? "",
-    profile: parsed.profile ?? "",
-    branch: parsed.branch ?? "",
-    commit_sha: parsed.commit_sha ?? "",
+    app_id: parsed.app_id ?? (isIdentityAction ? "_" : ""),
+    profile: parsed.profile ?? (isIdentityAction ? (process.env["AXHUB_PROFILE"] ?? "default") : ""),
+    branch: parsed.branch ?? (isIdentityAction ? "_" : ""),
+    commit_sha: parsed.commit_sha ?? (isIdentityAction ? "_" : ""),
   };
 
   const result = await verifyToken(binding);

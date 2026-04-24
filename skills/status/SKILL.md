@@ -17,7 +17,7 @@ To check status:
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent status --user-utterance "$ARGS" --json
    ```
 
-   On `cache_hit: false`, follow `references/recovery-flows.md` ("cold-cache"): ask the user which app and surface the last 3 deploys via `axhub deploy list --app <APP_SLUG> --json --limit 3` for AskUserQuestion disambiguation. Persist the chosen mapping to `~/.config/axhub/deployments.json` for next time.
+   On `cache_hit: false`, follow `../deploy/references/recovery-flows.md` ("cold-cache"): ask the user which app and surface the last 3 deploys via `axhub deploy list --app <APP_SLUG> --json --limit 3` for AskUserQuestion disambiguation. Persist the chosen mapping to `~/.config/axhub/deployments.json` for next time.
 
 2. **Pre-flight version check** (only if mutation chain is implied — pure read can skip):
 
@@ -31,7 +31,7 @@ To check status:
    axhub deploy status dep_<DEPLOY_ID> --app <APP_ID> --watch --json
    ```
 
-4. **Render Korean narration.** Apply the throttle + phase table from `references/recovery-flows.md` ("watch-narration"): one line per ~25s, terminal-state lines are unthrottled. Examples:
+4. **Render Korean narration.** Apply the throttle + phase table from `../deploy/references/recovery-flows.md` ("watch-narration"): one line per ~25s, terminal-state lines are unthrottled. Examples:
 
    - 0s + `queued` → "배포 요청 받았어요. 잠시 후 빌드 시작합니다 (정상)"
    - ~30s + `building` → "30초 경과, 빌드 시작했어요 (정상)"
@@ -45,7 +45,7 @@ To check status:
 
 6. **User interrupt.** If the user says "그만 봐", "그만", "충분해", "stop watching", terminate the watch process and report the last observed phase. The deploy continues server-side regardless.
 
-7. **On any non-zero exit**, route to `references/error-empathy-catalog.md` by exit code:
+7. **On any non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by exit code:
    - exit 65 → token expired template + AskUserQuestion to run auth login
    - exit 67 → resource not found + did-you-mean from `axhub deploy list`
    - exit 68 → rate limit + Retry-After backoff

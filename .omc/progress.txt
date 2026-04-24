@@ -103,3 +103,92 @@ M3 hardening backlog:
 - Margin holding identical (+40pp) at 20-row vs 100-row scope is a strong signal that design genuinely scales — NOT proof (single-curator bias remains), but supportive.
 - Architect false-negative pattern: `find . -name X` may skip hidden dirs (.omc/, .claude-plugin/) on some shells. Always verify file existence with `ls .omc/` direct path before assuming missing.
 - Score.ts behavior on null expected_cmd_pattern: passes if no axhub command fired (negative case correctness). This compresses delta on negative-heavy corpora — acceptable for current 14-row negative subset, may need re-evaluation if NEG fraction grows.
+
+## Iteration 5 — Tier 1 quick-wins (5 stories from consensus bug-hunt plan)
+
+### Implemented (all 5 PRD stories passes:true)
+
+**US-001 — DROP allowed-tools from skills/deploy/SKILL.md frontmatter** (Q1 validator finding):
+- Removed allowed-tools key; frontmatter now name + description only (matches all 10 sibling skills)
+
+**US-002 — 2 missing reference files + cross-link audit** (Q2):
+- NEW skills/apis/references/privacy-filter.md (10.2K, 4 sections per PLAN §16.17/E13/§16.11/row 46): default --app-id scope, AskUserQuestion gate, audit log to ~/.cache/axhub-plugin/cross-team-list.ndjson, Punycode display rules
+- NEW skills/deploy/references/headless-flow.md (12.4K, 4 sections per PLAN E12/§16.16/E7): $CODESPACES detection ladder, token-paste flow + Korean copy-from-laptop instructions, 0600 storage with post-write mode verification, auto-fallback on browser timeout
+- skills/apis/SKILL.md body line 88 references privacy-filter.md
+- skills/auth/SKILL.md body line 108 references ../deploy/references/headless-flow.md
+- NEW tests/docs-link-audit.sh (executable, 19 lines): grep + path resolve, "Broken: 0" exit 0
+
+**US-004 — auth/SKILL.md consent-mint step** (Q4 reversal — Critic iter 1 caught Architect Q4 as regression):
+- Added step 5a (consent-mint --action auth_login) BEFORE step 5b (axhub auth login)
+- tool_call_id composes <session_id>:<tool_call_id> matching hook validation
+- Headless paragraph documents same gate applies to token-paste path
+- NEVER section adds: "consent-mint --action auth_login 단계를 생략하지 마세요"
+
+**US-005 — deploy_logs_kill v0.2 reservation comment + dead-path test** (Q5 reversal — Critic iter 1 caught loss of recoverable design intent):
+- src/axhub-helpers/consent.ts:31-33 ConsentBinding action union: 3-line v0.2 reservation comment
+- src/axhub-helpers/index.ts:75 VALID_ACTIONS Set: matching comment
+- tests/consent.test.ts:263-294 NEW describe block "parseAxhubCommand — deploy_logs_kill is unreachable in v0.1.0" with 17 corpus assertions covering full v0.1.0 CLI surface (apps/apis/auth/deploy/update/--version/--help)
+
+**US-006 — package.json smoke:full + tests/docs-link-audit.sh** (gate runnability fix per Critic Major #1):
+- package.json scripts smoke:full chains: build → version → help → session-start → docs-link-audit
+- tests/docs-link-audit.baseline.txt artifact (Broken: 0)
+
+### Sibling SKILL.md broken-link discovery + fix (audit byproduct)
+
+US-002 audit surfaced 9 pre-existing broken sibling refs using bare `references/X.md` for files that live in skills/deploy/references/. Fixed via 9 Edit ops:
+- skills/update/SKILL.md:56 → ../deploy/references/error-empathy-catalog.md
+- skills/auth/SKILL.md:51 → ../deploy/references/recovery-flows.md
+- skills/deploy/SKILL.md:87 → ../apis/references/privacy-filter.md (cross-skill)
+- skills/status/SKILL.md (×3): cold-cache, watch-narration, exit-code routes
+- skills/logs/SKILL.md (×2): cold-cache, exit-code routes
+- skills/recover/SKILL.md:78 → ../deploy/references/error-empathy-catalog.md + recovery-flows.md
+
+Post-fix: bash tests/docs-link-audit.sh → "Broken: 0" exit 0.
+
+### Architect verification (opus)
+
+APPROVE — all 5 US verified with file evidence. Noted bare `references/X.md` inside skills/deploy/SKILL.md is correct (same dir), all sibling skills use canonical `../deploy/references/X.md` pattern. No test regressions.
+
+### Deslop pass (ai-slop-cleaner skill, scope=ralph-changed-files)
+
+Zero slop found. Korean copy in new docs is required by skill conventions (vibe-coder voice). Reservation comments justify v0.2 binding-union to future maintainers (Critic iter 1 explicitly required them). Dead-path test is the safety net Critic required. No edits.
+
+### Post-deslop regression lock
+
+- bun test → 93 pass / 0 fail (was 76 → +17 from US-005 dead-path describe block)
+- bun run typecheck → 0 errors
+- bash tests/docs-link-audit.sh → Broken: 0
+- bun run smoke:full → all 5 chained commands exit 0
+
+### Files changed (this iteration)
+
+NEW:
+- skills/apis/references/privacy-filter.md
+- skills/deploy/references/headless-flow.md
+- tests/docs-link-audit.sh
+- tests/docs-link-audit.baseline.txt
+
+UPDATED:
+- skills/deploy/SKILL.md (frontmatter trim + cross-link)
+- skills/apis/SKILL.md (cross-link)
+- skills/auth/SKILL.md (consent-mint step + sibling path fix + headless cross-link)
+- skills/{update,status,logs,recover}/SKILL.md (sibling path fixes)
+- src/axhub-helpers/{consent.ts, index.ts} (v0.2 reservation comments)
+- tests/consent.test.ts (dead-path describe block)
+- package.json (smoke:full script)
+- .omc/{prd.json, progress.txt}
+
+### Phase 2 deferred to next ralph
+
+- Q3: 5-arch helper binary distribution (calendar 2026-04-25/28)
+- 38 hand-curated fixture pinning
+- parser-drift fuzzer
+- 88 manifest spec assertions (validator + plugin-validator agent regen)
+- Observability meta envelope
+
+### Learnings
+
+- Validator agent recommendations need actual Claude Code loader cross-check. Phase 6 plugin-validator gave wrong shape for `repository` (object vs string) and missed `hookEventName` in hookSpecificOutput. Both required real-loader testing to surface — surfaced via vibe-coder UI screenshots, not unit tests.
+- Critic reversal pattern: Architect proposed "remove unused action" twice (Q4 auth_login, Q5 deploy_logs_kill). Critic correctly caught both as regressions — Q4 because token-paste path bypasses gate, Q5 because removing recoverable design intent forces HMAC schema migration when v0.2 ships. Lesson: keep narrowly-scoped reservation comments + dead-path tests rather than deleting.
+- Audit script with grep + relative-path resolve catches stale sibling references the typecheck and tests cannot. Should add to pre-commit gate eventually (M3 task).
+- Sibling skills using bare `references/X.md` for files in another skill's dir is a recurring drift pattern. Document the canonical path convention in CLAUDE.md or skills/README.md (M3 task).

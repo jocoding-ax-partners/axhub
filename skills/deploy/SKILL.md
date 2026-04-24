@@ -1,7 +1,6 @@
 ---
 name: deploy
 description: This skill should be used when the user asks to "deploy", "ship", "release", "rollout", "launch", "배포해", "배포해줘", "올려", "올리자", "쏘자", "내보내자", "푸시한 거 띄워", "프로덕션에 박아", "터트려", "공개해", "demo가 필요해", or any request to push the current branch live to axhub. Triggers axhub deploy create with safety primitives: live profile/app resolution, HMAC consent gate via AskUserQuestion preview card, exit-code recovery routing.
-allowed-tools: Bash(axhub-helpers:*), Bash(axhub:*), Bash(git:*), AskUserQuestion, Read
 ---
 
 # Deploy via axhub
@@ -85,4 +84,4 @@ For Korean trigger lexicon (informal, honorific, demo-context variants): `refere
 For exit-code → 4-part Korean error template (emotion + cause + action + button): `references/error-empathy-catalog.md`.
 For multi-machine cold cache, headless/Codespaces, version skew, watch narration: `references/recovery-flows.md`.
 For working transcripts: `examples/golden-deploy-transcript.md`, `examples/concurrent-deploy-rejection.md`.
-For privacy filter on apis list: `references/privacy-filter.md` (used by sibling apis skill).
+For privacy filter on apis list: `../apis/references/privacy-filter.md` (used by sibling apis skill).

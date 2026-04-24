@@ -17,7 +17,7 @@ To fetch logs:
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent logs --user-utterance "$ARGS" --json
    ```
 
-   On `cache_hit: false`, follow `references/recovery-flows.md` ("cold-cache") to surface the last 3 deploys via AskUserQuestion.
+   On `cache_hit: false`, follow `../deploy/references/recovery-flows.md` ("cold-cache") to surface the last 3 deploys via AskUserQuestion.
 
 2. **Pick source.** Default `--source=build`. Switch to `--source=pod` only when the utterance contains "런타임 로그", "running logs", "컨테이너 로그", "pod logs", or when the deploy is already in a `health_check`/terminal `succeeded` phase. When uncertain, ask once via AskUserQuestion ("빌드 로그 / 런타임 로그 / 둘 다").
 
@@ -33,7 +33,7 @@ To fetch logs:
 
 5. **Render trimmed output.** For non-failure logs, show the last 50 lines plus a "전체 보기" AskUserQuestion option. For failure logs, show the last 200 lines and surface the first error-level line at the top with "이 줄에서 멈춘 것 같아요:".
 
-6. **On non-zero exit**, route to `references/error-empathy-catalog.md`:
+6. **On non-zero exit**, route to `../deploy/references/error-empathy-catalog.md`:
    - exit 65 → token expired
    - exit 67 → deploy id not found + did-you-mean
    - exit 68 → rate limit (logs is the most rate-limited surface)

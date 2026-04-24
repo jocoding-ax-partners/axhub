@@ -1,96 +1,85 @@
 {
-  "task": "M2.5 baseline + plugin-arm 재큐레이트 to 100-row stratified subset. M1.5 verdict v2.",
-  "createdAt": "2026-04-24T02:00:00Z",
-  "completedAt": "2026-04-24T03:00:00Z",
+  "task": "Bug hunt Tier 1 quick-wins (consensus plan §6 Fixes 1.1-1.6 subset). 5 stories addressing Q1/Q2/Q4/Q5 + script gate fix. Mechanical edits, ~2 hours. Phase 2 (Q3 5-arch binaries, fixture suite, fuzzer, manifest assertions) deferred to next ralph.",
+  "createdAt": "2026-04-24T04:00:00Z",
   "stories": [
     {
       "id": "US-001",
-      "title": "Stratified 100-row corpus subset",
+      "title": "DROP allowed-tools from skills/deploy/SKILL.md frontmatter (Q1)",
       "priority": 1,
       "passes": true,
-      "evidence": {
-        "files": ["tests/corpus.100.jsonl (100 rows)", "tests/README.md (scope flag updated)"],
-        "stratification": "RO 30, DH 12, ADV 13, UNI 4, PRF 4, HDL 4, MIX 8, NEG 14, legacy 11 = 100",
-        "lang": "ko 46, en 45, mixed 8, slash 1 (≥40/40/5 met)",
-        "legacy_preserved": "All 20 M0.5 IDs included verbatim"
-      },
       "acceptanceCriteria": [
-        "PASS: 100 rows exactly",
-        "PASS: stratification ratio ±1 of target",
-        "PASS: KR/EN balance ≥40/≥40/≥5",
-        "PASS: All 20 legacy IDs preserved",
-        "PASS: jq + Zod valid",
-        "PASS: README updated with scope rationale"
+        "skills/deploy/SKILL.md frontmatter: allowed-tools key 완전 제거",
+        "Frontmatter has only name + description (other 10 skills와 일치)",
+        "bun run typecheck + bun run build 통과",
+        "76 tests 모두 그대로 pass"
       ],
-      "owner": "us-001"
+      "owner": null
     },
     {
       "id": "US-002",
-      "title": "Re-curated docs-only baseline (100 rows)",
+      "title": "2 missing reference files 작성 (Q2): privacy-filter.md + headless-flow.md",
       "priority": 2,
       "passes": true,
-      "evidence": {
-        "files": ["tests/baseline-results.docs-only.100.json (100 entries)"],
-        "score": "Trusted 51%, Unsafe 97.7%, Recovery 0% (baseline alone, KILL gate as expected for floor)",
-        "verbatim_20": "Original 20 baseline preserved"
-      },
       "acceptanceCriteria": [
-        "PASS: 100 entries, all corpus.100 IDs covered",
-        "PASS: Original 20 verbatim",
-        "PASS: Trusted ~40-50% predicted (51% actual)",
-        "PASS: Unsafe ~85-95% predicted (97.7% actual)",
-        "PASS: Recovery ~0-5% predicted (0% actual)",
-        "PASS: jq + Zod valid"
+        "skills/apis/references/privacy-filter.md 작성 (현재 skills/apis/SKILL.md:88 referenced 안 됨, 새로 referencing 추가). Content: cross-team API leak 방지 패턴 (PLAN §16.17/E13). Default --app-id scope, AskUserQuestion before cross-team list, audit log to ~/.cache/axhub-plugin/cross-team-list.ndjson",
+        "skills/deploy/references/headless-flow.md 작성. 현재 recovery-flows.md의 headless-auth section을 standalone reference로 분리 (Critic recommendation: drop OR extend recovery-flows). 결정: standalone (다른 skills에서 reuse 가능). Content: $CODESPACES detection, no-DISPLAY/no-`open` fallback, token-paste flow + Korean copy-from-laptop instructions",
+        "skills/apis/SKILL.md body에 'For cross-team scope filter rules, see references/privacy-filter.md' 라인 추가",
+        "skills/auth/SKILL.md body에 'For headless/Codespaces auth flow, see ../deploy/references/headless-flow.md' 라인 추가",
+        "tests/docs-link-audit.sh 작성 (간단 grep + jq), 모든 references 링크 resolve 확인 (broken=0)"
       ],
-      "owner": "us-002"
-    },
-    {
-      "id": "US-003",
-      "title": "Re-curated plugin-arm predictions (100 rows)",
-      "priority": 3,
-      "passes": true,
-      "evidence": {
-        "files": ["tests/plugin-arm-results.100.json (100 entries)"],
-        "score": "Trusted 91%, Unsafe 0%, Recovery 100% (plugin alone, GO gate)",
-        "verbatim_20": "Original 20 plugin-arm preserved",
-        "invariants": "All destructive=true rows have consent_seen=true; all T-ADV-* have empty actual_tool_calls (HMAC denied)"
-      },
-      "acceptanceCriteria": [
-        "PASS: 100 entries, all corpus.100 IDs covered",
-        "PASS: Original 20 verbatim",
-        "PASS: HMAC consent invariant (every destructive shows consent_seen=true)",
-        "PASS: Adversarial denial (T-ADV-* actual_tool_calls=[])",
-        "PASS: Trusted ≥80% predicted (91% actual)",
-        "PASS: Unsafe = 0%",
-        "PASS: Recovery ≥80% predicted (100% actual)",
-        "PASS: jq + Zod valid"
-      ],
-      "owner": "us-003"
+      "owner": null,
+      "blockedBy": []
     },
     {
       "id": "US-004",
-      "title": "M1.5 v2 verdict against 100-row scope",
+      "title": "auth/SKILL.md에 consent-mint step 추가 (Q4 reversal)",
+      "priority": 3,
+      "passes": true,
+      "acceptanceCriteria": [
+        "skills/auth/SKILL.md workflow에 'axhub auth login' bash call 직전 'axhub-helpers consent-mint --action auth_login --app-id _ --profile _ --branch _ --commit _' 단계 추가",
+        "Body에 명확히 설명: token-paste path도 동일 consent gate 적용 (PreToolUse hook이 binding 검증)",
+        "Smoke: skills/auth invocation 시 PreToolUse 가 deny 안 함 (consent token mint 후)",
+        "76 tests 그대로 pass (no regression)"
+      ],
+      "owner": null,
+      "blockedBy": []
+    },
+    {
+      "id": "US-005",
+      "title": "deploy_logs_kill 예약 주석 + dead-path unit test (Q5 reversal)",
       "priority": 4,
       "passes": true,
-      "evidence": {
-        "files": [".omc/m1.5-verdict.v2.md (full verdict + continuity with v1)"],
-        "score": "Trusted 51→91 (+40pp), Unsafe 97.7→0, Recovery 0→100 (+100pp). GO.",
-        "reproduce": "bun tests/score.ts tests/plugin-arm-results.100.json --vs tests/baseline-results.docs-only.100.json --corpus tests/corpus.100.jsonl"
-      },
       "acceptanceCriteria": [
-        "PASS: Score ran cleanly with all metrics",
-        "PASS: Verdict file has 7 sections + continuity with v1",
-        "PASS: GO verdict (all 3 thresholds pass)",
-        "PASS: README points to v2 as canonical",
-        "PASS: M3 unblocked, caveats listed (3 human runs OR auto headless)"
+        "src/axhub-helpers/consent.ts:31 (ConsentBinding action union) + index.ts:75 (VALID_ACTIONS) 양쪽에 주석 '// reserved for v0.2 signal-kill protection; currently unreachable in v0.1.0 CLI' 추가",
+        "tests/consent.test.ts 새 test: 'deploy_logs_kill is currently unreachable' — corpus.100의 모든 destructive utterance에 대해 parseAxhubCommand 결과 action !== 'deploy_logs_kill' 검증 (negative test)",
+        "또는 더 직접적: parseAxhubCommand 호출 with v0.1.0 CLI 모든 valid command surface (apps list, apis list, deploy create, deploy logs, deploy logs --follow, auth login, update check, update apply) → action 'deploy_logs_kill' 한 번도 안 나오는지 assert",
+        "bun test → 76+1 pass / 0 fail"
       ],
-      "owner": "us-004"
+      "owner": null,
+      "blockedBy": []
+    },
+    {
+      "id": "US-006",
+      "title": "package.json smoke:full script + tests/docs-link-audit.sh (gate runnability fix)",
+      "priority": 5,
+      "passes": true,
+      "acceptanceCriteria": [
+        "package.json scripts에 'smoke:full' 추가: 'bun run build:all && for f in bin/axhub-helpers-*; do echo \"--- $f ---\"; \"$f\" version && \"$f\" help; done'. (Critic Major #1 fix)",
+        "bun run smoke:full → 5 binaries × 2 subcommands = 10 successful runs (또는 architecture availability에 따라 native arch만 build).  실제 cross-arch build 환경 없으면: 'smoke:full' 명령은 'smoke' alias로 시작 + TODO 주석 (Q3 binary distribution이 next ralph에서 ship 후 채움)",
+        "tests/docs-link-audit.sh 작성 (US-002와 일치): 모든 SKILL.md 안의 'references/' 링크 추출 → 파일 존재 확인 → 0 broken links",
+        "tests/docs-link-audit.baseline.txt 생성 (artifact, US-002 fix 후 = empty)",
+        "bun run smoke:full + tests/docs-link-audit.sh 둘 다 exit 0"
+      ],
+      "owner": null,
+      "blockedBy": ["US-002"]
     }
   ],
   "metadata": {
-    "task_origin": "/oh-my-claudecode:ralph M2.5 baseline + plugin-arm re-curate",
-    "iteration_outcome": "ALL 4 stories pass. M1.5 v2 GO at 100-row scope. Margin held at +40pp trusted vs v1 (identical) — design genuinely scales across scope expansion.",
+    "task_origin": "/oh-my-claudecode:ralph + team — bug hunt Tier 1 quick wins from consensus plan",
+    "consensus_plan": ".omc/plans/bug-hunt-systematic.md (3856w, iter 2 consensus, ITERATE → minor fixes only)",
     "deslop": "enabled",
-    "critic": "architect"
+    "critic": "architect",
+    "phase_2_deferred": "Q3 5-arch binary distribution (calendar 4-25/4-28), 38 hand-curated fixture pinning, parser-drift fuzzer, 88 manifest spec assertions, observability meta envelope",
+    "scope_note": "Phase 1 only — mechanical edits + 1 test + 2 doc files + 1 script. Estimated ~2 hours. Phase 2 separately."
   }
 }
