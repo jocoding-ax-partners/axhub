@@ -1,108 +1,77 @@
 {
-  "task": "Plugin-only fixes for 6 bugs surfaced from real CC user trace. CLI 미변경 — helper binary가 REST API로 missing CLI feature 우회. 5 stories: list-deployments helper subcommand, SessionStart binary auto-download, doctor 진단 수정, parser fixtures, update workflow 정리.",
-  "createdAt": "2026-04-24T06:00:00Z",
+  "task": "Phase 6 plugin polish from architect Phase 5 backlog. 4 stories: matchDestructive rename, install.sh version codegen, token-init UX subcommand, v0.1.0 verify-release smoke + pilot launch readiness. CLI 변경 없음. 약 4시간 예상.",
+  "createdAt": "2026-04-24T07:00:00Z",
   "stories": [
     {
-      "id": "US-506",
-      "title": "Korean translation for all skill + command descriptions (user request — image showed English /axhub:help)",
-      "priority": 0,
-      "passes": true,
-      "acceptanceCriteria": [
-        "9 commands/*.md descriptions all Korean (apis, apps, deploy, doctor, help, login, logs, status, update)",
-        "11 skills/*/SKILL.md descriptions all Korean (apis, apps, auth, clarify, deploy, doctor, logs, recover, status, update, upgrade) — '이 스킬은 사용자가...' Korean prefix replaces English 'This skill should be used when...' while keeping all Korean trigger phrases verbatim",
-        "tests/manifest.test.ts assertion accepts both English and Korean prefix (regex /^(This skill|이 스킬)/)",
-        "bun test → 309+ pass / 0 fail (descriptions still pass length/format checks)"
-      ],
-      "owner": null,
-      "blockedBy": []
-    },
-    {
-      "id": "US-501",
-      "title": "helper binary list-deployments subcommand (REST API direct, missing axhub deploy list 우회)",
+      "id": "US-601",
+      "title": "Rename matchDestructive → matchKnownIntent (semantics 명확화 — read-only allowlist 포함)",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "src/axhub-helpers/list-deployments.ts (NEW): GET https://hub-api.jocodingax.ai/api/v1/apps/{appID}/deployments?per_page=N. token은 axhub auth status --json 결과에서 user 정보 + AXHUB_TOKEN env var 또는 ~/.config/axhub/token 파일에서 읽음.",
-        "src/axhub-helpers/index.ts에 cmdListDeployments 추가 + USAGE에 'list-deployments' 등록 + main switch에 case",
-        "endpoint: AXHUB_ENDPOINT env var override 허용, default https://hub-api.jocodingax.ai",
-        "출력: JSON array of {id, app_id, status, commit_sha, commit_message, branch, created_at} (latest N개)",
-        "skills/status/SKILL.md + skills/logs/SKILL.md + skills/recover/SKILL.md cold-cache fallback path를 axhub-helpers list-deployments로 변경",
-        "tests/list-deployments.test.ts: 6+ assertions — valid token + app id, missing token (exit 65), invalid app id (exit 67), endpoint override, JSON shape, AskUserQuestion data 형식 호환",
-        "bun test → 295+6 pass / 0 fail / typecheck clean"
+        "src/axhub-helpers/consent.ts: function matchDestructive → matchKnownIntent rename. Docstring 업데이트: 'Match an axhub command against the known intent surface — destructive subcommands (deploy_create / update_apply / auth_login / deploy_logs_kill) AND read-only paths (returns null for read-only, signaling not destructive).'",
+        "src/axhub-helpers/index.ts caller 업데이트 (parseAxhubCommand 내부 호출)",
+        "tests/consent.test.ts: 모든 'matchDestructive' 언급 → 'matchKnownIntent' (describe + comment + assertion message)",
+        "bun test → 320 pass / 0 fail / typecheck clean (rename mechanical, behavior 변경 X)",
+        "git grep matchDestructive 결과 = empty (완전 rename)"
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-502",
-      "title": "SessionStart binary auto-download (marketplace install gap fix)",
+      "id": "US-602",
+      "title": "AXHUB_PLUGIN_RELEASE 자동 sync (codegen from package.json)",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "src/axhub-helpers/index.ts cmdSessionStart 확장: ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers (또는 axhub-helpers-{os}-{arch}) 부재 시 GitHub Release v0.1.0에서 OS+arch 매칭 binary 자동 download (curl -fsSL https://github.com/jocoding-ax-partners/axhub/releases/download/v0.1.0/axhub-helpers-<os>-<arch>...) + chmod +x + bin/install.sh 자동 실행",
-        "Network failure 시 한국어 안내: '플러그인 helper 다운로드 실패. 수동 설치: bash ${CLAUDE_PLUGIN_ROOT}/bin/install.sh' (URL + version 포함)",
-        "이미 binary 존재 시 download skip — idempotent",
-        "AXHUB_SKIP_AUTODOWNLOAD=1 env var로 자동 download 비활성화 옵션 (회사 보안 정책 호환)",
-        "tests/auto-download.test.ts: 4+ assertions — 부재 detect, mock URL fetch success, AXHUB_SKIP_AUTODOWNLOAD respect, 이미 있으면 skip",
-        "skills/doctor/SKILL.md에 AXHUB_SKIP_AUTODOWNLOAD 안내 추가",
-        "README.md installation section: '3. bash install.sh' 단계 → '플러그인 install 후 첫 CC session에서 자동 다운로드 (AXHUB_SKIP_AUTODOWNLOAD=1로 끌 수 있음)'"
+        "scripts/codegen-install-version.ts (NEW): package.json의 version field 읽음 → bin/install.sh의 RELEASE_VERSION default를 'v<X.Y.Z>'로 자동 갱신. sed-style replace using bun fs.",
+        "package.json scripts: 'codegen:version': 'bun scripts/codegen-install-version.ts'",
+        "smoke:full에 codegen:version 추가 (현재 codegen:catalog 와 동일 패턴 — drift 방지)",
+        "tests/codegen-version.test.ts (NEW, 4+ assertions): version 동기화 (package.json bump 시 install.sh 자동 갱신), idempotent (재실행 시 변경 없음), AXHUB_PLUGIN_RELEASE override 보존 (default만 갱신, env override 지원 그대로), package.json version 형식 validation",
+        "bun run codegen:version 실행 → bin/install.sh의 'RELEASE_VERSION=\"${AXHUB_PLUGIN_RELEASE:-v0.1.0}\"' 라인이 package.json version과 일치",
+        "bun test → 모든 테스트 PASS, codegen:version 새 테스트 포함"
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-503",
-      "title": "doctor 진단 로직 수정 (false-negative on binary detection)",
+      "id": "US-603",
+      "title": "helper token-init subcommand (사용자 친화 1-step setup)",
       "priority": 3,
       "passes": true,
       "acceptanceCriteria": [
-        "skills/doctor/SKILL.md workflow 변경: ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers 경로 check 대신 'axhub-helpers version' bash 호출로 binary present 검증 (PATH 기반, env var 의존 X)",
-        "Doctor 진단 항목: ✓ axhub-helpers 정상 (version + plugin v0.1.0 출력) | ⚠ binary 없음 (auto-download 안내) — CLAUDE_PLUGIN_ROOT 자체는 진단 필드에서 제거 (CC가 자동 set, end-user noise)",
-        "AXHUB_PROFILE/AXHUB_ENDPOINT가 미설정일 때 ✗ 대신 ✓ '기본값 사용 중' 표시 — 정상 케이스",
-        "환경 변수 진단 우선순위: 정상 항목 위에, 문제 항목 아래 (vibe coder가 액션 알 수 있게)",
-        "tests/doctor-diagnosis.test.ts: 6+ assertions — binary present + version output, binary absent + auto-download 안내 메시지, profile/endpoint 미설정 → 정상 표시"
-      ],
-      "owner": null,
-      "blockedBy": ["US-502"]
-    },
-    {
-      "id": "US-504",
-      "title": "parseAxhubCommand explicit allowlist + status/logs hook block 재현 + fix",
-      "priority": 4,
-      "passes": true,
-      "acceptanceCriteria": [
-        "tests/fixtures/ro-009-deploy-status-watch-explicit.json (NEW): {input: 'axhub deploy status dep_42 --app paydrop --watch --json', expected: {is_destructive: false}}",
-        "tests/fixtures/ro-010-deploy-logs-follow-explicit.json (NEW): {input: 'axhub deploy logs dep_42 --app paydrop --follow --source build --json', expected: {is_destructive: false}}",
-        "tests/fixtures/_curated.ts에 위 2개 추가 + count 38 → 40 업데이트, fixtures.test.ts count assertion도 40으로 변경",
-        "src/axhub-helpers/consent.ts matchDestructive: 'deploy status' + 'deploy logs (without --kill)'를 명시적 read-only allowlist로 처리 — 의도 명확화 + 미래 추가 sub-cmd가 default destructive로 분류되는 것 방지",
-        "tests/consent.test.ts에 새 describe 'parseAxhubCommand — read-only allowlist': deploy status + deploy logs (no --kill) + apps list + apis list + auth status + axhub --version 모두 destructive=false (5+ tests)",
-        "bun test → 모든 테스트 PASS, 새 fixtures.test.ts 도 40/40"
+        "src/axhub-helpers/index.ts: cmdTokenInit (NEW) — 'axhub auth login --print-token' 자동 실행 (Bun.spawnSync) → stdout 캡처 → token-import 자동 호출. 한 줄 setup.",
+        "Browser unavailable 시 (headless detect): 'axhub auth login --print-token' 실패 → Korean 안내: '브라우저 환경에서 axhub auth login --print-token 실행 후 출력을 복사해서 here에 paste 해주세요' + AskUserQuestion text input (echo masked)",
+        "Token validation: cmdTokenInit이 받은 string이 axhub_pat_* 형식인지 확인 후 token-import 호출 (idempotent)",
+        "USAGE에 'token-init' 추가",
+        "skills/auth/SKILL.md workflow: token 미설정 케이스 fallback에 'axhub-helpers token-init' 안내 추가 (한 줄 setup)",
+        "skills/{status,logs,recover}/SKILL.md cold-cache fallback: helper list-deployments가 exit 65 (token missing) 반환 시 'axhub-helpers token-init' 안내 한 줄 추가",
+        "tests/token-init.test.ts (NEW, 5+ assertions): success path (mocked spawn), browser unavailable fallback, token format validation, idempotent (재실행 OK), USAGE/dispatch 등록 확인"
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-505",
-      "title": "update SKILL workflow 정리 (AXHUB_DISABLE_AUTOUPDATE 강제 set 제거)",
-      "priority": 5,
-      "passes": true,
+      "id": "US-604",
+      "title": "v0.1.0 release verify-release.sh smoke + pilot launch-readiness checklist",
+      "priority": 4,
+      "passes": false,
       "acceptanceCriteria": [
-        "skills/update/SKILL.md workflow step 1 변경: AXHUB_DISABLE_AUTOUPDATE=1 강제 set 제거 — 'axhub update check --json' 직접 실행. 회사가 환경변수 설정한 경우만 disable.",
-        "exit 2 (autoupdate disabled) handling 명시: '회사가 autoupdate 정책 disable 한 환경입니다. axhub update apply 강제 실행 가능하지만 권장하지 않아요.' Korean message",
-        "skills/upgrade/SKILL.md (separate skill if exists)도 동일 점검 — AXHUB_DISABLE_AUTOUPDATE 강제 set 없는지 확인",
-        "tests/manifest.test.ts에 update skill body assertion 추가: 'AXHUB_DISABLE_AUTOUPDATE=1' 강제 set 패턴 부재 확인",
-        "bun test → manifest test 통과 + 기존 모든 테스트 통과"
+        "bash scripts/release/verify-release.sh v0.1.0 → 모든 14 asset cosign signature valid + sha256 manifest match. 출력에 '14/14 verified' 또는 동등.",
+        "docs/pilot/launch-readiness-checklist.md (NEW): pilot 시작 day -1 admin 점검 항목. Sections: (1) account setup (5명 vibe coder 토큰 발급 status), (2) plugin install 안내 메일 발송 status, (3) SLA on-call 배정 (4시간 response) + 대체 인원, (4) feedback 수집 채널 (Slack DM 또는 secure email) 확립, (5) day-1 walkthrough 일정 5명 × 30분 confirmed, (6) emergency rollback procedure (token revoke, plugin disable 안내) 문서화 위치 link.",
+        "checklist 모든 항목에 checkbox '[ ]' 형태 + 'verified by:', 'date:' 필드.",
+        "checklist 마지막에 GO 결정 기준 (5/5 항목 ✓ 일 때만 day 1 시작) 명시",
+        "verify-release.sh 결과 로그 docs/pilot/v0.1.0-verify-result.txt에 캡처 (시점 추적 + 향후 재검증 베이스라인)"
       ],
       "owner": null,
       "blockedBy": []
     }
   ],
   "metadata": {
-    "task_origin": "/oh-my-claudecode:ralph cli는 건들지말고 플러그인만 작업해 (real CC user trace 6 bugs)",
-    "user_constraint": "CLI 변경 금지 — plugin 자체 해결",
+    "task_origin": "/oh-my-claudecode:ralph 진행 — Phase 5 architect backlog 처리",
+    "phase5_predecessor": "Phase 5 ralph (this session) — 6 stories, 320 pass / 0 fail",
     "deslop": "enabled",
     "critic": "architect",
-    "scope_note": "B1 (cold-cache deployment ID) → US-501 helper REST API 우회. B2 (binary missing) → US-502 auto-download. B3 (doctor false) → US-503. B4 (status hook block — 가설: binary 부재 + skill fallback 잘못 + parser allowlist 부재 복합) → US-504 fixtures + allowlist 강화. B5 (logs hand-curl) → US-501 cover. B6 (update exit 2) → US-505.",
-    "phase_5_deferred": "CLI deploy list 추가 (별도 ax-hub-cli issue), marketplace publish announcement, customer pilot execution"
+    "scope_note": "US-604는 verify-release smoke (autonomous 가능) + checklist 문서 (autonomous 가능) 만 포함. 실제 vibe coder pilot 실행은 영업/마케팅 영역 — 이 PRD scope 밖.",
+    "phase_7_deferred": "actual customer recruit + pilot 실행 (HUMAN), ax-hub-cli deploy list 추가 (별도 repo), keytar 통합 (heavy native dep, 마지막 옵션)"
   }
 }

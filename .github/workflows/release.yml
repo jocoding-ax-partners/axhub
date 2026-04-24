@@ -76,7 +76,10 @@ jobs:
         run: |
           for f in bin/axhub-helpers-* bin/manifest.json bin/checksums.txt; do
             echo "Signing $f"
-            cosign sign-blob --yes --output-signature="${f}.sig" "${f}"
+            cosign sign-blob --yes \
+              --output-signature="${f}.sig" \
+              --output-certificate="${f}.pem" \
+              "${f}"
           done
 
       - name: Upload release assets (gh CLI, sequential — avoids race)
@@ -91,7 +94,7 @@ jobs:
                  --title "$TAG" \
                  --notes "Automated release. See CHANGELOG.md for details. Verify with: bash scripts/release/verify-release.sh $TAG"
           # Upload all assets sequentially with --clobber so re-runs replace.
-          for f in bin/axhub-helpers-* bin/checksums.txt bin/manifest.json bin/*.sig; do
+          for f in bin/axhub-helpers-* bin/checksums.txt bin/manifest.json bin/*.sig bin/*.pem; do
             [ -f "$f" ] || continue
             echo "Uploading $f"
             gh release upload "$TAG" "$f" --repo "$GITHUB_REPOSITORY" --clobber

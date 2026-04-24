@@ -122,6 +122,7 @@ Subcommands:
   redact           Filter: NFKC normalize + redact secrets/cross-team URLs
   list-deployments Skill: GET /api/v1/apps/{id}/deployments — fallback for missing axhub deploy list
   token-import     Skill: read axhub_pat_* from stdin, store at ~/.config/axhub-plugin/token (mode 0600)
+  token-init       Skill: 1-step setup — runs 'axhub auth login --print-token' + auto token-import
   version          Print version
   help             Show this message`;
 
@@ -154,6 +155,8 @@ async function main(): Promise<number> {
       return cmdListDeployments(args);
     case "token-import":
       return cmdTokenImport(args);
+    case "token-init":
+      return cmdTokenInit(args);
     case "version":
     case "--version":
     case "-v":
@@ -404,6 +407,70 @@ async function cmdTokenImport(_args: string[]): Promise<number> {
     process.umask(oldMask);
   }
   out({ stored_at: path, redacted_token: "axhub_pat_[redacted]" });
+  return 0;
+}
+
+async function cmdTokenInit(_args: string[]): Promise<number> {
+  // Phase 6 US-603: 1-step token setup. Runs `axhub auth login --print-token`
+  // (CLI handles browser OAuth + token print), captures stdout, validates
+  // axhub_pat_* shape, stores at ${XDG_CONFIG_HOME}/axhub-plugin/token via
+  // the same code path as token-import.
+  //
+  // Headless fallback: if axhub binary fails (no browser, codespace, etc.),
+  // print Korean instructions for the laptop-paste flow.
+  let result: ReturnType<typeof Bun.spawnSync>;
+  try {
+    result = Bun.spawnSync({
+      cmd: ["axhub", "auth", "login", "--print-token"],
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: 120000,
+    });
+  } catch {
+    err("token-init: 'axhub' 바이너리를 PATH에서 찾을 수 없어요. axhub CLI 먼저 설치해주세요.");
+    return 64;
+  }
+
+  if (result.exitCode !== 0) {
+    const stderr = (result.stderr?.toString() ?? "").trim();
+    err(
+      "token-init: axhub auth login --print-token 실패.\n" +
+        "헤드리스 환경 (Codespaces, SSH 등) 이라면:\n" +
+        "  1단계 (브라우저 있는 노트북): axhub auth login --print-token\n" +
+        "  2단계 (출력된 axhub_pat_... 복사)\n" +
+        "  3단계 (이 환경에서): echo 'axhub_pat_...' | axhub-helpers token-import\n" +
+        (stderr.length > 0 ? `\n원본 에러: ${stderr}\n` : ""),
+    );
+    return 65;
+  }
+
+  const token = (result.stdout?.toString() ?? "").trim();
+  if (!/^axhub_pat_[A-Za-z0-9_-]{16,}$/.test(token)) {
+    err(
+      "token-init: 'axhub auth login --print-token' 출력이 token 형식이 아니에요. axhub --version 으로 CLI 정상 작동 확인 후 다시 시도해주세요.",
+    );
+    return 65;
+  }
+
+  const { homedir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  const xdg = process.env["XDG_CONFIG_HOME"];
+  const dir =
+    xdg && xdg.length > 0 ? join(xdg, "axhub-plugin") : join(homedir(), ".config", "axhub-plugin");
+  const path = join(dir, "token");
+  const oldMask = process.umask(0o077);
+  try {
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    await writeFile(path, token, { mode: 0o600 });
+  } finally {
+    process.umask(oldMask);
+  }
+  out({
+    stored_at: path,
+    redacted_token: "axhub_pat_[redacted]",
+    next_step: "이제 /axhub:status, /axhub:logs 같은 명령이 자동으로 작동합니다.",
+  });
   return 0;
 }
 

@@ -26,12 +26,16 @@ trap "rm -rf $WORKDIR" EXIT
 cd "$WORKDIR"
 
 echo "Downloading release assets from $REPO@$TAG..."
-gh release download "$TAG" --repo "$REPO" --pattern "axhub-helpers-*" --pattern "manifest.json*" --pattern "checksums.txt*"
+gh release download "$TAG" --repo "$REPO" \
+  --pattern "axhub-helpers-*" \
+  --pattern "manifest.json*" \
+  --pattern "checksums.txt*"
 
 # Verify manifest signature first — it's the trust anchor.
 echo "Verifying manifest.json signature (cosign keyless)..."
 COSIGN_EXPERIMENTAL=1 cosign verify-blob \
   --signature manifest.json.sig \
+  --certificate manifest.json.pem \
   --certificate-identity-regexp "^https://github.com/${REPO}/" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   manifest.json
@@ -61,6 +65,7 @@ for entry in $(jq -r '.binaries[] | @base64' manifest.json); do
 
   COSIGN_EXPERIMENTAL=1 cosign verify-blob \
     --signature "${filename}.sig" \
+    --certificate "${filename}.pem" \
     --certificate-identity-regexp "^https://github.com/${REPO}/" \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
     "$filename" >/dev/null 2>&1 || {

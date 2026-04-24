@@ -383,8 +383,16 @@ const tokensIfAxhubCommand = (rawPosition: string): string[] | null => {
     .filter((t) => t.length > 0);
 };
 
-// Try to extract a destructive axhub invocation from a single tokenized command.
-const matchDestructive = (tokens: string[]): ParsedAxhubCommand | null => {
+// Match an axhub command against the known intent surface — destructive
+// subcommands (deploy_create / update_apply / auth_login / deploy_logs_kill)
+// AND read-only paths. Returns ParsedAxhubCommand for matched destructive
+// intents; returns null for read-only commands (apps list, apis list, deploy
+// status/logs without --kill, auth status, --version, --help) — null signals
+// "known but not destructive", which the caller treats as is_destructive=false.
+//
+// Phase 6 US-601 rename: was matchDestructive — semantics expanded since Phase
+// 5 fixture allowlist (US-504) made the read-only branch a first-class concern.
+const matchKnownIntent = (tokens: string[]): ParsedAxhubCommand | null => {
   // tokens[0] === "axhub"
   const sub = tokens[1];
   const sub2 = tokens[2];
@@ -418,7 +426,7 @@ export function parseAxhubCommand(cmd: string): ParsedAxhubCommand {
   for (const pos of positions) {
     const tokens = tokensIfAxhubCommand(pos);
     if (tokens === null) continue;
-    const hit = matchDestructive(tokens);
+    const hit = matchKnownIntent(tokens);
     if (hit !== null) return hit;
   }
   return { is_destructive: false };
