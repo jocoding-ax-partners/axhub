@@ -12,6 +12,8 @@ name: release
 #   - Settings → Actions → General → Workflow permissions: "Read and write"
 #   - Sigstore OIDC: no key material to manage — keyless signing uses ephemeral
 #     identities tied to the workflow run's GitHub OIDC token.
+#   - Self-hosted runner registered with labels [self-hosted, linux, axhub-build]
+#     (see docs/RELEASE.md "Self-hosted runner setup").
 #
 # Optional E2E job (US-206): runs only if STAGING_TOKEN secret exists.
 on:
@@ -27,7 +29,7 @@ permissions:
 jobs:
   build-and-sign:
     name: Build cross-arch + cosign sign
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, axhub-build]
     steps:
       - uses: actions/checkout@v4
 
@@ -75,7 +77,7 @@ jobs:
 
   e2e-staging:
     name: ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGING_TOKEN)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, axhub-build]
     needs: build-and-sign
     # Only run when the secret is present (manual gate via repo Settings).
     if: ${{ false && env.AXHUB_E2E_STAGING_TOKEN != '' }}

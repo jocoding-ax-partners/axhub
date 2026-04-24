@@ -36,6 +36,14 @@ describe("release.yml workflow shape (US-204)", () => {
     expect(content).toContain("oven-sh/setup-bun");
   });
 
+  test("build-and-sign job runs on self-hosted runner with axhub-build label", () => {
+    content = readFileSync(path, "utf8");
+    expect(content).toContain("self-hosted");
+    expect(content).toContain("axhub-build");
+    // Confirm we are NOT using GitHub-hosted runner for the signing job
+    expect(content).not.toMatch(/build-and-sign:[\s\S]*?runs-on:\s*ubuntu-latest/);
+  });
+
   test("runs build:all to produce 5 cross-arch binaries", () => {
     content = readFileSync(path, "utf8");
     expect(content).toContain("bun run build:all");
