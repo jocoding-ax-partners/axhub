@@ -77,11 +77,15 @@ jobs:
             bin/*.sig
 
   e2e-staging:
-    name: ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGING_TOKEN)
+    name: ax-hub-cli staging E2E (gated by E2E_ENABLED repo var)
     runs-on: [self-hosted, Linux, ARM64]
     needs: build-and-sign
-    # Only run when the secret is present (manual gate via repo Settings).
-    if: ${{ false && env.AXHUB_E2E_STAGING_TOKEN != '' }}
+    # Disabled by default. To enable: Settings → Secrets and variables →
+    # Actions → Variables → New repository variable, name=E2E_ENABLED,
+    # value=true. Also requires AXHUB_E2E_STAGING_TOKEN +
+    # AXHUB_E2E_STAGING_ENDPOINT secrets. (Job-level `if:` cannot read
+    # `env.` or `secrets.` directly, so we gate via `vars.`.)
+    if: ${{ vars.E2E_ENABLED == 'true' }}
     env:
       AXHUB_E2E_STAGING_TOKEN: ${{ secrets.AXHUB_E2E_STAGING_TOKEN }}
       AXHUB_E2E_STAGING_ENDPOINT: ${{ secrets.AXHUB_E2E_STAGING_ENDPOINT }}
