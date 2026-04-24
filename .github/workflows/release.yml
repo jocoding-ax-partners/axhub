@@ -1,0 +1,91 @@
+name: release
+
+# Phase 3 US-204: Tag-triggered release pipeline.
+# - Builds 5 cross-arch helper binaries via bun
+# - Generates manifest.json (binary → arch → sha256 mapping)
+# - Cosign keyless signs each binary using sigstore OIDC (no long-lived keys)
+# - Uploads binaries + .sig sidecars + checksums.txt + manifest.json to release
+#
+# Trigger: push tag v*.*.*  (e.g. v0.1.1, v0.2.0-beta.1)
+#
+# Required repo configuration (one-time, by maintainer):
+#   - Settings → Actions → General → Workflow permissions: "Read and write"
+#   - Sigstore OIDC: no key material to manage — keyless signing uses ephemeral
+#     identities tied to the workflow run's GitHub OIDC token.
+#
+# Optional E2E job (US-206): runs only if STAGING_TOKEN secret exists.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write    # upload release assets
+  id-token: write    # sigstore OIDC for cosign keyless
+
+jobs:
+  build-and-sign:
+    name: Build cross-arch + cosign sign
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.1.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build all 5 archs
+        run: bun run build:all
+
+      - name: Generate manifest.json
+        run: bun scripts/release/manifest.ts > bin/manifest.json
+
+      - name: Generate checksums.txt
+        run: |
+          cd bin
+          shasum -a 256 axhub-helpers-* manifest.json > checksums.txt
+          cat checksums.txt
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.0
+
+      - name: Cosign sign each binary (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          for f in bin/axhub-helpers-* bin/manifest.json bin/checksums.txt; do
+            echo "Signing $f"
+            cosign sign-blob --yes --output-signature="${f}.sig" "${f}"
+          done
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bin/axhub-helpers-*
+            bin/checksums.txt
+            bin/manifest.json
+            bin/*.sig
+
+  e2e-staging:
+    name: ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGING_TOKEN)
+    runs-on: ubuntu-latest
+    needs: build-and-sign
+    # Only run when the secret is present (manual gate via repo Settings).
+    if: ${{ false && env.AXHUB_E2E_STAGING_TOKEN != '' }}
+    env:
+      AXHUB_E2E_STAGING_TOKEN: ${{ secrets.AXHUB_E2E_STAGING_TOKEN }}
+      AXHUB_E2E_STAGING_ENDPOINT: ${{ secrets.AXHUB_E2E_STAGING_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.1.0
+      - run: bun install --frozen-lockfile
+      - run: bun run test:e2e

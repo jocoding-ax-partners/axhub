@@ -171,9 +171,23 @@ async function main(): Promise<number> {
 async function cmdSessionStart(_args: string[]): Promise<number> {
   // TODO M0.5: check axhub binary on PATH, version range (semver compare against
   // MIN_AXHUB_CLI_VERSION/MAX_AXHUB_CLI_VERSION), plugin signature, env hints.
-  out({
-    systemMessage: `[axhub] M0 scaffold: session-start placeholder. Plugin v${PLUGIN_VERSION} loaded.`,
-  });
+  let systemMessage = `[axhub] M0 scaffold: session-start placeholder. Plugin v${PLUGIN_VERSION} loaded.`;
+
+  // Phase 3 US-204: cosign sidecar advisory (warn, don't block).
+  if (process.env["AXHUB_REQUIRE_COSIGN"] === "1") {
+    try {
+      const { existsSync } = await import("node:fs");
+      const selfPath = process.execPath;
+      if (selfPath && !existsSync(`${selfPath}.sig`)) {
+        systemMessage +=
+          "\n\n⚠️ 보안 검증 미통과: 이 helper 바이너리는 cosign 서명이 없어요. 회사 보안 정책에 따라 IT/admin에 문의하세요. (계속 사용은 가능합니다.)";
+      }
+    } catch {
+      // Best-effort: never let the cosign check break session start.
+    }
+  }
+
+  out({ systemMessage });
   await emitMetaEnvelope({ event: "session_start" });
   return 0;
 }

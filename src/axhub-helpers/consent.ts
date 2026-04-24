@@ -267,8 +267,11 @@ const ENV_ASSIGN_PREFIX_RE = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+/;
 // Returns the substring of the command starting at each candidate command position
 // (already shifted past the opening delimiter). Quoted strings inside `bash -c "..."`
 // have outer quotes stripped before being added to the candidate list.
-const collectCommandPositions = (cmd: string): string[] => {
+const COLLECT_MAX_DEPTH = 5;
+
+const collectCommandPositions = (cmd: string, depth: number = 0): string[] => {
   const positions: string[] = [cmd];
+  if (depth >= COLLECT_MAX_DEPTH) return positions;
   const len = cmd.length;
   let i = 0;
   while (i < len) {
@@ -308,34 +311,76 @@ const collectCommandPositions = (cmd: string): string[] => {
 
   // Detect `bash -c "..."`, `sh -c "..."`, `eval "..."` — pull the quoted body
   // out and treat it as another command position. Handles single, double, and
-  // unquoted forms.
+  // unquoted forms. Recursively re-scan the extracted body so nested wrappers
+  // like `bash -c "(axhub auth login)"` or `eval "bash -c '...'"` are not
+  // missed (Phase 3 gotcha #2 fix).
   const shellInString =
     /\b(?:bash|sh|zsh|dash|ksh|eval)\s+(?:-c\s+)?(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|(\S+))/g;
   let m: RegExpExecArray | null;
   while ((m = shellInString.exec(cmd)) !== null) {
     const body = m[1] ?? m[2] ?? m[3];
-    if (body !== undefined && body.length > 0) positions.push(body);
+    if (body !== undefined && body.length > 0) {
+      positions.push(body);
+      // Unescape one level of shell quoting before recursing — handles
+      // `eval "bash -c \"axhub ...\""` where the inner double-quotes are
+      // backslash-escaped inside the outer double-quoted eval string. The
+      // resulting unescaped body is what the outer shell would actually
+      // execute, so it must be scanned too.
+      const unescaped = body.replace(/\\(.)/g, "$1");
+      if (unescaped !== body) {
+        positions.push(unescaped);
+        const nestedUn = collectCommandPositions(unescaped, depth + 1);
+        for (let k = 1; k < nestedUn.length; k++) positions.push(nestedUn[k]!);
+      }
+      // Recurse into the raw body too — depth-limited to prevent runaway on
+      // pathological input.
+      const nested = collectCommandPositions(body, depth + 1);
+      // Skip nested[0] (it's `body` itself, already pushed above).
+      for (let k = 1; k < nested.length; k++) positions.push(nested[k]!);
+    }
   }
 
   return positions;
 };
 
 // Tokenize a single command position into whitespace-separated tokens, after
-// stripping any leading env-var assignments. Returns null if axhub is not the
-// command being executed at this position.
+// stripping any leading env-var assignments and wrapping delimiters. Returns
+// null if axhub is not the command being executed at this position.
 const tokensIfAxhubCommand = (rawPosition: string): string[] | null => {
   let s = rawPosition.trimStart();
   // Strip leading env-var assignments (one or more), e.g. `AXHUB_TOKEN=foo `.
   s = s.replace(ENV_ASSIGN_PREFIX_RE, "");
-  // Strip a single leading quote if the position came from a quoted string body
-  // and the parser handed us its inner contents (defensive — collectCommandPositions
-  // already strips outer quotes for shell-in-string forms).
-  if (s.startsWith('"') || s.startsWith("'")) s = s.slice(1);
+  // Strip leading wrapping chars: quotes, parens, backticks. Repeats handle
+  // multiply-wrapped positions like `("axhub ...)`. Also strip a leading `$(`
+  // pair if collectCommandPositions handed us text that started with one
+  // (defense-in-depth — typically already stripped at a higher level).
+  // Phase 3 gotcha #2 fix (nested wrappers leaking into single position).
+  while (s.length > 0 && /["'`(]/.test(s[0]!)) s = s.slice(1);
+  if (s.startsWith("$(")) s = s.slice(2);
   s = s.trimStart();
 
   // Must start with the bare token `axhub` followed by whitespace or end.
   if (!/^axhub(?:\s|$)/.test(s)) return null;
-  return s.split(/\s+/);
+  const raw = s.split(/\s+/);
+  // Phase 3 gotcha #1 + #3 fixes: strip surrounding quotes and trailing
+  // close-delimiters (e.g. `login)`, `"create"`, ``"deploy"``) from each
+  // token so subcommand and flag matching works regardless of wrapper.
+  return raw
+    .map((t) => {
+      let v = t;
+      // Surrounding quotes (matched pair only)
+      if (v.length >= 2) {
+        const first = v[0];
+        const last = v[v.length - 1];
+        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+          v = v.slice(1, -1);
+        }
+      }
+      // Trailing close delimiters
+      while (v.length > 0 && /[)`'"]/.test(v[v.length - 1]!)) v = v.slice(0, -1);
+      return v;
+    })
+    .filter((t) => t.length > 0);
 };
 
 // Try to extract a destructive axhub invocation from a single tokenized command.

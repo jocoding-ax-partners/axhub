@@ -292,3 +292,108 @@ describe("parseAxhubCommand — deploy_logs_kill is unreachable in v0.1.0", () =
     });
   }
 });
+
+// Phase 3 US-201: parser gotchas surfaced by Phase 2 fuzzer iteration.
+// These were intentionally avoided by the fuzzer ("stress, not gotchas") and
+// are now closed by trailing-delimiter strip + recursive shellInString +
+// surrounding-quote strip in tokensIfAxhubCommand.
+
+describe("parseAxhubCommand — Gotcha #1: trailing close-delimiter on action token", () => {
+  test("(axhub auth login) — paren-wrapped detected as auth_login", () => {
+    const r = parseAxhubCommand("(axhub auth login)");
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("auth_login");
+  });
+
+  test("`axhub auth login` — backtick-wrapped detected as auth_login", () => {
+    const r = parseAxhubCommand("`axhub auth login`");
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("auth_login");
+  });
+
+  test("(axhub deploy create --app paydrop --branch main --commit abc) — paren-wrapped deploy detected with extracted flags", () => {
+    const r = parseAxhubCommand("(axhub deploy create --app paydrop --branch main --commit abc)");
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("deploy_create");
+    expect(r.app_id).toBe("paydrop");
+    expect(r.branch).toBe("main");
+    expect(r.commit_sha).toBe("abc");
+  });
+
+  test("flag value with trailing close-delimiter is stripped (--commit abc) → abc)", () => {
+    const r = parseAxhubCommand("(axhub deploy create --app paydrop --branch main --commit abc)");
+    expect(r.commit_sha).toBe("abc");
+    expect(r.commit_sha).not.toBe("abc)");
+  });
+
+  test("$(axhub deploy create --app paydrop --branch main --commit abc) — sub-shell wrapper detected", () => {
+    const r = parseAxhubCommand("$(axhub deploy create --app paydrop --branch main --commit abc)");
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("deploy_create");
+    expect(r.app_id).toBe("paydrop");
+  });
+});
+
+describe("parseAxhubCommand — Gotcha #2: nested sub-shell inside eval/bash -c", () => {
+  test('eval "bash -c \\"axhub deploy create --app paydrop --branch main --commit abc\\"" — eval-of-bash detected', () => {
+    const r = parseAxhubCommand('eval "bash -c \\"axhub deploy create --app paydrop --branch main --commit abc\\""');
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("deploy_create");
+  });
+
+  test('bash -c "(axhub auth login)" — bash-c with paren-wrapped inner detected', () => {
+    const r = parseAxhubCommand('bash -c "(axhub auth login)"');
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("auth_login");
+  });
+
+  test('sh -c "$(axhub deploy create --app paydrop --branch main --commit abc)" — sh-c with $() inner detected', () => {
+    const r = parseAxhubCommand('sh -c "$(axhub deploy create --app paydrop --branch main --commit abc)"');
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("deploy_create");
+  });
+
+  test("zsh -c '`axhub auth login`' — zsh-c with backtick inner detected", () => {
+    const r = parseAxhubCommand("zsh -c '`axhub auth login`'");
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("auth_login");
+  });
+
+  test('eval "(bash -c \\"axhub update apply --yes\\")" — triple-nested still detected', () => {
+    const r = parseAxhubCommand('eval "(bash -c \\"axhub update apply --yes\\")"');
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("update_apply");
+  });
+});
+
+describe("parseAxhubCommand — Gotcha #3: quoted subcommand tokens", () => {
+  test('axhub "deploy" "create" --app paydrop — double-quoted subcommands detected', () => {
+    const r = parseAxhubCommand('axhub "deploy" "create" --app paydrop --branch main --commit abc');
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("deploy_create");
+  });
+
+  test("axhub 'auth' 'login' — single-quoted subcommands detected", () => {
+    const r = parseAxhubCommand("axhub 'auth' 'login'");
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("auth_login");
+  });
+
+  test('axhub "update" "apply" --yes — quoted update apply detected', () => {
+    const r = parseAxhubCommand('axhub "update" "apply" --yes');
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("update_apply");
+  });
+
+  test('axhub "deploy" create — mixed quoted/bare subcommands detected', () => {
+    const r = parseAxhubCommand('axhub "deploy" create --app paydrop --branch main --commit abc');
+    expect(r.is_destructive).toBe(true);
+    expect(r.action).toBe("deploy_create");
+  });
+
+  test("read-only quoted subcommand stays NOT destructive (axhub 'apps' 'list')", () => {
+    const r = parseAxhubCommand("axhub 'apps' 'list' --json");
+    expect(r.is_destructive).toBe(false);
+    expect(r.action).toBeUndefined();
+  });
+});

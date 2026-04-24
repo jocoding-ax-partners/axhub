@@ -7,13 +7,14 @@
  * protection: if a future refactor narrows detection, the fuzzer trips.
  *
  * Each variant wraps a base destructive command with one wrapper from each of
- * three buckets (env-prefix, structural, whitespace). Wrappers are designed to
- * stay within parser-detectable space — sub-shell wrappers leave a trailing
- * argument so close-delimiters never contaminate the action token, and
- * eval/bash -c bodies are NOT also wrapped in parens/sub-shells (which would
- * require recursive shell tokenization the parser intentionally does not do).
- * Adversarial gotchas (Unicode whitespace as token separators, multi-level
- * eval-of-eval) are explicitly out-of-scope per the task spec.
+ * three buckets (env-prefix, structural, whitespace). The first 1000 variants
+ * stay within the parser-detectable space documented in Phase 2; the final 100
+ * (Phase 3 US-201) probe the three gotcha classes that Phase 2 deliberately
+ * avoided and Phase 3 closed:
+ *   - trailing close-delimiter contamination on action token
+ *   - nested sub-shell inside eval/bash -c (recursive shell tokenization)
+ *   - quoted subcommand tokens (`axhub "deploy" "create"`)
+ * Total target: 1100/1100 caught.
  *
  * Reproducibility: deterministic PRNG (mulberry32) seeded from CLI arg.
  *   bun tests/fuzz-parser.ts            # default seed (FNV-1a of "0xAxHub42")
@@ -283,9 +284,85 @@ const generateVariant = (rng: Rand): Variant => {
 };
 
 // ---------------------------------------------------------------------------
-// Main: generate VARIANT_COUNT variants, classify, report bypass cases.
+// Phase 3 US-201: gotcha variant generators (trailing-delimiter, nested-shell,
+// quoted-subcommand). 100 variants total, evenly split. These are SEPARATE
+// from the 1000-variant standard set above so the gotcha classes are an
+// explicit add-on, not a silent change to the original fuzzer's coverage.
+// ---------------------------------------------------------------------------
+
+// Bases that pad less aggressively so close-delimiter contamination on the
+// ACTION token is actually possible (the standard BASE_COMMANDS pad with a
+// trailing flag specifically to avoid this).
+const TIGHT_BASES: ReadonlyArray<string> = [
+  "axhub auth login",
+  "axhub update apply --yes",
+  "axhub deploy create --app paydrop --branch main --commit abc",
+];
+
+// Gotcha #1: trailing close-delimiter — wrap with parens/backticks/sub-shell
+// such that the closing char glues onto the LAST token (which may be the
+// action subcommand or a flag value).
+const gotcha1 = (rng: Rand): Variant => {
+  const base = pick(rng, TIGHT_BASES);
+  const wrappers: Array<[string, string, string]> = [
+    ["paren", "(", ")"],
+    ["dollar-paren", "$(", ")"],
+    ["backtick", "`", "`"],
+  ];
+  const w = pick(rng, wrappers);
+  const cmd = `${w[1]}${base}${w[2]}`;
+  return { command: cmd, base, layers: ["gotcha1-trailing-delim", w[0]] };
+};
+
+// Gotcha #2: nested sub-shell inside eval/bash -c — `bash -c "(axhub ...)"`
+// or `eval "bash -c \"axhub ...\""`. Tests recursive collectCommandPositions.
+const gotcha2 = (rng: Rand): Variant => {
+  const base = pick(rng, TIGHT_BASES);
+  const inner = pick(rng, [
+    `(${base})`,
+    `$(${base})`,
+    `\`${base}\``,
+  ]);
+  const outer = pick(rng, [
+    (s: string) => `bash -c "${s}"`,
+    (s: string) => `sh -c "${s}"`,
+    (s: string) => `zsh -c '${s}'`,
+    (s: string) => `eval "${s.replace(/"/g, '\\"')}"`,
+    (s: string) => `eval '${s.replace(/'/g, "'\\''")}'`,
+  ]);
+  const cmd = outer(inner);
+  return { command: cmd, base, layers: ["gotcha2-nested-shell"] };
+};
+
+// Gotcha #3: quoted subcommand tokens — `axhub "deploy" "create" ...`.
+// Parser must strip surrounding quotes from each token.
+const gotcha3 = (rng: Rand): Variant => {
+  const base = pick(rng, TIGHT_BASES);
+  const tokens = base.split(/\s+/);
+  // Quote tokens 1 and 2 (the subcommand pair). Use random quote style.
+  const q = pick(rng, ['"', "'"]);
+  if (tokens.length >= 3) {
+    tokens[1] = `${q}${tokens[1]}${q}`;
+    tokens[2] = `${q}${tokens[2]}${q}`;
+  }
+  const cmd = tokens.join(" ");
+  return { command: cmd, base, layers: ["gotcha3-quoted-sub", q === '"' ? "dq" : "sq"] };
+};
+
+const generateGotchaVariant = (rng: Rand, idx: number): Variant => {
+  // Round-robin: 0,3,6... → gotcha1; 1,4,7... → gotcha2; 2,5,8... → gotcha3.
+  const which = idx % 3;
+  if (which === 0) return gotcha1(rng);
+  if (which === 1) return gotcha2(rng);
+  return gotcha3(rng);
+};
+
+// ---------------------------------------------------------------------------
+// Main: generate VARIANT_COUNT standard + GOTCHA_COUNT gotcha variants.
 // ---------------------------------------------------------------------------
 const VARIANT_COUNT = 1000;
+const GOTCHA_COUNT = 100;
+const TOTAL_COUNT = VARIANT_COUNT + GOTCHA_COUNT;
 
 const main = (): number => {
   const seedArg = process.argv[2];
@@ -293,7 +370,9 @@ const main = (): number => {
   const rng = mulberry32(seed);
 
   const seedDisplay = "0x" + seed.toString(16).padStart(8, "0");
-  process.stdout.write(`fuzz-parser: seed=${seedDisplay} variants=${VARIANT_COUNT}\n`);
+  process.stdout.write(
+    `fuzz-parser: seed=${seedDisplay} variants=${TOTAL_COUNT} (${VARIANT_COUNT} standard + ${GOTCHA_COUNT} gotcha)\n`,
+  );
 
   let caught = 0;
   const bypasses: Array<{ idx: number; v: Variant }> = [];
@@ -309,13 +388,24 @@ const main = (): number => {
     }
   }
 
+  for (let g = 0; g < GOTCHA_COUNT; g++) {
+    const v = generateGotchaVariant(rng, g);
+    const r = parseAxhubCommand(v.command);
+    const isDestructive = r.is_destructive === true || r.action !== undefined;
+    if (isDestructive) {
+      caught++;
+    } else {
+      bypasses.push({ idx: VARIANT_COUNT + g, v });
+    }
+  }
+
   if (bypasses.length === 0) {
-    process.stdout.write(`${caught}/${VARIANT_COUNT} caught\n`);
+    process.stdout.write(`${caught}/${TOTAL_COUNT} caught\n`);
     return 0;
   }
 
   process.stdout.write(
-    `${caught}/${VARIANT_COUNT} caught — ${bypasses.length} BYPASS(ES) FOUND:\n`,
+    `${caught}/${TOTAL_COUNT} caught — ${bypasses.length} BYPASS(ES) FOUND:\n`,
   );
   // Cap detail output so a wide bypass doesn't flood CI logs.
   const showMax = Math.min(bypasses.length, 25);
