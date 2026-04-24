@@ -1,0 +1,10 @@
+{
+  "input": {
+    "command": "true && axhub deploy create --app paydrop --branch main --commit abc --json"
+  },
+  "expected": {
+    "is_destructive": true,
+    "action": "deploy_create"
+  },
+  "description": "&&-chain — destructive command in second position"
+}

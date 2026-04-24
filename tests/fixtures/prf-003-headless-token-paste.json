@@ -1,0 +1,10 @@
+{
+  "input": {
+    "command": "axhub auth login --print-token"
+  },
+  "expected": {
+    "is_destructive": true,
+    "action": "auth_login"
+  },
+  "description": "Headless token-paste flow (auth login without browser)"
+}

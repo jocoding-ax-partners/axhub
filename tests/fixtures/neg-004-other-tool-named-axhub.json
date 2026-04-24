@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "axhubctl status"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "Different tool whose name starts with 'axhub' (no subcommand match) — NOT destructive"
+}

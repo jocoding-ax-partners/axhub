@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "ls -la"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "Random non-axhub bash command — must NOT be destructive"
+}

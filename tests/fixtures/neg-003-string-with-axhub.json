@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "echo 'axhub deploy create --app paydrop'"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "String containing 'axhub deploy create' — echo only, NOT executable"
+}

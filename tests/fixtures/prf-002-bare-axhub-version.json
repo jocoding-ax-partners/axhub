@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "axhub --version"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "Bare axhub --version (read-only diagnostic, not destructive)"
+}

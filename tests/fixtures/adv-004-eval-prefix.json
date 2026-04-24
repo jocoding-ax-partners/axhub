@@ -1,0 +1,10 @@
+{
+  "input": {
+    "command": "eval \"axhub deploy create --app paydrop --branch main --commit abc --json\""
+  },
+  "expected": {
+    "is_destructive": true,
+    "action": "deploy_create"
+  },
+  "description": "Eval prefix bypass attempt"
+}

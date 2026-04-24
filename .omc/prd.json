@@ -1,85 +1,93 @@
 {
-  "task": "Bug hunt Tier 1 quick-wins (consensus plan §6 Fixes 1.1-1.6 subset). 5 stories addressing Q1/Q2/Q4/Q5 + script gate fix. Mechanical edits, ~2 hours. Phase 2 (Q3 5-arch binaries, fixture suite, fuzzer, manifest assertions) deferred to next ralph.",
+  "task": "Phase 2 hardening (deferred from Tier 1 ralph). 5 stories: 5-arch binary distribution + install.sh, 38 hand-curated fixture pinning, parser-drift fuzzer, 88 manifest spec assertions, observability meta envelope. Estimated 12-17 hours total. Order matters: US-101 (binaries) foundation, US-102+US-103+US-104 testing infra parallel-safe, US-105 telemetry last.",
   "createdAt": "2026-04-24T04:00:00Z",
   "stories": [
     {
-      "id": "US-001",
-      "title": "DROP allowed-tools from skills/deploy/SKILL.md frontmatter (Q1)",
+      "id": "US-101",
+      "title": "5-arch helper binary distribution + install.sh OS/arch detection",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "skills/deploy/SKILL.md frontmatter: allowed-tools key 완전 제거",
-        "Frontmatter has only name + description (other 10 skills와 일치)",
-        "bun run typecheck + bun run build 통과",
-        "76 tests 모두 그대로 pass"
+        "bun run build:all 성공 — 5개 outputs: bin/axhub-helpers-darwin-arm64, darwin-amd64, linux-amd64, linux-arm64, windows-amd64.exe",
+        "각 binary 파일 크기 < 120MB (sanity, bun runtime overhead 고려), 각각 실행 가능 (file 명령어로 architecture 확인)",
+        "bin/install.sh 작성 (executable, POSIX shell): uname -s + uname -m으로 OS+arch 감지 후 ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers symlink 생성. macOS arm64 → axhub-helpers-darwin-arm64, Linux x86_64 → axhub-helpers-linux-amd64 등. unsupported arch → exit 1 with Korean error message",
+        "hooks.json + commands/*.md에서 ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers 그대로 (install.sh가 symlink 처리)",
+        "PostInstall hook이 install.sh 자동 실행 (또는 README에 manual 1-step 명시)",
+        "tests/install.test.sh: install.sh의 OS/arch detection을 4가지 mock 환경에서 실행 (uname mock) — 4 PASS expected"
       ],
-      "owner": null
+      "owner": null,
+      "blockedBy": []
     },
     {
-      "id": "US-002",
-      "title": "2 missing reference files 작성 (Q2): privacy-filter.md + headless-flow.md",
+      "id": "US-104",
+      "title": "88 manifest spec assertions (Phase 6 plugin-validator regen + actual loader test)",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "skills/apis/references/privacy-filter.md 작성 (현재 skills/apis/SKILL.md:88 referenced 안 됨, 새로 referencing 추가). Content: cross-team API leak 방지 패턴 (PLAN §16.17/E13). Default --app-id scope, AskUserQuestion before cross-team list, audit log to ~/.cache/axhub-plugin/cross-team-list.ndjson",
-        "skills/deploy/references/headless-flow.md 작성. 현재 recovery-flows.md의 headless-auth section을 standalone reference로 분리 (Critic recommendation: drop OR extend recovery-flows). 결정: standalone (다른 skills에서 reuse 가능). Content: $CODESPACES detection, no-DISPLAY/no-`open` fallback, token-paste flow + Korean copy-from-laptop instructions",
-        "skills/apis/SKILL.md body에 'For cross-team scope filter rules, see references/privacy-filter.md' 라인 추가",
-        "skills/auth/SKILL.md body에 'For headless/Codespaces auth flow, see ../deploy/references/headless-flow.md' 라인 추가",
-        "tests/docs-link-audit.sh 작성 (간단 grep + jq), 모든 references 링크 resolve 확인 (broken=0)"
+        "tests/manifest.test.ts 작성. 88개 이상 단위 assertion (describe block 단위 카운트, expect 카운트 88+)",
+        "Coverage: plugin.json schema (15+ assertions: required keys, repository as string not object, version semver, license, etc), hooks.json structure (10+: outer wrapper, hookEventName presence in hookSpecificOutput, valid event names, command shape), commands/*.md frontmatter (10+: argument-hint optional, allowed-tools optional, description required), skills/*/SKILL.md frontmatter (15+: name + description only, no allowed-tools, length limits), agent definitions if any, marketplace.json (10+ if exists), CLAUDE.md/AGENTS.md presence",
+        "Test failures from real bug history: hookEventName missing → fail, repository as object → fail, allowed-tools in skill → fail (Phase 6 actual incidents)",
+        "bun test → 추가된 manifest test 모두 PASS, 기존 93 tests 유지 (총 181+)",
+        "tests/manifest.test.ts 문서: 각 describe block 위에 'Reason: <Phase 6 incident X>' 주석"
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-004",
-      "title": "auth/SKILL.md에 consent-mint step 추가 (Q4 reversal)",
+      "id": "US-103",
+      "title": "Parser-drift fuzzer for parseAxhubCommand defense-in-depth",
       "priority": 3,
       "passes": true,
       "acceptanceCriteria": [
-        "skills/auth/SKILL.md workflow에 'axhub auth login' bash call 직전 'axhub-helpers consent-mint --action auth_login --app-id _ --profile _ --branch _ --commit _' 단계 추가",
-        "Body에 명확히 설명: token-paste path도 동일 consent gate 적용 (PreToolUse hook이 binding 검증)",
-        "Smoke: skills/auth invocation 시 PreToolUse 가 deny 안 함 (consent token mint 후)",
-        "76 tests 그대로 pass (no regression)"
+        "tests/fuzz-parser.ts 작성. 1000+ randomized destructive variant generator: env-prefix (FOO=bar axhub deploy create), sub-shell ($(axhub deploy create)), eval (eval axhub deploy create), &&-chain (true && axhub deploy create), ;-chain, parens, backticks, quote escapes (axhub \"deploy\" \"create\"), tab/whitespace insertion, Unicode equivalents",
+        "Each generated variant of a destructive base command MUST produce: parseAxhubCommand(variant).is_destructive === true (or action defined). 0 false negatives across 1000 iterations",
+        "Reproducibility: bun run fuzz [seed] — same seed = same variants. Default seed = 0xAxHub42 or similar",
+        "package.json scripts: 'fuzz': 'bun tests/fuzz-parser.ts'",
+        "Run output: '1000/1000 variants caught' or list of bypasses (must be 0)",
+        "Add to smoke:full: bun run fuzz with deterministic seed"
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-005",
-      "title": "deploy_logs_kill 예약 주석 + dead-path unit test (Q5 reversal)",
+      "id": "US-102",
+      "title": "38 hand-curated fixture pinning (anti-regression frozen test set)",
       "priority": 4,
       "passes": true,
       "acceptanceCriteria": [
-        "src/axhub-helpers/consent.ts:31 (ConsentBinding action union) + index.ts:75 (VALID_ACTIONS) 양쪽에 주석 '// reserved for v0.2 signal-kill protection; currently unreachable in v0.1.0 CLI' 추가",
-        "tests/consent.test.ts 새 test: 'deploy_logs_kill is currently unreachable' — corpus.100의 모든 destructive utterance에 대해 parseAxhubCommand 결과 action !== 'deploy_logs_kill' 검증 (negative test)",
-        "또는 더 직접적: parseAxhubCommand 호출 with v0.1.0 CLI 모든 valid command surface (apps list, apis list, deploy create, deploy logs, deploy logs --follow, auth login, update check, update apply) → action 'deploy_logs_kill' 한 번도 안 나오는지 assert",
-        "bun test → 76+1 pass / 0 fail"
+        "tests/fixtures/ directory with 38 .json files. Each fixture name: <category>-<id>.json (e.g., destructive-001-deploy-create.json, ro-005-apps-list.json, adv-008-env-prefix.json, uni-002-cyrillic-homoglyph.json, prf-001-bare-axhub.json, hdl-001-codespaces-detect.json)",
+        "Categories distribution: 10 destructive, 8 read-only, 8 adversarial, 4 unicode, 4 profile/headless, 4 negative (false-positive checks)",
+        "Each fixture schema: { input: { utterance, command? }, expected: { is_destructive, action?, app_id?, branch?, commit_sha?, profile?, exit_code_class? } }",
+        "tests/fixtures.test.ts 작성: glob tests/fixtures/*.json, for each fixture run parseAxhubCommand (or full pipeline) and assert deep-equal against expected",
+        "Frozen: any change to expected output requires explicit fixture update (forces a conscious 'we are changing semantics' moment)",
+        "Documentation: tests/fixtures/README.md explains curation methodology, categories, and update protocol"
       ],
       "owner": null,
-      "blockedBy": []
+      "blockedBy": ["US-103"]
     },
     {
-      "id": "US-006",
-      "title": "package.json smoke:full script + tests/docs-link-audit.sh (gate runnability fix)",
+      "id": "US-105",
+      "title": "Observability meta envelope (opt-in telemetry to ${XDG_STATE_HOME}/axhub-plugin/usage.jsonl)",
       "priority": 5,
       "passes": true,
       "acceptanceCriteria": [
-        "package.json scripts에 'smoke:full' 추가: 'bun run build:all && for f in bin/axhub-helpers-*; do echo \"--- $f ---\"; \"$f\" version && \"$f\" help; done'. (Critic Major #1 fix)",
-        "bun run smoke:full → 5 binaries × 2 subcommands = 10 successful runs (또는 architecture availability에 따라 native arch만 build).  실제 cross-arch build 환경 없으면: 'smoke:full' 명령은 'smoke' alias로 시작 + TODO 주석 (Q3 binary distribution이 next ralph에서 ship 후 채움)",
-        "tests/docs-link-audit.sh 작성 (US-002와 일치): 모든 SKILL.md 안의 'references/' 링크 추출 → 파일 존재 확인 → 0 broken links",
-        "tests/docs-link-audit.baseline.txt 생성 (artifact, US-002 fix 후 = empty)",
-        "bun run smoke:full + tests/docs-link-audit.sh 둘 다 exit 0"
+        "src/axhub-helpers/telemetry.ts 작성: emitMetaEnvelope({event, ...payload}) — wraps payload with {ts: ISO8601 UTC, session_id: $CLAUDE_SESSION_ID, plugin_version: '0.1.0', cli_version: <axhub --version>, helper_version: '0.1.0', event, ...payload}",
+        "Opt-in only: AXHUB_TELEMETRY=1 environment variable required. Default disabled (no writes, no env reads beyond gate).",
+        "Write target: ${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/usage.jsonl (append, one JSON line per event, mode 0600 like consent files)",
+        "Wrap key emissions: cmdSessionStart, cmdPreauthCheck (decisions deny/allow), cmdConsentMint (mint result), cmdClassifyExit (exit code class). Helper internal only — skill prose untouched.",
+        "tests/telemetry.test.ts: 6+ assertions — opt-out default (no writes when AXHUB_TELEMETRY unset), opt-in writes (when AXHUB_TELEMETRY=1), envelope shape, file mode 0600, append (not overwrite), JSON-per-line format",
+        "skills/deploy/references/telemetry.md (NEW): documents opt-in flag + envelope schema + privacy guarantee (no PII, no command args echoed verbatim, only event types + counts + version metadata)"
       ],
       "owner": null,
-      "blockedBy": ["US-002"]
+      "blockedBy": ["US-101"]
     }
   ],
   "metadata": {
-    "task_origin": "/oh-my-claudecode:ralph + team — bug hunt Tier 1 quick wins from consensus plan",
-    "consensus_plan": ".omc/plans/bug-hunt-systematic.md (3856w, iter 2 consensus, ITERATE → minor fixes only)",
+    "task_origin": "/oh-my-claudecode:ralph 페이즈2 진행해 — Phase 2 hardening from Tier 1 deferred backlog",
+    "tier1_predecessor": ".omc/plans/bug-hunt-systematic.md (consensus iter 2) + Tier 1 PRD (5/5 shipped 063e849)",
     "deslop": "enabled",
     "critic": "architect",
-    "phase_2_deferred": "Q3 5-arch binary distribution (calendar 4-25/4-28), 38 hand-curated fixture pinning, parser-drift fuzzer, 88 manifest spec assertions, observability meta envelope",
-    "scope_note": "Phase 1 only — mechanical edits + 1 test + 2 doc files + 1 script. Estimated ~2 hours. Phase 2 separately."
+    "phase_3_deferred": "Marketplace publish prep (cosign signing, goreleaser), first-customer pilot (1 company × 5 vibe coders × 1 week), real ax-hub-cli staging E2E, codegen catalog→markdown sync (architect M1 §3), expected_cmd_pattern on T-RO rows (architect M2.5 §3)",
+    "scope_note": "Phase 2 = 5 stories ~12-17 hours total. Foundation US-101 first, then test infra US-104+US-103 (parallel-safe), then US-102 (fixtures depend on stable parser from US-103), then US-105 telemetry."
   }
 }

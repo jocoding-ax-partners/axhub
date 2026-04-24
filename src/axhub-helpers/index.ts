@@ -35,6 +35,7 @@ import { classify } from "./catalog.ts";
 import { redact } from "./redact.ts";
 import { runPreflight } from "./preflight.ts";
 import { runResolve } from "./resolve.ts";
+import { emitMetaEnvelope } from "./telemetry.ts";
 
 // CLI I/O primitives: stdout for protocol payloads (JSON to hooks/skills),
 // stderr for diagnostics. Avoids console.log to keep this binary's contract
@@ -173,6 +174,7 @@ async function cmdSessionStart(_args: string[]): Promise<number> {
   out({
     systemMessage: `[axhub] M0 scaffold: session-start placeholder. Plugin v${PLUGIN_VERSION} loaded.`,
   });
+  await emitMetaEnvelope({ event: "session_start" });
   return 0;
 }
 
@@ -190,6 +192,7 @@ async function cmdPreauthCheck(_args: string[]): Promise<number> {
 
   if (!payload || payload.tool_name !== "Bash") {
     out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } });
+    await emitMetaEnvelope({ event: "preauth_check_allow", reason: "non_bash" });
     return 0;
   }
 
@@ -197,6 +200,7 @@ async function cmdPreauthCheck(_args: string[]): Promise<number> {
   const parsed = parseAxhubCommand(cmd);
   if (!parsed.is_destructive) {
     out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } });
+    await emitMetaEnvelope({ event: "preauth_check_allow", reason: "non_destructive" });
     return 0;
   }
 
@@ -220,6 +224,7 @@ async function cmdPreauthCheck(_args: string[]): Promise<number> {
   const result = await verifyToken(binding);
   if (result.valid) {
     out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } });
+    await emitMetaEnvelope({ event: "preauth_check_allow", reason: "consent_verified", action: parsed.action });
     return 0;
   }
 
@@ -228,6 +233,7 @@ async function cmdPreauthCheck(_args: string[]): Promise<number> {
     systemMessage:
       "이 명령은 사전 승인이 필요해요. 먼저 'paydrop 배포해'라고 말해서 승인 카드를 받으세요.",
   });
+  await emitMetaEnvelope({ event: "preauth_check_deny", action: parsed.action });
   return 0;
 }
 
@@ -242,6 +248,7 @@ async function cmdConsentMint(_args: string[]): Promise<number> {
   }
   const result = await mintToken(binding, CONSENT_TOKEN_TTL_SEC);
   out(result);
+  await emitMetaEnvelope({ event: "consent_mint", action: binding.action });
   return 0;
 }
 
@@ -316,6 +323,7 @@ async function cmdClassifyExit(_args: string[]): Promise<number> {
   }
 
   out({ systemMessage });
+  await emitMetaEnvelope({ event: "classify_exit", exit_code: exitCode, command_class: command.split(/\s+/).slice(0, 3).join(" ") });
   return 0;
 }
 

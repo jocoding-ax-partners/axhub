@@ -1,0 +1,13 @@
+{
+  "input": {
+    "command": "axhub deploy create --app paydrop --branch main --commit abc123"
+  },
+  "expected": {
+    "is_destructive": true,
+    "action": "deploy_create",
+    "app_id": "paydrop",
+    "branch": "main",
+    "commit_sha": "abc123"
+  },
+  "description": "Bare deploy create with all required flags"
+}

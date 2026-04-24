@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "axhub apps list --json --per-page=10"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "Apps list with pagination"
+}

@@ -13,9 +13,10 @@
     "build:windows-amd64":"bun build src/axhub-helpers/index.ts --compile --target=bun-windows-x64  --outfile bin/axhub-helpers-windows-amd64.exe",
     "build:all": "bun run build:darwin-arm64 && bun run build:darwin-amd64 && bun run build:linux-amd64 && bun run build:linux-arm64 && bun run build:windows-amd64",
     "smoke": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help",
-    "smoke:full": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help && ./bin/axhub-helpers session-start </dev/null && bash tests/docs-link-audit.sh",
+    "smoke:full": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help && ./bin/axhub-helpers session-start </dev/null && bash tests/docs-link-audit.sh && bun run fuzz",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "fuzz": "bun tests/fuzz-parser.ts"
   },
   "engines": {
     "bun": ">=1.1.0"

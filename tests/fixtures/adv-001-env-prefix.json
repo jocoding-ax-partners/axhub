@@ -1,0 +1,10 @@
+{
+  "input": {
+    "command": "FOO=bar axhub deploy create --app paydrop --branch main --commit abc"
+  },
+  "expected": {
+    "is_destructive": true,
+    "action": "deploy_create"
+  },
+  "description": "Env-prefix bypass attempt — must still detect destructive"
+}

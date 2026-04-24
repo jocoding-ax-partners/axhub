@@ -1,0 +1,10 @@
+{
+  "input": {
+    "command": "axhub deploy create --app pay‍drop --branch main --commit abc --json"
+  },
+  "expected": {
+    "is_destructive": true,
+    "action": "deploy_create"
+  },
+  "description": "Zero-width joiner inside app slug — parser still flags destructive"
+}

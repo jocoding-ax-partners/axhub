@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "axhub apps list --json"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "Apps list — pure read, no consent gate"
+}

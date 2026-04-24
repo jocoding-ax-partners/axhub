@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "axhub --help"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "axhub --help (info-only, not destructive)"
+}

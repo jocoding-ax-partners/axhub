@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "axhub auth status --json"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "Auth status query (no token mutation)"
+}

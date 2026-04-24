@@ -192,3 +192,91 @@ UPDATED:
 - Critic reversal pattern: Architect proposed "remove unused action" twice (Q4 auth_login, Q5 deploy_logs_kill). Critic correctly caught both as regressions — Q4 because token-paste path bypasses gate, Q5 because removing recoverable design intent forces HMAC schema migration when v0.2 ships. Lesson: keep narrowly-scoped reservation comments + dead-path tests rather than deleting.
 - Audit script with grep + relative-path resolve catches stale sibling references the typecheck and tests cannot. Should add to pre-commit gate eventually (M3 task).
 - Sibling skills using bare `references/X.md` for files in another skill's dir is a recurring drift pattern. Document the canonical path convention in CLAUDE.md or skills/README.md (M3 task).
+
+## Iteration 6 — Phase 2 hardening (5 stories from Tier 1 deferred backlog)
+
+### Implemented (all 5 PRD stories passes:true)
+
+**US-101 — 5-arch helper binary distribution + install.sh**:
+- bun run build:all → 5 binaries: bin/axhub-helpers-{darwin-arm64 (58.3M), darwin-amd64 (63.0M), linux-amd64 (99.2M), linux-arm64 (96.8M), windows-amd64.exe (109.6M)}
+- file confirms architectures: Mach-O arm64/x86_64, ELF x86-64/aarch64, PE32+ x86-64
+- bin/install.sh (NEW, executable): POSIX shell, AXHUB_OS/AXHUB_ARCH env overrides, 5-arch detection ladder, Windows arm64 gate, Korean error messages for unsupported envs
+- tests/install.test.sh (NEW, executable): 8/8 PASS (5 positive + 3 negative). Uses scratch dir + env override pattern (no uname stubbing)
+- README.md installation section adds bin/install.sh step
+
+**US-102 — 38 hand-curated fixture pinning**:
+- tests/fixtures/_curated.ts (NEW): generator source-of-truth with 38 typed Fixture entries
+- tests/fixtures/*.json (NEW × 38): 10 destructive, 8 ro, 8 adv, 4 uni, 4 prf, 4 neg
+- tests/fixtures.test.ts (NEW): readdirSync glob, 46 tests / 0 fail / 201 expect()
+- tests/fixtures/README.md (NEW): curation methodology + frozen-by-design update protocol
+
+**US-103 — Parser-drift fuzzer** (opus executor):
+- tests/fuzz-parser.ts (NEW, 258 lines): mulberry32 PRNG, 1000 variants combining env-prefix, structural wrappers (13 types: $(), backticks, &&, ||, ;, |, bash/sh/zsh/dash/ksh -c, eval × 2, parens), tab/multi-space + Unicode whitespace mutations
+- "1000/1000 caught" exit 0, reproducible (same seed = same output)
+- package.json scripts: "fuzz" + smoke:full extension
+- 3 scope-deferred parser gotchas documented (Unicode WS, eval-of-eval, recursive shell tokenization) — Phase 3 backlog
+
+**US-104 — 88 manifest spec assertions**:
+- tests/manifest.test.ts (NEW, 580 lines, 86 tests, 358 expect()): 7 describe groups (plugin.json schema, marketplace.json, hooks.json structure, hookSpecificOutput field validation, commands frontmatter, skills frontmatter, cross-consistency)
+- Each describe has Reason: Phase 6 incident X header
+- Direct regression assertions for actual loader bugs: repository as STRING (incident #1), hookEventName presence (incident #2), allowed-tools absence (Q1 finding)
+
+**US-105 — Telemetry meta envelope (opt-in)**:
+- src/axhub-helpers/telemetry.ts (NEW, 78 lines): emitMetaEnvelope, AXHUB_TELEMETRY=1 gate (default OFF), XDG_STATE_HOME/axhub-plugin/usage.jsonl mode 0600 append, cli_version cache, error swallow
+- src/axhub-helpers/index.ts: 7 emit sites added (cmdSessionStart, cmdPreauthCheck × 4 paths, cmdConsentMint, cmdClassifyExit). Additive only — no behavior change when opted out
+- tests/telemetry.test.ts (NEW, 16 tests / 27 expect()): opt-in gate (3 cases), envelope shape (6 cases), file behavior (4 cases), error swallowing (2 cases)
+- skills/deploy/references/telemetry.md (NEW): privacy contract, schema, events list, why opt-in rationale
+
+### Architect verification (opus)
+
+APPROVE — all 5 US verified with file evidence + bash command outputs. Noted scope-deferred parser gotchas as Phase 3 candidates (not blockers). Suggested polish: comment near manifest test count assertion explaining literal-grep vs runtime-expect-count discrepancy.
+
+### Deslop pass (ai-slop-cleaner skill)
+
+Zero slop. Korean copy in telemetry docs required by skill conventions. install.sh is single-responsibility. Reservation comments and dead-path tests are intentional safety nets per Critic iter 1 (Phase 1 lesson). Generator + serialized .json fixture pattern is the trade-off frozen-by-design intent requires. No edits.
+
+### Post-deslop regression lock
+
+- bun test → 241 pass / 0 fail / 789 expect() calls (vs Phase 1 baseline 93 → +148 from US-102/103/104/105)
+- bun run typecheck → 0 errors
+- bash tests/docs-link-audit.sh → Broken: 0
+- bun run smoke:full → exit 0 (build + version + help + session-start + audit + fuzz "1000/1000 caught")
+
+### Files changed (this iteration)
+
+NEW:
+- bin/install.sh (executable)
+- tests/install.test.sh (executable)
+- tests/fixtures/_curated.ts (generator)
+- tests/fixtures.test.ts (loader test)
+- tests/fixtures/README.md (methodology)
+- tests/fixtures/*.json (× 38 frozen contracts)
+- tests/fuzz-parser.ts (opus, 258 lines)
+- tests/manifest.test.ts (580 lines)
+- tests/telemetry.test.ts (16 tests)
+- src/axhub-helpers/telemetry.ts (78 lines)
+- skills/deploy/references/telemetry.md
+
+UPDATED:
+- src/axhub-helpers/index.ts (6 emit calls + import)
+- package.json (fuzz script + smoke:full extension)
+- README.md (install.sh step)
+- .omc/{prd.json, progress.txt}
+
+### Phase 3 deferred backlog
+
+- 3 parser gotchas surfaced by fuzzer iteration: Unicode whitespace separators inside subcommand tokens, eval-of-eval recursion, recursive shell tokenization on bash -c "$(...)"
+- Marketplace publish prep (cosign signing, goreleaser pipeline)
+- First-customer pilot (1 company × 5 vibe coders × 1 week)
+- Real ax-hub-cli staging E2E (not just helper unit tests)
+- Codegen catalog → markdown sync (architect M1 §3)
+- expected_cmd_pattern on T-RO corpus rows (architect M2.5 §3)
+
+### Learnings
+
+- Sub-agent 1M context inheritance fails when parent has the flag set; spawned executors error with "Extra usage required for 1M context". Workaround: do work directly OR launch agents in fresh sessions. Phase 2 had 2 agents fail this way (US-104 + US-105 sonnet) → recovered by inline implementation.
+- Generator + serialized .json contract pattern works well for "frozen by design" testing. README + commit-both protocol prevents drift. Bonus: external tools can consume .json directly without TS toolchain.
+- Bun cross-arch compile is mature: `bun build --compile --target=bun-{os}-{arch}` produces working binaries for 5 targets in <2s each. Windows binary largest at 109.6M (PE32+ runtime overhead) — 120MB threshold appropriate.
+- Phase 6 plugin-validator agent pre-empted bug class A (manifest shape) but missed real loader edge cases (object repository, missing hookEventName). Real loader testing is non-substitutable. Persistent assertions in tests/manifest.test.ts are the regression gate.
+- Mulberry32 PRNG (10 lines, 32-bit period) is sufficient for fuzz reproducibility. Don't reach for crypto-grade RNG when seed-determinism is the only requirement.
+- Telemetry opt-in default-OFF posture is the right tradeoff for B2B vibe-coder tool — surprise data collection in any session would erode trust faster than the analytics value.

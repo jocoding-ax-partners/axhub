@@ -1,0 +1,10 @@
+{
+  "input": {
+    "command": "axhub deploy create --app=pay drop --branch=main --commit=abc --json"
+  },
+  "expected": {
+    "is_destructive": true,
+    "action": "deploy_create"
+  },
+  "description": "Non-breaking space (U+00A0) inside flag value"
+}

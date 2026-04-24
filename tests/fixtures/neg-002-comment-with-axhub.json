@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "# This will run axhub deploy create later"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "Comment containing 'axhub deploy' — must NOT be destructive"
+}

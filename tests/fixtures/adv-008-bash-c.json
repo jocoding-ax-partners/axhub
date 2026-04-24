@@ -1,0 +1,10 @@
+{
+  "input": {
+    "command": "bash -c \"axhub deploy create --app paydrop --branch main --commit abc --json\""
+  },
+  "expected": {
+    "is_destructive": true,
+    "action": "deploy_create"
+  },
+  "description": "bash -c wrapper — destructive in shell-string"
+}

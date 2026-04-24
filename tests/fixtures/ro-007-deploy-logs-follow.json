@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "axhub deploy logs dep_42 --follow --source pod --json"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "Deploy logs with --follow (SSE stream, still read-only)"
+}

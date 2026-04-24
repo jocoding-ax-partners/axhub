@@ -1,0 +1,10 @@
+{
+  "input": {
+    "command": "AXHUB_REQUIRE_COSIGN=1 axhub update apply --yes --json"
+  },
+  "expected": {
+    "is_destructive": true,
+    "action": "update_apply"
+  },
+  "description": "Update apply with cosign required env (default-on per Phase 6 §16.10)"
+}

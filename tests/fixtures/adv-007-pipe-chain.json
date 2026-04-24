@@ -1,0 +1,10 @@
+{
+  "input": {
+    "command": "echo hi | axhub deploy create --app paydrop --branch main --commit abc --json"
+  },
+  "expected": {
+    "is_destructive": true,
+    "action": "deploy_create"
+  },
+  "description": "Pipe chain — destructive in second position"
+}

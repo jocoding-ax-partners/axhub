@@ -1,0 +1,13 @@
+{
+  "input": {
+    "command": "axhub deploy create --app paydrop --branch feat/auth --commit deadbeef"
+  },
+  "expected": {
+    "is_destructive": true,
+    "action": "deploy_create",
+    "app_id": "paydrop",
+    "branch": "feat/auth",
+    "commit_sha": "deadbeef"
+  },
+  "description": "Deploy create with feature branch (slash in branch name)"
+}

@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "axhub apis list --app-id 42 --json"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "APIs list scoped to current app (default-deny pattern)"
+}

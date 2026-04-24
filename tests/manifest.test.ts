@@ -1,0 +1,655 @@
+// Phase 2 US-104: Manifest spec assertions to prevent regression of bug class A
+// (manifest/JSON shape) discovered during Phase 6 actual loader testing.
+//
+// Each describe block has a Reason header citing the historical incident.
+// Total assertion count target: ≥88.
+
+import { describe, expect, test, beforeAll } from "bun:test";
+import { readFile, readdir, stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
+const REPO_ROOT = join(import.meta.dir, "..");
+
+interface PluginJson {
+  name: string;
+  version: string;
+  description: string;
+  author: { name: string; url?: string };
+  homepage?: string;
+  repository: string;
+  license: string;
+  keywords?: string[];
+}
+
+interface MarketplaceJson {
+  name: string;
+  owner: { name: string; url?: string };
+  plugins: Array<{ name: string; source: string; description: string; version: string }>;
+}
+
+interface PackageJson {
+  name: string;
+  version: string;
+  scripts: Record<string, string>;
+  engines?: Record<string, string>;
+  dependencies?: Record<string, string>;
+}
+
+interface HookConfig {
+  type: string;
+  command: string;
+  timeout?: number;
+}
+
+interface HookGroup {
+  matcher?: string;
+  hooks: HookConfig[];
+}
+
+interface HooksJson {
+  description?: string;
+  hooks: Record<string, HookGroup[]>;
+}
+
+let pluginJson: PluginJson;
+let marketplaceJson: MarketplaceJson;
+let packageJson: PackageJson;
+let hooksJson: HooksJson;
+let helperSource: string;
+
+beforeAll(async () => {
+  pluginJson = JSON.parse(await readFile(join(REPO_ROOT, ".claude-plugin/plugin.json"), "utf8"));
+  marketplaceJson = JSON.parse(await readFile(join(REPO_ROOT, ".claude-plugin/marketplace.json"), "utf8"));
+  packageJson = JSON.parse(await readFile(join(REPO_ROOT, "package.json"), "utf8"));
+  hooksJson = JSON.parse(await readFile(join(REPO_ROOT, "hooks/hooks.json"), "utf8"));
+  helperSource = await readFile(join(REPO_ROOT, "src/axhub-helpers/index.ts"), "utf8");
+});
+
+// ---------------------------------------------------------------------------
+// Reason: Phase 6 incident — Claude Code loader rejected `repository: {type, url}` object
+// (must be string). Persist hard assertions on plugin.json shape.
+// ---------------------------------------------------------------------------
+describe("plugin.json schema", () => {
+  test("name field present and matches kebab-case", () => {
+    expect(pluginJson.name).toBeTypeOf("string");
+    expect(pluginJson.name).toMatch(/^[a-z][a-z0-9-]*$/);
+  });
+
+  test("name is exactly 'axhub'", () => {
+    expect(pluginJson.name).toBe("axhub");
+  });
+
+  test("version is semver", () => {
+    expect(pluginJson.version).toMatch(/^\d+\.\d+\.\d+(-[a-z0-9.]+)?$/);
+  });
+
+  test("description present and non-empty", () => {
+    expect(pluginJson.description).toBeTypeOf("string");
+    expect(pluginJson.description.length).toBeGreaterThan(20);
+  });
+
+  test("author is object with name", () => {
+    expect(pluginJson.author).toBeTypeOf("object");
+    expect(pluginJson.author.name).toBeTypeOf("string");
+  });
+
+  test("author.url is HTTPS URL", () => {
+    expect(pluginJson.author.url).toMatch(/^https:\/\//);
+  });
+
+  test("homepage is HTTPS URL", () => {
+    expect(pluginJson.homepage).toMatch(/^https:\/\//);
+  });
+
+  test("repository is STRING (not object) — Phase 6 incident #1", () => {
+    expect(pluginJson.repository).toBeTypeOf("string");
+    expect(typeof pluginJson.repository === "object").toBe(false);
+  });
+
+  test("repository ends in .git", () => {
+    expect(pluginJson.repository).toMatch(/\.git$/);
+  });
+
+  test("license is recognized SPDX identifier", () => {
+    expect(pluginJson.license).toMatch(/^(MIT|Apache-2\.0|BSD-3-Clause|ISC|GPL-3\.0(-only|-or-later)?)$/);
+  });
+
+  test("keywords is array if present", () => {
+    if (pluginJson.keywords) {
+      expect(Array.isArray(pluginJson.keywords)).toBe(true);
+      expect(pluginJson.keywords.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("keywords contain 'axhub'", () => {
+    expect(pluginJson.keywords).toContain("axhub");
+  });
+
+  test("no unknown top-level keys", () => {
+    const allowed = new Set(["name", "version", "description", "author", "homepage", "repository", "license", "keywords"]);
+    for (const key of Object.keys(pluginJson)) {
+      expect(allowed.has(key)).toBe(true);
+    }
+  });
+
+  test("version matches package.json version", () => {
+    expect(pluginJson.version).toBe(packageJson.version);
+  });
+
+  test("description mentions axhub", () => {
+    expect(pluginJson.description.toLowerCase()).toContain("axhub");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reason: marketplace.json must be loadable by Claude Code marketplace add.
+// ---------------------------------------------------------------------------
+describe("marketplace.json schema", () => {
+  test("name field present", () => {
+    expect(marketplaceJson.name).toBeTypeOf("string");
+    expect(marketplaceJson.name.length).toBeGreaterThan(0);
+  });
+
+  test("owner is object with name", () => {
+    expect(marketplaceJson.owner).toBeTypeOf("object");
+    expect(marketplaceJson.owner.name).toBeTypeOf("string");
+  });
+
+  test("owner.url is HTTPS URL", () => {
+    expect(marketplaceJson.owner.url).toMatch(/^https:\/\//);
+  });
+
+  test("plugins is non-empty array", () => {
+    expect(Array.isArray(marketplaceJson.plugins)).toBe(true);
+    expect(marketplaceJson.plugins.length).toBeGreaterThan(0);
+  });
+
+  test("each plugin has name", () => {
+    for (const p of marketplaceJson.plugins) {
+      expect(p.name).toBeTypeOf("string");
+    }
+  });
+
+  test("each plugin has source path", () => {
+    for (const p of marketplaceJson.plugins) {
+      expect(p.source).toBeTypeOf("string");
+    }
+  });
+
+  test("each plugin has description", () => {
+    for (const p of marketplaceJson.plugins) {
+      expect(p.description).toBeTypeOf("string");
+      expect(p.description.length).toBeGreaterThan(10);
+    }
+  });
+
+  test("each plugin has semver version", () => {
+    for (const p of marketplaceJson.plugins) {
+      expect(p.version).toMatch(/^\d+\.\d+\.\d+(-[a-z0-9.]+)?$/);
+    }
+  });
+
+  test("plugin name in marketplace matches plugin.json name", () => {
+    const axhub = marketplaceJson.plugins.find((p) => p.name === "axhub");
+    expect(axhub).toBeDefined();
+  });
+
+  test("plugin version in marketplace matches plugin.json version", () => {
+    const axhub = marketplaceJson.plugins.find((p) => p.name === "axhub")!;
+    expect(axhub.version).toBe(pluginJson.version);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reason: hooks.json must wrap event arrays in `hooks` outer key (Claude Code
+// loader convention — bare event-keyed object fails to load).
+// ---------------------------------------------------------------------------
+describe("hooks.json structure", () => {
+  test("outer wrapper has 'hooks' key", () => {
+    expect(hooksJson.hooks).toBeTypeOf("object");
+  });
+
+  test("description present and non-empty", () => {
+    expect(hooksJson.description).toBeTypeOf("string");
+    expect(hooksJson.description!.length).toBeGreaterThan(10);
+  });
+
+  test("contains SessionStart event", () => {
+    expect(hooksJson.hooks.SessionStart).toBeDefined();
+  });
+
+  test("contains PreToolUse event", () => {
+    expect(hooksJson.hooks.PreToolUse).toBeDefined();
+  });
+
+  test("contains PostToolUse event", () => {
+    expect(hooksJson.hooks.PostToolUse).toBeDefined();
+  });
+
+  test("each event value is an array", () => {
+    for (const [, group] of Object.entries(hooksJson.hooks)) {
+      expect(Array.isArray(group)).toBe(true);
+    }
+  });
+
+  test("each hook group has hooks array", () => {
+    for (const [, group] of Object.entries(hooksJson.hooks)) {
+      for (const g of group) {
+        expect(Array.isArray(g.hooks)).toBe(true);
+      }
+    }
+  });
+
+  test("each hook config has type 'command'", () => {
+    for (const [, group] of Object.entries(hooksJson.hooks)) {
+      for (const g of group) {
+        for (const h of g.hooks) {
+          expect(h.type).toBe("command");
+        }
+      }
+    }
+  });
+
+  test("each hook command references CLAUDE_PLUGIN_ROOT", () => {
+    for (const [, group] of Object.entries(hooksJson.hooks)) {
+      for (const g of group) {
+        for (const h of g.hooks) {
+          expect(h.command).toContain("${CLAUDE_PLUGIN_ROOT}");
+        }
+      }
+    }
+  });
+
+  test("each hook command references axhub-helpers binary", () => {
+    for (const [, group] of Object.entries(hooksJson.hooks)) {
+      for (const g of group) {
+        for (const h of g.hooks) {
+          expect(h.command).toContain("axhub-helpers");
+        }
+      }
+    }
+  });
+
+  test("each hook timeout is positive integer if set", () => {
+    for (const [, group] of Object.entries(hooksJson.hooks)) {
+      for (const g of group) {
+        for (const h of g.hooks) {
+          if (h.timeout !== undefined) {
+            expect(h.timeout).toBeGreaterThan(0);
+            expect(Number.isInteger(h.timeout)).toBe(true);
+          }
+        }
+      }
+    }
+  });
+
+  test("PreToolUse + PostToolUse have Bash matcher", () => {
+    expect(hooksJson.hooks.PreToolUse[0].matcher).toBe("Bash");
+    expect(hooksJson.hooks.PostToolUse[0].matcher).toBe("Bash");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reason: Phase 6 incident #2 — hookSpecificOutput in helper code missing
+// hookEventName field caused "Hook JSON output validation failed". Every
+// emission MUST include hookEventName.
+// ---------------------------------------------------------------------------
+describe("hookSpecificOutput field validation in src/axhub-helpers/index.ts", () => {
+  test("source contains hookSpecificOutput emissions", () => {
+    expect(helperSource).toContain("hookSpecificOutput");
+  });
+
+  test("every hookSpecificOutput object literal includes hookEventName", () => {
+    // Match the smallest object literal that contains `hookSpecificOutput`.
+    const matches = helperSource.match(/hookSpecificOutput:\s*\{[^}]+\}/g) ?? [];
+    expect(matches.length).toBeGreaterThan(0);
+    for (const m of matches) {
+      expect(m).toContain("hookEventName");
+    }
+  });
+
+  test("every hookEventName references a real Claude Code event", () => {
+    const validEvents = new Set(["PreToolUse", "PostToolUse", "SessionStart", "UserPromptSubmit", "Stop"]);
+    const events = helperSource.match(/hookEventName:\s*"([^"]+)"/g) ?? [];
+    expect(events.length).toBeGreaterThan(0);
+    for (const e of events) {
+      const name = e.match(/"([^"]+)"/)![1];
+      expect(validEvents.has(name)).toBe(true);
+    }
+  });
+
+  test("permissionDecision values are valid (allow|deny|ask)", () => {
+    const decisions = helperSource.match(/permissionDecision:\s*"([^"]+)"/g) ?? [];
+    for (const d of decisions) {
+      const value = d.match(/"([^"]+)"/)![1];
+      expect(["allow", "deny", "ask"].includes(value)).toBe(true);
+    }
+  });
+
+  test("at least one PreToolUse permissionDecision: deny path exists (gate works)", () => {
+    expect(helperSource).toMatch(/permissionDecision:\s*"deny"/);
+  });
+
+  test("at least one PreToolUse permissionDecision: allow path exists (escape valve)", () => {
+    expect(helperSource).toMatch(/permissionDecision:\s*"allow"/);
+  });
+
+  test("classify-exit emits systemMessage only on relevant exits", () => {
+    expect(helperSource).toMatch(/exit\s*0/i);
+    expect(helperSource).toContain("systemMessage");
+  });
+
+  test("source compiles to a valid TypeScript module (heuristic: has exports)", () => {
+    expect(helperSource).toMatch(/^(export|import)/m);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reason: commands/*.md frontmatter shape — Claude Code loader requires
+// `description` field; allowed-tools / argument-hint / model are optional.
+// ---------------------------------------------------------------------------
+describe("commands/*.md frontmatter", () => {
+  let cmdFiles: string[] = [];
+  const cmdContents = new Map<string, string>();
+
+  beforeAll(async () => {
+    const dir = join(REPO_ROOT, "commands");
+    cmdFiles = (await readdir(dir)).filter((f) => f.endsWith(".md"));
+    for (const f of cmdFiles) {
+      cmdContents.set(f, await readFile(join(dir, f), "utf8"));
+    }
+  });
+
+  test("at least one command file exists", () => {
+    expect(cmdFiles.length).toBeGreaterThan(0);
+  });
+
+  test("each command file has YAML frontmatter (--- delimited)", () => {
+    for (const [, content] of cmdContents) {
+      expect(content.startsWith("---\n")).toBe(true);
+      const closeIdx = content.indexOf("\n---\n", 4);
+      expect(closeIdx).toBeGreaterThan(0);
+    }
+  });
+
+  test("each command frontmatter has description field", () => {
+    for (const [, content] of cmdContents) {
+      const fm = content.split("\n---\n")[0].slice(4);
+      expect(fm).toMatch(/^description:\s*.+/m);
+    }
+  });
+
+  test("each command description is non-empty string", () => {
+    for (const [, content] of cmdContents) {
+      const m = content.match(/^description:\s*(.+)/m);
+      expect(m).not.toBeNull();
+      expect(m![1].trim().length).toBeGreaterThan(5);
+    }
+  });
+
+  test("each command description ≤200 chars", () => {
+    for (const [, content] of cmdContents) {
+      const m = content.match(/^description:\s*(.+)/m);
+      expect(m![1].length).toBeLessThanOrEqual(200);
+    }
+  });
+
+  test("commands without name in frontmatter (auto-derived from filename)", () => {
+    for (const [, content] of cmdContents) {
+      const fm = content.split("\n---\n")[0];
+      expect(fm).not.toMatch(/^name:\s/m);
+    }
+  });
+
+  test("model field if present is valid Claude model", () => {
+    const validModels = new Set(["sonnet", "opus", "haiku", "claude-sonnet-4-6", "claude-opus-4-7", "claude-haiku-4-5"]);
+    for (const [, content] of cmdContents) {
+      const m = content.match(/^model:\s*(.+)/m);
+      if (m) {
+        expect(validModels.has(m[1].trim())).toBe(true);
+      }
+    }
+  });
+
+  test("body section exists after frontmatter", () => {
+    for (const [, content] of cmdContents) {
+      const closeIdx = content.indexOf("\n---\n", 4);
+      const body = content.slice(closeIdx + 5).trim();
+      expect(body.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("argument-hint is non-empty string if present", () => {
+    for (const [, content] of cmdContents) {
+      const m = content.match(/^argument-hint:\s*"?(.+?)"?$/m);
+      if (m) {
+        expect(m[1].trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test("help command exists", () => {
+    expect(cmdFiles).toContain("help.md");
+  });
+
+  test("deploy command exists", () => {
+    expect(cmdFiles).toContain("deploy.md");
+  });
+
+  test("login command exists (auth entrypoint)", () => {
+    expect(cmdFiles).toContain("login.md");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reason: Phase 6 finding Q1 — skills/deploy/SKILL.md had `allowed-tools` in
+// frontmatter (over-spec; not part of skill spec). All 11 skills must use only
+// `name` + `description`.
+// ---------------------------------------------------------------------------
+describe("skills/*/SKILL.md frontmatter", () => {
+  let skillDirs: string[] = [];
+  const skillContents = new Map<string, string>();
+
+  beforeAll(async () => {
+    const dir = join(REPO_ROOT, "skills");
+    skillDirs = (await readdir(dir, { withFileTypes: true }))
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+    for (const d of skillDirs) {
+      const path = join(dir, d, "SKILL.md");
+      if (existsSync(path)) {
+        skillContents.set(d, await readFile(path, "utf8"));
+      }
+    }
+  });
+
+  test("at least 11 skills exist", () => {
+    expect(skillDirs.length).toBeGreaterThanOrEqual(11);
+  });
+
+  test("each skill dir has SKILL.md", () => {
+    for (const d of skillDirs) {
+      expect(skillContents.has(d)).toBe(true);
+    }
+  });
+
+  test("each SKILL.md starts with --- frontmatter", () => {
+    for (const [, content] of skillContents) {
+      expect(content.startsWith("---\n")).toBe(true);
+    }
+  });
+
+  test("each SKILL.md frontmatter has name field", () => {
+    for (const [, content] of skillContents) {
+      const fm = content.split("\n---\n")[0];
+      expect(fm).toMatch(/^name:\s*.+/m);
+    }
+  });
+
+  test("each skill name matches its directory name", () => {
+    for (const [d, content] of skillContents) {
+      const m = content.match(/^name:\s*(.+)/m);
+      expect(m![1].trim()).toBe(d);
+    }
+  });
+
+  test("each SKILL.md frontmatter has description field", () => {
+    for (const [, content] of skillContents) {
+      const fm = content.split("\n---\n")[0];
+      expect(fm).toMatch(/^description:\s*.+/m);
+    }
+  });
+
+  test("each description starts with 'This skill' (Anthropic skill activation convention)", () => {
+    for (const [, content] of skillContents) {
+      const m = content.match(/^description:\s*(.+)/m);
+      expect(m![1]).toMatch(/^This skill/);
+    }
+  });
+
+  test("NO skill has allowed-tools in frontmatter — Phase 6 Q1 finding", () => {
+    for (const [, content] of skillContents) {
+      const fm = content.split("\n---\n")[0];
+      expect(fm).not.toMatch(/^allowed-tools:/m);
+    }
+  });
+
+  test("NO skill has model field in frontmatter (skills are model-agnostic)", () => {
+    for (const [, content] of skillContents) {
+      const fm = content.split("\n---\n")[0];
+      expect(fm).not.toMatch(/^model:/m);
+    }
+  });
+
+  test("frontmatter contains ONLY name + description keys", () => {
+    for (const [, content] of skillContents) {
+      const fm = content.split("\n---\n")[0].slice(4);
+      const keys = fm.match(/^[a-z-]+:/gm) ?? [];
+      const allowed = new Set(["name:", "description:"]);
+      for (const k of keys) {
+        expect(allowed.has(k)).toBe(true);
+      }
+    }
+  });
+
+  test("description includes Korean trigger phrases (per skill convention)", () => {
+    for (const [, content] of skillContents) {
+      const m = content.match(/^description:\s*(.+)/m);
+      // At least one Hangul char in description
+      expect(m![1]).toMatch(/[ㄱ-ㆎ가-힣]/);
+    }
+  });
+
+  test("body section exists after frontmatter", () => {
+    for (const [, content] of skillContents) {
+      const closeIdx = content.indexOf("\n---\n", 4);
+      const body = content.slice(closeIdx + 5).trim();
+      expect(body.length).toBeGreaterThan(50);
+    }
+  });
+
+  test("description length reasonable (≤2000 chars — skill activation dispatcher)", () => {
+    for (const [, content] of skillContents) {
+      const m = content.match(/^description:\s*(.+)/m);
+      expect(m![1].length).toBeLessThanOrEqual(2000);
+    }
+  });
+
+  test("expected 11 specific skills present", () => {
+    const expected = ["apis", "apps", "auth", "clarify", "deploy", "doctor", "logs", "recover", "status", "update", "upgrade"];
+    for (const e of expected) {
+      expect(skillDirs).toContain(e);
+    }
+  });
+
+  test("deploy skill has body referencing axhub-helpers binary", () => {
+    const deployContent = skillContents.get("deploy")!;
+    expect(deployContent).toContain("axhub-helpers");
+  });
+
+  test("auth skill has body referencing consent-mint (US-004 outcome)", () => {
+    const authContent = skillContents.get("auth")!;
+    expect(authContent).toContain("consent-mint");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reason: Cross-file consistency — broken cross-refs break loader silently.
+// ---------------------------------------------------------------------------
+describe("cross-manifest consistency", () => {
+  test("plugin.json name matches package.json name suffix", () => {
+    expect(packageJson.name).toContain(pluginJson.name);
+  });
+
+  test("plugin.json version === package.json version", () => {
+    expect(pluginJson.version).toBe(packageJson.version);
+  });
+
+  test("plugin.json version === marketplace.json plugin version", () => {
+    const marketplaceAxhub = marketplaceJson.plugins.find((p) => p.name === "axhub")!;
+    expect(pluginJson.version).toBe(marketplaceAxhub.version);
+  });
+
+  test("hooks.json command paths reference existing helper subcommands", () => {
+    const knownSubcommands = new Set([
+      "session-start", "preauth-check", "consent-mint", "consent-verify",
+      "resolve", "preflight", "classify-exit", "redact", "version", "help",
+      "token-install"
+    ]);
+    for (const [, group] of Object.entries(hooksJson.hooks)) {
+      for (const g of group) {
+        for (const h of g.hooks) {
+          const sub = h.command.split(/\s+/).pop();
+          if (sub) {
+            expect(knownSubcommands.has(sub)).toBe(true);
+          }
+        }
+      }
+    }
+  });
+
+  test("README.md exists and references plugin name", async () => {
+    const readme = await readFile(join(REPO_ROOT, "README.md"), "utf8");
+    expect(readme).toContain("axhub");
+  });
+
+  test("CLAUDE.md exists and is non-empty", async () => {
+    const claudeMd = await readFile(join(REPO_ROOT, "CLAUDE.md"), "utf8");
+    expect(claudeMd.length).toBeGreaterThan(100);
+  });
+
+  test("LICENSE file exists", () => {
+    expect(existsSync(join(REPO_ROOT, "LICENSE"))).toBe(true);
+  });
+
+  test("CHANGELOG.md exists", () => {
+    expect(existsSync(join(REPO_ROOT, "CHANGELOG.md"))).toBe(true);
+  });
+
+  test("package.json scripts include build, test, typecheck", () => {
+    expect(packageJson.scripts.build).toBeDefined();
+    expect(packageJson.scripts.test).toBeDefined();
+    expect(packageJson.scripts.typecheck).toBeDefined();
+  });
+
+  test("package.json scripts include build:all (cross-arch)", () => {
+    expect(packageJson.scripts["build:all"]).toBeDefined();
+  });
+
+  test("package.json scripts include smoke and smoke:full", () => {
+    expect(packageJson.scripts.smoke).toBeDefined();
+    expect(packageJson.scripts["smoke:full"]).toBeDefined();
+  });
+
+  test("package.json declares Bun engine", () => {
+    expect(packageJson.engines?.bun).toBeDefined();
+  });
+
+  test("install.sh exists and is executable", async () => {
+    const path = join(REPO_ROOT, "bin/install.sh");
+    expect(existsSync(path)).toBe(true);
+    const stats = await stat(path);
+    expect((stats.mode & 0o100) !== 0).toBe(true);
+  });
+});

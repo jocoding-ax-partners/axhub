@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "axhub deploy logs dep_42 --source build --json"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "Deploy build logs"
+}
