@@ -1,8 +1,4 @@
-// Phase 8 US-802: tests for cmdTokenInit keychain bridge.
-//
-// Phase 6/7 had a broken assumption — `axhub auth login --print-token` is not
-// a real CLI flag. Phase 8 rewrote cmdTokenInit to read straight from the OS
-// keychain that ax-hub-cli already populates via `axhub auth login`.
+// Tests for cmdTokenInit OS-keychain bridge + parseKeyringValue decoder.
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
@@ -14,7 +10,7 @@ const REPO_ROOT = join(import.meta.dir, "..");
 const INDEX_TS = join(REPO_ROOT, "src/axhub-helpers/index.ts");
 const KEYCHAIN_TS = join(REPO_ROOT, "src/axhub-helpers/keychain.ts");
 
-describe("cmdTokenInit subcommand registration (US-603)", () => {
+describe("cmdTokenInit subcommand registration", () => {
   test("dispatch switch includes 'token-init' case", () => {
     const content = readFileSync(INDEX_TS, "utf8");
     expect(content).toMatch(/case "token-init":\s*\n\s*return cmdTokenInit\(args\);/);
@@ -31,7 +27,7 @@ describe("cmdTokenInit subcommand registration (US-603)", () => {
     expect(content).toMatch(/async function cmdTokenInit\(_args: string\[\]\): Promise<number>/);
   });
 
-  test("Phase 8 rewrite: NO axhub --print-token call (CLI flag does not exist)", () => {
+  test("NO axhub --print-token call (CLI flag does not exist)", () => {
     const content = readFileSync(INDEX_TS, "utf8");
     const initIdx = content.indexOf("async function cmdTokenInit");
     const initBody = content.slice(initIdx, initIdx + 4000);
@@ -55,7 +51,7 @@ describe("cmdTokenInit subcommand registration (US-603)", () => {
   });
 });
 
-describe("Phase 8 US-801: AXHUB_TOKEN env var precedence + keychain bridge", () => {
+describe("AXHUB_TOKEN env var precedence + keychain bridge", () => {
   test("AXHUB_TOKEN env var path is checked before keychain", () => {
     const content = readFileSync(INDEX_TS, "utf8");
     const initIdx = content.indexOf("async function cmdTokenInit");
@@ -87,7 +83,7 @@ describe("Phase 8 US-801: AXHUB_TOKEN env var precedence + keychain bridge", () 
   });
 });
 
-describe("Phase 8 US-801: parseKeyringValue (go-keyring-base64 decoder)", () => {
+describe("parseKeyringValue (go-keyring-base64 decoder)", () => {
   test("strips 'go-keyring-base64:' prefix + decodes JSON + extracts access_token", () => {
     const json = JSON.stringify({
       schema_version: 2,

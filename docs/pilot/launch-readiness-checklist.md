@@ -79,23 +79,26 @@ GO decision by: `_____________________` (admin) + `_____________________` (jocod
 
 ---
 
-## 별첨: release verification baseline (v0.1.3)
+## 별첨: release verification baseline (v0.1.4)
 
-**Pilot 권장 release: v0.1.3** (v0.1.0 은 cosign cert 누락으로 keyless verify 부분 실패 — Phase 6 release pipeline fix 후 v0.1.3 출시).
+**Pilot 권장 release: v0.1.4** (Phase 8 keychain bridge ship — `axhub auth login --print-token` 미지원 flag 가정 폐기, helper 가 OS keychain 직접 read).
 
-Pilot 시작 전 plugin v0.1.3 release cosign signature + sha256 무결성 검증 결과:
+Pilot 시작 전 plugin v0.1.4 release cosign signature + sha256 무결성 검증 결과:
 
-- 검증 명령: `bash scripts/release/verify-release.sh v0.1.3`
-- 결과 캡처: `docs/pilot/v0.1.3-verify-result.txt`
-- 검증 시점: `2026-04-24 (Phase 6 ralph)`
-- 검증자: `jocoding-ax-partners (Phase 6 architect ralph)`
-- 검증 결과: **✓ All release assets verified for jocoding-ax-partners/axhub@v0.1.3** — manifest.json signature OK + 5 binary signatures OK + sha256 manifest match.
+- 검증 명령: `bash scripts/release/verify-release.sh v0.1.4`
+- 결과 캡처: `docs/pilot/v0.1.4-verify-result.txt`
+- 검증 시점: `2026-04-24 (Phase 8 ralph)`
+- 검증자: `jocoding-ax-partners (Phase 8 architect ralph)`
+- 검증 결과: **✓ All release assets verified for jocoding-ax-partners/axhub@v0.1.4** — manifest.json signature OK + 5 binary signatures OK + sha256 manifest match.
+- Live binary self-report: `axhub-helpers 0.1.4 (plugin v0.1.4, schema v0)` ✓ (codegen sync 정확)
 
 이 baseline 은 pilot 진행 중 supply chain 의심 시점에 재검증 비교 기준이 됩니다.
 
-### v0.1.0 + v0.1.1 + v0.1.2 known limitations (참고용)
+### v0.1.0 ~ v0.1.3 known limitations (참고용, history preservation)
 
-- **v0.1.0**: release pipeline 의 `--output-certificate` flag 누락 → .pem 부재 → cosign keyless verify 실패 (signature 만 있고 cert 부재). v0.1.3 fix.
-- **v0.1.1**: cosign cert pipeline fix는 적용됐으나 codegen이 install.sh 만 sync, in-binary `PLUGIN_VERSION` constants 미동기화 → v0.1.1 binary가 self-report `0.1.0` (telemetry envelope + session-start 메시지 모두 거짓 보고). v0.1.3 fix.
+- **v0.1.0**: release pipeline 의 `--output-certificate` flag 누락 → cosign keyless verify 실패. v0.1.3 fix.
+- **v0.1.1**: codegen 이 install.sh 만 sync, in-binary `PLUGIN_VERSION` constants 미동기화 → self-report 거짓. v0.1.3 fix.
+- **v0.1.2**: codegen 정상화 baseline.
+- **v0.1.3**: SessionStart 자동 token-init trigger 추가했으나 `axhub auth login --print-token` 가정으로 token-init 자체가 broken (CLI 미지원 flag). v0.1.4 fix — helper 가 OS keychain 직접 read.
 
-두 v0.1.0/v0.1.1 release 자체는 history preservation 으로 그대로 두되, 신규 install + pilot 은 **v0.1.3** 사용. v0.1.3 binary self-report 검증: `axhub-helpers 0.1.2 (plugin v0.1.3, schema v0)` ✓
+신규 install + pilot 은 **v0.1.4** 사용.

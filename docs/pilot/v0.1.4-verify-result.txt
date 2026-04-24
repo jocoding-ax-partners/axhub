@@ -1,0 +1,53 @@
+v0.1.4 release verification — Phase 8 keychain bridge ship
+============================================================
+
+Verified at: 2026-04-24
+Verifier: jocoding-ax-partners (Phase 8 architect ralph)
+Tag: v0.1.4
+Commit: 6357106 (feat: v0.1.4 — Phase 8 keychain bridge)
+
+CI release workflow
+-------------------
+Run ID: 24878589674
+URL: https://github.com/jocoding-ax-partners/axhub/actions/runs/24878589674
+Status: completed
+Conclusion: success
+Build job: ✓ Build cross-arch + cosign sign (1m39s) — all 11 steps green
+E2E job: skipped (gated by E2E_ENABLED repo var, expected for plugin-only release)
+
+verify-release.sh v0.1.4 output
+-------------------------------
+Downloading release assets from jocoding-ax-partners/axhub@v0.1.4...
+Verifying manifest.json signature (cosign keyless)...
+Verified OK
+Manifest signature OK.
+Verifying each binary signature + checksum...
+OK: axhub-helpers-darwin-amd64
+OK: axhub-helpers-darwin-arm64
+OK: axhub-helpers-linux-amd64
+OK: axhub-helpers-linux-arm64
+OK: axhub-helpers-windows-amd64.exe
+---
+All release assets verified for jocoding-ax-partners/axhub@v0.1.4
+
+Live binary self-report (downloaded darwin-arm64)
+--------------------------------------------------
+$ curl -sL .../axhub-helpers-darwin-arm64 -o /tmp/axhub-helpers-v014
+$ /tmp/axhub-helpers-v014 version
+axhub-helpers 0.1.4 (plugin v0.1.4, schema v0)
+
+→ self-reports 0.1.4 (matches plugin v0.1.4) — codegen sync correct.
+
+Phase 8 acceptance summary
+--------------------------
+US-801 ✓  cmdTokenInit 재작성 — keychain 직접 read (macOS first, Linux/Windows 단계적)
+US-802 ✓  tests/token-init.test.ts (18 pass / 0 fail) — keychain bridge 검증
+US-803 ✓  skills/auth/SKILL.md '--print-token' 안내 제거 + AXHUB_TOKEN/keychain 흐름 추가
+US-804 ✓  docs (admin-rollout, headless-flow, recovery-flows, list-deployments) 정리
+US-805 ✓  v0.1.4 release ship — manifest sig + 5 binary sigs + sha256 검증 통과
+
+Test baseline
+-------------
+bun test → 343 pass / 5 skip / 0 fail / 2227 expect()
+typecheck → clean
+docs link audit → Broken: 0

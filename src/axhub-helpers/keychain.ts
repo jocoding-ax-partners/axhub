@@ -1,15 +1,12 @@
 /**
- * keychain.ts — Phase 8 US-801: token discovery from OS keychain.
+ * keychain.ts — token discovery from OS keychain.
  *
- * Reads the axhub access_token that ax-hub-cli stores under
- * service="axhub" via zalando/keyring. Cross-platform shell-out:
- *   - macOS: `security find-generic-password -s axhub -w`
- *   - Linux: `secret-tool lookup service axhub`
- *   - Windows: deferred — AXHUB_TOKEN env var only
+ * Reads the axhub access_token that ax-hub-cli stores under service="axhub"
+ * via zalando/keyring. macOS: `security find-generic-password -s axhub -w`;
+ * Linux: `secret-tool lookup service axhub`; Windows deferred.
  *
- * Storage format (zalando/keyring): `go-keyring-base64:<base64 JSON>` where
- * the decoded JSON has `{schema_version, access_token, token_type,
- * expires_at, scopes}`. parseKeyringValue extracts access_token.
+ * Storage format: `go-keyring-base64:<base64 JSON>` where decoded JSON has
+ * `{schema_version, access_token, token_type, expires_at, scopes}`.
  *
  * Pure functions live here so tests can import without booting the helper
  * binary's main dispatch (importing index.ts triggers process.argv parsing).

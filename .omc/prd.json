@@ -69,7 +69,7 @@
       "id": "US-805",
       "title": "v0.1.4 release — keychain bridge ship",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "Version bump: package.json + .claude-plugin/{plugin,marketplace}.json 0.1.3 → 0.1.4",
         "bun run codegen:version → 3 file 자동 sync (install.sh + index.ts + telemetry.ts)",
