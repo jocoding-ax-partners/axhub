@@ -79,22 +79,23 @@ GO decision by: `_____________________` (admin) + `_____________________` (jocod
 
 ---
 
-## 별첨: release verification baseline (v0.1.1)
+## 별첨: release verification baseline (v0.1.2)
 
-**Pilot 권장 release: v0.1.1** (v0.1.0 은 cosign cert 누락으로 keyless verify 부분 실패 — Phase 6 release pipeline fix 후 v0.1.1 출시).
+**Pilot 권장 release: v0.1.2** (v0.1.0 은 cosign cert 누락으로 keyless verify 부분 실패 — Phase 6 release pipeline fix 후 v0.1.2 출시).
 
-Pilot 시작 전 plugin v0.1.1 release cosign signature + sha256 무결성 검증 결과:
+Pilot 시작 전 plugin v0.1.2 release cosign signature + sha256 무결성 검증 결과:
 
-- 검증 명령: `bash scripts/release/verify-release.sh v0.1.1`
-- 결과 캡처: `docs/pilot/v0.1.1-verify-result.txt`
+- 검증 명령: `bash scripts/release/verify-release.sh v0.1.2`
+- 결과 캡처: `docs/pilot/v0.1.2-verify-result.txt`
 - 검증 시점: `2026-04-24 (Phase 6 ralph)`
 - 검증자: `jocoding-ax-partners (Phase 6 architect ralph)`
-- 검증 결과: **✓ All release assets verified for jocoding-ax-partners/axhub@v0.1.1** — manifest.json signature OK + 5 binary signatures OK + sha256 manifest match.
+- 검증 결과: **✓ All release assets verified for jocoding-ax-partners/axhub@v0.1.2** — manifest.json signature OK + 5 binary signatures OK + sha256 manifest match.
 
 이 baseline 은 pilot 진행 중 supply chain 의심 시점에 재검증 비교 기준이 됩니다.
 
-### v0.1.0 known limitation (참고용)
+### v0.1.0 + v0.1.1 known limitations (참고용)
 
-v0.1.0 은 release pipeline 의 `--output-certificate` flag 누락으로 .pem 파일 미생성 → cosign keyless verify 실패 (signature 만 있고 cert 부재). v0.1.0 release 자체는 그대로 두되 (history preservation), 신규 install + pilot 은 v0.1.1 사용 권장.
+- **v0.1.0**: release pipeline 의 `--output-certificate` flag 누락 → .pem 부재 → cosign keyless verify 실패 (signature 만 있고 cert 부재). v0.1.2 fix.
+- **v0.1.1**: cosign cert pipeline fix는 적용됐으나 codegen이 install.sh 만 sync, in-binary `PLUGIN_VERSION` constants 미동기화 → v0.1.1 binary가 self-report `0.1.0` (telemetry envelope + session-start 메시지 모두 거짓 보고). v0.1.2 fix.
 
-이는 supply chain 공격 신호 X — 단순 release pipeline 의 step 누락. v0.1.1 에서 fix 되어 모든 14 asset (5 bin + 5 sig + 5 cert + manifest + checksums + 4 sidecars = 17 actual) 정상 검증.
+두 v0.1.0/v0.1.1 release 자체는 history preservation 으로 그대로 두되, 신규 install + pilot 은 **v0.1.2** 사용. v0.1.2 binary self-report 검증: `axhub-helpers 0.1.2 (plugin v0.1.2, schema v0)` ✓
