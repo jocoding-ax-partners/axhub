@@ -1,0 +1,18 @@
+{
+  "session_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "transcript_path": "/tmp/claude-transcripts/f47ac10b-58cc-4372-a567-0e02b2c3d479.txt",
+  "cwd": "/Users/dev/projects/paydrop",
+  "permission_mode": "ask",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "axhub apps list --json",
+    "description": "List all apps in the current axhub account"
+  },
+  "tool_response": {
+    "stdout": "{\"apps\":[{\"id\":\"app_01hv2k9mzq\",\"slug\":\"paydrop\",\"name\":\"Paydrop\",\"status\":\"running\",\"region\":\"ap-northeast-2\",\"created_at\":\"2026-01-15T09:00:00Z\"},{\"id\":\"app_01hv2kbxyz\",\"slug\":\"paydrop-staging\",\"name\":\"Paydrop Staging\",\"status\":\"running\",\"region\":\"ap-northeast-2\",\"created_at\":\"2026-01-20T11:30:00Z\"}]}",
+    "stderr": "",
+    "exit_code": 0,
+    "interrupted": false
+  }
+}

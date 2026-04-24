@@ -1,0 +1,12 @@
+{
+  "session_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "transcript_path": "/tmp/claude-transcripts/f47ac10b-58cc-4372-a567-0e02b2c3d479.txt",
+  "cwd": "/Users/dev/projects/paydrop",
+  "permission_mode": "ask",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "axhub deploy create --app paydrop --branch main --commit a3f9c1b --json",
+    "description": "Deploy the paydrop app to production from main branch at commit a3f9c1b"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "axhub",
+  "owner": {
+    "name": "Jocoding AX Partners",
+    "url": "https://jocodingax.ai"
+  },
+  "plugins": [
+    {
+      "name": "axhub",
+      "source": "./",
+      "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders at customer companies",
+      "version": "0.1.0"
+    }
+  ]
+}

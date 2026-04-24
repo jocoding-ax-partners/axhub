@@ -1,0 +1,18 @@
+{
+  "session_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "transcript_path": "/tmp/claude-transcripts/f47ac10b-58cc-4372-a567-0e02b2c3d479.txt",
+  "cwd": "/Users/dev/projects/paydrop",
+  "permission_mode": "ask",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "axhub deploy create --app paydrop --branch main --json",
+    "description": "Deploy the paydrop app from main branch"
+  },
+  "tool_response": {
+    "stdout": "{\"error\":{\"code\":\"validation.deployment_in_progress\",\"message\":\"Another deployment in progress for paydrop\"}}",
+    "stderr": "",
+    "exit_code": 64,
+    "interrupted": false
+  }
+}

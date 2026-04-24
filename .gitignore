@@ -1,0 +1,56 @@
+# Build outputs (Bun-compiled binary — single multi-cmd, gitignored)
+bin/axhub-helpers
+bin/axhub-helpers-*
+dist/
+*.exe
+
+# Node / Bun
+node_modules/
+.bun/
+bun.lockb
+package-lock.json
+yarn.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and runtime state
+*.log
+.cache/
+~/.cache/axhub-plugin/
+
+# Test artifacts
+tests/.coverage/
+tests/.last-run/
+
+# OMC / orchestration state (per-session, transient — not for commit)
+.omc/state/
+.omc/sessions/
+.omc/logs/
+.omx/
+
+# Autoplan restore points (transient)
+.autoplan/
+
+# Graphify output (local knowledge graph, large)
+graphify-out/
+
+# Project memory / notepad (local context only)
+.omc/project-memory.json
+.omc/notepad.md
+
+# Local Claude config (per-developer plugin/skill setup, not project artifact)
+.claude/
+
+# Transient harness state
+docs/.harness-state.json
+
+# GitNexus index
+.gitnexus

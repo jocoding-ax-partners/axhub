@@ -1,0 +1,40 @@
+{
+  "description": "axhub plugin hooks: SessionStart diagnostics + PreToolUse HMAC consent gate (Go binary, deterministic) + PostToolUse exit-code Korean classifier",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers session-start",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preauth-check",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers classify-exit",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

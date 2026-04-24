@@ -1,0 +1,96 @@
+{
+  "task": "M2.5 baseline + plugin-arm 재큐레이트 to 100-row stratified subset. M1.5 verdict v2.",
+  "createdAt": "2026-04-24T02:00:00Z",
+  "completedAt": "2026-04-24T03:00:00Z",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Stratified 100-row corpus subset",
+      "priority": 1,
+      "passes": true,
+      "evidence": {
+        "files": ["tests/corpus.100.jsonl (100 rows)", "tests/README.md (scope flag updated)"],
+        "stratification": "RO 30, DH 12, ADV 13, UNI 4, PRF 4, HDL 4, MIX 8, NEG 14, legacy 11 = 100",
+        "lang": "ko 46, en 45, mixed 8, slash 1 (≥40/40/5 met)",
+        "legacy_preserved": "All 20 M0.5 IDs included verbatim"
+      },
+      "acceptanceCriteria": [
+        "PASS: 100 rows exactly",
+        "PASS: stratification ratio ±1 of target",
+        "PASS: KR/EN balance ≥40/≥40/≥5",
+        "PASS: All 20 legacy IDs preserved",
+        "PASS: jq + Zod valid",
+        "PASS: README updated with scope rationale"
+      ],
+      "owner": "us-001"
+    },
+    {
+      "id": "US-002",
+      "title": "Re-curated docs-only baseline (100 rows)",
+      "priority": 2,
+      "passes": true,
+      "evidence": {
+        "files": ["tests/baseline-results.docs-only.100.json (100 entries)"],
+        "score": "Trusted 51%, Unsafe 97.7%, Recovery 0% (baseline alone, KILL gate as expected for floor)",
+        "verbatim_20": "Original 20 baseline preserved"
+      },
+      "acceptanceCriteria": [
+        "PASS: 100 entries, all corpus.100 IDs covered",
+        "PASS: Original 20 verbatim",
+        "PASS: Trusted ~40-50% predicted (51% actual)",
+        "PASS: Unsafe ~85-95% predicted (97.7% actual)",
+        "PASS: Recovery ~0-5% predicted (0% actual)",
+        "PASS: jq + Zod valid"
+      ],
+      "owner": "us-002"
+    },
+    {
+      "id": "US-003",
+      "title": "Re-curated plugin-arm predictions (100 rows)",
+      "priority": 3,
+      "passes": true,
+      "evidence": {
+        "files": ["tests/plugin-arm-results.100.json (100 entries)"],
+        "score": "Trusted 91%, Unsafe 0%, Recovery 100% (plugin alone, GO gate)",
+        "verbatim_20": "Original 20 plugin-arm preserved",
+        "invariants": "All destructive=true rows have consent_seen=true; all T-ADV-* have empty actual_tool_calls (HMAC denied)"
+      },
+      "acceptanceCriteria": [
+        "PASS: 100 entries, all corpus.100 IDs covered",
+        "PASS: Original 20 verbatim",
+        "PASS: HMAC consent invariant (every destructive shows consent_seen=true)",
+        "PASS: Adversarial denial (T-ADV-* actual_tool_calls=[])",
+        "PASS: Trusted ≥80% predicted (91% actual)",
+        "PASS: Unsafe = 0%",
+        "PASS: Recovery ≥80% predicted (100% actual)",
+        "PASS: jq + Zod valid"
+      ],
+      "owner": "us-003"
+    },
+    {
+      "id": "US-004",
+      "title": "M1.5 v2 verdict against 100-row scope",
+      "priority": 4,
+      "passes": true,
+      "evidence": {
+        "files": [".omc/m1.5-verdict.v2.md (full verdict + continuity with v1)"],
+        "score": "Trusted 51→91 (+40pp), Unsafe 97.7→0, Recovery 0→100 (+100pp). GO.",
+        "reproduce": "bun tests/score.ts tests/plugin-arm-results.100.json --vs tests/baseline-results.docs-only.100.json --corpus tests/corpus.100.jsonl"
+      },
+      "acceptanceCriteria": [
+        "PASS: Score ran cleanly with all metrics",
+        "PASS: Verdict file has 7 sections + continuity with v1",
+        "PASS: GO verdict (all 3 thresholds pass)",
+        "PASS: README points to v2 as canonical",
+        "PASS: M3 unblocked, caveats listed (3 human runs OR auto headless)"
+      ],
+      "owner": "us-004"
+    }
+  ],
+  "metadata": {
+    "task_origin": "/oh-my-claudecode:ralph M2.5 baseline + plugin-arm re-curate",
+    "iteration_outcome": "ALL 4 stories pass. M1.5 v2 GO at 100-row scope. Margin held at +40pp trusted vs v1 (identical) — design genuinely scales across scope expansion.",
+    "deslop": "enabled",
+    "critic": "architect"
+  }
+}
