@@ -36,10 +36,11 @@ describe("release.yml workflow shape (US-204)", () => {
     expect(content).toContain("oven-sh/setup-bun");
   });
 
-  test("build-and-sign job runs on self-hosted runner with axhub-build label", () => {
+  test("build-and-sign job runs on self-hosted Linux ARM64 runner", () => {
     content = readFileSync(path, "utf8");
     expect(content).toContain("self-hosted");
-    expect(content).toContain("axhub-build");
+    expect(content).toContain("Linux");
+    expect(content).toContain("ARM64");
     // Confirm we are NOT using GitHub-hosted runner for the signing job
     expect(content).not.toMatch(/build-and-sign:[\s\S]*?runs-on:\s*ubuntu-latest/);
   });

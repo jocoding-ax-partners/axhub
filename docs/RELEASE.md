@@ -19,10 +19,10 @@ axhub plugin uses sigstore cosign keyless signing for supply-chain integrity. Ev
 
 2. **Sigstore OIDC**: nothing to configure. Keyless signing uses the workflow's GitHub OIDC token (`id-token: write` in the workflow file).
 
-3. **Self-hosted runner setup** (required — workflow uses `runs-on: [self-hosted, linux, axhub-build]`):
-   - Provision a Linux machine with: bun ≥1.1, git, cosign installer compatibility (curl + bash). 4 CPU / 8GB RAM is plenty for `bun build:all` (5 cross-arch compiles, ~10s total).
-   - Settings → Actions → Runners → "New self-hosted runner" → follow GitHub's installer instructions on the runner host.
-   - When prompted for labels, add `axhub-build` (matches the workflow's runs-on filter). Default labels `self-hosted` + `linux` are added automatically.
+3. **Self-hosted runner setup** (required — workflow uses `runs-on: [self-hosted, Linux, ARM64]`):
+   - Provision a Linux ARM64 machine with: bun ≥1.1, git, cosign installer compatibility (curl + bash). 4 CPU / 8GB RAM is plenty for `bun build:all` (5 cross-arch compiles, ~10s total).
+   - Bun cross-compiles all 5 targets (darwin-arm64/amd64, linux-arm64/amd64, windows-amd64) from a single ARM64 host — no need to provision multiple architectures.
+   - Settings → Actions → Runners → "New self-hosted runner" → follow GitHub's installer instructions on the runner host. Default labels `self-hosted` + `Linux` + `ARM64` are added automatically (no extra label needed).
    - Verify: Settings → Actions → Runners shows the runner as **Idle** (green dot).
    - **Why self-hosted**: keeps cosign signing material + sigstore OIDC token exchange on owned infra (회사 보안 정책 호환), avoids GitHub-hosted runner queue times during release windows, fixed cost vs. per-minute billing on busy weeks.
    - **Hardening checklist**: ephemeral runner OR run with `--ephemeral` flag (fresh state per job), restricted firewall (outbound only — fulcio.sigstore.dev, rekor.sigstore.dev, github.com, api.github.com, registry.npmjs.org, registry.bun.sh), runner user has no sudo, log retention ≥ 30d for audit.
