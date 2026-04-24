@@ -23,10 +23,10 @@ To fetch logs:
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP_ID> --limit 3
    ```
 
-   On exit 65 (token missing), surface the Korean 1-step setup hint:
-   > "토큰을 찾을 수 없어요. 한 번만 setup: `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-init`"
+   On exit 65 (token missing — Phase 7 US-701 이후엔 SessionStart 가 자동 setup):
+   > "토큰을 찾을 수 없어요. 'axhub auth login' 또는 CC 세션 재시작."
 
-   ax-hub-cli has no `axhub deploy list`; helper uses REST API directly via the token from token-init.
+   ax-hub-cli has no `axhub deploy list`; helper uses REST API directly via the token from auto-bootstrap.
 
 2. **Pick source.** Default `--source=build`. Switch to `--source=pod` only when the utterance contains "런타임 로그", "running logs", "컨테이너 로그", "pod logs", or when the deploy is already in a `health_check`/terminal `succeeded` phase. When uncertain, ask once via AskUserQuestion ("빌드 로그 / 런타임 로그 / 둘 다").
 

@@ -123,6 +123,108 @@ else
 fi
 rm -rf "$SCRATCH"
 
+# ----------------------------------------------------------------------------
+# 6. SessionStart shim — Phase 7 US-701: token-init auto-trigger when token
+#    file missing + axhub auth status returns user_email
+# ----------------------------------------------------------------------------
+SCRATCH="$(scratch)"
+mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"
+cp "$SHIM" "$SCRATCH/hooks/session-start.sh"
+# Helper stub that records which subcommand it was called with
+cat > "$SCRATCH/bin/axhub-helpers" <<'EOF'
+#!/bin/sh
+echo "STUB_HELPER_CALLED:$1" >> /tmp/axhub-shim-test-trace
+echo "{}"
+EOF
+chmod +x "$SCRATCH/bin/axhub-helpers"
+# Stub axhub on PATH that returns a valid auth status
+mkdir -p "$SCRATCH/stub-bin"
+cat > "$SCRATCH/stub-bin/axhub" <<'EOF'
+#!/bin/sh
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  echo '{"user_email":"test@example.com","scopes":["read","write"]}'
+fi
+EOF
+chmod +x "$SCRATCH/stub-bin/axhub"
+rm -f /tmp/axhub-shim-test-trace
+TOKEN_HOME="$(mktemp -d)"
+PATH="$SCRATCH/stub-bin:$PATH" XDG_CONFIG_HOME="$TOKEN_HOME" CLAUDE_PLUGIN_ROOT="$SCRATCH" bash "$SCRATCH/hooks/session-start.sh" </dev/null >/dev/null 2>&1 || true
+trace="$(cat /tmp/axhub-shim-test-trace 2>/dev/null || echo '')"
+case "$trace" in
+  *"STUB_HELPER_CALLED:token-init"*) assert "shim auto-triggers token-init when token missing + axhub auth valid" "ok" "ok" ;;
+  *)                                 assert "shim token-init auto-trigger" "missing" "ok" ;;
+esac
+rm -f /tmp/axhub-shim-test-trace
+rm -rf "$TOKEN_HOME"
+rm -rf "$SCRATCH"
+
+# ----------------------------------------------------------------------------
+# 7. SessionStart shim — Phase 7 US-701: token-init SKIPPED when token already exists
+# ----------------------------------------------------------------------------
+SCRATCH="$(scratch)"
+mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"
+cp "$SHIM" "$SCRATCH/hooks/session-start.sh"
+cat > "$SCRATCH/bin/axhub-helpers" <<'EOF'
+#!/bin/sh
+echo "STUB_HELPER_CALLED:$1" >> /tmp/axhub-shim-test-trace
+echo "{}"
+EOF
+chmod +x "$SCRATCH/bin/axhub-helpers"
+mkdir -p "$SCRATCH/stub-bin"
+cat > "$SCRATCH/stub-bin/axhub" <<'EOF'
+#!/bin/sh
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  echo '{"user_email":"test@example.com","scopes":["read","write"]}'
+fi
+EOF
+chmod +x "$SCRATCH/stub-bin/axhub"
+TOKEN_HOME="$(mktemp -d)"
+mkdir -p "$TOKEN_HOME/axhub-plugin"
+echo "axhub_pat_existing_token_value" > "$TOKEN_HOME/axhub-plugin/token"
+chmod 0600 "$TOKEN_HOME/axhub-plugin/token"
+rm -f /tmp/axhub-shim-test-trace
+PATH="$SCRATCH/stub-bin:$PATH" XDG_CONFIG_HOME="$TOKEN_HOME" CLAUDE_PLUGIN_ROOT="$SCRATCH" bash "$SCRATCH/hooks/session-start.sh" </dev/null >/dev/null 2>&1 || true
+trace="$(cat /tmp/axhub-shim-test-trace 2>/dev/null || echo '')"
+case "$trace" in
+  *"STUB_HELPER_CALLED:token-init"*) assert "shim does NOT call token-init when token file present" "called" "skipped" ;;
+  *)                                 assert "shim skips token-init when token already exists" "ok" "ok" ;;
+esac
+rm -f /tmp/axhub-shim-test-trace
+rm -rf "$TOKEN_HOME"
+rm -rf "$SCRATCH"
+
+# ----------------------------------------------------------------------------
+# 8. SessionStart shim — Phase 7 US-701: AXHUB_SKIP_AUTODOWNLOAD=1 skips token-init
+# ----------------------------------------------------------------------------
+SCRATCH="$(scratch)"
+mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"
+cp "$SHIM" "$SCRATCH/hooks/session-start.sh"
+cat > "$SCRATCH/bin/axhub-helpers" <<'EOF'
+#!/bin/sh
+echo "STUB_HELPER_CALLED:$1" >> /tmp/axhub-shim-test-trace
+echo "{}"
+EOF
+chmod +x "$SCRATCH/bin/axhub-helpers"
+mkdir -p "$SCRATCH/stub-bin"
+cat > "$SCRATCH/stub-bin/axhub" <<'EOF'
+#!/bin/sh
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  echo '{"user_email":"test@example.com","scopes":["read","write"]}'
+fi
+EOF
+chmod +x "$SCRATCH/stub-bin/axhub"
+TOKEN_HOME="$(mktemp -d)"
+rm -f /tmp/axhub-shim-test-trace
+PATH="$SCRATCH/stub-bin:$PATH" XDG_CONFIG_HOME="$TOKEN_HOME" AXHUB_SKIP_AUTODOWNLOAD=1 CLAUDE_PLUGIN_ROOT="$SCRATCH" bash "$SCRATCH/hooks/session-start.sh" </dev/null >/dev/null 2>&1 || true
+trace="$(cat /tmp/axhub-shim-test-trace 2>/dev/null || echo '')"
+case "$trace" in
+  *"STUB_HELPER_CALLED:token-init"*) assert "AXHUB_SKIP_AUTODOWNLOAD=1 skips token-init" "called" "skipped" ;;
+  *)                                 assert "AXHUB_SKIP_AUTODOWNLOAD=1 skips token-init" "ok" "ok" ;;
+esac
+rm -f /tmp/axhub-shim-test-trace
+rm -rf "$TOKEN_HOME"
+rm -rf "$SCRATCH"
+
 echo "---"
 echo "Total: $((PASS+FAIL)) | PASS: $PASS | FAIL: $FAIL"
 exit "$FAIL"

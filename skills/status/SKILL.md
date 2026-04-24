@@ -23,10 +23,10 @@ To check status:
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP_ID> --limit 3
    ```
 
-   On exit 65 (token missing), surface the Korean 1-step setup hint:
-   > "토큰을 찾을 수 없어요. 한 번만 setup 하시면 다음부터 자동 작동: `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-init`"
+   On exit 65 (token missing — Phase 7 US-701 이후엔 SessionStart hook 가 자동 token-init 하므로 거의 발생 안 함):
+   > "토큰을 찾을 수 없어요. 'axhub auth login' 으로 한 번 로그인하시거나 CC 세션을 재시작해주세요."
 
-   After user runs token-init + picks a deployment, persist the mapping to `~/.config/axhub/deployments.json` for next time.
+   사용자가 deployment 선택 후 mapping 을 `~/.config/axhub/deployments.json` 에 저장.
 
    Note: ax-hub-cli v0.1.x has no `axhub deploy list` — the helper hits `GET /api/v1/apps/{id}/deployments` directly with the user's token (env `AXHUB_TOKEN` or `~/.config/axhub-plugin/token`).
 
