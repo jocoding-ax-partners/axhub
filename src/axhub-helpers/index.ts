@@ -36,6 +36,7 @@ import { redact } from "./redact.ts";
 import { runPreflight } from "./preflight.ts";
 import { runResolve } from "./resolve.ts";
 import { emitMetaEnvelope } from "./telemetry.ts";
+import { runListDeployments } from "./list-deployments.ts";
 
 // CLI I/O primitives: stdout for protocol payloads (JSON to hooks/skills),
 // stderr for diagnostics. Avoids console.log to keep this binary's contract
@@ -119,6 +120,8 @@ Subcommands:
   preflight        Skill: CLI version range + auth status check
   classify-exit    Hook: PostToolUse exit code → Korean systemMessage
   redact           Filter: NFKC normalize + redact secrets/cross-team URLs
+  list-deployments Skill: GET /api/v1/apps/{id}/deployments — fallback for missing axhub deploy list
+  token-import     Skill: read axhub_pat_* from stdin, store at ~/.config/axhub-plugin/token (mode 0600)
   version          Print version
   help             Show this message`;
 
@@ -147,6 +150,10 @@ async function main(): Promise<number> {
       return cmdClassifyExit(args);
     case "redact":
       return cmdRedact(args);
+    case "list-deployments":
+      return cmdListDeployments(args);
+    case "token-import":
+      return cmdTokenImport(args);
     case "version":
     case "--version":
     case "-v":
@@ -346,6 +353,57 @@ async function cmdRedact(_args: string[]): Promise<number> {
   // redaction + ANSI strip. Emit redacted plain text on stdout (no JSON wrap).
   const input = await readStdin();
   outRaw(redact(input));
+  return 0;
+}
+
+async function cmdListDeployments(args: string[]): Promise<number> {
+  // Phase 5 US-501: REST API direct fallback for missing axhub deploy list.
+  // Args: --app <id> [--limit <n>]
+  let appId = "";
+  let limit: number | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const t = args[i];
+    if (t === "--app") appId = args[++i] ?? "";
+    else if (t?.startsWith("--app=")) appId = t.slice(6);
+    else if (t === "--limit") {
+      const n = parseInt(args[++i] ?? "", 10);
+      if (Number.isFinite(n)) limit = n;
+    } else if (t?.startsWith("--limit=")) {
+      const n = parseInt(t.slice(8), 10);
+      if (Number.isFinite(n)) limit = n;
+    }
+  }
+  if (appId.length === 0) {
+    err("list-deployments: --app <id-or-slug> is required");
+    return 64;
+  }
+  const result = await runListDeployments({ appId, limit });
+  out(result);
+  return result.exit_code;
+}
+
+async function cmdTokenImport(_args: string[]): Promise<number> {
+  // Phase 5 US-501: read axhub_pat_* from stdin, store at
+  // ${XDG_CONFIG_HOME:-$HOME/.config}/axhub-plugin/token (mode 0600).
+  const input = (await readStdin()).trim();
+  if (!/^axhub_pat_[A-Za-z0-9_-]{16,}$/.test(input)) {
+    err("token-import: stdin does not look like an axhub_pat_* token (expected 'axhub_pat_' + ≥16 chars)");
+    return 65;
+  }
+  const { homedir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  const xdg = process.env["XDG_CONFIG_HOME"];
+  const dir = xdg && xdg.length > 0 ? join(xdg, "axhub-plugin") : join(homedir(), ".config", "axhub-plugin");
+  const path = join(dir, "token");
+  const oldMask = process.umask(0o077);
+  try {
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    await writeFile(path, input, { mode: 0o600 });
+  } finally {
+    process.umask(oldMask);
+  }
+  out({ stored_at: path, redacted_token: "axhub_pat_[redacted]" });
   return 0;
 }
 

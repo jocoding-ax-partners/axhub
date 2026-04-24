@@ -389,3 +389,92 @@ UPDATED:
 - Phase 6 plugin-validator pre-empts JSON shape bugs but cannot pre-empt actual loader edge cases. The 295-test gate (with manifest.test.ts asserting hookEventName presence + repository-as-string + cross-consistency) is the only sustainable defense — agent recommendations need real-loader cross-validation.
 - Out-of-scope-but-shipped pattern: US-205 + US-206 ship infrastructure (docs + scaffolds) for human-coordination tasks (customer recruit + cred procurement). Ralph CAN'T do these autonomously, but it CAN reduce the "last mile" friction by shipping ready-to-use templates. Honest documentation of out-of-scope items in each file's header prevents over-promising.
 - describe.skipIf pattern (with positive + negative paired blocks) gives clearest test runner output for env-gated suites. The 5-line placeholder describe is worth its weight — turns "empty file run, 0 tests" into "1 placeholder pass, gating reason printed to stderr".
+
+## Iteration 8 — Phase 5 plugin-only fixes (6 stories from real CC user trace)
+
+### Implemented (all 6 PRD stories passes:true)
+
+**US-501 — helper list-deployments subcommand (REST API direct)**:
+- src/axhub-helpers/list-deployments.ts (NEW, 223 lines): runListDeployments + resolveToken (AXHUB_TOKEN env → ~/.config/axhub-plugin/token file fallback) + STATUS_MAP enum + structured Korean error messages
+- src/axhub-helpers/index.ts: cmdListDeployments + cmdTokenImport + USAGE updated + 2 switch cases
+- skills/{status,logs,recover}/SKILL.md cold-cache fallback rewritten — 'axhub deploy list' (CLI v0.1.x 미지원) → helper REST API
+- tests/list-deployments.test.ts (NEW, 13 tests / 27 expect): token discovery, auth gate, REST shape, endpoint override, Bearer header
+
+**US-502 — SessionStart binary auto-download (marketplace install gap)**:
+- hooks/session-start.sh (NEW, executable POSIX shim, 25 lines): chicken-egg solve — detects missing helper → invokes install.sh → execs binary
+- bin/install.sh extended: AXHUB_PLUGIN_RELEASE override, curl auto-download from v0.1.0 release, AXHUB_SKIP_AUTODOWNLOAD opt-out, fail-graceful Korean error
+- hooks/hooks.json: SessionStart command bash shim (was direct binary call)
+- tests/auto-download.test.sh (NEW, 5 tests): skip flag, present binary, release override, shim exec, missing install.sh graceful
+- README.md install section simplified
+
+**US-503 — doctor 진단 로직 수정**:
+- skills/doctor/SKILL.md: step 1 NEW `command -v axhub-helpers || echo missing` (PATH-based, no $CLAUDE_PLUGIN_ROOT 의존). profile/endpoint NULL → ✓ "기본값 사용 중" (was ✗). Failure rows ordered first.
+
+**US-504 — parser allowlist + status/logs hook block defense**:
+- tests/fixtures/_curated.ts: count 38 → 40, ro count 8 → 10. NEW ro-009-deploy-status-watch-explicit + ro-010-deploy-logs-follow-explicit
+- tests/fixtures.test.ts: count assertions updated
+- tests/consent.test.ts NEW describe "parseAxhubCommand — read-only allowlist": 8 explicit tests covering deploy status/logs (no --kill), apps/apis list, auth status, --version/--help
+
+**US-505 — update SKILL workflow 정리**:
+- skills/update/SKILL.md step 1: AXHUB_DISABLE_AUTOUPDATE=1 강제 set 제거 — 'axhub update check --json' 직접 호출, exit 2 = 회사 정책 disable Korean message
+- tests/manifest.test.ts NEW assertion: update.md 에 'AXHUB_DISABLE_AUTOUPDATE=1 axhub' 패턴 부재 확인
+
+**US-506 — Korean translation (user image 요청)**:
+- 9 commands/*.md descriptions all Korean (apis, apps, deploy, doctor, help, login, logs, status, update)
+- 11 skills/*/SKILL.md descriptions: 영어 'This skill should be used when...' → 한국어 '이 스킬은 사용자가...' prefix, Korean trigger phrases verbatim 유지
+- tests/manifest.test.ts assertion: 영어 또는 한국어 prefix 모두 accept (regex /^(This skill|이 스킬)/)
+
+### Architect verification (opus)
+
+APPROVE — 6 US 모두 file evidence 검증. 2 비차단 권고:
+1. matchDestructive 이름이 misleading (positive-match 의미인데 read-only allowlist 시맨틱 추가됨) — 다음 사이클에서 matchKnownIntent 로 rename 권장
+2. AXHUB_PLUGIN_RELEASE default v0.1.0 hardcode — 버전 bump 시 sync 필요. 인라인 maintainer 주석 추가 (deslop pass 중).
+
+### Deslop pass
+
+Zero slop. install.sh RELEASE_VERSION hardcode 옆에 maintainer 주석 1개 추가 (architect flagged).
+
+### Post-deslop regression
+
+- bun test → 325 pass / 5 skip / 0 fail / 2188 expect() across 12 files
+- bun run typecheck → 0 errors
+- bash tests/install.test.sh → 8/8 PASS
+- bash tests/auto-download.test.sh → 5/5 PASS
+
+### Files changed (this iteration)
+
+NEW:
+- src/axhub-helpers/list-deployments.ts
+- hooks/session-start.sh
+- tests/list-deployments.test.ts
+- tests/auto-download.test.sh
+- tests/fixtures/ro-009-deploy-status-watch-explicit.json
+- tests/fixtures/ro-010-deploy-logs-follow-explicit.json
+
+UPDATED:
+- src/axhub-helpers/index.ts (cmdListDeployments + cmdTokenImport + USAGE + switch cases)
+- bin/install.sh (auto-download + maintainer 주석)
+- hooks/hooks.json (SessionStart shim)
+- skills/{status,logs,recover}/SKILL.md (cold-cache → helper REST)
+- skills/doctor/SKILL.md (PATH-based detect, profile/endpoint default ✓)
+- skills/update/SKILL.md (AXHUB_DISABLE_AUTOUPDATE 강제 set 제거)
+- skills/{apis,apps,auth,clarify,deploy,doctor,logs,recover,status,update,upgrade}/SKILL.md (Korean description)
+- commands/{apis,apps,deploy,doctor,help,login,logs,status,update}.md (Korean description)
+- tests/{fixtures.test.ts,fixtures/_curated.ts,consent.test.ts,manifest.test.ts,release-config.test.ts}
+- README.md (install section)
+- .omc/{prd.json, progress.txt}
+
+### Phase 6 backlog
+
+- Rename matchDestructive → matchKnownIntent (architect 권고)
+- AXHUB_PLUGIN_RELEASE 자동 sync (package.json version → install.sh — codegen step 또는 bun run script)
+- ax-hub-cli 측 'deploy list' 추가 (별도 issue file) — 현재 plugin REST API 우회로 동작하지만 long-term CLI single-source-of-truth 정착이 깔끔
+- helper token storage ↔ axhub keychain 통합 (현재 parallel store)
+- 실 vibe coder pilot 실행 (prep kit 이미 ship)
+
+### Learnings
+
+- CC plugin 의 marketplace install 은 repo clone 만 — gitignored binary 자동 fetch 필요. SessionStart shim + install.sh auto-download 패턴이 chicken-egg 해결.
+- skill description Korean prefix 변경은 LLM 매칭에 영향 X (한국어로도 동일하게 trigger). 하지만 manifest test 가 영어 prefix 가정 → assertion regex 확장 필요. 다국어 plugin의 test 설계 시 미리 prefix 패턴 유연성 확보.
+- Token 분리 (axhub keychain vs helper file) 은 단기 trade-off. CLI 통합 keychain 접근에 keytar 의존성 도입 vs 사용자 1회 setup 부담. 후자 선택 — 자율 동작에 의존성 낮음.
+- Architect 권고 중 "naming rename"은 deslop scope 밖. OMC posture "preserve behavior unless asked" 따라 다음 사이클로 보류. 단순 maintainer 주석은 1줄로 즉시 추가 가능.

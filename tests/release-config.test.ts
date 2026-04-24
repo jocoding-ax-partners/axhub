@@ -31,9 +31,10 @@ describe("release.yml workflow shape (US-204)", () => {
     expect(content).toContain("contents: write");
   });
 
-  test("uses oven-sh/setup-bun action", () => {
+  test("installs Bun via official curl install (avoids unzip dependency)", () => {
     content = readFileSync(path, "utf8");
-    expect(content).toContain("oven-sh/setup-bun");
+    expect(content).toContain("curl -fsSL https://bun.sh/install");
+    expect(content).toContain("$HOME/.bun/bin");
   });
 
   test("build-and-sign job runs on self-hosted Linux ARM64 runner", () => {
@@ -66,9 +67,10 @@ describe("release.yml workflow shape (US-204)", () => {
     expect(content).toContain("--yes");
   });
 
-  test("uploads release assets via softprops/action-gh-release", () => {
+  test("uploads release assets via gh CLI sequential loop (avoids race)", () => {
     content = readFileSync(path, "utf8");
-    expect(content).toContain("softprops/action-gh-release");
+    expect(content).toContain("gh release upload");
+    expect(content).toContain("--clobber");
     expect(content).toContain("axhub-helpers-*");
     expect(content).toContain("*.sig");
   });

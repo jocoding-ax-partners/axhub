@@ -1,5 +1,5 @@
 ---
-description: Stream or fetch axhub deployment logs (build or pod source)
+description: axhub 배포 로그 보기 (빌드 로그 또는 런타임 pod 로그, --follow 스트림 가능)
 allowed-tools: Bash(axhub-helpers:*), Bash(axhub:*), Bash(jq:*)
 argument-hint: "[deployment-id] [--source build|pod]"
 model: sonnet

@@ -1,6 +1,6 @@
 ---
 name: status
-description: This skill should be used when the user asks about deploy progress or status. Activates on "배포 상태", "어떻게 됐어", "됐어", "다 됐어", "끝났어", "지금 어디까지", "어디쯤이야", "진행 중이야", "방금 거 됐어", "올라갔어", "떴어", "라이브 됐어", "반영 됐어", "빌드 됐어", "상태 봐", "진행 상황 알려주세요", "배포 끝났나요", "어디까지 됐나요", "status", "watch", "follow", "progress", "is it done", "deploy state", "build status", or any request to track an in-flight axhub deploy. Streams humanized Korean progress narration off the NDJSON tick stream and routes terminal exit codes through the empathy catalog.
+description: 이 스킬은 사용자가 배포 진행 상황 또는 상태를 묻거나 추적하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "배포 상태", "어떻게 됐어", "됐어", "다 됐어", "끝났어", "지금 어디까지", "어디쯤이야", "진행 중이야", "방금 거 됐어", "올라갔어", "떴어", "라이브 됐어", "반영 됐어", "빌드 됐어", "상태 봐", "진행 상황 알려주세요", "배포 끝났나요", "어디까지 됐나요", "status", "watch", "follow", "progress", "is it done", "deploy state", "build status", 또는 진행 중 axhub 배포를 추적하는 모든 요청. NDJSON tick 스트림을 한국어 진행 안내로 humanize 하고 terminal exit code 를 empathy catalog 로 라우팅합니다.
 ---
 
 # Deploy Status (watch + narrate)
@@ -17,7 +17,15 @@ To check status:
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent status --user-utterance "$ARGS" --json
    ```
 
-   On `cache_hit: false`, follow `../deploy/references/recovery-flows.md` ("cold-cache"): ask the user which app and surface the last 3 deploys via `axhub deploy list --app <APP_SLUG> --json --limit 3` for AskUserQuestion disambiguation. Persist the chosen mapping to `~/.config/axhub/deployments.json` for next time.
+   On `cache_hit: false`, follow `../deploy/references/recovery-flows.md` ("cold-cache"): ask the user which app first (use `axhub apps list --json` for choices), then surface the last 3 deploys via the helper:
+
+   ```bash
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP_ID> --limit 3
+   ```
+
+   On exit 65 (token missing), the helper prints a Korean setup hint — surface it verbatim and stop. After user picks a deployment, persist the mapping to `~/.config/axhub/deployments.json` for next time.
+
+   Note: ax-hub-cli v0.1.x has no `axhub deploy list` — the helper hits `GET /api/v1/apps/{id}/deployments` directly with the user's token (env `AXHUB_TOKEN` or `~/.config/axhub-plugin/token`).
 
 2. **Pre-flight version check** (only if mutation chain is implied — pure read can skip):
 

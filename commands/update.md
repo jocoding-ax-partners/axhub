@@ -1,5 +1,5 @@
 ---
-description: Update the axhub CLI binary (destructive — replaces binary in place)
+description: axhub CLI 업데이트 (cosign 서명 검증 — 회사 보안 정책 호환, destructive 작업)
 allowed-tools: Bash(axhub-helpers:*), Bash(axhub:*), AskUserQuestion
 argument-hint: "[--check-only] [--force]"
 model: sonnet

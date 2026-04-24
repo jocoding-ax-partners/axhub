@@ -43,10 +43,33 @@ EXT=""
 TARGET_NAME="axhub-helpers-${OS_KEY}-${ARCH_KEY}${EXT}"
 TARGET_PATH="${BIN_DIR}/${TARGET_NAME}"
 
+# Maintainer: when bumping plugin version (package.json + .claude-plugin/*),
+# update this default to match the new release tag. Override via AXHUB_PLUGIN_RELEASE.
+RELEASE_VERSION="${AXHUB_PLUGIN_RELEASE:-v0.1.0}"
+RELEASE_BASE="https://github.com/jocoding-ax-partners/axhub/releases/download/${RELEASE_VERSION}"
+
 if [ ! -f "$TARGET_PATH" ]; then
-  echo "바이너리가 없어요: $TARGET_PATH" >&2
-  echo "먼저 'bun run build:all' 실행해주세요." >&2
-  exit 1
+  if [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" = "1" ]; then
+    echo "바이너리가 없어요: $TARGET_PATH" >&2
+    echo "AXHUB_SKIP_AUTODOWNLOAD=1 — 자동 다운로드 비활성화. 수동: bun run build:all" >&2
+    exit 1
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "curl 이 없어서 바이너리를 다운로드할 수 없어요. curl 설치 후 다시 시도해주세요." >&2
+    exit 1
+  fi
+  URL="${RELEASE_BASE}/${TARGET_NAME}"
+  echo "axhub-helpers 바이너리 다운로드 중: ${RELEASE_VERSION} (${OS_KEY}-${ARCH_KEY})..." >&2
+  if ! curl -fsSL "$URL" -o "$TARGET_PATH.tmp"; then
+    rm -f "$TARGET_PATH.tmp"
+    echo "다운로드 실패: $URL" >&2
+    echo "수동 다운로드: gh release download ${RELEASE_VERSION} --pattern '${TARGET_NAME}' -D '${BIN_DIR}'" >&2
+    echo "또는 비활성화: export AXHUB_SKIP_AUTODOWNLOAD=1" >&2
+    exit 1
+  fi
+  chmod +x "$TARGET_PATH.tmp"
+  mv "$TARGET_PATH.tmp" "$TARGET_PATH"
+  echo "다운로드 완료." >&2
 fi
 
 # Symlink (or copy on Windows where symlinks need admin)

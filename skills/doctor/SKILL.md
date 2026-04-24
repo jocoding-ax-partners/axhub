@@ -1,6 +1,6 @@
 ---
 name: doctor
-description: This skill should be used when the user wants to diagnose their axhub install or environment. Activates on "axhub 설치돼 있어", "doctor", "닥터", "진단해", "환경 점검해", "axhub 점검", "헬스체크 해", "잘 깔렸어", "셋업 다 됐어", "설정 봐", "환경 변수 확인해주세요", "설치 상태 알려주세요", "진단 부탁드려요", "환경 점검해주세요", "시스템 상태 확인해주세요", "셋업이 다 끝났나요", "doctor", "check", "diagnose", "health check", "sanity check", "setup check", "env check", or any axhub diagnostic request. Reports CLI version, auth state, profile, endpoint, and scopes with fix suggestions per failure.
+description: 이 스킬은 사용자가 자신의 axhub 설치 또는 환경을 진단하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "axhub 설치돼 있어", "doctor", "닥터", "진단해", "환경 점검해", "axhub 점검", "헬스체크 해", "잘 깔렸어", "셋업 다 됐어", "설정 봐", "환경 변수 확인해주세요", "설치 상태 알려주세요", "진단 부탁드려요", "환경 점검해주세요", "시스템 상태 확인해주세요", "셋업이 다 끝났나요", "doctor", "check", "diagnose", "health check", "sanity check", "setup check", "env check", 또는 axhub 진단 요청. CLI 버전, 인증 상태, profile, endpoint, scopes 를 보고하고 실패 항목마다 다음에 할 수 있는 자연어 안내를 제공합니다.
 ---
 
 # Doctor (env + install diagnostic)
@@ -11,46 +11,57 @@ Run a full axhub plugin health check. Report what's working, what's not, and the
 
 To run diagnostics:
 
-1. **Run preflight** (CLI version range + auth status combined):
+1. **Detect helper binary via PATH first** (Phase 5 US-503 — env var `CLAUDE_PLUGIN_ROOT` may not propagate to skill bash subshells):
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json
+   command -v axhub-helpers || echo "missing"
+   ```
+
+   If output is `missing`, surface: "axhub-helpers 바이너리가 PATH에 없어요. 첫 CC 세션에서 자동 다운로드돼야 정상이에요. 'bash ${CLAUDE_PLUGIN_ROOT}/bin/install.sh' 수동 실행 또는 자동 다운로드 비활성화 (export AXHUB_SKIP_AUTODOWNLOAD=1) 확인해주세요." Skip remaining steps; report ✗ helper missing only.
+
+2. **Run preflight** (CLI version range + auth status combined):
+
+   ```bash
+   axhub-helpers preflight --json
    ```
 
    This returns: `cli_version, in_range, cli_too_old, cli_too_new, cli_present, auth_ok, auth_error_code, scopes, profile, endpoint, user_email, expires_at`.
 
-2. **Fetch raw version + path** for the report:
+3. **Fetch raw version + path** for the report:
 
    ```bash
    axhub --version
    which axhub
    ```
 
-3. **Render the diagnostic card in Korean.** Use checkmarks (✓ / ✗ / ⚠) per row:
+4. **Render the diagnostic card in Korean.** Use checkmarks (✓ / ✗ / ⚠) per row. Profile/endpoint NULL is ✓ "기본값 사용 중" not ✗ (default state, not a failure):
 
    ```
    axhub 진단 결과:
-     ✓ CLI 설치:     v<CLI_VERSION> (<WHICH_PATH>)
-     ✓ 버전 범위:    호환 (필요: v<MIN> ~ v<MAX> 미만)
-     ✓ 로그인:       <USER_EMAIL>
-     ✓ 만료:         <EXPIRES_AT> (남은 시간: <DELTA>)
-     ✓ 권한 (scope): <SCOPES joined>
-     ✓ 환경 (profile): <PROFILE> (<ENDPOINT>)
+     ✓ helper 바이너리: 정상 (axhub-helpers v<HELPER_VERSION>)
+     ✓ CLI 설치:        v<CLI_VERSION> (<WHICH_PATH>)
+     ✓ 버전 범위:       호환 (필요: v<MIN> ~ v<MAX> 미만)
+     ✓ 로그인:          <USER_EMAIL>
+     ✓ 만료:            <EXPIRES_AT> (남은 시간: <DELTA>)
+     ✓ 권한 (scope):    <SCOPES joined>
+     ✓ 환경 (profile):  <PROFILE 또는 "default (기본값 사용 중)">
+     ✓ endpoint:        <ENDPOINT 또는 "https://hub-api.jocodingax.ai (기본값)">
 
    모두 정상이에요. 배포하실 준비 완료!
    ```
 
-4. **On any failure row**, replace ✓ with ✗ and append a one-line fix suggestion as a literal next phrase:
+5. **On any failure row**, replace ✓ with ✗ and append a one-line fix suggestion as a literal next phrase. Order: failures FIRST (so user sees them), then warnings, then ✓ rows:
 
    | Failure | Suggested phrase |
    |---|---|
+   | helper missing (step 1 returned `missing`) | "axhub-helpers 바이너리가 PATH에 없어요. 'bash ${CLAUDE_PLUGIN_ROOT}/bin/install.sh' 수동 실행 또는 CC 재시작으로 자동 다운로드 트리거." |
    | `cli_present: false` | "axhub 설치되어 있지 않아요. 'brew install axhub' 또는 회사 IT 안내대로 설치해주세요." |
    | `cli_too_old: true` | "axhub가 너무 오래된 버전이에요 (v<CUR>). 'axhub 업그레이드해줘' 라고 말씀해주세요." |
    | `cli_too_new: true` | "axhub가 플러그인보다 최신이에요. 'axhub 플러그인 업데이트' 라고 말씀해주세요." |
    | `auth_ok: false` (token_expired) | "로그인이 만료됐어요. '다시 로그인해줘' 라고 말씀해주세요." |
    | `auth_ok: false` (not_logged_in) | "아직 로그인 안 했어요. '로그인해줘' 라고 말씀해주세요." |
-   | `profile: null` | "환경 (profile)이 설정 안 됐어요. AXHUB_PROFILE을 회사 IT가 안내한 값으로 설정해주세요." |
-   | `endpoint: null` | "endpoint가 설정 안 됐어요. AXHUB_ENDPOINT 또는 ~/.config/axhub/config.yaml 확인해주세요." |
+
+   **Note**: `profile: null` 또는 `endpoint: null` 은 default 사용 중인 정상 상태. ✓ 로 표시하고 default 값을 괄호로 부연 설명. AXHUB_PROFILE 또는 AXHUB_ENDPOINT 설정은 회사 IT 정책에 따라 선택사항.
 
 5. **Multi-failure summary.** If multiple rows fail, list all of them and surface AskUserQuestion to pick the first one to fix:
 

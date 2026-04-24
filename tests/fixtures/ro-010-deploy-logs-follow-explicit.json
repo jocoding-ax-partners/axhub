@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "axhub deploy logs dep_42 --app paydrop --follow --source build --json"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "Phase 5 US-504: deploy logs with --follow build source — read-only SSE stream"
+}

@@ -1,0 +1,9 @@
+{
+  "input": {
+    "command": "axhub deploy status dep_42 --app paydrop --watch --json"
+  },
+  "expected": {
+    "is_destructive": false
+  },
+  "description": "Phase 5 US-504: deploy status with --watch — read-only despite long-lived stream"
+}

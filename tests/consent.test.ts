@@ -366,6 +366,54 @@ describe("parseAxhubCommand — Gotcha #2: nested sub-shell inside eval/bash -c"
   });
 });
 
+describe("parseAxhubCommand — read-only allowlist (Phase 5 US-504)", () => {
+  // Explicit assertions that read-only commands NEVER classify as destructive.
+  // Defensive coverage for the user-trace bug where /axhub:status hit hook deny.
+
+  test("axhub deploy status dep_X --watch --json → not destructive", () => {
+    const r = parseAxhubCommand("axhub deploy status dep_42 --app paydrop --watch --json");
+    expect(r.is_destructive).toBe(false);
+    expect(r.action).toBeUndefined();
+  });
+
+  test("axhub deploy logs dep_X --follow --source build → not destructive", () => {
+    const r = parseAxhubCommand("axhub deploy logs dep_42 --app paydrop --follow --source build --json");
+    expect(r.is_destructive).toBe(false);
+    expect(r.action).toBeUndefined();
+  });
+
+  test("axhub deploy logs dep_X --source pod → not destructive (no --kill)", () => {
+    const r = parseAxhubCommand("axhub deploy logs dep_42 --source pod --json");
+    expect(r.is_destructive).toBe(false);
+  });
+
+  test("axhub apps list --json → not destructive", () => {
+    const r = parseAxhubCommand("axhub apps list --json");
+    expect(r.is_destructive).toBe(false);
+  });
+
+  test("axhub apis list --json --query auth → not destructive", () => {
+    const r = parseAxhubCommand("axhub apis list --json --query auth");
+    expect(r.is_destructive).toBe(false);
+  });
+
+  test("axhub auth status --json → not destructive (only auth login is)", () => {
+    const r = parseAxhubCommand("axhub auth status --json");
+    expect(r.is_destructive).toBe(false);
+    expect(r.action).toBeUndefined();
+  });
+
+  test("axhub --version → not destructive", () => {
+    const r = parseAxhubCommand("axhub --version");
+    expect(r.is_destructive).toBe(false);
+  });
+
+  test("axhub --help → not destructive", () => {
+    const r = parseAxhubCommand("axhub --help");
+    expect(r.is_destructive).toBe(false);
+  });
+});
+
 describe("parseAxhubCommand — Gotcha #3: quoted subcommand tokens", () => {
   test('axhub "deploy" "create" --app paydrop — double-quoted subcommands detected', () => {
     const r = parseAxhubCommand('axhub "deploy" "create" --app paydrop --branch main --commit abc');

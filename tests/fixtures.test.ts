@@ -33,9 +33,9 @@ const fixtureFiles = readdirSync(FIXTURE_DIR)
 const loadFixture = (filename: string): Fixture =>
   JSON.parse(readFileSync(join(FIXTURE_DIR, filename), "utf8"));
 
-describe("Frozen fixture suite (38 hand-curated parseAxhubCommand cases)", () => {
-  test("exactly 38 fixtures present", () => {
-    expect(fixtureFiles.length).toBe(38);
+describe("Frozen fixture suite (40 hand-curated parseAxhubCommand cases)", () => {
+  test("exactly 40 fixtures present", () => {
+    expect(fixtureFiles.length).toBe(40);
   });
 
   test("each fixture has required schema fields", () => {
@@ -83,8 +83,8 @@ describe("Fixture distribution (curation invariants)", () => {
     expect(counts.destructive).toBe(10);
   });
 
-  test("8 read-only fixtures (ro-*)", () => {
-    expect(counts.ro).toBe(8);
+  test("10 read-only fixtures (ro-*) — Phase 5 US-504 added 2 explicit deploy status/logs", () => {
+    expect(counts.ro).toBe(10);
   });
 
   test("8 adversarial fixtures (adv-*)", () => {

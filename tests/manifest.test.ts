@@ -261,11 +261,15 @@ describe("hooks.json structure", () => {
     }
   });
 
-  test("each hook command references axhub-helpers binary", () => {
+  test("each hook command references axhub-helpers binary or session-start shim", () => {
+    // Phase 5 US-502: SessionStart now uses bash shim (hooks/session-start.sh)
+    // that bootstraps the binary if missing. Other hooks call the binary directly.
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {
         for (const h of g.hooks) {
-          expect(h.command).toContain("axhub-helpers");
+          const refsBinary = h.command.includes("axhub-helpers");
+          const refsShim = h.command.includes("hooks/session-start.sh");
+          expect(refsBinary || refsShim).toBe(true);
         }
       }
     }
@@ -501,10 +505,10 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
-  test("each description starts with 'This skill' (Anthropic skill activation convention)", () => {
+  test("each description starts with 'This skill' or '이 스킬' (Korean equivalent — Phase 5 한국어 전환)", () => {
     for (const [, content] of skillContents) {
       const m = content.match(/^description:\s*(.+)/m);
-      expect(m![1]).toMatch(/^This skill/);
+      expect(m![1]).toMatch(/^(This skill|이 스킬)/);
     }
   });
 
@@ -572,6 +576,13 @@ describe("skills/*/SKILL.md frontmatter", () => {
     const authContent = skillContents.get("auth")!;
     expect(authContent).toContain("consent-mint");
   });
+
+  test("Phase 5 US-505: update skill does NOT force-set AXHUB_DISABLE_AUTOUPDATE=1", () => {
+    const updateContent = skillContents.get("update")!;
+    // Plugin must respect company policy — disable should only happen when
+    // user/admin explicitly sets the env var, not when the plugin forces it.
+    expect(updateContent).not.toMatch(/AXHUB_DISABLE_AUTOUPDATE=1\s+axhub/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -591,15 +602,17 @@ describe("cross-manifest consistency", () => {
     expect(pluginJson.version).toBe(marketplaceAxhub.version);
   });
 
-  test("hooks.json command paths reference existing helper subcommands", () => {
+  test("hooks.json command paths reference existing helper subcommands or shim", () => {
     const knownSubcommands = new Set([
       "session-start", "preauth-check", "consent-mint", "consent-verify",
       "resolve", "preflight", "classify-exit", "redact", "version", "help",
-      "token-install"
+      "token-install", "list-deployments", "token-import",
     ]);
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {
         for (const h of g.hooks) {
+          // Skip shim path (Phase 5 US-502): bash hooks/session-start.sh
+          if (h.command.includes("hooks/session-start.sh")) continue;
           const sub = h.command.split(/\s+/).pop();
           if (sub) {
             expect(knownSubcommands.has(sub)).toBe(true);

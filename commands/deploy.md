@@ -1,5 +1,5 @@
 ---
-description: Deploy current app to axhub via deploy skill (slash escape hatch — same safety gates as NL flow)
+description: deploy 스킬로 현재 앱을 axhub 에 배포 (슬래시 진입로 — 자연어 흐름과 동일한 안전 가드 적용)
 allowed-tools: Bash(axhub-helpers:*), Bash(axhub:*), Bash(git:*), AskUserQuestion
 argument-hint: "[app-slug] [--branch <name>] [--dry-run]"
 model: sonnet

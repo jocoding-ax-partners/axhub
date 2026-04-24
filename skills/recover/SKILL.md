@@ -1,6 +1,6 @@
 ---
 name: recover
-description: This skill should be used when the user wants to undo the last deploy or restore a previous version. Activates on "방금 거 되돌려", "되돌려", "롤백해", "롤백", "이전 버전으로", "직전 버전으로 돌려줘", "방금 배포 취소해", "망했어 되돌려", "어제 거로 돌려줘", "잘 되던 버전으로 돌려", "마지막 정상 빌드로", "복구해", "안정 버전으로", "롤백 부탁드립니다", "직전 안정 버전으로 복구 부탁", "마지막 정상 빌드로 돌려주세요", "이전 버전으로 되돌려주세요", "rollback", "roll back", "revert", "undo", "undo deploy", "restore previous", "redeploy previous", "hot fix", "hotfix", "forward fix", or any restore-previous-state intent. Note: implements forward-fix-as-rollback because the v0.1.0 CLI does not support real rollback.
+description: 이 스킬은 사용자가 직전 배포를 되돌리거나 이전 버전으로 복원하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "방금 거 되돌려", "되돌려", "롤백해", "롤백", "이전 버전으로", "직전 버전으로 돌려줘", "방금 배포 취소해", "망했어 되돌려", "어제 거로 돌려줘", "잘 되던 버전으로 돌려", "마지막 정상 빌드로", "복구해", "안정 버전으로", "롤백 부탁드립니다", "직전 안정 버전으로 복구 부탁", "마지막 정상 빌드로 돌려주세요", "이전 버전으로 되돌려주세요", "rollback", "roll back", "revert", "undo", "undo deploy", "restore previous", "redeploy previous", "hot fix", "hotfix", "forward fix", 또는 이전 상태 복원 의도. 참고: v0.1.0 CLI 가 실제 rollback 미지원이므로 직전 안정 commit 재배포 (forward-fix) 방식으로 구현합니다.
 ---
 
 # Recover (forward-fix-as-rollback)
@@ -22,8 +22,10 @@ To recover:
    Find the most recent entry where `status == "succeeded"` for the current app. If the cache is cold, fall back to:
 
    ```bash
-   axhub deploy list --app <APP_SLUG> --json --limit 10
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP_ID> --limit 10
    ```
+
+   (ax-hub-cli has no `axhub deploy list` — helper hits REST API directly. On exit 65 (token missing), surface helper's Korean hint verbatim and stop.)
 
    Filter to `status == "succeeded"` and pick the second-most-recent (the most recent succeeded ≠ current state because the user wants to back out).
 

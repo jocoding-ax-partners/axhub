@@ -1,6 +1,6 @@
 ---
 name: clarify
-description: This skill is the fallback for ambiguous axhub-related utterances that did not match deploy, status, logs, apps, apis, auth, update, doctor, recover, or upgrade. Activates on bare verbs without targets, mixed intents, contradictory deixis, or uncertain context like "axhub", "axhub 좀", "axhub 도와줘", "axhub로 뭐 해야 해", "axhub 어떻게 써", "뭔가 잘못된 것 같아", "axhub 관련해서", "axhub 어떻게", "도와줘 axhub", "help me with axhub", "axhub thing", "do something with axhub", or any axhub-context utterance that lacks a clear destination. Presents numbered Korean options and routes to the chosen sibling skill via the Skill tool.
+description: 이 스킬은 deploy / status / logs / apps / apis / auth / update / doctor / recover / upgrade 어느 것도 매칭되지 않은 모호한 axhub 관련 발화의 fallback 입니다. 대상이 없는 bare 동사, 의도 혼합, 모순된 deixis, 또는 다음과 같은 불확실 컨텍스트에서 활성화: "axhub", "axhub 좀", "axhub 도와줘", "axhub로 뭐 해야 해", "axhub 어떻게 써", "뭔가 잘못된 것 같아", "axhub 관련해서", "axhub 어떻게", "도와줘 axhub", "help me with axhub", "axhub thing", "do something with axhub", 또는 명확한 목적지가 없는 axhub 관련 발화. 번호가 매겨진 한국어 옵션을 제시한 후 Skill 도구로 선택된 sibling 스킬로 라우팅합니다.
 ---
 
 # Clarify (fallback router)

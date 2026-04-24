@@ -1,6 +1,6 @@
 ---
 name: logs
-description: This skill should be used when the user asks for build or runtime logs of an axhub deploy. Activates on "로그 봐", "로그 보여줘", "로그 까봐", "빌드 로그 봐", "런타임 로그 봐", "왜 실패했어", "왜 안돼", "왜 깨졌어", "왜 죽었어", "에러 봐", "에러 메시지 봐", "콘솔 봐", "출력 보여줘", "방금 거 로그", "로그 보여주세요", "빌드 로그 확인해주세요", "실패 원인 알려주세요", "에러 로그 보여주세요", "logs", "log", "tail", "build output", "console", "console log", "error log", "runtime log", "why did it fail", "why is it broken", or any axhub log retrieval request. Defaults to build logs and offers pod logs on explicit runtime intent.
+description: 이 스킬은 사용자가 axhub 배포의 빌드 로그 또는 런타임 로그를 보고 싶어할 때 사용합니다. 다음 표현에서 활성화: "로그 봐", "로그 보여줘", "로그 까봐", "빌드 로그 봐", "런타임 로그 봐", "왜 실패했어", "왜 안돼", "왜 깨졌어", "왜 죽었어", "에러 봐", "에러 메시지 봐", "콘솔 봐", "출력 보여줘", "방금 거 로그", "로그 보여주세요", "빌드 로그 확인해주세요", "실패 원인 알려주세요", "에러 로그 보여주세요", "logs", "log", "tail", "build output", "console", "console log", "error log", "runtime log", "why did it fail", "why is it broken", 또는 axhub 로그 조회 요청. 기본값은 빌드 로그이며 명시적 런타임 의도가 있을 때만 pod 로그를 제시합니다.
 ---
 
 # Deploy Logs (follow + classify source)
@@ -17,7 +17,13 @@ To fetch logs:
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent logs --user-utterance "$ARGS" --json
    ```
 
-   On `cache_hit: false`, follow `../deploy/references/recovery-flows.md` ("cold-cache") to surface the last 3 deploys via AskUserQuestion.
+   On `cache_hit: false`, follow `../deploy/references/recovery-flows.md` ("cold-cache"): ask the user which app first (`axhub apps list --json`), then surface the last 3 deploys via the helper:
+
+   ```bash
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP_ID> --limit 3
+   ```
+
+   On exit 65 (token missing), the helper prints a Korean setup hint — surface it verbatim and stop. ax-hub-cli has no `axhub deploy list`; helper uses REST API directly.
 
 2. **Pick source.** Default `--source=build`. Switch to `--source=pod` only when the utterance contains "런타임 로그", "running logs", "컨테이너 로그", "pod logs", or when the deploy is already in a `health_check`/terminal `succeeded` phase. When uncertain, ask once via AskUserQuestion ("빌드 로그 / 런타임 로그 / 둘 다").
 

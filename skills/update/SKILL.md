@@ -1,6 +1,6 @@
 ---
 name: update
-description: This skill should be used when the user wants to check or apply an axhub CLI update. Activates on "axhub 새 버전 있어", "업데이트 있어", "새 버전 나왔어", "최신이야", "버전 확인", "업데이트 확인해", "업데이트해", "업그레이드해", "최신으로 올려", "새 버전 받아", "axhub 업그레이드 부탁드려요", "업데이트 적용해주세요", "최신 버전으로 올려주세요", "CLI 업데이트 부탁드려요", "brew upgrade 해줘", "update", "upgrade", "version", "new release", "check version", "update available", "latest", or any axhub CLI version-management request. Enforces cosign verification by default per PLAN §16.10.
+description: 이 스킬은 사용자가 axhub CLI 업데이트를 확인하거나 적용하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "axhub 새 버전 있어", "업데이트 있어", "새 버전 나왔어", "최신이야", "버전 확인", "업데이트 확인해", "업데이트해", "업그레이드해", "최신으로 올려", "새 버전 받아", "axhub 업그레이드 부탁드려요", "업데이트 적용해주세요", "최신 버전으로 올려주세요", "CLI 업데이트 부탁드려요", "brew upgrade 해줘", "update", "upgrade", "version", "new release", "check version", "update available", "latest", 또는 axhub CLI 버전 관리 요청. PLAN §16.10 에 따라 cosign 서명 검증을 기본 enforce 합니다.
 ---
 
 # Update (CLI version check + apply)
@@ -11,13 +11,13 @@ Check and apply axhub CLI updates with cosign signature verification mandatory b
 
 To handle updates:
 
-1. **Check for update with autoupdate disabled.** Bypass GitHub Releases rate limits by setting `AXHUB_DISABLE_AUTOUPDATE=1` (the check itself runs separately):
+1. **Check for update.** Run `axhub update check --json` directly — do NOT force `AXHUB_DISABLE_AUTOUPDATE=1` (Phase 5 US-505: 회사 정책으로 disable 한 환경만 자연스럽게 disable 처리되도록 둠):
 
    ```bash
-   AXHUB_DISABLE_AUTOUPDATE=1 axhub update check --json
+   axhub update check --json
    ```
 
-   Parse the response: `{"current": "0.1.0", "latest": "0.1.1", "has_update": true}` or `{"has_update": false}`. Exit 2 means autoupdate is disabled (treat as "use current"); exit 0 with `has_update:false` means already latest.
+   Parse the response: `{"current": "0.1.0", "latest": "0.1.1", "has_update": true}` or `{"has_update": false}`. Exit 2 means the user's environment has `AXHUB_DISABLE_AUTOUPDATE=1` set (회사 보안 정책). Surface the Korean message: "회사 환경에서 autoupdate 정책이 disable 되어 있어요. 강제 진행하려면 IT/보안팀에 먼저 확인해주세요." and stop. Exit 0 with `has_update:false` means already latest.
 
 2. **On `has_update: false`.** Tell the user "이미 최신 버전이에요 (v<CURRENT>). 업데이트 안 받아도 돼요." and stop.
 

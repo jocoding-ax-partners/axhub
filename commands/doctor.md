@@ -1,5 +1,5 @@
 ---
-description: Run axhub environment diagnostics (CLI presence, auth state, version check)
+description: axhub 환경 진단 (CLI 설치 / 인증 상태 / 버전 호환성 점검)
 allowed-tools: Bash(axhub-helpers:*), Bash(axhub:*), Bash(which:*)
 argument-hint: "(no args)"
 model: sonnet

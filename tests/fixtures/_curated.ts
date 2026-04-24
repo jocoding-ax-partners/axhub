@@ -5,9 +5,9 @@
 // curation index. Adding a fixture: append below + rerun the script + commit
 // both the new .json AND the updated _curated.ts.
 //
-// Categories (target: 38 total):
+// Categories (target: 40 total):
 //   10 destructive (deploy_create variants, update_apply, auth_login)
-//    8 read-only  (apps list, apis list, deploy status, deploy logs, auth status)
+//   10 read-only  (apps list, apis list, deploy status (incl. --watch explicit), deploy logs (incl. --follow explicit), auth status)
 //    8 adversarial (env-prefix, sub-shell, eval, &&, ;, parens, backticks, quote)
 //    4 unicode    (Cyrillic homoglyph, ZWJ, Bidi override, full-width digit)
 //    4 profile/headless (AXHUB_PROFILE override, --profile flag, $CODESPACES, $SSH_TTY)
@@ -159,6 +159,20 @@ const FIXTURES: Fixture[] = [
     category: "read-only",
     description: "Auth status query (no token mutation)",
     input: { command: "axhub auth status --json" },
+    expected: { is_destructive: false },
+  },
+  {
+    id: "ro-009-deploy-status-watch-explicit",
+    category: "read-only",
+    description: "Phase 5 US-504: deploy status with --watch — read-only despite long-lived stream",
+    input: { command: "axhub deploy status dep_42 --app paydrop --watch --json" },
+    expected: { is_destructive: false },
+  },
+  {
+    id: "ro-010-deploy-logs-follow-explicit",
+    category: "read-only",
+    description: "Phase 5 US-504: deploy logs with --follow build source — read-only SSE stream",
+    input: { command: "axhub deploy logs dep_42 --app paydrop --follow --source build --json" },
     expected: { is_destructive: false },
   },
 
@@ -318,8 +332,8 @@ const COUNTS = FIXTURES.reduce<Record<string, number>>((acc, f) => {
 }, {});
 
 const main = async () => {
-  if (TOTAL !== 38) {
-    console.error(`FAIL: fixture count is ${TOTAL}, expected 38`);
+  if (TOTAL !== 40) {
+    console.error(`FAIL: fixture count is ${TOTAL}, expected 40`);
     process.exit(1);
   }
   const dir = dirname(import.meta.path);

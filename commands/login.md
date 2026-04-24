@@ -1,5 +1,5 @@
 ---
-description: Authenticate with axhub (opens browser for OAuth flow)
+description: axhub 인증 (브라우저 OAuth 로그인, 헤드리스 환경에선 토큰 붙여넣기 자동 전환)
 allowed-tools: Bash(axhub:*), AskUserQuestion
 argument-hint: "(no args, optional --token-file <path>)"
 model: sonnet
