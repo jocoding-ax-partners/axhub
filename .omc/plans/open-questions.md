@@ -2,6 +2,15 @@
 
 Append-only log of unresolved decisions across plans.
 
+## phase-13-toss-tone-migration - 2026-04-24
+
+- [ ] Q1: AskUserQuestion `취소` → `닫기` 일괄 변환 여부 — Rule T-05 는 다이얼로그 한정. "강제 다운그레이드 / 취소" 같은 destructive abort 옵션은 의미상 "닫기" 가 부적절. 예외 정책 정의 필요.
+- [ ] Q2: `아이고` 어휘 polling — Toss 가이드 미언급. 일부 사용자가 emotional warmth 로 인지할 가능성. PM-1 의 5명 A/B test 에 포함 여부.
+- [ ] Q3: 작업자용 한국어 문서 (CLAUDE.md, AGENTS.md, README.md) Tier E 포함 여부 — vibe coder 노출 surface 가 아니므로 ROI 가 낮음.
+- [ ] Q4: CHANGELOG 한국어 release notes 정리 비용 vs 가치 — 이력 텍스트라 재방문 빈도 낮음.
+- [ ] Q5: `scripts/codegen-catalog.ts` source-of-truth — `error-empathy-catalog.md` (수동 spec) vs `catalog.ts` (코드) 중 어느 쪽이 우선? Tone 변경 시 양쪽 동기화 순서 확정 필요 (PM-4 와 직접 연결).
+- [ ] Q6: 마케팅 카피 (`docs/marketing/landing-page.ko.md` 등) 톤 — Toss 자체도 마케팅과 product UX 톤이 약간 다름. 작성자/리뷰어 분리 정책 필요.
+
 ## bug-hunt-systematic - 2026-04-23
 
 - [ ] Q1: Drop `allowed-tools` from `deploy/SKILL.md`, or add to all 11 skills? — PLAN row 53 says drop (Phase 6 Validator HIGH); current state is split (1 of 11 has it). Need confirmation that Claude Code's loader actually ignores it (or rejects it).

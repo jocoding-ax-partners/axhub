@@ -16,6 +16,8 @@
     "smoke:full": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help && ./bin/axhub-helpers session-start </dev/null && bash tests/docs-link-audit.sh && bun run fuzz && bun run codegen:catalog && bun run codegen:version",
     "codegen:catalog": "bun scripts/codegen-catalog.ts",
     "codegen:version": "bun scripts/codegen-install-version.ts",
+    "lint:tone": "bun scripts/check-toss-tone-conformance.ts --strict",
+    "lint:keywords": "bun scripts/check-skill-keywords-preserved.ts --check",
     "test": "bun test",
     "test:e2e": "bun test tests/e2e/",
     "typecheck": "tsc --noEmit",
