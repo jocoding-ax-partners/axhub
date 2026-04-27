@@ -8,6 +8,9 @@ import { join } from "node:path";
 import {
   runListDeployments,
   resolveToken,
+  verifyHubApiTlsPin,
+  TlsPinError,
+  HUB_API_SPKI_SHA256_PINS,
   EXIT_LIST_OK,
   EXIT_LIST_AUTH,
   EXIT_LIST_NOT_FOUND,
@@ -22,11 +25,13 @@ beforeEach(() => {
   originalEnv = {
     AXHUB_TOKEN: process.env["AXHUB_TOKEN"],
     AXHUB_ENDPOINT: process.env["AXHUB_ENDPOINT"],
+    AXHUB_ALLOW_PROXY: process.env["AXHUB_ALLOW_PROXY"],
     XDG_CONFIG_HOME: process.env["XDG_CONFIG_HOME"],
   };
   process.env["XDG_CONFIG_HOME"] = scratchDir;
   delete process.env["AXHUB_TOKEN"];
   delete process.env["AXHUB_ENDPOINT"];
+  delete process.env["AXHUB_ALLOW_PROXY"];
 });
 
 afterEach(() => {
@@ -52,6 +57,55 @@ describe("token discovery (US-501)", () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "token"), "axhub_pat_file_token_value\n");
     expect(resolveToken()).toBe("axhub_pat_file_token_value");
+  });
+});
+
+describe("hub-api TLS pinning (PLAN row 60)", () => {
+  test("documents the current hub-api SPKI pin", () => {
+    expect(HUB_API_SPKI_SHA256_PINS).toContain("sha256/vmsW4ExrgK3t3mFNtwk6KMsokm6PM+WNgC/KWhe7Z7g=");
+  });
+
+  test("runs TLS pin checker before sending the bearer token", async () => {
+    process.env["AXHUB_TOKEN"] = "axhub_pat_test";
+    let checkedEndpoint = "";
+    let capturedAuth = "";
+    const fakeFetch = async (_url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      capturedAuth = (init?.headers as Record<string, string>)?.["Authorization"] ?? "";
+      return new Response(JSON.stringify({ success: true, data: { deployments: [] } }), { status: 200 });
+    };
+    const fakeChecker = async (endpoint: string): Promise<void> => {
+      checkedEndpoint = endpoint;
+    };
+
+    const result = await runListDeployments({ appId: "6" }, fakeFetch as unknown as typeof fetch, fakeChecker);
+
+    expect(result.exit_code).toBe(EXIT_LIST_OK);
+    expect(checkedEndpoint).toBe("https://hub-api.jocodingax.ai");
+    expect(capturedAuth).toBe("Bearer axhub_pat_test");
+  });
+
+  test("fails closed on TLS pin mismatch before fetch runs", async () => {
+    process.env["AXHUB_TOKEN"] = "axhub_pat_test";
+    let fetchCalled = false;
+    const fakeFetch = async (): Promise<Response> => {
+      fetchCalled = true;
+      return new Response(JSON.stringify({ success: true, data: { deployments: [] } }), { status: 200 });
+    };
+    const fakeChecker = async (): Promise<void> => {
+      throw new TlsPinError("hub-api TLS pin mismatch: sha256/test");
+    };
+
+    const result = await runListDeployments({ appId: "6" }, fakeFetch as unknown as typeof fetch, fakeChecker);
+
+    expect(result.exit_code).toBe(EXIT_LIST_TRANSPORT);
+    expect(result.error_code).toBe("security.tls_pin_failed");
+    expect(result.error_message_kr).toContain("AXHUB_ALLOW_PROXY=1");
+    expect(fetchCalled).toBe(false);
+  });
+
+  test("AXHUB_ALLOW_PROXY bypasses the real pin checker for managed corporate proxy", async () => {
+    process.env["AXHUB_ALLOW_PROXY"] = "1";
+    await expect(verifyHubApiTlsPin("https://hub-api.jocodingax.ai")).resolves.toBeUndefined();
   });
 });
 
