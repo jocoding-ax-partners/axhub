@@ -18,9 +18,9 @@ describe("classify()", () => {
     expect(entry.button).toBeTruthy();
   });
 
-  test("exit 64 base → 배포는 시작 안 됐어요", () => {
+  test("exit 64 base → 배포는 시작 안 했어요", () => {
     const entry = classify(64, "");
-    expect(entry.emotion).toContain("배포는 시작 안 됐어요");
+    expect(entry.emotion).toContain("배포는 시작 안 했어요");
     expect(entry.cause).toContain("검증");
     expect(entry.action).toBeTruthy();
     expect(entry.button).toBeTruthy();
@@ -32,7 +32,7 @@ describe("classify()", () => {
     });
     const entry = classify(64, stdout);
     expect(entry.emotion).toContain("다른 배포가 먼저 진행 중이에요");
-    expect(entry.cause).toContain("한 번에 한 배포만");
+    expect(entry.cause).toContain("한 번에 하나만");
     expect(entry.button).toContain("진행 중인 거 지켜보기");
   });
 
@@ -108,7 +108,7 @@ describe("classify()", () => {
     const entry = classify(99, "");
     expect(entry.emotion).toBeTruthy();
     expect(entry.cause).toContain("알 수 없는 에러");
-    expect(entry.action).toContain("관리자에게 문의");
+    expect(entry.action).toContain("관리자에게 물어");
     expect(entry.button).toBeUndefined();
   });
 

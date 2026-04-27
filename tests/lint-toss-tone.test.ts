@@ -27,10 +27,9 @@ describe("Phase 13 US-1306 — Toss tone conformance lint", () => {
     expect(files.some((f) => f.includes("commands/help.md"))).toBe(true);
   });
 
-  test("scan() returns violations with file:line:col + rule + reason", async () => {
+  test("scan() returns Violation[] with proper shape (post-Phase 13: empty array OK)", async () => {
     const violations = await scan();
-    // Phase 13 baseline has 33 errors before tone migration
-    expect(violations.length).toBeGreaterThan(0);
+    expect(Array.isArray(violations)).toBe(true);
     for (const v of violations) {
       expect(v.file).toBeTypeOf("string");
       expect(v.line).toBeGreaterThan(0);

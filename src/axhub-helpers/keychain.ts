@@ -67,7 +67,7 @@ export const readKeychainToken = (): KeychainResult => {
       if (token === null)
         return {
           error:
-            "아이고.\n" +
+            "이상해요.\n" +
             "원인: macOS keychain 의 axhub token 형식을 파싱할 수 없어요 (axhub CLI 버전 mismatch 가능).\n" +
             "해결: 'axhub auth login --force' 로 재발급 시도해주세요.\n" +
             "다음: 그래도 안 되면 'axhub --version' 으로 CLI 버전 확인 후 업그레이드.",
@@ -76,7 +76,7 @@ export const readKeychainToken = (): KeychainResult => {
     } catch {
       return {
         error:
-          "죄송해요.\n" +
+          "잠깐만요.\n" +
           "원인: macOS 'security' 명령 실행 자체가 실패했어요.\n" +
           "해결: /usr/bin/security 가 PATH 에 있는지 확인해주세요.\n" +
           "다음: 또는 AXHUB_TOKEN 환경변수로 우회 → export AXHUB_TOKEN=axhub_pat_...",
@@ -105,7 +105,7 @@ export const readKeychainToken = (): KeychainResult => {
       if (token === null)
         return {
           error:
-            "아이고.\n" +
+            "이상해요.\n" +
             "원인: Linux secret-service 의 axhub token 형식을 파싱할 수 없어요 (axhub CLI 버전 mismatch 가능).\n" +
             "해결: 'axhub auth login --force' 로 재발급 시도해주세요.\n" +
             "다음: 그래도 안 되면 'axhub --version' 으로 CLI 버전 확인 후 업그레이드.",
@@ -114,7 +114,7 @@ export const readKeychainToken = (): KeychainResult => {
     } catch {
       return {
         error:
-          "죄송해요.\n" +
+          "잠깐만요.\n" +
           "원인: secret-tool 명령이 PATH 에 없거나 D-Bus session bus 미실행.\n" +
           "해결: 'sudo apt-get install libsecret-tools' + 'eval $(dbus-launch --sh-syntax)' 시도.\n" +
           "다음: 또는 AXHUB_TOKEN 환경변수로 우회 → export AXHUB_TOKEN=axhub_pat_...",
@@ -126,7 +126,7 @@ export const readKeychainToken = (): KeychainResult => {
     error:
       "잠깐만요.\n" +
       `원인: 지원하지 않는 플랫폼이에요 (platform=${platform}).\n` +
-      "해결: AXHUB_TOKEN 환경변수로 우회 가능합니다.\n" +
+      "해결: AXHUB_TOKEN 환경변수로 우회 가능해요.\n" +
       "다음: export AXHUB_TOKEN=axhub_pat_... 후 token-init 재시도.",
   };
 };

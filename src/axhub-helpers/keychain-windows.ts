@@ -105,26 +105,26 @@ const ERR_NOT_FOUND =
 const ERR_EXEC_POLICY =
   "잠깐만요.\n" +
   "Windows PowerShell 실행 정책 (ExecutionPolicy) 이 잠겨 있어요 (회사 GPO 가능성).\n" +
-  "해결: AXHUB_TOKEN 환경변수로 우회 가능합니다.\n" +
+  "해결: AXHUB_TOKEN 환경변수로 우회 가능해요.\n" +
   "다음: PowerShell에서 $env:AXHUB_TOKEN='axhub_pat_...' 실행 후 token-init 재시도.";
 
 const ERR_PINVOKE =
   "PowerShell 인라인 C# 컴파일 (Add-Type) 이 실패했어요.\n" +
   "원인: .NET Framework 누락 또는 PowerShell 5.1 미만 버전.\n" +
-  "해결: AXHUB_TOKEN 환경변수가 정식 회피 경로입니다.\n" +
+  "해결: AXHUB_TOKEN 환경변수가 정식 회피 경로예요.\n" +
   "다음: $env:AXHUB_TOKEN='axhub_pat_...' 후 token-init 재시도. PowerShell 5.1+ 권장.";
 
 const ERR_EDR =
   "잠깐만요.\n" +
   "보안 솔루션 (V3, AhnLab, CrowdStrike 등) 이 PowerShell 호출을 차단했어요.\n" +
-  "현재 v0.1.5 는 코드사이닝 전이라 EDR가 PInvoke 패턴을 위협으로 분류합니다 — 우리 책임입니다.\n" +
-  "당장은 AXHUB_TOKEN 환경변수가 정식 회피 경로입니다 ($env:AXHUB_TOKEN='axhub_pat_...').\n" +
-  "v0.1.6 Authenticode 코드사이닝 후 EDR allowlist 가능해질 예정입니다.";
+  "현재 v0.1.5 는 코드사이닝 전이라 EDR 가 PInvoke 패턴을 위협으로 분류해요 — 우리 책임이에요.\n" +
+  "지금은 AXHUB_TOKEN 환경변수가 정식 회피 경로예요 ($env:AXHUB_TOKEN='axhub_pat_...').\n" +
+  "v0.1.6 Authenticode 코드사이닝 후 EDR allowlist 가능해질 예정이에요.";
 
 const ERR_SPAWN =
   "PowerShell 실행 자체가 실패했어요 (powershell.exe 가 PATH 에 없거나 권한 부족).\n" +
   "원인: Windows 최소 설치 환경 또는 Server Core.\n" +
-  "해결: AXHUB_TOKEN 환경변수가 정식 회피 경로입니다.\n" +
+  "해결: AXHUB_TOKEN 환경변수가 정식 회피 경로예요.\n" +
   "다음: $env:AXHUB_TOKEN='axhub_pat_...' 후 token-init 재시도.";
 
 const isEdrSignal = (result: WindowsSpawnResult): boolean => {

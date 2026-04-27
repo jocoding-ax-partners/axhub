@@ -15,16 +15,16 @@
 $ErrorActionPreference = 'Stop'
 
 $BinDir = Split-Path -Parent $PSCommandPath
-$ReleaseVersion = if ($env:AXHUB_PLUGIN_RELEASE) { $env:AXHUB_PLUGIN_RELEASE } else { 'v0.1.13' }
+$ReleaseVersion = if ($env:AXHUB_PLUGIN_RELEASE) { $env:AXHUB_PLUGIN_RELEASE } else { 'v0.1.14' }
 $ReleaseBase = "https://github.com/jocoding-ax-partners/axhub/releases/download/$ReleaseVersion"
 
 # Windows only ships amd64 (per package.json build:all)
 $ArchKey = if ($env:PROCESSOR_ARCHITECTURE -eq 'AMD64') { 'amd64' } else { $env:PROCESSOR_ARCHITECTURE.ToLower() }
 if ($ArchKey -ne 'amd64') {
   $msg = "지원하지 않는 Windows 아키텍처에요 (요청: $ArchKey).`n" +
-         "원인: 현재 release 는 windows-amd64 만 빌드합니다.`n" +
+         "원인: 현재 release 는 windows-amd64 만 빌드해요.`n" +
          "해결: AXHUB_TOKEN 환경변수로 우회 → `$env:AXHUB_TOKEN='axhub_pat_...'`n" +
-         "다음: arm64 Windows 지원은 다음 릴리즈에 추가될 예정입니다."
+         "다음: arm64 Windows 지원은 다음 릴리즈에 추가될 예정이에요."
   Write-Output (ConvertTo-Json @{ systemMessage = $msg } -Compress)
   exit 0
 }
@@ -87,7 +87,7 @@ if (-not (Test-Path -Path $TargetPath -PathType Leaf)) {
     if (Test-Path $TmpPath) { Remove-Item -Path $TmpPath -Force -ErrorAction SilentlyContinue }
     $msg = "axhub-helpers 다운로드 중 알 수 없는 에러 발생.`n" +
            "원인: $($_.Exception.Message)`n" +
-           "해결: AXHUB_TOKEN 환경변수로 우회 가능합니다.`n" +
+           "해결: AXHUB_TOKEN 환경변수로 우회 가능해요.`n" +
            "다음: `$env:AXHUB_TOKEN='axhub_pat_...' 후 token-init 재시도."
     Write-Output (ConvertTo-Json @{ systemMessage = $msg } -Compress)
     exit 0
@@ -98,7 +98,7 @@ if (-not (Test-Path -Path $TargetPath -PathType Leaf)) {
   Start-Sleep -Seconds 2
   if (-not (Test-Path -Path $TargetPath -PathType Leaf)) {
     $msg = "다운로드 후 바이너리가 사라졌어요 (Windows Defender / V3 / AhnLab 등 격리 가능성).`n" +
-           "원인: 보안 솔루션이 Bun-compiled .exe 를 PUP 로 분류했을 수 있어요. v0.1.5 코드사이닝 전이라 우리 책임입니다.`n" +
+           "원인: 보안 솔루션이 Bun-compiled .exe 를 PUP 로 분류했을 수 있어요. v0.1.5 코드사이닝 전이라 우리 책임이에요.`n" +
            "해결: AXHUB_TOKEN 환경변수가 정식 회피 경로 → `$env:AXHUB_TOKEN='axhub_pat_...'`n" +
            "다음: 또는 IT 팀에 $TargetPath 예외 요청 (v0.1.8 Authenticode 서명 후 EDR allowlist 합법화 예정)."
     Write-Output (ConvertTo-Json @{ systemMessage = $msg } -Compress)

@@ -23,7 +23,7 @@
       "id": "US-1301",
       "title": "catalog.ts 13 entries → Toss 4-part 톤 (Tier A core)",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "catalog.ts 13 exit-code entries: 어미 100% 해요체, 직접 호칭 (당신) 0회, 부정형 → 긍정형, emotion prefix (잠깐만요/괜찮아요/축하해요) 보존.",
         "취소 → 닫기 decision tree per §6: 5× 취소 → 닫기, 1× 취소 retain (FORCE_DOWNGRADE destructive abort).",
@@ -39,7 +39,7 @@
       "id": "US-1302",
       "title": "Keychain 4-part Toss 톤 (keychain.ts + keychain-windows.ts)",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "keychain.ts 7 errors + keychain-windows.ts 5 errors → Toss 톤.",
         "아이고 deprecated → 잠깐만요 또는 이상해요 통일.",
@@ -55,7 +55,7 @@
       "id": "US-1303",
       "title": "List-deployments + index.ts USAGE Toss 톤",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "list-deployments.ts 7 strings (auth error, token-missing fallback, parse failures) → Toss.",
         "index.ts cmdSessionStart Korean message + USAGE description Toss.",
@@ -70,7 +70,7 @@
       "id": "US-1304",
       "title": "9 slash commands + help.md menu Toss 톤",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "commands/{deploy,status,logs,apps,apis,doctor,login,update,help}.md description 한 줄 → Toss.",
         "help.md 21줄 menu Toss (자연어 예시 따옴표 = 발화 lexicon UNCHANGED).",
@@ -85,7 +85,7 @@
       "id": "US-1305",
       "title": "Install + hook system message Toss (Tier D)",
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "bin/install.sh 12 Korean lines + bin/install.ps1 5 multi-line + hooks/session-start.sh 2 + hooks/session-start.ps1 8 → Toss.",
         "Korean error messages 4-part structure 보존 (Tier D 도 information density 유지).",

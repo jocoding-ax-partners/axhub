@@ -84,7 +84,7 @@ describe("keychain.ts 4-part Korean error format-parity (Phase 11 US-1102 closes
   });
 
   test("each error starts with emotion word (감정 prefix per error-empathy-catalog)", () => {
-    const emotions = source.match(/(잠깐만요|아이고|죄송해요)\.\\n/g);
+    const emotions = source.match(/(잠깐만요|이상해요)\.\\n/g);
     expect(emotions?.length).toBeGreaterThanOrEqual(7);
   });
 

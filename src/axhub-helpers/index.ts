@@ -101,7 +101,7 @@ const asConsentBinding = (v: unknown): ConsentBinding | null => {
   };
 };
 
-const PLUGIN_VERSION = "0.1.13";
+const PLUGIN_VERSION = "0.1.14";
 // MIN_AXHUB_CLI_VERSION + MAX_AXHUB_CLI_VERSION live in ./preflight.ts (the
 // only consumer); re-importing here would just create a stale duplicate.
 const CONSENT_TOKEN_TTL_SEC = 60;
@@ -191,7 +191,7 @@ async function cmdSessionStart(_args: string[]): Promise<number> {
       const selfPath = process.execPath;
       if (selfPath && !existsSync(`${selfPath}.sig`)) {
         systemMessage +=
-          "\n\n⚠️ 보안 검증 미통과: 이 helper 바이너리는 cosign 서명이 없어요. 회사 보안 정책에 따라 IT/admin에 문의하세요. (계속 사용은 가능합니다.)";
+          "\n\n⚠️ 보안 검증 미통과: 이 helper 바이너리는 cosign 서명이 없어요. 회사 보안 정책에 따라 IT/admin 에 문의해주세요. (계속 사용은 가능해요.)";
       }
     } catch {
       // Best-effort: never let the cosign check break session start.
@@ -453,7 +453,7 @@ async function cmdTokenInit(_args: string[]): Promise<number> {
     stored_at: path,
     source,
     redacted_token: token.slice(0, 12) + "...[redacted]",
-    next_step: "이제 /axhub:status, /axhub:logs 같은 명령이 자동으로 작동합니다.",
+    next_step: "이제 /axhub:status, /axhub:logs 같은 명령이 자동으로 작동해요.",
   });
   return 0;
 }

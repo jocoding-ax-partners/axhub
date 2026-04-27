@@ -33,7 +33,7 @@ esac
 
 # Windows only ships amd64 (per package.json build:all)
 if [ "$OS_KEY" = "windows" ] && [ "$ARCH_KEY" != "amd64" ]; then
-  echo "Windows는 amd64만 지원해요 (요청: $ARCH). arm64는 다음 릴리즈에서 추가 예정입니다." >&2
+  echo "Windows는 amd64만 지원해요 (요청: $ARCH). arm64는 다음 릴리즈에서 추가될 예정이에요." >&2
   exit 1
 fi
 
@@ -45,7 +45,7 @@ TARGET_PATH="${BIN_DIR}/${TARGET_NAME}"
 
 # Maintainer: when bumping plugin version (package.json + .claude-plugin/*),
 # update this default to match the new release tag. Override via AXHUB_PLUGIN_RELEASE.
-RELEASE_VERSION="${AXHUB_PLUGIN_RELEASE:-v0.1.13}"
+RELEASE_VERSION="${AXHUB_PLUGIN_RELEASE:-v0.1.14}"
 RELEASE_BASE="https://github.com/jocoding-ax-partners/axhub/releases/download/${RELEASE_VERSION}"
 
 if [ ! -f "$TARGET_PATH" ]; then
