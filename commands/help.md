@@ -1,5 +1,6 @@
 ---
 description: axhub 플러그인 슬래시 명령 메뉴 보기 (한국어)
+argument-hint: "(no args)"
 ---
 
 Show the axhub plugin command menu to the user. Render in Korean with friendly tone for vibe coders. Format:
