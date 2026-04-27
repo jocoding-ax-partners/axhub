@@ -21,6 +21,11 @@ const BEARER_RE = /Bearer [A-Za-z0-9_\-.]{20,}/g;
 // axhub env-var token: "AXHUB_TOKEN=" followed by ≥20 base64url/dot chars
 const AXHUB_TOKEN_RE = /AXHUB_TOKEN=[A-Za-z0-9_\-.]{20,}/g;
 
+// axhub raw PAT token: "axhub_pat_" followed by ≥16 alnum/_/- chars.
+// Phase docs (PLAN E7 + skills/deploy/references/headless-flow.md §3) require
+// this masking — caught missing by live plugin smoke 2026-04-27.
+const AXHUB_PAT_RE = /axhub_pat_[A-Za-z0-9_-]{16,}/g;
+
 /**
  * Sanitize and redact a text string:
  * 1. NFKC normalize (collapses homoglyphs, compatibility chars)
@@ -28,7 +33,8 @@ const AXHUB_TOKEN_RE = /AXHUB_TOKEN=[A-Za-z0-9_\-.]{20,}/g;
  * 3. Strip ZWJ / ZWNJ / ZWSP
  * 4. Redact Bearer tokens
  * 5. Redact AXHUB_TOKEN= values
- * 6. Strip ANSI escape sequences
+ * 6. Redact raw axhub_pat_* tokens
+ * 7. Strip ANSI escape sequences
  */
 export function redact(text: string): string {
   return text
@@ -37,5 +43,6 @@ export function redact(text: string): string {
     .replace(ZW_RE, "")
     .replace(BEARER_RE, "Bearer ***")
     .replace(AXHUB_TOKEN_RE, "AXHUB_TOKEN=***")
+    .replace(AXHUB_PAT_RE, "axhub_pat_[redacted]")
     .replace(ANSI_RE, "");
 }

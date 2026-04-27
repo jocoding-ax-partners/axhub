@@ -67,6 +67,18 @@ describe("redact()", () => {
     expect(redact(input)).toContain("AXHUB_TOKEN=short123");
   });
 
+  test("raw axhub_pat_* token redacted (Phase 11 v0.1.10 — caught by live smoke)", () => {
+    const input = "test axhub_pat_a1b2c3d4e5f6g7h8i9j0 leak";
+    const result = redact(input);
+    expect(result).toBe("test axhub_pat_[redacted] leak");
+    expect(result).not.toContain("a1b2c3d4");
+  });
+
+  test("axhub_pat_* shorter than 16 chars NOT redacted (regex floor)", () => {
+    const input = "axhub_pat_short";
+    expect(redact(input)).toContain("axhub_pat_short");
+  });
+
   test("ANSI escape sequences stripped: colour codes", () => {
     const input = "\x1b[31mred\x1b[0m text";
     expect(redact(input)).toBe("red text");
