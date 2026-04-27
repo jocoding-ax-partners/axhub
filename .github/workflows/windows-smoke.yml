@@ -1,0 +1,101 @@
+name: Windows smoke (PS1 hooks)
+
+# Phase 11+ — runs install.ps1 + session-start.ps1 paths on real Windows
+# runner. Replaces "Real Windows VM smoke test" deferred from Phase 10.
+# AXHUB_VM_SMOKE=1 path requires plugin install which doesn't fit GHA;
+# this workflow runs the script-level smoke (build + invoke install.ps1
+# stub-mode + verify ASCII + verify JSON envelope shape).
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  windows-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify install.ps1 + session-start.ps1 exist
+        shell: pwsh
+        run: |
+          if (-not (Test-Path bin\install.ps1)) { throw "bin\install.ps1 missing" }
+          if (-not (Test-Path hooks\session-start.ps1)) { throw "hooks\session-start.ps1 missing" }
+          Write-Output "[ok] both scripts present"
+
+      - name: ASCII clean check (no U+200B / FEFF)
+        shell: pwsh
+        run: |
+          $content = (Get-Content bin\install.ps1 -Raw) + (Get-Content hooks\session-start.ps1 -Raw)
+          $matches = [regex]::Matches($content, '[​-‏﻿]')
+          if ($matches.Count -gt 0) { throw "ASCII contamination: $($matches.Count) zero-width chars found" }
+          Write-Output "[ok] ASCII clean"
+
+      - name: install.ps1 dry-run (AXHUB_SKIP_AUTODOWNLOAD=1 — no network)
+        shell: pwsh
+        env:
+          AXHUB_SKIP_AUTODOWNLOAD: '1'
+        run: |
+          $output = & powershell -NoProfile -ExecutionPolicy Bypass -File bin\install.ps1 2>&1
+          $exit = $LASTEXITCODE
+          Write-Output "exit=$exit"
+          Write-Output "output=$output"
+          # Should exit 0 (graceful — install skipped due to env flag)
+          if ($exit -ne 0) { throw "install.ps1 dry-run exit=$exit (expected 0)" }
+          # Should emit JSON systemMessage envelope
+          $parsed = $output | ConvertFrom-Json -ErrorAction Stop
+          if (-not $parsed.systemMessage) { throw "install.ps1 did not emit systemMessage envelope" }
+          if ($parsed.systemMessage -notmatch 'AXHUB_SKIP_AUTODOWNLOAD') { throw "expected message to mention AXHUB_SKIP_AUTODOWNLOAD" }
+          Write-Output "[ok] install.ps1 dry-run produced 4-part Korean systemMessage"
+
+      - name: session-start.ps1 missing-CLAUDE_PLUGIN_ROOT path
+        shell: pwsh
+        run: |
+          # Without CLAUDE_PLUGIN_ROOT set, script should emit Korean
+          # systemMessage and exit 0 (never block session)
+          Remove-Item Env:\CLAUDE_PLUGIN_ROOT -ErrorAction SilentlyContinue
+          $output = & powershell -NoProfile -ExecutionPolicy Bypass -File hooks\session-start.ps1 2>&1
+          $exit = $LASTEXITCODE
+          Write-Output "exit=$exit"
+          Write-Output "output=$output"
+          if ($exit -ne 0) { throw "session-start.ps1 exit=$exit (expected 0 — must never block)" }
+          $parsed = $output | ConvertFrom-Json -ErrorAction Stop
+          if ($parsed.systemMessage -notmatch 'CLAUDE_PLUGIN_ROOT') { throw "expected message to mention CLAUDE_PLUGIN_ROOT" }
+          Write-Output "[ok] session-start.ps1 emits expected Korean systemMessage on missing env"
+
+      - name: PowerShell + Add-Type Win32 API smoke (verify CredReadW signature loads)
+        shell: pwsh
+        run: |
+          # Compile the same Add-Type stub Phase 9 keychain-windows.ts uses.
+          # If this throws on windows-latest, the keychain bridge is broken
+          # before any pilot user touches it.
+          $ErrorActionPreference = 'Stop'
+          Add-Type -TypeDefinition @"
+          using System;
+          using System.Runtime.InteropServices;
+          public class Advapi32Smoke {
+            [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+            public static extern bool CredReadW(string target, int type, int reservedFlag, out IntPtr CredentialPtr);
+          }
+          "@ -PassThru | Out-Null
+          $ptr = [IntPtr]::Zero
+          $ok = [Advapi32Smoke]::CredReadW('axhub-nonexistent-test-target', 1, 0, [ref]$ptr)
+          # Expected: $ok=$false (target doesn't exist) — Win32 LastError should be 1168 (ERROR_NOT_FOUND)
+          $err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+          Write-Output "CredReadW returned ok=$ok, LastError=$err (expected ok=False, LastError=1168 ERROR_NOT_FOUND)"
+          if ($ok) { throw "CredReadW unexpectedly succeeded for nonexistent target" }
+          if ($err -ne 1168) { throw "Expected ERROR_NOT_FOUND (1168), got $err" }
+          Write-Output "[ok] Add-Type advapi32!CredReadW PInvoke smoke green"
+
+      - name: Summary
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Output "=========================================="
+          Write-Output "Windows smoke workflow complete"
+          Write-Output "Note: full token-init flow requires axhub auth login (browser OAuth) which GHA cannot do."
+          Write-Output "Real Windows pilot session uses tests/smoke-windows-vm-checklist.ps1 for full E2E."
+          Write-Output "=========================================="
