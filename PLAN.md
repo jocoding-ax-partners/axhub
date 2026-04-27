@@ -27,7 +27,7 @@
 - **자연어 우선** — 슬래시 사용 없이 "내 앱 어떻게 됐어", "방금 배포한 거 살아 있어?" 같은 자연 발화에 반응. 단, 메트릭은 trigger 비율이 아닌 trusted task completion + unsafe-trigger 0%.
 - **슬래시는 escape hatch** — 명시적 컨트롤이 필요한 사용자용.
 - **B2B 배포 channel** — 각 고객사가 marketplace에서 self-install. plugin = axhub 영업 자료의 일부.
-- **Cross-agent portability** — vibe coder들이 Claude Code만 쓰지는 않음. MCP 계층이 가치 있음 (Phase 1에서 reverse 결정).
+- **Cross-agent portability (superseded)** — vibe coder들이 여러 agent를 쓸 수는 있지만, Phase 6.5 사용자 정정(rows 61–64) 이후 plugin 자체의 MCP/cross-agent 계층은 **CANCELLED**. 공통 surface는 별도 plugin layer가 아니라 `ax-hub-cli` 자체다.
 
 ## 1.5 Personas (new)
 
@@ -51,7 +51,7 @@
 | P6 (new) | 사용자 = **단일 회사 내 10–500명 vibe coders + senior 일부**. <10이면 docs로 충분, >1000이면 web dashboard 우선. | 사용자 컨텍스트 (B2B 회사 도입) | 첫 고객사 N 카운트로 검증 |
 | P7 (new) | Destructive 행동 (deploy create, deploy logs --follow kill, update apply --force) **항상 명시적 사용자 승인 필요**. fuzzy NL trigger만으로 자동 실행 X. | C3 (CEO 합의) | unsafe-trigger 측정 + AskUserQuestion 패턴 |
 | P8 (new) | Plugin은 **ax-hub-cli와 동일 maintainer + 동일 release cadence**. 별도 owner 분리 시 90일 내 abandonware. | jocoding-ax-partners org | CODEOWNERS + CI matrix |
-| P9 (new) | **Cross-agent portability는 v0.2 scope에 포함** — Claude Code-first ship, MCP 계층 후속. v0.1에서 architecture 결정만 미리. | C4 (CEO 합의), 사용자 컨텍스트 (vibe coder들이 다양한 에이전트 씀) | MCP 계층 추가가 plugin 재작성 없이 가능한 architecture |
+| P9 (superseded) | **Plugin cross-agent/MCP 계층은 scope 제외** — Phase 6.5 rows 61–64가 Phase 1/5/6의 M7 결정을 취소. Claude Code plugin은 항상 `ax-hub-cli`만 호출하고, 다른 agent도 필요 시 CLI를 직접 사용한다. | 사용자 2회 정정 ("plugin이 MCP를 쓰는게 아니라 cli를 쓰는거야") | PLAN active scope에서 M7/MCP placeholder가 다시 살아나지 않는지 문서/테스트로 검증 |
 | P10 (new) | **Docs-only baseline 측정이 plugin 존재의 GO/KILL gate.** baseline ≥X% 능가 못하면 plugin 보류, docs로 ship. | C1 (CEO 합의) | M1.5에서 corpus 실측 |
 
 → **모든 premise는 §11 milestones에서 falsifiable check로 연결됨.**
@@ -377,9 +377,9 @@ exit 68 → "rate limit. Retry-After 헤더만큼 대기 후 재시도."
 | **M4** | hooks/ (SessionStart 진단 + PostToolUse classify-exit) — **axhub 명령 아니면 즉시 no-op (5ms 이내)** | hook latency benchmark < 5ms (95p), exit 65/64+in_progress/67/68 자동 분류 정확도 100% |
 | **M5** | Trust hardening: profile 명시 prompt before destructive op (P5), multi-machine cache cold-start 처리 (P4), 토큰 scope pre-flight (auth status before deploy) | unsafe-trigger 0% 회귀 테스트, 다른 머신/Codespaces에서 첫 deploy 동작 |
 | **M6** | marketplace.json + private/public 결정 + README/CHANGELOG/LICENSE 본격 + 첫 고객사 install 가이드 (Korean) | `/plugin install` flow 동작, 첫 고객사 onboarding doc 완성 |
-| **M7 (v0.2 scope)** | **MCP server 계층** — skills를 MCP tool schema로 export, Codex/Cursor 사용자도 같은 surface. plugin = Claude Code-specific UX wrapper around MCP. | Codex CLI에서 deploy/status/logs MCP tool 호출 동작 |
+<!-- M7 removed by Decision Audit Trail row 62. Plugin MCP server / .mcp.json placeholder / MCP tool naming were canceled by rows 61–64. -->
 
-**Out of M0–M7 (TODO 백로그)**: 자동 rollback (CLI에 명령 생기면), org-admin audit log skill, multi-tenant marketplace policy, web dashboard.
+**Out of M0–M6 (TODO 백로그)**: 자동 rollback (CLI에 명령 생기면), org-admin audit log skill, multi-tenant marketplace policy, web dashboard. Plugin 자체 MCP server / `.mcp.json` placeholder / cross-agent portability layer는 TODO가 아니라 rows 61–64에 의해 취소된 scope다.
 
 ## 12. Risks / Edge cases
 
@@ -450,7 +450,7 @@ tests/score.py           # corpus 결과 → 4개 메트릭 산출 + diff vs bas
 - v0.1.x release 마다 corpus 재실행 (CI matrix), regression 발견 시 plugin minor bump 또는 hold.
 - v0.2.0 (CLI breaking change 가능) 진입 시 plugin 0.2.0 별도 branch.
 
-## 14. NOT in scope (revised — MCP는 v0.2 scope에 ENTERED)
+## 14. NOT in scope (revised after Phase 6.5 cancellation)
 
 **v0.1 (M0–M6) 안 함:**
 - **자체 LSP** — 해당 없음.
@@ -462,12 +462,15 @@ tests/score.py           # corpus 결과 → 4개 메트릭 산출 + diff vs bas
 - **Org-admin audit log skill** — v0.2+ (P6 user count 검증 후).
 - **Web dashboard** — 본 plugin과 별개 product.
 
-**v0.2 (M7) entered (Phase 1 reverse):**
-- **MCP server 계층** — Claude Code 외 에이전트 (Codex/Cursor/Cline)에서 동일 deploy/status/logs surface. v0.1 architecture가 MCP 추가 가능하게 설계 (skills의 비즈니스 로직을 별도 함수로 분리, skill markdown은 thin caller).
+**v0.x 전체에서 영구 제외 (rows 61–64):**
+- Plugin이 자체 MCP server를 expose하는 것.
+- Plugin이 backend MCP를 직접 호출하거나 MCP를 primary interface로 삼는 것.
+- `.mcp.json` placeholder, MCP tool naming, MCP consent-token tool 설계.
 
-**Architecturally deferred (v0.1.0에서 미리 결정):**
-- skills/ 내부 로직은 future MCP tool boundary에 맞춰 함수 단위로 작성 (description ≠ implementation).
-- `bin/axhub-helpers/` 같은 헬퍼 스크립트 placeholder만 두고 실제 MCP server는 M7에서.
+**유지되는 설계 원칙:**
+- `skills/`와 `commands/`는 Claude Code presentation layer다.
+- `bin/axhub-helpers`는 testability/maintainability를 위한 TypeScript helper이며, 항상 `ax-hub-cli`를 호출한다.
+- 다른 agent가 필요하면 plugin layer가 아니라 `ax-hub-cli`를 공통 surface로 사용한다.
 
 ## 15. What already exists (재사용 가능)
 
@@ -639,10 +642,10 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 ```
 
 **§16.13 bin/axhub-helpers (single binary spec)**:
-- Single Go binary at `bin/axhub-helpers` (no nested dir).
-- Subcommands: `session-start`, `preauth-check`, `consent-mint`, `consent-verify`, `resolve`, `preflight`, `classify-exit`, `redact`, `mcp-serve`.
-- Multi-arch builds via goreleaser (mirror of ax-hub-cli pattern).
-- Cosign-signed releases.
+- Single TypeScript/Bun-compiled binary at `bin/axhub-helpers` (no nested dir), per rows 66–68.
+- Subcommands: `session-start`, `preauth-check`, `consent-mint`, `consent-verify`, `resolve`, `preflight`, `classify-exit`, `redact`.
+- Multi-arch builds via Bun compile targets already mirrored in package scripts.
+- Release artifacts are signed/verified by the release workflow; plugin helper always calls `ax-hub-cli`.
 
 **§16.14 Hook Schema Versioning + State Files**:
 - Hook payload contract pinned with `tests/hook-fixtures/{v0, v1}/*.json`.
@@ -650,10 +653,10 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 - State file pattern: `${XDG_STATE_HOME}/axhub-plugin/last-exit.json` + `consent-<sessionId>.json` (machine-readable).
 - Correctness MUST NOT depend on hook ordering.
 
-**§16.15 MCP Server (M7) — Consent in MCP, Not in Host Hook**:
-- §16.6 강화: `deploy_create` MCP tool REQUIRES `consent_token` parameter minted by sibling `request_consent` MCP tool.
-- Host (Codex/Cursor/Cline) MUST surface `request_consent` to user via native approval UI; if it doesn't, every destructive call fails closed.
-- Adversarial test: stub MCP client that skips `request_consent` → every destructive call returns error.
+**§16.15 CANCELED — Plugin MCP Server (historical only)**:
+- Rows 61–64 cancel the M7 plugin MCP server, `.mcp.json` placeholder, MCP tool naming, and MCP-specific consent-token design.
+- Do not add `mcp-serve`, MCP client fixtures, or MCP consent tools in this plugin.
+- The surviving requirement is host-independent safety at the CLI/helper boundary: destructive Bash calls remain protected by Claude Code hooks + HMAC consent, and helper logic stays testable.
 
 **§16.16 Multi-Tenant Credential Isolation**:
 - Keychain account = `axhub-{profile}-{companyId}-{userEmail}`. Refuse to write if discriminator missing.
@@ -771,14 +774,14 @@ axhub/                                      # plugin root
 │   ├── transcripts/                        # T1–T15 골든 시나리오 (revised §13)
 │   └── hook-fixtures/                      # E11 fix, hook stdin payload pinning
 │
-├── .mcp.json                               # M7 placeholder (G11), v0.2 진입 시 활성화
-└── .claude-plugin/marketplace.json         # B2B install (M6)
+├── .claude-plugin/marketplace.json         # B2B install (M6)
+└── (no .mcp.json)                          # rows 61–64: plugin MCP server placeholder canceled
 ```
 
 **Critical rules:**
-- All hook commands and MCP `command` fields use `${CLAUDE_PLUGIN_ROOT}/...`. NEVER hardcoded paths.
-- `bin/axhub-helpers/` is added to plugin's `bin/` so it appears on `PATH` while plugin is enabled (per official docs). Skills/commands/hooks invoke it via PATH lookup, no path fragility.
-- Adapter logic lives in `bin/axhub-helpers/` (Go) — Skills' SKILL.md becomes thin (calls helper), references/ holds detail.
+- All hook commands use `${CLAUDE_PLUGIN_ROOT}/...`. NEVER hardcoded paths.
+- `bin/axhub-helpers` is the single helper binary shipped in the plugin `bin/` surface. Skills/commands/hooks invoke it via PATH lookup or `${CLAUDE_PLUGIN_ROOT}` path, no path fragility.
+- Adapter logic lives in `src/axhub-helpers/` and compiles to `bin/axhub-helpers` (TypeScript/Bun per rows 66–68) — Skills' SKILL.md stays thin, references/ holds detail.
 
 ### 16.3 Revised Skill Template (best practices conformant)
 
@@ -912,25 +915,11 @@ Apply skill workflow as defined in skills/deploy/SKILL.md. Slash invocation does
 - Commands instruct Claude (not the user). "Trigger the axhub deploy skill..." not "This command will deploy your app".
 - Slash NEVER bypasses safety (G3/E2 alignment).
 
-### 16.6 MCP M7 Placeholder Spec
+### 16.6 CANCELED Plugin MCP Placeholder Spec (historical only)
 
-`.mcp.json` (created at M7 entry, empty placeholder until then):
+Rows 61–64 supersede the earlier M7 placeholder. The repository should **not** contain `.mcp.json`, a server-mode helper subcommand, MCP tool naming, or MCP consent-tool scaffolding for this plugin.
 
-```json
-{
-  "axhub-agent": {
-    "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers",
-    "args": ["mcp-serve", "--stdio"],
-    "env": {
-      "AXHUB_AGENT": "1"
-    }
-  }
-}
-```
-
-**Tool naming**: `mcp__plugin_axhub_axhub-agent__deploy_create`, `mcp__plugin_axhub_axhub-agent__deploy_status`, etc.
-
-**Adapter layer (`bin/axhub-helpers`) is the source of truth.** Skills/commands/hooks call helper via stdio (current). MCP server mode (M7) exposes same helper functions as MCP tools to Codex/Cursor/Cline. Day-1 host-agnostic boundary (E3 fix) is achieved by making the helper the contract, not skill markdown.
+The adapter layer (`bin/axhub-helpers`) remains the source of truth for testable helper behavior, but its job is CLI orchestration: skills/commands/hooks call the helper, and the helper calls `ax-hub-cli`. It does not expose an MCP server.
 
 ### 16.7 Best Practices Audit Checklist
 
@@ -938,15 +927,15 @@ Before M1 ship, audit against:
 
 - [ ] All hook commands use `${CLAUDE_PLUGIN_ROOT}` prefix
 - [ ] hooks.json uses `{"hooks": {...}}` wrapper
-- [ ] PreToolUse uses prompt-based hook for consent (or sh equivalent with structured JSON output)
-- [ ] All hook scripts emit `hookSpecificOutput` JSON (not just exit code)
+- [ ] PreToolUse uses command-based HMAC consent hook with structured JSON output
+- [ ] All hook commands emit `hookSpecificOutput` JSON (not just exit code)
 - [ ] All SKILL.md ≤2000 words; detailed content in references/
-- [ ] All skill descriptions use third-person "This skill should be used when the user asks to..."
+- [ ] All skill descriptions use third-person "This skill should be used when the user asks to..." or the approved Korean equivalent
 - [ ] All skill bodies use imperative form (no "you should...")
-- [ ] All commands have `description` + `allowed-tools` + `argument-hint`
+- [ ] All commands have `description` + `allowed-tools` + `argument-hint` + `model`
 - [ ] Commands written as instructions FOR Claude, not messages TO user
 - [ ] All references/, examples/, scripts/ subdirs created where applicable
-- [ ] `bin/axhub-helpers/` Go binary builds and emits structured JSON
+- [ ] `bin/axhub-helpers` TypeScript/Bun single binary builds and emits structured JSON
 - [ ] Validate with `claude --debug` and `/hooks` command
 - [ ] Use `skill-reviewer` agent on each SKILL.md
 - [ ] Use `plugin-validator` agent on overall structure

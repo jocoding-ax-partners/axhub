@@ -424,22 +424,40 @@ describe("hookSpecificOutput field validation in src/axhub-helpers/index.ts", ()
 
 // ---------------------------------------------------------------------------
 // Reason: commands/*.md frontmatter shape — Claude Code loader requires
-// `description` field; allowed-tools / argument-hint / model are optional.
+// explicit command metadata. Phase 1 PLAN reconciliation makes
+// description / allowed-tools / argument-hint / model mandatory for all
+// command files so missing metadata cannot silently regress marketplace UX.
 // ---------------------------------------------------------------------------
 describe("commands/*.md frontmatter", () => {
   let cmdFiles: string[] = [];
   const cmdContents = new Map<string, string>();
+  const expectedCommands = [
+    "apis.md",
+    "apps.md",
+    "deploy.md",
+    "doctor.md",
+    "help.md",
+    "login.md",
+    "logs.md",
+    "status.md",
+    "update.md",
+    "배포.md",
+  ].sort();
+
+  const frontmatterOf = (content: string): string => content.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
+  const frontmatterValue = (content: string, key: string): string | undefined =>
+    frontmatterOf(content).match(new RegExp(`^${key}:\\s*(.+)$`, "m"))?.[1]?.trim();
 
   beforeAll(async () => {
     const dir = join(REPO_ROOT, "commands");
-    cmdFiles = (await readdir(dir)).filter((f) => f.endsWith(".md"));
+    cmdFiles = (await readdir(dir)).filter((f) => f.endsWith(".md")).sort();
     for (const f of cmdFiles) {
       cmdContents.set(f, await readFile(join(dir, f), "utf8"));
     }
   });
 
-  test("at least one command file exists", () => {
-    expect(cmdFiles.length).toBeGreaterThan(0);
+  test("exactly 10 command files exist, including the Korean deploy alias", () => {
+    expect(cmdFiles).toEqual(expectedCommands);
   });
 
   test("each command file has YAML frontmatter (--- delimited)", () => {
@@ -450,42 +468,51 @@ describe("commands/*.md frontmatter", () => {
     }
   });
 
-  test("each command frontmatter has description field", () => {
-    for (const [, content] of cmdContents) {
-      const fm = content.split("\n---\n")[0].slice(4);
-      expect(fm).toMatch(/^description:\s*.+/m);
+  test("each command frontmatter has all required metadata fields", () => {
+    for (const [file, content] of cmdContents) {
+      const fm = frontmatterOf(content);
+      for (const key of ["description", "allowed-tools", "argument-hint", "model"]) {
+        expect(fm, `${file} missing ${key}`).toMatch(new RegExp(`^${key}:\\s*.+`, "m"));
+      }
     }
   });
 
   test("each command description is non-empty string", () => {
     for (const [, content] of cmdContents) {
-      const m = content.match(/^description:\s*(.+)/m);
-      expect(m).not.toBeNull();
-      expect(m![1].trim().length).toBeGreaterThan(5);
+      const description = frontmatterValue(content, "description");
+      expect(description).toBeDefined();
+      expect(description!.length).toBeGreaterThan(5);
     }
   });
 
   test("each command description ≤200 chars", () => {
     for (const [, content] of cmdContents) {
-      const m = content.match(/^description:\s*(.+)/m);
-      expect(m![1].length).toBeLessThanOrEqual(200);
+      const description = frontmatterValue(content, "description")!;
+      expect(description.length).toBeLessThanOrEqual(200);
     }
   });
 
   test("commands without name in frontmatter (auto-derived from filename)", () => {
     for (const [, content] of cmdContents) {
-      const fm = content.split("\n---\n")[0];
+      const fm = frontmatterOf(content);
       expect(fm).not.toMatch(/^name:\s/m);
     }
   });
 
-  test("model field if present is valid Claude model", () => {
+  test("model field is present and valid Claude model", () => {
     const validModels = new Set(["sonnet", "opus", "haiku", "claude-sonnet-4-6", "claude-opus-4-7", "claude-haiku-4-5"]);
     for (const [, content] of cmdContents) {
-      const m = content.match(/^model:\s*(.+)/m);
-      if (m) {
-        expect(validModels.has(m[1].trim())).toBe(true);
-      }
+      const model = frontmatterValue(content, "model");
+      expect(model).toBeDefined();
+      expect(validModels.has(model!)).toBe(true);
+    }
+  });
+
+  test("argument-hint is present and non-empty", () => {
+    for (const [, content] of cmdContents) {
+      const hint = frontmatterValue(content, "argument-hint");
+      expect(hint).toBeDefined();
+      expect(hint!.replace(/^"|"$/g, "").trim().length).toBeGreaterThan(0);
     }
   });
 
@@ -497,13 +524,21 @@ describe("commands/*.md frontmatter", () => {
     }
   });
 
-  test("argument-hint is non-empty string if present", () => {
-    for (const [, content] of cmdContents) {
-      const m = content.match(/^argument-hint:\s*"?(.+?)"?$/m);
-      if (m) {
-        expect(m[1].trim().length).toBeGreaterThan(0);
-      }
-    }
+  test("help command remains least-privilege and tool-free", () => {
+    const help = cmdContents.get("help.md")!;
+    expect(frontmatterValue(help, "allowed-tools")).toBe("[]");
+    expect(help).not.toContain("Bash(");
+    expect(help).not.toContain("AskUserQuestion");
+  });
+
+  test("Korean deploy alias delegates to deploy skill without forking deploy logic", () => {
+    const alias = cmdContents.get("배포.md")!;
+    const deploy = cmdContents.get("deploy.md")!;
+    expect(frontmatterValue(alias, "allowed-tools")).toBe(frontmatterValue(deploy, "allowed-tools"));
+    expect(frontmatterValue(alias, "argument-hint")).toBe(frontmatterValue(deploy, "argument-hint"));
+    expect(alias).toContain("skills/deploy/SKILL.md");
+    expect(alias).toContain("Korean alias");
+    expect(alias).not.toMatch(/^\s*axhub deploy create\b/m);
   });
 
   test("login command does not advertise unsupported token-file auth flags", () => {
@@ -518,6 +553,10 @@ describe("commands/*.md frontmatter", () => {
     expect(cmdFiles).toContain("deploy.md");
   });
 
+  test("Korean deploy alias exists", () => {
+    expect(cmdFiles).toContain("배포.md");
+  });
+
   test("login command exists (auth entrypoint)", () => {
     expect(cmdFiles).toContain("login.md");
   });
@@ -527,6 +566,8 @@ describe("commands/*.md frontmatter", () => {
       ["apis.md", "apis"],
       ["apps.md", "apps"],
       ["login.md", "auth"],
+      ["deploy.md", "deploy"],
+      ["배포.md", "deploy"],
     ]);
     for (const [commandFile, skillSlug] of skillByCommand) {
       const command = cmdContents.get(commandFile)!;
