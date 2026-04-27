@@ -1,0 +1,16 @@
+Live plugin smoke — subprocess claude -p
+Date: 2026-04-27T03:45:03Z
+Plugin: axhub@axhub (directory mode → /Users/wongil/Desktop/work/jocoding/axhub)
+
+command                        exit       evidence file
+------------------------------------------------------------------------
+/axhub:help                    0          live-plugin-smoke-axhubhelp.txt
+/axhub:status                  TIMEOUT    live-plugin-smoke-axhubstatus.txt
+/axhub:doctor                  0          live-plugin-smoke-axhubdoctor.txt
+/axhub:apps                    0          live-plugin-smoke-axhubapps.txt
+/axhub:apis                    0          live-plugin-smoke-axhubapis.txt
+/axhub:login                   0          live-plugin-smoke-axhublogin.txt
+/axhub:logs                    TIMEOUT    live-plugin-smoke-axhublogs.txt
+/axhub:update                  0          live-plugin-smoke-axhubupdate.txt
+/axhub:deploy --dry-run        0          live-plugin-smoke-axhubdeploydryrun.txt
+

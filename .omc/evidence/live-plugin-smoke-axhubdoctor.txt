@@ -1,0 +1,20 @@
+=== command: /axhub:doctor ===
+=== timestamp: 2026-04-27T03:47:13Z ===
+
+모두 정상입니다.
+
+---
+
+```
+axhub 진단 결과:
+  ✓ helper 바이너리: 정상 (/Users/wongil/Desktop/work/jocoding/axhub/bin/axhub-helpers)
+  ✓ CLI 설치:        v0.1.8 (/opt/homebrew/bin/axhub)
+  ✓ 버전 범위:       호환
+  ✓ 로그인:          giri@jocodingax.ai
+  ✓ 만료:            2026-04-28 03:32 UTC (약 24시간 남음)
+  ✓ 권한 (scope):    read, write
+  ✓ 환경 (profile):  default (기본값 사용 중)
+  ✓ endpoint:        https://hub-api.jocodingax.ai (기본값)
+
+모두 정상이에요. 배포하실 준비 완료!
+```

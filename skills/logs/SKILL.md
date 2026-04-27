@@ -38,6 +38,8 @@ To fetch logs:
 
    For pod logs, swap `--source build` with `--source pod`.
 
+   **Non-interactive guard (Phase 12 US-1203 — caught by live subprocess smoke):** If running in non-interactive context (`$CI` or `$CLAUDE_NON_INTERACTIVE` env var set, OR no TTY, OR `claude -p` invocation), DROP `--follow` flag and render single snapshot — `--follow` blocks indefinitely in headless/subprocess mode and `/axhub:logs` hangs forever. Detection: `if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then FOLLOW=--follow; else FOLLOW=; fi` then use `$FOLLOW`.
+
 4. **Handle SSE eof + resume.** Watch for the `eof:true` sentinel — that is the natural terminator, not a transport error. If the stream drops mid-flight, resume once via `Last-Event-ID` (CLI handles this automatically when re-invoked with `--follow`); never attempt a second resume from the agent side (avoids re-spam to the user).
 
 5. **Render trimmed output.** For non-failure logs, show the last 50 lines plus a "전체 보기" AskUserQuestion option. For failure logs, show the last 200 lines and surface the first error-level line at the top with "이 줄에서 멈춘 것 같아요:".

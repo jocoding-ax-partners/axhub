@@ -1,97 +1,54 @@
 {
-  "task": "Phase 11 v0.1.8 — 5 deferred Phase 10 tradeoffs (Option B scope split). In-session: US-1101 codegen install.ps1 + US-1102 keychain.ts 6-line format-parity (closes #1) + US-1105 Linux Docker smoke. Deferred doc-only: US-1103 Win VM checklist + US-1104 Authenticode procurement runbook. Plan: .omc/plans/phase-11-deferred-tradeoffs-v2.md (ralplan round 2 APPROVE).",
+  "task": "Phase 12 — exhaustive live bug hunt by spawning claude as subprocess and exercising every axhub slash command + skill workflow. Capture failures, classify as bugs, fix + ship hotfixes.",
   "createdAt": "2026-04-27T00:00:00Z",
   "stories": [
     {
-      "id": "US-1101",
-      "title": "scripts/codegen-install-version.ts — extend to also sync bin/install.ps1 $ReleaseVersion",
+      "id": "US-1201",
+      "title": "Subprocess claude harness — verify claude -p works with plugin loaded + capture output",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "scripts/codegen-install-version.ts — add 4th syncFile() invocation against bin/install.ps1, mirror pattern of existing 3 (install.sh, index.ts, telemetry.ts).",
-        "Regex must preserve PowerShell single-quote literals around version: pattern roughly `/^(\\$ReleaseVersion = if \\(\\$env:AXHUB_PLUGIN_RELEASE\\) \\{ \\$env:AXHUB_PLUGIN_RELEASE \\} else \\{ ')v\\d+\\.\\d+\\.\\d+(?:-[a-z0-9.]+)?(' \\})$/m`",
-        "Captured groups (1) and (2) preserve surrounding context including single-quote pair.",
-        "tests/codegen-version.test.ts — add 2 NEW test cases: (a) syncInstallVersion() also writes bin/install.ps1 with new version, (b) pre-release tag '0.1.8-rc.1' handling round-trips correctly through both install.sh and install.ps1.",
-        "bun test → 372 pass / 5 skip / 0 fail (370 baseline + 2 new).",
-        "bunx tsc --noEmit → clean.",
-        "MUST land BEFORE US-1102 (D1 — codegen test mutates bin/install.ps1 in tests; if US-1102 lands first the new ps1 sync regex isn't there yet, codegen test throws at line 42 missing-expected-version)."
+        "tests/live-plugin-smoke.sh (NEW) — bash harness that spawns `claude -p '<prompt>'` for each slash command with timeout + captures stdout/stderr/exit to .omc/evidence/live-plugin-smoke-<command>.txt.",
+        "Verify subprocess inherits axhub plugin (cached at ~/.claude/plugins/cache/axhub or directory mode from settings).",
+        "First test: `claude -p '/axhub:help'` → output contains help text (or hookSpecificOutput from session-start)."
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-1102",
-      "title": "keychain.ts — 6 existing one-line errors → 4-part empathy template (closes GitHub issue #1)",
+      "id": "US-1202",
+      "title": "Live test all 9 axhub slash commands — capture + classify each result",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "Rewrite 6 keychain.ts Korean error strings to 4-part format (감정 / 원인 / 해결 / 다음액션) per error-empathy-catalog.md and Phase 9 keychain-windows.ts precedent. Lines: 57, 62, 79, 85, 90, 95.",
-        "Line 65 (catch [System.Net.WebException] error path) — UNREACHABLE per Bun.spawnSync ENOENT semantics (returns exitCode:null, doesn't throw). Add NOTE comment instead of rewriting: '// NOTE: Bun.spawnSync returns exitCode:null on ENOENT, so this catch is unreachable in practice. Kept for type-safety. Format-parity skipped (D2).'",
-        "Each rewritten error must (a) preserve original semantic kernel (e.g., line 79 must still mention 'libsecret-tools'), (b) have 4 parts separated by \\n, (c) start with 감정 word ('잠깐만요', '아이고', '죄송해요' etc.).",
-        "tests/keychain.test.ts — extend with 6 NEW test cases (1 per rewritten line). Each asserts: (1) message contains 감정 prefix, (2) message contains 원인:, 해결:, 다음:, (3) message preserves semantic kernel keyword.",
-        "bun test → 378 pass / 5 skip / 0 fail (372 baseline post-US-1101 + 6 new).",
-        "Issue #1 close protocol: precheck `gh issue view 1 --json state,locked,closed`, capture to .omc/evidence/issue-1-close-attempt.txt; if state=OPEN AND locked=false: `gh issue close 1 --comment '<commit URL> — 6 lines fixed, 1 deferred per D2 unreachable catch'`; if locked or already closed, surface to commit body, no silent skip.",
-        "Blocked by: US-1101"
+        "Run subprocess claude with each slash command: /axhub:status, /axhub:doctor, /axhub:apps, /axhub:apis, /axhub:deploy, /axhub:logs, /axhub:login, /axhub:update, /axhub:help.",
+        "For each: capture exit code + stdout + stderr + any rendered error templates.",
+        "Evidence file .omc/evidence/live-plugin-smoke-summary.txt — table per command: pass/fail/error class.",
+        "Document each failure as concrete bug (unexpected error, missing functionality, broken UX)."
       ],
       "owner": null,
-      "blockedBy": ["US-1101"]
+      "blockedBy": ["US-1201"]
     },
     {
-      "id": "US-1105",
-      "title": "tests/smoke-linux-docker.sh — Linux secret-tool keychain bridge runtime smoke harness",
+      "id": "US-1203",
+      "title": "Fix all bugs found in US-1202 — ship as v0.1.X hotfix(es)",
       "priority": 3,
       "passes": true,
       "acceptanceCriteria": [
-        "tests/smoke-linux-docker.sh (NEW) — bash script that builds + runs ubuntu:24.04 container with libsecret-tools, secret-service backend (libsecret + dbus-x11 shim), runs `secret-tool store --label=axhub service axhub` to seed test token, then runs axhub-helpers-linux-amd64 token-init inside container.",
-        "tests/smoke-linux-docker.Dockerfile (NEW) — base image PINNED to explicit sha256 digest: `FROM ubuntu:24.04@sha256:<digest>` where digest captured via `docker manifest inspect ubuntu:24.04 | jq -r '.manifests[0].digest'` AT TIME OF WRITING. Add comment with capture command + date for reproducibility.",
-        "If user lacks docker: script gracefully exits 0 with message 'docker not available — skipping Linux smoke (run on machine with docker for v0.1.8 evidence)'. NOT a failure mode.",
-        "Evidence file .omc/evidence/phase-11-linux-docker-smoke.txt — first line MUST be exact LIMITATION banner: 'LIMITATION: libsecret-tools CLI path only — Coverage: 40% READ-path (axhub-helpers contract). End-to-end ~15% (ax-hub-cli WRITE-path D-Bus is upstream). Does NOT validate gnome-keyring-daemon, kwalletd5, or headless systemd-keyring user-bus.'",
-        "Banner appears in 3 places: (1) Dockerfile header comment, (2) shell script header, (3) evidence artifact first line.",
-        "If docker available + smoke passes: evidence file follows banner with: timestamp + container sha256 + secret-tool exit code 0 + axhub-helpers token-init exit code 0 + extracted token first 16 chars.",
-        "If docker available + smoke fails: evidence file follows banner with FAILED + exit codes + docker logs tail."
+        "For each bug: minimal fix + regression test that locks the contract.",
+        "All hotfix versions tagged + pushed (v0.1.X for each fix or one combined release).",
+        "Re-run US-1201 harness post-fix → all commands now pass or have honest 4-part Korean error path.",
+        "bun test → all green (388+ pass)."
       ],
       "owner": null,
-      "blockedBy": []
-    },
-    {
-      "id": "US-1103",
-      "title": "docs/pilot/windows-vm-smoke-checklist.md + tests/smoke-windows-vm-checklist.ps1 — companion runbook + executor",
-      "priority": 4,
-      "passes": true,
-      "acceptanceCriteria": [
-        "docs/pilot/windows-vm-smoke-checklist.md (NEW) — 14-step manual checklist for next pilot session: (1) provision Win11 VM (Parallels/UTM/Azure free tier), (2) install Claude Code 2.1.84+, (3) `/plugin install axhub@axhub`, (4) confirm SessionStart fires session-start.ps1, (5) confirm install.ps1 auto-downloads windows-amd64.exe, (6) verify cmdkey /list:axhub shows credential post-axhub-auth-login, (7) run axhub-helpers token-init, (8) verify ~/.config/axhub-plugin/token (mode 0600 equivalent on NTFS), (9) PreToolUse + PostToolUse hooks fire on bash commands, (10) ExecutionPolicy Restricted fallback test, (11) AMSI/EDR detection test (skip if no AV available), (12) MAX_PATH test (Korean profile + deep root), (13) NTLM proxy test (skip if no proxy), (14) capture full transcript to docs/pilot/v0.1.x-windows-vm-result.txt.",
-        "tests/smoke-windows-vm-checklist.ps1 (NEW) — companion PowerShell executor. First line: `if ($env:AXHUB_VM_SMOKE -ne '1') { exit 0 }`. Each of 14 steps becomes a function with try/catch + $LASTEXITCODE check + ConvertFrom-Json validation for hook envelope shape. Pester optional (bare try/catch sufficient).",
-        "Both files must NOT block any current build/test (companion .ps1 only runs when AXHUB_VM_SMOKE=1).",
-        "tests/manifest.test.ts (extend) — assert checklist file exists + has 14 numbered steps + companion .ps1 exists with $env:AXHUB_VM_SMOKE guard."
-      ],
-      "owner": null,
-      "blockedBy": []
-    },
-    {
-      "id": "US-1104",
-      "title": "docs/pilot/authenticode-signing-runbook.md + .github/workflows/sign-windows.yml.template + signing stub",
-      "priority": 5,
-      "passes": true,
-      "acceptanceCriteria": [
-        "docs/pilot/authenticode-signing-runbook.md (NEW) — vendor procurement steps: (a) Sectigo OV cert ($300+/yr), (b) HSM/KMS for signing key (Azure Key Vault / AWS KMS), (c) GitHub Actions windows-latest runner config with cert secret, (d) Authenticode signtool command + cosign integration retention.",
-        ".github/workflows/sign-windows.yml.template (NEW) — workflow_dispatch-only YAML template, NOT triggered automatically. Steps: (1) checkout, (2) download windows-amd64.exe artifact, (3) `signtool verify /pa <file>` with continue-on-error: true (unsigned binary exits non-zero), (4) emit telemetry through EXISTING src/axhub-helpers/telemetry.ts channel: event 'windows.signing.skipped' with reason 'vendor_cert_pending'.",
-        ".gitattributes (NEW or extend) — add line: `*.yml.template linguist-language=YAML linguist-detectable=false` so GitHub doesn't classify as workflow file + linters skip.",
-        "If .eslintignore exists in repo: add `*.yml.template` line. If not exist: skip this step (don't create just for one entry).",
-        "When AXHUB_SIGNING_STUB=1 env var set in CI: stub workflow becomes active. Until vendor procurement completes, telemetry shows 'signing stubbed' allowing release pipeline to acknowledge unsigned-binary state without breaking.",
-        "Runbook explicitly states: 'This is paperwork + executable scaffold. Day procurement clears, integration is one PR (s/AXHUB_SIGNING_STUB=1// + s/continue-on-error: true// + add cert secret config).'",
-        "tests/manifest.test.ts (extend) — assert runbook exists, .yml.template exists with workflow_dispatch on header, .gitattributes line present."
-      ],
-      "owner": null,
-      "blockedBy": []
+      "blockedBy": ["US-1202"]
     }
   ],
   "metadata": {
-    "task_origin": "/ralplan 전부 다 작업해 (Phase 11 — 5 deferred Phase 10 tradeoffs)",
-    "phase10_predecessor": "v0.1.7 commit post-2fd6c48 — Phase 10 Windows PS1 hooks shipped, 5 deferred items (Win VM smoke, Authenticode, codegen install.ps1, format-parity, Linux Docker smoke)",
-    "consensus_plan": ".omc/plans/phase-11-deferred-tradeoffs-v2.md (2 ralplan rounds: 9 fixes round 1 + APPROVE round 2)",
+    "task_origin": "/ralph 다시 한번 더 플러그인을 claude code 안에서 실행해서 버그 찾아줘봐. 서브 프로세스로 띄어서 해봐",
+    "predecessor": "Phase 11 v0.1.11 — 3 bugs already found via direct binary smoke (BOM, list-deployments shape, redact pattern)",
+    "scope_note": "Subprocess-driven live test — exercises full Claude Code → hook → skill → helper → API loop. Most realistic vibe coder simulation possible from dev env.",
     "deslop": "enabled",
-    "critic": "architect",
-    "scope_note": "Option B split — code+runtime US-1101+1102+1105 in-session, doc+executable-scaffold US-1103+1104 deferred. macOS + Linux + helper unchanged.",
-    "phase_12_deferred": "v0.1.9 — actual Win VM smoke run (uses US-1103 doc), actual Authenticode procurement (uses US-1104 runbook), Real Linux desktop test (gnome-keyring-daemon / kwalletd5)."
+    "critic": "architect"
   }
 }

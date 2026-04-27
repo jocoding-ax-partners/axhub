@@ -1,0 +1,14 @@
+=== command: /axhub:apis ===
+=== timestamp: 2026-04-27T03:48:33Z ===
+
+AskUserQuestion 미지원. 앱 선택해주세요:
+
+| # | 앱 이름 | calls | access |
+|---|---------|-------|--------|
+| 1 | **ccrank** (id=6) | 283,815 | approved |
+| 2 | **지원사업 크롤링** (id=62) | 104,438 | managed |
+| 3 | **견적 계산기** (id=4) | 2,203 | requestable |
+| 4 | **급여명세서 자동발송** (id=7) | 432 | approved |
+| 5 | **참 잘 했어요!** (id=16) | 340 | approved |
+
+어떤 앱 API 볼까요? 번호나 이름 말해주세요.

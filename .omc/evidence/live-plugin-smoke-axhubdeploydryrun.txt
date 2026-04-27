@@ -1,0 +1,15 @@
+=== command: /axhub:deploy --dry-run ===
+=== timestamp: 2026-04-27T03:52:29Z ===
+
+`resolve`가 앱 슬러그를 특정하지 못했다. 어떤 앱을 배포할지 알려줘:
+
+| # | 앱 이름 | slug | id | 상태 |
+|---|---------|------|----|------|
+| 1 | ccrank | ccrank | 6 | active |
+| 2 | 급여명세서 자동발송 | paydrop | 7 | active |
+| 3 | 참 잘 했어요! | good | 16 | active |
+| 4 | 사전 기업 진단 컨설팅 | corporate-consulting | 10 | active |
+| 5 | 명함 생성기 | businesscard-maker | 2 | active |
+| 6 | jocodingax-partners-homepage | jocodingax-partners-homepage | 28 | active |
+
+슬러그 또는 번호로 답해줘. `--dry-run`이라 실제 배포는 없다.
