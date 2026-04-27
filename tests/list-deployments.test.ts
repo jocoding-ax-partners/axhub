@@ -77,11 +77,16 @@ describe("runListDeployments — REST API (US-501)", () => {
     const fakeFetch = async (_url: string | URL | Request, _init?: RequestInit): Promise<Response> => {
       return new Response(
         JSON.stringify({
+          // Real API shape verified live 2026-04-27: data.deployments is the array,
+          // NOT data itself. Phase 11 v0.1.10 hotfix corrected the mock + extraction.
           success: true,
-          data: [
-            { id: 384, app_id: 6, status: 3, commit_sha: "abc123", commit_message: "fix", branch: "main", created_at: "2026-04-23T10:00:00Z" },
-            { id: 383, app_id: 6, status: 4, commit_sha: "def456", commit_message: "broken", branch: "feature", created_at: "2026-04-22T10:00:00Z" },
-          ],
+          data: {
+            active_deployment: { id: 384, app_id: 6, status: 3, commit_sha: "abc123", commit_message: "fix", branch: "main", created_at: "2026-04-23T10:00:00Z" },
+            deployments: [
+              { id: 384, app_id: 6, status: 3, commit_sha: "abc123", commit_message: "fix", branch: "main", created_at: "2026-04-23T10:00:00Z" },
+              { id: 383, app_id: 6, status: 4, commit_sha: "def456", commit_message: "broken", branch: "feature", created_at: "2026-04-22T10:00:00Z" },
+            ],
+          },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
@@ -128,7 +133,7 @@ describe("runListDeployments — REST API (US-501)", () => {
     let capturedUrl = "";
     const fakeFetch = async (url: string | URL | Request): Promise<Response> => {
       capturedUrl = url.toString();
-      return new Response(JSON.stringify({ success: true, data: [] }), { status: 200 });
+      return new Response(JSON.stringify({ success: true, data: { deployments: [] } }), { status: 200 });
     };
     const result = await runListDeployments({ appId: "6" }, fakeFetch as unknown as typeof fetch);
     expect(result.exit_code).toBe(EXIT_LIST_OK);
@@ -141,7 +146,7 @@ describe("runListDeployments — REST API (US-501)", () => {
     let capturedUrl = "";
     const fakeFetch = async (url: string | URL | Request): Promise<Response> => {
       capturedUrl = url.toString();
-      return new Response(JSON.stringify({ success: true, data: [] }), { status: 200 });
+      return new Response(JSON.stringify({ success: true, data: { deployments: [] } }), { status: 200 });
     };
     await runListDeployments({ appId: "6" }, fakeFetch as unknown as typeof fetch);
     expect(capturedUrl).toContain("hub-api.jocodingax.ai");
@@ -152,7 +157,7 @@ describe("runListDeployments — REST API (US-501)", () => {
     let capturedUrl = "";
     const fakeFetch = async (url: string | URL | Request): Promise<Response> => {
       capturedUrl = url.toString();
-      return new Response(JSON.stringify({ success: true, data: [] }), { status: 200 });
+      return new Response(JSON.stringify({ success: true, data: { deployments: [] } }), { status: 200 });
     };
     await runListDeployments({ appId: "6", limit: 3 }, fakeFetch as unknown as typeof fetch);
     expect(capturedUrl).toContain("per_page=3");
@@ -163,7 +168,7 @@ describe("runListDeployments — REST API (US-501)", () => {
     let capturedAuth = "";
     const fakeFetch = async (_url: string | URL | Request, init?: RequestInit): Promise<Response> => {
       capturedAuth = (init?.headers as Record<string, string>)?.["Authorization"] ?? "";
-      return new Response(JSON.stringify({ success: true, data: [] }), { status: 200 });
+      return new Response(JSON.stringify({ success: true, data: { deployments: [] } }), { status: 200 });
     };
     await runListDeployments({ appId: "6" }, fakeFetch as unknown as typeof fetch);
     expect(capturedAuth).toBe("Bearer axhub_pat_my_token_42");

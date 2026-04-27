@@ -101,7 +101,7 @@ const asConsentBinding = (v: unknown): ConsentBinding | null => {
   };
 };
 
-const PLUGIN_VERSION = "0.1.9";
+const PLUGIN_VERSION = "0.1.10";
 // MIN_AXHUB_CLI_VERSION + MAX_AXHUB_CLI_VERSION live in ./preflight.ts (the
 // only consumer); re-importing here would just create a stale duplicate.
 const CONSENT_TOKEN_TTL_SEC = 60;

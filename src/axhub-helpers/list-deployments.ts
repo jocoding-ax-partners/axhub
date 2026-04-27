@@ -105,9 +105,15 @@ interface BackendDeployment {
   created_at: string;
 }
 
+// Real API shape (verified live 2026-04-27 against /api/v1/apps/{id}/deployments):
+//   { success: bool, data: { active_deployment: {...}, deployments: [...] }, meta: {...} }
+// `deployments` array lives at data.deployments, NOT data itself.
 interface BackendListEnvelope {
   success: boolean;
-  data?: BackendDeployment[];
+  data?: {
+    active_deployment?: BackendDeployment;
+    deployments?: BackendDeployment[];
+  };
   error?: string;
   code?: string;
 }
@@ -204,7 +210,7 @@ export async function runListDeployments(
     };
   }
 
-  const items = env.data ?? [];
+  const items = env.data?.deployments ?? [];
   const deployments: DeploymentSummary[] = items.map((d) => ({
     id: d.id,
     app_id: d.app_id,
