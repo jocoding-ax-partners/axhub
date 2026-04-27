@@ -599,11 +599,11 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 
 ### New architectural additions (M0 included)
 
-**§16.9 Plugin Supply Chain Integrity** (NEW):
-- Plugin ships `manifest.sha256` + `manifest.sig` (cosign or minisign).
-- SessionStart first action = verify plugin integrity (pinned public key, TOFU model).
-- Plugin auto-update OPT-IN for B2B (`AXHUB_DISABLE_PLUGIN_AUTOUPDATE=1` default for org-admin policy).
-- `bin/axhub-helpers` is **single multi-command Go binary** (not directory) at `bin/axhub-helpers`. Multi-arch builds: darwin-arm64, darwin-amd64, linux-amd64, linux-arm64, win32. Cosign-signed + macOS-notarized.
+**§16.9 Plugin Supply Chain Integrity** (NEW, reconciled to current release pipeline):
+- Release ships `manifest.json` + `checksums.txt`; GitHub Actions signs each binary, `manifest.json`, and `checksums.txt` with cosign keyless sidecars (`.sig` + `.pem`). There is **no standalone manifest checksum or generic manifest signature artifact**; sha256 lives in `manifest.json` and `checksums.txt`, and signature sidecars use the exact asset names (`manifest.json.sig`, `checksums.txt.sig`).
+- User-side verification path = `scripts/release/verify-release.sh <tag>`: verify `manifest.json.sig` first, then each binary signature, then cross-check binary sha256 values against `manifest.json`.
+- SessionStart integrity behavior is advisory and policy-driven: `AXHUB_REQUIRE_COSIGN=1` warns when helper sidecars are missing; release/update verification remains the hard supply-chain gate.
+- `bin/axhub-helpers` is a **single multi-command TypeScript/Bun compiled binary** (not a directory) at `bin/axhub-helpers`. Multi-arch builds: darwin-arm64, darwin-amd64, linux-amd64, linux-arm64, win32. Cosign-signed release assets; Windows Authenticode remains a separate runbook/template path.
 
 **§16.10 CLI Cosign Default-On**:
 - Plugin's `update apply` skill ALWAYS prepends `AXHUB_REQUIRE_COSIGN=1` regardless of user env (override only via explicit `AXHUB_ALLOW_UNSIGNED=1` with Korean warning at SessionStart).

@@ -42,3 +42,22 @@ describe("Phase 1 PLAN reconciliation", () => {
     expect(plan).toContain("공통 surface는 별도 plugin layer가 아니라 `ax-hub-cli` 자체");
   });
 });
+
+describe("PLAN release artifact reconciliation", () => {
+  const supplyChain = between("**§16.9 Plugin Supply Chain Integrity**", "**§16.10 CLI Cosign Default-On**");
+
+  test("supply-chain section matches current release artifact names", () => {
+    expect(supplyChain).toContain("manifest.json");
+    expect(supplyChain).toContain("checksums.txt");
+    expect(supplyChain).toContain("manifest.json.sig");
+    expect(supplyChain).toContain("checksums.txt.sig");
+    expect(supplyChain).toContain("scripts/release/verify-release.sh");
+    expect(supplyChain).not.toContain("manifest.sha256");
+    expect(supplyChain).not.toContain("manifest.sig");
+  });
+
+  test("active supply-chain section names the current Bun helper, not a new Go rewrite", () => {
+    expect(supplyChain).toContain("TypeScript/Bun compiled binary");
+    expect(supplyChain).not.toContain("single multi-command Go binary");
+  });
+});
