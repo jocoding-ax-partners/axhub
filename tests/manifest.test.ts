@@ -326,6 +326,47 @@ describe("hooks.json structure", () => {
   });
 });
 
+// Phase 11 US-1103/US-1104: deferred-doc + executable-scaffold artifacts
+// must exist on disk so next pilot session can run them without rediscovery.
+describe("Phase 11 deferred-doc artifacts", () => {
+  test("docs/pilot/windows-vm-smoke-checklist.md exists with 14 numbered steps", async () => {
+    const checklist = await readFile(join(REPO_ROOT, "docs/pilot/windows-vm-smoke-checklist.md"), "utf8");
+    // Top-level numbered steps "1." through "14." in the "## 14 manual steps" section
+    const stepHeadings = checklist.match(/^\d+\.\s+\*\*[^*]+\*\*/gm);
+    expect(stepHeadings).not.toBeNull();
+    expect(stepHeadings!.length).toBe(14);
+  });
+
+  test("tests/smoke-windows-vm-checklist.ps1 exists with $env:AXHUB_VM_SMOKE guard", async () => {
+    const ps1 = await readFile(join(REPO_ROOT, "tests/smoke-windows-vm-checklist.ps1"), "utf8");
+    expect(ps1).toContain("$env:AXHUB_VM_SMOKE");
+    expect(ps1).toContain("if ($env:AXHUB_VM_SMOKE -ne '1')");
+    // 14 Run-Step calls
+    const runSteps = ps1.match(/^Run-Step \d+/gm);
+    expect(runSteps).not.toBeNull();
+    expect(runSteps!.length).toBe(14);
+  });
+
+  test("docs/pilot/authenticode-signing-runbook.md exists", async () => {
+    const runbook = await readFile(join(REPO_ROOT, "docs/pilot/authenticode-signing-runbook.md"), "utf8");
+    expect(runbook).toContain("Sectigo");
+    expect(runbook).toContain("AXHUB_SIGNING_STUB");
+  });
+
+  test(".github/workflows/sign-windows.yml.template exists with workflow_dispatch + continue-on-error", async () => {
+    const wf = await readFile(join(REPO_ROOT, ".github/workflows/sign-windows.yml.template"), "utf8");
+    expect(wf).toContain("workflow_dispatch:");
+    expect(wf).toContain("continue-on-error: true");
+    expect(wf).toContain("signtool verify");
+  });
+
+  test(".gitattributes contains *.yml.template linguist exemption", async () => {
+    const gitattributes = await readFile(join(REPO_ROOT, ".gitattributes"), "utf8");
+    expect(gitattributes).toContain("*.yml.template");
+    expect(gitattributes).toContain("linguist-detectable=false");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Reason: Phase 6 incident #2 — hookSpecificOutput in helper code missing
 // hookEventName field caused "Hook JSON output validation failed". Every

@@ -1,145 +1,97 @@
 {
-  "task": "Phase 10 v0.1.7 — Windows PS1 hooks (sibling powershell entry in hooks.json + bin/install.ps1 + hooks/session-start.ps1). Existing sh files byte-identical. Floor: Claude Code >= 2.1.84. Plan: .omc/plans/phase-10-windows-ps1-hooks-v2.md (consensus round 2/5 APPROVE).",
+  "task": "Phase 11 v0.1.8 — 5 deferred Phase 10 tradeoffs (Option B scope split). In-session: US-1101 codegen install.ps1 + US-1102 keychain.ts 6-line format-parity (closes #1) + US-1105 Linux Docker smoke. Deferred doc-only: US-1103 Win VM checklist + US-1104 Authenticode procurement runbook. Plan: .omc/plans/phase-11-deferred-tradeoffs-v2.md (ralplan round 2 APPROVE).",
   "createdAt": "2026-04-27T00:00:00Z",
   "stories": [
     {
-      "id": "US-1000",
-      "title": "macOS noise spike — verify wrong-OS spawn behavior of `\"shell\":\"powershell\"` hook",
+      "id": "US-1101",
+      "title": "scripts/codegen-install-version.ts — extend to also sync bin/install.ps1 $ReleaseVersion",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "Setup minimal stub plugin in /tmp/ps-spike-plugin/ with hooks.json containing only ONE SessionStart hook: {\"shell\":\"powershell\",\"command\":\"powershell -Command 'exit 0'\"}.",
-        "Run `claude` (or harness equivalent) on this macOS host with that plugin loaded; capture stderr + Claude Code session output.",
-        "If powershell.exe not on PATH (likely on macOS without pwsh), document the exact behavior: silent / visible-error in session output / popup.",
-        "If pwsh IS installed (PS Core cross-platform), test that branch separately — should run successfully.",
-        "Write findings to docs/pilot/v0.1.7-spike-result.txt with: outcome category (silent / visible-error / popup), exact stderr captured, recommendation for US-1003 (no guard needed / add `if (-not $IsWindows) { exit 0 }` first line / skip Option B entirely).",
-        "If outcome = visible-error or popup → US-1002 PS_SCRIPT first line MUST be `if (-not $IsWindows) { exit 0 }` AND US-1003 hook command MUST add a `Get-Command powershell -ErrorAction SilentlyContinue` probe.",
-        "If outcome = silent → US-1003 ships unmodified per plan."
+        "scripts/codegen-install-version.ts — add 4th syncFile() invocation against bin/install.ps1, mirror pattern of existing 3 (install.sh, index.ts, telemetry.ts).",
+        "Regex must preserve PowerShell single-quote literals around version: pattern roughly `/^(\\$ReleaseVersion = if \\(\\$env:AXHUB_PLUGIN_RELEASE\\) \\{ \\$env:AXHUB_PLUGIN_RELEASE \\} else \\{ ')v\\d+\\.\\d+\\.\\d+(?:-[a-z0-9.]+)?(' \\})$/m`",
+        "Captured groups (1) and (2) preserve surrounding context including single-quote pair.",
+        "tests/codegen-version.test.ts — add 2 NEW test cases: (a) syncInstallVersion() also writes bin/install.ps1 with new version, (b) pre-release tag '0.1.8-rc.1' handling round-trips correctly through both install.sh and install.ps1.",
+        "bun test → 372 pass / 5 skip / 0 fail (370 baseline + 2 new).",
+        "bunx tsc --noEmit → clean.",
+        "MUST land BEFORE US-1102 (D1 — codegen test mutates bin/install.ps1 in tests; if US-1102 lands first the new ps1 sync regex isn't there yet, codegen test throws at line 42 missing-expected-version)."
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-1001",
-      "title": "bin/install.ps1 — Windows installer mirror of bin/install.sh (no Add-Type, EDR-clean)",
+      "id": "US-1102",
+      "title": "keychain.ts — 6 existing one-line errors → 4-part empathy template (closes GitHub issue #1)",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "New file bin/install.ps1 — Windows PowerShell 5.1+ installer mirror of bin/install.sh.",
-        "RELEASE_VERSION constant = 'v0.1.7' (matches install.sh:48 post-bump).",
-        "Detect arch: $env:PROCESSOR_ARCHITECTURE = 'AMD64' → windows-amd64.exe (only arch CI builds).",
-        "Download via Invoke-WebRequest -Uri \"https://github.com/jocoding-ax-partners/axhub/releases/download/$RELEASE_VERSION/axhub-helpers-windows-amd64.exe\" -OutFile \"$TargetPath.tmp\" -TimeoutSec 600.",
-        "Move-Item $TargetPath.tmp $TargetPath -Force, then Start-Sleep -Seconds 2 + Test-Path $TargetPath re-check (Defender post-Move quarantine pre-mortem #6).",
-        "If existing link/file at TARGET path: explicit `if (Test-Path -PathType Any) { Remove-Item -Force }` pattern. NO `||` operator emulation. Comment: `# NOTE: bin/install.sh:80 has known operator precedence bug; PS mirror uses explicit Test-Path/Remove-Item.`",
-        "NO Add-Type, NO inline C#, NO Reflection.Assembly — EDR-clean (Phase 9 PInvoke pattern not used in installer).",
-        "Try/catch [System.IO.PathTooLongException] for MAX_PATH (pre-mortem #5) → 4-part Korean error pointing to `subst N: <long-path>` workaround.",
-        "Try/catch HTTP 407 (NTLM proxy pre-mortem #7) → 4-part Korean error → suggest `-Proxy $env:HTTPS_PROXY -ProxyUseDefaultCredentials`.",
-        "Try/catch [System.Net.WebException] for slow corp network → 4-part Korean → AXHUB_TOKEN env var fallback.",
-        "Every catch: emit `Write-Output (ConvertTo-Json @{ systemMessage = '<4-part Korean>' } -Compress)` then `exit 0` (don't block, surface).",
-        "ASCII-clean (no U+200B, no smart quotes — verified via `perl -ne 'print if /[\\x{200B}-\\x{200F}\\x{FEFF}]/' bin/install.ps1` returns empty).",
-        "Korean error messages all 4-part (감정 / 원인 / 해결 / 다음액션) per error-empathy-catalog.md."
+        "Rewrite 6 keychain.ts Korean error strings to 4-part format (감정 / 원인 / 해결 / 다음액션) per error-empathy-catalog.md and Phase 9 keychain-windows.ts precedent. Lines: 57, 62, 79, 85, 90, 95.",
+        "Line 65 (catch [System.Net.WebException] error path) — UNREACHABLE per Bun.spawnSync ENOENT semantics (returns exitCode:null, doesn't throw). Add NOTE comment instead of rewriting: '// NOTE: Bun.spawnSync returns exitCode:null on ENOENT, so this catch is unreachable in practice. Kept for type-safety. Format-parity skipped (D2).'",
+        "Each rewritten error must (a) preserve original semantic kernel (e.g., line 79 must still mention 'libsecret-tools'), (b) have 4 parts separated by \\n, (c) start with 감정 word ('잠깐만요', '아이고', '죄송해요' etc.).",
+        "tests/keychain.test.ts — extend with 6 NEW test cases (1 per rewritten line). Each asserts: (1) message contains 감정 prefix, (2) message contains 원인:, 해결:, 다음:, (3) message preserves semantic kernel keyword.",
+        "bun test → 378 pass / 5 skip / 0 fail (372 baseline post-US-1101 + 6 new).",
+        "Issue #1 close protocol: precheck `gh issue view 1 --json state,locked,closed`, capture to .omc/evidence/issue-1-close-attempt.txt; if state=OPEN AND locked=false: `gh issue close 1 --comment '<commit URL> — 6 lines fixed, 1 deferred per D2 unreachable catch'`; if locked or already closed, surface to commit body, no silent skip.",
+        "Blocked by: US-1101"
+      ],
+      "owner": null,
+      "blockedBy": ["US-1101"]
+    },
+    {
+      "id": "US-1105",
+      "title": "tests/smoke-linux-docker.sh — Linux secret-tool keychain bridge runtime smoke harness",
+      "priority": 3,
+      "passes": true,
+      "acceptanceCriteria": [
+        "tests/smoke-linux-docker.sh (NEW) — bash script that builds + runs ubuntu:24.04 container with libsecret-tools, secret-service backend (libsecret + dbus-x11 shim), runs `secret-tool store --label=axhub service axhub` to seed test token, then runs axhub-helpers-linux-amd64 token-init inside container.",
+        "tests/smoke-linux-docker.Dockerfile (NEW) — base image PINNED to explicit sha256 digest: `FROM ubuntu:24.04@sha256:<digest>` where digest captured via `docker manifest inspect ubuntu:24.04 | jq -r '.manifests[0].digest'` AT TIME OF WRITING. Add comment with capture command + date for reproducibility.",
+        "If user lacks docker: script gracefully exits 0 with message 'docker not available — skipping Linux smoke (run on machine with docker for v0.1.8 evidence)'. NOT a failure mode.",
+        "Evidence file .omc/evidence/phase-11-linux-docker-smoke.txt — first line MUST be exact LIMITATION banner: 'LIMITATION: libsecret-tools CLI path only — Coverage: 40% READ-path (axhub-helpers contract). End-to-end ~15% (ax-hub-cli WRITE-path D-Bus is upstream). Does NOT validate gnome-keyring-daemon, kwalletd5, or headless systemd-keyring user-bus.'",
+        "Banner appears in 3 places: (1) Dockerfile header comment, (2) shell script header, (3) evidence artifact first line.",
+        "If docker available + smoke passes: evidence file follows banner with: timestamp + container sha256 + secret-tool exit code 0 + axhub-helpers token-init exit code 0 + extracted token first 16 chars.",
+        "If docker available + smoke fails: evidence file follows banner with FAILED + exit codes + docker logs tail."
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-1002",
-      "title": "hooks/session-start.ps1 — Windows SessionStart hook mirror with proper XDG paths",
-      "priority": 3,
-      "passes": true,
-      "acceptanceCriteria": [
-        "New file hooks/session-start.ps1 — PowerShell 5.1+ mirror of hooks/session-start.sh.",
-        "If US-1000 outcome = visible-error/popup: first line `if (-not $IsWindows) { exit 0 }`. Else: first line `$ErrorActionPreference = 'Stop'`.",
-        "Check `$Helper = Join-Path $env:CLAUDE_PLUGIN_ROOT 'bin\\axhub-helpers-windows-amd64.exe'`. If missing, run install.ps1 → capture `$installExit = $LASTEXITCODE` → if non-zero, surface 4-part Korean systemMessage + exit 0.",
-        "Run `& $Helper session-start` (binary subcommand) — direct exe call, not PS-spawned.",
-        "Run `& $Helper token-init` after session-start.",
-        "State dir for breadcrumb (when AXHUB_TELEMETRY=1): `$StateDir = if ($env:XDG_STATE_HOME) { Join-Path $env:XDG_STATE_HOME 'axhub-plugin' } else { Join-Path $env:USERPROFILE '.local\\state\\axhub-plugin' }` — byte-mirror of telemetry.ts:40-44 (XDG_STATE_HOME fallback to ~/.local/state, NOT %LOCALAPPDATA%).",
-        "Token dir for cmdTokenInit reads (separate from state): `$TokenDir = if ($env:XDG_CONFIG_HOME) { Join-Path $env:XDG_CONFIG_HOME 'axhub-plugin' } else { Join-Path $env:USERPROFILE '.config\\axhub-plugin' }` — mirrors index.ts:441 cmdTokenInit (XDG_CONFIG_HOME, NOT XDG_STATE_HOME).",
-        "Every catch (top-level + nested) emits `Write-Output (ConvertTo-Json @{ systemMessage = '<4-part Korean>' } -Compress)` then `exit 0`. NO bare Write-Output.",
-        "Try/catch [System.IO.PathTooLongException] for MAX_PATH (pre-mortem #5).",
-        "Try/catch for AMSI/EDR quarantine (pre-mortem #2) — detect via spawn-fail or signal != null.",
-        "ASCII-clean.",
-        "Korean errors 4-part."
-      ],
-      "owner": null,
-      "blockedBy": ["US-1001"]
-    },
-    {
-      "id": "US-1003",
-      "title": "hooks/hooks.json — sibling powershell SessionStart entry (bash[0] byte-identical)",
+      "id": "US-1103",
+      "title": "docs/pilot/windows-vm-smoke-checklist.md + tests/smoke-windows-vm-checklist.ps1 — companion runbook + executor",
       "priority": 4,
       "passes": true,
       "acceptanceCriteria": [
-        "hooks/hooks.json modified: SessionStart array gets a NEW second entry alongside existing bash entry. Bash entry [0] preserved BYTE-IDENTICAL (verified via `git diff hooks/hooks.json` — only +N lines, 0 changed lines in bash entry).",
-        "New entry [1]: {\"hooks\":[{\"type\":\"command\",\"shell\":\"powershell\",\"command\":\"powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\\\hooks\\\\session-start.ps1\",\"timeout\":30}]}.",
-        "If US-1000 outcome required guard: add `Get-Command powershell -ErrorAction SilentlyContinue; if (-not $?) { exit 0 }` to command prefix.",
-        "JSON valid (jq '.' < hooks/hooks.json passes).",
-        "PreToolUse + PostToolUse hooks UNTOUCHED."
+        "docs/pilot/windows-vm-smoke-checklist.md (NEW) — 14-step manual checklist for next pilot session: (1) provision Win11 VM (Parallels/UTM/Azure free tier), (2) install Claude Code 2.1.84+, (3) `/plugin install axhub@axhub`, (4) confirm SessionStart fires session-start.ps1, (5) confirm install.ps1 auto-downloads windows-amd64.exe, (6) verify cmdkey /list:axhub shows credential post-axhub-auth-login, (7) run axhub-helpers token-init, (8) verify ~/.config/axhub-plugin/token (mode 0600 equivalent on NTFS), (9) PreToolUse + PostToolUse hooks fire on bash commands, (10) ExecutionPolicy Restricted fallback test, (11) AMSI/EDR detection test (skip if no AV available), (12) MAX_PATH test (Korean profile + deep root), (13) NTLM proxy test (skip if no proxy), (14) capture full transcript to docs/pilot/v0.1.x-windows-vm-result.txt.",
+        "tests/smoke-windows-vm-checklist.ps1 (NEW) — companion PowerShell executor. First line: `if ($env:AXHUB_VM_SMOKE -ne '1') { exit 0 }`. Each of 14 steps becomes a function with try/catch + $LASTEXITCODE check + ConvertFrom-Json validation for hook envelope shape. Pester optional (bare try/catch sufficient).",
+        "Both files must NOT block any current build/test (companion .ps1 only runs when AXHUB_VM_SMOKE=1).",
+        "tests/manifest.test.ts (extend) — assert checklist file exists + has 14 numbered steps + companion .ps1 exists with $env:AXHUB_VM_SMOKE guard."
       ],
       "owner": null,
-      "blockedBy": ["US-1000", "US-1001", "US-1002"]
+      "blockedBy": []
     },
     {
-      "id": "US-1004",
-      "title": "tests — 16 NEW test() blocks + 6 NEW expect() in existing files",
+      "id": "US-1104",
+      "title": "docs/pilot/authenticode-signing-runbook.md + .github/workflows/sign-windows.yml.template + signing stub",
       "priority": 5,
       "passes": true,
       "acceptanceCriteria": [
-        "New file tests/install-ps1.test.ts — 7 cases: (1) RELEASE_VERSION literal v0.1.7 + parity with install.sh:48 regex-extracted, (2) AMD64 arch detection, (3) Invoke-WebRequest with -TimeoutSec 600, (4) Move-Item + Start-Sleep + Test-Path re-check (Defender pre-mortem), (5) NO Add-Type / Reflection.Assembly (EDR-clean), (6) explicit Test-Path/Remove-Item NOT `||` operator + comment naming bin/install.sh:80 bug, (7) every catch ConvertTo-Json @{systemMessage=...} envelope + exit 0.",
-        "New file tests/session-start-ps1.test.ts — 9 cases: (1) first line guard (if US-1000 required) OR ErrorActionPreference Stop, (2) $Helper path uses CLAUDE_PLUGIN_ROOT, (3) install.ps1 spawn captures $LASTEXITCODE, (4) `& $Helper session-start` direct exe call, (5) `& $Helper token-init` after session-start, (6) MAX_PATH catch, (7) AMSI/EDR catch, (8) state dir XDG_STATE_HOME mirror (NO LOCALAPPDATA literal in source), (9) token dir XDG_CONFIG_HOME mirror DISTINCT from state dir.",
-        "tests/manifest.test.ts — extend with 5 NEW expect() asserting hooks.json: (a) bash entry [0] byte-identical to v0.1.6 baseline, (b) new entry [1] uses shell:powershell, (c) command references session-start.ps1, (d) timeout 30, (e) JSON valid.",
-        "tests/keychain-windows.test.ts (or similar telemetry test) — extend with 1 NEW expect() asserting telemetry counter exists for ps1 invocations.",
-        "Final test count: 365 pass / 5 skip / 0 fail / ~2279 expect() / 370 tests across 18 files (bun test 2>&1 | tail -5 must show this exact line)."
+        "docs/pilot/authenticode-signing-runbook.md (NEW) — vendor procurement steps: (a) Sectigo OV cert ($300+/yr), (b) HSM/KMS for signing key (Azure Key Vault / AWS KMS), (c) GitHub Actions windows-latest runner config with cert secret, (d) Authenticode signtool command + cosign integration retention.",
+        ".github/workflows/sign-windows.yml.template (NEW) — workflow_dispatch-only YAML template, NOT triggered automatically. Steps: (1) checkout, (2) download windows-amd64.exe artifact, (3) `signtool verify /pa <file>` with continue-on-error: true (unsigned binary exits non-zero), (4) emit telemetry through EXISTING src/axhub-helpers/telemetry.ts channel: event 'windows.signing.skipped' with reason 'vendor_cert_pending'.",
+        ".gitattributes (NEW or extend) — add line: `*.yml.template linguist-language=YAML linguist-detectable=false` so GitHub doesn't classify as workflow file + linters skip.",
+        "If .eslintignore exists in repo: add `*.yml.template` line. If not exist: skip this step (don't create just for one entry).",
+        "When AXHUB_SIGNING_STUB=1 env var set in CI: stub workflow becomes active. Until vendor procurement completes, telemetry shows 'signing stubbed' allowing release pipeline to acknowledge unsigned-binary state without breaking.",
+        "Runbook explicitly states: 'This is paperwork + executable scaffold. Day procurement clears, integration is one PR (s/AXHUB_SIGNING_STUB=1// + s/continue-on-error: true// + add cert secret config).'",
+        "tests/manifest.test.ts (extend) — assert runbook exists, .yml.template exists with workflow_dispatch on header, .gitattributes line present."
       ],
       "owner": null,
-      "blockedBy": ["US-1001", "US-1002", "US-1003"]
-    },
-    {
-      "id": "US-1005",
-      "title": "docs additive — Windows PS1 mentions in CHANGELOG, quickstart, troubleshooting (4 file edits)",
-      "priority": 6,
-      "passes": true,
-      "acceptanceCriteria": [
-        "CHANGELOG.md — v0.1.7 entry: Added (bin/install.ps1 + hooks/session-start.ps1 + hooks.json sibling powershell entry), Compatibility (Claude Code >= 2.1.84 required for `\"shell\":\"powershell\"` field), Honest tradeoff (US-1000 macOS noise outcome documented).",
-        "docs/pilot/vibe-coder-quickstart.ko.md (or main README if quickstart doesn't exist) — Windows section added: 'Claude Code 2.1.84+ 필요. 자동 설치는 PowerShell 5.1+ 사용. Git Bash/WSL 불필요.' Linux/macOS sections UNTOUCHED.",
-        "docs/pilot/admin-rollout.ko.md — Windows row added to platform support table (or paragraph mentioning PS1 hook).",
-        "bin/README.md:31 — already mentions windows-amd64.exe; extend with: 'Windows installer: bin/install.ps1 (PowerShell 5.1+, no Install-Module).' Linux/macOS lines UNTOUCHED.",
-        "bash tests/docs-link-audit.sh → Broken: 0."
-      ],
-      "owner": null,
-      "blockedBy": ["US-1004"]
-    },
-    {
-      "id": "US-1006",
-      "title": "v0.1.7 release ship — bump + codegen + release-time grep cross-check + tag + CI green + verify",
-      "priority": 7,
-      "passes": true,
-      "acceptanceCriteria": [
-        "Step 1: Version bump 0.1.6 → 0.1.7 in package.json + .claude-plugin/{plugin,marketplace}.json.",
-        "Step 2 (release-time cross-check D2): `diff <(grep -oE 'v?0\\.1\\.7' bin/install.sh) <(grep -oE 'v?0\\.1\\.7' bin/install.ps1)` exit 0 — both files contain v0.1.7 literal.",
-        "Step 3: bun run codegen:version → install.sh + index.ts PLUGIN_VERSION + telemetry.ts.",
-        "Step 4: bun test 2>&1 | tail -8 → '365 pass / 5 skip / 0 fail / 370 tests across 18 files'.",
-        "Step 5: bunx tsc --noEmit → clean.",
-        "Step 6: bash tests/docs-link-audit.sh → Broken: 0.",
-        "Step 7: git commit + push origin main.",
-        "Step 8: git tag v0.1.7 + push origin v0.1.7 → CI release workflow auto-trigger.",
-        "Step 9: CI conclusion success.",
-        "Step 10: bash scripts/release/verify-release.sh v0.1.7 → 'All release assets verified'.",
-        "Step 11: Live binary self-report (downloaded darwin-arm64): `axhub-helpers 0.1.7 (plugin v0.1.7, schema v0)`.",
-        "Step 12: Windows VM smoke (or document deferred to next session — capture binary shape: PE32+ x86-64, 109.6M).",
-        "Step 13: docs/pilot/v0.1.7-verify-result.txt + launch-readiness-checklist baseline updated."
-      ],
-      "owner": null,
-      "blockedBy": ["US-1001", "US-1002", "US-1003", "US-1004", "US-1005"]
+      "blockedBy": []
     }
   ],
   "metadata": {
-    "task_origin": "/oh-my-claudecode:ralplan + /ralph 진행해 (Phase 10 — Windows PS1 hooks)",
-    "phase9_predecessor": "v0.1.6 commit post-2fd6c48 — Windows keychain bridge (PowerShell + advapi32 PInvoke) shipped, but install.sh + session-start.sh remain bash-only → Windows users without Git Bash/WSL still broken end-to-end",
-    "consensus_plan": ".omc/plans/phase-10-windows-ps1-hooks-v2.md (2 ralplan rounds: 9 fixes round 1 + APPROVE round 2)",
+    "task_origin": "/ralplan 전부 다 작업해 (Phase 11 — 5 deferred Phase 10 tradeoffs)",
+    "phase10_predecessor": "v0.1.7 commit post-2fd6c48 — Phase 10 Windows PS1 hooks shipped, 5 deferred items (Win VM smoke, Authenticode, codegen install.ps1, format-parity, Linux Docker smoke)",
+    "consensus_plan": ".omc/plans/phase-11-deferred-tradeoffs-v2.md (2 ralplan rounds: 9 fixes round 1 + APPROVE round 2)",
     "deslop": "enabled",
     "critic": "architect",
-    "scope_note": "Linux/macOS sh files BYTE-IDENTICAL. Compiled binary unchanged (already cross-compiles to windows-amd64.exe). Additive PS1 layer + hooks.json sibling entry only.",
-    "phase_11_deferred": "v0.1.8 — Authenticode .ps1 + .exe signing (EDR allowlist legitimization), GitHub Actions windows-latest runner for CI E2E, claude_code.minVersion manifest field if Anthropic schema adds support, fix install.sh:80 operator precedence bug."
+    "scope_note": "Option B split — code+runtime US-1101+1102+1105 in-session, doc+executable-scaffold US-1103+1104 deferred. macOS + Linux + helper unchanged.",
+    "phase_12_deferred": "v0.1.9 — actual Win VM smoke run (uses US-1103 doc), actual Authenticode procurement (uses US-1104 runbook), Real Linux desktop test (gnome-keyring-daemon / kwalletd5)."
   }
 }

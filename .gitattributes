@@ -1,0 +1,6 @@
+# Phase 11 US-1104 — exempt YAML workflow templates from linguist + linters.
+# .yml.template files are scaffolds awaiting vendor procurement (Authenticode);
+# GitHub Actions ignores them (only .yml/.yaml triggers), but actionlint /
+# pre-commit YAML hooks may try to scan them. linguist-detectable=false hides
+# them from GitHub language stats.
+*.yml.template linguist-language=YAML linguist-detectable=false

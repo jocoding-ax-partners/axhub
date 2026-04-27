@@ -1,0 +1,45 @@
+LIMITATION: libsecret-tools CLI path only — Coverage: 40% READ-path (axhub-helpers contract). End-to-end ~15% (ax-hub-cli WRITE-path D-Bus is upstream). Does NOT validate gnome-keyring-daemon, kwalletd5, or headless systemd-keyring user-bus.
+
+STATUS: RUNNING
+TIMESTAMP_START: 2026-04-27T02:47:22Z
+#0 building with "orbstack" instance using docker driver
+
+#1 [internal] load build definition from smoke-linux-docker.Dockerfile
+#1 transferring dockerfile: 1.31kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/ubuntu:24.04@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/3] FROM docker.io/library/ubuntu:24.04@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
+#4 DONE 0.0s
+
+#5 [2/3] RUN apt-get update && apt-get install -y --no-install-recommends     libsecret-tools     dbus-x11     gnome-keyring     ca-certificates     && rm -rf /var/lib/apt/lists/*
+#5 CACHED
+
+#6 [3/3] WORKDIR /work
+#6 CACHED
+
+#7 exporting to image
+#7 exporting layers done
+#7 writing image sha256:bdfe479af846f8acdfbfeba12b88043940ac3c811fa8dc3e4a53feb6cc0f2e80 done
+#7 naming to docker.io/library/axhub-linux-smoke:phase-11 done
+#7 DONE 0.0s
+[container] starting dbus session
+[container] seeding secret-tool with envelope
+[container] secret-tool store exit=0
+[container] secret-tool lookup recovered length=262
+[container] running axhub-helpers token-init
+warn: CPU lacks AVX support, strange crashes may occur. Reinstall Bun or use *-baseline build:
+  https://github.com/oven-sh/bun/releases/download/bun-v1.3.10/bun-linux-x64-baseline.zip
+{"stored_at":"/tmp/.config/axhub-plugin/token","source":"linux-secret-service","redacted_token":"axhub_pat_ph...[redacted]","next_step":"이제 /axhub:status, /axhub:logs 같은 명령이 자동으로 작동합니다."}
+[container] token-init exit=0
+[container] token file mode=600 size=60
+[container] token first 16 chars=axhub_pat_phase1
+
+STATUS: PASSED
+TIMESTAMP_END: 2026-04-27T02:47:24Z

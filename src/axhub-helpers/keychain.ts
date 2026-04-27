@@ -54,15 +54,33 @@ export const readKeychainToken = (): KeychainResult => {
         timeout: 5000,
       });
       if (result.exitCode !== 0) {
-        return { error: "macOS keychain에 axhub token이 없어요. 'axhub auth login' 으로 한 번 로그인해주세요." };
+        return {
+          error:
+            "잠깐만요.\n" +
+            "원인: macOS keychain 에 axhub token 이 저장돼 있지 않아요.\n" +
+            "해결: 'axhub auth login' 으로 한 번 로그인해주세요.\n" +
+            "다음: 로그인 후 token-init 자동 실행됩니다.",
+        };
       }
       const raw = (result.stdout?.toString() ?? "").trim();
       const token = parseKeyringValue(raw);
       if (token === null)
-        return { error: "macOS keychain의 axhub token을 파싱할 수 없어요. axhub CLI 버전 확인 또는 'axhub auth login --force' 로 재발급 시도." };
+        return {
+          error:
+            "아이고.\n" +
+            "원인: macOS keychain 의 axhub token 형식을 파싱할 수 없어요 (axhub CLI 버전 mismatch 가능).\n" +
+            "해결: 'axhub auth login --force' 로 재발급 시도해주세요.\n" +
+            "다음: 그래도 안 되면 'axhub --version' 으로 CLI 버전 확인 후 업그레이드.",
+        };
       return { token, source: "macos-keychain" };
     } catch {
-      return { error: "macOS 'security' 명령 실행 실패. /usr/bin/security 가 PATH에 있는지 확인해주세요." };
+      return {
+        error:
+          "죄송해요.\n" +
+          "원인: macOS 'security' 명령 실행 자체가 실패했어요.\n" +
+          "해결: /usr/bin/security 가 PATH 에 있는지 확인해주세요.\n" +
+          "다음: 또는 AXHUB_TOKEN 환경변수로 우회 → export AXHUB_TOKEN=axhub_pat_...",
+      };
     }
   }
   if (platform === "linux") {
@@ -76,21 +94,39 @@ export const readKeychainToken = (): KeychainResult => {
       if (result.exitCode !== 0) {
         return {
           error:
-            "Linux secret-service에서 axhub token을 찾을 수 없어요. 'sudo apt-get install libsecret-tools' 로 secret-tool 설치 후 'axhub auth login' 또는 export AXHUB_TOKEN=... 로 우회해주세요.",
+            "잠깐만요.\n" +
+            "원인: Linux secret-service 에 axhub token 이 저장돼 있지 않거나 secret-tool 미설치.\n" +
+            "해결: 'sudo apt-get install libsecret-tools' 후 'axhub auth login' 실행.\n" +
+            "다음: 또는 AXHUB_TOKEN 환경변수로 우회 → export AXHUB_TOKEN=axhub_pat_...",
         };
       }
       const raw = (result.stdout?.toString() ?? "").trim();
       const token = parseKeyringValue(raw);
       if (token === null)
-        return { error: "Linux secret-service의 axhub token을 파싱할 수 없어요. axhub CLI 재로그인 시도해주세요." };
+        return {
+          error:
+            "아이고.\n" +
+            "원인: Linux secret-service 의 axhub token 형식을 파싱할 수 없어요 (axhub CLI 버전 mismatch 가능).\n" +
+            "해결: 'axhub auth login --force' 로 재발급 시도해주세요.\n" +
+            "다음: 그래도 안 되면 'axhub --version' 으로 CLI 버전 확인 후 업그레이드.",
+        };
       return { token, source: "linux-secret-service" };
     } catch {
       return {
         error:
-          "secret-tool 명령이 PATH에 없어요. 'sudo apt-get install libsecret-tools' 후 다시 시도하시거나 export AXHUB_TOKEN=... 사용.",
+          "죄송해요.\n" +
+          "원인: secret-tool 명령이 PATH 에 없거나 D-Bus session bus 미실행.\n" +
+          "해결: 'sudo apt-get install libsecret-tools' + 'eval $(dbus-launch --sh-syntax)' 시도.\n" +
+          "다음: 또는 AXHUB_TOKEN 환경변수로 우회 → export AXHUB_TOKEN=axhub_pat_...",
       };
     }
   }
   if (platform === "win32") return readWindowsKeychain();
-  return { error: `지원하지 않는 플랫폼: ${platform}. AXHUB_TOKEN 환경변수로 우회해주세요.` };
+  return {
+    error:
+      "잠깐만요.\n" +
+      `원인: 지원하지 않는 플랫폼이에요 (platform=${platform}).\n` +
+      "해결: AXHUB_TOKEN 환경변수로 우회 가능합니다.\n" +
+      "다음: export AXHUB_TOKEN=axhub_pat_... 후 token-init 재시도.",
+  };
 };

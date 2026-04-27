@@ -1,0 +1,85 @@
+# Phase 11 US-1104 — Authenticode signing stub workflow.
+#
+# THIS FILE HAS .yml.template EXTENSION ON PURPOSE.
+# GitHub Actions ignores files not ending in .yml or .yaml so this scaffold
+# does NOT trigger automatically. To activate after vendor cert procurement:
+#   1. Rename to sign-windows.yml
+#   2. Remove AXHUB_SIGNING_STUB=1 env block
+#   3. Remove continue-on-error: true on verify step
+#   4. Configure GitHub secret AUTHENTICODE_PFX_BASE64 + AUTHENTICODE_PASSWORD
+#
+# See docs/pilot/authenticode-signing-runbook.md for procurement steps.
+
+name: Sign Windows binary (Authenticode)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to sign (e.g. v0.1.8)'
+        required: true
+        type: string
+
+jobs:
+  sign-windows:
+    runs-on: windows-latest
+    env:
+      AXHUB_SIGNING_STUB: '1'  # REMOVE this when vendor cert configured
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download windows-amd64.exe from release
+        shell: pwsh
+        run: |
+          gh release download "${{ inputs.release_tag }}" `
+            --pattern "axhub-helpers-windows-amd64.exe" `
+            --dir bin/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Decode Authenticode cert (skipped when stub mode active)
+        shell: pwsh
+        if: env.AXHUB_SIGNING_STUB != '1'
+        run: |
+          $pfxBase64 = $env:AUTHENTICODE_PFX_BASE64
+          [System.IO.File]::WriteAllBytes("cert.pfx", [Convert]::FromBase64String($pfxBase64))
+        env:
+          AUTHENTICODE_PFX_BASE64: ${{ secrets.AUTHENTICODE_PFX_BASE64 }}
+
+      - name: Sign binary with signtool (skipped when stub mode active)
+        shell: pwsh
+        if: env.AXHUB_SIGNING_STUB != '1'
+        run: |
+          $signtool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"
+          & $signtool sign `
+            /f cert.pfx `
+            /p "$env:AUTHENTICODE_PASSWORD" `
+            /tr http://timestamp.sectigo.com `
+            /td sha256 `
+            /fd sha256 `
+            bin/axhub-helpers-windows-amd64.exe
+        env:
+          AUTHENTICODE_PASSWORD: ${{ secrets.AUTHENTICODE_PASSWORD }}
+
+      - name: Verify signature
+        shell: pwsh
+        continue-on-error: true  # REMOVE this when vendor cert configured (unsigned binary exits non-zero)
+        run: |
+          $signtool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"
+          & $signtool verify /pa bin/axhub-helpers-windows-amd64.exe
+
+      - name: Emit telemetry (signing skipped while stub active)
+        shell: pwsh
+        if: env.AXHUB_SIGNING_STUB == '1'
+        run: |
+          # Use existing telemetry.ts channel — emit event with stub reason
+          # so release pipeline can acknowledge unsigned-binary state without
+          # breaking. Real run after procurement omits this step entirely.
+          Write-Output "telemetry: { event: 'windows.signing.skipped', reason: 'vendor_cert_pending', release: '${{ inputs.release_tag }}' }"
+
+      - name: Upload signed artifact (skipped when stub mode active)
+        if: env.AXHUB_SIGNING_STUB != '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: axhub-helpers-windows-amd64-signed
+          path: bin/axhub-helpers-windows-amd64.exe
