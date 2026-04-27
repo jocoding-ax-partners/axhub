@@ -3,9 +3,31 @@
 All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
 
-Nothing yet.
+## [0.1.19](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.18...v0.1.19) (2026-04-27)
+
+Phase 19 — `bun run release` 한 줄로 버전 범프 자동화. v0.1.10..v0.1.18 까지 9 release 동안 5 파일 수동 편집 + codegen + release:check + commit + tag 를 매번 따로 했어요. 이제 commit-and-tag-version (D2) 가 한 번에 chain — Conventional Commits 파싱 + 3 파일 bump + postbump hook 으로 codegen:version + release:check 자동 실행 + CHANGELOG entry generation + git commit + tag. 사람은 narrative paragraph 만 amend 로 추가하면 돼요. ralplan 분석에서 D1 release-please 거절 이유: PR rubber-stamp 가 v0.1.14 stale-binary 같은 trust-without-verify drift 재발 위험, 한국어 narrative 자동 생성 어색함, axhub 의 hotfix 빈번 cadence 와 weekly bot-PR cadence 미스매치.
+
+### Added
+
+* Phase 19 v0.1.19 — auto version bump via commit-and-tag-version ([98befbf](https://github.com/jocoding-ax-partners/axhub/commit/98befbf1a89cbdc7c95ba134009be70956555af9))
+
+
+### Docs
+
+* **v0.1.18:** AGENTS.md + CLAUDE.md add Skill Authoring section ([666fc1a](https://github.com/jocoding-ax-partners/axhub/commit/666fc1a3a36f9d81055ab947c74b4835ba72d927))
+
+### Test baseline
+
+- `bun test` → 498 pass / 5 skip / 0 fail / 503 tests / 28 files (preserved from v0.1.18).
+- `bunx tsc --noEmit` → clean.
+- `bun lint:tone --strict` → 0 error / 0 warning across 29 files.
+- `bun run release:check` → OK at v0.1.19, 5 cross-arch binaries verified (auto-ran in postbump).
+
+### Honest tradeoff
+
+- CHANGELOG narrative paragraph (해요체) 는 사람이 작성 — auto-bullets 만으로는 Phase 의미 전달 부족. 사용자 workflow: `bun run release` 후 `vim CHANGELOG.md` → `git commit --amend --no-edit -a`.
+- D1 release-please 는 future Phase 에서 multi-contributor 단계가 되면 재검토. 현재 solo 단계에서는 D2 가 단순 + 안전.
 
 ## [0.1.18] — 2026-04-27
 

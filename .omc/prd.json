@@ -6,7 +6,7 @@
       "id": "US-1901",
       "title": "Install commit-and-tag-version + .versionrc.json config",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "bun add -D commit-and-tag-version installed (devDependency in package.json).",
         ".versionrc.json exists at repo root with: types config (feat/fix sections, chore hidden), header preserved, postbump hook chains codegen:version + release:check, bumpFiles array covers package.json + .claude-plugin/plugin.json + .claude-plugin/marketplace.json (path + jsonpath).",
@@ -19,7 +19,7 @@
       "id": "US-1902",
       "title": "Dry-run release verifies bumpFiles + postbump chain",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "bun run release -- --dry-run executes successfully without modifying files.",
         "Dry-run output shows next version (0.1.18 → 0.1.19 patch from current commit history).",
@@ -32,7 +32,7 @@
       "id": "US-1903",
       "title": "docs/RELEASE.md updated — D2 primary path + manual fallback",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "docs/RELEASE.md 'Cutting a release' section rewritten — bun run release primary path + bun run release -- --release-as <ver|minor|major> for explicit choice + manual edit fallback preserved at bottom.",
         "Step-by-step recipe documents: 1. ensure clean working tree, 2. bun run release [-- --release-as X], 3. git push origin main --tags, 4. release.yml fires automatically.",
@@ -46,7 +46,7 @@
       "id": "US-1904",
       "title": "Phase 19 ship — v0.1.19 via the new automation itself (dogfood)",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "bun run release executed (auto-bump from current commits → 0.1.18 → 0.1.19 patch).",
         "Generated CHANGELOG entry inspected — Phase 19 narrative paragraph (해요체) added by author below the auto-bullets.",

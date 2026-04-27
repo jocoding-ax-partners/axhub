@@ -2,6 +2,59 @@
 
 Append-only log of unresolved decisions across plans.
 
+## phase-19-auto-version-bump-v1 - 2026-04-27
+
+- [ ] Q1: `Release-As: 0.1.19` footer in Phase 19 PR's commit — confirm release-please reads this from squash-merge commit message (vs only from individual commit messages). Affects whether v0.1.19 lands as patch or minor on first auto-managed release.
+- [ ] Q2: Branch protection rule for `release:check` on all `main`-targeting PRs — required-and-blocking OR required-but-bypassable-by-admin? Affects developer ergonomics during Phase 19 settling period.
+- [ ] Q3: CHANGELOG `## [Unreleased]` section — confirm release-please preserves Toss-tone narrative paragraph (not just bullets) when promoting to `## [X.Y.Z]`. Affects T6 (human-authored narrative) ergonomics.
+- [ ] Q4: Hotfix script `--push` flag default — push automatically (matches existing manual `git push origin main --tags`) OR require explicit `--push` (safer)? Affects US-1902 acceptance criteria.
+- [ ] Q5: `tests/release-bump.test.ts` test strategy — actual git operation test (creates temp repo, runs script, asserts state) OR pure unit test (mock `child_process.execSync`)? Affects test runtime + brittleness vs realism trade.
+
+## phase-18-skill-scaffold-automation-v1 - 2026-04-27
+
+- [ ] Q1: Should C4 (`docs/SKILL_AUTHORING.md`) ship in same v0.1.18 PR or be split to v0.1.19? — Affects PR scope; Planner recommends same PR (low marginal cost, helps adoption) but Architect may prefer minimal-surface ship.
+- [ ] Q2: Should the scaffold script also generate a stub `tests/skill-<name>.test.ts` for SKILL-specific unit tests? — Phase 17 convention is "extend existing UX gates" (no per-SKILL test file); Planner recommends NO for Phase 18, defer to Phase 19 if needed.
+- [ ] Q3: Should `PREFLIGHT_REQUIRED` opt-in list live in test file or shared `tests/fixtures/skill-classifications.json`? — Affects readability vs reusability; Planner recommends test-file for now, refactor if list grows >10.
+- [ ] Q4: Should `MULTI_STEP_OPT_OUT` exempt list be auto-derived from frontmatter (e.g. `multi-step: false`) instead of hard-coded? — Auto-derive needs touching 11 SKILL frontmatters (body churn we want to avoid in Phase 18); Planner recommends hard-coded for Phase 18, defer.
+- [ ] Q5: Classification heuristic for "needs TodoWrite" — `≥4 numbered top-level steps` regex (`^\s*\d+\.\s\*\*[^*]+\*\*`) vs alternative signals (e.g. presence of `axhub deploy create`/`axhub auth login` destructive verbs)? — Affects which future SKILLs trigger the gate; Planner picks step-count for simplicity, Architect may prefer destructive-verb signal.
+- [ ] Q6: Toss tone scope extension to SKILL bodies — should ALL `skills/*/SKILL.md` go in `PHASE_13_FILES` immediately (Planner default), or shadow-mode (warn-only) for v0.1.18 then strict in v0.1.19? — Risk: LOW (Phase 17 already manually conformed bodies) but Architect may prefer shadow first.
+- [ ] Q7: Template generator slug validation — restrict to `[a-z][a-z0-9-]{2,19}` (lowercase, dash-separated, 3-20 chars) per Planner default? Or allow underscores for test fixtures (e.g. `_template`, `test_xyz`)? — Affects whether `_template` directory itself can be reserved or needs special-casing.
+- [ ] Q8: Registry stub auto-append idempotency — should `bun run skill:new myskill` running twice fail with exit-1 (Planner default — refuses to clobber) or fall back to `--force` flag? — Affects DX for re-running after partial failure.
+
+## phase-18-skill-scaffold-automation-v2 - 2026-04-27 (Architect round-1 fixes — adds Q9..Q11)
+
+- [x] Q1 (RESOLVED in v2): C4 (`docs/SKILL_AUTHORING.md`) DEFERRED to Phase 19 per Architect R7. v2 embeds authoring guidance as inline `<!-- AUTHOR: -->` comments inside `skills/_template/SKILL.md.tmpl`. Saves 1-2h. Phase 19 ships full doc with worked examples.
+- [x] Q3 (RESOLVED in v2): `PREFLIGHT_REQUIRED` hardcoded list ELIMINATED per Architect R1. Replaced with per-SKILL frontmatter `needs-preflight: true|false`. Tests read frontmatter; no separate test array.
+- [x] Q4 (RESOLVED in v2): `MULTI_STEP_OPT_OUT` auto-derive APPROVED per Architect R1. C0 commit migrates 11 SKILLs (~30min, 22 lines added, 0 body changes). Tests read frontmatter `multi-step: true|false`.
+- [x] Q5 (RESOLVED in v2): Classification heuristic resolved — frontmatter declarations replace numbered-step regex. Author makes intent explicit via `multi-step: <bool>`.
+- [x] Q6 (RESOLVED in v2): Toss tone scope extension SHIPS IMMEDIATELY per Architect R4, but with mandatory C1 prep step verification BEFORE merge. If pre-flight surfaces violations, conditional C0.5 fix-existing-prose commit lands first. No shadow mode needed.
+- [x] Q7 (RESOLVED in v2): Slug regex `/^[a-z][a-z0-9-]{2,19}$/` confirmed. `_template/` directory excluded from glob via `[a-z]` first-char filter. Underscore-prefixed slugs rejected by scaffold.
+- [x] Q8 (RESOLVED in v2): Registry stub idempotency = exit 1 on collision (no `--force` flag in Phase 18 scope). Confirmed.
+- [ ] Q9: Notification hook for missing pattern detection (Architect R8) — should `bun run skill:doctor` or CI emit Discord/Slack notification when SKILL #12 ships with patterns missing? Plan: NO for Phase 18 (Phase 19+ surface). Requires `configure-notifications` SKILL prerequisite + CI integration. Confirm deferral.
+- [ ] Q10: Frontmatter migration commit boundary — C0 as single commit (touches 11 files) vs split per-SKILL (11 commits)? Plan: single commit (atomic migration, easier to revert, smaller PR review burden). Confirm.
+- [ ] Q11: `skill:doctor` exit-code semantics (Architect R5) — default mode exits 0 even with findings (author iteration); `--strict` exits 1 (CI + meta-test). Two-mode design vs always-exit-1-on-findings. Confirm.
+- [ ] Q12: Frontmatter key naming convention — `multi-step:` (kebab-case, matches existing `argument-hint:` / `allowed-tools:`) vs `multiStep:` (camelCase) vs `multi_step:` (snake_case)? Plan: kebab-case for consistency.
+- [ ] Q13: Frontmatter validation strictness — accept ONLY `true|false` literals (reject `"true"|"false"` strings)? Plan: strict literal-only at C1 test time AND C5 doctor time.
+- [ ] Q14: MCP elicitation primitives Phase 19+ migration timing — when does AskUserQuestion + D1 fallback model give way to `elicitation/create`? Plan: defer until Anthropic plugin SDK stabilizes elicitation primitives (target Phase 19+ but contingent on SDK maturity). No hard timeline in Phase 18.
+- [ ] Q15: Windows compat for `skill:new` + `skill:doctor` (Architect A3 acknowledged) — Phase 18 documents "macOS/Linux only" in scaffold help text. Phase 19+ scope to handle CRLF + path separators. Confirm deferral acceptable.
+- [ ] Q16: Activation phrases TODO rejection (Architect A2) — scaffold validates generated `description` does not contain literal `TODO`/`{{`. Should validation also reject empty `description: ""`? Plan: yes (require non-empty Korean activation phrases). Confirm error message tone (Korean 해요체 vs English).
+
+## phase-17-ux-uplift-v2 - 2026-04-27 (Architect round-1 fixes — adds Q7..Q10)
+
+- [ ] Q7: Statusline rendering mechanism — `subagentStatusLine` hook (per Anthropic docs) vs `statusLine` hook (older syntax)? Plan picks `subagentStatusLine`; confirm against current Claude Code release before C7 lands.
+- [ ] Q8: Registry schema versioning — should `skills/_shared/ask-defaults.json` carry a `"schema_version": "1"` top-level key for future Phase 18 D2 migration? Plan defaults to no version key (small, single-consumer); add if Architect prefers explicit versioning.
+- [ ] Q9: Preflight subcommand security — does `axhub-helpers preflight --json` need its own consent gate, or is read-only access to keychain/cache safe-by-default? Plan assumes safe (no destructive ops, only `auth_status: "authenticated"|"none"` boolean — never the actual token); confirm with security-reviewer.
+- [ ] Q10: Live-plugin-smoke harness extension — adding "exit non-zero on any failure" is a STRICTER gate. Currently informational. Promote to mandatory CI gate immediately, or 1 release of "shadow mode" (warn but don't fail) first? Plan picks immediate strict mode (fastest feedback); Architect may prefer shadow mode in v0.1.17 then strict in v0.1.18.
+
+## phase-17-ux-uplift-v1 - 2026-04-27
+
+- [ ] Q1: TodoWrite item count for `/axhub:deploy` — ≥6 (per user-sketched 토큰→앱→미리보기→배포→빌드→결과) vs ≥5 (drop one) — affects `tests/ux-todowrite.test.ts` lock threshold.
+- [ ] Q2: AskUserQuestion header chip width budget — `Array.from(s).length ≤ 12` (codepoint count, conservative) vs visual-width via wcwidth-like — confirm with Architect against actual Claude Code chip render.
+- [ ] Q3: CHANGELOG `[0.1.17]` entry tone — all-Korean Toss bullets (plan default) vs mixed EN/KR for technical changes — affects `lint:toss` outcome on the new release entry.
+- [ ] Q4: `commands/upgrade.md` creation — should the slash command exist, or keep upgrade SKILL natural-language-only for symmetry-breaking with CLI `update`? Plan creates it; Architect may disagree.
+- [ ] Q5: `multiSelect: true` scope — only on doctor multi-failure (plan default) vs also on apis cross-team + apps expand — UX gain vs accidental-batch-action risk.
+- [ ] Q6: D2 universal PreToolUse hook — Phase 18 sunset SLA target (v0.1.20 release per ADR §7), but should Phase 17 ship a feature flag stub for D2 telemetry collection?
+
 ## phase-13-toss-tone-migration - 2026-04-24
 
 - [ ] Q1: AskUserQuestion `취소` → `닫기` 일괄 변환 여부 — Rule T-05 는 다이얼로그 한정. "강제 다운그레이드 / 취소" 같은 destructive abort 옵션은 의미상 "닫기" 가 부적절. 예외 정책 정의 필요.
