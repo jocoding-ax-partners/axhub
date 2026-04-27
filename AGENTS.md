@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **axhub** (811 symbols, 1147 relationships, 32 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **axhub** (907 symbols, 1307 relationships, 37 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -99,3 +99,57 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+# axhub Skill Authoring (Phase 17/18 강제)
+
+새 SKILL 을 `skills/<name>/SKILL.md` 에 작성할 때 **반드시** scaffold 사용. 직접 작성 금지.
+
+## Always Do
+
+- **MUST `bun run skill:new <slug>` 로 스캐폴드 생성** — 직접 `mkdir skills/<name>` 후 SKILL.md 작성 시 Phase 17/18 패턴 (D1 TTY guard / TodoWrite Step 0 / `!command` preflight injection / AskUserQuestion header / registry stub) 누락되어 CI fail.
+- **MUST frontmatter 에 `multi-step:` + `needs-preflight:` 선언** — `multi-step: true` (deploy/recover/update/upgrade/doctor 같이 4+ 단계) 또는 `false` (apis/apps/auth/clarify/logs/status 같이 단일/조회). `needs-preflight: true` (deploy/recover/apis/apps 같이 live state 필요) 또는 `false`.
+- **MUST `bun run skill:doctor` 로 패턴 체크** — colored 한글 출력으로 SKILL 별 D1 sentinel / TodoWrite / `!command` preflight 누락 즉시 보임. CI 도 `--strict` mode 로 같은 검사 통과 필수.
+- **MUST `tests/fixtures/ask-defaults/registry.json` 에 AskUserQuestion 별 `safe_default` + `rationale` 등록** — scaffold 가 stub 자동 append. 새 question 추가 시 매번 channel 등록 (drift catch).
+- **MUST 모든 한글 텍스트 해요체 통일** — `bun run lint:tone --strict` 0 err 필수. 금지 token: 합니다 / 입니다 / 시겠어요 / 드립니다 / 당신 / 아이고. 사용: 해요 / 예요 / 이에요 / 할래요.
+- **MUST nl-lexicon trigger 어구는 frontmatter `description:` 에만** — `bun run lint:keywords --check` 베이스라인 잠금. SKILL body 에서 새 trigger 어구 추가하면 baseline 깨짐.
+
+## Skill Authoring Workflow
+
+```bash
+# 1. Scaffold 생성 (mutate-aware safe defaults)
+bun run skill:new my-skill
+
+# Read-only SKILL 인 경우 flag opt-out:
+bun run skill:new my-readonly --no-multi-step --no-preflight
+
+# 2. skills/my-skill/SKILL.md TODO placeholder 채우기
+#    - description: nl-lexicon 활성화 trigger 어구
+#    - workflow Step 1..N
+#    - AskUserQuestion JSON block (필요 시)
+
+# 3. 진단 + lint + test
+bun run skill:doctor          # 패턴 누락 colored 출력
+bun run lint:tone --strict    # 톤 0 err
+bun run lint:keywords --check # nl-lexicon 베이스라인 lock
+bun test                      # 회귀
+
+# 4. 모두 green 이면 commit
+```
+
+## Never Do
+
+- NEVER `mkdir skills/foo && touch skills/foo/SKILL.md` 후 빈 SKILL.md 직접 작성. scaffold 우회 시 패턴 누락.
+- NEVER `tests/ux-todowrite.test.ts` / `tests/ux-skill-preflight-injection.test.ts` 등에 hardcoded SKILL slug 추가. frontmatter 선언으로 자동 enforce — test 코드 편집 불필요.
+- NEVER `tests/fixtures/ask-defaults/registry.json` 에 AskUserQuestion 등록 없이 SKILL ship. `tests/ux-ask-fallback-registry.test.ts` 가 drift catch.
+- NEVER `description:` 의 nl-lexicon trigger 어구 변경 — baseline 깨짐. 필요 시 `.omc/lint-baselines/skill-keywords.json` baseline 재캡처 (rare event).
+- NEVER lint:tone scope 에 SKILL frontmatter 포함 시키기 — `description:` 은 nl-lexicon trigger 라 byte-identical lock 우선.
+
+## Self-Check Before Finishing Skill
+
+- [ ] `bun run skill:doctor --strict` exit 0
+- [ ] `bun run lint:tone --strict` 0 err
+- [ ] `bun run lint:keywords --check` no diff
+- [ ] `bun test` ≥498 pass / 0 fail (Phase 18 baseline)
+- [ ] `bunx tsc --noEmit` clean
+- [ ] frontmatter `multi-step:` + `needs-preflight:` 선언
+- [ ] AskUserQuestion 마다 registry entry 등록
