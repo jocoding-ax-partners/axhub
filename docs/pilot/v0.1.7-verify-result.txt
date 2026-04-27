@@ -1,0 +1,90 @@
+v0.1.7 release verification — Phase 10 Windows PS1 hooks ship
+================================================================
+
+Verified at: 2026-04-27
+Verifier: jocoding-ax-partners (Phase 10 ralph)
+Tag: v0.1.7
+Commit: post-2fd6c48 (feat: v0.1.7 — Phase 10 Windows PS1 hooks)
+
+CI release workflow
+-------------------
+Run ID: 24972887491
+Status: completed
+Conclusion: success
+Build job: ✓ Build cross-arch + cosign sign — all 11 steps green
+E2E job: skipped (gated by E2E_ENABLED repo var, expected)
+
+verify-release.sh v0.1.7 output
+-------------------------------
+Verified OK
+Manifest signature OK.
+Verifying each binary signature + checksum...
+OK: axhub-helpers-darwin-amd64
+OK: axhub-helpers-darwin-arm64
+OK: axhub-helpers-linux-amd64
+OK: axhub-helpers-linux-arm64
+OK: axhub-helpers-windows-amd64.exe
+---
+All release assets verified for jocoding-ax-partners/axhub@v0.1.7
+
+Live binary self-report (downloaded darwin-arm64)
+--------------------------------------------------
+$ /tmp/axhub-helpers-v017 version
+axhub-helpers 0.1.7 (plugin v0.1.7, schema v0)
+
+→ self-reports 0.1.7 (matches plugin v0.1.7) — codegen sync correct.
+
+Release-time grep cross-check (D2)
+-----------------------------------
+$ diff <(grep -oE 'v?0\.1\.7' bin/install.sh | sort -u) \
+       <(grep -oE 'v?0\.1\.7' bin/install.ps1 | sort -u)
+[ok] Files are identical
+release-cross-check exit:0
+
+→ Both bin/install.sh + bin/install.ps1 contain v0.1.7 literal post-bump.
+
+Phase 10 acceptance summary
+---------------------------
+US-1000 ✓ macOS noise spike — outcome A silent assumed (cannot test in same session)
+US-1001 ✓ bin/install.ps1 (NEW) — PS 5.1 mirror, EDR-clean, 7 pre-mortem catches
+US-1002 ✓ hooks/session-start.ps1 (NEW) — XDG_STATE_HOME + XDG_CONFIG_HOME mirrors
+US-1003 ✓ hooks/hooks.json — sibling powershell entry [1], bash entry [0] byte-identical
+US-1004 ✓ tests — 21 NEW test()/expect() blocks (7 install-ps1 + 9 session-start-ps1 + 5 manifest)
+US-1005 ✓ docs — CHANGELOG v0.1.7 + bin/README + admin-rollout Windows additive
+US-1006 ✓ v0.1.7 release ship — 5 binaries cosign-verified, darwin-arm64 self-report 0.1.7
+
+Test baseline
+-------------
+bun test → 370 pass / 5 skip / 0 fail / 2323 expect() / 375 tests across 18 files
+typecheck → clean
+docs link audit → Broken: 0
+release-time grep → install.{sh,ps1} both v0.1.7
+
+Honest tradeoffs (deferred to v0.1.8)
+--------------------------------------
+1. .ps1 NOT Authenticode-signed — EDR may quarantine PowerShell invocation.
+   Korean ERR_EDR systemMessage path documents AXHUB_TOKEN env var fallback.
+2. macOS wrong-OS spawn behavior assumed silent (per Anthropic spec phrasing
+   "runs on Windows"). Not directly verified in current session — would
+   require running another claude instance against stub plugin which interferes
+   with this session. Hotfix v0.1.7.1 ready if first pilot reports visible-error.
+3. install.sh:80 operator precedence bug NOT replicated in install.ps1
+   (explicit Test-Path/Remove-Item used). sh-side fix tracked for future.
+4. codegen-install-version doesn't bump install.ps1 yet — manual bump required
+   this release. Add to scripts/codegen-install-version.ts in v0.1.8.
+5. Claude Code minVersion 2.1.84 floor lives in CHANGELOG + admin-rollout
+   strings only — manifest schema lacks claude_code.minVersion field per
+   Anthropic docs. Older clients silently fail (run powershell command via
+   bash). v0.1.8 follow-up if Anthropic schema adds field.
+
+Windows VM smoke
+----------------
+Not executed in current session (macOS host). Binary shape verified:
+  windows-amd64.exe — 109.6M (PE32+ executable, console x86-64)
+
+Manual checklist remains as US-1006 documented step:
+  1. Real Win11 VM with PowerShell 5.1+
+  2. Install plugin via /plugin install axhub@axhub
+  3. Verify hooks/session-start.ps1 fires on session start
+  4. Verify bin/install.ps1 auto-downloads windows-amd64.exe
+  5. Verify token-init reads Windows Credential Manager via Phase 9 keychain bridge

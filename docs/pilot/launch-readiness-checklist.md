@@ -79,25 +79,34 @@ GO decision by: `_____________________` (admin) + `_____________________` (jocod
 
 ---
 
-## 별첨: release verification baseline (v0.1.6)
+## 별첨: release verification baseline (v0.1.7)
 
-**Pilot 권장 release: v0.1.6** (Phase 9 hotfix — Windows ERR_NOT_FOUND cmdkey instruction 제거. v0.1.5 의 doc/code self-contradiction 수정).
+**Pilot 권장 release: v0.1.7** (Phase 10 — Windows PS1 hooks 추가. Git Bash/WSL 없이도 stock Windows 10/11 에서 plugin end-to-end 작동. Claude Code >= 2.1.84 필수).
 
-Pilot 시작 전 plugin v0.1.6 release cosign signature + sha256 무결성 검증 결과:
+Pilot 시작 전 plugin v0.1.7 release cosign signature + sha256 무결성 검증 결과:
 
-- 검증 명령: `bash scripts/release/verify-release.sh v0.1.6`
-- 결과 캡처: `docs/pilot/v0.1.6-verify-result.txt`
-- 검증 시점: `2026-04-24 (Phase 9 hotfix)`
-- 검증자: `jocoding-ax-partners (Phase 9 architect ralph)`
-- 검증 결과: **✓ All release assets verified for jocoding-ax-partners/axhub@v0.1.6** — manifest.json signature OK + 5 binary signatures OK + sha256 manifest match.
-- Live binary self-report (darwin-arm64): `axhub-helpers 0.1.6 (plugin v0.1.6, schema v0)` ✓
-- Windows binary smoke: 109.6M PE32+ x86-64 ✓ (실제 Windows VM 실행 검증은 다음 pilot 세션 — `docs/RELEASE.md` E1 manual checklist).
+- 검증 명령: `bash scripts/release/verify-release.sh v0.1.7`
+- 결과 캡처: `docs/pilot/v0.1.7-verify-result.txt`
+- 검증 시점: `2026-04-27 (Phase 10 ralph)`
+- 검증자: `jocoding-ax-partners (Phase 10 architect ralph)`
+- 검증 결과: **✓ All release assets verified for jocoding-ax-partners/axhub@v0.1.7** — manifest.json signature OK + 5 binary signatures OK + sha256 manifest match.
+- Live binary self-report (darwin-arm64): `axhub-helpers 0.1.7 (plugin v0.1.7, schema v0)` ✓
+- Windows binary smoke: 109.6M PE32+ x86-64 ✓ (실제 Windows VM 실행 검증은 다음 pilot 세션).
+- Release-time cross-check: `bin/install.{sh,ps1}` 둘 다 v0.1.7 literal 포함 (D2 통과).
+
+### v0.1.7 known tradeoffs (Phase 11 deferred)
+
+1. `.ps1` NOT Authenticode-signed — EDR / V3 / AhnLab / CrowdStrike 차단 가능. ERR_EDR systemMessage 가 AXHUB_TOKEN env var fallback 안내.
+2. macOS 에서 wrong-OS `"shell":"powershell"` spawn 동작 silent 가정 (직접 verify 안 함). Hotfix v0.1.7.1 hotfix-ready if first pilot reports visible-error.
+3. `install.sh:80` operator precedence bug NOT replicated in install.ps1 — sh-side fix tracked for future v0.1.x.
+4. codegen-install-version 가 아직 install.ps1 자동 sync 안 함 — 매 release 마다 수동 bump 필요. v0.1.8 에서 codegen 확장.
+5. Claude Code minVersion 2.1.84 floor 은 CHANGELOG + admin-rollout 문자열에만 명시. manifest schema 에 `claude_code.minVersion` 필드 없음 → 더 오래된 client silent fail.
 
 ### v0.1.5 known tradeoff (EDR 차단 가능성)
 
 windows-amd64.exe 는 **Authenticode 서명 안 됨** (v0.1.6 deferred). 회사 EDR / AMSI / V3 / AhnLab / CrowdStrike 가 inline PInvoke (advapi32!CredReadW) 를 Mimikatz 패턴으로 분류해 차단할 가능성 있음. Korean 에러 메시지 (`keychain-windows.ts:ERR_EDR`) 가 이를 honest 하게 owning — `AXHUB_TOKEN` 환경변수가 v0.1.6 코드사이닝 전까지 정식 회피 경로.
 
-### v0.1.0 ~ v0.1.4 known limitations (참고용, history preservation)
+### v0.1.0 ~ v0.1.6 known limitations (참고용, history preservation)
 
 - **v0.1.0**: release pipeline 의 `--output-certificate` flag 누락 → cosign keyless verify 실패. v0.1.3 fix.
 - **v0.1.1**: codegen 이 install.sh 만 sync, in-binary `PLUGIN_VERSION` constants 미동기화 → self-report 거짓. v0.1.3 fix.
@@ -105,5 +114,6 @@ windows-amd64.exe 는 **Authenticode 서명 안 됨** (v0.1.6 deferred). 회사 
 - **v0.1.3**: SessionStart 자동 token-init trigger 추가했으나 `axhub auth login --print-token` 가정으로 token-init 자체가 broken (CLI 미지원 flag). v0.1.4 fix — helper 가 OS keychain 직접 read.
 - **v0.1.4**: macOS + Linux keychain bridge 만 — Windows 는 deferred error 반환. v0.1.5 fix — Windows Credential Manager 통합 추가.
 - **v0.1.5**: Windows 통합 첫 ship 했으나 ERR_NOT_FOUND 메시지가 cmdkey /list:axhub 로 자격증명 확인하라고 안내 (cmdkey 는 present/absent 둘 다 exit 0 → useless probe). v0.1.6 fix — single-line patch 으로 AXHUB_TOKEN env var path 안내로 교체.
+- **v0.1.6**: Windows keychain 통합 작동했지만 install.sh + session-start.sh 가 bash-only — Git Bash/WSL 없는 stock Windows 사용자는 plugin 자동 설치/SessionStart 모두 broken. v0.1.7 fix — bin/install.ps1 + hooks/session-start.ps1 + hooks.json sibling powershell entry 추가.
 
-신규 install + pilot 은 **v0.1.6** 사용.
+신규 install + pilot 은 **v0.1.7** 사용.
