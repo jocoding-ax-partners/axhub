@@ -70,6 +70,8 @@ To check status:
 - NEVER echo the raw NDJSON tick stream verbatim — vibe coders cannot read it.
 - NEVER auto-trigger `axhub deploy create` from the status path (read-only intent).
 - NEVER invent a `deployment_id` when the cache is cold; ask via AskUserQuestion.
+
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — cold cache deploy pick → `most_recent` (가장 최근 succeeded), exit-65 re-login → `abort` (subprocess 자동 로그인 안 해요).
 - NEVER throttle the terminal-state narration — success/failure must surface immediately.
 
 ## Additional Resources

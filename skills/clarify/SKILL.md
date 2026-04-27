@@ -17,6 +17,8 @@ To clarify:
    - Contradictory deixis ("그거" with no recent context)
    - Unknown axhub-adjacent term ("axhub 어떻게 써", "axhub thing")
 
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — clarify menu → `abort` (모호한 의도라 subprocess 에서는 추측 안 해요).
+
 2. **Render numbered Korean menu.** Use AskUserQuestion with the most relevant 4–5 options based on detected class. Default menu:
 
    ```json

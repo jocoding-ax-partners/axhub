@@ -27,6 +27,8 @@ To list APIs:
 
    On `app_id: null`, ask the user via AskUserQuestion to pick an app from `axhub apps list --json` (top 5 by recency).
 
+   **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — app pick → `top_recent` (가장 최근 deploy 한 앱), cross-team opt-in → `stay` (privacy-first 기본), pagination → `stop` (첫 10개 만).
+
 3. **DEFAULT — current-app scope:**
 
    ```bash

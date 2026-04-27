@@ -28,6 +28,8 @@ To fetch logs:
 
    ax-hub-cli has no `axhub deploy list`; helper uses REST API directly via the token from auto-bootstrap.
 
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — source pick → `build` (가장 흔한 use case), 전체 보기 → `last 50` (subprocess 에서는 trimmed 만 보여줘요).
+
 2. **Pick source.** Default `--source=build`. Switch to `--source=pod` only when the utterance contains "런타임 로그", "running logs", "컨테이너 로그", "pod logs", or when the deploy is already in a `health_check`/terminal `succeeded` phase. When uncertain, ask once via AskUserQuestion ("빌드 로그 / 런타임 로그 / 둘 다").
 
 3. **Stream logs with SSE follow:**

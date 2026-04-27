@@ -35,6 +35,8 @@ To handle auth:
 
    Stop here unless the user also asked for a re-login.
 
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — login confirm → `abort`, headless → `token_file`, logout confirm → `abort` (subprocess 자동 logout 안 해요).
+
 3. **On expired or login-intent.** Confirm via AskUserQuestion:
 
    ```json

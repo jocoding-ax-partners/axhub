@@ -63,6 +63,8 @@ To run diagnostics:
 
    **Note**: `profile: null` 또는 `endpoint: null` 은 default 사용 중인 정상 상태. ✓ 로 표시하고 default 값을 괄호로 부연 설명. AXHUB_PROFILE 또는 AXHUB_ENDPOINT 설정은 회사 IT 정책에 따라 선택사항.
 
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — multi-failure pick → `later` (subprocess 에서 자동 fix 안 해요, 진단만 보여줘요).
+
 5. **Multi-failure summary.** If multiple rows fail, list all of them and surface AskUserQuestion to pick the first one to fix:
 
    ```json

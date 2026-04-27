@@ -54,6 +54,8 @@ To upgrade the plugin:
    - `current < latest` → "새 플러그인이 나왔어요. 업그레이드 권장."
    - `current > latest` → "프리뷰 버전이에요. 안정판 (v<LATEST>)으로 다운그레이드 가능해요."
 
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — upgrade 명령 안내 → `show` (안내만, destructive 작업 안 해요).
+
 5. **Surface upgrade instructions (manual — Claude Code does not auto-execute plugin self-modification).** AskUserQuestion:
 
    ```json
