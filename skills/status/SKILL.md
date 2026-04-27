@@ -42,7 +42,7 @@ To check status:
    axhub deploy status dep_<DEPLOY_ID> --app <APP_ID> --watch --json
    ```
 
-   **Non-interactive guard (Phase 12 US-1203 — caught by live subprocess smoke):** If running in non-interactive context (`$CI` or `$CLAUDE_NON_INTERACTIVE` env var set, OR no TTY, OR `claude -p` invocation), DROP `--watch` flag and render single snapshot instead — `--watch` blocks indefinitely in headless/subprocess mode and `/axhub:status` hangs forever. Detection: prefix command with `if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then WATCH=--watch; else WATCH=; fi` then use `$WATCH`.
+   **Non-interactive guard:** If running in non-interactive context (`$CI` or `$CLAUDE_NON_INTERACTIVE` env var set, OR no TTY, OR `claude -p` invocation), DROP `--watch` flag and render single snapshot instead — `--watch` blocks indefinitely in headless/subprocess mode and `/axhub:status` hangs forever. Detection: prefix command with `if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then WATCH=--watch; else WATCH=; fi` then use `$WATCH`.
 
 4. **Render Korean narration.** Apply the throttle + phase table from `../deploy/references/recovery-flows.md` ("watch-narration"): one line per ~25s, terminal-state lines are unthrottled. Examples:
 
