@@ -215,6 +215,12 @@ async function cmdPreauthCheck(_args: string[]): Promise<number> {
     tool_input?: { command?: string };
   }>(raw);
 
+  // If CLAUDE_SESSION_ID is not injected by Claude Code, fall back to the
+  // payload's session_id so verifyToken can locate the consent token file.
+  if (payload?.session_id && !process.env["CLAUDE_SESSION_ID"]) {
+    process.env["CLAUDE_SESSION_ID"] = payload.session_id;
+  }
+
   if (!payload || payload.tool_name !== "Bash") {
     out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } });
     await emitMetaEnvelope({ event: "preauth_check_allow", reason: "non_bash" });
