@@ -379,7 +379,7 @@ exit 68 → "rate limit. Retry-After 헤더만큼 대기 후 재시도."
 | **M6** | marketplace.json + private/public 결정 + README/CHANGELOG/LICENSE 본격 + 첫 고객사 install 가이드 (Korean) | `/plugin install` flow 동작, 첫 고객사 onboarding doc 완성 |
 <!-- M7 removed by Decision Audit Trail row 62. Plugin MCP server / .mcp.json placeholder / MCP tool naming were canceled by rows 61–64. -->
 
-**Out of M0–M6 (TODO 백로그)**: 자동 rollback (CLI에 명령 생기면), org-admin audit log skill, multi-tenant marketplace policy, web dashboard. Plugin 자체 MCP server / `.mcp.json` placeholder / cross-agent portability layer는 TODO가 아니라 rows 61–64에 의해 취소된 scope다.
+**Deferred outside M0–M6 (not active implementation)**: 자동 rollback (CLI에 명령 생기면), org-admin audit log skill, multi-tenant marketplace policy, web dashboard. Plugin 자체 MCP server / `.mcp.json` placeholder / cross-agent portability layer는 backlog가 아니라 rows 61–64에 의해 취소된 scope다.
 
 ## 12. Risks / Edge cases
 
@@ -619,13 +619,13 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 // .claude-plugin/plugin.json
 {
   "name": "axhub",
-  "version": "0.1.0",
-  "description": "Claude Code plugin for axhub - vibe coder app hub. Korean-first NL deploy/manage with safety gates.",
+  "version": "0.1.20",
+  "description": "Claude Code plugin for axhub — vibe coder app hub. Korean-first natural-language deploy and manage with HMAC-bound consent gates, live profile/app resolution, and exit-code recovery routing. Wraps ax-hub-cli (v0.1.0+).",
   "author": {"name": "Jocoding AX Partners", "url": "https://jocodingax.ai"},
   "homepage": "https://hub-api.jocodingax.ai",
-  "repository": "https://github.com/jocoding-ax-partners/axhub",
-  "license": "TBD-decide-before-publish",
-  "keywords": ["axhub", "vibe-coding", "deploy", "korean"]
+  "repository": "https://github.com/jocoding-ax-partners/axhub.git",
+  "license": "MIT",
+  "keywords": ["axhub", "vibe-coding", "deploy", "korean", "claude-code-plugin"]
 }
 
 // .claude-plugin/marketplace.json
@@ -635,8 +635,8 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
   "plugins": [{
     "name": "axhub",
     "source": "./",
-    "description": "axhub Claude Code plugin",
-    "version": "0.1.0"
+    "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders at customer companies",
+    "version": "0.1.20"
   }]
 }
 ```
@@ -730,42 +730,44 @@ axhub/                                      # plugin root
 ├── skills/                                 # auto-triggered NL skills
 │   ├── deploy/
 │   │   ├── SKILL.md                        # ≤2000w, third-person desc, imperative
-│   │   ├── references/
-│   │   │   ├── nl-lexicon.md               # Korean trigger phrase catalog (DX-3 fix)
-│   │   │   ├── error-empathy-catalog.md    # DX-2 fix, 4-part Korean copy per exit code
-│   │   │   └── recovery-flows.md           # cold cache, headless, version skew (E5/E12)
-│   │   ├── examples/
-│   │   │   ├── golden-deploy-transcript.md
-│   │   │   └── concurrent-deploy-rejection.md
-│   │   └── scripts/
-│   │       └── format-preview-card.sh      # AskUserQuestion preview (DX-8 fix)
-│   ├── status/{SKILL.md, references/, examples/, scripts/}
-│   ├── logs/{SKILL.md, ...}
-│   ├── apps/{SKILL.md, ...}
-│   ├── apis/{SKILL.md, references/privacy-filter.md, ...}     # E13 fix
-│   ├── auth/{SKILL.md, references/headless-flow.md, ...}      # E12 fix
-│   ├── update/{SKILL.md, ...}
-│   ├── doctor/{SKILL.md, ...}
-│   ├── clarify/{SKILL.md, ...}                                # DX-3 fallback
-│   ├── recover/{SKILL.md, ...}                                # DX-8 forward-fix-as-rollback
-│   └── upgrade/{SKILL.md, ...}                                # DX-6 fix
+│   │   └── references/                     # NL lexicon, empathy copy, headless/recovery/telemetry
+│   ├── apis/{SKILL.md, references/privacy-filter.md}          # E13 fix
+│   ├── apps/SKILL.md
+│   ├── auth/SKILL.md
+│   ├── clarify/SKILL.md                                      # DX-3 fallback
+│   ├── doctor/SKILL.md
+│   ├── logs/SKILL.md
+│   ├── recover/SKILL.md                                      # DX-8 forward-fix-as-rollback
+│   ├── status/SKILL.md
+│   ├── update/SKILL.md
+│   └── upgrade/SKILL.md                                      # DX-6 fix
 │
 ├── hooks/
 │   ├── hooks.json                          # {"hooks": {...}} wrapper format (G2 fix)
-│   └── scripts/                            # only if command-type hooks needed
+│   ├── session-start.sh                    # Unix SessionStart shim
+│   └── session-start.ps1                   # Windows SessionStart shim
+│
+├── src/axhub-helpers/                      # TypeScript source of the helper surface
+│   ├── index.ts                            # multi-command dispatcher
+│   ├── resolve.ts                          # profile + app + endpoint live resolve
+│   ├── classify-exit.ts                    # exit code → Korean message + next-action
+│   ├── consent.ts                          # PreToolUse HMAC deny-gate state
+│   ├── list-deployments.ts                 # REST fallback + hub-api TLS pin
+│   └── ...
 │
 ├── bin/
-│   └── axhub-helpers/                      # Adapter layer (E1 fix) — Go binary preferred
-│       ├── resolve.go                      # profile + app + endpoint live resolve
-│       ├── classify-exit.go                # exit code → Korean message + next-action
-│       ├── consent-token.go                # PreToolUse deny-gate state
-│       └── README.md
+│   ├── axhub-helpers                       # TypeScript/Bun compiled single binary
+│   ├── axhub-helpers-{darwin,linux,win32}-*# release artifacts built by `bun run build:all`
+│   ├── install.sh
+│   ├── install.ps1
+│   └── statusline.sh
 │
 ├── docs/                                   # vibe coder + admin 분리 (DX-5 fix)
+│   ├── RELEASE.md
 │   ├── vibe-coder-quickstart.ko.md
 │   ├── troubleshooting.ko.md
 │   ├── org-admin-rollout.ko.md             # B2B blocker (DX-7 fix)
-│   └── trust-ux-patterns.ko.md             # §16.5 below + DX-8
+│   └── pilot/                              # rollout/smoke/runbook evidence
 │
 ├── tests/
 │   ├── corpus.jsonl                        # n≥100 fixed corpus, risk-stratified (E6 fix)
@@ -923,7 +925,7 @@ The adapter layer (`bin/axhub-helpers`) remains the source of truth for testable
 
 ### 16.7 Best Practices Audit Checklist
 
-Status ledger as of 2026-04-27. This section is no longer a live TODO list; open boxes here previously made completed work look unimplemented. Any new row must be either machine-gated in tests/scripts or explicitly marked as out-of-scope/manual evidence.
+Status ledger as of 2026-04-27. This section is no longer a live open-work list; open boxes here previously made completed work look unimplemented. Any new row must be either machine-gated in tests/scripts or explicitly marked as out-of-scope/manual evidence.
 
 | Status | Item | Evidence |
 |---|---|---|
@@ -1185,4 +1187,3 @@ M7 (v0.2): MCP server ⚠ unbuilt; coupling risk if skills/ stay markdown-only (
 | 66 | M0 | **REVERSE row 41 + 55 (helper language)**: bin/axhub-helpers = TypeScript on Bun runtime (was Go), single binary via `bun build --compile` | **User decision** | "ts 쓰는게 더 좋지 않아" | (1) Claude Code 자체가 Node/Bun 기반 (2) jax-plugin-cc도 .mjs 사용 (3) Bun cold start 5-20ms는 새 50ms hook gate에 충분 (Go 1ms는 over-engineering) (4) npm 생태계 (jose for HMAC, semver, zod) (5) vibe coder가 codebase 읽기 쉬움 (TS ≫ Go 친숙도) | Go 유지 |
 | 67 | M0 | Build pipeline: Bun + npm scripts + `bun build --compile --target=bun-{platform}-{arch}`, multi-arch single binary, cosign-signed in CI | Auto (cascade) | row 66 | Bun이 멀티플랫폼 single binary 지원 (Go cross-compile 우월성 동등 cover) | go build / Makefile |
 | 68 | M0 | Distribution: src/* TypeScript checked in, bin/axhub-helpers* gitignored (build artifact), runtime requirement = Bun ≥1.1 (개발자) / 사용자는 pre-built binary 사용 | Auto | row 66 | Bun runtime은 dev 머신에만 필요. 사용자는 release tarball의 pre-compiled binary 다운로드 | source-in-bin |
-
