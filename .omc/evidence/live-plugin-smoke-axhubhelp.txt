@@ -1,41 +1,41 @@
 === command: /axhub:help ===
-=== timestamp: 2026-04-27T03:45:03Z ===
+=== timestamp: 2026-04-27T05:36:10Z ===
 
 axhub 플러그인으로 할 수 있는 것:
 
 🚀 배포
-  /axhub:deploy [앱이름] [--branch <브랜치>] [--dry-run]
+  `/axhub:deploy [앱이름] [--branch <브랜치>] [--dry-run]`
   자연어 예시: "paydrop 배포해", "방금 푸시한 거 올려"
 
 📊 상태 확인
-  /axhub:status
+  `/axhub:status`
   자연어 예시: "지금 진행 중인 거 어떻게 됐어"
 
 📝 로그 보기
-  /axhub:logs
+  `/axhub:logs`
   자연어 예시: "왜 실패했어, 빌드 로그 보여줘"
 
 📦 앱 목록
-  /axhub:apps
+  `/axhub:apps`
   자연어 예시: "내 앱 목록", "어떤 앱 있어"
 
 🔌 API 카탈로그
-  /axhub:apis
+  `/axhub:apis`
   자연어 예시: "어떤 API 쓸 수 있어"
 
 🔑 로그인
-  /axhub:login
+  `/axhub:login`
   자연어 예시: "로그인해", "권한 만료된 것 같아"
 
 🔧 진단 (axhub 설치 확인 등)
-  /axhub:doctor
+  `/axhub:doctor`
   자연어 예시: "axhub 설치돼 있어?", "환경 점검"
 
 📦 axhub CLI 업데이트
-  /axhub:update
+  `/axhub:update`
   자연어 예시: "axhub 새 버전 있어?"
 
 처음이라면 "안녕"이라고 말해보세요. 첫 배포까지 함께 도와드릴게요.
 
-문제가 생기면: docs/troubleshooting.ko.md 참고
-조직 관리자 가이드: docs/org-admin-rollout.ko.md
+문제가 생기면: `docs/troubleshooting.ko.md` 참고
+조직 관리자 가이드: `docs/org-admin-rollout.ko.md`

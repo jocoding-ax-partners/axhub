@@ -56,8 +56,10 @@ To deploy:
 5. **Post-deploy chain** — capture `.id` from the deploy create JSON, then auto-follow:
 
    ```bash
-   axhub deploy status dep_$DEPLOY_ID --watch --json
+   axhub deploy status dep_$DEPLOY_ID $WATCH --json
    ```
+
+   **Non-interactive guard:** If running in non-interactive context (`$CI` or `$CLAUDE_NON_INTERACTIVE` env var set, OR no TTY, OR `claude -p` invocation), DROP `--watch` flag and render single snapshot — `--watch` blocks indefinitely in headless/subprocess mode and `/axhub:deploy` post-chain hangs forever (same root cause as v0.1.12 status/logs hotfix). Detection: `if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then WATCH=--watch; else WATCH=; fi` then use `$WATCH`.
 
    Render humanized Korean progress every ~30s ("1분 경과, 빌드 중이에요 (정상)") per `references/recovery-flows.md` ("watch-narration").
 

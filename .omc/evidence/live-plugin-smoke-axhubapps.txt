@@ -1,19 +1,29 @@
 === command: /axhub:apps ===
-=== timestamp: 2026-04-27T03:47:58Z ===
+=== timestamp: 2026-04-27T05:38:25Z ===
 
-현재 팀 앱 목록 (전체 19개 중 상위 10개):
+인증 확인 완료 (giri@jocodingax.ai). 전체 18개 앱 → 상위 10개 표시:
 
-| # | 앱 이름 | slug (id) | 상태 |
-|---|---------|-----------|------|
-| ① | ccrank | `ccrank` (id=6) | active · approved · 283,815 calls |
-| ② | 지원사업 크롤링 | `app-3` (id=62) | active · managed |
-| ③ | 견적 계산기 | `quotation` (id=4) | active · requestable |
-| ④ | 급여명세서 자동발송 | `paydrop` (id=7) | active · approved |
-| ⑤ | 참 잘 했어요! | `good` (id=16) | active · approved |
-| ⑥ | 사전 기업 진단 컨설팅 | `corporate-consulting` (id=10) | active · approved |
-| ⑦ | 명함 생성기 | `businesscard-maker` (id=2) | active · approved |
-| ⑧ | 점심 뭐먹지 | `lunch` (id=1) | active · managed |
-| ⑨ | 테스트 앱 | `affa-affa` (id=15) | draft · requestable |
-| ⑩ | 연차관리 | `app-6` (id=82) | draft · approved |
+---
 
-앱이 9개 더 있어요. 전체 보시겠어요?
+**현재 팀 앱 10개 (전체 18개):**
+
+| # | 이름 | slug (id) | 상태 |
+|---|------|-----------|------|
+| ① | ccrank | ccrank (id=6) | active |
+| ② | 지원사업 크롤링 | app-3 (id=62) | active |
+| ③ | 견적 계산기 | quotation (id=4) | active |
+| ④ | 급여명세서 자동발송 | paydrop (id=7) | active |
+| ⑤ | 참 잘 했어요! | good (id=16) | active |
+| ⑥ | 사전 기업 진단 컨설팅 | corporate-consulting (id=10) | active |
+| ⑦ | 명함 생성기 | businesscard-maker (id=2) | active |
+| ⑧ | 점심 뭐먹지 | lunch (id=1) | active |
+| ⑨ | 테스트 앱 | affa-affa (id=15) | draft |
+| ⑩ | 연차관리 | app-6 (id=82) | draft |
+
+---
+
+앱이 8개 더 있어요. 전체 목록 보시겠어요?
+
+- **전체 보기** — 나머지 8개 포함
+- **지금은 그대로** — 상위 10개로 충분
+- **slug 검색** — 특정 앱 찾기

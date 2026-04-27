@@ -546,3 +546,24 @@ UPDATED:
 - helper token + axhub keychain 통합 (keytar 등 native dep 필요 — 마지막 옵션)
 - actions/checkout v4 → v5 (Node.js 24 deprecation 대응 — 2026-09 deadline)
 - v0.1.1 release announcement (Twitter / Korean dev 커뮤니티 / blog)
+
+=== 2026-04-27 v0.1.15 Ralph cycle ===
+Task: subprocess claude -p 플러그인 실행 + 버그 헌트
+
+Bugs found + fixed (all green):
+  Bug 1: bin/axhub-helpers reported v0.1.10 vs source v0.1.14 — release miss bun run build.
+    Fix: bun run build → 0.1.14. .gitignored so user-impact only on plugin directory mode.
+    Follow-up: v0.1.16 release procedure with build:all enforced step.
+  Bug 2: skills/deploy/SKILL.md step 5 post-chain --watch hang (same root as v0.1.12 status/logs).
+    Fix: TTY guard added matching status/logs pattern.
+    Lock: tests/skill-noninteractive-guard.test.ts +2 assertions (positive + negative).
+
+Smoke evidence: 9/9 axhub commands exit 0, TIMEOUT 0 (.omc/evidence/live-plugin-smoke-summary.txt).
+Test baseline: 403 pass / 5 skip / 0 fail / +2 from v0.1.14 (deploy guard).
+Lint: tone 0 err / keywords no diff vs baseline.
+Reviewer: architect APPROVED — pattern parity with v0.1.12, no scope creep, honest tradeoff documented.
+Deslop: 3 trims (SKILL trailing clause, test task-comment, CHANGELOG dup line).
+
+Out of scope (logged honest tradeoff):
+  - /axhub:apis 작동하지 않았습니다 T-01 violation = Claude default polite Korean since SKILL body english. Phase 14 territory.
+  - Build automation enforcement = v0.1.16.

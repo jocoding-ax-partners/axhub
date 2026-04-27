@@ -1,3 +1,10 @@
 === command: /axhub:logs ===
-=== timestamp: 2026-04-27T03:50:03Z ===
+=== timestamp: 2026-04-27T05:40:35Z ===
 
+어느 앱 로그를 볼까요?
+
+1. 참 잘 했어요! (`good`) — https://welldone-app.jocodingax.ai
+2. ccrank — https://ccrank.jocodingax.ai
+3. 지원사업 크롤링 (`app-3`) — https://crawl.jocodingax.ai
+4. glassmorphism — https://glassmorphism.jocodingax.ai
+5. 기타 (앱 이름/슬러그 알려주세요)

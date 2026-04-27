@@ -1,15 +1,19 @@
 === command: /axhub:deploy --dry-run ===
-=== timestamp: 2026-04-27T03:52:29Z ===
+=== timestamp: 2026-04-27T05:42:01Z ===
 
-`resolve`가 앱 슬러그를 특정하지 못했다. 어떤 앱을 배포할지 알려줘:
+현재 프로젝트에 연결된 app slug 없음 (exit 67). 배포 대상 앱을 지정해야 함.
 
-| # | 앱 이름 | slug | id | 상태 |
-|---|---------|------|----|------|
-| 1 | ccrank | ccrank | 6 | active |
-| 2 | 급여명세서 자동발송 | paydrop | 7 | active |
-| 3 | 참 잘 했어요! | good | 16 | active |
-| 4 | 사전 기업 진단 컨설팅 | corporate-consulting | 10 | active |
-| 5 | 명함 생성기 | businesscard-maker | 2 | active |
-| 6 | jocodingax-partners-homepage | jocodingax-partners-homepage | 28 | active |
+사용 가능한 앱 목록:
 
-슬러그 또는 번호로 답해줘. `--dry-run`이라 실제 배포는 없다.
+| id | slug | name |
+|----|------|------|
+| 8 | `jocoding-ax` | JOCODING AX |
+| 6 | `ccrank` | ccrank |
+| 4 | `quotation` | 견적 계산기 |
+| 7 | `paydrop` | 급여명세서 자동발송 |
+| 16 | `good` | 참 잘 했어요! |
+| 62 | `app-3` | 지원사업 크롤링 |
+| 15 | `affa-affa` | 테스트 앱 |
+| 82 | `app-6` | 연차관리 |
+
+어느 앱에 배포할까요? slug 또는 id 알려주세요.

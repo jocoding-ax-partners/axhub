@@ -1,3 +1,19 @@
 === command: /axhub:status ===
-=== timestamp: 2026-04-27T03:45:13Z ===
+=== timestamp: 2026-04-27T05:36:25Z ===
 
+배포 상태 확인할 앱을 알려주세요:
+
+| # | 앱 이름 | URL | 상태 |
+|---|---------|-----|------|
+| 1 | **ccrank** | ccrank.jocodingax.ai | active |
+| 2 | **지원사업 크롤링** | crawl.jocodingax.ai | active |
+| 3 | **견적 계산기** | quotation.jocodingax.ai | active |
+| 4 | **급여명세서 자동발송** | paydrop.jocodingax.ai | active |
+| 5 | **참 잘 했어요!** | welldone-app.jocodingax.ai | active |
+| 6 | **glassmorphism** | glassmorphism.jocodingax.ai | active |
+| 7 | **GKE Pod 계산기** | pod-calculate.jocodingax.ai | active |
+| 8 | **Hitman** | hitman.jocodingax.ai | active |
+| 9 | **jocodingax-partners-homepage** | home.jocodingax.ai | active |
+| 10 | **점심 뭐먹지** | lunch.jocodingax.ai | active |
+
+어떤 앱 볼까요?

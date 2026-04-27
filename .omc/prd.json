@@ -1,109 +1,79 @@
 {
-  "task": "Phase 13 v0.1.14 — Toss UX Writing 톤 migration (Tier A+B+C+D = runtime+commands+install/hook+tests+lint). Plan: .omc/plans/phase-13-toss-tone-migration-v2.md (ralplan round 2/5 APPROVE). Phase 14+15 deferred (docs + SKILL descriptions).",
-  "createdAt": "2026-04-27T00:00:00Z",
+  "task": "v0.1.15 hotfix — subprocess `claude -p` plugin smoke 재실행으로 버그 헌트 + fix. 9개 axhub command 모두 hang 없이 exit 0 + 발견 버그 fix + regression test 잠금.",
+  "createdAt": "2026-04-27T05:30:00Z",
   "stories": [
     {
-      "id": "US-1306",
-      "title": "Lint infrastructure — check-toss-tone-conformance.ts + check-skill-keywords-preserved.ts (PR1 commit 1 prerequisite)",
+      "id": "US-1501",
+      "title": "Subprocess plugin smoke 9/9 exit 0 (no TIMEOUT)",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "scripts/check-toss-tone-conformance.ts (NEW) — scans Phase 13 file scope (catalog.ts, keychain*.ts, list-deployments.ts, index.ts USAGE/cmdSessionStart, commands/*.md, bin/install.{sh,ps1}, hooks/session-start.{sh,ps1}). Forbidden tokens: 합니다, 입니다, 시겠어요, 시나요, 당신, 아이고, 드립니다 (with 시나요? T-06 3-exception verbatim from Toss guide).",
-        "scripts/check-skill-keywords-preserved.ts (NEW) — baseline snapshot of nl-lexicon.md user-utterance phrases AND SKILL.md description quoted phrases. PR2 must show diff = 0.",
-        "tests/lint-toss-tone.test.ts (NEW) — assertion: both scripts run, --strict mode supported, baseline file exists.",
-        "package.json scripts.lint:tone = 'bun scripts/check-toss-tone-conformance.ts --strict'.",
-        "Commit 1 baseline: source unchanged, scripts run, baseline = current count of violations (warn-only baseline mode).",
-        "Documentation in scripts/ headers: which files in scope, which tokens forbidden, why each (link to Toss T-NN rules).",
-        "bun test lint-toss-tone → green."
+        "tests/live-plugin-smoke.sh 9 명령 (/axhub:help, /axhub:status, /axhub:doctor, /axhub:apps, /axhub:apis, /axhub:login, /axhub:logs, /axhub:update, /axhub:deploy --dry-run) 모두 exit 0.",
+        "TIMEOUT 0 건. .omc/evidence/live-plugin-smoke-summary.txt 캡처.",
+        "각 command 별 evidence file 캡처 (.omc/evidence/live-plugin-smoke-axhub*.txt)."
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-1301",
-      "title": "catalog.ts 13 entries → Toss 4-part 톤 (Tier A core)",
+      "id": "US-1502",
+      "title": "Bug 1 — bin/axhub-helpers stale binary (v0.1.10 reported, source v0.1.14)",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "catalog.ts 13 exit-code entries: 어미 100% 해요체, 직접 호칭 (당신) 0회, 부정형 → 긍정형, emotion prefix (잠깐만요/괜찮아요/축하해요) 보존.",
-        "취소 → 닫기 decision tree per §6: 5× 취소 → 닫기, 1× 취소 retain (FORCE_DOWNGRADE destructive abort).",
-        "tests/classify-exit.test.ts 39 assertion update + green.",
-        "bun lint:tone --strict on catalog.ts → 0 violation.",
-        "axhub-helpers classify-exit live sample for codes 65/66/68 captured to .omc/evidence/phase-13-classify-exit-samples.txt.",
-        "4-part structure (감정/원인/해결/다음) 보존 — codegen.test.ts snapshot regenerate + green."
+        "bin/axhub-helpers --version 가 0.1.14 보고.",
+        "bun run build 로 로컬 빌드 갱신.",
+        "v0.1.16 follow-up 로 release procedure 문서화 (CHANGELOG honest tradeoff 에 명시)."
       ],
       "owner": null,
-      "blockedBy": ["US-1306"]
+      "blockedBy": []
     },
     {
-      "id": "US-1302",
-      "title": "Keychain 4-part Toss 톤 (keychain.ts + keychain-windows.ts)",
+      "id": "US-1503",
+      "title": "Bug 2 — skills/deploy/SKILL.md post-deploy `--watch` no TTY guard (same root cause as v0.1.12 status/logs)",
       "priority": 3,
       "passes": true,
       "acceptanceCriteria": [
-        "keychain.ts 7 errors + keychain-windows.ts 5 errors → Toss 톤.",
-        "아이고 deprecated → 잠깐만요 또는 이상해요 통일.",
-        "tests/keychain.test.ts emotion prefix regex `/잠깐만요|이상해요/` (drop 아이고) + green.",
-        "tests/keychain-windows.test.ts kernel keyword retain checks green (보안 솔루션, Authenticode, AXHUB_TOKEN).",
-        "4-part structure 보존 — semantic kernel preserved per error path.",
-        "bun lint:tone --strict on keychain*.ts → 0 violation."
+        "skills/deploy/SKILL.md step 5 에 `if [ -t 1 ] && [ -z \"$CI\" ] && [ -z \"$CLAUDE_NON_INTERACTIVE\" ]; then WATCH=--watch; else WATCH=; fi` 가드 추가.",
+        "post-chain command 이 `axhub deploy status dep_$DEPLOY_ID $WATCH --json` 으로 변경 (raw `--watch` 제거).",
+        "tests/skill-noninteractive-guard.test.ts 에 deploy 스킬용 assertion 2 개 추가 (가드 literal + raw --watch 검출 negative).",
+        "bun test → 8/8 pass on skill-noninteractive-guard.test.ts."
       ],
       "owner": null,
-      "blockedBy": ["US-1306"]
+      "blockedBy": []
     },
     {
-      "id": "US-1303",
-      "title": "List-deployments + index.ts USAGE Toss 톤",
+      "id": "US-1504",
+      "title": "Regression baseline preserved (no test break)",
       "priority": 4,
       "passes": true,
       "acceptanceCriteria": [
-        "list-deployments.ts 7 strings (auth error, token-missing fallback, parse failures) → Toss.",
-        "index.ts cmdSessionStart Korean message + USAGE description Toss.",
-        "tests/list-deployments.test.ts toContain assertions update + green.",
-        "axhub-helpers token-init + axhub-helpers list-deployments stdout sample captured.",
-        "bun lint:tone --strict on both files → 0 violation."
+        "bun test → 403 pass / 5 skip / 0 fail / 2394 expect / 408 tests / 20 files. v0.1.14 baseline 401 pass 에서 +2 (deploy guard).",
+        "bunx tsc --noEmit → clean.",
+        "bun lint:tone --strict → 0 error / 0 warning.",
+        "bun lint:keywords --check → OK no diff vs baseline."
       ],
       "owner": null,
-      "blockedBy": ["US-1306"]
+      "blockedBy": ["US-1503"]
     },
     {
-      "id": "US-1304",
-      "title": "9 slash commands + help.md menu Toss 톤",
+      "id": "US-1505",
+      "title": "CHANGELOG v0.1.15 entry + honest tradeoff",
       "priority": 5,
       "passes": true,
       "acceptanceCriteria": [
-        "commands/{deploy,status,logs,apps,apis,doctor,login,update,help}.md description 한 줄 → Toss.",
-        "help.md 21줄 menu Toss (자연어 예시 따옴표 = 발화 lexicon UNCHANGED).",
-        "/axhub:help via subprocess claude -p captured to .omc/evidence/phase-13-help-after.txt + diff vs Phase 12 baseline.",
-        "tests/manifest.test.ts command description structure tests green (prefix 'This skill'/'이 스킬' lint untouched per F4).",
-        "bun lint:tone --strict on commands/*.md → 0 violation."
+        "CHANGELOG.md [0.1.15] 섹션 추가 — Fixed (deploy guard + binary stale), Added (regression test), Detection win, Honest tradeoff (Phase 14 SKILL body Korean default + v0.1.16 build automation).",
+        "Toss 톤 유지 — 합니다/입니다/시겠어요/드립니다/당신/아이고 0건.",
+        "lint:tone 통과 (CHANGELOG 가 lint scope 밖이지만 신규 entry 자체는 Toss 톤 준수)."
       ],
       "owner": null,
-      "blockedBy": ["US-1306"]
-    },
-    {
-      "id": "US-1305",
-      "title": "Install + hook system message Toss (Tier D)",
-      "priority": 6,
-      "passes": true,
-      "acceptanceCriteria": [
-        "bin/install.sh 12 Korean lines + bin/install.ps1 5 multi-line + hooks/session-start.sh 2 + hooks/session-start.ps1 8 → Toss.",
-        "Korean error messages 4-part structure 보존 (Tier D 도 information density 유지).",
-        "tests/install.test.sh + tests/install-ps1.test.ts + tests/session-start-ps1.test.ts grep assertions update + green.",
-        "bun test → 394 baseline pass count (or higher with new lint test) — no regression.",
-        "bun lint:tone --strict on install/hook files → 0 violation."
-      ],
-      "owner": null,
-      "blockedBy": ["US-1306"]
+      "blockedBy": ["US-1503"]
     }
   ],
   "metadata": {
-    "task_origin": "/ralplan + Toss UX Writing tone application",
-    "consensus_plan": ".omc/plans/phase-13-toss-tone-migration-v2.md (2 ralplan rounds: 10 fixes round 1 + APPROVE round 2)",
-    "scope_note": "Phase 13 = Tier A+B+C+D runtime+commands+install/hook+tests+lint ONLY. Phase 14 = docs+SKILL workflow+CHANGELOG+marketing ADR. Phase 15 = SKILL descriptions (after activation drift measurement).",
+    "task_origin": "/ralph subprocess plugin bug hunt — 다시 한번 더 플러그인을 claude code 안에서 실행해서 버그 찾아줘봐. 서브 프로세스로 띄어서 해봐",
+    "scope_note": "Hotfix v0.1.15 = deploy SKILL guard 누락 (v0.1.12 hotfix 도중 빠진 케이스) + 로컬 binary stale 발견. Phase 14/15 (SKILL 본문 + description) 별도 cycle.",
     "deslop": "enabled",
-    "critic": "architect",
-    "phase_14_deferred": "v0.1.15 — docs Toss (vibe-coder-quickstart, troubleshooting, admin-rollout, landing-page, outreach-email, etc.) + SKILL workflow body + CHANGELOG + marketing voice ADR.",
-    "phase_15_deferred": "Pending Phase 13 activation drift measurement — SKILL.md description narrative migration"
+    "critic": "architect"
   }
 }
