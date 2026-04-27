@@ -11,6 +11,20 @@ Check and apply axhub CLI updates with cosign signature verification mandatory b
 
 To handle updates:
 
+0. **Render TodoWrite checklist (vibe coder sees real-time progress).** Call TodoWrite at workflow start:
+
+   ```typescript
+   TodoWrite({ todos: [
+     { content: "현재 / 최신 버전 비교",        status: "in_progress", activeForm: "버전 확인하는 중" },
+     { content: "릴리즈 노트 요약",             status: "pending",     activeForm: "변경사항 정리하는 중" },
+     { content: "동의 받고 cosign 검증",         status: "pending",     activeForm: "서명 검증하는 중" },
+     { content: "binary 교체",                  status: "pending",     activeForm: "교체 진행하는 중" },
+     { content: "결과 안내",                    status: "pending",     activeForm: "마무리하는 중" }
+   ]})
+   ```
+
+   각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
+
 1. **Check for update.** Run `axhub update check --json` directly — do NOT force `AXHUB_DISABLE_AUTOUPDATE=1` (Phase 5 US-505: 회사 정책으로 disable 한 환경만 자연스럽게 disable 처리되도록 둠):
 
    ```bash

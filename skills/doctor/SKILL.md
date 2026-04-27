@@ -11,6 +11,20 @@ Run a full axhub plugin health check. Report what's working, what's not, and the
 
 To run diagnostics:
 
+0. **Render TodoWrite checklist (vibe coder sees real-time progress).** Call TodoWrite at workflow start:
+
+   ```typescript
+   TodoWrite({ todos: [
+     { content: "helper binary 점검",            status: "in_progress", activeForm: "helper 보는 중" },
+     { content: "axhub CLI 버전 점검",           status: "pending",     activeForm: "CLI 버전 보는 중" },
+     { content: "인증 상태 점검",                status: "pending",     activeForm: "인증 보는 중" },
+     { content: "profile / endpoint 점검",      status: "pending",     activeForm: "환경 보는 중" },
+     { content: "결과 표 출력",                  status: "pending",     activeForm: "표 만드는 중" }
+   ]})
+   ```
+
+   각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
+
 1. **Detect helper binary via PATH first** (Phase 5 US-503 — env var `CLAUDE_PLUGIN_ROOT` may not propagate to skill bash subshells):
 
    ```bash

@@ -11,6 +11,21 @@ Deploy a vibe coder's app to axhub with safety primitives. Use the adapter `axhu
 
 To deploy:
 
+0. **Render TodoWrite checklist (vibe coder sees real-time progress).** Call TodoWrite at workflow start so the user can glance and see how far we've come:
+
+   ```typescript
+   TodoWrite({ todos: [
+     { content: "토큰 확인 (preflight)",         status: "in_progress", activeForm: "토큰 확인하는 중" },
+     { content: "앱 / 환경 / 브랜치 확정",         status: "pending",     activeForm: "앱 정보 정리하는 중" },
+     { content: "미리보기 카드 보여드리기",         status: "pending",     activeForm: "미리보기 준비하는 중" },
+     { content: "동의 받고 배포 시작",            status: "pending",     activeForm: "배포 시작하는 중" },
+     { content: "빌드 모니터 (~3분)",             status: "pending",     activeForm: "빌드 진행 보는 중" },
+     { content: "결과 안내",                     status: "pending",     activeForm: "마무리하는 중" }
+   ]})
+   ```
+
+   각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
+
 1. **Live resolve** — call the helper to fetch authoritative `{profile, endpoint, app_id, app_slug, branch, commit_sha, commit_message, eta_sec}`:
 
    ```bash
