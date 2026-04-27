@@ -153,3 +153,72 @@ bun test                      # 회귀
 - [ ] `bunx tsc --noEmit` clean
 - [ ] frontmatter `multi-step:` + `needs-preflight:` 선언
 - [ ] AskUserQuestion 마다 registry entry 등록
+
+# axhub Release Workflow (Phase 19 v0.1.19+ 자동화)
+
+새 버전 ship 할 때 **반드시** `bun run release` 사용. 직접 `vim package.json` + `git tag` 절대 금지 (drift 위험).
+
+## Always Do
+
+- **MUST `bun run release` 로 자동 bump** — `commit-and-tag-version` (D2) 가 3 파일 (package.json + plugin.json + marketplace.json) bump + postbump hook (codegen:version + release:check) + CHANGELOG entry + git commit + tag 자동 chain.
+- **MUST CHANGELOG 본문 narrative 추가** — auto-bullets 위에 Phase NN 한국어 narrative paragraph (해요체) 작성. `git commit --amend --no-edit -a` 로 tag commit 에 narrative 합침.
+- **MUST `git push origin main --tags`** — release.yml 가 tag push 시 자동 fire (5 cross-arch binary cosign 서명 + GH release upload).
+- **MUST Conventional Commits** — `feat:` (minor) / `fix:` (patch) / `chore:` (no-bump) / `docs:` / `test:` / `refactor:` / `perf:` (Performance section). commit-and-tag-version 이 type 으로 bump 결정.
+
+## Release Workflow
+
+```bash
+# 1. clean working tree 확인
+git status
+
+# 2. release 한 줄 (auto-bump from commit history since last tag)
+bun run release
+# 또는 explicit:
+bun run release -- --release-as patch    # 0.1.X → 0.1.X+1
+bun run release -- --release-as minor    # 0.1.X → 0.2.0
+bun run release -- --release-as major    # 0.X.Y → 1.0.0
+bun run release -- --release-as 0.1.20   # explicit version
+
+# 자동 수행:
+#  ✓ 3 files bump (package/plugin/marketplace)
+#  ✓ postbump: codegen:version (install.sh/ps1/index.ts/telemetry.ts 동기화)
+#               + release:check (5 binary build + version assert — v0.1.14 stale binary 재발 방지)
+#  ✓ CHANGELOG.md auto entry (Conventional Commits parse)
+#  ✓ git commit + git tag vX.Y.Z
+
+# 3. CHANGELOG narrative 추가 (해요체 1-3 문장)
+vim CHANGELOG.md   # auto-bullets 위에 Phase NN narrative paragraph + Test baseline + Honest tradeoff sections
+git commit --amend --no-edit -a   # tag commit 에 narrative 흡수
+
+# 4. push
+git push origin main --tags
+# release.yml 자동 fire — 5 binary cosign 서명 + GH release v0.1.X 생성
+
+# 5. release 검증
+gh release view vX.Y.Z --json url -q .url
+```
+
+## Hotfix Workflow (긴급 fix mid-Phase)
+
+```bash
+git commit -am "fix: <urgent issue>"
+bun run release -- --release-as patch
+git push origin main --tags
+```
+
+## Never Do
+
+- NEVER `vim package.json` + `git tag` manual edit. drift + v0.1.14 stale binary 재발 위험.
+- NEVER `git push --force` to main. branch protection + hook block.
+- NEVER skip CHANGELOG narrative — auto-bullets 만으로는 Phase 의미 전달 부족.
+- NEVER tag without push (local-only tag = release.yml 안 fire).
+- NEVER use D1 release-please / standard-version / semantic-release — 이미 D2 commit-and-tag-version 결정 (.versionrc.json + ralplan ADR 기록).
+
+## Self-Check Before Push
+
+- [ ] `git status` clean
+- [ ] `bun run release` 자동 chain 완료 (3 files + postbump + CHANGELOG + commit + tag)
+- [ ] CHANGELOG narrative paragraph (해요체) 추가 + amend
+- [ ] `git push origin main --tags` 성공
+- [ ] release.yml workflow run completed: success
+- [ ] `gh release view vX.Y.Z` 5 cross-arch binaries 확인
