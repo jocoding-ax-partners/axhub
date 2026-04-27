@@ -2,57 +2,61 @@
 # tests/run-corpus.sh — corpus runner for axhub plugin evaluation.
 #
 # Usage:
-#   tests/run-corpus.sh [--mode docs-only|plugin] [--out <file>]
+#   tests/run-corpus.sh [--mode docs-only|plugin] [--corpus <file>] [--out <file>] [--fixture <file>] [--vs <baseline-file>] [--score]
 #
-# This is a stub that documents the manual-run protocol for M0.5.
-# True automated runner requires Anthropic API headless eval setup (deferred to M1.5+).
+# Default mode is a deterministic fixture replay runner. It copies the committed
+# docs-only or plugin-arm result fixture for the selected corpus scope, then can
+# invoke tests/score.ts. This closes the old M1.5 "manual only" gap without
+# requiring live Claude/API calls in CI.
 #
-# Manual protocol:
-#   1. For each row in tests/corpus.jsonl, paste utterance into Claude Code session
-#      (with plugin enabled or disabled depending on --mode).
-#   2. Capture tool calls + exit codes via Claude Code transcript export.
-#   3. Format as results.json matching schema in tests/score.ts.
-#   4. Run: bun tests/score.ts results.json --vs tests/baseline-results.docs-only.json
+# Supported committed scopes:
+#   - tests/corpus.20.jsonl  → tests/{baseline-results.docs-only,plugin-arm-results}.json
+#   - tests/corpus.100.jsonl → tests/{baseline-results.docs-only,plugin-arm-results}.100.json
 #
-# Result row schema (one entry per corpus row):
-#   {
-#     "utterance_id": "T1",           // must match corpus id
-#     "fired_skill": "apps",          // null if no skill fired
-#     "actual_tool_calls": [          // ordered list of all tool calls made
-#       {"cmd": "axhub apps list --json", "exit_code": 0, "ts": "2026-04-23T00:01:00Z"}
-#     ],
-#     "required_consent_seen": false, // true if Claude showed a consent/preview card before destructive op
-#     "ts": "2026-04-23T00:01:00Z",  // when utterance was evaluated
-#     "notes": "..."                  // optional human annotation
-#   }
-#
-# M1.5+ automated runner plan:
-#   - Use Anthropic API (claude --no-interactive) with frozen model + temp=0
-#   - Inject each utterance as user turn
-#   - Capture tool_use blocks from API response as actual_tool_calls
-#   - Detect required_consent_seen by checking for AskUserQuestion tool call or
-#     preview card keyword in assistant text before any destructive tool call
-#   - Run 3 times per utterance, take median for stability
-#   - Output JSONL trace per case to --out file
-#   - Pass --out to bun tests/score.ts for automated M1.5 gate
+# For the full 331-row corpus, pass --fixture explicitly after a fresh manual or
+# external eval run. The runner refuses to synthesize fake results.
 
 set -euo pipefail
 
 MODE="docs-only"
 OUT_FILE=""
+CORPUS=""
+FIXTURE=""
+VS_FILE=""
+SCORE="0"
+
+usage() {
+  grep '^#' "$0" | sed 's/^# \{0,1\}//'
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --mode)
-      MODE="$2"
+      MODE="${2:-}"
+      shift 2
+      ;;
+    --corpus)
+      CORPUS="${2:-}"
       shift 2
       ;;
     --out)
-      OUT_FILE="$2"
+      OUT_FILE="${2:-}"
       shift 2
       ;;
+    --fixture)
+      FIXTURE="${2:-}"
+      shift 2
+      ;;
+    --vs)
+      VS_FILE="${2:-}"
+      shift 2
+      ;;
+    --score)
+      SCORE="1"
+      shift
+      ;;
     --help|-h)
-      grep '^#' "$0" | sed 's/^# \{0,1\}//'
+      usage
       exit 0
       ;;
     *)
@@ -73,39 +77,87 @@ fi
 
 CORPUS_ROWS=$(wc -l < "$CORPUS" | tr -d ' ')
 
-echo "[corpus-runner] mode=$MODE corpus=$CORPUS rows=$CORPUS_ROWS model=$MODEL" >&2
-echo "" >&2
+fixture_for() {
+  local mode="$1"
+  local rows="$2"
+  case "$mode:$rows" in
+    docs-only:20) echo "$PLUGIN_ROOT/tests/baseline-results.docs-only.json" ;;
+    docs-only:100) echo "$PLUGIN_ROOT/tests/baseline-results.docs-only.100.json" ;;
+    plugin:20) echo "$PLUGIN_ROOT/tests/plugin-arm-results.json" ;;
+    plugin:100) echo "$PLUGIN_ROOT/tests/plugin-arm-results.100.json" ;;
+    *) return 1 ;;
+  esac
+}
 
-if [ "$MODE" = "docs-only" ]; then
-  echo "[corpus-runner] M0.5 docs-only baseline mode." >&2
-  echo "[corpus-runner] Pre-scored baseline: tests/baseline-results.docs-only.json" >&2
-  echo "[corpus-runner] To score: bun tests/score.ts tests/baseline-results.docs-only.json" >&2
-  echo "" >&2
-  echo "[corpus-runner] Manual protocol for fresh docs-only measurement:" >&2
-  echo "[corpus-runner]   1. Disable this plugin: claude --no-plugin-dir" >&2
-  echo "[corpus-runner]   2. Ensure agent-manual.md + CLAUDE.md are in context" >&2
-  echo "[corpus-runner]   3. Run each utterance from corpus.jsonl and record results" >&2
-  echo "[corpus-runner]   4. Save as results-docs-only.json matching ResultRow schema" >&2
-  echo "[corpus-runner]   5. bun tests/score.ts results-docs-only.json" >&2
-elif [ "$MODE" = "plugin" ]; then
-  echo "[corpus-runner] M1.5 plugin mode — automated runner not yet implemented." >&2
-  echo "[corpus-runner] Manual protocol:" >&2
-  echo "[corpus-runner]   1. Enable plugin: claude --plugin-dir $PLUGIN_ROOT" >&2
-  echo "[corpus-runner]   2. Run each utterance from corpus.jsonl in a fresh session" >&2
-  echo "[corpus-runner]   3. Record tool calls + exit codes + consent_seen flag" >&2
-  echo "[corpus-runner]   4. Save as results-plugin.json matching ResultRow schema" >&2
-  echo "[corpus-runner]   5. bun tests/score.ts results-plugin.json --vs tests/baseline-results.docs-only.json" >&2
-else
+baseline_for() {
+  local rows="$1"
+  case "$rows" in
+    20) echo "$PLUGIN_ROOT/tests/baseline-results.docs-only.json" ;;
+    100) echo "$PLUGIN_ROOT/tests/baseline-results.docs-only.100.json" ;;
+    *) return 1 ;;
+  esac
+}
+
+if [ "$MODE" != "docs-only" ] && [ "$MODE" != "plugin" ]; then
   echo "ERROR: unknown mode '$MODE'. Use docs-only or plugin." >&2
   exit 1
 fi
 
-if [ -n "$OUT_FILE" ]; then
-  echo "[corpus-runner] --out $OUT_FILE specified but automated runner not yet implemented." >&2
-  echo "[corpus-runner] Placeholder empty results file written." >&2
-  echo "[]" > "$OUT_FILE"
+if [ -z "$FIXTURE" ]; then
+  if ! FIXTURE=$(fixture_for "$MODE" "$CORPUS_ROWS"); then
+    echo "ERROR: no committed $MODE fixture for $CORPUS_ROWS-row corpus." >&2
+    echo "ERROR: pass --corpus tests/corpus.20.jsonl, --corpus tests/corpus.100.jsonl, or --fixture <results.json>." >&2
+    exit 2
+  fi
 fi
 
-echo "" >&2
-echo "[corpus-runner] M0.5 stub complete. See tests/README.md for full protocol." >&2
-exit 0
+if [ ! -f "$FIXTURE" ]; then
+  echo "ERROR: fixture not found at $FIXTURE" >&2
+  exit 1
+fi
+
+RESULT_FILE="$FIXTURE"
+
+echo "[corpus-runner] mode=$MODE corpus=$CORPUS rows=$CORPUS_ROWS model=$MODEL" >&2
+echo "[corpus-runner] fixture=$FIXTURE" >&2
+
+if [ -n "$OUT_FILE" ]; then
+  mkdir -p "$(dirname "$OUT_FILE")"
+  cp "$FIXTURE" "$OUT_FILE"
+  RESULT_FILE="$OUT_FILE"
+  echo "[corpus-runner] wrote replay results to $OUT_FILE" >&2
+fi
+
+if [ "$SCORE" = "1" ]; then
+  if [ -z "$VS_FILE" ] && [ "$MODE" = "plugin" ]; then
+    if ! VS_FILE=$(baseline_for "$CORPUS_ROWS"); then
+      echo "ERROR: no committed docs-only baseline for $CORPUS_ROWS-row corpus; pass --vs <baseline.json>." >&2
+      exit 2
+    fi
+  fi
+
+  if [ "$MODE" = "plugin" ]; then
+    echo "[corpus-runner] scoring plugin arm against baseline $VS_FILE" >&2
+    bun "$PLUGIN_ROOT/tests/score.ts" "$RESULT_FILE" --corpus "$CORPUS" --vs "$VS_FILE"
+  else
+    echo "[corpus-runner] scoring docs-only baseline (informational; GO/KILL applies to plugin arm)" >&2
+    set +e
+    bun "$PLUGIN_ROOT/tests/score.ts" "$RESULT_FILE" --corpus "$CORPUS"
+    SCORE_EXIT=$?
+    set -e
+    if [ "$SCORE_EXIT" -ne 0 ]; then
+      echo "[corpus-runner] docs-only scorer exited $SCORE_EXIT; treating as baseline signal, not runner failure" >&2
+    fi
+  fi
+else
+  echo "[corpus-runner] replay complete. To score:" >&2
+  if [ "$MODE" = "plugin" ]; then
+    if VS_DEFAULT=$(baseline_for "$CORPUS_ROWS" 2>/dev/null); then
+      echo "[corpus-runner]   bun tests/score.ts $RESULT_FILE --corpus $CORPUS --vs $VS_DEFAULT" >&2
+    else
+      echo "[corpus-runner]   bun tests/score.ts $RESULT_FILE --corpus $CORPUS --vs <baseline.json>" >&2
+    fi
+  else
+    echo "[corpus-runner]   bun tests/score.ts $RESULT_FILE --corpus $CORPUS" >&2
+  fi
+fi

@@ -117,24 +117,22 @@ To collect a fresh docs-only baseline manually:
    bun tests/score.ts results-docs-only.json
    ```
 
-## How to run — M1.5 plugin arm (manual until automated runner ships)
+## How to run — M1.5 plugin arm (fixture replay, live re-curation optional)
 
-1. Enable the plugin: `claude --plugin-dir /path/to/axhub`
-2. For each corpus row, start a **fresh session**, paste the utterance.
-3. Record the same fields as above.
-4. Save as `results-plugin.json` and score against baseline:
-   ```bash
-   bun tests/score.ts results-plugin.json --vs tests/baseline-results.docs-only.json
-   ```
-5. The scorer exits 0 (GO) or 1 (KILL) based on M1.5 thresholds.
+Committed result fixtures exist for the frozen 20-row M0.5 scope and the 100-row M2.5 scope. Use `tests/run-corpus.sh` to replay those fixtures into an output file and/or score them through the same gate used by CI.
 
 ```bash
-# Also runs the corpus runner stub (M0.5 docs-only mode):
-bash tests/run-corpus.sh --mode docs-only
+# Replay + score the 20-row docs-only baseline
+bash tests/run-corpus.sh --mode docs-only --corpus tests/corpus.20.jsonl --score
 
-# Plugin mode stub:
-bash tests/run-corpus.sh --mode plugin --out results-plugin.json
+# Replay + score the 100-row plugin arm against the matching docs-only baseline
+bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --score
+
+# Write replayed plugin results for downstream inspection
+bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.20.jsonl --out results-plugin.json
 ```
+
+For a fresh live re-curation, enable the plugin with `claude --plugin-dir /path/to/axhub`, run each corpus row in a fresh session, save the captured `ResultRow[]`, then pass it with `--fixture <results.json>`. The runner refuses to fabricate results for the full 331-row corpus when no explicit fixture is provided.
 
 ## M1.5 GO/KILL thresholds
 
@@ -147,12 +145,12 @@ bash tests/run-corpus.sh --mode plugin --out results-plugin.json
 If all three pass → GO: proceed to M2 (read-only skills).
 If any fail → plugin development pauses; evaluate whether docs-only is sufficient.
 
-## Automated runner (M1.5+)
+## Live automated runner (future)
 
-The automated runner requires headless Claude Code eval with:
+`tests/run-corpus.sh` now automates deterministic fixture replay and scoring. A fully live headless Claude eval runner remains a future optional layer because it requires:
 - Frozen model + temperature=0
 - 3-run median per utterance
 - Tool call capture from API response
 - Consent detection via `AskUserQuestion` tool presence or preview card keyword in assistant text
 
-See `run-corpus.sh` for the full planned protocol.
+Until that external eval harness exists, pass freshly captured live results via `--fixture <results.json>` so the scoring path stays reproducible.
