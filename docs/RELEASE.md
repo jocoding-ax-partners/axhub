@@ -29,31 +29,57 @@ axhub plugin uses sigstore cosign keyless signing for supply-chain integrity. Ev
 
 4. **Optional: AXHUB_E2E_STAGING_TOKEN** + `AXHUB_E2E_STAGING_ENDPOINT` repository secrets for the gated E2E job (see US-206).
 
-### Cutting a release
+### Cutting a release (Phase 19 v0.1.19+ — 자동 버전 범프)
+
+`commit-and-tag-version` (D2 per `.versionrc.json`) 가 모든 절차를 한 줄로 묶어요. Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`) 기반 자동 bump.
 
 ```bash
-# 1. Bump version in package.json + .claude-plugin/plugin.json + .claude-plugin/marketplace.json
-#    (must all match — see tests/manifest.test.ts cross-consistency assertions)
-vim package.json    # "version": "0.1.1"
-vim .claude-plugin/plugin.json
-vim .claude-plugin/marketplace.json
+# 0. clean working tree 확인
+git status
 
-# 2. MANDATORY pre-tag check (v0.1.16 US-1601):
-#    Syncs install.sh/install.ps1/index.ts/telemetry.ts to package.json,
-#    rebuilds bin/axhub-helpers + 5 cross-arch artifacts, asserts each
-#    binary's --version output matches package.json. Fails fast if any
-#    binary stays stale (the v0.1.14 bug: bin/axhub-helpers shipped at
-#    v0.1.10 because nobody ran `bun run build` after version bump).
-bun run release:check
+# 1. release 한 줄 (auto-bump from commit history)
+bun run release
+# 또는 명시적:
+bun run release -- --release-as patch    # 0.1.18 → 0.1.19
+bun run release -- --release-as minor    # 0.1.18 → 0.2.0
+bun run release -- --release-as major    # 0.1.18 → 1.0.0
+bun run release -- --release-as 0.1.20   # 명시 version
 
-# 3. Run regression locally
-bun test
-bun run typecheck
-bun run smoke:full
+# 자동 수행:
+#  ✓ package.json + plugin.json + marketplace.json (3 files) 버전 bump
+#  ✓ postbump hook: codegen:version (install.sh/ps1/index.ts/telemetry.ts 동기화)
+#                   + release:check (5 cross-arch binary build + version assert)
+#  ✓ CHANGELOG.md 자동 entry generation (Conventional Commits → Added/Fixed sections)
+#  ✓ git commit + git tag vX.Y.Z
 
-# 4. Commit + tag
-git commit -am "chore: bump version to 0.1.1"
-git tag v0.1.1
+# 2. CHANGELOG narrative 본문 추가 (해요체, 사람이 작성)
+vim CHANGELOG.md   # auto-bullets 위에 Phase NN 한국어 narrative 1-3 문장
+git commit --amend --no-edit -a   # tag commit 에 narrative 추가
+
+# 3. push
+git push origin main --tags
+# release.yml workflow tag push 시 자동 fire — 5 binary + cosign 서명 + GH release upload
+```
+
+### Hotfix workflow (긴급 fix mid-Phase)
+
+```bash
+# 1. fix commit
+git commit -am "fix: <urgent issue>"
+
+# 2. patch bump + ship 즉시
+bun run release -- --release-as patch
+git push origin main --tags
+```
+
+### Manual fallback (commit-and-tag-version 사용 안 할 때)
+
+```bash
+# vim package.json + .claude-plugin/plugin.json + .claude-plugin/marketplace.json
+bun run release:check    # MANDATORY (v0.1.14 stale binary 재발 방지)
+bun test                 # 회귀
+git commit -am "chore: bump version to X.Y.Z"
+git tag vX.Y.Z
 git push origin main --tags
 ```
 

@@ -1,0 +1,37 @@
+{
+  "header": "# Changelog\n\nAll notable changes to the axhub Claude Code plugin will be documented here.\nFormat follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).\n\n",
+  "types": [
+    {"type": "feat", "section": "Added"},
+    {"type": "fix", "section": "Fixed"},
+    {"type": "perf", "section": "Performance"},
+    {"type": "refactor", "section": "Changed"},
+    {"type": "docs", "section": "Docs"},
+    {"type": "test", "hidden": true},
+    {"type": "chore", "hidden": true},
+    {"type": "ci", "hidden": true},
+    {"type": "build", "hidden": true},
+    {"type": "style", "hidden": true}
+  ],
+  "bumpFiles": [
+    {
+      "filename": "package.json",
+      "type": "json"
+    },
+    {
+      "filename": ".claude-plugin/plugin.json",
+      "type": "json"
+    },
+    {
+      "filename": ".claude-plugin/marketplace.json",
+      "updater": "scripts/version-updater-marketplace.cjs"
+    }
+  ],
+  "scripts": {
+    "postbump": "bun run codegen:version && bun run release:check",
+    "posttag": "echo '\\n다음 단계: git push origin main --tags  → release.yml 가 자동 fire 돼요.\\nCHANGELOG 본문은 사람이 작성 (해요체 narrative): vim CHANGELOG.md 후 git commit --amend.'"
+  },
+  "skip": {
+    "commit": false,
+    "tag": false
+  }
+}

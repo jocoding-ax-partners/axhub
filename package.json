@@ -8,9 +8,9 @@
     "build": "bun build src/axhub-helpers/index.ts --compile --outfile bin/axhub-helpers --target=bun",
     "build:darwin-arm64": "bun build src/axhub-helpers/index.ts --compile --target=bun-darwin-arm64 --outfile bin/axhub-helpers-darwin-arm64",
     "build:darwin-amd64": "bun build src/axhub-helpers/index.ts --compile --target=bun-darwin-x64   --outfile bin/axhub-helpers-darwin-amd64",
-    "build:linux-amd64":  "bun build src/axhub-helpers/index.ts --compile --target=bun-linux-x64    --outfile bin/axhub-helpers-linux-amd64",
-    "build:linux-arm64":  "bun build src/axhub-helpers/index.ts --compile --target=bun-linux-arm64  --outfile bin/axhub-helpers-linux-arm64",
-    "build:windows-amd64":"bun build src/axhub-helpers/index.ts --compile --target=bun-windows-x64  --outfile bin/axhub-helpers-windows-amd64.exe",
+    "build:linux-amd64": "bun build src/axhub-helpers/index.ts --compile --target=bun-linux-x64    --outfile bin/axhub-helpers-linux-amd64",
+    "build:linux-arm64": "bun build src/axhub-helpers/index.ts --compile --target=bun-linux-arm64  --outfile bin/axhub-helpers-linux-arm64",
+    "build:windows-amd64": "bun build src/axhub-helpers/index.ts --compile --target=bun-windows-x64  --outfile bin/axhub-helpers-windows-amd64.exe",
     "build:all": "bun run build:darwin-arm64 && bun run build:darwin-amd64 && bun run build:linux-amd64 && bun run build:linux-arm64 && bun run build:windows-amd64",
     "smoke": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help",
     "smoke:full": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help && ./bin/axhub-helpers session-start </dev/null && bash tests/docs-link-audit.sh && bun run fuzz && bun run codegen:catalog && bun run codegen:version",
@@ -19,6 +19,7 @@
     "lint:tone": "bun scripts/check-toss-tone-conformance.ts --strict",
     "lint:keywords": "bun scripts/check-skill-keywords-preserved.ts --check",
     "release:check": "bun scripts/release-check.ts",
+    "release": "commit-and-tag-version",
     "skill:new": "bun scripts/skill-new.ts",
     "skill:doctor": "bun scripts/skill-doctor.ts",
     "test": "bun test",
@@ -37,6 +38,7 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/semver": "^7.5.8",
+    "commit-and-tag-version": "^12.7.1",
     "typescript": "^5.6.3"
   }
 }

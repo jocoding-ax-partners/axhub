@@ -1,78 +1,66 @@
 {
-  "task": "v0.1.15 hotfix — subprocess `claude -p` plugin smoke 재실행으로 버그 헌트 + fix. 9개 axhub command 모두 hang 없이 exit 0 + 발견 버그 fix + regression test 잠금.",
-  "createdAt": "2026-04-27T05:30:00Z",
+  "task": "Phase 19 v0.1.19 — auto version bump via commit-and-tag-version (D2). Replace manual version edits with 1-CLI bump that auto-runs codegen:version + release:check + writes CHANGELOG entry + git commit + tag.",
+  "createdAt": "2026-04-27T08:30:00Z",
   "stories": [
     {
-      "id": "US-1501",
-      "title": "Subprocess plugin smoke 9/9 exit 0 (no TIMEOUT)",
+      "id": "US-1901",
+      "title": "Install commit-and-tag-version + .versionrc.json config",
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "tests/live-plugin-smoke.sh 9 명령 (/axhub:help, /axhub:status, /axhub:doctor, /axhub:apps, /axhub:apis, /axhub:login, /axhub:logs, /axhub:update, /axhub:deploy --dry-run) 모두 exit 0.",
-        "TIMEOUT 0 건. .omc/evidence/live-plugin-smoke-summary.txt 캡처.",
-        "각 command 별 evidence file 캡처 (.omc/evidence/live-plugin-smoke-axhub*.txt)."
+        "bun add -D commit-and-tag-version installed (devDependency in package.json).",
+        ".versionrc.json exists at repo root with: types config (feat/fix sections, chore hidden), header preserved, postbump hook chains codegen:version + release:check, bumpFiles array covers package.json + .claude-plugin/plugin.json + .claude-plugin/marketplace.json (path + jsonpath).",
+        "package.json scripts.release = 'commit-and-tag-version' added."
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-1502",
-      "title": "Bug 1 — bin/axhub-helpers stale binary (v0.1.10 reported, source v0.1.14)",
+      "id": "US-1902",
+      "title": "Dry-run release verifies bumpFiles + postbump chain",
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "bin/axhub-helpers --version 가 0.1.14 보고.",
-        "bun run build 로 로컬 빌드 갱신.",
-        "v0.1.16 follow-up 로 release procedure 문서화 (CHANGELOG honest tradeoff 에 명시)."
+        "bun run release -- --dry-run executes successfully without modifying files.",
+        "Dry-run output shows next version (0.1.18 → 0.1.19 patch from current commit history).",
+        "Dry-run output references all 3 bumpFiles + plans codegen:version + release:check postbump."
       ],
       "owner": null,
-      "blockedBy": []
+      "blockedBy": ["US-1901"]
     },
     {
-      "id": "US-1503",
-      "title": "Bug 2 — skills/deploy/SKILL.md post-deploy `--watch` no TTY guard (same root cause as v0.1.12 status/logs)",
+      "id": "US-1903",
+      "title": "docs/RELEASE.md updated — D2 primary path + manual fallback",
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "skills/deploy/SKILL.md step 5 에 `if [ -t 1 ] && [ -z \"$CI\" ] && [ -z \"$CLAUDE_NON_INTERACTIVE\" ]; then WATCH=--watch; else WATCH=; fi` 가드 추가.",
-        "post-chain command 이 `axhub deploy status dep_$DEPLOY_ID $WATCH --json` 으로 변경 (raw `--watch` 제거).",
-        "tests/skill-noninteractive-guard.test.ts 에 deploy 스킬용 assertion 2 개 추가 (가드 literal + raw --watch 검출 negative).",
-        "bun test → 8/8 pass on skill-noninteractive-guard.test.ts."
+        "docs/RELEASE.md 'Cutting a release' section rewritten — bun run release primary path + bun run release -- --release-as <ver|minor|major> for explicit choice + manual edit fallback preserved at bottom.",
+        "Step-by-step recipe documents: 1. ensure clean working tree, 2. bun run release [-- --release-as X], 3. git push origin main --tags, 4. release.yml fires automatically.",
+        "lint:tone --strict 0 err on docs/RELEASE.md (해요체 narrative).",
+        "Hotfix workflow documented (urgent fix mid-Phase): bun run release -- --release-as patch + push."
       ],
       "owner": null,
-      "blockedBy": []
+      "blockedBy": ["US-1902"]
     },
     {
-      "id": "US-1504",
-      "title": "Regression baseline preserved (no test break)",
+      "id": "US-1904",
+      "title": "Phase 19 ship — v0.1.19 via the new automation itself (dogfood)",
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "bun test → 403 pass / 5 skip / 0 fail / 2394 expect / 408 tests / 20 files. v0.1.14 baseline 401 pass 에서 +2 (deploy guard).",
-        "bunx tsc --noEmit → clean.",
-        "bun lint:tone --strict → 0 error / 0 warning.",
-        "bun lint:keywords --check → OK no diff vs baseline."
+        "bun run release executed (auto-bump from current commits → 0.1.18 → 0.1.19 patch).",
+        "Generated CHANGELOG entry inspected — Phase 19 narrative paragraph (해요체) added by author below the auto-bullets.",
+        "git tag v0.1.19 + git push origin main --tags ships release.",
+        "release.yml workflow run completes success.",
+        "GitHub release v0.1.19 published with 5 cross-arch binaries."
       ],
       "owner": null,
-      "blockedBy": ["US-1503"]
-    },
-    {
-      "id": "US-1505",
-      "title": "CHANGELOG v0.1.15 entry + honest tradeoff",
-      "priority": 5,
-      "passes": true,
-      "acceptanceCriteria": [
-        "CHANGELOG.md [0.1.15] 섹션 추가 — Fixed (deploy guard + binary stale), Added (regression test), Detection win, Honest tradeoff (Phase 14 SKILL body Korean default + v0.1.16 build automation).",
-        "Toss 톤 유지 — 합니다/입니다/시겠어요/드립니다/당신/아이고 0건.",
-        "lint:tone 통과 (CHANGELOG 가 lint scope 밖이지만 신규 entry 자체는 Toss 톤 준수)."
-      ],
-      "owner": null,
-      "blockedBy": ["US-1503"]
+      "blockedBy": ["US-1903"]
     }
   ],
   "metadata": {
-    "task_origin": "/ralph subprocess plugin bug hunt — 다시 한번 더 플러그인을 claude code 안에서 실행해서 버그 찾아줘봐. 서브 프로세스로 띄어서 해봐",
-    "scope_note": "Hotfix v0.1.15 = deploy SKILL guard 누락 (v0.1.12 hotfix 도중 빠진 케이스) + 로컬 binary stale 발견. Phase 14/15 (SKILL 본문 + description) 별도 cycle.",
+    "task_origin": "/ralph 그렇게 진행해 — D2 commit-and-tag-version per ralplan recommendation (vs D1 release-please overkill for solo + Korean narrative).",
+    "scope_note": "D2 chosen over D1 release-please per ralplan analysis: bot-PR rubber-stamp re-introduces v0.1.14 stale-binary trust-without-verify drift; release-please optimizes for weekly cadence (axhub does daily ship-day batches); Korean CHANGELOG narrative needs human author. D2 reuses Phase 16 release:check invariant via postbump hook.",
     "deslop": "enabled",
     "critic": "architect"
   }
