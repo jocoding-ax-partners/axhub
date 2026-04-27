@@ -3,9 +3,18 @@
 All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
 
-Nothing yet.
+## [0.1.19](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.18...v0.1.19) (2026-04-27)
+
+
+### Added
+
+* Phase 19 v0.1.19 — auto version bump via commit-and-tag-version ([98befbf](https://github.com/jocoding-ax-partners/axhub/commit/98befbf1a89cbdc7c95ba134009be70956555af9))
+
+
+### Docs
+
+* **v0.1.18:** AGENTS.md + CLAUDE.md add Skill Authoring section ([666fc1a](https://github.com/jocoding-ax-partners/axhub/commit/666fc1a3a36f9d81055ab947c74b4835ba72d927))
 
 ## [0.1.18] — 2026-04-27
 
