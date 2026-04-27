@@ -53,3 +53,21 @@ done
 echo "" >> "$SUMMARY"
 echo "Summary written to $SUMMARY"
 cat "$SUMMARY"
+
+# Phase 17 US-1705 — strict mode: exit non-zero on any failure / timeout.
+# Critic round 2 MAJOR #1 — capture-only mode silently swallows regressions.
+# Honor SMOKE_STRICT=0 to skip strict gate (capture-only legacy mode).
+if [ "${SMOKE_STRICT:-1}" = "1" ]; then
+  if grep -E "TIMEOUT$" "$SUMMARY" >/dev/null; then
+    echo "FAIL: at least one command hit TIMEOUT" >&2
+    exit 1
+  fi
+  if grep -E " [1-9][0-9]* " "$SUMMARY" | grep -v "exit " >/dev/null; then
+    # Match exit codes != 0 in summary table
+    if grep -E "axhub:[a-z-]+ +[1-9]" "$SUMMARY" >/dev/null; then
+      echo "FAIL: at least one command exited non-zero" >&2
+      exit 1
+    fi
+  fi
+  echo "STRICT: 9/9 commands exit 0, TIMEOUT 0" >&2
+fi

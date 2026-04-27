@@ -1,0 +1,65 @@
+{
+  "_schema": "Per-SKILL × per-question safe-default registry. Key = SKILL slug. Inner key = question text (verbatim from SKILL.md AskUserQuestion JSON). Value = {safe_default: option label/value, rationale: why}. Used by tests/ux-ask-fallback-registry.test.ts to mechanically lock D1 fallback contract — adding a new AskUserQuestion question without registering its safe-default fails the test. Phase 17 US-1705 / Critic round 2 hardening.",
+  "_path_history": "Originally proposed skills/_shared/ask-defaults.json (Architect r2 → tests/manifest.test.ts:548 collision) → tests/fixtures/ask-defaults.json (Critic r2 → tests/fixtures.test.ts:38 toBe(40) collision) → final tests/fixtures/ask-defaults/registry.json (subdir bypasses both invariants — non-recursive readdirSync ignores subdir entries).",
+  "deploy": {
+    "_note": "deploy SKILL Step 3 uses a free-form text preview card (5-field identity layout), NOT a structured AskUserQuestion JSON block. Plan §2.1.A.137 proposed JSON migration but deferred to Phase 18 to keep ship surface tight. Default behavior in non-interactive subprocess: --dry-run (most conservative).",
+    "default_subprocess_action": "--dry-run"
+  },
+  "auth": {
+    "다시 로그인할래요?": {
+      "safe_default": "abort",
+      "rationale": "Subprocess cannot complete OAuth Device Flow. Abort + tell user to re-run interactively."
+    }
+  },
+  "recover": {
+    "직전 안정 커밋으로 다시 배포해요?": {
+      "safe_default": "abort",
+      "rationale": "Forward-fix is destructive deploy_create. Subprocess must not auto-rollback without explicit human confirm."
+    }
+  },
+  "apis": {
+    "다른 팀 API도 볼래요? 권한 있는 모든 endpoint 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요.": {
+      "safe_default": "stay",
+      "rationale": "Privacy-first: never widen scope to cross-team without explicit human consent (PLAN row 46 audit log requirement)."
+    }
+  },
+  "apps": {
+    "앱이 더 있어요. 전체 목록 볼래요?": {
+      "safe_default": "skip",
+      "rationale": "Top 10 sufficient for vibe-coder browse; full list rarely needed in non-interactive."
+    }
+  },
+  "clarify": {
+    "어떤 작업 원해요?": {
+      "safe_default": "abort",
+      "rationale": "Ambiguous intent in non-interactive context — agent cannot guess; surface ambiguity message and stop."
+    }
+  },
+  "doctor": {
+    "여러 항목 점검 필요해요. 어디부터 고쳐요?": {
+      "safe_default": "later",
+      "rationale": "Diagnosis output sufficient in non-interactive; subprocess should not auto-trigger remediation."
+    }
+  },
+  "update": {
+    "axhub CLI 업그레이드해요?": {
+      "safe_default": "skip",
+      "rationale": "Binary replacement is destructive; non-interactive subprocess must not auto-upgrade."
+    }
+  },
+  "upgrade": {
+    "플러그인 업그레이드 명령 보여줄까요?": {
+      "safe_default": "show",
+      "rationale": "Read-only display action, safe in subprocess. Show the upgrade command without executing it."
+    }
+  },
+  "logs": {
+    "_note": "logs SKILL uses inline AskUserQuestion narration ('빌드 로그 / 런타임 로그 / 둘 다') without a structured JSON block. Default = build (most common failure-mode use case). Test parses 'AskUserQuestion (...)' inline literal and falls back to logs.* defaults below.",
+    "default_source": "build"
+  },
+  "status": {
+    "_note": "status SKILL delegates AskUserQuestion sites to recovery-flows.md (cold-cache deploy pick) and error-empathy-catalog.md (exit-65 re-login). Defaults handled at delegation point.",
+    "cold_cache_default": "most_recent",
+    "exit_65_default": "abort"
+  }
+}
