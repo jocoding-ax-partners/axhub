@@ -40,6 +40,7 @@ interface HookConfig {
   type: string;
   command: string;
   timeout?: number;
+  shell?: string;
 }
 
 interface HookGroup {
@@ -262,13 +263,15 @@ describe("hooks.json structure", () => {
   });
 
   test("each hook command references axhub-helpers binary or session-start shim", () => {
-    // Phase 5 US-502: SessionStart now uses bash shim (hooks/session-start.sh)
-    // that bootstraps the binary if missing. Other hooks call the binary directly.
+    // SessionStart uses platform-specific shim (sh on Unix, ps1 on Windows).
+    // Other hooks call the binary directly.
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {
         for (const h of g.hooks) {
           const refsBinary = h.command.includes("axhub-helpers");
-          const refsShim = h.command.includes("hooks/session-start.sh");
+          const refsShim =
+            h.command.includes("hooks/session-start.sh") ||
+            h.command.includes("hooks\\session-start.ps1");
           expect(refsBinary || refsShim).toBe(true);
         }
       }
@@ -291,6 +294,35 @@ describe("hooks.json structure", () => {
   test("PreToolUse + PostToolUse have Bash matcher", () => {
     expect(hooksJson.hooks.PreToolUse[0].matcher).toBe("Bash");
     expect(hooksJson.hooks.PostToolUse[0].matcher).toBe("Bash");
+  });
+
+  // Phase 10: SessionStart has 2 sibling entries — bash[0] for Unix + powershell[1] for Windows
+  test("SessionStart has exactly 2 sibling entries (bash + powershell platform branches)", () => {
+    expect(hooksJson.hooks.SessionStart.length).toBe(2);
+  });
+
+  test("SessionStart entry [0] is bash (Unix) — preserved byte-identical from v0.1.6", () => {
+    const bashEntry = hooksJson.hooks.SessionStart[0].hooks[0];
+    expect(bashEntry.command).toBe("bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh");
+    expect(bashEntry.timeout).toBe(30);
+    expect(bashEntry.shell).toBeUndefined(); // bash is the implicit default
+  });
+
+  test("SessionStart entry [1] uses shell:powershell + references session-start.ps1", () => {
+    const psEntry = hooksJson.hooks.SessionStart[1].hooks[0];
+    expect(psEntry.shell).toBe("powershell");
+    expect(psEntry.command).toContain("session-start.ps1");
+    expect(psEntry.command).toContain("-NoProfile");
+    expect(psEntry.command).toContain("-ExecutionPolicy Bypass");
+  });
+
+  test("SessionStart entry [1] timeout matches sibling bash entry", () => {
+    expect(hooksJson.hooks.SessionStart[1].hooks[0].timeout).toBe(30);
+  });
+
+  test("PreToolUse + PostToolUse remain single-entry (no platform branching needed — direct binary call)", () => {
+    expect(hooksJson.hooks.PreToolUse.length).toBe(1);
+    expect(hooksJson.hooks.PostToolUse.length).toBe(1);
   });
 });
 
@@ -611,8 +643,9 @@ describe("cross-manifest consistency", () => {
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {
         for (const h of g.hooks) {
-          // Skip shim path (Phase 5 US-502): bash hooks/session-start.sh
+          // Skip shim paths: bash hooks/session-start.sh + powershell hooks\session-start.ps1
           if (h.command.includes("hooks/session-start.sh")) continue;
+          if (h.command.includes("hooks\\session-start.ps1")) continue;
           const sub = h.command.split(/\s+/).pop();
           if (sub) {
             expect(knownSubcommands.has(sub)).toBe(true);

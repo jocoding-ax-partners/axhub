@@ -1,0 +1,89 @@
+US-1000 Spike Result — macOS wrong-OS spawn behavior of `"shell":"powershell"` hook
+====================================================================================
+
+Spike date: 2026-04-27
+Spike runner: jocoding-ax-partners (Phase 10 ralph)
+Plan reference: .omc/plans/phase-10-windows-ps1-hooks-v2.md US-1000
+
+Goal
+----
+Verify behavior when Claude Code on macOS encounters a SessionStart hook with
+`"shell":"powershell"` AND powershell is not on PATH. Three outcomes possible:
+  (A) silent — Claude Code internally skips wrong-OS shell, no user-visible noise
+  (B) visible-error — user sees `command not found: powershell` in session output
+  (C) popup — Claude Code surfaces hook failure via UI dialog/toast
+
+Outcome determines whether US-1003 needs a guard.
+
+Test setup
+----------
+Stub plugin at /tmp/ps-spike-plugin/:
+  .claude-plugin/plugin.json — minimal {"name":"ps-spike","version":"0.0.1"}
+  hooks/hooks.json — single SessionStart entry:
+    {"shell":"powershell","command":"powershell -Command 'exit 0'","timeout":5}
+
+Host: macOS (Darwin 25.3.0), Apple Silicon
+$ command -v powershell    → (empty, exit 1)
+$ command -v pwsh          → (empty, exit 1)
+$ powershell -Command "exit 0"
+  zsh: command not found: powershell  (exit 127)
+
+Direct exec confirms shell-level ENOENT.
+
+Findings
+--------
+**Cannot directly verify Claude Code's internal behavior in current session**
+(running another `claude` instance against stub plugin would interfere with
+the current ralph session). Reasoning from Anthropic hook spec phrasing:
+
+> `shell: "powershell"` — Setting `"powershell"` runs the command via
+> PowerShell on Windows. Does not require `CLAUDE_CODE_USE_POWERSHELL_TOOL`
+> since hooks spawn PowerShell directly.
+
+The "on Windows" qualifier strongly implies Claude Code platform-gates this
+field internally (process.platform === "win32" check before spawn). Most
+likely outcome: **(A) silent**.
+
+Evidence supporting (A):
+  - Spec phrasing explicitly scopes the field to Windows
+  - Other hook fields (matcher, timeout) are platform-agnostic — only `shell`
+    is Windows-scoped, suggesting deliberate gating
+  - Hook output parser expects JSON {"systemMessage":...}; non-JSON ENOENT
+    output would be ignored, not surfaced
+
+Evidence supporting (B) cannot rule out:
+  - Anthropic docs are SILENT on wrong-OS behavior (confirmed via WebFetch)
+  - Most subprocess-spawning systems (Node child_process.spawn) surface ENOENT
+  - Some hook implementations log failures to user-visible stderr regardless of
+    JSON parsing
+
+Decision
+--------
+**Ship US-1003 WITHOUT macOS guard** (per plan v2 default-on path).
+
+Rationale:
+  - (A) is more likely than (B)/(C) per spec phrasing
+  - Adding a guard requires a probe shim (`Get-Command powershell` first) that
+    itself requires powershell to run — chicken-and-egg
+  - Worst case (visible-error in session output): bounded UX degradation,
+    no broken functionality. Hotfixable as v0.1.7.1 if pilot users report noise
+  - Architect round 1 steelman flagged this; ADR Consequences acknowledges as
+    "documented honest tradeoff"
+
+Mitigations in case outcome turns out to be (B):
+  - First Korean vibe coder Phase 10 pilot session reports noise → v0.1.7.1
+    hotfix adds session-start.ps1 first line: `if (-not $IsWindows) { exit 0 }`
+  - Plan v0.1.8 follow-up: add Anthropic schema feedback request for explicit
+    `platform` field on hooks (currently only `shell`)
+
+Action items for executor
+-------------------------
+  - US-1002 PS_SCRIPT first line: `$ErrorActionPreference = 'Stop'` (NOT the
+    `if (-not $IsWindows)` guard since outcome A assumed)
+  - US-1003 hook command: ship per plan v2 unmodified — no `Get-Command` probe
+  - US-1006 release notes: include spike methodology + outcome A assumption +
+    hotfix path if outcome turns out to be B
+
+Outcome category: **(A) silent — assumed, not directly verified**
+Recommendation: **proceed unmodified, monitor first Windows-pilot Korean
+session for any macOS-side noise reports, hotfix-ready if needed**

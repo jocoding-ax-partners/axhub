@@ -1,111 +1,145 @@
 {
-  "task": "Phase 9 v0.1.5 — Windows keychain bridge (PowerShell + Add-Type PInvoke against advapi32!CredReadW). Linux secret-tool branch UNTOUCHED. macOS branch UNTOUCHED. Plan: .omc/plans/phase-9-windows-keychain-v3.md (consensus-approved 2026-04-24).",
-  "createdAt": "2026-04-24T08:30:00Z",
+  "task": "Phase 10 v0.1.7 — Windows PS1 hooks (sibling powershell entry in hooks.json + bin/install.ps1 + hooks/session-start.ps1). Existing sh files byte-identical. Floor: Claude Code >= 2.1.84. Plan: .omc/plans/phase-10-windows-ps1-hooks-v2.md (consensus round 2/5 APPROVE).",
+  "createdAt": "2026-04-27T00:00:00Z",
   "stories": [
     {
-      "id": "US-901",
-      "title": "keychain.ts Windows branch — inline PowerShell + Add-Type PInvoke + ASCII sentinel",
+      "id": "US-1000",
+      "title": "macOS noise spike — verify wrong-OS spawn behavior of `\"shell\":\"powershell\"` hook",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "src/axhub-helpers/keychain.ts win32 branch (currently lines 91-96 deferred error) replaced: spawn powershell.exe with single Add-Type -TypeDefinition inline C# stub for CredReadW + CredFree + CREDENTIAL struct.",
-        "PS script first line: $ErrorActionPreference = 'Stop' (PS5.1 terminating exception hardening per architect synthesis).",
-        "ASCII sentinel scheme — success: stdout 'AXHUB_OK:<base64>'. Missing credential: stdout 'ERR:NOT_FOUND'. C# compile/load failure: stderr 'ERR:LOAD_FAIL'. Locale-independent (no English stderr parsing).",
-        "TS side decodeWindowsBlob: base64 decode → UTF-8 → reuse existing parseKeyringValue (no new decoder).",
-        "readWindowsKeychain extracted into new src/axhub-helpers/keychain-windows.ts module exporting (a) PS_SCRIPT string (using String.raw to avoid template-literal interpolation of $variables), (b) async readWindowsKeychain(runner = Bun.spawnSync) function. CommandRunner type imported from preflight.ts (do not redefine).",
-        "spawnSync timeout: 8000ms (vs macOS 5000ms — accommodates PS startup latency).",
-        "5 Windows error scenarios all 4-part Korean (감정/원인/해결/다음액션): ExecutionPolicy block, NOT_FOUND, PInvoke load failure, EDR/AMSI quarantine (signal != null OR exit ∈ {-1, 0xC0000409}), spawnSync throws.",
-        "EDR error message MUST NOT instruct user to ask IT for 'EDR allowlist 추가' (SOC will reject for unsigned binary doing PInvoke). Use 'v0.1.5 코드사이닝 전 — 우리 책임. AXHUB_TOKEN 환경변수가 정식 회피 경로. v0.1.6 Authenticode 후 EDR allowlist 가능' framing.",
-        "Empty CredentialBlob → early-return ERR:NOT_FOUND (treat same as missing credential). NO new error message for empty-blob path (per Critic round 2 Fix 1 path b).",
-        "Linux secret-tool branch (keychain.ts:65-90) UNTOUCHED.",
-        "macOS security branch (keychain.ts:46-66) UNTOUCHED.",
-        "Returns { token, source: 'windows-credential-manager' } on success."
+        "Setup minimal stub plugin in /tmp/ps-spike-plugin/ with hooks.json containing only ONE SessionStart hook: {\"shell\":\"powershell\",\"command\":\"powershell -Command 'exit 0'\"}.",
+        "Run `claude` (or harness equivalent) on this macOS host with that plugin loaded; capture stderr + Claude Code session output.",
+        "If powershell.exe not on PATH (likely on macOS without pwsh), document the exact behavior: silent / visible-error in session output / popup.",
+        "If pwsh IS installed (PS Core cross-platform), test that branch separately — should run successfully.",
+        "Write findings to docs/pilot/v0.1.7-spike-result.txt with: outcome category (silent / visible-error / popup), exact stderr captured, recommendation for US-1003 (no guard needed / add `if (-not $IsWindows) { exit 0 }` first line / skip Option B entirely).",
+        "If outcome = visible-error or popup → US-1002 PS_SCRIPT first line MUST be `if (-not $IsWindows) { exit 0 }` AND US-1003 hook command MUST add a `Get-Command powershell -ErrorAction SilentlyContinue` probe.",
+        "If outcome = silent → US-1003 ships unmodified per plan."
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-902",
-      "title": "docs additive — Windows mentions added (7 edits / 6 files). Linux/macOS untouched.",
+      "id": "US-1001",
+      "title": "bin/install.ps1 — Windows installer mirror of bin/install.sh (no Add-Type, EDR-clean)",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "skills/auth/SKILL.md:55 + :58 — add Windows parallel sentence to existing macOS+Linux headless guidance. PS-only architecture aligned: 'axhub-helpers token-init 가 PowerShell 단일 호출로 자격증명을 직접 읽어옵니다.' NO cmdkey instruction (cmdkey returns exit 0 in both present/missing cases — useless for probe).",
-        "skills/deploy/references/headless-flow.md:60 — add Windows command line `# Windows: PowerShell + Add-Type 단일 호출 (axhub-helpers 가 자동 처리)` after existing macOS/Linux block.",
-        "skills/deploy/references/recovery-flows.md:87 — same Windows PS-only addition pattern.",
-        "docs/pilot/admin-rollout.ko.md:96 — Windows context added to 'headless 환경 (Codespaces, SSH)' paragraph: 'Windows: PowerShell + Credential Manager 통합'.",
-        "src/axhub-helpers/list-deployments.ts:13-16 JSDoc — add Windows mention: 'Windows PowerShell + Advapi32 CredReadW' alongside existing token discovery comment.",
-        "bin/README.md:31 — add note: 'windows-amd64.exe: PowerShell + Add-Type PInvoke against advapi32 (no Install-Module required, stock Win10/11)'.",
-        "ALL Linux + macOS existing mentions UNTOUCHED. Additive only.",
-        "Korean text grammatically natural.",
-        "bash tests/docs-link-audit.sh → Broken: 0."
-      ],
-      "owner": null,
-      "blockedBy": ["US-901"]
-    },
-    {
-      "id": "US-903",
-      "title": "tests/keychain-windows.test.ts — 6 mocked-runner cases + parseKeyringValue extraction",
-      "priority": 3,
-      "passes": true,
-      "acceptanceCriteria": [
-        "New file tests/keychain.test.ts — extracts the 8 existing parseKeyringValue tests from tests/token-init.test.ts:88-145 (move not duplicate).",
-        "tests/token-init.test.ts:88-145 parseKeyringValue describe block REMOVED (extracted to keychain.test.ts).",
-        "tests/token-init.test.ts:81-86 (Windows deferred-error 3 assertions) REPLACED with 3 new assertions: powershell.exe spawn + Add-Type + advapi32 + CredReadW present in keychain-windows.ts source (read via readFileSync).",
-        "New file tests/keychain-windows.test.ts — 6 mocked-runner test cases via injected runner: (1) success → AXHUB_OK:<base64> → token extracted, (2) ExecutionPolicy block → exit 1 + stderr matches 'execution of scripts' → 4-part Korean ExecutionPolicy message, (3) NOT_FOUND → stdout ERR:NOT_FOUND → 4-part Korean missing-credential message, (4) PInvoke load failure → stdout ERR:LOAD_FAIL → 4-part Korean PInvoke message, (5) EDR signal kill → result.signal != null OR exit ∈ {-1, 0xC0000409} → 4-part Korean EDR honesty message (no IT-allowlist instruction), (6) spawnSync throws → 4-part Korean spawn-failure message.",
-        "Test count after Phase 9: 343 (Phase 8 baseline) + 6 (windows mocks) = 349 pass / 354 total / 15 files.",
-        "bun test 2>&1 | tail -8 → '349 pass / 5 skip / 0 fail / 354 tests across 15 files'.",
-        "bunx tsc --noEmit → clean."
-      ],
-      "owner": null,
-      "blockedBy": ["US-901"]
-    },
-    {
-      "id": "US-905",
-      "title": "GitHub issue — format-parity v0.1.6 deferral tracking",
-      "priority": 4,
-      "passes": true,
-      "acceptanceCriteria": [
-        "gh issue create — title: 'Format-parity: keychain.ts existing one-liner errors → 4-part empathy template (v0.1.6)'",
-        "Body: lists keychain.ts existing line numbers (54, 59, 62, 76, 82, 86, 93) that are one-line Korean errors NOT 4-part per error-empathy-catalog.md:76-148. Phase 9 v0.1.5 ships Windows 4-part from day one but defers existing macOS/Linux line repair to v0.1.6 to keep Phase 9 surgical.",
-        "Labels: 'format-parity', 'v0.1.6', 'deferred-from-phase-9'.",
-        "Issue URL captured to .omc/state/us-905-issue-url.txt for US-904 CHANGELOG handoff.",
-        "Issue is OPEN status in github.com/jocoding-ax-partners/axhub."
+        "New file bin/install.ps1 — Windows PowerShell 5.1+ installer mirror of bin/install.sh.",
+        "RELEASE_VERSION constant = 'v0.1.7' (matches install.sh:48 post-bump).",
+        "Detect arch: $env:PROCESSOR_ARCHITECTURE = 'AMD64' → windows-amd64.exe (only arch CI builds).",
+        "Download via Invoke-WebRequest -Uri \"https://github.com/jocoding-ax-partners/axhub/releases/download/$RELEASE_VERSION/axhub-helpers-windows-amd64.exe\" -OutFile \"$TargetPath.tmp\" -TimeoutSec 600.",
+        "Move-Item $TargetPath.tmp $TargetPath -Force, then Start-Sleep -Seconds 2 + Test-Path $TargetPath re-check (Defender post-Move quarantine pre-mortem #6).",
+        "If existing link/file at TARGET path: explicit `if (Test-Path -PathType Any) { Remove-Item -Force }` pattern. NO `||` operator emulation. Comment: `# NOTE: bin/install.sh:80 has known operator precedence bug; PS mirror uses explicit Test-Path/Remove-Item.`",
+        "NO Add-Type, NO inline C#, NO Reflection.Assembly — EDR-clean (Phase 9 PInvoke pattern not used in installer).",
+        "Try/catch [System.IO.PathTooLongException] for MAX_PATH (pre-mortem #5) → 4-part Korean error pointing to `subst N: <long-path>` workaround.",
+        "Try/catch HTTP 407 (NTLM proxy pre-mortem #7) → 4-part Korean error → suggest `-Proxy $env:HTTPS_PROXY -ProxyUseDefaultCredentials`.",
+        "Try/catch [System.Net.WebException] for slow corp network → 4-part Korean → AXHUB_TOKEN env var fallback.",
+        "Every catch: emit `Write-Output (ConvertTo-Json @{ systemMessage = '<4-part Korean>' } -Compress)` then `exit 0` (don't block, surface).",
+        "ASCII-clean (no U+200B, no smart quotes — verified via `perl -ne 'print if /[\\x{200B}-\\x{200F}\\x{FEFF}]/' bin/install.ps1` returns empty).",
+        "Korean error messages all 4-part (감정 / 원인 / 해결 / 다음액션) per error-empathy-catalog.md."
       ],
       "owner": null,
       "blockedBy": []
     },
     {
-      "id": "US-904",
-      "title": "v0.1.5 release ship — bump + codegen + tag + CI green + verify",
-      "priority": 5,
-      "passes": false,
+      "id": "US-1002",
+      "title": "hooks/session-start.ps1 — Windows SessionStart hook mirror with proper XDG paths",
+      "priority": 3,
+      "passes": true,
       "acceptanceCriteria": [
-        "Step 1: Read .omc/state/us-905-issue-url.txt (US-905 artifact handoff).",
-        "Step 2: Substitute {US905_ISSUE_URL} placeholder in CHANGELOG entry with actual URL from step 1.",
-        "Step 3: Verify CHANGELOG.md contains valid GitHub issue URL pattern (grep -E 'https://github.com/jocoding-ax-partners/axhub/issues/[0-9]+').",
-        "Version bump: package.json + .claude-plugin/{plugin,marketplace}.json 0.1.4 → 0.1.5.",
-        "bun run codegen:version → 3 file auto-sync (install.sh + index.ts PLUGIN_VERSION + telemetry.ts).",
-        "CHANGELOG.md new v0.1.5 entry: Added (Windows keychain bridge), Unchanged (Linux secret-tool, macOS security), Deferred (v0.1.6 link to US-905 issue).",
-        "git commit + push origin main.",
-        "git tag v0.1.5 + push origin v0.1.5 → CI release workflow auto-trigger.",
-        "CI conclusion: success (5 binaries built, 5 cosign sigs, manifest signed).",
-        "bash scripts/release/verify-release.sh v0.1.5 → 'All release assets verified for jocoding-ax-partners/axhub@v0.1.5'.",
-        "Live binary self-report (downloaded windows-amd64.exe via curl): version subcommand prints 'axhub-helpers 0.1.5 (plugin v0.1.5, schema v0)'. Skip exec-on-mac if cross-platform issues — verify only via file size + sha256 match in that case.",
-        "docs/pilot/v0.1.5-verify-result.txt — capture cosign + sha256 verify output + binary size match.",
-        "docs/pilot/launch-readiness-checklist.md — baseline updated v0.1.4 → v0.1.5."
+        "New file hooks/session-start.ps1 — PowerShell 5.1+ mirror of hooks/session-start.sh.",
+        "If US-1000 outcome = visible-error/popup: first line `if (-not $IsWindows) { exit 0 }`. Else: first line `$ErrorActionPreference = 'Stop'`.",
+        "Check `$Helper = Join-Path $env:CLAUDE_PLUGIN_ROOT 'bin\\axhub-helpers-windows-amd64.exe'`. If missing, run install.ps1 → capture `$installExit = $LASTEXITCODE` → if non-zero, surface 4-part Korean systemMessage + exit 0.",
+        "Run `& $Helper session-start` (binary subcommand) — direct exe call, not PS-spawned.",
+        "Run `& $Helper token-init` after session-start.",
+        "State dir for breadcrumb (when AXHUB_TELEMETRY=1): `$StateDir = if ($env:XDG_STATE_HOME) { Join-Path $env:XDG_STATE_HOME 'axhub-plugin' } else { Join-Path $env:USERPROFILE '.local\\state\\axhub-plugin' }` — byte-mirror of telemetry.ts:40-44 (XDG_STATE_HOME fallback to ~/.local/state, NOT %LOCALAPPDATA%).",
+        "Token dir for cmdTokenInit reads (separate from state): `$TokenDir = if ($env:XDG_CONFIG_HOME) { Join-Path $env:XDG_CONFIG_HOME 'axhub-plugin' } else { Join-Path $env:USERPROFILE '.config\\axhub-plugin' }` — mirrors index.ts:441 cmdTokenInit (XDG_CONFIG_HOME, NOT XDG_STATE_HOME).",
+        "Every catch (top-level + nested) emits `Write-Output (ConvertTo-Json @{ systemMessage = '<4-part Korean>' } -Compress)` then `exit 0`. NO bare Write-Output.",
+        "Try/catch [System.IO.PathTooLongException] for MAX_PATH (pre-mortem #5).",
+        "Try/catch for AMSI/EDR quarantine (pre-mortem #2) — detect via spawn-fail or signal != null.",
+        "ASCII-clean.",
+        "Korean errors 4-part."
       ],
       "owner": null,
-      "blockedBy": ["US-901", "US-902", "US-903", "US-905"]
+      "blockedBy": ["US-1001"]
+    },
+    {
+      "id": "US-1003",
+      "title": "hooks/hooks.json — sibling powershell SessionStart entry (bash[0] byte-identical)",
+      "priority": 4,
+      "passes": true,
+      "acceptanceCriteria": [
+        "hooks/hooks.json modified: SessionStart array gets a NEW second entry alongside existing bash entry. Bash entry [0] preserved BYTE-IDENTICAL (verified via `git diff hooks/hooks.json` — only +N lines, 0 changed lines in bash entry).",
+        "New entry [1]: {\"hooks\":[{\"type\":\"command\",\"shell\":\"powershell\",\"command\":\"powershell -NoProfile -ExecutionPolicy Bypass -File ${CLAUDE_PLUGIN_ROOT}\\\\hooks\\\\session-start.ps1\",\"timeout\":30}]}.",
+        "If US-1000 outcome required guard: add `Get-Command powershell -ErrorAction SilentlyContinue; if (-not $?) { exit 0 }` to command prefix.",
+        "JSON valid (jq '.' < hooks/hooks.json passes).",
+        "PreToolUse + PostToolUse hooks UNTOUCHED."
+      ],
+      "owner": null,
+      "blockedBy": ["US-1000", "US-1001", "US-1002"]
+    },
+    {
+      "id": "US-1004",
+      "title": "tests — 16 NEW test() blocks + 6 NEW expect() in existing files",
+      "priority": 5,
+      "passes": true,
+      "acceptanceCriteria": [
+        "New file tests/install-ps1.test.ts — 7 cases: (1) RELEASE_VERSION literal v0.1.7 + parity with install.sh:48 regex-extracted, (2) AMD64 arch detection, (3) Invoke-WebRequest with -TimeoutSec 600, (4) Move-Item + Start-Sleep + Test-Path re-check (Defender pre-mortem), (5) NO Add-Type / Reflection.Assembly (EDR-clean), (6) explicit Test-Path/Remove-Item NOT `||` operator + comment naming bin/install.sh:80 bug, (7) every catch ConvertTo-Json @{systemMessage=...} envelope + exit 0.",
+        "New file tests/session-start-ps1.test.ts — 9 cases: (1) first line guard (if US-1000 required) OR ErrorActionPreference Stop, (2) $Helper path uses CLAUDE_PLUGIN_ROOT, (3) install.ps1 spawn captures $LASTEXITCODE, (4) `& $Helper session-start` direct exe call, (5) `& $Helper token-init` after session-start, (6) MAX_PATH catch, (7) AMSI/EDR catch, (8) state dir XDG_STATE_HOME mirror (NO LOCALAPPDATA literal in source), (9) token dir XDG_CONFIG_HOME mirror DISTINCT from state dir.",
+        "tests/manifest.test.ts — extend with 5 NEW expect() asserting hooks.json: (a) bash entry [0] byte-identical to v0.1.6 baseline, (b) new entry [1] uses shell:powershell, (c) command references session-start.ps1, (d) timeout 30, (e) JSON valid.",
+        "tests/keychain-windows.test.ts (or similar telemetry test) — extend with 1 NEW expect() asserting telemetry counter exists for ps1 invocations.",
+        "Final test count: 365 pass / 5 skip / 0 fail / ~2279 expect() / 370 tests across 18 files (bun test 2>&1 | tail -5 must show this exact line)."
+      ],
+      "owner": null,
+      "blockedBy": ["US-1001", "US-1002", "US-1003"]
+    },
+    {
+      "id": "US-1005",
+      "title": "docs additive — Windows PS1 mentions in CHANGELOG, quickstart, troubleshooting (4 file edits)",
+      "priority": 6,
+      "passes": true,
+      "acceptanceCriteria": [
+        "CHANGELOG.md — v0.1.7 entry: Added (bin/install.ps1 + hooks/session-start.ps1 + hooks.json sibling powershell entry), Compatibility (Claude Code >= 2.1.84 required for `\"shell\":\"powershell\"` field), Honest tradeoff (US-1000 macOS noise outcome documented).",
+        "docs/pilot/vibe-coder-quickstart.ko.md (or main README if quickstart doesn't exist) — Windows section added: 'Claude Code 2.1.84+ 필요. 자동 설치는 PowerShell 5.1+ 사용. Git Bash/WSL 불필요.' Linux/macOS sections UNTOUCHED.",
+        "docs/pilot/admin-rollout.ko.md — Windows row added to platform support table (or paragraph mentioning PS1 hook).",
+        "bin/README.md:31 — already mentions windows-amd64.exe; extend with: 'Windows installer: bin/install.ps1 (PowerShell 5.1+, no Install-Module).' Linux/macOS lines UNTOUCHED.",
+        "bash tests/docs-link-audit.sh → Broken: 0."
+      ],
+      "owner": null,
+      "blockedBy": ["US-1004"]
+    },
+    {
+      "id": "US-1006",
+      "title": "v0.1.7 release ship — bump + codegen + release-time grep cross-check + tag + CI green + verify",
+      "priority": 7,
+      "passes": false,
+      "acceptanceCriteria": [
+        "Step 1: Version bump 0.1.6 → 0.1.7 in package.json + .claude-plugin/{plugin,marketplace}.json.",
+        "Step 2 (release-time cross-check D2): `diff <(grep -oE 'v?0\\.1\\.7' bin/install.sh) <(grep -oE 'v?0\\.1\\.7' bin/install.ps1)` exit 0 — both files contain v0.1.7 literal.",
+        "Step 3: bun run codegen:version → install.sh + index.ts PLUGIN_VERSION + telemetry.ts.",
+        "Step 4: bun test 2>&1 | tail -8 → '365 pass / 5 skip / 0 fail / 370 tests across 18 files'.",
+        "Step 5: bunx tsc --noEmit → clean.",
+        "Step 6: bash tests/docs-link-audit.sh → Broken: 0.",
+        "Step 7: git commit + push origin main.",
+        "Step 8: git tag v0.1.7 + push origin v0.1.7 → CI release workflow auto-trigger.",
+        "Step 9: CI conclusion success.",
+        "Step 10: bash scripts/release/verify-release.sh v0.1.7 → 'All release assets verified'.",
+        "Step 11: Live binary self-report (downloaded darwin-arm64): `axhub-helpers 0.1.7 (plugin v0.1.7, schema v0)`.",
+        "Step 12: Windows VM smoke (or document deferred to next session — capture binary shape: PE32+ x86-64, 109.6M).",
+        "Step 13: docs/pilot/v0.1.7-verify-result.txt + launch-readiness-checklist baseline updated."
+      ],
+      "owner": null,
+      "blockedBy": ["US-1001", "US-1002", "US-1003", "US-1004", "US-1005"]
     }
   ],
   "metadata": {
-    "task_origin": "/oh-my-claudecode:ralplan + /team ralph (Phase 8 v0.1.4 successor — keychain bridge Windows expansion)",
-    "phase8_predecessor": "v0.1.4 commit d18bdb6 — macOS keychain bridge ship + Linux code-only + Windows deferred error",
-    "consensus_plan": ".omc/plans/phase-9-windows-keychain-v3.md (3 ralplan rounds: 5 critic fixes round 1 + 6 fixes round 2 + APPROVE round 3)",
+    "task_origin": "/oh-my-claudecode:ralplan + /ralph 진행해 (Phase 10 — Windows PS1 hooks)",
+    "phase9_predecessor": "v0.1.6 commit post-2fd6c48 — Windows keychain bridge (PowerShell + advapi32 PInvoke) shipped, but install.sh + session-start.sh remain bash-only → Windows users without Git Bash/WSL still broken end-to-end",
+    "consensus_plan": ".omc/plans/phase-10-windows-ps1-hooks-v2.md (2 ralplan rounds: 9 fixes round 1 + APPROVE round 2)",
     "deslop": "enabled",
     "critic": "architect",
-    "scope_note": "Linux/macOS branches UNTOUCHED. Windows from-scratch. CLI 변경 X. Codespaces vibe coder uses AXHUB_TOKEN env var (Linux binary preserved).",
-    "phase_10_deferred": "v0.1.6 Authenticode code-signing for Windows binary → EDR allowlist legitimization, format-parity repair (US-905 issue), Real Windows GitHub Actions runner for E2E."
+    "scope_note": "Linux/macOS sh files BYTE-IDENTICAL. Compiled binary unchanged (already cross-compiles to windows-amd64.exe). Additive PS1 layer + hooks.json sibling entry only.",
+    "phase_11_deferred": "v0.1.8 — Authenticode .ps1 + .exe signing (EDR allowlist legitimization), GitHub Actions windows-latest runner for CI E2E, claude_code.minVersion manifest field if Anthropic schema adds support, fix install.sh:80 operator precedence bug."
   }
 }

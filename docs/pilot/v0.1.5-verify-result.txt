@@ -1,0 +1,73 @@
+v0.1.5 release verification — Phase 9 Windows keychain bridge ship
+======================================================================
+
+Verified at: 2026-04-24
+Verifier: jocoding-ax-partners (Phase 9 architect ralph)
+Tag: v0.1.5
+Commit: 2fd6c48 (feat: v0.1.5 — Phase 9 Windows keychain bridge)
+
+CI release workflow
+-------------------
+Run ID: 24882394344
+URL: https://github.com/jocoding-ax-partners/axhub/actions/runs/24882394344
+Status: completed
+Conclusion: success
+Build job: ✓ Build cross-arch + cosign sign — all 11 steps green
+E2E job: skipped (gated by E2E_ENABLED repo var, expected)
+
+verify-release.sh v0.1.5 output
+-------------------------------
+Downloading release assets from jocoding-ax-partners/axhub@v0.1.5...
+Verifying manifest.json signature (cosign keyless)...
+Verified OK
+Manifest signature OK.
+Verifying each binary signature + checksum...
+OK: axhub-helpers-darwin-amd64
+OK: axhub-helpers-darwin-arm64
+OK: axhub-helpers-linux-amd64
+OK: axhub-helpers-linux-arm64
+OK: axhub-helpers-windows-amd64.exe
+---
+All release assets verified for jocoding-ax-partners/axhub@v0.1.5
+
+Live binary self-report (downloaded darwin-arm64)
+--------------------------------------------------
+$ /tmp/axhub-helpers-v015 version
+axhub-helpers 0.1.5 (plugin v0.1.5, schema v0)
+
+→ self-reports 0.1.5 (matches plugin v0.1.5) — codegen sync correct.
+
+Windows binary smoke check (downloaded windows-amd64.exe)
+---------------------------------------------------------
+$ ls -lh /tmp/win-v015.exe
+/tmp/win-v015.exe  109.6M
+$ file /tmp/win-v015.exe
+/tmp/win-v015.exe: PE32+ executable (console) x86-64, for MS Windows
+
+→ Binary shape correct (PE32+ x86-64, 109.6M matches v0.1.0 baseline).
+→ Cannot exec on macOS host. Real Windows VM smoke deferred to next pilot session
+  per Phase 9 plan acceptance (E1 manual checklist in docs/RELEASE.md).
+
+Phase 9 acceptance summary
+--------------------------
+US-901 ✓  keychain.ts Windows branch — PowerShell + Add-Type advapi32 PInvoke + ASCII sentinel
+US-902 ✓  docs additive — 6 file Windows mentions (Linux/macOS untouched)
+US-903 ✓  tests/keychain.test.ts (8 extracted) + tests/keychain-windows.test.ts (6 mocked)
+US-905 ✓  GitHub issue #1 — format-parity v0.1.6 deferral tracking
+US-904 ✓  v0.1.5 release ship — manifest sig + 5 binary sigs + sha256 검증 통과
+
+Test baseline
+-------------
+bun test → 349 pass / 5 skip / 0 fail / 2256 expect() / 354 tests across 16 files
+typecheck → clean
+docs link audit → Broken: 0
+
+Honest tradeoff (EDR — recorded in CHANGELOG)
+---------------------------------------------
+v0.1.5 windows-amd64.exe is unsigned. EDR / AMSI / corporate AV may block the
+inline PInvoke against advapi32!CredReadW as Mimikatz pattern. Korean error
+message ERR_EDR in keychain-windows.ts owns this — recommends AXHUB_TOKEN env
+var until v0.1.6 Authenticode signing makes EDR allowlist viable.
+
+Tracked: https://github.com/jocoding-ax-partners/axhub/issues/1 (format-parity
+companion item also deferred to v0.1.6).
