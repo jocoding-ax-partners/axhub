@@ -599,11 +599,11 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
-  test("frontmatter contains ONLY name + description keys", () => {
+  test("frontmatter contains ONLY allowed keys (Phase 18: + multi-step / needs-preflight)", () => {
     for (const [, content] of skillContents) {
       const fm = content.split("\n---\n")[0].slice(4);
       const keys = fm.match(/^[a-z-]+:/gm) ?? [];
-      const allowed = new Set(["name:", "description:"]);
+      const allowed = new Set(["name:", "description:", "multi-step:", "needs-preflight:"]);
       for (const k of keys) {
         expect(allowed.has(k)).toBe(true);
       }

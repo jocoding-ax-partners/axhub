@@ -1,6 +1,8 @@
 ---
 name: status
 description: 이 스킬은 사용자가 배포 진행 상황 또는 상태를 묻거나 추적하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "배포 상태", "어떻게 됐어", "됐어", "다 됐어", "끝났어", "지금 어디까지", "어디쯤이야", "진행 중이야", "방금 거 됐어", "올라갔어", "떴어", "라이브 됐어", "반영 됐어", "빌드 됐어", "상태 봐", "진행 상황 알려주세요", "배포 끝났나요", "어디까지 됐나요", "status", "watch", "follow", "progress", "is it done", "deploy state", "build status", 또는 진행 중 axhub 배포를 추적하는 모든 요청. NDJSON tick 스트림을 한국어 진행 안내로 humanize 하고 terminal exit code 를 empathy catalog 로 라우팅합니다.
+multi-step: false
+needs-preflight: false
 ---
 
 # Deploy Status (watch + narrate)

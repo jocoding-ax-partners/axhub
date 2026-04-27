@@ -1,6 +1,8 @@
 ---
 name: logs
 description: 이 스킬은 사용자가 axhub 배포의 빌드 로그 또는 런타임 로그를 보고 싶어할 때 사용합니다. 다음 표현에서 활성화: "로그 봐", "로그 보여줘", "로그 까봐", "빌드 로그 봐", "런타임 로그 봐", "왜 실패했어", "왜 안돼", "왜 깨졌어", "왜 죽었어", "에러 봐", "에러 메시지 봐", "콘솔 봐", "출력 보여줘", "방금 거 로그", "로그 보여주세요", "빌드 로그 확인해주세요", "실패 원인 알려주세요", "에러 로그 보여주세요", "logs", "log", "tail", "build output", "console", "console log", "error log", "runtime log", "why did it fail", "why is it broken", 또는 axhub 로그 조회 요청. 기본값은 빌드 로그이며 명시적 런타임 의도가 있을 때만 pod 로그를 제시합니다.
+multi-step: false
+needs-preflight: false
 ---
 
 # Deploy Logs (follow + classify source)
