@@ -1,4 +1,4 @@
-# axhub-helpers Windows installer — picks windows-amd64 binary, downloads from
+﻿# axhub-helpers Windows installer — picks windows-amd64 binary, downloads from
 # GitHub releases, places at bin/axhub-helpers.exe.
 #
 # Mirrors bin/install.sh logic for Windows hosts without Git Bash/WSL.
@@ -15,7 +15,7 @@
 $ErrorActionPreference = 'Stop'
 
 $BinDir = Split-Path -Parent $PSCommandPath
-$ReleaseVersion = if ($env:AXHUB_PLUGIN_RELEASE) { $env:AXHUB_PLUGIN_RELEASE } else { 'v0.1.8' }
+$ReleaseVersion = if ($env:AXHUB_PLUGIN_RELEASE) { $env:AXHUB_PLUGIN_RELEASE } else { 'v0.1.9' }
 $ReleaseBase = "https://github.com/jocoding-ax-partners/axhub/releases/download/$ReleaseVersion"
 
 # Windows only ships amd64 (per package.json build:all)

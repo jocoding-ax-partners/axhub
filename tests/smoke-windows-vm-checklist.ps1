@@ -1,4 +1,4 @@
-# Phase 11 US-1103 — Windows VM smoke executor (companion to
+﻿# Phase 11 US-1103 — Windows VM smoke executor (companion to
 # docs/pilot/windows-vm-smoke-checklist.md). Codifies 14 steps as
 # PowerShell functions. Guarded by $env:AXHUB_VM_SMOKE so it never
 # runs accidentally outside the dedicated pilot session.

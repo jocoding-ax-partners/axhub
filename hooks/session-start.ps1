@@ -1,4 +1,4 @@
-# SessionStart shim for Windows — PowerShell mirror of hooks/session-start.sh.
+﻿# SessionStart shim for Windows — PowerShell mirror of hooks/session-start.sh.
 #
 # Flow (mirrors sh version):
 #   1. If ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers.exe missing AND
