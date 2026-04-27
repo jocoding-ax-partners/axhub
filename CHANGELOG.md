@@ -7,6 +7,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 Nothing yet.
 
+## [0.1.17] — 2026-04-27
+
+Phase 17 — vibe coder UX uplift across 11 SKILLs / 9 commands. Plan: `.omc/plans/phase-17-ux-uplift-v2.md` (ralplan consensus, Critic round 3 APPROVE).
+
+### Added
+
+- **D1 TTY guard** (C1/US-1701) — 11 SKILLs 모두 non-interactive context (`! [ -t 1 ] || $CI || $CLAUDE_NON_INTERACTIVE`) 에서 AskUserQuestion 호출 건너뛰고 안전한 기본값으로 진행. v0.1.12 status/logs + v0.1.15 deploy hotfix 와 동일 패턴, 이번에 AskUserQuestion 표면 전체에 적용.
+- **TodoWrite progress UI** (C2/US-1702) — deploy/recover/update/upgrade/doctor 5 SKILL 워크플로 시작에 TodoWrite 추가. Vibe coder 가 실시간 체크박스로 어디까지 왔는지 한 눈에 봐요. activeForm 모두 해요체.
+- **AskUserQuestion polish** (C3/US-1703) — 8 SKILL 의 모든 question JSON 에 `header` 필드 (≤12 char chip) 추가. 질문 문자열 해요체 통일 (보시겠어요/원하시나요/할까요 → 볼래요/원해요/해요).
+- **argument-hint frontmatter** (C4/US-1704) — commands/help.md 추가 (8/9 이미 있었어요). 슬래시 명령 자동완성에 hint 표시.
+- **!command preflight injection** (C6/US-1706) — deploy/recover/apis/apps SKILL 시작에 `!\`${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json\`` 사전 실행. 모델 컨텍스트에 auth_status / current_app / current_env / last_deploy_id / last_deploy_status / plugin_version 자동 주입. Step 1 별도 bash round-trip 줄어요. PreToolUse Bash hook 은 preprocessing 에서 trigger 안 해요.
+- **Statusline** (C7/US-1707) — `bin/statusline.sh` 신규. 캐시 + 토큰 읽고 ≤80 char 한국어 한 줄 출력 (`axhub: <app> · <profile> · 최근 배포 <SHA8> (<status>)`). 사용자가 `~/.claude/settings.json` 에 `statusLine` 설정 추가하면 켜져요. deploy/recover SKILL 워크플로 끝에 `~/.cache/axhub-plugin/last-deploy.json` 캐시 기록.
+- **Per-question fallback registry** (C5/US-1705) — `tests/fixtures/ask-defaults/registry.json` 신규. SKILL 별 × 질문 별 safe_default + rationale. drift catch — 새 AskUserQuestion 추가시 registry 등록 안 하면 test FAIL.
+- **6 new test files** — `tests/ux-{todowrite,askuserquestion-headers,argument-hints,ask-fallback-defaults,ask-fallback-registry,statusline}.test.ts`. v0.1.14/v0.1.15 drift mode 회복 mechanical 차단.
+- **Strict subprocess smoke** — `tests/live-plugin-smoke.sh SMOKE_STRICT=1` 기본. TIMEOUT 또는 non-zero exit 시 harness 자체가 exit 1. capture-only 모드는 SMOKE_STRICT=0 으로 보존.
+
+### Changed
+
+- `src/axhub-helpers/preflight.ts PreflightOutput` — current_app / current_env / last_deploy_id / last_deploy_status / plugin_version 5 필드 확장. 기존 cli_version / auth_ok 출력은 backward-compatible.
+
+### Test baseline
+
+- `bun test` → 477 pass / 5 skip / 0 fail / 2510 expect / 482 tests / 26 files (+74 from v0.1.16, +6 test files).
+- `bunx tsc --noEmit` → clean.
+- `bun lint:tone --strict` → 0 error / 0 warning across 18 files.
+- `bun lint:keywords --check` → OK no diff vs baseline.
+- `bun run release:check` → OK at v0.1.17, 5 cross-arch binaries verified.
+
+### Honest tradeoff
+
+- D2 universal PreToolUse hook injection (vs D1 per-call guard) — deferred to Phase 18 if drift recurs in v0.1.18. Registry test enables mechanical D2 migration with zero re-derivation cost.
+- Notification hook (Slack/webhook for non-terminal vibe coders) — deferred Phase 18.
+- Agent SDK `permissionDecision: "defer"` for SDK consumers embedding axhub — deferred Phase 19+.
+- MCP elicitation — deferred Phase 20+ (axhub doesn't ship MCP server today).
+- Statusline auto-install — Claude Code plugin can't install user-level `statusLine` config; user opts in by adding to `~/.claude/settings.json`. Doc/PR follow-up.
+- deploy SKILL Step 3 preview is text card (5-field identity), NOT structured JSON — registry handles via `default_subprocess_action`. JSON migration deferred Phase 18.
+
 ## [0.1.16] — 2026-04-27
 
 Hotfix follow-up — v0.1.15 honest-tradeoff entry promised release procedure 강제. 이번 cycle 에서 처리.

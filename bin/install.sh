@@ -45,7 +45,7 @@ TARGET_PATH="${BIN_DIR}/${TARGET_NAME}"
 
 # Maintainer: when bumping plugin version (package.json + .claude-plugin/*),
 # update this default to match the new release tag. Override via AXHUB_PLUGIN_RELEASE.
-RELEASE_VERSION="${AXHUB_PLUGIN_RELEASE:-v0.1.16}"
+RELEASE_VERSION="${AXHUB_PLUGIN_RELEASE:-v0.1.17}"
 RELEASE_BASE="https://github.com/jocoding-ax-partners/axhub/releases/download/${RELEASE_VERSION}"
 
 if [ ! -f "$TARGET_PATH" ]; then
