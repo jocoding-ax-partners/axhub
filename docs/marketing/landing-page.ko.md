@@ -146,7 +146,7 @@ Claude Code  ──→  axhub plugin
 [1] 본인이 직접 try (5분)
     ┌────────────────────────────────────────────────┐
     │ /plugin marketplace add jocoding-ax-partners/  │
-    │   axhub-plugin-cc                              │
+    │   axhub                              │
     │ /plugin install axhub@axhub                    │
     │ bash ${CLAUDE_PLUGIN_ROOT}/bin/install.sh      │
     │ /axhub:login                                   │

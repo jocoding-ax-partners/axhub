@@ -100,7 +100,7 @@ To run diagnostics:
 ## NEVER
 
 - NEVER attempt auto-fix from doctor — only report + suggest the next natural-language phrase. The user routes to the relevant sibling skill.
-- NEVER echo the raw token contents even if `~/.config/axhub/token` is readable.
+- NEVER echo the raw token contents even if `~/.config/axhub-plugin/token` is readable.
 - NEVER skip preflight — that is the single source of truth for version + auth state.
 - NEVER mark the system "정상" when any required field is null.
 

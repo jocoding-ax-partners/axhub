@@ -74,6 +74,14 @@ describe("release.yml workflow shape (US-204)", () => {
     expect(content).toContain("axhub-helpers-*");
     expect(content).toContain("*.sig");
   });
+
+  test("manual workflow_dispatch requires an explicit semver tag input", () => {
+    content = readFileSync(path, "utf8");
+    expect(content).toMatch(/workflow_dispatch:\s*\n\s*inputs:\s*\n\s*tag:/);
+    expect(content).toMatch(/TAG=.*github\.event\.inputs\.tag/);
+    expect(content).toMatch(/refs\/tags\/v\*/);
+    expect(content).toMatch(/ref: \$\{\{ github\.event_name == 'workflow_dispatch' && github\.event\.inputs\.tag \|\| github\.ref \}\}/);
+  });
 });
 
 describe("manifest.ts generator (US-204)", () => {
@@ -97,6 +105,40 @@ describe("manifest.ts generator (US-204)", () => {
     const content = readFileSync(path, "utf8");
     expect(content).toContain("createHash");
     expect(content).toContain('"sha256"');
+  });
+
+  test("excludes cosign signature and certificate sidecars from binary manifest entries", () => {
+    const content = readFileSync(path, "utf8");
+    expect(content).toContain('!f.endsWith(".sig")');
+    expect(content).toContain('!f.endsWith(".pem")');
+  });
+});
+
+describe(".versionrc.json release lifecycle", () => {
+  const path = join(REPO_ROOT, ".versionrc.json");
+
+  test("postbump stages all generated tracked version files before commit/tag", () => {
+    const config = JSON.parse(readFileSync(path, "utf8")) as {
+      scripts: { postbump?: string; posttag?: string };
+    };
+    const postbump = config.scripts.postbump ?? "";
+    for (const generatedPath of [
+      "bin/install.sh",
+      "bin/install.ps1",
+      "src/axhub-helpers/index.ts",
+      "src/axhub-helpers/telemetry.ts",
+    ]) {
+      expect(postbump).toContain(generatedPath);
+    }
+    expect(postbump).toContain("git add");
+    expect(postbump.indexOf("git add")).toBeLessThan(postbump.indexOf("bun run release:check"));
+  });
+
+  test("posttag no longer asks maintainers to amend the already-created release tag", () => {
+    const config = JSON.parse(readFileSync(path, "utf8")) as {
+      scripts: { posttag?: string };
+    };
+    expect(config.scripts.posttag ?? "").not.toMatch(/commit --amend|amend/);
   });
 });
 

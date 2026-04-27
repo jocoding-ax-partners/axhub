@@ -8,7 +8,7 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
 
 ## 1. `cold-cache` — multi-machine deployment cache miss
 
-**When it fires:** user on a second laptop says "방금 배포한 거 status" but `~/.config/axhub/deployments.json` is empty (cache lives per-machine; the deploy was created on a different machine — PLAN §3.4, E4).
+**When it fires:** user on a second laptop says "방금 배포한 거 status" but `~/.config/axhub-plugin/deployments.json` is empty (cache lives per-machine; the deploy was created on a different machine — PLAN §3.4, E4).
 
 ### Flow
 
@@ -27,9 +27,9 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
 
 3. **Fall back to live list.** Once the app is known:
    ```bash
-   axhub deploy list --app <APP_SLUG> --json --limit 3
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP_ID_OR_SLUG> --limit 3
    ```
-   (Confirm `deploy list` exists in CLI v0.1.0 first — see PLAN E10 caveat. If absent, prompt user for `deployment_id` directly.)
+   (`axhub deploy list` is not available in ax-hub-cli v0.1.x, so the helper calls the REST fallback directly.)
 
 4. **Present last 3 candidates** via AskUserQuestion:
    ```
@@ -45,7 +45,7 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
    axhub deploy status <DEPLOY_ID> --app <APP_SLUG> --json
    ```
 
-6. **Persist locally.** Write the chosen `(deployment_id → app_id)` mapping to this machine's `~/.config/axhub/deployments.json` so the next "방금 거" works immediately.
+6. **Persist locally.** Write the chosen `(deployment_id → app_id)` mapping to this machine's `~/.config/axhub-plugin/deployments.json` so the next "방금 거" works immediately.
 
 ### Korean reassurance
 
@@ -95,13 +95,13 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
             export AXHUB_TOKEN=axhub_pat_... 로 바로 우회 가능)
    ```
 
-4. **Receive token via AskUserQuestion (text input).** Save to `~/.config/axhub/token` with mode 0600:
+4. **Receive token via AskUserQuestion (text input).** Save to `~/.config/axhub-plugin/token` with mode 0600:
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-install --from-stdin
-   # Internally: umask 077; cat > ~/.config/axhub/token; chmod 600
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-import
+   # Internally: umask 077; cat > ~/.config/axhub-plugin/token; chmod 600
    ```
 
-5. **Verify.** Run `axhub auth status --json --token-file ~/.config/axhub/token`. On success, set `$AXHUB_TOKEN_FILE` for the session and continue with the original intent.
+5. **Verify.** Run `AXHUB_TOKEN="$(cat "$HOME/.config/axhub-plugin/token")" axhub auth status --json`. On success, helpers can read `~/.config/axhub-plugin/token` directly; for raw `axhub` CLI calls in this shell, export `AXHUB_TOKEN` from that file and continue with the original intent.
 
 6. **Never echo the token.** Hooks must redact any `axhub_pat_*` pattern from `tool_response` before classification (PLAN E7).
 
@@ -230,7 +230,7 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
 
 4. **On "watch":** route to flow #4 (`watch-narration`) with `<IN_FLIGHT_DEPLOY_ID>`. **Do NOT call `axhub deploy create` again** under any circumstances. PreToolUse hook will deny a re-invocation of `deploy create` for the same `{app, branch, commit}` within 30s as a defense-in-depth check.
 
-5. **On "later":** schedule a single follow-up after 5 min via `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers schedule --action recheck-deploy --app <APP_ID> --after 300`. When fires, run `axhub deploy status` on the in-flight ID; if terminal, notify user and offer to re-run their original deploy intent.
+5. **On "later":** do not call a background scheduler helper (none ships in v0.1.x). Tell the user you'll pause here and suggest: "5분 뒤에 `/axhub:status <IN_FLIGHT_DEPLOY_ID>` 를 다시 실행하면 바로 확인할 수 있어요." If they ask to watch now, route to flow #4 instead.
 
 6. **NEVER auto-retry create.** This is the single most important guarantee. Phase 3 E2 explicitly identified retry-on-create as the trust killer.
 

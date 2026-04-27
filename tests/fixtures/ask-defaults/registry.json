@@ -9,6 +9,10 @@
     "다시 로그인할래요?": {
       "safe_default": "abort",
       "rationale": "Subprocess cannot complete OAuth Device Flow. Abort + tell user to re-run interactively."
+    },
+    "로그아웃할래요?": {
+      "safe_default": "abort",
+      "rationale": "Logout deletes the local axhub token; subprocess/non-interactive mode must not kill a session automatically."
     }
   },
   "recover": {

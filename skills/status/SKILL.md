@@ -62,7 +62,7 @@ To check status:
 
 7. **On any non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by exit code:
    - exit 65 → token expired template + AskUserQuestion to run auth login
-   - exit 67 → resource not found + did-you-mean from `axhub deploy list`
+   - exit 67 → resource not found + did-you-mean from `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments`
    - exit 68 → rate limit + Retry-After backoff
    - exit 1 → transport error; retry the watch once for read paths
 

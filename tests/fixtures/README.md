@@ -1,6 +1,6 @@
 # Fixtures — frozen parseAxhubCommand contract
 
-38 hand-curated `parseAxhubCommand` cases, one .json file each. Loaded by `tests/fixtures.test.ts` to detect any unintentional change in parser semantics.
+40 hand-curated `parseAxhubCommand` cases, one .json file each. Loaded by `tests/fixtures.test.ts` to detect any unintentional change in parser semantics.
 
 ## Curation methodology
 
@@ -9,7 +9,7 @@ Each fixture pins the EXPECTED parser output for one specific input. The fixture
 | Category | Count | What it pins |
 |---|---|---|
 | `destructive-*` | 10 | All destructive command shapes (deploy_create with various flag styles, update_apply, auth_login) |
-| `ro-*` | 8 | Read-only commands that MUST NOT trigger consent gate (apps/apis list, deploy status/logs, auth status) |
+| `ro-*` | 10 | Read-only commands that MUST NOT trigger consent gate (apps/apis list, deploy status/logs, auth status) |
 | `adv-*` | 8 | Adversarial wrappers that MUST still be detected (env-prefix, $(), eval, &&, ;, |, bash -c) |
 | `uni-*` | 4 | Unicode edge cases (Cyrillic homoglyph, ZWJ, full-width digit, NBSP) |
 | `prf-*` | 4 | Profile/headless boundary (AXHUB_PROFILE env, --version, --help, token-paste) |

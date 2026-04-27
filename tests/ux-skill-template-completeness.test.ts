@@ -4,6 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
@@ -32,6 +33,38 @@ describe("Phase 18 C3/US-1805 — skill:doctor --strict gate", () => {
     const lines = result.stdout.split("\n").filter((l) => l.trim().length > 0);
     for (const line of lines) {
       expect(line).toMatch(/^skills\/[a-z][a-z0-9-]*\/SKILL\.md: missing /);
+    }
+  });
+
+  test("skill-doctor diagnostic format is exercised with a controlled missing-pattern fixture", () => {
+    const fixtureDir = join(REPO_ROOT, "skills", "_doctor-format-fixture");
+    try {
+      mkdirSync(fixtureDir, { recursive: true });
+      writeFileSync(
+        join(fixtureDir, "SKILL.md"),
+        [
+          "---",
+          "name: _doctor-format-fixture",
+          "description: 이 스킬은 테스트용 AskUserQuestion 누락 fixture 입니다.",
+          "---",
+          "",
+          "AskUserQuestion",
+          "",
+        ].join("\n"),
+      );
+
+      const result = spawnSync("bun", ["scripts/skill-doctor.ts", "--strict"], {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        timeout: 30000,
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stdout.split("\n").filter(Boolean)).toContain(
+        "skills/_doctor-format-fixture/SKILL.md: missing D1 sentinel",
+      );
+    } finally {
+      rmSync(fixtureDir, { recursive: true, force: true });
     }
   });
 });

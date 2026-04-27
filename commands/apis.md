@@ -1,6 +1,6 @@
 ---
 description: axhub API 카탈로그 보기 (privacy-aware — 다른 팀 목록은 명시 동의 필요)
-allowed-tools: Bash(axhub:*), Bash(jq:*)
+allowed-tools: Bash(axhub-helpers:*), Bash(axhub:*), Bash(jq:*)
 argument-hint: "[--query <text>]"
 model: sonnet
 ---

@@ -767,7 +767,7 @@ Vibe coders use context-dependent references constantly. The recent-context cach
 | 그 로그 | last `deploy logs` invocation target |
 | 어제 그 앱 | app referenced ≥24h ago — fall back to `apps list` if cache miss |
 
-**Fallback rule:** if cache lookup fails (cold-cache, multi-machine), fall through to `axhub deploy list --app <slug> --json` and present last 3 candidates via AskUserQuestion. See `recovery-flows.md` ("cold-cache").
+**Fallback rule:** if cache lookup fails (cold-cache, multi-machine), fall through to `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <slug> --limit 3` and present last 3 candidates via AskUserQuestion. See `recovery-flows.md` ("cold-cache").
 
 **Never silently guess.** If two recent entities are equally likely (same timestamp, both apps mentioned), ask via AskUserQuestion with numbered choices.
 

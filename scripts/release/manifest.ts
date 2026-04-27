@@ -44,7 +44,9 @@ const sha256File = (path: string): string => {
 
 const main = (): void => {
   const binDir = join(import.meta.dir, "..", "..", "bin");
-  const files = readdirSync(binDir).filter((f) => f.startsWith("axhub-helpers-") && !f.endsWith(".sig"));
+  const files = readdirSync(binDir).filter(
+    (f) => f.startsWith("axhub-helpers-") && !f.endsWith(".sig") && !f.endsWith(".pem"),
+  );
   files.sort();
 
   const binaries: ManifestEntry[] = files.map((f) => {

@@ -506,6 +506,10 @@ describe("commands/*.md frontmatter", () => {
     }
   });
 
+  test("login command does not advertise unsupported token-file auth flags", () => {
+    expect(cmdContents.get("login.md")!).not.toContain("--token-file");
+  });
+
   test("help command exists", () => {
     expect(cmdFiles).toContain("help.md");
   });
@@ -516,6 +520,23 @@ describe("commands/*.md frontmatter", () => {
 
   test("login command exists (auth entrypoint)", () => {
     expect(cmdFiles).toContain("login.md");
+  });
+
+  test("commands allow axhub-helpers when their target skill invokes the helper binary", async () => {
+    const skillByCommand = new Map([
+      ["apis.md", "apis"],
+      ["apps.md", "apps"],
+      ["login.md", "auth"],
+    ]);
+    for (const [commandFile, skillSlug] of skillByCommand) {
+      const command = cmdContents.get(commandFile)!;
+      const skill = await readFile(join(REPO_ROOT, "skills", skillSlug, "SKILL.md"), "utf8");
+      if (skill.includes("axhub-helpers")) {
+        expect(command, `${commandFile} delegates to skills/${skillSlug}/SKILL.md`).toContain(
+          "Bash(axhub-helpers:*)",
+        );
+      }
+    }
   });
 });
 
@@ -659,12 +680,88 @@ describe("skills/*/SKILL.md frontmatter", () => {
     // user/admin explicitly sets the env var, not when the plugin forces it.
     expect(updateContent).not.toMatch(/AXHUB_DISABLE_AUTOUPDATE=1\s+axhub/);
   });
+
+  test("skills use stdin JSON consent-mint instead of unsupported flags", () => {
+    for (const [slug, content] of skillContents) {
+      expect(content, slug).not.toMatch(/consent-mint\s+--/);
+    }
+    for (const slug of ["deploy", "recover", "auth"]) {
+      const content = skillContents.get(slug)!;
+      expect(content).toMatch(/\|\s*\$\{CLAUDE_PLUGIN_ROOT\}\/bin\/axhub-helpers consent-mint/);
+    }
+  });
+
+  test("auth headless token-paste docs use token-import and the plugin token path", () => {
+    const files = [
+      skillContents.get("auth")!,
+      skillContents.get("deploy")!,
+      skillContents.get("recover")!,
+    ];
+    for (const content of files) {
+      expect(content).not.toContain("token-install");
+      expect(content).not.toContain("~/.config/axhub/token");
+    }
+    expect(skillContents.get("auth")!).toContain("token-import");
+    expect(skillContents.get("auth")!).toContain("~/.config/axhub-plugin/token");
+  });
+
+  test("auth logout path prompts with AskUserQuestion before running axhub auth logout", () => {
+    const authContent = skillContents.get("auth")!;
+    const logoutIdx = authContent.indexOf("axhub auth logout");
+    expect(logoutIdx).toBeGreaterThan(0);
+    const logoutSectionPrefix = authContent.slice(0, logoutIdx);
+    expect(logoutSectionPrefix).toContain('"question": "로그아웃할래요?"');
+    expect(logoutSectionPrefix).toContain('"value": "abort"');
+  });
+
+  test("skills do not instruct unavailable deploy-list or helper-schedule commands", () => {
+    for (const [slug, content] of skillContents) {
+      expect(content, slug).not.toMatch(/^\s*axhub deploy list\b/m);
+      expect(content, slug).not.toContain("axhub-helpers schedule");
+    }
+  });
+
+  test("skill error-catalog cross references are resolvable relative paths", () => {
+    for (const [slug, content] of skillContents) {
+      if (slug === "deploy") continue; // deploy owns references/error-empathy-catalog.md locally.
+      expect(content, slug).not.toMatch(/route to `error-empathy-catalog\.md`/);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
 // Reason: Cross-file consistency — broken cross-refs break loader silently.
 // ---------------------------------------------------------------------------
 describe("cross-manifest consistency", () => {
+  test("headless auth references use implemented token-import command and plugin token path", async () => {
+    for (const relPath of [
+      "skills/deploy/references/headless-flow.md",
+      "skills/deploy/references/recovery-flows.md",
+      "docs/troubleshooting.ko.md",
+      "docs/org-admin-rollout.ko.md",
+    ]) {
+      const content = await readFile(join(REPO_ROOT, relPath), "utf8");
+      expect(content, relPath).not.toContain("token-install");
+      expect(content, relPath).not.toContain("~/.config/axhub/token");
+      expect(content, relPath).toContain("token-import");
+      expect(content, relPath).toContain("~/.config/axhub-plugin/token");
+    }
+  });
+
+  test("current user-facing auth docs do not advertise legacy token-file env or flags", async () => {
+    for (const relPath of [
+      "commands/login.md",
+      "docs/troubleshooting.ko.md",
+      "docs/org-admin-rollout.ko.md",
+      "skills/auth/SKILL.md",
+    ]) {
+      const content = await readFile(join(REPO_ROOT, relPath), "utf8");
+      expect(content, relPath).not.toContain("AXHUB_TOKEN_FILE");
+      expect(content, relPath).not.toContain("--token-file");
+      expect(content, relPath).not.toMatch(/consent-mint\s+--/);
+    }
+  });
+
   test("plugin.json name matches package.json name suffix", () => {
     expect(packageJson.name).toContain(pluginJson.name);
   });
@@ -682,7 +779,7 @@ describe("cross-manifest consistency", () => {
     const knownSubcommands = new Set([
       "session-start", "preauth-check", "consent-mint", "consent-verify",
       "resolve", "preflight", "classify-exit", "redact", "version", "help",
-      "token-install", "list-deployments", "token-import",
+      "list-deployments", "token-import",
     ]);
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {

@@ -1,6 +1,6 @@
 ---
 description: 현재 프로필이 볼 수 있는 axhub 앱 목록 (읽기 전용)
-allowed-tools: Bash(axhub:*), Bash(jq:*)
+allowed-tools: Bash(axhub-helpers:*), Bash(axhub:*), Bash(jq:*)
 argument-hint: "[--all] [--slug-prefix <name>]"
 model: sonnet
 ---

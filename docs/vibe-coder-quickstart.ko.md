@@ -34,7 +34,7 @@ Claude Code 한 곳에서 한국어 자연어로 ("내 앱 배포해") 말하면
 axhub 플러그인을 Claude Code 에 등록합니다. 평생 한 번만 하면 됩니다.
 
 ```text
-/plugin marketplace add jocoding-ax-partners/axhub-plugin-cc
+/plugin marketplace add jocoding-ax-partners/axhub
 /plugin install axhub@axhub
 ```
 
@@ -229,6 +229,6 @@ axhub 로그인해줘
 
 - 에러 메시지가 떴는데 무엇을 뜻하는지 모르겠다 → [troubleshooting.ko.md](./troubleshooting.ko.md)
 - 회사 단위로 도입 / 정책 / 보안 질문 → 회사 axhub 관리자 또는 [org-admin-rollout.ko.md](./org-admin-rollout.ko.md)
-- 플러그인 자체의 버그 / 기능 요청 → https://github.com/jocoding-ax-partners/axhub-plugin-cc/issues
+- 플러그인 자체의 버그 / 기능 요청 → https://github.com/jocoding-ax-partners/axhub/issues
 
 > **두려워하지 마세요.** axhub 플러그인은 destructive 한 모든 동작 (배포, 토큰 변경 등) 전에 반드시 한 번 더 묻게 설계되어 있습니다. "엔터" 한 번에 prod 가 망가지는 일은 일어나지 않습니다.

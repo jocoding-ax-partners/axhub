@@ -34,6 +34,7 @@ tests/.last-run/
 .omc/state/
 .omc/sessions/
 .omc/logs/
+.omc/plans/*.md
 .omx/
 
 # Autoplan restore points (transient)

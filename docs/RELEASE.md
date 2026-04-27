@@ -48,13 +48,14 @@ bun run release -- --release-as 0.1.20   # 명시 version
 # 자동 수행:
 #  ✓ package.json + plugin.json + marketplace.json (3 files) 버전 bump
 #  ✓ postbump hook: codegen:version (install.sh/ps1/index.ts/telemetry.ts 동기화)
+#                   + generated version file staging
 #                   + release:check (5 cross-arch binary build + version assert)
 #  ✓ CHANGELOG.md 자동 entry generation (Conventional Commits → Added/Fixed sections)
 #  ✓ git commit + git tag vX.Y.Z
 
-# 2. CHANGELOG narrative 본문 추가 (해요체, 사람이 작성)
-vim CHANGELOG.md   # auto-bullets 위에 Phase NN 한국어 narrative 1-3 문장
-git commit --amend --no-edit -a   # tag commit 에 narrative 추가
+# 2. CHANGELOG narrative 본문 확인
+# tag 생성 뒤에는 amend 하지 않습니다. 필요한 narrative 는 release 전 별도 docs commit 으로 반영해요.
+git show --stat --oneline HEAD
 
 # 3. push
 git push origin main --tags
@@ -86,7 +87,8 @@ git push origin main --tags
 The `release.yml` workflow auto-fires on the tag push. Watch progress:
 
 ```bash
-gh workflow run --watch
+gh run list --workflow release.yml --limit 1
+gh run watch <run-id>
 ```
 
 ### What gets uploaded to the release
@@ -166,4 +168,4 @@ If you see `update.cosign_verification_failed`:
 ## Out of scope (this PR)
 
 - **Cosign key generation**: not needed for keyless signing. If you want to switch to long-lived keys (some org policies require this), generate via `cosign generate-key-pair` and modify `release.yml` to use `--key`. This requires storing `COSIGN_PASSWORD` + `COSIGN_PRIVATE_KEY` as repo secrets — see [cosign docs](https://docs.sigstore.dev/cosign/key_management/signing_with_self-managed_keys/).
-- **Marketplace publish**: separate step after first signed release lands. Currently the plugin is consumed via `/plugin marketplace add jocoding-ax-partners/axhub-plugin-cc`; no signed-marketplace-asset workflow exists yet (Phase 4 deferred).
+- **Marketplace publish**: separate step after first signed release lands. Currently the plugin is consumed via `/plugin marketplace add jocoding-ax-partners/axhub`; no signed-marketplace-asset workflow exists yet (Phase 4 deferred).

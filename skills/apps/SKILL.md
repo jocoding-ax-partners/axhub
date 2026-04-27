@@ -63,9 +63,9 @@ To list apps:
    }
    ```
 
-6. **On `validation.app_list_truncated`** (>100 apps server-side): route to `error-empathy-catalog.md` ("exit 64 + validation.app_list_truncated"); ask user to provide a numeric `--app <id>` directly.
+6. **On `validation.app_list_truncated`** (>100 apps server-side): route to `../deploy/references/error-empathy-catalog.md` ("exit 64 + validation.app_list_truncated"); ask user to provide a numeric `--app <id>` directly.
 
-7. **On non-zero exit**, route to `error-empathy-catalog.md` by exit code (65 / 67 / 68 / 1). Read paths may auto-retry once on exit 1.
+7. **On non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by exit code (65 / 67 / 68 / 1). Read paths may auto-retry once on exit 1.
 
 ## NEVER
 

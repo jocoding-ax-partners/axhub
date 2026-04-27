@@ -2,6 +2,7 @@ LIMITATION: libsecret-tools CLI path only — Coverage: 40% READ-path (axhub-hel
 
 STATUS: RUNNING
 TIMESTAMP_START: 2026-04-27T02:47:22Z
+LIBSECRET_TOOLS_VERSION: 0.21.4-1build3
 #0 building with "orbstack" instance using docker driver
 
 #1 [internal] load build definition from smoke-linux-docker.Dockerfile
@@ -30,6 +31,7 @@ TIMESTAMP_START: 2026-04-27T02:47:22Z
 #7 naming to docker.io/library/axhub-linux-smoke:phase-11 done
 #7 DONE 0.0s
 [container] starting dbus session
+[container] libsecret-tools version=0.21.4-1build3
 [container] seeding secret-tool with envelope
 [container] secret-tool store exit=0
 [container] secret-tool lookup recovered length=262
