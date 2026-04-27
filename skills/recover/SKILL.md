@@ -9,7 +9,7 @@ needs-preflight: true
 
 Restore the previous known-good deploy by **redeploying the prior commit**, not by reversing the current one. The axhub v0.1.0 CLI has no `axhub deploy rollback` command — this skill is transparent about that.
 
-> "이건 진짜 rollback이 아니라 forward-fix예요 — 직전 안정 커밋을 다시 배포하는 방식입니다. 결과는 같지만 새 배포가 한 건 더 생겨요."
+> "이건 진짜 rollback이 아니라 forward-fix예요 — 직전 안정 커밋을 다시 배포하는 방식이에요. 결과는 같지만 새 배포가 한 건 더 생겨요."
 
 ## Workflow
 
@@ -108,7 +108,7 @@ To recover:
 
 7. **On non-zero exit from create**, route to `../deploy/references/error-empathy-catalog.md`. The `validation.deployment_in_progress` case is especially relevant here (user might recover during another deploy) — follow `../deploy/references/recovery-flows.md` ("deployment_in_progress") and offer to watch the in-flight deploy first.
 
-8. **No prior succeeded deploy found.** Surface: "되돌릴 수 있는 직전 안정 배포를 못 찾았어요. 이 앱의 첫 배포이거나, 모든 이전 배포가 실패한 상태일 수 있어요. 'logs'로 현재 배포 원인 먼저 보시겠어요?"
+8. **No prior succeeded deploy found.** Surface: "되돌릴 수 있는 직전 안정 배포를 못 찾았어요. 이 앱의 첫 배포이거나, 모든 이전 배포가 실패한 상태일 수 있어요. 'logs'로 현재 배포 원인 먼저 볼래요?"
 
 9. **Cache last-deploy for statusline (Phase 17 US-1707).** After Step 5 terminal status, write the recovery summary so `bin/statusline.sh` can show it across sessions:
 

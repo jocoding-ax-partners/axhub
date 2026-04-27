@@ -60,7 +60,7 @@ To handle auth:
    - 2순위: 별도 노트북에서 `axhub auth login` 실행 후, 그 노트북의 keychain에서 토큰 추출 → secure 채널 (Slack DM, secure email) 로 헤드리스 환경에 전달 → `export AXHUB_TOKEN=...`
    - 3순위: pasted token을 `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-install --from-stdin` 으로 `~/.config/axhub/token` 에 mode 0600 저장
 
-   **Token 자동 추출 메커니즘:** 브라우저 환경에서는 `axhub auth login` 한 번 실행 후, 헬퍼의 `token-init` 서브커맨드가 macOS keychain / Linux secret-service / Windows Credential Manager (PowerShell + Add-Type 단일 호출) 에서 `axhub` CLI 가 저장한 토큰을 자동 추출합니다. vibe coder 가 별도 토큰 setup 단계를 볼 일 없습니다.
+   **Token 자동 추출 메커니즘:** 브라우저 환경에서는 `axhub auth login` 한 번 실행 후, 헬퍼의 `token-init` 서브커맨드가 macOS keychain / Linux secret-service / Windows Credential Manager (PowerShell + Add-Type 단일 호출) 에서 `axhub` CLI 가 저장한 토큰을 자동 추출해요. vibe coder 가 별도 토큰 setup 단계를 볼 일 없어요.
 
 5. **On `browser`** (browser available):
 
@@ -71,7 +71,7 @@ To handle auth:
      | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
    ```
 
-   `auth_login` binding은 실제 app/branch/commit이 필요 없지만 `asConsentBinding`이 모든 필드에서 비어있지 않은 문자열을 요구하므로 `"_"`를 플레이스홀더로 사용합니다. `tool_call_id`는 반드시 `<session_id>:<tool_call_id>` 형식으로 조합해야 hook의 검증과 일치합니다.
+   `auth_login` binding은 실제 app/branch/commit이 필요 없지만 `asConsentBinding`이 모든 필드에서 비어있지 않은 문자열을 요구하므로 `"_"`를 플레이스홀더로 사용해요. `tool_call_id`는 반드시 `<session_id>:<tool_call_id>` 형식으로 조합해야 hook의 검증과 일치해요.
 
    **5b. Run auth login**:
 
@@ -79,7 +79,7 @@ To handle auth:
    axhub auth login
    ```
 
-   PreToolUse hook이 step 5a에서 발급한 consent token을 검증합니다. 유효하면 브라우저가 열려 OAuth Device Flow가 시작됩니다. 만료되거나 없으면 hook이 한국어 메시지와 함께 deny합니다.
+   PreToolUse hook이 step 5a에서 발급한 consent token을 검증해요. 유효하면 브라우저가 열려 OAuth Device Flow가 시작돼요. 만료되거나 없으면 hook이 한국어 메시지와 함께 deny 해요.
 
    After completion, re-run `axhub auth status --json` and render the identity card from step 2.
 
@@ -100,7 +100,7 @@ To handle auth:
 - NEVER call `axhub auth login` without first checking `auth status` (avoids re-login when already valid).
 - NEVER persist tokens outside `~/.config/axhub/token` (0600).
 - NEVER call `axhub auth logout` without confirming via AskUserQuestion (destructive — kills active session).
-- NEVER call `axhub auth login` without running `consent-mint --action auth_login` (step 5a) first — PreToolUse hook이 consent token 없이 deny합니다.
+- NEVER call `axhub auth login` without running `consent-mint --action auth_login` (step 5a) first — PreToolUse hook이 consent token 없이 deny 해요.
 
 ## Additional Resources
 

@@ -76,7 +76,12 @@ const PHASE_13_FILES = async (): Promise<string[]> => {
   for await (const f of glob("commands/*.md", { cwd: REPO_ROOT })) {
     commandFiles.push(f);
   }
-  const all = [...explicit, ...commandFiles].map((f) => join(REPO_ROOT, f));
+  // Phase 18 R4 — extend scope to skills/*/SKILL.md (verified clean by C0.5 prep run).
+  const skillFiles: string[] = [];
+  for await (const f of glob("skills/*/SKILL.md", { cwd: REPO_ROOT })) {
+    skillFiles.push(f);
+  }
+  const all = [...explicit, ...commandFiles, ...skillFiles].map((f) => join(REPO_ROOT, f));
   return all.filter((f) => existsSync(f));
 };
 
@@ -97,7 +102,20 @@ const scan = async (): Promise<Violation[]> => {
   for (const file of files) {
     const content = readFileSync(file, "utf8");
     const lines = content.split("\n");
-    for (let i = 0; i < lines.length; i++) {
+    // Phase 18 R4 — for SKILL.md files, skip YAML frontmatter (between first
+    // two `---` lines). description: contains nl-lexicon activation phrases
+    // anchored byte-identical via lint:keywords baseline. Phase 14/15 deferred
+    // territory — do NOT lint frontmatter prose.
+    let frontmatterEnd = 0;
+    if (file.endsWith("/SKILL.md") && lines[0] === "---") {
+      for (let j = 1; j < lines.length; j++) {
+        if (lines[j] === "---") {
+          frontmatterEnd = j + 1;
+          break;
+        }
+      }
+    }
+    for (let i = frontmatterEnd; i < lines.length; i++) {
       const line = lines[i];
       if (!line) continue;
       for (const token of FORBIDDEN) {

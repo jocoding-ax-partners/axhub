@@ -48,7 +48,7 @@ To check status:
 
 4. **Render Korean narration.** Apply the throttle + phase table from `../deploy/references/recovery-flows.md` ("watch-narration"): one line per ~25s, terminal-state lines are unthrottled. Examples:
 
-   - 0s + `queued` → "배포 요청 받았어요. 잠시 후 빌드 시작합니다 (정상)"
+   - 0s + `queued` → "배포 요청 받았어요. 잠시 후 빌드 시작해요 (정상)"
    - ~30s + `building` → "30초 경과, 빌드 시작했어요 (정상)"
    - ~1m + `building` → "1분 경과, 빌드 중이에요 (정상). 보통 2~3분 정도 걸려요"
    - ~2m + `pushing_image` → "2분 경과, 이미지 푸시 중이에요 (정상). 거의 다 왔어요"
@@ -56,7 +56,7 @@ To check status:
    - terminal `succeeded` → trigger exit 0 success template
    - terminal `failed` → trigger exit 1/65/66/67/68 template per emitted error
 
-5. **Silent stream guard.** If 60s pass with no NDJSON event, emit "조용하네요. 서버 응답 기다리는 중입니다 (정상). 30초 후 다시 알려드릴게요."
+5. **Silent stream guard.** If 60s pass with no NDJSON event, emit "조용하네요. 서버 응답 기다리는 중이에요 (정상). 30초 후 다시 알려줄게요."
 
 6. **User interrupt.** If the user says "그만 봐", "그만", "충분해", "stop watching", terminate the watch process and report the last observed phase. The deploy continues server-side regardless.
 

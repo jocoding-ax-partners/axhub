@@ -91,7 +91,7 @@ To deploy:
    Render humanized Korean progress every ~30s ("1분 경과, 빌드 중이에요 (정상)") per `references/recovery-flows.md` ("watch-narration").
 
 6. **On any non-zero exit**, route to `references/error-empathy-catalog.md` by exit code:
-   - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 당신 앱은 안전합니다. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.
+   - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 앱은 안전해요. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.
    - exit 65 → token expired template + AskUserQuestion to run auth login
    - exit 67 → resource not found + did-you-mean suggestion from apps list
    - exit 68 → rate limit + Retry-After backoff

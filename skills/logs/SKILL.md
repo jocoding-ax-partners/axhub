@@ -54,7 +54,7 @@ To fetch logs:
    - exit 68 → rate limit (logs is the most rate-limited surface)
    - exit 1 → transport; allow one retry on read path
 
-7. **No source available.** If both build and pod logs return empty, emit: "아직 로그가 없어요. 배포가 시작되기 전이거나, 빌드 단계가 너무 빨라서 출력이 캡처 안 됐을 수 있어요. 'status'로 단계 먼저 확인해보시겠어요?"
+7. **No source available.** If both build and pod logs return empty, emit: "아직 로그가 없어요. 배포가 시작되기 전이거나, 빌드 단계가 너무 빨라서 출력이 캡처 안 됐을 수 있어요. 'status'로 단계 먼저 확인해볼래요?"
 
 ## NEVER
 
