@@ -79,7 +79,31 @@ GO decision by: `_____________________` (admin) + `_____________________` (jocod
 
 ---
 
-## 별첨: release verification baseline (v0.1.7)
+## 별첨: release verification baseline (v0.1.9)
+
+**Pilot 권장 release: v0.1.9** (Phase 11 work shipped as v0.1.8 → UTF-8 BOM hotfix v0.1.9 — windows-smoke CI caught Korean mojibake before pilot exposure).
+
+Pilot 시작 전 plugin v0.1.9 release cosign signature + sha256 무결성 검증 결과:
+
+- 검증 명령: `bash scripts/release/verify-release.sh v0.1.9`
+- 검증 시점: 2026-04-27
+- 검증자: jocoding-ax-partners (Phase 11 ralph)
+- 검증 결과: **✓ All release assets verified for jocoding-ax-partners/axhub@v0.1.9**
+- Live binary self-report (darwin-arm64): `axhub-helpers 0.1.9 (plugin v0.1.9, schema v0)` ✓
+- Windows GHA CI smoke: ✓ install.ps1 + session-start.ps1 + Add-Type advapi32!CredReadW PInvoke 모두 green
+- Linux Docker smoke: ✓ secret-tool → axhub-helpers token-init exit=0 → token written mode=600
+
+### v0.1.9 evolution from v0.1.8 (BOM hotfix story)
+
+1. v0.1.8 shipped Phase 11 (codegen install.ps1 + format-parity + Windows GHA CI workflow)
+2. windows-smoke CI ran for FIRST time on v0.1.8 tag
+3. PowerShell 7 on Windows mojibake'd Korean strings (UTF-8 .ps1 read as Windows-1252 without BOM)
+4. install.ps1 crashed at parse time before AXHUB_SKIP_AUTODOWNLOAD env check
+5. v0.1.9 hotfix prepended UTF-8 BOM to all 3 .ps1 files
+6. v0.1.9 windows-smoke CI: GREEN
+7. **Detection win:** without Phase 11 windows-smoke CI workflow, this would have shipped to vibe coder Windows pilots
+
+## 별첨 (예전): release verification baseline (v0.1.7)
 
 **Pilot 권장 release: v0.1.7** (Phase 10 — Windows PS1 hooks 추가. Git Bash/WSL 없이도 stock Windows 10/11 에서 plugin end-to-end 작동. Claude Code >= 2.1.84 필수).
 
