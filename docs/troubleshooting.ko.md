@@ -177,7 +177,7 @@ keychain 이 사용 불가한 환경 (특정 Linux 컨테이너 등) 에서는 h
 방금 거 되돌려줘
 ```
 
-라고 말하면 플러그인의 `recover` skill 이 자동으로 위 절차를 안내합니다 (앞으로 ship 예정 — M1+ 에서 작동).
+라고 말하면 플러그인의 `recover` skill 이 현재 동작합니다. 실제 rollback 명령을 호출하지 않고, 직전 안정 commit 을 새 배포로 다시 올리는 **forward-fix-as-rollback** 카드와 승인 흐름을 안내합니다.
 
 > 회사 정책상 진짜 즉각적인 rollback 이 필요한 경우 (장애 대응 등) → 회사 axhub 관리자에게 백엔드 차원의 traffic switch 를 요청하세요. [org-admin-rollout.ko.md — 사고 대응 runbook](./org-admin-rollout.ko.md#사고-대응-runbook) 참고.
 
