@@ -7,6 +7,14 @@ description: 이 스킬은 사용자가 팀에 등록된 axhub 앱 목록을 보
 
 Show registered axhub apps for the current team. Read-only — never triggers a mutation, never needs consent token.
 
+**Pre-execute preflight context (Phase 17 US-1706 — `!command` injection)**:
+
+```
+!`${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json`
+```
+
+이 줄은 Claude Code SKILL preprocessing 으로 워크플로 시작 전에 실행돼요. 출력 (auth_status, current_app, current_env) 이 컨텍스트에 자동 주입돼서 별도 auth/profile 호출이 줄어요.
+
 ## Workflow
 
 To list apps:

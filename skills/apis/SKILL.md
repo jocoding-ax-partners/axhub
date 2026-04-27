@@ -9,6 +9,14 @@ List axhub APIs available to the current app. **Privacy-first**: default scope i
 
 ## Workflow
 
+**Pre-execute preflight context (Phase 17 US-1706 — `!command` injection)**:
+
+```
+!`${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json`
+```
+
+이 줄은 Claude Code SKILL preprocessing 으로 워크플로 시작 전에 실행돼요. 출력 (auth_status, current_app, current_env) 이 컨텍스트에 자동 주입돼서 Step 1 pre-flight + Step 2 resolve 호출이 줄어요.
+
 To list APIs:
 
 1. **Pre-flight.** Confirm auth:

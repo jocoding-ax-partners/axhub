@@ -18,10 +18,16 @@
  *   or PATH state during CI.
  */
 
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 import semver from "semver";
 
 export const MIN_AXHUB_CLI_VERSION = "0.1.0";
 export const MAX_AXHUB_CLI_VERSION = "0.2.0"; // exclusive (audit row 49)
+
+const LAST_DEPLOY_CACHE = join(homedir(), ".cache", "axhub-plugin", "last-deploy.json");
 
 // Exit code constants (PLAN §3.2 contract).
 export const EXIT_OK = 0;
@@ -136,6 +142,42 @@ export interface PreflightOutput {
   endpoint: string | null;
   user_email: string | null;
   expires_at: string | null;
+  // Phase 17 US-1706 — !command injection context for vibe coder UX.
+  // current_app reads $AXHUB_APP_SLUG (set by deploy/recover write-back);
+  // last_deploy_* read from ~/.cache/axhub-plugin/last-deploy.json (written by C7).
+  current_app: string | null;
+  current_env: string | null;
+  last_deploy_id: string | null;
+  last_deploy_status: string | null;
+  plugin_version: string;
+}
+
+interface LastDeployCache {
+  deployment_id: string;
+  status: string;
+  app_slug?: string;
+}
+
+function readLastDeployCache(): LastDeployCache | null {
+  if (!existsSync(LAST_DEPLOY_CACHE)) return null;
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(LAST_DEPLOY_CACHE, "utf8"));
+    if (parsed && typeof parsed === "object") {
+      const obj = parsed as Record<string, unknown>;
+      const id = obj["deployment_id"];
+      const status = obj["status"];
+      if (typeof id === "string" && typeof status === "string") {
+        return {
+          deployment_id: id,
+          status,
+          app_slug: typeof obj["app_slug"] === "string" ? obj["app_slug"] : undefined,
+        };
+      }
+    }
+  } catch {
+    // Corrupt cache — treat as absent. Cache writer (C7) writes atomically.
+  }
+  return null;
 }
 
 /**
@@ -188,6 +230,7 @@ export function runPreflight(runner: CommandRunner = defaultRunner): {
     authStatus = parseAuthStatus(authResult.stdout);
   }
 
+  const cache = readLastDeployCache();
   const output: PreflightOutput = {
     cli_version: cliVersion,
     in_range: inRange,
@@ -201,6 +244,11 @@ export function runPreflight(runner: CommandRunner = defaultRunner): {
     endpoint: process.env["AXHUB_ENDPOINT"] || null,
     user_email: authStatus.ok ? authStatus.user_email : null,
     expires_at: authStatus.ok ? authStatus.expires_at : null,
+    current_app: process.env["AXHUB_APP_SLUG"] || cache?.app_slug || null,
+    current_env: process.env["AXHUB_PROFILE"] || null,
+    last_deploy_id: cache?.deployment_id || null,
+    last_deploy_status: cache?.status || null,
+    plugin_version: process.env["AXHUB_PLUGIN_VERSION"] || "0.1.17",
   };
 
   if (!cliPresent || !inRange) return { output, exitCode: EXIT_USAGE };

@@ -11,6 +11,14 @@ Restore the previous known-good deploy by **redeploying the prior commit**, not 
 
 ## Workflow
 
+**Pre-execute preflight context (Phase 17 US-1706 — `!command` injection)**:
+
+```
+!`${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json`
+```
+
+이 줄은 Claude Code SKILL preprocessing 으로 워크플로 시작 전에 실행돼요. 출력 (auth_status, current_app, last_deploy_id, last_deploy_status) 이 컨텍스트에 자동 주입돼서 직전 배포 정보 호출이 줄어요.
+
 To recover:
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).** Call TodoWrite at workflow start so the user sees rollback steps as a journey:

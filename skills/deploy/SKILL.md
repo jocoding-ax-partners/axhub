@@ -9,6 +9,14 @@ Deploy a vibe coder's app to axhub with safety primitives. Use the adapter `axhu
 
 ## Workflow
 
+**Pre-execute preflight context (Phase 17 US-1706 — `!command` injection)**:
+
+```
+!`${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json`
+```
+
+이 줄은 Claude Code SKILL preprocessing 으로 워크플로 시작 전에 실행돼요. 출력 (auth_status, current_app, current_env, last_deploy_id, last_deploy_status, plugin_version) 이 모델 컨텍스트에 자동 주입돼서 Step 1 의 별도 bash 호출이 줄어요. PreToolUse Bash hook 은 preprocessing 단계에서 trigger 안 해요 (Claude Code SKILL primitive 동작).
+
 To deploy:
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).** Call TodoWrite at workflow start so the user can glance and see how far we've come:
