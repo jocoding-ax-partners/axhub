@@ -923,22 +923,24 @@ The adapter layer (`bin/axhub-helpers`) remains the source of truth for testable
 
 ### 16.7 Best Practices Audit Checklist
 
-Before M1 ship, audit against:
+Status ledger as of 2026-04-27. This section is no longer a live TODO list; open boxes here previously made completed work look unimplemented. Any new row must be either machine-gated in tests/scripts or explicitly marked as out-of-scope/manual evidence.
 
-- [ ] All hook commands use `${CLAUDE_PLUGIN_ROOT}` prefix
-- [ ] hooks.json uses `{"hooks": {...}}` wrapper
-- [ ] PreToolUse uses command-based HMAC consent hook with structured JSON output
-- [ ] All hook commands emit `hookSpecificOutput` JSON (not just exit code)
-- [ ] All SKILL.md ≤2000 words; detailed content in references/
-- [ ] All skill descriptions use third-person "This skill should be used when the user asks to..." or the approved Korean equivalent
-- [ ] All skill bodies use imperative form (no "you should...")
-- [ ] All commands have `description` + `allowed-tools` + `argument-hint` + `model`
-- [ ] Commands written as instructions FOR Claude, not messages TO user
-- [ ] All references/, examples/, scripts/ subdirs created where applicable
-- [ ] `bin/axhub-helpers` TypeScript/Bun single binary builds and emits structured JSON
-- [ ] Validate with `claude --debug` and `/hooks` command
-- [ ] Use `skill-reviewer` agent on each SKILL.md
-- [ ] Use `plugin-validator` agent on overall structure
+| Status | Item | Evidence |
+|---|---|---|
+| **DONE** | All hook commands use `${CLAUDE_PLUGIN_ROOT}` prefix | `tests/manifest.test.ts` → hooks.json structure checks. |
+| **DONE** | hooks.json uses `{"hooks": {...}}` wrapper | `tests/manifest.test.ts` → hooks wrapper checks. |
+| **DONE** | PreToolUse uses command-based HMAC consent hook with structured JSON output | `src/axhub-helpers/index.ts`, `tests/consent.test.ts`, `tests/fixtures.test.ts`, `tests/manifest.test.ts`. |
+| **DONE** | All hook commands emit `hookSpecificOutput` JSON (not just exit code) | `tests/manifest.test.ts` hookSpecificOutput validation. |
+| **DONE** | All SKILL.md files are ≤2000 words; detailed content lives in references/ where needed | Current max skill body is under 1000 words; `skills/deploy/references/*` and `skills/apis/references/*` hold long-form details. |
+| **DONE** | Skill descriptions use third-person "This skill..." or approved Korean equivalent | `tests/manifest.test.ts` skill frontmatter checks. |
+| **DONE** | Skill bodies use imperative form and avoid "you should" | `bun run skill:doctor --strict` plus literal scan in `tests/plan-consistency.test.ts`. |
+| **DONE** | Commands have `description` + `allowed-tools` + `argument-hint` + `model` | `tests/manifest.test.ts` and `tests/ux-argument-hints.test.ts`. |
+| **DONE** | Commands are instructions for Claude, not messages to the user | Command bodies delegate to skills and are covered by command metadata/body checks. |
+| **DONE** | references/, examples/, scripts/ subdirs exist where applicable | Long-form skill details are under `skills/*/references`; no command-specific examples/scripts are required for current v0.1 surface. |
+| **DONE** | `bin/axhub-helpers` TypeScript/Bun single binary builds and emits structured JSON | `bun run release:check`, `tests/manifest.test.ts`, `tests/hook-latency.test.ts`. |
+| **MANUAL EVIDENCE** | Validate with `claude --debug` and `/hooks` command | Covered by committed live smoke evidence under `.omc/evidence/live-plugin-smoke-summary.txt`; keep as manual release smoke, not a blocking code TODO. |
+| **REPLACED BY GATES** | Use `skill-reviewer` agent on each SKILL.md | Replaced by `bun run skill:doctor --strict`, manifest tests, keyword lint, and tone lint for repeatability. |
+| **DONE** | Use `plugin-validator` agent on overall structure | Phase 6 source included plugin-validator review; structural outcomes are locked by `tests/manifest.test.ts`. |
 
 ### 16.8 Phase 5 transition summary
 
@@ -1183,5 +1185,4 @@ M7 (v0.2): MCP server ⚠ unbuilt; coupling risk if skills/ stay markdown-only (
 | 66 | M0 | **REVERSE row 41 + 55 (helper language)**: bin/axhub-helpers = TypeScript on Bun runtime (was Go), single binary via `bun build --compile` | **User decision** | "ts 쓰는게 더 좋지 않아" | (1) Claude Code 자체가 Node/Bun 기반 (2) jax-plugin-cc도 .mjs 사용 (3) Bun cold start 5-20ms는 새 50ms hook gate에 충분 (Go 1ms는 over-engineering) (4) npm 생태계 (jose for HMAC, semver, zod) (5) vibe coder가 codebase 읽기 쉬움 (TS ≫ Go 친숙도) | Go 유지 |
 | 67 | M0 | Build pipeline: Bun + npm scripts + `bun build --compile --target=bun-{platform}-{arch}`, multi-arch single binary, cosign-signed in CI | Auto (cascade) | row 66 | Bun이 멀티플랫폼 single binary 지원 (Go cross-compile 우월성 동등 cover) | go build / Makefile |
 | 68 | M0 | Distribution: src/* TypeScript checked in, bin/axhub-helpers* gitignored (build artifact), runtime requirement = Bun ≥1.1 (개발자) / 사용자는 pre-built binary 사용 | Auto | row 66 | Bun runtime은 dev 머신에만 필요. 사용자는 release tarball의 pre-compiled binary 다운로드 | source-in-bin |
-
 
