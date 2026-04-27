@@ -38,12 +38,20 @@ vim package.json    # "version": "0.1.1"
 vim .claude-plugin/plugin.json
 vim .claude-plugin/marketplace.json
 
-# 2. Run regression locally
+# 2. MANDATORY pre-tag check (v0.1.16 US-1601):
+#    Syncs install.sh/install.ps1/index.ts/telemetry.ts to package.json,
+#    rebuilds bin/axhub-helpers + 5 cross-arch artifacts, asserts each
+#    binary's --version output matches package.json. Fails fast if any
+#    binary stays stale (the v0.1.14 bug: bin/axhub-helpers shipped at
+#    v0.1.10 because nobody ran `bun run build` after version bump).
+bun run release:check
+
+# 3. Run regression locally
 bun test
 bun run typecheck
 bun run smoke:full
 
-# 3. Commit + tag
+# 4. Commit + tag
 git commit -am "chore: bump version to 0.1.1"
 git tag v0.1.1
 git push origin main --tags

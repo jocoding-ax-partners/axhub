@@ -7,6 +7,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 Nothing yet.
 
+## [0.1.16] — 2026-04-27
+
+Hotfix follow-up — v0.1.15 honest-tradeoff entry promised release procedure 강제. 이번 cycle 에서 처리.
+
+### Added
+
+- `scripts/release-check.ts` — release pre-flight script. `codegen:version` → `bun run build` → `bun run build:all` → host 가 실행 가능한 모든 binary 의 `--version` 출력이 package.json version 과 일치하는지 assert. v0.1.14 의 stale binary bug (bin/axhub-helpers v0.1.10 보고하면서 source 는 v0.1.14) 재발 방지.
+- `package.json scripts.release:check` — `bun run release:check` 한 줄로 호출.
+- `docs/RELEASE.md` 절차 step 2 에 MANDATORY 표기 + v0.1.14 사고 회고 1 줄 인용. 정렬: bump → release:check → regression → commit/tag.
+
+### Test baseline
+
+- `bun test` → 403 pass / 5 skip / 0 fail (변동 없음 — 새 script 자체는 pre-flight 도구라 unit test 불필요, integration 검증은 release:check 자기 실행으로 대체).
+- `bunx tsc --noEmit` → clean.
+- `bun lint:tone --strict` → 0 error / 0 warning.
+- `bun run release:check` → OK at v0.1.16, 4 host-runnable binaries verified.
+
+### Honest tradeoff
+
+- pre-push git hook 추가 옵션 검토했으나 보류 — opt-in script (`release:check`) + RELEASE.md MANDATORY 표기로 충분, hook 강제는 contributor onboarding 마찰만 늘어요. 두 번째 사고 발생 시 hook 도입 재검토.
+
 ## [0.1.15] — 2026-04-27
 
 Hotfix — subprocess `claude -p` smoke 재실행으로 발견한 두 가지 버그.
