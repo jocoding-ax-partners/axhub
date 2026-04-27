@@ -176,13 +176,11 @@ async function main(): Promise<number> {
 }
 
 // ============================================================================
-// Subcommand stubs (M0 scaffold; M1+ implements full behavior)
+// Subcommands
 // ============================================================================
 
 async function cmdSessionStart(_args: string[]): Promise<number> {
-  // TODO M0.5: check axhub binary on PATH, version range (semver compare against
-  // MIN_AXHUB_CLI_VERSION/MAX_AXHUB_CLI_VERSION), plugin signature, env hints.
-  let systemMessage = `[axhub] M0 scaffold: session-start placeholder. Plugin v${PLUGIN_VERSION} loaded.`;
+  let systemMessage = sessionStartMessage(runPreflight());
 
   // Phase 3 US-204: cosign sidecar advisory (warn, don't block).
   if (process.env["AXHUB_REQUIRE_COSIGN"] === "1") {
@@ -463,6 +461,45 @@ async function cmdTokenInit(_args: string[]): Promise<number> {
   });
   return 0;
 }
+const sessionStartMessage = (preflight: ReturnType<typeof runPreflight>): string => {
+  const { output, exitCode } = preflight;
+  const lines = [`[axhub] Plugin v${PLUGIN_VERSION} loaded.`];
+
+  if (!output.cli_present) {
+    lines.push("axhub CLI를 찾지 못했어요. 설치 후 `axhub auth login`을 실행해주세요.");
+  } else if (!output.in_range) {
+    const version = output.cli_version ?? "unknown";
+    if (output.cli_too_old) {
+      lines.push(`axhub CLI ${version}은 너무 오래됐어요. \`axhub update apply\`로 업데이트해주세요.`);
+    } else if (output.cli_too_new) {
+      lines.push(`axhub CLI ${version}은 이 플러그인이 검증한 범위를 넘어섰어요. 플러그인 업데이트를 확인해주세요.`);
+    } else {
+      lines.push(`axhub CLI 버전(${version})을 해석하지 못했어요. \`/axhub:doctor\`로 진단해주세요.`);
+    }
+  } else {
+    lines.push(`axhub CLI ${output.cli_version} OK.`);
+  }
+
+  if (exitCode === 0 && output.auth_ok) {
+    const profile = output.profile ?? "default";
+    const endpoint = output.endpoint ?? "default endpoint";
+    lines.push(`로그인: ${output.user_email ?? "unknown"} · profile=${profile} · endpoint=${endpoint}`);
+  } else if (output.cli_present && output.in_range && !output.auth_ok) {
+    lines.push(`로그인이 필요해요 (${output.auth_error_code ?? "auth_required"}). \`/axhub:login\` 또는 "axhub 로그인해줘"를 실행해주세요.`);
+  }
+
+  if (output.current_app || output.last_deploy_id) {
+    const context = [
+      output.current_app ? `app=${output.current_app}` : null,
+      output.last_deploy_id ? `last_deploy=${output.last_deploy_id}` : null,
+      output.last_deploy_status ? `status=${output.last_deploy_status}` : null,
+    ].filter(Boolean).join(" · ");
+    lines.push(`최근 컨텍스트: ${context}`);
+  }
+
+  return lines.join("\n");
+};
+
 
 main()
   .then((code) => process.exit(code))
