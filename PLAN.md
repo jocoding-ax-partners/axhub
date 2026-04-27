@@ -339,7 +339,7 @@ exit 68 → "rate limit. Retry-After 헤더만큼 대기 후 재시도."
 
 ### 8.3 UserPromptSubmit hook (선택) — `hooks/scripts/intent-detect.sh`
 
-사용자 발화에 axhub 키워드 (배포/로그/앱/...) 가 있으면, 가장 최근 `axhub apps list` 캐시나 마지막 deploy id를 system reminder로 주입. **매 프롬프트마다 실행되므로 빠르고 조용해야 함 (5ms 이내, 키워드 없으면 no-op).**
+사용자 발화에 axhub 키워드 (배포/로그/앱/...) 가 있으면, 가장 최근 `axhub apps list` 캐시나 마지막 deploy id를 system reminder로 주입. **매 프롬프트마다 실행되므로 빠르고 조용해야 함 (구현 시 compiled-helper 50ms p95 이내, 키워드 없으면 no-op).**
 
 → **§Phase 3 Eng 리뷰에서 hook 비용/안전성 재검토.**
 
@@ -374,7 +374,7 @@ exit 68 → "rate limit. Retry-After 헤더만큼 대기 후 재시도."
 | **M1.5** | **GO/KILL GATE (P3, P10)** | `tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --score` must pass against the matching docs-only baseline. 위 3개 메트릭 중 1개라도 baseline 못 넘기면: M2 이후 보류, "docs로 ship" 결정. plugin 자체 재고. |
 | **M2** | skills/apps + skills/apis + skills/auth + skills/update + skills/doctor (5개 read-only) | corpus에 read-only 의도 추가 → trusted-completion ≥ 90% (read는 위험 낮음) |
 | **M3** | commands/* (8개 슬래시 wrapper) — skills의 thin wrapper, source of truth는 skill | `/axhub:deploy paydrop --branch main` 명시 호출 동작 |
-| **M4** | hooks/ (SessionStart 진단 + PostToolUse classify-exit) — **axhub 명령 아니면 즉시 no-op (5ms 이내)** | SessionStart surfaces CLI version/auth/profile diagnostics without blocking; hook latency benchmark < 5ms (95p), exit 65/64+in_progress/67/68 자동 분류 정확도 100% |
+| **M4** | hooks/ (SessionStart 진단 + PostToolUse classify-exit) — **axhub 명령 아니면 compiled-helper hot path no-op (50ms p95 이내; audit row 16 현실화)** | SessionStart surfaces CLI version/auth/profile diagnostics without blocking; `bun run bench:hooks` validates non-axhub PreToolUse/PostToolUse p95 < 50ms, exit 65/64+in_progress/67/68 자동 분류 정확도 100% |
 | **M5** | Trust hardening: profile 명시 prompt before destructive op (P5), multi-machine cache cold-start 처리 (P4), 토큰 scope pre-flight (auth status before deploy) | unsafe-trigger 0% 회귀 테스트, 다른 머신/Codespaces에서 첫 deploy 동작 |
 | **M6** | marketplace.json + private/public 결정 + README/CHANGELOG/LICENSE 본격 + 첫 고객사 install 가이드 (Korean) | `/plugin install` flow 동작, 첫 고객사 onboarding doc 완성 |
 <!-- M7 removed by Decision Audit Trail row 62. Plugin MCP server / .mcp.json placeholder / MCP tool naming were canceled by rows 61–64. -->
@@ -388,7 +388,7 @@ exit 68 → "rate limit. Retry-After 헤더만큼 대기 후 재시도."
 | R1 | NL 트리거 오작동 (deploy 의도 아닌데 트리거) | description을 보수적으로, 모호 시 confirm prompt |
 | R2 | 동시 deploy 가드 (`validation.deployment_in_progress`)에서 retry loop 폭주 | skill에 "never retry on exit 64" 명시 + PostToolUse hook이 차단 |
 | R3 | `--app` 캐시는 같은 머신만 유효 → 다른 머신 / Codespaces / CI 에서 깨짐 | skill이 항상 `--app` 명시 fallback |
-| R4 | hooks가 모든 Bash에 PostToolUse 트리거 → 성능 비용 | 스크립트 5ms 내 종료, axhub 명령 아니면 즉시 exit 0 |
+| R4 | hooks가 모든 Bash에 PostToolUse 트리거 → 성능 비용 | `bun run bench:hooks` 기준 compiled-helper p95 < 50ms, axhub 명령 아니면 즉시 exit 0 |
 | R5 | axhub binary가 PATH에 없는 환경 | SessionStart hook이 안내, doctor skill이 진단 |
 | R6 | 한국어 발화 트리거가 description (영어 보통) 매칭 안 됨 | description에 한·영 모두 박기 + 트리거 카탈로그 유지 |
 | R7 | OAuth Device Flow는 브라우저 필요 → headless / CI 에서 깨짐 | `--token-file` / `AXHUB_TOKEN_FILE` 안내, doctor가 검출 |
@@ -891,7 +891,7 @@ For working transcripts: `examples/golden-deploy-transcript.md`, `examples/concu
 **Output contracts:**
 - PreToolUse hook returns `{"hookSpecificOutput": {"permissionDecision": "allow|deny|ask"}, "systemMessage": "<Korean>"}` — Claude sees both.
 - PostToolUse `axhub-helpers classify-exit` reads `tool_response` JSON from stdin, exits 0 with `{"systemMessage": "<exit-code-class + Korean next action>"}`. Non-axhub Bash → `jq -e '.tool_input.command | test("axhub")' || exit 0` (E11 fix).
-- All hook scripts are Go binaries via `axhub-helpers` (sub-1ms cold start) — kills sh+jq 5ms gate problem (E8 fix).
+- All hook paths go through compiled `axhub-helpers`; `bun run bench:hooks` enforces the accepted 50ms p95 no-op hot path from audit row 16 (E8 fix).
 
 ### 16.5 Command Best Practices (revised template)
 
