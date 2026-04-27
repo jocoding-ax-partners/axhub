@@ -107,6 +107,15 @@ To recover:
 
 8. **No prior succeeded deploy found.** Surface: "되돌릴 수 있는 직전 안정 배포를 못 찾았어요. 이 앱의 첫 배포이거나, 모든 이전 배포가 실패한 상태일 수 있어요. 'logs'로 현재 배포 원인 먼저 보시겠어요?"
 
+9. **Cache last-deploy for statusline (Phase 17 US-1707).** After Step 5 terminal status, write the recovery summary so `bin/statusline.sh` can show it across sessions:
+
+   ```bash
+   mkdir -p ~/.cache/axhub-plugin
+   cat > ~/.cache/axhub-plugin/last-deploy.json <<JSON
+   {"deployment_id":"$NEW_DEPLOY_ID","status":"$TERMINAL_STATUS","commit_sha":"$PREV_SHA","app_slug":"$APP_SLUG","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","kind":"recover"}
+   JSON
+   ```
+
 ## NEVER
 
 - NEVER claim this is a real rollback — always say "forward-fix" / "직전 커밋 재배포" in the confirmation card.

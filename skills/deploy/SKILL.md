@@ -97,6 +97,17 @@ To deploy:
 
 7. **Dry-run NL trigger** — if the user said "한번 해보기만", "리허설", "테스트로", "진짜 안 올리고", add `--dry-run` to step 4 and skip step 5.
 
+8. **Cache last-deploy for statusline (Phase 17 US-1707).** After Step 5 terminal status, write the deploy summary so `bin/statusline.sh` can show it across sessions:
+
+   ```bash
+   mkdir -p ~/.cache/axhub-plugin
+   cat > ~/.cache/axhub-plugin/last-deploy.json <<JSON
+   {"deployment_id":"$DEPLOY_ID","status":"$TERMINAL_STATUS","commit_sha":"$COMMIT_SHA","app_slug":"$APP_SLUG","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+   JSON
+   ```
+
+   Skip on `--dry-run` (statusline 은 실제 deploy 만 추적).
+
 ## NEVER
 
 - NEVER retry `axhub deploy create` on exit 64.
