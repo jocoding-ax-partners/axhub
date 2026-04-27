@@ -23,7 +23,8 @@ To clarify:
 
    ```json
    {
-     "question": "어떤 작업을 원하시나요?",
+     "question": "어떤 작업 원해요?",
+     "header": "작업 선택",
      "options": [
        {"label": "1. 배포 (앱 올리기)", "value": "deploy", "description": "현재 코드를 axhub에 배포"},
        {"label": "2. 상태 확인 (배포 어디까지?)", "value": "status", "description": "진행 중인 배포 추적"},

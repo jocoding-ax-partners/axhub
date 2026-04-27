@@ -51,7 +51,8 @@ To list apps:
 
    ```json
    {
-     "question": "앱이 더 있어요. 전체 목록 보시겠어요?",
+     "question": "앱이 더 있어요. 전체 목록 볼래요?",
+     "header": "전체 보기",
      "options": [
        {"label": "네, 전체 보기", "value": "show_all", "description": "현재 팀의 모든 앱"},
        {"label": "지금은 그대로", "value": "skip", "description": "상위 10개로 충분"},

@@ -73,7 +73,8 @@ To upgrade the plugin:
 
    ```json
    {
-     "question": "플러그인 업그레이드 명령을 보여드릴까요?",
+     "question": "플러그인 업그레이드 명령 보여줄까요?",
+     "header": "업그레이드 안내",
      "options": [
        {"label": "네, 명령 보여줘", "value": "show", "description": "/plugin update 슬래시 명령 안내"},
        {"label": "릴리즈 노트 보기", "value": "notes", "description": "변경사항 자세히"},

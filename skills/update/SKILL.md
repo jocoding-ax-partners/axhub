@@ -52,7 +52,8 @@ To handle updates:
 
    ```json
    {
-     "question": "axhub CLI를 업그레이드할까요?",
+     "question": "axhub CLI 업그레이드해요?",
+     "header": "업그레이드",
      "options": [
        {"label": "네, 업그레이드", "value": "apply", "description": "cosign 서명 검증 후 업데이트"},
        {"label": "릴리즈 노트 보기", "value": "notes", "description": "변경사항 자세히 보기"},

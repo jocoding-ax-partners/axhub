@@ -79,7 +79,8 @@ To recover:
 
    ```json
    {
-     "question": "직전 안정 커밋으로 다시 배포할까요?",
+     "question": "직전 안정 커밋으로 다시 배포해요?",
+     "header": "rollback 확인",
      "options": [
        {"label": "네, 직전 커밋으로", "value": "confirm", "description": "<PREV_SHA>를 새로 배포"},
        {"label": "다른 커밋 고르기", "value": "pick_other", "description": "최근 succeeded 배포 목록에서 선택"},

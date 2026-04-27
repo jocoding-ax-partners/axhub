@@ -83,7 +83,8 @@ To run diagnostics:
 
    ```json
    {
-     "question": "여러 항목 점검 필요해요. 어디부터 고칠까요?",
+     "question": "여러 항목 점검 필요해요. 어디부터 고쳐요?",
+     "header": "고칠 항목",
      "options": [
        {"label": "1. CLI 업그레이드", "value": "upgrade", "description": "skills/update 호출"},
        {"label": "2. 로그인 다시", "value": "login", "description": "skills/auth 호출"},

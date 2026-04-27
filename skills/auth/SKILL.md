@@ -41,7 +41,8 @@ To handle auth:
 
    ```json
    {
-     "question": "다시 로그인할까요?",
+     "question": "다시 로그인할래요?",
+     "header": "로그인 방법",
      "options": [
        {"label": "네, 브라우저로 로그인", "value": "browser", "description": "axhub auth login (OAuth Device Flow)"},
        {"label": "토큰 파일로 로그인 (헤드리스)", "value": "token_file", "description": "Codespaces나 SSH 환경"},
