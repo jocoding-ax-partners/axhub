@@ -7,7 +7,7 @@ axhub 진단 결과:
   ✓ CLI 설치:        v0.1.8 (/opt/homebrew/bin/axhub)
   ✓ 버전 범위:       호환 (in_range: true)
   ✓ 로그인:          giri@jocodingax.ai
-  ✓ 만료:            2026-04-28T05:01:49Z (약 ~17시간 남음)
+  ✓ 만료:            2026-04-28T05:01:49Z (약 ~23시간 남음)
   ✓ 권한 (scope):    read, write
   ✓ 환경 (profile):  default (기본값 사용 중)
   ✓ endpoint:        https://hub-api.jocodingax.ai (기본값)

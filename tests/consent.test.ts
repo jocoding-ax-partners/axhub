@@ -16,7 +16,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -26,6 +27,8 @@ import {
   verifyToken,
   type ConsentBinding,
 } from "../src/axhub-helpers/consent.ts";
+
+const REPO_ROOT = join(import.meta.dir, "..");
 
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -77,6 +80,47 @@ describe("mintToken / verifyToken", () => {
     expect(result.valid).toBe(true);
     expect(result.reason).toBeUndefined();
   });
+
+  test("mint fails fast without CLAUDE_SESSION_ID instead of writing an unverifiable token", async () => {
+    delete process.env["CLAUDE_SESSION_ID"];
+
+    await expect(mintToken(baseBinding(), 60)).rejects.toThrow(/CLAUDE_SESSION_ID/);
+    expect(existsSync(join(tmpRoot, "state", "axhub", "hmac-key"))).toBe(false);
+    expect(existsSync(join(tmpRoot, "runtime", "axhub"))).toBe(false);
+  });
+
+  test("CLI consent-mint also fails fast without CLAUDE_SESSION_ID across process boundary", () => {
+    const env = { ...process.env };
+    delete env["CLAUDE_SESSION_ID"];
+    env["XDG_STATE_HOME"] = join(tmpRoot, "state");
+    env["XDG_RUNTIME_DIR"] = join(tmpRoot, "runtime");
+
+    const result = spawnSync("bun", ["src/axhub-helpers/index.ts", "consent-mint"], {
+      cwd: REPO_ROOT,
+      env,
+      input: JSON.stringify(baseBinding()),
+      encoding: "utf8",
+      timeout: 10000,
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("CLAUDE_SESSION_ID");
+  });
+
+  test.skipIf(process.platform === "win32")(
+    "mint rejects a symlinked consent file instead of overwriting its target",
+    async () => {
+      const runtimeRoot = join(tmpRoot, "runtime", "axhub");
+      mkdirSync(runtimeRoot, { recursive: true });
+      const targetPath = join(tmpRoot, "symlink-target.json");
+      const originalTarget = "do-not-overwrite";
+      writeFileSync(targetPath, originalTarget);
+      symlinkSync(targetPath, join(runtimeRoot, `consent-${process.env["CLAUDE_SESSION_ID"]}.json`));
+
+      await expect(mintToken(baseBinding(), 60)).rejects.toThrow(/symlink|consent/i);
+      expect(readFileSync(targetPath, "utf8")).toBe(originalTarget);
+    },
+  );
 
   test("expired token: ttl=1, sleep 2s, verify fails with expired reason", async () => {
     const binding = baseBinding();

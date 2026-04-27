@@ -98,7 +98,7 @@ The `secret: true` flag tells the harness to treat the input as a credential —
 The helper validates the pasted string before writing:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-install --from-stdin
+${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-import
 ```
 
 Rejection rules (Korean error messages):
@@ -108,20 +108,20 @@ Rejection rules (Korean error messages):
 | Doesn't start with `axhub_pat_` | "토큰 형식이 아니에요. 다시 1단계부터 해주세요. 출력 마지막 줄만 복사하면 됩니다." |
 | Contains whitespace mid-string | "토큰 가운데에 공백이 들어갔어요. 줄바꿈 없이 한 줄로 붙여넣어 주세요." |
 | Length < 32 chars | "토큰이 너무 짧아요. 잘려서 복사된 것 같아요. 다시 복사해주세요." |
-| Already exists at `~/.config/axhub/token` | (after AskUserQuestion confirm) "기존 토큰을 덮어쓸까요?" — yes/cancel |
+| Already exists at `~/.config/axhub-plugin/token` | (after AskUserQuestion confirm) "기존 토큰을 덮어쓸까요?" — yes/cancel |
 
-On success: `axhub auth status --json --token-file ~/.config/axhub/token` runs immediately to confirm the token works. If `auth status` returns `code: token_invalid`, the file is deleted and the user is told the token failed validation (likely expired between issuance and paste). Re-enter the flow from step 1.
+On success: `AXHUB_TOKEN="$(cat "$HOME/.config/axhub-plugin/token")" axhub auth status --json` runs immediately to confirm the token works without relying on unsupported `--token-file` flags. If `auth status` returns `code: token_invalid`, the file is deleted and the user is told the token failed validation (likely expired between issuance and paste). Re-enter the flow from step 1.
 
 ---
 
-## 3. Token storage 보안 (`~/.config/axhub/token` 0600, redact when echoing)
+## 3. Token storage 보안 (`~/.config/axhub-plugin/token` 0600, redact when echoing)
 
 ### File mode
 
 The token file MUST be created with mode `0600` (owner read+write only). The helper uses `umask 077` before the write to defend against race conditions where the file briefly exists at default mode:
 
 ```ts
-// Inside ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-install
+// Inside ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-import
 const oldMask = process.umask(0o077);
 try {
   await Bun.write(tokenPath, tokenString, { mode: 0o600 });
@@ -139,10 +139,10 @@ The post-write `mode` check is mandatory. On some filesystems (NFS, certain Dock
 
 ### Storage location rules
 
-- Default: `~/.config/axhub/token` (XDG-compliant, per-user).
+- Default: `~/.config/axhub-plugin/token` (XDG-compliant, per-user).
 - Codespaces / SSH: same path; Codespaces persists `~/.config/` across rebuilds.
 - Shared machine policy (PLAN §16.16): if the helper detects shared-machine markers (multiple `$HOME` users in `/Users` or `/home` AND `$AXHUB_PROFILE != "personal"`), it warns: "이 노트북은 여러 사람이 쓰는 것 같아요. 작업 끝나면 'axhub auth logout' 으로 토큰 지우는 걸 잊지 마세요."
-- NEVER write to `/tmp`, `/var/tmp`, or any path outside `$HOME/.config/axhub/`.
+- NEVER write to `/tmp`, `/var/tmp`, or any path outside `$HOME/.config/axhub-plugin/`.
 - NEVER duplicate the token to another path "for backup" — single source of truth.
 
 ### Redaction on echo (PLAN E7)
@@ -215,7 +215,7 @@ The `auto_fallback: true` field is read by the corpus scorer (`tests/score.ts`) 
 ## Cross-flow rules
 
 - **Detection is one-shot per session.** SessionStart writes; skills read. No live re-detection unless the auto-fallback in section 4 fires.
-- **Token storage is single-path.** Always `~/.config/axhub/token`, mode 0600, with post-write verification.
+- **Token storage is single-path.** Always `~/.config/axhub-plugin/token`, mode 0600, with post-write verification.
 - **Redaction is double-layered.** PostToolUse hook + skill output filter, both mandatory.
 - **Fail-closed on storage errors.** If the token file can't be written safely, the skill refuses the session — never falls back to env-var or memory-only credentials.
 - **Sibling reference:** `recovery-flows.md` §2 (`headless-auth`) holds the cross-skill state-machine summary. This file holds the implementation detail. Both must stay in sync — when this file changes substantively, update `recovery-flows.md` §2's cross-link only (not the body).

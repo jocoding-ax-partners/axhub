@@ -72,8 +72,9 @@ To deploy:
 4. **On user approval**, mint a consent token and run deploy:
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint --tool-call-id "$NEXT_BASH_TOOL_CALL_ID" --action deploy_create \
-     --app-id "$APP_ID" --profile "$PROFILE" --branch "$BRANCH" --commit "$COMMIT_SHA"
+   cat <<JSON | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
+   {"tool_call_id":"${CLAUDE_SESSION_ID}:${NEXT_BASH_TOOL_CALL_ID}","action":"deploy_create","app_id":"${APP_ID}","profile":"${PROFILE}","branch":"${BRANCH}","commit_sha":"${COMMIT_SHA}"}
+   JSON
 
    axhub deploy create --app "$APP_ID" --branch "$BRANCH" --commit "$COMMIT_SHA" --json
    ```
@@ -123,5 +124,5 @@ To deploy:
 For Korean trigger lexicon (informal, honorific, demo-context variants): `references/nl-lexicon.md`.
 For exit-code → 4-part Korean error template (emotion + cause + action + button): `references/error-empathy-catalog.md`.
 For multi-machine cold cache, headless/Codespaces, version skew, watch narration: `references/recovery-flows.md`.
-For working transcripts: `examples/golden-deploy-transcript.md`, `examples/concurrent-deploy-rejection.md`.
+For working transcripts, use captured `.omc/evidence/` pilot logs; no standalone example transcript files ship in this plugin.
 For privacy filter on apis list: `../apis/references/privacy-filter.md` (used by sibling apis skill).

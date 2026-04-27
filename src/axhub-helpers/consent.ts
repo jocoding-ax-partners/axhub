@@ -22,9 +22,10 @@
 
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { randomBytes, randomUUID } from "node:crypto";
+import { constants } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, stat, writeFile } from "node:fs/promises";
 
 export interface ConsentBinding {
   tool_call_id: string;
@@ -84,7 +85,7 @@ const hmacKeyPath = (): string => join(stateRoot(), "hmac-key");
 const sessionId = (): string => {
   const env = process.env["CLAUDE_SESSION_ID"];
   if (env && env.length > 0) return env;
-  return randomUUID();
+  throw new Error("CLAUDE_SESSION_ID is required for consent token mint/verify");
 };
 
 const tokenFilePath = (sid: string): string => join(runtimeRoot(), `consent-${sid}.json`);
@@ -120,6 +121,7 @@ export async function mintToken(
   binding: ConsentBinding,
   ttl_sec: number,
 ): Promise<MintResult> {
+  const sid = sessionId();
   const key = await getOrCreateHmacKey();
   const now = Math.floor(Date.now() / 1000);
   const exp = now + ttl_sec;
@@ -136,7 +138,6 @@ export async function mintToken(
     .setExpirationTime(exp)
     .sign(key);
 
-  const sid = sessionId();
   const file_path = tokenFilePath(sid);
   await mkdir(runtimeRoot(), { recursive: true, mode: DIR_MODE_PRIVATE });
 
@@ -146,7 +147,31 @@ export async function mintToken(
     expires_at: new Date(exp * 1000).toISOString(),
     session_id: sid,
   });
-  await writeFile(file_path, fileBody, { mode: FILE_MODE_PRIVATE });
+
+  try {
+    const existing = await lstat(file_path);
+    if (existing.isSymbolicLink()) {
+      throw new Error("consent token path is a symlink");
+    }
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException;
+    if (err.code !== "ENOENT") throw e;
+  }
+
+  const handle = await open(
+    file_path,
+    constants.O_WRONLY |
+      constants.O_CREAT |
+      constants.O_TRUNC |
+      (constants.O_NOFOLLOW ?? 0),
+    FILE_MODE_PRIVATE,
+  );
+  try {
+    await handle.chmod(FILE_MODE_PRIVATE);
+    await handle.writeFile(fileBody);
+  } finally {
+    await handle.close();
+  }
 
   return {
     token_id,

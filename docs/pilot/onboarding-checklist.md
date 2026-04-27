@@ -25,7 +25,7 @@
 
 설치 (한 번만):
   1. Claude Code 최신 버전 확인
-  2. /plugin marketplace add jocoding-ax-partners/axhub-plugin-cc
+  2. /plugin marketplace add jocoding-ax-partners/axhub
   3. /plugin install axhub@axhub
   4. bash ${CLAUDE_PLUGIN_ROOT}/bin/install.sh   ← 환경에 맞는 helper 자동 선택
   5. /axhub:login → 받으신 token을 붙여넣어주세요

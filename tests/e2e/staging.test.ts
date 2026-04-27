@@ -45,6 +45,18 @@ const runAxhub = async (args: string[]): Promise<{ exitCode: number; stdout: str
   };
 };
 
+const expectAppListContract = (apps: unknown[]): void => {
+  for (const app of apps) {
+    expect(app).toBeTypeOf("object");
+    expect(app).not.toBeNull();
+    const obj = app as Record<string, unknown>;
+    const hasId = typeof obj.id === "string" || typeof obj.id === "number";
+    const hasNameOrSlug = typeof obj.name === "string" || typeof obj.slug === "string";
+    expect(hasId, `app item missing id: ${JSON.stringify(obj).slice(0, 200)}`).toBe(true);
+    expect(hasNameOrSlug, `app item missing name/slug: ${JSON.stringify(obj).slice(0, 200)}`).toBe(true);
+  }
+};
+
 describe.skipIf(!E2E_ENABLED)("ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGING_TOKEN)", () => {
   beforeAll(() => {
     if (!E2E_ENABLED) return;
@@ -67,9 +79,10 @@ describe.skipIf(!E2E_ENABLED)("ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGIN
     const parsed = JSON.parse(result.stdout) as unknown;
     // Either bare array or {apps: [...]} — accept both shapes
     if (Array.isArray(parsed)) {
-      expect(parsed.length).toBeGreaterThanOrEqual(0);
+      expectAppListContract(parsed);
     } else if (parsed && typeof parsed === "object" && "apps" in parsed) {
       expect(Array.isArray((parsed as { apps: unknown }).apps)).toBe(true);
+      expectAppListContract((parsed as { apps: unknown[] }).apps);
     } else {
       throw new Error(`unexpected apps list shape: ${result.stdout.slice(0, 200)}`);
     }

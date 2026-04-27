@@ -82,7 +82,7 @@ To handle updates:
 
    > "axhub가 brew로 설치돼 있어서 직접 업데이트는 못 해요. 'brew upgrade axhub' 라고 터미널에 입력하시면 됩니다. 도와드릴까요?"
 
-7. **On non-zero exit (other)**, route to `error-empathy-catalog.md` by code (65 / 68 / 1).
+7. **On non-zero exit (other)**, route to `../deploy/references/error-empathy-catalog.md` by code (65 / 68 / 1).
 
 ## NEVER
 

@@ -58,7 +58,7 @@ To handle auth:
    Token 소스 우선순위 (헤드리스):
    - 1순위: `export AXHUB_TOKEN=axhub_pat_...` 환경변수 직접 설정 (가장 간단)
    - 2순위: 별도 노트북에서 `axhub auth login` 실행 후, 그 노트북의 keychain에서 토큰 추출 → secure 채널 (Slack DM, secure email) 로 헤드리스 환경에 전달 → `export AXHUB_TOKEN=...`
-   - 3순위: pasted token을 `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-install --from-stdin` 으로 `~/.config/axhub/token` 에 mode 0600 저장
+   - 3순위: pasted token을 `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-import` 로 `~/.config/axhub-plugin/token` 에 mode 0600 저장
 
    **Token 자동 추출 메커니즘:** 브라우저 환경에서는 `axhub auth login` 한 번 실행 후, 헬퍼의 `token-init` 서브커맨드가 macOS keychain / Linux secret-service / Windows Credential Manager (PowerShell + Add-Type 단일 호출) 에서 `axhub` CLI 가 저장한 토큰을 자동 추출해요. vibe coder 가 별도 토큰 setup 단계를 볼 일 없어요.
 
@@ -85,6 +85,21 @@ To handle auth:
 
 6. **Logout intent.** When user says "로그아웃", "토큰 지워줘", "세션 끊어":
 
+   Confirm via AskUserQuestion before deleting the active local token:
+
+   ```json
+   {
+     "question": "로그아웃할래요?",
+     "header": "로그아웃 확인",
+     "options": [
+       {"label": "네, 로그아웃", "value": "confirm", "description": "이 노트북의 axhub 토큰을 제거"},
+       {"label": "취소", "value": "abort", "description": "아무것도 안 함"}
+     ]
+   }
+   ```
+
+   Only when the answer is `confirm`, run:
+
    ```bash
    axhub auth logout
    ```
@@ -98,9 +113,9 @@ To handle auth:
 - NEVER echo the raw token value (`axhub_pat_*`) — the redact helper masks it but skill output must not interpolate it back.
 - NEVER auto-launch browser in headless environments — the CLI will block and confuse the user.
 - NEVER call `axhub auth login` without first checking `auth status` (avoids re-login when already valid).
-- NEVER persist tokens outside `~/.config/axhub/token` (0600).
+- NEVER persist tokens outside `~/.config/axhub-plugin/token` (0600).
 - NEVER call `axhub auth logout` without confirming via AskUserQuestion (destructive — kills active session).
-- NEVER call `axhub auth login` without running `consent-mint --action auth_login` (step 5a) first — PreToolUse hook이 consent token 없이 deny 해요.
+- NEVER call `axhub auth login` without running the stdin JSON `consent-mint` step (step 5a) first — PreToolUse hook이 consent token 없이 deny 해요.
 
 ## Additional Resources
 

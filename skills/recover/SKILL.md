@@ -94,8 +94,9 @@ To recover:
 4. **On `confirm`.** Mint consent token and run deploy create with the prior commit:
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint --tool-call-id "$NEXT_BASH_TOOL_CALL_ID" --action deploy_create \
-     --app-id "$APP_ID" --profile "$PROFILE" --branch "$BRANCH" --commit "$PREV_SHA"
+   cat <<JSON | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
+   {"tool_call_id":"${CLAUDE_SESSION_ID}:${NEXT_BASH_TOOL_CALL_ID}","action":"deploy_create","app_id":"${APP_ID}","profile":"${PROFILE}","branch":"${BRANCH}","commit_sha":"${PREV_SHA}"}
+   JSON
 
    axhub deploy create --app "$APP_ID" --branch "$BRANCH" --commit "$PREV_SHA" --json
    ```
@@ -104,7 +105,7 @@ To recover:
 
 5. **Auto-watch.** Capture the new `dep_<id>` and route to `skills/status` for narrated tracking. Do not block on completion — the user wanted the recovery action; status is a courtesy follow-up.
 
-6. **On `pick_other`.** Surface the last 5 succeeded deploys from `axhub deploy list` via AskUserQuestion. Repeat from step 3 with the chosen commit.
+6. **On `pick_other`.** Surface the last 5 succeeded deploys from `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app "$APP_ID" --limit 5` via AskUserQuestion. Repeat from step 3 with the chosen commit.
 
 7. **On non-zero exit from create**, route to `../deploy/references/error-empathy-catalog.md`. The `validation.deployment_in_progress` case is especially relevant here (user might recover during another deploy) — follow `../deploy/references/recovery-flows.md` ("deployment_in_progress") and offer to watch the in-flight deploy first.
 

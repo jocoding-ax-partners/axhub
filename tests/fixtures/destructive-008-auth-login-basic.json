@@ -6,5 +6,5 @@
     "is_destructive": true,
     "action": "auth_login"
   },
-  "description": "Auth login (mutates token storage at ~/.config/axhub/token)"
+  "description": "Auth login (mutates token storage at ~/.config/axhub-plugin/token)"
 }

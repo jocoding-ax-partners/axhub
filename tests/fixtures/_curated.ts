@@ -85,7 +85,7 @@ const FIXTURES: Fixture[] = [
   {
     id: "destructive-008-auth-login-basic",
     category: "destructive",
-    description: "Auth login (mutates token storage at ~/.config/axhub/token)",
+    description: "Auth login (mutates token storage at ~/.config/axhub-plugin/token)",
     input: { command: "axhub auth login" },
     expected: { is_destructive: true, action: "auth_login" },
   },

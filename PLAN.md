@@ -357,9 +357,9 @@ exit 68 → "rate limit. Retry-After 헤더만큼 대기 후 재시도."
 
 1. **Local dev**: `claude --plugin-dir ./axhub` (개발용)
 2. **Marketplace 등록** — jax-plugin-cc와 같은 패턴.
-   - 이 디렉토리 자체를 GitHub 저장소(`jocoding-ax-partners/axhub-plugin-cc` 가칭)로 push.
+   - 이 디렉토리 자체를 GitHub 저장소(`jocoding-ax-partners/axhub` 가칭)로 push.
    - `.claude-plugin/marketplace.json` 작성.
-   - 사용자: `/plugin marketplace add jocoding-ax-partners/axhub-plugin-cc` → `/plugin install axhub@axhub`.
+   - 사용자: `/plugin marketplace add jocoding-ax-partners/axhub` → `/plugin install axhub@axhub`.
 3. **버전**: `0.1.0` (semver, axhub CLI v0.1.0 contract 매칭).
 
 ## 11. Milestones (revised — measurement-gated, kill-criteria embedded)
@@ -620,7 +620,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
   "description": "Claude Code plugin for axhub - vibe coder app hub. Korean-first NL deploy/manage with safety gates.",
   "author": {"name": "Jocoding AX Partners", "url": "https://jocodingax.ai"},
   "homepage": "https://hub-api.jocodingax.ai",
-  "repository": "https://github.com/jocoding-ax-partners/axhub-plugin-cc",
+  "repository": "https://github.com/jocoding-ax-partners/axhub",
   "license": "TBD-decide-before-publish",
   "keywords": ["axhub", "vibe-coding", "deploy", "korean"]
 }

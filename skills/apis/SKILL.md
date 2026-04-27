@@ -85,7 +85,7 @@ To list APIs:
    axhub apis list --json | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers redact
    ```
 
-8. **On non-zero exit**, route to `error-empathy-catalog.md` by code (65 / 67 / 68 / 1).
+8. **On non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by code (65 / 67 / 68 / 1).
 
 ## NEVER
 

@@ -69,6 +69,7 @@ SMOKE_SCRIPT='set -e
 echo "[container] starting dbus session"
 eval "$(dbus-launch --sh-syntax)"
 export DBUS_SESSION_BUS_ADDRESS DBUS_SESSION_BUS_PID
+echo "[container] libsecret-tools version=$(dpkg-query -W libsecret-tools | cut -f2)"
 
 # Spawn gnome-keyring-daemon to back secret-service
 echo -n "test_password" | gnome-keyring-daemon --unlock >/dev/null 2>&1 || true

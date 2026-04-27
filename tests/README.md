@@ -90,7 +90,7 @@ The primary GO/KILL signal for M1.5.
 
 `tests/corpus.20.jsonl` is the frozen M0.5 snapshot — first 20 rows of the canonical corpus. Do not modify; create new snapshots if scope evolves.
 
-`tests/corpus.100.jsonl` is the M2.5 hand-curation scope — a deterministic 100-row stratified subset of `corpus.jsonl` (331 rows). It preserves all 20 original M0.5 IDs for backward compatibility with M1.5 v1, and samples each category proportionally (read-only ×30, destructive-happy ×12, adversarial ×10, negative ×11, language-mix ×8, unicode ×3, profile-mismatch ×3, headless ×3). Language balance: ko ≥40, en ≥40, mixed ≥5. Selection is deterministic (first N by ID within each lang bucket); do not modify.
+`tests/corpus.100.jsonl` is the M2.5 hand-curation scope — a deterministic 100-row stratified subset of `corpus.jsonl` (331 rows). It preserves all 20 original M0.5 IDs for backward compatibility with M1.5 v1, and samples each category proportionally (read-only ×30, destructive-happy ×12, adversarial ×13, negative ×14, language-mix ×8, unicode ×4, profile-mismatch ×4, headless ×4, plus 11 legacy/uncategorized rows including the multi-machine cold-cache case). Language balance: ko 46, en 45, mixed 8, slash 1. Selection is deterministic (first N by ID within each lang bucket); do not modify.
 
 **Current canonical M1.5 verdict: `.omc/m1.5-verdict.v2.md`** (100-row scope). v1 at `.omc/m1.5-verdict.md` retained for M0.5 continuity. To reproduce:
 
