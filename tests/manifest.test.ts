@@ -532,6 +532,9 @@ describe("skills/*/SKILL.md frontmatter", () => {
     const dir = join(REPO_ROOT, "skills");
     skillDirs = (await readdir(dir, { withFileTypes: true }))
       .filter((d) => d.isDirectory())
+      // Phase 18 R2 — exclude scaffold _template (sibling dir without SKILL.md
+      // by design). Any leading-underscore dir is a scaffold helper, not a skill.
+      .filter((d) => !d.name.startsWith("_"))
       .map((d) => d.name);
     for (const d of skillDirs) {
       const path = join(dir, d, "SKILL.md");

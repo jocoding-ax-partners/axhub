@@ -1,6 +1,6 @@
 {
   "name": "@jocoding-ax-partners/axhub-plugin-cc",
-  "version": "0.1.18",
+  "version": "0.1.17",
   "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders. TypeScript helper layer (Bun runtime).",
   "type": "module",
   "private": true,
@@ -19,6 +19,8 @@
     "lint:tone": "bun scripts/check-toss-tone-conformance.ts --strict",
     "lint:keywords": "bun scripts/check-skill-keywords-preserved.ts --check",
     "release:check": "bun scripts/release-check.ts",
+    "skill:new": "bun scripts/skill-new.ts",
+    "skill:doctor": "bun scripts/skill-doctor.ts",
     "test": "bun test",
     "test:e2e": "bun test tests/e2e/",
     "typecheck": "tsc --noEmit",

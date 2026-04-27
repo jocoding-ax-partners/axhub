@@ -1,0 +1,62 @@
+---
+name: {{SLUG}}
+description: TODO 한 줄 요약 + 활성화 표현 (한국어 trigger 어구). 예시 "다음 표현에서 활성화: '...', '...'". nl-lexicon 추가는 skills/deploy/references/nl-lexicon.md 참조.
+multi-step: {{MULTI_STEP}}
+needs-preflight: {{NEEDS_PREFLIGHT}}
+---
+
+# {{TITLE}}
+
+TODO 1 줄 SKILL 요약 (vibe coder 가 이해할 한국어).
+
+<!-- AUTHOR: 새 SKILL 작성 가이드 (Phase 17/18 패턴)
+1. multi-step: true 면 Step 0 에 TodoWrite 호출 (4+ todos 해요체) 추가.
+2. needs-preflight: true 면 워크플로 시작 전 !command preflight 자동 주입 됨 (이미 emit 됨).
+3. AskUserQuestion 호출 site 마다 D1 sentinel 블록 + tests/fixtures/ask-defaults/registry.json 에 safe_default 추가.
+4. 모든 텍스트 해요체 (no 합니다/입니다/시겠어요/드립니다/당신/아이고). bun run lint:tone --strict 0 err.
+5. 검증: bun run skill:doctor 로 패턴 체크 + bun test 로 회귀.
+-->
+
+## Workflow
+
+To {{ACTION}}:
+
+!`${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json`
+
+이 줄은 Claude Code SKILL preprocessing 으로 워크플로 시작 전에 실행돼요.
+
+{{TODOWRITE_BLOCK}}
+
+1. **TODO Step 1.** 워크플로 첫 단계.
+
+2. **TODO Step 2.** 다음 단계.
+
+{{D1_GUARD_BLOCK}}
+
+3. **TODO Step 3 (AskUserQuestion 사이트 예시).**
+
+   ```json
+   {
+     "questions": [{
+       "question": "TODO 질문 (해요체)?",
+       "header": "TODO chip",
+       "multiSelect": false,
+       "options": [
+         {"label": "TODO 옵션 1", "description": "설명"},
+         {"label": "TODO 옵션 2", "description": "설명"}
+       ]
+     }]
+   }
+   ```
+
+4. **TODO 마지막 단계.**
+
+## NEVER
+
+- NEVER TODO 안전 규칙 1.
+- NEVER TODO 안전 규칙 2.
+
+## Additional Resources
+
+- `../deploy/references/nl-lexicon.md` — 활성화 trigger 어구 추가 시 참조.
+- `../deploy/references/error-empathy-catalog.md` — 4-part Korean exit-code template.
