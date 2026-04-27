@@ -7,6 +7,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 Nothing yet.
 
+## [0.1.18] — 2026-04-27
+
+Phase 18 — 새 SKILL 자동 적용 인프라. Plan: `.omc/plans/phase-18-skill-scaffold-automation-v2.md` (Critic APPROVE round 3).
+
+### Added
+
+- **Frontmatter 선언 (R1)**: 11 SKILL 모두 `multi-step:` + `needs-preflight:` 두 키 추가. Hardcoded `MULTI_STEP_OPT_OUT` / `PREFLIGHT_REQUIRED` 배열 제거. 새 SKILL 추가 시 frontmatter 만 선언하면 모든 패턴 검사가 자동 enforce 돼요.
+- **`scripts/skill-doctor.ts`** (R5/US-1806) — colored 한글 진단 출력. SKILL 별 D1 sentinel / TodoWrite / `!command preflight` 패턴 체크. `--strict` mode 는 machine-parseable (`skills/<slug>/SKILL.md: missing <pattern>`), CI 용. `bun run skill:doctor` 호출.
+- **`scripts/skill-new.ts`** (R2/US-1803) — `bun run skill:new <slug> [flags]` 스캐폴드. `skills/_template/SKILL.md.tmpl` 에서 Phase 17/18 패턴 미리 emit. 기본 mutate-aware (multi-step:true + needs-preflight:true). Flags: `--no-multi-step`, `--no-preflight`, `--action`, `--title`. registry stub 자동 append.
+- **`tests/ux-skill-template-completeness.test.ts`** (R5/US-1805) — meta-test, `skill:doctor --strict` wrapper. CI 가 새 SKILL 패턴 누락 시 fail.
+- **`tests/ux-skill-preflight-injection.test.ts`** (R2/US-1804) — frontmatter `needs-preflight:true` 선언 SKILL 마다 `!command preflight` literal 존재 assert.
+- **`skills/_template/SKILL.md.tmpl`** — 새 SKILL 작성 시 출발점. inline AUTHOR 가이드 주석 (Phase 17/18 패턴 5개).
+
+### Changed
+
+- **`scripts/check-toss-tone-conformance.ts`** (R4) — `PHASE_13_FILES` 에 `skills/*/SKILL.md` glob 추가. Frontmatter (description: nl-lexicon trigger 포함) 는 SKIP — workflow body 만 lint.
+- **`tests/ux-todowrite.test.ts`** (R1) — hardcoded 5 SKILL 배열 제거. glob + frontmatter `multi-step:` read. 새 multi-step SKILL 자동 enforce.
+- **`tests/manifest.test.ts`** (R2): frontmatter allowlist 에 `multi-step` + `needs-preflight` 추가. skill scan 에서 leading `_` dir (e.g. `_template`) 제외.
+- **14 workflow body fixes** (C0.5): lint:tone scope 확장 후 발견된 pre-existing 위반 14개 (Phase 14 deferred 영역) 모두 fix. recover/logs/status/deploy/auth/update SKILLs.
+
+### Test baseline
+
+- `bun test` → 498 pass / 5 skip / 0 fail / 503 tests / 28 files (+21 from v0.1.17).
+- `bunx tsc --noEmit` → clean.
+- `bun lint:tone --strict` → 0 error / 0 warning across 29 files.
+- `bun lint:keywords --check` → OK (no diff vs baseline).
+- `bun run skill:doctor --strict` → 11/11 SKILLs complete.
+- `bun run release:check` → OK at v0.1.18, 5 cross-arch binaries verified.
+
+### Honest tradeoff
+
+- D2 universal PreToolUse hook injection — Phase 19 trigger if drift recurs. Registry test enables mechanical migration.
+- Notification hook on missing pattern — Phase 19 deferred.
+- SDK `permissionDecision: "defer"` — Phase 19+ deferred (axhub scope = TUI + claude -p).
+- MCP elicitation — Phase 20+ deferred (no MCP server today).
+- `docs/SKILL_AUTHORING.md` — deferred (template comments 로 흡수).
+- Statusline auto-install — 사용자 opt-in (`~/.claude/settings.json` 직접 추가).
+
 ## [0.1.17] — 2026-04-27
 
 Phase 17 — vibe coder UX uplift across 11 SKILLs / 9 commands. Plan: `.omc/plans/phase-17-ux-uplift-v2.md` (ralplan consensus, Critic round 3 APPROVE).
