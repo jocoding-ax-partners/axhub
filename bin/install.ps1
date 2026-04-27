@@ -15,7 +15,7 @@
 $ErrorActionPreference = 'Stop'
 
 $BinDir = Split-Path -Parent $PSCommandPath
-$ReleaseVersion = if ($env:AXHUB_PLUGIN_RELEASE) { $env:AXHUB_PLUGIN_RELEASE } else { 'v0.1.19' }
+$ReleaseVersion = if ($env:AXHUB_PLUGIN_RELEASE) { $env:AXHUB_PLUGIN_RELEASE } else { 'v0.1.20' }
 $ReleaseBase = "https://github.com/jocoding-ax-partners/axhub/releases/download/$ReleaseVersion"
 
 # Windows only ships amd64 (per package.json build:all)

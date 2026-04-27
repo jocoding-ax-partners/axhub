@@ -4,6 +4,42 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.1.20](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.19...v0.1.20) (2026-04-27)
+
+Phase 20 — exhaustive review bugfix release. PR #3 reviewed the full 221-file inventory from latest `origin/main` and ships only evidence-backed fixes: consent-token safety, release automation drift, and user-facing skill/docs contract drift.
+
+### Fixed
+
+- **Consent token safety**: `consent-mint` now fails fast when `CLAUDE_SESSION_ID` is absent instead of writing unverifiable per-process tokens; token writes reject symlinked consent paths and use `O_NOFOLLOW`.
+- **Release automation drift**: patch releases now stage generated version files before release checks, avoid post-tag amend guidance, require an explicit semver tag for manual dispatch, and keep `.pem` cosign certificate sidecars out of binary manifests.
+- **Skill/docs contract drift**: command frontmatter grants `axhub-helpers` where delegated skills need it; consent examples use stdin JSON; headless auth docs use `token-import`, `~/.config/axhub-plugin/token`, and `AXHUB_TOKEN`; stale unavailable `deploy list` / helper schedule instructions were replaced with helper-backed flows.
+- **Public docs drift**: repository links now point to `jocoding-ax-partners/axhub`, and pilot launch guidance points at the current release line.
+
+### Tests
+
+- Added regression coverage for missing `CLAUDE_SESSION_ID` across the real CLI process boundary and for symlinked consent-token paths.
+- Added release/manifest guards for `.pem` exclusion, workflow dispatch tag handling, generated version-file staging, and no post-tag amend guidance.
+- Added manifest/docs guards for unsupported token-file/token-install/consent flag drift, helper permissions, auth logout confirmation, and unavailable deploy-list/helper-schedule instructions.
+- Tightened staging E2E app-list response shape checks and skill-doctor diagnostic coverage.
+
+### Verification
+
+- `bun run typecheck`
+- `bun run lint:tone --strict`
+- `bun run lint:keywords --check`
+- `bun run skill:doctor --strict`
+- `bun test` → 515 pass / 5 skip / 0 fail
+- `bun run fuzz` → 1100/1100 caught
+- `bun run smoke`
+- `bun run smoke:full` → docs link audit Broken: 0
+- `bun run build:all`
+- `bun run release:check`
+- `bun run test:e2e` against `https://hub-api.jocodingax.ai` → 4 pass / 1 skip / 0 fail
+
+### Honest tradeoff
+
+- `CLAUDE_SESSION_ID` is now a hard requirement for consent mint/verify. Persisting a fallback session id was rejected because separate helper processes could collide across sessions when Claude does not provide a session id.
+
 ## [0.1.19](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.18...v0.1.19) (2026-04-27)
 
 Phase 19 — `bun run release` 한 줄로 버전 범프 자동화. v0.1.10..v0.1.18 까지 9 release 동안 5 파일 수동 편집 + codegen + release:check + commit + tag 를 매번 따로 했어요. 이제 commit-and-tag-version (D2) 가 한 번에 chain — Conventional Commits 파싱 + 3 파일 bump + postbump hook 으로 codegen:version + release:check 자동 실행 + CHANGELOG entry generation + git commit + tag. 사람은 narrative paragraph 만 amend 로 추가하면 돼요. ralplan 분석에서 D1 release-please 거절 이유: PR rubber-stamp 가 v0.1.14 stale-binary 같은 trust-without-verify drift 재발 위험, 한국어 narrative 자동 생성 어색함, axhub 의 hotfix 빈번 cadence 와 weekly bot-PR cadence 미스매치.
