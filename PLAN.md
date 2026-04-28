@@ -369,9 +369,9 @@ exit 68 → "rate limit. Retry-After 헤더만큼 대기 후 재시도."
 | M | 산출물 | 검증 / Kill criterion |
 |---|---|---|
 | **M0** | git init / `.claude-plugin/plugin.json` / README skeleton / measurement harness scaffold (`tests/corpus.jsonl` empty + scoring script) | `claude --plugin-dir ./axhub` 로딩 OK + 빈 corpus runner 동작 |
-| **M0.5** | **Docs-only baseline 측정**: `agent-manual.md` + 200줄 CLAUDE.md 템플릿만 둔 상태에서 corpus 실행. trusted-completion / unsafe-trigger / recovery 측정. | baseline 숫자 기록 → §13 표에 baseline column 채움 |
+| **M0.5** | **Docs-only baseline 측정**: `agent-manual.md` + 200줄 CLAUDE.md 템플릿만 둔 상태에서 corpus 실행. trusted-completion / unsafe-trigger / recovery 측정. | baseline 숫자 기록 → §13 표에 baseline column 채움. Current runner replays committed 20/100-row fixtures and scores them deterministically; full 331-row live re-curation requires explicit `--fixture`. |
 | **M1** | skills/deploy + skills/status + skills/logs (3대장) + **AskUserQuestion 기반 destructive 승인 패턴** (P7) | corpus 재측정. deploy 의도 corpus에 대해: trusted-completion ≥ baseline + 20pp, **unsafe-trigger = 0%**, recovery ≥ baseline + 30pp |
-| **M1.5** | **GO/KILL GATE (P3, P10)** | 위 3개 메트릭 중 1개라도 baseline 못 넘기면: M2 이후 보류, "docs로 ship" 결정. plugin 자체 재고. |
+| **M1.5** | **GO/KILL GATE (P3, P10)** | `tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --score` must pass against the matching docs-only baseline. 위 3개 메트릭 중 1개라도 baseline 못 넘기면: M2 이후 보류, "docs로 ship" 결정. plugin 자체 재고. |
 | **M2** | skills/apps + skills/apis + skills/auth + skills/update + skills/doctor (5개 read-only) | corpus에 read-only 의도 추가 → trusted-completion ≥ 90% (read는 위험 낮음) |
 | **M3** | commands/* (8개 슬래시 wrapper) — skills의 thin wrapper, source of truth는 skill | `/axhub:deploy paydrop --branch main` 명시 호출 동작 |
 | **M4** | hooks/ (SessionStart 진단 + PostToolUse classify-exit) — **axhub 명령 아니면 즉시 no-op (5ms 이내)** | hook latency benchmark < 5ms (95p), exit 65/64+in_progress/67/68 자동 분류 정확도 100% |
