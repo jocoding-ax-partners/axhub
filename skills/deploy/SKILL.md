@@ -39,6 +39,7 @@ To deploy:
 1. **Live resolve** — call the helper to fetch authoritative `{profile, endpoint, app_id, app_slug, branch, commit_sha, commit_message, eta_sec}`:
 
    ```bash
+   echo '[deploy:Step 1 resolve] entered' >&2
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
    ```
 
@@ -47,6 +48,7 @@ To deploy:
 2. **Pre-flight version check**:
 
    ```bash
+   echo '[deploy:Step 2 preflight] entered' >&2
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json
    ```
 
@@ -72,6 +74,7 @@ To deploy:
 4. **On user approval**, mint a consent token and run deploy:
 
    ```bash
+   echo '[deploy:Step 4 consent-deploy] entered' >&2
    cat <<JSON | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
    {"tool_call_id":"${CLAUDE_SESSION_ID}:${NEXT_BASH_TOOL_CALL_ID}","action":"deploy_create","app_id":"${APP_ID}","profile":"${PROFILE}","branch":"${BRANCH}","commit_sha":"${COMMIT_SHA}"}
    JSON
@@ -84,6 +87,7 @@ To deploy:
 5. **Post-deploy chain** — capture `.id` from the deploy create JSON, then auto-follow:
 
    ```bash
+   echo '[deploy:Step 5 status-chain] entered' >&2
    axhub deploy status dep_$DEPLOY_ID $WATCH --json
    ```
 
@@ -103,6 +107,7 @@ To deploy:
 8. **Cache last-deploy for statusline (Phase 17 US-1707).** After Step 5 terminal status, write the deploy summary so `bin/statusline.sh` can show it across sessions:
 
    ```bash
+   echo '[deploy:Step 8 statusline-cache] entered' >&2
    mkdir -p ~/.cache/axhub-plugin
    cat > ~/.cache/axhub-plugin/last-deploy.json <<JSON
    {"deployment_id":"$DEPLOY_ID","status":"$TERMINAL_STATUS","commit_sha":"$COMMIT_SHA","app_slug":"$APP_SLUG","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
