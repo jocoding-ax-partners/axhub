@@ -23,9 +23,17 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
+import { createHash, X509Certificate } from "node:crypto";
+import { connect } from "node:tls";
 
 const DEFAULT_ENDPOINT = "https://hub-api.jocodingax.ai";
+const HUB_API_HOST = "hub-api.jocodingax.ai";
 const DEFAULT_LIMIT = 5;
+const TLS_PIN_TIMEOUT_MS = 5_000;
+
+export const HUB_API_SPKI_SHA256_PINS = [
+  "sha256/vmsW4ExrgK3t3mFNtwk6KMsokm6PM+WNgC/KWhe7Z7g=",
+] as const;
 
 export const EXIT_LIST_OK = 0;
 export const EXIT_LIST_AUTH = 65;
@@ -54,6 +62,15 @@ export interface ListDeploymentsResult {
   error_code?: string;
   error_message_kr?: string;
 }
+
+export class TlsPinError extends Error {
+  constructor(message: string, readonly code = "security.tls_pin_failed") {
+    super(message);
+    this.name = "TlsPinError";
+  }
+}
+
+export type TlsPinChecker = (endpoint: string) => Promise<void>;
 
 const STATUS_MAP: Record<number, DeploymentSummary["status"]> = {
   0: "pending",
@@ -88,6 +105,94 @@ const resolveEndpoint = (): string => {
   const e = process.env["AXHUB_ENDPOINT"];
   return e && e.length > 0 ? e : DEFAULT_ENDPOINT;
 };
+
+const proxyOverrideEnabled = (): boolean => process.env["AXHUB_ALLOW_PROXY"] === "1";
+
+const pinnedHubApiUrl = (endpoint: string): URL | null => {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new TlsPinError(`잘못된 AXHUB_ENDPOINT 값이에요: ${endpoint}`, "security.endpoint_invalid");
+  }
+
+  if (url.hostname !== HUB_API_HOST) return null;
+  if (url.protocol !== "https:") {
+    throw new TlsPinError("hub-api.jocodingax.ai 는 HTTPS 로만 호출해야 해요.", "security.tls_required");
+  }
+  return url;
+};
+
+const spkiHashFromCert = (rawCert: Buffer): string => {
+  const x509 = new X509Certificate(rawCert);
+  const spkiDer = x509.publicKey.export({ type: "spki", format: "der" });
+  return `sha256/${createHash("sha256").update(spkiDer).digest("base64")}`;
+};
+
+/**
+ * PLAN row 60: pin the direct fallback's hub-api TLS identity.
+ *
+ * The primary plugin path delegates network calls to ax-hub-cli. This helper is
+ * the one direct REST fallback, so it verifies the hub-api leaf public key
+ * before sending the bearer token. Corporate TLS inspection can opt out with
+ * AXHUB_ALLOW_PROXY=1, which is documented for org-admin rollout only.
+ */
+export async function verifyHubApiTlsPin(endpoint: string): Promise<void> {
+  if (proxyOverrideEnabled()) return;
+
+  const url = pinnedHubApiUrl(endpoint);
+  if (url === null) return;
+
+  const port = url.port.length > 0 ? Number(url.port) : 443;
+  if (!Number.isInteger(port) || port <= 0) {
+    throw new TlsPinError(`hub-api TLS 포트가 올바르지 않아요: ${url.port}`, "security.endpoint_invalid");
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const socket = connect({
+      host: url.hostname,
+      port,
+      servername: url.hostname,
+      rejectUnauthorized: true,
+      timeout: TLS_PIN_TIMEOUT_MS,
+    });
+
+    const finish = (err?: Error): void => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      if (err) reject(err);
+      else resolve();
+    };
+
+    socket.once("secureConnect", () => {
+      try {
+        const cert = socket.getPeerCertificate(true);
+        if (!cert.raw) {
+          finish(new TlsPinError("hub-api 인증서 원본을 읽을 수 없어요."));
+          return;
+        }
+        const actual = spkiHashFromCert(cert.raw);
+        if (!HUB_API_SPKI_SHA256_PINS.includes(actual as (typeof HUB_API_SPKI_SHA256_PINS)[number])) {
+          finish(new TlsPinError(`hub-api TLS pin mismatch: ${actual}`));
+          return;
+        }
+        finish();
+      } catch (e) {
+        finish(e instanceof Error ? e : new TlsPinError("hub-api TLS pin 검증에 실패했어요."));
+      }
+    });
+
+    socket.once("timeout", () => {
+      finish(new TlsPinError("hub-api TLS pin 검증 시간이 초과됐어요.", "security.tls_pin_timeout"));
+    });
+
+    socket.once("error", (e) => {
+      finish(e instanceof Error ? e : new TlsPinError("hub-api TLS 연결에 실패했어요."));
+    });
+  });
+}
 
 const parseAppId = (raw: string): number | null => {
   const n = parseInt(raw, 10);
@@ -129,6 +234,7 @@ const buildAuthError = (): ListDeploymentsResult => ({
 export async function runListDeployments(
   args: ListDeploymentsArgs,
   fetchFn: typeof fetch = fetch,
+  tlsPinChecker?: TlsPinChecker,
 ): Promise<ListDeploymentsResult> {
   const endpoint = resolveEndpoint();
   const token = resolveToken();
@@ -150,6 +256,8 @@ export async function runListDeployments(
 
   let resp: Response;
   try {
+    const checker = tlsPinChecker ?? (fetchFn === fetch ? verifyHubApiTlsPin : undefined);
+    await checker?.(endpoint);
     resp = await fetchFn(url, {
       method: "GET",
       headers: {
@@ -162,8 +270,10 @@ export async function runListDeployments(
       deployments: [],
       endpoint_used: endpoint,
       exit_code: EXIT_LIST_TRANSPORT,
-      error_code: "transport.network_error",
-      error_message_kr: `axhub 서버까지 연결이 끊겼어요. 네트워크 확인 후 다시 시도해주세요. (${e instanceof Error ? e.message : "unknown"})`,
+      error_code: e instanceof TlsPinError ? e.code : "transport.network_error",
+      error_message_kr: e instanceof TlsPinError
+        ? `axhub 서버 TLS 검증에 실패했어요. 신뢰 가능한 회사 proxy 환경이면 AXHUB_ALLOW_PROXY=1 을 설정하고, 그 외에는 네트워크를 확인해주세요. (${e.message})`
+        : `axhub 서버까지 연결이 끊겼어요. 네트워크 확인 후 다시 시도해주세요. (${e instanceof Error ? e.message : "unknown"})`,
     };
   }
 
