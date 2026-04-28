@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Phase 22.0.4 / 22.1 — fixture axhub shim.
+# Sentinel touch + AXHUB_ALLOW_PROXY=1 강제 + mock-hub forward.
+# 시스템 /usr/local/bin/axhub 호출 0건 검증용 — sentinel 없으면 leak 발생.
+
+set -euo pipefail
+
+# Sentinel — assert_shim_used_or_skipped 가 검증.
+SHIM_CASE_DIR="${SHIM_CASE_DIR:-${HOME}/.cache/axhub-plugin}"
+mkdir -p "$SHIM_CASE_DIR"
+touch "${SHIM_CASE_DIR}/shim-called"
+
+# Forward args to mock-impl 또는 simple stub.
+MOCK_IMPL="$(dirname "$0")/axhub-mock-impl.sh"
+if [ -x "$MOCK_IMPL" ]; then
+  AXHUB_ALLOW_PROXY=1 exec "$MOCK_IMPL" "$@"
+fi
+
+# mock-impl 부재 시 simple stub — 부재 subcommand 면 unknown 반환.
+case "${1:-}" in
+  --version)
+    echo "ax-hub-cli 0.1.0-mock"
+    exit 0
+    ;;
+  --help|help)
+    echo "Usage: axhub <subcommand> [args]"
+    echo "Subcommands: deploy / apps / apis / auth / update / logs"
+    exit 0
+    ;;
+  auth)
+    case "${2:-}" in
+      status)
+        # 기본: unauth (token fixture 없을 때)
+        if [ -f "${HOME}/.config/axhub-plugin/token" ]; then
+          echo '{"user_email":"test@axhub.local","token_expires_at":"2099-01-01T00:00:00Z"}'
+        else
+          echo '{"error":"not_authenticated"}' >&2
+          exit 65
+        fi
+        ;;
+      *)
+        echo '{"error":"unknown_subcommand","subcommand":"auth '"${2:-}"'"}' >&2
+        exit 64
+        ;;
+    esac
+    ;;
+  apps)
+    case "${2:-}" in
+      list)
+        echo '{"apps":[{"slug":"paydrop","env":"prod"}]}'
+        ;;
+      *)
+        echo '{"error":"unknown_subcommand"}' >&2
+        exit 64
+        ;;
+    esac
+    ;;
+  apis|deploy|update|logs)
+    echo '{"error":"mock_not_implemented","subcommand":"'"$1"' '"${2:-}"'"}' >&2
+    exit 64
+    ;;
+  *)
+    echo "shim: unknown command '${1:-}'" >&2
+    exit 127
+    ;;
+esac

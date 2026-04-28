@@ -1,0 +1,1 @@
+{"id":"01","tier":"T1","trigger":"slash","utterance":"/axhub:help","auth":"n/a","expected_skill":"axhub:help","expected_exit":0,"expected_state":"PASS","expected_phrases":["axhub","도움말"],"forbidden_phrases":[],"timeout_s":45,"description":"slash help — 9 명령 한국어 메뉴, no token I/O"}
