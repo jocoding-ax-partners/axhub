@@ -4,41 +4,43 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
-## [Unreleased] — Phase 22 claude -p subprocess E2E harness (in progress)
+## [0.1.23](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.22...v0.1.23) (2026-04-28)
 
-vibe coder 가 Claude Code 안에서 axhub 자연어를 발화했을 때의 끝-끝 흐름 (SKILL routing → preflight → AskUserQuestion D1 fallback → HMAC consent → exit-code 한국어 분류) 을 subprocess `claude -p` 로 직접 driving 하는 33-case 매트릭스 harness 도입. ralplan 합의 (3 iteration) 후 단계별 land 진행 중이에요.
+Phase 22 의 claude -p subprocess E2E harness 후속 phase 4건 (22.0.3 / 22.3 / 22.4 / 22.5) + CI hardening 을 한 릴리즈예요. unauth/error / token_expired / cli_too_old / mock-hub 401 / consent gate bypass 시나리오 모두 closed-loop. production code 영향은 22.0.3 의 deploy SKILL Step entry sentinel (`echo '[deploy:Step N ...] entered' >&2`) 5건만 — 나머지 phase 는 test infra / fixture / case assertion 강화에 한정.
 
-### Added (Phase 22 land 분)
+### Added
 
-- **`tests/e2e/claude-cli/` harness scaffold** (Phase 22.0): README + CLAUDE_FLAGS.md (claude 2.1.121 freeze) + CLAUDE_JSON_SCHEMA.md (LOCKED, baseline measurement 결과) + fixtures + lib/spawn.sh + lib/assert.sh + lib/mock-hub.{sh,ts} + lib/t2-helper.sh + run-matrix.sh.
-- **15 active cases (T1 6 / T2 9)**: case 01 `/axhub:help`, 02 `/axhub:doctor`, 03 NL "내 axhub 앱 목록", 04 NL "어떤 API 쓸 수 있어", 13 NL "누구로 로그인", 16 `/axhub:update` (T1 claude -p) + 20/21/25-31 classify-exit + redact + preflight + consent-mint (T2 helper-bin direct, $0 cost).
-- **`scripts/measure-claude-baseline.ts`** Phase 22.5.5 baseline measurement — per-case wall-time + actual cost USD + JSON schema 실측.
-- **`scripts/enumerate-axhub-subcommands.sh`** mock-impl coverage closed-loop helper.
-- **`tests/e2e-claude-cli-registry.test.ts`** registry 9 safe_default sanity lock (5 test, 40 expect).
-- **`.github/workflows/claude-cli-e2e.yml`** PR-blocking T2 only ($0 cost) + nightly cron + workflow_dispatch T1+T2+T3.
-- **`bun run test:plugin-e2e[:t1|:t2|:nightly]`** npm scripts.
+- **deploy SKILL Step entry sentinel** (22.0.3): Step 1/2/4/5/8 bash block 첫 line 에 stderr 마커 — telemetry / debugging / regression baseline 용. case 18 alias parity 와 orthogonal.
+- **claude-cli E2E unauth/error case 5건** (22.3): T1 status/deploy/doctor NL + T2 preauth-check direct deny + T2 list-deployments TLS-pin baseline. SKILL routing + 한국어 phrase 검증으로 ralph PR-blocking surface 확장.
+- **fixture infra 확장** (22.4):
+  - `fixtures/bin/axhub`: `AXHUB_FIXTURE_VERSION` (cli_too_old/cli_too_new 강제) + `AXHUB_FIXTURE_AUTH=expired` (auth status / deploy 시뮬레이션 exit 65 + token_expired) env 지원.
+  - `lib/mock-hub.ts`: `MOCK_HUB_AUTH_FAIL=1` env → `/v1/*` + `/api/v1/*` 401 token_expired (`_ping` 보호).
+  - `lib/spawn.sh`: case 별 `FIXTURE_AXHUB_VERSION` / `FIXTURE_AXHUB_AUTH` env propagate.
+- **case 19/22/34 강화** (22.4): plan 의 token_expired / cli_too_old / mock-hub 401 stdout positive evidence 시나리오 정확 매칭.
+- **case 23/34 assertion 강화** (22.5): case 23 의 systemMessage 4 token AND lock (`사전 승인` / `필요해요` / `paydrop 배포해` / `승인 카드`) — production 메시지 drift catch. case 34 mock-hub log file 에 `GET /api/v1/apps/42/deployments` line assert — fetch URL 라우팅 결정적 evidence.
 
-### Fixed during baseline measurement
+### CI
 
-- Plan v3 SB-3 cap-hit detector 정의 부정확 (stop_reason 으로는 cap-hit / graceful abort 구분 불가능 — 둘 다 `end_turn`). 결정적 marker = `subtype: "error_max_budget_usd"`. v5 detector 재정의 + CLAUDE_JSON_SCHEMA.md LOCKED.
-- macOS env -i 가 claude OAuth Keychain 접근 깨뜨림 ("Not logged in"). selective env override fallback (ANTHROPIC_API_KEY 있을 때만 full env -i 격리).
-- `--mcp-config '{}'` invalid → `'{"mcpServers":{}}'`.
-- macOS GNU timeout 부재 → perl alarm wrapper portable.
+- **`bun install` step 추가**: `claude-cli-e2e.yml` 의 e2e-pr + e2e-nightly 두 job 모두 `bun run build` 전에 dependency resolve 단계 추가. semver/jose 런타임 의존성을 `bun build --compile` 가 못 찾던 회귀 fix (PR-blocking T2 job 처음 실행 시 노출).
 
-### Verification (현재 시점)
+### Verification
 
-- `bash run-matrix.sh --tier t2` → 9/9 PASS, $0 cost, wall <2s
-- `bash run-matrix.sh --only 01 02 03 04 13 16` → 6/6 PASS, $1.00 total cost, wall 221s
-- `bun test` → 555 tests, 550 pass, 5 skip, 0 fail
-- `bunx tsc --noEmit` clean
-- `bun run lint:tone --strict` 0 err / 0 warn
-- `bun run skill:doctor --strict` OK
+- `bun test`: **550 pass / 5 skip / 0 fail / 2872 expect()**.
+- `bunx tsc --noEmit`: clean.
+- `bun run lint:tone --strict`: 0 error / 0 warning.
+- `bun run lint:keywords --check`: no diff vs baseline.
+- `bun run skill:doctor --strict`: OK.
+- `bash run-matrix.sh --tier t2 --only 23 34`: **2/2 PASS** (case 23 4-phrase AND match + case 34 mock-hub 401 stdout `error_code='auth.token_invalid'` + log line `GET /api/v1/apps/42/deployments`).
+- 4 PR (#13/#14/#17/#18) sequential merge — 22.0.3 → 22.3 → 22.4 → 22.5. 22.4/22.5 stack 충돌은 `--ours` 로 해결 (강화 버전 우선).
 
 ### Honest tradeoff
 
-- T1 claude -p 7 case 는 PR-blocking 에서 제외 — cost burn ($1+/run) 우려. nightly cron + manual workflow_dispatch + release tag 직전에만 fire. macOS-specific 회귀 detection latency 1-7일 (수용 가능).
-- 22.0.3 (deploy SKILL Step entry sentinel) — case 18 alias parity 의존, gitnexus_impact 후 별도 small PR 으로 land 예정.
-- 남은 T1 cases (05/19/20/21/22/23/24 → 22.3 unauth/error path), T2 cases (32/33/34) 후속 PR.
+- T1 case 05/19/22 의 nightly 실측 검증은 ANTHROPIC_API_KEY 의존 (`e2e-nightly` job). PR-blocking T2 surface 만 결정적 검증, T1 surface 는 cron + workflow_dispatch 에서 fire.
+- case 23 의 4 token AND lock 은 production systemMessage refactor 시 case fail (의도된 friction — drift signal). case 34 의 mock-hub log path coupling 은 `mock-hub.sh` API 변경 시 case 동시 update 필요.
+
+### Docs
+
+* README 를 v0.1.22 출하 상태에 맞게 갱신 ([8eca06b](https://github.com/jocoding-ax-partners/axhub/commit/8eca06ba38abe277db39dd9a0ec7dc81cf726d23))
 
 ## [0.1.22](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.21...v0.1.22) (2026-04-28)
 
