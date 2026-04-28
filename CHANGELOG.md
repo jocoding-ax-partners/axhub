@@ -4,6 +4,39 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.1.21](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.20...v0.1.21) (2026-04-28)
+
+Phase 21 — PLAN.md 잔여 항목을 최신 `main` 기준으로 끝까지 닫은 릴리즈예요. PR #4–#12 를 순서대로 머지해 명령 표면, corpus replay, SessionStart preflight, hook latency, supply-chain 문서/검증, recover 문서, hub-api TLS pinning, PLAN evidence ledger, 현재 레이아웃/schema 동기화까지 반영했어요.
+
+### Added
+
+- **Scoreable corpus replay**: `tests/run-corpus.sh` fixtures now assert replayable outcomes instead of placeholder execution only.
+- **SessionStart preflight diagnostics**: startup checks now surface concrete axhub install/version/auth guidance.
+- **Hook latency benchmark**: no-op hook latency is measurable through a dedicated benchmark and regression coverage.
+- **PLAN evidence ledger**: best-practices checklist rows now carry evidence instead of untracked TODO state.
+
+### Fixed
+
+- **Command-surface drift**: active PLAN scope now excludes canceled plugin-server work and matches the shipped command set.
+- **hub-api deployment fallback trust**: deployment-list fallback pins the expected hub-api TLS certificate before REST fallback calls.
+- **Release/supply-chain plan drift**: PLAN release artifact guidance now matches the signed helper binary release pipeline.
+- **Recover/docs drift**: recover guidance is marked as shipped and troubleshooting docs align with current behavior.
+- **Current layout/schema drift**: PLAN schema and repository layout references now match the implementation merged on `main`.
+
+### Verification
+
+- `bun test` → 546 pass / 5 skip / 0 fail
+- `bunx tsc --noEmit`
+- `bun run lint:tone --strict` → 0 error / 0 warning
+- `bun run lint:keywords --check` → OK
+- `bun run skill:doctor --strict`
+- `bun run release:check` → OK at v0.1.20 before bump, then postbump rebuilt v0.1.21 artifacts
+- `bun run test:e2e` against `https://hub-api.jocodingax.ai` → 4 pass / 1 skip / 0 fail
+
+### Honest tradeoff
+
+- This is a patch release because the merged work is hardening, documentation/schema synchronization, and test coverage. No new public command contract is introduced.
+
 ## [0.1.20](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.19...v0.1.20) (2026-04-27)
 
 Phase 20 — exhaustive review bugfix release. PR #3 reviewed the full 221-file inventory from latest `origin/main` and ships only evidence-backed fixes: consent-token safety, release automation drift, and user-facing skill/docs contract drift.
