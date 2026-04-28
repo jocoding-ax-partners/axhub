@@ -1,0 +1,14 @@
+apis list
+apps list
+auth login
+auth logout
+auth status
+deploy create
+deploy list
+deploy logs
+deploy rollback
+deploy status
+logs build
+logs runtime
+update apply
+update check

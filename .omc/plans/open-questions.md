@@ -2,6 +2,17 @@
 
 Append-only log of unresolved decisions across plans.
 
+## phase-22-claude-cli-e2e-harness - 2026-04-28
+
+- [ ] helper bin 에 `--insecure-pin-override` 또는 `AXHUB_DEV_CA_BUNDLE` 같은 dev-only TLS pinning knob 가 이미 있나? — mock-hub 로 라우팅 못 하면 24-case 중 read-only mock (03/04/13) 와 mutate mock (08/09/19/20/21) 전부 fail. 없으면 Phase 22.0 에 helper bin PR 먼저 prepend.
+- [ ] `claude -p --output-format json` schema 안정성 — claude v2.1.121 기준 `messages[]` 안의 SKILL invocation 식별 필드 (`tool_use.name === "Skill"`?). 스키마가 minor 마다 바뀌면 assert.sh 회귀 부하 큼.
+- [ ] matrix.jsonl 의 `expected_route` strict 단일 vs OR 허용 — case 03 같은 한국어 NL 이 가끔 clarify 로 라우팅. strict = flaky, OR = 회귀 시그널 약화. 트레이드오프 결정 필요.
+- [ ] CI macOS-14 runner 의 `claude` first-run modal 자동 통과 — `CLAUDE_TELEMETRY=0` / `CLAUDE_FIRST_RUN_DONE=1` env, `$HOME/.claude/config.json` pre-seed 가 통하는지 Phase 22.6 전 1회 dry-run.
+- [ ] `tests/live-plugin-smoke.sh` deprecate 시점 — 24-case harness 안정화되면 capture-only smoke 는 시그널 중복. SMOKE_STRICT=1 로 이미 strict 화. Phase 22.7 후 결정.
+- [ ] Korean tone lint 가 stdout 에 적용 가능한가 — `check-toss-tone-conformance.ts` 가 .md 대상. JSON stdout 에 적용 시 영어 SKILL 이름 등 false-positive 가능. lint stub 별도 필요.
+- [ ] mock-hub self-signed cert 와 helper bin TLS pinning 차단 지점 — `src/axhub-helpers/network.ts` / `consent.ts` 의 fetch 옵션 검토 필요.
+- [ ] AskUserQuestion fallback registry 의 SKILL 본문 question text 와 byte-identical lock 검증 — `tests/ux-ask-fallback-registry.test.ts` 가 이미 catch, 24-case harness 에서 cross-check 가치 평가.
+
 ## phase-19-auto-version-bump-v1 - 2026-04-27
 
 - [ ] Q1: `Release-As: 0.1.19` footer in Phase 19 PR's commit — confirm release-please reads this from squash-merge commit message (vs only from individual commit messages). Affects whether v0.1.19 lands as patch or minor on first auto-managed release.
