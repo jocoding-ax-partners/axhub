@@ -19,7 +19,10 @@ COMMANDS=(
   "/axhub:logs"
   "/axhub:update"
   "/axhub:deploy --dry-run"
+  "/axhub:배포 --dry-run"
 )
+
+FAILURES=0
 
 {
   echo "Live plugin smoke — subprocess claude -p"
@@ -48,6 +51,9 @@ for cmd in "${COMMANDS[@]}"; do
   done
   if kill -0 $pid 2>/dev/null; then kill -9 $pid 2>/dev/null; wait $pid 2>/dev/null; exit_code="TIMEOUT"; else wait $pid; exit_code=$?; fi
   printf "%-30s %-10s %s\n" "$cmd" "$exit_code" "$(basename "$evidence")" >> "$SUMMARY"
+  if [ "$exit_code" != "0" ]; then
+    FAILURES=$((FAILURES + 1))
+  fi
 done
 
 echo "" >> "$SUMMARY"
@@ -62,12 +68,9 @@ if [ "${SMOKE_STRICT:-1}" = "1" ]; then
     echo "FAIL: at least one command hit TIMEOUT" >&2
     exit 1
   fi
-  if grep -E " [1-9][0-9]* " "$SUMMARY" | grep -v "exit " >/dev/null; then
-    # Match exit codes != 0 in summary table
-    if grep -E "axhub:[a-z-]+ +[1-9]" "$SUMMARY" >/dev/null; then
-      echo "FAIL: at least one command exited non-zero" >&2
-      exit 1
-    fi
+  if [ "$FAILURES" -ne 0 ]; then
+    echo "FAIL: at least one command exited non-zero" >&2
+    exit 1
   fi
-  echo "STRICT: 9/9 commands exit 0, TIMEOUT 0" >&2
+  echo "STRICT: 10/10 commands exit 0, TIMEOUT 0" >&2
 fi

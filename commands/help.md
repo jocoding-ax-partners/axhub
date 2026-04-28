@@ -1,6 +1,8 @@
 ---
 description: axhub 플러그인 슬래시 명령 메뉴 보기 (한국어)
+allowed-tools: []
 argument-hint: "(no args)"
+model: sonnet
 ---
 
 Show the axhub plugin command menu to the user. Render in Korean with friendly tone for vibe coders. Format:
@@ -10,6 +12,7 @@ axhub 플러그인으로 할 수 있는 것:
 
 🚀 배포
   /axhub:deploy [앱이름] [--branch <브랜치>] [--dry-run]
+  /axhub:배포 [앱이름] [--branch <브랜치>] [--dry-run]  # 한글 alias
   자연어 예시: "paydrop 배포해", "방금 푸시한 거 올려"
 
 📊 상태 확인
