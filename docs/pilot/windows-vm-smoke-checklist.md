@@ -26,10 +26,10 @@ Manual 14-step checklist for next pilot session. Companion executor at
    - In a new claude session: `/plugin install axhub@axhub`
    - Verify: `~/.claude/plugins/marketplaces/axhub-marketplace/axhub/` exists
 
-4. **Confirm SessionStart fires session-start.ps1**
+4. **Confirm current universal hook config does not auto-fire session-start.ps1**
    - Start fresh claude session
-   - Verify: PowerShell process briefly visible in Task Manager
-   - Check: `~/.claude/sessions/*/transcript.json` mentions session-start.ps1 exec
+   - Verify: no `shell:powershell` SessionStart hook is registered in `hooks/hooks.json`
+   - Reason: the universal PowerShell sibling caused visible startup errors on non-Windows hosts. Stock Windows auto-SessionStart requires future platform-specific hook packaging.
 
 5. **Confirm install.ps1 auto-downloads windows-amd64.exe**
    - First session should trigger install.ps1 if `bin\axhub-helpers.exe` missing

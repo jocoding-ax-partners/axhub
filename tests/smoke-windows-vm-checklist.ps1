@@ -33,10 +33,7 @@ Run-Step 1 "Provision Win11 VM (visual confirmation)" {
 Run-Step 2 "Claude Code 2.1.84+ installed" {
   $version = (claude --version 2>$null) -replace '[^\d.]', ''
   if (-not $version) { throw "claude --version produced no output" }
-  $parts = $version.Split('.')
-  if ([int]$parts[0] -lt 2 -or ([int]$parts[0] -eq 2 -and [int]$parts[1] -lt 1) -or ([int]$parts[0] -eq 2 -and [int]$parts[1] -eq 1 -and [int]$parts[2] -lt 84)) {
-    throw "Claude Code $version < 2.1.84 — `"shell`":`"powershell`" hooks not supported"
-  }
+  Write-Output "  Claude Code version: $version"
 }
 
 Run-Step 3 "Plugin installed" {
@@ -44,9 +41,14 @@ Run-Step 3 "Plugin installed" {
   if (-not (Test-Path $pluginRoot)) { throw "plugin not installed at $pluginRoot" }
 }
 
-Run-Step 4 "session-start.ps1 exists in plugin" {
+Run-Step 4 "session-start.ps1 exists but is not registered by universal hooks.json" {
   $script = "$HOME\.claude\plugins\marketplaces\axhub-marketplace\axhub\hooks\session-start.ps1"
   if (-not (Test-Path $script)) { throw "session-start.ps1 missing" }
+  $hooksJson = Get-Content "$HOME\.claude\plugins\marketplaces\axhub-marketplace\axhub\hooks\hooks.json" -Raw | ConvertFrom-Json
+  $serialized = $hooksJson.hooks.SessionStart | ConvertTo-Json -Compress
+  if ($serialized -match 'session-start\.ps1' -or $serialized -match '"shell":"powershell"') {
+    throw "universal hooks.json must not register shell:powershell SessionStart; it creates visible non-Windows startup errors"
+  }
 }
 
 Run-Step 5 "axhub-helpers.exe exists post-install" {

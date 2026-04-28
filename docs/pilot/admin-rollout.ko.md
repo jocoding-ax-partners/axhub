@@ -94,7 +94,7 @@ vibe coder가 같은 회사 내 여러 노트북 (사무실 + 집) 사용 시:
 - **각 노트북별 독립 token 발급**: 절대 token 복사 X (HMAC 키도 각각 생성됨)
 - **deploy 권한은 단일 노트북에 한정 권장**: 여러 노트북에서 동시에 deploy 시도 → race condition + 동시-배포 차단 (validation.deployment_in_progress)
 - **headless 환경 (Codespaces, SSH, Windows)**: token-paste flow (skills/auth/SKILL.md step 4 / `skills/deploy/references/headless-flow.md`) 사용. 옵션 A — 헤드리스 환경에서 직접 `export AXHUB_TOKEN=axhub_pat_...` (PowerShell: `$env:AXHUB_TOKEN='axhub_pat_...'`). 옵션 B — 브라우저 노트북에서 `axhub auth login` 후 keychain 에서 토큰 추출 (`security find-generic-password -s axhub -w` / `secret-tool lookup service axhub`) → secure 채널 (Slack DM 등) 로 전달. Windows 는 PowerShell + Credential Manager 통합으로 token-init 자동 처리됨.
-- **Windows 자동 설치 (v0.1.7+)**: Git Bash / WSL 불필요. `bin/install.ps1` + `hooks/session-start.ps1` 가 PowerShell 5.1+ stock 환경에서 자동 다운로드 + token-init 실행. **Claude Code >= 2.1.84 필수** (`"shell": "powershell"` hook 필드 도입). 더 오래된 client 는 silent fail.
+- **Windows 자동 설치 상태 (v0.1.22+ 예정 재설계)**: `bin/install.ps1` + `hooks/session-start.ps1` 파일은 유지하지만, universal `hooks/hooks.json` 에서는 `"shell": "powershell"` SessionStart hook 을 등록하지 않는다. Claude Code가 모든 SessionStart sibling hook 을 현재 호스트에서 실행하기 때문에 macOS/Linux에서 PowerShell 미설치 오류가 사용자에게 노출됐다. stock Windows 자동 SessionStart는 platform-specific hook packaging 이 추가될 때까지 pilot/manual smoke 범위로 둔다. Windows 사용자는 현재 `AXHUB_TOKEN`/`token-import` headless flow 또는 Git Bash/WSL 환경의 bash shim을 사용한다.
 
 ---
 
