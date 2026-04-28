@@ -2,6 +2,10 @@
 # Phase 22.0.4 / 22.1 — fixture axhub shim.
 # Sentinel touch + AXHUB_ALLOW_PROXY=1 강제 + mock-hub forward.
 # 시스템 /usr/local/bin/axhub 호출 0건 검증용 — sentinel 없으면 leak 발생.
+#
+# Phase 22.4 확장 — env-driven stub 분기:
+#   AXHUB_FIXTURE_VERSION=X.Y.Z   --version 응답 가짜 버전 (cli_too_old/cli_too_new 강제)
+#   AXHUB_FIXTURE_AUTH=expired    auth status / deploy create 모두 exit 65 + token_expired stderr
 
 set -euo pipefail
 
@@ -19,7 +23,11 @@ fi
 # mock-impl 부재 시 simple stub — 부재 subcommand 면 unknown 반환.
 case "${1:-}" in
   --version)
-    echo "ax-hub-cli 0.1.0-mock"
+    if [ -n "${AXHUB_FIXTURE_VERSION:-}" ]; then
+      echo "ax-hub-cli ${AXHUB_FIXTURE_VERSION} (commit fake, built fake, fake)"
+    else
+      echo "ax-hub-cli 0.1.0-mock"
+    fi
     exit 0
     ;;
   --help|help)
@@ -30,6 +38,10 @@ case "${1:-}" in
   auth)
     case "${2:-}" in
       status)
+        if [ "${AXHUB_FIXTURE_AUTH:-}" = "expired" ]; then
+          echo '{"code":"token_expired","detail":"Bearer token has expired"}' >&2
+          exit 65
+        fi
         # 기본: unauth (token fixture 없을 때)
         if [ -f "${HOME}/.config/axhub-plugin/token" ]; then
           echo '{"user_email":"test@axhub.local","token_expires_at":"2099-01-01T00:00:00Z"}'
@@ -55,7 +67,23 @@ case "${1:-}" in
         ;;
     esac
     ;;
-  apis|deploy|update|logs)
+  deploy)
+    case "${2:-}" in
+      create)
+        if [ "${AXHUB_FIXTURE_AUTH:-}" = "expired" ]; then
+          echo '{"code":"token_expired","detail":"Bearer token has expired during deploy create"}' >&2
+          exit 65
+        fi
+        echo '{"error":"mock_not_implemented","subcommand":"deploy create"}' >&2
+        exit 64
+        ;;
+      *)
+        echo '{"error":"mock_not_implemented","subcommand":"deploy '"${2:-}"'"}' >&2
+        exit 64
+        ;;
+    esac
+    ;;
+  apis|update|logs)
     echo '{"error":"mock_not_implemented","subcommand":"'"$1"' '"${2:-}"'"}' >&2
     exit 64
     ;;

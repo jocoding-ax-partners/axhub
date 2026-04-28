@@ -33,6 +33,10 @@ const json = (status: number, body: unknown): Response =>
     headers: { "content-type": "application/json" },
   });
 
+// Phase 22.4 — MOCK_HUB_AUTH_FAIL=1 → 모든 /v1/* + /api/v1/* 가 401 token_expired 반환.
+// case 19 deploy 401 path / case 34 list-deployments 401 stdout error_code positive evidence.
+const authFail = process.env["MOCK_HUB_AUTH_FAIL"] === "1";
+
 Bun.serve({
   port,
   hostname: "127.0.0.1",
@@ -42,6 +46,10 @@ Bun.serve({
     log(`${stamp} ${req.method} ${url.pathname}${url.search}`);
 
     if (url.pathname === "/_ping") return new Response("ok");
+
+    if (authFail && (url.pathname.startsWith("/v1/") || url.pathname.startsWith("/api/v1/"))) {
+      return json(401, { code: "token_expired", detail: "Bearer token has expired" });
+    }
 
     if (req.method === "GET" && url.pathname === "/v1/apps") {
       const fix = readFixture("apps-list.json");

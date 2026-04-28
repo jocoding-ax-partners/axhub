@@ -130,6 +130,14 @@ spawn_claude() {
     SHIM_CASE_DIR="${case_out}"
   )
 
+  # Phase 22.4 — case 별 fixture stub env propagate (cli_too_old / auth_expired).
+  if [ -n "${FIXTURE_AXHUB_VERSION:-}" ]; then
+    cmd+=("AXHUB_FIXTURE_VERSION=${FIXTURE_AXHUB_VERSION}")
+  fi
+  if [ -n "${FIXTURE_AXHUB_AUTH:-}" ]; then
+    cmd+=("AXHUB_FIXTURE_AUTH=${FIXTURE_AXHUB_AUTH}")
+  fi
+
   case "$TIMEOUT_CMD" in
     timeout)
       cmd+=(timeout --kill-after=5 "${timeout_s}")
