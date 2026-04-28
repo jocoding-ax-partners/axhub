@@ -1,74 +1,136 @@
 {
-  "task": "Phase 19 v0.1.19 — auto version bump via commit-and-tag-version (D2). Replace manual version edits with 1-CLI bump that auto-runs codegen:version + release:check + writes CHANGELOG entry + git commit + tag.",
-  "createdAt": "2026-04-27T08:30:00Z",
+  "task": "Phase 22.3 — T1 unauth/error 4 cases (05/19/22/23) + T2 case 34 list-deployments TLS-pin baseline. claude-cli-e2e harness 의 unauth/error 경로 + helper-bin 경로 unblock. 22.0.3 sentinel 머지 의존 없음 (orthogonal).",
+  "createdAt": "2026-04-28T05:30:00Z",
   "stories": [
     {
-      "id": "US-1901",
-      "title": "Install commit-and-tag-version + .versionrc.json config",
+      "id": "US-2230A",
+      "title": "case 05 (T3) status NL auth_missing → 한국어 안내 phrase 검증",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "bun add -D commit-and-tag-version installed (devDependency in package.json).",
-        ".versionrc.json exists at repo root with: types config (feat/fix sections, chore hidden), header preserved, postbump hook chains codegen:version + release:check, bumpFiles array covers package.json + .claude-plugin/plugin.json + .claude-plugin/marketplace.json (path + jsonpath).",
-        "package.json scripts.release = 'commit-and-tag-version' added."
+        "tests/e2e/claude-cli/cases/05-status-noauth-nl.case.sh 존재",
+        "case 13 NL pattern mirror — ENABLE_SLASH=0 spawn_claude '어디까지 됐어' 60",
+        "STATE=PASS assert + 한국어 phrase OR 매칭 ('로그인'|'토큰'|'확인'|'axhub')",
+        "matrix.jsonl 에 id=05 tier=T3 entry 1건 추가"
       ],
-      "owner": "ralph-verified",
+      "owner": "",
       "blockedBy": []
     },
     {
-      "id": "US-1902",
-      "title": "Dry-run release verifies bumpFiles + postbump chain",
+      "id": "US-2230B",
+      "title": "case 19 (T1) deploy NL auth_missing → 한국어 4-part 안내 phrase 검증",
+      "priority": 1,
+      "passes": true,
+      "acceptanceCriteria": [
+        "tests/e2e/claude-cli/cases/19-deploy-noauth-nl.case.sh 존재",
+        "ENABLE_SLASH=0 spawn_claude '배포해' 90 (deploy SKILL preflight 시간 여유)",
+        "STATE=PASS assert + 한국어 phrase OR 매칭 ('로그인'|'토큰'|'axhub')",
+        "matrix.jsonl 에 id=19 tier=T1 entry 1건 추가",
+        "Plan 의 token_expired (mock-hub 401) 시나리오는 Phase 22.4 mock-hub fixture 확장 후 deferred — auth_missing path 가 동일 한국어 4-part 카피 라우팅 검증"
+      ],
+      "owner": "",
+      "blockedBy": []
+    },
+    {
+      "id": "US-2230C",
+      "title": "case 22 (T1) doctor NL → preflight 출력 + 한국어 안내 phrase 검증",
+      "priority": 1,
+      "passes": true,
+      "acceptanceCriteria": [
+        "tests/e2e/claude-cli/cases/22-doctor-preflight-nl.case.sh 존재",
+        "ENABLE_SLASH=0 spawn_claude '환경 점검' 90 (doctor 는 multi-step preflight injection 포함)",
+        "STATE=PASS assert + 한국어 phrase OR 매칭 ('확인'|'버전'|'axhub')",
+        "matrix.jsonl 에 id=22 tier=T1 entry 1건 추가",
+        "Plan 의 cli_too_old=true 시나리오는 Phase 22.4 preflight stub 후 deferred — SKILL routing 검증으로 22.3 범위 확정"
+      ],
+      "owner": "",
+      "blockedBy": []
+    },
+    {
+      "id": "US-2230D",
+      "title": "case 23 (T2) preauth-check direct deny — consent gate bypass 차단 검증",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "bun run release -- --dry-run executes successfully without modifying files.",
-        "Dry-run output shows next version (0.1.18 → 0.1.19 patch from current commit history).",
-        "Dry-run output references all 3 bumpFiles + plans codegen:version + release:check postbump."
+        "tests/e2e/claude-cli/cases/23-preauth-check-deny.case.sh 존재",
+        "Plan 의 'T1 PreToolUse 차단' 을 T2 helper-bin 직접 호출로 pivot — preauth-check stdin 주입이 claude-p orchestration 보다 결정적 + $0",
+        "stdin payload: tool_name=Bash + tool_input.command='axhub deploy create --app paydrop --branch main --commit a3f9c1b'",
+        "consent token 없는 sandbox (XDG_STATE_HOME / XDG_RUNTIME_DIR empty) 에서 hookSpecificOutput.permissionDecision == 'deny' 검증",
+        ".systemMessage 에 '사전 승인' phrase 포함 검증",
+        "matrix.jsonl 에 id=23 tier=T2 entry 1건 추가"
       ],
-      "owner": "ralph-verified",
-      "blockedBy": [
-        "US-1901"
-      ]
+      "owner": "",
+      "blockedBy": []
     },
     {
-      "id": "US-1903",
-      "title": "docs/RELEASE.md updated — D2 primary path + manual fallback",
+      "id": "US-2230E",
+      "title": "case 34 (T2) list-deployments AXHUB_ALLOW_PROXY=1 baseline — TLS-pin 우회 path 검증",
+      "priority": 2,
+      "passes": true,
+      "acceptanceCriteria": [
+        "tests/e2e/claude-cli/cases/34-list-deployments-proxy-baseline.case.sh 존재",
+        "mock-hub start + AXHUB_ALLOW_PROXY=1 + AXHUB_ENDPOINT=mock-hub URL",
+        "token 없음 → list-deployments 가 EXIT_LIST_AUTH=65 반환 검증 (TLS pin 코드 경로 진입 전 token resolve 실패)",
+        "stderr 에 'tls'|'cert'|'spki' phrase 부재 검증 (proxyOverrideEnabled 가 verifyHubApiTlsPin 을 early-return — list-deployments.ts:140-141)",
+        "matrix.jsonl 에 id=34 tier=T2 entry 1건 추가"
+      ],
+      "owner": "",
+      "blockedBy": []
+    },
+    {
+      "id": "US-2230F",
+      "title": "T2 case 23/34 로컬 실행 green — 결정적 회귀 검증",
       "priority": 3,
       "passes": true,
       "acceptanceCriteria": [
-        "docs/RELEASE.md 'Cutting a release' section rewritten — bun run release primary path + bun run release -- --release-as <ver|minor|major> for explicit choice + manual edit fallback preserved at bottom.",
-        "Step-by-step recipe documents: 1. ensure clean working tree, 2. bun run release [-- --release-as X], 3. git push origin main --tags, 4. release.yml fires automatically.",
-        "lint:tone --strict 0 err on docs/RELEASE.md (해요체 narrative).",
-        "Hotfix workflow documented (urgent fix mid-Phase): bun run release -- --release-as patch + push."
+        "bash tests/e2e/claude-cli/run-matrix.sh --tier t2 --only 23 34 → exit 0 + 2/2 PASS",
+        "각 case 의 output/{23,34}/exit-code + stdout.json + assertions 결정적 결과"
       ],
-      "owner": "ralph-verified",
+      "owner": "",
       "blockedBy": [
-        "US-1902"
+        "US-2230D",
+        "US-2230E"
       ]
     },
     {
-      "id": "US-1904",
-      "title": "Phase 19 ship — v0.1.19 via the new automation itself (dogfood)",
+      "id": "US-2230G",
+      "title": "회귀 검증 — bun test / tsc / lint:tone / lint:keywords / skill:doctor 모두 green",
       "priority": 4,
       "passes": true,
       "acceptanceCriteria": [
-        "bun run release executed (auto-bump from current commits → 0.1.18 → 0.1.19 patch).",
-        "Generated CHANGELOG entry inspected — Phase 19 narrative paragraph (해요체) added by author below the auto-bullets.",
-        "git tag v0.1.19 + git push origin main --tags ships release.",
-        "release.yml workflow run completes success.",
-        "GitHub release v0.1.19 published with 5 cross-arch binaries."
+        "bun test 결과 v0.1.22 baseline 유지 (pass count 동일, fail 0)",
+        "bunx tsc --noEmit clean exit 0",
+        "bun run lint:tone --strict 0 error",
+        "bun run lint:keywords --check no diff vs baseline",
+        "bun run skill:doctor --strict OK"
       ],
-      "owner": "ralph-verified",
+      "owner": "",
       "blockedBy": [
-        "US-1903"
+        "US-2230F"
+      ]
+    },
+    {
+      "id": "US-2230H",
+      "title": "PR 워크플로 — branch push + PR 생성 + URL 보고",
+      "priority": 5,
+      "passes": true,
+      "acceptanceCriteria": [
+        "phase-22.3/unauth-error-cases branch 에 commit (Conventional Commits 'feat:' 또는 'test:')",
+        "git push origin phase-22.3/unauth-error-cases 성공",
+        "gh pr create --base main 사용. PR 본문에 22.3 plan 컨텍스트 + 5 case 매핑 + verification result 명시",
+        "PR URL 사용자에게 보고"
+      ],
+      "owner": "",
+      "blockedBy": [
+        "US-2230G"
       ]
     }
   ],
   "metadata": {
-    "task_origin": "/ralph 그렇게 진행해 — D2 commit-and-tag-version per ralplan recommendation (vs D1 release-please overkill for solo + Korean narrative).",
-    "scope_note": "D2 chosen over D1 release-please per ralplan analysis: bot-PR rubber-stamp re-introduces v0.1.14 stale-binary trust-without-verify drift; release-please optimizes for weekly cadence (axhub does daily ship-day batches); Korean CHANGELOG narrative needs human author. D2 reuses Phase 16 release:check invariant via postbump hook.",
+    "task_origin": "/oh-my-claudecode:ralph 다음 페이즈도 진행해 — Phase 22 plan T1 unauth/error + T2 list-deployments mock-hub.",
+    "scope_note": "case 23 = T1 → T2 pivot 결정 (preauth-check 직접 호출이 claude-p orchestration 보다 결정적 + $0). cases 19/22 의 plan 시나리오 (token_expired / cli_too_old) 는 fixture/stub 의존이라 22.4 deferred — SKILL routing + 한국어 phrase 검증으로 본 phase 확정. case 05 는 T3 nightly only.",
     "deslop": "enabled",
     "critic": "architect",
-    "verification_note": "Phase 19 release automation is implemented on main: commit-and-tag-version config, release script, codegen/release-check chain, and v0.1.19 metadata are present."
+    "branch": "phase-22.3/unauth-error-cases"
   }
 }
