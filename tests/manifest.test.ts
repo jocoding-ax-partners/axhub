@@ -803,6 +803,15 @@ describe("cross-manifest consistency", () => {
     }
   });
 
+  test("recover troubleshooting docs describe the shipped forward-fix skill", async () => {
+    const troubleshooting = await readFile(join(REPO_ROOT, "docs/troubleshooting.ko.md"), "utf8");
+    const recover = await readFile(join(REPO_ROOT, "skills/recover/SKILL.md"), "utf8");
+    expect(troubleshooting).toContain("`recover` skill 이 현재 동작합니다");
+    expect(troubleshooting).toContain("forward-fix-as-rollback");
+    expect(troubleshooting).not.toContain("앞으로 ship 예정");
+    expect(recover).toContain("forward-fix-as-rollback");
+  });
+
   test("plugin.json name matches package.json name suffix", () => {
     expect(packageJson.name).toContain(pluginJson.name);
   });
