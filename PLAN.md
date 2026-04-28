@@ -3,7 +3,46 @@
 
 > 한 줄: `ax-hub-cli`(v0.1.0 GA)를 Claude Code가 자연어로 90% 이상, 보조적으로 슬래시 커맨드로 안전하게 사용해 axhub 앱을 배포·관리하도록 만드는 플러그인.
 
-작성일: 2026-04-23 · 대상 contract: ax-hub-cli **v0.1.0** (오늘 GA) · 작업 디렉토리: `/Users/wongil/Desktop/work/jocoding/axhub` (빈 폴더, git init 완료)
+작성일: 2026-04-23 · 최근 업데이트: 2026-04-28 · 대상 contract: ax-hub-cli **v0.1.0** GA · 현재 릴리즈: **axhub plugin v0.1.21** · 작업 디렉토리: `/Users/wongil/Desktop/work/jocoding/axhub`
+
+---
+
+## 0. 현재 구현/릴리즈 스냅샷 (2026-04-28, v0.1.21)
+
+> 이 섹션은 PLAN.md가 stale open-work list처럼 보이지 않도록, 2026-04-28 기준으로 실제 머지·릴리즈된 구현 범위를 고정한다. 아래 항목은 모두 `main`에 머지되어 `v0.1.21` GitHub Release까지 배포됐다.
+
+| Status | 범위 | PR / commit | 구현·검증 근거 |
+|---|---|---:|---|
+| **SHIPPED** | v0.1.20 exhaustive review bugfix baseline: consent-token safety, release automation drift, skill/docs contract drift | PR #3, tag `v0.1.20` | `tests/consent.test.ts`, `tests/release-config.test.ts`, `tests/manifest.test.ts`, `bun run release:check`, staging E2E |
+| **SHIPPED** | Phase 1 command-surface reconciliation: canceled plugin-server/MCP scope가 active plan으로 되살아나지 않도록 PLAN/commands 정리 | PR #4, merge `5227f94` | `tests/plan-consistency.test.ts`, `tests/manifest.test.ts`, `commands/help.md`, `commands/배포.md` |
+| **SHIPPED** | Phase 2 corpus runner replay: placeholder runner 대신 committed fixture를 replay/score 가능하게 전환 | PR #5, merge `d38f248` | `tests/run-corpus.sh`, `tests/run-corpus.test.ts`, `tests/README.md` |
+| **SHIPPED** | Phase 3 SessionStart preflight: 시작 시 axhub 설치/버전/auth/profile 진단을 실제 메시지로 노출 | PR #6, merge `4cf3baf` | `src/axhub-helpers/index.ts`, `tests/session-start.test.ts` |
+| **SHIPPED** | Phase 4 hook latency benchmark: impossible 5ms gate 제거, helper hot path p95 50ms gate를 측정 가능하게 고정 | PR #7, merge `f944fdf` | `scripts/benchmark-hooks.ts`, `tests/hook-latency.test.ts`, `package.json#bench:hooks` |
+| **SHIPPED** | Phase 5 supply-chain/release plan sync: 현재 signed Bun helper release artifact와 PLAN/docs를 일치 | PR #8, merge `6eb8779` | `docs/RELEASE.md`, `.github/workflows/release.yml`, `tests/release-config.test.ts`, `bun run release:check` |
+| **SHIPPED** | Phase 6 recover guidance sync: recover guidance를 shipped forward-fix flow로 문서화 | PR #9, merge `cc8d487` | `docs/troubleshooting.ko.md`, `tests/manifest.test.ts`, `tests/plan-consistency.test.ts` |
+| **SHIPPED** | Phase 7 hub-api TLS pinning: deployment-list fallback이 bearer token 전송 전 hub-api SPKI pin을 검증 | PR #10, merge `ed67fb9` | `src/axhub-helpers/list-deployments.ts`, `tests/list-deployments.test.ts` |
+| **SHIPPED** | Phase 8 PLAN checklist ledger: best-practices checklist를 unchecked TODO가 아닌 evidence ledger로 전환 | PR #11, merge `6364e66` | §16.7, `tests/plan-consistency.test.ts`, `bun run skill:doctor --strict` |
+| **SHIPPED** | Phase 9 current layout/schema sync: PLAN의 repo layout, plugin schema, package version snippet을 실제 구현과 동기화 | PR #12, merge `9fd6c09` | §16.2/§16.12, `tests/plan-consistency.test.ts`, `tests/manifest.test.ts` |
+| **SHIPPED** | Phase 21 release cut: PR #4–#12 누적분을 `v0.1.21`로 bump/tag/release | commit `75418a3`, tag `v0.1.21` | GitHub Release `v0.1.21`, release workflow `25028614673`, `scripts/release/verify-release.sh v0.1.21` |
+
+**v0.1.21 검증 기록**
+
+- `bun test` → 546 pass / 5 skip / 0 fail.
+- `bunx tsc --noEmit` → pass.
+- `bun run lint:tone --strict` → 0 error / 0 warning.
+- `bun run lint:keywords --check` → OK.
+- `bun run skill:doctor --strict` → pass.
+- `bun run release:check` → 5 cross-arch binaries rebuilt/checked at `0.1.21`.
+- `AXHUB_E2E_STAGING_ENDPOINT=https://hub-api.jocodingax.ai bun run test:e2e` → 4 pass / 1 skip / 0 fail.
+- GitHub Actions release workflow `25028614673` → success; 21 release assets uploaded.
+- `bash scripts/release/verify-release.sh v0.1.21` → manifest cosign verification + 5 binary signature/checksum checks all OK.
+
+**남은 범위 정리**
+
+- 이번 라운드에서 PLAN.md의 stale/mismatch/open-list 성격 항목은 닫혔다. 새 구현 TODO를 추가하려면 반드시 test/script gate 또는 manual evidence row를 같이 추가한다.
+- `tests/run-corpus.sh`의 full live re-curation은 의도적으로 explicit `--fixture`가 필요하다. 자동으로 fabricated result를 만들지 않는 것이 현재 안전장치다.
+- §13.3의 최소 2개 고객사 사용자 검증, deferred outside M0–M6 항목(자동 rollback, org-admin audit log skill, multi-tenant marketplace policy, web dashboard)은 코드 미구현이 아니라 별도 제품/운영 단계로 남긴다.
+- GitHub Actions Node.js 20 deprecation 경고는 v0.1.21 릴리즈 블로커가 아니었지만, 다음 release infra 라운드에서 runner/action Node 24 대응으로 추적한다.
 
 ---
 
