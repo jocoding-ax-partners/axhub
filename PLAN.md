@@ -3,13 +3,13 @@
 
 > 한 줄: `ax-hub-cli`(v0.1.0 GA)를 Claude Code가 자연어로 90% 이상, 보조적으로 슬래시 커맨드로 안전하게 사용해 axhub 앱을 배포·관리하도록 만드는 플러그인.
 
-작성일: 2026-04-23 · 최근 업데이트: 2026-04-28 · 대상 contract: ax-hub-cli **v0.1.0** GA · 현재 릴리즈: **axhub plugin v0.1.21** · 작업 디렉토리: `/Users/wongil/Desktop/work/jocoding/axhub`
+작성일: 2026-04-23 · 최근 업데이트: 2026-04-28 · 대상 contract: ax-hub-cli **v0.1.0** GA · 현재 릴리즈: **axhub plugin v0.1.22** · 작업 디렉토리: `/Users/wongil/Desktop/work/jocoding/axhub`
 
 ---
 
-## 0. 현재 구현/릴리즈 스냅샷 (2026-04-28, v0.1.21)
+## 0. 현재 구현/릴리즈 스냅샷 (2026-04-28, v0.1.22)
 
-> 이 섹션은 PLAN.md가 stale open-work list처럼 보이지 않도록, 2026-04-28 기준으로 실제 머지·릴리즈된 구현 범위를 고정한다. 아래 항목은 모두 `main`에 머지되어 `v0.1.21` GitHub Release까지 배포됐다.
+> 이 섹션은 PLAN.md가 stale open-work list처럼 보이지 않도록, 2026-04-28 기준으로 실제 머지·릴리즈된 구현 범위를 고정한다. 아래 항목은 모두 `main`에 머지되었고, v0.1.21 baseline 이후 SessionStart hotfix는 `v0.1.22` patch release로 배포한다.
 
 | Status | 범위 | PR / commit | 구현·검증 근거 |
 |---|---|---:|---|
@@ -24,10 +24,11 @@
 | **SHIPPED** | Phase 8 PLAN checklist ledger: best-practices checklist를 unchecked TODO가 아닌 evidence ledger로 전환 | PR #11, merge `6364e66` | §16.7, `tests/plan-consistency.test.ts`, `bun run skill:doctor --strict` |
 | **SHIPPED** | Phase 9 current layout/schema sync: PLAN의 repo layout, plugin schema, package version snippet을 실제 구현과 동기화 | PR #12, merge `9fd6c09` | §16.2/§16.12, `tests/plan-consistency.test.ts`, `tests/manifest.test.ts` |
 | **SHIPPED** | Phase 21 release cut: PR #4–#12 누적분을 `v0.1.21`로 bump/tag/release | commit `75418a3`, tag `v0.1.21` | GitHub Release `v0.1.21`, release workflow `25028614673`, `scripts/release/verify-release.sh v0.1.21` |
+| **SHIPPED** | Phase 22 SessionStart startup hotfix: non-Windows 호스트에서 universal `hooks.json`가 PowerShell hook을 실행해 startup error를 노출하던 문제 수정 | commit `a90edd7`, tag `v0.1.22` | `tests/manifest.test.ts`, `tests/smoke-windows-vm-checklist.ps1`, `docs/pilot/*`, `bun test`, `bun run release:check` |
 
-**v0.1.21 검증 기록**
+**v0.1.22 검증 기록**
 
-- `bun test` → 546 pass / 5 skip / 0 fail.
+- `bun test` → 545 pass / 5 skip / 0 fail.
 - `bunx tsc --noEmit` → pass.
 - `bun run lint:tone --strict` → 0 error / 0 warning.
 - `bun run lint:keywords --check` → OK.
@@ -36,13 +37,14 @@
 - `AXHUB_E2E_STAGING_ENDPOINT=https://hub-api.jocodingax.ai bun run test:e2e` → 4 pass / 1 skip / 0 fail.
 - GitHub Actions release workflow `25028614673` → success; 21 release assets uploaded.
 - `bash scripts/release/verify-release.sh v0.1.21` → manifest cosign verification + 5 binary signature/checksum checks all OK.
+- v0.1.22 hotfix pre-release gate: `bun test`, `bash tests/auto-download.test.sh`, `bunx tsc --noEmit`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict`, `bun run release:check`, `git diff --check`.
 
 **남은 범위 정리**
 
 - 이번 라운드에서 PLAN.md의 stale/mismatch/open-list 성격 항목은 닫혔다. 새 구현 TODO를 추가하려면 반드시 test/script gate 또는 manual evidence row를 같이 추가한다.
 - `tests/run-corpus.sh`의 full live re-curation은 의도적으로 explicit `--fixture`가 필요하다. 자동으로 fabricated result를 만들지 않는 것이 현재 안전장치다.
 - §13.3의 최소 2개 고객사 사용자 검증, deferred outside M0–M6 항목(자동 rollback, org-admin audit log skill, multi-tenant marketplace policy, web dashboard)은 코드 미구현이 아니라 별도 제품/운영 단계로 남긴다.
-- GitHub Actions Node.js 20 deprecation 경고는 v0.1.21 릴리즈 블로커가 아니었지만, 다음 release infra 라운드에서 runner/action Node 24 대응으로 추적한다.
+- GitHub Actions Node.js 20 deprecation 경고는 v0.1.21/v0.1.22 릴리즈 블로커가 아니었지만, 다음 release infra 라운드에서 runner/action Node 24 대응으로 추적한다.
 
 ---
 
@@ -658,7 +660,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 // .claude-plugin/plugin.json
 {
   "name": "axhub",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "description": "Claude Code plugin for axhub — vibe coder app hub. Korean-first natural-language deploy and manage with HMAC-bound consent gates, live profile/app resolution, and exit-code recovery routing. Wraps ax-hub-cli (v0.1.0+).",
   "author": {"name": "Jocoding AX Partners", "url": "https://jocodingax.ai"},
   "homepage": "https://hub-api.jocodingax.ai",
@@ -675,7 +677,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
     "name": "axhub",
     "source": "./",
     "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders at customer companies",
-    "version": "0.1.21"
+    "version": "0.1.22"
   }]
 }
 ```

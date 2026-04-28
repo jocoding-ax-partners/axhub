@@ -4,6 +4,32 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.1.22](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.21...v0.1.22) (2026-04-28)
+
+Hotfix release for the visible SessionStart startup error captured in the user screenshot. Claude Code runs matching hook entries on the current host and reports non-blocking hook spawn failures; the universal axhub hook config was registering a Windows PowerShell SessionStart sibling on macOS/Linux, where `pwsh`/`powershell` is usually absent.
+
+### Fixed
+
+- **SessionStart hook noise**: universal `hooks/hooks.json` now registers only the bash SessionStart shim, removing the unconditional `shell:powershell` sibling that caused visible startup errors on non-Windows hosts.
+- **Regression guard**: `tests/manifest.test.ts` now asserts universal SessionStart hooks do not reference `session-start.ps1` or require PowerShell.
+- **Pilot docs**: Windows pilot/admin docs now state that stock Windows automatic SessionStart requires future platform-specific hook packaging; current Windows fallback is `AXHUB_TOKEN`/`token-import` or Git Bash/WSL.
+
+### Verification
+
+- Red test first: `bun test tests/manifest.test.ts --test-name-pattern 'SessionStart registers only|does not require PowerShell'` failed against the old 2-hook config.
+- `bun test` → 545 pass / 5 skip / 0 fail.
+- `bash tests/auto-download.test.sh` → 8 pass / 0 fail.
+- `bunx tsc --noEmit`.
+- `bun run lint:tone --strict` → 0 error / 0 warning.
+- `bun run lint:keywords --check` → OK.
+- `bun run skill:doctor --strict`.
+- `bun run release:check` → 5 cross-arch binaries rebuilt/checked at `0.1.22`.
+- `git diff --check`.
+
+### Honest tradeoff
+
+- This prioritizes eliminating visible startup errors for all non-Windows users. Stock Windows automatic SessionStart is paused until the plugin has platform-conditioned hook packaging or a verified Claude Code platform matcher. The PowerShell scripts remain in the repo for manual smoke and future packaging work.
+
 ## [0.1.21](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.20...v0.1.21) (2026-04-28)
 
 Phase 21 — PLAN.md 잔여 항목을 최신 `main` 기준으로 끝까지 닫은 릴리즈예요. PR #4–#12 를 순서대로 머지해 명령 표면, corpus replay, SessionStart preflight, hook latency, supply-chain 문서/검증, recover 문서, hub-api TLS pinning, PLAN evidence ledger, 현재 레이아웃/schema 동기화까지 반영했어요.
