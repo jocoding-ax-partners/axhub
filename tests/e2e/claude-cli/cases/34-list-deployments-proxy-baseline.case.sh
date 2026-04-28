@@ -15,8 +15,10 @@ mkdir -p "$CASE_DIR/.config/axhub-plugin"
 MOCK_HUB_AUTH_FAIL=1 mock_hub_start || { echo "  FAIL: mock-hub start" >&2; exit 2; }
 trap 'mock_hub_stop' EXIT INT TERM
 
-# token 배치 — list-deployments resolveToken 은 file content 를 raw bearer 로 trim/사용.
-# token-headed.json (구조화 JSON) 는 SKILL flows 용; helper bin 직접 호출엔 raw token string 필요.
+# token 배치 — list-deployments.ts:89-100 의 tokenFromFile() 은 readFileSync(path, "utf8").trim() 후
+# 결과를 그대로 Bearer 헤더에 사용. token-headed.json (구조화 JSON) 을 그대로 두면 JSON blob 이
+# Bearer 값으로 들어가 HTTP header invalid 에러 (실측: "Header has invalid value: 'Bearer {\n...}'").
+# SKILL flow 용 JSON fixture 와 helper-bin 용 raw bearer 는 형식이 다름 — case 34 는 후자.
 printf 'axhub_pat_test_HEADED_TOKEN_DO_NOT_USE_IN_PROD\n' > "${CASE_DIR}/.config/axhub-plugin/token"
 chmod 600 "${CASE_DIR}/.config/axhub-plugin/token"
 
