@@ -29,7 +29,7 @@ classify_case_state() {
     return 0
   fi
 
-  # PASS — exit 0 + valid JSON + is_error false
+  # PASS branch 1: claude --output-format json (T1) — exit 0 + is_error false
   # 주의: jq 의 `//` 가 boolean false 를 falsy 로 처리하므로 `// empty` 사용 시
   # is_error=false 가 빈 문자열로 변환됨. tostring 으로 명시 변환.
   if [ "$exit_code" -eq 0 ] && [ -s "$stdout_path" ]; then
@@ -38,6 +38,15 @@ classify_case_state() {
     if [ "$is_error" = "false" ]; then
       echo "PASS"
       return 0
+    fi
+    # PASS branch 2: T2 helper-bin output — claude shape 안 가지지만 valid JSON + exit 0
+    # T2 의 classify-exit / preflight / consent-mint 등은 is_error 필드 자체가 없음.
+    # has("is_error") 가 false 면 helper-bin output 으로 간주, exit 0 이면 PASS.
+    if [ "$is_error" = "missing" ]; then
+      if jq empty "$stdout_path" >/dev/null 2>&1; then
+        echo "PASS"
+        return 0
+      fi
     fi
   fi
 
