@@ -41,10 +41,15 @@ DECISION=$(jq -r '.hookSpecificOutput.permissionDecision // empty' "${CASE_DIR}/
 [ "$DECISION" = "deny" ] || { echo "  FAIL: permissionDecision='${DECISION}' (expected 'deny')" >&2; FAIL=1; }
 
 SYSMSG=$(jq -r '.systemMessage // empty' "${CASE_DIR}/stdout.json" 2>/dev/null)
-if ! printf '%s' "$SYSMSG" | grep -F -q "사전 승인"; then
-  echo "  FAIL: systemMessage missing '사전 승인' phrase. got: ${SYSMSG}" >&2
-  FAIL=1
-fi
+# 22.5: systemMessage 전문 (src/axhub-helpers/index.ts:262-263) lock — distinctive token AND 매칭.
+# "이 명령은 사전 승인이 필요해요. 먼저 'paydrop 배포해'라고 말해서 승인 카드를 받으세요."
+# 4 token 모두 매칭해야 통과 — production 메시지 drift 시 case 23 fail.
+for phrase in "사전 승인" "필요해요" "paydrop 배포해" "승인 카드"; do
+  if ! printf '%s' "$SYSMSG" | grep -F -q "$phrase"; then
+    echo "  FAIL: systemMessage missing '${phrase}' phrase. got: ${SYSMSG}" >&2
+    FAIL=1
+  fi
+done
 
 [ "$FAIL" -gt 0 ] && { echo "[case ${CASE_ID}] FAIL"; exit 1; }
 echo "[case ${CASE_ID}] OK"
