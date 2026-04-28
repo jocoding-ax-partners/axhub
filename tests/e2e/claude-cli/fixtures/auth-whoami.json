@@ -1,0 +1,5 @@
+{
+  "user_email": "test@axhub.local",
+  "scopes": ["deploy:create", "apps:read", "apis:read"],
+  "token_expires_at": "2099-01-01T00:00:00Z"
+}

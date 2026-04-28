@@ -1,0 +1,14 @@
+{
+  "apis": [
+    {
+      "slug": "paydrop-public",
+      "owner_app": "paydrop",
+      "endpoints": [
+        { "method": "GET", "path": "/v1/balance" },
+        { "method": "POST", "path": "/v1/transfer" }
+      ]
+    }
+  ],
+  "scope": "current_app",
+  "cross_team_available": false
+}

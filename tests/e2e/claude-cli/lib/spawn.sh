@@ -50,9 +50,9 @@ detect_timeout_cmd() {
   echo "perl"
 }
 TIMEOUT_CMD="${TIMEOUT_CMD:-$(detect_timeout_cmd)}"
-DEFAULT_TIMEOUT="${DEFAULT_TIMEOUT:-30}"
+DEFAULT_TIMEOUT="${DEFAULT_TIMEOUT:-90}"
 DEFAULT_MODEL="${CLAUDE_E2E_MODEL:-claude-haiku-4-5}"
-DEFAULT_CAP_USD="${CLAUDE_E2E_CAP_USD:-0.30}"  # 22.5.5 plugin-loaded measurement: haiku + /axhub:help = $0.155. cap 0.30 = 2x 안전 마진.
+DEFAULT_CAP_USD="${CLAUDE_E2E_CAP_USD:-0.60}"  # 22.5.5 + 22.2 measurement: simple slash $0.09, multi-step doctor 60s+ overrun. cap 0.60 USD = 4x slash baseline 안전 마진.
 MOCK_HUB_URL="${MOCK_HUB_URL:-http://127.0.0.1:18080}"
 
 spawn_claude() {

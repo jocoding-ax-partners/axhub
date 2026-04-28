@@ -1,0 +1,25 @@
+{
+  "apps": [
+    {
+      "slug": "paydrop",
+      "display_name": "PayDrop",
+      "env": "prod",
+      "owner": "test@axhub.local",
+      "last_deploy_id": "dep-2026-04-28-001",
+      "last_deploy_status": "succeeded"
+    },
+    {
+      "slug": "memo-bot",
+      "display_name": "Memo Bot",
+      "env": "prod",
+      "owner": "test@axhub.local",
+      "last_deploy_id": "dep-2026-04-27-014",
+      "last_deploy_status": "succeeded"
+    }
+  ],
+  "pagination": {
+    "total": 2,
+    "page": 1,
+    "limit": 10
+  }
+}
