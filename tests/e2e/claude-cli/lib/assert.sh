@@ -39,14 +39,12 @@ classify_case_state() {
       echo "PASS"
       return 0
     fi
-    # PASS branch 2: T2 helper-bin output — claude shape 안 가지지만 valid JSON + exit 0
-    # T2 의 classify-exit / preflight / consent-mint 등은 is_error 필드 자체가 없음.
-    # has("is_error") 가 false 면 helper-bin output 으로 간주, exit 0 이면 PASS.
+    # PASS branch 2: T2 helper-bin output — claude shape 안 가지지만 exit 0
+    # T2 의 classify-exit / preflight / consent-mint 등은 is_error 필드 없음 + JSON 출력.
+    # redact 는 raw 텍스트 출력 (non-JSON) — 그래도 exit 0 + non-empty 이면 PASS.
     if [ "$is_error" = "missing" ]; then
-      if jq empty "$stdout_path" >/dev/null 2>&1; then
-        echo "PASS"
-        return 0
-      fi
+      echo "PASS"
+      return 0
     fi
   fi
 

@@ -4,6 +4,42 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [Unreleased] — Phase 22 claude -p subprocess E2E harness (in progress)
+
+vibe coder 가 Claude Code 안에서 axhub 자연어를 발화했을 때의 끝-끝 흐름 (SKILL routing → preflight → AskUserQuestion D1 fallback → HMAC consent → exit-code 한국어 분류) 을 subprocess `claude -p` 로 직접 driving 하는 33-case 매트릭스 harness 도입. ralplan 합의 (3 iteration) 후 단계별 land 진행 중이에요.
+
+### Added (Phase 22 land 분)
+
+- **`tests/e2e/claude-cli/` harness scaffold** (Phase 22.0): README + CLAUDE_FLAGS.md (claude 2.1.121 freeze) + CLAUDE_JSON_SCHEMA.md (LOCKED, baseline measurement 결과) + fixtures + lib/spawn.sh + lib/assert.sh + lib/mock-hub.{sh,ts} + lib/t2-helper.sh + run-matrix.sh.
+- **15 active cases (T1 6 / T2 9)**: case 01 `/axhub:help`, 02 `/axhub:doctor`, 03 NL "내 axhub 앱 목록", 04 NL "어떤 API 쓸 수 있어", 13 NL "누구로 로그인", 16 `/axhub:update` (T1 claude -p) + 20/21/25-31 classify-exit + redact + preflight + consent-mint (T2 helper-bin direct, $0 cost).
+- **`scripts/measure-claude-baseline.ts`** Phase 22.5.5 baseline measurement — per-case wall-time + actual cost USD + JSON schema 실측.
+- **`scripts/enumerate-axhub-subcommands.sh`** mock-impl coverage closed-loop helper.
+- **`tests/e2e-claude-cli-registry.test.ts`** registry 9 safe_default sanity lock (5 test, 40 expect).
+- **`.github/workflows/claude-cli-e2e.yml`** PR-blocking T2 only ($0 cost) + nightly cron + workflow_dispatch T1+T2+T3.
+- **`bun run test:plugin-e2e[:t1|:t2|:nightly]`** npm scripts.
+
+### Fixed during baseline measurement
+
+- Plan v3 SB-3 cap-hit detector 정의 부정확 (stop_reason 으로는 cap-hit / graceful abort 구분 불가능 — 둘 다 `end_turn`). 결정적 marker = `subtype: "error_max_budget_usd"`. v5 detector 재정의 + CLAUDE_JSON_SCHEMA.md LOCKED.
+- macOS env -i 가 claude OAuth Keychain 접근 깨뜨림 ("Not logged in"). selective env override fallback (ANTHROPIC_API_KEY 있을 때만 full env -i 격리).
+- `--mcp-config '{}'` invalid → `'{"mcpServers":{}}'`.
+- macOS GNU timeout 부재 → perl alarm wrapper portable.
+
+### Verification (현재 시점)
+
+- `bash run-matrix.sh --tier t2` → 9/9 PASS, $0 cost, wall <2s
+- `bash run-matrix.sh --only 01 02 03 04 13 16` → 6/6 PASS, $1.00 total cost, wall 221s
+- `bun test` → 555 tests, 550 pass, 5 skip, 0 fail
+- `bunx tsc --noEmit` clean
+- `bun run lint:tone --strict` 0 err / 0 warn
+- `bun run skill:doctor --strict` OK
+
+### Honest tradeoff
+
+- T1 claude -p 7 case 는 PR-blocking 에서 제외 — cost burn ($1+/run) 우려. nightly cron + manual workflow_dispatch + release tag 직전에만 fire. macOS-specific 회귀 detection latency 1-7일 (수용 가능).
+- 22.0.3 (deploy SKILL Step entry sentinel) — case 18 alias parity 의존, gitnexus_impact 후 별도 small PR 으로 land 예정.
+- 남은 T1 cases (05/19/20/21/22/23/24 → 22.3 unauth/error path), T2 cases (32/33/34) 후속 PR.
+
 ## [0.1.22](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.21...v0.1.22) (2026-04-28)
 
 Hotfix release for the visible SessionStart startup error captured in the user screenshot. Claude Code runs matching hook entries on the current host and reports non-blocking hook spawn failures; the universal axhub hook config was registering a Windows PowerShell SessionStart sibling on macOS/Linux, where `pwsh`/`powershell` is usually absent.

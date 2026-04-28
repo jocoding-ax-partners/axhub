@@ -25,6 +25,10 @@
     "skill:doctor": "bun scripts/skill-doctor.ts",
     "test": "bun test",
     "test:e2e": "bun test tests/e2e/",
+    "test:plugin-e2e": "bash tests/e2e/claude-cli/run-matrix.sh",
+    "test:plugin-e2e:t1": "bash tests/e2e/claude-cli/run-matrix.sh --tier t1",
+    "test:plugin-e2e:t2": "bash tests/e2e/claude-cli/run-matrix.sh --tier t2",
+    "test:plugin-e2e:nightly": "bash tests/e2e/claude-cli/run-matrix.sh --tier nightly",
     "typecheck": "tsc --noEmit",
     "fuzz": "bun tests/fuzz-parser.ts"
   },

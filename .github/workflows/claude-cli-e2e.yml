@@ -1,0 +1,96 @@
+name: claude-cli-e2e
+
+# Phase 22.6 — claude -p subprocess E2E harness CI.
+#
+# 두 job 분리 (Plan v3 SB-1 Tier overlay):
+#   e2e-pr      : T2 only ($0 model cost, 결정적, PR-blocking)
+#   e2e-nightly : T1+T2+T3 union (claude API cost burn — cron + workflow_dispatch + release tag)
+#
+# T1 (claude -p) 은 cost burn ($1.0/run) 우려로 PR-blocking 에서 제외. nightly 와 release tag 직전에만 fire.
+
+on:
+  pull_request:
+    paths:
+      - 'skills/**'
+      - 'commands/**'
+      - 'hooks/**'
+      - 'src/axhub-helpers/**'
+      - 'tests/e2e/claude-cli/**'
+      - 'tests/fixtures/ask-defaults/**'
+  push:
+    branches: [main]
+    paths:
+      - 'skills/**'
+      - 'src/axhub-helpers/**'
+      - 'tests/e2e/claude-cli/**'
+  schedule:
+    - cron: "0 17 * * *"  # 02:00 KST nightly
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: "Run tier"
+        required: false
+        default: "pr"
+        type: choice
+        options: [pr, t1, t2, nightly]
+
+jobs:
+  e2e-pr:
+    name: T2 helper-bin (PR-blocking, $0 cost)
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Build helper bin
+        run: bun run build
+      - name: Smoke
+        run: bun run smoke
+      - name: Run T2 plugin E2E (helper-bin only)
+        run: bun run test:plugin-e2e:t2
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-cli-e2e-pr-t2
+          path: tests/e2e/claude-cli/output/
+          retention-days: 7
+
+  e2e-nightly:
+    name: T1+T2+T3 full matrix (cost-aware)
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Build helper bin
+        run: bun run build
+      - name: Install claude CLI
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          claude --version
+      - name: Verify ANTHROPIC_API_KEY present
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::error::ANTHROPIC_API_KEY repo secret missing — required for nightly T1 cost burn"
+            exit 1
+          fi
+          echo "::notice::API key present, proceeding with T1 cost burn (~\$1.50/run)"
+      - name: Run E2E matrix (tier from input or default nightly)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          TIER="${{ inputs.tier || 'nightly' }}"
+          bun run test:plugin-e2e -- --tier "$TIER"
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-cli-e2e-nightly
+          path: tests/e2e/claude-cli/output/
+          retention-days: 14
