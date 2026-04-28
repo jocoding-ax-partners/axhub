@@ -7,10 +7,12 @@ import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const plan = readFileSync(join(REPO_ROOT, "PLAN.md"), "utf8");
+const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as { version: string };
 const between = (start: string, end: string): string => plan.slice(plan.indexOf(start), plan.indexOf(end, plan.indexOf(start)));
 const milestones = between("## 11. Milestones", "## 12. Risks");
 const layout = between("### 16.2 Revised Plugin Layout", "### 16.3 Revised Skill Template");
 const scope = between("## 14. NOT in scope", "## 15. What already exists");
+const schema = between("**§16.12 plugin.json + marketplace.json Schemas**", "**§16.13 bin/axhub-helpers");
 const bestPractices = between("### 16.7 Best Practices Audit Checklist", "### 16.8 Phase 5 transition summary");
 
 describe("Phase 1 PLAN reconciliation", () => {
@@ -38,6 +40,15 @@ describe("Phase 1 PLAN reconciliation", () => {
     expect(layout).not.toContain("mcp-serve");
   });
 
+  test("repository layout mirrors current Bun helper implementation, not stale Go scaffolding", () => {
+    expect(layout).toContain("src/axhub-helpers/");
+    expect(layout).toContain("bin/axhub-helpers");
+    expect(layout).toContain("TypeScript/Bun compiled single binary");
+    expect(layout).not.toContain("resolve.go");
+    expect(layout).not.toContain("Go binary preferred");
+    expect(layout).not.toContain("trust-ux-patterns.ko.md");
+  });
+
   test("current architecture names CLI as the shared surface", () => {
     expect(plan).toContain("항상 ax-hub-cli만 호출");
     expect(plan).toContain("공통 surface는 별도 plugin layer가 아니라 `ax-hub-cli` 자체");
@@ -63,8 +74,18 @@ describe("PLAN release artifact reconciliation", () => {
   });
 });
 
+describe("PLAN plugin schema reconciliation", () => {
+  test("active schema snippet matches current release metadata decisions", () => {
+    expect(schema).toContain(`"version": "${packageJson.version}"`);
+    expect(schema).toContain('"license": "MIT"');
+    expect(schema).toContain('"repository": "https://github.com/jocoding-ax-partners/axhub.git"');
+    expect(schema).toContain('"claude-code-plugin"');
+    expect(schema).not.toContain("TBD");
+  });
+});
+
 describe("PLAN best-practices checklist reconciliation", () => {
-  test("best-practices section is a status ledger, not an unchecked TODO list", () => {
+  test("best-practices section is a status ledger, not an unchecked open-work list", () => {
     expect(bestPractices).toContain("Status ledger as of 2026-04-27");
     expect(bestPractices).not.toMatch(/- \[ \]/);
   });
