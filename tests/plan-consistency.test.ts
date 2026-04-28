@@ -2,7 +2,7 @@
 // plugin-server work after the Phase 6.5 user clarification.
 
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
@@ -11,6 +11,7 @@ const between = (start: string, end: string): string => plan.slice(plan.indexOf(
 const milestones = between("## 11. Milestones", "## 12. Risks");
 const layout = between("### 16.2 Revised Plugin Layout", "### 16.3 Revised Skill Template");
 const scope = between("## 14. NOT in scope", "## 15. What already exists");
+const bestPractices = between("### 16.7 Best Practices Audit Checklist", "### 16.8 Phase 5 transition summary");
 
 describe("Phase 1 PLAN reconciliation", () => {
   test("cancellation decision remains explicit in the audit trail", () => {
@@ -59,5 +60,28 @@ describe("PLAN release artifact reconciliation", () => {
   test("active supply-chain section names the current Bun helper, not a new Go rewrite", () => {
     expect(supplyChain).toContain("TypeScript/Bun compiled binary");
     expect(supplyChain).not.toContain("single multi-command Go binary");
+  });
+});
+
+describe("PLAN best-practices checklist reconciliation", () => {
+  test("best-practices section is a status ledger, not an unchecked TODO list", () => {
+    expect(bestPractices).toContain("Status ledger as of 2026-04-27");
+    expect(bestPractices).not.toMatch(/- \[ \]/);
+  });
+
+  test("manual review-only rows are marked as evidence/replaced instead of active implementation gaps", () => {
+    expect(bestPractices).toContain("MANUAL EVIDENCE");
+    expect(bestPractices).toContain("REPLACED BY GATES");
+    expect(bestPractices).toContain("bun run skill:doctor --strict");
+    expect(bestPractices).toContain("tests/manifest.test.ts");
+  });
+
+  test("skill bodies remain free of the explicit 'you should' anti-pattern", () => {
+    for (const dir of readdirSync(join(REPO_ROOT, "skills"))) {
+      if (dir.startsWith("_")) continue;
+      if (!statSync(join(REPO_ROOT, "skills", dir)).isDirectory()) continue;
+      const skill = readFileSync(join(REPO_ROOT, "skills", dir, "SKILL.md"), "utf8");
+      expect(skill).not.toMatch(/\byou should\b/i);
+    }
   });
 });
