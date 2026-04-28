@@ -1,114 +1,54 @@
 {
-  "task": "Phase 22.4 — fixture infrastructure 확장: mock-hub 401 fixture + fixture shim cli_too_old/auth_expired stub. 22.3 cases 19/22/34 의 token_expired·cli_too_old 정확 시나리오 + case 34 stdout positive evidence. 22.3 PR (#14) 위에 stack.",
-  "createdAt": "2026-04-28T05:50:00Z",
+  "task": "Phase 22.5 — case 23 systemMessage 추가 phrase 검증 + case 34 mock-hub log assertion. 22.4 PR #15 위에 stack. case 23 의 systemMessage 전문 (index.ts:262-263 '먼저 paydrop 배포해라고 말해서 승인 카드를 받으세요') 의 distinctive token 추가 매칭 + case 34 가 mock-hub log file 에 'GET /api/v1/apps/42/deployments' 라인 실재 검증.",
+  "createdAt": "2026-04-28T06:10:00Z",
   "stories": [
     {
-      "id": "US-2240A",
-      "title": "fixture axhub shim 확장 — AXHUB_FIXTURE_VERSION + AXHUB_FIXTURE_AUTH env 지원",
+      "id": "US-2250A",
+      "title": "case 23 systemMessage 추가 phrase 검증 — 승인 카드 / 필요해요 / paydrop 배포해 token 매칭",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "tests/e2e/claude-cli/fixtures/bin/axhub 가 AXHUB_FIXTURE_VERSION=0.0.5 시 `axhub --version` 으로 'ax-hub-cli 0.0.5' (MIN_AXHUB_CLI_VERSION 0.1.0 미만) 출력",
-        "AXHUB_FIXTURE_AUTH=expired 시 `axhub auth status` exit 65 + stderr 'token_expired'",
-        "AXHUB_FIXTURE_AUTH=expired 시 `axhub deploy create ...` exit 65 + stderr 'token_expired'",
-        "기존 동작 (no env vars) 보존 — apps list / auth status fixture token 분기 / unknown subcommand 처리"
+        "tests/e2e/claude-cli/cases/23-preauth-check-deny.case.sh 가 systemMessage 에 '사전 승인' 외 추가 distinctive token (`승인 카드`, `필요해요`, `paydrop 배포해`) AND 매칭 검증",
+        "src/axhub-helpers/index.ts:262-263 의 systemMessage 전문 lock — production code 변경 시 case 23 fail 로 drift catch",
+        "matrix.jsonl id=23 entry expected_phrases 에 추가 token 동기화"
       ],
       "owner": "",
       "blockedBy": []
     },
     {
-      "id": "US-2240B",
-      "title": "mock-hub.ts 401 fixture 지원 — MOCK_HUB_AUTH_FAIL=1 env",
+      "id": "US-2250B",
+      "title": "case 34 mock-hub log assertion — 'GET /api/v1/apps/42/deployments' 라인 실재 검증",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "tests/e2e/claude-cli/lib/mock-hub.ts 가 MOCK_HUB_AUTH_FAIL=1 env 시 모든 /v1/* 및 /api/v1/* path 에서 401 + JSON {code:'token_expired', detail:...} 반환",
-        "/_ping 은 변동 없음 (readiness probe 보호)",
-        "기존 200 응답 분기 보존 (env 미설정 시)"
-      ],
-      "owner": "",
-      "blockedBy": []
-    },
-    {
-      "id": "US-2240C",
-      "title": "spawn.sh 가 case 별 fixture env (FIXTURE_AXHUB_VERSION / FIXTURE_AXHUB_AUTH) 를 subprocess 에 propagate",
-      "priority": 1,
-      "passes": true,
-      "acceptanceCriteria": [
-        "tests/e2e/claude-cli/lib/spawn.sh 가 FIXTURE_AXHUB_VERSION env (caller-set) 시 cmd 에 AXHUB_FIXTURE_VERSION=<value> 추가",
-        "FIXTURE_AXHUB_AUTH env 시 cmd 에 AXHUB_FIXTURE_AUTH=<value> 추가",
-        "use_full_sandbox=1 path (env -i) 와 use_full_sandbox=0 path (selective override) 모두 propagate",
-        "기존 FIXTURE_TOKEN / ENABLE_SLASH 동작 보존"
-      ],
-      "owner": "",
-      "blockedBy": []
-    },
-    {
-      "id": "US-2240D",
-      "title": "case 19 강화 — AXHUB_FIXTURE_AUTH=expired + 한국어 4-part phrase 강화",
-      "priority": 2,
-      "passes": true,
-      "acceptanceCriteria": [
-        "tests/e2e/claude-cli/cases/19-deploy-noauth-nl.case.sh 가 FIXTURE_TOKEN=token-headed.json + FIXTURE_AXHUB_AUTH=expired 로 spawn",
-        "expected_phrases 강화 — 기존 OR 매칭 + '원인'/'만료' 추가 (4-part Korean classify-exit 65 카피 정확 매칭)",
-        "matrix.jsonl id=19 entry expected_phrases 동기화"
-      ],
-      "owner": "",
-      "blockedBy": [
-        "US-2240A",
-        "US-2240C"
-      ]
-    },
-    {
-      "id": "US-2240E",
-      "title": "case 22 강화 — AXHUB_FIXTURE_VERSION=0.0.5 + 한국어 cli_too_old phrase",
-      "priority": 2,
-      "passes": true,
-      "acceptanceCriteria": [
-        "tests/e2e/claude-cli/cases/22-doctor-preflight-nl.case.sh 가 FIXTURE_AXHUB_VERSION=0.0.5 로 spawn",
-        "expected_phrases 강화 — 기존 OR 매칭 + '오래된'/'업그레이드' 추가 (doctor cli_too_old 카피)",
-        "matrix.jsonl id=22 entry expected_phrases 동기화"
-      ],
-      "owner": "",
-      "blockedBy": [
-        "US-2240A",
-        "US-2240C"
-      ]
-    },
-    {
-      "id": "US-2240F",
-      "title": "case 34 강화 — token-headed fixture + numeric appId + mock-hub 401 → stdout error_code 검증 (positive evidence)",
-      "priority": 2,
-      "passes": true,
-      "acceptanceCriteria": [
-        "tests/e2e/claude-cli/cases/34-list-deployments-proxy-baseline.case.sh 가 token-headed.json fixture + --app 42 (numeric) + MOCK_HUB_AUTH_FAIL=1 로 list-deployments 호출",
-        "list-deployments fetch → mock-hub 401 → exit 65 + stdout JSON .error_code == 'auth.token_invalid' assert (positive evidence: proxy override 가 actually engaged + mock-hub 가 401 응답함)",
-        "기존 stderr cert/tls/spki 부재 검증 보존",
+        "tests/e2e/claude-cli/cases/34-list-deployments-proxy-baseline.case.sh 가 mock-hub log file (${OUTPUT_DIR}/mock-hub.log) 에 'GET /api/v1/apps/42/deployments' substring assert",
+        "기존 stdout .error_code='auth.token_invalid' assert 보존 (22.4 positive evidence)",
+        "log file 부재 시 명시적 FAIL — readiness probe (`/_ping`) 만 있고 actual fetch 없으면 fail",
         "matrix.jsonl id=34 entry description 동기화"
       ],
       "owner": "",
-      "blockedBy": [
-        "US-2240B"
-      ]
+      "blockedBy": []
     },
     {
-      "id": "US-2240G",
-      "title": "T2 case 34 로컬 실행 green — mock-hub 401 path 결정적 검증",
-      "priority": 3,
+      "id": "US-2250C",
+      "title": "T2 case 23/34 로컬 실행 green — 신규 phrase + log assertion 결정적 검증",
+      "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
         "bash tests/e2e/claude-cli/run-matrix.sh --tier t2 --only 23 34 → exit 0 + 2/2 PASS",
-        "case 34 stdout JSON .error_code == 'auth.token_invalid' (mock-hub 401 응답 직접 받았다는 결정적 증거)"
+        "case 23 stdout systemMessage 에 4 token (사전 승인 / 승인 카드 / 필요해요 / paydrop 배포해) 모두 포함 verified",
+        "case 34 mock-hub log 에 GET /api/v1/apps/42/deployments line verified"
       ],
       "owner": "",
       "blockedBy": [
-        "US-2240F"
+        "US-2250A",
+        "US-2250B"
       ]
     },
     {
-      "id": "US-2240H",
+      "id": "US-2250D",
       "title": "회귀 검증 — bun test / tsc / lint:tone / lint:keywords / skill:doctor 모두 green",
-      "priority": 4,
+      "priority": 3,
       "passes": true,
       "acceptanceCriteria": [
         "bun test 결과 baseline 유지 (550 pass / 5 skip / 0 fail)",
@@ -119,33 +59,33 @@
       ],
       "owner": "",
       "blockedBy": [
-        "US-2240G"
+        "US-2250C"
       ]
     },
     {
-      "id": "US-2240I",
-      "title": "PR 워크플로 — branch push + PR 생성 (22.3 위에 stack) + URL 보고",
-      "priority": 5,
+      "id": "US-2250E",
+      "title": "PR 워크플로 — branch push + PR 생성 (22.4 위에 stack) + URL 보고",
+      "priority": 4,
       "passes": true,
       "acceptanceCriteria": [
-        "phase-22.4/mockhub-401-preflight-stub branch 에 commit (Conventional Commits 'test:' 또는 'feat:')",
-        "git push origin phase-22.4/mockhub-401-preflight-stub 성공",
-        "gh pr create --base phase-22.3/unauth-error-cases (22.3 stacked PR — main 머지 후 rebase 예정)",
-        "PR 본문에 22.4 plan 컨텍스트 + 4 fixture infra change + 3 case 강화 매핑 + verification 결과 명시",
+        "phase-22.5/case23-msg-case34-mockhub-log branch 에 commit (Conventional Commits 'test:')",
+        "git push origin phase-22.5/case23-msg-case34-mockhub-log 성공",
+        "gh pr create --base phase-22.4/mockhub-401-preflight-stub (22.4 stacked)",
+        "PR 본문에 22.5 plan 컨텍스트 + 2 case 강화 매핑 + verification 결과 명시",
         "PR URL 사용자에게 보고"
       ],
       "owner": "",
       "blockedBy": [
-        "US-2240H"
+        "US-2250D"
       ]
     }
   ],
   "metadata": {
-    "task_origin": "/oh-my-claudecode:ralph 22.4 mock-hub 401 fixture + preflight cli_too_old stub 작업해 — Phase 22.4 fixture infra 확장.",
-    "scope_note": "22.3 PR #14 위에 stack. 22.3 의 deferred 시나리오 (cases 19/22/34 token_expired·cli_too_old 정확 시나리오 + case 34 stdout positive evidence) 모두 closed-loop. fixture-only 변경이라 production code 영향 0 (preflight.ts / list-deployments.ts 변경 없음, mock-hub.ts + fixture shim + spawn.sh 만 영향).",
+    "task_origin": "/oh-my-claudecode:ralph 22.5 case 23 systemMessage 추가 phrase + case 34 mock-hub log assertion 작업해",
+    "scope_note": "22.4 PR #15 위에 stack. case 23/34 의 assertion strengthening only — production code 영향 0, infra 변경 없음. case 23 systemMessage drift catch + case 34 mock-hub fetch 도달 결정적 evidence 강화.",
     "deslop": "enabled",
     "critic": "architect",
-    "branch": "phase-22.4/mockhub-401-preflight-stub",
-    "stacked_on": "phase-22.3/unauth-error-cases"
+    "branch": "phase-22.5/case23-msg-case34-mockhub-log",
+    "stacked_on": "phase-22.4/mockhub-401-preflight-stub"
   }
 }

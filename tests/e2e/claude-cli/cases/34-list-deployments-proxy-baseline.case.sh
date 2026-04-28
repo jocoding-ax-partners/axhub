@@ -52,5 +52,20 @@ if grep -i -q -e 'tls' -e 'cert' -e 'spki' "${CASE_DIR}/stderr.log"; then
   FAIL=1
 fi
 
+# 22.5: mock-hub log assertion — fetch 가 실재 mock-hub 까지 도달했음을 결정적으로 검증.
+# 22.4 의 stdout error_code='auth.token_invalid' 는 list-deployments.ts:280-288 path 진입 증거지만,
+# mock-hub log 에 GET /api/v1/apps/42/deployments line 이 있어야 fetch URL 이 정확히 mock-hub 로
+# 라우팅됐다는 결정적 evidence — DNS / 환경변수 / endpoint resolve 단계 sanity check.
+MOCK_LOG="${OUTPUT_DIR}/mock-hub.log"
+if [ ! -f "$MOCK_LOG" ]; then
+  echo "  FAIL: mock-hub log file not found at ${MOCK_LOG}" >&2
+  FAIL=1
+elif ! grep -F -q 'GET /api/v1/apps/42/deployments' "$MOCK_LOG"; then
+  echo "  FAIL: mock-hub log missing 'GET /api/v1/apps/42/deployments' line" >&2
+  echo "  log content:" >&2
+  cat "$MOCK_LOG" >&2
+  FAIL=1
+fi
+
 [ "$FAIL" -gt 0 ] && { echo "[case ${CASE_ID}] FAIL"; exit 1; }
 echo "[case ${CASE_ID}] OK"
