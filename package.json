@@ -14,6 +14,7 @@
     "build:all": "bun run build:darwin-arm64 && bun run build:darwin-amd64 && bun run build:linux-amd64 && bun run build:linux-arm64 && bun run build:windows-amd64",
     "smoke": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help",
     "smoke:full": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help && ./bin/axhub-helpers session-start </dev/null && bash tests/docs-link-audit.sh && bun run fuzz && bun run codegen:catalog && bun run codegen:version",
+    "bench:hooks": "bun scripts/benchmark-hooks.ts",
     "codegen:catalog": "bun scripts/codegen-catalog.ts",
     "codegen:version": "bun scripts/codegen-install-version.ts",
     "lint:tone": "bun scripts/check-toss-tone-conformance.ts --strict",

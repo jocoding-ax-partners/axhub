@@ -314,7 +314,7 @@ async function cmdPreflight(_args: string[]): Promise<number> {
 
 async function cmdClassifyExit(_args: string[]): Promise<number> {
   // PostToolUse hook: maps axhub exit code to 4-part Korean systemMessage.
-  // Early return ({}) on non-axhub Bash commands — 5ms gate.
+  // Early return ({}) on non-axhub Bash commands — 50ms hot path goal.
   const raw = await readStdin();
   const payload = parseJson<{
     tool_input?: { command?: string };
