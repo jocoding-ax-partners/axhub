@@ -30,7 +30,11 @@
     "test:plugin-e2e:t2": "bash tests/e2e/claude-cli/run-matrix.sh --tier t2",
     "test:plugin-e2e:nightly": "bash tests/e2e/claude-cli/run-matrix.sh --tier nightly",
     "typecheck": "tsc --noEmit",
-    "fuzz": "bun tests/fuzz-parser.ts"
+    "fuzz": "bun tests/fuzz-parser.ts",
+    "lint:tone:rust": "bun scripts/check-toss-tone-conformance.ts --include \"crates/**/*.rs\" --strict",
+    "cargo:test": "cargo test --workspace",
+    "cargo:build": "cargo build --workspace",
+    "cargo:coverage": "cargo llvm-cov --workspace --fail-under-lines 90"
   },
   "engines": {
     "bun": ">=1.1.0"

@@ -1,0 +1,9 @@
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+rustc 1.95.0 (59807616e 2026-04-14)
+secret-tool recovered length=258
+
+running 1 test
+test linux_secret_service_reads_go_keyring_envelope ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+

@@ -1,0 +1,27 @@
+Unable to find image 'rust:1.83-bookworm' locally
+1.83-bookworm: Pulling from library/rust
+0a96bdb82805: Pulling fs layer
+54c7be425079: Pulling fs layer
+7aa8176e6d89: Pulling fs layer
+1523f4b3f560: Pulling fs layer
+38d98af84437: Pulling fs layer
+1523f4b3f560: Waiting
+38d98af84437: Waiting
+0a96bdb82805: Download complete
+54c7be425079: Verifying Checksum
+54c7be425079: Download complete
+7aa8176e6d89: Verifying Checksum
+7aa8176e6d89: Download complete
+0a96bdb82805: Pull complete
+54c7be425079: Pull complete
+38d98af84437: Verifying Checksum
+38d98af84437: Download complete
+7aa8176e6d89: Pull complete
+1523f4b3f560: Verifying Checksum
+1523f4b3f560: Download complete
+1523f4b3f560: Pull complete
+38d98af84437: Pull complete
+Digest: sha256:a45bf1f5d9af0a23b26703b3500d70af1abff7f984a7abef5a104b42c02a292b
+Status: Downloaded newer image for rust:1.83-bookworm
+debconf: delaying package configuration, since apt-utils is not installed
+bash: line 15: cargo: command not found

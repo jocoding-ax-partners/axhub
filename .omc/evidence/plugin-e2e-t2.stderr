@@ -1,0 +1,2 @@
+$ bun build src/axhub-helpers/index.ts --compile --outfile bin/axhub-helpers --target=bun
+$ bash tests/e2e/claude-cli/run-matrix.sh --tier t2

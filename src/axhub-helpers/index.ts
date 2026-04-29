@@ -14,6 +14,7 @@
  * Subcommands:
  *   session-start    SessionStart hook entry: checks axhub install, version, plugin signature
  *   preauth-check    PreToolUse hook entry: verifies HMAC consent token for destructive ops
+ *   prompt-route     UserPromptSubmit hook entry: injects NL skill-routing context
  *   consent-mint     Skill entry: mints HMAC consent token after AskUserQuestion approval
  *   consent-verify   Internal: verifies consent token (used by preauth-check)
  *   resolve          Skill entry: live resolves profile/endpoint/app_id/branch/commit
@@ -35,9 +36,14 @@ import { classify } from "./catalog.ts";
 import { redact } from "./redact.ts";
 import { runPreflight } from "./preflight.ts";
 import { runResolve } from "./resolve.ts";
+import { runPromptRoute } from "./prompt-route.ts";
 import { emitMetaEnvelope } from "./telemetry.ts";
 import { runListDeployments } from "./list-deployments.ts";
 import { readKeychainToken } from "./keychain.ts";
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // CLI I/O primitives: stdout for protocol payloads (JSON to hooks/skills),
 // stderr for diagnostics. Avoids console.log to keep this binary's contract
@@ -101,6 +107,65 @@ const asConsentBinding = (v: unknown): ConsentBinding | null => {
   };
 };
 
+
+const rustHelperPath = (): string => {
+  const override = process.env["AXHUB_HELPERS_RUST_BIN"];
+  if (override && override.length > 0) return override;
+  const here = dirname(fileURLToPath(import.meta.url));
+  return join(here, "..", "..", "bin", process.platform === "win32" ? "axhub-helpers-rs.exe" : "axhub-helpers-rs");
+};
+
+const RUST_SUPPORTED_COMMANDS = new Set([
+  "session-start",
+  "preauth-check",
+  "prompt-route",
+  "consent-mint",
+  "consent-verify",
+  "resolve",
+  "preflight",
+  "classify-exit",
+  "redact",
+  "list-deployments",
+  "version",
+  "--version",
+  "-v",
+  "help",
+  "--help",
+  "-h",
+]);
+
+const maybeDelegateToRust = async (cmd: string, args: string[]): Promise<number | null> => {
+  const runtime = process.env["AXHUB_HELPERS_RUNTIME"] ?? "auto";
+  if (runtime === "ts") return null;
+  if (runtime !== "auto" && runtime !== "rust") return null;
+  if (process.env["AXHUB_HELPERS_RUNTIME_DELEGATED"] === "1") return null;
+  if (runtime === "auto" && !RUST_SUPPORTED_COMMANDS.has(cmd)) return null;
+
+  const rustBin = rustHelperPath();
+  if (!existsSync(rustBin)) {
+    if (runtime === "auto") return null;
+    err(`AXHUB_HELPERS_RUNTIME=rust 이지만 Rust helper를 찾을 수 없어요: ${rustBin}`);
+    return 127;
+  }
+
+  const stdin = await readStdin();
+  const result = spawnSync(rustBin, [cmd, ...args], {
+    input: stdin,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      AXHUB_HELPERS_RUNTIME_DELEGATED: "1",
+    },
+  });
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.error) {
+    err(`Rust helper 실행에 실패했어요: ${result.error.message}`);
+    return 127;
+  }
+  return result.status ?? 1;
+};
+
 const PLUGIN_VERSION = "0.1.23";
 // MIN_AXHUB_CLI_VERSION + MAX_AXHUB_CLI_VERSION live in ./preflight.ts (the
 // only consumer); re-importing here would just create a stale duplicate.
@@ -115,6 +180,7 @@ Usage:
 Subcommands:
   session-start    Hook: SessionStart diagnostics + plugin signature verify
   preauth-check    Hook: PreToolUse HMAC consent gate for destructive axhub ops
+  prompt-route     Hook: UserPromptSubmit NL routing context for axhub skills
   consent-mint     Skill: mint HMAC consent token bound to {action, app, profile, branch, commit}
   consent-verify   Internal: verify consent token
   resolve          Skill: live resolve {profile, endpoint, app_id, app_slug, branch, commit_sha}
@@ -135,11 +201,16 @@ async function main(): Promise<number> {
     return 64;
   }
 
+  const rustExitCode = await maybeDelegateToRust(cmd, args);
+  if (rustExitCode !== null) return rustExitCode;
+
   switch (cmd) {
     case "session-start":
       return cmdSessionStart(args);
     case "preauth-check":
       return cmdPreauthCheck(args);
+    case "prompt-route":
+      return cmdPromptRoute(args);
     case "consent-mint":
       return cmdConsentMint(args);
     case "consent-verify":
@@ -263,6 +334,16 @@ async function cmdPreauthCheck(_args: string[]): Promise<number> {
       "이 명령은 사전 승인이 필요해요. 먼저 'paydrop 배포해'라고 말해서 승인 카드를 받으세요.",
   });
   await emitMetaEnvelope({ event: "preauth_check_deny", action: parsed.action });
+  return 0;
+}
+
+async function cmdPromptRoute(_args: string[]): Promise<number> {
+  // UserPromptSubmit hook: inject narrowly scoped axhub workflow context for
+  // Korean/English natural-language prompts that should route to plugin skills.
+  // Official Claude Code hooks docs say UserPromptSubmit context belongs in
+  // hookSpecificOutput.additionalContext.
+  const raw = await readStdin();
+  out(runPromptRoute(raw));
   return 0;
 }
 

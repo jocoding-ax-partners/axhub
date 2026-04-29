@@ -1,0 +1,2 @@
+cargo:rustc-check-cfg=cfg(coverage)
+cargo:rerun-if-changed=../../src/axhub-helpers/catalog.ts

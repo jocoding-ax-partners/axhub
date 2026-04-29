@@ -1,5 +1,5 @@
 {
-  "description": "axhub plugin hooks: SessionStart diagnostics + PreToolUse HMAC consent gate (Go binary, deterministic) + PostToolUse exit-code Korean classifier",
+  "description": "axhub plugin hooks: SessionStart diagnostics + UserPromptSubmit NL routing + PreToolUse HMAC consent gate (Go binary, deterministic) + PostToolUse exit-code Korean classifier",
   "hooks": {
     "SessionStart": [
       {
@@ -8,6 +8,17 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh",
             "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers prompt-route",
+            "timeout": 5
           }
         ]
       }

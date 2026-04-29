@@ -75,6 +75,23 @@ UX 보장:
 
 배포 정책 / 권한 관리 / 보안 설정 / 파일럿 롤아웃: [`docs/org-admin-rollout.ko.md`](docs/org-admin-rollout.ko.md).
 
+
+## Runtime 선택 (전환 기간)
+
+axhub-helpers 는 v1.0 전환 기간 동안 Rust + TypeScript 양쪽 helper 를 지원해요. 환경변수로 선택할 수 있어요.
+
+```bash
+export AXHUB_HELPERS_RUNTIME=auto   # default (자동 감지, 권장)
+export AXHUB_HELPERS_RUNTIME=rust   # Rust helper 강제
+export AXHUB_HELPERS_RUNTIME=ts     # TypeScript helper 강제 (회귀 시)
+```
+
+- `auto`: Rust helper 가 PATH 에 있으면 사용하고, 없으면 TypeScript fallback 을 써요.
+- `rust`: Rust 만 써요. 없으면 즉시 실패해요.
+- `ts`: TypeScript 만 써요. 회귀 발견 시 즉시 rollback 용이에요.
+
+자세한 내용은 [`docs/migrate-rust.md`](docs/migrate-rust.md) 를 참고해요.
+
 ## 문제 해결
 
 흔한 에러 (token 만료, 동시 배포 차단, slug 모호, Windows fallback 등) 한국어 가이드: [`docs/troubleshooting.ko.md`](docs/troubleshooting.ko.md).

@@ -1,0 +1,9 @@
+[run-matrix] tier=pr selected 1 case(s): 22
+[case 22] state=PASS exit=0
+[case 22] OK
+
+[run-matrix] summary: /Users/wongil/Desktop/work/jocoding/axhub/tests/e2e/claude-cli/output/summary.tsv
+case_id  state  exit  wall_s
+22       PASS   0     21
+
+[run-matrix] OK — 1 / 1 case(s) passed

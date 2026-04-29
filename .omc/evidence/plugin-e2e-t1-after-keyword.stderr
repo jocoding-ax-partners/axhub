@@ -1,0 +1,3 @@
+$ bash tests/e2e/claude-cli/run-matrix.sh --tier t1
+  FAIL: no Korean cli_too_old phrase (오래된|업그레이드|버전|확인|axhub) in output
+error: script "test:plugin-e2e:t1" exited with code 1
