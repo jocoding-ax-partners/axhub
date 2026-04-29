@@ -39,7 +39,7 @@ jobs:
             cross: true
           - target: x86_64-apple-darwin
             asset: axhub-helpers-darwin-amd64
-            runner: macos-13
+            runner: macos-15-intel
             cross: false
           - target: aarch64-apple-darwin
             asset: axhub-helpers-darwin-arm64
