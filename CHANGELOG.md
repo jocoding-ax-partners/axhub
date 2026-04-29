@@ -4,6 +4,24 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.1.25](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.23...v0.1.25) (2026-04-29)
+
+Phase 23은 PR #19에서 검증한 Rust helper 기본 전환을 실제 배포 태그로 묶는 릴리즈예요. `AXHUB_HELPERS_RUNTIME=auto`는 Rust native helper를 우선 쓰고, 회귀가 보이면 `AXHUB_HELPERS_RUNTIME=ts`로 즉시 돌아갈 수 있게 fallback은 남겨요.
+
+### Verification
+
+- PR #19 필수 checks: Rust CI ubuntu / macOS / Windows, Rust staging local gate, claude-cli-e2e T2 모두 SUCCESS.
+- Local baseline: `cargo fmt --all -- --check`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `bunx tsc --noEmit`, `cargo llvm-cov --workspace --fail-under-lines 90` → 91.10% line coverage.
+- Release baseline: `bun run release:check`, `bun test` → 570 pass / 6 skip / 0 fail.
+
+### Honest tradeoff
+
+- TypeScript fallback은 이번 릴리즈에 남겨요. live staging secrets run, Windows V3/AhnLab cohort, 24h fuzz(`fuzz_minutes=1440`)까지 끝난 뒤 삭제가 안전해요.
+
+### Added
+
+* prove the Rust helper cutover through staging gates ([2ca7e1c](https://github.com/jocoding-ax-partners/axhub/commit/2ca7e1c6c9b1fe775475640d9bf063337c5df281))
+
 ## [0.1.24](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.23...v0.1.24) (2026-04-29)
 
 ## [0.1.23](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.22...v0.1.23) (2026-04-28)
