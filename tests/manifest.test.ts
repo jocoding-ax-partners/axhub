@@ -228,6 +228,10 @@ describe("hooks.json structure", () => {
     expect(hooksJson.hooks.PostToolUse).toBeDefined();
   });
 
+  test("contains UserPromptSubmit event", () => {
+    expect(hooksJson.hooks.UserPromptSubmit).toBeDefined();
+  });
+
   test("each event value is an array", () => {
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       expect(Array.isArray(group)).toBe(true);
@@ -291,6 +295,12 @@ describe("hooks.json structure", () => {
   test("PreToolUse + PostToolUse have Bash matcher", () => {
     expect(hooksJson.hooks.PreToolUse[0].matcher).toBe("Bash");
     expect(hooksJson.hooks.PostToolUse[0].matcher).toBe("Bash");
+  });
+
+  test("UserPromptSubmit routes through axhub-helpers prompt-route", () => {
+    const hook = hooksJson.hooks.UserPromptSubmit[0].hooks[0];
+    expect(hook.command).toBe("${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers prompt-route");
+    expect(hook.timeout).toBe(5);
   });
 
   // Regression: Claude Code evaluates every SessionStart sibling on the current host.
@@ -823,7 +833,7 @@ describe("cross-manifest consistency", () => {
     const knownSubcommands = new Set([
       "session-start", "preauth-check", "consent-mint", "consent-verify",
       "resolve", "preflight", "classify-exit", "redact", "version", "help",
-      "list-deployments", "token-import",
+      "list-deployments", "prompt-route", "token-import",
     ]);
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {

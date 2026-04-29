@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Case 22 (T1) — 한국어 NL "환경 점검" + cli_too_old → doctor SKILL.
+# Case 22 (T1) — 한국어 NL "환경 점검해" + cli_too_old → doctor SKILL.
 # 22.4: AXHUB_FIXTURE_VERSION=0.0.5 (MIN_AXHUB_CLI_VERSION 0.1.0 미만) 강제 → preflight cli_too_old=true →
 #       doctor SKILL 의 version-skew 한국어 카피 ('너무 오래된 버전' / '업그레이드') 라우팅 검증.
 # 22.3 의 generic doctor routing 보다 강한 검증 — preflight 의 cli_too_old branch 정확 매칭.
@@ -11,7 +11,7 @@ CASE_DIR="${OUTPUT_DIR}/${CASE_ID}"
 
 ENABLE_SLASH=0 \
 FIXTURE_AXHUB_VERSION="0.0.5" \
-spawn_claude "${CASE_ID}" "환경 점검" 90 || true
+spawn_claude "${CASE_ID}" "환경 점검해" 90 || true
 EXIT_CODE=$(cat "${CASE_DIR}/exit-code")
 STDOUT="${CASE_DIR}/stdout.json"
 STATE=$(classify_case_state "$STDOUT" "$EXIT_CODE")

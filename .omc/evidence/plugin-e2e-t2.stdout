@@ -1,0 +1,33 @@
+  [25ms]  bundle  90 modules
+  [93ms] compile  bin/axhub-helpers
+[run-matrix] tier=t2 selected 11 case(s): 20 21 23 25 26 27 28 29 30 31 34
+[case 20] OK
+[case 21] OK
+[case 23] exit=0
+[case 23] OK
+[case 25] OK
+[case 26] OK
+[case 27] OK
+[case 28] OK
+[case 29] OK
+[case 30] OK
+[case 31] OK
+[mock-hub] ready at http://127.0.0.1:18080 (pid 70202)
+[case 34] exit=65
+[case 34] OK
+
+[run-matrix] summary: /Users/wongil/Desktop/work/jocoding/axhub/tests/e2e/claude-cli/output/summary.tsv
+case_id  state  exit  wall_s
+20       PASS   0     1
+21       PASS   0     0
+23       PASS   0     0
+25       PASS   0     0
+26       PASS   0     0
+27       PASS   0     0
+28       PASS   0     0
+29       PASS   0     0
+30       FAIL   64    0
+31       PASS   0     0
+34       FAIL   65    0
+
+[run-matrix] OK — 11 / 11 case(s) passed

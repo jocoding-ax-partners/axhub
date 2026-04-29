@@ -132,6 +132,24 @@ describe("mintToken / verifyToken", () => {
     expect(result.reason!.toLowerCase()).toContain("expired");
   });
 
+  test("zero leeway: exp = now - 1 is rejected", async () => {
+    const binding = baseBinding();
+    await mintToken(binding, -1);
+    const result = await verifyToken(binding);
+    expect(result.valid).toBe(false);
+    expect(result.reason).toBeDefined();
+    expect(result.reason!.toLowerCase()).toContain("expired");
+  });
+
+  test("zero leeway: exp = now boundary is rejected", async () => {
+    const binding = baseBinding();
+    await mintToken(binding, 0);
+    const result = await verifyToken(binding);
+    expect(result.valid).toBe(false);
+    expect(result.reason).toBeDefined();
+    expect(result.reason!.toLowerCase()).toContain("expired");
+  });
+
   test("wrong app_id: minted with paydrop, verified with otherapp → invalid", async () => {
     await mintToken(baseBinding({ app_id: "paydrop" }), 60);
     const result = await verifyToken(baseBinding({ app_id: "otherapp" }));

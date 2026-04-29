@@ -1,0 +1,34 @@
+$ bun run test:plugin-e2e:t1
+[run-matrix] tier=t1 selected 8 case(s): 01 02 03 04 13 16 19 22
+[case 01] state=PASS exit=0
+[case 01] OK
+[case 02] state=PASS exit=0
+[case 02] OK
+[mock-hub] ready at http://127.0.0.1:18080 (pid 92848)
+[case 03] state=PASS exit=0
+[case 03] OK
+[mock-hub] ready at http://127.0.0.1:18080 (pid 41485)
+[case 04] state=PASS exit=0
+[case 04] OK
+[case 13] state=PASS exit=0
+[case 13] OK
+[case 16] state=PASS exit=0
+[case 16] OK
+[case 19] state=PASS exit=0
+[case 19] OK
+[case 22] state=PASS exit=0
+[case 22] OK
+
+[run-matrix] summary: /Users/wongil/Desktop/work/jocoding/axhub/tests/e2e/claude-cli/output/summary.tsv
+case_id  state  exit  wall_s
+01       PASS   0     14
+02       PASS   0     58
+03       PASS   0     33
+04       PASS   0     26
+13       PASS   0     17
+16       PASS   0     58
+19       PASS   0     78
+22       PASS   0     14
+
+[run-matrix] OK — 8 / 8 case(s) passed
+plugin_e2e_t1_after_prompt_route_exit=0

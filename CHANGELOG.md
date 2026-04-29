@@ -4,6 +4,8 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.1.24](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.23...v0.1.24) (2026-04-29)
+
 ## [0.1.23](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.22...v0.1.23) (2026-04-28)
 
 Phase 22 의 claude -p subprocess E2E harness 후속 phase 4건 (22.0.3 / 22.3 / 22.4 / 22.5) + CI hardening 을 한 릴리즈예요. unauth/error / token_expired / cli_too_old / mock-hub 401 / consent gate bypass 시나리오 모두 closed-loop. production code 영향은 22.0.3 의 deploy SKILL Step entry sentinel (`echo '[deploy:Step N ...] entered' >&2`) 5건만 — 나머지 phase 는 test infra / fixture / case assertion 강화에 한정.

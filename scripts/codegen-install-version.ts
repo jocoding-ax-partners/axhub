@@ -23,12 +23,14 @@ const INSTALL_SH = join(REPO_ROOT, "bin/install.sh");
 const INSTALL_PS1 = join(REPO_ROOT, "bin/install.ps1");
 const INDEX_TS = join(REPO_ROOT, "src/axhub-helpers/index.ts");
 const TELEMETRY_TS = join(REPO_ROOT, "src/axhub-helpers/telemetry.ts");
+const CARGO_TOML = join(REPO_ROOT, "Cargo.toml");
 
 const VERSION_LINE_RE = /^(RELEASE_VERSION="\$\{AXHUB_PLUGIN_RELEASE:-)v\d+\.\d+\.\d+(?:-[a-z0-9.]+)?(\}")/m;
 // PowerShell single-quote literal — preserves quote pair via captured groups.
 const PS_VERSION_LINE_RE = /^(\$ReleaseVersion = if \(\$env:AXHUB_PLUGIN_RELEASE\) \{ \$env:AXHUB_PLUGIN_RELEASE \} else \{ ')v\d+\.\d+\.\d+(?:-[a-z0-9.]+)?(' \})$/m;
 const TS_PLUGIN_VERSION_RE = /^(const PLUGIN_VERSION = ")\d+\.\d+\.\d+(?:-[a-z0-9.]+)?(";)$/m;
 const TS_HELPER_VERSION_RE = /^(const HELPER_VERSION = ")\d+\.\d+\.\d+(?:-[a-z0-9.]+)?(";)$/m;
+const CARGO_WORKSPACE_VERSION_RE = /^(version = ")\d+\.\d+\.\d+(?:-[a-z0-9.]+)?(")$/m;
 
 export interface SyncResult {
   changed: boolean;
@@ -97,6 +99,11 @@ export function syncInstallVersion(): SyncResult {
     writeFileSync(TELEMETRY_TS, tlmUpdated);
     filesUpdated.push("src/axhub-helpers/telemetry.ts (PLUGIN_VERSION + HELPER_VERSION)");
   }
+
+
+  // 4. Cargo.toml — Rust workspace package version used by env!("CARGO_PKG_VERSION")
+  const cargoResult = syncFile(CARGO_TOML, CARGO_WORKSPACE_VERSION_RE, pkgVersion, (m) => m.replace(/\d+\.\d+\.\d+(?:-[a-z0-9.]+)?/, pkgVersion));
+  if (cargoResult.changed) filesUpdated.push("Cargo.toml (workspace.package.version)");
 
   return {
     changed: filesUpdated.length > 0,

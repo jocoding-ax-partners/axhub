@@ -1,0 +1,31 @@
+[run-matrix] tier=t1 selected 8 case(s): 01 02 03 04 13 16 19 22
+[case 01] state=PASS exit=0
+[case 01] OK
+[case 02] state=PASS exit=0
+[case 02] OK
+[mock-hub] ready at http://127.0.0.1:18080 (pid 1678)
+[case 03] state=PASS exit=0
+[case 03] OK
+[mock-hub] ready at http://127.0.0.1:18080 (pid 39033)
+[case 04] state=PASS exit=0
+[case 04] OK
+[case 13] state=PASS exit=0
+[case 13] OK
+[case 16] state=FAIL exit=142
+[case 19] state=PASS exit=0
+[case 19] OK
+[case 22] state=PASS exit=0
+[case 22] OK
+
+[run-matrix] summary: /Users/wongil/Desktop/work/jocoding/axhub/tests/e2e/claude-cli/output/summary.tsv
+case_id  state  exit  wall_s
+01       PASS   0     11
+02       PASS   0     60
+03       PASS   0     33
+04       PASS   0     15
+13       PASS   0     27
+16       FAIL   142   60
+19       PASS   0     19
+22       PASS   0     11
+
+[run-matrix] FAIL — 1 / 8 case(s) failed

@@ -60,7 +60,7 @@ const FORBIDDEN: ForbiddenToken[] = [
   { pattern: /시나요/g, rule: "T-06 (3 exceptions)", reason: "과도한 경어 (Toss has 3 exception cases — manual review)", severity: "warn" },
 ];
 
-const PHASE_13_FILES = async (): Promise<string[]> => {
+const PHASE_13_FILES = async (includePatterns: string[] = []): Promise<string[]> => {
   const explicit = [
     "src/axhub-helpers/catalog.ts",
     "src/axhub-helpers/keychain.ts",
@@ -81,8 +81,14 @@ const PHASE_13_FILES = async (): Promise<string[]> => {
   for await (const f of glob("skills/*/SKILL.md", { cwd: REPO_ROOT })) {
     skillFiles.push(f);
   }
-  const all = [...explicit, ...commandFiles, ...skillFiles].map((f) => join(REPO_ROOT, f));
-  return all.filter((f) => existsSync(f));
+  const includeFiles: string[] = [];
+  for (const pattern of includePatterns) {
+    for await (const f of glob(pattern, { cwd: REPO_ROOT })) {
+      includeFiles.push(f);
+    }
+  }
+  const all = [...explicit, ...commandFiles, ...skillFiles, ...includeFiles].map((f) => join(REPO_ROOT, f));
+  return Array.from(new Set(all)).filter((f) => existsSync(f));
 };
 
 interface Violation {
@@ -96,8 +102,8 @@ interface Violation {
   context: string;
 }
 
-const scan = async (): Promise<Violation[]> => {
-  const files = await PHASE_13_FILES();
+const scan = async (includePatterns: string[] = []): Promise<Violation[]> => {
+  const files = await PHASE_13_FILES(includePatterns);
   const out: Violation[] = [];
   for (const file of files) {
     const content = readFileSync(file, "utf8");
@@ -147,7 +153,17 @@ const main = async (): Promise<number> => {
   const baselineFlag = args.find((a) => a.startsWith("--baseline"));
   const baseline = baselineFlag ? parseInt(baselineFlag.split("=")[1] ?? args[args.indexOf(baselineFlag) + 1] ?? "0", 10) : null;
 
-  const violations = await scan();
+  const includePatterns: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--include" && args[i + 1]) {
+      includePatterns.push(args[i + 1]!);
+      i++;
+    } else if (args[i]?.startsWith("--include=")) {
+      includePatterns.push(args[i]!.slice("--include=".length));
+    }
+  }
+
+  const violations = await scan(includePatterns);
   const errors = violations.filter((v) => v.severity === "error");
   const warns = violations.filter((v) => v.severity === "warn");
 
@@ -158,7 +174,7 @@ const main = async (): Promise<number> => {
       const tag = v.severity === "error" ? "ERROR" : "WARN ";
       process.stdout.write(`${tag} ${v.file}:${v.line}:${v.col}  [${v.rule}]  ${v.match}  — ${v.reason}\n      ${v.context}\n`);
     }
-    process.stdout.write(`\n${errors.length} error(s), ${warns.length} warning(s) across ${(await PHASE_13_FILES()).length} file(s)\n`);
+    process.stdout.write(`\n${errors.length} error(s), ${warns.length} warning(s) across ${(await PHASE_13_FILES(includePatterns)).length} file(s)\n`);
   }
 
   if (strict && errors.length > 0) return 1;

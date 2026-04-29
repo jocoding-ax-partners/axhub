@@ -1,0 +1,1 @@
+$ bash tests/e2e/claude-cli/run-matrix.sh --tier t1

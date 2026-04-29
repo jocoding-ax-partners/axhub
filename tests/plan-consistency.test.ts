@@ -40,10 +40,10 @@ describe("Phase 1 PLAN reconciliation", () => {
     expect(layout).not.toContain("mcp-serve");
   });
 
-  test("repository layout mirrors current Bun helper implementation, not stale Go scaffolding", () => {
-    expect(layout).toContain("src/axhub-helpers/");
+  test("repository layout mirrors current Rust helper primary implementation, not stale Go scaffolding", () => {
+    expect(layout).toContain("crates/axhub-helpers/");
     expect(layout).toContain("bin/axhub-helpers");
-    expect(layout).toContain("TypeScript/Bun compiled single binary");
+    expect(layout).toContain("Rust helper primary");
     expect(layout).not.toContain("resolve.go");
     expect(layout).not.toContain("Go binary preferred");
     expect(layout).not.toContain("trust-ux-patterns.ko.md");
@@ -68,8 +68,8 @@ describe("PLAN release artifact reconciliation", () => {
     expect(supplyChain).not.toContain("manifest.sig");
   });
 
-  test("active supply-chain section names the current Bun helper, not a new Go rewrite", () => {
-    expect(supplyChain).toContain("TypeScript/Bun compiled binary");
+  test("active supply-chain section names the current Rust helper, not a new Go rewrite", () => {
+    expect(supplyChain).toContain("Rust helper binary");
     expect(supplyChain).not.toContain("single multi-command Go binary");
   });
 });

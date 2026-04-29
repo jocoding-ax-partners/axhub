@@ -1,0 +1,1 @@
+{"rustc":17940977064402226622,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[4052781840638386842,"build_script_build",false,12400768495903458021]],"local":[{"RerunIfChanged":{"output":"debug/build/axhub-helpers-d51ecd60e0277bfe/output","paths":["../../src/axhub-helpers/catalog.ts"]}}],"rustflags":[],"config":0,"compile_kind":0}

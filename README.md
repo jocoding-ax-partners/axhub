@@ -75,6 +75,23 @@ UX 보장:
 
 배포 정책 / 권한 관리 / 보안 설정 / 파일럿 롤아웃: [`docs/org-admin-rollout.ko.md`](docs/org-admin-rollout.ko.md).
 
+
+## Runtime 선택 (전환 기간)
+
+axhub-helpers 는 Rust helper 를 기본 runtime 으로 사용해요. 전환/롤백 기간 동안 TypeScript fallback 도 환경변수로 선택할 수 있어요.
+
+```bash
+export AXHUB_HELPERS_RUNTIME=auto   # default (자동 감지, 권장)
+export AXHUB_HELPERS_RUNTIME=rust   # Rust helper 강제
+export AXHUB_HELPERS_RUNTIME=ts     # TypeScript helper 강제 (회귀 시)
+```
+
+- `auto`: 현재 release 에서는 Rust helper 를 기본으로 써요. TypeScript fallback 은 monitor window 의 롤백 경로예요.
+- `rust`: Rust 만 써요. 없으면 즉시 실패해요.
+- `ts`: TypeScript 만 써요. 회귀 발견 시 즉시 rollback 용이에요.
+
+자세한 내용은 [`docs/migrate-rust.md`](docs/migrate-rust.md) 를 참고해요.
+
 ## 문제 해결
 
 흔한 에러 (token 만료, 동시 배포 차단, slug 모호, Windows fallback 등) 한국어 가이드: [`docs/troubleshooting.ko.md`](docs/troubleshooting.ko.md).
@@ -89,7 +106,7 @@ Claude Code  →  axhub plugin
         │              ├── skills/* (11 SKILL, NL 자동 트리거 + frontmatter multi-step/needs-preflight)
         │              ├── commands/* (9 슬래시 + 한글 alias)
         │              ├── hooks/* (SessionStart preflight, PreToolUse HMAC consent)
-        │              └── bin/axhub-helpers (Bun 컴파일, 5 cross-arch cosign-signed)
+        │              └── bin/axhub-helpers (Rust native, 5 cross-arch cosign-signed)
         │                       │  resolve + HMAC consent + classify + redact + preflight
         ▼                       │
    Bash tool ────────────────────┘
@@ -136,7 +153,7 @@ git push origin main --tags         # release.yml 자동 fire (cosign 서명 + G
 - `bunx tsc --noEmit` clean
 - `bun run lint:tone --strict` 0 err / 0 warn
 - `bun run skill:doctor --strict` 11/11 SKILLs complete
-- `bun run release:check` 5 cross-arch binaries verified
+- `bun run release:check` Rust helper host artifact + release matrix verified
 - `bun run test:e2e` (`https://hub-api.jocodingax.ai`) 4 pass / 1 skip / 0 fail
 
 ## 라이선스

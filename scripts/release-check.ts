@@ -1,22 +1,20 @@
 #!/usr/bin/env bun
 /**
- * v0.1.16 US-1601: Release pre-flight — guard against binary staleness.
+ * Release pre-flight — guard against version drift for the Rust-primary helper.
  *
- * Runs in this order:
- *   1. codegen:version (sync install.sh / install.ps1 / index.ts / telemetry.ts to package.json)
- *   2. build (local bin/axhub-helpers — symlink target for plugin directory mode)
- *   3. build:all (5 cross-arch artifacts for release.yml parity)
- *   4. Assert each compiled binary's `--version` output matches package.json
+ * Default local mode:
+ *   1. codegen:version syncs generated version files + Cargo workspace version
+ *   2. bun run build builds the host Rust helper into bin/axhub-helpers
+ *   3. host runnable binary reports package.json version
+ *   4. workflow/package wiring for the 5 release assets is present
  *
- * Failure mode prevented: v0.1.14 release shipped CHANGELOG + JSON bumps
- * but local bin/axhub-helpers stayed at v0.1.10 because `bun run build`
- * was never re-run. Plugin directory mode users saw stale runtime even
- * after pulling the release tag locally.
- *
- * Run BEFORE `git tag vX.Y.Z`. Idempotent — safe to re-run.
+ * Full matrix mode (`AXHUB_RELEASE_CHECK_FULL=1`) also runs `bun run build:all`
+ * and requires all 5 release asset names to exist. This is intended for hosts
+ * with the required Rust targets/linkers installed; the tag release workflow
+ * performs the authoritative 5-platform build in matrix jobs.
  */
 import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import packageJson from "../package.json" with { type: "json" };
@@ -24,13 +22,7 @@ import packageJson from "../package.json" with { type: "json" };
 const REPO_ROOT = join(import.meta.dir, "..");
 const BIN_DIR = join(REPO_ROOT, "bin");
 const EXPECTED = packageJson.version;
-
-const HOST_RUNNABLE_BINARIES: { name: string; arch: NodeJS.Architecture; platform: NodeJS.Platform }[] = [
-  { name: "axhub-helpers-darwin-arm64", arch: "arm64", platform: "darwin" },
-  { name: "axhub-helpers-darwin-amd64", arch: "x64", platform: "darwin" },
-  { name: "axhub-helpers-linux-arm64", arch: "arm64", platform: "linux" },
-  { name: "axhub-helpers-linux-amd64", arch: "x64", platform: "linux" },
-];
+const FULL_MATRIX = process.env.AXHUB_RELEASE_CHECK_FULL === "1";
 
 const ALL_BINARIES = [
   "axhub-helpers-darwin-arm64",
@@ -40,10 +32,17 @@ const ALL_BINARIES = [
   "axhub-helpers-windows-amd64.exe",
 ];
 
+const hostAssetName = (): string | null => {
+  if (process.platform === "darwin" && process.arch === "arm64") return "axhub-helpers-darwin-arm64";
+  if (process.platform === "darwin" && process.arch === "x64") return "axhub-helpers-darwin-amd64";
+  if (process.platform === "linux" && process.arch === "arm64") return "axhub-helpers-linux-arm64";
+  if (process.platform === "linux" && process.arch === "x64") return "axhub-helpers-linux-amd64";
+  if (process.platform === "win32" && process.arch === "x64") return "axhub-helpers-windows-amd64.exe";
+  return null;
+};
+
 const exec = (cmd: string): string => execSync(cmd, { cwd: REPO_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-
 const log = (msg: string) => process.stdout.write(`[release-check] ${msg}\n`);
-
 const fail = (msg: string): never => {
   process.stderr.write(`[release-check] FAIL: ${msg}\n`);
   process.exit(1);
@@ -54,47 +53,61 @@ const extractVersion = (output: string): string | null => {
   return m ? m[1] : null;
 };
 
+const assertVersion = (relativePath: string): void => {
+  const binPath = join(REPO_ROOT, relativePath);
+  if (!existsSync(binPath)) fail(`${relativePath} missing`);
+  const output = exec(`"${binPath}" --version`);
+  const version = extractVersion(output);
+  if (version !== EXPECTED) fail(`${relativePath} reports ${version ?? "unknown"} but package.json is ${EXPECTED}`);
+  log(`  ✓ ${relativePath} = ${version}`);
+};
+
+const assertWorkflowMatrix = (): void => {
+  const releaseYml = readFileSync(join(REPO_ROOT, ".github/workflows/release.yml"), "utf8");
+  for (const target of [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+  ]) {
+    if (!releaseYml.includes(target)) fail(`release.yml missing Rust target ${target}`);
+  }
+  for (const name of ALL_BINARIES) {
+    if (!releaseYml.includes(name)) fail(`release.yml missing asset name ${name}`);
+  }
+  log("  ✓ release.yml declares 5 Rust target assets");
+};
+
 const main = (): void => {
   log(`package.json version = ${EXPECTED}`);
 
   log("step 1/4: codegen:version (sync version constants)");
-  const codegenOutput = exec("bun run codegen:version");
-  process.stdout.write(codegenOutput);
+  process.stdout.write(exec("bun run codegen:version"));
 
-  log("step 2/4: bun run build (rebuild local bin/axhub-helpers)");
-  exec("bun run build");
+  log("step 2/4: bun run build (Cargo host build → bin/axhub-helpers)");
+  process.stdout.write(exec("bun run build"));
 
-  log("step 3/4: bun run build:all (rebuild 5 cross-arch artifacts)");
-  exec("bun run build:all");
+  log("step 3/4: assert host runnable Rust binary version");
+  assertVersion("bin/axhub-helpers");
+  const hostName = hostAssetName();
+  if (hostName) assertVersion(`bin/${hostName}`);
 
-  log("step 4/4: assert binary --version output matches package.json");
+  log("step 4/4: verify 5-asset release wiring");
+  assertWorkflowMatrix();
 
-  // Local bin/axhub-helpers — host arch — always runnable
-  const localBinPath = join(BIN_DIR, "axhub-helpers");
-  if (!existsSync(localBinPath)) fail(`bin/axhub-helpers missing — build step did not produce expected artifact`);
-  const localVersionOut = exec(`"${localBinPath}" --version`);
-  const localVersion = extractVersion(localVersionOut);
-  if (localVersion !== EXPECTED) {
-    fail(`bin/axhub-helpers reports ${localVersion ?? "unknown"} but package.json is ${EXPECTED}`);
-  }
-  log(`  ✓ bin/axhub-helpers = ${localVersion}`);
-
-  // Per-arch binaries: only execute the ones the host can run; verify others exist
-  for (const bin of ALL_BINARIES) {
-    const binPath = join(BIN_DIR, bin);
-    if (!existsSync(binPath)) fail(`bin/${bin} missing — build:all did not produce all artifacts`);
+  if (FULL_MATRIX) {
+    log("full matrix mode: bun run build:all");
+    process.stdout.write(exec("bun run build:all"));
+    for (const bin of ALL_BINARIES) {
+      if (!existsSync(join(BIN_DIR, bin))) fail(`bin/${bin} missing after build:all`);
+    }
+    if (hostName) assertVersion(`bin/${hostName}`);
+  } else {
+    log("full matrix build delegated to release.yml; set AXHUB_RELEASE_CHECK_FULL=1 to force local build:all");
   }
 
-  for (const { name, arch, platform } of HOST_RUNNABLE_BINARIES) {
-    if (process.platform !== platform || process.arch !== arch) continue;
-    const binPath = join(BIN_DIR, name);
-    const out = exec(`"${binPath}" --version`);
-    const v = extractVersion(out);
-    if (v !== EXPECTED) fail(`bin/${name} reports ${v ?? "unknown"} but package.json is ${EXPECTED}`);
-    log(`  ✓ bin/${name} = ${v}`);
-  }
-
-  log(`OK — all binaries at ${EXPECTED}, ready to tag v${EXPECTED}`);
+  log(`OK — Rust helper host artifact at ${EXPECTED}, release matrix wired for tag v${EXPECTED}`);
 };
 
 if (import.meta.main) {

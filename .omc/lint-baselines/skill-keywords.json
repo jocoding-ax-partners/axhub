@@ -81,6 +81,7 @@
       "axhub 설치돼 있어",
       "닥터",
       "진단해",
+      "환경 점검",
       "환경 점검해",
       "axhub 점검",
       "헬스체크 해",
@@ -776,5 +777,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-04-27T04:39:02.764Z"
+  "generated_at": "2026-04-29T06:56:03.649Z"
 }

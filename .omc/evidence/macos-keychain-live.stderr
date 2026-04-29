@@ -1,0 +1,3 @@
+   Compiling axhub-helpers v0.1.23 (/Users/wongil/Desktop/work/jocoding/axhub/crates/axhub-helpers)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.51s
+     Running tests/macos_keychain_live.rs (target/debug/deps/macos_keychain_live-be7f0c3ab00443f7)

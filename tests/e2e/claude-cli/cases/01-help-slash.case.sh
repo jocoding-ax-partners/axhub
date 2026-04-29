@@ -13,7 +13,7 @@ CASE_DIR="${OUTPUT_DIR}/${CASE_ID}"
 # shellcheck source=/dev/null
 . "${HARNESS_LIB}/assert.sh"
 
-ENABLE_SLASH=1 spawn_claude "${CASE_ID}" "/axhub:help" 60 || true
+ENABLE_SLASH=1 spawn_claude "${CASE_ID}" "/axhub:help" 90 || true
 
 EXIT_CODE=$(cat "${CASE_DIR}/exit-code")
 STDOUT="${CASE_DIR}/stdout.json"

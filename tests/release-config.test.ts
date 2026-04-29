@@ -31,24 +31,31 @@ describe("release.yml workflow shape (US-204)", () => {
     expect(content).toContain("contents: write");
   });
 
-  test("installs Bun via official curl install (avoids unzip dependency)", () => {
+  test("build matrix uses Rust toolchain for all 5 release targets", () => {
     content = readFileSync(path, "utf8");
-    expect(content).toContain("curl -fsSL https://bun.sh/install");
-    expect(content).toContain("$HOME/.bun/bin");
+    expect(content).toContain("dtolnay/rust-toolchain");
+    for (const target of [
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-pc-windows-msvc",
+    ]) {
+      expect(content).toContain(target);
+    }
   });
 
-  test("build-and-sign job runs on self-hosted Linux ARM64 runner", () => {
+  test("builds Rust helper via cargo/cross and uploads per-target artifacts", () => {
     content = readFileSync(path, "utf8");
-    expect(content).toContain("self-hosted");
-    expect(content).toContain("Linux");
-    expect(content).toContain("ARM64");
-    // Confirm we are NOT using GitHub-hosted runner for the signing job
-    expect(content).not.toMatch(/build-and-sign:[\s\S]*?runs-on:\s*ubuntu-latest/);
+    expect(content).toContain("cargo build --release -p axhub-helpers");
+    expect(content).toContain("cross build --release -p axhub-helpers");
+    expect(content).toContain("actions/upload-artifact");
   });
 
-  test("runs build:all to produce 5 cross-arch binaries", () => {
+  test("uses Bun only for manifest script in sign-and-upload job", () => {
     content = readFileSync(path, "utf8");
-    expect(content).toContain("bun run build:all");
+    expect(content).toContain("Install Bun for release manifest script");
+    expect(content).toContain("bun scripts/release/manifest.ts");
   });
 
   test("generates manifest.json via scripts/release/manifest.ts", () => {
@@ -79,8 +86,78 @@ describe("release.yml workflow shape (US-204)", () => {
     content = readFileSync(path, "utf8");
     expect(content).toMatch(/workflow_dispatch:\s*\n\s*inputs:\s*\n\s*tag:/);
     expect(content).toMatch(/TAG=.*github\.event\.inputs\.tag/);
-    expect(content).toMatch(/refs\/tags\/v\*/);
+    expect(content).toContain("refs/tags/$TAG");
     expect(content).toMatch(/ref: \$\{\{ github\.event_name == 'workflow_dispatch' && github\.event\.inputs\.tag \|\| github\.ref \}\}/);
+  });
+});
+
+describe("rust-staging-gates.yml workflow shape", () => {
+  const path = join(REPO_ROOT, ".github/workflows/rust-staging-gates.yml");
+  let content: string;
+
+  test(".github/workflows/rust-staging-gates.yml exists", () => {
+    expect(existsSync(path)).toBe(true);
+    content = readFileSync(path, "utf8");
+  });
+
+  test("manual dispatch exposes staging, credential, fuzz, and Windows gates", () => {
+    content = readFileSync(path, "utf8");
+    expect(content).toMatch(/workflow_dispatch:\s*\n\s*inputs:/);
+    expect(content).toContain("run_staging");
+    expect(content).toContain("require_credentials");
+    expect(content).toContain("fuzz_minutes");
+    expect(content).toContain("run_windows_smoke");
+  });
+
+  test("local gate rebuilds the Rust helper before any staging probe", () => {
+    content = readFileSync(path, "utf8");
+    expect(content).toContain("bun run codegen:version");
+    expect(content).toContain("bun run build");
+    expect(content).toContain("bin/axhub-helpers version");
+    expect(content).toContain("bun run release:check");
+  });
+
+  test("local gate installs rustfmt and clippy on an edition-2024-capable toolchain", () => {
+    content = readFileSync(path, "utf8");
+    expect(content).toContain("RUST_TOOLCHAIN: 1.94.1");
+    expect(content).toContain("components: rustfmt, clippy");
+    expect(content).not.toContain("RUST_TOOLCHAIN: 1.83.0");
+  });
+
+  test("staging job requires explicit credentials and runs read-only E2E", () => {
+    content = readFileSync(path, "utf8");
+    expect(content).toContain("AXHUB_E2E_STAGING_TOKEN");
+    expect(content).toContain("AXHUB_E2E_STAGING_ENDPOINT");
+    expect(content).toContain("AXHUB_E2E_STAGING_APP_ID");
+    expect(content).toContain("AXHUB_CLI_INSTALL_COMMAND");
+    expect(content).toContain("AXHUB_E2E_REQUIRE_RUST_HELPER: \"1\"");
+    expect(content).toContain("bun run test:e2e");
+  });
+
+  test("external security gates include cargo-fuzz and Windows smoke", () => {
+    content = readFileSync(path, "utf8");
+    expect(content).toContain("cargo +nightly fuzz run parser");
+    expect(content).toContain("windows-latest");
+    expect(content).toContain("bin\\axhub-helpers-windows-amd64.exe");
+    expect(content).toContain("CredReadW");
+  });
+});
+
+describe("Rust CI workflow toolchain compatibility", () => {
+  const workflowPaths = [
+    ".github/workflows/rust-ci.yml",
+    ".github/workflows/claude-cli-e2e.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/rust-staging-gates.yml",
+  ].map((relativePath) => join(REPO_ROOT, relativePath));
+
+  test("all Rust workflows pin the CI toolchain to the same edition-2024-capable version", () => {
+    for (const path of workflowPaths) {
+      const content = readFileSync(path, "utf8");
+      expect(content).toContain("toolchain:");
+      expect(content).toContain("1.94.1");
+      expect(content).not.toContain("1.83.0");
+    }
   });
 });
 
@@ -127,6 +204,7 @@ describe(".versionrc.json release lifecycle", () => {
       "bin/install.ps1",
       "src/axhub-helpers/index.ts",
       "src/axhub-helpers/telemetry.ts",
+      "Cargo.toml",
     ]) {
       expect(postbump).toContain(generatedPath);
     }

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"find /Users/wongil/Desktop/work/jocoding/axhub -path '*/node_modules' -prune -o \\\\( -name 'ralph-state.json' -o -name 'ultrawork-state.json' \\\\) -print 2>/dev/null | grep -v node_modules |...",
+  "error": "Exit code 1\nxargs: command line cannot be assembled, too long",
+  "timestamp": "2026-04-29T06:37:18.515Z",
+  "retry_count": 1
+}

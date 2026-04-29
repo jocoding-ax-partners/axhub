@@ -46,6 +46,15 @@ describe("Phase 13 US-1306 — Toss tone conformance lint", () => {
     // 시나요 = warn (3 exceptions), all others = error
     expect(errors.length + warns.length).toBe(violations.length);
   });
+
+  test("Rust include patterns can be scanned for Phase 0 tone lock", async () => {
+    const files = await PHASE_13_FILES(["crates/**/*.rs"]);
+    expect(files.some((f) => f.includes("crates/axhub-helpers/src/messages.rs"))).toBe(true);
+
+    const violations = await scan(["crates/**/*.rs"]);
+    const rustViolations = violations.filter((v) => v.file.endsWith(".rs"));
+    expect(rustViolations.every((v) => v.severity === "warn" || v.severity === "error")).toBe(true);
+  });
 });
 
 describe("Phase 13 US-1306 — Skill keyword preservation lint", () => {
