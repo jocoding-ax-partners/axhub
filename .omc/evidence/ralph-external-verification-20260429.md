@@ -3015,3 +3015,23 @@ $ bash tests/e2e/claude-cli/run-matrix.sh --tier t1
   FAIL: no Korean cli_too_old phrase (오래된|업그레이드|버전|확인|axhub) in output
 error: script "test:plugin-e2e:t1" exited with code 1
 ```
+
+
+## Final external verification addendum — prompt-route and plan sync
+
+- Plugin Claude T1 after `UserPromptSubmit` prompt-route hook: **PASS** (`.omc/evidence/plugin-e2e-t1-after-prompt-route.stdout`, `OK — 8 / 8 case(s) passed`).
+- Rust final gate after prompt-route fix: **PASS through `cargo audit`**, including `cargo llvm-cov --workspace --fail-under-lines 90` with **90.69% line coverage** (`.omc/evidence/final-regression-after-prompt-route.log`).
+- Bun/Plugin final sync gate: **PASS** (`.omc/evidence/final-regression-after-plan-sync.log`): `bun test` 562 pass / 5 skip / 0 fail, `bun run test:e2e` 1 pass / 5 skip / 0 fail, `bun run test:plugin-e2e:t2` 11 / 11 case scripts passed, `bunx tsc --noEmit`, `lint:tone`, `lint:tone:rust`, `lint:keywords`, and `git diff --check`.
+- GitNexus `detect_changes(scope=all)` reported **CRITICAL** blast radius because this Ralph branch changes the shared TS dispatcher/version-sync files plus docs; this is expected for the version-sync + hook-routing work and is covered by the final gates above.
+- Remaining credential/environment-gated checks: real staging token run (`AXHUB_E2E_STAGING_TOKEN` / endpoint) and real Windows V3/AhnLab cohort were not executable from this macOS session.
+
+
+## Ralph deslop pass — changed-file scope
+
+Scope: `.omc/evidence/plugin-e2e-t1-after-prompt-route.stdout`, `.omc/evidence/ralph-external-verification-20260429.md`, `.plan/10-source-mapping.md`, `PLAN.md`, `bin/install.ps1`, `bin/install.sh`, `src/axhub-helpers/index.ts`, `src/axhub-helpers/telemetry.ts`.
+
+Behavior lock: final gates in `.omc/evidence/final-regression-after-prompt-route.log` and `.omc/evidence/final-regression-after-plan-sync.log`, plus fresh `bun test tests/plan-consistency.test.ts` and `git diff --check` after the plan/source-map sync.
+
+Cleanup plan: keep this as a no-op cleanup because remaining diffs are generated version-sync files, evidence logs, and plan/source-map reconciliation; deleting or reshaping them would reduce traceability instead of reducing slop. No new abstractions, dependencies, or behavior edits were introduced in the cleanup pass.
+
+Quality gate addendum: LSP diagnostics on `src/axhub-helpers/index.ts`, `src/axhub-helpers/prompt-route.ts`, and `src/axhub-helpers/telemetry.ts` reported 0 errors.

@@ -13,12 +13,17 @@
 // staging access.
 
 import { describe, expect, test, beforeAll } from "bun:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 import { parseAxhubCommand } from "../../src/axhub-helpers/consent";
 import { classify } from "../../src/axhub-helpers/catalog";
 
 const E2E_TOKEN = process.env["AXHUB_E2E_STAGING_TOKEN"];
 const E2E_ENDPOINT = process.env["AXHUB_E2E_STAGING_ENDPOINT"];
+const E2E_APP_ID = process.env["AXHUB_E2E_STAGING_APP_ID"];
+const REQUIRE_RUST_HELPER = process.env["AXHUB_E2E_REQUIRE_RUST_HELPER"] === "1";
+const RUST_HELPER_PATH = join(import.meta.dir, "../../bin/axhub-helpers");
 
 const E2E_ENABLED = Boolean(E2E_TOKEN && E2E_TOKEN.length > 0);
 
@@ -116,6 +121,38 @@ describe.skipIf(!E2E_ENABLED)("ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGIN
       expect(entry.action).toBeTypeOf("string");
       expect(entry.emotion.length).toBeGreaterThan(0);
     }
+  });
+
+  test("Rust helper list-deployments hits staging when app id is provided", () => {
+    if (!E2E_APP_ID) {
+      if (REQUIRE_RUST_HELPER) {
+        throw new Error("AXHUB_E2E_REQUIRE_RUST_HELPER=1 requires AXHUB_E2E_STAGING_APP_ID");
+      }
+      process.stderr.write("Skipped Rust helper staging probe: AXHUB_E2E_STAGING_APP_ID not set.\n");
+      return;
+    }
+    if (!existsSync(RUST_HELPER_PATH)) {
+      throw new Error(`Rust helper binary missing at ${RUST_HELPER_PATH}; run bun run build first`);
+    }
+    const env = { ...process.env, AXHUB_TOKEN: E2E_TOKEN ?? "", AXHUB_ENDPOINT: E2E_ENDPOINT ?? "" };
+    const result = Bun.spawnSync({
+      cmd: [RUST_HELPER_PATH, "list-deployments", "--app-id", E2E_APP_ID, "--limit", "1"],
+      stdout: "pipe",
+      stderr: "pipe",
+      env,
+    });
+    const stdout = result.stdout.toString();
+    expect(result.exitCode, result.stderr.toString()).toBe(0);
+    const parsed = JSON.parse(stdout) as {
+      deployments?: unknown[];
+      endpoint_used?: string;
+      exit_code?: number;
+      error_code?: string;
+    };
+    expect(parsed.exit_code).toBe(0);
+    expect(parsed.error_code).toBeUndefined();
+    expect(parsed.endpoint_used).toBe(E2E_ENDPOINT);
+    expect(Array.isArray(parsed.deployments)).toBe(true);
   });
 });
 

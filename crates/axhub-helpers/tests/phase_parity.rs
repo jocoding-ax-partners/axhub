@@ -1050,17 +1050,27 @@ fn telemetry_is_opt_in_private_jsonl_and_error_swallowing() {
 
     let bin_dir = guard.path("bin");
     fs::create_dir_all(&bin_dir).unwrap();
-    let axhub = std::path::Path::new(&bin_dir).join("axhub");
-    fs::write(&axhub, "#!/bin/sh\necho 'axhub 1.2.3-beta.1'\n").unwrap();
-    #[cfg(unix)]
-    fs::set_permissions(&axhub, fs::Permissions::from_mode(0o755)).unwrap();
-    let old_path = std::env::var("PATH").unwrap_or_default();
-    std::env::set_var("PATH", format!("{bin_dir}:{old_path}"));
+    let axhub =
+        std::path::Path::new(&bin_dir).join(if cfg!(windows) { "axhub.cmd" } else { "axhub" });
+    let write_axhub = |version: &str| {
+        let script = if cfg!(windows) {
+            format!("@echo off\r\necho axhub {version}\r\n")
+        } else {
+            format!("#!/bin/sh\necho 'axhub {version}'\n")
+        };
+        fs::write(&axhub, script).unwrap();
+        #[cfg(unix)]
+        fs::set_permissions(&axhub, fs::Permissions::from_mode(0o755)).unwrap();
+    };
+    write_axhub("1.2.3-beta.1");
+    let mut path_entries = vec![std::path::PathBuf::from(&bin_dir)];
+    if let Some(old_path) = std::env::var_os("PATH") {
+        path_entries.extend(std::env::split_paths(&old_path));
+    }
+    std::env::set_var("PATH", std::env::join_paths(path_entries).unwrap());
     reset_cli_version_cache();
     assert_eq!(resolve_cli_version(), "1.2.3-beta.1");
-    fs::write(&axhub, "#!/bin/sh\necho 'axhub 9.9.9'\n").unwrap();
-    #[cfg(unix)]
-    fs::set_permissions(&axhub, fs::Permissions::from_mode(0o755)).unwrap();
+    write_axhub("9.9.9");
     assert_eq!(resolve_cli_version(), "1.2.3-beta.1");
     reset_cli_version_cache();
 

@@ -1,22 +1,11 @@
 name: release
 
-# Phase 3 US-204: Tag-triggered release pipeline.
-# - Builds 5 cross-arch helper binaries via bun
-# - Generates manifest.json (binary → arch → sha256 mapping)
-# - Cosign keyless signs each binary using sigstore OIDC (no long-lived keys)
-# - Uploads binaries + .sig sidecars + checksums.txt + manifest.json to release
-#
-# Trigger: push tag v*.*.*  (e.g. v0.1.1, v0.2.0-beta.1)
-#
-# Required repo configuration (one-time, by maintainer):
-#   - Settings → Actions → General → Workflow permissions: "Read and write"
-#   - Sigstore OIDC: no key material to manage — keyless signing uses ephemeral
-#     identities tied to the workflow run's GitHub OIDC token.
-#   - Self-hosted runner registered with default labels [self-hosted, Linux, ARM64]
-#     — Bun cross-compiles all 5 targets from ARM64 host (no native x64 needed).
-#     See docs/RELEASE.md "Self-hosted runner setup".
-#
-# Optional E2E job (US-206): runs only if STAGING_TOKEN secret exists.
+# Phase 4 Rust-primary release pipeline.
+# - Builds 5 native Rust helper binaries in a GitHub-hosted target matrix
+# - Generates manifest.json (binary → arch → sha256 mapping) + checksums.txt
+# - Cosign keyless signs each binary + manifest/checksums via sigstore OIDC
+# - Uploads binaries + .sig/.pem sidecars + checksums.txt + manifest.json
+
 on:
   push:
     tags:
@@ -24,75 +13,145 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to upload (for example, v0.1.19)"
+        description: "Existing release tag to upload (for example, v0.1.24)"
         required: true
         type: string
 
 permissions:
-  contents: write    # upload release assets
-  id-token: write    # sigstore OIDC for cosign keyless
+  contents: write
+  id-token: write
 
 jobs:
-  build-and-sign:
-    name: Build cross-arch + cosign sign
-    runs-on: [self-hosted, Linux, ARM64]
+  build:
+    name: Build ${{ matrix.asset }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            asset: axhub-helpers-linux-amd64
+            runner: ubuntu-latest
+            cross: false
+          - target: aarch64-unknown-linux-gnu
+            asset: axhub-helpers-linux-arm64
+            runner: ubuntu-latest
+            cross: true
+          - target: x86_64-apple-darwin
+            asset: axhub-helpers-darwin-amd64
+            runner: macos-13
+            cross: false
+          - target: aarch64-apple-darwin
+            asset: axhub-helpers-darwin-arm64
+            runner: macos-14
+            cross: false
+          - target: x86_64-pc-windows-msvc
+            asset: axhub-helpers-windows-amd64.exe
+            runner: windows-latest
+            cross: false
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
 
-      - name: Ensure unzip available (bun install dep)
-        run: |
-          if ! command -v unzip >/dev/null 2>&1; then
-            if command -v sudo >/dev/null 2>&1; then
-              sudo apt-get update -qq && sudo apt-get install -y -qq unzip
-            else
-              apt-get update -qq && apt-get install -y -qq unzip
-            fi
-          fi
-          unzip -v | head -1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.94.1
+          targets: ${{ matrix.target }}
 
-      - name: Install Bun
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      - name: Install cross for Linux ARM64
+        if: matrix.cross == true
+        run: cargo install cross --locked
+
+      - name: Build Rust helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --release -p axhub-helpers --target "${{ matrix.target }}"
+          else
+            cargo build --release -p axhub-helpers --target "${{ matrix.target }}"
+          fi
+
+      - name: Rename release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          if [ "${{ matrix.runner }}" = "windows-latest" ]; then
+            SRC="target/${{ matrix.target }}/release/axhub-helpers.exe"
+          else
+            SRC="target/${{ matrix.target }}/release/axhub-helpers"
+            strip "$SRC" || true
+          fi
+          cp "$SRC" "dist/${{ matrix.asset }}"
+          chmod +x "dist/${{ matrix.asset }}" || true
+          "dist/${{ matrix.asset }}" --version || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
+          if-no-files-found: error
+
+  sign-and-upload:
+    name: Manifest + cosign + upload
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Collect assets in bin/
+        run: |
+          set -euo pipefail
+          mkdir -p bin
+          find release-assets -type f -name 'axhub-helpers-*' -exec cp {} bin/ \;
+          ls -lh bin/axhub-helpers-*
+
+      - name: Install Bun for release manifest script
         run: |
           curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.10"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build all 5 archs
-        run: bun run build:all
-
-      - name: Generate manifest.json
-        run: bun scripts/release/manifest.ts > bin/manifest.json
-
-      - name: Generate checksums.txt
+      - name: Generate manifest.json + checksums.txt
         run: |
+          bun scripts/release/manifest.ts > bin/manifest.json
           cd bin
           shasum -a 256 axhub-helpers-* manifest.json > checksums.txt
           cat checksums.txt
 
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@v3
         with:
           cosign-release: v2.4.0
 
-      - name: Cosign sign each binary (keyless)
+      - name: Cosign sign each release asset (keyless)
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: |
+          set -euo pipefail
           for f in bin/axhub-helpers-* bin/manifest.json bin/checksums.txt; do
             echo "Signing $f"
             cosign sign-blob --yes \
               --output-signature="${f}.sig" \
               --output-certificate="${f}.pem" \
-              "${f}"
+              "$f"
           done
 
-      - name: Upload release assets (gh CLI, sequential — avoids race)
+      - name: Upload release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="${{ github.event.inputs.tag }}"
           else
@@ -102,18 +161,15 @@ jobs:
             echo "release tag must look like vX.Y.Z, got: $TAG" >&2
             exit 1
           fi
-          # Tag pushes arrive as refs/tags/v*; manual workflow_dispatch must name the tag explicitly.
           if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
             echo "release workflow must run from refs/tags/$TAG, got: $GITHUB_REF" >&2
             exit 1
           fi
-          # Create release if not exists; else continue and just upload to it.
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$TAG" \
                  --repo "$GITHUB_REPOSITORY" \
                  --title "$TAG" \
-                 --notes "Automated release. See CHANGELOG.md for details. Verify with: bash scripts/release/verify-release.sh $TAG"
-          # Upload all assets sequentially with --clobber so re-runs replace.
+                 --notes "Automated Rust helper release. See CHANGELOG.md for details. Verify with: bash scripts/release/verify-release.sh $TAG"
           for f in bin/axhub-helpers-* bin/checksums.txt bin/manifest.json bin/*.sig bin/*.pem; do
             [ -f "$f" ] || continue
             echo "Uploading $f"
@@ -122,33 +178,14 @@ jobs:
 
   e2e-staging:
     name: ax-hub-cli staging E2E (gated by E2E_ENABLED repo var)
-    runs-on: [self-hosted, Linux, ARM64]
-    needs: build-and-sign
-    # Disabled by default. To enable: Settings → Secrets and variables →
-    # Actions → Variables → New repository variable, name=E2E_ENABLED,
-    # value=true. Also requires AXHUB_E2E_STAGING_TOKEN +
-    # AXHUB_E2E_STAGING_ENDPOINT secrets. (Job-level `if:` cannot read
-    # `env.` or `secrets.` directly, so we gate via `vars.`.)
+    runs-on: ubuntu-latest
+    needs: sign-and-upload
     if: ${{ vars.E2E_ENABLED == 'true' }}
     env:
       AXHUB_E2E_STAGING_TOKEN: ${{ secrets.AXHUB_E2E_STAGING_TOKEN }}
       AXHUB_E2E_STAGING_ENDPOINT: ${{ secrets.AXHUB_E2E_STAGING_ENDPOINT }}
     steps:
       - uses: actions/checkout@v4
-      - name: Ensure unzip available (bun install dep)
-        run: |
-          if ! command -v unzip >/dev/null 2>&1; then
-            if command -v sudo >/dev/null 2>&1; then
-              sudo apt-get update -qq && sudo apt-get install -y -qq unzip
-            else
-              apt-get update -qq && apt-get install -y -qq unzip
-            fi
-          fi
-          unzip -v | head -1
-
-      - name: Install Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.10"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
+      - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run test:e2e

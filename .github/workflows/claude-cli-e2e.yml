@@ -43,9 +43,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.94.1
+      - uses: Swatinem/rust-cache@v2
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Build helper bin
+      - name: Build Rust helper bin
         run: bun run build
       - name: Smoke
         run: bun run smoke
@@ -67,9 +71,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.94.1
+      - uses: Swatinem/rust-cache@v2
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Build helper bin
+      - name: Build Rust helper bin
         run: bun run build
       - name: Install claude CLI
         run: |

@@ -6,7 +6,7 @@ CASE_DIR="${OUTPUT_DIR}/${CASE_ID}"
 . "${HARNESS_LIB}/spawn.sh"
 . "${HARNESS_LIB}/assert.sh"
 
-ENABLE_SLASH=1 spawn_claude "${CASE_ID}" "/axhub:doctor" || true
+ENABLE_SLASH=1 spawn_claude "${CASE_ID}" "/axhub:doctor" 90 || true
 EXIT_CODE=$(cat "${CASE_DIR}/exit-code")
 STDOUT="${CASE_DIR}/stdout.json"
 STATE=$(classify_case_state "$STDOUT" "$EXIT_CODE")

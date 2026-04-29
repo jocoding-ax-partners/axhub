@@ -26,7 +26,13 @@ pub fn resolve_cli_version() -> String {
     if let Some(v) = cache.as_ref() {
         return v.clone();
     }
-    let resolved = Command::new("axhub")
+    let resolved = resolve_uncached_cli_version();
+    *cache = Some(resolved.clone());
+    resolved
+}
+
+fn read_cli_version_from(command: &str) -> Option<String> {
+    Command::new(command)
         .arg("--version")
         .output()
         .ok()
@@ -38,9 +44,23 @@ pub fn resolve_cli_version() -> String {
                 None
             }
         })
-        .unwrap_or_else(|| "unknown".into());
-    *cache = Some(resolved.clone());
-    resolved
+}
+
+fn resolve_uncached_cli_version() -> String {
+    #[cfg(windows)]
+    {
+        for command in ["axhub", "axhub.exe", "axhub.cmd", "axhub.bat"] {
+            if let Some(version) = read_cli_version_from(command) {
+                return version;
+            }
+        }
+        "unknown".into()
+    }
+
+    #[cfg(not(windows))]
+    {
+        read_cli_version_from("axhub").unwrap_or_else(|| "unknown".into())
+    }
 }
 
 pub fn reset_cli_version_cache() {

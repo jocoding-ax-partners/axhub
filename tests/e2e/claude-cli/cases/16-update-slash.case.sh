@@ -6,7 +6,9 @@ CASE_DIR="${OUTPUT_DIR}/${CASE_ID}"
 . "${HARNESS_LIB}/spawn.sh"
 . "${HARNESS_LIB}/assert.sh"
 
-ENABLE_SLASH=1 spawn_claude "${CASE_ID}" "/axhub:update" 60 || true
+# Slash-command expansion loads the update SKILL and release/version context; on busy
+# Claude CLI runs this occasionally crosses 60s even when the command succeeds.
+ENABLE_SLASH=1 spawn_claude "${CASE_ID}" "/axhub:update" 90 || true
 EXIT_CODE=$(cat "${CASE_DIR}/exit-code")
 STDOUT="${CASE_DIR}/stdout.json"
 STATE=$(classify_case_state "$STDOUT" "$EXIT_CODE")

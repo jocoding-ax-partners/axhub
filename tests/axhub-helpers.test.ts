@@ -217,6 +217,37 @@ describe("runPromptRoute()", () => {
     expect(context).toContain("업그레이드");
   });
 
+  test("axhub NL routes inject specific skill context", () => {
+    const cases = [
+      ["배포해", "skills/deploy/SKILL.md", "bun run release"],
+      ["내 axhub 앱 목록 보여줘", "skills/apps/SKILL.md", "팀 scope"],
+      ["axhub 앱이 어떤 API 쓸 수 있는지 보여줘", "skills/apis/SKILL.md", "현재 앱"],
+      ["axhub 에 누구로 로그인돼있어", "skills/auth/SKILL.md", "identity"],
+      ["로그 보여줘", "skills/logs/SKILL.md", "빌드 로그"],
+      ["배포 상태 봐", "skills/status/SKILL.md", "진행 상태"],
+      ["방금 거 되돌려", "skills/recover/SKILL.md", "직전 안정"],
+      ["axhub 새 버전 있어", "skills/update/SKILL.md", "CLI 버전"],
+      ["axhub 플러그인 업데이트", "skills/upgrade/SKILL.md", "플러그인 업그레이드"],
+      ["axhub 좀 도와줘", "skills/clarify/SKILL.md", "선택지"],
+    ] as const;
+    for (const [prompt, skillPath, expectedPhrase] of cases) {
+      const output = runPromptRoute(
+        JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt }),
+        () => ({
+          output: runPreflight(makeRunner({
+            versionStdout: "axhub 0.1.0 (commit abc, built fake, darwin/arm64)\n",
+            authStdout: AUTH_OK_JSON,
+          })).output,
+          exitCode: 0,
+        }),
+      );
+      const context = output.hookSpecificOutput?.additionalContext ?? "";
+      expect(output.hookSpecificOutput?.hookEventName).toBe("UserPromptSubmit");
+      expect(context).toContain(skillPath);
+      expect(context).toContain(expectedPhrase);
+    }
+  });
+
   test("non-axhub prompt → no injected context", () => {
     expect(runPromptRoute(JSON.stringify({ prompt: "오늘 날씨 알려줘" }))).toEqual({});
   });

@@ -1,0 +1,20 @@
+[run-matrix] tier=pr selected 4 case(s): 03 04 13 19
+[mock-hub] ready at http://127.0.0.1:18080 (pid 20882)
+[case 03] state=PASS exit=0
+[case 03] OK
+[mock-hub] ready at http://127.0.0.1:18080 (pid 34969)
+[case 04] state=PASS exit=0
+[case 04] OK
+[case 13] state=PASS exit=0
+[case 13] OK
+[case 19] state=PASS exit=0
+[case 19] OK
+
+[run-matrix] summary: /Users/wongil/Desktop/work/jocoding/axhub/tests/e2e/claude-cli/output/summary.tsv
+case_id  state  exit  wall_s
+03       PASS   0     12
+04       PASS   0     19
+13       PASS   0     35
+19       PASS   0     12
+
+[run-matrix] OK — 4 / 4 case(s) passed

@@ -5,7 +5,9 @@
 ```bash
 export AXHUB_E2E_STAGING_TOKEN=<token-with-staging-scope>
 export AXHUB_E2E_STAGING_ENDPOINT=<staging-api-url>
+export AXHUB_E2E_STAGING_APP_ID=<numeric-app-id-with-read-access> # enables Rust helper probe
 
+bun run build
 bun run test:e2e
 ```
 
@@ -15,8 +17,9 @@ bun run test:e2e
 2. `axhub apps list --json` returns array (may be empty for a fresh staging account)
 3. `parseAxhubCommand` action mapping stays consistent with the real CLI surface
 4. `classify-exit` produces 4-part Korean templates for documented exit codes (0, 1, 64, 65, 66, 67, 68)
+5. `bin/axhub-helpers list-deployments --app-id <id>` reaches staging through the Rust helper when `AXHUB_E2E_STAGING_APP_ID` is set
 
-The first 2 tests hit staging; the last 2 are pure-logic smoke checks that ride along when E2E is enabled (no extra cost).
+The first 2 tests hit staging through the real `axhub` CLI; the Rust helper probe hits staging through `bin/axhub-helpers`. The parser/classifier tests are pure-logic smoke checks that ride along when E2E is enabled (no extra cost).
 
 ## How to obtain staging credentials
 
@@ -26,11 +29,22 @@ The first 2 tests hit staging; the last 2 are pure-logic smoke checks that ride 
 
 ## CI configuration
 
-The `.github/workflows/release.yml` workflow has an `e2e-staging` job gated by `if: ${{ false && env.AXHUB_E2E_STAGING_TOKEN != '' }}`. The `false &&` prefix keeps it disabled by default. To enable in your fork:
+Use `.github/workflows/rust-staging-gates.yml` for Rust-primary staging validation. To enable it in your fork/repo:
 
-1. Add `AXHUB_E2E_STAGING_TOKEN` + `AXHUB_E2E_STAGING_ENDPOINT` as repo secrets
-2. Edit `.github/workflows/release.yml` to remove the `false &&` prefix from the `if:` clause
-3. Workflow will then run E2E whenever the secrets are present + a release is cut
+1. Add `AXHUB_E2E_STAGING_TOKEN`, `AXHUB_E2E_STAGING_ENDPOINT`, and `AXHUB_E2E_STAGING_APP_ID` as repo secrets.
+2. Add `AXHUB_CLI_INSTALL_COMMAND` as a repo secret or repo variable. It must install the real `axhub` CLI and leave `axhub` on `PATH`.
+3. Optionally set repo var `E2E_ENABLED=true` to run staging gates on pushes to `main`; otherwise run manually with `workflow_dispatch`.
+4. If staging uses a proxy or non-production TLS endpoint, set `AXHUB_E2E_ALLOW_PROXY=1`.
+
+Manual run:
+
+```bash
+gh workflow run rust-staging-gates.yml \
+  -f run_staging=true \
+  -f require_credentials=true \
+  -f fuzz_minutes=1 \
+  -f run_windows_smoke=false
+```
 
 ## Why gated, not always-on
 
@@ -50,6 +64,8 @@ bun test
 # Run E2E (when investigating a real-CLI integration bug)
 export AXHUB_E2E_STAGING_TOKEN=<your-token>
 export AXHUB_E2E_STAGING_ENDPOINT=https://staging-api.jocodingax.ai
+export AXHUB_E2E_STAGING_APP_ID=<numeric-app-id>
+bun run build
 bun run test:e2e
 ```
 

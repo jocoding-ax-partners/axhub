@@ -27,7 +27,7 @@
     }
   ],
   "scripts": {
-    "postbump": "bun run codegen:version && git add bin/install.sh bin/install.ps1 src/axhub-helpers/index.ts src/axhub-helpers/telemetry.ts && bun run release:check",
+    "postbump": "bun run codegen:version && git add bin/install.sh bin/install.ps1 src/axhub-helpers/index.ts src/axhub-helpers/telemetry.ts Cargo.toml && bun run release:check",
     "posttag": "echo '\\n다음 단계: git push origin main --tags  → release.yml 가 자동 fire 돼요.\\nCHANGELOG 본문은 tag 생성 전에 사람이 작성해야 해요 (해요체 narrative).'"
   },
   "skip": {

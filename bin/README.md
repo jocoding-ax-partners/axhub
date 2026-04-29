@@ -1,6 +1,6 @@
 # bin/
 
-This directory holds the compiled `axhub-helpers` binary (single multi-command Bun-compiled executable). Source lives in `../src/axhub-helpers/index.ts`.
+This directory holds the compiled `axhub-helpers` binary (single multi-command Rust executable). Primary source lives in `../crates/axhub-helpers`; `../src/axhub-helpers` remains a transition fallback/parity reference.
 
 Claude Code adds this `bin/` to `PATH` while the plugin is enabled, so skills/commands/hooks invoke the helper as `axhub-helpers <subcommand>` (no path needed).
 
@@ -10,14 +10,12 @@ Native (current arch):
 
 ```bash
 bun install
-bun run build
+bun run build  # wraps cargo build --release -p axhub-helpers
 ```
 
 All platforms (release):
 
-```bash
-bun run build:all
-```
+The authoritative release build runs in `.github/workflows/release.yml` across the Rust target matrix. `bun run build:all` is available for maintainers with all Rust targets/linkers installed.
 
 Smoke test:
 
@@ -27,8 +25,8 @@ bun run smoke
 
 ## Build outputs (gitignored)
 
-- `axhub-helpers` (native)
-- `axhub-helpers-darwin-arm64` / `-darwin-amd64` / `-linux-amd64` / `-linux-arm64` / `-windows-amd64.exe` (release)
+- `axhub-helpers` (native Rust helper)
+- `axhub-helpers-darwin-arm64` / `-darwin-amd64` / `-linux-amd64` / `-linux-arm64` / `-windows-amd64.exe` (release Rust helpers)
   - `windows-amd64.exe`: PowerShell + Add-Type PInvoke against `advapi32!CredReadW` for keychain. No `Install-Module` required, stock Win10/11.
 
 ## Windows installer (Phase 10 v0.1.7+)

@@ -644,7 +644,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 - Release ships `manifest.json` + `checksums.txt`; GitHub Actions signs each binary, `manifest.json`, and `checksums.txt` with cosign keyless sidecars (`.sig` + `.pem`). There is **no standalone manifest checksum or generic manifest signature artifact**; sha256 lives in `manifest.json` and `checksums.txt`, and signature sidecars use the exact asset names (`manifest.json.sig`, `checksums.txt.sig`).
 - User-side verification path = `scripts/release/verify-release.sh <tag>`: verify `manifest.json.sig` first, then each binary signature, then cross-check binary sha256 values against `manifest.json`.
 - SessionStart integrity behavior is advisory and policy-driven: `AXHUB_REQUIRE_COSIGN=1` warns when helper sidecars are missing; release/update verification remains the hard supply-chain gate.
-- `bin/axhub-helpers` is a **single multi-command TypeScript/Bun compiled binary** (not a directory) at `bin/axhub-helpers`. Multi-arch builds: darwin-arm64, darwin-amd64, linux-amd64, linux-arm64, win32. Cosign-signed release assets; Windows Authenticode remains a separate runbook/template path.
+- `bin/axhub-helpers` is a **single multi-command Rust helper binary** (not a directory) at `bin/axhub-helpers`. Multi-arch release builds: darwin-arm64, darwin-amd64, linux-amd64, linux-arm64, windows-amd64. Cosign-signed release assets; Windows Authenticode remains a separate runbook/template path.
 
 **§16.10 CLI Cosign Default-On**:
 - Plugin's `update apply` skill ALWAYS prepends `AXHUB_REQUIRE_COSIGN=1` regardless of user env (override only via explicit `AXHUB_ALLOW_UNSIGNED=1` with Korean warning at SessionStart).
@@ -660,7 +660,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 // .claude-plugin/plugin.json
 {
   "name": "axhub",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "description": "Claude Code plugin for axhub — vibe coder app hub. Korean-first natural-language deploy and manage with HMAC-bound consent gates, live profile/app resolution, and exit-code recovery routing. Wraps ax-hub-cli (v0.1.0+).",
   "author": {"name": "Jocoding AX Partners", "url": "https://jocodingax.ai"},
   "homepage": "https://hub-api.jocodingax.ai",
@@ -677,15 +677,15 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
     "name": "axhub",
     "source": "./",
     "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders at customer companies",
-    "version": "0.1.23"
+    "version": "0.1.24"
   }]
 }
 ```
 
 **§16.13 bin/axhub-helpers (single binary spec)**:
-- Single TypeScript/Bun-compiled binary at `bin/axhub-helpers` (no nested dir), per rows 66–68.
-- Subcommands: `session-start`, `preauth-check`, `consent-mint`, `consent-verify`, `resolve`, `preflight`, `classify-exit`, `redact`.
-- Multi-arch builds via Bun compile targets already mirrored in package scripts.
+- Single Rust helper binary at `bin/axhub-helpers` (no nested dir). TypeScript helper sources remain only as transition fallback and parity reference during the monitor window.
+- Subcommands: `session-start`, `preauth-check`, `prompt-route`, `consent-mint`, `consent-verify`, `resolve`, `preflight`, `classify-exit`, `redact`, `list-deployments`, `version`, `help`.
+- Multi-arch release builds use the Rust matrix in `.github/workflows/release.yml`; local `bun run build` is a Cargo wrapper because Bun remains the repo scripting runtime.
 - Release artifacts are signed/verified by the release workflow; plugin helper always calls `ax-hub-cli`.
 
 **§16.14 Hook Schema Versioning + State Files**:
@@ -788,17 +788,20 @@ axhub/                                      # plugin root
 │   ├── session-start.sh                    # Unix SessionStart shim
 │   └── session-start.ps1                   # Windows SessionStart shim
 │
-├── src/axhub-helpers/                      # TypeScript source of the helper surface
-│   ├── index.ts                            # multi-command dispatcher
-│   ├── resolve.ts                          # profile + app + endpoint live resolve
-│   ├── classify-exit.ts                    # exit code → Korean message + next-action
-│   ├── consent.ts                          # PreToolUse HMAC deny-gate state
-│   ├── list-deployments.ts                 # REST fallback + hub-api TLS pin
+├── crates/axhub-helpers/                   # Rust helper primary implementation
+│   ├── src/main.rs                         # multi-command dispatcher
+│   ├── src/resolve.rs                      # profile + app + endpoint live resolve
+│   ├── src/catalog.rs                      # exit code → Korean message + next-action
+│   ├── src/consent/                        # PreToolUse HMAC deny-gate state
+│   ├── src/list_deployments.rs             # REST fallback + hub-api TLS pin
+│   └── ...
+│
+├── src/axhub-helpers/                      # TypeScript transition fallback + parity reference
 │   └── ...
 │
 ├── bin/
-│   ├── axhub-helpers                       # TypeScript/Bun compiled single binary
-│   ├── axhub-helpers-{darwin,linux,win32}-*# release artifacts built by `bun run build:all`
+│   ├── axhub-helpers                       # Rust helper primary binary
+│   ├── axhub-helpers-{darwin,linux,windows}-*# release artifacts built by Rust matrix
 │   ├── install.sh
 │   ├── install.ps1
 │   └── statusline.sh
@@ -824,7 +827,7 @@ axhub/                                      # plugin root
 **Critical rules:**
 - All hook commands use `${CLAUDE_PLUGIN_ROOT}/...`. NEVER hardcoded paths.
 - `bin/axhub-helpers` is the single helper binary shipped in the plugin `bin/` surface. Skills/commands/hooks invoke it via PATH lookup or `${CLAUDE_PLUGIN_ROOT}` path, no path fragility.
-- Adapter logic lives in `src/axhub-helpers/` and compiles to `bin/axhub-helpers` (TypeScript/Bun per rows 66–68) — Skills' SKILL.md stays thin, references/ holds detail.
+- Adapter logic lives primarily in `crates/axhub-helpers/` and builds to `bin/axhub-helpers` through Cargo. `src/axhub-helpers/` remains a transition fallback/parity reference until the monitor window closes — Skills' SKILL.md stays thin, references/ holds detail.
 
 ### 16.3 Revised Skill Template (best practices conformant)
 
@@ -980,7 +983,7 @@ Status ledger as of 2026-04-27. This section is no longer a live open-work list;
 | **DONE** | Commands have `description` + `allowed-tools` + `argument-hint` + `model` | `tests/manifest.test.ts` and `tests/ux-argument-hints.test.ts`. |
 | **DONE** | Commands are instructions for Claude, not messages to the user | Command bodies delegate to skills and are covered by command metadata/body checks. |
 | **DONE** | references/, examples/, scripts/ subdirs exist where applicable | Long-form skill details are under `skills/*/references`; no command-specific examples/scripts are required for current v0.1 surface. |
-| **DONE** | `bin/axhub-helpers` TypeScript/Bun single binary builds and emits structured JSON | `bun run release:check`, `tests/manifest.test.ts`, `tests/hook-latency.test.ts`. |
+| **DONE** | `bin/axhub-helpers` Rust helper binary builds and emits structured JSON | `bun run release:check`, `cargo test --workspace`, `tests/manifest.test.ts`, `tests/hook-latency.test.ts`. |
 | **MANUAL EVIDENCE** | Validate with `claude --debug` and `/hooks` command | Covered by committed live smoke evidence under `.omc/evidence/live-plugin-smoke-summary.txt`; keep as manual release smoke, not a blocking code TODO. |
 | **REPLACED BY GATES** | Use `skill-reviewer` agent on each SKILL.md | Replaced by `bun run skill:doctor --strict`, manifest tests, keyword lint, and tone lint for repeatability. |
 | **DONE** | Use `plugin-validator` agent on overall structure | Phase 6 source included plugin-validator review; structural outcomes are locked by `tests/manifest.test.ts`. |

@@ -2,7 +2,7 @@
 
 axhub plugin uses sigstore cosign keyless signing for supply-chain integrity. Every release tag automatically:
 
-1. Builds 5 cross-arch helper binaries (darwin-arm64/amd64, linux-arm64/amd64, windows-amd64) via Bun
+1. Builds 5 cross-arch Rust helper binaries (darwin-arm64/amd64, linux-arm64/amd64, windows-amd64) via Cargo/cross in a GitHub Actions matrix
 2. Generates `manifest.json` (binary → arch → sha256 mapping) + `checksums.txt`
 3. Signs each binary + the manifest with cosign keyless (sigstore OIDC, no long-lived secrets)
 4. Uploads everything to a GitHub Release: binaries, .sig sidecars, manifest.json, checksums.txt
@@ -19,15 +19,15 @@ axhub plugin uses sigstore cosign keyless signing for supply-chain integrity. Ev
 
 2. **Sigstore OIDC**: nothing to configure. Keyless signing uses the workflow's GitHub OIDC token (`id-token: write` in the workflow file).
 
-3. **Self-hosted runner setup** (required — workflow uses `runs-on: [self-hosted, Linux, ARM64]`):
-   - Provision a Linux ARM64 machine with: bun ≥1.1, git, cosign installer compatibility (curl + bash). 4 CPU / 8GB RAM is plenty for `bun build:all` (5 cross-arch compiles, ~10s total).
-   - Bun cross-compiles all 5 targets (darwin-arm64/amd64, linux-arm64/amd64, windows-amd64) from a single ARM64 host — no need to provision multiple architectures.
-   - Settings → Actions → Runners → "New self-hosted runner" → follow GitHub's installer instructions on the runner host. Default labels `self-hosted` + `Linux` + `ARM64` are added automatically (no extra label needed).
-   - Verify: Settings → Actions → Runners shows the runner as **Idle** (green dot).
-   - **Why self-hosted**: keeps cosign signing material + sigstore OIDC token exchange on owned infra (회사 보안 정책 호환), avoids GitHub-hosted runner queue times during release windows, fixed cost vs. per-minute billing on busy weeks.
-   - **Hardening checklist**: ephemeral runner OR run with `--ephemeral` flag (fresh state per job), restricted firewall (outbound only — fulcio.sigstore.dev, rekor.sigstore.dev, github.com, api.github.com, registry.npmjs.org, registry.bun.sh), runner user has no sudo, log retention ≥ 30d for audit.
+3. **Rust release matrix**:
+   - GitHub-hosted runners build the helper with Rust 1.94.1: ubuntu-latest for Linux amd64, `cross` on ubuntu-latest for Linux arm64, macos-13 for Intel Mac, macos-14 for Apple Silicon Mac, and windows-latest for Windows amd64.
+   - Bun is still installed in the signing job only to run `scripts/release/manifest.ts`; it is no longer used to compile helper binaries.
+   - Cosign keyless signing remains on ubuntu-latest with `id-token: write`.
 
-4. **Optional: AXHUB_E2E_STAGING_TOKEN** + `AXHUB_E2E_STAGING_ENDPOINT` repository secrets for the gated E2E job (see US-206).
+4. **Optional staging gate secrets/vars** for `.github/workflows/rust-staging-gates.yml`:
+   - Secrets: `AXHUB_E2E_STAGING_TOKEN`, `AXHUB_E2E_STAGING_ENDPOINT`, `AXHUB_E2E_STAGING_APP_ID`
+   - Secret or repo var: `AXHUB_CLI_INSTALL_COMMAND` (installs the real `axhub` CLI on Ubuntu runners)
+   - Optional repo var: `AXHUB_E2E_ALLOW_PROXY=1` when staging uses a managed proxy or non-production TLS endpoint.
 
 ### Cutting a release (Phase 19 v0.1.19+ — 자동 버전 범프)
 
@@ -49,7 +49,7 @@ bun run release -- --release-as 0.1.20   # 명시 version
 #  ✓ package.json + plugin.json + marketplace.json (3 files) 버전 bump
 #  ✓ postbump hook: codegen:version (install.sh/ps1/index.ts/telemetry.ts 동기화)
 #                   + generated version file staging
-#                   + release:check (5 cross-arch binary build + version assert)
+#                   + release:check (Rust host artifact + release matrix/version assert)
 #  ✓ CHANGELOG.md 자동 entry generation (Conventional Commits → Added/Fixed sections)
 #  ✓ git commit + git tag vX.Y.Z
 
@@ -59,7 +59,7 @@ git show --stat --oneline HEAD
 
 # 3. push
 git push origin main --tags
-# release.yml workflow tag push 시 자동 fire — 5 binary + cosign 서명 + GH release upload
+# release.yml workflow tag push 시 자동 fire — Rust 5 binary + cosign 서명 + GH release upload
 ```
 
 ### Hotfix workflow (긴급 fix mid-Phase)
@@ -77,7 +77,7 @@ git push origin main --tags
 
 ```bash
 # vim package.json + .claude-plugin/plugin.json + .claude-plugin/marketplace.json
-bun run release:check    # MANDATORY (v0.1.14 stale binary 재발 방지)
+bun run release:check    # MANDATORY (Rust helper stale binary / release matrix drift 방지)
 bun test                 # 회귀
 git commit -am "chore: bump version to X.Y.Z"
 git tag vX.Y.Z
@@ -90,6 +90,28 @@ The `release.yml` workflow auto-fires on the tag push. Watch progress:
 gh run list --workflow release.yml --limit 1
 gh run watch <run-id>
 ```
+
+### Rust staging gate workflow
+
+Use this before deleting the TypeScript fallback or when a Rust helper change touches auth, deploy listing, TLS, prompt routing, or release packaging:
+
+```bash
+gh workflow run rust-staging-gates.yml \
+  -f run_staging=true \
+  -f require_credentials=true \
+  -f fuzz_minutes=1 \
+  -f run_windows_smoke=false
+```
+
+What it proves:
+
+1. Rebuilds the Rust helper with Cargo and runs local regression gates.
+2. Installs the real `axhub` CLI using `AXHUB_CLI_INSTALL_COMMAND`.
+3. Runs read-only staging E2E with `AXHUB_E2E_STAGING_TOKEN` and endpoint.
+4. Runs the Rust helper against staging via `bin/axhub-helpers list-deployments --app-id "$AXHUB_E2E_STAGING_APP_ID"`.
+5. Optionally runs parser fuzz (`fuzz_minutes=1440` for the 24h gate) and GitHub Windows smoke.
+
+The Windows V3/AhnLab cohort still needs the target Windows/EDR environment; the GitHub Windows job is only a smoke gate for the Rust binary and `CredReadW` bridge.
 
 ### What gets uploaded to the release
 

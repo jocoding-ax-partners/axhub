@@ -166,7 +166,7 @@ const maybeDelegateToRust = async (cmd: string, args: string[]): Promise<number 
   return result.status ?? 1;
 };
 
-const PLUGIN_VERSION = "0.1.23";
+const PLUGIN_VERSION = "0.1.24";
 // MIN_AXHUB_CLI_VERSION + MAX_AXHUB_CLI_VERSION live in ./preflight.ts (the
 // only consumer); re-importing here would just create a stale duplicate.
 const CONSENT_TOKEN_TTL_SEC = 60;

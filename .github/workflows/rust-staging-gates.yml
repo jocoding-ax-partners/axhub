@@ -1,0 +1,229 @@
+name: Rust staging gates
+
+# Rust-primary cutover gate:
+# - local gate proves the checked-in Rust helper can build and pass core tests
+# - staging gate probes the real axhub CLI plus Rust helper list-deployments path
+# - optional fuzz/Windows gates cover the external risks that cannot be proven by unit tests alone
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/rust-staging-gates.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "fuzz/**"
+      - "scripts/build-rust-helper.ts"
+      - "scripts/release-check.ts"
+      - "tests/e2e/**"
+      - "tests/release-config.test.ts"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rust-staging-gates.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "fuzz/**"
+      - "scripts/build-rust-helper.ts"
+      - "scripts/release-check.ts"
+      - "tests/e2e/**"
+      - "tests/release-config.test.ts"
+  schedule:
+    - cron: "30 17 * * *" # 02:30 KST nightly
+  workflow_dispatch:
+    inputs:
+      run_staging:
+        description: "Run read-only staging E2E with real credentials"
+        required: true
+        default: true
+        type: boolean
+      require_credentials:
+        description: "Fail instead of skip when staging credentials are missing"
+        required: true
+        default: true
+        type: boolean
+      fuzz_minutes:
+        description: "Parser fuzz minutes; use 0 to skip, 1440 for 24h"
+        required: true
+        default: "1"
+        type: string
+      run_windows_smoke:
+        description: "Run GitHub Windows smoke; V3/AhnLab remains manual cohort evidence"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-staging-gates-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RUST_TOOLCHAIN: 1.94.1
+
+jobs:
+  local-rust-primary-gate:
+    name: Local Rust-primary gate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Sync generated versions
+        run: bun run codegen:version
+      - name: Rust format, clippy, and tests
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --workspace -- -D warnings
+          cargo test --workspace
+      - name: Build Rust helper
+        run: |
+          bun run build
+          bin/axhub-helpers version
+      - name: TypeScript and workflow regression tests
+        run: |
+          bunx tsc --noEmit
+          bun test tests/release-config.test.ts tests/e2e/staging.test.ts
+      - name: Release preflight
+        run: bun run release:check
+
+  staging-readonly-e2e:
+    name: Read-only staging E2E with Rust helper
+    runs-on: ubuntu-22.04
+    needs: local-rust-primary-gate
+    timeout-minutes: 15
+    if: ${{ github.event_name == 'schedule' || vars.E2E_ENABLED == 'true' || (github.event_name == 'workflow_dispatch' && inputs.run_staging) }}
+    env:
+      AXHUB_E2E_STAGING_TOKEN: ${{ secrets.AXHUB_E2E_STAGING_TOKEN }}
+      AXHUB_E2E_STAGING_ENDPOINT: ${{ secrets.AXHUB_E2E_STAGING_ENDPOINT }}
+      AXHUB_E2E_STAGING_APP_ID: ${{ secrets.AXHUB_E2E_STAGING_APP_ID }}
+      AXHUB_CLI_INSTALL_COMMAND: ${{ secrets.AXHUB_CLI_INSTALL_COMMAND || vars.AXHUB_CLI_INSTALL_COMMAND }}
+      AXHUB_ALLOW_PROXY: ${{ vars.AXHUB_E2E_ALLOW_PROXY || '0' }}
+      REQUIRE_CREDENTIALS: ${{ inputs.require_credentials }}
+      AXHUB_E2E_REQUIRE_RUST_HELPER: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build Rust helper for staging probe
+        run: |
+          bun run build
+          bin/axhub-helpers version
+      - name: Check staging gate inputs
+        id: gate
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "${AXHUB_E2E_STAGING_TOKEN:-}" ] || missing+=("AXHUB_E2E_STAGING_TOKEN")
+          [ -n "${AXHUB_E2E_STAGING_ENDPOINT:-}" ] || missing+=("AXHUB_E2E_STAGING_ENDPOINT")
+          [ -n "${AXHUB_E2E_STAGING_APP_ID:-}" ] || missing+=("AXHUB_E2E_STAGING_APP_ID")
+          [ -n "${AXHUB_CLI_INSTALL_COMMAND:-}" ] || missing+=("AXHUB_CLI_INSTALL_COMMAND")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing staging inputs: %s\n' "${missing[*]}"
+            if [ "${REQUIRE_CREDENTIALS:-false}" = "true" ]; then
+              echo "::error::Required staging inputs are missing: ${missing[*]}"
+              exit 1
+            fi
+            echo "::warning::Skipping staging E2E because inputs are missing: ${missing[*]}"
+            echo "run_staging=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "run_staging=true" >> "$GITHUB_OUTPUT"
+      - name: Install axhub CLI
+        if: steps.gate.outputs.run_staging == 'true'
+        run: |
+          set -euo pipefail
+          bash -lc "$AXHUB_CLI_INSTALL_COMMAND"
+          command -v axhub
+          axhub --version
+      - name: Run read-only staging E2E
+        if: steps.gate.outputs.run_staging == 'true'
+        run: bun run test:e2e
+
+  parser-fuzz:
+    name: Parser fuzz gate
+    runs-on: ubuntu-22.04
+    needs: local-rust-primary-gate
+    timeout-minutes: 1445
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.fuzz_minutes != '0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            fuzz
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: Run parser fuzz
+        working-directory: fuzz
+        run: |
+          set -euo pipefail
+          minutes="${{ inputs.fuzz_minutes }}"
+          case "$minutes" in
+            ''|*[!0-9]*) echo "fuzz_minutes must be a non-negative integer" >&2; exit 64 ;;
+          esac
+          if [ "$minutes" -gt 1440 ]; then
+            echo "fuzz_minutes max is 1440 (24h)" >&2
+            exit 64
+          fi
+          seconds=$((minutes * 60))
+          cargo +nightly fuzz run parser -- -max_total_time="$seconds"
+
+  windows-smoke:
+    name: Windows Rust helper smoke
+    runs-on: windows-latest
+    needs: local-rust-primary-gate
+    timeout-minutes: 20
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_windows_smoke }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Install dependencies
+        shell: pwsh
+        run: bun install --frozen-lockfile
+      - name: Build and run Rust helper on Windows
+        shell: pwsh
+        run: |
+          bun run build
+          if (-not (Test-Path bin\axhub-helpers-windows-amd64.exe)) { throw "bin\axhub-helpers-windows-amd64.exe missing" }
+          & bin\axhub-helpers-windows-amd64.exe version
+      - name: PowerShell + Add-Type Win32 API smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Add-Type -TypeDefinition @"
+          using System;
+          using System.Runtime.InteropServices;
+          public class Advapi32Smoke {
+            [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+            public static extern bool CredReadW(string target, int type, int reservedFlag, out IntPtr CredentialPtr);
+          }
+          "@ -PassThru | Out-Null
+          $ptr = [IntPtr]::Zero
+          $ok = [Advapi32Smoke]::CredReadW('axhub-nonexistent-test-target', 1, 0, [ref]$ptr)
+          $err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+          Write-Output "CredReadW returned ok=$ok, LastError=$err"
+          if ($ok) { throw "CredReadW unexpectedly succeeded for nonexistent target" }
+          if ($err -ne 1168) { throw "Expected ERROR_NOT_FOUND (1168), got $err" }
+          Write-Output "[ok] Add-Type advapi32!CredReadW PInvoke smoke green"

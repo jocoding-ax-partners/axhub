@@ -100,6 +100,86 @@ exit 1
     assert!(stdout.contains("업그레이드"));
 }
 
+#[cfg(unix)]
+#[test]
+fn cli_prompt_route_injects_axhub_skill_contexts() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "axhub 0.1.0 (commit fake, built fake, fake)"
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then
+  echo '{"user_email":"test@jocodingax.ai","user_id":1,"expires_at":"2026-04-29T00:00:00Z","scopes":["read"]}'
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let cases = [
+        ("배포해", "skills/deploy/SKILL.md", "bun run release"),
+        (
+            "내 axhub 앱 목록 보여줘",
+            "skills/apps/SKILL.md",
+            "팀 scope",
+        ),
+        (
+            "axhub 앱이 어떤 API 쓸 수 있는지 보여줘",
+            "skills/apis/SKILL.md",
+            "현재 앱",
+        ),
+        (
+            "axhub 에 누구로 로그인돼있어",
+            "skills/auth/SKILL.md",
+            "identity",
+        ),
+        ("로그 보여줘", "skills/logs/SKILL.md", "빌드 로그"),
+        ("배포 상태 봐", "skills/status/SKILL.md", "진행 상태"),
+        ("방금 거 되돌려", "skills/recover/SKILL.md", "직전 안정"),
+        ("axhub 새 버전 있어", "skills/update/SKILL.md", "CLI 버전"),
+        (
+            "axhub 플러그인 업데이트",
+            "skills/upgrade/SKILL.md",
+            "플러그인 업그레이드",
+        ),
+        ("axhub 좀 도와줘", "skills/clarify/SKILL.md", "선택지"),
+    ];
+
+    for (prompt, skill_path, expected) in cases {
+        let input = serde_json::json!({
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": prompt,
+        })
+        .to_string();
+        let output = run_stdin(
+            &["prompt-route"],
+            &input,
+            &[("AXHUB_BIN", axhub.to_str().unwrap())],
+        );
+        assert_eq!(output.status.code(), Some(0));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("UserPromptSubmit"), "{stdout}");
+        assert!(stdout.contains(skill_path), "{stdout}");
+        assert!(stdout.contains(expected), "{stdout}");
+    }
+
+    let no_route = run_stdin(
+        &["prompt-route"],
+        r#"{"hook_event_name":"UserPromptSubmit","prompt":"오늘 날씨 알려줘"}"#,
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(no_route.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&no_route.stdout).trim(), "{}");
+}
+
 #[test]
 fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     let no_args = run(&[]);
@@ -208,16 +288,17 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
         r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-deny","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --branch main --commit abc123"}}"#,
         &envs,
     );
-    assert_eq!(destructive_without_token.status.code(), Some(65));
-    assert!(String::from_utf8_lossy(&destructive_without_token.stdout)
-        .contains("permissionDecision\":\"deny"));
+    assert_eq!(destructive_without_token.status.code(), Some(0));
+    let deny_stdout = String::from_utf8_lossy(&destructive_without_token.stdout);
+    assert!(deny_stdout.contains("permissionDecision\":\"deny"));
+    assert!(deny_stdout.contains("사전 승인"));
 
     let identity_without_token = run_stdin(
         &["preauth-check"],
         r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-login","tool_name":"Bash","tool_input":{"command":"axhub auth login --profile prod"}}"#,
         &envs,
     );
-    assert_eq!(identity_without_token.status.code(), Some(65));
+    assert_eq!(identity_without_token.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&identity_without_token.stdout)
         .contains("permissionDecision\":\"deny"));
 }
