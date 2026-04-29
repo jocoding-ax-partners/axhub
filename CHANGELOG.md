@@ -4,6 +4,23 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.1.26](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.25...v0.1.26) (2026-04-29)
+
+Phase 23.1은 v0.1.25 태그에서 멈춘 darwin-amd64 release lane을 복구하는 패치예요. GitHub가 2025-12-04에 retired 처리한 `macos-13` 대신 공식 Intel label인 `macos-15-intel`로 바꿔서 5개 Rust helper artifact가 다시 서명·업로드되게 해요.
+
+### Verification
+
+- Blocked release run: `v0.1.25 release` run `25100364587`은 `macos-13` darwin-amd64 job 대기 때문에 cancelled 처리했어요.
+- Local release baseline: `bun run release:check` → 5-asset release wiring OK, host Rust helper version `0.1.25` 확인 후 patch bump를 진행했어요.
+
+### Honest tradeoff
+
+- `macos-15-intel`도 Intel macOS 마지막 세대에 속해요. GitHub 공지상 macOS x86_64 지원은 macOS 15 runner retirement까지라서, 장기적으로는 darwin-amd64 artifact 폐기나 self-hosted Intel runner 전략이 필요해요.
+
+### Fixed
+
+* **release:** keep Intel macOS artifact builds on a supported runner ([0ad65ad](https://github.com/jocoding-ax-partners/axhub/commit/0ad65ad03baff018df2d4694b0693fcf30bb0a0f))
+
 ## [0.1.25](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.23...v0.1.25) (2026-04-29)
 
 Phase 23은 PR #19에서 검증한 Rust helper 기본 전환을 실제 배포 태그로 묶는 릴리즈예요. `AXHUB_HELPERS_RUNTIME=auto`는 Rust native helper를 우선 쓰고, 회귀가 보이면 `AXHUB_HELPERS_RUNTIME=ts`로 즉시 돌아갈 수 있게 fallback은 남겨요.
