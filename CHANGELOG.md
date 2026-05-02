@@ -4,6 +4,37 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.26...v0.2.0) (2026-05-02)
+
+Phase 24는 ax-hub-cli v0.10 lifecycle surface를 플러그인 v0.2.0으로 묶는 릴리즈예요. 새 init/env/github/open/whatsnew/profile SKILL과 Rust prompt-route/preauth/consent context를 current CLI main에 맞추고, helper bootstrap·admin onboarding·remote `templates.json`는 의도적으로 deferred로 남겨요.
+
+### Verification
+
+- PR #20 checks: Rust CI ubuntu / macOS / Windows, Rust staging local gate, claude-cli-e2e T2 모두 PASS예요.
+- Local baseline: `bun test` → 336 pass / 4 skip / 0 fail, `cargo test --workspace`, `bunx tsc --noEmit`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict`, `bun run bench:hooks`, `bun run test:plugin-e2e:t2`, `bun run release:check` 모두 green이에요.
+- CLI contract smoke: `/Users/wongil/Desktop/work/jocoding/ax-hub-cli` main에서 `go run ./cmd/axhub --json init --list-templates` schema `init/v1` 확인했어요.
+- GitNexus: worktree staged detect_changes는 consent/preauth/prompt-route 핵심 흐름 영향 때문에 CRITICAL로 분류됐고, 해당 위험은 Rust phase parity, CLI e2e, hook latency, T2 lifecycle smoke로 잠갔어요.
+
+### Honest tradeoff
+
+- Live Claude T1/T3 matrix와 staging token E2E는 로컬에서 실행하지 않았어요. 비용·credential gated 경로라 PR-blocking T2와 Rust CI를 release gate로 사용해요.
+- v0.2.0은 Node/CLI/dependency 자동 설치 릴리즈가 아니에요. 템플릿 source of truth는 계속 `axhub init --list-templates`예요.
+
+
+### Added
+
+* cover current CLI lifecycle without bootstrap drift ([9147ac4](https://github.com/jocoding-ax-partners/axhub/commit/9147ac4f80d4ed7a28fa8ee983fe9b50c4d3dc3e))
+
+
+### Changed
+
+* **helper:** TS shadow 박멸, Rust binary single source-of-truth ([747a5a6](https://github.com/jocoding-ax-partners/axhub/commit/747a5a66b3b9eaffd2638f5ac6352b2914e9fed1))
+
+
+### Docs
+
+* cli-coverage v0.2.0 phase plan 12 문서 신설 ([1db57d4](https://github.com/jocoding-ax-partners/axhub/commit/1db57d4448a6911414f9af5920f59221b1dcf9d8))
+
 ## [0.1.26](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.25...v0.1.26) (2026-04-29)
 
 Phase 23.1은 v0.1.25 태그에서 멈춘 darwin-amd64 release lane을 복구하는 패치예요. GitHub가 2025-12-04에 retired 처리한 `macos-13` 대신 공식 Intel label인 `macos-15-intel`로 바꿔서 5개 Rust helper artifact가 다시 서명·업로드되게 해요.
