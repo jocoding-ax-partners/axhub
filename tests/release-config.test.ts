@@ -194,7 +194,7 @@ describe("manifest.ts generator (US-204)", () => {
 describe(".versionrc.json release lifecycle", () => {
   const path = join(REPO_ROOT, ".versionrc.json");
 
-  test("postbump stages all generated tracked version files before commit/tag", () => {
+  test("postbump stages all generated Rust-only version files before commit/tag", () => {
     const config = JSON.parse(readFileSync(path, "utf8")) as {
       scripts: { postbump?: string; posttag?: string };
     };
@@ -202,12 +202,11 @@ describe(".versionrc.json release lifecycle", () => {
     for (const generatedPath of [
       "bin/install.sh",
       "bin/install.ps1",
-      "src/axhub-helpers/index.ts",
-      "src/axhub-helpers/telemetry.ts",
       "Cargo.toml",
     ]) {
       expect(postbump).toContain(generatedPath);
     }
+    expect(postbump).not.toContain("src/axhub-helpers");
     expect(postbump).toContain("git add");
     expect(postbump.indexOf("git add")).toBeLessThan(postbump.indexOf("bun run release:check"));
   });
