@@ -713,11 +713,17 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(logoutSectionPrefix).toContain('"value": "abort"');
   });
 
-  test("skills do not instruct unavailable deploy-list or helper-schedule commands", () => {
+  test("skills do not instruct unavailable helper-schedule command", () => {
     for (const [slug, content] of skillContents) {
-      expect(content, slug).not.toMatch(/^\s*axhub deploy list\b/m);
       expect(content, slug).not.toContain("axhub-helpers schedule");
     }
+  });
+
+  test("deploy skill documents current deploy list and cancel surfaces", () => {
+    const deploy = skillContents.get("deploy")!;
+    expect(deploy).toContain('axhub deploy list --app "$APP_ID" --json');
+    expect(deploy).toContain('action=deploy_cancel');
+    expect(deploy).toContain('axhub deploy cancel "$DEPLOYMENT_ID" --app "$APP_ID" --yes --json');
   });
 
   test("skill error-catalog cross references are resolvable relative paths", () => {

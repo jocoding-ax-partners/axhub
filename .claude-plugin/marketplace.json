@@ -8,7 +8,7 @@
     {
       "name": "axhub",
       "source": "./",
-      "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders at customer companies",
+      "description": "Korean-first axhub Claude Code plugin wrapping ax-hub-cli v0.10 surfaces with NL skills and consent gates",
       "version": "0.1.26"
     }
   ]

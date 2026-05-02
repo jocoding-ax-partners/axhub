@@ -61,6 +61,54 @@ The drift between this file and the hand-written sibling is checked by
 
 ---
 
+### exit 64:env.prod_confirm_mismatch
+
+**감정:** 잠깐만요. 확인 문구가 일치하지 않아요.
+
+**원인:** 입력한 key 또는 app 확인값이 실제 변경 대상과 달라요. 오타일 수 있어서 실행을 막았어요.
+
+**해결:** 대상 key 와 app slug 를 다시 보고, 정확히 일치할 때만 다시 시도해요.
+
+**버튼:** 다시 확인 / 취소 / 도와주세요
+
+---
+
+### exit 64:env.prod_force_required
+
+**감정:** 잠깐만요. production 환경변수는 더 조심해야 해요.
+
+**원인:** production 값은 즉시 라이브 앱에 영향을 줄 수 있어서 일반 env 변경보다 위험해요.
+
+**해결:** 키와 앱을 다시 확인하고 정말 필요할 때만 exact confirm 후 진행해요. 값은 절대 화면에 노출하지 않아요.
+
+**버튼:** 키 다시 확인 / 취소 / 도와주세요
+
+---
+
+### exit 64:github.confirm_slug_mismatch
+
+**감정:** 확인한 앱 slug 가 달라요.
+
+**원인:** GitHub 연결 해제 대상과 확인 문구가 일치하지 않아 안전하게 중단했어요.
+
+**해결:** 앱 slug 를 다시 확인하고 정말 해제할 때만 정확히 입력해요.
+
+**버튼:** slug 다시 확인 / 취소 / 도와주세요
+
+---
+
+### exit 64:github.git_connection_already_exists
+
+**감정:** 이미 GitHub repo 가 연결되어 있어요.
+
+**원인:** 이 앱에는 기존 GitHub 연결이 있어서 중복 연결을 만들 수 없어요.
+
+**해결:** 현재 연결을 확인한 뒤 바꾸려면 disconnect preview 와 exact confirm 을 먼저 진행해요.
+
+**버튼:** 현재 연결 보기 / 연결 해제 검토 / 닫기
+
+---
+
 ### exit 64:validation.app_ambiguous
 
 **감정:** 잠깐만요. 같은 이름이 두 개라서 헷갈렸어요.
@@ -109,6 +157,18 @@ The drift between this file and the hand-written sibling is checked by
 
 ---
 
+### exit 65:apis.call_consent_required
+
+**감정:** API 호출에는 사전 승인이 필요해요.
+
+**원인:** 이 endpoint 호출은 서버 상태를 바꿀 수 있어요. read-only 조회처럼 자동 실행할 수 없어요.
+
+**해결:** method, endpoint, body source 를 preview 로 확인한 뒤 동의 token 을 mint 해서 다시 실행해요.
+
+**버튼:** preview 보기 / 취소 / 도와주세요
+
+---
+
 ## exit 66
 
 **감정:** 잠깐만요. 권한 문제예요. 앱은 안전해요.
@@ -118,6 +178,18 @@ The drift between this file and the hand-written sibling is checked by
 **해결:** 토큰을 발급해준 분께 이 메시지 그대로 보내주세요: "axhub 토큰에 필요한 scope 추가 필요해요." 그분이 처리해주면 다시 로그인하면 돼요.
 
 **버튼:** 담당자에게 메시지 복사 / 현재 권한 확인 / 도와주세요
+
+---
+
+### exit 66:profile.endpoint_not_in_allowlist
+
+**감정:** endpoint 가 허용 목록 밖이에요.
+
+**원인:** 사내 endpoint 나 임시 endpoint 일 수 있지만, 토큰과 요청이 다른 서버로 갈 수 있어서 조심해야 해요.
+
+**해결:** 회사에서 승인한 endpoint 인지 확인하고 exact confirm 후에만 profile 에 추가해요.
+
+**버튼:** endpoint 확인 / 취소 / 도와주세요
 
 ---
 
@@ -154,6 +226,30 @@ The drift between this file and the hand-written sibling is checked by
 **해결:** 가장 비슷한 후보를 보여줄게요. 아래 중 하나 선택하거나 다시 입력해주세요.
 
 **버튼:** 가장 유사한 거로 / 앱 목록 보기 / 다시 입력
+
+---
+
+### exit 67:github.install_not_found
+
+**감정:** GitHub App 설치를 찾지 못했어요.
+
+**원인:** 선택한 account 에 axhub GitHub App 이 설치되어 있지 않거나 repo 권한이 없어요.
+
+**해결:** CLI 가 제공한 install URL 로 설치를 마친 뒤 다시 연결해요. 권한 부여는 자동으로 진행하지 않아요.
+
+**버튼:** 설치 URL 보기 / repo 다시 고르기 / 닫기
+
+---
+
+### exit 67:open.no_app_manifest
+
+**감정:** 열 수 있는 axhub 앱 정보를 찾지 못했어요.
+
+**원인:** 현재 디렉토리에 apphub.yaml 또는 axhub.yaml 이 없고 최근 배포 cache 도 비어 있어요.
+
+**해결:** 먼저 init 으로 앱 파일을 만들거나 apps 목록에서 열 앱을 골라요.
+
+**버튼:** init 시작 / 앱 목록 보기 / 닫기
 
 ---
 

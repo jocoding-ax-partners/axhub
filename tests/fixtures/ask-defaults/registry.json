@@ -65,5 +65,35 @@
     "_note": "status SKILL delegates AskUserQuestion sites to recovery-flows.md (cold-cache deploy pick) and error-empathy-catalog.md (exit-65 re-login). Defaults handled at delegation point.",
     "cold_cache_default": "most_recent",
     "exit_65_default": "abort"
+  },
+  "init": {
+    "어떤 템플릿으로 시작할까요?": {
+      "safe_default": "abort",
+      "rationale": "Template choice creates files. Non-interactive subprocess must not scaffold without an explicit human selection."
+    }
+  },
+  "env": {
+    "어떤 환경변수 작업을 할까요?": {
+      "safe_default": "조회만",
+      "rationale": "Env set/delete can mutate secrets. Non-interactive mode may list masked keys only."
+    }
+  },
+  "github": {
+    "GitHub 연동 작업을 고를까요?": {
+      "safe_default": "목록만",
+      "rationale": "GitHub connect/disconnect changes deployment source bindings. Non-interactive mode should only list available repos."
+    }
+  },
+  "open": {
+    "_note": "open SKILL is read-only and has no structured AskUserQuestion site. It only calls axhub open/URL display paths."
+  },
+  "whatsnew": {
+    "_note": "whatsnew SKILL is read-only and has no structured AskUserQuestion site. It summarizes axhub whatsnew output."
+  },
+  "profile": {
+    "프로필 작업을 고를까요?": {
+      "safe_default": "현재 프로필 보기",
+      "rationale": "Profile add/use changes endpoint context. Non-interactive mode may only show the current profile."
+    }
   }
 }

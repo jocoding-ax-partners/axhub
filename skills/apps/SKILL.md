@@ -67,6 +67,61 @@ To list apps:
 
 7. **On non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by exit code (65 / 67 / 68 / 1). Read paths may auto-retry once on exit 1.
 
+## v0.2.0 command coverage polish
+
+Use these paths only when the user intent is explicit. Listing remains the default.
+
+### apps create
+
+1. Preview the source file or interactive intent first.
+2. Mint consent with stdin JSON:
+
+   ```bash
+   printf '%s\n' "$CONSENT_BINDING_JSON" | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
+   ```
+
+   Required binding fields: `action=apps_create`, `context={source}`.
+3. Run one of the current CLI contracts:
+
+   ```bash
+   axhub apps create --from-file apphub.yaml --yes --json
+   axhub apps create --interactive --json
+   ```
+
+### apps get
+
+Read-only details use:
+
+```bash
+axhub apps get "$APP" --json
+```
+
+### apps update
+
+Preview each `key=value` field, then mint `action=apps_update` with top-level `app_id` and `context={slug,field}` before:
+
+```bash
+axhub apps update "$APP" --field "$FIELD" --json
+```
+
+### apps delete
+
+Deletion must run a safe preview first when supported:
+
+```bash
+axhub apps delete "$APP" --dry-run --json
+```
+
+After exact slug confirm, mint `action=apps_delete` with top-level `app_id` and `context={slug}` and run:
+
+```bash
+axhub apps delete "$APP" --yes --json
+```
+
+### apps open delegation
+
+If the user wants to open a live app or dashboard, route to `../open/SKILL.md` instead of using `axhub apps open`.
+
 ## NEVER
 
 - NEVER list cross-team apps without explicit user opt-in (F4 privacy guarantee).

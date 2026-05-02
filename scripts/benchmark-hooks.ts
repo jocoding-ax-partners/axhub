@@ -11,7 +11,8 @@
  * reproducible without adding a flaky unit-test timing assertion.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
@@ -24,11 +25,29 @@ const warmup = Number(process.env["AXHUB_HOOK_LATENCY_WARMUP"] ?? "5");
 const thresholdMs = Number(process.env["AXHUB_HOOK_LATENCY_P95_MS"] ?? "50");
 const shouldBuild = !process.argv.includes("--no-build");
 const printConfigOnly = process.argv.includes("--print-config");
+const fakeBinDir = mkdtempSync(join(tmpdir(), "axhub-hook-bench-"));
+const fakeAxhub = join(fakeBinDir, "axhub");
+writeFileSync(
+  fakeAxhub,
+  `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "axhub 0.10.2 (bench)"
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then
+  echo '{"user_email":"bench@example.com","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["read","deploy"]}'
+  exit 0
+fi
+exit 0
+`,
+);
+chmodSync(fakeAxhub, 0o755);
 
 const scenarios = [
   {
     name: "preauth-check non-axhub Bash allow",
     subcommand: "preauth-check",
+    thresholdMs: 30,
     payload: {
       hook_event_name: "PreToolUse",
       tool_name: "Bash",
@@ -43,6 +62,7 @@ const scenarios = [
   {
     name: "classify-exit non-axhub Bash no-op",
     subcommand: "classify-exit",
+    thresholdMs: 10,
     payload: {
       hook_event_name: "PostToolUse",
       tool_name: "Bash",
@@ -52,6 +72,78 @@ const scenarios = [
     assertOutput(stdout: string): void {
       const parsed = JSON.parse(stdout);
       if (Object.keys(parsed).length !== 0) throw new Error(`expected PostToolUse no-op {}, got ${stdout}`);
+    },
+  },
+  {
+    name: "prompt-route open no-preflight",
+    subcommand: "prompt-route",
+    thresholdMs: 50,
+    payload: { hook_event_name: "UserPromptSubmit", prompt: "결과 봐" },
+    assertOutput(stdout: string): void {
+      if (!stdout.includes("skills/open/SKILL.md")) throw new Error(`expected open route, got ${stdout}`);
+    },
+  },
+  {
+    name: "prompt-route whatsnew no-preflight",
+    subcommand: "prompt-route",
+    thresholdMs: 50,
+    payload: { hook_event_name: "UserPromptSubmit", prompt: "axhub 뭐 새로 나왔어" },
+    assertOutput(stdout: string): void {
+      if (!stdout.includes("skills/whatsnew/SKILL.md")) throw new Error(`expected whatsnew route, got ${stdout}`);
+    },
+  },
+  {
+    name: "prompt-route profile current no-preflight",
+    subcommand: "prompt-route",
+    thresholdMs: 50,
+    payload: { hook_event_name: "UserPromptSubmit", prompt: "profile current" },
+    assertOutput(stdout: string): void {
+      if (!stdout.includes("skills/profile/SKILL.md")) throw new Error(`expected profile route, got ${stdout}`);
+    },
+  },
+  {
+    name: "prompt-route env list with preflight",
+    subcommand: "prompt-route",
+    thresholdMs: 50,
+    env: { AXHUB_BIN: fakeAxhub },
+    payload: { hook_event_name: "UserPromptSubmit", prompt: "env list" },
+    assertOutput(stdout: string): void {
+      if (!stdout.includes("skills/env/SKILL.md") || !stdout.includes("Preflight 결과")) {
+        throw new Error(`expected env route with preflight, got ${stdout}`);
+      }
+    },
+  },
+  {
+    name: "prompt-route github connect with preflight",
+    subcommand: "prompt-route",
+    thresholdMs: 50,
+    env: { AXHUB_BIN: fakeAxhub },
+    payload: { hook_event_name: "UserPromptSubmit", prompt: "github connect" },
+    assertOutput(stdout: string): void {
+      if (!stdout.includes("skills/github/SKILL.md") || !stdout.includes("Preflight 결과")) {
+        throw new Error(`expected github route with preflight, got ${stdout}`);
+      }
+    },
+  },
+  {
+    name: "prompt-route deploy with preflight",
+    subcommand: "prompt-route",
+    thresholdMs: 50,
+    env: { AXHUB_BIN: fakeAxhub },
+    payload: { hook_event_name: "UserPromptSubmit", prompt: "deploy" },
+    assertOutput(stdout: string): void {
+      if (!stdout.includes("skills/deploy/SKILL.md") || !stdout.includes("Preflight 결과")) {
+        throw new Error(`expected deploy route with preflight, got ${stdout}`);
+      }
+    },
+  },
+  {
+    name: "prompt-route clarify fallback",
+    subcommand: "prompt-route",
+    thresholdMs: 50,
+    payload: { hook_event_name: "UserPromptSubmit", prompt: "환경" },
+    assertOutput(stdout: string): void {
+      if (!stdout.includes("skills/clarify/SKILL.md")) throw new Error(`expected clarify route, got ${stdout}`);
     },
   },
 ] as const;
@@ -79,7 +171,7 @@ const runScenario = (scenario: typeof scenarios[number]): Result => {
       cwd: REPO_ROOT,
       input,
       encoding: "utf8",
-      env: { ...process.env, AXHUB_TELEMETRY: "0" },
+      env: { ...process.env, AXHUB_TELEMETRY: "0", ...(scenario as { env?: Record<string, string> }).env },
     });
     const elapsedMs = Number(process.hrtime.bigint() - started) / 1_000_000;
 
@@ -104,7 +196,7 @@ const runScenario = (scenario: typeof scenarios[number]): Result => {
 };
 
 if (printConfigOnly) {
-  process.stdout.write(JSON.stringify({ samples, warmup, thresholdMs, scenarios: scenarios.map((s) => s.subcommand) }, null, 2) + "\n");
+  process.stdout.write(JSON.stringify({ samples, warmup, thresholdMs, scenarios: scenarios.map((s) => ({ name: s.name, subcommand: s.subcommand, thresholdMs: s.thresholdMs ?? thresholdMs })) }, null, 2) + "\n");
   process.exit(0);
 }
 
@@ -121,9 +213,11 @@ if (!helper) fail(`helper binary missing after build: ${helperCandidates.join(",
 process.stdout.write(`[hook-latency] samples=${samples} warmup=${warmup} p95-threshold=${thresholdMs}ms\n`);
 const results = scenarios.map(runScenario);
 for (const r of results) {
-  process.stdout.write(`[hook-latency] ${r.name}: p50=${r.p50.toFixed(2)}ms p95=${r.p95.toFixed(2)}ms max=${r.max.toFixed(2)}ms\n`);
-  if (r.p95 > thresholdMs) {
-    fail(`${r.name}: p95 ${r.p95.toFixed(2)}ms > ${thresholdMs}ms`);
+  const scenario = scenarios.find((s) => s.name === r.name);
+  const scenarioThreshold = scenario?.thresholdMs ?? thresholdMs;
+  process.stdout.write(`[hook-latency] ${r.name}: p50=${r.p50.toFixed(2)}ms p95=${r.p95.toFixed(2)}ms max=${r.max.toFixed(2)}ms threshold=${scenarioThreshold}ms\n`);
+  if (r.p95 > scenarioThreshold) {
+    fail(`${r.name}: p95 ${r.p95.toFixed(2)}ms > ${scenarioThreshold}ms`);
   }
 }
 process.stdout.write("[hook-latency] OK\n");

@@ -125,12 +125,35 @@ exit 1
     std::fs::set_permissions(&axhub, permissions).unwrap();
 
     let cases = [
+        ("결제 앱 만들어줘", "skills/init/SKILL.md", "init template"),
+        (
+            "Next.js 앱 만들어줘",
+            "skills/init/SKILL.md",
+            "init template",
+        ),
+        (
+            "axhub.yaml 만들어줘",
+            "skills/init/SKILL.md",
+            "init template",
+        ),
+        ("환경변수 뭐 있어?", "skills/env/SKILL.md", "env var"),
+        ("환경 변수 확인", "skills/env/SKILL.md", "env var"),
+        ("회사 endpoint 바꿔", "skills/profile/SKILL.md", "profile"),
+        ("profile current", "skills/profile/SKILL.md", "profile"),
+        ("GitHub repo 연결해", "skills/github/SKILL.md", "GitHub"),
+        ("결과 봐", "skills/open/SKILL.md", "브라우저"),
+        (
+            "axhub 뭐 새로 나왔어",
+            "skills/whatsnew/SKILL.md",
+            "release notes",
+        ),
         ("배포해", "skills/deploy/SKILL.md", "bun run release"),
         (
             "내 axhub 앱 목록 보여줘",
             "skills/apps/SKILL.md",
             "팀 scope",
         ),
+        ("앱 등록해", "skills/apps/SKILL.md", "팀 scope"),
         (
             "axhub 앱이 어떤 API 쓸 수 있는지 보여줘",
             "skills/apis/SKILL.md",
@@ -178,6 +201,24 @@ exit 1
     );
     assert_eq!(no_route.status.code(), Some(0));
     assert_eq!(String::from_utf8_lossy(&no_route.stdout).trim(), "{}");
+
+    let clarify_environment = run_stdin(
+        &["prompt-route"],
+        r#"{"hook_event_name":"UserPromptSubmit","prompt":"환경"}"#,
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(clarify_environment.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&clarify_environment.stdout);
+    assert!(stdout.contains("skills/clarify/SKILL.md"), "{stdout}");
+
+    let doctor_environment = run_stdin(
+        &["prompt-route"],
+        r#"{"hook_event_name":"UserPromptSubmit","prompt":"환경 점검해"}"#,
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(doctor_environment.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&doctor_environment.stdout);
+    assert!(stdout.contains("skills/doctor/SKILL.md"), "{stdout}");
 }
 
 #[test]
@@ -240,7 +281,8 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
         "app_id":"paydrop",
         "profile":"prod",
         "branch":"main",
-        "commit_sha":"abc123"
+        "commit_sha":"abc123",
+        "context": {}
     })
     .to_string();
 
@@ -300,5 +342,34 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
     );
     assert_eq!(identity_without_token.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&identity_without_token.stdout)
+        .contains("permissionDecision\":\"deny"));
+
+    let env_binding = serde_json::json!({
+        "tool_call_id":"cli-e2e-session:tc-env",
+        "action":"env_set",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"key":"DATABASE_URL"}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &env_binding, &envs);
+    assert_eq!(minted.status.code(), Some(0));
+    let env_allowed = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-env","tool_name":"Bash","tool_input":{"command":"printf %s \"$DATABASE_URL\" | axhub env set DATABASE_URL --app paydrop --from-stdin --json"}}"#,
+        &envs,
+    );
+    assert_eq!(env_allowed.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&env_allowed.stdout).contains("permissionDecision\":\"allow"));
+
+    let cancel_without_token = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-cancel","tool_name":"Bash","tool_input":{"command":"axhub deploy cancel dep_123 --app paydrop --json"}}"#,
+        &envs,
+    );
+    assert_eq!(cancel_without_token.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&cancel_without_token.stdout)
         .contains("permissionDecision\":\"deny"));
 }

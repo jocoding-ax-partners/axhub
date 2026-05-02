@@ -77,6 +77,7 @@ fn base_binding() -> ConsentBinding {
         profile: "prod".into(),
         branch: "main".into(),
         commit_sha: "a3f9c1b".into(),
+        context: HashMap::new(),
     }
 }
 
@@ -125,6 +126,27 @@ fn catalog_classifies_base_subclassified_and_default_entries() {
     .action
     .contains("IT 보안 담당자"));
     assert!(classify(99, "not-json{{").cause.contains("알 수 없는 에러"));
+    assert!(
+        classify(64, r#"{"error":{"code":"env.prod_force_required"}}"#)
+            .action
+            .contains("값은 절대")
+    );
+    assert!(
+        classify(67, r#"{"error":{"code":"github.install_not_found"}}"#)
+            .button
+            .is_some_and(|button| button.contains("설치 URL"))
+    );
+    assert!(classify(
+        66,
+        r#"{"error":{"code":"profile.endpoint_not_in_allowlist"}}"#
+    )
+    .emotion
+    .contains("허용 목록"));
+    assert!(
+        classify(65, r#"{"error":{"code":"apis.call_consent_required"}}"#)
+            .cause
+            .contains("서버 상태")
+    );
 }
 
 #[test]
@@ -148,12 +170,60 @@ fn preflight_semver_auth_and_exit_precedence_match_ts() {
     let too_new = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: EXIT_OK,
-            stdout: "axhub 0.2.0".into(),
+            stdout: "axhub 0.11.0".into(),
             stderr: String::new(),
         },
         ["axhub", "auth", "status", "--json"] => SpawnResult {
             exit_code: EXIT_OK,
             stdout: r#"{"code":"auth.expired"}"#.into(),
+            stderr: String::new(),
+        },
+        _ => SpawnResult {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: String::new(),
+        },
+    });
+    assert_eq!(too_new.exit_code, EXIT_USAGE);
+    assert!(too_new.output.cli_too_new);
+}
+
+#[test]
+fn preflight_admits_axhub_cli_0_10_line_and_rejects_0_11_exclusive_max() {
+    for version in ["0.1.0", "0.5.0", "0.7.5", "0.9.0", "0.10.2"] {
+        let run = run_preflight_with_runner(|cmd| {
+            match cmd {
+            ["axhub", "--version"] => SpawnResult {
+                exit_code: EXIT_OK,
+                stdout: format!("axhub {version}"),
+                stderr: String::new(),
+            },
+            ["axhub", "auth", "status", "--json"] => SpawnResult {
+                exit_code: EXIT_OK,
+                stdout: r#"{"user_email":"u@example.com","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["read"]}"#.into(),
+                stderr: String::new(),
+            },
+            _ => SpawnResult {
+                exit_code: 1,
+                stdout: String::new(),
+                stderr: String::new(),
+            },
+        }
+        });
+        assert_eq!(run.exit_code, EXIT_OK, "version {version}");
+        assert!(run.output.in_range, "version {version}");
+        assert!(!run.output.cli_too_new, "version {version}");
+    }
+
+    let too_new = run_preflight_with_runner(|cmd| match cmd {
+        ["axhub", "--version"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: "axhub 0.11.0".into(),
+            stderr: String::new(),
+        },
+        ["axhub", "auth", "status", "--json"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: r#"{"user_email":"u@example.com","scopes":["read"]}"#.into(),
             stderr: String::new(),
         },
         _ => SpawnResult {
@@ -763,6 +833,35 @@ fn consent_locks_zero_leeway_binding_mismatch_and_parser_hardening() {
 }
 
 #[test]
+fn consent_binding_accepts_context_and_backfills_legacy_tokens() {
+    let with_context: ConsentBinding = serde_json::from_value(json!({
+        "tool_call_id": "sess-abc:tc-1",
+        "action": "env_set",
+        "app_id": "paydrop",
+        "profile": "prod",
+        "branch": "",
+        "commit_sha": "",
+        "context": {"key": "DATABASE_URL"}
+    }))
+    .unwrap();
+    assert_eq!(
+        with_context.context.get("key").map(String::as_str),
+        Some("DATABASE_URL")
+    );
+
+    let legacy: ConsentBinding = serde_json::from_value(json!({
+        "tool_call_id": "sess-abc:tc-1",
+        "action": "deploy_create",
+        "app_id": "paydrop",
+        "profile": "prod",
+        "branch": "main",
+        "commit_sha": "a3f9c1b"
+    }))
+    .unwrap();
+    assert!(legacy.context.is_empty());
+}
+
+#[test]
 fn consent_parser_recognizes_nested_shell_destructive_intents_and_ignores_safe_commands() {
     let update = parse_axhub_command(
         r#"sh -c 'echo before && axhub update apply --app=paydrop --profile=prod'"#,
@@ -787,6 +886,111 @@ fn consent_parser_recognizes_nested_shell_destructive_intents_and_ignores_safe_c
     let safe = parse_axhub_command("axhub deploy logs --app paydrop");
     assert!(!safe.is_destructive);
     assert!(safe.action.is_none());
+}
+
+#[test]
+fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() {
+    let cases = [
+        (
+            "axhub env set DATABASE_URL --app paydrop --from-stdin --json",
+            "env_set",
+            Some("paydrop"),
+            [("key", "DATABASE_URL")].as_slice(),
+        ),
+        (
+            "axhub env delete DATABASE_URL --app paydrop --force --confirm=DATABASE_URL --json",
+            "env_delete",
+            Some("paydrop"),
+            [("key", "DATABASE_URL")].as_slice(),
+        ),
+        (
+            "axhub apps create --from-file apphub.yaml --yes --json",
+            "apps_create",
+            None,
+            [("source", "apphub.yaml")].as_slice(),
+        ),
+        (
+            "axhub apps update paydrop --field name=Paydrop --json",
+            "apps_update",
+            Some("paydrop"),
+            [("slug", "paydrop"), ("field", "name=Paydrop")].as_slice(),
+        ),
+        (
+            "axhub apps delete paydrop --force --confirm=paydrop --json",
+            "apps_delete",
+            Some("paydrop"),
+            [("slug", "paydrop")].as_slice(),
+        ),
+        (
+            "axhub github connect paydrop --account jocoding --repo paydrop --branch main --json",
+            "github_connect",
+            Some("paydrop"),
+            [("repo", "paydrop"), ("branch", "main")].as_slice(),
+        ),
+        (
+            "axhub github disconnect paydrop --force --confirm=paydrop --json",
+            "github_disconnect",
+            Some("paydrop"),
+            [("slug", "paydrop")].as_slice(),
+        ),
+        (
+            "axhub deploy cancel dep_123 --app paydrop --json",
+            "deploy_cancel",
+            Some("paydrop"),
+            [("deployment_id", "dep_123")].as_slice(),
+        ),
+        (
+            "axhub profile add corp --endpoint https://corp.example.test --json",
+            "profile_add",
+            None,
+            [
+                ("profile", "corp"),
+                ("endpoint", "https://corp.example.test"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub profile use corp --json",
+            "profile_use",
+            None,
+            [("profile", "corp")].as_slice(),
+        ),
+        (
+            "axhub apis call endpoint_123 --method POST --body-file payload.json --json",
+            "apis_call",
+            None,
+            [
+                ("endpoint_id", "endpoint_123"),
+                ("method", "POST"),
+                ("body_file", "payload.json"),
+            ]
+            .as_slice(),
+        ),
+    ];
+
+    for (command, action, app_id, expected_context) in cases {
+        let parsed = parse_axhub_command(command);
+        assert!(parsed.is_destructive, "{command}");
+        assert_eq!(parsed.action.as_deref(), Some(action), "{command}");
+        assert_eq!(parsed.app_id.as_deref(), app_id, "{command}");
+        for (key, value) in expected_context {
+            assert_eq!(
+                parsed.context.get(*key).map(String::as_str),
+                Some(*value),
+                "{command}"
+            );
+        }
+    }
+
+    for command in [
+        "axhub bootstrap install-node",
+        "axhub install-deps",
+        "axhub admin setup team",
+    ] {
+        let parsed = parse_axhub_command(command);
+        assert!(!parsed.is_destructive, "{command}");
+        assert!(parsed.action.is_none(), "{command}");
+    }
 }
 
 #[test]

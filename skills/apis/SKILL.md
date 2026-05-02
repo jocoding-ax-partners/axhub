@@ -87,12 +87,52 @@ To list APIs:
 
 8. **On non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by code (65 / 67 / 68 / 1).
 
+## v0.2.0 command coverage polish
+
+### apis schema
+
+Read-only schema inspection uses the current CLI contract:
+
+```bash
+axhub apis schema "$ENDPOINT_ID" --json
+```
+
+### apis test
+
+Low-risk endpoint probes use:
+
+```bash
+axhub apis test "$ENDPOINT_ID" --method "$METHOD" --body-file "$BODY_FILE" --json
+```
+
+### apis call
+
+`call` can have write side effects, so treat it like deploy-equivalent mutation.
+
+Preview card fields:
+
+- endpoint id
+- method
+- payload/body source
+- possible side effect
+- auth scope
+- idempotency guess
+
+Mint consent with stdin JSON and `action=apis_call`, top-level app/profile fields when known, and `context={endpoint_id,method,body_file}` before:
+
+```bash
+axhub apis call "$ENDPOINT_ID" --method "$METHOD" --body-file "$BODY_FILE" --json
+```
+
+Large bodies stay in temp files or stdin. Do not place request body JSON directly in shell argv.
+
 ## NEVER
 
 - NEVER call `axhub apis list` without `--app-id` unless the user explicitly opted in (E13 / F4 privacy fix — Phase 6 §16.17).
 - NEVER echo cross-team `service_base_url` raw — always pass through the redact filter.
 - NEVER cache the cross-team catalog locally (pulls back stale once team membership changes).
 - NEVER drop `--json`.
+- NEVER run `axhub apis call` without the consent parser accepting `apis_call`.
 
 ## Additional Resources
 

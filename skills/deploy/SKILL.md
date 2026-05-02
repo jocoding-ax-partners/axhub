@@ -116,11 +116,42 @@ To deploy:
 
    Skip on `--dry-run` (statusline 은 실제 deploy 만 추적).
 
+## v0.2.0 command coverage polish
+
+### deploy list
+
+Read-only deployment browsing uses the current CLI command:
+
+```bash
+axhub deploy list --app "$APP_ID" --json
+```
+
+If pagination appears in JSON, show the first page and offer a follow-up instead of dumping a long list.
+
+### deploy cancel
+
+Cancel is a mutation. Preview the in-progress deployment first:
+
+- app id / slug
+- deployment id
+- branch and commit if present
+- current status
+- expected effect
+
+Mint consent with stdin JSON using `action=deploy_cancel`, top-level `app_id`, and `context={deployment_id}` and then run:
+
+```bash
+axhub deploy cancel "$DEPLOYMENT_ID" --app "$APP_ID" --yes --json
+```
+
+After cancellation, run a read-only status check and summarize the terminal state.
+
 ## NEVER
 
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop `--json` (parsing relies on it).
 - NEVER call `axhub deploy create` without going through `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint` first; the PreToolUse hook will deny.
+- NEVER call `axhub deploy cancel` without a matching `deploy_cancel` consent token.
 - NEVER infer `app_id` from `pwd` or git remote alone in the mutation path; always live resolve through the helper.
 - NEVER bypass the AskUserQuestion preview card on slash invocation; slash is explicit consent for the SKILL invocation, not for the destructive operation.
 

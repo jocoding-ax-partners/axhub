@@ -12,6 +12,8 @@ pub struct ParsedAxhubCommand {
     pub branch: Option<String>,
     pub commit_sha: Option<String>,
     pub profile: Option<String>,
+    #[serde(default)]
+    pub context: HashMap<String, String>,
 }
 
 static ENV_ASSIGN_PREFIX_RE: LazyLock<Regex> =
@@ -24,6 +26,15 @@ fn flag_map(flag: &str) -> Option<&'static str> {
         "--branch" => Some("branch"),
         "--commit" => Some("commit_sha"),
         "--profile" => Some("profile"),
+        "--method" => Some("method"),
+        "--repo" => Some("repo"),
+        "--account" => Some("account"),
+        "--endpoint" => Some("endpoint"),
+        "--slug" => Some("slug"),
+        "--confirm" => Some("confirm"),
+        "--from-file" => Some("source"),
+        "--field" => Some("field"),
+        "--body-file" => Some("body_file"),
         _ => None,
     }
 }
@@ -46,6 +57,29 @@ fn extract_flags(tokens: &[String]) -> HashMap<&'static str, String> {
         i += 1;
     }
     out
+}
+
+fn positional(tokens: &[String], index: usize) -> Option<String> {
+    tokens.get(index).filter(|v| !v.starts_with('-')).cloned()
+}
+
+fn destructive(action: &str, tokens: &[String], app_id: Option<String>) -> ParsedAxhubCommand {
+    let flags = extract_flags(tokens.get(3..).unwrap_or_default());
+    ParsedAxhubCommand {
+        is_destructive: true,
+        action: Some(action.into()),
+        app_id: app_id.or_else(|| flags.get("app_id").cloned()),
+        branch: flags.get("branch").cloned(),
+        commit_sha: flags.get("commit_sha").cloned(),
+        profile: flags.get("profile").cloned(),
+        context: HashMap::new(),
+    }
+}
+
+fn insert_if_some(context: &mut HashMap<String, String>, key: &str, value: Option<String>) {
+    if let Some(value) = value.filter(|v| !v.is_empty()) {
+        context.insert(key.into(), value);
+    }
 }
 
 fn collect_command_positions(cmd: &str, depth: usize) -> Vec<String> {
@@ -144,24 +178,96 @@ fn tokens_if_axhub_command(raw_position: &str) -> Option<Vec<String>> {
 fn match_known_intent(tokens: &[String]) -> Option<ParsedAxhubCommand> {
     let sub = tokens.get(1).map(String::as_str);
     let sub2 = tokens.get(2).map(String::as_str);
-    let destructive = match (sub, sub2) {
-        (Some("deploy"), Some("create")) => Some("deploy_create"),
-        (Some("update"), Some("apply")) => Some("update_apply"),
-        (Some("deploy"), Some("logs")) if tokens.iter().any(|t| t == "--kill") => {
-            Some("deploy_logs_kill")
-        }
-        (Some("auth"), Some("login")) => Some("auth_login"),
-        _ => None,
-    }?;
     let flags = extract_flags(tokens.get(3..).unwrap_or_default());
-    Some(ParsedAxhubCommand {
-        is_destructive: true,
-        action: Some(destructive.into()),
-        app_id: flags.get("app_id").cloned(),
-        branch: flags.get("branch").cloned(),
-        commit_sha: flags.get("commit_sha").cloned(),
-        profile: flags.get("profile").cloned(),
-    })
+    let parsed = match (sub, sub2) {
+        (Some("deploy"), Some("create")) => destructive("deploy_create", tokens, None),
+        (Some("update"), Some("apply")) => destructive("update_apply", tokens, None),
+        (Some("deploy"), Some("logs")) if tokens.iter().any(|t| t == "--kill") => {
+            destructive("deploy_logs_kill", tokens, None)
+        }
+        (Some("auth"), Some("login")) => destructive("auth_login", tokens, None),
+        (Some("env"), Some("set")) => {
+            let mut parsed = destructive("env_set", tokens, None);
+            insert_if_some(&mut parsed.context, "key", positional(tokens, 3));
+            parsed
+        }
+        (Some("env"), Some("delete")) | (Some("env"), Some("unset")) => {
+            let mut parsed = destructive("env_delete", tokens, None);
+            insert_if_some(&mut parsed.context, "key", positional(tokens, 3));
+            parsed
+        }
+        (Some("apps"), Some("create")) => {
+            let app = flags.get("slug").cloned().or_else(|| positional(tokens, 3));
+            let mut parsed = destructive("apps_create", tokens, app.clone());
+            insert_if_some(&mut parsed.context, "slug", app);
+            insert_if_some(&mut parsed.context, "source", flags.get("source").cloned());
+            parsed
+        }
+        (Some("apps"), Some("update")) => {
+            let app = positional(tokens, 3).or_else(|| flags.get("slug").cloned());
+            let mut parsed = destructive("apps_update", tokens, app.clone());
+            insert_if_some(&mut parsed.context, "slug", app);
+            insert_if_some(&mut parsed.context, "field", flags.get("field").cloned());
+            parsed
+        }
+        (Some("apps"), Some("delete")) | (Some("apps"), Some("rm")) => {
+            let app = positional(tokens, 3).or_else(|| flags.get("slug").cloned());
+            let mut parsed = destructive("apps_delete", tokens, app.clone());
+            insert_if_some(&mut parsed.context, "slug", app);
+            parsed
+        }
+        (Some("github"), Some("connect")) => {
+            let app = positional(tokens, 3).or_else(|| flags.get("app_id").cloned());
+            let mut parsed = destructive("github_connect", tokens, app);
+            insert_if_some(&mut parsed.context, "repo", flags.get("repo").cloned());
+            insert_if_some(&mut parsed.context, "branch", flags.get("branch").cloned());
+            insert_if_some(
+                &mut parsed.context,
+                "account",
+                flags.get("account").cloned(),
+            );
+            parsed
+        }
+        (Some("github"), Some("disconnect")) => {
+            let app = positional(tokens, 3).or_else(|| flags.get("app_id").cloned());
+            let mut parsed = destructive("github_disconnect", tokens, app.clone());
+            insert_if_some(&mut parsed.context, "slug", app);
+            parsed
+        }
+        (Some("deploy"), Some("cancel")) => {
+            let mut parsed = destructive("deploy_cancel", tokens, None);
+            insert_if_some(&mut parsed.context, "deployment_id", positional(tokens, 3));
+            parsed
+        }
+        (Some("profile"), Some("add")) => {
+            let mut parsed = destructive("profile_add", tokens, None);
+            insert_if_some(&mut parsed.context, "profile", positional(tokens, 3));
+            insert_if_some(
+                &mut parsed.context,
+                "endpoint",
+                flags.get("endpoint").cloned(),
+            );
+            parsed
+        }
+        (Some("profile"), Some("use")) => {
+            let mut parsed = destructive("profile_use", tokens, None);
+            insert_if_some(&mut parsed.context, "profile", positional(tokens, 3));
+            parsed
+        }
+        (Some("apis"), Some("call")) => {
+            let mut parsed = destructive("apis_call", tokens, None);
+            insert_if_some(&mut parsed.context, "endpoint_id", positional(tokens, 3));
+            insert_if_some(&mut parsed.context, "method", flags.get("method").cloned());
+            insert_if_some(
+                &mut parsed.context,
+                "body_file",
+                flags.get("body_file").cloned(),
+            );
+            parsed
+        }
+        _ => return None,
+    };
+    Some(parsed)
 }
 
 pub fn parse_axhub_command(cmd: &str) -> ParsedAxhubCommand {

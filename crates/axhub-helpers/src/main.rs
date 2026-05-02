@@ -221,6 +221,7 @@ fn cmd_preauth_check() -> anyhow::Result<i32> {
                 "".into()
             }
         }),
+        context: parsed.context,
     };
     let result = verify_token(binding);
     if result.valid {
@@ -263,6 +264,49 @@ fn detect_prompt_route(prompt: &str) -> Option<PromptRoute> {
     if contains_any(
         &p,
         &[
+            "새 앱 만들어",
+            "결제 앱 만들어",
+            "앱 만들어줘",
+            "프로젝트 만들어",
+            "next.js 앱",
+            "nextjs 앱",
+            "fastapi 앱",
+            "init",
+            "scaffold",
+            "axhub.yaml 만들어",
+            "apphub.yaml 만들어",
+            "빈 디렉토리",
+        ],
+    ) {
+        return Some(PromptRoute {
+            skill: "init",
+            label: "init template scaffold",
+            guidance: "새 axhub 앱을 시작하는 init template 요청이에요. helper bootstrap 을 만들지 말고 skills/init/SKILL.md 흐름에서 axhub --json init --list-templates 를 source of truth 로 사용해요.",
+            needs_preflight: false,
+        });
+    }
+    if contains_any(
+        &p,
+        &[
+            "profile",
+            "프로필",
+            "다른 회사",
+            "회사 endpoint",
+            "endpoint 바꿔",
+            "엔드포인트 바꿔",
+            "사내 endpoint",
+        ],
+    ) {
+        return Some(PromptRoute {
+            skill: "profile",
+            label: "profile/endpoint",
+            guidance: "axhub profile 또는 endpoint 전환 요청이에요. skills/profile/SKILL.md 흐름으로 current/list/add/use 를 구분하고 endpoint allowlist 를 확인해요.",
+            needs_preflight: false,
+        });
+    }
+    if contains_any(
+        &p,
+        &[
             "/axhub:doctor",
             "doctor",
             "diagnose",
@@ -286,6 +330,98 @@ fn detect_prompt_route(prompt: &str) -> Option<PromptRoute> {
             label: "doctor/환경 점검",
             guidance: "일반 저장소 환경 체크로 답하지 말고 axhub doctor 워크플로우를 적용해요.",
             needs_preflight: true,
+        });
+    }
+    if p == "환경" {
+        return Some(PromptRoute {
+            skill: "clarify",
+            label: "모호한 환경 요청",
+            guidance: "환경이라는 단어만으로는 axhub env var 조회인지 환경 점검인지 확실하지 않아요. skills/clarify/SKILL.md 흐름으로 선택지를 좁혀요.",
+            needs_preflight: false,
+        });
+    }
+    if contains_any(
+        &p,
+        &[
+            "환경변수",
+            "환경 변수",
+            "db url",
+            "database url",
+            "secret",
+            "api 키",
+            "api key",
+            "env 봐",
+            "env list",
+            "env 추가",
+            "env 삭제",
+            "env var",
+        ],
+    ) {
+        return Some(PromptRoute {
+            skill: "env",
+            label: "env var 관리",
+            guidance: "axhub env var 조회/변경 요청이에요. skills/env/SKILL.md 흐름을 따르고 set 은 --from-stdin 으로만 secret 값을 전달해요.",
+            needs_preflight: true,
+        });
+    }
+    if contains_any(
+        &p,
+        &[
+            "github 연결",
+            "github repo",
+            "github connect",
+            "github disconnect",
+            "repo 연결",
+            "repo 끊",
+            "내 repo 붙",
+            "git 연결",
+            "깃허브 연결",
+        ],
+    ) {
+        return Some(PromptRoute {
+            skill: "github",
+            label: "GitHub repo 연결",
+            guidance: "GitHub repo 연결 또는 해제 요청이에요. skills/github/SKILL.md 흐름으로 GitHub App 설치 상태와 connect/disconnect consent 를 확인해요.",
+            needs_preflight: true,
+        });
+    }
+    if contains_any(
+        &p,
+        &[
+            "결과 봐",
+            "라이브 봐",
+            "브라우저로 열",
+            "프로덕션 열",
+            "deploy url",
+            "open in browser",
+            "open",
+            "metrics 봐",
+            "logs 페이지",
+        ],
+    ) {
+        return Some(PromptRoute {
+            skill: "open",
+            label: "브라우저 open",
+            guidance: "배포 결과를 브라우저에서 여는 요청이에요. skills/open/SKILL.md 흐름으로 axhub open 의 read-only URL 확인을 수행해요.",
+            needs_preflight: false,
+        });
+    }
+    if contains_any(
+        &p,
+        &[
+            "뭐 새로",
+            "release notes",
+            "changelog",
+            "what's new",
+            "whatsnew",
+            "신규 기능",
+        ],
+    ) {
+        return Some(PromptRoute {
+            skill: "whatsnew",
+            label: "release notes",
+            guidance: "axhub whatsnew/release notes 요청이에요. skills/whatsnew/SKILL.md read-only 흐름으로 변경점을 요약해요.",
+            needs_preflight: false,
         });
     }
     if contains_any(
@@ -331,6 +467,9 @@ fn detect_prompt_route(prompt: &str) -> Option<PromptRoute> {
             "앱 리스트",
             "앱 보여",
             "앱 봐",
+            "앱 등록",
+            "앱 생성",
+            "apps create",
             "앱 뭐",
             "어떤 앱",
             "등록된 앱",
