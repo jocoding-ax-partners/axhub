@@ -84,6 +84,26 @@ To handle updates:
 
 7. **On non-zero exit (other)**, route to `../deploy/references/error-empathy-catalog.md` by code (65 / 68 / 1).
 
+## v0.2.0 command coverage polish
+
+### cosign mode 안내
+
+Before `apply`, show the current supply-chain mode in the preview:
+
+- signature verification mode
+- whether sigstore/cosign network access may be needed
+- target version and install path
+- rollback note if available
+
+Use current CLI support only:
+
+```bash
+axhub update check --json
+AXHUB_REQUIRE_COSIGN=1 axhub update apply --json
+```
+
+Do not mention unsigned bypass env vars unless the current CLI help or release note exposes them.
+
 ## NEVER
 
 - NEVER drop `AXHUB_REQUIRE_COSIGN=1` from the apply call (Phase 6 §16.10 default-on supply chain protection).

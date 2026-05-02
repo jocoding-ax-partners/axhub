@@ -97,6 +97,25 @@ To run diagnostics:
 
 6. **Report exit code** in the summary block: green (all 0), yellow (warnings only), red (preflight returned 64 or 65). The skill itself always returns to the user — never `exit 1` from the doctor flow.
 
+## v0.2.0 command coverage polish
+
+### doctor audit
+
+After the normal readiness summary, offer the agent observability check when the user mentions audit, agent logs, or observability.
+
+```bash
+axhub doctor audit --json
+```
+
+Render these rows when present:
+
+- `migration_applied`
+- `endpoint_reachable`
+- `role`
+- `export_permission`
+
+Keep this read-only. If audit export requires extra permission, explain the missing role and point to the admin owner instead of attempting a fix.
+
 ## NEVER
 
 - NEVER attempt auto-fix from doctor — only report + suggest the next natural-language phrase. The user routes to the relevant sibling skill.

@@ -7,7 +7,7 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 
 pub const MIN_AXHUB_CLI_VERSION: &str = "0.1.0";
-pub const MAX_AXHUB_CLI_VERSION: &str = "0.2.0";
+pub const MAX_AXHUB_CLI_VERSION: &str = "0.11.0";
 pub const EXIT_OK: i32 = 0;
 pub const EXIT_USAGE: i32 = 64;
 pub const EXIT_AUTH: i32 = 65;

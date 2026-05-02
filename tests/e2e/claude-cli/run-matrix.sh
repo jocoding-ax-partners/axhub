@@ -6,6 +6,7 @@
 #   bash run-matrix.sh --tier nightly   # full T3
 #   bash run-matrix.sh --only 01        # single case
 #   bash run-matrix.sh --only 01 09     # multiple cases
+#   bash run-matrix.sh --persist-session # keep Claude/session sandbox between selected case steps
 
 set -u
 
@@ -20,6 +21,7 @@ mkdir -p "$OUTPUT_DIR" "$SANDBOX_ROOT"
 # Args
 TIER="pr"   # pr | t1 | t2 | nightly
 ONLY=()
+PERSIST_SESSION_GLOBAL=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -33,6 +35,10 @@ while [ $# -gt 0 ]; do
         ONLY+=("$1")
         shift
       done
+      ;;
+    --persist-session)
+      PERSIST_SESSION_GLOBAL=1
+      shift
       ;;
     *)
       echo "unknown arg: $1" >&2
@@ -101,8 +107,12 @@ for id in "${PICK_IDS[@]}"; do
     TOTAL_FAIL=$((TOTAL_FAIL + 1))
     continue
   fi
+  CASE_PERSIST_SESSION="$PERSIST_SESSION_GLOBAL"
+  if grep -Eq '^[[:space:]]*MULTI_STEP=1([[:space:]]|$)' "${CASE_FOUND[0]}"; then
+    CASE_PERSIST_SESSION=1
+  fi
   set +e
-  bash "${CASE_FOUND[0]}"
+  PERSIST_SESSION="$CASE_PERSIST_SESSION" bash "${CASE_FOUND[0]}"
   CASE_RC=$?
   set -e
   if [ -f "${OUTPUT_DIR}/${id}/exit-code" ]; then

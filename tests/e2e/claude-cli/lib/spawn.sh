@@ -65,7 +65,10 @@ spawn_claude() {
   local case_out="${OUTPUT_DIR}/${case_id}"
   local sandbox="${SANDBOX_ROOT}/${case_id}"
 
-  rm -rf "$case_out" "$sandbox"
+  rm -rf "$case_out"
+  if [ "${PERSIST_SESSION:-0}" != "1" ]; then
+    rm -rf "$sandbox"
+  fi
   mkdir -p "$case_out" "$sandbox/.config/axhub-plugin" "$sandbox/.cache/axhub-plugin"
 
   if [ -n "$fixture_token" ]; then
@@ -157,11 +160,13 @@ spawn_claude() {
     --plugin-dir "${CLAUDE_PLUGIN_ROOT}"
     --strict-mcp-config
     --mcp-config '{"mcpServers":{}}'
-    --no-session-persistence
     --output-format json
     --model "$DEFAULT_MODEL"
     --max-budget-usd "$DEFAULT_CAP_USD"
   )
+  if [ "${PERSIST_SESSION:-0}" != "1" ]; then
+    cmd+=("--no-session-persistence")
+  fi
   if [ ${#extra_args[@]} -gt 0 ]; then
     cmd+=("${extra_args[@]}")
   fi

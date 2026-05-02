@@ -21,7 +21,7 @@ const skillSlugs = readdirSync(SKILLS_DIR).filter((d) => {
   }
 });
 
-describe("Phase 17 C1/US-1701 — D1 fallback sentinel in all 11 SKILLs", () => {
+describe("Phase 23 — D1 fallback sentinel in all 17 SKILLs", () => {
   for (const slug of skillSlugs) {
     test(`skills/${slug}/SKILL.md contains D1 sentinel`, () => {
       const content = readFileSync(join(SKILLS_DIR, slug, "SKILL.md"), "utf8");
@@ -34,12 +34,12 @@ describe("Phase 17 C1/US-1701 — D1 fallback sentinel in all 11 SKILLs", () => 
     });
   }
 
-  test("exactly 11 SKILLs have the sentinel (no drop)", () => {
+  test("exactly 17 SKILLs have the sentinel (no drop)", () => {
     let count = 0;
     for (const slug of skillSlugs) {
       const content = readFileSync(join(SKILLS_DIR, slug, "SKILL.md"), "utf8");
       if (content.includes(SENTINEL)) count++;
     }
-    expect(count).toBe(11);
+    expect(count).toBe(17);
   });
 });

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::{SecondsFormat, TimeZone, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
@@ -18,6 +20,8 @@ pub struct ConsentBinding {
     pub profile: String,
     pub branch: String,
     pub commit_sha: String,
+    #[serde(default)]
+    pub context: HashMap<String, String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MintResult {
@@ -39,6 +43,8 @@ struct Claims {
     profile: String,
     branch: String,
     commit_sha: String,
+    #[serde(default)]
+    context: HashMap<String, String>,
     jti: String,
     iat: i64,
     exp: i64,
@@ -60,6 +66,7 @@ impl From<(ConsentBinding, String, i64, i64)> for Claims {
             profile: b.profile,
             branch: b.branch,
             commit_sha: b.commit_sha,
+            context: b.context,
             jti,
             iat,
             exp,
@@ -188,6 +195,12 @@ fn verify_token_result(binding: ConsentBinding) -> Result<VerifyResult, &'static
                 reason: Some(format!("binding_mismatch:{field}")),
             });
         }
+    }
+    if data.claims.context != binding.context {
+        return Ok(VerifyResult {
+            valid: false,
+            reason: Some("binding_mismatch:context".into()),
+        });
     }
     Ok(VerifyResult {
         valid: true,

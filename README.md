@@ -2,17 +2,17 @@
 
 > 바이브코더가 자연어로 axhub 앱을 안전하게 배포하고 관리하는 Claude Code 플러그인.
 
-**상태**: v0.1.22 (ship). 11 SKILLs / 9 commands / 5 cross-arch cosign-signed binaries 라이브.
+**상태**: v0.2.0 (ship). 17 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
 
 ---
 
 ## 한 줄 요약
 
-axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "내 paydrop 앱 배포해" 같은 한국어 자연어로 prod 배포·상태·로그·복구를 수행하는 플러그인이에요. ax-hub-cli (v0.1.0+) 를 wrapping 하고, HMAC consent token / TLS-pinned hub-api / exit-code recovery routing 으로 안전 가드를 걸어요.
+axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "결제 앱 만들어줘" → "GitHub 연결해" → "배포해" → "결과 봐" 같은 한국어 자연어로 앱 lifecycle 을 수행하는 플러그인이에요. ax-hub-cli v0.10 surface 를 얇게 wrapping 하고, HMAC consent token / TLS-pinned hub-api / exit-code recovery routing 으로 안전 가드를 걸어요.
 
 ## 무엇을 할 수 있는가
 
-11 SKILL 자연어 트리거 + 9 슬래시 명령 (한글 alias `/axhub:배포` 포함):
+17 SKILL 자연어 트리거 + 10 슬래시 명령 (한글 alias `/axhub:배포` 포함):
 
 | SKILL | 트리거 예시 | 슬래시 |
 |-------|-------------|--------|
@@ -26,6 +26,12 @@ axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "내 pay
 | `update` | "axhub CLI 새 버전 있어" | `/axhub:update` |
 | `upgrade` | "플러그인 업그레이드" | — |
 | `doctor` | "axhub 설치돼 있어" | `/axhub:doctor` |
+| `init` | "결제 앱 만들어줘" | — |
+| `env` | "환경변수 뭐 있어" | — |
+| `github` | "GitHub repo 연결해" | — |
+| `open` | "결과 봐" | — |
+| `whatsnew` | "뭐 새로 나왔어" | — |
+| `profile` | "회사 endpoint 바꿔" | — |
 | `clarify` | (모호 발화 disambiguation) | — |
 
 UX 보장:
@@ -42,6 +48,20 @@ UX 보장:
 - `https://hub-api.jocodingax.ai` TLS pinning fallback
 - exit 65 (token 만료) → 한국어 안내 + auth login flow
 - SessionStart preflight diagnostics
+
+## 5분 만에 시작하기
+
+1. Claude Code 에 axhub plugin 을 설치해요.
+2. 빈 디렉토리에서 "결제 앱 만들어줘" 라고 말해요.
+3. `axhub --json init --list-templates` 에서 온 template 을 골라요.
+4. plugin 이 `axhub init --from-template` 흐름을 실행해요.
+5. 이어서 "앱 등록해", "GitHub 연결해", "환경변수 추가해", "배포해", "결과 봐" 라고 말할 수 있어요.
+
+정직한 tradeoff:
+
+- v0.2.0 은 Node/CLI/dependency 자동 설치 release 가 아니에요.
+- template 목록은 `ax-hub-cli` registry 를 source of truth 로 사용해요.
+- admin onboarding, helper bootstrap, remote `templates.json` 는 deferred 예요.
 
 ## 빠른 시작
 
@@ -103,7 +123,7 @@ export AXHUB_HELPERS_RUNTIME=ts     # TypeScript helper 강제 (회귀 시)
         │
         ▼
 Claude Code  →  axhub plugin
-        │              ├── skills/* (11 SKILL, NL 자동 트리거 + frontmatter multi-step/needs-preflight)
+        │              ├── skills/* (17 SKILL, NL 자동 트리거 + frontmatter multi-step/needs-preflight)
         │              ├── commands/* (9 슬래시 + 한글 alias)
         │              ├── hooks/* (SessionStart preflight, PreToolUse HMAC consent)
         │              └── bin/axhub-helpers (Rust native, 5 cross-arch cosign-signed)
@@ -112,7 +132,7 @@ Claude Code  →  axhub plugin
    Bash tool ────────────────────┘
         │
         ▼
-   ax-hub-cli binary (v0.1.0+)
+   ax-hub-cli binary (v0.10.x supported surface)
         │
         ▼
    https://hub-api.jocodingax.ai  (TLS pinned fallback)
@@ -146,15 +166,17 @@ git push origin main --tags         # release.yml 자동 fire (cosign 서명 + G
 
 상세: [`docs/RELEASE.md`](docs/RELEASE.md).
 
-## Test baseline (v0.1.22)
+## Test baseline (v0.2.0)
 
-- `bun test` → 545 pass / 5 skip / 0 fail
-- `bash tests/auto-download.test.sh` → 8 pass / 0 fail
+- `bun test` → 336 pass / 4 skip / 0 fail
+- `cargo test --workspace` → Rust helper unit/integration/phase parity green (keychain live tests ignored)
 - `bunx tsc --noEmit` clean
 - `bun run lint:tone --strict` 0 err / 0 warn
-- `bun run skill:doctor --strict` 11/11 SKILLs complete
+- `bun run lint:keywords --check` clean
+- `bun run skill:doctor --strict` 17/17 SKILLs complete
+- `bun run bench:hooks` prompt-route/preflight p95 thresholds green
+- `bun run test:plugin-e2e:t2` → 12/12 helper lifecycle cases pass
 - `bun run release:check` Rust helper host artifact + release matrix verified
-- `bun run test:e2e` (`https://hub-api.jocodingax.ai`) 4 pass / 1 skip / 0 fail
 
 ## 라이선스
 

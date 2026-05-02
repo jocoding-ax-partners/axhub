@@ -14,7 +14,7 @@
  *
  * File scope (Phase 13 v2, Rust-only post TS migration):
  *   - crates/axhub-helpers/data/catalog.json (Tier A — exit-code Korean templates, JSON)
- *   - crates/axhub-helpers/src/**/*.rs (Tier A — Korean string literals via lint:tone:rust)
+ *   - crates/axhub-helpers/src recursive .rs files (Tier A — Korean string literals via lint:tone:rust)
  *   - commands/*.md (Tier C — 9 slash commands)
  *   - bin/install.sh + bin/install.ps1 (Tier D — installer Korean)
  *   - hooks/session-start.sh + hooks/session-start.ps1 (Tier D — hook Korean)

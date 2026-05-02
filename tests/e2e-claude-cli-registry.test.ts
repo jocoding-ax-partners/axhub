@@ -45,10 +45,10 @@ const collectSafeDefaultPaths = (): string[] => {
   return paths;
 };
 
-describe("Phase 22.0.4 — registry.json baseline (SB-2)", () => {
-  test("13 top-level keys (2 메타 + 11 SKILL slug)", () => {
+describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
+  test("19 top-level keys (2 메타 + 17 SKILL slug)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(13);
+    expect(keys).toHaveLength(19);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const skillSlugs = keys.filter((k) => !k.startsWith("_")).sort();
@@ -59,17 +59,23 @@ describe("Phase 22.0.4 — registry.json baseline (SB-2)", () => {
       "clarify",
       "deploy",
       "doctor",
+      "env",
+      "github",
+      "init",
       "logs",
+      "open",
+      "profile",
       "recover",
       "status",
       "update",
       "upgrade",
+      "whatsnew",
     ]);
   });
 
-  test("9 actual safe_default rationale 엔트리 (auth ×2 / recover / apis / apps / clarify / doctor / update / upgrade)", () => {
+  test("13 actual safe_default rationale 엔트리 (기존 9 + init/env/github/profile)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(9);
+    expect(paths).toHaveLength(13);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -79,13 +85,17 @@ describe("Phase 22.0.4 — registry.json baseline (SB-2)", () => {
       "auth",
       "clarify",
       "doctor",
+      "env",
+      "github",
+      "init",
+      "profile",
       "recover",
       "update",
       "upgrade",
     ]);
   });
 
-  test("9 safe_default 값 (abort/stay/skip/later/show 카탈로그)", () => {
+  test("13 safe_default 값 (safe fallback 카탈로그)", () => {
     const auth = registry["auth"] as Record<string, SafeDefaultEntry>;
     expect(auth["다시 로그인할래요?"]?.safe_default).toBe("abort");
     expect(auth["로그아웃할래요?"]?.safe_default).toBe("abort");
@@ -120,9 +130,23 @@ describe("Phase 22.0.4 — registry.json baseline (SB-2)", () => {
     expect(
       upgrade["플러그인 업그레이드 명령 보여줄까요?"]?.safe_default,
     ).toBe("show");
+
+    const init = registry["init"] as Record<string, SafeDefaultEntry>;
+    expect(init["어떤 템플릿으로 시작할까요?"]?.safe_default).toBe("abort");
+
+    const env = registry["env"] as Record<string, SafeDefaultEntry>;
+    expect(env["어떤 환경변수 작업을 할까요?"]?.safe_default).toBe("조회만");
+
+    const github = registry["github"] as Record<string, SafeDefaultEntry>;
+    expect(github["GitHub 연동 작업을 고를까요?"]?.safe_default).toBe("목록만");
+
+    const profile = registry["profile"] as Record<string, SafeDefaultEntry>;
+    expect(profile["프로필 작업을 고를까요?"]?.safe_default).toBe(
+      "현재 프로필 보기",
+    );
   });
 
-  test("deploy / logs / status 는 safe_default 없이 _note + 메타 키만 (의도)", () => {
+  test("read-only/no-question skills keep metadata without safe_default", () => {
     const deploy = registry["deploy"] as Record<string, RegistryValue>;
     expect(deploy["_note"]).toBeString();
     expect(deploy["default_subprocess_action"]).toBe("--dry-run");
@@ -135,6 +159,12 @@ describe("Phase 22.0.4 — registry.json baseline (SB-2)", () => {
     expect(status["_note"]).toBeString();
     expect(status["cold_cache_default"]).toBe("most_recent");
     expect(status["exit_65_default"]).toBe("abort");
+
+    const open = registry["open"] as Record<string, RegistryValue>;
+    expect(open["_note"]).toBeString();
+
+    const whatsnew = registry["whatsnew"] as Record<string, RegistryValue>;
+    expect(whatsnew["_note"]).toBeString();
   });
 
   test("모든 safe_default 엔트리에 rationale 첨부 (drift catch)", () => {
