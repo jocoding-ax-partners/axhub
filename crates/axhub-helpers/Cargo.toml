@@ -29,7 +29,6 @@ unicode-normalization.workspace = true
 uuid.workspace = true
 
 [build-dependencies]
-axhub-codegen = { path = "../axhub-codegen" }
 anyhow.workspace = true
 
 [dev-dependencies]

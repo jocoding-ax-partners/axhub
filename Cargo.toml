@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/axhub-helpers", "crates/axhub-codegen"]
+members = ["crates/axhub-helpers"]
 resolver = "2"
 
 [workspace.package]

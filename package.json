@@ -1,7 +1,7 @@
 {
   "name": "@jocoding-ax-partners/axhub-plugin-cc",
   "version": "0.1.26",
-  "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders. Rust helper primary; Bun remains for repo tooling and transition fallback.",
+  "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders. Rust helper only (TS shadow removed v0.2.0); Bun for repo tooling.",
   "type": "module",
   "private": true,
   "scripts": {
@@ -13,7 +13,7 @@
     "build:windows-amd64": "bun scripts/build-rust-helper.ts --target x86_64-pc-windows-msvc --name axhub-helpers-windows-amd64.exe",
     "build:all": "bun run build:darwin-arm64 && bun run build:darwin-amd64 && bun run build:linux-amd64 && bun run build:linux-arm64 && bun run build:windows-amd64",
     "smoke": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help",
-    "smoke:full": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help && ./bin/axhub-helpers session-start </dev/null && bash tests/docs-link-audit.sh && bun run fuzz && bun run codegen:catalog && bun run codegen:version",
+    "smoke:full": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help && ./bin/axhub-helpers session-start </dev/null && bash tests/docs-link-audit.sh && bun run codegen:catalog && bun run codegen:version",
     "bench:hooks": "bun scripts/benchmark-hooks.ts",
     "codegen:catalog": "bun scripts/codegen-catalog.ts",
     "codegen:version": "bun scripts/codegen-install-version.ts",
@@ -30,7 +30,6 @@
     "test:plugin-e2e:t2": "bash tests/e2e/claude-cli/run-matrix.sh --tier t2",
     "test:plugin-e2e:nightly": "bash tests/e2e/claude-cli/run-matrix.sh --tier nightly",
     "typecheck": "tsc --noEmit",
-    "fuzz": "bun tests/fuzz-parser.ts",
     "lint:tone:rust": "bun scripts/check-toss-tone-conformance.ts --include \"crates/**/*.rs\" --strict",
     "cargo:test": "cargo test --workspace",
     "cargo:build": "cargo build --workspace",

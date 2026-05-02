@@ -1,17 +1,27 @@
-// Phase 3 US-202: codegen + drift detection tests for catalog ↔ markdown sync.
+// Codegen + drift detection tests for catalog ↔ markdown sync.
+// Catalog source-of-truth = crates/axhub-helpers/data/catalog.json (Rust).
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { CATALOG } from "../src/axhub-helpers/catalog";
 import { formatEntry, sortKeys } from "../scripts/codegen-catalog";
 
+interface ErrorEntry {
+  emotion: string;
+  cause: string;
+  action: string;
+  button?: string;
+}
+
 const REPO_ROOT = join(import.meta.dir, "..");
+const CATALOG_JSON = join(REPO_ROOT, "crates/axhub-helpers/data/catalog.json");
 const HAND_WRITTEN = join(REPO_ROOT, "skills/deploy/references/error-empathy-catalog.md");
 const GENERATED = join(REPO_ROOT, "skills/deploy/references/error-empathy-catalog.generated.md");
 
-describe("catalog → markdown codegen (US-202)", () => {
+const CATALOG: Record<string, ErrorEntry> = JSON.parse(readFileSync(CATALOG_JSON, "utf8"));
+
+describe("catalog → markdown codegen", () => {
   test("generated markdown file exists", () => {
     expect(existsSync(GENERATED)).toBe(true);
   });
@@ -24,7 +34,6 @@ describe("catalog → markdown codegen (US-202)", () => {
   test("generated markdown contains every catalog key", () => {
     const content = readFileSync(GENERATED, "utf8");
     for (const key of Object.keys(CATALOG)) {
-      // Each key appears as `## exit N` or `### exit N:code`
       const headingPattern = key.includes(":")
         ? `### exit ${key}`
         : `## exit ${key}`;
@@ -36,7 +45,6 @@ describe("catalog → markdown codegen (US-202)", () => {
     const content = readFileSync(GENERATED, "utf8");
     const entries = Object.entries(CATALOG);
     for (const [key, entry] of entries) {
-      // Split on heading to get this entry's section
       const headingPattern = key.includes(":")
         ? `### exit ${key}`
         : `## exit ${key}`;
@@ -53,7 +61,6 @@ describe("catalog → markdown codegen (US-202)", () => {
   });
 
   test("idempotency: re-running formatEntry on each entry produces identical output", () => {
-    // Pure-function test (no fs): re-format every entry, compare byte-for-byte.
     const keys = sortKeys(Object.keys(CATALOG));
     const first = keys.map((k) => formatEntry(k, CATALOG[k]!)).join("");
     const second = keys.map((k) => formatEntry(k, CATALOG[k]!)).join("");
@@ -61,19 +68,16 @@ describe("catalog → markdown codegen (US-202)", () => {
   });
 });
 
-describe("catalog ↔ hand-written markdown drift detection (US-202)", () => {
+describe("catalog ↔ hand-written markdown drift detection", () => {
   test("hand-written markdown exists", () => {
     expect(existsSync(HAND_WRITTEN)).toBe(true);
   });
 
-  test("every catalog.ts key has a corresponding section in hand-written markdown", () => {
+  test("every catalog key has a corresponding section in hand-written markdown", () => {
     const content = readFileSync(HAND_WRITTEN, "utf8");
     const missing: string[] = [];
     for (const key of Object.keys(CATALOG)) {
       if (key.includes(":")) {
-        // Sub-classified keys may be rendered as `exit 64 + \`validation.X\``
-        // (markdown style) or `exit 64:validation.X` (machine style). Match
-        // either by checking both the exit code AND the error code substring.
         const [exitCode, errorCode] = key.split(":");
         const hasExitWithErrorCode = content.includes(`exit ${exitCode}`) && content.includes(errorCode!);
         if (!hasExitWithErrorCode) missing.push(key);

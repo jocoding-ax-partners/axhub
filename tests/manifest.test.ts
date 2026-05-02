@@ -57,14 +57,15 @@ let pluginJson: PluginJson;
 let marketplaceJson: MarketplaceJson;
 let packageJson: PackageJson;
 let hooksJson: HooksJson;
-let helperSource: string;
+// helperSource removed v0.2.0 — TS shadow박멸.
 
 beforeAll(async () => {
   pluginJson = JSON.parse(await readFile(join(REPO_ROOT, ".claude-plugin/plugin.json"), "utf8"));
   marketplaceJson = JSON.parse(await readFile(join(REPO_ROOT, ".claude-plugin/marketplace.json"), "utf8"));
   packageJson = JSON.parse(await readFile(join(REPO_ROOT, "package.json"), "utf8"));
   hooksJson = JSON.parse(await readFile(join(REPO_ROOT, "hooks/hooks.json"), "utf8"));
-  helperSource = await readFile(join(REPO_ROOT, "src/axhub-helpers/index.ts"), "utf8");
+  // helperSource (TS shadow) removed v0.2.0 — equivalent validation now in
+  // crates/axhub-helpers/tests/phase_parity.rs (cargo test).
 });
 
 // ---------------------------------------------------------------------------
@@ -376,55 +377,8 @@ describe("Phase 11 deferred-doc artifacts", () => {
 // hookEventName field caused "Hook JSON output validation failed". Every
 // emission MUST include hookEventName.
 // ---------------------------------------------------------------------------
-describe("hookSpecificOutput field validation in src/axhub-helpers/index.ts", () => {
-  test("source contains hookSpecificOutput emissions", () => {
-    expect(helperSource).toContain("hookSpecificOutput");
-  });
-
-  test("every hookSpecificOutput object literal includes hookEventName", () => {
-    // Match the smallest object literal that contains `hookSpecificOutput`.
-    const matches = helperSource.match(/hookSpecificOutput:\s*\{[^}]+\}/g) ?? [];
-    expect(matches.length).toBeGreaterThan(0);
-    for (const m of matches) {
-      expect(m).toContain("hookEventName");
-    }
-  });
-
-  test("every hookEventName references a real Claude Code event", () => {
-    const validEvents = new Set(["PreToolUse", "PostToolUse", "SessionStart", "UserPromptSubmit", "Stop"]);
-    const events = helperSource.match(/hookEventName:\s*"([^"]+)"/g) ?? [];
-    expect(events.length).toBeGreaterThan(0);
-    for (const e of events) {
-      const name = e.match(/"([^"]+)"/)![1];
-      expect(validEvents.has(name)).toBe(true);
-    }
-  });
-
-  test("permissionDecision values are valid (allow|deny|ask)", () => {
-    const decisions = helperSource.match(/permissionDecision:\s*"([^"]+)"/g) ?? [];
-    for (const d of decisions) {
-      const value = d.match(/"([^"]+)"/)![1];
-      expect(["allow", "deny", "ask"].includes(value)).toBe(true);
-    }
-  });
-
-  test("at least one PreToolUse permissionDecision: deny path exists (gate works)", () => {
-    expect(helperSource).toMatch(/permissionDecision:\s*"deny"/);
-  });
-
-  test("at least one PreToolUse permissionDecision: allow path exists (escape valve)", () => {
-    expect(helperSource).toMatch(/permissionDecision:\s*"allow"/);
-  });
-
-  test("classify-exit emits systemMessage only on relevant exits", () => {
-    expect(helperSource).toMatch(/exit\s*0/i);
-    expect(helperSource).toContain("systemMessage");
-  });
-
-  test("source compiles to a valid TypeScript module (heuristic: has exports)", () => {
-    expect(helperSource).toMatch(/^(export|import)/m);
-  });
-});
+// hookSpecificOutput field validation moved to cargo test (Rust binary
+// emissions). v0.2.0 TS shadow removal — see crates/axhub-helpers/tests/.
 
 // ---------------------------------------------------------------------------
 // Reason: commands/*.md frontmatter shape — Claude Code loader requires

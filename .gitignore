@@ -55,3 +55,6 @@ docs/.harness-state.json
 
 # GitNexus index
 .gitnexus
+
+# Rust build outputs
+target/

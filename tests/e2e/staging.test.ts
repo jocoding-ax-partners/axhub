@@ -16,9 +16,6 @@ import { describe, expect, test, beforeAll } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { parseAxhubCommand } from "../../src/axhub-helpers/consent";
-import { classify } from "../../src/axhub-helpers/catalog";
-
 const E2E_TOKEN = process.env["AXHUB_E2E_STAGING_TOKEN"];
 const E2E_ENDPOINT = process.env["AXHUB_E2E_STAGING_ENDPOINT"];
 const E2E_APP_ID = process.env["AXHUB_E2E_STAGING_APP_ID"];
@@ -93,35 +90,8 @@ describe.skipIf(!E2E_ENABLED)("ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGIN
     }
   });
 
-  test("parseAxhubCommand → action mapping is consistent with real CLI surface", () => {
-    // Smoke check: parseAxhubCommand classifications match the real commands
-    // we'd run against staging. No actual mutation here — just verifying the
-    // parser stays in sync with what the staging CLI accepts as valid syntax.
-    type Action = "deploy_create" | "update_apply" | "deploy_logs_kill" | "auth_login";
-    const samples: Array<{ cmd: string; destructive: boolean; action?: Action }> = [
-      { cmd: "axhub auth status --json", destructive: false },
-      { cmd: "axhub apps list --json", destructive: false },
-      { cmd: "axhub deploy create --app paydrop --branch main --commit abc", destructive: true, action: "deploy_create" },
-      { cmd: "axhub auth login", destructive: true, action: "auth_login" },
-    ];
-    for (const s of samples) {
-      const r = parseAxhubCommand(s.cmd);
-      expect(r.is_destructive).toBe(s.destructive);
-      if (s.action) expect(r.action).toBe(s.action);
-    }
-  });
-
-  test("classify-exit produces Korean 4-part template for real exit codes", () => {
-    // Pure logic test — does not hit staging. Verifies the catalog covers
-    // the exit codes the staging CLI is documented to return.
-    for (const exitCode of [0, 1, 64, 65, 66, 67, 68]) {
-      const entry = classify(exitCode, "");
-      expect(entry.emotion).toBeTypeOf("string");
-      expect(entry.cause).toBeTypeOf("string");
-      expect(entry.action).toBeTypeOf("string");
-      expect(entry.emotion.length).toBeGreaterThan(0);
-    }
-  });
+  // parseAxhubCommand + classify-exit pure-logic tests = cargo test
+  // (crates/axhub-helpers) 가 동일하게 cover. TS shadow 박멸 후 Rust 만 검증.
 
   test("Rust helper list-deployments hits staging when app id is provided", () => {
     if (!E2E_APP_ID) {

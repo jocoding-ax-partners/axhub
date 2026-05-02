@@ -1,9 +1,0 @@
-/Users/wongil/Desktop/work/jocoding/axhub/target/debug/deps/oid_registry-e92523cf3f6cadbe.d: /Users/wongil/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oid-registry-0.7.1/src/lib.rs /Users/wongil/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oid-registry-0.7.1/src/load.rs /Users/wongil/Desktop/work/jocoding/axhub/target/debug/build/oid-registry-b651adbc0061c851/out/oid_db.rs
-
-/Users/wongil/Desktop/work/jocoding/axhub/target/debug/deps/liboid_registry-e92523cf3f6cadbe.rmeta: /Users/wongil/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oid-registry-0.7.1/src/lib.rs /Users/wongil/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oid-registry-0.7.1/src/load.rs /Users/wongil/Desktop/work/jocoding/axhub/target/debug/build/oid-registry-b651adbc0061c851/out/oid_db.rs
-
-/Users/wongil/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oid-registry-0.7.1/src/lib.rs:
-/Users/wongil/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oid-registry-0.7.1/src/load.rs:
-/Users/wongil/Desktop/work/jocoding/axhub/target/debug/build/oid-registry-b651adbc0061c851/out/oid_db.rs:
-
-# env-dep:OUT_DIR=/Users/wongil/Desktop/work/jocoding/axhub/target/debug/build/oid-registry-b651adbc0061c851/out

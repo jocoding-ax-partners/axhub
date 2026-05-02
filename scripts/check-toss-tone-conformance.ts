@@ -12,12 +12,9 @@
  *   --baseline N     warn-only with baseline N tolerated, exit 1 if exceeded
  *   --json           emit structured violations for CI consumption
  *
- * File scope (Phase 13 v2):
- *   - src/axhub-helpers/catalog.ts (Tier A — exit-code Korean templates)
- *   - src/axhub-helpers/keychain.ts (Tier A — 4-part errors)
- *   - src/axhub-helpers/keychain-windows.ts (Tier A — 5 Windows errors)
- *   - src/axhub-helpers/list-deployments.ts (Tier A — auth/parse errors)
- *   - src/axhub-helpers/index.ts (Tier A — USAGE + cmdSessionStart strings)
+ * File scope (Phase 13 v2, Rust-only post TS migration):
+ *   - crates/axhub-helpers/data/catalog.json (Tier A — exit-code Korean templates, JSON)
+ *   - crates/axhub-helpers/src/**/*.rs (Tier A — Korean string literals via lint:tone:rust)
  *   - commands/*.md (Tier C — 9 slash commands)
  *   - bin/install.sh + bin/install.ps1 (Tier D — installer Korean)
  *   - hooks/session-start.sh + hooks/session-start.ps1 (Tier D — hook Korean)
@@ -62,11 +59,7 @@ const FORBIDDEN: ForbiddenToken[] = [
 
 const PHASE_13_FILES = async (includePatterns: string[] = []): Promise<string[]> => {
   const explicit = [
-    "src/axhub-helpers/catalog.ts",
-    "src/axhub-helpers/keychain.ts",
-    "src/axhub-helpers/keychain-windows.ts",
-    "src/axhub-helpers/list-deployments.ts",
-    "src/axhub-helpers/index.ts",
+    "crates/axhub-helpers/data/catalog.json",
     "bin/install.sh",
     "bin/install.ps1",
     "hooks/session-start.sh",
