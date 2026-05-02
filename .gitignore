@@ -58,3 +58,6 @@ docs/.harness-state.json
 
 # Rust build outputs
 target/
+
+# Plan documents (local strategic notes, not for commit)
+.plan/
