@@ -226,7 +226,8 @@ where
             .filter(|s| !s.is_empty()),
         last_deploy_id: cache.as_ref().map(|c| c.deployment_id.clone()),
         last_deploy_status: cache.as_ref().map(|c| c.status.clone()),
-        plugin_version: std::env::var("AXHUB_PLUGIN_VERSION").unwrap_or_else(|_| "0.1.17".into()),
+        plugin_version: std::env::var("AXHUB_PLUGIN_VERSION")
+            .unwrap_or_else(|_| env!("CARGO_PKG_VERSION").into()),
     };
     let exit_code = if !cli_present || !in_range {
         EXIT_USAGE

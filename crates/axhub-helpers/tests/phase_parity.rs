@@ -3,7 +3,9 @@ use std::fs;
 use std::sync::{Mutex, OnceLock};
 
 use axhub_helpers::catalog::classify;
-use axhub_helpers::consent::{mint_token, parse_axhub_command, verify_token, ConsentBinding};
+use axhub_helpers::consent::{
+    mint_token, parse_axhub_command, verify_or_claim_token, verify_token, ConsentBinding,
+};
 use axhub_helpers::keychain::{
     parse_keyring_value, read_keychain_token_with_runner, CommandOutput,
 };
@@ -302,6 +304,29 @@ fn preflight_covers_auth_shapes_env_cache_and_cli_absence() {
     );
     assert_eq!(auth_expired.output.last_deploy_id.as_deref(), Some("dep-1"));
     assert_eq!(auth_expired.output.plugin_version, "9.9.9");
+
+    std::env::remove_var("AXHUB_PLUGIN_VERSION");
+    let default_plugin_version = run_preflight_with_runner(|cmd| match cmd {
+        ["axhub", "--version"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: "axhub 0.1.5".into(),
+            stderr: String::new(),
+        },
+        ["axhub", "auth", "status", "--json"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: r#"{"user_email":"u@example.com","scopes":[]}"#.into(),
+            stderr: String::new(),
+        },
+        _ => SpawnResult {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: String::new(),
+        },
+    });
+    assert_eq!(
+        default_plugin_version.output.plugin_version,
+        env!("CARGO_PKG_VERSION")
+    );
 
     std::env::set_var("AXHUB_APP_SLUG", "env-app");
     let absent = run_preflight_with_runner(|_cmd| SpawnResult {
@@ -830,6 +855,38 @@ fn consent_locks_zero_leeway_binding_mismatch_and_parser_hardening() {
     assert!(parsed.is_destructive);
     assert_eq!(parsed.action.as_deref(), Some("deploy_create"));
     assert_eq!(parsed.app_id.as_deref(), Some("paydrop"));
+}
+
+#[test]
+fn consent_pending_token_allows_future_bash_tool_call_once_without_session_env() {
+    let _lock = env_lock().lock().unwrap();
+    let guard = EnvGuard::new(&["XDG_STATE_HOME", "XDG_RUNTIME_DIR", "CLAUDE_SESSION_ID"]);
+    std::env::set_var("XDG_STATE_HOME", guard.path("state"));
+    std::env::set_var("XDG_RUNTIME_DIR", guard.path("runtime"));
+    std::env::remove_var("CLAUDE_SESSION_ID");
+
+    let mut pending_binding = base_binding();
+    pending_binding.tool_call_id = "model-does-not-know-next-bash-id".into();
+    let minted = mint_token(pending_binding.clone(), 60).unwrap();
+    assert!(minted.file_path.contains("consent-pending-"));
+    assert!(std::path::Path::new(&minted.file_path).exists());
+    assert_eq!(
+        verify_token(pending_binding).reason.as_deref(),
+        Some("session_id_missing")
+    );
+
+    let mut actual = base_binding();
+    actual.tool_call_id = "actual-session:toolu_123".into();
+    let mut wrong_branch = actual.clone();
+    wrong_branch.branch = "dev".into();
+    let rejected = verify_or_claim_token(wrong_branch);
+    assert!(!rejected.valid);
+    assert!(std::path::Path::new(&minted.file_path).exists());
+
+    assert!(verify_or_claim_token(actual.clone()).valid);
+    assert!(!std::path::Path::new(&minted.file_path).exists());
+    let second_try = verify_or_claim_token(actual);
+    assert!(!second_try.valid);
 }
 
 #[test]

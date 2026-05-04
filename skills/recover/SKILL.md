@@ -94,9 +94,12 @@ To recover:
 4. **On `confirm`.** Mint consent token and run deploy create with the prior commit:
 
    ```bash
+   (
+   unset CLAUDE_SESSION_ID
    cat <<JSON | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
-   {"tool_call_id":"${CLAUDE_SESSION_ID}:${NEXT_BASH_TOOL_CALL_ID}","action":"deploy_create","app_id":"${APP_ID}","profile":"${PROFILE}","branch":"${BRANCH}","commit_sha":"${PREV_SHA}"}
+   {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${PROFILE}","branch":"${BRANCH}","commit_sha":"${PREV_SHA}","context":{}}
    JSON
+   )
 
    axhub deploy create --app "$APP_ID" --branch "$BRANCH" --commit "$PREV_SHA" --json
    ```

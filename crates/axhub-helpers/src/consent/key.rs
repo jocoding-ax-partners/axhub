@@ -37,6 +37,9 @@ pub fn session_id() -> anyhow::Result<String> {
 pub fn token_file_path(sid: &str) -> PathBuf {
     runtime_root().join(format!("consent-{sid}.json"))
 }
+pub fn pending_token_file_path(token_id: &str) -> PathBuf {
+    runtime_root().join(format!("consent-pending-{token_id}.json"))
+}
 
 pub fn load_or_mint_key() -> anyhow::Result<[u8; HMAC_KEY_BYTES]> {
     let path = hmac_key_path();

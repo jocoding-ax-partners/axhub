@@ -44,6 +44,16 @@ To fetch logs:
 
    **Non-interactive guard:** If running in non-interactive context (`$CI` or `$CLAUDE_NON_INTERACTIVE` env var set, OR no TTY, OR `claude -p` invocation), DROP `--follow` flag and render single snapshot — `--follow` blocks indefinitely in headless/subprocess mode and `/axhub:logs` hangs forever. Detection: `if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then FOLLOW=--follow; else FOLLOW=; fi` then use `$FOLLOW`.
 
+   **Build-log snapshot fallback:** The current backend can return `validation.build_logs_require_follow` for `--source build` without `--follow`. In non-interactive mode, do not re-add `--follow` and do not treat this as a user-facing failure. Instead fetch the deployment snapshot and render the embedded build log:
+
+   ```bash
+   STATUS_JSON="$(axhub deploy status dep_<DEPLOY_ID> --json)"
+   APP_ID="$(printf '%s' "$STATUS_JSON" | jq -r '.app_id')"
+   axhub deploy list --app "$APP_ID" --json
+   ```
+
+   Select the matching deployment id from `.data[]`, read `.build_log`, and show the last 50 lines. If `.build_log` is still empty, explain that the backend has no build-log snapshot yet and suggest an interactive `--follow` run.
+
 4. **Handle SSE eof + resume.** Watch for the `eof:true` sentinel — that is the natural terminator, not a transport error. If the stream drops mid-flight, resume once via `Last-Event-ID` (CLI handles this automatically when re-invoked with `--follow`); never attempt a second resume from the agent side (avoids re-spam to the user).
 
 5. **Render trimmed output.** For non-failure logs, show the last 50 lines plus a "전체 보기" AskUserQuestion option. For failure logs, show the last 200 lines and surface the first error-level line at the top with "이 줄에서 멈춘 것 같아요:".

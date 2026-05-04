@@ -1,7 +1,9 @@
 use std::io::{self, Read};
 
 use axhub_helpers::catalog::classify;
-use axhub_helpers::consent::{mint_token, parse_axhub_command, verify_token, ConsentBinding};
+use axhub_helpers::consent::{
+    mint_token, parse_axhub_command, verify_or_claim_token, verify_token, ConsentBinding,
+};
 use axhub_helpers::list_deployments::{run_list_deployments, ListDeploymentsArgs};
 use axhub_helpers::preflight::run_preflight;
 use axhub_helpers::redact::redact;
@@ -223,7 +225,7 @@ fn cmd_preauth_check() -> anyhow::Result<i32> {
         }),
         context: parsed.context,
     };
-    let result = verify_token(binding);
+    let result = verify_or_claim_token(binding);
     if result.valid {
         out_json(
             json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}),

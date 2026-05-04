@@ -67,11 +67,14 @@ To handle auth:
    **5a. Mint consent token** (PreToolUse gate requires it before `axhub auth login`):
 
    ```bash
-   echo '{"tool_call_id":"'"$CLAUDE_SESSION_ID"':'"$NEXT_BASH_TOOL_CALL_ID"'","action":"auth_login","app_id":"_","profile":"'"${AXHUB_PROFILE:-default}"'","branch":"_","commit_sha":"_"}' \
+   (
+   unset CLAUDE_SESSION_ID
+   echo '{"tool_call_id":"pending","action":"auth_login","app_id":"_","profile":"'"${AXHUB_PROFILE:-default}"'","branch":"_","commit_sha":"_","context":{}}' \
      | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
+   )
    ```
 
-   `auth_login` binding은 실제 app/branch/commit이 필요 없지만 `asConsentBinding`이 모든 필드에서 비어있지 않은 문자열을 요구하므로 `"_"`를 플레이스홀더로 사용해요. `tool_call_id`는 반드시 `<session_id>:<tool_call_id>` 형식으로 조합해야 hook의 검증과 일치해요.
+   `auth_login` binding은 실제 app/branch/commit이 필요 없지만 `asConsentBinding`이 모든 필드에서 비어있지 않은 문자열을 요구하므로 `"_"`를 플레이스홀더로 사용해요. 다음 Bash tool id는 consent-mint 이후에 생기므로 `pending` token을 한 번만 쓰게 해요.
 
    **5b. Run auth login**:
 

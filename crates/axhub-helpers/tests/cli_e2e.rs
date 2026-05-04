@@ -304,6 +304,61 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
         String::from_utf8_lossy(&allowed_deploy.stdout).contains("permissionDecision\":\"allow")
     );
 
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+    let pending_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"deploy_create",
+        "app_id":"paydrop",
+        "profile":"prod",
+        "branch":"main",
+        "commit_sha":"def456",
+        "context": {}
+    })
+    .to_string();
+    let pending_minted = run_stdin(&["consent-mint"], &pending_binding, &pending_envs);
+    assert_eq!(pending_minted.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&pending_minted.stdout).contains("consent-pending-"));
+    let pending_allowed = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_actual","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --profile prod --branch main --commit def456"}}"#,
+        &pending_envs,
+    );
+    assert_eq!(pending_allowed.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&pending_allowed.stdout).contains("permissionDecision\":\"allow")
+    );
+    let pending_reused = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_actual_2","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --profile prod --branch main --commit def456"}}"#,
+        &pending_envs,
+    );
+    assert_eq!(pending_reused.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&pending_reused.stdout).contains("permissionDecision\":\"deny"));
+
+    let pending_auth_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"auth_login",
+        "app_id":"_",
+        "profile":"default",
+        "branch":"_",
+        "commit_sha":"_",
+        "context": {}
+    })
+    .to_string();
+    let pending_auth_minted = run_stdin(&["consent-mint"], &pending_auth_binding, &pending_envs);
+    assert_eq!(pending_auth_minted.status.code(), Some(0));
+    let pending_auth_allowed = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_auth","tool_name":"Bash","tool_input":{"command":"axhub auth login"}}"#,
+        &pending_envs,
+    );
+    assert_eq!(pending_auth_allowed.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&pending_auth_allowed.stdout)
+        .contains("permissionDecision\":\"allow"));
+
     let wrong = binding.replace("\"paydrop\"", "\"otherapp\"");
     let rejected = run_stdin(&["consent-verify"], &wrong, &envs);
     assert_eq!(rejected.status.code(), Some(65));
