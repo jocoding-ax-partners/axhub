@@ -59,6 +59,34 @@ const expectAppListContract = (apps: unknown[]): void => {
   }
 };
 
+const extractAppsList = (parsed: unknown): unknown[] => {
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && typeof parsed === "object") {
+    const obj = parsed as Record<string, unknown>;
+    // ax-hub-cli has returned both {apps:[...]} and {data:[...]} across releases.
+    // Keep staging E2E focused on the read contract instead of one envelope name.
+    for (const key of ["apps", "data"]) {
+      const value = obj[key];
+      if (Array.isArray(value)) return value;
+    }
+  }
+  const preview = JSON.stringify(parsed) ?? String(parsed);
+  throw new Error(`unexpected apps list shape: ${preview.slice(0, 200)}`);
+};
+
+describe("staging E2E response shape helpers", () => {
+  test("extractAppsList accepts all supported CLI envelopes", () => {
+    const app = { id: 1, slug: "demo" };
+    expect(extractAppsList([app])).toEqual([app]);
+    expect(extractAppsList({ apps: [app] })).toEqual([app]);
+    expect(extractAppsList({ data: [app] })).toEqual([app]);
+  });
+
+  test("extractAppsList rejects unknown envelopes", () => {
+    expect(() => extractAppsList({ items: [] })).toThrow("unexpected apps list shape");
+  });
+});
+
 describe.skipIf(!E2E_ENABLED)("ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGING_TOKEN)", () => {
   beforeAll(() => {
     if (!E2E_ENABLED) return;
@@ -79,15 +107,7 @@ describe.skipIf(!E2E_ENABLED)("ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGIN
     const result = await runAxhub(["apps", "list", "--json"]);
     expect(result.exitCode).toBe(0);
     const parsed = JSON.parse(result.stdout) as unknown;
-    // Either bare array or {apps: [...]} — accept both shapes
-    if (Array.isArray(parsed)) {
-      expectAppListContract(parsed);
-    } else if (parsed && typeof parsed === "object" && "apps" in parsed) {
-      expect(Array.isArray((parsed as { apps: unknown }).apps)).toBe(true);
-      expectAppListContract((parsed as { apps: unknown[] }).apps);
-    } else {
-      throw new Error(`unexpected apps list shape: ${result.stdout.slice(0, 200)}`);
-    }
+    expectAppListContract(extractAppsList(parsed));
   });
 
   // parseAxhubCommand + classify-exit pure-logic tests = cargo test
@@ -117,10 +137,10 @@ describe.skipIf(!E2E_ENABLED)("ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGIN
       deployments?: unknown[];
       endpoint_used?: string;
       exit_code?: number;
-      error_code?: string;
+      error_code?: string | null;
     };
     expect(parsed.exit_code).toBe(0);
-    expect(parsed.error_code).toBeUndefined();
+    expect(parsed.error_code ?? undefined).toBeUndefined();
     expect(parsed.endpoint_used).toBe(E2E_ENDPOINT);
     expect(Array.isArray(parsed.deployments)).toBe(true);
   });
