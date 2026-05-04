@@ -4,6 +4,24 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.6](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.5...v0.2.6) (2026-05-04)
+
+Phase 24.6은 Windows 사용자도 같은 경로 규칙을 쓰도록 statusline과 토큰 경로 판단을 Rust helper 계약으로 모은 패치예요. 셸과 PowerShell은 얇은 실행 래퍼로 남기고, 실제 토큰·캐시·state 경로와 statusline 출력은 `axhub-helpers`가 한 번만 결정해요.
+
+### Verification
+
+- Runtime contract: `cargo test --workspace`에서 Rust path/statusline 단위 테스트와 Windows `USERPROFILE` 경로 e2e가 green이에요.
+- Wrapper regression: `bash tests/auto-download.test.sh` 9/9 pass, `bun test tests/ux-statusline.test.ts` 9/9 pass예요.
+- Release baseline: `bun run build`, `bun test`, `bun run typecheck`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict`, `cargo clippy --workspace --all-targets -- -D warnings`, `bun run release:check`, `git diff --check` 모두 green이에요.
+
+### Honest tradeoff
+
+- 실제 Windows VM에서 PowerShell 훅을 실행하는 smoke는 이번 세션에서 돌리지 않았어요. 대신 Rust `USERPROFILE` 경로 계약과 PowerShell wrapper의 helper-first 흐름을 회귀 테스트와 정적 검토로 잠갔어요.
+
+### Fixed
+
+* centralize plugin runtime paths in Rust ([4321e4e](https://github.com/jocoding-ax-partners/axhub/commit/4321e4ecc2c5b4d0db673857c99dd9f68c550465))
+
 ## [0.2.5](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.4...v0.2.5) (2026-05-04)
 
 Phase 24.5는 Windows 사용자까지 고려해 pending consent를 셸 문법이 아니라 helper 계약으로 고정한 패치예요. `tool_call_id:"pending"` 자체가 다음 실제 tool call에서 한 번만 claim 되는 신호가 되므로, 스킬이 `CLAUDE_SESSION_ID`를 지우는 POSIX 전용 명령에 기대지 않아요.
