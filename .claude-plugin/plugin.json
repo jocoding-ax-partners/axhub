@@ -1,6 +1,6 @@
 {
   "name": "axhub",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Korean-first Claude Code plugin for axhub. Wraps ax-hub-cli v0.10 surfaces with natural-language skills, Rust prompt routing, and HMAC-bound consent gates.",
   "author": {
     "name": "Jocoding AX Partners",

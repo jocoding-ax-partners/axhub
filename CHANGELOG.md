@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.3](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.2...v0.2.3) (2026-05-04)
+
+Phase 24.3은 실제 로그인한 staging 계정으로 CLI read-only E2E를 다시 돌려서 발견한 응답 포맷 drift를 막는 패치예요. 앱 목록은 `data[]`와 기존 `apps[]`/배열 응답을 모두 같은 의미로 받아들이고, Rust helper 성공 응답의 `null` error field도 정상 성공으로 해석해요.
+
+### Verification
+
+- Live staging QA: macOS Keychain 토큰을 출력하지 않고 주입해서 `bun run test:e2e` → 5 pass / 1 skip / 0 fail이에요.
+- Local regression baseline: `bun test` → 344 pass / 4 skip / 0 fail, `bunx tsc --noEmit`, `git diff --check` 모두 green이에요.
+- Release baseline: `claude plugin validate .claude-plugin/plugin.json`, `bun run test:plugin-e2e:t1` → 8/8 pass, `bun run release:check` 모두 green이에요.
+
+### Honest tradeoff
+
+- Windows live keychain 경로는 이번 세션에서 토큰이 macOS Keychain에 있어 직접 검증하지 않았어요.
+- Staging app id는 현재 로그인 계정이 읽을 수 있는 `ccrank` 앱으로 read-only 조회만 수행했어요.
+
+
+### Fixed
+
+* Track latest axhub staging app envelopes ([28af5be](https://github.com/jocoding-ax-partners/axhub/commit/28af5be26f28d8c1cb49ae9e02900c190c3cefb8))
+
 ## [0.2.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.1...v0.2.2) (2026-05-04)
 
 Phase 24.2는 실제 Claude Code plugin validator에서 발견된 SKILL frontmatter 파싱 오류를 막는 긴급 패치예요. 모든 SKILL description은 트리거 문구를 유지한 채 YAML-safe quoted scalar로 감싸서, 설치된 플러그인에서도 metadata가 비지 않고 자연어 라우팅에 남아요.
