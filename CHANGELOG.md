@@ -4,6 +4,25 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.8](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.7...v0.2.8) (2026-05-04)
+
+Phase 24.8은 비개발자가 `/axhub:deploy`에서 git 저장 지점 때문에 멈추지 않도록 만든 UX 패치예요. 비-git 폴더를 helper가 명확히 알려주고, deploy 스킬은 AskUserQuestion으로 로컬 `git init`과 첫 커밋을 선택하게 하며, 모든 multi-step 스킬은 같은 순서의 `작업 단계` 체크리스트를 먼저 보여줘요.
+
+### Verification
+
+- Regression-first: 비-git 폴더에서 `git_init_needed:true`가 나와야 하는 Rust 테스트와 deploy git-init UX 테스트를 먼저 실패시킨 뒤 green으로 고쳤어요.
+- Multi-step UX lock: 모든 `multi-step: true` SKILL의 TodoWrite 항목이 사용자-facing `작업 단계` 체크리스트에도 그대로 노출되는 테스트를 추가했어요.
+- Local baseline: `cargo test -p axhub-helpers`, `cargo clippy --workspace --all-targets -- -D warnings`, `bun run typecheck`, `bun test`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict`, `bun run release:check`, `git diff --check` 모두 green이에요.
+
+### Honest tradeoff
+
+- 실제 Claude Code 대화형 `/axhub:deploy`에서 git-init 선택지를 누르는 end-to-end smoke는 이번 세션에서 실행하지 않았어요. 대신 helper JSON 계약, SKILL 문구, non-interactive safe default, release artifact build를 회귀 테스트로 잠갔어요.
+
+### Fixed
+
+* guide non-git deploys through a consented git-init stage ([671898f](https://github.com/jocoding-ax-partners/axhub/commit/671898f))
+* show visible stage checklists for all multi-step skills ([671898f](https://github.com/jocoding-ax-partners/axhub/commit/671898f))
+
 ## [0.2.7](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.6...v0.2.7) (2026-05-04)
 
 Phase 24.7은 `axhub 0.11.0`을 설치한 사용자가 `/github` 같은 preflight-gated slash command에서 막히던 버전 게이트 핫픽스예요. 플러그인 helper의 허용 범위를 다음 minor 전까지로 올려서 현재 CLI와 examples-backed init template 목록을 정상적으로 함께 쓸 수 있어요.
