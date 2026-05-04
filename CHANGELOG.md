@@ -4,6 +4,25 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.1...v0.2.2) (2026-05-04)
+
+Phase 24.2는 실제 Claude Code plugin validator에서 발견된 SKILL frontmatter 파싱 오류를 막는 긴급 패치예요. 모든 SKILL description은 트리거 문구를 유지한 채 YAML-safe quoted scalar로 감싸서, 설치된 플러그인에서도 metadata가 비지 않고 자연어 라우팅에 남아요.
+
+### Verification
+
+- Failure reproduced: `claude plugin validate .claude-plugin/plugin.json` on clean `v0.2.1` tag clone → SKILL frontmatter YAML parse errors예요.
+- Local fixed plugin: `claude plugin validate .claude-plugin/plugin.json`, isolated marketplace install, installed-path `/axhub:help` subprocess smoke 모두 green이에요.
+- Regression baseline: `bun test` → 342 pass / 4 skip / 0 fail, `bun run test:plugin-e2e:t1` → 8/8 pass, `bunx tsc --noEmit`, `bun run lint:keywords --check`, `bun run lint:tone --strict`, `bun run skill:doctor --strict`, `bun run release:check` 모두 green이에요.
+
+### Honest tradeoff
+
+- Staging token E2E는 `AXHUB_E2E_STAGING_TOKEN`이 없어 credential-gated skip으로 남아요.
+- GitHub release workflow의 Node.js 20 deprecation 경고는 이번 패치의 실패 원인이 아니라서 별도 follow-up으로 남겨요.
+
+### Fixed
+
+* Keep Claude plugin skills loadable in released installs ([98a3290](https://github.com/jocoding-ax-partners/axhub/commit/98a329082c6490c418b89093e9c3afc98fe66fdc))
+
 ## [0.2.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.0...v0.2.1) (2026-05-04)
 
 Phase 24.1은 init 템플릿 선택 화면을 바이브코더 친화적으로 다듬는 패치예요. 템플릿 id는 계속 `axhub --json init --list-templates` 결과만 믿고, 플러그인은 쇼핑몰·예약·결제·문서·입력 폼 같은 만들고 싶은 결과물 기준 설명만 덧붙여요.

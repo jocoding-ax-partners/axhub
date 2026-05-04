@@ -194,7 +194,7 @@ describe("manifest.ts generator (US-204)", () => {
 describe(".versionrc.json release lifecycle", () => {
   const path = join(REPO_ROOT, ".versionrc.json");
 
-  test("postbump stages all generated Rust-only version files before commit/tag", () => {
+  test("postbump stages all generated Rust-only version files after release-check rewrites", () => {
     const config = JSON.parse(readFileSync(path, "utf8")) as {
       scripts: { postbump?: string; posttag?: string };
     };
@@ -209,7 +209,7 @@ describe(".versionrc.json release lifecycle", () => {
     }
     expect(postbump).not.toContain("src/axhub-helpers");
     expect(postbump).toContain("git add");
-    expect(postbump.indexOf("git add")).toBeLessThan(postbump.indexOf("bun run release:check"));
+    expect(postbump.indexOf("git add")).toBeGreaterThan(postbump.indexOf("bun run release:check"));
   });
 
   test("posttag no longer asks maintainers to amend the already-created release tag", () => {
