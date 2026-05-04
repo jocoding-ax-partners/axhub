@@ -26,6 +26,16 @@ To upgrade the plugin:
    ]})
    ```
 
+   같은 순서로 사용자에게 짧은 단계표도 보여줘요:
+
+   ```
+   작업 단계
+   └ □ 현재 플러그인 버전 읽기
+     □ 최신 릴리즈와 비교
+     □ 릴리즈 노트 정리
+     □ 업그레이드 명령 안내
+   ```
+
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
 1. **Read current plugin version.** Fetch from the manifest baked into the plugin:

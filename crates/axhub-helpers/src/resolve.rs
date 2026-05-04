@@ -162,6 +162,9 @@ pub struct GitContext {
     pub branch: Option<String>,
     pub commit_sha: Option<String>,
     pub commit_message: Option<String>,
+    pub git_repo: bool,
+    pub git_has_commit: bool,
+    pub git_init_needed: bool,
 }
 
 pub fn read_git_context<F>(runner: &F) -> GitContext
@@ -169,19 +172,36 @@ where
     F: Fn(&[&str]) -> SpawnResult,
 {
     let safe = |cmd: &[&str]| runner(cmd);
+    let repo = safe(&["git", "rev-parse", "--is-inside-work-tree"]);
+    if repo.exit_code != EXIT_OK || repo.stdout.trim() != "true" {
+        return GitContext {
+            branch: None,
+            commit_sha: None,
+            commit_message: None,
+            git_repo: false,
+            git_has_commit: false,
+            git_init_needed: true,
+        };
+    }
+
     let branch = safe(&["git", "branch", "--show-current"]);
     let sha = safe(&["git", "rev-parse", "HEAD"]);
     let msg = safe(&["git", "log", "-1", "--pretty=%s"]);
+    let commit_sha = (sha.exit_code == EXIT_OK)
+        .then(|| sha.stdout.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let git_has_commit = commit_sha.is_some();
     GitContext {
         branch: (branch.exit_code == EXIT_OK)
             .then(|| branch.stdout.trim().to_string())
             .filter(|s| !s.is_empty()),
-        commit_sha: (sha.exit_code == EXIT_OK)
-            .then(|| sha.stdout.trim().to_string())
-            .filter(|s| !s.is_empty()),
+        commit_sha,
         commit_message: (msg.exit_code == EXIT_OK)
             .then(|| msg.stdout.trim().to_string())
             .filter(|s| !s.is_empty()),
+        git_repo: true,
+        git_has_commit,
+        git_init_needed: false,
     }
 }
 
@@ -196,6 +216,9 @@ pub struct ResolveOutput {
     pub branch: Option<String>,
     pub commit_sha: Option<String>,
     pub commit_message: Option<String>,
+    pub git_repo: bool,
+    pub git_has_commit: bool,
+    pub git_init_needed: bool,
     pub eta_sec: u64,
     pub error: Option<String>,
 }
@@ -235,6 +258,9 @@ where
         branch: None,
         commit_sha: None,
         commit_message: None,
+        git_repo: false,
+        git_has_commit: false,
+        git_init_needed: false,
         eta_sec: DEFAULT_DEPLOY_ETA_SEC,
         error: None,
     };
@@ -273,6 +299,9 @@ where
         out.branch = git.branch.clone();
         out.commit_sha = git.commit_sha.clone();
         out.commit_message = git.commit_message.clone();
+        out.git_repo = git.git_repo;
+        out.git_has_commit = git.git_has_commit;
+        out.git_init_needed = git.git_init_needed;
         out
     };
     if matches.is_empty() {

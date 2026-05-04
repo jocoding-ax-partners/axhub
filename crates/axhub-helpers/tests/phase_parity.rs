@@ -387,6 +387,11 @@ fn resolve_filters_apps_and_preserves_git_context_for_errors() {
                 stdout: r#"[{"id":42,"slug":"paydrop"}]"#.into(),
                 stderr: String::new(),
             },
+            ["git", "rev-parse", "--is-inside-work-tree"] => SpawnResult {
+                exit_code: 0,
+                stdout: "true\n".into(),
+                stderr: String::new(),
+            },
             ["git", "branch", "--show-current"] => SpawnResult {
                 exit_code: 0,
                 stdout: "main\n".into(),
@@ -412,6 +417,50 @@ fn resolve_filters_apps_and_preserves_git_context_for_errors() {
     assert_eq!(run.exit_code, EXIT_OK);
     assert_eq!(run.output.app_id, Some(42));
     assert_eq!(run.output.branch.as_deref(), Some("main"));
+}
+
+#[test]
+fn resolve_marks_non_git_repositories_as_init_needed() {
+    let run = run_resolve_with_runner(
+        &["--user-utterance".into(), "paydrop 배포해".into()],
+        |cmd| match cmd {
+            ["axhub", "auth", "status", "--json"] => SpawnResult {
+                exit_code: 0,
+                stdout: r#"{"user_email":"u@example.com","scopes":["deploy"]}"#.into(),
+                stderr: String::new(),
+            },
+            ["axhub", "apps", "list", "--json"] => SpawnResult {
+                exit_code: 0,
+                stdout: r#"[{"id":42,"slug":"paydrop"}]"#.into(),
+                stderr: String::new(),
+            },
+            ["git", "rev-parse", "--is-inside-work-tree"] => SpawnResult {
+                exit_code: 128,
+                stdout: String::new(),
+                stderr: "fatal: not a git repository".into(),
+            },
+            ["git", "branch", "--show-current"]
+            | ["git", "rev-parse", "HEAD"]
+            | ["git", "log", "-1", "--pretty=%s"] => SpawnResult {
+                exit_code: 128,
+                stdout: String::new(),
+                stderr: "fatal: not a git repository".into(),
+            },
+            _ => SpawnResult {
+                exit_code: 1,
+                stdout: String::new(),
+                stderr: String::new(),
+            },
+        },
+    );
+
+    assert_eq!(run.exit_code, EXIT_OK);
+    assert_eq!(run.output.app_id, Some(42));
+    assert_eq!(run.output.branch, None);
+    assert_eq!(run.output.commit_sha, None);
+    assert!(!run.output.git_repo);
+    assert!(!run.output.git_has_commit);
+    assert!(run.output.git_init_needed);
 }
 
 #[test]

@@ -28,6 +28,16 @@ To manage env vars:
    ]})
    ```
 
+   같은 순서로 사용자에게 짧은 단계표도 보여줘요:
+
+   ```
+   작업 단계
+   └ □ 앱과 auth 컨텍스트 확인
+     □ env 작업 분기
+     □ 안전한 CLI 호출
+     □ 마스킹된 결과 안내
+   ```
+
 1. **preflight 와 current app 을 확인해요.** `auth_ok` 가 false 면 auth skill 로 넘겨요. 앱이 없으면 `axhub apps list --json` 또는 resolve helper 로 후보를 좁혀요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — 작업 선택은 `조회만` 예요.

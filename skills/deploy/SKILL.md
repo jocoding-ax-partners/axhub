@@ -27,11 +27,25 @@ To deploy:
    TodoWrite({ todos: [
      { content: "토큰 확인 (preflight)",         status: "in_progress", activeForm: "토큰 확인하는 중" },
      { content: "앱 / 환경 / 브랜치 확정",         status: "pending",     activeForm: "앱 정보 정리하는 중" },
+     { content: "git 저장 지점 확인",             status: "pending",     activeForm: "배포용 저장 지점 보는 중" },
      { content: "미리보기 카드 보여드리기",         status: "pending",     activeForm: "미리보기 준비하는 중" },
      { content: "동의 받고 배포 시작",            status: "pending",     activeForm: "배포 시작하는 중" },
      { content: "빌드 모니터 (~3분)",             status: "pending",     activeForm: "빌드 진행 보는 중" },
      { content: "결과 안내",                     status: "pending",     activeForm: "마무리하는 중" }
    ]})
+   ```
+
+   같은 순서로 사용자에게 짧은 단계표도 보여줘요:
+
+   ```
+   작업 단계
+   └ □ 토큰 확인 (preflight)
+     □ 앱 / 환경 / 브랜치 확정
+     □ git 저장 지점 확인
+     □ 미리보기 카드 보여드리기
+     □ 동의 받고 배포 시작
+     □ 빌드 모니터 (~3분)
+     □ 결과 안내
    ```
 
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
@@ -44,6 +58,59 @@ To deploy:
    ```
 
    Never use cached `app_id` for mutation. If resolve returns ambiguity, ask the user to disambiguate (slug list with numeric IDs).
+   The resolve JSON also includes `git_repo`, `git_has_commit`, and `git_init_needed`; deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
+
+1.5. **Git 저장 지점 준비** — if resolve returns `git_init_needed: true` OR `git_has_commit: false` OR either `branch`/`commit_sha` is empty, do not show the deploy preview yet. First explain in non-developer Korean:
+
+   ```
+   배포 전에 저장 지점이 필요해요.
+   axhub 배포는 "어떤 버전의 파일을 올릴지"를 정확히 알아야 해서 branch 와 commit SHA 를 써요.
+   지금 폴더에는 아직 그 저장 지점이 없어서, 제가 git 초기화와 첫 커밋을 만들어드릴 수 있어요.
+
+   작업 단계
+   └ □ git 저장소 만들기
+     □ 파일을 첫 저장 지점에 담기
+     □ 첫 커밋 만들기
+     □ 배포 정보 다시 확인하기
+   ```
+
+   Then ask:
+
+   ```json
+   {
+     "question": "배포 전 저장 지점을 만들까요?",
+     "options": [
+       {
+         "label": "초기화하고 계속",
+         "description": "현재 폴더에 git 저장소와 첫 커밋을 만들고 배포를 이어가요."
+       },
+       {
+         "label": "명령어만 보기",
+         "description": "아무것도 바꾸지 않고 직접 실행할 명령어만 보여줘요."
+       },
+       {
+         "label": "취소",
+         "description": "배포를 멈춰요."
+       }
+     ]
+   }
+   ```
+
+   If the user chooses "초기화하고 계속", run only local git commands, then re-run resolve and continue from Step 2:
+
+   ```bash
+   echo '[deploy:Step 1.5 git-init] entered' >&2
+   if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+     git init
+   fi
+   git add -A
+   git commit -m "init: axhub deploy baseline"
+   git branch -M main
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
+   ```
+
+   If `git commit` fails because there are no staged files or git identity is missing, stop before deploy and show the exact git error plus the smallest next command. Do not mint deploy consent until a fresh resolve returns both `branch` and `commit_sha`.
+   If the user chooses "명령어만 보기", show the command block above and stop. In non-interactive mode, use the registry safe default "명령어만 보기" and never run `git init` automatically.
 
 2. **Pre-flight version check**:
 

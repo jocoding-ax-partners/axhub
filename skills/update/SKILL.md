@@ -25,6 +25,17 @@ To handle updates:
    ]})
    ```
 
+   같은 순서로 사용자에게 짧은 단계표도 보여줘요:
+
+   ```
+   작업 단계
+   └ □ 현재 / 최신 버전 비교
+     □ 릴리즈 노트 요약
+     □ 동의 받고 cosign 검증
+     □ binary 교체
+     □ 결과 안내
+   ```
+
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
 1. **Check for update.** Run `axhub update check --json` directly — do NOT force `AXHUB_DISABLE_AUTOUPDATE=1` (Phase 5 US-505: 회사 정책으로 disable 한 환경만 자연스럽게 disable 처리되도록 둠):

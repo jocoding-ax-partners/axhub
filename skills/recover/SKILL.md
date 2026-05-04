@@ -36,6 +36,18 @@ To recover:
    ]})
    ```
 
+   같은 순서로 사용자에게 짧은 단계표도 보여줘요:
+
+   ```
+   작업 단계
+   └ □ 직전 안정 배포 찾기
+     □ 이전 commit 정보 정리
+     □ rollback 카드 보여드리기
+     □ 동의 받고 forward-fix 시작
+     □ 재배포 진행 보기
+     □ 결과 안내
+   ```
+
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
 1. **Read last-known-good from local cache.** The deployments cache holds `(deployment_id → app_id → commit_sha → status)` per machine:

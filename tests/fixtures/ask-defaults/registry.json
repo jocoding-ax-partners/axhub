@@ -3,7 +3,11 @@
   "_path_history": "Originally proposed skills/_shared/ask-defaults.json (Architect r2 → tests/manifest.test.ts:548 collision) → tests/fixtures/ask-defaults.json (Critic r2 → tests/fixtures.test.ts:38 toBe(40) collision) → final tests/fixtures/ask-defaults/registry.json (subdir bypasses both invariants — non-recursive readdirSync ignores subdir entries).",
   "deploy": {
     "_note": "deploy SKILL Step 3 uses a free-form text preview card (5-field identity layout), NOT a structured AskUserQuestion JSON block. Plan §2.1.A.137 proposed JSON migration but deferred to Phase 18 to keep ship surface tight. Default behavior in non-interactive subprocess: --dry-run (most conservative).",
-    "default_subprocess_action": "--dry-run"
+    "default_subprocess_action": "--dry-run",
+    "배포 전 저장 지점을 만들까요?": {
+      "safe_default": "명령어만 보기",
+      "rationale": "non-interactive contexts must not run git init/git add/git commit automatically; showing commands is read-only and lets the user decide locally."
+    }
   },
   "auth": {
     "다시 로그인할래요?": {

@@ -24,6 +24,16 @@ To manage profiles:
    ]})
    ```
 
+   같은 순서로 사용자에게 짧은 단계표도 보여줘요:
+
+   ```
+   작업 단계
+   └ □ profile 의도 확인
+     □ 현재 profile 조회
+     □ 필요 시 add/use 실행
+     □ endpoint 안전 안내
+   ```
+
 1. **작업을 분기해요.** 명확한 `current` 또는 `list` 의도는 질문 없이 read-only 로 가요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — 작업 선택은 `현재 프로필 보기` 예요.

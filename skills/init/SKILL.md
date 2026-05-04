@@ -24,6 +24,16 @@ To start an axhub app:
    ]})
    ```
 
+   같은 순서로 사용자에게 짧은 단계표도 보여줘요:
+
+   ```
+   작업 단계
+   └ □ CLI와 template registry 확인
+     □ template 선택
+     □ axhub init 실행
+     □ 다음 액션 안내
+   ```
+
 1. **CLI 존재를 확인해요.**
 
    ```bash

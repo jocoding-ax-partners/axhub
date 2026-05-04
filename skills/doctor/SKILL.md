@@ -25,6 +25,17 @@ To run diagnostics:
    ]})
    ```
 
+   같은 순서로 사용자에게 짧은 단계표도 보여줘요:
+
+   ```
+   작업 단계
+   └ □ helper binary 점검
+     □ axhub CLI 버전 점검
+     □ 인증 상태 점검
+     □ profile / endpoint 점검
+     □ 결과 표 출력
+   ```
+
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
 1. **Detect helper binary via PATH first** (Phase 5 US-503 — env var `CLAUDE_PLUGIN_ROOT` may not propagate to skill bash subshells):
