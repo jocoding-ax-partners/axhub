@@ -38,25 +38,48 @@ To start an axhub app:
    axhub --json init --list-templates
    ```
 
-   `schema_version` 이 `init/v1` 인지 확인하고, `templates[].id`, `framework`, `description` 만 사용자에게 보여줘요.
+   `schema_version` 이 `init/v1` 인지 확인하고, CLI가 반환한 template 만 선택 후보로 써요. `templates[].id`, `framework`, `description` 에 아래 로컬 가이드를 덧붙여 보여줘요.
+
+## 템플릿 선택 가이드
+
+이 가이드는 두 번째 registry 가 아니에요. 먼저 `axhub --json init --list-templates` 로 CLI가 반환한 template 목록을 읽고, 그 안에 있는 id 에만 설명을 덧붙여요. 선택 값은 반드시 CLI가 반환한 template id 여야 해요.
+
+알 수 없는 새 template 이 CLI에서 오면 숨기지 않아요. 로컬 설명이 없는 항목은 CLI의 `framework` 와 `description` 을 그대로 보여주고, “CLI 설명을 보고 고르면 돼요. 잘 모르겠으면 먼저 Next.js 계열 추천 항목을 봐요.”처럼 중립 안내만 덧붙여요.
+
+| template id | 이렇게 만들고 싶을 때 골라요 |
+|---|---|
+| `nextjs-axhub` | 쇼핑몰, 예약, 결제, 로그인, 관리자 화면처럼 화면과 기능이 함께 있는 웹서비스를 만들 때 추천해요. 자동 선택은 아니고 사용자가 고를 때만 실행해요. |
+| `astro-axhub` | 회사 소개, 랜딩 페이지, 블로그, 문서처럼 글과 이미지 중심이고 자주 바뀌지 않는 사이트에 좋아요. |
+| `vite-react-axhub` | 로그인한 뒤 쓰는 설정 화면, 입력 폼, 관리 화면처럼 버튼을 눌러 내용이 자주 바뀌는 화면에 좋아요. |
+| `remix-axhub` | 입력한 내용을 바로 저장하고, 페이지 이동 중에도 자연스럽게 이어지는 서비스에 좋아요. 예약, 신청서, 설문, 주문처럼 작성하고 제출하는 흐름이 많다면 Next.js 대신 고려해요. |
+| `express-axhub` | 화면은 거의 없고, 다른 앱이 요청하면 주문 처리나 데이터 저장 같은 일을 해주는 서버가 필요할 때 골라요. |
+| `hono-axhub` | 아주 작고 빠른 연결용 서버를 만들 때 골라요. 예를 들면 외부 서비스가 부르면 바로 응답하는 작은 기능이에요. |
+
+AskUserQuestion 선택지는 CLI가 반환한 template 들로 만들어요. 알려진 id 는 위 설명을 짧게 붙이고, 알 수 없는 id 는 CLI `description` 과 `framework` 를 붙여요. 항상 `취소` 선택지를 함께 보여줘요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — template 선택은 `abort` 예요.
 
 3. **template 을 선택해요.**
+
+   먼저 위 가이드를 보여주고, CLI가 반환한 template id 로 AskUserQuestion 선택지를 만들어요. 가능한 경우 template 을 바로 고르게 하고, 선택지 값은 exact template id 를 써요.
 
    ```json
    {
      "question": "어떤 템플릿으로 시작할까요?",
      "header": "템플릿",
      "options": [
-       {"label": "목록에서 선택", "value": "select", "description": "CLI registry 에서 받은 template 중 하나를 골라요"},
-       {"label": "직접 입력", "value": "manual", "description": "template id 를 직접 입력해요"},
+       {"label": "Next.js 추천", "value": "nextjs-axhub", "description": "쇼핑몰·예약·결제·로그인·관리자 화면"},
+       {"label": "Astro 추천", "value": "astro-axhub", "description": "회사 소개·랜딩·블로그·문서"},
+       {"label": "Vite 화면", "value": "vite-react-axhub", "description": "설정 화면·입력 폼·관리 화면"},
+       {"label": "Remix 흐름", "value": "remix-axhub", "description": "신청서·설문·주문처럼 작성 후 제출"},
+       {"label": "Express 서버", "value": "express-axhub", "description": "주문 처리·데이터 저장 중심"},
+       {"label": "Hono 연결", "value": "hono-axhub", "description": "외부 서비스가 부르는 작은 기능"},
        {"label": "취소", "value": "abort", "description": "scaffold 를 실행하지 않아요"}
      ]
    }
    ```
 
-   subprocess 에서는 자동 선택하지 않아요.
+   위 JSON 은 예시예요. 실제 선택지는 runtime CLI 목록에 맞춰 만들고, CLI가 반환한 template 만 보여줘요. template 선택지의 `value` 는 exact template id 여야 하고, 항상 `취소` 선택지를 함께 보여줘요. UI 선택지 수 제한이 있으면 가이드를 먼저 보여준 뒤 사용자가 원하는 exact template id 를 고르게 해요. subprocess 에서는 자동 선택하지 않아요.
 
 4. **선택된 template 으로 scaffold 해요.**
 
