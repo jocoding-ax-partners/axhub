@@ -9,7 +9,7 @@
       "name": "axhub",
       "source": "./",
       "description": "Korean-first axhub Claude Code plugin wrapping ax-hub-cli v0.10 surfaces with NL skills and consent gates",
-      "version": "0.2.3"
+      "version": "0.2.4"
     }
   ]
 }

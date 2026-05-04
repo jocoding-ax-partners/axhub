@@ -4,6 +4,25 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.4](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.3...v0.2.4) (2026-05-04)
+
+Phase 24.4는 실제 Claude 서브프로세스에서 모든 `/axhub:*` 슬래시 명령을 호출하며 발견한 라이브 배포 consent 문제를 막는 패치예요. 미래 Bash tool id를 미리 맞히려 하지 않고, action/app/profile/branch/commit/context가 모두 맞을 때만 한 번 claim 되는 pending consent로 실제 `/axhub:deploy`가 배포까지 도달해요.
+
+### Verification
+
+- Live slash QA: Claude subprocess로 `/axhub:deploy` 실제 호출 → deployment `485`가 `active`예요. `/axhub:apps`, `/axhub:apis`, `/axhub:doctor`, `/axhub:login`, `/axhub:status`, `/axhub:logs`, `/axhub:update`, `/axhub:배포 --dry-run`, `/axhub:help`도 exit 0이에요.
+- Local regression baseline: `cargo test --workspace`, `bun test` → 344 pass / 4 skip / 0 fail, `bun run typecheck`, `bun run skill:doctor --strict`, `bun run lint:tone --strict`, `bun run lint:keywords --check` 모두 green이에요.
+- Release baseline: `bun run release -- --release-as patch` postbump에서 `bun run codegen:version`과 `bun run release:check`가 green이에요.
+
+### Honest tradeoff
+
+- `/axhub:login`은 이미 유효한 계정이 있어 상태 확인 경로만 실제 slash로 실행했어요. 브라우저 re-login mutation은 사용자 세션 교체를 피하려고 Rust preauth pending-token 회귀 테스트로 잠갔어요.
+- QA용 앱은 private `axhub-qa-slash-1777869574`로 남겨서 deployment 증거를 보존해요.
+
+### Fixed
+
+* unblock real Claude slash deploy consent ([73b9e93](https://github.com/jocoding-ax-partners/axhub/commit/73b9e933dda0185a3464c039a5790f34f553d0dc))
+
 ## [0.2.3](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.2...v0.2.3) (2026-05-04)
 
 Phase 24.3은 실제 로그인한 staging 계정으로 CLI read-only E2E를 다시 돌려서 발견한 응답 포맷 drift를 막는 패치예요. 앱 목록은 `data[]`와 기존 `apps[]`/배열 응답을 모두 같은 의미로 받아들이고, Rust helper 성공 응답의 `null` error field도 정상 성공으로 해석해요.
