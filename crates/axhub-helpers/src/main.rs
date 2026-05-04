@@ -8,11 +8,13 @@ use axhub_helpers::list_deployments::{run_list_deployments, ListDeploymentsArgs}
 use axhub_helpers::preflight::run_preflight;
 use axhub_helpers::redact::redact;
 use axhub_helpers::resolve::run_resolve;
+use axhub_helpers::runtime_paths::{last_deploy_file, state_dir, token_file};
+use axhub_helpers::statusline::current_statusline;
 use axhub_helpers::telemetry::emit_meta_envelope;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  list-deployments\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  list-deployments\n  version\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -49,6 +51,11 @@ fn run() -> anyhow::Result<i32> {
             print!("{}", redact(&raw));
             Ok(0)
         }
+        "statusline" => {
+            print!("{}", current_statusline());
+            Ok(0)
+        }
+        "path" => cmd_path(&rest),
         "classify-exit" => cmd_classify_exit(&rest),
         "preflight" => {
             let run = run_preflight();
@@ -89,6 +96,28 @@ fn read_stdin() -> anyhow::Result<String> {
 }
 fn out_json(v: Value) {
     println!("{}", v);
+}
+
+fn cmd_path(args: &[String]) -> anyhow::Result<i32> {
+    let Some(kind) = args.first().map(String::as_str) else {
+        eprintln!("axhub-helpers path: expected one of token-file, last-deploy-file, state-dir");
+        return Ok(64);
+    };
+    let path = match kind {
+        "token-file" => token_file(),
+        "last-deploy-file" => last_deploy_file(),
+        "state-dir" => state_dir(),
+        _ => {
+            eprintln!("axhub-helpers path: unknown path kind \"{kind}\"");
+            return Ok(64);
+        }
+    };
+    let Some(path) = path else {
+        eprintln!("axhub-helpers path: cannot resolve {kind}");
+        return Ok(65);
+    };
+    println!("{}", path.display());
+    Ok(0)
 }
 
 fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {

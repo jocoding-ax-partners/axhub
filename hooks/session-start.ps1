@@ -58,13 +58,20 @@ if (-not (Test-Path -Path $Helper -PathType Leaf)) {
 # Step 2: auto-trigger token-init when helper token file is missing
 # but axhub CLI has a valid login. Silent skip on any failure.
 if ($env:AXHUB_SKIP_AUTODOWNLOAD -ne '1') {
-  # Token dir mirrors index.ts:441 cmdTokenInit (XDG_CONFIG_HOME)
-  $TokenDir = if ($env:XDG_CONFIG_HOME) {
-    Join-Path $env:XDG_CONFIG_HOME 'axhub-plugin'
-  } else {
-    Join-Path $env:USERPROFILE '.config\axhub-plugin'
+  try {
+    $TokenFile = (& $Helper path token-file 2>$null | Select-Object -First 1)
+  } catch {
+    $TokenFile = $null
   }
-  $TokenFile = Join-Path $TokenDir 'token'
+  if ((-not $TokenFile) -or $TokenFile.StartsWith('{')) {
+    # Fallback mirrors the Rust path contract when an older helper lacks `path`.
+    $TokenDir = if ($env:XDG_CONFIG_HOME) {
+      Join-Path $env:XDG_CONFIG_HOME 'axhub-plugin'
+    } else {
+      Join-Path $env:USERPROFILE '.config\axhub-plugin'
+    }
+    $TokenFile = Join-Path $TokenDir 'token'
+  }
 
   if (-not (Test-Path -Path $TokenFile -PathType Leaf)) {
     $axhubCmd = Get-Command axhub -ErrorAction SilentlyContinue

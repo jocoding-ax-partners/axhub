@@ -260,6 +260,41 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     assert_eq!(resolve.status.code(), Some(65));
     assert!(String::from_utf8_lossy(&resolve.stdout).contains("auth_parse_error"));
 
+    let statusline = run(&["statusline"]);
+    assert_eq!(statusline.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&statusline.stdout).starts_with("axhub:"));
+
+    let temp = tempfile::tempdir().unwrap();
+    let xdg_config = temp.path().join("xdg-config");
+    let token_file = Command::new(bin())
+        .args(["path", "token-file"])
+        .env("XDG_CONFIG_HOME", &xdg_config)
+        .env_remove("HOME")
+        .env_remove("USERPROFILE")
+        .output()
+        .unwrap();
+    assert_eq!(token_file.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&token_file.stdout).trim(),
+        xdg_config.join("axhub-plugin/token").to_string_lossy()
+    );
+
+    let user_profile = temp.path().join("Users/Vibe");
+    let windows_home_token = Command::new(bin())
+        .args(["path", "token-file"])
+        .env_remove("XDG_CONFIG_HOME")
+        .env_remove("HOME")
+        .env("USERPROFILE", &user_profile)
+        .output()
+        .unwrap();
+    assert_eq!(windows_home_token.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&windows_home_token.stdout).trim(),
+        user_profile
+            .join(".config/axhub-plugin/token")
+            .to_string_lossy()
+    );
+
     let session = run(&["session-start"]);
     assert_eq!(session.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&session.stdout).contains("Rust runtime"));

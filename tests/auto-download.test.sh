@@ -124,7 +124,48 @@ fi
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 6. SessionStart shim — Phase 7 US-701: token-init auto-trigger when token
+# 6. SessionStart shim — token file path comes from Rust helper when available
+# ----------------------------------------------------------------------------
+SCRATCH="$(scratch)"
+mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks" "$SCRATCH/custom-token-dir" "$SCRATCH/stub-bin"
+cp "$SHIM" "$SCRATCH/hooks/session-start.sh"
+cat > "$SCRATCH/bin/axhub-helpers" <<EOF
+#!/bin/sh
+if [ "\$1" = "path" ] && [ "\$2" = "token-file" ]; then
+  echo "HELPER_PATH_CALLED" >> /tmp/axhub-shim-test-trace
+  echo "$SCRATCH/custom-token-dir/token"
+  exit 0
+fi
+echo "STUB_HELPER_CALLED:\$1" >> /tmp/axhub-shim-test-trace
+echo "{}"
+EOF
+chmod +x "$SCRATCH/bin/axhub-helpers"
+cat > "$SCRATCH/stub-bin/axhub" <<'EOF'
+#!/bin/sh
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  echo '{"user_email":"test@example.com","scopes":["read","write"]}'
+fi
+EOF
+chmod +x "$SCRATCH/stub-bin/axhub"
+echo "axhub_pat_existing_token_value" > "$SCRATCH/custom-token-dir/token"
+chmod 0600 "$SCRATCH/custom-token-dir/token"
+rm -f /tmp/axhub-shim-test-trace
+PATH="$SCRATCH/stub-bin:$PATH" CLAUDE_PLUGIN_ROOT="$SCRATCH" bash "$SCRATCH/hooks/session-start.sh" </dev/null >/dev/null 2>&1 || true
+trace="$(cat /tmp/axhub-shim-test-trace 2>/dev/null || echo '')"
+case "$trace" in
+  *"HELPER_PATH_CALLED"* )
+    case "$trace" in
+      *"STUB_HELPER_CALLED:token-init"*) assert "shim uses Rust token-file path before token-init" "called-token-init" "skipped-token-init" ;;
+      *)                                 assert "shim uses Rust token-file path before token-init" "ok" "ok" ;;
+    esac
+    ;;
+  *) assert "shim uses Rust token-file path before token-init" "missing-helper-path" "ok" ;;
+esac
+rm -f /tmp/axhub-shim-test-trace
+rm -rf "$SCRATCH"
+
+# ----------------------------------------------------------------------------
+# 7. SessionStart shim — Phase 7 US-701: token-init auto-trigger when token
 #    file missing + axhub auth status returns user_email
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
@@ -159,7 +200,7 @@ rm -rf "$TOKEN_HOME"
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 7. SessionStart shim — Phase 7 US-701: token-init SKIPPED when token already exists
+# 8. SessionStart shim — Phase 7 US-701: token-init SKIPPED when token already exists
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"
@@ -194,7 +235,7 @@ rm -rf "$TOKEN_HOME"
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 8. SessionStart shim — Phase 7 US-701: AXHUB_SKIP_AUTODOWNLOAD=1 skips token-init
+# 9. SessionStart shim — Phase 7 US-701: AXHUB_SKIP_AUTODOWNLOAD=1 skips token-init
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"

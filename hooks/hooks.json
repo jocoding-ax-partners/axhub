@@ -1,5 +1,5 @@
 {
-  "description": "axhub plugin hooks: SessionStart diagnostics + UserPromptSubmit NL routing + PreToolUse HMAC consent gate (Go binary, deterministic) + PostToolUse exit-code Korean classifier",
+  "description": "axhub plugin hooks: SessionStart diagnostics + UserPromptSubmit NL routing + PreToolUse HMAC consent gate (Rust helper, deterministic) + PostToolUse exit-code Korean classifier",
   "hooks": {
     "SessionStart": [
       {

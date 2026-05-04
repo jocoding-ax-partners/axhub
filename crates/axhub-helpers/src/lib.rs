@@ -7,5 +7,7 @@ pub mod messages;
 pub mod preflight;
 pub mod redact;
 pub mod resolve;
+pub mod runtime_paths;
 pub mod spawn;
+pub mod statusline;
 pub mod telemetry;

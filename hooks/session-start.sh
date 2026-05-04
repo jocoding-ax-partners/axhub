@@ -35,8 +35,10 @@ fi
 # but axhub CLI has a valid login. Silent skip on any failure — never block
 # session-start. Honors AXHUB_SKIP_AUTODOWNLOAD as the single opt-out switch.
 if [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" != "1" ]; then
-  TOKEN_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/axhub-plugin"
-  TOKEN_FILE="$TOKEN_DIR/token"
+  TOKEN_FILE="$("$HELPER" path token-file 2>/dev/null || true)"
+  case "$TOKEN_FILE" in
+    ""|\{*) TOKEN_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/axhub-plugin/token" ;;
+  esac
   if [ ! -f "$TOKEN_FILE" ] && command -v axhub >/dev/null 2>&1; then
     if axhub auth status --json 2>/dev/null | grep -q '"user_email"'; then
       "$HELPER" token-init >&2 2>&1 || true

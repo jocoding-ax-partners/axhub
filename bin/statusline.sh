@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Phase 17 US-1707: axhub plugin statusline.
 #
-# Reads ~/.cache/axhub-plugin/last-deploy.json + auth token presence,
+# Delegates to the Rust helper when available, then falls back to the
+# portable shell implementation. Reads local cache + auth token presence,
 # emits ≤80 char Korean status line in 해요체 (Toss tone).
 #
 # Format:
@@ -18,6 +19,16 @@
 #
 # Latency budget: <50ms cold (no network, file reads only).
 set -u
+
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+HELPER="${AXHUB_HELPER_BIN:-${PLUGIN_ROOT}/bin/axhub-helpers}"
+
+if [ -x "$HELPER" ]; then
+  if OUTPUT="$("$HELPER" statusline 2>/dev/null)"; then
+    printf '%s\n' "$OUTPUT"
+    exit 0
+  fi
+fi
 
 CACHE="${HOME}/.cache/axhub-plugin/last-deploy.json"
 TOKEN_FILE="${HOME}/.config/axhub-plugin/token"
