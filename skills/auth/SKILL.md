@@ -1,6 +1,6 @@
 ---
 name: auth
-description: 이 스킬은 사용자가 로그인, 로그아웃, 토큰 상태, 또는 현재 계정 identity 를 묻거나 변경할 때 사용합니다. 다음 표현에서 활성화: "로그인해", "로그인해줘", "다시 로그인", "토큰 만료됐어", "토큰 갱신해줘", "인증 다시", "권한이 없대", "scope 없대", "누구로 접속하는 거야", "누구야", "어떤 계정이야", "토큰 살아있어", "로그인 됐어", "로그인 상태", "로그아웃해", "토큰 지워줘", "로그인해주세요", "다시 로그인해주세요", "로그인 상태 알려주세요", "어떤 계정으로 접속 중인가요", "login", "log in", "sign in", "logout", "log out", "sign out", "who am I", "whoami", "auth", "authenticate", "scope", "token expired", "refresh token", 또는 axhub identity 관리 의도. 헤드리스 환경 (Codespaces, SSH) 을 자동 감지하여 브라우저 사용 불가 시 토큰 붙여넣기 흐름으로 전환합니다.
+description: '이 스킬은 사용자가 로그인, 로그아웃, 토큰 상태, 또는 현재 계정 identity 를 묻거나 변경할 때 사용합니다. 다음 표현에서 활성화: "로그인해", "로그인해줘", "다시 로그인", "토큰 만료됐어", "토큰 갱신해줘", "인증 다시", "권한이 없대", "scope 없대", "누구로 접속하는 거야", "누구야", "어떤 계정이야", "토큰 살아있어", "로그인 됐어", "로그인 상태", "로그아웃해", "토큰 지워줘", "로그인해주세요", "다시 로그인해주세요", "로그인 상태 알려주세요", "어떤 계정으로 접속 중인가요", "login", "log in", "sign in", "logout", "log out", "sign out", "who am I", "whoami", "auth", "authenticate", "scope", "token expired", "refresh token", 또는 axhub identity 관리 의도. 헤드리스 환경 (Codespaces, SSH) 을 자동 감지하여 브라우저 사용 불가 시 토큰 붙여넣기 흐름으로 전환합니다.'
 multi-step: false
 needs-preflight: false
 ---

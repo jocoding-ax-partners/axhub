@@ -1,6 +1,6 @@
 ---
 name: init
-description: 이 스킬은 사용자가 새 axhub 앱을 만들거나 템플릿으로 프로젝트를 시작하고 싶어할 때 사용해요. 다음 표현에서 활성화: "새 앱 만들어줘", "결제 앱 만들어줘", "프로젝트 만들어", "Next.js 앱 만들어줘", "FastAPI 앱 만들어줘", "init", "scaffold", "axhub.yaml 만들어줘", "apphub.yaml 만들어줘", 또는 빈 디렉토리에서 새 앱 시작 의도. ax-hub-cli 의 init template 목록을 보여주고 선택한 template 으로 scaffold 해요.
+description: '이 스킬은 사용자가 새 axhub 앱을 만들거나 템플릿으로 프로젝트를 시작하고 싶어할 때 사용해요. 다음 표현에서 활성화: "새 앱 만들어줘", "결제 앱 만들어줘", "프로젝트 만들어", "Next.js 앱 만들어줘", "FastAPI 앱 만들어줘", "init", "scaffold", "axhub.yaml 만들어줘", "apphub.yaml 만들어줘", 또는 빈 디렉토리에서 새 앱 시작 의도. ax-hub-cli 의 init template 목록을 보여주고 선택한 template 으로 scaffold 해요.'
 multi-step: true
 needs-preflight: false
 ---

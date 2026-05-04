@@ -1,6 +1,6 @@
 ---
 name: update
-description: 이 스킬은 사용자가 axhub CLI 업데이트를 확인하거나 적용하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "axhub 새 버전 있어", "업데이트 있어", "새 버전 나왔어", "최신이야", "버전 확인", "업데이트 확인해", "업데이트해", "업그레이드해", "최신으로 올려", "새 버전 받아", "axhub 업그레이드 부탁드려요", "업데이트 적용해주세요", "최신 버전으로 올려주세요", "CLI 업데이트 부탁드려요", "brew upgrade 해줘", "update", "upgrade", "version", "new release", "check version", "update available", "latest", 또는 axhub CLI 버전 관리 요청. PLAN §16.10 에 따라 cosign 서명 검증을 기본 enforce 합니다.
+description: '이 스킬은 사용자가 axhub CLI 업데이트를 확인하거나 적용하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "axhub 새 버전 있어", "업데이트 있어", "새 버전 나왔어", "최신이야", "버전 확인", "업데이트 확인해", "업데이트해", "업그레이드해", "최신으로 올려", "새 버전 받아", "axhub 업그레이드 부탁드려요", "업데이트 적용해주세요", "최신 버전으로 올려주세요", "CLI 업데이트 부탁드려요", "brew upgrade 해줘", "update", "upgrade", "version", "new release", "check version", "update available", "latest", 또는 axhub CLI 버전 관리 요청. PLAN §16.10 에 따라 cosign 서명 검증을 기본 enforce 합니다.'
 multi-step: true
 needs-preflight: false
 ---

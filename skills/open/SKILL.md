@@ -1,6 +1,6 @@
 ---
 name: open
-description: 이 스킬은 사용자가 배포된 axhub 앱을 브라우저에서 열어보고 싶어할 때 사용해요. 다음 표현에서 활성화: "결과 봐", "라이브 봐", "브라우저로 열어", "프로덕션 열어", "deploy URL 봐", "open", "open in browser", "metrics 봐", "logs 페이지", 또는 배포 결과 확인 의도. axhub open 을 호출해 read-only 로 URL 을 확인해요.
+description: '이 스킬은 사용자가 배포된 axhub 앱을 브라우저에서 열어보고 싶어할 때 사용해요. 다음 표현에서 활성화: "결과 봐", "라이브 봐", "브라우저로 열어", "프로덕션 열어", "deploy URL 봐", "open", "open in browser", "metrics 봐", "logs 페이지", 또는 배포 결과 확인 의도. axhub open 을 호출해 read-only 로 URL 을 확인해요.'
 multi-step: false
 needs-preflight: false
 ---

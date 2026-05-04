@@ -1,6 +1,6 @@
 ---
 name: profile
-description: 이 스킬은 사용자가 axhub profile, endpoint, 회사 환경, 현재 프로필을 보거나 바꾸고 싶어할 때 사용해요. 다음 표현에서 활성화: "profile current", "profile list", "회사 endpoint 바꿔", "다른 회사로 바꿔", "endpoint 변경", "사내 endpoint", "프로필 추가", "프로필 사용", 또는 axhub profile 관리 의도. endpoint allowlist 를 확인하고 위험한 endpoint 는 명시 확인해요.
+description: '이 스킬은 사용자가 axhub profile, endpoint, 회사 환경, 현재 프로필을 보거나 바꾸고 싶어할 때 사용해요. 다음 표현에서 활성화: "profile current", "profile list", "회사 endpoint 바꿔", "다른 회사로 바꿔", "endpoint 변경", "사내 endpoint", "프로필 추가", "프로필 사용", 또는 axhub profile 관리 의도. endpoint allowlist 를 확인하고 위험한 endpoint 는 명시 확인해요.'
 multi-step: true
 needs-preflight: false
 ---

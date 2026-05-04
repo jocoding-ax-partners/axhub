@@ -604,7 +604,8 @@ describe("skills/*/SKILL.md frontmatter", () => {
   test("each description starts with 'This skill' or '이 스킬' (Korean equivalent — Phase 5 한국어 전환)", () => {
     for (const [, content] of skillContents) {
       const m = content.match(/^description:\s*(.+)/m);
-      expect(m![1]).toMatch(/^(This skill|이 스킬)/);
+      const description = m![1].replace(/^['"]|['"]$/g, "");
+      expect(description).toMatch(/^(This skill|이 스킬)/);
     }
   });
 
@@ -638,6 +639,19 @@ describe("skills/*/SKILL.md frontmatter", () => {
       const m = content.match(/^description:\s*(.+)/m);
       // At least one Hangul char in description
       expect(m![1]).toMatch(/[ㄱ-ㆎ가-힣]/);
+    }
+  });
+
+  test("description stays YAML-plain-safe for Claude plugin validation", () => {
+    for (const [, content] of skillContents) {
+      const m = content.match(/^description:\s*(.+)/m);
+      // Claude Code's plugin validator parses SKILL frontmatter as YAML.
+      // Plain scalars cannot contain ": " because that starts a mapping token,
+      // so long natural-language descriptions with trigger labels must be
+      // quoted.
+      const description = m![1];
+      const isQuoted = /^'.*'$|^".*"$/.test(description);
+      expect(isQuoted || !/:\s/.test(description)).toBe(true);
     }
   });
 

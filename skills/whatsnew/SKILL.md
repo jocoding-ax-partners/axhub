@@ -1,6 +1,6 @@
 ---
 name: whatsnew
-description: 이 스킬은 사용자가 axhub 의 새 기능, 변경점, 릴리즈 노트, changelog 를 알고 싶어할 때 사용해요. 다음 표현에서 활성화: "뭐 새로 나왔어", "새 기능 뭐야", "release notes", "changelog", "what's new", "whatsnew", "신규 기능", 또는 axhub 변경점 확인 의도. axhub whatsnew 를 read-only 로 호출해요.
+description: '이 스킬은 사용자가 axhub 의 새 기능, 변경점, 릴리즈 노트, changelog 를 알고 싶어할 때 사용해요. 다음 표현에서 활성화: "뭐 새로 나왔어", "새 기능 뭐야", "release notes", "changelog", "what''s new", "whatsnew", "신규 기능", 또는 axhub 변경점 확인 의도. axhub whatsnew 를 read-only 로 호출해요.'
 multi-step: false
 needs-preflight: false
 ---
