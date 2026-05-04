@@ -4,6 +4,21 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.0...v0.2.1) (2026-05-04)
+
+Phase 24.1은 init 템플릿 선택 화면을 바이브코더 친화적으로 다듬는 패치예요. 템플릿 id는 계속 `axhub --json init --list-templates` 결과만 믿고, 플러그인은 쇼핑몰·예약·결제·문서·입력 폼 같은 만들고 싶은 결과물 기준 설명만 덧붙여요.
+
+### Verification
+
+- Local release baseline: `bun test` → 341 pass / 4 skip / 0 fail, `bunx tsc --noEmit`, `bun run skill:doctor --strict`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `git diff --check` 모두 green이에요.
+- Targeted UX gate: `bun test tests/init-template-guidance.test.ts tests/plan-consistency.test.ts` → 17 pass / 0 fail이에요.
+- Release baseline: `bun run release -- --release-as patch` postbump에서 `bun run codegen:version` 과 `bun run release:check`가 green이에요.
+
+### Honest tradeoff
+
+- 이 패치는 CLI 템플릿 schema를 확장하지 않아요. CLI가 새 template id를 돌려주면 숨기지 않고 CLI `framework` / `description` 을 보여준 뒤 중립 안내만 붙여요.
+- Staging token E2E는 credential gated라 로컬에서 실행하지 않았어요.
+
 ## [0.2.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.1.26...v0.2.0) (2026-05-02)
 
 Phase 24는 ax-hub-cli v0.10 lifecycle surface를 플러그인 v0.2.0으로 묶는 릴리즈예요. 새 init/env/github/open/whatsnew/profile SKILL과 Rust prompt-route/preauth/consent context를 current CLI main에 맞추고, helper bootstrap·admin onboarding·remote `templates.json`는 의도적으로 deferred로 남겨요.

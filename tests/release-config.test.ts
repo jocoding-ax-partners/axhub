@@ -203,6 +203,7 @@ describe(".versionrc.json release lifecycle", () => {
       "bin/install.sh",
       "bin/install.ps1",
       "Cargo.toml",
+      "Cargo.lock",
     ]) {
       expect(postbump).toContain(generatedPath);
     }
