@@ -4,6 +4,24 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.5](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.4...v0.2.5) (2026-05-04)
+
+Phase 24.5는 Windows 사용자까지 고려해 pending consent를 셸 문법이 아니라 helper 계약으로 고정한 패치예요. `tool_call_id:"pending"` 자체가 다음 실제 tool call에서 한 번만 claim 되는 신호가 되므로, 스킬이 `CLAUDE_SESSION_ID`를 지우는 POSIX 전용 명령에 기대지 않아요.
+
+### Verification
+
+- Regression-first: `unset CLAUDE_SESSION_ID`가 destructive SKILL에 남아 있으면 실패하는 manifest test를 추가했고, 실제로 먼저 실패하는 것을 확인했어요.
+- Helper contract: `CLAUDE_SESSION_ID`가 있는 상태에서도 `tool_call_id:"pending"`이 pending consent file을 만들고 다음 Bash tool call에서 한 번만 claim 되는 Rust 테스트를 추가했어요.
+- Local baseline: `bun test`, `cargo test --workspace`, `bun run typecheck`, `bun run skill:doctor --strict`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run release:check` 모두 green이에요.
+
+### Honest tradeoff
+
+- 실제 Windows VM slash smoke는 이번 세션에서 실행하지 않았어요. 대신 macOS/Linux/Windows 공통 helper 계약과 스킬 문구 회귀 테스트로 `unset` 의존을 차단했어요.
+
+### Fixed
+
+* make pending consent portable ([46dbe66](https://github.com/jocoding-ax-partners/axhub/commit/46dbe664fdb1d7801cbbc7901fadafa8a182a311))
+
 ## [0.2.4](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.3...v0.2.4) (2026-05-04)
 
 Phase 24.4는 실제 Claude 서브프로세스에서 모든 `/axhub:*` 슬래시 명령을 호출하며 발견한 라이브 배포 consent 문제를 막는 패치예요. 미래 Bash tool id를 미리 맞히려 하지 않고, action/app/profile/branch/commit/context가 모두 맞을 때만 한 번 claim 되는 pending consent로 실제 `/axhub:deploy`가 배포까지 도달해요.
