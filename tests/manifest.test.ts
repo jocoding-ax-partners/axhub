@@ -704,6 +704,13 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
+  test("destructive skill consent examples do not require POSIX-only session unsetting", () => {
+    for (const slug of ["deploy", "recover", "auth"]) {
+      const content = skillContents.get(slug)!;
+      expect(content, slug).not.toContain("unset CLAUDE_SESSION_ID");
+    }
+  });
+
   test("auth headless token-paste docs use token-import and the plugin token path", () => {
     const files = [
       skillContents.get("auth")!,

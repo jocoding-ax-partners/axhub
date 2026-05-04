@@ -94,17 +94,14 @@ To recover:
 4. **On `confirm`.** Mint consent token and run deploy create with the prior commit:
 
    ```bash
-   (
-   unset CLAUDE_SESSION_ID
    cat <<JSON | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
    {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${PROFILE}","branch":"${BRANCH}","commit_sha":"${PREV_SHA}","context":{}}
    JSON
-   )
 
    axhub deploy create --app "$APP_ID" --branch "$BRANCH" --commit "$PREV_SHA" --json
    ```
 
-   The PreToolUse hook verifies the consent token before allowing the bash call.
+   The PreToolUse hook verifies the consent token before allowing the bash call. Do not unset or fake `CLAUDE_SESSION_ID`; `tool_call_id:"pending"` is the portable macOS/Linux/Windows path for the next real tool call.
 
 5. **Auto-watch.** Capture the new `dep_<id>` and route to `skills/status` for narrated tracking. Do not block on completion — the user wanted the recovery action; status is a courtesy follow-up.
 

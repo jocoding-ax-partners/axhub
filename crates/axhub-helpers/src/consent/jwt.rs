@@ -78,6 +78,9 @@ impl From<(ConsentBinding, String, i64, i64)> for Claims {
 
 pub fn mint_token(binding: ConsentBinding, ttl_sec: i64) -> anyhow::Result<MintResult> {
     let key = load_or_mint_key()?;
+    if binding.tool_call_id == PENDING_TOOL_CALL_ID {
+        return mint_pending_token_with_key(binding, ttl_sec, &key);
+    }
     match session_id() {
         Ok(sid) => mint_token_with_key(binding, ttl_sec, &key, &sid),
         Err(_) => mint_pending_token_with_key(binding, ttl_sec, &key),

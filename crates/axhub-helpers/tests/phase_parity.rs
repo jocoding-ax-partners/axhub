@@ -890,6 +890,26 @@ fn consent_pending_token_allows_future_bash_tool_call_once_without_session_env()
 }
 
 #[test]
+fn consent_pending_token_allows_future_bash_tool_call_with_session_env_when_explicit_pending() {
+    let _lock = env_lock().lock().unwrap();
+    let guard = EnvGuard::new(&["XDG_STATE_HOME", "XDG_RUNTIME_DIR", "CLAUDE_SESSION_ID"]);
+    std::env::set_var("XDG_STATE_HOME", guard.path("state"));
+    std::env::set_var("XDG_RUNTIME_DIR", guard.path("runtime"));
+    std::env::set_var("CLAUDE_SESSION_ID", "current-claude-session");
+
+    let mut pending_binding = base_binding();
+    pending_binding.tool_call_id = "pending".into();
+    let minted = mint_token(pending_binding, 60).unwrap();
+    assert!(minted.file_path.contains("consent-pending-"));
+    assert!(std::path::Path::new(&minted.file_path).exists());
+
+    let mut actual = base_binding();
+    actual.tool_call_id = "actual-session:toolu_456".into();
+    assert!(verify_or_claim_token(actual).valid);
+    assert!(!std::path::Path::new(&minted.file_path).exists());
+}
+
+#[test]
 fn consent_binding_accepts_context_and_backfills_legacy_tokens() {
     let with_context: ConsentBinding = serde_json::from_value(json!({
         "tool_call_id": "sess-abc:tc-1",
