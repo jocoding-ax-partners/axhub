@@ -4,6 +4,24 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.7](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.6...v0.2.7) (2026-05-04)
+
+Phase 24.7은 `axhub 0.11.0`을 설치한 사용자가 `/github` 같은 preflight-gated slash command에서 막히던 버전 게이트 핫픽스예요. 플러그인 helper의 허용 범위를 다음 minor 전까지로 올려서 현재 CLI와 examples-backed init template 목록을 정상적으로 함께 쓸 수 있어요.
+
+### Verification
+
+- Regression-first: 0.11.0을 허용하는 Rust test를 먼저 실패시킨 뒤 `MAX_AXHUB_CLI_VERSION=0.12.0`으로 고쳐 green을 확인했어요.
+- Live preflight: 실제 로그인된 `axhub 0.11.0`에서 `./bin/axhub-helpers preflight --json`이 `in_range:true`, `cli_too_new:false`를 반환해요.
+- Local baseline: `cargo test --workspace`, `bun test`, `bash tests/auto-download.test.sh`, `bun run typecheck`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict`, `cargo clippy --workspace --all-targets -- -D warnings`, `bun run release:check`, `git diff --check` 모두 green이에요.
+
+### Honest tradeoff
+
+- 실제 `/github` mutation은 이번 세션에서 실행하지 않았어요. 실패 지점이 slash body 전 preflight라서 같은 helper preflight를 live auth와 CLI 0.11.0으로 직접 검증했어요.
+
+### Fixed
+
+* admit axhub cli 0.11 in preflight ([8090255](https://github.com/jocoding-ax-partners/axhub/commit/8090255e4718b5c6e0c05fe9810e6a5156b802b4))
+
 ## [0.2.6](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.5...v0.2.6) (2026-05-04)
 
 Phase 24.6은 Windows 사용자도 같은 경로 규칙을 쓰도록 statusline과 토큰 경로 판단을 Rust helper 계약으로 모은 패치예요. 셸과 PowerShell은 얇은 실행 래퍼로 남기고, 실제 토큰·캐시·state 경로와 statusline 출력은 `axhub-helpers`가 한 번만 결정해요.
