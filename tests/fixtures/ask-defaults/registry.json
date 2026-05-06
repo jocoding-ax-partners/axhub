@@ -103,5 +103,11 @@
       "safe_default": "현재 프로필 보기",
       "rationale": "Profile add/use changes endpoint context. Non-interactive mode may only show the current profile."
     }
+  },
+  "install-cli": {
+    "axhub CLI 어떤 채널로 설치해요?": {
+      "safe_default": "수동 안내",
+      "rationale": "Auto-running an installer in subprocess (claude -p / CI / headless) writes new system binaries without explicit user consent. Non-interactive mode must surface install commands only, never execute them."
+    }
   }
 }

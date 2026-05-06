@@ -46,6 +46,13 @@
       "마지막 정상 빌드로 돌려주세요",
       "이전 버전으로 되돌려주세요"
     ],
+    "skills/install-cli/SKILL.md": [
+      "CLI 설치",
+      "axhub CLI 설치",
+      "axhub 설치",
+      "ax-hub-cli 설치",
+      "자동 설치"
+    ],
     "skills/profile/SKILL.md": [
       "회사 endpoint 바꿔",
       "다른 회사로 바꿔",
@@ -827,5 +834,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-05-02T17:45:38.967Z"
+  "generated_at": "2026-05-06T08:22:47.306Z"
 }

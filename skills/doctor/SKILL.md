@@ -115,7 +115,7 @@ To run diagnostics:
    | helper missing on Windows (PATH + plugin-local both missing) | "axhub-helpers.exe 바이너리가 없어요. 'powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:CLAUDE_PLUGIN_ROOT\\bin\\install.ps1\"' 수동 실행 또는 CC 재시작으로 자동 다운로드 트리거." |
    | Windows artifact exists but `axhub-helpers.exe` missing | "다운로드 artifact 는 있지만 실행 파일 복사가 안 됐어요. 'powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:CLAUDE_PLUGIN_ROOT\\bin\\install.ps1\"' 로 다시 연결해요." |
    | Windows `install.ps1` missing | "install.ps1 이 없어서 플러그인 install 이 손상된 상태예요. '/plugin install axhub@axhub' 로 재설치해요." |
-   | `cli_present: false` | "axhub 설치되어 있지 않아요. 'brew install axhub' 또는 회사 IT 안내대로 설치해주세요." |
+   | `cli_present: false` | "axhub CLI 가 설치되어 있지 않아요. 'CLI 설치해줘' 라고 말씀해주시면 자동 설치할게요." |
    | `cli_too_old: true` | "axhub가 너무 오래된 버전이에요 (v<CUR>). 'axhub 업그레이드해줘' 라고 말씀해주세요." |
    | `cli_too_new: true` | "axhub가 플러그인보다 최신이에요. 'axhub 플러그인 업데이트' 라고 말씀해주세요." |
    | `auth_ok: false` (token_expired) | "로그인이 만료됐어요. '다시 로그인해줘' 라고 말씀해주세요." |
@@ -132,8 +132,9 @@ To run diagnostics:
      "question": "여러 항목 점검 필요해요. 어디부터 고쳐요?",
      "header": "고칠 항목",
      "options": [
-       {"label": "1. CLI 업그레이드", "value": "upgrade", "description": "skills/update 호출"},
-       {"label": "2. 로그인 다시", "value": "login", "description": "skills/auth 호출"},
+       {"label": "1. CLI 설치", "value": "install", "description": "skills/install-cli 호출"},
+       {"label": "2. CLI 업그레이드", "value": "upgrade", "description": "skills/update 호출"},
+       {"label": "3. 로그인 다시", "value": "login", "description": "skills/auth 호출"},
        {"label": "전부 나중에", "value": "later", "description": "지금은 그대로"}
      ]
    }
