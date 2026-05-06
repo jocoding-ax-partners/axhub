@@ -16,7 +16,8 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
     command
         .args(args)
         .stdin(Stdio::piped())
-        .stdout(Stdio::piped());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     for (k, v) in envs {
         command.env(k, v);
     }
@@ -303,6 +304,94 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     let session = run(&["session-start"]);
     assert_eq!(session.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&session.stdout).contains("Rust runtime"));
+}
+
+#[test]
+fn cli_consent_mint_rejects_binding_schema_drift_before_writing_tokens() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "schema-e2e-session"),
+    ];
+    let session_token = temp
+        .path()
+        .join("runtime/axhub/consent-schema-e2e-session.json");
+
+    let unknown_action = serde_json::json!({
+        "tool_call_id":"schema-e2e-session:tc-unknown",
+        "action":"apps_publish",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {}
+    })
+    .to_string();
+    let rejected_unknown = run_stdin(&["consent-mint"], &unknown_action, &envs);
+    assert_eq!(rejected_unknown.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&rejected_unknown.stderr).contains("binding_schema:unknown_action")
+    );
+    assert!(!session_token.exists());
+
+    let missing_source = serde_json::json!({
+        "tool_call_id":"schema-e2e-session:tc-apps-create",
+        "action":"apps_create",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"slug":"paydrop"}
+    })
+    .to_string();
+    let rejected_missing_source = run_stdin(&["consent-mint"], &missing_source, &envs);
+    assert_eq!(rejected_missing_source.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&rejected_missing_source.stderr)
+        .contains("binding_schema:missing_context:source"));
+    assert!(!session_token.exists());
+
+    let valid_apps_create = serde_json::json!({
+        "tool_call_id":"schema-e2e-session:tc-apps-create",
+        "action":"apps_create",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"source":"apphub.yaml"}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &valid_apps_create, &envs);
+    assert_eq!(minted.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&minted.stdout).contains("token_id"));
+    assert!(session_token.exists());
+
+    let interactive_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"apps_create",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"source":"interactive"}
+    })
+    .to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+    let interactive_minted = run_stdin(&["consent-mint"], &interactive_binding, &pending_envs);
+    assert_eq!(interactive_minted.status.code(), Some(0));
+    let interactive_allowed = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"schema-e2e-session","tool_call_id":"tc-interactive","tool_name":"Bash","tool_input":{"command":"axhub apps create --interactive --json"}}"#,
+        &pending_envs,
+    );
+    assert_eq!(interactive_allowed.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&interactive_allowed.stdout)
+        .contains("permissionDecision\":\"allow"));
 }
 
 #[test]

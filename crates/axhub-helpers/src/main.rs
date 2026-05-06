@@ -2,8 +2,8 @@ use std::io::{self, Read};
 
 use axhub_helpers::catalog::classify;
 use axhub_helpers::consent::{
-    format_preauth_deny_hint, mint_token, parse_axhub_command, verify_or_claim_token, verify_token,
-    ConsentBinding,
+    format_preauth_deny_hint, mint_token, parse_axhub_command, validate_binding_schema,
+    verify_or_claim_token, verify_token, ConsentBinding,
 };
 use axhub_helpers::list_deployments::{run_list_deployments, ListDeploymentsArgs};
 use axhub_helpers::preflight::run_preflight;
@@ -183,6 +183,7 @@ fn parse_binding(raw: &str) -> anyhow::Result<ConsentBinding> {
 }
 fn cmd_consent_mint() -> anyhow::Result<i32> {
     let b = parse_binding(&read_stdin()?)?;
+    validate_binding_schema(&b)?;
     let result = mint_token(b, 60)?;
     out_json(serde_json::to_value(result)?);
     Ok(0)

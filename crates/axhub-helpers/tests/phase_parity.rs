@@ -4,8 +4,8 @@ use std::sync::{Mutex, OnceLock};
 
 use axhub_helpers::catalog::classify;
 use axhub_helpers::consent::{
-    format_preauth_deny_hint, mint_token, parse_axhub_command, verify_or_claim_token, verify_token,
-    ConsentBinding,
+    format_preauth_deny_hint, mint_token, parse_axhub_command, validate_binding_schema,
+    verify_or_claim_token, verify_token, ConsentBinding,
 };
 use axhub_helpers::keychain::{
     parse_keyring_value, read_keychain_token_with_runner, CommandOutput,
@@ -1076,6 +1076,168 @@ fn consent_binding_accepts_context_and_backfills_legacy_tokens() {
 }
 
 #[test]
+fn consent_binding_schema_accepts_known_actions_and_rejects_required_field_gaps() {
+    let mut deploy = base_binding();
+    assert!(validate_binding_schema(&deploy).is_ok());
+
+    deploy.action = "unknown_publish".into();
+    assert_eq!(
+        validate_binding_schema(&deploy).unwrap_err().to_string(),
+        "binding_schema:unknown_action:unknown_publish"
+    );
+
+    let mut missing_branch = base_binding();
+    missing_branch.branch.clear();
+    assert_eq!(
+        validate_binding_schema(&missing_branch)
+            .unwrap_err()
+            .to_string(),
+        "binding_schema:missing_field:branch"
+    );
+
+    let valid_cases = [
+        (
+            "apps_create",
+            "",
+            "",
+            "",
+            "",
+            [("source", "apphub.yaml")].as_slice(),
+        ),
+        (
+            "apps_create",
+            "",
+            "",
+            "",
+            "",
+            [("source", "interactive")].as_slice(),
+        ),
+        (
+            "apps_update",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("slug", "paydrop"), ("field", "name=Paydrop")].as_slice(),
+        ),
+        (
+            "apps_delete",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("slug", "paydrop")].as_slice(),
+        ),
+        (
+            "env_set",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("key", "DATABASE_URL")].as_slice(),
+        ),
+        (
+            "env_delete",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("key", "DATABASE_URL")].as_slice(),
+        ),
+        (
+            "github_connect",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("repo", "paydrop"), ("branch", "main")].as_slice(),
+        ),
+        (
+            "github_disconnect",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("slug", "paydrop")].as_slice(),
+        ),
+        (
+            "deploy_cancel",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("deployment_id", "dep_123")].as_slice(),
+        ),
+        (
+            "profile_add",
+            "",
+            "",
+            "",
+            "",
+            [
+                ("profile", "corp"),
+                ("endpoint", "https://corp.example.test"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "profile_use",
+            "",
+            "",
+            "",
+            "",
+            [("profile", "corp")].as_slice(),
+        ),
+        (
+            "apis_call",
+            "",
+            "",
+            "",
+            "",
+            [("endpoint_id", "endpoint_123"), ("method", "POST")].as_slice(),
+        ),
+        ("update_apply", "paydrop", "", "", "", [].as_slice()),
+        ("deploy_logs_kill", "paydrop", "", "", "", [].as_slice()),
+        ("auth_login", "_", "default", "_", "_", [].as_slice()),
+    ];
+
+    for (action, app_id, profile, branch, commit_sha, context) in valid_cases {
+        let mut binding = ConsentBinding {
+            tool_call_id: "sess:tool".into(),
+            action: action.into(),
+            app_id: app_id.into(),
+            profile: profile.into(),
+            branch: branch.into(),
+            commit_sha: commit_sha.into(),
+            context: HashMap::new(),
+        };
+        for (key, value) in context {
+            binding.context.insert((*key).into(), (*value).into());
+        }
+        assert!(validate_binding_schema(&binding).is_ok(), "{action}");
+    }
+
+    let mut missing_source = ConsentBinding {
+        tool_call_id: "sess:tool".into(),
+        action: "apps_create".into(),
+        app_id: "".into(),
+        profile: "".into(),
+        branch: "".into(),
+        commit_sha: "".into(),
+        context: HashMap::new(),
+    };
+    missing_source
+        .context
+        .insert("slug".into(), "paydrop".into());
+    assert_eq!(
+        validate_binding_schema(&missing_source)
+            .unwrap_err()
+            .to_string(),
+        "binding_schema:missing_context:source"
+    );
+}
+
+#[test]
 fn consent_parser_recognizes_nested_shell_destructive_intents_and_ignores_safe_commands() {
     let update = parse_axhub_command(
         r#"sh -c 'echo before && axhub update apply --app=paydrop --profile=prod'"#,
@@ -1122,6 +1284,12 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
             "apps_create",
             None,
             [("source", "apphub.yaml")].as_slice(),
+        ),
+        (
+            "axhub apps create --interactive --json",
+            "apps_create",
+            None,
+            [("source", "interactive")].as_slice(),
         ),
         (
             "axhub apps update paydrop --field name=Paydrop --json",
