@@ -36,6 +36,7 @@ To deploy:
    ```
 
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
+   TodoWrite 상태는 Claude Code 세션 안에서 이어질 수 있어요. 그래서 이 스킬을 시작할 때는 기존 todo 에 항목을 하나씩 더하거나 일부만 고치지 말고, 위 배열 전체로 교체해요. 이전 스킬 todo 가 화면에 남아 있으면 Step 1 전에 deploy 목록만 보이도록 다시 호출해요.
 
 
 1. **Live resolve first.** Fetch authoritative `{profile, endpoint, app_id, app_slug, branch, commit_sha, commit_message, eta_sec}` before any bootstrap create flow:
@@ -125,7 +126,19 @@ To deploy:
    }
    ```
 
-   If the user chooses "초기화하고 계속", run only local git commands, then re-run resolve and continue from Step 2:
+   If the user chooses "초기화하고 계속", run only local git commands, then re-run resolve and continue from Step 2. Before running shell commands after the user answer, replace the full TodoWrite list with the local git readiness checklist:
+
+   ```typescript
+   TodoWrite({ todos: [
+     { content: "git 저장소 만들기",        status: "in_progress", activeForm: "git 저장소 만드는 중" },
+     { content: "파일을 첫 저장 지점에 담기", status: "pending",     activeForm: "파일 담는 중" },
+     { content: "첫 커밋 만들기",          status: "pending",     activeForm: "첫 커밋 만드는 중" },
+     { content: "배포 정보 다시 확인하기",   status: "pending",     activeForm: "배포 정보 다시 보는 중" },
+     { content: "미리보기 카드 보여드리기",  status: "pending",     activeForm: "미리보기 준비하는 중" }
+   ]})
+   ```
+
+   이 TodoWrite 호출도 기존 목록을 기준으로 patch 하지 말고 전체 교체로 실행해요. 이전 스킬 todo 를 섞으면 사용자가 지금 흐름을 잘못 이해해요.
 
    ```bash
    echo '[deploy:Step 1.5 git-init] entered' >&2

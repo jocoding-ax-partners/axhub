@@ -25,6 +25,16 @@ describe("deploy skill git init stage", () => {
     expect(content).toContain("resolve --intent deploy");
   });
 
+  test("replaces stale TodoWrite state when entering deploy git readiness", () => {
+    const content = readFileSync(DEPLOY_SKILL, "utf8");
+
+    expect(content).toContain("위 배열 전체로 교체해요");
+    expect(content).toContain("이전 스킬 todo 가 화면에 남아 있으면 Step 1 전에 deploy 목록만 보이도록 다시 호출해요");
+    expect(content).toContain("replace the full TodoWrite list with the local git readiness checklist");
+    expect(content).toContain('content: "git 저장소 만들기"');
+    expect(content).toContain("이 TodoWrite 호출도 기존 목록을 기준으로 patch 하지 말고 전체 교체로 실행해요");
+  });
+
   test("non-interactive fallback never initializes git automatically", () => {
     const registry = JSON.parse(readFileSync(ASK_DEFAULTS, "utf8"));
     const entry = registry.deploy["배포 전 저장 지점을 만들까요?"];
