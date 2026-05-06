@@ -35,19 +35,6 @@ To deploy:
    ]})
    ```
 
-   같은 순서로 사용자에게 짧은 단계표도 보여줘요:
-
-   ```
-   작업 단계
-   └ □ 토큰 확인 (preflight)
-     □ 앱 / 환경 / 브랜치 확정
-     □ git 저장 지점 확인
-     □ 미리보기 카드 보여드리기
-     □ 동의 받고 배포 시작
-     □ 빌드 모니터 (~3분)
-     □ 결과 안내
-   ```
-
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
 1. **Live resolve** — call the helper to fetch authoritative `{profile, endpoint, app_id, app_slug, branch, commit_sha, commit_message, eta_sec}`:
