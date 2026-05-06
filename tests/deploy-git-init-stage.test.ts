@@ -33,4 +33,18 @@ describe("deploy skill git init stage", () => {
     expect(entry.rationale).toContain("non-interactive");
     expect(entry.rationale).toContain("git init");
   });
+
+  test("uses bootstrap plan/record before destructive deploy commands", () => {
+    const content = readFileSync(DEPLOY_SKILL, "utf8");
+
+    expect(content).toContain("axhub-helpers bootstrap --auto-chain --json");
+    expect(content).toContain("bootstrap --record");
+    expect(content).toContain("pending_action_id");
+    expect(content).toContain("pending_action_hash");
+    expect(content).toContain("binding_hash");
+    expect(content).toContain("no_retry_without_confirmed_idempotency");
+    expect(content).toContain("schema_version");
+    expect(content).toContain("bootstrap-record/v1");
+  });
+
 });

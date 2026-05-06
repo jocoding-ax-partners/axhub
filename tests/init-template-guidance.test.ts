@@ -71,4 +71,12 @@ describe("init template guidance UX", () => {
     expect(initSkill).not.toMatch(/\b(?:yarn|pip|poetry)\s+install\b/);
     expect(initSkill).not.toMatch(/curl\s+.*templates\.json/);
   });
+
+  test("uses bootstrap only as a plan-only next-step preview after scaffold", () => {
+    expect(initSkill).toContain("axhub-helpers bootstrap --dry-run --json");
+    expect(initSkill).toContain("consent_required_apps_create");
+    expect(initSkill).toContain("bootstrap --auto-chain");
+    expect(initSkill).toContain("앱 등록이나 배포는 deploy/apps 흐름");
+  });
+
 });

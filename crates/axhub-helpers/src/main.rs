@@ -1,5 +1,6 @@
 use std::io::{self, Read};
 
+use axhub_helpers::bootstrap::run_bootstrap;
 use axhub_helpers::catalog::classify;
 use axhub_helpers::consent::{
     format_preauth_deny_hint, mint_token, parse_axhub_command, validate_binding_schema,
@@ -15,7 +16,7 @@ use axhub_helpers::telemetry::emit_meta_envelope;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  list-deployments\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>]\n  version\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -69,6 +70,7 @@ fn run() -> anyhow::Result<i32> {
             Ok(run.exit_code)
         }
         "list-deployments" => cmd_list_deployments(&rest),
+        "bootstrap" => cmd_bootstrap(&rest),
         "consent-mint" => cmd_consent_mint(&rest),
         "consent-verify" => cmd_consent_verify(),
         "preauth-check" => cmd_preauth_check(),
@@ -119,6 +121,26 @@ fn cmd_path(args: &[String]) -> anyhow::Result<i32> {
     };
     println!("{}", path.display());
     Ok(0)
+}
+
+fn cmd_bootstrap(args: &[String]) -> anyhow::Result<i32> {
+    let stdin = if bootstrap_record_event(args).is_some() {
+        Some(read_stdin()?)
+    } else {
+        None
+    };
+    let run = run_bootstrap(args, stdin.as_deref());
+    println!("{}", serde_json::to_string(&run.output)?);
+    Ok(run.exit_code)
+}
+
+fn bootstrap_record_event(args: &[String]) -> Option<&str> {
+    let index = args.iter().position(|arg| arg == "--record")?;
+    let event = args.get(index + 1)?.as_str();
+    if event.starts_with("--") || !matches!(event, "apps_create" | "deploy_create") {
+        return None;
+    }
+    Some(event)
 }
 
 fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {

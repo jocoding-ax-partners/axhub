@@ -37,6 +37,36 @@ To deploy:
 
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
+
+1. **Bootstrap plan/record bridge (Sprint 3).** Before any remote mutation, ask the Rust FSM for the next safe step:
+
+   ```bash
+   echo '[deploy:Step 1 bootstrap-plan] entered' >&2
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers bootstrap --auto-chain --json
+   ```
+
+   Treat this output as the source of truth for Sprint 3 bootstrap state. If it returns `template_required`, `git_init_required`, `first_commit_required`, `subdomain_collision`, `backend_contract_missing_defaults`, or `idempotency_unavailable`, stop at that user-decision state and show the helper reason plus the safest next command. If it returns `next_action: apps_create` or `next_action: deploy_create`, show the exact `command`, `binding_hash`, `pending_action_id`, `pending_action_hash`, `retry_policy`, and consent preview before running anything. The helper is only a planner/recorder here; it must not be treated as approval to mutate.
+
+   Execute returned destructive `axhub ... --json` commands only as top-level Bash after the preview/consent path. Then record the observed result back into the FSM with the same pending metadata:
+
+   ```bash
+   echo '[deploy:Step 1 bootstrap-record] entered' >&2
+   cat > /tmp/axhub-bootstrap-record.json <<JSON
+   {
+     "schema_version": "bootstrap-record/v1",
+     "pending_action_id": "$PENDING_ACTION_ID",
+     "pending_action_hash": "$PENDING_ACTION_HASH",
+     "command_argv": $COMMAND_ARGV_JSON,
+     "exit_code": $EXIT_CODE,
+     "stdout_json": $STDOUT_JSON,
+     "stderr": "$STDERR_JSON_ESCAPED"
+   }
+   JSON
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers bootstrap --record "$NEXT_ACTION" --json < /tmp/axhub-bootstrap-record.json
+   ```
+
+   S3B retry ownership lives in this skill because this skill runs the top-level command. Retry a create only when helper output explicitly provides an idempotency key and a retry policy that allows it. If the helper says `no_retry_without_confirmed_idempotency` or returns `idempotency_unavailable`, do not retry; show the typed stop.
+
 1. **Live resolve** — call the helper to fetch authoritative `{profile, endpoint, app_id, app_slug, branch, commit_sha, commit_message, eta_sec}`:
 
    ```bash
@@ -207,6 +237,10 @@ axhub deploy cancel "$DEPLOYMENT_ID" --app "$APP_ID" --yes --json
 After cancellation, run a read-only status check and summarize the terminal state.
 
 ## NEVER
+
+- NEVER treat `axhub-helpers bootstrap --auto-chain --json` as approval; it is only a plan/record FSM.
+- NEVER retry `apps_create` or `deploy_create` unless bootstrap returns a confirmed idempotency key and retry policy that allows retry.
+- NEVER skip `bootstrap --record` after a returned top-level destructive command finishes; pending action correlation is the audit trail.
 
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop `--json` (parsing relies on it).

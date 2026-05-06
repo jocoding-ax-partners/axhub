@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::{Mutex, OnceLock};
 
+use axhub_helpers::bootstrap::{interpret_apps_create_result, AppsCreateDecision, BootstrapState};
 use axhub_helpers::catalog::classify;
 use axhub_helpers::consent::{
     format_preauth_deny_hint, mint_token, parse_axhub_command, validate_binding_schema,
@@ -1832,4 +1833,80 @@ fn preauth_deny_hint_unknown_action_falls_back_to_deploy_phrase() {
 fn preauth_deny_hint_empty_app_uses_placeholder() {
     let hint = format_preauth_deny_hint(Some("deploy_create"), Some(""));
     assert!(hint.contains("'앱이름 배포해'"), "got: {hint}");
+}
+
+#[test]
+fn bootstrap_backend_contract_fixtures_lock_defaults_and_stops() {
+    let success: Value = serde_json::from_str(include_str!(
+        "fixtures/bootstrap/apps_create.success.v1.json"
+    ))
+    .unwrap();
+    match interpret_apps_create_result(0, &success) {
+        AppsCreateDecision::Registered(app) => {
+            assert_eq!(app.app_id, "app_01HUBPAYDROP");
+            assert_eq!(app.app_slug, "paydrop");
+            assert_eq!(app.subdomain, "paydrop");
+            assert_eq!(app.domain_id, "dom_01HUBDEFAULT");
+        }
+        other => panic!("expected registered app, got {other:?}"),
+    }
+
+    let alias_payload = json!({
+        "id": "app_alias",
+        "slug": "legacy-paydrop",
+        "subdomain": "legacy-paydrop",
+        "domain_id": "dom_alias"
+    });
+    assert!(matches!(
+        interpret_apps_create_result(0, &alias_payload),
+        AppsCreateDecision::Registered(_)
+    ));
+
+    let missing_defaults: Value = serde_json::from_str(include_str!(
+        "fixtures/bootstrap/apps_create.missing_defaults.json"
+    ))
+    .unwrap();
+    assert!(matches!(
+        interpret_apps_create_result(0, &missing_defaults),
+        AppsCreateDecision::Stop {
+            state: BootstrapState::BackendContractMissingDefaults,
+            ..
+        }
+    ));
+
+    let collision: Value = serde_json::from_str(include_str!(
+        "fixtures/bootstrap/apps_create.422.subdomain_collision.json"
+    ))
+    .unwrap();
+    match interpret_apps_create_result(422, &collision) {
+        AppsCreateDecision::Stop {
+            state: BootstrapState::SubdomainCollision,
+            suggested_subdomain,
+            ..
+        } => assert_eq!(suggested_subdomain.as_deref(), Some("paydrop-2")),
+        other => panic!("expected subdomain collision stop, got {other:?}"),
+    }
+
+    let legacy_collision = json!({
+        "code": "subdomain_collision",
+        "suggested_subdomain": "paydrop-3"
+    });
+    match interpret_apps_create_result(422, &legacy_collision) {
+        AppsCreateDecision::Stop {
+            state: BootstrapState::SubdomainCollision,
+            suggested_subdomain,
+            ..
+        } => assert_eq!(suggested_subdomain.as_deref(), Some("paydrop-3")),
+        other => panic!("expected legacy subdomain collision stop, got {other:?}"),
+    }
+
+    let server_error: Value =
+        serde_json::from_str(include_str!("fixtures/bootstrap/apps_create.5xx.json")).unwrap();
+    assert!(matches!(
+        interpret_apps_create_result(500, &server_error),
+        AppsCreateDecision::Stop {
+            state: BootstrapState::IdempotencyUnavailable,
+            ..
+        }
+    ));
 }

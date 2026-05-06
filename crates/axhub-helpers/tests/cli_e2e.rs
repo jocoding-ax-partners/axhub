@@ -37,6 +37,104 @@ fn assert_no_consent_side_effects(state_dir: &Path, runtime_dir: &Path) {
     assert!(!runtime_dir.exists());
 }
 
+fn run_in_dir(args: &[&str], cwd: &Path) -> Output {
+    Command::new(bin())
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .unwrap()
+}
+
+fn run_stdin_in_dir(args: &[&str], stdin: &str, cwd: &Path) -> Output {
+    let mut child = Command::new(bin())
+        .args(args)
+        .current_dir(cwd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(stdin.as_bytes())
+        .unwrap();
+    child.wait_with_output().unwrap()
+}
+
+fn stdout_json(output: &Output) -> serde_json::Value {
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|err| {
+        panic!(
+            "stdout must be json: {err}; stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )
+    })
+}
+
+fn record_apps_create_success(cwd: &Path, plan: &serde_json::Value) -> Output {
+    let envelope = serde_json::json!({
+        "schema_version": "bootstrap-record/v1",
+        "pending_action_id": plan["pending_action_id"],
+        "pending_action_hash": plan["pending_action_hash"],
+        "command_argv": plan["command"],
+        "exit_code": 0,
+        "stdout_json": serde_json::from_str::<serde_json::Value>(include_str!("fixtures/bootstrap/apps_create.success.v1.json")).unwrap(),
+        "stderr": ""
+    });
+    run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &envelope.to_string(),
+        cwd,
+    )
+}
+
+fn init_git_with_commit(cwd: &Path) {
+    assert!(Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(cwd)
+        .output()
+        .unwrap()
+        .status
+        .success());
+    for args in [
+        ["config", "user.email", "test@example.com"],
+        ["config", "user.name", "Axhub Test"],
+    ] {
+        assert!(Command::new("git")
+            .args(args)
+            .current_dir(cwd)
+            .output()
+            .unwrap()
+            .status
+            .success());
+    }
+    assert!(Command::new("git")
+        .args(["add", "apphub.yaml", ".gitignore"])
+        .current_dir(cwd)
+        .output()
+        .unwrap()
+        .status
+        .success());
+    assert!(Command::new("git")
+        .args(["commit", "-m", "init: test"])
+        .current_dir(cwd)
+        .output()
+        .unwrap()
+        .status
+        .success());
+}
+
+fn write_manifest(dir: &Path) {
+    std::fs::write(
+        dir.join("apphub.yaml"),
+        "name: Paydrop\nslug: paydrop\nframework: nextjs\n",
+    )
+    .unwrap();
+}
+
 #[test]
 fn cli_version_help_redact_and_classify_work() {
     let version = run(&["version"]);
@@ -47,6 +145,7 @@ fn cli_version_help_redact_and_classify_work() {
     assert!(help.status.success());
     assert!(String::from_utf8_lossy(&help.stdout).contains("Subcommands"));
     assert!(String::from_utf8_lossy(&help.stdout).contains("prompt-route"));
+    assert!(String::from_utf8_lossy(&help.stdout).contains("bootstrap"));
 
     let mut child = Command::new(bin())
         .arg("redact")
@@ -622,4 +721,255 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
     assert_eq!(cancel_without_token.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&cancel_without_token.stdout)
         .contains("permissionDecision\":\"deny"));
+}
+
+#[test]
+fn cli_bootstrap_dry_run_does_not_create_state_or_gitignore() {
+    let temp = tempfile::tempdir().unwrap();
+    let output = run_in_dir(&["bootstrap", "--dry-run", "--json"], temp.path());
+    assert_eq!(output.status.code(), Some(65));
+    let json = stdout_json(&output);
+    assert_eq!(json["state"], "template_required");
+    assert_eq!(json["user_decision"], "template_required");
+    assert!(!temp.path().join(".axhub").exists());
+    assert!(!temp.path().join(".gitignore").exists());
+}
+
+#[test]
+fn cli_bootstrap_auto_chain_plans_apps_create_without_hidden_remote_mutation() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let ledger = temp.path().join("axhub-call-ledger.txt");
+    let output = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["state"], "consent_required_apps_create");
+    assert_eq!(json["next_action"], "apps_create");
+    assert_eq!(json["command"][0], "axhub");
+    assert_eq!(json["command"][1], "apps");
+    assert_eq!(json["command"][2], "create");
+    assert_eq!(json["consent_binding"]["action"], "apps_create");
+    assert_eq!(json["consent_binding"]["synthesized_by_helper"], true);
+    assert!(json["binding_hash"].as_str().unwrap().len() >= 16);
+    assert!(json["pending_action_id"]
+        .as_str()
+        .unwrap()
+        .starts_with("apps_create:"));
+    assert!(json["pending_action_hash"].as_str().unwrap().len() >= 16);
+    assert!(
+        !ledger.exists(),
+        "bootstrap must not execute axhub internally"
+    );
+    assert!(temp.path().join(".axhub/bootstrap.state.json").exists());
+    assert!(std::fs::read_to_string(temp.path().join(".gitignore"))
+        .unwrap()
+        .contains(".axhub/bootstrap.state.json"));
+
+    let replayed = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(replayed.status.code(), Some(0));
+    let replayed_json = stdout_json(&replayed);
+    assert_eq!(
+        replayed_json["pending_action_id"],
+        json["pending_action_id"]
+    );
+    assert_eq!(
+        replayed_json["pending_action_hash"],
+        json["pending_action_hash"]
+    );
+    assert_eq!(replayed_json["binding_hash"], json["binding_hash"]);
+    assert_eq!(replayed_json["command"], json["command"]);
+    assert_eq!(replayed_json["consent_binding"], json["consent_binding"]);
+    assert_eq!(
+        replayed_json["retry_policy"],
+        "no_retry_without_confirmed_idempotency"
+    );
+}
+
+#[test]
+fn cli_bootstrap_record_rejects_duplicate_out_of_order_and_mismatched_pending_actions() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(planned.status.code(), Some(0));
+    let plan = stdout_json(&planned);
+    let envelope = serde_json::json!({
+        "schema_version": "bootstrap-record/v1",
+        "pending_action_id": plan["pending_action_id"],
+        "pending_action_hash": plan["pending_action_hash"],
+        "command_argv": plan["command"],
+        "exit_code": 0,
+        "stdout_json": serde_json::from_str::<serde_json::Value>(include_str!("fixtures/bootstrap/apps_create.success.v1.json")).unwrap(),
+        "stderr": ""
+    });
+    let recorded = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &envelope.to_string(),
+        temp.path(),
+    );
+    assert_eq!(recorded.status.code(), Some(0));
+    assert_eq!(stdout_json(&recorded)["state"], "app_registered");
+
+    let duplicate = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &envelope.to_string(),
+        temp.path(),
+    );
+    assert_eq!(duplicate.status.code(), Some(64));
+    assert_eq!(
+        stdout_json(&duplicate)["reason"],
+        "record_duplicate_or_no_pending_action"
+    );
+
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    let plan = stdout_json(&planned);
+    let mut stale = envelope.clone();
+    stale["pending_action_id"] = plan["pending_action_id"].clone();
+    stale["pending_action_hash"] = serde_json::Value::String("bad-hash".into());
+    stale["command_argv"] = plan["command"].clone();
+    let mismatch = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &stale.to_string(),
+        temp.path(),
+    );
+    assert_eq!(mismatch.status.code(), Some(64));
+    assert_eq!(
+        stdout_json(&mismatch)["reason"],
+        "record_pending_action_mismatch"
+    );
+
+    let out_of_order = run_stdin_in_dir(
+        &["bootstrap", "--record", "deploy_create", "--json"],
+        &serde_json::json!({
+            "schema_version": "bootstrap-record/v1",
+            "pending_action_id": plan["pending_action_id"],
+            "pending_action_hash": plan["pending_action_hash"],
+            "command_argv": plan["command"],
+            "exit_code": 0,
+            "stdout_json": serde_json::from_str::<serde_json::Value>(include_str!("fixtures/bootstrap/apps_create.success.v1.json")).unwrap(),
+            "stderr": ""
+        })
+        .to_string(),
+        temp.path(),
+    );
+    assert_eq!(out_of_order.status.code(), Some(64));
+    assert_eq!(stdout_json(&out_of_order)["reason"], "record_out_of_order");
+}
+
+#[test]
+fn cli_bootstrap_git_init_and_first_commit_are_user_decision_states() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    let plan = stdout_json(&planned);
+    let envelope = serde_json::json!({
+        "schema_version": "bootstrap-record/v1",
+        "pending_action_id": plan["pending_action_id"],
+        "pending_action_hash": plan["pending_action_hash"],
+        "command_argv": plan["command"],
+        "exit_code": 0,
+        "stdout_json": serde_json::from_str::<serde_json::Value>(include_str!("fixtures/bootstrap/apps_create.success.v1.json")).unwrap(),
+        "stderr": ""
+    });
+    let recorded = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &envelope.to_string(),
+        temp.path(),
+    );
+    assert_eq!(recorded.status.code(), Some(0));
+
+    let no_git = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(no_git.status.code(), Some(65));
+    let no_git_json = stdout_json(&no_git);
+    assert_eq!(no_git_json["state"], "git_init_required");
+    assert_eq!(no_git_json["next_action"], "git_init");
+    assert_eq!(no_git_json["command"], serde_json::json!(["git", "init"]));
+    assert!(
+        !temp.path().join(".git").exists(),
+        "bootstrap must not run git init"
+    );
+
+    let git_init = Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(git_init.status.success());
+    let first_commit = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(first_commit.status.code(), Some(65));
+    let first_commit_json = stdout_json(&first_commit);
+    assert_eq!(first_commit_json["state"], "first_commit_required");
+    assert_eq!(first_commit_json["next_action"], "first_commit");
+    assert_eq!(first_commit_json["command"][0], "git");
+    assert_eq!(first_commit_json["command"][1], "commit");
+}
+
+#[test]
+fn cli_bootstrap_record_validates_event_before_reading_stdin() {
+    let temp = tempfile::tempdir().unwrap();
+    let missing = run_in_dir(&["bootstrap", "--record", "--json"], temp.path());
+    assert_eq!(missing.status.code(), Some(64));
+    assert_eq!(stdout_json(&missing)["reason"], "record_event_missing");
+
+    let unknown = run_in_dir(&["bootstrap", "--record", "unknown", "--json"], temp.path());
+    assert_eq!(unknown.status.code(), Some(64));
+    assert_eq!(stdout_json(&unknown)["reason"], "record_event_unknown");
+}
+
+#[test]
+fn cli_bootstrap_malformed_deploy_success_records_terminal_stop_without_stale_pending() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(planned.status.code(), Some(0));
+    let plan = stdout_json(&planned);
+    let recorded = record_apps_create_success(temp.path(), &plan);
+    assert_eq!(recorded.status.code(), Some(0));
+
+    init_git_with_commit(temp.path());
+    let deploy_plan = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(deploy_plan.status.code(), Some(0));
+    let deploy_plan_json = stdout_json(&deploy_plan);
+    assert_eq!(deploy_plan_json["next_action"], "deploy_create");
+    assert_eq!(
+        deploy_plan_json["consent_binding"]["action"],
+        "deploy_create"
+    );
+
+    let malformed = serde_json::json!({
+        "schema_version": "bootstrap-record/v1",
+        "pending_action_id": deploy_plan_json["pending_action_id"],
+        "pending_action_hash": deploy_plan_json["pending_action_hash"],
+        "command_argv": deploy_plan_json["command"],
+        "exit_code": 0,
+        "stdout_json": {},
+        "stderr": ""
+    });
+    let malformed_record = run_stdin_in_dir(
+        &["bootstrap", "--record", "deploy_create", "--json"],
+        &malformed.to_string(),
+        temp.path(),
+    );
+    assert_eq!(malformed_record.status.code(), Some(65));
+    let malformed_json = stdout_json(&malformed_record);
+    assert_eq!(malformed_json["state"], "backend_contract_missing_defaults");
+    assert_eq!(
+        malformed_json["reason"],
+        "deploy_create_missing_deployment_id"
+    );
+
+    let replay = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(replay.status.code(), Some(65));
+    let replay_json = stdout_json(&replay);
+    assert_eq!(replay_json["state"], "backend_contract_missing_defaults");
+    assert!(replay_json.get("pending_action_id").is_none());
+    assert!(replay_json.get("command").is_none());
+
+    let state_raw =
+        std::fs::read_to_string(temp.path().join(".axhub/bootstrap.state.json")).unwrap();
+    let state_json: serde_json::Value = serde_json::from_str(&state_raw).unwrap();
+    assert!(state_json.get("pending_action").is_none());
+    assert_eq!(state_json["completed_actions"].as_array().unwrap().len(), 2);
 }
