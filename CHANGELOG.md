@@ -4,6 +4,29 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.9](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.8...v0.2.9) (2026-05-06)
+
+Phase 24.9는 vibe coder 가 `axhub apps delete shopmall` 같은 destructive 명령으로 PreToolUse:Bash hook 에 차단됐을 때 보던 hardcoded `'paydrop 배포해'` 안내가 misleading 하던 문제를 고친 UX 패치예요. helper 가 `parse_axhub_command` 결과의 `action` 과 `app_id` 를 읽어 15개 destructive action (deploy_create / deploy_cancel / deploy_logs_kill / update_apply / auth_login / env_set / env_delete / apps_create / apps_update / apps_delete / github_connect / github_disconnect / profile_add / profile_use / apis_call) 별로 적절한 한국어 NL trigger 어구를 동적으로 만들어 보여줘요. 각 어구는 `detect_prompt_route` 의 `contains_any` 매핑과 일치해서 사용자가 그대로 입력하면 해당 SKILL 의 AskUserQuestion 카드 흐름으로 자연스럽게 연결돼요.
+
+### Verification
+
+- Regression-first: phase_parity 에 hint 동작 케이스 10개 (paydrop baseline lock / shopmall 동적 deploy / apps_delete / env_set·delete / auth_login no-app / profile_use no-app / github_connect / unknown action fallback / empty app placeholder) 를 먼저 작성해 helper 가 hardcoded 문구 대신 동적 hint 를 반환하도록 만들었어요.
+- e2e case 23 (`tests/e2e/claude-cli/cases/23-preauth-check-deny.case.sh`) 의 `paydrop 배포해` substring lock 이 그대로 통과하는지 직접 시뮬레이션으로 확인했어요.
+- Windows-latest 에서 처음 노출된 `cli_e2e.rs` path separator mismatch 도 같은 PR 에서 `PathBuf::join` 컴포넌트 분리로 묶어 해결해 모든 4 active CI gate (Local Rust-primary / rust ubuntu / rust macos / rust windows) 를 green 으로 회복했어요.
+
+### Honest tradeoff
+
+- preauth-check 게이트 자체 (HMAC consent token 검증, `verify_or_claim_token` runtime path) 은 손대지 않아요. ralplan iter 1-2 에서 검토한 maintainer 전용 dev escape (`AXHUB_PREAUTH_BYPASS` env var, `consent-mint --dev-mode` short-lived scoped token) 은 supply-chain risk vs DX tradeoff 분석 결과 별도 PRD + ADR 로 보관하고 본 릴리스에서는 다루지 않아요. 일반 사용자 NL primary surface 만 개선해서 보안 surface 를 그대로 유지해요.
+
+### Added
+
+* preauth 차단 메시지를 액션·앱별로 동적 생성 ([e110541](https://github.com/jocoding-ax-partners/axhub/commit/e110541affd05e1feabeb5013d8c9dc9e2d3f827))
+
+
+### Fixed
+
+* **test:** cli_e2e Windows path separator mismatch 해결 ([aacb3ed](https://github.com/jocoding-ax-partners/axhub/commit/aacb3ed9219697c2845cc9de921b4b69a05cc974))
+
 ## [0.2.8](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.7...v0.2.8) (2026-05-04)
 
 Phase 24.8은 비개발자가 `/axhub:deploy`에서 git 저장 지점 때문에 멈추지 않도록 만든 UX 패치예요. 비-git 폴더를 helper가 명확히 알려주고, deploy 스킬은 AskUserQuestion으로 로컬 `git init`과 첫 커밋을 선택하게 하며, 모든 multi-step 스킬은 같은 순서의 `작업 단계` 체크리스트를 먼저 보여줘요.
