@@ -4,6 +4,34 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.3.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.14...v0.3.0) (2026-05-06)
+
+Phase 26 은 axhub CLI 미설치 사용자가 \`/axhub:doctor\` 단계에서 막혀 manual 설치 안내만 보던 friction 을 root-cause 해결한 릴리스예요. 신규 \`axhub:install-cli\` SKILL 이 OS (macOS / Linux / Windows) 를 감지해 공식 채널 (curl install.sh / irm install.ps1 / Homebrew / Scoop) 중 하나로 자동 설치하고, brew / scoop 미설치 호스트에서는 공식 installer 로 graceful fallback 해요. doctor 의 \`NEVER auto-fix\` 규칙은 보존해 진단 / 변경 책임을 분리했어요. 부수로 apps delete consent remint 루프 fix 도 포함해요.
+
+### Test baseline
+
+- Local gate: \`bunx tsc --noEmit\`, \`bun test\` (402 pass / 4 skip / 0 fail), \`bun run lint:tone --strict\`, \`bun run lint:keywords --check\`, \`bun run skill:doctor --strict\` 모두 green 이에요.
+- nl-lexicon baseline: 신규 install-cli SKILL description 의 trigger 어구 추가로 baseline 재캡처 (593 entries 유지, 18 files).
+- Cross-OS verification: install-cli SKILL 이 \`uname -s\` (Darwin/Linux) / \`$env:OS\` (Windows_NT) 분기로 채널 선택, 패키지 매니저 부재 시 graceful fallback.
+
+### Honest tradeoff
+
+- Plugin SKILL 이 사용자 host 에 install script 를 실행해요 — supply-chain 신뢰는 \`cli.jocodingax.ai\` HTTPS 도메인 + ax-hub-cli 팀의 cosign 서명에 위임해요. plugin 자체가 추가 검증 안 해요.
+- brew / scoop 자체는 자동 설치 안 해요 — 패키지 매니저 부재 시 사용자가 직접 설치해야 (https://brew.sh / https://scoop.sh 안내). supply-chain scope 한정 결정.
+- subprocess (CI / claude -p) 환경에서는 자동 install 차단 — registry safe_default \`수동 안내\` 로 명령어만 출력하고 종료해요.
+
+
+### Added
+
+* install-cli SKILL — axhub CLI 자동 설치 (doctor consent route) ([1bc1cca](https://github.com/jocoding-ax-partners/axhub/commit/1bc1cca07dcde84e120c18d9dc375f16b9e35387))
+
+
+### Fixed
+
+* **install-cli:** brew/scoop 부재 시 graceful fallback ([f23f9dc](https://github.com/jocoding-ax-partners/axhub/commit/f23f9dc8588f7c29077ab1d19655fd7c6954f138))
+* **install-cli:** Windows scoop 부재 안내 메시지 추가 ([2eff07a](https://github.com/jocoding-ax-partners/axhub/commit/2eff07ad41d7d2bba997049235731715520b0530)), closes [#33](https://github.com/jocoding-ax-partners/axhub/issues/33)
+* prevent app delete consent remint loops ([6868eca](https://github.com/jocoding-ax-partners/axhub/commit/6868ecad15d357267924bab23ef5c360f92808bd))
+
 ## [0.2.14](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.13...v0.2.14) (2026-05-06)
 
 Phase 25.3 은 회사 보안 정책상 VC++ Redistributable 사전 설치를 가정할 수 없는 Windows 호스트에서 `axhub-helpers.exe` 가 `STATUS_DLL_NOT_FOUND` (0xC0000135) 로 즉시 종료되던 문제를 root-cause 해결한 릴리스예요. `.cargo/config.toml` 에 Windows MSVC target-scoped `+crt-static` rustflag 를 추가해 vcruntime140.dll / msvcp140.dll 동적 import 를 끊고, 회귀 방지를 위해 release.yml 과 rust-ci.yml 양쪽에 `dumpbin /dependents` assertion 을 박아 모든 PR 과 release tag 에서 정적 CRT 링크를 자동 enforce 해요.
