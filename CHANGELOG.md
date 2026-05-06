@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.13](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.12...v0.2.13) (2026-05-06)
+
+Phase 25.2는 deploy 중 git 저장 지점 확인으로 들어갈 때 이전 `init` TodoWrite 항목이 Claude Code UI에 남아 사용자에게 잘못된 진행 상태를 보여주던 UX 회귀를 막는 패치예요. deploy 스킬은 시작 시점과 git readiness 분기에서 기존 todo 를 patch 하지 않고 전체 교체하도록 명시하고, 회귀 테스트로 stale TodoWrite 재유입을 잠가요.
+
+### Test baseline
+
+- Local gate: `bun run skill:doctor --strict`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bunx tsc --noEmit`, `bun test`, `git diff --check` 가 green이에요.
+- Regression guard: `tests/deploy-git-init-stage.test.ts` 가 deploy 시작과 git readiness 분기에서 TodoWrite 전체 교체 지시를 확인해요.
+- Release chain: `bun run release -- --release-as patch` postbump 의 `codegen:version` + `release:check` 가 통과했어요.
+
+### Honest tradeoff
+
+- 실제 Claude Code UI 렌더링은 릴리스 전 destructive deploy 세션으로 재실행하지 않았어요. 이번 릴리스는 SKILL 지시와 회귀 테스트로 stale todo 혼입을 차단하고, 라이브 UI 확인은 새 플러그인 설치 후 smoke 에서 이어가요.
+- TodoWrite 상태 보존 자체는 Claude Code 런타임 특성이므로, 제품 쪽에서는 skill 이 분기마다 전체 목록을 다시 렌더링하는 방어 계약을 유지해요.
+
+
+### Fixed
+
+* replace stale deploy todo state ([57e58c9](https://github.com/jocoding-ax-partners/axhub/commit/57e58c9257081e0c0034e247c3ae4af0a480ba1c))
+
 ## [0.2.12](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.11...v0.2.12) (2026-05-06)
 
 Phase 25.1은 첫 배포 중 `apphub.yaml` 에 `slug` 없이 `name: nextjs-axhub` 만 있는 경우 resolve 가 멈추고, GitHub repo 연결 안내가 `/axhub:github` handoff 에서 끊기던 문제를 고친 hotfix예요. helper는 slug-like `name` 을 안전한 후보로 쓰고, GitHub 연결은 install_url 을 바로 보여준 뒤 `github_connect` consent token 이 parser binding 과 일치하도록 branch 를 함께 민트해요.
