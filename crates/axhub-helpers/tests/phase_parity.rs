@@ -4,7 +4,8 @@ use std::sync::{Mutex, OnceLock};
 
 use axhub_helpers::catalog::classify;
 use axhub_helpers::consent::{
-    mint_token, parse_axhub_command, verify_or_claim_token, verify_token, ConsentBinding,
+    format_preauth_deny_hint, mint_token, parse_axhub_command, verify_or_claim_token, verify_token,
+    ConsentBinding,
 };
 use axhub_helpers::keychain::{
     parse_keyring_value, read_keychain_token_with_runner, CommandOutput,
@@ -1442,4 +1443,74 @@ fn spawn_sync_covers_empty_command_and_successful_child_output() {
     let rustc = axhub_helpers::spawn::spawn_sync(&["rustc", "--version"]).unwrap();
     assert_eq!(rustc.exit_code, Some(0));
     assert!(rustc.stdout.contains("rustc "));
+}
+
+#[test]
+fn preauth_deny_hint_paydrop_baseline_locked() {
+    let hint = format_preauth_deny_hint(Some("deploy_create"), Some("paydrop"));
+    assert!(hint.contains("paydrop 배포해"), "got: {hint}");
+    assert!(hint.contains("사전 승인"), "got: {hint}");
+    assert!(hint.contains("승인 카드"), "got: {hint}");
+}
+
+#[test]
+fn preauth_deny_hint_uses_dynamic_app_for_deploy() {
+    let hint = format_preauth_deny_hint(Some("deploy_create"), Some("shopmall"));
+    assert!(hint.contains("'shopmall 배포해'"), "got: {hint}");
+    assert!(
+        !hint.contains("paydrop"),
+        "stale paydrop in dynamic hint: {hint}"
+    );
+}
+
+#[test]
+fn preauth_deny_hint_apps_delete_uses_korean_imperative() {
+    let hint = format_preauth_deny_hint(Some("apps_delete"), Some("oldapp"));
+    assert!(hint.contains("'oldapp 앱 지워'"), "got: {hint}");
+}
+
+#[test]
+fn preauth_deny_hint_env_set_routes_to_env_skill() {
+    let hint = format_preauth_deny_hint(Some("env_set"), Some("paydrop"));
+    assert!(hint.contains("'paydrop 환경변수 추가해'"), "got: {hint}");
+}
+
+#[test]
+fn preauth_deny_hint_env_delete_routes_to_env_skill() {
+    let hint = format_preauth_deny_hint(Some("env_delete"), Some("paydrop"));
+    assert!(hint.contains("'paydrop 환경변수 삭제해'"), "got: {hint}");
+}
+
+#[test]
+fn preauth_deny_hint_auth_login_omits_app_token() {
+    let hint = format_preauth_deny_hint(Some("auth_login"), None);
+    assert!(hint.contains("'로그인해'"), "got: {hint}");
+    assert!(
+        !hint.contains("앱이름"),
+        "auth hint must not pad app placeholder: {hint}"
+    );
+}
+
+#[test]
+fn preauth_deny_hint_profile_use_omits_app_token() {
+    let hint = format_preauth_deny_hint(Some("profile_use"), None);
+    assert!(hint.contains("'profile 바꿔'"), "got: {hint}");
+}
+
+#[test]
+fn preauth_deny_hint_github_connect_includes_app() {
+    let hint = format_preauth_deny_hint(Some("github_connect"), Some("paydrop"));
+    assert!(hint.contains("'paydrop github 연결해'"), "got: {hint}");
+}
+
+#[test]
+fn preauth_deny_hint_unknown_action_falls_back_to_deploy_phrase() {
+    let hint = format_preauth_deny_hint(None, None);
+    assert!(hint.contains("'앱이름 배포해'"), "got: {hint}");
+}
+
+#[test]
+fn preauth_deny_hint_empty_app_uses_placeholder() {
+    let hint = format_preauth_deny_hint(Some("deploy_create"), Some(""));
+    assert!(hint.contains("'앱이름 배포해'"), "got: {hint}");
 }

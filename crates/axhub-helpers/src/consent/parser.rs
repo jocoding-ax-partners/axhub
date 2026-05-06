@@ -283,3 +283,29 @@ pub fn parse_axhub_command(cmd: &str) -> ParsedAxhubCommand {
         ..Default::default()
     }
 }
+
+pub fn format_preauth_deny_hint(action: Option<&str>, app_id: Option<&str>) -> String {
+    let app = app_id.filter(|s| !s.is_empty()).unwrap_or("앱이름");
+    let phrase = match action {
+        Some("deploy_create") => format!("'{} 배포해'", app),
+        Some("deploy_cancel") => format!("'{} 배포 취소해'", app),
+        Some("deploy_logs_kill") => format!("'{} 로그 종료해'", app),
+        Some("update_apply") => "'axhub 업데이트해'".to_string(),
+        Some("auth_login") => "'로그인해'".to_string(),
+        Some("env_set") => format!("'{} 환경변수 추가해'", app),
+        Some("env_delete") => format!("'{} 환경변수 삭제해'", app),
+        Some("apps_create") => format!("'{} 앱 만들어'", app),
+        Some("apps_update") => format!("'{} 앱 업데이트해'", app),
+        Some("apps_delete") => format!("'{} 앱 지워'", app),
+        Some("github_connect") => format!("'{} github 연결해'", app),
+        Some("github_disconnect") => format!("'{} github 끊어'", app),
+        Some("profile_add") => "'profile 추가해'".to_string(),
+        Some("profile_use") => "'profile 바꿔'".to_string(),
+        Some("apis_call") => format!("'{} API 호출해'", app),
+        _ => format!("'{} 배포해'", app),
+    };
+    format!(
+        "이 명령은 사전 승인이 필요해요. 먼저 {}라고 말해서 승인 카드를 받으세요.",
+        phrase
+    )
+}
