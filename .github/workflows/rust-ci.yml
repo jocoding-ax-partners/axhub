@@ -21,3 +21,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
       - run: cargo build --workspace --release
+      - name: Verify static CRT linkage (Windows only)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $exe = "target/release/axhub-helpers.exe"
+          $deps = & dumpbin /dependents $exe 2>&1 | Out-String
+          if ($deps -match '(?i)vcruntime140|msvcp140') {
+            Write-Error "FAIL: dynamic MSVC CRT linkage detected in $exe — expected +crt-static. Dependencies:`n$deps"
+            exit 1
+          }
+          Write-Output "PASS: static CRT verified for $exe"
