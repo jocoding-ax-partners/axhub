@@ -276,10 +276,13 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     assert_eq!(token_file.status.code(), Some(0));
     assert_eq!(
         String::from_utf8_lossy(&token_file.stdout).trim(),
-        xdg_config.join("axhub-plugin/token").to_string_lossy()
+        xdg_config
+            .join("axhub-plugin")
+            .join("token")
+            .to_string_lossy()
     );
 
-    let user_profile = temp.path().join("Users/Vibe");
+    let user_profile = temp.path().join("Users").join("Vibe");
     let windows_home_token = Command::new(bin())
         .args(["path", "token-file"])
         .env_remove("XDG_CONFIG_HOME")
@@ -291,7 +294,9 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     assert_eq!(
         String::from_utf8_lossy(&windows_home_token.stdout).trim(),
         user_profile
-            .join(".config/axhub-plugin/token")
+            .join(".config")
+            .join("axhub-plugin")
+            .join("token")
             .to_string_lossy()
     );
 
