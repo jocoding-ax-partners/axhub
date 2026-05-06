@@ -39,6 +39,10 @@
     "앱이 더 있어요. 전체 목록 볼래요?": {
       "safe_default": "skip",
       "rationale": "Top 10 sufficient for vibe-coder browse; full list rarely needed in non-interactive."
+    },
+    "앱을 삭제할까요?": {
+      "safe_default": "abort",
+      "rationale": "앱 삭제는 되돌리기 어려운 파괴적 작업이라 비대화형 환경에서는 항상 삭제를 멈춰요."
     }
   },
   "clarify": {

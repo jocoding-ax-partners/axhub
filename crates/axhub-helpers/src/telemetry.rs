@@ -162,9 +162,16 @@ pub fn emit_meta_envelope(fields: Map<String, Value>) -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use std::cell::Cell;
+    use std::sync::{Mutex, OnceLock};
+
+    fn cli_version_cache_test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn cli_version_cache_uses_thirty_second_ttl_for_matching_helper_version() {
+        let _guard = cli_version_cache_test_lock().lock().unwrap();
         reset_cli_version_cache();
         let calls = Cell::new(0);
         let start = Instant::now();
@@ -193,6 +200,7 @@ mod tests {
 
     #[test]
     fn cli_version_cache_invalidates_cached_helper_mismatch_immediately() {
+        let _guard = cli_version_cache_test_lock().lock().unwrap();
         reset_cli_version_cache();
         let calls = Cell::new(0);
         let start = Instant::now();

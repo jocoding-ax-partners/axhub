@@ -539,6 +539,11 @@ fn detect_prompt_route(prompt: &str) -> Option<PromptRoute> {
             "앱 등록",
             "앱 생성",
             "apps create",
+            "앱 삭제",
+            "앱 지워",
+            "앱 제거",
+            "apps delete",
+            "apps rm",
             "앱 뭐",
             "어떤 앱",
             "등록된 앱",
@@ -549,8 +554,8 @@ fn detect_prompt_route(prompt: &str) -> Option<PromptRoute> {
     ) {
         return Some(PromptRoute {
             skill: "apps",
-            label: "앱 목록 조회",
-            guidance: "읽기 전용 앱 목록 요청이에요. 일반 repo 탐색 대신 skills/apps/SKILL.md 흐름으로 팀 scope 안에서만 보여줘요.",
+            label: "앱 관리",
+            guidance: "앱 목록/관리 요청이에요. 현재 팀 scope 안에서 목록과 상세 조회는 read-only 로 처리하고, create/update/delete 는 skills/apps/SKILL.md 의 AskUserQuestion + HMAC consent 흐름을 따라요. 삭제는 승인 전 axhub apps delete --dry-run 도 실행하지 않아요.",
             needs_preflight: true,
         });
     }
