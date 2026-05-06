@@ -24,6 +24,8 @@ pub struct ConsentBinding {
     pub commit_sha: String,
     #[serde(default)]
     pub context: HashMap<String, String>,
+    #[serde(default)]
+    pub synthesized_by_helper: bool,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MintResult {
@@ -47,6 +49,8 @@ struct Claims {
     commit_sha: String,
     #[serde(default)]
     context: HashMap<String, String>,
+    #[serde(default)]
+    synthesized_by_helper: bool,
     jti: String,
     iat: i64,
     exp: i64,
@@ -69,6 +73,7 @@ impl From<(ConsentBinding, String, i64, i64)> for Claims {
             branch: b.branch,
             commit_sha: b.commit_sha,
             context: b.context,
+            synthesized_by_helper: b.synthesized_by_helper,
             jti,
             iat,
             exp,

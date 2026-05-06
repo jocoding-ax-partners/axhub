@@ -27,18 +27,59 @@ To run diagnostics:
 
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
-1. **Detect helper binary via PATH first** (Phase 5 US-503 — env var `CLAUDE_PLUGIN_ROOT` may not propagate to skill bash subshells):
+1. **Detect helper binary with OS-aware install-state rows** (Phase 5 US-503 + Windows helper bootstrap hotfix — `CLAUDE_PLUGIN_ROOT` or PATH may differ per shell):
+
+   Unix / Git Bash:
 
    ```bash
    command -v axhub-helpers || echo "missing"
+   test -x "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" || echo "plugin-local-missing"
    ```
 
-   If output is `missing`, surface: "axhub-helpers 바이너리가 PATH에 없어요. 첫 CC 세션에서 자동 다운로드돼야 정상이에요. 'bash ${CLAUDE_PLUGIN_ROOT}/bin/install.sh' 수동 실행 또는 자동 다운로드 비활성화 (export AXHUB_SKIP_AUTODOWNLOAD=1) 확인해주세요." Skip remaining steps; report ✗ helper missing only.
+   Windows PowerShell:
+
+   ```powershell
+   Get-Command axhub-helpers -ErrorAction SilentlyContinue
+   Test-Path "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe"
+   Test-Path "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers-windows-amd64.exe"
+   Test-Path "$env:CLAUDE_PLUGIN_ROOT\bin\install.ps1"
+   ```
+
+   Render helper state as separate rows:
+
+   - `helper PATH`: `command -v axhub-helpers` or `Get-Command axhub-helpers`
+   - `helper plugin-local`: `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers` or `$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe`
+   - `helper downloaded artifact` (Windows only): `$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers-windows-amd64.exe`
+   - `helper installer`: `${CLAUDE_PLUGIN_ROOT}/bin/install.sh` or `$env:CLAUDE_PLUGIN_ROOT\bin\install.ps1`
+
+   If PATH is missing but plugin-local helper exists, mark PATH as ⚠ and continue using the plugin-local helper path for later checks. If both PATH and plugin-local helper are missing, skip remaining preflight rows and report ✗ helper missing only.
+
+   Windows missing-helper next action:
+
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File "$env:CLAUDE_PLUGIN_ROOT\bin\install.ps1"
+   ```
+
+   Unix missing-helper next action:
+
+   ```bash
+   bash "${CLAUDE_PLUGIN_ROOT}/bin/install.sh"
+   ```
 
 2. **Run preflight** (CLI version range + auth status combined):
 
    ```bash
    axhub-helpers preflight --json
+   ```
+
+   If PATH is missing but plugin-local helper exists, run the plugin-local helper instead:
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" preflight --json
+   ```
+
+   ```powershell
+   & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" preflight --json
    ```
 
    This returns: `cli_version, in_range, cli_too_old, cli_too_new, cli_present, auth_ok, auth_error_code, scopes, profile, endpoint, user_email, expires_at`.
@@ -70,7 +111,10 @@ To run diagnostics:
 
    | Failure | Suggested phrase |
    |---|---|
-   | helper missing (step 1 returned `missing`) | "axhub-helpers 바이너리가 PATH에 없어요. 'bash ${CLAUDE_PLUGIN_ROOT}/bin/install.sh' 수동 실행 또는 CC 재시작으로 자동 다운로드 트리거." |
+   | helper missing on Unix (PATH + plugin-local both missing) | "axhub-helpers 바이너리가 없어요. 'bash \"${CLAUDE_PLUGIN_ROOT}/bin/install.sh\"' 수동 실행 또는 CC 재시작으로 자동 다운로드 트리거." |
+   | helper missing on Windows (PATH + plugin-local both missing) | "axhub-helpers.exe 바이너리가 없어요. 'powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:CLAUDE_PLUGIN_ROOT\\bin\\install.ps1\"' 수동 실행 또는 CC 재시작으로 자동 다운로드 트리거." |
+   | Windows artifact exists but `axhub-helpers.exe` missing | "다운로드 artifact 는 있지만 실행 파일 복사가 안 됐어요. 'powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:CLAUDE_PLUGIN_ROOT\\bin\\install.ps1\"' 로 다시 연결해요." |
+   | Windows `install.ps1` missing | "install.ps1 이 없어서 플러그인 install 이 손상된 상태예요. '/plugin install axhub@axhub' 로 재설치해요." |
    | `cli_present: false` | "axhub 설치되어 있지 않아요. 'brew install axhub' 또는 회사 IT 안내대로 설치해주세요." |
    | `cli_too_old: true` | "axhub가 너무 오래된 버전이에요 (v<CUR>). 'axhub 업그레이드해줘' 라고 말씀해주세요." |
    | `cli_too_new: true` | "axhub가 플러그인보다 최신이에요. 'axhub 플러그인 업데이트' 라고 말씀해주세요." |
