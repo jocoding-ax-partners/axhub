@@ -1,6 +1,7 @@
 use std::io::Write;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
 fn bin() -> &'static str {
@@ -29,6 +30,11 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
         .write_all(stdin.as_bytes())
         .unwrap();
     child.wait_with_output().unwrap()
+}
+
+fn assert_no_consent_side_effects(state_dir: &Path, runtime_dir: &Path) {
+    assert!(!state_dir.exists());
+    assert!(!runtime_dir.exists());
 }
 
 #[test]
@@ -392,6 +398,66 @@ fn cli_consent_mint_rejects_binding_schema_drift_before_writing_tokens() {
     assert_eq!(interactive_allowed.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&interactive_allowed.stdout)
         .contains("permissionDecision\":\"allow"));
+}
+
+#[test]
+fn cli_consent_mint_validate_only_has_no_runtime_or_key_side_effects() {
+    let temp = tempfile::tempdir().unwrap();
+    let state_dir = temp.path().join("state");
+    let runtime_dir = temp.path().join("runtime");
+    let state = state_dir.display().to_string();
+    let runtime = runtime_dir.display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "validate-only-session"),
+    ];
+    let binding = serde_json::json!({
+        "tool_call_id":"validate-only-session:tc-validate",
+        "action":"deploy_create",
+        "app_id":"paydrop",
+        "profile":"prod",
+        "branch":"main",
+        "commit_sha":"abc123",
+        "context": {}
+    })
+    .to_string();
+
+    let validated = run_stdin(&["consent-mint", "--validate-only"], &binding, &envs);
+    assert_eq!(validated.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&validated.stdout);
+    assert!(stdout.contains(r#""valid":true"#));
+    assert!(stdout.contains(r#""action":"deploy_create"#));
+    assert_no_consent_side_effects(&state_dir, &runtime_dir);
+}
+
+#[test]
+fn cli_consent_mint_unknown_flags_fail_without_runtime_or_key_side_effects() {
+    let temp = tempfile::tempdir().unwrap();
+    let state_dir = temp.path().join("state");
+    let runtime_dir = temp.path().join("runtime");
+    let state = state_dir.display().to_string();
+    let runtime = runtime_dir.display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "unknown-flag-session"),
+    ];
+    let binding = serde_json::json!({
+        "tool_call_id":"unknown-flag-session:tc-flag",
+        "action":"deploy_create",
+        "app_id":"paydrop",
+        "profile":"prod",
+        "branch":"main",
+        "commit_sha":"abc123",
+        "context": {}
+    })
+    .to_string();
+
+    let rejected = run_stdin(&["consent-mint", "--unexpected"], &binding, &envs);
+    assert_eq!(rejected.status.code(), Some(64));
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("unknown option"));
+    assert_no_consent_side_effects(&state_dir, &runtime_dir);
 }
 
 #[test]

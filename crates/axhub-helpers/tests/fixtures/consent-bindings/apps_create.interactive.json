@@ -1,0 +1,11 @@
+{
+  "tool_call_id": "pending",
+  "action": "apps_create",
+  "app_id": "",
+  "profile": "",
+  "branch": "",
+  "commit_sha": "",
+  "context": {
+    "source": "interactive"
+  }
+}

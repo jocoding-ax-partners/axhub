@@ -97,7 +97,19 @@ fn base_binding() -> ConsentBinding {
         branch: "main".into(),
         commit_sha: "a3f9c1b".into(),
         context: HashMap::new(),
+        synthesized_by_helper: false,
     }
+}
+
+fn decode_token_payload(file_path: &str) -> Value {
+    let raw = fs::read_to_string(file_path).unwrap();
+    let token_file: Value = serde_json::from_str(&raw).unwrap();
+    let jwt = token_file.get("jwt").and_then(Value::as_str).unwrap();
+    let payload = jwt.split('.').nth(1).unwrap();
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .unwrap();
+    serde_json::from_slice(&decoded).unwrap()
 }
 
 #[test]
@@ -1073,6 +1085,53 @@ fn consent_binding_accepts_context_and_backfills_legacy_tokens() {
     }))
     .unwrap();
     assert!(legacy.context.is_empty());
+    assert!(!legacy.synthesized_by_helper);
+}
+
+#[test]
+fn consent_synthesized_by_helper_claim_is_audit_only() {
+    let _lock = env_lock().lock().unwrap();
+    let guard = EnvGuard::new(&["XDG_STATE_HOME", "XDG_RUNTIME_DIR", "CLAUDE_SESSION_ID"]);
+    std::env::set_var("XDG_STATE_HOME", guard.path("state"));
+    std::env::set_var("XDG_RUNTIME_DIR", guard.path("runtime"));
+    std::env::set_var("CLAUDE_SESSION_ID", "synthesized-audit-session");
+
+    let mut synthesized = base_binding();
+    synthesized.synthesized_by_helper = true;
+    let minted = mint_token(synthesized.clone(), 60).unwrap();
+    let claims = decode_token_payload(&minted.file_path);
+    assert_eq!(
+        claims.get("synthesized_by_helper").and_then(Value::as_bool),
+        Some(true)
+    );
+
+    let mut default_binding = synthesized;
+    default_binding.synthesized_by_helper = false;
+    assert!(verify_token(default_binding).valid);
+}
+
+#[test]
+fn consent_binding_fixture_contract_stays_valid_for_future_bootstrap_synthesizer() {
+    const FIXTURES: &[&str] = &[
+        "deploy_create.pending.json",
+        "apps_create.from_file.json",
+        "apps_create.interactive.json",
+        "env_set.json",
+        "helper_synthesized.deploy_create.json",
+    ];
+
+    for fixture in FIXTURES {
+        let path = format!("tests/fixtures/consent-bindings/{fixture}");
+        let raw = fs::read_to_string(&path).unwrap();
+        let binding: ConsentBinding = serde_json::from_str(&raw).unwrap();
+        validate_binding_schema(&binding).unwrap_or_else(|err| {
+            panic!("{path} should be a valid consent binding fixture: {err}")
+        });
+
+        if *fixture == "helper_synthesized.deploy_create.json" {
+            assert!(binding.synthesized_by_helper);
+        }
+    }
 }
 
 #[test]
@@ -1210,6 +1269,7 @@ fn consent_binding_schema_accepts_known_actions_and_rejects_required_field_gaps(
             branch: branch.into(),
             commit_sha: commit_sha.into(),
             context: HashMap::new(),
+            synthesized_by_helper: false,
         };
         for (key, value) in context {
             binding.context.insert((*key).into(), (*value).into());
@@ -1225,6 +1285,7 @@ fn consent_binding_schema_accepts_known_actions_and_rejects_required_field_gaps(
         branch: "".into(),
         commit_sha: "".into(),
         context: HashMap::new(),
+        synthesized_by_helper: false,
     };
     missing_source
         .context

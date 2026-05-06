@@ -15,7 +15,7 @@ use axhub_helpers::telemetry::emit_meta_envelope;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  list-deployments\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  list-deployments\n  version\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -69,7 +69,7 @@ fn run() -> anyhow::Result<i32> {
             Ok(run.exit_code)
         }
         "list-deployments" => cmd_list_deployments(&rest),
-        "consent-mint" => cmd_consent_mint(),
+        "consent-mint" => cmd_consent_mint(&rest),
         "consent-verify" => cmd_consent_verify(),
         "preauth-check" => cmd_preauth_check(),
         "prompt-route" => cmd_prompt_route(),
@@ -181,9 +181,21 @@ fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {
 fn parse_binding(raw: &str) -> anyhow::Result<ConsentBinding> {
     Ok(serde_json::from_str(raw)?)
 }
-fn cmd_consent_mint() -> anyhow::Result<i32> {
+fn cmd_consent_mint(args: &[String]) -> anyhow::Result<i32> {
+    let validate_only = match args {
+        [] => false,
+        [flag] if flag == "--validate-only" => true,
+        [flag, ..] => {
+            eprintln!("axhub-helpers consent-mint: unknown option \"{flag}\"");
+            return Ok(64);
+        }
+    };
     let b = parse_binding(&read_stdin()?)?;
     validate_binding_schema(&b)?;
+    if validate_only {
+        out_json(json!({"valid": true, "action": b.action}));
+        return Ok(0);
+    }
     let result = mint_token(b, 60)?;
     out_json(serde_json::to_value(result)?);
     Ok(0)
@@ -256,6 +268,7 @@ fn cmd_preauth_check() -> anyhow::Result<i32> {
             }
         }),
         context: parsed.context,
+        synthesized_by_helper: false,
     };
     let result = verify_or_claim_token(binding);
     if result.valid {

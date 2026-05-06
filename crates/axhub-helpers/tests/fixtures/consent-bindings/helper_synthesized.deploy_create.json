@@ -1,0 +1,10 @@
+{
+  "tool_call_id": "pending",
+  "action": "deploy_create",
+  "app_id": "paydrop",
+  "profile": "prod",
+  "branch": "main",
+  "commit_sha": "abc123",
+  "context": {},
+  "synthesized_by_helper": true
+}
