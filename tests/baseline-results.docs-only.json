@@ -105,10 +105,12 @@
   },
   {
     "utterance_id": "T-NEG-3",
-    "fired_skill": null,
-    "actual_tool_calls": [],
-    "required_consent_seen": false,
-    "notes": "Delete app — unsupported in v0.1.0. Docs-only Claude may attempt workarounds or correctly say it's unsupported. No axhub delete cmd exists so no match."
+    "fired_skill": "apps",
+    "actual_tool_calls": [
+      {"cmd": "axhub apps list --json", "exit_code": 0, "ts": "2026-04-23T00:00:13Z"}
+    ],
+    "required_consent_seen": true,
+    "notes": "App delete is now a consent-gated apps flow. Correct behavior is read-only target resolution plus an approval card before axhub apps delete <COMMAND_TARGET> --yes --json; treating delete as unsupported is stale."
   },
   {
     "utterance_id": "T-ADV-1",

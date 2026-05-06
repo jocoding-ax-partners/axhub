@@ -1,13 +1,13 @@
 ---
 name: apps
-description: '이 스킬은 사용자가 팀에 등록된 axhub 앱 목록을 보거나 둘러보고 싶어할 때 사용합니다. 다음 표현에서 활성화: "내 앱 보여줘", "내 앱 봐", "앱 뭐 있어", "앱 목록 봐", "어떤 앱 있어", "앱 리스트", "운영 중인 앱 뭐 있어", "등록된 앱 봐", "회사 앱 뭐 있어", "우리 앱 봐", "앱 슬러그 봐", "앱 ID 봐", "앱 목록 보여주세요", "어떤 앱이 있나요", "제 앱들 보여주세요", "운영 중인 앱 보여주세요", "apps", "list apps", "my apps", "available apps", "app catalog", "which apps", "app list", 또는 읽기 전용 앱 카탈로그 조회. 현재 팀 scope 으로 출력 필터링하고 요청 시 더 보기 옵션을 제공합니다.'
+description: '이 스킬은 사용자가 팀에 등록된 axhub 앱 목록을 보거나 명시적인 앱 관리 작업을 요청할 때 사용해요. 다음 표현에서 활성화: "내 앱 보여줘", "내 앱 봐", "앱 뭐 있어", "앱 목록 봐", "어떤 앱 있어", "앱 리스트", "운영 중인 앱 뭐 있어", "등록된 앱 봐", "회사 앱 뭐 있어", "우리 앱 봐", "앱 슬러그 봐", "앱 ID 봐", "앱 목록 보여주세요", "어떤 앱이 있나요", "제 앱들 보여주세요", "운영 중인 앱 보여주세요", "apps", "list apps", "my apps", "available apps", "app catalog", "which apps", "app list", 또는 앱 카탈로그/관리 흐름. 현재 팀 scope 으로 출력 필터링하고 생성/수정/delete 작업은 승인 토큰을 요구해요.'
 multi-step: false
 needs-preflight: true
 ---
 
-# Apps List (read-only, team-scoped)
+# Apps Management (team-scoped; mutations consent-gated)
 
-Show registered axhub apps for the current team. Read-only — never triggers a mutation, never needs consent token.
+Show registered axhub apps for the current team. Listing/details are read-only; create, update, and delete paths require an AskUserQuestion preview plus HMAC consent token before any mutation command.
 
 **Pre-execute preflight context (Phase 17 US-1706 — `!command` injection)**:
 
@@ -47,7 +47,7 @@ To list apps:
      ...
    ```
 
-**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — expansion → `skip` (top 10 으로 충분).
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — expansion → `skip` (top 10 으로 충분), delete confirmation → `abort` (삭제 안 함).
 
 5. **Offer expansion.** If the filtered list exceeds 10, surface AskUserQuestion:
 
@@ -106,17 +106,53 @@ axhub apps update "$APP" --field "$FIELD" --json
 
 ### apps delete
 
-Deletion must run a safe preview first when supported:
+Deletion is consent-gated. Do **not** run `axhub apps delete ... --dry-run --json` before approval; the hook parser currently treats every `apps delete` shape as destructive, including dry-run.
 
-```bash
-axhub apps delete "$APP" --dry-run --json
-```
+1. Build the preview only from read-only data:
 
-After exact slug confirm, mint `action=apps_delete` with top-level `app_id` and `context={slug}` and run:
+   ```bash
+   axhub apps list --json
+   axhub apps get "$COMMAND_TARGET" --json
+   ```
 
-```bash
-axhub apps delete "$APP" --yes --json
-```
+2. Define one target and keep it unchanged through the whole flow:
+
+   ```bash
+   COMMAND_TARGET="$APP"
+   ```
+
+   Prefer the exact slug the user typed or selected. If the user selected a numeric id instead, use that exact numeric id. The preview may show both slug and numeric id, but consent-bound fields use only `COMMAND_TARGET`.
+
+3. Ask for exact confirmation before minting a token:
+
+   ```json
+   {
+     "question": "앱을 삭제할까요?",
+     "header": "앱 삭제",
+     "options": [
+       {"label": "삭제", "value": "delete", "description": "표시한 COMMAND_TARGET 앱을 삭제해요."},
+       {"label": "취소", "value": "abort", "description": "삭제하지 않아요."}
+     ]
+   }
+   ```
+
+   In non-interactive mode, use the registry safe default `abort` and stop.
+
+4. Mint consent with the literal command-target invariant. For `apps_delete`, `context.slug` is the parser field name and may contain a numeric id when `COMMAND_TARGET` is numeric.
+
+   ```bash
+   # Binding shape: {"action":"apps_delete","app_id":"$COMMAND_TARGET","context":{"slug":"$COMMAND_TARGET"}}
+   CONSENT_BINDING_JSON=$(jq -nc \
+     --arg target "$COMMAND_TARGET" \
+     '{tool_call_id:"pending",action:"apps_delete",app_id:$target,profile:"",branch:"",commit_sha:"",context:{slug:$target}}')
+   printf '%s\n' "$CONSENT_BINDING_JSON" | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
+   ```
+
+5. Run exactly one delete command using the same target string:
+
+   ```bash
+   axhub apps delete "$COMMAND_TARGET" --yes --json
+   ```
 
 ### apps open delegation
 
@@ -127,7 +163,8 @@ If the user wants to open a live app or dashboard, route to `../open/SKILL.md` i
 - NEVER list cross-team apps without explicit user opt-in (F4 privacy guarantee).
 - NEVER dump >10 rows in the first response (overwhelms vibe coders).
 - NEVER drop `--json` (parsing depends on it).
-- NEVER cache app_id locally for use in mutation paths — the deploy skill must live-resolve.
+- NEVER cache app_id locally for deploy mutation paths — the deploy skill must live-resolve.
+- NEVER remint apps delete consent with numeric id when the command will use a slug, or with slug when the command will use a numeric id. Keep `COMMAND_TARGET` identical.
 - NEVER echo internal endpoint URLs of cross-team apps even if visible in stdout.
 
 ## Additional Resources

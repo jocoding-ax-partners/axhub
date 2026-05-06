@@ -1,5 +1,5 @@
 ---
-description: 현재 프로필이 볼 수 있는 axhub 앱 목록 (읽기 전용)
+description: 현재 프로필의 axhub 앱 목록/관리 (삭제 등 파괴적 작업은 승인 필요)
 allowed-tools: Bash(axhub-helpers:*), Bash(axhub:*), Bash(jq:*)
 argument-hint: "[--all] [--slug-prefix <name>]"
 model: sonnet
