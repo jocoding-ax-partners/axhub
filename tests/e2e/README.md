@@ -74,3 +74,32 @@ When done, unset the vars to avoid accidentally running E2E in subsequent sessio
 ```bash
 unset AXHUB_E2E_STAGING_TOKEN AXHUB_E2E_STAGING_ENDPOINT
 ```
+
+## Vibe bootstrap measurement gate (Sprint 4)
+
+`tests/e2e/staging.test.ts` stays read-only. The empty-dir → live URL measurement path is separate because it can create real apps/deploys and consume backend build capacity.
+
+Run only with explicit destructive opt-in:
+
+```bash
+export AXHUB_E2E_STAGING_TOKEN=<token>
+export AXHUB_E2E_STAGING_ENDPOINT=<explicit-staging-api-url>
+export AXHUB_E2E_DESTRUCTIVE=1
+export AXHUB_E2E_MAX_RUNS=1
+export AXHUB_E2E_COST_BUDGET_USD=1
+export AXHUB_E2E_CLEANUP_MODE=preprovisioned # or ttl
+export AXHUB_E2E_FIXTURE_APP=tests/e2e/fixtures/vibe-static-app
+
+bun run build
+bun run measure:vibe-bootstrap --out vibe-bootstrap-measurement-summary.json
+bun run check:vibe-sla --summary vibe-bootstrap-measurement-summary.json --mode advisory --min-samples 20 --p95-seconds 480
+```
+
+Safety contract:
+
+- `AXHUB_E2E_STAGING_ENDPOINT` is required. The script refuses default endpoint fallback.
+- `AXHUB_E2E_DESTRUCTIVE=1` is required.
+- Cost and run bounds are required.
+- Cleanup ownership is required: use a pre-provisioned staging app/project, or disposable app names with backend TTL/runbook.
+- Summary artifacts are redacted. They may include phase timings and booleans, but not tokens, emails, app slugs, raw URLs, command argv, stdout/stderr, or backend response bodies.
+- The SLA source of truth is harness wall-clock. Bootstrap telemetry markers only corroborate phase/re-entry/consent behavior.

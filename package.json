@@ -33,7 +33,9 @@
     "lint:tone:rust": "bun scripts/check-toss-tone-conformance.ts --include \"crates/**/*.rs\" --strict",
     "cargo:test": "cargo test --workspace",
     "cargo:build": "cargo build --workspace",
-    "cargo:coverage": "cargo llvm-cov --workspace --fail-under-lines 90"
+    "cargo:coverage": "cargo llvm-cov --workspace --fail-under-lines 90",
+    "measure:vibe-bootstrap": "bun scripts/measure-vibe-bootstrap.ts",
+    "check:vibe-sla": "bun scripts/check-vibe-bootstrap-sla.ts"
   },
   "engines": {
     "bun": ">=1.1.0"

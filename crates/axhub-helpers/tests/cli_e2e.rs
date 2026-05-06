@@ -45,6 +45,15 @@ fn run_in_dir(args: &[&str], cwd: &Path) -> Output {
         .unwrap()
 }
 
+fn run_in_dir_env(args: &[&str], cwd: &Path, envs: &[(&str, &str)]) -> Output {
+    let mut command = Command::new(bin());
+    command.args(args).current_dir(cwd);
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    command.output().unwrap()
+}
+
 fn run_stdin_in_dir(args: &[&str], stdin: &str, cwd: &Path) -> Output {
     let mut child = Command::new(bin())
         .args(args)
@@ -781,6 +790,118 @@ fn cli_bootstrap_auto_chain_plans_apps_create_without_hidden_remote_mutation() {
     assert_eq!(replayed_json["consent_binding"], json["consent_binding"]);
     assert_eq!(
         replayed_json["retry_policy"],
+        "no_retry_without_confirmed_idempotency"
+    );
+}
+
+#[test]
+fn cli_bootstrap_telemetry_markers_are_opt_in_redacted_and_re_entry_aware() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let state_home = temp.path().join("state-home");
+    let state_home_str = state_home.display().to_string();
+    let env_off = [
+        ("AXHUB_TELEMETRY", "0"),
+        ("XDG_STATE_HOME", state_home_str.as_str()),
+        ("CLAUDE_SESSION_ID", "bootstrap_session_abc123"),
+        ("AXHUB_PROFILE", "staging"),
+    ];
+
+    let off = run_in_dir_env(
+        &["bootstrap", "--auto-chain", "--json"],
+        temp.path(),
+        &env_off,
+    );
+    assert_eq!(off.status.code(), Some(0));
+    assert!(!state_home.join("axhub-plugin/usage.jsonl").exists());
+
+    std::fs::remove_dir_all(temp.path().join(".axhub")).unwrap();
+    std::fs::remove_file(temp.path().join(".gitignore")).unwrap();
+    let env_on = [
+        ("AXHUB_TELEMETRY", "1"),
+        ("XDG_STATE_HOME", state_home_str.as_str()),
+        ("CLAUDE_SESSION_ID", "bootstrap_session_abc123"),
+        ("AXHUB_PROFILE", "staging"),
+    ];
+
+    let planned = run_in_dir_env(
+        &["bootstrap", "--auto-chain", "--json"],
+        temp.path(),
+        &env_on,
+    );
+    assert_eq!(planned.status.code(), Some(0));
+    let replayed = run_in_dir_env(
+        &["bootstrap", "--auto-chain", "--json"],
+        temp.path(),
+        &env_on,
+    );
+    assert_eq!(replayed.status.code(), Some(0));
+
+    let raw = std::fs::read_to_string(state_home.join("axhub-plugin/usage.jsonl")).unwrap();
+    let events: Vec<serde_json::Value> = raw
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let event_names: Vec<&str> = events
+        .iter()
+        .filter_map(|event| event["event"].as_str())
+        .collect();
+    assert!(event_names.contains(&"bootstrap_phase_start"));
+    assert!(event_names.contains(&"bootstrap_phase_end"));
+    assert!(event_names.contains(&"bootstrap_re_entry_at_state"));
+    assert!(event_names.contains(&"consent_synthesized_by_helper"));
+
+    let allowed = [
+        "ts",
+        "session_id",
+        "plugin_version",
+        "cli_version",
+        "helper_version",
+        "event",
+        "schema_version",
+        "state",
+        "phase",
+        "outcome",
+        "elapsed_ms",
+        "decision_class",
+        "retry_policy",
+        "record_event",
+    ];
+    for event in &events {
+        let obj = event.as_object().unwrap();
+        for key in obj.keys() {
+            assert!(
+                allowed.contains(&key.as_str()),
+                "unexpected telemetry key: {key}"
+            );
+        }
+        let serialized = event.to_string();
+        for forbidden in [
+            "paydrop",
+            "apphub.yaml",
+            "axhub apps create",
+            "Bearer ",
+            "AXHUB_TOKEN",
+            "https://",
+            "stdout",
+            "stderr",
+        ] {
+            assert!(
+                !serialized.contains(forbidden),
+                "forbidden telemetry value {forbidden}: {serialized}"
+            );
+        }
+        assert_eq!(event["schema_version"], "bootstrap-telemetry/v1");
+    }
+
+    let consent = events
+        .iter()
+        .find(|event| event["event"] == "consent_synthesized_by_helper")
+        .unwrap();
+    assert_eq!(consent["record_event"], "apps_create");
+    assert_eq!(consent["decision_class"], "remote_destructive_plan");
+    assert_eq!(
+        consent["retry_policy"],
         "no_retry_without_confirmed_idempotency"
     );
 }
