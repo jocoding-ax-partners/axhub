@@ -4,6 +4,38 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.11](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.10...v0.2.11) (2026-05-06)
+
+Phase 25는 vibe coder가 첫 배포를 5분 안에 끝내도록 PRD, consent schema, bootstrap mutation gate, resolve-first deploy, 측정 E2E를 하나의 안전한 릴리스 단위로 묶은 패치예요. helper가 live `{data:[...]}` app list를 파싱하고 bootstrap-generated consent binding을 parser/preauth와 byte-equivalent로 맞추며, measurement runner는 비용·TTL·preprovisioned app·timeout guard 없이 destructive staging run을 시작하지 않아요.
+
+### Test baseline
+
+- Release chain: `bun run release` postbump가 `codegen:version` + `release:check`를 통과했어요.
+- Merge gate: stacked PR #28→#27, #25→#24, #27→#26, #26→#24, #24→#23, #23→main 순서로 머지했고 main push CI (`claude-cli-e2e`, `Rust CI`, `Rust staging gates`)가 success였어요.
+- Local Ralph gate: `cargo fmt --all -- --check`, `bunx tsc --noEmit`, `bun run lint:keywords --check`, `bun run lint:tone --strict`, `bun run skill:doctor --strict`, `cargo clippy -p axhub-helpers --all-targets -- -D warnings`, `cargo test -p axhub-helpers`, `bun test`, `bun run build`가 green이에요.
+
+### Honest tradeoff
+
+- Live destructive measurement는 secrets-gated advisory path로 남겨요. 이번 릴리스는 TTL 확인, preprovisioned app id, 비용 budget, per-command timeout을 강제해 안전한 실행 조건을 만든 뒤, 실제 staging mutation은 운영 secret이 있는 workflow에서만 실행되게 해요.
+- #26 merge propagation 중 Linux CI에서 test helper `BrokenPipe` race가 한 번 재현되어 `f427b18`로 조기 종료 child의 stdin close만 허용했어요. 명령 결과 assertion은 그대로 두고 BrokenPipe 외 stdin write error는 계속 실패해요.
+
+### Added
+
+* keep bootstrap mutations consent-gated ([db4f65d](https://github.com/jocoding-ax-partners/axhub/commit/db4f65df8666b7e1a2d00fb018c7d4b387038f26))
+* make vibe bootstrap SLA measurable without unsafe defaults ([4983c2b](https://github.com/jocoding-ax-partners/axhub/commit/4983c2bbc4e8d92f5bebc4c9bb01bfba57906e84))
+
+
+### Fixed
+
+* close vibe deploy merge blockers ([8b6d50c](https://github.com/jocoding-ax-partners/axhub/commit/8b6d50c2b3bd36f7641621f105f6a2b3cc4a7f7e))
+* prevent consent mint schema drift ([100f1e1](https://github.com/jocoding-ax-partners/axhub/commit/100f1e1f074bd62853f4157f8259efcbbaf2a615))
+* unblock first-run deploy helper drift ([f0924cb](https://github.com/jocoding-ax-partners/axhub/commit/f0924cb87439badcb1cac83e8858b2fcf4a764b9))
+
+
+### Docs
+
+* **prd:** vibe coder 5분 매끄러운 deploy PRD 작성 ([d41cacc](https://github.com/jocoding-ax-partners/axhub/commit/d41cacc096996de1ee0841d09f09e035c7be558f)), closes [#8](https://github.com/jocoding-ax-partners/axhub/issues/8)
+
 ## [0.2.10](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.9...v0.2.10) (2026-05-06)
 
 Phase 24.10은 vibe coder 가 multi-step SKILL (deploy / doctor / env / github / init / profile / recover / update / upgrade) 첫 응답에서 native Claude Code TodoWrite 의 orange 진행 박스와 markdown `작업 단계:` + `□ ...` 체크리스트를 동시에 보던 시각 중복을 없앤 UX 패치예요. TodoWrite tool call 만 단일 진행 source 로 남기고 markdown 체크리스트는 9개 SKILL 에서 일괄 제거해요. `skills/deploy/SKILL.md` 의 sentinel `1.5. **Git 저장 지점 준비**` 이후 git-init nested checklist 만 별도 UX 흐름으로 보존하고, `tests/multistep-stage-checklist.test.ts` 를 negative assertion 으로 invert 해 미래 markdown 재유입 drift 를 잠가요.
