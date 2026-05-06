@@ -111,10 +111,22 @@ To install ax-hub-cli on the user's host:
 
     매니저 부재 시 사용자에게 한국어로 안내하고 공식 installer 로 자동 전환 제안. 두 옵션 제시:
 
+    macOS (brew 부재):
+
     ```
     brew 가 설치되어 있지 않아요. 두 가지 방법 중 골라주세요:
       1. 공식 installer 로 axhub 설치 (Recommended) — brew 없이도 가능
+         (curl -fsSL https://cli.jocodingax.ai/install.sh | bash)
       2. brew 먼저 설치 후 axhub — https://brew.sh 안내
+    ```
+
+    Windows (scoop 부재):
+
+    ```
+    scoop 이 설치되어 있지 않아요. 두 가지 방법 중 골라주세요:
+      1. 공식 installer 로 axhub 설치 (Recommended) — scoop 없이도 가능
+         (irm https://cli.jocodingax.ai/install.ps1 | iex)
+      2. scoop 먼저 설치 후 axhub — https://scoop.sh 안내
     ```
 
     AskUserQuestion 으로 처리하거나, 사용자가 즉시 답한 의도가 명확하면 (예: "brew 깔게요" / "공식꺼") 그대로 따름. 매니저 설치 책임은 사용자에게 — SKILL 이 brew / scoop 자체를 자동 설치하지 않아요 (supply-chain scope 위반).
