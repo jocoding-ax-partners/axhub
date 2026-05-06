@@ -4,6 +4,29 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.14](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.13...v0.2.14) (2026-05-06)
+
+Phase 25.3 은 회사 보안 정책상 VC++ Redistributable 사전 설치를 가정할 수 없는 Windows 호스트에서 `axhub-helpers.exe` 가 `STATUS_DLL_NOT_FOUND` (0xC0000135) 로 즉시 종료되던 문제를 root-cause 해결한 릴리스예요. `.cargo/config.toml` 에 Windows MSVC target-scoped `+crt-static` rustflag 를 추가해 vcruntime140.dll / msvcp140.dll 동적 import 를 끊고, 회귀 방지를 위해 release.yml 과 rust-ci.yml 양쪽에 `dumpbin /dependents` assertion 을 박아 모든 PR 과 release tag 에서 정적 CRT 링크를 자동 enforce 해요.
+
+### Test baseline
+
+- Local gate: `bunx tsc --noEmit`, `bun test` (390 pass / 0 fail), `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict` 모두 green 이에요.
+- Build regression: macOS 에서 `cargo build --release -p axhub-helpers` 가 exit 0 — Windows-only rustflag 가 macOS / Linux 빌드를 건드리지 않는 target-scoped 격리 확인했어요.
+- CI assertion: rust-ci.yml Windows job 이 vswhere 로 dumpbin.exe 절대경로 resolve 후 vcruntime140 / msvcp140 import 시 즉시 fail 해요. release.yml 에도 동일 step 박혀서 tag push 시 회귀 차단해요.
+
+### Honest tradeoff
+
+- Windows 바이너리가 약 1MB 증가해요 — ripgrep / fd / deno / bun 이 채택한 표준 패턴과 동일한 트레이드오프예요. 단명 plugin helper scope 라 vcruntime CVE 패치 propagation 손실 영향은 미미해요.
+- 거부된 대안 — VC++ Redist 자동 설치 (admin 권한 필요, 회사 IT 정책 차단), windows-gnu target (ring crate MinGW 비호환), pre-flight DLL check (real fix 아님) — 은 모두 회사 환경 제약 또는 안정성 이유로 제외했어요.
+- 실제 Windows 사용자 검증은 v0.2.14 release upload 후 install.ps1 재실행으로 이어져요 — CI 의 dumpbin assertion 과 cosign 서명이 정적 CRT 링크 + 무결성을 1차 보증해요.
+
+
+### Fixed
+
+* **ci:** vswhere 로 dumpbin 절대경로 resolve ([6d552c3](https://github.com/jocoding-ax-partners/axhub/commit/6d552c35b6c677539cb0143bb12bfb88d0e4b9dc))
+* rust-ci 에 정적 CRT 회귀 가드 추가 ([ab17c01](https://github.com/jocoding-ax-partners/axhub/commit/ab17c01a8f8f58fa5b19b6185cecc1fffdb0d55d))
+* Windows helper STATUS_DLL_NOT_FOUND 정적 CRT 링크로 해결 ([19980b5](https://github.com/jocoding-ax-partners/axhub/commit/19980b5cfe1d9ae13de9168d247ccb2fc246f506))
+
 ## [0.2.13](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.12...v0.2.13) (2026-05-06)
 
 Phase 25.2는 deploy 중 git 저장 지점 확인으로 들어갈 때 이전 `init` TodoWrite 항목이 Claude Code UI에 남아 사용자에게 잘못된 진행 상태를 보여주던 UX 회귀를 막는 패치예요. deploy 스킬은 시작 시점과 git readiness 분기에서 기존 todo 를 patch 하지 않고 전체 교체하도록 명시하고, 회귀 테스트로 stale TodoWrite 재유입을 잠가요.

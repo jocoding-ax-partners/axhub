@@ -567,3 +567,14 @@ Deslop: 3 trims (SKILL trailing clause, test task-comment, CHANGELOG dup line).
 Out of scope (logged honest tradeoff):
   - /axhub:apis 작동하지 않았습니다 T-01 violation = Claude default polite Korean since SKILL body english. Phase 14 territory.
   - Build automation enforcement = v0.1.16.
+
+---
+[2026-05-06] Windows helper STATUS_DLL_NOT_FOUND fix (PR #30)
+- Branch: fix/windows-static-crt → main
+- Files: .cargo/config.toml (new), .github/workflows/release.yml (+12 lines)
+- Root cause: 0xC0000135 STATUS_DLL_NOT_FOUND — MSVC dynamic CRT (vcruntime140.dll/msvcp140.dll) resolve fail on hosts without VC++ Redist
+- Fix: target-scoped +crt-static rustflag (ripgrep/fd/deno/bun pattern)
+- Regression guard: release.yml dumpbin /dependents step blocks future +crt-static removal
+- Baselines: tsc clean / bun test 390 pass 0 fail / lint:tone 0 err / lint:keywords no diff / skill:doctor 17/17
+- Trade-off: ~1MB binary size increase (acceptable for short-lived plugin helper)
+- Next: user runs `bun run release -- --release-as patch` after PR merge → v0.2.14
