@@ -189,3 +189,40 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run test:e2e
+
+  vibe-bootstrap-measurement-advisory:
+    name: Vibe bootstrap SLA measurement (advisory)
+    runs-on: ubuntu-latest
+    needs: sign-and-upload
+    continue-on-error: true
+    if: ${{ vars.VIBE_BOOTSTRAP_MEASUREMENT_ENABLED == 'true' }}
+    env:
+      AXHUB_E2E_STAGING_TOKEN: ${{ secrets.AXHUB_E2E_STAGING_TOKEN }}
+      AXHUB_E2E_STAGING_ENDPOINT: ${{ secrets.AXHUB_E2E_STAGING_ENDPOINT }}
+      AXHUB_E2E_DESTRUCTIVE: ${{ vars.AXHUB_E2E_DESTRUCTIVE || '0' }}
+      AXHUB_E2E_MAX_RUNS: ${{ vars.AXHUB_E2E_MAX_RUNS || '1' }}
+      AXHUB_E2E_COST_BUDGET_USD: ${{ vars.AXHUB_E2E_COST_BUDGET_USD || '' }}
+      AXHUB_E2E_CLEANUP_MODE: ${{ vars.AXHUB_E2E_CLEANUP_MODE || '' }}
+      AXHUB_E2E_TTL_CONFIRMED: ${{ vars.AXHUB_E2E_TTL_CONFIRMED || '0' }}
+      AXHUB_E2E_PREPROVISIONED_APP_ID: ${{ vars.AXHUB_E2E_PREPROVISIONED_APP_ID || '' }}
+      AXHUB_E2E_COMMAND_TIMEOUT_MS: ${{ vars.AXHUB_E2E_COMMAND_TIMEOUT_MS || '120000' }}
+      AXHUB_E2E_FIXTURE_APP: tests/e2e/fixtures/vibe-static-app
+      AXHUB_E2E_MEASUREMENT_OUT: vibe-bootstrap-measurement-summary.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.94.1
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - name: Run advisory measurement
+        run: |
+          bun run measure:vibe-bootstrap --out "$AXHUB_E2E_MEASUREMENT_OUT"
+          bun run check:vibe-sla --summary "$AXHUB_E2E_MEASUREMENT_OUT" --mode advisory --min-samples 20 --p95-seconds 480
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-vibe-bootstrap-measurement-summary
+          path: vibe-bootstrap-measurement-summary.json
+          if-no-files-found: ignore

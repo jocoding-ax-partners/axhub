@@ -1,6 +1,7 @@
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
 fn bin() -> &'static str {
@@ -9,6 +10,14 @@ fn bin() -> &'static str {
 
 fn run(args: &[&str]) -> Output {
     Command::new(bin()).args(args).output().unwrap()
+}
+
+fn write_stdin_allowing_early_exit(writer: &mut impl Write, stdin: &str) {
+    match writer.write_all(stdin.as_bytes()) {
+        Ok(()) => {}
+        Err(err) if err.kind() == ErrorKind::BrokenPipe => {}
+        Err(err) => panic!("failed to write child stdin: {err}"),
+    }
 }
 
 fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
@@ -22,13 +31,115 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
         command.env(k, v);
     }
     let mut child = command.spawn().unwrap();
-    child
-        .stdin
-        .as_mut()
-        .unwrap()
-        .write_all(stdin.as_bytes())
-        .unwrap();
+    write_stdin_allowing_early_exit(child.stdin.as_mut().unwrap(), stdin);
     child.wait_with_output().unwrap()
+}
+
+fn assert_no_consent_side_effects(state_dir: &Path, runtime_dir: &Path) {
+    assert!(!state_dir.exists());
+    assert!(!runtime_dir.exists());
+}
+
+fn run_in_dir(args: &[&str], cwd: &Path) -> Output {
+    Command::new(bin())
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .unwrap()
+}
+
+fn run_in_dir_env(args: &[&str], cwd: &Path, envs: &[(&str, &str)]) -> Output {
+    let mut command = Command::new(bin());
+    command.args(args).current_dir(cwd);
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    command.output().unwrap()
+}
+
+fn run_stdin_in_dir(args: &[&str], stdin: &str, cwd: &Path) -> Output {
+    let mut child = Command::new(bin())
+        .args(args)
+        .current_dir(cwd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    write_stdin_allowing_early_exit(child.stdin.as_mut().unwrap(), stdin);
+    child.wait_with_output().unwrap()
+}
+
+fn stdout_json(output: &Output) -> serde_json::Value {
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|err| {
+        panic!(
+            "stdout must be json: {err}; stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )
+    })
+}
+
+fn record_apps_create_success(cwd: &Path, plan: &serde_json::Value) -> Output {
+    let envelope = serde_json::json!({
+        "schema_version": "bootstrap-record/v1",
+        "pending_action_id": plan["pending_action_id"],
+        "pending_action_hash": plan["pending_action_hash"],
+        "command_argv": plan["command"],
+        "exit_code": 0,
+        "stdout_json": serde_json::from_str::<serde_json::Value>(include_str!("fixtures/bootstrap/apps_create.success.v1.json")).unwrap(),
+        "stderr": ""
+    });
+    run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &envelope.to_string(),
+        cwd,
+    )
+}
+
+fn init_git_with_commit(cwd: &Path) {
+    assert!(Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(cwd)
+        .output()
+        .unwrap()
+        .status
+        .success());
+    for args in [
+        ["config", "user.email", "test@example.com"],
+        ["config", "user.name", "Axhub Test"],
+    ] {
+        assert!(Command::new("git")
+            .args(args)
+            .current_dir(cwd)
+            .output()
+            .unwrap()
+            .status
+            .success());
+    }
+    assert!(Command::new("git")
+        .args(["add", "apphub.yaml", ".gitignore"])
+        .current_dir(cwd)
+        .output()
+        .unwrap()
+        .status
+        .success());
+    assert!(Command::new("git")
+        .args(["commit", "-m", "init: test"])
+        .current_dir(cwd)
+        .output()
+        .unwrap()
+        .status
+        .success());
+}
+
+fn write_manifest(dir: &Path) {
+    std::fs::write(
+        dir.join("apphub.yaml"),
+        "name: Paydrop\nslug: paydrop\nframework: nextjs\n",
+    )
+    .unwrap();
 }
 
 #[test]
@@ -41,6 +152,7 @@ fn cli_version_help_redact_and_classify_work() {
     assert!(help.status.success());
     assert!(String::from_utf8_lossy(&help.stdout).contains("Subcommands"));
     assert!(String::from_utf8_lossy(&help.stdout).contains("prompt-route"));
+    assert!(String::from_utf8_lossy(&help.stdout).contains("bootstrap"));
 
     let mut child = Command::new(bin())
         .arg("redact")
@@ -395,6 +507,66 @@ fn cli_consent_mint_rejects_binding_schema_drift_before_writing_tokens() {
 }
 
 #[test]
+fn cli_consent_mint_validate_only_has_no_runtime_or_key_side_effects() {
+    let temp = tempfile::tempdir().unwrap();
+    let state_dir = temp.path().join("state");
+    let runtime_dir = temp.path().join("runtime");
+    let state = state_dir.display().to_string();
+    let runtime = runtime_dir.display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "validate-only-session"),
+    ];
+    let binding = serde_json::json!({
+        "tool_call_id":"validate-only-session:tc-validate",
+        "action":"deploy_create",
+        "app_id":"paydrop",
+        "profile":"prod",
+        "branch":"main",
+        "commit_sha":"abc123",
+        "context": {}
+    })
+    .to_string();
+
+    let validated = run_stdin(&["consent-mint", "--validate-only"], &binding, &envs);
+    assert_eq!(validated.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&validated.stdout);
+    assert!(stdout.contains(r#""valid":true"#));
+    assert!(stdout.contains(r#""action":"deploy_create"#));
+    assert_no_consent_side_effects(&state_dir, &runtime_dir);
+}
+
+#[test]
+fn cli_consent_mint_unknown_flags_fail_without_runtime_or_key_side_effects() {
+    let temp = tempfile::tempdir().unwrap();
+    let state_dir = temp.path().join("state");
+    let runtime_dir = temp.path().join("runtime");
+    let state = state_dir.display().to_string();
+    let runtime = runtime_dir.display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "unknown-flag-session"),
+    ];
+    let binding = serde_json::json!({
+        "tool_call_id":"unknown-flag-session:tc-flag",
+        "action":"deploy_create",
+        "app_id":"paydrop",
+        "profile":"prod",
+        "branch":"main",
+        "commit_sha":"abc123",
+        "context": {}
+    })
+    .to_string();
+
+    let rejected = run_stdin(&["consent-mint", "--unexpected"], &binding, &envs);
+    assert_eq!(rejected.status.code(), Some(64));
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("unknown option"));
+    assert_no_consent_side_effects(&state_dir, &runtime_dir);
+}
+
+#[test]
 fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
     let temp = tempfile::tempdir().unwrap();
     let state = temp.path().join("state").display().to_string();
@@ -556,4 +728,367 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
     assert_eq!(cancel_without_token.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&cancel_without_token.stdout)
         .contains("permissionDecision\":\"deny"));
+}
+
+#[test]
+fn cli_bootstrap_dry_run_does_not_create_state_or_gitignore() {
+    let temp = tempfile::tempdir().unwrap();
+    let output = run_in_dir(&["bootstrap", "--dry-run", "--json"], temp.path());
+    assert_eq!(output.status.code(), Some(65));
+    let json = stdout_json(&output);
+    assert_eq!(json["state"], "template_required");
+    assert_eq!(json["user_decision"], "template_required");
+    assert!(!temp.path().join(".axhub").exists());
+    assert!(!temp.path().join(".gitignore").exists());
+}
+
+#[test]
+fn cli_bootstrap_auto_chain_plans_apps_create_without_hidden_remote_mutation() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let ledger = temp.path().join("axhub-call-ledger.txt");
+    let output = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["state"], "consent_required_apps_create");
+    assert_eq!(json["next_action"], "apps_create");
+    assert_eq!(json["command"][0], "axhub");
+    assert_eq!(json["command"][1], "apps");
+    assert_eq!(json["command"][2], "create");
+    assert_eq!(json["consent_binding"]["action"], "apps_create");
+    assert_eq!(json["consent_binding"]["synthesized_by_helper"], true);
+    assert!(json["binding_hash"].as_str().unwrap().len() >= 16);
+    assert!(json["pending_action_id"]
+        .as_str()
+        .unwrap()
+        .starts_with("apps_create:"));
+    assert!(json["pending_action_hash"].as_str().unwrap().len() >= 16);
+    assert!(
+        !ledger.exists(),
+        "bootstrap must not execute axhub internally"
+    );
+    assert!(temp.path().join(".axhub/bootstrap.state.json").exists());
+    assert!(std::fs::read_to_string(temp.path().join(".gitignore"))
+        .unwrap()
+        .contains(".axhub/bootstrap.state.json"));
+
+    let replayed = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(replayed.status.code(), Some(0));
+    let replayed_json = stdout_json(&replayed);
+    assert_eq!(
+        replayed_json["pending_action_id"],
+        json["pending_action_id"]
+    );
+    assert_eq!(
+        replayed_json["pending_action_hash"],
+        json["pending_action_hash"]
+    );
+    assert_eq!(replayed_json["binding_hash"], json["binding_hash"]);
+    assert_eq!(replayed_json["command"], json["command"]);
+    assert_eq!(replayed_json["consent_binding"], json["consent_binding"]);
+    assert_eq!(
+        replayed_json["retry_policy"],
+        "no_retry_without_confirmed_idempotency"
+    );
+}
+
+#[test]
+fn cli_bootstrap_telemetry_markers_are_opt_in_redacted_and_re_entry_aware() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let state_home = temp.path().join("state-home");
+    let state_home_str = state_home.display().to_string();
+    let env_off = [
+        ("AXHUB_TELEMETRY", "0"),
+        ("XDG_STATE_HOME", state_home_str.as_str()),
+        ("CLAUDE_SESSION_ID", "bootstrap_session_abc123"),
+        ("AXHUB_PROFILE", "staging"),
+    ];
+
+    let off = run_in_dir_env(
+        &["bootstrap", "--auto-chain", "--json"],
+        temp.path(),
+        &env_off,
+    );
+    assert_eq!(off.status.code(), Some(0));
+    assert!(!state_home.join("axhub-plugin/usage.jsonl").exists());
+
+    std::fs::remove_dir_all(temp.path().join(".axhub")).unwrap();
+    std::fs::remove_file(temp.path().join(".gitignore")).unwrap();
+    let env_on = [
+        ("AXHUB_TELEMETRY", "1"),
+        ("XDG_STATE_HOME", state_home_str.as_str()),
+        ("CLAUDE_SESSION_ID", "bootstrap_session_abc123"),
+        ("AXHUB_PROFILE", "staging"),
+    ];
+
+    let planned = run_in_dir_env(
+        &["bootstrap", "--auto-chain", "--json"],
+        temp.path(),
+        &env_on,
+    );
+    assert_eq!(planned.status.code(), Some(0));
+    let replayed = run_in_dir_env(
+        &["bootstrap", "--auto-chain", "--json"],
+        temp.path(),
+        &env_on,
+    );
+    assert_eq!(replayed.status.code(), Some(0));
+
+    let raw = std::fs::read_to_string(state_home.join("axhub-plugin/usage.jsonl")).unwrap();
+    let events: Vec<serde_json::Value> = raw
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let event_names: Vec<&str> = events
+        .iter()
+        .filter_map(|event| event["event"].as_str())
+        .collect();
+    assert!(event_names.contains(&"bootstrap_phase_start"));
+    assert!(event_names.contains(&"bootstrap_phase_end"));
+    assert!(event_names.contains(&"bootstrap_re_entry_at_state"));
+    assert!(event_names.contains(&"consent_synthesized_by_helper"));
+
+    let allowed = [
+        "ts",
+        "session_id",
+        "plugin_version",
+        "cli_version",
+        "helper_version",
+        "event",
+        "schema_version",
+        "state",
+        "phase",
+        "outcome",
+        "elapsed_ms",
+        "decision_class",
+        "retry_policy",
+        "record_event",
+    ];
+    for event in &events {
+        let obj = event.as_object().unwrap();
+        for key in obj.keys() {
+            assert!(
+                allowed.contains(&key.as_str()),
+                "unexpected telemetry key: {key}"
+            );
+        }
+        let serialized = event.to_string();
+        for forbidden in [
+            "paydrop",
+            "apphub.yaml",
+            "axhub apps create",
+            "Bearer ",
+            "AXHUB_TOKEN",
+            "https://",
+            "stdout",
+            "stderr",
+        ] {
+            assert!(
+                !serialized.contains(forbidden),
+                "forbidden telemetry value {forbidden}: {serialized}"
+            );
+        }
+        assert_eq!(event["schema_version"], "bootstrap-telemetry/v1");
+    }
+
+    let consent = events
+        .iter()
+        .find(|event| event["event"] == "consent_synthesized_by_helper")
+        .unwrap();
+    assert_eq!(consent["record_event"], "apps_create");
+    assert_eq!(consent["decision_class"], "remote_destructive_plan");
+    assert_eq!(
+        consent["retry_policy"],
+        "no_retry_without_confirmed_idempotency"
+    );
+}
+
+#[test]
+fn cli_bootstrap_record_rejects_duplicate_out_of_order_and_mismatched_pending_actions() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(planned.status.code(), Some(0));
+    let plan = stdout_json(&planned);
+    let envelope = serde_json::json!({
+        "schema_version": "bootstrap-record/v1",
+        "pending_action_id": plan["pending_action_id"],
+        "pending_action_hash": plan["pending_action_hash"],
+        "command_argv": plan["command"],
+        "exit_code": 0,
+        "stdout_json": serde_json::from_str::<serde_json::Value>(include_str!("fixtures/bootstrap/apps_create.success.v1.json")).unwrap(),
+        "stderr": ""
+    });
+    let recorded = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &envelope.to_string(),
+        temp.path(),
+    );
+    assert_eq!(recorded.status.code(), Some(0));
+    assert_eq!(stdout_json(&recorded)["state"], "app_registered");
+
+    let duplicate = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &envelope.to_string(),
+        temp.path(),
+    );
+    assert_eq!(duplicate.status.code(), Some(64));
+    assert_eq!(
+        stdout_json(&duplicate)["reason"],
+        "record_duplicate_or_no_pending_action"
+    );
+
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    let plan = stdout_json(&planned);
+    let mut stale = envelope.clone();
+    stale["pending_action_id"] = plan["pending_action_id"].clone();
+    stale["pending_action_hash"] = serde_json::Value::String("bad-hash".into());
+    stale["command_argv"] = plan["command"].clone();
+    let mismatch = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &stale.to_string(),
+        temp.path(),
+    );
+    assert_eq!(mismatch.status.code(), Some(64));
+    assert_eq!(
+        stdout_json(&mismatch)["reason"],
+        "record_pending_action_mismatch"
+    );
+
+    let out_of_order = run_stdin_in_dir(
+        &["bootstrap", "--record", "deploy_create", "--json"],
+        &serde_json::json!({
+            "schema_version": "bootstrap-record/v1",
+            "pending_action_id": plan["pending_action_id"],
+            "pending_action_hash": plan["pending_action_hash"],
+            "command_argv": plan["command"],
+            "exit_code": 0,
+            "stdout_json": serde_json::from_str::<serde_json::Value>(include_str!("fixtures/bootstrap/apps_create.success.v1.json")).unwrap(),
+            "stderr": ""
+        })
+        .to_string(),
+        temp.path(),
+    );
+    assert_eq!(out_of_order.status.code(), Some(64));
+    assert_eq!(stdout_json(&out_of_order)["reason"], "record_out_of_order");
+}
+
+#[test]
+fn cli_bootstrap_git_init_and_first_commit_are_user_decision_states() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    let plan = stdout_json(&planned);
+    let envelope = serde_json::json!({
+        "schema_version": "bootstrap-record/v1",
+        "pending_action_id": plan["pending_action_id"],
+        "pending_action_hash": plan["pending_action_hash"],
+        "command_argv": plan["command"],
+        "exit_code": 0,
+        "stdout_json": serde_json::from_str::<serde_json::Value>(include_str!("fixtures/bootstrap/apps_create.success.v1.json")).unwrap(),
+        "stderr": ""
+    });
+    let recorded = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &envelope.to_string(),
+        temp.path(),
+    );
+    assert_eq!(recorded.status.code(), Some(0));
+
+    let no_git = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(no_git.status.code(), Some(65));
+    let no_git_json = stdout_json(&no_git);
+    assert_eq!(no_git_json["state"], "git_init_required");
+    assert_eq!(no_git_json["next_action"], "git_init");
+    assert_eq!(no_git_json["command"], serde_json::json!(["git", "init"]));
+    assert!(
+        !temp.path().join(".git").exists(),
+        "bootstrap must not run git init"
+    );
+
+    let git_init = Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(git_init.status.success());
+    let first_commit = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(first_commit.status.code(), Some(65));
+    let first_commit_json = stdout_json(&first_commit);
+    assert_eq!(first_commit_json["state"], "first_commit_required");
+    assert_eq!(first_commit_json["next_action"], "first_commit");
+    assert_eq!(first_commit_json["command"][0], "git");
+    assert_eq!(first_commit_json["command"][1], "commit");
+}
+
+#[test]
+fn cli_bootstrap_record_validates_event_before_reading_stdin() {
+    let temp = tempfile::tempdir().unwrap();
+    let missing = run_in_dir(&["bootstrap", "--record", "--json"], temp.path());
+    assert_eq!(missing.status.code(), Some(64));
+    assert_eq!(stdout_json(&missing)["reason"], "record_event_missing");
+
+    let unknown = run_in_dir(&["bootstrap", "--record", "unknown", "--json"], temp.path());
+    assert_eq!(unknown.status.code(), Some(64));
+    assert_eq!(stdout_json(&unknown)["reason"], "record_event_unknown");
+}
+
+#[test]
+fn cli_bootstrap_malformed_deploy_success_records_terminal_stop_without_stale_pending() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(planned.status.code(), Some(0));
+    let plan = stdout_json(&planned);
+    let recorded = record_apps_create_success(temp.path(), &plan);
+    assert_eq!(recorded.status.code(), Some(0));
+
+    init_git_with_commit(temp.path());
+    let deploy_plan = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(deploy_plan.status.code(), Some(0));
+    let deploy_plan_json = stdout_json(&deploy_plan);
+    assert_eq!(deploy_plan_json["next_action"], "deploy_create");
+    assert_eq!(
+        deploy_plan_json["consent_binding"]["action"],
+        "deploy_create"
+    );
+
+    let malformed = serde_json::json!({
+        "schema_version": "bootstrap-record/v1",
+        "pending_action_id": deploy_plan_json["pending_action_id"],
+        "pending_action_hash": deploy_plan_json["pending_action_hash"],
+        "command_argv": deploy_plan_json["command"],
+        "exit_code": 0,
+        "stdout_json": {},
+        "stderr": ""
+    });
+    let malformed_record = run_stdin_in_dir(
+        &["bootstrap", "--record", "deploy_create", "--json"],
+        &malformed.to_string(),
+        temp.path(),
+    );
+    assert_eq!(malformed_record.status.code(), Some(65));
+    let malformed_json = stdout_json(&malformed_record);
+    assert_eq!(malformed_json["state"], "backend_contract_missing_defaults");
+    assert_eq!(
+        malformed_json["reason"],
+        "deploy_create_missing_deployment_id"
+    );
+
+    let replay = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(replay.status.code(), Some(65));
+    let replay_json = stdout_json(&replay);
+    assert_eq!(replay_json["state"], "backend_contract_missing_defaults");
+    assert!(replay_json.get("pending_action_id").is_none());
+    assert!(replay_json.get("command").is_none());
+
+    let state_raw =
+        std::fs::read_to_string(temp.path().join(".axhub/bootstrap.state.json")).unwrap();
+    let state_json: serde_json::Value = serde_json::from_str(&state_raw).unwrap();
+    assert!(state_json.get("pending_action").is_none());
+    assert_eq!(state_json["completed_actions"].as_array().unwrap().len(), 2);
 }

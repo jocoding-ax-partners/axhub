@@ -1,0 +1,11 @@
+{
+  "tool_call_id": "fixture-session:env-set",
+  "action": "env_set",
+  "app_id": "paydrop",
+  "profile": "",
+  "branch": "",
+  "commit_sha": "",
+  "context": {
+    "key": "DATABASE_URL"
+  }
+}

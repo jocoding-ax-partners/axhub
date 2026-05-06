@@ -349,3 +349,4 @@ apphub.yaml CRLF, git init defaults, path separator.
 ## 13. 변경 이력
 
 - **2026-05-06 (Phase 24.11 draft)**: 초안 작성. ralplan iter 1 Architect/Critic feedback 반영. Issue #8 empirical confirmed. 4 sprint phased rollout. P50/P95 SLA 채택.
+- **2026-05-06 (Sprint 4 ralplan)**: Sprint 4는 helper telemetry 를 SLA 근거로 쓰지 않고, full-chain measurement harness wall-clock 을 P50/P95 source of truth 로 둔다. telemetry 는 `bootstrap_phase_start/end`, `bootstrap_re_entry_at_state`, `consent_synthesized_by_helper` marker 로만 사용한다. destructive measurement 는 explicit staging endpoint + token + `AXHUB_E2E_DESTRUCTIVE=1` + cost/run budget + cleanup/TTL contract 가 있을 때만 advisory/manual/nightly 로 실행한다. blocking release gate 는 N≥20 sample, backend P3 readiness, cleanup ownership, pre-publication workflow placement 후에만 켠다.

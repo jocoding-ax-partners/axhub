@@ -126,7 +126,8 @@ pub fn parse_apps_list(stdout: &str) -> Option<Vec<AppRecord>> {
     let parsed: serde_json::Value = serde_json::from_str(stdout).ok()?;
     let arr = parsed
         .as_array()
-        .or_else(|| parsed.get("apps").and_then(serde_json::Value::as_array))?;
+        .or_else(|| parsed.get("apps").and_then(serde_json::Value::as_array))
+        .or_else(|| parsed.get("data").and_then(serde_json::Value::as_array))?;
     Some(
         arr.iter()
             .filter_map(|item| {
