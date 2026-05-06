@@ -235,9 +235,9 @@ The drift between this file and the hand-written sibling is checked by
 
 **원인:** 선택한 account 에 axhub GitHub App 이 설치되어 있지 않거나 repo 권한이 없어요.
 
-**해결:** CLI 가 제공한 install URL 로 설치를 마친 뒤 다시 연결해요. 권한 부여는 자동으로 진행하지 않아요.
+**해결:** CLI 출력의 install_url 을 GitHub 연결 링크로 바로 보여줘요. 권한 부여는 자동으로 진행하지 않아요.
 
-**버튼:** 설치 URL 보기 / repo 다시 고르기 / 닫기
+**버튼:** GitHub 연결 링크 / repo 다시 고르기 / 닫기
 
 ---
 

@@ -63,6 +63,10 @@ fn positional(tokens: &[String], index: usize) -> Option<String> {
     tokens.get(index).filter(|v| !v.starts_with('-')).cloned()
 }
 
+fn is_help_request(tokens: &[String]) -> bool {
+    tokens.iter().any(|t| matches!(t.as_str(), "--help" | "-h"))
+}
+
 fn destructive(action: &str, tokens: &[String], app_id: Option<String>) -> ParsedAxhubCommand {
     let flags = extract_flags(tokens.get(3..).unwrap_or_default());
     ParsedAxhubCommand {
@@ -176,6 +180,9 @@ fn tokens_if_axhub_command(raw_position: &str) -> Option<Vec<String>> {
 }
 
 fn match_known_intent(tokens: &[String]) -> Option<ParsedAxhubCommand> {
+    if is_help_request(tokens) {
+        return None;
+    }
     let sub = tokens.get(1).map(String::as_str);
     let sub2 = tokens.get(2).map(String::as_str);
     let flags = extract_flags(tokens.get(3..).unwrap_or_default());

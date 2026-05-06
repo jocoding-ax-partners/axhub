@@ -34,6 +34,29 @@ describe("deploy skill git init stage", () => {
     expect(entry.rationale).toContain("git init");
   });
 
+  test("git-init and deploy preview questions are structured AskUserQuestion payloads", () => {
+    const content = readFileSync(DEPLOY_SKILL, "utf8");
+    const registry = JSON.parse(readFileSync(ASK_DEFAULTS, "utf8"));
+
+    expect(content).toContain('"question": "배포 전 저장 지점을 만들까요?"');
+    expect(content).toContain('"header": "저장 지점"');
+    expect(content).toContain('"value": "init_and_continue"');
+    expect(content).toContain('"value": "show_commands"');
+    expect(content).toContain('"value": "abort"');
+
+    expect(content).toContain("Then ask with structured AskUserQuestion JSON");
+    expect(content).toContain('"question": "진행할까요?"');
+    expect(content).toContain('"header": "배포 확인"');
+    expect(content).toContain('"label": "네, 배포"');
+    expect(content).toContain('"value": "approve"');
+    expect(content).toContain('"label": "미리보기만"');
+    expect(content).toContain('"value": "dry_run"');
+    expect(content).toContain("If the user chooses `dry_run`, add `--dry-run`");
+
+    expect(registry.deploy["진행할까요?"].safe_default).toBe("미리보기만");
+    expect(registry.deploy["진행할까요?"].rationale).toContain("dry-run");
+  });
+
   test("uses bootstrap plan/record before destructive deploy commands", () => {
     const content = readFileSync(DEPLOY_SKILL, "utf8");
 
@@ -50,6 +73,18 @@ describe("deploy skill git init stage", () => {
     expect(content).toContain("no_retry_without_confirmed_idempotency");
     expect(content).toContain("schema_version");
     expect(content).toContain("bootstrap-record/v1");
+  });
+
+  test("github connection blocker shows a direct link instead of slash-command handoff", () => {
+    const content = readFileSync(DEPLOY_SKILL, "utf8");
+
+    expect(content).toContain("github.git_connection_required");
+    expect(content).toContain("GitHub 저장소 연결");
+    expect(content).toContain('axhub github repos list --json');
+    expect(content).toContain("GitHub 연결 링크: <install_url>");
+    expect(content).toContain("https://github.com/new?name=$APP_SLUG");
+    expect(content).toContain('axhub github connect "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --account "$ACCOUNT" --json');
+    expect(content).not.toContain("(/axhub:github 호출)");
   });
 
 });

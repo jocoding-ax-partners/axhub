@@ -169,7 +169,7 @@ fn catalog_classifies_base_subclassified_and_default_entries() {
     assert!(
         classify(67, r#"{"error":{"code":"github.install_not_found"}}"#)
             .button
-            .is_some_and(|button| button.contains("설치 URL"))
+            .is_some_and(|button| button.contains("GitHub 연결 링크"))
     );
     assert!(classify(
         66,
@@ -569,6 +569,67 @@ fn resolve_marks_non_git_repositories_as_init_needed() {
     assert!(!run.output.git_repo);
     assert!(!run.output.git_has_commit);
     assert!(run.output.git_init_needed);
+}
+
+#[test]
+fn resolve_uses_manifest_name_slug_when_utterance_has_no_candidate() {
+    let _lock = env_lock().lock().unwrap();
+    let guard = EnvGuard::new(&["AXHUB_PROFILE", "AXHUB_ENDPOINT", "AXHUB_BIN"]);
+    let _cwd = CwdGuard::enter(guard._dir.path());
+    fs::write(
+        guard._dir.path().join("apphub.yaml"),
+        "name: nextjs-axhub\nframework: nextjs\n",
+    )
+    .unwrap();
+
+    let run =
+        run_resolve_with_runner(
+            &["--user-utterance".into(), "배포해줘".into()],
+            |cmd| match cmd {
+                ["axhub", "auth", "status", "--json"] => SpawnResult {
+                    exit_code: 0,
+                    stdout: r#"{"user_email":"u@example.com","scopes":["deploy"]}"#.into(),
+                    stderr: String::new(),
+                },
+                ["axhub", "apps", "list", "--json"] => SpawnResult {
+                    exit_code: 0,
+                    stdout: r#"[{"id":165,"slug":"nextjs-axhub"}]"#.into(),
+                    stderr: String::new(),
+                },
+                ["git", "rev-parse", "--is-inside-work-tree"] => SpawnResult {
+                    exit_code: 0,
+                    stdout: "true\n".into(),
+                    stderr: String::new(),
+                },
+                ["git", "branch", "--show-current"] => SpawnResult {
+                    exit_code: 0,
+                    stdout: "main\n".into(),
+                    stderr: String::new(),
+                },
+                ["git", "rev-parse", "HEAD"] => SpawnResult {
+                    exit_code: 0,
+                    stdout: "4fd1140\n".into(),
+                    stderr: String::new(),
+                },
+                ["git", "log", "-1", "--pretty=%s"] => SpawnResult {
+                    exit_code: 0,
+                    stdout: "init\n".into(),
+                    stderr: String::new(),
+                },
+                _ => SpawnResult {
+                    exit_code: 1,
+                    stdout: String::new(),
+                    stderr: String::new(),
+                },
+            },
+        );
+
+    assert_eq!(run.exit_code, EXIT_OK);
+    assert_eq!(run.output.candidate_slug.as_deref(), Some("nextjs-axhub"));
+    assert_eq!(run.output.app_id, Some(165));
+    assert_eq!(run.output.app_slug.as_deref(), Some("nextjs-axhub"));
+    assert_eq!(run.output.branch.as_deref(), Some("main"));
+    assert_eq!(run.output.commit_sha.as_deref(), Some("4fd1140"));
 }
 
 #[test]
@@ -1440,6 +1501,9 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
     }
 
     for command in [
+        "axhub apps create --help",
+        "axhub apps create -h",
+        "axhub deploy create --help",
         "axhub bootstrap install-node",
         "axhub install-deps",
         "axhub admin setup team",
@@ -1621,9 +1685,10 @@ fn keychain_bad_value_runner(_cmd: &[&str], _timeout_ms: u64) -> CommandOutput {
 #[test]
 fn keychain_runner_maps_platform_success_missing_parse_error_and_unsupported() {
     assert_eq!(parse_keyring_value(""), None);
-    let default_ok = axhub_helpers::keychain::default_runner(&["rustc", "--version"], 1000);
+    let helper_bin = env!("CARGO_BIN_EXE_axhub-helpers");
+    let default_ok = axhub_helpers::keychain::default_runner(&[helper_bin, "version"], 1000);
     assert_eq!(default_ok.exit_code, 0);
-    assert!(default_ok.stdout.contains("rustc "));
+    assert!(default_ok.stdout.contains("axhub-helpers "));
     let default_err = axhub_helpers::keychain::default_runner(&["/definitely-not-a-command"], 1000);
     assert_ne!(default_err.exit_code, 0);
     assert!(!default_err.stderr.is_empty());
@@ -1730,10 +1795,11 @@ fn windows_edr_runner(_cmd: &[&str], _timeout_ms: u64) -> WindowsSpawnResult {
 
 #[test]
 fn windows_keychain_runner_covers_success_and_failure_guidance() {
+    let helper_bin = env!("CARGO_BIN_EXE_axhub-helpers");
     let default_ok =
-        axhub_helpers::keychain_windows::default_windows_runner(&["rustc", "--version"], 1000);
+        axhub_helpers::keychain_windows::default_windows_runner(&[helper_bin, "version"], 1000);
     assert_eq!(default_ok.exit_code, 0);
-    assert!(default_ok.stdout.contains("rustc "));
+    assert!(default_ok.stdout.contains("axhub-helpers "));
     let default_err = axhub_helpers::keychain_windows::default_windows_runner(
         &["/definitely-not-a-command"],
         1000,
@@ -1882,9 +1948,10 @@ fn spawn_sync_covers_empty_command_and_successful_child_output() {
     let empty = axhub_helpers::spawn::spawn_sync(&[]).unwrap_err();
     assert!(empty.to_string().contains("command is empty"));
 
-    let rustc = axhub_helpers::spawn::spawn_sync(&["rustc", "--version"]).unwrap();
-    assert_eq!(rustc.exit_code, Some(0));
-    assert!(rustc.stdout.contains("rustc "));
+    let helper_bin = env!("CARGO_BIN_EXE_axhub-helpers");
+    let helper = axhub_helpers::spawn::spawn_sync(&[helper_bin, "version"]).unwrap();
+    assert_eq!(helper.exit_code, Some(0));
+    assert!(helper.stdout.contains("axhub-helpers "));
 }
 
 #[test]

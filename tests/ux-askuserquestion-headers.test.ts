@@ -23,6 +23,13 @@ describe("Phase 17 C3/US-1703 — AskUserQuestion header ≤12 chars", () => {
   for (const slug of skillSlugs) {
     test(`skills/${slug}/SKILL.md AskUserQuestion headers ≤12 Korean chars`, () => {
       const content = readFileSync(join(SKILLS_DIR, slug, "SKILL.md"), "utf8");
+      const questionMatches = [...content.matchAll(/"question":\s*"([^"]+)"/g)];
+      for (let i = 0; i < questionMatches.length; i++) {
+        const start = questionMatches[i].index ?? 0;
+        const end = questionMatches[i + 1]?.index ?? content.length;
+        const block = content.slice(start, end);
+        expect(block, `${slug}:${questionMatches[i][1]} missing header`).toContain('"header":');
+      }
       const headerMatches = content.match(/"header":\s*"([^"]+)"/g) ?? [];
       for (const m of headerMatches) {
         const value = m.match(/"header":\s*"([^"]+)"/)?.[1] ?? "";
