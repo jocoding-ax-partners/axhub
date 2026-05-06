@@ -175,6 +175,75 @@ fn cli_version_help_redact_and_classify_work() {
     assert!(String::from_utf8_lossy(&classified.stdout).contains("로그인이 만료"));
 }
 
+#[test]
+fn cli_preauth_allows_axhub_help_flags_for_destructive_subcommands() {
+    for command in [
+        "axhub apps create --help",
+        "axhub apps create -h",
+        "axhub deploy create --help",
+    ] {
+        let payload = serde_json::json!({
+            "session_id": "cli-e2e-session",
+            "tool_call_id": format!("tc-help-{command}"),
+            "tool_name": "Bash",
+            "tool_input": {"command": command}
+        })
+        .to_string();
+        let output = run_stdin(&["preauth-check"], &payload, &[]);
+        assert_eq!(output.status.code(), Some(0), "{command}");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("permissionDecision\":\"allow"),
+            "{command}: {stdout}"
+        );
+    }
+}
+
+#[test]
+fn cli_preauth_claims_pending_github_connect_consent() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let runtime = temp.path().join("run");
+    std::fs::create_dir_all(&runtime).unwrap();
+    let state_s = state.to_str().unwrap();
+    let runtime_s = runtime.to_str().unwrap();
+    let envs = [("XDG_STATE_HOME", state_s), ("XDG_RUNTIME_DIR", runtime_s)];
+
+    let binding = serde_json::json!({
+        "tool_call_id": "pending",
+        "action": "github_connect",
+        "app_id": "165",
+        "profile": "",
+        "branch": "main",
+        "commit_sha": "",
+        "context": {
+            "repo": "realitsyourman/test2",
+            "branch": "main",
+            "account": "realitsyourman"
+        }
+    })
+    .to_string();
+    let mint = run_stdin(&["consent-mint"], &binding, &envs);
+    assert_eq!(mint.status.code(), Some(0));
+
+    let payload = serde_json::json!({
+        "session_id": "cli-e2e-session",
+        "tool_call_id": "tc-github-connect",
+        "tool_name": "Bash",
+        "tool_input": {
+            "command": "axhub github connect 165 --repo realitsyourman/test2 --branch main --account realitsyourman --json"
+        }
+    })
+    .to_string();
+    let output = run_stdin(&["preauth-check"], &payload, &envs);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("permissionDecision\":\"allow"),
+        "preauth stdout: {stdout}"
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn cli_prompt_route_injects_doctor_context_for_version_skew() {

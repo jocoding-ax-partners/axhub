@@ -749,6 +749,23 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
+  test("github skill mints consent before connect/disconnect and avoids manual hook bypass", () => {
+    const github = skillContents.get("github")!;
+    expect(github).toContain("axhub-helpers");
+    expect(github).toContain('"action":"github_connect"');
+    expect(github).toContain('"branch":"${BRANCH}"');
+    expect(github).toContain('"context":{"repo":"${OWNER_REPO}","branch":"${BRANCH}","account":"${ACCOUNT}"}');
+    expect(github).toContain('axhub github connect "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --account "$ACCOUNT" --json');
+    expect(github).toContain('"action":"github_disconnect"');
+    expect(github).toContain('"context":{"slug":"${APP_ID_OR_SLUG}"}');
+    expect(github).toContain('axhub github disconnect "$APP_ID" --force --confirm "$APP_ID" --json');
+    expect(github).toContain("PATH 의 `axhub-helpers`");
+    expect(github).toContain("GitHub 연결 링크: <install_url>");
+    expect(github).toContain("axhub github repos list --json");
+    expect(github).toContain("NEVER `CLAUDE_PLUGIN_ROOT` 누락");
+    expect(github).not.toContain("! axhub github connect");
+  });
+
   test("deploy skill documents current deploy list and cancel surfaces", () => {
     const deploy = skillContents.get("deploy")!;
     expect(deploy).toContain('axhub deploy list --app "$APP_ID" --json');

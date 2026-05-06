@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fs;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -110,6 +111,37 @@ pub fn extract_slug_candidate(utterance: &str) -> Option<String> {
         }
         if SLUG_RE.is_match(tok) {
             return Some(tok.to_string());
+        }
+    }
+    None
+}
+
+fn read_manifest_slug() -> Option<String> {
+    for path in ["apphub.yaml", "axhub.yaml"] {
+        let Ok(content) = fs::read_to_string(path) else {
+            continue;
+        };
+        let mut name_candidate = None;
+        for key in ["slug", "name"] {
+            for line in content.lines() {
+                let Some(raw_value) = line.trim().strip_prefix(&format!("{key}:")) else {
+                    continue;
+                };
+                let value = raw_value
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string();
+                if !value.is_empty() && SLUG_RE.is_match(&value) {
+                    if key == "slug" {
+                        return Some(value);
+                    }
+                    name_candidate = Some(value);
+                }
+            }
+        }
+        if name_candidate.is_some() {
+            return name_candidate;
         }
     }
     None
@@ -245,7 +277,7 @@ where
     F: Fn(&[&str]) -> SpawnResult,
 {
     let parsed_args = parse_resolve_args(args);
-    let candidate = extract_slug_candidate(&parsed_args.user_utterance);
+    let candidate = extract_slug_candidate(&parsed_args.user_utterance).or_else(read_manifest_slug);
     let bin = axhub_bin();
     let base = ResolveOutput {
         profile: std::env::var("AXHUB_PROFILE")

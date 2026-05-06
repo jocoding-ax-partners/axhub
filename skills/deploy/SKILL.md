@@ -104,17 +104,21 @@ To deploy:
    ```json
    {
      "question": "배포 전 저장 지점을 만들까요?",
+     "header": "저장 지점",
      "options": [
        {
          "label": "초기화하고 계속",
+         "value": "init_and_continue",
          "description": "현재 폴더에 git 저장소와 첫 커밋을 만들고 배포를 이어가요."
        },
        {
          "label": "명령어만 보기",
+         "value": "show_commands",
          "description": "아무것도 바꾸지 않고 직접 실행할 명령어만 보여줘요."
        },
        {
          "label": "취소",
+         "value": "abort",
          "description": "배포를 멈춰요."
        }
      ]
@@ -163,6 +167,34 @@ To deploy:
 
    Use the template in `references/error-empathy-catalog.md` ("deploy-preview"). Apply NFKC normalize to displayed slug; if NFKC altered the string, surface a warning.
 
+   Then ask with structured AskUserQuestion JSON:
+
+   ```json
+   {
+     "question": "진행할까요?",
+     "header": "배포 확인",
+     "options": [
+       {
+         "label": "네, 배포",
+         "value": "approve",
+         "description": "consent token 을 만들고 실제 배포를 시작해요."
+       },
+       {
+         "label": "미리보기만",
+         "value": "dry_run",
+         "description": "--dry-run 으로 실제 배포 없이 확인해요."
+       },
+       {
+         "label": "취소",
+         "value": "abort",
+         "description": "배포를 멈춰요."
+       }
+     ]
+   }
+   ```
+
+   If the user chooses `dry_run`, add `--dry-run` to Step 4 and skip Step 5. If the user chooses `abort`, stop without minting consent.
+
 4. **On user approval**, mint a consent token and run deploy. Run this step only when Step 1.1 did not already execute and record `deploy_create`; never double-submit a deploy for the same pending bootstrap action.
 
    ```bash
@@ -195,6 +227,20 @@ To deploy:
 
 6. **On any non-zero exit**, route to `references/error-empathy-catalog.md` by exit code:
    - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 앱은 안전해요. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.
+   - exit 64/67 + `github.git_connection_required`, `github.git_connection_not_found`, `git_connection_required`, or CLI stderr containing "GitHub 저장소 연결" → do not ask "지금 GitHub repo 연결 진행할까요?" and do not ask the user to invoke `/axhub:github`. Immediately show a direct GitHub connection block:
+
+     ```bash
+     echo '[deploy:Step 6 github-link] entered' >&2
+     axhub github repos list --json
+     ```
+
+     Render the first `install_url` from that output as `GitHub 연결 링크: <install_url>` so the user can grant repo access directly. If the repo itself does not exist yet, also show `GitHub repo 만들기: https://github.com/new?name=$APP_SLUG`. Then show the exact follow-up command without executing it until consent is minted in the github skill flow:
+
+     ```bash
+     axhub github connect "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --account "$ACCOUNT" --json
+     ```
+
+     If the account is already installed and the desired repo appears in `axhub github repos list --account "$ACCOUNT" --json`, tell the user the repo is ready and route directly to `skills/github/SKILL.md` Step 4 consent-connect without another yes/no handoff.
    - exit 65 → token expired template + AskUserQuestion to run auth login
    - exit 67 → resource not found + did-you-mean suggestion from apps list
    - exit 68 → rate limit + Retry-After backoff
