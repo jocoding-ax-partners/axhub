@@ -2,7 +2,8 @@ use std::io::{self, Read};
 
 use axhub_helpers::catalog::classify;
 use axhub_helpers::consent::{
-    mint_token, parse_axhub_command, verify_or_claim_token, verify_token, ConsentBinding,
+    format_preauth_deny_hint, mint_token, parse_axhub_command, verify_or_claim_token, verify_token,
+    ConsentBinding,
 };
 use axhub_helpers::list_deployments::{run_list_deployments, ListDeploymentsArgs};
 use axhub_helpers::preflight::run_preflight;
@@ -218,6 +219,7 @@ fn cmd_preauth_check() -> anyhow::Result<i32> {
         );
         return Ok(0);
     }
+    let deny_hint = format_preauth_deny_hint(parsed.action.as_deref(), parsed.app_id.as_deref());
     let is_identity = parsed.action.as_deref() == Some("auth_login");
     let binding = ConsentBinding {
         tool_call_id: format!(
@@ -266,7 +268,7 @@ fn cmd_preauth_check() -> anyhow::Result<i32> {
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "deny"
             },
-            "systemMessage": "이 명령은 사전 승인이 필요해요. 먼저 'paydrop 배포해'라고 말해서 승인 카드를 받으세요."
+            "systemMessage": deny_hint
         }));
         Ok(0)
     }
