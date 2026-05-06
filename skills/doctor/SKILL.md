@@ -52,7 +52,22 @@ To run diagnostics:
    - `helper downloaded artifact` (Windows only): `$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers-windows-amd64.exe`
    - `helper installer`: `${CLAUDE_PLUGIN_ROOT}/bin/install.sh` or `$env:CLAUDE_PLUGIN_ROOT\bin\install.ps1`
 
-   If PATH is missing but plugin-local helper exists, mark PATH as ⚠ and continue using the plugin-local helper path for later checks. If both PATH and plugin-local helper are missing, skip remaining preflight rows and report ✗ helper missing only.
+   **CLAUDE_PLUGIN_ROOT empty fallback** — Claude Code 가 env var 를 propagate 안 했거나 PowerShell session 에서 unset 된 경우, 알려진 cache path 패턴으로 scan:
+
+   - Windows: `$env:USERPROFILE\.claude\plugins\cache\axhub\axhub\*\bin\axhub-helpers.exe`
+   - Unix: `$HOME/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers`
+
+   가장 최신 버전 (semver descending) 의 binary 사용. 발견 시 row 는 ✓ 로 표시하되 본문에 사용한 절대경로 명시.
+
+   **Status mapping** (PATH missing 은 plugin-local 가 작동하면 정상 fallback):
+
+   | PATH | plugin-local (또는 cache scan) | 결과 |
+   |---|---|---|
+   | ✓ found | ✓ found | ✓ helper PATH (정상) |
+   | ✗ missing | ✓ found | ✓ helper plugin-local (정상 fallback — PATH 미등록은 plugin design 상 의도) |
+   | ✗ missing | ✗ missing | ✗ helper missing — install 안내 + 후속 row skip |
+
+   PATH 미등록 자체는 ⚠ 가 아닌 정상 동작이에요. plugin-local path 는 plugin 설치 위치 (`$CLAUDE_PLUGIN_ROOT/bin/`) 한정이라 user PATH 오염 방지가 의도된 design. plugin-local 또는 cache scan 으로 binary 를 찾을 수 있으면 ✓ 표시하고, 어떤 경로를 사용했는지 본문에 한 줄 명시 ("plugin-local 사용 중: \<path\>").
 
    Windows missing-helper next action:
 
