@@ -677,6 +677,15 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
+  test("doctor skill distinguishes Windows helper install states", () => {
+    const doctorContent = skillContents.get("doctor")!;
+    expect(doctorContent).toContain("Get-Command axhub-helpers");
+    expect(doctorContent).toContain("axhub-helpers.exe");
+    expect(doctorContent).toContain("axhub-helpers-windows-amd64.exe");
+    expect(doctorContent).toContain("install.ps1");
+    expect(doctorContent).toContain("powershell -NoProfile -ExecutionPolicy Bypass -File");
+  });
+
   test("deploy skill has body referencing axhub-helpers binary", () => {
     const deployContent = skillContents.get("deploy")!;
     expect(deployContent).toContain("axhub-helpers");

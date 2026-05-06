@@ -37,15 +37,53 @@ To deploy:
 
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
-1. **Live resolve** — call the helper to fetch authoritative `{profile, endpoint, app_id, app_slug, branch, commit_sha, commit_message, eta_sec}`:
+
+1. **Live resolve first.** Fetch authoritative `{profile, endpoint, app_id, app_slug, branch, commit_sha, commit_message, eta_sec}` before any bootstrap create flow:
 
    ```bash
    echo '[deploy:Step 1 resolve] entered' >&2
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
    ```
 
-   Never use cached `app_id` for mutation. If resolve returns ambiguity, ask the user to disambiguate (slug list with numeric IDs).
-   The resolve JSON also includes `git_repo`, `git_has_commit`, and `git_init_needed`; deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
+   Never use cached `app_id` for mutation. If live resolve returns an `app_id`, this is an existing app deploy: do **not** run `bootstrap apps_create`, and continue with git readiness, preflight, preview, and the normal consent-deploy path. If resolve returns ambiguity, ask the user to disambiguate (slug list with numeric IDs). If resolve cannot identify a registered app and the project has an `apphub.yaml`/`axhub.yaml`, enter the first-run bootstrap bridge below. The resolve JSON also includes `git_repo`, `git_has_commit`, and `git_init_needed`; deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
+
+1.1. **First-run bootstrap plan/record bridge (Sprint 3).** Use this only when Step 1 did not resolve an existing `app_id`. Before any first-run remote mutation, ask the Rust FSM for the next safe step:
+
+   ```bash
+   echo '[deploy:Step 1 bootstrap-plan] entered' >&2
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers bootstrap --auto-chain --json
+   ```
+
+   Treat this output as the source of truth for Sprint 3 bootstrap state. If it returns `template_required`, `git_init_required`, `first_commit_required`, `subdomain_collision`, `backend_contract_missing_defaults`, or `idempotency_unavailable`, stop at that user-decision state and show the helper reason plus the safest next command. If it returns `next_action: apps_create` or `next_action: deploy_create`, show the exact `command`, `binding_hash`, `pending_action_id`, `pending_action_hash`, `retry_policy`, and consent preview before running anything. The helper is only a planner/recorder here; it must not be treated as approval to mutate. If `deploy_create` is executed and recorded here, do not mint or run a second `deploy_create` in Step 4; jump to Step 5 status-chain with the recorded deployment id.
+
+   Execute returned destructive `axhub ... --json` commands only as top-level Bash after the preview/consent path. Then record the observed result back into the FSM with the same pending metadata:
+
+   ```bash
+   echo '[deploy:Step 1 bootstrap-record] entered' >&2
+   cat > /tmp/axhub-bootstrap-record.json <<JSON
+   {
+     "schema_version": "bootstrap-record/v1",
+     "pending_action_id": "$PENDING_ACTION_ID",
+     "pending_action_hash": "$PENDING_ACTION_HASH",
+     "command_argv": $COMMAND_ARGV_JSON,
+     "exit_code": $EXIT_CODE,
+     "stdout_json": $STDOUT_JSON,
+     "stderr": "$STDERR_JSON_ESCAPED"
+   }
+   JSON
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers bootstrap --record "$NEXT_ACTION" --json < /tmp/axhub-bootstrap-record.json
+   ```
+
+   S3B retry ownership lives in this skill because this skill runs the top-level command. Retry a create only when helper output explicitly provides an idempotency key and a retry policy that allows it. If the helper says `no_retry_without_confirmed_idempotency` or returns `idempotency_unavailable`, do not retry; show the typed stop.
+
+1.2. **Fresh resolve after local/bootstrap state changes** — call the helper again if git/bootstrap work changed app or commit identity:
+
+   ```bash
+   echo '[deploy:Step 1 resolve] entered' >&2
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
+   ```
+
+   Never use cached `app_id` for mutation. If resolve still returns ambiguity, ask the user to disambiguate (slug list with numeric IDs). Deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
 
 1.5. **Git 저장 지점 준비** — if resolve returns `git_init_needed: true` OR `git_has_commit: false` OR either `branch`/`commit_sha` is empty, do not show the deploy preview yet. First explain in non-developer Korean:
 
@@ -125,7 +163,7 @@ To deploy:
 
    Use the template in `references/error-empathy-catalog.md` ("deploy-preview"). Apply NFKC normalize to displayed slug; if NFKC altered the string, surface a warning.
 
-4. **On user approval**, mint a consent token and run deploy:
+4. **On user approval**, mint a consent token and run deploy. Run this step only when Step 1.1 did not already execute and record `deploy_create`; never double-submit a deploy for the same pending bootstrap action.
 
    ```bash
    echo '[deploy:Step 4 consent-deploy] entered' >&2
@@ -207,6 +245,10 @@ axhub deploy cancel "$DEPLOYMENT_ID" --app "$APP_ID" --yes --json
 After cancellation, run a read-only status check and summarize the terminal state.
 
 ## NEVER
+
+- NEVER treat `axhub-helpers bootstrap --auto-chain --json` as approval; it is only a plan/record FSM.
+- NEVER retry `apps_create` or `deploy_create` unless bootstrap returns a confirmed idempotency key and retry policy that allows retry.
+- NEVER skip `bootstrap --record` after a returned top-level destructive command finishes; pending action correlation is the audit trail.
 
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop `--json` (parsing relies on it).

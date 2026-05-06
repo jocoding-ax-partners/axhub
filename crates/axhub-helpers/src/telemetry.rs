@@ -3,6 +3,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use chrono::{SecondsFormat, Utc};
 use regex::Regex;
@@ -13,7 +14,15 @@ pub const PLUGIN_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const HELPER_VERSION: &str = env!("CARGO_PKG_VERSION");
 static VERSION_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(\d+\.\d+\.\d+(?:-[a-z0-9.]+)?)").unwrap());
-static CACHED_CLI_VERSION: Mutex<Option<String>> = Mutex::new(None);
+const CLI_VERSION_CACHE_TTL: Duration = Duration::from_secs(30);
+
+#[derive(Debug, Clone)]
+struct CachedCliVersion {
+    version: String,
+    resolved_at: Instant,
+}
+
+static CACHED_CLI_VERSION: Mutex<Option<CachedCliVersion>> = Mutex::new(None);
 
 fn home_dir() -> PathBuf {
     std::env::var_os("HOME")
@@ -22,12 +31,25 @@ fn home_dir() -> PathBuf {
 }
 
 pub fn resolve_cli_version() -> String {
+    resolve_cli_version_with(Instant::now(), resolve_uncached_cli_version)
+}
+
+fn resolve_cli_version_with<F>(now: Instant, mut resolve_uncached: F) -> String
+where
+    F: FnMut() -> String,
+{
     let mut cache = CACHED_CLI_VERSION.lock().expect("cli version cache lock");
-    if let Some(v) = cache.as_ref() {
-        return v.clone();
+    if let Some(cached) = cache.as_ref() {
+        let fresh = now.saturating_duration_since(cached.resolved_at) < CLI_VERSION_CACHE_TTL;
+        if fresh && cached.version == HELPER_VERSION {
+            return cached.version.clone();
+        }
     }
-    let resolved = resolve_uncached_cli_version();
-    *cache = Some(resolved.clone());
+    let resolved = resolve_uncached();
+    *cache = Some(CachedCliVersion {
+        version: resolved.clone(),
+        resolved_at: now,
+    });
     resolved
 }
 
@@ -66,6 +88,7 @@ fn resolve_uncached_cli_version() -> String {
 pub fn reset_cli_version_cache() {
     *CACHED_CLI_VERSION.lock().expect("cli version cache lock") = None;
 }
+
 pub fn is_enabled() -> bool {
     std::env::var("AXHUB_TELEMETRY").as_deref() == Ok("1")
 }
@@ -133,4 +156,59 @@ pub fn emit_meta_envelope(fields: Map<String, Value>) -> anyhow::Result<()> {
     // Telemetry must not block the hot path; match TS by swallowing failures.
     let _ = result;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    #[test]
+    fn cli_version_cache_uses_thirty_second_ttl_for_matching_helper_version() {
+        reset_cli_version_cache();
+        let calls = Cell::new(0);
+        let start = Instant::now();
+
+        let first = resolve_cli_version_with(start, || {
+            calls.set(calls.get() + 1);
+            HELPER_VERSION.to_string()
+        });
+        assert_eq!(first, HELPER_VERSION);
+
+        let second = resolve_cli_version_with(start + Duration::from_secs(29), || {
+            calls.set(calls.get() + 1);
+            "9.9.9".into()
+        });
+        assert_eq!(second, HELPER_VERSION);
+        assert_eq!(calls.get(), 1);
+
+        let third = resolve_cli_version_with(start + Duration::from_secs(30), || {
+            calls.set(calls.get() + 1);
+            "9.9.9".into()
+        });
+        assert_eq!(third, "9.9.9");
+        assert_eq!(calls.get(), 2);
+        reset_cli_version_cache();
+    }
+
+    #[test]
+    fn cli_version_cache_invalidates_cached_helper_mismatch_immediately() {
+        reset_cli_version_cache();
+        let calls = Cell::new(0);
+        let start = Instant::now();
+
+        let first = resolve_cli_version_with(start, || {
+            calls.set(calls.get() + 1);
+            "0.0.1".into()
+        });
+        assert_eq!(first, "0.0.1");
+
+        let second = resolve_cli_version_with(start + Duration::from_secs(1), || {
+            calls.set(calls.get() + 1);
+            HELPER_VERSION.to_string()
+        });
+        assert_eq!(second, HELPER_VERSION);
+        assert_eq!(calls.get(), 2);
+        reset_cli_version_cache();
+    }
 }

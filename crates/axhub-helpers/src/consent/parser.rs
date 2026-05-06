@@ -199,8 +199,16 @@ fn match_known_intent(tokens: &[String]) -> Option<ParsedAxhubCommand> {
         (Some("apps"), Some("create")) => {
             let app = flags.get("slug").cloned().or_else(|| positional(tokens, 3));
             let mut parsed = destructive("apps_create", tokens, app.clone());
+            let interactive = tokens.iter().any(|t| t == "--interactive");
             insert_if_some(&mut parsed.context, "slug", app);
-            insert_if_some(&mut parsed.context, "source", flags.get("source").cloned());
+            insert_if_some(
+                &mut parsed.context,
+                "source",
+                flags
+                    .get("source")
+                    .cloned()
+                    .or_else(|| interactive.then(|| "interactive".into())),
+            );
             parsed
         }
         (Some("apps"), Some("update")) => {

@@ -14,8 +14,11 @@ on:
       - "crates/**"
       - "fuzz/**"
       - "scripts/build-rust-helper.ts"
+      - "scripts/measure-vibe-bootstrap.ts"
+      - "scripts/check-vibe-bootstrap-sla.ts"
       - "scripts/release-check.ts"
       - "tests/e2e/**"
+      - "tests/vibe-bootstrap-measurement.test.ts"
       - "tests/release-config.test.ts"
   push:
     branches: [main]
@@ -26,8 +29,11 @@ on:
       - "crates/**"
       - "fuzz/**"
       - "scripts/build-rust-helper.ts"
+      - "scripts/measure-vibe-bootstrap.ts"
+      - "scripts/check-vibe-bootstrap-sla.ts"
       - "scripts/release-check.ts"
       - "tests/e2e/**"
+      - "tests/vibe-bootstrap-measurement.test.ts"
       - "tests/release-config.test.ts"
   schedule:
     - cron: "30 17 * * *" # 02:30 KST nightly
@@ -50,6 +56,11 @@ on:
         type: string
       run_windows_smoke:
         description: "Run GitHub Windows smoke; V3/AhnLab remains manual cohort evidence"
+        required: true
+        default: false
+        type: boolean
+      run_measurement:
+        description: "Run destructive vibe bootstrap measurement in advisory mode"
         required: true
         default: false
         type: boolean
@@ -93,7 +104,7 @@ jobs:
       - name: TypeScript and workflow regression tests
         run: |
           bunx tsc --noEmit
-          bun test tests/release-config.test.ts tests/e2e/staging.test.ts
+          bun test tests/release-config.test.ts tests/e2e/staging.test.ts tests/vibe-bootstrap-measurement.test.ts
       - name: Release preflight
         run: bun run release:check
 
@@ -154,6 +165,48 @@ jobs:
       - name: Run read-only staging E2E
         if: steps.gate.outputs.run_staging == 'true'
         run: bun run test:e2e
+
+  vibe-bootstrap-measurement:
+    name: Vibe bootstrap measurement (advisory)
+    runs-on: ubuntu-22.04
+    needs: local-rust-primary-gate
+    continue-on-error: true
+    timeout-minutes: 30
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_measurement) || vars.VIBE_BOOTSTRAP_MEASUREMENT_ENABLED == 'true' }}
+    env:
+      AXHUB_E2E_STAGING_TOKEN: ${{ secrets.AXHUB_E2E_STAGING_TOKEN }}
+      AXHUB_E2E_STAGING_ENDPOINT: ${{ secrets.AXHUB_E2E_STAGING_ENDPOINT }}
+      AXHUB_E2E_DESTRUCTIVE: ${{ vars.AXHUB_E2E_DESTRUCTIVE || '0' }}
+      AXHUB_E2E_MAX_RUNS: ${{ vars.AXHUB_E2E_MAX_RUNS || '1' }}
+      AXHUB_E2E_COST_BUDGET_USD: ${{ vars.AXHUB_E2E_COST_BUDGET_USD || '' }}
+      AXHUB_E2E_CLEANUP_MODE: ${{ vars.AXHUB_E2E_CLEANUP_MODE || '' }}
+      AXHUB_E2E_TTL_CONFIRMED: ${{ vars.AXHUB_E2E_TTL_CONFIRMED || '0' }}
+      AXHUB_E2E_PREPROVISIONED_APP_ID: ${{ vars.AXHUB_E2E_PREPROVISIONED_APP_ID || '' }}
+      AXHUB_E2E_COMMAND_TIMEOUT_MS: ${{ vars.AXHUB_E2E_COMMAND_TIMEOUT_MS || '120000' }}
+      AXHUB_E2E_FIXTURE_APP: tests/e2e/fixtures/vibe-static-app
+      AXHUB_E2E_MEASUREMENT_OUT: vibe-bootstrap-measurement-summary.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build Rust helper for measurement
+        run: bun run build
+      - name: Run destructive measurement in advisory mode
+        run: |
+          set -euo pipefail
+          bun run measure:vibe-bootstrap --out "$AXHUB_E2E_MEASUREMENT_OUT"
+          bun run check:vibe-sla --summary "$AXHUB_E2E_MEASUREMENT_OUT" --mode advisory --min-samples 20 --p95-seconds 480
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vibe-bootstrap-measurement-summary
+          path: vibe-bootstrap-measurement-summary.json
+          if-no-files-found: ignore
 
   parser-fuzz:
     name: Parser fuzz gate

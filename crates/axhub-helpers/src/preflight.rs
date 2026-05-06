@@ -13,6 +13,8 @@ pub const EXIT_USAGE: i32 = 64;
 pub const EXIT_AUTH: i32 = 65;
 
 static SEMVER_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\d+)\.(\d+)\.(\d+)").unwrap());
+static APP_SLUG_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[a-z0-9][a-z0-9-]*$").unwrap());
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpawnResult {
@@ -153,6 +155,43 @@ fn read_last_deploy_cache() -> Option<LastDeployCache> {
     serde_json::from_str(&fs::read_to_string(last_deploy_cache_path()).ok()?).ok()
 }
 
+fn parse_manifest_app_slug(raw: &str) -> Option<String> {
+    for key in ["app_slug", "slug", "name"] {
+        for line in raw.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            let Some((candidate_key, value)) = trimmed.split_once(':') else {
+                continue;
+            };
+            if candidate_key.trim() != key {
+                continue;
+            }
+            let value = value
+                .split('#')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .trim();
+            if APP_SLUG_RE.is_match(value) {
+                return Some(value.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn read_manifest_current_app() -> Option<String> {
+    ["apphub.yaml", "axhub.yaml"].into_iter().find_map(|path| {
+        fs::read_to_string(path)
+            .ok()
+            .and_then(|raw| parse_manifest_app_slug(&raw))
+    })
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PreflightRun {
     pub output: PreflightOutput,
@@ -220,6 +259,7 @@ where
         current_app: std::env::var("AXHUB_APP_SLUG")
             .ok()
             .filter(|s| !s.is_empty())
+            .or_else(read_manifest_current_app)
             .or_else(|| cache.as_ref().and_then(|c| c.app_slug.clone())),
         current_env: std::env::var("AXHUB_PROFILE")
             .ok()

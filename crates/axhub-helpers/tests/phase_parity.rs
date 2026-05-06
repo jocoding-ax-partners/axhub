@@ -2,10 +2,14 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::{Mutex, OnceLock};
 
+use axhub_helpers::bootstrap::{
+    interpret_apps_create_result, run_bootstrap, AppsCreateDecision, BootstrapState,
+    BOOTSTRAP_RECORD_SCHEMA_VERSION,
+};
 use axhub_helpers::catalog::classify;
 use axhub_helpers::consent::{
-    format_preauth_deny_hint, mint_token, parse_axhub_command, verify_or_claim_token, verify_token,
-    ConsentBinding,
+    format_preauth_deny_hint, mint_token, parse_axhub_command, validate_binding_schema,
+    verify_or_claim_token, verify_token, ConsentBinding,
 };
 use axhub_helpers::keychain::{
     parse_keyring_value, read_keychain_token_with_runner, CommandOutput,
@@ -72,6 +76,22 @@ impl Drop for EnvGuard {
     }
 }
 
+struct CwdGuard {
+    saved: std::path::PathBuf,
+}
+impl CwdGuard {
+    fn enter(path: &std::path::Path) -> Self {
+        let saved = std::env::current_dir().unwrap();
+        std::env::set_current_dir(path).unwrap();
+        Self { saved }
+    }
+}
+impl Drop for CwdGuard {
+    fn drop(&mut self) {
+        std::env::set_current_dir(&self.saved).unwrap();
+    }
+}
+
 fn base_binding() -> ConsentBinding {
     ConsentBinding {
         tool_call_id: "sess-abc:tc-1".into(),
@@ -81,7 +101,19 @@ fn base_binding() -> ConsentBinding {
         branch: "main".into(),
         commit_sha: "a3f9c1b".into(),
         context: HashMap::new(),
+        synthesized_by_helper: false,
     }
+}
+
+fn decode_token_payload(file_path: &str) -> Value {
+    let raw = fs::read_to_string(file_path).unwrap();
+    let token_file: Value = serde_json::from_str(&raw).unwrap();
+    let jwt = token_file.get("jwt").and_then(Value::as_str).unwrap();
+    let payload = jwt.split('.').nth(1).unwrap();
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .unwrap();
+    serde_json::from_slice(&decoded).unwrap()
 }
 
 #[test]
@@ -365,6 +397,71 @@ fn preflight_covers_auth_shapes_env_cache_and_cli_absence() {
 }
 
 #[test]
+fn preflight_current_app_prefers_env_manifest_then_cache() {
+    let _lock = env_lock().lock().unwrap();
+    let guard = EnvGuard::new(&["HOME", "AXHUB_APP_SLUG", "AXHUB_BIN"]);
+    let _cwd = CwdGuard::enter(guard._dir.path());
+    std::env::set_var("HOME", guard.path("home"));
+    std::env::remove_var("AXHUB_APP_SLUG");
+    fs::create_dir_all(guard.path("home/.cache/axhub-plugin")).unwrap();
+    fs::write(
+        guard.path("home/.cache/axhub-plugin/last-deploy.json"),
+        r#"{"deployment_id":"dep-1","status":"active","app_slug":"cached-app"}"#,
+    )
+    .unwrap();
+
+    let ok_runner = |cmd: &[&str]| match cmd {
+        ["axhub", "--version"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: "axhub 0.1.5".into(),
+            stderr: String::new(),
+        },
+        ["axhub", "auth", "status", "--json"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: r#"{"user_email":"u@example.com","scopes":["read"]}"#.into(),
+            stderr: String::new(),
+        },
+        _ => SpawnResult {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: String::new(),
+        },
+    };
+
+    fs::write("apphub.yaml", "name: yaml-app\n").unwrap();
+    let manifest = run_preflight_with_runner(ok_runner);
+    assert_eq!(manifest.output.current_app.as_deref(), Some("yaml-app"));
+
+    std::env::set_var("AXHUB_APP_SLUG", "env-app");
+    let env_override = run_preflight_with_runner(ok_runner);
+    assert_eq!(env_override.output.current_app.as_deref(), Some("env-app"));
+
+    std::env::remove_var("AXHUB_APP_SLUG");
+    fs::remove_file("apphub.yaml").unwrap();
+    fs::write("axhub.yaml", "slug: legacy-app\n").unwrap();
+    let legacy_manifest = run_preflight_with_runner(ok_runner);
+    assert_eq!(
+        legacy_manifest.output.current_app.as_deref(),
+        Some("legacy-app")
+    );
+
+    fs::remove_file("axhub.yaml").unwrap();
+    fs::write("apphub.yaml", "name: not a slug\n").unwrap();
+    let invalid_manifest = run_preflight_with_runner(ok_runner);
+    assert_eq!(
+        invalid_manifest.output.current_app.as_deref(),
+        Some("cached-app")
+    );
+
+    fs::remove_file("apphub.yaml").unwrap();
+    let cache_fallback = run_preflight_with_runner(ok_runner);
+    assert_eq!(
+        cache_fallback.output.current_app.as_deref(),
+        Some("cached-app")
+    );
+}
+
+#[test]
 fn resolve_filters_apps_and_preserves_git_context_for_errors() {
     assert_eq!(
         extract_slug_candidate("paydrop 배포해"),
@@ -375,6 +472,16 @@ fn resolve_filters_apps_and_preserves_git_context_for_errors() {
     )
     .unwrap();
     assert_eq!(filter_apps_by_slug(&apps, "paydrop").len(), 2);
+    let envelope_apps =
+        parse_apps_list(r#"{"apps":[{"id":7,"slug":"paydrop","name":"Paydrop"}],"total":1}"#)
+            .unwrap();
+    assert_eq!(envelope_apps[0].slug, "paydrop");
+    assert_eq!(envelope_apps[0].name.as_deref(), Some("Paydrop"));
+    let data_apps =
+        parse_apps_list(r#"{"data":[{"id":8,"slug":"paydrop-live","name":"Paydrop Live"}]}"#)
+            .unwrap();
+    assert_eq!(data_apps[0].id, 8);
+    assert_eq!(data_apps[0].slug, "paydrop-live");
     let run = run_resolve_with_runner(
         &["--user-utterance".into(), "paydrop 배포해".into()],
         |cmd| match cmd {
@@ -385,7 +492,7 @@ fn resolve_filters_apps_and_preserves_git_context_for_errors() {
             },
             ["axhub", "apps", "list", "--json"] => SpawnResult {
                 exit_code: 0,
-                stdout: r#"[{"id":42,"slug":"paydrop"}]"#.into(),
+                stdout: r#"{"data":[{"id":42,"slug":"paydrop"}],"total":1}"#.into(),
                 stderr: String::new(),
             },
             ["git", "rev-parse", "--is-inside-work-tree"] => SpawnResult {
@@ -486,6 +593,7 @@ fn resolve_covers_arg_parsing_auth_parse_ambiguity_and_not_found_paths() {
     );
     assert_eq!(extract_slug_candidate("그거 배포해줘"), None);
     assert!(parse_apps_list("not json").is_none());
+    assert!(parse_apps_list(r#"{"apps":"not-array","total":1}"#).is_none());
     assert_eq!(
         parse_apps_list(r#"[{"id":1,"slug":"paydrop"},{"id":"bad","slug":"skip"}]"#)
             .unwrap()
@@ -986,6 +1094,222 @@ fn consent_binding_accepts_context_and_backfills_legacy_tokens() {
     }))
     .unwrap();
     assert!(legacy.context.is_empty());
+    assert!(!legacy.synthesized_by_helper);
+}
+
+#[test]
+fn consent_synthesized_by_helper_claim_is_audit_only() {
+    let _lock = env_lock().lock().unwrap();
+    let guard = EnvGuard::new(&["XDG_STATE_HOME", "XDG_RUNTIME_DIR", "CLAUDE_SESSION_ID"]);
+    std::env::set_var("XDG_STATE_HOME", guard.path("state"));
+    std::env::set_var("XDG_RUNTIME_DIR", guard.path("runtime"));
+    std::env::set_var("CLAUDE_SESSION_ID", "synthesized-audit-session");
+
+    let mut synthesized = base_binding();
+    synthesized.synthesized_by_helper = true;
+    let minted = mint_token(synthesized.clone(), 60).unwrap();
+    let claims = decode_token_payload(&minted.file_path);
+    assert_eq!(
+        claims.get("synthesized_by_helper").and_then(Value::as_bool),
+        Some(true)
+    );
+
+    let mut default_binding = synthesized;
+    default_binding.synthesized_by_helper = false;
+    assert!(verify_token(default_binding).valid);
+}
+
+#[test]
+fn consent_binding_fixture_contract_stays_valid_for_future_bootstrap_synthesizer() {
+    const FIXTURES: &[&str] = &[
+        "deploy_create.pending.json",
+        "apps_create.from_file.json",
+        "apps_create.interactive.json",
+        "env_set.json",
+        "helper_synthesized.deploy_create.json",
+    ];
+
+    for fixture in FIXTURES {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/consent-bindings")
+            .join(fixture);
+        let raw = fs::read_to_string(&path).unwrap();
+        let binding: ConsentBinding = serde_json::from_str(&raw).unwrap();
+        validate_binding_schema(&binding).unwrap_or_else(|err| {
+            panic!(
+                "{} should be a valid consent binding fixture: {err}",
+                path.display()
+            )
+        });
+
+        if *fixture == "helper_synthesized.deploy_create.json" {
+            assert!(binding.synthesized_by_helper);
+        }
+    }
+}
+
+#[test]
+fn consent_binding_schema_accepts_known_actions_and_rejects_required_field_gaps() {
+    let mut deploy = base_binding();
+    assert!(validate_binding_schema(&deploy).is_ok());
+
+    deploy.action = "unknown_publish".into();
+    assert_eq!(
+        validate_binding_schema(&deploy).unwrap_err().to_string(),
+        "binding_schema:unknown_action:unknown_publish"
+    );
+
+    let mut missing_branch = base_binding();
+    missing_branch.branch.clear();
+    assert_eq!(
+        validate_binding_schema(&missing_branch)
+            .unwrap_err()
+            .to_string(),
+        "binding_schema:missing_field:branch"
+    );
+
+    let valid_cases = [
+        (
+            "apps_create",
+            "",
+            "",
+            "",
+            "",
+            [("source", "apphub.yaml")].as_slice(),
+        ),
+        (
+            "apps_create",
+            "",
+            "",
+            "",
+            "",
+            [("source", "interactive")].as_slice(),
+        ),
+        (
+            "apps_update",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("slug", "paydrop"), ("field", "name=Paydrop")].as_slice(),
+        ),
+        (
+            "apps_delete",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("slug", "paydrop")].as_slice(),
+        ),
+        (
+            "env_set",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("key", "DATABASE_URL")].as_slice(),
+        ),
+        (
+            "env_delete",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("key", "DATABASE_URL")].as_slice(),
+        ),
+        (
+            "github_connect",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("repo", "paydrop"), ("branch", "main")].as_slice(),
+        ),
+        (
+            "github_disconnect",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("slug", "paydrop")].as_slice(),
+        ),
+        (
+            "deploy_cancel",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("deployment_id", "dep_123")].as_slice(),
+        ),
+        (
+            "profile_add",
+            "",
+            "",
+            "",
+            "",
+            [
+                ("profile", "corp"),
+                ("endpoint", "https://corp.example.test"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "profile_use",
+            "",
+            "",
+            "",
+            "",
+            [("profile", "corp")].as_slice(),
+        ),
+        (
+            "apis_call",
+            "",
+            "",
+            "",
+            "",
+            [("endpoint_id", "endpoint_123"), ("method", "POST")].as_slice(),
+        ),
+        ("update_apply", "paydrop", "", "", "", [].as_slice()),
+        ("deploy_logs_kill", "paydrop", "", "", "", [].as_slice()),
+        ("auth_login", "_", "default", "_", "_", [].as_slice()),
+    ];
+
+    for (action, app_id, profile, branch, commit_sha, context) in valid_cases {
+        let mut binding = ConsentBinding {
+            tool_call_id: "sess:tool".into(),
+            action: action.into(),
+            app_id: app_id.into(),
+            profile: profile.into(),
+            branch: branch.into(),
+            commit_sha: commit_sha.into(),
+            context: HashMap::new(),
+            synthesized_by_helper: false,
+        };
+        for (key, value) in context {
+            binding.context.insert((*key).into(), (*value).into());
+        }
+        assert!(validate_binding_schema(&binding).is_ok(), "{action}");
+    }
+
+    let mut missing_source = ConsentBinding {
+        tool_call_id: "sess:tool".into(),
+        action: "apps_create".into(),
+        app_id: "".into(),
+        profile: "".into(),
+        branch: "".into(),
+        commit_sha: "".into(),
+        context: HashMap::new(),
+        synthesized_by_helper: false,
+    };
+    missing_source
+        .context
+        .insert("slug".into(), "paydrop".into());
+    assert_eq!(
+        validate_binding_schema(&missing_source)
+            .unwrap_err()
+            .to_string(),
+        "binding_schema:missing_context:source"
+    );
 }
 
 #[test]
@@ -1035,6 +1359,12 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
             "apps_create",
             None,
             [("source", "apphub.yaml")].as_slice(),
+        ),
+        (
+            "axhub apps create --interactive --json",
+            "apps_create",
+            None,
+            [("source", "interactive")].as_slice(),
         ),
         (
             "axhub apps update paydrop --field name=Paydrop --json",
@@ -1118,6 +1448,115 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
         assert!(!parsed.is_destructive, "{command}");
         assert!(parsed.action.is_none(), "{command}");
     }
+}
+
+#[test]
+fn bootstrap_synthesized_bindings_roundtrip_through_preauth_parser() {
+    let _lock = env_lock().lock().unwrap();
+    let guard = EnvGuard::new(&[
+        "XDG_STATE_HOME",
+        "XDG_RUNTIME_DIR",
+        "CLAUDE_SESSION_ID",
+        "AXHUB_PROFILE",
+    ]);
+    std::env::set_var("XDG_STATE_HOME", guard.path("state"));
+    std::env::set_var("XDG_RUNTIME_DIR", guard.path("runtime"));
+    std::env::set_var("CLAUDE_SESSION_ID", "bootstrap-roundtrip-session");
+    std::env::set_var("AXHUB_PROFILE", "prod");
+
+    let project = tempfile::tempdir().unwrap();
+    fs::write(project.path().join("apphub.yaml"), "name: paydrop\n").unwrap();
+    let _cwd = CwdGuard::enter(project.path());
+
+    let apps_plan = run_bootstrap(&["--auto-chain".into(), "--json".into()], None);
+    assert_eq!(apps_plan.exit_code, 0);
+    assert_eq!(
+        apps_plan.output.state,
+        BootstrapState::ConsentRequiredAppsCreate
+    );
+    let apps_command = apps_plan.output.command.clone().unwrap();
+    let apps_binding = apps_plan.output.consent_binding.clone().unwrap();
+    let parsed_apps = parse_axhub_command(&apps_command.join(" "));
+    assert_eq!(parsed_apps.action.as_deref(), Some("apps_create"));
+    assert_eq!(apps_binding.context, parsed_apps.context);
+    assert_eq!(apps_binding.app_id, parsed_apps.app_id.unwrap_or_default());
+
+    mint_token(apps_binding.clone(), 60).unwrap();
+    let mut actual_apps = apps_binding.clone();
+    actual_apps.tool_call_id = "actual-session:toolu_apps".into();
+    actual_apps.synthesized_by_helper = false;
+    assert!(verify_or_claim_token(actual_apps).valid);
+
+    let apps_record = json!({
+        "schema_version": BOOTSTRAP_RECORD_SCHEMA_VERSION,
+        "pending_action_id": apps_plan.output.pending_action_id.as_ref().unwrap(),
+        "pending_action_hash": apps_plan.output.pending_action_hash.as_ref().unwrap(),
+        "command_argv": apps_command,
+        "exit_code": 0,
+        "stdout_json": {
+            "id": 42,
+            "slug": "paydrop",
+            "subdomain": "paydrop",
+            "domain_id": 1
+        },
+        "stderr": ""
+    });
+    let recorded = run_bootstrap(
+        &["--record".into(), "apps_create".into(), "--json".into()],
+        Some(&apps_record.to_string()),
+    );
+    assert_eq!(recorded.exit_code, 0);
+
+    std::process::Command::new("git")
+        .args(["init", "-q"])
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "s4@example.invalid"])
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "S4 Test"])
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["add", "."])
+        .status()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["commit", "-q", "-m", "init"])
+        .status()
+        .unwrap();
+
+    let deploy_plan = run_bootstrap(&["--auto-chain".into(), "--json".into()], None);
+    assert_eq!(deploy_plan.exit_code, 0);
+    assert_eq!(
+        deploy_plan.output.state,
+        BootstrapState::ConsentRequiredDeployCreate
+    );
+    let deploy_command = deploy_plan.output.command.clone().unwrap();
+    let deploy_binding = deploy_plan.output.consent_binding.clone().unwrap();
+    let parsed_deploy = parse_axhub_command(&deploy_command.join(" "));
+    assert_eq!(parsed_deploy.action.as_deref(), Some("deploy_create"));
+    assert_eq!(
+        deploy_binding.app_id,
+        parsed_deploy.app_id.unwrap_or_default()
+    );
+    assert_eq!(
+        deploy_binding.branch,
+        parsed_deploy.branch.unwrap_or_default()
+    );
+    assert_eq!(
+        deploy_binding.commit_sha,
+        parsed_deploy.commit_sha.unwrap_or_default()
+    );
+    assert_eq!(deploy_binding.context, parsed_deploy.context);
+
+    mint_token(deploy_binding.clone(), 60).unwrap();
+    let mut actual_deploy = deploy_binding;
+    actual_deploy.tool_call_id = "actual-session:toolu_deploy".into();
+    actual_deploy.synthesized_by_helper = false;
+    assert!(verify_or_claim_token(actual_deploy).valid);
 }
 
 #[test]
@@ -1393,16 +1832,19 @@ fn telemetry_is_opt_in_private_jsonl_and_error_swallowing() {
         #[cfg(unix)]
         fs::set_permissions(&axhub, fs::Permissions::from_mode(0o755)).unwrap();
     };
-    write_axhub("1.2.3-beta.1");
+    let helper_version = env!("CARGO_PKG_VERSION");
+    write_axhub("0.0.1");
     let mut path_entries = vec![std::path::PathBuf::from(&bin_dir)];
     if let Some(old_path) = std::env::var_os("PATH") {
         path_entries.extend(std::env::split_paths(&old_path));
     }
     std::env::set_var("PATH", std::env::join_paths(path_entries).unwrap());
     reset_cli_version_cache();
-    assert_eq!(resolve_cli_version(), "1.2.3-beta.1");
+    assert_eq!(resolve_cli_version(), "0.0.1");
+    write_axhub(helper_version);
+    assert_eq!(resolve_cli_version(), helper_version);
     write_axhub("9.9.9");
-    assert_eq!(resolve_cli_version(), "1.2.3-beta.1");
+    assert_eq!(resolve_cli_version(), helper_version);
     reset_cli_version_cache();
 
     std::env::set_var("XDG_STATE_HOME", guard.path("state"));
@@ -1513,4 +1955,83 @@ fn preauth_deny_hint_unknown_action_falls_back_to_deploy_phrase() {
 fn preauth_deny_hint_empty_app_uses_placeholder() {
     let hint = format_preauth_deny_hint(Some("deploy_create"), Some(""));
     assert!(hint.contains("'앱이름 배포해'"), "got: {hint}");
+}
+
+#[test]
+fn bootstrap_backend_contract_fixtures_lock_defaults_and_stops() {
+    let success: Value = serde_json::from_str(include_str!(
+        "fixtures/bootstrap/apps_create.success.v1.json"
+    ))
+    .unwrap();
+    match interpret_apps_create_result(0, &success) {
+        AppsCreateDecision::Registered(app) => {
+            assert_eq!(app.app_id, "app_01HUBPAYDROP");
+            assert_eq!(app.app_slug, "paydrop");
+            assert_eq!(app.subdomain, "paydrop");
+            assert_eq!(app.domain_id, "dom_01HUBDEFAULT");
+        }
+        other => panic!("expected registered app, got {other:?}"),
+    }
+
+    let alias_payload = json!({
+        "id": 42,
+        "slug": "legacy-paydrop",
+        "subdomain": "legacy-paydrop",
+        "domain_id": 1
+    });
+    match interpret_apps_create_result(0, &alias_payload) {
+        AppsCreateDecision::Registered(app) => {
+            assert_eq!(app.app_id, "42");
+            assert_eq!(app.domain_id, "1");
+        }
+        other => panic!("expected registered numeric app/domain ids, got {other:?}"),
+    }
+
+    let missing_defaults: Value = serde_json::from_str(include_str!(
+        "fixtures/bootstrap/apps_create.missing_defaults.json"
+    ))
+    .unwrap();
+    assert!(matches!(
+        interpret_apps_create_result(0, &missing_defaults),
+        AppsCreateDecision::Stop {
+            state: BootstrapState::BackendContractMissingDefaults,
+            ..
+        }
+    ));
+
+    let collision: Value = serde_json::from_str(include_str!(
+        "fixtures/bootstrap/apps_create.422.subdomain_collision.json"
+    ))
+    .unwrap();
+    match interpret_apps_create_result(422, &collision) {
+        AppsCreateDecision::Stop {
+            state: BootstrapState::SubdomainCollision,
+            suggested_subdomain,
+            ..
+        } => assert_eq!(suggested_subdomain.as_deref(), Some("paydrop-2")),
+        other => panic!("expected subdomain collision stop, got {other:?}"),
+    }
+
+    let legacy_collision = json!({
+        "code": "subdomain_collision",
+        "suggested_subdomain": "paydrop-3"
+    });
+    match interpret_apps_create_result(422, &legacy_collision) {
+        AppsCreateDecision::Stop {
+            state: BootstrapState::SubdomainCollision,
+            suggested_subdomain,
+            ..
+        } => assert_eq!(suggested_subdomain.as_deref(), Some("paydrop-3")),
+        other => panic!("expected legacy subdomain collision stop, got {other:?}"),
+    }
+
+    let server_error: Value =
+        serde_json::from_str(include_str!("fixtures/bootstrap/apps_create.5xx.json")).unwrap();
+    assert!(matches!(
+        interpret_apps_create_result(500, &server_error),
+        AppsCreateDecision::Stop {
+            state: BootstrapState::IdempotencyUnavailable,
+            ..
+        }
+    ));
 }
