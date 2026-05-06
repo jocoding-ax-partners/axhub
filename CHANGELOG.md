@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.10](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.9...v0.2.10) (2026-05-06)
+
+Phase 24.10은 vibe coder 가 multi-step SKILL (deploy / doctor / env / github / init / profile / recover / update / upgrade) 첫 응답에서 native Claude Code TodoWrite 의 orange 진행 박스와 markdown `작업 단계:` + `□ ...` 체크리스트를 동시에 보던 시각 중복을 없앤 UX 패치예요. TodoWrite tool call 만 단일 진행 source 로 남기고 markdown 체크리스트는 9개 SKILL 에서 일괄 제거해요. `skills/deploy/SKILL.md` 의 sentinel `1.5. **Git 저장 지점 준비**` 이후 git-init nested checklist 만 별도 UX 흐름으로 보존하고, `tests/multistep-stage-checklist.test.ts` 를 negative assertion 으로 invert 해 미래 markdown 재유입 drift 를 잠가요.
+
+### Verification
+
+- Regression-first: `tests/multistep-stage-checklist.test.ts` 의 contract 를 `not.toContain("작업 단계")` + `not.toMatch(/^\s*(?:└\s*)?□\s/m)` 로 뒤집고 deploy slug 만 sentinel boundary split 으로 main stage 차단 + nested 보존이 되도록 했어요. boundary 자체도 `expect(parts.length).toBe(2)` 로 lock 해서 sentinel rename 시 즉시 fail.
+- 3겹 안전망: `tests/deploy-git-init-stage.test.ts` 에 `(content.match(/작업 단계/g) || []).length === 1` count assertion 추가로 deploy main stage 재유입 시 count=2 fail. content literal lock (`□ git 저장소 만들기`) 은 그대로 유지.
+- 0.2.9 release 시 누락된 `PLAN.md` §16.12 plugin/marketplace schema version (0.2.8 → 0.2.9) 도 같이 동기화해 `plan-consistency.test.ts` baseline 을 회복했어요.
+- `bun test` 367 pass / 0 fail / 4 skip, `bun run skill:doctor --strict` 17/17 OK, `bun run lint:tone --strict` 0 err, `bunx tsc --noEmit` clean.
+
+### Honest tradeoff
+
+- markdown 체크리스트가 agent 의 self-reminder 로 작동했다는 가설은 검증되지 않았어요. TodoWrite tool call 의 `content` array 가 SKILL.md 본문에 그대로 텍스트로 존재하므로 step 시퀀스는 이미 본문에서 읽혀요. `□` mirror 라인은 시각용이었다고 판단하고 제거했어요. 만약 long-context 세션에서 step 누락 회귀가 보이면 HTML comment sentinel (`<!-- stage-checklist:allow -->`) 패턴 도입이 follow-up.
+- `scripts/skill-new.ts` scaffold 와 `scripts/skill-doctor.ts` enforcement 는 이미 markdown 체크리스트를 강제하지 않아 변경 없이 그대로 둬요. 새 SKILL 추가 시 자동으로 markdown 무생성.
+
+### Added
+
+* multi-step SKILL 의 markdown 작업 단계 체크리스트 제거 ([64ada78](https://github.com/jocoding-ax-partners/axhub/commit/64ada785714ba1be820bf6ddf536cc0add88ab12))
+
 ## [0.2.9](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.8...v0.2.9) (2026-05-06)
 
 Phase 24.9는 vibe coder 가 `axhub apps delete shopmall` 같은 destructive 명령으로 PreToolUse:Bash hook 에 차단됐을 때 보던 hardcoded `'paydrop 배포해'` 안내가 misleading 하던 문제를 고친 UX 패치예요. helper 가 `parse_axhub_command` 결과의 `action` 과 `app_id` 를 읽어 15개 destructive action (deploy_create / deploy_cancel / deploy_logs_kill / update_apply / auth_login / env_set / env_delete / apps_create / apps_update / apps_delete / github_connect / github_disconnect / profile_add / profile_use / apis_call) 별로 적절한 한국어 NL trigger 어구를 동적으로 만들어 보여줘요. 각 어구는 `detect_prompt_route` 의 `contains_any` 매핑과 일치해서 사용자가 그대로 입력하면 해당 SKILL 의 AskUserQuestion 카드 흐름으로 자연스럽게 연결돼요.
