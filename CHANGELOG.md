@@ -4,6 +4,31 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.3.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.3.0...v0.3.1) (2026-05-06)
+
+Phase 26.1 은 v0.3.0 의 install-cli 흐름 UX 폴리시 패치예요. doctor 가 \`cli_present:false\` 를 detect 하면 \"CLI 설치해줘\" phrase 를 사용자가 다시 발화하지 않아도 즉시 AskUserQuestion (\`자동 / 명령어만 / 나중에\`) 으로 설치 의향을 확인하고, 선택 시 install-cli SKILL 을 sibling consent route 로 호출해요. 또 PATH 미등록은 plugin-local 이 작동하면 ⚠ 가 아닌 ✓ 로 표시하고 — plugin design 상 user PATH 오염 방지가 의도된 동작이라 cosmetic 노이즈를 제거했어요.
+
+### Test baseline
+
+- Local gate: \`bunx tsc --noEmit\`, \`bun test\` (402 pass / 4 skip / 0 fail), \`bun run lint:tone --strict\`, \`bun run lint:keywords --check\`, \`bun run skill:doctor --strict\` 모두 green 이에요.
+- Registry: doctor SKILL 의 두 번째 AskUserQuestion (cli-install) 이 \`tests/fixtures/ask-defaults/registry.json\` 에 등록 — \`safe_default: \"나중에\"\` 로 subprocess 자동 install 차단.
+- Status mapping: PATH+plugin-local 두 row 의 매트릭스가 ✓ / ✓ fallback / ✗ 세 분기로 명확화. ⚠ 는 진짜 문제일 때만 fire.
+
+### Honest tradeoff
+
+- doctor 의 NEVER auto-fix 규칙 회색지대 — Step 5.5 가 sibling skill (install-cli) 로 consent route 만 하므로 직접 install 안 함. 규칙은 보존되지만 \"진단 SKILL 이 다른 SKILL 호출\" 패턴이 늘어나서 future drift 우려 있어요. multi-failure summary 와 동일 패턴이라 일관성은 있어요.
+- CLAUDE_PLUGIN_ROOT empty fallback 으로 cache path 패턴 (\`\$env:USERPROFILE\\.claude\\plugins\\cache\\axhub\\axhub\\*\\bin\\\`) 을 hardcoded 하게 scan 해요 — Claude Code 가 cache layout 바꾸면 fallback 깨져요. 하지만 현재까지 path 안정적이고 fallback 부재 시 사용자 stuck 되는 cost 가 더 커요.
+
+
+### Added
+
+* **doctor:** cli_present:false 단일 fail 시 즉시 AskUserQuestion 으로 설치 의향 확인 ([867e6f3](https://github.com/jocoding-ax-partners/axhub/commit/867e6f3bd031b780ad97b078f25207602c26774c))
+
+
+### Fixed
+
+* **doctor:** PATH 미등록은 ⚠ 아닌 ✓ — plugin-local 작동 시 정상 fallback ([bc15317](https://github.com/jocoding-ax-partners/axhub/commit/bc1531711d49ac8da0cff76acb11f0195a6e93b3))
+
 ## [0.3.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.14...v0.3.0) (2026-05-06)
 
 Phase 26 은 axhub CLI 미설치 사용자가 \`/axhub:doctor\` 단계에서 막혀 manual 설치 안내만 보던 friction 을 root-cause 해결한 릴리스예요. 신규 \`axhub:install-cli\` SKILL 이 OS (macOS / Linux / Windows) 를 감지해 공식 채널 (curl install.sh / irm install.ps1 / Homebrew / Scoop) 중 하나로 자동 설치하고, brew / scoop 미설치 호스트에서는 공식 installer 로 graceful fallback 해요. doctor 의 \`NEVER auto-fix\` 규칙은 보존해 진단 / 변경 책임을 분리했어요. 부수로 apps delete consent remint 루프 fix 도 포함해요.
