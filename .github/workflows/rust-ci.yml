@@ -26,7 +26,14 @@ jobs:
         shell: pwsh
         run: |
           $exe = "target/release/axhub-helpers.exe"
-          $deps = & dumpbin /dependents $exe 2>&1 | Out-String
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -property installationPath
+          $msvcDir = Get-ChildItem "$vsPath\VC\Tools\MSVC" -Directory | Sort-Object Name -Descending | Select-Object -First 1
+          $dumpbin = Join-Path $msvcDir.FullName 'bin\Hostx64\x64\dumpbin.exe'
+          if (-not (Test-Path $dumpbin)) {
+            Write-Error "dumpbin.exe not found at $dumpbin"; exit 1
+          }
+          $deps = & $dumpbin /dependents $exe 2>&1 | Out-String
           if ($deps -match '(?i)vcruntime140|msvcp140') {
             Write-Error "FAIL: dynamic MSVC CRT linkage detected in $exe — expected +crt-static. Dependencies:`n$deps"
             exit 1
