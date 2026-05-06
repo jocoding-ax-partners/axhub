@@ -1457,7 +1457,10 @@ fn preauth_deny_hint_paydrop_baseline_locked() {
 fn preauth_deny_hint_uses_dynamic_app_for_deploy() {
     let hint = format_preauth_deny_hint(Some("deploy_create"), Some("shopmall"));
     assert!(hint.contains("'shopmall 배포해'"), "got: {hint}");
-    assert!(!hint.contains("paydrop"), "stale paydrop in dynamic hint: {hint}");
+    assert!(
+        !hint.contains("paydrop"),
+        "stale paydrop in dynamic hint: {hint}"
+    );
 }
 
 #[test]
@@ -1482,7 +1485,10 @@ fn preauth_deny_hint_env_delete_routes_to_env_skill() {
 fn preauth_deny_hint_auth_login_omits_app_token() {
     let hint = format_preauth_deny_hint(Some("auth_login"), None);
     assert!(hint.contains("'로그인해'"), "got: {hint}");
-    assert!(!hint.contains("앱이름"), "auth hint must not pad app placeholder: {hint}");
+    assert!(
+        !hint.contains("앱이름"),
+        "auth hint must not pad app placeholder: {hint}"
+    );
 }
 
 #[test]
