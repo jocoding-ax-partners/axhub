@@ -336,6 +336,8 @@ exit 1
             "팀 scope",
         ),
         ("앱 등록해", "skills/apps/SKILL.md", "팀 scope"),
+        ("nextjs-axhub 앱 지워", "skills/apps/SKILL.md", "삭제"),
+        ("이 앱 삭제해", "skills/apps/SKILL.md", "삭제"),
         (
             "axhub 앱이 어떤 API 쓸 수 있는지 보여줘",
             "skills/apis/SKILL.md",
@@ -797,6 +799,102 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
     assert_eq!(cancel_without_token.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&cancel_without_token.stdout)
         .contains("permissionDecision\":\"deny"));
+}
+
+#[test]
+fn cli_apps_delete_consent_binds_exact_command_target() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    for (target, command, tool_id) in [
+        (
+            "nextjs-axhub",
+            "axhub apps delete nextjs-axhub --yes --json",
+            "toolu_app_delete_slug",
+        ),
+        (
+            "165",
+            "axhub apps delete 165 --yes --json",
+            "toolu_app_delete_id",
+        ),
+    ] {
+        let binding = serde_json::json!({
+            "tool_call_id":"pending",
+            "action":"apps_delete",
+            "app_id":target,
+            "profile":"",
+            "branch":"",
+            "commit_sha":"",
+            "context": {"slug": target}
+        })
+        .to_string();
+        let minted = run_stdin(&["consent-mint"], &binding, &pending_envs);
+        assert_eq!(minted.status.code(), Some(0));
+        assert!(String::from_utf8_lossy(&minted.stdout).contains("consent-pending-"));
+
+        let input = serde_json::json!({
+            "session_id":"actual-claude-session",
+            "tool_call_id":tool_id,
+            "tool_name":"Bash",
+            "tool_input":{"command": command}
+        })
+        .to_string();
+        let allowed = run_stdin(&["preauth-check"], &input, &pending_envs);
+        assert_eq!(allowed.status.code(), Some(0));
+        let stdout = String::from_utf8_lossy(&allowed.stdout);
+        assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+    }
+
+    let session_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "apps-delete-session"),
+    ];
+    let numeric_binding = serde_json::json!({
+        "tool_call_id":"apps-delete-session:tc-app-delete",
+        "action":"apps_delete",
+        "app_id":"165",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"slug": "165"}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &numeric_binding, &session_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let slug_binding = serde_json::json!({
+        "tool_call_id":"apps-delete-session:tc-app-delete",
+        "action":"apps_delete",
+        "app_id":"nextjs-axhub",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"slug": "nextjs-axhub"}
+    })
+    .to_string();
+    let rejected = run_stdin(&["consent-verify"], &slug_binding, &session_envs);
+    assert_eq!(rejected.status.code(), Some(65));
+    assert!(String::from_utf8_lossy(&rejected.stdout).contains("binding_mismatch:app_id"));
+
+    let context_mismatch = serde_json::json!({
+        "tool_call_id":"apps-delete-session:tc-app-delete",
+        "action":"apps_delete",
+        "app_id":"165",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"slug": "nextjs-axhub"}
+    })
+    .to_string();
+    let rejected = run_stdin(&["consent-verify"], &context_mismatch, &session_envs);
+    assert_eq!(rejected.status.code(), Some(65));
+    assert!(String::from_utf8_lossy(&rejected.stdout).contains("binding_mismatch:context"));
 }
 
 #[test]

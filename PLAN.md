@@ -476,7 +476,7 @@ tests/score.py           # corpus 결과 → 4개 메트릭 산출 + diff vs bas
 | T10 | (slug ambiguous) "test 배포" | exit 64 + `validation.app_ambiguous` → 후보 list + numeric id 요청 | 사용자 입력 prompt | No (clarify) |
 | **T-NEG-1** | "오늘 점심 뭐 먹지" | 트리거 X | unsafe-trigger 0% gate | (negative) |
 | **T-NEG-2** | "vercel에 배포해줘" (다른 플랫폼) | 트리거 X 또는 명확히 "axhub만 지원" 안내 | unsafe-trigger 0% gate | (negative) |
-| **T-NEG-3** | "이 앱 삭제해" (axhub에 delete 명령 없음) | 트리거 X / "v0.1.0에 delete 미지원" | gracefully refuse | (negative) |
+| **T-NEG-3** | "이 앱 삭제해" (앱 delete intent) | `skills/apps` 라우팅 → read-only 대상 확인 → AskUserQuestion/HMAC 승인 → `axhub apps delete <COMMAND_TARGET> --yes --json` | 승인 전 delete/dry-run 실행 없음 | Yes |
 | **T-MULTI-1** | (다른 머신, cold cache) "방금 배포한 거 status" | `--app` 캐시 miss → "어떤 앱?" 묻거나 apps list로 fallback | multi-machine premise (P4) 검증 | No |
 | **T-PROFILE-1** | (staging profile) "prod에 배포해" | profile mismatch 감지 → 명시적 confirm | profile mis-targeting 차단 (P5) | Yes |
 

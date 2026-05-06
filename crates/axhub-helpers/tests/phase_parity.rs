@@ -1434,7 +1434,19 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
             [("slug", "paydrop"), ("field", "name=Paydrop")].as_slice(),
         ),
         (
-            "axhub apps delete paydrop --force --confirm=paydrop --json",
+            "axhub apps delete paydrop --yes --json",
+            "apps_delete",
+            Some("paydrop"),
+            [("slug", "paydrop")].as_slice(),
+        ),
+        (
+            "axhub apps delete 165 --yes --json",
+            "apps_delete",
+            Some("165"),
+            [("slug", "165")].as_slice(),
+        ),
+        (
+            "axhub apps delete paydrop --dry-run --json",
             "apps_delete",
             Some("paydrop"),
             [("slug", "paydrop")].as_slice(),
