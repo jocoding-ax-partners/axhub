@@ -98,6 +98,39 @@ To install ax-hub-cli on the user's host:
    }
    ```
 
+3.5. **Validate package manager presence (brew/scoop 선택했을 때만).** 패키지 매니저 옵션을 골랐을 경우, 실행 직전에 해당 매니저가 설치돼 있는지 확인.
+
+    - Homebrew 선택 시:
+      ```bash
+      command -v brew >/dev/null 2>&1 || echo "brew-missing"
+      ```
+    - Scoop 선택 시:
+      ```powershell
+      Get-Command scoop -ErrorAction SilentlyContinue
+      ```
+
+    매니저 부재 시 사용자에게 한국어로 안내하고 공식 installer 로 자동 전환 제안. 두 옵션 제시:
+
+    macOS (brew 부재):
+
+    ```
+    brew 가 설치되어 있지 않아요. 두 가지 방법 중 골라주세요:
+      1. 공식 installer 로 axhub 설치 (Recommended) — brew 없이도 가능
+         (curl -fsSL https://cli.jocodingax.ai/install.sh | bash)
+      2. brew 먼저 설치 후 axhub — https://brew.sh 안내
+    ```
+
+    Windows (scoop 부재):
+
+    ```
+    scoop 이 설치되어 있지 않아요. 두 가지 방법 중 골라주세요:
+      1. 공식 installer 로 axhub 설치 (Recommended) — scoop 없이도 가능
+         (irm https://cli.jocodingax.ai/install.ps1 | iex)
+      2. scoop 먼저 설치 후 axhub — https://scoop.sh 안내
+    ```
+
+    AskUserQuestion 으로 처리하거나, 사용자가 즉시 답한 의도가 명확하면 (예: "brew 깔게요" / "공식꺼") 그대로 따름. 매니저 설치 책임은 사용자에게 — SKILL 이 brew / scoop 자체를 자동 설치하지 않아요 (supply-chain scope 위반).
+
 4. **Run installer (consent 받은 후).** 사용자가 직접 실행하도록 명령어를 안내하거나 (`! ` prefix), 또는 SKILL 이 Bash tool 로 실행. 두 흐름 모두 사용자가 의식적으로 confirm 한 후만.
 
    - macOS / Linux 공식: `! curl -fsSL https://cli.jocodingax.ai/install.sh | bash`
@@ -142,6 +175,7 @@ To install ax-hub-cli on the user's host:
 - NEVER `cli.jocodingax.ai` 외 다른 도메인의 install script 실행. supply chain 신뢰 채널 한정.
 - NEVER pre-existing CLI 덮어쓰기. Step 2 race check 필수.
 - NEVER 설치 도중 helper preflight 호출 — CLI 부재 상태로 fire 되므로 무한 루프.
+- NEVER brew / scoop 자체를 자동 설치. 패키지 매니저 부재 시 공식 installer 로 전환하거나 사용자가 직접 패키지 매니저 설치하도록 안내. supply-chain scope 한정.
 
 ## Additional Resources
 
