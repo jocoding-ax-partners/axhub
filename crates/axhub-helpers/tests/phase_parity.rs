@@ -72,6 +72,22 @@ impl Drop for EnvGuard {
     }
 }
 
+struct CwdGuard {
+    saved: std::path::PathBuf,
+}
+impl CwdGuard {
+    fn enter(path: &std::path::Path) -> Self {
+        let saved = std::env::current_dir().unwrap();
+        std::env::set_current_dir(path).unwrap();
+        Self { saved }
+    }
+}
+impl Drop for CwdGuard {
+    fn drop(&mut self) {
+        std::env::set_current_dir(&self.saved).unwrap();
+    }
+}
+
 fn base_binding() -> ConsentBinding {
     ConsentBinding {
         tool_call_id: "sess-abc:tc-1".into(),
@@ -365,6 +381,71 @@ fn preflight_covers_auth_shapes_env_cache_and_cli_absence() {
 }
 
 #[test]
+fn preflight_current_app_prefers_env_manifest_then_cache() {
+    let _lock = env_lock().lock().unwrap();
+    let guard = EnvGuard::new(&["HOME", "AXHUB_APP_SLUG", "AXHUB_BIN"]);
+    let _cwd = CwdGuard::enter(guard._dir.path());
+    std::env::set_var("HOME", guard.path("home"));
+    std::env::remove_var("AXHUB_APP_SLUG");
+    fs::create_dir_all(guard.path("home/.cache/axhub-plugin")).unwrap();
+    fs::write(
+        guard.path("home/.cache/axhub-plugin/last-deploy.json"),
+        r#"{"deployment_id":"dep-1","status":"active","app_slug":"cached-app"}"#,
+    )
+    .unwrap();
+
+    let ok_runner = |cmd: &[&str]| match cmd {
+        ["axhub", "--version"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: "axhub 0.1.5".into(),
+            stderr: String::new(),
+        },
+        ["axhub", "auth", "status", "--json"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: r#"{"user_email":"u@example.com","scopes":["read"]}"#.into(),
+            stderr: String::new(),
+        },
+        _ => SpawnResult {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: String::new(),
+        },
+    };
+
+    fs::write("apphub.yaml", "name: yaml-app\n").unwrap();
+    let manifest = run_preflight_with_runner(ok_runner);
+    assert_eq!(manifest.output.current_app.as_deref(), Some("yaml-app"));
+
+    std::env::set_var("AXHUB_APP_SLUG", "env-app");
+    let env_override = run_preflight_with_runner(ok_runner);
+    assert_eq!(env_override.output.current_app.as_deref(), Some("env-app"));
+
+    std::env::remove_var("AXHUB_APP_SLUG");
+    fs::remove_file("apphub.yaml").unwrap();
+    fs::write("axhub.yaml", "slug: legacy-app\n").unwrap();
+    let legacy_manifest = run_preflight_with_runner(ok_runner);
+    assert_eq!(
+        legacy_manifest.output.current_app.as_deref(),
+        Some("legacy-app")
+    );
+
+    fs::remove_file("axhub.yaml").unwrap();
+    fs::write("apphub.yaml", "name: not a slug\n").unwrap();
+    let invalid_manifest = run_preflight_with_runner(ok_runner);
+    assert_eq!(
+        invalid_manifest.output.current_app.as_deref(),
+        Some("cached-app")
+    );
+
+    fs::remove_file("apphub.yaml").unwrap();
+    let cache_fallback = run_preflight_with_runner(ok_runner);
+    assert_eq!(
+        cache_fallback.output.current_app.as_deref(),
+        Some("cached-app")
+    );
+}
+
+#[test]
 fn resolve_filters_apps_and_preserves_git_context_for_errors() {
     assert_eq!(
         extract_slug_candidate("paydrop 배포해"),
@@ -375,6 +456,11 @@ fn resolve_filters_apps_and_preserves_git_context_for_errors() {
     )
     .unwrap();
     assert_eq!(filter_apps_by_slug(&apps, "paydrop").len(), 2);
+    let envelope_apps =
+        parse_apps_list(r#"{"apps":[{"id":7,"slug":"paydrop","name":"Paydrop"}],"total":1}"#)
+            .unwrap();
+    assert_eq!(envelope_apps[0].slug, "paydrop");
+    assert_eq!(envelope_apps[0].name.as_deref(), Some("Paydrop"));
     let run = run_resolve_with_runner(
         &["--user-utterance".into(), "paydrop 배포해".into()],
         |cmd| match cmd {
@@ -385,7 +471,7 @@ fn resolve_filters_apps_and_preserves_git_context_for_errors() {
             },
             ["axhub", "apps", "list", "--json"] => SpawnResult {
                 exit_code: 0,
-                stdout: r#"[{"id":42,"slug":"paydrop"}]"#.into(),
+                stdout: r#"{"apps":[{"id":42,"slug":"paydrop"}],"total":1}"#.into(),
                 stderr: String::new(),
             },
             ["git", "rev-parse", "--is-inside-work-tree"] => SpawnResult {
@@ -486,6 +572,7 @@ fn resolve_covers_arg_parsing_auth_parse_ambiguity_and_not_found_paths() {
     );
     assert_eq!(extract_slug_candidate("그거 배포해줘"), None);
     assert!(parse_apps_list("not json").is_none());
+    assert!(parse_apps_list(r#"{"apps":"not-array","total":1}"#).is_none());
     assert_eq!(
         parse_apps_list(r#"[{"id":1,"slug":"paydrop"},{"id":"bad","slug":"skip"}]"#)
             .unwrap()
@@ -1393,16 +1480,19 @@ fn telemetry_is_opt_in_private_jsonl_and_error_swallowing() {
         #[cfg(unix)]
         fs::set_permissions(&axhub, fs::Permissions::from_mode(0o755)).unwrap();
     };
-    write_axhub("1.2.3-beta.1");
+    let helper_version = env!("CARGO_PKG_VERSION");
+    write_axhub("0.0.1");
     let mut path_entries = vec![std::path::PathBuf::from(&bin_dir)];
     if let Some(old_path) = std::env::var_os("PATH") {
         path_entries.extend(std::env::split_paths(&old_path));
     }
     std::env::set_var("PATH", std::env::join_paths(path_entries).unwrap());
     reset_cli_version_cache();
-    assert_eq!(resolve_cli_version(), "1.2.3-beta.1");
+    assert_eq!(resolve_cli_version(), "0.0.1");
+    write_axhub(helper_version);
+    assert_eq!(resolve_cli_version(), helper_version);
     write_axhub("9.9.9");
-    assert_eq!(resolve_cli_version(), "1.2.3-beta.1");
+    assert_eq!(resolve_cli_version(), helper_version);
     reset_cli_version_cache();
 
     std::env::set_var("XDG_STATE_HOME", guard.path("state"));
