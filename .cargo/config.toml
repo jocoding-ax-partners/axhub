@@ -1,0 +1,15 @@
+# Static MSVC CRT linkage for Windows release binary.
+#
+# Without this, axhub-helpers.exe imports vcruntime140.dll and msvcp140.dll
+# from VC++ Redistributable. Hosts without VC++ Redist installed (common on
+# corporate Windows under IT policy) fail with STATUS_DLL_NOT_FOUND
+# (exit code 0xC0000135 / -1073741515) before any helper code runs.
+#
+# Static linkage trades ~1MB binary size for zero-dependency execution —
+# the same trade-off ripgrep, fd, deno, and bun ship with. Target-scoped
+# so macOS / Linux release builds remain unaffected.
+#
+# Verified at release-time by .github/workflows/release.yml dumpbin step.
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

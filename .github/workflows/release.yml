@@ -92,6 +92,18 @@ jobs:
           chmod +x "dist/${{ matrix.asset }}" || true
           "dist/${{ matrix.asset }}" --version || true
 
+      - name: Verify static CRT linkage (Windows only)
+        if: matrix.runner == 'windows-latest'
+        shell: pwsh
+        run: |
+          $exe = "dist/${{ matrix.asset }}"
+          $deps = & dumpbin /dependents $exe 2>&1 | Out-String
+          if ($deps -match '(?i)vcruntime140|msvcp140') {
+            Write-Error "FAIL: dynamic MSVC CRT linkage detected in $exe — expected +crt-static. Dependencies:`n$deps"
+            exit 1
+          }
+          Write-Output "PASS: static CRT verified for $exe"
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
