@@ -88,6 +88,10 @@ export AXHUB_E2E_DESTRUCTIVE=1
 export AXHUB_E2E_MAX_RUNS=1
 export AXHUB_E2E_COST_BUDGET_USD=1
 export AXHUB_E2E_CLEANUP_MODE=preprovisioned # or ttl
+export AXHUB_E2E_PREPROVISIONED_APP_ID=<dedicated-staging-app-id> # required for preprovisioned
+# or, for ttl cleanup:
+# export AXHUB_E2E_TTL_CONFIRMED=1
+export AXHUB_E2E_COMMAND_TIMEOUT_MS=120000
 export AXHUB_E2E_FIXTURE_APP=tests/e2e/fixtures/vibe-static-app
 
 bun run build
@@ -99,7 +103,8 @@ Safety contract:
 
 - `AXHUB_E2E_STAGING_ENDPOINT` is required. The script refuses default endpoint fallback.
 - `AXHUB_E2E_DESTRUCTIVE=1` is required.
-- Cost and run bounds are required.
-- Cleanup ownership is required: use a pre-provisioned staging app/project, or disposable app names with backend TTL/runbook.
+- Cost and run bounds are enforced: `AXHUB_E2E_MAX_RUNS` is capped and `AXHUB_E2E_COST_BUDGET_USD` must cover the configured runs.
+- Cleanup ownership is required: `preprovisioned` requires `AXHUB_E2E_PREPROVISIONED_APP_ID`; `ttl` rewrites the fixture to a unique `s4-measure-*` app and requires `AXHUB_E2E_TTL_CONFIRMED=1`.
+- Each external command has `AXHUB_E2E_COMMAND_TIMEOUT_MS` timeout protection.
 - Summary artifacts are redacted. They may include phase timings and booleans, but not tokens, emails, app slugs, raw URLs, command argv, stdout/stderr, or backend response bodies.
 - The SLA source of truth is harness wall-clock. Bootstrap telemetry markers only corroborate phase/re-entry/consent behavior.

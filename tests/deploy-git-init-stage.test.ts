@@ -37,6 +37,11 @@ describe("deploy skill git init stage", () => {
   test("uses bootstrap plan/record before destructive deploy commands", () => {
     const content = readFileSync(DEPLOY_SKILL, "utf8");
 
+    expect(content.indexOf("Live resolve first")).toBeLessThan(
+      content.indexOf("First-run bootstrap plan/record bridge"),
+    );
+    expect(content).toContain("do **not** run `bootstrap apps_create`");
+    expect(content).toContain("do not mint or run a second `deploy_create`");
     expect(content).toContain("axhub-helpers bootstrap --auto-chain --json");
     expect(content).toContain("bootstrap --record");
     expect(content).toContain("pending_action_id");

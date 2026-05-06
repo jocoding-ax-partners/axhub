@@ -16,6 +16,9 @@ import { basename, join, resolve } from "node:path";
 export const REPO_ROOT = join(import.meta.dir, "..");
 export const DEFAULT_FIXTURE_APP = join(REPO_ROOT, "tests/e2e/fixtures/vibe-static-app");
 export const DEFAULT_HELPER = join(REPO_ROOT, "bin/axhub-helpers");
+export const DEFAULT_COMMAND_TIMEOUT_MS = 120_000;
+export const ESTIMATED_COST_PER_RUN_USD = 0.25;
+export const MAX_DESTRUCTIVE_RUNS = 3;
 export const FORBIDDEN_ARTIFACT_KEYS = new Set([
   "token",
   "access_token",
@@ -53,10 +56,13 @@ export type MeasurementConfig = {
   maxRuns: number;
   costBudgetUsd: number;
   cleanupMode: CleanupMode;
+  preprovisionedAppId?: string;
+  ttlConfirmed: boolean;
   fixtureApp: string;
   helperPath: string;
   outputPath?: string;
   watchTimeout: string;
+  commandTimeoutMs: number;
 };
 
 export type TranscriptMetrics = {
@@ -139,10 +145,25 @@ export function validateMeasurementEnv(env: NodeJS.ProcessEnv = process.env): Me
     throw new MeasurementConfigError("destructive_opt_in.missing", "AXHUB_E2E_DESTRUCTIVE=1 is required for full-chain measurement");
   }
   const maxRuns = asPositiveInt(env["AXHUB_E2E_MAX_RUNS"], "AXHUB_E2E_MAX_RUNS");
+  if (maxRuns > MAX_DESTRUCTIVE_RUNS) {
+    throw new MeasurementConfigError("max_runs.exceeds_safe_limit", `AXHUB_E2E_MAX_RUNS must be <= ${MAX_DESTRUCTIVE_RUNS}`);
+  }
   const costBudgetUsd = asPositiveNumber(env["AXHUB_E2E_COST_BUDGET_USD"], "AXHUB_E2E_COST_BUDGET_USD");
+  const minimumBudget = maxRuns * ESTIMATED_COST_PER_RUN_USD;
+  if (costBudgetUsd < minimumBudget) {
+    throw new MeasurementConfigError("cost_budget.too_low", `AXHUB_E2E_COST_BUDGET_USD must cover ${maxRuns} run(s) at $${ESTIMATED_COST_PER_RUN_USD}/run`);
+  }
   const cleanupMode = env["AXHUB_E2E_CLEANUP_MODE"];
   if (cleanupMode !== "preprovisioned" && cleanupMode !== "ttl") {
     throw new MeasurementConfigError("cleanup_mode.missing", "AXHUB_E2E_CLEANUP_MODE must be preprovisioned or ttl");
+  }
+  const ttlConfirmed = env["AXHUB_E2E_TTL_CONFIRMED"] === "1";
+  const preprovisionedAppId = env["AXHUB_E2E_PREPROVISIONED_APP_ID"];
+  if (cleanupMode === "ttl" && !ttlConfirmed) {
+    throw new MeasurementConfigError("cleanup_ttl.unconfirmed", "AXHUB_E2E_TTL_CONFIRMED=1 is required when AXHUB_E2E_CLEANUP_MODE=ttl");
+  }
+  if (cleanupMode === "preprovisioned" && !preprovisionedAppId) {
+    throw new MeasurementConfigError("preprovisioned_app.missing", "AXHUB_E2E_PREPROVISIONED_APP_ID is required when AXHUB_E2E_CLEANUP_MODE=preprovisioned");
   }
   const fixtureApp = resolve(env["AXHUB_E2E_FIXTURE_APP"] ?? DEFAULT_FIXTURE_APP);
   if (!existsSync(fixtureApp)) {
@@ -159,10 +180,13 @@ export function validateMeasurementEnv(env: NodeJS.ProcessEnv = process.env): Me
     maxRuns,
     costBudgetUsd,
     cleanupMode,
+    preprovisionedAppId,
+    ttlConfirmed,
     fixtureApp,
     helperPath,
     outputPath: env["AXHUB_E2E_MEASUREMENT_OUT"],
     watchTimeout: env["AXHUB_E2E_WATCH_TIMEOUT"] ?? "10m",
+    commandTimeoutMs: asPositiveInt(env["AXHUB_E2E_COMMAND_TIMEOUT_MS"] ?? String(DEFAULT_COMMAND_TIMEOUT_MS), "AXHUB_E2E_COMMAND_TIMEOUT_MS"),
   };
 }
 
@@ -281,13 +305,14 @@ export function classifyEndpoint(endpoint: string): string {
   }
 }
 
-type Runner = (cmd: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string }) => SpawnSyncReturns<string>;
+type Runner = (cmd: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string; timeoutMs: number }) => SpawnSyncReturns<string>;
 
 const defaultRunner: Runner = (cmd, opts) => spawnSync(cmd[0] ?? "", cmd.slice(1), {
   cwd: opts.cwd,
   env: opts.env,
   input: opts.input,
   encoding: "utf8",
+  timeout: opts.timeoutMs,
 });
 
 export function runLiveMeasurement(config: MeasurementConfig, runner: Runner = defaultRunner): MeasurementSummary {
@@ -326,10 +351,18 @@ function runOneMeasurement(config: MeasurementConfig, index: number, runner: Run
     if (!started) return;
     phaseDurations[phase] = Number(process.hrtime.bigint() - started) / 1_000_000;
   };
+  const runCommand = (cmd: string[], opts: { input?: string } = {}): SpawnSyncReturns<string> => {
+    const result = runner(cmd, { cwd: projectDir, env, input: opts.input, timeoutMs: config.commandTimeoutMs });
+    if (spawnTimedOut(result)) {
+      throw new MeasurementConfigError("command.timeout", "measurement command timed out");
+    }
+    return result;
+  };
 
   try {
     mkdirSync(stateHome, { recursive: true });
     cpSync(config.fixtureApp, projectDir, { recursive: true });
+    prepareProjectForCleanupModel(config, projectDir, runId);
 
     let readinessSource = "unknown";
     let liveUrlPresent = false;
@@ -337,7 +370,7 @@ function runOneMeasurement(config: MeasurementConfig, index: number, runner: Run
 
     for (let step = 0; step < 20; step += 1) {
       startPhase("bootstrap_plan");
-      const planned = runner([config.helperPath, "bootstrap", "--auto-chain", "--json"], { cwd: projectDir, env });
+      const planned = runCommand([config.helperPath, "bootstrap", "--auto-chain", "--json"]);
       endPhase("bootstrap_plan");
       const plan = parseJson(planned.stdout, "bootstrap_plan_stdout");
       const state = String(plan["state"] ?? "");
@@ -351,7 +384,7 @@ function runOneMeasurement(config: MeasurementConfig, index: number, runner: Run
         if (!deployId || !app) throw new MeasurementConfigError("readiness.input_missing", "deploying state lacks deployment/app id");
 
         startPhase("deploy_watch");
-        const status = runner(["axhub", "deploy", "status", deployId, "--app", app, "--watch", "--watch-timeout", config.watchTimeout, "--json"], { cwd: projectDir, env });
+        const status = runCommand(["axhub", "deploy", "status", deployId, "--app", app, "--watch", "--watch-timeout", config.watchTimeout, "--json"]);
         endPhase("deploy_watch");
         const statusJson = parseLastJson(status.stdout, "deploy_status_stdout");
         const readiness = verifyReadinessStatus(statusJson);
@@ -359,7 +392,7 @@ function runOneMeasurement(config: MeasurementConfig, index: number, runner: Run
         if (!readiness.ok) throw new MeasurementConfigError("readiness.not_ready", readiness.reason ?? "deploy not ready");
 
         startPhase("open_url");
-        const open = runner(["axhub", "open", app, "--json"], { cwd: projectDir, env });
+        const open = runCommand(["axhub", "open", app, "--json"]);
         endPhase("open_url");
         const openJson = parseJson(open.stdout, "open_stdout");
         const openResult = verifyOpenUrlPresence(openJson);
@@ -384,12 +417,12 @@ function runOneMeasurement(config: MeasurementConfig, index: number, runner: Run
 
       if (command[0] === "git") {
         if (nextAction === "first_commit") {
-          runner(["git", "config", "user.email", "s4-measure@example.invalid"], { cwd: projectDir, env });
-          runner(["git", "config", "user.name", "S4 Measure"], { cwd: projectDir, env });
-          runner(["git", "add", "."], { cwd: projectDir, env });
+          runCommand(["git", "config", "user.email", "s4-measure@example.invalid"]);
+          runCommand(["git", "config", "user.name", "S4 Measure"]);
+          runCommand(["git", "add", "."]);
         }
         startPhase(nextAction);
-        const result = runner(command, { cwd: projectDir, env });
+        const result = runCommand(command);
         endPhase(nextAction);
         if (result.status !== 0) throw new MeasurementConfigError(`${nextAction}.failed`, result.stderr || result.stdout);
         continue;
@@ -398,7 +431,7 @@ function runOneMeasurement(config: MeasurementConfig, index: number, runner: Run
       if (command[0] === "axhub" && (nextAction === "apps_create" || nextAction === "deploy_create")) {
         transcript.push(JSON.stringify({ event: "consent_mint" }));
         startPhase(nextAction);
-        const result = runner(command, { cwd: projectDir, env });
+        const result = runCommand(command);
         endPhase(nextAction);
         const stdoutJson = parseJson(result.stdout || "{}", `${nextAction}_stdout`);
         const envelope = {
@@ -411,9 +444,7 @@ function runOneMeasurement(config: MeasurementConfig, index: number, runner: Run
           stderr: "",
         };
         startPhase(`${nextAction}_record`);
-        const recorded = runner([config.helperPath, "bootstrap", "--record", nextAction, "--json"], {
-          cwd: projectDir,
-          env,
+        const recorded = runCommand([config.helperPath, "bootstrap", "--record", nextAction, "--json"], {
           input: JSON.stringify(envelope),
         });
         endPhase(`${nextAction}_record`);
@@ -439,6 +470,51 @@ function runOneMeasurement(config: MeasurementConfig, index: number, runner: Run
   } finally {
     rmSync(sandbox, { recursive: true, force: true });
   }
+}
+
+function spawnTimedOut(result: SpawnSyncReturns<string>): boolean {
+  const withError = result as SpawnSyncReturns<string> & { error?: NodeJS.ErrnoException };
+  return withError.error?.code === "ETIMEDOUT" || (result.status === null && result.signal === "SIGTERM");
+}
+
+function prepareProjectForCleanupModel(config: MeasurementConfig, projectDir: string, runId: string): void {
+  if (config.cleanupMode === "ttl") {
+    rewriteFixtureIdentity(projectDir, runId);
+    return;
+  }
+  seedPreprovisionedBootstrapState(projectDir, config.preprovisionedAppId ?? "preprovisioned");
+}
+
+function rewriteFixtureIdentity(projectDir: string, runId: string): void {
+  const manifestPath = join(projectDir, "apphub.yaml");
+  let raw = readFileSync(manifestPath, "utf8");
+  const replaceOrPrepend = (key: "name" | "slug", value: string): void => {
+    const re = new RegExp(`^${key}:.*$`, "m");
+    if (re.test(raw)) {
+      raw = raw.replace(re, `${key}: ${value}`);
+    } else {
+      raw = `${key}: ${value}\n${raw}`;
+    }
+  };
+  replaceOrPrepend("name", runId);
+  replaceOrPrepend("slug", runId);
+  writeFileSync(manifestPath, raw);
+}
+
+function seedPreprovisionedBootstrapState(projectDir: string, appId: string): void {
+  const stateDir = join(projectDir, ".axhub");
+  mkdirSync(stateDir, { recursive: true });
+  writeFileSync(join(stateDir, "bootstrap.state.json"), JSON.stringify({
+    version: "bootstrap-state/v1",
+    state: "app_registered",
+    app_id: appId,
+    app_slug: appId,
+    subdomain: "preprovisioned",
+    domain_id: "preprovisioned",
+    git_initialized: false,
+    completed_actions: [],
+    updated_at: new Date().toISOString(),
+  }));
 }
 
 function readString(value: unknown, pointers: string[]): string | undefined {
@@ -492,7 +568,7 @@ function parseLastJson(raw: string, label: string): Record<string, unknown> {
 }
 
 function printUsageAndExit(): never {
-  process.stderr.write(`Usage: bun scripts/measure-vibe-bootstrap.ts [--out measurement-summary.json]\n\nRequired env for live measurement:\n  AXHUB_E2E_STAGING_TOKEN\n  AXHUB_E2E_STAGING_ENDPOINT\n  AXHUB_E2E_DESTRUCTIVE=1\n  AXHUB_E2E_MAX_RUNS=<positive integer>\n  AXHUB_E2E_COST_BUDGET_USD=<positive number>\n  AXHUB_E2E_CLEANUP_MODE=preprovisioned|ttl\n`);
+  process.stderr.write(`Usage: bun scripts/measure-vibe-bootstrap.ts [--out measurement-summary.json]\n\nRequired env for live measurement:\n  AXHUB_E2E_STAGING_TOKEN\n  AXHUB_E2E_STAGING_ENDPOINT\n  AXHUB_E2E_DESTRUCTIVE=1\n  AXHUB_E2E_MAX_RUNS=<positive integer, <= ${MAX_DESTRUCTIVE_RUNS}>\n  AXHUB_E2E_COST_BUDGET_USD=<positive number, >= runs * ${ESTIMATED_COST_PER_RUN_USD}>\n  AXHUB_E2E_CLEANUP_MODE=preprovisioned|ttl\n  AXHUB_E2E_TTL_CONFIRMED=1               # required for ttl\n  AXHUB_E2E_PREPROVISIONED_APP_ID=<app-id> # required for preprovisioned\n  AXHUB_E2E_COMMAND_TIMEOUT_MS=<ms>        # optional, default ${DEFAULT_COMMAND_TIMEOUT_MS}\n`);
   process.exit(64);
 }
 

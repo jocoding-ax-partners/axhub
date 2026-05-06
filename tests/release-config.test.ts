@@ -152,6 +152,9 @@ describe("rust-staging-gates.yml workflow shape", () => {
     expect(content).toContain("AXHUB_E2E_DESTRUCTIVE");
     expect(content).toContain("AXHUB_E2E_COST_BUDGET_USD");
     expect(content).toContain("AXHUB_E2E_CLEANUP_MODE");
+    expect(content).toContain("AXHUB_E2E_TTL_CONFIRMED");
+    expect(content).toContain("AXHUB_E2E_PREPROVISIONED_APP_ID");
+    expect(content).toContain("AXHUB_E2E_COMMAND_TIMEOUT_MS");
     expect(content).toContain("bun run measure:vibe-bootstrap");
     expect(content).toContain("bun run check:vibe-sla");
     expect(content).toContain("continue-on-error: true");

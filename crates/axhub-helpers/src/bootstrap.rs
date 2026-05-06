@@ -498,8 +498,6 @@ fn plan_after_app_registered(
         commit.clone(),
         "--json".into(),
     ];
-    let mut context = HashMap::new();
-    context.insert("source".into(), "bootstrap".into());
     let binding = ConsentBinding {
         tool_call_id: "pending".into(),
         action: "deploy_create".into(),
@@ -507,7 +505,7 @@ fn plan_after_app_registered(
         profile: std::env::var("AXHUB_PROFILE").unwrap_or_default(),
         branch,
         commit_sha: commit,
-        context,
+        context: HashMap::new(),
         synthesized_by_helper: true,
     };
     plan_remote_action(
@@ -545,9 +543,6 @@ fn plan_apps_create(manifest: &ManifestInfo, plan_only: bool, persist_plan: bool
     ];
     let mut context = HashMap::new();
     context.insert("source".into(), manifest.path.clone());
-    if let Some(slug) = manifest.slug.as_ref() {
-        context.insert("slug".into(), slug.clone());
-    }
     let binding = ConsentBinding {
         tool_call_id: "pending".into(),
         action: "apps_create".into(),
@@ -976,12 +971,15 @@ fn stable_hash(value: &Value) -> String {
 
 fn string_at(value: &Value, pointers: &[&str]) -> Option<String> {
     pointers.iter().find_map(|pointer| {
-        value
-            .pointer(pointer)
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(ToOwned::to_owned)
+        let found = value.pointer(pointer)?;
+        match found {
+            Value::String(s) => {
+                let trimmed = s.trim();
+                (!trimmed.is_empty()).then(|| trimmed.to_string())
+            }
+            Value::Number(n) => Some(n.to_string()),
+            _ => None,
+        }
     })
 }
 

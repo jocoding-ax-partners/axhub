@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { SpawnSyncReturns } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -45,9 +45,11 @@ const measurementConfig = (overrides: Partial<MeasurementConfig> = {}): Measurem
   maxRuns: 1,
   costBudgetUsd: 1,
   cleanupMode: "ttl",
+  ttlConfirmed: true,
   fixtureApp: DEFAULT_FIXTURE_APP,
   helperPath: "/tmp/fake-axhub-helpers",
   watchTimeout: "1m",
+  commandTimeoutMs: 1_000,
   ...overrides,
 });
 
@@ -63,6 +65,55 @@ describe("vibe bootstrap measurement env gate", () => {
     ).toThrow("AXHUB_E2E_DESTRUCTIVE=1");
   });
 
+  test("enforces run budget, cleanup ownership, and preprovisioned app contract", () => {
+    const helper = fakeHelper();
+    const baseEnv = {
+      AXHUB_E2E_STAGING_TOKEN: "axhub_pat_test",
+      AXHUB_E2E_STAGING_ENDPOINT: "https://staging.example.test",
+      AXHUB_E2E_DESTRUCTIVE: "1",
+      AXHUB_E2E_FIXTURE_APP: DEFAULT_FIXTURE_APP,
+      AXHUB_E2E_HELPER_PATH: helper,
+    };
+
+    expect(() =>
+      validateMeasurementEnv({
+        ...baseEnv,
+        AXHUB_E2E_MAX_RUNS: "4",
+        AXHUB_E2E_COST_BUDGET_USD: "10",
+        AXHUB_E2E_CLEANUP_MODE: "ttl",
+        AXHUB_E2E_TTL_CONFIRMED: "1",
+      }),
+    ).toThrow("AXHUB_E2E_MAX_RUNS");
+
+    expect(() =>
+      validateMeasurementEnv({
+        ...baseEnv,
+        AXHUB_E2E_MAX_RUNS: "2",
+        AXHUB_E2E_COST_BUDGET_USD: "0.1",
+        AXHUB_E2E_CLEANUP_MODE: "ttl",
+        AXHUB_E2E_TTL_CONFIRMED: "1",
+      }),
+    ).toThrow("AXHUB_E2E_COST_BUDGET_USD");
+
+    expect(() =>
+      validateMeasurementEnv({
+        ...baseEnv,
+        AXHUB_E2E_MAX_RUNS: "1",
+        AXHUB_E2E_COST_BUDGET_USD: "1",
+        AXHUB_E2E_CLEANUP_MODE: "ttl",
+      }),
+    ).toThrow("AXHUB_E2E_TTL_CONFIRMED=1");
+
+    expect(() =>
+      validateMeasurementEnv({
+        ...baseEnv,
+        AXHUB_E2E_MAX_RUNS: "1",
+        AXHUB_E2E_COST_BUDGET_USD: "1",
+        AXHUB_E2E_CLEANUP_MODE: "preprovisioned",
+      }),
+    ).toThrow("AXHUB_E2E_PREPROVISIONED_APP_ID");
+  });
+
   test("accepts only fully bounded destructive measurement config", () => {
     const helper = fakeHelper();
     const config = validateMeasurementEnv({
@@ -72,11 +123,14 @@ describe("vibe bootstrap measurement env gate", () => {
       AXHUB_E2E_MAX_RUNS: "2",
       AXHUB_E2E_COST_BUDGET_USD: "1.5",
       AXHUB_E2E_CLEANUP_MODE: "ttl",
+      AXHUB_E2E_TTL_CONFIRMED: "1",
       AXHUB_E2E_FIXTURE_APP: DEFAULT_FIXTURE_APP,
       AXHUB_E2E_HELPER_PATH: helper,
     });
     expect(config.maxRuns).toBe(2);
     expect(config.cleanupMode).toBe("ttl");
+    expect(config.ttlConfirmed).toBe(true);
+    expect(config.commandTimeoutMs).toBe(120_000);
     expect(config.endpoint).toBe("https://staging.example.test");
   });
 });
@@ -135,6 +189,9 @@ describe("vibe bootstrap live measurement runner", () => {
         return spawnResult(JSON.stringify({ state: cmd[3] === "apps_create" ? "needs_deploy_create" : "deploying" }));
       }
       if (cmd[0] === "/tmp/fake-axhub-helpers" && cmd[1] === "bootstrap") {
+        const manifest = readFileSync(join(opts.cwd, "apphub.yaml"), "utf8");
+        expect(manifest).toContain("s4-measure-");
+        expect(manifest).not.toContain("s4-measure-fixture");
         planStep += 1;
         if (planStep === 1) {
           return spawnResult(JSON.stringify({ state: "needs_git_init", next_action: "git_init", command: ["git", "init"] }));
@@ -187,6 +244,51 @@ describe("vibe bootstrap live measurement runner", () => {
     expect(recordedEnvelopes).toHaveLength(2);
     expect(recordedEnvelopes[0]?.["command_argv"]).toEqual(["axhub", "apps", "create", "--json"]);
     expect(commands).toContain("axhub deploy status dep-1 --app app-1 --watch --watch-timeout 1m --json");
+    expect(artifactContainsForbiddenValue(summary)).toBe(false);
+  });
+
+  test("seeds preprovisioned state instead of creating disposable apps", () => {
+    let sawPreprovisionedState = false;
+    const summary = runLiveMeasurement(
+      measurementConfig({
+        cleanupMode: "preprovisioned",
+        preprovisionedAppId: "app-pre",
+      }),
+      (cmd, opts) => {
+        if (cmd[0] === "/tmp/fake-axhub-helpers") {
+          const state = JSON.parse(readFileSync(join(opts.cwd, ".axhub/bootstrap.state.json"), "utf8"));
+          sawPreprovisionedState = state.app_id === "app-pre" && state.state === "app_registered";
+          mkdirSync(join(opts.cwd, ".axhub"), { recursive: true });
+          writeFileSync(join(opts.cwd, ".axhub/bootstrap.state.json"), JSON.stringify({ state: "deploying", app_id: "app-pre", last_deploy_id: "dep-1" }));
+          return spawnResult(JSON.stringify({ state: "deploying" }));
+        }
+        if (cmd[0] === "axhub" && cmd[1] === "deploy" && cmd[2] === "status") {
+          return spawnResult(JSON.stringify({ status: "succeeded" }));
+        }
+        if (cmd[0] === "axhub" && cmd[1] === "open") {
+          return spawnResult(JSON.stringify({ deploy_url: "https://live.example.test" }));
+        }
+        return spawnResult("{}");
+      },
+    );
+
+    expect(sawPreprovisionedState).toBe(true);
+    expect(summary.failure_count).toBe(0);
+  });
+
+  test("converts command timeouts into typed redacted failures", () => {
+    const timeoutError = Object.assign(new Error("timed out"), { code: "ETIMEDOUT" });
+    const timedOut = {
+      ...spawnResult("", 0),
+      status: null,
+      signal: "SIGTERM",
+      error: timeoutError,
+    } as SpawnSyncReturns<string> & { error: NodeJS.ErrnoException };
+
+    const summary = runLiveMeasurement(measurementConfig(), () => timedOut);
+
+    expect(summary.failure_count).toBe(1);
+    expect(summary.runs[0]?.failure_code).toBe("command.timeout");
     expect(artifactContainsForbiddenValue(summary)).toBe(false);
   });
 

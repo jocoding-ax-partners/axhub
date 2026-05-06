@@ -203,6 +203,9 @@ jobs:
       AXHUB_E2E_MAX_RUNS: ${{ vars.AXHUB_E2E_MAX_RUNS || '1' }}
       AXHUB_E2E_COST_BUDGET_USD: ${{ vars.AXHUB_E2E_COST_BUDGET_USD || '' }}
       AXHUB_E2E_CLEANUP_MODE: ${{ vars.AXHUB_E2E_CLEANUP_MODE || '' }}
+      AXHUB_E2E_TTL_CONFIRMED: ${{ vars.AXHUB_E2E_TTL_CONFIRMED || '0' }}
+      AXHUB_E2E_PREPROVISIONED_APP_ID: ${{ vars.AXHUB_E2E_PREPROVISIONED_APP_ID || '' }}
+      AXHUB_E2E_COMMAND_TIMEOUT_MS: ${{ vars.AXHUB_E2E_COMMAND_TIMEOUT_MS || '120000' }}
       AXHUB_E2E_FIXTURE_APP: tests/e2e/fixtures/vibe-static-app
       AXHUB_E2E_MEASUREMENT_OUT: vibe-bootstrap-measurement-summary.json
     steps:

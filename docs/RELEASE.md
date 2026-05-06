@@ -215,6 +215,8 @@ AXHUB_E2E_DESTRUCTIVE=1 \
 AXHUB_E2E_MAX_RUNS=1 \
 AXHUB_E2E_COST_BUDGET_USD=1 \
 AXHUB_E2E_CLEANUP_MODE=preprovisioned \
+AXHUB_E2E_PREPROVISIONED_APP_ID=<dedicated-staging-app-id> \
+AXHUB_E2E_COMMAND_TIMEOUT_MS=120000 \
 bun run measure:vibe-bootstrap --out vibe-bootstrap-measurement-summary.json
 bun run check:vibe-sla --summary vibe-bootstrap-measurement-summary.json --mode advisory --min-samples 20 --p95-seconds 480
 ```
