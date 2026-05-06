@@ -52,7 +52,22 @@ To run diagnostics:
    - `helper downloaded artifact` (Windows only): `$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers-windows-amd64.exe`
    - `helper installer`: `${CLAUDE_PLUGIN_ROOT}/bin/install.sh` or `$env:CLAUDE_PLUGIN_ROOT\bin\install.ps1`
 
-   If PATH is missing but plugin-local helper exists, mark PATH as ⚠ and continue using the plugin-local helper path for later checks. If both PATH and plugin-local helper are missing, skip remaining preflight rows and report ✗ helper missing only.
+   **CLAUDE_PLUGIN_ROOT empty fallback** — Claude Code 가 env var 를 propagate 안 했거나 PowerShell session 에서 unset 된 경우, 알려진 cache path 패턴으로 scan:
+
+   - Windows: `$env:USERPROFILE\.claude\plugins\cache\axhub\axhub\*\bin\axhub-helpers.exe`
+   - Unix: `$HOME/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers`
+
+   가장 최신 버전 (semver descending) 의 binary 사용. 발견 시 row 는 ✓ 로 표시하되 본문에 사용한 절대경로 명시.
+
+   **Status mapping** (PATH missing 은 plugin-local 가 작동하면 정상 fallback):
+
+   | PATH | plugin-local (또는 cache scan) | 결과 |
+   |---|---|---|
+   | ✓ found | ✓ found | ✓ helper PATH (정상) |
+   | ✗ missing | ✓ found | ✓ helper plugin-local (정상 fallback — PATH 미등록은 plugin design 상 의도) |
+   | ✗ missing | ✗ missing | ✗ helper missing — install 안내 + 후속 row skip |
+
+   PATH 미등록 자체는 ⚠ 가 아닌 정상 동작이에요. plugin-local path 는 plugin 설치 위치 (`$CLAUDE_PLUGIN_ROOT/bin/`) 한정이라 user PATH 오염 방지가 의도된 design. plugin-local 또는 cache scan 으로 binary 를 찾을 수 있으면 ✓ 표시하고, 어떤 경로를 사용했는지 본문에 한 줄 명시 ("plugin-local 사용 중: \<path\>").
 
    Windows missing-helper next action:
 
@@ -115,7 +130,7 @@ To run diagnostics:
    | helper missing on Windows (PATH + plugin-local both missing) | "axhub-helpers.exe 바이너리가 없어요. 'powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:CLAUDE_PLUGIN_ROOT\\bin\\install.ps1\"' 수동 실행 또는 CC 재시작으로 자동 다운로드 트리거." |
    | Windows artifact exists but `axhub-helpers.exe` missing | "다운로드 artifact 는 있지만 실행 파일 복사가 안 됐어요. 'powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:CLAUDE_PLUGIN_ROOT\\bin\\install.ps1\"' 로 다시 연결해요." |
    | Windows `install.ps1` missing | "install.ps1 이 없어서 플러그인 install 이 손상된 상태예요. '/plugin install axhub@axhub' 로 재설치해요." |
-   | `cli_present: false` | "axhub CLI 가 설치되어 있지 않아요. 'CLI 설치해줘' 라고 말씀해주시면 자동 설치할게요." |
+   | `cli_present: false` | "axhub CLI 가 설치되어 있지 않아요." → 즉시 Step 5.5 의 AskUserQuestion 으로 설치 의향 확인 (사용자가 phrase 다시 발화 안 해도 됨) |
    | `cli_too_old: true` | "axhub가 너무 오래된 버전이에요 (v<CUR>). 'axhub 업그레이드해줘' 라고 말씀해주세요." |
    | `cli_too_new: true` | "axhub가 플러그인보다 최신이에요. 'axhub 플러그인 업데이트' 라고 말씀해주세요." |
    | `auth_ok: false` (token_expired) | "로그인이 만료됐어요. '다시 로그인해줘' 라고 말씀해주세요." |
@@ -123,7 +138,24 @@ To run diagnostics:
 
    **Note**: `profile: null` 또는 `endpoint: null` 은 default 사용 중인 정상 상태. ✓ 로 표시하고 default 값을 괄호로 부연 설명. AXHUB_PROFILE 또는 AXHUB_ENDPOINT 설정은 회사 IT 정책에 따라 선택사항.
 
-**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — multi-failure pick → `later` (subprocess 에서 자동 fix 안 해요, 진단만 보여줘요).
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — single CLI-missing pick → `나중에`, multi-failure pick → `later` (subprocess 에서 자동 fix 안 해요, 진단만 보여줘요).
+
+5.5. **Single failure: cli_present:false 즉시 AskUserQuestion.** CLI 만 부재이고 다른 row 가 모두 ✓ 일 때, 사용자가 "CLI 설치해줘" 라고 다시 발화 안 해도 되도록 즉시 AskUserQuestion 으로 설치 의향 확인:
+
+   ```json
+   {
+     "question": "axhub CLI 가 설치되어 있지 않아요. 지금 설치할까요?",
+     "header": "CLI 설치",
+     "multiSelect": false,
+     "options": [
+       {"label": "1. 자동 설치 (Recommended)", "value": "install", "description": "skills/install-cli 즉시 호출 — OS 별 공식 채널로 설치"},
+       {"label": "2. 명령어만 보고 직접", "value": "manual", "description": "설치 명령어 출력 후 종료 — 사용자가 직접 실행"},
+       {"label": "3. 나중에", "value": "later", "description": "지금은 그대로 두고 진단만 끝내기"}
+     ]
+   }
+   ```
+
+   "1. 자동 설치" 선택 시 → `Skill("axhub:install-cli")` 즉시 호출. doctor SKILL 의 `NEVER auto-fix` 규칙은 보존 — direct install 안 하고 sibling skill 로 consent route 만 함. multi-failure 가 아닌 단일 cli-missing 시나리오에서만 fire (다른 row 도 fail 이면 Step 5 (multi-failure summary) 가 우선).
 
 5. **Multi-failure summary.** If multiple rows fail, list all of them and surface AskUserQuestion to pick the first one to fix:
 

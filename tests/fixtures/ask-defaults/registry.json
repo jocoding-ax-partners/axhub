@@ -55,6 +55,10 @@
     "여러 항목 점검 필요해요. 어디부터 고쳐요?": {
       "safe_default": "later",
       "rationale": "Diagnosis output sufficient in non-interactive; subprocess should not auto-trigger remediation."
+    },
+    "axhub CLI 가 설치되어 있지 않아요. 지금 설치할까요?": {
+      "safe_default": "나중에",
+      "rationale": "CLI install in subprocess (claude -p / CI / headless) writes new system binaries without explicit user consent. Non-interactive mode must surface the diagnosis and stop, never auto-route to install-cli SKILL."
     }
   },
   "update": {

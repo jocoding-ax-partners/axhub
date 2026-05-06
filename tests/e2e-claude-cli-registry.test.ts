@@ -74,9 +74,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("17 actual safe_default rationale 엔트리 (기존 9 + init/env/github/profile/deploy/apps delete/install-cli)", () => {
+  test("18 actual safe_default rationale 엔트리 (기존 9 + init/env/github/profile/deploy/apps delete/install-cli + doctor cli-install)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(17);
+    expect(paths).toHaveLength(18);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -89,6 +89,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "deploy",
       "deploy",
       "doctor",
+      "doctor",
       "env",
       "github",
       "init",
@@ -100,7 +101,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("17 safe_default 값 (safe fallback 카탈로그)", () => {
+  test("18 safe_default 값 (safe fallback 카탈로그)", () => {
     const auth = registry["auth"] as Record<string, SafeDefaultEntry>;
     expect(auth["다시 로그인할래요?"]?.safe_default).toBe("abort");
     expect(auth["로그아웃할래요?"]?.safe_default).toBe("abort");
