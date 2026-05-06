@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -12,6 +12,14 @@ fn run(args: &[&str]) -> Output {
     Command::new(bin()).args(args).output().unwrap()
 }
 
+fn write_stdin_allowing_early_exit(writer: &mut impl Write, stdin: &str) {
+    match writer.write_all(stdin.as_bytes()) {
+        Ok(()) => {}
+        Err(err) if err.kind() == ErrorKind::BrokenPipe => {}
+        Err(err) => panic!("failed to write child stdin: {err}"),
+    }
+}
+
 fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
     let mut command = Command::new(bin());
     command
@@ -23,12 +31,7 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
         command.env(k, v);
     }
     let mut child = command.spawn().unwrap();
-    child
-        .stdin
-        .as_mut()
-        .unwrap()
-        .write_all(stdin.as_bytes())
-        .unwrap();
+    write_stdin_allowing_early_exit(child.stdin.as_mut().unwrap(), stdin);
     child.wait_with_output().unwrap()
 }
 
@@ -63,12 +66,7 @@ fn run_stdin_in_dir(args: &[&str], stdin: &str, cwd: &Path) -> Output {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child
-        .stdin
-        .as_mut()
-        .unwrap()
-        .write_all(stdin.as_bytes())
-        .unwrap();
+    write_stdin_allowing_early_exit(child.stdin.as_mut().unwrap(), stdin);
     child.wait_with_output().unwrap()
 }
 
