@@ -2,17 +2,20 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Instant;
 
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 use crate::consent::{validate_binding_schema, ConsentBinding};
+use crate::telemetry::emit_meta_envelope;
 
 pub const BOOTSTRAP_STATE_VERSION: &str = "bootstrap-state/v1";
 pub const BOOTSTRAP_RECORD_SCHEMA_VERSION: &str = "bootstrap-record/v1";
 pub const BOOTSTRAP_STATE_RELATIVE_PATH: &str = ".axhub/bootstrap.state.json";
+pub const BOOTSTRAP_TELEMETRY_SCHEMA_VERSION: &str = "bootstrap-telemetry/v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -260,10 +263,91 @@ pub fn run_bootstrap(args: &[String], stdin: Option<&str>) -> BootstrapRun {
     }
 
     if let Some(event) = args.record_event.as_deref() {
-        return record_event(event, stdin.unwrap_or_default());
+        return with_bootstrap_phase("record_event", || {
+            record_event(event, stdin.unwrap_or_default())
+        });
     }
 
-    plan_next(args.dry_run || !args.auto_chain, args.auto_chain)
+    with_bootstrap_phase("plan_next", || {
+        plan_next(args.dry_run || !args.auto_chain, args.auto_chain)
+    })
+}
+
+fn with_bootstrap_phase<F>(phase: &'static str, run: F) -> BootstrapRun
+where
+    F: FnOnce() -> BootstrapRun,
+{
+    let started = Instant::now();
+    emit_bootstrap_marker(
+        "bootstrap_phase_start",
+        [
+            ("phase", Value::String(phase.into())),
+            ("state", Value::String("unknown".into())),
+            ("outcome", Value::String("started".into())),
+        ],
+    );
+    let result = run();
+    emit_bootstrap_marker(
+        "bootstrap_phase_end",
+        [
+            ("phase", Value::String(phase.into())),
+            ("state", Value::String(result.output.state.as_str().into())),
+            (
+                "outcome",
+                Value::String(if result.exit_code == 0 { "ok" } else { "stop" }.into()),
+            ),
+            ("elapsed_ms", json!(started.elapsed().as_millis() as u64)),
+        ],
+    );
+    result
+}
+
+fn emit_bootstrap_re_entry(state: BootstrapState) {
+    emit_bootstrap_marker(
+        "bootstrap_re_entry_at_state",
+        [
+            ("phase", Value::String("plan_next".into())),
+            ("state", Value::String(state.as_str().into())),
+            ("outcome", Value::String("re_entry".into())),
+        ],
+    );
+}
+
+fn emit_consent_synthesized_by_helper(event: &str, state: BootstrapState, pending: &PendingAction) {
+    emit_bootstrap_marker(
+        "consent_synthesized_by_helper",
+        [
+            ("phase", Value::String("plan_remote_action".into())),
+            ("state", Value::String(state.as_str().into())),
+            ("outcome", Value::String("planned".into())),
+            (
+                "decision_class",
+                Value::String("remote_destructive_plan".into()),
+            ),
+            ("record_event", Value::String(event.into())),
+            (
+                "retry_policy",
+                Value::String(if pending.event == "apps_create" {
+                    "no_retry_without_confirmed_idempotency".into()
+                } else {
+                    "none".into()
+                }),
+            ),
+        ],
+    );
+}
+
+fn emit_bootstrap_marker<const N: usize>(event: &'static str, fields: [(&'static str, Value); N]) {
+    let mut envelope = Map::new();
+    envelope.insert("event".into(), Value::String(event.into()));
+    envelope.insert(
+        "schema_version".into(),
+        Value::String(BOOTSTRAP_TELEMETRY_SCHEMA_VERSION.into()),
+    );
+    for (key, value) in fields {
+        envelope.insert(key.into(), value);
+    }
+    let _ = emit_meta_envelope(envelope);
 }
 
 fn parse_args(args: &[String]) -> Result<BootstrapArgs, String> {
@@ -327,6 +411,7 @@ fn plan_next(plan_only: bool, persist_plan: bool) -> BootstrapRun {
     };
 
     if let Some(state) = state {
+        emit_bootstrap_re_entry(state.state);
         if state.last_deploy_id.is_some() && matches!(state.state, BootstrapState::Deployed) {
             return BootstrapRun {
                 output: BootstrapOutput::state(BootstrapState::AlreadyDeployed)
@@ -413,8 +498,6 @@ fn plan_after_app_registered(
         commit.clone(),
         "--json".into(),
     ];
-    let mut context = HashMap::new();
-    context.insert("source".into(), "bootstrap".into());
     let binding = ConsentBinding {
         tool_call_id: "pending".into(),
         action: "deploy_create".into(),
@@ -422,7 +505,7 @@ fn plan_after_app_registered(
         profile: std::env::var("AXHUB_PROFILE").unwrap_or_default(),
         branch,
         commit_sha: commit,
-        context,
+        context: HashMap::new(),
         synthesized_by_helper: true,
     };
     plan_remote_action(
@@ -460,9 +543,6 @@ fn plan_apps_create(manifest: &ManifestInfo, plan_only: bool, persist_plan: bool
     ];
     let mut context = HashMap::new();
     context.insert("source".into(), manifest.path.clone());
-    if let Some(slug) = manifest.slug.as_ref() {
-        context.insert("slug".into(), slug.clone());
-    }
     let binding = ConsentBinding {
         tool_call_id: "pending".into(),
         action: "apps_create".into(),
@@ -522,6 +602,7 @@ fn plan_remote_action(
             return stop(BootstrapState::BackendContractMissingDefaults, err);
         }
     }
+    emit_consent_synthesized_by_helper(event, bootstrap_state, &pending);
     BootstrapRun {
         output: BootstrapOutput::state(bootstrap_state)
             .with_action(event, command)
@@ -564,6 +645,9 @@ fn output_pending(
     output.binding_hash = pending.binding_hash.clone();
     if pending.event == "apps_create" {
         output.retry_policy = Some("no_retry_without_confirmed_idempotency".into());
+    }
+    if pending.consent_binding.is_some() {
+        emit_consent_synthesized_by_helper(&pending.event, state.state, pending);
     }
     BootstrapRun { output, exit_code }
 }
@@ -887,12 +971,15 @@ fn stable_hash(value: &Value) -> String {
 
 fn string_at(value: &Value, pointers: &[&str]) -> Option<String> {
     pointers.iter().find_map(|pointer| {
-        value
-            .pointer(pointer)
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(ToOwned::to_owned)
+        let found = value.pointer(pointer)?;
+        match found {
+            Value::String(s) => {
+                let trimmed = s.trim();
+                (!trimmed.is_empty()).then(|| trimmed.to_string())
+            }
+            Value::Number(n) => Some(n.to_string()),
+            _ => None,
+        }
     })
 }
 
