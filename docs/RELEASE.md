@@ -191,3 +191,32 @@ If you see `update.cosign_verification_failed`:
 
 - **Cosign key generation**: not needed for keyless signing. If you want to switch to long-lived keys (some org policies require this), generate via `cosign generate-key-pair` and modify `release.yml` to use `--key`. This requires storing `COSIGN_PASSWORD` + `COSIGN_PRIVATE_KEY` as repo secrets — see [cosign docs](https://docs.sigstore.dev/cosign/key_management/signing_with_self-managed_keys/).
 - **Marketplace publish**: separate step after first signed release lands. Currently the plugin is consumed via `/plugin marketplace add jocoding-ax-partners/axhub`; no signed-marketplace-asset workflow exists yet (Phase 4 deferred).
+
+## Vibe bootstrap SLA measurement (Sprint 4 advisory)
+
+The release workflow can run an advisory empty-dir → live URL measurement job when `VIBE_BOOTSTRAP_MEASUREMENT_ENABLED=true`. This job is intentionally `continue-on-error` and runs after asset upload today; it is evidence gathering, not a release blocker.
+
+A future blocking P95 gate must move before `gh release create/upload`. Do not enable blocking until all of these are true:
+
+- backend P3/default/idempotency behavior is confirmed in the target environment,
+- cleanup/TTL ownership is confirmed,
+- true staging endpoint/secrets are configured,
+- cost budget is approved,
+- at least 20 successful samples are collected,
+- redacted artifacts show no token/email/app slug/raw URL/argv/stdout/stderr/backend body leaks.
+
+Manual advisory run:
+
+```bash
+bun run build
+AXHUB_E2E_STAGING_TOKEN=<token> \
+AXHUB_E2E_STAGING_ENDPOINT=<explicit-staging-api-url> \
+AXHUB_E2E_DESTRUCTIVE=1 \
+AXHUB_E2E_MAX_RUNS=1 \
+AXHUB_E2E_COST_BUDGET_USD=1 \
+AXHUB_E2E_CLEANUP_MODE=preprovisioned \
+AXHUB_E2E_PREPROVISIONED_APP_ID=<dedicated-staging-app-id> \
+AXHUB_E2E_COMMAND_TIMEOUT_MS=120000 \
+bun run measure:vibe-bootstrap --out vibe-bootstrap-measurement-summary.json
+bun run check:vibe-sla --summary vibe-bootstrap-measurement-summary.json --mode advisory --min-samples 20 --p95-seconds 480
+```

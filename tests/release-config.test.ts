@@ -89,6 +89,16 @@ describe("release.yml workflow shape (US-204)", () => {
     expect(content).toContain("refs/tags/$TAG");
     expect(content).toMatch(/ref: \$\{\{ github\.event_name == 'workflow_dispatch' && github\.event\.inputs\.tag \|\| github\.ref \}\}/);
   });
+
+  test("release workflow keeps vibe bootstrap SLA measurement advisory after upload", () => {
+    content = readFileSync(path, "utf8");
+    expect(content).toContain("vibe-bootstrap-measurement-advisory");
+    expect(content).toContain("continue-on-error: true");
+    expect(content).toContain("VIBE_BOOTSTRAP_MEASUREMENT_ENABLED");
+    expect(content).toContain("bun run measure:vibe-bootstrap");
+    expect(content).toContain("bun run check:vibe-sla");
+    expect(content).toContain("release-vibe-bootstrap-measurement-summary");
+  });
 });
 
 describe("rust-staging-gates.yml workflow shape", () => {
@@ -107,6 +117,7 @@ describe("rust-staging-gates.yml workflow shape", () => {
     expect(content).toContain("require_credentials");
     expect(content).toContain("fuzz_minutes");
     expect(content).toContain("run_windows_smoke");
+    expect(content).toContain("run_measurement");
   });
 
   test("local gate rebuilds the Rust helper before any staging probe", () => {
@@ -132,6 +143,22 @@ describe("rust-staging-gates.yml workflow shape", () => {
     expect(content).toContain("AXHUB_CLI_INSTALL_COMMAND");
     expect(content).toContain("AXHUB_E2E_REQUIRE_RUST_HELPER: \"1\"");
     expect(content).toContain("bun run test:e2e");
+  });
+
+  test("vibe bootstrap measurement is explicit, destructive-gated, and advisory", () => {
+    content = readFileSync(path, "utf8");
+    expect(content).toContain("vibe-bootstrap-measurement");
+    expect(content).toContain("VIBE_BOOTSTRAP_MEASUREMENT_ENABLED");
+    expect(content).toContain("AXHUB_E2E_DESTRUCTIVE");
+    expect(content).toContain("AXHUB_E2E_COST_BUDGET_USD");
+    expect(content).toContain("AXHUB_E2E_CLEANUP_MODE");
+    expect(content).toContain("AXHUB_E2E_TTL_CONFIRMED");
+    expect(content).toContain("AXHUB_E2E_PREPROVISIONED_APP_ID");
+    expect(content).toContain("AXHUB_E2E_COMMAND_TIMEOUT_MS");
+    expect(content).toContain("bun run measure:vibe-bootstrap");
+    expect(content).toContain("bun run check:vibe-sla");
+    expect(content).toContain("continue-on-error: true");
+    expect(content).toContain("actions/upload-artifact");
   });
 
   test("external security gates include cargo-fuzz and Windows smoke", () => {
