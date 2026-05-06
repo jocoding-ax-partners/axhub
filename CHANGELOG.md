@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.2.12](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.11...v0.2.12) (2026-05-06)
+
+Phase 25.1은 첫 배포 중 `apphub.yaml` 에 `slug` 없이 `name: nextjs-axhub` 만 있는 경우 resolve 가 멈추고, GitHub repo 연결 안내가 `/axhub:github` handoff 에서 끊기던 문제를 고친 hotfix예요. helper는 slug-like `name` 을 안전한 후보로 쓰고, GitHub 연결은 install_url 을 바로 보여준 뒤 `github_connect` consent token 이 parser binding 과 일치하도록 branch 를 함께 민트해요.
+
+### Test baseline
+
+- Local gate: `bun run skill:doctor --strict`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `cargo fmt --all -- --check`, `cargo clippy -p axhub-helpers --all-targets -- -D warnings`, `cargo test -p axhub-helpers`, `bunx tsc --noEmit`, `bun test`, `git diff --check` 가 green이에요.
+- Live read-only smoke: `apphub.yaml` 의 `name: nextjs-axhub` 만으로 resolve 가 `app_id=165` / `candidate_slug=nextjs-axhub` 를 찾고, `axhub github repos list --json` 이 install_url 보유 계정을 반환했어요.
+- Consent smoke: pending `github_connect` token 이 동일한 `axhub github connect 165 --repo realitsyourman/test2 --branch main --account realitsyourman --json` preauth 를 allow 하는지 확인했어요.
+- PR gate: #29 의 Local Rust-primary gate, T2 helper-bin, Rust CI ubuntu/macos/windows 가 success예요.
+
+### Honest tradeoff
+
+- 실제 `axhub github connect` 와 `axhub deploy create` 는 production mutation 이라 실행하지 않았어요. 이번 릴리스는 read-only account/install_url 확인과 consent/preauth binding smoke 로 destructive 직전까지의 실패 지점을 검증해요.
+- `github_connect` 의 branch 는 현재 parser 가 top-level branch 와 context branch 를 모두 binding 에 반영하므로 SKILL 이 둘 다 민트하게 맞췄어요. parser/schema 를 단일 source 로 정리하는 작업은 별도 contract 변경으로 남겨요.
+
+### Fixed
+
+* prevent deploy flow from dead-ending before GitHub consent ([f95fc88](https://github.com/jocoding-ax-partners/axhub/commit/f95fc8841dd83bc169e581149667f1e256340c3c))
+
 ## [0.2.11](https://github.com/jocoding-ax-partners/axhub/compare/v0.2.10...v0.2.11) (2026-05-06)
 
 Phase 25는 vibe coder가 첫 배포를 5분 안에 끝내도록 PRD, consent schema, bootstrap mutation gate, resolve-first deploy, 측정 E2E를 하나의 안전한 릴리스 단위로 묶은 패치예요. helper가 live `{data:[...]}` app list를 파싱하고 bootstrap-generated consent binding을 parser/preauth와 byte-equivalent로 맞추며, measurement runner는 비용·TTL·preprovisioned app·timeout guard 없이 destructive staging run을 시작하지 않아요.
