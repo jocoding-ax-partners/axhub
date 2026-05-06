@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("19 top-level keys (2 메타 + 17 SKILL slug)", () => {
+  test("20 top-level keys (2 메타 + 18 SKILL slug)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(19);
+    expect(keys).toHaveLength(20);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const skillSlugs = keys.filter((k) => !k.startsWith("_")).sort();
@@ -62,6 +62,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "env",
       "github",
       "init",
+      "install-cli",
       "logs",
       "open",
       "profile",
@@ -73,9 +74,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("16 actual safe_default rationale 엔트리 (apps delete 포함)", () => {
+  test("17 actual safe_default rationale 엔트리 (기존 9 + init/env/github/profile/deploy/apps delete/install-cli)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(16);
+    expect(paths).toHaveLength(17);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -91,6 +92,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "env",
       "github",
       "init",
+      "install-cli",
       "profile",
       "recover",
       "update",
@@ -98,7 +100,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("16 safe_default 값 (safe fallback 카탈로그)", () => {
+  test("17 safe_default 값 (safe fallback 카탈로그)", () => {
     const auth = registry["auth"] as Record<string, SafeDefaultEntry>;
     expect(auth["다시 로그인할래요?"]?.safe_default).toBe("abort");
     expect(auth["로그아웃할래요?"]?.safe_default).toBe("abort");
