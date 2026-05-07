@@ -80,6 +80,19 @@ fn stdout_json(output: &Output) -> serde_json::Value {
     })
 }
 
+fn assert_output_does_not_contain(output: &Output, needle: &str) {
+    assert!(
+        !String::from_utf8_lossy(&output.stdout).contains(needle),
+        "stdout leaked {needle}: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        !String::from_utf8_lossy(&output.stderr).contains(needle),
+        "stderr leaked {needle}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 fn record_apps_create_success(cwd: &Path, plan: &serde_json::Value) -> Output {
     let envelope = serde_json::json!({
         "schema_version": "bootstrap-record/v1",
@@ -153,6 +166,8 @@ fn cli_version_help_redact_and_classify_work() {
     assert!(String::from_utf8_lossy(&help.stdout).contains("Subcommands"));
     assert!(String::from_utf8_lossy(&help.stdout).contains("prompt-route"));
     assert!(String::from_utf8_lossy(&help.stdout).contains("bootstrap"));
+    assert!(String::from_utf8_lossy(&help.stdout).contains("token-init"));
+    assert!(String::from_utf8_lossy(&help.stdout).contains("token-import"));
 
     let mut child = Command::new(bin())
         .arg("redact")
@@ -173,6 +188,80 @@ fn cli_version_help_redact_and_classify_work() {
     let classified = run(&["classify-exit", "--exit-code", "65", "--stdout", "{}"]);
     assert!(classified.status.success());
     assert!(String::from_utf8_lossy(&classified.stdout).contains("로그인이 만료"));
+}
+
+#[test]
+fn cli_token_init_uses_env_fallback_and_writes_plugin_token_file() {
+    let temp = tempfile::tempdir().unwrap();
+    let xdg_config = temp.path().join("xdg-config");
+    let xdg_config_s = xdg_config.to_str().unwrap();
+    let token = "axhub_pat_envfallback1234567890";
+
+    let output = run_stdin(
+        &["token-init", "--json"],
+        "",
+        &[("XDG_CONFIG_HOME", xdg_config_s), ("AXHUB_TOKEN", token)],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert_output_does_not_contain(&output, token);
+    let json = stdout_json(&output);
+    assert_eq!(json["stored"], true);
+    assert_eq!(json["source"], "env:AXHUB_TOKEN");
+
+    let token_path = xdg_config.join("axhub-plugin").join("token");
+    assert_eq!(std::fs::read_to_string(&token_path).unwrap(), token);
+    #[cfg(unix)]
+    assert_eq!(
+        std::fs::metadata(&token_path).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+}
+
+#[test]
+fn cli_token_import_accepts_raw_and_json_without_leaking_token() {
+    let temp = tempfile::tempdir().unwrap();
+    let xdg_config = temp.path().join("xdg-config");
+    let xdg_config_s = xdg_config.to_str().unwrap();
+    let token_path = xdg_config.join("axhub-plugin").join("token");
+
+    let raw_token = "axhub_pat_rawimport1234567890";
+    let raw = run_stdin(
+        &["token-import", "--json"],
+        raw_token,
+        &[("XDG_CONFIG_HOME", xdg_config_s)],
+    );
+    assert_eq!(raw.status.code(), Some(0));
+    assert_output_does_not_contain(&raw, raw_token);
+    assert_eq!(std::fs::read_to_string(&token_path).unwrap(), raw_token);
+
+    let json_token = "axhub_pat_jsonimport1234567890";
+    let payload = serde_json::json!({"access_token": json_token, "token_type": "Bearer"});
+    let json_import = run_stdin(
+        &["token-import", "--json"],
+        &payload.to_string(),
+        &[("XDG_CONFIG_HOME", xdg_config_s)],
+    );
+    assert_eq!(json_import.status.code(), Some(0));
+    assert_output_does_not_contain(&json_import, json_token);
+    assert_eq!(std::fs::read_to_string(&token_path).unwrap(), json_token);
+}
+
+#[test]
+fn cli_token_commands_do_not_echo_token_like_unknown_options() {
+    for command in ["token-init", "token-import"] {
+        let mistaken_token_arg = "axhub_pat_mistakenarg1234567890";
+        let output = Command::new(bin())
+            .args([command, mistaken_token_arg])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(64), "{command}");
+        assert_output_does_not_contain(&output, mistaken_token_arg);
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("unknown option"),
+            "{command} stderr={}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }
 
 #[test]
@@ -357,6 +446,11 @@ exit 1
             "skills/upgrade/SKILL.md",
             "플러그인 업그레이드",
         ),
+        (
+            "axhub CLI 설치해줘",
+            "skills/install-cli/SKILL.md",
+            "설치 채널",
+        ),
         ("axhub 좀 도와줘", "skills/clarify/SKILL.md", "선택지"),
     ];
 
@@ -385,6 +479,17 @@ exit 1
     );
     assert_eq!(no_route.status.code(), Some(0));
     assert_eq!(String::from_utf8_lossy(&no_route.stdout).trim(), "{}");
+
+    let no_route_substring = run_stdin(
+        &["prompt-route"],
+        r#"{"hook_event_name":"UserPromptSubmit","prompt":"rapid prototype 아이디어 정리해줘"}"#,
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(no_route_substring.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&no_route_substring.stdout).trim(),
+        "{}"
+    );
 
     let clarify_environment = run_stdin(
         &["prompt-route"],
@@ -427,6 +532,25 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
         .unwrap();
     assert_eq!(invalid_app.status.code(), Some(67));
     assert!(String::from_utf8_lossy(&invalid_app.stdout).contains("validation.app_id_invalid"));
+
+    for (limit, expected) in [
+        ("not-a-number", "invalid --limit"),
+        ("0", "--limit must be between 1 and 100"),
+        ("101", "--limit must be between 1 and 100"),
+    ] {
+        let invalid_limit = Command::new(bin())
+            .args(["list-deployments", "--app-id", "42", "--limit", limit])
+            .env("AXHUB_TOKEN", "axhub_pat_abcdefghijklmnop")
+            .env("AXHUB_ENDPOINT", "https://example.test")
+            .output()
+            .unwrap();
+        assert_eq!(invalid_limit.status.code(), Some(64), "limit={limit}");
+        assert!(
+            String::from_utf8_lossy(&invalid_limit.stderr).contains(expected),
+            "limit={limit}; stderr={}",
+            String::from_utf8_lossy(&invalid_limit.stderr)
+        );
+    }
 
     let preflight = Command::new(bin())
         .arg("preflight")

@@ -1,6 +1,6 @@
 # Rust helper 전환 가이드
 
-axhub-helpers 는 Rust helper 를 기본 binary 로 사용해요. Bun 은 repo 스크립트와 전환 fallback 검증에 남아 있고, 사용자 release artifact 는 Rust native binary 예요.
+axhub-helpers 는 Rust helper 를 단일 사용자 binary 로 사용해요. Bun 은 repo 스크립트와 release 검증 runner 로 남아 있고, 사용자 release artifact 는 Rust native binary 예요.
 
 ## 자동 마이그레이션
 
@@ -10,23 +10,22 @@ axhub update
 
 업데이트는 helper binary 만 교체해요. 토큰, profile, app 설정은 그대로 유지해요.
 
-## Runtime 선택
+## Runtime 상태
 
 ```bash
-export AXHUB_HELPERS_RUNTIME=auto   # 기본값, Rust helper 우선
-export AXHUB_HELPERS_RUNTIME=rust   # Rust helper 강제
-export AXHUB_HELPERS_RUNTIME=ts     # monitor window rollback
+bin/axhub-helpers version
+bun run build
 ```
 
-- `auto`: 현재 release 에서는 Rust helper 를 우선 사용해요.
-- `rust`: Rust helper 가 없으면 바로 실패해요.
-- `ts`: TypeScript fallback 만 사용해요. 회귀가 보일 때 임시 우회용이에요.
+- 현재 release 는 Rust helper 만 사용자 경로로 제공해요.
+- 예전 runtime 선택 환경변수는 현재 사용자 rollback 경로가 아니에요.
+- 회귀가 보이면 서명된 이전 release helper 로 되돌려요.
 
 ## 호환성 약속
 
 ### 그대로 유지해요
 
-- Token/env 계약: `AXHUB_TOKEN`, `AXHUB_ENDPOINT`, `AXHUB_ALLOW_PROXY`, `AXHUB_HELPERS_RUNTIME`.
+- Token/env 계약: `AXHUB_TOKEN`, `AXHUB_ENDPOINT`, `AXHUB_ALLOW_PROXY`.
 - Consent token: HS256, zero leeway, 60초 TTL, session/tool-call binding.
 - keychain read path: macOS Keychain, Linux Secret Service, Windows Credential Manager guidance.
 - Hub API fallback: bearer token 전송 전 TLS SPKI pin 확인.
@@ -41,17 +40,9 @@ export AXHUB_HELPERS_RUNTIME=ts     # monitor window rollback
 
 ## Rollback
 
-회귀가 보이면 TypeScript fallback 을 강제해요.
+회귀가 보이면 이전 서명 release 로 되돌려요.
 
 ```bash
-export AXHUB_HELPERS_RUNTIME=ts
-axhub:doctor
-```
-
-문제가 release artifact 자체라면 이전 서명 release 로 되돌려요.
-
-```bash
-export AXHUB_HELPERS_RUNTIME=ts
 axhub update --force-version 0.1.23
 ```
 

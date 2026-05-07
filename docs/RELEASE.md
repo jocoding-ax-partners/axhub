@@ -93,7 +93,7 @@ gh run watch <run-id>
 
 ### Rust staging gate workflow
 
-Use this before deleting the TypeScript fallback or when a Rust helper change touches auth, deploy listing, TLS, prompt routing, or release packaging:
+Use this when a Rust helper change touches auth, deploy listing, TLS, prompt routing, keychain bridges, or release packaging:
 
 ```bash
 gh workflow run rust-staging-gates.yml \

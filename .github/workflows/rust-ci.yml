@@ -20,6 +20,15 @@ jobs:
           toolchain: 1.94.1
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
+      - uses: oven-sh/setup-bun@v2
+        if: matrix.os == 'ubuntu-latest'
+      - uses: taiki-e/install-action@cargo-llvm-cov
+        if: matrix.os == 'ubuntu-latest'
+      - name: Coverage gate (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          bun install --frozen-lockfile
+          bun run cargo:coverage
       - run: cargo build --workspace --release
       - name: Verify static CRT linkage (Windows only)
         if: matrix.os == 'windows-latest'

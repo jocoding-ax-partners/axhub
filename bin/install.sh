@@ -77,7 +77,9 @@ LINK_PATH="${BIN_DIR}/axhub-helpers"
 [ "$OS_KEY" = "windows" ] && LINK_PATH="${BIN_DIR}/axhub-helpers.exe"
 
 # Remove existing link/file before relinking
-[ -e "$LINK_PATH" ] || [ -L "$LINK_PATH" ] && rm -f "$LINK_PATH"
+if [ -e "$LINK_PATH" ] || [ -L "$LINK_PATH" ]; then
+  rm -f "$LINK_PATH"
+fi
 
 if [ "$OS_KEY" = "windows" ]; then
   cp "$TARGET_PATH" "$LINK_PATH"

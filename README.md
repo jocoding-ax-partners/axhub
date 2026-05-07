@@ -2,7 +2,7 @@
 
 > 바이브코더가 자연어로 axhub 앱을 안전하게 배포하고 관리하는 Claude Code 플러그인.
 
-**상태**: v0.2.0 (ship). 17 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
+**상태**: v0.3.1 (ship). 18 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
 
 ---
 
@@ -12,7 +12,7 @@ axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "결제 
 
 ## 무엇을 할 수 있는가
 
-17 SKILL 자연어 트리거 + 10 슬래시 명령 (한글 alias `/axhub:배포` 포함):
+18 SKILL 자연어 트리거 + 10 슬래시 명령 (한글 alias `/axhub:배포` 포함):
 
 | SKILL | 트리거 예시 | 슬래시 |
 |-------|-------------|--------|
@@ -32,6 +32,7 @@ axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "결제 
 | `open` | "결과 봐" | — |
 | `whatsnew` | "뭐 새로 나왔어" | — |
 | `profile` | "회사 endpoint 바꿔" | — |
+| `install-cli` | "axhub CLI 설치해줘" | — |
 | `clarify` | (모호 발화 disambiguation) | — |
 
 UX 보장:
@@ -59,9 +60,10 @@ UX 보장:
 
 정직한 tradeoff:
 
-- v0.2.0 은 Node/CLI/dependency 자동 설치 release 가 아니에요.
+- v0.3.1 은 plugin helper 를 Rust native binary 하나로 유지해요.
+- axhub CLI 자체 설치가 필요하면 `install-cli` skill 이 OS 별 공식 설치 채널을 안내해요.
 - template 목록은 `ax-hub-cli` registry 를 source of truth 로 사용해요.
-- admin onboarding, helper bootstrap, remote `templates.json` 는 deferred 예요.
+- admin onboarding 과 remote `templates.json` 는 deferred 예요.
 
 ## 빠른 시작
 
@@ -96,19 +98,14 @@ UX 보장:
 배포 정책 / 권한 관리 / 보안 설정 / 파일럿 롤아웃: [`docs/org-admin-rollout.ko.md`](docs/org-admin-rollout.ko.md).
 
 
-## Runtime 선택 (전환 기간)
+## Runtime
 
-axhub-helpers 는 Rust helper 를 기본 runtime 으로 사용해요. 전환/롤백 기간 동안 TypeScript fallback 도 환경변수로 선택할 수 있어요.
+axhub-helpers 는 Rust native helper 를 단일 runtime 으로 사용해요. 예전 전환기 runtime 선택 환경변수는 현재 release 의 사용자 경로가 아니에요.
 
 ```bash
-export AXHUB_HELPERS_RUNTIME=auto   # default (자동 감지, 권장)
-export AXHUB_HELPERS_RUNTIME=rust   # Rust helper 강제
-export AXHUB_HELPERS_RUNTIME=ts     # TypeScript helper 강제 (회귀 시)
+bin/axhub-helpers version
+bun run build
 ```
-
-- `auto`: 현재 release 에서는 Rust helper 를 기본으로 써요. TypeScript fallback 은 monitor window 의 롤백 경로예요.
-- `rust`: Rust 만 써요. 없으면 즉시 실패해요.
-- `ts`: TypeScript 만 써요. 회귀 발견 시 즉시 rollback 용이에요.
 
 자세한 내용은 [`docs/migrate-rust.md`](docs/migrate-rust.md) 를 참고해요.
 
@@ -123,8 +120,8 @@ export AXHUB_HELPERS_RUNTIME=ts     # TypeScript helper 강제 (회귀 시)
         │
         ▼
 Claude Code  →  axhub plugin
-        │              ├── skills/* (17 SKILL, NL 자동 트리거 + frontmatter multi-step/needs-preflight)
-        │              ├── commands/* (9 슬래시 + 한글 alias)
+        │              ├── skills/* (18 SKILL, NL 자동 트리거 + frontmatter multi-step/needs-preflight)
+        │              ├── commands/* (10 슬래시 + 한글 alias)
         │              ├── hooks/* (SessionStart preflight, PreToolUse HMAC consent)
         │              └── bin/axhub-helpers (Rust native, 5 cross-arch cosign-signed)
         │                       │  resolve + HMAC consent + classify + redact + preflight
@@ -132,7 +129,7 @@ Claude Code  →  axhub plugin
    Bash tool ────────────────────┘
         │
         ▼
-   ax-hub-cli binary (v0.10.x supported surface)
+   ax-hub-cli binary (v0.11.x supported surface)
         │
         ▼
    https://hub-api.jocodingax.ai  (TLS pinned fallback)
@@ -166,14 +163,14 @@ git push origin main --tags         # release.yml 자동 fire (cosign 서명 + G
 
 상세: [`docs/RELEASE.md`](docs/RELEASE.md).
 
-## Test baseline (v0.2.0)
+## Test baseline (v0.3.1)
 
-- `bun test` → 336 pass / 4 skip / 0 fail
+- `bun test` → plugin manifest / skill / workflow regression green
 - `cargo test --workspace` → Rust helper unit/integration/phase parity green (keychain live tests ignored)
 - `bunx tsc --noEmit` clean
 - `bun run lint:tone --strict` 0 err / 0 warn
 - `bun run lint:keywords --check` clean
-- `bun run skill:doctor --strict` 17/17 SKILLs complete
+- `bun run skill:doctor --strict` 18/18 SKILLs complete
 - `bun run bench:hooks` prompt-route/preflight p95 thresholds green
 - `bun run test:plugin-e2e:t2` → 12/12 helper lifecycle cases pass
 - `bun run release:check` Rust helper host artifact + release matrix verified

@@ -82,6 +82,15 @@ describe("release.yml workflow shape (US-204)", () => {
     expect(content).toContain("*.sig");
   });
 
+  test("verifies uploaded release assets after upload completes", () => {
+    content = readFileSync(path, "utf8");
+    const uploadIdx = content.indexOf("gh release upload");
+    const verifyIdx = content.indexOf("scripts/release/verify-release.sh");
+    expect(uploadIdx).toBeGreaterThan(0);
+    expect(verifyIdx).toBeGreaterThan(uploadIdx);
+    expect(content).toContain('bash scripts/release/verify-release.sh "$TAG"');
+  });
+
   test("manual workflow_dispatch requires an explicit semver tag input", () => {
     content = readFileSync(path, "utf8");
     expect(content).toMatch(/workflow_dispatch:\s*\n\s*inputs:\s*\n\s*tag:/);
@@ -185,6 +194,21 @@ describe("Rust CI workflow toolchain compatibility", () => {
       expect(content).toContain("1.94.1");
       expect(content).not.toContain("1.83.0");
     }
+  });
+});
+
+describe("Rust helper workflow path and coverage gates", () => {
+  test("claude-cli-e2e path filters track the Rust helper source tree", () => {
+    const workflow = readFileSync(join(REPO_ROOT, ".github/workflows/claude-cli-e2e.yml"), "utf8");
+    expect(workflow).toContain("crates/axhub-helpers/**");
+    expect(workflow).toContain("Cargo.toml");
+    expect(workflow).toContain("Cargo.lock");
+    expect(workflow).not.toContain("src/axhub-helpers/**");
+  });
+
+  test("rust-ci enforces the cargo coverage script instead of leaving it advisory-only", () => {
+    const workflow = readFileSync(join(REPO_ROOT, ".github/workflows/rust-ci.yml"), "utf8");
+    expect(workflow).toContain("bun run cargo:coverage");
   });
 });
 

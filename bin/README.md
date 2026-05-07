@@ -1,6 +1,6 @@
 # bin/
 
-This directory holds the compiled `axhub-helpers` binary (single multi-command Rust executable). Primary source lives in `../crates/axhub-helpers`; `../src/axhub-helpers` remains a transition fallback/parity reference.
+This directory holds the compiled `axhub-helpers` binary (single multi-command Rust executable). Primary source lives in `../crates/axhub-helpers`.
 
 Claude Code adds this `bin/` to `PATH` while the plugin is enabled, so skills/commands/hooks invoke the helper as `axhub-helpers <subcommand>` (no path needed).
 

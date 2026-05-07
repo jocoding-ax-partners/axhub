@@ -27,6 +27,10 @@ $InstallPs1 = Join-Path $Root 'bin\install.ps1'
 
 # Step 1: ensure helper binary exists
 if (-not (Test-Path -Path $Helper -PathType Leaf)) {
+  if ($env:AXHUB_SKIP_AUTODOWNLOAD -eq '1') {
+    Write-Output (ConvertTo-Json @{ systemMessage = "[axhub] AXHUB_SKIP_AUTODOWNLOAD=1 이라 helper 자동 설치를 건너뛰었어요. 수동 설치 후 다시 시작해요: powershell -NoProfile -ExecutionPolicy Bypass -File bin\install.ps1" } -Compress)
+    exit 0
+  }
   if (-not (Test-Path -Path $InstallPs1 -PathType Leaf)) {
     Write-Output (ConvertTo-Json @{ systemMessage = "[axhub] install.ps1 없음 — 플러그인 install 손상. 재설치: /plugin install axhub@axhub" } -Compress)
     exit 0

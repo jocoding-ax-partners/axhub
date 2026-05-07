@@ -568,6 +568,29 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(skillDirs.length).toBeGreaterThanOrEqual(11);
   });
 
+  test("all 18 shipped skills are present, including install-cli", () => {
+    expect(skillDirs.sort()).toEqual([
+      "apis",
+      "apps",
+      "auth",
+      "clarify",
+      "deploy",
+      "doctor",
+      "env",
+      "github",
+      "init",
+      "install-cli",
+      "logs",
+      "open",
+      "profile",
+      "recover",
+      "status",
+      "update",
+      "upgrade",
+      "whatsnew",
+    ]);
+  });
+
   test("each skill dir has SKILL.md", () => {
     for (const d of skillDirs) {
       expect(skillContents.has(d)).toBe(true);
@@ -749,6 +772,13 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
+  test("apis cross-team listing is redacted in the same command that widens scope", () => {
+    const apis = skillContents.get("apis")!;
+    expect(apis).toContain('axhub apis list --app-id "$CURRENT_APP" --json');
+    expect(apis).not.toMatch(/^\s*axhub apis list --json\s*$/m);
+    expect(apis).toContain('axhub apis list --json | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers redact');
+  });
+
   test("github skill mints consent before connect/disconnect and avoids manual hook bypass", () => {
     const github = skillContents.get("github")!;
     expect(github).toContain("axhub-helpers");
@@ -840,7 +870,7 @@ describe("cross-manifest consistency", () => {
     const knownSubcommands = new Set([
       "session-start", "preauth-check", "consent-mint", "consent-verify",
       "resolve", "preflight", "classify-exit", "redact", "version", "help",
-      "list-deployments", "prompt-route", "token-import",
+      "list-deployments", "prompt-route", "token-init", "token-import",
     ]);
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {
@@ -856,9 +886,38 @@ describe("cross-manifest consistency", () => {
     }
   });
 
+  test("session-start shims only call implemented helper subcommands", async () => {
+    const helperMain = await readFile(join(REPO_ROOT, "crates/axhub-helpers/src/main.rs"), "utf8");
+    for (const subcommand of ["session-start", "token-init"]) {
+      expect(helperMain, `${subcommand} must be in usage`).toContain(`  ${subcommand}`);
+      expect(helperMain, `${subcommand} must be dispatched`).toContain(`"${subcommand}" =>`);
+    }
+
+    for (const relPath of ["hooks/session-start.sh", "hooks/session-start.ps1"]) {
+      const content = await readFile(join(REPO_ROOT, relPath), "utf8");
+      expect(content, `${relPath} must not reference an unimplemented token bootstrap command`)
+        .toContain("token-init");
+    }
+  });
+
   test("README.md exists and references plugin name", async () => {
     const readme = await readFile(join(REPO_ROOT, "README.md"), "utf8");
     expect(readme).toContain("axhub");
+  });
+
+  test("README current-release summary matches package metadata and shipped surfaces", async () => {
+    const readme = await readFile(join(REPO_ROOT, "README.md"), "utf8");
+    expect(readme).toContain(`**상태**: v${packageJson.version}`);
+    expect(readme).toContain("18 SKILLs / 10 commands");
+    expect(readme).not.toContain("AXHUB_HELPERS_RUNTIME=ts");
+    expect(readme).not.toContain("TypeScript fallback");
+  });
+
+  test("tsconfig covers release and validation scripts, not only tests", async () => {
+    const tsconfig = JSON.parse(await readFile(join(REPO_ROOT, "tsconfig.json"), "utf8")) as {
+      include?: string[];
+    };
+    expect(tsconfig.include).toContain("scripts/**/*.ts");
   });
 
   test("CLAUDE.md exists and is non-empty", async () => {

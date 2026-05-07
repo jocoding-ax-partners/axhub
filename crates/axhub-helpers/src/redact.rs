@@ -12,6 +12,10 @@ static AXHUB_TOKEN_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"AXHUB_TOKEN=[A-Za-z0-9_\-.]{20,}").unwrap());
 static AXHUB_PAT_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"axhub_pat_[A-Za-z0-9_-]{16,}").unwrap());
+static SERVICE_BASE_URL_JSON_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#""service_base_url"\s*:\s*"[^"]*""#).unwrap());
+static SERVICE_BASE_URL_TEXT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?i)\bservice_base_url\s*:\s*https?://[^\s,"}]+"#).unwrap());
 
 pub fn redact(text: &str) -> String {
     let normalized: String = text.nfkc().collect();
@@ -20,6 +24,8 @@ pub fn redact(text: &str) -> String {
     let s = BEARER_RE.replace_all(&s, "Bearer ***");
     let s = AXHUB_TOKEN_RE.replace_all(&s, "AXHUB_TOKEN=***");
     let s = AXHUB_PAT_RE.replace_all(&s, "axhub_pat_[redacted]");
+    let s = SERVICE_BASE_URL_JSON_RE.replace_all(&s, r#""service_base_url":"[redacted]""#);
+    let s = SERVICE_BASE_URL_TEXT_RE.replace_all(&s, "service_base_url: [redacted]");
     ANSI_RE.replace_all(&s, "").into_owned()
 }
 

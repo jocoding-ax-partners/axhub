@@ -109,7 +109,35 @@ fi
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 5. SessionStart shim — helper + install.sh both missing → graceful systemMessage
+# 5. SessionStart shim — AXHUB_SKIP_AUTODOWNLOAD=1 + missing helper does NOT run install.sh
+# ----------------------------------------------------------------------------
+SCRATCH="$(scratch)"
+mkdir -p "$SCRATCH/bin"
+mkdir -p "$SCRATCH/hooks"
+cp "$SHIM" "$SCRATCH/hooks/session-start.sh"
+cat > "$SCRATCH/bin/install.sh" <<'EOF'
+#!/bin/sh
+echo "INSTALLER_SHOULD_NOT_RUN" >> /tmp/axhub-shim-test-trace
+exit 0
+EOF
+chmod +x "$SCRATCH/bin/install.sh"
+rm -f /tmp/axhub-shim-test-trace
+output="$(AXHUB_SKIP_AUTODOWNLOAD=1 CLAUDE_PLUGIN_ROOT="$SCRATCH" bash "$SCRATCH/hooks/session-start.sh" </dev/null 2>&1 || true)"
+trace="$(cat /tmp/axhub-shim-test-trace 2>/dev/null || echo '')"
+case "$trace" in
+  *"INSTALLER_SHOULD_NOT_RUN"*) assert "AXHUB_SKIP_AUTODOWNLOAD=1 prevents helper install" "called" "skipped" ;;
+  *)                            assert "AXHUB_SKIP_AUTODOWNLOAD=1 prevents helper install" "ok" "ok" ;;
+esac
+if echo "$output" | grep -q "자동 설치를 건너뛰"; then
+  assert "shim explains skipped helper install" "ok" "ok"
+else
+  assert "shim explains skipped helper install" "missing-message" "ok"
+fi
+rm -f /tmp/axhub-shim-test-trace
+rm -rf "$SCRATCH"
+
+# ----------------------------------------------------------------------------
+# 6. SessionStart shim — helper + install.sh both missing → graceful systemMessage
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin"
@@ -124,7 +152,7 @@ fi
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 6. SessionStart shim — token file path comes from Rust helper when available
+# 7. SessionStart shim — token file path comes from Rust helper when available
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks" "$SCRATCH/custom-token-dir" "$SCRATCH/stub-bin"
@@ -165,7 +193,7 @@ rm -f /tmp/axhub-shim-test-trace
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 7. SessionStart shim — Phase 7 US-701: token-init auto-trigger when token
+# 8. SessionStart shim — Phase 7 US-701: token-init auto-trigger when token
 #    file missing + axhub auth status returns user_email
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
@@ -200,7 +228,7 @@ rm -rf "$TOKEN_HOME"
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 8. SessionStart shim — Phase 7 US-701: token-init SKIPPED when token already exists
+# 9. SessionStart shim — Phase 7 US-701: token-init SKIPPED when token already exists
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"
@@ -235,7 +263,7 @@ rm -rf "$TOKEN_HOME"
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 9. SessionStart shim — Phase 7 US-701: AXHUB_SKIP_AUTODOWNLOAD=1 skips token-init
+# 10. SessionStart shim — Phase 7 US-701: AXHUB_SKIP_AUTODOWNLOAD=1 skips token-init
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"

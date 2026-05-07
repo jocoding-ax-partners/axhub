@@ -166,8 +166,8 @@ const runScenario = (scenario: typeof scenarios[number]): Result => {
 
   for (let i = 0; i < samples + warmup; i += 1) {
     const started = process.hrtime.bigint();
-    if (!helper) fail("helper binary missing");
-    const result = spawnSync(helper, [scenario.subcommand], {
+    const helperPath: string = helper ?? fail("helper binary missing");
+    const result = spawnSync(helperPath, [scenario.subcommand], {
       cwd: REPO_ROOT,
       input,
       encoding: "utf8",
