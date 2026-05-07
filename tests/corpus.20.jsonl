@@ -18,3 +18,6 @@
 {"id": "T-PROFILE-1", "utterance": "prod에 배포해", "intent": "deploy", "expected_skill": "deploy", "destructive": true, "requires_consent": true, "lang": "ko", "category": "profile-mismatch", "context": {"AXHUB_PROFILE": "staging"}, "expected_response_contains": "현재 staging 환경입니다"}
 {"id": "T-MULTI-1", "utterance": "방금 배포한 거 status", "intent": "deploy_status", "expected_skill": "status", "destructive": false, "lang": "ko", "context": {"machine": "different-from-create"}, "note": "cold cache scenario; must fall back to apps list + ask"}
 {"id": "T-HEADLESS-1", "utterance": "로그인", "intent": "auth", "expected_skill": "auth", "destructive": true, "lang": "ko", "category": "headless", "context": {"CODESPACES": "true", "DISPLAY": ""}, "expected_response_contains": "토큰 파일"}
+{"id": "M1", "utterance": "이거 하드코딩하는건 너무 이상한 방식 아니야?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id": "M3", "utterance": "왜 배포가 키워드 매칭이지?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id": "M11", "utterance": "이거 구현이 이상해 보이는데", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}

@@ -2,7 +2,7 @@
 // fixture replay runner, not an empty placeholder writer.
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -20,14 +20,14 @@ const run = (args: string[]) =>
 const readJson = (path: string) => JSON.parse(readFileSync(path, "utf8"));
 
 describe("tests/run-corpus.sh fixture replay runner", () => {
-  test("plugin mode writes committed 20-row plugin results instead of an empty placeholder", () => {
+  test("plugin mode writes committed 20-row plugin results (Phase 5: 20 base + 3 meta_question = 23)", () => {
     const dir = mkdtempSync(join(tmpdir(), "axhub-corpus-"));
     try {
       const out = join(dir, "plugin.json");
       const result = run(["--mode", "plugin", "--corpus", "tests/corpus.20.jsonl", "--out", out]);
       expect(result.status).toBe(0);
       const rows = readJson(out);
-      expect(rows).toHaveLength(20);
+      expect(rows).toHaveLength(23);
       expect(rows[0].actual_tool_calls.length).toBeGreaterThan(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -57,9 +57,53 @@ describe("tests/run-corpus.sh fixture replay runner", () => {
       const out = join(dir, "plugin.json");
       const result = run(["--mode", "plugin", "--corpus", "tests/corpus.jsonl", "--out", out]);
       expect(result.status).toBe(2);
-      expect(result.stderr).toContain("no committed plugin fixture for 331-row corpus");
+      // Phase 5 — corpus.jsonl row count is 346 (331 base + 15 meta_question).
+      expect(result.stderr).toContain("no committed plugin fixture for 346-row corpus");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test("vs_claude_native_diff_5pct: mock baselines (100% match) → routing-score exit 0", () => {
+    // Synthetic convergence: copy claude-native.20.json over docs-only.20.json so
+    // routing-score sees drift 0% / accuracy match → verdict PASS.
+    const dir = mkdtempSync(join(tmpdir(), "axhub-corpus-vs-"));
+    try {
+      const fakeRoot = dir;
+      mkdirSync(join(fakeRoot, "tests"), { recursive: true });
+
+      const copy = (src: string, dst: string) =>
+        copyFileSync(join(REPO_ROOT, src), join(fakeRoot, dst));
+      copy("tests/corpus.20.jsonl", "tests/corpus.20.jsonl");
+      copy("tests/baseline-results.claude-native.20.json", "tests/baseline-results.claude-native.20.json");
+      copy("tests/baseline-results.claude-native.20.json", "tests/baseline-results.docs-only.20.json");
+      copy("tests/routing-score.ts", "tests/routing-score.ts");
+      copy("tests/run-corpus.sh", "tests/run-corpus.sh");
+
+      const result = spawnSync(
+        "bash",
+        [join(fakeRoot, "tests/run-corpus.sh"), "--mode", "plugin", "--corpus", "tests/corpus.20.jsonl", "--vs", "claude-native", "--score"],
+        {
+          cwd: fakeRoot,
+          encoding: "utf8",
+          timeout: 30000,
+          env: { ...process.env, PLUGIN_ROOT: fakeRoot },
+        },
+      );
+      if (result.status !== 0) {
+        process.stderr.write(`stdout=${result.stdout}\nstderr=${result.stderr}\n`);
+      }
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("verdict: PASS");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("331_row_advisory_mode: corpus.jsonl + --vs claude-native + --score → advisory + exit 0", () => {
+    const result = run(["--mode", "plugin", "--corpus", "tests/corpus.jsonl", "--vs", "claude-native", "--score"]);
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain("ADVISORY");
+    expect(result.stderr).toContain("manual/advisory");
   });
 });

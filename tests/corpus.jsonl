@@ -329,3 +329,18 @@
 {"id": "T-RO-117", "utterance": "is axhub set up correctly", "intent": "doctor", "expected_skill": "doctor", "expected_cmd_pattern": "axhub --version|axhub-helpers session-start", "destructive": false, "lang": "en", "category": "read-only-happy"}
 {"id": "T-RO-118", "utterance": "deploy progress", "intent": "deploy_status", "expected_skill": "status", "expected_cmd_pattern": "axhub deploy status dep_.* --watch --json", "destructive": false, "lang": "en", "category": "read-only-happy"}
 {"id": "T-RO-119", "utterance": "service health", "intent": "doctor", "expected_skill": "doctor", "expected_cmd_pattern": "axhub --version|axhub-helpers session-start", "destructive": false, "lang": "en", "category": "read-only-happy"}
+{"id": "M1", "utterance": "이거 하드코딩하는건 너무 이상한 방식 아니야?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id": "M2", "utterance": "배포 함수 어떻게 동작해?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id": "M3", "utterance": "왜 배포가 키워드 매칭이지?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id": "M4", "utterance": "isn't this hardcoded approach too limited?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "en", "category": "meta_question"}
+{"id": "M5", "utterance": "deploy 함수 코드를 보면", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id": "M6", "utterance": "라우팅 어떻게 작동하는 거야?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id": "M7", "utterance": "why is logs hardcoded as keywords?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "en", "category": "meta_question"}
+{"id": "M8", "utterance": "이거 왜 이렇게 만들었어?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id": "M9", "utterance": "STOP_WORDS 가 뭐야?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id": "M10", "utterance": "how does prompt-route hook work internally?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "en", "category": "meta_question"}
+{"id": "M11", "utterance": "이거 구현이 이상해 보이는데", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id": "M12", "utterance": "why does this skill match?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "en", "category": "meta_question"}
+{"id": "M13", "utterance": "키워드 체인 한계가 명확하지 않아?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id": "M14", "utterance": "is the routing layer well-designed?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "en", "category": "meta_question"}
+{"id": "M15", "utterance": "이 코드 리팩토링 어떻게 해야 해?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}

@@ -15,7 +15,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
-const CORPUS_PATH = join(REPO_ROOT, "tests/corpus.100.jsonl");
 
 interface CorpusRow {
   id: string;
@@ -27,19 +26,19 @@ interface CorpusRow {
   lang: string;
 }
 
-const loadCorpus = (): CorpusRow[] => {
-  const lines = readFileSync(CORPUS_PATH, "utf8")
+const loadCorpus = (relPath: string): CorpusRow[] => {
+  const lines = readFileSync(join(REPO_ROOT, relPath), "utf8")
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0 && !l.startsWith("//"));
   return lines.map((l) => JSON.parse(l) as CorpusRow);
 };
 
-const corpus = loadCorpus();
+const corpus = loadCorpus("tests/corpus.100.jsonl");
 
 describe("corpus.100.jsonl schema validation (US-203)", () => {
-  test("exactly 100 rows", () => {
-    expect(corpus.length).toBe(100);
+  test("at least 100 rows (100 base + Phase 5 meta_question expansion)", () => {
+    expect(corpus.length).toBeGreaterThanOrEqual(100);
   });
 
   test("each row has all 7 required fields", () => {
@@ -60,7 +59,7 @@ describe("corpus.100.jsonl schema validation (US-203)", () => {
       expect(ids.has(row.id)).toBe(false);
       ids.add(row.id);
     }
-    expect(ids.size).toBe(100);
+    expect(ids.size).toBe(corpus.length);
   });
 
   test("lang is one of: ko, en, mixed, slash", () => {
@@ -139,6 +138,46 @@ describe("expected_cmd_pattern distribution (curation health)", () => {
     const required = ["apps", "apis", "deploy", "status", "logs", "auth", "update", "doctor"];
     for (const s of required) {
       expect(skills.has(s)).toBe(true);
+    }
+  });
+});
+
+// Phase 5 — meta_question intent invariants across all 3 tiers.
+// meta_question = "이 코드/구현/라우팅 어떻게 동작해?" 류 발화. axhub 도구 호출 의도 X →
+// expected_skill = null + expected_cmd_pattern = null + destructive = false.
+
+const tier20 = loadCorpus("tests/corpus.20.jsonl");
+const tier100 = corpus;
+const tierFull = loadCorpus("tests/corpus.jsonl");
+
+describe("meta_question intent (Phase 5 — Approach E corpus expansion)", () => {
+  test("meta_question rows have null expected_skill + null expected_cmd_pattern + destructive=false", () => {
+    for (const tier of [tier20, tier100, tierFull]) {
+      const meta = tier.filter((r) => r.intent === "meta_question");
+      expect(meta.length).toBeGreaterThan(0);
+      for (const row of meta) {
+        expect(row.expected_skill).toBeNull();
+        expect(row.expected_cmd_pattern).toBeNull();
+        expect(row.destructive).toBe(false);
+      }
+    }
+  });
+
+  test("meta_question count per tier (20≥3, 100≥10, full≥15)", () => {
+    expect(tier20.filter((r) => r.intent === "meta_question").length).toBeGreaterThanOrEqual(3);
+    expect(tier100.filter((r) => r.intent === "meta_question").length).toBeGreaterThanOrEqual(10);
+    expect(tierFull.filter((r) => r.intent === "meta_question").length).toBeGreaterThanOrEqual(15);
+  });
+
+  test("subset relationship: tier20 ids ⊆ tier100 ids ⊆ tierFull ids (meta only)", () => {
+    const metaIds20 = new Set(tier20.filter((r) => r.intent === "meta_question").map((r) => r.id));
+    const metaIds100 = new Set(tier100.filter((r) => r.intent === "meta_question").map((r) => r.id));
+    const metaIdsFull = new Set(tierFull.filter((r) => r.intent === "meta_question").map((r) => r.id));
+    for (const id of metaIds20) {
+      expect(metaIds100.has(id)).toBe(true);
+    }
+    for (const id of metaIds100) {
+      expect(metaIdsFull.has(id)).toBe(true);
     }
   });
 });

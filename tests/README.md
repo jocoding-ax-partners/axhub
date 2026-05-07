@@ -173,3 +173,35 @@ If any fail → plugin development pauses; evaluate whether docs-only is suffici
 - Consent detection via `AskUserQuestion` tool presence or preview card keyword in assistant text
 
 Until that external eval harness exists, pass freshly captured live results via `--fixture <results.json>` so the scoring path stays reproducible.
+
+## Approach E corpus baseline (Phase 5)
+
+Approach E = `Hook = preflight + audit only`. plugin 이 routing 결정 안 하고 Claude 가 SKILL.md description 으로 native 매칭해요. 두 baseline 으로 정확도 비교해요.
+
+| Baseline | 의미 | 파일 |
+|----------|------|------|
+| docs-only | Claude 가 SKILL.md description 만 보고 매칭한 결과 (이상적 Approach E behavior, ground truth) | `baseline-results.docs-only.{20,100}.json` |
+| claude-native | 실제 axhub plugin (Approach E hook) 통과 결과 | `baseline-results.claude-native.{20,100}.json` |
+
+두 baseline 의 expected_skill 일치율 = routing 정확도 metric. Approach E 가 hook 단계에서 routing 결정 X 면 두 baseline 이 수렴해야 해요 (drift < 5%).
+
+### CI gate
+
+| Tier | rows | gate type | command |
+|------|------|-----------|---------|
+| `corpus.20.jsonl`  | 23 (20 + 3 meta_question) | reliable CI | `bun run test:routing:20` |
+| `corpus.100.jsonl` | 111 (100 + 11 meta_question) | reliable CI | `bun run test:routing:100` |
+| `corpus.jsonl`     | 346 (331 + 15 meta_question) | **manual / advisory only** | `bun run test:routing:full` (exit 0 강제) |
+
+`test:routing:full` 은 331-row baseline 가 미완 (별도 후속 PR 의 fresh fixture 작업) 이라 advisory mode 로 실행해요. CI gate 로 사용하지 마세요.
+
+### routing-score.ts threshold
+
+- accuracy ≥ 95% (default)
+- drift ≤ 5%
+- 둘 다 통과 → GO. 하나라도 실패 → KILL (CI fail)
+- per-skill precision/recall 출력으로 회귀 분석 가능해요
+
+### meta_question intent (Phase 5)
+
+corpus 에 추가된 `meta_question` row 는 "이 코드 어떻게 동작해?", "왜 키워드 매칭이지?" 류 발화예요. axhub 도구 호출 의도 X → `expected_skill = null` + `expected_cmd_pattern = null` + `destructive = false`. Approach E 후 plugin 이 routing 결정 안 하니 Claude 가 자연어로 답변해요 (skill 매칭 X 가 정답).
