@@ -110,6 +110,7 @@ impl 후 rollback (별도 PR):
 
 - deploy / apps / auth / 다른 SKILL 의 nl-lexicon trigger 한국화 (별도 RFC)
 - ax-hub-cli 자체의 trigger phrase (axhub repo 외부)
+- **본 RFC merge 자체는 한국어 trigger 추가 commitment 가 아니에요.** decision rule (≥3건 OR 4-week timeout) 통과 후 별도 PR (`feat/nl-lexicon-init-localization`) 으로만 impl 진행해요.
 
 ## References
 
