@@ -1,11 +1,14 @@
+use std::fs;
 use std::io::{self, Read};
+use std::path::PathBuf;
 
 use axhub_helpers::bootstrap::run_bootstrap;
 use axhub_helpers::catalog::classify;
 use axhub_helpers::consent::{
     format_preauth_deny_hint, mint_token, parse_axhub_command, validate_binding_schema,
-    verify_or_claim_token, verify_token, ConsentBinding,
+    verify_or_claim_token, verify_token, write_private_file_no_follow, ConsentBinding,
 };
+use axhub_helpers::keychain::{parse_keyring_value, read_keychain_token};
 use axhub_helpers::list_deployments::{run_list_deployments, ListDeploymentsArgs};
 use axhub_helpers::preflight::run_preflight;
 use axhub_helpers::redact::redact;
@@ -16,7 +19,7 @@ use axhub_helpers::telemetry::emit_meta_envelope;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>]\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>]\n  version\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -58,6 +61,8 @@ fn run() -> anyhow::Result<i32> {
             Ok(0)
         }
         "path" => cmd_path(&rest),
+        "token-init" => cmd_token_init(&rest),
+        "token-import" => cmd_token_import(&rest),
         "classify-exit" => cmd_classify_exit(&rest),
         "preflight" => {
             let run = run_preflight();
@@ -121,6 +126,151 @@ fn cmd_path(args: &[String]) -> anyhow::Result<i32> {
     };
     println!("{}", path.display());
     Ok(0)
+}
+
+fn cmd_token_init(args: &[String]) -> anyhow::Result<i32> {
+    let json_output = match parse_json_flag(args, "token-init") {
+        Ok(value) => value,
+        Err(code) => return Ok(code),
+    };
+    let (token, source) = match env_token() {
+        Some(token) => (token, "env:AXHUB_TOKEN".to_string()),
+        None => {
+            let keychain = read_keychain_token();
+            match keychain.token {
+                Some(token) => (
+                    token,
+                    keychain
+                        .source
+                        .unwrap_or_else(|| "platform-keychain".to_string()),
+                ),
+                None => {
+                    return emit_token_error(
+                        json_output,
+                        keychain.error.unwrap_or_else(|| {
+                            "axhub token을 찾을 수 없어요. axhub auth login 또는 AXHUB_TOKEN을 사용해주세요."
+                                .to_string()
+                        }),
+                    );
+                }
+            }
+        }
+    };
+    store_and_report_token(json_output, &token, &source)
+}
+
+fn cmd_token_import(args: &[String]) -> anyhow::Result<i32> {
+    let json_output = match parse_json_flag(args, "token-import") {
+        Ok(value) => value,
+        Err(code) => return Ok(code),
+    };
+    let raw = read_stdin()?;
+    let Some(token) = extract_token_from_import_payload(&raw) else {
+        return emit_token_error(
+            json_output,
+            "token-import 입력에서 access_token/token 값을 찾을 수 없어요.".to_string(),
+        );
+    };
+    store_and_report_token(json_output, &token, "stdin")
+}
+
+fn parse_json_flag(args: &[String], command: &str) -> Result<bool, i32> {
+    let mut json_output = false;
+    for arg in args {
+        match arg.as_str() {
+            "--json" => json_output = true,
+            _ => {
+                eprintln!("axhub-helpers {command}: unknown option");
+                return Err(64);
+            }
+        }
+    }
+    Ok(json_output)
+}
+
+fn env_token() -> Option<String> {
+    std::env::var("AXHUB_TOKEN")
+        .ok()
+        .and_then(|value| normalize_token_candidate(&value))
+}
+
+fn extract_token_from_import_payload(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(token) = parse_keyring_value(trimmed) {
+        return Some(token);
+    }
+    if let Ok(value) = serde_json::from_str::<Value>(trimmed) {
+        return token_from_json_value(&value).and_then(normalize_token_candidate);
+    }
+    normalize_token_candidate(trimmed)
+}
+
+fn token_from_json_value(value: &Value) -> Option<&str> {
+    if let Some(token) = value.as_str() {
+        return Some(token);
+    }
+    ["access_token", "token", "AXHUB_TOKEN"]
+        .iter()
+        .find_map(|key| value.get(key).and_then(Value::as_str))
+}
+
+fn normalize_token_candidate(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    let candidate = trimmed
+        .strip_prefix("Bearer ")
+        .or_else(|| trimmed.strip_prefix("bearer "))
+        .unwrap_or(trimmed)
+        .trim();
+    if candidate.len() < 16
+        || candidate
+            .chars()
+            .any(|c| c.is_control() || c.is_whitespace())
+    {
+        return None;
+    }
+    Some(candidate.to_string())
+}
+
+fn store_and_report_token(json_output: bool, token: &str, source: &str) -> anyhow::Result<i32> {
+    let path = store_plugin_token(token)?;
+    if json_output {
+        out_json(json!({
+            "stored": true,
+            "source": source,
+            "token_file": path,
+        }));
+    } else {
+        println!("axhub token stored at {} ({source})", path.display());
+    }
+    Ok(0)
+}
+
+fn emit_token_error(json_output: bool, message: String) -> anyhow::Result<i32> {
+    if json_output {
+        out_json(json!({
+            "stored": false,
+            "error": message,
+        }));
+    } else {
+        eprintln!("{message}");
+    }
+    Ok(65)
+}
+
+fn store_plugin_token(token: &str) -> anyhow::Result<PathBuf> {
+    let path = token_file()
+        .ok_or_else(|| anyhow::anyhow!("cannot resolve axhub plugin token file path"))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("cannot resolve axhub plugin token directory"))?
+        .to_path_buf();
+    fs::create_dir_all(&parent)?;
+    axhub_helpers::consent::set_private_dir_mode(&parent).ok();
+    write_private_file_no_follow(&path, token.as_bytes())?;
+    Ok(path)
 }
 
 fn cmd_bootstrap(args: &[String]) -> anyhow::Result<i32> {
@@ -318,10 +468,42 @@ struct PromptRoute {
     needs_preflight: bool,
 }
 
+const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
+
+fn is_ascii_word_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_' || c == '-'
+}
+
+fn contains_ascii_token(haystack: &str, needle: &str) -> bool {
+    haystack.match_indices(needle).any(|(idx, _)| {
+        let before = haystack[..idx]
+            .chars()
+            .next_back()
+            .is_some_and(is_ascii_word_char);
+        let after = haystack[idx + needle.len()..]
+            .chars()
+            .next()
+            .is_some_and(is_ascii_word_char);
+        !before && !after
+    })
+}
+
+fn needle_matches(haystack: &str, needle: &str) -> bool {
+    if needle
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        contains_ascii_token(haystack, needle)
+    } else {
+        haystack.contains(needle)
+    }
+}
+
 fn contains_any(prompt: &str, needles: &[&str]) -> bool {
     let compact = prompt.split_whitespace().collect::<String>();
     needles.iter().any(|needle| {
-        prompt.contains(needle) || compact.contains(&needle.split_whitespace().collect::<String>())
+        let compact_needle = needle.split_whitespace().collect::<String>();
+        needle_matches(prompt, needle) || needle_matches(&compact, &compact_needle)
     })
 }
 
@@ -399,6 +581,27 @@ fn detect_prompt_route(prompt: &str) -> Option<PromptRoute> {
             label: "doctor/환경 점검",
             guidance: "일반 저장소 환경 체크로 답하지 말고 axhub doctor 워크플로우를 적용해요.",
             needs_preflight: true,
+        });
+    }
+    if contains_any(
+        &p,
+        &[
+            "cli 설치",
+            "axhub cli 설치",
+            "axhub 설치",
+            "ax-hub-cli 설치",
+            "axhub install",
+            "install axhub",
+            "install cli",
+            "auto install",
+            "자동 설치",
+        ],
+    ) {
+        return Some(PromptRoute {
+            skill: "install-cli",
+            label: "CLI 설치",
+            guidance: "axhub CLI 설치 요청이에요. skills/install-cli/SKILL.md 흐름으로 OS 를 감지하고 설치 채널을 고른 뒤 axhub --version 으로 검증해요.",
+            needs_preflight: false,
         });
     }
     if p == "환경" {
@@ -838,13 +1041,32 @@ fn cmd_list_deployments(args: &[String]) -> anyhow::Result<i32> {
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
-            "--app-id" | "--app" if i + 1 < args.len() => {
+            "--app-id" | "--app" => {
+                if i + 1 >= args.len() {
+                    eprintln!("{} requires a value", args[i]);
+                    return Ok(64);
+                }
                 i += 1;
                 app_id = Some(args[i].clone());
             }
-            "--limit" if i + 1 < args.len() => {
+            "--limit" => {
+                if i + 1 >= args.len() {
+                    eprintln!("--limit requires a value");
+                    return Ok(64);
+                }
                 i += 1;
-                limit = args[i].parse().ok();
+                let parsed = match args[i].parse::<usize>() {
+                    Ok(value) => value,
+                    Err(_) => {
+                        eprintln!("invalid --limit: {}", args[i]);
+                        return Ok(64);
+                    }
+                };
+                if !(1..=MAX_LIST_DEPLOYMENTS_LIMIT).contains(&parsed) {
+                    eprintln!("--limit must be between 1 and {MAX_LIST_DEPLOYMENTS_LIMIT}");
+                    return Ok(64);
+                }
+                limit = Some(parsed);
             }
             _ => {}
         }

@@ -51,11 +51,23 @@ Run-Step 4 "session-start.ps1 exists but is not registered by universal hooks.js
   }
 }
 
-Run-Step 5 "axhub-helpers.exe exists post-install" {
-  $exe = "$HOME\.claude\plugins\marketplaces\axhub-marketplace\axhub\bin\axhub-helpers.exe"
-  if (-not (Test-Path $exe)) { throw "axhub-helpers.exe missing — install.ps1 may have failed" }
+Run-Step 5 "explicit install.ps1 downloads windows-amd64.exe" {
+  $pluginRoot = "$HOME\.claude\plugins\marketplaces\axhub-marketplace\axhub"
+  $installPs1 = Join-Path $pluginRoot 'bin\install.ps1'
+  $exe = Join-Path $pluginRoot 'bin\axhub-helpers.exe'
+  if (-not (Test-Path $installPs1)) { throw "install.ps1 missing at $installPs1" }
+  if (-not (Test-Path $exe)) {
+    Write-Output "  axhub-helpers.exe missing — invoking explicit install.ps1 Tier 2 path"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $installPs1
+    $installExit = $LASTEXITCODE
+    if ($installExit -ne 0) { throw "install.ps1 exit=$installExit" }
+  } else {
+    Write-Output "  axhub-helpers.exe already present; explicit install.ps1 download path not needed"
+  }
+  if (-not (Test-Path $exe)) { throw "axhub-helpers.exe missing after explicit install.ps1 path" }
   $size = (Get-Item $exe).Length
   Write-Output "  binary size: $([math]::Round($size / 1MB, 1)) MB"
+  Write-Output "  NOTE: do not record first-session auto-trigger unless Windows-specific hook packaging is enabled"
 }
 
 Run-Step 6 "cmdkey shows axhub credential" {
@@ -81,10 +93,26 @@ Run-Step 8 "Token file written to XDG_CONFIG_HOME path" {
   if (-not $first16.StartsWith('axhub_pat_')) { throw "token does not start with axhub_pat_ (got: $first16)" }
 }
 
-Run-Step 9 "PreToolUse + PostToolUse hooks registered in hooks.json" {
-  $hooksJson = Get-Content "$HOME\.claude\plugins\marketplaces\axhub-marketplace\axhub\hooks\hooks.json" -Raw | ConvertFrom-Json
+Run-Step 9 "Hook paths labeled accurately for native Windows evidence" {
+  $hooksPath = "$HOME\.claude\plugins\marketplaces\axhub-marketplace\axhub\hooks\hooks.json"
+  $hooksJson = Get-Content $hooksPath -Raw | ConvertFrom-Json
+  if (-not $hooksJson.hooks.UserPromptSubmit) { throw "UserPromptSubmit hook missing" }
   if (-not $hooksJson.hooks.PreToolUse) { throw "PreToolUse hook missing" }
   if (-not $hooksJson.hooks.PostToolUse) { throw "PostToolUse hook missing" }
+
+  $hookCommands = @(
+    $hooksJson.hooks.UserPromptSubmit.hooks.command
+    $hooksJson.hooks.PreToolUse.hooks.command
+    $hooksJson.hooks.PostToolUse.hooks.command
+  )
+  Write-Output "  hook commands:"
+  $hookCommands | ForEach-Object { Write-Output "    $_" }
+  if ($hookCommands -match '\.exe') {
+    Write-Output "  native .exe hook path observed; verify with Claude debug transcript before Tier 3 claim"
+  } else {
+    Write-Output "  extensionless helper path observed; capture Claude debug transcript to prove or reject native Windows resolution"
+  }
+  Write-Output "  cmd evidence label: cmd-launching-PowerShell/helper only unless cmd-native hook execution is separately proven"
 }
 
 Run-Step 10 "ExecutionPolicy fallback semantics (manual visual check)" {

@@ -153,7 +153,7 @@ To install ax-hub-cli on the user's host:
    axhub CLI 설치 완료:
      ✓ 채널: <selected channel>
      ✓ 버전: <CLI_VERSION>
-     ✓ 경로: <which axhub>
+     ✓ 경로: <which axhub 또는 Get-Command axhub>
 
    다음 단계: '로그인해줘' 라고 말씀해주세요.
    ```

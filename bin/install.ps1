@@ -4,10 +4,8 @@
 # Mirrors bin/install.sh logic for Windows hosts without Git Bash/WSL.
 # Run automatically by hooks/session-start.ps1, or manually after release.
 #
-# NOTE: bin/install.sh:80 has a known operator precedence bug
-#   ([ -e "$LINK_PATH" ] || [ -L "$LINK_PATH" ] && rm -f "$LINK_PATH")
-# This PS mirror uses explicit Test-Path / Remove-Item to avoid replicating it.
-# Tracked for sh-side fix: future v0.1.x.
+# NOTE: bin/install.sh uses an explicit if block for link cleanup; this PS mirror
+# keeps the same Test-Path / Remove-Item shape for parity.
 #
 # Maintainer: when bumping plugin version, update $RELEASE_VERSION below to
 # match install.sh:48. Override via env $env:AXHUB_PLUGIN_RELEASE.
@@ -106,7 +104,7 @@ if (-not (Test-Path -Path $TargetPath -PathType Leaf)) {
   }
 }
 
-# Remove existing link before relinking. Explicit pattern (NOT install.sh:80 ||).
+# Remove existing link before relinking. Explicit pattern mirrors install.sh.
 if (Test-Path -Path $LinkPath -PathType Any) {
   Remove-Item -Path $LinkPath -Force
 }

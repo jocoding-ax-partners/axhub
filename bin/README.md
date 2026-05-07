@@ -1,8 +1,8 @@
 # bin/
 
-This directory holds the compiled `axhub-helpers` binary (single multi-command Rust executable). Primary source lives in `../crates/axhub-helpers`; `../src/axhub-helpers` remains a transition fallback/parity reference.
+This directory holds the compiled `axhub-helpers` binary (single multi-command Rust executable). Primary source lives in `../crates/axhub-helpers`.
 
-Claude Code adds this `bin/` to `PATH` while the plugin is enabled, so skills/commands/hooks invoke the helper as `axhub-helpers <subcommand>` (no path needed).
+Claude Code plugin docs state that plugin `bin/` executables are added to the **Bash tool** `PATH` while the plugin is enabled, so POSIX/Bash-path skills and hooks may invoke the helper as `axhub-helpers <subcommand>`. Native Windows hook/statusLine resolution is not treated as proven by that Bash-tool guarantee; Windows-native docs should use explicit `.exe` or PowerShell paths until smoke evidence says otherwise.
 
 ## Build
 
@@ -31,9 +31,10 @@ bun run smoke
 
 ## Windows installer (Phase 10 v0.1.7+)
 
-- `bin/install.ps1` — PowerShell 5.1+ mirror of `install.sh`. Used by `hooks/session-start.ps1` to auto-download `windows-amd64.exe` on first session.
-- Requires Claude Code >= 2.1.84 (introduced `"shell": "powershell"` hook field).
-- No `Install-Module`, no `Add-Type` (EDR-clean — different from keychain.ts which uses inline PInvoke).
+- `bin/install.ps1` — PowerShell 5.1+ mirror of `install.sh`. It is the native Windows installer for explicit/manual smoke and for a future Windows-specific hook package.
+- `hooks/session-start.ps1` can call `install.ps1`, but it is **not** registered in the universal `hooks/hooks.json` today. Universal PowerShell SessionStart stays disabled until platform-specific hook packaging or a Windows wrapper is proven safe.
+- Claude Code supports `"shell": "powershell"` for command hooks on Windows, but the checked plugin docs do not document a per-OS plugin hook gate.
+- No `Install-Module`, no `Add-Type` in the installer (EDR-clean — different from helper token extraction, which uses inline PInvoke).
 
 ## Contract
 

@@ -4,7 +4,7 @@
 // CLAUDE_JSON_SCHEMA.md 의 stop_reason / cost_usd 필드 실재성 lock.
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 

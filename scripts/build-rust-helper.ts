@@ -45,14 +45,12 @@ const run = (cmd: string, args: string[]): void => {
 
 const hostSpec = (): TargetSpec => {
   const spec = TARGETS.find((t) => t.platform === process.platform && t.arch === process.arch);
-  if (!spec) fail(`unsupported host ${process.platform}/${process.arch}`);
-  return spec;
+  return spec ?? fail(`unsupported host ${process.platform}/${process.arch}`);
 };
 
 const target = argValue("--target");
 const requestedName = argValue("--name");
-const spec = target ? TARGETS.find((t) => t.target === target) : hostSpec();
-if (!spec) fail(`unknown target ${target}`);
+const spec: TargetSpec = target ? (TARGETS.find((t) => t.target === target) ?? fail(`unknown target ${target}`)) : hostSpec();
 const outputName = requestedName ?? (target ? spec.name : "axhub-helpers");
 
 const cargoArgs = ["build", "--release", "-p", "axhub-helpers"];

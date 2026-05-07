@@ -19,7 +19,11 @@ ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set by Claude Code}"
 HELPER="${ROOT}/bin/axhub-helpers"
 INSTALL_SH="${ROOT}/bin/install.sh"
 
-if [ ! -x "$HELPER" ] && [ ! -L "$HELPER" ]; then
+if [ ! -x "$HELPER" ]; then
+  if [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" = "1" ]; then
+    echo '{"systemMessage":"[axhub] AXHUB_SKIP_AUTODOWNLOAD=1 이라 helper 자동 설치를 건너뛰었어요. 수동 설치 후 다시 시작해요: bash bin/install.sh"}'
+    exit 0
+  fi
   if [ -x "$INSTALL_SH" ]; then
     "$INSTALL_SH" >&2 || {
       echo '{"systemMessage":"[axhub] helper 바이너리 설치 실패. 진단: /axhub:doctor"}'
@@ -41,7 +45,7 @@ if [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" != "1" ]; then
   esac
   if [ ! -f "$TOKEN_FILE" ] && command -v axhub >/dev/null 2>&1; then
     if axhub auth status --json 2>/dev/null | grep -q '"user_email"'; then
-      "$HELPER" token-init >&2 2>&1 || true
+      "$HELPER" token-init >/dev/null 2>&1 || true
     fi
   fi
 fi

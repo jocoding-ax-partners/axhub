@@ -69,21 +69,17 @@ To list APIs:
    }
    ```
 
-5. **On `cross_team` only**, run without `--app-id`:
+5. **On `cross_team` only**, run without `--app-id` and redact in the same pipeline:
 
    ```bash
-   axhub apis list --json
+   axhub apis list --json | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers redact
    ```
 
    Audit log this elevation locally to `~/.cache/axhub-plugin/cross-team-list.ndjson` so admins can review (PLAN row 46 audit requirement).
 
 6. **Render long lists in pages.** For >20 entries, paginate via AskUserQuestion ("다음 10개 / 검색 / 그만"). Never dump >100 rows at once.
 
-7. **Redact service base URLs** of cross-team APIs even when listed. Helper handles this:
-
-   ```bash
-   axhub apis list --json | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers redact
-   ```
+7. **Redact service base URLs** of cross-team APIs even when listed. Step 5 already pipes the widened-scope output through the helper, so never add a second raw `axhub apis list --json` command.
 
 8. **On non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by code (65 / 67 / 68 / 1).
 

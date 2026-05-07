@@ -47,8 +47,8 @@ pub struct CommandOutput {
 }
 pub type CommandRunner = fn(&[&str], u64) -> CommandOutput;
 
-pub fn default_runner(cmd: &[&str], _timeout_ms: u64) -> CommandOutput {
-    match crate::spawn::spawn_sync(cmd) {
+pub fn default_runner(cmd: &[&str], timeout_ms: u64) -> CommandOutput {
+    match crate::spawn::spawn_sync_with_timeout(cmd, timeout_ms) {
         Ok(r) => CommandOutput {
             exit_code: r.exit_code.unwrap_or(1),
             stdout: r.stdout,

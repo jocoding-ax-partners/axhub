@@ -8,6 +8,7 @@ import { join } from "node:path";
 const REPO_ROOT = join(import.meta.dir, "..");
 const INSTALL_PS1 = join(REPO_ROOT, "bin/install.ps1");
 const INSTALL_SH = join(REPO_ROOT, "bin/install.sh");
+const SESSION_START_PS1 = join(REPO_ROOT, "hooks/session-start.ps1");
 
 describe("bin/install.ps1 — Windows installer mirror", () => {
   test("RELEASE_VERSION literal matches install.sh:48 (parity assertion)", () => {
@@ -47,14 +48,14 @@ describe("bin/install.ps1 — Windows installer mirror", () => {
     expect(ps1).not.toContain("DllImport");
   });
 
-  test("Explicit Test-Path / Remove-Item NOT install.sh:80 || operator (D4)", () => {
+  test("Explicit Test-Path / Remove-Item mirrors fixed install.sh link cleanup (D4)", () => {
     const ps1 = readFileSync(INSTALL_PS1, "utf8");
+    const sh = readFileSync(INSTALL_SH, "utf8");
     // Must use explicit pattern
     expect(ps1).toContain("Test-Path -Path $LinkPath -PathType Any");
     expect(ps1).toContain("Remove-Item -Path $LinkPath -Force");
-    // Must reference install.sh:80 bug in NOTE comment
-    expect(ps1).toContain("install.sh:80");
-    expect(ps1).toContain("operator precedence bug");
+    expect(sh).toContain('if [ -e "$LINK_PATH" ] || [ -L "$LINK_PATH" ]; then');
+    expect(sh).not.toContain('[ -e "$LINK_PATH" ] || [ -L "$LINK_PATH" ] && rm -f "$LINK_PATH"');
   });
 
   test("Every catch emits ConvertTo-Json @{ systemMessage = ... } envelope + exit 0 (F3)", () => {
@@ -72,5 +73,29 @@ describe("bin/install.ps1 — Windows installer mirror", () => {
     const exitZeros = ps1.match(/exit\s+0\s*$/gm);
     expect(exitZeros).not.toBeNull();
     expect(exitZeros!.length).toBeGreaterThanOrEqual(catchKeywords!.length);
+  });
+
+  test("session-start.ps1 honors AXHUB_SKIP_AUTODOWNLOAD before invoking install.ps1", () => {
+    const ps1 = readFileSync(SESSION_START_PS1, "utf8");
+    const guardIdx = ps1.indexOf("$env:AXHUB_SKIP_AUTODOWNLOAD -eq '1'");
+    const installIdx = ps1.indexOf("& powershell -NoProfile -ExecutionPolicy Bypass -File $InstallPs1");
+    expect(guardIdx).toBeGreaterThan(0);
+    expect(installIdx).toBeGreaterThan(0);
+    expect(guardIdx).toBeLessThan(installIdx);
+    expect(ps1).toContain("자동 설치를 건너뛰었어요");
+  });
+
+  test("session-start.ps1 captures installer output and stops if helper is still missing", () => {
+    const ps1 = readFileSync(SESSION_START_PS1, "utf8");
+    const captureIdx = ps1.indexOf(
+      "$installOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $InstallPs1 2>&1",
+    );
+    const exitCheckIdx = ps1.indexOf("$installExit = $LASTEXITCODE", captureIdx);
+    const recheckIdx = ps1.indexOf("install.ps1 실행 후에도 axhub-helpers.exe", captureIdx);
+    expect(captureIdx).toBeGreaterThan(0);
+    expect(exitCheckIdx).toBeGreaterThan(captureIdx);
+    expect(recheckIdx).toBeGreaterThan(exitCheckIdx);
+    expect(ps1).toContain("function Write-InstallFailureOrFallback");
+    expect(ps1).toContain("TrimStart().StartsWith('{')");
   });
 });

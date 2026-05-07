@@ -56,9 +56,9 @@ To handle auth:
 4. **Detect headless environment.** If `$CODESPACES`, `$SSH_TTY` without `$DISPLAY`, or no `open`/`xdg-open` on PATH, default the AskUserQuestion to `token_file` and skip the browser option entirely. Follow `../deploy/references/recovery-flows.md` ("headless-auth").
 
    Token 소스 우선순위 (헤드리스):
-   - 1순위: `export AXHUB_TOKEN=axhub_pat_...` 환경변수 직접 설정 (가장 간단)
-   - 2순위: 별도 노트북에서 `axhub auth login` 실행 후, 그 노트북의 keychain에서 토큰 추출 → secure 채널 (Slack DM, secure email) 로 헤드리스 환경에 전달 → `export AXHUB_TOKEN=...`
-   - 3순위: pasted token을 `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-import` 로 `~/.config/axhub-plugin/token` 에 mode 0600 저장
+   - 1순위: 환경변수 직접 설정. POSIX/Git Bash/WSL 은 `export AXHUB_TOKEN=axhub_pat_...`, Windows PowerShell 은 `$env:AXHUB_TOKEN='axhub_pat_...'` 를 사용해요.
+   - 2순위: 별도 노트북에서 `axhub auth login` 실행 후, 그 노트북의 keychain에서 토큰 추출 → secure 채널 (Slack DM, secure email) 로 헤드리스 환경에 전달 → 현재 shell 에 맞게 `AXHUB_TOKEN` 설정
+   - 3순위: pasted token을 helper 로 import. POSIX/Git Bash/WSL 은 `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-import`, Windows PowerShell 은 `& "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" token-import` 를 사용해요.
 
    **Token 자동 추출 메커니즘:** 브라우저 환경에서는 `axhub auth login` 한 번 실행 후, 헬퍼의 `token-init` 서브커맨드가 macOS keychain / Linux secret-service / Windows Credential Manager (PowerShell + Add-Type 단일 호출) 에서 `axhub` CLI 가 저장한 토큰을 자동 추출해요. vibe coder 가 별도 토큰 setup 단계를 볼 일 없어요.
 

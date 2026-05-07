@@ -33,6 +33,7 @@ use axhub_helpers::resolve::{
     extract_slug_candidate, filter_apps_by_slug, parse_apps_list, parse_resolve_args,
     run_resolve_with_runner, EXIT_NOT_FOUND,
 };
+use axhub_helpers::spawn::spawn_sync_with_timeout;
 use axhub_helpers::telemetry::{
     emit_meta_envelope, reset_cli_version_cache, resolve_cli_version, state_dir,
 };
@@ -143,6 +144,52 @@ fn redact_matches_typescript_secret_and_unicode_contract() {
         ),
         "OK Bearer *** AXHUB_TOKEN=***"
     );
+    assert_eq!(
+        redact(r#"{"service_base_url":"https://tenant-a.internal.example/v1","name":"billing"}"#),
+        r#"{"service_base_url":"[redacted]","name":"billing"}"#
+    );
+    assert_eq!(
+        redact("service_base_url: https://tenant-a.internal.example/v1"),
+        "service_base_url: [redacted]"
+    );
+}
+
+#[test]
+fn spawn_sync_with_timeout_terminates_slow_children() {
+    let cmd: Vec<&str> = if cfg!(windows) {
+        vec![
+            "powershell.exe",
+            "-NoProfile",
+            "-Command",
+            "Write-Error warn; Start-Sleep -Milliseconds 800",
+        ]
+    } else {
+        vec!["sh", "-c", "printf warn >&2; sleep 1"]
+    };
+    let result = spawn_sync_with_timeout(&cmd, 50).unwrap();
+    assert_eq!(result.exit_code, None);
+    assert!(
+        result.stderr.contains("timed out after 50ms"),
+        "stderr={}",
+        result.stderr
+    );
+}
+
+#[test]
+fn spawn_sync_with_timeout_returns_successful_child_output() {
+    let cmd: Vec<&str> = if cfg!(windows) {
+        vec!["cmd", "/C", "echo timeout-ok"]
+    } else {
+        vec!["sh", "-c", "printf timeout-ok"]
+    };
+    let result = spawn_sync_with_timeout(&cmd, 1_000).unwrap();
+    assert_eq!(result.exit_code, Some(0));
+    assert_eq!(result.stdout.trim(), "timeout-ok");
+    assert_eq!(result.stderr, "");
+
+    let zero_timeout_result = spawn_sync_with_timeout(&cmd, 0).unwrap();
+    assert_eq!(zero_timeout_result.exit_code, Some(0));
+    assert_eq!(zero_timeout_result.stdout.trim(), "timeout-ok");
 }
 
 #[test]
@@ -459,6 +506,43 @@ fn preflight_current_app_prefers_env_manifest_then_cache() {
         cache_fallback.output.current_app.as_deref(),
         Some("cached-app")
     );
+}
+
+#[test]
+fn preflight_uses_xdg_cache_home_for_last_deploy_cache() {
+    let _lock = env_lock().lock().unwrap();
+    let guard = EnvGuard::new(&["HOME", "XDG_CACHE_HOME", "AXHUB_APP_SLUG", "AXHUB_BIN"]);
+    let _cwd = CwdGuard::enter(guard._dir.path());
+    std::env::set_var("HOME", guard.path("home"));
+    std::env::set_var("XDG_CACHE_HOME", guard.path("xdg-cache"));
+    std::env::remove_var("AXHUB_APP_SLUG");
+    fs::create_dir_all(guard.path("xdg-cache/axhub-plugin")).unwrap();
+    fs::write(
+        guard.path("xdg-cache/axhub-plugin/last-deploy.json"),
+        r#"{"deployment_id":"dep-xdg","status":"active","app_slug":"xdg-app"}"#,
+    )
+    .unwrap();
+
+    let run = run_preflight_with_runner(|cmd| match cmd {
+        ["axhub", "--version"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: "axhub 0.1.5".into(),
+            stderr: String::new(),
+        },
+        ["axhub", "auth", "status", "--json"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: r#"{"user_email":"u@example.com","scopes":["read"]}"#.into(),
+            stderr: String::new(),
+        },
+        _ => SpawnResult {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: String::new(),
+        },
+    });
+
+    assert_eq!(run.output.current_app.as_deref(), Some("xdg-app"));
+    assert_eq!(run.output.last_deploy_id.as_deref(), Some("dep-xdg"));
 }
 
 #[test]
@@ -1864,6 +1948,14 @@ fn windows_keychain_runner_covers_success_and_failure_guidance() {
         decode_windows_blob(
             &base64::engine::general_purpose::STANDARD.encode("plain-token-envelope")
         ),
+        Some("plain-token-envelope".into())
+    );
+    let utf16_bytes: Vec<u8> = "plain-token-envelope"
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect();
+    assert_eq!(
+        decode_windows_blob(&base64::engine::general_purpose::STANDARD.encode(utf16_bytes)),
         Some("plain-token-envelope".into())
     );
     assert!(decode_windows_blob("not-base64").is_none());

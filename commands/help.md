@@ -43,7 +43,17 @@ axhub 플러그인으로 할 수 있는 것:
   /axhub:update
   자연어 예시: "axhub 새 버전 있어?"
 
-처음이라면 "안녕"이라고 말해보세요. 첫 배포까지 함께 도와드릴게요.
+🧭 자연어 전용 흐름
+  init: "결제 앱 만들어줘"
+  env: "환경변수 뭐 있어"
+  github: "GitHub repo 연결해"
+  open: "결과 봐"
+  profile: "회사 endpoint 바꿔"
+  upgrade: "플러그인 업그레이드"
+  install-cli: "axhub CLI 설치해줘"
+  whatsnew: "뭐 새로 나왔어"
+
+처음이라면 "안녕"이라고 말해보세요. 첫 배포까지 함께 도와줄게요.
 
 문제가 생기면: docs/troubleshooting.ko.md 참고
 조직 관리자 가이드: docs/org-admin-rollout.ko.md

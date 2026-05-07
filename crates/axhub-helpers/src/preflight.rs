@@ -148,7 +148,8 @@ fn home_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 fn last_deploy_cache_path() -> PathBuf {
-    home_dir().join(".cache/axhub-plugin/last-deploy.json")
+    crate::runtime_paths::last_deploy_file()
+        .unwrap_or_else(|| home_dir().join(".cache/axhub-plugin/last-deploy.json"))
 }
 
 fn read_last_deploy_cache() -> Option<LastDeployCache> {

@@ -66,8 +66,8 @@ try {
   [Advapi32]::CredFree($ptr)
 }"#;
 
-pub fn default_windows_runner(cmd: &[&str], _timeout_ms: u64) -> WindowsSpawnResult {
-    match crate::spawn::spawn_sync(cmd) {
+pub fn default_windows_runner(cmd: &[&str], timeout_ms: u64) -> WindowsSpawnResult {
+    match crate::spawn::spawn_sync_with_timeout(cmd, timeout_ms) {
         Ok(r) => WindowsSpawnResult {
             exit_code: r.exit_code.unwrap_or(1),
             signal_code: r.signal.map(|s| s.to_string()),
@@ -89,10 +89,30 @@ pub fn is_edr_signal(result: &WindowsSpawnResult) -> bool {
         || result.exit_code == 0xC0000409u32 as i32
 }
 pub fn decode_windows_blob(b64: &str) -> Option<String> {
-    base64::engine::general_purpose::STANDARD
-        .decode(b64)
+    let bytes = base64::engine::general_purpose::STANDARD.decode(b64).ok()?;
+    if looks_like_utf16le(&bytes) {
+        return decode_utf16le(&bytes);
+    }
+    String::from_utf8(bytes).ok()
+}
+
+fn looks_like_utf16le(bytes: &[u8]) -> bool {
+    if bytes.len() < 4 || bytes.len() % 2 != 0 {
+        return false;
+    }
+    let units = bytes.len() / 2;
+    let zero_high_bytes = bytes.chunks_exact(2).filter(|chunk| chunk[1] == 0).count();
+    zero_high_bytes * 2 >= units
+}
+
+fn decode_utf16le(bytes: &[u8]) -> Option<String> {
+    let units: Vec<u16> = bytes
+        .chunks_exact(2)
+        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        .collect();
+    String::from_utf16(&units)
         .ok()
-        .and_then(|b| String::from_utf8(b).ok())
+        .map(|decoded| decoded.trim_end_matches('\0').to_string())
 }
 
 pub fn read_windows_keychain() -> KeychainResult {
