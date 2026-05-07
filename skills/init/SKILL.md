@@ -7,7 +7,7 @@ needs-preflight: false
 
 # Init
 
-새 axhub 앱을 current CLI template registry 에서 시작해요. v0.2.0 에서는 dependency install 과 remote template fetch 를 하지 않고 `axhub --json init --list-templates` 를 source of truth 로 써요. Sprint 3 부터 프로젝트 파일을 만든 뒤에는 helper bootstrap 을 plan-only (계획만 보기) 모드로만 호출해서 다음 안전 단계를 보여줘요.
+새 axhub 앱을 현재 CLI 템플릿 목록에서 시작해요. v0.2.0 에서는 패키지 설치와 원격 template 내려받기를 하지 않고 `axhub --json init --list-templates` 를 단일 정답 소스로 써요. Sprint 3 부터 프로젝트 파일을 만든 뒤에는 helper bootstrap 을 plan-only (계획만 보기) 모드로만 호출해서 다음 안전 단계를 보여줘요.
 
 ## Workflow
 
