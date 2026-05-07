@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
-use axhub_helpers::bootstrap::run_bootstrap;
+use axhub_helpers::bootstrap::{cmd_bootstrap_dependency_plan, run_bootstrap};
 use axhub_helpers::catalog::classify;
 use axhub_helpers::consent::{
     format_preauth_deny_hint, mint_token, parse_axhub_command, validate_binding_schema,
@@ -19,7 +19,7 @@ use axhub_helpers::telemetry::emit_meta_envelope;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>]\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  version\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -274,6 +274,9 @@ fn store_plugin_token(token: &str) -> anyhow::Result<PathBuf> {
 }
 
 fn cmd_bootstrap(args: &[String]) -> anyhow::Result<i32> {
+    if args.first().map(String::as_str) == Some("dependency-plan") {
+        return cmd_bootstrap_dependency_plan(&args[1..]);
+    }
     let stdin = if bootstrap_record_event(args).is_some() {
         Some(read_stdin()?)
     } else {

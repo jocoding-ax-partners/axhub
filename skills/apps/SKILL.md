@@ -3,6 +3,7 @@ name: apps
 description: '이 스킬은 사용자가 팀에 등록된 axhub 앱 목록을 보거나 명시적인 앱 관리 작업을 요청할 때 사용해요. 다음 표현에서 활성화: "내 앱 보여줘", "내 앱 봐", "앱 뭐 있어", "앱 목록 봐", "어떤 앱 있어", "앱 리스트", "운영 중인 앱 뭐 있어", "등록된 앱 봐", "회사 앱 뭐 있어", "우리 앱 봐", "앱 슬러그 봐", "앱 ID 봐", "앱 목록 보여주세요", "어떤 앱이 있나요", "제 앱들 보여주세요", "운영 중인 앱 보여주세요", "apps", "list apps", "my apps", "available apps", "app catalog", "which apps", "app list", 또는 앱 카탈로그/관리 흐름. 현재 팀 scope 으로 출력 필터링하고 생성/수정/delete 작업은 승인 토큰을 요구해요.'
 multi-step: false
 needs-preflight: true
+allows-dependency-execution: false
 ---
 
 # Apps Management (team-scoped; mutations consent-gated)
