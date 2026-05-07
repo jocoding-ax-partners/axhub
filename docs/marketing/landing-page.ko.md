@@ -127,7 +127,7 @@ Claude Code  ──→  axhub plugin
 
 | 항목 | 값 |
 |---|---|
-| Plugin version | 0.3.1 |
+| Plugin version | 0.3.2 |
 | ax-hub-cli compatibility | `>=0.1.0,<0.12.0` |
 | Test coverage | `bun test` + `cargo test --workspace` + release gates |
 | Cross-arch binaries | macOS arm64/Intel, Linux x86_64/arm64, Windows x86_64 |
