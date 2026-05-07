@@ -1523,3 +1523,68 @@ fn cli_bootstrap_malformed_deploy_success_records_terminal_stop_without_stale_pe
     assert!(state_json.get("pending_action").is_none());
     assert_eq!(state_json["completed_actions"].as_array().unwrap().len(), 2);
 }
+
+// Phase 4: routing-stats + cleanup-audit E2E tests.
+
+#[cfg(unix)]
+#[test]
+fn cli_routing_stats_help() {
+    let output = run_stdin(&["routing-stats", "--help"], "", &[]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("axhub-helpers routing-stats"));
+    assert!(stdout.contains("--since"));
+    assert!(stdout.contains("--json"));
+    assert!(stdout.contains("--top"));
+    assert!(stdout.contains("PRIVACY:"));
+    assert!(stdout.contains("AXHUB_NO_AUDIT=1"));
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_routing_stats_axhub_no_audit() {
+    let output = run_stdin(&["routing-stats"], "", &[("AXHUB_NO_AUDIT", "1")]);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("audit log 가 비활성"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_routing_stats_axhub_no_audit_json() {
+    let output = run_stdin(&["routing-stats", "--json"], "", &[("AXHUB_NO_AUDIT", "1")]);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("valid JSON");
+    assert_eq!(parsed["audit_disabled"], true);
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_routing_stats_invalid_since() {
+    let output = run_stdin(&["routing-stats", "--since", "xyz"], "", &[("AXHUB_NO_AUDIT", "1")]);
+    assert_eq!(output.status.code(), Some(64));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("duration") || stderr.contains("xyz"), "{stderr}");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_cleanup_audit_help() {
+    let output = run_stdin(&["cleanup-audit", "--help"], "", &[]);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("cleanup-audit"));
+    assert!(stdout.contains("--all"));
+    assert!(stdout.contains("--yes"));
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_cleanup_audit_default_rotates_only() {
+    // default = 7-day rotation. Result message must include "7일 이상" + Korean count phrase.
+    let output = run_stdin(&["cleanup-audit"], "", &[]);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("7일 이상"), "{stdout}");
+    assert!(stdout.contains("audit log"), "{stdout}");
+}
