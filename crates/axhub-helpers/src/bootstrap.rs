@@ -1089,7 +1089,6 @@ pub fn build_dependency_plan(cwd: &Path) -> anyhow::Result<DependencyPlan> {
 
     let lockfile_count = detected.len() as u32;
     let requires_pm_choice = lockfile_count > 1;
-    debug_assert_eq!(requires_pm_choice, lockfile_count > 1);
 
     let detected_lockfile = if lockfile_count == 1 {
         Some(detected[0].0.to_string())
@@ -1111,13 +1110,12 @@ pub fn build_dependency_plan(cwd: &Path) -> anyhow::Result<DependencyPlan> {
         PlanState::DependencyInstallRequired
     };
 
-    let recommended_command = if matches!(plan_state, PlanState::DependencyInstallRequired)
-        && !requires_pm_choice
-    {
-        Some(manager_candidates[0].install_command().to_string())
-    } else {
-        None
-    };
+    let recommended_command =
+        if matches!(plan_state, PlanState::DependencyInstallRequired) && !requires_pm_choice {
+            Some(manager_candidates[0].install_command().to_string())
+        } else {
+            None
+        };
 
     Ok(DependencyPlan {
         detected_lockfile,
@@ -1158,7 +1156,10 @@ pub fn cmd_bootstrap_dependency_plan(args: &[String]) -> anyhow::Result<i32> {
                 .iter()
                 .map(|pm| pm.install_command())
                 .collect();
-            println!("multiple lockfiles detected; choose one: {}", candidates.join(", "));
+            println!(
+                "multiple lockfiles detected; choose one: {}",
+                candidates.join(", ")
+            );
         }
     }
     Ok(exit_code)

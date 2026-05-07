@@ -83,3 +83,149 @@ fn case4_node_modules_present_already_installed() {
     assert!(plan.recommended_command.is_none());
     assert!(!plan.requires_pm_choice);
 }
+
+#[test]
+fn case5_pnpm_only_lockfile_recommends_pnpm() {
+    let dir = tempdir().expect("tempdir");
+    let cwd = dir.path();
+    write(cwd, "package.json", "{}\n");
+    write(cwd, "pnpm-lock.yaml", "lockfileVersion: 6.0\n");
+
+    let plan = build_dependency_plan(cwd).expect("plan");
+
+    assert_eq!(plan.detected_lockfile.as_deref(), Some("pnpm-lock.yaml"));
+    assert_eq!(plan.manager_candidates, vec![PackageManager::Pnpm]);
+    assert_eq!(plan.recommended_command.as_deref(), Some("pnpm install"));
+    assert_eq!(plan.plan_state, PlanState::DependencyInstallRequired);
+}
+
+#[test]
+fn case6_yarn_only_lockfile_recommends_yarn() {
+    let dir = tempdir().expect("tempdir");
+    let cwd = dir.path();
+    write(cwd, "package.json", "{}\n");
+    write(cwd, "yarn.lock", "# yarn lockfile v1\n");
+
+    let plan = build_dependency_plan(cwd).expect("plan");
+
+    assert_eq!(plan.detected_lockfile.as_deref(), Some("yarn.lock"));
+    assert_eq!(plan.manager_candidates, vec![PackageManager::Yarn]);
+    assert_eq!(plan.recommended_command.as_deref(), Some("yarn install"));
+}
+
+#[test]
+fn case7_bun_only_lockfile_recommends_bun() {
+    let dir = tempdir().expect("tempdir");
+    let cwd = dir.path();
+    write(cwd, "package.json", "{}\n");
+    write(cwd, "bun.lockb", "");
+
+    let plan = build_dependency_plan(cwd).expect("plan");
+
+    assert_eq!(plan.detected_lockfile.as_deref(), Some("bun.lockb"));
+    assert_eq!(plan.manager_candidates, vec![PackageManager::Bun]);
+    assert_eq!(plan.recommended_command.as_deref(), Some("bun install"));
+}
+
+#[test]
+fn plan_state_as_str_covers_three_variants() {
+    assert_eq!(
+        PlanState::DependencyInstallRequired.as_str(),
+        "dependency_install_required"
+    );
+    assert_eq!(
+        PlanState::DependencyAlreadyInstalled.as_str(),
+        "dependency_already_installed"
+    );
+    assert_eq!(
+        PlanState::DependencyNotRequired.as_str(),
+        "dependency_not_required"
+    );
+}
+
+#[test]
+fn package_manager_install_command_covers_four_variants() {
+    assert_eq!(PackageManager::Npm.install_command(), "npm install");
+    assert_eq!(PackageManager::Pnpm.install_command(), "pnpm install");
+    assert_eq!(PackageManager::Yarn.install_command(), "yarn install");
+    assert_eq!(PackageManager::Bun.install_command(), "bun install");
+}
+
+#[test]
+fn cmd_dependency_plan_json_output_single_lockfile() {
+    let dir = tempdir().expect("tempdir");
+    let cwd = dir.path();
+    write(cwd, "package.json", "{}\n");
+    write(cwd, "package-lock.json", "{}\n");
+
+    let exe = env!("CARGO_BIN_EXE_axhub-helpers");
+    let output = std::process::Command::new(exe)
+        .args(["bootstrap", "dependency-plan", "--json"])
+        .current_dir(cwd)
+        .output()
+        .expect("spawn dependency-plan");
+
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8(output.stdout).expect("utf8");
+    assert!(stdout.contains("\"plan_state\":\"dependency_install_required\""));
+    assert!(stdout.contains("\"recommended_command\":\"npm install\""));
+    assert!(stdout.contains("\"requires_pm_choice\":false"));
+}
+
+#[test]
+fn cmd_dependency_plan_plain_output_single_lockfile() {
+    let dir = tempdir().expect("tempdir");
+    let cwd = dir.path();
+    write(cwd, "package.json", "{}\n");
+    write(cwd, "package-lock.json", "{}\n");
+
+    let exe = env!("CARGO_BIN_EXE_axhub-helpers");
+    let output = std::process::Command::new(exe)
+        .args(["bootstrap", "dependency-plan"])
+        .current_dir(cwd)
+        .output()
+        .expect("spawn dependency-plan plain");
+
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8(output.stdout).expect("utf8");
+    assert!(stdout.contains("plan_state: dependency_install_required"));
+    assert!(stdout.contains("recommended_command: npm install"));
+}
+
+#[test]
+fn cmd_dependency_plan_multiple_lockfiles_exits_65() {
+    let dir = tempdir().expect("tempdir");
+    let cwd = dir.path();
+    write(cwd, "package.json", "{}\n");
+    write(cwd, "package-lock.json", "{}\n");
+    write(cwd, "pnpm-lock.yaml", "lockfileVersion: 6.0\n");
+
+    let exe = env!("CARGO_BIN_EXE_axhub-helpers");
+    let output = std::process::Command::new(exe)
+        .args(["bootstrap", "dependency-plan"])
+        .current_dir(cwd)
+        .output()
+        .expect("spawn dependency-plan multi");
+
+    assert_eq!(output.status.code(), Some(65));
+    let stdout = String::from_utf8(output.stdout).expect("utf8");
+    assert!(stdout.contains("multiple lockfiles detected"));
+}
+
+#[test]
+fn cmd_dependency_plan_unknown_option_exits_64() {
+    let dir = tempdir().expect("tempdir");
+    let cwd = dir.path();
+
+    let exe = env!("CARGO_BIN_EXE_axhub-helpers");
+    let output = std::process::Command::new(exe)
+        .args(["bootstrap", "dependency-plan", "--bogus-flag"])
+        .current_dir(cwd)
+        .output()
+        .expect("spawn dependency-plan unknown");
+
+    assert_eq!(output.status.code(), Some(64));
+    let stderr = String::from_utf8(output.stderr).expect("utf8");
+    assert!(stderr.contains("unknown option"));
+    assert!(stderr.contains("--bogus-flag"));
+}
