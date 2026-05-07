@@ -122,7 +122,7 @@ To run diagnostics:
      ✓ CLI 설치:        v<CLI_VERSION> (<WHICH_PATH>)
      ✓ 버전 범위:       호환 (필요: v<MIN> ~ v<MAX> 미만)
      ✓ 로그인:          <USER_EMAIL>
-     ✓ 만료:            <EXPIRES_AT> (남은 시간: <DELTA>)
+     ✓ 만료:            <EXPIRES_HUMAN>
      ✓ 권한 (scope):    <SCOPES joined>
      ✓ 환경 (profile):  <PROFILE 또는 "default (기본값 사용 중)">
      ✓ endpoint:        <ENDPOINT 또는 "https://hub-api.jocodingax.ai (기본값)">
@@ -213,3 +213,4 @@ Keep this read-only. If audit export requires extra permission, explain the miss
 For Korean trigger lexicon (doctor intent): `../deploy/references/nl-lexicon.md` (section 8).
 For 4-part Korean exit templates: `../deploy/references/error-empathy-catalog.md`.
 For version-skew flows (too old / too new): `../deploy/references/recovery-flows.md` ("version-skew").
+For expires_at humanization rule: `../deploy/references/time-render.md`.

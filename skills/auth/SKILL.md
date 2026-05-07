@@ -30,7 +30,7 @@ To handle auth:
    ```
    현재 로그인:
      · 계정: <user_email>
-     · 만료: <expires_at> (남은 시간: <DELTA>)
+     · 만료: <EXPIRES_HUMAN>
      · 권한: <scopes joined by ", ">
      · 환경: <profile> (<endpoint>)
    ```
@@ -124,3 +124,4 @@ For Korean trigger lexicon (auth intent): `../deploy/references/nl-lexicon.md` (
 For 4-part Korean exit templates (exit 65, exit 66): `../deploy/references/error-empathy-catalog.md`.
 For headless-auth + token-paste flow: `../deploy/references/recovery-flows.md` ("headless-auth").
 For headless / Codespaces / SSH auth fallback (token-paste flow), see `../deploy/references/headless-flow.md`.
+For expires_at humanization rule: `../deploy/references/time-render.md`.
