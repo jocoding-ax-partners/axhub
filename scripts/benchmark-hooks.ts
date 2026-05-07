@@ -74,87 +74,45 @@ const scenarios = [
       if (Object.keys(parsed).length !== 0) throw new Error(`expected PostToolUse no-op {}, got ${stdout}`);
     },
   },
+  // Approach E (Phase 2): cmd_prompt_route is preflight + audit only. No skill path
+  // enforcement. Latency benchmark for hot-path prompt processing.
   {
-    name: "prompt-route open no-preflight",
+    name: "prompt-route no-preflight",
     subcommand: "prompt-route",
     thresholdMs: 50,
     payload: { hook_event_name: "UserPromptSubmit", prompt: "결과 봐" },
-    // TODO Phase 2 (Approach E): rewrite assertion. Approach E removes Rust intent
-    // routing — cmd_prompt_route returns `{}` or preflight-only additionalContext
-    // (no skills/<skill>/SKILL.md path). Phase 0 leaves the current assertion in
-    // place because main.rs still emits the skill path; Phase 2 PR must update
-    // this assertion alongside detect_prompt_route() removal.
     assertOutput(stdout: string): void {
-      if (!stdout.includes("skills/open/SKILL.md")) throw new Error(`expected open route, got ${stdout}`);
+      if (stdout.includes("skills/")) throw new Error(`Approach E: no skill path expected, got ${stdout}`);
+      if (stdout.includes("워크플로우를 우선 적용")) throw new Error(`Approach E: no enforcement language, got ${stdout}`);
     },
   },
   {
-    name: "prompt-route whatsnew no-preflight",
-    subcommand: "prompt-route",
-    thresholdMs: 50,
-    payload: { hook_event_name: "UserPromptSubmit", prompt: "axhub 뭐 새로 나왔어" },
-    // TODO Phase 2 (Approach E): drop skill path assertion. cmd_prompt_route returns no skill path.
-    assertOutput(stdout: string): void {
-      if (!stdout.includes("skills/whatsnew/SKILL.md")) throw new Error(`expected whatsnew route, got ${stdout}`);
-    },
-  },
-  {
-    name: "prompt-route profile current no-preflight",
-    subcommand: "prompt-route",
-    thresholdMs: 50,
-    payload: { hook_event_name: "UserPromptSubmit", prompt: "profile current" },
-    // TODO Phase 2 (Approach E): drop skill path assertion.
-    assertOutput(stdout: string): void {
-      if (!stdout.includes("skills/profile/SKILL.md")) throw new Error(`expected profile route, got ${stdout}`);
-    },
-  },
-  {
-    name: "prompt-route env list with preflight",
+    name: "prompt-route with preflight (axhub-related)",
     subcommand: "prompt-route",
     thresholdMs: 50,
     env: { AXHUB_BIN: fakeAxhub },
-    payload: { hook_event_name: "UserPromptSubmit", prompt: "env list" },
-    // TODO Phase 2 (Approach E): drop skill path assertion. Keep "Preflight 결과" check (preflight context preserved).
+    payload: { hook_event_name: "UserPromptSubmit", prompt: "axhub 배포해" },
     assertOutput(stdout: string): void {
-      if (!stdout.includes("skills/env/SKILL.md") || !stdout.includes("Preflight 결과")) {
-        throw new Error(`expected env route with preflight, got ${stdout}`);
+      if (stdout.includes("skills/")) throw new Error(`Approach E: no skill path, got ${stdout}`);
+      const parsed = JSON.parse(stdout);
+      const ctx = parsed?.hookSpecificOutput?.additionalContext;
+      if (typeof ctx !== "string" || !ctx.includes("axhub 버전 확인 결과")) {
+        throw new Error(`expected preflight context, got ${stdout}`);
       }
     },
   },
   {
-    name: "prompt-route github connect with preflight",
+    name: "prompt-route with preflight (off-topic)",
     subcommand: "prompt-route",
     thresholdMs: 50,
     env: { AXHUB_BIN: fakeAxhub },
-    payload: { hook_event_name: "UserPromptSubmit", prompt: "github connect" },
-    // TODO Phase 2 (Approach E): drop skill path assertion. Keep "Preflight 결과" check.
+    payload: { hook_event_name: "UserPromptSubmit", prompt: "오늘 날씨 알려줘" },
     assertOutput(stdout: string): void {
-      if (!stdout.includes("skills/github/SKILL.md") || !stdout.includes("Preflight 결과")) {
-        throw new Error(`expected github route with preflight, got ${stdout}`);
-      }
-    },
-  },
-  {
-    name: "prompt-route deploy with preflight",
-    subcommand: "prompt-route",
-    thresholdMs: 50,
-    env: { AXHUB_BIN: fakeAxhub },
-    payload: { hook_event_name: "UserPromptSubmit", prompt: "deploy" },
-    // TODO Phase 2 (Approach E): drop skill path assertion. Keep "Preflight 결과" check.
-    assertOutput(stdout: string): void {
-      if (!stdout.includes("skills/deploy/SKILL.md") || !stdout.includes("Preflight 결과")) {
-        throw new Error(`expected deploy route with preflight, got ${stdout}`);
-      }
-    },
-  },
-  {
-    name: "prompt-route clarify fallback",
-    subcommand: "prompt-route",
-    thresholdMs: 50,
-    payload: { hook_event_name: "UserPromptSubmit", prompt: "환경" },
-    // TODO Phase 2 (Approach E): drop skill path assertion. cmd_prompt_route returns `{}` for no-preflight cases.
-    assertOutput(stdout: string): void {
-      if (!stdout.includes("skills/clarify/SKILL.md")) throw new Error(`expected clarify route, got ${stdout}`);
+      // Approach E: same preflight context regardless of intent.
+      if (stdout.includes("skills/")) throw new Error(`Approach E: no skill path, got ${stdout}`);
+      const parsed = JSON.parse(stdout);
+      const ctx = parsed?.hookSpecificOutput?.additionalContext;
+      if (typeof ctx !== "string") throw new Error(`expected preflight string context, got ${stdout}`);
     },
   },
 ] as const;

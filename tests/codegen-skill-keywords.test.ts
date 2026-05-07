@@ -14,45 +14,20 @@ import {
 
 const REPO_ROOT = join(import.meta.dir, "..");
 
-describe("parseMainRs", () => {
-  const blocks = parseMainRs();
-
-  test("extracts 19 keyword blocks from main.rs (18 contains_any + 1 if-eq single-token)", () => {
-    expect(blocks.length).toBe(19);
-  });
-
-  test("each block has at least 1 phrase", () => {
-    for (const block of blocks) {
-      expect(block.phrases.length).toBeGreaterThan(0);
-    }
-  });
-
-  test("deploy block contains expected core phrases", () => {
-    const deployBlock = blocks.find((b) => b.skill === "deploy");
-    expect(deployBlock).toBeDefined();
-    expect(deployBlock?.phrases).toContain("deploy");
-    expect(deployBlock?.phrases).toContain("배포");
-    expect(deployBlock?.phrases).toContain("ship");
-  });
-
-  test("single-token if p == case captured (clarify env)", () => {
-    const clarifyBlocks = blocks.filter((b) => b.skill === "clarify");
-    expect(clarifyBlocks.length).toBe(2); // env clarify + axhub clarify
-    const allClarifyPhrases = clarifyBlocks.flatMap((b) => b.phrases);
-    expect(allClarifyPhrases).toContain("환경"); // single-token if p == "환경"
-    expect(allClarifyPhrases).toContain("axhub"); // axhub clarify
+describe("parseMainRs (Phase 2 — Approach E: detect_prompt_route 폐기 후)", () => {
+  // Phase 2 후 main.rs 에 detect_prompt_route 부재 → parseMainRs() returns [].
+  // Phase 1 시점 (PR #40) 에서는 19 blocks 였음. one-time migration 완료 후 의미 없음.
+  test("returns empty array when detect_prompt_route is removed (Phase 2)", () => {
+    const blocks = parseMainRs();
+    expect(blocks.length).toBe(0);
   });
 });
 
-describe("aggregatePerSkill", () => {
-  test("merges multiple blocks for same skill into one set", () => {
+describe("aggregatePerSkill (Phase 2)", () => {
+  test("0 blocks → 0 unique skills", () => {
     const blocks = parseMainRs();
     const map = aggregatePerSkill(blocks);
-    expect(map.size).toBe(18); // unique skill names
-
-    const clarifySet = map.get("clarify");
-    expect(clarifySet?.has("환경")).toBe(true);
-    expect(clarifySet?.has("axhub")).toBe(true);
+    expect(map.size).toBe(0);
   });
 });
 
