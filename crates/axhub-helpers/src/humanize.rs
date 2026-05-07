@@ -14,11 +14,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 /// - 5m <= delta < 1h -> "N분 남았어요"
 /// - 0 <= delta < 5m -> "곧 만료돼요 (5분 미만)"
 /// - delta < 0 -> "이미 만료됐어요"
-pub fn format_expires_human(
-    rfc3339: &str,
-    _tz: FixedOffset,
-    now: DateTime<Utc>,
-) -> Option<String> {
+pub fn format_expires_human(rfc3339: &str, _tz: FixedOffset, now: DateTime<Utc>) -> Option<String> {
     let exp = DateTime::parse_from_rfc3339(rfc3339)
         .ok()?
         .with_timezone(&Utc);
