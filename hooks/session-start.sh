@@ -19,7 +19,7 @@ ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set by Claude Code}"
 HELPER="${ROOT}/bin/axhub-helpers"
 INSTALL_SH="${ROOT}/bin/install.sh"
 
-if [ ! -x "$HELPER" ] && [ ! -L "$HELPER" ]; then
+if [ ! -x "$HELPER" ]; then
   if [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" = "1" ]; then
     echo '{"systemMessage":"[axhub] AXHUB_SKIP_AUTODOWNLOAD=1 이라 helper 자동 설치를 건너뛰었어요. 수동 설치 후 다시 시작해요: bash bin/install.sh"}'
     exit 0

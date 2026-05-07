@@ -84,4 +84,18 @@ describe("bin/install.ps1 — Windows installer mirror", () => {
     expect(guardIdx).toBeLessThan(installIdx);
     expect(ps1).toContain("자동 설치를 건너뛰었어요");
   });
+
+  test("session-start.ps1 captures installer output and stops if helper is still missing", () => {
+    const ps1 = readFileSync(SESSION_START_PS1, "utf8");
+    const captureIdx = ps1.indexOf(
+      "$installOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $InstallPs1 2>&1",
+    );
+    const exitCheckIdx = ps1.indexOf("$installExit = $LASTEXITCODE", captureIdx);
+    const recheckIdx = ps1.indexOf("install.ps1 실행 후에도 axhub-helpers.exe", captureIdx);
+    expect(captureIdx).toBeGreaterThan(0);
+    expect(exitCheckIdx).toBeGreaterThan(captureIdx);
+    expect(recheckIdx).toBeGreaterThan(exitCheckIdx);
+    expect(ps1).toContain("function Write-InstallFailureOrFallback");
+    expect(ps1).toContain("TrimStart().StartsWith('{')");
+  });
 });

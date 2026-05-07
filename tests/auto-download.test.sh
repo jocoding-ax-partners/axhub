@@ -109,7 +109,27 @@ fi
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 5. SessionStart shim — AXHUB_SKIP_AUTODOWNLOAD=1 + missing helper does NOT run install.sh
+# 5. SessionStart shim — broken helper symlink is repaired via install.sh
+# ----------------------------------------------------------------------------
+SCRATCH="$(scratch)"
+mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"
+cp "$SHIM" "$SCRATCH/hooks/session-start.sh"
+cp "$INSTALL_SH" "$SCRATCH/bin/install.sh"
+printf '#!/bin/sh
+echo REPAIRED_HELPER_RAN
+' > "$SCRATCH/bin/axhub-helpers-darwin-arm64"
+chmod +x "$SCRATCH/bin/axhub-helpers-darwin-arm64"
+ln -s missing-target "$SCRATCH/bin/axhub-helpers"
+output="$(AXHUB_OS=Darwin AXHUB_ARCH=arm64 CLAUDE_PLUGIN_ROOT="$SCRATCH" bash "$SCRATCH/hooks/session-start.sh" </dev/null 2>&1 || true)"
+if echo "$output" | grep -q "REPAIRED_HELPER_RAN"; then
+  assert "shim repairs broken helper symlink before exec" "ok" "ok"
+else
+  assert "shim repairs broken helper symlink before exec" "missing-repaired-helper" "ok"
+fi
+rm -rf "$SCRATCH"
+
+# ----------------------------------------------------------------------------
+# 6. SessionStart shim — AXHUB_SKIP_AUTODOWNLOAD=1 + missing helper does NOT run install.sh
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin"
@@ -137,7 +157,7 @@ rm -f /tmp/axhub-shim-test-trace
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 6. SessionStart shim — helper + install.sh both missing → graceful systemMessage
+# 7. SessionStart shim — helper + install.sh both missing → graceful systemMessage
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin"
@@ -152,7 +172,7 @@ fi
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 7. SessionStart shim — token file path comes from Rust helper when available
+# 8. SessionStart shim — token file path comes from Rust helper when available
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks" "$SCRATCH/custom-token-dir" "$SCRATCH/stub-bin"
@@ -193,7 +213,7 @@ rm -f /tmp/axhub-shim-test-trace
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 8. SessionStart shim — Phase 7 US-701: token-init auto-trigger when token
+# 9. SessionStart shim — Phase 7 US-701: token-init auto-trigger when token
 #    file missing + axhub auth status returns user_email
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
@@ -228,7 +248,7 @@ rm -rf "$TOKEN_HOME"
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 9. SessionStart shim — Phase 7 US-701: token-init output stays silent
+# 10. SessionStart shim — Phase 7 US-701: token-init output stays silent
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks" "$SCRATCH/stub-bin"
@@ -269,7 +289,7 @@ esac
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 10. SessionStart shim — Phase 7 US-701: token-init SKIPPED when token already exists
+# 11. SessionStart shim — Phase 7 US-701: token-init SKIPPED when token already exists
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"
@@ -304,7 +324,7 @@ rm -rf "$TOKEN_HOME"
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 11. SessionStart shim — Phase 7 US-701: AXHUB_SKIP_AUTODOWNLOAD=1 skips token-init
+# 12. SessionStart shim — Phase 7 US-701: AXHUB_SKIP_AUTODOWNLOAD=1 skips token-init
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"

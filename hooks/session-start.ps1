@@ -25,6 +25,19 @@ $Root = $env:CLAUDE_PLUGIN_ROOT
 $Helper = Join-Path $Root 'bin\axhub-helpers.exe'
 $InstallPs1 = Join-Path $Root 'bin\install.ps1'
 
+function Write-InstallFailureOrFallback {
+  param(
+    [object[]]$InstallOutput,
+    [string]$FallbackMessage
+  )
+  $installJson = $InstallOutput | ForEach-Object { "$_" } | Where-Object { $_.TrimStart().StartsWith('{') } | Select-Object -Last 1
+  if ($installJson) {
+    Write-Output $installJson
+  } else {
+    Write-Output (ConvertTo-Json @{ systemMessage = $FallbackMessage } -Compress)
+  }
+}
+
 # Step 1: ensure helper binary exists
 if (-not (Test-Path -Path $Helper -PathType Leaf)) {
   if ($env:AXHUB_SKIP_AUTODOWNLOAD -eq '1') {
@@ -37,10 +50,16 @@ if (-not (Test-Path -Path $Helper -PathType Leaf)) {
   }
 
   try {
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $InstallPs1
+    $installOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $InstallPs1 2>&1
     $installExit = $LASTEXITCODE
     if ($installExit -ne 0) {
-      Write-Output (ConvertTo-Json @{ systemMessage = "[axhub] helper 바이너리 설치 실패 (exit $installExit). 진단: /axhub:doctor" } -Compress)
+      $failureMessage = "[axhub] helper 바이너리 설치 실패 (exit $installExit). 진단: /axhub:doctor"
+      Write-InstallFailureOrFallback -InstallOutput $installOutput -FallbackMessage $failureMessage
+      exit 0
+    }
+    if (-not (Test-Path -Path $Helper -PathType Leaf)) {
+      $failureMessage = "[axhub] install.ps1 실행 후에도 axhub-helpers.exe 를 찾지 못했어요. 진단: /axhub:doctor"
+      Write-InstallFailureOrFallback -InstallOutput $installOutput -FallbackMessage $failureMessage
       exit 0
     }
   } catch [System.IO.PathTooLongException] {
