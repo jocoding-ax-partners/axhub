@@ -138,6 +138,34 @@ Claude Code  →  axhub plugin
 
 **핵심 원칙**: 플러그인은 **얇은 routing/recovery layer** 예요. 비즈니스 로직은 모두 ax-hub-cli 에 있고, 플러그인은 (1) 자연어 인텐트 → 명령어 매핑, (2) HMAC consent token 으로 destructive op 보호, (3) exit code 기반 자동 복구만 담당해요. Plugin 은 MCP 안 써요. 항상 ax-hub-cli 호출.
 
+## 라우팅
+
+axhub plugin 은 자연어 prompt 를 적합한 skill 워크플로우로 라우팅해요. v0.4.0 부터 Claude 의 native skill matching 을 사용해요.
+
+작동 방식:
+- 각 skill 의 `SKILL.md` frontmatter `description` 이 trigger 어구 source of truth 예요.
+- Claude 가 description 보고 가장 적합한 skill 자동 invoke 해요.
+- preflight context (CLI 버전, 인증 상태, 현재 앱) 자동 주입돼요.
+- 라우팅 audit log 로컬 7일 보관 (외부 전송 X) 이에요.
+
+환경 변수:
+- `AXHUB_NO_AUDIT=1` — audit log 비활성
+
+라우팅 통계 조회:
+
+```bash
+axhub-helpers routing-stats --since 7d
+axhub-helpers routing-stats --json
+axhub-helpers cleanup-audit --all  # 전체 삭제
+```
+
+Privacy:
+- prompt content 저장 X (sha256 hash 만 저장해요)
+- 외부 telemetry 전송 X (모두 로컬 디스크)
+- 짧은 prompt 의 hash 는 익명화 보장 X (예: "deploy" 같은 6-byte input)
+
+상세는 [`docs/routing.md`](docs/routing.md) 를 참고해요.
+
 ## Skill 작성
 
 새 SKILL 추가 시 **반드시** scaffold 사용 (Phase 17/18 패턴 자동 주입):
