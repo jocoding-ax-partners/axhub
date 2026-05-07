@@ -4,6 +4,33 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.3.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.3.1...v0.3.2) (2026-05-07)
+
+Phase 27 은 Windows 호스트에서 axhub plugin bootstrap 이 과장된 지원 claim 없이 안전하게 실패하거나 복구하도록 정리한 호환성 릴리스예요. Rust helper 는 token / keychain / preflight 경로를 CI 로 검증 가능한 단위로 나누고, SessionStart hook 은 helper bootstrap 실패 시 JSON diagnostic 을 한 번만 내도록 막아요.
+
+### Test baseline
+
+- PR #35 gate: GitHub Actions `rust ubuntu-latest`, `rust macos-latest`, `rust windows-latest`, `Local Rust-primary gate`, `T2 helper-bin (PR-blocking, $0 cost)` 가 green 이에요.
+- Local gate: `bun test` (420 pass / 4 skip / 0 fail), `cargo test -q --workspace`, `cargo clippy -q -p axhub-helpers --all-targets --locked -- -D warnings`, `bunx tsc --noEmit`, `bun run skill:doctor --strict`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run cargo:coverage` 가 green 이에요.
+- Release gate: `bun run release` postbump 의 `codegen:version` + `release:check` 가 v0.3.2 install script 와 Rust helper version 동기화를 확인했어요.
+
+### Honest tradeoff
+
+- 실제 Windows VM 에서 `hooks/session-start.ps1` 전체 hook runtime smoke 를 직접 수행하지는 않았어요. 대신 Windows CI 의 Rust helper gate, PowerShell wrapper static regression, 문서화된 VM smoke checklist 로 지원 범위를 Tier 2 검증으로 한정해요.
+- macOS/Linux shell auto-download 는 broken symlink repair 까지 로컬 regression 으로 잠갔지만, corporate proxy / antivirus 같은 Windows host 정책은 릴리스 후 사용자 환경에서 추가 관찰이 필요해요.
+
+
+### Fixed
+
+* keep axhub plugin bootstrap reliable across Windows ([3c6067f](https://github.com/jocoding-ax-partners/axhub/commit/3c6067f9621a3cf986b7a67322c77f9a815c57d8))
+* keep first-run auth bootstrap silent and CI-provable ([7725c35](https://github.com/jocoding-ax-partners/axhub/commit/7725c3553e6b4d5dab99d5eacf373415e1056d64))
+* keep SessionStart bootstrap diagnostics single-source ([362c197](https://github.com/jocoding-ax-partners/axhub/commit/362c1976136d59682f64b30514e496fb9be06231))
+
+
+### Docs
+
+* prevent unsupported Windows auto-start claims ([cec8cee](https://github.com/jocoding-ax-partners/axhub/commit/cec8cee94ea7a455878468d0c2308c1bdbfb6b7e))
+
 ## [0.3.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.3.0...v0.3.1) (2026-05-06)
 
 Phase 26.1 은 v0.3.0 의 install-cli 흐름 UX 폴리시 패치예요. doctor 가 \`cli_present:false\` 를 detect 하면 \"CLI 설치해줘\" phrase 를 사용자가 다시 발화하지 않아도 즉시 AskUserQuestion (\`자동 / 명령어만 / 나중에\`) 으로 설치 의향을 확인하고, 선택 시 install-cli SKILL 을 sibling consent route 로 호출해요. 또 PATH 미등록은 plugin-local 이 작동하면 ⚠ 가 아닌 ✓ 로 표시하고 — plugin design 상 user PATH 오염 방지가 의도된 동작이라 cosmetic 노이즈를 제거했어요.
