@@ -1588,3 +1588,183 @@ fn cli_cleanup_audit_default_rotates_only() {
     assert!(stdout.contains("7일 이상"), "{stdout}");
     assert!(stdout.contains("audit log"), "{stdout}");
 }
+
+// Phase 6: cross-phase + routing-stats E2E (XDG_STATE_HOME 격리).
+//
+// Each test writes a fake axhub binary to TempDir, points AXHUB_BIN at it, and
+// scopes audit IO into TempDir/state via XDG_STATE_HOME. Hook input is the
+// JSON envelope Claude Code sends (hook_event_name + prompt).
+
+#[cfg(unix)]
+fn fake_axhub(temp: &tempfile::TempDir) -> std::path::PathBuf {
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "axhub 0.1.0 (commit fake, built fake, fake)"
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then
+  echo '{"user_email":"phase6@jocodingax.ai","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["read","deploy"]}'
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
+}
+
+#[cfg(unix)]
+fn audit_dir_path(state: &std::path::Path) -> std::path::PathBuf {
+    state.join("axhub-plugin")
+}
+
+#[cfg(unix)]
+fn invoke_prompt_route(prompt: &str, axhub: &std::path::Path, state: &str) {
+    let input = serde_json::json!({"hook_event_name":"UserPromptSubmit","prompt":prompt}).to_string();
+    let output = run_stdin(
+        &["prompt-route"],
+        &input,
+        &[("AXHUB_BIN", axhub.to_str().unwrap()), ("XDG_STATE_HOME", state)],
+    );
+    assert_eq!(output.status.code(), Some(0), "prompt-route stderr={}", String::from_utf8_lossy(&output.stderr));
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_full_lifecycle_prompt_route_then_routing_stats() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_axhub(&temp);
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    // heuristic_axhub_keyword = lowercase substring "axhub". prompt 에 'axhub' 포함.
+    invoke_prompt_route("axhub 배포해줘", &axhub, &state_s);
+
+    let stats = run_stdin(&["routing-stats", "--since", "7d", "--json"], "", &[("XDG_STATE_HOME", state_s.as_str())]);
+    assert_eq!(stats.status.code(), Some(0), "routing-stats stderr={}", String::from_utf8_lossy(&stats.stderr));
+    let stdout = String::from_utf8_lossy(&stats.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("valid JSON");
+    assert_eq!(parsed["total_prompts"], 1);
+    assert!(parsed["axhub_related"].as_u64().unwrap() >= 1, "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_audit_dir_persists_across_invocations() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_axhub(&temp);
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    invoke_prompt_route("배포해줘", &axhub, &state_s);
+    invoke_prompt_route("로그 보여줘", &axhub, &state_s);
+
+    let dir = audit_dir_path(&state);
+    let jsonl: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            name.starts_with("routing-audit-") && name.ends_with(".jsonl")
+        })
+        .collect();
+    assert_eq!(jsonl.len(), 1, "expected single audit file, got {}", jsonl.len());
+    let content = std::fs::read_to_string(jsonl[0].path()).unwrap();
+    let lines: Vec<_> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+    assert_eq!(lines.len(), 2, "expected 2 audit lines, got {} ({})", lines.len(), content);
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_rotation_during_routing_stats_call() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let dir = audit_dir_path(&state);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    // 8 days ago stale file + today fresh file.
+    let stale_date = (chrono::Utc::now() - chrono::Duration::days(8)).format("%Y-%m-%d").to_string();
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let stale = dir.join(format!("routing-audit-{stale_date}.jsonl"));
+    let fresh = dir.join(format!("routing-audit-{today}.jsonl"));
+    std::fs::write(&stale, "{}\n").unwrap();
+    std::fs::write(&fresh, "{}\n").unwrap();
+
+    let stats = run_stdin(&["routing-stats", "--json"], "", &[("XDG_STATE_HOME", state.display().to_string().as_str())]);
+    assert_eq!(stats.status.code(), Some(0));
+
+    // routing-stats triggers silent rotate(7) — stale removed, today preserved.
+    assert!(!stale.exists(), "stale audit file should be removed by rotate(7)");
+    assert!(fresh.exists(), "today's audit file should persist");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_routing_stats_full_flow_korean_default() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_axhub(&temp);
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    // Seed 3 prompt-route invocations.
+    invoke_prompt_route("배포해줘", &axhub, &state_s);
+    invoke_prompt_route("앱 목록 보여줘", &axhub, &state_s);
+    invoke_prompt_route("이 코드 어떻게 동작해?", &axhub, &state_s);
+
+    let stats = run_stdin(&["routing-stats", "--since", "7d"], "", &[("XDG_STATE_HOME", state_s.as_str())]);
+    assert_eq!(stats.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&stats.stdout);
+    assert!(stdout.contains("[지난 prompt 통계]"), "{stdout}");
+    assert!(stdout.contains("총 prompt:"), "{stdout}");
+    assert!(stdout.contains("audit log 위치:"), "{stdout}");
+    assert!(stdout.contains("끄려면: AXHUB_NO_AUDIT=1"), "{stdout}");
+    assert!(stdout.contains("삭제: axhub-helpers cleanup-audit --all"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_routing_stats_json_schema() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_axhub(&temp);
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    invoke_prompt_route("배포해줘", &axhub, &state_s);
+
+    let stats = run_stdin(&["routing-stats", "--json"], "", &[("XDG_STATE_HOME", state_s.as_str())]);
+    assert_eq!(stats.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&stats.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("valid JSON");
+    for key in ["total_prompts", "axhub_related", "axhub_related_rate", "auth_failed", "prompt_length_p50", "prompt_length_p95", "cli_versions", "top_axhub_hashes"] {
+        assert!(parsed.get(key).is_some(), "missing key: {key} in {stdout}");
+    }
+    assert!(parsed["top_axhub_hashes"].is_array());
+    assert!(parsed["cli_versions"].is_object());
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_routing_stats_top_n_filter() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_axhub(&temp);
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    // Seed 5 unique axhub-related prompts.
+    for prompt in ["배포해줘", "앱 만들어", "axhub 로그", "axhub status", "axhub auth"] {
+        invoke_prompt_route(prompt, &axhub, &state_s);
+    }
+
+    let stats = run_stdin(&["routing-stats", "--top", "2", "--json"], "", &[("XDG_STATE_HOME", state_s.as_str())]);
+    assert_eq!(stats.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&stats.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("valid JSON");
+    let top = parsed["top_axhub_hashes"].as_array().unwrap();
+    assert!(top.len() <= 2, "--top 2 must cap at 2, got {} ({stdout})", top.len());
+}
