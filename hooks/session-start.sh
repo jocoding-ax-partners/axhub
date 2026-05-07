@@ -45,7 +45,7 @@ if [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" != "1" ]; then
   esac
   if [ ! -f "$TOKEN_FILE" ] && command -v axhub >/dev/null 2>&1; then
     if axhub auth status --json 2>/dev/null | grep -q '"user_email"'; then
-      "$HELPER" token-init >&2 2>&1 || true
+      "$HELPER" token-init >/dev/null 2>&1 || true
     fi
   fi
 fi

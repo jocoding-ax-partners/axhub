@@ -247,6 +247,39 @@ fn cli_token_import_accepts_raw_and_json_without_leaking_token() {
 }
 
 #[test]
+fn cli_token_import_reports_invalid_payloads_without_side_effects() {
+    let temp = tempfile::tempdir().unwrap();
+    let xdg_config = temp.path().join("xdg-config");
+    let xdg_config_s = xdg_config.to_str().unwrap();
+    let token_path = xdg_config.join("axhub-plugin").join("token");
+
+    let empty_json = run_stdin(
+        &["token-import", "--json"],
+        "   \n",
+        &[("XDG_CONFIG_HOME", xdg_config_s)],
+    );
+    assert_eq!(empty_json.status.code(), Some(65));
+    let json = stdout_json(&empty_json);
+    assert_eq!(json["stored"], false);
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("access_token/token"));
+    assert!(!token_path.exists());
+
+    let short_token = "Bearer too-short";
+    let short = run_stdin(
+        &["token-import"],
+        short_token,
+        &[("XDG_CONFIG_HOME", xdg_config_s)],
+    );
+    assert_eq!(short.status.code(), Some(65));
+    assert!(String::from_utf8_lossy(&short.stderr).contains("access_token/token"));
+    assert_output_does_not_contain(&short, "too-short");
+    assert!(!token_path.exists());
+}
+
+#[test]
 fn cli_token_commands_do_not_echo_token_like_unknown_options() {
     for command in ["token-init", "token-import"] {
         let mistaken_token_arg = "axhub_pat_mistakenarg1234567890";
@@ -520,9 +553,26 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     assert_eq!(unknown.status.code(), Some(64));
     assert!(String::from_utf8_lossy(&unknown.stderr).contains("unknown subcommand"));
 
+    let missing_path_kind = run(&["path"]);
+    assert_eq!(missing_path_kind.status.code(), Some(64));
+    assert!(String::from_utf8_lossy(&missing_path_kind.stderr).contains("expected one of"));
+
+    let unknown_path_kind = run(&["path", "unknown"]);
+    assert_eq!(unknown_path_kind.status.code(), Some(64));
+    assert!(String::from_utf8_lossy(&unknown_path_kind.stderr).contains("unknown path kind"));
+
     let missing_app = run(&["list-deployments"]);
     assert_eq!(missing_app.status.code(), Some(64));
     assert!(String::from_utf8_lossy(&missing_app.stderr).contains("--app-id"));
+
+    for args in [
+        ["list-deployments", "--app-id"].as_slice(),
+        ["list-deployments", "--limit"].as_slice(),
+    ] {
+        let output = run(args);
+        assert_eq!(output.status.code(), Some(64), "{args:?}");
+        assert!(String::from_utf8_lossy(&output.stderr).contains("requires a value"));
+    }
 
     let invalid_app = Command::new(bin())
         .args(["list-deployments", "--app", "paydrop"])

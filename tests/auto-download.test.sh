@@ -228,7 +228,48 @@ rm -rf "$TOKEN_HOME"
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 9. SessionStart shim — Phase 7 US-701: token-init SKIPPED when token already exists
+# 9. SessionStart shim — Phase 7 US-701: token-init output stays silent
+# ----------------------------------------------------------------------------
+SCRATCH="$(scratch)"
+mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks" "$SCRATCH/stub-bin"
+cp "$SHIM" "$SCRATCH/hooks/session-start.sh"
+cat > "$SCRATCH/bin/axhub-helpers" <<EOF
+#!/bin/sh
+if [ "\$1" = "path" ] && [ "\$2" = "token-file" ]; then
+  echo "$SCRATCH/missing-token-dir/token"
+  exit 0
+fi
+if [ "\$1" = "token-init" ]; then
+  echo "TOKEN_INIT_STDOUT_SHOULD_NOT_LEAK"
+  echo "TOKEN_INIT_STDERR_SHOULD_NOT_LEAK" >&2
+  exit 0
+fi
+echo "STUB_HELPER_CALLED:\$1"
+EOF
+chmod +x "$SCRATCH/bin/axhub-helpers"
+cat > "$SCRATCH/stub-bin/axhub" <<'EOF'
+#!/bin/sh
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  echo '{"user_email":"test@example.com","scopes":["read","write"]}'
+fi
+EOF
+chmod +x "$SCRATCH/stub-bin/axhub"
+output="$(PATH="$SCRATCH/stub-bin:$PATH" CLAUDE_PLUGIN_ROOT="$SCRATCH" bash "$SCRATCH/hooks/session-start.sh" </dev/null 2>&1 || true)"
+case "$output" in
+  *"TOKEN_INIT_STDOUT_SHOULD_NOT_LEAK"*|*"TOKEN_INIT_STDERR_SHOULD_NOT_LEAK"*)
+    assert "shim keeps token-init auto-trigger silent" "leaked" "silent"
+    ;;
+  *"STUB_HELPER_CALLED:session-start"*)
+    assert "shim keeps token-init auto-trigger silent" "ok" "ok"
+    ;;
+  *)
+    assert "shim keeps token-init auto-trigger silent" "missing-session-start" "ok"
+    ;;
+esac
+rm -rf "$SCRATCH"
+
+# ----------------------------------------------------------------------------
+# 10. SessionStart shim — Phase 7 US-701: token-init SKIPPED when token already exists
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"
@@ -263,7 +304,7 @@ rm -rf "$TOKEN_HOME"
 rm -rf "$SCRATCH"
 
 # ----------------------------------------------------------------------------
-# 10. SessionStart shim — Phase 7 US-701: AXHUB_SKIP_AUTODOWNLOAD=1 skips token-init
+# 11. SessionStart shim — Phase 7 US-701: AXHUB_SKIP_AUTODOWNLOAD=1 skips token-init
 # ----------------------------------------------------------------------------
 SCRATCH="$(scratch)"
 mkdir -p "$SCRATCH/bin" "$SCRATCH/hooks"
