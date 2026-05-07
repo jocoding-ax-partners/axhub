@@ -40,7 +40,7 @@ invariant 5는 3 조건이 동시 충족될 때만 dependency install 실행을 
 }
 ```
 
-`cmd_preauth_check` 의 HMAC 패턴 (`crates/axhub-helpers/src/main.rs:382-461`) 은 `ConsentBinding` + `verify_or_claim_token` 조합으로 이미 machine-enforceable gate 를 구현했어요. nonce 설계는 동일 패턴을 재사용해요.
+`cmd_preauth_check` 의 HMAC 패턴 (`crates/axhub-helpers/src/main.rs:385-464`) 은 `ConsentBinding` + `verify_or_claim_token` 조합으로 이미 machine-enforceable gate 를 구현했어요. nonce 설계는 동일 패턴을 재사용해요.
 
 ### nonce 생명주기
 
@@ -52,10 +52,14 @@ session-start
 per-prompt hook (PreToolUse / 또는 SKILL preflight)
   └─ verify AXHUB_INTERACTIVE_TOKEN
        ├─ valid   → allow, per-prompt rotate 옵션
-       └─ invalid → deny + systemMessage "replay or stale nonce"
+       └─ invalid → deny + systemMessage:
+                    "AXHUB_INTERACTIVE_TOKEN 검증 실패예요.
+                     세션이 만료됐거나 subprocess 환경이에요.
+                     대화형 Claude Code 세션에서 다시 시도해요."
 
 subprocess (CI / claude -p)
   └─ AXHUB_INTERACTIVE_TOKEN 상속 시 session_id 불일치 → deny
+     (위 systemMessage 동일 적용 — CI 로그에서 원인 즉시 식별 가능)
 ```
 
 ### 구현 범위
@@ -102,8 +106,21 @@ subprocess (CI / claude -p)
 ### 절충 (tradeoff)
 
 - `session-start` 를 갱신하고 per-prompt hook 을 추가해야 해요. (~80 line Rust)
-- `AXHUB_NONCE_SECRET` 환경 변수 또는 keychain 항목을 새로 관리해야 해요.
 - SKILL preflight 에 `!axhub-helpers verify-interactive-token` 1줄이 추가돼요 (init / deploy / recover).
+
+#### AXHUB_NONCE_SECRET 키 관리 옵션
+
+`AXHUB_NONCE_SECRET` 는 nonce 보안의 핵심이에요. 두 옵션의 tradeoff 는 아래와 같아요.
+
+| 항목 | A. 환경 변수 (`AXHUB_NONCE_SECRET`) | B. OS keychain (`keychain.rs` 재사용) |
+|------|--------------------------------------|---------------------------------------|
+| 보안 | 프로세스 env 노출 위험 (ps, /proc) | OS 보호 저장소, 평문 노출 없음 |
+| 구현 난이도 | 낮음 — env var 읽기만 필요 | 중간 — `crates/axhub-helpers/src/keychain.rs` 재사용 가능 |
+| cross-platform | macOS / Linux / Windows 동일 | macOS Keychain / Windows DPAPI / Linux Secret Service — 플랫폼별 분기 있음 |
+| CI 호환성 | CI secret 으로 주입 가능 (GitHub Actions `${{ secrets.X }}`) | CI 환경에서 keychain daemon 미존재 시 fallback 필요 |
+| 결론 | PoC 1단계 기본값 | PoC 검증 후 보안 요구에 따라 선택 |
+
+PoC 는 환경 변수 옵션(A)으로 시작하고, 운영 데이터 수집 후 keychain(B) 전환 여부를 결정해요.
 
 ### 중립
 
