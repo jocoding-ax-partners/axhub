@@ -92,16 +92,34 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
    3단계 (지금 이 환경에서):
      아래 입력창에 그 token blob 을 붙여넣어 주세요. 0600 으로 안전하게 저장할게요.
      (대안: 1단계 노트북에서 axhub_pat_... 평문 토큰을 이미 알고 있다면
-            export AXHUB_TOKEN=axhub_pat_... 로 바로 우회 가능)
+            POSIX/Git Bash/WSL 은 export AXHUB_TOKEN=axhub_pat_...,
+            Windows PowerShell 은 $env:AXHUB_TOKEN='axhub_pat_...' 로 바로 우회 가능)
    ```
 
 4. **Receive token via AskUserQuestion (text input).** Save to `~/.config/axhub-plugin/token` with mode 0600:
    ```bash
+   # POSIX: macOS / Linux / Git Bash / WSL
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-import
    # Internally: umask 077; cat > ~/.config/axhub-plugin/token; chmod 600
    ```
 
-5. **Verify.** Run `AXHUB_TOKEN="$(cat "$HOME/.config/axhub-plugin/token")" axhub auth status --json`. On success, helpers can read `~/.config/axhub-plugin/token` directly; for raw `axhub` CLI calls in this shell, export `AXHUB_TOKEN` from that file and continue with the original intent.
+   ```powershell
+   # Windows PowerShell
+   & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" token-import
+   ```
+
+5. **Verify.** Run the matching shell check. On success, helpers can read `~/.config/axhub-plugin/token` directly; for raw `axhub` CLI calls in this shell, export `AXHUB_TOKEN` from that file and continue with the original intent.
+
+   ```bash
+   # POSIX: macOS / Linux / Git Bash / WSL
+   AXHUB_TOKEN="$(cat "$HOME/.config/axhub-plugin/token")" axhub auth status --json
+   ```
+
+   ```powershell
+   # Windows PowerShell
+   $env:AXHUB_TOKEN = (Get-Content "$env:USERPROFILE\.config\axhub-plugin\token" -Raw).Trim()
+   axhub auth status --json
+   ```
 
 6. **Never echo the token.** Hooks must redact any `axhub_pat_*` pattern from `tool_response` before classification (PLAN E7).
 

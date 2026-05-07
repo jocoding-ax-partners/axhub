@@ -74,9 +74,13 @@ Render this verbatim when entering the token-paste flow. The numbered steps are 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 (더 간단한 방법) 1단계 노트북에서 본 access_token 평문 (axhub_pat_…) 을
-이미 알고 있다면 헤드리스 환경에서 바로:
+이미 알고 있다면 헤드리스 환경에서 현재 shell 에 맞게 바로 설정해요:
 
+    # POSIX: macOS / Linux / Git Bash / WSL
     export AXHUB_TOKEN=axhub_pat_...
+
+    # Windows PowerShell
+    $env:AXHUB_TOKEN='axhub_pat_...'
 
 후 작업하면 token-init 이 즉시 그 환경변수를 사용합니다.
 ```
@@ -98,7 +102,13 @@ The `secret: true` flag tells the harness to treat the input as a credential —
 The helper validates the pasted string before writing:
 
 ```bash
+# POSIX: macOS / Linux / Git Bash / WSL
 ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-import
+```
+
+```powershell
+# Windows PowerShell
+& "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" token-import
 ```
 
 Rejection rules (Korean error messages):
@@ -110,7 +120,20 @@ Rejection rules (Korean error messages):
 | Length < 32 chars | "토큰이 너무 짧아요. 잘려서 복사된 것 같아요. 다시 복사해주세요." |
 | Already exists at `~/.config/axhub-plugin/token` | (after AskUserQuestion confirm) "기존 토큰을 덮어쓸까요?" — yes/cancel |
 
-On success: `AXHUB_TOKEN="$(cat "$HOME/.config/axhub-plugin/token")" axhub auth status --json` runs immediately to confirm the token works without relying on unsupported `--token-file` flags. If `auth status` returns `code: token_invalid`, the file is deleted and the user is told the token failed validation (likely expired between issuance and paste). Re-enter the flow from step 1.
+On success, run a shell-appropriate status check to confirm the token works without relying on unsupported `--token-file` flags:
+
+```bash
+# POSIX: macOS / Linux / Git Bash / WSL
+AXHUB_TOKEN="$(cat "$HOME/.config/axhub-plugin/token")" axhub auth status --json
+```
+
+```powershell
+# Windows PowerShell
+$env:AXHUB_TOKEN = (Get-Content "$env:USERPROFILE\.config\axhub-plugin\token" -Raw).Trim()
+axhub auth status --json
+```
+
+If `auth status` returns `code: token_invalid`, the file is deleted and the user is told the token failed validation (likely expired between issuance and paste). Re-enter the flow from step 1.
 
 ---
 

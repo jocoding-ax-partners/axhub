@@ -1,8 +1,9 @@
 # Windows VM smoke checklist (Phase 11 US-1103)
 
-Manual 14-step checklist for next pilot session. Companion executor at
+Manual 14-step checklist for the next pilot session. Companion executor at
 `tests/smoke-windows-vm-checklist.ps1` codifies steps as PowerShell behind
-`$env:AXHUB_VM_SMOKE` guard.
+`$env:AXHUB_VM_SMOKE` guard. This checklist separates current Tier 2
+explicit/manual Windows support from future Tier 3 automatic SessionStart.
 
 ## Prerequisites
 
@@ -31,10 +32,11 @@ Manual 14-step checklist for next pilot session. Companion executor at
    - Verify: no `shell:powershell` SessionStart hook is registered in `hooks/hooks.json`
    - Reason: the universal PowerShell sibling caused visible startup errors on non-Windows hosts. Stock Windows auto-SessionStart requires future platform-specific hook packaging.
 
-5. **Confirm install.ps1 auto-downloads windows-amd64.exe**
-   - First session should trigger install.ps1 if `bin\axhub-helpers.exe` missing
+5. **Confirm explicit install.ps1 downloads windows-amd64.exe**
+   - Current Tier 2 path: run `powershell -NoProfile -ExecutionPolicy Bypass -File bin\install.ps1` from the plugin root when `bin\axhub-helpers.exe` is missing
    - Verify file appears at `~/.claude/plugins/marketplaces/axhub-marketplace/axhub/bin/axhub-helpers.exe`
-   - Capture: file size (should be ~109.6M PE32+ x86-64)
+   - Capture: file size and PE32+ x86-64 metadata when available
+   - Do not record “first session auto-triggered install.ps1” unless Phase 0 / `docs/pilot/windows-hook-packaging-spike.md` has enabled a Windows-specific hook path
 
 6. **Verify cmdkey shows credential post-axhub-auth-login**
    - Run `axhub auth login` (browser OAuth flow)
@@ -53,11 +55,11 @@ Manual 14-step checklist for next pilot session. Companion executor at
    - NTFS permissions: file should be readable only by current user (verify via `Get-Acl`)
    - Capture: first 16 chars (must be `axhub_pat_<8 hex>`)
 
-9. **PreToolUse + PostToolUse hooks fire on bash commands**
-   - In claude session: ask "/axhub:status"
-   - Verify: PreToolUse fires (consent gate, may prompt approval)
-   - Verify: PostToolUse fires on bash exit (Korean systemMessage if non-zero)
-   - Capture: transcript snippet showing both hooks
+9. **Hook paths are labeled accurately**
+   - Git Bash/WSL lane: ask "/axhub:status" and verify PreToolUse/PostToolUse fire on Bash tool calls
+   - Native Windows lane: capture whether `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers` resolves in UserPromptSubmit/PreToolUse/PostToolUse hook contexts, or whether `.exe`/PowerShell wrapper paths are required
+   - Do not call this cmd-native hook support unless cmd-native execution is separately proven
+   - Capture: transcript/debug snippet showing which shell/path actually ran
 
 10. **ExecutionPolicy Restricted fallback test**
     - In admin PowerShell: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Restricted`
@@ -90,7 +92,8 @@ Manual 14-step checklist for next pilot session. Companion executor at
 
 ## Acceptance for next pilot session
 
-- Steps 1-9: MUST PASS (core happy path)
+- Steps 1-8: MUST PASS for Tier 2 explicit/manual Windows path
+- Step 9: MUST CAPTURE as evidence; pass/fail determines whether native Windows hook paths can be promoted beyond manual support
 - Steps 10, 12, 14: MUST RUN (capture evidence even if can't fully exercise)
 - Steps 11, 13: SKIP if env unavailable (document as deferred)
 

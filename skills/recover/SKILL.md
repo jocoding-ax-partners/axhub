@@ -111,7 +111,7 @@ To recover:
 
 8. **No prior succeeded deploy found.** Surface: "되돌릴 수 있는 직전 안정 배포를 못 찾았어요. 이 앱의 첫 배포이거나, 모든 이전 배포가 실패한 상태일 수 있어요. 'logs'로 현재 배포 원인 먼저 볼래요?"
 
-9. **Cache last-deploy for statusline (Phase 17 US-1707).** After Step 5 terminal status, write the recovery summary so `bin/statusline.sh` can show it across sessions:
+9. **Cache last-deploy for statusline (Phase 17 US-1707).** After Step 5 terminal status, write the recovery summary so statusline readers can show it across sessions. The Bash block below is for POSIX/Git Bash/WSL tool execution; native Windows statusLine wiring must use the documented helper/PowerShell path only after the Windows packaging spike promotes it:
 
    ```bash
    mkdir -p ~/.cache/axhub-plugin

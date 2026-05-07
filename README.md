@@ -41,7 +41,7 @@ UX 보장:
 - **`!command` preflight** — auth_status / current_app / current_env / last_deploy 자동 주입
 - **AskUserQuestion polish** — `header` chip + 해요체 통일
 - **Per-question fallback registry** — drift catch (새 question 등록 안 하면 test FAIL)
-- **statusline** — 옵트인 (`bin/statusline.sh`)
+- **statusline** — 옵트인 (`bin/statusline.sh` 는 macOS/Linux/Git Bash/WSL 경로, Windows native 는 PowerShell/helper 경로 검증 후 사용해요)
 
 안전 가드:
 - HMAC consent token (`CLAUDE_SESSION_ID` 필수, O_NOFOLLOW, symlink reject)
@@ -70,7 +70,7 @@ UX 보장:
 준비:
 - Claude Code 최신
 - axhub SaaS 계정 + scope (회사 admin 발급)
-- macOS / Linux 자동 셋업 / Windows 는 token-import 또는 Git Bash·WSL fallback
+- macOS / Linux 자동 셋업 / Windows native 는 명시적 PowerShell 설치·token-import·AXHUB_TOKEN 경로, Git Bash·WSL 은 POSIX fallback
 
 설치:
 
@@ -80,12 +80,13 @@ UX 보장:
 
 # 2. 플러그인 설치
 /plugin install axhub@axhub
-#  └─ 첫 SessionStart 에서 OS/arch 맞는 helper 바이너리 자동 다운로드 (cosign 서명 검증)
-#  └─ 자동 다운로드 비활성화: export AXHUB_SKIP_AUTODOWNLOAD=1 (수동 install.sh / install.ps1)
+#  └─ macOS/Linux 첫 SessionStart 에서 OS/arch 맞는 helper 바이너리 자동 다운로드
+#  └─ Windows native 자동 SessionStart 는 platform-specific hook 검증 전까지 deferred 예요
+#  └─ 자동 다운로드 비활성화: export AXHUB_SKIP_AUTODOWNLOAD=1 (PowerShell: $env:AXHUB_SKIP_AUTODOWNLOAD='1')
 
 # 3. 첫 인증
 "axhub 로그인해줘"             # 또는 /axhub:login
-# headless: AXHUB_TOKEN env 또는 token-import (~/.config/axhub-plugin/token)
+# headless: AXHUB_TOKEN env 또는 token-import (PowerShell 은 $env:AXHUB_TOKEN / axhub-helpers.exe token-import)
 
 # 4. 첫 배포
 "내 paydrop 앱 배포해"
