@@ -16,6 +16,7 @@
     "smoke:full": "bun run build && ./bin/axhub-helpers version && ./bin/axhub-helpers help && ./bin/axhub-helpers session-start </dev/null && bash tests/docs-link-audit.sh && bun run codegen:catalog && bun run codegen:version",
     "bench:hooks": "bun scripts/benchmark-hooks.ts",
     "codegen:catalog": "bun scripts/codegen-catalog.ts",
+    "codegen:skill-keywords": "bun scripts/codegen-skill-keywords-from-rust.ts",
     "codegen:version": "bun scripts/codegen-install-version.ts",
     "lint:tone": "bun scripts/check-toss-tone-conformance.ts --strict",
     "lint:keywords": "bun scripts/check-skill-keywords-preserved.ts --check",

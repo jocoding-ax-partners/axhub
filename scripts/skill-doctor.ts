@@ -26,12 +26,45 @@
  *
  * --strict mode: same checks, machine-parseable output, exit 1 on any miss.
  */
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { readSkillDescription } from "./codegen-skill-keywords-from-rust";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const SKILLS_DIR = join(REPO_ROOT, "skills");
 const SENTINEL = "Non-interactive AskUserQuestion guard (D1)";
+const COLLISION_ALLOWLIST_PATH = join(REPO_ROOT, "scripts/skill-doctor-collision-allowlist.json");
+
+interface CollisionAllowlistEntry {
+  phrase: string;
+  skills: string[];
+  reason: string;
+}
+interface CollisionAllowlist {
+  allowed_collisions: CollisionAllowlistEntry[];
+}
+
+function loadAllowlist(): CollisionAllowlist {
+  if (!existsSync(COLLISION_ALLOWLIST_PATH)) {
+    return { allowed_collisions: [] };
+  }
+  return JSON.parse(readFileSync(COLLISION_ALLOWLIST_PATH, "utf8")) as CollisionAllowlist;
+}
+
+function isAllowed(allowlist: CollisionAllowlist, phrase: string, skills: string[]): boolean {
+  const sortedSkills = [...skills].sort();
+  for (const entry of allowlist.allowed_collisions) {
+    if (entry.phrase !== phrase) continue;
+    const allowedSkills = [...entry.skills].sort();
+    if (
+      allowedSkills.length === sortedSkills.length &&
+      allowedSkills.every((s, i) => s === sortedSkills[i])
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 const STRICT = process.argv.includes("--strict");
 const NO_COLOR = !process.stdout.isTTY || process.env["NO_COLOR"] || STRICT;
@@ -125,12 +158,71 @@ for (const check of checks) {
   }
 }
 
+// Phase 1 sub-task 1.3: collision lint — two skills sharing a description trigger phrase.
+const allowlist = loadAllowlist();
+const phraseToSkills = new Map<string, Set<string>>();
+for (const slug of skillSlugs) {
+  const path = join(SKILLS_DIR, slug, "SKILL.md");
+  const region = readSkillDescription(path);
+  if (!region) continue;
+  for (const phrase of region.existingPhrases) {
+    let set = phraseToSkills.get(phrase);
+    if (!set) {
+      set = new Set();
+      phraseToSkills.set(phrase, set);
+    }
+    set.add(slug);
+  }
+}
+
+let collisionCount = 0;
+const collisions: Array<{ phrase: string; skills: string[]; allowed: boolean; reason?: string }> = [];
+for (const [phrase, slugs] of phraseToSkills) {
+  if (slugs.size < 2) continue;
+  const skills = [...slugs].sort();
+  const allowed = isAllowed(allowlist, phrase, skills);
+  const reason = allowed
+    ? allowlist.allowed_collisions.find(
+        (e) =>
+          e.phrase === phrase &&
+          [...e.skills].sort().every((s, i) => s === skills[i]),
+      )?.reason
+    : undefined;
+  collisions.push({ phrase, skills, allowed, reason });
+  if (!allowed) collisionCount += 1;
+}
+
+if (STRICT) {
+  for (const col of collisions) {
+    if (!col.allowed) {
+      process.stdout.write(
+        `collision: phrase "${col.phrase}" appears in skills [${col.skills.join(", ")}] — not in allowlist\n`,
+      );
+    }
+  }
+} else {
+  if (collisions.length > 0) {
+    process.stdout.write(`${c.bold("Description trigger phrase collisions:")}\n`);
+    for (const col of collisions) {
+      const icon = col.allowed ? c.green("●") : c.red("✗");
+      const tail = col.allowed
+        ? c.gray(`(allowlisted: ${col.reason ?? ""})`)
+        : c.red("(NOT allowlisted)");
+      process.stdout.write(
+        `  ${icon} "${col.phrase}" → [${col.skills.join(", ")}] ${tail}\n`,
+      );
+    }
+    process.stdout.write("\n");
+  }
+}
+
 if (!STRICT) {
   const pluralS = checks.length === 1 ? "" : "s";
   const pluralM = totalMissing === 1 ? "" : "s";
+  const pluralC = collisionCount === 1 ? "" : "s";
   process.stdout.write(
-    `${checks.length} SKILL${pluralS} scanned, ${okSkills} OK, ${totalMissing} missing pattern${pluralM}.\n`
+    `${checks.length} SKILL${pluralS} scanned, ${okSkills} OK, ${totalMissing} missing pattern${pluralM}, ${collisionCount} unallowed collision${pluralC}.\n`,
   );
 }
 
-process.exit(totalMissing > 0 && STRICT ? 1 : 0);
+process.exit((totalMissing > 0 || collisionCount > 0) && STRICT ? 1 : 0);
