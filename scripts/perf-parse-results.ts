@@ -34,9 +34,9 @@ export interface CeilingCheck {
 }
 
 export const DEFAULT_CEILINGS: Record<string, number> = {
-  "scenario-1-warm-redeploy": 90_000,
-  "scenario-2-cold-first-deploy": 210_000,
-  "scenario-3-fresh-home-no-token": 360_000,
+  "scenario-1-warm-redeploy": 60_000,
+  "scenario-2-cold-first-deploy": 90_000,
+  "scenario-3-fresh-home-no-token": 120_000,
 };
 
 export function evaluate(

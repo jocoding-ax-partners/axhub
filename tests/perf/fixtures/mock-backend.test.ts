@@ -50,6 +50,14 @@ describe("MockBackendServer", () => {
     expect(text).toContain('"phase":"complete"');
   });
 
+  test("POST /api/v1/auth/refresh returns 200 with new token", async () => {
+    const res = await fetch(`${baseUrl}/api/v1/auth/refresh`, { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { token: string; expires_at: string };
+    expect(body.token).toBe("refreshed-token");
+    expect(body.expires_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
   test("unknown route returns 404", async () => {
     const res = await fetch(`${baseUrl}/api/v1/unknown`);
     expect(res.status).toBe(404);

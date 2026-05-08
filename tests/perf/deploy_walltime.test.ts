@@ -1,18 +1,18 @@
 /**
- * Phase 0 deploy walltime baseline.
+ * Phase 0.5 deploy walltime baseline.
  *
- * Spec: .plan/deploy-time-reduction/phase-0-measurement-first.md
+ * Spec: .plan/deploy-time-reduction/phase-0-measurement-first.md (§10.1).
  *
- * Phase 0 v1 measures `axhub-helpers session-start` walltime as a proxy for
- * SessionStart cost (Bottleneck B-06). Full deploy walltime (resolve →
- * bootstrap → deploy_create → watch) requires a deploy entry-point that
- * doesn't exist on the helper binary today; subsequent phases can extend
- * each scenario to drive the full cascade once that surface lands.
+ * Drives the deploy SKILL Step 0..5 cascade via tests/perf/scripts/
+ * deploy-flow-harness.sh. The harness records markers through
+ * `axhub-helpers mark` and emits the final telemetry envelope through
+ * `axhub-helpers emit-deploy-complete`. Mock backend latency is the
+ * dominant walltime contributor (4 routes × MOCK_BACKEND_LATENCY_MS).
  *
  * Three scenarios:
  *   1. warm — primed cache, auth signal OK
  *   2. cold — empty HOME (no caches)
- *   3. unauth — empty HOME + token absent (forces UNAUTHORIZED path)
+ *   3. fresh-HOME — empty HOME + token absent
  *
  * Each scenario runs 5 iterations and reports avg + p95. Results land in
  * test-results.json so scripts/perf-parse-results.ts and
@@ -20,19 +20,28 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { MockBackendServer } from "./fixtures/mock-backend";
 
-const HELPER_BIN_DEFAULT = process.platform === "win32"
-  ? join(process.cwd(), "bin", "axhub-helpers.exe")
-  : join(process.cwd(), "bin", "axhub-helpers");
+const HELPER_BIN_DEFAULT =
+  process.platform === "win32"
+    ? join(process.cwd(), "bin", "axhub-helpers.exe")
+    : join(process.cwd(), "bin", "axhub-helpers");
 const HELPER_BIN = process.env.AXHUB_HELPER_BIN ?? HELPER_BIN_DEFAULT;
+const HARNESS_PATH = join(
+  process.cwd(),
+  "tests",
+  "perf",
+  "scripts",
+  "deploy-flow-harness.sh",
+);
 const RUNS_PER_SCENARIO = 5;
-const RESULTS_FILE = process.env.PERF_RESULTS_FILE
-  ?? join(process.cwd(), "test-results.json");
+const RESULTS_FILE =
+  process.env.PERF_RESULTS_FILE ?? join(process.cwd(), "test-results.json");
+const LOCAL_DEFAULT_LATENCY_MS = "200";
 
 interface RunRecord {
   walltime_ms: number;
@@ -60,13 +69,10 @@ function percentile(values: number[], p: number): number {
   return sorted[Math.max(0, idx)];
 }
 
-async function runHelperOnce(
-  args: string[],
-  env: NodeJS.ProcessEnv,
-): Promise<RunRecord> {
+async function runHarnessOnce(env: NodeJS.ProcessEnv): Promise<RunRecord> {
   return await new Promise((resolve) => {
     const start = process.hrtime.bigint();
-    const child = spawn(HELPER_BIN, args, {
+    const child = spawn("bash", [HARNESS_PATH], {
       env,
       stdio: ["ignore", "ignore", "ignore"],
     });
@@ -107,11 +113,23 @@ async function teardownWorkdir(dir: string): Promise<void> {
   await rm(dir, { recursive: true, force: true });
 }
 
+async function safeUnlink(path: string): Promise<void> {
+  try {
+    await unlink(path);
+  } catch {
+    // ignore — file may already be drained by emit-deploy-complete
+  }
+}
+
 let mock: MockBackendServer;
 let mockBaseUrl: string;
 
 beforeAll(async () => {
-  mock = new MockBackendServer(0);
+  // CI passes MOCK_BACKEND_LATENCY_MS=5000; local default keeps test fast.
+  if (!process.env.MOCK_BACKEND_LATENCY_MS) {
+    process.env.MOCK_BACKEND_LATENCY_MS = LOCAL_DEFAULT_LATENCY_MS;
+  }
+  mock = new MockBackendServer();
   const started = await mock.start();
   mockBaseUrl = started.baseUrl;
 });
@@ -120,16 +138,47 @@ afterAll(async () => {
   await mock.stop();
 });
 
+interface ScenarioSetup {
+  env: NodeJS.ProcessEnv;
+  cleanup: () => Promise<void>;
+}
+
+async function buildEnv(
+  prefix: string,
+  extras: NodeJS.ProcessEnv,
+): Promise<ScenarioSetup> {
+  const home = await makeWorkdir(prefix);
+  const markerFile = join(home, "phase-markers.jsonl");
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOME: home,
+    AXHUB_HELPER_BIN: HELPER_BIN,
+    AXHUB_PHASE_MARKER_FILE: markerFile,
+    AXHUB_PERF_AUTO_APPROVE: "1",
+    AXHUB_TELEMETRY: "1",
+    AXHUB_BACKEND_URL: mockBaseUrl,
+    XDG_STATE_HOME: join(home, ".local", "state"),
+    ...extras,
+  };
+  return {
+    env,
+    cleanup: async () => {
+      await safeUnlink(markerFile);
+      await teardownWorkdir(home);
+    },
+  };
+}
+
 async function runScenario(
   scenarioId: string,
-  setup: () => Promise<{ env: NodeJS.ProcessEnv; cleanup: () => Promise<void> }>,
+  setup: () => Promise<ScenarioSetup>,
   hardLimitMs: number,
 ): Promise<ScenarioRecord> {
   const runs: RunRecord[] = [];
   for (let i = 0; i < RUNS_PER_SCENARIO; i++) {
     const { env, cleanup } = await setup();
     try {
-      const r = await runHelperOnce(["session-start"], env);
+      const r = await runHarnessOnce(env);
       runs.push(r);
     } finally {
       await cleanup();
@@ -141,33 +190,27 @@ async function runScenario(
     p95: percentile(wall, 95),
     runs,
     scope_note:
-      "Phase 0 v1: SessionStart walltime only. Full deploy cascade requires future deploy entry-point.",
+      "Phase 0.5: full deploy cascade walltime via deploy-flow-harness.sh (mock backend).",
   };
   await appendMeasurement(scenarioId, record);
   expect(record.avg).toBeLessThan(hardLimitMs);
   return record;
 }
 
-describe("deploy walltime baseline", () => {
+describe("deploy walltime baseline (Phase 0.5)", () => {
   test("scenario 1: warm redeploy (primed cache, auth OK)", async () => {
     const record = await runScenario(
       "scenario-1-warm-redeploy",
       async () => {
-        const home = await makeWorkdir("warm");
-        await mkdir(join(home, ".config", "axhub"), { recursive: true });
+        const setup = await buildEnv("warm", {});
+        await mkdir(join(setup.env.HOME!, ".config", "axhub"), {
+          recursive: true,
+        });
         await writeFile(
-          join(home, ".config", "axhub", "token.json"),
+          join(setup.env.HOME!, ".config", "axhub", "token.json"),
           JSON.stringify({ token: "valid", expires_at: "2099-01-01T00:00:00Z" }),
         );
-        const env: NodeJS.ProcessEnv = {
-          ...process.env,
-          HOME: home,
-          AXHUB_PERF_AUTO_APPROVE: "1",
-          AXHUB_TELEMETRY: "1",
-          MOCK_BACKEND_LATENCY_MS: "5000",
-          AXHUB_BACKEND_URL: mockBaseUrl,
-        };
-        return { env, cleanup: () => teardownWorkdir(home) };
+        return setup;
       },
       120_000,
     );
@@ -177,38 +220,16 @@ describe("deploy walltime baseline", () => {
   test("scenario 2: cold first deploy (empty HOME, no caches)", async () => {
     const record = await runScenario(
       "scenario-2-cold-first-deploy",
-      async () => {
-        const home = await makeWorkdir("cold");
-        const env: NodeJS.ProcessEnv = {
-          ...process.env,
-          HOME: home,
-          AXHUB_PERF_AUTO_APPROVE: "1",
-          AXHUB_TELEMETRY: "1",
-          MOCK_BACKEND_LATENCY_MS: "5000",
-          AXHUB_BACKEND_URL: mockBaseUrl,
-        };
-        return { env, cleanup: () => teardownWorkdir(home) };
-      },
+      async () => buildEnv("cold", {}),
       300_000,
     );
     expect(record.runs).toHaveLength(RUNS_PER_SCENARIO);
   }, 300_000);
 
-  test("scenario 3: first deploy + UNAUTHORIZED (no token)", async () => {
+  test("scenario 3: fresh HOME + auth-refresh round-trip", async () => {
     const record = await runScenario(
       "scenario-3-fresh-home-no-token",
-      async () => {
-        const home = await makeWorkdir("unauth");
-        const env: NodeJS.ProcessEnv = {
-          ...process.env,
-          HOME: home,
-          AXHUB_PERF_AUTO_APPROVE: "1",
-          AXHUB_TELEMETRY: "1",
-          MOCK_BACKEND_LATENCY_MS: "5000",
-          AXHUB_BACKEND_URL: mockBaseUrl,
-        };
-        return { env, cleanup: () => teardownWorkdir(home) };
-      },
+      async () => buildEnv("fresh-home", { AXHUB_PERF_FORCE_UNAUTH: "1" }),
       600_000,
     );
     expect(record.runs).toHaveLength(RUNS_PER_SCENARIO);
