@@ -134,6 +134,28 @@ describe("client mode selection", () => {
 });
 
 describe("routing:tune CLI", () => {
+
+  test("explicit AXHUB_HELPERS_BIN failure is fatal and does not fall back", () => {
+    const dir = mkdtempSync(join(tmpdir(), "axhub-routing-tune-bad-helper-"));
+    const helper = join(dir, "axhub-helpers");
+    writeFileSync(
+      helper,
+      ["#!/usr/bin/env bash", "echo configured helper broken >&2", "exit 42"].join("\n"),
+    );
+    chmodSync(helper, 0o755);
+
+    const result = spawnSync("bun", ["run", "scripts/routing-tune.ts", "--confused"], {
+      cwd: join(import.meta.dir, ".."),
+      encoding: "utf8",
+      env: { ...process.env, AXHUB_HELPERS_BIN: helper },
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("AXHUB_HELPERS_BIN");
+    expect(result.stderr).toContain(helper);
+    expect(result.stderr).toContain("configured helper broken");
+  });
+
   test("confused package entrypoint consumes helper JSON", () => {
     const dir = mkdtempSync(join(tmpdir(), "axhub-routing-tune-"));
     const helper = join(dir, "axhub-helpers");

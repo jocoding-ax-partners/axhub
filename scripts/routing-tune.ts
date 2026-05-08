@@ -267,23 +267,45 @@ export function shouldUseOnlineTuneClient(apply: boolean, argv: string[]): boole
   return apply || argv.includes("--online") || argv.includes("--llm");
 }
 
+function formatExecFailure(label: string, error: unknown): string {
+  const err = error as { message?: string; stderr?: Buffer | string; stdout?: Buffer | string; status?: number };
+  const stderr = typeof err.stderr === "string" ? err.stderr : err.stderr?.toString("utf8");
+  const stdout = typeof err.stdout === "string" ? err.stdout : err.stdout?.toString("utf8");
+  return [
+    `${label}: ${err.message ?? String(error)}`,
+    typeof err.status === "number" ? `exit_status: ${err.status}` : undefined,
+    stderr?.trim() ? `stderr: ${stderr.trim()}` : undefined,
+    stdout?.trim() ? `stdout: ${stdout.trim()}` : undefined,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+}
+
+function execAxhubHelper(candidate: string, args: string[]): string {
+  return execFileSync(candidate, args, {
+    encoding: "utf8",
+    cwd: REPO_ROOT,
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
 function runAxhubHelpers(args: string[]): string {
-  const candidates = [
-    process.env["AXHUB_HELPERS_BIN"],
-    join(REPO_ROOT, "bin/axhub-helpers"),
-  ].filter((v): v is string => Boolean(v));
-  const failures: string[] = [];
-  for (const candidate of candidates) {
+  const configured = process.env["AXHUB_HELPERS_BIN"];
+  if (configured) {
     try {
-      return execFileSync(candidate, args, {
-        encoding: "utf8",
-        cwd: REPO_ROOT,
-        env: process.env,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      return execAxhubHelper(configured, args);
     } catch (e) {
-      failures.push(`${candidate}: ${e instanceof Error ? e.message : String(e)}`);
+      throw new Error(`configured AXHUB_HELPERS_BIN failed (${configured})\n${formatExecFailure(configured, e)}`);
     }
+  }
+
+  const failures: string[] = [];
+  const packaged = join(REPO_ROOT, "bin/axhub-helpers");
+  try {
+    return execAxhubHelper(packaged, args);
+  } catch (e) {
+    failures.push(formatExecFailure(packaged, e));
   }
   try {
     return execFileSync("cargo", ["run", "--quiet", "-p", "axhub-helpers", "--", ...args], {
@@ -293,7 +315,7 @@ function runAxhubHelpers(args: string[]): string {
       stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (e) {
-    failures.push(`cargo run -p axhub-helpers: ${e instanceof Error ? e.message : String(e)}`);
+    failures.push(formatExecFailure("cargo run -p axhub-helpers", e));
   }
   throw new Error(failures.join("\n"));
 }
