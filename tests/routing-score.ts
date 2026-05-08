@@ -64,6 +64,8 @@ interface ScoreSummary {
   positive_matched: number;  // expected non-null, fired matches
   positive_wrong: number;    // expected non-null, fired non-null but wrong skill
   positive_missed: number;   // expected non-null, fired null
+  missing_results: number;   // corpus rows with no corresponding result row
+  extra_results: number;     // result rows whose utterance_id is not in the corpus
   per_skill: Record<string, { precision: number; recall: number; tp: number; fp: number; fn: number }>;
   overall_accuracy: number;
   null_rejection_rate: number;
@@ -161,9 +163,18 @@ function readJsonOrJsonl(path: string): unknown[] {
 function parseCorpus(path: string): CorpusRow[] {
   const raw = readJsonOrJsonl(path);
   const out: CorpusRow[] = [];
-  for (const r of raw) {
-    const parsed = CorpusRowSchema.safeParse(r);
-    if (parsed.success) out.push(parsed.data);
+  const errors: string[] = [];
+  for (const [index, row] of raw.entries()) {
+    const parsed = CorpusRowSchema.safeParse(row);
+    if (parsed.success) {
+      out.push(parsed.data);
+    } else {
+      errors.push(`entry ${index + 1}: ${parsed.error.issues.map((issue) => issue.path.join(".") || "<root>").join(", ")}`);
+    }
+  }
+  if (errors.length > 0) {
+    process.stderr.write(`invalid corpus rows in ${path}:\n${errors.join("\n")}\n`);
+    process.exit(2);
   }
   return out;
 }
@@ -171,9 +182,18 @@ function parseCorpus(path: string): CorpusRow[] {
 function parseResults(path: string): ResultRow[] {
   const raw = readJsonOrJsonl(path);
   const out: ResultRow[] = [];
-  for (const r of raw) {
-    const parsed = ResultRowSchema.safeParse(r);
-    if (parsed.success) out.push(parsed.data);
+  const errors: string[] = [];
+  for (const [index, row] of raw.entries()) {
+    const parsed = ResultRowSchema.safeParse(row);
+    if (parsed.success) {
+      out.push(parsed.data);
+    } else {
+      errors.push(`entry ${index + 1}: ${parsed.error.issues.map((issue) => issue.path.join(".") || "<root>").join(", ")}`);
+    }
+  }
+  if (errors.length > 0) {
+    process.stderr.write(`invalid result rows in ${path}:\n${errors.join("\n")}\n`);
+    process.exit(2);
   }
   return out;
 }
@@ -186,7 +206,9 @@ function deriveCorpusPath(baselinePath: string): string {
 }
 
 function score(corpus: CorpusRow[], results: ResultRow[]): ScoreSummary {
-  const byId: Map<string, CorpusRow> = new Map(corpus.map((r) => [r.id, r]));
+  const corpusIds = new Set(corpus.map((r) => r.id));
+  const byResultId: Map<string, ResultRow> = new Map(results.map((r) => [r.utterance_id, r]));
+  const extraResults = results.filter((r) => !corpusIds.has(r.utterance_id)).length;
   const perSkill: Record<string, { tp: number; fp: number; fn: number }> = {};
   let matched = 0;
   let nullRejected = 0;
@@ -194,12 +216,19 @@ function score(corpus: CorpusRow[], results: ResultRow[]): ScoreSummary {
   let positiveMatched = 0;
   let positiveWrong = 0;
   let positiveMissed = 0;
-  let total = 0;
+  let missingResults = 0;
 
-  for (const r of results) {
-    const c = byId.get(r.utterance_id);
-    if (!c) continue;
-    total++;
+  for (const c of corpus) {
+    const r = byResultId.get(c.id);
+    if (!r) {
+      missingResults++;
+      if (c.expected_skill !== null) {
+        positiveMissed++;
+        const slot = (perSkill[c.expected_skill] ??= { tp: 0, fp: 0, fn: 0 });
+        slot.fn++;
+      }
+      continue;
+    }
     const expected = c.expected_skill;
     const fired = r.fired_skill;
     if (expected === null) {
@@ -231,6 +260,7 @@ function score(corpus: CorpusRow[], results: ResultRow[]): ScoreSummary {
     }
   }
 
+  const total = corpus.length;
   const perSkillFinal: ScoreSummary["per_skill"] = {};
   for (const [skill, s] of Object.entries(perSkill)) {
     const precision = s.tp + s.fp === 0 ? 0 : s.tp / (s.tp + s.fp);
@@ -247,6 +277,8 @@ function score(corpus: CorpusRow[], results: ResultRow[]): ScoreSummary {
     positive_matched: positiveMatched,
     positive_wrong: positiveWrong,
     positive_missed: positiveMissed,
+    missing_results: missingResults,
+    extra_results: extraResults,
     per_skill: perSkillFinal,
     overall_accuracy: total === 0 ? 0 : matched / total,
     null_rejection_rate: negativeTotal === 0 ? 1 : nullRejected / negativeTotal,
@@ -290,11 +322,13 @@ function formatHuman(args: ReturnType<typeof parseArgs>, baselineScore: ScoreSum
   lines.push(`  total: ${baselineScore.total}`);
   lines.push(`  accuracy: ${(baselineScore.overall_accuracy * 100).toFixed(2)}%`);
   lines.push(`  null-rejection: ${(baselineScore.null_rejection_rate * 100).toFixed(2)}%`);
+  lines.push(`  missing/extra rows: ${baselineScore.missing_results}/${baselineScore.extra_results}`);
   lines.push("");
   lines.push("== against ==");
   lines.push(`  total: ${againstScore.total}`);
   lines.push(`  accuracy: ${(againstScore.overall_accuracy * 100).toFixed(2)}%`);
   lines.push(`  null-rejection: ${(againstScore.null_rejection_rate * 100).toFixed(2)}%`);
+  lines.push(`  missing/extra rows: ${againstScore.missing_results}/${againstScore.extra_results}`);
   lines.push("");
   lines.push("== drift (baseline vs against) ==");
   lines.push(`  rows: ${driftSummary.total_rows}`);
@@ -324,7 +358,15 @@ function main(): void {
   const baselineScore = score(corpus, baseline);
   const againstScore = score(corpus, against);
   const driftSummary = drift(baseline, against);
-  const ok = againstScore.overall_accuracy >= args.threshold && driftSummary.mismatch_rate <= 0.05;
+  const completeFixtures =
+    baselineScore.missing_results === 0 &&
+    baselineScore.extra_results === 0 &&
+    againstScore.missing_results === 0 &&
+    againstScore.extra_results === 0;
+  const ok =
+    againstScore.overall_accuracy >= args.threshold &&
+    driftSummary.mismatch_rate <= 0.05 &&
+    completeFixtures;
 
   if (args.json) {
     const payload = {
