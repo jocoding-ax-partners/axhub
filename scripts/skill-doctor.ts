@@ -44,7 +44,7 @@ interface CollisionAllowlist {
   allowed_collisions: CollisionAllowlistEntry[];
 }
 
-function loadAllowlist(): CollisionAllowlist {
+function loadCollisionAllowlist(): CollisionAllowlist {
   if (!existsSync(COLLISION_ALLOWLIST_PATH)) {
     return { allowed_collisions: [] };
   }
@@ -65,6 +65,32 @@ function isAllowed(allowlist: CollisionAllowlist, phrase: string, skills: string
   }
   return false;
 }
+
+const DEP_EXEC_PATTERNS = {
+  P1_DIRECT: /!\s*"?(?:npm|pnpm|yarn|bun)"?\s+(?:i|install|add)\b/,
+  P2_SHELL_WRAP: /!\s*(?:sh|bash|eval)\s+(?:-c\s+)?"[^"]*(?:npm|pnpm|yarn|bun)\s+(?:i|install|add)/,
+  P3_CHAIN: /!\s*[^;&|]*(?:&&|;|\|)\s*(?:npm|pnpm|yarn|bun)\s+(?:i|install|add)\b/,
+  P4_INDIRECT: /!\s*(?:[A-Z_]+=(?:npm|pnpm|yarn|bun)\s*;?\s*\$\{?[A-Z_]+\}?\s+(?:i|install|add)\b|npx\s+--package\s+(?:npm|pnpm|yarn|bun)\b)/,
+} as const;
+
+interface AllowlistEntry {
+  skill: string;
+  rationale: string;
+}
+interface Allowlist {
+  allows_dependency_execution: AllowlistEntry[];
+}
+
+const loadDependencyAllowlist = (): Allowlist => {
+  try {
+    const raw = readFileSync(join(REPO_ROOT, "scripts", "skill-doctor-allowlist.json"), "utf8");
+    return JSON.parse(raw) as Allowlist;
+  } catch {
+    return { allows_dependency_execution: [] };
+  }
+};
+
+const DEP_EXEC_ALLOWLIST = loadDependencyAllowlist();
 
 const STRICT = process.argv.includes("--strict");
 const NO_COLOR = !process.stdout.isTTY || process.env["NO_COLOR"] || STRICT;
@@ -94,6 +120,58 @@ const inspectSkill = (slug: string): SkillCheck => {
   const needsPreflight = /^needs-preflight:\s*true\s*$/m.test(fm);
   const referencesAUQ = content.includes("AskUserQuestion");
 
+  // dep-execution rule
+  const depExecFieldMatch = fm.match(/^allows-dependency-execution:\s*(true|false)\s*$/m);
+  const depExecDeclared = depExecFieldMatch !== null;
+  const depExecAllowed = depExecFieldMatch?.[1] === "true";
+
+  const allowlistEntry = DEP_EXEC_ALLOWLIST.allows_dependency_execution.find((e) => e.skill === slug);
+
+  let depExecReason: string;
+  let depExecRequired: boolean;
+  let depExecPresent: boolean;
+
+  if (!depExecDeclared) {
+    depExecRequired = true;
+    depExecPresent = false;
+    depExecReason = `frontmatter 'allows-dependency-execution: <true|false>' 필수`;
+  } else if (!depExecAllowed) {
+    // false — body must NOT contain any dep-exec pattern
+    const bodyLines = content.split("\n");
+    const matched = bodyLines.some((line) =>
+      Object.values(DEP_EXEC_PATTERNS).some((re) => re.test(line))
+    );
+    depExecRequired = matched;
+    depExecPresent = !matched;
+    depExecReason = matched
+      ? "allows-dependency-execution: false 이지만 body 에 dep-exec 패턴 발견"
+      : "allows-dependency-execution: false → exempt";
+  } else {
+    // true — must be in allowlist + axhub-helpers helper pattern must NOT appear
+    const inAllowlist = allowlistEntry !== undefined;
+    const rationale = allowlistEntry?.rationale ?? "";
+    const rationaleTooShort = rationale.length < 50;
+    const hasHelperAbuse = /axhub-helpers\s+(?:install-deps|verify-install|run-install)/.test(content);
+
+    if (!inAllowlist) {
+      depExecRequired = true;
+      depExecPresent = false;
+      depExecReason = `allows-dependency-execution: true 이지만 allowlist 에 없는 SKILL`;
+    } else if (rationaleTooShort) {
+      depExecRequired = true;
+      depExecPresent = false;
+      depExecReason = `allowlist rationale 가 50자 미만 (현재 ${rationale.length}자)`;
+    } else if (hasHelperAbuse) {
+      depExecRequired = true;
+      depExecPresent = false;
+      depExecReason = "axhub-helpers install-deps/verify-install/run-install 금지 패턴 발견";
+    } else {
+      depExecRequired = false;
+      depExecPresent = true;
+      depExecReason = "allows-dependency-execution: true + allowlist 검증 통과";
+    }
+  }
+
   return {
     slug,
     path: `skills/${slug}/SKILL.md`,
@@ -115,6 +193,12 @@ const inspectSkill = (slug: string): SkillCheck => {
         required: needsPreflight,
         present: content.includes("axhub-helpers preflight --json"),
         reason: needsPreflight ? "frontmatter needs-preflight: true" : "frontmatter needs-preflight: false → exempt",
+      },
+      {
+        name: "dep-execution",
+        required: depExecRequired,
+        present: depExecPresent,
+        reason: depExecReason,
       },
     ],
   };
@@ -159,7 +243,7 @@ for (const check of checks) {
 }
 
 // Phase 1 sub-task 1.3: collision lint — two skills sharing a description trigger phrase.
-const allowlist = loadAllowlist();
+const allowlist = loadCollisionAllowlist();
 const phraseToSkills = new Map<string, Set<string>>();
 for (const slug of skillSlugs) {
   const path = join(SKILLS_DIR, slug, "SKILL.md");
