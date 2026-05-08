@@ -22,7 +22,7 @@ use axhub_helpers::telemetry::{
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--json]\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--json]\n  version [--quiet]\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -43,11 +43,17 @@ fn run() -> anyhow::Result<i32> {
     let rest: Vec<String> = args.collect();
     match cmd.as_str() {
         "version" | "--version" | "-v" => {
-            println!(
-                "axhub-helpers {} (plugin v{}, schema {HOOK_SCHEMA_VERSION})",
-                env!("CARGO_PKG_VERSION"),
-                env!("CARGO_PKG_VERSION")
-            );
+            // --quiet flag silences output (used by SessionStart Gatekeeper
+            // warmup on macOS — invoking the binary primes codesign /
+            // notarization caches; we don't want stray stdout in the hook).
+            let quiet = rest.iter().any(|a| a == "--quiet");
+            if !quiet {
+                println!(
+                    "axhub-helpers {} (plugin v{}, schema {HOOK_SCHEMA_VERSION})",
+                    env!("CARGO_PKG_VERSION"),
+                    env!("CARGO_PKG_VERSION")
+                );
+            }
             Ok(0)
         }
         "help" | "--help" | "-h" => {

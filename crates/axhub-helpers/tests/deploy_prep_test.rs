@@ -169,7 +169,10 @@ fn run_deploy_prep_with_runner_dispatches_both_preflight_and_resolve() {
     let saw_apps_list = recorded
         .iter()
         .any(|c| c.contains(&"apps".to_string()) && c.contains(&"list".to_string()));
-    assert!(saw_preflight_version, "preflight `--version` must be invoked");
+    assert!(
+        saw_preflight_version,
+        "preflight `--version` must be invoked"
+    );
     assert!(saw_auth_status, "auth status must be invoked");
     assert!(saw_apps_list, "resolve `apps list` must be invoked");
     // Both threads ran — preflight produced auth_ok, resolve produced output.
