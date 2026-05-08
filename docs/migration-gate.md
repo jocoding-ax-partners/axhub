@@ -121,3 +121,23 @@ echo "로그인" | claude code  # auth flow 확인
 ## Reversibility
 
 이 Migration Gate 가 fail 하면 Approach E 폐기 후 Approach F (selective hook — 5 high-stakes skill 만 keyword chain 유지) 로 fallback 가능해요. 결정은 측정 데이터 + 사용자 승인 후.
+
+---
+
+## CI gate enforcement (Phase 8)
+
+`.github/workflows/routing-drift.yml` 가 PR 마다 corpus.100 fresh measure 자동 실행해요. drift > 5% 또는 accuracy < 95% 시 PR block.
+
+### Skip override
+
+의도된 drift (예: 새 SKILL 추가 후 baseline 재측정 전 PR) 일 때:
+
+PR title 에 `[skip-routing-gate]` 포함 → workflow skip + 머지 가능.
+
+skip override 사용 시 후속 PR 에서 `bun run measure:baseline` 실행 후 docs-only.100.json 갱신 필수예요.
+
+### 관련
+
+- workflow: `.github/workflows/routing-drift.yml`
+- measurement protocol: `docs/baseline-measurement.md`
+- script: `scripts/measure-docs-only-baseline.ts`
