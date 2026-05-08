@@ -650,7 +650,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     for (const [, content] of skillContents) {
       const fm = content.split("\n---\n")[0].slice(4);
       const keys = fm.match(/^[a-z-]+:/gm) ?? [];
-      const allowed = new Set(["name:", "description:", "multi-step:", "needs-preflight:"]);
+      const allowed = new Set(["name:", "description:", "multi-step:", "needs-preflight:", "allows-dependency-execution:"]);
       for (const k of keys) {
         expect(allowed.has(k)).toBe(true);
       }

@@ -3,6 +3,7 @@ name: apis
 description: '이 스킬은 사용자가 axhub API 엔드포인트를 탐색하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "사내 API 뭐 있어", "사용 가능한 api", "사용 가능한 API 알려주세요", "쓸 수 있는 api", "쓸 수 있는 API", "어떤 엔드포인트가 있나요", "어떤 api", "어떤 API 있어", "엔드포인트", "엔드포인트 뭐 있어", "호출 가능한 api", "호출 가능한 API", "api 리스트", "API 리스트", "api 목록", "API 목록 보여주세요", "API 목록 봐", "api 뭐", "API 뭐 있어", "api 보여", "API 보여줘", "api 카탈로그", "API 카탈로그", "API 카탈로그 확인해주세요", "api", "api catalog", "apis", "available api", "available apis", "available endpoint", "available endpoints", "endpoint", "endpoints", "list apis", "services", 또는 axhub API 탐색 의도. 기본 scope 는 현재 앱이며 다른 팀 경계를 넘기 전에 사용자에게 동의 확인합니다.'
 multi-step: false
 needs-preflight: true
+allows-dependency-execution: false
 ---
 
 # APIs Catalog (read-only, current-app scoped)

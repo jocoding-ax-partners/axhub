@@ -3,6 +3,7 @@ name: auth
 description: '이 스킬은 사용자가 로그인, 로그아웃, 토큰 상태, 또는 현재 계정 identity 를 묻거나 변경할 때 사용합니다. 다음 표현에서 활성화: "계정", "권한", "권한이 없대", "누구로", "누구로 접속하는 거야", "누구야", "다시 로그인", "다시 로그인해주세요", "로그아웃", "로그아웃해", "로그인", "로그인 됐어", "로그인 상태", "로그인 상태 알려주세요", "로그인해", "로그인해주세요", "로그인해줘", "어떤 계정으로 접속 중인가요", "어떤 계정이야", "인증", "인증 다시", "토큰", "토큰 갱신해줘", "토큰 만료됐어", "토큰 살아있어", "토큰 지워줘", "scope 없대", "auth", "authenticate", "log in", "log out", "login", "logout", "refresh token", "scope", "sign in", "sign out", "token expired", "who am I", "who am i", "whoami", 또는 axhub identity 관리 의도. 헤드리스 환경 (Codespaces, SSH) 을 자동 감지하여 브라우저 사용 불가 시 토큰 붙여넣기 흐름으로 전환합니다.'
 multi-step: false
 needs-preflight: false
+allows-dependency-execution: false
 ---
 
 # Auth (login / logout / status)
@@ -30,7 +31,7 @@ To handle auth:
    ```
    현재 로그인:
      · 계정: <user_email>
-     · 만료: <expires_at> (남은 시간: <DELTA>)
+     · 만료: <EXPIRES_HUMAN>
      · 권한: <scopes joined by ", ">
      · 환경: <profile> (<endpoint>)
    ```
@@ -124,3 +125,4 @@ For Korean trigger lexicon (auth intent): `../deploy/references/nl-lexicon.md` (
 For 4-part Korean exit templates (exit 65, exit 66): `../deploy/references/error-empathy-catalog.md`.
 For headless-auth + token-paste flow: `../deploy/references/recovery-flows.md` ("headless-auth").
 For headless / Codespaces / SSH auth fallback (token-paste flow), see `../deploy/references/headless-flow.md`.
+For expires_at humanization rule: `../deploy/references/time-render.md`.
