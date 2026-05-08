@@ -4,6 +4,25 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.1...v0.5.2) (2026-05-08)
+
+Phase 12.2 UX 패치는 단순 조회형 slash command 를 Haiku 로 내려 첫 응답 지연과 비용을 줄이고, deploy 의 git 저장 지점 준비 흐름을 Claude Code TodoWrite UI 로만 보여주게 만든 릴리스예요. deploy / doctor / update / login 은 인증·복구·destructive 위험이 남아 Sonnet 을 유지해요.
+
+### Test baseline
+
+- Local gate: `bun test` (548 pass / 4 skip / 0 fail), `bunx tsc --noEmit`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict`, `git diff --check` 가 green 이에요.
+- Targeted RED/GREEN gate: `bun test tests/manifest.test.ts tests/deploy-git-init-stage.test.ts tests/multistep-stage-checklist.test.ts` 에서 model policy 와 TodoWrite-only stage policy 를 먼저 실패시킨 뒤 green 으로 만들었어요.
+- Release gate: `bun run release -- --release-as patch` postbump 의 `codegen:version` + `release:check` 가 v0.5.2 version sync 와 host helper artifact 를 확인했어요.
+
+### Honest tradeoff
+
+- 실제 Claude Code latency 를 live 로 계측하지는 않았어요. Haiku 전환은 공식 모델 latency 특성과 command frontmatter 정책을 근거로 한 최적화예요.
+- 자연어 SKILL 자동 invoke 자체는 repo 정책상 `SKILL.md` 에 model 을 넣지 않기 때문에 현재 세션 모델을 따라가요. 이번 릴리스는 `/axhub:status`, `/axhub:logs`, `/axhub:apps`, `/axhub:apis`, `/axhub:help` slash command 실행 모델을 Haiku 로 낮추는 변경이에요.
+
+### Fixed
+
+* route lightweight axhub command surfaces faster ([4bb0b6a](https://github.com/jocoding-ax-partners/axhub/commit/4bb0b6a1ae6e5a7c8e44239438380a489f4cc037))
+
 ## [0.5.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.0...v0.5.1) (2026-05-08)
 
 Phase 12.1 핫픽스는 axhub CLI 0.12.1 사용자가 배포 preflight 에서 막히지 않게 호환 범위를 올리고, 사용자가 “프로젝트 초기화해줘”처럼 axhub 접두어 없이 말해도 init SKILL 이 잡히도록 라우팅 표면을 보강한 릴리스예요. preflight 의 미래 버전 차단 모델은 유지하면서, init routing metadata 는 corpus 와 baseline fixture 까지 같이 맞춰요.
