@@ -145,7 +145,9 @@ fn open_append_secure(path: &PathBuf) -> std::io::Result<std::fs::File> {
 /// Read all audit records with `ts` within the last `duration`. Skips corrupted
 /// lines (logs count to stderr). Returns empty vec if dir missing.
 pub fn read_since(duration: Duration) -> std::io::Result<Vec<AuditRecord>> {
-    let Some(dir) = audit_dir() else { return Ok(vec![]); };
+    let Some(dir) = audit_dir() else {
+        return Ok(vec![]);
+    };
     if !dir.exists() {
         return Ok(vec![]);
     }
@@ -155,7 +157,9 @@ pub fn read_since(duration: Duration) -> std::io::Result<Vec<AuditRecord>> {
     for entry in fs::read_dir(&dir)? {
         let entry = entry?;
         let name_owned = entry.file_name();
-        let Some(name) = name_owned.to_str() else { continue };
+        let Some(name) = name_owned.to_str() else {
+            continue;
+        };
         if !name.starts_with("routing-audit-") || !name.ends_with(".jsonl") {
             continue;
         }
@@ -189,7 +193,9 @@ pub fn read_since(duration: Duration) -> std::io::Result<Vec<AuditRecord>> {
 
 /// Delete every routing-audit-*.jsonl file unconditionally. Returns count deleted.
 pub fn cleanup_all() -> std::io::Result<u32> {
-    let Some(dir) = audit_dir() else { return Ok(0); };
+    let Some(dir) = audit_dir() else {
+        return Ok(0);
+    };
     if !dir.exists() {
         return Ok(0);
     }
@@ -197,7 +203,9 @@ pub fn cleanup_all() -> std::io::Result<u32> {
     for entry in fs::read_dir(&dir)? {
         let entry = entry?;
         let name_owned = entry.file_name();
-        let Some(name) = name_owned.to_str() else { continue };
+        let Some(name) = name_owned.to_str() else {
+            continue;
+        };
         if !name.starts_with("routing-audit-") || !name.ends_with(".jsonl") {
             continue;
         }

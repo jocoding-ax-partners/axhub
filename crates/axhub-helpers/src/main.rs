@@ -676,8 +676,7 @@ fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
         }
     }
 
-    let mut hash_counts: std::collections::HashMap<String, u32> =
-        std::collections::HashMap::new();
+    let mut hash_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
     for r in records.iter().filter(|r| r.is_axhub_related) {
         *hash_counts.entry(r.prompt_hash.clone()).or_insert(0) += 1;
     }
@@ -778,9 +777,7 @@ fn cmd_cleanup_audit(args: &[String]) -> anyhow::Result<i32> {
         println!("audit log {count} 파일 삭제했어요.");
     } else {
         let count = audit::rotate(7)?;
-        println!(
-            "7일 이상 된 audit log {count} 파일 삭제했어요. 전체 삭제는 --all 사용해요."
-        );
+        println!("7일 이상 된 audit log {count} 파일 삭제했어요. 전체 삭제는 --all 사용해요.");
     }
     Ok(0)
 }

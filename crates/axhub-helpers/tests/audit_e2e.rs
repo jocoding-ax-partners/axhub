@@ -1,4 +1,4 @@
-// Phase 2 — file-system level integration tests for audit module.
+// Phase 6 — audit_e2e.rs: file-system level integration tests for audit module.
 //
 // All tests scope IO into a tempdir via XDG_STATE_HOME so audit::audit_dir()
 // resolves to ${tempdir}/axhub-plugin instead of the real ~/.local/state path.
@@ -124,6 +124,35 @@ fn rotation_handles_today_yesterday_correctly() {
 }
 
 #[test]
+fn read_since_handles_corrupted_lines() {
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let dir = temp.path().join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let path = dir.join(format!("routing-audit-{today}.jsonl"));
+
+    let valid = serde_json::to_string(&sample_record("valid-1")).unwrap();
+    let valid2 = serde_json::to_string(&sample_record("valid-2")).unwrap();
+    let mut content = String::new();
+    content.push_str(&valid);
+    content.push('\n');
+    content.push_str("{ corrupted-not-json }\n");
+    content.push_str(&valid2);
+    content.push('\n');
+    content.push_str("\n"); // empty line, not corrupted
+    std::fs::write(&path, content).unwrap();
+
+    let records = audit::read_since(Duration::days(7)).unwrap();
+    assert_eq!(
+        records.len(),
+        2,
+        "expected 2 valid records, skipping corrupted"
+    );
+}
+
+#[test]
 fn audit_disabled_no_io() {
     let temp = tempfile::tempdir().unwrap();
     let g = EnvGuard::new(&temp);
@@ -131,11 +160,89 @@ fn audit_disabled_no_io() {
 
     audit::append(sample_record("no-io")).unwrap();
 
+    // AXHUB_NO_AUDIT 비활성 → audit dir 자체 미생성.
     let dir = temp.path().join("axhub-plugin");
     assert!(
         !dir.exists(),
         "audit dir must not be created when AXHUB_NO_AUDIT is set"
     );
+}
+
+#[test]
+#[ignore = "concurrent multi-process append is flake-prone in CI; nightly-only"]
+fn concurrent_multi_process_append() {
+    // POSIX O_APPEND atomic for write < PIPE_BUF. 2 thread 동시 append → no interleave.
+    // Spec test: kept as ignored placeholder until a stable harness exists.
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let handles: Vec<_> = (0..2)
+        .map(|i| {
+            std::thread::spawn(move || {
+                for _ in 0..50 {
+                    let _ = audit::append(sample_record(&format!("worker-{i}")));
+                }
+            })
+        })
+        .collect();
+    for h in handles {
+        h.join().unwrap();
+    }
+
+    let records = audit::read_since(Duration::days(1)).unwrap();
+    assert_eq!(records.len(), 100);
+}
+
+#[test]
+fn cleanup_all_ignores_non_audit_files_and_deletes_audit_files() {
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let dir = temp.path().join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let audit_file = dir.join(format!("routing-audit-{today}.jsonl"));
+    let other_file = dir.join("profile.json");
+    std::fs::write(&audit_file, "{}\n").unwrap();
+    std::fs::write(&other_file, "{}\n").unwrap();
+
+    let deleted = audit::cleanup_all().unwrap();
+
+    assert_eq!(deleted, 1);
+    assert!(!audit_file.exists());
+    assert!(other_file.exists());
+}
+
+#[test]
+fn read_since_skips_wrong_filenames_and_old_records() {
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let dir = temp.path().join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let path = dir.join(format!("routing-audit-{today}.jsonl"));
+
+    let fresh = sample_record("fresh");
+    let mut old = sample_record("old");
+    old.ts = (Utc::now() - Duration::days(30)).to_rfc3339();
+
+    std::fs::write(
+        &path,
+        format!(
+            "{}\n{}\n",
+            serde_json::to_string(&fresh).unwrap(),
+            serde_json::to_string(&old).unwrap()
+        ),
+    )
+    .unwrap();
+    std::fs::write(dir.join("routing-audit-not-a-date.jsonl"), "{}\n").unwrap();
+    std::fs::write(dir.join("unrelated.jsonl"), "{}\n").unwrap();
+
+    let records = audit::read_since(Duration::days(7)).unwrap();
+
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].prompt_hash, fresh.prompt_hash);
 }
 
 #[test]
