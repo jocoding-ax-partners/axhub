@@ -15,11 +15,13 @@ use axhub_helpers::redact::redact;
 use axhub_helpers::resolve::run_resolve;
 use axhub_helpers::runtime_paths::{last_deploy_file, state_dir, token_file, welcome_marker_path};
 use axhub_helpers::statusline::current_statusline;
-use axhub_helpers::telemetry::emit_meta_envelope;
+use axhub_helpers::telemetry::{
+    append_phase_marker_to_file, emit_deploy_complete, emit_meta_envelope,
+};
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  version\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -85,6 +87,8 @@ fn run() -> anyhow::Result<i32> {
         "preauth-check" => cmd_preauth_check(),
         "prompt-route" => cmd_prompt_route(),
         "session-start" => cmd_session_start(),
+        "mark" => cmd_mark(&rest),
+        "emit-deploy-complete" => cmd_emit_deploy_complete(&rest),
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -1132,4 +1136,32 @@ fn cmd_list_deployments(args: &[String]) -> anyhow::Result<i32> {
     let code = result.exit_code;
     out_json(serde_json::to_value(result)?);
     Ok(code)
+}
+
+fn cmd_mark(rest: &[String]) -> anyhow::Result<i32> {
+    let Some(phase_name) = rest.first() else {
+        eprintln!("mark requires <phase_name>");
+        return Ok(64);
+    };
+    let path_env = match std::env::var("AXHUB_PHASE_MARKER_FILE") {
+        Ok(v) if !v.is_empty() => v,
+        _ => return Ok(0),
+    };
+    let path = std::path::PathBuf::from(path_env);
+    if let Err(err) = append_phase_marker_to_file(&path, phase_name) {
+        eprintln!("mark: {err}");
+        return Ok(1);
+    }
+    Ok(0)
+}
+
+fn cmd_emit_deploy_complete(rest: &[String]) -> anyhow::Result<i32> {
+    let exit_code: i32 = rest.first().and_then(|s| s.parse().ok()).unwrap_or(0);
+    let default_class = "axhub deploy create".to_string();
+    let command_class = rest.get(1).unwrap_or(&default_class);
+    if let Err(err) = emit_deploy_complete(exit_code, command_class) {
+        eprintln!("emit-deploy-complete: {err}");
+        return Ok(1);
+    }
+    Ok(0)
 }

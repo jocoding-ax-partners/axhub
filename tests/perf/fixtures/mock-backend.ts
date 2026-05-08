@@ -88,6 +88,12 @@ export class MockBackendServer {
         const path = url.pathname;
         const method = req.method.toUpperCase();
 
+        if (method === "POST" && path === "/api/v1/auth/refresh") {
+          return jsonResponse(200, {
+            token: "refreshed-token",
+            expires_at: "2099-01-01T00:00:00Z",
+          });
+        }
         if (method === "POST" && path === "/api/v1/resolve") {
           return jsonResponse(200, {
             app_id: "paydrop",

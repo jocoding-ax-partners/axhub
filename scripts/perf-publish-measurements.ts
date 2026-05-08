@@ -97,8 +97,8 @@ export function spliceOsBlock(
 
 function scaffold(): string {
   return `---
-status: PHASE_0_PENDING_CI
-phase: 0
+status: PHASE_0_5_PENDING_CI
+phase: 0.5
 generated_by: scripts/perf-publish-measurements.ts
 ---
 
@@ -110,7 +110,7 @@ generated_by: scripts/perf-publish-measurements.ts
 > (\`.plan/\` is gitignored — this CI scaffold is regenerated per run when
 > the canonical doc is absent).
 
-## Phase 0 Baseline
+## Phase 0.5 Baseline
 
 `;
 }
