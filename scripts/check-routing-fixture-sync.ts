@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { spawnSync } from "node:child_process";
+import type { SpawnSyncReturns } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const routingAffectingPatterns = [
@@ -21,9 +22,30 @@ export interface FixtureSyncReport {
   ok: boolean;
 }
 
-export function analyzeRoutingFixtureSync(changedFiles: string[]): FixtureSyncReport {
+export interface AnalyzeRoutingFixtureSyncOptions {
+  isSkillRoutingMetadataChanged?: (file: string) => boolean;
+}
+
+function isSkillFile(file: string): boolean {
+  return /^skills\/[^/]+\/SKILL\.md$/.test(file);
+}
+
+function isRoutingAffectingFile(
+  file: string,
+  options: AnalyzeRoutingFixtureSyncOptions = {},
+): boolean {
+  if (isSkillFile(file) && options.isSkillRoutingMetadataChanged) {
+    return options.isSkillRoutingMetadataChanged(file);
+  }
+  return routingAffectingPatterns.some((p) => p.test(file));
+}
+
+export function analyzeRoutingFixtureSync(
+  changedFiles: string[],
+  options: AnalyzeRoutingFixtureSyncOptions = {},
+): FixtureSyncReport {
   const normalized = changedFiles.map((f) => f.trim()).filter(Boolean);
-  const routingAffectingFiles = normalized.filter((f) => routingAffectingPatterns.some((p) => p.test(f)));
+  const routingAffectingFiles = normalized.filter((f) => isRoutingAffectingFile(f, options));
   const baselineFiles = normalized.filter((f) => baselinePatterns.some((p) => p.test(f)));
   return {
     changedFiles: normalized,
@@ -33,14 +55,39 @@ export function analyzeRoutingFixtureSync(changedFiles: string[]): FixtureSyncRe
   };
 }
 
+function git(args: string[]): SpawnSyncReturns<string> {
+  return spawnSync("git", args, { encoding: "utf8" });
+}
+
 function changedFilesFromGit(baseRef: string, headRef: string): string[] {
-  const result = spawnSync("git", ["diff", "--name-only", `${baseRef}...${headRef}`], {
-    encoding: "utf8",
-  });
+  let result = git(["diff", "--name-only", `${baseRef}...${headRef}`]);
+  if (result.status !== 0 && (result.stderr ?? "").includes("no merge base")) {
+    result = git(["diff", "--name-only", `${baseRef}..${headRef}`]);
+  }
   if (result.status !== 0) {
     throw new Error(result.stderr.trim() || `git diff failed with status ${result.status}`);
   }
   return result.stdout.split("\n");
+}
+
+function showFile(ref: string, file: string): string | null {
+  const result = git(["show", `${ref}:${file}`]);
+  if (result.status !== 0) return null;
+  return result.stdout;
+}
+
+function frontmatterDescription(content: string): string | null {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return null;
+  const description = match[1]?.match(/^description:\s*(.*)$/m)?.[1];
+  return description?.trim() ?? null;
+}
+
+function skillRoutingMetadataChanged(file: string, baseRef: string, headRef: string): boolean {
+  const before = showFile(baseRef, file);
+  const after = showFile(headRef, file);
+  if (before === null || after === null) return true;
+  return frontmatterDescription(before) !== frontmatterDescription(after);
 }
 
 function parseArgs(argv: string[]): { base?: string; head: string } {
@@ -64,7 +111,15 @@ function main(): void {
   const opts = parseArgs(process.argv.slice(2));
   const stdin = readFileSync(0, "utf8");
   const changedFiles = stdin.trim().length > 0 ? stdin.split("\n") : opts.base ? changedFilesFromGit(opts.base, opts.head) : [];
-  const report = analyzeRoutingFixtureSync(changedFiles);
+  const report = analyzeRoutingFixtureSync(
+    changedFiles,
+    opts.base
+      ? {
+          isSkillRoutingMetadataChanged: (file) =>
+            skillRoutingMetadataChanged(file, opts.base!, opts.head),
+        }
+      : {},
+  );
 
   if (report.ok) {
     process.stderr.write(

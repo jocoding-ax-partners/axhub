@@ -88,6 +88,18 @@ To handle auth:
    PowerShell lane:
 
    ```powershell
+   $AxhubHelper = $null
+   if ($env:CLAUDE_PLUGIN_ROOT) {
+     $PluginHelper = Join-Path $env:CLAUDE_PLUGIN_ROOT "bin\axhub-helpers.exe"
+     if (Test-Path $PluginHelper) { $AxhubHelper = $PluginHelper }
+   }
+   if (-not $AxhubHelper) {
+     $HelperCommand = Get-Command axhub-helpers.exe -ErrorAction SilentlyContinue
+     if ($HelperCommand) { $AxhubHelper = $HelperCommand.Source }
+   }
+   if (-not $AxhubHelper) {
+     throw "axhub-helpers.exe 를 찾지 못했어요. axhub doctor 로 plugin helper 설치 상태를 확인해요."
+   }
    @{
      tool_call_id = "pending"
      action = "auth_login"
@@ -96,10 +108,10 @@ To handle auth:
      branch = "_"
      commit_sha = "_"
      context = @{}
-   } | ConvertTo-Json -Compress | & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" consent-mint
+   } | ConvertTo-Json -Compress | & $AxhubHelper consent-mint
    ```
 
-   temp-file fallback 은 위 두 stdin lane 을 쓸 수 없을 때만 secondary 로 써요. JSON 파일을 만들더라도 raw token 값을 쓰지 말고, consent JSON 만 0600/사용자 전용 ACL 임시 파일에 저장한 뒤 helper stdin 으로 다시 넣어요.
+   PowerShell 에서도 `CLAUDE_PLUGIN_ROOT` 가 비어 있으면 PATH 의 `axhub-helpers.exe` 를 자동으로 찾아요. temp-file fallback 은 위 두 stdin lane 을 쓸 수 없을 때만 secondary 로 써요. JSON 파일을 만들더라도 raw token 값을 쓰지 말고, consent JSON 만 0600/사용자 전용 ACL 임시 파일에 저장한 뒤 helper stdin 으로 다시 넣어요.
 
    `auth_login` binding은 실제 app/branch/commit이 필요 없지만 `asConsentBinding`이 모든 필드에서 비어있지 않은 문자열을 요구하므로 `"_"`를 플레이스홀더로 사용해요. 다음 Bash/PowerShell tool id는 consent-mint 이후에 생기므로 `pending` token을 한 번만 쓰게 해요.
    macOS/Linux/Windows 모두에서 `CLAUDE_SESSION_ID`를 지우지 마세요. `tool_call_id:"pending"` 자체가 helper에게 "다음 실제 tool call에서 한 번만 claim"하라는 명시 신호예요.

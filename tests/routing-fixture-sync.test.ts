@@ -18,6 +18,14 @@ describe("routing fixture sync guard", () => {
     expect(report.routingAffectingFiles).toEqual(["skills/deploy/SKILL.md"]);
   });
 
+  test("passes for SKILL body-only changes when routing metadata is unchanged", () => {
+    const report = analyzeRoutingFixtureSync(["skills/deploy/SKILL.md"], {
+      isSkillRoutingMetadataChanged: () => false,
+    });
+    expect(report.ok).toBe(true);
+    expect(report.routingAffectingFiles).toEqual([]);
+  });
+
   test("passes when routing metadata and baseline fixtures change together", () => {
     const report = analyzeRoutingFixtureSync([
       "skills/deploy/SKILL.md",
@@ -29,6 +37,7 @@ describe("routing fixture sync guard", () => {
 
   test("workflow lets the checker own git diff failures instead of piping", () => {
     const workflow = readFileSync(join(REPO_ROOT, ".github/workflows/routing-drift.yml"), "utf8");
+    expect(workflow).toContain("fetch-depth: 0");
     expect(workflow).toContain(
       'bun scripts/check-routing-fixture-sync.ts --base "origin/${{ github.base_ref }}" --head HEAD',
     );
