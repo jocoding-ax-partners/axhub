@@ -1164,3 +1164,37 @@ pub fn cmd_bootstrap_dependency_plan(args: &[String]) -> anyhow::Result<i32> {
     }
     Ok(exit_code)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bootstrap_state_strings_cover_terminal_and_progress_states() {
+        let cases = [
+            (
+                BootstrapState::ConflictExistingFiles,
+                "conflict_existing_files",
+                true,
+            ),
+            (
+                BootstrapState::SubdomainCollision,
+                "subdomain_collision",
+                true,
+            ),
+            (BootstrapState::AlreadyDeployed, "already_deployed", true),
+            (
+                BootstrapState::IdempotencyUnavailable,
+                "idempotency_unavailable",
+                true,
+            ),
+            (BootstrapState::Deploying, "deploying", false),
+            (BootstrapState::Deployed, "deployed", false),
+        ];
+
+        for (state, label, user_decision) in cases {
+            assert_eq!(state.as_str(), label);
+            assert_eq!(state.is_user_decision(), user_decision, "{label}");
+        }
+    }
+}

@@ -212,4 +212,13 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn fit_first_truncates_when_every_candidate_is_too_long() {
+        let long = "x".repeat(MAX_STATUSLINE_CHARS + 10);
+
+        let line = fit_first([long.clone(), long]);
+
+        assert_eq!(line.chars().count(), MAX_STATUSLINE_CHARS);
+    }
 }

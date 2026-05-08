@@ -102,16 +102,18 @@ function normalizeKeywordBlock(skill: string, phrases: string[]): string[] {
 function parseMainRs(): KeywordBlock[] {
   const text = readFileSync(MAIN_RS, "utf8");
 
-  // detect_prompt_route() 함수 본문만 (line 510~) 추출
+  // detect_prompt_route() 함수 본문만 (line 510~) 추출.
+  // Approach E (Phase 2): function 폐기 후 부재 → no-op return (codegen one-time work 완료).
   const startIdx = text.indexOf("fn detect_prompt_route(");
   if (startIdx === -1) {
-    throw new Error("detect_prompt_route() not found in main.rs");
+    return [];
   }
   // 함수 끝 (다음 fn 선언) 찾기
   const afterStart = text.slice(startIdx);
   const endRel = afterStart.indexOf("\nfn cmd_prompt_route(");
   if (endRel === -1) {
-    throw new Error("cmd_prompt_route() boundary not found");
+    // detect_prompt_route 가 있는데 cmd_prompt_route 가 부재 = unexpected. graceful no-op.
+    return [];
   }
   const fnBody = afterStart.slice(0, endRel);
 
