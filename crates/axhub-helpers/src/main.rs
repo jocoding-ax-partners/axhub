@@ -464,7 +464,6 @@ fn cmd_preauth_check() -> anyhow::Result<i32> {
 
 const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
 
-
 // Approach E (Phase 2): cmd_prompt_route is preflight + audit only.
 // No keyword chain, no skill enforcement, no `skills/<X>/SKILL.md` paths in
 // additionalContext. Claude Code matches skills via SKILL.md frontmatter
@@ -526,9 +525,8 @@ fn format_preflight_context(preflight: &PreflightRun) -> String {
             "axhub 버전 확인 결과, 검증 범위보다 새 버전이에요 ({cli_version}). 플러그인 업데이트 확인이 필요해요."
         ));
     } else if !preflight.output.cli_present {
-        lines.push(
-            "axhub 설치 확인 결과, CLI를 찾지 못했어요. axhub 설치 후 다시 점검해요.".into(),
-        );
+        lines
+            .push("axhub 설치 확인 결과, CLI를 찾지 못했어요. axhub 설치 후 다시 점검해요.".into());
     } else {
         lines.push(format!(
             "axhub 버전 확인 결과, CLI {cli_version} 상태를 확인했어요."

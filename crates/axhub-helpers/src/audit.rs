@@ -211,7 +211,9 @@ pub fn cleanup_all() -> std::io::Result<u32> {
 /// Delete audit JSONL files older than retention_days. Returns count deleted.
 /// Silent failures — directory or file permission errors swallowed.
 pub fn rotate(retention_days: i64) -> std::io::Result<u32> {
-    let Some(dir) = audit_dir() else { return Ok(0); };
+    let Some(dir) = audit_dir() else {
+        return Ok(0);
+    };
     if !dir.exists() {
         return Ok(0);
     }
@@ -223,7 +225,9 @@ pub fn rotate(retention_days: i64) -> std::io::Result<u32> {
     for entry in fs::read_dir(&dir)? {
         let entry = entry?;
         let name_owned = entry.file_name();
-        let Some(name) = name_owned.to_str() else { continue };
+        let Some(name) = name_owned.to_str() else {
+            continue;
+        };
 
         let prefix = "routing-audit-";
         let suffix = ".jsonl";
