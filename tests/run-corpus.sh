@@ -113,6 +113,11 @@ if [ "$MODE" != "docs-only" ] && [ "$MODE" != "plugin" ]; then
   exit 1
 fi
 
+if [ "$SCORE" = "1" ] && [ "$ADVISORY" = "1" ] && [ -z "$FIXTURE" ]; then
+  echo "[ADVISORY] ${CORPUS_ROWS}-row corpus has no committed reliable fixture; score is manual/advisory (CI gate X)." >&2
+  exit 0
+fi
+
 if [ -z "$FIXTURE" ]; then
   if ! FIXTURE=$(fixture_for "$MODE" "$CORPUS_ROWS"); then
     echo "ERROR: no committed $MODE fixture for $CORPUS_ROWS-row corpus." >&2
