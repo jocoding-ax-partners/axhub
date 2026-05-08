@@ -455,7 +455,6 @@ fn cmd_preauth_check() -> anyhow::Result<i32> {
 
 const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
 
-
 // Approach E (Phase 2): cmd_prompt_route is preflight + audit only.
 // No keyword chain, no skill enforcement, no `skills/<X>/SKILL.md` paths in
 // additionalContext. Claude Code matches skills via SKILL.md frontmatter
@@ -517,9 +516,8 @@ fn format_preflight_context(preflight: &PreflightRun) -> String {
             "axhub 버전 확인 결과, 검증 범위보다 새 버전이에요 ({cli_version}). 플러그인 업데이트 확인이 필요해요."
         ));
     } else if !preflight.output.cli_present {
-        lines.push(
-            "axhub 설치 확인 결과, CLI를 찾지 못했어요. axhub 설치 후 다시 점검해요.".into(),
-        );
+        lines
+            .push("axhub 설치 확인 결과, CLI를 찾지 못했어요. axhub 설치 후 다시 점검해요.".into());
     } else {
         lines.push(format!(
             "axhub 버전 확인 결과, CLI {cli_version} 상태를 확인했어요."
@@ -669,8 +667,7 @@ fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
         }
     }
 
-    let mut hash_counts: std::collections::HashMap<String, u32> =
-        std::collections::HashMap::new();
+    let mut hash_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
     for r in records.iter().filter(|r| r.is_axhub_related) {
         *hash_counts.entry(r.prompt_hash.clone()).or_insert(0) += 1;
     }
@@ -771,9 +768,7 @@ fn cmd_cleanup_audit(args: &[String]) -> anyhow::Result<i32> {
         println!("audit log {count} 파일 삭제했어요.");
     } else {
         let count = audit::rotate(7)?;
-        println!(
-            "7일 이상 된 audit log {count} 파일 삭제했어요. 전체 삭제는 --all 사용해요."
-        );
+        println!("7일 이상 된 audit log {count} 파일 삭제했어요. 전체 삭제는 --all 사용해요.");
     }
     Ok(0)
 }
@@ -788,8 +783,12 @@ const WELCOME_VERSION: &str = "0.4.0";
 
 fn cmd_session_start() -> anyhow::Result<i32> {
     let mut lines: Vec<String> = vec![
-        format!("axhub helper Rust runtime 활성 (v{}).", env!("CARGO_PKG_VERSION")),
-        "막히면 /axhub:help 로 명령 메뉴를, /axhub:clarify 로 모호한 의도 확인을 부탁해요.".to_string(),
+        format!(
+            "axhub helper Rust runtime 활성 (v{}).",
+            env!("CARGO_PKG_VERSION")
+        ),
+        "막히면 /axhub:help 로 명령 메뉴를, /axhub:clarify 로 모호한 의도 확인을 부탁해요."
+            .to_string(),
         "라우팅 통계는 axhub-helpers routing-stats 로 봐요.".to_string(),
     ];
 
@@ -798,16 +797,24 @@ fn cmd_session_start() -> anyhow::Result<i32> {
     if show_welcome {
         lines.push(String::new());
         lines.push("[axhub v0.4.0 첫 세션] 라우팅 똑똑해졌어요.".to_string());
-        lines.push("- Rust 키워드 체인 ~600줄 폐기. Claude 가 SKILL.md description 으로 직접 매칭해요.".to_string());
+        lines.push(
+            "- Rust 키워드 체인 ~600줄 폐기. Claude 가 SKILL.md description 으로 직접 매칭해요."
+                .to_string(),
+        );
         lines.push("- 메타 질문 (\"왜 ~ 키워드 매칭이야?\") 자동 처리해요.".to_string());
-        lines.push("- routing audit log 7일 로컬 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1.".to_string());
+        lines.push(
+            "- routing audit log 7일 로컬 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1.".to_string(),
+        );
         lines.push("- 변경점 보기: /axhub:whatsnew".to_string());
 
         if let Some(path) = marker {
             if let Some(parent) = path.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
-            let _ = std::fs::write(&path, format!("shown: {}\n", chrono::Utc::now().to_rfc3339()));
+            let _ = std::fs::write(
+                &path,
+                format!("shown: {}\n", chrono::Utc::now().to_rfc3339()),
+            );
         }
     }
 

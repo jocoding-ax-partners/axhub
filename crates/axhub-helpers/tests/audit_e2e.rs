@@ -29,7 +29,11 @@ impl EnvGuard {
             std::env::set_var("XDG_STATE_HOME", temp.path());
             std::env::remove_var("AXHUB_NO_AUDIT");
         }
-        EnvGuard { prev_state, prev_no_audit, _lock: lock }
+        EnvGuard {
+            prev_state,
+            prev_no_audit,
+            _lock: lock,
+        }
     }
 
     fn set_no_audit(&self) {
@@ -77,8 +81,15 @@ fn file_permissions_unix() {
     assert_eq!(dir_mode, 0o700, "audit dir mode {:o}", dir_mode);
 
     let mut entries = std::fs::read_dir(&dir).unwrap();
-    let entry = entries.next().expect("expected at least one audit file").unwrap();
-    let file_mode = std::fs::metadata(entry.path()).unwrap().permissions().mode() & 0o777;
+    let entry = entries
+        .next()
+        .expect("expected at least one audit file")
+        .unwrap();
+    let file_mode = std::fs::metadata(entry.path())
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777;
     assert_eq!(file_mode, 0o600, "audit file mode {:o}", file_mode);
 }
 
@@ -90,8 +101,12 @@ fn rotation_handles_today_yesterday_correctly() {
     let dir = temp.path().join("axhub-plugin");
     std::fs::create_dir_all(&dir).unwrap();
 
-    let stale_date = (Utc::now() - Duration::days(8)).format("%Y-%m-%d").to_string();
-    let yesterday = (Utc::now() - Duration::days(1)).format("%Y-%m-%d").to_string();
+    let stale_date = (Utc::now() - Duration::days(8))
+        .format("%Y-%m-%d")
+        .to_string();
+    let yesterday = (Utc::now() - Duration::days(1))
+        .format("%Y-%m-%d")
+        .to_string();
     let today = Utc::now().format("%Y-%m-%d").to_string();
 
     let stale = dir.join(format!("routing-audit-{stale_date}.jsonl"));
@@ -130,7 +145,11 @@ fn read_since_handles_corrupted_lines() {
     std::fs::write(&path, content).unwrap();
 
     let records = audit::read_since(Duration::days(7)).unwrap();
-    assert_eq!(records.len(), 2, "expected 2 valid records, skipping corrupted");
+    assert_eq!(
+        records.len(),
+        2,
+        "expected 2 valid records, skipping corrupted"
+    );
 }
 
 #[test]
@@ -143,7 +162,10 @@ fn audit_disabled_no_io() {
 
     // AXHUB_NO_AUDIT 비활성 → audit dir 자체 미생성.
     let dir = temp.path().join("axhub-plugin");
-    assert!(!dir.exists(), "audit dir must not be created when AXHUB_NO_AUDIT is set");
+    assert!(
+        !dir.exists(),
+        "audit dir must not be created when AXHUB_NO_AUDIT is set"
+    );
 }
 
 #[test]
@@ -169,4 +191,75 @@ fn concurrent_multi_process_append() {
 
     let records = audit::read_since(Duration::days(1)).unwrap();
     assert_eq!(records.len(), 100);
+}
+
+#[test]
+fn cleanup_all_ignores_non_audit_files_and_deletes_audit_files() {
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let dir = temp.path().join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let audit_file = dir.join(format!("routing-audit-{today}.jsonl"));
+    let other_file = dir.join("profile.json");
+    std::fs::write(&audit_file, "{}\n").unwrap();
+    std::fs::write(&other_file, "{}\n").unwrap();
+
+    let deleted = audit::cleanup_all().unwrap();
+
+    assert_eq!(deleted, 1);
+    assert!(!audit_file.exists());
+    assert!(other_file.exists());
+}
+
+#[test]
+fn read_since_skips_wrong_filenames_and_old_records() {
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let dir = temp.path().join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let path = dir.join(format!("routing-audit-{today}.jsonl"));
+
+    let fresh = sample_record("fresh");
+    let mut old = sample_record("old");
+    old.ts = (Utc::now() - Duration::days(30)).to_rfc3339();
+
+    std::fs::write(
+        &path,
+        format!(
+            "{}\n{}\n",
+            serde_json::to_string(&fresh).unwrap(),
+            serde_json::to_string(&old).unwrap()
+        ),
+    )
+    .unwrap();
+    std::fs::write(dir.join("routing-audit-not-a-date.jsonl"), "{}\n").unwrap();
+    std::fs::write(dir.join("unrelated.jsonl"), "{}\n").unwrap();
+
+    let records = audit::read_since(Duration::days(7)).unwrap();
+
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].prompt_hash, fresh.prompt_hash);
+}
+
+#[test]
+fn rotate_ignores_non_audit_and_malformed_audit_filenames() {
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let dir = temp.path().join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let malformed = dir.join("routing-audit-not-a-date.jsonl");
+    let unrelated = dir.join("notes.txt");
+    std::fs::write(&malformed, "{}\n").unwrap();
+    std::fs::write(&unrelated, "{}\n").unwrap();
+
+    let deleted = audit::rotate(7).unwrap();
+
+    assert_eq!(deleted, 0);
+    assert!(malformed.exists());
+    assert!(unrelated.exists());
 }

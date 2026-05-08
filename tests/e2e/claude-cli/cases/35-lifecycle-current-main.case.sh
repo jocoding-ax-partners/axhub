@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Case 35 (T2) — current-main lifecycle smoke without external Claude spend.
-# Verifies v0.2.0 coverage path: prompt-route + CLI contract + secret argv leak guard.
+# Approach E contract: prompt-route injects preflight/audit context only. Claude
+# native skill matching owns routing, so this case verifies the hook no longer
+# emits forced skills/* context while the deterministic CLI lifecycle still works.
 set -u
 MULTI_STEP=1
 CASE_ID="35"
@@ -71,26 +73,28 @@ SH
 chmod 755 "$FAKE_AXHUB"
 : > "$TRACE"
 
-route_expect() {
+preflight_expect_no_forced_route() {
   local prompt="$1"
-  local skill="$2"
-  local out="${CASE_DIR}/route-${skill}.json"
+  local label="$2"
+  local out="${CASE_DIR}/route-${label}.json"
   printf '{"hook_event_name":"UserPromptSubmit","prompt":%s}' "$(jq -Rn --arg s "$prompt" '$s')" \
     | AXHUB_BIN="$FAKE_AXHUB" SHIM_CASE_DIR="$CASE_DIR" "$T2_HELPER_BIN" prompt-route > "$out"
-  if ! grep -F -q "skills/${skill}/SKILL.md" "$out"; then
-    echo "  FAIL: prompt '$prompt' did not route to ${skill}" >&2
+  if grep -F -q "skills/" "$out"; then
+    echo "  FAIL: prompt '$prompt' emitted stale forced skill context" >&2
     cat "$out" >&2
     return 1
   fi
+  jq -e '.hookSpecificOutput.hookEventName == "UserPromptSubmit"' "$out" >/dev/null || return 1
+  jq -e '.hookSpecificOutput.additionalContext | contains("axhub 버전 확인 결과")' "$out" >/dev/null || return 1
 }
 
 FAIL=0
-route_expect "Next.js 결제 앱 만들어줘" init || FAIL=1
-route_expect "앱 등록해" apps || FAIL=1
-route_expect "GitHub repo 연결해" github || FAIL=1
-route_expect "DATABASE_URL 환경변수 추가해" env || FAIL=1
-route_expect "배포해" deploy || FAIL=1
-route_expect "결과 봐" open || FAIL=1
+preflight_expect_no_forced_route "Next.js 결제 앱 만들어줘" init || FAIL=1
+preflight_expect_no_forced_route "앱 등록해" apps || FAIL=1
+preflight_expect_no_forced_route "GitHub repo 연결해" github || FAIL=1
+preflight_expect_no_forced_route "DATABASE_URL 환경변수 추가해" env || FAIL=1
+preflight_expect_no_forced_route "배포해" deploy || FAIL=1
+preflight_expect_no_forced_route "결과 봐" open || FAIL=1
 
 (
   cd "$SANDBOX" || exit 1
