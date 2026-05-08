@@ -42,7 +42,7 @@ jobs:
       - name: Check routing fixture freshness
         run: |
           git fetch origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}" --depth=1
-          git diff --name-only "origin/${{ github.base_ref }}...HEAD" | bun scripts/check-routing-fixture-sync.ts
+          bun scripts/check-routing-fixture-sync.ts --base "origin/${{ github.base_ref }}" --head HEAD
 
       - name: Run corpus.100 drift gate
         id: drift
