@@ -95,6 +95,23 @@ To clarify:
 
    Stop without routing.
 
+7. **Audit feedback (final).** After the user chooses a final skill, record the clarify feedback through the packaged helper. This is best-effort and must never block routing.
+
+   ```bash
+   ORIGINAL_PROMPT="${ORIGINAL_USER_UTTERANCE:-}"
+   FINAL_SKILL="${FINAL_SKILL:-null}"
+   HELPER_BIN="${AXHUB_HELPERS_BIN:-}"
+   if [ -z "$HELPER_BIN" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -x "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" ]; then
+     HELPER_BIN="${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers"
+   fi
+   if [ -z "$HELPER_BIN" ]; then
+     HELPER_BIN="axhub-helpers"
+   fi
+   if [ -n "$ORIGINAL_PROMPT" ]; then
+     "$HELPER_BIN" audit-clarify --prompt "$ORIGINAL_PROMPT" --chosen "$FINAL_SKILL" >/dev/null 2>&1 || true
+   fi
+   ```
+
 ## NEVER
 
 - NEVER silently guess intent — always surface AskUserQuestion when ambiguity is detected.

@@ -64,6 +64,8 @@ fn sample_record(label: &str) -> AuditRecord {
         cli_version: Some("0.1.0".into()),
         auth_ok: true,
         is_axhub_related: true,
+        clarify_invoked: false,
+        chosen_skill: None,
     }
 }
 

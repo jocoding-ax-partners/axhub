@@ -7,83 +7,121 @@
     "배포 전 저장 지점을 만들까요?": {
       "safe_default": "명령어만 보기",
       "rationale": "non-interactive contexts must not run git init/git add/git commit automatically; showing commands is read-only and lets the user decide locally.",
-      "allowed_safe_defaults": ["명령어만 보기", "저장 지점 만들기"]
+      "allowed_safe_defaults": [
+        "명령어만 보기",
+        "저장 지점 만들기"
+      ]
     },
     "진행할까요?": {
       "safe_default": "미리보기만",
       "rationale": "non-interactive contexts must not start a real deployment automatically; dry-run preserves the exact preview path without mutating remote state.",
-      "allowed_safe_defaults": ["미리보기만", "배포 진행"]
+      "allowed_safe_defaults": [
+        "미리보기만",
+        "배포 진행"
+      ]
     }
   },
   "auth": {
     "다시 로그인할래요?": {
       "safe_default": "abort",
       "rationale": "Subprocess cannot complete OAuth Device Flow. Abort + tell user to re-run interactively.",
-      "allowed_safe_defaults": ["abort", "진행"]
+      "allowed_safe_defaults": [
+        "abort",
+        "진행"
+      ]
     },
     "로그아웃할래요?": {
       "safe_default": "abort",
       "rationale": "Logout deletes the local axhub token; subprocess/non-interactive mode must not kill a session automatically.",
-      "allowed_safe_defaults": ["abort", "진행"]
+      "allowed_safe_defaults": [
+        "abort",
+        "진행"
+      ]
     }
   },
   "recover": {
     "직전 안정 커밋으로 다시 배포해요?": {
       "safe_default": "abort",
       "rationale": "Forward-fix is destructive deploy_create. Subprocess must not auto-rollback without explicit human confirm.",
-      "allowed_safe_defaults": ["abort", "진행"]
+      "allowed_safe_defaults": [
+        "abort",
+        "진행"
+      ]
     }
   },
   "apis": {
     "다른 팀 API도 볼래요? 권한 있는 모든 endpoint 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요.": {
       "safe_default": "stay",
       "rationale": "Privacy-first: never widen scope to cross-team without explicit human consent (PLAN row 46 audit log requirement).",
-      "allowed_safe_defaults": ["stay", "전체 보기"]
+      "allowed_safe_defaults": [
+        "stay",
+        "전체 보기"
+      ]
     }
   },
   "apps": {
     "앱이 더 있어요. 전체 목록 볼래요?": {
       "safe_default": "skip",
       "rationale": "Top 10 sufficient for vibe-coder browse; full list rarely needed in non-interactive.",
-      "allowed_safe_defaults": ["skip", "전체 목록"]
+      "allowed_safe_defaults": [
+        "skip",
+        "전체 목록"
+      ]
     },
     "앱을 삭제할까요?": {
       "safe_default": "abort",
       "rationale": "앱 삭제는 되돌리기 어려운 파괴적 작업이라 비대화형 환경에서는 항상 삭제를 멈춰요.",
-      "allowed_safe_defaults": ["abort", "삭제"]
+      "allowed_safe_defaults": [
+        "abort",
+        "삭제"
+      ]
     }
   },
   "clarify": {
     "어떤 작업 원해요?": {
       "safe_default": "abort",
       "rationale": "Ambiguous intent in non-interactive context — agent cannot guess; surface ambiguity message and stop.",
-      "allowed_safe_defaults": ["abort"]
+      "allowed_safe_defaults": [
+        "abort"
+      ]
     }
   },
   "doctor": {
     "여러 항목 점검 필요해요. 어디부터 고쳐요?": {
       "safe_default": "later",
       "rationale": "Diagnosis output sufficient in non-interactive; subprocess should not auto-trigger remediation.",
-      "allowed_safe_defaults": ["later", "지금 고치기"]
+      "allowed_safe_defaults": [
+        "later",
+        "지금 고치기"
+      ]
     },
     "axhub CLI 가 설치되어 있지 않아요. 지금 설치할까요?": {
       "safe_default": "나중에",
       "rationale": "CLI install in subprocess (claude -p / CI / headless) writes new system binaries without explicit user consent. Non-interactive mode must surface the diagnosis and stop, never auto-route to install-cli SKILL.",
-      "allowed_safe_defaults": ["나중에", "지금 설치"]
+      "allowed_safe_defaults": [
+        "나중에",
+        "지금 설치"
+      ]
     }
   },
   "update": {
     "axhub CLI 업그레이드해요?": {
       "safe_default": "skip",
       "rationale": "Binary replacement is destructive; non-interactive subprocess must not auto-upgrade.",
-      "allowed_safe_defaults": ["skip", "업그레이드"]
+      "allowed_safe_defaults": [
+        "skip",
+        "업그레이드"
+      ]
     }
   },
   "upgrade": {
     "플러그인 업그레이드 명령 보여줄까요?": {
       "safe_default": "show",
       "rationale": "Read-only display action, safe in subprocess. Show the upgrade command without executing it.",
-      "allowed_safe_defaults": ["show", "skip"]
+      "allowed_safe_defaults": [
+        "show",
+        "skip"
+      ]
     }
   },
   "logs": {
@@ -99,31 +137,46 @@
     "어떤 템플릿으로 시작할까요?": {
       "safe_default": "abort",
       "rationale": "Template choice creates files. Non-interactive subprocess must not scaffold without an explicit human selection.",
-      "allowed_safe_defaults": ["abort"]
+      "allowed_safe_defaults": [
+        "abort"
+      ]
     },
     "dependency_install_strategy": {
       "safe_default": "manual_terminal",
       "rationale": "Claude Code 세션 비대화형/headless 환경 fallback. inline 실행은 사용자 동의 필요해요.",
-      "allowed_safe_defaults": ["skip", "manual_terminal"]
+      "allowed_safe_defaults": [
+        "skip",
+        "manual_terminal"
+      ]
     },
     "package_manager_choice": {
       "safe_default": "skip",
       "rationale": "lockfile 다중 시 자동 결정 위험. 사용자 explicit 선택 필요해요.",
-      "allowed_safe_defaults": ["skip"]
+      "allowed_safe_defaults": [
+        "skip"
+      ]
     }
   },
   "env": {
     "어떤 환경변수 작업을 할까요?": {
       "safe_default": "조회만",
       "rationale": "Env set/delete can mutate secrets. Non-interactive mode may list masked keys only.",
-      "allowed_safe_defaults": ["조회만", "설정", "삭제"]
+      "allowed_safe_defaults": [
+        "조회만",
+        "설정",
+        "삭제"
+      ]
     }
   },
   "github": {
     "GitHub 연동 작업을 고를까요?": {
       "safe_default": "목록만",
       "rationale": "GitHub connect/disconnect changes deployment source bindings. Non-interactive mode should only list available repos.",
-      "allowed_safe_defaults": ["목록만", "연결", "끊기"]
+      "allowed_safe_defaults": [
+        "목록만",
+        "연결",
+        "끊기"
+      ]
     }
   },
   "open": {
@@ -136,14 +189,25 @@
     "프로필 작업을 고를까요?": {
       "safe_default": "현재 프로필 보기",
       "rationale": "Profile add/use changes endpoint context. Non-interactive mode may only show the current profile.",
-      "allowed_safe_defaults": ["현재 프로필 보기", "추가", "전환"]
+      "allowed_safe_defaults": [
+        "현재 프로필 보기",
+        "추가",
+        "전환"
+      ]
     }
   },
   "install-cli": {
     "axhub CLI 어떤 채널로 설치해요?": {
       "safe_default": "수동 안내",
       "rationale": "Auto-running an installer in subprocess (claude -p / CI / headless) writes new system binaries without explicit user consent. Non-interactive mode must surface install commands only, never execute them.",
-      "allowed_safe_defaults": ["수동 안내", "brew", "curl"]
+      "allowed_safe_defaults": [
+        "수동 안내",
+        "brew",
+        "curl"
+      ]
     }
+  },
+  "routing-stats": {
+    "_note": "TODO: add per-question safe_default + rationale entries as AskUserQuestion call sites are added to skills/routing-stats/SKILL.md"
   }
 }
