@@ -4,6 +4,28 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.0...v0.5.1) (2026-05-08)
+
+Phase 12.1 핫픽스는 axhub CLI 0.12.1 사용자가 배포 preflight 에서 막히지 않게 호환 범위를 올리고, 사용자가 “프로젝트 초기화해줘”처럼 axhub 접두어 없이 말해도 init SKILL 이 잡히도록 라우팅 표면을 보강한 릴리스예요. preflight 의 미래 버전 차단 모델은 유지하면서, init routing metadata 는 corpus 와 baseline fixture 까지 같이 맞춰요.
+
+### Test baseline
+
+- Local gate: `cargo test --workspace`, `bun test` (547 pass / 4 skip / 0 fail), `bunx tsc --noEmit`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict`, `bun run routing:drift`, `cargo fmt --check`, `git diff --check` 가 green 이에요.
+- Targeted gate: `cargo test -p axhub-helpers preflight -- --nocapture`, `bun run build`, `./bin/axhub-helpers preflight --json`, `bun test tests/init-template-guidance.test.ts`, `bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.20.jsonl --vs claude-native --score`, `bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --vs claude-native --score` 가 green 이에요.
+- Release gate: `bun run release -- --release-as patch` postbump 의 `codegen:version` + `release:check` 가 v0.5.1 manifest 와 host helper artifact 를 확인했어요.
+
+### Honest tradeoff
+
+- 실제 destructive deploy create 는 실행하지 않았어요. 대신 `./bin/axhub-helpers preflight --json` 로 현재 CLI 0.12.1 이 `cli_too_new:false` / `in_range:true` 로 통과하는지 확인했어요.
+- Claude Code 의 실제 native skill picker UI 는 로컬 자동화에서 직접 열 수 없어서, SKILL description/examples, keyword baseline, corpus 20/100 fixture, routing-drift gate 로 간접 검증해요.
+
+
+### Fixed
+
+* keep skill fallbacks inside runtime envelopes ([0ada525](https://github.com/jocoding-ax-partners/axhub/commit/0ada52502e23c9c2bf2f446373dca6188faa0c25))
+* restore deploy preflight for axhub cli 0.12 users ([d2aa0e5](https://github.com/jocoding-ax-partners/axhub/commit/d2aa0e5595bf9de0922e439aab270a66e92ae05c))
+* route plain Korean project initialization to init ([e24828d](https://github.com/jocoding-ax-partners/axhub/commit/e24828db49af25550fc9639a71ca96754c73759b))
+
 ## [0.5.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.3.2...v0.5.0) (2026-05-08)
 
 Phase 8-11 라우팅 스택은 SKILL description 을 단일 source of truth 로 삼고, 예시 기반 튜닝과 clarify feedback visibility 를 붙여 실제 사용자 발화 drift 를 더 빨리 발견하도록 만든 릴리스예요. routing-drift gate 는 fixture freshness 를 fail-closed 로 확인하고, `routing:tune --confused` 는 명시 helper 오류를 숨기지 않게 바꿨어요.
