@@ -1,0 +1,8 @@
+{
+  "allows_dependency_execution": [
+    {
+      "skill": "init",
+      "rationale": "axhub init 의 dependency install 흐름은 inline ! prefix 로 stderr observability 회복. helper dependency-plan 의 recommended_command byte-identical 검증."
+    }
+  ]
+}
