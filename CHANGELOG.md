@@ -4,6 +4,58 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.3.2...v0.5.0) (2026-05-08)
+
+Phase 8-11 라우팅 스택은 SKILL description 을 단일 source of truth 로 삼고, 예시 기반 튜닝과 clarify feedback visibility 를 붙여 실제 사용자 발화 drift 를 더 빨리 발견하도록 만든 릴리스예요. routing-drift gate 는 fixture freshness 를 fail-closed 로 확인하고, `routing:tune --confused` 는 명시 helper 오류를 숨기지 않게 바꿨어요.
+
+### Test baseline
+
+- PR gate: #53, #54, #55, #56 의 Rust ubuntu/macos/windows, Local Rust-primary gate, T2 helper-bin checks 가 green 이에요. `[skip-routing-gate]` 로 의도적으로 skip 된 cost-aware / staging / fuzz / routing-drift 항목은 PR title audit trail 로 남겨요.
+- Local gate: `bun test` (543 pass / 4 skip / 0 fail), `cargo fmt --all -- --check`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `bunx tsc --noEmit`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict`, `bun run routing:drift`, `git diff --check` 가 green 이에요.
+- Release gate: `bun run release -- --release-as 0.5.0` postbump 의 `codegen:version` + `release:check` 가 version sync 와 release binary build path 를 확인했어요.
+
+### Honest tradeoff
+
+- `routing:tune --confused` 는 prompt 원문을 저장하지 않아요. hash + chosen_skill 로 privacy 를 지키는 대신, 원본 발화 재구성은 corpus 또는 사용자 기억에 의존해요.
+- routing-drift gate 는 fresh LLM measurement 를 매 PR 에서 실행하지 않고 committed fixture freshness 를 강제해요. 비용과 재현성을 우선한 선택이라, 대규모 routing 변경은 별도 `measure:baseline` 재생성이 필요해요.
+
+
+### Added
+
+* add npm permission error empathy entries (EACCES/EEXIST/EPERM/ENOSPC/ENOTEMPTY) ([b1ce831](https://github.com/jocoding-ax-partners/axhub/commit/b1ce8319f06a66b566d9ba36915a105acf94e20a))
+* axhub init dependency-plan helper로 install 가시성 확보 ([5dae562](https://github.com/jocoding-ax-partners/axhub/commit/5dae5627632fa00bde3e51b30557083fee4aae73))
+* **routing:** Phase 0 — Approach E test contract rewrite ([a7a3848](https://github.com/jocoding-ax-partners/axhub/commit/a7a3848d72017f37bb75c44eee67fb4ea2a427ac))
+* **routing:** Phase 0 — Approach E test contract rewrite ([#38](https://github.com/jocoding-ax-partners/axhub/issues/38)) ([c3fab5e](https://github.com/jocoding-ax-partners/axhub/commit/c3fab5e8d76182f9a59448017e6617628f11a129))
+* **routing:** Phase 1 — keyword phrase → SKILL.md description codegen migration ([a52f3d4](https://github.com/jocoding-ax-partners/axhub/commit/a52f3d408390f68827e5a381c7392e43f7b857fd))
+* **routing:** Phase 1 — keyword phrase → SKILL.md description codegen migration ([#40](https://github.com/jocoding-ax-partners/axhub/issues/40)) ([9c52f56](https://github.com/jocoding-ax-partners/axhub/commit/9c52f56e889c73b877efe6ad40a3e06639cdd46a)), closes [#38](https://github.com/jocoding-ax-partners/axhub/issues/38)
+* **routing:** Phase 10 (FINAL v0.5.0) — Feedback Loop + Visibility ([5e4e432](https://github.com/jocoding-ax-partners/axhub/commit/5e4e432358098de83308be32c68b687891b77f3b))
+* **routing:** Phase 2 — router 단순화 + audit module (Approach E core) ([8f4a00e](https://github.com/jocoding-ax-partners/axhub/commit/8f4a00eea3392625469cfe18d47737a592cd1293))
+* **routing:** Phase 4 — routing-stats + cleanup-audit CLI subcommands ([e664036](https://github.com/jocoding-ax-partners/axhub/commit/e6640369dc77d1de41f61ebf2ec4a57a1f76c47c))
+* **routing:** Phase 5 — corpus + baseline 재생성 (Approach E meta_question expansion) ([e0d8750](https://github.com/jocoding-ax-partners/axhub/commit/e0d8750cc921211b5d34a3049ae1e3ae7e102fb6))
+* **routing:** Phase 6 — Component 8 cross-phase test infra + Migration Gate aggregator ([5d3075c](https://github.com/jocoding-ax-partners/axhub/commit/5d3075c08e63cebb40bb9b3268093810e98dc009))
+* **routing:** Phase 7 (FINAL) — SessionStart v0.4.0 magical moment + 라우팅 docs ([a06d161](https://github.com/jocoding-ax-partners/axhub/commit/a06d161109be75714f4787d62d3da5f11ee76664))
+* **routing:** Phase 8 — Groundwork (fresh baseline + skill:doctor 강화 + routing-drift CI gate) ([6f44876](https://github.com/jocoding-ax-partners/axhub/commit/6f448769291611e7996af7a1e5256378922b7e2a))
+* **routing:** Phase 9 — Examples + Tuning (95% accuracy driver) ([3949076](https://github.com/jocoding-ax-partners/axhub/commit/394907675ebea8717f8aee6b224226e5d590f9f0))
+* 토큰 만료 시각 사용자 친화 한국어 표시 ([8146353](https://github.com/jocoding-ax-partners/axhub/commit/8146353ce3c466030fc70764764c9bc5ba1195df))
+
+
+### Fixed
+
+* **docs:** landing-page 표 entry v0.3.1 → v0.3.2 잔여 site ([128ebf6](https://github.com/jocoding-ax-partners/axhub/commit/128ebf65dd38ea5ba61a22a5b8c11a1ce20c8ea2))
+* **docs:** README/PLAN/quickstart/landing-page 의 v0.3.1 → v0.3.2 동기화 ([08d3a91](https://github.com/jocoding-ax-partners/axhub/commit/08d3a9120927d05530ccae5138baee55c2344c25))
+* npm 권한 catalog Windows 호환 명령 추가 ([cf7f492](https://github.com/jocoding-ax-partners/axhub/commit/cf7f4920ea9e3e4b9eb9530a1b83afec9999659d))
+* remove bootstrap dependency-plan tautology + add coverage tests ([55e1357](https://github.com/jocoding-ax-partners/axhub/commit/55e135786e8ba530c660122174c4ae91763d74da)), closes [#41](https://github.com/jocoding-ax-partners/axhub/issues/41)
+* **routing:** Phase 11 — code review fixes for v0.5.0 PR stack ([#53](https://github.com/jocoding-ax-partners/axhub/issues/53)/[#54](https://github.com/jocoding-ax-partners/axhub/issues/54)/[#55](https://github.com/jocoding-ax-partners/axhub/issues/55)) ([51db4c8](https://github.com/jocoding-ax-partners/axhub/commit/51db4c897a716a74d7e3cfb75fb7a06cc6515753))
+
+
+### Docs
+
+* **init:** L10 영어 jargon 한국어로 풀이 ([1a26e3f](https://github.com/jocoding-ax-partners/axhub/commit/1a26e3f891870941a7f88bad2401199bb1e876c4)), closes [#36](https://github.com/jocoding-ax-partners/axhub/issues/36)
+* **init:** scaffold/apphub.yaml 비개발자 친화 용어로 풀이 ([d3d2b27](https://github.com/jocoding-ax-partners/axhub/commit/d3d2b27e798e607de3646b0dbe18f18a33b11c17))
+* **init:** T2 RFC gate-skip impl — frontmatter trailing 한국화 + L41/L99 inline gloss ([043c83a](https://github.com/jocoding-ax-partners/axhub/commit/043c83a229a82c35ee7b90d55572ac0bbb6b3c50)), closes [#36](https://github.com/jocoding-ax-partners/axhub/issues/36)
+* **rfc:** nl-lexicon trigger localization RFC 초안 ([bb48520](https://github.com/jocoding-ax-partners/axhub/commit/bb48520a9ce39e2248cf64616efc709853288eb7)), closes [#36](https://github.com/jocoding-ax-partners/axhub/issues/36)
+* **rfc:** RFC merge ≠ impl commitment 명시 보강 ([dc67447](https://github.com/jocoding-ax-partners/axhub/commit/dc6744727f2cab53b7861dad2257b75071a88dae))
+
 ## [0.3.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.3.1...v0.3.2) (2026-05-07)
 
 Phase 27 은 Windows 호스트에서 axhub plugin bootstrap 이 과장된 지원 claim 없이 안전하게 실패하거나 복구하도록 정리한 호환성 릴리스예요. Rust helper 는 token / keychain / preflight 경로를 CI 로 검증 가능한 단위로 나누고, SessionStart hook 은 helper bootstrap 실패 시 JSON diagnostic 을 한 번만 내도록 막아요.
