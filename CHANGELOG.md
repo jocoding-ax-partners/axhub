@@ -4,6 +4,25 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.3](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.2...v0.5.3) (2026-05-08)
+
+Phase 12.3 핫픽스는 init 처럼 질문 뒤에 이어지는 multi-step SKILL 이 초기 TodoWrite 목록을 stale 상태로 남기지 않도록, 모든 multi-step skill 과 새 skill scaffold 에 status sync 규칙을 고정한 릴리스예요. 이제 workflow step 이 끝나거나 AskUserQuestion 답변 뒤에 전체 todos 배열을 다시 호출해서 completed / in_progress / pending 상태를 최신화하게 해요.
+
+### Test baseline
+
+- Local gate: `bun test` (559 pass / 4 skip / 0 fail), `bunx tsc --noEmit`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict`, `git diff --check` 가 green 이에요.
+- Targeted RED/GREEN gate: `bun test tests/ux-todowrite.test.ts` 에서 10개 multi-step SKILL 과 scaffold 의 status sync 누락을 먼저 실패시킨 뒤 green 으로 만들었어요.
+
+### Honest tradeoff
+
+- 실제 Claude Code Todo UI replay 는 로컬 자동화에서 직접 열 수 없어서, SKILL 문서 계약과 회귀 테스트로 고정했어요.
+- 작업트리에 있던 별도 perf 측정 변경은 릴리스 범위 밖이라 stash 로 보존하고, 이 릴리스에는 포함하지 않았어요.
+
+
+### Fixed
+
+* keep skill todos synced after progress ([c48f7f8](https://github.com/jocoding-ax-partners/axhub/commit/c48f7f8d69203483bc4178e5e11e0f39565553f6))
+
 ## [0.5.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.1...v0.5.2) (2026-05-08)
 
 Phase 12.2 UX 패치는 단순 조회형 slash command 를 Haiku 로 내려 첫 응답 지연과 비용을 줄이고, deploy 의 git 저장 지점 준비 흐름을 Claude Code TodoWrite UI 로만 보여주게 만든 릴리스예요. deploy / doctor / update / login 은 인증·복구·destructive 위험이 남아 Sonnet 을 유지해요.
