@@ -83,10 +83,24 @@ describe("token-freshness-gate.sh (Phase 3.5 Step 3.5 consumer)", () => {
     expect(result.walltimeMs).toBeLessThan(500);
   });
 
-  test("Token missing falls through to exit 0 without polling", async () => {
+  test("Token missing + UNAUTHORIZED inline check exits 65", async () => {
     const result = await runGate({
       AXHUB_AUTH_BG_REFRESH: "1",
       AXHUB_TOKEN_PATH: join(workdir, "missing-token"),
+      AXHUB_GATE_AUTH_PROBE: 'echo "{\\"code\\":\\"auth.token_missing\\"}"',
+    });
+    expect(result.exitCode).toBe(65);
+    expect(result.walltimeMs).toBeLessThan(500);
+    expect(result.stderr).toContain("token file missing");
+    expect(result.stderr).toContain("UNAUTHORIZED");
+  });
+
+  test("Token missing + authenticated inline check exits 0", async () => {
+    const result = await runGate({
+      AXHUB_AUTH_BG_REFRESH: "1",
+      AXHUB_TOKEN_PATH: join(workdir, "missing-token"),
+      AXHUB_GATE_AUTH_PROBE:
+        'echo "{\\"user_email\\":\\"dev@jocodingax.ai\\",\\"user_id\\":1}"',
     });
     expect(result.exitCode).toBe(0);
     expect(result.walltimeMs).toBeLessThan(500);
@@ -122,6 +136,26 @@ describe("token-freshness-gate.sh (Phase 3.5 Step 3.5 consumer)", () => {
     });
     expect(result.exitCode).toBe(65);
     expect(result.stderr).toContain("UNAUTHORIZED");
+  });
+
+  test("Stale token that becomes fresh during polling exits 0 without inline probe", async () => {
+    const fakeNow = 2_000_000;
+    const tokenPath = await setupTokenFile(workdir, fakeNow - 3600);
+    const gate = runGate({
+      AXHUB_AUTH_BG_REFRESH: "1",
+      AXHUB_TOKEN_PATH: tokenPath,
+      AXHUB_GATE_FAKE_NOW: String(fakeNow),
+      AXHUB_GATE_POLL_INTERVAL: "1",
+      AXHUB_GATE_POLL_ITERATIONS: "2",
+      AXHUB_GATE_AUTH_PROBE: 'echo "{\\"code\\":\\"should_not_run\\"}"; exit 1',
+    });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await utimes(tokenPath, fakeNow - 5, fakeNow - 5);
+
+    const result = await gate;
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain("token refreshed after");
+    expect(result.stderr).not.toContain("inline auth status check");
   });
 
   test("Stale token + authenticated inline check → exit 0", async () => {

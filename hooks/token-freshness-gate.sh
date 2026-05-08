@@ -51,9 +51,18 @@ POLL_INTERVAL=${AXHUB_GATE_POLL_INTERVAL:-5}
 POLL_ITERATIONS=${AXHUB_GATE_POLL_ITERATIONS:-6}
 AUTH_PROBE=${AXHUB_GATE_AUTH_PROBE:-"axhub auth status --json"}
 
-if [ ! -f "$TOKEN_PATH" ]; then
-  echo "[token-freshness-gate] token file missing — skip polling, no inline check" >&2
+inline_auth_check() {
+  echo "[token-freshness-gate] inline auth status check" >&2
+  if ! eval "$AUTH_PROBE" 2>/dev/null | grep -q '"user_email"'; then
+    echo "[token-freshness-gate] auth UNAUTHORIZED, exit 65" >&2
+    exit 65
+  fi
   exit 0
+}
+
+if [ ! -f "$TOKEN_PATH" ]; then
+  echo "[token-freshness-gate] token file missing — inline auth status check" >&2
+  inline_auth_check
 fi
 
 MTIME=$(stat_mtime "$TOKEN_PATH")
@@ -73,9 +82,5 @@ while [ "$POLL" -lt "$POLL_ITERATIONS" ]; do
   fi
 done
 
-echo "[token-freshness-gate] poll timeout, inline auth status check" >&2
-if ! eval "$AUTH_PROBE" 2>/dev/null | grep -q '"user_email"'; then
-  echo "[token-freshness-gate] auth UNAUTHORIZED, exit 65" >&2
-  exit 65
-fi
-exit 0
+echo "[token-freshness-gate] poll timeout" >&2
+inline_auth_check

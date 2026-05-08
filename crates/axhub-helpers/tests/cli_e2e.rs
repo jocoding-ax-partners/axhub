@@ -69,6 +69,15 @@ fn run_in_dir_env(args: &[&str], cwd: &Path, envs: &[(&str, &str)]) -> Output {
     command.output().unwrap()
 }
 
+fn run_env(args: &[&str], envs: &[(&str, &str)]) -> Output {
+    let mut command = Command::new(bin());
+    command.args(args);
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    command.output().unwrap()
+}
+
 fn run_stdin_in_dir(args: &[&str], stdin: &str, cwd: &Path) -> Output {
     let mut child = Command::new(bin())
         .args(args)
@@ -200,6 +209,186 @@ fn cli_version_help_redact_and_classify_work() {
     let classified = run(&["classify-exit", "--exit-code", "65", "--stdout", "{}"]);
     assert!(classified.status.success());
     assert!(String::from_utf8_lossy(&classified.stdout).contains("로그인이 만료"));
+}
+
+#[test]
+fn cli_config_get_set_json_plaintext_and_opt_out_are_stable() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_home = temp.path().join("xdg-config");
+    let home = temp.path().join("home");
+    let config_home_s = config_home.to_string_lossy().to_string();
+    let home_s = home.to_string_lossy().to_string();
+
+    let missing = run_env(
+        &["config", "get", "ignore_too_new_until", "--json"],
+        &[("XDG_CONFIG_HOME", &config_home_s), ("HOME", &home_s)],
+    );
+    assert_eq!(missing.status.code(), Some(0));
+    let missing_json = stdout_json(&missing);
+    assert_eq!(missing_json["key"], "ignore_too_new_until");
+    assert_eq!(missing_json["value"], serde_json::Value::Null);
+
+    let set = run_env(
+        &["config", "set", "ignore_too_new_until", "v0.12.5"],
+        &[("XDG_CONFIG_HOME", &config_home_s), ("HOME", &home_s)],
+    );
+    assert_eq!(
+        set.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&set.stderr)
+    );
+
+    let plain = run_env(
+        &["config", "get", "ignore_too_new_until"],
+        &[("XDG_CONFIG_HOME", &config_home_s), ("HOME", &home_s)],
+    );
+    assert_eq!(plain.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&plain.stdout).trim(), "v0.12.5");
+
+    let disabled_json = run_env(
+        &["config", "get", "ignore_too_new_until", "--json"],
+        &[
+            ("XDG_CONFIG_HOME", &config_home_s),
+            ("HOME", &home_s),
+            ("AXHUB_CLI_TOO_NEW_DISMISS", "0"),
+        ],
+    );
+    assert_eq!(disabled_json.status.code(), Some(0));
+    assert_eq!(
+        stdout_json(&disabled_json)["value"],
+        serde_json::Value::Null
+    );
+
+    let disabled_plain = run_env(
+        &["config", "get", "ignore_too_new_until"],
+        &[
+            ("XDG_CONFIG_HOME", &config_home_s),
+            ("HOME", &home_s),
+            ("AXHUB_CLI_TOO_NEW_DISMISS", "0"),
+        ],
+    );
+    assert_eq!(disabled_plain.status.code(), Some(1));
+}
+
+#[test]
+fn cli_config_usage_errors_are_stable() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_home_s = temp.path().join("xdg-config").to_string_lossy().to_string();
+    let home_s = temp.path().join("home").to_string_lossy().to_string();
+    let envs = [
+        ("XDG_CONFIG_HOME", config_home_s.as_str()),
+        ("HOME", home_s.as_str()),
+    ];
+
+    for args in [
+        &["config"][..],
+        &["config", "get"][..],
+        &["config", "set"][..],
+        &["config", "set", "ignore_too_new_until"][..],
+        &["config", "unknown"][..],
+        &["config", "set", "not_a_real_key", "x"][..],
+    ] {
+        let output = run_env(args, &envs);
+        assert_eq!(
+            output.status.code(),
+            Some(64),
+            "args={args:?} stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn cli_auth_refresh_bg_opt_out_and_missing_cli_are_non_blocking() {
+    let temp = tempfile::tempdir().unwrap();
+    let home_s = temp.path().join("home").to_string_lossy().to_string();
+    let missing_bin = temp
+        .path()
+        .join("missing-axhub")
+        .to_string_lossy()
+        .to_string();
+
+    let disabled = run_env(
+        &["auth-refresh-bg"],
+        &[
+            ("HOME", &home_s),
+            ("AXHUB_BIN", &missing_bin),
+            ("AXHUB_AUTH_BG_REFRESH", "0"),
+        ],
+    );
+    assert_eq!(disabled.status.code(), Some(0));
+    assert!(!temp
+        .path()
+        .join("home/.config/axhub-plugin/auth-refresh-status.json")
+        .exists());
+
+    let missing = run_env(
+        &["auth-refresh-bg"],
+        &[("HOME", &home_s), ("AXHUB_BIN", &missing_bin)],
+    );
+    assert_eq!(missing.status.code(), Some(0));
+    let sentinel = std::fs::read_to_string(
+        temp.path()
+            .join("home/.config/axhub-plugin/auth-refresh-status.json"),
+    )
+    .unwrap();
+    assert!(sentinel.contains("\"success\":false"));
+    assert!(sentinel.contains("\"status\":\"axhub_cli_missing\""));
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_auth_refresh_bg_records_success_and_failure_sentinels() {
+    fn fake_axhub(dir: &Path, name: &str, login_exit: i32) -> String {
+        let path = dir.join(name);
+        std::fs::write(
+            &path,
+            format!(
+                "#!/usr/bin/env sh\nif [ \"$1\" = \"--version\" ]; then echo 'axhub 0.12.5'; exit 0; fi\nif [ \"$1 $2 $3 $4\" = \"auth login --browser --force\" ]; then exit {login_exit}; fi\nexit 64\n"
+            ),
+        )
+        .unwrap();
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&path, perms).unwrap();
+        path.to_string_lossy().to_string()
+    }
+
+    let temp = tempfile::tempdir().unwrap();
+    let success_home = temp.path().join("success-home");
+    let success_home_s = success_home.to_string_lossy().to_string();
+    let success_bin = fake_axhub(temp.path(), "axhub-success", 0);
+    let success = run_env(
+        &["auth-refresh-bg"],
+        &[("HOME", &success_home_s), ("AXHUB_BIN", &success_bin)],
+    );
+    assert_eq!(
+        success.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&success.stderr)
+    );
+    let success_sentinel =
+        std::fs::read_to_string(success_home.join(".config/axhub-plugin/auth-refresh-status.json"))
+            .unwrap();
+    assert!(success_sentinel.contains("\"success\":true"));
+    assert!(success_sentinel.contains("\"status\":\"ok\""));
+
+    let fail_home = temp.path().join("fail-home");
+    let fail_home_s = fail_home.to_string_lossy().to_string();
+    let fail_bin = fake_axhub(temp.path(), "axhub-fail", 7);
+    let failure = run_env(
+        &["auth-refresh-bg"],
+        &[("HOME", &fail_home_s), ("AXHUB_BIN", &fail_bin)],
+    );
+    assert_eq!(failure.status.code(), Some(1));
+    let failure_sentinel =
+        std::fs::read_to_string(fail_home.join(".config/axhub-plugin/auth-refresh-status.json"))
+            .unwrap();
+    assert!(failure_sentinel.contains("\"success\":false"));
+    assert!(failure_sentinel.contains("\"status\":\"fail\""));
 }
 
 #[test]
@@ -1207,7 +1396,14 @@ fn cli_routing_stats_help_and_invalid_args_are_stable() {
 
 #[cfg(unix)]
 fn session_start_systemmessage(state_s: &str) -> String {
-    let output = run_stdin(&["session-start"], "", &[("XDG_STATE_HOME", state_s)]);
+    let output = run_stdin(
+        &["session-start"],
+        "",
+        &[
+            ("XDG_STATE_HOME", state_s),
+            ("AXHUB_BIN", "/definitely/missing/axhub"),
+        ],
+    );
     assert_eq!(output.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&output.stdout);
     // session-start 가 systemMessage JSON 1 line + meta_envelope JSON 1 line 출력. 첫 번째 만 추출.
@@ -1220,6 +1416,45 @@ fn session_start_systemmessage(state_s: &str) -> String {
         .as_str()
         .expect("systemMessage is string")
         .to_owned()
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_session_start_writes_session_bundle_cache() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+    let config_s = temp.path().join("config").display().to_string();
+    let cache_s = temp.path().join("cache").display().to_string();
+
+    let output = run_stdin(
+        &["session-start"],
+        "",
+        &[
+            ("XDG_STATE_HOME", &state_s),
+            ("XDG_CONFIG_HOME", &config_s),
+            ("XDG_CACHE_HOME", &cache_s),
+            ("AXHUB_BIN", "/definitely/missing/axhub"),
+            ("AXHUB_APP_SLUG", "paydrop"),
+            ("AXHUB_PROFILE", "prod"),
+        ],
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let bundle_path = temp.path().join("cache/axhub-plugin/session-bundle.json");
+    let bundle = std::fs::read_to_string(&bundle_path)
+        .unwrap_or_else(|err| panic!("missing session bundle at {bundle_path:?}: {err}"));
+    let parsed: serde_json::Value = serde_json::from_str(&bundle).unwrap();
+    assert_eq!(parsed["schema_version"], "session-bundle/v1");
+    assert_eq!(parsed["auth_status"]["ok"], false);
+    assert_eq!(parsed["auth_status"]["scopes"], serde_json::json!([]));
+    assert_eq!(parsed["current_app"], "paydrop");
+    assert_eq!(parsed["current_env"], "prod");
+    assert_eq!(parsed["helper_version"], env!("CARGO_PKG_VERSION"));
 }
 
 #[cfg(unix)]

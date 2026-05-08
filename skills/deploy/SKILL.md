@@ -248,10 +248,18 @@ To deploy:
        echo '[deploy:Step 2.5 cli_too_new] dismissed via preference' >&2
      else
        # AskUserQuestion: 3 options — continue / explain upgrade / dismiss permanently for this version.
-       # On "dismiss" answer:
-       ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers config set ignore_too_new_until "$CLI_VER"
-       # On "explain": show docs/migrate-rust.md or `axhub-helpers update` hint, then halt.
-       # On "continue": no-op, fall through to Step 3.
+       case "${CLI_TOO_NEW_ANSWER:-continue}" in
+         dismiss)
+           ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers config set ignore_too_new_until "$CLI_VER"
+           ;;
+         explain)
+           echo "업그레이드 안내: docs/migrate-rust.md 또는 axhub-helpers update 를 확인해요." >&2
+           exit 64
+           ;;
+         continue|*)
+           # 안전 기본값: 이번 세션만 진행하고 preferences 는 바꾸지 않아요.
+           ;;
+       esac
      fi
    fi
    ```
