@@ -69,6 +69,55 @@ fn sample_record(label: &str) -> AuditRecord {
     }
 }
 
+#[test]
+fn clarify_invoked_field_persists() {
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let mut record = sample_record("clarify-feedback");
+    record.clarify_invoked = true;
+    record.chosen_skill = Some("status".into());
+    let expected_hash = record.prompt_hash.clone();
+
+    audit::append(record).unwrap();
+
+    let records = audit::read_since(Duration::days(1)).unwrap();
+    let found = records
+        .iter()
+        .find(|r| r.prompt_hash == expected_hash)
+        .expect("clarify feedback record");
+    assert!(found.clarify_invoked);
+    assert_eq!(found.chosen_skill.as_deref(), Some("status"));
+}
+
+#[test]
+fn clarify_invoked_default_false_backward_compat() {
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let dir = temp.path().join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let path = dir.join(format!("routing-audit-{today}.jsonl"));
+    let legacy = serde_json::json!({
+        "ts": audit::now_iso8601(),
+        "prompt_hash": "sha256:legacy",
+        "prompt_len": 12,
+        "cli_version": "0.1.0",
+        "auth_ok": true,
+        "is_axhub_related": true
+    });
+    std::fs::write(&path, format!("{legacy}\n")).unwrap();
+
+    let records = audit::read_since(Duration::days(1)).unwrap();
+    let found = records
+        .iter()
+        .find(|r| r.prompt_hash == "sha256:legacy")
+        .expect("legacy audit record");
+    assert!(!found.clarify_invoked);
+    assert!(found.chosen_skill.is_none());
+}
+
 #[cfg(unix)]
 #[test]
 fn file_permissions_unix() {

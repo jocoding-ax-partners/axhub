@@ -208,6 +208,14 @@
     }
   },
   "routing-stats": {
-    "_note": "TODO: add per-question safe_default + rationale entries as AskUserQuestion call sites are added to skills/routing-stats/SKILL.md"
+    "다음에 뭘 볼까요?": {
+      "safe_default": "끝",
+      "rationale": "Routing stats is read-only, but non-interactive sessions should not open docs or run extra confused/audit commands unless the user can choose them.",
+      "allowed_safe_defaults": [
+        "끝",
+        "상세 문서",
+        "confused 보기"
+      ]
+    }
   }
 }

@@ -19,7 +19,7 @@ Phase 0 (Task 0): `.plan/ceo-review-nl-routing/phases/phase-0-task-0-test-contra
 | 2 | Workspace test | exit 0 | `cargo test --workspace` |
 | 3 | TypeScript test | exit 0 (1 known fail = README/package version mismatch 별개 issue, blocker X) | `bun test` |
 | 4 | Hook latency benchmark | p95 < 50ms (이미 enforce, Phase 0 후에도 회귀 X) | `bun run scripts/benchmark-hooks.ts` |
-| 5 | Routing-specific 100-row scorer | accuracy ≥ 95% AND drift ≤ 5% | `bun run tests/routing-score.ts --baseline tests/baseline-results.docs-only.100.json --against tests/baseline-results.claude-native.100.json` |
+| 5 | Routing-specific 100-tier scorer | accuracy ≥ 95% AND drift ≤ 5% | `bun run routing:drift` 또는 `bun run tests/routing-score.ts --baseline tests/baseline-results.docs-only.100.json --against tests/baseline-results.claude-native.100.json` |
 | 6 | High-risk live canary | manual run 4 prompt, consent gate / classify-exit 정상 | manual: "배포해줘" / "이 앱 삭제해" / "DB_URL=foo 설정" / "로그인" |
 
 PR description 의 gate evidence 가 6 개 모두 ✅ 또는 ⚠️ (canary 만 manual) 이어야 reviewer 가 approve 해요.

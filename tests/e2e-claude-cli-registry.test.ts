@@ -75,9 +75,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("20 actual safe_default rationale 엔트리 (기존 18 + init dependency_install_strategy/package_manager_choice)", () => {
+  test("21 actual safe_default rationale 엔트리 (기존 18 + init 추가 + routing-stats 후속 선택)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(20);
+    expect(paths).toHaveLength(21);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -99,12 +99,13 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "install-cli",
       "profile",
       "recover",
+      "routing-stats",
       "update",
       "upgrade",
     ]);
   });
 
-  test("18 safe_default 값 (safe fallback 카탈로그)", () => {
+  test("19 safe_default 값 (safe fallback 카탈로그)", () => {
     const auth = registry["auth"] as Record<string, SafeDefaultEntry>;
     expect(auth["다시 로그인할래요?"]?.safe_default).toBe("abort");
     expect(auth["로그아웃할래요?"]?.safe_default).toBe("abort");
@@ -160,6 +161,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     expect(profile["프로필 작업을 고를까요?"]?.safe_default).toBe(
       "현재 프로필 보기",
     );
+
+    const routingStats = registry["routing-stats"] as Record<string, SafeDefaultEntry>;
+    expect(routingStats["다음에 뭘 볼까요?"]?.safe_default).toBe("끝");
   });
 
   test("read-only/no-question skills keep metadata without safe_default", () => {

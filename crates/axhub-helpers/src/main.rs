@@ -571,7 +571,9 @@ PRIVACY:
   삭제: axhub-helpers cleanup-audit --all
 ";
 
-fn parse_routing_stats_args(args: &[String]) -> anyhow::Result<(chrono::Duration, bool, u32, bool)> {
+fn parse_routing_stats_args(
+    args: &[String],
+) -> anyhow::Result<(chrono::Duration, bool, u32, bool)> {
     let mut since = chrono::Duration::days(7);
     let mut json = false;
     let mut top: u32 = 10;
@@ -671,7 +673,10 @@ fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
     }
     if records.is_empty() {
         if json {
-            println!("{}", json!({"records": [], "total_prompts": 0}));
+            println!(
+                "{}",
+                json!({"records": [], "total_prompts": 0, "confused_prompts": []})
+            );
         } else if confused {
             println!("최근 {since:?} 동안 clarify 발동 prompt 가 없어요.");
         } else {
@@ -704,6 +709,23 @@ fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
     top_hashes.sort_by(|a, b| b.1.cmp(&a.1));
     top_hashes.truncate(top as usize);
 
+    let mut confused_counts: std::collections::HashMap<(String, Option<String>), (u32, String)> =
+        std::collections::HashMap::new();
+    for r in records.iter().filter(|r| r.clarify_invoked) {
+        let entry = confused_counts
+            .entry((r.prompt_hash.clone(), r.chosen_skill.clone()))
+            .or_insert((0, r.ts.clone()));
+        entry.0 += 1;
+        if r.ts.as_str() > entry.1.as_str() {
+            entry.1 = r.ts.clone();
+        }
+    }
+    let mut confused_rows: Vec<(String, Option<String>, u32, String)> = confused_counts
+        .into_iter()
+        .map(|((hash, chosen_skill), (count, latest_ts))| (hash, chosen_skill, count, latest_ts))
+        .collect();
+    confused_rows.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.0.cmp(&b.0)));
+
     if json {
         let summary = json!({
             "total_prompts": total,
@@ -714,6 +736,12 @@ fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
             "prompt_length_p95": p95,
             "cli_versions": versions,
             "top_axhub_hashes": top_hashes.iter().map(|(h, c)| json!({"hash": h, "count": c})).collect::<Vec<_>>(),
+            "confused_prompts": confused_rows.iter().map(|(hash, chosen_skill, count, latest_ts)| json!({
+                "hash": hash,
+                "count": count,
+                "chosen_skill": chosen_skill,
+                "latest_ts": latest_ts,
+            })).collect::<Vec<_>>(),
         });
         println!("{}", summary);
         return Ok(0);
@@ -891,12 +919,17 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
         return Ok(0);
     }
     let records = audit::read_since(chrono::Duration::days(7))?;
-    let total = records.len();
-    let axhub_related = records.iter().filter(|r| r.is_axhub_related).count();
-    let auth_failed = records.iter().filter(|r| !r.auth_ok).count();
+    let operational_records: Vec<_> = records.iter().filter(|r| !r.clarify_invoked).collect();
+    let total = operational_records.len();
+    let axhub_related = operational_records
+        .iter()
+        .filter(|r| r.is_axhub_related)
+        .count();
+    let auth_failed = operational_records.iter().filter(|r| !r.auth_ok).count();
     let confused = records.iter().filter(|r| r.clarify_invoked).count();
-    let mut chosen_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
-    for r in &records {
+    let mut chosen_counts: std::collections::HashMap<String, u32> =
+        std::collections::HashMap::new();
+    for r in records.iter().filter(|r| r.clarify_invoked) {
         if let Some(skill) = &r.chosen_skill {
             *chosen_counts.entry(skill.clone()).or_insert(0) += 1;
         }
@@ -907,9 +940,26 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
         let mut chosen_rows = String::new();
         for (skill, count) in &rows {
             chosen_rows.push_str(&format!(
-                "<tr><td>{}</td><td>{count}</td></tr>",
+                "<tr><td>{}</td><td>{count}</td><td>n/a</td><td>n/a</td></tr>",
                 html_escape(skill)
             ));
+        }
+        if chosen_rows.is_empty() {
+            chosen_rows
+                .push_str("<tr><td colspan=\"4\">clarify feedback 이 아직 없어요.</td></tr>");
+        }
+        let mut failing_rows = String::new();
+        for r in records.iter().filter(|r| r.clarify_invoked).take(25) {
+            failing_rows.push_str(&format!(
+                "<tr><td>{}</td><td>{}</td><td>{}</td></tr>",
+                html_escape(&r.prompt_hash),
+                html_escape(r.chosen_skill.as_deref().unwrap_or("null")),
+                html_escape(&r.ts),
+            ));
+        }
+        if failing_rows.is_empty() {
+            failing_rows
+                .push_str("<tr><td colspan=\"3\">failing prompt hash 가 아직 없어요.</td></tr>");
         }
         let html = format!(
             include_str!("../templates/dashboard.html"),
@@ -918,6 +968,7 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
             auth_failed = auth_failed,
             confused = confused,
             chosen_rows = chosen_rows,
+            failing_rows = failing_rows,
         );
         print!("{html}");
     } else {

@@ -184,6 +184,14 @@ function parseResults(path: string): ResultRow[] {
   const out: ResultRow[] = [];
   const errors: string[] = [];
   for (const [index, row] of raw.entries()) {
+    if (
+      row !== null &&
+      typeof row === "object" &&
+      "_metadata" in row &&
+      !("utterance_id" in row)
+    ) {
+      continue;
+    }
     const parsed = ResultRowSchema.safeParse(row);
     if (parsed.success) {
       out.push(parsed.data);

@@ -95,6 +95,19 @@ To clarify:
 
    Stop without routing.
 
+7. **Audit feedback (final).** 사용자가 disambiguation option 을 고른 뒤 fail-soft 로 feedback record 를 남겨요. prompt 원문은 저장하지 않고 sha256 hash 만 사용해요. `FINAL_SKILL` 은 위 Step 4 의 선택값이에요.
+
+   ```bash
+   ORIGINAL_PROMPT="${ORIGINAL_USER_UTTERANCE:-}"
+   FINAL_SKILL="${FINAL_SKILL:-null}"
+   if [ -n "$ORIGINAL_PROMPT" ]; then
+     PROMPT_HASH="$(printf '%s' "$ORIGINAL_PROMPT" | shasum -a 256 | awk '{print "sha256:" $1}')"
+     axhub-helpers audit-clarify --hash "$PROMPT_HASH" --chosen "$FINAL_SKILL" >/dev/null 2>&1 || true
+   fi
+   ```
+
+   이 기록은 `axhub-helpers routing-stats --confused --json` 과 `bun run routing:tune --confused` 의 feedback input 이에요.
+
 ## NEVER
 
 - NEVER silently guess intent — always surface AskUserQuestion when ambiguity is detected.
