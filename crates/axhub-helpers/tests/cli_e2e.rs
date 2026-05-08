@@ -191,6 +191,36 @@ fn cli_version_help_redact_and_classify_work() {
 }
 
 #[test]
+fn cli_classify_exit_post_tool_use_payload_branches() {
+    let non_axhub = serde_json::json!({
+        "tool_input": {"command": "echo hello"},
+        "tool_response": {"exit_code": 65, "stdout": "{}"}
+    });
+    let output = run_stdin(&["classify-exit"], &non_axhub.to_string(), &[]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stdout_json(&output), serde_json::json!({}));
+
+    let safe_success = serde_json::json!({
+        "tool_input": {"command": "axhub apps list --json"},
+        "tool_response": {"exit_code": 0, "stdout": "[]"}
+    });
+    let output = run_stdin(&["classify-exit"], &safe_success.to_string(), &[]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(stdout_json(&output), serde_json::json!({}));
+
+    let deploy_failure = serde_json::json!({
+        "tool_input": {"command": "axhub deploy create --app paydrop --json"},
+        "tool_response": {"exit_code": 65, "stdout": "{}"}
+    });
+    let output = run_stdin(&["classify-exit"], &deploy_failure.to_string(), &[]);
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    let msg = json["systemMessage"].as_str().unwrap();
+    assert!(msg.contains("로그인이 만료"), "{msg}");
+    assert!(msg.contains("선택:"), "{msg}");
+}
+
+#[test]
 fn cli_token_init_uses_env_fallback_and_writes_plugin_token_file() {
     let temp = tempfile::tempdir().unwrap();
     let xdg_config = temp.path().join("xdg-config");
@@ -403,7 +433,10 @@ exit 1
     assert!(stdout.contains("너무 오래된 버전"));
     assert!(stdout.contains("axhub 업그레이드해줘"));
     // Approach E: skill path enforcement 폐기.
-    assert!(!stdout.contains("skills/"), "no forced skill path: {stdout}");
+    assert!(
+        !stdout.contains("skills/"),
+        "no forced skill path: {stdout}"
+    );
 }
 
 #[cfg(unix)]
@@ -516,8 +549,14 @@ exit 1
     permissions.set_mode(0o755);
     std::fs::set_permissions(&axhub, permissions).unwrap();
 
-    for prompt in ["배포해줘", "환경 점검", "어제 결제 페이지 띄워봐", "오늘 날씨"] {
-        let input = serde_json::json!({"hook_event_name":"UserPromptSubmit","prompt":prompt}).to_string();
+    for prompt in [
+        "배포해줘",
+        "환경 점검",
+        "어제 결제 페이지 띄워봐",
+        "오늘 날씨",
+    ] {
+        let input =
+            serde_json::json!({"hook_event_name":"UserPromptSubmit","prompt":prompt}).to_string();
         let output = run_stdin(
             &["prompt-route"],
             &input,
@@ -525,9 +564,18 @@ exit 1
         );
         assert_eq!(output.status.code(), Some(0));
         let stdout = String::from_utf8_lossy(&output.stdout);
-        assert!(!stdout.contains("skills/"), "no skill path for {prompt:?}: {stdout}");
-        assert!(!stdout.contains("SKILL.md"), "no SKILL.md ref for {prompt:?}: {stdout}");
-        assert!(!stdout.contains("워크플로우를 우선 적용"), "no enforcement for {prompt:?}: {stdout}");
+        assert!(
+            !stdout.contains("skills/"),
+            "no skill path for {prompt:?}: {stdout}"
+        );
+        assert!(
+            !stdout.contains("SKILL.md"),
+            "no SKILL.md ref for {prompt:?}: {stdout}"
+        );
+        assert!(
+            !stdout.contains("워크플로우를 우선 적용"),
+            "no enforcement for {prompt:?}: {stdout}"
+        );
     }
 }
 
@@ -558,7 +606,8 @@ exit 1
     std::fs::set_permissions(&axhub, permissions).unwrap();
 
     let snapshot = |prompt: &str| -> String {
-        let input = serde_json::json!({"hook_event_name":"UserPromptSubmit","prompt":prompt}).to_string();
+        let input =
+            serde_json::json!({"hook_event_name":"UserPromptSubmit","prompt":prompt}).to_string();
         let output = run_stdin(
             &["prompt-route"],
             &input,
@@ -586,11 +635,18 @@ fn cli_prompt_route_preflight_fail_soft() {
         r#"{"hook_event_name":"UserPromptSubmit","prompt":"배포해줘"}"#,
         &[("AXHUB_BIN", "/no/such/axhub/binary/exists")],
     );
-    assert_eq!(output.status.code(), Some(0), "preflight failure must exit 0");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "preflight failure must exit 0"
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     // Should produce non-empty additionalContext (cli_present=false branch) and never crash.
     // No skill path enforcement.
-    assert!(!stdout.contains("skills/"), "no skill path on preflight fail: {stdout}");
+    assert!(
+        !stdout.contains("skills/"),
+        "no skill path on preflight fail: {stdout}"
+    );
 }
 
 // Approach E (Phase 2): audit::append failures (e.g., AXHUB_NO_AUDIT=1) silently no-op.

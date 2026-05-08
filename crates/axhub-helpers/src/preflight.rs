@@ -291,4 +291,21 @@ mod tests {
             Some("1.2.3".into())
         );
     }
+
+    #[test]
+    fn auth_status_ok_reports_only_authenticated_shape() {
+        assert!(AuthStatus::Ok {
+            user_email: "dev@example.test".into(),
+            user_id: 7,
+            expires_at: "2099-01-01T00:00:00Z".into(),
+            scopes: vec!["read".into()],
+        }
+        .ok());
+
+        assert!(!AuthStatus::Error {
+            code: "auth.token_missing".into(),
+            detail: "missing".into(),
+        }
+        .ok());
+    }
 }
