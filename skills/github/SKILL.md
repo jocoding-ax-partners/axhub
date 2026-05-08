@@ -1,6 +1,17 @@
 ---
 name: github
 description: '이 스킬은 사용자가 axhub 앱과 GitHub repo 를 연결하거나 끊고 싶어할 때 사용해요. 다음 표현에서 활성화: "깃허브 연결", "내 repo 붙", "내 repo 붙여", "git 연결", "github 연결", "GitHub 연결", "GitHub repo 연결해", "repo 끊", "repo 끊어", "repo 연결", "github connect", "github disconnect", "github repo", 또는 GitHub 연동 의도. GitHub App 설치가 없으면 install URL 을 안내해요.'
+examples:
+  - utterance: "깃허브 연결"
+    intent: "connect github repo to axhub"
+  - utterance: "내 repo 붙"
+    intent: "connect github repo to axhub"
+  - utterance: "github connect"
+    intent: "connect github repo to axhub"
+  - utterance: "github disconnect"
+    intent: "connect github repo to axhub"
+  - utterance: "내 repo 붙여"
+    intent: "connect github repo to axhub"
 multi-step: true
 needs-preflight: true
 allows-dependency-execution: false

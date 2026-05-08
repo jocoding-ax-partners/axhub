@@ -1,6 +1,17 @@
 ---
 name: upgrade
 description: '이 스킬은 사용자가 axhub Claude Code 플러그인 자체를 업그레이드하고 싶어할 때 사용합니다 (CLI 가 아닌 플러그인). 다음 표현에서 활성화: "플러그인 새 버전", "플러그인 업그레이드", "플러그인 업데이트", "플러그인 버전", "플러그인 호환", "지금 플러그인 버전이 뭐야", "플러그인이랑 호환되는 버전이야", "axhub plugin update", "axhub plugin upgrade", "axhub plugin version", "plugin self-upgrade", "plugin update", "plugin upgrade", "plugin version", 또는 axhub 플러그인 self-upgrade 요청. CLI 바이너리를 업그레이드하는 skills/update 와는 별개. PLAN row 28 의 DX-6 fix 를 구현합니다.'
+examples:
+  - utterance: "플러그인 새 버전"
+    intent: "upgrade axhub plugin"
+  - utterance: "플러그인 업그레이드"
+    intent: "upgrade axhub plugin"
+  - utterance: "axhub plugin update"
+    intent: "upgrade axhub plugin"
+  - utterance: "axhub plugin upgrade"
+    intent: "upgrade axhub plugin"
+  - utterance: "플러그인 업데이트"
+    intent: "upgrade axhub plugin"
 multi-step: true
 needs-preflight: false
 allows-dependency-execution: false

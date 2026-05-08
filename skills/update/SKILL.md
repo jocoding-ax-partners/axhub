@@ -1,6 +1,17 @@
 ---
 name: update
 description: '이 스킬은 사용자가 axhub CLI 업데이트를 확인하거나 적용하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "버전 확인", "새 버전", "새 버전 나왔어", "새 버전 받아", "업그레이드", "업그레이드해", "업데이트", "업데이트 있어", "업데이트 적용해주세요", "업데이트 확인해", "업데이트해", "최신", "최신 버전으로 올려주세요", "최신으로 올려", "최신이야", "axhub 새 버전 있어", "axhub 업그레이드 부탁드려요", "brew upgrade 해줘", "CLI 업데이트 부탁드려요", "brew upgrade", "check version", "latest", "new release", "update", "update available", "upgrade", "version", 또는 axhub CLI 버전 관리 요청. PLAN §16.10 에 따라 cosign 서명 검증을 기본 enforce 합니다.'
+examples:
+  - utterance: "axhub 새 버전 있어?"
+    intent: "update axhub CLI"
+  - utterance: "update check 해주세요"
+    intent: "update axhub CLI"
+  - utterance: "upgrade axhub"
+    intent: "update axhub CLI"
+  - utterance: "brew upgrade"
+    intent: "update axhub CLI"
+  - utterance: "버전 확인"
+    intent: "update axhub CLI"
 multi-step: true
 needs-preflight: false
 allows-dependency-execution: false

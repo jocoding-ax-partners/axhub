@@ -531,6 +531,15 @@ fn format_preflight_context(preflight: &PreflightRun) -> String {
             lines.push(format!("auth 상태 비정상 ({code}). 로그인 확인 필요해요."));
         }
     }
+    // Phase 9 sub-task 9.2 — examples context marker (env-gated, default off).
+    // Claude Code 가 SKILL.md frontmatter examples field 를 native 인식하면
+    // 별도 hook 주입 불필요. 미지원 환경의 fallback marker 만 emit.
+    if std::env::var("AXHUB_INJECT_EXAMPLES").is_ok() {
+        lines.push(
+            "[examples context] AXHUB_INJECT_EXAMPLES enabled — 각 SKILL.md frontmatter 의 examples field 를 매칭 시 참고해요."
+                .to_string(),
+        );
+    }
     lines.join("\n")
 }
 

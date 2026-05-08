@@ -17,6 +17,8 @@
     "bench:hooks": "bun scripts/benchmark-hooks.ts",
     "gate:check": "bun run scripts/migration-gate-check.ts",
     "measure:baseline": "bun run scripts/measure-docs-only-baseline.ts",
+    "codegen:skill-examples": "bun run scripts/codegen-skill-examples.ts",
+    "routing:tune": "bun run scripts/routing-tune.ts",
     "codegen:catalog": "bun scripts/codegen-catalog.ts",
     "codegen:skill-keywords": "bun scripts/codegen-skill-keywords-from-rust.ts",
     "codegen:version": "bun scripts/codegen-install-version.ts",
