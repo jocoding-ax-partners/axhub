@@ -42,16 +42,25 @@ function buildSseStream(): ReadableStream<Uint8Array> {
   ];
   const encoder = new TextEncoder();
   let i = 0;
+  let tick: ReturnType<typeof setInterval> | undefined;
   return new ReadableStream({
     start(controller) {
-      const tick = setInterval(() => {
-        if (i >= events.length) {
-          clearInterval(tick);
-          controller.close();
-          return;
+      tick = setInterval(() => {
+        try {
+          if (i >= events.length) {
+            if (tick) clearInterval(tick);
+            controller.close();
+            return;
+          }
+          controller.enqueue(encoder.encode(events[i++]));
+        } catch {
+          // Controller already closed by client cancel — stop the producer.
+          if (tick) clearInterval(tick);
         }
-        controller.enqueue(encoder.encode(events[i++]));
       }, 250);
+    },
+    cancel() {
+      if (tick) clearInterval(tick);
     },
   });
 }
