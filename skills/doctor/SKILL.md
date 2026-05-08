@@ -37,6 +37,8 @@ To run diagnostics:
    ]})
    ```
 
+   **TodoWrite status sync:** after every workflow step and after every AskUserQuestion answer, call TodoWrite again with the full current todos array. Mark finished items as `"completed"`, the active item as `"in_progress"`, and untouched items as `"pending"`. Do not leave the initial Step 0 list stale after commands, user answers, or final result.
+
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
 1. **Detect helper binary with OS-aware install-state rows** (Phase 5 US-503 + Windows helper bootstrap hotfix — `CLAUDE_PLUGIN_ROOT` or PATH may differ per shell):

@@ -48,6 +48,8 @@ To recover:
    ]})
    ```
 
+   **TodoWrite status sync:** after every workflow step and after every AskUserQuestion answer, call TodoWrite again with the full current todos array. Mark finished items as `"completed"`, the active item as `"in_progress"`, and untouched items as `"pending"`. Do not leave the initial Step 0 list stale after commands, user answers, or final result.
+
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
 1. **Read last-known-good from local cache.** The deployments cache holds `(deployment_id → app_id → commit_sha → status)` per machine:

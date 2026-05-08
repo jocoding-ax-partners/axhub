@@ -38,6 +38,12 @@ describe("Phase 17 C2/US-1702 + Phase 18 R1 — TodoWrite presence per multi-ste
         expect(todoCount).toBeGreaterThanOrEqual(4);
       });
 
+      test(`skills/${slug}/SKILL.md updates TodoWrite status after progress`, () => {
+        expect(content).toContain("TodoWrite status sync");
+        expect(content).toContain("after every AskUserQuestion answer");
+        expect(content).toContain("Do not leave the initial Step 0 list stale");
+      });
+
       test(`skills/${slug}/SKILL.md TodoWrite activeForm in 해요체 (no forbidden tokens)`, () => {
         const activeFormMatches = content.match(/activeForm:\s*"([^"]+)"/g) ?? [];
         expect(activeFormMatches.length).toBeGreaterThan(0);
@@ -57,5 +63,14 @@ describe("Phase 17 C2/US-1702 + Phase 18 R1 — TodoWrite presence per multi-ste
   test("at least 5 SKILLs are declared multi-step: true (Phase 18 baseline)", () => {
     const count = skillSlugs.filter((s) => readFrontmatter(s).multiStep).length;
     expect(count).toBeGreaterThanOrEqual(5);
+  });
+
+  test("skill scaffold preserves TodoWrite status sync instructions for future multi-step skills", () => {
+    const scaffold = readFileSync(join(REPO_ROOT, "scripts", "skill-new.ts"), "utf8");
+    const template = readFileSync(join(SKILLS_DIR, "_template", "SKILL.md.tmpl"), "utf8");
+
+    expect(scaffold).toContain("TodoWrite status sync");
+    expect(scaffold).toContain("after every AskUserQuestion answer");
+    expect(template).toContain("TodoWrite status sync");
   });
 });

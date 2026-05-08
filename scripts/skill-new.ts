@@ -83,7 +83,9 @@ const todoWriteBlock = multiStep
      { content: "TODO 단계 3",      status: "pending",     activeForm: "TODO 진행 중" },
      { content: "결과 안내",        status: "pending",     activeForm: "마무리하는 중" }
    ]})
-   \`\`\``
+   \`\`\`
+
+   **TodoWrite status sync:** after every workflow step and after every AskUserQuestion answer, call TodoWrite again with the full current todos array. Mark finished items as \`"completed"\`, the active item as \`"in_progress"\`, and untouched items as \`"pending"\`. Do not leave the initial Step 0 list stale after commands, user answers, or final result.`
   : "";
 
 const d1GuardBlock = `**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. \`if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]\` 인 subprocess (\`claude -p\`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 \`tests/fixtures/ask-defaults/registry.json\` 참조 — TODO 질문 별 safe_default.`;

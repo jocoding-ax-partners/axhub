@@ -11,6 +11,7 @@ TODO 1 줄 SKILL 요약 (vibe coder 가 이해할 한국어).
 
 <!-- AUTHOR: 새 SKILL 작성 가이드 (Phase 17/18 패턴)
 1. multi-step: true 면 Step 0 에 TodoWrite 호출 (4+ todos 해요체) 추가.
+   TodoWrite status sync: 각 workflow step 과 AskUserQuestion answer 뒤에는 전체 todos 배열을 다시 호출해서 completed/in_progress/pending 상태를 최신화해요.
 2. needs-preflight: true 면 워크플로 시작 전 !command preflight 자동 주입 됨 (이미 emit 됨).
 3. AskUserQuestion 호출 site 마다 D1 sentinel 블록 + tests/fixtures/ask-defaults/registry.json 에 safe_default 추가.
 4. 모든 텍스트 해요체 (no 합니다/입니다/시겠어요/드립니다/당신/아이고). bun run lint:tone --strict 0 err.

@@ -37,6 +37,8 @@ To handle updates:
    ]})
    ```
 
+   **TodoWrite status sync:** after every workflow step and after every AskUserQuestion answer, call TodoWrite again with the full current todos array. Mark finished items as `"completed"`, the active item as `"in_progress"`, and untouched items as `"pending"`. Do not leave the initial Step 0 list stale after commands, user answers, or final result.
+
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
 1. **Check for update.** Run `axhub update check --json` directly — do NOT force `AXHUB_DISABLE_AUTOUPDATE=1` (Phase 5 US-505: 회사 정책으로 disable 한 환경만 자연스럽게 disable 처리되도록 둠):
