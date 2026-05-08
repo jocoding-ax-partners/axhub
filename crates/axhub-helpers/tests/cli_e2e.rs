@@ -27,6 +27,18 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    let needs_prompt_route_sandbox = args.contains(&"prompt-route")
+        && !envs
+            .iter()
+            .any(|(key, _)| *key == "XDG_STATE_HOME" || *key == "AXHUB_NO_AUDIT");
+    let prompt_route_state = if needs_prompt_route_sandbox {
+        Some(tempfile::tempdir().unwrap())
+    } else {
+        None
+    };
+    if let Some(state) = &prompt_route_state {
+        command.env("XDG_STATE_HOME", state.path());
+    }
     for (k, v) in envs {
         command.env(k, v);
     }
@@ -1836,6 +1848,36 @@ fn cli_rotation_during_routing_stats_call() {
         "stale audit file should be removed by rotate(7)"
     );
     assert!(fresh.exists(), "today's audit file should persist");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_prompt_route_rotates_audit_on_write_path() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let dir = audit_dir_path(&state);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let stale_date = (chrono::Utc::now() - chrono::Duration::days(8))
+        .format("%Y-%m-%d")
+        .to_string();
+    let stale = dir.join(format!("routing-audit-{stale_date}.jsonl"));
+    std::fs::write(&stale, "{}\n").unwrap();
+
+    let output = run_stdin(
+        &["prompt-route"],
+        r#"{"hook_event_name":"UserPromptSubmit","prompt":"오늘 날씨 알려줘"}"#,
+        &[
+            ("AXHUB_BIN", "/no/such/axhub/binary/exists"),
+            ("XDG_STATE_HOME", state.display().to_string().as_str()),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(
+        !stale.exists(),
+        "prompt-route append should rotate stale audit files"
+    );
 }
 
 #[cfg(unix)]
