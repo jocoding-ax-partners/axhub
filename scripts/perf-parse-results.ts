@@ -85,7 +85,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const checks = evaluate(parsed);
-  console.log(format(checks));
+  process.stdout.write(format(checks) + "\n");
   const failed = checks.filter((c) => !c.ok);
   process.exit(failed.length === 0 ? 0 : 1);
 }

@@ -10,8 +10,8 @@
  * Usage: bun run scripts/perf-publish-measurements.ts --os macos-latest
  */
 
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import process from "node:process";
 import type { ResultsFile, ScenarioRecord } from "./perf-parse-results";
 
@@ -95,15 +95,47 @@ export function spliceOsBlock(
   return `${beforePart}${middle}${after}`;
 }
 
+function scaffold(): string {
+  return `---
+status: PHASE_0_PENDING_CI
+phase: 0
+generated_by: scripts/perf-publish-measurements.ts
+---
+
+# Deploy Walltime Measurements
+
+> CI matrix runs \`tests/perf/deploy_walltime.test.ts\` and republishes each
+> OS subsection idempotently via \`scripts/perf-publish-measurements.ts --os <runner>\`.
+> The canonical doc lives at \`.plan/deploy-time-reduction/MEASUREMENTS.md\`
+> (\`.plan/\` is gitignored — this CI scaffold is regenerated per run when
+> the canonical doc is absent).
+
+## Phase 0 Baseline
+
+`;
+}
+
+async function ensureMeasurementsDoc(): Promise<string> {
+  try {
+    return await readFile(MEASUREMENTS_PATH, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    await mkdir(dirname(MEASUREMENTS_PATH), { recursive: true });
+    const initial = scaffold();
+    await writeFile(MEASUREMENTS_PATH, initial, "utf8");
+    return initial;
+  }
+}
+
 async function main(): Promise<void> {
   const { os, resultsFile } = parseArgs(process.argv.slice(2));
   const raw = await readFile(resultsFile, "utf8");
   const results = JSON.parse(raw) as ResultsFile;
-  const doc = await readFile(MEASUREMENTS_PATH, "utf8");
+  const doc = await ensureMeasurementsDoc();
   const block = buildOsBlock(os, results, new Date().toISOString());
   const next = spliceOsBlock(doc, os, block);
   await writeFile(MEASUREMENTS_PATH, next, "utf8");
-  console.log(`perf-publish: updated ${MEASUREMENTS_PATH} for ${os}`);
+  process.stdout.write(`perf-publish: updated ${MEASUREMENTS_PATH} for ${os}\n`);
 }
 
 if (import.meta.main) {

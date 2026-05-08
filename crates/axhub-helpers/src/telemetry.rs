@@ -68,10 +68,7 @@ pub fn emit_deploy_complete(exit_code: i32, command_class: &str) -> anyhow::Resu
     let mut fields = Map::new();
     fields.insert("event".into(), Value::String("deploy_complete".into()));
     fields.insert("exit_code".into(), Value::Number(exit_code.into()));
-    fields.insert(
-        "command_class".into(),
-        Value::String(command_class.into()),
-    );
+    fields.insert("command_class".into(), Value::String(command_class.into()));
     let durations = drain_phase_durations_ms();
     if !durations.is_empty() {
         fields.insert("phase_durations_ms".into(), Value::Object(durations));
@@ -271,8 +268,14 @@ mod tests {
         ];
         let out = compute_phase_durations(&markers);
         assert_eq!(out.len(), 2);
-        assert_eq!(out.get("step_a_to_step_b").and_then(|v| v.as_u64()), Some(120));
-        assert_eq!(out.get("step_b_to_step_c").and_then(|v| v.as_u64()), Some(300));
+        assert_eq!(
+            out.get("step_a_to_step_b").and_then(|v| v.as_u64()),
+            Some(120)
+        );
+        assert_eq!(
+            out.get("step_b_to_step_c").and_then(|v| v.as_u64()),
+            Some(300)
+        );
     }
 
     #[test]
