@@ -2099,7 +2099,13 @@ fn cli_audit_clarify_appends_record_then_confused_filter_returns_it() {
     let state_s = state.display().to_string();
 
     let clarify = run_stdin(
-        &["audit-clarify", "--hash", "sha256:test123", "--chosen", "deploy"],
+        &[
+            "audit-clarify",
+            "--hash",
+            "sha256:test123",
+            "--chosen",
+            "deploy",
+        ],
         "",
         &[("XDG_STATE_HOME", state_s.as_str())],
     );
@@ -2115,7 +2121,10 @@ fn cli_audit_clarify_appends_record_then_confused_filter_returns_it() {
     assert_eq!(stats.status.code(), Some(0));
     let stats_stdout = String::from_utf8_lossy(&stats.stdout);
     let parsed: serde_json::Value = serde_json::from_str(stats_stdout.trim()).expect("valid JSON");
-    assert!(parsed["total_prompts"].as_u64().unwrap() >= 1, "{stats_stdout}");
+    assert!(
+        parsed["total_prompts"].as_u64().unwrap() >= 1,
+        "{stats_stdout}"
+    );
 }
 
 #[cfg(unix)]

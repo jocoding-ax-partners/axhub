@@ -571,7 +571,9 @@ PRIVACY:
   삭제: axhub-helpers cleanup-audit --all
 ";
 
-fn parse_routing_stats_args(args: &[String]) -> anyhow::Result<(chrono::Duration, bool, u32, bool)> {
+fn parse_routing_stats_args(
+    args: &[String],
+) -> anyhow::Result<(chrono::Duration, bool, u32, bool)> {
     let mut since = chrono::Duration::days(7);
     let mut json = false;
     let mut top: u32 = 10;
@@ -882,7 +884,8 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
     let axhub_related = records.iter().filter(|r| r.is_axhub_related).count();
     let auth_failed = records.iter().filter(|r| !r.auth_ok).count();
     let confused = records.iter().filter(|r| r.clarify_invoked).count();
-    let mut chosen_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    let mut chosen_counts: std::collections::HashMap<String, u32> =
+        std::collections::HashMap::new();
     for r in &records {
         if let Some(skill) = &r.chosen_skill {
             *chosen_counts.entry(skill.clone()).or_insert(0) += 1;
