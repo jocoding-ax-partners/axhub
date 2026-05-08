@@ -23,6 +23,19 @@ Deploy a vibe coder's app to axhub with safety primitives. Use the adapter `axhu
 
 ## Workflow
 
+<!--
+phase markers (Phase 0 baseline naming — keep aligned with
+crates/axhub-helpers/src/telemetry.rs::record_phase_marker):
+  - phase marker: step_0_preflight
+  - phase marker: step_1_resolve
+  - phase marker: step_1_1_bootstrap_plan
+  - phase marker: step_2_preview_card
+  - phase marker: step_3_consent
+  - phase marker: step_4_deploy_create
+  - phase marker: step_5_watch
+runtime impact 0 — comments only.
+-->
+
 **CLAUDE_PLUGIN_ROOT 자동 확인.** 모든 helper 호출 전에 `CLAUDE_PLUGIN_ROOT` 를 자동으로 채워요. Claude Code 가 env 를 전달하지 않은 세션에서는 `CLAUDE_SKILL_DIR` 로 plugin root 를 계산하고, 그래도 없으면 PATH 의 `axhub-helpers` / `axhub-helpers.exe` 위치에서 root 를 역산해요. 성공하면 조용히 `PATH` 에 plugin `bin/` 을 앞에 붙이고, 사용자에게 절대경로 우회 안내를 시키지 않아요.
 
 ```bash

@@ -43,6 +43,15 @@ pub fn axhub_bin() -> String {
     std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string())
 }
 
+/// Returns `true` when `AXHUB_PERF_AUTO_APPROVE=1` is set.
+///
+/// Test/CI only — never set in user production. Used by the perf walltime
+/// test suite (Phase 0) to bypass `AskUserQuestion` consent so that walltime
+/// excludes user think time. Production flows ignore this signal entirely.
+pub fn auto_approve_enabled() -> bool {
+    std::env::var("AXHUB_PERF_AUTO_APPROVE").as_deref() == Ok("1")
+}
+
 pub fn extract_semver(text: &str) -> Option<String> {
     let caps = SEMVER_RE.captures(text)?;
     Some(format!("{}.{}.{}", &caps[1], &caps[2], &caps[3]))
@@ -300,6 +309,34 @@ mod tests {
             extract_semver("axhub 1.2.3-rc.1+build"),
             Some("1.2.3".into())
         );
+    }
+
+    fn auto_approve_env_lock() -> &'static std::sync::Mutex<()> {
+        static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+        LOCK.get_or_init(|| std::sync::Mutex::new(()))
+    }
+
+    #[test]
+    fn auto_approve_enabled_only_when_env_is_one() {
+        let _guard = auto_approve_env_lock().lock().unwrap();
+        let prev = std::env::var("AXHUB_PERF_AUTO_APPROVE").ok();
+
+        std::env::remove_var("AXHUB_PERF_AUTO_APPROVE");
+        assert!(!auto_approve_enabled(), "unset should be false");
+
+        std::env::set_var("AXHUB_PERF_AUTO_APPROVE", "0");
+        assert!(!auto_approve_enabled(), "0 should be false");
+
+        std::env::set_var("AXHUB_PERF_AUTO_APPROVE", "true");
+        assert!(!auto_approve_enabled(), "non-1 string should be false");
+
+        std::env::set_var("AXHUB_PERF_AUTO_APPROVE", "1");
+        assert!(auto_approve_enabled(), "1 should be true");
+
+        match prev {
+            Some(v) => std::env::set_var("AXHUB_PERF_AUTO_APPROVE", v),
+            None => std::env::remove_var("AXHUB_PERF_AUTO_APPROVE"),
+        }
     }
 
     #[test]

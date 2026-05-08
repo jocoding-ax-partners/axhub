@@ -61,3 +61,4 @@ target/
 
 # Plan documents (local strategic notes, not for commit)
 .plan/
+test-results.json
