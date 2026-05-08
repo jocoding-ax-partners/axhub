@@ -824,6 +824,120 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     assert!(session_stdout.contains("cleanup-audit --all"));
 }
 
+#[cfg(unix)]
+#[test]
+fn cli_prompt_route_rotates_audit_on_write_path() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let dir = state.join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let stale_date = (chrono::Utc::now() - chrono::Duration::days(8))
+        .format("%Y-%m-%d")
+        .to_string();
+    let stale = dir.join(format!("routing-audit-{stale_date}.jsonl"));
+    std::fs::write(&stale, "{}\n").unwrap();
+
+    let output = run_stdin(
+        &["prompt-route"],
+        r#"{"hook_event_name":"UserPromptSubmit","prompt":"오늘 날씨 알려줘"}"#,
+        &[
+            ("AXHUB_BIN", "/no/such/axhub/binary/exists"),
+            ("XDG_STATE_HOME", state.to_str().unwrap()),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(
+        !stale.exists(),
+        "prompt-route append should rotate stale audit files"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_cleanup_audit_all_yes_removes_audit_files() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let dir = state.join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let audit = dir.join("routing-audit-2000-01-01.jsonl");
+    let unrelated = dir.join("notes.txt");
+    std::fs::write(&audit, "{}\n").unwrap();
+    std::fs::write(&unrelated, "{}\n").unwrap();
+
+    let output = Command::new(bin())
+        .args(["cleanup-audit", "--all", "--yes"])
+        .env("XDG_STATE_HOME", state)
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(!audit.exists());
+    assert!(unrelated.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_cleanup_audit_default_rotates_only_stale_files() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let dir = state.join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let stale_date = (chrono::Utc::now() - chrono::Duration::days(8))
+        .format("%Y-%m-%d")
+        .to_string();
+    let recent_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let stale = dir.join(format!("routing-audit-{stale_date}.jsonl"));
+    let recent = dir.join(format!("routing-audit-{recent_date}.jsonl"));
+    std::fs::write(&stale, "{}\n").unwrap();
+    std::fs::write(&recent, "{}\n").unwrap();
+
+    let output = Command::new(bin())
+        .arg("cleanup-audit")
+        .env("XDG_STATE_HOME", state)
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("7일 이상 된 audit log 1 파일 삭제했어요")
+    );
+    assert!(!stale.exists());
+    assert!(recent.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_cleanup_audit_all_cancel_keeps_files_without_yes() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let dir = state.join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let audit = dir.join("routing-audit-2000-01-01.jsonl");
+    std::fs::write(&audit, "{}\n").unwrap();
+
+    let output = run_stdin(
+        &["cleanup-audit", "--all"],
+        "n\n",
+        &[("XDG_STATE_HOME", state.to_str().unwrap())],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("취소했어요."));
+    assert!(audit.exists());
+}
+
+#[test]
+fn cli_cleanup_audit_help_and_unknown_flags_are_stable() {
+    let help = run(&["cleanup-audit", "--help"]);
+    assert_eq!(help.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&help.stdout).contains("cleanup-audit"));
+
+    let unknown = run(&["cleanup-audit", "--bogus"]);
+    assert_eq!(unknown.status.code(), Some(64));
+    assert!(String::from_utf8_lossy(&unknown.stderr).contains("알 수 없는 flag"));
+}
+
 // Phase 4 routing-stats E2E helpers (XDG_STATE_HOME 격리).
 //
 // Each test writes a fake axhub binary to TempDir, points AXHUB_BIN at it, and
@@ -881,36 +995,6 @@ fn invoke_prompt_route(prompt: &str, axhub: &std::path::Path, state: &str) {
 
 #[cfg(unix)]
 #[test]
-fn cli_prompt_route_rotates_audit_on_write_path() {
-    let temp = tempfile::tempdir().unwrap();
-    let state = temp.path().join("state");
-    let dir = audit_dir_path(&state);
-    std::fs::create_dir_all(&dir).unwrap();
-
-    let stale_date = (chrono::Utc::now() - chrono::Duration::days(8))
-        .format("%Y-%m-%d")
-        .to_string();
-    let stale = dir.join(format!("routing-audit-{stale_date}.jsonl"));
-    std::fs::write(&stale, "{}\n").unwrap();
-
-    let output = run_stdin(
-        &["prompt-route"],
-        r#"{"hook_event_name":"UserPromptSubmit","prompt":"오늘 날씨 알려줘"}"#,
-        &[
-            ("AXHUB_BIN", "/no/such/axhub/binary/exists"),
-            ("XDG_STATE_HOME", state.display().to_string().as_str()),
-        ],
-    );
-
-    assert_eq!(output.status.code(), Some(0));
-    assert!(
-        !stale.exists(),
-        "prompt-route append should rotate stale audit files"
-    );
-}
-
-#[cfg(unix)]
-#[test]
 fn cli_rotation_during_routing_stats_call() {
     let temp = tempfile::tempdir().unwrap();
     let state = temp.path().join("state");
@@ -938,37 +1022,6 @@ fn cli_rotation_during_routing_stats_call() {
         "stale audit file should be removed by rotate(7)"
     );
     assert!(fresh.exists(), "today's audit file should persist");
-}
-
-#[cfg(unix)]
-#[test]
-fn cli_cleanup_audit_all_yes_removes_audit_files() {
-    let temp = tempfile::tempdir().unwrap();
-    let state = temp.path().join("state");
-    let dir = audit_dir_path(&state);
-    std::fs::create_dir_all(&dir).unwrap();
-
-    let stale_date = (chrono::Utc::now() - chrono::Duration::days(8))
-        .format("%Y-%m-%d")
-        .to_string();
-    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    let stale = dir.join(format!("routing-audit-{stale_date}.jsonl"));
-    let fresh = dir.join(format!("routing-audit-{today}.jsonl"));
-    std::fs::write(&stale, "{}\n").unwrap();
-    std::fs::write(&fresh, "{}\n").unwrap();
-
-    let cleanup = run_stdin(
-        &["cleanup-audit", "--all", "--yes"],
-        "",
-        &[("XDG_STATE_HOME", state.display().to_string().as_str())],
-    );
-
-    assert_eq!(cleanup.status.code(), Some(0));
-    assert!(!stale.exists(), "stale audit file should be removed");
-    assert!(
-        !fresh.exists(),
-        "fresh audit file should be removed by --all"
-    );
 }
 
 #[cfg(unix)]
@@ -1070,6 +1123,82 @@ fn cli_routing_stats_top_n_filter() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn cli_routing_stats_disabled_and_empty_outputs_are_stable() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    let disabled_plain = run_stdin(
+        &["routing-stats"],
+        "",
+        &[
+            ("XDG_STATE_HOME", state_s.as_str()),
+            ("AXHUB_NO_AUDIT", "1"),
+        ],
+    );
+    assert_eq!(disabled_plain.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&disabled_plain.stdout).contains("audit log 가 비활성이에요"));
+
+    let disabled_json = run_stdin(
+        &["routing-stats", "--json"],
+        "",
+        &[
+            ("XDG_STATE_HOME", state_s.as_str()),
+            ("AXHUB_NO_AUDIT", "1"),
+        ],
+    );
+    assert_eq!(disabled_json.status.code(), Some(0));
+    let parsed = stdout_json(&disabled_json);
+    assert_eq!(parsed["audit_disabled"], true);
+
+    let empty_plain = run_stdin(
+        &["routing-stats", "--since", "1h"],
+        "",
+        &[("XDG_STATE_HOME", state_s.as_str())],
+    );
+    assert_eq!(empty_plain.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&empty_plain.stdout).contains("아직 audit 데이터가 없어요"));
+
+    let empty_json = run_stdin(
+        &["routing-stats", "--since", "1m", "--json"],
+        "",
+        &[("XDG_STATE_HOME", state_s.as_str())],
+    );
+    assert_eq!(empty_json.status.code(), Some(0));
+    let parsed = stdout_json(&empty_json);
+    assert_eq!(parsed["total_prompts"], 0);
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_routing_stats_help_and_invalid_args_are_stable() {
+    let help = run_stdin(&["routing-stats", "--help"], "", &[]);
+    assert_eq!(help.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&help.stdout).contains("routing-stats"));
+
+    for (args, expected) in [
+        (&["routing-stats", "--unknown"][..], "알 수 없는 flag"),
+        (
+            &["routing-stats", "--top", "NaN"][..],
+            "--top 은 숫자여야 해요",
+        ),
+        (
+            &["routing-stats", "--since", "3w"][..],
+            "duration 단위는 d/h/m 또는 'all' 만",
+        ),
+    ] {
+        let output = run_stdin(args, "", &[]);
+        assert_eq!(output.status.code(), Some(64), "args={args:?}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected),
+            "stderr={} expected={expected}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
 // Phase 7: SessionStart magical-moment + welcome marker.
 //
 // XDG_STATE_HOME=tempdir 으로 audit/welcome marker 격리. session-start 는 stdin
@@ -1145,4 +1274,775 @@ fn cli_session_start_base_message_korean_tone() {
     assert!(msg.contains("/axhub:help"), "{msg}");
     assert!(msg.contains("/axhub:clarify"), "{msg}");
     assert!(msg.contains("axhub-helpers routing-stats"), "{msg}");
+}
+
+#[test]
+fn cli_consent_mint_rejects_binding_schema_drift_before_writing_tokens() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "schema-e2e-session"),
+    ];
+    let session_token = temp
+        .path()
+        .join("runtime/axhub/consent-schema-e2e-session.json");
+
+    let unknown_action = serde_json::json!({
+        "tool_call_id":"schema-e2e-session:tc-unknown",
+        "action":"apps_publish",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {}
+    })
+    .to_string();
+    let rejected_unknown = run_stdin(&["consent-mint"], &unknown_action, &envs);
+    assert_eq!(rejected_unknown.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&rejected_unknown.stderr).contains("binding_schema:unknown_action")
+    );
+    assert!(!session_token.exists());
+
+    let missing_source = serde_json::json!({
+        "tool_call_id":"schema-e2e-session:tc-apps-create",
+        "action":"apps_create",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"slug":"paydrop"}
+    })
+    .to_string();
+    let rejected_missing_source = run_stdin(&["consent-mint"], &missing_source, &envs);
+    assert_eq!(rejected_missing_source.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&rejected_missing_source.stderr)
+        .contains("binding_schema:missing_context:source"));
+    assert!(!session_token.exists());
+
+    let valid_apps_create = serde_json::json!({
+        "tool_call_id":"schema-e2e-session:tc-apps-create",
+        "action":"apps_create",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"source":"apphub.yaml"}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &valid_apps_create, &envs);
+    assert_eq!(minted.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&minted.stdout).contains("token_id"));
+    assert!(session_token.exists());
+
+    let interactive_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"apps_create",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"source":"interactive"}
+    })
+    .to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+    let interactive_minted = run_stdin(&["consent-mint"], &interactive_binding, &pending_envs);
+    assert_eq!(interactive_minted.status.code(), Some(0));
+    let interactive_allowed = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"schema-e2e-session","tool_call_id":"tc-interactive","tool_name":"Bash","tool_input":{"command":"axhub apps create --interactive --json"}}"#,
+        &pending_envs,
+    );
+    assert_eq!(interactive_allowed.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&interactive_allowed.stdout)
+        .contains("permissionDecision\":\"allow"));
+}
+
+#[test]
+fn cli_consent_mint_validate_only_has_no_runtime_or_key_side_effects() {
+    let temp = tempfile::tempdir().unwrap();
+    let state_dir = temp.path().join("state");
+    let runtime_dir = temp.path().join("runtime");
+    let state = state_dir.display().to_string();
+    let runtime = runtime_dir.display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "validate-only-session"),
+    ];
+    let binding = serde_json::json!({
+        "tool_call_id":"validate-only-session:tc-validate",
+        "action":"deploy_create",
+        "app_id":"paydrop",
+        "profile":"prod",
+        "branch":"main",
+        "commit_sha":"abc123",
+        "context": {}
+    })
+    .to_string();
+
+    let validated = run_stdin(&["consent-mint", "--validate-only"], &binding, &envs);
+    assert_eq!(validated.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&validated.stdout);
+    assert!(stdout.contains(r#""valid":true"#));
+    assert!(stdout.contains(r#""action":"deploy_create"#));
+    assert_no_consent_side_effects(&state_dir, &runtime_dir);
+}
+
+#[test]
+fn cli_consent_mint_unknown_flags_fail_without_runtime_or_key_side_effects() {
+    let temp = tempfile::tempdir().unwrap();
+    let state_dir = temp.path().join("state");
+    let runtime_dir = temp.path().join("runtime");
+    let state = state_dir.display().to_string();
+    let runtime = runtime_dir.display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "unknown-flag-session"),
+    ];
+    let binding = serde_json::json!({
+        "tool_call_id":"unknown-flag-session:tc-flag",
+        "action":"deploy_create",
+        "app_id":"paydrop",
+        "profile":"prod",
+        "branch":"main",
+        "commit_sha":"abc123",
+        "context": {}
+    })
+    .to_string();
+
+    let rejected = run_stdin(&["consent-mint", "--unexpected"], &binding, &envs);
+    assert_eq!(rejected.status.code(), Some(64));
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("unknown option"));
+    assert_no_consent_side_effects(&state_dir, &runtime_dir);
+}
+
+#[test]
+fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "cli-e2e-session"),
+    ];
+    let binding = serde_json::json!({
+        "tool_call_id":"cli-e2e-session:tc-1",
+        "action":"deploy_create",
+        "app_id":"paydrop",
+        "profile":"prod",
+        "branch":"main",
+        "commit_sha":"abc123",
+        "context": {}
+    })
+    .to_string();
+
+    let minted = run_stdin(&["consent-mint"], &binding, &envs);
+    assert_eq!(minted.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&minted.stdout).contains("token_id"));
+
+    let verified = run_stdin(&["consent-verify"], &binding, &envs);
+    assert_eq!(verified.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&verified.stdout).contains(r#""valid":true"#));
+
+    let allowed_deploy = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-1","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --profile prod --branch main --commit abc123"}}"#,
+        &envs,
+    );
+    assert_eq!(allowed_deploy.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&allowed_deploy.stdout).contains("permissionDecision\":\"allow")
+    );
+
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+    let pending_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"deploy_create",
+        "app_id":"paydrop",
+        "profile":"prod",
+        "branch":"main",
+        "commit_sha":"def456",
+        "context": {}
+    })
+    .to_string();
+    let pending_minted = run_stdin(&["consent-mint"], &pending_binding, &pending_envs);
+    assert_eq!(pending_minted.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&pending_minted.stdout).contains("consent-pending-"));
+    let pending_allowed = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_actual","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --profile prod --branch main --commit def456"}}"#,
+        &pending_envs,
+    );
+    assert_eq!(pending_allowed.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&pending_allowed.stdout).contains("permissionDecision\":\"allow")
+    );
+    let pending_reused = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_actual_2","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --profile prod --branch main --commit def456"}}"#,
+        &pending_envs,
+    );
+    assert_eq!(pending_reused.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&pending_reused.stdout).contains("permissionDecision\":\"deny"));
+
+    let pending_auth_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"auth_login",
+        "app_id":"_",
+        "profile":"default",
+        "branch":"_",
+        "commit_sha":"_",
+        "context": {}
+    })
+    .to_string();
+    let pending_auth_minted = run_stdin(&["consent-mint"], &pending_auth_binding, &pending_envs);
+    assert_eq!(pending_auth_minted.status.code(), Some(0));
+    let pending_auth_allowed = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_auth","tool_name":"Bash","tool_input":{"command":"axhub auth login"}}"#,
+        &pending_envs,
+    );
+    assert_eq!(pending_auth_allowed.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&pending_auth_allowed.stdout)
+        .contains("permissionDecision\":\"allow"));
+
+    let wrong = binding.replace("\"paydrop\"", "\"otherapp\"");
+    let rejected = run_stdin(&["consent-verify"], &wrong, &envs);
+    assert_eq!(rejected.status.code(), Some(65));
+    assert!(String::from_utf8_lossy(&rejected.stdout).contains("binding_mismatch:app_id"));
+
+    let non_bash = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-2","tool_name":"Edit","tool_input":{}}"#,
+        &envs,
+    );
+    assert_eq!(non_bash.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&non_bash.stdout).contains("permissionDecision\":\"allow"));
+
+    let read_only = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-3","tool_name":"Bash","tool_input":{"command":"axhub deploy logs --app paydrop"}}"#,
+        &envs,
+    );
+    assert_eq!(read_only.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&read_only.stdout).contains("permissionDecision\":\"allow"));
+
+    let destructive_without_token = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-deny","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --branch main --commit abc123"}}"#,
+        &envs,
+    );
+    assert_eq!(destructive_without_token.status.code(), Some(0));
+    let deny_stdout = String::from_utf8_lossy(&destructive_without_token.stdout);
+    assert!(deny_stdout.contains("permissionDecision\":\"deny"));
+    assert!(deny_stdout.contains("사전 승인"));
+
+    let identity_without_token = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-login","tool_name":"Bash","tool_input":{"command":"axhub auth login --profile prod"}}"#,
+        &envs,
+    );
+    assert_eq!(identity_without_token.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&identity_without_token.stdout)
+        .contains("permissionDecision\":\"deny"));
+
+    let env_binding = serde_json::json!({
+        "tool_call_id":"cli-e2e-session:tc-env",
+        "action":"env_set",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"key":"DATABASE_URL"}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &env_binding, &envs);
+    assert_eq!(minted.status.code(), Some(0));
+    let env_allowed = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-env","tool_name":"Bash","tool_input":{"command":"printf %s \"$DATABASE_URL\" | axhub env set DATABASE_URL --app paydrop --from-stdin --json"}}"#,
+        &envs,
+    );
+    assert_eq!(env_allowed.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&env_allowed.stdout).contains("permissionDecision\":\"allow"));
+
+    let cancel_without_token = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-cancel","tool_name":"Bash","tool_input":{"command":"axhub deploy cancel dep_123 --app paydrop --json"}}"#,
+        &envs,
+    );
+    assert_eq!(cancel_without_token.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&cancel_without_token.stdout)
+        .contains("permissionDecision\":\"deny"));
+}
+
+#[test]
+fn cli_apps_delete_consent_binds_exact_command_target() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    for (target, command, tool_id) in [
+        (
+            "nextjs-axhub",
+            "axhub apps delete nextjs-axhub --yes --json",
+            "toolu_app_delete_slug",
+        ),
+        (
+            "165",
+            "axhub apps delete 165 --yes --json",
+            "toolu_app_delete_id",
+        ),
+    ] {
+        let binding = serde_json::json!({
+            "tool_call_id":"pending",
+            "action":"apps_delete",
+            "app_id":target,
+            "profile":"",
+            "branch":"",
+            "commit_sha":"",
+            "context": {"slug": target}
+        })
+        .to_string();
+        let minted = run_stdin(&["consent-mint"], &binding, &pending_envs);
+        assert_eq!(minted.status.code(), Some(0));
+        assert!(String::from_utf8_lossy(&minted.stdout).contains("consent-pending-"));
+
+        let input = serde_json::json!({
+            "session_id":"actual-claude-session",
+            "tool_call_id":tool_id,
+            "tool_name":"Bash",
+            "tool_input":{"command": command}
+        })
+        .to_string();
+        let allowed = run_stdin(&["preauth-check"], &input, &pending_envs);
+        assert_eq!(allowed.status.code(), Some(0));
+        let stdout = String::from_utf8_lossy(&allowed.stdout);
+        assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+    }
+
+    let session_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "apps-delete-session"),
+    ];
+    let numeric_binding = serde_json::json!({
+        "tool_call_id":"apps-delete-session:tc-app-delete",
+        "action":"apps_delete",
+        "app_id":"165",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"slug": "165"}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &numeric_binding, &session_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let slug_binding = serde_json::json!({
+        "tool_call_id":"apps-delete-session:tc-app-delete",
+        "action":"apps_delete",
+        "app_id":"nextjs-axhub",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"slug": "nextjs-axhub"}
+    })
+    .to_string();
+    let rejected = run_stdin(&["consent-verify"], &slug_binding, &session_envs);
+    assert_eq!(rejected.status.code(), Some(65));
+    assert!(String::from_utf8_lossy(&rejected.stdout).contains("binding_mismatch:app_id"));
+
+    let context_mismatch = serde_json::json!({
+        "tool_call_id":"apps-delete-session:tc-app-delete",
+        "action":"apps_delete",
+        "app_id":"165",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"slug": "nextjs-axhub"}
+    })
+    .to_string();
+    let rejected = run_stdin(&["consent-verify"], &context_mismatch, &session_envs);
+    assert_eq!(rejected.status.code(), Some(65));
+    assert!(String::from_utf8_lossy(&rejected.stdout).contains("binding_mismatch:context"));
+}
+
+#[test]
+fn cli_bootstrap_dry_run_does_not_create_state_or_gitignore() {
+    let temp = tempfile::tempdir().unwrap();
+    let output = run_in_dir(&["bootstrap", "--dry-run", "--json"], temp.path());
+    assert_eq!(output.status.code(), Some(65));
+    let json = stdout_json(&output);
+    assert_eq!(json["state"], "template_required");
+    assert_eq!(json["user_decision"], "template_required");
+    assert!(!temp.path().join(".axhub").exists());
+    assert!(!temp.path().join(".gitignore").exists());
+}
+
+#[test]
+fn cli_bootstrap_auto_chain_plans_apps_create_without_hidden_remote_mutation() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let ledger = temp.path().join("axhub-call-ledger.txt");
+    let output = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["state"], "consent_required_apps_create");
+    assert_eq!(json["next_action"], "apps_create");
+    assert_eq!(json["command"][0], "axhub");
+    assert_eq!(json["command"][1], "apps");
+    assert_eq!(json["command"][2], "create");
+    assert_eq!(json["consent_binding"]["action"], "apps_create");
+    assert_eq!(json["consent_binding"]["synthesized_by_helper"], true);
+    assert!(json["binding_hash"].as_str().unwrap().len() >= 16);
+    assert!(json["pending_action_id"]
+        .as_str()
+        .unwrap()
+        .starts_with("apps_create:"));
+    assert!(json["pending_action_hash"].as_str().unwrap().len() >= 16);
+    assert!(
+        !ledger.exists(),
+        "bootstrap must not execute axhub internally"
+    );
+    assert!(temp.path().join(".axhub/bootstrap.state.json").exists());
+    assert!(std::fs::read_to_string(temp.path().join(".gitignore"))
+        .unwrap()
+        .contains(".axhub/bootstrap.state.json"));
+
+    let replayed = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(replayed.status.code(), Some(0));
+    let replayed_json = stdout_json(&replayed);
+    assert_eq!(
+        replayed_json["pending_action_id"],
+        json["pending_action_id"]
+    );
+    assert_eq!(
+        replayed_json["pending_action_hash"],
+        json["pending_action_hash"]
+    );
+    assert_eq!(replayed_json["binding_hash"], json["binding_hash"]);
+    assert_eq!(replayed_json["command"], json["command"]);
+    assert_eq!(replayed_json["consent_binding"], json["consent_binding"]);
+    assert_eq!(
+        replayed_json["retry_policy"],
+        "no_retry_without_confirmed_idempotency"
+    );
+}
+
+#[test]
+fn cli_bootstrap_telemetry_markers_are_opt_in_redacted_and_re_entry_aware() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let state_home = temp.path().join("state-home");
+    let state_home_str = state_home.display().to_string();
+    let env_off = [
+        ("AXHUB_TELEMETRY", "0"),
+        ("XDG_STATE_HOME", state_home_str.as_str()),
+        ("CLAUDE_SESSION_ID", "bootstrap_session_abc123"),
+        ("AXHUB_PROFILE", "staging"),
+    ];
+
+    let off = run_in_dir_env(
+        &["bootstrap", "--auto-chain", "--json"],
+        temp.path(),
+        &env_off,
+    );
+    assert_eq!(off.status.code(), Some(0));
+    assert!(!state_home.join("axhub-plugin/usage.jsonl").exists());
+
+    std::fs::remove_dir_all(temp.path().join(".axhub")).unwrap();
+    std::fs::remove_file(temp.path().join(".gitignore")).unwrap();
+    let env_on = [
+        ("AXHUB_TELEMETRY", "1"),
+        ("XDG_STATE_HOME", state_home_str.as_str()),
+        ("CLAUDE_SESSION_ID", "bootstrap_session_abc123"),
+        ("AXHUB_PROFILE", "staging"),
+    ];
+
+    let planned = run_in_dir_env(
+        &["bootstrap", "--auto-chain", "--json"],
+        temp.path(),
+        &env_on,
+    );
+    assert_eq!(planned.status.code(), Some(0));
+    let replayed = run_in_dir_env(
+        &["bootstrap", "--auto-chain", "--json"],
+        temp.path(),
+        &env_on,
+    );
+    assert_eq!(replayed.status.code(), Some(0));
+
+    let raw = std::fs::read_to_string(state_home.join("axhub-plugin/usage.jsonl")).unwrap();
+    let events: Vec<serde_json::Value> = raw
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let event_names: Vec<&str> = events
+        .iter()
+        .filter_map(|event| event["event"].as_str())
+        .collect();
+    assert!(event_names.contains(&"bootstrap_phase_start"));
+    assert!(event_names.contains(&"bootstrap_phase_end"));
+    assert!(event_names.contains(&"bootstrap_re_entry_at_state"));
+    assert!(event_names.contains(&"consent_synthesized_by_helper"));
+
+    let allowed = [
+        "ts",
+        "session_id",
+        "plugin_version",
+        "cli_version",
+        "helper_version",
+        "event",
+        "schema_version",
+        "state",
+        "phase",
+        "outcome",
+        "elapsed_ms",
+        "decision_class",
+        "retry_policy",
+        "record_event",
+    ];
+    for event in &events {
+        let obj = event.as_object().unwrap();
+        for key in obj.keys() {
+            assert!(
+                allowed.contains(&key.as_str()),
+                "unexpected telemetry key: {key}"
+            );
+        }
+        let serialized = event.to_string();
+        for forbidden in [
+            "paydrop",
+            "apphub.yaml",
+            "axhub apps create",
+            "Bearer ",
+            "AXHUB_TOKEN",
+            "https://",
+            "stdout",
+            "stderr",
+        ] {
+            assert!(
+                !serialized.contains(forbidden),
+                "forbidden telemetry value {forbidden}: {serialized}"
+            );
+        }
+        assert_eq!(event["schema_version"], "bootstrap-telemetry/v1");
+    }
+
+    let consent = events
+        .iter()
+        .find(|event| event["event"] == "consent_synthesized_by_helper")
+        .unwrap();
+    assert_eq!(consent["record_event"], "apps_create");
+    assert_eq!(consent["decision_class"], "remote_destructive_plan");
+    assert_eq!(
+        consent["retry_policy"],
+        "no_retry_without_confirmed_idempotency"
+    );
+}
+
+#[test]
+fn cli_bootstrap_record_rejects_duplicate_out_of_order_and_mismatched_pending_actions() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(planned.status.code(), Some(0));
+    let plan = stdout_json(&planned);
+    let envelope = serde_json::json!({
+        "schema_version": "bootstrap-record/v1",
+        "pending_action_id": plan["pending_action_id"],
+        "pending_action_hash": plan["pending_action_hash"],
+        "command_argv": plan["command"],
+        "exit_code": 0,
+        "stdout_json": serde_json::from_str::<serde_json::Value>(include_str!("fixtures/bootstrap/apps_create.success.v1.json")).unwrap(),
+        "stderr": ""
+    });
+    let recorded = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &envelope.to_string(),
+        temp.path(),
+    );
+    assert_eq!(recorded.status.code(), Some(0));
+    assert_eq!(stdout_json(&recorded)["state"], "app_registered");
+
+    let duplicate = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &envelope.to_string(),
+        temp.path(),
+    );
+    assert_eq!(duplicate.status.code(), Some(64));
+    assert_eq!(
+        stdout_json(&duplicate)["reason"],
+        "record_duplicate_or_no_pending_action"
+    );
+
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    let plan = stdout_json(&planned);
+    let mut stale = envelope.clone();
+    stale["pending_action_id"] = plan["pending_action_id"].clone();
+    stale["pending_action_hash"] = serde_json::Value::String("bad-hash".into());
+    stale["command_argv"] = plan["command"].clone();
+    let mismatch = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &stale.to_string(),
+        temp.path(),
+    );
+    assert_eq!(mismatch.status.code(), Some(64));
+    assert_eq!(
+        stdout_json(&mismatch)["reason"],
+        "record_pending_action_mismatch"
+    );
+
+    let out_of_order = run_stdin_in_dir(
+        &["bootstrap", "--record", "deploy_create", "--json"],
+        &serde_json::json!({
+            "schema_version": "bootstrap-record/v1",
+            "pending_action_id": plan["pending_action_id"],
+            "pending_action_hash": plan["pending_action_hash"],
+            "command_argv": plan["command"],
+            "exit_code": 0,
+            "stdout_json": serde_json::from_str::<serde_json::Value>(include_str!("fixtures/bootstrap/apps_create.success.v1.json")).unwrap(),
+            "stderr": ""
+        })
+        .to_string(),
+        temp.path(),
+    );
+    assert_eq!(out_of_order.status.code(), Some(64));
+    assert_eq!(stdout_json(&out_of_order)["reason"], "record_out_of_order");
+}
+
+#[test]
+fn cli_bootstrap_git_init_and_first_commit_are_user_decision_states() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    let plan = stdout_json(&planned);
+    let envelope = serde_json::json!({
+        "schema_version": "bootstrap-record/v1",
+        "pending_action_id": plan["pending_action_id"],
+        "pending_action_hash": plan["pending_action_hash"],
+        "command_argv": plan["command"],
+        "exit_code": 0,
+        "stdout_json": serde_json::from_str::<serde_json::Value>(include_str!("fixtures/bootstrap/apps_create.success.v1.json")).unwrap(),
+        "stderr": ""
+    });
+    let recorded = run_stdin_in_dir(
+        &["bootstrap", "--record", "apps_create", "--json"],
+        &envelope.to_string(),
+        temp.path(),
+    );
+    assert_eq!(recorded.status.code(), Some(0));
+
+    let no_git = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(no_git.status.code(), Some(65));
+    let no_git_json = stdout_json(&no_git);
+    assert_eq!(no_git_json["state"], "git_init_required");
+    assert_eq!(no_git_json["next_action"], "git_init");
+    assert_eq!(no_git_json["command"], serde_json::json!(["git", "init"]));
+    assert!(
+        !temp.path().join(".git").exists(),
+        "bootstrap must not run git init"
+    );
+
+    let git_init = Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(git_init.status.success());
+    let first_commit = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(first_commit.status.code(), Some(65));
+    let first_commit_json = stdout_json(&first_commit);
+    assert_eq!(first_commit_json["state"], "first_commit_required");
+    assert_eq!(first_commit_json["next_action"], "first_commit");
+    assert_eq!(first_commit_json["command"][0], "git");
+    assert_eq!(first_commit_json["command"][1], "commit");
+}
+
+#[test]
+fn cli_bootstrap_record_validates_event_before_reading_stdin() {
+    let temp = tempfile::tempdir().unwrap();
+    let missing = run_in_dir(&["bootstrap", "--record", "--json"], temp.path());
+    assert_eq!(missing.status.code(), Some(64));
+    assert_eq!(stdout_json(&missing)["reason"], "record_event_missing");
+
+    let unknown = run_in_dir(&["bootstrap", "--record", "unknown", "--json"], temp.path());
+    assert_eq!(unknown.status.code(), Some(64));
+    assert_eq!(stdout_json(&unknown)["reason"], "record_event_unknown");
+}
+
+#[test]
+fn cli_bootstrap_malformed_deploy_success_records_terminal_stop_without_stale_pending() {
+    let temp = tempfile::tempdir().unwrap();
+    write_manifest(temp.path());
+    let planned = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(planned.status.code(), Some(0));
+    let plan = stdout_json(&planned);
+    let recorded = record_apps_create_success(temp.path(), &plan);
+    assert_eq!(recorded.status.code(), Some(0));
+
+    init_git_with_commit(temp.path());
+    let deploy_plan = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(deploy_plan.status.code(), Some(0));
+    let deploy_plan_json = stdout_json(&deploy_plan);
+    assert_eq!(deploy_plan_json["next_action"], "deploy_create");
+    assert_eq!(
+        deploy_plan_json["consent_binding"]["action"],
+        "deploy_create"
+    );
+
+    let malformed = serde_json::json!({
+        "schema_version": "bootstrap-record/v1",
+        "pending_action_id": deploy_plan_json["pending_action_id"],
+        "pending_action_hash": deploy_plan_json["pending_action_hash"],
+        "command_argv": deploy_plan_json["command"],
+        "exit_code": 0,
+        "stdout_json": {},
+        "stderr": ""
+    });
+    let malformed_record = run_stdin_in_dir(
+        &["bootstrap", "--record", "deploy_create", "--json"],
+        &malformed.to_string(),
+        temp.path(),
+    );
+    assert_eq!(malformed_record.status.code(), Some(65));
+    let malformed_json = stdout_json(&malformed_record);
+    assert_eq!(malformed_json["state"], "backend_contract_missing_defaults");
+    assert_eq!(
+        malformed_json["reason"],
+        "deploy_create_missing_deployment_id"
+    );
+
+    let replay = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    assert_eq!(replay.status.code(), Some(65));
+    let replay_json = stdout_json(&replay);
+    assert_eq!(replay_json["state"], "backend_contract_missing_defaults");
+    assert!(replay_json.get("pending_action_id").is_none());
+    assert!(replay_json.get("command").is_none());
+
+    let state_raw =
+        std::fs::read_to_string(temp.path().join(".axhub/bootstrap.state.json")).unwrap();
+    let state_json: serde_json::Value = serde_json::from_str(&state_raw).unwrap();
+    assert!(state_json.get("pending_action").is_none());
+    assert_eq!(state_json["completed_actions"].as_array().unwrap().len(), 2);
 }
