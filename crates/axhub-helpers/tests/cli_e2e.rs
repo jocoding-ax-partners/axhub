@@ -27,6 +27,18 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    let needs_prompt_route_sandbox = args.contains(&"prompt-route")
+        && !envs
+            .iter()
+            .any(|(key, _)| *key == "XDG_STATE_HOME" || *key == "AXHUB_NO_AUDIT");
+    let prompt_route_state = if needs_prompt_route_sandbox {
+        Some(tempfile::tempdir().unwrap())
+    } else {
+        None
+    };
+    if let Some(state) = &prompt_route_state {
+        command.env("XDG_STATE_HOME", state.path());
+    }
     for (k, v) in envs {
         command.env(k, v);
     }
@@ -806,7 +818,62 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
 
     let session = run(&["session-start"]);
     assert_eq!(session.status.code(), Some(0));
-    assert!(String::from_utf8_lossy(&session.stdout).contains("Rust runtime"));
+    let session_stdout = String::from_utf8_lossy(&session.stdout);
+    assert!(session_stdout.contains("Rust runtime"));
+    assert!(session_stdout.contains("AXHUB_NO_AUDIT"));
+    assert!(session_stdout.contains("cleanup-audit --all"));
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_prompt_route_rotates_audit_on_write_path() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let dir = state.join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let stale_date = (chrono::Utc::now() - chrono::Duration::days(8))
+        .format("%Y-%m-%d")
+        .to_string();
+    let stale = dir.join(format!("routing-audit-{stale_date}.jsonl"));
+    std::fs::write(&stale, "{}\n").unwrap();
+
+    let output = run_stdin(
+        &["prompt-route"],
+        r#"{"hook_event_name":"UserPromptSubmit","prompt":"오늘 날씨 알려줘"}"#,
+        &[
+            ("AXHUB_BIN", "/no/such/axhub/binary/exists"),
+            ("XDG_STATE_HOME", state.to_str().unwrap()),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(
+        !stale.exists(),
+        "prompt-route append should rotate stale audit files"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_cleanup_audit_all_yes_removes_audit_files() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let dir = state.join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let audit = dir.join("routing-audit-2000-01-01.jsonl");
+    let unrelated = dir.join("notes.txt");
+    std::fs::write(&audit, "{}\n").unwrap();
+    std::fs::write(&unrelated, "{}\n").unwrap();
+
+    let output = Command::new(bin())
+        .args(["cleanup-audit", "--all", "--yes"])
+        .env("XDG_STATE_HOME", state)
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(!audit.exists());
+    assert!(unrelated.exists());
 }
 
 #[test]

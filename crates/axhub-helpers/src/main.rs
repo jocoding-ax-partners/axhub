@@ -19,7 +19,7 @@ use axhub_helpers::telemetry::emit_meta_envelope;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>]\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>]\n  cleanup-audit [--all] [--yes]\n  version\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -76,6 +76,7 @@ fn run() -> anyhow::Result<i32> {
         }
         "list-deployments" => cmd_list_deployments(&rest),
         "bootstrap" => cmd_bootstrap(&rest),
+        "cleanup-audit" => cmd_cleanup_audit(&rest),
         "consent-mint" => cmd_consent_mint(&rest),
         "consent-verify" => cmd_consent_verify(),
         "preauth-check" => cmd_preauth_check(),
@@ -83,7 +84,7 @@ fn run() -> anyhow::Result<i32> {
         "session-start" => {
             println!(
                 "{}",
-                json!({"systemMessage":"axhub helper Rust runtime이에요."})
+                json!({"systemMessage":"axhub helper Rust runtime이에요.\naudit log 로컬 7일 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1. 삭제: axhub-helpers cleanup-audit --all"})
             );
             let mut m = Map::new();
             m.insert("event".into(), Value::String("session_start".into()));
@@ -461,6 +462,60 @@ fn cmd_preauth_check() -> anyhow::Result<i32> {
 }
 
 const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
+
+const CLEANUP_AUDIT_HELP: &str = "axhub-helpers cleanup-audit — audit log 삭제
+
+USAGE:
+  axhub-helpers cleanup-audit          # 7일 이상 된 파일만 삭제 (rotation)
+  axhub-helpers cleanup-audit --all    # 전체 삭제 (확인 prompt)
+  axhub-helpers cleanup-audit --all --yes   # 확인 우회
+
+OPTIONS:
+  --all      전체 삭제 (default 는 7일 이상만)
+  --yes -y   확인 prompt 우회
+  -h --help  도움말
+";
+
+fn cmd_cleanup_audit(args: &[String]) -> anyhow::Result<i32> {
+    use axhub_helpers::audit;
+
+    let mut all = false;
+    let mut yes = false;
+    for arg in args {
+        match arg.as_str() {
+            "--all" => all = true,
+            "--yes" | "-y" => yes = true,
+            "-h" | "--help" => {
+                print!("{CLEANUP_AUDIT_HELP}");
+                return Ok(0);
+            }
+            other => {
+                eprintln!("axhub-helpers cleanup-audit: 알 수 없는 flag: {other}");
+                return Ok(64);
+            }
+        }
+    }
+
+    if all {
+        if !yes {
+            print!("audit log 전체 삭제할까요? (y/N): ");
+            use std::io::Write;
+            std::io::stdout().flush().ok();
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+            if !input.trim().eq_ignore_ascii_case("y") {
+                println!("취소했어요.");
+                return Ok(0);
+            }
+        }
+        let count = audit::cleanup_all()?;
+        println!("audit log {count} 파일 삭제했어요.");
+    } else {
+        let count = audit::rotate(7)?;
+        println!("7일 이상 된 audit log {count} 파일 삭제했어요. 전체 삭제는 --all 사용해요.");
+    }
+    Ok(0)
+}
 
 // Approach E (Phase 2): cmd_prompt_route is preflight + audit only.
 // No keyword chain, no skill enforcement, no `skills/<X>/SKILL.md` paths in

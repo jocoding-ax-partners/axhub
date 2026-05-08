@@ -98,6 +98,10 @@ pub fn append(record: AuditRecord) -> std::io::Result<()> {
         return Ok(());
     }
 
+    if let Err(e) = rotate(7) {
+        eprintln!("[audit] rotate failed: {e}");
+    }
+
     let path = dir.join(format!("routing-audit-{}.jsonl", today_utc_iso_date()));
     match open_append_secure(&path) {
         Ok(mut f) => {
@@ -130,16 +134,46 @@ fn ensure_dir_with_perms(dir: &PathBuf) -> std::io::Result<()> {
 #[cfg(unix)]
 fn open_append_secure(path: &PathBuf) -> std::io::Result<std::fs::File> {
     use std::os::unix::fs::OpenOptionsExt;
-    OpenOptions::new()
+    use std::os::unix::fs::PermissionsExt;
+    let file = OpenOptions::new()
         .create(true)
         .append(true)
         .mode(0o600)
-        .open(path)
+        .open(path)?;
+    let mut perms = file.metadata()?.permissions();
+    perms.set_mode(0o600);
+    fs::set_permissions(path, perms)?;
+    Ok(file)
 }
 
 #[cfg(not(unix))]
 fn open_append_secure(path: &PathBuf) -> std::io::Result<std::fs::File> {
     OpenOptions::new().create(true).append(true).open(path)
+}
+
+/// Delete every routing-audit-*.jsonl file unconditionally. Returns count deleted.
+pub fn cleanup_all() -> std::io::Result<u32> {
+    let Some(dir) = audit_dir() else {
+        return Ok(0);
+    };
+    if !dir.exists() {
+        return Ok(0);
+    }
+    let mut deleted: u32 = 0;
+    for entry in fs::read_dir(&dir)? {
+        let entry = entry?;
+        let name_owned = entry.file_name();
+        let Some(name) = name_owned.to_str() else {
+            continue;
+        };
+        if !name.starts_with("routing-audit-") || !name.ends_with(".jsonl") {
+            continue;
+        }
+        if fs::remove_file(entry.path()).is_ok() {
+            deleted += 1;
+        }
+    }
+    Ok(deleted)
 }
 
 /// Delete audit JSONL files older than retention_days. Returns count deleted.
