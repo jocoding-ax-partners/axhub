@@ -106,4 +106,40 @@ describe("tests/run-corpus.sh fixture replay runner", () => {
     expect(result.stderr).toContain("ADVISORY");
     expect(result.stderr).toContain("manual/advisory");
   });
+
+  test("meta_question rows null match: fixture has fired_skill=null + null-rejection metric reaches 100% on identical baselines", () => {
+    // Fixture validity: corpus.20 의 3 meta rows (M1, M3, M11) 가 baseline 의 fired_skill = null.
+    const claudeNative = readJson("tests/baseline-results.claude-native.20.json");
+    const docsOnly = readJson("tests/baseline-results.docs-only.20.json");
+    for (const id of ["M1", "M3", "M11"]) {
+      const cn = claudeNative.find((r: { utterance_id: string }) => r.utterance_id === id);
+      const dl = docsOnly.find((r: { utterance_id: string }) => r.utterance_id === id);
+      expect(cn?.fired_skill).toBeNull();
+      expect(dl?.fired_skill).toBeNull();
+    }
+
+    // routing-score metric: identical baselines → null-rejection-rate 100% on full set.
+    const dir = mkdtempSync(join(tmpdir(), "axhub-corpus-meta-"));
+    try {
+      const fakeRoot = dir;
+      mkdirSync(join(fakeRoot, "tests"), { recursive: true });
+      const copy = (src: string, dst: string) =>
+        copyFileSync(join(REPO_ROOT, src), join(fakeRoot, dst));
+      copy("tests/corpus.20.jsonl", "tests/corpus.20.jsonl");
+      copy("tests/baseline-results.claude-native.20.json", "tests/baseline-results.claude-native.20.json");
+      copy("tests/baseline-results.claude-native.20.json", "tests/baseline-results.docs-only.20.json");
+      copy("tests/routing-score.ts", "tests/routing-score.ts");
+      copy("tests/run-corpus.sh", "tests/run-corpus.sh");
+
+      const result = spawnSync(
+        "bash",
+        [join(fakeRoot, "tests/run-corpus.sh"), "--mode", "plugin", "--corpus", "tests/corpus.20.jsonl", "--vs", "claude-native", "--score"],
+        { cwd: fakeRoot, encoding: "utf8", timeout: 30000, env: { ...process.env, PLUGIN_ROOT: fakeRoot } },
+      );
+      expect(result.status).toBe(0);
+      expect(result.stdout).toMatch(/null-rejection:\s+100\.00%/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
