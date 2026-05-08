@@ -29,7 +29,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { readSkillDescription } from "./codegen-skill-keywords-from-rust";
-import { computeQualityIssues, type QualityIssue } from "./skill-doctor-quality";
+import { computeExamplesIssues, computeQualityIssues, type QualityIssue } from "./skill-doctor-quality";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const SKILLS_DIR = join(REPO_ROOT, "skills");
@@ -312,6 +312,11 @@ for (const slug of skillSlugs) {
   const region = readSkillDescription(path);
   if (!region) continue;
   qualityIssues.push(...computeQualityIssues(slug, region.existingPhrases));
+  // Phase 9 — frontmatter examples field validation.
+  const content = readFileSync(path, "utf8");
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  const fm = fmMatch?.[1] ?? "";
+  qualityIssues.push(...computeExamplesIssues(slug, fm));
 }
 
 if (STRICT) {

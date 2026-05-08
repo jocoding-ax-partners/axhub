@@ -1,6 +1,17 @@
 ---
 name: whatsnew
 description: '이 스킬은 사용자가 axhub 의 새 기능, 변경점, 릴리즈 노트, changelog 를 알고 싶어할 때 사용해요. 다음 표현에서 활성화: "뭐 새로", "뭐 새로 나왔어", "새 기능 뭐야", "신규 기능", "changelog", "release notes", "what''s new", "whatsnew", 또는 axhub 변경점 확인 의도. axhub whatsnew 를 read-only 로 호출해요.'
+examples:
+  - utterance: "뭐 새로"
+    intent: "show axhub release notes"
+  - utterance: "뭐 새로 나왔어"
+    intent: "show axhub release notes"
+  - utterance: "changelog"
+    intent: "show axhub release notes"
+  - utterance: "release notes"
+    intent: "show axhub release notes"
+  - utterance: "새 기능 뭐야"
+    intent: "show axhub release notes"
 multi-step: false
 needs-preflight: false
 allows-dependency-execution: false

@@ -1,6 +1,17 @@
 ---
 name: env
 description: '이 스킬은 사용자가 axhub 앱의 환경변수를 보거나 추가하거나 삭제하고 싶어할 때 사용해요. 다음 표현에서 활성화: "환경 변수", "환경 변수 확인", "환경변수", "환경변수 뭐 있어", "환경변수 추가", "api 키", "API 키 등록", "DB URL 추가", "env 봐", "env 삭제", "env 추가", "secret 추가", "api key", "database url", "db url", "env list", "env var", "secret", 또는 axhub 앱의 env var 조회/변경 의도. set 은 --from-stdin 으로만 받아 argv 노출을 막아요.'
+examples:
+  - utterance: "환경 변수"
+    intent: "manage axhub environment variables"
+  - utterance: "환경 변수 확인"
+    intent: "manage axhub environment variables"
+  - utterance: "api key"
+    intent: "manage axhub environment variables"
+  - utterance: "database url"
+    intent: "manage axhub environment variables"
+  - utterance: "환경변수"
+    intent: "manage axhub environment variables"
 multi-step: true
 needs-preflight: true
 allows-dependency-execution: false

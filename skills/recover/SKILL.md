@@ -1,6 +1,17 @@
 ---
 name: recover
 description: '이 스킬은 사용자가 직전 배포를 되돌리거나 이전 버전으로 복원하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "되돌", "되돌려", "롤백", "롤백 부탁드립니다", "롤백해", "마지막 정상", "마지막 정상 빌드로", "마지막 정상 빌드로 돌려주세요", "망했어 되돌려", "방금 거 되돌려", "방금 배포 취소해", "배포 취소", "복구", "복구해", "안정 버전", "안정 버전으로", "어제 거로 돌려줘", "이전 버전", "이전 버전으로", "이전 버전으로 되돌려주세요", "잘 되던 버전으로 돌려", "직전 버전", "직전 버전으로 돌려줘", "직전 안정 버전으로 복구 부탁", "forward fix", "hot fix", "hotfix", "redeploy previous", "restore", "restore previous", "revert", "roll back", "rollback", "undo", "undo deploy", 또는 이전 상태 복원 의도. 참고: v0.1.0 CLI 가 실제 rollback 미지원이므로 직전 안정 commit 재배포 (forward-fix) 방식으로 구현합니다.'
+examples:
+  - utterance: "되돌"
+    intent: "rollback axhub deployment"
+  - utterance: "되돌려"
+    intent: "rollback axhub deployment"
+  - utterance: "forward fix"
+    intent: "rollback axhub deployment"
+  - utterance: "hot fix"
+    intent: "rollback axhub deployment"
+  - utterance: "롤백"
+    intent: "rollback axhub deployment"
 multi-step: true
 needs-preflight: true
 allows-dependency-execution: false
