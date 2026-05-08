@@ -2129,6 +2129,48 @@ fn cli_audit_clarify_appends_record_then_confused_filter_returns_it() {
 
 #[cfg(unix)]
 #[test]
+fn cli_audit_clarify_prompt_hashes_locally_for_portable_skill_snippet() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    let clarify = run_stdin(
+        &[
+            "audit-clarify",
+            "--prompt",
+            "배포 로그 애매해",
+            "--chosen",
+            "logs",
+        ],
+        "",
+        &[("XDG_STATE_HOME", state_s.as_str())],
+    );
+    assert_eq!(clarify.status.code(), Some(0));
+
+    let stats = run_stdin(
+        &["routing-stats", "--confused", "--json"],
+        "",
+        &[("XDG_STATE_HOME", state_s.as_str())],
+    );
+    assert_eq!(stats.status.code(), Some(0));
+    let stats_stdout = String::from_utf8_lossy(&stats.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(stats_stdout.trim()).expect("valid JSON");
+    let confused = parsed["confused_prompts"]
+        .as_array()
+        .expect("confused prompts");
+    assert!(
+        confused.iter().any(|record| {
+            record["chosen_skill"].as_str() == Some("logs")
+                && record["hash"]
+                    .as_str()
+                    .is_some_and(|hash| hash.starts_with("sha256:"))
+        }),
+        "{stats_stdout}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn cli_routing_dashboard_html_renders() {
     let temp = tempfile::tempdir().unwrap();
     let state = temp.path().join("state");
