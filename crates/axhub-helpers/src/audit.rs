@@ -173,10 +173,8 @@ pub fn rotate(retention_days: i64) -> std::io::Result<u32> {
             continue;
         };
 
-        if file_date < cutoff_date {
-            if fs::remove_file(entry.path()).is_ok() {
-                deleted += 1;
-            }
+        if file_date < cutoff_date && fs::remove_file(entry.path()).is_ok() {
+            deleted += 1;
         }
     }
     Ok(deleted)
