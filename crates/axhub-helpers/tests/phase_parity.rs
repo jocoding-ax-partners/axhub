@@ -52,6 +52,11 @@ fn env_lock() -> &'static Mutex<()> {
     LOCK.get_or_init(|| Mutex::new(()))
 }
 
+fn cwd_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
 struct EnvGuard {
     saved: HashMap<&'static str, Option<String>>,
     _dir: TempDir,
@@ -79,12 +84,14 @@ impl Drop for EnvGuard {
 
 struct CwdGuard {
     saved: std::path::PathBuf,
+    _lock: std::sync::MutexGuard<'static, ()>,
 }
 impl CwdGuard {
     fn enter(path: &std::path::Path) -> Self {
+        let lock = cwd_lock().lock().unwrap();
         let saved = std::env::current_dir().unwrap();
         std::env::set_current_dir(path).unwrap();
-        Self { saved }
+        Self { saved, _lock: lock }
     }
 }
 impl Drop for CwdGuard {
@@ -156,6 +163,7 @@ fn redact_matches_typescript_secret_and_unicode_contract() {
 
 #[test]
 fn spawn_sync_with_timeout_terminates_slow_children() {
+    let _cwd_lock = cwd_lock().lock().unwrap();
     let cmd: Vec<&str> = if cfg!(windows) {
         vec![
             "powershell.exe",
@@ -177,6 +185,7 @@ fn spawn_sync_with_timeout_terminates_slow_children() {
 
 #[test]
 fn spawn_sync_with_timeout_returns_successful_child_output() {
+    let _cwd_lock = cwd_lock().lock().unwrap();
     let cmd: Vec<&str> = if cfg!(windows) {
         vec!["cmd", "/C", "echo timeout-ok"]
     } else {
