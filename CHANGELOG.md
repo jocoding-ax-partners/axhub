@@ -4,6 +4,29 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.4](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.3...v0.5.4) (2026-05-08)
+
+Phase 24는 Windows 브라우저 로그인과 GitHub repo 연결 회복 흐름을 vibe coder 기준으로 막히지 않게 다듬은 패치예요. PowerShell consent-mint, PR routing gate, macOS spawn 테스트 격리를 함께 고쳐서 Windows·macOS·Linux 검증을 다시 green 으로 맞췄어요. 원격 main 에 먼저 들어온 Phase 0 deploy walltime measurement commit 도 같은 릴리스에 반영해요.
+
+### Test baseline
+
+- Local gate: `bun test`, `cargo test --workspace`, `bun run typecheck`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict`, `bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --vs claude-native --score` 가 green 이에요.
+- PR gate: Local Rust-primary, T2 helper-bin, corpus.100 drift, rust macOS / Ubuntu / Windows matrix 가 pass 예요.
+- Release gate: `bun run release -- --release-as patch` postbump 의 `codegen:version` + `release:check` 가 v0.5.4 manifest 와 helper artifact 를 확인했어요.
+
+### Honest tradeoff
+
+- Native Windows 실사용 OAuth 로그인은 CI smoke 가 아니라 문서·helper·Windows Rust matrix 경계까지 검증했어요.
+
+### Features
+
+* add Phase 0 deploy walltime measurement infrastructure ([d1e80b2](https://github.com/jocoding-ax-partners/axhub/commit/d1e80b2))
+
+### Fixed
+
+* make Windows auth and GitHub setup safer ([df9bec6](https://github.com/jocoding-ax-partners/axhub/commit/df9bec6fe47eb9590947e3187b355ba285a71ff9))
+* unblock routing gate and auth helper fallback ([e702d02](https://github.com/jocoding-ax-partners/axhub/commit/e702d021aa31820215e9742ee3b70782c9307345))
+
 ## [0.5.3](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.2...v0.5.3) (2026-05-08)
 
 Phase 12.3 핫픽스는 init 처럼 질문 뒤에 이어지는 multi-step SKILL 이 초기 TodoWrite 목록을 stale 상태로 남기지 않도록, 모든 multi-step skill 과 새 skill scaffold 에 status sync 규칙을 고정한 릴리스예요. 이제 workflow step 이 끝나거나 AskUserQuestion 답변 뒤에 전체 todos 배열을 다시 호출해서 completed / in_progress / pending 상태를 최신화하게 해요.
