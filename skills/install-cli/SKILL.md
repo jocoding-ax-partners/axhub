@@ -1,6 +1,6 @@
 ---
 name: install-cli
-description: '이 스킬은 사용자가 axhub CLI 가 설치되지 않은 상태에서 자동 설치를 요청할 때 사용해요. 다음 표현에서 활성화: "CLI 설치", "axhub CLI 설치", "axhub 설치", "ax-hub-cli 설치", "axhub install", "install axhub", "install cli", "auto install", "자동 설치", 또는 axhub CLI 부재 상태에서 doctor / deploy 가 routing 한 install 의도. OS 감지 후 공식 채널 (curl install.sh / irm install.ps1 / Homebrew / Scoop) 중 하나로 설치하고 axhub --version 으로 검증해요.'
+description: '이 스킬은 사용자가 axhub CLI 가 설치되지 않은 상태에서 자동 설치를 요청할 때 사용해요. 다음 표현에서 활성화: "자동 설치", "ax-hub-cli 설치", "axhub 설치", "axhub cli 설치", "axhub CLI 설치", "cli 설치", "CLI 설치", "auto install", "axhub install", "install axhub", "install cli", 또는 axhub CLI 부재 상태에서 doctor / deploy 가 routing 한 install 의도. OS 감지 후 공식 채널 (curl install.sh / irm install.ps1 / Homebrew / Scoop) 중 하나로 설치하고 axhub --version 으로 검증해요.'
 multi-step: true
 needs-preflight: false
 allows-dependency-execution: false
