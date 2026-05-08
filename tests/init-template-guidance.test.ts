@@ -55,6 +55,18 @@ describe("init template guidance UX", () => {
     expect(guide).toMatch(/숨기지/);
   });
 
+  test("keeps the structured template picker within the AskUserQuestion option limit", () => {
+    const questionStart = initSkill.indexOf('"question": "어떤 템플릿으로 시작할까요?"');
+    expect(questionStart).toBeGreaterThanOrEqual(0);
+
+    const questionEnd = initSkill.indexOf("```", questionStart);
+    expect(questionEnd).toBeGreaterThan(questionStart);
+
+    const questionBlock = initSkill.slice(questionStart, questionEnd);
+    const optionCount = [...questionBlock.matchAll(/"label":/g)].length;
+    expect(optionCount).toBeLessThanOrEqual(3);
+  });
+
   test("avoids unexplained developer jargon in user-facing guidance", () => {
     const guide = guidanceSection();
     expect(guide).not.toMatch(/\bSPA\b/i);

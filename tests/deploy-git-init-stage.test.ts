@@ -44,6 +44,27 @@ describe("deploy skill git init stage", () => {
     expect(entry.rationale).toContain("git init");
   });
 
+  test("auto-resolves CLAUDE_PLUGIN_ROOT before helper preflight and deploy commands", () => {
+    const content = readFileSync(DEPLOY_SKILL, "utf8");
+
+    expect(content).toContain("CLAUDE_PLUGIN_ROOT 자동 확인");
+    expect(content).toContain("CLAUDE_SKILL_DIR");
+    expect(content).toContain("export CLAUDE_PLUGIN_ROOT");
+    expect(content).toContain('PATH="${CLAUDE_PLUGIN_ROOT}/bin:${PATH}"');
+  });
+
+  test("pre-execute helper root fallback is not bash-only and includes native Windows", () => {
+    const content = readFileSync(DEPLOY_SKILL, "utf8");
+
+    const preflightBlock = content.match(/!\`([\s\S]*?)\`/)?.[1] ?? "";
+    expect(preflightBlock).toContain("node -e");
+    expect(preflightBlock).toContain("path.delimiter");
+    expect(preflightBlock).toContain("axhub-helpers.exe");
+    expect(preflightBlock).not.toContain("bash -lc");
+    expect(content).toContain("Windows PowerShell");
+    expect(content).toContain('$env:CLAUDE_PLUGIN_ROOT');
+  });
+
   test("git-init and deploy preview questions are structured AskUserQuestion payloads", () => {
     const content = readFileSync(DEPLOY_SKILL, "utf8");
     const registry = JSON.parse(readFileSync(ASK_DEFAULTS, "utf8"));

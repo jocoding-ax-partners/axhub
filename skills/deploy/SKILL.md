@@ -23,13 +23,49 @@ Deploy a vibe coder's app to axhub with safety primitives. Use the adapter `axhu
 
 ## Workflow
 
+**CLAUDE_PLUGIN_ROOT 자동 확인.** 모든 helper 호출 전에 `CLAUDE_PLUGIN_ROOT` 를 자동으로 채워요. Claude Code 가 env 를 전달하지 않은 세션에서는 `CLAUDE_SKILL_DIR` 로 plugin root 를 계산하고, 그래도 없으면 PATH 의 `axhub-helpers` / `axhub-helpers.exe` 위치에서 root 를 역산해요. 성공하면 조용히 `PATH` 에 plugin `bin/` 을 앞에 붙이고, 사용자에게 절대경로 우회 안내를 시키지 않아요.
+
+```bash
+if [ -z "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  if [ -n "${CLAUDE_SKILL_DIR:-}" ] && [ -d "${CLAUDE_SKILL_DIR}/../.." ]; then
+    export CLAUDE_PLUGIN_ROOT="$(cd "${CLAUDE_SKILL_DIR}/../.." && pwd)"
+  elif HELPER_FROM_PATH="$(command -v axhub-helpers 2>/dev/null)"; then
+    export CLAUDE_PLUGIN_ROOT="$(cd "$(dirname "$HELPER_FROM_PATH")/.." && pwd)"
+  elif [ -x "./bin/axhub-helpers" ]; then
+    export CLAUDE_PLUGIN_ROOT="$(pwd)"
+  fi
+fi
+if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  export PATH="${CLAUDE_PLUGIN_ROOT}/bin:${PATH}"
+fi
+```
+
+Windows PowerShell 에서는 같은 규칙을 아래처럼 적용해요. native Windows 는 `.exe` helper 를 명시해요.
+
+```powershell
+if (-not $env:CLAUDE_PLUGIN_ROOT) {
+  if ($env:CLAUDE_SKILL_DIR -and (Test-Path (Join-Path $env:CLAUDE_SKILL_DIR "..\.."))) {
+    $env:CLAUDE_PLUGIN_ROOT = (Resolve-Path (Join-Path $env:CLAUDE_SKILL_DIR "..\..")).Path
+  } elseif ($cmd = Get-Command axhub-helpers.exe -ErrorAction SilentlyContinue) {
+    $env:CLAUDE_PLUGIN_ROOT = (Resolve-Path (Join-Path (Split-Path $cmd.Source -Parent) "..")).Path
+  } elseif (Test-Path ".\bin\axhub-helpers.exe") {
+    $env:CLAUDE_PLUGIN_ROOT = (Get-Location).Path
+  }
+}
+if ($env:CLAUDE_PLUGIN_ROOT) {
+  $env:PATH = (Join-Path $env:CLAUDE_PLUGIN_ROOT "bin") + [IO.Path]::PathSeparator + $env:PATH
+}
+```
+
 **Pre-execute preflight context (Phase 17 US-1706 — `!command` injection)**:
 
 ```
-!`${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json`
+!`node -e "const fs=require('fs'),path=require('path'),cp=require('child_process'),isWin=process.platform==='win32';let root=process.env.CLAUDE_PLUGIN_ROOT||'';const env=Object.assign({},process.env);let pathKey='PATH';for(const key of Object.keys(env)){if(key.toLowerCase()==='path'){pathKey=key;break;}}if(root.length===0&&process.env.CLAUDE_SKILL_DIR){const candidate=path.resolve(process.env.CLAUDE_SKILL_DIR,'..','..');if(fs.existsSync(candidate))root=candidate;}if(root.length===0){const helperName=isWin?'axhub-helpers.exe':'axhub-helpers';for(const dir of (env[pathKey]||'').split(path.delimiter)){const helperPath=path.join(dir,helperName);if(fs.existsSync(helperPath)){root=path.resolve(dir,'..');break;}}}if(root.length===0&&fs.existsSync(path.resolve('bin',isWin?'axhub-helpers.exe':'axhub-helpers')))root=process.cwd();if(root.length>0){env.CLAUDE_PLUGIN_ROOT=root;env[pathKey]=path.join(root,'bin')+path.delimiter+(env[pathKey]||'');}const helper=root.length>0?path.join(root,'bin',isWin?'axhub-helpers.exe':'axhub-helpers'):(isWin?'axhub-helpers.exe':'axhub-helpers');const result=cp.spawnSync(helper,['preflight','--json'],{stdio:'inherit',env});if(result.error){console.log(JSON.stringify({systemMessage:'[axhub] plugin root 를 자동 확인하지 못했어요. axhub-helpers 를 PATH 에 넣거나 Claude Code plugin 을 다시 로드해요.'}));process.exit(0);}process.exit(typeof result.status==='number'?result.status:0);"`
 ```
 
-이 줄은 Claude Code SKILL preprocessing 으로 워크플로 시작 전에 실행돼요. 출력 (auth_status, current_app, current_env, last_deploy_id, last_deploy_status, plugin_version) 이 모델 컨텍스트에 자동 주입돼서 Step 1 의 별도 bash 호출이 줄어요. PreToolUse Bash hook 은 preprocessing 단계에서 trigger 안 해요 (Claude Code SKILL primitive 동작).
+이 줄은 Claude Code SKILL preprocessing 으로 워크플로 시작 전에 실행돼요. 출력 (auth_status, current_app, current_env, last_deploy_id, last_deploy_status, plugin_version) 이 모델 컨텍스트에 자동 주입돼서 Step 1 의 별도 shell 호출이 줄어요. PreToolUse hook 은 preprocessing 단계에서 trigger 안 해요 (Claude Code SKILL primitive 동작). 실질 명령은 `axhub-helpers preflight --json` 이고, `CLAUDE_PLUGIN_ROOT` 가 비어 있어도 cross-shell Node runner 가 POSIX/Git Bash/WSL 과 Windows PowerShell 양쪽에서 먼저 root 를 확인해요.
+
+**Command lane.** POSIX/Git Bash/WSL 은 `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers` 를 쓰고, Windows PowerShell 은 `& "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe"` 를 써요. JSON stdin 이 필요한 helper 호출은 PowerShell 에서 `ConvertTo-Json -Compress | & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" <subcommand>` 형태로 실행해요. Bash 배열 예시는 Windows 에서 그대로 붙여넣지 말고 PowerShell 배열 (`$ProfileArgs = @("--profile", $env:PROFILE)`) 로 바꿔요.
 
 To deploy:
 
