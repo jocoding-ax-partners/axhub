@@ -23,6 +23,8 @@ describe("score()", () => {
     expect(s.matched).toBe(4);
     expect(s.overall_accuracy).toBe(1);
     expect(s.null_rejection_rate).toBe(1);
+    expect(s.missing_results).toBe(0);
+    expect(s.extra_results).toBe(0);
     expect(s.per_skill.deploy?.precision).toBe(1);
     expect(s.per_skill.deploy?.recall).toBe(1);
   });
@@ -71,10 +73,35 @@ describe("score()", () => {
     expect(s.per_skill.deploy?.fn).toBe(1);
   });
 
-  test("empty results returns zeros", () => {
+  test("missing result rows count against corpus total", () => {
+    const s = score(corpus, [
+      { utterance_id: "A1", fired_skill: "deploy" },
+      { utterance_id: "N1", fired_skill: null },
+    ]);
+    expect(s.total).toBe(4);
+    expect(s.matched).toBe(2);
+    expect(s.missing_results).toBe(2);
+    expect(s.positive_missed).toBe(1);
+    expect(s.overall_accuracy).toBe(0.5);
+    expect(s.per_skill.logs?.fn).toBe(1);
+  });
+
+  test("empty results still uses corpus total and fails accuracy", () => {
     const s = score(corpus, []);
-    expect(s.total).toBe(0);
+    expect(s.total).toBe(4);
+    expect(s.missing_results).toBe(4);
+    expect(s.positive_missed).toBe(2);
     expect(s.overall_accuracy).toBe(0);
+  });
+
+  test("unknown result rows are reported as extra fixture data", () => {
+    const s = score(corpus, [
+      { utterance_id: "A1", fired_skill: "deploy" },
+      { utterance_id: "UNKNOWN", fired_skill: "deploy" },
+    ]);
+    expect(s.extra_results).toBe(1);
+    expect(s.missing_results).toBe(3);
+    expect(s.overall_accuracy).toBe(0.25);
   });
 });
 
