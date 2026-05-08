@@ -42,6 +42,17 @@ describe("parseMainRs", () => {
     expect(allClarifyPhrases).toContain("환경"); // single-token if p == "환경"
     expect(allClarifyPhrases).toContain("axhub"); // axhub clarify
   });
+
+  test("upgrade compound guard does not become standalone plugin/update triggers", () => {
+    const upgradeBlock = blocks.find((b) => b.skill === "upgrade");
+    expect(upgradeBlock).toBeDefined();
+    const phrases = upgradeBlock?.phrases ?? [];
+    for (const unsafe of ["plugin", "플러그인", "update", "upgrade", "version", "업데이트", "업그레이드", "버전", "새 버전", "호환"]) {
+      expect(phrases).not.toContain(unsafe);
+    }
+    expect(phrases).toContain("plugin update");
+    expect(phrases).toContain("플러그인 업데이트");
+  });
 });
 
 describe("aggregatePerSkill", () => {
@@ -81,6 +92,13 @@ describe("readSkillDescription", () => {
     const region = readSkillDescription(join(REPO_ROOT, "skills/clarify/SKILL.md"));
     expect(region).not.toBeNull();
     expect(region?.marker).toBe("다음과 같은 불확실 컨텍스트에서 활성화:");
+  });
+
+  test("parses YAML-escaped apostrophes in single-quoted descriptions", () => {
+    const region = readSkillDescription(join(REPO_ROOT, "skills/whatsnew/SKILL.md"));
+    expect(region).not.toBeNull();
+    expect(region?.existingPhrases).toContain("what's new");
+    expect(region?.existingPhrases.filter((phrase) => phrase === "what's new")).toHaveLength(1);
   });
 
   test("returns null for missing SKILL.md", () => {
@@ -153,5 +171,15 @@ describe("end-to-end codegen idempotency", () => {
     expect(afterFirst).toBe(afterSecond);
     // Also: second run should produce zero changes vs original (assuming caller already converged)
     expect(afterFirst).toBe(before);
+  });
+});
+
+
+describe("generated SKILL frontmatter", () => {
+  test("single-quoted description lines escape apostrophes for YAML", () => {
+    const skillPath = join(REPO_ROOT, "skills/whatsnew/SKILL.md");
+    const line = readFileSync(skillPath, "utf8").split("\n").find((l) => l.startsWith("description: "));
+    expect(line).toBeDefined();
+    expect(line).toMatch(/^description:\s*'(?:[^']|'')*'$/);
   });
 });

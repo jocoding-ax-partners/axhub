@@ -31,6 +31,8 @@ interface KeywordBlock {
 interface SkillDescriptionRegion {
   path: string;
   description: string;
+  rawDescription: string;
+  quote: "'" | '"';
   triggerStart: number;
   triggerEnd: number;
   existingPhrases: string[];
@@ -55,6 +57,47 @@ const TRIGGER_MARKERS = [
   "다음과 같은 불확실 컨텍스트에서 활성화:",
   "Triggers on:",
 ] as const;
+
+const UPGRADE_COMPOUND_TRIGGER_PHRASES = [
+  "플러그인 새 버전",
+  "플러그인 업그레이드",
+  "플러그인 업데이트",
+  "플러그인 버전",
+  "플러그인 호환",
+  "지금 플러그인 버전이 뭐야",
+  "플러그인이랑 호환되는 버전이야",
+  "axhub plugin update",
+  "axhub plugin upgrade",
+  "axhub plugin version",
+  "plugin self-upgrade",
+  "plugin update",
+  "plugin upgrade",
+  "plugin version",
+] as const;
+
+function normalizeKeywordBlock(skill: string, phrases: string[]): string[] {
+  if (skill !== "upgrade") return phrases;
+
+  const unsafeStandalone = new Set([
+    "plugin",
+    "플러그인",
+    "upgrade",
+    "update",
+    "version",
+    "업데이트",
+    "업그레이드",
+    "새 버전",
+    "버전",
+    "호환",
+  ]);
+  const allFromCompoundGuard = phrases.length > 0 && phrases.every((phrase) => unsafeStandalone.has(phrase));
+  if (!allFromCompoundGuard) return phrases;
+
+  // main.rs routes upgrade only when a plugin guard AND an update/version term
+  // both match. Flat SKILL descriptions cannot express that conjunction, so emit
+  // only plugin-qualified phrases and never the guard terms as standalone triggers.
+  return [...UPGRADE_COMPOUND_TRIGGER_PHRASES];
+}
 
 function parseMainRs(): KeywordBlock[] {
   const text = readFileSync(MAIN_RS, "utf8");
@@ -91,7 +134,7 @@ function parseMainRs(): KeywordBlock[] {
       const decoded = raw.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
       phrases.push(decoded);
     }
-    blocks.push({ skill, phrases });
+    blocks.push({ skill, phrases: normalizeKeywordBlock(skill, phrases) });
   }
 
   // Pattern B: if p == "X" { return Some(PromptRoute { skill: "Y" })
@@ -100,7 +143,7 @@ function parseMainRs(): KeywordBlock[] {
     const phrase = match[1];
     const skill = match[2];
     if (!phrase || !skill) continue;
-    blocks.push({ skill, phrases: [phrase] });
+    blocks.push({ skill, phrases: normalizeKeywordBlock(skill, [phrase]) });
   }
 
   return blocks;
@@ -129,10 +172,17 @@ function readSkillDescription(path: string): SkillDescriptionRegion | null {
     return null;
   }
 
-  // frontmatter 안 description 라인 추출 (single-line description, quoted prose)
-  const descMatch = raw.match(/^description:\s*(['"])([\s\S]*?)\1$/m);
-  if (!descMatch) return null;
-  const description = descMatch[2];
+  // frontmatter 안 description 라인 추출 (single-line description, quoted prose).
+  // YAML single-quoted scalars escape apostrophes as doubled single quotes.
+  const single = raw.match(/^description:\s*'((?:[^']|'')*)'$/m);
+  const double = single ? null : raw.match(/^description:\s*"((?:[^"\\]|\\.)*)"$/m);
+  if (!single && !double) return null;
+
+  const quote = single ? "'" : '"';
+  const rawDescription = (single?.[1] ?? double?.[1]) ?? "";
+  const description = single
+    ? rawDescription.replace(/''/g, "'")
+    : JSON.parse(`"${rawDescription}"`);
   if (!description) return null;
 
   let marker: typeof TRIGGER_MARKERS[number] | null = null;
@@ -173,6 +223,8 @@ function readSkillDescription(path: string): SkillDescriptionRegion | null {
   return {
     path,
     description,
+    rawDescription,
+    quote,
     triggerStart,
     triggerEnd,
     existingPhrases,
@@ -233,14 +285,20 @@ function applyMerge(
   };
 }
 
-function writeSkillFile(path: string, oldDescription: string, newDescription: string): void {
-  const raw = readFileSync(path, "utf8");
-  // exact match replace (full description content between quotes)
-  const updated = raw.replace(oldDescription, newDescription);
+function serializeDescription(description: string, quote: "'" | '"'): string {
+  if (quote === "'") return description.replace(/'/g, "''");
+  return description.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function writeSkillFile(region: SkillDescriptionRegion, newDescription: string): void {
+  const raw = readFileSync(region.path, "utf8");
+  const oldLine = `description: ${region.quote}${region.rawDescription}${region.quote}`;
+  const newLine = `description: ${region.quote}${serializeDescription(newDescription, region.quote)}${region.quote}`;
+  const updated = raw.replace(oldLine, newLine);
   if (updated === raw) {
-    throw new Error(`description replace failed for ${path}`);
+    throw new Error(`description replace failed for ${region.path}`);
   }
-  writeFileSync(path, updated);
+  writeFileSync(region.path, updated);
 }
 
 function main(): void {
@@ -279,7 +337,7 @@ function main(): void {
     if (mode === "apply" && diff.missing.length > 0) {
       const merge = applyMerge(region, mainRsPhrases);
       if (merge.changed) {
-        writeSkillFile(path, region.description, merge.newDescription);
+        writeSkillFile(region, merge.newDescription);
         appliedCount += 1;
       }
     }
