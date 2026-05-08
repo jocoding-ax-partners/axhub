@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
+use chrono::FixedOffset;
 use regex::Regex;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -128,6 +129,7 @@ pub struct PreflightOutput {
     pub endpoint: Option<String>,
     pub user_email: Option<String>,
     pub expires_at: Option<String>,
+    pub expires_human: Option<String>,
     pub current_app: Option<String>,
     pub current_env: Option<String>,
     pub last_deploy_id: Option<String>,
@@ -240,6 +242,13 @@ where
         } => (true, None, scopes, Some(user_email), Some(expires_at)),
         AuthStatus::Error { code, .. } => (false, Some(code), vec![], None, None),
     };
+    let expires_human = expires_at.as_deref().and_then(|iso| {
+        crate::humanize::format_expires_human(
+            iso,
+            FixedOffset::east_opt(9 * 3600).unwrap(),
+            chrono::Utc::now(),
+        )
+    });
     let output = PreflightOutput {
         cli_version,
         in_range,
@@ -257,6 +266,7 @@ where
             .filter(|s| !s.is_empty()),
         user_email,
         expires_at,
+        expires_human,
         current_app: std::env::var("AXHUB_APP_SLUG")
             .ok()
             .filter(|s| !s.is_empty())

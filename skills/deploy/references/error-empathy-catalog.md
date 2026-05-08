@@ -354,3 +354,140 @@ When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <I
 **해결:** method, endpoint, body source 를 preview 로 확인한 뒤 동의 token 을 mint 해서 다시 실행해요.
 
 **버튼:** ["preview 보기", "취소", "도와주세요"]
+
+---
+
+## npm 권한 오류 (npm_eacces_cache)
+
+> 오류 패턴: `EACCES` + `_cacache`
+
+**감정:** 이건 흔한 일이에요. npm 캐시 폴더 권한이 달라졌을 뿐이에요.
+
+**원인:** npm 캐시 폴더를 다른 사용자 (보통 root 또는 관리자) 권한으로 쓴 적이 있어서 지금 계정으로는 읽거나 쓸 수 없어요. 패키지 설치 자체의 문제가 아니에요. 캐시 위치는 macOS/Linux 는 `~/.npm/_cacache`, Windows 는 `%LOCALAPPDATA%\npm-cache\_cacache` 예요.
+
+**해결:** "npm 캐시 권한 고쳐줘" 라고 말씀하시면 OS 별로 아래 명령을 안내드려요.
+
+macOS / Linux:
+```
+sudo chown -R $(whoami) ~/.npm
+```
+Windows (PowerShell, 관리자 권한):
+```
+icacls "$env:LOCALAPPDATA\npm-cache" /grant "$($env:USERNAME):F" /T
+```
+또는 캐시를 비우고 다시 시도하세요 (양쪽 OS 공통):
+```
+npm cache clean --force && npm install
+```
+
+**버튼:** ["캐시 권한 고치기", "캐시 비우고 재시도", "도와주세요"]
+
+---
+
+## npm 권한 오류 (npm_eexist_cache)
+
+> 오류 패턴: `EEXIST` + `rename` + `tmp`
+
+**감정:** 이건 흔한 일이에요. npm 캐시 임시 파일 충돌이에요.
+
+**원인:** npm 이 패키지를 캐시에 저장하다가 임시 파일이 이미 존재해서 충돌했어요. 이전 설치가 중간에 끊기거나 여러 npm 프로세스가 동시에 돌 때 생겨요. 앱 코드는 전혀 건드리지 않았어요.
+
+**해결:** "npm 캐시 지우고 다시 설치해줘" 라고 말씀하시면 됩니다 (양쪽 OS 공통):
+```
+npm cache clean --force
+npm install
+```
+계속 반복된다면 캐시 폴더를 완전히 지워도 안전해요 (캐시만 지우는 거예요). macOS/Linux 는 `~/.npm/_cacache`, Windows 는 `%LOCALAPPDATA%\npm-cache\_cacache` 예요.
+
+**버튼:** ["캐시 지우고 재시도", "캐시 폴더 삭제 안내", "도와주세요"]
+
+---
+
+## npm 권한 오류 (npm_eperm)
+
+> 오류 패턴: `EPERM` + `operation not permitted`
+
+**감정:** 이건 흔한 일이에요. 파일 시스템 권한 문제예요.
+
+**원인:** npm 이 파일을 만들거나 지우려는데 운영체제에서 막고 있어요. 보통 node_modules 폴더나 패키지 파일이 다른 사용자 소유이거나, Windows 에서 Antivirus 가 파일을 잠근 경우예요.
+
+**해결:** 프로젝트 폴더 소유권을 현재 계정으로 바꿔주세요.
+
+macOS / Linux:
+```
+sudo chown -R $(whoami) ./node_modules
+sudo chown -R $(whoami) .
+```
+Windows (PowerShell, 관리자 권한):
+```
+icacls .\node_modules /grant "$($env:USERNAME):F" /T
+icacls . /grant "$($env:USERNAME):F" /T
+```
+Windows 라면 Antivirus 를 잠시 끄거나 터미널을 관리자 권한으로 실행해보세요. `sudo npm install` 은 사용하지 마세요 — 더 큰 권한 문제가 생길 수 있어요.
+
+**버튼:** ["소유권 변경 안내", "node_modules 삭제 후 재설치", "도와주세요"]
+
+---
+
+## npm 권한 오류 (npm_enospc)
+
+> 오류 패턴: `ENOSPC` + `no space left`
+
+**감정:** 잠깐만요. 디스크 공간이 부족해요. 당신 코드는 안전합니다.
+
+**원인:** 디스크에 여유 공간이 없어서 npm 이 패키지 파일을 저장하지 못했어요. node_modules 나 npm 캐시가 커지면서 디스크를 다 쓴 경우가 많아요.
+
+**해결:** 먼저 여유 공간을 확보해보세요.
+
+macOS / Linux:
+```
+df -h                     # 디스크 사용량 확인
+npm cache clean --force   # npm 캐시 정리
+```
+Windows (PowerShell):
+```
+Get-PSDrive -PSProvider FileSystem   # 드라이브 사용량 확인
+npm cache clean --force              # npm 캐시 정리
+```
+Docker 나 CI 환경이라면 볼륨 크기를 늘리거나 불필요한 이미지를 정리해주세요 (양쪽 OS 공통):
+```
+docker system prune
+```
+
+**버튼:** ["디스크 사용량 확인", "캐시 정리 후 재시도", "도와주세요"]
+
+---
+
+## npm 권한 오류 (npm_enotempty)
+
+> 오류 패턴: `ENOTEMPTY` + `directory not empty`
+
+**감정:** 이건 흔한 일이에요. 폴더가 비어있지 않아서 생긴 충돌이에요.
+
+**원인:** npm 이 패키지 폴더를 교체하거나 지우려는데 안에 파일이 남아있어서 실패했어요. 이전 설치가 중간에 끊겼거나 다른 프로세스가 폴더를 사용 중일 때 생겨요.
+
+**해결:** node_modules 를 완전히 지우고 다시 설치해보세요.
+
+macOS / Linux:
+```
+rm -rf node_modules
+npm install
+```
+Windows (PowerShell):
+```
+Remove-Item -Recurse -Force node_modules
+npm install
+```
+잠금 파일도 함께 지우고 싶다면 — macOS / Linux:
+```
+rm -rf node_modules package-lock.json
+npm install
+```
+Windows (PowerShell):
+```
+Remove-Item -Recurse -Force node_modules, package-lock.json
+npm install
+```
+`npm install --force` 는 사용하지 마세요 — 의존성 불일치를 숨길 수 있어요.
+
+**버튼:** ["node_modules 삭제 후 재설치", "잠금 파일도 같이 삭제", "도와주세요"]

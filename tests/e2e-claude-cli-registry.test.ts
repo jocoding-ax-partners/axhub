@@ -74,9 +74,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("18 actual safe_default rationale 엔트리 (기존 9 + init/env/github/profile/deploy/apps delete/install-cli + doctor cli-install)", () => {
+  test("20 actual safe_default rationale 엔트리 (기존 18 + init dependency_install_strategy/package_manager_choice)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(18);
+    expect(paths).toHaveLength(20);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -92,6 +92,8 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "doctor",
       "env",
       "github",
+      "init",
+      "init",
       "init",
       "install-cli",
       "profile",
