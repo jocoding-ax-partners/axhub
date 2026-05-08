@@ -2054,7 +2054,8 @@ fn cli_bootstrap_malformed_deploy_success_records_terminal_stop_without_stale_pe
 fn cli_prompt_route_examples_injected_when_env_set() {
     let temp = tempfile::tempdir().unwrap();
     let axhub = fake_axhub(&temp);
-    let input = serde_json::json!({"hook_event_name":"UserPromptSubmit","prompt":"배포해줘"}).to_string();
+    let input =
+        serde_json::json!({"hook_event_name":"UserPromptSubmit","prompt":"배포해줘"}).to_string();
 
     let with_env = run_stdin(
         &["prompt-route"],
@@ -2067,12 +2068,18 @@ fn cli_prompt_route_examples_injected_when_env_set() {
     );
     assert_eq!(with_env.status.code(), Some(0));
     let stdout_with = String::from_utf8_lossy(&with_env.stdout);
-    assert!(stdout_with.contains("AXHUB_INJECT_EXAMPLES enabled"), "{stdout_with}");
+    assert!(
+        stdout_with.contains("AXHUB_INJECT_EXAMPLES enabled"),
+        "{stdout_with}"
+    );
 
     let without_env = run_stdin(
         &["prompt-route"],
         &input,
-        &[("AXHUB_BIN", axhub.to_str().unwrap()), ("AXHUB_NO_AUDIT", "1")],
+        &[
+            ("AXHUB_BIN", axhub.to_str().unwrap()),
+            ("AXHUB_NO_AUDIT", "1"),
+        ],
     );
     assert_eq!(without_env.status.code(), Some(0));
     let stdout_without = String::from_utf8_lossy(&without_env.stdout);
