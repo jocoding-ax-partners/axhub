@@ -29,7 +29,9 @@ export interface SkillExample {
   intent: string;
 }
 
-export const isKorean = (s: string): boolean => /[가-힯]/.test(s);
+// U+AC00 (가) - U+D7A3 (힣) = Hangul Syllables block. Previous bound 힯 (U+D76F)
+// missed 52 rare syllables (U+D770-U+D7A3).
+export const isKorean = (s: string): boolean => /[가-힣]/.test(s);
 
 export function computeQualityIssues(slug: string, phrases: string[]): QualityIssue[] {
   const issues: QualityIssue[] = [];
@@ -81,15 +83,18 @@ export function parseExamples(frontmatter: string): SkillExample[] {
       inExamples = false;
       break;
     }
-    const dashUtter = line.match(/^\s+-\s+utterance:\s*['"](.+?)['"]\s*$/);
+    // Phase 11 fix: support escaped double-quotes (formatExamplesYaml emits \").
+    // Pattern accepts either a non-quote/non-backslash char or a backslash-escape.
+    const unescape = (s: string): string => s.replace(/\\(.)/g, "$1");
+    const dashUtter = line.match(/^\s+-\s+utterance:\s*"((?:[^"\\]|\\.)*)"\s*$/);
     if (dashUtter && dashUtter[1] !== undefined) {
       flush();
-      current.utterance = dashUtter[1];
+      current.utterance = unescape(dashUtter[1]);
       continue;
     }
-    const intentMatch = line.match(/^\s+intent:\s*['"](.+?)['"]\s*$/);
+    const intentMatch = line.match(/^\s+intent:\s*"((?:[^"\\]|\\.)*)"\s*$/);
     if (intentMatch && intentMatch[1] !== undefined) {
-      current.intent = intentMatch[1];
+      current.intent = unescape(intentMatch[1]);
     }
   }
   flush();

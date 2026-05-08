@@ -75,37 +75,23 @@ export function findFailingCases(opts: {
 }): FailingCase[] {
   const docsMap = new Map(opts.docsOnly.map((e) => [e.utterance_id, e.fired_skill]));
   const cnMap = new Map(opts.claudeNative.map((e) => [e.utterance_id, e.fired_skill]));
+  // Phase 11 fix: 1 case per utterance_id (priority: drift > docs-only > claude-native).
   const cases: FailingCase[] = [];
   for (const row of opts.corpus) {
     if (!row.expected_skill) continue;
     const docs = docsMap.get(row.id);
     const cn = cnMap.get(row.id);
-    if (docs !== undefined && docs !== row.expected_skill) {
-      cases.push({
-        utterance_id: row.id,
-        utterance: row.utterance,
-        expected_skill: row.expected_skill,
-        actual_skill: docs,
-        source: "docs-only",
-      });
-    }
-    if (cn !== undefined && cn !== row.expected_skill) {
-      cases.push({
-        utterance_id: row.id,
-        utterance: row.utterance,
-        expected_skill: row.expected_skill,
-        actual_skill: cn,
-        source: "claude-native",
-      });
-    }
+    const base = {
+      utterance_id: row.id,
+      utterance: row.utterance,
+      expected_skill: row.expected_skill,
+    } as const;
     if (docs !== undefined && cn !== undefined && docs !== cn) {
-      cases.push({
-        utterance_id: row.id,
-        utterance: row.utterance,
-        expected_skill: row.expected_skill,
-        actual_skill: cn,
-        source: "drift",
-      });
+      cases.push({ ...base, actual_skill: cn, source: "drift" });
+    } else if (docs !== undefined && docs !== row.expected_skill) {
+      cases.push({ ...base, actual_skill: docs, source: "docs-only" });
+    } else if (cn !== undefined && cn !== row.expected_skill) {
+      cases.push({ ...base, actual_skill: cn, source: "claude-native" });
     }
   }
   return cases;
@@ -144,12 +130,20 @@ export async function runTune(opts: {
 class AnthropicTuneClient implements LlmClient {
   constructor(private readonly apiKey: string, private readonly model: string) {}
   async suggest(failing: FailingCase, currentDescription: string) {
+    // Phase 11 — sanitize prompt input (matches measure-docs-only-baseline:sanitizeForPrompt contract).
+    const safe = (s: string, n = 200): string =>
+      s
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .slice(0, n);
     const prompt = [
       "당신은 axhub plugin 의 SKILL 작성자예요. 다음 routing failure 를 수정해야 해요:",
       "",
-      `발화: "${failing.utterance}"`,
-      `기대된 skill: ${failing.expected_skill}`,
-      `실제 fired skill: ${failing.actual_skill ?? "null"}`,
+      `발화: "${safe(failing.utterance)}"`,
+      `기대된 skill: ${safe(failing.expected_skill, 64)}`,
+      `실제 fired skill: ${safe(failing.actual_skill ?? "null", 64)}`,
       `failure source: ${failing.source}`,
       "",
       `현재 description:`,
@@ -221,10 +215,20 @@ async function main(): Promise<void> {
   }
 
   if (confused) {
-    const result = execSync("bin/axhub-helpers routing-stats --confused --json", {
-      encoding: "utf8",
-      cwd: REPO_ROOT,
-    });
+    let result: string;
+    try {
+      result = execSync("bin/axhub-helpers routing-stats --confused --json", {
+        encoding: "utf8",
+        cwd: REPO_ROOT,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      process.stderr.write(
+        `[routing-tune] bin/axhub-helpers 호출 실패: ${msg}\n` +
+          "  cargo build --release -p axhub-helpers 먼저 실행한 후 bin/axhub-helpers 가 존재하는지 확인해요.\n",
+      );
+      process.exit(1);
+    }
     const parsed = JSON.parse(result || "{}") as { total_prompts?: number; top_axhub_hashes?: { hash: string; count: number }[] };
     const total = parsed.total_prompts ?? 0;
     process.stderr.write(

@@ -254,7 +254,7 @@ function computeDiff(skill: string, region: SkillDescriptionRegion, mainRsPhrase
 function formatPhraseList(phrases: string[]): string {
   // 한국어 → 영어 + alphabetical within each group
   const collator = new Intl.Collator("ko");
-  const isKorean = (s: string): boolean => /[가-힯]/.test(s);
+  const isKorean = (s: string): boolean => /[가-힣]/.test(s);
   const korean = phrases.filter(isKorean).sort(collator.compare);
   const english = phrases.filter((p) => !isKorean(p)).sort();
   const all = [...korean, ...english];

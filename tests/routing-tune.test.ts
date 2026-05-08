@@ -43,16 +43,26 @@ class MockLlmClient implements LlmClient {
 }
 
 describe("findFailingCases", () => {
-  test("filters drift > 0 rows only — T3 docs-only fired_skill mismatch", () => {
+  test("filters drift > 0 rows only — T3 docs-only ≠ claude-native → 1 'drift' case (priority)", () => {
     const cases = findFailingCases({
       corpus: SAMPLE_CORPUS,
       docsOnly: DOCS_ONLY,
       claudeNative: CLAUDE_NATIVE,
     });
     const t3 = cases.filter((c) => c.utterance_id === "T3");
-    expect(t3.length).toBeGreaterThanOrEqual(1);
-    expect(t3.some((c) => c.source === "docs-only")).toBe(true);
-    expect(t3.some((c) => c.source === "drift")).toBe(true);
+    // Phase 11 fix — dedup: drift > docs-only > claude-native priority. 1 case per utterance_id.
+    expect(t3.length).toBe(1);
+    expect(t3[0]?.source).toBe("drift");
+  });
+
+  test("no_duplicate_failing_case_per_utterance_id (Phase 11 dedup)", () => {
+    const cases = findFailingCases({
+      corpus: SAMPLE_CORPUS,
+      docsOnly: DOCS_ONLY,
+      claudeNative: CLAUDE_NATIVE,
+    });
+    const ids = cases.map((c) => c.utterance_id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   test("expected_skill = null rows skipped", () => {

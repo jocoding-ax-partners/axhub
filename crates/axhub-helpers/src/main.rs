@@ -663,6 +663,11 @@ fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
     let mut records = audit::read_since(since)?;
     if confused {
         records.retain(|r| r.clarify_invoked);
+    } else {
+        // Phase 11 fix: exclude clarify sentinel records from default stats so
+        // they don't inflate auth_failed (clarify records have auth_ok=false by
+        // construction) or depress axhub_related counts.
+        records.retain(|r| !r.clarify_invoked);
     }
     if records.is_empty() {
         if json {
@@ -870,6 +875,14 @@ OPTIONS:
   -h, --help  도움말
 ";
 
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
+}
+
 fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
     use axhub_helpers::audit;
     let html_mode = args.iter().any(|a| a == "--html");
@@ -893,7 +906,10 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
     if html_mode {
         let mut chosen_rows = String::new();
         for (skill, count) in &rows {
-            chosen_rows.push_str(&format!("<tr><td>{skill}</td><td>{count}</td></tr>"));
+            chosen_rows.push_str(&format!(
+                "<tr><td>{}</td><td>{count}</td></tr>",
+                html_escape(skill)
+            ));
         }
         let html = format!(
             include_str!("../templates/dashboard.html"),
