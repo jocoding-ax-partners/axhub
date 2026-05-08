@@ -93,6 +93,49 @@ fn file_permissions_unix() {
     assert_eq!(file_mode, 0o600, "audit file mode {:o}", file_mode);
 }
 
+#[cfg(unix)]
+#[test]
+fn append_reasserts_existing_file_permissions_unix() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let dir = temp.path().join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let file = dir.join(format!("routing-audit-{today}.jsonl"));
+    std::fs::write(&file, "{}\n").unwrap();
+    let mut loose = std::fs::metadata(&file).unwrap().permissions();
+    loose.set_mode(0o644);
+    std::fs::set_permissions(&file, loose).unwrap();
+
+    audit::append(sample_record("existing-perm")).unwrap();
+
+    let mode = std::fs::metadata(&file).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "existing audit file mode {:o}", mode);
+}
+
+#[test]
+fn append_rotates_stale_files_on_normal_write_path() {
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let dir = temp.path().join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let stale_date = (Utc::now() - Duration::days(8))
+        .format("%Y-%m-%d")
+        .to_string();
+    let stale = dir.join(format!("routing-audit-{stale_date}.jsonl"));
+    std::fs::write(&stale, "{}\n").unwrap();
+
+    audit::append(sample_record("rotate-on-append")).unwrap();
+
+    assert!(
+        !stale.exists(),
+        "normal audit append should enforce rotation"
+    );
+}
+
 #[test]
 fn rotation_handles_today_yesterday_correctly() {
     let temp = tempfile::tempdir().unwrap();

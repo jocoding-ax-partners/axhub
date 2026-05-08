@@ -98,6 +98,10 @@ pub fn append(record: AuditRecord) -> std::io::Result<()> {
         return Ok(());
     }
 
+    if let Err(e) = rotate(7) {
+        eprintln!("[audit] rotate failed: {e}");
+    }
+
     let path = dir.join(format!("routing-audit-{}.jsonl", today_utc_iso_date()));
     match open_append_secure(&path) {
         Ok(mut f) => {
@@ -130,11 +134,16 @@ fn ensure_dir_with_perms(dir: &PathBuf) -> std::io::Result<()> {
 #[cfg(unix)]
 fn open_append_secure(path: &PathBuf) -> std::io::Result<std::fs::File> {
     use std::os::unix::fs::OpenOptionsExt;
-    OpenOptions::new()
+    use std::os::unix::fs::PermissionsExt;
+    let file = OpenOptions::new()
         .create(true)
         .append(true)
         .mode(0o600)
-        .open(path)
+        .open(path)?;
+    let mut perms = file.metadata()?.permissions();
+    perms.set_mode(0o600);
+    fs::set_permissions(path, perms)?;
+    Ok(file)
 }
 
 #[cfg(not(unix))]
