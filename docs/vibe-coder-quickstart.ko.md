@@ -42,7 +42,7 @@ axhub 플러그인을 Claude Code 에 등록합니다. 평생 한 번만 하면 
 
 ```
 ✓ Marketplace 'axhub' added (1 plugin)
-✓ Plugin 'axhub' installed (v0.3.1)
+✓ Plugin 'axhub' installed (v0.3.2)
    Skills: deploy, status, logs, apps, apis, auth, update, doctor, init, env, github, open, profile, upgrade, install-cli, whatsnew, recover, clarify
    Commands: /axhub:deploy, /axhub:status, /axhub:logs, ...
 ```

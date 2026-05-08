@@ -127,7 +127,7 @@ Claude Code  ──→  axhub plugin
 
 | 항목 | 값 |
 |---|---|
-| Plugin version | 0.3.1 |
+| Plugin version | 0.3.2 |
 | ax-hub-cli compatibility | `>=0.1.0,<0.12.0` |
 | Test coverage | `bun test` + `cargo test --workspace` + release gates |
 | Cross-arch binaries | macOS arm64/Intel, Linux x86_64/arm64, Windows x86_64 |
@@ -187,7 +187,7 @@ A: 현재는 Claude Code 전용입니다. Cursor / Copilot CLI / 다른 IDE 지�
 ## Footer
 
 ```
-axhub Claude Code 플러그인 v0.3.1
+axhub Claude Code 플러그인 v0.3.2
 MIT License — github.com/jocoding-ax-partners/axhub
 Made by jocoding-ax-partners (https://jocodingax.ai)
 한국 vibe coder 들이 자력으로 자기 앱을 안전하게 배포하는 환경을 만들고자 해요.

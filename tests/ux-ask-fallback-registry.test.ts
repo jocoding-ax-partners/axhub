@@ -15,6 +15,7 @@ const REGISTRY_PATH = join(REPO_ROOT, "tests/fixtures/ask-defaults/registry.json
 interface RegistryEntry {
   safe_default?: string;
   rationale?: string;
+  allowed_safe_defaults?: string[];
   _note?: string;
   default_source?: string;
   cold_cache_default?: string;
@@ -74,5 +75,46 @@ describe("Phase 17 C5/US-1705 — per-question fallback registry coverage", () =
         expect(content, `stale registry key ${slug}:${qKey} not found in SKILL.md`).toContain(qKey);
       }
     }
+  });
+
+  test("registry entries declare allowed_safe_defaults enum (Plan v3 새 schema)", () => {
+    for (const [slug, questions] of Object.entries(registry)) {
+      if (slug.startsWith("_")) continue;
+      for (const [qKey, entry] of Object.entries(questions)) {
+        if (qKey.startsWith("_") || qKey.startsWith("default_") || qKey.startsWith("cold_") || qKey.startsWith("exit_")) continue;
+        const e = entry as RegistryEntry;
+        expect(
+          e.allowed_safe_defaults,
+          `${slug}:${qKey} missing allowed_safe_defaults enum`
+        ).toBeInstanceOf(Array);
+        expect(e.allowed_safe_defaults!.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test("safe_default 값이 allowed_safe_defaults enum 안에 있음", () => {
+    for (const [slug, questions] of Object.entries(registry)) {
+      if (slug.startsWith("_")) continue;
+      for (const [qKey, entry] of Object.entries(questions)) {
+        if (qKey.startsWith("_") || qKey.startsWith("default_") || qKey.startsWith("cold_") || qKey.startsWith("exit_")) continue;
+        const e = entry as RegistryEntry;
+        if (!e.safe_default || !e.allowed_safe_defaults) continue;
+        expect(
+          e.allowed_safe_defaults,
+          `${slug}:${qKey} safe_default "${e.safe_default}" not in enum`
+        ).toContain(e.safe_default);
+      }
+    }
+  });
+
+  test("init SKILL 의 dependency_install_strategy enum 은 정확히 ['skip','manual_terminal']", () => {
+    const initEntry = registry["init"]?.["dependency_install_strategy"];
+    expect(initEntry).toBeDefined();
+    expect((initEntry as RegistryEntry).allowed_safe_defaults).toEqual([
+      "skip",
+      "manual_terminal",
+    ]);
+    expect((initEntry as RegistryEntry).safe_default).toBe("manual_terminal");
+    expect((initEntry as RegistryEntry).allowed_safe_defaults).not.toContain("inline_session");
   });
 });
