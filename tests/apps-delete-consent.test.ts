@@ -38,9 +38,9 @@ describe("apps delete consent UX contract", () => {
       "tests/corpus.jsonl",
       "tests/corpus.20.jsonl",
       "tests/corpus.100.jsonl",
-      "tests/plugin-arm-results.json",
-      "tests/plugin-arm-results.100.json",
-      "tests/baseline-results.docs-only.json",
+      "tests/baseline-results.claude-native.20.json",
+      "tests/baseline-results.claude-native.100.json",
+      "tests/baseline-results.docs-only.20.json",
       "tests/baseline-results.docs-only.100.json",
     ];
 

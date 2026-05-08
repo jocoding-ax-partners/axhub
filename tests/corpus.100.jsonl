@@ -98,3 +98,14 @@
 {"id":"T-NEG-030","utterance":"just run it","intent":"ambiguous","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"en","category":"negative","expected_response_contains":"which"}
 {"id":"T-NEG-033","utterance":"deploy fakeapp123 to prod","intent":"deploy_unknown_app","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"en","category":"negative","expected_response_contains":"not found"}
 {"id":"T-NEG-034","utterance":"ship made-up-app","intent":"deploy_unknown_app","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"en","category":"negative","expected_response_contains":"not found"}
+{"id":"M1","utterance":"이거 하드코딩하는건 너무 이상한 방식 아니야?","intent":"meta_question","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"ko","category":"meta_question"}
+{"id":"M2","utterance":"배포 함수 어떻게 동작해?","intent":"meta_question","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"ko","category":"meta_question"}
+{"id":"M3","utterance":"왜 배포가 키워드 매칭이지?","intent":"meta_question","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"ko","category":"meta_question"}
+{"id":"M4","utterance":"isn't this hardcoded approach too limited?","intent":"meta_question","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"en","category":"meta_question"}
+{"id":"M5","utterance":"deploy 함수 코드를 보면","intent":"meta_question","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"ko","category":"meta_question"}
+{"id":"M6","utterance":"라우팅 어떻게 작동하는 거야?","intent":"meta_question","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"ko","category":"meta_question"}
+{"id":"M7","utterance":"why is logs hardcoded as keywords?","intent":"meta_question","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"en","category":"meta_question"}
+{"id":"M8","utterance":"이거 왜 이렇게 만들었어?","intent":"meta_question","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"ko","category":"meta_question"}
+{"id":"M9","utterance":"STOP_WORDS 가 뭐야?","intent":"meta_question","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"ko","category":"meta_question"}
+{"id":"M10","utterance":"how does prompt-route hook work internally?","intent":"meta_question","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"en","category":"meta_question"}
+{"id":"M11","utterance":"이거 구현이 이상해 보이는데","intent":"meta_question","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"ko","category":"meta_question"}

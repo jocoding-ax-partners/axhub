@@ -3,7 +3,11 @@
     "utterance_id": "T1",
     "fired_skill": "apps",
     "actual_tool_calls": [
-      {"cmd": "axhub apps list --json", "exit_code": 0, "ts": "2026-04-24T10:00:01Z"}
+      {
+        "cmd": "axhub apps list --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:01Z"
+      }
     ],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:00:01Z",
@@ -13,7 +17,11 @@
     "utterance_id": "T1-en",
     "fired_skill": "apps",
     "actual_tool_calls": [
-      {"cmd": "axhub apps list --json", "exit_code": 0, "ts": "2026-04-24T10:00:02Z"}
+      {
+        "cmd": "axhub apps list --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:02Z"
+      }
     ],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:00:02Z",
@@ -23,10 +31,26 @@
     "utterance_id": "T2",
     "fired_skill": "deploy",
     "actual_tool_calls": [
-      {"cmd": "axhub-helpers resolve --intent deploy --user-utterance \"paydrop 배포해\" --json", "exit_code": 0, "ts": "2026-04-24T10:00:03Z"},
-      {"cmd": "axhub-helpers preflight --json", "exit_code": 0, "ts": "2026-04-24T10:00:04Z"},
-      {"cmd": "axhub deploy create --app paydrop --branch main --json", "exit_code": 0, "ts": "2026-04-24T10:00:05Z"},
-      {"cmd": "axhub deploy status dep_abc123 --watch --json", "exit_code": 0, "ts": "2026-04-24T10:00:06Z"}
+      {
+        "cmd": "axhub-helpers resolve --intent deploy --user-utterance \"paydrop 배포해\" --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:03Z"
+      },
+      {
+        "cmd": "axhub-helpers preflight --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:04Z"
+      },
+      {
+        "cmd": "axhub deploy create --app paydrop --branch main --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:05Z"
+      },
+      {
+        "cmd": "axhub deploy status dep_abc123 --watch --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:06Z"
+      }
     ],
     "required_consent_seen": true,
     "ts": "2026-04-24T10:00:06Z",
@@ -36,10 +60,26 @@
     "utterance_id": "T2-en",
     "fired_skill": "deploy",
     "actual_tool_calls": [
-      {"cmd": "axhub-helpers resolve --intent deploy --user-utterance \"ship paydrop\" --json", "exit_code": 0, "ts": "2026-04-24T10:00:07Z"},
-      {"cmd": "axhub-helpers preflight --json", "exit_code": 0, "ts": "2026-04-24T10:00:08Z"},
-      {"cmd": "axhub deploy create --app paydrop --branch main --json", "exit_code": 0, "ts": "2026-04-24T10:00:09Z"},
-      {"cmd": "axhub deploy status dep_abc123 --watch --json", "exit_code": 0, "ts": "2026-04-24T10:00:10Z"}
+      {
+        "cmd": "axhub-helpers resolve --intent deploy --user-utterance \"ship paydrop\" --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:07Z"
+      },
+      {
+        "cmd": "axhub-helpers preflight --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:08Z"
+      },
+      {
+        "cmd": "axhub deploy create --app paydrop --branch main --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:09Z"
+      },
+      {
+        "cmd": "axhub deploy status dep_abc123 --watch --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:10Z"
+      }
     ],
     "required_consent_seen": true,
     "ts": "2026-04-24T10:00:10Z",
@@ -49,7 +89,11 @@
     "utterance_id": "T3",
     "fired_skill": "status",
     "actual_tool_calls": [
-      {"cmd": "axhub deploy status dep_abc123 --watch --json", "exit_code": 0, "ts": "2026-04-24T10:00:11Z"}
+      {
+        "cmd": "axhub deploy status dep_abc123 --watch --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:11Z"
+      }
     ],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:00:11Z",
@@ -59,7 +103,11 @@
     "utterance_id": "T4",
     "fired_skill": "logs",
     "actual_tool_calls": [
-      {"cmd": "axhub deploy logs dep_abc123 --follow --source build --json", "exit_code": 0, "ts": "2026-04-24T10:00:12Z"}
+      {
+        "cmd": "axhub deploy logs dep_abc123 --follow --source build --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:12Z"
+      }
     ],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:00:12Z",
@@ -69,8 +117,16 @@
     "utterance_id": "T5",
     "fired_skill": "auth",
     "actual_tool_calls": [
-      {"cmd": "axhub auth status --json", "exit_code": 65, "ts": "2026-04-24T10:00:13Z"},
-      {"cmd": "axhub auth login", "exit_code": 0, "ts": "2026-04-24T10:00:14Z"}
+      {
+        "cmd": "axhub auth status --json",
+        "exit_code": 65,
+        "ts": "2026-04-24T10:00:13Z"
+      },
+      {
+        "cmd": "axhub auth login",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:14Z"
+      }
     ],
     "required_consent_seen": true,
     "ts": "2026-04-24T10:00:14Z",
@@ -80,7 +136,11 @@
     "utterance_id": "T6",
     "fired_skill": "update",
     "actual_tool_calls": [
-      {"cmd": "axhub update check --json", "exit_code": 0, "ts": "2026-04-24T10:00:15Z"}
+      {
+        "cmd": "axhub update check --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:15Z"
+      }
     ],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:00:15Z",
@@ -90,10 +150,26 @@
     "utterance_id": "T7",
     "fired_skill": "deploy",
     "actual_tool_calls": [
-      {"cmd": "axhub-helpers resolve --intent deploy --user-utterance \"/axhub:deploy paydrop --branch main\" --json", "exit_code": 0, "ts": "2026-04-24T10:00:16Z"},
-      {"cmd": "axhub-helpers preflight --json", "exit_code": 0, "ts": "2026-04-24T10:00:17Z"},
-      {"cmd": "axhub deploy create --app paydrop --branch main --json", "exit_code": 0, "ts": "2026-04-24T10:00:18Z"},
-      {"cmd": "axhub deploy status dep_abc123 --watch --json", "exit_code": 0, "ts": "2026-04-24T10:00:19Z"}
+      {
+        "cmd": "axhub-helpers resolve --intent deploy --user-utterance \"/axhub:deploy paydrop --branch main\" --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:16Z"
+      },
+      {
+        "cmd": "axhub-helpers preflight --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:17Z"
+      },
+      {
+        "cmd": "axhub deploy create --app paydrop --branch main --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:18Z"
+      },
+      {
+        "cmd": "axhub deploy status dep_abc123 --watch --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:19Z"
+      }
     ],
     "required_consent_seen": true,
     "ts": "2026-04-24T10:00:19Z",
@@ -103,8 +179,16 @@
     "utterance_id": "T8",
     "fired_skill": "doctor",
     "actual_tool_calls": [
-      {"cmd": "axhub --version", "exit_code": 0, "ts": "2026-04-24T10:00:20Z"},
-      {"cmd": "axhub-helpers session-start", "exit_code": 0, "ts": "2026-04-24T10:00:21Z"}
+      {
+        "cmd": "axhub --version",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:20Z"
+      },
+      {
+        "cmd": "axhub-helpers session-start",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:21Z"
+      }
     ],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:00:21Z",
@@ -130,7 +214,11 @@
     "utterance_id": "T-NEG-3",
     "fired_skill": "apps",
     "actual_tool_calls": [
-      {"cmd": "axhub apps list --json", "exit_code": 0, "ts": "2026-04-24T10:00:24Z"}
+      {
+        "cmd": "axhub apps list --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:24Z"
+      }
     ],
     "required_consent_seen": true,
     "ts": "2026-04-24T10:00:24Z",
@@ -154,7 +242,7 @@
   },
   {
     "utterance_id": "T-ADV-3",
-    "fired_skill": "deploy",
+    "fired_skill": null,
     "actual_tool_calls": [],
     "required_consent_seen": true,
     "ts": "2026-04-24T10:00:27Z",
@@ -172,9 +260,21 @@
     "utterance_id": "T-PROFILE-1",
     "fired_skill": "deploy",
     "actual_tool_calls": [
-      {"cmd": "axhub-helpers resolve --intent deploy --user-utterance \"prod에 배포해\" --json", "exit_code": 0, "ts": "2026-04-24T10:00:29Z"},
-      {"cmd": "axhub-helpers preflight --json", "exit_code": 0, "ts": "2026-04-24T10:00:30Z"},
-      {"cmd": "axhub deploy create --app unknown --branch main --json", "exit_code": 0, "ts": "2026-04-24T10:00:31Z"}
+      {
+        "cmd": "axhub-helpers resolve --intent deploy --user-utterance \"prod에 배포해\" --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:29Z"
+      },
+      {
+        "cmd": "axhub-helpers preflight --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:30Z"
+      },
+      {
+        "cmd": "axhub deploy create --app unknown --branch main --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:31Z"
+      }
     ],
     "required_consent_seen": true,
     "ts": "2026-04-24T10:00:31Z",
@@ -184,8 +284,16 @@
     "utterance_id": "T-MULTI-1",
     "fired_skill": "status",
     "actual_tool_calls": [
-      {"cmd": "axhub apps list --json", "exit_code": 0, "ts": "2026-04-24T10:00:32Z"},
-      {"cmd": "axhub deploy status dep_abc123 --watch --json", "exit_code": 0, "ts": "2026-04-24T10:00:33Z"}
+      {
+        "cmd": "axhub apps list --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:32Z"
+      },
+      {
+        "cmd": "axhub deploy status dep_abc123 --watch --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:33Z"
+      }
     ],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:00:33Z",
@@ -195,11 +303,43 @@
     "utterance_id": "T-HEADLESS-1",
     "fired_skill": "auth",
     "actual_tool_calls": [
-      {"cmd": "axhub auth status --json", "exit_code": 65, "ts": "2026-04-24T10:00:34Z"},
-      {"cmd": "axhub auth login --token-file ~/.config/axhub/token", "exit_code": 0, "ts": "2026-04-24T10:00:35Z"}
+      {
+        "cmd": "axhub auth status --json",
+        "exit_code": 65,
+        "ts": "2026-04-24T10:00:34Z"
+      },
+      {
+        "cmd": "axhub auth login --token-file ~/.config/axhub/token",
+        "exit_code": 0,
+        "ts": "2026-04-24T10:00:35Z"
+      }
     ],
     "required_consent_seen": true,
     "ts": "2026-04-24T10:00:35Z",
     "notes": "Headless environment (CODESPACES=true, no DISPLAY). skills/auth detects headless env vars → shows AskUserQuestion with '토큰 파일' path instructions instead of browser OAuth (required_consent_seen=true). Runs axhub auth login --token-file path. exit 65 on status check triggers recovery; follow-up login with token file succeeds (exit 0). Design feature: headless detection in skills/auth per recovery-flows.md headless/Codespaces section."
+  },
+  {
+    "utterance_id": "M1",
+    "fired_skill": null,
+    "actual_tool_calls": [],
+    "required_consent_seen": false,
+    "notes": "Phase 5 meta_question — code/architecture analysis intent. Approach E hook (preflight + audit only) does not route. Claude answers natively without firing axhub skill.",
+    "ts": "2026-05-07T22:30:00Z"
+  },
+  {
+    "utterance_id": "M3",
+    "fired_skill": null,
+    "actual_tool_calls": [],
+    "required_consent_seen": false,
+    "notes": "Phase 5 meta_question — code/architecture analysis intent. Approach E hook (preflight + audit only) does not route. Claude answers natively without firing axhub skill.",
+    "ts": "2026-05-07T22:30:00Z"
+  },
+  {
+    "utterance_id": "M11",
+    "fired_skill": null,
+    "actual_tool_calls": [],
+    "required_consent_seen": false,
+    "notes": "Phase 5 meta_question — code/architecture analysis intent. Approach E hook (preflight + audit only) does not route. Claude answers natively without firing axhub skill.",
+    "ts": "2026-05-07T22:30:00Z"
   }
 ]
