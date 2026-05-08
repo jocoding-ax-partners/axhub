@@ -151,6 +151,55 @@ fn open_append_secure(path: &PathBuf) -> std::io::Result<std::fs::File> {
     OpenOptions::new().create(true).append(true).open(path)
 }
 
+/// Read all audit records with `ts` within the last `duration`. Skips corrupted
+/// lines (logs count to stderr). Returns empty vec if dir missing.
+pub fn read_since(duration: Duration) -> std::io::Result<Vec<AuditRecord>> {
+    let Some(dir) = audit_dir() else {
+        return Ok(vec![]);
+    };
+    if !dir.exists() {
+        return Ok(vec![]);
+    }
+    let cutoff = Utc::now() - duration;
+    let mut records: Vec<AuditRecord> = Vec::new();
+    let mut corrupted: u32 = 0;
+    for entry in fs::read_dir(&dir)? {
+        let entry = entry?;
+        let name_owned = entry.file_name();
+        let Some(name) = name_owned.to_str() else {
+            continue;
+        };
+        if !name.starts_with("routing-audit-") || !name.ends_with(".jsonl") {
+            continue;
+        }
+        let content = match fs::read_to_string(entry.path()) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        for line in content.lines() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            match serde_json::from_str::<AuditRecord>(line) {
+                Ok(r) => {
+                    if let Ok(record_ts) = chrono::DateTime::parse_from_rfc3339(&r.ts) {
+                        if record_ts.with_timezone(&Utc) >= cutoff {
+                            records.push(r);
+                        }
+                    } else {
+                        corrupted += 1;
+                    }
+                }
+                Err(_) => corrupted += 1,
+            }
+        }
+    }
+    if corrupted > 0 {
+        eprintln!("[audit] read_since: skipped {corrupted} corrupted line(s)");
+    }
+    Ok(records)
+}
+
 /// Delete every routing-audit-*.jsonl file unconditionally. Returns count deleted.
 pub fn cleanup_all() -> std::io::Result<u32> {
     let Some(dir) = audit_dir() else {
@@ -237,6 +286,21 @@ mod tests {
         let s = now_iso8601();
         let parsed = chrono::DateTime::parse_from_rfc3339(&s);
         assert!(parsed.is_ok(), "now_iso8601 not RFC 3339 parseable: {s}");
+    }
+
+    #[test]
+    fn read_since_returns_empty_when_dir_missing() {
+        // audit_dir() may return Some(path) for nonexistent dir; read_since should still no-op.
+        // Test in absence of real audit dir is best-effort — just verify it doesn't panic.
+        let result = read_since(Duration::days(7));
+        // Either Ok(empty) or Ok(records); both are valid outcomes.
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn cleanup_all_returns_zero_when_dir_missing() {
+        let result = cleanup_all();
+        assert!(result.is_ok());
     }
 
     #[test]

@@ -75,8 +75,9 @@ fn run() -> anyhow::Result<i32> {
             Ok(run.exit_code)
         }
         "list-deployments" => cmd_list_deployments(&rest),
-        "bootstrap" => cmd_bootstrap(&rest),
+        "routing-stats" => cmd_routing_stats(&rest),
         "cleanup-audit" => cmd_cleanup_audit(&rest),
+        "bootstrap" => cmd_bootstrap(&rest),
         "consent-mint" => cmd_consent_mint(&rest),
         "consent-verify" => cmd_consent_verify(),
         "preauth-check" => cmd_preauth_check(),
@@ -466,60 +467,6 @@ fn cmd_preauth_check() -> anyhow::Result<i32> {
 
 const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
 
-const CLEANUP_AUDIT_HELP: &str = "axhub-helpers cleanup-audit — audit log 삭제
-
-USAGE:
-  axhub-helpers cleanup-audit          # 7일 이상 된 파일만 삭제 (rotation)
-  axhub-helpers cleanup-audit --all    # 전체 삭제 (확인 prompt)
-  axhub-helpers cleanup-audit --all --yes   # 확인 우회
-
-OPTIONS:
-  --all      전체 삭제 (default 는 7일 이상만)
-  --yes -y   확인 prompt 우회
-  -h --help  도움말
-";
-
-fn cmd_cleanup_audit(args: &[String]) -> anyhow::Result<i32> {
-    use axhub_helpers::audit;
-
-    let mut all = false;
-    let mut yes = false;
-    for arg in args {
-        match arg.as_str() {
-            "--all" => all = true,
-            "--yes" | "-y" => yes = true,
-            "-h" | "--help" => {
-                print!("{CLEANUP_AUDIT_HELP}");
-                return Ok(0);
-            }
-            other => {
-                eprintln!("axhub-helpers cleanup-audit: 알 수 없는 flag: {other}");
-                return Ok(64);
-            }
-        }
-    }
-
-    if all {
-        if !yes {
-            print!("audit log 전체 삭제할까요? (y/N): ");
-            use std::io::Write;
-            std::io::stdout().flush().ok();
-            let mut input = String::new();
-            std::io::stdin().read_line(&mut input)?;
-            if !input.trim().eq_ignore_ascii_case("y") {
-                println!("취소했어요.");
-                return Ok(0);
-            }
-        }
-        let count = audit::cleanup_all()?;
-        println!("audit log {count} 파일 삭제했어요.");
-    } else {
-        let count = audit::rotate(7)?;
-        println!("7일 이상 된 audit log {count} 파일 삭제했어요. 전체 삭제는 --all 사용해요.");
-    }
-    Ok(0)
-}
-
 // Approach E (Phase 2): cmd_prompt_route is preflight + audit only.
 // No keyword chain, no skill enforcement, no `skills/<X>/SKILL.md` paths in
 // additionalContext. Claude Code matches skills via SKILL.md frontmatter
@@ -594,6 +541,248 @@ fn format_preflight_context(preflight: &PreflightRun) -> String {
         }
     }
     lines.join("\n")
+}
+
+// Approach E (Phase 4): routing-stats + cleanup-audit subcommands.
+//
+// Local-only audit log analytics. AXHUB_NO_AUDIT respected. Silent skip on
+// disk read errors. Always Korean default + --json machine-readable.
+
+const ROUTING_STATS_HELP: &str = "axhub-helpers routing-stats — 라우팅 audit log 통계 조회
+
+USAGE:
+  axhub-helpers routing-stats [OPTIONS]
+
+OPTIONS:
+  --since <DURATION>    조회 기간 (예: 1d, 7d, 30d, all). 기본: 7d
+  --json                machine-readable JSON 출력
+  --top <N>             top N axhub-related prompt hash 표시. 기본: 10
+  -h, --help            도움말
+
+PRIVACY:
+  prompt content 저장 X. sha256 hash + length + cli_version + auth_ok 만 기록.
+  외부 전송 X. 모두 로컬 ~/.local/share/axhub-plugin/ 또는 동등 경로.
+  끄려면: AXHUB_NO_AUDIT=1 환경 변수 설정.
+  삭제: axhub-helpers cleanup-audit --all
+";
+
+fn parse_routing_stats_args(args: &[String]) -> anyhow::Result<(chrono::Duration, bool, u32)> {
+    let mut since = chrono::Duration::days(7);
+    let mut json = false;
+    let mut top: u32 = 10;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--since" if i + 1 < args.len() => {
+                i += 1;
+                since = parse_duration(&args[i])?;
+            }
+            "--json" => json = true,
+            "--top" if i + 1 < args.len() => {
+                i += 1;
+                top = args[i]
+                    .parse()
+                    .map_err(|_| anyhow::anyhow!("--top 은 숫자여야 해요"))?;
+            }
+            "-h" | "--help" => {
+                print!("{}", ROUTING_STATS_HELP);
+                std::process::exit(0);
+            }
+            other => anyhow::bail!("알 수 없는 flag: {other}"),
+        }
+        i += 1;
+    }
+    Ok((since, json, top))
+}
+
+fn parse_duration(s: &str) -> anyhow::Result<chrono::Duration> {
+    if s == "all" {
+        return Ok(chrono::Duration::days(36500));
+    }
+    if s.is_empty() {
+        anyhow::bail!("duration 비어 있어요");
+    }
+    let last = s.chars().last().unwrap();
+    let (num_str, unit) = s.split_at(s.len() - last.len_utf8());
+    let num: i64 = num_str
+        .parse()
+        .map_err(|_| anyhow::anyhow!("duration 숫자 부분 파싱 실패: {s}"))?;
+    match unit {
+        "d" => Ok(chrono::Duration::days(num)),
+        "h" => Ok(chrono::Duration::hours(num)),
+        "m" => Ok(chrono::Duration::minutes(num)),
+        _ => anyhow::bail!("duration 단위는 d/h/m 또는 'all' 만 (받은 값: {s})"),
+    }
+}
+
+fn percentile(sorted: &[u32], p: f64) -> u32 {
+    if sorted.is_empty() {
+        return 0;
+    }
+    let idx = ((sorted.len() as f64 - 1.0) * p).round() as usize;
+    sorted[idx.min(sorted.len() - 1)]
+}
+
+fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
+    use axhub_helpers::audit;
+
+    let (since, json, top) = match parse_routing_stats_args(args) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("axhub-helpers routing-stats: {e}");
+            return Ok(64);
+        }
+    };
+
+    // 매 호출마다 7-day rotation 자동 trigger (silent).
+    let _ = audit::rotate(7);
+
+    if std::env::var("AXHUB_NO_AUDIT").is_ok() {
+        if json {
+            println!(
+                "{}",
+                json!({
+                    "audit_disabled": true,
+                    "message": "AXHUB_NO_AUDIT 환경 변수가 설정되어 audit 가 비활성이에요."
+                })
+            );
+        } else {
+            println!("audit log 가 비활성이에요 (AXHUB_NO_AUDIT 환경 변수 설정).");
+            println!("끄려면 변수 unset 후 다음 prompt 부터 기록해요.");
+        }
+        return Ok(0);
+    }
+
+    let records = audit::read_since(since)?;
+    if records.is_empty() {
+        if json {
+            println!("{}", json!({"records": [], "total_prompts": 0}));
+        } else {
+            println!("아직 audit 데이터가 없어요. axhub 사용하다 보면 자동 누적돼요.");
+        }
+        return Ok(0);
+    }
+
+    let total = records.len() as u32;
+    let axhub_related = records.iter().filter(|r| r.is_axhub_related).count() as u32;
+    let auth_failed = records.iter().filter(|r| !r.auth_ok).count() as u32;
+
+    let mut lengths: Vec<u32> = records.iter().map(|r| r.prompt_len).collect();
+    lengths.sort_unstable();
+    let p50 = percentile(&lengths, 0.50);
+    let p95 = percentile(&lengths, 0.95);
+
+    let mut versions: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    for r in &records {
+        if let Some(v) = &r.cli_version {
+            *versions.entry(v.clone()).or_insert(0) += 1;
+        }
+    }
+
+    let mut hash_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    for r in records.iter().filter(|r| r.is_axhub_related) {
+        *hash_counts.entry(r.prompt_hash.clone()).or_insert(0) += 1;
+    }
+    let mut top_hashes: Vec<(String, u32)> = hash_counts.into_iter().collect();
+    top_hashes.sort_by(|a, b| b.1.cmp(&a.1));
+    top_hashes.truncate(top as usize);
+
+    if json {
+        let summary = json!({
+            "total_prompts": total,
+            "axhub_related": axhub_related,
+            "axhub_related_rate": axhub_related as f64 / total as f64,
+            "auth_failed": auth_failed,
+            "prompt_length_p50": p50,
+            "prompt_length_p95": p95,
+            "cli_versions": versions,
+            "top_axhub_hashes": top_hashes.iter().map(|(h, c)| json!({"hash": h, "count": c})).collect::<Vec<_>>(),
+        });
+        println!("{}", summary);
+        return Ok(0);
+    }
+
+    // Korean default output
+    println!("[지난 prompt 통계]");
+    println!("==========================================");
+    println!("총 prompt:           {total}");
+    let rate_pct = 100.0 * axhub_related as f64 / total as f64;
+    println!("axhub 관련 가능성:    {axhub_related} ({rate_pct:.1}%)");
+    println!("auth 실패:           {auth_failed}");
+    println!("prompt 길이 p50/p95: {p50} / {p95} bytes");
+    println!();
+    println!("CLI 버전:");
+    for (v, c) in &versions {
+        println!("  {v}: {c}");
+    }
+    if !top_hashes.is_empty() {
+        println!();
+        println!("상위 axhub 관련 prompt (hash):");
+        for (h, c) in &top_hashes {
+            println!("  {h}: {c:>4}");
+        }
+    }
+    println!();
+    if let Some(dir) = axhub_helpers::runtime_paths::state_dir() {
+        println!("audit log 위치: {}", dir.display());
+    }
+    println!("끄려면: AXHUB_NO_AUDIT=1");
+    println!("삭제: axhub-helpers cleanup-audit --all");
+    Ok(0)
+}
+
+const CLEANUP_AUDIT_HELP: &str = "axhub-helpers cleanup-audit — audit log 삭제
+
+USAGE:
+  axhub-helpers cleanup-audit          # 7일 이상 된 파일만 삭제 (rotation)
+  axhub-helpers cleanup-audit --all    # 전체 삭제 (확인 prompt)
+  axhub-helpers cleanup-audit --all --yes   # 확인 우회
+
+OPTIONS:
+  --all      전체 삭제 (default 는 7일 이상만)
+  --yes -y   확인 prompt 우회
+  -h --help  도움말
+";
+
+fn cmd_cleanup_audit(args: &[String]) -> anyhow::Result<i32> {
+    use axhub_helpers::audit;
+
+    let mut all = false;
+    let mut yes = false;
+    for arg in args {
+        match arg.as_str() {
+            "--all" => all = true,
+            "--yes" | "-y" => yes = true,
+            "-h" | "--help" => {
+                print!("{CLEANUP_AUDIT_HELP}");
+                return Ok(0);
+            }
+            other => {
+                eprintln!("axhub-helpers cleanup-audit: 알 수 없는 flag: {other}");
+                return Ok(64);
+            }
+        }
+    }
+
+    if all {
+        if !yes {
+            print!("audit log 전체 삭제할까요? (y/N): ");
+            use std::io::Write;
+            std::io::stdout().flush().ok();
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+            if !input.trim().eq_ignore_ascii_case("y") {
+                println!("취소했어요.");
+                return Ok(0);
+            }
+        }
+        let count = audit::cleanup_all()?;
+        println!("audit log {count} 파일 삭제했어요.");
+    } else {
+        let count = audit::rotate(7)?;
+        println!("7일 이상 된 audit log {count} 파일 삭제했어요. 전체 삭제는 --all 사용해요.");
+    }
+    Ok(0)
 }
 
 fn cmd_list_deployments(args: &[String]) -> anyhow::Result<i32> {
