@@ -26,6 +26,11 @@ describe("init template guidance UX", () => {
     expect(defaults.init["어떤 템플릿으로 시작할까요?"].safe_default).toBe("abort");
   });
 
+  test("routes plain Korean project initialization phrasing without requiring axhub prefix", () => {
+    expect(initSkill).toContain('"프로젝트 초기화"');
+    expect(initSkill).toContain('"프로젝트 초기화해줘"');
+  });
+
   test("explains each current visible template with beginner outcomes", () => {
     const guide = guidanceSection();
     for (const id of [

@@ -20,14 +20,14 @@ const run = (args: string[]) =>
 const readJson = (path: string) => JSON.parse(readFileSync(path, "utf8"));
 
 describe("tests/run-corpus.sh fixture replay runner", () => {
-  test("plugin mode writes committed 20-row plugin results (Phase 5: 20 base + 3 meta_question = 23)", () => {
+  test("plugin mode writes committed 20-row plugin results (Phase 5: 20 base + init + 3 meta_question = 24)", () => {
     const dir = mkdtempSync(join(tmpdir(), "axhub-corpus-"));
     try {
       const out = join(dir, "plugin.json");
       const result = run(["--mode", "plugin", "--corpus", "tests/corpus.20.jsonl", "--out", out]);
       expect(result.status).toBe(0);
       const rows = readJson(out);
-      expect(rows).toHaveLength(23);
+      expect(rows).toHaveLength(24);
       expect(rows[0].actual_tool_calls.length).toBeGreaterThan(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -57,8 +57,8 @@ describe("tests/run-corpus.sh fixture replay runner", () => {
       const out = join(dir, "plugin.json");
       const result = run(["--mode", "plugin", "--corpus", "tests/corpus.jsonl", "--out", out]);
       expect(result.status).toBe(2);
-      // Phase 5 — corpus.jsonl row count is 346 (331 base + 15 meta_question).
-      expect(result.stderr).toContain("no committed plugin fixture for 346-row corpus");
+      // Phase 5 — corpus.jsonl row count is 347 (331 base + init + 15 meta_question).
+      expect(result.stderr).toContain("no committed plugin fixture for 347-row corpus");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

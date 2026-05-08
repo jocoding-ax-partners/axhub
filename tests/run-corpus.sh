@@ -85,7 +85,7 @@ fi
 CORPUS_ROWS=$(wc -l < "$CORPUS" | tr -d ' ')
 
 # Phase 5 — tier detection by corpus filename (post-meta_question expansion the
-# 20-row and 100-row corpora hold 23/111 rows; row counts are no longer tier
+# 20-row and 100-row corpora hold 24/112 rows; row counts are no longer tier
 # discriminators).
 TIER_SUFFIX=""
 case "$CORPUS" in

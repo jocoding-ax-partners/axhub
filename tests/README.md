@@ -189,9 +189,9 @@ Approach E = `Hook = preflight + audit only`. plugin 이 routing 결정 안 하�
 
 | Tier | rows | gate type | command |
 |------|------|-----------|---------|
-| `corpus.20.jsonl`  | 23 (20 + 3 meta_question) | reliable CI | `bun run test:routing:20` |
+| `corpus.20.jsonl`  | 24 (20 + init + 3 meta_question) | reliable CI | `bun run test:routing:20` |
 | `corpus.100.jsonl` | 111 (100 + 11 meta_question) | reliable CI | `bun run test:routing:100` |
-| `corpus.jsonl`     | 346 (331 + 15 meta_question) | **manual / advisory only** | `bun run test:routing:full` (exit 0 강제) |
+| `corpus.jsonl`     | 347 (331 + init + 15 meta_question) | **manual / advisory only** | `bun run test:routing:full` (exit 0 강제) |
 
 `test:routing:full` 은 331-row baseline 가 미완 (별도 후속 PR 의 fresh fixture 작업) 이라 advisory mode 로 실행해요. CI gate 로 사용하지 마세요.
 

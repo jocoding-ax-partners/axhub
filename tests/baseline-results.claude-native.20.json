@@ -195,6 +195,20 @@
     "notes": "Read-only op. skills/doctor fires: runs axhub --version + axhub-helpers session-start (endpoint reachability, profile display, plugin signature verify). Non-destructive. exit 0."
   },
   {
+    "utterance_id": "T9",
+    "fired_skill": "init",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub --json init --list-templates",
+        "exit_code": 0,
+        "ts": "2026-05-08T06:30:09Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "notes": "Plain Korean '프로젝트 초기화해줘' routes to init via SKILL description/examples without requiring an axhub prefix.",
+    "ts": "2026-05-08T06:30:09Z"
+  },
+  {
     "utterance_id": "T-NEG-1",
     "fired_skill": null,
     "actual_tool_calls": [],
