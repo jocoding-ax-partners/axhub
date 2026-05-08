@@ -22,10 +22,10 @@ describe("parseMainRs (Phase 2 — Approach E: detect_prompt_route 폐기 후)",
     expect(blocks.length).toBe(0);
   });
 
-  test("upgrade compound guard does not become standalone plugin/update triggers", () => {
-    const upgradeBlock = blocks.find((b) => b.skill === "upgrade");
-    expect(upgradeBlock).toBeDefined();
-    const phrases = upgradeBlock?.phrases ?? [];
+  test("upgrade description remains scoped after runtime codegen source removal", () => {
+    const region = readSkillDescription(join(REPO_ROOT, "skills/upgrade/SKILL.md"));
+    expect(region).not.toBeNull();
+    const phrases = region?.existingPhrases ?? [];
     for (const unsafe of ["plugin", "플러그인", "update", "upgrade", "version", "업데이트", "업그레이드", "버전", "새 버전", "호환"]) {
       expect(phrases).not.toContain(unsafe);
     }
