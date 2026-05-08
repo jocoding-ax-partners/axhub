@@ -102,14 +102,25 @@ To deploy:
    TodoWrite 상태는 Claude Code 세션 안에서 이어질 수 있어요. 그래서 이 스킬을 시작할 때는 기존 todo 에 항목을 하나씩 더하거나 일부만 고치지 말고, 위 배열 전체로 교체해요. 이전 스킬 todo 가 화면에 남아 있으면 Step 1 전에 deploy 목록만 보이도록 다시 호출해요.
 
 
-1. **Live resolve first.** Fetch authoritative `{profile, endpoint, app_id, app_slug, branch, commit_sha, commit_message, eta_sec}` before any bootstrap create flow:
+1. **Live resolve + preflight (parallel via deploy-prep).** Fetch authoritative `{profile, endpoint, app_id, app_slug, branch, commit_sha, commit_message, eta_sec}` AND preflight (`auth_ok`, `cli_too_old/new`) in one helper call. Phase 1 runs preflight + resolve in parallel via `std::thread::scope`, so Step 2 (re-preflight) and Step 1.2 (re-resolve) below are skipped on the default path:
 
    ```bash
-   echo '[deploy:Step 1 resolve] entered' >&2
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
+   echo '[deploy:Step 1 deploy-prep] entered' >&2
+   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --json
    ```
 
-   Never use cached `app_id` for mutation. If live resolve returns an `app_id`, this is an existing app deploy: do **not** run `bootstrap apps_create`, and continue with git readiness, preflight, preview, and the normal consent-deploy path. If resolve returns ambiguity, ask the user to disambiguate (slug list with numeric IDs). If resolve cannot identify a registered app and the project has an `apphub.yaml`/`axhub.yaml`, enter the first-run bootstrap bridge below. The resolve JSON also includes `git_repo`, `git_has_commit`, and `git_init_needed`; deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
+   The JSON envelope contains `{preflight, resolve, bootstrap_plan?, exit_code}`. Use `jq -r '.resolve.app_id'` and friends to extract fields. If `bootstrap_plan` is non-null, this is a first-deploy path — fall through to Step 1.1 below. If `exit_code == 65`, surface auth recovery (Step 6 path). If `exit_code == 64`, surface version-skew recovery. If `exit_code == 67` AND `bootstrap_plan` is null, treat as ambiguous resolve.
+
+   **Backwards-compat fallback (1 release cycle):** when `AXHUB_DEPLOY_PREP=0` is set, the helper exits silently with no JSON — Step 1 falls through to the legacy `resolve` call below, and Step 1.2 / Step 2 re-runs are not skipped:
+
+   ```bash
+   if [[ "${AXHUB_DEPLOY_PREP:-1}" == "0" ]]; then
+     echo '[deploy:Step 1 resolve legacy] entered' >&2
+     ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
+   fi
+   ```
+
+   Never use cached `app_id` for mutation. If resolve returns an `app_id`, this is an existing app deploy: do **not** run `bootstrap apps_create`, and continue with git readiness, preview, and the normal consent-deploy path. If resolve returns ambiguity, ask the user to disambiguate (slug list with numeric IDs). If resolve cannot identify a registered app and the project has an `apphub.yaml`/`axhub.yaml`, enter the first-run bootstrap bridge below. The resolve JSON also includes `git_repo`, `git_has_commit`, and `git_init_needed`; deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
 
 1.1. **First-run bootstrap plan/record bridge (Sprint 3).** Use this only when Step 1 did not resolve an existing `app_id`. Before any first-run remote mutation, ask the Rust FSM for the next safe step:
 
@@ -140,11 +151,13 @@ To deploy:
 
    S3B retry ownership lives in this skill because this skill runs the top-level command. Retry a create only when helper output explicitly provides an idempotency key and a retry policy that allows it. If the helper says `no_retry_without_confirmed_idempotency` or returns `idempotency_unavailable`, do not retry; show the typed stop.
 
-1.2. **Fresh resolve after local/bootstrap state changes** — call the helper again if git/bootstrap work changed app or commit identity:
+1.2. **Fresh resolve after local/bootstrap state changes (legacy fallback only).** Phase 1 default path skips this — `deploy-prep` already covers it. This block runs only when `AXHUB_DEPLOY_PREP=0` is set, or when Step 1.5 (git-init) materially changed local commit identity since the deploy-prep call:
 
    ```bash
-   echo '[deploy:Step 1 resolve] entered' >&2
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
+   if [[ "${AXHUB_DEPLOY_PREP:-1}" == "0" ]] || [[ "${AXHUB_RESOLVE_AFTER_GIT_INIT:-0}" == "1" ]]; then
+     echo '[deploy:Step 1 resolve refresh] entered' >&2
+     ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
+   fi
    ```
 
    Never use cached `app_id` for mutation. If resolve still returns ambiguity, ask the user to disambiguate (slug list with numeric IDs). Deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
@@ -211,11 +224,13 @@ To deploy:
    If `git commit` fails because there are no staged files or git identity is missing, stop before deploy and show the exact git error plus the smallest next command. Do not mint deploy consent until a fresh resolve returns both `branch` and `commit_sha`.
    If the user chooses "명령어만 보기", show the command block above and stop. In non-interactive mode, use the registry safe default "명령어만 보기" and never run `git init` automatically.
 
-2. **Pre-flight version check**:
+2. **Pre-flight version check (legacy fallback only).** Phase 1 default path skips this — `deploy-prep` already returned the preflight envelope as `.preflight` in Step 1's JSON. Use the cached value: read `cli_too_old`, `cli_too_new`, `auth_ok` directly via `jq`. The block below is the legacy fallback path that fires only when `AXHUB_DEPLOY_PREP=0` is set:
 
    ```bash
-   echo '[deploy:Step 2 preflight] entered' >&2
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json
+   if [[ "${AXHUB_DEPLOY_PREP:-1}" == "0" ]]; then
+     echo '[deploy:Step 2 preflight legacy] entered' >&2
+     ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json
+   fi
    ```
 
    On `cli_too_old: true` or `cli_too_new: true`, halt and surface the corresponding entry from `references/error-empathy-catalog.md` ("version-skew"). Do not proceed.
@@ -318,9 +333,25 @@ To deploy:
 
 7. **Dry-run NL trigger** — if the user said "한번 해보기만", "리허설", "테스트로", "진짜 안 올리고", add `--dry-run` to step 4 and skip step 5.
 
-8. **Cache last-deploy for statusline (Phase 17 US-1707).** After Step 5 terminal status, write the deploy summary so statusline readers can show it across sessions. The Bash block below is for POSIX/Git Bash/WSL tool execution; native Windows statusLine wiring must use the documented helper/PowerShell path only after the Windows packaging spike promotes it:
+8. **Statusline live tick + cache last-deploy (Phase 17 US-1707, Phase 1 live update).** During Step 5 watch, run a 5-second polling loop that writes the statusline cache only when the deploy phase changes (vibe coder sees real-time progress instead of a stale "starting" line). After Step 5 terminal status, write the deploy summary so statusline readers can show it across sessions. The Bash block below is for POSIX/Git Bash/WSL tool execution; native Windows statusLine wiring must use the documented helper/PowerShell path only after the Windows packaging spike promotes it:
 
    ```bash
+   # Phase 1: live tick beside the watch loop (5s polling, write-on-change).
+   echo '[deploy:Step 8 statusline-live] entered' >&2
+   STATUSLINE_LAST=""
+   while kill -0 $WATCH_PID 2>/dev/null; do
+     sleep 5
+     CURRENT=$(axhub deploy status "$DEPLOY_ID" --json 2>/dev/null || true)
+     if [[ -n "$CURRENT" && "$CURRENT" != "$STATUSLINE_LAST" ]]; then
+       PHASE=$(echo "$CURRENT" | jq -r '.phase // .status // "?"')
+       APP=$(echo "$CURRENT" | jq -r '.app_slug // "?"')
+       mkdir -p ~/.cache/axhub-plugin
+       echo "axhub: $APP · $PHASE" > ~/.cache/axhub-plugin/statusline.cache
+       STATUSLINE_LAST="$CURRENT"
+     fi
+   done
+
+   # Terminal cache write (existing behavior — preserved across sessions).
    echo '[deploy:Step 8 statusline-cache] entered' >&2
    mkdir -p ~/.cache/axhub-plugin
    cat > ~/.cache/axhub-plugin/last-deploy.json <<JSON

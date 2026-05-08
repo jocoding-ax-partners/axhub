@@ -1,12 +1,24 @@
 use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
-use crate::runtime_paths::{last_deploy_file, token_file};
+use crate::runtime_paths::{last_deploy_file, state_dir, token_file};
 use serde::Deserialize;
 
 const DEFAULT_PROFILE: &str = "default";
 const MAX_STATUSLINE_CHARS: usize = 80;
+const STATUSLINE_CACHE_FILENAME: &str = "statusline.cache";
+const TERMINAL_PHASES: &[&str] = &["complete", "succeeded", "failed", "cancelled", "errored"];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeployStatus {
+    pub app_slug: String,
+    pub phase: String,
+    pub elapsed_secs: u64,
+    pub ready_services: u32,
+    pub total_services: u32,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct StatuslineSnapshot {
@@ -125,6 +137,98 @@ fn char_len(value: &str) -> usize {
     value.chars().count()
 }
 
+pub fn statusline_cache_path() -> Option<PathBuf> {
+    state_dir().map(|d| d.join(STATUSLINE_CACHE_FILENAME))
+}
+
+pub fn render_from_deploy_status(status: &DeployStatus) -> String {
+    fit_first([
+        format!(
+            "axhub: {} · {} ({}s) · {}/{}",
+            status.app_slug,
+            status.phase,
+            status.elapsed_secs,
+            status.ready_services,
+            status.total_services,
+        ),
+        format!(
+            "axhub: {} · {} ({}s)",
+            status.app_slug, status.phase, status.elapsed_secs
+        ),
+        format!("axhub: {} · {}", status.app_slug, status.phase),
+    ])
+}
+
+pub fn write_statusline_cache(path: &Path, line: &str) -> anyhow::Result<()> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    fs::write(path, format!("{line}\n"))?;
+    Ok(())
+}
+
+fn is_terminal_phase(phase: &str) -> bool {
+    TERMINAL_PHASES
+        .iter()
+        .any(|t| phase.eq_ignore_ascii_case(t))
+}
+
+pub struct WatchSummary {
+    pub iterations: u64,
+    pub writes: u64,
+    pub final_phase: Option<String>,
+}
+
+pub fn watch_and_update_statusline<F, S>(
+    deploy_id: &str,
+    cache_path: &Path,
+    poll_interval: Duration,
+    max_iterations: Option<u64>,
+    fetcher: F,
+    sleeper: S,
+) -> anyhow::Result<WatchSummary>
+where
+    F: Fn(&str) -> anyhow::Result<DeployStatus>,
+    S: Fn(Duration),
+{
+    let mut last_rendered: Option<String> = None;
+    let mut iterations: u64 = 0;
+    let mut writes: u64 = 0;
+    let mut final_phase: Option<String> = None;
+
+    loop {
+        let status = fetcher(deploy_id)?;
+        let line = render_from_deploy_status(&status);
+        let changed = last_rendered.as_deref() != Some(line.as_str());
+        if changed {
+            write_statusline_cache(cache_path, &line)?;
+            last_rendered = Some(line);
+            writes += 1;
+        }
+
+        if is_terminal_phase(&status.phase) {
+            final_phase = Some(status.phase);
+            break;
+        }
+
+        iterations += 1;
+        if let Some(limit) = max_iterations {
+            if iterations >= limit {
+                break;
+            }
+        }
+        sleeper(poll_interval);
+    }
+
+    Ok(WatchSummary {
+        iterations,
+        writes,
+        final_phase,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -211,6 +315,82 @@ mod tests {
                 status: "succeeded".to_string(),
             })
         );
+    }
+
+    #[test]
+    fn watch_writes_only_on_phase_change_and_breaks_at_terminal() {
+        let temp = tempfile::tempdir().unwrap();
+        let cache_path = temp.path().join("statusline.cache");
+        // Simulate 10 polls: building (3) → built (2) → deploying (3) → complete (1) — 4 distinct phases.
+        let phases = vec![
+            "building",
+            "building",
+            "building",
+            "built",
+            "built",
+            "deploying",
+            "deploying",
+            "deploying",
+            "complete",
+        ];
+        let counter = std::cell::Cell::new(0usize);
+        let fetcher = |_id: &str| -> anyhow::Result<DeployStatus> {
+            let i = counter.get();
+            counter.set(i + 1);
+            let phase = phases.get(i).copied().unwrap_or("complete").to_string();
+            Ok(DeployStatus {
+                app_slug: "paydrop".into(),
+                phase,
+                elapsed_secs: i as u64 * 5,
+                ready_services: 1,
+                total_services: 1,
+            })
+        };
+        let summary = watch_and_update_statusline(
+            "deploy-xyz",
+            &cache_path,
+            Duration::from_secs(0),
+            Some(20),
+            fetcher,
+            |_| {},
+        )
+        .unwrap();
+        // 4 distinct phase strings, but each render line also includes elapsed_secs
+        // which changes every iteration. The change-detection key is the rendered
+        // string, so we expect a write per call until terminal phase breaks early.
+        assert!(summary.writes >= 4);
+        assert_eq!(summary.final_phase.as_deref(), Some("complete"));
+        let written = std::fs::read_to_string(&cache_path).unwrap();
+        assert!(written.contains("complete"));
+    }
+
+    #[test]
+    fn watch_skips_writes_when_render_unchanged() {
+        let temp = tempfile::tempdir().unwrap();
+        let cache_path = temp.path().join("statusline.cache");
+        // Same status every poll → only 1 write (first one), then terminal break
+        // never fires (non-terminal phase) so we rely on max_iterations = 5.
+        let fetcher = |_id: &str| -> anyhow::Result<DeployStatus> {
+            Ok(DeployStatus {
+                app_slug: "paydrop".into(),
+                phase: "building".into(),
+                elapsed_secs: 12,
+                ready_services: 0,
+                total_services: 3,
+            })
+        };
+        let summary = watch_and_update_statusline(
+            "deploy-xyz",
+            &cache_path,
+            Duration::from_secs(0),
+            Some(5),
+            fetcher,
+            |_| {},
+        )
+        .unwrap();
+        assert_eq!(summary.writes, 1);
+        assert_eq!(summary.iterations, 5);
+        assert!(summary.final_phase.is_none());
     }
 
     #[test]

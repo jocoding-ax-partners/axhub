@@ -8,6 +8,7 @@ use axhub_helpers::consent::{
     format_preauth_deny_hint, mint_token, parse_axhub_command, validate_binding_schema,
     verify_or_claim_token, verify_token, write_private_file_no_follow, ConsentBinding,
 };
+use axhub_helpers::deploy_prep::run_deploy_prep;
 use axhub_helpers::keychain::{parse_keyring_value, read_keychain_token};
 use axhub_helpers::list_deployments::{run_list_deployments, ListDeploymentsArgs};
 use axhub_helpers::preflight::{run_preflight, PreflightRun};
@@ -21,7 +22,7 @@ use axhub_helpers::telemetry::{
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--json]\n  version\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -89,6 +90,7 @@ fn run() -> anyhow::Result<i32> {
         "session-start" => cmd_session_start(),
         "mark" => cmd_mark(&rest),
         "emit-deploy-complete" => cmd_emit_deploy_complete(&rest),
+        "deploy-prep" => cmd_deploy_prep(&rest),
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -1153,6 +1155,17 @@ fn cmd_mark(rest: &[String]) -> anyhow::Result<i32> {
         return Ok(1);
     }
     Ok(0)
+}
+
+fn cmd_deploy_prep(rest: &[String]) -> anyhow::Result<i32> {
+    if std::env::var("AXHUB_DEPLOY_PREP").as_deref() == Ok("0") {
+        // Backwards-compat fallback signal: SKILL detects exit 0 + no JSON
+        // payload and routes to the legacy 3x resolve / 2x preflight cascade.
+        return Ok(0);
+    }
+    let result = run_deploy_prep(rest);
+    println!("{}", serde_json::to_string(&result)?);
+    Ok(result.exit_code)
 }
 
 fn cmd_emit_deploy_complete(rest: &[String]) -> anyhow::Result<i32> {
