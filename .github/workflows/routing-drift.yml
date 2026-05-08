@@ -2,9 +2,9 @@ name: routing-drift
 
 # Phase 8 sub-task 8.3: routing accuracy + drift CI gate.
 #
-# PR 마다 corpus.100 fresh measure 실행 후 baseline 와 비교 → drift > 5%
-# 또는 accuracy < 95% 시 PR block. manual override = PR title 에
-# [skip-routing-gate] 포함.
+# PR 마다 routing-affecting file 이 바뀌면 committed baseline fixture 갱신을
+# 요구하고, corpus.100 fixture gate 로 accuracy/drift 를 확인해요.
+# manual override = PR title 에 [skip-routing-gate] 포함.
 
 on:
   pull_request:
@@ -39,6 +39,11 @@ jobs:
           mkdir -p bin
           cp target/release/axhub-helpers bin/axhub-helpers
 
+      - name: Check routing fixture freshness
+        run: |
+          git fetch origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}" --depth=1
+          git diff --name-only "origin/${{ github.base_ref }}...HEAD" | bun scripts/check-routing-fixture-sync.ts
+
       - name: Run corpus.100 drift gate
         id: drift
         run: bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --vs claude-native --score
@@ -56,7 +61,7 @@ jobs:
               body: [
                 'routing-drift gate 실패',
                 '',
-                'corpus.100 의 docs-only baseline ↔ claude-native baseline 의 drift > 5% 또는 accuracy < 95% 예요.',
+                'routing-affecting 변경에 baseline fixture 갱신이 없거나, corpus.100 의 docs-only baseline ↔ claude-native baseline drift > 5% 또는 accuracy < 95% 예요.',
                 '',
                 '대응:',
                 '1. `bun run measure:baseline` 으로 fresh docs-only baseline 측정 (docs/baseline-measurement.md 참고)',
