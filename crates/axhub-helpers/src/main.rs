@@ -13,7 +13,7 @@ use axhub_helpers::list_deployments::{run_list_deployments, ListDeploymentsArgs}
 use axhub_helpers::preflight::{run_preflight, PreflightRun};
 use axhub_helpers::redact::redact;
 use axhub_helpers::resolve::run_resolve;
-use axhub_helpers::runtime_paths::{last_deploy_file, state_dir, token_file};
+use axhub_helpers::runtime_paths::{last_deploy_file, state_dir, token_file, welcome_marker_path};
 use axhub_helpers::statusline::current_statusline;
 use axhub_helpers::telemetry::emit_meta_envelope;
 use serde_json::{json, Map, Value};
@@ -82,16 +82,7 @@ fn run() -> anyhow::Result<i32> {
         "consent-verify" => cmd_consent_verify(),
         "preauth-check" => cmd_preauth_check(),
         "prompt-route" => cmd_prompt_route(),
-        "session-start" => {
-            println!(
-                "{}",
-                json!({"systemMessage":"axhub helper Rust runtime이에요.\naudit log 로컬 7일 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1. 삭제: axhub-helpers cleanup-audit --all"})
-            );
-            let mut m = Map::new();
-            m.insert("event".into(), Value::String("session_start".into()));
-            emit_meta_envelope(m).ok();
-            Ok(0)
-        }
+        "session-start" => cmd_session_start(),
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -782,6 +773,63 @@ fn cmd_cleanup_audit(args: &[String]) -> anyhow::Result<i32> {
         let count = audit::rotate(7)?;
         println!("7일 이상 된 audit log {count} 파일 삭제했어요. 전체 삭제는 --all 사용해요.");
     }
+    Ok(0)
+}
+
+// Phase 7 (Component 6): SessionStart magical-moment message.
+//
+// Base systemMessage (always 3 lines) + current-version first-session welcome
+// (6 extra lines, one-shot, gated by welcome marker file). Marker write is
+// best-effort — failure surfaces the welcome again next session, never blocks Claude.
+
+const WELCOME_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+fn cmd_session_start() -> anyhow::Result<i32> {
+    let mut lines: Vec<String> = vec![
+        format!(
+            "axhub helper Rust runtime 활성 (v{}).",
+            env!("CARGO_PKG_VERSION")
+        ),
+        "막히면 /axhub:help 로 명령 메뉴를, /axhub:clarify 로 모호한 의도 확인을 부탁해요."
+            .to_string(),
+        "라우팅 통계는 axhub-helpers routing-stats 로 봐요.".to_string(),
+        "audit log 로컬 7일 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1. 삭제: axhub-helpers cleanup-audit --all"
+            .to_string(),
+    ];
+
+    let marker = welcome_marker_path(WELCOME_VERSION);
+    let show_welcome = marker.as_ref().map(|p| !p.exists()).unwrap_or(false);
+    if show_welcome {
+        lines.push(String::new());
+        lines.push(format!(
+            "[axhub v{WELCOME_VERSION} 첫 세션] 라우팅 똑똑해졌어요."
+        ));
+        lines.push(
+            "- Rust 키워드 체인 ~600줄 폐기. Claude 가 SKILL.md description 으로 직접 매칭해요."
+                .to_string(),
+        );
+        lines.push("- 메타 질문 (\"왜 ~ 키워드 매칭이야?\") 자동 처리해요.".to_string());
+        lines.push(
+            "- routing audit log 7일 로컬 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1.".to_string(),
+        );
+        lines.push("- 변경점 보기: /axhub:whatsnew".to_string());
+
+        if let Some(path) = marker {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(
+                &path,
+                format!("shown: {}\n", chrono::Utc::now().to_rfc3339()),
+            );
+        }
+    }
+
+    let context = lines.join("\n");
+    println!("{}", json!({"systemMessage": context}));
+    let mut m = Map::new();
+    m.insert("event".into(), Value::String("session_start".into()));
+    emit_meta_envelope(m).ok();
     Ok(0)
 }
 

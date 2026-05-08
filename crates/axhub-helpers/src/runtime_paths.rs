@@ -30,6 +30,12 @@ pub fn state_dir() -> Option<PathBuf> {
     state_base_dir().map(|base| base.join("axhub-plugin"))
 }
 
+/// Path to the per-version SessionStart welcome marker. Presence means the
+/// magical-moment message for that version has already been shown.
+pub fn welcome_marker_path(version: &str) -> Option<PathBuf> {
+    state_dir().map(|dir| dir.join(format!(".v{version}-welcome-shown")))
+}
+
 fn config_base_dir() -> Option<PathBuf> {
     config_base_dir_from(env_path("XDG_CONFIG_HOME"), home_dir())
 }

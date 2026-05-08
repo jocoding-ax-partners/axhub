@@ -1199,6 +1199,83 @@ fn cli_routing_stats_help_and_invalid_args_are_stable() {
     }
 }
 
+// Phase 7: SessionStart magical-moment + welcome marker.
+//
+// XDG_STATE_HOME=tempdir 으로 audit/welcome marker 격리. session-start 는 stdin
+// 안 읽으니 run_stdin 의 stdin = "" 사용. systemMessage JSON parse 후 한국어
+// 톤 / magical moment marker / marker file persistence 검증.
+
+#[cfg(unix)]
+fn session_start_systemmessage(state_s: &str) -> String {
+    let output = run_stdin(&["session-start"], "", &[("XDG_STATE_HOME", state_s)]);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // session-start 가 systemMessage JSON 1 line + meta_envelope JSON 1 line 출력. 첫 번째 만 추출.
+    let first = stdout
+        .lines()
+        .find(|l| l.contains("systemMessage"))
+        .expect("systemMessage line");
+    let parsed: serde_json::Value = serde_json::from_str(first).expect("valid JSON");
+    parsed["systemMessage"]
+        .as_str()
+        .expect("systemMessage is string")
+        .to_owned()
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_session_start_first_current_version_session() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    let msg = session_start_systemmessage(&state_s);
+    let helper_version = env!("CARGO_PKG_VERSION");
+    assert!(msg.contains(&format!("v{helper_version} 첫 세션")), "{msg}");
+    assert!(msg.contains("/axhub:whatsnew"), "{msg}");
+    assert!(msg.contains("AXHUB_NO_AUDIT"), "{msg}");
+
+    // Marker file 생성됐는지.
+    let marker = state
+        .join("axhub-plugin")
+        .join(format!(".v{}-welcome-shown", env!("CARGO_PKG_VERSION")));
+    assert!(marker.exists(), "marker missing at {marker:?}");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_session_start_subsequent_session() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let dir = state.join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join(format!(".v{}-welcome-shown", env!("CARGO_PKG_VERSION"))),
+        "shown\n",
+    )
+    .unwrap();
+
+    let msg = session_start_systemmessage(&state.display().to_string());
+    assert!(
+        !msg.contains(&format!("v{} 첫 세션", env!("CARGO_PKG_VERSION"))),
+        "magical moment should not repeat: {msg}"
+    );
+    assert!(!msg.contains("/axhub:whatsnew"), "{msg}");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_session_start_base_message_korean_tone() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+
+    let msg = session_start_systemmessage(&state.display().to_string());
+    assert!(msg.contains("axhub helper Rust runtime 활성"), "{msg}");
+    assert!(msg.contains("/axhub:help"), "{msg}");
+    assert!(msg.contains("/axhub:clarify"), "{msg}");
+    assert!(msg.contains("axhub-helpers routing-stats"), "{msg}");
+}
+
 #[test]
 fn cli_consent_mint_rejects_binding_schema_drift_before_writing_tokens() {
     let temp = tempfile::tempdir().unwrap();
