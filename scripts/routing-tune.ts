@@ -343,10 +343,10 @@ async function main(): Promise<void> {
       result = runAxhubHelpers(["routing-stats", "--confused", "--json"]);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      process.stderr.write(
-        `[routing-tune] axhub-helpers 호출 실패: ${msg}\n` +
-          "  bin/axhub-helpers 가 stale 이면 cargo run -p axhub-helpers fallback 도 함께 실패했는지 확인해요.\n",
-      );
+      const hint = msg.includes("configured AXHUB_HELPERS_BIN failed")
+        ? "  명시한 AXHUB_HELPERS_BIN 이 실패해서 다른 helper 로 대체하지 않고 중단했어요.\n"
+        : "  bin/axhub-helpers 가 stale 이면 cargo run -p axhub-helpers 경로까지 함께 실패했는지 확인해요.\n";
+      process.stderr.write(`[routing-tune] axhub-helpers 호출 실패: ${msg}\n${hint}`);
       process.exit(1);
     }
     const parsed = parseConfusedStats(result);

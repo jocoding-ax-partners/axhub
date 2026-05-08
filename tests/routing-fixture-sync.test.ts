@@ -32,5 +32,8 @@ describe("routing fixture sync guard", () => {
     expect(workflow).toContain(
       'bun scripts/check-routing-fixture-sync.ts --base "origin/${{ github.base_ref }}" --head HEAD',
     );
-    expect(workflow).not.toMatch(/git diff --name-only[^\n]*\|\s*bun scripts\/check-routing-fixture-sync\.ts/);
-  });});
+    expect(workflow).not.toMatch(
+      /git diff --name-only[^\n]*\|\s*bun scripts\/check-routing-fixture-sync\.ts/,
+    );
+  });
+});

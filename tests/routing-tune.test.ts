@@ -154,6 +154,7 @@ describe("routing:tune CLI", () => {
     expect(result.stderr).toContain("AXHUB_HELPERS_BIN");
     expect(result.stderr).toContain(helper);
     expect(result.stderr).toContain("configured helper broken");
+    expect(result.stderr).not.toContain("fallback");
   });
 
   test("confused package entrypoint consumes helper JSON", () => {
