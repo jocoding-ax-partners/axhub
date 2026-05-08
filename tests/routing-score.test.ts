@@ -1,6 +1,9 @@
 // Phase 0 — Sub-task 0.1: routing-score.ts unit tests.
 import { describe, expect, test } from "bun:test";
-import { score, drift } from "./routing-score";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { score, drift, parseResults } from "./routing-score";
 import type { CorpusRow, ResultRow } from "./routing-score";
 
 const corpus: CorpusRow[] = [
@@ -144,5 +147,31 @@ describe("drift()", () => {
     const d = drift(a, b);
     expect(d.total_rows).toBe(0);
     expect(d.mismatch_rate).toBe(0);
+  });
+});
+
+describe("parseResults()", () => {
+  test("skips metadata rows emitted by measure-docs-only-baseline", () => {
+    const dir = mkdtempSync(join(tmpdir(), "axhub-routing-score-"));
+    const path = join(dir, "baseline.json");
+    writeFileSync(
+      path,
+      JSON.stringify(
+        [
+          {
+            _metadata: {
+              measured_at: "2026-05-08T00:00:00Z",
+              reviewer: "test",
+              rows_measured: 1,
+            },
+          },
+          { utterance_id: "A1", fired_skill: "deploy" },
+        ],
+        null,
+        2,
+      ),
+    );
+
+    expect(parseResults(path)).toEqual([{ utterance_id: "A1", fired_skill: "deploy" }]);
   });
 });

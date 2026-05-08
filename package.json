@@ -19,6 +19,7 @@
     "measure:baseline": "bun run scripts/measure-docs-only-baseline.ts",
     "codegen:skill-examples": "bun run scripts/codegen-skill-examples.ts",
     "routing:tune": "bun run scripts/routing-tune.ts",
+    "routing:drift": "bun run scripts/routing-drift-check.ts",
     "codegen:catalog": "bun scripts/codegen-catalog.ts",
     "codegen:skill-keywords": "bun scripts/codegen-skill-keywords-from-rust.ts",
     "codegen:version": "bun scripts/codegen-install-version.ts",

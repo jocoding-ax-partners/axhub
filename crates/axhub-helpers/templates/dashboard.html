@@ -28,11 +28,23 @@
   <div class="stat"><div class="stat-label">clarify invoked</div><div class="stat-value">{confused}</div></div>
 </div>
 
-<h2>User-chosen skill (clarify feedback)</h2>
+<h2>Per-skill precision / recall</h2>
+<p>Local audit 에는 prompt 원문과 expected/actual pair 를 저장하지 않아서 precision/recall 은 corpus gate 결과를 별도로 봐요. 이 표는 clarify feedback 으로 사용자가 고른 skill count 를 함께 보여줘요.</p>
 <table>
-  <thead><tr><th>SKILL</th><th>count</th></tr></thead>
+  <thead><tr><th>SKILL</th><th>feedback hits</th><th>precision</th><th>recall</th></tr></thead>
   <tbody>
 {chosen_rows}
+  </tbody>
+</table>
+
+<h2>Drift trend</h2>
+<p>corpus.100 drift trend 는 CI 의 <code>routing-drift</code> gate 에서 확인해요. 로컬 즉시 확인: <code>bun run test:routing:100</code>.</p>
+
+<h2>Failing prompt hashes (clarify invoked)</h2>
+<table>
+  <thead><tr><th>prompt hash</th><th>chosen skill</th><th>latest timestamp</th></tr></thead>
+  <tbody>
+{failing_rows}
   </tbody>
 </table>
 

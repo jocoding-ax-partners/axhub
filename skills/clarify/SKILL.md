@@ -95,7 +95,7 @@ To clarify:
 
    Stop without routing.
 
-7. **Audit feedback (final).** After the user chooses a final skill, record the clarify feedback through the packaged helper. This is best-effort and must never block routing.
+7. **Audit feedback (final).** 사용자가 disambiguation option 을 고른 뒤 packaged helper 로 fail-soft feedback record 를 남겨요. prompt 원문은 저장하지 않고 helper 가 로컬에서 sha256 hash 로 변환해요. `FINAL_SKILL` 은 위 Step 4 의 선택값이에요.
 
    ```bash
    ORIGINAL_PROMPT="${ORIGINAL_USER_UTTERANCE:-}"
@@ -111,6 +111,8 @@ To clarify:
      "$HELPER_BIN" audit-clarify --prompt "$ORIGINAL_PROMPT" --chosen "$FINAL_SKILL" >/dev/null 2>&1 || true
    fi
    ```
+
+   이 기록은 `axhub-helpers routing-stats --confused --json` 과 `bun run routing:tune --confused` 의 feedback input 이에요.
 
 ## NEVER
 

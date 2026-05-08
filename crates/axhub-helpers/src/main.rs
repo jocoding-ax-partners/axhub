@@ -668,7 +668,7 @@ fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
     } else {
         // Clarify sentinel records are feedback events, not regular prompt-route samples.
         // Keeping them in default stats inflates auth_failed because sentinel records have
-        // auth_ok=false by construction.
+        // auth_ok=false by construction, and can depress axhub_related counts.
         records.retain(|r| !r.clarify_invoked);
     }
     if records.is_empty() {
@@ -918,6 +918,14 @@ OPTIONS:
   -h, --help  도움말
 ";
 
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
+}
+
 fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
     use axhub_helpers::audit;
     let html_mode = args.iter().any(|a| a == "--html");
@@ -926,13 +934,17 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
         return Ok(0);
     }
     let records = audit::read_since(chrono::Duration::days(7))?;
-    let total = records.len();
-    let axhub_related = records.iter().filter(|r| r.is_axhub_related).count();
-    let auth_failed = records.iter().filter(|r| !r.auth_ok).count();
+    let operational_records: Vec<_> = records.iter().filter(|r| !r.clarify_invoked).collect();
+    let total = operational_records.len();
+    let axhub_related = operational_records
+        .iter()
+        .filter(|r| r.is_axhub_related)
+        .count();
+    let auth_failed = operational_records.iter().filter(|r| !r.auth_ok).count();
     let confused = records.iter().filter(|r| r.clarify_invoked).count();
     let mut chosen_counts: std::collections::HashMap<String, u32> =
         std::collections::HashMap::new();
-    for r in &records {
+    for r in records.iter().filter(|r| r.clarify_invoked) {
         if let Some(skill) = &r.chosen_skill {
             *chosen_counts.entry(skill.clone()).or_insert(0) += 1;
         }
@@ -942,7 +954,27 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
     if html_mode {
         let mut chosen_rows = String::new();
         for (skill, count) in &rows {
-            chosen_rows.push_str(&format!("<tr><td>{skill}</td><td>{count}</td></tr>"));
+            chosen_rows.push_str(&format!(
+                "<tr><td>{}</td><td>{count}</td><td>n/a</td><td>n/a</td></tr>",
+                html_escape(skill)
+            ));
+        }
+        if chosen_rows.is_empty() {
+            chosen_rows
+                .push_str("<tr><td colspan=\"4\">clarify feedback 이 아직 없어요.</td></tr>");
+        }
+        let mut failing_rows = String::new();
+        for r in records.iter().filter(|r| r.clarify_invoked).take(25) {
+            failing_rows.push_str(&format!(
+                "<tr><td>{}</td><td>{}</td><td>{}</td></tr>",
+                html_escape(&r.prompt_hash),
+                html_escape(r.chosen_skill.as_deref().unwrap_or("null")),
+                html_escape(&r.ts),
+            ));
+        }
+        if failing_rows.is_empty() {
+            failing_rows
+                .push_str("<tr><td colspan=\"3\">failing prompt hash 가 아직 없어요.</td></tr>");
         }
         let html = format!(
             include_str!("../templates/dashboard.html"),
@@ -951,6 +983,7 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
             auth_failed = auth_failed,
             confused = confused,
             chosen_rows = chosen_rows,
+            failing_rows = failing_rows,
         );
         print!("{html}");
     } else {

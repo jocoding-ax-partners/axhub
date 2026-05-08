@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { analyzeRoutingFixtureSync } from "../scripts/check-routing-fixture-sync";
+
+const REPO_ROOT = join(import.meta.dir, "..");
 
 describe("routing fixture sync guard", () => {
   test("passes when routing files are untouched", () => {
@@ -21,5 +25,15 @@ describe("routing fixture sync guard", () => {
     ]);
     expect(report.ok).toBe(true);
     expect(report.baselineFiles).toEqual(["tests/baseline-results.docs-only.100.json"]);
+  });
+
+  test("workflow lets the checker own git diff failures instead of piping", () => {
+    const workflow = readFileSync(join(REPO_ROOT, ".github/workflows/routing-drift.yml"), "utf8");
+    expect(workflow).toContain(
+      'bun scripts/check-routing-fixture-sync.ts --base "origin/${{ github.base_ref }}" --head HEAD',
+    );
+    expect(workflow).not.toMatch(
+      /git diff --name-only[^\n]*\|\s*bun scripts\/check-routing-fixture-sync\.ts/,
+    );
   });
 });

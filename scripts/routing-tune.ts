@@ -5,7 +5,7 @@
  * Pipeline:
  *   1. corpus.{tier}.jsonl + baseline-results.{docs-only,claude-native}.{tier}.json 읽기
  *   2. failing case 추출 (corpus.expected_skill ≠ baseline.fired_skill 또는 docs-only ↔ claude-native drift)
- *   3. 각 SKILL 의 failing utterance 그룹화 → LLM call (Claude Sonnet) → description / examples 보강 suggestion
+ *   3. 각 SKILL 의 failing utterance 그룹화 → deterministic dry-run 또는 명시적 LLM call → suggestion
  *   4. --dry-run: stdout JSON. --apply: git branch + SKILL.md edit + commit + push + gh PR draft
  *
  * LlmClient + 기타 entry point DI design (test 시 mock-able).
@@ -13,11 +13,12 @@
  * Usage:
  *   bun run scripts/routing-tune.ts                    # dry-run, full corpus.100
  *   bun run scripts/routing-tune.ts --skill deploy     # 1 SKILL 만
+ *   bun run scripts/routing-tune.ts --online --dry-run # ANTHROPIC_API_KEY 로 LLM suggestion
  *   bun run scripts/routing-tune.ts --apply            # PR draft 생성
- *   bun run scripts/routing-tune.ts --confused         # Phase 10 의 clarify confusion log input (stub)
+ *   bun run scripts/routing-tune.ts --confused         # Phase 10 clarify feedback hash input
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -49,6 +50,18 @@ export interface TuneSuggestion {
   example_additions: { utterance: string; intent: string }[];
 }
 
+export interface ConfusedPrompt {
+  hash: string;
+  count: number;
+  chosen_skill: string | null;
+  latest_ts?: string;
+}
+
+export interface ConfusedStats {
+  total_prompts: number;
+  confused_prompts: ConfusedPrompt[];
+}
+
 export interface LlmClient {
   suggest(failing: FailingCase, currentDescription: string): Promise<{
     description_additions: string[];
@@ -68,6 +81,41 @@ export function loadBaseline(path: string): BaselineEntry[] {
   return arr.filter((r): r is BaselineEntry => typeof (r as BaselineEntry).utterance_id === "string");
 }
 
+export function parseConfusedStats(raw: string): ConfusedStats {
+  type RawConfusedPrompt = {
+    hash?: string;
+    prompt_hash?: string;
+    count?: number;
+    chosen_skill?: string | null;
+    latest_ts?: string;
+  };
+  const parsed = JSON.parse(raw || "{}") as {
+    total_prompts?: number;
+    confused_prompts?: RawConfusedPrompt[];
+    top_axhub_hashes?: Array<{ hash?: string; count?: number }>;
+  };
+  const direct: RawConfusedPrompt[] = Array.isArray(parsed.confused_prompts) ? parsed.confused_prompts : [];
+  const fallback: RawConfusedPrompt[] = direct.length === 0 && Array.isArray(parsed.top_axhub_hashes)
+    ? parsed.top_axhub_hashes.map((h) => ({ ...h, chosen_skill: null }))
+    : direct;
+  const confused_prompts = fallback
+    .map((p): ConfusedPrompt | null => {
+      const hash = p.hash ?? p.prompt_hash;
+      if (!hash) return null;
+      return {
+        hash,
+        count: typeof p.count === "number" && Number.isFinite(p.count) ? p.count : 1,
+        chosen_skill: p.chosen_skill ?? null,
+        latest_ts: p.latest_ts,
+      };
+    })
+    .filter((p): p is ConfusedPrompt => p !== null);
+  return {
+    total_prompts: parsed.total_prompts ?? confused_prompts.length,
+    confused_prompts,
+  };
+}
+
 export function findFailingCases(opts: {
   corpus: CorpusRow[];
   docsOnly: BaselineEntry[];
@@ -75,37 +123,23 @@ export function findFailingCases(opts: {
 }): FailingCase[] {
   const docsMap = new Map(opts.docsOnly.map((e) => [e.utterance_id, e.fired_skill]));
   const cnMap = new Map(opts.claudeNative.map((e) => [e.utterance_id, e.fired_skill]));
+  // Phase 11 fix: 1 case per utterance_id (priority: drift > docs-only > claude-native).
   const cases: FailingCase[] = [];
   for (const row of opts.corpus) {
     if (!row.expected_skill) continue;
     const docs = docsMap.get(row.id);
     const cn = cnMap.get(row.id);
-    if (docs !== undefined && docs !== row.expected_skill) {
-      cases.push({
-        utterance_id: row.id,
-        utterance: row.utterance,
-        expected_skill: row.expected_skill,
-        actual_skill: docs,
-        source: "docs-only",
-      });
-    }
-    if (cn !== undefined && cn !== row.expected_skill) {
-      cases.push({
-        utterance_id: row.id,
-        utterance: row.utterance,
-        expected_skill: row.expected_skill,
-        actual_skill: cn,
-        source: "claude-native",
-      });
-    }
+    const base = {
+      utterance_id: row.id,
+      utterance: row.utterance,
+      expected_skill: row.expected_skill,
+    } as const;
     if (docs !== undefined && cn !== undefined && docs !== cn) {
-      cases.push({
-        utterance_id: row.id,
-        utterance: row.utterance,
-        expected_skill: row.expected_skill,
-        actual_skill: cn,
-        source: "drift",
-      });
+      cases.push({ ...base, actual_skill: cn, source: "drift" });
+    } else if (docs !== undefined && docs !== row.expected_skill) {
+      cases.push({ ...base, actual_skill: docs, source: "docs-only" });
+    } else if (cn !== undefined && cn !== row.expected_skill) {
+      cases.push({ ...base, actual_skill: cn, source: "claude-native" });
     }
   }
   return cases;
@@ -144,12 +178,20 @@ export async function runTune(opts: {
 class AnthropicTuneClient implements LlmClient {
   constructor(private readonly apiKey: string, private readonly model: string) {}
   async suggest(failing: FailingCase, currentDescription: string) {
+    // Phase 11 — sanitize prompt input (matches measure-docs-only-baseline:sanitizeForPrompt contract).
+    const safe = (s: string, n = 200): string =>
+      s
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .slice(0, n);
     const prompt = [
       "당신은 axhub plugin 의 SKILL 작성자예요. 다음 routing failure 를 수정해야 해요:",
       "",
-      `발화: "${failing.utterance}"`,
-      `기대된 skill: ${failing.expected_skill}`,
-      `실제 fired skill: ${failing.actual_skill ?? "null"}`,
+      `발화: "${safe(failing.utterance)}"`,
+      `기대된 skill: ${safe(failing.expected_skill, 64)}`,
+      `실제 fired skill: ${safe(failing.actual_skill ?? "null", 64)}`,
       `failure source: ${failing.source}`,
       "",
       `현재 description:`,
@@ -186,6 +228,23 @@ class AnthropicTuneClient implements LlmClient {
   }
 }
 
+class DeterministicDryRunClient implements LlmClient {
+  async suggest(failing: FailingCase) {
+    const normalized = failing.utterance.slice(0, 80);
+    return {
+      description_additions: [
+        `${failing.expected_skill} intent phrase for ${failing.source} failure ${failing.utterance_id}`,
+      ],
+      example_additions: [
+        {
+          utterance: normalized,
+          intent: `route utterance to ${failing.expected_skill}`,
+        },
+      ],
+    };
+  }
+}
+
 function gitBranchAndPr(suggestions: TuneSuggestion[]): void {
   if (suggestions.length === 0) {
     process.stderr.write("[routing-tune] no suggestions to apply\n");
@@ -204,9 +263,67 @@ function summarizeStdout(suggestions: TuneSuggestion[]): void {
   process.stdout.write(JSON.stringify(suggestions, null, 2) + "\n");
 }
 
+export function shouldUseOnlineTuneClient(apply: boolean, argv: string[]): boolean {
+  return apply || argv.includes("--online") || argv.includes("--llm");
+}
+
+function formatExecFailure(label: string, error: unknown): string {
+  const err = error as { message?: string; stderr?: Buffer | string; stdout?: Buffer | string; status?: number };
+  const stderr = typeof err.stderr === "string" ? err.stderr : err.stderr?.toString("utf8");
+  const stdout = typeof err.stdout === "string" ? err.stdout : err.stdout?.toString("utf8");
+  return [
+    `${label}: ${err.message ?? String(error)}`,
+    typeof err.status === "number" ? `exit_status: ${err.status}` : undefined,
+    stderr?.trim() ? `stderr: ${stderr.trim()}` : undefined,
+    stdout?.trim() ? `stdout: ${stdout.trim()}` : undefined,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+}
+
+function execAxhubHelper(candidate: string, args: string[]): string {
+  return execFileSync(candidate, args, {
+    encoding: "utf8",
+    cwd: REPO_ROOT,
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+function runAxhubHelpers(args: string[]): string {
+  const configured = process.env["AXHUB_HELPERS_BIN"];
+  if (configured) {
+    try {
+      return execAxhubHelper(configured, args);
+    } catch (e) {
+      throw new Error(`configured AXHUB_HELPERS_BIN failed (${configured})\n${formatExecFailure(configured, e)}`);
+    }
+  }
+
+  const failures: string[] = [];
+  const packaged = join(REPO_ROOT, "bin/axhub-helpers");
+  try {
+    return execAxhubHelper(packaged, args);
+  } catch (e) {
+    failures.push(formatExecFailure(packaged, e));
+  }
+  try {
+    return execFileSync("cargo", ["run", "--quiet", "-p", "axhub-helpers", "--", ...args], {
+      encoding: "utf8",
+      cwd: REPO_ROOT,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (e) {
+    failures.push(formatExecFailure("cargo run -p axhub-helpers", e));
+  }
+  throw new Error(failures.join("\n"));
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const apply = argv.includes("--apply");
+  const online = shouldUseOnlineTuneClient(apply, argv);
   const confused = argv.includes("--confused");
   let skillFilter: string | undefined;
   let corpus = "tests/corpus.100.jsonl";
@@ -221,12 +338,19 @@ async function main(): Promise<void> {
   }
 
   if (confused) {
-    const result = execSync("bin/axhub-helpers routing-stats --confused --json", {
-      encoding: "utf8",
-      cwd: REPO_ROOT,
-    });
-    const parsed = JSON.parse(result || "{}") as { total_prompts?: number; top_axhub_hashes?: { hash: string; count: number }[] };
-    const total = parsed.total_prompts ?? 0;
+    let result: string;
+    try {
+      result = runAxhubHelpers(["routing-stats", "--confused", "--json"]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const hint = msg.includes("configured AXHUB_HELPERS_BIN failed")
+        ? "  명시한 AXHUB_HELPERS_BIN 이 실패해서 다른 helper 로 대체하지 않고 중단했어요.\n"
+        : "  bin/axhub-helpers 가 stale 이면 cargo run -p axhub-helpers 경로까지 함께 실패했는지 확인해요.\n";
+      process.stderr.write(`[routing-tune] axhub-helpers 호출 실패: ${msg}\n${hint}`);
+      process.exit(1);
+    }
+    const parsed = parseConfusedStats(result);
+    const total = parsed.total_prompts;
     process.stderr.write(
       [
         "",
@@ -240,13 +364,26 @@ async function main(): Promise<void> {
         "",
       ].join("\n"),
     );
-    process.stdout.write(JSON.stringify(parsed, null, 2) + "\n");
+    process.stdout.write(
+      JSON.stringify(
+        {
+          ...parsed,
+          manual_review_required: true,
+          next_command:
+            parsed.confused_prompts[0]?.chosen_skill
+              ? `bun run routing:tune --skill ${parsed.confused_prompts[0].chosen_skill} --dry-run`
+              : "bun run routing:tune --confused",
+        },
+        null,
+        2,
+      ) + "\n",
+    );
     return;
   }
 
   const apiKey = process.env["ANTHROPIC_API_KEY"];
-  if (!apiKey) {
-    process.stderr.write("ANTHROPIC_API_KEY env var 필요해요.\n");
+  if (online && !apiKey) {
+    process.stderr.write("ANTHROPIC_API_KEY env var 필요해요. offline dry-run 은 --online 없이 실행해요.\n");
     process.exit(1);
   }
   const model = process.env["CLAUDE_MODEL"] ?? "claude-sonnet-4-6";
@@ -257,7 +394,7 @@ async function main(): Promise<void> {
   const claudeNative = loadBaseline(join(REPO_ROOT, `tests/baseline-results.claude-native.${tier}.json`));
   const failing = findFailingCases({ corpus: corpusRows, docsOnly, claudeNative });
 
-  const llm = new AnthropicTuneClient(apiKey, model);
+  const llm = online ? new AnthropicTuneClient(apiKey as string, model) : new DeterministicDryRunClient();
   const suggestions = await runTune({
     failingCases: failing,
     llm,

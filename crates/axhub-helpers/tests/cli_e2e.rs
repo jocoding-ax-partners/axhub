@@ -2093,6 +2093,23 @@ fn cli_prompt_route_examples_injected_when_env_set() {
 
 #[cfg(unix)]
 #[test]
+fn cli_routing_stats_skill_invoke() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    let output = run_stdin(
+        &["routing-stats", "--since", "7d", "--json"],
+        "",
+        &[("XDG_STATE_HOME", state_s.as_str())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["total_prompts"], 0);
+}
+
+#[cfg(unix)]
+#[test]
 fn cli_audit_clarify_appends_record_then_confused_filter_returns_it() {
     let temp = tempfile::tempdir().unwrap();
     let state = temp.path().join("state");
@@ -2123,6 +2140,15 @@ fn cli_audit_clarify_appends_record_then_confused_filter_returns_it() {
     let parsed: serde_json::Value = serde_json::from_str(stats_stdout.trim()).expect("valid JSON");
     assert!(
         parsed["total_prompts"].as_u64().unwrap() >= 1,
+        "{stats_stdout}"
+    );
+    let confused = parsed["confused_prompts"]
+        .as_array()
+        .expect("confused_prompts array");
+    assert!(
+        confused
+            .iter()
+            .any(|row| row["hash"] == "sha256:test123" && row["chosen_skill"] == "deploy"),
         "{stats_stdout}"
     );
 }
@@ -2192,5 +2218,19 @@ fn cli_routing_dashboard_html_renders() {
     assert!(html.contains("<!DOCTYPE html>"), "{html}");
     assert!(html.contains("axhub routing dashboard"), "{html}");
     assert!(html.contains("<table>"), "{html}");
+    assert!(
+        html.contains("total prompts</div><div class=\"stat-value\">0"),
+        "clarify feedback sentinel should not inflate total prompt count: {html}"
+    );
+    assert!(
+        html.contains("auth failed</div><div class=\"stat-value\">0"),
+        "clarify feedback sentinel should not inflate auth failures: {html}"
+    );
+    assert!(
+        html.contains("clarify invoked</div><div class=\"stat-value\">1"),
+        "clarify feedback count should still be visible: {html}"
+    );
+    assert!(html.contains("Failing prompt hashes"), "{html}");
+    assert!(html.contains("sha256:dash"), "{html}");
     assert!(html.contains("logs"), "chosen_skill row 보여야 함: {html}");
 }

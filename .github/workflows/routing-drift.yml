@@ -42,7 +42,7 @@ jobs:
       - name: Check routing fixture freshness
         run: |
           git fetch origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}" --depth=1
-          git diff --name-only "origin/${{ github.base_ref }}...HEAD" | bun scripts/check-routing-fixture-sync.ts
+          bun scripts/check-routing-fixture-sync.ts --base "origin/${{ github.base_ref }}" --head HEAD
 
       - name: Run corpus.100 drift gate
         id: drift
@@ -75,3 +75,26 @@ jobs:
       - name: Fail if drift gate failed
         if: steps.drift.outcome == 'failure'
         run: exit 1
+
+  # Phase 11 fix — audit trail for [skip-routing-gate] manual override.
+  # Posts a PR comment so reviewers see the skip explicitly.
+  audit-skip:
+    name: routing-drift gate skipped (audit trail)
+    runs-on: ubuntu-latest
+    if: ${{ contains(github.event.pull_request.title, '[skip-routing-gate]') }}
+    steps:
+      - name: Comment skip override
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: [
+                'routing-drift gate **manually skipped** via `[skip-routing-gate]` PR title flag.',
+                '',
+                '`bun run measure:baseline` 후 fresh docs-only baseline 갱신 PR 가 후속 필수예요.',
+                '리뷰어는 이 skip 사용 의도 확인 후 approve 부탁해요.',
+              ].join('\n'),
+            })

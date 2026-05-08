@@ -150,7 +150,16 @@ function parseJsonArray<S extends z.ZodSchema<any>>(
   }
   const results: z.output<S>[] = [];
   for (let i = 0; i < parsed.length; i++) {
-    const result = schema.safeParse(parsed[i]);
+    const row = parsed[i];
+    if (
+      row !== null &&
+      typeof row === "object" &&
+      "_metadata" in row &&
+      !("utterance_id" in row)
+    ) {
+      continue;
+    }
+    const result = schema.safeParse(row);
     if (!result.success) {
       err(
         `ERROR: ${label} entry ${i} schema validation failed:\n${result.error.message}`

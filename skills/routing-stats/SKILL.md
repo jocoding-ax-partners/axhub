@@ -53,6 +53,20 @@ To show routing stats:
    - 7일 이상 audit 정리: `axhub-helpers cleanup-audit`
    - 전체 audit 삭제: `axhub-helpers cleanup-audit --all`
 
+   대화형 모드에서는 AskUserQuestion 으로 다음 선택지를 보여줘요:
+
+   ```json
+   {
+     "question": "다음에 뭘 볼까요?",
+     "header": "다음",
+     "options": [
+       {"label": "끝", "value": "done", "description": "요약만 보고 종료해요."},
+       {"label": "상세 문서", "value": "docs", "description": "docs/routing.md 를 안내해요."},
+       {"label": "confused 보기", "value": "confused", "description": "clarify 발동 hash 만 보여줘요."}
+     ]
+   }
+   ```
+
 ## NEVER
 
 - NEVER prompt 원문 출력 X — audit log 는 sha256 hash 만 저장해요.

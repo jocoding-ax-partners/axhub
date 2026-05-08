@@ -44,6 +44,7 @@ export const SKILL_INTENTS: Record<string, string> = {
   profile: "manage axhub profile",
   "install-cli": "install axhub CLI binary",
   clarify: "disambiguate axhub intent",
+  "routing-stats": "show axhub routing statistics summary",
 };
 
 interface CorpusRow {
@@ -126,7 +127,7 @@ export function mergeExamplesIntoContent(content: string, yaml: string): string 
   } else if (/^multi-step:/m.test(fm)) {
     fm = fm.replace(/^(multi-step:)/m, `${yaml}\n$1`);
   } else {
-    fm = fm.replace(/(\n)?$/, `\n${yaml}`);
+    fm = fm.trimEnd() + "\n" + yaml;
   }
 
   return content.replace(/^---\n[\s\S]*?\n---/, `---\n${fm}\n---`);

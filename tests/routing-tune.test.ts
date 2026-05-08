@@ -1,9 +1,15 @@
 // Phase 9 sub-task 9.3 — routing-tune.ts unit tests (mock LlmClient).
 
 import { describe, expect, test } from "bun:test";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import {
   findFailingCases,
+  parseConfusedStats,
   runTune,
+  shouldUseOnlineTuneClient,
   type BaselineEntry,
   type CorpusRow,
   type FailingCase,
@@ -43,16 +49,26 @@ class MockLlmClient implements LlmClient {
 }
 
 describe("findFailingCases", () => {
-  test("filters drift > 0 rows only — T3 docs-only fired_skill mismatch", () => {
+  test("filters drift > 0 rows only — T3 docs-only ≠ claude-native → 1 'drift' case (priority)", () => {
     const cases = findFailingCases({
       corpus: SAMPLE_CORPUS,
       docsOnly: DOCS_ONLY,
       claudeNative: CLAUDE_NATIVE,
     });
     const t3 = cases.filter((c) => c.utterance_id === "T3");
-    expect(t3.length).toBeGreaterThanOrEqual(1);
-    expect(t3.some((c) => c.source === "docs-only")).toBe(true);
-    expect(t3.some((c) => c.source === "drift")).toBe(true);
+    // Phase 11 fix — dedup: drift > docs-only > claude-native priority. 1 case per utterance_id.
+    expect(t3.length).toBe(1);
+    expect(t3[0]?.source).toBe("drift");
+  });
+
+  test("no_duplicate_failing_case_per_utterance_id (Phase 11 dedup)", () => {
+    const cases = findFailingCases({
+      corpus: SAMPLE_CORPUS,
+      docsOnly: DOCS_ONLY,
+      claudeNative: CLAUDE_NATIVE,
+    });
+    const ids = cases.map((c) => c.utterance_id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   test("expected_skill = null rows skipped", () => {
@@ -72,6 +88,100 @@ describe("findFailingCases", () => {
     });
     expect(cases.every((c) => c.utterance_id !== "T1")).toBe(true);
     expect(cases.every((c) => c.utterance_id !== "T2")).toBe(true);
+  });
+});
+
+describe("parseConfusedStats", () => {
+  test("confused_mode_consumes_audit_feedback: hash + chosen_skill records become tune input", () => {
+    const parsed = parseConfusedStats(
+      JSON.stringify({
+        total_prompts: 2,
+        confused_prompts: [
+          { hash: "sha256:abc", count: 1, chosen_skill: "status", latest_ts: "2026-05-08T00:00:00Z" },
+          { hash: "sha256:def", count: 2, chosen_skill: null },
+        ],
+      }),
+    );
+
+    expect(parsed.total_prompts).toBe(2);
+    expect(parsed.confused_prompts).toEqual([
+      { hash: "sha256:abc", count: 1, chosen_skill: "status", latest_ts: "2026-05-08T00:00:00Z" },
+      { hash: "sha256:def", count: 2, chosen_skill: null },
+    ]);
+  });
+
+  test("supports legacy top_axhub_hashes fallback without chosen skill", () => {
+    const parsed = parseConfusedStats(
+      JSON.stringify({ total_prompts: 1, top_axhub_hashes: [{ hash: "sha256:legacy", count: 3 }] }),
+    );
+    expect(parsed.confused_prompts).toEqual([
+      { hash: "sha256:legacy", count: 3, chosen_skill: null, latest_ts: undefined },
+    ]);
+  });
+});
+
+describe("client mode selection", () => {
+  test("dry-run stays deterministic/offline even when credentials exist", () => {
+    expect(shouldUseOnlineTuneClient(false, [])).toBe(false);
+    expect(shouldUseOnlineTuneClient(false, ["--dry-run"])).toBe(false);
+  });
+
+  test("online LLM mode requires explicit online flag or apply", () => {
+    expect(shouldUseOnlineTuneClient(false, ["--online", "--dry-run"])).toBe(true);
+    expect(shouldUseOnlineTuneClient(false, ["--llm", "--dry-run"])).toBe(true);
+    expect(shouldUseOnlineTuneClient(true, ["--apply"])).toBe(true);
+  });
+});
+
+describe("routing:tune CLI", () => {
+
+  test("explicit AXHUB_HELPERS_BIN failure is fatal and does not fall back", () => {
+    const dir = mkdtempSync(join(tmpdir(), "axhub-routing-tune-bad-helper-"));
+    const helper = join(dir, "axhub-helpers");
+    writeFileSync(
+      helper,
+      ["#!/usr/bin/env bash", "echo configured helper broken >&2", "exit 42"].join("\n"),
+    );
+    chmodSync(helper, 0o755);
+
+    const result = spawnSync("bun", ["run", "scripts/routing-tune.ts", "--confused"], {
+      cwd: join(import.meta.dir, ".."),
+      encoding: "utf8",
+      env: { ...process.env, AXHUB_HELPERS_BIN: helper },
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("AXHUB_HELPERS_BIN");
+    expect(result.stderr).toContain(helper);
+    expect(result.stderr).toContain("configured helper broken");
+    expect(result.stderr).not.toContain("fallback");
+  });
+
+  test("confused package entrypoint consumes helper JSON", () => {
+    const dir = mkdtempSync(join(tmpdir(), "axhub-routing-tune-"));
+    const helper = join(dir, "axhub-helpers");
+    writeFileSync(
+      helper,
+      [
+        "#!/usr/bin/env bash",
+        "if [ \"$1\" = \"routing-stats\" ] && [ \"$2\" = \"--confused\" ] && [ \"$3\" = \"--json\" ]; then",
+        "  printf '%s\\n' '{\"total_prompts\":1,\"confused_prompts\":[{\"hash\":\"sha256:test\",\"count\":1,\"chosen_skill\":\"logs\",\"latest_ts\":\"2026-05-08T00:00:00Z\"}]}'",
+        "  exit 0",
+        "fi",
+        "exit 64",
+      ].join("\n"),
+    );
+    chmodSync(helper, 0o755);
+
+    const result = spawnSync("bun", ["run", "scripts/routing-tune.ts", "--confused"], {
+      cwd: join(import.meta.dir, ".."),
+      encoding: "utf8",
+      env: { ...process.env, AXHUB_HELPERS_BIN: helper },
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('"hash": "sha256:test"');
+    expect(result.stdout).toContain('"next_command": "bun run routing:tune --skill logs --dry-run"');
   });
 });
 

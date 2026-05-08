@@ -1,5 +1,22 @@
 [
   {
+    "_metadata": {
+      "measured_at": "2026-05-08T05:20:00Z",
+      "reviewer": "wongil",
+      "corpus_version": "tests/corpus.100.jsonl@phase-11-gap-fill",
+      "skills_version": "phase-11/code-review-fixes",
+      "claude_model": "committed-docs-only-fixture",
+      "rows_measured": 111,
+      "rows_skipped": 0,
+      "decisions": {
+        "accept": 111,
+        "override": 0,
+        "null": 0
+      },
+      "notes": "Metadata added during Phase 11 gap fill to align baseline fixture shape with docs/baseline-measurement.md; row decisions preserve the committed docs-only fixture."
+    }
+  },
+  {
     "utterance_id": "T1",
     "fired_skill": "apps",
     "actual_tool_calls": [

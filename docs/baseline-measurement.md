@@ -12,7 +12,7 @@ axhub plugin 의 라우팅 정확도 측정 baseline 중 `baseline-results.docs-
 
 ### 1. Claude 추천
 
-`scripts/measure-docs-only-baseline.ts` 가 corpus.100 의 100 row 각각 처리:
+`scripts/measure-docs-only-baseline.ts` 가 `tests/corpus.100.jsonl` 의 100-tier row 각각 처리해요. v0.5.0 현재 100-tier 는 base 100 + meta_question 11 = 111 row 예요.
 
 - 18 SKILL.md 의 frontmatter description 만 read
 - LLM call (Claude Sonnet 4.6 / temperature=0):
@@ -109,7 +109,7 @@ Reviewer (보통 SKILL 작성자 또는 maintainer) 의 결정 기준:
 - Claude 가 description 만 본 결과는 "추천" — ground truth 가 아니에요
 - LLM 의 비결정성 (temperature=0 이라도 약간의 sampling 변동 가능) 은 reviewer review 로 흡수
 - script 가 사용자 stdin 의존 → CI 에서 자동 실행 X (manual measurement)
-- routing-drift CI gate 는 commit 된 baseline (이 protocol 결과) 로만 측정 — fresh measurement 자체는 제외
+- routing-drift CI gate 는 commit 된 baseline (이 protocol 결과) 로만 측정해요. CI 안에서 Claude API fresh measurement 는 실행하지 않아요.
 
 ## 사용
 

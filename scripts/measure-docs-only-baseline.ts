@@ -100,6 +100,15 @@ export function loadSkills(skillsDir: string): SkillDescription[] {
   return skills;
 }
 
+function sanitizeForPrompt(s: string, maxLen = 500): string {
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .slice(0, maxLen);
+}
+
 export function buildLlmPrompt(utterance: string, skills: SkillDescription[]): string {
   const skillBlock = skills
     .map((s) => `- ${s.name}: ${s.description.slice(0, 200)}`)
@@ -108,7 +117,7 @@ export function buildLlmPrompt(utterance: string, skills: SkillDescription[]): s
     "당신은 axhub plugin 의 routing 분류기예요.",
     "사용자 발화를 보고 가장 적합한 SKILL name 1 개 또는 null (axhub 도구 호출 의도 X) 결정해요.",
     "",
-    `발화: "${utterance}"`,
+    `발화: "${sanitizeForPrompt(utterance)}"`,
     "",
     "후보 SKILL:",
     skillBlock,
@@ -209,7 +218,8 @@ class AnthropicClient implements LlmClient {
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      throw new Error(`Anthropic API ${response.status}: ${await response.text()}`);
+      const body = (await response.text()).slice(0, 200);
+      throw new Error(`Anthropic API ${response.status}: ${body}`);
     }
     const data = (await response.json()) as { content?: { text?: string }[] };
     const text = data.content?.[0]?.text ?? "{}";
