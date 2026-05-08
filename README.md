@@ -60,7 +60,7 @@ UX 보장:
 
 정직한 tradeoff:
 
-- v0.3.2 은 plugin helper 를 Rust native binary 하나로 유지해요.
+- v0.3.2는 plugin helper 를 Rust native binary 하나로 유지해요.
 - axhub CLI 자체 설치가 필요하면 `install-cli` skill 이 OS 별 공식 설치 채널을 안내해요.
 - template 목록은 `ax-hub-cli` registry 를 source of truth 로 사용해요.
 - admin onboarding 과 remote `templates.json` 는 deferred 예요.

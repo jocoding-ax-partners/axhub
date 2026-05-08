@@ -124,15 +124,14 @@ if [ "$MODE" != "docs-only" ] && [ "$MODE" != "plugin" ]; then
   exit 1
 fi
 
-# Phase 5 — `--vs <name>` (no .json suffix) + advisory tier short-circuits before
-# the fixture lookup so 331-row scoring exits 0 with an advisory line, instead of
-# failing closed because no committed fixture exists.
-if [ "$SCORE" = "1" ] \
-  && [ -n "$VS_FILE" ] \
-  && [[ "$VS_FILE" != *.json ]] \
-  && [ "$ADVISORY" = "1" ]; then
-  echo "[ADVISORY] 331-row corpus 의 routing-score 결과는 manual/advisory 입니다 (CI gate X). 호출 안 해요." >&2
-  exit 0
+# Phase 5 — advisory tier short-circuits before fixture lookup so the full
+# corpus remains manual/advisory whether scoring via routing-score (--vs name)
+# or the legacy scorer with no committed fixture.
+if [ "$SCORE" = "1" ] && [ "$ADVISORY" = "1" ]; then
+  if [ -z "$FIXTURE" ] || { [ -n "$VS_FILE" ] && [[ "$VS_FILE" != *.json ]]; }; then
+    echo "[ADVISORY] ${CORPUS_ROWS}-row corpus 의 routing-score 결과는 manual/advisory 입니다 (CI gate X). 호출 안 해요." >&2
+    exit 0
+  fi
 fi
 
 if [ -z "$FIXTURE" ]; then

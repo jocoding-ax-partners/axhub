@@ -19,7 +19,7 @@ use axhub_helpers::telemetry::emit_meta_envelope;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>]\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>]\n  cleanup-audit [--all] [--yes]\n  version\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -790,6 +790,8 @@ fn cmd_session_start() -> anyhow::Result<i32> {
         "막히면 /axhub:help 로 명령 메뉴를, /axhub:clarify 로 모호한 의도 확인을 부탁해요."
             .to_string(),
         "라우팅 통계는 axhub-helpers routing-stats 로 봐요.".to_string(),
+        "audit log 로컬 7일 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1. 삭제: axhub-helpers cleanup-audit --all"
+            .to_string(),
     ];
 
     let marker = welcome_marker_path(WELCOME_VERSION);
