@@ -24,6 +24,58 @@ struct CachedCliVersion {
 
 static CACHED_CLI_VERSION: Mutex<Option<CachedCliVersion>> = Mutex::new(None);
 
+static PHASE_MARKERS: Mutex<Vec<(String, Instant)>> = Mutex::new(Vec::new());
+
+pub fn record_phase_marker(phase_name: &str) {
+    if let Ok(mut markers) = PHASE_MARKERS.lock() {
+        markers.push((phase_name.to_string(), Instant::now()));
+    }
+}
+
+pub fn reset_phase_markers() {
+    if let Ok(mut markers) = PHASE_MARKERS.lock() {
+        markers.clear();
+    }
+}
+
+fn compute_phase_durations(markers: &[(String, Instant)]) -> Map<String, Value> {
+    let mut out = Map::new();
+    if markers.len() < 2 {
+        return out;
+    }
+    for window in markers.windows(2) {
+        let (name_a, instant_a) = &window[0];
+        let (name_b, instant_b) = &window[1];
+        let duration_ms = instant_b.saturating_duration_since(*instant_a).as_millis() as u64;
+        out.insert(
+            format!("{}_to_{}", name_a, name_b),
+            Value::Number(duration_ms.into()),
+        );
+    }
+    out
+}
+
+fn drain_phase_durations_ms() -> Map<String, Value> {
+    let Ok(mut markers) = PHASE_MARKERS.lock() else {
+        return Map::new();
+    };
+    let durations = compute_phase_durations(&markers);
+    markers.clear();
+    durations
+}
+
+pub fn emit_deploy_complete(exit_code: i32, command_class: &str) -> anyhow::Result<()> {
+    let mut fields = Map::new();
+    fields.insert("event".into(), Value::String("deploy_complete".into()));
+    fields.insert("exit_code".into(), Value::Number(exit_code.into()));
+    fields.insert("command_class".into(), Value::String(command_class.into()));
+    let durations = drain_phase_durations_ms();
+    if !durations.is_empty() {
+        fields.insert("phase_durations_ms".into(), Value::Object(durations));
+    }
+    emit_meta_envelope(fields)
+}
+
 fn home_dir() -> PathBuf {
     std::env::var_os("HOME")
         .map(PathBuf::from)
@@ -196,6 +248,47 @@ mod tests {
         assert_eq!(third, "9.9.9");
         assert_eq!(calls.get(), 2);
         reset_cli_version_cache();
+    }
+
+    #[test]
+    fn compute_phase_durations_empty_when_zero_or_one_marker() {
+        let zero: Vec<(String, Instant)> = vec![];
+        assert!(compute_phase_durations(&zero).is_empty());
+        let one = vec![("a".to_string(), Instant::now())];
+        assert!(compute_phase_durations(&one).is_empty());
+    }
+
+    #[test]
+    fn compute_phase_durations_records_sliding_window_pairs() {
+        let t0 = Instant::now();
+        let markers = vec![
+            ("step_a".to_string(), t0),
+            ("step_b".to_string(), t0 + Duration::from_millis(120)),
+            ("step_c".to_string(), t0 + Duration::from_millis(420)),
+        ];
+        let out = compute_phase_durations(&markers);
+        assert_eq!(out.len(), 2);
+        assert_eq!(
+            out.get("step_a_to_step_b").and_then(|v| v.as_u64()),
+            Some(120)
+        );
+        assert_eq!(
+            out.get("step_b_to_step_c").and_then(|v| v.as_u64()),
+            Some(300)
+        );
+    }
+
+    #[test]
+    fn record_and_drain_phase_markers_roundtrip() {
+        reset_phase_markers();
+        record_phase_marker("alpha");
+        std::thread::sleep(Duration::from_millis(2));
+        record_phase_marker("beta");
+        let drained = drain_phase_durations_ms();
+        assert_eq!(drained.len(), 1);
+        assert!(drained.contains_key("alpha_to_beta"));
+        let again = drain_phase_durations_ms();
+        assert!(again.is_empty());
     }
 
     #[test]

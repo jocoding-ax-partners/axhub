@@ -235,7 +235,7 @@ fn read_since_handles_corrupted_lines() {
     content.push_str("{ corrupted-not-json }\n");
     content.push_str(&valid2);
     content.push('\n');
-    content.push_str("\n"); // empty line, not corrupted
+    content.push('\n'); // empty line, not corrupted
     std::fs::write(&path, content).unwrap();
 
     let records = audit::read_since(Duration::days(7)).unwrap();

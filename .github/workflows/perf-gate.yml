@@ -1,0 +1,68 @@
+name: Perf Gate — Deploy Walltime Baseline
+
+on:
+  pull_request:
+    paths:
+      - 'crates/axhub-helpers/**'
+      - 'skills/deploy/**'
+      - 'tests/perf/**'
+      - 'scripts/perf-parse-results.ts'
+      - 'scripts/perf-publish-measurements.ts'
+      - '.github/workflows/perf-gate.yml'
+  push:
+    branches: [main]
+
+jobs:
+  perf-baseline:
+    name: perf ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      AXHUB_TELEMETRY: '1'
+      AXHUB_PERF_AUTO_APPROVE: '1'
+      MOCK_BACKEND_LATENCY_MS: '5000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.94.1
+      - uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+      - name: Build axhub-helpers (release)
+        run: cargo build --workspace --release
+      - name: Stage helper binary at bin/axhub-helpers
+        shell: bash
+        run: |
+          mkdir -p bin
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp target/release/axhub-helpers.exe bin/axhub-helpers.exe
+            cp target/release/axhub-helpers.exe bin/axhub-helpers
+          else
+            cp target/release/axhub-helpers bin/axhub-helpers
+          fi
+      - name: Install bun deps
+        run: bun install --frozen-lockfile
+      - name: Run walltime perf suite
+        env:
+          PERF_RESULTS_FILE: ${{ github.workspace }}/test-results.json
+        run: bun test tests/perf/deploy_walltime.test.ts
+      - name: Perf gate — p95 ceiling
+        env:
+          RESULTS_FILE: ${{ github.workspace }}/test-results.json
+        run: bun run scripts/perf-parse-results.ts
+      - name: Publish MEASUREMENTS.md for this OS
+        if: always()
+        env:
+          RESULTS_FILE: ${{ github.workspace }}/test-results.json
+        run: bun run scripts/perf-publish-measurements.ts --os ${{ matrix.os }}
+      - name: Upload perf artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-${{ matrix.os }}
+          path: |
+            test-results.json
+            .plan/deploy-time-reduction/MEASUREMENTS.md
