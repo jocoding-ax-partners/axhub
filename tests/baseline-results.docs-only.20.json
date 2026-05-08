@@ -1,7 +1,7 @@
 [
   {
     "utterance_id": "T1",
-    "fired_skill": null,
+    "fired_skill": "apps",
     "actual_tool_calls": [
       {
         "cmd": "axhub apps list --json",
@@ -14,7 +14,7 @@
   },
   {
     "utterance_id": "T1-en",
-    "fired_skill": null,
+    "fired_skill": "apps",
     "actual_tool_calls": [
       {
         "cmd": "axhub apps list --json",
@@ -27,7 +27,7 @@
   },
   {
     "utterance_id": "T2",
-    "fired_skill": null,
+    "fired_skill": "deploy",
     "actual_tool_calls": [
       {
         "cmd": "axhub deploy create --app paydrop --branch main --json",
@@ -40,7 +40,7 @@
   },
   {
     "utterance_id": "T2-en",
-    "fired_skill": null,
+    "fired_skill": "deploy",
     "actual_tool_calls": [
       {
         "cmd": "axhub deploy create --app paydrop --branch main --json",
@@ -53,7 +53,7 @@
   },
   {
     "utterance_id": "T3",
-    "fired_skill": null,
+    "fired_skill": "status",
     "actual_tool_calls": [
       {
         "cmd": "axhub deploy status dep_abc123 --watch --json",
@@ -66,7 +66,7 @@
   },
   {
     "utterance_id": "T4",
-    "fired_skill": null,
+    "fired_skill": "logs",
     "actual_tool_calls": [
       {
         "cmd": "axhub deploy logs dep_abc123 --follow --source build --json",
@@ -79,7 +79,7 @@
   },
   {
     "utterance_id": "T5",
-    "fired_skill": null,
+    "fired_skill": "auth",
     "actual_tool_calls": [
       {
         "cmd": "axhub auth status --json",
@@ -92,7 +92,7 @@
   },
   {
     "utterance_id": "T6",
-    "fired_skill": null,
+    "fired_skill": "update",
     "actual_tool_calls": [
       {
         "cmd": "axhub update check --json",
@@ -105,7 +105,7 @@
   },
   {
     "utterance_id": "T7",
-    "fired_skill": null,
+    "fired_skill": "deploy",
     "actual_tool_calls": [
       {
         "cmd": "axhub deploy create --app paydrop --branch main --json",
@@ -118,7 +118,7 @@
   },
   {
     "utterance_id": "T8",
-    "fired_skill": null,
+    "fired_skill": "doctor",
     "actual_tool_calls": [
       {
         "cmd": "axhub --version",
@@ -158,7 +158,7 @@
   },
   {
     "utterance_id": "T-ADV-1",
-    "fired_skill": null,
+    "fired_skill": "deploy",
     "actual_tool_calls": [
       {
         "cmd": "axhub deploy create --app unknown --branch main --json",
@@ -171,7 +171,7 @@
   },
   {
     "utterance_id": "T-ADV-2",
-    "fired_skill": null,
+    "fired_skill": "deploy",
     "actual_tool_calls": [
       {
         "cmd": "axhub deploy create --app unknown --branch main --json",
@@ -197,7 +197,7 @@
   },
   {
     "utterance_id": "T-UNI-1",
-    "fired_skill": null,
+    "fired_skill": "deploy",
     "actual_tool_calls": [
       {
         "cmd": "axhub deploy create --app pаydrop --branch main --json",
@@ -210,7 +210,7 @@
   },
   {
     "utterance_id": "T-PROFILE-1",
-    "fired_skill": null,
+    "fired_skill": "deploy",
     "actual_tool_calls": [
       {
         "cmd": "axhub deploy create --app unknown --branch main --json",
@@ -223,7 +223,7 @@
   },
   {
     "utterance_id": "T-MULTI-1",
-    "fired_skill": null,
+    "fired_skill": "status",
     "actual_tool_calls": [
       {
         "cmd": "axhub deploy status dep_unknown --watch --json",
@@ -236,7 +236,7 @@
   },
   {
     "utterance_id": "T-HEADLESS-1",
-    "fired_skill": null,
+    "fired_skill": "auth",
     "actual_tool_calls": [
       {
         "cmd": "axhub auth login",

@@ -54,6 +54,15 @@ describe("parseLatencyP95", () => {
     expect(parseLatencyP95("p95=42ms")).toBe(42);
   });
 
+  test("ignores p95-threshold banner and returns worst real row", () => {
+    const text = [
+      "[hook-latency] samples=40 warmup=5 p95-threshold=50ms",
+      "UserPromptSubmit p50=5ms p95=12ms",
+      "PreToolUse p50=8ms p95=18ms",
+    ].join("\n");
+    expect(parseLatencyP95(text)).toBe(18);
+  });
+
   test("returns null when missing", () => {
     expect(parseLatencyP95("no latency reported")).toBeNull();
   });

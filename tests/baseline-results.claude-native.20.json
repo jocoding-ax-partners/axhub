@@ -242,7 +242,7 @@
   },
   {
     "utterance_id": "T-ADV-3",
-    "fired_skill": "deploy",
+    "fired_skill": null,
     "actual_tool_calls": [],
     "required_consent_seen": true,
     "ts": "2026-04-24T10:00:27Z",
