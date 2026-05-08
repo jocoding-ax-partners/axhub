@@ -134,18 +134,24 @@ To deploy:
 
    Never use cached `app_id` for mutation. If resolve still returns ambiguity, ask the user to disambiguate (slug list with numeric IDs). Deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
 
-1.5. **Git 저장 지점 준비** — if resolve returns `git_init_needed: true` OR `git_has_commit: false` OR either `branch`/`commit_sha` is empty, do not show the deploy preview yet. First explain in non-developer Korean:
+1.5. **Git 저장 지점 준비** — if resolve returns `git_init_needed: true` OR `git_has_commit: false` OR either `branch`/`commit_sha` is empty, do not show the deploy preview yet. Before showing any explanatory copy or AskUserQuestion, replace the full TodoWrite list with the local git readiness checklist. Do not render this plan as a markdown checklist; Claude Code TodoWrite is the progress UI for every 3+ step branch.
+
+   ```typescript
+   TodoWrite({ todos: [
+     { content: "git 저장소 만들기",        status: "in_progress", activeForm: "git 저장소 만드는 중" },
+     { content: "파일을 첫 저장 지점에 담기", status: "pending",     activeForm: "파일 담는 중" },
+     { content: "첫 커밋 만들기",          status: "pending",     activeForm: "첫 커밋 만드는 중" },
+     { content: "배포 정보 다시 확인하기",   status: "pending",     activeForm: "배포 정보 다시 보는 중" },
+     { content: "미리보기 카드 보여드리기",  status: "pending",     activeForm: "미리보기 준비하는 중" }
+   ]})
+   ```
+
+   Then explain in non-developer Korean:
 
    ```
    배포 전에 저장 지점이 필요해요.
    axhub 배포는 "어떤 버전의 파일을 올릴지"를 정확히 알아야 해서 branch 와 commit SHA 를 써요.
    지금 폴더에는 아직 그 저장 지점이 없어서, 제가 git 초기화와 첫 커밋을 만들어드릴 수 있어요.
-
-   작업 단계
-   └ □ git 저장소 만들기
-     □ 파일을 첫 저장 지점에 담기
-     □ 첫 커밋 만들기
-     □ 배포 정보 다시 확인하기
    ```
 
    Then ask:
@@ -174,19 +180,7 @@ To deploy:
    }
    ```
 
-   If the user chooses "초기화하고 계속", run only local git commands, then re-run resolve and continue from Step 2. Before running shell commands after the user answer, replace the full TodoWrite list with the local git readiness checklist:
-
-   ```typescript
-   TodoWrite({ todos: [
-     { content: "git 저장소 만들기",        status: "in_progress", activeForm: "git 저장소 만드는 중" },
-     { content: "파일을 첫 저장 지점에 담기", status: "pending",     activeForm: "파일 담는 중" },
-     { content: "첫 커밋 만들기",          status: "pending",     activeForm: "첫 커밋 만드는 중" },
-     { content: "배포 정보 다시 확인하기",   status: "pending",     activeForm: "배포 정보 다시 보는 중" },
-     { content: "미리보기 카드 보여드리기",  status: "pending",     activeForm: "미리보기 준비하는 중" }
-   ]})
-   ```
-
-   이 TodoWrite 호출도 기존 목록을 기준으로 patch 하지 말고 전체 교체로 실행해요. 이전 스킬 todo 를 섞으면 사용자가 지금 흐름을 잘못 이해해요.
+   If the user chooses "초기화하고 계속", run only local git commands, then re-run resolve and continue from Step 2. Keep the git readiness TodoWrite list on screen and update statuses as each command finishes. 이 TodoWrite 호출도 기존 목록을 기준으로 patch 하지 말고 전체 교체로 실행해요. If another skill or stale todo list appears, replace the whole list again instead of patching individual items. 이전 스킬 todo 를 섞으면 사용자가 지금 흐름을 잘못 이해해요.
 
    ```bash
    echo '[deploy:Step 1.5 git-init] entered' >&2

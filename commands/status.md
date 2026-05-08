@@ -2,7 +2,7 @@
 description: axhub 배포 상태 확인 (한국어 진행 상황 안내 + 자동 watch 옵션)
 allowed-tools: Bash(axhub-helpers:*), Bash(axhub:*), Bash(jq:*)
 argument-hint: "[deployment-id]"
-model: sonnet
+model: haiku
 ---
 
 Trigger the axhub `status` skill with arguments: $ARGUMENTS.

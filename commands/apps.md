@@ -2,7 +2,7 @@
 description: 현재 프로필의 axhub 앱 목록/관리 (삭제 등 파괴적 작업은 승인 필요)
 allowed-tools: Bash(axhub-helpers:*), Bash(axhub:*), Bash(jq:*)
 argument-hint: "[--all] [--slug-prefix <name>]"
-model: sonnet
+model: haiku
 ---
 
 Trigger the axhub `apps` skill with arguments: $ARGUMENTS.

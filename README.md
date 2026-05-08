@@ -2,7 +2,7 @@
 
 > 바이브코더가 자연어로 axhub 앱을 안전하게 배포하고 관리하는 Claude Code 플러그인.
 
-**상태**: v0.5.0 (ship). 19 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
+**상태**: v0.5.1 (ship). 19 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
 
 ---
 
@@ -12,7 +12,7 @@ axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "결제 
 
 ## 무엇을 할 수 있는가
 
-18 SKILL 자연어 트리거 + 10 슬래시 명령 (한글 alias `/axhub:배포` 포함):
+19 SKILL 자연어 트리거 + 10 슬래시 명령 (한글 alias `/axhub:배포` 포함):
 
 | SKILL | 트리거 예시 | 슬래시 |
 |-------|-------------|--------|
@@ -60,7 +60,7 @@ UX 보장:
 
 정직한 tradeoff:
 
-- v0.5.0 에서도 plugin helper 를 Rust native binary 하나로 유지해요.
+- v0.5.1 에서도 plugin helper 를 Rust native binary 하나로 유지해요.
 - axhub CLI 자체 설치가 필요하면 `install-cli` skill 이 OS 별 공식 설치 채널을 안내해요.
 - template 목록은 `ax-hub-cli` registry 를 source of truth 로 사용해요.
 - admin onboarding 과 remote `templates.json` 는 deferred 예요.
@@ -121,7 +121,7 @@ bun run build
         │
         ▼
 Claude Code  →  axhub plugin
-        │              ├── skills/* (18 SKILL, NL 자동 트리거 + frontmatter multi-step/needs-preflight)
+        │              ├── skills/* (19 SKILL, NL 자동 트리거 + frontmatter multi-step/needs-preflight)
         │              ├── commands/* (10 슬래시 + 한글 alias)
         │              ├── hooks/* (SessionStart preflight, PreToolUse HMAC consent)
         │              └── bin/axhub-helpers (Rust native, 5 cross-arch cosign-signed)
@@ -192,14 +192,14 @@ git push origin main --tags         # release.yml 자동 fire (cosign 서명 + G
 
 상세: [`docs/RELEASE.md`](docs/RELEASE.md).
 
-## Test baseline (v0.5.0)
+## Test baseline (v0.5.1)
 
 - `bun test` → plugin manifest / skill / workflow regression green
 - `cargo test --workspace` → Rust helper unit/integration/phase parity green (keychain live tests ignored)
 - `bunx tsc --noEmit` clean
 - `bun run lint:tone --strict` 0 err / 0 warn
 - `bun run lint:keywords --check` clean
-- `bun run skill:doctor --strict` 18/18 SKILLs complete
+- `bun run skill:doctor --strict` 19/19 SKILLs complete
 - `bun run bench:hooks` prompt-route/preflight p95 thresholds green
 - `bun run test:plugin-e2e:t2` → 12/12 helper lifecycle cases pass
 - `bun run release:check` Rust helper host artifact + release matrix verified

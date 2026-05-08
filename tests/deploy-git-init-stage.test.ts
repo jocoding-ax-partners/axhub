@@ -12,12 +12,9 @@ describe("deploy skill git init stage", () => {
 
     expect(content).toContain("git_init_needed");
     expect(content).toContain("배포 전 저장 지점을 만들까요?");
-    expect(content).toContain("작업 단계");
-    // git-init nested checklist 만 허용 — main stage markdown 다시 들어오면 count > 1 로 fail.
-    expect((content.match(/작업 단계/g) || []).length).toBe(1);
-    expect(content).toContain("□ git 저장소 만들기");
-    expect(content).toContain("□ 파일을 첫 저장 지점에 담기");
-    expect(content).toContain("□ 배포 정보 다시 확인하기");
+    expect(content).toContain("Do not render this plan as a markdown checklist");
+    expect(content).not.toContain("작업 단계");
+    expect(content).not.toMatch(/^\s*(?:└\s*)?□\s/m);
     expect(content).toContain("git init");
     expect(content).toContain("git branch -M main");
     expect(content).toContain("git add -A");

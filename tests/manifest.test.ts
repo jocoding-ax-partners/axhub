@@ -466,6 +466,22 @@ describe("commands/*.md frontmatter", () => {
     }
   });
 
+  test("CLI-wrapper commands use Haiku while risky mutation/recovery commands stay on Sonnet", () => {
+    const haikuCommands = new Set(["apis.md", "apps.md", "help.md", "logs.md", "status.md"]);
+    const sonnetCommands = new Set(["deploy.md", "배포.md", "doctor.md", "login.md", "update.md"]);
+
+    for (const [file, content] of cmdContents) {
+      const model = frontmatterValue(content, "model");
+      if (haikuCommands.has(file)) {
+        expect(model, `${file} should prefer fast Haiku for simple CLI wrapping`).toBe("haiku");
+      } else if (sonnetCommands.has(file)) {
+        expect(model, `${file} should keep Sonnet for auth, recovery, or deploy risk`).toBe("sonnet");
+      } else {
+        throw new Error(`Unclassified command model policy for ${file}`);
+      }
+    }
+  });
+
   test("argument-hint is present and non-empty", () => {
     for (const [, content] of cmdContents) {
       const hint = frontmatterValue(content, "argument-hint");
