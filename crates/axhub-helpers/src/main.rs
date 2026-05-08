@@ -19,7 +19,7 @@ use axhub_helpers::telemetry::emit_meta_envelope;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify --hash <H> --chosen <S>\n  routing-dashboard [--html]\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  version\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -666,9 +666,9 @@ fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
     if confused {
         records.retain(|r| r.clarify_invoked);
     } else {
-        // Phase 11 fix: exclude clarify sentinel records from default stats so
-        // they don't inflate auth_failed (clarify records have auth_ok=false by
-        // construction) or depress axhub_related counts.
+        // Clarify sentinel records are feedback events, not regular prompt-route samples.
+        // Keeping them in default stats inflates auth_failed because sentinel records have
+        // auth_ok=false by construction, and can depress axhub_related counts.
         records.retain(|r| !r.clarify_invoked);
     }
     if records.is_empty() {
@@ -837,23 +837,29 @@ fn cmd_cleanup_audit(args: &[String]) -> anyhow::Result<i32> {
 const AUDIT_CLARIFY_HELP: &str = "axhub-helpers audit-clarify — clarify feedback record
 
 USAGE:
-  axhub-helpers audit-clarify --hash <prompt-hash> --chosen <skill-name>
+  axhub-helpers audit-clarify (--hash <prompt-hash>|--prompt <prompt>) --chosen <skill-name>
 
 OPTIONS:
   --hash <H>       원본 prompt 의 sha256 hash (e.g. sha256:abc...)
+  --prompt <P>     원본 prompt. helper 가 로컬에서 sha256 hash 로 변환해요.
   --chosen <S>     사용자가 final 선택한 skill name (또는 'null')
   -h, --help       도움말
 ";
 
 fn cmd_audit_clarify(args: &[String]) -> anyhow::Result<i32> {
-    use axhub_helpers::audit::{self, AuditRecord};
+    use axhub_helpers::audit::{self, sha256_hex, AuditRecord};
     let mut hash: Option<String> = None;
+    let mut prompt: Option<String> = None;
     let mut chosen: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--hash" if i + 1 < args.len() => {
                 hash = Some(args[i + 1].clone());
+                i += 1;
+            }
+            "--prompt" if i + 1 < args.len() => {
+                prompt = Some(args[i + 1].clone());
                 i += 1;
             }
             "--chosen" if i + 1 < args.len() => {
@@ -871,15 +877,24 @@ fn cmd_audit_clarify(args: &[String]) -> anyhow::Result<i32> {
         }
         i += 1;
     }
-    let Some(prompt_hash) = hash else {
-        eprintln!("axhub-helpers audit-clarify: --hash 필요해요");
+    if hash.is_some() && prompt.is_some() {
+        eprintln!("axhub-helpers audit-clarify: --hash 또는 --prompt 하나만 사용해요");
         return Ok(64);
+    }
+    let (prompt_hash, prompt_len) = match (hash, prompt) {
+        (Some(prompt_hash), None) => (prompt_hash, 0),
+        (None, Some(prompt)) => (sha256_hex(&prompt), prompt.len() as u32),
+        (None, None) => {
+            eprintln!("axhub-helpers audit-clarify: --hash 또는 --prompt 필요해요");
+            return Ok(64);
+        }
+        (Some(_), Some(_)) => unreachable!(),
     };
     let chosen_skill = chosen.and_then(|s| if s == "null" { None } else { Some(s) });
     let record = AuditRecord {
         ts: audit::now_iso8601(),
         prompt_hash,
-        prompt_len: 0,
+        prompt_len,
         cli_version: None,
         auth_ok: false,
         is_axhub_related: false,

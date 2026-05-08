@@ -95,14 +95,20 @@ To clarify:
 
    Stop without routing.
 
-7. **Audit feedback (final).** 사용자가 disambiguation option 을 고른 뒤 fail-soft 로 feedback record 를 남겨요. prompt 원문은 저장하지 않고 sha256 hash 만 사용해요. `FINAL_SKILL` 은 위 Step 4 의 선택값이에요.
+7. **Audit feedback (final).** 사용자가 disambiguation option 을 고른 뒤 packaged helper 로 fail-soft feedback record 를 남겨요. prompt 원문은 저장하지 않고 helper 가 로컬에서 sha256 hash 로 변환해요. `FINAL_SKILL` 은 위 Step 4 의 선택값이에요.
 
    ```bash
    ORIGINAL_PROMPT="${ORIGINAL_USER_UTTERANCE:-}"
    FINAL_SKILL="${FINAL_SKILL:-null}"
+   HELPER_BIN="${AXHUB_HELPERS_BIN:-}"
+   if [ -z "$HELPER_BIN" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -x "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" ]; then
+     HELPER_BIN="${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers"
+   fi
+   if [ -z "$HELPER_BIN" ]; then
+     HELPER_BIN="axhub-helpers"
+   fi
    if [ -n "$ORIGINAL_PROMPT" ]; then
-     PROMPT_HASH="$(printf '%s' "$ORIGINAL_PROMPT" | shasum -a 256 | awk '{print "sha256:" $1}')"
-     axhub-helpers audit-clarify --hash "$PROMPT_HASH" --chosen "$FINAL_SKILL" >/dev/null 2>&1 || true
+     "$HELPER_BIN" audit-clarify --prompt "$ORIGINAL_PROMPT" --chosen "$FINAL_SKILL" >/dev/null 2>&1 || true
    fi
    ```
 
