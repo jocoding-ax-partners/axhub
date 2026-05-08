@@ -876,6 +876,68 @@ fn cli_cleanup_audit_all_yes_removes_audit_files() {
     assert!(unrelated.exists());
 }
 
+#[cfg(unix)]
+#[test]
+fn cli_cleanup_audit_default_rotates_only_stale_files() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let dir = state.join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let stale_date = (chrono::Utc::now() - chrono::Duration::days(8))
+        .format("%Y-%m-%d")
+        .to_string();
+    let recent_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let stale = dir.join(format!("routing-audit-{stale_date}.jsonl"));
+    let recent = dir.join(format!("routing-audit-{recent_date}.jsonl"));
+    std::fs::write(&stale, "{}\n").unwrap();
+    std::fs::write(&recent, "{}\n").unwrap();
+
+    let output = Command::new(bin())
+        .arg("cleanup-audit")
+        .env("XDG_STATE_HOME", state)
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("7일 이상 된 audit log 1 파일 삭제했어요")
+    );
+    assert!(!stale.exists());
+    assert!(recent.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_cleanup_audit_all_cancel_keeps_files_without_yes() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let dir = state.join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let audit = dir.join("routing-audit-2000-01-01.jsonl");
+    std::fs::write(&audit, "{}\n").unwrap();
+
+    let output = run_stdin(
+        &["cleanup-audit", "--all"],
+        "n\n",
+        &[("XDG_STATE_HOME", state.to_str().unwrap())],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("취소했어요."));
+    assert!(audit.exists());
+}
+
+#[test]
+fn cli_cleanup_audit_help_and_unknown_flags_are_stable() {
+    let help = run(&["cleanup-audit", "--help"]);
+    assert_eq!(help.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&help.stdout).contains("cleanup-audit"));
+
+    let unknown = run(&["cleanup-audit", "--bogus"]);
+    assert_eq!(unknown.status.code(), Some(64));
+    assert!(String::from_utf8_lossy(&unknown.stderr).contains("알 수 없는 flag"));
+}
+
 #[test]
 fn cli_consent_mint_rejects_binding_schema_drift_before_writing_tokens() {
     let temp = tempfile::tempdir().unwrap();
