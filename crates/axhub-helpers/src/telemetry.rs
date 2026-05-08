@@ -511,6 +511,10 @@ mod tests {
 
     #[test]
     fn record_and_drain_phase_markers_roundtrip() {
+        // Serialize against `emit_deploy_complete_writes_phase_durations_via_file_drain`
+        // which also drains the in-memory PHASE_MARKERS as a side effect when the
+        // file marker env is set.
+        let _guard = telemetry_env_lock().lock().unwrap();
         reset_phase_markers();
         record_phase_marker("alpha");
         std::thread::sleep(Duration::from_millis(2));
