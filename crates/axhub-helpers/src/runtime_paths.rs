@@ -119,4 +119,15 @@ mod tests {
             Some(PathBuf::from("/home/user/.local/state"))
         );
     }
+
+    #[test]
+    fn runtime_paths_current_resolves_all_plugin_paths() {
+        let paths = RuntimePaths::current().expect("test runner has a home directory");
+
+        assert!(paths.token_file.ends_with("axhub-plugin/token"));
+        assert!(paths
+            .last_deploy_file
+            .ends_with("axhub-plugin/last-deploy.json"));
+        assert!(paths.state_dir.ends_with("axhub-plugin"));
+    }
 }
