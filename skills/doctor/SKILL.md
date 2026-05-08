@@ -3,6 +3,7 @@ name: doctor
 description: '이 스킬은 사용자가 자신의 axhub 설치 또는 환경을 진단하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "axhub 설치돼 있어", "doctor", "닥터", "진단해", "환경 점검", "환경 점검해", "axhub 점검", "헬스체크 해", "잘 깔렸어", "셋업 다 됐어", "설정 봐", "환경 변수 확인해주세요", "설치 상태 알려주세요", "진단 부탁드려요", "환경 점검해주세요", "시스템 상태 확인해주세요", "셋업이 다 끝났나요", "doctor", "check", "diagnose", "health check", "sanity check", "setup check", "env check", 또는 axhub 진단 요청. CLI 버전, 인증 상태, profile, endpoint, scopes 를 보고하고 실패 항목마다 다음에 할 수 있는 자연어 안내를 제공합니다.'
 multi-step: true
 needs-preflight: false
+allows-dependency-execution: false
 ---
 
 # Doctor (env + install diagnostic)
@@ -122,7 +123,7 @@ To run diagnostics:
      ✓ CLI 설치:        v<CLI_VERSION> (<WHICH_PATH>)
      ✓ 버전 범위:       호환 (필요: v<MIN> ~ v<MAX> 미만)
      ✓ 로그인:          <USER_EMAIL>
-     ✓ 만료:            <EXPIRES_AT> (남은 시간: <DELTA>)
+     ✓ 만료:            <EXPIRES_HUMAN>
      ✓ 권한 (scope):    <SCOPES joined>
      ✓ 환경 (profile):  <PROFILE 또는 "default (기본값 사용 중)">
      ✓ endpoint:        <ENDPOINT 또는 "https://hub-api.jocodingax.ai (기본값)">
@@ -213,3 +214,4 @@ Keep this read-only. If audit export requires extra permission, explain the miss
 For Korean trigger lexicon (doctor intent): `../deploy/references/nl-lexicon.md` (section 8).
 For 4-part Korean exit templates: `../deploy/references/error-empathy-catalog.md`.
 For version-skew flows (too old / too new): `../deploy/references/recovery-flows.md` ("version-skew").
+For expires_at humanization rule: `../deploy/references/time-render.md`.

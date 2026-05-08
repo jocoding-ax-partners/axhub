@@ -33,6 +33,7 @@ pub enum BootstrapState {
     AppRegistered,
     Deploying,
     Deployed,
+    DependencyInstallRequired,
 }
 
 impl BootstrapState {
@@ -51,10 +52,11 @@ impl BootstrapState {
             Self::AppRegistered => "app_registered",
             Self::Deploying => "deploying",
             Self::Deployed => "deployed",
+            Self::DependencyInstallRequired => "dependency_install_required",
         }
     }
 
-    fn is_user_decision(self) -> bool {
+    pub fn is_user_decision(self) -> bool {
         matches!(
             self,
             Self::TemplateRequired
@@ -67,8 +69,59 @@ impl BootstrapState {
                 | Self::ConsentRequiredDeployCreate
                 | Self::BackendContractMissingDefaults
                 | Self::IdempotencyUnavailable
+                | Self::DependencyInstallRequired
         )
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlanState {
+    DependencyInstallRequired,
+    DependencyAlreadyInstalled,
+    DependencyNotRequired,
+}
+
+impl PlanState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::DependencyInstallRequired => "dependency_install_required",
+            Self::DependencyAlreadyInstalled => "dependency_already_installed",
+            Self::DependencyNotRequired => "dependency_not_required",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PackageManager {
+    Npm,
+    Pnpm,
+    Yarn,
+    Bun,
+}
+
+impl PackageManager {
+    pub fn install_command(self) -> &'static str {
+        match self {
+            Self::Npm => "npm install",
+            Self::Pnpm => "pnpm install",
+            Self::Yarn => "yarn install",
+            Self::Bun => "bun install",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DependencyPlan {
+    pub detected_lockfile: Option<String>,
+    pub lockfile_count: u32,
+    pub requires_pm_choice: bool,
+    pub manager_candidates: Vec<PackageManager>,
+    pub recommended_command: Option<String>,
+    pub plan_state: PlanState,
+    pub package_json_present: bool,
+    pub node_modules_present: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1014,4 +1067,100 @@ fn stop(state: BootstrapState, reason: impl Into<String>) -> BootstrapRun {
         output: BootstrapOutput::state(state).with_reason(reason),
         exit_code: 65,
     }
+}
+
+pub fn build_dependency_plan(cwd: &Path) -> anyhow::Result<DependencyPlan> {
+    let package_json_present = cwd.join("package.json").exists();
+    let node_modules_present = cwd.join("node_modules").is_dir();
+
+    let lockfile_specs: [(&str, PackageManager); 4] = [
+        ("package-lock.json", PackageManager::Npm),
+        ("pnpm-lock.yaml", PackageManager::Pnpm),
+        ("yarn.lock", PackageManager::Yarn),
+        ("bun.lockb", PackageManager::Bun),
+    ];
+
+    let mut detected: Vec<(&str, PackageManager)> = Vec::new();
+    for (name, pm) in lockfile_specs {
+        if cwd.join(name).exists() {
+            detected.push((name, pm));
+        }
+    }
+
+    let lockfile_count = detected.len() as u32;
+    let requires_pm_choice = lockfile_count > 1;
+
+    let detected_lockfile = if lockfile_count == 1 {
+        Some(detected[0].0.to_string())
+    } else {
+        None
+    };
+
+    let manager_candidates: Vec<PackageManager> = if detected.is_empty() {
+        vec![PackageManager::Npm]
+    } else {
+        detected.iter().map(|(_, pm)| *pm).collect()
+    };
+
+    let plan_state = if !package_json_present {
+        PlanState::DependencyNotRequired
+    } else if node_modules_present {
+        PlanState::DependencyAlreadyInstalled
+    } else {
+        PlanState::DependencyInstallRequired
+    };
+
+    let recommended_command =
+        if matches!(plan_state, PlanState::DependencyInstallRequired) && !requires_pm_choice {
+            Some(manager_candidates[0].install_command().to_string())
+        } else {
+            None
+        };
+
+    Ok(DependencyPlan {
+        detected_lockfile,
+        lockfile_count,
+        requires_pm_choice,
+        manager_candidates,
+        recommended_command,
+        plan_state,
+        package_json_present,
+        node_modules_present,
+    })
+}
+
+pub fn cmd_bootstrap_dependency_plan(args: &[String]) -> anyhow::Result<i32> {
+    let mut json_output = false;
+    for arg in args {
+        match arg.as_str() {
+            "--json" => json_output = true,
+            other => {
+                eprintln!("axhub-helpers bootstrap dependency-plan: unknown option \"{other}\"");
+                return Ok(64);
+            }
+        }
+    }
+    let cwd = std::env::current_dir()?;
+    let plan = build_dependency_plan(&cwd)?;
+    let exit_code = if plan.requires_pm_choice { 65 } else { 0 };
+    if json_output {
+        println!("{}", serde_json::to_string(&plan)?);
+    } else {
+        println!("plan_state: {}", plan.plan_state.as_str());
+        if let Some(cmd) = plan.recommended_command.as_ref() {
+            println!("recommended_command: {cmd}");
+        }
+        if plan.requires_pm_choice {
+            let candidates: Vec<&str> = plan
+                .manager_candidates
+                .iter()
+                .map(|pm| pm.install_command())
+                .collect();
+            println!(
+                "multiple lockfiles detected; choose one: {}",
+                candidates.join(", ")
+            );
+        }
+    }
+    Ok(exit_code)
 }

@@ -1,6 +1,7 @@
 pub mod bootstrap;
 pub mod catalog;
 pub mod consent;
+pub mod humanize;
 pub mod keychain;
 pub mod keychain_windows;
 pub mod list_deployments;
