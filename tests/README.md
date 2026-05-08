@@ -1,5 +1,24 @@
 # axhub plugin — Test Suite
 
+## Approach E corpus baseline (Phase 0 sub-task 0.2)
+
+`tests/corpus.jsonl` (full, 331-row) 의 committed baseline 은 **incomplete** 상태예요. 따라서 331-row 결과는 **manual/advisory only** — CI gate 로 사용 안 해요.
+
+| Tier | rows | gate type | command |
+|------|------|-----------|---------|
+| `tests/corpus.20.jsonl` | 20 + meta | reliable CI | `bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.20.jsonl --score` |
+| `tests/corpus.100.jsonl` | 100 + meta | reliable CI | `bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --score` |
+| `tests/corpus.jsonl` | 331 + meta | **manual / advisory only** | `bash tests/run-corpus.sh --mode plugin --score` (exit 0 강제) |
+
+`run-corpus.sh` 가 corpus row count 를 보고 자동 분기:
+- 20 / 100 → score exit code 그대로 propagate (CI fail 가능)
+- 그 외 → stderr 에 `ADVISORY ONLY` 경고 + score exit code 0 으로 강제
+
+`bun run test:routing` (100-row) 만 CI gate 로 사용해요.
+`bun run test:routing:full` (331-row) 은 분석 용 advisory.
+
+routing-specific scorer: `bun run tests/routing-score.ts --baseline <docs-only> --against <claude-native>`.
+
 ## Corpus structure
 
 `tests/corpus.jsonl` — **331 labeled utterances** (Korean + English + mixed), one JSON object per line.
