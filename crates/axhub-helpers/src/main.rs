@@ -19,7 +19,7 @@ use axhub_helpers::telemetry::emit_meta_envelope;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  cleanup-audit [--all] [--yes]\n  version\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify --hash <H> --chosen <S>\n  routing-dashboard [--html]\n  version\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -77,6 +77,8 @@ fn run() -> anyhow::Result<i32> {
         "list-deployments" => cmd_list_deployments(&rest),
         "routing-stats" => cmd_routing_stats(&rest),
         "cleanup-audit" => cmd_cleanup_audit(&rest),
+        "audit-clarify" => cmd_audit_clarify(&rest),
+        "routing-dashboard" => cmd_routing_dashboard(&rest),
         "bootstrap" => cmd_bootstrap(&rest),
         "consent-mint" => cmd_consent_mint(&rest),
         "consent-verify" => cmd_consent_verify(),
@@ -479,6 +481,8 @@ fn cmd_prompt_route() -> anyhow::Result<i32> {
         cli_version: preflight.output.cli_version.clone(),
         auth_ok: preflight.output.auth_ok,
         is_axhub_related: heuristic_axhub_keyword(prompt),
+        clarify_invoked: false,
+        chosen_skill: None,
     };
     let _ = audit_append(record);
 
@@ -557,6 +561,7 @@ OPTIONS:
   --since <DURATION>    조회 기간 (예: 1d, 7d, 30d, all). 기본: 7d
   --json                machine-readable JSON 출력
   --top <N>             top N axhub-related prompt hash 표시. 기본: 10
+  --confused            clarify_invoked=true 인 records 만 표시 (사용자 disambiguation 발동)
   -h, --help            도움말
 
 PRIVACY:
@@ -566,10 +571,11 @@ PRIVACY:
   삭제: axhub-helpers cleanup-audit --all
 ";
 
-fn parse_routing_stats_args(args: &[String]) -> anyhow::Result<(chrono::Duration, bool, u32)> {
+fn parse_routing_stats_args(args: &[String]) -> anyhow::Result<(chrono::Duration, bool, u32, bool)> {
     let mut since = chrono::Duration::days(7);
     let mut json = false;
     let mut top: u32 = 10;
+    let mut confused = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -584,6 +590,7 @@ fn parse_routing_stats_args(args: &[String]) -> anyhow::Result<(chrono::Duration
                     .parse()
                     .map_err(|_| anyhow::anyhow!("--top 은 숫자여야 해요"))?;
             }
+            "--confused" => confused = true,
             "-h" | "--help" => {
                 print!("{}", ROUTING_STATS_HELP);
                 std::process::exit(0);
@@ -592,7 +599,7 @@ fn parse_routing_stats_args(args: &[String]) -> anyhow::Result<(chrono::Duration
         }
         i += 1;
     }
-    Ok((since, json, top))
+    Ok((since, json, top, confused))
 }
 
 fn parse_duration(s: &str) -> anyhow::Result<chrono::Duration> {
@@ -626,7 +633,7 @@ fn percentile(sorted: &[u32], p: f64) -> u32 {
 fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
     use axhub_helpers::audit;
 
-    let (since, json, top) = match parse_routing_stats_args(args) {
+    let (since, json, top, confused) = match parse_routing_stats_args(args) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("axhub-helpers routing-stats: {e}");
@@ -653,10 +660,15 @@ fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
         return Ok(0);
     }
 
-    let records = audit::read_since(since)?;
+    let mut records = audit::read_since(since)?;
+    if confused {
+        records.retain(|r| r.clarify_invoked);
+    }
     if records.is_empty() {
         if json {
             println!("{}", json!({"records": [], "total_prompts": 0}));
+        } else if confused {
+            println!("최근 {since:?} 동안 clarify 발동 prompt 가 없어요.");
         } else {
             println!("아직 audit 데이터가 없어요. axhub 사용하다 보면 자동 누적돼요.");
         }
@@ -781,6 +793,129 @@ fn cmd_cleanup_audit(args: &[String]) -> anyhow::Result<i32> {
     } else {
         let count = audit::rotate(7)?;
         println!("7일 이상 된 audit log {count} 파일 삭제했어요. 전체 삭제는 --all 사용해요.");
+    }
+    Ok(0)
+}
+
+// Phase 10 — audit-clarify subcommand: clarify SKILL fires this command after the
+// user picks a final disambiguation. Adds an audit record with clarify_invoked=true
+// + chosen_skill=Some(name). routing-stats --confused filters on this signal.
+
+const AUDIT_CLARIFY_HELP: &str = "axhub-helpers audit-clarify — clarify feedback record
+
+USAGE:
+  axhub-helpers audit-clarify --hash <prompt-hash> --chosen <skill-name>
+
+OPTIONS:
+  --hash <H>       원본 prompt 의 sha256 hash (e.g. sha256:abc...)
+  --chosen <S>     사용자가 final 선택한 skill name (또는 'null')
+  -h, --help       도움말
+";
+
+fn cmd_audit_clarify(args: &[String]) -> anyhow::Result<i32> {
+    use axhub_helpers::audit::{self, AuditRecord};
+    let mut hash: Option<String> = None;
+    let mut chosen: Option<String> = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--hash" if i + 1 < args.len() => {
+                hash = Some(args[i + 1].clone());
+                i += 1;
+            }
+            "--chosen" if i + 1 < args.len() => {
+                chosen = Some(args[i + 1].clone());
+                i += 1;
+            }
+            "-h" | "--help" => {
+                print!("{AUDIT_CLARIFY_HELP}");
+                return Ok(0);
+            }
+            other => {
+                eprintln!("axhub-helpers audit-clarify: 알 수 없는 flag: {other}");
+                return Ok(64);
+            }
+        }
+        i += 1;
+    }
+    let Some(prompt_hash) = hash else {
+        eprintln!("axhub-helpers audit-clarify: --hash 필요해요");
+        return Ok(64);
+    };
+    let chosen_skill = chosen.and_then(|s| if s == "null" { None } else { Some(s) });
+    let record = AuditRecord {
+        ts: audit::now_iso8601(),
+        prompt_hash,
+        prompt_len: 0,
+        cli_version: None,
+        auth_ok: false,
+        is_axhub_related: false,
+        clarify_invoked: true,
+        chosen_skill,
+    };
+    audit::append(record).ok();
+    println!("audit-clarify 기록했어요.");
+    Ok(0)
+}
+
+// Phase 10 — routing-dashboard subcommand: per-skill stats HTML render.
+
+const ROUTING_DASHBOARD_HELP: &str = "axhub-helpers routing-dashboard — per-skill drift dashboard
+
+USAGE:
+  axhub-helpers routing-dashboard [--html]
+
+OPTIONS:
+  --html      inline HTML render (per-skill table + drift trend + failing prompts)
+  -h, --help  도움말
+";
+
+fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
+    use axhub_helpers::audit;
+    let html_mode = args.iter().any(|a| a == "--html");
+    if args.iter().any(|a| a == "-h" || a == "--help") {
+        print!("{ROUTING_DASHBOARD_HELP}");
+        return Ok(0);
+    }
+    let records = audit::read_since(chrono::Duration::days(7))?;
+    let total = records.len();
+    let axhub_related = records.iter().filter(|r| r.is_axhub_related).count();
+    let auth_failed = records.iter().filter(|r| !r.auth_ok).count();
+    let confused = records.iter().filter(|r| r.clarify_invoked).count();
+    let mut chosen_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    for r in &records {
+        if let Some(skill) = &r.chosen_skill {
+            *chosen_counts.entry(skill.clone()).or_insert(0) += 1;
+        }
+    }
+    let mut rows: Vec<(String, u32)> = chosen_counts.into_iter().collect();
+    rows.sort_by(|a, b| b.1.cmp(&a.1));
+    if html_mode {
+        let mut chosen_rows = String::new();
+        for (skill, count) in &rows {
+            chosen_rows.push_str(&format!("<tr><td>{skill}</td><td>{count}</td></tr>"));
+        }
+        let html = format!(
+            include_str!("../templates/dashboard.html"),
+            total = total,
+            axhub_related = axhub_related,
+            auth_failed = auth_failed,
+            confused = confused,
+            chosen_rows = chosen_rows,
+        );
+        print!("{html}");
+    } else {
+        println!("[axhub routing dashboard — last 7d]");
+        println!("total prompts: {total}");
+        println!("axhub-related: {axhub_related}");
+        println!("auth failed: {auth_failed}");
+        println!("clarify invoked: {confused}");
+        if !rows.is_empty() {
+            println!("\nUser-chosen skill (clarify feedback):");
+            for (skill, count) in &rows {
+                println!("  {skill:<16} {count}");
+            }
+        }
     }
     Ok(0)
 }

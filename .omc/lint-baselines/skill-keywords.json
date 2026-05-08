@@ -326,6 +326,13 @@
       "지금 플러그인 버전이 뭐야",
       "플러그인이랑 호환되는 버전이야"
     ],
+    "skills/routing-stats/SKILL.md": [
+      "라우팅 통계",
+      "이번 주 routing 어땠어",
+      "지난주 매칭",
+      "어떤 skill 많이 썼어",
+      "axhub routing 분석"
+    ],
     "skills/init/SKILL.md": [
       "결제 앱 만들어",
       "결제 앱 만들어줘",
@@ -940,5 +947,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-05-08T02:11:13.324Z"
+  "generated_at": "2026-05-08T04:35:17.208Z"
 }

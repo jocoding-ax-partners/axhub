@@ -35,6 +35,14 @@ pub struct AuditRecord {
     pub cli_version: Option<String>,
     pub auth_ok: bool,
     pub is_axhub_related: bool,
+    /// Phase 10 — clarify skill fired for this prompt (audit feedback signal).
+    /// Default false for legacy entries (no field in JSONL).
+    #[serde(default)]
+    pub clarify_invoked: bool,
+    /// Phase 10 — final SKILL the user picked after clarify disambiguation.
+    /// Default None for legacy entries.
+    #[serde(default)]
+    pub chosen_skill: Option<String>,
 }
 
 /// ISO 8601 UTC timestamp ("2026-05-07T19:00:00+00:00").
@@ -317,6 +325,8 @@ mod tests {
             cli_version: None,
             auth_ok: false,
             is_axhub_related: false,
+            clarify_invoked: false,
+            chosen_skill: None,
         });
         match prev {
             Some(v) => unsafe { std::env::set_var("AXHUB_NO_AUDIT", v) },

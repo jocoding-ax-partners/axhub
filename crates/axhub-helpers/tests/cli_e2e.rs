@@ -2081,3 +2081,58 @@ fn cli_prompt_route_examples_injected_when_env_set() {
         "default 시 examples marker 없어야 해요. {stdout_without}",
     );
 }
+
+// Phase 10 — clarify audit feedback + routing-stats --confused + routing-dashboard.
+
+#[cfg(unix)]
+#[test]
+fn cli_audit_clarify_appends_record_then_confused_filter_returns_it() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    let clarify = run_stdin(
+        &["audit-clarify", "--hash", "sha256:test123", "--chosen", "deploy"],
+        "",
+        &[("XDG_STATE_HOME", state_s.as_str())],
+    );
+    assert_eq!(clarify.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&clarify.stdout);
+    assert!(stdout.contains("audit-clarify 기록"), "{stdout}");
+
+    let stats = run_stdin(
+        &["routing-stats", "--confused", "--json"],
+        "",
+        &[("XDG_STATE_HOME", state_s.as_str())],
+    );
+    assert_eq!(stats.status.code(), Some(0));
+    let stats_stdout = String::from_utf8_lossy(&stats.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(stats_stdout.trim()).expect("valid JSON");
+    assert!(parsed["total_prompts"].as_u64().unwrap() >= 1, "{stats_stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_routing_dashboard_html_renders() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    let _ = run_stdin(
+        &["audit-clarify", "--hash", "sha256:dash", "--chosen", "logs"],
+        "",
+        &[("XDG_STATE_HOME", state_s.as_str())],
+    );
+
+    let dash = run_stdin(
+        &["routing-dashboard", "--html"],
+        "",
+        &[("XDG_STATE_HOME", state_s.as_str())],
+    );
+    assert_eq!(dash.status.code(), Some(0));
+    let html = String::from_utf8_lossy(&dash.stdout);
+    assert!(html.contains("<!DOCTYPE html>"), "{html}");
+    assert!(html.contains("axhub routing dashboard"), "{html}");
+    assert!(html.contains("<table>"), "{html}");
+    assert!(html.contains("logs"), "chosen_skill row 보여야 함: {html}");
+}

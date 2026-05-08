@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("20 top-level keys (2 메타 + 18 SKILL slug)", () => {
+  test("21 top-level keys (2 메타 + 19 SKILL slug)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(20);
+    expect(keys).toHaveLength(21);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const skillSlugs = keys.filter((k) => !k.startsWith("_")).sort();
@@ -67,6 +67,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "open",
       "profile",
       "recover",
+      "routing-stats",
       "status",
       "update",
       "upgrade",

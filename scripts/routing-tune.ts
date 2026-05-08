@@ -221,7 +221,26 @@ async function main(): Promise<void> {
   }
 
   if (confused) {
-    process.stderr.write("[routing-tune] --confused mode 는 Phase 10 의 clarify audit feedback 의존이라 stub 이에요. failing case 0.\n");
+    const result = execSync("bin/axhub-helpers routing-stats --confused --json", {
+      encoding: "utf8",
+      cwd: REPO_ROOT,
+    });
+    const parsed = JSON.parse(result || "{}") as { total_prompts?: number; top_axhub_hashes?: { hash: string; count: number }[] };
+    const total = parsed.total_prompts ?? 0;
+    process.stderr.write(
+      [
+        "",
+        `[routing-tune --confused] clarify 발동 prompt ${total} 개`,
+        "",
+        "audit log 는 prompt 원문 저장 X (sha256 hash 만). chosen_skill 정보로 routing:tune 자동화 어려워요.",
+        "manual review 절차:",
+        "  1. routing-stats --confused 출력의 hash + chosen_skill 확인",
+        "  2. corpus 또는 사용자 기억으로 원본 발화 lookup",
+        "  3. bun run routing:tune --skill <chosen_skill> 으로 fresh suggestion",
+        "",
+      ].join("\n"),
+    );
+    process.stdout.write(JSON.stringify(parsed, null, 2) + "\n");
     return;
   }
 
