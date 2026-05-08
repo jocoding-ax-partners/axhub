@@ -216,10 +216,41 @@ pub fn run_preflight() -> PreflightRun {
 
 pub fn run_preflight_with_runner<F>(runner: F) -> PreflightRun
 where
-    F: Fn(&[&str]) -> SpawnResult,
+    F: Fn(&[&str]) -> SpawnResult + Sync,
 {
     let bin = axhub_bin();
-    let version_result = runner(&[&bin, "--version"]);
+    let parallel_disabled = std::env::var("AXHUB_PREFLIGHT_PARALLEL").as_deref() == Ok("0");
+
+    // Phase 3 B-06: spawn the four independent probes in parallel
+    // (version + auth + last-deploy cache + manifest read). The auth
+    // probe always spawns; if `--version` fails we override the result
+    // post-join because re-running CLI auth without a CLI is irrelevant.
+    // AXHUB_PREFLIGHT_PARALLEL=0 falls back to the sequential path below
+    // for environments where thread::scope misbehaves.
+    let (version_result, raw_auth_status, cache, manifest_app) = if parallel_disabled {
+        let version_result = runner(&[&bin, "--version"]);
+        let auth_raw = parse_auth_status(&runner(&[&bin, "auth", "status", "--json"]).stdout);
+        let cache = read_last_deploy_cache();
+        let manifest_app = read_manifest_current_app();
+        (version_result, auth_raw, cache, manifest_app)
+    } else {
+        let runner_ref = &runner;
+        let bin_ref: &str = &bin;
+        std::thread::scope(|scope| {
+            let v_handle = scope.spawn(move || runner_ref(&[bin_ref, "--version"]));
+            let a_handle = scope.spawn(move || {
+                parse_auth_status(&runner_ref(&[bin_ref, "auth", "status", "--json"]).stdout)
+            });
+            let c_handle = scope.spawn(read_last_deploy_cache);
+            let m_handle = scope.spawn(read_manifest_current_app);
+            let v = v_handle.join().expect("version probe thread panicked");
+            let a = a_handle.join().expect("auth probe thread panicked");
+            let c = c_handle.join().expect("cache probe thread panicked");
+            let m = m_handle.join().expect("manifest probe thread panicked");
+            (v, a, c, m)
+        })
+    };
+
     let cli_present = version_result.exit_code == EXIT_OK && !version_result.stdout.is_empty();
     let cli_version = if cli_present {
         extract_semver(&version_result.stdout)
@@ -234,14 +265,13 @@ where
     let too_new = parsed.as_ref().is_some_and(|v| v >= &max);
 
     let auth_status = if cli_present {
-        parse_auth_status(&runner(&[&bin, "auth", "status", "--json"]).stdout)
+        raw_auth_status
     } else {
         AuthStatus::Error {
             code: "cli_unavailable".into(),
             detail: String::new(),
         }
     };
-    let cache = read_last_deploy_cache();
     let (auth_ok, auth_error_code, scopes, user_email, expires_at) = match auth_status {
         AuthStatus::Ok {
             user_email,
@@ -279,7 +309,7 @@ where
         current_app: std::env::var("AXHUB_APP_SLUG")
             .ok()
             .filter(|s| !s.is_empty())
-            .or_else(read_manifest_current_app)
+            .or(manifest_app)
             .or_else(|| cache.as_ref().and_then(|c| c.app_slug.clone())),
         current_env: std::env::var("AXHUB_PROFILE")
             .ok()

@@ -1,0 +1,99 @@
+//! Phase 3 — `run_preflight_with_runner` parallel orchestration.
+//!
+//! Spec: `.plan/deploy-time-reduction/phase-3-client-cascade-reduced.md` §2.
+//!
+//! Three coverage angles:
+//!   1. Happy path — all four probes (version + auth + cache + manifest) run
+//!      and produce a merged PreflightOutput with auth_ok=true.
+//!   2. CLI absent — version probe returns empty stdout; auth raw status is
+//!      ignored (overridden to `cli_unavailable`).
+//!   3. Sequential fallback — `AXHUB_PREFLIGHT_PARALLEL=0` env exercises the
+//!      non-scoped path and produces the same output shape.
+
+use std::sync::{Mutex, OnceLock};
+
+use axhub_helpers::preflight::{run_preflight_with_runner, SpawnResult, EXIT_AUTH, EXIT_OK};
+
+fn parallel_env_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn ok(stdout: &str) -> SpawnResult {
+    SpawnResult {
+        exit_code: 0,
+        stdout: stdout.to_string(),
+        stderr: String::new(),
+    }
+}
+
+fn auth_ok_stdout() -> &'static str {
+    r#"{"user_email":"dev@jocodingax.ai","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["deploy:write"]}"#
+}
+
+fn happy_runner(cmd: &[&str]) -> SpawnResult {
+    if cmd.contains(&"--version") {
+        ok("axhub 0.12.1\n")
+    } else if cmd.contains(&"auth") && cmd.contains(&"status") {
+        ok(auth_ok_stdout())
+    } else {
+        ok("[]")
+    }
+}
+
+fn cli_absent_runner(cmd: &[&str]) -> SpawnResult {
+    if cmd.contains(&"--version") {
+        SpawnResult {
+            exit_code: 127,
+            stdout: String::new(),
+            stderr: "axhub: not found".into(),
+        }
+    } else if cmd.contains(&"auth") && cmd.contains(&"status") {
+        // Even if a stale auth handler answered, the merged output should
+        // override to "cli_unavailable" because cli_present is false.
+        ok(auth_ok_stdout())
+    } else {
+        ok("[]")
+    }
+}
+
+#[test]
+fn parallel_happy_path_merges_all_four_probes() {
+    let _guard = parallel_env_lock().lock().unwrap();
+    std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL");
+    let run = run_preflight_with_runner(happy_runner);
+    assert_eq!(run.exit_code, EXIT_OK);
+    assert!(run.output.cli_present);
+    assert!(run.output.in_range);
+    assert!(run.output.auth_ok);
+    assert_eq!(run.output.user_email.as_deref(), Some("dev@jocodingax.ai"));
+}
+
+#[test]
+fn parallel_cli_absent_overrides_auth_to_cli_unavailable() {
+    let _guard = parallel_env_lock().lock().unwrap();
+    std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL");
+    let run = run_preflight_with_runner(cli_absent_runner);
+    // exit code reflects the cli_present=false / in_range=false branch.
+    assert!(!run.output.cli_present);
+    assert!(!run.output.auth_ok);
+    assert_eq!(
+        run.output.auth_error_code.as_deref(),
+        Some("cli_unavailable")
+    );
+}
+
+#[test]
+fn sequential_fallback_when_axhub_preflight_parallel_is_zero() {
+    let _guard = parallel_env_lock().lock().unwrap();
+    let prev = std::env::var("AXHUB_PREFLIGHT_PARALLEL").ok();
+    std::env::set_var("AXHUB_PREFLIGHT_PARALLEL", "0");
+    let run = run_preflight_with_runner(happy_runner);
+    assert_eq!(run.exit_code, EXIT_OK);
+    assert!(run.output.auth_ok);
+    match prev {
+        Some(v) => std::env::set_var("AXHUB_PREFLIGHT_PARALLEL", v),
+        None => std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL"),
+    }
+    let _ = EXIT_AUTH; // keep import live
+}
