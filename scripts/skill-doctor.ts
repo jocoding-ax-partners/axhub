@@ -29,6 +29,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { readSkillDescription } from "./codegen-skill-keywords-from-rust";
+import { computeQualityIssues, type QualityIssue } from "./skill-doctor-quality";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const SKILLS_DIR = join(REPO_ROOT, "skills");
@@ -300,13 +301,41 @@ if (STRICT) {
   }
 }
 
+// Phase 8 sub-task 8.2: description quality lint — minimum trigger count + lang balance.
+//   - 각 SKILL 의 trigger phrase ≥ 5
+//   - 각 SKILL 의 ko phrase ≥ 2 + en phrase ≥ 2
+// 통과 못 하면 STRICT 시 exit 1.
+
+const qualityIssues: QualityIssue[] = [];
+for (const slug of skillSlugs) {
+  const path = join(SKILLS_DIR, slug, "SKILL.md");
+  const region = readSkillDescription(path);
+  if (!region) continue;
+  qualityIssues.push(...computeQualityIssues(slug, region.existingPhrases));
+}
+
+if (STRICT) {
+  for (const issue of qualityIssues) {
+    process.stdout.write(`quality: ${issue.slug} ${issue.kind} (${issue.detail})\n`);
+  }
+} else if (qualityIssues.length > 0) {
+  process.stdout.write(`${c.bold("Description quality gate:")}\n`);
+  for (const issue of qualityIssues) {
+    process.stdout.write(`  ${miss} ${issue.slug}: ${issue.kind} ${c.gray("(" + issue.detail + ")")}\n`);
+  }
+  process.stdout.write("\n");
+}
+
 if (!STRICT) {
   const pluralS = checks.length === 1 ? "" : "s";
   const pluralM = totalMissing === 1 ? "" : "s";
   const pluralC = collisionCount === 1 ? "" : "s";
+  const pluralQ = qualityIssues.length === 1 ? "" : "s";
   process.stdout.write(
-    `${checks.length} SKILL${pluralS} scanned, ${okSkills} OK, ${totalMissing} missing pattern${pluralM}, ${collisionCount} unallowed collision${pluralC}.\n`,
+    `${checks.length} SKILL${pluralS} scanned, ${okSkills} OK, ${totalMissing} missing pattern${pluralM}, ${collisionCount} unallowed collision${pluralC}, ${qualityIssues.length} quality issue${pluralQ}.\n`,
   );
 }
 
-process.exit((totalMissing > 0 || collisionCount > 0) && STRICT ? 1 : 0);
+process.exit(
+  (totalMissing > 0 || collisionCount > 0 || qualityIssues.length > 0) && STRICT ? 1 : 0,
+);
