@@ -31,7 +31,7 @@ To show what is new:
 - NEVER update/upgrade 를 자동 실행하지 않아요.
 - NEVER changelog 원문을 과도하게 길게 붙이지 않아요.
 
-## v0.4.0 — 라우팅 단순화
+## v0.3.2 — 라우팅 단순화
 
 ### 무엇이 바뀌었어요
 
@@ -40,7 +40,7 @@ To show what is new:
 - 메타 질문 ("왜 ~ 키워드 매칭이야?") → 잘못된 skill 라우팅 위험이 있었어요.
 - 자연어 변형 ("어제 만든 결제 페이지 라이브로 띄워봐") robust 부족이었어요.
 
-이후 (v0.4.0):
+이후 (v0.3.2):
 - Claude 가 SKILL.md description 을 보고 직접 매칭해요.
 - 메타 질문 자동 처리 (Claude native 인식)예요.
 - 자연어 composition robust ("어제", "결제 페이지", "라이브로", "띄워봐" 모두 cohesive 해석)이에요.

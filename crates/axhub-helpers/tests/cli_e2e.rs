@@ -1962,18 +1962,21 @@ fn session_start_systemmessage(state_s: &str) -> String {
 
 #[cfg(unix)]
 #[test]
-fn cli_session_start_first_v040_session() {
+fn cli_session_start_first_current_version_session() {
     let temp = tempfile::tempdir().unwrap();
     let state = temp.path().join("state");
     let state_s = state.display().to_string();
 
     let msg = session_start_systemmessage(&state_s);
-    assert!(msg.contains("v0.4.0 첫 세션"), "{msg}");
+    let helper_version = env!("CARGO_PKG_VERSION");
+    assert!(msg.contains(&format!("v{helper_version} 첫 세션")), "{msg}");
     assert!(msg.contains("/axhub:whatsnew"), "{msg}");
     assert!(msg.contains("AXHUB_NO_AUDIT"), "{msg}");
 
     // Marker file 생성됐는지.
-    let marker = state.join("axhub-plugin").join(".v0.4.0-welcome-shown");
+    let marker = state
+        .join("axhub-plugin")
+        .join(format!(".v{}-welcome-shown", env!("CARGO_PKG_VERSION")));
     assert!(marker.exists(), "marker missing at {marker:?}");
 }
 
@@ -1984,11 +1987,15 @@ fn cli_session_start_subsequent_session() {
     let state = temp.path().join("state");
     let dir = state.join("axhub-plugin");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join(".v0.4.0-welcome-shown"), "shown\n").unwrap();
+    std::fs::write(
+        dir.join(format!(".v{}-welcome-shown", env!("CARGO_PKG_VERSION"))),
+        "shown\n",
+    )
+    .unwrap();
 
     let msg = session_start_systemmessage(&state.display().to_string());
     assert!(
-        !msg.contains("v0.4.0 첫 세션"),
+        !msg.contains(&format!("v{} 첫 세션", env!("CARGO_PKG_VERSION"))),
         "magical moment should not repeat: {msg}"
     );
     assert!(!msg.contains("/axhub:whatsnew"), "{msg}");

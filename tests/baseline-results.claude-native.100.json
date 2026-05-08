@@ -242,7 +242,7 @@
   },
   {
     "utterance_id": "T-ADV-3",
-    "fired_skill": "deploy",
+    "fired_skill": null,
     "actual_tool_calls": [],
     "required_consent_seen": true,
     "ts": "2026-04-24T10:00:27Z",
@@ -1069,7 +1069,7 @@
   },
   {
     "utterance_id": "T-DH-029",
-    "fired_skill": "upgrade",
+    "fired_skill": "update",
     "actual_tool_calls": [
       {
         "cmd": "axhub update check --json",
@@ -1525,7 +1525,7 @@
   },
   {
     "utterance_id": "T-NEG-029",
-    "fired_skill": "clarify",
+    "fired_skill": null,
     "actual_tool_calls": [],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:02:31Z",
@@ -1533,7 +1533,7 @@
   },
   {
     "utterance_id": "T-NEG-030",
-    "fired_skill": "clarify",
+    "fired_skill": null,
     "actual_tool_calls": [],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:02:32Z",
@@ -1541,7 +1541,7 @@
   },
   {
     "utterance_id": "T-NEG-033",
-    "fired_skill": "deploy",
+    "fired_skill": null,
     "actual_tool_calls": [
       {
         "cmd": "axhub-helpers resolve --intent deploy --user-utterance \"deploy fakeapp123 to prod\" --json",
@@ -1555,7 +1555,7 @@
   },
   {
     "utterance_id": "T-NEG-034",
-    "fired_skill": "deploy",
+    "fired_skill": null,
     "actual_tool_calls": [
       {
         "cmd": "axhub-helpers resolve --intent deploy --user-utterance \"ship made-up-app\" --json",

@@ -82,10 +82,11 @@ export function shouldExitWithError(gates: GateResult[]): boolean {
 }
 
 export function parseLatencyP95(text: string): number | null {
-  const match = text.match(/p95[^0-9]*([\d.]+)\s*ms/i);
-  if (!match || !match[1]) return null;
-  const n = Number(match[1]);
-  return Number.isFinite(n) ? n : null;
+  const values = [...text.matchAll(/\bp95\s*[=:]\s*([\d.]+)\s*ms\b/gi)]
+    .map((match) => Number(match[1]))
+    .filter((value) => Number.isFinite(value));
+  if (values.length === 0) return null;
+  return Math.max(...values);
 }
 
 export function buildAllGates(): GateResult[] {

@@ -1,6 +1,6 @@
 # 라우팅
 
-axhub plugin 의 자연어 prompt 라우팅 architecture 예요. v0.4.0 부터 Claude 의 native skill matching 을 사용해요.
+axhub plugin 의 자연어 prompt 라우팅 architecture 예요. v0.3.2 부터 Claude 의 native skill matching 을 사용해요.
 
 ## 작동 방식
 

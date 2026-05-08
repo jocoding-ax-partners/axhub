@@ -775,11 +775,11 @@ fn cmd_cleanup_audit(args: &[String]) -> anyhow::Result<i32> {
 
 // Phase 7 (Component 6): SessionStart magical-moment message.
 //
-// Base systemMessage (always 3 lines) + v0.4.0 first-session welcome (6 extra
-// lines, one-shot, gated by welcome marker file). Marker write is best-effort —
-// failure surfaces the welcome again next session, never blocks Claude.
+// Base systemMessage (always 3 lines) + current-version first-session welcome
+// (6 extra lines, one-shot, gated by welcome marker file). Marker write is
+// best-effort — failure surfaces the welcome again next session, never blocks Claude.
 
-const WELCOME_VERSION: &str = "0.4.0";
+const WELCOME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn cmd_session_start() -> anyhow::Result<i32> {
     let mut lines: Vec<String> = vec![
@@ -796,7 +796,9 @@ fn cmd_session_start() -> anyhow::Result<i32> {
     let show_welcome = marker.as_ref().map(|p| !p.exists()).unwrap_or(false);
     if show_welcome {
         lines.push(String::new());
-        lines.push("[axhub v0.4.0 첫 세션] 라우팅 똑똑해졌어요.".to_string());
+        lines.push(format!(
+            "[axhub v{WELCOME_VERSION} 첫 세션] 라우팅 똑똑해졌어요."
+        ));
         lines.push(
             "- Rust 키워드 체인 ~600줄 폐기. Claude 가 SKILL.md description 으로 직접 매칭해요."
                 .to_string(),

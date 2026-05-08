@@ -140,7 +140,7 @@ Claude Code  →  axhub plugin
 
 ## 라우팅
 
-axhub plugin 은 자연어 prompt 를 적합한 skill 워크플로우로 라우팅해요. v0.4.0 부터 Claude 의 native skill matching 을 사용해요.
+axhub plugin 은 자연어 prompt 를 적합한 skill 워크플로우로 라우팅해요. v0.3.2 부터 Claude 의 native skill matching 을 사용해요.
 
 작동 방식:
 - 각 skill 의 `SKILL.md` frontmatter `description` 이 trigger 어구 source of truth 예요.
