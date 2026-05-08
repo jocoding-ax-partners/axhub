@@ -75,9 +75,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("21 actual safe_default rationale 엔트리 (기존 18 + init 추가 + routing-stats 후속 선택)", () => {
+  test("25 actual safe_default rationale 엔트리 (GitHub guided setup 추가)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(21);
+    expect(paths).toHaveLength(25);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -93,6 +93,10 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "doctor",
       "env",
       "github",
+      "github",
+      "github",
+      "github",
+      "github",
       "init",
       "init",
       "init",
@@ -105,7 +109,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("19 safe_default 값 (safe fallback 카탈로그)", () => {
+  test("25 safe_default 값 (safe fallback 카탈로그)", () => {
     const auth = registry["auth"] as Record<string, SafeDefaultEntry>;
     expect(auth["다시 로그인할래요?"]?.safe_default).toBe("abort");
     expect(auth["로그아웃할래요?"]?.safe_default).toBe("abort");
@@ -155,7 +159,11 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     expect(env["어떤 환경변수 작업을 할까요?"]?.safe_default).toBe("조회만");
 
     const github = registry["github"] as Record<string, SafeDefaultEntry>;
-    expect(github["GitHub 연동 작업을 고를까요?"]?.safe_default).toBe("목록만");
+    expect(github["GitHub 연동 작업을 고를까요?"]?.safe_default).toBe("list_only");
+    expect(github["GitHub repo 를 만들까요?"]?.safe_default).toBe("abort");
+    expect(github["git remote 를 추가할까요?"]?.safe_default).toBe("abort");
+    expect(github["첫 push 를 실행할까요?"]?.safe_default).toBe("abort");
+    expect(github["axhub 앱에 repo 를 연결할까요?"]?.safe_default).toBe("abort");
 
     const profile = registry["profile"] as Record<string, SafeDefaultEntry>;
     expect(profile["프로필 작업을 고를까요?"]?.safe_default).toBe(

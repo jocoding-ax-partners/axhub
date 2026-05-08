@@ -115,4 +115,23 @@ describe("deploy skill git init stage", () => {
     expect(content).not.toContain("(/axhub:github 호출)");
   });
 
+  test("github connection blocker routes into guided github setup instead of ending on manual connect", () => {
+    const content = readFileSync(DEPLOY_SKILL, "utf8");
+
+    expect(content).toContain("route into `skills/github/SKILL.md` guided setup/connect");
+    expect(content).toContain("do not end with a manual connect command as the next step");
+    expect(content).toContain("GitHub guided setup/connect owns repo create, remote add, first push, and connect consent");
+    expect(content).not.toContain("Then show the exact follow-up command without executing it until consent is minted in the github skill flow");
+  });
+
+  test("github setup AskUserQuestion fallbacks are conservative in subprocess", () => {
+    const registry = JSON.parse(readFileSync(ASK_DEFAULTS, "utf8"));
+
+    expect(registry.github["GitHub 연동 작업을 고를까요?"].safe_default).toBe("list_only");
+    expect(registry.github["GitHub repo 를 만들까요?"].safe_default).toBe("abort");
+    expect(registry.github["git remote 를 추가할까요?"].safe_default).toBe("abort");
+    expect(registry.github["첫 push 를 실행할까요?"].safe_default).toBe("abort");
+    expect(registry.github["axhub 앱에 repo 를 연결할까요?"].safe_default).toBe("abort");
+  });
+
 });

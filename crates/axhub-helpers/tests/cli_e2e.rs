@@ -1395,6 +1395,118 @@ fn cli_consent_mint_validate_only_has_no_runtime_or_key_side_effects() {
     assert_no_consent_side_effects(&state_dir, &runtime_dir);
 }
 
+fn consent_mint_valid_binding(session_id: &str, tool_call_suffix: &str) -> String {
+    serde_json::json!({
+        "tool_call_id": format!("{session_id}:{tool_call_suffix}"),
+        "action":"deploy_create",
+        "app_id":"paydrop",
+        "profile":"prod",
+        "branch":"main",
+        "commit_sha":"abc123",
+        "context": {}
+    })
+    .to_string()
+}
+
+#[test]
+fn cli_consent_mint_stdin_valid_json_behavior_unchanged() {
+    let temp = tempfile::tempdir().unwrap();
+    let state_dir = temp.path().join("state");
+    let runtime_dir = temp.path().join("runtime");
+    let state = state_dir.display().to_string();
+    let runtime = runtime_dir.display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "stdin-valid-session"),
+    ];
+    let session_token = runtime_dir.join("axhub/consent-stdin-valid-session.json");
+    let binding = consent_mint_valid_binding("stdin-valid-session", "tc-valid");
+
+    let minted = run_stdin(&["consent-mint"], &binding, &envs);
+    assert_eq!(minted.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&minted.stdout);
+    assert!(stdout.contains("token_id"), "{stdout}");
+    assert!(stdout.contains("expires_at"), "{stdout}");
+    assert!(session_token.exists());
+}
+
+#[test]
+fn cli_consent_mint_stdin_empty_input_has_actionable_powershell_diagnostic() {
+    let temp = tempfile::tempdir().unwrap();
+    let state_dir = temp.path().join("state");
+    let runtime_dir = temp.path().join("runtime");
+    let state = state_dir.display().to_string();
+    let runtime = runtime_dir.display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "stdin-empty-session"),
+    ];
+
+    for stdin in ["", "   \r\n\t", "\u{feff}\r\n\t "] {
+        let rejected = run_stdin(&["consent-mint"], stdin, &envs);
+        assert_ne!(rejected.status.code(), Some(0));
+        let stderr = String::from_utf8_lossy(&rejected.stderr);
+        assert!(stderr.contains("empty stdin"), "{stderr}");
+        assert!(stderr.contains("no JSON binding"), "{stderr}");
+        assert!(stderr.contains("ConvertTo-Json -Compress"), "{stderr}");
+        assert!(stderr.contains("$env:CLAUDE_PLUGIN_ROOT"), "{stderr}");
+        assert!(
+            stderr.contains(r#"& "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" consent-mint"#),
+            "{stderr}"
+        );
+        assert!(stderr.contains("Temp-file fallback"), "{stderr}");
+        assert!(stderr.contains("Get-Content -Raw"), "{stderr}");
+    }
+
+    assert_no_consent_side_effects(&state_dir, &runtime_dir);
+}
+
+#[test]
+fn cli_consent_mint_stdin_invalid_json_has_actionable_diagnostic_without_side_effects() {
+    let temp = tempfile::tempdir().unwrap();
+    let state_dir = temp.path().join("state");
+    let runtime_dir = temp.path().join("runtime");
+    let state = state_dir.display().to_string();
+    let runtime = runtime_dir.display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "stdin-invalid-session"),
+    ];
+
+    let rejected = run_stdin(&["consent-mint"], "{not-json", &envs);
+    assert_ne!(rejected.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&rejected.stderr);
+    assert!(stderr.contains("invalid JSON"), "{stderr}");
+    assert!(stderr.contains("expects one JSON object"), "{stderr}");
+    assert_no_consent_side_effects(&state_dir, &runtime_dir);
+}
+
+#[test]
+fn cli_consent_mint_stdin_accepts_bom_and_whitespace_wrapped_json() {
+    let temp = tempfile::tempdir().unwrap();
+    let state_dir = temp.path().join("state");
+    let runtime_dir = temp.path().join("runtime");
+    let state = state_dir.display().to_string();
+    let runtime = runtime_dir.display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "stdin-bom-session"),
+    ];
+    let session_token = runtime_dir.join("axhub/consent-stdin-bom-session.json");
+    let binding = consent_mint_valid_binding("stdin-bom-session", "tc-bom");
+    let wrapped_binding = format!("\u{feff}\r\n\t {binding}\n\n");
+
+    let minted = run_stdin(&["consent-mint"], &wrapped_binding, &envs);
+    assert_eq!(minted.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&minted.stdout);
+    assert!(stdout.contains("token_id"), "{stdout}");
+    assert!(session_token.exists());
+}
+
 #[test]
 fn cli_consent_mint_unknown_flags_fail_without_runtime_or_key_side_effects() {
     let temp = tempfile::tempdir().unwrap();

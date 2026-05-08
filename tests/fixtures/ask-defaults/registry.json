@@ -170,12 +170,44 @@
   },
   "github": {
     "GitHub 연동 작업을 고를까요?": {
-      "safe_default": "목록만",
+      "safe_default": "list_only",
       "rationale": "GitHub connect/disconnect changes deployment source bindings. Non-interactive mode should only list available repos.",
       "allowed_safe_defaults": [
-        "목록만",
-        "연결",
-        "끊기"
+        "list_only",
+        "connect",
+        "disconnect"
+      ]
+    },
+    "GitHub repo 를 만들까요?": {
+      "safe_default": "abort",
+      "rationale": "Repository creation mutates GitHub state and visibility. Non-interactive mode must not create repos without explicit human confirmation.",
+      "allowed_safe_defaults": [
+        "abort",
+        "create"
+      ]
+    },
+    "git remote 를 추가할까요?": {
+      "safe_default": "abort",
+      "rationale": "Adding a remote changes local repository configuration. Non-interactive mode must leave git remotes untouched.",
+      "allowed_safe_defaults": [
+        "abort",
+        "add_remote"
+      ]
+    },
+    "첫 push 를 실행할까요?": {
+      "safe_default": "abort",
+      "rationale": "First push publishes local code to GitHub. Non-interactive mode must not push without explicit human confirmation.",
+      "allowed_safe_defaults": [
+        "abort",
+        "push"
+      ]
+    },
+    "axhub 앱에 repo 를 연결할까요?": {
+      "safe_default": "abort",
+      "rationale": "Connecting a repo changes the app deployment source. Non-interactive mode must stop before connect.",
+      "allowed_safe_defaults": [
+        "abort",
+        "connect"
       ]
     }
   },

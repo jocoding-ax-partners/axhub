@@ -351,6 +351,30 @@ fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {
 fn parse_binding(raw: &str) -> anyhow::Result<ConsentBinding> {
     Ok(serde_json::from_str(raw)?)
 }
+
+fn consent_mint_json_stdin_help() -> &'static str {
+    r#"PowerShell example: $binding | ConvertTo-Json -Compress | & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" consent-mint
+Temp-file fallback: Get-Content -Raw "$Path" | & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" consent-mint"#
+}
+
+fn parse_consent_mint_binding(raw: &str) -> Result<ConsentBinding, i32> {
+    let binding_json = raw.trim().trim_start_matches('\u{feff}').trim();
+    if binding_json.is_empty() {
+        eprintln!(
+            "axhub-helpers consent-mint: empty stdin; no JSON binding was provided.\n{}",
+            consent_mint_json_stdin_help()
+        );
+        return Err(65);
+    }
+    serde_json::from_str(binding_json).map_err(|err| {
+        eprintln!(
+            "axhub-helpers consent-mint: invalid JSON; consent-mint expects one JSON object binding on stdin.\nError: {err}\n{}",
+            consent_mint_json_stdin_help()
+        );
+        65
+    })
+}
+
 fn cmd_consent_mint(args: &[String]) -> anyhow::Result<i32> {
     let validate_only = match args {
         [] => false,
@@ -360,7 +384,11 @@ fn cmd_consent_mint(args: &[String]) -> anyhow::Result<i32> {
             return Ok(64);
         }
     };
-    let b = parse_binding(&read_stdin()?)?;
+    let raw = read_stdin()?;
+    let b = match parse_consent_mint_binding(&raw) {
+        Ok(binding) => binding,
+        Err(code) => return Ok(code),
+    };
     validate_binding_schema(&b)?;
     if validate_only {
         out_json(json!({"valid": true, "action": b.action}));

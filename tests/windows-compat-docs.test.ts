@@ -71,6 +71,23 @@ describe("Windows compatibility docs", () => {
     expect(recovery).toContain('"$env:CLAUDE_PLUGIN_ROOT\\bin\\axhub-helpers.exe" token-import');
   });
 
+  test("auth browser login guidance has Windows consent and pre-wait device-code lanes", () => {
+    const auth = read("skills/auth/SKILL.md");
+
+    expect(auth).toContain("PowerShell lane");
+    expect(auth).toContain("$env:CLAUDE_PLUGIN_ROOT");
+    expect(auth).toContain("ConvertTo-Json -Compress");
+    expect(auth).toContain('& "$env:CLAUDE_PLUGIN_ROOT\\bin\\axhub-helpers.exe" consent-mint');
+    expect(auth).toContain("temp-file fallback");
+    expect(auth.indexOf("PowerShell lane")).toBeLessThan(auth.indexOf("temp-file fallback"));
+    expect(auth).toContain("axhub auth login --force --no-browser");
+    expect(auth).toContain("--json 은 challenge fields");
+    expect(auth).toContain("device URL/code");
+    expect(auth).toContain("pre-wait");
+    expect(auth).toContain("do not run blocking `axhub auth login --force`");
+    expect(auth).toContain("CLI follow-up gap");
+  });
+
   test("skill guidance separates POSIX statusline/cache from native Windows", () => {
     const deploy = read("skills/deploy/SKILL.md");
     const recover = read("skills/recover/SKILL.md");

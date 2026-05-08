@@ -76,23 +76,45 @@ To handle auth:
 
 5. **On `browser`** (browser available):
 
-   **5a. Mint consent token** (PreToolUse gate requires it before `axhub auth login`):
+   **5a. Mint consent token with the current shell lane** (PreToolUse gate requires it before any `axhub auth login` command). Do not use one POSIX-only pipe for every environment.
+
+   POSIX/Git Bash/WSL lane:
 
    ```bash
    echo '{"tool_call_id":"pending","action":"auth_login","app_id":"_","profile":"'"${AXHUB_PROFILE:-default}"'","branch":"_","commit_sha":"_","context":{}}' \
      | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
    ```
 
-   `auth_login` binding은 실제 app/branch/commit이 필요 없지만 `asConsentBinding`이 모든 필드에서 비어있지 않은 문자열을 요구하므로 `"_"`를 플레이스홀더로 사용해요. 다음 Bash tool id는 consent-mint 이후에 생기므로 `pending` token을 한 번만 쓰게 해요.
-   macOS/Linux/Windows 모두에서 `CLAUDE_SESSION_ID`를 지우지 마세요. `tool_call_id:"pending"` 자체가 helper에게 "다음 실제 tool call에서 한 번만 claim"하라는 명시 신호예요.
+   PowerShell lane:
 
-   **5b. Run auth login**:
-
-   ```bash
-   axhub auth login
+   ```powershell
+   @{
+     tool_call_id = "pending"
+     action = "auth_login"
+     app_id = "_"
+     profile = if ($env:AXHUB_PROFILE) { $env:AXHUB_PROFILE } else { "default" }
+     branch = "_"
+     commit_sha = "_"
+     context = @{}
+   } | ConvertTo-Json -Compress | & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" consent-mint
    ```
 
-   PreToolUse hook이 step 5a에서 발급한 consent token을 검증해요. 유효하면 브라우저가 열려 OAuth Device Flow가 시작돼요. 만료되거나 없으면 hook이 한국어 메시지와 함께 deny 해요.
+   temp-file fallback 은 위 두 stdin lane 을 쓸 수 없을 때만 secondary 로 써요. JSON 파일을 만들더라도 raw token 값을 쓰지 말고, consent JSON 만 0600/사용자 전용 ACL 임시 파일에 저장한 뒤 helper stdin 으로 다시 넣어요.
+
+   `auth_login` binding은 실제 app/branch/commit이 필요 없지만 `asConsentBinding`이 모든 필드에서 비어있지 않은 문자열을 요구하므로 `"_"`를 플레이스홀더로 사용해요. 다음 Bash/PowerShell tool id는 consent-mint 이후에 생기므로 `pending` token을 한 번만 쓰게 해요.
+   macOS/Linux/Windows 모두에서 `CLAUDE_SESSION_ID`를 지우지 마세요. `tool_call_id:"pending"` 자체가 helper에게 "다음 실제 tool call에서 한 번만 claim"하라는 명시 신호예요.
+
+   **5b. Surface OAuth challenge before waiting.** Prefer:
+
+   ```bash
+   axhub auth login --force --no-browser
+   ```
+
+   This command must surface the device URL/code before any polling wait. Render the device URL/code to the user first, then wait or instruct them to finish in the browser. `--json 은 challenge fields` (`device_url`, `user_code`, verification URL, or equivalent) 를 polling 전에 emit 할 때만 사용해요. If JSON output does not expose those challenge fields before polling, do not use `--json` for the interactive wait.
+
+   Never run a blocking login unless the device URL/code is visible first: do not run blocking `axhub auth login --force` and then wait silently. If the current CLI cannot expose the challenge pre-wait, stop with a CLI follow-up gap instead of improvising a hidden/blocking auth flow.
+
+   PreToolUse hook이 step 5a에서 발급한 consent token을 검증해요. 유효하면 OAuth Device Flow가 시작돼요. 만료되거나 없으면 hook이 한국어 메시지와 함께 deny 해요.
 
    After completion, re-run `axhub auth status --json` and render the identity card from step 2.
 

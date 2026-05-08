@@ -820,6 +820,24 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(github).not.toContain("! axhub github connect");
   });
 
+  test("github skill locks guided repo setup capability ladder and consent gates", () => {
+    const github = skillContents.get("github")!;
+    expect(github).toContain("Strict guided capability ladder");
+    expect(github).toContain("read-only git inspect");
+    expect(github).toContain("parse existing remote");
+    expect(github).toContain('axhub github repos list --account "$ACCOUNT" --json');
+    expect(github).toContain("gh repo create");
+    expect(github).toContain("gh exists/authenticated");
+    expect(github).toContain("owner-repo-visibility confirmed");
+    expect(github).toContain('"question": "GitHub repo 를 만들까요?"');
+    expect(github).toContain('"question": "git remote 를 추가할까요?"');
+    expect(github).toContain('"question": "첫 push 를 실행할까요?"');
+    expect(github).toContain('"question": "axhub 앱에 repo 를 연결할까요?"');
+    expect(github).toContain("re-list after create/push");
+    expect(github).toContain("before connect");
+    expect(github).toContain("unsupported gap");
+  });
+
   test("deploy skill documents current deploy list and cancel surfaces", () => {
     const deploy = skillContents.get("deploy")!;
     expect(deploy).toContain('axhub deploy list --app "$APP_ID" --json');
