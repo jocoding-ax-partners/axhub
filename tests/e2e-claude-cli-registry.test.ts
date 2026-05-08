@@ -75,9 +75,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("25 actual safe_default rationale 엔트리 (GitHub guided setup 추가)", () => {
+  test("26 actual safe_default rationale 엔트리 (Phase 3.5 cli_too_new dismiss 추가)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(25);
+    expect(paths).toHaveLength(26);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -87,6 +87,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "auth",
       "auth",
       "clarify",
+      "deploy",
       "deploy",
       "deploy",
       "doctor",
@@ -135,6 +136,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "명령어만 보기",
     );
     expect(deploy["진행할까요?"]?.safe_default).toBe("미리보기만");
+    expect(
+      deploy["axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?"]?.safe_default,
+    ).toBe("계속해요");
 
     const clarify = registry["clarify"] as Record<string, SafeDefaultEntry>;
     expect(clarify["어떤 작업 원해요?"]?.safe_default).toBe("abort");
