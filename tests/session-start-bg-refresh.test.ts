@@ -66,7 +66,11 @@ exit 0
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     CLAUDE_PLUGIN_ROOT: args.workdir,
-    PATH: `${join(args.workdir, "bin")}:${process.env.PATH ?? ""}`,
+    // Isolate PATH so the host's real axhub binary cannot leak into the
+    // hook's `command -v axhub` probe. Keep `/usr/bin:/bin` for `mktemp`,
+    // `cat`, `bash`, etc. Test stubs (axhub, uname, axhub-helpers) live in
+    // workdir/bin and shadow nothing else.
+    PATH: `${join(args.workdir, "bin")}:/usr/bin:/bin`,
     AXHUB_SKIP_AUTODOWNLOAD: "1",
   };
   if (args.warmupEnv !== undefined) env.AXHUB_GATEKEEPER_WARMUP = args.warmupEnv;
