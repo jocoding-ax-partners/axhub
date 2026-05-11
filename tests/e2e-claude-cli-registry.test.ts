@@ -69,6 +69,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "recover",
       "routing-stats",
       "status",
+      "trace",
       "update",
       "upgrade",
       "verify",
@@ -76,9 +77,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("27 actual safe_default rationale 엔트리 (Phase 26 verify health_endpoint_setup 추가)", () => {
+  test("28 actual safe_default rationale 엔트리 (Phase 25 trace + Phase 26 verify 추가)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(27);
+    expect(paths).toHaveLength(28);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -106,6 +107,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "profile",
       "recover",
       "routing-stats",
+      "trace",
       "update",
       "upgrade",
       "verify",

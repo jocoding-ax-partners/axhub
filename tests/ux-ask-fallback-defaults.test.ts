@@ -21,7 +21,7 @@ const skillSlugs = readdirSync(SKILLS_DIR).filter((d) => {
   }
 });
 
-describe("Phase 26 — D1 fallback sentinel in all 20 SKILLs", () => {
+describe("Phase 26 — D1 fallback sentinel in all 21 SKILLs", () => {
   for (const slug of skillSlugs) {
     test(`skills/${slug}/SKILL.md contains D1 sentinel`, () => {
       const content = readFileSync(join(SKILLS_DIR, slug, "SKILL.md"), "utf8");

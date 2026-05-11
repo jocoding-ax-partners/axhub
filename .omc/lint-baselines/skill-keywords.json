@@ -301,6 +301,17 @@
       "brew upgrade 해줘",
       "CLI 업데이트 부탁드려요"
     ],
+    "skills/trace/SKILL.md": [
+      "왜 실패",
+      "왜 안돼",
+      "왜 죽었",
+      "왜 깨졌",
+      "왜 멈췄",
+      "원인 알려줘",
+      "디버그",
+      "추적해",
+      "분석해"
+    ],
     "skills/apis/SKILL.md": [
       "사내 API 뭐 있어",
       "사용 가능한 api",
@@ -959,5 +970,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-05-11T06:07:19.822Z"
+  "generated_at": "2026-05-11T06:27:40.050Z"
 }

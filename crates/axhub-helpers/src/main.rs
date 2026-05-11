@@ -106,6 +106,7 @@ fn run() -> anyhow::Result<i32> {
         "config" => cmd_config(&rest),
         "auth-refresh-bg" => cmd_auth_refresh_bg(),
         "verify" => cmd_verify(&rest),
+        "trace" => cmd_trace(&rest),
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -1459,6 +1460,132 @@ fn cmd_verify(args: &[String]) -> anyhow::Result<i32> {
         Verdict::NotLive => 64,
     })
 }
+
+struct RealTraceProbes;
+
+impl axhub_helpers::trace_helper::TraceProbes for RealTraceProbes {
+    fn axhub_build_log(&self, deploy_id: &str, tail: u32) -> String {
+        let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
+        match std::process::Command::new(&axhub_bin)
+            .args([
+                "logs",
+                "--build",
+                "--tail",
+                &tail.to_string(),
+                "--deploy-id",
+                deploy_id,
+            ])
+            .output()
+        {
+            Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),
+            Err(_) => String::new(),
+        }
+    }
+
+    fn recent_routing_context(&self) -> Option<axhub_helpers::trace_helper::RoutingContext> {
+        use axhub_helpers::audit;
+        let records = audit::read_since(chrono::Duration::seconds(3600)).ok()?;
+        let last = records.last()?;
+        Some(axhub_helpers::trace_helper::RoutingContext {
+            last_routing_audit_ts: last.ts.clone(),
+            last_prompt_hash_prefix: last
+                .prompt_hash
+                .strip_prefix("sha256:")
+                .unwrap_or(&last.prompt_hash)
+                .chars()
+                .take(12)
+                .collect(),
+            is_axhub_related_recent: last.is_axhub_related,
+        })
+    }
+}
+
+fn humanize_trace_korean(report: &axhub_helpers::trace_helper::TraceReport) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("📍 deploy_id: {}", report.deploy_id));
+    lines.push(format!("  - 마지막 phase: {}", report.last_phase));
+    if let Some(reason) = &report.failure_reason {
+        lines.push(format!("  - 실패 사유: {reason}"));
+    }
+    if !report.phase_durations.is_empty() {
+        lines.push("  - phase 별 소요:".to_string());
+        for phase in &report.phase_durations {
+            let dur = phase
+                .duration_ms
+                .map(|ms| format!("{ms}ms"))
+                .unwrap_or_else(|| "?".to_string());
+            lines.push(format!(
+                "    · step {} {} → {}",
+                phase.step, phase.phase, dur
+            ));
+        }
+    }
+    if !report.build_log_errors.is_empty() {
+        lines.push(format!(
+            "  - build_log 마지막 {} 라인:",
+            report.build_log_errors.len()
+        ));
+        for err in &report.build_log_errors {
+            lines.push(format!("    > {err}"));
+        }
+    }
+    if !report.matched_patterns.is_empty() {
+        lines.push(format!(
+            "  - 매칭 패턴: {}",
+            report.matched_patterns.join(", ")
+        ));
+        lines.push(
+            "  - 다음: skills/trace/references/error-patterns.md 의 매칭 entry 참고".to_string(),
+        );
+    } else if !report.build_log_errors.is_empty() {
+        lines.push("  - 자동 매칭 실패. 위 raw 에러 라인 직접 검색해주세요.".to_string());
+    }
+    if let Some(rc) = &report.routing_context {
+        lines.push(format!(
+            "  - 최근 routing audit: {} (axhub_related={})",
+            rc.last_routing_audit_ts, rc.is_axhub_related_recent
+        ));
+    }
+    lines.join("\n")
+}
+
+fn cmd_trace(args: &[String]) -> anyhow::Result<i32> {
+    let mut deploy_id: Option<String> = None;
+    let mut json_mode = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--json" => json_mode = true,
+            "--deploy-id" => {
+                if i + 1 < args.len() {
+                    deploy_id = Some(args[i + 1].clone());
+                    i += 1;
+                }
+            }
+            other if other.starts_with("--deploy-id=") => {
+                deploy_id = Some(other.trim_start_matches("--deploy-id=").to_string());
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    let Some(deploy_id) = deploy_id else {
+        eprintln!("axhub-helpers trace: --deploy-id <id> required");
+        return Ok(64);
+    };
+
+    let probes = RealTraceProbes;
+    let report = axhub_helpers::trace_helper::trace(&deploy_id, &probes)?;
+
+    if json_mode {
+        out_json(serde_json::to_value(&report)?);
+    } else {
+        println!("{}", humanize_trace_korean(&report));
+    }
+    Ok(0)
+}
+
 
 fn cmd_auth_refresh_bg() -> anyhow::Result<i32> {
     if std::env::var("AXHUB_AUTH_BG_REFRESH").as_deref() == Ok("0") {
