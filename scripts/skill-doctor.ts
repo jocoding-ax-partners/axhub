@@ -11,6 +11,10 @@
  *   1. D1 sentinel — required only when body references AskUserQuestion
  *   2. TodoWrite Step 0 — required when frontmatter `multi-step: true`
  *   3. !command preflight injection — required when frontmatter `needs-preflight: true`
+ *   4. dep-execution — requires frontmatter `allows-dependency-execution: true|false`
+ *   5. model routing — Phase 25 PR 25.5a. Optional `model:` frontmatter; when declared
+ *      it must be one of haiku|sonnet|opus. Missing field is allowed (no-op for the
+ *      19 existing SKILLs; bulk migration happens in 25.5b/25.5c).
  *
  * Output (default mode):
  *   skills/deploy/SKILL.md:
@@ -93,6 +97,8 @@ const loadDependencyAllowlist = (): Allowlist => {
 
 const DEP_EXEC_ALLOWLIST = loadDependencyAllowlist();
 
+const VALID_MODELS = ["haiku", "sonnet", "opus"] as const;
+
 const STRICT = process.argv.includes("--strict");
 const NO_COLOR = !process.stdout.isTTY || process.env["NO_COLOR"] || STRICT;
 
@@ -173,6 +179,30 @@ const inspectSkill = (slug: string): SkillCheck => {
     }
   }
 
+  // Phase 25 PR 25.5a — model routing field. Optional today; required to be a
+  // valid value only when declared. Existing 19 SKILLs lack the field and must
+  // continue to pass (no-op effective). Bulk migration arrives in 25.5b/25.5c.
+  const modelFieldMatch = fm.match(/^model:\s*([a-z]+)\s*$/m);
+  const modelDeclared = modelFieldMatch !== null;
+  const modelValue = modelFieldMatch?.[1] ?? null;
+  const modelValid = modelValue !== null && (VALID_MODELS as readonly string[]).includes(modelValue);
+  let modelRequired: boolean;
+  let modelPresent: boolean;
+  let modelReason: string;
+  if (!modelDeclared) {
+    modelRequired = false;
+    modelPresent = true;
+    modelReason = "frontmatter 'model' 미선언 → exempt (Phase 25 PR 25.5b/25.5c 까지 일괄 미적용 OK)";
+  } else if (modelValid) {
+    modelRequired = true;
+    modelPresent = true;
+    modelReason = `frontmatter model: ${modelValue}`;
+  } else {
+    modelRequired = true;
+    modelPresent = false;
+    modelReason = `frontmatter model: ${modelValue ?? "(unparsed)"} — must be one of ${VALID_MODELS.join("|")}`;
+  }
+
   return {
     slug,
     path: `skills/${slug}/SKILL.md`,
@@ -200,6 +230,12 @@ const inspectSkill = (slug: string): SkillCheck => {
         required: depExecRequired,
         present: depExecPresent,
         reason: depExecReason,
+      },
+      {
+        name: "model routing",
+        required: modelRequired,
+        present: modelPresent,
+        reason: modelReason,
       },
     ],
   };

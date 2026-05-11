@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Phase 18 R2/US-1803 — `bun run skill:new <slug> [flags]` scaffold.
+ * Phase 25 PR 25.5a — adds `--model` frontmatter flag.
  *
  * Generates skills/<slug>/SKILL.md from skills/_template/SKILL.md.tmpl with
  * Phase 17/18 patterns pre-populated. Author fills in TODO placeholders + runs
@@ -9,12 +10,16 @@
  * Defaults (R2 mutate-aware):
  *   --multi-step    (true)   skills with workflow ≥4 numbered steps
  *   --needs-preflight (true)  skills that mutate state OR need live context
+ *   --model           (sonnet) safe default for destructive / multi-step skills
  *
  * Flags:
  *   --no-multi-step       declare frontmatter `multi-step: false`
  *   --no-preflight        declare frontmatter `needs-preflight: false` + omit !command line
  *   --action <verb>       verb for "To <verb>:" (default: "do something")
  *   --title <text>        H1 title (default: SLUG capitalized)
+ *   --model <name>        haiku | sonnet | opus (default: sonnet). Phase 25 routing —
+ *                         read-only skills should pick haiku, destructive multi-step
+ *                         stay on sonnet, opus is reserved (axhub domain doesn't need it).
  *
  * Side effects:
  *   1. mkdir skills/<slug>
@@ -36,7 +41,7 @@ const argv = process.argv.slice(2);
 const slug = argv[0];
 
 if (!slug || slug.startsWith("-") || !/^[a-z][a-z0-9-]*$/.test(slug)) {
-  process.stderr.write(`usage: bun run skill:new <slug> [--no-multi-step] [--no-preflight] [--action <verb>] [--title <text>]\n`);
+  process.stderr.write(`usage: bun run skill:new <slug> [--no-multi-step] [--no-preflight] [--action <verb>] [--title <text>] [--model <haiku|sonnet|opus>]\n`);
   process.stderr.write(`  slug must be lowercase alphanumeric + hyphens (e.g. "my-skill")\n`);
   process.exit(1);
 }
@@ -47,10 +52,19 @@ const flagValue = (name: string): string | undefined => {
   return idx >= 0 && idx + 1 < argv.length ? argv[idx + 1] : undefined;
 };
 
+const VALID_MODELS = ["haiku", "sonnet", "opus"] as const;
+type SkillModel = (typeof VALID_MODELS)[number];
+
 const multiStep = !flag("--no-multi-step");
 const needsPreflight = !flag("--no-preflight");
 const action = flagValue("--action") ?? "do something";
 const title = flagValue("--title") ?? slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const modelRaw = flagValue("--model") ?? "sonnet";
+if (!VALID_MODELS.includes(modelRaw as SkillModel)) {
+  process.stderr.write(`error: --model must be one of ${VALID_MODELS.join("|")} (got ${JSON.stringify(modelRaw)})\n`);
+  process.exit(1);
+}
+const model: SkillModel = modelRaw as SkillModel;
 
 const targetDir = join(REPO_ROOT, "skills", slug);
 const targetFile = join(targetDir, "SKILL.md");
@@ -72,6 +86,7 @@ content = content.replace(/\{\{TITLE\}\}/g, title);
 content = content.replace(/\{\{ACTION\}\}/g, action);
 content = content.replace(/\{\{MULTI_STEP\}\}/g, multiStep ? "true" : "false");
 content = content.replace(/\{\{NEEDS_PREFLIGHT\}\}/g, needsPreflight ? "true" : "false");
+content = content.replace(/\{\{MODEL\}\}/g, model);
 
 const todoWriteBlock = multiStep
   ? `0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
@@ -109,7 +124,7 @@ if (!registry[slug]) {
 }
 
 process.stdout.write(`✓ Created skills/${slug}/SKILL.md\n`);
-process.stdout.write(`  multi-step: ${multiStep}, needs-preflight: ${needsPreflight}\n`);
+process.stdout.write(`  multi-step: ${multiStep}, needs-preflight: ${needsPreflight}, model: ${model}\n`);
 process.stdout.write(`✓ Appended registry stub to tests/fixtures/ask-defaults/registry.json\n`);
 process.stdout.write(`\nNext steps:\n`);
 process.stdout.write(`  1. Edit skills/${slug}/SKILL.md — replace TODO placeholders\n`);
