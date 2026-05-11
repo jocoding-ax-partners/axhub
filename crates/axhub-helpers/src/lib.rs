@@ -14,6 +14,7 @@ pub mod list_deployments;
 pub mod messages;
 pub mod preflight;
 pub mod quality_gate;
+pub mod recovery_scan;
 pub mod redact;
 pub mod resolve;
 pub mod runtime_paths;
