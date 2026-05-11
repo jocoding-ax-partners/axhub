@@ -1,83 +1,61 @@
 {
-  "task": "Vibe Coder Visibility — deploy SKILL 흐름에서 사용자(비개발자 바이브코더) chat 화면에 raw 기술 jargon 노출 차단. Step 1.1 의 binding_hash / pending_action_id / pending_action_hash / retry_policy / consent_binding 같은 internal primitives 는 PreToolUse 검증 용도일 뿐 절대 chat echo 금지. Step 1.5 git-init AskUserQuestion 옵션을 2개로 단순화 (지금 만들기 / 취소) 하고 dev-only \"명령어만 보기\" 제거. Step 2.5 cli_too_new question 에서 (cli_too_new) jargon 제거. SKILL.md 에 \"Vibe Coder Visibility Rules\" 신규 섹션 추가 — Claude 가 사용자 chat 에 보일 때 출력 금지 fields enum + 한국어 한 줄 templates. registry.json / tests/deploy-git-init-stage.test.ts 동기화. lint + cargo test + bun test green.",
-  "createdAt": "2026-05-11T00:00:00Z",
+  "task": "Vibe Coder Visibility 2차 deep scan — Step 본문 narrative / references templates / TodoWrite content / header label 의 영문 dev jargon 추가 검출 및 한국어 자연어 humanize. 사용자 chat 노출 surface 전수 점검.",
+  "createdAt": "2026-05-11T01:00:00Z",
   "stories": [
     {
-      "id": "US-VC-1",
-      "title": "SKILL Step 1.1 — raw jargon chat echo 금지 instruction",
+      "id": "US-VCX-1",
+      "title": "Step 본문 narrative — 사용자 facing copy 안 영문 jargon",
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "skills/deploy/SKILL.md Step 1.1 의 \"show the exact command, binding_hash, pending_action_id, pending_action_hash, retry_policy, and consent preview before running anything\" 문구 변경",
-        "새 instruction: helper output 의 binding_hash / pending_action_id / pending_action_hash / retry_policy / consent_binding 은 internal verification primitives 임을 명시, raw 값 사용자 chat echo 금지 (PreToolUse hook 가 검증)",
-        "humanized progress message templates 제공 (예: '처음 배포라 앱을 만들고 있어요')",
-        "기존 기능 instruction (record FSM 호출, retry policy 확인, idempotency) 은 internal primitive 로 유지",
-        "tests/deploy-git-init-stage.test.ts:98-100 의 `pending_action_id` / `pending_action_hash` / `binding_hash` 문자열 존재 expect 는 통과 (instruction text 안에 단어 등장)"
+        "skills/*/SKILL.md 의 Bash 'echo' / 'printf' / cat heredoc 안 사용자 facing 한국어 copy 에 잔존 영문 jargon (endpoint / scope / profile / token / commit / branch / origin / remote / repo / consent) 검출",
+        "검출된 항목을 한국어 자연어 (서버 주소 / 권한 범위 / 프로필 / 토큰 / 커밋 — 일부 친숙어는 유지) 로 humanize",
+        "단 instruction 안 internal primitive (Bash 변수 명, JSON field key, helper CLI flag) 은 그대로 유지"
       ],
       "owner": "",
       "blockedBy": []
     },
     {
-      "id": "US-VC-2",
-      "title": "SKILL 신규 \"Vibe Coder Visibility Rules\" 섹션",
+      "id": "US-VCX-2",
+      "title": "references templates — error empathy / recovery flows 사용자 facing copy",
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "skills/deploy/SKILL.md 본문에 신규 ## Vibe Coder Visibility Rules 섹션 추가 (Workflow 시작 근처)",
-        "노출 금지 raw fields enum 명시: binding_hash, pending_action_id, pending_action_hash, command_argv, command_id, consent_binding, synthesized_by_helper, retry_policy, idempotency_key, exit_code, next_action, schema_version, stdout_json, stderr raw, bootstrap_plan, required_steps, decision_inputs",
-        "한국어 한 줄 templates 제공: 첫 배포 / 빌드 / 토큰 만료 / consent dispatch / 에러 routing 각각",
-        "lint:tone --strict 0 err (해요체)",
-        "lint:keywords --check no diff (description frontmatter 미변경)",
-        "skill:doctor strict 통과"
+        "references/error-empathy-catalog.md / references/recovery-flows.md 등 사용자 facing template 의 영문 jargon 검출",
+        "한국어 자연어로 humanize (예: 'OAuth Device Flow' / 'token expired' 같은 jargon)",
+        "lint:tone --strict 통과"
       ],
       "owner": "",
       "blockedBy": []
     },
     {
-      "id": "US-VC-3",
-      "title": "Step 1.5 git-init prompt 옵션 단순화 + label humanize",
+      "id": "US-VCX-3",
+      "title": "AskUserQuestion header 일관성 — 영문/한국어 mix",
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "Step 1.5 AskUserQuestion 옵션을 2개로 축소 — '지금 만들기' (value=init_and_continue) / '취소' (value=abort)",
-        "기존 'show_commands' 옵션 제거 (vibe coder 에게 git CLI 명령어 raw 노출은 부담)",
-        "Bash block 의 실제 git init / git add / git commit 명령은 유지 — 사용자 'init_and_continue' 선택 시 자동 실행",
-        "옵션 description 도 비개발자 친화 자연어 ('git' / '저장소' / '커밋' 같은 jargon 최소화)",
-        "tests/deploy-git-init-stage.test.ts expect 갱신 — show_commands value 검사 제거, init_and_continue 및 abort 만 expect",
-        "tests/fixtures/ask-defaults/registry.json 의 '배포 전 저장 지점을 만들까요?' safe_default 를 '취소' 로 변경 + allowed_safe_defaults enum 동기화",
-        "tests/deploy-git-init-stage.test.ts registry safe_default expect 도 '취소' 로 갱신"
+        "skills/*/SKILL.md 의 AskUserQuestion JSON 안 header 필드 영문 ('env', 'profile', 'First push', 'Repo 생성' 같이 영문 mix) 검출",
+        "영문 header 를 한국어로 humanize (예: 'env' → '환경변수', 'profile' → '프로필', 'First push' → '첫 올리기', 'Repo 생성' → '저장소 생성')",
+        "단 internal value 필드 ('value': 'env' 같은) 은 그대로 유지 — header 만 humanize"
       ],
       "owner": "",
       "blockedBy": []
     },
     {
-      "id": "US-VC-4",
-      "title": "Step 2.5 cli_too_new question jargon 제거",
+      "id": "US-VCX-4",
+      "title": "회귀 — bun / cargo / lint / skill:doctor green",
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "Step 2.5 AskUserQuestion 의 question 문구에서 '(cli_too_new)' jargon 제거 — 새 문구: 'axhub CLI 가 더 최신 버전인데 계속할까요?'",
-        "tests/fixtures/ask-defaults/registry.json 의 deploy 키도 동기화 (옛 키 제거 + 새 키 등록, safe_default / rationale / allowed_safe_defaults 보존)",
-        "ux-ask-fallback-registry.test.ts pass (질문 텍스트가 SKILL ↔ registry 사이 byte-identical)"
-      ],
-      "owner": "",
-      "blockedBy": []
-    },
-    {
-      "id": "US-VC-5",
-      "title": "회귀 — cargo / bun / lint / skill:doctor green",
-      "priority": 5,
-      "passes": true,
-      "acceptanceCriteria": [
-        "cargo test -p axhub-helpers full pass (Phase 3.5 baseline 181 유지)",
-        "bun test full pass (Phase 3.5 baseline 586 + 갱신된 deploy-git-init-stage 통과)",
+        "bun test full pass (Phase VC baseline 599 유지)",
+        "cargo test -p axhub-helpers full pass (Phase 3.5 baseline 189 유지)",
         "bunx tsc --noEmit clean",
         "bun run lint:tone --strict 0 err",
         "bun run lint:keywords --check no diff",
-        "bun run skill:doctor --strict pass"
+        "bun run skill:doctor --strict exit 0"
       ],
       "owner": "",
-      "blockedBy": ["US-VC-1", "US-VC-2", "US-VC-3", "US-VC-4"]
+      "blockedBy": ["US-VCX-1", "US-VCX-2", "US-VCX-3"]
     }
   ]
 }

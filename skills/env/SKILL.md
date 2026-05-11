@@ -51,7 +51,7 @@ To manage env vars:
    ```json
    {
      "question": "어떤 환경변수 작업을 할까요?",
-     "header": "env",
+     "header": "환경변수",
      "options": [
        {"label": "조회만", "value": "list", "description": "값은 가리고 환경변수 이름 목록만 봐요"},
        {"label": "추가 또는 수정", "value": "set", "description": "값은 안전하게 입력으로만 전달해요"},

@@ -253,7 +253,7 @@ When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <I
   · 새 컨테이너 이미지 빌드: 예상 ~2분
   · DB 마이그레이션: <N>개 변경 감지
   · 환경변수 변경: <N>개 (이전 배포 대비)
-  · 헬스체크 endpoint: <URL>
+  · 헬스체크 주소: <URL>
   · 라이브 전환 방식: <STRATEGY>
 
 이대로 진짜 배포하시려면 "이대로 진행해" 라고 말씀해주세요.
@@ -335,13 +335,13 @@ When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <I
 
 ### exit 66 + `profile.endpoint_not_in_allowlist`
 
-**감정:** endpoint 가 허용 목록 밖이에요.
+**감정:** 이 서버 주소가 허용 목록 밖이에요.
 
-**원인:** 사내 endpoint 나 임시 endpoint 일 수 있지만, 토큰과 요청이 다른 서버로 갈 수 있어서 조심해야 해요.
+**원인:** 사내 서버 주소거나 임시 서버 주소일 수 있지만, 토큰과 요청이 다른 서버로 갈 수 있어서 조심해야 해요.
 
-**해결:** 회사에서 승인한 endpoint 인지 확인하고 exact confirm 후에만 profile 에 추가해요.
+**해결:** 회사에서 승인한 서버 주소인지 확인하고 정확히 한 번 더 확인한 뒤에만 프로필에 추가해요.
 
-**버튼:** ["endpoint 확인", "취소", "도와주세요"]
+**버튼:** ["서버 주소 확인", "취소", "도와주세요"]
 
 ---
 
@@ -349,11 +349,11 @@ When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <I
 
 **감정:** API 호출에는 사전 승인이 필요해요.
 
-**원인:** 이 endpoint 호출은 서버 상태를 바꿀 수 있어요. read-only 조회처럼 자동 실행할 수 없어요.
+**원인:** 이 API 호출은 서버 상태를 바꿀 수 있어요. 단순 조회처럼 자동으로 실행할 수 없어요.
 
-**해결:** method, endpoint, body source 를 preview 로 확인한 뒤 동의 token 을 mint 해서 다시 실행해요.
+**해결:** 어떤 요청인지 (요청 방식 / 주소 / 보낼 내용) 미리 보고 확인한 뒤, 동의를 받아 다시 실행해요.
 
-**버튼:** ["preview 보기", "취소", "도와주세요"]
+**버튼:** ["미리보기", "취소", "도와주세요"]
 
 ---
 

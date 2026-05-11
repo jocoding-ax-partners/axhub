@@ -100,7 +100,7 @@ To connect GitHub:
       ```json
       {
         "question": "GitHub repo 를 만들까요?",
-        "header": "Repo 생성",
+        "header": "저장소 만들기",
         "options": [
           {"label": "취소", "value": "abort", "description": "GitHub 저장소를 만들지 않고 멈춰요"},
           {"label": "생성", "value": "create", "description": "확인한 이름과 공개 범위로 GitHub 저장소를 새로 만들어요"}
@@ -115,7 +115,7 @@ To connect GitHub:
       ```json
       {
         "question": "git remote 를 추가할까요?",
-        "header": "Remote 추가",
+        "header": "GitHub 주소 추가",
         "options": [
           {"label": "취소", "value": "abort", "description": "GitHub 연결 설정을 바꾸지 않고 멈춰요"},
           {"label": "추가", "value": "add_remote", "description": "확인한 GitHub 주소를 현재 폴더에 연결해요"}
@@ -130,7 +130,7 @@ To connect GitHub:
       ```json
       {
         "question": "첫 push 를 실행할까요?",
-        "header": "First push",
+        "header": "첫 올리기",
         "options": [
           {"label": "취소", "value": "abort", "description": "push 하지 않고 멈춰요"},
           {"label": "올리기", "value": "push", "description": "현재 branch 를 origin 에 처음 올려요"}
@@ -145,7 +145,7 @@ To connect GitHub:
       ```json
       {
         "question": "axhub 앱에 repo 를 연결할까요?",
-        "header": "Repo 연결",
+        "header": "저장소 연결",
         "options": [
           {"label": "취소", "value": "abort", "description": "앱 연결 없이 멈춰요"},
           {"label": "연결", "value": "connect", "description": "동의를 받고 axhub 앱과 GitHub 저장소를 연결해요"}
