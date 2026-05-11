@@ -78,6 +78,47 @@ fn run_env(args: &[&str], envs: &[(&str, &str)]) -> Output {
     command.output().unwrap()
 }
 
+#[cfg(unix)]
+fn fake_verify_axhub(
+    temp: &tempfile::TempDir,
+    name: &str,
+    status_stdout: &str,
+    status_exit: i32,
+    logs_stdout: &str,
+    logs_exit: i32,
+) -> std::path::PathBuf {
+    let axhub = temp.path().join(name);
+    std::fs::write(
+        &axhub,
+        format!(
+            r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "axhub 0.1.0"
+  exit 0
+fi
+if [ "$1" = "status" ]; then
+  cat <<'AXHUB_STATUS'
+{status_stdout}
+AXHUB_STATUS
+  exit {status_exit}
+fi
+if [ "$1" = "logs" ]; then
+  cat <<'AXHUB_LOGS'
+{logs_stdout}
+AXHUB_LOGS
+  exit {logs_exit}
+fi
+exit 64
+"#,
+        ),
+    )
+    .unwrap();
+    let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
+}
+
 fn run_stdin_in_dir(args: &[&str], stdin: &str, cwd: &Path) -> Output {
     let mut child = Command::new(bin())
         .args(args)
@@ -174,6 +215,95 @@ fn write_manifest(dir: &Path) {
         "name: Paydrop\nslug: paydrop\nframework: nextjs\n",
     )
     .unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_verify_requires_app_id() {
+    let output = run_env(&["verify", "--json"], &[]);
+    assert_eq!(output.status.code(), Some(64));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--app-id"));
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_verify_json_live_uses_status_and_logs_probes() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_verify_axhub(
+        &temp,
+        "axhub-live",
+        r#"{"state":"live","last_deploy_id":"dep-live","last_deploy_age_secs":42}"#,
+        0,
+        "INFO boot\nINFO ready\n",
+        0,
+    );
+
+    let output = run_env(
+        &["verify", "--json", "--app-id=paydrop"],
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["verdict"], "live");
+    assert_eq!(json["state"], "live");
+    assert_eq!(json["last_deploy_id"], "dep-live");
+    assert_eq!(json["last_deploy_age_secs"], 42);
+    assert!(json["errors"].as_array().unwrap().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_verify_plain_suspect_humanizes_runtime_errors() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_verify_axhub(
+        &temp,
+        "axhub-suspect",
+        r#"{"state":"live","last_deploy_id":"dep-sus","last_deploy_age_secs":30}"#,
+        0,
+        "ERROR connection refused\nINFO retry\n",
+        0,
+    );
+
+    let output = run_env(
+        &["verify", "--app-id", "paydrop"],
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("⚠️ 의심"), "{stdout}");
+    assert!(stdout.contains("runtime 에러 1건"), "{stdout}");
+    assert!(stdout.contains("다시 확인해줘"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_verify_json_not_live_exits_usage_code() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_verify_axhub(
+        &temp,
+        "axhub-not-live",
+        r#"{"state":"rolled_back","last_deploy_id":"dep-old","last_deploy_age_secs":900}"#,
+        0,
+        "INFO old deploy\n",
+        0,
+    );
+
+    let output = run_env(
+        &["verify", "--json", "--app-id", "paydrop"],
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(output.status.code(), Some(64));
+    let json = stdout_json(&output);
+    assert_eq!(json["verdict"], "not_live");
+    assert_eq!(json["state"], "rolled_back");
+    assert!(
+        json["reasons"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|reason| reason.as_str().unwrap().contains("rolled_back")),
+        "{json}",
+    );
 }
 
 #[test]
