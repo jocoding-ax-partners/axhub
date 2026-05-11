@@ -22,6 +22,16 @@
 
 set -u
 
+# Phase 25 PR 25.2 — hook safety kill switch. Canonical envs per
+# .plan/matrix-absorption/00-overview.md §10.6 (Env Var Taxonomy ADR).
+# Legacy DISABLE_AXHUB=1 alias honored through v0.8.0 deprecation window.
+if [ "${AXHUB_DISABLE_HOOKS:-0}" = "1" ] || [ "${DISABLE_AXHUB:-0}" = "1" ]; then
+  exit 0
+fi
+case ",${AXHUB_DISABLE_HOOK:-}," in
+  *,token-freshness-gate,*) exit 0 ;;
+esac
+
 if [ "${AXHUB_AUTH_BG_REFRESH:-1}" = "0" ]; then
   exit 0
 fi

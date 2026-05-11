@@ -15,6 +15,16 @@
 # detection + download + symlink logic so this stays a thin POSIX wrapper.
 set -eu
 
+# Phase 25 PR 25.2 — hook safety kill switch. Canonical envs per
+# .plan/matrix-absorption/00-overview.md §10.6 (Env Var Taxonomy ADR).
+# Legacy DISABLE_AXHUB=1 alias honored through v0.8.0 deprecation window.
+if [ "${AXHUB_DISABLE_HOOKS:-0}" = "1" ] || [ "${DISABLE_AXHUB:-0}" = "1" ]; then
+  exit 0
+fi
+case ",${AXHUB_DISABLE_HOOK:-}," in
+  *,session-start,*) exit 0 ;;
+esac
+
 ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set by Claude Code}"
 HELPER="${ROOT}/bin/axhub-helpers"
 INSTALL_SH="${ROOT}/bin/install.sh"
