@@ -47,7 +47,7 @@ To manage profiles:
    ```json
    {
      "question": "프로필 작업을 고를까요?",
-     "header": "profile",
+     "header": "프로필",
      "options": [
        {"label": "현재 프로필 보기", "value": "current", "description": "지금 연결된 서버 주소와 프로필을 봐요"},
        {"label": "목록 보기", "value": "list", "description": "저장된 프로필 목록을 봐요"},
