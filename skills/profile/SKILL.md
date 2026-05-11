@@ -30,9 +30,9 @@ To manage profiles:
    ```typescript
    TodoWrite({ todos: [
      { content: "profile 의도 확인", status: "in_progress", activeForm: "profile 확인 중" },
-     { content: "현재 profile 조회", status: "pending", activeForm: "현재 상태 보는 중" },
+     { content: "현재 프로필 보기", status: "pending", activeForm: "현재 상태 보는 중" },
      { content: "필요 시 add/use 실행", status: "pending", activeForm: "profile 처리 중" },
-     { content: "endpoint 안전 안내", status: "pending", activeForm: "마무리하는 중" }
+     { content: "서버 주소 안전 안내", status: "pending", activeForm: "마무리하는 중" }
    ]})
    ```
 

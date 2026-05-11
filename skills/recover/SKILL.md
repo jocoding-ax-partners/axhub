@@ -40,7 +40,7 @@ To recover:
    ```typescript
    TodoWrite({ todos: [
      { content: "직전 안정 배포 찾기",          status: "in_progress", activeForm: "이전 succeeded deploy 찾는 중" },
-     { content: "이전 commit 정보 정리",        status: "pending",     activeForm: "commit 메타데이터 모으는 중" },
+     { content: "이전 배포 정보 정리",        status: "pending",     activeForm: "commit 메타데이터 모으는 중" },
      { content: "rollback 카드 보여드리기",      status: "pending",     activeForm: "rollback 카드 준비하는 중" },
      { content: "동의 받고 forward-fix 시작",    status: "pending",     activeForm: "forward-fix 시작하는 중" },
      { content: "재배포 진행 보기",             status: "pending",     activeForm: "재배포 모니터하는 중" },

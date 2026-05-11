@@ -35,7 +35,7 @@ To connect GitHub:
    TodoWrite({ todos: [
      { content: "앱과 auth 컨텍스트 확인", status: "in_progress", activeForm: "컨텍스트 확인 중" },
      { content: "GitHub 작업 분기", status: "pending", activeForm: "작업 고르는 중" },
-     { content: "repo 연결 상태 처리", status: "pending", activeForm: "GitHub 처리 중" },
+     { content: "GitHub 저장소 연결 상태 점검", status: "pending", activeForm: "GitHub 처리 중" },
      { content: "다음 deploy 안내", status: "pending", activeForm: "마무리하는 중" }
    ]})
    ```

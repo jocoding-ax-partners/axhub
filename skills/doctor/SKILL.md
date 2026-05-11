@@ -29,10 +29,10 @@ To run diagnostics:
 
    ```typescript
    TodoWrite({ todos: [
-     { content: "helper binary 점검",            status: "in_progress", activeForm: "helper 보는 중" },
+     { content: "axhub 도우미 설치 확인",         status: "in_progress", activeForm: "도우미 보는 중" },
      { content: "axhub CLI 버전 점검",           status: "pending",     activeForm: "CLI 버전 보는 중" },
      { content: "인증 상태 점검",                status: "pending",     activeForm: "인증 보는 중" },
-     { content: "profile / endpoint 점검",      status: "pending",     activeForm: "환경 보는 중" },
+     { content: "프로필 / 서버 주소 점검",        status: "pending",     activeForm: "환경 보는 중" },
      { content: "결과 표 출력",                  status: "pending",     activeForm: "표 만드는 중" }
    ]})
    ```
