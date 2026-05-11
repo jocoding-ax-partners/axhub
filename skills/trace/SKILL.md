@@ -14,6 +14,7 @@ examples:
     intent: "trace last failed deploy"
 multi-step: true
 needs-preflight: true
+model: sonnet
 allows-dependency-execution: false
 ---
 

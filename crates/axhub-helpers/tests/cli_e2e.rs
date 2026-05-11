@@ -2768,3 +2768,116 @@ fn cli_routing_dashboard_html_renders() {
     assert!(html.contains("sha256:dash"), "{html}");
     assert!(html.contains("logs"), "chosen_skill row 보여야 함: {html}");
 }
+
+// Phase 25 PR 25.4 — trace CLI coverage. These cases keep the rust coverage
+// gate honest for the new `trace --json` command and its Korean human output.
+
+#[test]
+fn cli_trace_requires_deploy_id() {
+    let out = run(&["trace", "--json"]);
+    assert_eq!(out.status.code(), Some(64));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("--deploy-id"));
+}
+
+#[cfg(unix)]
+fn fake_axhub_logs(temp: &tempfile::TempDir) -> std::path::PathBuf {
+    let axhub = temp.path().join("axhub-logs");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "logs" ] && [ "$2" = "--build" ]; then
+  echo "INFO build started"
+  echo "ERROR build command failed with exit code 1"
+  echo "WARN network timeout while fetching dependency"
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
+}
+
+#[cfg(unix)]
+fn write_trace_deploy_events(state: &Path, deploy_id: &str) {
+    let dir = state.join("axhub-plugin").join("deploy-events");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join(format!("{deploy_id}.jsonl"));
+    let body = format!(
+        "{{\"schema_version\":\"deploy-event/v1\",\"deploy_id\":\"{deploy_id}\",\"ts\":\"2026-05-11T00:00:00.000Z\",\"phase\":\"preflight\",\"duration_ms\":10}}\n{{\"schema_version\":\"deploy-event/v1\",\"deploy_id\":\"{deploy_id}\",\"ts\":\"2026-05-11T00:00:01.000Z\",\"phase\":\"failed\",\"duration_ms\":20,\"reason\":\"build command failed\"}}\n"
+    );
+    std::fs::write(path, body).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_trace_json_reads_events_and_build_log_patterns() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let deploy_id = "dep-cli-trace-json";
+    write_trace_deploy_events(&state, deploy_id);
+    let axhub = fake_axhub_logs(&temp);
+    let state_s = state.display().to_string();
+    let axhub_s = axhub.display().to_string();
+
+    let out = run_env(
+        &["trace", "--deploy-id", deploy_id, "--json"],
+        &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json = stdout_json(&out);
+    assert_eq!(json["deploy_id"], deploy_id);
+    assert_eq!(json["last_phase"], "failed");
+    assert_eq!(json["failure_reason"], "build command failed");
+    assert_eq!(json["phase_durations"].as_array().unwrap().len(), 2);
+    assert!(json["build_log_errors"].as_array().unwrap().len() >= 2);
+    assert!(json["matched_patterns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v == "build_command_failed"));
+    assert!(json["matched_patterns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v == "network_timeout"));
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_trace_human_output_includes_phase_errors_and_patterns() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let deploy_id = "dep-cli-trace-human";
+    write_trace_deploy_events(&state, deploy_id);
+    let axhub = fake_axhub_logs(&temp);
+    let state_s = state.display().to_string();
+    let axhub_s = axhub.display().to_string();
+
+    let out = run_env(
+        &["trace", "--deploy-id", deploy_id],
+        &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("마지막 phase: failed"), "stdout={stdout}");
+    assert!(
+        stdout.contains("실패 사유: build command failed"),
+        "stdout={stdout}"
+    );
+    assert!(stdout.contains("build_log 마지막"), "stdout={stdout}");
+    assert!(stdout.contains("매칭 패턴"), "stdout={stdout}");
+}
