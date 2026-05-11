@@ -28,7 +28,7 @@ use chrono::Utc;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  version [--quiet]\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  version [--quiet]\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -107,6 +107,7 @@ fn run() -> anyhow::Result<i32> {
         "auth-refresh-bg" => cmd_auth_refresh_bg(),
         "verify" => cmd_verify(&rest),
         "trace" => cmd_trace(&rest),
+        "doctor" => cmd_doctor(&rest),
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -1490,6 +1491,135 @@ fn cmd_verify(args: &[String]) -> anyhow::Result<i32> {
         Verdict::Suspect => 0, // fail-soft: SKILL surfaces "의심" but doesn't error
         Verdict::NotLive => 64,
     })
+}
+
+/// Phase 25 PR 25.6 — `axhub-helpers doctor` health JSON.
+/// Reports plugin version + helper version + deploy-events disk usage so
+/// the `axhub:doctor` SKILL can decide whether to surface a size warning.
+/// Cooldown is enforced via `doctor-cooldown.json` mtime so repeat doctor
+/// runs within an hour stay quiet.
+const DEPLOY_EVENTS_WARN_THRESHOLD_BYTES: u64 = 100 * 1024 * 1024;
+const DOCTOR_COOLDOWN_SECS: u64 = 3600;
+
+fn measure_deploy_events_size() -> (u64, u64) {
+    let Some(dir) = axhub_helpers::runtime_paths::deploy_events_dir() else {
+        return (0, 0);
+    };
+    if !dir.exists() {
+        return (0, 0);
+    }
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(it) => it,
+        Err(_) => return (0, 0),
+    };
+    let mut size_bytes: u64 = 0;
+    let mut count: u64 = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        if let Ok(meta) = entry.metadata() {
+            size_bytes = size_bytes.saturating_add(meta.len());
+            count += 1;
+        }
+    }
+    (size_bytes, count)
+}
+
+fn cooldown_expired(now: std::time::SystemTime, last_warned_secs: u64) -> bool {
+    let now_secs = now
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    now_secs.saturating_sub(last_warned_secs) >= DOCTOR_COOLDOWN_SECS
+}
+
+fn read_cooldown_last_warned() -> Option<u64> {
+    let path = axhub_helpers::runtime_paths::doctor_cooldown_path()?;
+    let raw = std::fs::read_to_string(&path).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    v.get("deploy_events_size_warning")
+        .and_then(|x| x.get("last_warned_secs"))
+        .and_then(|x| x.as_u64())
+}
+
+fn write_cooldown_now() -> std::io::Result<()> {
+    let Some(path) = axhub_helpers::runtime_paths::doctor_cooldown_path() else {
+        return Ok(());
+    };
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let payload = serde_json::json!({
+        "deploy_events_size_warning": {
+            "last_warned_secs": now_secs,
+        }
+    });
+    std::fs::write(&path, serde_json::to_string(&payload)?)
+}
+
+fn cmd_doctor(args: &[String]) -> anyhow::Result<i32> {
+    let mut json_mode = false;
+    let mut no_cooldown = false;
+    for a in args {
+        match a.as_str() {
+            "--json" => json_mode = true,
+            "--no-cooldown" => no_cooldown = true,
+            _ => {}
+        }
+    }
+
+    let (size_bytes, count) = measure_deploy_events_size();
+    let last_warned = read_cooldown_last_warned();
+    let cooldown_open = match last_warned {
+        Some(t) if !no_cooldown => cooldown_expired(std::time::SystemTime::now(), t),
+        _ => true,
+    };
+    let over_threshold = size_bytes > DEPLOY_EVENTS_WARN_THRESHOLD_BYTES;
+    let should_warn = over_threshold && cooldown_open;
+
+    if should_warn {
+        let _ = write_cooldown_now();
+    }
+
+    let report = serde_json::json!({
+        "axhub_helpers_version": env!("CARGO_PKG_VERSION"),
+        "deploy_events_dir": axhub_helpers::runtime_paths::deploy_events_dir()
+            .as_ref()
+            .map(|p| p.display().to_string()),
+        "deploy_events_size_bytes": size_bytes,
+        "deploy_events_count": count,
+        "deploy_events_threshold_bytes": DEPLOY_EVENTS_WARN_THRESHOLD_BYTES,
+        "over_threshold": over_threshold,
+        "should_warn": should_warn,
+        "last_warned_secs": last_warned,
+    });
+
+    if json_mode {
+        out_json(report);
+    } else {
+        println!("axhub-helpers v{}", env!("CARGO_PKG_VERSION"));
+        println!("deploy-events: {count} files, {size_bytes} bytes");
+        if over_threshold {
+            if should_warn {
+                println!(
+                    "⚠️ deploy-events 디렉토리가 {} MB 를 넘었어요. cleanup 필요. (cooldown 1 시간 활성)",
+                    DEPLOY_EVENTS_WARN_THRESHOLD_BYTES / (1024 * 1024)
+                );
+            } else {
+                println!(
+                    "(deploy-events {} MB 초과 하지만 cooldown 활성 — 다음 알림은 1 시간 후)",
+                    DEPLOY_EVENTS_WARN_THRESHOLD_BYTES / (1024 * 1024)
+                );
+            }
+        }
+    }
+    Ok(0)
 }
 
 struct RealTraceProbes;

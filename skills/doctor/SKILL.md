@@ -215,6 +215,32 @@ Render these rows when present:
 
 Keep this read-only. If audit export requires extra permission, explain the missing role and point to the admin owner instead of attempting a fix.
 
+## Phase 25 PR 25.6 — deploy-events disk usage check
+
+`axhub-helpers doctor --json` 이 deploy-events/ 디렉토리 크기를 같이 보고해요. 100 MB 이상이면 `should_warn=true` + cooldown 마커 (`doctor-cooldown.json`) 갱신해요. cooldown 활성 (1 시간 이내) 이면 second run 은 `should_warn=false` 로 조용히 통과해요.
+
+```bash
+!`${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers doctor --json`
+```
+
+응답 예:
+```json
+{
+  "axhub_helpers_version": "0.5.6",
+  "deploy_events_dir": "/Users/.../axhub-plugin/deploy-events",
+  "deploy_events_size_bytes": 105263104,
+  "deploy_events_count": 487,
+  "deploy_events_threshold_bytes": 104857600,
+  "over_threshold": true,
+  "should_warn": true,
+  "last_warned_secs": null
+}
+```
+
+`should_warn=true` 시 사용자에게 다음 안내해요:
+- "deploy-events 가 100 MB 넘었어요. atomic_jsonl 의 7-day rotation 이 자동 정리하지만, 강제로 비우려면 `axhub-helpers cleanup-audit --all` 또는 디렉토리 수동 삭제."
+- 다음 anchor: "/axhub:doctor 다시" / "지금은 무시"
+
 ## NEVER
 
 - NEVER attempt auto-fix from doctor — only report + suggest the next natural-language phrase. The user routes to the relevant sibling skill.
