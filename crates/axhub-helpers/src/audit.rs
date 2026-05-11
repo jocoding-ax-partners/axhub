@@ -15,8 +15,7 @@
 // redact panic) — the hook MUST never crash because audit fails. Errors logged
 // to stderr only.
 
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs;
 use std::path::PathBuf;
 
 use chrono::{Duration, NaiveDate, Utc};
@@ -111,15 +110,11 @@ pub fn append(record: AuditRecord) -> std::io::Result<()> {
     }
 
     let path = dir.join(format!("routing-audit-{}.jsonl", today_utc_iso_date()));
-    match open_append_secure(&path) {
-        Ok(mut f) => {
-            if let Err(e) = writeln!(f, "{safe_line}") {
-                eprintln!("[audit] write failed: {e}");
-            }
-        }
-        Err(e) => {
-            eprintln!("[audit] open failed: {e}");
-        }
+    // Phase 26 PR 26.1a — delegate to atomic_jsonl. Behavior-preserving:
+    // O_CREATE | O_APPEND, Unix 0o600 enforced, pre-tightens loose perms on
+    // existing files (legacy `open_append_secure` paranoia, now centralized).
+    if let Err(e) = crate::atomic_jsonl::append_line(&path, &safe_line) {
+        eprintln!("[audit] write failed: {e}");
     }
     Ok(())
 }
@@ -139,25 +134,9 @@ fn ensure_dir_with_perms(dir: &PathBuf) -> std::io::Result<()> {
     fs::create_dir_all(dir)
 }
 
-#[cfg(unix)]
-fn open_append_secure(path: &PathBuf) -> std::io::Result<std::fs::File> {
-    use std::os::unix::fs::OpenOptionsExt;
-    use std::os::unix::fs::PermissionsExt;
-    let file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .mode(0o600)
-        .open(path)?;
-    let mut perms = file.metadata()?.permissions();
-    perms.set_mode(0o600);
-    fs::set_permissions(path, perms)?;
-    Ok(file)
-}
-
-#[cfg(not(unix))]
-fn open_append_secure(path: &PathBuf) -> std::io::Result<std::fs::File> {
-    OpenOptions::new().create(true).append(true).open(path)
-}
+// Phase 26 PR 26.1a — `open_append_secure` removed; the equivalent
+// create + 0o600 + permission-tighten contract now lives in
+// `crate::atomic_jsonl::append_line`. See PR 26.1a for migration notes.
 
 /// Read all audit records with `ts` within the last `duration`. Skips corrupted
 /// lines (logs count to stderr). Returns empty vec if dir missing.
