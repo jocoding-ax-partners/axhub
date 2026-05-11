@@ -36,6 +36,13 @@ pub fn welcome_marker_path(version: &str) -> Option<PathBuf> {
     state_dir().map(|dir| dir.join(format!(".v{version}-welcome-shown")))
 }
 
+/// Phase 26 PR 26.1b — directory housing one NDJSON file per deploy.
+/// `$XDG_STATE_HOME/axhub-plugin/deploy-events/`. The directory is created on
+/// first append by `event_log::append_event`.
+pub fn deploy_events_dir() -> Option<PathBuf> {
+    state_dir().map(|dir| dir.join("deploy-events"))
+}
+
 fn config_base_dir() -> Option<PathBuf> {
     config_base_dir_from(env_path("XDG_CONFIG_HOME"), home_dir())
 }
