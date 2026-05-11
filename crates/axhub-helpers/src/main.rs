@@ -313,6 +313,32 @@ fn bootstrap_record_event(args: &[String]) -> Option<&str> {
     Some(event)
 }
 
+/// Phase 25 PR 25.7 — nl-trigger-first verify/trace auto-suggest. D4 rule
+/// (overview §10.4): print the natural Korean phrase BEFORE the slash
+/// command so vibe coders learn `"확인해"` / `"왜 실패했어"` instead of
+/// reaching for `/axhub:verify` first.
+fn verify_trace_suggestion(command: &str, exit_code: i32) -> Option<String> {
+    if command.starts_with("axhub deploy create") && exit_code == 0 {
+        return Some(
+            "배포 완료. \"확인해\" 라고 말하면 라이브 확인해 드려요. (또는 /axhub:verify)"
+                .to_string(),
+        );
+    }
+    if command.starts_with("axhub deploy create") && (64..=68).contains(&exit_code) {
+        return Some(
+            "배포 실패. \"왜 실패했어\" 라고 말하면 원인 추적해 드려요. (또는 /axhub:trace)"
+                .to_string(),
+        );
+    }
+    if command.starts_with("axhub recover") && exit_code == 0 {
+        return Some(
+            "복구 완료. \"확인해\" 라고 말하면 라이브 재확인해 드려요. (또는 /axhub:verify)"
+                .to_string(),
+        );
+    }
+    None
+}
+
 fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("classify-exit") {
         out_json(json!({}));
@@ -337,8 +363,19 @@ fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {
             .pointer("/tool_response/stdout")
             .and_then(Value::as_str)
             .unwrap_or("");
+
+        // Phase 25 PR 25.7 — verify/trace auto-suggest. Surfaces a Korean
+        // nl-trigger first (D4 vibe-coder rule) so users learn the natural
+        // phrase before discovering the slash command.
+        let suggest = verify_trace_suggestion(command, exit_code);
+
         if exit_code == 0 && !command.starts_with("axhub deploy create") {
-            out_json(json!({}));
+            // No empathy catalog entry, but we may still want to nudge.
+            if let Some(msg) = suggest {
+                out_json(json!({ "systemMessage": msg }));
+            } else {
+                out_json(json!({}));
+            }
             return Ok(0);
         }
         let entry = classify(exit_code, stdout);
@@ -348,6 +385,10 @@ fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {
         );
         if let Some(button) = entry.button {
             system_message.push_str(&format!("\n\n선택: {button}"));
+        }
+        if let Some(msg) = suggest {
+            system_message.push_str("\n\n");
+            system_message.push_str(&msg);
         }
         out_json(json!({ "systemMessage": system_message }));
         return Ok(0);
