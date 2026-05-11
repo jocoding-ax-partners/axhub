@@ -58,7 +58,10 @@ pub fn append_line(path: &Path, line: &str) -> std::io::Result<()> {
     }
     let mut file = opts.open(path)?;
 
-    writeln!(file, "{line}")?;
+    let mut record = String::with_capacity(line.len() + 1);
+    record.push_str(line);
+    record.push('\n');
+    file.write_all(record.as_bytes())?;
     Ok(())
 }
 
