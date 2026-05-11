@@ -106,6 +106,51 @@ fn two_distinct_deploys_are_isolated() {
 }
 
 #[test]
+fn deploy_id_must_be_single_filename_segment() {
+    let _g = ENV_LOCK.lock().unwrap();
+    let _env = EnvGuard::new();
+
+    let bad_ids = ["../probe", "nested/probe", r"nested\probe", "", ".", ".."];
+    for deploy_id in bad_ids {
+        let event = make_event(deploy_id, "preflight");
+        assert!(
+            event_log::append_event(deploy_id, &event).is_err(),
+            "append_event should reject deploy_id={deploy_id:?}"
+        );
+        assert!(
+            read_events(deploy_id).is_err(),
+            "read_events should reject deploy_id={deploy_id:?}"
+        );
+        assert!(
+            current_phase(deploy_id).is_none(),
+            "current_phase should fail closed for deploy_id={deploy_id:?}"
+        );
+    }
+}
+
+#[test]
+fn invalid_deploy_id_cannot_read_outside_deploy_events_dir() {
+    let _g = ENV_LOCK.lock().unwrap();
+    let _env = EnvGuard::new();
+
+    let state_home = std::env::var("XDG_STATE_HOME").unwrap();
+    let outside = std::path::Path::new(&state_home)
+        .join("axhub-plugin")
+        .join("probe.jsonl");
+    std::fs::create_dir_all(outside.parent().unwrap()).unwrap();
+    std::fs::write(
+        &outside,
+        r#"{"schema_version":"deploy-event/v1","deploy_id":"../probe","ts":"2026-05-11T00:00:00.000Z","phase":"failed","reason":"outside"}"#,
+    )
+    .unwrap();
+
+    assert!(
+        read_events("../probe").is_err(),
+        "path traversal deploy_id must not read sibling JSONL files"
+    );
+}
+
+#[test]
 fn corrupt_line_in_the_middle_is_skipped_on_read() {
     let _g = ENV_LOCK.lock().unwrap();
     let _env = EnvGuard::new();

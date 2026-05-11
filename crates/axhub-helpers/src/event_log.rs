@@ -82,6 +82,8 @@ pub enum EventLogError {
     Serde(#[from] serde_json::Error),
     #[error("path resolution failed (XDG_STATE_HOME + HOME both unset?)")]
     PathResolution,
+    #[error("invalid deploy_id (must be a single filename segment): {0}")]
+    InvalidDeployId(String),
 }
 
 /// Append a single event to the per-deploy NDJSON log. Returns `Ok(())` when
@@ -166,8 +168,22 @@ pub fn current_phase(deploy_id: &str) -> Option<String> {
 }
 
 fn log_path(deploy_id: &str) -> Result<PathBuf, EventLogError> {
+    validate_deploy_id(deploy_id)?;
     let dir = deploy_events_dir().ok_or(EventLogError::PathResolution)?;
     Ok(dir.join(format!("{deploy_id}.jsonl")))
+}
+
+fn validate_deploy_id(deploy_id: &str) -> Result<(), EventLogError> {
+    if deploy_id.is_empty()
+        || deploy_id == "."
+        || deploy_id == ".."
+        || !deploy_id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_'))
+    {
+        return Err(EventLogError::InvalidDeployId(deploy_id.to_string()));
+    }
+    Ok(())
 }
 
 fn disabled_via_env() -> bool {
