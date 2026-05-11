@@ -6,6 +6,7 @@ on:
       - 'crates/axhub-helpers/**'
       - 'skills/deploy/**'
       - 'tests/perf/**'
+      - 'tests/fixtures/perf/phase-0-baselines.json'
       - 'scripts/perf-parse-results.ts'
       - 'scripts/perf-publish-measurements.ts'
       - '.github/workflows/perf-gate.yml'
@@ -52,6 +53,7 @@ jobs:
       - name: Perf gate — p95 ceiling
         env:
           RESULTS_FILE: ${{ github.workspace }}/test-results.json
+          PERF_BASELINE_OS: ${{ matrix.os }}
         run: bun run scripts/perf-parse-results.ts
       - name: Publish MEASUREMENTS.md for this OS
         if: always()

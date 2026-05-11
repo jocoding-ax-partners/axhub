@@ -11,11 +11,11 @@
 //   3. Phase 0 walltime bench delta < 5% vs the pre-migration baseline.
 //
 // (1) and (2) are deterministic shape contracts and live here as assertions.
-// (3) is a perf gate; until the bench harness lands its time-series fixture
-// (`.plan/deploy-time-reduction/MEASUREMENTS.md` baselines + scripted
-// comparator) we anchor the contract end of the gate so regressions in
-// schema/format fail loudly. The bench delta gate will be wired up in a
-// follow-up once the harness exposes a JSON output.
+// (3) is enforced by `scripts/perf-parse-results.ts`, which reads the tracked
+// cross-platform `tests/fixtures/perf/phase-0-baselines.json` baseline in the
+// perf-gate workflow and fails when scenario p95 regresses by more than 5%.
+// This file locks the deterministic marker/audit contracts that feed the same
+// regression surface.
 
 import { describe, expect, test } from "bun:test";
 
