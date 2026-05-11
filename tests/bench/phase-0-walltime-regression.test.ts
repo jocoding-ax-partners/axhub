@@ -20,9 +20,9 @@
 import { describe, expect, test } from "bun:test";
 
 // Tests in this file spawn the cargo-built axhub-helpers binary, which can
-// cost several hundred ms per invocation under contention. Default bun test
-// timeout (5s) is too tight; bump to 30s per case.
-const HELPER_SPAWN_TIMEOUT_MS = 30_000;
+// cost several hundred ms per invocation under contention. Keep per-test calls
+// on Bun's supported API surface; CI may raise timeout globally with
+// `bun test --timeout` if this ever needs a slower runner budget.
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -49,7 +49,7 @@ function ensureHelperBuilt() {
 }
 
 describe("Phase 26 PR 26.1a — telemetry phase marker NDJSON shape preserved", () => {
-  test("mark + emit-deploy-complete round-trip emits keys name/ns/ts/clock_source", { timeout: HELPER_SPAWN_TIMEOUT_MS }, () => {
+  test("mark + emit-deploy-complete round-trip emits keys name/ns/ts/clock_source", () => {
     ensureHelperBuilt();
     const stateDir = freshTempDir("phase-0-marker");
     const markerFile = join(stateDir, "phase-markers.jsonl");
@@ -80,7 +80,7 @@ describe("Phase 26 PR 26.1a — telemetry phase marker NDJSON shape preserved", 
 });
 
 describe("Phase 26 PR 26.1a — audit JSONL privacy contract preserved", () => {
-  test("audit append produces required keys and never echoes prompt content", { timeout: HELPER_SPAWN_TIMEOUT_MS }, () => {
+  test("audit append produces required keys and never echoes prompt content", () => {
     ensureHelperBuilt();
     const stateDir = freshTempDir("phase-0-audit");
 
@@ -127,7 +127,7 @@ describe("Phase 26 PR 26.1a — audit JSONL privacy contract preserved", () => {
 });
 
 describe("Phase 26 PR 26.1a — atomic_jsonl invariants surfaced via helper", () => {
-  test("audit file is 0o600 after first append (Unix only)", { timeout: HELPER_SPAWN_TIMEOUT_MS }, () => {
+  test("audit file is 0o600 after first append (Unix only)", () => {
     if (process.platform === "win32") return;
     ensureHelperBuilt();
     const stateDir = freshTempDir("phase-0-perm");
@@ -154,7 +154,7 @@ describe("Phase 26 PR 26.1a — atomic_jsonl invariants surfaced via helper", ()
     }
   });
 
-  test("phase marker file is created on first mark even when state dir does not exist", { timeout: HELPER_SPAWN_TIMEOUT_MS }, () => {
+  test("phase marker file is created on first mark even when state dir does not exist", () => {
     ensureHelperBuilt();
     const baseDir = freshTempDir("phase-0-create");
     const nested = join(baseDir, "nested", "phase-markers.jsonl");
