@@ -17,6 +17,7 @@ examples:
 multi-step: true
 needs-preflight: false
 allows-dependency-execution: true
+model: sonnet
 ---
 
 # Init

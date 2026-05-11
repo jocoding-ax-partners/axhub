@@ -15,6 +15,7 @@ examples:
 multi-step: false
 needs-preflight: true
 allows-dependency-execution: false
+model: sonnet
 ---
 
 # Apps Management (team-scoped; mutations consent-gated)
