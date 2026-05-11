@@ -270,6 +270,16 @@
       "토큰 지워줘",
       "scope 없대"
     ],
+    "skills/verify/SKILL.md": [
+      "확인해",
+      "검증해",
+      "라이브 됐어",
+      "정말 됐어",
+      "진짜 올라갔어",
+      "확실해",
+      "테스트해",
+      "방금 거 확인해줘"
+    ],
     "skills/update/SKILL.md": [
       "버전 확인",
       "새 버전",
@@ -949,5 +959,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-05-08T06:28:06.761Z"
+  "generated_at": "2026-05-11T06:07:19.822Z"
 }

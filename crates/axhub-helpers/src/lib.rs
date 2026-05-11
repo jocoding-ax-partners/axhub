@@ -17,3 +17,4 @@ pub mod session_bundle;
 pub mod spawn;
 pub mod statusline;
 pub mod telemetry;
+pub mod verify_helper;

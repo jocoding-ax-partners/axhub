@@ -27,7 +27,7 @@ use chrono::Utc;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  version [--quiet]\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  version [--quiet]\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -104,6 +104,7 @@ fn run() -> anyhow::Result<i32> {
         "deploy-prep" => cmd_deploy_prep(&rest),
         "config" => cmd_config(&rest),
         "auth-refresh-bg" => cmd_auth_refresh_bg(),
+        "verify" => cmd_verify(&rest),
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -1273,6 +1274,132 @@ fn cmd_config(rest: &[String]) -> anyhow::Result<i32> {
             Ok(64)
         }
     }
+}
+
+struct RealVerifyProbes;
+
+impl axhub_helpers::verify_helper::VerifyProbes for RealVerifyProbes {
+    fn axhub_status(&self, app_id: &str) -> axhub_helpers::verify_helper::ProbeResult {
+        let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
+        let output = std::process::Command::new(&axhub_bin)
+            .args(["status", "--json", "--app-id", app_id])
+            .output();
+        match output {
+            Ok(o) => axhub_helpers::verify_helper::ProbeResult {
+                stdout: String::from_utf8_lossy(&o.stdout).to_string(),
+                exit_code: o.status.code().unwrap_or(127),
+            },
+            Err(_) => axhub_helpers::verify_helper::ProbeResult {
+                stdout: String::new(),
+                exit_code: 127,
+            },
+        }
+    }
+
+    fn axhub_logs_tail(
+        &self,
+        app_id: &str,
+        lines: u32,
+    ) -> axhub_helpers::verify_helper::ProbeResult {
+        let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
+        let output = std::process::Command::new(&axhub_bin)
+            .args([
+                "logs",
+                "--runtime",
+                "--tail",
+                &lines.to_string(),
+                "--app-id",
+                app_id,
+            ])
+            .output();
+        match output {
+            Ok(o) => axhub_helpers::verify_helper::ProbeResult {
+                stdout: String::from_utf8_lossy(&o.stdout).to_string(),
+                exit_code: o.status.code().unwrap_or(127),
+            },
+            Err(_) => axhub_helpers::verify_helper::ProbeResult {
+                stdout: String::new(),
+                exit_code: 127,
+            },
+        }
+    }
+}
+
+fn humanize_verify_korean(result: &axhub_helpers::verify_helper::VerifyResult) -> String {
+    use axhub_helpers::verify_helper::Verdict;
+    let mut lines: Vec<String> = Vec::new();
+    let header = match result.verdict {
+        Verdict::Live => "✅ 라이브 확정",
+        Verdict::Suspect => "⚠️ 의심",
+        Verdict::NotLive => "❌ 라이브 안 됨",
+    };
+    lines.push(header.to_string());
+    if let Some(state) = &result.state {
+        lines.push(format!("  - 상태: {state}"));
+    }
+    if let Some(id) = &result.last_deploy_id {
+        lines.push(format!("  - 마지막 배포 ID: {id}"));
+    }
+    if let Some(age) = result.last_deploy_age_secs {
+        lines.push(format!("  - 마지막 배포 경과: {age}초"));
+    }
+    if !result.errors.is_empty() {
+        lines.push(format!("  - runtime 에러 {}건", result.errors.len()));
+    }
+    for reason in &result.reasons {
+        lines.push(format!("  · {reason}"));
+    }
+    lines.push(match result.verdict {
+        Verdict::Live => "  - 다음: \"방금 거 로그 보여줘\" / \"방금 거 상태\"".to_string(),
+        Verdict::Suspect => {
+            "  - 다음: \"방금 거 로그 보여줘\" / 1 분 뒤 \"다시 확인해줘\"".to_string()
+        }
+        Verdict::NotLive => "  - 다음: \"왜 실패했어\"".to_string(),
+    });
+    lines.join("\n")
+}
+
+fn cmd_verify(args: &[String]) -> anyhow::Result<i32> {
+    let mut app_id: Option<String> = None;
+    let mut json_mode = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--json" => json_mode = true,
+            "--app-id" => {
+                if i + 1 < args.len() {
+                    app_id = Some(args[i + 1].clone());
+                    i += 1;
+                }
+            }
+            other if other.starts_with("--app-id=") => {
+                app_id = Some(other.trim_start_matches("--app-id=").to_string());
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    let Some(app_id) = app_id else {
+        eprintln!("axhub-helpers verify: --app-id <id> required");
+        return Ok(64);
+    };
+
+    let probes = RealVerifyProbes;
+    let result = axhub_helpers::verify_helper::run_verify(&app_id, &probes);
+
+    if json_mode {
+        out_json(serde_json::to_value(&result)?);
+    } else {
+        println!("{}", humanize_verify_korean(&result));
+    }
+
+    use axhub_helpers::verify_helper::Verdict;
+    Ok(match result.verdict {
+        Verdict::Live => 0,
+        Verdict::Suspect => 0, // fail-soft: SKILL surfaces "의심" but doesn't error
+        Verdict::NotLive => 64,
+    })
 }
 
 fn cmd_auth_refresh_bg() -> anyhow::Result<i32> {
