@@ -1,6 +1,7 @@
 pub mod audit;
 pub mod bootstrap;
 pub mod catalog;
+pub mod config;
 pub mod consent;
 pub mod deploy_prep;
 pub mod humanize;
