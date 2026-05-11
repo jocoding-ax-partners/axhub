@@ -15,6 +15,7 @@ examples:
 multi-step: false
 needs-preflight: false
 allows-dependency-execution: false
+model: haiku
 ---
 
 # Deploy Status (watch + narrate)

@@ -4,6 +4,7 @@ description: '이 스킬은 사용자가 axhub plugin 의 routing 통계, 매칭
 multi-step: false
 needs-preflight: true
 allows-dependency-execution: false
+model: haiku
 examples:
   - utterance: "라우팅 통계"
     intent: "show axhub routing statistics summary"
