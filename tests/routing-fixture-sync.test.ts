@@ -45,4 +45,12 @@ describe("routing fixture sync guard", () => {
       /git diff --name-only[^\n]*\|\s*bun scripts\/check-routing-fixture-sync\.ts/,
     );
   });
+
+  test("skip audit trail cannot fail CI when PR comment permission is read-only", () => {
+    const workflow = readFileSync(join(REPO_ROOT, ".github/workflows/routing-drift.yml"), "utf8");
+    expect(workflow).toContain("issues: write");
+    expect(workflow).toMatch(
+      /name: Comment skip override[\s\S]*continue-on-error: true[\s\S]*uses: actions\/github-script@v7/,
+    );
+  });
 });
