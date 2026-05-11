@@ -48,6 +48,7 @@ pub trait VerifyProbes {
 pub struct ProbeResult {
     pub stdout: String,
     pub exit_code: i32,
+    pub timed_out: bool,
 }
 
 /// Live state synonyms accepted from axhub status (`state` field).
@@ -70,9 +71,13 @@ pub fn run_verify<P: VerifyProbes>(app_id: &str, probes: &P) -> VerifyResult {
     let mut last_deploy_id: Option<String> = None;
     let mut last_deploy_age_secs: Option<u64> = None;
 
-    if status.exit_code != 0 {
+    let mut status_observed = false;
+    if status.timed_out {
+        reasons.push("axhub status timeout (5초)".to_string());
+    } else if status.exit_code != 0 {
         reasons.push(format!("axhub status exit code {}", status.exit_code));
     } else if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&status.stdout) {
+        status_observed = true;
         state = parsed
             .get("state")
             .and_then(|v| v.as_str())
@@ -98,13 +103,19 @@ pub fn run_verify<P: VerifyProbes>(app_id: &str, probes: &P) -> VerifyResult {
         }
     }
 
-    if let Some(age) = last_deploy_age_secs {
-        if age > FRESH_DEPLOY_WINDOW_SECS {
-            reasons.push(format!("최근 배포 없음 ({age}초 전)"));
+    if status_observed {
+        match last_deploy_age_secs {
+            Some(age) if age > FRESH_DEPLOY_WINDOW_SECS => {
+                reasons.push(format!("최근 배포 없음 ({age}초 전)"));
+            }
+            Some(_) => {}
+            None => reasons.push("최근 배포 없음".to_string()),
         }
     }
 
-    if logs.exit_code != 0 {
+    if logs.timed_out {
+        reasons.push("axhub logs timeout (5초)".to_string());
+    } else if logs.exit_code != 0 {
         reasons.push(format!("axhub logs exit code {}", logs.exit_code));
     } else {
         for line in logs.stdout.lines() {
@@ -120,7 +131,13 @@ pub fn run_verify<P: VerifyProbes>(app_id: &str, probes: &P) -> VerifyResult {
         }
     }
 
-    let verdict = compute_verdict(state_live, last_deploy_age_secs, &errors, &reasons);
+    let verdict = compute_verdict(
+        status_observed,
+        state_live,
+        last_deploy_age_secs,
+        &errors,
+        &reasons,
+    );
 
     VerifyResult {
         verdict,
@@ -133,27 +150,24 @@ pub fn run_verify<P: VerifyProbes>(app_id: &str, probes: &P) -> VerifyResult {
 }
 
 fn compute_verdict(
+    status_observed: bool,
     state_live: bool,
     age_secs: Option<u64>,
     errors: &[String],
     reasons: &[String],
 ) -> Verdict {
+    if !status_observed {
+        return Verdict::Suspect;
+    }
     let fresh = matches!(age_secs, Some(age) if age <= FRESH_DEPLOY_WINDOW_SECS);
     if state_live && fresh && errors.is_empty() && reasons.is_empty() {
         Verdict::Live
-    } else if !state_live
-        && age_secs
-            .map(|a| a > FRESH_DEPLOY_WINDOW_SECS)
-            .unwrap_or(false)
-    {
-        Verdict::NotLive
-    } else if !state_live {
-        // state ≠ live but recent deploy — still "not live", emit NotLive
-        // verdict so SKILL routes to trace.
+    } else if !state_live || !fresh {
+        // state ≠ live OR no fresh deploy — emit NotLive so SKILL routes to trace.
         Verdict::NotLive
     } else {
-        // state=live but with at least one anomaly (errors / stale window /
-        // parse problem) → Suspect.
+        // state=live + fresh deploy but with at least one anomaly (runtime
+        // errors / logs probe failure) → Suspect.
         Verdict::Suspect
     }
 }
@@ -174,12 +188,14 @@ mod tests {
             ProbeResult {
                 stdout: self.status_stdout.clone(),
                 exit_code: self.status_exit,
+                timed_out: false,
             }
         }
         fn axhub_logs_tail(&self, _app_id: &str, _lines: u32) -> ProbeResult {
             ProbeResult {
                 stdout: self.logs_stdout.clone(),
                 exit_code: self.logs_exit,
+                timed_out: false,
             }
         }
     }
@@ -232,11 +248,49 @@ mod tests {
             logs_exit: 0,
         };
         let result = run_verify("paydrop", &probes);
-        assert!(matches!(
-            result.verdict,
-            Verdict::Suspect | Verdict::NotLive
-        ));
+        assert_eq!(result.verdict, Verdict::NotLive);
         assert!(result.reasons.iter().any(|r| r.contains("최근 배포 없음")));
+    }
+
+    #[test]
+    fn missing_recent_deploy_returns_not_live_verdict() {
+        let probes = FakeProbes {
+            status_stdout: r#"{"state":"live","last_deploy_id":null}"#.to_string(),
+            status_exit: 0,
+            logs_stdout: String::new(),
+            logs_exit: 0,
+        };
+        let result = run_verify("paydrop", &probes);
+        assert_eq!(result.verdict, Verdict::NotLive);
+        assert!(result.reasons.iter().any(|r| r.contains("최근 배포 없음")));
+    }
+
+    struct TimeoutProbes;
+
+    impl VerifyProbes for TimeoutProbes {
+        fn axhub_status(&self, _app_id: &str) -> ProbeResult {
+            ProbeResult {
+                stdout: String::new(),
+                exit_code: 124,
+                timed_out: true,
+            }
+        }
+
+        fn axhub_logs_tail(&self, _app_id: &str, _lines: u32) -> ProbeResult {
+            ProbeResult {
+                stdout: String::new(),
+                exit_code: 124,
+                timed_out: true,
+            }
+        }
+    }
+
+    #[test]
+    fn probe_timeouts_return_suspect_with_timeout_reasons() {
+        let result = run_verify("paydrop", &TimeoutProbes);
+        assert_eq!(result.verdict, Verdict::Suspect);
+        assert!(result.reasons.iter().any(|r| r.contains("status timeout")));
+        assert!(result.reasons.iter().any(|r| r.contains("logs timeout")));
     }
 
     #[test]

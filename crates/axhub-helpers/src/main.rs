@@ -1278,22 +1278,70 @@ fn cmd_config(rest: &[String]) -> anyhow::Result<i32> {
 
 struct RealVerifyProbes;
 
+const AXHUB_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+fn run_probe_with_timeout(
+    axhub_bin: &str,
+    args: &[&str],
+) -> axhub_helpers::verify_helper::ProbeResult {
+    let mut child = match std::process::Command::new(axhub_bin)
+        .args(args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(_) => {
+            return axhub_helpers::verify_helper::ProbeResult {
+                stdout: String::new(),
+                exit_code: 127,
+                timed_out: false,
+            };
+        }
+    };
+
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                return match child.wait_with_output() {
+                    Ok(output) => axhub_helpers::verify_helper::ProbeResult {
+                        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+                        exit_code: output.status.code().unwrap_or(127),
+                        timed_out: false,
+                    },
+                    Err(_) => axhub_helpers::verify_helper::ProbeResult {
+                        stdout: String::new(),
+                        exit_code: 127,
+                        timed_out: false,
+                    },
+                };
+            }
+            Ok(None) if start.elapsed() >= AXHUB_PROBE_TIMEOUT => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return axhub_helpers::verify_helper::ProbeResult {
+                    stdout: String::new(),
+                    exit_code: 124,
+                    timed_out: true,
+                };
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(25)),
+            Err(_) => {
+                return axhub_helpers::verify_helper::ProbeResult {
+                    stdout: String::new(),
+                    exit_code: 127,
+                    timed_out: false,
+                };
+            }
+        }
+    }
+}
+
 impl axhub_helpers::verify_helper::VerifyProbes for RealVerifyProbes {
     fn axhub_status(&self, app_id: &str) -> axhub_helpers::verify_helper::ProbeResult {
         let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
-        let output = std::process::Command::new(&axhub_bin)
-            .args(["status", "--json", "--app-id", app_id])
-            .output();
-        match output {
-            Ok(o) => axhub_helpers::verify_helper::ProbeResult {
-                stdout: String::from_utf8_lossy(&o.stdout).to_string(),
-                exit_code: o.status.code().unwrap_or(127),
-            },
-            Err(_) => axhub_helpers::verify_helper::ProbeResult {
-                stdout: String::new(),
-                exit_code: 127,
-            },
-        }
+        run_probe_with_timeout(&axhub_bin, &["status", "--json", "--app-id", app_id])
     }
 
     fn axhub_logs_tail(
@@ -1302,26 +1350,17 @@ impl axhub_helpers::verify_helper::VerifyProbes for RealVerifyProbes {
         lines: u32,
     ) -> axhub_helpers::verify_helper::ProbeResult {
         let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
-        let output = std::process::Command::new(&axhub_bin)
-            .args([
+        run_probe_with_timeout(
+            &axhub_bin,
+            &[
                 "logs",
                 "--runtime",
                 "--tail",
                 &lines.to_string(),
                 "--app-id",
                 app_id,
-            ])
-            .output();
-        match output {
-            Ok(o) => axhub_helpers::verify_helper::ProbeResult {
-                stdout: String::from_utf8_lossy(&o.stdout).to_string(),
-                exit_code: o.status.code().unwrap_or(127),
-            },
-            Err(_) => axhub_helpers::verify_helper::ProbeResult {
-                stdout: String::new(),
-                exit_code: 127,
-            },
-        }
+            ],
+        )
     }
 }
 

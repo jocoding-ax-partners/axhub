@@ -119,6 +119,34 @@ exit 64
     axhub
 }
 
+#[cfg(unix)]
+fn fake_slow_status_axhub(temp: &tempfile::TempDir) -> std::path::PathBuf {
+    let axhub = temp.path().join("axhub-slow-status");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "axhub 0.1.0"
+  exit 0
+fi
+if [ "$1" = "status" ]; then
+  sleep 6
+  exit 0
+fi
+if [ "$1" = "logs" ]; then
+  echo "INFO still serving"
+  exit 0
+fi
+exit 64
+"#,
+    )
+    .unwrap();
+    let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
+}
+
 fn run_stdin_in_dir(args: &[&str], stdin: &str, cwd: &Path) -> Output {
     let mut child = Command::new(bin())
         .args(args)
@@ -302,6 +330,35 @@ fn cli_verify_json_not_live_exits_usage_code() {
             .unwrap()
             .iter()
             .any(|reason| reason.as_str().unwrap().contains("rolled_back")),
+        "{json}",
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_verify_times_out_slow_status_probe() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_slow_status_axhub(&temp);
+
+    let started = std::time::Instant::now();
+    let output = run_env(
+        &["verify", "--json", "--app-id", "paydrop"],
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(7),
+        "verify should enforce the 5s status probe timeout"
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["verdict"], "suspect");
+    assert!(
+        json["reasons"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|reason| reason.as_str().unwrap().contains("status timeout")),
         "{json}",
     );
 }
