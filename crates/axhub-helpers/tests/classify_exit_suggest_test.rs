@@ -6,7 +6,7 @@
 //   - the natural-language Korean phrase comes BEFORE the slash command (D4)
 //   - the kill-switch env vars from PR 25.2 silence the suggest entirely
 
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 use std::process::{Command, Output, Stdio};
 
 fn bin() -> &'static str {
@@ -31,12 +31,14 @@ fn run_classify_exit(stdin: &str, envs: &[(&str, &str)]) -> Output {
         command.env(k, v);
     }
     let mut child = command.spawn().unwrap();
-    child
-        .stdin
-        .as_mut()
-        .unwrap()
-        .write_all(stdin.as_bytes())
-        .unwrap();
+    let write_result = child.stdin.as_mut().unwrap().write_all(stdin.as_bytes());
+    if let Err(error) = write_result {
+        assert_eq!(
+            error.kind(),
+            ErrorKind::BrokenPipe,
+            "stdin write failed with unexpected error: {error}"
+        );
+    }
     child.wait_with_output().unwrap()
 }
 
