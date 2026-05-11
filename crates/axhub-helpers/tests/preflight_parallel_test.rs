@@ -11,6 +11,7 @@
 //!      non-scoped path and produces the same output shape.
 
 use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use axhub_helpers::preflight::{run_preflight_with_runner, SpawnResult, EXIT_AUTH, EXIT_OK};
 
@@ -96,4 +97,31 @@ fn sequential_fallback_when_axhub_preflight_parallel_is_zero() {
         None => std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL"),
     }
     let _ = EXIT_AUTH; // keep import live
+}
+
+#[test]
+fn parallel_walltime_is_bounded_by_slowest_cli_probe_not_sum() {
+    let _guard = parallel_env_lock().lock().unwrap();
+    std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL");
+
+    let start = Instant::now();
+    let run = run_preflight_with_runner(|cmd| {
+        if cmd.contains(&"--version") {
+            std::thread::sleep(Duration::from_millis(180));
+            ok("axhub 0.12.1\n")
+        } else if cmd.contains(&"auth") && cmd.contains(&"status") {
+            std::thread::sleep(Duration::from_millis(180));
+            ok(auth_ok_stdout())
+        } else {
+            ok("[]")
+        }
+    });
+    let elapsed = start.elapsed();
+
+    assert_eq!(run.exit_code, EXIT_OK);
+    assert!(run.output.auth_ok);
+    assert!(
+        elapsed < Duration::from_millis(320),
+        "parallel preflight took {elapsed:?}; expected it below the 360ms sequential sum"
+    );
 }

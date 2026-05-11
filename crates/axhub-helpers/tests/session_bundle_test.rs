@@ -48,6 +48,27 @@ fn write_and_read_roundtrip_preserves_fields() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+#[cfg(unix)]
+#[test]
+fn write_session_bundle_uses_private_permissions_and_cleans_tmp() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = std::env::temp_dir().join(format!("axhub-bundle-mode-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("session-bundle.json");
+
+    write_session_bundle(&fixture_bundle(), &path).unwrap();
+
+    let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600);
+    assert!(
+        !path.with_extension("json.tmp").exists(),
+        "atomic temp file should not remain after successful rename"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn read_session_bundle_rejects_expired_files() {
     let dir = std::env::temp_dir().join(format!("axhub-bundle-ttl-{}", std::process::id()));
@@ -69,6 +90,23 @@ fn read_session_bundle_rejects_expired_files() {
     // for the same fresh file.
     let fresh = read_session_bundle(&path).unwrap();
     assert_eq!(fresh.current_app.as_deref(), Some("paydrop"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn read_session_bundle_or_empty_falls_back_on_schema_mismatch() {
+    let dir = std::env::temp_dir().join(format!("axhub-bundle-schema-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("session-bundle.json");
+    let mut bundle = fixture_bundle();
+    bundle.schema_version = "session-bundle/v999".into();
+    write_session_bundle(&bundle, &path).unwrap();
+
+    let empty = read_session_bundle_or_empty(&path);
+    assert_eq!(empty.schema_version, SESSION_BUNDLE_SCHEMA_VERSION);
+    assert!(!empty.auth_status.ok);
+    assert!(empty.current_app.is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
 
