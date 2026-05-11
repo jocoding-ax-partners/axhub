@@ -340,7 +340,7 @@ To deploy:
        {
          "label": "네, 배포",
          "value": "approve",
-         "description": "consent token 을 만들고 실제 배포를 시작해요."
+         "description": "동의를 받고 실제 배포를 시작해요."
        },
        {
          "label": "미리보기만",

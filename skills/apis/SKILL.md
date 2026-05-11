@@ -75,7 +75,7 @@ To list APIs:
      "header": "팀 범위",
      "options": [
        {"label": "네, 전체 보기", "value": "cross_team", "description": "권한 있는 모든 팀의 API 카탈로그"},
-       {"label": "현재 앱만 충분해요", "value": "stay", "description": "현재 앱 scope 유지"},
+       {"label": "현재 앱만 충분해요", "value": "stay", "description": "현재 앱만 보고 다른 팀은 안 봐요"},
        {"label": "취소", "value": "abort", "description": "아무것도 안 함"}
      ]
    }

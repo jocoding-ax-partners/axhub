@@ -53,8 +53,8 @@ To connect GitHub:
      "question": "GitHub 연동 작업을 고를까요?",
      "header": "GitHub",
      "options": [
-       {"label": "목록만", "value": "list_only", "description": "연결 가능한 repo 목록을 봐요"},
-       {"label": "연결", "value": "connect", "description": "앱에 repo 와 branch 를 연결해요"},
+       {"label": "목록만", "value": "list_only", "description": "연결할 수 있는 GitHub 저장소 목록을 봐요"},
+       {"label": "연결", "value": "connect", "description": "앱에 GitHub 저장소를 연결해요"},
        {"label": "연결 해제", "value": "disconnect", "description": "exact confirm 과 consent 가 필요해요"}
      ]
    }
@@ -102,8 +102,8 @@ To connect GitHub:
         "question": "GitHub repo 를 만들까요?",
         "header": "Repo 생성",
         "options": [
-          {"label": "취소", "value": "abort", "description": "repo 를 만들지 않고 멈춰요"},
-          {"label": "생성", "value": "create", "description": "확인한 owner/repo/visibility 로 gh repo create 를 실행해요"}
+          {"label": "취소", "value": "abort", "description": "GitHub 저장소를 만들지 않고 멈춰요"},
+          {"label": "생성", "value": "create", "description": "확인한 이름과 공개 범위로 GitHub 저장소를 새로 만들어요"}
         ]
       }
       ```
@@ -117,8 +117,8 @@ To connect GitHub:
         "question": "git remote 를 추가할까요?",
         "header": "Remote 추가",
         "options": [
-          {"label": "취소", "value": "abort", "description": "remote 를 바꾸지 않고 멈춰요"},
-          {"label": "추가", "value": "add_remote", "description": "확인한 GitHub URL 을 origin 으로 추가해요"}
+          {"label": "취소", "value": "abort", "description": "GitHub 연결 설정을 바꾸지 않고 멈춰요"},
+          {"label": "추가", "value": "add_remote", "description": "확인한 GitHub 주소를 현재 폴더에 연결해요"}
         ]
       }
       ```
@@ -148,7 +148,7 @@ To connect GitHub:
         "header": "Repo 연결",
         "options": [
           {"label": "취소", "value": "abort", "description": "앱 연결 없이 멈춰요"},
-          {"label": "연결", "value": "connect", "description": "consent token 을 만든 뒤 axhub github connect 를 실행해요"}
+          {"label": "연결", "value": "connect", "description": "동의를 받고 axhub 앱과 GitHub 저장소를 연결해요"}
         ]
       }
       ```

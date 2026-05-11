@@ -71,7 +71,7 @@ To handle updates:
      "question": "axhub CLI 업그레이드해요?",
      "header": "업그레이드",
      "options": [
-       {"label": "네, 업그레이드", "value": "apply", "description": "cosign 서명 검증 후 업데이트"},
+       {"label": "네, 업그레이드", "value": "apply", "description": "안전 검증 후 업데이트해요"},
        {"label": "릴리즈 노트 보기", "value": "notes", "description": "변경사항 자세히 보기"},
        {"label": "지금은 그대로", "value": "skip", "description": "현재 버전 유지"}
      ]
