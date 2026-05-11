@@ -2802,6 +2802,26 @@ exit 1
 }
 
 #[cfg(unix)]
+fn fake_slow_axhub_logs(temp: &tempfile::TempDir) -> std::path::PathBuf {
+    let axhub = temp.path().join("axhub-logs-slow");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "logs" ] && [ "$2" = "--build" ]; then
+  sleep 6
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
+}
+
+#[cfg(unix)]
 fn write_trace_deploy_events(state: &Path, deploy_id: &str) {
     let dir = state.join("axhub-plugin").join("deploy-events");
     std::fs::create_dir_all(&dir).unwrap();
@@ -2849,6 +2869,70 @@ fn cli_trace_json_reads_events_and_build_log_patterns() {
         .unwrap()
         .iter()
         .any(|v| v == "network_timeout"));
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_trace_rejects_path_traversal_deploy_id() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let outside = state.join("axhub-plugin").join("probe.jsonl");
+    std::fs::create_dir_all(outside.parent().unwrap()).unwrap();
+    std::fs::write(
+        &outside,
+        r#"{"schema_version":"deploy-event/v1","deploy_id":"../probe","ts":"2026-05-11T00:00:00.000Z","phase":"failed","reason":"outside"}"#,
+    )
+    .unwrap();
+    let axhub = fake_axhub_logs(&temp);
+    let state_s = state.display().to_string();
+    let axhub_s = axhub.display().to_string();
+
+    let out = run_env(
+        &["trace", "--deploy-id", "../probe", "--json"],
+        &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
+    );
+
+    assert_ne!(out.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("invalid deploy_id"), "stderr={stderr}");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_trace_times_out_slow_build_log_probe() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let deploy_id = "dep-cli-trace-timeout";
+    write_trace_deploy_events(&state, deploy_id);
+    let axhub = fake_slow_axhub_logs(&temp);
+    let state_s = state.display().to_string();
+    let axhub_s = axhub.display().to_string();
+
+    let started = std::time::Instant::now();
+    let out = run_env(
+        &["trace", "--deploy-id", deploy_id, "--json"],
+        &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
+    );
+
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(7),
+        "trace should enforce the 5s build-log timeout"
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json = stdout_json(&out);
+    assert!(
+        json["build_log_errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v.as_str().unwrap().contains("timeout after 5s")),
+        "{json}",
+    );
 }
 
 #[cfg(unix)]

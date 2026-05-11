@@ -1463,21 +1463,52 @@ fn cmd_verify(args: &[String]) -> anyhow::Result<i32> {
 
 struct RealTraceProbes;
 
+const AXHUB_TRACE_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+fn axhub_stdout_with_timeout(axhub_bin: &str, args: &[&str]) -> Result<String, &'static str> {
+    let mut child = std::process::Command::new(axhub_bin)
+        .args(args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|_| "spawn")?;
+
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                return child
+                    .wait_with_output()
+                    .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
+                    .map_err(|_| "wait");
+            }
+            Ok(None) if start.elapsed() >= AXHUB_TRACE_PROBE_TIMEOUT => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("timeout");
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(25)),
+            Err(_) => return Err("wait"),
+        }
+    }
+}
+
 impl axhub_helpers::trace_helper::TraceProbes for RealTraceProbes {
     fn axhub_build_log(&self, deploy_id: &str, tail: u32) -> String {
         let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
-        match std::process::Command::new(&axhub_bin)
-            .args([
+        match axhub_stdout_with_timeout(
+            &axhub_bin,
+            &[
                 "logs",
                 "--build",
                 "--tail",
                 &tail.to_string(),
                 "--deploy-id",
                 deploy_id,
-            ])
-            .output()
-        {
-            Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),
+            ],
+        ) {
+            Ok(stdout) => stdout,
+            Err("timeout") => "WARN axhub build log probe timeout after 5s".to_string(),
             Err(_) => String::new(),
         }
     }
