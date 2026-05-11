@@ -4,6 +4,38 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.5](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.4...v0.5.5) (2026-05-11)
+
+Phase 25는 deploy 시간 단축 Phase 1~3.5 스택을 main 에 올리는 릴리스예요. REST 중복 호출을 `deploy-prep` 와 session bundle/cache 로 줄이고, macOS Gatekeeper warmup, parallel preflight, config 기반 CLI 호환 경고, token freshness bridge 를 연결해서 배포 시작 전 대기와 불필요한 CLI round-trip 을 낮춰요.
+
+### Test baseline
+
+- PR gate: #60, #61, #62, #63 의 Local Rust-primary, T2 helper-bin, rust macOS / Ubuntu / Windows, perf macOS / Ubuntu / Windows checks 가 green 이에요.
+- Integrated main gate: `bun run codegen:version`, `cargo fmt --all -- --check`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `bun run build`, `bin/axhub-helpers version`, `bunx tsc --noEmit`, `bun test` (598 pass / 4 skip / 0 fail), `bun run lint:tone --strict`, `bun run lint:keywords --check` 가 green 이에요.
+- Release gate: `bun run release` postbump 의 `codegen:version` + `release:check` 가 v0.5.5 version sync 와 helper artifacts 를 확인했어요.
+
+### Honest tradeoff
+
+- 실제 production destructive deploy create 는 실행하지 않았어요. 대신 mock backend perf fixture, staging-gated E2E skip 계약, Rust helper unit/e2e tests 로 deploy prep 과 token freshness 경계를 검증했어요.
+- 스택 PR 은 squash 대신 bottom-to-top merge 로 통합했어요. 하위 CI fix 커밋을 상위 Phase 브랜치가 덮지 않게 하려는 선택이에요.
+
+
+### Added
+
+* Phase 0.5 deploy entry + mark subcommand [skip-routing-gate] ([#58](https://github.com/jocoding-ax-partners/axhub/issues/58)) ([50e047a](https://github.com/jocoding-ax-partners/axhub/commit/50e047a31b6082bd5d45240f852ca2da73fc134e))
+* Phase 1 REST dedup + statusline live [skip-routing-gate] ([cd0a480](https://github.com/jocoding-ax-partners/axhub/commit/cd0a480a6d7659d811bec42c12c4ad854defbc96))
+* Phase 2 Gatekeeper warmup + version --quiet ([64219c3](https://github.com/jocoding-ax-partners/axhub/commit/64219c397a07bfef2a5f2c76a570b56b67e329c4)), closes [#2](https://github.com/jocoding-ax-partners/axhub/issues/2)
+* Phase 3 client cascade reduced [skip-routing-gate] ([1e981ac](https://github.com/jocoding-ax-partners/axhub/commit/1e981ac08649688ab515db81d4f321a1a036447d))
+* Phase 3.5 SKILL flow wire-up [skip-routing-gate] ([351b668](https://github.com/jocoding-ax-partners/axhub/commit/351b668192e9efb35da495e756f967c464a098a3))
+
+
+### Fixed
+
+* close phase 3.5 deploy flow gaps ([3f14a78](https://github.com/jocoding-ax-partners/axhub/commit/3f14a787dd37f1e4290391bf907ba579bcfd2006))
+* isolate PATH in hook tests so host axhub doesn't leak ([167bb7c](https://github.com/jocoding-ax-partners/axhub/commit/167bb7c8a921ea452afc3fd198b5884762177089))
+* keep phase 1 CI skip audit non-blocking ([9586133](https://github.com/jocoding-ax-partners/axhub/commit/958613320fcd37ee3fcaf67edb3cafefcc03841c)), closes [#60](https://github.com/jocoding-ax-partners/axhub/issues/60)
+* stabilize telemetry CLI version fixture in coverage ([7cb17c9](https://github.com/jocoding-ax-partners/axhub/commit/7cb17c921a7bd79f75e72a732d3f576693da945f))
+
 ## [0.5.4](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.3...v0.5.4) (2026-05-08)
 
 Phase 24는 Windows 브라우저 로그인과 GitHub repo 연결 회복 흐름을 vibe coder 기준으로 막히지 않게 다듬은 패치예요. PowerShell consent-mint, PR routing gate, macOS spawn 테스트 격리를 함께 고쳐서 Windows·macOS·Linux 검증을 다시 green 으로 맞췄어요. 원격 main 에 먼저 들어온 Phase 0 deploy walltime measurement commit 도 같은 릴리스에 반영해요.
