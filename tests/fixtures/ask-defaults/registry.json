@@ -19,6 +19,15 @@
         "미리보기만",
         "배포 진행"
       ]
+    },
+    "axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?": {
+      "safe_default": "계속해요",
+      "rationale": "Phase 3.5 cli_too_new dismiss prompt. Non-interactive default keeps the deploy moving without mutating user preferences (storing ignore_too_new_until via config_set is a side effect we don't want to apply silently in subprocess context).",
+      "allowed_safe_defaults": [
+        "계속해요",
+        "업그레이드 안내",
+        "이 버전부터는 묻지 마요"
+      ]
     }
   },
   "auth": {

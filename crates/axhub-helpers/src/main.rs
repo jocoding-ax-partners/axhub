@@ -16,6 +16,9 @@ use axhub_helpers::preflight::{run_preflight, PreflightRun};
 use axhub_helpers::redact::redact;
 use axhub_helpers::resolve::run_resolve;
 use axhub_helpers::runtime_paths::{last_deploy_file, state_dir, token_file, welcome_marker_path};
+use axhub_helpers::session_bundle::{
+    write_session_bundle, AuthStatusBundle, LastDeployBundle, SessionBundle,
+};
 use axhub_helpers::statusline::current_statusline;
 use axhub_helpers::telemetry::{
     append_phase_marker_to_file, emit_deploy_complete, emit_meta_envelope,
@@ -1055,6 +1058,8 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
 const WELCOME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn cmd_session_start() -> anyhow::Result<i32> {
+    write_session_start_bundle_best_effort();
+
     let mut lines: Vec<String> = vec![
         format!(
             "axhub helper Rust runtime 활성 (v{}).",
@@ -1101,6 +1106,54 @@ fn cmd_session_start() -> anyhow::Result<i32> {
     m.insert("event".into(), Value::String("session_start".into()));
     emit_meta_envelope(m).ok();
     Ok(0)
+}
+
+fn session_bundle_path() -> Option<PathBuf> {
+    last_deploy_file()
+        .map(|path| path.with_file_name("session-bundle.json"))
+        .or_else(|| state_dir().map(|dir| dir.join("session-bundle.json")))
+}
+
+fn session_bundle_from_preflight(preflight: &PreflightRun) -> SessionBundle {
+    let output = &preflight.output;
+    SessionBundle {
+        schema_version: axhub_helpers::session_bundle::SESSION_BUNDLE_SCHEMA_VERSION.to_string(),
+        auth_status: AuthStatusBundle {
+            ok: output.auth_ok,
+            user_email: output.user_email.clone(),
+            user_id: None,
+            expires_at: output.expires_at.clone(),
+            scopes: output.scopes.clone(),
+        },
+        current_app: output.current_app.clone(),
+        current_env: output.current_env.clone(),
+        last_deploy: output
+            .last_deploy_id
+            .as_ref()
+            .map(|deployment_id| LastDeployBundle {
+                deployment_id: deployment_id.clone(),
+                status: output
+                    .last_deploy_status
+                    .clone()
+                    .unwrap_or_else(|| "unknown".to_string()),
+                commit_sha: None,
+            }),
+        plugin_version: output.plugin_version.clone(),
+        helper_version: env!("CARGO_PKG_VERSION").to_string(),
+        written_at: Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+    }
+}
+
+fn write_session_start_bundle_best_effort() {
+    if std::env::var("AXHUB_SESSION_BUNDLE").as_deref() == Ok("0") {
+        return;
+    }
+    let Some(path) = session_bundle_path() else {
+        return;
+    };
+    let preflight = run_preflight();
+    let bundle = session_bundle_from_preflight(&preflight);
+    let _ = write_session_bundle(&bundle, &path);
 }
 
 fn cmd_list_deployments(args: &[String]) -> anyhow::Result<i32> {

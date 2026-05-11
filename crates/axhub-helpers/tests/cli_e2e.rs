@@ -1396,7 +1396,14 @@ fn cli_routing_stats_help_and_invalid_args_are_stable() {
 
 #[cfg(unix)]
 fn session_start_systemmessage(state_s: &str) -> String {
-    let output = run_stdin(&["session-start"], "", &[("XDG_STATE_HOME", state_s)]);
+    let output = run_stdin(
+        &["session-start"],
+        "",
+        &[
+            ("XDG_STATE_HOME", state_s),
+            ("AXHUB_BIN", "/definitely/missing/axhub"),
+        ],
+    );
     assert_eq!(output.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&output.stdout);
     // session-start 가 systemMessage JSON 1 line + meta_envelope JSON 1 line 출력. 첫 번째 만 추출.
@@ -1409,6 +1416,45 @@ fn session_start_systemmessage(state_s: &str) -> String {
         .as_str()
         .expect("systemMessage is string")
         .to_owned()
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_session_start_writes_session_bundle_cache() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+    let config_s = temp.path().join("config").display().to_string();
+    let cache_s = temp.path().join("cache").display().to_string();
+
+    let output = run_stdin(
+        &["session-start"],
+        "",
+        &[
+            ("XDG_STATE_HOME", &state_s),
+            ("XDG_CONFIG_HOME", &config_s),
+            ("XDG_CACHE_HOME", &cache_s),
+            ("AXHUB_BIN", "/definitely/missing/axhub"),
+            ("AXHUB_APP_SLUG", "paydrop"),
+            ("AXHUB_PROFILE", "prod"),
+        ],
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let bundle_path = temp.path().join("cache/axhub-plugin/session-bundle.json");
+    let bundle = std::fs::read_to_string(&bundle_path)
+        .unwrap_or_else(|err| panic!("missing session bundle at {bundle_path:?}: {err}"));
+    let parsed: serde_json::Value = serde_json::from_str(&bundle).unwrap();
+    assert_eq!(parsed["schema_version"], "session-bundle/v1");
+    assert_eq!(parsed["auth_status"]["ok"], false);
+    assert_eq!(parsed["auth_status"]["scopes"], serde_json::json!([]));
+    assert_eq!(parsed["current_app"], "paydrop");
+    assert_eq!(parsed["current_env"], "prod");
+    assert_eq!(parsed["helper_version"], env!("CARGO_PKG_VERSION"));
 }
 
 #[cfg(unix)]

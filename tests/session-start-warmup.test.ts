@@ -72,7 +72,7 @@ exit 0
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     CLAUDE_PLUGIN_ROOT: args.workdir,
-    PATH: `${join(args.workdir, "bin")}:${process.env.PATH ?? ""}`,
+    PATH: `${join(args.workdir, "bin")}:/usr/bin:/bin`,
     AXHUB_SKIP_AUTODOWNLOAD: "1",
   };
   if (args.warmupEnv !== undefined) {
