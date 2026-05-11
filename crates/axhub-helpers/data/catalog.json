@@ -59,6 +59,12 @@
     "action": "아래 후보 중 하나 골라주세요. 다음부터는 정확한 ID 로 기억해둘게요.",
     "button": "후보 앱 선택 / 더 많은 후보 보기 / 닫기"
   },
+  "64:validation.quality_gate_failed": {
+    "emotion": "잠깐만요. push 전에 설정 불일치를 발견했어요. 앱은 안전해요.",
+    "cause": "preflight / resolve 결과에서 일관성 문제가 있어요. cli_version 누락, bootstrap plan 충돌, exit code mismatch, 프로필 불일치 같은 사유로 잘못된 배포가 될 수 있어요.",
+    "action": "구체적 violation 을 같이 보여줄게요. 의도된 거면 \"강제로 진행해\" 라고 말해주세요. 비대화형 환경에서는 자동으로 차단됐어요.",
+    "button": "violation 자세히 보기 / 강제로 진행 (위험) / 취소"
+  },
   "64:validation.app_list_truncated": {
     "emotion": "잠깐만요. 회사에 앱이 너무 많아서 다 못 가져왔어요.",
     "cause": "앱이 100개를 넘어서 목록이 잘렸어요. 이름만으로는 정확히 어떤 앱인지 못 찾아요.",

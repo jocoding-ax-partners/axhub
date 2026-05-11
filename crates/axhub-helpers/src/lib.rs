@@ -13,6 +13,7 @@ pub mod keychain_windows;
 pub mod list_deployments;
 pub mod messages;
 pub mod preflight;
+pub mod quality_gate;
 pub mod redact;
 pub mod resolve;
 pub mod runtime_paths;
