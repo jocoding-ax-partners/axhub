@@ -21,6 +21,30 @@ allows-dependency-execution: false
 
 Deploy a vibe coder's app to axhub with safety primitives. Use the adapter `axhub-helpers` (auto on PATH while plugin is enabled) for live resolution and consent management. Do not call `axhub deploy create` directly without going through the helper flow.
 
+## Vibe Coder Visibility Rules
+
+이 SKILL 을 쓰는 사람은 대부분 개발 지식이 없어요. helper 가 돌려주는 다음 field 는 **internal verification primitives** 예요. PreToolUse hook 가 동의 토큰 검증에 쓰고, retry / record FSM 도 같은 값으로 동작해요. 그래서 SKILL 안에서는 이 field 들을 변수에 담아 helper 와 주고받되, **raw 값을 사용자 chat 에 echo 하면 안 돼요**:
+
+- `binding_hash`, `pending_action_id`, `pending_action_hash`, `command_argv`, `command_id`
+- `consent_binding`, `synthesized_by_helper`, `retry_policy`, `idempotency_key`
+- `exit_code`, `next_action`, `schema_version`, `stdout_json`, `stderr` (raw)
+- `bootstrap_plan`, `required_steps`, `decision_inputs`
+
+대신 사용자에게는 한국어 한 줄로 진행 상황만 알려드려요. 예시 templates:
+
+| 시점 | 사용자 chat 한 줄 |
+|------|-------------------|
+| Step 1 첫 배포 / app 등록 | "처음 배포라 앱을 먼저 만들고 있어요." |
+| Step 1.5 git 저장 지점 준비 | "배포 전에 파일 저장 지점을 만들어두고 있어요." |
+| Step 3 preview card | 5필드 한국어 카드만 (앱 / 환경 / 브랜치 / 커밋 / 예상 시간) |
+| Step 4 consent → deploy | "배포 동의를 받았어요. 시작해요." |
+| Step 5 watch | "빌드 시작했어요. 약 3분 뒤에 결과 알려드릴게요." |
+| Step 6 exit 65 | "axhub 로그인이 만료됐어요. 다시 로그인할까요?" |
+| Step 6 exit 64 | "다른 배포가 진행 중이라 지금은 못 올려요. 잠시 뒤에 다시 시도해요." |
+| Step 6 exit 67 | "이 이름의 앱을 못 찾았어요. 비슷한 이름을 알려드릴게요." |
+
+raw helper JSON 이 디버깅에 필요한 환경 (개발 검증) 은 `AXHUB_DEPLOY_VERBOSE=1` 환경변수가 켜진 경우에만 echo 해요. 기본 흐름은 항상 한 줄 자연어로 진행해요.
+
 ## Workflow
 
 <!--
@@ -129,9 +153,9 @@ To deploy:
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers bootstrap --auto-chain --json
    ```
 
-   Treat this output as the source of truth for Sprint 3 bootstrap state. If it returns `template_required`, `git_init_required`, `first_commit_required`, `subdomain_collision`, `backend_contract_missing_defaults`, or `idempotency_unavailable`, stop at that user-decision state and show the helper reason plus the safest next command. If it returns `next_action: apps_create` or `next_action: deploy_create`, show the exact `command`, `binding_hash`, `pending_action_id`, `pending_action_hash`, `retry_policy`, and consent preview before running anything. The helper is only a planner/recorder here; it must not be treated as approval to mutate. If `deploy_create` is executed and recorded here, do not mint or run a second `deploy_create` in Step 4; jump to Step 5 status-chain with the recorded deployment id.
+   Treat this output as the source of truth for Sprint 3 bootstrap state. If it returns `template_required`, `git_init_required`, `first_commit_required`, `subdomain_collision`, `backend_contract_missing_defaults`, or `idempotency_unavailable`, stop at that user-decision state and surface a humanized one-line reason plus the safest next command (jargon-free per Vibe Coder Visibility Rules). If it returns `next_action: apps_create` or `next_action: deploy_create`, **internally bind** `command`, `binding_hash`, `pending_action_id`, `pending_action_hash`, `retry_policy`, and `consent_binding` into shell variables (PreToolUse hook consumes them for consent verification + retry policy enforcement) but **do not echo their raw values to the user chat** — those are internal verification primitives. Show the user a single humanized line such as "처음 배포라 앱을 먼저 만들고 있어요." and proceed to consent + execution. The helper is only a planner/recorder here; it must not be treated as approval to mutate. If `deploy_create` is executed and recorded here, do not mint or run a second `deploy_create` in Step 4; jump to Step 5 status-chain with the recorded deployment id.
 
-   Execute returned destructive `axhub ... --json` commands only as top-level Bash after the preview/consent path. Then record the observed result back into the FSM with the same pending metadata:
+   Execute returned destructive `axhub ... --json` commands only as top-level Bash after the consent path runs (consent token mint via `consent-mint`). Then record the observed result back into the FSM with the same pending metadata — keep `pending_action_id` / `pending_action_hash` / `command_argv` / `exit_code` / `stdout_json` / `stderr` strictly inside the record JSON envelope, never as user-facing chat text:
 
    ```bash
    echo '[deploy:Step 1 bootstrap-record] entered' >&2
@@ -174,15 +198,15 @@ To deploy:
    ]})
    ```
 
-   Then explain in non-developer Korean:
+   Then explain in non-developer Korean (jargon-free):
 
    ```
-   배포 전에 저장 지점이 필요해요.
-   axhub 배포는 "어떤 버전의 파일을 올릴지"를 정확히 알아야 해서 branch 와 commit SHA 를 써요.
-   지금 폴더에는 아직 그 저장 지점이 없어서, 제가 git 초기화와 첫 커밋을 만들어드릴 수 있어요.
+   배포 전에 파일을 저장 지점에 한 번 담아둬야 해요.
+   이렇게 해야 어떤 버전을 올릴지 정확히 알 수 있어요.
+   지금은 아직 그 저장 지점이 없어서, 제가 자동으로 만들어드릴게요.
    ```
 
-   Then ask:
+   Then ask (2-option humanized prompt — vibe coder 친화):
 
    ```json
    {
@@ -190,14 +214,9 @@ To deploy:
      "header": "저장 지점",
      "options": [
        {
-         "label": "초기화하고 계속",
+         "label": "지금 만들기",
          "value": "init_and_continue",
-         "description": "현재 폴더에 git 저장소와 첫 커밋을 만들고 배포를 이어가요."
-       },
-       {
-         "label": "명령어만 보기",
-         "value": "show_commands",
-         "description": "아무것도 바꾸지 않고 직접 실행할 명령어만 보여줘요."
+         "description": "현재 폴더에 저장 지점을 자동으로 만들고 배포를 이어가요."
        },
        {
          "label": "취소",
@@ -208,21 +227,23 @@ To deploy:
    }
    ```
 
-   If the user chooses "초기화하고 계속", run only local git commands, then re-run resolve and continue from Step 2. Keep the git readiness TodoWrite list on screen and update statuses as each command finishes. 이 TodoWrite 호출도 기존 목록을 기준으로 patch 하지 말고 전체 교체로 실행해요. If another skill or stale todo list appears, replace the whole list again instead of patching individual items. 이전 스킬 todo 를 섞으면 사용자가 지금 흐름을 잘못 이해해요.
+   If the user chooses "지금 만들기", run the local git commands silently (do not echo the raw `git init` / `git add` / `git commit` command output to the chat — surface a one-line "저장 지점을 만들고 있어요." instead). Then re-run resolve and continue from Step 2. Keep the git readiness TodoWrite list on screen and update statuses as each command finishes. 이 TodoWrite 호출도 기존 목록을 기준으로 patch 하지 말고 전체 교체로 실행해요. If another skill or stale todo list appears, replace the whole list again instead of patching individual items. 이전 스킬 todo 를 섞으면 사용자가 지금 흐름을 잘못 이해해요.
 
    ```bash
    echo '[deploy:Step 1.5 git-init] entered' >&2
    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-     git init
+     git init >/dev/null 2>&1
    fi
-   git add -A
-   git commit -m "init: axhub deploy baseline"
-   git branch -M main
+   git add -A >/dev/null 2>&1
+   git commit -m "init: axhub deploy baseline" >/dev/null 2>&1 || true
+   git branch -M main >/dev/null 2>&1
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
    ```
 
-   If `git commit` fails because there are no staged files or git identity is missing, stop before deploy and show the exact git error plus the smallest next command. Do not mint deploy consent until a fresh resolve returns both `branch` and `commit_sha`.
-   If the user chooses "명령어만 보기", show the command block above and stop. In non-interactive mode, use the registry safe default "명령어만 보기" and never run `git init` automatically.
+   git stderr 와 stdout 은 모두 `/dev/null` 로 보내요 — vibe coder chat 에 raw git output 이 노출되지 않게 구조적으로 막아요. `git commit` 이 실패하면 (no staged files / missing git identity) `|| true` 로 다음 줄로 넘어가고, 뒤따르는 resolve 호출이 `branch` / `commit_sha` 가 비어 있다고 알려서 humanized 한 줄로 사용자에게 안내해요. `AXHUB_DEPLOY_VERBOSE=1` 환경변수가 켜진 세션에서는 Visibility Rules 가 verbose lane 으로 전환되어 raw 출력이 다시 보여요 (개발 검증용).
+
+   If `git commit` fails because there are no staged files or git identity is missing, stop before deploy and surface a humanized one-line reason ("저장 지점을 만들지 못했어요. 잠시 뒤에 다시 시도해요." 같은 한 줄). 내부 git stderr 는 user chat 에 직접 echo 하지 마요. Do not mint deploy consent until a fresh resolve returns both `branch` and `commit_sha`.
+   If the user chooses "취소", stop deploy without running any git command. In non-interactive mode (subprocess / CI / `claude -p`), use the registry safe default "취소" — never run `git init` automatically in headless context.
 
 2. **Pre-flight version check (legacy fallback only).** Phase 1 default path skips this — `deploy-prep` already returned the preflight envelope as `.preflight` in Step 1's JSON. Use the cached value: read `cli_too_old`, `cli_too_new`, `auth_ok` directly via `jq`. The block below is the legacy fallback path that fires only when `AXHUB_DEPLOY_PREP=0` is set:
 
@@ -264,27 +285,27 @@ To deploy:
    fi
    ```
 
-   AskUserQuestion JSON envelope:
+   AskUserQuestion JSON envelope (jargon-free 자연어):
 
    ```json
    {
-     "question": "axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?",
+     "question": "axhub CLI 가 더 최신 버전인데 계속할까요?",
      "header": "버전 확인",
      "options": [
        {
          "label": "계속해요",
          "value": "continue",
-         "description": "이번 세션만 진행해요. 다음 세션에는 다시 물어요."
+         "description": "이번 배포만 그대로 진행해요. 다음 세션에는 다시 물어요."
        },
        {
          "label": "업그레이드 안내",
          "value": "explain",
-         "description": "axhub-helpers update 또는 docs/migrate-rust.md 안내를 봐요."
+         "description": "axhub 최신 버전으로 올리는 방법을 보여줘요."
        },
        {
          "label": "이 버전부터는 묻지 마요",
          "value": "dismiss",
-         "description": "현재 CLI 버전을 ignore_too_new_until 에 저장해서 다음 세션에 prompt 를 띄우지 않아요."
+         "description": "지금 버전을 기억해 둬서, 같은 버전 동안에는 이 안내를 다시 띄우지 않아요."
        }
      ]
    }

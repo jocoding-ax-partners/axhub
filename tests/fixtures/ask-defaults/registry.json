@@ -5,11 +5,11 @@
     "_note": "deploy SKILL Step 3 uses a structured AskUserQuestion JSON block after the 5-field identity preview card. Default behavior in non-interactive subprocess: --dry-run (most conservative).",
     "default_subprocess_action": "--dry-run",
     "배포 전 저장 지점을 만들까요?": {
-      "safe_default": "명령어만 보기",
-      "rationale": "non-interactive contexts must not run git init/git add/git commit automatically; showing commands is read-only and lets the user decide locally.",
+      "safe_default": "취소",
+      "rationale": "Vibe Coder Visibility 갱신 — non-interactive contexts must not run git init/git add/git commit automatically. 'show_commands' option removed in Phase VC because exposing raw git CLI commands to a non-developer surface conflicts with the visibility rules; abort is the only safe default in subprocess mode.",
       "allowed_safe_defaults": [
-        "명령어만 보기",
-        "저장 지점 만들기"
+        "취소",
+        "지금 만들기"
       ]
     },
     "진행할까요?": {
@@ -20,9 +20,9 @@
         "배포 진행"
       ]
     },
-    "axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?": {
+    "axhub CLI 가 더 최신 버전인데 계속할까요?": {
       "safe_default": "계속해요",
-      "rationale": "Phase 3.5 cli_too_new dismiss prompt. Non-interactive default keeps the deploy moving without mutating user preferences (storing ignore_too_new_until via config_set is a side effect we don't want to apply silently in subprocess context).",
+      "rationale": "Phase VC humanize — original Phase 3.5 question carried '(cli_too_new)' jargon that confused vibe-coder users. Non-interactive default still keeps the deploy moving without mutating user preferences (storing ignore_too_new_until via config_set is a side effect we don't want to apply silently in subprocess context).",
       "allowed_safe_defaults": [
         "계속해요",
         "업그레이드 안내",

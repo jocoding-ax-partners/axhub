@@ -1,91 +1,83 @@
 {
-  "task": "Phase 22.5 — case 23 systemMessage 추가 phrase 검증 + case 34 mock-hub log assertion. 22.4 PR #15 위에 stack. case 23 의 systemMessage 전문 (index.ts:262-263 '먼저 paydrop 배포해라고 말해서 승인 카드를 받으세요') 의 distinctive token 추가 매칭 + case 34 가 mock-hub log file 에 'GET /api/v1/apps/42/deployments' 라인 실재 검증.",
-  "createdAt": "2026-04-28T06:10:00Z",
+  "task": "Vibe Coder Visibility — deploy SKILL 흐름에서 사용자(비개발자 바이브코더) chat 화면에 raw 기술 jargon 노출 차단. Step 1.1 의 binding_hash / pending_action_id / pending_action_hash / retry_policy / consent_binding 같은 internal primitives 는 PreToolUse 검증 용도일 뿐 절대 chat echo 금지. Step 1.5 git-init AskUserQuestion 옵션을 2개로 단순화 (지금 만들기 / 취소) 하고 dev-only \"명령어만 보기\" 제거. Step 2.5 cli_too_new question 에서 (cli_too_new) jargon 제거. SKILL.md 에 \"Vibe Coder Visibility Rules\" 신규 섹션 추가 — Claude 가 사용자 chat 에 보일 때 출력 금지 fields enum + 한국어 한 줄 templates. registry.json / tests/deploy-git-init-stage.test.ts 동기화. lint + cargo test + bun test green.",
+  "createdAt": "2026-05-11T00:00:00Z",
   "stories": [
     {
-      "id": "US-2250A",
-      "title": "case 23 systemMessage 추가 phrase 검증 — 승인 카드 / 필요해요 / paydrop 배포해 token 매칭",
+      "id": "US-VC-1",
+      "title": "SKILL Step 1.1 — raw jargon chat echo 금지 instruction",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "tests/e2e/claude-cli/cases/23-preauth-check-deny.case.sh 가 systemMessage 에 '사전 승인' 외 추가 distinctive token (`승인 카드`, `필요해요`, `paydrop 배포해`) AND 매칭 검증",
-        "src/axhub-helpers/index.ts:262-263 의 systemMessage 전문 lock — production code 변경 시 case 23 fail 로 drift catch",
-        "matrix.jsonl id=23 entry expected_phrases 에 추가 token 동기화"
+        "skills/deploy/SKILL.md Step 1.1 의 \"show the exact command, binding_hash, pending_action_id, pending_action_hash, retry_policy, and consent preview before running anything\" 문구 변경",
+        "새 instruction: helper output 의 binding_hash / pending_action_id / pending_action_hash / retry_policy / consent_binding 은 internal verification primitives 임을 명시, raw 값 사용자 chat echo 금지 (PreToolUse hook 가 검증)",
+        "humanized progress message templates 제공 (예: '처음 배포라 앱을 만들고 있어요')",
+        "기존 기능 instruction (record FSM 호출, retry policy 확인, idempotency) 은 internal primitive 로 유지",
+        "tests/deploy-git-init-stage.test.ts:98-100 의 `pending_action_id` / `pending_action_hash` / `binding_hash` 문자열 존재 expect 는 통과 (instruction text 안에 단어 등장)"
       ],
       "owner": "",
       "blockedBy": []
     },
     {
-      "id": "US-2250B",
-      "title": "case 34 mock-hub log assertion — 'GET /api/v1/apps/42/deployments' 라인 실재 검증",
-      "priority": 1,
-      "passes": true,
-      "acceptanceCriteria": [
-        "tests/e2e/claude-cli/cases/34-list-deployments-proxy-baseline.case.sh 가 mock-hub log file (${OUTPUT_DIR}/mock-hub.log) 에 'GET /api/v1/apps/42/deployments' substring assert",
-        "기존 stdout .error_code='auth.token_invalid' assert 보존 (22.4 positive evidence)",
-        "log file 부재 시 명시적 FAIL — readiness probe (`/_ping`) 만 있고 actual fetch 없으면 fail",
-        "matrix.jsonl id=34 entry description 동기화"
-      ],
-      "owner": "",
-      "blockedBy": []
-    },
-    {
-      "id": "US-2250C",
-      "title": "T2 case 23/34 로컬 실행 green — 신규 phrase + log assertion 결정적 검증",
+      "id": "US-VC-2",
+      "title": "SKILL 신규 \"Vibe Coder Visibility Rules\" 섹션",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "bash tests/e2e/claude-cli/run-matrix.sh --tier t2 --only 23 34 → exit 0 + 2/2 PASS",
-        "case 23 stdout systemMessage 에 4 token (사전 승인 / 승인 카드 / 필요해요 / paydrop 배포해) 모두 포함 verified",
-        "case 34 mock-hub log 에 GET /api/v1/apps/42/deployments line verified"
+        "skills/deploy/SKILL.md 본문에 신규 ## Vibe Coder Visibility Rules 섹션 추가 (Workflow 시작 근처)",
+        "노출 금지 raw fields enum 명시: binding_hash, pending_action_id, pending_action_hash, command_argv, command_id, consent_binding, synthesized_by_helper, retry_policy, idempotency_key, exit_code, next_action, schema_version, stdout_json, stderr raw, bootstrap_plan, required_steps, decision_inputs",
+        "한국어 한 줄 templates 제공: 첫 배포 / 빌드 / 토큰 만료 / consent dispatch / 에러 routing 각각",
+        "lint:tone --strict 0 err (해요체)",
+        "lint:keywords --check no diff (description frontmatter 미변경)",
+        "skill:doctor strict 통과"
       ],
       "owner": "",
-      "blockedBy": [
-        "US-2250A",
-        "US-2250B"
-      ]
+      "blockedBy": []
     },
     {
-      "id": "US-2250D",
-      "title": "회귀 검증 — bun test / tsc / lint:tone / lint:keywords / skill:doctor 모두 green",
+      "id": "US-VC-3",
+      "title": "Step 1.5 git-init prompt 옵션 단순화 + label humanize",
       "priority": 3,
       "passes": true,
       "acceptanceCriteria": [
-        "bun test 결과 baseline 유지 (550 pass / 5 skip / 0 fail)",
-        "bunx tsc --noEmit clean exit 0",
-        "bun run lint:tone --strict 0 error",
-        "bun run lint:keywords --check no diff vs baseline",
-        "bun run skill:doctor --strict OK"
+        "Step 1.5 AskUserQuestion 옵션을 2개로 축소 — '지금 만들기' (value=init_and_continue) / '취소' (value=abort)",
+        "기존 'show_commands' 옵션 제거 (vibe coder 에게 git CLI 명령어 raw 노출은 부담)",
+        "Bash block 의 실제 git init / git add / git commit 명령은 유지 — 사용자 'init_and_continue' 선택 시 자동 실행",
+        "옵션 description 도 비개발자 친화 자연어 ('git' / '저장소' / '커밋' 같은 jargon 최소화)",
+        "tests/deploy-git-init-stage.test.ts expect 갱신 — show_commands value 검사 제거, init_and_continue 및 abort 만 expect",
+        "tests/fixtures/ask-defaults/registry.json 의 '배포 전 저장 지점을 만들까요?' safe_default 를 '취소' 로 변경 + allowed_safe_defaults enum 동기화",
+        "tests/deploy-git-init-stage.test.ts registry safe_default expect 도 '취소' 로 갱신"
       ],
       "owner": "",
-      "blockedBy": [
-        "US-2250C"
-      ]
+      "blockedBy": []
     },
     {
-      "id": "US-2250E",
-      "title": "PR 워크플로 — branch push + PR 생성 (22.4 위에 stack) + URL 보고",
+      "id": "US-VC-4",
+      "title": "Step 2.5 cli_too_new question jargon 제거",
       "priority": 4,
       "passes": true,
       "acceptanceCriteria": [
-        "phase-22.5/case23-msg-case34-mockhub-log branch 에 commit (Conventional Commits 'test:')",
-        "git push origin phase-22.5/case23-msg-case34-mockhub-log 성공",
-        "gh pr create --base phase-22.4/mockhub-401-preflight-stub (22.4 stacked)",
-        "PR 본문에 22.5 plan 컨텍스트 + 2 case 강화 매핑 + verification 결과 명시",
-        "PR URL 사용자에게 보고"
+        "Step 2.5 AskUserQuestion 의 question 문구에서 '(cli_too_new)' jargon 제거 — 새 문구: 'axhub CLI 가 더 최신 버전인데 계속할까요?'",
+        "tests/fixtures/ask-defaults/registry.json 의 deploy 키도 동기화 (옛 키 제거 + 새 키 등록, safe_default / rationale / allowed_safe_defaults 보존)",
+        "ux-ask-fallback-registry.test.ts pass (질문 텍스트가 SKILL ↔ registry 사이 byte-identical)"
       ],
       "owner": "",
-      "blockedBy": [
-        "US-2250D"
-      ]
+      "blockedBy": []
+    },
+    {
+      "id": "US-VC-5",
+      "title": "회귀 — cargo / bun / lint / skill:doctor green",
+      "priority": 5,
+      "passes": true,
+      "acceptanceCriteria": [
+        "cargo test -p axhub-helpers full pass (Phase 3.5 baseline 181 유지)",
+        "bun test full pass (Phase 3.5 baseline 586 + 갱신된 deploy-git-init-stage 통과)",
+        "bunx tsc --noEmit clean",
+        "bun run lint:tone --strict 0 err",
+        "bun run lint:keywords --check no diff",
+        "bun run skill:doctor --strict pass"
+      ],
+      "owner": "",
+      "blockedBy": ["US-VC-1", "US-VC-2", "US-VC-3", "US-VC-4"]
     }
-  ],
-  "metadata": {
-    "task_origin": "/oh-my-claudecode:ralph 22.5 case 23 systemMessage 추가 phrase + case 34 mock-hub log assertion 작업해",
-    "scope_note": "22.4 PR #15 위에 stack. case 23/34 의 assertion strengthening only — production code 영향 0, infra 변경 없음. case 23 systemMessage drift catch + case 34 mock-hub fetch 도달 결정적 evidence 강화.",
-    "deslop": "enabled",
-    "critic": "architect",
-    "branch": "phase-22.5/case23-msg-case34-mockhub-log",
-    "stacked_on": "phase-22.4/mockhub-401-preflight-stub"
-  }
+  ]
 }

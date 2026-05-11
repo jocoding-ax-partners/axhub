@@ -110,7 +110,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("25 safe_default 값 (safe fallback 카탈로그)", () => {
+  test("safe_default 값 카탈로그 (safe fallback)", () => {
     const auth = registry["auth"] as Record<string, SafeDefaultEntry>;
     expect(auth["다시 로그인할래요?"]?.safe_default).toBe("abort");
     expect(auth["로그아웃할래요?"]?.safe_default).toBe("abort");
@@ -133,11 +133,11 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
 
     const deploy = registry["deploy"] as Record<string, SafeDefaultEntry>;
     expect(deploy["배포 전 저장 지점을 만들까요?"]?.safe_default).toBe(
-      "명령어만 보기",
+      "취소",
     );
     expect(deploy["진행할까요?"]?.safe_default).toBe("미리보기만");
     expect(
-      deploy["axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?"]?.safe_default,
+      deploy["axhub CLI 가 더 최신 버전인데 계속할까요?"]?.safe_default,
     ).toBe("계속해요");
 
     const clarify = registry["clarify"] as Record<string, SafeDefaultEntry>;

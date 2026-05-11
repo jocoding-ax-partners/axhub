@@ -36,9 +36,11 @@ describe("deploy skill git init stage", () => {
     const registry = JSON.parse(readFileSync(ASK_DEFAULTS, "utf8"));
     const entry = registry.deploy["배포 전 저장 지점을 만들까요?"];
 
-    expect(entry.safe_default).toBe("명령어만 보기");
+    expect(entry.safe_default).toBe("취소");
     expect(entry.rationale).toContain("non-interactive");
     expect(entry.rationale).toContain("git init");
+    expect(entry.allowed_safe_defaults).toContain("취소");
+    expect(entry.allowed_safe_defaults).not.toContain("명령어만 보기");
   });
 
   test("auto-resolves CLAUDE_PLUGIN_ROOT before helper preflight and deploy commands", () => {
@@ -69,8 +71,9 @@ describe("deploy skill git init stage", () => {
     expect(content).toContain('"question": "배포 전 저장 지점을 만들까요?"');
     expect(content).toContain('"header": "저장 지점"');
     expect(content).toContain('"value": "init_and_continue"');
-    expect(content).toContain('"value": "show_commands"');
     expect(content).toContain('"value": "abort"');
+    expect(content).not.toContain('"value": "show_commands"');
+    expect(content).toContain('"label": "지금 만들기"');
 
     expect(content).toContain("Then ask with structured AskUserQuestion JSON");
     expect(content).toContain('"question": "진행할까요?"');
@@ -83,6 +86,47 @@ describe("deploy skill git init stage", () => {
 
     expect(registry.deploy["진행할까요?"].safe_default).toBe("미리보기만");
     expect(registry.deploy["진행할까요?"].rationale).toContain("dry-run");
+  });
+
+  test("Vibe Coder Visibility Rules block masks raw helper jargon from user chat", () => {
+    const content = readFileSync(DEPLOY_SKILL, "utf8");
+
+    expect(content).toContain("## Vibe Coder Visibility Rules");
+    expect(content).toContain("internal verification primitives");
+    expect(content).toContain("do not echo their raw values to the user chat");
+    expect(content).toContain("AXHUB_DEPLOY_VERBOSE=1");
+
+    // internal primitives enum 명시 — 모든 항목이 본문 안에 등장해야 잠금됨
+    const lockedFields = [
+      "binding_hash",
+      "pending_action_id",
+      "pending_action_hash",
+      "command_argv",
+      "consent_binding",
+      "synthesized_by_helper",
+      "retry_policy",
+      "idempotency_key",
+      "exit_code",
+      "next_action",
+      "schema_version",
+      "bootstrap_plan",
+    ];
+    for (const field of lockedFields) {
+      expect(content, `Visibility Rules must enumerate '${field}'`).toContain(field);
+    }
+  });
+
+  test("cli_too_new dismiss question drops raw '(cli_too_new)' jargon", () => {
+    const content = readFileSync(DEPLOY_SKILL, "utf8");
+    const registry = JSON.parse(readFileSync(ASK_DEFAULTS, "utf8"));
+
+    expect(content).toContain('"question": "axhub CLI 가 더 최신 버전인데 계속할까요?"');
+    expect(content).not.toContain('"question": "axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?"');
+
+    const entry = registry.deploy["axhub CLI 가 더 최신 버전인데 계속할까요?"];
+    expect(entry).toBeDefined();
+    expect(entry.safe_default).toBe("계속해요");
+    expect(registry.deploy["axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?"]).toBeUndefined();
   });
 
   test("uses bootstrap plan/record before destructive deploy commands", () => {
