@@ -50,4 +50,19 @@ if [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" != "1" ]; then
   fi
 fi
 
+# Phase 2 B-07: macOS Gatekeeper / notarization cache warmup. The first
+# helper spawn after a fresh boot or signature recheck pays a 3-6s
+# codesign/notarization cost; running `--version --quiet` here primes the
+# OS cache so the deploy hot path skips it. Best-effort + 3s timeout +
+# AXHUB_GATEKEEPER_WARMUP=0 opt-out so a wedged Gatekeeper never blocks
+# session-start.
+if [ "${AXHUB_GATEKEEPER_WARMUP:-1}" != "0" ] && [ "$(uname -s)" = "Darwin" ]; then
+  # Hard-skip when `timeout` is unavailable: an unbounded warmup against a
+  # wedged Gatekeeper would block session-start indefinitely. Losing the
+  # 3-6s warmup on stripped macOS hosts is the right tradeoff vs hang risk.
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 3 "$HELPER" --version --quiet >/dev/null 2>&1 || true
+  fi
+fi
+
 exec "$HELPER" session-start
