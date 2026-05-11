@@ -314,27 +314,17 @@ fn bootstrap_record_event(args: &[String]) -> Option<&str> {
 }
 
 /// Phase 25 PR 25.7 — nl-trigger-first verify/trace auto-suggest. D4 rule
-/// (overview §10.4): print the natural Korean phrase BEFORE the slash
-/// command so vibe coders learn `"확인해"` / `"왜 실패했어"` instead of
-/// reaching for `/axhub:verify` first.
+/// (overview §10.4): print the natural Korean phrase only so vibe coders
+/// learn `"확인해"` / `"왜 실패했어"` without dangling slash-command hints.
 fn verify_trace_suggestion(command: &str, exit_code: i32) -> Option<String> {
     if command.starts_with("axhub deploy create") && exit_code == 0 {
-        return Some(
-            "배포 완료. \"확인해\" 라고 말하면 라이브 확인해 드려요. (또는 /axhub:verify)"
-                .to_string(),
-        );
+        return Some("배포 완료. \"확인해\" 라고 말하면 라이브 확인해 드려요.".to_string());
     }
     if command.starts_with("axhub deploy create") && (64..=68).contains(&exit_code) {
-        return Some(
-            "배포 실패. \"왜 실패했어\" 라고 말하면 원인 추적해 드려요. (또는 /axhub:trace)"
-                .to_string(),
-        );
+        return Some("배포 실패. \"왜 실패했어\" 라고 말하면 원인 추적해 드려요.".to_string());
     }
     if command.starts_with("axhub recover") && exit_code == 0 {
-        return Some(
-            "복구 완료. \"확인해\" 라고 말하면 라이브 재확인해 드려요. (또는 /axhub:verify)"
-                .to_string(),
-        );
+        return Some("복구 완료. \"확인해\" 라고 말하면 라이브 재확인해 드려요.".to_string());
     }
     None
 }

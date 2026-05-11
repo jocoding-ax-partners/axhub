@@ -58,10 +58,10 @@ fn deploy_create_success_suggests_verify_with_nl_trigger_first() {
     let s = stdout(&out);
     assert!(s.contains("배포 완료"), "got: {s}");
     assert!(s.contains("\\\"확인해\\\""), "nl-trigger missing: {s}");
-    assert!(s.contains("/axhub:verify"), "slash command missing: {s}");
-    let nl_idx = s.find("확인해").unwrap();
-    let slash_idx = s.find("/axhub:verify").unwrap();
-    assert!(nl_idx < slash_idx, "nl-trigger must come before slash");
+    assert!(
+        !s.contains("/axhub:verify"),
+        "unregistered slash command leaked: {s}"
+    );
 }
 
 #[test]
@@ -72,7 +72,11 @@ fn recover_success_suggests_verify_with_nl_trigger_first() {
     let s = stdout(&out);
     assert!(s.contains("복구 완료"), "got: {s}");
     assert!(s.contains("확인해"));
-    assert!(s.contains("/axhub:verify"));
+    assert!(s.contains("확인해"));
+    assert!(
+        !s.contains("/axhub:verify"),
+        "unregistered slash command leaked: {s}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +91,11 @@ fn deploy_create_validation_failure_suggests_trace() {
     let s = stdout(&out);
     assert!(s.contains("배포 실패"), "got: {s}");
     assert!(s.contains("왜 실패했어"));
-    assert!(s.contains("/axhub:trace"));
+    assert!(s.contains("왜 실패했어"));
+    assert!(
+        !s.contains("/axhub:trace"),
+        "unregistered slash command leaked: {s}"
+    );
     // empathy catalog entry should still be present alongside the suggest.
     assert!(
         s.contains("배포는 시작") || s.contains("권한"),
@@ -102,7 +110,11 @@ fn deploy_create_auth_failure_suggests_trace() {
     assert!(out.status.success());
     let s = stdout(&out);
     assert!(s.contains("왜 실패했어"));
-    assert!(s.contains("/axhub:trace"));
+    assert!(s.contains("왜 실패했어"));
+    assert!(
+        !s.contains("/axhub:trace"),
+        "unregistered slash command leaked: {s}"
+    );
 }
 
 #[test]
@@ -110,7 +122,11 @@ fn deploy_create_rate_limit_suggests_trace() {
     let payload = r#"{"tool_input":{"command":"axhub deploy create"},"tool_response":{"exit_code":68,"stdout":""}}"#;
     let out = run_classify_exit(payload, &[]);
     let s = stdout(&out);
-    assert!(s.contains("/axhub:trace"));
+    assert!(s.contains("왜 실패했어"));
+    assert!(
+        !s.contains("/axhub:trace"),
+        "unregistered slash command leaked: {s}"
+    );
 }
 
 // ---------------------------------------------------------------------------
