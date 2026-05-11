@@ -4,6 +4,32 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.6](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.5...v0.5.6) (2026-05-11)
+
+### Phase VC narrative — Vibe Coder Visibility
+
+이번 릴리즈는 비개발자 vibe coder 사용자가 axhub 흐름에서 raw 기술 jargon 을 마주치지 않게 SKILL 표면을 전수 정리했어요. deploy SKILL 에 "Vibe Coder Visibility Rules" 섹션을 박아 `binding_hash` / `pending_action_id` / `pending_action_hash` / `retry_policy` / `consent_binding` 같은 internal verification primitive 12개를 명시적으로 chat echo 금지 했고, 한국어 한 줄 templates 표 + `AXHUB_DEPLOY_VERBOSE=1` verbose toggle 을 함께 제공해요. 이어서 Step 1.1 instruction text, Step 1.5 (git-init 옵션 단순화 + `>/dev/null 2>&1` 구조적 redirect), Step 2.5 `(cli_too_new)` jargon 제거, 9 SKILL description 자연어화 (deploy / github 6곳 / auth `OAuth Device Flow` / env `key`+`stdin` / profile `endpoint` / apis `scope` / update `cosign 서명 검증` / doctor internal slug / init bootstrap FSM raw state echo), 5 TodoWrite content (doctor `helper binary` / `profile`+`endpoint` / github `repo` / profile `profile`+`endpoint` / recover `commit`), AskUserQuestion header 영문 (env `env` / github 4곳 / profile `profile`) → 한국어 단일 명사, references/error-empathy-catalog 3 섹션 user-facing template (`endpoint` / `method` / `body source` / `preview` / `token mint` / `read-only`) 까지 자연어 한 줄로 humanize 했어요.
+
+### Test baseline
+
+- bun test: 599 pass / 4 skip / 0 fail / 3835 expect (Phase 3.5 baseline 586 → +13)
+- cargo test -p axhub-helpers: 189 pass / 3 ignored (Phase 3.5 baseline 181 → +8)
+- bunx tsc --noEmit: clean
+- bun run lint:tone --strict: 0 err / 0 warning across 34 files
+- bun run lint:keywords --check: no diff vs baseline
+- bun run skill:doctor --strict: exit 0
+- architect review (Sonnet) 2회: 1차 조건부 → fix → 2차 승인
+
+### Honest tradeoff
+
+- Visibility Rules 는 instruction-level lock 이라 LLM compliance 의존이에요. 결정론적 enforce 는 PostToolUse output redact filter 또는 helper API 의 user-visible/internal JSON 분리가 필요해요 (후속 PR scope).
+- `show_commands` 옵션 제거로 개발자 escape hatch 가 `AXHUB_DEPLOY_VERBOSE=1` 환경변수에만 존재해요. discovery path 는 `/axhub:doctor` 출력 통합 등 후속 작업으로 보완해요.
+- Step 1.5 git 명령은 `>/dev/null 2>&1` + `|| true` 로 raw output redact + `git commit` 실패 시 뒤따르는 resolve 가 `branch` / `commit_sha` 비어 있음을 감지해 humanized 한 줄로 안내해요.
+
+### Added
+
+* vibe coder visibility — chat surface jargon redact across SKILLs ([fc6318a](https://github.com/jocoding-ax-partners/axhub/commit/fc6318a4632843afe1df6e32cdb55551a9bbc68f))
+
 ## [0.5.5](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.4...v0.5.5) (2026-05-11)
 
 Phase 25는 deploy 시간 단축 Phase 1~3.5 스택을 main 에 올리는 릴리스예요. REST 중복 호출을 `deploy-prep` 와 session bundle/cache 로 줄이고, macOS Gatekeeper warmup, parallel preflight, config 기반 CLI 호환 경고, token freshness bridge 를 연결해서 배포 시작 전 대기와 불필요한 CLI round-trip 을 낮춰요.
