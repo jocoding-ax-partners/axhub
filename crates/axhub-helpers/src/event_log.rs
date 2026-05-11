@@ -192,3 +192,136 @@ fn disabled_via_env() -> bool {
         Ok("1") | Ok("true") | Ok("yes") | Ok("on")
     )
 }
+
+// =============================================================================
+// Phase 26 PR 26.2 — phase logic (event-sourcing derived view).
+//
+// The plan ran a 1-week spike (overview §10.2 #10) comparing two abstractions
+// for the deploy lifecycle:
+//   option (a) `phase_machine.rs` — first-class FSM, ~120 LOC + ~250 LOC test,
+//               stateful Failed→Idle reset requiring an explicit `axhub reset`
+//               subcommand (Tier B #16 prerequisite), stateless principle
+//               amend mandatory.
+//   option (b) event-sourcing derived view — DeployPhase enum + transition
+//               table on top of `current_phase()` (~80 LOC including tests),
+//               single source of truth is the NDJSON log, Failed→Idle is
+//               implicit (the next user-triggered deploy_id starts a fresh
+//               event chain — "last event wins"), no stateless amend.
+//
+// Outcome: option (b) chosen. Drivers per plan §PR 26.2 weak preference:
+//   - LOC ↓ (~80 vs ~370)
+//   - stateless ↑ (no cross-process Failed state to keep coherent)
+//   - natural integration with the existing `statusline::is_terminal_phase`
+//     terminal-string set
+// Tier B #16 (`axhub reset` subcommand) stays P3 — recover skill already
+// covers the "user explicitly wants to clear failed state" path because
+// option (b) treats a fresh Preflight event as the implicit reset.
+//
+// Stateless §10.7 reconciliation: derived view is fully stateless — every
+// "current phase" answer is computed from the append-only event log. The
+// overview §3 non-goal needs NO amend.
+
+/// Coarse lifecycle of an `axhub deploy create` invocation. Mirrors plan
+/// §PR 26.2 transition table; the enum is purely a derived view computed by
+/// reading the event log, never stored anywhere as a separate piece of state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DeployPhase {
+    Idle,
+    Preflight,
+    Resolve,
+    Bootstrap,
+    Push,
+    Verify,
+    Completed,
+    Failed,
+    Aborted,
+}
+
+impl DeployPhase {
+    /// Canonical lowercase snake_case name used in the NDJSON `phase` field.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DeployPhase::Idle => "idle",
+            DeployPhase::Preflight => "preflight",
+            DeployPhase::Resolve => "resolve",
+            DeployPhase::Bootstrap => "bootstrap",
+            DeployPhase::Push => "push",
+            DeployPhase::Verify => "verify",
+            DeployPhase::Completed => "completed",
+            DeployPhase::Failed => "failed",
+            DeployPhase::Aborted => "aborted",
+        }
+    }
+
+    /// Parse a phase string emitted by an `axhub` CLI or our own event log.
+    /// Returns `None` for unrecognized values so callers can fail soft.
+    pub fn parse(s: &str) -> Option<DeployPhase> {
+        match s {
+            "idle" => Some(DeployPhase::Idle),
+            "preflight" => Some(DeployPhase::Preflight),
+            "resolve" => Some(DeployPhase::Resolve),
+            "bootstrap" => Some(DeployPhase::Bootstrap),
+            "push" => Some(DeployPhase::Push),
+            "verify" => Some(DeployPhase::Verify),
+            "completed" | "complete" | "succeeded" | "success" => Some(DeployPhase::Completed),
+            "failed" | "errored" => Some(DeployPhase::Failed),
+            "aborted" | "cancelled" | "canceled" => Some(DeployPhase::Aborted),
+            _ => None,
+        }
+    }
+
+    /// Terminal phases never auto-progress; a fresh `Preflight` event
+    /// implicitly starts the next attempt (last-event-wins).
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            DeployPhase::Completed | DeployPhase::Failed | DeployPhase::Aborted
+        )
+    }
+
+    /// Plan §PR 26.2 transition table. `Failed` / `Aborted` → `Preflight`
+    /// reset is allowed because, under last-event-wins semantics, the user
+    /// kicking off a fresh deploy is the canonical reset signal — no
+    /// dedicated `axhub reset` subcommand needed.
+    pub fn can_transition_to(&self, next: &DeployPhase) -> bool {
+        use DeployPhase::*;
+        matches!(
+            (self, next),
+            (Idle, Preflight)
+                | (Preflight, Resolve)
+                | (Preflight, Failed)
+                | (Resolve, Bootstrap)
+                | (Resolve, Push)
+                | (Resolve, Failed)
+                | (Bootstrap, Push)
+                | (Bootstrap, Failed)
+                | (Push, Verify)
+                | (Push, Failed)
+                | (Verify, Completed)
+                | (Verify, Failed)
+                | (Failed, Preflight)
+                | (Aborted, Preflight)
+                | (Completed, Preflight)
+        )
+    }
+}
+
+/// Read the current phase from the event log and decide whether `next` is a
+/// legal transition. Returns `Ok(())` when the move is valid, an `Err` with
+/// the rejected pair otherwise. Errors are intentionally `String` because
+/// callers surface them as Korean systemMessage text rather than
+/// pattern-match on error types.
+pub fn validate_transition(deploy_id: &str, next: DeployPhase) -> Result<(), String> {
+    let current = current_phase(deploy_id)
+        .and_then(|s| DeployPhase::parse(&s))
+        .unwrap_or(DeployPhase::Idle);
+    if current.can_transition_to(&next) {
+        Ok(())
+    } else {
+        Err(format!(
+            "invalid transition: {} → {}",
+            current.as_str(),
+            next.as_str()
+        ))
+    }
+}
