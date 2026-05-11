@@ -54,7 +54,7 @@ To start an axhub app:
    axhub --json init --list-templates
    ```
 
-   `schema_version` (CLI 응답 형식 버전) 이 `init/v1` 인지 확인하고, CLI가 반환한 template 만 선택 후보로 써요. `templates[].id`, `framework`, `description` 에 아래 로컬 가이드를 덧붙여 보여줘요.
+   `schema_version` 은 helper API 응답 검증용 **internal verification primitive** 예요 — `init/v1` 인지 확인만 하고 raw 값을 사용자 chat 에 echo 하면 안 돼요 (deploy SKILL Visibility Rules 와 같은 규칙). CLI가 반환한 template 만 선택 후보로 쓰고, `templates[].id`, `framework`, `description` 에 아래 로컬 가이드를 덧붙여 보여줘요.
 
 ## 템플릿 선택 가이드
 
@@ -108,7 +108,7 @@ CLI가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요. str
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers bootstrap --dry-run --json
    ```
 
-   `consent_required_apps_create`, `git_init_required`, `first_commit_required`, `template_required`, `conflict_existing_files` 같은 상태 (다음 단계에 필요한 작업을 알려주는 신호) 를 그대로 보여주고, 앱 등록이나 배포는 deploy/apps 흐름으로 이어가요. init 은 파일 생성까지만 맡고, `bootstrap --auto-chain`, `apps create`, `deploy create` 는 실행하지 않아요.
+   `consent_required_apps_create`, `git_init_required`, `first_commit_required`, `template_required`, `conflict_existing_files` 같은 상태는 helper 가 다음 단계를 알려주는 **internal verification primitive** 예요 — raw 식별자를 사용자 chat 에 그대로 echo 하면 안 돼요 (deploy SKILL Visibility Rules 와 같은 규칙). 대신 한국어 한 줄로 humanize 해서 알려드려요 (예: "앱 등록 동의가 필요해요" / "저장 지점을 먼저 만들어야 해요" / "템플릿을 골라야 해요" / "현재 폴더에 이미 같은 이름 파일이 있어요"). 앱 등록이나 배포는 deploy/apps 흐름으로 이어가요. init 은 파일 생성까지만 맡고, `bootstrap --auto-chain`, `apps create`, `deploy create` 는 실행하지 않아요.
 
 5. **결과와 다음 액션을 안내해요.** 앱 등록, GitHub 연결, env 설정, deploy, open 흐름을 자연어로 이어갈 수 있다고 짧게 말해요.
 

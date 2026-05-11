@@ -578,3 +578,164 @@ Out of scope (logged honest tradeoff):
 - Baselines: tsc clean / bun test 390 pass 0 fail / lint:tone 0 err / lint:keywords no diff / skill:doctor 17/17
 - Trade-off: ~1MB binary size increase (acceptable for short-lived plugin helper)
 - Next: user runs `bun run release -- --release-as patch` after PR merge → v0.2.14
+
+---
+[2026-05-08] Phase 1 — REST 중복 제거 + statusline live (.plan/deploy-time-reduction/phase-1-rest-dedup-statusline.md)
+- PRD: 6 stories US-P1-1..6, all passes:true.
+- Files added/changed:
+  - crates/axhub-helpers/src/deploy_prep.rs (신규): DeployPrepResult struct, BootstrapPlan struct,
+    compose_deploy_prep (pure fn for testability), run_deploy_prep_with_runner using std::thread::scope
+    for parallel preflight + resolve. Exit code priority: preflight > resolve > 67 (first-deploy missing app_id).
+  - crates/axhub-helpers/src/session_bundle.rs (신규): SessionBundle/AuthStatusBundle/LastDeployBundle
+    structs, write_session_bundle (tempfile + rename atomic, unix 0600), read_session_bundle (TTL 5min
+    + schema_version match), read_session_bundle_at (now injection for testability),
+    read_session_bundle_or_empty (fallback path).
+  - crates/axhub-helpers/src/lib.rs: pub mod deploy_prep + pub mod session_bundle.
+  - crates/axhub-helpers/src/main.rs: USAGE +deploy-prep, dispatch + cmd_deploy_prep with
+    AXHUB_DEPLOY_PREP=0 silent no-op for backwards compat.
+  - crates/axhub-helpers/src/statusline.rs: DeployStatus struct, render_from_deploy_status,
+    write_statusline_cache, watch_and_update_statusline (poll + change detection + max_iterations,
+    fetcher + sleeper DI for testability), WatchSummary struct, is_terminal_phase helper +
+    statusline_cache_path.
+  - crates/axhub-helpers/tests/deploy_prep_test.rs (신규): 3 tests covering compose_deploy_prep
+    composition (warm / cold / unauth).
+  - crates/axhub-helpers/tests/session_bundle_test.rs (신규): 4 tests (roundtrip / TTL via
+    read_session_bundle_at / corrupt fallback / missing fallback).
+  - skills/deploy/SKILL.md: Step 1 → deploy-prep (single helper call); Step 1.2 + Step 2 → wrapped
+    with AXHUB_DEPLOY_PREP=0 legacy fallback bash guards; Step 8 → live tick block (5s polling,
+    write-on-change) before existing terminal cache write.
+  - README.md / PLAN.md: v0.5.3 → v0.5.4 (pre-existing post-merge release drift unblocked the
+    plan-consistency.test.ts gate).
+- Verification:
+  - cargo test -p axhub-helpers: 170 pass / 3 ignored (170 = 38 prior baseline + 7 new = 45,
+    plus integration tests). clippy -D warnings: clean. cargo fmt --check: clean.
+  - bun test: 577 pass / 4 skip / 0 fail (was 572 baseline → +5).
+  - bunx tsc --noEmit: clean.
+  - lint:tone --strict: 0 err. lint:keywords --check: no diff. skill:doctor: 19/19 OK.
+- Honest tradeoff: B-09 keep-alive (TLS reuse 2-5s) NOT included — process boundary 충돌로 ADR-001
+  Option C 가정 시 phase 1 scope 밖. Option A/B 채택 시 phase 1 spec 재작성 필요.
+
+
+---
+[2026-05-08] Phase 2 — Helper batch (10→5) + Gatekeeper warmup
+- PRD: 4 stories US-P2-1..4, all passes:true.
+- Files added/changed:
+  - crates/axhub-helpers/src/main.rs: version subcommand 가 --quiet flag 인식, USAGE 'version [--quiet]'.
+  - hooks/session-start.sh: macOS 조건부 Gatekeeper warmup spawn (timeout 3s, best-effort, AXHUB_GATEKEEPER_WARMUP=0 opt-out).
+  - crates/axhub-helpers/tests/version_quiet_test.rs (신규): 3 tests (default, --quiet stdout/stderr empty, arg order).
+  - tests/session-start-warmup.test.ts (신규): 4 tests (Darwin warmup / opt-out skip / Linux skip / session-start exec).
+- B-05 (telemetry in-process): already done in Phase 0 (telemetry.rs uses OpenOptions::append).
+- B-01 (helper batch): already done in Phase 1 (deploy-prep subcommand).
+- Verification:
+  - cargo test -p axhub-helpers: 174 pass (171 prior + 3 quiet).
+  - cargo clippy -D warnings: clean. cargo fmt --check: clean.
+  - bun test: 581 pass / 4 skip / 0 fail (577 prior + 4 hook).
+  - bunx tsc --noEmit: clean.
+  - lint:tone --strict / lint:keywords --check / skill:doctor: 0 err.
+- Honest tradeoff:
+  - Cold first-deploy 절감 (3-6s) 은 macOS Gatekeeper 캐시 미스 회피에 따라 가변. CI macos runner = fresh VM 마다 cold, 절감 효과 측정은 perf-gate.yml 에서.
+  - Linux/Windows 무동작 (uname check skip). Windows Defender warmup 은 별도 phase.
+
+
+---
+[2026-05-08] Phase 3 — Client cascade reduced
+- PRD: 4 stories US-P3-1..4 all passes:true.
+- Files added/changed:
+  - crates/axhub-helpers/src/preflight.rs: run_preflight_with_runner — std::thread::scope 로 4 probes
+    (version + auth + last_deploy_cache + manifest) parallel spawn. F: Fn + Sync 바운드. cli_present=false 시
+    auth raw 결과 ignored, cli_unavailable override. AXHUB_PREFLIGHT_PARALLEL=0 시 sequential fallback.
+  - crates/axhub-helpers/src/config.rs (신규): preferences.json (TOML 대신 — serde_json 재사용, dep 추가 없음)
+    config_get/set/at + render_get_json. Atomic write tempfile + rename, unix 0600. AXHUB_CLI_TOO_NEW_DISMISS=0 opt-out.
+    4 unit test (roundtrip / missing / unknown key / null JSON envelope).
+  - crates/axhub-helpers/src/lib.rs: pub mod config 추가.
+  - crates/axhub-helpers/src/main.rs: USAGE +config get/set + auth-refresh-bg, dispatch + cmd_config + cmd_auth_refresh_bg
+    (axhub binary 부재 시 sentinel write fail + exit 0, 존재 시 detached spawn axhub auth login --browser --force,
+    sentinel JSON write to ~/.config/axhub-plugin/auth-refresh-status.json).
+  - crates/axhub-helpers/tests/preflight_parallel_test.rs (신규): 3 tests (happy path / cli absent override /
+    sequential fallback via AXHUB_PREFLIGHT_PARALLEL=0).
+- Verification:
+  - cargo test -p axhub-helpers: 181 pass / 3 ignored (174 prior + 3 preflight + 4 config = 7 new).
+  - cargo clippy -D warnings: clean. cargo fmt --check: clean.
+  - bun test: 581 pass / 4 skip / 0 fail.
+  - tsc / lint:tone / lint:keywords / skill:doctor: 0 err.
+  - Smoke: ./bin/axhub-helpers config get/set roundtrip JSON envelope 정확.
+- Honest tradeoff:
+  - SKILL.md Step 3.5 token mtime polling integration 은 Phase 3.5 로 defer — helper-side
+    auth-refresh-bg infrastructure 는 ship 했지만 실제 deploy SKILL flow 에서 호출하는 wiring
+    은 별도 작업. 현재는 helper subcommand 만 호출 가능 상태.
+  - cli_too_new dismiss SKILL flow integration 도 Phase 3.5 — config get/set 은 호출 가능하지만
+    SKILL Step 0.5 에서 자동 검사 + AskUserQuestion dismiss 옵션 wire 는 별도.
+  - Auth bg refresh 의 axhub auth login --browser flow 는 실제 OAuth 가 사용자 브라우저 흐름이라
+    integration test 부재. Sentinel write 로직 까지만 unit-tested.
+- Phase 3.5 backlog: SKILL.md Step 3.5 token mtime polling + Step 0.5 cli_too_new dismiss prompt + AskUserQuestion 통합.
+
+
+---
+[2026-05-08] Phase 3.5 — helper API SKILL flow wire-up
+- PRD: 4 stories US-P35-1..4 all passes:true.
+- Files added/changed:
+  - hooks/session-start.sh: auth-refresh-bg detached spawn block — AXHUB_AUTH_BG_REFRESH != "0"
+    + axhub CLI 존재 시 auth status 응답으로 user_email 부재 감지 → nohup "$HELPER" auth-refresh-bg & disown.
+    AXHUB_GATEKEEPER_WARMUP block 다음 + exec session-start 직전.
+  - skills/deploy/SKILL.md Step 2.5 신규 (cli_too_new dismiss bridge): cli_too_new=true 감지 시
+    helpers config get ignore_too_new_until 비교 → 일치 시 skip / 미일치 시 AskUserQuestion 3 옵션
+    (계속해요 / 업그레이드 안내 / 이 버전부터는 묻지 마요), dismiss 선택 시 config set 호출.
+  - skills/deploy/SKILL.md Step 3.5 신규 (token freshness gate): Step 4 직전 TOKEN_PATH mtime 비교,
+    AXHUB_SESSION_START_TS 와 비교 후 stale 시 5s × 6 iter polling + cross-platform stat (-c %Y / -f %m),
+    timeout 후 inline axhub auth status check + UNAUTHORIZED 시 exit 65.
+  - tests/fixtures/ask-defaults/registry.json: deploy.cli_too_new dismiss prompt 등록
+    safe_default "계속해요" + rationale + allowed_safe_defaults 3.
+  - tests/e2e-claude-cli-registry.test.ts: 25 → 26 baseline 갱신 + Phase 3.5 cli_too_new dismiss 추가 명시,
+    deploy 엔트리 +1, safe_default 카탈로그 assertion 추가.
+  - tests/session-start-bg-refresh.test.ts (신규): 5 Bun integration tests — UNAUTHORIZED triggers spawn,
+    authenticated skip, axhub CLI absent skip, AXHUB_AUTH_BG_REFRESH=0 skip, exec session-start reach.
+- Verification:
+  - cargo test: 181 pass / 3 ignored (Phase 3 baseline 유지).
+  - cargo clippy -D warnings: clean.
+  - bun test: 586 pass / 4 skip / 0 fail (581 prior + 5 bg refresh = 586).
+  - bunx tsc --noEmit: clean.
+  - lint:tone --strict / lint:keywords --check / skill:doctor: 0 err / no diff / 19 OK.
+- Honest tradeoff:
+  - Phase 3.5 ship 으로 Phase 3 helper API 가 SKILL flow 에 wire 되어 절감 실현 가능: UNAUTHORIZED bg refresh 5-15s + cli_too_new dismiss 200ms.
+  - Step 3.5 polling timeout fallback inline check 는 SessionStart timestamp env 변수 (AXHUB_SESSION_START_TS) 가 SessionStart 에서 export 안 되면 0 으로 처리되어 polling 로직이 skip 됨. 이 env 의 SKILL 측 export 는 추가 PR 또는 별도 wire 필요 (현재 일부 fall-through 안전 동작).
+  - Cross-platform stat fallback chain 은 GNU + BSD 다 처리하지만 일부 stripped UNIX (busybox) 에서 둘 다 실패 가능 — inline check fallback 으로 진행.
+
+
+
+---
+[2026-05-11] Phase VC — Vibe Coder Visibility 보강 (deploy SKILL)
+- PRD: 5 stories US-VC-1..5 all passes:true.
+- 사용자 문제 / 동기:
+  - 비개발자 vibe coder 사용자에게 deploy SKILL Step 1.1 이 binding_hash / pending_action_id / pending_action_hash / retry_policy / consent_binding raw JSON 필드를 chat 으로 echo 하라고 instruct → 사용자 당황.
+  - Step 1.5 git-init AskUserQuestion 의 "명령어만 보기" 옵션 — git CLI 명령어 raw 노출 (vibe coder 부담).
+  - Step 2.5 cli_too_new question 라벨 "axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?" — "(cli_too_new)" jargon 노출.
+- Files changed:
+  - skills/deploy/SKILL.md:
+    * 신규 ## Vibe Coder Visibility Rules 섹션 (Workflow 진입 전) — 노출 금지 internal primitives enum + 한국어 한 줄 templates 표 + AXHUB_DEPLOY_VERBOSE=1 verbose 토글.
+    * Step 1.1 instruction 수정 — "show the exact command, binding_hash, ..." → "internally bind ... PreToolUse hook consumes them for consent verification + retry policy enforcement, do not echo their raw values to the user chat". humanized one-line example 명시.
+    * Step 1.5 explanation 자연어 (branch / commit SHA 같은 jargon 제거) + AskUserQuestion 옵션 2개로 축소 ("지금 만들기" / "취소") + show_commands 옵션 + 관련 fall-through 라인 제거 + git stderr humanize 가이드 추가.
+    * Step 2.5 question 라벨 "axhub CLI 가 더 최신 버전인데 계속할까요?" 로 humanize ((cli_too_new) 제거) + 옵션 description 자연어.
+  - tests/fixtures/ask-defaults/registry.json:
+    * 배포 전 저장 지점 만들까요? safe_default: 명령어만 보기 → 취소, allowed_safe_defaults: [취소, 지금 만들기].
+    * axhub CLI 새 버전 (cli_too_new) 인데 계속할까요? key 제거, axhub CLI 가 더 최신 버전인데 계속할까요? key 신규 등록 (safe_default 계속해요 유지).
+  - tests/deploy-git-init-stage.test.ts:
+    * non-interactive fallback test 갱신 — safe_default "취소" + allowed_safe_defaults 검증 enum + 명령어만 보기 부재 expect.
+    * structured AskUserQuestion test 갱신 — show_commands value 부재 expect + 지금 만들기 label expect.
+    * 신규 test "Vibe Coder Visibility Rules block masks raw helper jargon from user chat" — visibility 섹션 존재 + 12 internal primitive 필드 enum lock + AXHUB_DEPLOY_VERBOSE 토글 expect.
+    * 신규 test "cli_too_new dismiss question drops raw '(cli_too_new)' jargon" — 새 질문 문자열 + 옛 키 부재 + registry 동기화.
+  - tests/e2e-claude-cli-registry.test.ts:
+    * deploy registry safe_default: 명령어만 보기 → 취소, 옛 cli_too_new key → 새 key 동기화.
+  - tests/deploy-skill-wire-up.test.ts:
+    * askIndex grep 문자열 + registry key 모두 새 question 으로 갱신.
+- Verification:
+  - cargo test -p axhub-helpers: 189 passed / 3 ignored / 15 suites (Phase 3.5 baseline 181 → 189).
+  - bun test: 599 pass / 4 skip / 0 fail / 3835 expect calls / 45 files (Phase 3.5 baseline 586 → 599 = 13 추가).
+  - bunx tsc --noEmit: clean.
+  - bun run lint:tone --strict: 0 error / 0 warning across 34 files.
+  - bun run lint:keywords --check: no diff vs baseline.
+  - bun run skill:doctor --strict: exit 0.
+- Honest tradeoff:
+  - AskUserQuestion 자체는 보안 동의 채널이라 제거 불가 (git init 은 local mutation 이라 silent 자동화 위험). 사용자 요구 "노출 안 되게" 는 옵션 단순화 (2 options) + label 자연어화로 절충 — 사용자에게는 popup 자체보다는 raw jargon 노출이 더 confusing 함.
+  - Step 1.5 의 "지금 만들기" 선택 시 실제 git init / add / commit / branch -M 명령은 여전히 실행 (필수). SKILL 가이드라인에 "raw stderr / stdout 사용자 chat echo 금지" 명시했지만 Claude 가 실제로 한 줄 humanize 만 출력할지는 모델 행동에 의존 — instruction-level enforce, runtime enforcement 는 없음.
+  - Vibe Coder Visibility Rules 의 internal primitives enum 은 SKILL.md text-level lock 만 — Claude 가 LLM 으로 잠재 우회 가능. 더 강한 enforce 는 PostToolUse hook 또는 별도 redact filter 가 필요 (Phase VC 범위 밖, 후속 PR).
+- Phase 18 baseline 유지: lint:tone / lint:keywords / skill:doctor / cargo / bun 모두 green.

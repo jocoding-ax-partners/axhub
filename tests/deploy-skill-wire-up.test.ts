@@ -38,7 +38,7 @@ describe("deploy SKILL Phase 3.5 wire-up invariants", () => {
     const body = deploySkill();
     const bridgeIndex = body.indexOf("cli_too_new dismiss bridge");
     const configGetIndex = body.indexOf("config get ignore_too_new_until --json");
-    const askIndex = body.indexOf('"question": "axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?"');
+    const askIndex = body.indexOf('"question": "axhub CLI 가 더 최신 버전인데 계속할까요?"');
     const caseIndex = body.indexOf('case "${CLI_TOO_NEW_ANSWER:-continue}" in');
     const dismissCaseIndex = body.indexOf("dismiss)", caseIndex);
     const configSetIndex = body.indexOf("config set ignore_too_new_until");
@@ -75,7 +75,7 @@ describe("deploy SKILL Phase 3.5 wire-up invariants", () => {
 
   test("cli_too_new registry default continues without mutating preferences", () => {
     const registry = deployRegistry();
-    const entry = registry["axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?"];
+    const entry = registry["axhub CLI 가 더 최신 버전인데 계속할까요?"];
     expect(entry.safe_default).toBe("계속해요");
     expect(entry.allowed_safe_defaults).toContain("이 버전부터는 묻지 마요");
     expect(entry.rationale).toContain("without mutating user preferences");

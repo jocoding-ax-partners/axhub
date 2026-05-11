@@ -110,20 +110,20 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("25 safe_default 값 (safe fallback 카탈로그)", () => {
+  test("safe_default 값 카탈로그 (safe fallback)", () => {
     const auth = registry["auth"] as Record<string, SafeDefaultEntry>;
     expect(auth["다시 로그인할래요?"]?.safe_default).toBe("abort");
     expect(auth["로그아웃할래요?"]?.safe_default).toBe("abort");
 
     const recover = registry["recover"] as Record<string, SafeDefaultEntry>;
     expect(
-      recover["직전 안정 커밋으로 다시 배포해요?"]?.safe_default,
+      recover["직전에 잘 됐던 버전으로 다시 올릴까요?"]?.safe_default,
     ).toBe("abort");
 
     const apis = registry["apis"] as Record<string, SafeDefaultEntry>;
     expect(
       apis[
-        "다른 팀 API도 볼래요? 권한 있는 모든 endpoint 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요."
+        "다른 팀 API도 볼래요? 권한 있는 모든 API 주소를 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요."
       ]?.safe_default,
     ).toBe("stay");
 
@@ -133,11 +133,11 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
 
     const deploy = registry["deploy"] as Record<string, SafeDefaultEntry>;
     expect(deploy["배포 전 저장 지점을 만들까요?"]?.safe_default).toBe(
-      "명령어만 보기",
+      "취소",
     );
     expect(deploy["진행할까요?"]?.safe_default).toBe("미리보기만");
     expect(
-      deploy["axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?"]?.safe_default,
+      deploy["axhub CLI 가 더 최신 버전인데 계속할까요?"]?.safe_default,
     ).toBe("계속해요");
 
     const clarify = registry["clarify"] as Record<string, SafeDefaultEntry>;

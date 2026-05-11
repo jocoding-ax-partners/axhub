@@ -29,10 +29,10 @@ To manage profiles:
 
    ```typescript
    TodoWrite({ todos: [
-     { content: "profile 의도 확인", status: "in_progress", activeForm: "profile 확인 중" },
-     { content: "현재 profile 조회", status: "pending", activeForm: "현재 상태 보는 중" },
-     { content: "필요 시 add/use 실행", status: "pending", activeForm: "profile 처리 중" },
-     { content: "endpoint 안전 안내", status: "pending", activeForm: "마무리하는 중" }
+     { content: "프로필 의도 확인", status: "in_progress", activeForm: "프로필 의도 보는 중" },
+     { content: "현재 프로필 보기", status: "pending", activeForm: "현재 상태 보는 중" },
+     { content: "필요 시 추가하거나 전환", status: "pending", activeForm: "프로필 처리하는 중" },
+     { content: "서버 주소 안전 안내", status: "pending", activeForm: "마무리하는 중" }
    ]})
    ```
 
@@ -47,11 +47,11 @@ To manage profiles:
    ```json
    {
      "question": "프로필 작업을 고를까요?",
-     "header": "profile",
+     "header": "프로필",
      "options": [
-       {"label": "현재 프로필 보기", "value": "current", "description": "현재 endpoint 와 profile 을 봐요"},
-       {"label": "목록 보기", "value": "list", "description": "저장된 profile 을 봐요"},
-       {"label": "추가 또는 전환", "value": "mutate", "description": "consent 와 endpoint 확인이 필요해요"}
+       {"label": "현재 프로필 보기", "value": "current", "description": "지금 연결된 서버 주소와 프로필을 봐요"},
+       {"label": "목록 보기", "value": "list", "description": "저장된 프로필 목록을 봐요"},
+       {"label": "추가 또는 전환", "value": "mutate", "description": "동의와 서버 주소 확인이 필요해요"}
      ]
    }
    ```
