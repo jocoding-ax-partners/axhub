@@ -233,7 +233,64 @@ To deploy:
    fi
    ```
 
-   On `cli_too_old: true` or `cli_too_new: true`, halt and surface the corresponding entry from `references/error-empathy-catalog.md` ("version-skew"). Do not proceed.
+   On `cli_too_old: true`, halt and surface the corresponding entry from `references/error-empathy-catalog.md` ("version-skew"). Do not proceed.
+
+   On `cli_too_new: true`, run the dismiss bridge below. The user can suppress the prompt for the current CLI version range by storing `ignore_too_new_until` in the helper preferences file.
+
+2.5. **cli_too_new dismiss bridge (Phase 3.5 B-11).** Read user preference, decide to halt / proceed / prompt:
+
+   ```bash
+   if [[ "$CLI_TOO_NEW" == "true" ]]; then
+     IGNORE_UNTIL=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers config get ignore_too_new_until --json 2>/dev/null | jq -r '.value // ""')
+     CLI_VER=$(echo "$PREFLIGHT_JSON" | jq -r '.cli_version // ""')
+     # Skip prompt if user previously dismissed at this CLI_VER or higher.
+     if [[ -n "$IGNORE_UNTIL" && "$IGNORE_UNTIL" == "$CLI_VER" ]]; then
+       echo '[deploy:Step 2.5 cli_too_new] dismissed via preference' >&2
+     else
+       # AskUserQuestion: 3 options — continue / explain upgrade / dismiss permanently for this version.
+       case "${CLI_TOO_NEW_ANSWER:-continue}" in
+         dismiss)
+           ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers config set ignore_too_new_until "$CLI_VER"
+           ;;
+         explain)
+           echo "업그레이드 안내: docs/migrate-rust.md 또는 axhub-helpers update 를 확인해요." >&2
+           exit 64
+           ;;
+         continue|*)
+           # 안전 기본값: 이번 세션만 진행하고 preferences 는 바꾸지 않아요.
+           ;;
+       esac
+     fi
+   fi
+   ```
+
+   AskUserQuestion JSON envelope:
+
+   ```json
+   {
+     "question": "axhub CLI 새 버전 (cli_too_new) 인데 계속할까요?",
+     "header": "버전 확인",
+     "options": [
+       {
+         "label": "계속해요",
+         "value": "continue",
+         "description": "이번 세션만 진행해요. 다음 세션에는 다시 물어요."
+       },
+       {
+         "label": "업그레이드 안내",
+         "value": "explain",
+         "description": "axhub-helpers update 또는 docs/migrate-rust.md 안내를 봐요."
+       },
+       {
+         "label": "이 버전부터는 묻지 마요",
+         "value": "dismiss",
+         "description": "현재 CLI 버전을 ignore_too_new_until 에 저장해서 다음 세션에 prompt 를 띄우지 않아요."
+       }
+     ]
+   }
+   ```
+
+   Non-interactive (`! [ -t 1 ]` / CI / `$CLAUDE_NON_INTERACTIVE`) registry default = "continue" (안전한 기본값, drift catch 는 review 책임). `AXHUB_CLI_TOO_NEW_DISMISS=0` 환경에서는 helper config_get 가 항상 None 을 반환해서 매번 prompt 가 떠요 (kill switch).
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — Step 3 preview → `--dry-run` (가장 안전해요), Step 6 exit-65 → `abort` (subprocess 자동 로그인 안 해요).
 
@@ -279,6 +336,15 @@ To deploy:
    ```
 
    If the user chooses `dry_run`, add `--dry-run` to Step 4 and skip Step 5. If the user chooses `abort`, stop without minting consent.
+
+3.5. **Token freshness gate (Phase 3.5 B-08).** Before minting consent, confirm that the auth token is fresh — SessionStart may have fired `auth-refresh-bg` in the background while the user reviewed the preview card. Skip when `AXHUB_AUTH_BG_REFRESH=0`.
+
+   ```bash
+   echo '[deploy:Step 3.5 token-freshness] entered' >&2
+   bash "${CLAUDE_PLUGIN_ROOT}/hooks/token-freshness-gate.sh"
+   ```
+
+   The gate script (`hooks/token-freshness-gate.sh`) captures `now - 30 s` locally as the freshness anchor (matches `.plan` §3.4), polls token mtime up to 30 s (5 s × 6 iter), and calls `axhub auth status --json` inline on timeout. UNAUTHORIZED → exit 65 routes to Step 6 recovery. Cross-platform `stat` chain handles GNU (`-c %Y`) and BSD/macOS (`-f %m`); on stripped systems where neither flag works the chain returns 0 and inline check decides. Test fixtures inject `AXHUB_TOKEN_PATH` / `AXHUB_GATE_FAKE_NOW` / `AXHUB_GATE_POLL_*` to exercise the gate without a live OAuth flow.
 
 4. **On user approval**, mint a consent token and run deploy. Run this step only when Step 1.1 did not already execute and record `deploy_create`; never double-submit a deploy for the same pending bootstrap action.
 

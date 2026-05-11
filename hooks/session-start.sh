@@ -65,4 +65,17 @@ if [ "${AXHUB_GATEKEEPER_WARMUP:-1}" != "0" ] && [ "$(uname -s)" = "Darwin" ]; t
   fi
 fi
 
+# Phase 3.5 B-08: detached auth refresh trigger. When `axhub` CLI reports
+# UNAUTHORIZED in this session, fire-and-forget the helper's auth-refresh-bg
+# subcommand so token refresh runs in parallel with the user's deploy
+# preview prompt. Helper writes the result sentinel; SKILL Step 3.5 polls
+# token mtime + reads sentinel before deploy_create.
+# AXHUB_AUTH_BG_REFRESH=0 disables. axhub CLI absent → skip.
+if [ "${AXHUB_AUTH_BG_REFRESH:-1}" != "0" ] && command -v axhub >/dev/null 2>&1; then
+  if ! axhub auth status --json 2>/dev/null | grep -q '"user_email"'; then
+    nohup "$HELPER" auth-refresh-bg >/dev/null 2>&1 &
+    disown >/dev/null 2>&1 || true
+  fi
+fi
+
 exec "$HELPER" session-start
