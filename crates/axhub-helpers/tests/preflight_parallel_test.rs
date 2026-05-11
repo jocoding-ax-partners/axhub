@@ -10,14 +10,21 @@
 //!   3. Sequential fallback — `AXHUB_PREFLIGHT_PARALLEL=0` env exercises the
 //!      non-scoped path and produces the same output shape.
 
-use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::time::Duration;
 
-use axhub_helpers::preflight::{run_preflight_with_runner, SpawnResult, EXIT_AUTH, EXIT_OK};
+use axhub_helpers::preflight::{run_preflight_with_runner, SpawnResult, EXIT_OK};
 
 fn parallel_env_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn lock_parallel_env() -> MutexGuard<'static, ()> {
+    parallel_env_lock()
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
 }
 
 fn ok(stdout: &str) -> SpawnResult {
@@ -60,7 +67,7 @@ fn cli_absent_runner(cmd: &[&str]) -> SpawnResult {
 
 #[test]
 fn parallel_happy_path_merges_all_four_probes() {
-    let _guard = parallel_env_lock().lock().unwrap();
+    let _guard = lock_parallel_env();
     std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL");
     let run = run_preflight_with_runner(happy_runner);
     assert_eq!(run.exit_code, EXIT_OK);
@@ -72,7 +79,7 @@ fn parallel_happy_path_merges_all_four_probes() {
 
 #[test]
 fn parallel_cli_absent_overrides_auth_to_cli_unavailable() {
-    let _guard = parallel_env_lock().lock().unwrap();
+    let _guard = lock_parallel_env();
     std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL");
     let run = run_preflight_with_runner(cli_absent_runner);
     // exit code reflects the cli_present=false / in_range=false branch.
@@ -86,7 +93,7 @@ fn parallel_cli_absent_overrides_auth_to_cli_unavailable() {
 
 #[test]
 fn sequential_fallback_when_axhub_preflight_parallel_is_zero() {
-    let _guard = parallel_env_lock().lock().unwrap();
+    let _guard = lock_parallel_env();
     let prev = std::env::var("AXHUB_PREFLIGHT_PARALLEL").ok();
     std::env::set_var("AXHUB_PREFLIGHT_PARALLEL", "0");
     let run = run_preflight_with_runner(happy_runner);
@@ -96,32 +103,36 @@ fn sequential_fallback_when_axhub_preflight_parallel_is_zero() {
         Some(v) => std::env::set_var("AXHUB_PREFLIGHT_PARALLEL", v),
         None => std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL"),
     }
-    let _ = EXIT_AUTH; // keep import live
 }
 
 #[test]
 fn parallel_walltime_is_bounded_by_slowest_cli_probe_not_sum() {
-    let _guard = parallel_env_lock().lock().unwrap();
+    let _guard = lock_parallel_env();
     std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL");
 
-    let start = Instant::now();
+    let active_cli_probes = AtomicUsize::new(0);
+    let max_active_cli_probes = AtomicUsize::new(0);
     let run = run_preflight_with_runner(|cmd| {
-        if cmd.contains(&"--version") {
-            std::thread::sleep(Duration::from_millis(180));
-            ok("axhub 0.12.1\n")
-        } else if cmd.contains(&"auth") && cmd.contains(&"status") {
-            std::thread::sleep(Duration::from_millis(180));
-            ok(auth_ok_stdout())
+        if cmd.contains(&"--version") || (cmd.contains(&"auth") && cmd.contains(&"status")) {
+            let active = active_cli_probes.fetch_add(1, Ordering::SeqCst) + 1;
+            max_active_cli_probes.fetch_max(active, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(80));
+            active_cli_probes.fetch_sub(1, Ordering::SeqCst);
+            if cmd.contains(&"--version") {
+                ok("axhub 0.12.1\n")
+            } else {
+                ok(auth_ok_stdout())
+            }
         } else {
             ok("[]")
         }
     });
-    let elapsed = start.elapsed();
 
     assert_eq!(run.exit_code, EXIT_OK);
     assert!(run.output.auth_ok);
-    assert!(
-        elapsed < Duration::from_millis(320),
-        "parallel preflight took {elapsed:?}; expected it below the 360ms sequential sum"
+    assert_eq!(
+        max_active_cli_probes.load(Ordering::SeqCst),
+        2,
+        "version + auth probes should overlap instead of running sequentially"
     );
 }
