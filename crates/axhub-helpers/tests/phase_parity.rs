@@ -2004,14 +2004,18 @@ fn telemetry_is_opt_in_private_jsonl_and_error_swallowing() {
     let axhub =
         std::path::Path::new(&bin_dir).join(if cfg!(windows) { "axhub.cmd" } else { "axhub" });
     let write_axhub = |version: &str| {
+        let tmp_axhub = axhub.with_extension("tmp");
         let script = if cfg!(windows) {
             format!("@echo off\r\necho axhub {version}\r\n")
         } else {
             format!("#!/bin/sh\necho 'axhub {version}'\n")
         };
-        fs::write(&axhub, script).unwrap();
+        fs::write(&tmp_axhub, script).unwrap();
         #[cfg(unix)]
-        fs::set_permissions(&axhub, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::set_permissions(&tmp_axhub, fs::Permissions::from_mode(0o755)).unwrap();
+        #[cfg(windows)]
+        let _ = fs::remove_file(&axhub);
+        fs::rename(&tmp_axhub, &axhub).unwrap();
     };
     let helper_version = env!("CARGO_PKG_VERSION");
     write_axhub("0.0.1");

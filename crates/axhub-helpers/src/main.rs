@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use axhub_helpers::bootstrap::{cmd_bootstrap_dependency_plan, run_bootstrap};
 use axhub_helpers::catalog::classify;
+use axhub_helpers::config::{config_get, config_set, render_get_json};
 use axhub_helpers::consent::{
     format_preauth_deny_hint, mint_token, parse_axhub_command, validate_binding_schema,
     verify_or_claim_token, verify_token, write_private_file_no_follow, ConsentBinding,
@@ -19,10 +20,11 @@ use axhub_helpers::statusline::current_statusline;
 use axhub_helpers::telemetry::{
     append_phase_marker_to_file, emit_deploy_complete, emit_meta_envelope,
 };
+use chrono::Utc;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--json]\n  version [--quiet]\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  version [--quiet]\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -97,6 +99,8 @@ fn run() -> anyhow::Result<i32> {
         "mark" => cmd_mark(&rest),
         "emit-deploy-complete" => cmd_emit_deploy_complete(&rest),
         "deploy-prep" => cmd_deploy_prep(&rest),
+        "config" => cmd_config(&rest),
+        "auth-refresh-bg" => cmd_auth_refresh_bg(),
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -1161,6 +1165,97 @@ fn cmd_mark(rest: &[String]) -> anyhow::Result<i32> {
         return Ok(1);
     }
     Ok(0)
+}
+
+fn cmd_config(rest: &[String]) -> anyhow::Result<i32> {
+    let Some(action) = rest.first() else {
+        eprintln!("axhub-helpers config: expected 'get' or 'set'");
+        return Ok(64);
+    };
+    match action.as_str() {
+        "get" => {
+            let Some(key) = rest.get(1) else {
+                eprintln!("axhub-helpers config get: expected <key>");
+                return Ok(64);
+            };
+            let json = rest.iter().any(|a| a == "--json");
+            let value = config_get(key);
+            if json {
+                println!("{}", render_get_json(key, value.as_deref()));
+                Ok(0)
+            } else {
+                match value {
+                    Some(v) => {
+                        println!("{v}");
+                        Ok(0)
+                    }
+                    None => Ok(1),
+                }
+            }
+        }
+        "set" => {
+            let Some(key) = rest.get(1) else {
+                eprintln!("axhub-helpers config set: expected <key> <value>");
+                return Ok(64);
+            };
+            let Some(value) = rest.get(2) else {
+                eprintln!("axhub-helpers config set: expected <value>");
+                return Ok(64);
+            };
+            if let Err(err) = config_set(key, value) {
+                eprintln!("axhub-helpers config set: {err}");
+                // Unknown-key is a usage error (caller passed a bad CLI
+                // argument); reserve exit 1 for IO/runtime failures.
+                let exit_code = if err.to_string().contains("unknown config key") {
+                    64
+                } else {
+                    1
+                };
+                return Ok(exit_code);
+            }
+            Ok(0)
+        }
+        other => {
+            eprintln!("axhub-helpers config: unknown action \"{other}\"");
+            Ok(64)
+        }
+    }
+}
+
+fn cmd_auth_refresh_bg() -> anyhow::Result<i32> {
+    if std::env::var("AXHUB_AUTH_BG_REFRESH").as_deref() == Ok("0") {
+        return Ok(0);
+    }
+    let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
+    let probe = std::process::Command::new(&axhub_bin)
+        .arg("--version")
+        .output();
+    if probe.is_err() {
+        // axhub CLI missing — write a fail sentinel and exit cleanly so the
+        // hook never blocks session-start on a stale install.
+        let _ = write_refresh_sentinel(false, "axhub_cli_missing");
+        return Ok(0);
+    }
+    let result = std::process::Command::new(&axhub_bin)
+        .args(["auth", "login", "--browser", "--force"])
+        .output();
+    let success = result.as_ref().is_ok_and(|out| out.status.success());
+    let status_label = if success { "ok" } else { "fail" };
+    let _ = write_refresh_sentinel(success, status_label);
+    Ok(if success { 0 } else { 1 })
+}
+
+fn write_refresh_sentinel(success: bool, status: &str) -> anyhow::Result<()> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let dir = PathBuf::from(home).join(".config/axhub-plugin");
+    fs::create_dir_all(&dir)?;
+    let path = dir.join("auth-refresh-status.json");
+    let body = format!(
+        "{{\"success\":{success},\"status\":\"{status}\",\"ts\":\"{}\"}}\n",
+        Utc::now().to_rfc3339()
+    );
+    fs::write(&path, body)?;
+    Ok(())
 }
 
 fn cmd_deploy_prep(rest: &[String]) -> anyhow::Result<i32> {
