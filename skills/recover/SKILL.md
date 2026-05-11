@@ -95,7 +95,7 @@ To recover:
 
    ```json
    {
-     "question": "직전 안정 커밋으로 다시 배포해요?",
+     "question": "직전에 잘 됐던 버전으로 다시 올릴까요?",
      "header": "rollback 확인",
      "options": [
        {"label": "네, 직전 커밋으로", "value": "confirm", "description": "<PREV_SHA>를 새로 배포"},

@@ -54,7 +54,7 @@ To start an axhub app:
    axhub --json init --list-templates
    ```
 
-   `schema_version` (CLI 응답 형식 버전) 이 `init/v1` 인지 확인하고, CLI가 반환한 template 만 선택 후보로 써요. `templates[].id`, `framework`, `description` 에 아래 로컬 가이드를 덧붙여 보여줘요.
+   `schema_version` 은 helper API 응답 검증용 **internal verification primitive** 예요 — `init/v1` 인지 확인만 하고 raw 값을 사용자 chat 에 echo 하면 안 돼요 (deploy SKILL Visibility Rules 와 같은 규칙). CLI가 반환한 template 만 선택 후보로 쓰고, `templates[].id`, `framework`, `description` 에 아래 로컬 가이드를 덧붙여 보여줘요.
 
 ## 템플릿 선택 가이드
 

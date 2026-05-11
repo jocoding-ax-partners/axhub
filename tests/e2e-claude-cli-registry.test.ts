@@ -117,13 +117,13 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
 
     const recover = registry["recover"] as Record<string, SafeDefaultEntry>;
     expect(
-      recover["직전 안정 커밋으로 다시 배포해요?"]?.safe_default,
+      recover["직전에 잘 됐던 버전으로 다시 올릴까요?"]?.safe_default,
     ).toBe("abort");
 
     const apis = registry["apis"] as Record<string, SafeDefaultEntry>;
     expect(
       apis[
-        "다른 팀 API도 볼래요? 권한 있는 모든 endpoint 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요."
+        "다른 팀 API도 볼래요? 권한 있는 모든 API 주소를 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요."
       ]?.safe_default,
     ).toBe("stay");
 

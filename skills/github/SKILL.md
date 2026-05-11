@@ -133,7 +133,7 @@ To connect GitHub:
         "header": "First push",
         "options": [
           {"label": "취소", "value": "abort", "description": "push 하지 않고 멈춰요"},
-          {"label": "push", "value": "push", "description": "현재 branch 를 origin 에 처음 올려요"}
+          {"label": "올리기", "value": "push", "description": "현재 branch 를 origin 에 처음 올려요"}
         ]
       }
       ```

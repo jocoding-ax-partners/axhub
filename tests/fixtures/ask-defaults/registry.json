@@ -49,7 +49,7 @@
     }
   },
   "recover": {
-    "직전 안정 커밋으로 다시 배포해요?": {
+    "직전에 잘 됐던 버전으로 다시 올릴까요?": {
       "safe_default": "abort",
       "rationale": "Forward-fix is destructive deploy_create. Subprocess must not auto-rollback without explicit human confirm.",
       "allowed_safe_defaults": [
@@ -59,7 +59,7 @@
     }
   },
   "apis": {
-    "다른 팀 API도 볼래요? 권한 있는 모든 endpoint 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요.": {
+    "다른 팀 API도 볼래요? 권한 있는 모든 API 주소를 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요.": {
       "safe_default": "stay",
       "rationale": "Privacy-first: never widen scope to cross-team without explicit human consent (PLAN row 46 audit log requirement).",
       "allowed_safe_defaults": [

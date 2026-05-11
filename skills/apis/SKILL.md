@@ -71,7 +71,7 @@ To list APIs:
 
    ```json
    {
-     "question": "다른 팀 API도 볼래요? 권한 있는 모든 endpoint 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요.",
+     "question": "다른 팀 API도 볼래요? 권한 있는 모든 API 주소를 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요.",
      "header": "팀 범위",
      "options": [
        {"label": "네, 전체 보기", "value": "cross_team", "description": "권한 있는 모든 팀의 API 카탈로그"},
