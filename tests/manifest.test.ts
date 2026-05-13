@@ -268,13 +268,16 @@ describe("hooks.json structure", () => {
   });
 
   test("each hook command references axhub-helpers binary or session-start shim", () => {
-    // SessionStart uses the universal bash shim; other hooks call the binary directly.
+    // SessionStart uses the universal bash shim; most hooks call the binary
+    // directly; Phase 25 PR 25.3 introduces a TS PostToolUse hook executed
+    // via the host bun runtime (hooks/*.ts).
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {
         for (const h of g.hooks) {
           const refsBinary = h.command.includes("axhub-helpers");
           const refsShim = h.command.includes("hooks/session-start.sh");
-          expect(refsBinary || refsShim).toBe(true);
+          const refsTsHook = /hooks\/[a-z0-9_-]+\.ts\b/.test(h.command);
+          expect(refsBinary || refsShim || refsTsHook).toBe(true);
         }
       }
     }
@@ -920,6 +923,9 @@ describe("cross-manifest consistency", () => {
         for (const h of g.hooks) {
           // Skip shim paths: universal hooks.json only registers the bash SessionStart shim.
           if (h.command.includes("hooks/session-start.sh")) continue;
+          // Phase 25 PR 25.3 — bun-launched TS hooks live under hooks/*.ts and
+          // are not axhub-helpers subcommands, so they're outside this check.
+          if (/hooks\/[a-z0-9_-]+\.ts\b/.test(h.command)) continue;
           const sub = h.command.split(/\s+/).pop();
           if (sub) {
             expect(knownSubcommands.has(sub)).toBe(true);

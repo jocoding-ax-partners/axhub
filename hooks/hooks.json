@@ -1,5 +1,5 @@
 {
-  "description": "axhub plugin hooks: SessionStart diagnostics + UserPromptSubmit NL routing + PreToolUse HMAC consent gate (Rust helper, deterministic) + PostToolUse exit-code Korean classifier",
+  "description": "axhub plugin hooks: SessionStart diagnostics + UserPromptSubmit NL routing + PreToolUse HMAC consent gate (Rust helper, deterministic) + PostToolUse exit-code Korean classifier + PostToolUse deploy artifact verifier (Phase 25 PR 25.3)",
   "hooks": {
     "SessionStart": [
       {
@@ -43,6 +43,11 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers classify-exit",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-verify-deploy-artifacts.ts",
+            "timeout": 7
           }
         ]
       }
