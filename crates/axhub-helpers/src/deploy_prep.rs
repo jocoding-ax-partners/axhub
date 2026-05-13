@@ -360,4 +360,70 @@ mod tests {
             "kill switch must clear in_flight_deploy"
         );
     }
+
+    /// save_cache → load_cache roundtrip preserves DeployPrepResult shape and
+    /// exercises the atomic rename path (.tmp → final).
+    #[test]
+    fn save_cache_load_cache_roundtrip() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmpdir = std::env::temp_dir().join(format!(
+            "axhub-test-cache-{}",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&tmpdir).unwrap();
+        let prev = std::env::var_os("XDG_CACHE_HOME");
+        std::env::set_var("XDG_CACHE_HOME", &tmpdir);
+
+        let original = make_result(true);
+        save_cache(&original);
+
+        let loaded = load_cache().expect("expected cache hit after save_cache");
+        assert_eq!(loaded.exit_code, original.exit_code);
+        assert_eq!(loaded.github_connected, original.github_connected);
+
+        // Verify no stray .tmp survives after rename.
+        let cache_file = tmpdir.join("axhub-plugin").join("deploy-prep-cache.json");
+        let tmp_file = cache_file.with_extension("json.tmp");
+        assert!(cache_file.exists(), "final cache file must exist");
+        assert!(!tmp_file.exists(), ".tmp must not survive rename");
+
+        match prev {
+            Some(v) => std::env::set_var("XDG_CACHE_HOME", v),
+            None => std::env::remove_var("XDG_CACHE_HOME"),
+        }
+        let _ = std::fs::remove_dir_all(&tmpdir);
+    }
+
+    /// load_cache returns None when the cache file is missing or corrupt.
+    #[test]
+    fn load_cache_returns_none_on_missing_and_corrupt() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmpdir = std::env::temp_dir().join(format!(
+            "axhub-test-cache-corrupt-{}",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        let prev = std::env::var_os("XDG_CACHE_HOME");
+        std::env::set_var("XDG_CACHE_HOME", &tmpdir);
+
+        // Missing file → None
+        assert!(
+            load_cache().is_none(),
+            "load_cache must return None for missing file"
+        );
+
+        // Corrupt file → None
+        let cache_dir = tmpdir.join("axhub-plugin");
+        std::fs::create_dir_all(&cache_dir).unwrap();
+        std::fs::write(cache_dir.join("deploy-prep-cache.json"), "not json").unwrap();
+        assert!(
+            load_cache().is_none(),
+            "load_cache must return None for corrupt JSON"
+        );
+
+        match prev {
+            Some(v) => std::env::set_var("XDG_CACHE_HOME", v),
+            None => std::env::remove_var("XDG_CACHE_HOME"),
+        }
+        let _ = std::fs::remove_dir_all(&tmpdir);
+    }
 }
