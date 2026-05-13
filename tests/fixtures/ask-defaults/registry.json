@@ -49,7 +49,7 @@
         "decision_topic": "duplicate"
       }
     },
-    "다른 사람이 같은 앱에 배포 중이에요. 어떻게 할까요?": {
+    "다른 사람이 같은 앱에 배포 중일 가능성이 있어요. 어떻게 할까요?": {
       "safe_default": "취소",
       "rationale": "Step 1.6b (cross-tenant). 다른 사용자 의 in-flight deploy. non-interactive 에서 explicit user intent 없이 mutate 차단. operator notify hint.",
       "allowed_safe_defaults": [
