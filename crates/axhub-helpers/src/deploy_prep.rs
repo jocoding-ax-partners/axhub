@@ -47,6 +47,13 @@ pub struct DeployPrepResult {
     pub resolve: ResolveOutput,
     pub bootstrap_plan: Option<BootstrapPlan>,
     pub exit_code: i32,
+    /// Preflight stage exit code, needed by `--refresh-in-flight` selective
+    /// refresh path to re-derive the merged `exit_code` against a fresh resolve
+    /// while keeping the cached preflight result (issue #81 PR B1).
+    /// `#[serde(default)]` keeps deserialization backwards compatible with
+    /// older cache files written before this field existed.
+    #[serde(default)]
+    pub preflight_exit_code: i32,
     /// In-flight deploy for this app, if one exists within the detection window.
     /// Serialises as JSON `null` when absent (not missing key) via `#[serde(default)]`.
     /// JSON shape: `{"id": i64, "created_at": "<RFC3339>"}`.
@@ -113,8 +120,9 @@ pub fn apply_in_flight(result: &mut DeployPrepResult, in_flight: Option<InFlight
 /// `apply_in_flight` explicitly after fetching.
 pub fn compose_deploy_prep(preflight: PreflightRun, resolve: ResolveRun) -> DeployPrepResult {
     let bootstrap_plan = derive_bootstrap_plan(&resolve.output);
+    let preflight_exit_code = preflight.exit_code;
     let exit_code = merge_exit_code(
-        preflight.exit_code,
+        preflight_exit_code,
         resolve.exit_code,
         bootstrap_plan.as_ref(),
     );
@@ -124,6 +132,7 @@ pub fn compose_deploy_prep(preflight: PreflightRun, resolve: ResolveRun) -> Depl
         resolve: resolve.output,
         bootstrap_plan,
         exit_code,
+        preflight_exit_code,
         in_flight_deploy: None,
         github_connected,
     }
@@ -152,9 +161,20 @@ fn cache_path() -> Option<PathBuf> {
 }
 
 fn save_cache(result: &DeployPrepResult) {
+    save_cache_internal(result, chrono::Utc::now().to_rfc3339());
+}
+
+/// Selective refresh path 전용 — original cached_at 을 그대로 유지하여 TTL 시계가
+/// refresh 마다 reset 되는 것을 차단해요. preflight 부분이 무기한 stale 되는 위험
+/// 을 막아요 (issue #81 PR B1 Critic round 2 finding).
+fn save_cache_preserve_timestamp(result: &DeployPrepResult, original_cached_at: String) {
+    save_cache_internal(result, original_cached_at);
+}
+
+fn save_cache_internal(result: &DeployPrepResult, cached_at: String) {
     let Some(path) = cache_path() else { return };
     let cache = CacheFile {
-        cached_at: chrono::Utc::now().to_rfc3339(),
+        cached_at,
         result: result.clone(),
     };
     let Ok(json) = serde_json::to_string(&cache) else {
@@ -170,7 +190,15 @@ fn save_cache(result: &DeployPrepResult) {
     }
 }
 
+#[allow(dead_code)] // Used by tests only; production refresh path calls load_cache_with_timestamp.
 fn load_cache() -> Option<DeployPrepResult> {
+    load_cache_with_timestamp().map(|(r, _)| r)
+}
+
+/// `load_cache` 와 같지만 cache 의 original `cached_at` 도 반환해요. selective
+/// refresh path 에서 `save_cache_preserve_timestamp` 와 함께 사용해서 TTL invariant
+/// 를 유지해요 (issue #81 PR B1).
+fn load_cache_with_timestamp() -> Option<(DeployPrepResult, String)> {
     let path = cache_path()?;
     let json = std::fs::read_to_string(path).ok()?;
     let cache: CacheFile = serde_json::from_str(&json).ok()?;
@@ -181,7 +209,7 @@ fn load_cache() -> Option<DeployPrepResult> {
     if age < 0 || age as u64 > CACHE_TTL_SECS {
         return None;
     }
-    Some(cache.result)
+    Some((cache.result, cache.cached_at))
 }
 
 // ── Public entry points ────────────────────────────────────────────────────────
@@ -196,15 +224,35 @@ where
 {
     let refresh_in_flight = args.iter().any(|a| a == "--refresh-in-flight");
 
+    // PR B1 selective refresh — `--refresh-in-flight` 시 resolve 만 fresh fetch,
+    // preflight 는 cache 재사용. bootstrap_plan + github_connected + exit_code 같은
+    // derived state 는 fresh resolve 기준으로 모두 재유도해요 (issue #81 M3).
     let mut result = if refresh_in_flight {
-        // Use cached preflight + resolve; only re-check in_flight below.
-        if let Some(cached) = load_cache() {
-            cached
-        } else {
-            // Cache miss or expired — fall back to full fresh fetch.
-            run_preflight_and_resolve(args, &runner)
+        let cached_with_ts = load_cache_with_timestamp();
+        let fresh_resolve_run = run_resolve_with_runner(args, &runner);
+        match cached_with_ts {
+            Some((mut c, original_cached_at)) => {
+                c.resolve = fresh_resolve_run.output;
+                // resolve 의 derived state 모두 re-derive — compose_deploy_prep 와 동일 invariant
+                c.bootstrap_plan = derive_bootstrap_plan(&c.resolve);
+                c.github_connected = c.resolve.github_repo_url.is_some();
+                c.exit_code = merge_exit_code(
+                    c.preflight_exit_code,
+                    fresh_resolve_run.exit_code,
+                    c.bootstrap_plan.as_ref(),
+                );
+                save_cache_preserve_timestamp(&c, original_cached_at);
+                c
+            }
+            None => {
+                let fresh = run_preflight_and_resolve(args, &runner);
+                save_cache(&fresh);
+                fresh
+            }
         }
     } else {
+        // 일반 deploy: 항상 fresh + cache write-only.
+        // cache 는 `--refresh-in-flight` 의 selective refresh 에만 read 돼요.
         let fresh = run_preflight_and_resolve(args, &runner);
         save_cache(&fresh);
         fresh
@@ -300,6 +348,7 @@ mod tests {
             },
             bootstrap_plan: None,
             exit_code: EXIT_OK,
+            preflight_exit_code: EXIT_OK,
             in_flight_deploy: None,
             github_connected,
         }
