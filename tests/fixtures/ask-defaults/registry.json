@@ -258,5 +258,17 @@
         "confused 보기"
       ]
     }
+  },
+  "verify": {
+    "_note": "Phase 26 PR 26.4 verify SKILL. axhub status + logs tail evidence 기반 verdict. interactive=AskUserQuestion 헬스 endpoint setup / non-interactive=skip (status+logs 만으로 verdict).",
+    "default_subprocess_action": "skip",
+    "헬스 endpoint 가 설정 안 돼 있어요. 지금 설정해서 더 깊게 검증할까요?": {
+      "safe_default": "skip",
+      "rationale": "헬스 endpoint 미설정 시 비대화형 환경에선 axhub status + logs tail 만으로 verdict 결정. interactive 환경에서만 사용자에게 setup 묻기.",
+      "allowed_safe_defaults": [
+        "skip",
+        "지금 설정"
+      ]
+    }
   }
 }

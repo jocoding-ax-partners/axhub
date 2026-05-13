@@ -4,33 +4,59 @@
   "allowed_collisions": [
     {
       "phrase": "update",
-      "skills": ["update", "upgrade"],
+      "skills": [
+        "update",
+        "upgrade"
+      ],
       "reason": "main.rs 의 두 skill 모두 동일 phrase 를 trigger 로 사용. update = CLI 버전, upgrade = plugin 자체 버전. main.rs first-match-wins 우선순위로 이미 update 가 먼저 매칭. Approach E 후 Claude 가 description prose 의 'CLI' / '플러그인' 단서로 분기."
     },
     {
       "phrase": "upgrade",
-      "skills": ["update", "upgrade"],
+      "skills": [
+        "update",
+        "upgrade"
+      ],
       "reason": "update phrase 와 동일 사유."
     },
     {
       "phrase": "version",
-      "skills": ["update", "upgrade"],
+      "skills": [
+        "update",
+        "upgrade"
+      ],
       "reason": "update phrase 와 동일 사유."
     },
     {
       "phrase": "업데이트",
-      "skills": ["update", "upgrade"],
+      "skills": [
+        "update",
+        "upgrade"
+      ],
       "reason": "update phrase 와 동일 사유 (한국어)."
     },
     {
       "phrase": "업그레이드",
-      "skills": ["update", "upgrade"],
+      "skills": [
+        "update",
+        "upgrade"
+      ],
       "reason": "update phrase 와 동일 사유 (한국어)."
     },
     {
       "phrase": "새 버전",
-      "skills": ["update", "upgrade"],
+      "skills": [
+        "update",
+        "upgrade"
+      ],
       "reason": "update phrase 와 동일 사유 (한국어)."
+    },
+    {
+      "phrase": "라이브 됐어",
+      "skills": [
+        "status",
+        "verify"
+      ],
+      "reason": "Phase 26 PR 26.4 — status (마지막 배포 state 조회) vs verify (evidence 기반 라이브 확정) 의도 분기. status = 가벼운 read-only / verify = axhub status + logs tail + (선택) health endpoint 종합 verdict. Claude description prose 의 \"evidence\" / \"진짜\" 단서로 우선 매칭."
     }
   ]
 }

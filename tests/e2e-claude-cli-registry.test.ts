@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("21 top-level keys (2 메타 + 19 SKILL slug)", () => {
+  test("22 top-level keys (2 메타 + 20 SKILL slug)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(21);
+    expect(keys).toHaveLength(22);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const skillSlugs = keys.filter((k) => !k.startsWith("_")).sort();
@@ -71,13 +71,14 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "status",
       "update",
       "upgrade",
+      "verify",
       "whatsnew",
     ]);
   });
 
-  test("26 actual safe_default rationale 엔트리 (Phase 3.5 cli_too_new dismiss 추가)", () => {
+  test("27 actual safe_default rationale 엔트리 (Phase 26 verify health_endpoint_setup 추가)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(26);
+    expect(paths).toHaveLength(27);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -107,6 +108,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "routing-stats",
       "update",
       "upgrade",
+      "verify",
     ]);
   });
 

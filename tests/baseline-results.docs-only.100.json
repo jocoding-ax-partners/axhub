@@ -1,10 +1,10 @@
 [
   {
     "_metadata": {
-      "measured_at": "2026-05-08T05:20:00Z",
+      "measured_at": "2026-05-11T07:56:00Z",
       "reviewer": "wongil",
       "corpus_version": "tests/corpus.100.jsonl@phase-11-gap-fill",
-      "skills_version": "phase-12/init-prefixless-routing",
+      "skills_version": "phase-26/pr-26-4-verify-skill",
       "claude_model": "committed-docs-only-fixture",
       "rows_measured": 112,
       "rows_skipped": 0,
@@ -13,7 +13,7 @@
         "override": 0,
         "null": 0
       },
-      "notes": "Metadata refreshed for the prefixless Korean init trigger fixture; existing row decisions preserve committed docs-only fixture semantics."
+      "notes": "Metadata refreshed for axhub:verify routing description. Row decisions preserve committed docs-only fixture semantics; verify SKILL drift is covered by dedicated invariants in tests/skills/verify-skill.test.ts."
     }
   },
   {
