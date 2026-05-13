@@ -4,6 +4,28 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.8](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.7...v0.5.8) (2026-05-13)
+
+`/axhub:deploy` push 직후 중복 `deploy_create` race 를 차단하는 릴리스예요. PR #80 가 preventive + reactive guard 를 도입했고, issue #81 후속 stack 으로 in-flight detection 을 3-way (same-commit / cross-tenant / uncertain) 로 정밀화해서 `INFLIGHT_BRANCH` 변수로 분기했어요. `--refresh-in-flight` selective refresh flag 로 cache hit 후 in-flight 만 fresh 재조회하고, Step 3.6 도 같은 flag 를 쓰도록 통일했어요. ADR-0010 으로 stderr filter 의 graceful degradation 정책을 명문화했고, Step 1.6 에 ownership 추론 한계 disclosure 와 1.6b 카피 톤을 부드럽게 다듬었어요.
+
+### Test baseline
+
+- PR gate: #80 + #93 (통합) checks pass 또는 의도된 skip 이에요 — Rust CI 3 OS, Perf Gate 3 OS, T2 helper-bin, corpus.100 drift gate, Local Rust-primary 전부 SUCCESS.
+- Integrated main gate: `cargo test -p axhub-helpers --release` 332 pass / 3 ignored, `bun test` 701 pass / 4 skip / 0 fail / 4217 expect 가 green 이에요.
+- Release gate: `bun run release` postbump 의 `codegen:version` + `release:check` 가 v0.5.8 manifest 와 install script version sync 를 확인했어요.
+
+### Honest tradeoff
+
+- 원본 stacked PR #82/#83/#84/#89/#90/#91 은 #80 squash merge 직후 base branch 자동 삭제로 cascade 충돌 발생, 9 commits 를 단일 통합 PR #93 으로 cherry-pick 재정렬해서 머지했어요. 원본 review/CI 이력은 보존했어요.
+- `AXHUB_E2E_STAGING_TOKEN` 이 필요한 staging E2E 4개는 로컬 검증에서 의도적으로 skip 됐어요. 대신 PR checks 와 mock/backend 계약, helper unit/e2e tests 로 릴리스 경계를 확인했어요.
+- 실제 production destructive deploy create 는 실행하지 않았어요. race fix 는 fixture + 7 selective refresh unit test 와 SKILL invariant test 로 검증했어요.
+
+
+### Fixed
+
+* **deploy:** /axhub:deploy push 후 중복 deploy_create race 차단 ([#80](https://github.com/jocoding-ax-partners/axhub/issues/80)) ([138b177](https://github.com/jocoding-ax-partners/axhub/commit/138b1770b6bde310b9843175602bb71cd748c161))
+* **deploy:** 통합 — issue [#81](https://github.com/jocoding-ax-partners/axhub/issues/81) stack + [#85](https://github.com/jocoding-ax-partners/axhub/issues/85)/[#86](https://github.com/jocoding-ax-partners/axhub/issues/86)/[#87](https://github.com/jocoding-ax-partners/axhub/issues/87) 후속 (M1-M6 + M85/M86/M87) ([#93](https://github.com/jocoding-ax-partners/axhub/issues/93)) ([1685fdd](https://github.com/jocoding-ax-partners/axhub/commit/1685fdd552d678320c374c16a2b3076d07ccd680)), closes [#80](https://github.com/jocoding-ax-partners/axhub/issues/80) [#80](https://github.com/jocoding-ax-partners/axhub/issues/80) [#80](https://github.com/jocoding-ax-partners/axhub/issues/80) [#82](https://github.com/jocoding-ax-partners/axhub/issues/82) [#80](https://github.com/jocoding-ax-partners/axhub/issues/80) [#80](https://github.com/jocoding-ax-partners/axhub/issues/80) [#80](https://github.com/jocoding-ax-partners/axhub/issues/80) [#82](https://github.com/jocoding-ax-partners/axhub/issues/82) [#83](https://github.com/jocoding-ax-partners/axhub/issues/83) [#80](https://github.com/jocoding-ax-partners/axhub/issues/80) [#84](https://github.com/jocoding-ax-partners/axhub/issues/84) [#80](https://github.com/jocoding-ax-partners/axhub/issues/80) [#82](https://github.com/jocoding-ax-partners/axhub/issues/82) [#83](https://github.com/jocoding-ax-partners/axhub/issues/83) [#84](https://github.com/jocoding-ax-partners/axhub/issues/84) [#84](https://github.com/jocoding-ax-partners/axhub/issues/84) [#88](https://github.com/jocoding-ax-partners/axhub/issues/88) [#88](https://github.com/jocoding-ax-partners/axhub/issues/88) [#84](https://github.com/jocoding-ax-partners/axhub/issues/84) [#80](https://github.com/jocoding-ax-partners/axhub/issues/80) [#88](https://github.com/jocoding-ax-partners/axhub/issues/88) [#80](https://github.com/jocoding-ax-partners/axhub/issues/80) [#88](https://github.com/jocoding-ax-partners/axhub/issues/88) [#83](https://github.com/jocoding-ax-partners/axhub/issues/83) [#83](https://github.com/jocoding-ax-partners/axhub/issues/83)
+
 ## [0.5.7](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.6...v0.5.7) (2026-05-13)
 
 Phase 25/26 matrix absorption 릴리스예요. deploy event log, recovery scan, hook kill switch, verify/trace 자동 제안, trace/verify SKILL, 품질 게이트, SKILL model routing 을 순서대로 main 에 흡수했고, 마지막 registry idempotence hotfix 까지 반영해서 검증 재실행 후 워킹트리가 깨끗하게 남아요.
