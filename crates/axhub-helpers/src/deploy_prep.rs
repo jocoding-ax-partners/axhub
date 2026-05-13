@@ -49,7 +49,7 @@ pub struct DeployPrepResult {
     pub exit_code: i32,
     /// In-flight deploy for this app, if one exists within the detection window.
     /// Serialises as JSON `null` when absent (not missing key) via `#[serde(default)]`.
-    /// JSON shape: `{"id": i64, "pushed_at": "<RFC3339>"}`.
+    /// JSON shape: `{"id": i64, "created_at": "<RFC3339>"}`.
     #[serde(default)]
     pub in_flight_deploy: Option<InFlightDeploy>,
     /// True when the resolved app has a linked GitHub repository.
@@ -315,7 +315,7 @@ mod tests {
     }
 
     /// `in_flight_deploy: None` → JSON `null`; `Some(...)` → nested object
-    /// with `pushed_at` (not `created_at`) and no `seconds_since_created`.
+    /// with `created_at` (not `created_at`) and no `seconds_since_created`.
     #[test]
     fn serializes_in_flight_deploy_field() {
         let mut result = make_result(false);
@@ -327,7 +327,7 @@ mod tests {
             "expected null: {json_none}"
         );
 
-        // Some → nested object with `pushed_at`, no `seconds_since_created`
+        // Some → nested object with `created_at`, no `seconds_since_created`
         result.in_flight_deploy = Some(in_flight_deploy());
         let json_some = serde_json::to_string(&result).unwrap();
         assert!(
@@ -335,8 +335,8 @@ mod tests {
             "expected nested object: {json_some}"
         );
         assert!(
-            json_some.contains("\"pushed_at\":"),
-            "field must be pushed_at: {json_some}"
+            json_some.contains("\"created_at\":"),
+            "field must be created_at: {json_some}"
         );
         assert!(
             !json_some.contains("seconds_since_created"),
