@@ -428,8 +428,10 @@ fn refresh_in_flight_rederives_github_connected_when_repo_url_changes() {
 
 #[test]
 fn refresh_in_flight_preserves_cached_at_timestamp() {
+    // Sentinel-based verification — no timing dependency (issue #81 testing M2).
+    // Prime cache then mutate cached_at to a stable sentinel string; selective
+    // refresh must leave the sentinel intact while still updating resolve.
     with_temp_cache_home(|cache_root| {
-        // Prime
         let calls1: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
         let runner1 = capturing_runner(
             Arc::clone(&calls1),
@@ -440,16 +442,19 @@ fn refresh_in_flight_preserves_cached_at_timestamp() {
         let cache_path = cache_root
             .join("axhub-plugin")
             .join("deploy-prep-cache.json");
-        let original_cached_at = {
+
+        // Overwrite cached_at with a sentinel that is (a) within the 300 s TTL so the
+        // cache stays valid, (b) at a fixed past offset so we can detect any reset.
+        // 60 s in the past keeps load_cache_with_timestamp returning Some(...) while
+        // remaining distinguishable from chrono::Utc::now() at the refresh site.
+        let sentinel_cached_at = (chrono::Utc::now() - chrono::Duration::seconds(60)).to_rfc3339();
+        {
             let json = std::fs::read_to_string(&cache_path).unwrap();
-            let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-            v["cached_at"].as_str().unwrap().to_string()
-        };
+            let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+            v["cached_at"] = serde_json::Value::String(sentinel_cached_at.clone());
+            std::fs::write(&cache_path, serde_json::to_string(&v).unwrap()).unwrap();
+        }
 
-        // Sleep > 1 s so chrono::Utc::now() differs noticeably from cached_at
-        std::thread::sleep(std::time::Duration::from_millis(1_100));
-
-        // Refresh
         let calls2: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
         let runner2 = capturing_runner(
             Arc::clone(&calls2),
@@ -463,8 +468,8 @@ fn refresh_in_flight_preserves_cached_at_timestamp() {
             v["cached_at"].as_str().unwrap().to_string()
         };
         assert_eq!(
-            original_cached_at, post_cached_at,
-            "cached_at must be preserved across selective refresh (TTL invariant)"
+            sentinel_cached_at, post_cached_at,
+            "cached_at sentinel must be preserved across selective refresh (TTL invariant)"
         );
     });
 }

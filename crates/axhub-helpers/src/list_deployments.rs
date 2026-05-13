@@ -503,7 +503,10 @@ where
         let created_secs = created_dt.timestamp().max(0) as u64;
         let seconds_since_created = now_secs.saturating_sub(created_secs);
         if seconds_since_created <= window_secs {
-            let canonical = created_dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            // Preserve millisecond precision so SKILL `date` arithmetic
+            // doesn't lose up to 1 s near the 60 s window boundary
+            // (issue #81 C4 — correctness review finding).
+            let canonical = created_dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
             return Ok(Some(InFlightDeploy {
                 id: d.id,
                 status: d.status,
@@ -740,5 +743,30 @@ mod tests {
 
         std::env::remove_var("AXHUB_TOKEN");
         assert!(result.is_err(), "malformed created_at must surface as Err");
+    }
+
+    /// HTTP 200 + non-JSON body must surface as Err from find_app_in_flight_with_fetch
+    /// (issue #81 testing M3 — covers run_list_deployments_with_fetch invalid_json branch).
+    #[test]
+    fn invalid_json_response_body_returns_err() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("AXHUB_TOKEN", "test_token");
+        let now = chrono::Utc::now();
+
+        let result = find_app_in_flight_with_fetch(
+            42,
+            now,
+            600,
+            |_url, _token| {
+                Ok(HttpResponse {
+                    status: 200,
+                    body: "not json".to_string(),
+                })
+            },
+            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
+        );
+
+        std::env::remove_var("AXHUB_TOKEN");
+        assert!(result.is_err(), "invalid JSON body must surface as Err");
     }
 }
