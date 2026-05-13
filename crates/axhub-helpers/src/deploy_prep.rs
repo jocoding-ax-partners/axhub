@@ -334,7 +334,10 @@ mod tests {
             json_some.contains("\"in_flight_deploy\":{"),
             "expected nested object: {json_some}"
         );
-        assert!(json_some.contains("\"pushed_at\":"), "field must be pushed_at: {json_some}");
+        assert!(
+            json_some.contains("\"pushed_at\":"),
+            "field must be pushed_at: {json_some}"
+        );
         assert!(
             !json_some.contains("seconds_since_created"),
             "seconds_since_created must not appear in JSON: {json_some}"
@@ -352,6 +355,9 @@ mod tests {
 
         std::env::remove_var(ENV_IN_FLIGHT_KILL_SWITCH);
 
-        assert!(result.in_flight_deploy.is_none(), "kill switch must clear in_flight_deploy");
+        assert!(
+            result.in_flight_deploy.is_none(),
+            "kill switch must clear in_flight_deploy"
+        );
     }
 }

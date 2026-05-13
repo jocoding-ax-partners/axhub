@@ -480,11 +480,9 @@ where
     );
 
     if result.exit_code != EXIT_LIST_OK {
-        return Err(anyhow::anyhow!(
-            result
-                .error_message_kr
-                .unwrap_or_else(|| "list_deployments failed".into())
-        ));
+        return Err(anyhow::anyhow!(result
+            .error_message_kr
+            .unwrap_or_else(|| "list_deployments failed".into())));
     }
 
     let now_secs = now.timestamp().max(0) as u64;
@@ -499,8 +497,7 @@ where
         let created_secs = created_dt.timestamp().max(0) as u64;
         let seconds_since_created = now_secs.saturating_sub(created_secs);
         if seconds_since_created <= window_secs {
-            let canonical = created_dt
-                .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            let canonical = created_dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
             return Ok(Some(InFlightDeploy {
                 id: d.id,
                 status: d.status,
@@ -604,7 +601,12 @@ mod tests {
             42,
             now,
             600,
-            move |_url, _token| Ok(HttpResponse { status: 200, body: body.clone() }),
+            move |_url, _token| {
+                Ok(HttpResponse {
+                    status: 200,
+                    body: body.clone(),
+                })
+            },
             Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
         )
         .unwrap();
@@ -630,12 +632,105 @@ mod tests {
             42,
             now,
             600,
-            move |_url, _token| Ok(HttpResponse { status: 200, body: body.clone() }),
+            move |_url, _token| {
+                Ok(HttpResponse {
+                    status: 200,
+                    body: body.clone(),
+                })
+            },
             Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
         )
         .unwrap();
 
         std::env::remove_var("AXHUB_TOKEN");
         assert!(result.is_none(), "deploy outside window must be excluded");
+    }
+
+    /// Happy path: pending deploy within window returns Some with canonical Z pushed_at.
+    #[test]
+    fn returns_some_for_in_flight_within_window() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("AXHUB_TOKEN", "test_token");
+        let now = chrono::Utc::now();
+        let recent = (now - chrono::Duration::seconds(30)).to_rfc3339();
+
+        let body = list_response(&[
+            deployment_json(99, 1, &recent), // building, within window
+        ]);
+
+        let result = find_app_in_flight_with_fetch(
+            42,
+            now,
+            600,
+            move |_url, _token| {
+                Ok(HttpResponse {
+                    status: 200,
+                    body: body.clone(),
+                })
+            },
+            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
+        )
+        .unwrap()
+        .expect("expected Some for in-flight deploy");
+
+        std::env::remove_var("AXHUB_TOKEN");
+        assert_eq!(result.id, 99);
+        assert_eq!(result.status, "building");
+        assert!(
+            result.created_at.ends_with('Z'),
+            "canonical Z form expected: {}",
+            result.created_at
+        );
+        assert!(result.seconds_since_created >= 28 && result.seconds_since_created <= 35);
+    }
+
+    /// HTTP 401 (auth failure) propagates as anyhow error from find_app_in_flight_with_fetch.
+    #[test]
+    fn fetch_auth_failure_returns_err() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("AXHUB_TOKEN", "test_token");
+        let now = chrono::Utc::now();
+
+        let result = find_app_in_flight_with_fetch(
+            42,
+            now,
+            600,
+            |_url, _token| {
+                Ok(HttpResponse {
+                    status: 401,
+                    body: r#"{"error":"unauthorized"}"#.to_string(),
+                })
+            },
+            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
+        );
+
+        std::env::remove_var("AXHUB_TOKEN");
+        assert!(result.is_err(), "401 must surface as Err");
+    }
+
+    /// Malformed created_at field raises a parse error from find_app_in_flight_with_fetch.
+    #[test]
+    fn malformed_created_at_returns_err() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("AXHUB_TOKEN", "test_token");
+        let now = chrono::Utc::now();
+
+        let body = list_response(&[deployment_json(7, 0, "not-an-rfc3339-timestamp")]);
+
+        let result = find_app_in_flight_with_fetch(
+            42,
+            now,
+            600,
+            move |_url, _token| {
+                Ok(HttpResponse {
+                    status: 200,
+                    body: body.clone(),
+                })
+            },
+            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
+        );
+
+        std::env::remove_var("AXHUB_TOKEN");
+        assert!(result.is_err(), "malformed created_at must surface as Err");
     }
 }
