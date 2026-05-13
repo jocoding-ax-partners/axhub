@@ -503,7 +503,7 @@ To deploy:
    ```bash
    echo '[deploy:Step 3.6 refresh-in-flight] entered' >&2
    if [ "${AXHUB_REFRESH_IN_FLIGHT:-0}" = "1" ]; then
-     REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --json 2>/dev/null || echo '{}')
+     REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --refresh-in-flight --json 2>/dev/null || echo '{}')
      NEW_IN_FLIGHT=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
      if [ -n "$NEW_IN_FLIGHT" ]; then
        DEPLOY_PREP_JSON="$REFRESH_JSON"
