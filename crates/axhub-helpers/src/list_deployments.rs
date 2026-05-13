@@ -437,16 +437,22 @@ const IN_FLIGHT_STATUSES: &[&str] = &["pending", "building", "deploying"];
 
 /// A deploy that is currently in-flight for a given app.
 ///
-/// JSON shape: `{"id": i64, "created_at": "<RFC3339>"}`.
+/// JSON shape: `{"id": i64, "status": "<str>", "created_at": "<RFC3339>", "commit_sha": "<str>"}`.
 /// `seconds_since_created` is kept for internal computation (saturating_sub
 /// clock-skew guard) but excluded from the public JSON envelope — the SKILL
 /// layer uses shell `date` arithmetic for deterministic timing comparisons.
+///
+/// `commit_sha` is the git commit hash of the deploy event, used by SKILL
+/// Step 1.6 to distinguish same-commit (current user's deploy) vs cross-tenant
+/// (another user's deploy on the same app). Empty string when backend response
+/// omits the field — routed to "uncertain" Step 1.6c branch (safe fallback).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InFlightDeploy {
     pub id: i64,
     pub status: String,
-    #[serde(rename = "created_at")]
     pub created_at: String, // RFC3339
+    #[serde(default)]
+    pub commit_sha: String,
     #[serde(skip)]
     pub seconds_since_created: u64,
 }
@@ -502,6 +508,7 @@ where
                 id: d.id,
                 status: d.status,
                 created_at: canonical,
+                commit_sha: d.commit_sha,
                 seconds_since_created,
             }));
         }

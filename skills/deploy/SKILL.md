@@ -262,27 +262,39 @@ To deploy:
    If `git commit` fails because there are no staged files or git identity is missing, stop before deploy and surface a humanized one-line reason ("저장 지점을 만들지 못했어요. 잠시 뒤에 다시 시도해요." 같은 한 줄). 내부 git stderr 는 user chat 에 직접 echo 하지 마요. Do not mint deploy consent until a fresh resolve returns both `branch` and `commit_sha`.
    If the user chooses "취소", stop deploy without running any git command. In non-interactive mode (subprocess / CI / `claude -p`), use the registry safe default "취소" — never run `git init` automatically in headless context.
 
-1.6. **In-flight deploy 감지 (배포 충돌 방지).** `deploy-prep` 응답에 `.in_flight_deploy.id` 가 non-null 이면 이미 진행 중인 배포가 있어요. 즉시 Step 2 로 넘어가지 않고 아래 AskUserQuestion 으로 사용자 의도를 확인해요.
+1.6. **In-flight deploy 감지 (배포 충돌 방지) — 3-way 분기.** `deploy-prep` 응답에 `.in_flight_deploy.id` 가 non-null 이면 이미 진행 중인 배포가 있어요. `in_flight_deploy.commit_sha` 와 `resolve.commit_sha` 비교로 3 가지 sub-step (1.6a / 1.6b / 1.6c) 중 어느 분기로 진입할지 결정해요.
 
-   최근 60초 이내에 push 가 있었으면 (`in_flight_deploy.created_at` 기준) "진행 중인 배포 보기" 를 default highlight 로, 60초를 넘겼으면 "새 배포 시작" 을 default highlight 로 제안해요. non-interactive 환경에서는 항상 `abort` 가 safe default 예요.
+   - **Step 1.6a (same-commit)**: 두 commit_sha 모두 non-empty 이고 일치 — 본인 배포 중복. 기존 "이미 배포가 진행 중이에요." prompt.
+   - **Step 1.6b (cross-tenant)**: 두 commit_sha 모두 non-empty 이고 다름 — 다른 user 의 in-flight. "다른 사람이 같은 앱에 배포 중이에요." prompt.
+   - **Step 1.6c (uncertain)**: 둘 중 하나가 empty (commit_sha missing) — uncertain state. "배포 중인 게 있는데 누구 건지 확인 중이에요." prompt (silent misidentification 차단).
 
    ```bash
    echo '[deploy:Step 1.6 in-flight-check] entered' >&2
    IN_FLIGHT_ID=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.id // ""')
    if [ -n "$IN_FLIGHT_ID" ]; then
+     IN_FLIGHT_COMMIT=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.commit_sha // ""')
+     RESOLVE_COMMIT=$(echo "$DEPLOY_PREP_JSON" | jq -r '.resolve.commit_sha // ""')
      CREATED_AT=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.created_at // ""')
      NOW_SEC=$(date +%s)
      CREATED_SEC=$(date -d "$CREATED_AT" +%s 2>/dev/null || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$CREATED_AT" +%s 2>/dev/null || echo 0)
      DELTA=$((NOW_SEC - CREATED_SEC))
-     # non-interactive: safe default = abort
+     # 3-way 분기 결정
+     if [ -z "$IN_FLIGHT_COMMIT" ] || [ -z "$RESOLVE_COMMIT" ]; then
+       INFLIGHT_BRANCH="uncertain"  # → Step 1.6c
+     elif [ "$IN_FLIGHT_COMMIT" = "$RESOLVE_COMMIT" ]; then
+       INFLIGHT_BRANCH="same"  # → Step 1.6a
+     else
+       INFLIGHT_BRANCH="cross_tenant"  # → Step 1.6b
+     fi
+     # non-interactive: safe default = abort (모든 분기 공통)
      if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]; then
-       echo '[deploy:Step 1.6] non-interactive → abort' >&2
+       echo "[deploy:Step 1.6 $INFLIGHT_BRANCH] non-interactive → abort" >&2
        exit 0
      fi
    fi
    ```
 
-   AskUserQuestion JSON envelope (해요체, 3-option):
+   1.6a — Step 1.6a (same-commit). AskUserQuestion JSON (해요체, 3-option). 최근 60초 이내 (`DELTA` ≤ 60) 면 "진행 중인 배포 보기" default highlight, 60초 넘으면 "새 배포 시작" default highlight.
 
    ```json
    {
@@ -298,6 +310,58 @@ To deploy:
          "label": "새 배포 시작",
          "value": "force_new",
          "description": "진행 중인 배포와 별개로 지금 바로 새 배포를 올려요."
+       },
+       {
+         "label": "취소",
+         "value": "abort",
+         "description": "배포를 멈춰요."
+       }
+     ]
+   }
+   ```
+
+   1.6b — Step 1.6b (cross-tenant). 다른 사용자 의 in-flight 라 더 보수적이에요. default highlight 는 "취소".
+
+   ```json
+   {
+     "question": "다른 사람이 같은 앱에 배포 중이에요. 어떻게 할까요?",
+     "header": "배포 충돌",
+     "options": [
+       {
+         "label": "진행 중인 배포 보기",
+         "value": "monitor",
+         "description": "다른 사용자 의 배포 결과를 실시간으로 확인해요."
+       },
+       {
+         "label": "새 배포 시작",
+         "value": "force_new",
+         "description": "다른 사용자 의 배포와 별개로 지금 바로 새 배포를 올려요."
+       },
+       {
+         "label": "취소",
+         "value": "abort",
+         "description": "배포를 멈춰요."
+       }
+     ]
+   }
+   ```
+
+   1.6c — Step 1.6c (uncertain). commit_sha missing → 누구 배포인지 판단 불가. silent misidentification 차단 위해 explicit uncertainty surface. default highlight 는 "취소".
+
+   ```json
+   {
+     "question": "배포 중인 게 있는데 누구 건지 확인 중이에요. 어떻게 할까요?",
+     "header": "배포 충돌",
+     "options": [
+       {
+         "label": "진행 중인 배포 보기",
+         "value": "monitor",
+         "description": "진행 중인 배포 결과를 일단 지켜봐요."
+       },
+       {
+         "label": "새 배포 시작",
+         "value": "force_new",
+         "description": "확인 안 되는 채로 지금 바로 새 배포를 올려요."
        },
        {
          "label": "취소",
@@ -449,7 +513,7 @@ To deploy:
    fi
    ```
 
-   in_flight 가 발견되면 Step 1.6 의 AskUserQuestion 3-option 라우팅을 동일하게 적용해요. `monitor` → Step 5 바로 이동, `force_new` → Step 4 계속, `abort` → 중단. non-interactive 환경에서는 건너뛰어요 (`AXHUB_REFRESH_IN_FLIGHT` 기본값 0 → no-op).
+   in_flight 가 발견되면 Step 1.6 의 3-way 분기 (1.6a / 1.6b / 1.6c) logic 을 동일하게 적용해요. `IN_FLIGHT_COMMIT` vs `RESOLVE_COMMIT` 비교 후 same-commit / cross-tenant / uncertain 분기 선택 → 해당 AskUserQuestion → `monitor` (Step 5 watch) / `force_new` (Step 4 계속) / `abort` (중단). non-interactive 환경에서는 건너뛰어요 (`AXHUB_REFRESH_IN_FLIGHT` 기본값 0 → no-op).
 
 4. **On user approval**, mint a consent token and run deploy. Run this step only when Step 1.1 did not already execute and record `deploy_create`; never double-submit a deploy for the same pending bootstrap action.
 
@@ -468,7 +532,8 @@ To deploy:
    AXHUB_STDERR_TMP=$(mktemp)
    axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --branch "$BRANCH" --commit "$COMMIT_SHA" --json 2>"$AXHUB_STDERR_TMP"
    AXHUB_EXIT=$?
-   if [ $AXHUB_EXIT -eq 64 ] && grep -qE 'validation\.deployment_in_progress' "$AXHUB_STDERR_TMP" 2>/dev/null; then
+   # Format: "axhub-error-sub-key: 64:validation.deployment_in_progress" (main.rs:1845, quality_gate.rs:15)
+   if [ $AXHUB_EXIT -eq 64 ] && grep -qE '^axhub-error-sub-key:.*64:validation\.deployment_in_progress' "$AXHUB_STDERR_TMP" 2>/dev/null; then
      # in-flight race: silent swallow raw stderr, then re-fetch in-flight id and route Step 5 watch.
      REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --refresh-in-flight --json 2>/dev/null || echo '{}')
      IN_FLIGHT_ID=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
@@ -491,7 +556,8 @@ To deploy:
    $AxhubStderrTmp = New-TemporaryFile
    & axhub deploy create --app $env:APP_ID @ProfileFlag --branch $env:BRANCH --commit $env:COMMIT_SHA --json 2>$AxhubStderrTmp.FullName
    $AxhubExit = $LASTEXITCODE
-   if ($AxhubExit -eq 64 -and (Select-String -Path $AxhubStderrTmp.FullName -Pattern 'validation\.deployment_in_progress' -Quiet)) {
+   # Format: "axhub-error-sub-key: 64:validation.deployment_in_progress" (main.rs:1845, quality_gate.rs:15)
+   if ($AxhubExit -eq 64 -and (Select-String -Path $AxhubStderrTmp.FullName -Pattern '^axhub-error-sub-key:.*64:validation\.deployment_in_progress' -Quiet)) {
      # in-flight race: silent swallow raw stderr, then re-fetch in-flight id and route Step 5 watch.
      $RefreshJson = & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" deploy-prep --intent deploy --refresh-in-flight --json 2>$null
      if (-not $RefreshJson) { $RefreshJson = '{}' }

@@ -39,12 +39,39 @@
     },
     "이미 배포가 진행 중이에요. 어떻게 할까요?": {
       "safe_default": "취소",
-      "rationale": "non-interactive (CI / claude -p) 에서는 race 차단보다 explicit user intent 우선. abort 가 mutate-aware safe default.",
+      "rationale": "Step 1.6a (same-commit duplicate). non-interactive 에서 본인 배포 중복 차단.",
       "allowed_safe_defaults": [
         "취소",
         "진행 중인 배포 보기",
         "새 배포 시작"
-      ]
+      ],
+      "metadata": {
+        "decision_topic": "duplicate"
+      }
+    },
+    "다른 사람이 같은 앱에 배포 중이에요. 어떻게 할까요?": {
+      "safe_default": "취소",
+      "rationale": "Step 1.6b (cross-tenant). 다른 사용자 의 in-flight deploy. non-interactive 에서 explicit user intent 없이 mutate 차단. operator notify hint.",
+      "allowed_safe_defaults": [
+        "취소",
+        "진행 중인 배포 보기",
+        "새 배포 시작"
+      ],
+      "metadata": {
+        "decision_topic": "cross_tenant"
+      }
+    },
+    "배포 중인 게 있는데 누구 건지 확인 중이에요. 어떻게 할까요?": {
+      "safe_default": "취소",
+      "rationale": "Step 1.6c (uncertain). commit_sha missing 으로 owner 판단 불가. silent misidentification 차단 위해 explicit uncertainty surface.",
+      "allowed_safe_defaults": [
+        "취소",
+        "진행 중인 배포 보기",
+        "새 배포 시작"
+      ],
+      "metadata": {
+        "decision_topic": "uncertain"
+      }
     }
   },
   "auth": {
