@@ -425,13 +425,313 @@ pub fn run_list_deployments(args: ListDeploymentsArgs) -> ListDeploymentsResult 
     )
 }
 
-#[cfg(all(test, not(coverage)))]
+// ── In-flight deploy detection ────────────────────────────────────────────────
+
+/// Default window for "recently pushed" classification (separate from
+/// `recovery_scan::DEFAULT_STALE_THRESHOLD_SECS` even though the numeric
+/// value is the same — the two thresholds serve different purposes).
+pub const RECENTLY_PUSHED_WINDOW_SECS: u64 = 60;
+
+/// Statuses that indicate a deploy is actively in progress.
+const IN_FLIGHT_STATUSES: &[&str] = &["pending", "building", "deploying"];
+
+/// A deploy that is currently in-flight for a given app.
+///
+/// JSON shape: `{"id": i64, "pushed_at": "<RFC3339>"}`.
+/// `seconds_since_created` is kept for internal computation (saturating_sub
+/// clock-skew guard) but excluded from the public JSON envelope — the SKILL
+/// layer uses shell `date` arithmetic for deterministic timing comparisons.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InFlightDeploy {
+    pub id: i64,
+    pub status: String,
+    #[serde(rename = "pushed_at")]
+    pub created_at: String, // RFC3339
+    #[serde(skip)]
+    pub seconds_since_created: u64,
+}
+
+/// Testable core: fetches the deployment list via `fetch_fn` and returns the
+/// first in-flight deploy within `window_secs`, or `None`.
+///
+/// - Filters status ∈ {pending, building, deploying}.
+/// - Filters `created_at` within last `window_secs`.
+/// - `seconds_since_created` uses `saturating_sub` to defend against clock
+///   skew underflow (clock skew where created_at > now).
+/// - Does NOT match on `commit_sha`.
+pub fn find_app_in_flight_with_fetch<F, T>(
+    app_id: i64,
+    now: chrono::DateTime<chrono::Utc>,
+    window_secs: u64,
+    fetch_fn: F,
+    tls_pin_checker: Option<T>,
+) -> Result<Option<InFlightDeploy>, anyhow::Error>
+where
+    F: Fn(&str, &str) -> Result<HttpResponse, anyhow::Error>,
+    T: Fn(&str) -> Result<(), TlsPinError>,
+{
+    let result = run_list_deployments_with_fetch(
+        ListDeploymentsArgs {
+            app_id: app_id.to_string(),
+            limit: Some(DEFAULT_LIMIT),
+        },
+        fetch_fn,
+        tls_pin_checker,
+    );
+
+    if result.exit_code != EXIT_LIST_OK {
+        return Err(anyhow::anyhow!(result
+            .error_message_kr
+            .unwrap_or_else(|| "list_deployments failed".into())));
+    }
+
+    let now_secs = now.timestamp().max(0) as u64;
+
+    for d in result.deployments {
+        if !IN_FLIGHT_STATUSES.contains(&d.status.as_str()) {
+            continue;
+        }
+        let created_dt = chrono::DateTime::parse_from_rfc3339(&d.created_at)
+            .map_err(|e| anyhow::anyhow!("created_at parse failed: {e}"))?
+            .with_timezone(&chrono::Utc);
+        let created_secs = created_dt.timestamp().max(0) as u64;
+        let seconds_since_created = now_secs.saturating_sub(created_secs);
+        if seconds_since_created <= window_secs {
+            let canonical = created_dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            return Ok(Some(InFlightDeploy {
+                id: d.id,
+                status: d.status,
+                created_at: canonical,
+                seconds_since_created,
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
+#[cfg(not(coverage))]
+pub fn find_app_in_flight_with_window(
+    app_id: i64,
+    now: chrono::DateTime<chrono::Utc>,
+    window_secs: u64,
+) -> Result<Option<InFlightDeploy>, anyhow::Error> {
+    find_app_in_flight_with_fetch(
+        app_id,
+        now,
+        window_secs,
+        |url, token| {
+            let client = reqwest::blocking::Client::new();
+            let resp = client
+                .get(url)
+                .bearer_auth(token)
+                .header("Accept", "application/json")
+                .send()?;
+            let status = resp.status().as_u16();
+            let body = resp.text()?;
+            Ok(HttpResponse { status, body })
+        },
+        Some(verify_hub_api_tls_pin),
+    )
+}
+
+#[cfg(coverage)]
+pub fn find_app_in_flight_with_window(
+    _app_id: i64,
+    _now: chrono::DateTime<chrono::Utc>,
+    _window_secs: u64,
+) -> Result<Option<InFlightDeploy>, anyhow::Error> {
+    Ok(None)
+}
+
+// ── Unit tests ─────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
+    use super::*;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    fn ok_pin(_: &str) -> Result<(), TlsPinError> {
+        Ok(())
+    }
+
+    fn deployment_json(id: i64, status: i64, created_at: &str) -> serde_json::Value {
+        serde_json::json!({
+            "id": id,
+            "app_id": 42_i64,
+            "status": status,
+            "commit_sha": "deadbeef",
+            "commit_message": null,
+            "branch": null,
+            "created_at": created_at
+        })
+    }
+
+    fn list_response(deps: &[serde_json::Value]) -> String {
+        serde_json::json!({ "data": { "deployments": deps } }).to_string()
+    }
+
+    #[cfg(not(coverage))]
     #[test]
     fn rustls_crypto_provider_is_unambiguous_without_proxy_override() {
         let roots = rustls::RootCertStore::empty();
         let _ = rustls::ClientConfig::builder()
             .with_root_certificates(roots)
             .with_no_client_auth();
+    }
+
+    /// Only deployments with status pending/building/deploying (0/1/2) are
+    /// returned; active (3), failed (4), stopped (5) must be excluded.
+    #[test]
+    fn filters_status_pending_building_deploying_only() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("AXHUB_TOKEN", "test_token");
+        let now = chrono::Utc::now();
+        let recent = (now - chrono::Duration::seconds(30)).to_rfc3339();
+
+        let body = list_response(&[
+            deployment_json(1, 3, &recent), // active   — excluded
+            deployment_json(2, 4, &recent), // failed   — excluded
+            deployment_json(3, 5, &recent), // stopped  — excluded
+        ]);
+
+        let result = find_app_in_flight_with_fetch(
+            42,
+            now,
+            600,
+            move |_url, _token| {
+                Ok(HttpResponse {
+                    status: 200,
+                    body: body.clone(),
+                })
+            },
+            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
+        )
+        .unwrap();
+
+        std::env::remove_var("AXHUB_TOKEN");
+        assert!(result.is_none(), "non-in-flight statuses must be excluded");
+    }
+
+    /// A pending deploy whose created_at is older than window_secs must be
+    /// excluded (now - created_at > window).
+    #[test]
+    fn filters_outside_window() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("AXHUB_TOKEN", "test_token");
+        let now = chrono::Utc::now();
+        let old = (now - chrono::Duration::seconds(700)).to_rfc3339(); // 700 s > 600 s window
+
+        let body = list_response(&[
+            deployment_json(1, 0, &old), // pending but outside window
+        ]);
+
+        let result = find_app_in_flight_with_fetch(
+            42,
+            now,
+            600,
+            move |_url, _token| {
+                Ok(HttpResponse {
+                    status: 200,
+                    body: body.clone(),
+                })
+            },
+            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
+        )
+        .unwrap();
+
+        std::env::remove_var("AXHUB_TOKEN");
+        assert!(result.is_none(), "deploy outside window must be excluded");
+    }
+
+    /// Happy path: pending deploy within window returns Some with canonical Z pushed_at.
+    #[test]
+    fn returns_some_for_in_flight_within_window() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("AXHUB_TOKEN", "test_token");
+        let now = chrono::Utc::now();
+        let recent = (now - chrono::Duration::seconds(30)).to_rfc3339();
+
+        let body = list_response(&[
+            deployment_json(99, 1, &recent), // building, within window
+        ]);
+
+        let result = find_app_in_flight_with_fetch(
+            42,
+            now,
+            600,
+            move |_url, _token| {
+                Ok(HttpResponse {
+                    status: 200,
+                    body: body.clone(),
+                })
+            },
+            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
+        )
+        .unwrap()
+        .expect("expected Some for in-flight deploy");
+
+        std::env::remove_var("AXHUB_TOKEN");
+        assert_eq!(result.id, 99);
+        assert_eq!(result.status, "building");
+        assert!(
+            result.created_at.ends_with('Z'),
+            "canonical Z form expected: {}",
+            result.created_at
+        );
+        assert!(result.seconds_since_created >= 28 && result.seconds_since_created <= 35);
+    }
+
+    /// HTTP 401 (auth failure) propagates as anyhow error from find_app_in_flight_with_fetch.
+    #[test]
+    fn fetch_auth_failure_returns_err() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("AXHUB_TOKEN", "test_token");
+        let now = chrono::Utc::now();
+
+        let result = find_app_in_flight_with_fetch(
+            42,
+            now,
+            600,
+            |_url, _token| {
+                Ok(HttpResponse {
+                    status: 401,
+                    body: r#"{"error":"unauthorized"}"#.to_string(),
+                })
+            },
+            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
+        );
+
+        std::env::remove_var("AXHUB_TOKEN");
+        assert!(result.is_err(), "401 must surface as Err");
+    }
+
+    /// Malformed created_at field raises a parse error from find_app_in_flight_with_fetch.
+    #[test]
+    fn malformed_created_at_returns_err() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("AXHUB_TOKEN", "test_token");
+        let now = chrono::Utc::now();
+
+        let body = list_response(&[deployment_json(7, 0, "not-an-rfc3339-timestamp")]);
+
+        let result = find_app_in_flight_with_fetch(
+            42,
+            now,
+            600,
+            move |_url, _token| {
+                Ok(HttpResponse {
+                    status: 200,
+                    body: body.clone(),
+                })
+            },
+            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
+        );
+
+        std::env::remove_var("AXHUB_TOKEN");
+        assert!(result.is_err(), "malformed created_at must surface as Err");
     }
 }

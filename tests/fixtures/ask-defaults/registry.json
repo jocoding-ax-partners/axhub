@@ -36,6 +36,15 @@
         "취소",
         "강제로 진행"
       ]
+    },
+    "이미 배포가 진행 중이에요. 어떻게 할까요?": {
+      "safe_default": "취소",
+      "rationale": "non-interactive (CI / claude -p) 에서는 race 차단보다 explicit user intent 우선. abort 가 mutate-aware safe default.",
+      "allowed_safe_defaults": [
+        "취소",
+        "진행 중인 배포 보기",
+        "새 배포 시작"
+      ]
     }
   },
   "auth": {
