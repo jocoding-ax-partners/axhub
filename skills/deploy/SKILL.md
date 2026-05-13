@@ -530,49 +530,78 @@ To deploy:
    JSON
 
    AXHUB_STDERR_TMP=$(mktemp)
-   axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --branch "$BRANCH" --commit "$COMMIT_SHA" --json 2>"$AXHUB_STDERR_TMP"
+   AXHUB_STDOUT_TMP=$(mktemp)
+   axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --branch "$BRANCH" --commit "$COMMIT_SHA" --json >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
    AXHUB_EXIT=$?
    # Format: "axhub-error-sub-key: 64:validation.deployment_in_progress" (main.rs:1845, quality_gate.rs:15)
    if [ $AXHUB_EXIT -eq 64 ] && grep -qE '^axhub-error-sub-key:.*64:validation\.deployment_in_progress' "$AXHUB_STDERR_TMP" 2>/dev/null; then
-     # in-flight race: silent swallow raw stderr, then re-fetch in-flight id and route Step 5 watch.
+     # in-flight race: silent swallow raw stderr, then re-fetch in-flight id + commit + app_slug for Step 5 watch and Step 8 cache consistency.
      REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --refresh-in-flight --json 2>/dev/null || echo '{}')
      IN_FLIGHT_ID=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
      if [ -n "$IN_FLIGHT_ID" ]; then
        DEPLOY_ID="$IN_FLIGHT_ID"
+       # Pull fresh commit_sha + app_slug so Step 8 statusline cache reflects the actually-running deploy (issue #81 C5).
+       COMMIT_SHA=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.commit_sha // .resolve.commit_sha // empty')
+       APP_SLUG=$(echo "$REFRESH_JSON" | jq -r '.resolve.app_slug // empty')
        echo "[deploy:Step 4 swallow-and-watch] routing to in-flight deploy $DEPLOY_ID" >&2
      else
        echo "다른 배포가 진행 중이에요. 잠시 뒤에 다시 시도해요." >&2
+       rm -f "$AXHUB_STDERR_TMP" "$AXHUB_STDOUT_TMP"
        exit 0
      fi
+   elif [ $AXHUB_EXIT -eq 0 ]; then
+     # Happy path: extract deploy id + app slug from stdout JSON so Step 5 watch + Step 8 cache have non-empty values (issue #81 C1).
+     DEPLOY_ID=$(jq -r '.id // .deployment_id // empty' "$AXHUB_STDOUT_TMP")
+     APP_SLUG=$(jq -r '.app_slug // empty' "$AXHUB_STDOUT_TMP" 2>/dev/null)
+     cat "$AXHUB_STDOUT_TMP"
    else
      cat "$AXHUB_STDERR_TMP" >&2
+     cat "$AXHUB_STDOUT_TMP"
    fi
-   rm -f "$AXHUB_STDERR_TMP"
+   rm -f "$AXHUB_STDERR_TMP" "$AXHUB_STDOUT_TMP"
    ```
 
    Windows PowerShell 에서는 같은 selective stderr filter 를 아래처럼 적용해요.
 
    ```powershell
    $AxhubStderrTmp = New-TemporaryFile
-   & axhub deploy create --app $env:APP_ID @ProfileFlag --branch $env:BRANCH --commit $env:COMMIT_SHA --json 2>$AxhubStderrTmp.FullName
+   $AxhubStdoutTmp = New-TemporaryFile
+   & axhub deploy create --app $env:APP_ID @ProfileFlag --branch $env:BRANCH --commit $env:COMMIT_SHA --json 1>$AxhubStdoutTmp.FullName 2>$AxhubStderrTmp.FullName
    $AxhubExit = $LASTEXITCODE
    # Format: "axhub-error-sub-key: 64:validation.deployment_in_progress" (main.rs:1845, quality_gate.rs:15)
    if ($AxhubExit -eq 64 -and (Select-String -Path $AxhubStderrTmp.FullName -Pattern '^axhub-error-sub-key:.*64:validation\.deployment_in_progress' -Quiet)) {
-     # in-flight race: silent swallow raw stderr, then re-fetch in-flight id and route Step 5 watch.
+     # in-flight race: silent swallow raw stderr, then re-fetch in-flight id + commit + app_slug for Step 5 watch and Step 8 cache consistency.
      $RefreshJson = & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" deploy-prep --intent deploy --refresh-in-flight --json 2>$null
      if (-not $RefreshJson) { $RefreshJson = '{}' }
-     $InFlightId = ($RefreshJson | ConvertFrom-Json -ErrorAction SilentlyContinue).in_flight_deploy.id
+     $Refresh = $RefreshJson | ConvertFrom-Json -ErrorAction SilentlyContinue
+     $InFlightId = $Refresh.in_flight_deploy.id
      if ($InFlightId) {
-       $env:DEPLOY_ID = "$InFlightId"
+       $DeployId = "$InFlightId"  # Use local scope, not $env:DEPLOY_ID (issue #81 C9)
+       # Pull fresh commit_sha + app_slug so Step 8 statusline cache reflects the actually-running deploy (issue #81 C5).
+       $CommitShaFresh = $Refresh.in_flight_deploy.commit_sha
+       if (-not $CommitShaFresh) { $CommitShaFresh = $Refresh.resolve.commit_sha }
+       $AppSlugFresh = $Refresh.resolve.app_slug
        [Console]::Error.WriteLine("[deploy:Step 4 swallow-and-watch] routing to in-flight deploy $InFlightId")
      } else {
        [Console]::Error.WriteLine("다른 배포가 진행 중이에요. 잠시 뒤에 다시 시도해요.")
+       Remove-Item $AxhubStderrTmp.FullName -Force
+       Remove-Item $AxhubStdoutTmp.FullName -Force
        exit 0
      }
+   } elseif ($AxhubExit -eq 0) {
+     # Happy path: extract deploy id + app slug from stdout JSON so Step 5 watch + Step 8 cache have non-empty values (issue #81 C1).
+     $DeployOutput = Get-Content $AxhubStdoutTmp.FullName -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+     if ($DeployOutput) {
+       $DeployId = if ($DeployOutput.id) { $DeployOutput.id } else { $DeployOutput.deployment_id }
+       $AppSlugFresh = $DeployOutput.app_slug
+     }
+     Get-Content $AxhubStdoutTmp.FullName | Write-Output
    } else {
      [Console]::Error.WriteLine((Get-Content $AxhubStderrTmp.FullName -Raw))
+     Get-Content $AxhubStdoutTmp.FullName | Write-Output
    }
    Remove-Item $AxhubStderrTmp.FullName -Force
+   Remove-Item $AxhubStdoutTmp.FullName -Force
    ```
 
    The next Bash tool call id is created by Claude after consent-mint runs, so never invent `${NEXT_BASH_TOOL_CALL_ID}`, never set a fake `CLAUDE_SESSION_ID`, and never clear the real session env just to mint consent. `tool_call_id:"pending"` explicitly mints a short-lived pending token; the PreToolUse hook claims it once only when action/app/profile/branch/commit/context all match. If the token is absent, already used, expired, or non-matching, the command is blocked. This avoids POSIX-only session-unset commands and keeps the flow portable across macOS/Linux/Windows Claude Code environments.
