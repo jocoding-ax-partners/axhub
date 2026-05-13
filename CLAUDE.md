@@ -152,7 +152,26 @@ bun test                      # 회귀
 - [ ] `bun test` ≥498 pass / 0 fail (Phase 18 baseline)
 - [ ] `bunx tsc --noEmit` clean
 - [ ] frontmatter `multi-step:` + `needs-preflight:` 선언
+- [ ] (Phase 25 PR 25.5a+) 새 SKILL 또는 마이그레이션 시 `model:` 선언 (`haiku|sonnet|opus`)
 - [ ] AskUserQuestion 마다 registry entry 등록
+
+## SKILL Model Routing (Phase 25 PR 25.5a+)
+
+새 SKILL 생성 시 `model:` frontmatter 를 권장해요 (25.5a 부터 scaffold + skill-doctor 가 지원). 기존 19 SKILL 의 일괄 마이그레이션은 25.5a.1 단일-skill A/B test 통과 후 25.5b (haiku) / 25.5c (sonnet) 에서 진행해요.
+
+- **haiku**: read-only / 단순 조회 (status / logs / apis / open / clarify / doctor / routing-stats / whatsnew)
+- **sonnet**: multi-step / destructive / interactive (deploy / recover / env / apps / auth / github / init / install-cli / profile / update / upgrade / verify / trace)
+- **opus**: 사용 안 함 (axhub 도메인 외 — architecture decision / deep analysis 필요 없음)
+
+```bash
+# 새 SKILL scaffold 시 명시
+bun run skill:new <slug> --model haiku
+
+# 미명시 시 default = sonnet (mutate-aware 안전 기본값)
+bun run skill:new <slug>
+```
+
+기존 19 SKILL 은 `model:` 미선언 상태도 `bun run skill:doctor --strict` 통과해요 (Phase 25 PR 25.5a 의 no-op 약속). 선언했다면 `haiku|sonnet|opus` 셋 중 하나여야 해요.
 
 # axhub Release Workflow (Phase 19 v0.1.19+ 자동화)
 
