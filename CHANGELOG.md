@@ -4,6 +4,48 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.7](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.6...v0.5.7) (2026-05-13)
+
+Phase 25/26 matrix absorption 릴리스예요. deploy event log, recovery scan, hook kill switch, verify/trace 자동 제안, trace/verify SKILL, 품질 게이트, SKILL model routing 을 순서대로 main 에 흡수했고, 마지막 registry idempotence hotfix 까지 반영해서 검증 재실행 후 워킹트리가 깨끗하게 남아요.
+
+### Test baseline
+
+- PR gate: #65, #66, #67, #68, #69, #70, #71, #72, #73, #74, #75, #76, #77, #78, #79 checks 가 pass 또는 의도된 skip 이에요.
+- Integrated main gate: `bun test --timeout 30000` 674 pass / 4 skip / 0 fail / 4148 expect, `cargo test --workspace`, `bun run skill:doctor --strict`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bunx tsc --noEmit`, `cargo fmt --all -- --check`, `cargo clippy --workspace -- -D warnings`, `git diff --check` 가 green 이에요.
+- Release gate: `bun run release` postbump 의 `codegen:version` + `release:check` 가 v0.5.7 manifest, Cargo workspace, install script version sync 를 확인했어요.
+
+### Honest tradeoff
+
+- `AXHUB_E2E_STAGING_TOKEN` 이 필요한 staging E2E 4개는 로컬 전체 검증에서 의도적으로 skip 됐어요. 대신 PR checks 와 mock/backend 계약, helper unit/e2e tests 로 릴리스 경계를 확인했어요.
+- 실제 production destructive deploy create 는 실행하지 않았어요. matrix absorption 은 ordered squash merge 와 post-merge idempotence hotfix 로 통합했어요.
+
+
+### Added
+
+* Phase 25 PR 25.1 recovery_scan idempotent in-flight deploy detection ([#73](https://github.com/jocoding-ax-partners/axhub/issues/73)) ([1e3c918](https://github.com/jocoding-ax-partners/axhub/commit/1e3c91857487b13cb9ddd7c62895cf3e8fe3eade)), closes [#78](https://github.com/jocoding-ax-partners/axhub/issues/78)
+* Phase 25 PR 25.2 hook safety + AXHUB_DISABLE_HOOKS ([#65](https://github.com/jocoding-ax-partners/axhub/issues/65)) ([50c4b2f](https://github.com/jocoding-ax-partners/axhub/commit/50c4b2fc59e6a51b1c3aa0a13f5b4c1af564f5a0)), closes [#78](https://github.com/jocoding-ax-partners/axhub/issues/78)
+* Phase 25 PR 25.3 user-app deploy artifact verifier hook ([#67](https://github.com/jocoding-ax-partners/axhub/issues/67)) ([650b7c1](https://github.com/jocoding-ax-partners/axhub/commit/650b7c14410c3e955a72d29bd183c2886f35b2ef)), closes [#78](https://github.com/jocoding-ax-partners/axhub/issues/78)
+* Phase 25 PR 25.4 axhub:trace skill + trace --json subcommand ([#74](https://github.com/jocoding-ax-partners/axhub/issues/74)) ([1450d0a](https://github.com/jocoding-ax-partners/axhub/commit/1450d0a55a97448b577fd32a92785a8f65a11310))
+* Phase 25 PR 25.5a scaffold + skill-doctor model field ([#66](https://github.com/jocoding-ax-partners/axhub/issues/66)) ([7155b68](https://github.com/jocoding-ax-partners/axhub/commit/7155b689f5a6a933e6fe1250a0560040148c8be5)), closes [#78](https://github.com/jocoding-ax-partners/axhub/issues/78)
+* Phase 25 PR 25.5b — 8 read-only SKILLs model: haiku ([8fd3077](https://github.com/jocoding-ax-partners/axhub/commit/8fd3077fdb34f62a8ed95116f18c7a9753941ac5))
+* Phase 25 PR 25.5c — 11 destructive SKILLs model: sonnet (no-op confirm) ([#77](https://github.com/jocoding-ax-partners/axhub/issues/77)) ([b864b21](https://github.com/jocoding-ax-partners/axhub/commit/b864b21e3078cc79655dde6e2a104f64916aa19c))
+* Phase 25 PR 25.6 doctor deploy-events disk usage monitoring ([#76](https://github.com/jocoding-ax-partners/axhub/issues/76)) ([f27c050](https://github.com/jocoding-ax-partners/axhub/commit/f27c050e2554e07c6ace83dda1503d7ab1fe8d87))
+* Phase 25 PR 25.7 classify-exit verify/trace auto-suggest ([#75](https://github.com/jocoding-ax-partners/axhub/issues/75)) ([568c3c3](https://github.com/jocoding-ax-partners/axhub/commit/568c3c3846bb8ab3fa4141f440babf5ce5088307)), closes [#65](https://github.com/jocoding-ax-partners/axhub/issues/65)
+* Phase 26 PR 26.1b event_log deploy NDJSON audit trail ([#69](https://github.com/jocoding-ax-partners/axhub/issues/69)) ([9b50dee](https://github.com/jocoding-ax-partners/axhub/commit/9b50dee836e954ffc1cc01381e2a94e41df234f6)), closes [#78](https://github.com/jocoding-ax-partners/axhub/issues/78)
+* Phase 26 PR 26.2 phase logic — event-sourcing derived view (option b) ([#70](https://github.com/jocoding-ax-partners/axhub/issues/70)) ([ed407eb](https://github.com/jocoding-ax-partners/axhub/commit/ed407ebc7448e2e5d58c7ed071b581c35053c5dc)), closes [#78](https://github.com/jocoding-ax-partners/axhub/issues/78)
+* Phase 26 PR 26.3 quality_gate pure validator + catalog entry ([#71](https://github.com/jocoding-ax-partners/axhub/issues/71)) ([a151cc8](https://github.com/jocoding-ax-partners/axhub/commit/a151cc88065076b45e009e5fd2e8144e6435018c)), closes [#78](https://github.com/jocoding-ax-partners/axhub/issues/78)
+* Phase 26 PR 26.4 axhub:verify skill + verify --json subcommand ([#72](https://github.com/jocoding-ax-partners/axhub/issues/72)) ([c6e538a](https://github.com/jocoding-ax-partners/axhub/commit/c6e538aa9a8b7e6e91bb4a244da7087eb75ca9eb)), closes [#78](https://github.com/jocoding-ax-partners/axhub/issues/78)
+
+
+### Fixed
+
+* registry idempotence after matrix absorption ([e1ea810](https://github.com/jocoding-ax-partners/axhub/commit/e1ea8101db6a346f7ba7279f4bb634b5f0a67b35))
+
+
+### Changed
+
+* Phase 26 PR 26.1a atomic_jsonl + telemetry/audit migration ([#68](https://github.com/jocoding-ax-partners/axhub/issues/68)) ([50e31d7](https://github.com/jocoding-ax-partners/axhub/commit/50e31d7741331a13ae7daa30041f8a1b08aa1b6b)), closes [#78](https://github.com/jocoding-ax-partners/axhub/issues/78)
+
 ## [0.5.6](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.5...v0.5.6) (2026-05-11)
 
 ### Phase VC narrative — Vibe Coder Visibility
