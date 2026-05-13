@@ -152,6 +152,8 @@ pub struct AppRecord {
     pub id: i64,
     pub slug: String,
     pub name: Option<String>,
+    #[serde(default)]
+    pub github_repo_url: Option<String>,
 }
 
 pub fn parse_apps_list(stdout: &str) -> Option<Vec<AppRecord>> {
@@ -168,6 +170,10 @@ pub fn parse_apps_list(stdout: &str) -> Option<Vec<AppRecord>> {
                     slug: item.get("slug")?.as_str()?.to_string(),
                     name: item
                         .get("name")
+                        .and_then(|v| v.as_str())
+                        .map(ToOwned::to_owned),
+                    github_repo_url: item
+                        .get("github_repo_url")
                         .and_then(|v| v.as_str())
                         .map(ToOwned::to_owned),
                 })
@@ -256,6 +262,8 @@ pub struct ResolveOutput {
     pub git_init_needed: bool,
     pub eta_sec: u64,
     pub error: Option<String>,
+    #[serde(default)]
+    pub github_repo_url: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AppMatch {
@@ -298,6 +306,7 @@ where
         git_init_needed: false,
         eta_sec: DEFAULT_DEPLOY_ETA_SEC,
         error: None,
+        github_repo_url: None,
     };
     let auth = parse_auth_status(&runner(&[&bin, "auth", "status", "--json"]).stdout);
     if !matches!(auth, AuthStatus::Ok { .. }) {
@@ -381,6 +390,7 @@ where
                 id: sole.id,
                 slug: sole.slug,
             }],
+            github_repo_url: sole.github_repo_url.clone(),
             ..base
         }),
         exit_code: EXIT_OK,

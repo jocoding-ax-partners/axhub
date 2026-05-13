@@ -259,6 +259,56 @@ To deploy:
    If `git commit` fails because there are no staged files or git identity is missing, stop before deploy and surface a humanized one-line reason ("저장 지점을 만들지 못했어요. 잠시 뒤에 다시 시도해요." 같은 한 줄). 내부 git stderr 는 user chat 에 직접 echo 하지 마요. Do not mint deploy consent until a fresh resolve returns both `branch` and `commit_sha`.
    If the user chooses "취소", stop deploy without running any git command. In non-interactive mode (subprocess / CI / `claude -p`), use the registry safe default "취소" — never run `git init` automatically in headless context.
 
+1.6. **In-flight deploy 감지 (배포 충돌 방지).** `deploy-prep` 응답에 `.in_flight_deploy.id` 가 non-null 이면 이미 진행 중인 배포가 있어요. 즉시 Step 2 로 넘어가지 않고 아래 AskUserQuestion 으로 사용자 의도를 확인해요.
+
+   최근 60초 이내에 push 가 있었으면 (`in_flight_deploy.pushed_at` 기준) "진행 중인 배포 보기" 를 default highlight 로, 60초를 넘겼으면 "새 배포 시작" 을 default highlight 로 제안해요. non-interactive 환경에서는 항상 `abort` 가 safe default 예요.
+
+   ```bash
+   echo '[deploy:Step 1.6 in-flight-check] entered' >&2
+   IN_FLIGHT_ID=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.id // ""')
+   if [ -n "$IN_FLIGHT_ID" ]; then
+     PUSHED_AT=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.pushed_at // ""')
+     NOW_SEC=$(date +%s)
+     PUSHED_SEC=$(date -d "$PUSHED_AT" +%s 2>/dev/null || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$PUSHED_AT" +%s 2>/dev/null || echo 0)
+     DELTA=$((NOW_SEC - PUSHED_SEC))
+     # non-interactive: safe default = abort
+     if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]; then
+       echo '[deploy:Step 1.6] non-interactive → abort' >&2
+       exit 0
+     fi
+   fi
+   ```
+
+   AskUserQuestion JSON envelope (해요체, 3-option):
+
+   ```json
+   {
+     "question": "이미 배포가 진행 중이에요. 어떻게 할까요?",
+     "header": "배포 충돌",
+     "options": [
+       {
+         "label": "진행 중인 배포 보기",
+         "value": "monitor",
+         "description": "현재 진행 중인 배포 상태를 실시간으로 확인해요."
+       },
+       {
+         "label": "새 배포 시작",
+         "value": "force_new",
+         "description": "진행 중인 배포와 별개로 지금 바로 새 배포를 올려요."
+       },
+       {
+         "label": "취소",
+         "value": "abort",
+         "description": "배포를 멈춰요."
+       }
+     ]
+   }
+   ```
+
+   - `monitor` 선택 시: Step 5 status-chain 으로 바로 이동해 `$IN_FLIGHT_ID` 를 watch 해요. 새 `deploy create` 는 실행하지 않아요.
+   - `force_new` 선택 시: Step 2 로 진행해요. exit 64 + `validation.deployment_in_progress` 에러가 나도 retry 하지 않아요 (Step 6 라우팅 따름).
+   - `abort` 선택 시: 배포를 멈춰요. consent 를 발급하지 않아요.
+
 2. **Pre-flight version check (legacy fallback only).** Phase 1 default path skips this — `deploy-prep` already returned the preflight envelope as `.preflight` in Step 1's JSON. Use the cached value: read `cli_too_old`, `cli_too_new`, `auth_ok` directly via `jq`. The block below is the legacy fallback path that fires only when `AXHUB_DEPLOY_PREP=0` is set:
 
    ```bash
@@ -381,6 +431,23 @@ To deploy:
 
    The gate script (`hooks/token-freshness-gate.sh`) captures `now - 30 s` locally as the freshness anchor (matches `.plan` §3.4), polls token mtime up to 30 s (5 s × 6 iter), and calls `axhub auth status --json` inline on timeout. UNAUTHORIZED → exit 65 routes to Step 6 recovery. Cross-platform `stat` chain handles GNU (`-c %Y`) and BSD/macOS (`-f %m`); on stripped systems where neither flag works the chain returns 0 and inline check decides. Test fixtures inject `AXHUB_TOKEN_PATH` / `AXHUB_GATE_FAKE_NOW` / `AXHUB_GATE_POLL_*` to exercise the gate without a live OAuth flow.
 
+3.6. **토큰 freshness 폴링 중 신규 webhook 감지 (`--refresh-in-flight`).** Step 3.5 폴링 대기 중에 새 webhook 이 도착해 in_flight 상태가 바뀔 수 있어요. `AXHUB_REFRESH_IN_FLIGHT=1` 이거나 `--refresh-in-flight` 플래그가 있으면, 폴링 종료 직후 `deploy-prep` 을 재조회해요.
+
+   ```bash
+   echo '[deploy:Step 3.6 refresh-in-flight] entered' >&2
+   if [ "${AXHUB_REFRESH_IN_FLIGHT:-0}" = "1" ]; then
+     REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --json 2>/dev/null || echo '{}')
+     NEW_IN_FLIGHT=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
+     if [ -n "$NEW_IN_FLIGHT" ]; then
+       DEPLOY_PREP_JSON="$REFRESH_JSON"
+       IN_FLIGHT_ID="$NEW_IN_FLIGHT"
+       echo '[deploy:Step 3.6] in-flight detected → re-route to Step 1.6 logic' >&2
+     fi
+   fi
+   ```
+
+   in_flight 가 발견되면 Step 1.6 의 AskUserQuestion 3-option 라우팅을 동일하게 적용해요. `monitor` → Step 5 바로 이동, `force_new` → Step 4 계속, `abort` → 중단. non-interactive 환경에서는 건너뛰어요 (`AXHUB_REFRESH_IN_FLIGHT` 기본값 0 → no-op).
+
 4. **On user approval**, mint a consent token and run deploy. Run this step only when Step 1.1 did not already execute and record `deploy_create`; never double-submit a deploy for the same pending bootstrap action.
 
    ```bash
@@ -395,7 +462,29 @@ To deploy:
    {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${CONSENT_PROFILE}","branch":"${BRANCH}","commit_sha":"${COMMIT_SHA}","context":{}}
    JSON
 
-   axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --branch "$BRANCH" --commit "$COMMIT_SHA" --json
+   AXHUB_STDERR_TMP=$(mktemp)
+   axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --branch "$BRANCH" --commit "$COMMIT_SHA" --json 2>"$AXHUB_STDERR_TMP"
+   AXHUB_EXIT=$?
+   if [ $AXHUB_EXIT -eq 64 ] && grep -qE 'validation\.deployment_in_progress' "$AXHUB_STDERR_TMP" 2>/dev/null; then
+     : # silent swallow — Step 6 exit 64 라우팅이 담당해요
+   else
+     cat "$AXHUB_STDERR_TMP" >&2
+   fi
+   rm -f "$AXHUB_STDERR_TMP"
+   ```
+
+   Windows PowerShell 에서는 같은 selective stderr filter 를 아래처럼 적용해요.
+
+   ```powershell
+   $AxhubStderrTmp = New-TemporaryFile
+   & axhub deploy create --app $env:APP_ID @ProfileFlag --branch $env:BRANCH --commit $env:COMMIT_SHA --json 2>$AxhubStderrTmp.FullName
+   $AxhubExit = $LASTEXITCODE
+   if ($AxhubExit -eq 64 -and (Select-String -Path $AxhubStderrTmp.FullName -Pattern 'validation\.deployment_in_progress' -Quiet)) {
+     # silent swallow — Step 6 exit 64 라우팅이 담당해요
+   } else {
+     Get-Content $AxhubStderrTmp.FullName | Write-Error
+   }
+   Remove-Item $AxhubStderrTmp.FullName -Force
    ```
 
    The next Bash tool call id is created by Claude after consent-mint runs, so never invent `${NEXT_BASH_TOOL_CALL_ID}`, never set a fake `CLAUDE_SESSION_ID`, and never clear the real session env just to mint consent. `tool_call_id:"pending"` explicitly mints a short-lived pending token; the PreToolUse hook claims it once only when action/app/profile/branch/commit/context all match. If the token is absent, already used, expired, or non-matching, the command is blocked. This avoids POSIX-only session-unset commands and keeps the flow portable across macOS/Linux/Windows Claude Code environments.

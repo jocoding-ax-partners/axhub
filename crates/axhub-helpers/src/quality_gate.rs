@@ -203,6 +203,7 @@ mod tests {
             git_init_needed: false,
             eta_sec: 60,
             error: None,
+            github_repo_url: None,
         }
     }
 
@@ -212,6 +213,8 @@ mod tests {
             resolve: happy_resolve(),
             bootstrap_plan: None,
             exit_code: EXIT_OK,
+            in_flight_deploy: None,
+            github_connected: false,
         }
     }
 

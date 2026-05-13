@@ -882,6 +882,7 @@ fn resolve_covers_arg_parsing_auth_parse_ambiguity_and_not_found_paths() {
             id: 1,
             slug: "admin-paydrop".into(),
             name: None,
+            github_repo_url: None,
         }],
         "pay",
     );

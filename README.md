@@ -2,7 +2,7 @@
 
 > 바이브코더가 자연어로 axhub 앱을 안전하게 배포하고 관리하는 Claude Code 플러그인.
 
-**상태**: v0.5.6 (ship). 19 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
+**상태**: v0.5.7 (ship). 19 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
 
 ---
 
@@ -192,7 +192,7 @@ git push origin main --tags         # release.yml 자동 fire (cosign 서명 + G
 
 상세: [`docs/RELEASE.md`](docs/RELEASE.md).
 
-## Test baseline (v0.5.6)
+## Test baseline (v0.5.7)
 
 - `bun test` → plugin manifest / skill / workflow regression green
 - `cargo test --workspace` → Rust helper unit/integration/phase parity green (keychain live tests ignored)

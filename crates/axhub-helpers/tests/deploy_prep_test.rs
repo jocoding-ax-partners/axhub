@@ -68,6 +68,7 @@ fn ok_resolve() -> ResolveRun {
             git_init_needed: false,
             eta_sec: 60,
             error: None,
+            github_repo_url: None,
         },
         exit_code: EXIT_OK,
     }
@@ -90,6 +91,7 @@ fn cold_resolve() -> ResolveRun {
             git_init_needed: false,
             eta_sec: 60,
             error: None,
+            github_repo_url: None,
         },
         exit_code: EXIT_OK,
     }
