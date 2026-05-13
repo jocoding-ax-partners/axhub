@@ -57,6 +57,46 @@
         "verify"
       ],
       "reason": "Phase 26 PR 26.4 — status (마지막 배포 state 조회) vs verify (evidence 기반 라이브 확정) 의도 분기. status = 가벼운 read-only / verify = axhub status + logs tail + (선택) health endpoint 종합 verdict. Claude description prose 의 \"evidence\" / \"진짜\" 단서로 우선 매칭."
+    },
+    {
+      "phrase": "왜 실패",
+      "skills": [
+        "logs",
+        "trace"
+      ],
+      "reason": "Phase 25 PR 25.4 — logs = raw build_log dump / trace = 3-source 통합 root-cause 분석. \"왜 실패\" 둘 다 trigger 인정 (raw 로그 vs 자동 진단 선호 분기)."
+    },
+    {
+      "phrase": "왜 안돼",
+      "skills": [
+        "logs",
+        "trace"
+      ],
+      "reason": "동일 분기. logs = 로그 자체 보기 / trace = 분석 결과."
+    },
+    {
+      "phrase": "왜 죽었",
+      "skills": [
+        "logs",
+        "trace"
+      ],
+      "reason": "동일 분기."
+    },
+    {
+      "phrase": "왜 깨졌",
+      "skills": [
+        "logs",
+        "trace"
+      ],
+      "reason": "동일 분기."
+    },
+    {
+      "phrase": "diagnose",
+      "skills": [
+        "doctor",
+        "trace"
+      ],
+      "reason": "Phase 25 PR 25.4 — doctor = 환경 진단 (CLI/auth/profile) / trace = 배포 실패 진단 (build_log + audit + event_log). \"diagnose\" 둘 다 trigger 인정 (환경 진단 vs 배포 진단 분기)."
     }
   ]
 }

@@ -587,7 +587,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(skillDirs.length).toBeGreaterThanOrEqual(11);
   });
 
-  test("all 20 shipped skills are present, including install-cli + routing-stats + verify", () => {
+  test("all 21 shipped skills are present, including install-cli + routing-stats + trace + verify", () => {
     expect(skillDirs.sort()).toEqual([
       "apis",
       "apps",
@@ -605,6 +605,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "recover",
       "routing-stats",
       "status",
+      "trace",
       "update",
       "upgrade",
       "verify",

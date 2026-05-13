@@ -1,10 +1,10 @@
 [
   {
     "_metadata": {
-      "measured_at": "2026-05-11T07:56:00Z",
+      "measured_at": "2026-05-11T07:58:00Z",
       "reviewer": "wongil",
       "corpus_version": "tests/corpus.20.jsonl@phase-11-gap-fill",
-      "skills_version": "phase-26/pr-26-4-verify-skill",
+      "skills_version": "phase-25-26-trace-verify",
       "claude_model": "committed-docs-only-fixture",
       "rows_measured": 24,
       "rows_skipped": 0,
@@ -13,7 +13,7 @@
         "override": 0,
         "null": 0
       },
-      "notes": "Metadata refreshed for axhub:verify routing description. Row decisions preserve committed docs-only fixture semantics; verify SKILL drift is covered by dedicated invariants in tests/skills/verify-skill.test.ts."
+      "notes": "Metadata refreshed for axhub:trace and axhub:verify routing descriptions. Row decisions preserve committed docs-only fixture semantics; trace/verify invariants are covered by dedicated tests."
     }
   },
   {

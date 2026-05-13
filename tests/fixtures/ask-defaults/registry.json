@@ -259,6 +259,18 @@
       ]
     }
   },
+  "trace": {
+    "_note": "Phase 25 PR 25.4 trace SKILL. event_log + build_log + audit 3-source 통합 실패 추적. interactive=AskUserQuestion / non-interactive=abort (대상 모호 시 안전하게 중단).",
+    "default_subprocess_action": "abort",
+    "최근 Failed 배포가 여러 개예요. 어떤 거 추적할까요?": {
+      "safe_default": "abort",
+      "rationale": "비대화형 환경에서 대상 deploy 가 모호하면 추적 중단. 잘못된 deploy_id 로 trace 호출 시 빈 결과 + 사용자 혼란 방지. interactive 환경에서만 가장 최근/직접 입력 선택 허용.",
+      "allowed_safe_defaults": [
+        "abort",
+        "가장 최근"
+      ]
+    }
+  },
   "verify": {
     "_note": "Phase 26 PR 26.4 verify SKILL. axhub status + logs tail evidence 기반 verdict. interactive=AskUserQuestion 헬스 endpoint setup / non-interactive=skip (status+logs 만으로 verdict).",
     "default_subprocess_action": "skip",
