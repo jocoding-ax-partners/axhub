@@ -74,11 +74,6 @@ fn drain_phase_durations_ms() -> Map<String, Value> {
 /// produce a non-monotonic pair. `drain_file_phase_durations` clamps negative
 /// pairs to zero and reports the count via the `_backwards_skips` field.
 pub fn append_phase_marker_to_file(path: &std::path::Path, phase_name: &str) -> anyhow::Result<()> {
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)?;
-        }
-    }
     let mut entry = Map::new();
     entry.insert("name".into(), Value::String(phase_name.to_string()));
     entry.insert(
@@ -91,15 +86,9 @@ pub fn append_phase_marker_to_file(path: &std::path::Path, phase_name: &str) -> 
     );
     entry.insert("clock_source".into(), Value::String("wall".into()));
     let line = Value::Object(entry).to_string();
-    let mut opts = OpenOptions::new();
-    opts.create(true).append(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        opts.mode(0o600);
-    }
-    let mut f = opts.open(path)?;
-    writeln!(f, "{line}")?;
+    // Phase 26 PR 26.1a — delegate to atomic_jsonl. Behavior-preserving:
+    // same parent-dir creation, same O_CREATE | O_APPEND, same 0o600 perms.
+    crate::atomic_jsonl::append_line(path, &line)?;
     Ok(())
 }
 

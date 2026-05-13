@@ -1,3 +1,4 @@
+pub mod atomic_jsonl;
 pub mod audit;
 pub mod bootstrap;
 pub mod catalog;
