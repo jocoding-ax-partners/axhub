@@ -109,6 +109,18 @@ Every entry uses these four parts, in this order:
 
 ---
 
+### exit 64 + `validation.quality_gate_failed`
+
+**감정:** 잠깐만요. push 전에 설정 불일치를 발견했어요. 앱은 안전해요.
+
+**원인:** preflight / resolve 결과에서 일관성 문제가 있어요. cli_version 누락, bootstrap plan 충돌, exit code mismatch, 프로필 불일치 같은 사유로 잘못된 배포가 될 수 있어요.
+
+**해결:** 구체적 violation 을 같이 보여줄게요. 의도된 거면 "강제로 진행해" 라고 말해주세요. 비대화형 환경에서는 자동으로 차단됐어요.
+
+**버튼:** ["violation 자세히 보기", "강제로 진행 (위험)", "취소"]
+
+---
+
 ## exit 65 — auth required / token expired
 
 **감정:** 잠깐만요. 로그인이 만료됐을 뿐이에요. 당신 앱은 그대로예요.
