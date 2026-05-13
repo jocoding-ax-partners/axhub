@@ -274,3 +274,178 @@ fn current_phase_for_unknown_deploy_returns_none() {
 
     assert!(current_phase("never-existed").is_none());
 }
+
+// =============================================================================
+// Phase 26 PR 26.2 — phase logic (DeployPhase enum + transition table).
+//
+// Table-driven coverage of the spec at .plan/matrix-absorption/phases/
+// phase-26-tier-s-quick-wins.md PR 26.2 ("Transition rules" 표). Option (b)
+// derived view: validate_transition reads `current_phase` from the event log
+// so a fresh `Preflight` event after a terminal phase is a legal "implicit
+// reset" — no `axhub reset` subcommand required.
+
+use axhub_helpers::event_log::{validate_transition, DeployPhase};
+
+#[test]
+fn parse_and_as_str_round_trip_for_known_phases() {
+    let names = [
+        "idle",
+        "preflight",
+        "resolve",
+        "bootstrap",
+        "push",
+        "verify",
+        "completed",
+        "failed",
+        "aborted",
+    ];
+    for name in names {
+        let phase = DeployPhase::parse(name).unwrap_or_else(|| panic!("parse failed: {name}"));
+        assert_eq!(phase.as_str(), name);
+    }
+}
+
+#[test]
+fn parse_accepts_axhub_status_terminal_synonyms() {
+    // statusline::TERMINAL_PHASES = ["complete", "succeeded", "failed", "cancelled", "errored"]
+    // — verify the parser maps them onto the right enum variants so our
+    // derived view stays compatible with raw axhub status output.
+    assert_eq!(DeployPhase::parse("complete"), Some(DeployPhase::Completed));
+    assert_eq!(
+        DeployPhase::parse("succeeded"),
+        Some(DeployPhase::Completed)
+    );
+    assert_eq!(DeployPhase::parse("success"), Some(DeployPhase::Completed));
+    assert_eq!(DeployPhase::parse("errored"), Some(DeployPhase::Failed));
+    assert_eq!(DeployPhase::parse("cancelled"), Some(DeployPhase::Aborted));
+    assert_eq!(DeployPhase::parse("canceled"), Some(DeployPhase::Aborted));
+}
+
+#[test]
+fn parse_unknown_phase_returns_none() {
+    assert!(DeployPhase::parse("frobnicate").is_none());
+    assert!(DeployPhase::parse("").is_none());
+}
+
+#[test]
+fn is_terminal_only_for_completed_failed_aborted() {
+    use DeployPhase::*;
+    for phase in [Completed, Failed, Aborted] {
+        assert!(phase.is_terminal(), "{} should be terminal", phase.as_str());
+    }
+    for phase in [Idle, Preflight, Resolve, Bootstrap, Push, Verify] {
+        assert!(
+            !phase.is_terminal(),
+            "{} should NOT be terminal",
+            phase.as_str()
+        );
+    }
+}
+
+#[test]
+fn happy_path_transitions_are_legal() {
+    use DeployPhase::*;
+    let happy_path = [
+        (Idle, Preflight),
+        (Preflight, Resolve),
+        (Resolve, Bootstrap),
+        (Bootstrap, Push),
+        (Push, Verify),
+        (Verify, Completed),
+    ];
+    for (from, to) in happy_path {
+        assert!(
+            from.can_transition_to(&to),
+            "{} → {} must be legal",
+            from.as_str(),
+            to.as_str()
+        );
+    }
+}
+
+#[test]
+fn resolve_can_short_circuit_directly_to_push() {
+    // Cached bootstrap (e.g. apphub.yaml unchanged) skips Bootstrap.
+    assert!(DeployPhase::Resolve.can_transition_to(&DeployPhase::Push));
+}
+
+#[test]
+fn any_non_terminal_phase_can_jump_to_failed() {
+    use DeployPhase::*;
+    for from in [Preflight, Resolve, Bootstrap, Push, Verify] {
+        assert!(
+            from.can_transition_to(&Failed),
+            "{} → failed must be legal (deploy can fail at any phase)",
+            from.as_str()
+        );
+    }
+}
+
+#[test]
+fn terminal_phases_can_implicit_reset_to_preflight() {
+    use DeployPhase::*;
+    // Last-event-wins: a fresh Preflight after a terminal phase is the
+    // implicit reset. No `axhub reset` subcommand required.
+    assert!(Failed.can_transition_to(&Preflight));
+    assert!(Aborted.can_transition_to(&Preflight));
+    assert!(Completed.can_transition_to(&Preflight));
+}
+
+#[test]
+fn invalid_transitions_are_rejected() {
+    use DeployPhase::*;
+    let illegal = [
+        (Idle, Push), // must do Preflight first
+        (Idle, Verify),
+        (Preflight, Verify),    // must Resolve first
+        (Preflight, Completed), // can't complete before push
+        (Bootstrap, Verify),    // must Push first
+        (Verify, Idle),         // terminal-to-Idle banned
+        (Completed, Verify),    // can't rewind from terminal
+        (Failed, Verify),
+        (Aborted, Push),
+    ];
+    for (from, to) in illegal {
+        assert!(
+            !from.can_transition_to(&to),
+            "{} → {} must be rejected",
+            from.as_str(),
+            to.as_str()
+        );
+    }
+}
+
+#[test]
+fn validate_transition_uses_current_phase_from_event_log() {
+    let _g = ENV_LOCK.lock().unwrap();
+    let _env = EnvGuard::new();
+
+    // No events yet → current_phase = None → defaults to Idle. Idle → Preflight legal.
+    assert!(validate_transition("dep-vt", DeployPhase::Preflight).is_ok());
+
+    // Drop a preflight event. current_phase becomes "preflight".
+    event_log::append_event("dep-vt", &make_event("dep-vt", "preflight")).unwrap();
+    assert!(validate_transition("dep-vt", DeployPhase::Resolve).is_ok());
+    let err = validate_transition("dep-vt", DeployPhase::Completed).unwrap_err();
+    assert!(err.contains("preflight"));
+    assert!(err.contains("completed"));
+}
+
+#[test]
+fn validate_transition_after_terminal_allows_preflight_only() {
+    let _g = ENV_LOCK.lock().unwrap();
+    let _env = EnvGuard::new();
+
+    for phase in ["preflight", "resolve", "push", "verify", "completed"] {
+        event_log::append_event("dep-after-term", &make_event("dep-after-term", phase)).unwrap();
+    }
+    assert_eq!(
+        current_phase("dep-after-term").as_deref(),
+        Some("completed"),
+        "current_phase derives from last event"
+    );
+    // Implicit reset: Completed → Preflight is allowed.
+    assert!(validate_transition("dep-after-term", DeployPhase::Preflight).is_ok());
+    // But Completed → Verify is rejected (no rewinding).
+    assert!(validate_transition("dep-after-term", DeployPhase::Verify).is_err());
+}
