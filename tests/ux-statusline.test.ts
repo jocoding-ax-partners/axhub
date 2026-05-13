@@ -57,7 +57,10 @@ describe("Phase 17 C7/US-1707 — statusline binary contract", () => {
       const result = spawnSync(STATUSLINE, [], {
         encoding: "utf8",
         env: { ...process.env, AXHUB_HELPER_BIN: helper },
-        timeout: 1000,
+        // This assertion checks delegation semantics, not the cold statusline
+        // latency budget. On macOS, first-running a freshly chmod'ed temp
+        // helper can take ~500ms and can exceed 1s under parallel test load.
+        timeout: 3000,
       });
       expect(result.status).toBe(0);
       expect(result.stdout).toBe("axhub: helper path\n");

@@ -14,6 +14,7 @@ use axhub_helpers::hook_safety;
 use axhub_helpers::keychain::{parse_keyring_value, read_keychain_token};
 use axhub_helpers::list_deployments::{run_list_deployments, ListDeploymentsArgs};
 use axhub_helpers::preflight::{run_preflight, PreflightRun};
+use axhub_helpers::quality_gate::{validate_deploy_prep_quality, QualityCheckResult};
 use axhub_helpers::redact::redact;
 use axhub_helpers::resolve::run_resolve;
 use axhub_helpers::runtime_paths::{last_deploy_file, state_dir, token_file, welcome_marker_path};
@@ -1814,6 +1815,19 @@ fn write_refresh_sentinel(success: bool, status: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn deploy_prep_output_with_quality(
+    result: &axhub_helpers::deploy_prep::DeployPrepResult,
+    quality: &QualityCheckResult,
+    exit_code: i32,
+) -> anyhow::Result<Value> {
+    let mut value = serde_json::to_value(result)?;
+    if let Value::Object(ref mut obj) = value {
+        obj.insert("quality_gate".to_string(), serde_json::to_value(quality)?);
+        obj.insert("exit_code".to_string(), json!(exit_code));
+    }
+    Ok(value)
+}
+
 fn cmd_deploy_prep(rest: &[String]) -> anyhow::Result<i32> {
     if std::env::var("AXHUB_DEPLOY_PREP").as_deref() == Ok("0") {
         // Backwards-compat fallback signal: SKILL detects exit 0 + no JSON
@@ -1821,8 +1835,22 @@ fn cmd_deploy_prep(rest: &[String]) -> anyhow::Result<i32> {
         return Ok(0);
     }
     let result = run_deploy_prep(rest);
-    println!("{}", serde_json::to_string(&result)?);
-    Ok(result.exit_code)
+    let quality = validate_deploy_prep_quality(&result);
+    let exit_code = if quality.passed { result.exit_code } else { 64 };
+    if !quality.passed {
+        eprintln!(
+            "quality gate failed (non-interactive): {:?}",
+            quality.violations
+        );
+        eprintln!("axhub-error-sub-key: {}", QualityCheckResult::SUB_KEY);
+    }
+    println!(
+        "{}",
+        serde_json::to_string(&deploy_prep_output_with_quality(
+            &result, &quality, exit_code
+        )?)?
+    );
+    Ok(exit_code)
 }
 
 fn cmd_emit_deploy_complete(rest: &[String]) -> anyhow::Result<i32> {

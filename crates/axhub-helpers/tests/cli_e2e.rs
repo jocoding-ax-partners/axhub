@@ -147,6 +147,42 @@ exit 64
     axhub
 }
 
+#[cfg(unix)]
+fn fake_deploy_prep_axhub(temp: &tempfile::TempDir, version_stdout: &str) -> std::path::PathBuf {
+    let axhub = temp.path().join("axhub-deploy-prep");
+    std::fs::write(
+        &axhub,
+        format!(
+            r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  cat <<'AXHUB_VERSION'
+{version_stdout}
+AXHUB_VERSION
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  cat <<'AXHUB_AUTH'
+{{"user_email":"dev@jocodingax.ai","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["deploy:write"]}}
+AXHUB_AUTH
+  exit 0
+fi
+if [ "$1" = "apps" ] && [ "$2" = "list" ]; then
+  cat <<'AXHUB_APPS'
+[{{"id":42,"slug":"paydrop"}}]
+AXHUB_APPS
+  exit 0
+fi
+exit 0
+"#,
+        ),
+    )
+    .unwrap();
+    let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
+}
+
 fn run_stdin_in_dir(args: &[&str], stdin: &str, cwd: &Path) -> Output {
     let mut child = Command::new(bin())
         .args(args)
@@ -359,6 +395,71 @@ fn cli_verify_times_out_slow_status_probe() {
             .unwrap()
             .iter()
             .any(|reason| reason.as_str().unwrap().contains("status timeout")),
+        "{json}",
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_deploy_prep_quality_gate_passes_in_json() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_deploy_prep_axhub(&temp, "axhub 0.12.1");
+
+    let output = run_env(
+        &[
+            "deploy-prep",
+            "--intent",
+            "deploy",
+            "--user-utterance",
+            "paydrop",
+            "--json",
+        ],
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["quality_gate"]["passed"], true);
+    assert!(json["quality_gate"]["violations"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(json["exit_code"], 0);
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_deploy_prep_quality_gate_fails_closed_with_sub_key() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_deploy_prep_axhub(&temp, "axhub development-build");
+
+    let output = run_env(
+        &[
+            "deploy-prep",
+            "--intent",
+            "deploy",
+            "--user-utterance",
+            "paydrop",
+            "--json",
+        ],
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+
+    assert_eq!(output.status.code(), Some(64));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("axhub-error-sub-key: 64:validation.quality_gate_failed"),
+        "{stderr}"
+    );
+    let json = stdout_json(&output);
+    assert_eq!(json["quality_gate"]["passed"], false);
+    assert_eq!(json["exit_code"], 64);
+    assert!(
+        json["quality_gate"]["violations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|violation| violation["kind"] == "missing_cli_version"),
         "{json}",
     );
 }

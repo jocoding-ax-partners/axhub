@@ -46,13 +46,13 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("23 top-level keys (2 메타 + 21 SKILL slug)", () => {
+  test("24 top-level keys (2 메타 + 21 SKILL slug + quality_gate channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(23);
+    expect(keys).toHaveLength(24);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
-    const skillSlugs = keys.filter((k) => !k.startsWith("_")).sort();
-    expect(skillSlugs).toEqual([
+    const channels = keys.filter((k) => !k.startsWith("_")).sort();
+    expect(channels).toEqual([
       "apis",
       "apps",
       "auth",
@@ -66,6 +66,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "logs",
       "open",
       "profile",
+      "quality_gate",
       "recover",
       "routing-stats",
       "status",
@@ -77,9 +78,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("28 actual safe_default rationale 엔트리 (Phase 25 trace + Phase 26 verify 추가)", () => {
+  test("30 actual safe_default rationale 엔트리 (Phase 25 trace + Phase 26 verify + quality_gate 추가)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(28);
+    expect(paths).toHaveLength(30);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -89,6 +90,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "auth",
       "auth",
       "clarify",
+      "deploy",
       "deploy",
       "deploy",
       "deploy",
@@ -105,6 +107,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "init",
       "install-cli",
       "profile",
+      "quality_gate",
       "recover",
       "routing-stats",
       "trace",
@@ -143,6 +146,15 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     expect(
       deploy["axhub CLI 가 더 최신 버전인데 계속할까요?"]?.safe_default,
     ).toBe("계속해요");
+    expect(
+      deploy["품질 게이트가 막았어요. 그래도 진행할까요?"]?.safe_default,
+    ).toBe("취소");
+
+    const qualityGate = registry["quality_gate"] as Record<
+      string,
+      SafeDefaultEntry
+    >;
+    expect(qualityGate["abort_or_proceed"]?.safe_default).toBe("abort");
 
     const clarify = registry["clarify"] as Record<string, SafeDefaultEntry>;
     expect(clarify["어떤 작업 원해요?"]?.safe_default).toBe("abort");
