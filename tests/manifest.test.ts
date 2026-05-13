@@ -661,14 +661,18 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
-  test("NO skill has model field in frontmatter (skills are model-agnostic)", () => {
+  test("model field (Phase 25 PR 25.5a+) is haiku|sonnet|opus when declared", () => {
+    const validModels = new Set(["haiku", "sonnet", "opus"]);
     for (const [, content] of skillContents) {
       const fm = content.split("\n---\n")[0];
-      expect(fm).not.toMatch(/^model:/m);
+      const match = fm.match(/^model:\s*([a-z]+)\s*$/m);
+      if (match) {
+        expect(validModels.has(match[1])).toBe(true);
+      }
     }
   });
 
-  test("frontmatter contains ONLY allowed keys (Phase 18: + multi-step / needs-preflight; Phase 9: + examples)", () => {
+  test("frontmatter contains ONLY allowed keys (Phase 18: + multi-step / needs-preflight; Phase 9: + examples; Phase 25 PR 25.5a+: + model)", () => {
     for (const [, content] of skillContents) {
       const fm = content.split("\n---\n")[0].slice(4);
       const keys = fm.match(/^[a-z-]+:/gm) ?? [];
@@ -679,6 +683,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
         "needs-preflight:",
         "allows-dependency-execution:",
         "examples:",
+        "model:",
       ]);
       for (const k of keys) {
         expect(allowed.has(k)).toBe(true);

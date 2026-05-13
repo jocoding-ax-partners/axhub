@@ -15,6 +15,7 @@ examples:
 multi-step: true
 needs-preflight: true
 allows-dependency-execution: false
+model: sonnet
 ---
 
 # Env

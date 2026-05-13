@@ -15,6 +15,7 @@ examples:
 multi-step: true
 needs-preflight: false
 allows-dependency-execution: false
+model: sonnet
 ---
 
 # Upgrade (plugin self-upgrade nudge)
