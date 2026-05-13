@@ -15,6 +15,7 @@ examples:
 multi-step: false
 needs-preflight: true
 allows-dependency-execution: false
+model: haiku
 ---
 
 # APIs Catalog (read-only, current-app scoped)

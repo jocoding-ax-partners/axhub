@@ -1,5 +1,5 @@
 {
-  "_schema": "Per-SKILL × per-question safe-default registry. Key = SKILL slug. Inner key = question text (verbatim from SKILL.md AskUserQuestion JSON). Value = {safe_default: option label/value, rationale: why, allowed_safe_defaults: enum of valid fallback values}. Used by tests/ux-ask-fallback-registry.test.ts to mechanically lock D1 fallback contract — adding a new AskUserQuestion question without registering its safe-default fails the test. Phase 17 US-1705 / Critic round 2 hardening. Plan v3 §3 adds allowed_safe_defaults enum field.",
+  "_schema": "Per-SKILL × per-question safe-default registry, plus non-SKILL safety channels such as quality_gate. Key = SKILL slug or explicit channel. Inner key = question text or channel decision id. Value = {safe_default: option label/value, rationale: why, allowed_safe_defaults: enum of valid fallback values}. Used by tests/ux-ask-fallback-registry.test.ts to mechanically lock D1 fallback contract — adding a new AskUserQuestion question without registering its safe-default fails the test. Phase 17 US-1705 / Critic round 2 hardening. Plan v3 §3 adds allowed_safe_defaults enum field.",
   "_path_history": "Originally proposed skills/_shared/ask-defaults.json (Architect r2 → tests/manifest.test.ts:548 collision) → tests/fixtures/ask-defaults.json (Critic r2 → tests/fixtures.test.ts:38 toBe(40) collision) → final tests/fixtures/ask-defaults/registry.json (subdir bypasses both invariants — non-recursive readdirSync ignores subdir entries).",
   "deploy": {
     "_note": "deploy SKILL Step 3 uses a structured AskUserQuestion JSON block after the 5-field identity preview card. Default behavior in non-interactive subprocess: --dry-run (most conservative).",
@@ -27,6 +27,14 @@
         "계속해요",
         "업그레이드 안내",
         "이 버전부터는 묻지 마요"
+      ]
+    },
+    "품질 게이트가 막았어요. 그래도 진행할까요?": {
+      "safe_default": "취소",
+      "rationale": "품질 게이트는 push 전 설정 불일치 차단 장치라 비대화형 환경에서는 강제 진행하지 않고 중단해요.",
+      "allowed_safe_defaults": [
+        "취소",
+        "강제로 진행"
       ]
     }
   },
@@ -280,6 +288,20 @@
       "allowed_safe_defaults": [
         "skip",
         "지금 설정"
+      ]
+    }
+  },
+  "whatsnew": {
+    "_note": "whatsnew SKILL is read-only and has no structured AskUserQuestion site. It summarizes axhub whatsnew output."
+  },
+  "quality_gate": {
+    "_note": "Phase 26 PR 26.3 quality_gate non-SKILL safety channel. deploy-prep emits this gate before mutation; interactive flow can ask abort/proceed, non-interactive always aborts.",
+    "abort_or_proceed": {
+      "safe_default": "abort",
+      "rationale": "비대화형 환경에서 잘못된 push 차단 우선. interactive 환경에서만 사용자 선택을 허용해요.",
+      "allowed_safe_defaults": [
+        "abort",
+        "proceed"
       ]
     }
   }

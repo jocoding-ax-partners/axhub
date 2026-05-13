@@ -134,7 +134,20 @@ To deploy:
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --json
    ```
 
-   The JSON envelope contains `{preflight, resolve, bootstrap_plan?, exit_code}`. Use `jq -r '.resolve.app_id'` and friends to extract fields. If `bootstrap_plan` is non-null, this is a first-deploy path — fall through to Step 1.1 below. If `exit_code == 65`, surface auth recovery (Step 6 path). If `exit_code == 64`, surface version-skew recovery. If `exit_code == 67` AND `bootstrap_plan` is null, treat as ambiguous resolve.
+   The JSON envelope contains `{preflight, resolve, bootstrap_plan?, quality_gate?, exit_code}`. Use `jq -r '.resolve.app_id'` and friends to extract fields. If `.quality_gate.passed == false`, show the violations first and stop by default. 대화형 모드에서만 아래 AskUserQuestion 으로 위험한 강제 진행을 허용해요. subprocess / CI 에서는 `tests/fixtures/ask-defaults/registry.json` 의 `quality_gate.abort_or_proceed` 와 deploy 질문 기본값을 따라 `취소`예요.
+
+   ```json
+   {
+     "question": "품질 게이트가 막았어요. 그래도 진행할까요?",
+     "header": "품질게이트",
+     "options": [
+       {"label": "취소", "description": "설정 불일치를 고친 뒤 다시 배포해요."},
+       {"label": "강제로 진행", "description": "위험을 알고 현재 값으로 계속해요."}
+     ]
+   }
+   ```
+
+   If `bootstrap_plan` is non-null, this is a first-deploy path — fall through to Step 1.1 below. If `exit_code == 65`, surface auth recovery (Step 6 path). If `exit_code == 64` and `quality_gate.passed` is not false, surface version-skew recovery. If `exit_code == 67` AND `bootstrap_plan` is null, treat as ambiguous resolve.
 
    **Backwards-compat fallback (1 release cycle):** when `AXHUB_DEPLOY_PREP=0` is set, the helper exits silently with no JSON — Step 1 falls through to the legacy `resolve` call below, and Step 1.2 / Step 2 re-runs are not skipped:
 

@@ -17,9 +17,9 @@
 // canonical safe_default is "abort" so a CI/headless deploy never silently
 // proceeds with corrupt prep state.
 //
-// This PR ships the pure validator + catalog entry + registry stub. Wiring
-// the call into `run_deploy_prep` happens in a follow-up so this PR stays
-// behavior-preserving for existing callers.
+// This cumulative branch wires the validator into `axhub-helpers deploy-prep`.
+// The pure validator stays testable here; the binary layer prints the sub-key
+// and exits 64 in headless/non-interactive paths.
 
 use serde::{Deserialize, Serialize};
 
