@@ -241,3 +241,47 @@ git push origin main --tags
 - [ ] `git push origin main --tags` 성공
 - [ ] release.yml workflow run completed: success
 - [ ] `gh release view vX.Y.Z` 5 cross-arch binaries 확인
+
+# axhub Hook Safety (Phase 25 PR 25.2)
+
+axhub Claude Code hook 의 fail-open 계약을 명문화했어요. 모든 hook 진입점은
+`exit 0` 보장이에요. 자세한 spec 은 `docs/HOOKS.md` 를 봐주세요.
+
+## Kill Switch (Env Var Taxonomy ADR §10.6 따름)
+
+```bash
+# 모든 axhub hook 비활성화 (canonical)
+AXHUB_DISABLE_HOOKS=1
+
+# 특정 hook 만 비활성화 (csv)
+AXHUB_DISABLE_HOOK=session-start,preauth-check,prompt-route,classify-exit
+
+# Legacy alias (6 개월 deprecation, v0.8.0 에서 제거)
+DISABLE_AXHUB=1   # stderr 에 경고 출력
+```
+
+우선순위: `AXHUB_DISABLE_HOOKS` > `AXHUB_DISABLE_HOOK` > legacy.
+
+## Always Do
+
+- **MUST 새 hook subcommand 추가 시 `hook_safety::is_hook_disabled("name")` 진입부 첫 줄에 호출** — Rust helper 는 `crates/axhub-helpers/src/hook_safety.rs` 가 canonical. shell wrapper 가 있으면 동일 패턴 미러.
+- **MUST fail-open 원칙 지키기** — 어떤 실패에서도 exit 0. systemMessage 로만 사용자 노출. panic 금지.
+- **MUST 새 hook 이름을 `docs/HOOKS.md` §1 표 + 테스트 매트릭스에 추가**.
+- **MUST 신규 opt-out / kill switch env 도입 시 §10.6 polarity 룰 (`AXHUB_DISABLE_*` / `AXHUB_ENABLE_*` / `AXHUB_<scope>=<value>`) 따름**.
+
+## Never Do
+
+- NEVER hook 에서 `unwrap()` / `panic!()` — fail-open 깨짐. `Result<>` + `unwrap_or_else` 패턴.
+- NEVER non-zero exit — Claude Code 가 main 흐름 차단해요.
+- NEVER polarity inconsistent env (`AXHUB_NO_*` / `DISABLE_AXHUB_*` 같은) 도입 — §10.6 ADR 위반.
+- NEVER `AXHUB_HOOK_SAFETY_DISABLED` 사용 — ghost variable (zero code matches), 폐기됨. canonical `AXHUB_DISABLE_HOOKS=1` 써요.
+- NEVER `DISABLE_AXHUB` 새 자동화에서 사용 — legacy alias, v0.8.0 제거 예정.
+
+## Self-Check Before Adding a Hook
+
+- [ ] `hook_safety::is_hook_disabled("name")` 진입부 호출
+- [ ] shell wrapper (`hooks/<name>.sh`, `.ps1`) 있으면 동일 kill switch mirror
+- [ ] `docs/HOOKS.md` §1 표에 hook 이름 추가
+- [ ] `tests/hooks-kill-switch.test.ts` 매트릭스에 새 hook case 추가
+- [ ] `cargo test hook_safety` + `bun test tests/hooks-kill-switch.test.ts` 모두 pass
+- [ ] hook 실패 path 에서 `hook_safety::append_hook_error("name", &err)` 호출 확인

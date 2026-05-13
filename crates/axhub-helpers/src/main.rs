@@ -10,6 +10,7 @@ use axhub_helpers::consent::{
     verify_or_claim_token, verify_token, write_private_file_no_follow, ConsentBinding,
 };
 use axhub_helpers::deploy_prep::run_deploy_prep;
+use axhub_helpers::hook_safety;
 use axhub_helpers::keychain::{parse_keyring_value, read_keychain_token};
 use axhub_helpers::list_deployments::{run_list_deployments, ListDeploymentsArgs};
 use axhub_helpers::preflight::{run_preflight, PreflightRun};
@@ -312,6 +313,10 @@ fn bootstrap_record_event(args: &[String]) -> Option<&str> {
 }
 
 fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {
+    if hook_safety::is_hook_disabled("classify-exit") {
+        out_json(json!({}));
+        return Ok(0);
+    }
     let raw = read_stdin()?;
     if !raw.trim().is_empty() {
         let payload: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
@@ -426,6 +431,12 @@ fn cmd_consent_verify() -> anyhow::Result<i32> {
 }
 
 fn cmd_preauth_check() -> anyhow::Result<i32> {
+    if hook_safety::is_hook_disabled("preauth-check") {
+        out_json(
+            json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}),
+        );
+        return Ok(0);
+    }
     let raw = read_stdin()?;
     let payload: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
     if let Some(sid) = payload.get("session_id").and_then(Value::as_str) {
@@ -515,6 +526,10 @@ const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
 fn cmd_prompt_route() -> anyhow::Result<i32> {
     use axhub_helpers::audit::{append as audit_append, now_iso8601, sha256_hex, AuditRecord};
 
+    if hook_safety::is_hook_disabled("prompt-route") {
+        out_json(json!({}));
+        return Ok(0);
+    }
     let raw = read_stdin()?;
     let payload: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
     let prompt = payload.get("prompt").and_then(Value::as_str).unwrap_or("");
@@ -1059,6 +1074,10 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
 const WELCOME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn cmd_session_start() -> anyhow::Result<i32> {
+    if hook_safety::is_hook_disabled("session-start") {
+        out_json(json!({}));
+        return Ok(0);
+    }
     write_session_start_bundle_best_effort();
 
     let mut lines: Vec<String> = vec![

@@ -16,6 +16,19 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Phase 25 PR 25.2 — hook safety kill switch. Canonical envs per
+# .plan/matrix-absorption/00-overview.md §10.6 (Env Var Taxonomy ADR).
+# Legacy DISABLE_AXHUB=1 alias honored through v0.8.0 deprecation window.
+if ($env:AXHUB_DISABLE_HOOKS -eq '1' -or $env:DISABLE_AXHUB -eq '1') {
+  exit 0
+}
+if ($env:AXHUB_DISABLE_HOOK) {
+  $disabled = $env:AXHUB_DISABLE_HOOK -split ',' | ForEach-Object { $_.Trim() }
+  if ($disabled -contains 'session-start') {
+    exit 0
+  }
+}
+
 if (-not $env:CLAUDE_PLUGIN_ROOT) {
   Write-Output (ConvertTo-Json @{ systemMessage = "[axhub] CLAUDE_PLUGIN_ROOT 미설정 — Claude Code 가 hook 호출 시 자동 설정해야 하지만 누락됐어요. /plugin install axhub@axhub 로 재설치 시도." } -Compress)
   exit 0
