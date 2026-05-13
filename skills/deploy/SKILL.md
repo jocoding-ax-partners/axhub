@@ -264,8 +264,10 @@ To deploy:
 
 1.6. **In-flight deploy 감지 (배포 충돌 방지) — 3-way 분기.** `deploy-prep` 응답에 `.in_flight_deploy.id` 가 non-null 이면 이미 진행 중인 배포가 있어요. `in_flight_deploy.commit_sha` 와 `resolve.commit_sha` 비교로 3 가지 sub-step (1.6a / 1.6b / 1.6c) 중 어느 분기로 진입할지 결정해요.
 
-   - **Step 1.6a (same-commit)**: 두 commit_sha 모두 non-empty 이고 일치 — 본인 배포 중복. 기존 "이미 배포가 진행 중이에요." prompt.
-   - **Step 1.6b (cross-tenant)**: 두 commit_sha 모두 non-empty 이고 다름 — 다른 user 의 in-flight. "다른 사람이 같은 앱에 배포 중이에요." prompt.
+   > **Ownership 추론 한계 (issue #87).** 현재 ownership 판별은 `commit_sha` 비교만 사용해요. mono-repo team 의 same-HEAD case (다른 사람이 본인 HEAD 와 동일 commit 으로 push) 에서 본인 / 다른 사람 구분 못 해요 — Step 1.6a (same-commit) 가 다른 user 의 in-flight 를 본인 deploy 로 routing 할 수 있어요. 정식 fix 는 backend `BackendDeployment.owner_user_id` field 도착 후 진행해요 (별 RFC, Phase 2). 그래서 Step 1.6b copy 도 "가능성이 있어요" 로 약화해서 false confidence 회피해요.
+
+   - **Step 1.6a (same-commit)**: 두 commit_sha 모두 non-empty 이고 일치 — 본인 배포 중복 가능성 (또는 mono-repo same-HEAD edge). 기존 "이미 배포가 진행 중이에요." prompt.
+   - **Step 1.6b (cross-tenant)**: 두 commit_sha 모두 non-empty 이고 다름 — 다른 user 의 in-flight 가능성. "다른 사람이 같은 앱에 배포 중일 가능성이 있어요." prompt.
    - **Step 1.6c (uncertain)**: 둘 중 하나가 empty (commit_sha missing) — uncertain state. "배포 중인 게 있는데 누구 건지 확인 중이에요." prompt (silent misidentification 차단).
 
    ```bash
@@ -324,7 +326,7 @@ To deploy:
 
    ```json
    {
-     "question": "다른 사람이 같은 앱에 배포 중이에요. 어떻게 할까요?",
+     "question": "다른 사람이 같은 앱에 배포 중일 가능성이 있어요. 어떻게 할까요?",
      "header": "배포 충돌",
      "options": [
        {

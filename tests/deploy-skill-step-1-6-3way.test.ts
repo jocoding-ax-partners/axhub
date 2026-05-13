@@ -24,7 +24,7 @@ describe("deploy SKILL Step 1.6 — 3-way split invariants (issue #81 PR A2)", (
 
   test("Step 1.6b (cross-tenant) question literal", () => {
     const body = deploySkill();
-    expect(body).toContain("다른 사람이 같은 앱에 배포 중이에요. 어떻게 할까요?");
+    expect(body).toContain("다른 사람이 같은 앱에 배포 중일 가능성이 있어요. 어떻게 할까요?");
   });
 
   test("Step 1.6c (uncertain) question literal", () => {
