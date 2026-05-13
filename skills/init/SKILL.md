@@ -24,6 +24,32 @@ model: sonnet
 
 새 axhub 앱을 현재 CLI 템플릿 목록에서 시작해요. v0.2.0 에서는 패키지 설치와 원격 template 내려받기를 하지 않고 `axhub --json init --list-templates` 를 단일 정답 소스로 써요. Sprint 3 부터 프로젝트 파일을 만든 뒤에는 helper bootstrap 을 plan-only (계획만 보기) 모드로만 호출해서 다음 안전 단계를 보여줘요.
 
+## Vibe Coder Visibility Rules
+
+이 SKILL 을 쓰는 사람은 대부분 개발 지식이 없어요. CLI 와 helper 가 돌려주는 다음 field 는 **internal verification primitives** 예요. SKILL 안에서는 이 field 들을 변수에 담아 helper 와 주고받되, **raw 값을 사용자 chat 에 echo 하면 안 돼요** (deploy SKILL 의 동일 룰을 따라요):
+
+- `schema_version` (예: `init/v1`) — API 응답 검증용. raw 값 echo 금지.
+- `templates[].id`, `templates[].framework`, `templates[].description` — CLI 가 반환한 template registry. id 는 사용자 발화 매칭에만 쓰고, raw 목록 dump 금지.
+- `consent_required_apps_create`, `git_init_required`, `first_commit_required`, `template_required`, `conflict_existing_files`, `subdomain_collision`, `backend_contract_missing_defaults`, `idempotency_unavailable`, `dependency_install_required` — bootstrap state 코드. raw 식별자 echo 금지.
+- `next_action`, `next_steps[]`, `recommended_command`, `requires_pm_choice`, `manager_candidates`, `package_json_present`, `node_modules_present`, `detected_lockfile`, `lockfile_count` — helper plan / dependency-plan output. raw JSON echo 금지.
+- `pending_action_id`, `pending_action_hash`, `binding_hash`, `consent_binding`, `synthesized_by_helper`, `idempotency_key`, `retry_policy`, `command_argv`, `exit_code`, `stdout_json`, `stderr` — bootstrap record FSM 의 internal verification primitives. raw 값 echo 금지.
+
+대신 사용자에게는 한국어 한 줄로 진행 상황만 알려드려요. 예시 templates:
+
+| 시점 | 사용자 chat 한 줄 |
+|------|-------------------|
+| Step 1 CLI 존재 확인 | "axhub 도구가 있는지 보고 있어요." |
+| Step 2 template 목록 조회 | "사용할 수 있는 템플릿을 확인하고 있어요." |
+| Step 3 template 선택 | "어떤 종류 프로젝트를 만들지 골라요." |
+| Step 4 axhub init 실행 | "프로젝트 파일을 만들고 있어요." |
+| Step 5 bootstrap plan-only | (state 별 한 줄) "앱 등록 동의가 필요해요." / "저장 지점을 먼저 만들어야 해요." / "템플릿을 골라야 해요." / "현재 폴더에 이미 같은 이름 파일이 있어요." |
+| Step 6 next_steps 안내 | "이제 이 순서로 진행하면 돼요." (이어서 humanized 5단계) |
+| dependency install (D2) | "어떤 방법으로 패키지를 깔까요?" |
+| dependency install (D3) | "패키지를 깔고 있어요. 잠시만요." |
+| dependency install (D5) | "패키지 설치가 막혔어요. 어떻게 도와드릴까요?" |
+
+raw helper JSON 이 디버깅에 필요한 환경 (개발 검증) 은 `AXHUB_INIT_VERBOSE=1` 환경변수가 켜진 경우에만 echo 해요. 기본 흐름은 항상 한 줄 자연어로 진행해요.
+
 ## Workflow
 
 To start an axhub app:
