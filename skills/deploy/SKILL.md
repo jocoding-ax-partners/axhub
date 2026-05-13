@@ -131,8 +131,11 @@ To deploy:
 
    ```bash
    echo '[deploy:Step 1 deploy-prep] entered' >&2
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --json
+   DEPLOY_PREP_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --json)
+   echo "$DEPLOY_PREP_JSON"
    ```
+
+   `DEPLOY_PREP_JSON` 변수는 Step 1.6 / Step 3.6 에서 `.in_flight_deploy` 필드를 jq 로 읽을 때 다시 사용해요.
 
    The JSON envelope contains `{preflight, resolve, bootstrap_plan?, quality_gate?, exit_code}`. Use `jq -r '.resolve.app_id'` and friends to extract fields. If `.quality_gate.passed == false`, show the violations first and stop by default. 대화형 모드에서만 아래 AskUserQuestion 으로 위험한 강제 진행을 허용해요. subprocess / CI 에서는 `tests/fixtures/ask-defaults/registry.json` 의 `quality_gate.abort_or_proceed` 와 deploy 질문 기본값을 따라 `취소`예요.
 
@@ -466,7 +469,16 @@ To deploy:
    axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --branch "$BRANCH" --commit "$COMMIT_SHA" --json 2>"$AXHUB_STDERR_TMP"
    AXHUB_EXIT=$?
    if [ $AXHUB_EXIT -eq 64 ] && grep -qE 'validation\.deployment_in_progress' "$AXHUB_STDERR_TMP" 2>/dev/null; then
-     : # silent swallow — Step 6 exit 64 라우팅이 담당해요
+     # in-flight race: silent swallow raw stderr, then re-fetch in-flight id and route Step 5 watch.
+     REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --refresh-in-flight --json 2>/dev/null || echo '{}')
+     IN_FLIGHT_ID=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
+     if [ -n "$IN_FLIGHT_ID" ]; then
+       DEPLOY_ID="$IN_FLIGHT_ID"
+       echo "[deploy:Step 4 swallow-and-watch] routing to in-flight deploy $DEPLOY_ID" >&2
+     else
+       echo "다른 배포가 진행 중이에요. 잠시 뒤에 다시 시도해요." >&2
+       exit 0
+     fi
    else
      cat "$AXHUB_STDERR_TMP" >&2
    fi
@@ -480,9 +492,19 @@ To deploy:
    & axhub deploy create --app $env:APP_ID @ProfileFlag --branch $env:BRANCH --commit $env:COMMIT_SHA --json 2>$AxhubStderrTmp.FullName
    $AxhubExit = $LASTEXITCODE
    if ($AxhubExit -eq 64 -and (Select-String -Path $AxhubStderrTmp.FullName -Pattern 'validation\.deployment_in_progress' -Quiet)) {
-     # silent swallow — Step 6 exit 64 라우팅이 담당해요
+     # in-flight race: silent swallow raw stderr, then re-fetch in-flight id and route Step 5 watch.
+     $RefreshJson = & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" deploy-prep --intent deploy --refresh-in-flight --json 2>$null
+     if (-not $RefreshJson) { $RefreshJson = '{}' }
+     $InFlightId = ($RefreshJson | ConvertFrom-Json -ErrorAction SilentlyContinue).in_flight_deploy.id
+     if ($InFlightId) {
+       $env:DEPLOY_ID = "$InFlightId"
+       [Console]::Error.WriteLine("[deploy:Step 4 swallow-and-watch] routing to in-flight deploy $InFlightId")
+     } else {
+       [Console]::Error.WriteLine("다른 배포가 진행 중이에요. 잠시 뒤에 다시 시도해요.")
+       exit 0
+     }
    } else {
-     Get-Content $AxhubStderrTmp.FullName | Write-Error
+     [Console]::Error.WriteLine((Get-Content $AxhubStderrTmp.FullName -Raw))
    }
    Remove-Item $AxhubStderrTmp.FullName -Force
    ```

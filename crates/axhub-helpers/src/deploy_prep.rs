@@ -157,8 +157,16 @@ fn save_cache(result: &DeployPrepResult) {
         cached_at: chrono::Utc::now().to_rfc3339(),
         result: result.clone(),
     };
-    if let Ok(json) = serde_json::to_string(&cache) {
-        let _ = std::fs::write(path, json);
+    let Ok(json) = serde_json::to_string(&cache) else {
+        return;
+    };
+    let tmp = path.with_extension("json.tmp");
+    if std::fs::write(&tmp, json).is_err() {
+        let _ = std::fs::remove_file(&tmp);
+        return;
+    }
+    if std::fs::rename(&tmp, &path).is_err() {
+        let _ = std::fs::remove_file(&tmp);
     }
 }
 

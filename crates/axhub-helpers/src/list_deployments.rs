@@ -499,10 +499,12 @@ where
         let created_secs = created_dt.timestamp().max(0) as u64;
         let seconds_since_created = now_secs.saturating_sub(created_secs);
         if seconds_since_created <= window_secs {
+            let canonical = created_dt
+                .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
             return Ok(Some(InFlightDeploy {
                 id: d.id,
                 status: d.status,
-                created_at: d.created_at,
+                created_at: canonical,
                 seconds_since_created,
             }));
         }
