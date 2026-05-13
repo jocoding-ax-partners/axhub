@@ -5,6 +5,7 @@ pub mod catalog;
 pub mod config;
 pub mod consent;
 pub mod deploy_prep;
+pub mod event_log;
 pub mod humanize;
 pub mod keychain;
 pub mod keychain_windows;
