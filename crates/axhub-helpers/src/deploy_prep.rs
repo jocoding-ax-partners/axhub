@@ -47,9 +47,16 @@ pub struct DeployPrepResult {
     pub resolve: ResolveOutput,
     pub bootstrap_plan: Option<BootstrapPlan>,
     pub exit_code: i32,
+    /// Preflight stage exit code, needed by `--refresh-in-flight` selective
+    /// refresh path to re-derive the merged `exit_code` against a fresh resolve
+    /// while keeping the cached preflight result (issue #81 PR B1).
+    /// `#[serde(default)]` keeps deserialization backwards compatible with
+    /// older cache files written before this field existed.
+    #[serde(default)]
+    pub preflight_exit_code: i32,
     /// In-flight deploy for this app, if one exists within the detection window.
     /// Serialises as JSON `null` when absent (not missing key) via `#[serde(default)]`.
-    /// JSON shape: `{"id": i64, "pushed_at": "<RFC3339>"}`.
+    /// JSON shape: `{"id": i64, "created_at": "<RFC3339>"}`.
     #[serde(default)]
     pub in_flight_deploy: Option<InFlightDeploy>,
     /// True when the resolved app has a linked GitHub repository.
@@ -108,25 +115,40 @@ pub fn apply_in_flight(result: &mut DeployPrepResult, in_flight: Option<InFlight
     result.in_flight_deploy = in_flight;
 }
 
+/// Re-derives all state derived from `result.resolve` (bootstrap_plan,
+/// github_connected, exit_code) using the cached `preflight_exit_code` and the
+/// given `resolve_exit_code`. Used by both `compose_deploy_prep` and the
+/// `--refresh-in-flight` selective refresh path to enforce identical invariant.
+///
+/// Missing this call after assigning `result.resolve` leaves the derived
+/// fields stale (issue #81 PR B1 Critic round 2 / Architect round 3 finding).
+fn recompose_derived(result: &mut DeployPrepResult, resolve_exit_code: i32) {
+    result.bootstrap_plan = derive_bootstrap_plan(&result.resolve);
+    result.github_connected = result.resolve.github_repo_url.is_some();
+    result.exit_code = merge_exit_code(
+        result.preflight_exit_code,
+        resolve_exit_code,
+        result.bootstrap_plan.as_ref(),
+    );
+}
+
 /// Pure composition. Does NOT perform the in-flight HTTP check; callers that
 /// want the full envelope should use `run_deploy_prep_with_runner` or call
 /// `apply_in_flight` explicitly after fetching.
 pub fn compose_deploy_prep(preflight: PreflightRun, resolve: ResolveRun) -> DeployPrepResult {
-    let bootstrap_plan = derive_bootstrap_plan(&resolve.output);
-    let exit_code = merge_exit_code(
-        preflight.exit_code,
-        resolve.exit_code,
-        bootstrap_plan.as_ref(),
-    );
-    let github_connected = resolve.output.github_repo_url.is_some();
-    DeployPrepResult {
+    let preflight_exit_code = preflight.exit_code;
+    let resolve_exit_code = resolve.exit_code;
+    let mut result = DeployPrepResult {
         preflight: preflight.output,
         resolve: resolve.output,
-        bootstrap_plan,
-        exit_code,
+        bootstrap_plan: None,
+        exit_code: EXIT_OK,
+        preflight_exit_code,
         in_flight_deploy: None,
-        github_connected,
-    }
+        github_connected: false,
+    };
+    recompose_derived(&mut result, resolve_exit_code);
+    result
 }
 
 // ── File cache for --refresh-in-flight ────────────────────────────────────────
@@ -152,9 +174,20 @@ fn cache_path() -> Option<PathBuf> {
 }
 
 fn save_cache(result: &DeployPrepResult) {
+    save_cache_internal(result, chrono::Utc::now().to_rfc3339());
+}
+
+/// Selective refresh path 전용 — original cached_at 을 그대로 유지하여 TTL 시계가
+/// refresh 마다 reset 되는 것을 차단해요. preflight 부분이 무기한 stale 되는 위험
+/// 을 막아요 (issue #81 PR B1 Critic round 2 finding).
+fn save_cache_preserve_timestamp(result: &DeployPrepResult, original_cached_at: String) {
+    save_cache_internal(result, original_cached_at);
+}
+
+fn save_cache_internal(result: &DeployPrepResult, cached_at: String) {
     let Some(path) = cache_path() else { return };
     let cache = CacheFile {
-        cached_at: chrono::Utc::now().to_rfc3339(),
+        cached_at,
         result: result.clone(),
     };
     let Ok(json) = serde_json::to_string(&cache) else {
@@ -170,7 +203,15 @@ fn save_cache(result: &DeployPrepResult) {
     }
 }
 
+#[allow(dead_code)] // Used by tests only; production refresh path calls load_cache_with_timestamp.
 fn load_cache() -> Option<DeployPrepResult> {
+    load_cache_with_timestamp().map(|(r, _)| r)
+}
+
+/// `load_cache` 와 같지만 cache 의 original `cached_at` 도 반환해요. selective
+/// refresh path 에서 `save_cache_preserve_timestamp` 와 함께 사용해서 TTL invariant
+/// 를 유지해요 (issue #81 PR B1).
+fn load_cache_with_timestamp() -> Option<(DeployPrepResult, String)> {
     let path = cache_path()?;
     let json = std::fs::read_to_string(path).ok()?;
     let cache: CacheFile = serde_json::from_str(&json).ok()?;
@@ -181,7 +222,7 @@ fn load_cache() -> Option<DeployPrepResult> {
     if age < 0 || age as u64 > CACHE_TTL_SECS {
         return None;
     }
-    Some(cache.result)
+    Some((cache.result, cache.cached_at))
 }
 
 // ── Public entry points ────────────────────────────────────────────────────────
@@ -196,15 +237,29 @@ where
 {
     let refresh_in_flight = args.iter().any(|a| a == "--refresh-in-flight");
 
+    // PR B1 selective refresh — `--refresh-in-flight` 시 resolve 만 fresh fetch,
+    // preflight 는 cache 재사용. bootstrap_plan + github_connected + exit_code 같은
+    // derived state 는 fresh resolve 기준으로 모두 재유도해요 (issue #81 M3).
     let mut result = if refresh_in_flight {
-        // Use cached preflight + resolve; only re-check in_flight below.
-        if let Some(cached) = load_cache() {
-            cached
-        } else {
-            // Cache miss or expired — fall back to full fresh fetch.
-            run_preflight_and_resolve(args, &runner)
+        let cached_with_ts = load_cache_with_timestamp();
+        let fresh_resolve_run = run_resolve_with_runner(args, &runner);
+        match cached_with_ts {
+            Some((mut c, original_cached_at)) => {
+                c.resolve = fresh_resolve_run.output;
+                // recompose_derived 가 bootstrap_plan + github_connected + exit_code 일관 재유도
+                recompose_derived(&mut c, fresh_resolve_run.exit_code);
+                save_cache_preserve_timestamp(&c, original_cached_at);
+                c
+            }
+            None => {
+                let fresh = run_preflight_and_resolve(args, &runner);
+                save_cache(&fresh);
+                fresh
+            }
         }
     } else {
+        // 일반 deploy: 항상 fresh + cache write-only.
+        // cache 는 `--refresh-in-flight` 의 selective refresh 에만 read 돼요.
         let fresh = run_preflight_and_resolve(args, &runner);
         save_cache(&fresh);
         fresh
@@ -300,6 +355,7 @@ mod tests {
             },
             bootstrap_plan: None,
             exit_code: EXIT_OK,
+            preflight_exit_code: EXIT_OK,
             in_flight_deploy: None,
             github_connected,
         }
@@ -310,12 +366,13 @@ mod tests {
             id: 99,
             status: "building".into(),
             created_at: "2024-01-01T00:00:00Z".into(),
+            commit_sha: "deadbeefcafe1234567890abcdef0123456789ab".into(),
             seconds_since_created: 30,
         }
     }
 
     /// `in_flight_deploy: None` → JSON `null`; `Some(...)` → nested object
-    /// with `pushed_at` (not `created_at`) and no `seconds_since_created`.
+    /// with `created_at` + `commit_sha` and no `seconds_since_created`.
     #[test]
     fn serializes_in_flight_deploy_field() {
         let mut result = make_result(false);
@@ -327,7 +384,7 @@ mod tests {
             "expected null: {json_none}"
         );
 
-        // Some → nested object with `pushed_at`, no `seconds_since_created`
+        // Some → nested object with `created_at` + `commit_sha`, no `seconds_since_created`
         result.in_flight_deploy = Some(in_flight_deploy());
         let json_some = serde_json::to_string(&result).unwrap();
         assert!(
@@ -335,13 +392,27 @@ mod tests {
             "expected nested object: {json_some}"
         );
         assert!(
-            json_some.contains("\"pushed_at\":"),
-            "field must be pushed_at: {json_some}"
+            json_some.contains("\"created_at\":"),
+            "field must be created_at: {json_some}"
+        );
+        assert!(
+            json_some.contains("\"commit_sha\":\"deadbeefcafe"),
+            "commit_sha must be present: {json_some}"
         );
         assert!(
             !json_some.contains("seconds_since_created"),
             "seconds_since_created must not appear in JSON: {json_some}"
         );
+    }
+
+    /// `commit_sha` 가 backend 응답에 없으면 default empty string 으로 deserialize 되어
+    /// SKILL Step 1.6c (uncertain) 분기로 라우팅 가능.
+    #[test]
+    fn in_flight_deploy_deserializes_with_default_commit_sha() {
+        let json = r#"{"id":42,"status":"building","created_at":"2024-01-01T00:00:00Z"}"#;
+        let parsed: InFlightDeploy = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.id, 42);
+        assert_eq!(parsed.commit_sha, "", "missing commit_sha → empty default");
     }
 
     /// Kill switch `AXHUB_DEPLOY_IN_FLIGHT_CHECK=0` must force in_flight_deploy to None.

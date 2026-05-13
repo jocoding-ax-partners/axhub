@@ -25,4 +25,15 @@ describe("deploy SKILL Step 3.6 — refresh-in-flight invariants", () => {
       "axhub-helpers deploy-prep --intent deploy --user-utterance"
     );
   });
+
+  // Issue #85: Step 3.6 must use --refresh-in-flight flag so PR B1 selective
+  // refresh (preflight cache reuse + resolve fresh fetch) is actually engaged.
+  // Without the flag, Step 3.6 was doing full preflight+resolve re-fetch every
+  // poll — silent latency regression vs documented intent.
+  test("Step 3.6 deploy-prep invocation uses --refresh-in-flight flag", () => {
+    const body = deploySkill();
+    expect(body).toContain(
+      `deploy-prep --intent deploy --user-utterance "$ARGS" --refresh-in-flight --json`
+    );
+  });
 });

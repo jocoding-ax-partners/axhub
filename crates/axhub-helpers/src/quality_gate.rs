@@ -213,6 +213,7 @@ mod tests {
             resolve: happy_resolve(),
             bootstrap_plan: None,
             exit_code: EXIT_OK,
+            preflight_exit_code: EXIT_OK,
             in_flight_deploy: None,
             github_connected: false,
         }

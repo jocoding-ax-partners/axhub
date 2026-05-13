@@ -437,16 +437,22 @@ const IN_FLIGHT_STATUSES: &[&str] = &["pending", "building", "deploying"];
 
 /// A deploy that is currently in-flight for a given app.
 ///
-/// JSON shape: `{"id": i64, "pushed_at": "<RFC3339>"}`.
+/// JSON shape: `{"id": i64, "status": "<str>", "created_at": "<RFC3339>", "commit_sha": "<str>"}`.
 /// `seconds_since_created` is kept for internal computation (saturating_sub
 /// clock-skew guard) but excluded from the public JSON envelope — the SKILL
 /// layer uses shell `date` arithmetic for deterministic timing comparisons.
+///
+/// `commit_sha` is the git commit hash of the deploy event, used by SKILL
+/// Step 1.6 to distinguish same-commit (current user's deploy) vs cross-tenant
+/// (another user's deploy on the same app). Empty string when backend response
+/// omits the field — routed to "uncertain" Step 1.6c branch (safe fallback).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InFlightDeploy {
     pub id: i64,
     pub status: String,
-    #[serde(rename = "pushed_at")]
     pub created_at: String, // RFC3339
+    #[serde(default)]
+    pub commit_sha: String,
     #[serde(skip)]
     pub seconds_since_created: u64,
 }
@@ -497,11 +503,15 @@ where
         let created_secs = created_dt.timestamp().max(0) as u64;
         let seconds_since_created = now_secs.saturating_sub(created_secs);
         if seconds_since_created <= window_secs {
-            let canonical = created_dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            // Preserve millisecond precision so SKILL `date` arithmetic
+            // doesn't lose up to 1 s near the 60 s window boundary
+            // (issue #81 C4 — correctness review finding).
+            let canonical = created_dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
             return Ok(Some(InFlightDeploy {
                 id: d.id,
                 status: d.status,
                 created_at: canonical,
+                commit_sha: d.commit_sha,
                 seconds_since_created,
             }));
         }
@@ -647,7 +657,7 @@ mod tests {
         assert!(result.is_none(), "deploy outside window must be excluded");
     }
 
-    /// Happy path: pending deploy within window returns Some with canonical Z pushed_at.
+    /// Happy path: pending deploy within window returns Some with canonical Z created_at.
     #[test]
     fn returns_some_for_in_flight_within_window() {
         let _g = ENV_LOCK.lock().unwrap();
@@ -733,5 +743,30 @@ mod tests {
 
         std::env::remove_var("AXHUB_TOKEN");
         assert!(result.is_err(), "malformed created_at must surface as Err");
+    }
+
+    /// HTTP 200 + non-JSON body must surface as Err from find_app_in_flight_with_fetch
+    /// (issue #81 testing M3 — covers run_list_deployments_with_fetch invalid_json branch).
+    #[test]
+    fn invalid_json_response_body_returns_err() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("AXHUB_TOKEN", "test_token");
+        let now = chrono::Utc::now();
+
+        let result = find_app_in_flight_with_fetch(
+            42,
+            now,
+            600,
+            |_url, _token| {
+                Ok(HttpResponse {
+                    status: 200,
+                    body: "not json".to_string(),
+                })
+            },
+            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
+        );
+
+        std::env::remove_var("AXHUB_TOKEN");
+        assert!(result.is_err(), "invalid JSON body must surface as Err");
     }
 }

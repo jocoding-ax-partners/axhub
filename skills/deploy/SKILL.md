@@ -262,27 +262,41 @@ To deploy:
    If `git commit` fails because there are no staged files or git identity is missing, stop before deploy and surface a humanized one-line reason ("저장 지점을 만들지 못했어요. 잠시 뒤에 다시 시도해요." 같은 한 줄). 내부 git stderr 는 user chat 에 직접 echo 하지 마요. Do not mint deploy consent until a fresh resolve returns both `branch` and `commit_sha`.
    If the user chooses "취소", stop deploy without running any git command. In non-interactive mode (subprocess / CI / `claude -p`), use the registry safe default "취소" — never run `git init` automatically in headless context.
 
-1.6. **In-flight deploy 감지 (배포 충돌 방지).** `deploy-prep` 응답에 `.in_flight_deploy.id` 가 non-null 이면 이미 진행 중인 배포가 있어요. 즉시 Step 2 로 넘어가지 않고 아래 AskUserQuestion 으로 사용자 의도를 확인해요.
+1.6. **In-flight deploy 감지 (배포 충돌 방지) — 3-way 분기.** `deploy-prep` 응답에 `.in_flight_deploy.id` 가 non-null 이면 이미 진행 중인 배포가 있어요. `in_flight_deploy.commit_sha` 와 `resolve.commit_sha` 비교로 3 가지 sub-step (1.6a / 1.6b / 1.6c) 중 어느 분기로 진입할지 결정해요.
 
-   최근 60초 이내에 push 가 있었으면 (`in_flight_deploy.pushed_at` 기준) "진행 중인 배포 보기" 를 default highlight 로, 60초를 넘겼으면 "새 배포 시작" 을 default highlight 로 제안해요. non-interactive 환경에서는 항상 `abort` 가 safe default 예요.
+   **Ownership 추론 한계 (issue #87).** 현재 ownership 판별은 `commit_sha` 비교만 사용해요. mono-repo team 의 same-HEAD case (다른 사람이 본인 HEAD 와 동일 commit 으로 push) 에서 본인 / 다른 사람 구분 못 해요 — Step 1.6a (same-commit) 가 다른 user 의 in-flight 를 본인 deploy 로 routing 할 수 있어요. 정식 fix 는 backend `BackendDeployment.owner_user_id` field 도착 후 진행해요 (별 RFC, Phase 2). 그래서 Step 1.6b copy 도 "가능성이 있어요" 로 약화해서 false confidence 회피해요.
+
+   - **Step 1.6a (same-commit)**: 두 commit_sha 모두 non-empty 이고 일치 — 본인 배포 중복 가능성 (또는 mono-repo same-HEAD edge). 기존 "이미 배포가 진행 중이에요." prompt.
+   - **Step 1.6b (cross-tenant)**: 두 commit_sha 모두 non-empty 이고 다름 — 다른 user 의 in-flight 가능성. "다른 사람이 같은 앱에 배포 중일 가능성이 있어요." prompt.
+   - **Step 1.6c (uncertain)**: 둘 중 하나가 empty (commit_sha missing) — uncertain state. "배포 중인 게 있는데 누구 건지 확인 중이에요." prompt (silent misidentification 차단).
 
    ```bash
    echo '[deploy:Step 1.6 in-flight-check] entered' >&2
    IN_FLIGHT_ID=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.id // ""')
    if [ -n "$IN_FLIGHT_ID" ]; then
-     PUSHED_AT=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.pushed_at // ""')
+     IN_FLIGHT_COMMIT=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.commit_sha // ""')
+     RESOLVE_COMMIT=$(echo "$DEPLOY_PREP_JSON" | jq -r '.resolve.commit_sha // ""')
+     CREATED_AT=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.created_at // ""')
      NOW_SEC=$(date +%s)
-     PUSHED_SEC=$(date -d "$PUSHED_AT" +%s 2>/dev/null || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$PUSHED_AT" +%s 2>/dev/null || echo 0)
-     DELTA=$((NOW_SEC - PUSHED_SEC))
-     # non-interactive: safe default = abort
+     CREATED_SEC=$(date -d "$CREATED_AT" +%s 2>/dev/null || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$CREATED_AT" +%s 2>/dev/null || echo 0)
+     DELTA=$((NOW_SEC - CREATED_SEC))
+     # 3-way 분기 결정
+     if [ -z "$IN_FLIGHT_COMMIT" ] || [ -z "$RESOLVE_COMMIT" ]; then
+       INFLIGHT_BRANCH="uncertain"  # → Step 1.6c
+     elif [ "$IN_FLIGHT_COMMIT" = "$RESOLVE_COMMIT" ]; then
+       INFLIGHT_BRANCH="same"  # → Step 1.6a
+     else
+       INFLIGHT_BRANCH="cross_tenant"  # → Step 1.6b
+     fi
+     # non-interactive: safe default = abort (모든 분기 공통)
      if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]; then
-       echo '[deploy:Step 1.6] non-interactive → abort' >&2
+       echo "[deploy:Step 1.6 $INFLIGHT_BRANCH] non-interactive → abort" >&2
        exit 0
      fi
    fi
    ```
 
-   AskUserQuestion JSON envelope (해요체, 3-option):
+   1.6a — Step 1.6a (same-commit). AskUserQuestion JSON (해요체, 3-option). 최근 60초 이내 (`DELTA` ≤ 60) 면 "진행 중인 배포 보기" default highlight, 60초 넘으면 "새 배포 시작" default highlight.
 
    ```json
    {
@@ -298,6 +312,58 @@ To deploy:
          "label": "새 배포 시작",
          "value": "force_new",
          "description": "진행 중인 배포와 별개로 지금 바로 새 배포를 올려요."
+       },
+       {
+         "label": "취소",
+         "value": "abort",
+         "description": "배포를 멈춰요."
+       }
+     ]
+   }
+   ```
+
+   1.6b — Step 1.6b (cross-tenant). 다른 사용자 의 in-flight 라 더 보수적이에요. default highlight 는 "취소".
+
+   ```json
+   {
+     "question": "다른 사람이 같은 앱에 배포 중일 가능성이 있어요. 어떻게 할까요?",
+     "header": "배포 충돌",
+     "options": [
+       {
+         "label": "진행 중인 배포 보기",
+         "value": "monitor",
+         "description": "다른 사용자 의 배포 결과를 실시간으로 확인해요."
+       },
+       {
+         "label": "새 배포 시작",
+         "value": "force_new",
+         "description": "다른 사용자 의 배포와 별개로 지금 바로 새 배포를 올려요."
+       },
+       {
+         "label": "취소",
+         "value": "abort",
+         "description": "배포를 멈춰요."
+       }
+     ]
+   }
+   ```
+
+   1.6c — Step 1.6c (uncertain). commit_sha missing → 누구 배포인지 판단 불가. silent misidentification 차단 위해 explicit uncertainty surface. default highlight 는 "취소".
+
+   ```json
+   {
+     "question": "배포 중인 게 있는데 누구 건지 확인 중이에요. 어떻게 할까요?",
+     "header": "배포 충돌",
+     "options": [
+       {
+         "label": "진행 중인 배포 보기",
+         "value": "monitor",
+         "description": "진행 중인 배포 결과를 일단 지켜봐요."
+       },
+       {
+         "label": "새 배포 시작",
+         "value": "force_new",
+         "description": "확인 안 되는 채로 지금 바로 새 배포를 올려요."
        },
        {
          "label": "취소",
@@ -439,7 +505,7 @@ To deploy:
    ```bash
    echo '[deploy:Step 3.6 refresh-in-flight] entered' >&2
    if [ "${AXHUB_REFRESH_IN_FLIGHT:-0}" = "1" ]; then
-     REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --json 2>/dev/null || echo '{}')
+     REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --refresh-in-flight --json 2>/dev/null || echo '{}')
      NEW_IN_FLIGHT=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
      if [ -n "$NEW_IN_FLIGHT" ]; then
        DEPLOY_PREP_JSON="$REFRESH_JSON"
@@ -449,7 +515,7 @@ To deploy:
    fi
    ```
 
-   in_flight 가 발견되면 Step 1.6 의 AskUserQuestion 3-option 라우팅을 동일하게 적용해요. `monitor` → Step 5 바로 이동, `force_new` → Step 4 계속, `abort` → 중단. non-interactive 환경에서는 건너뛰어요 (`AXHUB_REFRESH_IN_FLIGHT` 기본값 0 → no-op).
+   in_flight 가 발견되면 Step 1.6 의 3-way 분기 (1.6a / 1.6b / 1.6c) logic 을 동일하게 적용해요. `IN_FLIGHT_COMMIT` vs `RESOLVE_COMMIT` 비교 후 same-commit / cross-tenant / uncertain 분기 선택 → 해당 AskUserQuestion → `monitor` (Step 5 watch) / `force_new` (Step 4 계속) / `abort` (중단). non-interactive 환경에서는 건너뛰어요 (`AXHUB_REFRESH_IN_FLIGHT` 기본값 0 → no-op).
 
 4. **On user approval**, mint a consent token and run deploy. Run this step only when Step 1.1 did not already execute and record `deploy_create`; never double-submit a deploy for the same pending bootstrap action.
 
@@ -466,47 +532,78 @@ To deploy:
    JSON
 
    AXHUB_STDERR_TMP=$(mktemp)
-   axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --branch "$BRANCH" --commit "$COMMIT_SHA" --json 2>"$AXHUB_STDERR_TMP"
+   AXHUB_STDOUT_TMP=$(mktemp)
+   axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --branch "$BRANCH" --commit "$COMMIT_SHA" --json >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
    AXHUB_EXIT=$?
-   if [ $AXHUB_EXIT -eq 64 ] && grep -qE 'validation\.deployment_in_progress' "$AXHUB_STDERR_TMP" 2>/dev/null; then
-     # in-flight race: silent swallow raw stderr, then re-fetch in-flight id and route Step 5 watch.
+   # Format: "axhub-error-sub-key: 64:validation.deployment_in_progress" (main.rs:1845, quality_gate.rs:15)
+   if [ $AXHUB_EXIT -eq 64 ] && grep -qE '^axhub-error-sub-key:.*64:validation\.deployment_in_progress' "$AXHUB_STDERR_TMP" 2>/dev/null; then
+     # in-flight race: silent swallow raw stderr, then re-fetch in-flight id + commit + app_slug for Step 5 watch and Step 8 cache consistency.
      REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --refresh-in-flight --json 2>/dev/null || echo '{}')
      IN_FLIGHT_ID=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
      if [ -n "$IN_FLIGHT_ID" ]; then
        DEPLOY_ID="$IN_FLIGHT_ID"
+       # Pull fresh commit_sha + app_slug so Step 8 statusline cache reflects the actually-running deploy (issue #81 C5).
+       COMMIT_SHA=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.commit_sha // .resolve.commit_sha // empty')
+       APP_SLUG=$(echo "$REFRESH_JSON" | jq -r '.resolve.app_slug // empty')
        echo "[deploy:Step 4 swallow-and-watch] routing to in-flight deploy $DEPLOY_ID" >&2
      else
        echo "다른 배포가 진행 중이에요. 잠시 뒤에 다시 시도해요." >&2
+       rm -f "$AXHUB_STDERR_TMP" "$AXHUB_STDOUT_TMP"
        exit 0
      fi
+   elif [ $AXHUB_EXIT -eq 0 ]; then
+     # Happy path: extract deploy id + app slug from stdout JSON so Step 5 watch + Step 8 cache have non-empty values (issue #81 C1).
+     DEPLOY_ID=$(jq -r '.id // .deployment_id // empty' "$AXHUB_STDOUT_TMP")
+     APP_SLUG=$(jq -r '.app_slug // empty' "$AXHUB_STDOUT_TMP" 2>/dev/null)
+     cat "$AXHUB_STDOUT_TMP"
    else
      cat "$AXHUB_STDERR_TMP" >&2
+     cat "$AXHUB_STDOUT_TMP"
    fi
-   rm -f "$AXHUB_STDERR_TMP"
+   rm -f "$AXHUB_STDERR_TMP" "$AXHUB_STDOUT_TMP"
    ```
 
    Windows PowerShell 에서는 같은 selective stderr filter 를 아래처럼 적용해요.
 
    ```powershell
    $AxhubStderrTmp = New-TemporaryFile
-   & axhub deploy create --app $env:APP_ID @ProfileFlag --branch $env:BRANCH --commit $env:COMMIT_SHA --json 2>$AxhubStderrTmp.FullName
+   $AxhubStdoutTmp = New-TemporaryFile
+   & axhub deploy create --app $env:APP_ID @ProfileFlag --branch $env:BRANCH --commit $env:COMMIT_SHA --json 1>$AxhubStdoutTmp.FullName 2>$AxhubStderrTmp.FullName
    $AxhubExit = $LASTEXITCODE
-   if ($AxhubExit -eq 64 -and (Select-String -Path $AxhubStderrTmp.FullName -Pattern 'validation\.deployment_in_progress' -Quiet)) {
-     # in-flight race: silent swallow raw stderr, then re-fetch in-flight id and route Step 5 watch.
+   # Format: "axhub-error-sub-key: 64:validation.deployment_in_progress" (main.rs:1845, quality_gate.rs:15)
+   if ($AxhubExit -eq 64 -and (Select-String -Path $AxhubStderrTmp.FullName -Pattern '^axhub-error-sub-key:.*64:validation\.deployment_in_progress' -Quiet)) {
+     # in-flight race: silent swallow raw stderr, then re-fetch in-flight id + commit + app_slug for Step 5 watch and Step 8 cache consistency.
      $RefreshJson = & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" deploy-prep --intent deploy --refresh-in-flight --json 2>$null
      if (-not $RefreshJson) { $RefreshJson = '{}' }
-     $InFlightId = ($RefreshJson | ConvertFrom-Json -ErrorAction SilentlyContinue).in_flight_deploy.id
+     $Refresh = $RefreshJson | ConvertFrom-Json -ErrorAction SilentlyContinue
+     $InFlightId = $Refresh.in_flight_deploy.id
      if ($InFlightId) {
-       $env:DEPLOY_ID = "$InFlightId"
+       $DeployId = "$InFlightId"  # Use local scope, not $env:DEPLOY_ID (issue #81 C9)
+       # Pull fresh commit_sha + app_slug so Step 8 statusline cache reflects the actually-running deploy (issue #81 C5).
+       $CommitShaFresh = $Refresh.in_flight_deploy.commit_sha
+       if (-not $CommitShaFresh) { $CommitShaFresh = $Refresh.resolve.commit_sha }
+       $AppSlugFresh = $Refresh.resolve.app_slug
        [Console]::Error.WriteLine("[deploy:Step 4 swallow-and-watch] routing to in-flight deploy $InFlightId")
      } else {
        [Console]::Error.WriteLine("다른 배포가 진행 중이에요. 잠시 뒤에 다시 시도해요.")
+       Remove-Item $AxhubStderrTmp.FullName -Force
+       Remove-Item $AxhubStdoutTmp.FullName -Force
        exit 0
      }
+   } elseif ($AxhubExit -eq 0) {
+     # Happy path: extract deploy id + app slug from stdout JSON so Step 5 watch + Step 8 cache have non-empty values (issue #81 C1).
+     $DeployOutput = Get-Content $AxhubStdoutTmp.FullName -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+     if ($DeployOutput) {
+       $DeployId = if ($DeployOutput.id) { $DeployOutput.id } else { $DeployOutput.deployment_id }
+       $AppSlugFresh = $DeployOutput.app_slug
+     }
+     Get-Content $AxhubStdoutTmp.FullName | Write-Output
    } else {
      [Console]::Error.WriteLine((Get-Content $AxhubStderrTmp.FullName -Raw))
+     Get-Content $AxhubStdoutTmp.FullName | Write-Output
    }
    Remove-Item $AxhubStderrTmp.FullName -Force
+   Remove-Item $AxhubStdoutTmp.FullName -Force
    ```
 
    The next Bash tool call id is created by Claude after consent-mint runs, so never invent `${NEXT_BASH_TOOL_CALL_ID}`, never set a fake `CLAUDE_SESSION_ID`, and never clear the real session env just to mint consent. `tool_call_id:"pending"` explicitly mints a short-lived pending token; the PreToolUse hook claims it once only when action/app/profile/branch/commit/context all match. If the token is absent, already used, expired, or non-matching, the command is blocked. This avoids POSIX-only session-unset commands and keeps the flow portable across macOS/Linux/Windows Claude Code environments.
