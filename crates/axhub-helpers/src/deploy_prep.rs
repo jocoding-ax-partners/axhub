@@ -310,12 +310,13 @@ mod tests {
             id: 99,
             status: "building".into(),
             created_at: "2024-01-01T00:00:00Z".into(),
+            commit_sha: "deadbeefcafe1234567890abcdef0123456789ab".into(),
             seconds_since_created: 30,
         }
     }
 
     /// `in_flight_deploy: None` → JSON `null`; `Some(...)` → nested object
-    /// with `created_at` (not `created_at`) and no `seconds_since_created`.
+    /// with `created_at` + `commit_sha` and no `seconds_since_created`.
     #[test]
     fn serializes_in_flight_deploy_field() {
         let mut result = make_result(false);
@@ -327,7 +328,7 @@ mod tests {
             "expected null: {json_none}"
         );
 
-        // Some → nested object with `created_at`, no `seconds_since_created`
+        // Some → nested object with `created_at` + `commit_sha`, no `seconds_since_created`
         result.in_flight_deploy = Some(in_flight_deploy());
         let json_some = serde_json::to_string(&result).unwrap();
         assert!(
@@ -339,9 +340,23 @@ mod tests {
             "field must be created_at: {json_some}"
         );
         assert!(
+            json_some.contains("\"commit_sha\":\"deadbeefcafe"),
+            "commit_sha must be present: {json_some}"
+        );
+        assert!(
             !json_some.contains("seconds_since_created"),
             "seconds_since_created must not appear in JSON: {json_some}"
         );
+    }
+
+    /// `commit_sha` 가 backend 응답에 없으면 default empty string 으로 deserialize 되어
+    /// SKILL Step 1.6c (uncertain) 분기로 라우팅 가능.
+    #[test]
+    fn in_flight_deploy_deserializes_with_default_commit_sha() {
+        let json = r#"{"id":42,"status":"building","created_at":"2024-01-01T00:00:00Z"}"#;
+        let parsed: InFlightDeploy = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.id, 42);
+        assert_eq!(parsed.commit_sha, "", "missing commit_sha → empty default");
     }
 
     /// Kill switch `AXHUB_DEPLOY_IN_FLIGHT_CHECK=0` must force in_flight_deploy to None.

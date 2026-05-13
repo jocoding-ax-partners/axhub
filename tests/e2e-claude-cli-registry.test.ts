@@ -78,9 +78,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("31 actual safe_default rationale 엔트리 (Phase 25 trace + Phase 26 verify + quality_gate + Phase 27 in-flight guard 추가)", () => {
+  test("33 actual safe_default rationale 엔트리 (Phase 27 PR A2 — Step 1.6 3-way split: cross-tenant + uncertain 추가)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(31);
+    expect(paths).toHaveLength(33);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -90,6 +90,8 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "auth",
       "auth",
       "clarify",
+      "deploy",
+      "deploy",
       "deploy",
       "deploy",
       "deploy",
