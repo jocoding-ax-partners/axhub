@@ -115,27 +115,40 @@ pub fn apply_in_flight(result: &mut DeployPrepResult, in_flight: Option<InFlight
     result.in_flight_deploy = in_flight;
 }
 
+/// Re-derives all state derived from `result.resolve` (bootstrap_plan,
+/// github_connected, exit_code) using the cached `preflight_exit_code` and the
+/// given `resolve_exit_code`. Used by both `compose_deploy_prep` and the
+/// `--refresh-in-flight` selective refresh path to enforce identical invariant.
+///
+/// Missing this call after assigning `result.resolve` leaves the derived
+/// fields stale (issue #81 PR B1 Critic round 2 / Architect round 3 finding).
+fn recompose_derived(result: &mut DeployPrepResult, resolve_exit_code: i32) {
+    result.bootstrap_plan = derive_bootstrap_plan(&result.resolve);
+    result.github_connected = result.resolve.github_repo_url.is_some();
+    result.exit_code = merge_exit_code(
+        result.preflight_exit_code,
+        resolve_exit_code,
+        result.bootstrap_plan.as_ref(),
+    );
+}
+
 /// Pure composition. Does NOT perform the in-flight HTTP check; callers that
 /// want the full envelope should use `run_deploy_prep_with_runner` or call
 /// `apply_in_flight` explicitly after fetching.
 pub fn compose_deploy_prep(preflight: PreflightRun, resolve: ResolveRun) -> DeployPrepResult {
-    let bootstrap_plan = derive_bootstrap_plan(&resolve.output);
     let preflight_exit_code = preflight.exit_code;
-    let exit_code = merge_exit_code(
-        preflight_exit_code,
-        resolve.exit_code,
-        bootstrap_plan.as_ref(),
-    );
-    let github_connected = resolve.output.github_repo_url.is_some();
-    DeployPrepResult {
+    let resolve_exit_code = resolve.exit_code;
+    let mut result = DeployPrepResult {
         preflight: preflight.output,
         resolve: resolve.output,
-        bootstrap_plan,
-        exit_code,
+        bootstrap_plan: None,
+        exit_code: EXIT_OK,
         preflight_exit_code,
         in_flight_deploy: None,
-        github_connected,
-    }
+        github_connected: false,
+    };
+    recompose_derived(&mut result, resolve_exit_code);
+    result
 }
 
 // ── File cache for --refresh-in-flight ────────────────────────────────────────
@@ -233,14 +246,8 @@ where
         match cached_with_ts {
             Some((mut c, original_cached_at)) => {
                 c.resolve = fresh_resolve_run.output;
-                // resolve 의 derived state 모두 re-derive — compose_deploy_prep 와 동일 invariant
-                c.bootstrap_plan = derive_bootstrap_plan(&c.resolve);
-                c.github_connected = c.resolve.github_repo_url.is_some();
-                c.exit_code = merge_exit_code(
-                    c.preflight_exit_code,
-                    fresh_resolve_run.exit_code,
-                    c.bootstrap_plan.as_ref(),
-                );
+                // recompose_derived 가 bootstrap_plan + github_connected + exit_code 일관 재유도
+                recompose_derived(&mut c, fresh_resolve_run.exit_code);
                 save_cache_preserve_timestamp(&c, original_cached_at);
                 c
             }
