@@ -43,6 +43,13 @@ pub fn deploy_events_dir() -> Option<PathBuf> {
     state_dir().map(|dir| dir.join("deploy-events"))
 }
 
+/// Phase 25 PR 25.6 — cooldown marker for `axhub-helpers doctor` size
+/// warnings. File mtime is the canonical "last warning emitted" timestamp;
+/// the doctor reads + compares against now() to decide whether to re-warn.
+pub fn doctor_cooldown_path() -> Option<PathBuf> {
+    state_dir().map(|dir| dir.join("doctor-cooldown.json"))
+}
+
 fn config_base_dir() -> Option<PathBuf> {
     config_base_dir_from(env_path("XDG_CONFIG_HOME"), home_dir())
 }
