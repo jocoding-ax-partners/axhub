@@ -437,7 +437,7 @@ const IN_FLIGHT_STATUSES: &[&str] = &["pending", "building", "deploying"];
 
 /// A deploy that is currently in-flight for a given app.
 ///
-/// JSON shape: `{"id": i64, "pushed_at": "<RFC3339>"}`.
+/// JSON shape: `{"id": i64, "created_at": "<RFC3339>"}`.
 /// `seconds_since_created` is kept for internal computation (saturating_sub
 /// clock-skew guard) but excluded from the public JSON envelope — the SKILL
 /// layer uses shell `date` arithmetic for deterministic timing comparisons.
@@ -445,7 +445,7 @@ const IN_FLIGHT_STATUSES: &[&str] = &["pending", "building", "deploying"];
 pub struct InFlightDeploy {
     pub id: i64,
     pub status: String,
-    #[serde(rename = "pushed_at")]
+    #[serde(rename = "created_at")]
     pub created_at: String, // RFC3339
     #[serde(skip)]
     pub seconds_since_created: u64,
@@ -647,7 +647,7 @@ mod tests {
         assert!(result.is_none(), "deploy outside window must be excluded");
     }
 
-    /// Happy path: pending deploy within window returns Some with canonical Z pushed_at.
+    /// Happy path: pending deploy within window returns Some with canonical Z created_at.
     #[test]
     fn returns_some_for_in_flight_within_window() {
         let _g = ENV_LOCK.lock().unwrap();

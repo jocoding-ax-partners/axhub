@@ -264,16 +264,16 @@ To deploy:
 
 1.6. **In-flight deploy 감지 (배포 충돌 방지).** `deploy-prep` 응답에 `.in_flight_deploy.id` 가 non-null 이면 이미 진행 중인 배포가 있어요. 즉시 Step 2 로 넘어가지 않고 아래 AskUserQuestion 으로 사용자 의도를 확인해요.
 
-   최근 60초 이내에 push 가 있었으면 (`in_flight_deploy.pushed_at` 기준) "진행 중인 배포 보기" 를 default highlight 로, 60초를 넘겼으면 "새 배포 시작" 을 default highlight 로 제안해요. non-interactive 환경에서는 항상 `abort` 가 safe default 예요.
+   최근 60초 이내에 push 가 있었으면 (`in_flight_deploy.created_at` 기준) "진행 중인 배포 보기" 를 default highlight 로, 60초를 넘겼으면 "새 배포 시작" 을 default highlight 로 제안해요. non-interactive 환경에서는 항상 `abort` 가 safe default 예요.
 
    ```bash
    echo '[deploy:Step 1.6 in-flight-check] entered' >&2
    IN_FLIGHT_ID=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.id // ""')
    if [ -n "$IN_FLIGHT_ID" ]; then
-     PUSHED_AT=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.pushed_at // ""')
+     CREATED_AT=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.created_at // ""')
      NOW_SEC=$(date +%s)
-     PUSHED_SEC=$(date -d "$PUSHED_AT" +%s 2>/dev/null || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$PUSHED_AT" +%s 2>/dev/null || echo 0)
-     DELTA=$((NOW_SEC - PUSHED_SEC))
+     CREATED_SEC=$(date -d "$CREATED_AT" +%s 2>/dev/null || date -j -f '%Y-%m-%dT%H:%M:%SZ' "$CREATED_AT" +%s 2>/dev/null || echo 0)
+     DELTA=$((NOW_SEC - CREATED_SEC))
      # non-interactive: safe default = abort
      if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]; then
        echo '[deploy:Step 1.6] non-interactive → abort' >&2

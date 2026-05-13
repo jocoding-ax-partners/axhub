@@ -29,8 +29,8 @@ describe("deploy SKILL Step 1.6 — in-flight deploy guard invariants", () => {
     expect(body).toContain('"value": "abort"');
   });
 
-  test("Step 1.6 uses in_flight_deploy.pushed_at for 60-second window logic", () => {
+  test("Step 1.6 uses in_flight_deploy.created_at for 60-second window logic", () => {
     const body = deploySkill();
-    expect(body).toContain("in_flight_deploy.pushed_at");
+    expect(body).toContain("in_flight_deploy.created_at");
   });
 });
