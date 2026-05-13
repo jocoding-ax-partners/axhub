@@ -291,9 +291,6 @@
       ]
     }
   },
-  "whatsnew": {
-    "_note": "whatsnew SKILL is read-only and has no structured AskUserQuestion site. It summarizes axhub whatsnew output."
-  },
   "quality_gate": {
     "_note": "Phase 26 PR 26.3 quality_gate non-SKILL safety channel. deploy-prep emits this gate before mutation; interactive flow can ask abort/proceed, non-interactive always aborts.",
     "abort_or_proceed": {
