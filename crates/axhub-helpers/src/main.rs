@@ -1617,7 +1617,6 @@ fn cmd_trace(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-
 fn cmd_auth_refresh_bg() -> anyhow::Result<i32> {
     if std::env::var("AXHUB_AUTH_BG_REFRESH").as_deref() == Ok("0") {
         return Ok(0);
