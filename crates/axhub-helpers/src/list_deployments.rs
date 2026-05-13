@@ -546,7 +546,7 @@ pub fn find_app_in_flight_with_window(
 
 // ── Unit tests ─────────────────────────────────────────────────────────────────
 
-#[cfg(all(test, not(coverage)))]
+#[cfg(test)]
 mod tests {
     use std::sync::Mutex;
 
@@ -574,6 +574,7 @@ mod tests {
         serde_json::json!({ "data": { "deployments": deps } }).to_string()
     }
 
+    #[cfg(not(coverage))]
     #[test]
     fn rustls_crypto_provider_is_unambiguous_without_proxy_override() {
         let roots = rustls::RootCertStore::empty();
