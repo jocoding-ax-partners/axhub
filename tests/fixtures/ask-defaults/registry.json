@@ -224,7 +224,7 @@
   "github": {
     "GitHub 연동 작업을 고를까요?": {
       "safe_default": "list_only",
-      "rationale": "GitHub connect/disconnect changes deployment source bindings. Non-interactive mode should only list available repos.",
+      "rationale": "GitHub connect/disconnect changes deployment source bindings. Non-interactive mode should only list available repos. GitHub disconnect 외 모든 옵션 (skip 포함) 은 backend 가 git_connection_required (HTTP 422) 로 거절. 모델이 4번째 'skip' 옵션을 만들어내면 안 돼요.",
       "allowed_safe_defaults": [
         "list_only",
         "connect",

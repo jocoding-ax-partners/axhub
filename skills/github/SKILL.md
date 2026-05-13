@@ -199,3 +199,4 @@ To connect GitHub:
 - NEVER disconnect 를 subprocess 에서 자동 실행하지 않아요.
 - NEVER `CLAUDE_PLUGIN_ROOT` 누락을 이유로 사용자에게 bang-prefixed connect 수동 우회를 요청하지 않아요.
 - NEVER `--json` 을 빼지 않아요.
+- NEVER add a 4th option (e.g. "지금은 스킵") to Step 2 의 AskUserQuestion. backend 가 git_connection_required (HTTP 422) 로 거절해요. options 는 정확히 3개: list_only / connect / disconnect.
