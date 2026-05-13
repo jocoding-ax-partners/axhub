@@ -35,10 +35,12 @@ describe("init SKILL workflow — top-level step numbering uniqueness (Plan F′
     expect(new Set(sorted).size).toBe(sorted.length);
   });
 
-  test("Step 6 (결과 안내) renders closed-form 5-step block with backend-truth labels", () => {
+  test("Step 6 (결과 안내) renders helper next_steps[] with required_for_deploy qualifier (FU-1)", () => {
     expect(content).toContain("6. **결과와 다음 액션을 안내해요.**");
-    expect(content).toContain("GitHub 연결 (배포에 꼭 필요해요)");
-    expect(content).not.toMatch(/3\.\s*GitHub 연결\s*\(선택\)/);
+    expect(content).toContain("next_steps[]");
+    expect(content).toContain("required_for_deploy");
+    expect(content).toContain("(배포에 꼭 필요해요)");
+    expect(content).not.toMatch(/\d+\.\s*GitHub 연결\s*[—-]?\s*[^\n]*\(선택\)/);
   });
 
   test("dependency-install subsection uses D-prefix (D1..D5) to avoid top-level collision", () => {

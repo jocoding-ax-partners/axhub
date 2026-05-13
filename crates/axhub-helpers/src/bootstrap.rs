@@ -213,6 +213,17 @@ impl BootstrapStateFile {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NextStep {
+    pub id: String,
+    pub label: String,
+    pub required_for_deploy: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub blocks: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trigger_phrase: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BootstrapOutput {
     pub state: BootstrapState,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -235,6 +246,8 @@ pub struct BootstrapOutput {
     pub retry_policy: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_steps: Option<Vec<NextStep>>,
 }
 
 impl BootstrapOutput {
@@ -252,6 +265,7 @@ impl BootstrapOutput {
             idempotency_key: None,
             retry_policy: None,
             reason: None,
+            next_steps: None,
         }
     }
 
@@ -321,9 +335,56 @@ pub fn run_bootstrap(args: &[String], stdin: Option<&str>) -> BootstrapRun {
         });
     }
 
-    with_bootstrap_phase("plan_next", || {
+    let mut result = with_bootstrap_phase("plan_next", || {
         plan_next(args.dry_run || !args.auto_chain, args.auto_chain)
-    })
+    });
+    if args.dry_run {
+        result.output.next_steps = Some(universal_post_init_next_steps());
+    }
+    result
+}
+
+/// Universal post-init "next safe steps" roadmap rendered by SKILLs after `axhub init`.
+/// Source-of-truth lives here so model prose cannot drift (e.g. labelling GitHub
+/// connection as `(선택)` when backend rejects deploy with `git_connection_required`).
+fn universal_post_init_next_steps() -> Vec<NextStep> {
+    vec![
+        NextStep {
+            id: "app_register".into(),
+            label: "앱 등록".into(),
+            required_for_deploy: true,
+            blocks: vec!["github_connect".into(), "deploy".into()],
+            trigger_phrase: Some("axhub 앱 만들어줘".into()),
+        },
+        NextStep {
+            id: "deps_install".into(),
+            label: "의존성 설치".into(),
+            required_for_deploy: false,
+            blocks: vec![],
+            trigger_phrase: Some("의존성 설치해".into()),
+        },
+        NextStep {
+            id: "github_connect".into(),
+            label: "GitHub 연결".into(),
+            required_for_deploy: true,
+            blocks: vec!["deploy".into()],
+            trigger_phrase: Some("깃허브 연결".into()),
+        },
+        NextStep {
+            id: "env_setup".into(),
+            label: "환경 변수".into(),
+            required_for_deploy: false,
+            blocks: vec![],
+            trigger_phrase: Some("환경변수 추가".into()),
+        },
+        NextStep {
+            id: "deploy".into(),
+            label: "배포".into(),
+            required_for_deploy: true,
+            blocks: vec![],
+            trigger_phrase: Some("배포해줘".into()),
+        },
+    ]
 }
 
 fn with_bootstrap_phase<F>(phase: &'static str, run: F) -> BootstrapRun
@@ -1196,5 +1257,57 @@ mod tests {
             assert_eq!(state.as_str(), label);
             assert_eq!(state.is_user_decision(), user_decision, "{label}");
         }
+    }
+
+    #[test]
+    fn universal_next_steps_match_init_skill_contract() {
+        let steps = universal_post_init_next_steps();
+        assert_eq!(steps.len(), 5, "init flow has 5 universal next steps");
+
+        let ids: Vec<&str> = steps.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec![
+                "app_register",
+                "deps_install",
+                "github_connect",
+                "env_setup",
+                "deploy"
+            ]
+        );
+
+        let required: Vec<&str> = steps
+            .iter()
+            .filter(|s| s.required_for_deploy)
+            .map(|s| s.id.as_str())
+            .collect();
+        assert_eq!(
+            required,
+            vec!["app_register", "github_connect", "deploy"],
+            "GitHub connect must be required_for_deploy=true (backend rejects with HTTP 422 git_connection_required)"
+        );
+
+        let github = steps.iter().find(|s| s.id == "github_connect").unwrap();
+        assert!(
+            github.blocks.iter().any(|b| b == "deploy"),
+            "github_connect must declare it blocks deploy"
+        );
+    }
+
+    #[test]
+    fn next_step_serialization_matches_init_skill_render_contract() {
+        let step = NextStep {
+            id: "github_connect".into(),
+            label: "GitHub 연결".into(),
+            required_for_deploy: true,
+            blocks: vec!["deploy".into()],
+            trigger_phrase: Some("깃허브 연결".into()),
+        };
+        let serialized = serde_json::to_value(&step).unwrap();
+        assert_eq!(serialized["id"], "github_connect");
+        assert_eq!(serialized["label"], "GitHub 연결");
+        assert_eq!(serialized["required_for_deploy"], true);
+        assert_eq!(serialized["blocks"][0], "deploy");
+        assert_eq!(serialized["trigger_phrase"], "깃허브 연결");
     }
 }
