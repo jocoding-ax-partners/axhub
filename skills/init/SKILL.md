@@ -137,16 +137,30 @@ CLI가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요. str
 
    `consent_required_apps_create`, `git_init_required`, `first_commit_required`, `template_required`, `conflict_existing_files` 같은 상태는 helper 가 다음 단계를 알려주는 **internal verification primitive** 예요 — raw 식별자를 사용자 chat 에 그대로 echo 하면 안 돼요 (deploy SKILL Visibility Rules 와 같은 규칙). 대신 한국어 한 줄로 humanize 해서 알려드려요 (예: "앱 등록 동의가 필요해요" / "저장 지점을 먼저 만들어야 해요" / "템플릿을 골라야 해요" / "현재 폴더에 이미 같은 이름 파일이 있어요"). 앱 등록이나 배포는 deploy/apps 흐름으로 이어가요. init 은 파일 생성까지만 맡고, `bootstrap --auto-chain`, `apps create`, `deploy create` 는 실행하지 않아요.
 
-6. **결과와 다음 액션을 안내해요.** 아래 5단계를 정해진 순서와 라벨로만 보여줘요. 임의로 "(선택)" 같은 라벨을 붙이거나 단계 순서를 바꾸지 않아요. backend 가 강제하는 단계 (앱 등록, GitHub 연결, 배포) 는 스킵 안내를 만들지 않아요.
+6. **결과와 다음 액션을 안내해요.** Step 5 의 `bootstrap --dry-run --json` 출력에 포함된 `next_steps[]` 배열을 source-of-truth 로 써요. 직접 단계를 만들거나 순서를 바꾸지 않아요. helper 가 emit 한 각 항목의 `label`, `required_for_deploy`, `trigger_phrase` 를 그대로 humanize 해서 한국어 5단계 안내문으로 보여줘요. `required_for_deploy: true` 인 항목 뒤에는 "(배포에 꼭 필요해요)" 한정자를 붙이고, `false` 인 항목에는 어떤 한정자도 붙이지 않아요. "(선택)" 같은 표기는 절대 만들지 않아요.
 
+   helper next_steps[] schema (NextStep struct, FU-1):
+   ```json
+   {
+     "id": "github_connect",
+     "label": "GitHub 연결",
+     "required_for_deploy": true,
+     "blocks": ["deploy"],
+     "trigger_phrase": "깃허브 연결"
+   }
+   ```
+
+   렌더 결과 예시 (helper 가 5개 step 을 emit 하면):
    ```
    다음 안전 단계예요:
-   1. 앱 등록 — `axhub 앱 만들어줘` 로 apphub.yaml 을 서버에 등록해요.
-   2. 의존성 설치 — `의존성 설치해` 라고 말하면 쓰는 패키지 매니저로 깔아드려요.
-   3. GitHub 연결 (배포에 꼭 필요해요) — `깃허브 연결` 로 repo 와 axhub 앱을 묶어요.
-   4. 환경 변수 — `환경변수 추가` 로 API 키 / DB URL 등을 주입해요.
-   5. 배포 — `배포해줘` 로 라이브로 띄워요.
+   1. 앱 등록 — `axhub 앱 만들어줘` (배포에 꼭 필요해요)
+   2. 의존성 설치 — `의존성 설치해`
+   3. GitHub 연결 — `깃허브 연결` (배포에 꼭 필요해요)
+   4. 환경 변수 — `환경변수 추가`
+   5. 배포 — `배포해줘` (배포에 꼭 필요해요)
    ```
+
+   helper 가 `next_steps[]` 를 emit 하지 않거나 비어 있으면 단계 안내를 생략해요. 다른 자유 라벨을 만들지 않아요.
 
 ### Dependency install (lockfile-aware)
 
