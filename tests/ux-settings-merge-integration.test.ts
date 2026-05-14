@@ -174,7 +174,8 @@ describe("v0.5.13 settings-merge integration — 14 cases", () => {
       );
       // PermissionDenied (exit 7) or lock-acquisition error (exit 1) are both acceptable —
       // neither is a successful merge.
-      expect([1, 7]).toContain(result.status);
+      expect(result.status).not.toBeNull();
+      expect([1, 7]).toContain(result.status as number);
       // No settings.json must have been created/modified
       expect(existsSync(join(claudeDir, "settings.json"))).toBe(false);
     } finally {
