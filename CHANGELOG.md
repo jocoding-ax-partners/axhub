@@ -4,17 +4,37 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
-## [Unreleased]
+## [0.5.10](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.9...v0.5.10) (2026-05-14)
 
-### Fixed
+Vibe coder 가 `axhub verify` / `axhub deploy` 같은 mutate-aware SKILL 을 첫 실행할 때 Claude Code 권한 게이트가 raw 영문 `"Shell command permission check failed for pattern ... requires approval"` 텍스트를 그대로 노출하던 UX 결함을 끊는 hotfix 예요. 동시에 deploy SKILL 의 cross-shell Node runner (Phase 17 US-1706) 가 `stdio:'inherit'` 으로 `result.stderr` capture 안 해서 silent no-op 였던 부수 결함도 해결했어요. RALPLAN-DR 4-iteration 합의 (Planner → Architect → Critic, 모두 APPROVE) 로 plan iter4 도출 후 team+ralph 모드로 ship 했어요.
 
-* 9 SKILL preflight `!command` 권한 prompt UX 한국어화 (deploy SKILL silent no-op 동시 해결, ADR-0011)
+핵심 변경:
+- **codegen-preflight-injection.ts 신설**: 9 SKILL + 1 template 의 `!command` injection 라인을 single source 에서 emit. **lite variant** (8 SKILL + 1 template) 는 Node runner + `stdio:['inherit','inherit','pipe']` + strict-anchor `(?:Shell|Bash) command permission check failed.*requires approval` denialRegex + 한국어 systemMessage fallback + 미매칭 stderr passthrough. **deploy variant** 는 lite body 위에 Phase 17 US-1706 cross-platform root resolution (Windows `.exe`/`path.delimiter`/`CLAUDE_SKILL_DIR` fallback) 보존. 권한 거부 시 `[axhub] 첫 실행이라 권한이 필요해요. ... '허용' 을 누르면 다음부터 자동으로 진행돼요.` 한 줄 한국어 안내로 vibe coder UX 완성.
+- **ADR-0011 (`docs/adr/0011-skill-preflight-permission-fallback.md`)**: SKILL preprocessing `!command` injection layer 의 fail-open contract 명문화. ADR-0010 (axhub binary stderr graceful degradation) 와 별 layer 임을 명시 — Claude Code 권한 게이트 stderr 와 axhub binary stderr 가 정합 철학 (strict-anchor + 미매칭 passthrough) 으로 통일. 검증된 가정 6 항목으로 plan 의 가정-checking-as-documentation.
+- **manifest invariant + skill-doctor variant-aware**: `tests/manifest.test.ts` 의 "Phase 27.x — preflight !command injection variant-aware byte-identical lock" 으로 9 SKILL + 1 template 의 codegen output 과 byte-identical drift 자동 catch. `skill-doctor.ts` substring 매칭이 `PREFLIGHT_TARGETS` lookup 기반 byte-identical 매칭으로 강화 — 새 SKILL 이 `needs-preflight: true` 인데 미등록이면 자동 fail.
+- **security hardening (PR #99 review M1/M2)**: codegen stderr passthrough 에 secret token redaction layer (`sk-` / `gho_` / `axhub_` / `Bearer` 4 패턴 → `<redacted>`) 추가. `tests/fixtures/permission-manifest-probe/plugin.json` → `plugin.probe.example.json` rename + README 경고 추가 — production 매니페스트 copy-paste 사고 차단.
+- **correctness hardening (PR #99 review correctness M1/M2)**: codegen `applyToFile` 가 dual-match (raw + Node runner 동시) + multi-match (한 SKILL 2 blocks) throw — byte-identical lock 의 silent regression vector 차단.
+- **CI infra fix (Apple Silicon GHA runner)**: `.github/workflows/{perf-gate,rust-ci}.yml` 의 `Swatinem/rust-cache@v2` 가 macOS-latest 에서 `~/.cargo/bin/{cargo,rustc}` 를 `rustup-init 1.29.0` 으로 restore 하던 부패 — macOS 만 cache skip 우회.
+
+### Test baseline
+- 766 pass / 4 skip / 2 pre-existing fail (README "19 SKILLs" / PLAN schema — main 동일, 본 릴리스 무관). +4 신규 case (Case B Shell+Bash split, Case F binary-not-found ENOENT, Case G token redaction, codegen redaction substring spec).
+- bun run skill:doctor --strict: 21 SKILLs OK (variant-aware byte-identical).
+- bun run lint:tone --strict: 0 err / 36 files.
+- bun run lint:keywords --check: no diff (nl-lexicon baseline lock 유지).
+- bunx tsc --noEmit: clean.
+- cargo test --workspace: 335 pass / 3 ignored.
+- bun run release:check: v0.5.10 5-binary matrix wired.
+- CI 9/9 SUCCESS (perf + rust × ubuntu/macos/windows + Local Rust-primary gate + T2 helper-bin + corpus.100 drift).
+
+### Honest tradeoff
+- **TTFD=1 잔존** — Option A 매니페스트 wildcard spec probe 미채택 (PATH hijack risk 라 거부). 사용자 첫 실행 시 권한 prompt 한 번 "허용" 클릭 필요. Phase 27.y RFC follow-up: `feat(plugin): permissions manifest wildcard support`.
+- **`result.error` 분기 mental model gap** — ENOENT / EACCES (binary 부재) 시 denialRegex 매칭과 동일한 systemMessage 출력 — "허용 클릭" 안내가 inaccurate. Case F regression test 로 의도 lock, 별도 systemMessage 분기는 follow-up.
+- **denialRegex strict-anchor fragility** — Claude Code 가 영문 prefix 를 바꾸면 silent skip. 미매칭 passthrough 분기로 chat 표시는 보존되지만 한국어 surface 손실. Phase 28.x production trace follow-up.
+- **macOS Swatinem cache skip** — macOS perf + rust CI 가 cache 없이 fresh build 라 ~5min 더 느려요. Phase 28.x 의 GHA runner image 또는 Swatinem upstream fix 시 재활성화.
 
 ### Added
 
-* preflight injection codegen single source (`scripts/codegen-preflight-injection.ts`) — lite variant (8 SKILL + 1 template) + deploy variant (cross-platform root resolution 보존), variant-aware byte-identical manifest invariant (ADR-0011)
-* SKILL preprocessing `!command` fail-open contract (`docs/HOOKS.md §3.6`) — Rust hook 진입점과 분리된 layer 명문화
-
+* **skill:** 9 SKILL + 1 template preflight !command 권한 fallback (ADR-0011) ([#99](https://github.com/jocoding-ax-partners/axhub/issues/99)) ([849a786](https://github.com/jocoding-ax-partners/axhub/commit/849a786015eab4eece23850ef32d859849dfe745)), closes [#5](https://github.com/jocoding-ax-partners/axhub/issues/5) [#6](https://github.com/jocoding-ax-partners/axhub/issues/6) [#1](https://github.com/jocoding-ax-partners/axhub/issues/1) [#3](https://github.com/jocoding-ax-partners/axhub/issues/3) [#5](https://github.com/jocoding-ax-partners/axhub/issues/5) [#6](https://github.com/jocoding-ax-partners/axhub/issues/6) [#2](https://github.com/jocoding-ax-partners/axhub/issues/2)
 
 ## [0.5.9](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.8...v0.5.9) (2026-05-14)
 
