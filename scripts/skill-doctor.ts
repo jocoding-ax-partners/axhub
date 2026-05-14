@@ -38,6 +38,7 @@ import {
   getInjectionLineForVariant,
   TARGETS as PREFLIGHT_TARGETS,
 } from "./codegen-preflight-injection";
+import { getStatuslineSnippet } from "./codegen-statusline-snippet";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const SKILLS_DIR = join(REPO_ROOT, "skills");
@@ -411,6 +412,47 @@ if (!STRICT) {
   );
 }
 
+// Phase 26 — statusline snippet codegen drift check (--strict only).
+// Skips silently when skills/enable-statusline/SKILL.md does not yet exist
+// (bootstrapping order: SKILL may not be authored before this check runs).
+let statuslineSnippetDrift = false;
+{
+  const enableStatuslinePath = join(SKILLS_DIR, "enable-statusline", "SKILL.md");
+  if (existsSync(enableStatuslinePath)) {
+    const content = readFileSync(enableStatuslinePath, "utf8");
+    const BEGIN_MARKER = "<!-- BEGIN STATUSLINE_SNIPPET";
+    const END_MARKER = "<!-- END STATUSLINE_SNIPPET -->";
+    const beginIdx = content.indexOf(BEGIN_MARKER);
+    const endIdx = content.indexOf(END_MARKER);
+    if (beginIdx !== -1 && endIdx !== -1) {
+      const between = content.slice(beginIdx, endIdx);
+      const fenceMatch = between.match(/```json\n([\s\S]*?)\n```/);
+      const extracted = fenceMatch?.[1] ?? null;
+      const canonical = getStatuslineSnippet();
+      if (extracted !== canonical) {
+        statuslineSnippetDrift = true;
+        if (STRICT) {
+          process.stdout.write(
+            "statusline-snippet: drift detected — run `bun run scripts/codegen-statusline-snippet.ts --write`\n"
+          );
+        } else {
+          process.stdout.write(
+            `  ${miss} ${c.red("statusline snippet drift")} ${c.gray("(bun run scripts/codegen-statusline-snippet.ts --write 실행해주세요)")}\n`
+          );
+        }
+      } else {
+        if (!STRICT) {
+          process.stdout.write(
+            `  ${ok} statusline snippet ${c.gray("(codegen-statusline-snippet.ts 와 byte-identical)")}\n`
+          );
+        }
+      }
+    }
+    // If markers absent: skip silently (SKILL body not yet fully authored)
+  }
+  // If SKILL does not exist: skip silently
+}
+
 process.exit(
-  (totalMissing > 0 || collisionCount > 0 || qualityIssues.length > 0) && STRICT ? 1 : 0,
+  (totalMissing > 0 || collisionCount > 0 || qualityIssues.length > 0 || statuslineSnippetDrift) && STRICT ? 1 : 0,
 );

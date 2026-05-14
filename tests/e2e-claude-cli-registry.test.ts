@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("24 top-level keys (2 메타 + 21 SKILL slug + quality_gate channel)", () => {
+  test("25 top-level keys (2 메타 + 22 SKILL slug + quality_gate channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(24);
+    expect(keys).toHaveLength(25);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
@@ -59,6 +59,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "clarify",
       "deploy",
       "doctor",
+      "enable-statusline",
       "env",
       "github",
       "init",
@@ -78,9 +79,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("33 actual safe_default rationale 엔트리 (Phase 27 PR A2 — Step 1.6 3-way split: cross-tenant + uncertain 추가)", () => {
+  test("34 actual safe_default rationale 엔트리 (Phase 27 PR A2 — Step 1.6 3-way split: cross-tenant + uncertain 추가, v0.5.11 enable-statusline 추가)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(33);
+    expect(paths).toHaveLength(34);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -99,6 +100,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "deploy",
       "doctor",
       "doctor",
+      "enable-statusline",
       "env",
       "github",
       "github",

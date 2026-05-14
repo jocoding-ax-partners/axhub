@@ -2,6 +2,13 @@
 
 Append-only log of unresolved decisions across plans.
 
+## enable-statusline-v0.5.11 - 2026-05-14
+
+- [ ] Q1: 4-way 클립보드 helper graceful degradation — macOS `pbcopy` / Windows `clip.exe` / WSL `clip.exe` / Linux `xclip` 부재 시 print-to-stdout fallback 만으로 충분한지, 아니면 Wayland `wl-copy` 도 지원할지? — 영향: SKILL body 분기 수, D1 TTY guard 와의 상호작용.
+- [ ] Q2: AskUserQuestion "어떻게 하는지 보여줘요" 분기의 step-by-step 본문 위치 — SKILL.md 안 inline 으로 둘지, 별도 docs 파일 link 로 뺄지? — 영향: SKILL body 길이 vs single-file 원칙.
+- [ ] Q3: README "Statusline 보이게 하기" subsection anchor 위치 — "5분 만에 시작하기" 마지막 step 뒤가 좋은지 별도 H3 으로 띄울지? — 영향: README 시각적 흐름.
+- [ ] Q4: v0.6.0+ Option C plan 시작 시 follow-up 6 prerequisite 공격 순서 — uninstall hook 조사 (1) 이 7-branch truth table (2) 의 input 이므로 1 → 2 우선이 맞는지? — 영향: v0.6.0 phase scoping.
+
 ## phase-22-claude-cli-e2e-harness - 2026-04-28
 
 - [ ] helper bin 에 `--insecure-pin-override` 또는 `AXHUB_DEV_CA_BUNDLE` 같은 dev-only TLS pinning knob 가 이미 있나? — mock-hub 로 라우팅 못 하면 24-case 중 read-only mock (03/04/13) 와 mutate mock (08/09/19/20/21) 전부 fail. 없으면 Phase 22.0 에 helper bin PR 먼저 prepend.

@@ -337,5 +337,15 @@
         "proceed"
       ]
     }
+  },
+  "enable-statusline": {
+    "statusLine 어떻게 켤래요?": {
+      "safe_default": "나중에 할래요",
+      "rationale": "Wiring snippet 표시는 idempotent read-only 라 user explicit consent 없는 비대화형 환경에서도 stdout 출력 안전해요. 다만 clipboard mutation 은 interactive 선택 후에만 진행해요.",
+      "allowed_safe_defaults": [
+        "나중에 할래요",
+        "어떻게 하는지 보여줘요"
+      ]
+    }
   }
 }
