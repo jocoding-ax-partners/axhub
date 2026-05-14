@@ -111,24 +111,35 @@ CLI가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요. str
 
    `consent_required_apps_create`, `git_init_required`, `first_commit_required`, `template_required`, `conflict_existing_files` 같은 상태는 helper 가 다음 단계를 알려주는 **internal verification primitive** 예요 — raw 식별자를 사용자 chat 에 그대로 echo 하면 안 돼요 (deploy SKILL Visibility Rules 와 같은 규칙). 대신 한국어 한 줄로 humanize 해서 알려드려요 (예: "앱 등록 동의가 필요해요" / "저장 지점을 먼저 만들어야 해요" / "템플릿을 골라야 해요" / "현재 폴더에 이미 같은 이름 파일이 있어요"). 앱 등록이나 배포는 deploy/apps 흐름으로 이어가요. init 은 파일 생성까지만 맡고, `bootstrap --auto-chain`, `apps create`, `deploy create` 는 실행하지 않아요.
 
-5. **결과와 다음 액션을 안내해요.** 앱 등록, GitHub 연결, env 설정, deploy, open 흐름을 자연어로 이어갈 수 있다고 짧게 말해요.
+6. **결과와 다음 액션을 안내해요.** 아래 5단계를 정해진 순서와 라벨로만 보여줘요. 임의로 "(선택)" 같은 라벨을 붙이거나 단계 순서를 바꾸지 않아요. backend 가 강제하는 단계 (앱 등록, GitHub 연결, 배포) 는 스킵 안내를 만들지 않아요.
+
+   ```
+   다음 안전 단계예요:
+   1. 앱 등록 — `axhub 앱 만들어줘` 로 apphub.yaml 을 서버에 등록해요.
+   2. 의존성 설치 — `의존성 설치해` 라고 말하면 쓰는 패키지 매니저로 깔아드려요.
+   3. GitHub 연결 (배포에 꼭 필요해요) — `깃허브 연결` 로 repo 와 axhub 앱을 묶어요.
+   4. 환경 변수 — `환경변수 추가` 로 API 키 / DB URL 등을 주입해요.
+   5. 배포 — `배포해줘` 로 라이브로 띄워요.
+   ```
 
 ### Dependency install (lockfile-aware)
 
-1. plan 을 조회해요:
+이 subsection 의 단계는 `D1.` ~ `D5.` 로 별도 namespace 를 써요. workflow 의 top-level Step 0~6 과 번호 충돌을 막기 위해서예요.
+
+D1. plan 을 조회해요:
    `!${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers bootstrap dependency-plan --json`
    결과의 `recommended_command` 필드 보존.
 
-2. AskUserQuestion `dependency_install_strategy` (default `inline_session`, options `inline_session` / `manual_terminal` / `skip`) fire.
+D2. AskUserQuestion `dependency_install_strategy` (default `inline_session`, options `inline_session` / `manual_terminal` / `skip`) fire.
 
-3. 사용자가 `inline_session` 선택 시:
+D3. 사용자가 `inline_session` 선택 시:
    - lockfile 단일 (`requires_pm_choice == false`) → `recommended_command` 필드를 그대로 inline 실행 (`!<recommended_command>`)
    - lockfile 다중 (`requires_pm_choice == true`) → `package_manager_choice` AskUserQuestion fire 후 선택된 manager 의 `recommended_command` inline 실행
 
-4. 실행 후 verify 단계:
+D4. 실행 후 verify 단계:
    helper 가 자동으로 byte-identical 검사 + log file 저장 (TOCTOU race 차단을 위한 atomic mode 또는 직전 re-verify).
 
-5. 실패 시 에러 분류 후 사용자에게 generic fallback 메시지 출력 (catalog 5 entry follow-up).
+D5. 실패 시 에러 분류 후 사용자에게 generic fallback 메시지 출력 (catalog 5 entry follow-up).
 
 설치가 60초+ 걸리면 ctrl-C 로 멈추고 strategy 재선택할 수 있어요.
 
