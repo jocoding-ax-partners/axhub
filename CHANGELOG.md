@@ -4,6 +4,37 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.11](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.10...v0.5.11) (2026-05-14)
+
+vibe coder 가 `/plugin install axhub` 직후 Claude Code statusline 영역에서 axhub 상태가 안 보이던 mental-model gap 을 끊는 patch 예요. Context7 docs 검증으로 Claude Code plugin manifest schema 가 `statusLine` 필드를 미지원함을 확인했고 (`code.claude.com/docs/en/plugins-reference` Complete Plugin Manifest Schema), 활성화는 user `~/.claude/settings.json` 에서만 가능한 게 사양상 의도예요. ralplan consensus 2 iteration (Planner → Architect → Critic, Architect/Critic 모두 Option B steelman 으로 flip 합의) 로 trust boundary 보존 path 를 결정 — axhub 가 user-global 파일을 mutate 한 적 없는 전례를 깨지 않고, `/axhub:enable-statusline` SKILL + AskUserQuestion + clipboard helper (pbcopy / clip.exe / xclip command -v guarded) + README "Statusline 보이게 하기" 4-step 가이드로 ctrl-V 한 번 비용으로 gap 을 닫았어요. Option C (auto-patch settings.json) 는 7-branch merge truth table 미설계, SessionStart hot path latency budget 충돌, uninstall orphan footgun 등 6 가지 ship blocker 로 v0.6.0+ defer 했어요.
+
+핵심 변경:
+- **`/axhub:enable-statusline` SKILL 신규** (`skills/enable-statusline/SKILL.md`, model: haiku, multi-step: false, needs-preflight: false). D1 TTY guard (CLAUDE_NO_TTY=1 / stdin not TTY → AskUserQuestion 건너뛰고 snippet stdout 만 출력, clipboard binary 호출 절대 금지) + 3-option AskUserQuestion (`복사해서 붙여 넣을래요` / `어떻게 하는지 보여줘요` / `나중에 할래요`, safe_default = `나중에 할래요`) + pbcopy/clip.exe/xclip command -v guarded fallback chain + canonical wiring snippet inside BEGIN/END STATUSLINE_SNIPPET codegen markers.
+- **codegen-statusline-snippet drift lock** (`scripts/codegen-statusline-snippet.ts`). TS string-literal SSOT mirror of `scripts/codegen-preflight-injection.ts:43-60` precedent. `--check` exits non-zero on drift between SKILL body markers and canonical `getStatuslineSnippet()` output, `--write` idempotent re-canonicalize. `scripts/skill-doctor.ts --strict` 가 drift check 자동 통합 (SKILL 또는 markers 부재 시 조용히 skip — bootstrap safe).
+- **registry rationale literal lock** (`tests/fixtures/ask-defaults/registry.json`). `enable-statusline` 엔트리에 `safe_default: "나중에 할래요"`, `allowed_safe_defaults: ["나중에 할래요", "어떻게 하는지 보여줘요"]`, literal rationale "Wiring snippet 표시는 idempotent read-only 라 user explicit consent 없는 비대화형 환경에서도 stdout 출력 안전해요. 다만 clipboard mutation 은 interactive 선택 후에만 진행해요." — `tests/ux-ask-fallback-registry.test.ts` 가 byte-identical assert.
+- **README "Statusline 보이게 하기" 서브섹션** (`README.md`). "5분 만에 시작하기" 뒤에 4-step opt-in 가이드 + canonical snippet + opt-in 사유 (Claude Code plugin manifest 미지원) 명문화. 기존 line 44 옵트인 한 줄 bullet 은 서브섹션 참조 링크로 갱신.
+- **count baseline drift sweep**: 신규 SKILL 추가로 manifest 21→22, registry 24→25 (top-level keys) / 33→34 (safe_default rationale), D1-fallback sentinel 21→22 SKILL count assertion 모두 갱신. nl-lexicon trigger 어구 baseline 재캡처 (`.omc/lint-baselines/skill-keywords.json`, CLAUDE.md rare event 정책 따름).
+- **pre-existing version drift cleanup**: `README.md "**상태**:" line` 및 SKILL 개수 (19→22), Architecture 다이어그램, test baseline 헤더 4 곳 + `PLAN.md` schema snippet 2 곳 (plugin.json / marketplace.json) 모두 v0.5.7 (stale 3-version 드리프트) → v0.5.11 동기화. `tests/manifest.test.ts` SKILL count assertion 도 동시 갱신.
+
+신규/확장 테스트 (`tests/`):
+- `ux-skill-enable-statusline.test.ts` — frontmatter (multi-step/needs-preflight/model:haiku) + 해요체 톤 + canonical snippet 본문 포함 검증.
+- `ux-skill-enable-statusline-d1.test.ts` — D1 TTY guard 문서화 + command -v guard 패턴 + 3-binary fallback 체인 명문화 lock.
+- `ux-statusline-snippet-codegen.test.ts` — drift lock 3-axis (`--check` match / drift detect / `--write` idempotent).
+- `ux-ask-fallback-registry.test.ts` extension — registry literal rationale text lock.
+
+검증 baseline (v0.5.11):
+- `bun test` → 792 tests / 0 fail (이전 baseline 781 pass + 7 fail → 788+ pass + 0 fail; 4 신규 SKILL 테스트 + 5 count drift fix + 2 version drift fix 모두 green).
+- `bun run skill:doctor --strict` exit 0, `bun run lint:tone --strict` 0 err / 0 warn, `bun run lint:keywords --check` clean (baseline 재캡처), `bunx tsc --noEmit` clean.
+- Trust boundary 무결성 — `git diff --name-only main | grep -E '^(crates/|hooks/|\.claude-plugin/plugin\.json$)'` empty (zero Rust/hook/manifest mutation), `bin/statusline.sh` no change (canonical snippet source unchanged).
+
+정직한 tradeoff:
+- 사용자가 여전히 manual paste 한 번 필요해요. Option C (auto-patch) 의 "동의 즉시 활성화" UX 는 v0.6.0+ 에서 — Claude Code uninstall lifecycle hook 가용성 조사 / 7-branch merge truth table spec / atomic uninstall rollback / codegen lock parity / claude-version schema fingerprint / inter-plugin collision detection 6 prerequisite Critic 재승인 후에야 시작해요.
+- Wayland `wl-copy` 클립보드 helper 는 v0.5.11 scope 외 — pbcopy (Darwin) / clip.exe (Windows/WSL) / xclip (X11 Linux) 3-way fallback 만 ship.
+
+### Added
+
+* enable-statusline SKILL with codegen drift lock ([1f6dbd1](https://github.com/jocoding-ax-partners/axhub/commit/1f6dbd14bf59cdd60fb3802043b5edfcf562231a))
+
 ## [0.5.10](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.9...v0.5.10) (2026-05-14)
 
 Vibe coder 가 `axhub verify` / `axhub deploy` 같은 mutate-aware SKILL 을 첫 실행할 때 Claude Code 권한 게이트가 raw 영문 `"Shell command permission check failed for pattern ... requires approval"` 텍스트를 그대로 노출하던 UX 결함을 끊는 hotfix 예요. 동시에 deploy SKILL 의 cross-shell Node runner (Phase 17 US-1706) 가 `stdio:'inherit'` 으로 `result.stderr` capture 안 해서 silent no-op 였던 부수 결함도 해결했어요. RALPLAN-DR 4-iteration 합의 (Planner → Architect → Critic, 모두 APPROVE) 로 plan iter4 도출 후 team+ralph 모드로 ship 했어요.

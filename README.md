@@ -2,7 +2,7 @@
 
 > 바이브코더가 자연어로 axhub 앱을 안전하게 배포하고 관리하는 Claude Code 플러그인.
 
-**상태**: v0.5.7 (ship). 19 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
+**상태**: v0.5.11 (ship). 22 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
 
 ---
 
@@ -12,7 +12,7 @@ axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "결제 
 
 ## 무엇을 할 수 있는가
 
-19 SKILL 자연어 트리거 + 10 슬래시 명령 (한글 alias `/axhub:배포` 포함):
+22 SKILL 자연어 트리거 + 10 슬래시 명령 (한글 alias `/axhub:배포` 포함):
 
 | SKILL | 트리거 예시 | 슬래시 |
 |-------|-------------|--------|
@@ -141,7 +141,7 @@ bun run build
         │
         ▼
 Claude Code  →  axhub plugin
-        │              ├── skills/* (19 SKILL, NL 자동 트리거 + frontmatter multi-step/needs-preflight)
+        │              ├── skills/* (22 SKILL, NL 자동 트리거 + frontmatter multi-step/needs-preflight)
         │              ├── commands/* (10 슬래시 + 한글 alias)
         │              ├── hooks/* (SessionStart preflight, PreToolUse HMAC consent)
         │              └── bin/axhub-helpers (Rust native, 5 cross-arch cosign-signed)
@@ -219,7 +219,7 @@ git push origin main --tags         # release.yml 자동 fire (cosign 서명 + G
 - `bunx tsc --noEmit` clean
 - `bun run lint:tone --strict` 0 err / 0 warn
 - `bun run lint:keywords --check` clean
-- `bun run skill:doctor --strict` 19/19 SKILLs complete
+- `bun run skill:doctor --strict` 22/22 SKILLs complete
 - `bun run bench:hooks` prompt-route/preflight p95 thresholds green
 - `bun run test:plugin-e2e:t2` → 12/12 helper lifecycle cases pass
 - `bun run release:check` Rust helper host artifact + release matrix verified
