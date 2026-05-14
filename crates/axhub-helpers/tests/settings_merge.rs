@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use axhub_helpers::settings_merge::{
-    command_for_platform_script, merge, MergeOptions, MergeOutcome, Scope,
+    command_for_platform_script, default_command_path, merge, MergeOptions, MergeOutcome, Scope,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -192,14 +192,11 @@ fn branch_4_idempotent_noop() {
     let home = HomeGuard::new();
     home.ensure_claude_dir();
 
-    // Determine the expected command literal for this platform.
-    let cmd = if cfg!(target_os = "windows") {
-        "${CLAUDE_PLUGIN_ROOT}/bin/statusline.ps1"
-    } else {
-        "${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh"
-    };
-
-    let fixture = format!(r#"{{"statusLine":{{"type":"command","command":"{cmd}","padding":0}}}}"#);
+    let cmd = default_command_path(None);
+    let fixture = serde_json::json!({
+        "statusLine": { "type": "command", "command": cmd, "padding": 0 }
+    })
+    .to_string();
     fs::write(home.settings_path(), &fixture).unwrap();
 
     let mtime_before = fs::metadata(home.settings_path())
