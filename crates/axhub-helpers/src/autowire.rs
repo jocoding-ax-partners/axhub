@@ -72,11 +72,12 @@ fn run_autowire(args: AutowireArgs) -> anyhow::Result<i32> {
         return Ok(0); // cannot resolve state dir — skip silently
     };
 
-    // --- Disclosure marker check ---
+    // --- Disclosure marker check (TOCTOU-safe atomic create-exclusive) ---
+    // Two concurrent SessionStart hooks can both see marker missing — use atomic
+    // create_new to ensure exactly one wins. Loser silently skips emission.
     let disclosure_marker = sd.join("install-disclosure-shown.txt");
-    if !disclosure_marker.exists() {
+    if try_claim_disclosure(&disclosure_marker) {
         emit_disclosure_message();
-        write_disclosure_marker(&disclosure_marker);
         // First encounter: show disclosure, skip merge this session (ADR-0012 §B step 0c)
         return Ok(0);
     }
@@ -197,15 +198,25 @@ fn emit_disclosure_message() {
     println!("{json}");
 }
 
-fn write_disclosure_marker(path: &std::path::Path) {
+/// Atomically claim the disclosure marker. Returns `true` if this caller created
+/// the marker (i.e. should emit disclosure), `false` if another process already
+/// claimed it OR the marker write failed silently (fail-open contract). Uses
+/// `create_new` (O_EXCL on POSIX, CREATE_NEW on Windows) for cross-platform
+/// TOCTOU-safe atomic exclusion against concurrent SessionStart hooks.
+fn try_claim_disclosure(path: &std::path::Path) -> bool {
+    use std::io::Write;
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    let content = format!(
-        "{{\"shown_at\":\"{}\"}}\n",
-        chrono::Utc::now().to_rfc3339()
-    );
-    let _ = fs::write(path, content);
+    let content = format!("{{\"shown_at\":\"{}\"}}\n", chrono::Utc::now().to_rfc3339());
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+    {
+        Ok(mut f) => f.write_all(content.as_bytes()).is_ok(),
+        Err(_) => false, // EEXIST (another process won) OR permission denied — skip emission
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -237,10 +248,7 @@ fn write_scope_marker(path: &std::path::Path) {
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    let content = format!(
-        "{{\"wired_at\":\"{}\"}}\n",
-        chrono::Utc::now().to_rfc3339()
-    );
+    let content = format!("{{\"wired_at\":\"{}\"}}\n", chrono::Utc::now().to_rfc3339());
     let _ = fs::write(path, content);
 }
 
@@ -254,7 +262,9 @@ mod tests {
 
     macro_rules! env_lock {
         () => {
-            crate::PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner())
+            crate::PROCESS_ENV_LOCK
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
         };
     }
 
@@ -286,7 +296,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let marker = dir.path().join("marker.json");
         fs::write(&marker, b"{}").unwrap();
-        assert!(within_dedup_window(&marker), "fresh marker should trigger skip");
+        assert!(
+            within_dedup_window(&marker),
+            "fresh marker should trigger skip"
+        );
     }
 
     #[test]
@@ -451,7 +464,10 @@ mod tests {
 
         // Scope marker should be written by dispatcher
         let marker = sd.join("auto-wire-done-user.json");
-        assert!(marker.exists(), "scope marker should exist after dispatcher run");
+        assert!(
+            marker.exists(),
+            "scope marker should exist after dispatcher run"
+        );
 
         // EnvGuard Drop restores all env vars automatically.
         drop(guard);

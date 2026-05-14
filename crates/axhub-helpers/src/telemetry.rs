@@ -426,7 +426,9 @@ mod tests {
 
     #[test]
     fn emit_deploy_complete_writes_phase_durations_via_file_drain() {
-        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let _guard = crate::PROCESS_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         let prev_telemetry = std::env::var("AXHUB_TELEMETRY").ok();
         let prev_marker = std::env::var("AXHUB_PHASE_MARKER_FILE").ok();
         let prev_xdg = std::env::var("XDG_STATE_HOME").ok();
@@ -498,7 +500,9 @@ mod tests {
         // Serialize against `emit_deploy_complete_writes_phase_durations_via_file_drain`
         // which also drains the in-memory PHASE_MARKERS as a side effect when the
         // file marker env is set.
-        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let _guard = crate::PROCESS_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         reset_phase_markers();
         record_phase_marker("alpha");
         std::thread::sleep(Duration::from_millis(2));

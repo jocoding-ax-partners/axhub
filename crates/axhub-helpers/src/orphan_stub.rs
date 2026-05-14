@@ -93,8 +93,7 @@ pub fn install() -> anyhow::Result<PathBuf> {
         .context("state_dir() 를 확인할 수 없어요. XDG_STATE_HOME 또는 HOME 을 설정해주세요.")?;
 
     let sd = state_dir().unwrap(); // already resolved above
-    fs::create_dir_all(&sd)
-        .with_context(|| format!("state dir 생성 실패: {}", sd.display()))?;
+    fs::create_dir_all(&sd).with_context(|| format!("state dir 생성 실패: {}", sd.display()))?;
 
     atomic_write_stub(&paths.sh, STUB_SH.as_bytes())?;
     set_executable(&paths.sh)?;
@@ -147,9 +146,7 @@ fn atomic_write_stub(path: &Path, content: &[u8]) -> anyhow::Result<()> {
 
     let tmp = parent.join(format!(
         ".{}.tmp",
-        path.file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
+        path.file_name().unwrap_or_default().to_string_lossy()
     ));
 
     let mut opts = OpenOptions::new();
@@ -166,13 +163,8 @@ fn atomic_write_stub(path: &Path, content: &[u8]) -> anyhow::Result<()> {
     f.sync_all()?;
     drop(f);
 
-    fs::rename(&tmp, path).with_context(|| {
-        format!(
-            "atomic rename 실패: {} → {}",
-            tmp.display(),
-            path.display()
-        )
-    })?;
+    fs::rename(&tmp, path)
+        .with_context(|| format!("atomic rename 실패: {} → {}", tmp.display(), path.display()))?;
     Ok(())
 }
 
@@ -224,11 +216,17 @@ mod tests {
 
     impl StateGuard {
         fn new() -> Self {
-            let lock = crate::PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+            let lock = crate::PROCESS_ENV_LOCK
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
             let dir = tempfile::tempdir().unwrap();
             let old_xdg = std::env::var_os("XDG_STATE_HOME");
             unsafe { std::env::set_var("XDG_STATE_HOME", dir.path()) }
-            Self { _dir: dir, old_xdg, _lock: lock }
+            Self {
+                _dir: dir,
+                old_xdg,
+                _lock: lock,
+            }
         }
     }
 

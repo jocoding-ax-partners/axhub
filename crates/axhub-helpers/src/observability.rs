@@ -69,7 +69,11 @@ fn load_or_create_salt(state_dir: &Path) -> Vec<u8> {
 
 /// `HMAC-SHA256(salt, value)` rendered as `"hmac-sha256:<hex>"`.
 pub fn hmac_hex(salt: &[u8], value: &str) -> String {
-    let key = if salt.is_empty() { &[0u8; 32] as &[u8] } else { salt };
+    let key = if salt.is_empty() {
+        &[0u8; 32] as &[u8]
+    } else {
+        salt
+    };
     let mut mac = HmacSha256::new_from_slice(key)
         .unwrap_or_else(|_| HmacSha256::new_from_slice(&[0u8; 32]).unwrap());
     mac.update(value.as_bytes());
@@ -227,11 +231,17 @@ mod tests {
 
     impl XdgGuard {
         fn new() -> Self {
-            let lock = crate::PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+            let lock = crate::PROCESS_ENV_LOCK
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
             let dir = tempfile::tempdir().unwrap();
             let old_xdg = std::env::var_os("XDG_STATE_HOME");
             unsafe { std::env::set_var("XDG_STATE_HOME", dir.path()) }
-            Self { _dir: dir, old_xdg, _lock: lock }
+            Self {
+                _dir: dir,
+                old_xdg,
+                _lock: lock,
+            }
         }
     }
 
