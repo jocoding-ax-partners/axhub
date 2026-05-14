@@ -132,13 +132,29 @@ fn resolve_auto_scope() -> anyhow::Result<PathBuf> {
 /// Default command path written to settings.json (unresolved literal).
 /// Claude Code expands `${CLAUDE_PLUGIN_ROOT}` at runtime.
 pub fn default_command_path(override_path: Option<&Path>) -> String {
-    if let Some(p) = override_path {
-        return p.to_string_lossy().into_owned();
-    }
-    if cfg!(target_os = "windows") {
+    let script_path = if let Some(p) = override_path {
+        p.to_string_lossy().into_owned()
+    } else if cfg!(target_os = "windows") {
         "${CLAUDE_PLUGIN_ROOT}/bin/statusline.ps1".to_string()
     } else {
         "${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh".to_string()
+    };
+    command_for_platform_script(&script_path, cfg!(target_os = "windows"))
+}
+
+/// Convert a script path into the `statusLine.command` string for a platform.
+///
+/// Windows must not store a bare `.ps1` path: stock Win10/11 commonly has
+/// `ExecutionPolicy=Restricted`, and `cmd` does not execute `.ps1` via PATHEXT.
+/// Keep the explicit PowerShell bypass form used by the public snippet.
+pub fn command_for_platform_script(script_path: &str, is_windows: bool) -> String {
+    if is_windows {
+        format!(
+            "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{}\"",
+            script_path
+        )
+    } else {
+        script_path.to_string()
     }
 }
 
