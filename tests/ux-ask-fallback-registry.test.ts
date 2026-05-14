@@ -118,3 +118,18 @@ describe("Phase 17 C5/US-1705 — per-question fallback registry coverage", () =
     expect((initEntry as RegistryEntry).allowed_safe_defaults).not.toContain("inline_session");
   });
 });
+
+describe("enable-statusline registry entry (Phase 0.5.11 ralplan consensus)", () => {
+  test("registry has enable-statusline key", () => {
+    expect((registry as any)["enable-statusline"]).toBeDefined();
+  });
+  test("entry has correct safe_default and allowed_safe_defaults", () => {
+    const entry = (registry as any)["enable-statusline"]["statusLine 어떻게 켤래요?"];
+    expect(entry.safe_default).toBe("나중에 할래요");
+    expect(entry.allowed_safe_defaults).toEqual(["나중에 할래요", "어떻게 하는지 보여줘요"]);
+  });
+  test("rationale literal text locked", () => {
+    const entry = (registry as any)["enable-statusline"]["statusLine 어떻게 켤래요?"];
+    expect(entry.rationale).toBe("Wiring snippet 표시는 idempotent read-only 라 user explicit consent 없는 비대화형 환경에서도 stdout 출력 안전해요. 다만 clipboard mutation 은 interactive 선택 후에만 진행해요.");
+  });
+});

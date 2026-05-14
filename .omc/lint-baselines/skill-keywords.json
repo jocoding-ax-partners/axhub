@@ -73,6 +73,14 @@
       "직전 버전으로 돌려줘",
       "직전 안정 버전으로 복구 부탁"
     ],
+    "skills/enable-statusline/SKILL.md": [
+      "statusline 켜줘",
+      "status line 활성화",
+      "statusline 활성화",
+      "statusline 보여줘",
+      "상태표시줄 켜줘",
+      "상태줄 활성화"
+    ],
     "skills/install-cli/SKILL.md": [
       "자동 설치",
       "ax-hub-cli 설치",
@@ -970,5 +978,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-05-11T06:27:40.050Z"
+  "generated_at": "2026-05-14T04:15:12.496Z"
 }

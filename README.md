@@ -41,7 +41,7 @@ UX 보장:
 - **`!command` preflight** — auth_status / current_app / current_env / last_deploy 자동 주입
 - **AskUserQuestion polish** — `header` chip + 해요체 통일
 - **Per-question fallback registry** — drift catch (새 question 등록 안 하면 test FAIL)
-- **statusline** — 옵트인 (`bin/statusline.sh` 는 macOS/Linux/Git Bash/WSL 경로, Windows native 는 PowerShell/helper 경로 검증 후 사용해요)
+- **statusline** — 옵트인 (활성화 방법은 아래 "Statusline 보이게 하기" 섹션 참고해요)
 
 안전 가드:
 - HMAC consent token (`CLAUDE_SESSION_ID` 필수, O_NOFOLLOW, symlink reject)
@@ -64,6 +64,26 @@ UX 보장:
 - axhub CLI 자체 설치가 필요하면 `install-cli` skill 이 OS 별 공식 설치 채널을 안내해요.
 - template 목록은 `ax-hub-cli` registry 를 source of truth 로 사용해요.
 - admin onboarding 과 remote `templates.json` 는 deferred 예요.
+
+### Statusline 보이게 하기
+
+Claude Code plugin manifest schema 가 `statusLine` 필드를 지원 안 해요. 그래서 user 가 `~/.claude/settings.json` 에서 직접 활성화해야 해요. axhub 가 도와줘요.
+
+1. Claude Code 에서 `/axhub:enable-statusline` 실행해요.
+2. "복사해서 붙여 넣을래요" 선택하면 snippet 이 클립보드에 들어가요 (또는 stdout 으로 출력돼요).
+3. `~/.claude/settings.json` 에 paste 해요. 기존 키와 충돌 안 나게 잘 합쳐요.
+4. Claude Code 재시작하면 statusline 에 axhub 상태가 보여요.
+
+snippet 본체:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh"
+  }
+}
+```
 
 ## 빠른 시작
 
