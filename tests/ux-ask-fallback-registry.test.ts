@@ -130,6 +130,6 @@ describe("enable-statusline registry entry (Phase 0.5.11 ralplan + 0.5.12 Window
   });
   test("rationale literal text locked (extended with Windows native disclaimer in v0.5.12)", () => {
     const entry = (registry as any)["enable-statusline"]["statusLine 어떻게 켤래요?"];
-    expect(entry.rationale).toBe("Wiring snippet 표시는 idempotent read-only 라 user explicit consent 없는 비대화형 환경에서도 stdout 출력 안전해요. 다만 clipboard mutation 은 interactive 선택 후에만 진행해요. Windows native 4번째 옵션도 stdout 만 출력해요 (clipboard 미사용).");
+    expect(entry.rationale).toBe("Wiring snippet 표시는 idempotent read-only 라 user explicit consent 없는 비대화형 환경에서도 stdout 출력 안전해요. 다만 clipboard mutation 은 interactive 선택 후에만 진행해요. Windows native 4번째 옵션도 stdout 만 출력해요 (clipboard 미사용). v0.5.13 부터 `복사해서 붙여 넣을래요` 옵션은 axhub-helpers settings-merge --apply 자동 wire 호출, 7-branch atomic + .bak rollback 으로 safe.");
   });
 });

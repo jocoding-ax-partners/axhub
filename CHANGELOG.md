@@ -4,6 +4,48 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.13](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.12...v0.5.13) (2026-05-14)
+
+v0.6.0 SessionStart autowire 가 reuse 할 settings.json merge core 를 SemVer-locked pub API 로 ship 하는 foundation patch 예요. trust event 0 — manual `axhub-helpers settings-merge --apply` 호출 시만 mutation. ralplan iter 3 consensus (Planner / Architect / Critic 모두 APPROVE, scope split Plan A) 로 진행. `MergeOptions { silent, command_path_override, scope, dry_run }` + `Scope { User, Project, Auto }` + `MergeOutcome` 8 variants 가 v0.5.13 시점에 lock — v0.6.0 reuse 시 추가 field 없음 (SemVer 보장).
+
+핵심 변경:
+- **`crates/axhub-helpers/src/settings_merge.rs` 신규** (~260 lines). 7-branch decision table — Branch 1 (file absent) / Branch 2 (empty) / Branch 3 (merge add) / Branch 4 (idempotent NoOp) / Branch 5 (other-plugin PreservedOther) / Branch 6 (invalid JSON abort) / Branch 7 (partial schema preserved) / Branch 8 (permission denied). 각 branch 마다 Korean 해요체 systemMessage 별 변형. Public API: `merge(MergeOptions) -> anyhow::Result<MergeOutcome>`.
+- **Atomic write contract**. `fslock` crate (cross-platform LockFileEx + flock 호환) 5s timeout. tempfile + fsync + atomic rename. `.bak` 가 mutation 직전 atomically 작성 (Branch 3+ 만 — Branch 1/2 는 unnecessary). On error → restore from .bak. TOCTOU 차단: lock-acquire BEFORE read-parse.
+- **Dispatch subcommand** (`crates/axhub-helpers/src/main.rs`). `axhub-helpers settings-merge --apply | --dry-run [--scope user|project|auto] [--json] [--silent]`. `--apply` = explicit consent gate (default = `--dry-run`). exit code per branch: 0=NoOp, 2=Created, 3=Merged, 4=PreservedOther, 5=InvalidJson, 6=PartialSchema, 7=PermissionDenied.
+- **`skills/enable-statusline/SKILL.md` option swap**. `복사해서 붙여 넣을래요` 옵션이 v0.5.12 까지 clipboard helper 였는데, v0.5.13 부터 `axhub-helpers settings-merge --apply --scope auto` atomic 호출로 변경. manual paste fallback (pbcopy/clip.exe/xclip) 그대로 보존. NEVER rule narrowing — manual subcommand 호출은 sanctioned, automatic without consent 만 금지.
+- **`tests/fixtures/ask-defaults/registry.json` rationale extension** — v0.5.13 settings-merge 자동 wire 동작 명시. tests/ux-ask-fallback-registry.test.ts literal lock 동기.
+
+신규 / 확장 테스트:
+- `crates/axhub-helpers/tests/settings_merge.rs` (new, 10 Rust integration) — branch_1..8 + dry_run_no_write + scope_auto_ambiguous_fails_closed. ENV_LOCK Mutex 로 HOME env race 차단. branch_8 readonly 는 `#[cfg(unix)]` 가드.
+- `tests/ux-settings-merge-integration.test.ts` (new, 14 bun) — spawnSync binary + 7 branches 정확한 exit code + dry-run + scope auto/explicit + .bak 생성 + .bak content 일치 + 해요체 tone lint.
+
+검증 baseline (v0.5.13):
+- `cargo build -p axhub-helpers` clean.
+- `cargo clippy -p axhub-helpers --tests -- -D warnings` no issues.
+- `cargo test -p axhub-helpers --test settings_merge` 10/10 pass.
+- `bun test tests/ux-settings-merge-integration.test.ts` 14/14 pass.
+- `bun test` 전체 ≥819 pass / 6 skip / 0 fail (v0.5.12 baseline 800 + 14 신규 integration + 5 신규 ux-ask-fallback / +manifest count = 819, drift fix 포함).
+- `bunx tsc --noEmit` clean.
+- `bun run lint:tone --strict` 0 err / 0 warn.
+- `bun run lint:keywords --check` clean.
+- `bun run skill:doctor --strict` exit 0.
+- Smoke `./bin/axhub-helpers settings-merge --dry-run --scope user` Branch 5 — 기존 omc-hud statusLine preserved 정확히 (exit 4 + stderr warning, file unchanged).
+
+Trust boundary 무결성:
+- `.claude-plugin/plugin.json` `statusLine` 필드 부재 (Claude Code schema 미지원, 변경 없음).
+- `crates/` Rust 추가지만 user-global file mutation 은 `--apply` flag 통과 시만.
+- `hooks/` 변경 없음 (Plan A foundation only — v0.6.0 SessionStart autowire 는 Plan B 별도 ship).
+- `~/.claude/settings.json` mutation 은 EXPLICIT consent gate (manual `--apply` flag) 통과 시만. dry-run default.
+
+정직한 tradeoff:
+- v0.5.13 자체로는 user-visible UX 변화 작아요 — `복사해서 붙여 넣을래요` 옵션이 clipboard copy → atomic merge subcommand 호출로 swap. 실패 시 manual paste fallback 자동 시도라 user 입장 transparent.
+- v0.6.0 SessionStart autowire (Plan B) 가 ship 돼야 진짜 "자동 활성화" UX 완성. 본 patch 는 foundation library + manual entry point.
+- `MergeOptions` API 가 SemVer-locked — v0.6.0 reuse 시 추가 field 없음 보장. v0.6.0 caller 가 `silent: true` + `command_path_override: Some(orphan_stub_path)` 로 호출.
+
+### Added
+
+* settings_merge foundation v0.5.13 — 7-branch atomic merge ([b159211](https://github.com/jocoding-ax-partners/axhub/commit/b159211223f39442b7db20410f335ed6983fcdfd))
+
 ## [0.5.12](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.11...v0.5.12) (2026-05-14)
 
 v0.5.11 의 statusline 활성화 SKILL 에 Windows native (PowerShell 5.1+) 지원을 추가한 patch 예요. Phase 17 US-1707 의 마지막 deferred 항목인 "Native Windows hook/statusLine resolution is not treated as proven" 을 닫아요. ralplan consensus 1 iteration (Architect/Critic 합의로 Option A → Option C promotion) — bare `.ps1` 가 stock Win10/11 Home `ExecutionPolicy=Restricted` default + `cmd /c` shell-spawn 의 PATHEXT 미포함으로 100% 차단됨을 `.github/workflows/windows-smoke.yml:42,60` 자체 evidence 로 확인했어요. wiring snippet 이 명시적 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${CLAUDE_PLUGIN_ROOT}/bin/statusline.ps1"` 형식으로 ship 돼요 — install.ps1 / session-start.ps1 가 이미 동일 패턴 사용하는 자기 CI precedent 와 일관.

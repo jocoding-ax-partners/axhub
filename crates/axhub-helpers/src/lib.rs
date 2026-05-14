@@ -19,6 +19,7 @@ pub mod redact;
 pub mod resolve;
 pub mod runtime_paths;
 pub mod session_bundle;
+pub mod settings_merge;
 pub mod spawn;
 pub mod statusline;
 pub mod telemetry;
