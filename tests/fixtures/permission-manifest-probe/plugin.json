@@ -1,0 +1,28 @@
+{
+  "_comment": "Step 0.7 Option A spec probe — ADR-0011 §검증된 가정 #4 placeholder",
+  "_probe_status": "NOT_VERIFIED",
+  "_probe_instructions": [
+    "이 파일은 Claude Code 플러그인 매니페스트 permissions 필드의 wildcard / placeholder 인식 여부를",
+    "manual 1회 트리거로 binary 검증하기 위한 최소 테스트 픽스처예요.",
+    "",
+    "검증 방법:",
+    "1. 이 plugin.json 을 임시 플러그인 디렉토리에 복사",
+    "2. Claude Code 에서 해당 플러그인 로드 후 axhub-helpers preflight 실행 시도",
+    "3. 권한 prompt 없이 통과하면 wildcard 인식 ✓, prompt 뜨면 ✗",
+    "",
+    "결과를 docs/adr/0011-skill-preflight-permission-fallback.md §검증된 가정 #4 에 기록해요.",
+    "",
+    "패턴 A1 — glob wildcard: Bash(*/axhub-helpers preflight*)",
+    "패턴 A2 — plugin root placeholder: Bash(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight*)",
+    "",
+    "Default decision (미검증 시): 인식 ✗ 가정 → B 단독 path.",
+    "Follow-up: feat(plugin): permissions manifest wildcard support RFC (Phase 27.y)"
+  ],
+  "name": "axhub-probe",
+  "version": "0.0.1",
+  "description": "Minimal test plugin for Step 0.7 permissions wildcard spec probe (not for production use)",
+  "permissions": [
+    "Bash(*/axhub-helpers preflight*)",
+    "Bash(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight*)"
+  ]
+}

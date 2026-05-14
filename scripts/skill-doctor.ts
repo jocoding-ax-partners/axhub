@@ -34,6 +34,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { readSkillDescription } from "./codegen-skill-keywords-from-rust";
 import { computeExamplesIssues, computeQualityIssues, type QualityIssue } from "./skill-doctor-quality";
+import { getInjectionLineForVariant } from "./codegen-preflight-injection";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const SKILLS_DIR = join(REPO_ROOT, "skills");
@@ -223,12 +224,20 @@ const inspectSkill = (slug: string): SkillCheck => {
         present: content.includes("TodoWrite({ todos: ["),
         reason: multiStep ? "frontmatter multi-step: true" : "frontmatter multi-step: false → exempt",
       },
-      {
-        name: "!command preflight",
-        required: needsPreflight,
-        present: content.includes("axhub-helpers preflight --json"),
-        reason: needsPreflight ? "frontmatter needs-preflight: true" : "frontmatter needs-preflight: false → exempt",
-      },
+      ((): { name: string; required: boolean; present: boolean; reason: string } => {
+        // Deploy SKILL uses the deploy variant (Phase 17 cross-platform root resolution +
+        // iteration-4 stderr-pipe/denialRegex/passthrough). All other needs-preflight
+        // SKILLs use the lite variant.
+        const variant: "lite" | "deploy" = slug === "deploy" ? "deploy" : "lite";
+        return {
+          name: "!command preflight",
+          required: needsPreflight,
+          present: content.includes(getInjectionLineForVariant(variant)),
+          reason: needsPreflight
+            ? `frontmatter needs-preflight: true — codegen-preflight-injection.ts ${variant} variant byte-identical`
+            : "frontmatter needs-preflight: false → exempt",
+        };
+      })(),
       {
         name: "dep-execution",
         required: depExecRequired,

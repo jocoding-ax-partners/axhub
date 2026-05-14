@@ -112,6 +112,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 - **MUST `tests/fixtures/ask-defaults/registry.json` 에 AskUserQuestion 별 `safe_default` + `rationale` 등록** — scaffold 가 stub 자동 append. 새 question 추가 시 매번 channel 등록 (drift catch).
 - **MUST 모든 한글 텍스트 해요체 통일** — `bun run lint:tone --strict` 0 err 필수. 금지 token: 합니다 / 입니다 / 시겠어요 / 드립니다 / 당신 / 아이고. 사용: 해요 / 예요 / 이에요 / 할래요.
 - **MUST nl-lexicon trigger 어구는 frontmatter `description:` 에만** — `bun run lint:keywords --check` 베이스라인 잠금. SKILL body 에서 새 trigger 어구 추가하면 baseline 깨짐.
+- **MUST codegen-preflight-injection lock 통과 (variant-aware) — `bun run skill:doctor` 가 자동 검사** — `needs-preflight: true` SKILL 의 `!command` 줄이 `scripts/codegen-preflight-injection.ts` 의 `getPreflightInjectionLine()` 출력과 byte-identical. scaffold (`bun run skill:new`) 가 자동 생성, drift 는 `bun run skill:doctor --strict` 에서 즉시 감지.
 
 ## Skill Authoring Workflow
 

@@ -25,7 +25,10 @@ describe("verify SKILL Phase 26 invariants", () => {
     expect(body).toContain("name: verify");
     expect(body).toContain("multi-step: true");
     expect(body).toContain("needs-preflight: true");
-    expect(body).toContain("axhub-helpers preflight --json");
+    // Phase 27.x: preflight injection is now a Node runner (codegen-preflight-injection.ts).
+    // Reference the helper binary + spawn args array instead of the legacy raw shell form.
+    expect(body).toContain("axhub-helpers");
+    expect(body).toContain("'preflight','--json'");
   });
 
   test("Step 0 renders TodoWrite checklist before evidence collection", () => {

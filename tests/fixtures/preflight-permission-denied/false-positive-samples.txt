@@ -1,0 +1,12 @@
+# Case C — generic "permission" 단어만 있는 샘플 (strict-anchor 차단 대상)
+# denialRegex: /^Shell command permission check failed.*requires approval/im 에 매칭 안 됨
+
+Error: permission denied to read file /etc/shadow
+Warning: permission bits 0777 are too permissive
+axhub: insufficient permission for operation
+INFO: checking permission scope for token
+
+# Case D — wording 변경 fuzz: "Shell command" prefix 없이 "permission check failed" 만
+permission check failed for pattern "axhub-helpers preflight": requires user approval
+command requires approval but permission check failed
+failed: permission was not granted to run this command
