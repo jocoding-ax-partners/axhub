@@ -32,8 +32,19 @@ jobs:
           toolchain: 1.94.1
       - uses: Swatinem/rust-cache@v2
       - uses: oven-sh/setup-bun@v2
+      - name: Verify cargo resolves correctly
+        shell: bash
+        run: |
+          set -e
+          echo "cargo path: $(which cargo || true)"
+          echo "cargo version: $(cargo --version 2>&1 || true)"
       - name: Build axhub-helpers (release)
-        run: cargo build --workspace --release
+        shell: bash
+        # PR #99 macOS infra workaround: invoke cargo through `rustup run` proxy
+        # instead of relying on $PATH. Apple Silicon GHA runners occasionally restored
+        # Swatinem/rust-cache state where `~/.cargo/bin/cargo` resolves to
+        # `rustup-init`, causing `cargo build` to print rustup-init's help and exit 1.
+        run: rustup run 1.94.1 cargo build --workspace --release
       - name: Stage helper binary at bin/axhub-helpers
         shell: bash
         run: |
