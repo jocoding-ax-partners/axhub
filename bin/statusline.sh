@@ -17,6 +17,8 @@
 #     }
 #   }
 #
+#   Windows native users: see bin/statusline.ps1 + /axhub:enable-statusline SKILL.
+#
 # Latency budget: <50ms cold (no network, file reads only).
 set -u
 
