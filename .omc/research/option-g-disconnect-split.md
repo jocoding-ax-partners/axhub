@@ -81,7 +81,7 @@ Step 1.5 신규: 사용자 utterance 가 disconnect 의도 (\"끊\", \"해제\",
 
 ## ROI 분석
 
-- **Marginal benefit**: 모델 invent 표면 축소 (이미 NEVER 룰 + test 로 차단됨) → 5% 추가 안전성
+- **Marginal benefit**: 모델 invent 표면 축소 (이미 NEVER 룰 + test 로 차단됨). 정량 baseline (telemetry / 회귀 사례 count) 없어요 — qualitative \"defense-in-depth 추가 layer\" 수준이라고 평가해요.
 - **Marginal cost**:
   - SKILL routing 1 step 추가 (Step 1.5 intent detection)
   - 신규 회귀 테스트 2-3 개
@@ -113,6 +113,8 @@ Step 1.5 신규: 사용자 utterance 가 disconnect 의도 (\"끊\", \"해제\",
 - F′ + FU-3 적용 후 6개월 안에 4번째 invent 회귀 사례 발견 → Option G 재검토
 - vibe coder 사용자 feedback 에서 disconnect 옵션 misclick 사고 보고 → Option G 재검토
 - github SKILL 의 list_only / connect 흐름이 disconnect 보다 압도적으로 자주 쓰인다는 telemetry 확보 → Option G 재검토
+
+**재검토 owner / process:** axhub plugin maintainer (현재 단일 owner, GitHub issue tracker 활용). trigger 발견 시 `chore/option-g-revisit-YYYYMMDD` branch 로 새 ralplan 사이클 시작. baseline 데이터 부재로 자동 monitoring 은 없어요 — vibe coder 사용자 보고와 maintainer 의 manual review 에 의존해요.
 
 ## ADR
 
