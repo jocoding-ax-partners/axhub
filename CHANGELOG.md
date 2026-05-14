@@ -4,6 +4,45 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.12](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.11...v0.5.12) (2026-05-14)
+
+v0.5.11 의 statusline 활성화 SKILL 에 Windows native (PowerShell 5.1+) 지원을 추가한 patch 예요. Phase 17 US-1707 의 마지막 deferred 항목인 "Native Windows hook/statusLine resolution is not treated as proven" 을 닫아요. ralplan consensus 1 iteration (Architect/Critic 합의로 Option A → Option C promotion) — bare `.ps1` 가 stock Win10/11 Home `ExecutionPolicy=Restricted` default + `cmd /c` shell-spawn 의 PATHEXT 미포함으로 100% 차단됨을 `.github/workflows/windows-smoke.yml:42,60` 자체 evidence 로 확인했어요. wiring snippet 이 명시적 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${CLAUDE_PLUGIN_ROOT}/bin/statusline.ps1"` 형식으로 ship 돼요 — install.ps1 / session-start.ps1 가 이미 동일 패턴 사용하는 자기 CI precedent 와 일관.
+
+핵심 변경:
+- **`bin/statusline.ps1` 신규** (3.4K, PowerShell 5.1 호환). UTF-8 BOM, `$ErrorActionPreference = 'Stop'`, 상단 try/catch fail-open. Helper-binary fast path (`axhub-helpers.exe statusline`) → inline `ConvertFrom-Json` fallback (jq 의존성 없음). XDG_CONFIG_HOME / XDG_CACHE_HOME 또는 `%USERPROFILE%\.config`/`.cache` 경로 (`hooks/session-start.ps1` precedent 따름). 출력 ≤80 char Korean 해요체. PS 예약어 `$Profile` 회피 (`$Profile_` 사용).
+- **codegen 2 SSOT 확장** (`scripts/codegen-statusline-snippet.ts`). `getStatuslineSnippetUnix()` (기존 alias 보존) + `getStatuslineSnippetWindows()` 신규. 마커 disambiguation (`_UNIX` / `_WINDOWS`) + legacy single marker fallback. `--check` / `--write` 양쪽 atomic 처리.
+- **`skills/enable-statusline/SKILL.md` 확장**. v0.5.11 PR #100 fix-up 의 Windows native 미지원 paragraph 제거 → cross-platform support note 로 교체. 2 wiring snippet block (`_UNIX` + `_WINDOWS`) + 4-option AskUserQuestion (3번째에 `Windows PowerShell snippet 보여줘요` 삽입). LLM-side OS branching 명시 — bash 또는 runtime `process.platform` 직접 탐지 금지 (statusLine 컨텍스트에서 노출 안 됨).
+- **registry entry 확장** (`tests/fixtures/ask-defaults/registry.json`). `allowed_safe_defaults` enum 2 items → 3 items (Windows option 포함). rationale literal extended with Windows 4번째 옵션 stdout-only disclaimer (`clipboard 미사용` 명시).
+- **`bin/statusline.sh` wiring header comment 갱신** — Windows native users 가 `bin/statusline.ps1` + `/axhub:enable-statusline` SKILL 참고하도록 cross-platform pair 명시. bash logic untouched (canonical snippet source 보존).
+- **`bin/README.md` L5 갱신** — "Native Windows hook/statusLine resolution is not treated as proven" deferred sentence 제거 → Option C explicit `powershell.exe -NoProfile -ExecutionPolicy Bypass -File` wiring rationale 명시 (windows-smoke.yml precedent + stock Win ExecutionPolicy default 차단 evidence).
+- **`.github/workflows/windows-smoke.yml` 확장** — PR trigger paths (`bin/statusline.{sh,ps1}`, `skills/enable-statusline/**`) 추가 + 신규 step "statusline.ps1 spawn smoke (Option C wiring shape parity)" — `powershell.exe -NoProfile -ExecutionPolicy Bypass -File` 정확히 그대로 spawn 시뮬레이션 후 stdout `^axhub:` regex 검증 + `$LASTEXITCODE=0` assertion. PR 단계에서 bare-PS1 regression catch.
+
+신규/확장 테스트:
+- `tests/ux-statusline-windows.test.ts` (new, 7 cases) — file existence / UTF-8 BOM / 해요체 톤 / axhub-helpers 참조 / 마지막 2 cases `test.skipIf(SKIP_NON_WIN)` gated (PS 5.1 syntax parse + powershell.exe invocation latency).
+- `tests/ux-statusline-parity.test.ts` (new, 8 cross-platform) — sh ↔ ps1 token-string byte-identical 검증 (로그인 안 됐어요 / 배포 기록 없어요 / 최근 배포 / AXHUB_TOKEN / AXHUB_PROFILE / last-deploy.json / axhub-helpers / non-empty).
+- `tests/ux-statusline-snippet-codegen.test.ts` extension — Windows snippet drift detection + `getStatuslineSnippet` legacy alias preservation + `--check` 양쪽 marker atomic.
+- `tests/ux-ask-fallback-registry.test.ts` extension — `allowed_safe_defaults` 3-item literal lock + extended rationale assertion.
+
+검증 baseline (v0.5.12):
+- `bun test` → 805 pass / 6 skip / 0 fail (v0.5.11 = 788 pass / 4 skip 에서 +17 pass / +2 skip; Windows runner 에서 추가 2 case 실행).
+- `bunx tsc --noEmit` clean.
+- `bun run lint:tone --strict` 0 err / 0 warn.
+- `bun run lint:keywords --check` clean (frontmatter description 미변경 — baseline lock 유지).
+- `bun run skill:doctor --strict` exit 0.
+- `bun scripts/codegen-statusline-snippet.ts --check` exit 0 ("Unix + Windows snippets in sync").
+- Trust boundary: `.claude-plugin/plugin.json` `statusLine` 필드 부재 (Claude Code manifest schema 미지원). `crates/` + `hooks/` 미변경. `bin/statusline.sh` logic 미변경 (comment header 만 갱신).
+
+정직한 tradeoff:
+- Windows native wiring snippet 이 Unix 보다 더 길어요 (`powershell.exe -NoProfile -ExecutionPolicy Bypass -File`). ExecutionPolicy 우회 명시 비용 — stock Win10/11 작동 보장이 우선이라 받아들였어요.
+- 4번째 AskUserQuestion 옵션 `Windows PowerShell snippet 보여줘요` 가 *nix 사용자에게도 표시돼요 (noise 허용 — UX 폴드 cost < UX bifurcation cost).
+- PS 5.1 호환 syntax 작성했지만 자동 lint gate 부재 (FU-2 v0.6.0).
+- `AXHUB_DISABLE_STATUSLINE` toggle 미존재 — statusline.ps1 은 hook 아니라 statusLine command 라 `AXHUB_DISABLE_HOOKS` 자동 적용 안 돼요. 별도 toggle 은 v0.6.0 FU-1.
+- v0.5.13 후보 follow-up: Wayland `wl-copy` 클립보드 helper / EDR 차단 텔레메트리 / Authenticode 서명 / PS 5.1 syntax lint gate.
+
+### Added
+
+* bin/statusline.ps1 Windows native PowerShell mirror ([59145ee](https://github.com/jocoding-ax-partners/axhub/commit/59145ee518acdc9b9448f4b5194f530abc2095fc))
+
 ## [0.5.11](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.10...v0.5.11) (2026-05-14)
 
 vibe coder 가 `/plugin install axhub` 직후 Claude Code statusline 영역에서 axhub 상태가 안 보이던 mental-model gap 을 끊는 patch 예요. Context7 docs 검증으로 Claude Code plugin manifest schema 가 `statusLine` 필드를 미지원함을 확인했고 (`code.claude.com/docs/en/plugins-reference` Complete Plugin Manifest Schema), 활성화는 user `~/.claude/settings.json` 에서만 가능한 게 사양상 의도예요. ralplan consensus 2 iteration (Planner → Architect → Critic, Architect/Critic 모두 Option B steelman 으로 flip 합의) 로 trust boundary 보존 path 를 결정 — axhub 가 user-global 파일을 mutate 한 적 없는 전례를 깨지 않고, `/axhub:enable-statusline` SKILL + AskUserQuestion + clipboard helper (pbcopy / clip.exe / xclip command -v guarded) + README "Statusline 보이게 하기" 4-step 가이드로 ctrl-V 한 번 비용으로 gap 을 닫았어요. Option C (auto-patch settings.json) 는 7-branch merge truth table 미설계, SessionStart hot path latency budget 충돌, uninstall orphan footgun 등 6 가지 ship blocker 로 v0.6.0+ defer 했어요.
