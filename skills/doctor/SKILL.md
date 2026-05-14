@@ -178,9 +178,9 @@ To run diagnostics:
    }
    ```
 
-   "1. 자동 설치" 선택 시 → `Skill("axhub:install-cli")` 즉시 호출. doctor SKILL 의 `NEVER auto-fix` 규칙은 보존 — direct install 안 하고 sibling skill 로 consent route 만 함. multi-failure 가 아닌 단일 cli-missing 시나리오에서만 fire (다른 row 도 fail 이면 Step 5 (multi-failure summary) 가 우선).
+   "1. 자동 설치" 선택 시 → `Skill("axhub:install-cli")` 즉시 호출. doctor SKILL 의 `NEVER auto-fix` 규칙은 보존 — direct install 안 하고 sibling skill 로 consent route 만 함. multi-failure 가 아닌 단일 cli-missing 시나리오에서만 fire (다른 row 도 fail 이면 Step 6 (multi-failure summary) 가 우선).
 
-5. **Multi-failure summary.** If multiple rows fail, list all of them and surface AskUserQuestion to pick the first one to fix:
+6. **Multi-failure summary.** If multiple rows fail, list all of them and surface AskUserQuestion to pick the first one to fix:
 
    ```json
    {
@@ -195,7 +195,7 @@ To run diagnostics:
    }
    ```
 
-6. **Report exit code** in the summary block: green (all 0), yellow (warnings only), red (preflight returned 64 or 65). The skill itself always returns to the user — never `exit 1` from the doctor flow.
+7. **Report exit code** in the summary block: green (all 0), yellow (warnings only), red (preflight returned 64 or 65). The skill itself always returns to the user — never `exit 1` from the doctor flow.
 
 ## v0.2.0 command coverage polish
 

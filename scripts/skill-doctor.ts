@@ -99,6 +99,10 @@ const DEP_EXEC_ALLOWLIST = loadDependencyAllowlist();
 
 const VALID_MODELS = ["haiku", "sonnet", "opus"] as const;
 
+// FU-3 — extracted to scripts/skill-doctor-step-numbering.ts so tests can import
+// the helper without triggering this script's top-level immediate execution.
+import { findTopLevelStepCollisions } from "./skill-doctor-step-numbering";
+
 const STRICT = process.argv.includes("--strict");
 const NO_COLOR = !process.stdout.isTTY || process.env["NO_COLOR"] || STRICT;
 
@@ -237,6 +241,23 @@ const inspectSkill = (slug: string): SkillCheck => {
         present: modelPresent,
         reason: modelReason,
       },
+      ((): { name: string; required: boolean; present: boolean; reason: string } => {
+        const collisions = findTopLevelStepCollisions(content);
+        if (collisions.length === 0) {
+          return {
+            name: "step numbering",
+            required: true,
+            present: true,
+            reason: "no top-level step number collisions in ## Workflow",
+          };
+        }
+        return {
+          name: "step numbering",
+          required: true,
+          present: false,
+          reason: `duplicate top-level step numbers in ## Workflow: ${collisions.join(", ")} (FU-3 — F′ regression guard; sub-steps like 3.5 and ### subsection numbering are exempt)`,
+        };
+      })(),
     ],
   };
 };
