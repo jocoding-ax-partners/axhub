@@ -6,6 +6,33 @@
 # Override detection with AXHUB_OS / AXHUB_ARCH env vars (used by tests).
 set -euo pipefail
 
+# --- install-time disclosure (idempotent, marker-gated) ---
+# Maintainer: keep _AXHUB_DISCLOSURE_VER in sync with RELEASE_VERSION below.
+_AXHUB_DISCLOSURE_VER="v0.5.13"
+_AXHUB_STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/axhub-plugin"
+_AXHUB_DISCLOSURE_MARKER="${_AXHUB_STATE_DIR}/install-disclosure-shown.txt"
+if [ ! -f "$_AXHUB_DISCLOSURE_MARKER" ] || ! grep -qxF "$_AXHUB_DISCLOSURE_VER" "$_AXHUB_DISCLOSURE_MARKER" 2>/dev/null; then
+  cat >&2 <<'DISCLOSURE'
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+axhub 이 다음을 수행해요:
+  (1) 인증 토큰을 keychain (macOS/Windows) / file (Linux) 에 저장해요.
+  (2) opt-in telemetry 가 활성화되어 있어요 (AXHUB_TELEMETRY=0 로 disable).
+  (3) macOS Gatekeeper 의 helper binary quarantine attribute 를 제거해요.
+  (4) auth-refresh 백그라운드 task 가 token 갱신해요.
+  (5) helper binary 를 GitHub release 에서 HTTPS 로 다운로드 + 실행해요.
+  (6) ~/.claude/settings.json 의 statusLine field 를 추가/관리해요 (other plugins preserved).
+
+거부하려면: AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1 환경변수 설정 후 install.
+uninstall 시 orphan stub 이 graceful fallback 을 보장해요.
+
+자세한 내용: https://github.com/jocoding-ax-partners/axhub#trust--uninstall
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DISCLOSURE
+  mkdir -p "$_AXHUB_STATE_DIR"
+  printf '%s\n' "$_AXHUB_DISCLOSURE_VER" > "$_AXHUB_DISCLOSURE_MARKER"
+fi
+# --- end install-time disclosure ---
+
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 OS="${AXHUB_OS:-$(uname -s)}"
 ARCH="${AXHUB_ARCH:-$(uname -m)}"

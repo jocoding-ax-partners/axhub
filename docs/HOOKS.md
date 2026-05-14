@@ -21,6 +21,7 @@
 | `prompt-route` | `axhub-helpers prompt-route` | UserPromptSubmit |
 | `classify-exit` | `axhub-helpers classify-exit` | PostToolUse (Bash `axhub …`) |
 | `token-freshness-gate` | `hooks/token-freshness-gate.sh` | Phase 3.5 deploy gate |
+| `session-start-autowire` | `hooks/session-start-autowire.{sh,ps1}` | Claude Code SessionStart — fail-open exit 0; `AXHUB_DISABLE_HOOKS` / `AXHUB_DISABLE_HOOK=session-start-autowire` / `AXHUB_DISABLE_STATUSLINE_AUTOWIRE` 지원; background detach (non-blocking) |
 
 여기서 다루지 않는 helper subcommand (예: `deploy-prep`, `bootstrap`,
 `list-deployments`) 는 사용자 명시 호출이라 kill switch 적용 대상 아니에요.

@@ -12,6 +12,42 @@
 
 $ErrorActionPreference = 'Stop'
 
+# --- install-time disclosure (idempotent, marker-gated) ---
+# Maintainer: keep $AxhubDisclosureVer in sync with $ReleaseVersion below.
+$AxhubDisclosureVer = 'v0.5.13'
+$AxhubStateDir = if ($env:XDG_STATE_HOME) {
+  Join-Path $env:XDG_STATE_HOME 'axhub-plugin'
+} else {
+  Join-Path $env:USERPROFILE '.local\state\axhub-plugin'
+}
+$AxhubDisclosureMarker = Join-Path $AxhubStateDir 'install-disclosure-shown.txt'
+$_axhubShowDisclosure = $true
+if (Test-Path -Path $AxhubDisclosureMarker -PathType Leaf) {
+  $markerContent = Get-Content -Path $AxhubDisclosureMarker -ErrorAction SilentlyContinue
+  if ($markerContent -contains $AxhubDisclosureVer) { $_axhubShowDisclosure = $false }
+}
+if ($_axhubShowDisclosure) {
+  Write-Host '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+  Write-Host 'axhub 이 다음을 수행해요:'
+  Write-Host '  (1) 인증 토큰을 keychain (macOS/Windows) / file (Linux) 에 저장해요.'
+  Write-Host '  (2) opt-in telemetry 가 활성화되어 있어요 (AXHUB_TELEMETRY=0 로 disable).'
+  Write-Host '  (3) macOS Gatekeeper 의 helper binary quarantine attribute 를 제거해요.'
+  Write-Host '  (4) auth-refresh 백그라운드 task 가 token 갱신해요.'
+  Write-Host '  (5) helper binary 를 GitHub release 에서 HTTPS 로 다운로드 + 실행해요.'
+  Write-Host '  (6) ~/.claude/settings.json 의 statusLine field 를 추가/관리해요 (other plugins preserved).'
+  Write-Host ''
+  Write-Host '거부하려면: $env:AXHUB_DISABLE_STATUSLINE_AUTOWIRE=''1'' 설정 후 install.'
+  Write-Host 'uninstall 시 orphan stub 이 graceful fallback 을 보장해요.'
+  Write-Host ''
+  Write-Host '자세한 내용: https://github.com/jocoding-ax-partners/axhub#trust--uninstall'
+  Write-Host '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+  if (-not (Test-Path -Path $AxhubStateDir)) {
+    New-Item -ItemType Directory -Path $AxhubStateDir -Force | Out-Null
+  }
+  Set-Content -Path $AxhubDisclosureMarker -Value $AxhubDisclosureVer -Encoding UTF8
+}
+# --- end install-time disclosure ---
+
 $BinDir = Split-Path -Parent $PSCommandPath
 $ReleaseVersion = if ($env:AXHUB_PLUGIN_RELEASE) { $env:AXHUB_PLUGIN_RELEASE } else { 'v0.5.13' }
 $ReleaseBase = "https://github.com/jocoding-ax-partners/axhub/releases/download/$ReleaseVersion"

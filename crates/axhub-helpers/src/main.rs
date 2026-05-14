@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
+use axhub_helpers::autowire::{autowire_statusline, AutowireArgs};
 use axhub_helpers::bootstrap::{cmd_bootstrap_dependency_plan, run_bootstrap};
 use axhub_helpers::catalog::classify;
 use axhub_helpers::config::{config_get, config_set, render_get_json};
@@ -32,7 +33,7 @@ use chrono::Utc;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  version [--quiet]\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  version [--quiet]\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -113,6 +114,8 @@ fn run() -> anyhow::Result<i32> {
         "trace" => cmd_trace(&rest),
         "doctor" => cmd_doctor(&rest),
         "settings-merge" => cmd_settings_merge(&rest),
+        "autowire-statusline" => cmd_autowire_statusline(&rest),
+        "orphan-stub" => cmd_orphan_stub(&rest),
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -1941,6 +1944,148 @@ fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArg
         silent,
         command_path_override,
     })
+}
+
+// ---------------------------------------------------------------------------
+// autowire-statusline subcommand
+// ---------------------------------------------------------------------------
+
+fn cmd_autowire_statusline(args: &[String]) -> anyhow::Result<i32> {
+    let mut scope: Option<Scope> = None;
+    let mut silent = false;
+    let mut command_path: Option<PathBuf> = None;
+    let mut is_child = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--scope" if i + 1 < args.len() => {
+                i += 1;
+                scope = Some(match args[i].as_str() {
+                    "user" => Scope::User,
+                    "project" => Scope::Project,
+                    other => {
+                        eprintln!(
+                            "axhub-helpers autowire-statusline: --scope 는 user|project 만 가능해요 (받은 값: {other})"
+                        );
+                        return Ok(64);
+                    }
+                });
+            }
+            "--silent" => silent = true,
+            "--child" => is_child = true,
+            "--command-path" if i + 1 < args.len() => {
+                i += 1;
+                command_path = Some(PathBuf::from(&args[i]));
+            }
+            "-h" | "--help" => {
+                println!(
+                    "axhub-helpers autowire-statusline — v0.6.0 SessionStart statusLine 자동 설정\n\n\
+                     USAGE:\n  axhub-helpers autowire-statusline --scope user|project [OPTIONS]\n\n\
+                     OPTIONS:\n  --scope user|project   대상 settings.json scope\n  \
+                     --silent               stderr 억제 (hook 호출 모드)\n  \
+                     --command-path <p>     statusLine.command 경로 override\n  \
+                     --child                child 프로세스 플래그 (marker write 안 함)\n  \
+                     -h, --help             도움말\n\n\
+                     ENV:\n  AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1   전체 skip"
+                );
+                return Ok(0);
+            }
+            other => {
+                eprintln!("axhub-helpers autowire-statusline: 알 수 없는 flag: {other}");
+                return Ok(64);
+            }
+        }
+        i += 1;
+    }
+    let scope = match scope {
+        Some(s) => s,
+        None => {
+            eprintln!("axhub-helpers autowire-statusline: --scope user|project 가 필요해요");
+            return Ok(64);
+        }
+    };
+    let code = autowire_statusline(AutowireArgs {
+        scope,
+        command_path_override: command_path,
+        silent,
+        is_dispatcher: !is_child,
+    });
+    Ok(code)
+}
+
+// ---------------------------------------------------------------------------
+// orphan-stub subcommand
+// ---------------------------------------------------------------------------
+
+fn cmd_orphan_stub(args: &[String]) -> anyhow::Result<i32> {
+    let mut install = false;
+    let mut verify = false;
+    for arg in args {
+        match arg.as_str() {
+            "--install" => install = true,
+            "--verify" => verify = true,
+            "-h" | "--help" => {
+                println!(
+                    "axhub-helpers orphan-stub — orphan stub 설치 및 검증\n\n\
+                     USAGE:\n  axhub-helpers orphan-stub --install [--verify]\n  \
+                     axhub-helpers orphan-stub --verify\n\n\
+                     OPTIONS:\n  --install   orphan stub 설치 (없으면 생성, 있으면 덮어쓰기)\n  \
+                     --verify    stub 존재 + 실행 권한 확인\n  \
+                     -h, --help  도움말\n\n\
+                     Stub 경로: $XDG_STATE_HOME/axhub-plugin/orphan-stub-statusline.{{sh,ps1}}"
+                );
+                return Ok(0);
+            }
+            other => {
+                eprintln!("axhub-helpers orphan-stub: 알 수 없는 flag: {other}");
+                return Ok(64);
+            }
+        }
+    }
+    if !install && !verify {
+        eprintln!("axhub-helpers orphan-stub: --install 또는 --verify 가 필요해요");
+        return Ok(64);
+    }
+    if install {
+        match axhub_helpers::orphan_stub::install() {
+            Ok(path) => {
+                if !axhub_helpers::orphan_stub::verify(&path) {
+                    eprintln!(
+                        "axhub-helpers orphan-stub: 설치 후 verify 실패 ({})",
+                        path.display()
+                    );
+                    return Ok(1);
+                }
+                if !axhub_helpers::autowire::is_non_interactive() {
+                    eprintln!("axhub: orphan stub 설치됐어요 → {}", path.display());
+                }
+            }
+            Err(e) => {
+                eprintln!("axhub-helpers orphan-stub: 설치 실패 — {e}");
+                return Ok(1);
+            }
+        }
+    }
+    if verify && !install {
+        // verify-only (no install)
+        let Some(paths) = axhub_helpers::orphan_stub::StubPaths::resolve() else {
+            eprintln!("axhub-helpers orphan-stub: state_dir() 확인 불가");
+            return Ok(1);
+        };
+        let path = if cfg!(target_os = "windows") {
+            &paths.ps1
+        } else {
+            &paths.sh
+        };
+        if !axhub_helpers::orphan_stub::verify(path) {
+            eprintln!(
+                "axhub-helpers orphan-stub: verify 실패 — 없거나 실행 권한 없어요 ({})",
+                path.display()
+            );
+            return Ok(1);
+        }
+    }
+    Ok(0)
 }
 
 fn cmd_settings_merge(args: &[String]) -> anyhow::Result<i32> {
