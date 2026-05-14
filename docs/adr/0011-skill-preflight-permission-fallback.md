@@ -122,6 +122,11 @@ A+B 혼합 (defense-in-depth) — A happy path TTFD=0, B fallback graceful degra
 - deploy:101 의 child stderr 가 denialRegex 매칭 시에만 swallow (Korean systemMessage 로 surface).
   미매칭 unrecognized stderr 는 parent passthrough 로 표시. 의도된 trade-off 예요.
 - 8 곳 신규 Node runner wrap 으로 raw shell substitution 대비 첫 실행 SKILL preprocessing ~50-100ms 미세 증가.
+- **PR #99 review M2 trade-off**: `result.error` 분기 (ENOENT / EACCES 같은 helper binary
+  부재) 가 권한 거부 분기 (denialRegex 매칭) 와 동일한 systemMessage 를 출력. 사용자 mental model 은
+  "권한 prompt" 가 아니라 "binary 부재" 라 "허용 클릭" 안내가 inaccurate — 첫 클릭 해도 다음에도
+  같은 메시지를 봐요. 본 PR scope 에서는 의도된 trade-off (Case F 회귀 test 로 lock).
+  Phase 27.y RFC 또는 별도 systemMessage 분기는 follow-up.
 
 ## Follow-ups
 

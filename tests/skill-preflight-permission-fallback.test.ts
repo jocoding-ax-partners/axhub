@@ -138,3 +138,21 @@ describe("Case E — unrecognized stderr passthrough (ADR-0010 §42 정합)", ()
     expect(out.stdout).not.toContain("systemMessage");
   });
 });
+
+describe("Case F — binary not found (ENOENT) — PR #99 review M2", () => {
+  // result.error truthy 분기 — helper binary 자체가 없을 때 spawnSync 가 ENOENT.
+  // 현재 codegen 의 분기 1 (result.error || denialRegex.test(stderrText)) 가
+  // 한국어 systemMessage 출력 — ADR-0011 Consequences 의 의도된 trade-off.
+  // Mental model 은 "권한 prompt" 가 아니라 "binary 부재" 지만 systemMessage 안내가
+  // "허용 클릭" 으로 일관 — 사용자가 한 번 클릭해도 다음에도 같은 메시지를 본다는 limitation.
+  // M2 follow-up: 별도 systemMessage 분기는 Phase 27.y RFC 로 deferred.
+  test("ENOENT result.error path → systemMessage swallow + exit 0 (current trade-off)", () => {
+    // Helper 파일 삭제 — buildScript() 가 가리키는 HELPER 가 없어서 spawnSync ENOENT
+    if (existsSync(HELPER)) rmSync(HELPER);
+    const out = runNode(buildScript());
+    expect(out.status).toBe(0);
+    expect(out.stdout).toContain("systemMessage");
+    expect(out.stdout).toContain("허용");
+    expect(out.stderr).toBe("");
+  });
+});
