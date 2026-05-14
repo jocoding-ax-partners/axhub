@@ -22,6 +22,8 @@ model: haiku
 
 Claude Code plugin manifest 가 statusLine 필드를 직접 지원하지 않아서 statusline 은 opt-in 방식이에요. `~/.claude/settings.json` 에 wiring snippet 을 직접 paste 하면 활성화돼요.
 
+**플랫폼 지원 범위:** macOS / Linux / Windows + Git Bash / Windows + WSL 만 지원해요. Windows native (PowerShell-only, Git Bash · WSL 둘 다 없음) 는 미지원이에요 — wiring snippet 의 `${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh` 가 bash interpreter 필요한데 PowerShell 단독으로 실행 불가능해요. 이 SKILL 본문의 `command -v` / `[ -t 0 ]` / heredoc 등 bash 문법도 PowerShell 에서 동작 안 해요. Windows native 사용자는 Git Bash (또는 WSL) 를 PATH 에 추가한 다음 다시 시도해주세요. `bin/statusline.ps1` PowerShell mirror 는 v0.6.0+ deferred 예요 (Phase 17 US-1707 spec 따름).
+
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — statusLine 어떻게 켤래요? → `나중에 할래요` (단, stdout 으로 snippet 출력은 해요 — idempotent read-only 라 안전해요).
 
 비대화형 컨텍스트 (`CLAUDE_NO_TTY=1` 설정 또는 stdin 이 TTY 가 아닌 경우) 에서는 AskUserQuestion 을 건너뛰고 아래 wiring snippet 을 stdout 으로 출력한 뒤 exit 0 해요. pbcopy / clip.exe / xclip 같은 clipboard 도구는 호출하지 않아요.

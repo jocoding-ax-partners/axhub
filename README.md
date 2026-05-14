@@ -69,6 +69,8 @@ UX 보장:
 
 Claude Code plugin manifest schema 가 `statusLine` 필드를 지원 안 해요. 그래서 user 가 `~/.claude/settings.json` 에서 직접 활성화해야 해요. axhub 가 도와줘요.
 
+**지원 범위**: macOS / Linux / Windows + Git Bash / Windows + WSL. Windows native (PowerShell-only) 는 `bin/statusline.sh` 가 bash interpreter 필요해서 미지원이에요 — Git Bash 또는 WSL 을 PATH 에 추가해주세요. PowerShell mirror 는 v0.6.0+ deferred 예요.
+
 1. Claude Code 에서 `/axhub:enable-statusline` 실행해요.
 2. "복사해서 붙여 넣을래요" 선택하면 snippet 이 클립보드에 들어가요 (또는 stdout 으로 출력돼요).
 3. `~/.claude/settings.json` 에 paste 해요. 기존 키와 충돌 안 나게 잘 합쳐요.
