@@ -116,7 +116,7 @@ describe("autowire observability — 4 cases", () => {
       // event type must always be "autowire-statusline"
       expect(ev.event).toBe("autowire-statusline");
       // action must be a known value
-      expect(["create", "merge", "noop", "preserve", "abort"]).toContain(ev.action);
+      expect(["create", "merge", "noop", "preserve", "abort"]).toContain(ev.action as string);
       // branch must be a number
       expect(typeof ev.branch).toBe("number");
       // ts must be an ISO-8601 string

@@ -3,7 +3,6 @@
 // kill switch matrix respected (AXHUB_DISABLE_HOOKS / per-hook csv / legacy / feature-specific).
 
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
