@@ -34,7 +34,10 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { readSkillDescription } from "./codegen-skill-keywords-from-rust";
 import { computeExamplesIssues, computeQualityIssues, type QualityIssue } from "./skill-doctor-quality";
-import { getInjectionLineForVariant } from "./codegen-preflight-injection";
+import {
+  getInjectionLineForVariant,
+  TARGETS as PREFLIGHT_TARGETS,
+} from "./codegen-preflight-injection";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const SKILLS_DIR = join(REPO_ROOT, "skills");
@@ -225,10 +228,11 @@ const inspectSkill = (slug: string): SkillCheck => {
         reason: multiStep ? "frontmatter multi-step: true" : "frontmatter multi-step: false → exempt",
       },
       ((): { name: string; required: boolean; present: boolean; reason: string } => {
-        // Deploy SKILL uses the deploy variant (Phase 17 cross-platform root resolution +
-        // iteration-4 stderr-pipe/denialRegex/passthrough). All other needs-preflight
-        // SKILLs use the lite variant.
-        const variant: "lite" | "deploy" = slug === "deploy" ? "deploy" : "lite";
+        // PR #99 review m2: lookup variant from PREFLIGHT_TARGETS (single source of truth)
+        // instead of hard-coding `slug === "deploy"`. Drift is now caught when a new SKILL
+        // is added to PREFLIGHT_TARGETS without a corresponding skill-doctor update.
+        const targetPath = `skills/${slug}/SKILL.md`;
+        const variant: "lite" | "deploy" = PREFLIGHT_TARGETS.find((t) => t.file === targetPath)?.variant ?? "lite";
         return {
           name: "!command preflight",
           required: needsPreflight,
