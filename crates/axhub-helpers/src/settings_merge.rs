@@ -21,6 +21,8 @@ use anyhow::Context;
 use serde::Serialize;
 use serde_json::{json, Value};
 
+use crate::orphan_stub;
+
 const LOCK_TIMEOUT: Duration = Duration::from_secs(5);
 const LOCK_POLL: Duration = Duration::from_millis(100);
 
@@ -129,10 +131,22 @@ fn resolve_auto_scope() -> anyhow::Result<PathBuf> {
 // Command path
 // ---------------------------------------------------------------------------
 
-/// Default command path written to settings.json (unresolved literal).
-/// Claude Code expands `${CLAUDE_PLUGIN_ROOT}` at runtime.
+/// Default command path written to settings.json.
+///
+/// When `override_path = None`, returns the orphan stub absolute path
+/// (plugin-context-independent, survives plugin uninstall).
+/// Falls back to the legacy `${CLAUDE_PLUGIN_ROOT}` literal only when
+/// the state dir is unavailable (XDG_STATE_HOME / HOME unset).
+///
+/// When `override_path = Some(p)`, emits a deprecation warning and returns
+/// the literal path for backward compatibility (removed in v0.7.0).
 pub fn default_command_path(override_path: Option<&Path>) -> String {
     let script_path = if let Some(p) = override_path {
+        eprintln!(
+            "axhub: command_path_override 는 deprecated 예요. v0.7.0 에서 제거될 예정이에요. orphan stub path 를 사용해주세요."
+        );
+        p.to_string_lossy().into_owned()
+    } else if let Some(p) = orphan_stub::stub_path() {
         p.to_string_lossy().into_owned()
     } else if cfg!(target_os = "windows") {
         "${CLAUDE_PLUGIN_ROOT}/bin/statusline.ps1".to_string()
@@ -453,5 +467,443 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<MergeOutcome> {
             );
             Ok(MergeOutcome::PartialSchema)
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Migration — stale ${CLAUDE_PLUGIN_ROOT} literal → orphan stub absolute path
+// ---------------------------------------------------------------------------
+
+/// Stale substring that identifies a settings.json written by the old code path.
+const STALE_SUBSTRING: &str = "${CLAUDE_PLUGIN_ROOT}/bin/statusline.";
+
+/// Per-path migration outcome.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MigrateOutcome {
+    /// Stale command replaced with orphan stub absolute path.
+    Migrated,
+    /// Already points at stub absolute path — no change needed.
+    NoOp,
+    /// File exists but contains no stale literal — nothing to migrate.
+    NoStaleFound,
+    /// Project scope + git-tracked → WARN-ONLY, no write.
+    WarnGitTracked,
+    /// Invalid JSON — never write.
+    InvalidJson,
+    /// Directory or file not writable.
+    PermissionDenied,
+    /// settings.json does not exist at this scope.
+    NotFound,
+    /// Stale literal detected but dry-run mode — no write.
+    DryRun,
+    /// Stub absolute path unavailable (state dir unresolvable) — cannot migrate.
+    StubUnavailable,
+}
+
+/// Detect and rewrite stale `${CLAUDE_PLUGIN_ROOT}` literals in settings.json.
+///
+/// When `scope = Auto`, both user and project settings files are scanned.
+/// Returns a vec of `(scope_label, outcome)` pairs.
+pub fn migrate_stale_command_path(
+    scope: &Scope,
+    dry_run: bool,
+) -> anyhow::Result<Vec<(String, MigrateOutcome)>> {
+    let stub = orphan_stub::stub_path();
+
+    let targets: Vec<(String, anyhow::Result<PathBuf>)> = match scope {
+        Scope::User => vec![("user".to_string(), Ok(user_settings_path()))],
+        Scope::Project => vec![("project".to_string(), project_settings_path())],
+        Scope::Auto => {
+            let mut v: Vec<(String, anyhow::Result<PathBuf>)> =
+                vec![("user".to_string(), Ok(user_settings_path()))];
+            // Project scope is best-effort — skip when not in a git repo.
+            if let Ok(p) = project_settings_path() {
+                v.push(("project".to_string(), Ok(p)));
+            }
+            v
+        }
+    };
+
+    let mut results = Vec::new();
+    for (label, path_res) in targets {
+        let path = match path_res {
+            Ok(p) => p,
+            Err(_) => {
+                results.push((label, MigrateOutcome::NotFound));
+                continue;
+            }
+        };
+        let outcome = migrate_single_path(&path, &label, &stub, dry_run)?;
+        results.push((label, outcome));
+    }
+    Ok(results)
+}
+
+fn migrate_single_path(
+    path: &Path,
+    scope_label: &str,
+    stub: &Option<PathBuf>,
+    dry_run: bool,
+) -> anyhow::Result<MigrateOutcome> {
+    if !path.exists() {
+        return Ok(MigrateOutcome::NotFound);
+    }
+
+    let lock_path = {
+        let name = format!(
+            "{}.lock",
+            path.file_name().unwrap_or_default().to_string_lossy()
+        );
+        path.with_file_name(name)
+    };
+    let _lock = acquire_lock(&lock_path)?;
+
+    let raw = match fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(MigrateOutcome::NotFound),
+        Err(_) => return Ok(MigrateOutcome::PermissionDenied),
+    };
+
+    // Branch 6: invalid JSON — never write.
+    let parsed: Value = match serde_json::from_str(&raw) {
+        Ok(v) => v,
+        Err(_) => return Ok(MigrateOutcome::InvalidJson),
+    };
+    let mut obj = match parsed {
+        Value::Object(m) => m,
+        _ => return Ok(MigrateOutcome::InvalidJson),
+    };
+
+    // Detect stale literal.
+    let current_cmd = obj
+        .get("statusLine")
+        .and_then(|sl| sl.get("command"))
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+
+    let is_stale = current_cmd
+        .as_deref()
+        .map(|cmd| cmd.contains(STALE_SUBSTRING))
+        .unwrap_or(false);
+
+    if !is_stale {
+        // Check if already migrated to stub absolute path (idempotent guard).
+        if let (Some(cmd), Some(stub_p)) = (current_cmd.as_deref(), stub.as_ref()) {
+            let expected =
+                command_for_platform_script(&stub_p.to_string_lossy(), cfg!(target_os = "windows"));
+            if cmd == expected {
+                return Ok(MigrateOutcome::NoOp);
+            }
+        }
+        return Ok(MigrateOutcome::NoStaleFound);
+    }
+
+    // Git-tracked detect (S7): project scope only — WARN-ONLY, no write.
+    if scope_label == "project" && is_git_tracked(path) {
+        eprintln!(
+            "axhub: {} 는 git 에 추적 중이에요. 자동 수정 안 했어요. 직접 편집 후 commit 해주세요.",
+            path.display()
+        );
+        return Ok(MigrateOutcome::WarnGitTracked);
+    }
+
+    if dry_run {
+        eprintln!(
+            "axhub: {} — stale statusLine.command 감지했어요. (dry-run, 변경 없음)",
+            path.display()
+        );
+        return Ok(MigrateOutcome::DryRun);
+    }
+
+    // Compute new command from stub absolute path.
+    let stub_p = match stub.as_ref() {
+        Some(p) => p,
+        None => {
+            eprintln!("axhub: orphan stub path 를 확인할 수 없어요. migrate 를 건너뛰었어요.");
+            return Ok(MigrateOutcome::StubUnavailable);
+        }
+    };
+    let new_cmd =
+        command_for_platform_script(&stub_p.to_string_lossy(), cfg!(target_os = "windows"));
+
+    // Atomic rewrite: .bak → mutate → rename.
+    write_bak(path, raw.as_bytes())?;
+
+    if let Some(sl) = obj.get_mut("statusLine").and_then(Value::as_object_mut) {
+        sl.insert("command".to_string(), Value::String(new_cmd));
+    }
+
+    let new_content = serde_json::to_string_pretty(&Value::Object(obj))?;
+    atomic_write(path, new_content.as_bytes())?;
+
+    eprintln!(
+        "axhub: {} statusLine.command 를 orphan stub path 로 마이그레이션했어요.",
+        path.display()
+    );
+    Ok(MigrateOutcome::Migrated)
+}
+
+/// Check whether `path` is tracked by git (`git ls-files --error-unmatch`).
+fn is_git_tracked(path: &Path) -> bool {
+    std::process::Command::new("git")
+        .args(["ls-files", "--error-unmatch", &path.to_string_lossy()])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    /// Guard: 테스트 동안 HOME + XDG_STATE_HOME + CLAUDE_PLUGIN_ROOT 격리.
+    /// Drop 시 원래 값 복원. PROCESS_ENV_LOCK 으로 크로스-테스트 env 경쟁 방지.
+    struct EnvGuard {
+        _lock: std::sync::MutexGuard<'static, ()>,
+        _xdg_dir: tempfile::TempDir,
+        _home_dir: tempfile::TempDir,
+        old_xdg: Option<std::ffi::OsString>,
+        old_home: Option<std::ffi::OsString>,
+        old_plugin_root: Option<std::ffi::OsString>,
+    }
+
+    impl EnvGuard {
+        fn new() -> Self {
+            let lock = crate::PROCESS_ENV_LOCK
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
+            let xdg_dir = tempfile::tempdir().unwrap();
+            let home_dir = tempfile::tempdir().unwrap();
+            let old_xdg = std::env::var_os("XDG_STATE_HOME");
+            let old_home = std::env::var_os("HOME");
+            let old_plugin_root = std::env::var_os("CLAUDE_PLUGIN_ROOT");
+            unsafe {
+                std::env::set_var("XDG_STATE_HOME", xdg_dir.path());
+                std::env::set_var("HOME", home_dir.path());
+                std::env::remove_var("CLAUDE_PLUGIN_ROOT");
+            }
+            Self {
+                _lock: lock,
+                _xdg_dir: xdg_dir,
+                _home_dir: home_dir,
+                old_xdg,
+                old_home,
+                old_plugin_root,
+            }
+        }
+
+        fn home(&self) -> &std::path::Path {
+            self._home_dir.path()
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match self.old_xdg.take() {
+                Some(v) => unsafe { std::env::set_var("XDG_STATE_HOME", v) },
+                None => unsafe { std::env::remove_var("XDG_STATE_HOME") },
+            }
+            match self.old_home.take() {
+                Some(v) => unsafe { std::env::set_var("HOME", v) },
+                None => unsafe { std::env::remove_var("HOME") },
+            }
+            match self.old_plugin_root.take() {
+                Some(v) => unsafe { std::env::set_var("CLAUDE_PLUGIN_ROOT", v) },
+                None => unsafe { std::env::remove_var("CLAUDE_PLUGIN_ROOT") },
+            }
+        }
+    }
+
+    fn write_settings(home: &std::path::Path, content: &str) {
+        let claude_dir = home.join(".claude");
+        fs::create_dir_all(&claude_dir).unwrap();
+        fs::write(claude_dir.join("settings.json"), content).unwrap();
+    }
+
+    fn read_settings(home: &std::path::Path) -> String {
+        fs::read_to_string(home.join(".claude").join("settings.json")).unwrap()
+    }
+
+    // ── AC #1: default_command_path(None) returns orphan stub absolute path ───
+
+    #[test]
+    fn default_command_path_none_returns_stub_absolute_path() {
+        let guard = EnvGuard::new();
+        let result = default_command_path(None);
+        assert!(
+            !result.contains("${CLAUDE_PLUGIN_ROOT}"),
+            "must not contain CLAUDE_PLUGIN_ROOT template: {result}"
+        );
+        assert!(
+            result.contains("orphan-stub-statusline"),
+            "must reference orphan stub: {result}"
+        );
+        #[cfg(unix)]
+        assert!(
+            result.starts_with('/'),
+            "must be absolute path on Unix: {result}"
+        );
+        let _ = guard;
+    }
+
+    // ── AC #2: default_command_path(Some(p)) emits deprecation + returns p ───
+
+    #[test]
+    fn default_command_path_some_returns_override_path() {
+        let guard = EnvGuard::new();
+        let override_path = std::path::Path::new("/my/custom/statusline.sh");
+        let result = default_command_path(Some(override_path));
+        assert!(
+            result.contains("/my/custom/statusline.sh"),
+            "must contain override path: {result}"
+        );
+        let _ = guard;
+    }
+
+    // ── AC #18: CLAUDE_PLUGIN_ROOT=OMC path — result independent ──────────────
+
+    #[test]
+    fn default_command_path_independent_of_claude_plugin_root() {
+        let guard = EnvGuard::new();
+        unsafe {
+            std::env::set_var(
+                "CLAUDE_PLUGIN_ROOT",
+                "/tmp/omc-fake-root/oh-my-claudecode/4.13.7",
+            );
+        }
+        let result = default_command_path(None);
+        assert!(
+            !result.contains("omc-fake-root"),
+            "must not contain OMC plugin root: {result}"
+        );
+        assert!(
+            !result.contains("oh-my-claudecode"),
+            "must not contain OMC plugin name: {result}"
+        );
+        assert!(
+            !result.contains("${CLAUDE_PLUGIN_ROOT}"),
+            "must not contain unresolved template: {result}"
+        );
+        assert!(
+            result.contains("orphan-stub-statusline"),
+            "must reference orphan stub: {result}"
+        );
+        let _ = guard;
+    }
+
+    // ── AC #7: Windows quoting — paths with spaces ────────────────────────────
+
+    #[test]
+    fn command_for_platform_script_quotes_paths_with_spaces_on_windows() {
+        let path_with_spaces = "/path with spaces/stub.ps1";
+        let result = command_for_platform_script(path_with_spaces, true);
+        assert!(
+            result.contains("powershell.exe"),
+            "Windows command must use powershell.exe: {result}"
+        );
+        assert!(
+            result.contains('"'),
+            "Windows command must quote the path: {result}"
+        );
+        assert!(
+            result.contains(path_with_spaces),
+            "Windows command must contain original path: {result}"
+        );
+        let unix = command_for_platform_script(path_with_spaces, false);
+        assert_eq!(unix, path_with_spaces, "Unix must return path as-is");
+    }
+
+    // ── AC #8: migrate detects stale literal + atomic write ──────────────────
+
+    #[test]
+    fn migrate_stale_command_path_replaces_stale_literal() {
+        let guard = EnvGuard::new();
+        let stale_cmd = "${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh";
+        write_settings(
+            guard.home(),
+            &serde_json::to_string(&serde_json::json!({
+                "statusLine": { "type": "command", "command": stale_cmd, "padding": 0 }
+            }))
+            .unwrap(),
+        );
+
+        let results = migrate_stale_command_path(&Scope::User, false).unwrap();
+        let (_, outcome) = results.iter().find(|(l, _)| l == "user").unwrap();
+        assert_eq!(*outcome, MigrateOutcome::Migrated, "must be Migrated");
+
+        let new_content: serde_json::Value =
+            serde_json::from_str(&read_settings(guard.home())).unwrap();
+        let new_cmd = new_content["statusLine"]["command"].as_str().unwrap();
+        assert!(
+            !new_cmd.contains("${CLAUDE_PLUGIN_ROOT}"),
+            "migrated command must not contain stale literal: {new_cmd}"
+        );
+        assert!(
+            new_cmd.contains("orphan-stub-statusline"),
+            "migrated command must reference stub: {new_cmd}"
+        );
+        // .bak must exist (atomic write committed)
+        assert!(
+            guard
+                .home()
+                .join(".claude")
+                .join("settings.json.bak")
+                .exists(),
+            ".bak must exist after migration"
+        );
+        let _ = guard;
+    }
+
+    // ── AC #9: migrate already-stub path → NoOp ──────────────────────────────
+
+    #[test]
+    fn migrate_stale_command_path_already_stub_is_noop() {
+        let guard = EnvGuard::new();
+        let stub_p = crate::orphan_stub::stub_path().expect("stub_path must resolve");
+        let stub_cmd =
+            command_for_platform_script(&stub_p.to_string_lossy(), cfg!(target_os = "windows"));
+        write_settings(
+            guard.home(),
+            &serde_json::to_string(&serde_json::json!({
+                "statusLine": { "type": "command", "command": stub_cmd, "padding": 0 }
+            }))
+            .unwrap(),
+        );
+        let original = read_settings(guard.home());
+
+        let results = migrate_stale_command_path(&Scope::User, false).unwrap();
+        let (_, outcome) = results.iter().find(|(l, _)| l == "user").unwrap();
+        assert_eq!(*outcome, MigrateOutcome::NoOp, "already-stub must be NoOp");
+        assert_eq!(
+            read_settings(guard.home()),
+            original,
+            "settings.json must be unchanged for NoOp"
+        );
+        let _ = guard;
+    }
+
+    // ── AC #10: migrate invalid JSON → abort, file unchanged ─────────────────
+
+    #[test]
+    fn migrate_stale_command_path_invalid_json_abort() {
+        let guard = EnvGuard::new();
+        let broken = "{broken json: this is not valid";
+        write_settings(guard.home(), broken);
+
+        let results = migrate_stale_command_path(&Scope::User, false).unwrap();
+        let (_, outcome) = results.iter().find(|(l, _)| l == "user").unwrap();
+        assert_eq!(*outcome, MigrateOutcome::InvalidJson, "must be InvalidJson");
+        assert_eq!(
+            read_settings(guard.home()),
+            broken,
+            "settings.json must not be modified for invalid JSON"
+        );
+        let _ = guard;
     }
 }

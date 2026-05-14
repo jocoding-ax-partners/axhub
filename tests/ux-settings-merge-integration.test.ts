@@ -1,4 +1,4 @@
-// v0.5.13 — settings-merge integration tests (14 cases)
+// v0.5.13 / v0.6.2 — settings-merge integration tests (15 cases)
 // Calls the compiled axhub-helpers binary with HOME + CLAUDE_PLUGIN_ROOT override
 // to exercise the 7-branch decision table via real filesystem I/O.
 //
@@ -31,7 +31,14 @@ function makeEnv(tempDir: string, pluginRoot: string): Record<string, string> {
     ...(process.env as Record<string, string>),
     HOME: tempDir,
     CLAUDE_PLUGIN_ROOT: pluginRoot,
+    // XDG_STATE_HOME 명시 → orphan stub 경로 격리 (HOME/.local/state 와 동일하게 고정)
+    XDG_STATE_HOME: join(tempDir, ".local", "state"),
   };
+}
+
+/** v0.6.2 — --apply 가 기록하는 orphan stub 절대경로. */
+function expectedStubPath(tempDir: string): string {
+  return join(tempDir, ".local", "state", "axhub-plugin", "orphan-stub-statusline.sh");
 }
 
 function runMerge(args: string[], tempDir: string, pluginRoot: string) {
@@ -42,7 +49,7 @@ function runMerge(args: string[], tempDir: string, pluginRoot: string) {
   });
 }
 
-describe("v0.5.13 settings-merge integration — 14 cases", () => {
+describe("v0.5.13/v0.6.2 settings-merge integration — 15 cases", () => {
   let tempDir: string;
   let pluginRoot: string;
   let settingsPath: string;
@@ -56,26 +63,30 @@ describe("v0.5.13 settings-merge integration — 14 cases", () => {
 
   // ── Case 1: Branch 1 — file absent ─────────────────────────────────────────
 
-  test("case 1 — branch 1: file absent → exit 2, settings.json created with statusLine", () => {
+  test("case 1 — branch 1: file absent → exit 2, settings.json created with stub absolute path (v0.6.2)", () => {
     const result = runMerge(["--apply", "--scope", "user"], tempDir, pluginRoot);
     expect(result.status).toBe(2);
     expect(existsSync(settingsPath)).toBe(true);
     const parsed = JSON.parse(readFileSync(settingsPath, "utf8"));
     expect(parsed.statusLine).toBeDefined();
     expect(parsed.statusLine.type).toBe("command");
-    expect(parsed.statusLine.command).toBe("${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh");
+    // v0.6.2: stub absolute path, NOT ${CLAUDE_PLUGIN_ROOT} literal
+    expect(parsed.statusLine.command).toBe(expectedStubPath(tempDir));
+    expect(parsed.statusLine.command).not.toContain("${CLAUDE_PLUGIN_ROOT}");
   });
 
   // ── Case 2: Branch 2 — empty file ──────────────────────────────────────────
 
-  test("case 2 — branch 2: empty file → exit 2 (treated as absent)", () => {
+  test("case 2 — branch 2: empty file → exit 2, stub absolute path written (v0.6.2)", () => {
     mkdirSync(join(tempDir, ".claude"), { recursive: true });
     writeFileSync(settingsPath, "");
     const result = runMerge(["--apply", "--scope", "user"], tempDir, pluginRoot);
     expect(result.status).toBe(2);
     const parsed = JSON.parse(readFileSync(settingsPath, "utf8"));
     expect(parsed.statusLine).toBeDefined();
-    expect(parsed.statusLine.command).toBe("${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh");
+    // v0.6.2: stub absolute path, NOT ${CLAUDE_PLUGIN_ROOT} literal
+    expect(parsed.statusLine.command).toBe(expectedStubPath(tempDir));
+    expect(parsed.statusLine.command).not.toContain("${CLAUDE_PLUGIN_ROOT}");
   });
 
   // ── Case 3: Branch 3 — valid JSON, no statusLine ───────────────────────────
@@ -93,15 +104,11 @@ describe("v0.5.13 settings-merge integration — 14 cases", () => {
 
   // ── Case 4: Branch 4 — axhub-managed statusLine, no-op ────────────────────
 
-  test("case 4 — branch 4: already axhub-managed → exit 0, file mtime unchanged", () => {
+  test("case 4 — branch 4: already stub-managed → exit 0, file mtime unchanged (v0.6.2)", () => {
     mkdirSync(join(tempDir, ".claude"), { recursive: true });
-    const existing = {
-      statusLine: {
-        type: "command",
-        command: "${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh",
-        padding: 0,
-      },
-    };
+    // v0.6.2: "managed" means stub absolute path, not the old ${CLAUDE_PLUGIN_ROOT} literal
+    const stubCmd = expectedStubPath(tempDir);
+    const existing = { statusLine: { type: "command", command: stubCmd, padding: 0 } };
     writeFileSync(settingsPath, JSON.stringify(existing));
     const before = statSync(settingsPath).mtimeMs;
     const result = runMerge(["--apply", "--scope", "user"], tempDir, pluginRoot);
@@ -109,7 +116,7 @@ describe("v0.5.13 settings-merge integration — 14 cases", () => {
     const after = statSync(settingsPath).mtimeMs;
     expect(after).toBe(before);
     const parsed = JSON.parse(readFileSync(settingsPath, "utf8"));
-    expect(parsed.statusLine.command).toBe("${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh");
+    expect(parsed.statusLine.command).toBe(stubCmd);
   });
 
   // ── Case 5: Branch 5 — other plugin command, preserve ──────────────────────
@@ -277,5 +284,43 @@ describe("v0.5.13 settings-merge integration — 14 cases", () => {
         expect(stderr).not.toMatch(FORBIDDEN_TONE);
       }
     }
+  });
+
+  // ── Case 15: AC #4 — multi-plugin disambiguation ───────────────────────────
+  // Pre-mortem S1 regression: CLAUDE_PLUGIN_ROOT 가 OMC plugin 경로로 설정된
+  // 환경에서 --apply 실행 시 settings.json 이 axhub 의 orphan stub 절대경로를
+  // 기록해야 해요. OMC 경로나 ${CLAUDE_PLUGIN_ROOT} 리터럴이 아니어야 해요.
+
+  test("case 15 — AC#4: CLAUDE_PLUGIN_ROOT=OMC path → stub absolute path written, not OMC path", () => {
+    const omcPluginRoot = "/tmp/fake-omc-root/oh-my-claudecode/4.13.7";
+    const isolatedXdgState = join(tempDir, "xdg-state");
+    const result = spawnSync(
+      join(REPO_ROOT, "target/debug/axhub-helpers"),
+      ["settings-merge", "--apply", "--scope", "user"],
+      {
+        encoding: "utf8",
+        timeout: 10_000,
+        env: {
+          ...(process.env as Record<string, string>),
+          HOME: tempDir,
+          CLAUDE_PLUGIN_ROOT: omcPluginRoot,
+          XDG_STATE_HOME: isolatedXdgState,
+        },
+      }
+    );
+    // exit 2 (Created) 또는 3 (Merged)
+    expect([2, 3]).toContain(result.status);
+    expect(existsSync(settingsPath)).toBe(true);
+    const parsed = JSON.parse(readFileSync(settingsPath, "utf8"));
+    const cmd: string = parsed.statusLine.command;
+    // stub absolute path 여야 해요
+    expect(cmd).toContain("orphan-stub-statusline");
+    // OMC 경로가 들어가면 안 돼요
+    expect(cmd).not.toContain("fake-omc-root");
+    expect(cmd).not.toContain("oh-my-claudecode");
+    // ${CLAUDE_PLUGIN_ROOT} 미확장 리터럴이면 안 돼요
+    expect(cmd).not.toContain("${CLAUDE_PLUGIN_ROOT}");
+    // 절대경로여야 해요
+    expect(cmd.startsWith("/")).toBe(true);
   });
 });

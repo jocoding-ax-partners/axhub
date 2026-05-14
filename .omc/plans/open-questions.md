@@ -2,6 +2,14 @@
 
 Append-only log of unresolved decisions across plans.
 
+## statusline-plugin-root-ambiguity-fix-v0.5.14 - 2026-05-14 (iter 1)
+
+- [ ] FX-1: `--migrate` 가 detection 후 user 확인 prompt vs 자동 적용 default — 기본 prompt + `--yes` opt-out 권장 — 영향: 사용자 trust + 자동화 친화성.
+- [ ] FX-2: Windows `XDG_STATE_HOME` 미설정 환경 stub state dir 폴백 정합성 — `runtime_paths::state_dir()` 동작 e2e 검증 필요 — 영향: Windows multi-plugin 환경 정확성.
+- [ ] FX-3: PR 순서 v0.5.14 → v0.6.0 → v0.6.1 hotfix vs v0.6.1 합치기 — Release manager 판단 — 영향: ship cadence.
+- [ ] FX-4: stub install 실패 시 `settings-merge --apply` exit code — manual 호출이라 non-zero 적절할 수 있음, autowire 는 fail-open 유지 — 영향: CLI UX 일관성.
+- [ ] FX-5: `command_path_override = Some(_)` deprecation warning 출력 채널 (stderr vs systemMessage JSON) — observability 이벤트 schema 와 정렬 필요 — 영향: v0.7.0 완전 제거 로드맵.
+
 ## settings-merge-foundation-v0.5.13 - 2026-05-14 (iter 2)
 
 - [ ] FA-1: `fslock` crate Windows 동작 검증 — `LockFileEx` wrap 안정성 + `MoveFileEx` 와 호환 — Cargo dep 추가 전 docs/Context7 확인 필요. — 영향: foundation atomic-write 신뢰성.

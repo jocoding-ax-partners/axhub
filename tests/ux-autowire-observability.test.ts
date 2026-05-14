@@ -264,4 +264,10 @@ describe("autowire observability — 4 cases", () => {
       expect(ev.event).toBe("autowire-statusline");
     }
   });
+
+  // ── O5: AC #12 — command_path HMAC field in events.jsonl ──────────────────
+  // Pre-mortem: events.jsonl 이 command_path HMAC 를 포함해야 해요.
+  // observability.rs append_autowire_event 에 command_path 필드 미구현 — TODO.
+
+  test.todo("O5: AC #12 — events.jsonl command_path field present as HMAC (not implemented yet in append_autowire_event)");
 });

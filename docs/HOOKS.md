@@ -26,6 +26,16 @@
 여기서 다루지 않는 helper subcommand (예: `deploy-prep`, `bootstrap`,
 `list-deployments`) 는 사용자 명시 호출이라 kill switch 적용 대상 아니에요.
 
+### 1.1 session-start-autowire 와 settings-merge --migrate (v0.6.2)
+
+`session-start-autowire` 가 `settings-merge --apply` 를 통해 `~/.claude/settings.json` 에 statusLine 을 기록해요. v0.6.1 이전 버전에서 hook 이 `${CLAUDE_PLUGIN_ROOT}` 리터럴을 기록한 경우, `--migrate` subcommand 로 orphan stub 절대경로로 치유해요:
+
+```bash
+axhub-helpers settings-merge --migrate --yes
+```
+
+이 subcommand 는 hook 이 아니라 사용자 명시 호출이에요. kill switch 무관. 상세 동작은 `docs/settings-merge.md` 를 참고해요.
+
 ---
 
 ## 2. Kill Switch (canonical)
