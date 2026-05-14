@@ -82,8 +82,7 @@ fn project_settings_path() -> anyhow::Result<PathBuf> {
     if !output.status.success() {
         anyhow::bail!("git rev-parse: git repository 안이에요");
     }
-    let toplevel = String::from_utf8(output.stdout)
-        .context("git rev-parse: non-UTF-8 output")?;
+    let toplevel = String::from_utf8(output.stdout).context("git rev-parse: non-UTF-8 output")?;
     Ok(PathBuf::from(toplevel.trim())
         .join(".claude")
         .join("settings.json"))
@@ -191,9 +190,7 @@ fn atomic_write(path: &Path, data: &[u8]) -> anyhow::Result<()> {
 
     let tmp = parent.join(format!(
         ".{}.tmp",
-        path.file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
+        path.file_name().unwrap_or_default().to_string_lossy()
     ));
 
     let mut opts = fs::OpenOptions::new();
@@ -211,13 +208,8 @@ fn atomic_write(path: &Path, data: &[u8]) -> anyhow::Result<()> {
     f.sync_all()?;
     drop(f);
 
-    fs::rename(&tmp, path).with_context(|| {
-        format!(
-            "atomic rename 실패: {} → {}",
-            tmp.display(),
-            path.display()
-        )
-    })?;
+    fs::rename(&tmp, path)
+        .with_context(|| format!("atomic rename 실패: {} → {}", tmp.display(), path.display()))?;
     Ok(())
 }
 
@@ -315,7 +307,10 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<MergeOutcome> {
     // Branch 1 / 2: file absent or empty/whitespace.
     if raw.trim().is_empty() {
         if opts.dry_run {
-            emit(opts.silent, "axhub: settings.json 만들고 statusLine 추가할 예정이에요. (dry-run)");
+            emit(
+                opts.silent,
+                "axhub: settings.json 만들고 statusLine 추가할 예정이에요. (dry-run)",
+            );
             return Ok(MergeOutcome::Created);
         }
         if !check_writable(&path) {
@@ -333,7 +328,10 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<MergeOutcome> {
             );
             return Err(e);
         }
-        emit(opts.silent, "axhub: settings.json 만들고 statusLine 추가했어요.");
+        emit(
+            opts.silent,
+            "axhub: settings.json 만들고 statusLine 추가했어요.",
+        );
         return Ok(MergeOutcome::Created);
     }
 
@@ -364,7 +362,10 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<MergeOutcome> {
     // Branch 3: statusLine key absent → shallow-merge add.
     if !obj.contains_key("statusLine") {
         if opts.dry_run {
-            emit(opts.silent, "axhub: settings.json 에 statusLine 추가할 예정이에요. (dry-run)");
+            emit(
+                opts.silent,
+                "axhub: settings.json 에 statusLine 추가할 예정이에요. (dry-run)",
+            );
             return Ok(MergeOutcome::Merged);
         }
         if !check_writable(&path) {

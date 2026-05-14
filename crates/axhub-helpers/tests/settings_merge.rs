@@ -101,7 +101,10 @@ fn branch_1_file_absent_creates() {
     let content = fs::read_to_string(home.settings_path()).expect("settings.json created");
     let v: serde_json::Value = serde_json::from_str(&content).unwrap();
     assert_eq!(v["statusLine"]["type"], "command");
-    assert!(v["statusLine"]["command"].as_str().unwrap().contains("statusline."));
+    assert!(v["statusLine"]["command"]
+        .as_str()
+        .unwrap()
+        .contains("statusline."));
     assert_eq!(v["statusLine"]["padding"], 0);
 }
 
@@ -168,9 +171,7 @@ fn branch_4_idempotent_noop() {
         "${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh"
     };
 
-    let fixture = format!(
-        r#"{{"statusLine":{{"type":"command","command":"{cmd}","padding":0}}}}"#
-    );
+    let fixture = format!(r#"{{"statusLine":{{"type":"command","command":"{cmd}","padding":0}}}}"#);
     fs::write(home.settings_path(), &fixture).unwrap();
 
     let mtime_before = fs::metadata(home.settings_path())
@@ -241,11 +242,7 @@ fn branch_7_partial_schema_preserved() {
     home.ensure_claude_dir();
 
     // statusLine has type but no command.
-    fs::write(
-        home.settings_path(),
-        r#"{"statusLine":{"type":"command"}}"#,
-    )
-    .unwrap();
+    fs::write(home.settings_path(), r#"{"statusLine":{"type":"command"}}"#).unwrap();
 
     let result = merge(user_apply()).unwrap();
     assert_eq!(result, MergeOutcome::PartialSchema);
@@ -307,14 +304,23 @@ fn dry_run_no_write() {
     // File absent: dry_run should return Created but not create the file.
     let result = merge(user_dry_run()).unwrap();
     assert_eq!(result, MergeOutcome::Created);
-    assert!(!home.settings_path().exists(), "dry_run must not create the file");
+    assert!(
+        !home.settings_path().exists(),
+        "dry_run must not create the file"
+    );
 
     // File with valid JSON but no statusLine: dry_run should return Merged but not write.
     fs::write(home.settings_path(), r#"{"other":1}"#).unwrap();
-    let mtime_before = fs::metadata(home.settings_path()).unwrap().modified().unwrap();
+    let mtime_before = fs::metadata(home.settings_path())
+        .unwrap()
+        .modified()
+        .unwrap();
     let result2 = merge(user_dry_run()).unwrap();
     assert_eq!(result2, MergeOutcome::Merged);
-    let mtime_after = fs::metadata(home.settings_path()).unwrap().modified().unwrap();
+    let mtime_after = fs::metadata(home.settings_path())
+        .unwrap()
+        .modified()
+        .unwrap();
     assert_eq!(mtime_before, mtime_after, "dry_run must not modify file");
     assert!(!home.settings_path().with_extension("json.bak").exists());
 }

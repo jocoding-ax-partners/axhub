@@ -21,7 +21,9 @@ use axhub_helpers::runtime_paths::{last_deploy_file, state_dir, token_file, welc
 use axhub_helpers::session_bundle::{
     write_session_bundle, AuthStatusBundle, LastDeployBundle, SessionBundle,
 };
-use axhub_helpers::settings_merge::{merge as run_settings_merge, MergeOptions, MergeOutcome, Scope};
+use axhub_helpers::settings_merge::{
+    merge as run_settings_merge, MergeOptions, MergeOutcome, Scope,
+};
 use axhub_helpers::statusline::current_statusline;
 use axhub_helpers::telemetry::{
     append_phase_marker_to_file, emit_deploy_complete, emit_meta_envelope,
