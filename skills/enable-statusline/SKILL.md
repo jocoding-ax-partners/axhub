@@ -86,7 +86,24 @@ To enable the axhub statusline:
 
    **`복사해서 붙여 넣을래요` 선택 시:**
 
-   Unix wiring snippet 을 임시 파일에 쓰고 best-effort clipboard 복사를 해요:
+   v0.5.13 부터 `axhub-helpers settings-merge --apply` 가 atomic 으로 `~/.claude/settings.json` 에 statusLine 을 추가해요. 7-branch 결정 + .bak rollback + flock 으로 safe.
+
+   ```bash
+   # 자동 wire (recommended)
+   "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" settings-merge --apply --scope auto
+   ```
+
+   Exit code 별 처리:
+   - 0 (NoOp): 이미 axhub-managed statusLine 있어요 — 변경 없음
+   - 2 (Created): settings.json 만들고 statusLine 추가했어요
+   - 3 (Merged): 기존 settings.json 에 statusLine 추가했어요
+   - 4 (PreservedOther): 다른 plugin 의 statusLine 발견 — preserve 했어요. 강제 override 는 `/axhub:enable-statusline` 재실행
+   - 5 (InvalidJson): settings.json 파싱 안 돼요 — 직접 수정 후 재시도
+   - 6/7 (PartialSchema/Permission): stderr 안내 따라 수동 해결
+
+   성공 시 "Claude Code 재시작해주세요" 안내.
+
+   **Manual paste fallback** (자동 wire 거부하는 경우):
 
    ```bash
    if command -v pbcopy >/dev/null 2>&1; then
@@ -100,8 +117,6 @@ To enable the axhub statusline:
      printf '%s\n' "$SNIPPET"
    fi
    ```
-
-   복사 성공 시: "복사했어요. `~/.claude/settings.json` 에 paste 하고 Claude Code 재시작해주세요." 라고 안내해요.
 
    **`어떻게 하는지 보여줘요` 선택 시:**
 
@@ -135,7 +150,7 @@ To enable the axhub statusline:
 
 ## NEVER
 
-- NEVER `~/.claude/settings.json` 을 자동으로 수정해요. trust boundary 위반이에요.
+- NEVER `~/.claude/settings.json` 을 explicit consent 없이 자동으로 수정해요. manual `axhub-helpers settings-merge --apply` 호출은 explicit consent 후 OK. v0.6.0 의 SessionStart autowire 는 install-time disclosure 동의로 간주.
 - NEVER 비대화형 환경에서 pbcopy / clip.exe / xclip 호출. clipboard mutation 은 interactive 선택 후에만 해요.
 - NEVER Claude Code 를 자동으로 재시작해요. 사용자가 직접 해야 해요.
 

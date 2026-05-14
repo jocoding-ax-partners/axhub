@@ -21,6 +21,7 @@ use axhub_helpers::runtime_paths::{last_deploy_file, state_dir, token_file, welc
 use axhub_helpers::session_bundle::{
     write_session_bundle, AuthStatusBundle, LastDeployBundle, SessionBundle,
 };
+use axhub_helpers::settings_merge::{merge as run_settings_merge, MergeOptions, MergeOutcome, Scope};
 use axhub_helpers::statusline::current_statusline;
 use axhub_helpers::telemetry::{
     append_phase_marker_to_file, emit_deploy_complete, emit_meta_envelope,
@@ -29,7 +30,7 @@ use chrono::Utc;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  version [--quiet]\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  version [--quiet]\n  help";
 
 fn main() {
     std::process::exit(match run() {
@@ -109,6 +110,7 @@ fn run() -> anyhow::Result<i32> {
         "verify" => cmd_verify(&rest),
         "trace" => cmd_trace(&rest),
         "doctor" => cmd_doctor(&rest),
+        "settings-merge" => cmd_settings_merge(&rest),
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -1862,4 +1864,115 @@ fn cmd_emit_deploy_complete(rest: &[String]) -> anyhow::Result<i32> {
         return Ok(1);
     }
     Ok(0)
+}
+
+// ---------------------------------------------------------------------------
+// settings-merge subcommand
+// ---------------------------------------------------------------------------
+
+struct SettingsMergeArgs {
+    dry_run: bool,
+    scope: Scope,
+    json: bool,
+    silent: bool,
+    command_path_override: Option<PathBuf>,
+}
+
+fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArgs> {
+    let mut apply = false;
+    let mut dry_run_flag = false;
+    let mut scope = Scope::Auto;
+    let mut json = false;
+    let mut silent = false;
+    let mut command_path_override: Option<PathBuf> = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--apply" => apply = true,
+            "--dry-run" => dry_run_flag = true,
+            "--json" => json = true,
+            "--silent" => silent = true,
+            "--scope" if i + 1 < args.len() => {
+                i += 1;
+                scope = match args[i].as_str() {
+                    "user" => Scope::User,
+                    "project" => Scope::Project,
+                    "auto" => Scope::Auto,
+                    other => anyhow::bail!(
+                        "--scope 값이 잘못됐어요: {other} (user|project|auto 만 가능)"
+                    ),
+                };
+            }
+            "--command-path" if i + 1 < args.len() => {
+                i += 1;
+                command_path_override = Some(PathBuf::from(&args[i]));
+            }
+            "-h" | "--help" => {
+                println!(
+                    "axhub-helpers settings-merge — ~/.claude/settings.json statusLine 병합\n\n\
+                     USAGE:\n  axhub-helpers settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n\n\
+                     OPTIONS:\n  --apply           실제 병합 실행 (explicit consent gate)\n  \
+                     --dry-run         결정만 출력, 파일 변경 없음 (기본값)\n  \
+                     --scope <s>       user|project|auto (기본: auto)\n  \
+                     --json            결과를 JSON 으로 출력\n  \
+                     --silent          stderr 억제\n  \
+                     --command-path    statusLine command 경로 override\n  \
+                     -h, --help        도움말\n\n\
+                     EXIT CODES:\n  0 no-op  2 created  3 merged  4 preserved-other  \
+                     5 invalid-json  6 partial-schema  7 permission-denied"
+                );
+                std::process::exit(0);
+            }
+            other => {
+                anyhow::bail!("알 수 없는 flag: {other}");
+            }
+        }
+        i += 1;
+    }
+    if apply && dry_run_flag {
+        anyhow::bail!("--apply 와 --dry-run 은 같이 사용할 수 없어요");
+    }
+    Ok(SettingsMergeArgs {
+        dry_run: !apply, // default = dry-run
+        scope,
+        json,
+        silent,
+        command_path_override,
+    })
+}
+
+fn cmd_settings_merge(args: &[String]) -> anyhow::Result<i32> {
+    let parsed = match parse_settings_merge_args(args) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("axhub-helpers settings-merge: {e}");
+            return Ok(64);
+        }
+    };
+    let opts = MergeOptions {
+        silent: parsed.silent,
+        command_path_override: parsed.command_path_override,
+        scope: parsed.scope,
+        dry_run: parsed.dry_run,
+    };
+    let outcome = match run_settings_merge(opts) {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("axhub-helpers settings-merge: {e}");
+            return Ok(1);
+        }
+    };
+    if parsed.json {
+        println!("{}", serde_json::to_string(&outcome)?);
+    }
+    let exit_code = match &outcome {
+        MergeOutcome::NoOp => 0,
+        MergeOutcome::Created => 2,
+        MergeOutcome::Merged => 3,
+        MergeOutcome::PreservedOther => 4,
+        MergeOutcome::InvalidJson => 5,
+        MergeOutcome::PartialSchema => 6,
+        MergeOutcome::PermissionDenied => 7,
+    };
+    Ok(exit_code)
 }

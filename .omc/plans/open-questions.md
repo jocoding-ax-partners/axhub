@@ -2,6 +2,30 @@
 
 Append-only log of unresolved decisions across plans.
 
+## settings-merge-foundation-v0.5.13 - 2026-05-14 (iter 2)
+
+- [ ] FA-1: `fslock` crate Windows 동작 검증 — `LockFileEx` wrap 안정성 + `MoveFileEx` 와 호환 — Cargo dep 추가 전 docs/Context7 확인 필요. — 영향: foundation atomic-write 신뢰성.
+- [ ] FA-2: `${CLAUDE_PLUGIN_ROOT}` runtime expand 시점 — settings.json 안 unresolved 문자열로 저장이 표준 패턴인지 Claude Code docs 확인. — 영향: Branch 4 literal-match 비교 정확성.
+- [ ] FA-3: v0.5.11 paste-only 옵션 + 새 subcommand 옵션 우선순위 표기 — SKILL 의 default option 추천 UX 결정. — 영향: enable-statusline SKILL UX.
+
+## auto-statusline-wire-v0.6.0 - 2026-05-14 (iter 2 — Option B-revised 채택)
+
+- [ ] FB-1: `CLAUDE_PARENT_TTY` env 존재 — Claude Code 가 SessionStart hook subprocess 에 parent TTY 상태를 env 로 inherit 하는지 Context7 verify 필요. fallback: silent always. — 영향: TTY-aware silent mode 알고리즘.
+- [ ] FB-2: `_axhub_managed: true` extra field 안전성 — Claude Code 가 unknown top-level field reject 하는지 schema validation 동작 확인. v0.7.0 minor 검토 시 결정. — 영향: FU-4 도입 결정.
+- [ ] FB-3: dotbot/chezmoi `.gitignore` 패턴 detect — install.sh 가 `~/.gitignore` 또는 `~/.claude/.gitignore` 에서 `settings.json` 패턴 검색 시 false positive 가능성 — 단순 grep vs gitignore 문법 파싱 trade-off. — 영향: install-time disclosure 의 dotfile sync warning 정확성.
+- [ ] FB-4: Scope detection robust 방식 — `CLAUDE_PLUGIN_ROOT` 환경 변수가 user vs project scope 구분 식별자 인지 — env 만으로 가능한지, 추가 marker (`scope.json`) 필요한지. — 영향: marker isolation 정확성.
+- [ ] FB-5: Orphan stub Windows path — PowerShell `$env:CLAUDE_PLUGIN_ROOT` expand timing + PSReadline 환경에서 stub 실행 시 quoting 문제 — Phase 10 windows-ps1 patterns 재활용 가능성. — 영향: orphan stub Windows 신뢰성.
+
+## auto-statusline-wire-v0.6.0 - 2026-05-14 (iter 1 — superseded by iter 2)
+
+- [ ] Q1: AskUserQuestion vs slash command UX — deferred AskUserQuestion 의 trigger 가 다음 user prompt 일 때 사용자가 즉시 다른 task 진입하면 prompt overlap. slash command consent 가 깔끔 (현재 plan 선택). 1턴 friction 수용 가능한지 사용자 검증 필요. — 영향: SKILL UX flow 결정.
+- [ ] Q2: `_axhub_managed` 마커 위치 — settings.json `statusLine` 객체 내부 vs 별도 top-level `_axhub` key. 내부가 atomicity 우수하지만 Claude Code 가 unknown 필드 거부 가능성 검증 필요. — 영향: 7-branch detect 로직 + Claude Code 호환성.
+- [ ] Q3: advisory lock cross-platform 일관성 — Unix `flock` + Windows `LockFileEx` timeout semantics 차이. 통합 추상화 layer 설계 필요. — 영향: `settings_merge.rs` API 모양.
+- [ ] Q4: schema fingerprint codegen — build-time `claude --version` vs runtime 동적 비교. CI 머신별 차이 issue. runtime 동적 선호 (현재 plan). — 영향: codegen scope vs runtime branching.
+- [ ] Q5: Default-ON migration timeline — v0.6.0 default-OFF → v0.7.0/+ default-ON 전환 시점. telemetry FU-1 데이터 기반 trust threshold 정의 필요. — 영향: FU-1 telemetry 우선순위.
+- [ ] Q6: Background detach on Windows — `Start-Job` PowerShell 5.1 호환성 + `Start-Process -WindowStyle Hidden` 대안. — 영향: `session-start-autowire.ps1` 구현.
+- [ ] Q7: gstack collision UX 정밀화 — 사용자가 gstack statusLine 가지고 있을 때 "그대로 둘래요 / axhub 로 바꿀래요 / diff 보여줘요" 3-way AskUserQuestion 필요한지, 단순 systemMessage 안내로 충분한지. — 영향: SKILL body 분기 + AskUserQuestion 등록 추가.
+
 ## statusline-ps1-windows-native-v0.5.12 - 2026-05-14
 
 - [ ] Q1: PowerShell 버전 floor — Win10/11 stock 5.1 vs PowerShell 7+. session-start.ps1 가 5.1 호환 syntax 만 사용 중인지 재확인 필요 (특히 `ConvertFrom-Json -AsHashtable` 은 5.1 미지원). Windows CI runner matrix 가 `pwsh` (7+) 만 vs `powershell` (5.1) 까지 커버할지 미정. — 영향: PS1 작성 호환성, CI matrix 비용.

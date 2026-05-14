@@ -8,6 +8,7 @@ build = "build.rs"
 
 [dependencies]
 anyhow.workspace = true
+fslock = "0.2"
 base64.workspace = true
 chrono.workspace = true
 clap.workspace = true

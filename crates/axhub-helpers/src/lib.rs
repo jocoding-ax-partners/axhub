@@ -20,6 +20,7 @@ pub mod resolve;
 pub mod runtime_paths;
 pub mod session_bundle;
 pub mod spawn;
+pub mod settings_merge;
 pub mod statusline;
 pub mod telemetry;
 pub mod trace_helper;
