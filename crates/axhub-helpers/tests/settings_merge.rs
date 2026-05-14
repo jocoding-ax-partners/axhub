@@ -7,7 +7,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use axhub_helpers::settings_merge::{merge, MergeOptions, MergeOutcome, Scope};
+use axhub_helpers::settings_merge::{
+    command_for_platform_script, merge, MergeOptions, MergeOutcome, Scope,
+};
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
@@ -84,6 +86,32 @@ fn user_apply() -> MergeOptions {
 
 fn user_dry_run() -> MergeOptions {
     user_opts(true)
+}
+
+#[test]
+fn windows_script_paths_use_explicit_powershell_bypass_command() {
+    let command = command_for_platform_script("${CLAUDE_PLUGIN_ROOT}/bin/statusline.ps1", true);
+    assert_eq!(
+        command,
+        "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/bin/statusline.ps1\""
+    );
+
+    let orphan_stub = command_for_platform_script(
+        r"C:\Users\me\AppData\Local\axhub-plugin\orphan-stub-statusline.ps1",
+        true,
+    );
+    assert!(
+        orphan_stub.starts_with("powershell.exe -NoProfile -ExecutionPolicy Bypass -File "),
+        "Windows orphan stub command must not be a bare .ps1 path"
+    );
+}
+
+#[test]
+fn unix_script_paths_stay_literal_for_shell_execution() {
+    assert_eq!(
+        command_for_platform_script("${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh", false),
+        "${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh"
+    );
 }
 
 // ---------------------------------------------------------------------------
