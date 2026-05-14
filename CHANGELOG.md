@@ -4,6 +4,33 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.6.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.13...v0.6.1) (2026-05-14)
+
+v0.6.1 은 #100-#103 스택을 main 에 머지한 뒤 리뷰에서 찾은 Windows statusLine command wrapper, autowire hook dispatcher, orphan-stub stdout 계약 수정을 함께 고정하는 안정화 패치예요. v0.6.0 narrative 의 trust UX 범위는 유지하고, 실제 공개 태그는 post-merge CI green 지점으로 맞춰요.
+
+검증 baseline (v0.6.1):
+- main post-merge CI 4 workflows green: claude-cli-e2e / Rust staging gates / Rust CI / Perf Gate.
+- `bun run release -- --release-as patch --skip.tag` postbump `release:check` green.
+- 최종 ultragoal review gate: ai-slop-cleaner passed, code-review APPROVE, architect CLEAR.
+
+정직한 tradeoff:
+- v0.6.1 은 v0.6.0 스택의 공개 태그를 대체하는 post-merge patch release 예요. v0.6.0 section 은 설계 narrative 로 남기고, 사용자는 v0.6.1 태그를 설치 기준으로 보면 돼요.
+
+### Added
+
+* auto-statusline-wire v0.6.0 — Option B-revised-v2 dual-channel ([c349f56](https://github.com/jocoding-ax-partners/axhub/commit/c349f56c225c5b898448d5202b3514ab337f683f))
+
+
+### Fixed
+
+* **ci+race:** cargo fmt v0.6.0 modules + TOCTOU-safe disclosure marker ([437c3c4](https://github.com/jocoding-ax-partners/axhub/commit/437c3c4d00a0d605414c1aa7d2ecba9b8266ada4)), closes [#103](https://github.com/jocoding-ax-partners/axhub/issues/103)
+* **ci:** cargo fmt drift in settings_merge.rs + tests/settings_merge.rs ([729907f](https://github.com/jocoding-ax-partners/axhub/commit/729907f347d347c1f5cbf36d7e951f804aef2eaf)), closes [#102](https://github.com/jocoding-ax-partners/axhub/issues/102)
+* **ci:** suppress install-time disclosure when AXHUB_SKIP_AUTODOWNLOAD=1 ([9224139](https://github.com/jocoding-ax-partners/axhub/commit/9224139782356c1c3bf4db9021e4e68e828e20e1)), closes [#103](https://github.com/jocoding-ax-partners/axhub/issues/103)
+* **ci:** TS2769 + TS6133 in autowire test files ([bab1219](https://github.com/jocoding-ax-partners/axhub/commit/bab12194a3f9896003d8e684e1c620ed9a72c5e8)), closes [#103](https://github.com/jocoding-ax-partners/axhub/issues/103)
+* **ci:** TS2769 result.status null-check in settings-merge-integration test ([471392a](https://github.com/jocoding-ax-partners/axhub/commit/471392a600b5ec201ed4b025548780f11c2d3146)), closes [#102](https://github.com/jocoding-ax-partners/axhub/issues/102)
+* let autowire dispatcher reach the merge ([77804b6](https://github.com/jocoding-ax-partners/axhub/commit/77804b6cbcd886a21334d47207ccc535f85a4895))
+* preserve Windows statusline execution policy ([62e229e](https://github.com/jocoding-ax-partners/axhub/commit/62e229ef260f101601abf529aeff9f93da3edc66))
+
 ## [0.6.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.13...v0.6.0) (2026-05-14)
 
 v0.5.13 settings_merge foundation 을 SessionStart hook 에서 silent 자동 호출하는 trust event minor release 예요. v0.5.11/v0.5.12 의 manual paste UX 가 v0.6.0 부터 `/plugin install axhub@axhub` 후 첫 SessionStart 시 자동으로 동작해요 — Anthropic plugin manifest schema 가 `statusLine` 필드를 미지원하는 제약을 **dual-channel disclosure** (install.sh OR SessionStart 첫 fire, marker-gated idempotent) + **orphan stub** (uninstall graceful) 로 해결했어요. ralplan DELIBERATE iter 3 consensus (Planner / Architect / Critic 모두 APPROVE, scope split v0.5.13 foundation + v0.6.0 trust UX) 결과 — Option B-revised-v2 채택 (iter 1 Option A → iter 2 Option B-revised → iter 2 Architect Q2 marketplace install gap fix → iter 3 dual-channel v2).
