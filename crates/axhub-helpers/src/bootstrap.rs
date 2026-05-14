@@ -1310,4 +1310,30 @@ mod tests {
         assert_eq!(serialized["blocks"][0], "deploy");
         assert_eq!(serialized["trigger_phrase"], "깃허브 연결");
     }
+
+    #[test]
+    fn next_step_omits_empty_blocks_and_none_trigger_phrase() {
+        // PR95 review finding: verify skip_serializing_if behavior on empty blocks[]
+        // and None trigger_phrase. Init SKILL Step 6 render contract assumes both
+        // optional fields disappear when empty so the rendered example block stays clean.
+        let leaf_step = NextStep {
+            id: "deploy".into(),
+            label: "배포".into(),
+            required_for_deploy: true,
+            blocks: vec![],
+            trigger_phrase: None,
+        };
+        let serialized = serde_json::to_value(&leaf_step).unwrap();
+        let obj = serialized.as_object().unwrap();
+        assert!(
+            !obj.contains_key("blocks"),
+            "empty blocks[] must be omitted via skip_serializing_if (Vec::is_empty)"
+        );
+        assert!(
+            !obj.contains_key("trigger_phrase"),
+            "None trigger_phrase must be omitted via skip_serializing_if (Option::is_none)"
+        );
+        assert_eq!(serialized["id"], "deploy");
+        assert_eq!(serialized["required_for_deploy"], true);
+    }
 }
