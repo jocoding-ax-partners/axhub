@@ -8,11 +8,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 ### Fixed
 
-* deploy SKILL 첫 사용자 권한 prompt 한국어화 (ADR-0011)
+* 9 SKILL preflight `!command` 권한 prompt UX 한국어화 (deploy SKILL silent no-op 동시 해결, ADR-0011)
 
 ### Added
 
-* 9 SKILL + 1 template preflight injection 권한 fallback (lite/deploy variant codegen + ADR-0011)
+* preflight injection codegen single source (`scripts/codegen-preflight-injection.ts`) — lite variant (8 SKILL + 1 template) + deploy variant (cross-platform root resolution 보존), variant-aware byte-identical manifest invariant (ADR-0011)
+* SKILL preprocessing `!command` fail-open contract (`docs/HOOKS.md §3.6`) — Rust hook 진입점과 분리된 layer 명문화
 
 
 ## [0.5.9](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.8...v0.5.9) (2026-05-14)
