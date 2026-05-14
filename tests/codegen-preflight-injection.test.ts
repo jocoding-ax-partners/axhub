@@ -40,7 +40,18 @@ describe("getPreflightInjectionLine — deterministic + structure", () => {
   });
 
   test("contains stderr passthrough branch (ADR-0010 §42 — raw stderr 가 chat 으로 흘러요)", () => {
-    expect(getPreflightInjectionLine()).toContain("process.stderr.write(stderrText)");
+    // PR #99 security M2: passthrough now goes through secret-token redaction layer
+    // (sk-/gho_/axhub_/Bearer) before writing to parent stderr.
+    expect(getPreflightInjectionLine()).toContain("process.stderr.write(stderrText.replace(redactRe,'<redacted>'))");
+  });
+
+  test("contains secret token redaction regex (PR #99 security M2)", () => {
+    const line = getPreflightInjectionLine();
+    expect(line).toContain("sk-[A-Za-z0-9_-]{20,}");
+    expect(line).toContain("gho_[A-Za-z0-9]{36}");
+    expect(line).toContain("axhub_[A-Za-z0-9]{32,}");
+    expect(line).toContain("Bearer");
+    expect(line).toContain("<redacted>");
   });
 
   test("contains exit code propagation", () => {

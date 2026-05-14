@@ -48,8 +48,12 @@ export function getLiteInjectionLine(): string {
     "const result=cp.spawnSync(helper,['preflight','--json'],{stdio:['inherit','inherit','pipe'],env});",
     "const stderrText=String(result.stderr??'');",
     "const denialRegex=/^(?:Shell|Bash) command permission check failed.*requires approval/im;",
+    // PR #99 security M2: redact common secret token patterns from stderr passthrough.
+    // Prevents accidental leak when helper emits RUST_LOG=debug, dependency panic, or
+    // transport debug output containing API keys / OAuth tokens to the Claude Code chat surface.
+    "const redactRe=/(sk-[A-Za-z0-9_-]{20,}|gho_[A-Za-z0-9]{36}|axhub_[A-Za-z0-9]{32,}|Bearer\\\\s+[A-Za-z0-9._~+\\\\/-]+=*)/g;",
     `if(result.error||(result.status!==0&&denialRegex.test(stderrText))){console.log(JSON.stringify({systemMessage:\\"${SYSTEM_MESSAGE}\\"}));process.exit(0)}`,
-    "else if(stderrText.length>0){process.stderr.write(stderrText)}",
+    "else if(stderrText.length>0){process.stderr.write(stderrText.replace(redactRe,'<redacted>'))}",
     "process.exit(typeof result.status==='number'?result.status:0)",
   ].join("");
   return "!`node -e \"" + script + "\"`";
@@ -82,8 +86,10 @@ export function getDeployInjectionLine(): string {
     "const result=cp.spawnSync(helper,['preflight','--json'],{stdio:['inherit','inherit','pipe'],env});",
     "const stderrText=String(result.stderr??'');",
     "const denialRegex=/^(?:Shell|Bash) command permission check failed.*requires approval/im;",
+    // PR #99 security M2: same redaction as lite variant — secret token leak prevention.
+    "const redactRe=/(sk-[A-Za-z0-9_-]{20,}|gho_[A-Za-z0-9]{36}|axhub_[A-Za-z0-9]{32,}|Bearer\\\\s+[A-Za-z0-9._~+\\\\/-]+=*)/g;",
     `if(result.error||(result.status!==0&&denialRegex.test(stderrText))){console.log(JSON.stringify({systemMessage:\\"${SYSTEM_MESSAGE}\\"}));process.exit(0)}`,
-    "else if(stderrText.length>0){process.stderr.write(stderrText)}",
+    "else if(stderrText.length>0){process.stderr.write(stderrText.replace(redactRe,'<redacted>'))}",
     "process.exit(typeof result.status==='number'?result.status:0)",
   ].join("");
   return "!`node -e \"" + script + "\"`";
@@ -151,6 +157,31 @@ export function applyToFile(target: PreflightTarget): ApplyResult {
 
   const rawMatch = content.match(OLD_RAW_RE);
   const nodeMatch = content.match(OLD_NODE_RUNNER_RE);
+
+  // PR #99 review correctness M2: refuse partial-migration state where both raw shell
+  // substitution AND Node runner pattern exist in the same file. Either an
+  // in-progress migration was interrupted or a second `!command` block was added.
+  // Silent first-match replace would corrupt the byte-identical lock invariant.
+  if (rawMatch && nodeMatch) {
+    throw new Error(
+      `${target.file}: both raw and Node-runner injection patterns matched — partial migration / drift state. Manually resolve and re-run codegen.`
+    );
+  }
+
+  // PR #99 review correctness M1: also refuse multi-match within a single pattern.
+  // Greedy `.*` line-anchored regex matches one block per file by design; >1 means
+  // the SKILL stacks multiple `!command` injections (e.g., for two preflight subcommands)
+  // and codegen single-source semantics cannot pick which one to replace.
+  const activeRe = rawMatch ? OLD_RAW_RE : nodeMatch ? OLD_NODE_RUNNER_RE : null;
+  if (activeRe) {
+    const allMatches = [...content.matchAll(new RegExp(activeRe.source, "gm"))];
+    if (allMatches.length > 1) {
+      throw new Error(
+        `${target.file}: ${allMatches.length} preflight \`!command\` blocks found — codegen single-source cannot disambiguate; refactor SKILL to single block.`
+      );
+    }
+  }
+
   const oldLine = rawMatch?.[0] ?? nodeMatch?.[0] ?? null;
   if (oldLine === null) {
     throw new Error(

@@ -139,6 +139,27 @@ describe("Case E — unrecognized stderr passthrough (ADR-0010 §42 정합)", ()
   });
 });
 
+describe("Case G — secret token redaction in stderr passthrough (PR #99 security M2)", () => {
+  test("sk- / gho_ / axhub_ / Bearer tokens redacted before parent forward", () => {
+    const tokenStderr =
+      "Authorization: Bearer abc123XYZ_token.example=\n" +
+      "OpenAI key sk-proj1234567890abcdefghij found in env\n" +
+      "GitHub gho_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa exposed\n" +
+      "axhub_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa internal token\n";
+    makeHelper(`#!/bin/sh\ncat >&2 << 'STDERR_EOF'\n${tokenStderr}STDERR_EOF\nexit 1\n`);
+    const out = runNode(buildScript());
+    expect(out.status).toBe(1);
+    // Verify passthrough still happened (not silenced) — non-empty stderr
+    expect(out.stderr.length).toBeGreaterThan(0);
+    // Token patterns must be redacted
+    expect(out.stderr).not.toContain("sk-proj1234567890abcdefghij");
+    expect(out.stderr).not.toContain("gho_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(out.stderr).not.toContain("axhub_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(out.stderr).toContain("<redacted>");
+    expect(out.stdout).not.toContain("systemMessage");
+  });
+});
+
 describe("Case F — binary not found (ENOENT) — PR #99 review M2", () => {
   // result.error truthy 분기 — helper binary 자체가 없을 때 spawnSync 가 ENOENT.
   // 현재 codegen 의 분기 1 (result.error || denialRegex.test(stderrText)) 가

@@ -131,6 +131,12 @@ A+B 혼합 (defense-in-depth) — A happy path TTFD=0, B fallback graceful degra
   "권한 prompt" 가 아니라 "binary 부재" 라 "허용 클릭" 안내가 inaccurate — 첫 클릭 해도 다음에도
   같은 메시지를 봐요. 본 PR scope 에서는 의도된 trade-off (Case F 회귀 test 로 lock).
   Phase 27.y RFC 또는 별도 systemMessage 분기는 follow-up.
+- **PR #99 security M2 trade-off**: stderr passthrough sink 가 chat surface (Claude Code
+  대화 / telemetry / 사용자 screenshot / 공유 transcript) 라 ADR-0010 (axhub binary stderr)
+  대비 secret leak risk 큼. helper 가 token / credential 을 stderr 에 emit 하지 않는 invariant
+  깨질 시 production 노출 가능. mitigations: (1) codegen `redactRe` 가 `sk-` / `gho_` /
+  `axhub_` / `Bearer` 4 패턴 redact (Case G 회귀 test 로 lock), (2) helper 의 stderr 출력
+  policy 는 `crates/axhub-helpers/src/lib.rs` 의 logging surface 검토 follow-up.
 
 ## Follow-ups
 
