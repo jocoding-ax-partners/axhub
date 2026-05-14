@@ -4,6 +4,54 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.6.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.13...v0.6.0) (2026-05-14)
+
+v0.5.13 settings_merge foundation 을 SessionStart hook 에서 silent 자동 호출하는 trust event minor release 예요. v0.5.11/v0.5.12 의 manual paste UX 가 v0.6.0 부터 `/plugin install axhub@axhub` 후 첫 SessionStart 시 자동으로 동작해요 — Anthropic plugin manifest schema 가 `statusLine` 필드를 미지원하는 제약을 **dual-channel disclosure** (install.sh OR SessionStart 첫 fire, marker-gated idempotent) + **orphan stub** (uninstall graceful) 로 해결했어요. ralplan DELIBERATE iter 3 consensus (Planner / Architect / Critic 모두 APPROVE, scope split v0.5.13 foundation + v0.6.0 trust UX) 결과 — Option B-revised-v2 채택 (iter 1 Option A → iter 2 Option B-revised → iter 2 Architect Q2 marketplace install gap fix → iter 3 dual-channel v2).
+
+핵심 변경:
+- **`crates/axhub-helpers/src/autowire.rs` 신규** (~456 lines). `autowire_statusline(scope, silent, stub_path)` foundation v0.5.13 `settings_merge::merge` 호출. scope detect (CLAUDE_PLUGIN_ROOT prefix vs HOME/.claude/plugins/ → user / vs $repo/.claude/plugins/ → project / else fail-closed) + marker mtime 60s subprocess race guard + dispatcher-only marker write (S5 stale-mtime cascade 방지).
+- **`crates/axhub-helpers/src/orphan_stub.rs` 신규** (~320 lines). `install_orphan_stub()` 가 `~/.local/state/axhub-plugin/orphan-stub-statusline.{sh,ps1}` atomic write (mode 0755). stub 자체는 plugin live check → 부재 시 empty output exit 0 (no error, no statusline). settings.json 의 `statusLine.command` 가 plugin root 가 아니라 user-global state stub path 가리킴 — `/plugin uninstall axhub` 후에도 broken reference 없이 graceful.
+- **`crates/axhub-helpers/src/observability.rs` 신규** (~281 lines). `events.jsonl` schema (ts/event/action/branch/scope/before_hash/after_hash/other_command_hash) + per-install random 32-byte salt (`observability-salt`, mode 0600, atomic init, **절대 log 안 함**) + HMAC-SHA256(salt, command_string) 으로 dictionary attack 방지 — plain SHA256 으로 알려진 plugin path reverse 가능했던 risk close.
+- **`hooks/session-start-autowire.sh` + `.ps1` 신규**. POSIX dispatcher + Windows mirror. Step 0 disclosure marker check (부재 시 systemMessage 출력 + marker write + exit 0, 이번 session merge 안 함) → Step 1-2 kill switch 매트릭스 (AXHUB_DISABLE_HOOKS / AXHUB_DISABLE_HOOK csv / legacy DISABLE_AXHUB / 신규 AXHUB_DISABLE_STATUSLINE_AUTOWIRE) → Step 3 scope detect → Step 4 marker mtime check → Step 4.5 orphan-stub install+verify → Step 5 nohup background detach (autowire-statusline --silent). Fail-open exit 0 contract.
+- **`hooks/hooks.json`**. session-start-autowire 가 기존 session-start.sh 와 같은 SessionStart group 내 sibling hook 으로 등록 (SessionStart array length 1 유지, manifest invariant 보존).
+- **`crates/axhub-helpers/src/hook_safety.rs`**. `AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1` 신규 env opt-out (canonical `AXHUB_DISABLE_*` polarity, §10.6 ADR 준수).
+- **`bin/install.sh` + `bin/install.ps1`**. install-time disclosure block (marker-gated idempotent). 6 trust events 명시 + opt-out env 안내. Korean 해요체.
+- **`README.md`**. "Trust & Uninstall" 신규 섹션 (line 90-118). 6 trust events 투명 disclosure + opt-out + orphan stub uninstall graceful + dotfile sync (chezmoi/Dotbot) 사용자 주의.
+- **`skills/enable-statusline/SKILL.md`**. NEVER rule supersede — autowire path 가 install-time OR SessionStart 첫 fire disclosure 동의로 간주. manual `axhub-helpers settings-merge --apply` 는 별도 explicit consent path.
+- **`docs/HOOKS.md`** + **`docs/adr/0012-statusline-autowire.md` 신규**. session-start-autowire row 등록 + 정식 ADR 문서화.
+
+신규 / 확장 테스트:
+- `tests/ux-autowire-hooks.test.ts` (new, 12 bun) — hook 존재 + UTF-8 BOM + hooks.json registration + kill switch env 매트릭스 body 검증 + 해요체 톤.
+- `tests/ux-autowire-cli.test.ts` (new, 10 bun) — autowire-statusline / orphan-stub CLI contract + --help 한국어 톤 + 미인수/invalid scope 에러 + `--install` + `--verify` 멱등.
+- `tests/ux-autowire-e2e.test.ts` (new, 6 bun) — 6 pre-mortem scenarios (S1 invalid JSON / S2 inter-plugin / S3 schema drift / S4 dotbot sync / S5 subprocess race / S6 2-scope).
+- `tests/ux-autowire-observability.test.ts` (new, 4 bun) — events.jsonl schema + per-install salt one-time + HMAC determinism + privacy redaction. 1 case skip (HMAC cross-install uniqueness — autowire path consistent emit 보장은 v0.6.1 polish FU-1).
+- `tests/manifest.test.ts` — session-start-autowire.sh shim path skip + hooks.json structure 확장 인식.
+
+검증 baseline (v0.6.0):
+- `bun test` 전체 → 851 pass / 6 skip / 0 fail (v0.5.13 baseline 819 → +32 신규).
+- `cargo build -p axhub-helpers` clean.
+- `cargo clippy -p axhub-helpers --tests -- -D warnings` no issues.
+- `./bin/axhub-helpers autowire-statusline --help` + `orphan-stub --help` 정상 출력 (Korean 해요체).
+- Trust boundary documented — 6 events disclosed at install + SessionStart (dual-channel) + opt-out env + orphan stub uninstall path + HMAC redaction.
+
+정직한 tradeoff:
+- 첫 SessionStart 가 marker 부재 시 disclosure systemMessage 출력 후 merge skip — 사용자가 1 session "왜 statusline 안 보이지?" 경험 가능. 다음 session 부터 silent merge. trade-off: trust transparency > 첫 session UX.
+- dotfile sync (chezmoi / Dotbot / git) 사용자는 `AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1` 권장 — working tree dirty propagate 위험.
+- 1 observability test skip (O3 HMAC cross-install uniqueness) — Rust autowire path 의 preserve event 일관 emit 보장은 v0.6.1 polish (FU-1).
+- PS 5.1 syntax lint 자동화 부재 (FU-2 v0.6.1).
+- Anthropic plugin uninstall lifecycle hook 부재 → orphan stub 으로 mitigate 했지만 `~/.local/state/axhub-plugin/orphan-stub-statusline.{sh,ps1}` 자체는 user-global state directory 에 영구 남음. `axhub-helpers self-cleanup` SKILL (FU-3) 로 manual cleanup 가능.
+
+Follow-ups (v0.6.1+):
+- FU-1: autowire path observability event 일관 emit 보장 (O3 / O2 nullable-tolerant 정리).
+- FU-2: PS 5.1 syntax lint 자동화 gate.
+- FU-3: `axhub-helpers self-cleanup` SKILL — post-uninstall manual orphan stub cleanup.
+- FU-4: `AXHUB_ENABLE_STATUSLINE_AUTOWIRE_AUTOCLEAN` env for dotfile sync users.
+- FU-5: `_axhub_managed` extra-field placement (v0.7.0 Context7 verify 후).
+
+### Added
+
+* auto-statusline-wire v0.6.0 — Option B-revised-v2 dual-channel ([ee662c2](https://github.com/jocoding-ax-partners/axhub/commit/ee662c2bc36a0d618f66a17b420ab52e2d2c45c4))
+
 ## [0.5.13](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.12...v0.5.13) (2026-05-14)
 
 v0.6.0 SessionStart autowire 가 reuse 할 settings.json merge core 를 SemVer-locked pub API 로 ship 하는 foundation patch 예요. trust event 0 — manual `axhub-helpers settings-merge --apply` 호출 시만 mutation. ralplan iter 3 consensus (Planner / Architect / Critic 모두 APPROVE, scope split Plan A) 로 진행. `MergeOptions { silent, command_path_override, scope, dry_run }` + `Scope { User, Project, Auto }` + `MergeOutcome` 8 variants 가 v0.5.13 시점에 lock — v0.6.0 reuse 시 추가 field 없음 (SemVer 보장).

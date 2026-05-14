@@ -2,7 +2,7 @@
 
 > 바이브코더가 자연어로 axhub 앱을 안전하게 배포하고 관리하는 Claude Code 플러그인.
 
-**상태**: v0.5.13 (ship). 22 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
+**상태**: v0.6.0 (ship). 22 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
 
 ---
 
@@ -86,6 +86,36 @@ snippet 본체:
   }
 }
 ```
+
+## Trust & Uninstall
+
+axhub 가 설치 중 수행하는 신뢰 이벤트를 투명하게 공개해요:
+
+1. **인증 토큰 저장** — keychain (macOS/Windows) / file (Linux) 에 보관해요.
+2. **opt-in telemetry** — `AXHUB_TELEMETRY=0` 로 비활성화할 수 있어요.
+3. **Gatekeeper quarantine 제거** — macOS 에서 helper binary 의 quarantine attribute 를 제거해요.
+4. **auth-refresh 백그라운드 task** — 토큰을 자동 갱신해요.
+5. **helper binary 자동 다운로드** — GitHub release 에서 HTTPS 로 받아요.
+6. **`~/.claude/settings.json` statusLine 관리** — 다른 plugin 의 설정은 그대로 보존해요.
+
+### statusLine 자동 관리 거부
+
+`AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1` 을 설정한 뒤 install 하면 (6) 을 비활성화해요:
+
+```bash
+export AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1   # PowerShell: $env:AXHUB_DISABLE_STATUSLINE_AUTOWIRE='1'
+/plugin install axhub@axhub
+```
+
+이미 설치된 경우에는 환경변수만 설정하면 다음 Claude Code 세션부터 statusLine 자동 관리를 건너뛰어요.
+
+### Uninstall 후 안전성
+
+Anthropic 에 별도 plugin uninstall hook 이 없어서 플러그인 삭제 후에도 `~/.claude/settings.json` 의 `statusLine.command` 경로가 남아 있어요. axhub 는 orphan stub (`~/.local/state/axhub-plugin/orphan-stub-statusline.{sh,ps1}`) 를 미리 설치해서 plugin 삭제 후에도 빈 output (no error) 으로 graceful 하게 처리해요. stub 은 plugin root 가 살아 있으면 위임하고, 없으면 조용히 exit 0 해요.
+
+### dotfile sync 사용자 주의
+
+chezmoi / Dotbot / git 으로 `~/.claude/settings.json` 을 tracking 하는 경우 axhub 가 자동으로 파일을 수정해서 working tree 가 dirty 해질 수 있어요. 다른 기기로 변경 내용이 propagate 되길 원하지 않는다면 `AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1` 설정을 권장해요.
 
 ## 빠른 시작
 

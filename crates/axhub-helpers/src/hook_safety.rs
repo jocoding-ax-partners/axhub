@@ -29,6 +29,8 @@ pub const ENV_DISABLE_ALL: &str = "AXHUB_DISABLE_HOOKS";
 pub const ENV_DISABLE_LIST: &str = "AXHUB_DISABLE_HOOK";
 /// Legacy alias retained for the 6-month deprecation window (overview §10.6).
 pub const LEGACY_DISABLE_ALL: &str = "DISABLE_AXHUB";
+/// ADR-0012 — per-feature opt-out for statusLine autowire (no legacy alias).
+pub const ENV_DISABLE_STATUSLINE_AUTOWIRE: &str = "AXHUB_DISABLE_STATUSLINE_AUTOWIRE";
 
 static LEGACY_WARNING_EMITTED: AtomicBool = AtomicBool::new(false);
 
@@ -53,6 +55,12 @@ pub fn is_hook_disabled(hook_name: &str) -> bool {
         return true;
     }
     false
+}
+
+/// Returns true when `AXHUB_DISABLE_STATUSLINE_AUTOWIRE` is set to a truthy
+/// value (1/true/yes/on). No legacy alias per ADR-0012 §10.6 polarity rules.
+pub fn is_statusline_autowire_disabled() -> bool {
+    env_truthy(ENV_DISABLE_STATUSLINE_AUTOWIRE)
 }
 
 /// Append a structured failure line for post-mortem inspection. Best-effort —
@@ -112,10 +120,15 @@ canonical 한 `{canonical}` 또는 `{per_hook}=<csv>` 로 옮겨주세요.",
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
 
-    // Tests in this module mutate process env, so serialize them.
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
+    // Tests in this module mutate process env, so serialize them with all other
+    // env-mutating tests via the process-wide lock.
+    use crate::PROCESS_ENV_LOCK;
+    macro_rules! env_lock {
+        () => {
+            PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner())
+        };
+    }
 
     fn reset_legacy_flag() {
         LEGACY_WARNING_EMITTED.store(false, Ordering::SeqCst);
@@ -129,7 +142,7 @@ mod tests {
 
     #[test]
     fn default_state_does_not_disable() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = env_lock!();
         clear_envs();
         reset_legacy_flag();
         assert!(!is_hook_disabled("session-start"));
@@ -137,7 +150,7 @@ mod tests {
 
     #[test]
     fn global_env_disables_every_hook() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = env_lock!();
         clear_envs();
         reset_legacy_flag();
         std::env::set_var(ENV_DISABLE_ALL, "1");
@@ -148,7 +161,7 @@ mod tests {
 
     #[test]
     fn per_hook_env_disables_only_listed() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = env_lock!();
         clear_envs();
         reset_legacy_flag();
         std::env::set_var(ENV_DISABLE_LIST, "session-start , preauth-check");
@@ -160,7 +173,7 @@ mod tests {
 
     #[test]
     fn legacy_alias_disables_with_warning() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = env_lock!();
         clear_envs();
         reset_legacy_flag();
         std::env::set_var(LEGACY_DISABLE_ALL, "1");
@@ -170,7 +183,7 @@ mod tests {
 
     #[test]
     fn truthy_variants_recognized() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = env_lock!();
         clear_envs();
         reset_legacy_flag();
         for value in ["1", "true", "yes", "on"] {
@@ -182,7 +195,7 @@ mod tests {
 
     #[test]
     fn falsy_or_unset_does_not_disable() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = env_lock!();
         clear_envs();
         reset_legacy_flag();
         for value in ["0", "false", "no", ""] {

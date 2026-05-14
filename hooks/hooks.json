@@ -8,6 +8,11 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-start-autowire.sh",
+            "timeout": 10
           }
         ]
       }

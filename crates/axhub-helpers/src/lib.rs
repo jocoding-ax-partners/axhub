@@ -1,4 +1,15 @@
 pub mod atomic_jsonl;
+pub mod autowire;
+pub mod observability;
+pub mod orphan_stub;
+
+/// Process-wide mutex for tests that mutate process environment variables.
+///
+/// Tests in different modules share the same process env, so a single lock
+/// prevents cross-module env-var races. Unit tests that call `std::env::set_var`
+/// / `remove_var` MUST hold this lock for the duration of the mutation.
+#[cfg(test)]
+pub static PROCESS_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 pub mod audit;
 pub mod bootstrap;
 pub mod catalog;

@@ -280,8 +280,9 @@ describe("hooks.json structure", () => {
         for (const h of g.hooks) {
           const refsBinary = h.command.includes("axhub-helpers");
           const refsShim = h.command.includes("hooks/session-start.sh");
+          const refsAutowireShim = h.command.includes("hooks/session-start-autowire.sh");
           const refsTsHook = /hooks\/[a-z0-9_-]+\.ts\b/.test(h.command);
-          expect(refsBinary || refsShim || refsTsHook).toBe(true);
+          expect(refsBinary || refsShim || refsAutowireShim || refsTsHook).toBe(true);
         }
       }
     }
@@ -932,8 +933,9 @@ describe("cross-manifest consistency", () => {
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {
         for (const h of g.hooks) {
-          // Skip shim paths: universal hooks.json only registers the bash SessionStart shim.
+          // Skip shim paths: universal hooks.json registers bash SessionStart shims (v0.5.x base + v0.6.0 autowire).
           if (h.command.includes("hooks/session-start.sh")) continue;
+          if (h.command.includes("hooks/session-start-autowire.sh")) continue;
           // Phase 25 PR 25.3 — bun-launched TS hooks live under hooks/*.ts and
           // are not axhub-helpers subcommands, so they're outside this check.
           if (/hooks\/[a-z0-9_-]+\.ts\b/.test(h.command)) continue;
