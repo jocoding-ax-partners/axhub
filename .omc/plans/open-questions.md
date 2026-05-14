@@ -2,6 +2,15 @@
 
 Append-only log of unresolved decisions across plans.
 
+## statusline-ps1-windows-native-v0.5.12 - 2026-05-14
+
+- [ ] Q1: PowerShell 버전 floor — Win10/11 stock 5.1 vs PowerShell 7+. session-start.ps1 가 5.1 호환 syntax 만 사용 중인지 재확인 필요 (특히 `ConvertFrom-Json -AsHashtable` 은 5.1 미지원). Windows CI runner matrix 가 `pwsh` (7+) 만 vs `powershell` (5.1) 까지 커버할지 미정. — 영향: PS1 작성 호환성, CI matrix 비용.
+- [ ] Q2: Windows CI runner 가 현재 axhub `.github/workflows/ci.yml` 에 포함되어 있는지 — release.yml 의 windows-amd64 build 매트릭스와는 별개의 test runner. 없으면 Phase 2 에서 ci.yml 매트릭스 PR 선행 필요. — 영향: PR scope expansion 여부.
+- [ ] Q3: Claude Code statusLine 명령 문자열의 forward slash 정규화 — `${CLAUDE_PLUGIN_ROOT}/bin/statusline.ps1` 가 PowerShell 에서 backslash 로 자동 변환되는지 (대부분 yes) 검증 필요. — 영향: 검증 방법 = Windows CI 통합 테스트.
+- [ ] Q4: statusLine 호출 사이클 (Claude Code 가 매 turn 호출인지 주기적 호출인지) — 캐시 IO 부담 평가용. sh 구현도 동일 부담이라 별도 작업은 불필요하지만 트래킹. — 영향: 없음 (트래킹만).
+- [ ] Q5: EDR 차단 가능성 — V3 / AhnLab / CrowdStrike 등이 PS1 statusLine 을 차단한 사례 텔레메트리 확인. mitigation 은 v0.6.0 Authenticode 서명 작업에서 처리. — 영향: v0.5.12 범위 밖.
+- [ ] Q6: ExecutionPolicy 차단 필드 리포트 모니터링 — v0.5.13 핫픽스 트리거. SKILL snippet 을 Option C (`powershell -ExecutionPolicy Bypass -File`) 으로 promotion. — 영향: FU-1 트리거 조건.
+
 ## enable-statusline-v0.5.11 - 2026-05-14
 
 - [ ] Q1: 4-way 클립보드 helper graceful degradation — macOS `pbcopy` / Windows `clip.exe` / WSL `clip.exe` / Linux `xclip` 부재 시 print-to-stdout fallback 만으로 충분한지, 아니면 Wayland `wl-copy` 도 지원할지? — 영향: SKILL body 분기 수, D1 TTY guard 와의 상호작용.

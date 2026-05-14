@@ -2,7 +2,7 @@
 
 This directory holds the compiled `axhub-helpers` binary (single multi-command Rust executable). Primary source lives in `../crates/axhub-helpers`.
 
-Claude Code plugin docs state that plugin `bin/` executables are added to the **Bash tool** `PATH` while the plugin is enabled, so POSIX/Bash-path skills and hooks may invoke the helper as `axhub-helpers <subcommand>`. Native Windows hook/statusLine resolution is not treated as proven by that Bash-tool guarantee; Windows-native docs should use explicit `.exe` or PowerShell paths until smoke evidence says otherwise.
+Claude Code plugin docs state that plugin `bin/` executables are added to the **Bash tool** `PATH` while the plugin is enabled, so POSIX/Bash-path skills and hooks may invoke the helper as `axhub-helpers <subcommand>`. Windows native `.ps1` mirrors ship for install, session-start, and statusline (v0.5.12+). Use the explicit `powershell.exe -NoProfile -ExecutionPolicy Bypass -File` invocation form — as done in `.github/workflows/windows-smoke.yml` — since bare `.ps1` paths are blocked under stock Win10/11 `ExecutionPolicy=Restricted` and are absent from `cmd` `PATHEXT`.
 
 ## Build
 
