@@ -49,10 +49,28 @@ codegen 이 lite variant (8 SKILL + 1 template) + deploy variant (deploy:101 만
    - **인식 ✗** → B 단독 채택, follow-up Issue 로 Phase 27.y RFC 일정 명시.
    (probe 결과: `tests/fixtures/permission-manifest-probe/plugin.json`)
 
+5. **Shell layer 가정 (PR #99 review M3 보강)**: Claude Code 가 SKILL `!` ` ` ` 블록을
+   POSIX sh 호환 layer 로 invoke 해요 (Windows 에서도 Git Bash / WSL 의 sh 호환). 이 가정 위에서
+   codegen 출력의 `node -e "..."` 가 `${CLAUDE_PLUGIN_ROOT}` 를 shell 단에서 확장 + `\"` 페어를
+   `"` 로 unescape 한 뒤 `node -e` 에 전달돼요. native `cmd.exe` (escape 룰 `""`) 또는
+   PowerShell raw invocation 환경은 본 fix scope 외 — Claude Code 가 그 환경에서 SKILL `!command` 를
+   호출하기 시작하면 codegen 출력 escape 룰 재검토가 필요해요. cross-platform 테스트는
+   `tests/skill-preflight-permission-fallback.test.ts` 의 buildScript() 가 shell unescape (`\\"` →
+   `"`) 를 명시적 시뮬레이션하는 형태로 mock 해요. 실제 production trace 는 Phase 28.x follow-up
+   으로 명시.
+
+6. **denialRegex wording fuzz 의 (Shell|Bash) 매칭 (PR #99 review M1 보강)**: Claude Code 의 permission
+   denial 첫 토큰이 `Shell command` 또는 `Bash command` 중 어느 쪽이든 매칭하도록 strict-anchor regex
+   를 `/^(?:Shell|Bash) command permission check failed.*requires approval/im` 로 확장. tool 분기
+   wording 변경 (e.g., bash 도구 vs shell 도구) 에 robust 해져요. 그래도 `.*requires approval`
+   suffix 와 `^...command permission check failed` prefix anchor 는 유지 — ADR-0010 §42 strict-anchor
+   정책 정합. 추가 wording 변형 (`Shell tool` / `permission denied`) 은 미매칭 → passthrough 분기로
+   raw stderr 가 chat 에 표시. catastrophic 아니지만 본 PR UX 목표 약화는 trade-off 로 명시.
+
 ## Decision
 
 SKILL preprocessing `!command` injection 라인을 cross-shell Node runner 로 wrap 하고,
-permission denial 가 strict-anchor regex (`/^Shell command permission check failed.*requires approval/im`)
+permission denial 가 strict-anchor regex (`/^(?:Shell|Bash) command permission check failed.*requires approval/im`)
 패턴 매칭 시 한국어 systemMessage 한 줄 출력 후 exit 0 으로 흐름을 SKILL Step 0 에 넘겨요.
 미매칭 unrecognized stderr 는 parent 로 passthrough 해요 (ADR-0010 정합).
 fail-open 원칙을 SKILL preprocessing 까지 확장하는 ADR 이에요.

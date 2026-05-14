@@ -66,8 +66,8 @@ describe("Case A — normal path: helper exits 0, no stderr", () => {
 });
 
 describe("Case B — permission denial: strict-anchor regex matches", () => {
-  test("exit 0 + Korean systemMessage JSON on stdout + stderr empty", () => {
-    // Use the canonical denial fixture
+  test("Shell-prefix variant — exit 0 + Korean systemMessage JSON on stdout + stderr empty", () => {
+    // Canonical Shell-prefix denial fixture
     const denialText =
       'Shell command permission check failed for pattern "!`test`": This command requires approval';
     makeHelper(`#!/bin/sh\n>&2 printf '${denialText}\\n'\nexit 1\n`);
@@ -76,6 +76,20 @@ describe("Case B — permission denial: strict-anchor regex matches", () => {
     const parsed = JSON.parse(out.stdout.trim());
     expect(parsed).toHaveProperty("systemMessage");
     expect((parsed as { systemMessage: string }).systemMessage).toContain("axhub");
+    expect((parsed as { systemMessage: string }).systemMessage).toContain("허용");
+    expect(out.stderr).toBe("");
+  });
+
+  test("Bash-prefix variant — M1 review (PR #99): regex covers (?:Shell|Bash)", () => {
+    // Verifies the M1 review broadening to (?:Shell|Bash) catches the Bash-prefix
+    // wording that Claude Code may emit on bash-tool denial.
+    const denialText =
+      'Bash command permission check failed for pattern "!`test`": This command requires approval';
+    makeHelper(`#!/bin/sh\n>&2 printf '${denialText}\\n'\nexit 1\n`);
+    const out = runNode(buildScript());
+    expect(out.status).toBe(0);
+    const parsed = JSON.parse(out.stdout.trim());
+    expect(parsed).toHaveProperty("systemMessage");
     expect((parsed as { systemMessage: string }).systemMessage).toContain("허용");
     expect(out.stderr).toBe("");
   });

@@ -29,7 +29,8 @@ describe("getPreflightInjectionLine — deterministic + structure", () => {
   });
 
   test("contains strict-anchor denialRegex (ADR-0010 §42 Pattern relaxation 비채택)", () => {
-    expect(getPreflightInjectionLine()).toContain("Shell command permission check failed.*requires approval");
+    // M1 review (PR #99): expanded to (?:Shell|Bash) to cover both Claude Code prefixes.
+    expect(getPreflightInjectionLine()).toContain("(?:Shell|Bash) command permission check failed.*requires approval");
   });
 
   test("contains Korean systemMessage (해요체)", () => {
