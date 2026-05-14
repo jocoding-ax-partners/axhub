@@ -2,7 +2,11 @@
 
 ## Status
 
-Proposed (2026-05-13, iteration 4)
+Accepted (2026-05-14, PR #99) — Option B 단독 path 채택, Option A 매니페스트 wildcard
+spec probe (§검증된 가정 #4) 는 Phase 27.y RFC 로 follow-up (`feat(plugin): permissions
+manifest wildcard support`). 본 ADR Decision 의 lite/deploy variant codegen + strict-anchor
+denialRegex `(?:Shell|Bash)` + unrecognized stderr passthrough 3 mechanism 으로 PR #99
+ship.
 
 본 ADR 의 범위는 SKILL preprocessing `!command` injection layer 의 fail-open contract 예요.
 `!command` injection 이 아닌 in-workflow manual `axhub-helpers` 호출 (예: `skills/apis/SKILL.md:40`,
