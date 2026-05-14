@@ -4,6 +4,18 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [Unreleased]
+
+### Fixed
+
+* 9 SKILL preflight `!command` 권한 prompt UX 한국어화 (deploy SKILL silent no-op 동시 해결, ADR-0011)
+
+### Added
+
+* preflight injection codegen single source (`scripts/codegen-preflight-injection.ts`) — lite variant (8 SKILL + 1 template) + deploy variant (cross-platform root resolution 보존), variant-aware byte-identical manifest invariant (ADR-0011)
+* SKILL preprocessing `!command` fail-open contract (`docs/HOOKS.md §3.6`) — Rust hook 진입점과 분리된 layer 명문화
+
+
 ## [0.5.9](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.8...v0.5.9) (2026-05-14)
 
 `init` SKILL 직후 모델이 "GitHub 연결 (선택)" 라벨을 자유 생성하고, 사용자가 skip 한 뒤 deploy 시 backend HTTP 422 + `git_connection_required` 로 거절되던 회귀를 끊는 릴리스예요. ralplan 2-iteration 합의 (Planner → Architect → Critic) 로 도출한 Plan F′ 와 4 개 follow-up 을 묶어 ship 했어요.

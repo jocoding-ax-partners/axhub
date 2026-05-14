@@ -30,8 +30,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.94.1
+      # PR #99 macOS infra: Swatinem/rust-cache@v2 restore corrupts
+      # `~/.cargo/bin/{cargo,rustc}` into `rustup-init` 1.29.0 on Apple Silicon
+      # GHA runners. Skip cache restore on macOS — accept ~5min slower build over
+      # systematic "error: rustc -vV didn't have a line for `host:`" failure.
       - uses: Swatinem/rust-cache@v2
+        if: matrix.os != 'macos-latest'
       - uses: oven-sh/setup-bun@v2
+      - name: Verify cargo resolves correctly
+        shell: bash
+        run: |
+          set -e
+          echo "cargo path: $(which cargo || true)"
+          echo "cargo version: $(cargo --version 2>&1 || true)"
+          echo "rustc version: $(rustc --version 2>&1 || true)"
       - name: Build axhub-helpers (release)
         run: cargo build --workspace --release
       - name: Stage helper binary at bin/axhub-helpers

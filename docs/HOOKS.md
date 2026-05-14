@@ -103,6 +103,18 @@ stderr 에 한 번 deprecation warning 을 출력해요. 새 자동화 스크립
   7-day 정책 적용 (event_log / audit 와 일관).
 - 외부 전송 0. 로컬 disk 만.
 
+### 3.6 SKILL preprocessing `!command` injection layer
+
+SKILL `!command` injection 라인 (예: `!${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json`) 은 §3 의 Rust hook 진입점과 **별개의 layer** 예요. Claude Code 가 SKILL 을 initialize 할 때 preprocessing 단계에서 실행하고, Rust helper `hook_safety::is_hook_disabled()` 진입부 체크가 아닌 Claude Code 권한 게이트가 이 layer 를 통제해요.
+
+이 layer 에도 동일한 fail-open 원칙을 적용해요:
+
+1. **permission denial 감지 시**: strict-anchor regex (`/^Shell command permission check failed.*requires approval/im`) 매칭 → `{"systemMessage":"[axhub] 첫 실행이라 권한이 필요해요. …"}` stdout 출력 + `exit 0`. SKILL Step 0 흐름이 계속돼요.
+2. **미매칭 unrecognized stderr**: `process.stderr.write(stderrText)` 로 parent 에 passthrough — silent black hole 방지. ADR-0010 "raw stderr 가 chat 으로 흘러요" 정합이에요.
+3. **exit code**: denial 분기 → 0, 미매칭 분기 → helper exit code 그대로 propagate.
+
+구현은 `scripts/codegen-preflight-injection.ts` 의 Node runner (lite variant / deploy variant) 가 single source 로 emit 해요. 상세 결정 근거는 [ADR-0011](adr/0011-skill-preflight-permission-fallback.md) 를 참고해요.
+
 ---
 
 ## 4. 구현 reference

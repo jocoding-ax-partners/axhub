@@ -18,7 +18,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.94.1
+      # PR #99 macOS infra: Swatinem/rust-cache@v2 restore corrupts
+      # `~/.cargo/bin/{cargo,rustc}` into `rustup-init` 1.29.0 on Apple Silicon
+      # GHA runners. Skip cache restore on macOS — accept slower fresh build over
+      # systematic "error: unexpected argument 'test' found / Usage: rustup-init"
+      # failure. ubuntu / windows cache 유지.
       - uses: Swatinem/rust-cache@v2
+        if: matrix.os != 'macos-latest'
       - run: cargo test --workspace
       - uses: oven-sh/setup-bun@v2
         if: matrix.os == 'ubuntu-latest'

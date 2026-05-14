@@ -62,3 +62,6 @@ target/
 # Plan documents (local strategic notes, not for commit)
 .plan/
 test-results.json
+
+# Test runtime tmp dirs (afterAll cleanup may miss on test interrupt)
+tests/.tmp-*/

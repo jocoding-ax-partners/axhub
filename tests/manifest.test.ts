@@ -6,8 +6,12 @@
 
 import { describe, expect, test, beforeAll } from "bun:test";
 import { readFile, readdir, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  getInjectionLineForVariant,
+  TARGETS,
+} from "../scripts/codegen-preflight-injection";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 
@@ -1013,4 +1017,24 @@ describe("cross-manifest consistency", () => {
     const stats = await stat(path);
     expect((stats.mode & 0o100) !== 0).toBe(true);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 27.x — preflight !command injection variant-aware byte-identical lock
+// Reason: codegen-preflight-injection.ts is the single source of truth for the
+// Node runner line injected in 9 SKILL + 1 template. Any drift (manual edit,
+// scaffold rot, merge conflict) is caught here before CI ships broken runners.
+// ---------------------------------------------------------------------------
+describe("Phase 27.x — preflight !command injection variant-aware byte-identical lock", () => {
+  test("exactly 10 codegen targets (9 SKILL + 1 template)", () => {
+    expect(TARGETS).toHaveLength(10);
+  });
+
+  for (const target of TARGETS) {
+    test(`${target.file} (${target.variant}) !command line = codegen output byte-identical`, () => {
+      const content = readFileSync(join(REPO_ROOT, target.file), "utf8");
+      const expectedLine = getInjectionLineForVariant(target.variant);
+      expect(content).toContain(expectedLine);
+    });
+  }
 });

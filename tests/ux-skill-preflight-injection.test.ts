@@ -33,9 +33,14 @@ describe("Phase 18 R2/US-1804 — !command preflight injection per needs-preflig
 
     if (needsPreflight) {
       test(`skills/${slug}/SKILL.md (needs-preflight: true) contains !command preflight literal`, () => {
-        // Match literal: !`${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json`
-        // Use substring check to avoid regex escaping headaches with backticks + braces.
-        expect(content.includes("axhub-helpers preflight --json")).toBe(true);
+        // Phase 27.x — codegen-preflight-injection.ts now emits a Node runner that
+        // references `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers` (helper path) plus
+        // `['preflight','--json']` (spawn args array). Check substrings that survive
+        // both the legacy raw shell substitution and the new Node runner envelope.
+        expect(content.includes("axhub-helpers")).toBe(true);
+        expect(
+          content.includes("'preflight','--json'") || content.includes("preflight --json"),
+        ).toBe(true);
         expect(content.includes("${CLAUDE_PLUGIN_ROOT}/bin/")).toBe(true);
       });
     } else {

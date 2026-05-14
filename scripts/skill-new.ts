@@ -32,6 +32,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { getPreflightInjectionLine } from "./codegen-preflight-injection";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const TEMPLATE = join(REPO_ROOT, "skills/_template/SKILL.md.tmpl");
@@ -109,7 +110,7 @@ content = content.replace(/\{\{TODOWRITE_BLOCK\}\}/g, todoWriteBlock);
 content = content.replace(/\{\{D1_GUARD_BLOCK\}\}/g, d1GuardBlock);
 
 if (!needsPreflight) {
-  content = content.replace(/!`\$\{CLAUDE_PLUGIN_ROOT\}\/bin\/axhub-helpers preflight --json`/, "");
+  content = content.replace(getPreflightInjectionLine(), "");
   content = content.replace(/이 줄은 Claude Code SKILL preprocessing.*?주입돼요\.\n\n/, "");
 }
 
