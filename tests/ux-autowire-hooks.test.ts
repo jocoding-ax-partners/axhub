@@ -73,6 +73,20 @@ describe("Phase 0.6.0 — session-start-autowire hook contract", () => {
     expect(body).not.toMatch(/^[^#]*exit [1-9]/m);
   });
 
+  test("dispatcher passes parser-compatible split CLI flags", () => {
+    const sh = readFileSync(HOOK_SH, "utf8");
+    expect(sh).not.toContain("--scope=${SCOPE}");
+    expect(sh).not.toContain("--command-path=${STUB_PATH}");
+    expect(sh).toContain('--scope "$SCOPE"');
+    expect(sh).toContain('--command-path "$STUB_PATH"');
+
+    const ps1 = readFileSync(HOOK_PS1, "utf8");
+    expect(ps1).not.toContain("--scope=$Scope");
+    expect(ps1).not.toContain("--command-path=$StubPath");
+    expect(ps1).toMatch(/'--scope'\s+\$Scope/s);
+    expect(ps1).toMatch(/'--command-path'\s+\$StubPath/s);
+  });
+
   test("sh hook body has Korean 해요체 (no forbidden tokens)", () => {
     const body = readFileSync(HOOK_SH, "utf8");
     expect(body).not.toMatch(/합니다|입니다|시겠어요|드립니다|당신|아이고/);

@@ -120,8 +120,8 @@ fi
 # short-circuited at step 4 (mtime race guard) before reaching here.
 nohup "$HELPER" autowire-statusline \
   --silent \
-  "--scope=${SCOPE}" \
-  "--command-path=${STUB_PATH}" \
+  --scope "$SCOPE" \
+  --command-path "$STUB_PATH" \
   >/dev/null 2>&1 &
 disown >/dev/null 2>&1 || true
 

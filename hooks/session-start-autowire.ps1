@@ -141,8 +141,10 @@ axhub 이 다음을 수행해요:
   $procArgs = @(
     'autowire-statusline'
     '--silent'
-    "--scope=$Scope"
-    "--command-path=$StubPath"
+    '--scope'
+    $Scope
+    '--command-path'
+    $StubPath
   )
   Start-Process -FilePath $Helper -ArgumentList $procArgs -NoNewWindow -PassThru | Out-Null
 

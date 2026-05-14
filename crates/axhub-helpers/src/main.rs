@@ -1971,11 +1971,27 @@ fn cmd_autowire_statusline(args: &[String]) -> anyhow::Result<i32> {
                     }
                 });
             }
+            arg if arg.starts_with("--scope=") => {
+                let value = arg.trim_start_matches("--scope=");
+                scope = Some(match value {
+                    "user" => Scope::User,
+                    "project" => Scope::Project,
+                    other => {
+                        eprintln!(
+                            "axhub-helpers autowire-statusline: --scope 는 user|project 만 가능해요 (받은 값: {other})"
+                        );
+                        return Ok(64);
+                    }
+                });
+            }
             "--silent" => silent = true,
             "--child" => is_child = true,
             "--command-path" if i + 1 < args.len() => {
                 i += 1;
                 command_path = Some(PathBuf::from(&args[i]));
+            }
+            arg if arg.starts_with("--command-path=") => {
+                command_path = Some(PathBuf::from(arg.trim_start_matches("--command-path=")));
             }
             "-h" | "--help" => {
                 println!(
@@ -2056,6 +2072,7 @@ fn cmd_orphan_stub(args: &[String]) -> anyhow::Result<i32> {
                     );
                     return Ok(1);
                 }
+                println!("{}", path.display());
                 if !axhub_helpers::autowire::is_non_interactive() {
                     eprintln!("axhub: orphan stub 설치됐어요 → {}", path.display());
                 }

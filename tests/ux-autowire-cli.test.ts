@@ -75,7 +75,12 @@ describe("Phase 0.6.0 — axhub-helpers orphan-stub subcommand", () => {
     try {
       const r = spawnSync(HELPER, ["orphan-stub", "--install"], {
         encoding: "utf8",
-        env: { ...process.env, HOME: tempHome, USERPROFILE: tempHome },
+        env: {
+          ...process.env,
+          HOME: tempHome,
+          USERPROFILE: tempHome,
+          XDG_STATE_HOME: "",
+        },
       });
       expect(r.status).toBe(0);
       // Stub should exist under one of XDG_STATE_HOME or ~/.local/state/axhub-plugin/
@@ -87,6 +92,7 @@ describe("Phase 0.6.0 — axhub-helpers orphan-stub subcommand", () => {
       // (PS1 mirror creation is platform-conditional inside the helper)
       const stubExists = existsSync(stubSh);
       expect(stubExists).toBe(true);
+      expect(r.stdout.trim()).toBe(stubSh);
     } finally {
       rmSync(tempHome, { recursive: true, force: true });
     }
@@ -97,12 +103,22 @@ describe("Phase 0.6.0 — axhub-helpers orphan-stub subcommand", () => {
     try {
       const r1 = spawnSync(HELPER, ["orphan-stub", "--install"], {
         encoding: "utf8",
-        env: { ...process.env, HOME: tempHome, USERPROFILE: tempHome },
+        env: {
+          ...process.env,
+          HOME: tempHome,
+          USERPROFILE: tempHome,
+          XDG_STATE_HOME: "",
+        },
       });
       expect(r1.status).toBe(0);
       const r2 = spawnSync(HELPER, ["orphan-stub", "--verify"], {
         encoding: "utf8",
-        env: { ...process.env, HOME: tempHome, USERPROFILE: tempHome },
+        env: {
+          ...process.env,
+          HOME: tempHome,
+          USERPROFILE: tempHome,
+          XDG_STATE_HOME: "",
+        },
       });
       expect(r2.status).toBe(0);
     } finally {
