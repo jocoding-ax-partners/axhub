@@ -26,6 +26,12 @@ if (Test-Path -Path $AxhubDisclosureMarker -PathType Leaf) {
   $markerContent = Get-Content -Path $AxhubDisclosureMarker -ErrorAction SilentlyContinue
   if ($markerContent -contains $AxhubDisclosureVer) { $_axhubShowDisclosure = $false }
 }
+# CI / scripted contexts suppress disclosure (AXHUB_SKIP_AUTODOWNLOAD=1 indicates
+# automated test path; AXHUB_NO_DISCLOSURE=1 explicit override for scripts piping
+# install.ps1 stdout to JSON parser).
+if ($env:AXHUB_SKIP_AUTODOWNLOAD -eq '1' -or $env:AXHUB_NO_DISCLOSURE -eq '1') {
+  $_axhubShowDisclosure = $false
+}
 if ($_axhubShowDisclosure) {
   Write-Host '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
   Write-Host 'axhub 이 다음을 수행해요:'

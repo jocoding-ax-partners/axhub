@@ -11,7 +11,14 @@ set -euo pipefail
 _AXHUB_DISCLOSURE_VER="v0.5.13"
 _AXHUB_STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/axhub-plugin"
 _AXHUB_DISCLOSURE_MARKER="${_AXHUB_STATE_DIR}/install-disclosure-shown.txt"
-if [ ! -f "$_AXHUB_DISCLOSURE_MARKER" ] || ! grep -qxF "$_AXHUB_DISCLOSURE_VER" "$_AXHUB_DISCLOSURE_MARKER" 2>/dev/null; then
+# CI / scripted contexts suppress disclosure (AXHUB_SKIP_AUTODOWNLOAD=1 indicates
+# automated test path; AXHUB_NO_DISCLOSURE=1 explicit override for scripts piping
+# install.sh stdout/stderr to JSON parser).
+_AXHUB_SHOW_DISCLOSURE=1
+if [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" = "1" ] || [ "${AXHUB_NO_DISCLOSURE:-0}" = "1" ]; then
+  _AXHUB_SHOW_DISCLOSURE=0
+fi
+if [ "$_AXHUB_SHOW_DISCLOSURE" = "1" ] && { [ ! -f "$_AXHUB_DISCLOSURE_MARKER" ] || ! grep -qxF "$_AXHUB_DISCLOSURE_VER" "$_AXHUB_DISCLOSURE_MARKER" 2>/dev/null; }; then
   cat >&2 <<'DISCLOSURE'
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 axhub 이 다음을 수행해요:
