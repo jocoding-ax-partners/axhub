@@ -4,6 +4,43 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.5.9](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.8...v0.5.9) (2026-05-14)
+
+`init` SKILL 직후 모델이 "GitHub 연결 (선택)" 라벨을 자유 생성하고, 사용자가 skip 한 뒤 deploy 시 backend HTTP 422 + `git_connection_required` 로 거절되던 회귀를 끊는 릴리스예요. ralplan 2-iteration 합의 (Planner → Architect → Critic) 로 도출한 Plan F′ 와 4 개 follow-up 을 묶어 ship 했어요.
+
+핵심 변경:
+- **F′ hotfix (#94)**: init SKILL Step 5 → Step 6 closed-form 5단계 안내로 교체. Step 3 라벨을 "GitHub 연결 (배포에 꼭 필요해요)" 로 잠그고, dependency-install subsection 을 `D1.`~`D5.` namespace 로 분리해서 init SKILL 의 3중 `5.` 헤더 충돌도 함께 해소했어요. github SKILL NEVER 섹션에 "4번째 옵션 (지금은 스킵 등) 만들어내기 금지 + HTTP 422 사유 명시" 룰을 추가했어요.
+- **FU-1 BootstrapOutput.next_steps[] (#95)**: helper Rust struct 에 `NextStep { id, label, required_for_deploy, blocks, trigger_phrase }` 를 추가하고 `bootstrap --dry-run --json` 출력에 universal post-init 5-step roadmap 을 자동 주입했어요. init SKILL Step 6 가 이제 prose 가 아니라 helper-emitted JSON 을 source-of-truth 로 render 해서 model paraphrase drift 가 substrate-level 에서 막혀요.
+- **FU-2 init Visibility Rules (#96)**: deploy SKILL 의 Vibe Coder Visibility Rules 패턴을 init SKILL 에도 mirror. internal verification primitives 5 카테고리 + Step 1~6/D2/D3/D5 humanized 템플릿 9 행 + `AXHUB_INIT_VERBOSE=1` escape hatch 를 명문화했어요.
+- **FU-3 skill:doctor step-collision (#97)**: `scripts/skill-doctor-step-numbering.ts` 신설 + `skill:doctor` 에 "step numbering" pattern 추가. top-level `^N. **` 헤더 중복을 자동 catch (sub-step `3.5. **` 와 H3 subsection 의 local 1./2./.../D1./D2. 는 exempt). 작업 중 `doctor` SKILL 자체에서도 동일 collision 발견해 함께 fix 했어요.
+- **FU-4 Option G investigation — DEFER (#98)**: github Step 2 옵션을 3 → 2 로 줄이고 disconnect 를 intent-based routing 으로 분리하는 안을 조사. F′ NEVER 룰 + FU-3 machine-enforcement 가 이미 substrate-level 에서 4번째 invent 를 차단하므로 marginal benefit 이 작고 discoverability 손실 risk 가 더 커서 DEFER. `.omc/research/option-g-disconnect-split.md` 에 ADR + 재검토 trigger + owner / process 기록.
+
+### Test baseline
+- `bun test` → 705 pass / 2 fail (둘 다 pre-existing on main: cross-manifest + plan-consistency v0.5.7→0.5.8 drift)
+- `cargo test -p axhub-helpers` → 95 pass / 0 fail (FU-1 unit tests 2 + empty-blocks defensive test 1)
+- `cargo clippy --workspace` → 0 issue
+- `bun run skill:doctor --strict` → 0 err (21 SKILLs scanned, 21 OK; FU-3 step-collision check 활성)
+- `bun run lint:tone --strict` → 0 err / 0 warn (해요체 회귀 0)
+- `bun run lint:keywords --check` → no diff (nl-lexicon baseline 무손상)
+- `bunx tsc --noEmit` → clean
+
+### Honest tradeoff
+- 5 PR stack 을 dependency 순서로 merge 했어요 (#94 → #96 / #97 / #95 / #98). #94 는 merge-commit 으로 lineage 보존, 나머지는 squash. main rebase 후 모든 후속 PR 은 main 기반 squash 으로 전환했어요.
+- FU-1 의 helper-emitted next_steps[] 는 substrate fix 이지만, prose drift 가 0 이 되려면 SKILL Step 6 가 helper 출력을 정확히 render 해야 해요. 5 단계 humanization 은 model 책임으로 남아 있어요 — 향후 텔레메트리 / 회귀 모니터링 필요.
+- FU-3 step-collision 검사는 `## Workflow` 본문만 scan 해요. `## Additional Resources` 같은 H2 boundary 이후의 step 은 검사 범위 밖이에요. 현재 SKILL 들은 해당 패턴 없음 — 새 SKILL 작성 시 주의.
+- FU-4 Option G 는 DEFER. 6 개월 안에 4번째 invent 회귀 / disconnect misclick 사고 / list_only / connect 흐름 telemetry 가 발견되면 재검토해요.
+
+### Added
+
+* helper bootstrap next_steps[] 로 init 안내 backend-truth 화 (FU-1) ([#95](https://github.com/jocoding-ax-partners/axhub/issues/95)) ([c1ea9de](https://github.com/jocoding-ax-partners/axhub/commit/c1ea9de23331d590124c25aaa41b36d92312e49d)), closes [#94](https://github.com/jocoding-ax-partners/axhub/issues/94) [#94](https://github.com/jocoding-ax-partners/axhub/issues/94)
+* init SKILL Visibility Rules 블록 추가 (FU-2) ([#96](https://github.com/jocoding-ax-partners/axhub/issues/96)) ([dfc8f98](https://github.com/jocoding-ax-partners/axhub/commit/dfc8f9873ec416b16d7b88ac12f31d1974eb91fc))
+* skill:doctor step-number collision 자동 감지 (FU-3) ([#97](https://github.com/jocoding-ax-partners/axhub/issues/97)) ([e67fae1](https://github.com/jocoding-ax-partners/axhub/commit/e67fae106568c60a708c83c6af57c717696903b5)), closes [#94](https://github.com/jocoding-ax-partners/axhub/issues/94)
+
+
+### Fixed
+
+* init/github SKILL closed-form 으로 GitHub 연결 안내 잠금 (Plan F′) ([7b9fcc1](https://github.com/jocoding-ax-partners/axhub/commit/7b9fcc1bcefb3636e9e03499955b34dfed2705b0))
+
 ## [0.5.8](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.7...v0.5.8) (2026-05-13)
 
 `/axhub:deploy` push 직후 중복 `deploy_create` race 를 차단하는 릴리스예요. PR #80 가 preventive + reactive guard 를 도입했고, issue #81 후속 stack 으로 in-flight detection 을 3-way (same-commit / cross-tenant / uncertain) 로 정밀화해서 `INFLIGHT_BRANCH` 변수로 분기했어요. `--refresh-in-flight` selective refresh flag 로 cache hit 후 in-flight 만 fresh 재조회하고, Step 3.6 도 같은 flag 를 쓰도록 통일했어요. ADR-0010 으로 stderr filter 의 graceful degradation 정책을 명문화했고, Step 1.6 에 ownership 추론 한계 disclosure 와 1.6b 카피 톤을 부드럽게 다듬었어요.
