@@ -73,7 +73,8 @@ To enable the axhub statusline:
        "header": "활성화",
        "multiSelect": false,
        "options": [
-         {"label": "복사해서 붙여 넣을래요", "description": "Unix (macOS/Linux/Git Bash/WSL) wiring snippet 을 클립보드에 복사해줄게요. ~/.claude/settings.json 에 paste 하면 돼요."},
+         {"label": "복사해서 붙여 넣을래요 (Unix bash)", "description": "Unix (macOS/Linux/Git Bash/WSL) 자동 wire 를 axhub-helpers settings-merge --apply 로 호출해요. ~/.claude/settings.json 에 atomic 으로 statusLine 추가해요."},
+         {"label": "복사해서 붙여 넣을래요 (Windows PowerShell)", "description": "Windows native (PowerShell 5.1+) 자동 wire 를 axhub-helpers.exe settings-merge --apply 로 호출해요. ~/.claude/settings.json 에 atomic 으로 statusLine 추가해요."},
          {"label": "어떻게 하는지 보여줘요", "description": "Unix (macOS/Linux/Git Bash/WSL) 단계별로 설명해줄게요."},
          {"label": "Windows PowerShell snippet 보여줘요", "description": "Windows native (PowerShell 5.1+) wiring snippet 을 stdout 으로 보여줄게요."},
          {"label": "이 repo 만 켤래요 (project scope, dotfiles 비추천)", "description": "현재 프로젝트의 .claude/settings.json 에 paste 할 snippet 을 출력해요. user-global statusLine (예: OMC HUD) 을 이 repo 에서만 override 해요. ${HOME} 절대경로라 dotfiles repo / dev container 에 commit 시 다른 머신에서 깨져요. .gitignore 필수예요. plugin uninstall 시 orphan stub 유지 → graceful exit 0."},
@@ -85,12 +86,12 @@ To enable the axhub statusline:
 
 2. **선택지별 처리.**
 
-   **`복사해서 붙여 넣을래요` 선택 시:**
+   **`복사해서 붙여 넣을래요 (Unix bash)` 선택 시:**
 
    v0.5.13 부터 `axhub-helpers settings-merge --apply` 가 atomic 으로 `~/.claude/settings.json` 에 statusLine 을 추가해요. 7-branch 결정 + .bak rollback + flock 으로 safe.
 
    ```bash
-   # 자동 wire (recommended)
+   # 자동 wire (recommended, Unix bash)
    "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" settings-merge --apply --scope auto
    ```
 
@@ -101,6 +102,19 @@ To enable the axhub statusline:
    - 4 (PreservedOther): 다른 plugin 의 statusLine 발견 — preserve 했어요. 강제 override 는 `/axhub:enable-statusline` 재실행
    - 5 (InvalidJson): settings.json 파싱 안 돼요 — 직접 수정 후 재시도
    - 6/7 (PartialSchema/Permission): stderr 안내 따라 수동 해결
+
+   성공 시 "Claude Code 재시작해주세요" 안내.
+
+   **`복사해서 붙여 넣을래요 (Windows PowerShell)` 선택 시:**
+
+   Unix 분기와 동일한 atomic merge 호출이지만 PowerShell 호환 형식을 사용해요. v0.6.2 의 bash 형식 명령이 PowerShell 에서 `Unexpected token 'settings-merge'` parser error 로 fail 하던 회귀를 막아요.
+
+   ```powershell
+   # 자동 wire (recommended, Windows PowerShell 5.1+)
+   & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" settings-merge --apply --scope auto
+   ```
+
+   Exit code 처리는 Unix 분기와 동일해요 (0/2/3/4/5/6/7).
 
    성공 시 "Claude Code 재시작해주세요" 안내.
 

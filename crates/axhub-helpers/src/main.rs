@@ -36,7 +36,29 @@ use serde_json::{json, Map, Value};
 const HOOK_SCHEMA_VERSION: &str = "v0";
 const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  version [--quiet]\n  help";
 
+/// Force Windows console output codepage to UTF-8 (65001).
+///
+/// Windows console 의 default codepage 가 OEM (Korean=CP949, US=CP437) 이라
+/// Rust `println!` 의 UTF-8 한글 출력이 mojibake 로 깨져요. `bin/statusline.ps1`
+/// wrapper 가 `[Console]::OutputEncoding=UTF8` 로 흡수하지만 `cmd.exe` 직접
+/// 호출 / 다른 wrapper 경로는 보호 못해요.
+///
+/// Codepage 는 process-attached scope 라 `axhub-helpers.exe` 종료 시 함께
+/// destroy 돼요. parent `cmd.exe` 세션 codepage 영향 0. pipe redirect / console
+/// 미attach 시 `SetConsoleOutputCP` 가 0 반환 — fail-open 으로 무시해요.
+#[cfg(windows)]
+fn enable_utf8_console() {
+    use windows_sys::Win32::System::Console::SetConsoleOutputCP;
+    unsafe {
+        SetConsoleOutputCP(65001);
+    }
+}
+
+#[cfg(not(windows))]
+fn enable_utf8_console() {}
+
 fn main() {
+    enable_utf8_console();
     std::process::exit(match run() {
         Ok(code) => code,
         Err(e) => {
