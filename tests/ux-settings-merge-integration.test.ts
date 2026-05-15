@@ -309,7 +309,8 @@ describe("v0.5.13/v0.6.2 settings-merge integration — 15 cases", () => {
       }
     );
     // exit 2 (Created) 또는 3 (Merged)
-    expect([2, 3]).toContain(result.status);
+    expect(result.status).not.toBeNull();
+    expect([2, 3]).toContain(result.status as number);
     expect(existsSync(settingsPath)).toBe(true);
     const parsed = JSON.parse(readFileSync(settingsPath, "utf8"));
     const cmd: string = parsed.statusLine.command;
