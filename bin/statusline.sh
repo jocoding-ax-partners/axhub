@@ -35,11 +35,21 @@ fi
 CACHE="${HOME}/.cache/axhub-plugin/last-deploy.json"
 TOKEN_FILE="${HOME}/.config/axhub-plugin/token"
 
-# Auth presence check — env var or token file. No network.
+# Auth presence check — env var, token file, or platform keychain. No network.
+# Keychain fallback: token-init 가 SessionStart 에서 mirror 안 만든 경우
+# axhub CLI 가 저장한 platform keychain entry 를 직접 조회해요. silent on miss.
 if [ -n "${AXHUB_TOKEN:-}" ] || [ -f "$TOKEN_FILE" ]; then
   AUTH_OK=1
 else
   AUTH_OK=0
+fi
+
+if [ "$AUTH_OK" = "0" ]; then
+  if command -v security >/dev/null 2>&1 && security find-generic-password -s axhub -w >/dev/null 2>&1; then
+    AUTH_OK=1
+  elif command -v secret-tool >/dev/null 2>&1 && secret-tool lookup service axhub >/dev/null 2>&1; then
+    AUTH_OK=1
+  fi
 fi
 
 if [ "$AUTH_OK" = "0" ]; then
