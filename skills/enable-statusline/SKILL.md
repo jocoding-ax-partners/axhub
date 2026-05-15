@@ -164,27 +164,45 @@ To enable the axhub statusline:
 
    user-global `~/.claude/settings.json` 의 statusLine (예: OMC HUD) 을 이 repo 에서만 override 해요. Claude Code precedence 가 project `.claude/settings.json` > user 라 그 디렉토리 진입 시만 axhub statusline 보이고, 다른 디렉토리는 user-global statusLine 유지돼요.
 
-   ⚠️ **commit 위험 안내:** project `.claude/settings.json` 에 paste 한 path 는 사용자 시스템의 `$HOME` 포함 절대경로예요.
+   `axhub-helpers settings-merge --apply --scope project` 가 atomic 으로 project `.claude/settings.json` 에 statusLine 추가해요. user scope autowire 와 동일한 7-branch 결정 + .bak rollback + flock 으로 safe.
+
+   ⚠️ **commit 위험 안내:** project `.claude/settings.json` 에 추가되는 `statusLine.command` 는 사용자 시스템의 `$HOME` 포함 절대경로예요.
    - dotfiles repo / dev container 로 commit 하면 다른 머신 (`$HOME` 다름) 에서 statusline 깨져요.
    - `.gitignore` 에 `.claude/settings.json` 추가 강력 권장이에요. axhub repo 자체는 이미 gitignored.
    - 단일 머신 단일 사용자 사용은 안전해요.
 
    **lifecycle:** plugin uninstall 시에도 orphan stub 은 `state_dir` 거주라 유지돼요 — statusline 은 graceful exit 0 (빈 출력) 해요. dangling reference 안 만들어요.
 
-   사용자 시스템에서 orphan stub absolute path 를 detect 해서 snippet 에 inject 한 뒤 stdout 으로 출력해요.
-
-   **Unix (macOS / Linux / Git Bash / WSL) detect logic:**
-
    ```bash
-   ORPHAN="${XDG_STATE_HOME:-${HOME}/.local/state}/axhub-plugin/orphan-stub-statusline.sh"
-   if [ -x "$ORPHAN" ]; then
-     PATH_ABS="$ORPHAN"                                # v0.5.13+ orphan stub (recommended, plugin version-agnostic)
-   else
-     PATH_ABS="${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh"  # fallback (plugin cache, version-specific)
-   fi
+   # 자동 wire (Unix bash — macOS / Linux / Git Bash / WSL)
+   "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" settings-merge --apply --scope project
    ```
 
-   Unix snippet (예시 — `$PATH_ABS` literal 절대경로 inject 후):
+   ```powershell
+   # 자동 wire (Windows PowerShell 5.1+)
+   & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" settings-merge --apply --scope project
+   ```
+
+   Exit code 별 처리:
+   - 0 (NoOp): 이미 axhub-managed statusLine 있어요 — 변경 없음
+   - 2 (Created): project `.claude/settings.json` 만들고 statusLine 추가했어요
+   - 3 (Merged): 기존 project `.claude/settings.json` 에 statusLine 추가했어요
+   - 4 (PreservedOther): 다른 plugin 의 statusLine 발견 — preserve 했어요. 강제 override 는 user 가 직접 project `.claude/settings.json` 편집
+   - 5 (InvalidJson): settings.json 파싱 안 돼요 — 직접 수정 후 재시도
+   - 6/7 (PartialSchema/Permission): stderr 안내 따라 수동 해결
+
+   성공 시 "Claude Code 재시작해주세요" + ".gitignore 확인해주세요" 안내.
+
+   **Edge cases:**
+   - **non-git repo:** `axhub-helpers` 가 `git rev-parse --show-toplevel` 호출 시 fail — stderr 에 안내 후 manual paste fallback (Unix snippet / Windows snippet 직접 출력) 으로 전환.
+   - **sub-dir invoke:** `git rev-parse --show-toplevel` 가 repo root 반환해서 root 의 `.claude/settings.json` 에 wire — sub-dir 가 아닌 repo root 라는 점 명시.
+   - **Windows helper.exe 미존재:** plugin 이 helper binary 자동 다운로드 안 된 경우 (`%CLAUDE_PLUGIN_ROOT%\bin\axhub-helpers.exe` 부재). 명령 spawn fail — 사용자에게 안내 후 위 manual paste fallback (Windows snippet) 으로 전환.
+
+   **Manual paste fallback (autowire 실패 또는 helper 미존재 시):**
+
+   사용자 시스템의 orphan stub absolute path 를 detect 해서 snippet 에 inject 한 뒤 stdout 으로 출력해요. 사용자가 직접 project `.claude/settings.json` 에 paste 해요.
+
+   Unix snippet (예시):
 
    ```json
    {
@@ -195,18 +213,7 @@ To enable the axhub statusline:
    }
    ```
 
-   **Windows native (PowerShell 5.1+) detect logic:**
-
-   ```powershell
-   $orphan = "$env:LOCALAPPDATA\axhub-plugin\orphan-stub-statusline.ps1"
-   if (Test-Path $orphan) {
-     $pathAbs = $orphan                                            # v0.5.13+ orphan stub
-   } else {
-     $pathAbs = "$env:CLAUDE_PLUGIN_ROOT\bin\statusline.ps1"       # fallback
-   }
-   ```
-
-   Windows snippet (예시 — `$pathAbs` literal 절대경로 inject 후):
+   Windows snippet (예시):
 
    ```json
    {
@@ -216,13 +223,6 @@ To enable the axhub statusline:
      }
    }
    ```
-
-   **4 단계 paste 절차:**
-
-   1. 현재 repo 의 `.claude/settings.json` 을 텍스트 에디터로 열어요. 파일이 없으면 빈 파일로 만들어도 돼요.
-   2. 위 platform-specific snippet JSON 블록을 최상위 객체 안에 paste 해요. command 의 절대경로는 stdout 출력값 그대로 써요.
-   3. JSON 의 닫는 `}` 가 잘 맞는지 확인해요. `.gitignore` 에 `.claude/settings.json` 추가했는지 다시 확인해요.
-   4. Claude Code 를 재시작하면 이 repo 진입 시만 axhub statusline 이 보이고, 다른 repo 는 user-global statusLine (OMC HUD 등) 유지돼요.
 
    **`나중에 할래요` 선택 시:**
 
