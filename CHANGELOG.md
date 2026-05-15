@@ -4,6 +4,27 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.6.8](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.7...v0.6.8) (2026-05-15)
+
+`enable-statusline` SKILL 의 `이 repo 만 켤래요 (project scope, dotfiles 비추천)` 옵션이 v0.6.7 까지는 사용자에게 manual paste 가이드만 보여줬어요. v0.6.8 부터는 `axhub-helpers settings-merge --apply --scope project` 를 자동 호출해서 project `.claude/settings.json` 에 atomic merge 로 statusLine 추가해요. 사용자 부담 0. axhub-helpers 의 `--scope project` 는 이미 v0.5.13 부터 존재했고 (`settings_merge.rs:97`), SKILL 본문만 manual → autowire 로 교체했어요. Rust 변경 0. 3 edge case (non-git repo bail / sub-dir invoke → repo root / Windows helper.exe 미존재 → manual paste fallback) 명시적으로 SKILL 본문에 적었어요.
+
+검증 baseline (v0.6.8):
+- `bun run skill:doctor --strict` exit 0
+- `bun run lint:tone --strict` 0 error / 0 warning across 37 files
+- `bun run lint:keywords --check` keywords preserved (no diff)
+- `bun test` (full) — 862 pass / 0 fail / 6 skip / 1 todo across 76 files
+- ralplan 1 iter consensus (Architect APPROVE WITH MINOR + Critic ACCEPT-WITH-RESERVATIONS, exit 8 제거 correction 반영)
+
+정직한 tradeoff:
+- autowire 후 `.claude/settings.json` 에 박히는 `statusLine.command` 는 `$HOME` 포함 절대경로라 dotfiles repo / dev container 로 commit 하면 다른 머신에서 깨져요. SKILL 본문에 강한 `.gitignore` warn 유지하지만 user discipline 의존이에요
+- Exit code 4 (PreservedOther) — 다른 plugin 이 이미 project `.claude/settings.json` 에 statusLine wired 한 경우 axhub 가 preserve. 강제 override 는 user 가 직접 편집
+- Windows native `helper.exe` auto-download 는 README `deferred` 항목 그대로 — Windows VM 사용자는 plugin install 시 helper binary 자동 안 받아서 autowire 명령 spawn fail. graceful fallback 으로 manual paste 안내 (v0.7.x 에서 helper auto-download 구현 예정)
+- Claude Code Windows VM 의 stdout ANSI decode mojibake 이슈는 별도 candidate — 본 PR scope 아님 (v0.6.4~v0.6.7 의 UTF-8 force 시도가 Claude Code 의 read layer 까지 도달 못 함을 사용자 진단으로 확인)
+
+### Added
+
+* **statusline:** 이 repo 만 켤래요 옵션 autowire 전환 (v0.6.8) ([#110](https://github.com/jocoding-ax-partners/axhub/issues/110)) ([7852721](https://github.com/jocoding-ax-partners/axhub/commit/78527210dfa18f5f3442538e8a3a5eb04c69a7a9))
+
 ## [0.6.7](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.6...v0.6.7) (2026-05-15)
 
 v0.6.4 의 `[Console]::OutputEncoding=UTF8` setting 이 PowerShell terminal 직접 호출에서는 한글 정상이지만 Claude Code 가 `powershell.exe -File` 로 spawn 해서 stdout 을 pipe 로 capture 하는 경로에서는 mojibake 재발했어요 (Windows VM 사용자 보고). Root cause 는 PowerShell 5.1 의 `Write-Output` / `Out-Default` formatter 가 non-console host context 에서 host UI raw layer 로 fallback 해서 process ANSI codepage (Korean Windows=CP949) 로 다시 떨어지는 거였어요. `bin/statusline.ps1` 의 5 개 `Write-Output` 모두 `Write-Utf8Line` helper 로 교체해서 `[Console]::OpenStandardOutput()` 으로 raw UTF-8 bytes 를 직접 써요 — PowerShell formatter pipeline 완전 우회.
