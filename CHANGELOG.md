@@ -4,6 +4,31 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.6.3](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.1...v0.6.3) (2026-05-15)
+
+OMC HUD 같은 user-global statusLine 이 깔린 환경에서 axhub repo 진입 시만 axhub statusline 보이게 하는 project-scope manual paste 옵션을 `enable-statusline` SKILL 에 추가해요. Claude Code precedence 룰 (project `.claude/settings.json` > user) 을 활용하고 autowire 는 하지 않아요 — `$HOME` 절대경로 commit 사고를 user 명시 paste + `.gitignore` 가이드로 막아요. ralplan 4 iteration consensus + ralph implement + architect 2-pass verify (path mismatch 1 차 reject 후 fix) + deslop pass 거쳐 ship 했어요.
+
+검증 baseline (v0.6.3):
+- `bun run skill:doctor --strict` exit 0
+- `bun run lint:tone --strict` 0 error / 0 warning across 37 files
+- `bun run lint:keywords --check` keywords preserved (no diff)
+- `bunx tsc --noEmit` clean
+- `bun test` — 862 pass / 0 fail / 6 skip / 1 todo across 76 files
+
+정직한 tradeoff:
+- `$HOME` 절대경로 commit 위험은 user discipline 의존 (`.gitignore` 강한 안내 + label `dotfiles 비추천` 명시로 mitigate)
+- autowire 안 함 → 4 단계 manual paste UX 마찰 받아들임 (structural 안전 우선)
+- Out of scope (별도 PR): Windows PowerShell parser error fix (line 93 bash command), `merge()` project-scope git-tracked guard (defense-in-depth)
+
+### Added
+
+* **statusline:** enable-statusline 에 project scope 옵션 추가 ([#105](https://github.com/jocoding-ax-partners/axhub/issues/105)) ([d43824f](https://github.com/jocoding-ax-partners/axhub/commit/d43824f5650ed4d52d58c88b646ca438f8ed4382))
+
+
+### Fixed
+
+* **statusline:** plugin-root ambiguity P0 hotfix — orphan stub absolute path (v0.6.2) ([#104](https://github.com/jocoding-ax-partners/axhub/issues/104)) ([68cfd17](https://github.com/jocoding-ax-partners/axhub/commit/68cfd17b807655e43266c78846ba0b70c7d331e0))
+
 ## [0.6.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.1...v0.6.2) (2026-05-14)
 
 다중 plugin 환경 (axhub + OMC + others) 에서 `${CLAUDE_PLUGIN_ROOT}` literal 이 plugin-context-ambiguous 하게 expand 되어 statusline 이 render 안 되는 production bug 를 핫픽스해요. `default_command_path()` 가 plugin-agnostic orphan stub absolute path 를 default 로 반환해요. 기존 broken settings.json 은 `axhub-helpers settings-merge --migrate` 로 atomic 치유해요.
