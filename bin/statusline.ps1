@@ -71,8 +71,28 @@ try {
   }
   $TokenFile = Join-Path $ConfigBase 'axhub-plugin\token'
 
-  # Auth presence check — env var or token file. No network.
+  # Auth presence check — env var, token file, or Windows Credential Manager. No network.
+  # Credential Manager fallback: token-init 가 SessionStart 에서 mirror 안 만든 경우
+  # axhub CLI 가 저장한 Credential Manager entry 를 직접 조회해요. silent on miss.
   $AuthOk = ($env:AXHUB_TOKEN -and $env:AXHUB_TOKEN.Length -gt 0) -or (Test-Path -Path $TokenFile -PathType Leaf)
+  if (-not $AuthOk) {
+    try {
+      Add-Type -ErrorAction SilentlyContinue -Namespace AxhubStatuslineCred -Name Native -MemberDefinition @'
+        [System.Runtime.InteropServices.DllImport("advapi32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        public static extern bool CredReadW(string target, int type, int reservedFlag, out System.IntPtr credentialPtr);
+        [System.Runtime.InteropServices.DllImport("advapi32.dll", SetLastError = true)]
+        public static extern void CredFree(System.IntPtr cred);
+'@ 2>$null
+      $credPtr = [System.IntPtr]::Zero
+      $found = [AxhubStatuslineCred.Native]::CredReadW('axhub', 1, 0, [ref] $credPtr)
+      if ($found -and $credPtr -ne [System.IntPtr]::Zero) {
+        [AxhubStatuslineCred.Native]::CredFree($credPtr)
+        $AuthOk = $true
+      }
+    } catch {
+      # Silent — Credential Manager 미존재 / Add-Type fail 시 auth=false 유지
+    }
+  }
 
   if (-not $AuthOk) {
     Write-Utf8Line 'axhub: 로그인 안 됐어요'

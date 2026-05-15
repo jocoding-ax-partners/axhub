@@ -2,7 +2,7 @@
 
 > 바이브코더가 자연어로 axhub 앱을 안전하게 배포하고 관리하는 Claude Code 플러그인.
 
-**상태**: v0.6.7 (ship). 22 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
+**상태**: v0.6.8 (ship). 22 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
 
 ---
 

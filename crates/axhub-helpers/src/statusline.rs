@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use crate::keychain::read_keychain_token;
 use crate::runtime_paths::{last_deploy_file, state_dir, token_file};
 use serde::Deserialize;
 
@@ -98,10 +99,21 @@ fn render_statusline(snapshot: &StatuslineSnapshot) -> String {
 }
 
 fn token_is_present() -> bool {
-    env::var("AXHUB_TOKEN")
+    // 1. AXHUB_TOKEN env var
+    if env::var("AXHUB_TOKEN")
         .ok()
         .is_some_and(|value| !value.trim().is_empty())
-        || token_file().is_some_and(|path| path.is_file())
+    {
+        return true;
+    }
+    // 2. plugin mirror token file (token-init 이 keychain → file 로 sync)
+    if token_file().is_some_and(|path| path.is_file()) {
+        return true;
+    }
+    // 3. platform keychain (token-init 이 SessionStart 에서 안 fire 한 경우 fallback)
+    //    macOS=security / Linux=secret-tool / Windows=CredReadW. 모두 silent on miss.
+    let keychain = read_keychain_token();
+    keychain.token.is_some_and(|tok| !tok.trim().is_empty())
 }
 
 fn read_last_deploy_cache(path: &Path) -> Option<LastDeploy> {
