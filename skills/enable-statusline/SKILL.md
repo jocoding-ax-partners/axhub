@@ -64,7 +64,7 @@ To enable the axhub statusline:
 
 1. **AskUserQuestion — 활성화 방법 선택.**
 
-   사용자의 OS 를 명시적으로 묻지 않아도 돼요. Step 1 답변에서 플랫폼 신호를 도출해요 — "Windows PowerShell snippet 보여줘요" 선택 시 Windows native 로 판단해요. bash 실행 / `process.platform` 런타임 탐지 금지 (statusLine 컨텍스트에서 노출 안 됨).
+   AskUserQuestion 의 `options` 가 max 4 개 라 platform 별 옵션을 하나로 통합했어요. 사용자의 OS 는 명시적으로 묻지 않아요. Step 2 본문에서 platform 별 명령을 모두 제시하고 LLM 이 user prompt context (예: "PowerShell", "Windows" 단서) 로 적합한 명령을 골라요. bash 실행 / `process.platform` 런타임 탐지 금지.
 
    ```json
    {
@@ -73,10 +73,8 @@ To enable the axhub statusline:
        "header": "활성화",
        "multiSelect": false,
        "options": [
-         {"label": "복사해서 붙여 넣을래요 (Unix bash)", "description": "Unix (macOS/Linux/Git Bash/WSL) 자동 wire 를 axhub-helpers settings-merge --apply 로 호출해요. ~/.claude/settings.json 에 atomic 으로 statusLine 추가해요."},
-         {"label": "복사해서 붙여 넣을래요 (Windows PowerShell)", "description": "Windows native (PowerShell 5.1+) 자동 wire 를 axhub-helpers.exe settings-merge --apply 로 호출해요. ~/.claude/settings.json 에 atomic 으로 statusLine 추가해요."},
-         {"label": "어떻게 하는지 보여줘요", "description": "Unix (macOS/Linux/Git Bash/WSL) 단계별로 설명해줄게요."},
-         {"label": "Windows PowerShell snippet 보여줘요", "description": "Windows native (PowerShell 5.1+) wiring snippet 을 stdout 으로 보여줄게요."},
+         {"label": "자동으로 켜요", "description": "axhub-helpers settings-merge --apply 를 호출해서 ~/.claude/settings.json 에 atomic 으로 statusLine 추가해요. Unix bash / Windows PowerShell 자동 분기."},
+         {"label": "복사할 snippet 보여줘요", "description": "wiring snippet 을 stdout 으로 출력해요. ~/.claude/settings.json 에 직접 paste 해요. Unix + Windows 양쪽 snippet 제공."},
          {"label": "이 repo 만 켤래요 (project scope, dotfiles 비추천)", "description": "현재 프로젝트의 .claude/settings.json 에 paste 할 snippet 을 출력해요. user-global statusLine (예: OMC HUD) 을 이 repo 에서만 override 해요. ${HOME} 절대경로라 dotfiles repo / dev container 에 commit 시 다른 머신에서 깨져요. .gitignore 필수예요. plugin uninstall 시 orphan stub 유지 → graceful exit 0."},
          {"label": "나중에 할래요", "description": "지금은 건너뛰고 나중에 활성화해요."}
        ]
@@ -86,16 +84,23 @@ To enable the axhub statusline:
 
 2. **선택지별 처리.**
 
-   **`복사해서 붙여 넣을래요 (Unix bash)` 선택 시:**
+   **`자동으로 켜요` 선택 시:**
 
    v0.5.13 부터 `axhub-helpers settings-merge --apply` 가 atomic 으로 `~/.claude/settings.json` 에 statusLine 을 추가해요. 7-branch 결정 + .bak rollback + flock 으로 safe.
 
+   User context 의 platform 단서로 적합한 명령을 골라서 실행해요. "PowerShell", "Windows", "cmd" 같은 단서 보이면 PowerShell 분기, 그 외 (macOS / Linux / Git Bash / WSL) 는 Unix 분기.
+
    ```bash
-   # 자동 wire (recommended, Unix bash)
+   # Unix bash (macOS / Linux / Git Bash / WSL)
    "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" settings-merge --apply --scope auto
    ```
 
-   Exit code 별 처리:
+   ```powershell
+   # Windows PowerShell 5.1+ (cmd.exe 직접 호출 시에는 axhub-helpers.exe 부터 시작)
+   & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" settings-merge --apply --scope auto
+   ```
+
+   Exit code 별 처리 (양 platform 공통):
    - 0 (NoOp): 이미 axhub-managed statusLine 있어요 — 변경 없음
    - 2 (Created): settings.json 만들고 statusLine 추가했어요
    - 3 (Merged): 기존 settings.json 에 statusLine 추가했어요
@@ -105,22 +110,42 @@ To enable the axhub statusline:
 
    성공 시 "Claude Code 재시작해주세요" 안내.
 
-   **`복사해서 붙여 넣을래요 (Windows PowerShell)` 선택 시:**
-
-   Unix 분기와 동일한 atomic merge 호출이지만 PowerShell 호환 형식을 사용해요. v0.6.2 의 bash 형식 명령이 PowerShell 에서 `Unexpected token 'settings-merge'` parser error 로 fail 하던 회귀를 막아요.
-
-   ```powershell
-   # 자동 wire (recommended, Windows PowerShell 5.1+)
-   & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" settings-merge --apply --scope auto
-   ```
-
-   Exit code 처리는 Unix 분기와 동일해요 (0/2/3/4/5/6/7).
-
-   성공 시 "Claude Code 재시작해주세요" 안내.
-
    **verify (v0.6.2+):** 성공 후 `~/.claude/settings.json` 의 `statusLine.command` 는 orphan stub 절대경로예요 — macOS/Linux: `~/.local/state/axhub-plugin/orphan-stub-statusline.sh`, Windows: `%LOCALAPPDATA%\axhub-plugin\orphan-stub-statusline.ps1`. `${CLAUDE_PLUGIN_ROOT}` 미확장 리터럴이 아닌 절대경로라서 plugin 버전 변경 / 다른 plugin 활성 시에도 statusline 이 깨지지 않아요.
 
-   **Manual paste fallback** (자동 wire 거부하는 경우):
+   **`복사할 snippet 보여줘요` 선택 시:**
+
+   wiring snippet 을 stdout 으로 출력해요. 사용자가 `~/.claude/settings.json` 에 직접 paste 해요. Unix + Windows 양쪽 snippet 모두 보여주고, 사용자 환경에 맞는 것을 paste 하라고 안내해요.
+
+   **Unix (macOS / Linux / Git Bash / WSL):**
+
+   ```json
+   {
+     "statusLine": {
+       "type": "command",
+       "command": "${CLAUDE_PLUGIN_ROOT}/bin/statusline.sh"
+     }
+   }
+   ```
+
+   **Windows native (PowerShell 5.1+):**
+
+   ```json
+   {
+     "statusLine": {
+       "type": "command",
+       "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/bin/statusline.ps1\""
+     }
+   }
+   ```
+
+   **4 단계 paste 절차:**
+
+   1. `~/.claude/settings.json` 을 텍스트 에디터로 열어요. 파일이 없으면 빈 파일로 만들어도 돼요.
+   2. 위 platform 에 맞는 JSON 블록을 최상위 객체 안에 paste 해요.
+   3. JSON 의 닫는 `}` 가 잘 맞는지 확인해요.
+   4. Claude Code 를 재시작하면 statusline 이 보여요.
+
+   **Clipboard 자동 복사 (interactive 환경 전용, D1 TTY guard 후):**
 
    ```bash
    if command -v pbcopy >/dev/null 2>&1; then
@@ -133,32 +158,6 @@ To enable the axhub statusline:
      echo "(클립보드 도구 없어서 stdout 출력으로 대체했어요)"
      printf '%s\n' "$SNIPPET"
    fi
-   ```
-
-   **`어떻게 하는지 보여줘요` 선택 시:**
-
-   아래 4 단계로 안내해요:
-
-   1. `~/.claude/settings.json` 을 텍스트 에디터로 열어요. 파일이 없으면 빈 파일로 만들어도 돼요.
-   2. 위 Unix wiring snippet JSON 블록을 `settings.json` 최상위 객체 안에 paste 해요.
-   3. JSON 의 닫는 `}` 가 잘 맞는지 확인해요.
-   4. Claude Code 를 재시작하면 statusline 이 보여요.
-
-   **`Windows PowerShell snippet 보여줘요` 선택 시:**
-
-   clipboard 조작 없이 stdout 으로 Windows wiring snippet 을 그대로 출력해요:
-
-   ```
-   ~/.claude/settings.json 에 추가할 Windows native snippet 이에요:
-
-   {
-     "statusLine": {
-       "type": "command",
-       "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/bin/statusline.ps1\""
-     }
-   }
-
-   settings.json 에 paste 하고 Claude Code 를 재시작하면 statusline 이 보여요.
    ```
 
    **`이 repo 만 켤래요 (project scope, dotfiles 비추천)` 선택 시:**
