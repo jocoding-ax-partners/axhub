@@ -4,6 +4,28 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.6.6](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.5...v0.6.6) (2026-05-15)
+
+v0.6.5 ship 직후 user-reported P0 핫픽스예요. `enable-statusline` SKILL step 1 의 AskUserQuestion options 가 6 개로 늘어나면서 Claude Code 의 `maxItems: 4` 제약을 위반해서 `/axhub:enable-statusline` 호출 시 `Invalid tool parameters` 에러로 SKILL invoke 자체 fail 했어요. options 4 개로 통합 (`자동으로 켜요` / `복사할 snippet 보여줘요` / `이 repo 만 켤래요` / `나중에 할래요`) 하고 platform 별 명령은 step 2 본문에서 LLM 이 user prompt context 단서로 분기하도록 했어요. v0.6.5 의 두 fix (cmd.exe UTF-8 + PowerShell autowire 옵션) 는 그대로 유지돼요.
+
+검증 baseline (v0.6.6):
+- `bun run skill:doctor --strict` exit 0
+- `bun run lint:tone --strict` 0 error / 0 warning across 37 files
+- `bun run lint:keywords --check` keywords preserved (no diff)
+- `bun test` (full) — 862 pass / 0 fail / 6 skip / 1 todo across 76 files
+- registry + test fixture byte-lock 동기화 (allowed_safe_defaults 4 → 3, rationale literal)
+
+정직한 tradeoff:
+- `자동으로 켜요` 분기에서 platform 분기를 LLM 이 user context 단서 (예: "PowerShell", "Windows", "cmd") 로 판단해요. 명시적 OS 질문 없이도 작동하지만 user prompt 에 platform 단서가 전혀 없으면 LLM 이 default (Unix bash) 로 가요 — 잘못 추론 시 manual 로 `복사할 snippet 보여줘요` 분기 선택 권장
+- v0.6.5 의 `복사해서 붙여 넣을래요 (Unix bash)` / `(Windows PowerShell)` 두 옵션 통합 → user 가 platform 옵션 선택으로 LLM 에게 명시 신호 주는 UX 손실. 단 max 4 limit 강제라 trade-off 불가피
+- v0.6.3 의 5 옵션도 이미 limit 위반이었지만 Claude Code 가 silent truncation 처리해서 회귀 검출 안 됨 — v0.6.5 의 6 옵션 에서 hard fail 로 surface
+- Cargo.lock 의 windows-sys 0.52/0.60 transitive 잔존 — v0.7.x 으로 defer (외부 crate upstream upgrade 대기)
+- PLAN.md / README.md schema/state 라인의 version drift — `bun run release` postbump 에 plan-consistency lock 추가 검토 (v0.7.x backlog)
+
+### Fixed
+
+* **statusline:** SKILL options 6→4 reduction — AskUserQuestion max-items 위반 P0 (v0.6.6) ([#108](https://github.com/jocoding-ax-partners/axhub/issues/108)) ([d2cbe7e](https://github.com/jocoding-ax-partners/axhub/commit/d2cbe7ef64a293ffdd026cd806844cfd9f87c276))
+
 ## [0.6.5](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.4...v0.6.5) (2026-05-15)
 
 v0.6.4 가 PowerShell wrapper 만 UTF-8 흡수했는데 `cmd.exe` 로 `axhub-helpers.exe` 직접 호출 시 한글 mojibake 재발하고, `enable-statusline` SKILL 의 자동 wire bash 명령이 PowerShell parser 에서 `Unexpected token 'settings-merge'` 로 fail 하던 두 문제를 동시 해결했어요. Rust binary 의 `fn main()` 시작부에 `SetConsoleOutputCP(65001)` 강제 호출 (process-attached scope 라 helper 종료 시 codepage 함께 destroy, parent cmd.exe 영향 0) + SKILL step 1 옵션을 `(Unix bash)` reword + 신규 `(Windows PowerShell)` 분기 추가 했어요. 추가로 axhub repo 의 `.claude/settings.json` 이 e2e test fixture leak 으로 stale tempdir path 가 mutate 되던 P1 버그도 동봉 fix 했어요 (S6 spawnSync 에 `cwd: repoDir` 추가).

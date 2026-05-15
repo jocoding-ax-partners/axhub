@@ -55,7 +55,7 @@ if ($_axhubShowDisclosure) {
 # --- end install-time disclosure ---
 
 $BinDir = Split-Path -Parent $PSCommandPath
-$ReleaseVersion = if ($env:AXHUB_PLUGIN_RELEASE) { $env:AXHUB_PLUGIN_RELEASE } else { 'v0.6.5' }
+$ReleaseVersion = if ($env:AXHUB_PLUGIN_RELEASE) { $env:AXHUB_PLUGIN_RELEASE } else { 'v0.6.6' }
 $ReleaseBase = "https://github.com/jocoding-ax-partners/axhub/releases/download/$ReleaseVersion"
 
 # Windows only ships amd64 (per package.json build:all)
