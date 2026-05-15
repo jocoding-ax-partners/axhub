@@ -27,11 +27,26 @@
 
 $ErrorActionPreference = 'Stop'
 
-# Force UTF-8 console output encoding — Windows PowerShell 5.1 default 은 OEM codepage
-# (Korean OS=CP949, US=CP437) 라 한글 mojibake (`로그?????�어??`) 발생. Claude Code 의
-# statusLine capture 가 child stdout 의 raw bytes 를 UTF-8 로 decode 한다고 가정해요.
+# Force UTF-8 encoding — Windows PowerShell 5.1 default 은 OEM codepage (Korean OS=CP949,
+# US=CP437) 라 한글 mojibake (`로그?????�어??`) 발생.
+#
+# `[Console]::OutputEncoding` 만 설정해도 PowerShell terminal 직접 호출은 한글 정상이지만,
+# Claude Code 가 powershell.exe 를 -File 로 spawn 해서 stdout 을 pipe 로 capture 하는
+# 경로에서는 `Write-Output` / `Out-Default` 가 host UI raw layer 를 사용해 process ANSI
+# codepage (CP949) 로 다시 떨어져요. 우회 위해 `Write-Utf8Line` helper 가 raw UTF-8 bytes 를
+# `[Console]::OpenStandardOutput()` 으로 직접 써요 — PowerShell 의 formatter pipeline 우회.
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 $OutputEncoding = [System.Text.UTF8Encoding]::new()
+
+$script:Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+$script:StdOut = [Console]::OpenStandardOutput()
+
+function Write-Utf8Line {
+  param([string]$Text)
+  $bytes = $script:Utf8NoBom.GetBytes($Text + "`n")
+  $script:StdOut.Write($bytes, 0, $bytes.Length)
+  $script:StdOut.Flush()
+}
 
 try {
   $Root = if ($env:CLAUDE_PLUGIN_ROOT) { $env:CLAUDE_PLUGIN_ROOT } else {
@@ -43,7 +58,7 @@ try {
   if (Test-Path -Path $Helper -PathType Leaf) {
     $helperOut = & $Helper statusline 2>$null
     if ($LASTEXITCODE -eq 0 -and $helperOut) {
-      Write-Output $helperOut
+      Write-Utf8Line $helperOut
       exit 0
     }
   }
@@ -60,7 +75,7 @@ try {
   $AuthOk = ($env:AXHUB_TOKEN -and $env:AXHUB_TOKEN.Length -gt 0) -or (Test-Path -Path $TokenFile -PathType Leaf)
 
   if (-not $AuthOk) {
-    Write-Output 'axhub: 로그인 안 됐어요'
+    Write-Utf8Line 'axhub: 로그인 안 됐어요'
     exit 0
   }
 
@@ -88,12 +103,12 @@ try {
 
   if ($Sha -and $Status_) {
     if (-not $App) { $App = '?' }
-    Write-Output ("axhub: {0} · {1} · 최근 배포 {2} ({3})" -f $App, $Profile_, $Sha, $Status_)
+    Write-Utf8Line ("axhub: {0} · {1} · 최근 배포 {2} ({3})" -f $App, $Profile_, $Sha, $Status_)
   } else {
-    Write-Output ("axhub: {0} · 배포 기록 없어요" -f $Profile_)
+    Write-Utf8Line ("axhub: {0} · 배포 기록 없어요" -f $Profile_)
   }
   exit 0
 } catch {
-  Write-Output 'axhub: '
+  Write-Utf8Line 'axhub: '
   exit 0
 }
