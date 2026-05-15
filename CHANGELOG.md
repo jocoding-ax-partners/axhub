@@ -3,29 +3,39 @@
 All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
 
-### Phase 26 — Vibe Coding Expansion (v1.0 readiness)
+## [0.7.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.9...v0.7.0) (2026-05-15)
 
-axhub 가 v1.0 quality auto-mode 준비 라인으로 확장돼요. 기존 SaaS deployment plugin 에 state-aware megaskill, review/debug/ship/tdd/plan quality SKILL, 3 quality agents, commit/push review gate, post-commit promotion, Karpathy guidelines inject, hook additionalContext 표준 템플릿을 더했어요.
+Phase 26 v1 quality automation release. axhub 가 SaaS deploy plugin 에 머무르지 않고 vibe coder 의 code-quality 보조 surface 로 확장됐어요. 5 신규 quality SKILL (`axhub-review`, `axhub-debug`, `axhub-ship`, `axhub-tdd`, `axhub-plan`) + 3 specialist agent (`axhub-reviewer`, `axhub-debugger`, `axhub-shipper`) + state-aware megaskill (`using-axhub-quality`) + Karpathy guidelines inject + commit/push hard-gate (`commit-gate`) + post-commit promotion + TDD inject (Edit/Write/MultiEdit/NotebookEdit PreToolUse) + hook `additionalContext` canonical template (`<axhub-{hook}-{purpose}>` triad + per-hook token budget) + shape linter CI gate (`lint:hook-inject`) 가 추가됐어요.
 
-제품 약속은 **best-effort next-turn reminder** 예요. Edit / Write / Bash 같은 사용자 행위가 `.axhub-state/quality.json` 에 누적되고, 다음 turn 에 SessionStart/UserPromptSubmit context 가 model 에게 적절한 axhub quality SKILL 호출을 권장해요. commit / push 는 hard gate 로 review 상태를 확인해요.
+제품 약속은 **best-effort next-turn reminder** 예요. Edit / Write / Bash 행위가 `.axhub-state/quality.json` 에 누적되고, 다음 turn 의 SessionStart / UserPromptSubmit context 가 model 에게 적절한 SKILL 호출을 권장해요. commit / push 만 hard gate. v1.0.0 가 아닌 v0.7.0 으로 ship 한 이유는 honest tradeoff section 참고해주세요.
 
-검증 baseline:
-- `cargo test -p axhub-helpers` — pass
-- `bun test` — 926 pass / 0 fail / 6 skip / 1 todo
-- `bunx tsc --noEmit` — clean
-- `bun run skill:doctor --strict` — clean
-- `bun run lint:tone --strict` — 0 error / 0 warning
-- `bun run lint:keywords --check` — keywords preserved
-- `bun run eval:megaskill-pilot` — 20/20, obedience_rate 1.0
-- `bun run eval:megaskill-final` — 120/120, obedience_rate 1.0
-- `bun run bench:hooks` — hook-latency OK
+대용량 변경 + CI fix:
+- 7 SKILL 추가 (`tests/baseline-results.*` 측정 deferred — `[skip-routing-gate]` audit trail PR comment)
+- clippy `if_same_then_else` collapse (`quality_state.rs:175` tree/diff hash `||`)
+- T2 case 35 assertion 갱신 (`prompt-route` Korean prose → English `<axhub-preflight-status>` Option A template)
+- NotebookEdit `notebook_path` 필드 추출 + `.ipynb` source whitelist + `tests/` top-level path 매칭 fix
+- `bin/install.{sh,ps1}`: `.gitignore` 부재 시 생성 fallback 추가
+- megaskill Skip 라인: `AXHUB_DISABLE_MEGASKILL=1` 함께 안내
+
+검증 baseline (v0.7.0):
+- `cargo test -p axhub-helpers` — 387 pass / 0 fail / 3 ignore (24 suites, 17s)
+- `bun test` — 926 pass / 0 fail / 6 skip / 1 todo across 79 files (48s)
+- `bunx tsc --noEmit` clean
+- `bun run skill:doctor --strict` clean
+- `bun run lint:tone --strict` 0 err / 0 warn across 44 files
+- `bun run lint:keywords --check` keywords preserved (no baseline diff)
+- `bun run lint:hook-inject` OK (canonical template enforced)
+- `bun run eval:megaskill-pilot` — 20/20 obedience 1.0
+- `bun run eval:megaskill-final` — 120/120 obedience 1.0
+- `bun run bench:hooks` — hook-latency budget green
+- CI: Local Rust-primary / T2 helper-bin / rust macos|ubuntu|windows / perf macos|ubuntu|windows 모두 pass
 
 정직한 tradeoff:
-- best-effort reminder 는 model obedience 의존이에요. v1.0 은 measurement baseline 을 ship 하고 v1.1 에서 hard gate 강화 여부를 판단해요.
-- v1.0.0 tag / GitHub release / cosign artifact publish 는 외부 배포라 명시 승인 전까지 보류해요. release 시에는 `bun run release -- --release-as 1.0.0` 로 자동 bump/commit/tag 후 이 narrative 를 tag commit 에 맞춰 정리해야 해요.
-
+- best-effort reminder 는 model obedience 의존이에요. v0.7.0 은 measurement baseline 을 ship 하고 v0.8 or v1.x 에서 hard-gate 강화 여부를 obedience drift 측정 후 판단해요. corpus.100 docs-only baseline 재측정 (Claude Sonnet LLM call × 100 fixture, 비용 + latency heavy) 은 본 release 에서 deferred — `[skip-routing-gate]` 사용했고 후속 PR 에서 fresh baseline 측정해서 commit 해요
+- v1.0.0 tag 미사용 이유: 제품 약속 (best-effort) 이 hard guarantee 가 아니라 model behavior 의존이라 SemVer 의 1.x major contract 부담을 v0.7 에서 짊어지지 않아요. v1.0.0 은 obedience baseline 측정 후 stable behavior 입증되면 ship
+- commit gate 는 `AXHUB_SKIP_REVIEW=1` / `AXHUB_DISABLE_TRIGGERS=1` 로 escape 가능 — review-less commit 강제 차단 안 함 (user autonomy 우선)
+- 매 세션 약 2500 tokens 추가 cost (`using-axhub-quality` + Karpathy + preflight). Anthropic prompt cache 적용 시 marginal cost 낮음. 전체 끄려면 `AXHUB_DISABLE_TRIGGERS=1`
 
 ## [0.6.9](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.8...v0.6.9) (2026-05-15)
 
