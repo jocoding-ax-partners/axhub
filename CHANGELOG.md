@@ -4,6 +4,23 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.6.4](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.3...v0.6.4) (2026-05-15)
+
+v0.6.3 ship 직후 user-reported P0 핫픽스예요. Windows PowerShell 5.1 default 콘솔 codepage (Korean OS=CP949, 영문=CP437) 가 OEM 라 statusline 의 UTF-8 한글이 mojibake 로 깨졌어요 (예: `axhub: 로그인 안 됐어요` → `axhub: 로그?????�어??`). `bin/statusline.ps1` 시작부에 `[Console]::OutputEncoding` + `$OutputEncoding` 을 UTF-8 로 강제해서 Claude Code statusLine bar 에 한글이 정상 표시되도록 고쳤어요. orphan stub (`orphan-stub-statusline.ps1`) 은 plugin 의 statusline.ps1 을 delegate 만 하니 한 곳 fix 로 양쪽 경로 다 보호돼요.
+
+검증 baseline (v0.6.4):
+- `bin/statusline.ps1` 시작부 encoding 강제 (PowerShell 5.1+ 호환)
+- `release:check` 5 cross-arch binary build + version assert green
+- macOS 환경 manual verify 불가 — Windows native 사용자 매뉴얼 확인 필요
+
+정직한 tradeoff:
+- mac/linux 에서는 PowerShell 직접 실행 불가라 manual verify 가 Windows 사용자 의존
+- `axhub-helpers.exe` (Rust binary) 자체 stdout encoding 은 OS-default 의존 — 현재 PowerShell wrapper 가 [Console]::OutputEncoding 으로 흡수. wrapper 우회 시나리오 (예: cmd.exe 직접 호출) 는 별도 fix 필요
+
+### Fixed
+
+* **statusline:** PowerShell UTF-8 console output encoding 강제 — 한글 mojibake 수정 ([#106](https://github.com/jocoding-ax-partners/axhub/issues/106)) ([e5ee783](https://github.com/jocoding-ax-partners/axhub/commit/e5ee7832ac7d82093a07f45d9674d260255919c8))
+
 ## [0.6.3](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.1...v0.6.3) (2026-05-15)
 
 OMC HUD 같은 user-global statusLine 이 깔린 환경에서 axhub repo 진입 시만 axhub statusline 보이게 하는 project-scope manual paste 옵션을 `enable-statusline` SKILL 에 추가해요. Claude Code precedence 룰 (project `.claude/settings.json` > user) 을 활용하고 autowire 는 하지 않아요 — `$HOME` 절대경로 commit 사고를 user 명시 paste + `.gitignore` 가이드로 막아요. ralplan 4 iteration consensus + ralph implement + architect 2-pass verify (path mismatch 1 차 reject 후 fix) + deslop pass 거쳐 ship 했어요.
