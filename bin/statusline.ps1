@@ -27,6 +27,12 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Force UTF-8 console output encoding — Windows PowerShell 5.1 default 은 OEM codepage
+# (Korean OS=CP949, US=CP437) 라 한글 mojibake (`로그?????�어??`) 발생. Claude Code 의
+# statusLine capture 가 child stdout 의 raw bytes 를 UTF-8 로 decode 한다고 가정해요.
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
+
 try {
   $Root = if ($env:CLAUDE_PLUGIN_ROOT) { $env:CLAUDE_PLUGIN_ROOT } else {
     Split-Path -Parent (Split-Path -Parent $PSCommandPath)
