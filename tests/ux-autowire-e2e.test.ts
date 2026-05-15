@@ -213,10 +213,13 @@ describe("autowire-statusline e2e — 9 scenarios", () => {
         XDG_STATE_HOME: stateDir,
       };
       // project-scope marker is absent → merge should run
+      // cwd MUST be repoDir — settings_merge.rs::project_settings_path() 가
+      // git rev-parse --show-toplevel 호출 시 caller cwd 의존. cwd 미지정 시
+      // axhub repo 자체의 .claude/settings.json 이 mutate 되는 fixture leak 발생.
       const projectResult = spawnSync(
         HELPER_BIN,
         ["autowire-statusline", "--scope", "project", "--silent"],
-        { encoding: "utf8", timeout: 15_000, env: projectEnv }
+        { cwd: repoDir, encoding: "utf8", timeout: 15_000, env: projectEnv }
       );
       expect(projectResult.status).toBe(0);
 
