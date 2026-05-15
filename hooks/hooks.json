@@ -1,5 +1,5 @@
 {
-  "description": "axhub plugin hooks: SessionStart diagnostics + UserPromptSubmit NL routing + PreToolUse HMAC consent gate (Rust helper, deterministic) + PostToolUse exit-code Korean classifier + PostToolUse deploy artifact verifier (Phase 25 PR 25.3)",
+  "description": "axhub plugin hooks: SessionStart diagnostics + quality auto-mode context + UserPromptSubmit preflight/Karpathy context + PreToolUse consent/review/TDD gates + PostToolUse classifiers (Phase 26)",
   "hooks": {
     "SessionStart": [
       {
@@ -36,6 +36,21 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preauth-check",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers commit-gate",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers tdd-inject",
+            "timeout": 5
           }
         ]
       }
@@ -53,6 +68,33 @@
             "type": "command",
             "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-verify-deploy-artifacts.ts",
             "timeout": 7
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers test-classifier",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers state-update --edit-event",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers test-classifier",
+            "timeout": 5
           }
         ]
       }

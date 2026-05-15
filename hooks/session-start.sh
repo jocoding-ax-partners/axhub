@@ -88,4 +88,15 @@ if [ "${AXHUB_AUTH_BG_REFRESH:-1}" != "0" ] && command -v axhub >/dev/null 2>&1;
   fi
 fi
 
+# Phase 26: warn once when superpowers using-superpowers may conflict with axhub megaskill.
+if [ "${AXHUB_DISABLE_MEGASKILL:-0}" != "1" ] && [ -d "$HOME/.codex/superpowers/skills/using-superpowers" ]; then
+  MARKER="${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/megaskill-superpowers-warning"
+  if [ ! -f "$MARKER" ]; then
+    mkdir -p "$(dirname "$MARKER")" 2>/dev/null || true
+    printf '%s
+' '[axhub] using-superpowers skill detected. axhub quality auto-mode stays best-effort; set AXHUB_DISABLE_MEGASKILL=1 to disable.' >&2
+    date -u +%FT%TZ > "$MARKER" 2>/dev/null || true
+  fi
+fi
+
 exec "$HELPER" session-start

@@ -333,9 +333,15 @@ describe("hooks.json structure", () => {
     expect(shells).not.toContain("powershell");
   });
 
-  test("PreToolUse + PostToolUse remain single-entry (no platform branching needed — direct binary call)", () => {
-    expect(hooksJson.hooks.PreToolUse.length).toBe(1);
-    expect(hooksJson.hooks.PostToolUse.length).toBe(1);
+  test("PreToolUse + PostToolUse register one Bash gate plus quality source-file gates", () => {
+    expect(hooksJson.hooks.PreToolUse.map((g) => g.matcher).sort()).toEqual([
+      "Bash",
+      "Edit|Write|MultiEdit|NotebookEdit",
+    ]);
+    expect(hooksJson.hooks.PostToolUse.map((g) => g.matcher).sort()).toEqual([
+      "Bash",
+      "Edit|Write|MultiEdit",
+    ]);
   });
 });
 
@@ -592,11 +598,16 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(skillDirs.length).toBeGreaterThanOrEqual(11);
   });
 
-  test("all 22 shipped skills are present, including enable-statusline + install-cli + routing-stats + trace + verify", () => {
+  test("all 29 shipped skills are present, including quality expansion skills", () => {
     expect(skillDirs.sort()).toEqual([
       "apis",
       "apps",
       "auth",
+      "axhub-debug",
+      "axhub-plan",
+      "axhub-review",
+      "axhub-ship",
+      "axhub-tdd",
       "clarify",
       "deploy",
       "doctor",
@@ -605,6 +616,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "github",
       "init",
       "install-cli",
+      "karpathy-guidelines",
       "logs",
       "open",
       "profile",
@@ -614,6 +626,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "trace",
       "update",
       "upgrade",
+      "using-axhub-quality",
       "verify",
       "whatsnew",
     ]);
@@ -929,6 +942,7 @@ describe("cross-manifest consistency", () => {
       "session-start", "preauth-check", "consent-mint", "consent-verify",
       "resolve", "preflight", "classify-exit", "redact", "version", "help",
       "list-deployments", "prompt-route", "token-init", "token-import",
+      "commit-gate", "test-classifier", "tdd-inject", "state-update",
     ]);
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {
@@ -939,7 +953,9 @@ describe("cross-manifest consistency", () => {
           // Phase 25 PR 25.3 — bun-launched TS hooks live under hooks/*.ts and
           // are not axhub-helpers subcommands, so they're outside this check.
           if (/hooks\/[a-z0-9_-]+\.ts\b/.test(h.command)) continue;
-          const sub = h.command.split(/\s+/).pop();
+          const parts = h.command.split(/\s+/);
+          const helperIdx = parts.findIndex((part) => part.includes("axhub-helpers"));
+          const sub = helperIdx >= 0 ? parts[helperIdx + 1] : parts.at(-1);
           if (sub) {
             expect(knownSubcommands.has(sub)).toBe(true);
           }
@@ -970,7 +986,7 @@ describe("cross-manifest consistency", () => {
   test("README current-release summary matches package metadata and shipped surfaces", async () => {
     const readme = await readFile(join(REPO_ROOT, "README.md"), "utf8");
     expect(readme).toContain(`**상태**: v${packageJson.version}`);
-    expect(readme).toContain("22 SKILLs / 10 commands");
+    expect(readme).toContain("29 SKILLs / 10 commands");
     expect(readme).not.toContain("AXHUB_HELPERS_RUNTIME=ts");
     expect(readme).not.toContain("TypeScript fallback");
   });

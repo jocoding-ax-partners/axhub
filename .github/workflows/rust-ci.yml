@@ -34,6 +34,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           bun install --frozen-lockfile
+          bun run lint:hook-inject
+          bun run bench:hooks
           bun run cargo:coverage
       - run: cargo build --workspace --release
       - name: Verify static CRT linkage (Windows only)

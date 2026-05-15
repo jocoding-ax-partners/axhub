@@ -2,7 +2,7 @@
 
 > 바이브코더가 자연어로 axhub 앱을 안전하게 배포하고 관리하는 Claude Code 플러그인.
 
-**상태**: v0.6.8 (ship). 22 SKILLs / 10 commands / 5 cross-arch cosign-signed binaries 라이브.
+**상태**: v0.6.9. 29 SKILLs / 10 commands / 3 quality agents / 5 cross-arch cosign-signed binaries 라이브.
 
 ---
 
@@ -12,7 +12,7 @@ axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "결제 
 
 ## 무엇을 할 수 있는가
 
-22 SKILL 자연어 트리거 + 10 슬래시 명령 (한글 alias `/axhub:배포` 포함):
+29 SKILL 자연어 트리거 + 10 슬래시 명령 (한글 alias `/axhub:배포` 포함):
 
 | SKILL | 트리거 예시 | 슬래시 |
 |-------|-------------|--------|
@@ -49,6 +49,44 @@ UX 보장:
 - `https://hub-api.jocodingax.ai` TLS pinning fallback
 - exit 65 (token 만료) → 한국어 안내 + auth login flow
 - SessionStart preflight diagnostics
+
+
+## Quality Auto-mode
+
+axhub v1.0 준비 라인은 코드 작성 행위가 quality SKILL 호출로 이어지는 자동 모드를 추가해요.
+
+### 작동 방식
+
+- 코드 50+ 줄 변경되면 다음 응답 후 axhub-review SKILL 실행을 강하게 권장해요.
+- 테스트 실패를 감지하면 다음 응답에서 axhub-debug 호출을 권장해요.
+- commit 전에 review 안 거치면 PreToolUse ask 로 "review 먼저?" 물어봐요.
+- "리뷰해줘" 같은 발화를 매번 치지 않아도 돼요.
+
+### 제품 약속 (best-effort next-turn reminder)
+
+발화 자체가 trigger 가 아니에요. **다음 응답 시점**에 model 이 state 를 보고
+권장 SKILL 을 호출하는 best-effort 메커니즘이에요. commit / push 만 hard gate 예요.
+
+자세히는 [docs/PRODUCT_CONTRACT.md](docs/PRODUCT_CONTRACT.md) 를 봐주세요.
+
+### 비용 + 비활성화
+
+매 세션 약 2500 tokens 추가돼요. Anthropic prompt cache 가 적용되면 marginal cost 는 낮아요.
+
+전체 끄기:
+
+```bash
+export AXHUB_DISABLE_TRIGGERS=1
+```
+
+개별 끄기:
+
+```bash
+export AXHUB_DISABLE_MEGASKILL=1
+export AXHUB_DISABLE_KARPATHY=1
+export AXHUB_DISABLE_POSTCOMMIT=1
+export AXHUB_TRIGGER_THRESHOLDS=lines:100,files:10,staleness:14d
+```
 
 ## 5분 만에 시작하기
 
@@ -256,7 +294,7 @@ git push origin main --tags         # release.yml 자동 fire (cosign 서명 + G
 - `bunx tsc --noEmit` clean
 - `bun run lint:tone --strict` 0 err / 0 warn
 - `bun run lint:keywords --check` clean
-- `bun run skill:doctor --strict` 22/22 SKILLs complete
+- `bun run skill:doctor --strict` 29/29 SKILLs complete
 - `bun run bench:hooks` prompt-route/preflight p95 thresholds green
 - `bun run test:plugin-e2e:t2` → 12/12 helper lifecycle cases pass
 - `bun run release:check` Rust helper host artifact + release matrix verified

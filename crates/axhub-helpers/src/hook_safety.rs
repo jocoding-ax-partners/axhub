@@ -31,6 +31,14 @@ pub const ENV_DISABLE_LIST: &str = "AXHUB_DISABLE_HOOK";
 pub const LEGACY_DISABLE_ALL: &str = "DISABLE_AXHUB";
 /// ADR-0012 — per-feature opt-out for statusLine autowire (no legacy alias).
 pub const ENV_DISABLE_STATUSLINE_AUTOWIRE: &str = "AXHUB_DISABLE_STATUSLINE_AUTOWIRE";
+/// Phase 26 env: disable quality next-turn triggers and commit gate review prompts.
+pub const ENV_DISABLE_TRIGGERS: &str = "AXHUB_DISABLE_TRIGGERS";
+/// Phase 26 env: disable megaskill SessionStart context.
+pub const ENV_DISABLE_MEGASKILL: &str = "AXHUB_DISABLE_MEGASKILL";
+/// Phase 26 env: disable Karpathy UserPromptSubmit context.
+pub const ENV_DISABLE_KARPATHY: &str = "AXHUB_DISABLE_KARPATHY";
+/// Phase 26 env: disable optional post-commit state promotion.
+pub const ENV_DISABLE_POSTCOMMIT: &str = "AXHUB_DISABLE_POSTCOMMIT";
 
 static LEGACY_WARNING_EMITTED: AtomicBool = AtomicBool::new(false);
 
@@ -61,6 +69,26 @@ pub fn is_hook_disabled(hook_name: &str) -> bool {
 /// value (1/true/yes/on). No legacy alias per ADR-0012 §10.6 polarity rules.
 pub fn is_statusline_autowire_disabled() -> bool {
     env_truthy(ENV_DISABLE_STATUSLINE_AUTOWIRE)
+}
+
+/// Returns true when quality reminder / commit-gate triggers are disabled.
+pub fn is_quality_triggers_disabled() -> bool {
+    env_truthy(ENV_DISABLE_TRIGGERS)
+}
+
+/// Returns true when the SessionStart megaskill context is disabled.
+pub fn is_megaskill_disabled() -> bool {
+    env_truthy(ENV_DISABLE_MEGASKILL) || is_quality_triggers_disabled()
+}
+
+/// Returns true when the Karpathy coding reminder context is disabled.
+pub fn is_karpathy_disabled() -> bool {
+    env_truthy(ENV_DISABLE_KARPATHY) || is_quality_triggers_disabled()
+}
+
+/// Returns true when the optional post-commit promotion hook is disabled.
+pub fn is_postcommit_disabled() -> bool {
+    env_truthy(ENV_DISABLE_POSTCOMMIT) || is_quality_triggers_disabled()
 }
 
 /// Append a structured failure line for post-mortem inspection. Best-effort —
@@ -138,6 +166,10 @@ mod tests {
         std::env::remove_var(ENV_DISABLE_ALL);
         std::env::remove_var(ENV_DISABLE_LIST);
         std::env::remove_var(LEGACY_DISABLE_ALL);
+        std::env::remove_var(ENV_DISABLE_TRIGGERS);
+        std::env::remove_var(ENV_DISABLE_MEGASKILL);
+        std::env::remove_var(ENV_DISABLE_KARPATHY);
+        std::env::remove_var(ENV_DISABLE_POSTCOMMIT);
     }
 
     #[test]
@@ -205,6 +237,18 @@ mod tests {
                 "value `{value}` should not disable"
             );
         }
+        clear_envs();
+    }
+    #[test]
+    fn quality_trigger_env_helpers_follow_truthy_contract() {
+        let _guard = env_lock!();
+        clear_envs();
+        reset_legacy_flag();
+        std::env::set_var(ENV_DISABLE_TRIGGERS, "1");
+        assert!(is_quality_triggers_disabled());
+        assert!(is_megaskill_disabled());
+        assert!(is_karpathy_disabled());
+        assert!(is_postcommit_disabled());
         clear_envs();
     }
 }

@@ -209,3 +209,37 @@ axhub 가 인식하는 모든 환경변수의 polarity / scope 는 `.plan/matrix
 신규 hook 또는 helper 가 자체 kill switch / opt-out 도입 필요할 때는
 **먼저 §10.6 의 룰에 맞춰 변수 이름을 정한 뒤** 본 문서 §1 표에 추가
 해주세요.
+
+## Phase 26 quality hook contract
+
+axhub quality hooks are fail-open except the explicit PreToolUse review gate, which returns a Claude Code `permissionDecision: ask` for `git commit` / `git push` when the current HEAD or worktree has not been reviewed.
+
+### additionalContext template
+
+Every agent-facing hook context uses tagged English blocks:
+
+```text
+<axhub-...>
+[axhub hook | purpose]
+Observed: concrete state
+Suggested: next safe action
+Skip: AXHUB_DISABLE_HOOK=<hook-name>
+</axhub-...>
+```
+
+User-facing warnings stay in Korean `systemMessage`; machine/action context stays in `hookSpecificOutput.additionalContext`.
+
+### Quality hook entries
+
+- `commit-gate` blocks unreviewed `git commit` / `git push` with an ask decision.
+- `tdd-inject` reminds on source file writes before tests.
+- `test-classifier` records failed test commands in `.axhub-state/quality.json`.
+- `state-update --edit-event` updates changed-line counters after source edits.
+- `state-update --post-commit-promote` promotes review acknowledgement after a matching commit.
+
+### Opt-outs
+
+- `AXHUB_DISABLE_TRIGGERS=1` disables quality reminders and gates.
+- `AXHUB_DISABLE_MEGASKILL=1` disables SessionStart quality context only.
+- `AXHUB_DISABLE_KARPATHY=1` disables Karpathy UserPromptSubmit context only.
+- `AXHUB_DISABLE_POSTCOMMIT=1` disables post-commit promotion only.
