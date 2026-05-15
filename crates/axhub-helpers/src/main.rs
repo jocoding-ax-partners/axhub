@@ -23,7 +23,8 @@ use axhub_helpers::session_bundle::{
     write_session_bundle, AuthStatusBundle, LastDeployBundle, SessionBundle,
 };
 use axhub_helpers::settings_merge::{
-    merge as run_settings_merge, MergeOptions, MergeOutcome, Scope,
+    merge as run_settings_merge, migrate_stale_command_path, MergeOptions, MergeOutcome,
+    MigrateOutcome, Scope,
 };
 use axhub_helpers::statusline::current_statusline;
 use axhub_helpers::telemetry::{
@@ -1881,6 +1882,8 @@ struct SettingsMergeArgs {
     json: bool,
     silent: bool,
     command_path_override: Option<PathBuf>,
+    migrate: bool,
+    yes: bool,
 }
 
 fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArgs> {
@@ -1890,6 +1893,8 @@ fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArg
     let mut json = false;
     let mut silent = false;
     let mut command_path_override: Option<PathBuf> = None;
+    let mut migrate = false;
+    let mut yes = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -1897,6 +1902,8 @@ fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArg
             "--dry-run" => dry_run_flag = true,
             "--json" => json = true,
             "--silent" => silent = true,
+            "--migrate" => migrate = true,
+            "--yes" => yes = true,
             "--scope" if i + 1 < args.len() => {
                 i += 1;
                 scope = match args[i].as_str() {
@@ -1915,9 +1922,12 @@ fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArg
             "-h" | "--help" => {
                 println!(
                     "axhub-helpers settings-merge — ~/.claude/settings.json statusLine 병합\n\n\
-                     USAGE:\n  axhub-helpers settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n\n\
+                     USAGE:\n  axhub-helpers settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n\
+                     \n  axhub-helpers settings-merge --migrate [--yes] [--dry-run] [--scope user|project|auto]\n\n\
                      OPTIONS:\n  --apply           실제 병합 실행 (explicit consent gate)\n  \
                      --dry-run         결정만 출력, 파일 변경 없음 (기본값)\n  \
+                     --migrate         stale ${{CLAUDE_PLUGIN_ROOT}} literal 를 orphan stub path 로 교체\n  \
+                     --yes             --migrate 와 함께: 대화형 확인 없이 자동 적용\n  \
                      --scope <s>       user|project|auto (기본: auto)\n  \
                      --json            결과를 JSON 으로 출력\n  \
                      --silent          stderr 억제\n  \
@@ -1937,12 +1947,19 @@ fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArg
     if apply && dry_run_flag {
         anyhow::bail!("--apply 와 --dry-run 은 같이 사용할 수 없어요");
     }
+    if migrate && apply {
+        anyhow::bail!("--migrate 와 --apply 는 같이 사용할 수 없어요");
+    }
     Ok(SettingsMergeArgs {
-        dry_run: !apply, // default = dry-run
+        // --migrate and --apply are mutually exclusive, so `!apply` is always
+        // true in migrate mode — use explicit dry_run_flag instead.
+        dry_run: if migrate { dry_run_flag } else { !apply },
         scope,
         json,
         silent,
         command_path_override,
+        migrate,
+        yes,
     })
 }
 
@@ -2113,9 +2130,39 @@ fn cmd_settings_merge(args: &[String]) -> anyhow::Result<i32> {
             return Ok(64);
         }
     };
+
+    // --migrate mode: detect and rewrite stale ${CLAUDE_PLUGIN_ROOT} literals.
+    if parsed.migrate {
+        return cmd_settings_merge_migrate(parsed);
+    }
+
+    // Ensure orphan stub is ready before --apply.
+    // For --dry-run: only check presence, do NOT install.
+    let command_path_override = if parsed.command_path_override.is_some() {
+        // Explicit override — use as-is (deprecation warning emitted inside default_command_path).
+        parsed.command_path_override
+    } else if !parsed.dry_run {
+        // --apply: install + verify stub (fail-open on error).
+        match axhub_helpers::orphan_stub::install_and_verify() {
+            Some(p) => Some(p),
+            None => {
+                eprintln!("axhub: orphan stub install/verify 실패했어요. merge 는 계속 진행해요.");
+                None
+            }
+        }
+    } else {
+        // --dry-run: check stub presence only, do not install.
+        if let Some(p) = axhub_helpers::orphan_stub::stub_path() {
+            if !axhub_helpers::orphan_stub::verify(&p) {
+                eprintln!("axhub: orphan stub 이 없어요. --apply 실행 시 자동 설치돼요.");
+            }
+        }
+        None
+    };
+
     let opts = MergeOptions {
         silent: parsed.silent,
-        command_path_override: parsed.command_path_override,
+        command_path_override,
         scope: parsed.scope,
         dry_run: parsed.dry_run,
     };
@@ -2139,4 +2186,82 @@ fn cmd_settings_merge(args: &[String]) -> anyhow::Result<i32> {
         MergeOutcome::PermissionDenied => 7,
     };
     Ok(exit_code)
+}
+
+fn cmd_settings_merge_migrate(parsed: SettingsMergeArgs) -> anyhow::Result<i32> {
+    use std::io::IsTerminal as _;
+
+    let dry_run = parsed.dry_run;
+
+    // When not --yes and not --dry-run: run a detection pass, then prompt on TTY.
+    if !parsed.yes && !dry_run {
+        let detect = match migrate_stale_command_path(&parsed.scope, true) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("axhub-helpers settings-merge --migrate: {e}");
+                return Ok(1);
+            }
+        };
+        let stale_labels: Vec<&str> = detect
+            .iter()
+            .filter(|(_, o)| *o == MigrateOutcome::DryRun)
+            .map(|(label, _)| label.as_str())
+            .collect();
+
+        if stale_labels.is_empty() {
+            eprintln!("axhub: stale statusLine.command 항목이 없어요. 이미 최신 상태예요.");
+            return Ok(0);
+        }
+
+        eprintln!("axhub: 아래 scope 의 settings.json 에서 stale statusLine.command 감지했어요:");
+        for label in &stale_labels {
+            eprintln!("  - {label}");
+        }
+
+        if !std::io::stdin().is_terminal() {
+            eprintln!(
+                "axhub: TTY 가 없어요. --yes flag 를 추가해 자동 적용하거나 직접 수정해주세요."
+            );
+            return Ok(0);
+        }
+
+        eprint!("axhub: orphan stub path 로 교체할까요? [y/N]: ");
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input)?;
+        if !input.trim().eq_ignore_ascii_case("y") {
+            eprintln!("axhub: migrate 를 취소했어요.");
+            return Ok(0);
+        }
+    }
+
+    let results = match migrate_stale_command_path(&parsed.scope, dry_run) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("axhub-helpers settings-merge --migrate: {e}");
+            return Ok(1);
+        }
+    };
+
+    if parsed.json {
+        let map: serde_json::Map<String, Value> = results
+            .iter()
+            .map(|(k, v)| (k.clone(), serde_json::to_value(v).unwrap_or(Value::Null)))
+            .collect();
+        println!("{}", serde_json::to_string(&map)?);
+    }
+
+    let migrated = results.iter().any(|(_, o)| *o == MigrateOutcome::Migrated);
+    let dry_detected = results.iter().any(|(_, o)| *o == MigrateOutcome::DryRun);
+    let warned = results
+        .iter()
+        .any(|(_, o)| *o == MigrateOutcome::WarnGitTracked);
+
+    // 0 = no-op/no stale, 2 = migrated (or would migrate), 3 = git-tracked warn
+    Ok(if migrated || dry_detected {
+        2
+    } else if warned {
+        3
+    } else {
+        0
+    })
 }

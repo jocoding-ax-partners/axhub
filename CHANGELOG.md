@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.6.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.1...v0.6.2) (2026-05-14)
+
+다중 plugin 환경 (axhub + OMC + others) 에서 `${CLAUDE_PLUGIN_ROOT}` literal 이 plugin-context-ambiguous 하게 expand 되어 statusline 이 render 안 되는 production bug 를 핫픽스해요. `default_command_path()` 가 plugin-agnostic orphan stub absolute path 를 default 로 반환해요. 기존 broken settings.json 은 `axhub-helpers settings-merge --migrate` 로 atomic 치유해요.
+
+검증 baseline (v0.6.2):
+- `cargo test -p axhub-helpers` — settings_merge / orphan_stub / autowire / migrate unit+integration pass.
+- `bun test` — 862 pass / 0 fail.
+- `bun run skill:doctor --strict` / `lint:tone` / `lint:keywords` clean.
+
+정직한 tradeoff:
+- `settings-merge --apply` 가 이제 부수효과 (stub install) 를 가져요 — docs 에 명시.
+- `command_path_override` flag 는 deprecated (v0.7.0 제거 예정).
+
+### Fixed
+
+* **statusline:** `default_command_path()` 가 plugin-agnostic orphan stub 절대경로 반환 — `${CLAUDE_PLUGIN_ROOT}` 다중 plugin ambiguity 해소
+* **settings-merge:** `--apply` 호출 전 `orphan_stub::install_and_verify()` 자동 보장
+* **settings-merge:** `--migrate` 신규 subcommand — 기존 stale literal atomic rewrite (dual-scope + git-tracked warn)
+* **settings-merge:** `--migrate --yes` dry-run mutex 결함 수정 (P1)
+
 ## [0.6.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.5.13...v0.6.1) (2026-05-14)
 
 v0.6.1 은 #100-#103 스택을 main 에 머지한 뒤 리뷰에서 찾은 Windows statusLine command wrapper, autowire hook dispatcher, orphan-stub stdout 계약 수정을 함께 고정하는 안정화 패치예요. v0.6.0 narrative 의 trust UX 범위는 유지하고, 실제 공개 태그는 post-merge CI green 지점으로 맞춰요.

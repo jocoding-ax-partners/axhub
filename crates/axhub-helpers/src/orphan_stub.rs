@@ -131,6 +131,19 @@ pub fn install_and_verify() -> Option<PathBuf> {
     }
 }
 
+/// Return the platform-appropriate orphan stub absolute path without installing.
+///
+/// Returns `None` if the state dir cannot be resolved (XDG_STATE_HOME / HOME unset).
+/// Use `install_and_verify()` to both install and get the verified path.
+pub fn stub_path() -> Option<PathBuf> {
+    let paths = StubPaths::resolve()?;
+    Some(if cfg!(target_os = "windows") {
+        paths.ps1
+    } else {
+        paths.sh
+    })
+}
+
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------

@@ -103,6 +103,8 @@ To enable the axhub statusline:
 
    성공 시 "Claude Code 재시작해주세요" 안내.
 
+   **verify (v0.6.2+):** 성공 후 `~/.claude/settings.json` 의 `statusLine.command` 는 orphan stub 절대경로예요 — macOS/Linux: `~/.local/state/axhub-plugin/orphan-stub-statusline.sh`, Windows: `%LOCALAPPDATA%\axhub-plugin\orphan-stub-statusline.ps1`. `${CLAUDE_PLUGIN_ROOT}` 미확장 리터럴이 아닌 절대경로라서 plugin 버전 변경 / 다른 plugin 활성 시에도 statusline 이 깨지지 않아요.
+
    **Manual paste fallback** (자동 wire 거부하는 경우):
 
    ```bash

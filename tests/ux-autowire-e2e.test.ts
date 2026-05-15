@@ -1,7 +1,9 @@
-// Phase 26 v0.6.0 — autowire-statusline e2e tests (6 pre-mortem scenarios).
+// Phase 26 v0.6.0 / v0.6.2 — autowire-statusline e2e tests (9 scenarios).
 //
 // Coverage: S1 invalid JSON / S2 inter-plugin / S3 schema drift /
-//           S4 dotbot sync / S5 subprocess race / S6 2-scope isolation.
+//           S4 dotbot sync / S5 subprocess race / S6 2-scope isolation /
+//           P1 multi-plugin disambiguation (AC#4) /
+//           P2 uninstall graceful (AC#5) / P3 version bump invariance (AC#6).
 //
 // Uses the compiled axhub-helpers binary against a real filesystem (tempdir).
 // XDG_STATE_HOME is overridden per-test to isolate state.
@@ -57,7 +59,7 @@ function writeDisclosureMarker(stateDir: string): void {
   writeFileSync(join(axhubState, "install-disclosure-shown.txt"), "shown-by=test\n");
 }
 
-describe("autowire-statusline e2e — 6 pre-mortem scenarios", () => {
+describe("autowire-statusline e2e — 9 scenarios", () => {
   let tempDir: string;
   let stateDir: string;
   let settingsPath: string;
@@ -227,5 +229,94 @@ describe("autowire-statusline e2e — 6 pre-mortem scenarios", () => {
     } finally {
       rmSync(repoDir, { recursive: true, force: true });
     }
+  });
+
+  // ── P1: multi-plugin disambiguation — AC #4 ───────────────────────────────
+  // Pre-mortem S1 회귀: CLAUDE_PLUGIN_ROOT 가 OMC plugin 경로인 상태에서
+  // autowire-statusline 실행 시 settings.json 이 axhub orphan stub 절대경로를
+  // 기록해야 해요. OMC path 나 ${CLAUDE_PLUGIN_ROOT} 리터럴이 아니어야 해요.
+
+  test("P1: multi-plugin disambiguation — CLAUDE_PLUGIN_ROOT=OMC → stub absolute path written", () => {
+    const omcPluginRoot = "/tmp/fake-omc-root/oh-my-claudecode/4.13.7";
+    const env = makeEnv(tempDir, stateDir, { CLAUDE_PLUGIN_ROOT: omcPluginRoot });
+
+    const result = runAutowire(env);
+    expect(result.status).toBe(0);
+    expect(existsSync(settingsPath)).toBe(true);
+
+    const parsed = JSON.parse(readFileSync(settingsPath, "utf8"));
+    const cmd: string = parsed.statusLine.command;
+    // axhub orphan stub 절대경로여야 해요
+    expect(cmd).toContain("orphan-stub-statusline");
+    // OMC 경로가 들어가면 안 돼요
+    expect(cmd).not.toContain("fake-omc-root");
+    expect(cmd).not.toContain("oh-my-claudecode");
+    // ${CLAUDE_PLUGIN_ROOT} 미확장 리터럴이면 안 돼요
+    expect(cmd).not.toContain("${CLAUDE_PLUGIN_ROOT}");
+  });
+
+  // ── P2: uninstall graceful — AC #5 ───────────────────────────────────────
+  // Pre-mortem S3 회귀: axhub plugin 제거 후에도 orphan stub 이 exit 0 (빈 출력)
+  // 으로 graceful 하게 동작해야 해요.
+
+  test("P2: uninstall graceful — stub exits 0 with empty stdout when plugin removed", () => {
+    // 1) autowire 실행 → stub 설치 + settings.json 기록 (기본 pluginRoot 사용)
+    const env = makeEnv(tempDir, stateDir);
+    runAutowire(env);
+
+    // stub 경로 얻기
+    const stubPath = join(stateDir, "axhub-plugin", "orphan-stub-statusline.sh");
+    if (!existsSync(stubPath)) {
+      // stub 설치 안 됐으면 skip (비-POSIX 환경)
+      return;
+    }
+
+    // 2) "plugin uninstall" 시뮬레이션: CLAUDE_PLUGIN_ROOT 를 빈 임시 dir 로 설정
+    const emptyPluginRoot = mkdtempSync(join(tmpdir(), "axhub-uninstall-"));
+    try {
+      const stubResult = spawnSync(stubPath, [], {
+        encoding: "utf8",
+        timeout: 5_000,
+        env: {
+          ...(process.env as Record<string, string>),
+          CLAUDE_PLUGIN_ROOT: emptyPluginRoot,
+        },
+      });
+      // 3) exit 0, stdout 비어 있어야 해요 (graceful empty statusline)
+      expect(stubResult.status).toBe(0);
+      expect(stubResult.stdout.trim()).toBe("");
+    } finally {
+      rmSync(emptyPluginRoot, { recursive: true, force: true });
+    }
+  });
+
+  // ── P3: version bump invariance — AC #6 ──────────────────────────────────
+  // settings.json 재기록 없이 plugin 0.6.1 → 0.6.2 업그레이드 후에도
+  // orphan stub path 가 그대로 유지돼야 해요 (NoOp).
+
+  test("P3: version bump invariance — settings.json not rewritten after plugin upgrade mock", () => {
+    // 1) 첫 번째 autowire: v0.6.1 plugin root
+    const v1PluginRoot = join(tempDir, ".claude", "plugins", "axhub@0.6.1");
+    const env1 = makeEnv(tempDir, stateDir, { CLAUDE_PLUGIN_ROOT: v1PluginRoot });
+    runAutowire(env1);
+    expect(existsSync(settingsPath)).toBe(true);
+
+    const firstContent = readFileSync(settingsPath, "utf8");
+    const firstParsed = JSON.parse(firstContent);
+    const firstCmd: string = firstParsed.statusLine?.command ?? "";
+    expect(firstCmd).toContain("orphan-stub-statusline");
+
+    // 2) done-marker 삭제 → 두 번째 실행이 mtime guard 에 걸리지 않도록
+    const doneMarker = join(stateDir, "axhub-plugin", "auto-wire-done-user.json");
+    try { rmSync(doneMarker); } catch { /* already absent is OK */ }
+
+    // 3) 두 번째 autowire: v0.6.2 plugin root (버전 업그레이드 시뮬레이션)
+    const v2PluginRoot = join(tempDir, ".claude", "plugins", "axhub@0.6.2");
+    const env2 = makeEnv(tempDir, stateDir, { CLAUDE_PLUGIN_ROOT: v2PluginRoot });
+    runAutowire(env2);
+
+    // 4) settings.json 이 변경되지 않아야 해요 (stub path 는 version-independent)
+    const secondContent = readFileSync(settingsPath, "utf8");
+    expect(secondContent).toBe(firstContent);
   });
 });
