@@ -4,6 +4,27 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.6.7](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.6...v0.6.7) (2026-05-15)
+
+v0.6.4 의 `[Console]::OutputEncoding=UTF8` setting 이 PowerShell terminal 직접 호출에서는 한글 정상이지만 Claude Code 가 `powershell.exe -File` 로 spawn 해서 stdout 을 pipe 로 capture 하는 경로에서는 mojibake 재발했어요 (Windows VM 사용자 보고). Root cause 는 PowerShell 5.1 의 `Write-Output` / `Out-Default` formatter 가 non-console host context 에서 host UI raw layer 로 fallback 해서 process ANSI codepage (Korean Windows=CP949) 로 다시 떨어지는 거였어요. `bin/statusline.ps1` 의 5 개 `Write-Output` 모두 `Write-Utf8Line` helper 로 교체해서 `[Console]::OpenStandardOutput()` 으로 raw UTF-8 bytes 를 직접 써요 — PowerShell formatter pipeline 완전 우회.
+
+검증 baseline (v0.6.7):
+- `bun run skill:doctor --strict` exit 0
+- `bun run lint:tone --strict` 0 error / 0 warning across 37 files
+- `bun run lint:keywords --check` keywords preserved (no diff)
+- `bun test` (full) — 862 pass / 0 fail / 6 skip / 1 todo across 76 files
+- 진단 evidence: PowerShell terminal 직접 호출 정상 + Claude Code statusLine 만 mojibake — formatter pipeline layer 가 root cause 임을 증명
+
+정직한 tradeoff:
+- `Write-Utf8Line` helper 는 PowerShell 의 표준 stdout 출력 메커니즘 (`Write-Output`) 우회 — 모든 출력 한 함수로 일원화돼 정직하지만 PowerShell pipeline (`| Out-File` 등) 사용 시 캡처 안 되는 직접 stdout write 라 advanced redirect 시나리오에는 부적합
+- `[Console]::OutputEncoding=UTF8` setting 은 유지 — 일부 PowerShell host 환경에서 여전히 효과 있을 수 있는 이중 방어
+- Windows native `helper.exe` auto-download 는 v0.7.x 까지 deferred 유지 — 사용자가 plugin 설치 시 helper.exe 자동 다운로드 안 되어 inline fallback path 만 동작. mojibake fix 는 helper 유무와 무관하게 적용
+- `bun run release` 시 `PLAN.md` / `README.md` version drift 가 매번 반복되는 manual patch — v0.7.x 의 release postbump 에 plan-consistency lock automation 추가 backlog
+
+### Fixed
+
+* **statusline:** PowerShell raw UTF-8 byte write — Claude Code mojibake P0 (v0.6.7) ([#109](https://github.com/jocoding-ax-partners/axhub/issues/109)) ([02ef2a1](https://github.com/jocoding-ax-partners/axhub/commit/02ef2a1be55aa9b0fe2459383096bfb513b0cda4))
+
 ## [0.6.6](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.5...v0.6.6) (2026-05-15)
 
 v0.6.5 ship 직후 user-reported P0 핫픽스예요. `enable-statusline` SKILL step 1 의 AskUserQuestion options 가 6 개로 늘어나면서 Claude Code 의 `maxItems: 4` 제약을 위반해서 `/axhub:enable-statusline` 호출 시 `Invalid tool parameters` 에러로 SKILL invoke 자체 fail 했어요. options 4 개로 통합 (`자동으로 켜요` / `복사할 snippet 보여줘요` / `이 repo 만 켤래요` / `나중에 할래요`) 하고 platform 별 명령은 step 2 본문에서 LLM 이 user prompt context 단서로 분기하도록 했어요. v0.6.5 의 두 fix (cmd.exe UTF-8 + PowerShell autowire 옵션) 는 그대로 유지돼요.
