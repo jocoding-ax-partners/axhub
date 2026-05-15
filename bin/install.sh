@@ -126,11 +126,14 @@ chmod +x "$LINK_PATH" 2>/dev/null || true
 # Phase 26 — local quality state stays out of git and post-commit promotion is opt-in-safe.
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-  if [ -f "${REPO_ROOT}/.gitignore" ] && ! grep -qxF ".axhub-state/" "${REPO_ROOT}/.gitignore"; then
+  GITIGNORE_PATH="${REPO_ROOT}/.gitignore"
+  if [ ! -f "$GITIGNORE_PATH" ]; then
+    printf '# axhub quality state (local-only)\n.axhub-state/\n' > "$GITIGNORE_PATH" 2>/dev/null || true
+  elif ! grep -qxF ".axhub-state/" "$GITIGNORE_PATH"; then
     {
       printf '\n# axhub quality state (local-only)\n'
       printf '.axhub-state/\n'
-    } >> "${REPO_ROOT}/.gitignore"
+    } >> "$GITIGNORE_PATH"
   fi
   HOOK_PATH="${REPO_ROOT}/.git/hooks/post-commit"
   AXHUB_POSTCOMMIT_LINE='"${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/axhub}/bin/axhub-helpers" state-update --post-commit-promote 2>/dev/null || true'

@@ -85,7 +85,7 @@ preflight_expect_no_forced_route() {
     return 1
   fi
   jq -e '.hookSpecificOutput.hookEventName == "UserPromptSubmit"' "$out" >/dev/null || return 1
-  jq -e '.hookSpecificOutput.additionalContext | contains("axhub 버전 확인 결과")' "$out" >/dev/null || return 1
+  jq -e '.hookSpecificOutput.additionalContext | contains("<axhub-preflight-status>")' "$out" >/dev/null || return 1
 }
 
 FAIL=0

@@ -1381,7 +1381,7 @@ fn session_start_megaskill_context() -> Option<String> {
     let path = root.join("skills/using-axhub-quality/SKILL.md");
     let content = fs::read_to_string(path).ok()?;
     Some(format!(
-        "<axhub-quality-auto-mode>\n[axhub hook | next-turn quality reminder]\nObserved: quality auto-mode available.\nSuggested: read `.axhub-state/quality.json` and call the matching quality SKILL when thresholds require it.\nSkip: AXHUB_DISABLE_HOOK=session-start\n</axhub-quality-auto-mode>\n\n{}",
+        "<axhub-quality-auto-mode>\n[axhub hook | next-turn quality reminder]\nObserved: quality auto-mode available.\nSuggested: read `.axhub-state/quality.json` and call the matching quality SKILL when thresholds require it.\nSkip: AXHUB_DISABLE_HOOK=session-start or AXHUB_DISABLE_MEGASKILL=1\n</axhub-quality-auto-mode>\n\n{}",
         content
     ))
 }

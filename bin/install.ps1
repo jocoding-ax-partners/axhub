@@ -159,7 +159,9 @@ try {
   if ($LASTEXITCODE -eq 0 -and $inside -eq 'true') {
     $RepoRoot = git rev-parse --show-toplevel
     $Gitignore = Join-Path $RepoRoot '.gitignore'
-    if ((Test-Path $Gitignore) -and -not (Select-String -Path $Gitignore -Pattern '^\.axhub-state/$' -Quiet)) {
+    if (-not (Test-Path $Gitignore)) {
+      Set-Content -Path $Gitignore -Value "# axhub quality state (local-only)`n.axhub-state/" -ErrorAction SilentlyContinue
+    } elseif (-not (Select-String -Path $Gitignore -Pattern '^\.axhub-state/$' -Quiet)) {
       Add-Content -Path $Gitignore -Value "`n# axhub quality state (local-only)`n.axhub-state/"
     }
     $HookPath = Join-Path $RepoRoot '.git/hooks/post-commit'

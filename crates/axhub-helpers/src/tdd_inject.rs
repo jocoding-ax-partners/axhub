@@ -8,6 +8,7 @@ pub fn additional_context_for_payload(payload: &Value) -> Option<String> {
     let path = payload
         .pointer("/tool_input/file_path")
         .or_else(|| payload.pointer("/tool_input/path"))
+        .or_else(|| payload.pointer("/tool_input/notebook_path"))
         .and_then(Value::as_str)?;
     if !is_source_write_path(path) || is_test_or_non_code_path(path) {
         return None;
@@ -43,16 +44,26 @@ pub fn is_source_write_path(path: &str) -> bool {
                 | "cpp"
                 | "h"
                 | "hpp"
+                | "ipynb"
         )
     )
 }
 
 pub fn is_test_or_non_code_path(path: &str) -> bool {
-    path.contains("/test/")
-        || path.contains("/tests/")
-        || path.contains("/__tests__/")
+    has_test_segment(path)
         || path.contains(".test.")
         || path.contains(".spec.")
         || path.ends_with("_test.go")
         || path.ends_with("_test.rs")
+}
+
+fn has_test_segment(path: &str) -> bool {
+    for segment in ["test", "tests", "__tests__"] {
+        let prefix = format!("{segment}/");
+        let infix = format!("/{segment}/");
+        if path == segment || path.starts_with(&prefix) || path.contains(&infix) {
+            return true;
+        }
+    }
+    false
 }

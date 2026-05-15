@@ -172,10 +172,11 @@ pub fn update_post_commit_promote(repo_root: &Path) -> Result<()> {
         .as_ref()
         .and_then(|base| git_diff_hash(repo_root, &["diff", &format!("{base}..HEAD")]).ok());
 
-    if committed_tree_hash.is_some() && committed_tree_hash == state.last_reviewed_tree_hash {
-        state.review_commit_sha = Some(head);
-    } else if committed_diff_hash.is_some() && committed_diff_hash == state.last_reviewed_diff_hash
-    {
+    let tree_match =
+        committed_tree_hash.is_some() && committed_tree_hash == state.last_reviewed_tree_hash;
+    let diff_match =
+        committed_diff_hash.is_some() && committed_diff_hash == state.last_reviewed_diff_hash;
+    if tree_match || diff_match {
         state.review_commit_sha = Some(head);
     } else {
         state.review_acknowledged = false;
@@ -298,13 +299,22 @@ fn excluded_path(path: &str) -> bool {
 }
 
 fn is_test_path(path: &str) -> bool {
-    path.contains("/test/")
-        || path.contains("/tests/")
-        || path.contains("/__tests__/")
+    has_test_segment(path)
         || path.contains(".test.")
         || path.contains(".spec.")
         || path.ends_with("_test.go")
         || path.ends_with("_test.rs")
+}
+
+fn has_test_segment(path: &str) -> bool {
+    for segment in ["test", "tests", "__tests__"] {
+        let prefix = format!("{segment}/");
+        let infix = format!("/{segment}/");
+        if path == segment || path.starts_with(&prefix) || path.contains(&infix) {
+            return true;
+        }
+    }
+    false
 }
 
 fn is_source_path(path: &str) -> bool {
@@ -325,6 +335,7 @@ fn is_source_path(path: &str) -> bool {
                 | "cpp"
                 | "h"
                 | "hpp"
+                | "ipynb"
         )
     )
 }

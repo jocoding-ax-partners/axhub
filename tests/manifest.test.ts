@@ -340,7 +340,7 @@ describe("hooks.json structure", () => {
     ]);
     expect(hooksJson.hooks.PostToolUse.map((g) => g.matcher).sort()).toEqual([
       "Bash",
-      "Edit|Write|MultiEdit",
+      "Edit|Write|MultiEdit|NotebookEdit",
     ]);
   });
 });

@@ -217,6 +217,29 @@ fn tdd_inject_emits_option_a_template_for_source_writes_only() {
 }
 
 #[test]
+fn tdd_inject_handles_notebook_edit_notebook_path_field() {
+    let repo = repo();
+    // NotebookEdit tool_input uses `notebook_path`, not `file_path`. Earlier
+    // releases dropped the inject because the field name didn't match.
+    let payload =
+        r#"{"tool_name":"NotebookEdit","tool_input":{"notebook_path":"src/analysis.ipynb"}}"#;
+    let out = run_stdin(&["tdd-inject"], payload, repo.path(), &[]);
+    assert!(out.status.success());
+    let v = json(&out);
+    let ctx = v["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .expect("NotebookEdit on a source .ipynb should inject");
+    assert!(ctx.contains("<axhub-tdd-cycle>"));
+    assert!(ctx.contains("Skip: AXHUB_DISABLE_HOOK=tdd-inject"));
+
+    let test_payload =
+        r#"{"tool_name":"NotebookEdit","tool_input":{"notebook_path":"tests/case.ipynb"}}"#;
+    let out = run_stdin(&["tdd-inject"], test_payload, repo.path(), &[]);
+    assert!(out.status.success());
+    assert_eq!(stdout(&out).trim(), "{}");
+}
+
+#[test]
 fn prompt_route_uses_english_additional_context_template() {
     let repo = repo();
     let out = run_stdin(
