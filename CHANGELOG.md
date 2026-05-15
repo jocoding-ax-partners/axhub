@@ -4,6 +4,35 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.6.9](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.8...v0.6.9) (2026-05-15)
+
+User 가 `axhub login` 으로 정상 로그인했는데 statusline 가 `axhub: 로그인 안 됐어요` 표시하던 P0 버그 수정 (Windows VM 사용자 보고). 원인은 `statusline.rs::token_is_present()` 가 plugin mirror file (`~/.config/axhub-plugin/token`) 만 확인하는데, axhub CLI 는 token 을 platform keychain (macOS=security / Linux=secret-service / Windows=Credential Manager) 에 저장해요. SessionStart hook 의 token-init 가 mirror 만들어야 하는데 Windows VM 환경에서 fire 안 됐거나 fail. 결과: `/axhub:doctor` 는 정상 인식 (`로그인: giri@jocodingax.ai`), statusline 만 mirror 절대 의존으로 불일치 표시.
+
+`token_is_present()` 를 3-step fallback chain (env / file / keychain) 으로 확장했어요. `read_keychain_token()` 재사용. inline fallback path 들 (helper.exe 부재 시 사용) 도 cross-platform parity 갖췄어요:
+- `bin/statusline.sh`: macOS `security find-generic-password -s axhub -w` + Linux `secret-tool lookup service axhub`
+- `bin/statusline.ps1`: Windows Credential Manager `Add-Type CredReadW` (advapi32.dll, `keychain_windows.rs:22` 와 동일 contract)
+
+모든 path 는 silent on miss — auth_ok=false 유지, 에러 안 띄움.
+
+검증 baseline (v0.6.9):
+- `cargo test -p axhub-helpers` — 377 pass / 3 ignore
+- `bun run skill:doctor --strict` exit 0
+- `bun run lint:tone --strict` 0 error / 0 warning
+- `bun run lint:keywords --check` keywords preserved
+- `bunx tsc --noEmit` clean
+- `bun test` (full) — 862 pass / 0 fail / 6 skip / 1 todo across 76 files
+- worktree 로 작업 + architect verify APPROVED
+
+정직한 tradeoff:
+- in-process keychain read 는 spawn cost (`security` / `secret-tool` / CredReadW) 추가. statusline cold path (env/file 미스) 에서만 hit. 5 초 timeout 으로 cap 했어요 — statusline budget <50ms 의 worst case 는 keychain 가 unresponsive 할 때만 발생
+- `axhub auth status --json` CLI 호출 대안 검토했는데 latency 300ms+ 라 reject. 현재 approach 는 keychain 직접 read 로 budget 안에 머물러요
+- root cause (SessionStart token-init 가 Windows VM 에서 fire 안 함) 은 defense-in-depth 차원에서 statusline 자체 fallback 추가가 더 robust — token-init reliability investigation 은 v0.7.x backlog
+- mojibake 이슈는 별도 candidate — Claude Code Windows 의 stdout ANSI decode layer 까지 v0.6.4~v0.6.7 의 UTF-8 force 시도가 도달 못 한 reality. v0.6.9 scope 아님
+
+### Fixed
+
+* **statusline:** keychain fallback 으로 CLI 로그인 인식 (v0.6.9) ([#111](https://github.com/jocoding-ax-partners/axhub/issues/111)) ([ca38f7b](https://github.com/jocoding-ax-partners/axhub/commit/ca38f7b8cecca667325d41e3a8579e21af2b137f))
+
 ## [0.6.8](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.7...v0.6.8) (2026-05-15)
 
 `enable-statusline` SKILL 의 `이 repo 만 켤래요 (project scope, dotfiles 비추천)` 옵션이 v0.6.7 까지는 사용자에게 manual paste 가이드만 보여줬어요. v0.6.8 부터는 `axhub-helpers settings-merge --apply --scope project` 를 자동 호출해서 project `.claude/settings.json` 에 atomic merge 로 statusLine 추가해요. 사용자 부담 0. axhub-helpers 의 `--scope project` 는 이미 v0.5.13 부터 존재했고 (`settings_merge.rs:97`), SKILL 본문만 manual → autowire 로 교체했어요. Rust 변경 0. 3 edge case (non-git repo bail / sub-dir invoke → repo root / Windows helper.exe 미존재 → manual paste fallback) 명시적으로 SKILL 본문에 적었어요.
