@@ -4,6 +4,27 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.6.5](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.4...v0.6.5) (2026-05-15)
+
+v0.6.4 가 PowerShell wrapper 만 UTF-8 흡수했는데 `cmd.exe` 로 `axhub-helpers.exe` 직접 호출 시 한글 mojibake 재발하고, `enable-statusline` SKILL 의 자동 wire bash 명령이 PowerShell parser 에서 `Unexpected token 'settings-merge'` 로 fail 하던 두 문제를 동시 해결했어요. Rust binary 의 `fn main()` 시작부에 `SetConsoleOutputCP(65001)` 강제 호출 (process-attached scope 라 helper 종료 시 codepage 함께 destroy, parent cmd.exe 영향 0) + SKILL step 1 옵션을 `(Unix bash)` reword + 신규 `(Windows PowerShell)` 분기 추가 했어요. 추가로 axhub repo 의 `.claude/settings.json` 이 e2e test fixture leak 으로 stale tempdir path 가 mutate 되던 P1 버그도 동봉 fix 했어요 (S6 spawnSync 에 `cwd: repoDir` 추가).
+
+검증 baseline (v0.6.5):
+- `cargo test -p axhub-helpers` — 377 pass / 3 ignore
+- `bun run skill:doctor --strict` / `lint:tone --strict` / `lint:keywords --check` clean
+- `bunx tsc --noEmit` clean
+- `bun test` — 862 pass / 0 fail / 6 skip / 1 todo across 76 files
+- ralplan 2 iter consensus (Architect APPROVE + Critic APPROVE) → ralph implement → architect verify APPROVED
+
+정직한 tradeoff:
+- `SetConsoleOutputCP` 는 process-attached scope 라 cmd.exe sub-shell 종료 시 codepage 자동 destroy — parent 세션 영향 없어요. 단 chain-tool (`axhub-helpers.exe && other-cjk-tool.exe`) 시나리오에서 후속 도구가 65001 가정 안 하면 surprise 가능 (drop-guard RAII 는 `std::process::exit` 가 Drop 우회라 무효 → 영구 mutation 채택)
+- `windows-sys 0.61` direct dep 추가 — `Cargo.lock` 의 0.61.2 transitive 와 dedup 했지만 0.52/0.60 transitive 잔존 (reqwest/jsonwebtoken 외부 crate 의존, upstream upgrade 대기)
+- `bin/statusline.ps1:33` 의 `[Console]::OutputEncoding=UTF8` 라인 **유지** — wrapper 외 경로 보호 위해 이중 방어
+- `project_settings_path()` 의 caller-cwd 의존 contract 는 SKILL step 1 의 `(Unix bash)` / `(Windows PowerShell)` 옵션 분리로 mitigate 했지만 defense-in-depth (env var override) 는 v0.7.x backlog 로 defer 했어요
+
+### Added
+
+* **statusline:** cmd.exe UTF-8 console + SKILL PowerShell autowire 옵션 (v0.6.5) ([#107](https://github.com/jocoding-ax-partners/axhub/issues/107)) ([3939ee4](https://github.com/jocoding-ax-partners/axhub/commit/3939ee4b87cfd397153849da61dc710d2c7c7ebd))
+
 ## [0.6.4](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.3...v0.6.4) (2026-05-15)
 
 v0.6.3 ship 직후 user-reported P0 핫픽스예요. Windows PowerShell 5.1 default 콘솔 codepage (Korean OS=CP949, 영문=CP437) 가 OEM 라 statusline 의 UTF-8 한글이 mojibake 로 깨졌어요 (예: `axhub: 로그인 안 됐어요` → `axhub: 로그?????�어??`). `bin/statusline.ps1` 시작부에 `[Console]::OutputEncoding` + `$OutputEncoding` 을 UTF-8 로 강제해서 Claude Code statusLine bar 에 한글이 정상 표시되도록 고쳤어요. orphan stub (`orphan-stub-statusline.ps1`) 은 plugin 의 statusline.ps1 을 delegate 만 하니 한 곳 fix 로 양쪽 경로 다 보호돼요.
