@@ -1,0 +1,81 @@
+fixtures:
+  - id: hi-no-state
+    state: {}
+    user_utterance: "안녕하세요"
+    expected_skill_invoke: null
+  - id: edit-50-lines
+    state: {"lines_since_review_user": 50, "files_changed_since_review": 3}
+    user_utterance: "수고했어요"
+    expected_skill_invoke: "axhub-review"
+  - id: edit-100-lines
+    state: {"lines_since_review_user": 100, "files_changed_since_review": 8}
+    user_utterance: "다음 작업 시작할게요"
+    expected_skill_invoke: "axhub-review"
+  - id: test-fail
+    state: {"last_test_failure_at": "2026-05-14T10:00:00Z"}
+    user_utterance: "왜 안되지?"
+    expected_skill_invoke: "axhub-debug"
+  - id: review-said
+    state: {}
+    user_utterance: "리뷰해줘"
+    expected_skill_invoke: "axhub-review"
+  - id: debug-said
+    state: {}
+    user_utterance: "디버그해"
+    expected_skill_invoke: "axhub-debug"
+  - id: ship-said
+    state: {}
+    user_utterance: "PR 만들어"
+    expected_skill_invoke: "axhub-ship"
+  - id: tdd-said
+    state: {}
+    user_utterance: "테스트 먼저"
+    expected_skill_invoke: "axhub-tdd"
+  - id: plan-said
+    state: {}
+    user_utterance: "계획 세워"
+    expected_skill_invoke: "axhub-plan"
+  - id: negation
+    state: {"lines_since_review_user": 0}
+    user_utterance: "그냥 바로 해"
+    expected_skill_invoke: null
+  - id: optout
+    state: {"env": "AXHUB_DISABLE_TRIGGERS"}
+    user_utterance: "리뷰해줘"
+    expected_skill_invoke: null
+  - id: many-files
+    state: {"files_changed_since_review": 7}
+    user_utterance: "다음"
+    expected_skill_invoke: "axhub-review"
+  - id: low-test-ratio
+    state: {"source_files_count": 8, "test_files_count": 1, "new_source_file": true}
+    user_utterance: "계속"
+    expected_skill_invoke: "axhub-tdd"
+  - id: arch-change
+    state: {"files_changed_since_review": 55}
+    user_utterance: "다음"
+    expected_skill_invoke: "axhub-plan"
+  - id: release
+    state: {}
+    user_utterance: "릴리즈 준비"
+    expected_skill_invoke: "axhub-ship"
+  - id: error-cause
+    state: {}
+    user_utterance: "에러 원인 봐줘"
+    expected_skill_invoke: "axhub-debug"
+  - id: code-look
+    state: {}
+    user_utterance: "코드 봐줘"
+    expected_skill_invoke: "axhub-review"
+  - id: redgreen
+    state: {}
+    user_utterance: "RED GREEN 으로 가"
+    expected_skill_invoke: "axhub-tdd"
+  - id: plan-large
+    state: {"major_arch_change": true}
+    user_utterance: "모듈 나눌래"
+    expected_skill_invoke: "axhub-plan"
+  - id: corrupt
+    state: {"corrupt": true}
+    user_utterance: "안녕"
+    expected_skill_invoke: null

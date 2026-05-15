@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **axhub** (3484 symbols, 6809 relationships, 255 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **axhub** (4336 symbols, 8812 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -222,3 +222,9 @@ git push origin main --tags
 - [ ] `git push origin main --tags` 성공
 - [ ] release.yml workflow run completed: success
 - [ ] `gh release view vX.Y.Z` 5 cross-arch binaries 확인
+# axhub v1.0 Quality Agents
+
+- `axhub-review`, `axhub-debug`, `axhub-ship`, `axhub-tdd`, and `axhub-plan` are first-class quality SKILL surfaces.
+- `.axhub-state/quality.json` is local-only state and must not be committed.
+- Commit / push review gating is hard PreToolUse ask unless `AXHUB_SKIP_REVIEW=1` or `AXHUB_DISABLE_TRIGGERS=1` is set.
+- SessionStart quality auto-mode is a best-effort next-turn reminder, not a guaranteed router.

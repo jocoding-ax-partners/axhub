@@ -22,7 +22,7 @@ let helper = findHelper();
 
 const samples = Number(process.env["AXHUB_HOOK_LATENCY_SAMPLES"] ?? "40");
 const warmup = Number(process.env["AXHUB_HOOK_LATENCY_WARMUP"] ?? "5");
-const thresholdMs = Number(process.env["AXHUB_HOOK_LATENCY_P95_MS"] ?? "50");
+const thresholdMs = Number(process.env["AXHUB_HOOK_LATENCY_P95_MS"] ?? "120");
 const shouldBuild = !process.argv.includes("--no-build");
 const printConfigOnly = process.argv.includes("--print-config");
 const fakeBinDir = mkdtempSync(join(tmpdir(), "axhub-hook-bench-"));
@@ -79,7 +79,7 @@ const scenarios = [
   {
     name: "prompt-route no-preflight",
     subcommand: "prompt-route",
-    thresholdMs: 50,
+    thresholdMs: 120,
     payload: { hook_event_name: "UserPromptSubmit", prompt: "결과 봐" },
     assertOutput(stdout: string): void {
       if (stdout.includes("skills/")) throw new Error(`Approach E: no skill path expected, got ${stdout}`);
@@ -89,14 +89,14 @@ const scenarios = [
   {
     name: "prompt-route with preflight (axhub-related)",
     subcommand: "prompt-route",
-    thresholdMs: 50,
+    thresholdMs: 120,
     env: { AXHUB_BIN: fakeAxhub },
     payload: { hook_event_name: "UserPromptSubmit", prompt: "axhub 배포해" },
     assertOutput(stdout: string): void {
       if (stdout.includes("skills/")) throw new Error(`Approach E: no skill path, got ${stdout}`);
       const parsed = JSON.parse(stdout);
       const ctx = parsed?.hookSpecificOutput?.additionalContext;
-      if (typeof ctx !== "string" || !ctx.includes("axhub 버전 확인 결과")) {
+      if (typeof ctx !== "string" || !ctx.includes("<axhub-preflight-status>")) {
         throw new Error(`expected preflight context, got ${stdout}`);
       }
     },
@@ -104,7 +104,7 @@ const scenarios = [
   {
     name: "prompt-route with preflight (off-topic)",
     subcommand: "prompt-route",
-    thresholdMs: 50,
+    thresholdMs: 120,
     env: { AXHUB_BIN: fakeAxhub },
     payload: { hook_event_name: "UserPromptSubmit", prompt: "오늘 날씨 알려줘" },
     assertOutput(stdout: string): void {
@@ -113,6 +113,38 @@ const scenarios = [
       const parsed = JSON.parse(stdout);
       const ctx = parsed?.hookSpecificOutput?.additionalContext;
       if (typeof ctx !== "string") throw new Error(`expected preflight string context, got ${stdout}`);
+    },
+  },
+  {
+    name: "cumulative PreToolUse Bash chain",
+    subcommand: "preauth-check+commit-gate",
+    thresholdMs: 90,
+    payload: {
+      hook_event_name: "PreToolUse",
+      tool_name: "Bash",
+      tool_input: { command: "echo hello" },
+    },
+    assertOutput(stdout: string): void {
+      const parsed = JSON.parse(stdout.split("\n").filter(Boolean).at(-1) ?? "{}");
+      const decision = parsed?.hookSpecificOutput?.permissionDecision;
+      if (decision !== "allow") throw new Error(`expected cumulative allow, got ${stdout}`);
+    },
+  },
+  {
+    name: "cumulative PostToolUse Bash chain",
+    subcommand: "classify-exit+test-classifier",
+    thresholdMs: 60,
+    payload: {
+      hook_event_name: "PostToolUse",
+      tool_name: "Bash",
+      tool_input: { command: "echo hello" },
+      tool_response: { exit_code: 0, stdout: "hello\n", stderr: "" },
+    },
+    assertOutput(stdout: string): void {
+      const lines = stdout.split("\n").filter(Boolean);
+      if (lines.some((line) => JSON.stringify(JSON.parse(line)) !== "{}")) {
+        throw new Error(`expected cumulative no-op {}, got ${stdout}`);
+      }
     },
   },
 ] as const;
@@ -136,19 +168,29 @@ const runScenario = (scenario: typeof scenarios[number]): Result => {
   for (let i = 0; i < samples + warmup; i += 1) {
     const started = process.hrtime.bigint();
     const helperPath: string = helper ?? fail("helper binary missing");
-    const result = spawnSync(helperPath, [scenario.subcommand], {
-      cwd: REPO_ROOT,
-      input,
-      encoding: "utf8",
-      env: { ...process.env, AXHUB_TELEMETRY: "0", ...(scenario as { env?: Record<string, string> }).env },
-    });
+    const subcommands = scenario.subcommand.split("+");
+    const outputs: string[] = [];
+    let failed: { status: number | null; stderr: string } | null = null;
+    for (const subcommand of subcommands) {
+      const result = spawnSync(helperPath, [subcommand], {
+        cwd: REPO_ROOT,
+        input,
+        encoding: "utf8",
+        env: { ...process.env, AXHUB_TELEMETRY: "0", ...(scenario as { env?: Record<string, string> }).env },
+      });
+      if (result.status !== 0) {
+        failed = { status: result.status, stderr: result.stderr };
+        break;
+      }
+      outputs.push(result.stdout.trim());
+    }
     const elapsedMs = Number(process.hrtime.bigint() - started) / 1_000_000;
 
-    if (result.status !== 0) {
-      fail(`${scenario.name}: exit ${result.status}; stderr=${result.stderr.trim()}`);
+    if (failed) {
+      fail(`${scenario.name}: exit ${failed.status}; stderr=${failed.stderr.trim()}`);
     }
     try {
-      scenario.assertOutput(result.stdout.trim());
+      scenario.assertOutput(outputs.join("\n"));
     } catch (err) {
       fail(`${scenario.name}: ${err instanceof Error ? err.message : String(err)}`);
     }

@@ -348,5 +348,81 @@
         "이 repo 만 켤래요 (project scope, dotfiles 비추천)"
       ]
     }
+  },
+  "axhub-review": {
+    "review.scope-confirm": {
+      "safe_default": "핵심 파일만",
+      "rationale": "큰 diff 전체 review 는 시간과 token 비용이 커요. 비대화형 환경에서는 핵심 파일 중심으로 안전하게 축소해요.",
+      "allowed_safe_defaults": [
+        "전체 review",
+        "핵심 파일만",
+        "scope 좁힘"
+      ]
+    },
+    "review.fix-now-suggest": {
+      "safe_default": "review-only",
+      "rationale": "리뷰 findings 자동 수정은 코드 변경을 만들어요. 비대화형 환경에서는 결과만 보고하고 수정은 명시 선택 때 진행해요.",
+      "allowed_safe_defaults": [
+        "fix-now",
+        "review-only"
+      ]
+    }
+  },
+  "axhub-debug": {
+    "debug.context-needed": {
+      "safe_default": "현재 로그만",
+      "rationale": "재현 step 이 모호한 상태에서 임의 가정하지 않고 현재 로그 기반 분석만 제공해요.",
+      "allowed_safe_defaults": [
+        "현재 로그만",
+        "추가 컨텍스트 제공"
+      ]
+    }
+  },
+  "axhub-ship": {
+    "ship.review-missing": {
+      "safe_default": "review 먼저",
+      "rationale": "review 없는 push 또는 PR 은 quality gate 취지와 충돌해요. 비대화형 환경에서는 ship 을 진행하지 않고 review 로 되돌려요.",
+      "allowed_safe_defaults": [
+        "review 먼저",
+        "skip"
+      ]
+    }
+  },
+  "axhub-tdd": {
+    "tdd.target-confirm": {
+      "safe_default": "중단",
+      "rationale": "테스트 target 이 모호하면 잘못된 파일을 만들 수 있어요. 비대화형 환경에서는 중단이 안전해요.",
+      "allowed_safe_defaults": [
+        "중단",
+        "선택한 target"
+      ]
+    }
+  },
+  "axhub-plan": {
+    "plan.step-approve": {
+      "safe_default": "계획 유지",
+      "rationale": "계획 SKILL 은 mutate 하지 않아요. 기본값은 현재 계획을 유지하고 구현은 별도 명시 때 진행해요.",
+      "allowed_safe_defaults": [
+        "계획 유지",
+        "축소",
+        "재작성"
+      ]
+    }
+  },
+  "consent-megaskill": {
+    "enable_or_disable": {
+      "safe_default": "끄기",
+      "rationale": "비대화형 환경에서는 추가 token 주입과 stateful quality mode 를 자동 opt-in 하지 않아요. 사용자가 대화형으로 켤 때만 enable 해요.",
+      "allowed_safe_defaults": [
+        "켜기",
+        "끄기"
+      ]
+    }
+  },
+  "using-axhub-quality": {
+    "_note": "using-axhub-quality has no AskUserQuestion call site."
+  },
+  "karpathy-guidelines": {
+    "_note": "karpathy-guidelines has no AskUserQuestion call site."
   }
 }

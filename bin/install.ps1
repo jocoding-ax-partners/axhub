@@ -154,5 +154,27 @@ if (Test-Path -Path $LinkPath -PathType Any) {
 # Windows: copy (symlinks need admin / developer mode)
 Copy-Item -Path $TargetPath -Destination $LinkPath -Force
 
+try {
+  $inside = git rev-parse --is-inside-work-tree 2>$null
+  if ($LASTEXITCODE -eq 0 -and $inside -eq 'true') {
+    $RepoRoot = git rev-parse --show-toplevel
+    $Gitignore = Join-Path $RepoRoot '.gitignore'
+    if (-not (Test-Path $Gitignore)) {
+      Set-Content -Path $Gitignore -Value "# axhub quality state (local-only)`n.axhub-state/" -ErrorAction SilentlyContinue
+    } elseif (-not (Select-String -Path $Gitignore -Pattern '^\.axhub-state/$' -Quiet)) {
+      Add-Content -Path $Gitignore -Value "`n# axhub quality state (local-only)`n.axhub-state/"
+    }
+    $HookPath = Join-Path $RepoRoot '.git/hooks/post-commit'
+    if (Test-Path $HookPath) {
+      $hasAxhub = Select-String -Path $HookPath -Pattern 'state-update --post-commit-promote' -Quiet
+      if (-not $hasAxhub) {
+        Write-Information '기존 .git/hooks/post-commit 감지됨. 자동 변경은 건너뛰어요. docs/MANUAL-POSTCOMMIT.md 를 참고해주세요.' -InformationAction Continue
+      }
+    }
+  }
+} catch {
+  # fail-open: install must not fail on optional repo-local quality setup
+}
+
 Write-Information "axhub-helpers -> $TargetName (OS=windows, arch=amd64)" -InformationAction Continue
 exit 0

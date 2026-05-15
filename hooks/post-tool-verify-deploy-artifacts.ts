@@ -11,7 +11,6 @@
 // kill-switch contract as the Rust hooks shipped in PR 25.2.
 
 import {
-  emitSystemMessage,
   isAxhubDeployCommand,
   isHookDisabled,
   readStdin,
@@ -48,9 +47,19 @@ async function main(): Promise<void> {
 
   const { passed, violations } = verifyUserAppArtifact(stdout);
   if (!passed && violations.length > 0) {
-    emitSystemMessage(
-      `⚠️ 배포 artifact 검증에서 의심 신호를 발견했어요: ${violations.join(", ")}. 라이브 결과를 한 번 더 확인해주세요.`,
-    );
+    const systemMessage = `⚠️ 배포 artifact 검증에서 의심 신호를 발견했어요: ${violations.join(", ")}. 라이브 결과를 한 번 더 확인해주세요.`;
+    const additionalContext = [
+      "<axhub-deploy-verify>",
+      "[axhub hook | deploy artifact verification]",
+      `Observed: ${violations.join("; ")}`,
+      "Suggested: run axhub verify or inspect deploy logs before claiming the app is live.",
+      "Skip: AXHUB_DISABLE_HOOK=post-tool-verify-deploy-artifacts",
+      "</axhub-deploy-verify>",
+    ].join("\n");
+    console.log(JSON.stringify({
+      systemMessage,
+      hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext },
+    }));
   }
 }
 

@@ -3,6 +3,29 @@
 All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Phase 26 — Vibe Coding Expansion (v1.0 readiness)
+
+axhub 가 v1.0 quality auto-mode 준비 라인으로 확장돼요. 기존 SaaS deployment plugin 에 state-aware megaskill, review/debug/ship/tdd/plan quality SKILL, 3 quality agents, commit/push review gate, post-commit promotion, Karpathy guidelines inject, hook additionalContext 표준 템플릿을 더했어요.
+
+제품 약속은 **best-effort next-turn reminder** 예요. Edit / Write / Bash 같은 사용자 행위가 `.axhub-state/quality.json` 에 누적되고, 다음 turn 에 SessionStart/UserPromptSubmit context 가 model 에게 적절한 axhub quality SKILL 호출을 권장해요. commit / push 는 hard gate 로 review 상태를 확인해요.
+
+검증 baseline:
+- `cargo test -p axhub-helpers` — pass
+- `bun test` — 926 pass / 0 fail / 6 skip / 1 todo
+- `bunx tsc --noEmit` — clean
+- `bun run skill:doctor --strict` — clean
+- `bun run lint:tone --strict` — 0 error / 0 warning
+- `bun run lint:keywords --check` — keywords preserved
+- `bun run eval:megaskill-pilot` — 20/20, obedience_rate 1.0
+- `bun run eval:megaskill-final` — 120/120, obedience_rate 1.0
+- `bun run bench:hooks` — hook-latency OK
+
+정직한 tradeoff:
+- best-effort reminder 는 model obedience 의존이에요. v1.0 은 measurement baseline 을 ship 하고 v1.1 에서 hard gate 강화 여부를 판단해요.
+- v1.0.0 tag / GitHub release / cosign artifact publish 는 외부 배포라 명시 승인 전까지 보류해요. release 시에는 `bun run release -- --release-as 1.0.0` 로 자동 bump/commit/tag 후 이 narrative 를 tag commit 에 맞춰 정리해야 해요.
+
 
 ## [0.6.9](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.8...v0.6.9) (2026-05-15)
 

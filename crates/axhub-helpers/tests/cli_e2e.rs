@@ -916,11 +916,12 @@ exit 1
     );
     assert_eq!(output.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&output.stdout);
-    // Approach E (Phase 2): preflight-only context. cli_too_old 시 한국어 안내.
+    // Phase 26: prompt-route emits tagged English additionalContext only.
     assert!(stdout.contains("UserPromptSubmit"));
-    assert!(stdout.contains("axhub 버전 확인 결과"));
-    assert!(stdout.contains("너무 오래된 버전"));
-    assert!(stdout.contains("axhub 업그레이드해줘"));
+    assert!(stdout.contains("<axhub-preflight-status>"));
+    assert!(stdout.contains("below required range"));
+    assert!(stdout.contains("run `axhub update` before axhub commands."));
+    assert!(stdout.contains("Skip: AXHUB_DISABLE_HOOK=prompt-route"));
     // Approach E: skill path enforcement 폐기.
     assert!(
         !stdout.contains("skills/"),

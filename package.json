@@ -47,7 +47,11 @@
     "cargo:build": "cargo build --workspace",
     "cargo:coverage": "cargo llvm-cov --workspace --fail-under-lines 85",
     "measure:vibe-bootstrap": "bun scripts/measure-vibe-bootstrap.ts",
-    "check:vibe-sla": "bun scripts/check-vibe-bootstrap-sla.ts"
+    "check:vibe-sla": "bun scripts/check-vibe-bootstrap-sla.ts",
+    "agent:new": "bun scripts/codegen-agent-scaffold.ts",
+    "eval:megaskill-pilot": "bun scripts/eval-megaskill-pilot.ts",
+    "eval:megaskill-final": "bun scripts/eval-megaskill-final.ts",
+    "lint:hook-inject": "bun scripts/lint-hook-inject-shape.ts"
   },
   "engines": {
     "bun": ">=1.1.0"

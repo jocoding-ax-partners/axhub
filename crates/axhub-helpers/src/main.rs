@@ -30,6 +30,7 @@ use axhub_helpers::statusline::current_statusline;
 use axhub_helpers::telemetry::{
     append_phase_marker_to_file, emit_deploy_complete, emit_meta_envelope,
 };
+use axhub_helpers::{commit_gate, hook_output, quality_state};
 use chrono::Utc;
 use serde_json::{json, Map, Value};
 
@@ -125,6 +126,13 @@ fn run() -> anyhow::Result<i32> {
         "bootstrap" => cmd_bootstrap(&rest),
         "consent-mint" => cmd_consent_mint(&rest),
         "consent-verify" => cmd_consent_verify(),
+        "state-show" => cmd_state_show(&rest),
+        "state-update" => cmd_state_update(&rest),
+        "commit-gate" => cmd_commit_gate(),
+        "test-classifier" => cmd_test_classifier(),
+        "tdd-inject" => cmd_tdd_inject(),
+        "karpathy-inject" => cmd_karpathy_inject(),
+        "consent" => cmd_quality_consent(&rest),
         "preauth-check" => cmd_preauth_check(),
         "prompt-route" => cmd_prompt_route(),
         "session-start" => cmd_session_start(),
@@ -494,6 +502,162 @@ fn cmd_consent_verify() -> anyhow::Result<i32> {
     Ok(if result.valid { 0 } else { 65 })
 }
 
+fn cmd_state_show(args: &[String]) -> anyhow::Result<i32> {
+    if !args.is_empty() && args != ["--json".to_string()] {
+        eprintln!("axhub-helpers state-show: expected --json or no args");
+        return Ok(64);
+    }
+    let repo_root = quality_state::repo_root_from_cwd()?;
+    println!("{}", quality_state::state_show_json(&repo_root)?);
+    Ok(0)
+}
+
+fn cmd_state_update(args: &[String]) -> anyhow::Result<i32> {
+    let repo_root = quality_state::repo_root_from_cwd()?;
+    match args.first().map(String::as_str) {
+        Some("--review-acknowledged") => quality_state::update_review_acknowledged(&repo_root)?,
+        Some("--post-commit-promote") => {
+            if !hook_safety::is_postcommit_disabled() {
+                quality_state::update_post_commit_promote(&repo_root)?;
+            }
+        }
+        Some("--debug-acknowledged") => quality_state::mark_debug_acknowledged(&repo_root)?,
+        Some("--shipped") => quality_state::mark_shipped(&repo_root)?,
+        Some("--edit-event") => quality_state::update_edit_event(&repo_root)?,
+        Some("--pull") => quality_state::mark_pull(&repo_root)?,
+        Some(flag) => {
+            eprintln!("axhub-helpers state-update: unknown option {flag}");
+            return Ok(64);
+        }
+        None => {
+            eprintln!("axhub-helpers state-update: missing option");
+            return Ok(64);
+        }
+    }
+    out_json(json!({"ok": true}));
+    Ok(0)
+}
+
+fn cmd_commit_gate() -> anyhow::Result<i32> {
+    if hook_safety::is_hook_disabled("commit-gate") || hook_safety::is_quality_triggers_disabled() {
+        println!("{}", hook_output::pre_tool_use_allow());
+        return Ok(0);
+    }
+    let raw = read_stdin()?;
+    let payload: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
+    if payload.get("tool_name").and_then(Value::as_str) != Some("Bash") {
+        println!("{}", hook_output::pre_tool_use_allow());
+        return Ok(0);
+    }
+    let command = payload
+        .pointer("/tool_input/command")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if !commit_gate::is_commit_or_push(command) {
+        println!("{}", hook_output::pre_tool_use_allow());
+        return Ok(0);
+    }
+    let repo_root = quality_state::repo_root_from_cwd()?;
+    let state = quality_state::QualityState::load_or_init(&repo_root)?;
+    match commit_gate::evaluate_bash_command(command, &state, &repo_root) {
+        commit_gate::GateDecision::Allow => println!("{}", hook_output::pre_tool_use_allow()),
+        commit_gate::GateDecision::Ask(reason) => {
+            println!("{}", hook_output::pre_tool_use_ask(&reason))
+        }
+    }
+    Ok(0)
+}
+
+fn cmd_test_classifier() -> anyhow::Result<i32> {
+    if hook_safety::is_hook_disabled("test-classifier")
+        || hook_safety::is_quality_triggers_disabled()
+    {
+        out_json(json!({}));
+        return Ok(0);
+    }
+    let raw = read_stdin()?;
+    let payload: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
+    let command = payload
+        .pointer("/tool_input/command")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let exit_code = payload
+        .pointer("/tool_response/exit_code")
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
+    let failed_event = payload.get("hook_event_name").and_then(Value::as_str)
+        == Some("PostToolUseFailure")
+        || exit_code != 0;
+    if payload.get("tool_name").and_then(Value::as_str) == Some("Bash")
+        && failed_event
+        && axhub_helpers::test_classifier::is_test_command(command)
+    {
+        let repo_root = quality_state::repo_root_from_cwd()?;
+        quality_state::mark_test_failure(&repo_root)?;
+    }
+    out_json(json!({}));
+    Ok(0)
+}
+
+fn cmd_tdd_inject() -> anyhow::Result<i32> {
+    if hook_safety::is_hook_disabled("tdd-inject") || hook_safety::is_quality_triggers_disabled() {
+        out_json(json!({}));
+        return Ok(0);
+    }
+    let raw = read_stdin()?;
+    let payload: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
+    if let Some(ctx) = axhub_helpers::tdd_inject::additional_context_for_payload(&payload) {
+        println!("{}", hook_output::pre_tool_use_context(&ctx));
+    } else {
+        out_json(json!({}));
+    }
+    Ok(0)
+}
+
+fn cmd_karpathy_inject() -> anyhow::Result<i32> {
+    if hook_safety::is_karpathy_disabled() {
+        out_json(json!({}));
+        return Ok(0);
+    }
+    if let Some(ctx) = axhub_helpers::karpathy_inject::user_prompt_karpathy_inject()? {
+        println!("{}", hook_output::user_prompt_context(&ctx));
+    } else {
+        out_json(json!({}));
+    }
+    Ok(0)
+}
+
+fn cmd_quality_consent(args: &[String]) -> anyhow::Result<i32> {
+    let state = match args.first().map(String::as_str) {
+        Some("--enable") => Some(true),
+        Some("--disable") => Some(false),
+        Some("--show") | None => None,
+        Some(flag) => {
+            eprintln!("axhub-helpers consent: unknown option {flag}");
+            return Ok(64);
+        }
+    };
+    let path = state_dir()
+        .unwrap_or_else(|| PathBuf::from(".axhub-state"))
+        .join("quality-consent.json");
+    if let Some(enabled) = state {
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&json!({"megaskill_enabled": enabled}))?,
+        )?;
+    }
+    let enabled = fs::read_to_string(&path)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+        .and_then(|v| v.get("megaskill_enabled").and_then(Value::as_bool))
+        .unwrap_or(false);
+    out_json(json!({"megaskill_enabled": enabled}));
+    Ok(0)
+}
+
 fn cmd_preauth_check() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("preauth-check") {
         out_json(
@@ -603,7 +767,6 @@ fn cmd_prompt_route() -> anyhow::Result<i32> {
     let record = AuditRecord {
         ts: now_iso8601(),
         prompt_hash: sha256_hex(prompt),
-        // UTF-8 byte length, not char count. Korean prompts run ~3x byte size of visible chars.
         prompt_len: prompt.len() as u32,
         cli_version: preflight.output.cli_version.clone(),
         auth_ok: preflight.output.auth_ok,
@@ -613,15 +776,14 @@ fn cmd_prompt_route() -> anyhow::Result<i32> {
     };
     let _ = audit_append(record);
 
-    // format_preflight_context always emits at least one Korean line (cli status branch);
-    // additionalContext is therefore always non-empty in normal operation.
-    let context = format_preflight_context(&preflight);
-    out_json(json!({
-        "hookSpecificOutput": {
-            "hookEventName": "UserPromptSubmit",
-            "additionalContext": context,
+    let mut context = format_preflight_context(&preflight);
+    if !hook_safety::is_karpathy_disabled() {
+        if let Some(karpathy) = axhub_helpers::karpathy_inject::user_prompt_karpathy_inject()? {
+            context.push_str("\n\n");
+            context.push_str(&karpathy);
         }
-    }));
+    }
+    println!("{}", hook_output::user_prompt_context(&context));
     Ok(0)
 }
 
@@ -630,48 +792,59 @@ fn heuristic_axhub_keyword(prompt: &str) -> bool {
     prompt.to_lowercase().contains("axhub")
 }
 
-/// Render preflight result as a Korean systemMessage block. Always emits at
-/// least one line (one of cli_too_old / cli_too_new / !cli_present / healthy)
-/// plus an optional auth_ok=false annotation. Fail-soft: never returns an Err
-/// that blocks the hook.
+/// Render preflight result as a tagged additionalContext block. User-facing
+/// Korean systemMessage prose is intentionally not emitted here; this path is
+/// agent-facing only and is locked by the Phase 26 hook template linter.
 fn format_preflight_context(preflight: &PreflightRun) -> String {
-    let mut lines = Vec::new();
     let cli_version = preflight
         .output
         .cli_version
         .clone()
         .unwrap_or_else(|| "unknown".into());
-    if preflight.output.cli_too_old {
-        lines.push(format!(
-            "axhub 버전 확인 결과, axhub가 너무 오래된 버전이에요 ({cli_version}). 'axhub 업그레이드해줘'라고 말해요."
-        ));
+    let mut observed = Vec::new();
+    let suggested = if preflight.output.cli_too_old {
+        observed.push(format!("axhub CLI v{cli_version} below required range."));
+        "run `axhub update` before axhub commands."
     } else if preflight.output.cli_too_new {
-        lines.push(format!(
-            "axhub 버전 확인 결과, 검증 범위보다 새 버전이에요 ({cli_version}). 플러그인 업데이트 확인이 필요해요."
+        observed.push(format!(
+            "axhub CLI v{cli_version} above validated plugin range."
         ));
+        "check for an axhub plugin update before release-sensitive commands."
     } else if !preflight.output.cli_present {
-        lines
-            .push("axhub 설치 확인 결과, CLI를 찾지 못했어요. axhub 설치 후 다시 점검해요.".into());
+        observed.push("axhub CLI not found on PATH.".to_string());
+        "install axhub CLI before axhub commands."
     } else {
-        lines.push(format!(
-            "axhub 버전 확인 결과, CLI {cli_version} 상태를 확인했어요."
-        ));
-    }
+        observed.push(format!("axhub CLI v{cli_version} healthy."));
+        "no action required."
+    };
     if !preflight.output.auth_ok {
         if let Some(code) = preflight.output.auth_error_code.as_deref() {
-            lines.push(format!("auth 상태 비정상 ({code}). 로그인 확인 필요해요."));
+            observed.push(format!("auth status: failed ({code})."));
         }
+    } else {
+        observed.push("auth status: ok.".to_string());
     }
-    // Phase 9 sub-task 9.2 — examples context marker (env-gated, default off).
-    // Claude Code 가 SKILL.md frontmatter examples field 를 native 인식하면
-    // 별도 hook 주입 불필요. 미지원 환경의 fallback marker 만 emit.
+    let observed_block = if observed.len() == 1 {
+        format!("Observed: {}", observed[0])
+    } else {
+        format!(
+            "Observed:\n{}",
+            observed
+                .into_iter()
+                .map(|line| format!("  - {line}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
+    };
+    let mut block = format!(
+        "<axhub-preflight-status>\n[axhub hook | session preflight]\n{observed_block}\nSuggested: {suggested}\nSkip: AXHUB_DISABLE_HOOK=prompt-route\n</axhub-preflight-status>"
+    );
     if std::env::var("AXHUB_INJECT_EXAMPLES").is_ok() {
-        lines.push(
-            "[examples context] AXHUB_INJECT_EXAMPLES enabled — 각 SKILL.md frontmatter 의 examples field 를 매칭 시 참고해요."
-                .to_string(),
+        block.push_str(
+            "\n\n<axhub-examples-context>\n[axhub hook | examples fallback]\nObserved: AXHUB_INJECT_EXAMPLES enabled.\nSuggested: consult SKILL.md frontmatter examples when matching skills.\nSkip: AXHUB_DISABLE_HOOK=prompt-route\n</axhub-examples-context>",
         );
     }
-    lines.join("\n")
+    block
 }
 
 // Approach E (Phase 4): routing-stats + cleanup-audit subcommands.
@@ -1185,11 +1358,32 @@ fn cmd_session_start() -> anyhow::Result<i32> {
     }
 
     let context = lines.join("\n");
-    println!("{}", json!({"systemMessage": context}));
+    let mut output = json!({"systemMessage": context});
+    if !hook_safety::is_megaskill_disabled() {
+        if let Some(megaskill) = session_start_megaskill_context() {
+            output["hookSpecificOutput"] = json!({
+                "hookEventName": "SessionStart",
+                "additionalContext": megaskill,
+            });
+        }
+    }
+    println!("{}", output);
     let mut m = Map::new();
     m.insert("event".into(), Value::String("session_start".into()));
     emit_meta_envelope(m).ok();
     Ok(0)
+}
+
+fn session_start_megaskill_context() -> Option<String> {
+    let root = std::env::var_os("CLAUDE_PLUGIN_ROOT")
+        .map(PathBuf::from)
+        .or_else(|| std::env::current_dir().ok())?;
+    let path = root.join("skills/using-axhub-quality/SKILL.md");
+    let content = fs::read_to_string(path).ok()?;
+    Some(format!(
+        "<axhub-quality-auto-mode>\n[axhub hook | next-turn quality reminder]\nObserved: quality auto-mode available.\nSuggested: read `.axhub-state/quality.json` and call the matching quality SKILL when thresholds require it.\nSkip: AXHUB_DISABLE_HOOK=session-start or AXHUB_DISABLE_MEGASKILL=1\n</axhub-quality-auto-mode>\n\n{}",
+        content
+    ))
 }
 
 fn session_bundle_path() -> Option<PathBuf> {

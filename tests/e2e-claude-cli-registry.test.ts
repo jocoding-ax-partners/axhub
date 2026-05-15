@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("25 top-level keys (2 메타 + 22 SKILL slug + quality_gate channel)", () => {
+  test("33 top-level keys (2 메타 + 29 SKILL slug + quality_gate + consent channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(25);
+    expect(keys).toHaveLength(33);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
@@ -56,7 +56,13 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "apis",
       "apps",
       "auth",
+      "axhub-debug",
+      "axhub-plan",
+      "axhub-review",
+      "axhub-ship",
+      "axhub-tdd",
       "clarify",
+      "consent-megaskill",
       "deploy",
       "doctor",
       "enable-statusline",
@@ -64,6 +70,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "github",
       "init",
       "install-cli",
+      "karpathy-guidelines",
       "logs",
       "open",
       "profile",
@@ -74,14 +81,15 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "trace",
       "update",
       "upgrade",
+      "using-axhub-quality",
       "verify",
       "whatsnew",
     ]);
   });
 
-  test("34 actual safe_default rationale 엔트리 (Phase 27 PR A2 — Step 1.6 3-way split: cross-tenant + uncertain 추가, v0.5.11 enable-statusline 추가)", () => {
+  test("41 actual safe_default rationale 엔트리 including Phase 26 quality channels", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(34);
+    expect(paths).toHaveLength(41);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -90,7 +98,14 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "apps",
       "auth",
       "auth",
+      "axhub-debug",
+      "axhub-plan",
+      "axhub-review",
+      "axhub-review",
+      "axhub-ship",
+      "axhub-tdd",
       "clarify",
+      "consent-megaskill",
       "deploy",
       "deploy",
       "deploy",

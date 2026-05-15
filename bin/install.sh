@@ -123,4 +123,42 @@ fi
 
 chmod +x "$LINK_PATH" 2>/dev/null || true
 
+# Phase 26 — local quality state stays out of git and post-commit promotion is opt-in-safe.
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  GITIGNORE_PATH="${REPO_ROOT}/.gitignore"
+  if [ ! -f "$GITIGNORE_PATH" ]; then
+    printf '# axhub quality state (local-only)\n.axhub-state/\n' > "$GITIGNORE_PATH" 2>/dev/null || true
+  elif ! grep -qxF ".axhub-state/" "$GITIGNORE_PATH"; then
+    {
+      printf '\n# axhub quality state (local-only)\n'
+      printf '.axhub-state/\n'
+    } >> "$GITIGNORE_PATH"
+  fi
+  HOOK_PATH="${REPO_ROOT}/.git/hooks/post-commit"
+  AXHUB_POSTCOMMIT_LINE='"${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/axhub}/bin/axhub-helpers" state-update --post-commit-promote 2>/dev/null || true'
+  if [ -f "$HOOK_PATH" ]; then
+    if ! grep -q "state-update --post-commit-promote" "$HOOK_PATH"; then
+      if [ "${AXHUB_POSTCOMMIT_INSTALL:-skip}" = "append" ]; then
+        {
+          printf '\n# axhub quality review promotion\n'
+          printf '%s\n' "$AXHUB_POSTCOMMIT_LINE"
+        } >> "$HOOK_PATH"
+        chmod +x "$HOOK_PATH" 2>/dev/null || true
+      else
+        echo "기존 .git/hooks/post-commit 감지됨. 자동 변경은 건너뛰어요. docs/MANUAL-POSTCOMMIT.md 를 참고해주세요." >&2
+      fi
+    fi
+  else
+    mkdir -p "$(dirname "$HOOK_PATH")"
+    {
+      printf '#!/usr/bin/env bash\n'
+      printf 'set -eu\n'
+      printf '[ "${AXHUB_DISABLE_POSTCOMMIT:-0}" = "1" ] && exit 0\n'
+      printf '%s\n' "$AXHUB_POSTCOMMIT_LINE"
+    } > "$HOOK_PATH"
+    chmod +x "$HOOK_PATH" 2>/dev/null || true
+  fi
+fi
+
 echo "axhub-helpers → $TARGET_NAME (OS=$OS_KEY, arch=$ARCH_KEY)"
