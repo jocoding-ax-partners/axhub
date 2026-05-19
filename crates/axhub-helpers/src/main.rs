@@ -35,7 +35,7 @@ use chrono::Utc;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -107,6 +107,8 @@ fn run() -> anyhow::Result<i32> {
         "path" => cmd_path(&rest),
         "token-init" => cmd_token_init(&rest),
         "token-import" => cmd_token_import(&rest),
+        "token-gate" => cmd_token_gate(&rest),
+        "post-install" => cmd_post_install(&rest),
         "classify-exit" => cmd_classify_exit(&rest),
         "preflight" => {
             let run = run_preflight();
@@ -215,6 +217,324 @@ fn cmd_token_init(args: &[String]) -> anyhow::Result<i32> {
         }
     };
     store_and_report_token(json_output, &token, &source)
+}
+
+/// Phase 3.5 token-freshness gate, Rust port of hooks/token-freshness-gate.sh.
+///
+/// Polls the local axhub token file mtime against a "session_ts" anchor (now - 30s)
+/// and falls back to an inline `axhub auth status --json` probe on timeout. The
+/// SKILL deploy Step 3.5 calls this subcommand directly (NOT through hooks.json),
+/// so polling can block up to `AXHUB_GATE_POLL_INTERVAL * AXHUB_GATE_POLL_ITERATIONS`
+/// seconds without hitting Claude Code hook timeouts.
+///
+/// Env contract (preserves hooks/token-freshness-gate.sh fixture semantics):
+///   AXHUB_AUTH_BG_REFRESH=0     silent skip + exit 0
+///   AXHUB_TOKEN_PATH            override token file path (test injection)
+///   AXHUB_GATE_FAKE_NOW         override "now" in seconds (test injection)
+///   AXHUB_GATE_POLL_INTERVAL    seconds per poll iteration (default 5)
+///   AXHUB_GATE_POLL_ITERATIONS  number of poll iterations (default 6)
+///   AXHUB_GATE_AUTH_PROBE       command for inline UNAUTHORIZED check
+///                                (default: `axhub auth status --json`). Parsed with
+///                                POSIX `shlex` (no `eval`) — safer than the sh
+///                                wrapper but breaks pipes/env-assignments overrides.
+///
+/// Exit codes:
+///   0   token fresh OR inline probe matches `"user_email"` OR hook disabled
+///   65  inline probe completed but did not match `"user_email"` (UNAUTHORIZED)
+///   Any other error falls through to exit 0 (fail-open contract).
+fn cmd_token_gate(_rest: &[String]) -> anyhow::Result<i32> {
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    if hook_safety::is_hook_disabled("token-freshness-gate") {
+        return Ok(0);
+    }
+    if std::env::var("AXHUB_AUTH_BG_REFRESH").as_deref() == Ok("0") {
+        return Ok(0);
+    }
+
+    let now: i64 = std::env::var("AXHUB_GATE_FAKE_NOW")
+        .ok()
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or_else(|| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0)
+        });
+    let session_ts = now - 30;
+
+    let token_path: PathBuf = match std::env::var("AXHUB_TOKEN_PATH").ok() {
+        Some(s) => PathBuf::from(s),
+        None => match token_file() {
+            Some(p) => p,
+            None => {
+                eprintln!("[token-gate] token path resolve failed — inline auth status check");
+                return inline_auth_check();
+            }
+        },
+    };
+
+    fn stat_mtime(p: &std::path::Path) -> i64 {
+        fs::metadata(p)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0)
+    }
+
+    if !token_path.exists() {
+        eprintln!("[token-gate] token file missing — inline auth status check");
+        return inline_auth_check();
+    }
+
+    let mtime = stat_mtime(&token_path);
+    if mtime > session_ts {
+        eprintln!("[token-gate] token mtime > session_ts, fresh");
+        return Ok(0);
+    }
+
+    let poll_interval = std::env::var("AXHUB_GATE_POLL_INTERVAL")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(5);
+    let poll_iters = std::env::var("AXHUB_GATE_POLL_ITERATIONS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(6);
+
+    for poll in 0..poll_iters {
+        std::thread::sleep(Duration::from_secs(poll_interval));
+        let mtime = stat_mtime(&token_path);
+        if mtime > session_ts {
+            eprintln!(
+                "[token-gate] token refreshed after {}s",
+                (poll + 1) * poll_interval
+            );
+            return Ok(0);
+        }
+    }
+
+    eprintln!("[token-gate] poll timeout");
+    inline_auth_check()
+}
+
+fn inline_auth_check() -> anyhow::Result<i32> {
+    let probe = std::env::var("AXHUB_GATE_AUTH_PROBE")
+        .unwrap_or_else(|_| "axhub auth status --json".to_string());
+    let parts = match shlex::split(&probe) {
+        Some(parts) if !parts.is_empty() => parts,
+        _ => {
+            eprintln!(
+                "[token-gate] AXHUB_GATE_AUTH_PROBE shellwords parse failed — exit 0 fail-open"
+            );
+            return Ok(0);
+        }
+    };
+    eprintln!("[token-gate] inline auth status check");
+    match std::process::Command::new(&parts[0])
+        .args(&parts[1..])
+        .output()
+    {
+        Ok(out) => {
+            let stdout_str = String::from_utf8_lossy(&out.stdout);
+            if stdout_str.contains("\"user_email\"") {
+                Ok(0)
+            } else {
+                eprintln!("[token-gate] auth UNAUTHORIZED, exit 65");
+                Ok(65)
+            }
+        }
+        Err(_) => {
+            eprintln!("[token-gate] auth probe spawn failed — exit 0 fail-open");
+            Ok(0)
+        }
+    }
+}
+
+/// Phase 3.1 post-install — handles symlink/copy + .gitignore + post-commit hook
+/// + disclosure marker on behalf of `bin/install.{sh,ps1}` (sh/ps1-absorption T7).
+///
+/// The shell wrapper still owns the chicken-and-egg download step (helper IS the
+/// download target). Once `$TARGET_PATH` exists, the wrapper invokes this
+/// subcommand with explicit `--target-name --bin-dir --link-path` flags so the
+/// post-install steps run from a single Rust source of truth.
+///
+/// Flags:
+///   --target-name <N>   downloaded binary filename (e.g. "axhub-helpers-darwin-arm64")
+///   --bin-dir <D>       directory containing $TARGET (== plugin/bin)
+///   --link-path <P>     stable link path (e.g. plugin/bin/axhub-helpers[.exe])
+///   --repo-root <R>     optional git repo root for .gitignore / post-commit hook
+///                       install (NULL when caller is not in a git tree)
+///
+/// Env semantics (codex finding #10 preserved):
+///   AXHUB_NO_DISCLOSURE=1      skip disclosure marker write
+///   AXHUB_SKIP_AUTODOWNLOAD=1  same effect (suppresses disclosure for CI / test
+///                              paths that pipe install output through JSON parsers)
+///   AXHUB_POSTCOMMIT_INSTALL=append → opt-in append to existing post-commit hook
+fn cmd_post_install(args: &[String]) -> anyhow::Result<i32> {
+    let mut target_name: Option<String> = None;
+    let mut bin_dir: Option<PathBuf> = None;
+    let mut link_path: Option<PathBuf> = None;
+    let mut repo_root: Option<PathBuf> = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--target-name" if i + 1 < args.len() => {
+                i += 1;
+                target_name = Some(args[i].clone());
+            }
+            "--bin-dir" if i + 1 < args.len() => {
+                i += 1;
+                bin_dir = Some(PathBuf::from(&args[i]));
+            }
+            "--link-path" if i + 1 < args.len() => {
+                i += 1;
+                link_path = Some(PathBuf::from(&args[i]));
+            }
+            "--repo-root" if i + 1 < args.len() => {
+                i += 1;
+                repo_root = Some(PathBuf::from(&args[i]));
+            }
+            "-h" | "--help" => {
+                println!("axhub-helpers post-install — sh/ps1-absorption Phase 3.1 post-install handler\n\nUSAGE:\n  axhub-helpers post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]");
+                return Ok(0);
+            }
+            other => {
+                eprintln!("axhub-helpers post-install: 알 수 없는 flag: {other}");
+                return Ok(64);
+            }
+        }
+        i += 1;
+    }
+    let (Some(target_name), Some(bin_dir), Some(link_path)) = (target_name, bin_dir, link_path)
+    else {
+        eprintln!(
+            "axhub-helpers post-install: --target-name / --bin-dir / --link-path 가 필요해요"
+        );
+        return Ok(64);
+    };
+
+    let target_path = bin_dir.join(&target_name);
+    if !target_path.exists() {
+        eprintln!(
+            "axhub-helpers post-install: target binary 없어요: {}",
+            target_path.display()
+        );
+        return Ok(64);
+    }
+
+    // sh/ps1-absorption Phase 3.1 (T7): symlink/copy + chmod remain in install.{sh,ps1}
+    // wrapper because tests/install.test.sh exercises the OS/arch matrix with
+    // stub binaries that cannot execute this subcommand. cmd_post_install owns
+    // .gitignore + post-commit + disclosure marker — the parts that benefit
+    // from a single Rust source of truth.
+
+    // .gitignore + post-commit hook (only when --repo-root supplied).
+    if let Some(repo) = repo_root.as_ref() {
+        if repo.exists() {
+            install_axhub_state_gitignore(repo);
+            install_post_commit_hook(repo);
+        }
+    }
+
+    // Disclosure marker write (dual-channel with autowire dispatcher per T3
+    // codex ADR). Suppressed by AXHUB_NO_DISCLOSURE / AXHUB_SKIP_AUTODOWNLOAD
+    // for CI / scripted contexts.
+    if std::env::var("AXHUB_NO_DISCLOSURE").as_deref() != Ok("1")
+        && std::env::var("AXHUB_SKIP_AUTODOWNLOAD").as_deref() != Ok("1")
+    {
+        write_disclosure_marker_from_post_install();
+    }
+
+    println!(
+        "axhub-helpers post-install: {} → {} (target_name={target_name})",
+        link_path.display(),
+        target_name
+    );
+    Ok(0)
+}
+
+fn install_axhub_state_gitignore(repo: &std::path::Path) {
+    let gitignore = repo.join(".gitignore");
+    let entry = ".axhub-state/";
+    if !gitignore.exists() {
+        let body = format!("# axhub quality state (local-only)\n{entry}\n");
+        let _ = fs::write(&gitignore, body);
+        return;
+    }
+    let body = match fs::read_to_string(&gitignore) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    let already_present = body.lines().any(|line| line.trim() == entry);
+    if already_present {
+        return;
+    }
+    // Preserve existing line ending — append entry on a new line. The trailing
+    // newline of the existing file is honored so CRLF (Windows) → CRLF + entry,
+    // LF (Unix) → LF + entry.
+    let needs_leading_newline = !body.ends_with('\n');
+    let suffix = if needs_leading_newline {
+        format!("\n# axhub quality state (local-only)\n{entry}\n")
+    } else {
+        format!("\n# axhub quality state (local-only)\n{entry}\n")
+    };
+    let _ = fs::write(&gitignore, format!("{body}{suffix}"));
+}
+
+fn install_post_commit_hook(repo: &std::path::Path) {
+    let hook_path = repo.join(".git/hooks/post-commit");
+    let post_commit_line = "\"${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/axhub}/bin/axhub-helpers\" state-update --post-commit-promote 2>/dev/null || true";
+    if hook_path.exists() {
+        let body = fs::read_to_string(&hook_path).unwrap_or_default();
+        if body.contains("state-update --post-commit-promote") {
+            return; // already installed
+        }
+        if std::env::var("AXHUB_POSTCOMMIT_INSTALL").as_deref() == Ok("append") {
+            let appended = format!("{body}\n# axhub quality review promotion\n{post_commit_line}\n");
+            let _ = fs::write(&hook_path, appended);
+            #[cfg(unix)]
+            chmod_executable_best_effort(&hook_path);
+        } else {
+            eprintln!(
+                "기존 .git/hooks/post-commit 감지됨. 자동 변경은 건너뛰어요. docs/MANUAL-POSTCOMMIT.md 를 참고해주세요."
+            );
+        }
+        return;
+    }
+    // Create new hook.
+    if let Some(parent) = hook_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let body = format!(
+        "#!/usr/bin/env bash\nset -eu\n[ \"${{AXHUB_DISABLE_POSTCOMMIT:-0}}\" = \"1\" ] && exit 0\n{post_commit_line}\n"
+    );
+    if fs::write(&hook_path, body).is_ok() {
+        #[cfg(unix)]
+        chmod_executable_best_effort(&hook_path);
+    }
+}
+
+#[cfg(unix)]
+fn chmod_executable_best_effort(path: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    if let Ok(meta) = fs::metadata(path) {
+        let mut perms = meta.permissions();
+        perms.set_mode(0o755);
+        let _ = fs::set_permissions(path, perms);
+    }
+}
+
+fn write_disclosure_marker_from_post_install() {
+    let Some(state) = axhub_helpers::runtime_paths::state_dir() else {
+        return;
+    };
+    let marker_path = state.join("install-disclosure-shown.txt");
+    let version = env!("CARGO_PKG_VERSION");
+    let body = format!("v{version}\n");
+    let _ = fs::create_dir_all(&state);
+    let _ = fs::write(&marker_path, body);
 }
 
 fn cmd_token_import(args: &[String]) -> anyhow::Result<i32> {
@@ -2185,7 +2505,12 @@ fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArg
 // ---------------------------------------------------------------------------
 
 fn cmd_autowire_statusline(args: &[String]) -> anyhow::Result<i32> {
+    // sh/ps1-absorption Phase 2.2 (T6): added `auto` scope keyword + dispatch
+    // mode so shell wrappers can drop the manual scope-detection block. The
+    // `--child` worker mode is preserved unchanged for the dispatcher's
+    // self-spawn path.
     let mut scope: Option<Scope> = None;
+    let mut auto_scope = false;
     let mut silent = false;
     let mut command_path: Option<PathBuf> = None;
     let mut is_child = false;
@@ -2194,29 +2519,31 @@ fn cmd_autowire_statusline(args: &[String]) -> anyhow::Result<i32> {
         match args[i].as_str() {
             "--scope" if i + 1 < args.len() => {
                 i += 1;
-                scope = Some(match args[i].as_str() {
-                    "user" => Scope::User,
-                    "project" => Scope::Project,
+                match args[i].as_str() {
+                    "user" => scope = Some(Scope::User),
+                    "project" => scope = Some(Scope::Project),
+                    "auto" => auto_scope = true,
                     other => {
                         eprintln!(
-                            "axhub-helpers autowire-statusline: --scope 는 user|project 만 가능해요 (받은 값: {other})"
+                            "axhub-helpers autowire-statusline: --scope 는 user|project|auto 만 가능해요 (받은 값: {other})"
                         );
                         return Ok(64);
                     }
-                });
+                }
             }
             arg if arg.starts_with("--scope=") => {
                 let value = arg.trim_start_matches("--scope=");
-                scope = Some(match value {
-                    "user" => Scope::User,
-                    "project" => Scope::Project,
+                match value {
+                    "user" => scope = Some(Scope::User),
+                    "project" => scope = Some(Scope::Project),
+                    "auto" => auto_scope = true,
                     other => {
                         eprintln!(
-                            "axhub-helpers autowire-statusline: --scope 는 user|project 만 가능해요 (받은 값: {other})"
+                            "axhub-helpers autowire-statusline: --scope 는 user|project|auto 만 가능해요 (받은 값: {other})"
                         );
                         return Ok(64);
                     }
-                });
+                }
             }
             "--silent" => silent = true,
             "--child" => is_child = true,
@@ -2247,10 +2574,25 @@ fn cmd_autowire_statusline(args: &[String]) -> anyhow::Result<i32> {
         }
         i += 1;
     }
-    let scope = match scope {
-        Some(s) => s,
-        None => {
-            eprintln!("axhub-helpers autowire-statusline: --scope user|project 가 필요해요");
+    let scope = match (scope, auto_scope) {
+        (Some(s), _) => s,
+        (None, true) => match detect_scope_from_env() {
+            Some(s) => s,
+            None => {
+                // Ambiguous scope (CLAUDE_PLUGIN_ROOT 가 user/project 어느 plugins dir 도
+                // 아니면) — fail-closed exit 0. shell wrapper 의 step 3 동작 보존.
+                if !silent {
+                    eprintln!(
+                        "axhub-helpers autowire-statusline: --scope auto 가 scope 감지 실패 — 종료 (fail-closed)"
+                    );
+                }
+                return Ok(0);
+            }
+        },
+        (None, false) => {
+            eprintln!(
+                "axhub-helpers autowire-statusline: --scope user|project|auto 가 필요해요"
+            );
             return Ok(64);
         }
     };
@@ -2261,6 +2603,61 @@ fn cmd_autowire_statusline(args: &[String]) -> anyhow::Result<i32> {
         is_dispatcher: !is_child,
     });
     Ok(code)
+}
+
+/// Detect statusLine scope from `CLAUDE_PLUGIN_ROOT` prefix.
+///
+/// Mirrors `hooks/session-start-autowire.{sh,ps1}` step 3 logic so the shell
+/// wrappers can drop manual scope detection and rely on `--scope auto`.
+///
+/// Returns:
+///   - `Some(Scope::User)`     when `CLAUDE_PLUGIN_ROOT` starts with `$HOME/.claude/plugins/`
+///   - `Some(Scope::Project)`  when it starts with `<repo>/.claude/plugins/`
+///   - `None`                  when ambiguous (fail-closed in caller)
+fn detect_scope_from_env() -> Option<Scope> {
+    let root = std::env::var("CLAUDE_PLUGIN_ROOT").ok()?;
+    if let Ok(home) = std::env::var("HOME") {
+        let user_prefix = format!("{home}/.claude/plugins/");
+        if root.starts_with(&user_prefix) {
+            return Some(Scope::User);
+        }
+    }
+    // Windows USERPROFILE fallback for `$HOME` shape mirroring the ps1 wrapper.
+    if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        let user_prefix = format!("{userprofile}\\.claude\\plugins\\");
+        if root.starts_with(&user_prefix) {
+            return Some(Scope::User);
+        }
+    }
+    // Project scope: `git -C <cwd> rev-parse --show-toplevel` then check whether
+    // CLAUDE_PLUGIN_ROOT starts with `<repo>/.claude/plugins/`. cwd-sensitive —
+    // dispatcher 가 child spawn 전 호출하므로 SessionStart hook 의 cwd 가
+    // 사용자의 repo 일 때 정확하게 동작해요.
+    let cwd = std::env::current_dir().ok()?;
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&cwd)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let repo = String::from_utf8(output.stdout).ok()?.trim().to_string();
+    if repo.is_empty() {
+        return None;
+    }
+    let project_prefix_unix = format!("{repo}/.claude/plugins/");
+    if root.starts_with(&project_prefix_unix) {
+        return Some(Scope::Project);
+    }
+    // Windows path separator variant
+    let repo_win = repo.replace('/', "\\");
+    let project_prefix_win = format!("{repo_win}\\.claude\\plugins\\");
+    if root.starts_with(&project_prefix_win) {
+        return Some(Scope::Project);
+    }
+    None
 }
 
 // ---------------------------------------------------------------------------

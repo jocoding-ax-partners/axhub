@@ -64,13 +64,17 @@ describe("deploy SKILL Phase 3.5 wire-up invariants", () => {
     const body = deploySkill();
     const previewIndex = body.indexOf("3. **Render preview card via AskUserQuestion**");
     const gateIndex = body.indexOf("3.5. **Token freshness gate");
-    const scriptIndex = body.indexOf("hooks/token-freshness-gate.sh", gateIndex);
+    // sh/ps1-absorption Phase 4 (T8): SKILL now calls `axhub-helpers token-gate`
+    // directly. Legacy `bash hooks/token-freshness-gate.sh` invocation removed;
+    // the shim file still exists for backward compat but the SKILL no longer
+    // references it.
+    const helperIndex = body.indexOf("axhub-helpers\" token-gate", gateIndex);
     const consentIndex = body.indexOf("axhub-helpers consent-mint");
 
     expect(previewIndex).toBeGreaterThan(-1);
     expect(gateIndex).toBeGreaterThan(previewIndex);
-    expect(scriptIndex).toBeGreaterThan(gateIndex);
-    expect(consentIndex).toBeGreaterThan(scriptIndex);
+    expect(helperIndex).toBeGreaterThan(gateIndex);
+    expect(consentIndex).toBeGreaterThan(helperIndex);
   });
 
   test("cli_too_new registry default continues without mutating preferences", () => {

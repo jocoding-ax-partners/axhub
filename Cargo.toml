@@ -28,3 +28,4 @@ unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v4", "serde"] }
 tokio = { version = "1", features = ["time", "rt-multi-thread", "macros", "io-util", "io-std", "process", "sync"] }
 crossterm = "0.28"
+shlex = "1.3"

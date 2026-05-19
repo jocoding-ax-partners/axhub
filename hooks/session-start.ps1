@@ -125,6 +125,29 @@ if ($env:AXHUB_SKIP_AUTODOWNLOAD -ne '1') {
   }
 }
 
+# Step 2.5: detached auth-refresh-bg trigger (mirror of session-start.sh:84-89).
+# When `axhub` CLI reports UNAUTHORIZED, spawn `axhub-helpers auth-refresh-bg`
+# in the background so token refresh runs in parallel with the user's deploy
+# preview prompt. Helper writes the result sentinel; SKILL Step 3.5 polls
+# token mtime + reads sentinel before deploy_create.
+# AXHUB_AUTH_BG_REFRESH=0 disables. axhub CLI absent -> skip.
+# Phase 3.2: this closes the Windows parity gap that previously only existed in
+# the POSIX sh wrapper.
+if ($env:AXHUB_AUTH_BG_REFRESH -ne '0') {
+  $axhubCmd = Get-Command axhub -ErrorAction SilentlyContinue
+  if ($axhubCmd) {
+    try {
+      $authStatus = & axhub auth status --json 2>$null
+      if ($authStatus -notmatch '"user_email"') {
+        Start-Process -FilePath $Helper -ArgumentList 'auth-refresh-bg' `
+          -WindowStyle Hidden -ErrorAction SilentlyContinue | Out-Null
+      }
+    } catch {
+      # Silent — fire-and-forget, never block session-start on this.
+    }
+  }
+}
+
 # Step 3: optional telemetry breadcrumb (only when AXHUB_TELEMETRY=1)
 # State dir mirrors telemetry.ts:40-44 (XDG_STATE_HOME envvar with HOME-relative fallback)
 if ($env:AXHUB_TELEMETRY -eq '1') {
