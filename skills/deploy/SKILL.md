@@ -495,10 +495,10 @@ To deploy:
 
    ```bash
    echo '[deploy:Step 3.5 token-freshness] entered' >&2
-   bash "${CLAUDE_PLUGIN_ROOT}/hooks/token-freshness-gate.sh"
+   "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" token-gate
    ```
 
-   The gate script (`hooks/token-freshness-gate.sh`) captures `now - 30 s` locally as the freshness anchor (matches `.plan` §3.4), polls token mtime up to 30 s (5 s × 6 iter), and calls `axhub auth status --json` inline on timeout. UNAUTHORIZED → exit 65 routes to Step 6 recovery. Cross-platform `stat` chain handles GNU (`-c %Y`) and BSD/macOS (`-f %m`); on stripped systems where neither flag works the chain returns 0 and inline check decides. Test fixtures inject `AXHUB_TOKEN_PATH` / `AXHUB_GATE_FAKE_NOW` / `AXHUB_GATE_POLL_*` to exercise the gate without a live OAuth flow.
+   `axhub-helpers token-gate` (sh/ps1-absorption Phase 1.1, T3) captures `now - 30 s` locally as the freshness anchor (matches `.plan` §3.4), polls token mtime up to 30 s (5 s × 6 iter), and calls `axhub auth status --json` inline on timeout. UNAUTHORIZED → exit 65 routes to Step 6 recovery. Pre-Phase 1.1 SKILL invocations through `bash hooks/token-freshness-gate.sh` still work — the shim delegates to the Rust binary — but new flows should call the helper directly. The Rust subcommand uses `std::fs::metadata().modified()` so the GNU vs BSD `stat` flag matrix disappears; cross-platform parity (Windows previously missing this gate entirely) comes for free. Test fixtures inject `AXHUB_TOKEN_PATH` / `AXHUB_GATE_FAKE_NOW` / `AXHUB_GATE_POLL_*` to exercise the gate without a live OAuth flow.
 
 3.6. **토큰 freshness 폴링 중 신규 webhook 감지 (`--refresh-in-flight`).** Step 3.5 폴링 대기 중에 새 webhook 이 도착해 in_flight 상태가 바뀔 수 있어요. `AXHUB_REFRESH_IN_FLIGHT=1` 이거나 `--refresh-in-flight` 플래그가 있으면, 폴링 종료 직후 `deploy-prep` 을 재조회해요.
 

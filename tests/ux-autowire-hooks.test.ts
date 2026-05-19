@@ -73,18 +73,29 @@ describe("Phase 0.6.0 — session-start-autowire hook contract", () => {
     expect(body).not.toMatch(/^[^#]*exit [1-9]/m);
   });
 
-  test("dispatcher passes parser-compatible split CLI flags", () => {
+  test("dispatcher passes parser-compatible split CLI flags (--scope auto OR explicit split form)", () => {
+    // sh/ps1-absorption Phase 2.2 (T6): wrapper now delegates scope detection
+    // to `axhub-helpers autowire-statusline --scope auto`. The legacy form
+    // (`--scope "$SCOPE" --command-path "$STUB_PATH"`) is still accepted if
+    // a wrapper opts back into manual scope detection. Either form is valid;
+    // the rule we enforce is that `--scope=X` / `--command-path=X` (the
+    // equal-sign joined form that older argparsers split incorrectly) is
+    // never used.
     const sh = readFileSync(HOOK_SH, "utf8");
-    expect(sh).not.toContain("--scope=${SCOPE}");
-    expect(sh).not.toContain("--command-path=${STUB_PATH}");
-    expect(sh).toContain('--scope "$SCOPE"');
-    expect(sh).toContain('--command-path "$STUB_PATH"');
+    expect(sh).not.toContain("--scope=");
+    expect(sh).not.toContain("--command-path=");
+    const shHasAuto = sh.includes("--scope auto");
+    const shHasLegacySplit =
+      sh.includes('--scope "$SCOPE"') && sh.includes('--command-path "$STUB_PATH"');
+    expect(shHasAuto || shHasLegacySplit).toBe(true);
 
     const ps1 = readFileSync(HOOK_PS1, "utf8");
     expect(ps1).not.toContain("--scope=$Scope");
     expect(ps1).not.toContain("--command-path=$StubPath");
-    expect(ps1).toMatch(/'--scope'\s+\$Scope/s);
-    expect(ps1).toMatch(/'--command-path'\s+\$StubPath/s);
+    const ps1HasAuto = /'--scope',\s*'auto'/.test(ps1);
+    const ps1HasLegacySplit =
+      /'--scope'\s+\$Scope/.test(ps1) && /'--command-path'\s+\$StubPath/.test(ps1);
+    expect(ps1HasAuto || ps1HasLegacySplit).toBe(true);
   });
 
   test("sh hook body has Korean 해요체 (no forbidden tokens)", () => {

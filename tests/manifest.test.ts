@@ -360,10 +360,11 @@ describe("Phase 11 deferred-doc artifacts", () => {
     const ps1 = await readFile(join(REPO_ROOT, "tests/smoke-windows-vm-checklist.ps1"), "utf8");
     expect(ps1).toContain("$env:AXHUB_VM_SMOKE");
     expect(ps1).toContain("if ($env:AXHUB_VM_SMOKE -ne '1')");
-    // 14 Run-Step calls
+    // 15 Run-Step calls (sh/ps1-absorption Phase 3.2 T2 added Step 14
+    // auth-refresh-bg trigger check; original Summary moved to Step 15)
     const runSteps = ps1.match(/^Run-Step \d+/gm);
     expect(runSteps).not.toBeNull();
-    expect(runSteps!.length).toBe(14);
+    expect(runSteps!.length).toBe(15);
   });
 
   test("docs/pilot/authenticode-signing-runbook.md exists", async () => {
@@ -1055,6 +1056,121 @@ describe("Phase 27.x — preflight !command injection variant-aware byte-identic
       const content = readFileSync(join(REPO_ROOT, target.file), "utf8");
       const expectedLine = getInjectionLineForVariant(target.variant);
       expect(content).toContain(expectedLine);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// sh/ps1-absorption Phase 4 (F3 / TODO 3) — hooks.json invariant 자동 가드.
+// Reason: Phase 4 PR review checklist (sh/ps1-absorption Issue 1.4 결정 (a))
+// 가 manual 이어서 reviewer 가 diff 놓치면 helper 부재 환경 (clean install) 에서
+// hook silent fail → 사용자 onboarding 차단 (high blast radius). codex outside
+// voice finding #15 가 자동화 권장. 본 describe 는 hooks.json 의 hook 진입점 +
+// 명령 string + timeout 을 baseline 으로 lock — 의도치 않은 변경은 PR diff
+// 에서 즉시 catch 돼요. 의도적 변경 시 이 baseline 도 같이 업데이트해요 (PR
+// reviewer 가 update 의도를 확인하는 신호).
+// ---------------------------------------------------------------------------
+describe("Phase 4 (F3) hooks.json invariant baseline", () => {
+  // Baseline = canonical hook entry shape. PR diff 에서 변경 시 reviewer 가
+  // 의도적 인지 확인. 의도적이면 본 baseline 도 같이 업데이트.
+  interface CanonicalHook {
+    matcher?: string;
+    commands: Array<{ command: string; timeout?: number }>;
+  }
+  const expectedBaseline: Record<string, CanonicalHook[]> = {
+    SessionStart: [
+      {
+        commands: [
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh", timeout: 30 },
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-start-autowire.sh", timeout: 10 },
+        ],
+      },
+    ],
+    UserPromptSubmit: [
+      {
+        commands: [
+          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers prompt-route", timeout: 5 },
+        ],
+      },
+    ],
+    PreToolUse: [
+      {
+        matcher: "Bash",
+        commands: [
+          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preauth-check", timeout: 5 },
+          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers commit-gate", timeout: 5 },
+        ],
+      },
+      {
+        matcher: "Edit|Write|MultiEdit|NotebookEdit",
+        commands: [
+          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers tdd-inject", timeout: 5 },
+        ],
+      },
+    ],
+    PostToolUse: [
+      {
+        matcher: "Bash",
+        commands: [
+          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers classify-exit", timeout: 5 },
+          { command: "bun ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-verify-deploy-artifacts.ts", timeout: 7 },
+          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers test-classifier", timeout: 5 },
+        ],
+      },
+      {
+        matcher: "Edit|Write|MultiEdit|NotebookEdit",
+        commands: [
+          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers state-update --edit-event", timeout: 5 },
+        ],
+      },
+    ],
+    PostToolUseFailure: [
+      {
+        matcher: "Bash",
+        commands: [
+          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers test-classifier", timeout: 5 },
+        ],
+      },
+    ],
+  };
+
+  test("hook event set exactly matches baseline (no surprise additions/removals)", () => {
+    const actualEvents = Object.keys(hooksJson.hooks).sort();
+    const expectedEvents = Object.keys(expectedBaseline).sort();
+    expect(actualEvents).toEqual(expectedEvents);
+  });
+
+  for (const [event, expectedGroups] of Object.entries(expectedBaseline)) {
+    test(`${event} group count matches baseline`, () => {
+      const actual = hooksJson.hooks[event];
+      expect(actual).toBeDefined();
+      expect(actual.length).toBe(expectedGroups.length);
+    });
+
+    expectedGroups.forEach((expectedGroup, groupIdx) => {
+      test(`${event}[${groupIdx}] matcher matches baseline${expectedGroup.matcher ? ` (matcher=${expectedGroup.matcher})` : ""}`, () => {
+        const actualGroup = hooksJson.hooks[event][groupIdx];
+        expect(actualGroup.matcher).toBe(expectedGroup.matcher);
+      });
+
+      test(`${event}[${groupIdx}] command count matches baseline`, () => {
+        const actualGroup = hooksJson.hooks[event][groupIdx];
+        expect(actualGroup.hooks.length).toBe(expectedGroup.commands.length);
+      });
+
+      expectedGroup.commands.forEach((expectedCmd, cmdIdx) => {
+        test(`${event}[${groupIdx}].hooks[${cmdIdx}] command byte-identical to baseline`, () => {
+          const actualGroup = hooksJson.hooks[event][groupIdx];
+          const actualCmd = actualGroup.hooks[cmdIdx];
+          expect(actualCmd.command).toBe(expectedCmd.command);
+        });
+
+        test(`${event}[${groupIdx}].hooks[${cmdIdx}] timeout = ${expectedCmd.timeout}`, () => {
+          const actualGroup = hooksJson.hooks[event][groupIdx];
+          const actualCmd = actualGroup.hooks[cmdIdx];
+          expect(actualCmd.timeout).toBe(expectedCmd.timeout);
+        });
+      });
     });
   }
 });

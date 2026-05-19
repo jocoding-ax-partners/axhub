@@ -142,14 +142,33 @@ Run-Step 13 "Proxy environment check" {
   }
 }
 
-Run-Step 14 "Summary capture" {
+Run-Step 14 "auth-refresh-bg ps1 trigger (Phase 3.2 — sh/ps1 absorption)" {
+  # Static body check — verifies session-start.ps1 mirrors session-start.sh:84-89
+  # auth-refresh-bg detach. Live UNAUTHORIZED -> Start-Process behavior requires
+  # a clean credstore mid-test; manual e2e during pilot covers behavior.
+  $hookPath = "$HOME\.claude\plugins\marketplaces\axhub-marketplace\axhub\hooks\session-start.ps1"
+  if (-not (Test-Path $hookPath)) { throw "session-start.ps1 missing at $hookPath" }
+  $body = Get-Content -Raw $hookPath
+  if ($body -notmatch 'auth-refresh-bg') {
+    throw "session-start.ps1 missing 'auth-refresh-bg' trigger block (Phase 3.2 regression)"
+  }
+  if ($body -notmatch 'AXHUB_AUTH_BG_REFRESH') {
+    throw "session-start.ps1 missing AXHUB_AUTH_BG_REFRESH env check"
+  }
+  if ($body -notmatch 'Start-Process') {
+    throw "session-start.ps1 auth-refresh-bg block should use Start-Process for detach"
+  }
+  Write-Output "  ps1 mirror present: AXHUB_AUTH_BG_REFRESH guard + Start-Process detach"
+}
+
+Run-Step 15 "Summary capture" {
   Write-Output ""
   Write-Output "=========================================="
   Write-Output "Windows VM smoke results:"
   $results | Format-Table -AutoSize | Out-String | Write-Output
   $passCount = ($results | Where-Object { $_.Status -eq 'PASS' }).Count
   $failCount = ($results | Where-Object { $_.Status -eq 'FAIL' }).Count
-  Write-Output "PASS: $passCount / 13 (step 14 is summary itself)"
+  Write-Output "PASS: $passCount / 14 (step 15 is summary itself)"
   Write-Output "FAIL: $failCount"
   Write-Output "=========================================="
 }

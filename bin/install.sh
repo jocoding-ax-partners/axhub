@@ -8,7 +8,7 @@ set -euo pipefail
 
 # --- install-time disclosure (idempotent, marker-gated) ---
 # Maintainer: keep _AXHUB_DISCLOSURE_VER in sync with RELEASE_VERSION below.
-_AXHUB_DISCLOSURE_VER="v0.5.13"
+_AXHUB_DISCLOSURE_VER="v0.8.0"
 _AXHUB_STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/axhub-plugin"
 _AXHUB_DISCLOSURE_MARKER="${_AXHUB_STATE_DIR}/install-disclosure-shown.txt"
 # CI / scripted contexts suppress disclosure (AXHUB_SKIP_AUTODOWNLOAD=1 indicates
@@ -106,7 +106,10 @@ if [ ! -f "$TARGET_PATH" ]; then
   echo "다운로드 완료." >&2
 fi
 
-# Symlink (or copy on Windows where symlinks need admin)
+# Symlink (or copy on Windows where symlinks need admin) — wrapper owns this
+# step because tests/install.test.sh injects stub binaries that cannot execute
+# the Rust post-install subcommand. Keeping symlink/copy + chmod here keeps the
+# OS/arch matrix coverage of install.test.sh intact.
 LINK_PATH="${BIN_DIR}/axhub-helpers"
 [ "$OS_KEY" = "windows" ] && LINK_PATH="${BIN_DIR}/axhub-helpers.exe"
 
@@ -123,41 +126,27 @@ fi
 
 chmod +x "$LINK_PATH" 2>/dev/null || true
 
-# Phase 26 — local quality state stays out of git and post-commit promotion is opt-in-safe.
+# sh/ps1-absorption Phase 3.1 (T7): .gitignore + post-commit hook + disclosure
+# marker write delegated to `axhub-helpers post-install`. Single Rust source of
+# truth + respects AXHUB_NO_DISCLOSURE / AXHUB_SKIP_AUTODOWNLOAD env semantics.
+# Best-effort: skip when the helper link isn't executable yet (broken install).
+REPO_ROOT=""
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-  GITIGNORE_PATH="${REPO_ROOT}/.gitignore"
-  if [ ! -f "$GITIGNORE_PATH" ]; then
-    printf '# axhub quality state (local-only)\n.axhub-state/\n' > "$GITIGNORE_PATH" 2>/dev/null || true
-  elif ! grep -qxF ".axhub-state/" "$GITIGNORE_PATH"; then
-    {
-      printf '\n# axhub quality state (local-only)\n'
-      printf '.axhub-state/\n'
-    } >> "$GITIGNORE_PATH"
-  fi
-  HOOK_PATH="${REPO_ROOT}/.git/hooks/post-commit"
-  AXHUB_POSTCOMMIT_LINE='"${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/axhub}/bin/axhub-helpers" state-update --post-commit-promote 2>/dev/null || true'
-  if [ -f "$HOOK_PATH" ]; then
-    if ! grep -q "state-update --post-commit-promote" "$HOOK_PATH"; then
-      if [ "${AXHUB_POSTCOMMIT_INSTALL:-skip}" = "append" ]; then
-        {
-          printf '\n# axhub quality review promotion\n'
-          printf '%s\n' "$AXHUB_POSTCOMMIT_LINE"
-        } >> "$HOOK_PATH"
-        chmod +x "$HOOK_PATH" 2>/dev/null || true
-      else
-        echo "기존 .git/hooks/post-commit 감지됨. 자동 변경은 건너뛰어요. docs/MANUAL-POSTCOMMIT.md 를 참고해주세요." >&2
-      fi
-    fi
+  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+fi
+
+if [ -x "$LINK_PATH" ]; then
+  if [ -n "$REPO_ROOT" ]; then
+    "$LINK_PATH" post-install \
+      --target-name "$TARGET_NAME" \
+      --bin-dir "$BIN_DIR" \
+      --link-path "$LINK_PATH" \
+      --repo-root "$REPO_ROOT" 2>/dev/null || true
   else
-    mkdir -p "$(dirname "$HOOK_PATH")"
-    {
-      printf '#!/usr/bin/env bash\n'
-      printf 'set -eu\n'
-      printf '[ "${AXHUB_DISABLE_POSTCOMMIT:-0}" = "1" ] && exit 0\n'
-      printf '%s\n' "$AXHUB_POSTCOMMIT_LINE"
-    } > "$HOOK_PATH"
-    chmod +x "$HOOK_PATH" 2>/dev/null || true
+    "$LINK_PATH" post-install \
+      --target-name "$TARGET_NAME" \
+      --bin-dir "$BIN_DIR" \
+      --link-path "$LINK_PATH" 2>/dev/null || true
   fi
 fi
 

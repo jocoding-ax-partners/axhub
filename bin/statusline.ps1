@@ -72,27 +72,15 @@ try {
   $TokenFile = Join-Path $ConfigBase 'axhub-plugin\token'
 
   # Auth presence check — env var, token file, or Windows Credential Manager. No network.
-  # Credential Manager fallback: token-init 가 SessionStart 에서 mirror 안 만든 경우
-  # axhub CLI 가 저장한 Credential Manager entry 를 직접 조회해요. silent on miss.
+  # Auth presence check — env var or token file only. Credential Manager probe
+  # used to live here as a P/Invoke `CredReadW` block but it duplicated logic
+  # already in `crates/axhub-helpers/src/keychain_windows.rs`. Phase 1.2
+  # sh/ps1 absorption removed the duplicate; the fast path (line 58-63) already
+  # invokes `axhub-helpers statusline` which goes through keychain_windows when
+  # the helper exists. This fallback only runs when the helper binary is
+  # missing — a broken-install state where the keychain probe was best-effort
+  # anyway. token file + AXHUB_TOKEN env still catch the common cases.
   $AuthOk = ($env:AXHUB_TOKEN -and $env:AXHUB_TOKEN.Length -gt 0) -or (Test-Path -Path $TokenFile -PathType Leaf)
-  if (-not $AuthOk) {
-    try {
-      Add-Type -ErrorAction SilentlyContinue -Namespace AxhubStatuslineCred -Name Native -MemberDefinition @'
-        [System.Runtime.InteropServices.DllImport("advapi32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
-        public static extern bool CredReadW(string target, int type, int reservedFlag, out System.IntPtr credentialPtr);
-        [System.Runtime.InteropServices.DllImport("advapi32.dll", SetLastError = true)]
-        public static extern void CredFree(System.IntPtr cred);
-'@ 2>$null
-      $credPtr = [System.IntPtr]::Zero
-      $found = [AxhubStatuslineCred.Native]::CredReadW('axhub', 1, 0, [ref] $credPtr)
-      if ($found -and $credPtr -ne [System.IntPtr]::Zero) {
-        [AxhubStatuslineCred.Native]::CredFree($credPtr)
-        $AuthOk = $true
-      }
-    } catch {
-      # Silent — Credential Manager 미존재 / Add-Type fail 시 auth=false 유지
-    }
-  }
 
   if (-not $AuthOk) {
     Write-Utf8Line 'axhub: 로그인 안 됐어요'
