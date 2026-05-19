@@ -165,6 +165,7 @@ mod tests {
 
     #[tokio::test]
     async fn slow_check_skipped_under_budget() {
+        let _g = crate::PROCESS_ENV_LOCK.lock().unwrap();
         std::env::set_var(WALL_BUDGET_ENV, "100");
         let summary = run_checks(
             Box::pin(slow_pass()),
@@ -187,6 +188,7 @@ mod tests {
 
     #[test]
     fn effective_wall_budget_default() {
+        let _g = crate::PROCESS_ENV_LOCK.lock().unwrap();
         std::env::remove_var(WALL_BUDGET_ENV);
         assert_eq!(effective_wall_budget().as_millis() as u64, WALL_BUDGET_MS);
     }

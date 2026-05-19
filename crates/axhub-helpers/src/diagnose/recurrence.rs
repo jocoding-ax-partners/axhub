@@ -70,6 +70,12 @@ mod tests {
     use super::*;
     use crate::diagnose::learning::builder;
 
+    use std::sync::Mutex;
+
+    /// Serialize env-modifying tests so parallel cargo test runners don't
+    /// race RECURRENCE_THRESHOLD_ENV. cargo test defaults to N threads.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
     fn make(err: &str, cwd: &str) -> LearningEntry {
         let mut e = builder(err);
         e.cwd_hash = cwd.into();
@@ -78,12 +84,14 @@ mod tests {
 
     #[test]
     fn default_threshold_is_3() {
+        let _g = ENV_LOCK.lock().unwrap();
         std::env::remove_var(RECURRENCE_THRESHOLD_ENV);
         assert_eq!(effective_threshold(), 3);
     }
 
     #[test]
     fn env_override_threshold() {
+        let _g = ENV_LOCK.lock().unwrap();
         std::env::set_var(RECURRENCE_THRESHOLD_ENV, "5");
         assert_eq!(effective_threshold(), 5);
         std::env::remove_var(RECURRENCE_THRESHOLD_ENV);
@@ -104,6 +112,7 @@ mod tests {
 
     #[test]
     fn threshold_crossed_when_count_at_or_above() {
+        let _g = ENV_LOCK.lock().unwrap();
         std::env::set_var(RECURRENCE_THRESHOLD_ENV, "2");
         let entries = vec![make("e1", "cwd1"), make("e1", "cwd1")];
         assert!(crossed_threshold(&entries, "e1", "cwd1"));
