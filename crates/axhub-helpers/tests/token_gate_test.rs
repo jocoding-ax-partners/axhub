@@ -88,7 +88,11 @@ fn touch_mtime(path: &std::path::Path, secs_since_epoch: i64) {
 #[test]
 fn kill_switch_disable_hooks_short_circuits() {
     let out = run_gate(&[("AXHUB_DISABLE_HOOKS", "1")]);
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(out.status.code(), Some(0));
 }
 

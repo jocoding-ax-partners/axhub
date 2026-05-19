@@ -267,12 +267,9 @@ mod tests_detached {
         let lock = lockfile_path("unix-fallback");
         let _ = std::fs::remove_file(&lock);
         let lock_str = lock.to_string_lossy().to_string();
-        let outcome = spawn_detached_with_fallback(&[
-            "sh",
-            "-c",
-            &format!("sleep 1 && touch {lock_str}"),
-        ])
-        .expect("fallback spawn should succeed");
+        let outcome =
+            spawn_detached_with_fallback(&["sh", "-c", &format!("sleep 1 && touch {lock_str}")])
+                .expect("fallback spawn should succeed");
         // Outcome MUST be one of the two enum variants; we don't assert which
         // because Docker / CI environments differ on whether setsid is allowed.
         assert!(matches!(

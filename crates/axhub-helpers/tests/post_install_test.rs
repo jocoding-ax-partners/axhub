@@ -81,7 +81,10 @@ fn gitignore_created_when_absent() {
     );
     assert_eq!(out.status.code(), Some(0));
     let body = fs::read_to_string(repo.path().join(".gitignore")).unwrap();
-    assert!(body.contains(".axhub-state/"), ".gitignore should contain entry: {body:?}");
+    assert!(
+        body.contains(".axhub-state/"),
+        ".gitignore should contain entry: {body:?}"
+    );
 }
 
 #[test]
@@ -103,7 +106,10 @@ fn gitignore_idempotent_skip_when_entry_present() {
         ],
     );
     let after = fs::read_to_string(repo.path().join(".gitignore")).unwrap();
-    assert_eq!(before, after, ".gitignore should not change when entry already present");
+    assert_eq!(
+        before, after,
+        ".gitignore should not change when entry already present"
+    );
 }
 
 #[test]
@@ -139,7 +145,10 @@ fn gitignore_appends_entry_when_missing() {
     );
     let body2 = fs::read_to_string(repo.path().join(".gitignore")).unwrap();
     let count = body2.matches(".axhub-state/").count();
-    assert_eq!(count, 1, "should appear exactly once after re-run, got {count}");
+    assert_eq!(
+        count, 1,
+        "should appear exactly once after re-run, got {count}"
+    );
 }
 
 #[test]
@@ -216,7 +225,9 @@ fn disclosure_marker_written_with_release_version_when_not_suppressed() {
             ("XDG_STATE_HOME", state.path().to_str().unwrap()),
         ],
     );
-    let marker = state.path().join("axhub-plugin/install-disclosure-shown.txt");
+    let marker = state
+        .path()
+        .join("axhub-plugin/install-disclosure-shown.txt");
     assert!(
         marker.exists(),
         "disclosure marker should be written when AXHUB_NO_DISCLOSURE is unset"
@@ -241,7 +252,9 @@ fn disclosure_marker_skipped_when_axhub_no_disclosure_set() {
             ("AXHUB_NO_DISCLOSURE", "1"),
         ],
     );
-    let marker = state.path().join("axhub-plugin/install-disclosure-shown.txt");
+    let marker = state
+        .path()
+        .join("axhub-plugin/install-disclosure-shown.txt");
     assert!(
         !marker.exists(),
         "AXHUB_NO_DISCLOSURE=1 should suppress marker write"
@@ -260,7 +273,9 @@ fn disclosure_marker_skipped_when_axhub_skip_autodownload_set() {
             ("AXHUB_SKIP_AUTODOWNLOAD", "1"),
         ],
     );
-    let marker = state.path().join("axhub-plugin/install-disclosure-shown.txt");
+    let marker = state
+        .path()
+        .join("axhub-plugin/install-disclosure-shown.txt");
     assert!(
         !marker.exists(),
         "AXHUB_SKIP_AUTODOWNLOAD=1 should suppress marker write (codex finding #10)"

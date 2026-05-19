@@ -492,7 +492,8 @@ fn install_post_commit_hook(repo: &std::path::Path) {
             return; // already installed
         }
         if std::env::var("AXHUB_POSTCOMMIT_INSTALL").as_deref() == Ok("append") {
-            let appended = format!("{body}\n# axhub quality review promotion\n{post_commit_line}\n");
+            let appended =
+                format!("{body}\n# axhub quality review promotion\n{post_commit_line}\n");
             let _ = fs::write(&hook_path, appended);
             #[cfg(unix)]
             chmod_executable_best_effort(&hook_path);
@@ -2590,9 +2591,7 @@ fn cmd_autowire_statusline(args: &[String]) -> anyhow::Result<i32> {
             }
         },
         (None, false) => {
-            eprintln!(
-                "axhub-helpers autowire-statusline: --scope user|project|auto 가 필요해요"
-            );
+            eprintln!("axhub-helpers autowire-statusline: --scope user|project|auto 가 필요해요");
             return Ok(64);
         }
     };

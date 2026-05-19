@@ -51,8 +51,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         if: matrix.os != 'macos-latest'
       - name: Build helper for hook integration tests
-        # 일부 hook test 가 axhub-helpers binary 존재 가정.
-        run: cargo build --workspace
+        # tests/token-freshness-gate.test.ts spawns `bin/axhub-helpers token-gate`
+        # directly (sh/ps1-absorption Phase 4 F1). Cargo's default target/debug/
+        # path doesn't satisfy that contract — copy + chmod into bin/ so the
+        # runtime layout matches what install.sh would have produced.
+        run: |
+          cargo build --workspace
+          mkdir -p bin
+          cp target/debug/axhub-helpers bin/axhub-helpers
+          chmod +x bin/axhub-helpers
       - uses: oven-sh/setup-bun@v2
       - name: bun install
         run: bun install --frozen-lockfile
