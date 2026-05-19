@@ -1042,12 +1042,12 @@ describe("cross-manifest consistency", () => {
 // ---------------------------------------------------------------------------
 // Phase 27.x — preflight !command injection variant-aware byte-identical lock
 // Reason: codegen-preflight-injection.ts is the single source of truth for the
-// Node runner line injected in 9 SKILL + 1 template. Any drift (manual edit,
+// Node runner line injected in 15 SKILL + 1 template. Any drift (manual edit,
 // scaffold rot, merge conflict) is caught here before CI ships broken runners.
 // ---------------------------------------------------------------------------
 describe("Phase 27.x — preflight !command injection variant-aware byte-identical lock", () => {
-  test("exactly 10 codegen targets (9 SKILL + 1 template)", () => {
-    expect(TARGETS).toHaveLength(10);
+  test("exactly 16 codegen targets (15 SKILL + 1 template)", () => {
+    expect(TARGETS).toHaveLength(16);
   });
 
   for (const target of TARGETS) {

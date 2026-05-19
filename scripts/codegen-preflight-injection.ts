@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * SKILL `!command` preflight injection codegen — single source for the Node runner line
- * applied to 9 SKILL + 1 template (lite variant 9 곳 + deploy variant 1 곳).
+ * applied to every needs-preflight SKILL + 1 template (lite variant 15 곳 + deploy variant 1 곳).
  *
  * In iteration 4 of `.omc/plans/preflight-permission-ux-fix.md`, the lite variant and
  * deploy variant share the same `!`...`` body — the only deploy-specific concern is the
@@ -29,7 +29,7 @@ const SYSTEM_MESSAGE =
 
 /**
  * Builds the single-line Node runner used as the `!command` injection body for
- * **lite-variant** SKILLs (8 SKILL + 1 template).
+ * **lite-variant** SKILLs (14 SKILL + 1 template).
  *
  * The shell sees `node -e "<script>"` with double-quoted JS so that
  * `${CLAUDE_PLUGIN_ROOT}` expands at the shell layer (same mechanism as the
@@ -51,7 +51,7 @@ export function getLiteInjectionLine(): string {
     // PR #99 security M2: redact common secret token patterns from stderr passthrough.
     // Prevents accidental leak when helper emits RUST_LOG=debug, dependency panic, or
     // transport debug output containing API keys / OAuth tokens to the Claude Code chat surface.
-    "const redactRe=/(sk-[A-Za-z0-9_-]{20,}|gho_[A-Za-z0-9]{36}|axhub_[A-Za-z0-9]{32,}|Bearer\\\\s+[A-Za-z0-9._~+\\\\/-]+=*)/g;",
+    "const redactRe=/(sk-[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9]{36}|axhub_[A-Za-z0-9]{32,}|Bearer\\\\s+[A-Za-z0-9._~+\\\\/-]+=*)/g;",
     `if(result.error||(result.status!==0&&denialRegex.test(stderrText))){console.log(JSON.stringify({systemMessage:\\"${SYSTEM_MESSAGE}\\"}));process.exit(0)}`,
     "else if(stderrText.length>0){process.stderr.write(stderrText.replace(redactRe,'<redacted>'))}",
     "process.exit(typeof result.status==='number'?result.status:0)",
@@ -87,7 +87,7 @@ export function getDeployInjectionLine(): string {
     "const stderrText=String(result.stderr??'');",
     "const denialRegex=/^(?:Shell|Bash) command permission check failed.*requires approval/im;",
     // PR #99 security M2: same redaction as lite variant — secret token leak prevention.
-    "const redactRe=/(sk-[A-Za-z0-9_-]{20,}|gho_[A-Za-z0-9]{36}|axhub_[A-Za-z0-9]{32,}|Bearer\\\\s+[A-Za-z0-9._~+\\\\/-]+=*)/g;",
+    "const redactRe=/(sk-[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9]{36}|axhub_[A-Za-z0-9]{32,}|Bearer\\\\s+[A-Za-z0-9._~+\\\\/-]+=*)/g;",
     `if(result.error||(result.status!==0&&denialRegex.test(stderrText))){console.log(JSON.stringify({systemMessage:\\"${SYSTEM_MESSAGE}\\"}));process.exit(0)}`,
     "else if(stderrText.length>0){process.stderr.write(stderrText.replace(redactRe,'<redacted>'))}",
     "process.exit(typeof result.status==='number'?result.status:0)",
@@ -108,13 +108,19 @@ export interface PreflightTarget {
 }
 
 /**
- * 9 SKILL + 1 template (10 targets total).
+ * 15 SKILL + 1 template (16 targets total).
  *
  * `deploy` keeps the lite body too — its uniqueness is the PowerShell `$env:PATH`
  * setup prose block at deploy:85-95 which sits ABOVE the `!command` line and stays
  * outside codegen scope.
  */
 export const TARGETS: PreflightTarget[] = [
+  { file: "skills/axhub-debug/SKILL.md", variant: "lite" },
+  { file: "skills/axhub-diagnose/SKILL.md", variant: "lite" },
+  { file: "skills/axhub-plan/SKILL.md", variant: "lite" },
+  { file: "skills/axhub-review/SKILL.md", variant: "lite" },
+  { file: "skills/axhub-ship/SKILL.md", variant: "lite" },
+  { file: "skills/axhub-tdd/SKILL.md", variant: "lite" },
   { file: "skills/apis/SKILL.md", variant: "lite" },
   { file: "skills/apps/SKILL.md", variant: "lite" },
   { file: "skills/env/SKILL.md", variant: "lite" },

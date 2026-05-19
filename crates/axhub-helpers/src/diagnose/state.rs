@@ -136,6 +136,7 @@ impl DiagnoseState {
             (Fixing, FixApplied) => LoopVerify,
             (LoopVerify, LoopVerifyGreen) => Postmortem,
             (LoopVerify, LoopVerifyRed) => Hypothesize,
+            (LoopVerify, HypothesesExhausted) => ArchHandoff,
             (Postmortem, CleanupDone) => Idle,
             (Postmortem, RecurrenceThresholdHit) => ArchHandoff,
             (ArchHandoff, HandoffSent) => Idle,
@@ -283,6 +284,51 @@ mod tests {
             next,
             DiagnoseState::Hypothesize,
             "red must regress to HYPOTHESIZE"
+        );
+    }
+
+    #[test]
+    fn loop_verify_red_cap_exceeded_enters_arch_handoff() {
+        let s = DiagnoseSession::new("loop-cap");
+        for ev in [
+            DiagnoseEvent::Trigger,
+            DiagnoseEvent::LoopReady,
+            DiagnoseEvent::SymptomConfirmed,
+            DiagnoseEvent::HypothesesReady,
+            DiagnoseEvent::ProbeApplied,
+            DiagnoseEvent::FixApplied,
+        ] {
+            s.apply(ev).unwrap();
+        }
+
+        for attempt in 1..=MAX_VERIFY_RETRIES {
+            assert_eq!(
+                s.apply(DiagnoseEvent::LoopVerifyRed).unwrap(),
+                DiagnoseState::Hypothesize,
+                "red attempt {attempt} should stay retryable"
+            );
+            assert_eq!(s.verify_red_count(), attempt);
+            for ev in [
+                DiagnoseEvent::HypothesesReady,
+                DiagnoseEvent::ProbeApplied,
+                DiagnoseEvent::FixApplied,
+            ] {
+                s.apply(ev).unwrap();
+            }
+        }
+
+        let err = s.apply(DiagnoseEvent::LoopVerifyRed).unwrap_err();
+        match err {
+            DiagnoseError::VerifyRetryCapExceeded { attempts, max } => {
+                assert_eq!(attempts, MAX_VERIFY_RETRIES + 1);
+                assert_eq!(max, MAX_VERIFY_RETRIES);
+            }
+            other => panic!("expected VerifyRetryCapExceeded, got {other:?}"),
+        }
+        assert_eq!(
+            s.snapshot(),
+            DiagnoseState::ArchHandoff,
+            "cap breach must terminally hand off instead of sticking in LOOP_VERIFY"
         );
     }
 

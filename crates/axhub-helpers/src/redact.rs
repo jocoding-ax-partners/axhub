@@ -23,8 +23,9 @@ static SERVICE_BASE_URL_TEXT_RE: LazyLock<Regex> =
 // Plan v6 §4.2 free-text secret regex set — for HITL capture redaction.
 static OPENAI_KEY_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"sk-[A-Za-z0-9_\-]{20,}").unwrap());
-static GH_TOKEN_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"gh[pousr]_[A-Za-z0-9]{36,}").unwrap());
+static GH_TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{20,})").unwrap()
+});
 // Broader AWS access-key prefix set per AWS account-id prefix taxonomy
 // (AKIA = long-lived, ASIA = STS temp, AGPA = group, AIDA = IAM user, etc.).
 // Covers temporary creds in CI logs that the prior `AKIA[0-9A-Z]{16}` missed.
@@ -115,6 +116,15 @@ mod tests {
         let s2 = "use ghs_ABCDEFGHIJ0123456789abcdefghij0123456789 here";
         let r2 = redact(s2);
         assert!(r2.contains("<REDACTED_GH_TOKEN>"), "got: {r2}");
+        // Fine-grained GitHub PATs use the `github_pat_` prefix and include
+        // underscores in the body, which the legacy gh[pousr]_ regex misses.
+        let s3 = "token github_pat_11AA22BB33CC44DD55EE66_77FF88GG99HH00II11JJ22KK33LL44MM55NN";
+        let r3 = redact(s3);
+        assert!(r3.contains("<REDACTED_GH_TOKEN>"), "got: {r3}");
+        assert!(
+            !r3.contains("github_pat_11AA22BB33CC44DD55EE66"),
+            "raw PAT leaked: {r3}"
+        );
     }
 
     #[test]

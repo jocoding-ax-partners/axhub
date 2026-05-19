@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, IsTerminal, Read};
 use std::path::PathBuf;
 
 use axhub_helpers::autowire::{autowire_statusline, AutowireArgs};
@@ -2549,6 +2549,10 @@ fn cmd_diagnose_hitl(args: &[String]) -> anyhow::Result<i32> {
         eprintln!("axhub-helpers diagnose hitl: --prompts <prompts.json> required");
         return Ok(64);
     };
+    if !io::stdin().is_terminal() {
+        eprintln!("axhub-helpers diagnose hitl: TTY unavailable");
+        return Ok(65);
+    }
     let output_path = match output {
         Some(p) => p,
         None => {
