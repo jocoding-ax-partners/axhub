@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, IsTerminal, Read};
 use std::path::PathBuf;
 
 use axhub_helpers::autowire::{autowire_statusline, AutowireArgs};
@@ -35,7 +35,7 @@ use chrono::Utc;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  version [--quiet]\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -147,6 +147,7 @@ fn run() -> anyhow::Result<i32> {
         "settings-merge" => cmd_settings_merge(&rest),
         "autowire-statusline" => cmd_autowire_statusline(&rest),
         "orphan-stub" => cmd_orphan_stub(&rest),
+        "diagnose" => cmd_diagnose(&rest),
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -2480,4 +2481,107 @@ fn cmd_settings_merge_migrate(parsed: SettingsMergeArgs) -> anyhow::Result<i32> 
     } else {
         0
     })
+}
+
+/// `diagnose` subcommand dispatch. v0.8.0 wires `hitl` only — strategy runner
+/// (`run`) and probe sweep ship in follow-up PRs per the PR #113 honest
+/// tradeoff section. Unknown subcommands return exit 64 (EX_USAGE) so the
+/// shell sees a stable error code instead of a panic.
+fn cmd_diagnose(args: &[String]) -> anyhow::Result<i32> {
+    let Some(sub) = args.first().map(String::as_str) else {
+        eprintln!("axhub-helpers diagnose: missing subcommand (try `hitl`)");
+        return Ok(64);
+    };
+    let rest = &args[1..];
+    match sub {
+        "hitl" => cmd_diagnose_hitl(rest),
+        other => {
+            eprintln!("axhub-helpers diagnose: unknown subcommand \"{other}\"");
+            Ok(64)
+        }
+    }
+}
+
+/// `diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]`
+///
+/// Drives the user through the prompt list via `StdioRunner`, applies
+/// `redact_for_handoff` to every capture, writes the result to a 0o600 file
+/// at `--output` (default: `<state_dir>/loops/<session>/captured.json`).
+///
+/// Exit codes:
+///   0 — completed (some prompts may have timed out, see `timed_out` field)
+///   64 — usage error (missing flags / invalid args)
+///   65 — environment error (TTY missing, state dir unresolvable)
+///   1 — operational error (spec parse failure, write failure, runner abort)
+fn cmd_diagnose_hitl(args: &[String]) -> anyhow::Result<i32> {
+    use axhub_helpers::diagnose::hitl::{run_from_files, StdioRunner};
+
+    let mut session: Option<String> = None;
+    let mut prompts: Option<PathBuf> = None;
+    let mut output: Option<PathBuf> = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--session" => {
+                i += 1;
+                session = args.get(i).cloned();
+            }
+            "--prompts" => {
+                i += 1;
+                prompts = args.get(i).map(PathBuf::from);
+            }
+            "--output" => {
+                i += 1;
+                output = args.get(i).map(PathBuf::from);
+            }
+            other => {
+                eprintln!("axhub-helpers diagnose hitl: unknown flag \"{other}\"");
+                return Ok(64);
+            }
+        }
+        i += 1;
+    }
+    let Some(session) = session else {
+        eprintln!("axhub-helpers diagnose hitl: --session <loop_id> required");
+        return Ok(64);
+    };
+    let Some(prompts) = prompts else {
+        eprintln!("axhub-helpers diagnose hitl: --prompts <prompts.json> required");
+        return Ok(64);
+    };
+    if !io::stdin().is_terminal() {
+        eprintln!("axhub-helpers diagnose hitl: TTY unavailable");
+        return Ok(65);
+    }
+    let output_path = match output {
+        Some(p) => p,
+        None => {
+            let Some(state) = state_dir() else {
+                eprintln!("axhub-helpers diagnose hitl: cannot resolve state directory");
+                return Ok(65);
+            };
+            state.join("loops").join(&session).join("captured.json")
+        }
+    };
+    let mut runner = StdioRunner::new();
+    match run_from_files(&prompts, &output_path, &mut runner) {
+        Ok(result) => {
+            // Echo a minimal completion summary to stdout so the orchestrator
+            // can read it deterministically. captured.json holds the full
+            // (already-redacted) detail.
+            let summary = json!({
+                "session": session,
+                "captured": result.captures.len(),
+                "timed_out": result.timed_out,
+                "truncated": result.truncated,
+                "output_path": output_path.display().to_string(),
+            });
+            println!("{summary}");
+            Ok(0)
+        }
+        Err(e) => {
+            eprintln!("axhub-helpers diagnose hitl: {e}");
+            Ok(1)
+        }
+    }
 }

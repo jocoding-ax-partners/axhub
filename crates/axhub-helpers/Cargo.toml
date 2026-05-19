@@ -28,6 +28,8 @@ sha2.workspace = true
 thiserror.workspace = true
 unicode-normalization.workspace = true
 uuid.workspace = true
+tokio.workspace = true
+crossterm.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true

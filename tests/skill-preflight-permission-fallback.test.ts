@@ -140,11 +140,12 @@ describe("Case E — unrecognized stderr passthrough (ADR-0010 §42 정합)", ()
 });
 
 describe("Case G — secret token redaction in stderr passthrough (PR #99 security M2)", () => {
-  test("sk- / gho_ / axhub_ / Bearer tokens redacted before parent forward", () => {
+  test("sk- / gho_ / github_pat_ / axhub_ / Bearer tokens redacted before parent forward", () => {
     const tokenStderr =
       "Authorization: Bearer abc123XYZ_token.example=\n" +
       "OpenAI key sk-proj1234567890abcdefghij found in env\n" +
       "GitHub gho_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa exposed\n" +
+      "GitHub fine-grained github_pat_11AA22BB33CC44DD55EE66_77FF88GG99HH00II11JJ22KK33LL44MM55NN exposed\n" +
       "axhub_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa internal token\n";
     makeHelper(`#!/bin/sh\ncat >&2 << 'STDERR_EOF'\n${tokenStderr}STDERR_EOF\nexit 1\n`);
     const out = runNode(buildScript());
@@ -154,6 +155,7 @@ describe("Case G — secret token redaction in stderr passthrough (PR #99 securi
     // Token patterns must be redacted
     expect(out.stderr).not.toContain("sk-proj1234567890abcdefghij");
     expect(out.stderr).not.toContain("gho_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(out.stderr).not.toContain("github_pat_11AA22BB33CC44DD55EE66");
     expect(out.stderr).not.toContain("axhub_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     expect(out.stderr).toContain("<redacted>");
     expect(out.stdout).not.toContain("systemMessage");

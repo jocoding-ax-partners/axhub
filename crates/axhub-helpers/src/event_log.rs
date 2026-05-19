@@ -125,9 +125,13 @@ pub fn list_recent_deploys(within_secs: u64) -> Result<Vec<String>, EventLogErro
         return Ok(Vec::new());
     }
 
-    let cutoff = SystemTime::now()
-        .checked_sub(Duration::from_secs(within_secs))
-        .unwrap_or(SystemTime::UNIX_EPOCH);
+    // checked_sub underflow (within_secs >= seconds since UNIX_EPOCH) means
+    // "infinite window" — but caller almost certainly passed a bogus value.
+    // Fall back to an empty result rather than UNIX_EPOCH (which would match
+    // every deploy on disk and let recovery scan pick up unrelated runs).
+    let Some(cutoff) = SystemTime::now().checked_sub(Duration::from_secs(within_secs)) else {
+        return Ok(Vec::new());
+    };
 
     let mut deploys: Vec<(String, SystemTime)> = Vec::new();
     for entry in std::fs::read_dir(&dir)? {
@@ -323,5 +327,169 @@ pub fn validate_transition(deploy_id: &str, next: DeployPhase) -> Result<(), Str
             current.as_str(),
             next.as_str()
         ))
+    }
+}
+
+// =============================================================================
+// Plan v6 Phase 0d — DiagnoseEvent schema (additive, backward compat with v1).
+//
+// The DeployEvent v1 schema remains the source of truth for deploy lifecycle.
+// DiagnoseEvent is a parallel envelope for the auto-diagnose loop (Phase 1L
+// → 5P). Both write NDJSON via `atomic_jsonl::append_line`, but to disjoint
+// directories so readers don't need to discriminate at the file level:
+//   <state>/deploy-events/{deploy_id}.jsonl    (existing)
+//   <state>/diagnose-events/{loop_id}.jsonl    (new)
+//
+// Forward compatibility: `read_diagnose_events` silently skips lines whose
+// `schema_version` does not match `DIAGNOSE_EVENT_SCHEMA_VERSION` so an older
+// reader paired with a newer writer keeps working.
+// =============================================================================
+
+/// Pinned NDJSON envelope version for diagnose events.
+pub const DIAGNOSE_EVENT_SCHEMA_VERSION: &str = "diagnose-event/v1";
+
+/// One diagnose loop phase / state transition.
+///
+/// `phase` mirrors the plan v6 §3.1 5-Phase loop names plus internal
+/// LOOP_VERIFY / ARCH_HANDOFF terminals. `evidence` is kind-specific
+/// (e.g. for `hypothesis.selected` → rank + cause; for `loop_verify` →
+/// pass/fail + duration_ms).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DiagnoseEvent {
+    pub schema_version: String,
+    pub loop_id: String,
+    /// ISO 8601 with millisecond precision, UTC ("Z" suffix).
+    pub ts: String,
+    pub phase: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<serde_json::Value>,
+}
+
+impl DiagnoseEvent {
+    /// Convenience constructor that stamps `schema_version` + ISO timestamp.
+    pub fn new(loop_id: impl Into<String>, phase: impl Into<String>) -> Self {
+        Self {
+            schema_version: DIAGNOSE_EVENT_SCHEMA_VERSION.to_string(),
+            loop_id: loop_id.into(),
+            ts: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+            phase: phase.into(),
+            duration_ms: None,
+            reason: None,
+            evidence: None,
+        }
+    }
+}
+
+fn diagnose_events_dir() -> Option<PathBuf> {
+    crate::runtime_paths::state_dir().map(|d| d.join("diagnose-events"))
+}
+
+fn diagnose_log_path(loop_id: &str) -> Result<PathBuf, EventLogError> {
+    validate_deploy_id(loop_id)?; // shares the same single-segment rule
+    let dir = diagnose_events_dir().ok_or(EventLogError::PathResolution)?;
+    Ok(dir.join(format!("{loop_id}.jsonl")))
+}
+
+fn diagnose_disabled_via_env() -> bool {
+    matches!(
+        std::env::var("AXHUB_DISABLE_DIAGNOSE_EVENTS").as_deref(),
+        Ok("1") | Ok("true") | Ok("yes") | Ok("on")
+    )
+}
+
+/// Append a diagnose event. Best-effort: returns `Ok(())` when the opt-out env
+/// is set so callers can treat audit as advisory.
+pub fn append_diagnose_event(loop_id: &str, event: &DiagnoseEvent) -> Result<(), EventLogError> {
+    if diagnose_disabled_via_env() {
+        return Ok(());
+    }
+    let path = diagnose_log_path(loop_id)?;
+    let line = serde_json::to_string(event)?;
+    atomic_jsonl::append_line(&path, &line)?;
+    Ok(())
+}
+
+/// Read every diagnose event for a loop_id. Corrupt lines + unknown schema
+/// rows are silently skipped (forward-compatible reader contract).
+pub fn read_diagnose_events(loop_id: &str) -> Result<Vec<DiagnoseEvent>, EventLogError> {
+    let path = diagnose_log_path(loop_id)?;
+    let events = atomic_jsonl::read_lines(&path, |line| {
+        let parsed: DiagnoseEvent = serde_json::from_str(line).ok()?;
+        if parsed.schema_version == DIAGNOSE_EVENT_SCHEMA_VERSION {
+            Some(parsed)
+        } else {
+            None
+        }
+    })?;
+    Ok(events)
+}
+
+#[cfg(test)]
+mod diagnose_tests {
+    use super::*;
+
+    #[test]
+    fn diagnose_schema_version_pinned() {
+        assert_eq!(DIAGNOSE_EVENT_SCHEMA_VERSION, "diagnose-event/v1");
+    }
+
+    #[test]
+    fn diagnose_event_constructor_stamps_schema_and_ts() {
+        let e = DiagnoseEvent::new("loop-001", "build_loop");
+        assert_eq!(e.schema_version, DIAGNOSE_EVENT_SCHEMA_VERSION);
+        assert_eq!(e.loop_id, "loop-001");
+        assert_eq!(e.phase, "build_loop");
+        // ISO 8601 millisecond UTC, ends with Z.
+        assert!(e.ts.ends_with('Z'), "ts must be UTC: {}", e.ts);
+    }
+
+    #[test]
+    fn diagnose_event_serde_roundtrip() {
+        let mut e = DiagnoseEvent::new("loop-roundtrip", "fix.apply");
+        e.duration_ms = Some(123);
+        e.reason = Some("ok".into());
+        e.evidence = Some(serde_json::json!({"hypothesis_rank": 1}));
+        let line = serde_json::to_string(&e).unwrap();
+        let parsed: DiagnoseEvent = serde_json::from_str(&line).unwrap();
+        assert_eq!(parsed, e);
+    }
+
+    #[test]
+    fn diagnose_disabled_env_is_noop() {
+        // Use a unique loop_id so we don't collide with other tests in parallel.
+        let loop_id = "loop-disabled-noop-test";
+        std::env::set_var("AXHUB_DISABLE_DIAGNOSE_EVENTS", "1");
+        let e = DiagnoseEvent::new(loop_id, "should_not_write");
+        let result = append_diagnose_event(loop_id, &e);
+        std::env::remove_var("AXHUB_DISABLE_DIAGNOSE_EVENTS");
+        assert!(result.is_ok(), "disabled env must be no-op success");
+    }
+
+    #[test]
+    fn invalid_loop_id_rejected() {
+        let e = DiagnoseEvent::new("bad", "phase");
+        // Path traversal style id rejected by validate_deploy_id (..).
+        let result = append_diagnose_event("..", &e);
+        assert!(matches!(result, Err(EventLogError::InvalidDeployId(_))));
+    }
+
+    #[test]
+    fn unknown_schema_version_silently_skipped_by_reader() {
+        // This test only verifies the pure filter function; no fs touch needed.
+        let mismatched = serde_json::json!({
+            "schema_version": "diagnose-event/v999",
+            "loop_id": "x",
+            "ts": "2026-05-19T00:00:00.000Z",
+            "phase": "p",
+        })
+        .to_string();
+        let parsed: Option<DiagnoseEvent> = serde_json::from_str::<DiagnoseEvent>(&mismatched)
+            .ok()
+            .filter(|p| p.schema_version == DIAGNOSE_EVENT_SCHEMA_VERSION);
+        assert!(parsed.is_none(), "reader must skip unknown schema");
     }
 }

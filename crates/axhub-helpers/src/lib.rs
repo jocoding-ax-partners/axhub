@@ -3,20 +3,23 @@ pub mod autowire;
 pub mod observability;
 pub mod orphan_stub;
 
-/// Process-wide mutex for tests that mutate process environment variables.
+/// Process-wide mutex for ANY code that mutates process environment variables.
 ///
-/// Tests in different modules share the same process env, so a single lock
-/// prevents cross-module env-var races. Unit tests that call `std::env::set_var`
-/// / `remove_var` MUST hold this lock for the duration of the mutation.
-#[cfg(test)]
+/// All env-mutating sites (production probes, hooks, recurrence env overrides,
+/// preflight wall-budget overrides, consent headless guards) MUST acquire this
+/// lock. Single source of truth so concurrent set_var/remove_var across
+/// threads/modules never tears the process env block. Tests share the same
+/// lock so cargo's parallel test runner stays correct.
 pub static PROCESS_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 pub mod audit;
+pub mod audit_ledger;
 pub mod bootstrap;
 pub mod catalog;
 pub mod commit_gate;
 pub mod config;
 pub mod consent;
 pub mod deploy_prep;
+pub mod diagnose;
 pub mod event_log;
 pub mod hook_output;
 pub mod hook_safety;

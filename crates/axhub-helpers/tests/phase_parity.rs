@@ -146,6 +146,10 @@ fn redact_matches_typescript_secret_and_unicode_contract() {
         "test axhub_pat_[redacted] leak"
     );
     assert_eq!(
+        redact("test github_pat_11AA22BB33CC44DD55EE66_77FF88GG99HH00II11JJ22KK33LL44MM55NN leak"),
+        "test <REDACTED_GH_TOKEN> leak"
+    );
+    assert_eq!(
         redact(
             "\x1b[32mOK\x1b[0m Bearer abcdef1234567890abcdef AXHUB_TOKEN=xyz1234567890abcdef1234"
         ),

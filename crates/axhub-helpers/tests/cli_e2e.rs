@@ -52,6 +52,52 @@ fn assert_no_consent_side_effects(state_dir: &Path, runtime_dir: &Path) {
     assert!(!runtime_dir.exists());
 }
 
+#[test]
+fn cli_diagnose_hitl_rejects_non_tty_stdin_without_empty_capture_success() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let runtime = temp.path().join("runtime");
+    let prompts = temp.path().join("prompts.json");
+    let output = temp.path().join("captured.json");
+    std::fs::write(
+        &prompts,
+        r#"[{"kind":"capture","key":"failure_note","message":"paste failure output"}]"#,
+    )
+    .unwrap();
+
+    let run = Command::new(bin())
+        .args([
+            "diagnose",
+            "hitl",
+            "--session",
+            "loop-non-tty",
+            "--prompts",
+            prompts.to_str().unwrap(),
+            "--output",
+            output.to_str().unwrap(),
+        ])
+        .env("XDG_STATE_HOME", &state)
+        .env("XDG_RUNTIME_DIR", &runtime)
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        run.status.code(),
+        Some(65),
+        "non-interactive HITL must fail closed instead of storing an empty capture"
+    );
+    let stderr = String::from_utf8_lossy(&run.stderr);
+    assert!(
+        stderr.contains("TTY unavailable"),
+        "stderr should explain the interactive requirement, got: {stderr}"
+    );
+    assert!(
+        !output.exists(),
+        "non-TTY fallback must not persist an empty captured.json"
+    );
+}
+
 fn run_in_dir(args: &[&str], cwd: &Path) -> Output {
     Command::new(bin())
         .args(args)

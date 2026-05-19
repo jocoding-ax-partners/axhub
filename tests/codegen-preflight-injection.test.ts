@@ -1,8 +1,8 @@
 // Phase 27.x — codegen-preflight-injection.ts unit tests.
 // Verifies:
 //   1. getPreflightInjectionLine() is deterministic and contains required elements.
-//   2. All 10 targets (9 SKILL + 1 template) contain the codegen output byte-identical.
-//   3. Variant taxonomy: 1 deploy + 9 lite.
+//   2. All 16 targets (15 SKILL + 1 template) contain the codegen output byte-identical.
+//   3. Variant taxonomy: 1 deploy + 15 lite.
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
@@ -49,6 +49,7 @@ describe("getPreflightInjectionLine — deterministic + structure", () => {
     const line = getPreflightInjectionLine();
     expect(line).toContain("sk-[A-Za-z0-9_-]{20,}");
     expect(line).toContain("gho_[A-Za-z0-9]{36}");
+    expect(line).toContain("github_pat_[A-Za-z0-9_]{20,}");
     expect(line).toContain("axhub_[A-Za-z0-9]{32,}");
     expect(line).toContain("Bearer");
     expect(line).toContain("<redacted>");
@@ -64,8 +65,8 @@ describe("getPreflightInjectionLine — deterministic + structure", () => {
 });
 
 describe("TARGETS — variant taxonomy", () => {
-  test("exactly 10 targets (9 SKILL + 1 template)", () => {
-    expect(TARGETS).toHaveLength(10);
+  test("exactly 16 targets (15 SKILL + 1 template)", () => {
+    expect(TARGETS).toHaveLength(16);
   });
 
   test("exactly 1 deploy variant — skills/deploy/SKILL.md", () => {
@@ -74,8 +75,8 @@ describe("TARGETS — variant taxonomy", () => {
     expect(deployTargets[0].file).toBe("skills/deploy/SKILL.md");
   });
 
-  test("exactly 9 lite variant targets", () => {
-    expect(TARGETS.filter((t) => t.variant === "lite")).toHaveLength(9);
+  test("exactly 15 lite variant targets", () => {
+    expect(TARGETS.filter((t) => t.variant === "lite")).toHaveLength(15);
   });
 
   test("template is lite variant", () => {
@@ -85,7 +86,7 @@ describe("TARGETS — variant taxonomy", () => {
   });
 });
 
-describe("10-target byte-identical lock (Phase 27.x variant-aware manifest invariant)", () => {
+describe("16-target byte-identical lock (Phase 27.x variant-aware manifest invariant)", () => {
   for (const target of TARGETS) {
     test(`${target.file} (${target.variant}) contains codegen output byte-identical`, () => {
       const content = readFileSync(join(REPO_ROOT, target.file), "utf8");
