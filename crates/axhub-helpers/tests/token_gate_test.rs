@@ -62,26 +62,24 @@ fn probe_unauthorized() -> &'static str {
     }
 }
 
+#[cfg(unix)]
 fn probe_authorized() -> &'static str {
-    // Probe that emits literal `"user_email":"u"` (quotes included) so
-    // cmd_token_gate's `stdout.contains("\"user_email\"")` check matches.
-    // We route through `sh -c` (POSIX) or `cmd /c` (Windows) so the inner
-    // shell expands the backslash-escaped quotes before printf/echo runs.
-    if cfg!(windows) {
-        r#"cmd /c echo "user_email":"u""#
-    } else {
-        // shlex POSIX 가 single-quoted body 를 literal 로 보존 →
-        // bash -c 가 double-quoted `\"` 를 literal quote 로 expand →
-        // printf 가 `"user_email":"u"` 그대로 stdout 출력.
-        r#"bash -c 'printf "\"user_email\":\"u\""'"#
-    }
+    // shlex POSIX 가 single-quoted body 를 literal 로 보존 →
+    // bash -c 가 double-quoted `\"` 를 literal quote 로 expand →
+    // printf 가 `"user_email":"u"` 그대로 stdout 출력.
+    // Windows 의 `cmd /c echo` 가 quote 제거로 동일 fixture 가 작동 안 해서,
+    // 본 fn 과 의존 test (`inline_auth_probe_with_user_email_match_exits_zero`)
+    // 둘 다 unix-only 로 묶어요.
+    r#"bash -c 'printf "\"user_email\":\"u\""'"#
 }
 
 fn touch_mtime(path: &std::path::Path, secs_since_epoch: i64) {
     // Set the file mtime explicitly so tests can simulate fresh / stale tokens
-    // regardless of when the file was actually created.
+    // regardless of when the file was actually created. Windows requires the
+    // file handle to be opened with write access for `set_modified` to succeed
+    // (NTFS denies metadata writes through read-only handles with OS error 5).
     let mtime = SystemTime::UNIX_EPOCH + Duration::from_secs(secs_since_epoch.max(0) as u64);
-    let f = std::fs::File::open(path).unwrap();
+    let f = std::fs::OpenOptions::new().write(true).open(path).unwrap();
     f.set_modified(mtime).unwrap();
 }
 
@@ -212,8 +210,14 @@ fn missing_token_file_falls_through_to_inline_check_unauthorized() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn inline_auth_probe_with_user_email_match_exits_zero() {
+    // Windows 의 `cmd /c echo` 가 인자에서 `"` 를 제거해서 stdout 에 literal
+    // `"user_email"` 가 안 들어가요. probe_authorized 의 bash -c 경로는 POSIX-
+    // only — Windows 에서 동일 효과를 내려면 별도 PowerShell mock 이 필요한데,
+    // 실제 Windows token-gate 동작은 cli_e2e + smoke-windows-vm-checklist.ps1
+    // 가 cover 하므로 unit fixture 는 unix-only 로 묶어둬요.
     let tmp = tempfile::tempdir().unwrap();
     let token_path = tmp.path().join("missing");
     let out = run_gate(&[
