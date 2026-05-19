@@ -228,6 +228,7 @@ jobs:
         if: success()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
@@ -240,9 +241,46 @@ jobs:
             TAG="${GITHUB_REF#refs/tags/}"
           fi
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+
+          # Fetch the release body so the Slack message includes the actual
+          # CHANGELOG narrative (same text GitHub renders on the release
+          # page). GitHub returns CRLF — strip \r so jq doesn't reject the
+          # payload with "control characters must be escaped". Slack section
+          # caps at 3000 chars — truncate with a marker if longer.
+          BODY_RAW="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body 2>/dev/null | tr -d '\r' || echo '')"
+          if [ -z "$BODY_RAW" ]; then
+            BODY_TRIMMED="(릴리즈 노트 본문 없음 — GitHub 에서 확인해주세요)"
+          else
+            # Slack hard cap is 3000 chars per section; reserve ~200 for the label + truncation marker.
+            BODY_TRIMMED="$(printf '%s' "$BODY_RAW" | awk '
+              { lines[NR] = $0 }
+              END {
+                cap = 2800
+                acc = 0
+                for (i = 1; i <= NR; i++) {
+                  line = lines[i]
+                  if (acc + length(line) + 1 > cap) {
+                    print line
+                    print "…(잘림 — 전체 본문은 GitHub release 페이지에서)"
+                    exit
+                  }
+                  print line
+                  acc += length(line) + 1
+                }
+              }
+            ')"
+          fi
+
+          # Use --rawfile so jq emits proper "\n" JSON escapes; --arg passes
+          # literal newline bytes through, which Slack rejects with
+          # "control characters must be escaped".
+          BODY_FILE="$(mktemp)"
+          printf '%s' "$BODY_TRIMMED" > "$BODY_FILE"
+
           PAYLOAD=$(jq -nc \
             --arg tag "$TAG" \
             --arg url "$URL" \
+            --rawfile body "$BODY_FILE" \
             '{
               text: ("axhub " + $tag + " released — " + $url),
               blocks: [
@@ -255,6 +293,13 @@ jobs:
                   text: {
                     type: "mrkdwn",
                     text: ("*릴리즈 노트*\n<" + $url + "|GitHub 에서 변경사항 보기>")
+                  }
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: ("*변경사항*\n```\n" + $body + "\n```")
                   }
                 },
                 {
@@ -280,6 +325,7 @@ jobs:
           curl -fsSL -X POST -H 'Content-type: application/json' \
             --data "$PAYLOAD" "$SLACK_WEBHOOK_URL" \
             || echo "Slack notification failed (fail-open) — release succeeded"
+          rm -f "$BODY_FILE"
 
   e2e-staging:
     name: ax-hub-cli staging E2E (gated by E2E_ENABLED repo var)
