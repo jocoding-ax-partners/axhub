@@ -207,6 +207,27 @@ jobs:
           fi
           bash scripts/release/verify-release.sh "$TAG"
 
+      - name: Notify Slack of new release
+        if: success()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "SLACK_WEBHOOK_URL secret not set — skipping notification"
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+          PAYLOAD=$(jq -nc --arg text ":rocket: *axhub ${TAG}* released\n${URL}" '{text: $text}')
+          curl -fsSL -X POST -H 'Content-type: application/json' \
+            --data "$PAYLOAD" "$SLACK_WEBHOOK_URL" \
+            || echo "Slack notification failed (fail-open) — release succeeded"
+
   e2e-staging:
     name: ax-hub-cli staging E2E (gated by E2E_ENABLED repo var)
     runs-on: ubuntu-latest
