@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("33 top-level keys (2 메타 + 29 SKILL slug + quality_gate + consent channel)", () => {
+  test("34 top-level keys (2 메타 + 30 SKILL slug + quality_gate + consent channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(33);
+    expect(keys).toHaveLength(34);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
@@ -57,6 +57,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "apps",
       "auth",
       "axhub-debug",
+      "axhub-diagnose",
       "axhub-plan",
       "axhub-review",
       "axhub-ship",
@@ -87,9 +88,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("41 actual safe_default rationale 엔트리 including Phase 26 quality channels", () => {
+  test("42 actual safe_default rationale 엔트리 including Phase 26 quality + Plan v6 diagnose", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(41);
+    expect(paths).toHaveLength(42);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -99,6 +100,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "auth",
       "auth",
       "axhub-debug",
+      "axhub-diagnose",
       "axhub-plan",
       "axhub-review",
       "axhub-review",

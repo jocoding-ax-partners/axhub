@@ -424,5 +424,15 @@
   },
   "karpathy-guidelines": {
     "_note": "karpathy-guidelines has no AskUserQuestion call site."
+  },
+  "axhub-diagnose": {
+    "어떤 가설부터 검증해볼까요?": {
+      "safe_default": "abort",
+      "rationale": "Probe apply mutates env or shadow fs. In non-interactive contexts (CI/headless), do not auto-pick a hypothesis — abort the loop and surface a systemMessage instead.",
+      "allowed_safe_defaults": [
+        "abort",
+        "검증 건너뛰고 일단 fix 시도"
+      ]
+    }
   }
 }

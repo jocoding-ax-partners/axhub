@@ -11,7 +11,9 @@ pub mod orphan_stub;
 #[cfg(test)]
 pub static PROCESS_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 pub mod audit;
+pub mod audit_ledger;
 pub mod bootstrap;
+pub mod diagnose;
 pub mod catalog;
 pub mod commit_gate;
 pub mod config;

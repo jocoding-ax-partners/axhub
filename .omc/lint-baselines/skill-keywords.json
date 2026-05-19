@@ -362,6 +362,12 @@
       "어떤 skill 많이 썼어",
       "axhub routing 분석"
     ],
+    "skills/axhub-diagnose/SKILL.md": [
+      "loop 돌려서 찾아줘",
+      "loop 돌려서 원인 찾아",
+      "느낌 loop",
+      "재현 가능한 loop 만들어"
+    ],
     "skills/init/SKILL.md": [
       "결제 앱 만들어",
       "결제 앱 만들어줘",
@@ -978,5 +984,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-05-14T04:15:12.496Z"
+  "generated_at": "2026-05-19T06:50:17.466Z"
 }
