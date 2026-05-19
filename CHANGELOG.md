@@ -4,6 +4,48 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.8.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.7.0...v0.8.0) (2026-05-19)
+
+Plan v6 auto-diagnose release. Matt Pocock 의 6-Phase diagnose pattern 을 axhub 5-Phase loop (1L Build → 2R Hypothesize → 3I Instrument → 4F Fix + LOOP_VERIFY → 5P Postmortem) 로 적용해서, vibe coder 가 deploy / test 실패에 부딪혔을 때 명령어 한 줄도 보지 않고 y/n + paste 만으로 자가 진단 + 복구하는 인프라가 ship 됐어요. v0.8.0 scope 은 deploy + test 2 tool 만 (npm / git / docker / playwright / lint 는 v0.8.1+ deferred).
+
+핵심 모듈:
+- `crates/axhub-helpers/src/diagnose/`: state machine (transition() single-entry + Mutex + MAX_VERIFY_RETRIES=5) + 5-phase pipeline + Probe trait (EnvVar + LoopShadow) + instrument boundary guard (real sha256 pre/post 비교) + recurrence (3-threshold) + preflight (tokio::join! 5-check + 2-level timeout 200ms wall / 50ms per-check)
+- `crates/axhub-helpers/src/consent/decision.rs`: 4-variant DecisionVariant (Once 60s / AllowSession 1h / AllowAlways 1y / Deny) + headless guard via session_id() + SessionIdLookup root-cause 보존
+- `crates/axhub-helpers/src/audit_ledger.rs`: JSONL + fslock + 5s bounded timeout poll (LEDGER_LOCK_TIMEOUT_ENV override)
+- `crates/axhub-helpers/src/redact.rs`: 6 free-text secret regex + AWS 7-prefix taxonomy (AKIA/ASIA/AGPA/ANPA/ANVA/AROA/AIDA/AIPA) + 100KB cap + UTF-8 char-boundary truncate
+- `crates/axhub-helpers/src/diagnose/hitl.rs`: Rust subcommand (sh/ps1 폐기) + StdioRunner production impl + redact_for_handoff 모든 capture 에 boundary 적용 + write_private_file_no_follow 로 0o600 mode 기록
+- `crates/axhub-helpers/src/main.rs`: `diagnose hitl --session <id> --prompts <p> [--output <p>]` 서브커맨드 wiring
+- `skills/axhub-diagnose/SKILL.md`: 해요체 SKILL + TodoWrite Step 0 + D1 sentinel + AskUserQuestion 가설 선택지
+
+보안 강화 (4-reviewer cross-confirm 후 해소):
+- LoopShadowProbe canonicalize shadow_root prefix 검증 → symlink swap 차단 (`<shadow>/<loop>/cwd-shadow/sub -> /etc` 류)
+- instrument 의 audit_ledger write 실패 → 즉시 probe revert + ProbeApplyFailed (silent swallow 제거)
+- captured.json 0o600 mode + symlink-reject + PromptSpec 1MB DoS cap
+
+검증 baseline (v0.8.0):
+- `cargo test --workspace` — 481 pass / 3 ignored / 0 fail (26 suites)
+- `bun test` — 935 pass / 6 skip / 1 todo / 0 fail (79 files)
+- `cargo clippy --workspace --all-targets -- -D warnings` clean
+- `cargo fmt --all -- --check` clean
+- `bun run skill:doctor --strict` exit 0 (30/30 SKILLs OK)
+- `bun run lint:tone --strict` 0 err / 0 warn (45 files)
+- `bun run lint:keywords --check` baseline preserved
+- `bunx tsc --noEmit` clean
+- CI: Rust ubuntu/macos/windows × Perf ubuntu/macos/windows × T2 helper-bin × Local Rust-primary 모두 pass
+- 8 reviewer instance pass (coherence ×3 + architecture + feasibility + security + scope + design) + Architect APPROVED 8/8 + 4-reviewer multi-perspective (code/reliability/correctness/security) 의 5 HIGH + 8 MEDIUM + 6 LOW + 2 NIT 전부 해소
+
+정직한 tradeoff:
+- CodeInjectionProbe v0.8.1 deferred — 3-reviewer cross-consensus (security/scope/design) 가 user code 직접 inject 의 risk profile 을 v0.8.0 scope 밖으로 분류
+- LLM-augmented hypothesis source v0.8.1 deferred — 비용 정책 결정 후. v0.8.0 은 catalog + template 만
+- npm install + git / docker / playwright / lint tool v0.8.1+ — cold-cache budget 실측 후. v0.8.0 = deploy + test 2 tool
+- audit_ledger HMAC chain (tamper-evidence) + ledger rotation v0.8.1 follow-up
+- `synthesized_by_helper` JWT enforcement 보류 — bootstrap pending-claim flow 가 helper-minted (true) → user-initiated (false) 로 claim 하는 의존성이 있고, `consent_synthesized_by_helper_claim_is_audit_only` 테스트가 이 contract 를 명시적으로 pin 해요. 트러스트 클래스 enforcement 는 별도 ADR 필요
+- strategy 실 runner (cargo test 호출 / event_log 재실행) v0.8.0 skeleton 으로 `NotApplicable` 반환 → HITL fallback. 실 wiring 은 v0.8.0-rc.2 또는 후속 PR
+
+### Added
+
+* plan v6 auto-diagnose 5-Phase loop (v0.8.0) ([1c835f2](https://github.com/jocoding-ax-partners/axhub/commit/1c835f2ecafb5fbe34fd40a815c68f5296c205f6))
+
 ## [0.7.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.6.9...v0.7.0) (2026-05-15)
 
 Phase 26 v1 quality automation release. axhub 가 SaaS deploy plugin 에 머무르지 않고 vibe coder 의 code-quality 보조 surface 로 확장됐어요. 5 신규 quality SKILL (`axhub-review`, `axhub-debug`, `axhub-ship`, `axhub-tdd`, `axhub-plan`) + 3 specialist agent (`axhub-reviewer`, `axhub-debugger`, `axhub-shipper`) + state-aware megaskill (`using-axhub-quality`) + Karpathy guidelines inject + commit/push hard-gate (`commit-gate`) + post-commit promotion + TDD inject (Edit/Write/MultiEdit/NotebookEdit PreToolUse) + hook `additionalContext` canonical template (`<axhub-{hook}-{purpose}>` triad + per-hook token budget) + shape linter CI gate (`lint:hook-inject`) 가 추가됐어요.
