@@ -4,6 +4,28 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.8.0...v0.9.0) (2026-05-19)
+
+axhub plugin 의 OS-conditional shell wrapper 5쌍 (~1100 LOC) 을 Rust `axhub-helpers` subcommand 로 흡수한 sh/ps1 absorption 릴리즈예요. plan-ceo-review + plan-eng-review + codex outside voice (18 finding, 6 cross-model tension) + feature-dev:code-reviewer (5 issues) 모두 통과한 8 task + 3 follow-up 통합 ship 이에요. Windows 사용자가 처음으로 deploy SKILL Step 3.5 의 `token-freshness gate` 와 `auth-refresh-bg detach` chain 을 정상 동작하게 됐어요 (Windows parity gap #1, #2 동시 해소). `session-start-autowire.{sh,ps1}` wrapper 가 130/158 줄 → 40/55 줄로 줄어들어 OS 분기가 `cfg!(target_os)` 단일 위치에 응집했어요. `_AXHUB_DISCLOSURE_VER` 가 v0.5.13 에서 v0.8.0 까지 drift 했던 문제도 `codegen-install-version.ts` 가 release version 과 자동 sync 하도록 잠갔어요.
+
+### Test baseline
+
+- bun test: 986/986 pass / 0 fail
+- cargo test -p axhub-helpers: 112/112 pass (신규 29 케이스 — token_gate_test 10, post_install_test 9, autowire_scope_auto_test 6, spawn detach 4)
+- bash tests/install.test.sh: 8/8 (OS/arch matrix)
+- cargo clippy --workspace --all-targets -- -D warnings: clean
+- cross-platform-helper.yml workflow: ubuntu + macos hook integration matrix
+
+### Honest tradeoff
+
+- `bin/install.{sh,ps1}` 의 curl/Invoke-WebRequest 다운로드 단계는 chicken-and-egg (helper 가 다운로드 대상) 라 shell 에 영속해요. bun bootstrap 으로 대체할 때 bun PATH 의존성 + corp proxy 위험이 흡수 가치 초과 — 사용자 EXPLICIT SKIP 결정.
+- `spawn_detached_with_fallback` unix setsid EPERM (Docker non-priv 컨테이너) fallback 은 best-effort 예요. SessionStart hook timeout 10s 안에 autowire merge (~100ms) 가 끝날 가능성이 높지만, 부모가 일찍 종료하면 SIGHUP propagation 으로 child 가 죽을 수 있어요. T1 codex tension 결정 = silent kill 보다 best-effort 시도가 더 안전한 trade-off.
+- POSIX shlex parser 가 Windows `cmd` 의 `&` / `;` separator 와 다르게 해석. `AXHUB_GATE_AUTH_PROBE` 가 test injection 전용이라 production probe (`axhub auth status --json`) 영향 없지만 P3 follow-up.
+
+### Added
+
+* sh/ps1 절차 Rust subcommand 흡수 (Phase 1-4 통합) ([#114](https://github.com/jocoding-ax-partners/axhub/issues/114)) ([ea7d872](https://github.com/jocoding-ax-partners/axhub/commit/ea7d8720d062dd21dbc991de58a963dafbe95b20))
+
 ## [0.8.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.7.0...v0.8.0) (2026-05-19)
 
 Plan v6 auto-diagnose release. Matt Pocock 의 6-Phase diagnose pattern 을 axhub 5-Phase loop (1L Build → 2R Hypothesize → 3I Instrument → 4F Fix + LOOP_VERIFY → 5P Postmortem) 로 적용해서, vibe coder 가 deploy / test 실패에 부딪혔을 때 명령어 한 줄도 보지 않고 y/n + paste 만으로 자가 진단 + 복구하는 인프라가 ship 됐어요. v0.8.0 scope 은 deploy + test 2 tool 만 (npm / git / docker / playwright / lint 는 v0.8.1+ deferred).
