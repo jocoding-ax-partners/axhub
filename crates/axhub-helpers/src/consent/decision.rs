@@ -119,8 +119,8 @@ mod tests {
 
     #[test]
     fn ttl_ordering() {
-        assert!(TTL_ONCE_SEC < TTL_SESSION_SEC);
-        assert!(TTL_SESSION_SEC < TTL_ALWAYS_SEC);
+        const _: () = assert!(TTL_ONCE_SEC < TTL_SESSION_SEC);
+        const _: () = assert!(TTL_SESSION_SEC < TTL_ALWAYS_SEC);
     }
 
     #[test]

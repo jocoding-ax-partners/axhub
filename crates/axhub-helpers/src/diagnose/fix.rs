@@ -29,7 +29,7 @@ pub struct FixOutcome {
 
 impl FixOutcome {
     pub fn is_green(&self) -> bool {
-        self.verify_signal.as_ref().map_or(false, |s| s.is_green())
+        self.verify_signal.as_ref().is_some_and(|s| s.is_green())
     }
 }
 
