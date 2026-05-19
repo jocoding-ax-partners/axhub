@@ -184,11 +184,28 @@ jobs:
             echo "release workflow must run from refs/tags/$TAG, got: $GITHUB_REF" >&2
             exit 1
           fi
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
-            || gh release create "$TAG" \
-                 --repo "$GITHUB_REPOSITORY" \
-                 --title "$TAG" \
-                 --notes "Automated Rust helper release. See CHANGELOG.md for details."
+          VERSION="${TAG#v}"
+          NOTES_FILE="$(mktemp)"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { flag=1; print; next }
+            flag && /^## \[/ { exit }
+            flag { print }
+          ' CHANGELOG.md > "$NOTES_FILE"
+          if [ ! -s "$NOTES_FILE" ]; then
+            echo "CHANGELOG section for $VERSION not found — using fallback notes"
+            printf 'Automated Rust helper release. See CHANGELOG.md for details.\n' > "$NOTES_FILE"
+          fi
+          echo "--- release notes preview ---"
+          head -40 "$NOTES_FILE"
+          echo "--- end preview ---"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$NOTES_FILE"
+          else
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TAG" \
+              --notes-file "$NOTES_FILE"
+          fi
           for f in bin/axhub-helpers-* bin/checksums.txt bin/manifest.json bin/*.sig bin/*.pem; do
             [ -f "$f" ] || continue
             echo "Uploading $f"
