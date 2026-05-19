@@ -25,15 +25,13 @@ static OPENAI_KEY_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"sk-[A-Za-z0-9_\-]{20,}").unwrap());
 static GH_TOKEN_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"gh[pousr]_[A-Za-z0-9]{36,}").unwrap());
-static AWS_KEY_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"AKIA[0-9A-Z]{16}").unwrap());
+static AWS_KEY_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"AKIA[0-9A-Z]{16}").unwrap());
 static PRIVATE_KEY_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?s)-----BEGIN [A-Z ]+PRIVATE KEY-----.*?-----END [A-Z ]+PRIVATE KEY-----")
         .unwrap()
 });
-static URL_CREDS_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\bhttps?://[A-Za-z0-9._~+\-]+:[^\s@/]+@").unwrap()
-});
+static URL_CREDS_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\bhttps?://[A-Za-z0-9._~+\-]+:[^\s@/]+@").unwrap());
 
 pub fn redact(text: &str) -> String {
     let normalized: String = text.nfkc().collect();

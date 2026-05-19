@@ -44,14 +44,16 @@ pub fn emit(entry: &LearningEntry) -> Result<(), DiagnoseError> {
 }
 
 pub fn emit_to(path: &std::path::Path, entry: &LearningEntry) -> Result<(), DiagnoseError> {
-    let line =
-        serde_json::to_string(entry).map_err(|e| DiagnoseError::LearningEmitFailed(e.to_string()))?;
+    let line = serde_json::to_string(entry)
+        .map_err(|e| DiagnoseError::LearningEmitFailed(e.to_string()))?;
     append_line(path, &line).map_err(|e| DiagnoseError::LearningEmitFailed(e.to_string()))
 }
 
 pub fn read_all_from(path: &std::path::Path) -> Result<Vec<LearningEntry>, DiagnoseError> {
-    let entries = read_lines(path, |line| serde_json::from_str::<LearningEntry>(line).ok())
-        .map_err(|e| DiagnoseError::LearningEmitFailed(e.to_string()))?;
+    let entries = read_lines(path, |line| {
+        serde_json::from_str::<LearningEntry>(line).ok()
+    })
+    .map_err(|e| DiagnoseError::LearningEmitFailed(e.to_string()))?;
     Ok(entries)
 }
 

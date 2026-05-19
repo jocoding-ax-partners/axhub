@@ -35,11 +35,7 @@ pub enum ProbeTouch {
     /// User-owned source file with a specific line range. Probe owns those
     /// lines exclusively. Plan v6 §4.4 — never used in v0.8.0
     /// (CodeInjectionProbe is v0.8.1+).
-    UserCodeLines {
-        path: PathBuf,
-        start: u32,
-        end: u32,
-    },
+    UserCodeLines { path: PathBuf, start: u32, end: u32 },
     /// Env var. No file touch.
     EnvVar(String),
     /// File inside `~/.axhub/loops/<loop_id>/cwd-shadow/`. Always safe to
@@ -123,7 +119,9 @@ mod tests {
 
     #[test]
     fn trait_apply_revert_roundtrip() {
-        let p = EchoProbe { id: "echo-1".into() };
+        let p = EchoProbe {
+            id: "echo-1".into(),
+        };
         let ctx = ProbeContext {
             loop_id: "loop-test".into(),
             shadow_root: PathBuf::from("/tmp/shadow"),
@@ -146,7 +144,9 @@ mod tests {
 
     #[test]
     fn default_run_returns_green() {
-        let p = EchoProbe { id: "echo-default".into() };
+        let p = EchoProbe {
+            id: "echo-default".into(),
+        };
         let ctx = ProbeContext {
             loop_id: "loop-test".into(),
             shadow_root: PathBuf::from("/tmp/shadow"),

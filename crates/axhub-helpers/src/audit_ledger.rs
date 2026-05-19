@@ -210,8 +210,7 @@ mod tests {
             let lk = lock.clone();
             handles.push(thread::spawn(move || {
                 for i in 0..per_writer {
-                    let entry = LedgerEntry::new("thread.kind")
-                        .with_action(format!("t{tid}-{i}"));
+                    let entry = LedgerEntry::new("thread.kind").with_action(format!("t{tid}-{i}"));
                     append_entry_to(&l, &lk, &entry).unwrap();
                 }
             }));

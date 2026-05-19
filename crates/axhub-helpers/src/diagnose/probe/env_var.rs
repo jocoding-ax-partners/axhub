@@ -104,7 +104,11 @@ mod tests {
         let handle = p.apply(&ctx).unwrap();
         assert_eq!(std::env::var(var).unwrap(), "new");
         p.revert(handle).unwrap();
-        assert_eq!(std::env::var(var).unwrap(), "original", "must restore prior value");
+        assert_eq!(
+            std::env::var(var).unwrap(),
+            "original",
+            "must restore prior value"
+        );
         std::env::remove_var(var);
     }
 

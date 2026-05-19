@@ -69,11 +69,8 @@ pub fn revert_with_guard<P: Probe + ?Sized>(
     probe: &P,
     outcome: ApplyOutcome,
 ) -> Result<(), DiagnoseError> {
-    let pre_paths: std::collections::BTreeSet<PathBuf> = outcome
-        .pre_snapshots
-        .keys()
-        .cloned()
-        .collect();
+    let pre_paths: std::collections::BTreeSet<PathBuf> =
+        outcome.pre_snapshots.keys().cloned().collect();
     probe.revert(outcome.handle)?;
 
     // Boundary guard: re-snapshot the same paths. We can't enumerate the

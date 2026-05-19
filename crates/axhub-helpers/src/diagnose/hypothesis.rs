@@ -71,8 +71,12 @@ pub fn generate(ctx: &HypothesisContext<'_>) -> Vec<Hypothesis> {
             ctx.signal.elapsed_ms
         ),
         user_facing_explanation: match ctx.strategy {
-            LoopStrategy::AxhubDeploy => "axhub deploy 명령이 중간에 멈췄어요. 이전 상태가 남아 있을 수 있어요.".into(),
-            LoopStrategy::Test => "테스트가 실패했어요. 직전 변경 또는 의존성 차이가 원인일 수 있어요.".into(),
+            LoopStrategy::AxhubDeploy => {
+                "axhub deploy 명령이 중간에 멈췄어요. 이전 상태가 남아 있을 수 있어요.".into()
+            }
+            LoopStrategy::Test => {
+                "테스트가 실패했어요. 직전 변경 또는 의존성 차이가 원인일 수 있어요.".into()
+            }
         },
         prediction: format!(
             "이 가설이 맞다면, `{}` 의 직전 상태를 정리한 뒤 재실행하면 에러가 사라져요.",
@@ -149,8 +153,7 @@ mod tests {
         let h = &hs[0];
         // Plan v6 §12 — UX text must be 해요체. Probe the suffix.
         assert!(
-            h.user_facing_explanation.contains("요")
-                || h.user_facing_explanation.contains("에요"),
+            h.user_facing_explanation.contains("요") || h.user_facing_explanation.contains("에요"),
             "expected 해요체 ending in user_facing_explanation: {}",
             h.user_facing_explanation
         );

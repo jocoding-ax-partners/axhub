@@ -102,7 +102,11 @@ fn ten_random_paths_all_reach_terminal_state() {
             Err(e) => errors.push(e),
         }
     }
-    assert!(errors.is_empty(), "2am-friday chaos failures:\n  {}", errors.join("\n  "));
+    assert!(
+        errors.is_empty(),
+        "2am-friday chaos failures:\n  {}",
+        errors.join("\n  ")
+    );
 }
 
 #[test]
@@ -128,7 +132,10 @@ fn concurrent_sessions_dont_interfere() {
             panic!("thread ended in non-terminal state: {final_state:?}");
         }
     }
-    assert_eq!(terminal_states, 10, "all 10 threads must reach a terminal state");
+    assert_eq!(
+        terminal_states, 10,
+        "all 10 threads must reach a terminal state"
+    );
 }
 
 #[test]
@@ -138,5 +145,8 @@ fn invalid_events_after_terminal_dont_panic() {
     assert!(session.snapshot().is_terminal());
     // Attempt to apply an event after Idle — should return Err, not panic.
     let result = session.apply(DiagnoseEvent::LoopReady);
-    assert!(result.is_err(), "transition from Idle on LoopReady must error");
+    assert!(
+        result.is_err(),
+        "transition from Idle on LoopReady must error"
+    );
 }

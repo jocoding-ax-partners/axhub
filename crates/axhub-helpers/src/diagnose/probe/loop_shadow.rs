@@ -76,8 +76,7 @@ impl Probe for LoopShadowProbe {
         };
         let path = PathBuf::from(path_str);
         if path.exists() {
-            std::fs::remove_file(&path)
-                .map_err(|e| DiagnoseError::CleanupFailed(e.to_string()))?;
+            std::fs::remove_file(&path).map_err(|e| DiagnoseError::CleanupFailed(e.to_string()))?;
         }
         Ok(())
     }
@@ -114,7 +113,10 @@ mod tests {
             .to_string();
         assert!(std::fs::read(&abs).unwrap() == b"hello");
         p.revert(handle).unwrap();
-        assert!(!PathBuf::from(&abs).exists(), "file must be deleted on revert");
+        assert!(
+            !PathBuf::from(&abs).exists(),
+            "file must be deleted on revert"
+        );
     }
 
     #[test]

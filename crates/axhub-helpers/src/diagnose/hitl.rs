@@ -73,7 +73,8 @@ pub fn run_with_runner(
     runner: &mut dyn PromptRunner,
 ) -> Result<HitlResult, DiagnoseError> {
     let mut result = HitlResult::default();
-    let session_deadline = std::time::Instant::now() + Duration::from_secs(HITL_SESSION_TIMEOUT_SECS);
+    let session_deadline =
+        std::time::Instant::now() + Duration::from_secs(HITL_SESSION_TIMEOUT_SECS);
     for prompt in prompts {
         if std::time::Instant::now() >= session_deadline {
             // Session timeout — abort remaining prompts but preserve partial result.
@@ -87,32 +88,28 @@ pub fn run_with_runner(
                 StepOutcome::Ok => {}
                 StepOutcome::TimedOut => result.timed_out.push("__step__".into()),
                 StepOutcome::Aborted => {
-                    return Err(DiagnoseError::HitlAborted(
-                        "step aborted by runner".into(),
-                    ));
+                    return Err(DiagnoseError::HitlAborted("step aborted by runner".into()));
                 }
             },
-            PromptKind::Capture { key } => match runner.capture(
-                &prompt.message,
-                prompt.timeout_secs,
-                prompt.max_bytes,
-            ) {
-                CaptureOutcome::Ok { value, truncated } => {
-                    if truncated {
-                        result.truncated.push(key.clone());
+            PromptKind::Capture { key } => {
+                match runner.capture(&prompt.message, prompt.timeout_secs, prompt.max_bytes) {
+                    CaptureOutcome::Ok { value, truncated } => {
+                        if truncated {
+                            result.truncated.push(key.clone());
+                        }
+                        result.captures.insert(key.clone(), value);
                     }
-                    result.captures.insert(key.clone(), value);
+                    CaptureOutcome::TimedOut => {
+                        result.timed_out.push(key.clone());
+                        result.captures.insert(key.clone(), String::new());
+                    }
+                    CaptureOutcome::Aborted => {
+                        return Err(DiagnoseError::HitlAborted(format!(
+                            "capture for {key} aborted"
+                        )));
+                    }
                 }
-                CaptureOutcome::TimedOut => {
-                    result.timed_out.push(key.clone());
-                    result.captures.insert(key.clone(), String::new());
-                }
-                CaptureOutcome::Aborted => {
-                    return Err(DiagnoseError::HitlAborted(format!(
-                        "capture for {key} aborted"
-                    )));
-                }
-            },
+            }
         }
     }
     Ok(result)
@@ -156,8 +153,7 @@ pub enum CaptureOutcome {
 /// tests use `FakeRunner`.
 pub trait PromptRunner {
     fn step(&mut self, message: &str, timeout_secs: u64) -> StepOutcome;
-    fn capture(&mut self, message: &str, timeout_secs: u64, max_bytes: usize)
-        -> CaptureOutcome;
+    fn capture(&mut self, message: &str, timeout_secs: u64, max_bytes: usize) -> CaptureOutcome;
 }
 
 /// Test fixture: returns canned answers in order. `step` always Ok; capture
@@ -182,12 +178,7 @@ impl PromptRunner for FakeRunner {
     fn step(&mut self, _message: &str, _timeout_secs: u64) -> StepOutcome {
         StepOutcome::Ok
     }
-    fn capture(
-        &mut self,
-        _message: &str,
-        _timeout_secs: u64,
-        max_bytes: usize,
-    ) -> CaptureOutcome {
+    fn capture(&mut self, _message: &str, _timeout_secs: u64, max_bytes: usize) -> CaptureOutcome {
         let Some(mut value) = self.answers.pop_front() else {
             return CaptureOutcome::TimedOut;
         };
@@ -254,9 +245,7 @@ mod tests {
     #[test]
     fn capture_byte_cap_truncates() {
         let prompts = vec![PromptSpec {
-            kind: PromptKind::Capture {
-                key: "big".into(),
-            },
+            kind: PromptKind::Capture { key: "big".into() },
             message: "paste".into(),
             timeout_secs: 60,
             max_bytes: 32,

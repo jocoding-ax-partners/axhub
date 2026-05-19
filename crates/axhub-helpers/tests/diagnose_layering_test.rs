@@ -25,7 +25,9 @@ const FORBIDDEN_CRATE_MODULES: &[&str] = &[
 ];
 
 fn diagnose_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src").join("diagnose")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("diagnose")
 }
 
 fn walk_rust_files(dir: &Path) -> Vec<PathBuf> {
@@ -50,7 +52,10 @@ fn diagnose_modules_dont_import_forbidden_layers() {
     let dir = diagnose_dir();
     assert!(dir.exists(), "diagnose dir must exist at {dir:?}");
     let files = walk_rust_files(&dir);
-    assert!(!files.is_empty(), "must find at least one .rs file in diagnose/");
+    assert!(
+        !files.is_empty(),
+        "must find at least one .rs file in diagnose/"
+    );
 
     let mut violations = Vec::new();
 
@@ -59,7 +64,8 @@ fn diagnose_modules_dont_import_forbidden_layers() {
         for (line_no, line) in contents.lines().enumerate() {
             let trimmed = line.trim_start();
             // Skip comments & doc-comments.
-            if trimmed.starts_with("//") || trimmed.starts_with("///") || trimmed.starts_with("//!") {
+            if trimmed.starts_with("//") || trimmed.starts_with("///") || trimmed.starts_with("//!")
+            {
                 continue;
             }
             // We only care about `use crate::X` and direct `crate::X::...` references.

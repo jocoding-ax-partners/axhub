@@ -168,7 +168,10 @@ mod tests {
     fn happy_path_transitions() {
         let s = DiagnoseSession::new("loop-happy");
         assert_eq!(s.snapshot(), DiagnoseState::Idle);
-        assert_eq!(s.apply(DiagnoseEvent::Trigger).unwrap(), DiagnoseState::Building);
+        assert_eq!(
+            s.apply(DiagnoseEvent::Trigger).unwrap(),
+            DiagnoseState::Building
+        );
         assert_eq!(
             s.apply(DiagnoseEvent::LoopReady).unwrap(),
             DiagnoseState::Reproducing
@@ -210,7 +213,11 @@ mod tests {
         s.apply(DiagnoseEvent::ProbeApplied).unwrap();
         s.apply(DiagnoseEvent::FixApplied).unwrap();
         let next = s.apply(DiagnoseEvent::LoopVerifyRed).unwrap();
-        assert_eq!(next, DiagnoseState::Hypothesize, "red must regress to HYPOTHESIZE");
+        assert_eq!(
+            next,
+            DiagnoseState::Hypothesize,
+            "red must regress to HYPOTHESIZE"
+        );
     }
 
     #[test]

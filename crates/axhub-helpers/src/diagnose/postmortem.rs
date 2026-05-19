@@ -19,8 +19,8 @@ pub struct CleanupReport {
 /// Real revert happens by the orchestrator — this function is the cleanup
 /// summary for the audit/telemetry layer.
 pub fn summarize_cleanup(loop_id: &str) -> Result<CleanupReport, DiagnoseError> {
-    let entries = audit_ledger::read_all()
-        .map_err(|e| DiagnoseError::CleanupFailed(e.to_string()))?;
+    let entries =
+        audit_ledger::read_all().map_err(|e| DiagnoseError::CleanupFailed(e.to_string()))?;
     let mut probes_reverted = 0u32;
     let mut skipped_unknown_kind = 0u32;
     for e in entries {
@@ -47,8 +47,7 @@ pub fn emit_cleanup_event(loop_id: &str, report: &CleanupReport) -> Result<(), D
             "probes_reverted": report.probes_reverted,
             "skipped_unknown_kind": report.skipped_unknown_kind,
         }));
-    audit_ledger::append_entry(&entry)
-        .map_err(|e| DiagnoseError::CleanupFailed(e.to_string()))
+    audit_ledger::append_entry(&entry).map_err(|e| DiagnoseError::CleanupFailed(e.to_string()))
 }
 
 #[cfg(test)]

@@ -129,10 +129,7 @@ mod tests {
         std::env::set_var("CLAUDE_SESSION_ID", "unknown");
         let result = issue_decision_token(DecisionVariant::AllowSession, binding());
         std::env::remove_var("CLAUDE_SESSION_ID");
-        assert!(matches!(
-            result,
-            Err(DecisionError::HeadlessEnvironment)
-        ));
+        assert!(matches!(result, Err(DecisionError::HeadlessEnvironment)));
     }
 
     #[test]
@@ -140,9 +137,6 @@ mod tests {
         let _g = ENV_LOCK.lock().unwrap();
         std::env::remove_var("CLAUDE_SESSION_ID");
         let result = issue_decision_token(DecisionVariant::AllowAlways, binding());
-        assert!(matches!(
-            result,
-            Err(DecisionError::HeadlessEnvironment)
-        ));
+        assert!(matches!(result, Err(DecisionError::HeadlessEnvironment)));
     }
 }

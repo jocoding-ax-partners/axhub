@@ -46,7 +46,10 @@ pub struct PreflightSummary {
 
 impl PreflightSummary {
     pub fn warnings(&self) -> Vec<&CheckReport> {
-        self.reports.iter().filter(|r| r.outcome.is_warn()).collect()
+        self.reports
+            .iter()
+            .filter(|r| r.outcome.is_warn())
+            .collect()
     }
 }
 

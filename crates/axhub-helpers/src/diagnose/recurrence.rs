@@ -26,11 +26,7 @@ pub fn effective_threshold() -> u32 {
 
 /// Count occurrences for a given (error_class, cwd_hash) pair across the
 /// supplied learnings.
-pub fn count_for(
-    entries: &[LearningEntry],
-    error_class: &str,
-    cwd_hash: &str,
-) -> u32 {
+pub fn count_for(entries: &[LearningEntry], error_class: &str, cwd_hash: &str) -> u32 {
     entries
         .iter()
         .filter(|e| e.error_class == error_class && e.cwd_hash == cwd_hash)
@@ -49,15 +45,15 @@ pub fn aggregate(entries: &[LearningEntry]) -> HashMap<(String, String), u32> {
 
 /// Returns true if the latest entry pushes the (error_class, cwd_hash) past
 /// the configured threshold.
-pub fn crossed_threshold(
-    entries: &[LearningEntry],
-    error_class: &str,
-    cwd_hash: &str,
-) -> bool {
+pub fn crossed_threshold(entries: &[LearningEntry], error_class: &str, cwd_hash: &str) -> bool {
     count_for(entries, error_class, cwd_hash) >= effective_threshold()
 }
 
-pub fn emit_threshold_event(loop_id: &str, error_class: &str, count: u32) -> Result<(), DiagnoseError> {
+pub fn emit_threshold_event(
+    loop_id: &str,
+    error_class: &str,
+    count: u32,
+) -> Result<(), DiagnoseError> {
     let entry = LedgerEntry::new("recurrence.threshold_hit")
         .with_loop_id(loop_id.to_string())
         .with_action(error_class.to_string())
@@ -66,8 +62,7 @@ pub fn emit_threshold_event(loop_id: &str, error_class: &str, count: u32) -> Res
             "count": count,
             "threshold": effective_threshold(),
         }));
-    audit_ledger::append_entry(&entry)
-        .map_err(|e| DiagnoseError::LearningEmitFailed(e.to_string()))
+    audit_ledger::append_entry(&entry).map_err(|e| DiagnoseError::LearningEmitFailed(e.to_string()))
 }
 
 #[cfg(test)]
@@ -119,11 +114,7 @@ mod tests {
 
     #[test]
     fn aggregate_groups_by_pair() {
-        let entries = vec![
-            make("e1", "c1"),
-            make("e1", "c1"),
-            make("e2", "c1"),
-        ];
+        let entries = vec![make("e1", "c1"), make("e1", "c1"), make("e2", "c1")];
         let m = aggregate(&entries);
         assert_eq!(m[&("e1".into(), "c1".into())], 2);
         assert_eq!(m[&("e2".into(), "c1".into())], 1);
