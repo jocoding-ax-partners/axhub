@@ -1,4 +1,4 @@
-# Phase 26 v0.6.0 — SessionStart autowire dispatcher (Windows PowerShell).
+﻿# Phase 26 v0.6.0 — SessionStart autowire dispatcher (Windows PowerShell).
 # Mirror of hooks/session-start-autowire.sh.
 #
 # Thin wrapper after sh/ps1-absorption Phase 2.2 (T6). The body

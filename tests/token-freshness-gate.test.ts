@@ -3,9 +3,14 @@
  *
  * Spec: .plan/deploy-time-reduction/phase-3-client-cascade-reduced.md §3.4.
  *
- * Exercises hooks/token-freshness-gate.sh with controlled token file mtimes
- * and a fake "now" timestamp. The gate is the consumer half of Phase 3.5;
- * the producer (auth-refresh-bg detached spawn) is covered separately by
+ * sh/ps1-absorption Phase 4 (F1): test now spawns `axhub-helpers token-gate`
+ * directly. The legacy `hooks/token-freshness-gate.sh` shim has been removed —
+ * SKILL deploy Step 3.5 calls the helper binary directly, and the bash shim
+ * had no remaining caller after T8 SKILL migration.
+ *
+ * Exercises the gate with controlled token file mtimes and a fake "now"
+ * timestamp. The gate is the consumer half of Phase 3.5; the producer
+ * (auth-refresh-bg detached spawn) is covered separately by
  * tests/session-start-bg-refresh.test.ts.
  */
 
@@ -15,7 +20,7 @@ import { mkdtemp, rm, writeFile, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const GATE_SCRIPT = join(process.cwd(), "hooks", "token-freshness-gate.sh");
+const GATE_BINARY = join(process.cwd(), "bin", "axhub-helpers");
 
 interface RunResult {
   exitCode: number;
@@ -27,7 +32,7 @@ interface RunResult {
 async function runGate(env: NodeJS.ProcessEnv): Promise<RunResult> {
   return await new Promise((resolve) => {
     const start = process.hrtime.bigint();
-    const child = spawn("bash", [GATE_SCRIPT], {
+    const child = spawn(GATE_BINARY, ["token-gate"], {
       env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -63,7 +68,7 @@ async function setupTokenFile(workdir: string, mtimeSecs: number): Promise<strin
   return tokenPath;
 }
 
-describe("token-freshness-gate.sh (Phase 3.5 Step 3.5 consumer)", () => {
+describe("axhub-helpers token-gate (Phase 3.5 Step 3.5 consumer)", () => {
   let workdir: string;
 
   beforeEach(async () => {

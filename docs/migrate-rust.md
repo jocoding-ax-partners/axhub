@@ -58,3 +58,39 @@ axhub update --force-version 0.1.23
 - `cargo llvm-cov --workspace --fail-under-lines 90`.
 - `bun test` / `bun run test:plugin-e2e:t1` / `bun run test:plugin-e2e:t2`.
 - `bun run release:check` 로 host Rust artifact 와 release matrix wiring 을 확인해요.
+
+## sh/ps1 wrapper 흡수 (v0.8.x → v0.9.0)
+
+### 사용자 영향 요약
+
+sh + ps1 wrapper 페어 5쌍 (~1100 LOC) 의 OS-conditional 로직이 `axhub-helpers` Rust subcommand 로 응집됐어요. 사용자 가시 동작은 동일하지만 Windows parity gap 두 개가 해소돼서 Windows 사용자가 처음으로 deploy SKILL 의 token-freshness gate + auth-refresh-bg chain 을 정상적으로 사용할 수 있어요.
+
+| 항목 | 이전 | v0.8.x → v0.9.0 |
+|---|---|---|
+| `hooks/token-freshness-gate.sh` | bash shim 가 polling + auth probe | `axhub-helpers token-gate` Rust subcommand 가 단일 구현. shim 자체는 v0.9.0 에서 삭제 (test 의존 정리 후). |
+| `hooks/session-start.ps1` auth-refresh trigger | 누락 (Windows parity gap #2) | `Start-Process` detach 추가 — `AXHUB_AUTH_BG_REFRESH` 가 sh 와 동일하게 동작 |
+| `hooks/session-start-autowire.{sh,ps1}` | 130 + 158 줄 dispatcher 본체 | thin wrapper (~40/55 줄). helper `--scope auto` 가 scope 감지 + disclosure marker + mtime guard + orphan-stub install + merge 통합 |
+| `bin/statusline.ps1` 폴백 | P/Invoke `CredReadW` 직접 호출 | `keychain_windows.rs` 단일 출처. P/Invoke 블록 제거, token file + env 검사 보존 |
+| `bin/install.{sh,ps1}` 후처리 | wrapper 가 `.gitignore` + post-commit + disclosure 직접 작성 | `axhub-helpers post-install` subcommand 위임. CLI contract: `--target-name --bin-dir --link-path [--repo-root]` |
+| `_AXHUB_DISCLOSURE_VER` drift | `v0.5.13` 하드코딩 (release v0.8.0 까지 stale) | `scripts/codegen-install-version.ts` 가 release version 과 자동 sync |
+
+### 호환성 보장
+
+- env 컨트랙트 동일: `AXHUB_GATE_*`, `AXHUB_DISABLE_HOOKS`, `AXHUB_DISABLE_HOOK`, `AXHUB_DISABLE_STATUSLINE_AUTOWIRE`, `AXHUB_AUTH_BG_REFRESH`, `AXHUB_NO_DISCLOSURE`, `AXHUB_SKIP_AUTODOWNLOAD`, `AXHUB_POSTCOMMIT_INSTALL`.
+- exit code 동일: token-gate UNAUTHORIZED → 65, kill switch → 0.
+- shell wrapper 가 자체적으로 helper 부재 케이스 처리 (broken install 시 silent exit 0).
+- `DISABLE_AXHUB=1` legacy alias 는 v0.8.x 까지 유지 (deprecation warning 출력). v0.9.0 에서 제거 예정 — 사전에 `AXHUB_DISABLE_HOOKS=1` 또는 `AXHUB_DISABLE_HOOK=<csv>` 로 마이그레이션 권장.
+
+### 신규 subcommand
+
+| subcommand | 용도 |
+|---|---|
+| `axhub-helpers token-gate` | deploy Step 3.5 polling consumer. SKILL 이 직접 호출. |
+| `axhub-helpers post-install` | install.sh/ps1 후처리 (`.gitignore`, post-commit, disclosure marker) |
+| `axhub-helpers autowire-statusline --scope auto` | SessionStart hook 가 scope 감지를 helper 에 위임 |
+
+### Rollback
+
+- v0.8.x 사용자: 자동 마이그레이션 (`axhub update`) 이외 추가 작업 없음.
+- 만약 회귀 발견 시 이전 서명된 release 로 rollback (`axhub update --force-version 0.8.0`).
+- shim `hooks/token-freshness-gate.sh` 가 v0.9.0 에서 제거되므로 v0.9.0 이상 버전을 직접 다운로드한 사용자는 SKILL 갱신 없이 자동 helper 호출 — 호환성 영향 없음.

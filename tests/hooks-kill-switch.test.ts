@@ -73,26 +73,8 @@ describe("hooks/session-start.sh kill switch", () => {
   });
 });
 
-describe("hooks/token-freshness-gate.sh kill switch", () => {
-  test("global AXHUB_DISABLE_HOOKS=1 short-circuits with exit 0", () => {
-    const out = runShell("hooks/token-freshness-gate.sh", {
-      AXHUB_DISABLE_HOOKS: "1",
-    });
-    expect(out.status).toBe(0);
-    expect(out.stdout.toString()).toBe("");
-  });
-
-  test("per-hook AXHUB_DISABLE_HOOK=token-freshness-gate short-circuits", () => {
-    const out = runShell("hooks/token-freshness-gate.sh", {
-      AXHUB_DISABLE_HOOK: "token-freshness-gate",
-    });
-    expect(out.status).toBe(0);
-    expect(out.stdout.toString()).toBe("");
-  });
-
-  test("legacy DISABLE_AXHUB=1 short-circuits", () => {
-    const out = runShell("hooks/token-freshness-gate.sh", { DISABLE_AXHUB: "1" });
-    expect(out.status).toBe(0);
-    expect(out.stdout.toString()).toBe("");
-  });
-});
+// sh/ps1-absorption Phase 4 (F1): hooks/token-freshness-gate.sh kill switch
+// cases removed — the shim was deleted after T8 SKILL migration. Coverage
+// migrated to crates/axhub-helpers/tests/token_gate_test.rs (kill switch
+// AXHUB_DISABLE_HOOKS / AXHUB_DISABLE_HOOK / DISABLE_AXHUB) which exercises
+// the Rust subcommand the SKILL now calls directly.

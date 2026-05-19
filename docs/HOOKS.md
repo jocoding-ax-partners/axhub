@@ -20,7 +20,7 @@
 | `preauth-check` | `axhub-helpers preauth-check` | PreToolUse (Bash) |
 | `prompt-route` | `axhub-helpers prompt-route` | UserPromptSubmit |
 | `classify-exit` | `axhub-helpers classify-exit` | PostToolUse (Bash `axhub …`) |
-| `token-freshness-gate` | `hooks/token-freshness-gate.sh` (thin shim) → `axhub-helpers token-gate` | Phase 3.5 deploy gate. sh body 가 Rust 로 흡수됐어요 (Phase 1.1 sh/ps1 absorption). 기존 env 컨트랙트 (`AXHUB_GATE_*`) 와 exit 65 UNAUTHORIZED 시맨틱 그대로 보존했어요. Windows 사용자도 동일 binary 가 자동 동작해요 (parity gap #1 해소). |
+| `token-freshness-gate` | `axhub-helpers token-gate` | Phase 3.5 deploy gate. sh body 가 Rust 로 흡수됐어요 (Phase 1.1 sh/ps1 absorption, T3). 기존 env 컨트랙트 (`AXHUB_GATE_*`) 와 exit 65 UNAUTHORIZED 시맨틱 그대로 보존했어요. Windows 사용자도 동일 binary 가 자동 동작해요 (parity gap #1 해소). Phase 4 (F1) 에서 `hooks/token-freshness-gate.sh` thin shim 도 삭제 — SKILL deploy Step 3.5 가 helper 직접 호출. |
 | `session-start-autowire` | `hooks/session-start-autowire.{sh,ps1}` | Claude Code SessionStart — fail-open exit 0; `AXHUB_DISABLE_HOOKS` / `AXHUB_DISABLE_HOOK=session-start-autowire` / `AXHUB_DISABLE_STATUSLINE_AUTOWIRE` 지원; background detach (non-blocking) |
 
 여기서 다루지 않는 helper subcommand (예: `deploy-prep`, `bootstrap`,
