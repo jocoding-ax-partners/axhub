@@ -1,16 +1,10 @@
 //! `EnvVarProbe` — snapshots an env var, sets it to a new value, restores on
 //! revert. Plan v6 §4.4 — v0.8.0 builtin probe.
 
-use std::sync::Mutex;
-
 use serde_json::json;
 
 use super::super::DiagnoseError;
 use super::{ApplyHandle, Probe, ProbeContext, ProbeTouch};
-
-/// Process-wide lock so concurrent EnvVarProbe operations don't race
-/// `std::env::set_var` / `std::env::remove_var`.
-static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 pub struct EnvVarProbe {
     pub id: String,
@@ -30,8 +24,21 @@ impl Probe for EnvVarProbe {
         vec![ProbeTouch::EnvVar(self.var_name.clone())]
     }
     fn apply(&self, _ctx: &ProbeContext) -> Result<ApplyHandle, DiagnoseError> {
-        let _guard = ENV_LOCK.lock().expect("env lock poisoned");
-        let prior = std::env::var(&self.var_name).ok();
+        // Use the crate-wide PROCESS_ENV_LOCK so this probe serialises with
+        // every other env-mutating site (recurrence threshold overrides,
+        // preflight wall-budget overrides, consent headless guards, tests).
+        // Recover from poisoning instead of panicking — fail-open hook
+        // contract (CLAUDE.md axhub Hook Safety §10.6).
+        let _guard = crate::PROCESS_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        // Manifest distinguishes "prior unset" (None → JSON null) from
+        // "prior was an empty string" (Some(String::new()) → "") so revert
+        // can restore each case correctly.
+        let prior_kind = match std::env::var(&self.var_name) {
+            Ok(v) => json!({ "kind": "set", "value": v }),
+            Err(_) => json!({ "kind": "unset" }),
+        };
         match &self.new_value {
             Some(v) => std::env::set_var(&self.var_name, v),
             None => std::env::remove_var(&self.var_name),
@@ -39,25 +46,42 @@ impl Probe for EnvVarProbe {
         Ok(ApplyHandle {
             probe_id: self.id.clone(),
             touched: self.touches(),
-            revert_metadata: json!({ "prior": prior }),
+            revert_metadata: json!({ "prior": prior_kind }),
         })
     }
     fn revert(&self, handle: ApplyHandle) -> Result<(), DiagnoseError> {
-        let _guard = ENV_LOCK.lock().expect("env lock poisoned");
-        let prior = handle
-            .revert_metadata
-            .get("prior")
-            .and_then(|v| {
-                if v.is_null() {
-                    Some(None)
-                } else {
-                    v.as_str().map(|s| Some(s.to_string()))
-                }
-            })
-            .unwrap_or(None);
-        match prior {
-            Some(s) => std::env::set_var(&self.var_name, s),
-            None => std::env::remove_var(&self.var_name),
+        let _guard = crate::PROCESS_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        let prior = handle.revert_metadata.get("prior").ok_or_else(|| {
+            DiagnoseError::CleanupFailed(format!(
+                "EnvVarProbe revert manifest missing `prior` for var={}",
+                self.var_name
+            ))
+        })?;
+        let kind = prior.get("kind").and_then(|v| v.as_str()).ok_or_else(|| {
+            DiagnoseError::CleanupFailed(format!(
+                "EnvVarProbe revert manifest missing `prior.kind` for var={}",
+                self.var_name
+            ))
+        })?;
+        match kind {
+            "set" => {
+                let value = prior.get("value").and_then(|v| v.as_str()).ok_or_else(|| {
+                    DiagnoseError::CleanupFailed(format!(
+                        "EnvVarProbe revert manifest `prior.kind=set` missing `value` for var={}",
+                        self.var_name
+                    ))
+                })?;
+                std::env::set_var(&self.var_name, value);
+            }
+            "unset" => std::env::remove_var(&self.var_name),
+            other => {
+                return Err(DiagnoseError::CleanupFailed(format!(
+                    "EnvVarProbe revert manifest unknown `prior.kind={other}` for var={}",
+                    self.var_name
+                )));
+            }
         }
         Ok(())
     }

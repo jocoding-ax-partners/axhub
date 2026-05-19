@@ -53,6 +53,17 @@ pub struct HypothesisContext<'a> {
     pub head_evidence: Option<&'a str>,
 }
 
+/// Clamp a confidence value into the valid 0.0..=1.0 range, defaulting NaN
+/// (e.g. from a misbehaving v0.8.1 LLM generator) to 0.0. Equality across
+/// `Hypothesis` values is otherwise undefined when NaN sneaks in.
+fn clamp_confidence(c: f32) -> f32 {
+    if c.is_nan() {
+        0.0
+    } else {
+        c.clamp(0.0, 1.0)
+    }
+}
+
 /// Generate up to 5 hypotheses. v0.8.0 skeleton emits 1 template-based
 /// placeholder so the orchestrator has at least one falsifiable candidate
 /// before the catalog + LLM sources land.
@@ -83,7 +94,7 @@ pub fn generate(ctx: &HypothesisContext<'_>) -> Vec<Hypothesis> {
             ctx.strategy.as_str()
         ),
         falsifier: "정리 후 재실행에도 같은 에러가 나오면 이 가설은 기각이에요.".into(),
-        confidence: 0.4,
+        confidence: clamp_confidence(0.4),
         source: HypothesisSource::Template,
     });
 

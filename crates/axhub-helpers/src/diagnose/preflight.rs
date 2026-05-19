@@ -78,23 +78,41 @@ pub async fn run_checks(
     helper_version_check: BoxedCheck,
 ) -> Result<PreflightSummary, DiagnoseError> {
     let budget = effective_wall_budget();
+    let per_check = Duration::from_millis(PER_CHECK_TIMEOUT_MS);
     let started = std::time::Instant::now();
 
-    let (disk, node, cache, git, helper) = tokio::join!(
-        tokio::time::timeout(budget, disk_check),
-        tokio::time::timeout(budget, node_check),
-        tokio::time::timeout(budget, npm_cache_check),
-        tokio::time::timeout(budget, git_check),
-        tokio::time::timeout(budget, helper_version_check),
-    );
+    // Two-level timeout strategy:
+    //   1. Per-check (PER_CHECK_TIMEOUT_MS) — bounds any single slow probe.
+    //   2. Outer wall (effective_wall_budget()) — bounds the entire scan, so
+    //      that a single-threaded current_thread runtime serialising the 5
+    //      checks cannot collectively exceed the wall budget. This honours
+    //      the SessionStart fail-open <200ms hook contract (plan §4.7).
+    let join_fut = async {
+        tokio::join!(
+            tokio::time::timeout(per_check, disk_check),
+            tokio::time::timeout(per_check, node_check),
+            tokio::time::timeout(per_check, npm_cache_check),
+            tokio::time::timeout(per_check, git_check),
+            tokio::time::timeout(per_check, helper_version_check),
+        )
+    };
 
+    let names = [
+        "disk_free",
+        "node_version",
+        "npm_cache_health",
+        "git_clean_tree",
+        "axhub_helper_version",
+    ];
+
+    let race_result = tokio::time::timeout(budget, join_fut).await;
     let wall_ms = started.elapsed().as_millis() as u64;
-    let wall_exceeded = wall_ms > budget.as_millis() as u64;
+    let wall_exceeded = wall_ms >= budget.as_millis() as u64;
 
     fn flatten(name: &str, r: Result<CheckOutcome, tokio::time::error::Elapsed>) -> CheckReport {
         let outcome = match r {
             Ok(o) => o,
-            Err(_) => CheckOutcome::Skipped("wall budget exceeded".into()),
+            Err(_) => CheckOutcome::Skipped("per-check budget exceeded".into()),
         };
         CheckReport {
             name: name.into(),
@@ -102,14 +120,25 @@ pub async fn run_checks(
         }
     }
 
-    Ok(PreflightSummary {
-        reports: vec![
-            flatten("disk_free", disk),
-            flatten("node_version", node),
-            flatten("npm_cache_health", cache),
-            flatten("git_clean_tree", git),
-            flatten("axhub_helper_version", helper),
+    let reports = match race_result {
+        Ok((disk, node, cache, git, helper)) => vec![
+            flatten(names[0], disk),
+            flatten(names[1], node),
+            flatten(names[2], cache),
+            flatten(names[3], git),
+            flatten(names[4], helper),
         ],
+        Err(_) => names
+            .iter()
+            .map(|n| CheckReport {
+                name: (*n).into(),
+                outcome: CheckOutcome::Skipped("wall budget exceeded".into()),
+            })
+            .collect(),
+    };
+
+    Ok(PreflightSummary {
+        reports,
         wall_exceeded,
         wall_ms,
     })
@@ -163,6 +192,13 @@ mod tests {
         assert_eq!(summary.warnings()[0].name, "disk_free");
     }
 
+    // Tests below hold a std::sync::Mutex guard across `.await` because
+    // PROCESS_ENV_LOCK is the canonical SERIALISATION primitive for env
+    // mutation — using `tokio::sync::Mutex` here would not protect against
+    // sync test code in other modules. The await within each test is short
+    // and bounded, and only one tokio test runs per worker at a time on the
+    // standard test harness, so this does not deadlock in practice.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn slow_check_skipped_under_budget() {
         let _g = crate::PROCESS_ENV_LOCK.lock().unwrap();
@@ -177,13 +213,46 @@ mod tests {
         .await
         .unwrap();
         std::env::remove_var(WALL_BUDGET_ENV);
-        // disk_free check should be skipped because it slept 400ms over 100ms budget.
+        // disk_free check should be skipped because it slept 400ms — either
+        // per-check (50ms) or outer wall (100ms) fires first; both surface
+        // as a Skipped outcome.
         let disk = summary
             .reports
             .iter()
             .find(|r| r.name == "disk_free")
             .unwrap();
         assert!(matches!(disk.outcome, CheckOutcome::Skipped(_)));
+    }
+
+    #[allow(clippy::await_holding_lock)]
+    #[tokio::test]
+    async fn slow_check_does_not_starve_fast_checks() {
+        // Regression: with the previous per-budget-as-wall implementation,
+        // 5 sequential 50ms checks would have summed to 250ms > 200ms wall
+        // and ALL would have been skipped. Now the per-check cap fires on
+        // the slow check while the fast ones still complete.
+        let _g = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        std::env::set_var(WALL_BUDGET_ENV, "300");
+        let summary = run_checks(
+            Box::pin(slow_pass()),
+            Box::pin(fast_pass()),
+            Box::pin(fast_pass()),
+            Box::pin(fast_pass()),
+            Box::pin(fast_pass()),
+        )
+        .await
+        .unwrap();
+        std::env::remove_var(WALL_BUDGET_ENV);
+        let fast_passes = summary
+            .reports
+            .iter()
+            .filter(|r| matches!(r.outcome, CheckOutcome::Pass))
+            .count();
+        assert!(
+            fast_passes >= 4,
+            "fast checks must complete despite slow neighbour: {:?}",
+            summary.reports
+        );
     }
 
     #[test]

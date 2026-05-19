@@ -27,9 +27,32 @@ pub struct FixOutcome {
     pub verify_signal: Option<Signal>,
 }
 
+/// Three-state outcome of LOOP_VERIFY for a fix attempt. Distinguishes "fix
+/// proved itself green" from "verify never ran / produced no signal," so the
+/// orchestrator does NOT silently treat a missing verify as a red regression.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerifyStatus {
+    Green,
+    Red,
+    /// No verify signal was produced — e.g. the LOOP_VERIFY runner errored out
+    /// before emitting a Signal. Caller MUST escalate (retry or HITL), not
+    /// implicitly route as a failed fix.
+    Unknown,
+}
+
 impl FixOutcome {
+    /// True only when verify produced a green signal. False for both red and
+    /// unknown — use `verify_status()` if you need to distinguish those two.
     pub fn is_green(&self) -> bool {
-        self.verify_signal.as_ref().is_some_and(|s| s.is_green())
+        matches!(self.verify_status(), VerifyStatus::Green)
+    }
+
+    pub fn verify_status(&self) -> VerifyStatus {
+        match &self.verify_signal {
+            Some(s) if s.is_green() => VerifyStatus::Green,
+            Some(_) => VerifyStatus::Red,
+            None => VerifyStatus::Unknown,
+        }
     }
 }
 
@@ -74,6 +97,22 @@ mod tests {
         let sig = Signal::red(Duration::from_millis(1500), "cli-replay", None, Some(1));
         let outcome = apply_fix(&action, sig).unwrap();
         assert!(outcome.applied);
+        assert!(!outcome.is_green());
+        assert_eq!(outcome.verify_status(), VerifyStatus::Red);
+    }
+
+    #[test]
+    fn missing_signal_is_unknown_not_red() {
+        // A future verify-runner failure (network error, helper crash) may
+        // produce an outcome with verify_signal=None. That MUST NOT silently
+        // pass for "red" — the orchestrator needs the third state to know
+        // it should escalate rather than try the next hypothesis.
+        let outcome = FixOutcome {
+            action_id: "F-missing".into(),
+            applied: true,
+            verify_signal: None,
+        };
+        assert_eq!(outcome.verify_status(), VerifyStatus::Unknown);
         assert!(!outcome.is_green());
     }
 

@@ -58,6 +58,27 @@ impl Probe for LoopShadowProbe {
             std::fs::create_dir_all(parent)
                 .map_err(|e| DiagnoseError::ProbeApplyFailed(e.to_string()))?;
         }
+        // Symlink defence: ensure the canonical target parent still lives
+        // under the canonical shadow root for this loop. Catches an attacker
+        // (or a buggy prior probe) who replaces `<shadow>/<loop>/cwd-shadow`
+        // or a nested subdir with a symlink pointing outside, which would
+        // otherwise let `std::fs::write` follow the link to e.g. /etc.
+        let canonical_root = std::fs::canonicalize(
+            ctx.shadow_root.join(&ctx.loop_id).join("cwd-shadow"),
+        )
+        .map_err(|e| {
+            DiagnoseError::ProbeApplyFailed(format!("canonicalize shadow root failed: {e}"))
+        })?;
+        let parent_for_check = target.parent().unwrap_or(target.as_path());
+        let canonical_parent = std::fs::canonicalize(parent_for_check).map_err(|e| {
+            DiagnoseError::ProbeApplyFailed(format!("canonicalize target parent failed: {e}"))
+        })?;
+        if !canonical_parent.starts_with(&canonical_root) {
+            return Err(DiagnoseError::ProbeBoundaryViolation {
+                probe_id: self.id.clone(),
+                path: target.display().to_string(),
+            });
+        }
         std::fs::write(&target, &self.contents)
             .map_err(|e| DiagnoseError::ProbeApplyFailed(e.to_string()))?;
         Ok(ApplyHandle {
@@ -149,6 +170,42 @@ mod tests {
         assert!(
             matches!(result, Err(DiagnoseError::ProbeBoundaryViolation { .. })),
             "path traversal must be rejected"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_swap_rejected_at_apply() {
+        // Set up a tempdir, create the expected cwd-shadow path, then replace
+        // a subdir under it with a symlink pointing OUTSIDE the shadow root.
+        // The canonical-prefix check at apply time must catch this and refuse.
+        let dir = TempDir::new().unwrap();
+        let outside = TempDir::new().unwrap();
+        let base = dir.path().join("loop-shadow-test").join("cwd-shadow");
+        std::fs::create_dir_all(&base).unwrap();
+        let inner = base.join("hijack");
+        // hijack → outside (different canonical root)
+        std::os::unix::fs::symlink(outside.path(), &inner).unwrap();
+        let ctx = ProbeContext {
+            loop_id: "loop-shadow-test".into(),
+            shadow_root: dir.path().to_path_buf(),
+        };
+        let p = LoopShadowProbe {
+            id: "ls-symlink".into(),
+            hypothesis_id: "H".into(),
+            relative_path: PathBuf::from("hijack/sample.txt"),
+            contents: b"should-not-land-outside".to_vec(),
+        };
+        let result = p.apply(&ctx);
+        assert!(
+            matches!(result, Err(DiagnoseError::ProbeBoundaryViolation { .. })),
+            "symlink-swap must be rejected: {result:?}"
+        );
+        // The escape target must not have received the write.
+        let target_in_outside = outside.path().join("sample.txt");
+        assert!(
+            !target_in_outside.exists(),
+            "write must NOT have followed the symlink: {target_in_outside:?}"
         );
     }
 }

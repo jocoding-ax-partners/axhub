@@ -103,6 +103,43 @@ pub fn append_entry(entry: &LedgerEntry) -> Result<(), LedgerError> {
     append_entry_to(&ledger_path(), &lock_path(), entry)
 }
 
+/// Maximum time we wait to acquire the cross-process ledger lock before
+/// giving up. Diagnose loops are user-facing (a frozen lock acquire would
+/// make the CLI appear hung), so we surface a TimedOut error instead of
+/// blocking forever. Override via `AXHUB_AUDIT_LOCK_TIMEOUT_MS` for tests.
+pub const LEDGER_LOCK_TIMEOUT_MS: u64 = 5_000;
+pub const LEDGER_LOCK_TIMEOUT_ENV: &str = "AXHUB_AUDIT_LOCK_TIMEOUT_MS";
+
+fn effective_lock_timeout_ms() -> u64 {
+    std::env::var(LEDGER_LOCK_TIMEOUT_ENV)
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(LEDGER_LOCK_TIMEOUT_MS)
+}
+
+/// Acquire the fslock with a bounded poll. `fslock::LockFile::try_lock` is
+/// non-blocking, so we sleep+retry until either the lock is held or the
+/// timeout window expires. Returns Err(TimedOut) on expiry.
+fn lock_with_timeout(lock_handle: &mut fslock::LockFile) -> Result<(), LedgerError> {
+    let timeout = std::time::Duration::from_millis(effective_lock_timeout_ms());
+    let started = std::time::Instant::now();
+    loop {
+        if lock_handle.try_lock()? {
+            return Ok(());
+        }
+        if started.elapsed() >= timeout {
+            return Err(LedgerError::Io(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                format!(
+                    "audit ledger lock not acquired within {timeout:?}; another process \
+                     may be holding the .lock file"
+                ),
+            )));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
+}
+
 /// Append `entry` to an explicit ledger path. Used by tests + multi-tenant
 /// scenarios that want their own ledger location.
 pub fn append_entry_to(
@@ -115,9 +152,12 @@ pub fn append_entry_to(
         std::fs::create_dir_all(parent)?;
     }
     let mut lock_handle = fslock::LockFile::open(lock)?;
-    lock_handle.lock()?;
+    lock_with_timeout(&mut lock_handle)?;
     let res = append_line(ledger, &line);
-    let _ = lock_handle.unlock();
+    // Drop the lock explicitly. On all targets fslock also releases on Drop,
+    // but an explicit drop documents intent and surfaces any unlock error
+    // (which we still discard because the write already succeeded or failed).
+    drop(lock_handle);
     res?;
     Ok(())
 }

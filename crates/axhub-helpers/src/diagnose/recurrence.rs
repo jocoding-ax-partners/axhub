@@ -43,8 +43,10 @@ pub fn aggregate(entries: &[LearningEntry]) -> HashMap<(String, String), u32> {
     counts
 }
 
-/// Returns true if the latest entry pushes the (error_class, cwd_hash) past
-/// the configured threshold.
+/// Returns true if the count for the (error_class, cwd_hash) pair reaches or
+/// exceeds the configured threshold. Inclusive boundary — count == threshold
+/// counts as crossed. Caller must invoke AFTER appending the latest learning
+/// entry so the current run is included in the count.
 pub fn crossed_threshold(entries: &[LearningEntry], error_class: &str, cwd_hash: &str) -> bool {
     count_for(entries, error_class, cwd_hash) >= effective_threshold()
 }
@@ -70,11 +72,8 @@ mod tests {
     use super::*;
     use crate::diagnose::learning::builder;
 
-    use std::sync::Mutex;
-
-    /// Serialize env-modifying tests so parallel cargo test runners don't
-    /// race RECURRENCE_THRESHOLD_ENV. cargo test defaults to N threads.
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
+    // Use the crate-wide PROCESS_ENV_LOCK so we serialise with every other
+    // env-mutating module (probe::env_var, preflight, decision tests).
 
     fn make(err: &str, cwd: &str) -> LearningEntry {
         let mut e = builder(err);
@@ -84,14 +83,14 @@ mod tests {
 
     #[test]
     fn default_threshold_is_3() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _g = crate::PROCESS_ENV_LOCK.lock().unwrap();
         std::env::remove_var(RECURRENCE_THRESHOLD_ENV);
         assert_eq!(effective_threshold(), 3);
     }
 
     #[test]
     fn env_override_threshold() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _g = crate::PROCESS_ENV_LOCK.lock().unwrap();
         std::env::set_var(RECURRENCE_THRESHOLD_ENV, "5");
         assert_eq!(effective_threshold(), 5);
         std::env::remove_var(RECURRENCE_THRESHOLD_ENV);
@@ -112,7 +111,7 @@ mod tests {
 
     #[test]
     fn threshold_crossed_when_count_at_or_above() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _g = crate::PROCESS_ENV_LOCK.lock().unwrap();
         std::env::set_var(RECURRENCE_THRESHOLD_ENV, "2");
         let entries = vec![make("e1", "cwd1"), make("e1", "cwd1")];
         assert!(crossed_threshold(&entries, "e1", "cwd1"));

@@ -312,5 +312,13 @@ fn binding_mismatch_reason(
     if claims.context != binding.context {
         return Some("binding_mismatch:context".into());
     }
+    // NOTE: `synthesized_by_helper` is INTENTIONALLY audit-only — it lives in
+    // the claim payload for forensics but is NOT enforced at verify time.
+    // The bootstrap pending-claim flow requires that a helper-minted token
+    // (`synthesized_by_helper=true`) be claimable by the subsequent user
+    // Bash tool call (`synthesized_by_helper=false`). The
+    // `consent_synthesized_by_helper_claim_is_audit_only` test pins this
+    // contract. If a future design changes this to a trust class, add the
+    // equality check here and update that test in the same PR.
     None
 }

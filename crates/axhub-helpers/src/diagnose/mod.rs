@@ -77,6 +77,21 @@ pub enum DiagnoseError {
     #[error("fix apply failed: {0}")]
     FixApplyFailed(String),
 
+    /// State-machine transition refused — `(src, event)` pair has no valid
+    /// destination. Distinct from `FixApplyFailed` so callers don't route
+    /// rescue actions intended for fix failures.
+    #[error("invalid transition: src={src} event={event}")]
+    InvalidTransition {
+        src: &'static str,
+        event: &'static str,
+    },
+
+    /// LOOP_VERIFY oscillation cap hit — same hypothesis-fix-verify cycle
+    /// returned red more than `MAX_VERIFY_RETRIES` times for this loop. The
+    /// orchestrator must escalate to ArchHandoff.
+    #[error("LOOP_VERIFY retry cap exceeded ({attempts} >= {max})")]
+    VerifyRetryCapExceeded { attempts: u32, max: u32 },
+
     /// Phase 5P cleanup encountered an error (audit-only, never propagated to
     /// user; we still consider the loop done).
     #[error("postmortem cleanup failed: {0}")]

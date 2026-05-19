@@ -125,9 +125,13 @@ pub fn list_recent_deploys(within_secs: u64) -> Result<Vec<String>, EventLogErro
         return Ok(Vec::new());
     }
 
-    let cutoff = SystemTime::now()
-        .checked_sub(Duration::from_secs(within_secs))
-        .unwrap_or(SystemTime::UNIX_EPOCH);
+    // checked_sub underflow (within_secs >= seconds since UNIX_EPOCH) means
+    // "infinite window" — but caller almost certainly passed a bogus value.
+    // Fall back to an empty result rather than UNIX_EPOCH (which would match
+    // every deploy on disk and let recovery scan pick up unrelated runs).
+    let Some(cutoff) = SystemTime::now().checked_sub(Duration::from_secs(within_secs)) else {
+        return Ok(Vec::new());
+    };
 
     let mut deploys: Vec<(String, SystemTime)> = Vec::new();
     for entry in std::fs::read_dir(&dir)? {

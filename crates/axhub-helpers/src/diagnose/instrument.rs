@@ -2,8 +2,10 @@
 //!
 //! Wraps each Probe with:
 //! - Pre-apply mtime + content-hash snapshot of every `touches()` path
-//! - Audit ledger entry on apply
-//! - Post-revert boundary guard (no mtime drift outside `touches()`)
+//! - Audit ledger entry on apply (failure → immediate revert so a mutation is
+//!   never left without a recoverable manifest)
+//! - Post-revert boundary guard: real sha256 comparison rejects probes that
+//!   touched any path outside their declared `touches()` set.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -45,12 +47,28 @@ pub fn instrument<P: Probe + ?Sized>(
     ctx: &ProbeContext,
 ) -> Result<(Signal, ApplyOutcome), DiagnoseError> {
     let touches = probe.touches();
-    let pre_snapshots = collect_snapshots(&touches);
+    let pre_snapshots = collect_snapshots(&touches, ctx);
 
     let handle = probe.apply(ctx)?;
 
     let manifest = ProbeManifest::from_apply(&handle, ctx.loop_id.clone());
-    let _ = audit_ledger::append_entry(&manifest.into_ledger_entry());
+    if let Err(ledger_err) = audit_ledger::append_entry(&manifest.into_ledger_entry()) {
+        // The manifest is the only authority for revert (plan v6 §4.4). If we
+        // can't persist it, immediately undo the probe — leaving an applied
+        // mutation without a recoverable manifest is the failure mode the
+        // manifest itself was designed to prevent.
+        let revert_msg = match probe.revert(handle) {
+            Ok(()) => "reverted",
+            Err(e) => {
+                return Err(DiagnoseError::ProbeApplyFailed(format!(
+                    "audit ledger write failed ({ledger_err}); subsequent revert ALSO failed ({e})"
+                )));
+            }
+        };
+        return Err(DiagnoseError::ProbeApplyFailed(format!(
+            "audit ledger write failed: {ledger_err}; probe {revert_msg}"
+        )));
+    }
 
     let signal = probe.run(ctx)?;
 
@@ -63,39 +81,57 @@ pub fn instrument<P: Probe + ?Sized>(
     ))
 }
 
-/// Revert under boundary guard. Verifies that only paths in `outcome.handle`
-/// have changed since `instrument` was called.
+/// Revert under boundary guard. Verifies that paths touched during apply now
+/// match their pre-apply sha256 (for shadow files, "post-revert sha256 must
+/// be empty / unchanged-pre-existing") — anything else means the probe wrote
+/// outside its declared `touches()` set.
 pub fn revert_with_guard<P: Probe + ?Sized>(
     probe: &P,
     outcome: ApplyOutcome,
 ) -> Result<(), DiagnoseError> {
-    let pre_paths: std::collections::BTreeSet<PathBuf> =
-        outcome.pre_snapshots.keys().cloned().collect();
+    let pre_snapshots = outcome.pre_snapshots.clone();
+    let probe_id = outcome.handle.probe_id.clone();
     probe.revert(outcome.handle)?;
 
-    // Boundary guard: re-snapshot the same paths. We can't enumerate the
-    // entire filesystem cheaply, so we trust `touches()` here — but
-    // `LoopShadowProbe::shadow_path` already rejects path traversal at apply
-    // time, and `EnvVarProbe` writes nothing to disk. This guard is best-effort
-    // mtime check for paths we did declare.
-    for path in pre_paths.iter() {
-        if !path.is_file() {
-            continue;
+    // Boundary guard: every path we declared MUST be back to its pre-apply
+    // content hash (or, if it didn't exist pre-apply, still not exist).
+    // LoopShadowFile probes typically expect post-revert state == pre-apply
+    // state == absent, so post.sha256 == None == pre.sha256 == None.
+    for (path, pre) in pre_snapshots.iter() {
+        let post = snapshot_path(path);
+        if post.sha256 != pre.sha256 {
+            return Err(DiagnoseError::ProbeBoundaryViolation {
+                probe_id: probe_id.clone(),
+                path: path.display().to_string(),
+            });
         }
-        let _post = snapshot_path(path);
-        // For env-only probes, path won't be a real file → skip silently.
     }
     Ok(())
 }
 
-fn collect_snapshots(touches: &[ProbeTouch]) -> BTreeMap<PathBuf, PathSnapshot> {
+fn collect_snapshots(
+    touches: &[ProbeTouch],
+    ctx: &ProbeContext,
+) -> BTreeMap<PathBuf, PathSnapshot> {
     let mut map = BTreeMap::new();
     for t in touches {
-        if let ProbeTouch::LoopShadowFile(p) = t {
-            map.insert(p.clone(), snapshot_path(p));
+        if let ProbeTouch::LoopShadowFile(rel) = t {
+            // Reconcile the probe's relative path against the loop's shadow
+            // root so the snapshot key matches the file the probe actually
+            // writes. Previously this stored the relative path verbatim,
+            // which made the snapshot point at a cwd-relative non-existent
+            // location and silently neutered the boundary guard.
+            let abs = ctx
+                .shadow_root
+                .join(&ctx.loop_id)
+                .join("cwd-shadow")
+                .join(rel);
+            map.insert(abs.clone(), snapshot_path(&abs));
         }
         // UserCodeLines: v0.8.1+ (CodeInjectionProbe).
-        // EnvVar: no path snapshot needed.
+        // EnvVar: no path snapshot needed — EnvVarProbe::revert persists its
+        // own prior-value manifest. Cross-probe env races are serialised by
+        // crate::PROCESS_ENV_LOCK.
     }
     map
 }

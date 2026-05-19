@@ -17,14 +17,34 @@ use crate::consent::key::state_root;
 const LEARNINGS_DIR: &str = "learnings";
 const LEARNINGS_FILE: &str = "learnings.jsonl";
 
+/// Enum form of "fail" / "pass" so a typo cannot land in
+/// `loop_signal_before` / `loop_signal_after` and silently break recurrence
+/// aggregation. Serialised as snake_case so existing JSONL files
+/// (`"fail"` / `"pass"`) deserialise without migration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LoopSignalState {
+    Fail,
+    Pass,
+}
+
+impl LoopSignalState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LoopSignalState::Fail => "fail",
+            LoopSignalState::Pass => "pass",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LearningEntry {
     pub ts: String,
     pub error_class: String,
     pub winning_hypothesis: String,
     pub fix_action: String,
-    pub loop_signal_before: String, // "fail" | "pass"
-    pub loop_signal_after: String,  // "fail" | "pass"
+    pub loop_signal_before: LoopSignalState,
+    pub loop_signal_after: LoopSignalState,
     pub cwd_hash: String,
     pub loop_id: String,
 }
@@ -63,8 +83,8 @@ pub fn builder(error_class: impl Into<String>) -> LearningEntry {
         error_class: error_class.into(),
         winning_hypothesis: String::new(),
         fix_action: String::new(),
-        loop_signal_before: "fail".into(),
-        loop_signal_after: "pass".into(),
+        loop_signal_before: LoopSignalState::Fail,
+        loop_signal_after: LoopSignalState::Pass,
         cwd_hash: String::new(),
         loop_id: String::new(),
     }

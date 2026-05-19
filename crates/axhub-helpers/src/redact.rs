@@ -25,7 +25,11 @@ static OPENAI_KEY_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"sk-[A-Za-z0-9_\-]{20,}").unwrap());
 static GH_TOKEN_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"gh[pousr]_[A-Za-z0-9]{36,}").unwrap());
-static AWS_KEY_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"AKIA[0-9A-Z]{16}").unwrap());
+// Broader AWS access-key prefix set per AWS account-id prefix taxonomy
+// (AKIA = long-lived, ASIA = STS temp, AGPA = group, AIDA = IAM user, etc.).
+// Covers temporary creds in CI logs that the prior `AKIA[0-9A-Z]{16}` missed.
+static AWS_KEY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(AKIA|ASIA|AGPA|ANPA|ANVA|AROA|AIDA|AIPA)[0-9A-Z]{16}").unwrap());
 static PRIVATE_KEY_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?s)-----BEGIN [A-Z ]+PRIVATE KEY-----.*?-----END [A-Z ]+PRIVATE KEY-----")
         .unwrap()
@@ -118,6 +122,27 @@ mod tests {
         assert_eq!(
             redact("aws_access_key_id=AKIAIOSFODNN7EXAMPLE done"),
             "aws_access_key_id=<REDACTED_AWS_KEY> done"
+        );
+    }
+
+    #[test]
+    fn redacts_aws_temp_creds_asia() {
+        // ASIA = STS temporary credentials — common in CI logs that pipe
+        // `aws sts assume-role` output. The prior AKIA-only regex missed these.
+        let r = redact("AWS_ACCESS_KEY_ID=ASIAIOSFODNN7EXAMPLE more");
+        assert!(
+            r.contains("<REDACTED_AWS_KEY>"),
+            "ASIA must be redacted: {r}"
+        );
+        assert!(!r.contains("ASIAIOSFODNN7EXAMPLE"), "raw ASIA leaked: {r}");
+    }
+
+    #[test]
+    fn redacts_aws_group_id_agpa() {
+        let r = redact("group: AGPAIOSFODNN7EXAMPLE end");
+        assert!(
+            r.contains("<REDACTED_AWS_KEY>"),
+            "AGPA must be redacted: {r}"
         );
     }
 

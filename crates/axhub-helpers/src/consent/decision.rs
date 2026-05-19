@@ -18,6 +18,8 @@ use super::key::session_id;
 /// TTL (seconds) for each variant.
 pub const TTL_ONCE_SEC: i64 = 60;
 pub const TTL_SESSION_SEC: i64 = 60 * 60;
+/// 365 days exact — leap-year drift accepted; consent grants are deliberately
+/// conservative (re-prompt 1d early in a leap year is fine, never late).
 pub const TTL_ALWAYS_SEC: i64 = 60 * 60 * 24 * 365;
 
 /// User decision variants emitted by AskUserQuestion at diagnose-loop entry.
@@ -58,10 +60,10 @@ pub fn issue_decision_token(
             .map(Some)
             .map_err(DecisionError::MintFailed),
         DecisionVariant::AllowSession | DecisionVariant::AllowAlways => {
-            let sid = match session_id() {
-                Ok(s) => s,
-                Err(_) => return Err(DecisionError::HeadlessEnvironment),
-            };
+            // Preserve root-cause (file I/O / env layer error) so audit ledger
+            // can distinguish "no session id at all" from "session id present
+            // but resolves to 'unknown'".
+            let sid = session_id().map_err(DecisionError::SessionIdLookup)?;
             if sid.is_empty() || sid == "unknown" {
                 return Err(DecisionError::HeadlessEnvironment);
             }
@@ -89,6 +91,8 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Mutex;
 
+    // Kept for legacy test API. Use crate::PROCESS_ENV_LOCK for cross-module
+    // serialisation in new tests.
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     fn binding() -> ConsentBinding {
@@ -106,14 +110,14 @@ mod tests {
 
     #[test]
     fn deny_returns_none() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _g = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
         let result = issue_decision_token(DecisionVariant::Deny, binding()).unwrap();
         assert!(result.is_none(), "Deny must return None");
     }
 
     #[test]
     fn once_short_ttl() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _g = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
         assert_eq!(TTL_ONCE_SEC, 60);
     }
 
@@ -125,7 +129,7 @@ mod tests {
 
     #[test]
     fn allow_session_rejects_unknown_session() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _g = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
         std::env::set_var("CLAUDE_SESSION_ID", "unknown");
         let result = issue_decision_token(DecisionVariant::AllowSession, binding());
         std::env::remove_var("CLAUDE_SESSION_ID");
@@ -134,9 +138,19 @@ mod tests {
 
     #[test]
     fn allow_always_rejects_empty_session() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _g = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
         std::env::remove_var("CLAUDE_SESSION_ID");
         let result = issue_decision_token(DecisionVariant::AllowAlways, binding());
-        assert!(matches!(result, Err(DecisionError::HeadlessEnvironment)));
+        // session_id() may return either `Err` (env var entirely missing, no
+        // fallback found) — now mapped to `SessionIdLookup` — or `Ok("unknown")`
+        // / `Ok("")` which our explicit check converts to `HeadlessEnvironment`.
+        // Either rejection is acceptable as long as no token is minted.
+        assert!(
+            matches!(
+                result,
+                Err(DecisionError::HeadlessEnvironment) | Err(DecisionError::SessionIdLookup(_))
+            ),
+            "expected headless rejection, got {result:?}"
+        );
     }
 }
