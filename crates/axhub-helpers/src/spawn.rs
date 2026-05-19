@@ -204,10 +204,15 @@ pub fn spawn_detached_with_fallback(cmd: &[&str]) -> anyhow::Result<DetachOutcom
 
 #[cfg(windows)]
 pub fn spawn_detached_with_fallback(cmd: &[&str]) -> anyhow::Result<DetachOutcome> {
+    // Match the Unix entry-point ensure! so callers don't depend on the inner
+    // ensure inside the Err(_) fallback. Reviewer Issue 1 (PR #114): without
+    // this, an empty cmd slice walks the Err path and only fails on the inner
+    // ensure — the test contract ("both paths hit the same ensure") relies
+    // on the front-loaded check matching Unix.
+    anyhow::ensure!(!cmd.is_empty(), "command is empty");
     match spawn_detached(cmd) {
         Ok(()) => Ok(DetachOutcome::Detached),
         Err(_) => {
-            anyhow::ensure!(!cmd.is_empty(), "command is empty");
             let child = Command::new(cmd[0])
                 .args(&cmd[1..])
                 .stdin(Stdio::null())

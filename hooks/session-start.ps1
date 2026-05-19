@@ -133,6 +133,12 @@ if ($env:AXHUB_SKIP_AUTODOWNLOAD -ne '1') {
 # AXHUB_AUTH_BG_REFRESH=0 disables. axhub CLI absent -> skip.
 # Phase 3.2: this closes the Windows parity gap that previously only existed in
 # the POSIX sh wrapper.
+#
+# Detach flag: `-NoNewWindow` keeps the dispatcher consistent with
+# `session-start-autowire.ps1` Step 5 — both wrappers fire-and-forget a
+# console-silent helper subcommand. `-WindowStyle Hidden` would create a
+# spurious new (hidden) window per fire, which is louder for users with
+# strict EDR / window-tracking policies. Reviewer Issue 5 (PR #114).
 if ($env:AXHUB_AUTH_BG_REFRESH -ne '0') {
   $axhubCmd = Get-Command axhub -ErrorAction SilentlyContinue
   if ($axhubCmd) {
@@ -140,7 +146,7 @@ if ($env:AXHUB_AUTH_BG_REFRESH -ne '0') {
       $authStatus = & axhub auth status --json 2>$null
       if ($authStatus -notmatch '"user_email"') {
         Start-Process -FilePath $Helper -ArgumentList 'auth-refresh-bg' `
-          -WindowStyle Hidden -ErrorAction SilentlyContinue | Out-Null
+          -NoNewWindow -ErrorAction SilentlyContinue | Out-Null
       }
     } catch {
       # Silent — fire-and-forget, never block session-start on this.

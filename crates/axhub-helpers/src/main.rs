@@ -320,6 +320,13 @@ fn cmd_token_gate(_rest: &[String]) -> anyhow::Result<i32> {
 }
 
 fn inline_auth_check() -> anyhow::Result<i32> {
+    // SECURITY (Reviewer Issue 4, PR #114): `AXHUB_GATE_AUTH_PROBE` 는 test
+    // injection 전용 env 예요. `shlex::split` 가 shell metachar (`|` / `;` / `&&`)
+    // 를 차단하지만, parts[0] 자체는 사용자 제어 binary path 예요. 신뢰할 수
+    // 없는 환경 (untrusted CI runner, foreign repo) 에서는 이 env 를 설정하지
+    // 마세요. 본 함수가 spawn 하는 명령은 호출 컨텍스트 (Claude Code SessionStart
+    // hook = trusted boundary) 안에서만 사용자 의도된 probe 와 일치한다고
+    // 가정해요. 운영 환경 default = `axhub auth status --json` 그대로 둬요.
     let probe = std::env::var("AXHUB_GATE_AUTH_PROBE")
         .unwrap_or_else(|_| "axhub auth status --json".to_string());
     let parts = match shlex::split(&probe) {
@@ -472,11 +479,12 @@ fn install_axhub_state_gitignore(repo: &std::path::Path) {
         return;
     }
     // Preserve existing line ending — append entry on a new line. When the
-    // existing body ends with `\n`, we still want a blank separator line
-    // before the axhub block so the comment stands out, hence the leading
-    // `\n` either way. When it does NOT end with `\n`, the leading `\n`
-    // doubles as the missing terminator + blank separator.
-    let suffix = format!("\n# axhub quality state (local-only)\n{entry}\n");
+    // existing body is non-empty we want a leading `\n` (blank separator if
+    // body ends with `\n`, or missing terminator + separator if not). For an
+    // empty `.gitignore` (touched but never written) we skip the leading `\n`
+    // so the first line isn't a blank — Reviewer Issue 3 (PR #114).
+    let separator = if body.is_empty() { "" } else { "\n" };
+    let suffix = format!("{separator}# axhub quality state (local-only)\n{entry}\n");
     let _ = fs::write(&gitignore, format!("{body}{suffix}"));
 }
 
@@ -2579,6 +2587,12 @@ fn cmd_autowire_statusline(args: &[String]) -> anyhow::Result<i32> {
             None => {
                 // Ambiguous scope (CLAUDE_PLUGIN_ROOT 가 user/project 어느 plugins dir 도
                 // 아니면) — fail-closed exit 0. shell wrapper 의 step 3 동작 보존.
+                // Reviewer Issue 2 (PR #114): observability log 가 --silent
+                // 모드에서도 남아야 silent skip 진단이 가능해요.
+                hook_safety::append_hook_error(
+                    "session-start-autowire",
+                    &"scope auto: CLAUDE_PLUGIN_ROOT 또는 git rev-parse cwd 가 user/project plugins prefix 와 매칭 안 됨 — merge 건너뜀",
+                );
                 if !silent {
                     eprintln!(
                         "axhub-helpers autowire-statusline: --scope auto 가 scope 감지 실패 — 종료 (fail-closed)"
