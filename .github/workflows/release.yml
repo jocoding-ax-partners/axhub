@@ -242,17 +242,38 @@ jobs:
           fi
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
 
-          # Fetch the release body so the Slack message includes the actual
-          # CHANGELOG narrative (same text GitHub renders on the release
-          # page). GitHub returns CRLF — strip \r so jq doesn't reject the
-          # payload with "control characters must be escaped". Slack section
-          # caps at 3000 chars — truncate with a marker if longer.
+          # Fetch the release body and extract ONLY the lead narrative
+          # paragraph — the first non-heading paragraph that follows the
+          # `## [version]` line. Everything below (핵심 모듈 / 보안 강화 /
+          # 검증 baseline / 정직한 tradeoff / ### Added auto-bullets) belongs
+          # on the GitHub release page; Slack stays focused on the human
+          # "what shipped" summary. Strip CRLF for jq compatibility.
           BODY_RAW="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body 2>/dev/null | tr -d '\r' || echo '')"
           if [ -z "$BODY_RAW" ]; then
             BODY_TRIMMED="(릴리즈 노트 본문 없음 — GitHub 에서 확인해주세요)"
           else
-            # Slack hard cap is 3000 chars per section; reserve ~200 for the label + truncation marker.
             BODY_TRIMMED="$(printf '%s' "$BODY_RAW" | awk '
+              BEGIN { started = 0 }
+              # Skip the version heading line (`## [0.8.0](...) (date)`).
+              /^## / { next }
+              # Stop at the auto-bullets section ("### Added" etc.) — those
+              # are derived from Conventional Commits and noisy in Slack.
+              /^### / { exit }
+              # Empty line: terminate paragraph once we have content.
+              NF == 0 {
+                if (started) exit
+                next
+              }
+              # First non-empty body line: print + flag paragraph started.
+              { started = 1; print }
+            ')"
+            if [ -z "$BODY_TRIMMED" ]; then
+              BODY_TRIMMED="(릴리즈 노트 narrative 없음 — GitHub 에서 확인해주세요)"
+            fi
+            # Slack section hard-cap = 3000 chars. Narrative paragraphs are
+            # short (~600-1200 chars) but truncate defensively if a future
+            # release writes a 3k+ char single paragraph.
+            BODY_TRIMMED="$(printf '%s' "$BODY_TRIMMED" | awk '
               { lines[NR] = $0 }
               END {
                 cap = 2800
