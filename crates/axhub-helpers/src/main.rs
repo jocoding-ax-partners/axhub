@@ -471,15 +471,12 @@ fn install_axhub_state_gitignore(repo: &std::path::Path) {
     if already_present {
         return;
     }
-    // Preserve existing line ending — append entry on a new line. The trailing
-    // newline of the existing file is honored so CRLF (Windows) → CRLF + entry,
-    // LF (Unix) → LF + entry.
-    let needs_leading_newline = !body.ends_with('\n');
-    let suffix = if needs_leading_newline {
-        format!("\n# axhub quality state (local-only)\n{entry}\n")
-    } else {
-        format!("\n# axhub quality state (local-only)\n{entry}\n")
-    };
+    // Preserve existing line ending — append entry on a new line. When the
+    // existing body ends with `\n`, we still want a blank separator line
+    // before the axhub block so the comment stands out, hence the leading
+    // `\n` either way. When it does NOT end with `\n`, the leading `\n`
+    // doubles as the missing terminator + blank separator.
+    let suffix = format!("\n# axhub quality state (local-only)\n{entry}\n");
     let _ = fs::write(&gitignore, format!("{body}{suffix}"));
 }
 
