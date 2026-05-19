@@ -223,7 +223,43 @@ jobs:
             TAG="${GITHUB_REF#refs/tags/}"
           fi
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
-          PAYLOAD=$(jq -nc --arg text ":rocket: *axhub ${TAG}* released\n${URL}" '{text: $text}')
+          PAYLOAD=$(jq -nc \
+            --arg tag "$TAG" \
+            --arg url "$URL" \
+            '{
+              text: ("axhub " + $tag + " released — " + $url),
+              blocks: [
+                {
+                  type: "header",
+                  text: { type: "plain_text", text: ("🚀 axhub " + $tag + " 릴리즈"), emoji: true }
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: ("*릴리즈 노트*\n<" + $url + "|GitHub 에서 변경사항 보기>")
+                  }
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: "*업데이트 방법*\n• Claude Code 플러그인 업데이트: `/plugin update axhub@axhub`\n• 강제 재설치 (파일 불일치 시): `/plugin install axhub@axhub --force`\n• CLI 바이너리만 갱신: `/axhub:update`"
+                  }
+                },
+                {
+                  type: "actions",
+                  elements: [
+                    {
+                      type: "button",
+                      text: { type: "plain_text", text: "Release notes 열기", emoji: true },
+                      url: $url,
+                      style: "primary"
+                    }
+                  ]
+                }
+              ]
+            }')
           curl -fsSL -X POST -H 'Content-type: application/json' \
             --data "$PAYLOAD" "$SLACK_WEBHOOK_URL" \
             || echo "Slack notification failed (fail-open) — release succeeded"
