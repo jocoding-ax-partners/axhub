@@ -292,12 +292,23 @@ jobs:
             ')"
           fi
 
+          # Convert the narrative paragraph into per-sentence bullets so
+          # Slack renders it as a scannable list instead of a wall of text.
+          # Split heuristic: ". " (period+space). Backtick-wrapped code such
+          # as `foo.ts`, `v0.5.13`, `{sh,ps1}` keeps dots tight (no trailing
+          # space) and survives the split intact. If the author already
+          # bulleted the narrative (`• ` / `- ` / `* ` line start) keep
+          # author intent verbatim.
+          BODY_FILE="$(mktemp)"
+          if printf '%s' "$BODY_TRIMMED" | head -1 | grep -qE '^[•\-\*] '; then
+            printf '%s' "$BODY_TRIMMED" > "$BODY_FILE"
+          else
+            printf '• %s' "$BODY_TRIMMED" | sed 's/\. /.\n• /g' > "$BODY_FILE"
+          fi
+
           # Use --rawfile so jq emits proper "\n" JSON escapes; --arg passes
           # literal newline bytes through, which Slack rejects with
           # "control characters must be escaped".
-          BODY_FILE="$(mktemp)"
-          printf '%s' "$BODY_TRIMMED" > "$BODY_FILE"
-
           PAYLOAD=$(jq -nc \
             --arg tag "$TAG" \
             --arg url "$URL" \
@@ -310,24 +321,25 @@ jobs:
                   text: { type: "plain_text", text: ("🚀 axhub " + $tag + " 릴리즈"), emoji: true }
                 },
                 {
-                  type: "section",
-                  text: {
-                    type: "mrkdwn",
-                    text: ("*릴리즈 노트*\n<" + $url + "|GitHub 에서 변경사항 보기>")
-                  }
+                  type: "context",
+                  elements: [
+                    { type: "mrkdwn", text: ("📖 <" + $url + "|GitHub 릴리즈 노트 보기>") }
+                  ]
                 },
+                { type: "divider" },
                 {
                   type: "section",
                   text: {
                     type: "mrkdwn",
-                    text: ("*변경사항*\n```\n" + $body + "\n```")
+                    text: ("*✨ 이번 릴리즈 요약*\n" + $body)
                   }
                 },
+                { type: "divider" },
                 {
                   type: "section",
                   text: {
                     type: "mrkdwn",
-                    text: "*업데이트 방법*\n• Claude Code 플러그인 업데이트: `/plugin update axhub@axhub`\n• 강제 재설치 (파일 불일치 시): `/plugin install axhub@axhub --force`\n• CLI 바이너리만 갱신: `/axhub:update`"
+                    text: "*📦 업데이트 방법*\n• Claude Code 플러그인: `/plugin update axhub@axhub`\n• 강제 재설치 (파일 불일치 시): `/plugin install axhub@axhub --force`\n• CLI 바이너리만 갱신: `/axhub:update`"
                   }
                 },
                 {
