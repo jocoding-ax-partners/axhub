@@ -152,10 +152,10 @@ describe("deploy skill git init stage", () => {
 
     expect(content).toContain("github.git_connection_required");
     expect(content).toContain("GitHub 저장소 연결");
-    expect(content).toContain('axhub github repos list --json');
+    expect(content).toContain('axhub apps git status --app "$APP_ID" --json');
     expect(content).toContain("GitHub 연결 링크: <install_url>");
     expect(content).toContain("https://github.com/new?name=$APP_SLUG");
-    expect(content).toContain('axhub github connect "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --account "$ACCOUNT" --json');
+    expect(content).toContain('axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json');
     expect(content).not.toContain("(/axhub:github 호출)");
   });
 
