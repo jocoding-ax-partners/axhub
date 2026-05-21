@@ -102,16 +102,6 @@
       ]
     }
   },
-  "apis": {
-    "다른 팀 API도 볼래요? 권한 있는 모든 API 주소를 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요.": {
-      "safe_default": "stay",
-      "rationale": "Privacy-first: never widen scope to cross-team without explicit human consent (PLAN row 46 audit log requirement).",
-      "allowed_safe_defaults": [
-        "stay",
-        "전체 보기"
-      ]
-    }
-  },
   "apps": {
     "앱이 더 있어요. 전체 목록 볼래요?": {
       "safe_default": "skip",

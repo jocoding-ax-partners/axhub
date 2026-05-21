@@ -31,7 +31,6 @@ export const SKILL_INTENTS: Record<string, string> = {
   logs: "view axhub deployment logs",
   recover: "rollback axhub deployment",
   apps: "list axhub apps",
-  apis: "browse axhub api catalog",
   auth: "authenticate to axhub",
   update: "update axhub CLI",
   upgrade: "upgrade axhub plugin",

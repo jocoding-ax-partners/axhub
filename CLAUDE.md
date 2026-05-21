@@ -107,7 +107,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 ## Always Do
 
 - **MUST `bun run skill:new <slug>` 로 스캐폴드 생성** — 직접 `mkdir skills/<name>` 후 SKILL.md 작성 시 Phase 17/18 패턴 (D1 TTY guard / TodoWrite Step 0 / `!command` preflight injection / AskUserQuestion header / registry stub) 누락되어 CI fail.
-- **MUST frontmatter 에 `multi-step:` + `needs-preflight:` 선언** — `multi-step: true` (deploy/recover/update/upgrade/doctor 같이 4+ 단계) 또는 `false` (apis/apps/auth/clarify/logs/status 같이 단일/조회). `needs-preflight: true` (deploy/recover/apis/apps 같이 live state 필요) 또는 `false`.
+- **MUST frontmatter 에 `multi-step:` + `needs-preflight:` 선언** — `multi-step: true` (deploy/recover/update/upgrade/doctor 같이 4+ 단계) 또는 `false` (apps/auth/clarify/logs/status 같이 단일/조회). `needs-preflight: true` (deploy/recover/apps 같이 live state 필요) 또는 `false`.
 - **MUST `bun run skill:doctor` 로 패턴 체크** — colored 한글 출력으로 SKILL 별 D1 sentinel / TodoWrite / `!command` preflight / **step-numbering collision (FU-3)** 누락 즉시 보임. CI 도 `--strict` mode 로 같은 검사 통과 필수. step-collision 검사는 `## Workflow` body 의 top-level `^N. **` 헤더 중복을 자동 catch (sub-step 인 `3.5. **` 이나 `### Subsection` 안의 local 1./2./.../D1./D2. 는 exempt).
 - **MUST `tests/fixtures/ask-defaults/registry.json` 에 AskUserQuestion 별 `safe_default` + `rationale` 등록** — scaffold 가 stub 자동 append. 새 question 추가 시 매번 channel 등록 (drift catch).
 - **MUST 모든 한글 텍스트 해요체 통일** — `bun run lint:tone --strict` 0 err 필수. 금지 token: 합니다 / 입니다 / 시겠어요 / 드립니다 / 당신 / 아이고. 사용: 해요 / 예요 / 이에요 / 할래요.
@@ -160,7 +160,7 @@ bun test                      # 회귀
 
 새 SKILL 생성 시 `model:` frontmatter 를 권장해요 (25.5a 부터 scaffold + skill-doctor 가 지원). 기존 19 SKILL 의 일괄 마이그레이션은 25.5a.1 단일-skill A/B test 통과 후 25.5b (haiku) / 25.5c (sonnet) 에서 진행해요.
 
-- **haiku**: read-only / 단순 조회 (status / logs / apis / open / clarify / doctor / routing-stats / whatsnew)
+- **haiku**: read-only / 단순 조회 (status / logs / open / clarify / doctor / routing-stats / whatsnew)
 - **sonnet**: multi-step / destructive / interactive (deploy / recover / env / apps / auth / github / init / install-cli / profile / update / upgrade / verify / trace)
 - **opus**: 사용 안 함 (axhub 도메인 외 — architecture decision / deep analysis 필요 없음)
 

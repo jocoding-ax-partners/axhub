@@ -9,7 +9,7 @@ denialRegex `(?:Shell|Bash)` + unrecognized stderr passthrough 3 mechanism 으�
 ship.
 
 본 ADR 의 범위는 SKILL preprocessing `!command` injection layer 의 fail-open contract 예요.
-`!command` injection 이 아닌 in-workflow manual `axhub-helpers` 호출 (예: `skills/apis/SKILL.md:40`,
+`!command` injection 이 아닌 in-workflow manual `axhub-helpers` 호출 (예:
 `skills/apps/SKILL.md:40`, `skills/deploy/SKILL.md:386`, `skills/doctor/SKILL.md:102`,
 `skills/status/SKILL.md:51`) 은 본 fix 범위 외 — Claude Code Bash tool 권한 게이트
 (PreToolUse hook fail-open) 적용 layer 라 별도 예요.
@@ -19,7 +19,7 @@ ship.
 
 ## Context
 
-9 SKILL + 1 template (routing-stats / trace / env / github / recover / apps / apis / deploy / verify
+8 SKILL + 1 template (routing-stats / trace / env / github / recover / apps / deploy / verify
 + `_template/SKILL.md.tmpl`) 의 `!${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json` 줄이
 Claude Code 의 first-run permission prompt 와 충돌해서 vibe coder 에게 raw 영문
 "Shell command permission check failed … requires approval" 텍스트가 노출돼요.
@@ -152,5 +152,5 @@ A+B 혼합 (defense-in-depth) — A happy path TTFD=0, B fallback graceful degra
 - [ADR-0010 stderr graceful degradation](0010-stderr-filter-graceful-degradation.md) — axhub binary layer, 본 ADR 과 다른 layer 지만 정합 (unrecognized stderr passthrough 분기)
 - 9 SKILL + 1 template `!command` injection 라인 (variant 매핑):
   - **deploy variant**: `skills/deploy/SKILL.md:101` (PowerShell setup + lite body)
-  - **lite variant**: `skills/routing-stats/SKILL.md:29` / `skills/apis/SKILL.md:30` / `skills/trace/SKILL.md:36` / `skills/verify/SKILL.md:35` / `skills/env/SKILL.md:29` / `skills/github/SKILL.md:29` / `skills/recover/SKILL.md:32` / `skills/apps/SKILL.md:28` + `skills/_template/SKILL.md.tmpl:26`
+  - **lite variant**: `skills/routing-stats/SKILL.md:29` / `skills/trace/SKILL.md:36` / `skills/verify/SKILL.md:35` / `skills/env/SKILL.md:29` / `skills/github/SKILL.md:29` / `skills/recover/SKILL.md:32` / `skills/apps/SKILL.md:28` + `skills/_template/SKILL.md.tmpl:26`
   - (deploy:101 만 본문 교체, 나머지 8 SKILL + 1 template 은 raw shell substitution → lite variant Node runner envelope 신규 wrap)

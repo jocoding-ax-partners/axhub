@@ -43,7 +43,7 @@ axhub 플러그인을 Claude Code 에 등록합니다. 평생 한 번만 하면 
 ```
 ✓ Marketplace 'axhub' added (1 plugin)
 ✓ Plugin 'axhub' installed (v0.3.2)
-   Skills: deploy, status, logs, apps, apis, auth, update, doctor, init, env, github, open, profile, upgrade, install-cli, whatsnew, recover, clarify
+   Skills: deploy, status, logs, apps, auth, update, doctor, init, env, github, open, profile, upgrade, install-cli, whatsnew, recover, clarify
    Commands: /axhub:deploy, /axhub:status, /axhub:logs, ...
 ```
 
@@ -218,7 +218,6 @@ axhub 로그인해줘
 | 📊 상태 확인 | "지금 진행 중인 거 어떻게 됐어" | `/axhub:status` |
 | 📝 로그 보기 | "왜 실패했어, 빌드 로그 보여줘" | `/axhub:logs` |
 | 📦 앱 목록 | "내 앱 목록", "어떤 앱 있어" | `/axhub:apps` |
-| 🔌 API 카탈로그 | "어떤 API 쓸 수 있어" | `/axhub:apis` |
 | 🔑 로그인 | "로그인해", "권한 만료된 것 같아" | `/axhub:login` |
 | 🔧 진단 | "axhub 설치돼 있어?" | `/axhub:doctor` |
 | 📦 CLI 업데이트 | "axhub 새 버전 있어?" | `/axhub:update` |

@@ -2,7 +2,7 @@
 
 > 바이브코더가 자연어로 axhub 앱을 안전하게 배포하고 관리하는 Claude Code 플러그인.
 
-**상태**: v0.8.0. 30 SKILLs / 10 commands / 3 quality agents / 5 cross-arch cosign-signed binaries 라이브.
+**상태**: v0.8.0. 29 SKILLs / 9 commands / 3 quality agents / 5 cross-arch cosign-signed binaries 라이브.
 
 ---
 
@@ -12,7 +12,7 @@ axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "결제 
 
 ## 무엇을 할 수 있는가
 
-29 SKILL 자연어 트리거 + 10 슬래시 명령 (한글 alias `/axhub:배포` 포함):
+28 SKILL 자연어 트리거 + 9 슬래시 명령 (한글 alias `/axhub:배포` 포함):
 
 | SKILL | 트리거 예시 | 슬래시 |
 |-------|-------------|--------|
@@ -21,7 +21,6 @@ axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "결제 
 | `logs` | "왜 실패했어 빌드 로그 보여줘" | `/axhub:logs` |
 | `recover` | "방금 거 되돌려" | — |
 | `apps` | "내 앱 목록" | `/axhub:apps` |
-| `apis` | "어떤 API 쓸 수 있어" | `/axhub:apis` |
 | `auth` | "axhub 로그인해줘" | `/axhub:login` |
 | `update` | "axhub CLI 새 버전 있어" | `/axhub:update` |
 | `upgrade` | "플러그인 업그레이드" | — |
@@ -294,7 +293,7 @@ git push origin main --tags         # release.yml 자동 fire (cosign 서명 + G
 - `bunx tsc --noEmit` clean
 - `bun run lint:tone --strict` 0 err / 0 warn
 - `bun run lint:keywords --check` clean
-- `bun run skill:doctor --strict` 29/29 SKILLs complete
+- `bun run skill:doctor --strict` 28/28 SKILLs complete
 - `bun run bench:hooks` prompt-route/preflight p95 thresholds green
 - `bun run test:plugin-e2e:t2` → 12/12 helper lifecycle cases pass
 - `bun run release:check` Rust helper host artifact + release matrix verified

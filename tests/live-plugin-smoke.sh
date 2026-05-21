@@ -14,7 +14,6 @@ COMMANDS=(
   "/axhub:status"
   "/axhub:doctor"
   "/axhub:apps"
-  "/axhub:apis"
   "/axhub:login"
   "/axhub:logs"
   "/axhub:update"
@@ -72,5 +71,5 @@ if [ "${SMOKE_STRICT:-1}" = "1" ]; then
     echo "FAIL: at least one command exited non-zero" >&2
     exit 1
   fi
-  echo "STRICT: 10/10 commands exit 0, TIMEOUT 0" >&2
+  echo "STRICT: 9/9 commands exit 0, TIMEOUT 0" >&2
 fi

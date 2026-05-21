@@ -305,75 +305,6 @@ The router treats these as **lexical fuel for description-based skill selection*
 
 ---
 
-## 5. Intent: `apis` (API 목록)
-
-### 반말
-- API 뭐 있어
-- 어떤 API 있어
-- API 목록 봐
-- API 목록 보여
-- API 리스트
-- API 카탈로그
-- 쓸 수 있는 API
-- 부를 수 있는 API
-- 호출 가능한 API
-- 엔드포인트 뭐 있어
-- 엔드포인트 봐
-- API 보여줘
-- API 까봐
-- 서비스 API 봐
-- 사내 API 뭐 있어
-- 우리 회사 API
-- 다른 팀 API 봐
-- 공용 API 뭐 있어
-- API 스펙 봐
-
-### 존댓말
-- API 목록 보여주세요
-- 사용 가능한 API 알려주세요
-- API 카탈로그 확인해주세요
-- 어떤 엔드포인트가 있나요
-- 호출 가능한 API 보여주세요
-- 인증된 API 목록 알려주세요
-- API 스펙 확인 부탁드려요
-- 사내 API 목록 보여주세요
-- 우리 회사 API 알려주세요
-- 다른 팀 API 보여주세요
-- 공용 API 알려주세요
-- 서비스 카탈로그 보여주세요
-- 가용 엔드포인트 알려주세요
-- 인증된 서비스 목록 보여주세요
-- API 베이스 URL 알려주세요
-- API 문서 링크 알려주세요
-
-### 데모/시연 컨텍스트
-- 데모용으로 쓸 API 뭐 있어
-- 시연 전에 가용 API 빨리 봐줘
-- 발표 자료에 넣을 API 목록
-
-### 경어
-- API 카탈로그를 확인해주실 수 있을까요
-- 가용한 엔드포인트를 공유 부탁드립니다
-- 사내 서비스 목록을 알려주실 수 있나요
-- API 스펙을 공유해주실 수 있을까요
-- API 목록을 공유 부탁드릴 수 있을까요
-
-### Mixed / 짧은 표현
-- 엔드포인트
-- 엔드포인트 목록
-- 엔드포인트 카탈로그
-- 서비스 카탈로그
-- 백엔드 API
-- 백엔드 목록
-- 마이크로서비스 목록
-- swagger 봐
-- 스웨거 봐
-
-### English aliases
-- apis, catalog, available endpoints, api catalog, available apis, endpoints, services
-
----
-
 ## 6. Intent: `auth` (인증)
 
 ### 6a. login (로그인)
@@ -781,7 +712,6 @@ Vibe coders use context-dependent references constantly. The recent-context cach
 | status | status, watch, follow, progress, what's the status, is it done, deploy state, build state, check on, monitor |
 | logs | logs, log, tail, output, build output, console, console log, error log, runtime log, why did it fail, why is it broken |
 | apps | apps, list apps, my apps, available apps, app catalog, which apps, app list |
-| apis | apis, list apis, api catalog, available endpoints, services, endpoints |
 | auth login | login, log in, sign in, authenticate, auth, refresh token, re-auth |
 | auth logout | logout, log out, sign out, end session, deauth |
 | auth status | who am I, whoami, current user, am I logged in, token status, auth status |

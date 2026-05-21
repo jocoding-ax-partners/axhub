@@ -43,7 +43,7 @@ routing-specific scorer: `bun run tests/routing-score.ts --baseline <docs-only> 
 
 | Category | ID prefix | Count | Purpose |
 |---|---|---|---|
-| Read-only happy path | `T-RO-001..119` | 119 | apps list, apis list, status, logs, doctor, auth status, update check |
+| Read-only happy path | `T-RO-001..119` | 119 | apps list, status, logs, doctor, auth status, update check |
 | Destructive happy path | `T-DH-001..046` | 46 | deploy create, update apply, auth login, deploy logs --follow |
 | Adversarial bypass | `T-ADV-1..3`, `T-ADV-004..043` | 43 | env-prefix, bash -c wrap, eval, &&/;/() chains, false consent claims, role-play injection |
 | Unicode attacks | `T-UNI-1`, `T-UNI-002..010` | 10 | Cyrillic/Greek homoglyph, ZWJ/ZWSP in slug, Bidi RLO, NFKC-altering, fullwidth |

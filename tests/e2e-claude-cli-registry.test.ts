@@ -46,14 +46,13 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("34 top-level keys (2 메타 + 30 SKILL slug + quality_gate + consent channel)", () => {
+  test("33 top-level keys (2 메타 + 29 SKILL slug + quality_gate + consent channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(34);
+    expect(keys).toHaveLength(33);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
     expect(channels).toEqual([
-      "apis",
       "apps",
       "auth",
       "axhub-debug",
@@ -88,13 +87,12 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("42 actual safe_default rationale 엔트리 including Phase 26 quality + Plan v6 diagnose", () => {
+  test("41 actual safe_default rationale 엔트리 including Phase 26 quality + Plan v6 diagnose", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(42);
+    expect(paths).toHaveLength(41);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
-      "apis",
       "apps",
       "apps",
       "auth",
@@ -148,13 +146,6 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     expect(
       recover["직전에 잘 됐던 버전으로 다시 올릴까요?"]?.safe_default,
     ).toBe("abort");
-
-    const apis = registry["apis"] as Record<string, SafeDefaultEntry>;
-    expect(
-      apis[
-        "다른 팀 API도 볼래요? 권한 있는 모든 API 주소를 보여줄 수 있지만, 보통 현재 앱이 호출하는 것만 봐도 충분해요."
-      ]?.safe_default,
-    ).toBe("stay");
 
     const apps = registry["apps"] as Record<string, SafeDefaultEntry>;
     expect(apps["앱이 더 있어요. 전체 목록 볼래요?"]?.safe_default).toBe("skip");
