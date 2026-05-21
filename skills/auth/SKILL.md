@@ -18,9 +18,9 @@ allows-dependency-execution: false
 model: sonnet
 ---
 
-# Auth (login / logout / status)
+# Auth (login / logout / status / refresh / pat)
 
-Manage axhub identity. Always check current state first via `axhub auth status` to avoid prompting the user for a login they already have.
+Manage axhub identity. Always check current state first via `axhub auth status` to avoid prompting the user for a login they already have. `axhub auth whoami` (alias `axhub auth me`) 는 identity-only 쿼리로 status 와 동일 출력 — "누구야" / "who am I" 발화에는 whoami 를 써요.
 
 ## Workflow
 
@@ -30,29 +30,68 @@ To handle auth:
 
    ```bash
    axhub auth status --json
+   # 또는 identity-only:
+   axhub auth whoami --json    # alias: axhub auth me --json
    ```
 
    Parse the result to discriminate four cases:
    - `user_email` present → currently logged in; show identity + scopes + expiry
-   - `code: token_expired` → token expired; flow to login
-   - `code: not_logged_in` → never logged in; flow to login
+   - `code: token_expired` → token expired; flow to refresh (Step 3a) 우선
+   - `code: not_logged_in` → never logged in; flow to login (Step 3b)
    - `code: ...` other → surface the helper's classify-exit template
+   - `auth_mode: "pat"` → PAT context; flow to PAT identity card (Step 2b)
 
 2. **On "logged in" (status query intent).** Render Korean identity card:
 
    ```
    현재 로그인:
-     · 계정: <user_email>
+     · 계정: <user_email>  (user_id: <user_id>)
+     · 이름: <name>                          # name 이 있으면 표시, 없으면 줄 생략
      · 만료: <EXPIRES_HUMAN>
      · 권한: <scopes joined by ", ">
      · 환경: <profile> (<endpoint>)
+     · Platform admin: 네                    # platform_admin=true 일 때만 표시
    ```
 
-   Stop here unless the user also asked for a re-login.
+   tenants 가 있으면 아래에 이어서:
 
-**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — login confirm → `abort`, headless → `token_file`, logout confirm → `abort` (subprocess 자동 logout 안 해요).
+   ```
+   소속 tenants:
+     - <tenant_slug or tenant_name>
+     - ...
+   ```
 
-3. **On expired or login-intent.** Confirm via AskUserQuestion:
+   tenants 가 비어 있으면 `소속 tenants: 없음` 한 줄 표시. Stop here unless the user also asked for a re-login.
+
+2b. **PAT context identity card** (when `auth_mode=pat` in status output):
+
+   ```
+   현재 인증: PAT (X-Api-Key)
+     · 계정: <user_email>  (user_id: <user_id>)
+     · 출처: <env:AXHUB_API_KEY | env:AXHUB_PAT_ID | profile:current_pat | keychain:current_pat>
+     · Platform admin: 네                    # platform_admin=true 일 때만 표시
+   ```
+
+   PAT mode 에서는 expires / scopes 정보가 OAuth status 와 다르게 표시 안 돼요. PAT 관리 (issue / list / revoke / rotate) 가 필요하면 Step 8 PAT 섹션 참고.
+
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — login confirm → `abort`, headless → `token_file`, logout confirm → `abort` (subprocess 자동 logout 안 해요), PAT revoke confirm → `abort`.
+
+3. **On expired or login-intent.** Token 이 expired 면 먼저 refresh 를 시도해요 (Step 3a) — full device flow 보다 friction 0. refresh 불가능 / invalid_grant 만 full login 으로 (Step 3b).
+
+3a. **Try `axhub auth refresh` first (token expired path).** Stored refresh_token 이 있으면 device flow 없이 새 access_token 발급 가능해요. CLI 가 자동으로 invalid_grant 일 때만 device-flow fallback 해요.
+
+   ```bash
+   axhub auth refresh --json
+   ```
+
+   성공 시: 새 token 으로 자동 진행, Step 2 identity card 로 마무리. 사용자에게 추가 prompt 필요 없어요.
+
+   실패 시:
+   - `invalid_grant` → refresh_token 이 revoked/expired. CLI 가 자동으로 device flow 로 fallback 하지만, `--no-input` / headless 컨텍스트면 SKILL 이 Step 3b token_file 흐름으로 이동
+   - 5xx / 429 / timeout (transient) → exit 6 (rate-limited) / exit 7 (server error) / exit 10 (timeout) 으로 끝나요. CI / agent 는 retry, 사용자에게 한 줄 안내
+   - 그 외 → Step 3b 로 이동
+
+3b. **Confirm full login** (refresh 불가 또는 사용자가 명시적으로 "다시 로그인" 요청 시):
 
    ```json
    {
@@ -121,9 +160,24 @@ To handle auth:
 
    ```bash
    axhub auth login --force --no-browser
+   # 다중 tenant 소속이면:
+   axhub auth login --force --no-browser --tenant <tenant-slug>
+   # scope 변경하면 (default: read,write):
+   axhub auth login --force --no-browser --scopes read,write,deploy
    ```
 
    This command must surface the device URL/code before any polling wait. Render the device URL/code to the user first, then wait or instruct them to finish in the browser. `--json 은 challenge fields` (`device_url`, `user_code`, verification URL, or equivalent) 를 polling 전에 emit 할 때만 사용해요. If JSON output does not expose those challenge fields before polling, do not use `--json` for the interactive wait.
+
+   **OAuth device flow URL + user_code 안내:** CLI 가 stderr 로 `To continue, visit: <verification_uri>` + `Enter code: <user_code>` + (있으면) `Or open directly: <verification_uri_complete>` 를 emit 해요. 사용자에게 한 번에 묶어서:
+
+   ```
+   GitHub 가 아닌 axhub OAuth 인증이 필요해요. 다음 두 단계를 진행해주세요:
+
+   1. 브라우저에서 열기: <verification_uri_complete or verification_uri>
+   2. 코드 입력: <user_code>
+
+   완료되면 자동으로 다음 단계로 진행돼요.
+   ```
 
    Never run a blocking login unless the device URL/code is visible first: do not run blocking `axhub auth login --force` and then wait silently. If the current CLI cannot expose the challenge pre-wait, stop with a CLI follow-up gap instead of improvising a hidden/blocking auth flow.
 
@@ -133,20 +187,26 @@ To handle auth:
 
 6. **Logout intent.** When user says "로그아웃", "토큰 지워줘", "세션 끊어":
 
-   Confirm via AskUserQuestion before deleting the active local token:
+   confirm AskUserQuestion 으로 사용자 의도를 먼저 확인해요:
 
    ```json
    {
      "question": "로그아웃할래요?",
      "header": "로그아웃 확인",
      "options": [
-       {"label": "네, 로그아웃", "value": "confirm", "description": "이 노트북의 axhub 토큰을 제거"},
+       {"label": "네, 로그아웃", "value": "confirm", "description": "이 노트북의 axhub 토큰을 제거 (실행 전 dry-run preview 표시)"},
        {"label": "취소", "value": "abort", "description": "아무것도 안 함"}
      ]
    }
    ```
 
-   Only when the answer is `confirm`, run:
+   사용자가 `confirm` 을 선택하면 destructive 실행 직전에 dry-run 으로 미리 보여줘요:
+
+   ```bash
+   axhub auth logout --dry-run --json
+   ```
+
+   `would_delete: true` / `profile: <name>` 출력을 사용자에게 한국어 한 줄로 요약 후 (예: "프로필 `default` 의 토큰이 제거돼요") 실제 실행:
 
    ```bash
    axhub auth logout
@@ -156,14 +216,85 @@ To handle auth:
 
 7. **Show scopes after success.** Always echo `scopes` from the post-login `auth status` so the user sees what they can/cannot do (prevents downstream exit 66 surprises).
 
+8. **PAT (Personal Access Token) management** — 사용자가 "PAT 발급", "토큰 발급", "agent token", "automation token", "CI 토큰" 등을 요청하거나, PAT context 에서 관리 작업 (list/revoke/rotate) 을 요청할 때 사용해요. PAT 는 X-Api-Key 인증 헤더로 동작하고 OAuth session 과 별도 storage 에 보관돼요.
+
+   8a. **List PATs:**
+
+   ```bash
+   axhub auth pat list --json
+   ```
+
+   출력의 `id` / `name` / `revoked_at` 을 한국어 한 줄씩 요약. revoked 는 "(폐기됨)" 로 표시.
+
+   8b. **Issue a new PAT** (consent + raw-token 1회 표시):
+
+   ```bash
+   axhub auth pat issue --name "<descriptive-name>" --expires-in-days 90 --json
+   # 즉시 활성 PAT 으로 사용하려면:
+   axhub auth pat issue --name "<n>" --expires-in-days 90 --use --json
+   # raw token 저장 없이 1회만 보여주려면:
+   axhub auth pat issue --name "<n>" --no-save --show-token
+   ```
+
+   **raw_token 은 응답 출력에 1회만 나타나요.** SKILL output / chat / log 에 echo 금지 (NEVER 섹션 참고). 사용자에게는 `id` / `fingerprint` / `expires_at` 만 표시. raw 는 keychain 에 저장되거나 `--show-token` 인 경우 stdout 으로 1회 표시되고 그 다음부터 다시 못 봐요.
+
+   8c. **Revoke a PAT** (dry-run 기본, `--execute` 로 mutate):
+
+   ```bash
+   # preview:
+   axhub auth pat revoke <pat-id> --json
+   # 실제 폐기:
+   axhub auth pat revoke <pat-id> --execute --json
+   ```
+
+   `--execute` 없이 호출하면 dry-run 이라 mutate 하지 않아요. confirm AskUserQuestion 후 `--execute` 붙여 실행:
+
+   ```json
+   {
+     "question": "PAT <id> 를 폐기할까요?",
+     "header": "PAT 폐기 확인",
+     "options": [
+       {"label": "네, 폐기", "value": "confirm", "description": "백엔드에서 PAT 를 revoke 하고 keychain 에서도 제거해요"},
+       {"label": "취소", "value": "abort", "description": "아무것도 안 함"}
+     ]
+   }
+   ```
+
+   8d. **Rotate active PAT** (replace + revoke old):
+
+   ```bash
+   axhub auth pat rotate --name "<new-name>" --expires-in-days 90 --json
+   ```
+
+   활성 PAT 을 새 PAT 으로 교체하고 old 는 자동 revoke. raw token 은 issue 때와 동일하게 1회만 표시.
+
+   8e. **Switch active PAT** (saved PATs 중 선택):
+
+   ```bash
+   axhub auth pat use <pat-id>
+   axhub auth pat unset            # 활성 PAT 해제
+   ```
+
+   8f. **PAT whoami** (출처 표시):
+
+   ```bash
+   axhub auth pat whoami --json
+   ```
+
+   `source` 필드 (`env:AXHUB_API_KEY` / `env:AXHUB_PAT_ID` / `profile:current_pat` / `keychain:current_pat`) 와 `fingerprint` 를 사용자에게 표시. raw token 노출 X.
+
 ## NEVER
 
 - NEVER echo the raw token value (`axhub_pat_*`) — the redact helper masks it but skill output must not interpolate it back.
+- NEVER raw PAT token (`pat issue` / `pat rotate` 의 `raw_token` 응답 필드) 을 SKILL output / chat / log 에 echo 안 해요. 1회 표시는 CLI 가 처리하고 사용자가 직접 복사해요.
 - NEVER auto-launch browser in headless environments — the CLI will block and confuse the user.
 - NEVER call `axhub auth login` without first checking `auth status` (avoids re-login when already valid).
+- NEVER token 이 expired 일 때 곧바로 full device-flow login 강제 안 해요. `axhub auth refresh` 가 먼저 시도되고, invalid_grant 일 때만 full login fallback 해요.
 - NEVER persist tokens outside `~/.config/axhub-plugin/token` (0600).
-- NEVER call `axhub auth logout` without confirming via AskUserQuestion (destructive — kills active session).
+- NEVER call `axhub auth logout` without confirming via AskUserQuestion (destructive — kills active session). dry-run preview 를 먼저 보여주세요.
+- NEVER call `axhub auth pat revoke` without `--execute` 를 mutate intent 로 가정 안 해요. dry-run 이 기본이라 `--execute` 가 빠지면 backend revoke 발생 안 해요.
 - NEVER call `axhub auth login` without running the stdin JSON `consent-mint` step (step 5a) first — PreToolUse hook이 consent token 없이 deny 해요.
+- NEVER OAuth device flow 의 `verification_uri` + `user_code` 를 사용자에게 안 보여주지 않아요. CLI 가 stderr "To continue, visit: …" / "Enter code: …" 줄을 emit 한 직후 한국어로 묶어서 표시.
 
 ## Additional Resources
 
