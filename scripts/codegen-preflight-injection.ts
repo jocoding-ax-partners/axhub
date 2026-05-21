@@ -30,6 +30,15 @@ const SYSTEM_MESSAGE =
 const CLI_UNAVAILABLE_MESSAGE =
   "[axhub] axhub CLI 가 감지 안 돼요. /axhub:install-cli 로 OS 별 공식 설치 채널을 안내받거나 /axhub:doctor 로 진단해주세요. (SKILL 흐름은 그대로 진행할 수 있어요 — preflight 가 cli_unavailable 만 알려준 거예요.)";
 
+const CLI_NOT_FOUND_MESSAGE =
+  "[axhub] axhub CLI 가 PATH 에서 안 보여요. /axhub:install-cli 로 설치하거나 (macOS Apple Silicon Homebrew 사용 중이면 /opt/homebrew/bin 이 inherit 안 됐을 가능성). /axhub:doctor 로 진단 가능해요.";
+
+const CLI_CONFIG_CORRUPTED_MESSAGE =
+  "[axhub] axhub CLI 의 ~/.config/axhub/config.yaml 이 새 schema 와 안 맞아요 (예: user_id 가 UUID/int64 mismatch). /axhub:auth 로 재로그인하면 fresh config 가 작성되면서 자동 fix 돼요.";
+
+const CLI_RUNTIME_ERROR_MESSAGE =
+  "[axhub] axhub CLI 가 실행은 됐지만 비정상 exit 했어요. /axhub:doctor 로 진단해주세요. CLI 자체 버그면 GitHub issue 로 stderr 한 줄 같이 알려주세요.";
+
 /**
  * Builds the single-line Node runner used as the `!command` injection body for
  * **lite-variant** SKILLs (14 SKILL + 1 template).
@@ -53,12 +62,18 @@ export function getLiteInjectionLine(): string {
     "const stderrText=String(result.stderr??'');",
     "if(stdoutText.length>0){process.stdout.write(stdoutText);}",
     "const denialRegex=/^(?:Shell|Bash) command permission check failed.*requires approval/im;",
+    "const cliNotFoundRegex=/\\\"auth_error_code\\\":\\\"cli_not_found\\\"/;",
+    "const cliConfigCorruptedRegex=/\\\"auth_error_code\\\":\\\"cli_config_corrupted\\\"/;",
+    "const cliRuntimeErrorRegex=/\\\"auth_error_code\\\":\\\"cli_runtime_error\\\"/;",
     "const cliUnavailableRegex=/\\\"auth_error_code\\\":\\\"cli_unavailable\\\"/;",
     // PR #99 security M2: redact common secret token patterns from stderr passthrough.
     // Prevents accidental leak when helper emits RUST_LOG=debug, dependency panic, or
     // transport debug output containing API keys / OAuth tokens to the Claude Code chat surface.
     "const redactRe=/(sk-[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9]{36}|axhub_[A-Za-z0-9]{32,}|Bearer\\\\s+[A-Za-z0-9._~+\\\\/-]+=*)/g;",
     `if(result.error||(result.status!==0&&denialRegex.test(stderrText))){console.log(JSON.stringify({systemMessage:\\"${SYSTEM_MESSAGE}\\"}));process.exit(0)}`,
+    `else if(result.status!==0&&cliNotFoundRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\\"${CLI_NOT_FOUND_MESSAGE}\\"}));process.exit(0)}`,
+    `else if(result.status!==0&&cliConfigCorruptedRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\\"${CLI_CONFIG_CORRUPTED_MESSAGE}\\"}));process.exit(0)}`,
+    `else if(result.status!==0&&cliRuntimeErrorRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\\"${CLI_RUNTIME_ERROR_MESSAGE}\\"}));process.exit(0)}`,
     `else if(result.status!==0&&cliUnavailableRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\\"${CLI_UNAVAILABLE_MESSAGE}\\"}));process.exit(0)}`,
     "else if(stderrText.length>0){process.stderr.write(stderrText.replace(redactRe,'<redacted>'))}",
     "process.exit(typeof result.status==='number'?result.status:0)",
@@ -95,10 +110,16 @@ export function getDeployInjectionLine(): string {
     "const stderrText=String(result.stderr??'');",
     "if(stdoutText.length>0){process.stdout.write(stdoutText);}",
     "const denialRegex=/^(?:Shell|Bash) command permission check failed.*requires approval/im;",
+    "const cliNotFoundRegex=/\\\"auth_error_code\\\":\\\"cli_not_found\\\"/;",
+    "const cliConfigCorruptedRegex=/\\\"auth_error_code\\\":\\\"cli_config_corrupted\\\"/;",
+    "const cliRuntimeErrorRegex=/\\\"auth_error_code\\\":\\\"cli_runtime_error\\\"/;",
     "const cliUnavailableRegex=/\\\"auth_error_code\\\":\\\"cli_unavailable\\\"/;",
     // PR #99 security M2: same redaction as lite variant — secret token leak prevention.
     "const redactRe=/(sk-[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9]{36}|axhub_[A-Za-z0-9]{32,}|Bearer\\\\s+[A-Za-z0-9._~+\\\\/-]+=*)/g;",
     `if(result.error||(result.status!==0&&denialRegex.test(stderrText))){console.log(JSON.stringify({systemMessage:\\"${SYSTEM_MESSAGE}\\"}));process.exit(0)}`,
+    `else if(result.status!==0&&cliNotFoundRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\\"${CLI_NOT_FOUND_MESSAGE}\\"}));process.exit(0)}`,
+    `else if(result.status!==0&&cliConfigCorruptedRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\\"${CLI_CONFIG_CORRUPTED_MESSAGE}\\"}));process.exit(0)}`,
+    `else if(result.status!==0&&cliRuntimeErrorRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\\"${CLI_RUNTIME_ERROR_MESSAGE}\\"}));process.exit(0)}`,
     `else if(result.status!==0&&cliUnavailableRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\\"${CLI_UNAVAILABLE_MESSAGE}\\"}));process.exit(0)}`,
     "else if(stderrText.length>0){process.stderr.write(stderrText.replace(redactRe,'<redacted>'))}",
     "process.exit(typeof result.status==='number'?result.status:0)",

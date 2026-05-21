@@ -286,6 +286,93 @@ fn read_manifest_current_app() -> Option<String> {
     })
 }
 
+/// Returns true when the current working directory contains a project-marker
+/// file or directory. Used by `current_app` resolution to gate cache fallback —
+/// an empty cwd (or a non-project directory like `~/Downloads`) should NOT
+/// inherit the `app_slug` from the most-recent global deploy cache, because
+/// SKILL routing reads `current_app` and renders "현재 앱: <slug>" prompts.
+/// v0.9.5 fixes a regression where cache was emitted unconditionally and
+/// users saw stale "현재 앱: nextjs-axhub" in unrelated empty directories.
+fn cwd_has_project_marker() -> bool {
+    const MARKERS: &[&str] = &[
+        "apphub.yaml",
+        "axhub.yaml",
+        ".git",
+        "package.json",
+        "Cargo.toml",
+        "pyproject.toml",
+        "go.mod",
+        "deno.json",
+        "deno.jsonc",
+        "Gemfile",
+        "composer.json",
+        "build.gradle",
+        "build.gradle.kts",
+        "pom.xml",
+    ];
+    MARKERS.iter().any(|marker| std::path::Path::new(marker).exists())
+}
+
+/// Classify the result of `axhub --version` into a discriminated CLI state so
+/// downstream SKILL wrappers + systemMessage emitters can route the user to
+/// the correct fix (install / re-auth / upgrade / report) instead of the
+/// blanket "cli_unavailable" message that v0.9.3 emitted.
+fn diagnose_cli_state(version_result: &SpawnResult) -> CliState {
+    if version_result.exit_code == EXIT_OK && !version_result.stdout.is_empty() {
+        return CliState::Ok;
+    }
+    let stderr_lower = version_result.stderr.to_lowercase();
+    // Exit code 127 = command not found (POSIX). Also catch spawn-error stderr text.
+    if version_result.exit_code == 127
+        || stderr_lower.contains("command not found")
+        || stderr_lower.contains("no such file")
+        || stderr_lower.contains("not recognized as the name")
+    {
+        return CliState::NotFound;
+    }
+    // Config schema mismatch (e.g. v0.9.4 user_id UUID -> int64 breakage).
+    if stderr_lower.contains("load config")
+        || stderr_lower.contains("cannot parse value")
+        || stderr_lower.contains("config.yaml")
+        || stderr_lower.contains("config:")
+        || stderr_lower.contains("yaml:")
+    {
+        return CliState::ConfigCorrupted;
+    }
+    CliState::RuntimeError
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CliState {
+    Ok,
+    NotFound,
+    ConfigCorrupted,
+    RuntimeError,
+}
+
+impl CliState {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::NotFound => "not_found",
+            Self::ConfigCorrupted => "config_corrupted",
+            Self::RuntimeError => "runtime_error",
+        }
+    }
+
+    /// Subcode string emitted as `auth_error_code` in the preflight JSON when
+    /// the CLI cannot be probed. Picked up by SKILL `!command` preflight
+    /// wrappers via regex match so they can render a fix-specific systemMessage.
+    pub fn auth_error_code(&self) -> Option<&'static str> {
+        match self {
+            Self::Ok => None,
+            Self::NotFound => Some("cli_not_found"),
+            Self::ConfigCorrupted => Some("cli_config_corrupted"),
+            Self::RuntimeError => Some("cli_runtime_error"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PreflightRun {
     pub output: PreflightOutput,
@@ -333,7 +420,8 @@ where
         })
     };
 
-    let cli_present = version_result.exit_code == EXIT_OK && !version_result.stdout.is_empty();
+    let cli_state = diagnose_cli_state(&version_result);
+    let cli_present = cli_state == CliState::Ok;
     let cli_version = if cli_present {
         extract_semver(&version_result.stdout)
     } else {
@@ -350,7 +438,15 @@ where
         raw_auth_status
     } else {
         AuthStatus::Error {
-            code: "cli_unavailable".into(),
+            // v0.9.5: surface specific cli failure mode (not_found / config_corrupted /
+            // runtime_error) so SKILL wrappers can render a fix-specific systemMessage
+            // instead of the blanket cli_unavailable that conflated install vs. config drift.
+            // Backward compat: keep `cli_unavailable` as the auth_error_code value for the
+            // RuntimeError/legacy path so existing wrapper regex still matches.
+            code: cli_state
+                .auth_error_code()
+                .unwrap_or("cli_unavailable")
+                .into(),
             detail: String::new(),
         }
     };
@@ -392,7 +488,19 @@ where
             .ok()
             .filter(|s| !s.is_empty())
             .or(manifest_app)
-            .or_else(|| cache.as_ref().and_then(|c| c.app_slug.clone())),
+            // v0.9.5: cache.app_slug 은 globally cached "last deploy" 라 cwd context
+            // 와 무관하게 emit 되면 빈 디렉토리에서도 "현재 앱: <stale-slug>" 가 떠요.
+            // SKILL routing 이 이를 보고 잘못된 안내를 함 (#: 사용자 보고된 회귀).
+            // cwd 에 project marker (.git / package.json / apphub.yaml / Cargo.toml 등)
+            // 가 있을 때만 cache fallback 활성화. 그 외는 None — SKILL 가 "현재 앱 없음"
+            // 으로 graceful 안내.
+            .or_else(|| {
+                if cwd_has_project_marker() {
+                    cache.as_ref().and_then(|c| c.app_slug.clone())
+                } else {
+                    None
+                }
+            }),
         current_env: std::env::var("AXHUB_PROFILE")
             .ok()
             .filter(|s| !s.is_empty()),

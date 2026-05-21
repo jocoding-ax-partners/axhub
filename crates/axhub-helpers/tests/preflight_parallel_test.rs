@@ -78,16 +78,20 @@ fn parallel_happy_path_merges_all_four_probes() {
 }
 
 #[test]
-fn parallel_cli_absent_overrides_auth_to_cli_unavailable() {
+fn parallel_cli_absent_overrides_auth_to_cli_not_found() {
     let _guard = lock_parallel_env();
     std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL");
     let run = run_preflight_with_runner(cli_absent_runner);
     // exit code reflects the cli_present=false / in_range=false branch.
     assert!(!run.output.cli_present);
     assert!(!run.output.auth_ok);
+    // v0.9.5: cli_absent_runner emits exit 127 + "axhub: not found" stderr,
+    // which the new diagnose_cli_state() classifies as cli_not_found (more
+    // specific than the legacy blanket cli_unavailable). SKILL wrappers route
+    // this to /axhub:install-cli instead of mixing with config drift cases.
     assert_eq!(
         run.output.auth_error_code.as_deref(),
-        Some("cli_unavailable")
+        Some("cli_not_found")
     );
 }
 

@@ -431,9 +431,13 @@ fn preflight_covers_auth_shapes_env_cache_and_cli_absence() {
     });
     assert_eq!(absent.exit_code, EXIT_USAGE);
     assert!(!absent.output.cli_present);
+    // v0.9.5: exit 127 + "not found" stderr is classified as cli_not_found (more
+    // specific than the legacy blanket cli_unavailable). SKILL wrappers route
+    // this to `/axhub:install-cli` instead of mixing it with config_corrupted /
+    // runtime_error fixes.
     assert_eq!(
         absent.output.auth_error_code.as_deref(),
-        Some("cli_unavailable")
+        Some("cli_not_found")
     );
     assert_eq!(absent.output.current_app.as_deref(), Some("env-app"));
 
@@ -471,6 +475,13 @@ fn preflight_current_app_prefers_env_manifest_then_cache() {
         r#"{"deployment_id":"dep-1","status":"active","app_slug":"cached-app"}"#,
     )
     .unwrap();
+    // v0.9.5: cache fallback now requires cwd to look like a project directory
+    // (any of .git / package.json / Cargo.toml / apphub.yaml / etc.). Without a
+    // marker the preflight emits current_app=None to avoid stale "현재 앱:
+    // <slug>" rendering in unrelated empty directories. Test cwd is a fresh
+    // tempdir — touch `.git/` so the cache fallback assertions below preserve
+    // their original intent (manifest > env > cache priority resolution).
+    fs::create_dir(".git").unwrap();
 
     let ok_runner = |cmd: &[&str]| match cmd {
         ["axhub", "--version"] => SpawnResult {
@@ -537,6 +548,9 @@ fn preflight_uses_xdg_cache_home_for_last_deploy_cache() {
         r#"{"deployment_id":"dep-xdg","status":"active","app_slug":"xdg-app"}"#,
     )
     .unwrap();
+    // v0.9.5: cache fallback gated on cwd project marker. See sibling test
+    // `preflight_current_app_prefers_env_manifest_then_cache` for context.
+    fs::create_dir(".git").unwrap();
 
     let run = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
