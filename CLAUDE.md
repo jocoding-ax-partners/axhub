@@ -176,13 +176,15 @@ bun run skill:new <slug>
 
 # axhub Release Workflow (Phase 19 v0.1.19+ 자동화)
 
-새 버전 ship 할 때 **반드시** `bun run release` 사용. 직접 `vim package.json` + `git tag` 절대 금지 (drift 위험).
+새 버전 ship 할 때 **반드시** 2단계 flow (`bun run release` → narrative amend → `bun run release:tag`) 사용. 직접 `vim package.json` + `git tag` 절대 금지 (drift 위험).
+
+v0.9.1 이전 flow 는 `commit-and-tag-version` 이 commit + tag 를 동시 생성해서 narrative amend 가 tag 와 분리됐어요 (tag 가 amend 전 commit 가리켜서 release.yml 이 narrative 빈 채로 fire). 이를 막기 위해 `.versionrc.json` 의 `skip.tag=true` + 새 `release:tag` 스크립트로 분리했어요.
 
 ## Always Do
 
-- **MUST `bun run release` 로 자동 bump** — `commit-and-tag-version` (D2) 가 3 파일 (package.json + plugin.json + marketplace.json) bump + postbump hook (codegen:version + release:check) + CHANGELOG entry + git commit + tag 자동 chain.
-- **MUST CHANGELOG 본문 narrative 추가** — auto-bullets 위에 Phase NN 한국어 narrative paragraph (해요체) 작성. `git commit --amend --no-edit -a` 로 tag commit 에 narrative 합침.
-- **MUST `git push origin main --tags`** — release.yml 가 tag push 시 자동 fire (5 cross-arch binary cosign 서명 + GH release upload).
+- **MUST step 1: `bun run release` 로 bump + commit (tag 미생성)** — `commit-and-tag-version` 이 3 파일 (package.json + plugin.json + marketplace.json) bump + postbump hook (codegen:version + release:check) + CHANGELOG entry + git commit 까지만 수행. tag 는 step 3 에서 생성.
+- **MUST step 2: CHANGELOG narrative 추가 + amend** — auto-bullets 위에 Phase NN 한국어 narrative paragraph (해요체) 작성. `git commit --amend --no-edit -a` 로 bump commit 에 narrative 흡수.
+- **MUST step 3: `bun run release:tag` 로 tag 생성 + push** — `scripts/release-tag.ts` 가 (a) CHANGELOG 현 버전 섹션의 narrative 길이 ≥50 chars 검증, (b) working tree clean 검증, (c) HEAD 에 `vX.Y.Z` tag 생성, (d) `git push origin main && git push origin vX.Y.Z` 수행. release.yml 가 narrative 포함된 commit 의 tag push 로 fire.
 - **MUST Conventional Commits** — `feat:` (minor) / `fix:` (patch) / `chore:` (no-bump) / `docs:` / `test:` / `refactor:` / `perf:` (Performance section). commit-and-tag-version 이 type 으로 bump 결정.
 
 ## Release Workflow
@@ -191,7 +193,7 @@ bun run skill:new <slug>
 # 1. clean working tree 확인
 git status
 
-# 2. release 한 줄 (auto-bump from commit history since last tag)
+# 2. step 1 — bump + commit (tag 미생성)
 bun run release
 # 또는 explicit:
 bun run release -- --release-as patch    # 0.1.X → 0.1.X+1
@@ -204,15 +206,20 @@ bun run release -- --release-as 0.1.20   # explicit version
 #  ✓ postbump: codegen:version (install.sh/ps1/index.ts/telemetry.ts 동기화)
 #               + release:check (5 binary build + version assert — v0.1.14 stale binary 재발 방지)
 #  ✓ CHANGELOG.md auto entry (Conventional Commits parse)
-#  ✓ git commit + git tag vX.Y.Z
+#  ✓ git commit (tag 는 안 생성 — .versionrc.json skip.tag=true)
 
-# 3. CHANGELOG narrative 추가 (해요체 1-3 문장)
+# 3. step 2 — CHANGELOG narrative 추가 (해요체 1-3 문장)
 vim CHANGELOG.md   # auto-bullets 위에 Phase NN narrative paragraph + Test baseline + Honest tradeoff sections
-git commit --amend --no-edit -a   # tag commit 에 narrative 흡수
+git commit --amend --no-edit -a   # bump commit 에 narrative 흡수
 
-# 4. push
-git push origin main --tags
-# release.yml 자동 fire — 5 binary cosign 서명 + GH release v0.1.X 생성
+# 4. step 3 — tag 생성 + push
+bun run release:tag
+# 자동 수행:
+#  ✓ CHANGELOG narrative 길이 검증 (50 chars 미만이면 fail)
+#  ✓ working tree clean 검증
+#  ✓ git tag -a vX.Y.Z (HEAD 가리킴)
+#  ✓ git push origin main + git push origin vX.Y.Z
+#  ✓ release.yml 자동 fire — 5 binary cosign 서명 + GH release + Slack narrative
 
 # 5. release 검증
 gh release view vX.Y.Z --json url -q .url
@@ -223,15 +230,19 @@ gh release view vX.Y.Z --json url -q .url
 ```bash
 git commit -am "fix: <urgent issue>"
 bun run release -- --release-as patch
-git push origin main --tags
+# narrative 추가
+vim CHANGELOG.md
+git commit --amend --no-edit -a
+bun run release:tag
 ```
 
 ## Never Do
 
 - NEVER `vim package.json` + `git tag` manual edit. drift + v0.1.14 stale binary 재발 위험.
 - NEVER `git push --force` to main. branch protection + hook block.
-- NEVER skip CHANGELOG narrative — auto-bullets 만으로는 Phase 의미 전달 부족.
-- NEVER tag without push (local-only tag = release.yml 안 fire).
+- NEVER skip CHANGELOG narrative — `release:tag` 가 50 chars 미만 narrative 를 거부해요.
+- NEVER step 1 직후 곧바로 `git push --tags` — tag 가 없어서 release.yml 안 fire. step 3 의 `release:tag` 가 tag 생성 + push 를 한 번에 처리.
+- NEVER tag 를 step 2 의 amend 전에 생성 — v0.9.1 회귀 시나리오. tag 는 narrative amend 후 HEAD 에 만들어야 해요.
 - NEVER use D1 release-please / standard-version / semantic-release — 이미 D2 commit-and-tag-version 결정 (.versionrc.json + ralplan ADR 기록).
 
 ## Self-Check Before Push

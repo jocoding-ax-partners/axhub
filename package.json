@@ -29,6 +29,7 @@
     "release:check": "bun scripts/release-check.ts",
     "verify:user-app-artifact": "bun scripts/verify-user-app-artifact.ts",
     "release": "commit-and-tag-version",
+    "release:tag": "bun scripts/release-tag.ts",
     "skill:new": "bun scripts/skill-new.ts",
     "skill:doctor": "bun scripts/skill-doctor.ts",
     "test": "bun test",
