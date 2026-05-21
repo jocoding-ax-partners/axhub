@@ -4,6 +4,31 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.4](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.3...v0.9.4) (2026-05-21)
+
+v0.9.3 의 후속 hotfix 두 개를 한 패치로 묶었어요. (1) macOS Apple Silicon 환경에서 `/opt/homebrew/bin/axhub` 를 plugin 의 preflight 가 못 찾아서 `cli_present:false` 로 보고하던 회귀를 차단했어요. macOS GUI app subprocess (Claude Code Desktop 포함) 가 shell profile 의 PATH 보완을 inherit 안 하는 Apple side limitation 때문인데, plugin 의 cross-platform support 가 Homebrew 표준 경로 (`/opt/homebrew/bin` Apple Silicon + `/usr/local/bin` Intel) / cargo install (`~/.cargo/bin`) / sh-native non-root (`~/.local/bin`) / Linuxbrew (`/home/linuxbrew/.linuxbrew/bin`) 를 자동 fallback 으로 cover 해요. `default_runner` 가 cmd[0] = bare basename ("axhub") 일 때만 resolved absolute path 로 substitute 하므로 mock-runner 통합 테스트는 그대로 동작해요. (2) v0.9.3 에서 도입한 `CLI_UNAVAILABLE_MESSAGE` 한국어 안내 안의 backtick (`` `/axhub:install-cli` ``) 이 outer `` !`...` `` bash command substitution backtick 과 충돌해서 zsh 가 'unmatched "' 로 parse fail — 결과적으로 `/github` 등 모든 SKILL slash 호출이 cli 미감지 환경에서 깨졌어요. systemMessage 의 backtick 제거 + codegen 으로 15 SKILL + 1 template 일괄 재주입.
+
+### Test baseline
+
+- cargo test -p axhub-helpers: 516 passed / 3 ignored (preflight resolve_axhub_path / fallback list / env override 새 케이스 + 기존 phase_parity mock 10 개 모두 green)
+- bun test: 973/975 pass / 2 fail (pre-existing v0.8.0 ↔ v0.9.x README/PLAN drift, 본 release 무관 — `git stash` 로 재현 확인)
+- bunx tsc --noEmit clean
+- bun run skill:doctor --strict exit 0 (15/15 SKILL preflight byte-identical)
+- bun run lint:tone --strict 0 err / 0 warn
+- bun run lint:keywords --check baseline diff 없음
+- tests/codegen-preflight-injection.test.ts 29/29 pass
+
+### Honest tradeoff
+
+- Apple side 의 GUI PATH limitation (`launchctl config user path` 또는 symlink 로 우회 가능) 자체를 plugin 이 고친 건 아니에요. plugin 은 "흔한 install dir 자동 cover" 라는 macOS / Linux / Windows 표준 패턴 (gh CLI / VSCode 등이 따르는) 을 따라잡았어요.
+- Scoop Windows (`$USERPROFILE/scoop/shims/axhub.exe`) / macports (`/opt/local/bin`) 는 fallback 리스트에 안 포함. 사용자 base 적어서 deferred. 필요 시 별도 patch.
+- backtick 회귀는 v0.9.3 ship 직전 deslop 패스에서 안 잡혔어요 — Shell-safe escaping invariant 가 codegen 단계 자동화 안 돼서 manual review 가 필수 였어요. v0.9.4 에 zsh parse 검증 lint 추가 후보.
+
+### Fixed
+
+* **preflight:** backtick 충돌로 zsh 가 cli_unavailable systemMessage 파싱 fail ([ea7e5ff](https://github.com/jocoding-ax-partners/axhub/commit/ea7e5ffdd0e83dd3f59abda398e0a4af83c5c9a6))
+* **preflight:** macOS Apple Silicon Homebrew + cargo/sh-native PATH fallback search ([16a1340](https://github.com/jocoding-ax-partners/axhub/commit/16a1340e1a853ce8b4b12d1a6c3c1e0db5dfa9ce))
+
 ## [0.9.3](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.2...v0.9.3) (2026-05-21)
 
 세 묶음 변경을 한 패치로 묶었어요. (1) auth SKILL 을 ax-hub-cli `main` 의 새 surface 에 6 user stories (refresh / whoami+me / pat 7-subcommand / login --tenant + --scopes / logout --dry-run / status 새 필드 user_id+name+platform_admin+tenants) 로 정렬했어요. (2) github SKILL 의 Step 4 connect 에 OAuth device flow `verification_uri` + `user_code` 사용자 안내 형식을 명시해서 CLI 가 emit 하는 device code 가 사용자에게 흘러나가도록 했어요 — 안 보여주면 OAuth 가 timeout 으로 멈춰요. (3) preflight `!command` injection codegen 을 고쳤어요: `axhub` CLI 가 PATH 에 없으면 preflight 가 exit 64 + `auth_error_code: cli_unavailable` JSON 을 stdout 으로 emit 하는데, 기존 wrapper 가 비어있는 stderr 만 보고 non-zero exit 를 그대로 propagate 해서 `/github` 같은 슬래시 명령이 "Shell command failed" 로 떨어졌어요. wrapper 의 stdio 를 `['inherit','pipe','pipe']` 로 바꿔 stdout JSON 을 capture + re-emit 한 뒤, `cli_unavailable` 패턴을 감지하면 `/axhub:install-cli` 안내 한국어 systemMessage 로 exit 0 해요. 15 SKILL + 1 template 전체에 codegen 으로 byte-identical 적용했어요.
