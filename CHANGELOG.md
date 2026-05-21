@@ -4,6 +4,20 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.0...v0.9.1) (2026-05-21)
+
+apis 스킬을 플러그인 표면에서 제거한 cleanup 릴리즈예요. `/axhub:apis` 슬래시 명령과 자연어 트리거가 사라져 더 이상 노출되지 않아요. clarify SKILL 의 disambiguation 메뉴 / deploy nl-lexicon / help.md / README / vibe-coder-quickstart / ADR-0011 인벤토리가 28 SKILL + 9 command 로 일관 동기화 됐어요. 테스트는 manifest / corpus-schema / ux-argument-hints / e2e-claude-cli-registry / codegen-preflight-injection (TARGETS 16→15) 의 어설션, baseline-results 의 apis fired_skill 행 4건씩, fixtures / OMC 키워드 베이스라인까지 한 번에 갱신했어요. hub-side `axhub apis` CLI subcommand 인프라 (Rust `apis_call` consent action, mock-hub `/v1/apis`, admin policy docs, OAuth `apis:read` scope) 는 그대로 유지해서 CLI 호출 layer 는 손상 없어요.
+
+### Test baseline
+
+- bun test: 973/975 pass / 2 fail (pre-existing v0.8.0 ↔ v0.9.0 README/PLAN 버전 drift, apis 무관 — `git stash` 로 재현 확인)
+- cargo test: 512 pass / 3 ignored (29 suites)
+- skill:doctor --strict / lint:tone --strict / lint:keywords --check / tsc --noEmit 모두 green
+
+### Honest tradeoff
+
+apis 스킬을 제거하면서 인접 시그널 (clarify routing, deploy nl-lexicon, OMC keyword baseline) 까지 같이 잠가야 했어요. user confirm 으로 hub-side CLI 인프라는 보존 결정 — 그래서 `apis_call` consent / mock-hub / admin docs 가 살아있는데, 정작 user-facing entry 가 없는 상태가 됐어요. 추후 apis CLI 자체도 sunset 결정되면 별도 PR 로 B 카테고리 (Rust consent + admin docs + catalog data) 일괄 정리가 필요해요.
+
 ## [0.9.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.8.0...v0.9.0) (2026-05-19)
 
 axhub plugin 의 OS-conditional shell wrapper 5쌍 (~1100 LOC) 을 Rust `axhub-helpers` subcommand 로 흡수한 sh/ps1 absorption 릴리즈예요. plan-ceo-review + plan-eng-review + codex outside voice (18 finding, 6 cross-model tension) + feature-dev:code-reviewer (5 issues) 모두 통과한 8 task + 3 follow-up 통합 ship 이에요. Windows 사용자가 처음으로 deploy SKILL Step 3.5 의 `token-freshness gate` 와 `auth-refresh-bg detach` chain 을 정상 동작하게 됐어요 (Windows parity gap #1, #2 동시 해소). `session-start-autowire.{sh,ps1}` wrapper 가 130/158 줄 → 40/55 줄로 줄어들어 OS 분기가 `cfg!(target_os)` 단일 위치에 응집했어요. `_AXHUB_DISCLOSURE_VER` 가 v0.5.13 에서 v0.8.0 까지 drift 했던 문제도 `codegen-install-version.ts` 가 release version 과 자동 sync 하도록 잠갔어요.
