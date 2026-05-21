@@ -24,8 +24,23 @@ describe("getPreflightInjectionLine — deterministic + structure", () => {
     expect(getPreflightInjectionLine()).toMatch(/^!`node -e "/);
   });
 
-  test("uses stdio pipe for stderr capture (ADR-0011 §검증된 가정 #2)", () => {
-    expect(getPreflightInjectionLine()).toContain("'inherit','inherit','pipe'");
+  test("uses stdio pipe for stdout + stderr capture (cli_unavailable detection + ADR-0011 §검증된 가정 #2)", () => {
+    // v0.9.3: stdout switched from inherit to pipe so we can detect
+    // auth_error_code:"cli_unavailable" in the preflight JSON and emit a friendly
+    // systemMessage instead of letting Claude Code surface a generic "Shell command failed"
+    // when axhub CLI is missing. stdout is re-emitted via process.stdout.write(stdoutText)
+    // so SKILL preprocessing still sees the JSON payload.
+    expect(getPreflightInjectionLine()).toContain("'inherit','pipe','pipe'");
+    expect(getPreflightInjectionLine()).toContain("process.stdout.write(stdoutText)");
+  });
+
+  test("contains cli_unavailable branch with install-cli systemMessage", () => {
+    const line = getPreflightInjectionLine();
+    expect(line).toContain("cliUnavailableRegex");
+    expect(line).toContain("auth_error_code");
+    expect(line).toContain("cli_unavailable");
+    expect(line).toContain("axhub CLI 가 감지 안 돼요");
+    expect(line).toContain("/axhub:install-cli");
   });
 
   test("contains strict-anchor denialRegex (ADR-0010 §42 Pattern relaxation 비채택)", () => {

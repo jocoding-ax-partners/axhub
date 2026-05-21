@@ -27,6 +27,9 @@ const REPO_ROOT = join(import.meta.dir, "..");
 const SYSTEM_MESSAGE =
   "[axhub] 첫 실행이라 권한이 필요해요. Claude Code 가 'axhub-helpers preflight' 실행 허용을 묻는 prompt 가 떠요. '허용' 을 누르면 다음부터 자동으로 진행돼요. (한 번만 진행하면 돼요)";
 
+const CLI_UNAVAILABLE_MESSAGE =
+  "[axhub] axhub CLI 가 감지 안 돼요. `/axhub:install-cli` 로 OS 별 공식 설치 채널을 안내받거나 `/axhub:doctor` 로 진단해주세요. (SKILL 흐름은 그대로 진행할 수 있어요 — preflight 가 cli_unavailable 만 알려준 거예요.)";
+
 /**
  * Builds the single-line Node runner used as the `!command` injection body for
  * **lite-variant** SKILLs (14 SKILL + 1 template).
@@ -45,14 +48,18 @@ export function getLiteInjectionLine(): string {
     "const cp=require('child_process');",
     "const env={...process.env};",
     "const helper='${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers';",
-    "const result=cp.spawnSync(helper,['preflight','--json'],{stdio:['inherit','inherit','pipe'],env});",
+    "const result=cp.spawnSync(helper,['preflight','--json'],{stdio:['inherit','pipe','pipe'],env});",
+    "const stdoutText=String(result.stdout??'');",
     "const stderrText=String(result.stderr??'');",
+    "if(stdoutText.length>0){process.stdout.write(stdoutText);}",
     "const denialRegex=/^(?:Shell|Bash) command permission check failed.*requires approval/im;",
+    "const cliUnavailableRegex=/\\\"auth_error_code\\\":\\\"cli_unavailable\\\"/;",
     // PR #99 security M2: redact common secret token patterns from stderr passthrough.
     // Prevents accidental leak when helper emits RUST_LOG=debug, dependency panic, or
     // transport debug output containing API keys / OAuth tokens to the Claude Code chat surface.
     "const redactRe=/(sk-[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9]{36}|axhub_[A-Za-z0-9]{32,}|Bearer\\\\s+[A-Za-z0-9._~+\\\\/-]+=*)/g;",
     `if(result.error||(result.status!==0&&denialRegex.test(stderrText))){console.log(JSON.stringify({systemMessage:\\"${SYSTEM_MESSAGE}\\"}));process.exit(0)}`,
+    `else if(result.status!==0&&cliUnavailableRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\\"${CLI_UNAVAILABLE_MESSAGE}\\"}));process.exit(0)}`,
     "else if(stderrText.length>0){process.stderr.write(stderrText.replace(redactRe,'<redacted>'))}",
     "process.exit(typeof result.status==='number'?result.status:0)",
   ].join("");
@@ -83,12 +90,16 @@ export function getDeployInjectionLine(): string {
     "if(root.length===0&&fs.existsSync(path.resolve('bin',isWin?'axhub-helpers.exe':'axhub-helpers')))root=process.cwd();",
     "if(root.length>0){env.CLAUDE_PLUGIN_ROOT=root;env[pathKey]=path.join(root,'bin')+path.delimiter+(env[pathKey]||'');}",
     "const helper=root.length>0?path.join(root,'bin',isWin?'axhub-helpers.exe':'axhub-helpers'):(isWin?'axhub-helpers.exe':'axhub-helpers');",
-    "const result=cp.spawnSync(helper,['preflight','--json'],{stdio:['inherit','inherit','pipe'],env});",
+    "const result=cp.spawnSync(helper,['preflight','--json'],{stdio:['inherit','pipe','pipe'],env});",
+    "const stdoutText=String(result.stdout??'');",
     "const stderrText=String(result.stderr??'');",
+    "if(stdoutText.length>0){process.stdout.write(stdoutText);}",
     "const denialRegex=/^(?:Shell|Bash) command permission check failed.*requires approval/im;",
+    "const cliUnavailableRegex=/\\\"auth_error_code\\\":\\\"cli_unavailable\\\"/;",
     // PR #99 security M2: same redaction as lite variant — secret token leak prevention.
     "const redactRe=/(sk-[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9]{36}|axhub_[A-Za-z0-9]{32,}|Bearer\\\\s+[A-Za-z0-9._~+\\\\/-]+=*)/g;",
     `if(result.error||(result.status!==0&&denialRegex.test(stderrText))){console.log(JSON.stringify({systemMessage:\\"${SYSTEM_MESSAGE}\\"}));process.exit(0)}`,
+    `else if(result.status!==0&&cliUnavailableRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\\"${CLI_UNAVAILABLE_MESSAGE}\\"}));process.exit(0)}`,
     "else if(stderrText.length>0){process.stderr.write(stderrText.replace(redactRe,'<redacted>'))}",
     "process.exit(typeof result.status==='number'?result.status:0)",
   ].join("");

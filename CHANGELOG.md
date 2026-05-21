@@ -4,6 +4,40 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.3](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.2...v0.9.3) (2026-05-21)
+
+세 묶음 변경을 한 패치로 묶었어요. (1) auth SKILL 을 ax-hub-cli `main` 의 새 surface 에 6 user stories (refresh / whoami+me / pat 7-subcommand / login --tenant + --scopes / logout --dry-run / status 새 필드 user_id+name+platform_admin+tenants) 로 정렬했어요. (2) github SKILL 의 Step 4 connect 에 OAuth device flow `verification_uri` + `user_code` 사용자 안내 형식을 명시해서 CLI 가 emit 하는 device code 가 사용자에게 흘러나가도록 했어요 — 안 보여주면 OAuth 가 timeout 으로 멈춰요. (3) preflight `!command` injection codegen 을 고쳤어요: `axhub` CLI 가 PATH 에 없으면 preflight 가 exit 64 + `auth_error_code: cli_unavailable` JSON 을 stdout 으로 emit 하는데, 기존 wrapper 가 비어있는 stderr 만 보고 non-zero exit 를 그대로 propagate 해서 `/github` 같은 슬래시 명령이 "Shell command failed" 로 떨어졌어요. wrapper 의 stdio 를 `['inherit','pipe','pipe']` 로 바꿔 stdout JSON 을 capture + re-emit 한 뒤, `cli_unavailable` 패턴을 감지하면 `/axhub:install-cli` 안내 한국어 systemMessage 로 exit 0 해요. 15 SKILL + 1 template 전체에 codegen 으로 byte-identical 적용했어요.
+
+### Test baseline
+
+- bun test: 973/975 pass / 2 fail (pre-existing v0.8.0 ↔ v0.9.x README/PLAN drift, 본 release 와 무관 — `git stash` 로 재현 확인)
+- bunx tsc --noEmit clean
+- bun run skill:doctor --strict exit 0 (15/15 SKILL preflight byte-identical 통과)
+- bun run lint:tone --strict 0 err / 0 warn (43 files)
+- bun run lint:keywords --check baseline diff 없음
+- tests/codegen-preflight-injection.test.ts 29/29 pass (new cli_unavailable branch + stdio pipe 보강)
+- tests/e2e-claude-cli-registry.test.ts 5/5 pass (41 → 42 entry, auth PAT revoke 추가)
+- tests/manifest.test.ts 172/172 pass (auth logout AskUserQuestion-before-command contract 포함)
+- tests/ux-ask-fallback-registry.test.ts 37/37 pass
+
+### Honest tradeoff
+
+- preflight wrapper 가 stdout 을 capture 하면서 즉시 re-emit 해서 SKILL preprocessing 이 보는 JSON payload 는 그대로지만, 큰 stdout 케이스에서 wrapper memory 가 살짝 늘어요 (preflight 출력은 항상 1 줄 JSON ~수백 byte 라 실제 영향 없음).
+- cli_unavailable 감지 로직은 stdout 정규식 매칭이라 미래에 preflight JSON shape 가 바뀌면 fragile 해요. axhub-helpers 의 `auth_error_code: cli_unavailable` literal 이 source of truth — 바뀌면 codegen 도 같이 갱신 필요해요.
+- routing-drift gate 는 SKILL description 무변경이라 `[skip-routing-gate]` 로 의도 표시했어요.
+
+### Changed
+
+* auth skill 을 ax-hub-cli 의 새 auth surface 에 정렬 ([#118](https://github.com/jocoding-ax-partners/axhub/issues/118)) ([7f1e8ab](https://github.com/jocoding-ax-partners/axhub/commit/7f1e8ab0d8260293532ae440395c20c00fa8197b))
+
+### Fixed
+
+* **preflight:** cli_unavailable 일 때 `/github` 등 SKILL slash 가 "Shell command failed" 로 떨어지던 회귀 — wrapper stdio pipe + cli_unavailable detection branch 추가 (codegen 으로 15 SKILL + 1 template 일괄 적용)
+
+### Docs
+
+* **github:** OAuth device flow URL + user_code 안내 추가 ([499f6dd](https://github.com/jocoding-ax-partners/axhub/commit/499f6ddbe1e209c71319f2ad5babf251ac649b31))
+
 ## [0.9.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.1...v0.9.2) (2026-05-21)
 
 ax-hub-cli `main` 에서 GitHub 연결 surface 가 `axhub github connect|disconnect|repos list` → `axhub apps git connect|status|disconnect` 로 이동했어요 (구 명령은 exit 7 `GITHUB_CMD_DEPRECATED` 로 거절). github SKILL 의 Step 3/3.5/4/5 호출을 새 명령어로 마이그레이션 했고, dry-run 이 기본이라 mutate 시 `--execute` 명시가 필수 예요. `--account` 가 사라지고 `--installation-id` 가 옵션이 됐고 OAuth device flow 는 CLI 내부에서 처리해요. consent-mint payload 의 action 이름 (`github_connect`/`github_disconnect`) 은 `axhub-helpers` consent schema 의 hard-coded 이름이라 그대로 유지했어요. 의존 surface (deploy SKILL Step 6 github blocker / 5 test 파일 / e2e case 35 fake-axhub shim + argv.trace) 도 같이 갱신했어요.

@@ -87,14 +87,15 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("41 actual safe_default rationale 엔트리 including Phase 26 quality + Plan v6 diagnose", () => {
+  test("42 actual safe_default rationale 엔트리 including Phase 26 quality + Plan v6 diagnose + v0.9.3 auth PAT revoke", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(41);
+    expect(paths).toHaveLength(42);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
       "apps",
       "apps",
+      "auth",
       "auth",
       "auth",
       "axhub-debug",
@@ -141,6 +142,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     const auth = registry["auth"] as Record<string, SafeDefaultEntry>;
     expect(auth["다시 로그인할래요?"]?.safe_default).toBe("abort");
     expect(auth["로그아웃할래요?"]?.safe_default).toBe("abort");
+    expect(auth["PAT <id> 를 폐기할까요?"]?.safe_default).toBe("abort");
 
     const recover = registry["recover"] as Record<string, SafeDefaultEntry>;
     expect(
