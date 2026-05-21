@@ -28,7 +28,7 @@ const SYSTEM_MESSAGE =
   "[axhub] 첫 실행이라 권한이 필요해요. Claude Code 가 'axhub-helpers preflight' 실행 허용을 묻는 prompt 가 떠요. '허용' 을 누르면 다음부터 자동으로 진행돼요. (한 번만 진행하면 돼요)";
 
 const CLI_UNAVAILABLE_MESSAGE =
-  "[axhub] axhub CLI 가 감지 안 돼요. `/axhub:install-cli` 로 OS 별 공식 설치 채널을 안내받거나 `/axhub:doctor` 로 진단해주세요. (SKILL 흐름은 그대로 진행할 수 있어요 — preflight 가 cli_unavailable 만 알려준 거예요.)";
+  "[axhub] axhub CLI 가 감지 안 돼요. /axhub:install-cli 로 OS 별 공식 설치 채널을 안내받거나 /axhub:doctor 로 진단해주세요. (SKILL 흐름은 그대로 진행할 수 있어요 — preflight 가 cli_unavailable 만 알려준 거예요.)";
 
 /**
  * Builds the single-line Node runner used as the `!command` injection body for
