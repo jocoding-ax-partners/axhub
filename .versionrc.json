@@ -28,10 +28,10 @@
   ],
   "scripts": {
     "postbump": "bun run codegen:version && bun run release:check && git add bin/install.sh bin/install.ps1 Cargo.toml Cargo.lock",
-    "posttag": "echo '\\n다음 단계: git push origin main --tags  → release.yml 가 자동 fire 돼요.\\nCHANGELOG 본문은 tag 생성 전에 사람이 작성해야 해요 (해요체 narrative).'"
+    "postchangelog": "echo '\\n[release step 1/2 완료] CHANGELOG bump commit 생성됨 (tag 미생성).\\n\\n다음:\\n  1. CHANGELOG.md 의 ## [신버전] 섹션 아래에 해요체 narrative paragraph 추가\\n  2. git commit --amend --no-edit -a  (narrative 를 bump commit 에 흡수)\\n  3. bun run release:tag  (HEAD 에 tag 생성 + push --tags)\\n\\nrelease.yml 은 step 3 의 tag push 가 narrative 포함된 commit 가리킬 때 fire 돼서 GitHub release body + Slack narrative 가 비지 않아요.'"
   },
   "skip": {
     "commit": false,
-    "tag": false
+    "tag": true
   }
 }
