@@ -10,7 +10,7 @@ describe("github SKILL Step 2 — option set membership lock (Plan F′ regressi
 
   test("Step 2 fenced JSON block has exactly 3 options (list_only / connect / disconnect)", () => {
     const startMarker = "2. **작업을 고르게 해요.**";
-    const endMarker = "3. **repo 목록은 read-only 로 실행해요.**";
+    const endMarker = "3. **현재 연결 상태를 read-only 로 확인해요.**";
     const startIdx = content.indexOf(startMarker);
     const endIdx = content.indexOf(endMarker);
     expect(startIdx).toBeGreaterThan(-1);
@@ -32,7 +32,7 @@ describe("github SKILL Step 2 — option set membership lock (Plan F′ regressi
 
   test("no '지금은 스킵' or 'skip' option appears as an actual JSON option in Step 2", () => {
     const startMarker = "2. **작업을 고르게 해요.**";
-    const endMarker = "3. **repo 목록은 read-only 로 실행해요.**";
+    const endMarker = "3. **현재 연결 상태를 read-only 로 확인해요.**";
     const slice = content.slice(content.indexOf(startMarker), content.indexOf(endMarker));
     expect(slice).not.toMatch(/"label":\s*"지금은 스킵"/);
     expect(slice).not.toMatch(/"value":\s*"skip"/);

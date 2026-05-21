@@ -830,15 +830,15 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(github).toContain('"action":"github_connect"');
     expect(github).toContain('"branch":"${BRANCH}"');
     expect(github).toContain('"context":{"repo":"${OWNER_REPO}","branch":"${BRANCH}","account":"${ACCOUNT}"}');
-    expect(github).toContain('axhub github connect "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --account "$ACCOUNT" --json');
+    expect(github).toContain('axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json');
     expect(github).toContain('"action":"github_disconnect"');
     expect(github).toContain('"context":{"slug":"${APP_ID_OR_SLUG}"}');
-    expect(github).toContain('axhub github disconnect "$APP_ID" --force --confirm "$APP_ID" --json');
+    expect(github).toContain('axhub apps git disconnect --app "$APP_ID" --execute --json');
     expect(github).toContain("PATH 의 `axhub-helpers`");
     expect(github).toContain("GitHub 연결 링크: <install_url>");
-    expect(github).toContain("axhub github repos list --json");
+    expect(github).toContain('axhub apps git status --app "$APP_ID" --json');
     expect(github).toContain("NEVER `CLAUDE_PLUGIN_ROOT` 누락");
-    expect(github).not.toContain("! axhub github connect");
+    expect(github).not.toContain("! axhub apps git connect");
   });
 
   test("github skill locks guided repo setup capability ladder and consent gates", () => {
@@ -846,7 +846,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(github).toContain("Strict guided capability ladder");
     expect(github).toContain("read-only git inspect");
     expect(github).toContain("parse existing remote");
-    expect(github).toContain('axhub github repos list --account "$ACCOUNT" --json');
+    expect(github).toContain('axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --json');
     expect(github).toContain("gh repo create");
     expect(github).toContain("gh exists/authenticated");
     expect(github).toContain("owner-repo-visibility confirmed");

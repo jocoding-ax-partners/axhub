@@ -625,16 +625,16 @@ To deploy:
 
      ```bash
      echo '[deploy:Step 6 github-link] entered' >&2
-     axhub github repos list --json
+     axhub apps git status --app "$APP_ID" --json
      ```
 
      Render the first `install_url` from that output as `GitHub 연결 링크: <install_url>` so the user can grant repo access directly. If the repo itself does not exist yet, also show `GitHub repo 만들기: https://github.com/new?name=$APP_SLUG` as context only. Then route into `skills/github/SKILL.md` guided setup/connect; do not end with a manual connect command as the next step. GitHub guided setup/connect owns repo create, remote add, first push, and connect consent.
 
      ```bash
-     axhub github connect "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --account "$ACCOUNT" --json
+     axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json
      ```
 
-     Do not present the command above as the user's next manual command. It is the final command that the GitHub skill may run only after its guided ladder verifies repo visibility and mints consent. If the account is already installed and the desired repo appears in `axhub github repos list --account "$ACCOUNT" --json`, tell the user the repo is ready and route directly to `skills/github/SKILL.md` Step 4 consent-connect without another yes/no handoff.
+     Do not present the command above as the user's next manual command. It is the final command that the GitHub skill may run only after its guided ladder verifies repo visibility and mints consent. If the account is already installed and the desired repo appears in `axhub apps git status --app "$APP_ID" --json` (or dry-run `axhub apps git connect`), tell the user the repo is ready and route directly to `skills/github/SKILL.md` Step 4 consent-connect without another yes/no handoff.
    - exit 65 → token expired template + AskUserQuestion to run auth login
    - exit 67 → resource not found + did-you-mean suggestion from apps list
    - exit 68 → rate limit + Retry-After backoff

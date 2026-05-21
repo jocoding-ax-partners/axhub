@@ -20,7 +20,7 @@ model: sonnet
 
 # GitHub
 
-axhub 앱과 GitHub repo 연결 상태를 안전하게 확인하고 connect/disconnect 를 consent 로 보호해요.
+axhub 앱과 GitHub repo 연결 상태를 안전하게 확인하고 connect/disconnect 를 consent 로 보호해요. CLI 는 `axhub apps git` 서브커맨드로 이동했어요 (구 `axhub github` 는 exit 7 GITHUB_CMD_DEPRECATED 로 거절돼요).
 
 ## Workflow
 
@@ -54,26 +54,20 @@ To connect GitHub:
      "question": "GitHub 연동 작업을 고를까요?",
      "header": "GitHub",
      "options": [
-       {"label": "목록만", "value": "list_only", "description": "연결할 수 있는 GitHub 저장소 목록을 봐요"},
+       {"label": "현재 상태", "value": "list_only", "description": "앱의 현재 GitHub 연결 상태를 봐요"},
        {"label": "연결", "value": "connect", "description": "앱에 GitHub 저장소를 연결해요"},
        {"label": "연결 해제", "value": "disconnect", "description": "exact confirm 과 consent 가 필요해요"}
      ]
    }
    ```
 
-3. **repo 목록은 read-only 로 실행해요.**
+3. **현재 연결 상태를 read-only 로 확인해요.**
 
    ```bash
-   axhub github repos list --account "$ACCOUNT" --json
+   axhub apps git status --app "$APP_ID" --json
    ```
 
-   If the user has not picked an account yet, first run:
-
-   ```bash
-   axhub github repos list --json
-   ```
-
-   If the output contains `install_url`, show it immediately as `GitHub 연결 링크: <install_url>`. Do not ask the user to invoke another slash command just to see the link. If `installed:false` or no repo list is available for the desired account, stop after showing the link and the account name. If the account is installed, continue to Step 4 with the selected `OWNER_REPO`, `BRANCH`, and `ACCOUNT`.
+   출력에 `install_url` 이 들어 있으면 즉시 `GitHub 연결 링크: <install_url>` 로 안내해요. 다른 슬래시 커맨드 호출을 요구하지 마세요. 연결이 아직 없으면 status 가 404 / `git_connection` not_found 를 반환해요 — 이 경우 install_url 안내 후 Step 4 consent-connect 로 진행해요. 연결이 이미 있으면 `repo_full_name` / `branch` / `installation_id` 를 사용자에게 보여줘요.
 
 3.5. **Strict guided capability ladder for missing repo/remote/push.** Stay inside this ladder and stop on every unsupported gap. Do not skip ahead to connect while GitHub cannot see the repo.
 
@@ -88,13 +82,13 @@ To connect GitHub:
 
       parse existing remote from `origin`/first GitHub remote when present. If no remote exists, derive only a suggested `OWNER_REPO` from the confirmed account and folder name; never treat it as confirmed.
 
-   2. **Verify remote visibility in axhub before mutating.**
+   2. **Verify remote visibility in axhub before mutating.** Run dry-run connect — `axhub apps git connect` 는 `--execute` 없이 호출하면 dry-run 이라 OAuth/installation 검증만 수행하고 mutate 하지 않아요.
 
       ```bash
-      axhub github repos list --account "$ACCOUNT" --json
+      axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --json
       ```
 
-      If `OWNER_REPO` appears, continue toward connect. If it does not appear, do not connect yet.
+      dry-run 결과의 `installation_id` + `repo_full_name` 이 채워지면 visibility 확인됨 — Step 4 consent-connect 로 진행해요. dry-run 이 install_url 을 emit 하거나 `not_in_installation` 류 에러를 내면 Step 3.5 의 다음 단계 (repo 생성 / remote 추가 / push) 로 내려가요.
 
    3. **Create repo only when every gate is true:** gh exists/authenticated (`gh auth status` succeeds for the target host/account), owner-repo-visibility confirmed by the user, visibility is explicit (`private`/`public`), and the user consents. If any gate is missing, stop with an unsupported gap and show the smallest next manual action.
 
@@ -109,7 +103,7 @@ To connect GitHub:
       }
       ```
 
-      Only after `create`, run a concrete `gh repo create "$OWNER_REPO" --private|--public` command that matches the confirmed visibility. Then re-list after create/push with `axhub github repos list --account "$ACCOUNT" --json`. If the repo still does not appear, stop with the install/access gap.
+      Only after `create`, run a concrete `gh repo create "$OWNER_REPO" --private|--public` command that matches the confirmed visibility. Then re-list after create/push with `axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --json` (dry-run). If the repo still does not appear, stop with the install/access gap.
 
    4. **Add remote only with separate consent.**
 
@@ -139,7 +133,7 @@ To connect GitHub:
       }
       ```
 
-      If the user consents, run `git push -u origin "$BRANCH"`. Then re-list after create/push with `axhub github repos list --account "$ACCOUNT" --json` before connect.
+      If the user consents, run `git push -u origin "$BRANCH"`. Then re-list after create/push with `axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --json` (dry-run) before connect.
 
    6. **Connect only after the repo is visible and with separate consent.**
 
@@ -168,10 +162,10 @@ To connect GitHub:
    {"tool_call_id":"pending","action":"github_connect","app_id":"${APP_ID}","profile":"","branch":"${BRANCH}","commit_sha":"","context":{"repo":"${OWNER_REPO}","branch":"${BRANCH}","account":"${ACCOUNT}"}}
    JSON
 
-   axhub github connect "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --account "$ACCOUNT" --json
+   axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json
    ```
 
-   `consent-mint` 에 `action=github_connect`, top-level `app_id`, `context={repo,branch,account}` 를 넣어요. GitHub App 설치가 없다는 응답이면 install URL 만 안내해요.
+   `consent-mint` 에 `action=github_connect`, top-level `app_id`, `context={repo,branch,account}` 를 넣어요. `axhub apps git connect` 가 `--execute` 없이 호출되면 dry-run 이라 mutate 하지 않아요 — 실제 연결은 `--execute` 가 필요해요. GitHub App 설치 / installation 다중 후보가 있으면 CLI 가 자동 OAuth device flow 로 처리하고, 안 되면 install_url 을 emit 해요. `installation_id` 가 여러 개로 모호하면 `--installation-id <id>` 로 disambiguate 해요.
    `CLAUDE_PLUGIN_ROOT` 가 훅 환경에 없더라도 사용자에게 수동 실행이나 bang-prefixed connect 우회를 요청하지 말고, PATH 의 `axhub-helpers` 로 pending token 을 민 뒤 같은 흐름에서 top-level Bash 로 connect 를 실행해요.
 
 5. **disconnect 는 exact confirm 후 실행해요.**
@@ -187,10 +181,10 @@ To connect GitHub:
    {"tool_call_id":"pending","action":"github_disconnect","app_id":"${APP_ID}","profile":"","branch":"","commit_sha":"","context":{"slug":"${APP_ID_OR_SLUG}"}}
    JSON
 
-   axhub github disconnect "$APP_ID" --force --confirm "$APP_ID" --json
+   axhub apps git disconnect --app "$APP_ID" --execute --json
    ```
 
-   `consent-mint` 에 `action=github_disconnect`, top-level `app_id`, `context={slug}` 를 넣어요.
+   `consent-mint` 에 `action=github_disconnect`, top-level `app_id`, `context={slug}` 를 넣어요. `--execute` 없이는 dry-run 이라 mutate 하지 않아요. 구 `--force` / `--confirm` 플래그는 제거됐어요.
 
 ## NEVER
 
@@ -199,4 +193,6 @@ To connect GitHub:
 - NEVER disconnect 를 subprocess 에서 자동 실행하지 않아요.
 - NEVER `CLAUDE_PLUGIN_ROOT` 누락을 이유로 사용자에게 bang-prefixed connect 수동 우회를 요청하지 않아요.
 - NEVER `--json` 을 빼지 않아요.
+- NEVER 구 `axhub github connect|disconnect|repos list` 명령어를 호출하지 않아요. exit 7 GITHUB_CMD_DEPRECATED 로 거절돼요. 항상 `axhub apps git connect|disconnect|status` 를 써요.
+- NEVER `axhub apps git connect|disconnect` 를 `--execute` 없이 mutate 한다고 가정하지 않아요. dry-run 이 기본이라 `--execute` 가 빠지면 backend mutation 은 발생 안 해요.
 - NEVER add a 4th option (e.g. "지금은 스킵") to Step 2 의 AskUserQuestion. backend 가 git_connection_required (HTTP 422) 로 거절해요. options 는 정확히 3개: list_only / connect / disconnect.

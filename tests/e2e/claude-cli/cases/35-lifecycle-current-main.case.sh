@@ -46,12 +46,12 @@ if [ "${1:-}" = "apps" ] && [ "${2:-}" = "create" ]; then
   echo '{"id":42,"slug":"paydrop"}'
   exit 0
 fi
-if [ "${1:-}" = "github" ] && [ "${2:-}" = "repos" ] && [ "${3:-}" = "list" ]; then
-  echo '{"repositories":[{"full_name":"jocoding/paydrop"}]}'
+if [ "${1:-}" = "apps" ] && [ "${2:-}" = "git" ] && [ "${3:-}" = "status" ]; then
+  echo '{"repo_full_name":"jocoding/paydrop","branch":"main","installation_id":123}'
   exit 0
 fi
-if [ "${1:-}" = "github" ] && [ "${2:-}" = "connect" ]; then
-  echo '{"ok":true,"repo":"jocoding/paydrop","branch":"main"}'
+if [ "${1:-}" = "apps" ] && [ "${2:-}" = "git" ] && [ "${3:-}" = "connect" ]; then
+  echo '{"ok":true,"repo_full_name":"jocoding/paydrop","branch":"main"}'
   exit 0
 fi
 if [ "${1:-}" = "env" ] && [ "${2:-}" = "set" ]; then
@@ -103,8 +103,8 @@ preflight_expect_no_forced_route "결과 봐" open || FAIL=1
   SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" init --from-template nextjs-axhub --json > "$CASE_DIR/init.json"
   test -f apphub.yaml || exit 1
   SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" apps create --from-file apphub.yaml --yes --json > "$CASE_DIR/apps-create.json"
-  SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" github repos list --account jocoding --json > "$CASE_DIR/github-repos.json"
-  SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" github connect paydrop --repo jocoding/paydrop --branch main --account jocoding --json > "$CASE_DIR/github-connect.json"
+  SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" apps git status --app paydrop --json > "$CASE_DIR/github-repos.json"
+  SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" apps git connect --app paydrop --repo jocoding/paydrop --branch main --execute --json > "$CASE_DIR/github-connect.json"
   SECRET='postgres://user:super-secret-lifecycle-value@localhost/db'
   printf '%s' "$SECRET" | SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" env set DATABASE_URL --app paydrop --from-stdin --json > "$CASE_DIR/env-set.json"
   if grep -F -q 'super-secret-lifecycle-value' "$TRACE"; then
