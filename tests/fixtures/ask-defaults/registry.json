@@ -90,6 +90,14 @@
         "abort",
         "진행"
       ]
+    },
+    "PAT <id> 를 폐기할까요?": {
+      "safe_default": "abort",
+      "rationale": "PAT revoke is destructive (backend revoke + keychain delete + active-PAT clear). Subprocess/non-interactive mode must not revoke automatically — abort and instruct the user to re-run interactively with the PAT id.",
+      "allowed_safe_defaults": [
+        "abort",
+        "진행"
+      ]
     }
   },
   "recover": {
