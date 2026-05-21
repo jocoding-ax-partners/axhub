@@ -25,7 +25,31 @@ pub struct SpawnResult {
 }
 
 pub fn default_runner(cmd: &[&str]) -> SpawnResult {
-    match crate::spawn::spawn_sync(cmd) {
+    // Production-spawn path resolution: when cmd[0] is the bare axhub basename
+    // ("axhub" / "axhub.exe"), substitute the resolved absolute path discovered via
+    // PATH search + well-known fallback dirs (Apple Silicon Homebrew, cargo bin,
+    // sh-native `~/.local/bin`, etc.). macOS GUI subprocesses inherit a stripped PATH
+    // that misses these locations, which is why pre-v0.9.4 preflight reported
+    // `cli_present: false` for users who had installed via Homebrew. Test paths use
+    // mock runners and never enter this branch, so integration mocks still match
+    // ["axhub", ...] literals.
+    let resolved;
+    let effective: Vec<&str> = if !cmd.is_empty()
+        && (cmd[0] == "axhub" || cmd[0] == "axhub.exe")
+    {
+        match resolve_axhub_path() {
+            Some(path) => {
+                resolved = path;
+                std::iter::once(resolved.as_str())
+                    .chain(cmd.iter().skip(1).copied())
+                    .collect()
+            }
+            None => cmd.to_vec(),
+        }
+    } else {
+        cmd.to_vec()
+    };
+    match crate::spawn::spawn_sync(&effective) {
         Ok(result) => SpawnResult {
             exit_code: result.exit_code.unwrap_or(1),
             stdout: result.stdout,
@@ -39,8 +63,66 @@ pub fn default_runner(cmd: &[&str]) -> SpawnResult {
     }
 }
 
+/// Logical name used in mock-runner pattern matching (preflight integration tests).
+/// Production callers always go through `default_runner` which substitutes the resolved
+/// absolute path right before `Command::new(...)` so real spawns can find the binary
+/// outside the inherited PATH (e.g. macOS GUI subprocess that lacks `/opt/homebrew/bin`).
 pub fn axhub_bin() -> String {
     std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string())
+}
+
+#[cfg(windows)]
+pub const AXHUB_BIN_NAME: &str = "axhub.exe";
+#[cfg(not(windows))]
+pub const AXHUB_BIN_NAME: &str = "axhub";
+
+/// Search for `axhub` binary on PATH plus well-known OS fallback locations.
+///
+/// macOS GUI app subprocesses (incl. Claude Code Desktop) don't inherit shell-profile
+/// PATH additions like `/opt/homebrew/bin` (Apple Silicon Homebrew, default since 2020)
+/// or `~/.cargo/bin` (cargo install). When `axhub` is installed via Homebrew or cargo,
+/// the inherited PATH may not contain the install directory, so `Command::new("axhub")`
+/// fails with "command not found" even though the binary is on disk. This fallback
+/// search supplements PATH with common install locations so preflight reports
+/// `cli_present: true` when the CLI is reachable from any standard install path.
+///
+/// Returns the first absolute path that exists, else `None` (caller keeps bare basename
+/// — spawn proceeds with PATH semantics so test mocks that match `["axhub", ...]` work).
+pub fn resolve_axhub_path() -> Option<String> {
+    if let Some(path) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&path) {
+            let candidate = dir.join(AXHUB_BIN_NAME);
+            if candidate.is_file() {
+                return Some(candidate.to_string_lossy().into_owned());
+            }
+        }
+    }
+    for candidate in fallback_axhub_paths() {
+        if candidate.is_file() {
+            return Some(candidate.to_string_lossy().into_owned());
+        }
+    }
+    None
+}
+
+pub fn fallback_axhub_paths() -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = Vec::new();
+    if cfg!(target_os = "macos") {
+        paths.push(PathBuf::from("/opt/homebrew/bin").join(AXHUB_BIN_NAME));
+        paths.push(PathBuf::from("/usr/local/bin").join(AXHUB_BIN_NAME));
+    } else if cfg!(target_os = "linux") {
+        paths.push(PathBuf::from("/usr/local/bin").join(AXHUB_BIN_NAME));
+        paths.push(PathBuf::from("/usr/bin").join(AXHUB_BIN_NAME));
+        paths.push(PathBuf::from("/home/linuxbrew/.linuxbrew/bin").join(AXHUB_BIN_NAME));
+    }
+    let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from);
+    if let Some(home) = home {
+        paths.push(home.join(".cargo/bin").join(AXHUB_BIN_NAME));
+        paths.push(home.join(".local/bin").join(AXHUB_BIN_NAME));
+    }
+    paths
 }
 
 /// Returns `true` when `AXHUB_PERF_AUTO_APPROVE=1` is set.
@@ -384,5 +466,122 @@ mod tests {
             detail: "missing".into(),
         }
         .ok());
+    }
+
+    fn axhub_bin_env_lock() -> &'static std::sync::Mutex<()> {
+        static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+        LOCK.get_or_init(|| std::sync::Mutex::new(()))
+    }
+
+    #[test]
+    fn axhub_bin_honors_explicit_env_override() {
+        let _guard = axhub_bin_env_lock().lock().unwrap();
+        let prev = std::env::var("AXHUB_BIN").ok();
+        std::env::set_var("AXHUB_BIN", "/custom/path/to/axhub");
+        assert_eq!(axhub_bin(), "/custom/path/to/axhub");
+        std::env::remove_var("AXHUB_BIN");
+        match prev {
+            Some(v) => std::env::set_var("AXHUB_BIN", v),
+            None => std::env::remove_var("AXHUB_BIN"),
+        }
+    }
+
+    #[test]
+    fn fallback_paths_include_apple_silicon_homebrew_on_macos() {
+        let paths = fallback_axhub_paths();
+        let path_strings: Vec<String> = paths
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
+        if cfg!(target_os = "macos") {
+            assert!(
+                path_strings.iter().any(|p| p == "/opt/homebrew/bin/axhub"),
+                "macOS fallback list missing Apple Silicon Homebrew path: {:?}",
+                path_strings
+            );
+            assert!(
+                path_strings.iter().any(|p| p == "/usr/local/bin/axhub"),
+                "macOS fallback list missing Intel Homebrew / sh-native path: {:?}",
+                path_strings
+            );
+        }
+        if cfg!(target_os = "linux") {
+            assert!(
+                path_strings.iter().any(|p| p == "/usr/local/bin/axhub"),
+                "Linux fallback list missing /usr/local/bin path: {:?}",
+                path_strings
+            );
+        }
+    }
+
+    #[test]
+    fn fallback_paths_include_cargo_and_local_bin_when_home_set() {
+        let _guard = axhub_bin_env_lock().lock().unwrap();
+        let prev_home = std::env::var("HOME").ok();
+        let prev_user = std::env::var("USERPROFILE").ok();
+        std::env::set_var("HOME", "/tmp/fake-home-for-test");
+        std::env::remove_var("USERPROFILE");
+
+        let paths = fallback_axhub_paths();
+        let path_strings: Vec<String> = paths
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
+        assert!(
+            path_strings
+                .iter()
+                .any(|p| p.contains("/tmp/fake-home-for-test/.cargo/bin/axhub")),
+            "fallback list missing cargo bin under HOME: {:?}",
+            path_strings
+        );
+        assert!(
+            path_strings
+                .iter()
+                .any(|p| p.contains("/tmp/fake-home-for-test/.local/bin/axhub")),
+            "fallback list missing $HOME/.local/bin (sh-native non-root path): {:?}",
+            path_strings
+        );
+
+        match prev_home {
+            Some(v) => std::env::set_var("HOME", v),
+            None => std::env::remove_var("HOME"),
+        }
+        if let Some(v) = prev_user {
+            std::env::set_var("USERPROFILE", v);
+        }
+    }
+
+    #[test]
+    fn resolve_axhub_path_finds_binary_in_path() {
+        let _guard = axhub_bin_env_lock().lock().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "axhub-resolve-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let fake = dir.join(AXHUB_BIN_NAME);
+        fs::write(&fake, b"#!/bin/sh\necho axhub 0.12.0\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perm = fs::metadata(&fake).unwrap().permissions();
+            perm.set_mode(0o755);
+            fs::set_permissions(&fake, perm).unwrap();
+        }
+
+        let prev_path = std::env::var("PATH").ok();
+        std::env::set_var("PATH", dir.to_string_lossy().to_string());
+
+        let resolved = resolve_axhub_path();
+        assert_eq!(resolved.as_deref(), Some(fake.to_string_lossy().as_ref()));
+
+        match prev_path {
+            Some(v) => std::env::set_var("PATH", v),
+            None => std::env::remove_var("PATH"),
+        }
+        let _ = fs::remove_dir_all(&dir);
     }
 }
