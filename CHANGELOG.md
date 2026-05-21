@@ -4,6 +4,29 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.5](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.4...v0.9.5) (2026-05-21)
+
+근본 원인 둘을 같이 고쳤어요. (1) preflight 가 `cli_present:false` 일 때 모든 실패 원인을 단일 `cli_unavailable` subcode 로 묶어서 SKILL wrapper 가 항상 `/axhub:install-cli` 안내만 emit 했어요. 실제 user 케이스 — axhub CLI 는 정상 설치돼 있는데 `~/.config/axhub/config.yaml` 의 `user_id` 가 UUID 문자열 / 새 CLI 는 int64 기대 mismatch (`load config: 'profiles[default].user_id' cannot parse value as int64`) — 에서 install 안내가 잘못된 fix path 였어요. `diagnose_cli_state()` 를 추가해서 `axhub --version` SpawnResult 를 4 분기 (`Ok` / `NotFound` exit 127 / `ConfigCorrupted` `load config`·`cannot parse value`·`yaml:` 패턴 / `RuntimeError`) 로 분류하고, 각 분기에 맞는 `auth_error_code` subcode + SKILL wrapper 의 fix-specific systemMessage 를 emit 해요: `cli_not_found` → `/axhub:install-cli` (+ Apple Silicon `/opt/homebrew` inherit 안 됐을 가능성 안내), `cli_config_corrupted` → `/axhub:auth` (재로그인이 fresh config 작성), `cli_runtime_error` → `/axhub:doctor`. legacy `cli_unavailable` sentinel 은 backward-compat 로 보존. codegen 으로 15 SKILL + 1 template 일괄 byte-identical 재주입. (2) preflight 의 `current_app` 이 cwd context 무관하게 `~/.cache/axhub-plugin/last-deploy.json` 의 `app_slug` 를 emit 해서 빈 디렉토리에서도 "현재 앱: nextjs-axhub" 같은 stale 안내가 떴어요 — SKILL routing 이 잘못된 app context 로 진행. `cwd_has_project_marker()` 추가해서 `.git` / `package.json` / `Cargo.toml` / `apphub.yaml` / `pyproject.toml` / `go.mod` / `Gemfile` / `composer.json` / `build.gradle` / `pom.xml` / `deno.json` 중 하나가 cwd 에 있을 때만 cache fallback 활성. 빈 cwd → `current_app: None` → SKILL 이 "현재 앱 없음" graceful 안내.
+
+### Test baseline
+
+- cargo test -p axhub-helpers: 516 passed / 3 ignored (diagnose_cli_state 4 분기 케이스 + cwd_has_project_marker 분기 케이스 모두 green, phase_parity cache fallback 테스트는 `.git` marker fixture 보강)
+- bun test: 974/976 pass / 2 fail (pre-existing v0.8.0 ↔ v0.9.x README/PLAN drift, 본 release 무관 — `git stash` 로 재현 확인)
+- bunx tsc --noEmit clean
+- bun run skill:doctor --strict exit 0 (15/15 SKILL preflight byte-identical)
+- bun run lint:tone --strict 0 err / 0 warn
+- bun run lint:keywords --check baseline diff 없음
+
+### Honest tradeoff
+
+- `cwd_has_project_marker` 의 marker 리스트는 11 개 — 흔한 폴리글랏 stack 은 cover 하지만 사용자가 정말 흔치 않은 stack (예: `Makefile` 만 있는 C++ 프로젝트, `dune-project` 만 있는 OCaml) 에 있으면 false negative 가능. Marker 추가는 PR 환영.
+- `diagnose_cli_state` 의 stderr 패턴 매칭 (`load config`, `cannot parse value`, `yaml:` 등) 은 axhub CLI 의 에러 메시지 surface 에 fragile coupling. CLI side error message format 바뀌면 fallback `RuntimeError` 로 떨어지면서 `/axhub:doctor` 안내로 graceful degrade.
+- routing-drift gate 는 SKILL description 무변경이라 `[skip-routing-gate]` 로 의도 표시.
+
+### Added
+
+* **preflight:** cli-state diagnosis + cwd-gated current_app cache fallback ([e24981b](https://github.com/jocoding-ax-partners/axhub/commit/e24981b026c42ebf65612109aa5992932d7e426f))
+
 ## [0.9.4](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.3...v0.9.4) (2026-05-21)
 
 v0.9.3 의 후속 hotfix 두 개를 한 패치로 묶었어요. (1) macOS Apple Silicon 환경에서 `/opt/homebrew/bin/axhub` 를 plugin 의 preflight 가 못 찾아서 `cli_present:false` 로 보고하던 회귀를 차단했어요. macOS GUI app subprocess (Claude Code Desktop 포함) 가 shell profile 의 PATH 보완을 inherit 안 하는 Apple side limitation 때문인데, plugin 의 cross-platform support 가 Homebrew 표준 경로 (`/opt/homebrew/bin` Apple Silicon + `/usr/local/bin` Intel) / cargo install (`~/.cargo/bin`) / sh-native non-root (`~/.local/bin`) / Linuxbrew (`/home/linuxbrew/.linuxbrew/bin`) 를 자동 fallback 으로 cover 해요. `default_runner` 가 cmd[0] = bare basename ("axhub") 일 때만 resolved absolute path 로 substitute 하므로 mock-runner 통합 테스트는 그대로 동작해요. (2) v0.9.3 에서 도입한 `CLI_UNAVAILABLE_MESSAGE` 한국어 안내 안의 backtick (`` `/axhub:install-cli` ``) 이 outer `` !`...` `` bash command substitution backtick 과 충돌해서 zsh 가 'unmatched "' 로 parse fail — 결과적으로 `/github` 등 모든 SKILL slash 호출이 cli 미감지 환경에서 깨졌어요. systemMessage 의 backtick 제거 + codegen 으로 15 SKILL + 1 template 일괄 재주입.
