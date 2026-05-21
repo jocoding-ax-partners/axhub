@@ -120,13 +120,6 @@ const FIXTURES: Fixture[] = [
     expected: { is_destructive: false },
   },
   {
-    id: "ro-003-apis-list-scoped",
-    category: "read-only",
-    description: "APIs list scoped to current app (default-deny pattern)",
-    input: { command: "axhub apis list --app-id 42 --json" },
-    expected: { is_destructive: false },
-  },
-  {
     id: "ro-004-deploy-status",
     category: "read-only",
     description: "Deploy status without watch",

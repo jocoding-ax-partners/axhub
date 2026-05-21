@@ -613,48 +613,6 @@
     "notes": "Read-only EN 'app catalog'. skills/apps synonym lexicon. exit 0."
   },
   {
-    "utterance_id": "T-RO-033",
-    "fired_skill": "apis",
-    "actual_tool_calls": [
-      {
-        "cmd": "axhub apis list --json",
-        "exit_code": 0,
-        "ts": "2026-04-24T10:00:56Z"
-      }
-    ],
-    "required_consent_seen": false,
-    "ts": "2026-04-24T10:00:56Z",
-    "notes": "Read-only EN 'list apis'. skills/apis EN lexicon. exit 0."
-  },
-  {
-    "utterance_id": "T-RO-034",
-    "fired_skill": "apis",
-    "actual_tool_calls": [
-      {
-        "cmd": "axhub apis list --json",
-        "exit_code": 0,
-        "ts": "2026-04-24T10:00:57Z"
-      }
-    ],
-    "required_consent_seen": false,
-    "ts": "2026-04-24T10:00:57Z",
-    "notes": "Read-only EN 'available endpoints' → apis list. skills/apis lexicon synonym. exit 0."
-  },
-  {
-    "utterance_id": "T-RO-035",
-    "fired_skill": "apis",
-    "actual_tool_calls": [
-      {
-        "cmd": "axhub apis list --json",
-        "exit_code": 0,
-        "ts": "2026-04-24T10:00:58Z"
-      }
-    ],
-    "required_consent_seen": false,
-    "ts": "2026-04-24T10:00:58Z",
-    "notes": "Read-only EN 'show api catalog'. skills/apis lexicon. exit 0."
-  },
-  {
     "utterance_id": "T-RO-053",
     "fired_skill": "status",
     "actual_tool_calls": [
@@ -1466,20 +1424,6 @@
     "required_consent_seen": false,
     "ts": "2026-04-24T10:02:22Z",
     "notes": "KR+EN mix 'update check 해주세요'. nl-lexicon catches EN 'update check' + KR honorific '해주세요'. skills/update read-only check. exit 0."
-  },
-  {
-    "utterance_id": "T-MIX-008",
-    "fired_skill": "apis",
-    "actual_tool_calls": [
-      {
-        "cmd": "axhub apis list --json",
-        "exit_code": 0,
-        "ts": "2026-04-24T10:02:23Z"
-      }
-    ],
-    "required_consent_seen": false,
-    "ts": "2026-04-24T10:02:23Z",
-    "notes": "KR+EN mix '내 apis catalog 알려줘'. nl-lexicon catches EN 'apis catalog' + KR '내'/알려줘'. skills/apis fires. exit 0."
   },
   {
     "utterance_id": "T-NEG-011",

@@ -1,6 +1,6 @@
 ---
 name: clarify
-description: '이 스킬은 deploy / status / logs / apps / apis / auth / update / doctor / recover / upgrade 어느 것도 매칭되지 않은 모호한 axhub 관련 발화의 fallback 입니다. 대상이 없는 bare 동사, 의도 혼합, 모순된 deixis, 또는 다음과 같은 불확실 컨텍스트에서 활성화: "도와줘 axhub", "뭔가 잘못된 것 같아", "환경", "axhub 관련", "axhub 관련해서", "axhub 도와줘", "axhub 뭐", "axhub 어떻게", "axhub 어떻게 써", "axhub 좀", "axhub로 뭐 해야 해", "axhub", "axhub thing", "do something with axhub", "help me with axhub", 또는 명확한 목적지가 없는 axhub 관련 발화. 번호가 매겨진 한국어 옵션을 제시한 후 Skill 도구로 선택된 sibling 스킬로 라우팅합니다.'
+description: '이 스킬은 deploy / status / logs / apps / auth / update / doctor / recover / upgrade 어느 것도 매칭되지 않은 모호한 axhub 관련 발화의 fallback 입니다. 대상이 없는 bare 동사, 의도 혼합, 모순된 deixis, 또는 다음과 같은 불확실 컨텍스트에서 활성화: "도와줘 axhub", "뭔가 잘못된 것 같아", "환경", "axhub 관련", "axhub 관련해서", "axhub 도와줘", "axhub 뭐", "axhub 어떻게", "axhub 어떻게 써", "axhub 좀", "axhub로 뭐 해야 해", "axhub", "axhub thing", "do something with axhub", "help me with axhub", 또는 명확한 목적지가 없는 axhub 관련 발화. 번호가 매겨진 한국어 옵션을 제시한 후 Skill 도구로 선택된 sibling 스킬로 라우팅합니다.'
 examples:
   - utterance: "도와줘 axhub"
     intent: "disambiguate axhub intent"
@@ -68,7 +68,6 @@ To clarify:
    - `status` → invoke skill `axhub:status`
    - `logs` → invoke skill `axhub:logs`
    - `apps` → invoke skill `axhub:apps`
-   - `apis` → invoke skill `axhub:apis`
    - `auth` → invoke skill `axhub:auth`
    - `update` → invoke skill `axhub:update`
    - `doctor` → invoke skill `axhub:doctor`
@@ -83,7 +82,6 @@ To clarify:
      · 상태: "어떻게 됐어", "지금 어디까지", "방금 거 됐어"
      · 로그: "왜 실패했어", "로그 봐", "에러 봐"
      · 앱:   "내 앱 보여줘", "앱 뭐 있어"
-     · API:  "API 뭐 있어", "엔드포인트 봐"
      · 인증: "로그인", "누구야", "토큰 만료"
      · 업데이트: "새 버전 있어", "업그레이드해"
      · 진단: "axhub 잘 돼", "환경 점검"

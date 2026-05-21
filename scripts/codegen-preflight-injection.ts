@@ -121,7 +121,6 @@ export const TARGETS: PreflightTarget[] = [
   { file: "skills/axhub-review/SKILL.md", variant: "lite" },
   { file: "skills/axhub-ship/SKILL.md", variant: "lite" },
   { file: "skills/axhub-tdd/SKILL.md", variant: "lite" },
-  { file: "skills/apis/SKILL.md", variant: "lite" },
   { file: "skills/apps/SKILL.md", variant: "lite" },
   { file: "skills/env/SKILL.md", variant: "lite" },
   { file: "skills/github/SKILL.md", variant: "lite" },

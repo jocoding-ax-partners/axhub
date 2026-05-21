@@ -135,7 +135,7 @@ describe("expected_cmd_pattern distribution (curation health)", () => {
   test("expected_skill set covers core skills", () => {
     const skills = new Set(corpus.map((r) => r.expected_skill).filter((s): s is string => s !== null));
     // At minimum we expect these skills represented in the 100-row subset.
-    const required = ["apps", "apis", "deploy", "status", "logs", "auth", "update", "doctor"];
+    const required = ["apps", "deploy", "status", "logs", "auth", "update", "doctor"];
     for (const s of required) {
       expect(skills.has(s)).toBe(true);
     }

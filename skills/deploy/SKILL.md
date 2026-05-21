@@ -719,4 +719,3 @@ For Korean trigger lexicon (informal, honorific, demo-context variants): `refere
 For exit-code → 4-part Korean error template (emotion + cause + action + button): `references/error-empathy-catalog.md`.
 For multi-machine cold cache, headless/Codespaces, version skew, watch narration: `references/recovery-flows.md`.
 For working transcripts, use captured `.omc/evidence/` pilot logs; no standalone example transcript files ship in this plugin.
-For privacy filter on apis list: `../apis/references/privacy-filter.md` (used by sibling apis skill).

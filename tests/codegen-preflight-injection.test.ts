@@ -1,7 +1,7 @@
 // Phase 27.x — codegen-preflight-injection.ts unit tests.
 // Verifies:
 //   1. getPreflightInjectionLine() is deterministic and contains required elements.
-//   2. All 16 targets (15 SKILL + 1 template) contain the codegen output byte-identical.
+//   2. All 15 targets (14 SKILL + 1 template) contain the codegen output byte-identical.
 //   3. Variant taxonomy: 1 deploy + 15 lite.
 
 import { describe, expect, test } from "bun:test";
@@ -65,8 +65,8 @@ describe("getPreflightInjectionLine — deterministic + structure", () => {
 });
 
 describe("TARGETS — variant taxonomy", () => {
-  test("exactly 16 targets (15 SKILL + 1 template)", () => {
-    expect(TARGETS).toHaveLength(16);
+  test("exactly 15 targets (14 SKILL + 1 template)", () => {
+    expect(TARGETS).toHaveLength(15);
   });
 
   test("exactly 1 deploy variant — skills/deploy/SKILL.md", () => {
@@ -75,8 +75,8 @@ describe("TARGETS — variant taxonomy", () => {
     expect(deployTargets[0].file).toBe("skills/deploy/SKILL.md");
   });
 
-  test("exactly 15 lite variant targets", () => {
-    expect(TARGETS.filter((t) => t.variant === "lite")).toHaveLength(15);
+  test("exactly 14 lite variant targets", () => {
+    expect(TARGETS.filter((t) => t.variant === "lite")).toHaveLength(14);
   });
 
   test("template is lite variant", () => {
@@ -86,7 +86,7 @@ describe("TARGETS — variant taxonomy", () => {
   });
 });
 
-describe("16-target byte-identical lock (Phase 27.x variant-aware manifest invariant)", () => {
+describe("15-target byte-identical lock (Phase 27.x variant-aware manifest invariant)", () => {
   for (const target of TARGETS) {
     test(`${target.file} (${target.variant}) contains codegen output byte-identical`, () => {
       const content = readFileSync(join(REPO_ROOT, target.file), "utf8");
