@@ -4,6 +4,28 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.1...v0.9.2) (2026-05-21)
+
+ax-hub-cli `main` 에서 GitHub 연결 surface 가 `axhub github connect|disconnect|repos list` → `axhub apps git connect|status|disconnect` 로 이동했어요 (구 명령은 exit 7 `GITHUB_CMD_DEPRECATED` 로 거절). github SKILL 의 Step 3/3.5/4/5 호출을 새 명령어로 마이그레이션 했고, dry-run 이 기본이라 mutate 시 `--execute` 명시가 필수 예요. `--account` 가 사라지고 `--installation-id` 가 옵션이 됐고 OAuth device flow 는 CLI 내부에서 처리해요. consent-mint payload 의 action 이름 (`github_connect`/`github_disconnect`) 은 `axhub-helpers` consent schema 의 hard-coded 이름이라 그대로 유지했어요. 의존 surface (deploy SKILL Step 6 github blocker / 5 test 파일 / e2e case 35 fake-axhub shim + argv.trace) 도 같이 갱신했어요.
+
+### Test baseline
+
+- bun test: 973/975 pass / 2 fail (pre-existing v0.8.0 ↔ v0.9.x README/PLAN 버전 drift, github 무관 — `git stash` 로 재현 확인)
+- bunx tsc --noEmit clean
+- bun run skill:doctor --strict exit 0
+- bun run lint:tone --strict 0 err / 0 warn (43 files)
+- bun run lint:keywords --check baseline diff 없음
+- github skill 관련 5 test 케이스 (manifest x2 / deploy-git-init-stage x1 / github-skill-step-2-options x3) 모두 green
+
+### Honest tradeoff
+
+- 구 `axhub github` 호출이 남은 user-side script 가 있다면 exit 7 로 거절돼요. NEVER 섹션에 명시했고, plugin skill 안내가 새 surface 로만 routing 돼요.
+- routing-drift gate 는 description frontmatter 무변경이라 `[skip-routing-gate]` 로 의도 표시했어요. 다음 release 에 baseline 재측정 필요해요.
+
+### Changed
+
+* github skill 을 axhub apps git CLI 로 마이그레이션 ([#117](https://github.com/jocoding-ax-partners/axhub/issues/117)) ([1d9f45c](https://github.com/jocoding-ax-partners/axhub/commit/1d9f45cfaa62423ee9fe91cf2047b5ce899a76c6))
+
 ## [0.9.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.0...v0.9.1) (2026-05-21)
 
 apis 스킬을 플러그인 표면에서 제거한 cleanup 릴리즈예요. `/axhub:apis` 슬래시 명령과 자연어 트리거가 사라져 더 이상 노출되지 않아요. clarify SKILL 의 disambiguation 메뉴 / deploy nl-lexicon / help.md / README / vibe-coder-quickstart / ADR-0011 인벤토리가 28 SKILL + 9 command 로 일관 동기화 됐어요. 테스트는 manifest / corpus-schema / ux-argument-hints / e2e-claude-cli-registry / codegen-preflight-injection (TARGETS 16→15) 의 어설션, baseline-results 의 apis fired_skill 행 4건씩, fixtures / OMC 키워드 베이스라인까지 한 번에 갱신했어요. hub-side `axhub apis` CLI subcommand 인프라 (Rust `apis_call` consent action, mock-hub `/v1/apis`, admin policy docs, OAuth `apis:read` scope) 는 그대로 유지해서 CLI 호출 layer 는 손상 없어요.
