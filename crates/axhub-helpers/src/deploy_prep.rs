@@ -318,6 +318,7 @@ mod tests {
                 cli_too_old: false,
                 cli_too_new: false,
                 cli_present: true,
+                cli_state: "ok".into(),
                 auth_ok: true,
                 auth_error_code: None,
                 scopes: vec![],

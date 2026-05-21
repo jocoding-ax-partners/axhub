@@ -213,6 +213,13 @@ pub struct PreflightOutput {
     pub cli_too_old: bool,
     pub cli_too_new: bool,
     pub cli_present: bool,
+    /// v0.9.6: explicit cli-state discriminator so SKILL preprocessing + AI
+    /// rendering can switch on the exact failure mode (`ok` / `not_found` /
+    /// `config_corrupted` / `runtime_error`) instead of mapping the blunt
+    /// `cli_present:false` flag to the stale "PATH 에 없음" message. Serde
+    /// `default` so older callers reading JSON keep deserializing as before.
+    #[serde(default = "default_cli_state")]
+    pub cli_state: String,
     pub auth_ok: bool,
     pub auth_error_code: Option<String>,
     pub scopes: Vec<String>,
@@ -226,6 +233,10 @@ pub struct PreflightOutput {
     pub last_deploy_id: Option<String>,
     pub last_deploy_status: Option<String>,
     pub plugin_version: String,
+}
+
+fn default_cli_state() -> String {
+    "ok".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -472,6 +483,7 @@ where
         cli_too_old: too_old,
         cli_too_new: too_new,
         cli_present,
+        cli_state: cli_state.as_str().to_string(),
         auth_ok,
         auth_error_code,
         scopes,
