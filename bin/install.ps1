@@ -14,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 
 # --- install-time disclosure (idempotent, marker-gated) ---
 # Maintainer: keep $AxhubDisclosureVer in sync with $ReleaseVersion below.
-$AxhubDisclosureVer = 'v0.9.5'
+$AxhubDisclosureVer = 'v0.9.6'
 $AxhubStateDir = if ($env:XDG_STATE_HOME) {
   Join-Path $env:XDG_STATE_HOME 'axhub-plugin'
 } else {
@@ -55,7 +55,7 @@ if ($_axhubShowDisclosure) {
 # --- end install-time disclosure ---
 
 $BinDir = Split-Path -Parent $PSCommandPath
-$ReleaseVersion = if ($env:AXHUB_PLUGIN_RELEASE) { $env:AXHUB_PLUGIN_RELEASE } else { 'v0.9.5' }
+$ReleaseVersion = if ($env:AXHUB_PLUGIN_RELEASE) { $env:AXHUB_PLUGIN_RELEASE } else { 'v0.9.6' }
 $ReleaseBase = "https://github.com/jocoding-ax-partners/axhub/releases/download/$ReleaseVersion"
 
 # Windows only ships amd64 (per package.json build:all)

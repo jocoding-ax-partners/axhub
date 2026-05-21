@@ -4,6 +4,27 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.6](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.5...v0.9.6) (2026-05-21)
+
+v0.9.5 의 4-state CLI 진단 (`Ok` / `NotFound` / `ConfigCorrupted` / `RuntimeError`) 분류가 plugin 내부에만 머물러 있었어요. JSON output 에 안 emit 되니 SKILL preprocessing 후 AI 가 preflight JSON 의 `cli_present:false` 만 보고 "axhub CLI 미설치 (PATH 에 없음)" 으로 추측 — 실제로는 `config_corrupted` (`~/.config/axhub/config.yaml` 의 `user_id` UUID vs int64 schema drift) 인데 install 안내가 나가서 사용자 혼란. 사용자 보고: 진단 카드의 첫 줄은 잘못된 "CLI 미설치" 인데 두 번째 줄은 정확하게 `cli_config_corrupted` 표시. systemMessage emit (v0.9.5) 은 작동했지만 SKILL 자체 prose 가 cli_state 인식 못 함. `PreflightOutput` 에 `cli_state: String` 필드를 명시적으로 emit (`"ok"` / `"not_found"` / `"config_corrupted"` / `"runtime_error"`) + `skills/github/SKILL.md` Step 1 에 cli_state 별 분기 안내 prose 추가 (cli_present:false 를 "PATH 에 없음" 으로 임의 매핑 금지 명시). 의존 fixture (deploy_prep / quality_gate / deploy_prep_test) 에 cli_state: "ok" 필드 추가로 compile fix. serde `default="ok"` 라 legacy 직렬화 호환.
+
+### Test baseline
+
+- cargo test -p axhub-helpers: 516 passed / 3 ignored / 0 fail (cli_state 필드 추가로 인한 3 fixture compile fix 모두 통과)
+- bun run skill:doctor --strict exit 0
+- bun run lint:tone --strict 0 err / 0 warn
+- bun run lint:keywords --check baseline diff 없음
+
+### Honest tradeoff
+
+- cli_state 필드는 SKILL prose 가 AI 한테 분기 명시해야 효과 — github SKILL 만 우선 갱신. status / deploy / apps / env 등 다른 SKILL 도 같은 분기 안내 가치 있음 (v0.9.7 후보).
+- AI 가 cli_state 를 보고도 여전히 stale "PATH 에 없음" 으로 추측할 위험은 prose authority 강도에 의존. 더 강한 보호가 필요하면 systemMessage 가 "render exactly this text" 라고 명시적으로 지시하거나, preflight JSON 에 `human_status: "..."` pre-rendered 한국어 문자열 직접 emit 도 고려 가능.
+- routing-drift gate 는 SKILL description 무변경이라 `[skip-routing-gate]` 로 의도 표시.
+
+### Added
+
+* **preflight:** expose cli_state enum field for SKILL/AI rendering ([b8d37bb](https://github.com/jocoding-ax-partners/axhub/commit/b8d37bb3b209fbe1abd1a78d13c110e4a1891830))
+
 ## [0.9.5](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.4...v0.9.5) (2026-05-21)
 
 근본 원인 둘을 같이 고쳤어요. (1) preflight 가 `cli_present:false` 일 때 모든 실패 원인을 단일 `cli_unavailable` subcode 로 묶어서 SKILL wrapper 가 항상 `/axhub:install-cli` 안내만 emit 했어요. 실제 user 케이스 — axhub CLI 는 정상 설치돼 있는데 `~/.config/axhub/config.yaml` 의 `user_id` 가 UUID 문자열 / 새 CLI 는 int64 기대 mismatch (`load config: 'profiles[default].user_id' cannot parse value as int64`) — 에서 install 안내가 잘못된 fix path 였어요. `diagnose_cli_state()` 를 추가해서 `axhub --version` SpawnResult 를 4 분기 (`Ok` / `NotFound` exit 127 / `ConfigCorrupted` `load config`·`cannot parse value`·`yaml:` 패턴 / `RuntimeError`) 로 분류하고, 각 분기에 맞는 `auth_error_code` subcode + SKILL wrapper 의 fix-specific systemMessage 를 emit 해요: `cli_not_found` → `/axhub:install-cli` (+ Apple Silicon `/opt/homebrew` inherit 안 됐을 가능성 안내), `cli_config_corrupted` → `/axhub:auth` (재로그인이 fresh config 작성), `cli_runtime_error` → `/axhub:doctor`. legacy `cli_unavailable` sentinel 은 backward-compat 로 보존. codegen 으로 15 SKILL + 1 template 일괄 byte-identical 재주입. (2) preflight 의 `current_app` 이 cwd context 무관하게 `~/.cache/axhub-plugin/last-deploy.json` 의 `app_slug` 를 emit 해서 빈 디렉토리에서도 "현재 앱: nextjs-axhub" 같은 stale 안내가 떴어요 — SKILL routing 이 잘못된 app context 로 진행. `cwd_has_project_marker()` 추가해서 `.git` / `package.json` / `Cargo.toml` / `apphub.yaml` / `pyproject.toml` / `go.mod` / `Gemfile` / `composer.json` / `build.gradle` / `pom.xml` / `deno.json` 중 하나가 cwd 에 있을 때만 cache fallback 활성. 빈 cwd → `current_app: None` → SKILL 이 "현재 앱 없음" graceful 안내.
