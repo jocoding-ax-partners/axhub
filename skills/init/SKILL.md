@@ -31,7 +31,7 @@ model: sonnet
 - `schema_version` (예: `bootstrap/v1`) — API 응답 검증용. raw 값 echo 금지.
 - `items[].id`, `items[].folder_name`, `items[].name`, `items[].resource_tier` — `axhub apps templates list` 가 반환한 backend template registry. id 는 사용자 발화 매칭에만 쓰고, raw 목록 dump 금지.
 - `bootstrap_id`, `status_url`, `stage`, `app_id`, `deployment_id`, `repo_full_name`, `error_code`, `error_message` — bootstrap saga 의 internal verification primitives. raw 값 echo 금지 (단 `repo_full_name` 은 마지막 단계에서 `git clone` URL 로 사용자에게 보여줘요).
-- `request_id`, `idempotency_key`, `installation_id`, `device_code` — internal correlation/auth primitives. raw 값 echo 금지.
+- `request_id`, `idempotency_key`, `installation_id`, `device_code` — internal correlation/auth primitives. raw 값 echo 금지. **예외**: saga 가 `event: device_code_issued` 를 emit 하면 `verification_uri` (또는 `verification_uri_complete`) + `user_code` 쌍은 humanize 해서 사용자에게 즉시 보여줘요 — 안 보여주면 saga 가 GitHub App install 승인을 기다리며 block 돼서 사용자는 멈춘 줄 알아요. internal `device_code` 값 자체는 여전히 echo 금지.
 
 대신 사용자에게는 한국어 한 줄로 진행 상황만 알려드려요. 예시:
 
@@ -44,6 +44,7 @@ model: sonnet
 | Step 5 bootstrap dry-run | "어떤 작업을 할지 미리 보여줘요." |
 | Step 6 사용자 동의 | "지금 만들고 배포까지 한 번에 진행해요." |
 | Step 7 bootstrap execute + watch | "앱 만들고, GitHub repo 만들고, 첫 배포까지 진행 중이에요. 보통 2~5분 정도 걸려요." |
+| Step 7a GitHub 연결 필요 (saga 에서 `device_code_issued` 발생 시) | "GitHub 연결이 필요해요. 브라우저에서 `{verification_uri}` 열고 코드 `{user_code}` 를 입력해 주세요. 승인하면 자동으로 진행돼요." |
 | Step 8 git clone | "코드를 현재 폴더로 가져와요." |
 | Step 9 결과 안내 | "끝났어요. 이렇게 시작하면 돼요." |
 
@@ -189,7 +190,27 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
    진행 중 매 ~30s 마다 한국어 한 줄로 narrate 해요 — "앱 만들고 있어요" / "GitHub repo 만들고 있어요" / "첫 배포 중이에요. 거의 다 왔어요". 60s 이상 같은 stage 머무르면 "조용하네요, 계속 기다리고 있어요" 한 줄을 추가해요.
 
-7. **응답에서 `repo_full_name` 을 꺼내 git clone 해요.**
+   **GitHub 연결 필요 (saga stdout 의 `device_code_issued` event 처리).** saga 가 GitHub App 미설치 / installation 만료 / scope 부족 상태면 첫 stage 에서 다음과 같은 JSON line 을 emit 하고 사용자 승인을 기다리며 block 해요:
+
+   ```json
+   {"event":"device_code_issued","data":{"verification_uri":"https://github.com/login/device","verification_uri_complete":null,"user_code":"XXXX-XXXX","expires_in":899}}
+   ```
+
+   이 event 가 stdout 에서 나오면 narrate 보다 우선해서 즉시 사용자에게 한국어로 안내해요. raw JSON dump 금지 — `verification_uri` (또는 `verification_uri_complete` 가 non-null 이면 그걸 우선), `user_code`, `expires_in` 만 humanize 해요:
+
+   > GitHub 연결이 필요해요. 다음 단계로 진행해 주세요:
+   >
+   > 1. 브라우저에서 열기: `<verification_uri_complete 우선, 없으면 verification_uri>`
+   > 2. 코드 입력: `<user_code>`
+   > 3. axhub GitHub App 설치 승인
+   >
+   > 승인하면 자동으로 다음 단계로 넘어가요. (유효시간 약 `<expires_in/60>` 분)
+
+   `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 안내 후에는 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 별도 작업 없이 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. 코드가 expire 되면 saga 가 error 로 종료해요 — 그 때는 `/axhub:github` 안내로 보내서 재시도 안내해요.
+
+   상세한 device flow 안내 패턴은 `../github/SKILL.md` 의 OAuth device flow 섹션을 따라요.
+
+7. **응답에서 `repo_full_name` 을 꺼내 CWD 로 받아요.**
 
    ```bash
    REPO=$(echo "$FINAL_JSON" | jq -r '.data.status.repo_full_name // empty')
@@ -197,14 +218,19 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
      echo '{"systemMessage":"GitHub repo 정보가 응답에 없어요. /axhub:doctor 로 진단해주세요."}'
      exit 65
    fi
-   if [ "$(ls -A 2>/dev/null | grep -v -e '^\.git$' -e '^\.codegraph$' -e '^\.omc$' | wc -l)" -eq 0 ]; then
-     git clone "https://github.com/${REPO}.git" .
+   if [ -d .git ]; then
+     echo "{\"systemMessage\":\"현재 dir 에 이미 .git 이 있어요. 자동 clone 건너뛸게요. 수동으로 origin 을 붙이려면: git remote add origin https://github.com/${REPO}.git && git fetch origin && git checkout -b main origin/main\"}"
    else
-     git clone "https://github.com/${REPO}.git" "$APP_SLUG"
+     git init -q -b main
+     git remote add origin "https://github.com/${REPO}.git"
+     git fetch origin --quiet --depth=1
+     DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo main)
+     git reset --hard "origin/$DEFAULT_BRANCH"
+     git branch --set-upstream-to="origin/$DEFAULT_BRANCH" "$DEFAULT_BRANCH" 2>/dev/null || true
    fi
    ```
 
-   현재 dir 이 비어 있으면 (`.git` / `.codegraph` / `.omc` 등 도구 메타만 있어도 비어있는 걸로 봐요) `git clone <repo> .` 로 같은 dir 에 코드를 받아요. 비어있지 않으면 `$APP_SLUG` 이름의 서브 dir 에 받아요. clone 실패 시 (권한 / network) `repo_full_name` 만 사용자에게 알려주고 수동 clone 안내를 보여줘요.
+   항상 현재 dir (CWD) 에 코드를 받아요. 서브 dir (`$APP_SLUG/`) 만들지 않아서 사용자가 "cd $APP_SLUG" 추가 단계 안 해도 돼요. `.claude` / `.omc` / `.codegraph` 같은 IDE/도구 메타 dir 은 untracked 로 자연스럽게 보존돼요 (`git reset --hard` 는 tracked 파일만 건드려요). 이미 `.git` 이 있는 dir 은 안전을 위해 자동 clone 건너뛰고 수동 명령 안내를 한 줄로 보여줘요. clone 실패 시 (권한 / network) `repo_full_name` 만 사용자에게 알려주고 수동 clone 안내를 보여줘요.
 
 8. **결과와 다음 액션을 안내해요.**
 
@@ -212,11 +238,10 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
    ```
    끝났어요. 이렇게 시작하면 돼요:
-   1. 폴더 들어가기 — `cd $APP_SLUG` (이미 같은 폴더에 받았으면 생략)
-   2. 의존성 설치 — package manager 자유 (`npm i` / `pnpm i` / `bun install`)
-   3. 로컬 실행 — README 의 dev 스크립트 (`npm run dev` 등)
-   4. 배포 상태 보기 — `/axhub:status` (방금 만든 첫 배포 진행 상황)
-   5. 다음 배포 — 코드 수정 후 `/axhub:deploy`
+   1. 의존성 설치 — package manager 자유 (`npm i` / `pnpm i` / `bun install`)
+   2. 로컬 실행 — README 의 dev 스크립트 (`npm run dev` 등)
+   3. 배포 상태 보기 — `/axhub:status` (방금 만든 첫 배포 진행 상황)
+   4. 다음 배포 — 코드 수정 후 `/axhub:deploy`
    ```
 
    `error_code` 로 saga 가 실패했으면 다음 routing 을 써요:
@@ -236,9 +261,11 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 - NEVER `--execute` 를 `--dry-run` 미리보기 + 사용자 동의 없이 호출하지 않아요. backend app + GitHub repo + deploy 가 한 번에 mutate 돼요.
 - NEVER auth 만료를 template 조회 실패로 오해하지 않아요. exit 65 는 `/axhub:auth` 로 라우팅 해요.
 - NEVER `bootstrap --execute` 호출 직후 별도 `axhub deploy create` 를 다시 부르지 않아요. saga 가 첫 deploy 까지 포함해요.
+- NEVER saga stdout 에서 `event: device_code_issued` 가 나왔는데 `verification_uri` + `user_code` 를 사용자에게 즉시 보여주지 않고 silent 하게 narrate 만 반복하지 않아요. saga 가 GitHub App install 승인을 기다리며 block 돼서 사용자는 SKILL 이 멈춘 줄 알아요. internal `device_code` raw 값은 여전히 echo 금지 — humanize 대상은 `verification_uri` + `user_code` + `expires_in` 만이에요.
 - NEVER `repo_full_name` 응답이 비어 있는데 임의 URL 을 만들어 clone 시도하지 않아요. 응답이 비면 `/axhub:doctor` 로 라우팅 해요.
 
 ## Additional Resources
 
 - `../deploy/references/nl-lexicon.md` — 활성화 trigger 어구 추가 시 참조.
 - `../deploy/references/error-empathy-catalog.md` — 4-part Korean exit-code template (Step 8 에서 사용).
+- `../github/SKILL.md` — OAuth device flow surface 패턴 (Step 6 의 `device_code_issued` event 처리 기준).
