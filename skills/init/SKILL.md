@@ -1,6 +1,6 @@
 ---
 name: init
-description: '이 스킬은 사용자가 새 axhub 앱을 만들거나 템플릿으로 프로젝트를 시작하고 싶어할 때 사용해요. 다음 표현에서 활성화: "결제 앱 만들어", "결제 앱 만들어줘", "빈 디렉토리", "새 앱 만들어", "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어", "프로젝트 초기화", "프로젝트 초기화해줘", "apphub.yaml 만들어", "apphub.yaml 만들어줘", "axhub.yaml 만들어", "axhub.yaml 만들어줘", "fastapi 앱", "FastAPI 앱 만들어줘", "next.js 앱", "Next.js 앱 만들어줘", "nextjs 앱", "init", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. `axhub apps bootstrap` saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 `repo_full_name` 으로 현재 dir 에 git clone 해요.'
+description: '이 스킬은 사용자가 새 axhub 앱을 만들거나 템플릿으로 프로젝트를 시작하고 싶어할 때 사용해요. 다음 표현에서 활성화: "결제 앱 만들어", "결제 앱 만들어줘", "빈 디렉토리", "새 앱 만들어", "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어", "프로젝트 초기화", "프로젝트 초기화 해줘", "프로젝트 초기화해줘", "초기화 해줘", "초기화해줘", "apphub.yaml 만들어", "apphub.yaml 만들어줘", "axhub.yaml 만들어", "axhub.yaml 만들어줘", "fastapi 앱", "FastAPI 앱 만들어줘", "next.js 앱", "Next.js 앱 만들어줘", "nextjs 앱", "init", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. `axhub apps bootstrap` saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 `repo_full_name` 으로 현재 dir 에 git clone 해요.'
 examples:
   - utterance: "결제 앱 만들어"
     intent: "scaffold new axhub app"

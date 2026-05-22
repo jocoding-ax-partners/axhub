@@ -448,5 +448,8 @@
         "검증 건너뛰고 일단 fix 시도"
       ]
     }
+  },
+  "inventory": {
+    "_note": "TODO: add per-question safe_default + rationale entries as AskUserQuestion call sites are added to skills/inventory/SKILL.md"
   }
 }

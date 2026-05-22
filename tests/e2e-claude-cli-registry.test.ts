@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("33 top-level keys (2 메타 + 29 SKILL slug + quality_gate + consent channel)", () => {
+  test("34 top-level keys (2 메타 + 30 SKILL slug + quality_gate + consent channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(33);
+    expect(keys).toHaveLength(34);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
@@ -70,6 +70,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "github",
       "init",
       "install-cli",
+      "inventory",
       "karpathy-guidelines",
       "logs",
       "open",
