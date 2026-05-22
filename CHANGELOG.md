@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.11](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.10...v0.9.11) (2026-05-22)
+
+auth SKILL 의 Step 5b login 흐름이 `axhub auth login --force --no-browser` 를 sync subprocess 로 호출해서 사용자 화면에는 "Running ... 22s · 4 lines" 만 보이고 OAuth device flow URL + user_code 가 안 보이던 회귀를 차단했어요. CLI 는 stderr 로 verification URL + code 를 emit 한 직후 OAuth 승인 polling 으로 최대 15분 block 되는데, Claude Code shell tool 은 명령 종료 후 한 번에 output 을 surface 하니까 사용자는 SKILL 이 멈춘 줄 알고 폐기했어요. 새 흐름은 background subprocess + log file polling wrapper 로 교체. login 을 백그라운드로 실행하면서 임시 log file 로 redirect 하고, 0.5s 간격으로 30회 (총 15s) 파일을 scan 해서 `https?://...` URL + `XXXX-XXXX` code 패턴이 등장하는 즉시 별도 stdout line 으로 한국어 안내 ("axhub OAuth 인증이 필요해요. 1. 브라우저에서 열기 ... 2. 코드 입력 ...") 를 emit 해요. Claude Code 가 이 별도 line 을 surface 하니까 사용자는 URL 을 보고 브라우저로 진행할 수 있어요. login process 가 OAuth 승인을 기다리는 동안 wait 로 block 하고, 종료 시 exit code 를 그대로 propagate 해요. 15s 안에 URL/code 추출 실패하면 CLI 출력 형식 변경 가능성으로 보고 `/axhub:doctor` 라우팅 안내해요. log file 은 trap 으로 cleanup. `--json` 은 현재 CLI v1.0.0-rc.1 에서 polling 완료 후 한 번에 결과 envelope 만 emit 하니까 interactive wait 에는 사용 금지 (challenge surface 못 함) — 별도 명문화했어요.
+
+### Test baseline
+
+- bun run skill:doctor --strict exit 0 (30/30 SKILL 통과)
+- bun run lint:tone --strict 0 err / 0 warn (44 files)
+- bun run lint:keywords --check baseline diff 없음
+- bunx tsc --noEmit clean
+- bun test 989 tests: 980 pass / 2 fail / 6 skip / 1 todo (둘 다 README/PLAN.md v0.8.0 vs package v0.9.11 pre-existing version drift, scope 외)
+
+### Honest tradeoff
+
+15s timeout 은 device flow URL emit latency 의 상한 (실측 ~1s, 95p ~3s) 을 충분히 덮지만 backend 가 비정상적으로 느린 경우 timeout 가능성. 그 때 "CLI 출력 형식이 바뀌었을 가능성. /axhub:doctor 로 진단해주세요." 안내가 나오니 사용자가 별도 액션 (재시도 / doctor 호출) 으로 회복할 수 있어요. URL/code 정규식은 `https?://...` 와 `[A-Z0-9]{4}-[A-Z0-9]{4}` 두 패턴을 모두 만족하는 첫 매치만 잡으니까, CLI 가 다른 형식의 verification 코드 (예: 8자 영숫자 연속 또는 다른 구분자) 로 바꾸면 추출 실패하고 timeout 분기로 빠져요 — 그 때는 SKILL 업데이트가 필요해요. login 자체는 여전히 백그라운드에서 정상 진행되니 사용자가 다른 채널로 URL 을 확인하면 그대로 완료할 수 있어요. background subprocess + sleep loop 패턴은 bash 3.2 (macOS default), 4.x (Linux), Git Bash (Windows) 모두에서 호환돼요. Windows native PowerShell lane 은 별도 wrapper 가 필요한데 PR #122 의 git clone 패턴처럼 후속 PR 에서 처리해요.
+
+### Fixed
+
+* **auth:** login --no-browser 의 device flow URL 즉시 surface ([#123](https://github.com/jocoding-ax-partners/axhub/issues/123)) ([74e07aa](https://github.com/jocoding-ax-partners/axhub/commit/74e07aa95d776ddfeb11b4ff8814fe4a4028914f))
+
 ## [0.9.10](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.9...v0.9.10) (2026-05-22)
 
 init SKILL 의 bootstrap saga 가 `git clone` 으로 코드를 받을 때 `.claude` 가 들어있는 CWD 를 비어있지 않다고 판정해서 `$APP_SLUG/` 서브 디렉터리 (예: `testyoung/`) 를 만들던 회귀를 차단했어요. vibe coder 가 Claude Code 에서 빈 폴더를 열고 "Next.js 앱 만들어줘" 발화하면 IDE 가 연 폴더와 코드가 받아진 폴더가 달라져서 매번 `cd $APP_SLUG` 한 단계를 거쳐야 했고, 폴더 trees 가 2 단계로 분리돼 README/package.json 이 한 단계 더 깊은 곳에 생겨 혼란스러웠어요. 새 흐름은 `git init -q -b main && git remote add origin <url> && git fetch origin --depth=1 && git reset --hard origin/<default-branch>` 패턴으로 항상 CWD 에 tracked 파일만 받아요. `.claude` / `.omc` / `.codegraph` 같은 untracked IDE/도구 메타 디렉터리는 `reset --hard` 가 tracked 파일만 건드리니 자연스럽게 보존돼요. 이미 `.git` 이 있는 디렉터리는 기존 history 를 덮어쓰지 않도록 자동 clone 을 건너뛰고 수동 명령 안내 (`git remote add origin ... && git fetch ... && git checkout -b main origin/main`) 한 줄만 출력해요. default branch 는 `git symbolic-ref refs/remotes/origin/HEAD` 로 동적 감지하고 실패 시 `main` 으로 fallback 하니 master/main 혼재 repo 에도 안전해요. Step 8 결과 안내에서 "1. 폴더 들어가기 — cd $APP_SLUG (이미 같은 폴더에 받았으면 생략)" 단계도 함께 삭제했어요 (이제 항상 CWD 라 불필요). 추가로 saga 가 GitHub App install 승인을 기다리며 block 될 때 silent narrate 만 반복하던 회귀를 차단하려고, jargon-block 섹션에 `device_code` 예외 노트, humanize 표에 Step 7a (GitHub 연결 필요) 행, Step 6 본문에 `device_code_issued` event 처리 패턴, NEVER 섹션에 silent narrate 금지 항목, Additional Resources 에 `../github/SKILL.md` OAuth device flow 링크를 함께 명문화했어요.
