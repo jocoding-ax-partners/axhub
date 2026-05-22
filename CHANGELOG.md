@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.12](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.11...v0.9.12) (2026-05-22)
+
+v0.9.11 의 wrapper 가 `wait $AUTH_PID` 로 login process 종료까지 block 해서 사용자가 OAuth device flow URL 을 끝까지 못 보던 회귀를 차단했어요. Claude Code shell tool 은 명령 종료 시점에 stdout 을 한 번에 surface 하니까 wrapper 가 OAuth polling (최대 15분) 끝까지 block 하면 URL printf 라인이 버퍼에 갇혀서 사용자 화면에는 "Running ... 22s · 4 lines" hang 상태만 보였어요. 사용자가 SKILL 이 멈춘 줄 알고 폐기. 새 흐름은 3 단계 분리로 교체. Step 5b 는 `nohup axhub auth login --force --no-browser ... </dev/null & disown` 으로 login process 를 detach 한 뒤 15초 (0.5s × 30회) log file polling 으로 URL + code 추출하면 즉시 stdout 으로 printf + `exit 0` 으로 빠져나와요. Claude Code 가 bash 종료를 인식해서 URL/code 안내가 사용자 화면에 즉시 보이고, login process 는 백그라운드에서 OAuth polling 계속해요. Step 5c (신규) 는 별도 bash call 로 `axhub auth status --json` 을 5초 간격 60회 (최대 5분) 폴링해요. user_email 이 비지 않으면 인증 완료, 5분 timeout 시 안내 후 `/axhub:auth` 재호출 라우팅 — background login process 는 자체 15분 timeout 으로 자연 정리돼요. SKILL 본문에 detach / surface / poll 3 단계 분리의 필요성을 명문화했어요.
+
+### Test baseline
+
+- bun run skill:doctor --strict exit 0 (30/30 SKILL 통과)
+- bun run lint:tone --strict 0 err / 0 warn (44 files)
+- bun run lint:keywords --check baseline diff 없음
+- bunx tsc --noEmit clean
+- bun test 989 tests: 980 pass / 2 fail / 6 skip / 1 todo (둘 다 README/PLAN.md v0.8.0 vs package v0.9.12 pre-existing version drift, scope 외)
+
+### Honest tradeoff
+
+`nohup ... & disown` 패턴은 bash 가 빠르게 종료되면서 OAuth polling 만 백그라운드에 남겨요. 사용자가 브라우저 승인 안 하고 5분 안에 안 돌아오면 background login process 는 자체 15분 timeout 까지 살아 있어서 로그 file 도 동시에 살아 있어요. mktemp 가 /tmp 또는 $TMPDIR 에 만들어서 system 이 주기적으로 cleanup 하니까 leak 위험은 낮아요. Step 5c poll loop 의 5분 cap 은 OAuth device flow 의 기본 expiration (15분) 보다 짧아서 사용자가 천천히 브라우저 진행하면 SKILL 이 먼저 timeout 가능 — 그 때는 안내에 따라 `/axhub:auth` 다시 호출하면 background 의 login process 가 이미 살아있어서 두 번째 5b 호출이 빠르게 status 확인으로 끝나거나, 만료됐으면 새 device code 받아요. URL/code 정규식 (`https?://...` + `[A-Z0-9]{4}-[A-Z0-9]{4}`) 은 CLI 가 형식 바꾸면 추출 실패하니까 그 때는 "/axhub:doctor 라우팅" 안내가 나와요. v0.9.11 → v0.9.12 는 회귀 수정 (block 해소) 가 핵심이라 minor bump 아닌 patch 로 release.
+
+### Fixed
+
+* **auth:** login wrapper 를 detach + fast-exit + poll 패턴으로 교체 ([#124](https://github.com/jocoding-ax-partners/axhub/issues/124)) ([ce88bfd](https://github.com/jocoding-ax-partners/axhub/commit/ce88bfda226c1eb19c931069e443f00e3611b89f))
+
 ## [0.9.11](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.10...v0.9.11) (2026-05-22)
 
 auth SKILL 의 Step 5b login 흐름이 `axhub auth login --force --no-browser` 를 sync subprocess 로 호출해서 사용자 화면에는 "Running ... 22s · 4 lines" 만 보이고 OAuth device flow URL + user_code 가 안 보이던 회귀를 차단했어요. CLI 는 stderr 로 verification URL + code 를 emit 한 직후 OAuth 승인 polling 으로 최대 15분 block 되는데, Claude Code shell tool 은 명령 종료 후 한 번에 output 을 surface 하니까 사용자는 SKILL 이 멈춘 줄 알고 폐기했어요. 새 흐름은 background subprocess + log file polling wrapper 로 교체. login 을 백그라운드로 실행하면서 임시 log file 로 redirect 하고, 0.5s 간격으로 30회 (총 15s) 파일을 scan 해서 `https?://...` URL + `XXXX-XXXX` code 패턴이 등장하는 즉시 별도 stdout line 으로 한국어 안내 ("axhub OAuth 인증이 필요해요. 1. 브라우저에서 열기 ... 2. 코드 입력 ...") 를 emit 해요. Claude Code 가 이 별도 line 을 surface 하니까 사용자는 URL 을 보고 브라우저로 진행할 수 있어요. login process 가 OAuth 승인을 기다리는 동안 wait 로 block 하고, 종료 시 exit code 를 그대로 propagate 해요. 15s 안에 URL/code 추출 실패하면 CLI 출력 형식 변경 가능성으로 보고 `/axhub:doctor` 라우팅 안내해요. log file 은 trap 으로 cleanup. `--json` 은 현재 CLI v1.0.0-rc.1 에서 polling 완료 후 한 번에 결과 envelope 만 emit 하니까 interactive wait 에는 사용 금지 (challenge surface 못 함) — 별도 명문화했어요.
