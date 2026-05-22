@@ -111,8 +111,10 @@ describe("dep-execution negative cases — doctor must pass", () => {
     });
   });
 
-  test("allows-dependency-execution: true + valid allowlist entry passes", () => {
-    // Use the real init skill — it is in the allowlist with a valid rationale.
+  test("init SKILL with allows-dependency-execution: false is not flagged by doctor", () => {
+    // After the bootstrap-saga refactor, init no longer claims dep-execution.
+    // Doctor must not flag init for allowlist concerns since the SKILL does
+    // not require an allowlist entry.
     const result = runDoctor();
     const lines = result.stdout.split("\n").filter(Boolean);
     expect(lines.filter((l) => l.includes("skills/init/SKILL.md")).length).toBe(0);
@@ -164,27 +166,35 @@ describe("dep-execution allowlist enforcement", () => {
   });
 
   test("allowlist entry with rationale shorter than 50 chars → exit 1", () => {
-    // Temporarily patch the allowlist to inject a short-rationale entry.
-    // We do this by writing a temp skill named exactly as a slug we inject
-    // into a modified allowlist — instead, we test via the doctor directly
-    // by relying on the existing allowlist validation path.
-    // Strategy: create a skill named "init" is impossible (real init exists).
-    // Instead we verify via a known-short rationale through a writable fixture
-    // that reads a patched allowlist. This requires overwriting the allowlist
-    // temporarily — use a separate approach: check that the doctor script
-    // itself enforces the constraint by examining the init allowlist entry.
+    // Create a temp SKILL that claims dep-execution, then patch the allowlist
+    // to give that SKILL a too-short rationale. Doctor must reject.
+    const slug = "_dep-exec-short-rationale";
+    const content = [
+      "---",
+      `name: ${slug}`,
+      "description: short-rationale fixture — true with too-short allowlist rationale",
+      "multi-step: false",
+      "needs-preflight: false",
+      "allows-dependency-execution: true",
+      "---",
+      "",
+      "This skill claims to allow dep-exec; allowlist will inject a short rationale.",
+      "",
+    ].join("\n");
     const allowlistPath = join(REPO_ROOT, "scripts", "skill-doctor-allowlist.json");
     const original = readFileSync(allowlistPath, "utf8");
     const patched = JSON.stringify({
       allows_dependency_execution: [
-        { skill: "init", rationale: "too short" },
+        { skill: slug, rationale: "too short" },
       ],
     });
     writeFileSync(allowlistPath, patched, "utf8");
     try {
-      const result = runDoctor();
-      expect(result.status).toBe(1);
-      expect(result.stdout).toContain("skills/init/SKILL.md: missing dep-execution");
+      withTempSkill(slug, content, () => {
+        const result = runDoctor();
+        expect(result.status).toBe(1);
+        expect(result.stdout).toContain(`skills/${slug}/SKILL.md: missing dep-execution`);
+      });
     } finally {
       writeFileSync(allowlistPath, original, "utf8");
     }
