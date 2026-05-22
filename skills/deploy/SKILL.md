@@ -612,7 +612,12 @@ To deploy:
 
    ```bash
    echo '[deploy:Step 5 status-chain] entered' >&2
-   axhub deploy status dep_$DEPLOY_ID $WATCH --json
+   DEPLOY_LIST_JSON=$(axhub deploy list --app "$APP_ID" --json 2>/dev/null || echo '{"items":[]}')
+   if [ "$(echo "$DEPLOY_LIST_JSON" | jq '(.items // .) | length')" -eq 0 ]; then
+     echo '{"systemMessage":"배포 이력이 없어요. 먼저 /axhub:deploy 로 배포 후 다시 호출하세요."}'
+     exit 0
+   fi
+   axhub deploy status "$DEPLOY_ID" --app "$APP_ID" $WATCH --json
    ```
 
    **Non-interactive guard:** If running in non-interactive context (`$CI` or `$CLAUDE_NON_INTERACTIVE` env var set, OR no TTY, OR `claude -p` invocation), DROP `--watch` flag and render single snapshot — `--watch` blocks indefinitely in headless/subprocess mode and `/axhub:deploy` post-chain hangs forever (same root cause as v0.1.12 status/logs hotfix). Detection: `if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then WATCH=--watch; else WATCH=; fi` then use `$WATCH`.

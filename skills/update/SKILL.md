@@ -79,13 +79,36 @@ To handle updates:
    }
    ```
 
-4. **On `apply`.** Run apply with cosign required (default-on per Phase 6 §16.10 / row 59):
+4. **On `apply`.** Preview the apply plan first:
 
    ```bash
-   AXHUB_REQUIRE_COSIGN=1 axhub update apply --yes --json
+   axhub update apply --dry-run --json
+   ```
+
+   Show the preview (target version, install path, cosign mode). Then ask for explicit consent:
+
+   ```json
+   {
+     "question": "지금 업데이트 적용할래요?",
+     "header": "업데이트 적용",
+     "options": [
+       {"label": "적용", "value": "적용", "description": "binary 교체를 진행해요"},
+       {"label": "취소", "value": "취소", "description": "지금은 하지 않아요"}
+     ]
+   }
+   ```
+
+   **Non-interactive guard (D1):** `[ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 면 → 기본값 "취소" (registry key: `update.apply_consent`).
+
+   **On "적용":** Run with cosign required (Phase 6 §16.10 / row 59):
+
+   ```bash
+   AXHUB_REQUIRE_COSIGN=1 axhub update apply --execute --yes --json
    ```
 
    The CLI verifies the binary signature before swapping. On exit 0, render: "업그레이드 완료! v<LATEST> 깔렸어요. 새 터미널을 열거나 다시 실행하시면 됩니다."
+
+   **On exit != 0:** Route to `/axhub:doctor` with the captured stderr (cosign verification failure path).
 
 5. **On exit 66 + `update.cosign_verification_failed`.** HARD STOP. Route to `../deploy/references/error-empathy-catalog.md` ("exit 66 + update.cosign_verification_failed"). Tell user:
 
@@ -114,7 +137,8 @@ Use current CLI support only:
 
 ```bash
 axhub update check --json
-AXHUB_REQUIRE_COSIGN=1 axhub update apply --json
+axhub update apply --dry-run --json
+AXHUB_REQUIRE_COSIGN=1 axhub update apply --execute --yes --json
 ```
 
 Do not mention unsigned bypass env vars unless the current CLI help or release note exposes them.
@@ -126,6 +150,7 @@ Do not mention unsigned bypass env vars unless the current CLI help or release n
 - NEVER continue past `update.cosign_verification_failed` under any circumstance.
 - NEVER call `axhub update apply` without explicit AskUserQuestion confirmation.
 - NEVER auto-retry `update apply` on transport failure (binary may be partially swapped).
+- NEVER call `axhub update apply --execute` without first running `axhub update apply --dry-run --json` preview.
 
 ## Additional Resources
 
