@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.10](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.9...v0.9.10) (2026-05-22)
+
+init SKILL 의 bootstrap saga 가 `git clone` 으로 코드를 받을 때 `.claude` 가 들어있는 CWD 를 비어있지 않다고 판정해서 `$APP_SLUG/` 서브 디렉터리 (예: `testyoung/`) 를 만들던 회귀를 차단했어요. vibe coder 가 Claude Code 에서 빈 폴더를 열고 "Next.js 앱 만들어줘" 발화하면 IDE 가 연 폴더와 코드가 받아진 폴더가 달라져서 매번 `cd $APP_SLUG` 한 단계를 거쳐야 했고, 폴더 trees 가 2 단계로 분리돼 README/package.json 이 한 단계 더 깊은 곳에 생겨 혼란스러웠어요. 새 흐름은 `git init -q -b main && git remote add origin <url> && git fetch origin --depth=1 && git reset --hard origin/<default-branch>` 패턴으로 항상 CWD 에 tracked 파일만 받아요. `.claude` / `.omc` / `.codegraph` 같은 untracked IDE/도구 메타 디렉터리는 `reset --hard` 가 tracked 파일만 건드리니 자연스럽게 보존돼요. 이미 `.git` 이 있는 디렉터리는 기존 history 를 덮어쓰지 않도록 자동 clone 을 건너뛰고 수동 명령 안내 (`git remote add origin ... && git fetch ... && git checkout -b main origin/main`) 한 줄만 출력해요. default branch 는 `git symbolic-ref refs/remotes/origin/HEAD` 로 동적 감지하고 실패 시 `main` 으로 fallback 하니 master/main 혼재 repo 에도 안전해요. Step 8 결과 안내에서 "1. 폴더 들어가기 — cd $APP_SLUG (이미 같은 폴더에 받았으면 생략)" 단계도 함께 삭제했어요 (이제 항상 CWD 라 불필요). 추가로 saga 가 GitHub App install 승인을 기다리며 block 될 때 silent narrate 만 반복하던 회귀를 차단하려고, jargon-block 섹션에 `device_code` 예외 노트, humanize 표에 Step 7a (GitHub 연결 필요) 행, Step 6 본문에 `device_code_issued` event 처리 패턴, NEVER 섹션에 silent narrate 금지 항목, Additional Resources 에 `../github/SKILL.md` OAuth device flow 링크를 함께 명문화했어요.
+
+### Test baseline
+
+- bun run skill:doctor --strict exit 0 (30/30 SKILL 통과)
+- bun run lint:tone --strict 0 err / 0 warn (44 files)
+- bun run lint:keywords --check baseline diff 없음
+- bunx tsc --noEmit clean
+- bun test 989 tests: 980 pass / 2 fail / 6 skip / 1 todo (둘 다 README/PLAN.md v0.8.0 vs package v0.9.10 pre-existing version drift, scope 외, stash 비교로 검증 완료)
+
+### Honest tradeoff
+
+`reset --hard origin/<default-branch>` 는 CWD 에 있는 tracked 파일 (예: repo 에 들어있는 README.md 와 동일 이름의 사용자 임의 README.md) 을 덮어써요. vibe coder 의 빈 디렉토리 + IDE 메타만 있는 정상 케이스에서는 충돌이 없지만, 사용자가 의도적으로 미리 만들어둔 파일이 repo template 의 파일과 정확히 이름이 겹치면 손실돼요. 안전을 위해 `.git` 이 있는 디렉터리는 자동 clone 을 거부하고 수동 안내만 보여줘서 기존 git history 를 보호해요. `bootstrap_id` raw 값은 여전히 internal 이라 echo 금지지만, `device_code_issued` event 의 `verification_uri` + `user_code` 쌍은 명시적 예외로 humanize 해서 보여주니까 saga 진행을 사용자가 추적할 수 있어요. Windows rust unit test 2개 (`preflight::tests::fallback_paths_include_cargo_and_local_bin_when_home_set`, `preflight::tests::resolve_axhub_path_finds_binary_in_path`) fail 은 path 환경 차이로 pre-existing — 이 release 와 무관해요. CI 의 `corpus.100 drift gate` 와 README/PLAN.md version drift 는 별도 chore 로 누적 4 release 째 미해결이라 다음 sprint 에 한 번에 정리할 예정이에요.
+
+### Fixed
+
+* **init:** bootstrap saga 의 git clone 을 CWD 로 받게 변경 ([#122](https://github.com/jocoding-ax-partners/axhub/issues/122)) ([01f6bb2](https://github.com/jocoding-ax-partners/axhub/commit/01f6bb2b682ed44fd4e0b9bacf847951a0d482c7))
+
 ## [0.9.9](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.8...v0.9.9) (2026-05-22)
 
 vibe coder 가 "내 리소스 보여줘" / "뭐 접근 가능해" / "what can I access" 발화 한 번에 본인이 접근 가능한 axhub 리소스 7-family (Identity 3 + Gateway 4) 통합 인벤토리를 한 응답에 받도록 신규 `inventory` SKILL 을 추가했어요. Identity tier 는 `axhub tenants list` / `apps mine` / `members list`, Gateway tier 는 `engines list` / `connectors list` / `resources list` / `catalog kinds` 7 명령을 `mktemp -d` 격리 디렉터리에서 백그라운드 병렬 호출 (`& wait`) 한 뒤 per-family `.code` exit code 검사로 fail-soft 처리해서 한 family 가 401/64/65 로 실패해도 나머지는 그대로 렌더해요. F4 privacy 필터로 `team_id != $TEAM_ID` 항목은 화면 노출 차단하고, 결과는 해요체 compact 카드 (count + top3) + drill-down hint (/axhub:apps, /axhub:env, /axhub:github, /axhub:deploy) 로 출력해요. mutation 경로는 0개 — frontmatter 는 `multi-step: false / needs-preflight: true / model: haiku / allows-dependency-execution: false` 라 비용 가벼워요. 함께 init SKILL 의 trigger phrase 에 "초기화 해줘" / "프로젝트 초기화 해줘" 같은 띄어쓰기 변형 5개를 추가해서 발화 인식 누락을 메웠어요.
