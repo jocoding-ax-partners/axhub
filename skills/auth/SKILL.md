@@ -167,9 +167,10 @@ To handle auth:
    #   AUTH_EXTRA="--scopes read,write,deploy"
 
    AUTH_LOG=$(mktemp -t axhub-auth-XXXXXX)
-   trap 'rm -f "$AUTH_LOG"' EXIT
-   ( axhub auth login --force --no-browser $AUTH_EXTRA >"$AUTH_LOG" 2>&1 ) &
+   # nohup + disown 으로 login 을 detach. bash 종료 후에도 OAuth polling 계속해요.
+   nohup axhub auth login --force --no-browser $AUTH_EXTRA >"$AUTH_LOG" 2>&1 </dev/null &
    AUTH_PID=$!
+   disown 2>/dev/null || true
 
    URL=""; CODE=""
    for _ in $(seq 1 30); do
@@ -183,18 +184,35 @@ To handle auth:
    done
 
    if [ -n "$URL" ] && [ -n "$CODE" ]; then
-     printf '\naxhub OAuth 인증이 필요해요. 다음 두 단계 진행해주세요:\n\n  1. 브라우저에서 열기: %s\n  2. 코드 입력: %s\n\n완료되면 자동으로 다음 단계로 진행돼요.\n\n' "$URL" "$CODE"
+     printf '\naxhub OAuth 인증이 필요해요. 다음 두 단계 진행해주세요:\n\n  1. 브라우저에서 열기: %s\n  2. 코드 입력: %s\n\n승인 후 잠시 기다리면 자동으로 토큰을 받아요.\n\n[axhub] AUTH_PID=%s AUTH_LOG=%s (다음 step 의 poll 에서 사용)\n' "$URL" "$CODE" "$AUTH_PID" "$AUTH_LOG"
+     exit 0
    else
      echo "OAuth device URL/code 를 15초 안에 추출 못 했어요. CLI 출력 형식이 바뀌었을 가능성. /axhub:doctor 로 진단해주세요."
+     kill "$AUTH_PID" 2>/dev/null
+     rm -f "$AUTH_LOG"
+     exit 1
    fi
-
-   wait "$AUTH_PID"
-   LOGIN_EXIT=$?
-   [ -f "$AUTH_LOG" ] && cat "$AUTH_LOG"
-   exit "$LOGIN_EXIT"
    ```
 
-   **왜 wrapper 가 필요해요?** Claude Code shell tool 은 명령 종료 후 한 번에 output 을 surface 해요. `axhub auth login --no-browser` 는 OAuth device flow polling 으로 최대 15분 block 되니까 그 사이 사용자는 URL 을 못 봐요. wrapper 는 백그라운드 실행 + log file polling 으로 URL/code 가 emit 되는 즉시 추출해서 별도 stdout line 으로 surface 해요. login 자체는 그대로 wait 해서 종료 후 종료 코드 propagate 해요.
+   **5c. Poll auth status until login completes.** 위 step 5b 는 URL surface 직후 exit 0 으로 빠져나와요 (Claude Code 가 stdout 을 즉시 사용자에게 보여줌). login process 는 detach 돼서 백그라운드 OAuth polling 계속해요. 사용자가 브라우저에서 승인하면 토큰 저장돼요. 다음 별도 bash call 로 완료 확인:
+
+   ```bash
+   # 최대 5분 (60회 × 5s) auth status 폴링
+   for _ in $(seq 1 60); do
+     EMAIL=$(axhub auth status --json 2>/dev/null | jq -r '.user_email // empty')
+     if [ -n "$EMAIL" ]; then
+       printf '인증 완료: %s\n' "$EMAIL"
+       exit 0
+     fi
+     sleep 5
+   done
+   echo "OAuth 승인 5분 안 들어왔어요. 다시 시도하려면 /axhub:auth 호출."
+   exit 64
+   ```
+
+   poll loop 이 너무 길게 안 block 되도록 5분 cap. 사용자가 5분 내 브라우저 승인 안 하면 안내 후 종료. (background login process 는 자체 15분 timeout 으로 곧 정리됨.)
+
+   **왜 wrapper 가 필요해요?** Claude Code shell tool 은 명령 종료 후 한 번에 output 을 surface 해요. `axhub auth login --no-browser` 는 OAuth device flow polling 으로 최대 15분 block 되니까 sync 호출 + wait 패턴은 URL 을 사용자가 못 봐요. 새 wrapper 는 (1) nohup + disown 으로 login 을 detach 해서 bash 가 빠르게 exit, (2) exit 직전 URL/code 추출해서 stdout 으로 surface, (3) 후속 step 에서 auth status polling 으로 완료 확인 — 3 단계 분리로 사용자 화면에 URL 이 즉시 보여요.
 
    `--json 은 challenge fields` (`device_url`, `user_code`, verification URL, or equivalent) 를 polling 전에 emit 할 때만 사용해요. 현재 CLI v1.0.0-rc.1 의 `--json` 은 polling 완료 후 한 번에 결과 envelope 만 emit 하니까 interactive wait 에는 사용 금지예요 (challenge surface 못 함).
 
