@@ -197,6 +197,21 @@ To run diagnostics:
 
 7. **Report exit code** in the summary block: green (all 0), yellow (warnings only), red (preflight returned 64 or 65). The skill itself always returns to the user — never `exit 1` from the doctor flow.
 
+## Optional Flags (구현 확인됨)
+
+vibe-coder 지원 시나리오에서 추가로 사용할 수 있어요:
+
+```bash
+# 지원 리포트 아카이브 생성 — doctor.rs:78 구현, 결과를 <path> 에 저장해요
+axhub doctor --bundle <path> --json
+
+# 네트워크 프로브 스킵 — doctor.rs:70 구현, 오프라인 환경 진단 시 사용해요
+axhub doctor --offline --json
+```
+
+- `--bundle <path>`: 진단 결과를 아카이브 파일로 저장해요. 지원팀에 공유할 때 써요.
+- `--offline`: 네트워크가 없는 환경에서 진단할 때 써요. auth endpoint 체크를 건너뛰어요.
+
 ## v0.2.0 command coverage polish
 
 ### doctor audit
@@ -248,6 +263,7 @@ Keep this read-only. If audit export requires extra permission, explain the miss
 - NEVER echo the raw token contents even if `~/.config/axhub-plugin/token` is readable.
 - NEVER skip preflight — that is the single source of truth for version + auth state.
 - NEVER mark the system "정상" when any required field is null.
+- NEVER `axhub doctor --fix`, `--dry-run`, `--send-report` 플래그를 호출하지 않아요. Rust v1.0.0-rc.1 에서 미구현 stub이에요 — 호출해도 일반 진단 JSON만 반환해요 (fix 아무것도 안 해요). Rust impl ship 후 별도 ralplan 으로 노출해요.
 
 ## Additional Resources
 

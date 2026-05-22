@@ -163,6 +163,14 @@
         "skip",
         "업그레이드"
       ]
+    },
+    "지금 업데이트 적용할래요?": {
+      "safe_default": "취소",
+      "rationale": "destructive binary swap, vibe-coder 명시 동의 후에만 진행해요. non-interactive 환경에서는 항상 취소해요.",
+      "allowed_safe_defaults": [
+        "취소",
+        "적용"
+      ]
     }
   },
   "upgrade": {
@@ -182,7 +190,15 @@
   "status": {
     "_note": "status SKILL delegates AskUserQuestion sites to recovery-flows.md (cold-cache deploy pick) and error-empathy-catalog.md (exit-65 re-login). Defaults handled at delegation point.",
     "cold_cache_default": "most_recent",
-    "exit_65_default": "abort"
+    "exit_65_default": "abort",
+    "어떤 배포 상태를 볼까요?": {
+      "safe_default": "most_recent",
+      "rationale": "Read-only deployment status lookup. Non-interactive subprocess (CI / claude -p / no TTY) must auto-pick items[0] (most recent succeeded) per cold_cache_default convention. No destructive side effects.",
+      "allowed_safe_defaults": [
+        "most_recent",
+        "abort"
+      ]
+    }
   },
   "init": {
     "어떤 템플릿으로 시작할까요?": {

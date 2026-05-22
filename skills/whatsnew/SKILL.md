@@ -43,6 +43,7 @@ To show what is new:
 - NEVER 인터넷 release note 를 임의로 source of truth 로 삼지 않아요.
 - NEVER update/upgrade 를 자동 실행하지 않아요.
 - NEVER changelog 원문을 과도하게 길게 붙이지 않아요.
+- NEVER `axhub whatsnew` 에 `--since` 등 플래그를 전달하지 않아요. `axhub whatsnew` 는 zero-flag CLI예요 (미지원 플래그 → exit 64). `--since` 는 `"${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" routing-stats` 전용이에요.
 
 ## v0.3.2 — 라우팅 단순화
 
@@ -76,8 +77,14 @@ To show what is new:
 
 ### 라우팅 통계 보기
 
+> `axhub whatsnew` 는 zero-flag CLI예요 — 플래그를 전달하면 exit 64 에러가 나요. `axhub-helpers` 는 별도 바이너리이고, `--since` 플래그는 이 명령에서만 유효해요.
+
 ```bash
-axhub-helpers routing-stats --since 7d
+# 릴리즈 노트 — axhub CLI (플래그 없음)
+axhub whatsnew --json
+
+# 라우팅 감사 통계 — 별도 바이너리, --since 는 여기에만 써요
+"${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" routing-stats --since 7d
 ```
 
 출력 예시:

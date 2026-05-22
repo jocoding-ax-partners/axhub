@@ -26,24 +26,33 @@ Track an axhub deploy without dumping raw JSON ticks. Use the adapter `axhub-hel
 
 To check status:
 
-1. **Resolve the deployment.** Call the helper to look up the deixis-resolved deployment id from the local cache, or fall back to user prompt:
+1. **최근 배포 목록 조회.** 앱을 확인하고 배포 목록을 가져와요:
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent status --user-utterance "$ARGS" --json
+   APP=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent status --user-utterance "$ARGS" --json | jq -r '.resolve.app_id // empty')
+   DEPLOY_LIST_JSON=$(axhub deploy list --app "$APP" --json)
    ```
 
-   On `cache_hit: false`, follow `../deploy/references/recovery-flows.md` ("cold-cache"): ask the user which app first (use `axhub apps list --json` for choices), then surface the last 3 deploys via the helper:
+   배포 이력이 없으면 안내하고 종료해요:
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP_ID> --limit 3
+   if [ "$(echo "$DEPLOY_LIST_JSON" | jq '(.items // .) | length')" -eq 0 ]; then
+     echo '{"systemMessage":"배포 이력이 없어요. 먼저 /axhub:deploy 로 배포 후 다시 호출하세요."}'
+     exit 0
+   fi
    ```
 
-   On exit 65 (token missing — Phase 7 US-701 이후엔 SessionStart hook 가 자동 token-init 하므로 거의 발생 안 함):
-   > "토큰을 찾을 수 없어요. 'axhub auth login' 으로 한 번 로그인하시거나 CC 세션을 재시작해주세요."
+   배포가 있으면 AskUserQuestion 으로 선택해요. 비대화형 환경에서는 `cold_cache_default: most_recent` (registry) 에 따라 `items[0]` 를 자동 선택해요:
 
-   사용자가 deployment 선택 후 mapping 을 `~/.config/axhub/deployments.json` 에 저장.
+   ```json
+   {
+     "question": "어떤 배포 상태를 볼까요?",
+     "header": "배포 선택",
+     "options": "<list[0..N] — id + app_slug + branch + created_at 으로 구성한 옵션>"
+   }
+   ```
 
-   Note: ax-hub-cli v0.1.x has no `axhub deploy list` — the helper hits `GET /api/v1/apps/{id}/deployments` directly with the user's token (env `AXHUB_TOKEN` or `~/.config/axhub-plugin/token`).
+   선택한 항목의 `id` 를 `$DEPLOYMENT_ID` 에 저장해요.
 
 2. **Pre-flight version check** (only if mutation chain is implied — pure read can skip):
 
@@ -51,10 +60,10 @@ To check status:
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json
    ```
 
-3. **Start watching.** Stream NDJSON with `--watch`:
+3. **상태 확인.** NDJSON 스트림을 `--watch` 로 받아요:
 
    ```bash
-   axhub deploy status dep_<DEPLOY_ID> --app <APP_ID> --watch --json
+   axhub deploy status "${DEPLOYMENT_ID}" --app "${APP}" --watch --json
    ```
 
    **Non-interactive guard:** If running in non-interactive context (`$CI` or `$CLAUDE_NON_INTERACTIVE` env var set, OR no TTY, OR `claude -p` invocation), DROP `--watch` flag and render single snapshot instead — `--watch` blocks indefinitely in headless/subprocess mode and `/axhub:status` hangs forever. Detection: prefix command with `if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then WATCH=--watch; else WATCH=; fi` then use `$WATCH`.

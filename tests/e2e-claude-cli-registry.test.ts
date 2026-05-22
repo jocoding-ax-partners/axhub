@@ -87,9 +87,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("42 actual safe_default rationale 엔트리 including Phase 26 quality + Plan v6 diagnose + v0.9.3 auth PAT revoke", () => {
+  test("44 actual safe_default rationale 엔트리 including Phase 26 quality + Plan v6 diagnose + v0.9.3 auth PAT revoke + skill-cli-drift-fix (update.apply_consent + status.deployment_id_pick)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(42);
+    expect(paths).toHaveLength(44);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -131,7 +131,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "quality_gate",
       "recover",
       "routing-stats",
+      "status",
       "trace",
+      "update",
       "update",
       "upgrade",
       "verify",
