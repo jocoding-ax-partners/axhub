@@ -18,12 +18,17 @@ const guidanceSection = (): string => {
   return nextHeading === -1 ? rest : rest.slice(0, marker.length + nextHeading);
 };
 
-describe("init template guidance UX", () => {
-  test("keeps CLI registry as source of truth and safe fallback as abort", () => {
-    expect(initSkill).toContain("axhub --json init --list-templates");
+describe("init template guidance UX (bootstrap saga workflow)", () => {
+  test("uses backend templates list as source of truth and safe fallback as abort", () => {
+    expect(initSkill).toContain("axhub apps templates list --json");
     expect(initSkill).toContain("Non-interactive AskUserQuestion guard (D1)");
     expect(initSkill).toContain("어떤 템플릿으로 시작할까요?");
     expect(defaults.init["어떤 템플릿으로 시작할까요?"].safe_default).toBe("abort");
+  });
+
+  test("registers all bootstrap-flow AskUserQuestions with safe defaults", () => {
+    expect(defaults.init["앱 이름 뭘로 할래요?"].safe_default).toBe("abort");
+    expect(defaults.init["지금 만들고 배포까지 진행할까요?"].safe_default).toBe("취소");
   });
 
   test("routes plain Korean project initialization phrasing without requiring axhub prefix", () => {
@@ -31,32 +36,21 @@ describe("init template guidance UX", () => {
     expect(initSkill).toContain('"프로젝트 초기화해줘"');
   });
 
-  test("explains each current visible template with beginner outcomes", () => {
+  test("explains each built-in template alias with beginner outcomes", () => {
     const guide = guidanceSection();
-    for (const id of [
-      "nextjs-axhub",
-      "astro-axhub",
-      "vite-react-axhub",
-      "remix-axhub",
-      "express-axhub",
-      "hono-axhub",
-    ]) {
-      expect(guide, `${id} should have local guidance`).toContain(id);
+    for (const alias of ["nextjs", "astro", "react"]) {
+      expect(guide, `${alias} alias should have local guidance`).toContain(alias);
     }
-
     expect(guide).toMatch(/쇼핑몰|예약|결제|로그인|관리자 화면/);
     expect(guide).toMatch(/회사 소개|랜딩 페이지|블로그|문서|글과 이미지/);
     expect(guide).toMatch(/설정 화면|입력 폼|관리 화면/);
-    expect(guide).toMatch(/신청서|설문|주문/);
-    expect(guide).toMatch(/주문 처리|데이터 저장/);
-    expect(guide).toMatch(/작고 빠른 연결용 서버|외부 서비스/);
   });
 
   test("documents overlay semantics and unknown template fallback", () => {
     const guide = guidanceSection();
-    expect(guide).toContain("CLI가 반환한 template");
+    expect(guide).toContain("backend 가 반환한 template");
     expect(guide).toMatch(/알 수 없는|새 template|unknown/);
-    expect(guide).toMatch(/framework.*description|description.*framework/);
+    expect(guide).toMatch(/folder_name|name/);
     expect(guide).toMatch(/숨기지/);
   });
 
@@ -82,18 +76,25 @@ describe("init template guidance UX", () => {
     expect(guide).not.toContain("프론트");
   });
 
-  test("does not introduce bootstrap, remote-template, or dependency-install commands", () => {
-    expect(initSkill).not.toMatch(/axhub-helpers\s+fetch-template/);
-    expect(initSkill).not.toMatch(/\b(?:npm|pnpm|bun)\s+install\b/);
-    expect(initSkill).not.toMatch(/\b(?:yarn|pip|poetry)\s+install\b/);
-    expect(initSkill).not.toMatch(/curl\s+.*templates\.json/);
+  test("forbids legacy stub commands and remote template fetches via NEVER bullets", () => {
+    expect(initSkill).toMatch(/NEVER `axhub init`/);
+    expect(initSkill).toMatch(/--from-template/);
+    expect(initSkill).toMatch(/NEVER `axhub-helpers fetch-template`/);
+    expect(initSkill).toMatch(/source-of-truth/);
   });
 
-  test("uses bootstrap only as a plan-only next-step preview after scaffold", () => {
-    expect(initSkill).toContain("axhub-helpers bootstrap --dry-run --json");
-    expect(initSkill).toContain("consent_required_apps_create");
-    expect(initSkill).toContain("bootstrap --auto-chain");
-    expect(initSkill).toContain("앱 등록이나 배포는 deploy/apps 흐름");
+  test("uses bootstrap saga as the primary workflow (not plan-only)", () => {
+    expect(initSkill).toMatch(/axhub apps bootstrap --template/);
+    expect(initSkill).toMatch(/--execute/);
+    expect(initSkill).toMatch(/--dry-run/);
+    expect(initSkill).toMatch(/bootstrap-status/);
+    expect(initSkill).toMatch(/repo_full_name/);
+    expect(initSkill).toMatch(/git clone/);
   });
 
+  test("preserves vibe coder visibility rules and TodoWrite checklist", () => {
+    expect(initSkill).toContain("Vibe Coder Visibility Rules");
+    expect(initSkill).toContain("TodoWrite");
+    expect(initSkill).toContain("TodoWrite status sync");
+  });
 });

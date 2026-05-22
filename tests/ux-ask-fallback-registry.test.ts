@@ -107,15 +107,19 @@ describe("Phase 17 C5/US-1705 — per-question fallback registry coverage", () =
     }
   });
 
-  test("init SKILL 의 dependency_install_strategy enum 은 정확히 ['skip','manual_terminal']", () => {
-    const initEntry = registry["init"]?.["dependency_install_strategy"];
-    expect(initEntry).toBeDefined();
-    expect((initEntry as RegistryEntry).allowed_safe_defaults).toEqual([
-      "skip",
-      "manual_terminal",
+  test("init SKILL bootstrap consent enum 은 정확히 ['취소','execute'] (Phase post-bootstrap-saga refactor)", () => {
+    const consentEntry = registry["init"]?.["지금 만들고 배포까지 진행할까요?"];
+    expect(consentEntry).toBeDefined();
+    expect((consentEntry as RegistryEntry).allowed_safe_defaults).toEqual([
+      "취소",
+      "execute",
     ]);
-    expect((initEntry as RegistryEntry).safe_default).toBe("manual_terminal");
-    expect((initEntry as RegistryEntry).allowed_safe_defaults).not.toContain("inline_session");
+    expect((consentEntry as RegistryEntry).safe_default).toBe("취소");
+    expect((consentEntry as RegistryEntry).allowed_safe_defaults).not.toContain("execute_silently");
+
+    const nameEntry = registry["init"]?.["앱 이름 뭘로 할래요?"];
+    expect(nameEntry).toBeDefined();
+    expect((nameEntry as RegistryEntry).safe_default).toBe("abort");
   });
 });
 

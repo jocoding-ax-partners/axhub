@@ -1,6 +1,6 @@
 ---
 name: init
-description: '이 스킬은 사용자가 새 axhub 앱을 만들거나 템플릿으로 프로젝트를 시작하고 싶어할 때 사용해요. 다음 표현에서 활성화: "결제 앱 만들어", "결제 앱 만들어줘", "빈 디렉토리", "새 앱 만들어", "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어", "프로젝트 초기화", "프로젝트 초기화해줘", "apphub.yaml 만들어", "apphub.yaml 만들어줘", "axhub.yaml 만들어", "axhub.yaml 만들어줘", "fastapi 앱", "FastAPI 앱 만들어줘", "next.js 앱", "Next.js 앱 만들어줘", "nextjs 앱", "init", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. ax-hub-cli 의 init template 목록을 보여주고 선택한 template 으로 scaffold 해요.'
+description: '이 스킬은 사용자가 새 axhub 앱을 만들거나 템플릿으로 프로젝트를 시작하고 싶어할 때 사용해요. 다음 표현에서 활성화: "결제 앱 만들어", "결제 앱 만들어줘", "빈 디렉토리", "새 앱 만들어", "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어", "프로젝트 초기화", "프로젝트 초기화해줘", "apphub.yaml 만들어", "apphub.yaml 만들어줘", "axhub.yaml 만들어", "axhub.yaml 만들어줘", "fastapi 앱", "FastAPI 앱 만들어줘", "next.js 앱", "Next.js 앱 만들어줘", "nextjs 앱", "init", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. `axhub apps bootstrap` saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 `repo_full_name` 으로 현재 dir 에 git clone 해요.'
 examples:
   - utterance: "결제 앱 만들어"
     intent: "scaffold new axhub app"
@@ -16,37 +16,36 @@ examples:
     intent: "scaffold new axhub app"
 multi-step: true
 needs-preflight: false
-allows-dependency-execution: true
+allows-dependency-execution: false
 model: sonnet
 ---
 
 # Init
 
-새 axhub 앱을 현재 CLI 템플릿 목록에서 시작해요. v0.2.0 에서는 패키지 설치와 원격 template 내려받기를 하지 않고 `axhub --json init --list-templates` 를 단일 정답 소스로 써요. Sprint 3 부터 프로젝트 파일을 만든 뒤에는 helper bootstrap 을 plan-only (계획만 보기) 모드로만 호출해서 다음 안전 단계를 보여줘요.
+새 axhub 앱을 `axhub apps bootstrap` saga 로 한 번에 만들어요. backend app 생성 + GitHub repo 생성 + 첫 deploy 를 server-side 에서 처리하고, saga 응답의 `repo_full_name` 으로 현재 dir 에 git clone 해서 local + remote 둘 다 채워줘요. 기존 `axhub init` 호출은 Rust v1.0.0-rc.1 에서 `--from-template` 미구현 stub 라 SKILL 에서 호출하지 않아요.
 
 ## Vibe Coder Visibility Rules
 
 이 SKILL 을 쓰는 사람은 대부분 개발 지식이 없어요. CLI 와 helper 가 돌려주는 다음 field 는 **internal verification primitives** 예요. SKILL 안에서는 이 field 들을 변수에 담아 helper 와 주고받되, **raw 값을 사용자 chat 에 echo 하면 안 돼요** (deploy SKILL 의 동일 룰을 따라요):
 
-- `schema_version` (예: `init/v1`) — API 응답 검증용. raw 값 echo 금지.
-- `templates[].id`, `templates[].framework`, `templates[].description` — CLI 가 반환한 template registry. id 는 사용자 발화 매칭에만 쓰고, raw 목록 dump 금지.
-- `consent_required_apps_create`, `git_init_required`, `first_commit_required`, `template_required`, `conflict_existing_files`, `subdomain_collision`, `backend_contract_missing_defaults`, `idempotency_unavailable`, `dependency_install_required` — bootstrap state 코드. raw 식별자 echo 금지.
-- `next_action`, `next_steps[]`, `recommended_command`, `requires_pm_choice`, `manager_candidates`, `package_json_present`, `node_modules_present`, `detected_lockfile`, `lockfile_count` — helper plan / dependency-plan output. raw JSON echo 금지.
-- `pending_action_id`, `pending_action_hash`, `binding_hash`, `consent_binding`, `synthesized_by_helper`, `idempotency_key`, `retry_policy`, `command_argv`, `exit_code`, `stdout_json`, `stderr` — bootstrap record FSM 의 internal verification primitives. raw 값 echo 금지.
+- `schema_version` (예: `bootstrap/v1`) — API 응답 검증용. raw 값 echo 금지.
+- `items[].id`, `items[].folder_name`, `items[].name`, `items[].resource_tier` — `axhub apps templates list` 가 반환한 backend template registry. id 는 사용자 발화 매칭에만 쓰고, raw 목록 dump 금지.
+- `bootstrap_id`, `status_url`, `stage`, `app_id`, `deployment_id`, `repo_full_name`, `error_code`, `error_message` — bootstrap saga 의 internal verification primitives. raw 값 echo 금지 (단 `repo_full_name` 은 마지막 단계에서 `git clone` URL 로 사용자에게 보여줘요).
+- `request_id`, `idempotency_key`, `installation_id`, `device_code` — internal correlation/auth primitives. raw 값 echo 금지.
 
-대신 사용자에게는 한국어 한 줄로 진행 상황만 알려드려요. 예시 templates:
+대신 사용자에게는 한국어 한 줄로 진행 상황만 알려드려요. 예시:
 
 | 시점 | 사용자 chat 한 줄 |
 |------|-------------------|
 | Step 1 CLI 존재 확인 | "axhub 도구가 있는지 보고 있어요." |
 | Step 2 template 목록 조회 | "사용할 수 있는 템플릿을 확인하고 있어요." |
 | Step 3 template 선택 | "어떤 종류 프로젝트를 만들지 골라요." |
-| Step 4 axhub init 실행 | "프로젝트 파일을 만들고 있어요." |
-| Step 5 bootstrap plan-only | (state 별 한 줄) "앱 등록 동의가 필요해요." / "저장 지점을 먼저 만들어야 해요." / "템플릿을 골라야 해요." / "현재 폴더에 이미 같은 이름 파일이 있어요." |
-| Step 6 next_steps 안내 | "이제 이 순서로 진행하면 돼요." (이어서 humanized 5단계) |
-| dependency install (D2) | "어떤 방법으로 패키지를 깔까요?" |
-| dependency install (D3) | "패키지를 깔고 있어요. 잠시만요." |
-| dependency install (D5) | "패키지 설치가 막혔어요. 어떻게 도와드릴까요?" |
+| Step 4 앱 이름 입력 | "앱 이름을 정해요." |
+| Step 5 bootstrap dry-run | "어떤 작업을 할지 미리 보여줘요." |
+| Step 6 사용자 동의 | "지금 만들고 배포까지 한 번에 진행해요." |
+| Step 7 bootstrap execute + watch | "앱 만들고, GitHub repo 만들고, 첫 배포까지 진행 중이에요. 보통 2~5분 정도 걸려요." |
+| Step 8 git clone | "코드를 현재 폴더로 가져와요." |
+| Step 9 결과 안내 | "끝났어요. 이렇게 시작하면 돼요." |
 
 raw helper JSON 이 디버깅에 필요한 환경 (개발 검증) 은 `AXHUB_INIT_VERBOSE=1` 환경변수가 켜진 경우에만 echo 해요. 기본 흐름은 항상 한 줄 자연어로 진행해요.
 
@@ -60,8 +59,9 @@ To start an axhub app:
    TodoWrite({ todos: [
      { content: "CLI와 template registry 확인", status: "in_progress", activeForm: "CLI 확인 중" },
      { content: "template 선택", status: "pending", activeForm: "template 고르는 중" },
-     { content: "axhub init 실행", status: "pending", activeForm: "프로젝트 만드는 중" },
-     { content: "다음 액션 안내", status: "pending", activeForm: "마무리하는 중" }
+     { content: "앱 이름 입력", status: "pending", activeForm: "앱 이름 정하는 중" },
+     { content: "bootstrap saga 실행 (app + repo + deploy)", status: "pending", activeForm: "bootstrap 진행 중" },
+     { content: "git clone + 결과 안내", status: "pending", activeForm: "코드 가져오는 중" }
    ]})
    ```
 
@@ -73,125 +73,172 @@ To start an axhub app:
    axhub --version
    ```
 
-   실패하면 install/update 안내를 짧게 보여주고 중단해요. auth 는 init template 목록 조회에 필요하지 않아요.
+   실패하면 `/axhub:install-cli` 안내를 짧게 보여주고 중단해요.
 
-2. **CLI registry 에서 template 목록을 읽어요.**
+2. **Backend template registry 를 읽어요.**
 
    ```bash
-   axhub --json init --list-templates
+   axhub apps templates list --json
    ```
 
-   `schema_version` 은 helper API 응답 검증용 **internal verification primitive** 예요 — `init/v1` 인지 확인만 하고 raw 값을 사용자 chat 에 echo 하면 안 돼요 (deploy SKILL Visibility Rules 와 같은 규칙). CLI가 반환한 template 만 선택 후보로 쓰고, `templates[].id`, `framework`, `description` 에 아래 로컬 가이드를 덧붙여 보여줘요.
+   응답 envelope shape:
+
+   ```json
+   {
+     "schema_version": "...",
+     "data": {
+       "items": [
+         {"id": "<uuid>", "folder_name": "react-axhub", "name": "React (Axhub)", "resource_tier": "small"},
+         {"id": "<uuid>", "folder_name": "nextjs-axhub", "name": "Next.js (Axhub)", "resource_tier": "small"},
+         {"id": "<uuid>", "folder_name": "astro-axhub", "name": "Astro (Axhub)", "resource_tier": "micro"}
+       ]
+     }
+   }
+   ```
+
+   `schema_version` 은 응답 검증용 internal primitive 예요 — raw 값을 사용자 chat 에 echo 하지 않아요. `items[]` 의 `id` 또는 built-in alias (`react` / `nextjs` / `astro`) 를 `--template` 인자로 써요.
+
+   on exit 65 (auth 만료) → `/axhub:auth` 로 라우팅. on exit 8 (tenant 미해석) → `axhub profile current --json` 안내. 그 외 비정상 종료는 `/axhub:doctor` 권장.
 
 ## 템플릿 선택 가이드
 
-이 가이드는 두 번째 registry 가 아니에요. 먼저 `axhub --json init --list-templates` 로 CLI가 반환한 template 목록을 읽고, 그 안에 있는 id 에만 설명을 덧붙여요. 선택 값은 반드시 CLI가 반환한 template id 여야 해요.
+이 가이드는 두 번째 registry 가 아니에요. 먼저 `axhub apps templates list --json` 로 backend 가 반환한 template 목록을 읽고, 그 안에 있는 alias / folder_name 에만 설명을 덧붙여요. 선택 값은 반드시 backend 가 반환한 `id` 또는 built-in alias (`react` / `nextjs` / `astro`) 여야 해요.
 
-알 수 없는 새 template 이 CLI에서 오면 숨기지 않아요. 로컬 설명이 없는 항목은 CLI의 `framework` 와 `description` 을 그대로 보여주고, “CLI 설명을 보고 고르면 돼요. 잘 모르겠으면 먼저 Next.js 계열 추천 항목을 봐요.”처럼 중립 안내만 덧붙여요.
+알 수 없는 새 template 이 backend 에서 오면 숨기지 않아요. 로컬 설명이 없는 항목은 backend `name` 과 `folder_name` 을 그대로 보여주고, "이름을 보고 고르면 돼요. 잘 모르겠으면 먼저 Next.js 추천을 봐요." 처럼 중립 안내만 덧붙여요.
 
-| template id | 이렇게 만들고 싶을 때 골라요 |
+| alias / folder | 이렇게 만들고 싶을 때 골라요 |
 |---|---|
-| `nextjs-axhub` | 쇼핑몰, 예약, 결제, 로그인, 관리자 화면처럼 화면과 기능이 함께 있는 웹서비스를 만들 때 추천해요. 자동 선택은 아니고 사용자가 고를 때만 실행해요. |
-| `astro-axhub` | 회사 소개, 랜딩 페이지, 블로그, 문서처럼 글과 이미지 중심이고 자주 바뀌지 않는 사이트에 좋아요. |
-| `vite-react-axhub` | 로그인한 뒤 쓰는 설정 화면, 입력 폼, 관리 화면처럼 버튼을 눌러 내용이 자주 바뀌는 화면에 좋아요. |
-| `remix-axhub` | 입력한 내용을 바로 저장하고, 페이지 이동 중에도 자연스럽게 이어지는 서비스에 좋아요. 예약, 신청서, 설문, 주문처럼 작성하고 제출하는 흐름이 많다면 Next.js 대신 고려해요. |
-| `express-axhub` | 화면은 거의 없고, 다른 앱이 요청하면 주문 처리나 데이터 저장 같은 일을 해주는 서버가 필요할 때 골라요. |
-| `hono-axhub` | 아주 작고 빠른 연결용 서버를 만들 때 골라요. 예를 들면 외부 서비스가 부르면 바로 응답하는 작은 기능이에요. |
+| `nextjs` (또는 `nextjs-axhub`) | 쇼핑몰, 예약, 결제, 로그인, 관리자 화면처럼 화면과 기능이 함께 있는 웹서비스를 만들 때 추천해요. |
+| `astro` (또는 `astro-axhub`) | 회사 소개, 랜딩 페이지, 블로그, 문서처럼 글과 이미지 중심이고 자주 바뀌지 않는 사이트에 좋아요. |
+| `react` (또는 `react-axhub`) | 로그인한 뒤 쓰는 설정 화면, 입력 폼, 관리 화면처럼 버튼을 눌러 내용이 자주 바뀌는 화면에 좋아요. |
 
-CLI가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요. structured AskUserQuestion 은 UI 제한에 맞춰 **최대 3개 선택지**만 써요. 알려진 id 는 위 설명을 짧게 붙이고, 알 수 없는 id 는 CLI `description` 과 `framework` 를 붙여요. 항상 `취소` 선택지를 함께 보여줘요.
+backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요. structured AskUserQuestion 은 UI 제한에 맞춰 **최대 3개 선택지** 만 써요. 알려진 alias 는 위 설명을 짧게 붙이고, 알 수 없는 항목은 backend `name` 과 `folder_name` 을 붙여요. 항상 `취소` 선택지를 함께 보여줘요.
 
-**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — template 선택은 `abort` 예요.
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — template 선택은 `abort`, 앱 이름은 `abort`, bootstrap consent 는 `취소` 예요.
 
 3. **template 을 선택해요.**
 
-   먼저 위 가이드와 CLI가 반환한 template id 전체 목록을 텍스트로 보여줘요. 사용자가 발화에 exact template id 를 이미 적었다면 AskUserQuestion 없이 그 id 로 진행해요. id 가 없으면 structured AskUserQuestion 은 3개 이하 선택지만 써요.
+   먼저 위 가이드와 backend 가 반환한 template 전체 목록을 텍스트로 보여줘요. 사용자가 발화에 exact alias 또는 backend folder_name 을 이미 적었다면 (예: "nextjs 앱 만들어줘") AskUserQuestion 없이 그 alias 로 진행해요. id 가 없으면 structured AskUserQuestion 은 3개 이하 선택지만 써요.
 
    ```json
    {
      "question": "어떤 템플릿으로 시작할까요?",
      "header": "템플릿",
      "options": [
-       {"label": "Next.js 추천", "value": "nextjs-axhub", "description": "쇼핑몰·예약·결제·로그인·관리자 화면"},
-       {"label": "직접 고르기", "value": "manual_template_id", "description": "위 목록에서 exact template id 를 말해요"},
+       {"label": "Next.js 추천", "value": "nextjs", "description": "쇼핑몰·예약·결제·로그인·관리자 화면"},
+       {"label": "직접 고르기", "value": "manual_template_id", "description": "위 목록에서 alias 또는 folder_name 을 말해요"},
        {"label": "취소", "value": "abort", "description": "프로젝트를 만들지 않아요"}
      ]
    }
    ```
 
-   위 JSON 은 예시예요. `Next.js 추천` 은 CLI가 `nextjs-axhub` 를 반환할 때만 보여줘요. CLI가 `nextjs-axhub` 를 반환하지 않으면 첫 번째 알려진 template 하나를 추천 버튼으로 쓰거나, 추천 없이 `직접 고르기` + `취소` 만 보여줘요. `manual_template_id` 를 고르면 AskUserQuestion 을 다시 호출하지 말고, 이미 보여준 텍스트 목록에서 exact template id 를 한 번만 물어요. 사용자가 답한 id 가 CLI 목록에 없으면 파일을 만들지 말고 다시 목록을 보여줘요. subprocess 에서는 자동 선택하지 않아요.
+   위 JSON 은 예시예요. `Next.js 추천` 은 backend 가 `nextjs` alias 또는 `nextjs-axhub` folder 를 반환할 때만 보여줘요. backend 가 두 표현 모두 반환하지 않으면 첫 번째 알려진 항목 하나를 추천 버튼으로 쓰거나, 추천 없이 `직접 고르기` + `취소` 만 보여줘요. `manual_template_id` 를 고르면 AskUserQuestion 을 다시 호출하지 말고, 이미 보여준 텍스트 목록에서 exact alias 또는 folder_name 을 한 번만 물어요. 사용자가 답한 값이 backend 목록에 없으면 saga 를 시작하지 말고 다시 목록을 보여줘요. subprocess 에서는 자동 선택하지 않아요.
 
-4. **선택된 template 으로 프로젝트 파일을 만들어요.**
+4. **앱 이름을 정해요.**
 
-   ```bash
-   axhub init --from-template "$TEMPLATE_ID" --json
-   ```
+   `--name` 은 bootstrap saga 의 required 인자예요. 사용자 발화에서 앱 이름을 유추할 수 있으면 (예: "결제 앱 만들어줘" → "결제 앱") AskUserQuestion 없이 그대로 써요. 없으면 한 번 물어요.
 
-   이 명령은 앱 설정 파일 (`apphub.yaml`, 또는 옛 방식인 `axhub.yaml`) 을 자동으로 만들어요. 이 파일에는 앱 이름과 배포 정보가 담겨 있고, 다음 단계 (앱 등록과 배포) 에서 사용해요. 둘 다 정상 결과로 다뤄요.
-
-
-5. **Bootstrap plan-only 로 다음 안전 단계를 보여줘요.** 프로젝트 파일이 만들어진 뒤에는 원격 앱 생성이나 배포를 실행하지 말고, Rust bootstrap FSM 을 읽기/계획 모드로만 호출해요.
-
-   ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers bootstrap --dry-run --json
-   ```
-
-   `consent_required_apps_create`, `git_init_required`, `first_commit_required`, `template_required`, `conflict_existing_files` 같은 상태는 helper 가 다음 단계를 알려주는 **internal verification primitive** 예요 — raw 식별자를 사용자 chat 에 그대로 echo 하면 안 돼요 (deploy SKILL Visibility Rules 와 같은 규칙). 대신 한국어 한 줄로 humanize 해서 알려드려요 (예: "앱 등록 동의가 필요해요" / "저장 지점을 먼저 만들어야 해요" / "템플릿을 골라야 해요" / "현재 폴더에 이미 같은 이름 파일이 있어요"). 앱 등록이나 배포는 deploy/apps 흐름으로 이어가요. init 은 파일 생성까지만 맡고, `bootstrap --auto-chain`, `apps create`, `deploy create` 는 실행하지 않아요.
-
-6. **결과와 다음 액션을 안내해요.** Step 5 의 `bootstrap --dry-run --json` 출력에 포함된 `next_steps[]` 배열을 source-of-truth 로 써요. 직접 단계를 만들거나 순서를 바꾸지 않아요. helper 가 emit 한 각 항목의 `label`, `required_for_deploy`, `trigger_phrase` 를 그대로 humanize 해서 한국어 5단계 안내문으로 보여줘요. `required_for_deploy: true` 인 항목 뒤에는 "(배포에 꼭 필요해요)" 한정자를 붙이고, `false` 인 항목에는 어떤 한정자도 붙이지 않아요. "(선택)" 같은 표기는 절대 만들지 않아요.
-
-   helper next_steps[] schema (NextStep struct, FU-1):
    ```json
    {
-     "id": "github_connect",
-     "label": "GitHub 연결",
-     "required_for_deploy": true,
-     "blocks": ["deploy"],
-     "trigger_phrase": "깃허브 연결"
+     "question": "앱 이름 뭘로 할래요?",
+     "header": "앱 이름",
+     "options": [
+       {"label": "지금 발화 기준 자동", "value": "auto_from_utterance", "description": "발화에서 유추한 이름을 그대로 써요"},
+       {"label": "직접 입력", "value": "manual_name", "description": "원하는 이름을 한 번만 말해요"},
+       {"label": "취소", "value": "abort", "description": "프로젝트를 만들지 않아요"}
+     ]
    }
    ```
 
-   렌더 결과 예시 (helper 가 5개 step 을 emit 하면):
-   ```
-   다음 안전 단계예요:
-   1. 앱 등록 — `axhub 앱 만들어줘` (배포에 꼭 필요해요)
-   2. 의존성 설치 — `의존성 설치해`
-   3. GitHub 연결 — `깃허브 연결` (배포에 꼭 필요해요)
-   4. 환경 변수 — `환경변수 추가`
-   5. 배포 — `배포해줘` (배포에 꼭 필요해요)
+   `--slug` 는 자동 유도해요 (이름을 소문자화 + 공백 → 하이픈, 특수문자 제거). slug 가 backend 정책과 충돌하면 saga 가 `error_code` 로 알려주고 SKILL 이 다시 한 번 물어요.
+
+5. **Bootstrap dry-run 으로 미리보기를 만들어요.**
+
+   ```bash
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --dry-run --json
    ```
 
-   helper 가 `next_steps[]` 를 emit 하지 않거나 비어 있으면 단계 안내를 생략해요. 다른 자유 라벨을 만들지 않아요.
+   응답 envelope 의 미리보기 카드 (template / slug / subdomain / repo_name / private/public / installation_id 후보) 를 사용자에게 한국어 한 줄씩 보여줘요. raw JSON dump 금지. `--dry-run` default 가 true 라 명시적으로 안 적어도 같지만, 가독성을 위해 명시해요.
 
-### Dependency install (lockfile-aware)
+6. **사용자 동의 + execute.**
 
-이 subsection 의 단계는 `D1.` ~ `D5.` 로 별도 namespace 를 써요. workflow 의 top-level Step 0~6 과 번호 충돌을 막기 위해서예요.
+   ```json
+   {
+     "question": "지금 만들고 배포까지 진행할까요?",
+     "header": "앱 만들기",
+     "options": [
+       {"label": "진행", "value": "execute", "description": "backend app + GitHub repo + 첫 deploy 를 자동으로 진행해요"},
+       {"label": "취소", "value": "취소", "description": "지금은 만들지 않아요"}
+     ]
+   }
+   ```
 
-D1. plan 을 조회해요:
-   `!${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers bootstrap dependency-plan --json`
-   결과의 `recommended_command` 필드 보존.
+   동의 받으면 saga 를 실행해요:
 
-D2. AskUserQuestion `dependency_install_strategy` (default `inline_session`, options `inline_session` / `manual_terminal` / `skip`) fire.
+   ```bash
+   if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then WATCH=--watch; else WATCH=; fi
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --yes $WATCH --json
+   ```
 
-D3. 사용자가 `inline_session` 선택 시:
-   - lockfile 단일 (`requires_pm_choice == false`) → `recommended_command` 필드를 그대로 inline 실행 (`!<recommended_command>`)
-   - lockfile 다중 (`requires_pm_choice == true`) → `package_manager_choice` AskUserQuestion fire 후 선택된 manager 의 `recommended_command` inline 실행
+   **Non-interactive guard:** subprocess (`$CI` / `$CLAUDE_NON_INTERACTIVE` / no TTY) 에서는 `--watch` 가 무한 block 돼서 SKILL 이 hang 해요. WATCH 변수가 비면 `--watch` 가 빠진 채로 saga 만 시작하고, 그 뒤 별도 `axhub apps bootstrap-status` 호출로 진행을 따라가요:
 
-D4. 실행 후 verify 단계:
-   helper 가 자동으로 byte-identical 검사 + log file 저장 (TOCTOU race 차단을 위한 atomic mode 또는 직전 re-verify).
+   ```bash
+   BOOTSTRAP_ID=$(echo "$ACCEPTED_JSON" | jq -r '.data.bootstrap_id')
+   axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --json
+   ```
 
-D5. 실패 시 에러 분류 후 사용자에게 generic fallback 메시지 출력 (catalog 5 entry follow-up).
+   진행 중 매 ~30s 마다 한국어 한 줄로 narrate 해요 — "앱 만들고 있어요" / "GitHub repo 만들고 있어요" / "첫 배포 중이에요. 거의 다 왔어요". 60s 이상 같은 stage 머무르면 "조용하네요, 계속 기다리고 있어요" 한 줄을 추가해요.
 
-설치가 60초+ 걸리면 ctrl-C 로 멈추고 strategy 재선택할 수 있어요.
+7. **응답에서 `repo_full_name` 을 꺼내 git clone 해요.**
+
+   ```bash
+   REPO=$(echo "$FINAL_JSON" | jq -r '.data.status.repo_full_name // empty')
+   if [ -z "$REPO" ]; then
+     echo '{"systemMessage":"GitHub repo 정보가 응답에 없어요. /axhub:doctor 로 진단해주세요."}'
+     exit 65
+   fi
+   if [ "$(ls -A 2>/dev/null | grep -v -e '^\.git$' -e '^\.codegraph$' -e '^\.omc$' | wc -l)" -eq 0 ]; then
+     git clone "https://github.com/${REPO}.git" .
+   else
+     git clone "https://github.com/${REPO}.git" "$APP_SLUG"
+   fi
+   ```
+
+   현재 dir 이 비어 있으면 (`.git` / `.codegraph` / `.omc` 등 도구 메타만 있어도 비어있는 걸로 봐요) `git clone <repo> .` 로 같은 dir 에 코드를 받아요. 비어있지 않으면 `$APP_SLUG` 이름의 서브 dir 에 받아요. clone 실패 시 (권한 / network) `repo_full_name` 만 사용자에게 알려주고 수동 clone 안내를 보여줘요.
+
+8. **결과와 다음 액션을 안내해요.**
+
+   saga 응답의 `app_id` / `deployment_id` / `repo_full_name` 을 humanize 해서 한국어 한 줄씩 보여줘요. 예시:
+
+   ```
+   끝났어요. 이렇게 시작하면 돼요:
+   1. 폴더 들어가기 — `cd $APP_SLUG` (이미 같은 폴더에 받았으면 생략)
+   2. 의존성 설치 — package manager 자유 (`npm i` / `pnpm i` / `bun install`)
+   3. 로컬 실행 — README 의 dev 스크립트 (`npm run dev` 등)
+   4. 배포 상태 보기 — `/axhub:status` (방금 만든 첫 배포 진행 상황)
+   5. 다음 배포 — 코드 수정 후 `/axhub:deploy`
+   ```
+
+   `error_code` 로 saga 가 실패했으면 다음 routing 을 써요:
+   - `github.installation_missing` / `github.repo_create_failed` → `/axhub:github` 가이드
+   - `validation.template_not_found` → Step 2 로 돌아가 다시 목록을 보여줘요
+   - `validation.slug_collision` → Step 4 로 돌아가 새 이름을 받아요
+   - exit 65 (auth 만료) → `/axhub:auth`
+   - exit 66 (forbidden / scope 부족) → 사용자에게 권한 부족 안내 + workspace admin 문의
+   - 그 외 → `/axhub:doctor`
 
 ## NEVER
 
-- NEVER init 흐름에서 `axhub-helpers bootstrap --auto-chain` 을 실행하지 않아요. init 은 `bootstrap --dry-run --json` 으로 다음 단계만 보여줘요.
-- NEVER init 흐름에서 `axhub apps create` 또는 `axhub deploy create` 를 실행하지 않아요.
+- NEVER `axhub init` 또는 `axhub init --from-template` 을 호출하지 않아요. Rust v1.0.0-rc.1 에서 `--from-template` flag 가 미구현 stub (`initcmd.rs` run() 미사용) 이라 호출해도 generic docker apphub.yaml 만 만들어져요. SKILL 은 `axhub apps bootstrap` saga 만 써요.
+- NEVER `axhub apps create` 또는 `axhub deploy create` 를 직접 호출하지 않아요. bootstrap saga 가 server-side 에서 둘 다 처리해요.
+- NEVER `axhub-helpers fetch-template` 또는 remote `templates.json` 을 source 로 쓰지 않아요. backend `axhub apps templates list` 만 source-of-truth 예요.
+- NEVER subprocess (`$CI` / `$CLAUDE_NON_INTERACTIVE` / no TTY) 에서 template 또는 앱 이름을 임의로 고르지 않아요. registry safe_default 가 `abort` 또는 `취소` 예요.
+- NEVER `--execute` 를 `--dry-run` 미리보기 + 사용자 동의 없이 호출하지 않아요. backend app + GitHub repo + deploy 가 한 번에 mutate 돼요.
+- NEVER auth 만료를 template 조회 실패로 오해하지 않아요. exit 65 는 `/axhub:auth` 로 라우팅 해요.
+- NEVER `bootstrap --execute` 호출 직후 별도 `axhub deploy create` 를 다시 부르지 않아요. saga 가 첫 deploy 까지 포함해요.
+- NEVER `repo_full_name` 응답이 비어 있는데 임의 URL 을 만들어 clone 시도하지 않아요. 응답이 비면 `/axhub:doctor` 로 라우팅 해요.
 
-- NEVER Node, package manager, dependency install 을 자동 실행하지 않아요. 단 다음 모든 조건을 동시에 만족하는 경우에만 예외를 허용해요:
-  1. SKILL frontmatter 에 `allows-dependency-execution: true` 선언
-  2. inline `!` prefix 가 호출하는 명령이 `axhub-helpers bootstrap dependency-plan --json` 가 emit 한 `recommended_command` 필드와 byte-identical
-  3. user 가 AskUserQuestion 의 "install dependencies" option 을 explicit 선택
-- NEVER helper `fetch-template` 또는 remote `templates.json` 를 v0.2.0 source 로 쓰지 않아요.
-- NEVER subprocess 에서 template 을 임의로 고르지 않아요.
-- NEVER auth 실패를 init template 조회 실패로 오해하지 않아요.
+## Additional Resources
+
+- `../deploy/references/nl-lexicon.md` — 활성화 trigger 어구 추가 시 참조.
+- `../deploy/references/error-empathy-catalog.md` — 4-part Korean exit-code template (Step 8 에서 사용).

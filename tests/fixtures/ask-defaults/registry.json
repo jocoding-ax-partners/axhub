@@ -203,24 +203,24 @@
   "init": {
     "어떤 템플릿으로 시작할까요?": {
       "safe_default": "abort",
-      "rationale": "Template choice creates files. Non-interactive subprocess must not scaffold without an explicit human selection.",
+      "rationale": "Template choice initiates a server-side bootstrap saga (backend app + GitHub repo + deploy). Non-interactive subprocess must not select without explicit human input.",
       "allowed_safe_defaults": [
         "abort"
       ]
     },
-    "dependency_install_strategy": {
-      "safe_default": "manual_terminal",
-      "rationale": "Claude Code 세션 비대화형/headless 환경 fallback. inline 실행은 사용자 동의 필요해요.",
+    "앱 이름 뭘로 할래요?": {
+      "safe_default": "abort",
+      "rationale": "App name is a required bootstrap saga argument and becomes the GitHub repo + deployment identity. Non-interactive subprocess must not invent a name.",
       "allowed_safe_defaults": [
-        "skip",
-        "manual_terminal"
+        "abort"
       ]
     },
-    "package_manager_choice": {
-      "safe_default": "skip",
-      "rationale": "lockfile 다중 시 자동 결정 위험. 사용자 explicit 선택 필요해요.",
+    "지금 만들고 배포까지 진행할까요?": {
+      "safe_default": "취소",
+      "rationale": "bootstrap --execute runs a destructive saga that creates a backend app, a GitHub repo, and a first deploy. Non-interactive subprocess must never auto-execute.",
       "allowed_safe_defaults": [
-        "skip"
+        "취소",
+        "execute"
       ]
     }
   },

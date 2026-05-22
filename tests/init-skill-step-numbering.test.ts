@@ -5,7 +5,7 @@ import { join } from "node:path";
 const REPO_ROOT = join(import.meta.dir, "..");
 const INIT_SKILL = join(REPO_ROOT, "skills/init/SKILL.md");
 
-describe("init SKILL workflow — top-level step numbering uniqueness (Plan F′ regression guard)", () => {
+describe("init SKILL workflow — top-level step numbering uniqueness (bootstrap saga refactor)", () => {
   const content = readFileSync(INIT_SKILL, "utf8");
 
   function extractWorkflowBody(): string {
@@ -19,7 +19,7 @@ describe("init SKILL workflow — top-level step numbering uniqueness (Plan F′
     return content.slice(startIdx, endIdx);
   }
 
-  test("Steps 0..6 each appear exactly once at top-level (no `5.` collisions)", () => {
+  test("each top-level step header appears exactly once (no number collisions)", () => {
     const body = extractWorkflowBody();
 
     const stepHeaders: number[] = [];
@@ -30,24 +30,25 @@ describe("init SKILL workflow — top-level step numbering uniqueness (Plan F′
       if (!Number.isNaN(n)) stepHeaders.push(n);
     }
 
+    expect(stepHeaders.length).toBeGreaterThanOrEqual(7);
+    expect(new Set(stepHeaders).size).toBe(stepHeaders.length);
     const sorted = [...stepHeaders].sort((a, b) => a - b);
-    expect(sorted).toEqual([0, 1, 2, 3, 4, 5, 6]);
-    expect(new Set(sorted).size).toBe(sorted.length);
+    expect(sorted[0]).toBe(0);
   });
 
-  test("Step 6 (결과 안내) renders helper next_steps[] with required_for_deploy qualifier (FU-1)", () => {
-    expect(content).toContain("6. **결과와 다음 액션을 안내해요.**");
-    expect(content).toContain("next_steps[]");
-    expect(content).toContain("required_for_deploy");
-    expect(content).toContain("(배포에 꼭 필요해요)");
-    expect(content).not.toMatch(/\d+\.\s*GitHub 연결\s*[—-]?\s*[^\n]*\(선택\)/);
+  test("workflow follows the bootstrap saga (template list → select → name → dry-run → execute → clone)", () => {
+    const body = extractWorkflowBody();
+    expect(body).toContain("axhub apps templates list --json");
+    expect(body).toMatch(/axhub apps bootstrap --template/);
+    expect(body).toContain("--dry-run");
+    expect(body).toContain("--execute");
+    expect(body).toContain("repo_full_name");
+    expect(body).toContain("git clone");
   });
 
-  test("dependency-install subsection uses D-prefix (D1..D5) to avoid top-level collision", () => {
-    expect(content).toContain("D1. plan 을 조회해요");
-    expect(content).toContain("D2. AskUserQuestion");
-    expect(content).toContain("D3. 사용자가 `inline_session`");
-    expect(content).toContain("D4. 실행 후 verify");
-    expect(content).toContain("D5. 실패 시 에러 분류");
+  test("workflow has no leftover D-prefix dependency-install subsection", () => {
+    expect(content).not.toMatch(/^D\d+\.\s+/m);
+    expect(content).not.toContain("dependency-plan");
+    expect(content).not.toMatch(/inline_session|manual_terminal|package_manager_choice/);
   });
 });
