@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.8](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.7...v0.9.8) (2026-05-22)
+
+init SKILL 을 `axhub apps bootstrap` saga 기반으로 전면 리팩토링했어요. 이전 흐름의 `axhub init --from-template` 호출은 Rust v1.0.0-rc.1 의 `initcmd.rs` run() 에서 `--from-template` flag 가 parse 만 되고 미사용 (NOP stub) — 호출해도 generic docker apphub.yaml 만 만들어지던 broken 상태였어요. vibe coder 가 "Next.js 앱 만들어줘" 발화해도 docker template 만 받던 회귀를 차단했어요. 새 워크플로 (Steps 0..8) 는 `axhub apps templates list --json` 으로 backend template registry 조회 → AskUserQuestion 으로 template + 앱 이름 입력 → `axhub apps bootstrap --template X --name Y --slug Z --dry-run --json` preview → 사용자 동의 → `--execute --yes [--watch] --json` saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고, 응답의 `repo_full_name` 으로 현재 dir 에 git clone 해서 local + remote 둘 다 채워줘요. error_code 별 라우팅 (github/validation/auth/forbidden/doctor) 도 추가했어요. 9 파일 변경 (1 deletion): SKILL.md rewrite, registry 의 init section 갱신 (`dependency_install_strategy` + `package_manager_choice` 제거 → `앱 이름 뭘로 할래요?` + `지금 만들고 배포까지 진행할까요?` 2 신규), 4 test 파일 갱신, `init-skill-flow.test.ts` 삭제 (CRIT-R2-1 dep-execution 흐름 더 이상 적용 안 됨), `skill-doctor-allowlist.json` 의 init entry 제거.
+
+### Test baseline
+
+- bun run skill:doctor --strict exit 0
+- bun run lint:tone --strict 0 err / 0 warn (43 files)
+- bun run lint:keywords --check baseline diff 없음
+- bunx tsc --noEmit clean
+- bun test 973 pass / 2 fail / 6 skip / 1 todo (둘 다 pre-existing version drift, scope 외)
+
+### Honest tradeoff
+
+bootstrap saga 는 server-side 에서 backend app + GitHub repo + deploy 를 한 번에 처리하니 GitHub OAuth device-code 가 cold-cache 사용자에게 mid-saga prompt 될 수 있어요. SKILL 의 exit-code routing 이 github 관련 에러 (`github.installation_missing`/`github.repo_create_failed`) 를 `/axhub:github` 로 자동 라우팅해서 회복 경로를 알려요. `axhub init` Rust impl 의 stub flag (`--from-template`) 정리는 ax-hub-cli 별도 PR 로 진행해야 해요 — 이번 PR 은 SKILL 만 forward-migrate 해요.
+
+### Added
+
+* **init:** bootstrap saga workflow 로 전환 (template + repo + deploy 한 번에) ([#120](https://github.com/jocoding-ax-partners/axhub/issues/120)) ([b52cfff](https://github.com/jocoding-ax-partners/axhub/commit/b52cfff077a1314f3631f6b26913310ff1cd8631))
+
 ## [0.9.7](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.6...v0.9.7) (2026-05-22)
 
 axhub Claude Code plugin 의 overlap-11 SKILL (CLI 와 1:1 매칭되는 11개 skill) 중 4 H-severity drift 를 ax-hub-cli (Rust) v1.0.0-rc.1 surface 와 정렬했어요. 실측 reproduction 으로 발견한 critical drift: ① `axhub update apply --yes` 가 no-op (`--dry-run` default-true, `--execute` 필수 신규 도입) — vibe coder 가 "업데이트했어요" 알림 받지만 실제 binary 안 바뀜. ② `axhub deploy status` 호출 시 positional `[DEPLOYMENT_ID]` 가 status.rs:25 에서 runtime-required 라 skill 호출 exit 64. ③ `axhub whatsnew --since` 가 unknown flag (whatsnew 는 zero-flag CLI, `--since` 는 `axhub-helpers routing-stats` 전용) → exit 64. ④ `axhub doctor --fix / --dry-run / --send-report` 가 Rust v1.0.0-rc.1 의 doctor.rs run() 에서 parse 만 되고 미사용 (NOP stub) — skill 이 호출해도 일반 진단 JSON 만 반환되니 노출 금지로 전환. ralplan consensus (Planner → Architect ITERATE → Critic ITERATE → APPROVE) 후 `/team ralph` 로 3 worker 병렬 실행 + lead 직접 verification, architect 최종 게이트 통과 후 ship 해요.
