@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.7](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.6...v0.9.7) (2026-05-22)
+
+axhub Claude Code plugin 의 overlap-11 SKILL (CLI 와 1:1 매칭되는 11개 skill) 중 4 H-severity drift 를 ax-hub-cli (Rust) v1.0.0-rc.1 surface 와 정렬했어요. 실측 reproduction 으로 발견한 critical drift: ① `axhub update apply --yes` 가 no-op (`--dry-run` default-true, `--execute` 필수 신규 도입) — vibe coder 가 "업데이트했어요" 알림 받지만 실제 binary 안 바뀜. ② `axhub deploy status` 호출 시 positional `[DEPLOYMENT_ID]` 가 status.rs:25 에서 runtime-required 라 skill 호출 exit 64. ③ `axhub whatsnew --since` 가 unknown flag (whatsnew 는 zero-flag CLI, `--since` 는 `axhub-helpers routing-stats` 전용) → exit 64. ④ `axhub doctor --fix / --dry-run / --send-report` 가 Rust v1.0.0-rc.1 의 doctor.rs run() 에서 parse 만 되고 미사용 (NOP stub) — skill 이 호출해도 일반 진단 JSON 만 반환되니 노출 금지로 전환. ralplan consensus (Planner → Architect ITERATE → Critic ITERATE → APPROVE) 후 `/team ralph` 로 3 worker 병렬 실행 + lead 직접 verification, architect 최종 게이트 통과 후 ship 해요.
+
+### Test baseline
+
+- bun run skill:doctor --strict exit 0
+- bun run lint:tone --strict 0 err / 0 warn (43 files)
+- bun run lint:keywords --check baseline diff 없음
+- bunx tsc --noEmit clean
+- bun test 974 pass / 2 fail / 6 skip / 1 todo (둘 다 pre-existing version-drift, scope 외)
+
+### Honest tradeoff
+
+ax-hub-cli (Rust) 는 v1.0.0-rc.1 forward-looking surface 라 production Go binary 에서는 일부 명령 (e.g. `axhub deploy list`) 이 v0.1.x 와 다르게 동작할 수 있어요. SKILL 은 Rust release 시점에 정합 — 그 사이 Go 사용자가 cold-cache 경로에서 `axhub-helpers list-deployments` fallback 을 거치게 돼요 (기존 deploy/status flow 가 이미 helpers 를 우선 호출하니 회귀 없음). doctor `--fix` 노출은 Rust impl ship 후 별도 ralplan 으로 처리해요. M-severity drift (apps/init/profile/auth 누락 subcmd) 는 후속 PR 로 분리.
+
+### Fixed
+
+* **skills:** ax-hub-cli Rust v1.0.0-rc.1 surface drift 정렬 ([#119](https://github.com/jocoding-ax-partners/axhub/issues/119)) ([4eb96b2](https://github.com/jocoding-ax-partners/axhub/commit/4eb96b20d59124789e3e97d094549ba5f40cb062))
+
 ## [0.9.6](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.5...v0.9.6) (2026-05-21)
 
 v0.9.5 의 4-state CLI 진단 (`Ok` / `NotFound` / `ConfigCorrupted` / `RuntimeError`) 분류가 plugin 내부에만 머물러 있었어요. JSON output 에 안 emit 되니 SKILL preprocessing 후 AI 가 preflight JSON 의 `cli_present:false` 만 보고 "axhub CLI 미설치 (PATH 에 없음)" 으로 추측 — 실제로는 `config_corrupted` (`~/.config/axhub/config.yaml` 의 `user_id` UUID vs int64 schema drift) 인데 install 안내가 나가서 사용자 혼란. 사용자 보고: 진단 카드의 첫 줄은 잘못된 "CLI 미설치" 인데 두 번째 줄은 정확하게 `cli_config_corrupted` 표시. systemMessage emit (v0.9.5) 은 작동했지만 SKILL 자체 prose 가 cli_state 인식 못 함. `PreflightOutput` 에 `cli_state: String` 필드를 명시적으로 emit (`"ok"` / `"not_found"` / `"config_corrupted"` / `"runtime_error"`) + `skills/github/SKILL.md` Step 1 에 cli_state 별 분기 안내 prose 추가 (cli_present:false 를 "PATH 에 없음" 으로 임의 매핑 금지 명시). 의존 fixture (deploy_prep / quality_gate / deploy_prep_test) 에 cli_state: "ok" 필드 추가로 compile fix. serde `default="ok"` 라 legacy 직렬화 호환.
