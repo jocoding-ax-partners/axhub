@@ -156,28 +156,47 @@ To handle auth:
    `auth_login` binding은 실제 app/branch/commit이 필요 없지만 `asConsentBinding`이 모든 필드에서 비어있지 않은 문자열을 요구하므로 `"_"`를 플레이스홀더로 사용해요. 다음 Bash/PowerShell tool id는 consent-mint 이후에 생기므로 `pending` token을 한 번만 쓰게 해요.
    macOS/Linux/Windows 모두에서 `CLAUDE_SESSION_ID`를 지우지 마세요. `tool_call_id:"pending"` 자체가 helper에게 "다음 실제 tool call에서 한 번만 claim"하라는 명시 신호예요.
 
-   **5b. Surface OAuth challenge before waiting.** Prefer:
+   **5b. Surface OAuth challenge before waiting.** `axhub auth login` 은 device flow URL + code 를 stderr 로 emit 한 뒤 사용자 승인을 기다리며 block 해요. SKILL 이 sync 로 호출하면 Claude Code 가 명령 종료까지 stdout buffer 를 surface 안 해서 사용자 화면에 URL 이 안 보여요. 반드시 다음 wrapper 패턴으로 호출해요 (URL/code 를 먼저 추출해서 사용자에게 보여준 뒤 wait):
 
    ```bash
-   axhub auth login --force --no-browser
+   # 기본 (default scopes / 단일 tenant)
+   AUTH_EXTRA=""
    # 다중 tenant 소속이면:
-   axhub auth login --force --no-browser --tenant <tenant-slug>
+   #   AUTH_EXTRA="--tenant <tenant-slug>"
    # scope 변경하면 (default: read,write):
-   axhub auth login --force --no-browser --scopes read,write,deploy
+   #   AUTH_EXTRA="--scopes read,write,deploy"
+
+   AUTH_LOG=$(mktemp -t axhub-auth-XXXXXX)
+   trap 'rm -f "$AUTH_LOG"' EXIT
+   ( axhub auth login --force --no-browser $AUTH_EXTRA >"$AUTH_LOG" 2>&1 ) &
+   AUTH_PID=$!
+
+   URL=""; CODE=""
+   for _ in $(seq 1 30); do
+     if [ -s "$AUTH_LOG" ]; then
+       URL=$(grep -oE 'https?://[A-Za-z0-9._~+%/?=#-]+' "$AUTH_LOG" | head -1)
+       CODE=$(grep -oE '[A-Z0-9]{4}-[A-Z0-9]{4}' "$AUTH_LOG" | head -1)
+       [ -n "$URL" ] && [ -n "$CODE" ] && break
+     fi
+     kill -0 "$AUTH_PID" 2>/dev/null || break
+     sleep 0.5
+   done
+
+   if [ -n "$URL" ] && [ -n "$CODE" ]; then
+     printf '\naxhub OAuth 인증이 필요해요. 다음 두 단계 진행해주세요:\n\n  1. 브라우저에서 열기: %s\n  2. 코드 입력: %s\n\n완료되면 자동으로 다음 단계로 진행돼요.\n\n' "$URL" "$CODE"
+   else
+     echo "OAuth device URL/code 를 15초 안에 추출 못 했어요. CLI 출력 형식이 바뀌었을 가능성. /axhub:doctor 로 진단해주세요."
+   fi
+
+   wait "$AUTH_PID"
+   LOGIN_EXIT=$?
+   [ -f "$AUTH_LOG" ] && cat "$AUTH_LOG"
+   exit "$LOGIN_EXIT"
    ```
 
-   This command must surface the device URL/code before any polling wait. Render the device URL/code to the user first, then wait or instruct them to finish in the browser. `--json 은 challenge fields` (`device_url`, `user_code`, verification URL, or equivalent) 를 polling 전에 emit 할 때만 사용해요. If JSON output does not expose those challenge fields before polling, do not use `--json` for the interactive wait.
+   **왜 wrapper 가 필요해요?** Claude Code shell tool 은 명령 종료 후 한 번에 output 을 surface 해요. `axhub auth login --no-browser` 는 OAuth device flow polling 으로 최대 15분 block 되니까 그 사이 사용자는 URL 을 못 봐요. wrapper 는 백그라운드 실행 + log file polling 으로 URL/code 가 emit 되는 즉시 추출해서 별도 stdout line 으로 surface 해요. login 자체는 그대로 wait 해서 종료 후 종료 코드 propagate 해요.
 
-   **OAuth device flow URL + user_code 안내:** CLI 가 stderr 로 `To continue, visit: <verification_uri>` + `Enter code: <user_code>` + (있으면) `Or open directly: <verification_uri_complete>` 를 emit 해요. 사용자에게 한 번에 묶어서:
-
-   ```
-   GitHub 가 아닌 axhub OAuth 인증이 필요해요. 다음 두 단계를 진행해주세요:
-
-   1. 브라우저에서 열기: <verification_uri_complete or verification_uri>
-   2. 코드 입력: <user_code>
-
-   완료되면 자동으로 다음 단계로 진행돼요.
-   ```
+   `--json 은 challenge fields` (`device_url`, `user_code`, verification URL, or equivalent) 를 polling 전에 emit 할 때만 사용해요. 현재 CLI v1.0.0-rc.1 의 `--json` 은 polling 완료 후 한 번에 결과 envelope 만 emit 하니까 interactive wait 에는 사용 금지예요 (challenge surface 못 함).
 
    Never run a blocking login unless the device URL/code is visible first: do not run blocking `axhub auth login --force` and then wait silently. If the current CLI cannot expose the challenge pre-wait, stop with a CLI follow-up gap instead of improvising a hidden/blocking auth flow.
 
