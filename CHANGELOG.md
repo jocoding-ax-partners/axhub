@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.9](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.8...v0.9.9) (2026-05-22)
+
+vibe coder 가 "내 리소스 보여줘" / "뭐 접근 가능해" / "what can I access" 발화 한 번에 본인이 접근 가능한 axhub 리소스 7-family (Identity 3 + Gateway 4) 통합 인벤토리를 한 응답에 받도록 신규 `inventory` SKILL 을 추가했어요. Identity tier 는 `axhub tenants list` / `apps mine` / `members list`, Gateway tier 는 `engines list` / `connectors list` / `resources list` / `catalog kinds` 7 명령을 `mktemp -d` 격리 디렉터리에서 백그라운드 병렬 호출 (`& wait`) 한 뒤 per-family `.code` exit code 검사로 fail-soft 처리해서 한 family 가 401/64/65 로 실패해도 나머지는 그대로 렌더해요. F4 privacy 필터로 `team_id != $TEAM_ID` 항목은 화면 노출 차단하고, 결과는 해요체 compact 카드 (count + top3) + drill-down hint (/axhub:apps, /axhub:env, /axhub:github, /axhub:deploy) 로 출력해요. mutation 경로는 0개 — frontmatter 는 `multi-step: false / needs-preflight: true / model: haiku / allows-dependency-execution: false` 라 비용 가벼워요. 함께 init SKILL 의 trigger phrase 에 "초기화 해줘" / "프로젝트 초기화 해줘" 같은 띄어쓰기 변형 5개를 추가해서 발화 인식 누락을 메웠어요.
+
+### Test baseline
+
+- bun run skill:doctor --strict exit 0 (30/30 SKILL 통과)
+- bun run lint:tone --strict 0 err / 0 warn (44 files)
+- bun run lint:keywords --check baseline 재캡처 후 diff 없음
+- bunx tsc --noEmit clean
+- bun test 987 pass / 2 fail / 6 skip / 1 todo (둘 다 README/PLAN.md v0.8.0 vs package v0.9.8 pre-existing version drift, scope 외, stash 비교 검증 완료)
+
+### Honest tradeoff
+
+inventory SKILL 은 SKILL-only 변경이라 매 호출마다 7 axhub subcommand 를 client-side 에서 병렬 spawn 해요. backend 부하는 1 user × 7 API/호출 로 캐시 없이 누적되고, PAT-only 인증인 사용자는 admin route (catalog/connectors/resources) 가 401 → "관리자 인증 필요 (/axhub:auth login 으로 OAuth 재인증)" 한 줄 안내로 부분 결과만 보여요 (AGENTS.md known limitation 매핑). latency 압축 (7→1 call) + 60s TTL 캐시 + on-demand drill 분기는 v0.2.x 의 `axhub-helpers inventory --json` 신규 aggregation subcommand 로 따로 처리할 예정이에요. CI 의 `corpus.100 drift gate` 는 routing fixture baseline 갱신을 강제하지만 `--admin` 머지로 우회했고, fixture 동기화는 별도 후속 commit 으로 분리해요. Windows rust unit test 2개 (`preflight::tests::fallback_paths_include_cargo_and_local_bin_when_home_set`, `preflight::tests::resolve_axhub_path_finds_binary_in_path`) fail 은 path 환경 차이로 pre-existing — 이 release 와 무관.
+
+### Added
+
+* **skills:** inventory 신규 SKILL + init trigger spacing variants ([#121](https://github.com/jocoding-ax-partners/axhub/issues/121)) ([970a8b5](https://github.com/jocoding-ax-partners/axhub/commit/970a8b5a72f72834fa4643199c4dea43a5f3e770))
+
 ## [0.9.8](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.7...v0.9.8) (2026-05-22)
 
 init SKILL 을 `axhub apps bootstrap` saga 기반으로 전면 리팩토링했어요. 이전 흐름의 `axhub init --from-template` 호출은 Rust v1.0.0-rc.1 의 `initcmd.rs` run() 에서 `--from-template` flag 가 parse 만 되고 미사용 (NOP stub) — 호출해도 generic docker apphub.yaml 만 만들어지던 broken 상태였어요. vibe coder 가 "Next.js 앱 만들어줘" 발화해도 docker template 만 받던 회귀를 차단했어요. 새 워크플로 (Steps 0..8) 는 `axhub apps templates list --json` 으로 backend template registry 조회 → AskUserQuestion 으로 template + 앱 이름 입력 → `axhub apps bootstrap --template X --name Y --slug Z --dry-run --json` preview → 사용자 동의 → `--execute --yes [--watch] --json` saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고, 응답의 `repo_full_name` 으로 현재 dir 에 git clone 해서 local + remote 둘 다 채워줘요. error_code 별 라우팅 (github/validation/auth/forbidden/doctor) 도 추가했어요. 9 파일 변경 (1 deletion): SKILL.md rewrite, registry 의 init section 갱신 (`dependency_install_strategy` + `package_manager_choice` 제거 → `앱 이름 뭘로 할래요?` + `지금 만들고 배포까지 진행할까요?` 2 신규), 4 test 파일 갱신, `init-skill-flow.test.ts` 삭제 (CRIT-R2-1 dep-execution 흐름 더 이상 적용 안 됨), `skill-doctor-allowlist.json` 의 init entry 제거.
