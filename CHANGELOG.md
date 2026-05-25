@@ -4,6 +4,29 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.19](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.18...v0.9.19) (2026-05-25)
+
+이번 릴리즈는 사용자 피드백으로 드러난 skill UX 3건을 고친 패치예요. (1) **doctor** — "현재 상태 진단해줘" 같은 generic 진단 발화가 axhub-scoped doctor description 과 semantic 매칭이 약해 라우팅이 안 되고 에이전트가 수동 조사로 빠지던 걸, `"현재 상태 진단"` / `"상태 진단"` 트리거 6개(전부 "진단" 포함해 `status` 스킬과 disambiguate)로 보강했어요. (2) **auth** — device code 발급 후 "터미널에서 직접 `axhub auth login` 실행" 으로 사용자에게 명령을 떠넘기던 punt 를 제거하고, 브라우저 승인만 사용자가 한 뒤 에이전트가 `--resume-last` 로 token 교환을 직접 마무리하도록 바꿨어요 (deploy 와 동일한 punt 금지 패턴). (3) **my-resources** — description 이 "compact 요약" 이라 haiku 가 body 의 표 1·2·3 지시 대신 bullet 요약을 내던 불일치를 "GFM 표(테이블)" 로 정합하고 `model` 을 sonnet 으로 올려 테이블 렌더 신뢰성을 높였어요.
+
+### Test baseline
+
+- `skill:doctor --strict` exit 0, `lint:tone --strict` 0 err, `lint:keywords --check` no diff(doctor baseline 재캡처 후), `bunx tsc --noEmit` exit 0 통과예요.
+- `bun test` 995 pass — 영향 테스트(skill-noninteractive-guard device-flow 13건, 라우팅/manifest)가 통과해요. auth 편집이 처음 깬 doc-reference 테스트는 committed `github-device-flow-surface-design.md` 참조를 5c 에 재추가해서 해소했어요.
+- release postbump: `codegen:version` + `release:check`(host 바이너리 빌드 + 버전 assert) 통과예요.
+
+### Honest tradeoff
+
+- `bun test` 의 기존 2 fail(`README current-release summary` + `PLAN plugin schema reconciliation`)은 본 변경과 무관해요 — stash-isolation 으로 확인했고 3건 fix 후에도 fail 이 그대로 2개라 NEW 회귀 0 이에요.
+- auth `--resume-last` 완료는 CLI 0.15.3+ 의 캐시된 device flow resume 에 의존해요. resume 가 pending/실패하면 SKILL 이 `auth status` 검증 후 재시도/재발급으로 graceful 처리하지만, device code 만료(약 15분) 뒤엔 새 challenge 가 필요해요. 실 환경 device-flow end-to-end 는 다음 배포 때 확인이 필요해요.
+- `my-resources` model haiku→sonnet 은 토큰/지연 비용이 늘어요 — 7-family 조회 + 3-테이블 렌더라 렌더 정합성을 우선했어요.
+
+
+### Fixed
+
+* auth device-flow 완료를 에이전트 --resume-last 로 전환 ([9fe3606](https://github.com/jocoding-ax-partners/axhub/commit/9fe3606929945b2caa83f69eaf46d852eeb6d9da))
+* doctor 스킬에 "현재 상태 진단"/"상태 진단" 트리거 추가 ([820994d](https://github.com/jocoding-ax-partners/axhub/commit/820994df461f52dee9c4d293825cb9745f6beb0f))
+* my-resources 조회를 bullet 요약 대신 GFM 테이블로 렌더 ([a5adee1](https://github.com/jocoding-ax-partners/axhub/commit/a5adee1000f07373b9c34694c1441c48b0b970e3))
+
 ## [0.9.18](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.17...v0.9.18) (2026-05-25)
 
 이번 릴리즈는 UUID 앱 ID 전환으로 깨졌던 배포 앱 resolve 를 복구하고, `inventory` 스킬을 `my-resources` 로 rename 한 패치예요. backend 가 app·deploy ID 를 정수에서 UUID 문자열로, `apps list` 배열 키를 `items` 로 바꿨는데 helper 가 따라가지 못해 `app_id` 가 null 이 되고, 그게 `git_repo=false` → consent binding 불일치 → preauth-check 반복 deny → 에이전트가 사용자에게 명령을 떠넘기는 연쇄로 이어졌어요(#147). `parse_apps_list` 가 `items` 키와 UUID 문자열 id 를 수용하고, git origin repo명을 앱 slug candidate 로 도출해 "배포해줘" 단독으로도 resolve 되게 했어요. preflight `current_app` 도 전역 캐시 대신 git remote 를 우선해서 다른 프로젝트 디렉토리에 stale 앱이 새지 않아요. `inventory` 스킬은 `my-resources` 로 이름만 바꿨고 트리거 어구는 그대로라 "내 리소스" / "inventory" 발화 모두 유지돼요. 함께 data 스킬 catalog invoke 통합(#144)과 snippet tenant-scoped 라우트 정합(#146)도 나가요.
