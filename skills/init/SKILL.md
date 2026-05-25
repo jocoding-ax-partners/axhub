@@ -180,7 +180,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --yes --watch --json
    ```
 
-   **에이전트 컨텍스트 자동 degrade (axhub-cli 0.15.3+).** `--watch` 를 항상 그대로 전달해요. CLI 가 비-TTY/에이전트 컨텍스트를 자동 감지해서 bootstrap / bootstrap-status 의 `--watch` 를 단일 스냅샷으로 degrade 한 뒤 종료하니 (수동 toggle 불필요), saga 가 무한 block 되지 않아요. 진행을 더 따라가려면 별도 `axhub apps bootstrap-status` 를 호출해요:
+   **에이전트 컨텍스트 자동 degrade (axhub-cli 0.15.3+).** `--watch` 를 항상 그대로 전달해요. CLI 가 비-TTY/에이전트 컨텍스트를 자동 감지해서 bootstrap / bootstrap-status 의 `--watch` 를 단일 스냅샷으로 degrade 한 뒤 종료하니 (수동 toggle 불필요), saga 가 무한 block 되지 않아요. 에이전트는 `--no-input` 같은 플래그도 따로 안 붙여도 돼요 (비-TTY 면 CLI 가 자동 감지). 진행을 더 따라가려면 별도 `axhub apps bootstrap-status` 를 호출해요:
 
    ```bash
    BOOTSTRAP_ID=$(echo "$ACCEPTED_JSON" | jq -r '.data.bootstrap_id')

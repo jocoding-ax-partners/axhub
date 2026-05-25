@@ -66,7 +66,7 @@ To check status:
    axhub deploy status "${DEPLOYMENT_ID}" --app "${APP}" --watch --json
    ```
 
-   **에이전트 컨텍스트 자동 degrade (axhub-cli 0.15.3+).** `--watch` 를 항상 그대로 전달해요. CLI 가 비-TTY/에이전트 컨텍스트를 자동 감지해서 단일 스냅샷으로 degrade 한 뒤 즉시 종료하니 (`/axhub:status` 가 더 이상 hang 안 나요), 수동 drop guard 는 불필요해요. 에이전트는 스냅샷 1개를 받고, 최신 상태가 필요하면 `/axhub:status` 를 다시 호출하면 돼요.
+   **에이전트 컨텍스트 자동 degrade (axhub-cli 0.15.3+).** `--watch` 를 항상 그대로 전달해요. CLI 가 비-TTY/에이전트 컨텍스트를 자동 감지해서 단일 스냅샷으로 degrade 한 뒤 즉시 종료하니 (`/axhub:status` 가 더 이상 hang 안 나요), 수동 drop guard 는 불필요해요. 에이전트는 스냅샷 1개를 받고, 최신 상태가 필요하면 `/axhub:status` 를 다시 호출하면 돼요. (에이전트는 `--no-input` 같은 플래그를 따로 안 붙여도 돼요 — 비-TTY 면 CLI 가 자동 감지하니까요.)
 
 4. **Render Korean narration (interactive TTY 전용).** 사람이 TTY 로 watch 할 때만 적용해요 — 에이전트 컨텍스트는 위에서 스냅샷으로 degrade 되니까 narration 대신 단일 상태 요약을 보여줘요. Apply the throttle + phase table from `../deploy/references/recovery-flows.md` ("watch-narration"): one line per ~25s, terminal-state lines are unthrottled. Examples:
 

@@ -622,7 +622,7 @@ To deploy:
    axhub deploy status "$DEPLOY_ID" --app "$APP_ID" --watch --json
    ```
 
-   **에이전트 컨텍스트 자동 degrade (axhub-cli 0.15.3+).** `--watch` 를 항상 그대로 전달해요. CLI 가 비-TTY/에이전트 컨텍스트를 자동 감지해서 단일 스냅샷으로 degrade 한 뒤 즉시 종료하니 (`/axhub:deploy` post-chain 이 더 이상 hang 안 나요), 플러그인 쪽 수동 `--watch` drop guard 는 불필요해요. 에이전트는 스냅샷 1개를 받고, 최신 상태가 필요하면 `/axhub:deploy` 또는 `/axhub:status` 를 다시 호출하면 돼요. 사람의 TTY 에서는 종전처럼 스트림으로 watch 해요.
+   **에이전트 컨텍스트 자동 degrade (axhub-cli 0.15.3+).** `--watch` 를 항상 그대로 전달해요. CLI 가 비-TTY/에이전트 컨텍스트를 자동 감지해서 단일 스냅샷으로 degrade 한 뒤 즉시 종료하니 (`/axhub:deploy` post-chain 이 더 이상 hang 안 나요), 플러그인 쪽 수동 `--watch` drop guard 는 불필요해요. 에이전트는 스냅샷 1개를 받고, 최신 상태가 필요하면 `/axhub:deploy` 또는 `/axhub:status` 를 다시 호출하면 돼요. 사람의 TTY 에서는 종전처럼 스트림으로 watch 해요. (에이전트는 `--no-input` 같은 플래그를 따로 안 붙여도 돼요 — 비-TTY 면 CLI 가 자동 감지하니까요.)
 
    **watch-narration 은 interactive TTY 전용이에요.** 사람이 TTY 로 watch 할 때만 ~30s 마다 humanized Korean progress 를 렌더해요 ("1분 경과, 빌드 중이에요 (정상)", `references/recovery-flows.md` "watch-narration"). 에이전트 컨텍스트(스냅샷)에서는 narration 대신 단일 상태 요약 + 재호출 안내를 보여줘요.
 

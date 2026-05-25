@@ -165,7 +165,7 @@ To handle auth:
    # scope 변경하면 (default read,write): AUTH_EXTRA="--scopes read,write,deploy"
    ```
 
-   - **에이전트 / 비-TTY 컨텍스트** (`! [ -t 1 ]` 또는 `$CI` / `$CLAUDE_NON_INTERACTIVE`): `--json` 으로 호출해요. CLI 가 `device_code_issued` event 를 emit 한 **직후 fast-exit** 하니 (출력이 데드락 없이 바로 surface 됨), challenge 를 보여주고 멈춰요.
+   - **에이전트 / 비-TTY 컨텍스트** (`! [ -t 1 ]` 또는 `$CI` / `$CLAUDE_NON_INTERACTIVE`): `--json` 으로 호출해요. CLI 가 `device_code_issued` event 를 emit 한 **직후 fast-exit** 하니 (출력이 데드락 없이 바로 surface 됨), challenge 를 보여주고 멈춰요. (에이전트는 `--no-input` 같은 플래그를 따로 안 붙여도 돼요 — 비-TTY 면 CLI 가 자동 감지해요.)
 
      ```bash
      axhub auth login --force --no-browser --json $AUTH_EXTRA
