@@ -597,7 +597,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(skillDirs.length).toBeGreaterThanOrEqual(11);
   });
 
-  test("all 30 shipped skills are present, including quality expansion skills + auto-diagnose + inventory", () => {
+  test("all 31 shipped skills are present, including quality expansion skills + auto-diagnose + inventory + setup", () => {
     expect(skillDirs.sort()).toEqual([
       "apps",
       "auth",
@@ -622,6 +622,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "profile",
       "recover",
       "routing-stats",
+      "setup",
       "status",
       "trace",
       "update",
@@ -979,7 +980,7 @@ describe("cross-manifest consistency", () => {
   test("README current-release summary matches package metadata and shipped surfaces", async () => {
     const readme = await readFile(join(REPO_ROOT, "README.md"), "utf8");
     expect(readme).toContain(`**상태**: v${packageJson.version}`);
-    expect(readme).toContain("30 SKILLs / 9 commands");
+    expect(readme).toContain("31 SKILLs / 9 commands");
     expect(readme).not.toContain("AXHUB_HELPERS_RUNTIME=ts");
     expect(readme).not.toContain("TypeScript fallback");
   });

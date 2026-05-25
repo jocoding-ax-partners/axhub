@@ -222,6 +222,19 @@
       "새 기능 뭐야",
       "신규 기능"
     ],
+    "skills/setup/SKILL.md": [
+      "셋업해줘",
+      "셋업 해줘",
+      "처음인데",
+      "처음 사용",
+      "처음 써",
+      "온보딩",
+      "온보딩해줘",
+      "시작하기",
+      "axhub 시작",
+      "axhub 처음",
+      "초기 셋업"
+    ],
     "skills/doctor/SKILL.md": [
       "닥터",
       "설정 봐",
@@ -936,5 +949,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-05-22T05:41:38.330Z"
+  "generated_at": "2026-05-25T07:09:24.946Z"
 }

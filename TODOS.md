@@ -183,3 +183,51 @@
 **Priority:** P3
 **Depends on:** phase-26 v2 PR 26.2 spike decision 유지 여부
 **Blocks:** FSM 채택 시 phase-26 v2 PR 26.2 merge
+
+## P3 — setup 온보딩에 statusline 자동활성 제안
+
+**Why:** `setup` 스킬 온보딩 끝에 statusline 활성화를 제안하면 첫 사용자가 배포 상태를 항상 보게 돼요. 지금은 `enable-statusline` 을 따로 발견해야 해요.
+
+**What:**
+- `setup` 의 init 연결 단계 근처에 `enable-statusline` 호출 제안을 추가해요.
+- 사용자가 거절하면 조용히 넘어가요 (온보딩 피로 방지).
+
+**Pros:**
+- 온보딩 완성도가 올라가요.
+- 기존 `enable-statusline` skill 을 재사용해요.
+
+**Cons:**
+- 온보딩 단계가 늘어 첫 사용자 피로가 생길 수 있어요.
+- statusline 미선호 사용자에겐 noise 예요.
+
+**Context:** `/plan-ceo-review` 에서 SELECTIVE EXPANSION cherry-pick 후보로 올랐으나 핵심 경로가 아니라 deferred 했어요. setup baseline 이 merge 되고 검증된 뒤 추가해요.
+
+**Effort:** human ~0.5d / CC+gstack ~15min
+**Priority:** P3
+**Depends on:** setup skill merge
+**Blocks:** 없음
+
+## P2 — setup 에 프로젝트 deps consent 설치 (dep-exec 게이트 정식 오픈)
+
+**Why:** `node_modules` 없는 프로젝트에서 `setup` 이 deps 설치까지 해주면 "clone → 셋업 → 바로 dev" 가 한 번에 돼요. 지금은 사용자가 수동 `npm/bun install` 해야 해요.
+
+**What:**
+- `setup` 에 `package.json` 감지 + `node_modules` 부재 시 consent-gate `npm/bun install` 을 추가해요.
+- `allows-dependency-execution: true` 선언 + `scripts/skill-doctor-allowlist.json` 등록 + rationale ≥50자 필요해요 (CI 게이트).
+- pm 선택은 lockfile(`bun.lockb`/`pnpm-lock.yaml`/`package-lock.json`) 우선순위로 결정해요.
+
+**Pros:**
+- 첫 dev 환경 마찰을 제거해요.
+- dep-exec 게이트를 정식 절차로 여는 첫 사례가 돼요.
+
+**Cons:**
+- dep-exec 게이트를 여는 일이라 보안 표면이 늘어요.
+- lockfile 없을 때 pm 선택이 모호해요.
+- silent 금지 — consent-gate 필수라 단계가 늘어요.
+
+**Context:** dep-exec 는 `skill-doctor.ts` 가 의도적으로 gated. `/plan-ceo-review` cherry-pick 에서 가치는 인정됐으나 CI 작업이 따라와 별 PR 로 deferred 했어요. setup baseline 검증 + 실수요 확인 후 진행해요.
+
+**Effort:** human ~1.5d / CC+gstack ~30min
+**Priority:** P2
+**Depends on:** setup skill merge
+**Blocks:** 없음
