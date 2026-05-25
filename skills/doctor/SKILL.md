@@ -171,14 +171,14 @@ To run diagnostics:
      "header": "CLI 설치",
      "multiSelect": false,
      "options": [
-       {"label": "1. 자동 설치 (Recommended)", "value": "install", "description": "skills/install-cli 즉시 호출 — OS 별 공식 채널로 설치"},
+       {"label": "1. 자동 설치 (Recommended)", "value": "install", "description": "skills/setup 즉시 호출 — CLI 설치부터 로그인·node 까지 순서대로 안내해요"},
        {"label": "2. 명령어만 보고 직접", "value": "manual", "description": "설치 명령어 출력 후 종료 — 사용자가 직접 실행"},
        {"label": "3. 나중에", "value": "later", "description": "지금은 그대로 두고 진단만 끝내기"}
      ]
    }
    ```
 
-   "1. 자동 설치" 선택 시 → `Skill("axhub:install-cli")` 즉시 호출. doctor SKILL 의 `NEVER auto-fix` 규칙은 보존 — direct install 안 하고 sibling skill 로 consent route 만 함. multi-failure 가 아닌 단일 cli-missing 시나리오에서만 fire (다른 row 도 fail 이면 Step 6 (multi-failure summary) 가 우선).
+   "1. 자동 설치" 선택 시 → `Skill("axhub:setup")` 즉시 호출. setup 은 detect-first 라 CLI 설치 → 로그인 → node 순으로 빈 곳만 채워요 (CLI 만 없으면 install-cli 한 번 위임하고 돌아와요). doctor SKILL 의 `NEVER auto-fix` 규칙은 보존 — direct install 안 하고 sibling skill 로 consent route 만 함. multi-failure 가 아닌 단일 cli-missing 시나리오에서만 fire (다른 row 도 fail 이면 Step 6 (multi-failure summary) 가 우선).
 
 6. **Multi-failure summary.** If multiple rows fail, list all of them and surface AskUserQuestion to pick the first one to fix:
 
@@ -187,7 +187,7 @@ To run diagnostics:
      "question": "여러 항목 점검 필요해요. 어디부터 고쳐요?",
      "header": "고칠 항목",
      "options": [
-       {"label": "1. CLI 설치", "value": "install", "description": "skills/install-cli 호출"},
+       {"label": "1. CLI 설치", "value": "install", "description": "skills/setup 호출 — CLI 설치 → 로그인 → node 온보딩까지 한 번에"},
        {"label": "2. CLI 업그레이드", "value": "upgrade", "description": "skills/update 호출"},
        {"label": "3. 로그인 다시", "value": "login", "description": "skills/auth 호출"},
        {"label": "전부 나중에", "value": "later", "description": "지금은 그대로"}
