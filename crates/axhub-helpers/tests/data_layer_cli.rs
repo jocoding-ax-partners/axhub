@@ -282,6 +282,92 @@ exit 64
 }
 
 #[cfg(unix)]
+fn write_fake_axhub_no_pat(dir: &std::path::Path) -> std::path::PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let path = dir.join("axhub-no-pat");
+    std::fs::write(
+        &path,
+        r#"#!/bin/sh
+if [ "$1" = "catalog" ] && [ "$2" = "resources" ]; then
+  cat <<'JSON'
+{"resources":[{"connector":"snowflake","path":"analytics/orders","kind":"table"}]}
+JSON
+  exit 0
+fi
+if [ "$1" = "catalog" ] && [ "$2" = "get" ]; then
+  cat <<'JSON'
+{"connector":"snowflake","path":"analytics/orders","kind":"table","permissions":{"read":{"allowed_columns":["id","total"],"masked":[]}}}
+JSON
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "whoami" ]; then
+  cat <<'JSON'
+{"tenant_id":"ten_1","tenant_slug":"acme","user_email":"dev@example.com","endpoint":"https://api.example.test"}
+JSON
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "pat" ] && [ "$3" = "whoami" ]; then
+  echo "No active PAT context." >&2
+  exit 65
+fi
+echo "unexpected fake axhub args: $*" >&2
+exit 64
+"#,
+    )
+    .unwrap();
+    let mut perms = std::fs::metadata(&path).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&path, perms).unwrap();
+    path
+}
+
+#[cfg(unix)]
+#[test]
+fn sync_writes_axhub_md_when_no_active_pat() {
+    // Regression: OAuth-only users have no PAT context, so `auth pat whoami` exits 65.
+    // PAT is optional metadata — sync must still write .axhub/AXHUB.md instead of
+    // aborting before the write (the bug that left vibe coders without AXHUB.md).
+    let temp = tempfile::tempdir().unwrap();
+    let fake = write_fake_axhub_no_pat(temp.path());
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    Command::new("git")
+        .args(["init"])
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+
+    let output = Command::new(bin())
+        .args(["sync", "--target", "local-python", "--json"])
+        .current_dir(&repo)
+        .env("AXHUB_BIN", &fake)
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "sync must succeed without a PAT; stdout={} stderr={}",
+        stdout_text(&output),
+        stderr_text(&output)
+    );
+    let axhub_dir = repo.join(".axhub");
+    assert!(
+        axhub_dir.join("AXHUB.md").exists(),
+        "AXHUB.md must be written even when no PAT is configured"
+    );
+    let catalog: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(axhub_dir.join("catalog.json")).unwrap())
+            .unwrap();
+    assert!(
+        catalog["pat"].is_null(),
+        "missing PAT must be recorded as null metadata, got {}",
+        catalog["pat"]
+    );
+    assert_eq!(catalog["principal"]["tenant_id"], "ten_1");
+}
+
+#[cfg(unix)]
 #[test]
 fn sync_writes_git_root_catalog_with_private_snapshot_and_gitignore() {
     let temp = tempfile::tempdir().unwrap();
