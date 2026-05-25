@@ -20,6 +20,8 @@ const LOGS_SKILL = join(REPO_ROOT, "skills/logs/SKILL.md");
 const DEPLOY_SKILL = join(REPO_ROOT, "skills/deploy/SKILL.md");
 const VERIFY_SKILL = join(REPO_ROOT, "skills/verify/SKILL.md");
 const INIT_SKILL = join(REPO_ROOT, "skills/init/SKILL.md");
+const AUTH_SKILL = join(REPO_ROOT, "skills/auth/SKILL.md");
+const GITHUB_SKILL = join(REPO_ROOT, "skills/github/SKILL.md");
 
 const AUTO_DEGRADE_NOTE = "axhub-cli 0.15.3";
 
@@ -71,6 +73,27 @@ describe("v0.15.3 — watch/follow CLI auto-degrade contract", () => {
     expect(content).toContain(AUTO_DEGRADE_NOTE);
     expect(content).not.toContain("WATCH=--watch");
     expect(content).not.toContain("WATCH=;");
+  });
+
+  test("device-flow fast-exit guidance does not promise stale approval resume", () => {
+    const init = readFileSync(INIT_SKILL, "utf8");
+    const github = readFileSync(GITHUB_SKILL, "utf8");
+
+    for (const content of [init, github]) {
+      expect(content).toContain("device_code_issued");
+      expect(content).toContain("새 device flow");
+      expect(content).toContain("internal `device_code` 를 노출하지 않기 때문");
+      expect(content).not.toContain("승인한 뒤 터미널에서 직접");
+    }
+  });
+
+  test("auth fresh device-flow lane matches the CLI's stdout gate", () => {
+    const content = readFileSync(AUTH_SKILL, "utf8");
+    expect(content).toContain("stdout non-TTY");
+    expect(content).toContain("`--no-input` / `--non-interactive`");
+    expect(content).toContain("fresh device flow");
+    expect(content).toContain("exit 65");
+    expect(content).toContain("axhub auth login --force --no-browser --json $AUTH_EXTRA");
   });
 
   test("status/logs/deploy/verify keep the D1 non-interactive AskUserQuestion guard", () => {

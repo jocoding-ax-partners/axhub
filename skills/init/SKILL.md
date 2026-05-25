@@ -31,7 +31,7 @@ model: sonnet
 - `schema_version` (예: `bootstrap/v1`) — API 응답 검증용. raw 값 echo 금지.
 - `items[].id`, `items[].folder_name`, `items[].name`, `items[].resource_tier` — `axhub apps templates list` 가 반환한 backend template registry. id 는 사용자 발화 매칭에만 쓰고, raw 목록 dump 금지.
 - `bootstrap_id`, `status_url`, `stage`, `app_id`, `deployment_id`, `repo_full_name`, `error_code`, `error_message` — bootstrap saga 의 internal verification primitives. raw 값 echo 금지 (단 `repo_full_name` 은 마지막 단계에서 `git clone` URL 로 사용자에게 보여줘요).
-- `request_id`, `idempotency_key`, `installation_id`, `device_code` — internal correlation/auth primitives. raw 값 echo 금지. **예외**: saga 가 `event: device_code_issued` 를 emit 하면 `verification_uri` (또는 `verification_uri_complete`) + `user_code` 쌍은 humanize 해서 사용자에게 즉시 보여줘요 — 안 보여주면 saga 가 GitHub App install 승인을 기다리며 block 돼서 사용자는 멈춘 줄 알아요. internal `device_code` 값 자체는 여전히 echo 금지.
+- `request_id`, `idempotency_key`, `installation_id`, `device_code` — internal correlation/auth primitives. raw 값 echo 금지. **예외**: CLI GitHub device-flow 준비 단계에서 `event: device_code_issued` 를 emit 하면 `verification_uri` (또는 `verification_uri_complete`) + `user_code` 쌍은 humanize 해서 사용자에게 즉시 보여줘요. 대화형 TTY 에서는 승인까지 polling 하고, 에이전트/비-TTY 에서는 event 직후 fast-exit 하므로 사용자는 안내를 못 보면 멈춘 줄 알아요. internal `device_code` 값 자체는 여전히 echo 금지.
 
 대신 사용자에게는 한국어 한 줄로 진행 상황만 알려드려요. 예시:
 
@@ -44,7 +44,7 @@ model: sonnet
 | Step 5 bootstrap dry-run | "어떤 작업을 할지 미리 보여줘요." |
 | Step 6 사용자 동의 | "지금 만들고 배포까지 한 번에 진행해요." |
 | Step 7 bootstrap execute + watch | "앱 만들고, GitHub repo 만들고, 첫 배포까지 진행 중이에요. 보통 2~5분 정도 걸려요." |
-| Step 7a GitHub 연결 필요 (saga 에서 `device_code_issued` 발생 시) | "GitHub 연결이 필요해요. 브라우저에서 `{verification_uri}` 열고 코드 `{user_code}` 를 입력해 주세요. 승인하면 자동으로 진행돼요." |
+| Step 7a GitHub 연결 필요 (`device_code_issued` 발생 시) | "GitHub 연결이 필요해요. 브라우저에서 `{verification_uri}` 열고 코드 `{user_code}` 를 입력해 주세요. 대화형 TTY 에서는 승인하면 자동으로 진행되고, 에이전트 컨텍스트에서는 안내 후 멈춰요." |
 | Step 8 git clone | "코드를 현재 폴더로 가져와요." |
 | Step 9 결과 안내 | "끝났어요. 이렇게 시작하면 돼요." |
 
@@ -189,7 +189,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
    진행 중 매 ~30s 마다 한국어 한 줄로 narrate 해요 — "앱 만들고 있어요" / "GitHub repo 만들고 있어요" / "첫 배포 중이에요. 거의 다 왔어요". 60s 이상 같은 stage 머무르면 "조용하네요, 계속 기다리고 있어요" 한 줄을 추가해요.
 
-   **GitHub 연결 필요 (saga stdout 의 `device_code_issued` event 처리).** saga 가 GitHub App 미설치 / installation 만료 / scope 부족 상태면 첫 stage 에서 다음과 같은 JSON line 을 emit 해요 (대화형이면 그 뒤 사용자 승인을 기다려요):
+   **GitHub 연결 필요 (CLI stdout 의 `device_code_issued` event 처리).** CLI 가 GitHub App 미설치 / installation 만료 / scope 부족 상태를 해결하려고 device flow 를 시작하면, backend saga 를 시작하기 전에 다음 JSON line 을 emit 해요 (대화형 TTY 면 그 뒤 승인까지 polling 하고, 에이전트/비-TTY 면 event 직후 fast-exit 해요):
 
    ```json
    {"event":"device_code_issued","data":{"verification_uri":"https://github.com/login/device","verification_uri_complete":null,"user_code":"XXXX-XXXX","expires_in":899}}
@@ -203,9 +203,9 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    > 2. 코드 입력: `<user_code>`
    > 3. axhub GitHub App 설치 승인
    >
-   > 승인하면 자동으로 다음 단계로 넘어가요. (유효시간 약 `<expires_in/60>` 분)
+   > 대화형 TTY 에서는 브라우저 승인 뒤 CLI 가 폴링을 계속해 다음 단계를 이어가요. 에이전트 컨텍스트에서는 이 안내를 보여준 뒤 멈춰요. (유효시간 약 `<expires_in/60>` 분)
 
-   `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 그 다음은 컨텍스트에 따라 갈라져요 (axhub-cli 0.15.3+): **대화형 TTY** 면 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. **에이전트 / 비-TTY 컨텍스트** 면 saga 가 `device_code_issued` emit 직후 fast-exit 하므로 다음 stage event 가 안 와요 — challenge 를 보여준 뒤 멈추고, "승인한 뒤 터미널에서 직접 `axhub init` 을 다시 실행해 마저 진행해 주세요" 라고 안내해요 (완전 autonomous 완료는 CLI device_code persist resume 기능을 기다려요 — `.omc/plans/device-flow-agent-completion-gap.md`). 코드가 expire 되면 saga 가 error 로 종료해요 — 그 때는 `/axhub:github` 안내로 재시도해요.
+   `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 그 다음은 컨텍스트에 따라 갈라져요 (axhub-cli 0.15.3+): **대화형 TTY** 면 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. **에이전트 / 비-TTY 컨텍스트** 면 CLI 가 `device_code_issued` emit 직후 fast-exit 하므로 다음 stage event 가 안 와요. challenge 를 보여준 뒤 멈추고, "이 호출은 승인 완료를 polling 하지 않아요. 계속하려면 대화형 터미널에서 `axhub init` 을 다시 실행해 새 device flow 를 완료해 주세요" 라고 안내해요. 이전 `user_code` 를 승인한 뒤 같은 에이전트 명령을 재호출해도 이어지지 않아요. CLI 가 internal `device_code` 를 노출하지 않기 때문이에요. 완전 autonomous 완료는 CLI device_code persist resume 기능을 기다려요 (`.omc/plans/device-flow-agent-completion-gap.md`). 코드가 expire 되면 `/axhub:github` 안내로 재시도해요.
 
    상세한 device flow 안내 패턴은 `../github/SKILL.md` 의 OAuth device flow 섹션을 따라요.
 
