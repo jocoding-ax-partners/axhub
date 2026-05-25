@@ -1,6 +1,6 @@
 ---
 name: my-resources
-description: '이 스킬은 사용자가 본인이 접근 가능한 axhub 리소스 전체 인벤토리를 한눈에 보고 싶을 때 사용해요. 다음 표현에서 활성화: "내 리소스", "내 리소스 봐", "내 리소스 보여", "내 리소스 보여줘", "내 리소스 목록", "리소스 봐", "리소스 보여", "리소스 보여줘", "리소스 목록", "리소스 뭐 있어", "리소스 조회", "뭐 접근 가능", "뭐 접근 가능해", "내가 뭐 봐", "내가 뭐 봐", "내 자산", "내 자산 봐", "내 스코프", "스코프 봐", "권한 봐", "권한 뭐 있어", "접근 가능한 거", "접근 권한", "접근 권한 봐", "쓸 수 있는 거", "available", "inventory", "list resources", "my resources", "my access", "my scope", "what can I access", "what do I have", "what i have access to", "access", "resources", "show my resources", 또는 사용자 scope 의 통합 리소스 카탈로그 조회. team scope 필터로 cross-tenant 데이터 노출 차단해요. 7 family (tenants / apps / members / engines / connectors / resources / catalog kinds) 를 병렬 호출해서 한 응답에 compact 한국어 요약 + drill-down hint 로 렌더해요.'
+description: '이 스킬은 사용자가 본인이 접근 가능한 axhub 리소스 전체 인벤토리를 한눈에 보고 싶을 때 사용해요. 다음 표현에서 활성화: "내 리소스", "내 리소스 봐", "내 리소스 보여", "내 리소스 보여줘", "내 리소스 목록", "리소스 봐", "리소스 보여", "리소스 보여줘", "리소스 목록", "리소스 뭐 있어", "리소스 조회", "뭐 접근 가능", "뭐 접근 가능해", "내가 뭐 봐", "내가 뭐 봐", "내 자산", "내 자산 봐", "내 스코프", "스코프 봐", "권한 봐", "권한 뭐 있어", "접근 가능한 거", "접근 권한", "접근 권한 봐", "쓸 수 있는 거", "available", "inventory", "list resources", "my resources", "my access", "my scope", "what can I access", "what do I have", "what i have access to", "access", "resources", "show my resources", 또는 사용자 scope 의 통합 리소스 카탈로그 조회. team scope 필터로 cross-tenant 데이터 노출 차단해요. 7 family (tenants / apps / members / engines / connectors / resources / catalog kinds) 를 병렬 호출해서 한 응답에 한국어 GFM 표(테이블) + drill-down hint 로 자세히 렌더해요.'
 examples:
   - utterance: "내 리소스 보여줘"
     intent: "list accessible axhub resources"
@@ -15,12 +15,12 @@ examples:
 multi-step: false
 needs-preflight: true
 allows-dependency-execution: false
-model: haiku
+model: sonnet
 ---
 
 # My Resources
 
-사용자가 접근 가능한 axhub 리소스를 7개 family (tenants / apps / members / engines / connectors / resources / catalog kinds) 로 한 번에 조회해서 compact 한국어 요약으로 렌더해요. 읽기 전용, mutation 경로 없음, F4 privacy 로 cross-tenant 데이터 차단해요.
+사용자가 접근 가능한 axhub 리소스를 7개 family (tenants / apps / members / engines / connectors / resources / catalog kinds) 로 한 번에 조회해서 한국어 GFM 표(테이블)로 자세히 렌더해요 (bullet 요약 아님 — Step 5 표 1·2·3). 읽기 전용, mutation 경로 없음, F4 privacy 로 cross-tenant 데이터 차단해요.
 
 ## Workflow
 
@@ -140,6 +140,7 @@ echo "$PREFLIGHT_JSON"
 ## NEVER
 
 - NEVER 한 family 실패로 전체 인벤토리 abort. 항상 7 family 모두 한 응답에 렌더 (성공/실패 혼합).
+- NEVER 표를 bullet 요약("- 앱: 10개 …" 같은)으로 축약. Step 5 의 GFM 표(표 1·2·3)를 그대로 그려요 — 사용자가 테이블 형식으로 자세히 보길 원해요.
 - NEVER cross-tenant 데이터 (team_id != $TEAM_ID) 화면에 표시. F4 privacy 위반.
 - NEVER mutation 호출 (`create` / `update` / `delete` / `set-role` / `bulk-register`) 진입. 이 SKILL 은 read-only.
 - NEVER per-app drill (`env list --app X` / `tables list --app X`) 자동 진행. 사용자가 명시적으로 앱 선택 후 다른 SKILL 로 위임.
