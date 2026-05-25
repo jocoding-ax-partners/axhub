@@ -4,6 +4,20 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.14](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.13...v0.9.14) (2026-05-25)
+
+백엔드/CLI 가 v0.15 로 옮겨가며 plugin 에 남아 있던 레거시를 정리한 릴리즈예요. 핵심은 **`hub-api.jocodingax.ai` → `axhub-api.jocodingax.ai` 마이그레이션** — 단순 문서 치환이 아니라 TLS-pinned helper (`list_deployments.rs`) 의 `DEFAULT_ENDPOINT`·`HUB_API_HOST`·**SPKI 핀** 까지 axhub-api 인증서 핀(`sha256/8bK9T3frw7OU…`, 실제 cert 에서 2회 추출 검증)으로 함께 옮겨서 레거시 호스트 폐기 후에도 핀닝이 안 깨지게 했어요. 그리고 CLI v0.15 surface 와 안 맞던 스킬 호출을 바로잡았어요 — `apps delete`/`env delete` 는 삭제가 실제로 안 먹던 잘못된 플래그(`--yes`/`--force --confirm`)를 `--execute` 로, `verify` 는 존재하지 않는 `axhub status`/`axhub logs --runtime` 대신 실제 `axhub deploy status`/`axhub deploy logs --source pod` 로, `logs` 는 "deploy list 없음" 이라는 stale 주장을 제거했어요. plugin v1 설계 가이드(`docs/plugin-developer-guide.md`)도 repo 에 내장해 개발 시 모델·기여자가 in-context 로 참조하게 했어요. **알려진 한계**: `deploy create --branch` 는 CLI v0.15 가 `--branch` 를 드롭했지만 consent 시스템(`schema.rs` 가 deploy_create 에 branch 를 binding 으로 요구)이 아직 결합돼 있어서 이번에 안 고쳤어요 — consent schema 변경이 필요한 별도 보안 작업이라 후속 PR 로 분리했어요. pre-1.0 관례에 따라 patch bump 예요.
+
+### Fixed
+
+* migrate hub-api.jocodingax.ai → axhub-api.jocodingax.ai (decommission legacy host) ([6c6ad17](https://github.com/jocoding-ax-partners/axhub/commit/6c6ad17d7f7408cdcb521b885a01b83a152dd525))
+* **skills:** correct legacy CLI invocations for ax-hub-cli v0.15 ([2f70522](https://github.com/jocoding-ax-partners/axhub/commit/2f705222c6528c1180beea936e457fd45307c692))
+
+
+### Docs
+
+* **plugin-developer-guide:** embed v1 plugin design guide ([9b978c7](https://github.com/jocoding-ax-partners/axhub/commit/9b978c74e6c970f29e6158dedf4b4a1955673531))
+
 ## [0.9.13](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.12...v0.9.13) (2026-05-25)
 
 이번 릴리즈의 핵심은 처음 axhub 를 쓰는 사람을 위한 `setup` 온보딩 orchestrator 스킬이에요 (#131). "셋업해줘" / "처음인데" / "getting started" 같은 발화로 진입해서 CLI 설치 → 로그인 → node 환경 감지 → (없으면) consent 설치 → 준비 완료 → 첫 앱까지 순서대로 손잡고 안내해요. 설치·로그인·scaffold 로직을 재구현하지 않고 `install-cli`/`auth`/`init` 에 `Skill()` 로 위임하는 thin orchestrator 라 중복이 없어요. 전체 상태를 먼저 감지(detect-first)한 뒤 첫 번째 빈 곳으로만 위임해서 `Skill()` 제어 복귀 여부와 무관하게 동작하고, 위임이 안 돌아와도 ready 카드가 다음 발화를 안내해서 사용자가 막히지 않아요. node 가 없을 때만 consent 한 번 받고 패키지 매니저 → nvm/fnm 스크립트(버전 핀 고정) → nodejs.org 안내 순으로 설치하는데, axhub CLI 외 third-party 자동설치의 유일한 예외라 도메인을 nodejs.org/nvm-sh/fnm 으로 제한했어요. 함께 install-cli 를 공식 단일 채널로 좁히고(#128, Homebrew/Scoop 제거로 stale client_id 로그인 실패 차단), CLI 호환 상한을 <1.0.0 으로 넓히고(#127), Windows preflight 테스트를 portable 하게 고쳤어요(#126). pre-1.0 관례에 따라 feat 이 있어도 patch bump 예요 (commit-and-tag-version 의 0.x 동작 — 직전 0.9.8/0.9.9 도 feat 을 patch 로 릴리즈했어요).
