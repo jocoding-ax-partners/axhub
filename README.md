@@ -2,17 +2,17 @@
 
 > 바이브코더가 자연어로 axhub 앱을 안전하게 배포하고 관리하는 Claude Code 플러그인.
 
-**상태**: v0.8.0. 30 SKILLs / 9 commands / 3 quality agents / 5 cross-arch cosign-signed binaries 라이브.
+**상태**: v0.9.12. 30 SKILLs / 9 commands / 3 quality agents / 3 cross-arch cosign-signed binaries 라이브.
 
 ---
 
 ## 한 줄 요약
 
-axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "결제 앱 만들어줘" → "GitHub 연결해" → "배포해" → "결과 봐" 같은 한국어 자연어로 앱 lifecycle 을 수행하는 플러그인이에요. ax-hub-cli v0.12 surface 를 얇게 wrapping 하고, HMAC consent token / TLS-pinned hub-api / exit-code recovery routing 으로 안전 가드를 걸어요.
+axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "결제 앱 만들어줘" → "GitHub 연결해" → "배포해" → "결과 봐" 같은 한국어 자연어로 앱 lifecycle 을 수행하는 플러그인이에요. ax-hub-cli v0.15 surface 를 얇게 wrapping 하고, HMAC consent token / TLS-pinned axhub-api / exit-code recovery routing 으로 안전 가드를 걸어요.
 
 ## 무엇을 할 수 있는가
 
-28 SKILL 자연어 트리거 + 9 슬래시 명령 (한글 alias `/axhub:배포` 포함):
+30 SKILL 자연어 트리거 + 9 슬래시 명령 (한글 alias `/axhub:배포` 포함):
 
 | SKILL | 트리거 예시 | 슬래시 |
 |-------|-------------|--------|
@@ -45,7 +45,7 @@ UX 보장:
 안전 가드:
 - HMAC consent token (`CLAUDE_SESSION_ID` 필수, O_NOFOLLOW, symlink reject)
 - 잘못된 앱 / profile 자동 차단
-- `https://hub-api.jocodingax.ai` TLS pinning fallback
+- `https://axhub-api.jocodingax.ai` TLS pinning fallback
 - exit 65 (token 만료) → 한국어 안내 + auth login flow
 - SessionStart preflight diagnostics
 
@@ -97,7 +97,7 @@ export AXHUB_TRIGGER_THRESHOLDS=lines:100,files:10,staleness:14d
 
 정직한 tradeoff:
 
-- v0.5.6 에서도 plugin helper 를 Rust native binary 하나로 유지해요.
+- plugin helper 를 Rust native binary 하나로 유지해요.
 - axhub CLI 자체 설치가 필요하면 `install-cli` skill 이 OS 별 공식 설치 채널을 안내해요.
 - template 목록은 `ax-hub-cli` registry 를 source of truth 로 사용해요.
 - admin onboarding 과 remote `templates.json` 는 deferred 예요.
@@ -215,19 +215,19 @@ bun run build
         │
         ▼
 Claude Code  →  axhub plugin
-        │              ├── skills/* (22 SKILL, NL 자동 트리거 + frontmatter multi-step/needs-preflight)
-        │              ├── commands/* (10 슬래시 + 한글 alias)
+        │              ├── skills/* (30 SKILL, NL 자동 트리거 + frontmatter multi-step/needs-preflight)
+        │              ├── commands/* (9 슬래시 + 한글 alias)
         │              ├── hooks/* (SessionStart preflight, PreToolUse HMAC consent)
-        │              └── bin/axhub-helpers (Rust native, 5 cross-arch cosign-signed)
+        │              └── bin/axhub-helpers (Rust native, 3 cross-arch cosign-signed)
         │                       │  resolve + HMAC consent + classify + redact + preflight
         ▼                       │
    Bash tool ────────────────────┘
         │
         ▼
-   ax-hub-cli binary (v0.12.x supported surface)
+   ax-hub-cli binary (v0.15.x supported surface)
         │
         ▼
-   https://hub-api.jocodingax.ai  (TLS pinned fallback)
+   https://axhub-api.jocodingax.ai  (TLS pinned fallback)
 ```
 
 **핵심 원칙**: 플러그인은 **얇은 routing/recovery layer** 예요. 비즈니스 로직은 모두 ax-hub-cli 에 있고, 플러그인은 (1) 자연어 인텐트 → 명령어 매핑, (2) HMAC consent token 으로 destructive op 보호, (3) exit code 기반 자동 복구만 담당해요. Plugin 은 MCP 안 써요. 항상 ax-hub-cli 호출.
@@ -286,14 +286,14 @@ git push origin main --tags         # release.yml 자동 fire (cosign 서명 + G
 
 상세: [`docs/RELEASE.md`](docs/RELEASE.md).
 
-## Test baseline (v0.5.7)
+## Test baseline (v0.9.12)
 
 - `bun test` → plugin manifest / skill / workflow regression green
 - `cargo test --workspace` → Rust helper unit/integration/phase parity green (keychain live tests ignored)
 - `bunx tsc --noEmit` clean
 - `bun run lint:tone --strict` 0 err / 0 warn
 - `bun run lint:keywords --check` clean
-- `bun run skill:doctor --strict` 28/28 SKILLs complete
+- `bun run skill:doctor --strict` 30/30 SKILLs complete
 - `bun run bench:hooks` prompt-route/preflight p95 thresholds green
 - `bun run test:plugin-e2e:t2` → 12/12 helper lifecycle cases pass
 - `bun run release:check` Rust helper host artifact + release matrix verified
