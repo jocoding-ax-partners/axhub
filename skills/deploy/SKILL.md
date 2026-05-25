@@ -610,7 +610,7 @@ To deploy:
 
    The next Bash tool call id is created by Claude after consent-mint runs, so never invent `${NEXT_BASH_TOOL_CALL_ID}`, never set a fake `CLAUDE_SESSION_ID`, and never clear the real session env just to mint consent. `tool_call_id:"pending"` explicitly mints a short-lived pending token; the PreToolUse hook claims it once only when action/app/profile/branch/commit/context all match. If the token is absent, already used, expired, or non-matching, the command is blocked. This avoids POSIX-only session-unset commands and keeps the flow portable across macOS/Linux/Windows Claude Code environments.
 
-5. **Post-deploy chain** — capture `.id` from the deploy create JSON, then auto-follow:
+5. **Post-deploy chain** — capture `.id` from the deploy create JSON, then auto-follow until terminal:
 
    ```bash
    echo '[deploy:Step 5 status-chain] entered' >&2
@@ -619,12 +619,22 @@ To deploy:
      echo '{"systemMessage":"배포 이력이 없어요. 먼저 /axhub:deploy 로 배포 후 다시 호출하세요."}'
      exit 0
    fi
-   axhub deploy status "$DEPLOY_ID" --app "$APP_ID" --watch --json
    ```
 
-   **에이전트 컨텍스트 자동 degrade (axhub-cli 0.15.3+).** `--watch` 를 항상 그대로 전달해요. CLI 가 비-TTY/에이전트 컨텍스트를 자동 감지해서 단일 스냅샷으로 degrade 한 뒤 즉시 종료하니 (`/axhub:deploy` post-chain 이 더 이상 hang 안 나요), 플러그인 쪽 수동 `--watch` drop guard 는 불필요해요. 에이전트는 스냅샷 1개를 받고, 최신 상태가 필요하면 `/axhub:deploy` 또는 `/axhub:status` 를 다시 호출하면 돼요. 사람의 TTY 에서는 종전처럼 스트림으로 watch 해요. (에이전트는 `--no-input` 같은 플래그를 따로 안 붙여도 돼요 — 비-TTY 면 CLI 가 자동 감지하니까요.)
+   시작 시점에 "빌드 중이에요. 완료될 때까지 확인할게요 (보통 2~5분)." 한 줄을 먼저 보여주고, terminal status 까지 따라가요:
 
-   **watch-narration 은 interactive TTY 전용이에요.** 사람이 TTY 로 watch 할 때만 ~30s 마다 humanized Korean progress 를 렌더해요 ("1분 경과, 빌드 중이에요 (정상)", `references/recovery-flows.md` "watch-narration"). 에이전트 컨텍스트(스냅샷)에서는 narration 대신 단일 상태 요약 + 재호출 안내를 보여줘요.
+   ```bash
+   axhub deploy status "$DEPLOY_ID" --app "$APP_ID" --watch --watch-timeout 9m --json
+   ```
+
+   **에이전트도 terminal 까지 폴링해요 (axhub-cli 0.15.3+).** bare `--watch` 는 agent context(비-TTY / `--no-input`)에서 single-snapshot 으로 degrade 하지만, `--watch-timeout` (또는 `--watch-interval`) 을 붙이면 explicit streaming override 라 CLI 가 degrade 하지 않고 terminal status(`succeeded` / `failed` / `cancelled` / `rolled_back`) 까지 직접 폴링하면서 NDJSON `stage_transition` 을 emit 해요. 그래서 SKILL 이 따로 bash polling loop 를 돌릴 필요가 없어요 — terminal 판정도 CLI 가 해요. 이 bash 는 Bash tool `timeout: 570000` (9.5분, `--watch-timeout 9m` 보다 약간 큼) 으로 호출해요. 사람 TTY 에서도 같은 명령이 스트림으로 watch 돼요.
+
+   - **terminal 도달**: CLI 가 폴링을 끝내고 exit 해요. Step 6 exit-code 라우팅 + 성공/실패 안내로 완료를 한 번에 알려줘요. 사용자가 "아직도 진행 중이야?" 하고 다시 안 물어도 돼요.
+   - **9분 timeout** (CLI 가 Timeout error + `axhub deploy watch ... resume` hint 를 줘요): 완료를 선언하지 말아요. "빌드가 아직 진행 중이에요 (9분+ 째). 계속 확인할게요." 한 줄을 보여주고 위 명령을 한 번 더 재호출해요 (총 2회 = 최대 ~19분). 2회 후에도 terminal 이 아니면 "빌드가 예상보다 길어요. `/axhub:status` 로 이어서 확인할 수 있어요." 로 안내하고 멈춰요.
+
+   raw NDJSON / JSON dump 금지 — 진행은 NDJSON `stage_transition` 을 humanize 하고, terminal 시 단일 한국어 요약만 보여줘요.
+
+   **watch-narration 은 interactive TTY 전용이에요.** 사람이 TTY 로 watch 할 때만 ~30s 마다 humanized Korean progress 를 렌더해요 ("1분 경과, 빌드 중이에요 (정상)", `references/recovery-flows.md` "watch-narration"). 에이전트는 terminal 도달 시 단일 완료 요약만 보여줘요.
 
 6. **On any non-zero exit**, route to `references/error-empathy-catalog.md` by exit code:
    - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 앱은 안전해요. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.
