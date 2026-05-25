@@ -4,7 +4,7 @@
  *
  * `bin/statusline.sh:13-18` 의 Unix wiring 코멘트 JSON 블록과
  * `skills/enable-statusline/SKILL.md` 의 두 snippet 블록(_UNIX + _WINDOWS)이
- * byte-identical 하도록 강제해요. `scripts/codegen-preflight-injection.ts:43-60`
+ * byte-identical 하도록 강제해요. `scripts/preflight-block.ts` 의 canonical-block
  * SSOT 선례를 그대로 따라요.
  *
  * Idempotent: 이미 최신 상태면 파일을 변경하지 않아요.

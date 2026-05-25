@@ -10,7 +10,8 @@
  * Patterns checked (all per-SKILL frontmatter declaration → body presence):
  *   1. D1 sentinel — required only when body references AskUserQuestion
  *   2. TodoWrite Step 0 — required when frontmatter `multi-step: true`
- *   3. !command preflight injection — required when frontmatter `needs-preflight: true`
+ *   3. in-body preflight — needs-preflight:true requires in-body `axhub-helpers preflight --json`
+ *      and NO load-time `!command` injection (ADR-0013, supersedes ADR-0011)
  *   4. dep-execution — requires frontmatter `allows-dependency-execution: true|false`
  *   5. model routing — Phase 25 PR 25.5a. Optional `model:` frontmatter; when declared
  *      it must be one of haiku|sonnet|opus. Missing field is allowed (no-op for the
@@ -20,11 +21,11 @@
  *   skills/deploy/SKILL.md:
  *     ✓ D1 sentinel
  *     ✓ TodoWrite (multi-step: true)
- *     ✓ !command preflight (needs-preflight: true)
+ *     ✓ in-body preflight (needs-preflight: true)
  *   skills/foo/SKILL.md:
  *     ❌ D1 sentinel missing
  *     ❌ TodoWrite missing (frontmatter says multi-step: true)
- *     ✓ !command preflight (needs-preflight: false → exempt)
+ *     ✓ in-body preflight (needs-preflight: false → no injection)
  *
  *   2 SKILLs scanned, 1 OK, 1 with 2 missing pattern(s).
  *
@@ -34,10 +35,6 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { readSkillDescription } from "./codegen-skill-keywords-from-rust";
 import { computeExamplesIssues, computeQualityIssues, type QualityIssue } from "./skill-doctor-quality";
-import {
-  getInjectionLineForVariant,
-  TARGETS as PREFLIGHT_TARGETS,
-} from "./codegen-preflight-injection";
 import { getStatuslineSnippet } from "./codegen-statusline-snippet";
 
 const REPO_ROOT = join(import.meta.dir, "..");
@@ -229,18 +226,29 @@ const inspectSkill = (slug: string): SkillCheck => {
         reason: multiStep ? "frontmatter multi-step: true" : "frontmatter multi-step: false → exempt",
       },
       ((): { name: string; required: boolean; present: boolean; reason: string } => {
-        // PR #99 review m2: lookup variant from PREFLIGHT_TARGETS (single source of truth)
-        // instead of hard-coding `slug === "deploy"`. Drift is now caught when a new SKILL
-        // is added to PREFLIGHT_TARGETS without a corresponding skill-doctor update.
-        const targetPath = `skills/${slug}/SKILL.md`;
-        const variant: "lite" | "deploy" = PREFLIGHT_TARGETS.find((t) => t.file === targetPath)?.variant ?? "lite";
+        // ADR-0013 (supersedes ADR-0011): needs-preflight:true means the SKILL runs
+        // `axhub-helpers preflight --json` as an in-body bash step, NOT a load-time
+        // `!command` injection. The injection hard-failed on first run (raw English
+        // "requires approval") because Claude Code permission-gates the outer `node -e`
+        // wrapper itself — and the inner denialRegex fallback could never catch its own
+        // denial (dead path). Invariant: NO skill may carry the dead `!`node -e
+        // ...preflight...`` injection; a needs-preflight:true skill MUST invoke preflight
+        // in its body so the call goes through the standard interactive Bash permission flow.
+        const hasInjection = /^!`node -e "[^\n]*axhub-helpers[^\n]*preflight[^\n]*"`$/m.test(content);
+        // Require the canonical block's assignment signature, NOT a bare `preflight --json`
+        // mention. A loose `/preflight\s+--json/` would false-pass any skill that references
+        // preflight in a later/legacy step (e.g. deploy's command-reference at deploy:388)
+        // even if its upfront canonical block were deleted. The `PREFLIGHT_JSON=$("$HELPER" ...`
+        // form is unique to the canonical block and also enforces the helper-pick fallback.
+        const invokesPreflight = /PREFLIGHT_JSON=\$\("\$HELPER" preflight --json/.test(content);
+        const present = needsPreflight ? !hasInjection && invokesPreflight : !hasInjection;
         return {
-          name: "!command preflight",
-          required: needsPreflight,
-          present: content.includes(getInjectionLineForVariant(variant)),
+          name: "in-body preflight",
+          required: true,
+          present,
           reason: needsPreflight
-            ? `frontmatter needs-preflight: true — codegen-preflight-injection.ts ${variant} variant byte-identical`
-            : "frontmatter needs-preflight: false → exempt",
+            ? "needs-preflight: true — body must invoke `axhub-helpers preflight --json` and carry NO `!command` injection"
+            : "needs-preflight: false → only checks NO `!command` injection remains",
         };
       })(),
       {

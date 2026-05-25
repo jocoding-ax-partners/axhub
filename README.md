@@ -37,7 +37,7 @@ axhub SaaS 도입사의 바이브코더 직원이 Claude Code 안에서 "결제 
 UX 보장:
 - **D1 TTY guard** — non-interactive context 에서 AskUserQuestion 건너뛰고 안전 기본값 진행
 - **TodoWrite Step 0** — multi-step SKILL 진행 체크박스 실시간 표시
-- **`!command` preflight** — auth_status / current_app / current_env / last_deploy 자동 주입
+- **in-body preflight** — auth_status / current_app / current_env / last_deploy 를 workflow Step 1 bash 에서 확보 (ADR-0013)
 - **AskUserQuestion polish** — `header` chip + 해요체 통일
 - **Per-question fallback registry** — drift catch (새 question 등록 안 하면 test FAIL)
 - **statusline** — 옵트인 (활성화 방법은 아래 "Statusline 보이게 하기" 섹션 참고해요)

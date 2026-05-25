@@ -108,13 +108,13 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 ## Always Do
 
-- **MUST `bun run skill:new <slug>` 로 스캐폴드 생성** — 직접 `mkdir skills/<name>` 후 SKILL.md 작성 시 Phase 17/18 패턴 (D1 TTY guard / TodoWrite Step 0 / `!command` preflight injection / AskUserQuestion header / registry stub) 누락되어 CI fail.
+- **MUST `bun run skill:new <slug>` 로 스캐폴드 생성** — 직접 `mkdir skills/<name>` 후 SKILL.md 작성 시 Phase 17/18 패턴 (D1 TTY guard / TodoWrite Step 0 / in-body preflight 블록 / AskUserQuestion header / registry stub) 누락되어 CI fail.
 - **MUST frontmatter 에 `multi-step:` + `needs-preflight:` 선언** — `multi-step: true` (deploy/recover/update/upgrade/doctor 같이 4+ 단계) 또는 `false` (apps/auth/clarify/logs/status 같이 단일/조회). `needs-preflight: true` (deploy/recover/apps 같이 live state 필요) 또는 `false`.
-- **MUST `bun run skill:doctor` 로 패턴 체크** — colored 한글 출력으로 SKILL 별 D1 sentinel / TodoWrite / `!command` preflight / **step-numbering collision (FU-3)** 누락 즉시 보임. CI 도 `--strict` mode 로 같은 검사 통과 필수. step-collision 검사는 `## Workflow` body 의 top-level `^N. **` 헤더 중복을 자동 catch (sub-step 인 `3.5. **` 이나 `### Subsection` 안의 local 1./2./.../D1./D2. 는 exempt).
+- **MUST `bun run skill:doctor` 로 패턴 체크** — colored 한글 출력으로 SKILL 별 D1 sentinel / TodoWrite / in-body preflight / **step-numbering collision (FU-3)** 누락 즉시 보임. CI 도 `--strict` mode 로 같은 검사 통과 필수. step-collision 검사는 `## Workflow` body 의 top-level `^N. **` 헤더 중복을 자동 catch (sub-step 인 `3.5. **` 이나 `### Subsection` 안의 local 1./2./.../D1./D2. 는 exempt).
 - **MUST `tests/fixtures/ask-defaults/registry.json` 에 AskUserQuestion 별 `safe_default` + `rationale` 등록** — scaffold 가 stub 자동 append. 새 question 추가 시 매번 channel 등록 (drift catch).
 - **MUST 모든 한글 텍스트 해요체 통일** — `bun run lint:tone --strict` 0 err 필수. 금지 token: 합니다 / 입니다 / 시겠어요 / 드립니다 / 당신 / 아이고. 사용: 해요 / 예요 / 이에요 / 할래요.
 - **MUST nl-lexicon trigger 어구는 frontmatter `description:` 에만** — `bun run lint:keywords --check` 베이스라인 잠금. SKILL body 에서 새 trigger 어구 추가하면 baseline 깨짐.
-- **MUST codegen-preflight-injection lock 통과 (variant-aware) — `bun run skill:doctor` 가 자동 검사** — `needs-preflight: true` SKILL 의 `!command` 줄이 `scripts/codegen-preflight-injection.ts` 의 `getPreflightInjectionLine()` 출력과 byte-identical. scaffold (`bun run skill:new`) 가 자동 생성, drift 는 `bun run skill:doctor --strict` 에서 즉시 감지.
+- **MUST in-body preflight 계약 통과 — `bun run skill:doctor` 가 자동 검사** — `needs-preflight: true` SKILL 은 (a) load-time `!command` 주입이 **없고** (b) body 에 `scripts/preflight-block.ts` 의 `CANONICAL_PREFLIGHT_BLOCK` 을 그대로 포함해야 해요 (scaffold `bun run skill:new` 가 자동 삽입). literal `axhub-helpers preflight --json` 만 쓰면 helper-pick fallback 이 누락되므로, skill-doctor 는 `PREFLIGHT_JSON=$("$HELPER" preflight --json` 할당 signature 로 검증해요 (bare 언급은 통과 못 함). 모든 SKILL 은 폐기된 `!`node -e ...preflight`` dead injection 을 가지면 안 돼요. (load-time `!command` 주입은 첫 실행 권한 hard-fail 로 폐기 — docs/adr/0013 참조, ADR-0011 supersede.)
 
 ## Skill Authoring Workflow
 
@@ -142,7 +142,7 @@ bun test                      # 회귀
 ## Never Do
 
 - NEVER `mkdir skills/foo && touch skills/foo/SKILL.md` 후 빈 SKILL.md 직접 작성. scaffold 우회 시 패턴 누락.
-- NEVER `tests/ux-todowrite.test.ts` / `tests/ux-skill-preflight-injection.test.ts` 등에 hardcoded SKILL slug 추가. frontmatter 선언으로 자동 enforce — test 코드 편집 불필요.
+- NEVER `tests/ux-todowrite.test.ts` / `tests/ux-skill-preflight-injection.test.ts` 등에 hardcoded SKILL slug 추가. SKILL 추가/제거는 frontmatter 선언으로 자동 enforce 돼요 (slug 추가 불필요). 단, 패턴 계약 자체가 바뀌면 (예: preflight injection→in-body) assertion 로직은 편집해야 해요.
 - NEVER `tests/fixtures/ask-defaults/registry.json` 에 AskUserQuestion 등록 없이 SKILL ship. `tests/ux-ask-fallback-registry.test.ts` 가 drift catch.
 - NEVER `description:` 의 nl-lexicon trigger 어구 변경 — baseline 깨짐. 필요 시 `.omc/lint-baselines/skill-keywords.json` baseline 재캡처 (rare event).
 - NEVER lint:tone scope 에 SKILL frontmatter 포함 시키기 — `description:` 은 nl-lexicon trigger 라 byte-identical lock 우선.

@@ -52,16 +52,18 @@ describe("deploy skill git init stage", () => {
     expect(content).toContain('PATH="${CLAUDE_PLUGIN_ROOT}/bin:${PATH}"');
   });
 
-  test("pre-execute helper root fallback is not bash-only and includes native Windows", () => {
+  test("pre-execute helper root resolution covers native Windows, not bash-only (PowerShell lane)", () => {
     const content = readFileSync(DEPLOY_SKILL, "utf8");
 
-    const preflightBlock = content.match(/!\`([\s\S]*?)\`/)?.[1] ?? "";
-    expect(preflightBlock).toContain("node -e");
-    expect(preflightBlock).toContain("path.delimiter");
-    expect(preflightBlock).toContain("axhub-helpers.exe");
-    expect(preflightBlock).not.toContain("bash -lc");
+    // Phase 27 (ADR-0013): the load-time node-runner `!command` injection is retired.
+    // Deploy's cross-platform root resolution now lives in the PowerShell setup prose
+    // (native Windows .exe lane) alongside the POSIX bash setup — not a node runner.
     expect(content).toContain("Windows PowerShell");
+    expect(content).toContain("axhub-helpers.exe");
     expect(content).toContain('$env:CLAUDE_PLUGIN_ROOT');
+    // No leftover load-time injection; preflight runs in-body instead.
+    expect(content).not.toMatch(/^!`node -e/m);
+    expect(content).toMatch(/preflight\s+--json/);
   });
 
   test("git-init and deploy preview questions are structured AskUserQuestion payloads", () => {

@@ -32,7 +32,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { getPreflightInjectionLine } from "./codegen-preflight-injection";
+import { CANONICAL_PREFLIGHT_BLOCK } from "./preflight-block";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const TEMPLATE = join(REPO_ROOT, "skills/_template/SKILL.md.tmpl");
@@ -110,8 +110,17 @@ content = content.replace(/\{\{TODOWRITE_BLOCK\}\}/g, todoWriteBlock);
 content = content.replace(/\{\{D1_GUARD_BLOCK\}\}/g, d1GuardBlock);
 
 if (!needsPreflight) {
-  content = content.replace(getPreflightInjectionLine(), "");
-  content = content.replace(/이 줄은 Claude Code SKILL preprocessing.*?주입돼요\.\n\n/, "");
+  // Fail loudly on template drift: if the template's preflight block no longer matches
+  // CANONICAL_PREFLIGHT_BLOCK byte-for-byte, the literal replace would silently no-op and
+  // ship a --no-preflight skill that still carries the block.
+  if (!content.includes(CANONICAL_PREFLIGHT_BLOCK + "\n\n")) {
+    process.stderr.write(
+      "error: template drift — CANONICAL_PREFLIGHT_BLOCK not found in scaffold output. " +
+        "Sync skills/_template/SKILL.md.tmpl with scripts/preflight-block.ts.\n",
+    );
+    process.exit(1);
+  }
+  content = content.replace(CANONICAL_PREFLIGHT_BLOCK + "\n\n", "");
 }
 
 writeFileSync(targetFile, content);
