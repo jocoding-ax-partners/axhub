@@ -191,10 +191,11 @@ echo "$PREFLIGHT_JSON"
    1. 브라우저에서 열기: <verification_uri_complete or verification_uri>
    2. 코드 입력: <user_code>
 
-   완료되면 자동으로 다음 단계로 진행돼요.
    ```
 
    `verification_uri_complete` 가 있으면 우선 표시 (코드 입력 자동). 없으면 `verification_uri` + 별도 `user_code` 표시.
+
+   **컨텍스트별 완료 (axhub-cli 0.15.3+).** 대화형 TTY 면 connect 가 승인까지 polling 해서 자동으로 다음 단계로 진행돼요. 에이전트 / 비-TTY 컨텍스트면 connect 가 `device_code_issued` emit 직후 fast-exit 하므로 자동 진행이 안 돼요 — challenge 를 보여준 뒤 멈추고, 사용자에게 "승인한 뒤 터미널에서 직접 `axhub apps git connect ... --execute` 를 실행하거나 `/axhub:github` 를 다시 호출해 주세요" 라고 안내해요. 완전 autonomous 완료는 CLI 의 device_code persist resume 기능을 기다려요 (`.omc/plans/device-flow-agent-completion-gap.md`).
 
    `CLAUDE_PLUGIN_ROOT` 가 훅 환경에 없더라도 사용자에게 수동 실행이나 bang-prefixed connect 우회를 요청하지 말고, PATH 의 `axhub-helpers` 로 pending token 을 민 뒤 같은 흐름에서 top-level Bash 로 connect 를 실행해요.
 

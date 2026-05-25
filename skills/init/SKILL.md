@@ -190,7 +190,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
    진행 중 매 ~30s 마다 한국어 한 줄로 narrate 해요 — "앱 만들고 있어요" / "GitHub repo 만들고 있어요" / "첫 배포 중이에요. 거의 다 왔어요". 60s 이상 같은 stage 머무르면 "조용하네요, 계속 기다리고 있어요" 한 줄을 추가해요.
 
-   **GitHub 연결 필요 (saga stdout 의 `device_code_issued` event 처리).** saga 가 GitHub App 미설치 / installation 만료 / scope 부족 상태면 첫 stage 에서 다음과 같은 JSON line 을 emit 하고 사용자 승인을 기다리며 block 해요:
+   **GitHub 연결 필요 (saga stdout 의 `device_code_issued` event 처리).** saga 가 GitHub App 미설치 / installation 만료 / scope 부족 상태면 첫 stage 에서 다음과 같은 JSON line 을 emit 해요 (대화형이면 그 뒤 사용자 승인을 기다려요):
 
    ```json
    {"event":"device_code_issued","data":{"verification_uri":"https://github.com/login/device","verification_uri_complete":null,"user_code":"XXXX-XXXX","expires_in":899}}
@@ -206,7 +206,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    >
    > 승인하면 자동으로 다음 단계로 넘어가요. (유효시간 약 `<expires_in/60>` 분)
 
-   `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 안내 후에는 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 별도 작업 없이 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. 코드가 expire 되면 saga 가 error 로 종료해요 — 그 때는 `/axhub:github` 안내로 보내서 재시도 안내해요.
+   `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 그 다음은 컨텍스트에 따라 갈라져요 (axhub-cli 0.15.3+): **대화형 TTY** 면 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. **에이전트 / 비-TTY 컨텍스트** 면 saga 가 `device_code_issued` emit 직후 fast-exit 하므로 다음 stage event 가 안 와요 — challenge 를 보여준 뒤 멈추고, "승인한 뒤 터미널에서 직접 `axhub init` 을 다시 실행해 마저 진행해 주세요" 라고 안내해요 (완전 autonomous 완료는 CLI device_code persist resume 기능을 기다려요 — `.omc/plans/device-flow-agent-completion-gap.md`). 코드가 expire 되면 saga 가 error 로 종료해요 — 그 때는 `/axhub:github` 안내로 재시도해요.
 
    상세한 device flow 안내 패턴은 `../github/SKILL.md` 의 OAuth device flow 섹션을 따라요.
 
