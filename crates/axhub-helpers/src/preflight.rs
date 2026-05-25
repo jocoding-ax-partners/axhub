@@ -505,6 +505,10 @@ where
             .ok()
             .filter(|s| !s.is_empty())
             .or(manifest_app)
+            // cwd-specific: github-connected 앱은 origin repo명 = 앱 slug. 전역
+            // last-deploy 캐시(아래)보다 먼저 써서, 다른 프로젝트 디렉토리에서
+            // stale "현재 앱: <남의 slug>" 가 누출되는 걸 막아요.
+            .or_else(|| crate::resolve::read_git_remote_slug(&runner))
             // v0.9.5: cache.app_slug 은 globally cached "last deploy" 라 cwd context
             // 와 무관하게 emit 되면 빈 디렉토리에서도 "현재 앱: <stale-slug>" 가 떠요.
             // SKILL routing 이 이를 보고 잘못된 안내를 함 (#: 사용자 보고된 회귀).

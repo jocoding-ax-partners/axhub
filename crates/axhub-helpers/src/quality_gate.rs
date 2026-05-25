@@ -192,7 +192,7 @@ mod tests {
         ResolveOutput {
             profile: Some("prod".to_string()),
             endpoint: Some("https://axhub-api.jocodingax.ai".to_string()),
-            app_id: Some(42),
+            app_id: Some("42".to_string()),
             app_slug: Some("paydrop".to_string()),
             candidate_slug: None,
             matched_apps: vec![],

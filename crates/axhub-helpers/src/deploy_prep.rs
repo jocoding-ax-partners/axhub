@@ -266,19 +266,32 @@ where
     };
 
     // In-flight detection (skipped by kill switch).
+    //
+    // NOTE (status-first gate, follow-up): `find_app_in_flight_with_window` still
+    // fetches via the legacy numeric-id backend path (`i64` app_id). App IDs are
+    // now UUID strings, so this `parse::<i64>()` fails and in-flight detection
+    // stays None — the SKILL Step 1.7 status-first gate is best-effort until that
+    // path is migrated to the working CLI `axhub deploy list --json` surface.
+    // Deploy itself still resolves correctly via `resolve.app_id`; this only
+    // affects pre-empting a duplicate `deploy create` against an in-flight deploy.
     if in_flight_check_enabled() {
-        if let Some(app_id) = result.resolve.app_id {
+        if let Some(numeric_app_id) = result
+            .resolve
+            .app_id
+            .as_deref()
+            .and_then(|id| id.parse::<i64>().ok())
+        {
             let now = chrono::Utc::now();
             #[cfg(not(coverage))]
             {
                 use crate::list_deployments::find_app_in_flight_with_window;
                 if let Ok(inflight) =
-                    find_app_in_flight_with_window(app_id, now, IN_FLIGHT_WINDOW_SECS)
+                    find_app_in_flight_with_window(numeric_app_id, now, IN_FLIGHT_WINDOW_SECS)
                 {
                     apply_in_flight(&mut result, inflight);
                 }
             }
-            let _ = (app_id, now); // suppress unused warnings in coverage builds
+            let _ = (numeric_app_id, now); // suppress unused warnings in coverage builds
         }
     }
 
@@ -336,7 +349,7 @@ mod tests {
             resolve: crate::resolve::ResolveOutput {
                 profile: None,
                 endpoint: None,
-                app_id: Some(1),
+                app_id: Some("1".into()),
                 app_slug: Some("test-app".into()),
                 candidate_slug: None,
                 matched_apps: vec![],
