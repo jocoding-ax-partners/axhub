@@ -4,6 +4,43 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.18](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.17...v0.9.18) (2026-05-25)
+
+이번 릴리즈는 UUID 앱 ID 전환으로 깨졌던 배포 앱 resolve 를 복구하고, `inventory` 스킬을 `my-resources` 로 rename 한 패치예요. backend 가 app·deploy ID 를 정수에서 UUID 문자열로, `apps list` 배열 키를 `items` 로 바꿨는데 helper 가 따라가지 못해 `app_id` 가 null 이 되고, 그게 `git_repo=false` → consent binding 불일치 → preauth-check 반복 deny → 에이전트가 사용자에게 명령을 떠넘기는 연쇄로 이어졌어요(#147). `parse_apps_list` 가 `items` 키와 UUID 문자열 id 를 수용하고, git origin repo명을 앱 slug candidate 로 도출해 "배포해줘" 단독으로도 resolve 되게 했어요. preflight `current_app` 도 전역 캐시 대신 git remote 를 우선해서 다른 프로젝트 디렉토리에 stale 앱이 새지 않아요. `inventory` 스킬은 `my-resources` 로 이름만 바꿨고 트리거 어구는 그대로라 "내 리소스" / "inventory" 발화 모두 유지돼요. 함께 data 스킬 catalog invoke 통합(#144)과 snippet tenant-scoped 라우트 정합(#146)도 나가요.
+
+### Test baseline
+
+- #147 deploy fix: `cargo test -p axhub-helpers` 532 pass / 0 fail (회귀 4 추가), `cargo clippy` clean, 라이브 `deploy-prep` 가 git remote 있는 repo 에서 git_repo/app_id/app_slug/candidate/current_app 전부 정상 resolve 확인했어요.
+- inventory→my-resources rename: `skill:doctor --strict` exit 0, `lint:keywords --check` no diff(baseline 키 rename), `lint:tone --strict` 0 err, `bunx tsc --noEmit` exit 0, 영향 테스트(manifest 31-skills / e2e-registry / data-contract / ask-fallback-registry) 전부 pass 예요.
+- #144/#146: rust(ubuntu/macos/windows) + Local Rust-primary gate + corpus.100 drift gate(#144 `[skip-routing-gate]`) + T2 helper-bin 전부 pass, mergeStateStatus CLEAN 에서 squash merge 했어요.
+- release postbump: `codegen:version` + `release:check`(host 바이너리 빌드 + 버전 assert + release.yml 5타깃 선언 확인) 통과예요.
+
+### Honest tradeoff
+
+- 전체 `bun test` 의 기존 2 fail(`README current-release summary` + `PLAN plugin schema reconciliation`)은 본 릴리즈 변경과 무관해요 — 변경 stash 후에도 동일 재현되는 버전/manifest drift 이고, rename 추가 후에도 fail 이 그대로 2개라 NEW 회귀 없음을 확인했어요.
+- status-first 중복배포 가드(#5)는 best-effort 로 남아요 — in-flight 탐지(`list_deployments`)가 직접 backend fetch 라 UUID `app_id` 를 거부하고 6개 skill 의 출력 계약이라, 동작하는 CLI(`axhub deploy list --json`) 위임으로 모듈 전체를 옮기는 후속 작업이 필요해요. headline(punt-to-user)은 resolution 복구로 사라졌어요.
+- #144 routing 변경은 `[skip-routing-gate]` 로 baseline 미측정 상태로 나가요. #146/#144 의 도메인 로직은 각자 CI green 에 의존했고 본 세션에서 코드 리뷰로 재검증하진 않았어요. `release:check` 는 host 바이너리만 빌드했고, 5-platform cross 빌드 + cosign 서명은 tag push 후 release.yml 매트릭스가 수행해요.
+
+
+### Added
+
+* **data:** AXHUB.md 컨텍스트를 spec 데이터 규칙 전체로 확장 ([e44e732](https://github.com/jocoding-ax-partners/axhub/commit/e44e7327cf94feb219a9bb6beff18f1d9cb3fc95))
+* 배포/상태/init watch 를 에이전트 자동 폴링으로 전환 ([af26f46](https://github.com/jocoding-ax-partners/axhub/commit/af26f46eca9ebf8ca52ed63e2166d14f8ca45315))
+
+
+### Fixed
+
+* **data:** snippet 경로를 tenant-scoped catalog/resources 라우트로 정합 ([#146](https://github.com/jocoding-ax-partners/axhub/issues/146)) ([55773a3](https://github.com/jocoding-ax-partners/axhub/commit/55773a3439d990d1ab40f8d9368803518b32052a))
+* **data:** 인사이트 흐름 catalog invoke 통합 + sync PAT optional ([f5558d0](https://github.com/jocoding-ax-partners/axhub/commit/f5558d092ffdc619566d76df17b899d078fd9882))
+* doctor 라우팅 보강 + 전역 multi-step SKILL TodoWrite 완료 정리 ([476d2c5](https://github.com/jocoding-ax-partners/axhub/commit/476d2c5afb257fa28efef424635179a189a404c3))
+* doctor 라우팅 보강 + 전역 multi-step SKILL TodoWrite 완료 정리 ([#141](https://github.com/jocoding-ax-partners/axhub/issues/141)) ([81aba7f](https://github.com/jocoding-ax-partners/axhub/commit/81aba7fdb6da9f033521b930b469617098f58315))
+* UUID 앱 ID 로 깨진 배포 앱 resolve 복구 ([#147](https://github.com/jocoding-ax-partners/axhub/issues/147)) ([79aff31](https://github.com/jocoding-ax-partners/axhub/commit/79aff3142932f645c5c8e96f8c826322e216d944))
+
+
+### Changed
+
+* inventory 스킬을 my-resources 로 rename ([6ece44c](https://github.com/jocoding-ax-partners/axhub/commit/6ece44c8034c88fa8d2843c0ba903eb6f4f87ffd))
+
 ## [0.9.17](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.16...v0.9.17) (2026-05-25)
 
 이번 릴리즈는 SKILL UX 를 에이전트 친화적으로 다듬은 패치예요. watch/follow 흐름을 에이전트 자동 폴링으로 전환하고, init 라우팅과 inventory 조회 렌더를 보강했어요. 안전 측면으로는 deploy 가 status-first 게이트로 배포 루프를 차단하고(#138), doctor 가 CLI 미설치를 발견하면 install-cli(바이너리만) 대신 setup 온보딩으로 이어줘서(#140) 미온보딩 사용자가 CLI 설치 → 로그인 → node 까지 한 번에 도달해요.
