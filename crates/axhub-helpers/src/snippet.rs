@@ -1,6 +1,6 @@
 use serde_json::json;
 
-const DEFAULT_BASE_URL: &str = "https://api.axhub.jocodingax.ai";
+const DEFAULT_BASE_URL: &str = "https://axhub-api.jocodingax.ai";
 const DEFAULT_ROW_LIMIT: u64 = 100;
 const _: &str = include_str!("../templates/mode-a-ts.tmpl");
 const _: &str = include_str!("../templates/mode-b-python.tmpl");
@@ -158,6 +158,7 @@ fn render_mode_a_typescript(args: &SnippetArgs) -> String {
     let path = url_encode(&args.path);
     let path_literal = js_string(&path);
     let sql = js_string(&args.sql);
+    let tenant = js_string(args.tenant.as_deref().unwrap_or("YOUR_TENANT_SLUG"));
     format!(
         r#"/**
  * axhub data snippet
@@ -165,9 +166,10 @@ fn render_mode_a_typescript(args: &SnippetArgs) -> String {
  * Auth: browser cookie session via credentials include. Do not add manual auth headers.
  */
 export async function readAxhubData() {{
+  const tenant = {tenant};
   const connector = {connector};
   const encodedPath = {path_literal};
-  const response = await fetch(`/api/v1/catalog/${{encodeURIComponent(connector)}}/${{encodedPath}}:read`, {{
+  const response = await fetch(`/api/v1/tenants/${{encodeURIComponent(tenant)}}/catalog/resources/${{encodeURIComponent(connector)}}/${{encodedPath}}:read`, {{
     method: 'POST',
     credentials: 'include',
     headers: {{ 'Content-Type': 'application/json' }},
@@ -180,6 +182,7 @@ export async function readAxhubData() {{
 }}
 "#,
         metadata = metadata(args),
+        tenant = tenant,
         connector = connector,
         path_literal = path_literal,
         sql = sql,
@@ -205,8 +208,9 @@ import requests
 
 AXHUB_BASE_URL = os.environ.get("AXHUB_BASE_URL", {base_url})
 AXHUB_PAT = os.environ["AXHUB_PAT"]
+AXHUB_TENANT = os.environ["AXHUB_TENANT"]
 
-url = f"{{AXHUB_BASE_URL}}/api/v1/catalog/" + {connector} + "/" + {path} + ":read"
+url = f"{{AXHUB_BASE_URL}}/api/v1/tenants/{{AXHUB_TENANT}}/catalog/resources/" + {connector} + "/" + {path} + ":read"
 response = requests.post(
     url,
     headers={{"Content-Type": "application/json", "X-Api-Key": AXHUB_PAT}},
@@ -239,10 +243,12 @@ fn render_mode_b_typescript(args: &SnippetArgs) -> String {
 const baseUrl = process.env.AXHUB_BASE_URL ?? {base_url};
 const pat = process.env.AXHUB_PAT;
 if (!pat) throw new Error('Missing AXHUB_PAT');
+const tenant = process.env.AXHUB_TENANT;
+if (!tenant) throw new Error('Missing AXHUB_TENANT');
 
 const connector = {connector};
 const encodedPath = {path};
-const response = await fetch(`${{baseUrl}}/api/v1/catalog/${{encodeURIComponent(connector)}}/${{encodedPath}}:read`, {{
+const response = await fetch(`${{baseUrl}}/api/v1/tenants/${{encodeURIComponent(tenant)}}/catalog/resources/${{encodeURIComponent(connector)}}/${{encodedPath}}:read`, {{
   method: 'POST',
   headers: {{ 'Content-Type': 'application/json', 'X-Api-Key': pat }},
   body: JSON.stringify({{ sql: {sql}, row_limit: {row_limit} }}),
@@ -279,7 +285,9 @@ func main() {{
   if baseURL == "" {{ baseURL = {base_url} }}
   pat := os.Getenv("AXHUB_PAT")
   if pat == "" {{ panic("missing AXHUB_PAT") }}
-  url := baseURL + "/api/v1/catalog/{connector}/{encoded_path}:read"
+  tenant := os.Getenv("AXHUB_TENANT")
+  if tenant == "" {{ panic("missing AXHUB_TENANT") }}
+  url := baseURL + "/api/v1/tenants/" + tenant + "/catalog/resources/{connector}/{encoded_path}:read"
   req, err := http.NewRequest("POST", url, bytes.NewBufferString({body}))
   if err != nil {{ panic(err) }}
   req.Header.Set("Content-Type", "application/json")
@@ -309,11 +317,12 @@ if [ -z "$AXHUB_BASE_URL" ]; then
   AXHUB_BASE_URL={base_url}
 fi
 : "${{AXHUB_PAT:?Missing AXHUB_PAT}}"
+: "${{AXHUB_TENANT:?Missing AXHUB_TENANT}}"
 
 curl -sS -X POST \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: $AXHUB_PAT" \
-  "$AXHUB_BASE_URL/api/v1/catalog/{connector}/{encoded_path}:read" \
+  "$AXHUB_BASE_URL/api/v1/tenants/$AXHUB_TENANT/catalog/resources/{connector}/{encoded_path}:read" \
   --data {body}
 "#,
         metadata = metadata(args),
