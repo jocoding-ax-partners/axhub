@@ -494,5 +494,15 @@
         "Overwrite"
       ]
     }
+  },
+  "insight": {
+    "실데이터에 이 집계 쿼리를 실행할까요?": {
+      "safe_default": "Dry-run only",
+      "rationale": "gateway query --execute reads live data. In non-interactive contexts, do not execute; show the resolved connector-id, path, SELECT SQL, and row limit only.",
+      "allowed_safe_defaults": [
+        "Dry-run only",
+        "Run query"
+      ]
+    }
   }
 }

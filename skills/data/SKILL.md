@@ -155,3 +155,4 @@ Use this only after `axhub-helpers sync` returns `identity_changed`.
 ## Additional Resources
 
 - `../deploy/references/error-empathy-catalog.generated.md` — generated exit-code copy from `crates/axhub-helpers/data/catalog.json`.
+- 인사이트/집계/분석 발화 ("인사이트 뽑아줘", "분석해줘", "집계해줘", "통계 내줘") 는 `/axhub:insight` 로 위임해요 — 이 SKILL 은 catalog 조회/describe/read snippet 전용이고, gateway query 집계는 insight 가 담당해요.

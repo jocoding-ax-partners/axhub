@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("36 top-level keys (2 메타 + 32 SKILL slug + quality_gate + consent channel)", () => {
+  test("37 top-level keys (2 메타 + 33 SKILL slug + quality_gate + consent channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(36);
+    expect(keys).toHaveLength(37);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
@@ -70,6 +70,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "env",
       "github",
       "init",
+      "insight",
       "install-cli",
       "inventory",
       "karpathy-guidelines",
@@ -90,9 +91,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("49 actual safe_default rationale 엔트리 including data bootstrap/live-read fallbacks + Phase 26 quality + Plan v6 diagnose + v0.9.3 auth PAT revoke + skill-cli-drift-fix (update.apply_consent + status.deployment_id_pick) + setup (node install + first app)", () => {
+  test("50 actual safe_default rationale 엔트리 including data bootstrap/live-read fallbacks + Phase 26 quality + Plan v6 diagnose + v0.9.3 auth PAT revoke + skill-cli-drift-fix (update.apply_consent + status.deployment_id_pick) + setup (node install + first app) + insight (gateway query live-run)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(49);
+    expect(paths).toHaveLength(50);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -132,6 +133,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "init",
       "init",
       "init",
+      "insight",
       "install-cli",
       "profile",
       "quality_gate",
