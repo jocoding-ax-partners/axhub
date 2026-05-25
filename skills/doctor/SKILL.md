@@ -12,6 +12,12 @@ examples:
     intent: "diagnose axhub setup"
   - utterance: "설정 봐"
     intent: "diagnose axhub setup"
+  - utterance: "현재 상태 진단해줘"
+    intent: "diagnose axhub setup"
+  - utterance: "현재 상태 점검해줘"
+    intent: "diagnose axhub setup"
+  - utterance: "도구 버전 확인해줘"
+    intent: "diagnose axhub setup"
 multi-step: true
 needs-preflight: false
 allows-dependency-execution: false
@@ -41,6 +47,8 @@ To run diagnostics:
    **TodoWrite status sync:** after every workflow step and after every AskUserQuestion answer, call TodoWrite again with the full current todos array. Mark finished items as `"completed"`, the active item as `"in_progress"`, and untouched items as `"pending"`. Do not leave the initial Step 0 list stale after commands, user answers, or final result.
 
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
+
+   **진단을 마치면 (결과 카드 출력 직후) TodoWrite 를 마지막으로 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.** `in_progress` / `pending` 이 하나라도 남으면 다음 SKILL (예: `/axhub:auth`) 이 시작될 때 doctor 의 미완료 todo 가 화면에 그대로 남아 버그처럼 보여요. 진단 종료 시점에 미완료 todo 가 0 개여야 해요.
 
 1. **Detect helper binary with OS-aware install-state rows** (Phase 5 US-503 + Windows helper bootstrap hotfix — `CLAUDE_PLUGIN_ROOT` or PATH may differ per shell):
 
