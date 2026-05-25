@@ -110,7 +110,18 @@ echo "$PREFLIGHT_JSON"
 
 To deploy:
 
-0. **Render TodoWrite checklist (vibe coder sees real-time progress).** Call TodoWrite at workflow start so the user can glance and see how far we've come:
+0. **Render TodoWrite checklist — derive it from the actual deploy path (don't paste a fixed list).** Call TodoWrite at workflow start so the vibe coder sees real-time progress. The items depend on what `deploy-prep` returns in Step 1: a git-connected app whose push auto-deploys **watches** a deploy it did not create (status-first), while a first-deploy or non-git app mints consent and runs `deploy create`. Read the situation, then write the todos that match it — the two blocks below are reference shapes, not a script to paste. Reference shape A — git-connected / status-first watch:
+
+   ```typescript
+   TodoWrite({ todos: [
+     { content: "배포 상태 확인 (preflight)", status: "in_progress", activeForm: "배포 상태 확인하는 중" },
+     { content: "최신 저장 지점 푸시 확인",     status: "pending",     activeForm: "푸시 상태 보는 중" },
+     { content: "자동 시작된 배포 따라가기",     status: "pending",     activeForm: "배포 따라가는 중" },
+     { content: "결과 안내",                  status: "pending",     activeForm: "마무리하는 중" }
+   ]})
+   ```
+
+   Reference shape B — first deploy / non-git (explicit create after status-first finds nothing):
 
    ```typescript
    TodoWrite({ todos: [
@@ -380,6 +391,32 @@ To deploy:
    - `force_new` 선택 시: Step 2 로 진행해요. exit 64 + `validation.deployment_in_progress` 에러가 나도 retry 하지 않아요 (Step 6 라우팅 따름).
    - `abort` 선택 시: 배포를 멈춰요. consent 를 발급하지 않아요.
 
+1.7. **Status-first gate (배포는 status 먼저 — `deploy create` 는 fallback).** push 가 자동배포를 트리거하는 환경(`deploy-prep` 의 `.github_connected: true`)에서는 preview/consent 로 가기 전에 **지금 돌고 있는 배포가 있는지 먼저 확인**해요. push 로 이미 시작된 배포가 있는데 새 `deploy create` 를 실행하면, exit 64 충돌이나 consent/`--branch` 불일치 deny 로 이어져서 토큰 재발급·우회 루프에 빠져요. 도는 배포가 있으면 그걸 따라가고(create 생략), 없을 때만 Step 2 이후 명시적 create 로 진행해요 — 이게 "status 보고 배포가 아니면 그제서야 진짜 create" 예요. 단, Step 1.6 이 이미 in-flight 를 처리했으면 (특히 사용자가 거기서 `force_new` 를 골랐으면) 그 선택을 존중해서 이 gate 는 건너뛰고 Step 2 로 진행해요 — 같은 in-flight 를 다시 watch 로 되돌리지 않아요.
+
+   ```bash
+   echo '[deploy:Step 1.7 status-first] entered' >&2
+   GITHUB_CONNECTED=$(echo "$DEPLOY_PREP_JSON" | jq -r '.github_connected // false')
+   STATUS_FIRST_ID=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.id // ""')
+   # github 연결 앱인데 in-flight 가 아직 안 보이면, push 자동배포가 backend 에 등록될 시간을 잠깐 줘요.
+   # interactive 에서만 짧게 폴링해요 (최대 ~15s, 5s × 3). non-interactive 는 추가 대기 없이 캐시값만 써요.
+   if [ -z "$STATUS_FIRST_ID" ] && [ "$GITHUB_CONNECTED" = "true" ] && [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then
+     for _ in 1 2 3; do
+       sleep 5
+       REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --refresh-in-flight --json 2>/dev/null || echo '{}')
+       STATUS_FIRST_ID=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
+       if [ -n "$STATUS_FIRST_ID" ]; then
+         DEPLOY_PREP_JSON="$REFRESH_JSON"
+         IN_FLIGHT_ID="$STATUS_FIRST_ID"
+         break
+       fi
+     done
+   fi
+   ```
+
+   - `STATUS_FIRST_ID` 가 non-empty → 이미 배포가 돌고 있어요. **여기서 Step 1.6 의 3-way 분기를 그대로 재사용**해요: `.in_flight_deploy.commit_sha` 와 `.resolve.commit_sha` 를 비교해서 same-commit 이면 본인 push 배포라 바로 Step 5 watch (`monitor`) 로 가고, cross-tenant / uncertain 이면 1.6b / 1.6c AskUserQuestion 으로 사용자에게 물어요. 이 경로에서는 **consent-mint 도 `deploy create` 도 실행하지 않아요** — 남의 배포를 말없이 본인 것처럼 따라가지 않으려고 same-commit 일 때만 자동 watch 예요.
+   - `STATUS_FIRST_ID` 가 empty (도는 배포 없음) → Step 2 이후 명시적 create 경로로 진행해요. github 연결이 아니거나, 폴링 동안에도 자동배포가 안 잡힌 경우예요.
+   - hook 이 `deploy create` 를 deny 하면 (consent/binding 불일치) flag 를 빼거나 wrapper 로 우회하지 말고, 사유를 한 줄로 알린 뒤 멈추거나 이 status-first watch 로 돌아와요 (NEVER 절 참조).
+
 2. **Pre-flight version check (legacy fallback only).** Phase 1 default path skips this — `deploy-prep` already returned the preflight envelope as `.preflight` in Step 1's JSON. Use the cached value: read `cli_too_old`, `cli_too_new`, `auth_ok` directly via `jq`. The block below is the legacy fallback path that fires only when `AXHUB_DEPLOY_PREP=0` is set:
 
    ```bash
@@ -519,7 +556,7 @@ To deploy:
 
    in_flight 가 발견되면 Step 1.6 의 3-way 분기 (1.6a / 1.6b / 1.6c) logic 을 동일하게 적용해요. `IN_FLIGHT_COMMIT` vs `RESOLVE_COMMIT` 비교 후 same-commit / cross-tenant / uncertain 분기 선택 → 해당 AskUserQuestion → `monitor` (Step 5 watch) / `force_new` (Step 4 계속) / `abort` (중단). non-interactive 환경에서는 건너뛰어요 (`AXHUB_REFRESH_IN_FLIGHT` 기본값 0 → no-op).
 
-4. **On user approval**, mint a consent token and run deploy. Run this step only when Step 1.1 did not already execute and record `deploy_create`; never double-submit a deploy for the same pending bootstrap action.
+4. **On user approval**, mint a consent token and run deploy. Run this step only when Step 1.1 did not already execute and record `deploy_create`; never double-submit a deploy for the same pending bootstrap action. 이 Step 은 **fallback create 경로**예요 — Step 1.7 status-first 가 도는 배포를 못 찾았을 때만 도달해요.
 
    ```bash
    echo '[deploy:Step 4 consent-deploy] entered' >&2
@@ -716,6 +753,8 @@ After cancellation, run a read-only status check and summarize the terminal stat
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop `--json` (parsing relies on it).
 - NEVER call `axhub deploy create` without going through `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint` first; the PreToolUse hook will deny.
+- NEVER bypass the `preauth-check` consent hook by stripping flags from the command (e.g. dropping `--branch`), building a command wrapper, symlinking `axhub` to a shim, or reordering `PATH` to shadow the real CLI. A denied `deploy create` means the consent binding did not match — improvising around the gate defeats the safety primitive. Surface the typed reason in one jargon-free line and stop, or fall back to the Step 1.7 status-first watch.
+- NEVER mint consent or run `deploy create` when Step 1.7 status-first already found an in-flight deploy for this app; route to watch instead. `deploy create` is the fallback only when no deploy is running.
 - NEVER call `axhub deploy cancel` without a matching `deploy_cancel` consent token.
 - NEVER infer `app_id` from `pwd` or git remote alone in the mutation path; always live resolve through the helper.
 - NEVER bypass the AskUserQuestion preview card on slash invocation; slash is explicit consent for the SKILL invocation, not for the destructive operation.
