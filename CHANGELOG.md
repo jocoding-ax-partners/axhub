@@ -4,6 +4,22 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.15](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.14...v0.9.15) (2026-05-25)
+
+ADR-0011 의 "검증된 가정 #1" — Claude Code 가 SKILL `!command` 주입의 outer `node -e` wrapper 자체에는 권한을 안 묻는다 — 이 거짓으로 판명된 걸 고친 릴리즈예요. 실제로는 권한 게이트가 outer `node -e` 명령 그 자체를 검사해서, needs-preflight SKILL 첫 실행에서 raw 영문 "requires approval" 로 hard-fail 했고, 안에 있던 한국어 denialRegex fallback 은 자기 자신의 거부를 못 잡는 dead path 였어요 (inner `spawnSync` 는 OS raw spawn 이라 권한 게이트를 안 거쳐서 그 문자열을 낼 일이 없었어요). 16 SKILL + template 의 load-time `!command` preflight 주입을 전부 제거하고, preflight 를 workflow 첫머리의 in-body bash 스텝으로 옮겼어요 — normal Bash 호출이라 default 모드에서 정상 interactive 권한 prompt 로 가고 hard-fail 이 사라져요. 대안인 `plugin.json` `permissions` 필드는 Claude Code 미지원으로 확정돼서, 유일하게 문서화된 baseline Bash 동작에만 의존하는 in-body 이동을 택했어요 (ADR-0013, ADR-0011 supersede). 생성형 `codegen-preflight-injection.ts` + byte-identical lock 은 폐기하고 `scripts/preflight-block.ts` 정적 단일소스 + skill-doctor 역전 검사로 대체했어요. CE 멀티-persona 리뷰가 마이그레이션 잔재 (axhub-diagnose 의 고아 caption — 손-작성 변형이라 1차 regex 가 놓침) 와 가드 약점 (deploy 의 bare preflight 언급으로 인한 false-pass) 을 추가로 잡아서, skill-doctor 를 canonical 할당 signature 로 강화하고 orphan-debris 회귀 test 를 더했어요.
+
+### Test baseline
+
+bun test 963 pass / 신규 fail 0. tsc --noEmit 0 · skill:doctor --strict 0 miss · lint:tone 0 · lint:keywords no-diff. README 현재-릴리즈 줄을 0.9.15 로, PLAN §16.12 schema 버전을 동기화해서 cross-manifest / plan-consistency 드리프트도 함께 해소했어요. architect (opus, THOROUGH) GO + CE 7-persona 리뷰 반영.
+
+### Honest tradeoff
+
+첫 실행 권한 prompt 1회는 여전히 떠요 — `plugin.json` 에 `permissions` 필드가 없어 TTFD=0 은 불가하고, 목표는 hard-fail 제거(정상 prompt 로 대체)였어요. end-to-end default-mode prompt 동작은 작업 환경(bypassPermissions)에서 재현 못 해 문서화된 baseline Bash 동작에 의존했고, 라이브 확인은 CI e2e / 사용자 몫으로 남겨요.
+
+### Fixed
+
+* SKILL preflight 를 in-body bash 로 이동 (load-time !command 주입 폐기) ([#132](https://github.com/jocoding-ax-partners/axhub/issues/132)) ([2b700ef](https://github.com/jocoding-ax-partners/axhub/commit/2b700ef41071378354a879f28f6169b21ecbb4b5))
+
 ## [0.9.14](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.13...v0.9.14) (2026-05-25)
 
 백엔드/CLI 가 v0.15 로 옮겨가며 plugin 에 남아 있던 레거시를 정리한 릴리즈예요. 핵심은 **`hub-api.jocodingax.ai` → `axhub-api.jocodingax.ai` 마이그레이션** — 단순 문서 치환이 아니라 TLS-pinned helper (`list_deployments.rs`) 의 `DEFAULT_ENDPOINT`·`HUB_API_HOST`·**SPKI 핀** 까지 axhub-api 인증서 핀(`sha256/8bK9T3frw7OU…`, 실제 cert 에서 2회 추출 검증)으로 함께 옮겨서 레거시 호스트 폐기 후에도 핀닝이 안 깨지게 했어요. 그리고 CLI v0.15 surface 와 안 맞던 스킬 호출을 바로잡았어요 — `apps delete`/`env delete` 는 삭제가 실제로 안 먹던 잘못된 플래그(`--yes`/`--force --confirm`)를 `--execute` 로, `verify` 는 존재하지 않는 `axhub status`/`axhub logs --runtime` 대신 실제 `axhub deploy status`/`axhub deploy logs --source pod` 로, `logs` 는 "deploy list 없음" 이라는 stale 주장을 제거했어요. plugin v1 설계 가이드(`docs/plugin-developer-guide.md`)도 repo 에 내장해 개발 시 모델·기여자가 in-context 로 참조하게 했어요. **알려진 한계**: `deploy create --branch` 는 CLI v0.15 가 `--branch` 를 드롭했지만 consent 시스템(`schema.rs` 가 deploy_create 에 branch 를 binding 으로 요구)이 아직 결합돼 있어서 이번에 안 고쳤어요 — consent schema 변경이 필요한 별도 보안 작업이라 후속 PR 로 분리했어요. pre-1.0 관례에 따라 patch bump 예요.
