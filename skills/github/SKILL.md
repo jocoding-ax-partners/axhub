@@ -50,6 +50,8 @@ echo "$PREFLIGHT_JSON"
 
    **TodoWrite status sync:** after every workflow step and after every AskUserQuestion answer, call TodoWrite again with the full current todos array. Mark finished items as `"completed"`, the active item as `"in_progress"`, and untouched items as `"pending"`. Do not leave the initial Step 0 list stale after commands, user answers, or final result.
 
+   **워크플로를 마치면 (마지막 결과 출력 직후) TodoWrite 를 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.** `in_progress` / `pending` 이 하나라도 남으면 다음 SKILL 이 시작될 때 이 SKILL 의 미완료 todo 가 화면에 그대로 남아 버그처럼 보여요. 종료 시점에 미완료 todo 가 0 개여야 해요.
+
 1. **preflight 와 current app 을 확인해요.** 앱이 없으면 `apps` skill 흐름으로 먼저 고르게 해요.
 
    **preflight 의 `cli_state` 를 보고 분기해요** (v0.9.6 부터 명시적 필드 emit). `cli_present:false` 만으로 "CLI 미설치 (PATH 에 없음)" 으로 해석하지 마세요 — cli_state 4 값에 따라 안내가 달라요:

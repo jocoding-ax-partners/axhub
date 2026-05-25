@@ -56,6 +56,8 @@ echo "$PREFLIGHT_JSON"
 
    **TodoWrite status sync:** after every workflow step and after every AskUserQuestion answer, call TodoWrite again with the full current todos array. Mark finished items as `"completed"`, the active item as `"in_progress"`, and untouched items as `"pending"`. Do not leave the initial Step 0 list stale after commands, user answers, or final result.
 
+   **워크플로를 마치면 (마지막 결과 출력 직후) TodoWrite 를 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.** `in_progress` / `pending` 이 하나라도 남으면 다음 SKILL 이 시작될 때 이 SKILL 의 미완료 todo 가 화면에 그대로 남아 버그처럼 보여요. 종료 시점에 미완료 todo 가 0 개여야 해요.
+
 1. **최근 배포 식별.** preflight 의 `current_app` + `last_deploy_id` 사용해요. 둘 다 비어 있으면 `axhub-helpers list-deployments --app-id=$APP --limit 1` 로 보강해요. 후보 없으면 "최근 배포 없음" 안내 + 종료.
 
 2. **`axhub deploy status <DEPLOY_ID> --app <APP> --json` 호출 (5s timeout).** `<DEPLOY_ID>` 는 Step 1 의 `last_deploy_id`. 없으면 `axhub deploy list --app <APP> --json` 의 최신 배포로 보강해요. 응답 `.status` 가 `active` / `succeeded` / `live` / `running` / `deployed` 면 health 신호 OK (배포가 끝나서 떠 있는 상태). `.current_stage` 도 같이 읽어서 어느 단계인지 안내해요. `.status` 가 `pending` / `building` / `deploying` 면 아직 진행 중 → 의심, `failed` / `stopped` 면 → 라이브 안 됨 사유 기록.
