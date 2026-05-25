@@ -23,18 +23,53 @@ fn snippet_routes_are_tenant_scoped_catalog_resources() {
     // 사용자 코드가 404 났어요. Mode B 는 AXHUB_TENANT env + axhub-api 도메인이에요.
     for lang in ["python", "typescript", "go", "shell"] {
         let output = run(&[
-            "snippet", "--mode", "B", "--language", lang, "--target", "local-python",
-            "--connector", "snowflake", "--path", "analytics/orders",
-            "--sql", "SELECT 1", "--allowed-columns", "id",
+            "snippet",
+            "--mode",
+            "B",
+            "--language",
+            lang,
+            "--target",
+            "local-python",
+            "--connector",
+            "snowflake",
+            "--path",
+            "analytics/orders",
+            "--sql",
+            "SELECT 1",
+            "--allowed-columns",
+            "id",
         ]);
-        assert_eq!(output.status.code(), Some(0), "lang={lang} stderr={}", stderr_text(&output));
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "lang={lang} stderr={}",
+            stderr_text(&output)
+        );
         let stdout = stdout_text(&output);
-        assert!(stdout.contains("/api/v1/tenants/"), "lang={lang}: missing tenant prefix\n{stdout}");
-        assert!(stdout.contains("/catalog/resources/"), "lang={lang}: missing resources segment\n{stdout}");
-        assert!(!stdout.contains("/api/v1/catalog/"), "lang={lang}: stale tenant-less route\n{stdout}");
-        assert!(stdout.contains("AXHUB_TENANT"), "lang={lang}: Mode B must read AXHUB_TENANT\n{stdout}");
-        assert!(stdout.contains("axhub-api.jocodingax.ai"), "lang={lang}: default domain\n{stdout}");
-        assert!(!stdout.contains("api.axhub.jocodingax.ai"), "lang={lang}: stale domain\n{stdout}");
+        assert!(
+            stdout.contains("/api/v1/tenants/"),
+            "lang={lang}: missing tenant prefix\n{stdout}"
+        );
+        assert!(
+            stdout.contains("/catalog/resources/"),
+            "lang={lang}: missing resources segment\n{stdout}"
+        );
+        assert!(
+            !stdout.contains("/api/v1/catalog/"),
+            "lang={lang}: stale tenant-less route\n{stdout}"
+        );
+        assert!(
+            stdout.contains("AXHUB_TENANT"),
+            "lang={lang}: Mode B must read AXHUB_TENANT\n{stdout}"
+        );
+        assert!(
+            stdout.contains("axhub-api.jocodingax.ai"),
+            "lang={lang}: default domain\n{stdout}"
+        );
+        assert!(
+            !stdout.contains("api.axhub.jocodingax.ai"),
+            "lang={lang}: stale domain\n{stdout}"
+        );
     }
 }
 
@@ -42,15 +77,41 @@ fn snippet_routes_are_tenant_scoped_catalog_resources() {
 fn snippet_mode_a_uses_tenant_scoped_route() {
     // Mode A: same-origin 상대경로지만 tenant-scoped catalog/resources 라우트여야 해요.
     let output = run(&[
-        "snippet", "--mode", "A", "--language", "typescript", "--target", "web-axhub",
-        "--connector", "snowflake", "--path", "analytics/orders",
-        "--sql", "SELECT 1", "--allowed-columns", "id",
+        "snippet",
+        "--mode",
+        "A",
+        "--language",
+        "typescript",
+        "--target",
+        "web-axhub",
+        "--connector",
+        "snowflake",
+        "--path",
+        "analytics/orders",
+        "--sql",
+        "SELECT 1",
+        "--allowed-columns",
+        "id",
     ]);
-    assert_eq!(output.status.code(), Some(0), "stderr={}", stderr_text(&output));
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr={}",
+        stderr_text(&output)
+    );
     let stdout = stdout_text(&output);
-    assert!(stdout.contains("/api/v1/tenants/"), "missing tenant prefix\n{stdout}");
-    assert!(stdout.contains("/catalog/resources/"), "missing resources segment\n{stdout}");
-    assert!(!stdout.contains("/api/v1/catalog/"), "stale tenant-less route\n{stdout}");
+    assert!(
+        stdout.contains("/api/v1/tenants/"),
+        "missing tenant prefix\n{stdout}"
+    );
+    assert!(
+        stdout.contains("/catalog/resources/"),
+        "missing resources segment\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("/api/v1/catalog/"),
+        "stale tenant-less route\n{stdout}"
+    );
 }
 
 #[test]
