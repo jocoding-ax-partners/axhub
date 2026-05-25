@@ -89,10 +89,7 @@ fn parallel_cli_absent_overrides_auth_to_cli_not_found() {
     // which the new diagnose_cli_state() classifies as cli_not_found (more
     // specific than the legacy blanket cli_unavailable). SKILL wrappers route
     // this to /axhub:install-cli instead of mixing with config drift cases.
-    assert_eq!(
-        run.output.auth_error_code.as_deref(),
-        Some("cli_not_found")
-    );
+    assert_eq!(run.output.auth_error_code.as_deref(), Some("cli_not_found"));
 }
 
 #[test]

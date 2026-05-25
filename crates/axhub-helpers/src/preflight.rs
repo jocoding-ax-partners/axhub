@@ -34,9 +34,7 @@ pub fn default_runner(cmd: &[&str]) -> SpawnResult {
     // mock runners and never enter this branch, so integration mocks still match
     // ["axhub", ...] literals.
     let resolved;
-    let effective: Vec<&str> = if !cmd.is_empty()
-        && (cmd[0] == "axhub" || cmd[0] == "axhub.exe")
-    {
+    let effective: Vec<&str> = if !cmd.is_empty() && (cmd[0] == "axhub" || cmd[0] == "axhub.exe") {
         match resolve_axhub_path() {
             Some(path) => {
                 resolved = path;
@@ -321,7 +319,9 @@ fn cwd_has_project_marker() -> bool {
         "build.gradle.kts",
         "pom.xml",
     ];
-    MARKERS.iter().any(|marker| std::path::Path::new(marker).exists())
+    MARKERS
+        .iter()
+        .any(|marker| std::path::Path::new(marker).exists())
 }
 
 /// Classify the result of `axhub --version` into a discriminated CLI state so
