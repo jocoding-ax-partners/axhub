@@ -231,3 +231,28 @@
 **Priority:** P2
 **Depends on:** setup skill merge
 **Blocks:** 없음
+
+## P2 — setup routing baseline fixture 측정 (skip-routing-gate 후속)
+
+**Why:** PR #131 (setup skill) 은 `[skip-routing-gate]` override 로 머지했어요. `skills/setup/SKILL.md` 가 routing-affecting 인데 corpus baseline fixture 를 갱신 안 했기 때문이에요. 다음 routing-affecting SKILL 변경이 override 없이 통과하려면 setup 의 baseline 이 먼저 측정돼 있어야 해요.
+
+**What:**
+- `bun run measure:baseline` (`scripts/measure-docs-only-baseline.ts`) 로 docs-only baseline 측정 — corpus.20 + corpus.100.
+- claude-native baseline pass 도 같이 돌려 `tests/baseline-results.{docs-only,claude-native}.{20,100}.json` 4 fixture 갱신.
+- `scripts/check-routing-fixture-sync.ts` + run-corpus + routing-score sync test 3종 통과 확인.
+- setup trigger 어구(온보딩 축)가 doctor/init 과 충돌 없는지 accuracy ≥95% / drift ≤5% 로 검증.
+
+**Pros:**
+- skip-routing-gate override 를 정식 측정으로 닫아요.
+- 다음 SKILL 변경이 override 없이 통과해요.
+
+**Cons:**
+- baseline 측정이 corpus row 마다 LLM 호출이라 비용/시간이 들어요.
+- 측정 환경(API 키)이 필요해 로컬에서 즉시 못 돌릴 수 있어요.
+
+**Context:** `/plan-ceo-review` 의 T5 routing 측정은 처음부터 follow-up 으로 스코프했어요. setup trigger 는 충돌 최소화하려 보수적으로(온보딩 축, bare 셋업/환경/초기 제외) 설계했고, gate 의 공식 override 로 머지했어요.
+
+**Effort:** human ~0.5d / CC+gstack ~20min (측정 환경 필요)
+**Priority:** P2
+**Depends on:** setup skill merge (#131)
+**Blocks:** 다음 routing-affecting SKILL 변경의 override-free 통과
