@@ -49,7 +49,7 @@
 │   SSO 없음 — PAT 필수.                                                  │
 │                                                                        │
 │   사용자 코드 예:                                                       │
-│     fetch(url, { headers: { Authorization: `Bearer ${env.PAT}` }})     │
+│     fetch(url, { headers: { "X-Api-Key": env.AXHUB_PAT }})     │
 │                                                                        │
 │   → PAT 은 env var · keychain 에서 주입. 하드코드 절대 금지.            │
 └────────────────────────────────────────────────────────────────────────┘
@@ -96,7 +96,7 @@ if (!result.allowed) throw new Error(`axhub denied: ${result.deny_reason}`);
 ```
 
 **Mode A 규칙**:
-- `Authorization` 헤더 박지 마라. SSO cookie 만으로 인증.
+- manual auth header 박지 마라. SSO cookie 만으로 인증.
 - `credentials: 'include'` 필수.
 - relative path (`/api/v1/...`) 사용 — 같은 origin.
 
@@ -117,7 +117,7 @@ AXHUB_PAT    = os.environ['AXHUB_PAT']           # ← env var, 하드코드 금
 r = requests.post(
     f"{AXHUB_API}/api/v1/tenants/{AXHUB_TENANT}/catalog/resources/axhub-qa-mysql/공개/employees:read",
     headers={
-        "Authorization": f"Bearer {AXHUB_PAT}",
+        "X-Api-Key": AXHUB_PAT,
         "Content-Type": "application/json",
     },
     json={"sql": "SELECT id, name FROM employees LIMIT 100", "row_limit": 100},
@@ -139,7 +139,7 @@ const r = await fetch(
   {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${AXHUB_PAT}`,
+      'X-Api-Key': AXHUB_PAT,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ sql: 'SELECT id FROM employees LIMIT 100', row_limit: 100 }),
@@ -158,7 +158,7 @@ body := strings.NewReader(`{"sql":"SELECT id FROM employees LIMIT 100","row_limi
 req, _ := http.NewRequest("POST",
     api+"/api/v1/tenants/"+tenant+"/catalog/resources/axhub-qa-mysql/공개/employees:read",
     body)
-req.Header.Set("Authorization", "Bearer "+pat)
+req.Header.Set("X-Api-Key", pat)
 req.Header.Set("Content-Type", "application/json")
 ```
 
@@ -166,7 +166,7 @@ req.Header.Set("Content-Type", "application/json")
 
 ```bash
 curl -s -X POST \
-  -H "Authorization: Bearer $AXHUB_PAT" \
+  -H "X-Api-Key: $AXHUB_PAT" \
   -H "Content-Type: application/json" \
   "$AXHUB_API/api/v1/tenants/$AXHUB_TENANT/catalog/resources/axhub-qa-mysql/%EA%B3%B5%EA%B0%9C/employees:read" \
   -d '{"sql":"SELECT id FROM employees LIMIT 100","row_limit":100}'
@@ -174,8 +174,8 @@ curl -s -X POST \
 
 ### 1.4 절대 금지
 
-- ❌ Mode A 코드에 `Authorization: Bearer ...` — SSO cookie 와 충돌 + PAT 노출 위험
-- ❌ Mode B 코드에 PAT 하드코드 (`"Bearer eyJhbG..."`) — git commit · log · screenshot 누설
+- ❌ Mode A 코드에 manual auth header — SSO cookie 와 충돌 + PAT 노출 위험
+- ❌ Mode B 코드에 PAT 하드코드 (`"axhub_pat_..."` 또는 token literal) — git commit · log · screenshot 누설
 - ❌ 토큰값 `console.log` / `print` / log file
 - ❌ axhub 도메인 외부에 PAT 전달 (proxy · 3rd party)
 
@@ -196,7 +196,7 @@ curl -s -X POST \
 ### 2.1 환경 감지 → 올바른 mode 의 snippet 생성
 
 ```
-plugin snippet <connector>/<path> [--target web-axhub|local-python|local-node|local-go|local-bash|auto]
+axhub-helpers snippet --mode A|B --connector <connector> --path <path> --target web-axhub|local-python|local-node|local-go|local-bash
 ```
 
 - `--target web-axhub` → §1.3 의 Mode A 코드 그대로
@@ -208,7 +208,7 @@ plugin snippet <connector>/<path> [--target web-axhub|local-python|local-node|lo
 ### 2.2 `.axhub/` 폴더 — AI 컨텍스트 자동 배치
 
 ```
-plugin sync
+axhub-helpers sync --target auto --json
 ```
 
 가 현재 폴더에 생성:
@@ -254,30 +254,18 @@ plugin sync
 
 `.gitignore` 에 `.axhub/catalog.json` 자동 추가 — user_email · tenant_id 등 PII 누설 방지. `AXHUB.md` 와 `AXHUB_TARGET` 은 commit 가능 (정책 정보 없음).
 
-### 2.3 MCP server — claude-code 직접 통합
+### 2.3 CLI-only integration
 
-stdio 모드 MCP server 를 plugin 이 노출. claude-code `~/.claude.json`:
+현재 v1.1 범위는 MCP server 가 아니라 CLI-only workflow 예요. Claude Code 는 다음 명령만 사용해요.
 
-```json
-{
-  "mcpServers": {
-    "axhub": { "command": "<plugin binary>", "args": ["mcp"] }
-  }
-}
+```bash
+axhub catalog search --json --limit 200
+axhub catalog get --connector <connector> --path <path> --json
+axhub catalog invoke --connector <connector> --path <path> --action read --sql '<SELECT ...>' --row-limit 100 --execute --json
+axhub-helpers snippet --mode A|B --language <lang> --target <target> --connector <connector> --path <path> --sql '<SELECT ...>' --allowed-columns <csv>
 ```
 
-노출 tool:
-
-| name | description (claude-code 가 read) | input |
-|---|---|---|
-| `axhub.search` | 사용자가 권한 가진 데이터 검색. 작업 시작 전 반드시 호출. | `{q?, kind?, connector?}` |
-| `axhub.describe` | 단일 resource 의 column 정보 + 정책 hint. | `{connector, path}` |
-| `axhub.invoke` | axhub gateway 통해 안전한 SQL 실행. SELECT/WITH 만. | `{connector, path, action:'read', sql, params?, row_limit?}` |
-| `axhub.snippet` | 이 resource 의 invoke 코드를 현재 프로젝트 환경 (Mode A/B) 에 맞춰 생성. | `{connector, path, lang?, target?}` |
-
-`axhub.snippet` 이 §1.3 의 패턴을 따라 코드 텍스트 반환 — claude-code 가 그걸 사용자 파일에 박는다.
-
-각 tool 의 description 에 §1 의 두 모드 규칙 1줄 포함 (AI 가 인증 코드 박을 때 헷갈리지 않게).
+MCP server 는 후속 P1 검토로 남겨요. v1.1 은 사용자 로컬 설정을 자동 변경하지 않아요.
 
 ### 2.4 에러를 친절한 한국어로
 
@@ -305,17 +293,15 @@ retry 자동 금지 — denied 또는 영구 에러일 수 있음.
     → 사용자 권한 catalog (.axhub/catalog.json) read
     → 1번 규칙: Mode B 패턴 사용 결정
 
-[2] claude-code 가 MCP tool axhub.search({q:"employees"}) 호출
-    → plugin 이 GET /api/v1/tenants/{T}/catalog/resources?search=employees 호출
+[2] claude-code 가 axhub catalog search --json --limit 200 실행
     → 응답에서 "공개/employees" hit
 
-[3] claude-code 가 axhub.describe({connector:"axhub-qa-mysql", path:"공개/employees"})
-    → plugin 이 GET /catalog/resources/{c}/{p}
+[3] claude-code 가 axhub catalog get --connector axhub-qa-mysql --path 공개/employees --json 실행
     → allowed_columns: [id, name, department_id, hired_at, ...]
     → name, hired_at 에 pii tag
 
-[4] claude-code 가 axhub.snippet({connector, path, lang:"python", target:"local-python"})
-    → plugin 이 §1.3 의 Python Mode B 패턴 + 사용자 의도에 맞는 SQL 생성:
+[4] claude-code 가 axhub-helpers snippet --mode B --language python --target local-python 실행
+    → helper 가 §1.3 의 Python Mode B 패턴 + 사용자 의도에 맞는 SQL 생성:
       """
       sql = '''
         SELECT department_id, AVG(DATEDIFF(NOW(), hired_at)) AS avg_tenure_days
@@ -335,7 +321,7 @@ retry 자동 금지 — denied 또는 영구 에러일 수 있음.
 
 ## 4. `.axhub/AXHUB.md` 본문 — AI 에이전트가 read
 
-`plugin sync` 가 사용자 프로젝트에 그대로 배포. **AI 가 가장 먼저 read 할 문서**.
+`axhub-helpers sync --target auto --json` 가 사용자 프로젝트에 그대로 배포. **AI 가 가장 먼저 read 할 문서**.
 
 ````markdown
 # axhub 사용 규칙 (AI 에이전트 read 용)
@@ -370,13 +356,13 @@ const r = await fetch(`/api/v1/tenants/${T}/catalog/resources/.../{path}:read`, 
 import os, requests
 r = requests.post(
     f"{os.environ['AXHUB_API']}/api/v1/tenants/{os.environ['AXHUB_TENANT']}/catalog/resources/.../{path}:read",
-    headers={"Authorization": f"Bearer {os.environ['AXHUB_PAT']}"},
+    headers={"X-Api-Key": os.environ["AXHUB_PAT"]},
     json={"sql": "...", "row_limit": 100},
 )
 ```
 
 **절대 금지**:
-- Mode A 코드에 `Authorization: Bearer ...` 헤더 박지 마라.
+- Mode A 코드에 manual auth header 박지 마라.
 - Mode B 코드에 PAT 하드코드 금지 — 항상 환경변수 `AXHUB_PAT`.
 - 토큰값을 `console.log` / `print` / commit / log file 출력 금지.
 
@@ -604,9 +590,8 @@ retry 자동 금지 — 영구 에러 가능성.
 
 | 항목 | 형태 | 우선순위 |
 |---|---|---|
-| **MCP server** (stdio) | claude-code 등록용. `axhub.search/describe/invoke/snippet` 4 tool 노출 | **P0** |
-| **`plugin sync`** | `.axhub/{AXHUB.md, AXHUB_TARGET, catalog.json}` 생성 | **P0** |
-| **`plugin snippet`** | Mode A / Mode B × Python·TS·Go·Shell 매트릭스. 상단 주석에 mode 명시 | **P0** |
+| **`axhub-helpers sync --target auto --json`** | `.axhub/{AXHUB.md, AXHUB_TARGET, catalog.json}` 생성 | **P0** |
+| **`axhub-helpers snippet`** | Mode A / Mode B × Python·TS·Go·Shell 매트릭스. 상단 주석에 mode 명시 | **P0** |
 | **인증 보조** | PAT 저장 (OS keychain · `~/.config/axhub/credentials.json` fallback) | **P0** |
 | `@axhub/sdk-{python,node,go}` | invoke wrapper 라이브러리 | P1 |
 | brew tap / scoop bucket | 비-npm 설치 경로 | P1 |
@@ -615,7 +600,6 @@ retry 자동 금지 — 영구 에러 가능성.
 
 ## 8. DoD (Definition of Done)
 
-- [ ] MCP server 가 claude-code 등록 후 4 tool 노출
 - [ ] PAT 가 OS keychain 저장 (fallback `~/.config/axhub/credentials.json` `chmod 600`)
 - [ ] **`snippet --target web-axhub` 의 코드에 PAT 변수 안 박힘** — `credentials:'include'` + relative path 만
 - [ ] **`snippet --target local-*` 의 코드에 PAT 하드코드 안 됨** — env var (`AXHUB_PAT`) 만
@@ -634,10 +618,9 @@ retry 자동 금지 — 영구 에러 가능성.
 - backend repo: `github.com/jocoding-ax-partners/ax-hub-backend` (SPEC 260·307 다 구현)
 - prod base URL: `https://axhub-api.jocodingax.ai`
 - staging base URL: 별도 — axhub product team 에 문의
-- MCP spec: <https://modelcontextprotocol.io>
 
 ---
 
-이 가이드 받은 개발자는 **§1 (SSO 두 모드)** 부터 시작. 그 뒤에 §2.1 (`snippet`) → §2.2 (`sync`) → §2.3 (MCP) → §4 (`.axhub/AXHUB.md`) → §8 DoD 통과.
+이 가이드 받은 개발자는 **§1 (SSO 두 모드)** 부터 시작. 그 뒤에 §2.1 (`snippet`) → §2.2 (`sync`) → §2.3 (CLI-only) → §4 (`.axhub/AXHUB.md`) → §8 DoD 통과.
 
 backend API 변경이 필요한 경우 (예: list 응답에 `allowed_columns` 추가) backend 팀과 먼저 조율.

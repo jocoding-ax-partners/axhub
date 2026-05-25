@@ -57,8 +57,8 @@ describe("tests/run-corpus.sh fixture replay runner", () => {
       const out = join(dir, "plugin.json");
       const result = run(["--mode", "plugin", "--corpus", "tests/corpus.jsonl", "--out", out]);
       expect(result.status).toBe(2);
-      // Phase 5 — corpus.jsonl row count is 347 (331 base + init + 15 meta_question).
-      expect(result.stderr).toContain("no committed plugin fixture for 347-row corpus");
+      // Phase 5+v1.1 — corpus.jsonl row count is 350 after data routing rows.
+      expect(result.stderr).toContain("no committed plugin fixture for 350-row corpus");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -100,7 +100,7 @@ describe("tests/run-corpus.sh fixture replay runner", () => {
     }
   });
 
-  test("331_row_advisory_mode: corpus.jsonl + --vs claude-native + --score → advisory + exit 0", () => {
+  test("350_row_advisory_mode: corpus.jsonl + --vs claude-native + --score → advisory + exit 0", () => {
     const result = run(["--mode", "plugin", "--corpus", "tests/corpus.jsonl", "--vs", "claude-native", "--score"]);
     expect(result.status).toBe(0);
     expect(result.stderr).toContain("ADVISORY");

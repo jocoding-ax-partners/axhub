@@ -44,6 +44,7 @@ export const SKILL_INTENTS: Record<string, string> = {
   "install-cli": "install axhub CLI binary",
   clarify: "disambiguate axhub intent",
   "routing-stats": "show axhub routing statistics summary",
+  data: "query axhub data catalog and generate safe read snippets",
 };
 
 interface CorpusRow {
