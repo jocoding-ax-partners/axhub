@@ -3,7 +3,7 @@
 # 22.4: token-headed.json fixture + numeric --app 42 + MOCK_HUB_AUTH_FAIL=1 → list-deployments 가
 #       mock-hub 까지 fetch 도달 → 401 응답 → exit_code 65 + stdout JSON .error_code='auth.token_invalid'.
 # proxyOverrideEnabled() 의 verifyHubApiTlsPin early-return 이 actually engaged 됐다는 결정적 evidence:
-#   - TLS pin 활성 시 hostname mismatch (127.0.0.1 vs hub-api.jocodingax.ai) 로 fetch 도달 불가
+#   - TLS pin 활성 시 hostname mismatch (127.0.0.1 vs axhub-api.jocodingax.ai) 로 fetch 도달 불가
 #   - mock-hub 가 401 응답 받았다 = TLS pin 코드 skip 됐다
 # 22.3 의 token absent path (exit 65 + tls phrase 부재 baseline) 보다 강한 verification.
 set -u

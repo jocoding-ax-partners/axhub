@@ -140,7 +140,7 @@ To run diagnostics:
      ✓ 만료:            <EXPIRES_HUMAN>
      ✓ 권한 (scope):    <SCOPES joined>
      ✓ 환경 (profile):  <PROFILE 또는 "default (기본값 사용 중)">
-     ✓ endpoint:        <ENDPOINT 또는 "https://hub-api.jocodingax.ai (기본값)">
+     ✓ endpoint:        <ENDPOINT 또는 "https://axhub-api.jocodingax.ai (기본값)">
 
    모두 정상이에요. 배포하실 준비 완료!
    ```

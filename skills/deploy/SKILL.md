@@ -453,7 +453,7 @@ To deploy:
    ```
    다음을 실행할게요:
    ① 앱:    paydrop (id=42)
-   ② 환경:  production (https://hub-api.jocodingax.ai)
+   ② 환경:  production (https://axhub-api.jocodingax.ai)
    ③ 브랜치: main
    ④ 커밋:  a3f9c1b — "결제 페이지 버그 수정" (12분 전 푸시, you)
    ⑤ 예상:  약 3분 소요

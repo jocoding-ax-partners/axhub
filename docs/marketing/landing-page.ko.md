@@ -110,10 +110,10 @@ Claude Code  ──→  axhub plugin
    Bash tool ────────────────────┘
         │
         ▼
-   ax-hub-cli binary (cosign 서명, v0.12.x surface)
+   ax-hub-cli binary (cosign 서명, v0.15.x surface)
         │
         ▼
-   https://hub-api.jocodingax.ai
+   https://axhub-api.jocodingax.ai
 ```
 
 플러그인 = **얇은 routing/recovery layer**. 비즈니스 로직은 모두 ax-hub-cli (회사 SaaS) 에. 플러그인이 하는 일:

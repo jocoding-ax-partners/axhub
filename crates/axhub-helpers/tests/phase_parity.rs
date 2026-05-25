@@ -1010,7 +1010,7 @@ fn list_deployments_covers_token_endpoint_http_and_error_matrix() {
         "security.endpoint_invalid"
     );
     assert_eq!(
-        pinned_hub_api_url("http://hub-api.jocodingax.ai")
+        pinned_hub_api_url("http://axhub-api.jocodingax.ai")
             .unwrap_err()
             .code,
         "security.tls_required"

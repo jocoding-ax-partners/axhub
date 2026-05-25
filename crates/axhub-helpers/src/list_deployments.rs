@@ -16,12 +16,14 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-pub const DEFAULT_ENDPOINT: &str = "https://hub-api.jocodingax.ai";
-pub const HUB_API_HOST: &str = "hub-api.jocodingax.ai";
+pub const DEFAULT_ENDPOINT: &str = "https://axhub-api.jocodingax.ai";
+pub const HUB_API_HOST: &str = "axhub-api.jocodingax.ai";
 pub const DEFAULT_LIMIT: usize = 5;
 pub const TLS_PIN_TIMEOUT_MS: u64 = 5_000;
+// SPKI pin for axhub-api.jocodingax.ai (hub-api.jocodingax.ai is decommissioned —
+// migrated host + matching leaf SPKI pin together so TLS pinning keeps working).
 pub const HUB_API_SPKI_SHA256_PINS: &[&str] =
-    &["sha256/vmsW4ExrgK3t3mFNtwk6KMsokm6PM+WNgC/KWhe7Z7g="];
+    &["sha256/8bK9T3frw7OUjaSrInC5bIcJxE6hVBmI81KjA6yr5xo="];
 pub const EXIT_LIST_OK: i32 = 0;
 pub const EXIT_LIST_AUTH: i32 = 65;
 pub const EXIT_LIST_NOT_FOUND: i32 = 67;
@@ -120,7 +122,7 @@ pub fn pinned_hub_api_url(endpoint: &str) -> Result<Option<reqwest::Url>, TlsPin
     }
     if url.scheme() != "https" {
         return Err(TlsPinError::new(
-            "hub-api.jocodingax.ai 는 HTTPS 로만 호출해야 해요.",
+            "axhub-api.jocodingax.ai 는 HTTPS 로만 호출해야 해요.",
             "security.tls_required",
         ));
     }
