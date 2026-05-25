@@ -178,7 +178,7 @@ To handle auth:
      >   1. 브라우저에서 열기: `<verification_uri_complete 우선, 없으면 verification_uri>`
      >   2. 코드 입력: `<user_code>`
 
-     **에이전트 컨텍스트는 여기서 멈춰요.** 0.15.3 fast-exit 는 토큰 교환 polling 을 안 하니 승인해도 이 호출만으로는 로그인이 완료되지 않아요. "승인까지 자동으로 끝내려면 터미널에서 직접 `axhub auth login` 을 실행해 주세요 (대화형이면 CLI 가 승인까지 기다려요)" 라고 안내해요. 완전 autonomous 완료는 CLI 의 device_code persist resume 기능을 기다려요 (`docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md`).
+     **에이전트가 직접 완료해요 — 사용자에게 명령을 치라고 떠넘기지 않아요.** 0.15.3 fast-exit 는 이 호출에서 device code 만 발급하고 token 교환은 안 하지만, CLI 가 `--resume-last` 로 캐시된 device flow 를 이어받을 수 있어요 (`axhub auth login --resume-last`). 그래서 challenge 를 보여준 뒤 이렇게 안내해요: "브라우저에서 승인한 다음 '로그인했어' 라고 알려주세요. 제가 이어서 마무리할게요." resume 명령을 사용자에게 치라고 출력하지 말아요 — 승인 신호를 받으면 에이전트가 Step 5c 에서 직접 실행해요.
 
    - **대화형 TTY 컨텍스트**: 그대로 호출하면 CLI 가 URL/code 를 stderr 로 보여주고 승인까지 polling 해서 완료해요:
 
@@ -186,7 +186,13 @@ To handle auth:
      axhub auth login --force --no-browser $AUTH_EXTRA
      ```
 
-   **5c. 완료 확인.** 대화형 TTY 에서 login 이 완료되면 토큰이 저장돼요 — 곧장 다음 단계로 진행해요. 에이전트 컨텍스트는 위에서 멈췄으니 (fast-exit) 여기서 polling 하지 않아요 — 사용자가 터미널에서 직접 완료하거나 persist resume 기능을 기다려요.
+   **5c. 완료 — 사용자 승인 후 에이전트가 resume 로 마무리.** 대화형 TTY 면 `axhub auth login` 이 승인까지 polling 해서 바로 완료돼요. 에이전트(비-TTY) 컨텍스트면, 사용자가 "로그인했어" / "승인했어" / "됐어" 로 브라우저 승인을 알린 뒤 에이전트가 step 5a 처럼 consent 를 다시 mint 하고 아래를 직접 실행해요 (사용자에게 치라고 출력 금지):
+
+     ```bash
+     axhub auth login --resume-last --json
+     ```
+
+     이어서 `axhub auth status --json` 로 검증해서 `authenticated` 면 "로그인됐어요" 라고 알려요. 아직 `pending` / 실패면 "브라우저 승인이 아직 안 끝난 것 같아요. 승인 후 다시 알려주세요" 로 안내하고 한 번 더 resume 해요. device code 가 만료(약 15분)됐으면 Step 5b 부터 새 challenge 를 발급해요. device-flow surface 설계 + resume 계약은 `docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md` 를 참조해요.
 
    어느 경우든 device URL/code 가 보이기 전에 silent 하게 block 하지 않아요 — CLI 가 challenge 를 못 내놓으면 hidden/blocking auth flow 를 임의로 만들지 말고 CLI follow-up gap 으로 멈춰요.
 
@@ -303,6 +309,7 @@ To handle auth:
 - NEVER call `axhub auth logout` without confirming via AskUserQuestion (destructive — kills active session). dry-run preview 를 먼저 보여주세요.
 - NEVER call `axhub auth pat revoke` without `--execute` 를 mutate intent 로 가정 안 해요. dry-run 이 기본이라 `--execute` 가 빠지면 backend revoke 발생 안 해요.
 - NEVER call `axhub auth login` without running the stdin JSON `consent-mint` step (step 5a) first — PreToolUse hook이 consent token 없이 deny 해요.
+- NEVER 사용자에게 `axhub auth login` / `axhub auth login --resume-last` (또는 raw resume 명령) 을 터미널이나 `!` 프롬프트로 직접 치라고 안내하지 말아요. 브라우저 승인만 사용자 몫이고, device code resume + token 교환 완료는 에이전트가 `--resume-last` 로 직접 수행해요. 명령 떠넘김은 deploy 의 consent 우회 punt 와 동급 안티패턴이에요.
 - NEVER OAuth device flow 의 `verification_uri` + `user_code` 를 사용자에게 안 보여주지 않아요. CLI 가 stderr "To continue, visit: …" / "Enter code: …" 줄을 emit 한 직후 한국어로 묶어서 표시.
 
 ## Additional Resources
