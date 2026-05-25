@@ -114,17 +114,13 @@ stderr 에 한 번 deprecation warning 을 출력해요. 새 자동화 스크립
   7-day 정책 적용 (event_log / audit 와 일관).
 - 외부 전송 0. 로컬 disk 만.
 
-### 3.6 SKILL preprocessing `!command` injection layer
+### 3.6 SKILL preflight 는 in-body bash 스텝 (load-time `!command` 주입 폐기)
 
-SKILL `!command` injection 라인 (예: `!${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json`) 은 §3 의 Rust hook 진입점과 **별개의 layer** 예요. Claude Code 가 SKILL 을 initialize 할 때 preprocessing 단계에서 실행하고, Rust helper `hook_safety::is_hook_disabled()` 진입부 체크가 아닌 Claude Code 권한 게이트가 이 layer 를 통제해요.
+`needs-preflight: true` SKILL 은 workflow body 시작부에서 `axhub-helpers preflight --json` 을 일반 bash 스텝으로 실행해요 (`scripts/preflight-block.ts` 의 `CANONICAL_PREFLIGHT_BLOCK` 단일소스). 이건 §3 의 Rust hook 진입점과도, 예전 load-time `!command` 주입과도 별개예요 — normal Bash tool 호출이라 Claude Code 의 표준 권한 흐름 (default 모드에서 interactive prompt) 을 거쳐요.
 
-이 layer 에도 동일한 fail-open 원칙을 적용해요:
+**과거**: load-time `!`node -e "..."`` 주입 + inner denialRegex fallback 을 썼지만, Claude Code 가 outer `node -e` 명령 자체를 권한 게이트해서 첫 실행에 raw 영문 "requires approval" 로 hard-fail 했고, fallback 은 자기 자신의 거부를 못 잡는 dead path 였어요. 상세는 [ADR-0013](adr/0013-skill-preflight-in-body.md) (supersedes [ADR-0011](adr/0011-skill-preflight-permission-fallback.md)) 를 참고해요.
 
-1. **permission denial 감지 시**: strict-anchor regex (`/^Shell command permission check failed.*requires approval/im`) 매칭 → `{"systemMessage":"[axhub] 첫 실행이라 권한이 필요해요. …"}` stdout 출력 + `exit 0`. SKILL Step 0 흐름이 계속돼요.
-2. **미매칭 unrecognized stderr**: `process.stderr.write(stderrText)` 로 parent 에 passthrough — silent black hole 방지. ADR-0010 "raw stderr 가 chat 으로 흘러요" 정합이에요.
-3. **exit code**: denial 분기 → 0, 미매칭 분기 → helper exit code 그대로 propagate.
-
-구현은 `scripts/codegen-preflight-injection.ts` 의 Node runner (lite variant / deploy variant) 가 single source 로 emit 해요. 상세 결정 근거는 [ADR-0011](adr/0011-skill-preflight-permission-fallback.md) 를 참고해요.
+검사: `scripts/skill-doctor.ts` 가 `needs-preflight: true` SKILL 에 (a) `!command` 주입이 없고 (b) body 가 `axhub-helpers preflight --json` 을 호출하는지 강제하고, 모든 SKILL 에 dead injection 이 없는지 확인해요. preprocessing 단계의 fail-open 계약은 더 이상 별도 layer 가 아니라 normal Bash 권한 흐름으로 흡수됐어요.
 
 ---
 

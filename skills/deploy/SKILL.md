@@ -95,13 +95,16 @@ if ($env:CLAUDE_PLUGIN_ROOT) {
 }
 ```
 
-**Pre-execute preflight context (Phase 17 US-1706 — `!command` injection)**:
+**Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
 
-```
-!`node -e "const fs=require('fs'),path=require('path'),cp=require('child_process'),isWin=process.platform==='win32';let root=process.env.CLAUDE_PLUGIN_ROOT||'';const env=Object.assign({},process.env);let pathKey='PATH';for(const key of Object.keys(env)){if(key.toLowerCase()==='path'){pathKey=key;break;}}if(root.length===0&&process.env.CLAUDE_SKILL_DIR){const candidate=path.resolve(process.env.CLAUDE_SKILL_DIR,'..','..');if(fs.existsSync(candidate))root=candidate;}if(root.length===0){const helperName=isWin?'axhub-helpers.exe':'axhub-helpers';for(const dir of (env[pathKey]||'').split(path.delimiter)){const helperPath=path.join(dir,helperName);if(fs.existsSync(helperPath)){root=path.resolve(dir,'..');break;}}}if(root.length===0&&fs.existsSync(path.resolve('bin',isWin?'axhub-helpers.exe':'axhub-helpers')))root=process.cwd();if(root.length>0){env.CLAUDE_PLUGIN_ROOT=root;env[pathKey]=path.join(root,'bin')+path.delimiter+(env[pathKey]||'');}const helper=root.length>0?path.join(root,'bin',isWin?'axhub-helpers.exe':'axhub-helpers'):(isWin?'axhub-helpers.exe':'axhub-helpers');const result=cp.spawnSync(helper,['preflight','--json'],{stdio:['inherit','pipe','pipe'],env});const stdoutText=String(result.stdout??'');const stderrText=String(result.stderr??'');if(stdoutText.length>0){process.stdout.write(stdoutText);}const denialRegex=/^(?:Shell|Bash) command permission check failed.*requires approval/im;const cliNotFoundRegex=/\"auth_error_code\":\"cli_not_found\"/;const cliConfigCorruptedRegex=/\"auth_error_code\":\"cli_config_corrupted\"/;const cliRuntimeErrorRegex=/\"auth_error_code\":\"cli_runtime_error\"/;const cliUnavailableRegex=/\"auth_error_code\":\"cli_unavailable\"/;const redactRe=/(sk-[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9]{36}|axhub_[A-Za-z0-9]{32,}|Bearer\\s+[A-Za-z0-9._~+\\/-]+=*)/g;if(result.error||(result.status!==0&&denialRegex.test(stderrText))){console.log(JSON.stringify({systemMessage:\"[axhub] 첫 실행이라 권한이 필요해요. Claude Code 가 'axhub-helpers preflight' 실행 허용을 묻는 prompt 가 떠요. '허용' 을 누르면 다음부터 자동으로 진행돼요. (한 번만 진행하면 돼요)\"}));process.exit(0)}else if(result.status!==0&&cliNotFoundRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\"[axhub] axhub CLI 가 PATH 에서 안 보여요. /axhub:install-cli 로 설치하거나 (macOS Apple Silicon Homebrew 사용 중이면 /opt/homebrew/bin 이 inherit 안 됐을 가능성). /axhub:doctor 로 진단 가능해요.\"}));process.exit(0)}else if(result.status!==0&&cliConfigCorruptedRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\"[axhub] axhub CLI 의 ~/.config/axhub/config.yaml 이 새 schema 와 안 맞아요 (예: user_id 가 UUID/int64 mismatch). /axhub:auth 로 재로그인하면 fresh config 가 작성되면서 자동 fix 돼요.\"}));process.exit(0)}else if(result.status!==0&&cliRuntimeErrorRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\"[axhub] axhub CLI 가 실행은 됐지만 비정상 exit 했어요. /axhub:doctor 로 진단해주세요. CLI 자체 버그면 GitHub issue 로 stderr 한 줄 같이 알려주세요.\"}));process.exit(0)}else if(result.status!==0&&cliUnavailableRegex.test(stdoutText)){console.log(JSON.stringify({systemMessage:\"[axhub] axhub CLI 가 감지 안 돼요. /axhub:install-cli 로 OS 별 공식 설치 채널을 안내받거나 /axhub:doctor 로 진단해주세요. (SKILL 흐름은 그대로 진행할 수 있어요 — preflight 가 cli_unavailable 만 알려준 거예요.)\"}));process.exit(0)}else if(stderrText.length>0){process.stderr.write(stderrText.replace(redactRe,'<redacted>'))}process.exit(typeof result.status==='number'?result.status:0)"`
+```bash
+HELPER="${CLAUDE_PLUGIN_ROOT:-.}/bin/axhub-helpers"; [ -x "$HELPER" ] || HELPER="axhub-helpers"
+PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
+[ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
+echo "$PREFLIGHT_JSON"
 ```
 
-이 줄은 Claude Code SKILL preprocessing 으로 워크플로 시작 전에 실행돼요. 출력 (auth_status, current_app, current_env, last_deploy_id, last_deploy_status, plugin_version) 이 모델 컨텍스트에 자동 주입돼서 Step 1 의 별도 shell 호출이 줄어요. PreToolUse hook 은 preprocessing 단계에서 trigger 안 해요 (Claude Code SKILL primitive 동작). 실질 명령은 `axhub-helpers preflight --json` 이고, `CLAUDE_PLUGIN_ROOT` 가 비어 있어도 cross-shell Node runner 가 POSIX/Git Bash/WSL 과 Windows PowerShell 양쪽에서 먼저 root 를 확인해요.
+`auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
 
 **Command lane.** POSIX/Git Bash/WSL 은 `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers` 를 쓰고, Windows PowerShell 은 `& "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe"` 를 써요. JSON stdin 이 필요한 helper 호출은 PowerShell 에서 `ConvertTo-Json -Compress | & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" <subcommand>` 형태로 실행해요. Bash 배열 예시는 Windows 에서 그대로 붙여넣지 말고 PowerShell 배열 (`$ProfileArgs = @("--profile", $env:PROFILE)`) 로 바꿔요.
 
@@ -125,7 +128,6 @@ To deploy:
 
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
    TodoWrite 상태는 Claude Code 세션 안에서 이어질 수 있어요. 그래서 이 스킬을 시작할 때는 기존 todo 에 항목을 하나씩 더하거나 일부만 고치지 말고, 위 배열 전체로 교체해요. 이전 스킬 todo 가 화면에 남아 있으면 Step 1 전에 deploy 목록만 보이도록 다시 호출해요.
-
 
 1. **Live resolve + preflight (parallel via deploy-prep).** Fetch authoritative `{profile, endpoint, app_id, app_slug, branch, commit_sha, commit_message, eta_sec}` AND preflight (`auth_ok`, `cli_too_old/new`) in one helper call. Phase 1 runs preflight + resolve in parallel via `std::thread::scope`, so Step 2 (re-preflight) and Step 1.2 (re-resolve) below are skipped on the default path:
 

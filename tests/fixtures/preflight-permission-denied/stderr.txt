@@ -1,1 +1,0 @@
-Shell command permission check failed for pattern "!`${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json`": This command requires approval

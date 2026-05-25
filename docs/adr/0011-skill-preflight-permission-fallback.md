@@ -2,6 +2,13 @@
 
 ## Status
 
+**Superseded by [ADR-0013](0013-skill-preflight-in-body.md) (2026-05-25, Phase 27).**
+본 ADR 의 핵심 "검증된 가정 #1" (Claude Code 가 outer `!node -e` 자체에는 권한을 안 묻는다) 이
+거짓으로 판명됐어요 — 권한 게이트의 검사 대상이 outer `node -e` 명령 그 자체라, inner stderr 를
+잡는 strict-anchor denialRegex fallback 은 자기 자신의 거부를 못 잡는 dead path 였어요. lite/deploy
+variant codegen + denialRegex fallback 은 폐기되고, preflight 는 in-body bash 스텝으로 이동했어요.
+아래 내용은 역사적 기록으로 보존해요.
+
 Accepted (2026-05-14, PR #99) — Option B 단독 path 채택, Option A 매니페스트 wildcard
 spec probe (§검증된 가정 #4) 는 Phase 27.y RFC 로 follow-up (`feat(plugin): permissions
 manifest wildcard support`). 본 ADR Decision 의 lite/deploy variant codegen + strict-anchor

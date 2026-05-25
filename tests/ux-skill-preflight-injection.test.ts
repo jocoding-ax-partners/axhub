@@ -1,7 +1,10 @@
-// Phase 18 R2 / US-1804 — assert !command preflight injection present in every
-// SKILL declared `needs-preflight: true` in frontmatter. New SKILL with
-// needs-preflight: true → must include `!`...preflight --json`` literal at
-// workflow start or test FAIL. Eliminates scaffold-rot.
+// Phase 27 — preflight is now an IN-BODY bash step, not a load-time `!command`
+// injection. ADR-0013 (supersedes ADR-0011): the `!`node -e ...`` injection
+// hard-failed on first run because Claude Code permission-gates the outer
+// `node -e` wrapper itself, and its inner denialRegex fallback could never catch
+// its own denial (dead path). Every needs-preflight:true SKILL must invoke
+// `axhub-helpers preflight --json` in its workflow body, and NO skill may carry
+// the dead `!command` injection.
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
@@ -27,25 +30,23 @@ const readFrontmatter = (slug: string): { needsPreflight: boolean; content: stri
   return { needsPreflight, content };
 };
 
-describe("Phase 18 R2/US-1804 — !command preflight injection per needs-preflight frontmatter", () => {
+/** The retired load-time injection: `!`node -e "...axhub-helpers...preflight..."`` */
+const INJECTION_RE = /^!`node -e "[^\n]*axhub-helpers[^\n]*preflight[^\n]*"`$/m;
+/** In-body invocation signal: `preflight --json` (helper is picked into `$HELPER` first). */
+const INVOKES_PREFLIGHT_RE = /preflight\s+--json/;
+
+describe("Phase 27 — in-body preflight per needs-preflight frontmatter (ADR-0013)", () => {
   for (const slug of skillSlugs) {
     const { needsPreflight, content } = readFrontmatter(slug);
 
     if (needsPreflight) {
-      test(`skills/${slug}/SKILL.md (needs-preflight: true) contains !command preflight literal`, () => {
-        // Phase 27.x — codegen-preflight-injection.ts now emits a Node runner that
-        // references `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers` (helper path) plus
-        // `['preflight','--json']` (spawn args array). Check substrings that survive
-        // both the legacy raw shell substitution and the new Node runner envelope.
-        expect(content.includes("axhub-helpers")).toBe(true);
-        expect(
-          content.includes("'preflight','--json'") || content.includes("preflight --json"),
-        ).toBe(true);
-        expect(content.includes("${CLAUDE_PLUGIN_ROOT}/bin/")).toBe(true);
+      test(`skills/${slug}/SKILL.md (needs-preflight: true) invokes axhub-helpers preflight in-body, no !command injection`, () => {
+        expect(INVOKES_PREFLIGHT_RE.test(content)).toBe(true);
+        expect(INJECTION_RE.test(content)).toBe(false);
       });
     } else {
-      test(`skills/${slug}/SKILL.md (needs-preflight: false) — preflight injection not required`, () => {
-        expect(true).toBe(true);
+      test(`skills/${slug}/SKILL.md (needs-preflight: false) carries no !command preflight injection`, () => {
+        expect(INJECTION_RE.test(content)).toBe(false);
       });
     }
   }
