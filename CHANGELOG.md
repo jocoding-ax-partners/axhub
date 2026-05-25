@@ -4,6 +4,38 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.13](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.12...v0.9.13) (2026-05-25)
+
+이번 릴리즈의 핵심은 처음 axhub 를 쓰는 사람을 위한 `setup` 온보딩 orchestrator 스킬이에요 (#131). "셋업해줘" / "처음인데" / "getting started" 같은 발화로 진입해서 CLI 설치 → 로그인 → node 환경 감지 → (없으면) consent 설치 → 준비 완료 → 첫 앱까지 순서대로 손잡고 안내해요. 설치·로그인·scaffold 로직을 재구현하지 않고 `install-cli`/`auth`/`init` 에 `Skill()` 로 위임하는 thin orchestrator 라 중복이 없어요. 전체 상태를 먼저 감지(detect-first)한 뒤 첫 번째 빈 곳으로만 위임해서 `Skill()` 제어 복귀 여부와 무관하게 동작하고, 위임이 안 돌아와도 ready 카드가 다음 발화를 안내해서 사용자가 막히지 않아요. node 가 없을 때만 consent 한 번 받고 패키지 매니저 → nvm/fnm 스크립트(버전 핀 고정) → nodejs.org 안내 순으로 설치하는데, axhub CLI 외 third-party 자동설치의 유일한 예외라 도메인을 nodejs.org/nvm-sh/fnm 으로 제한했어요. 함께 install-cli 를 공식 단일 채널로 좁히고(#128, Homebrew/Scoop 제거로 stale client_id 로그인 실패 차단), CLI 호환 상한을 <1.0.0 으로 넓히고(#127), Windows preflight 테스트를 portable 하게 고쳤어요(#126). pre-1.0 관례에 따라 feat 이 있어도 patch bump 예요 (commit-and-tag-version 의 0.x 동작 — 직전 0.9.8/0.9.9 도 feat 을 patch 로 릴리즈했어요).
+
+### Test baseline
+
+- `bun test` 990 pass / 1 fail / 6 skip / 1 todo (998 tests, 78 files)
+- 남은 1 fail = PLAN.md schema snippet 이 v0.8.0 을 박아둬서 package v0.9.13 과 어긋나는 pre-existing version drift 예요 (TODOS 후속). README current-release 일관성 테스트는 이 commit 에서 v0.9.13 으로 갱신해 통과시켰어요.
+- `bunx tsc --noEmit` clean
+- `bun run skill:doctor --strict` 31/31 SKILLs
+- CI (PR #131): rust macos/ubuntu/windows + T2 helper-bin pass, routing-drift gate 는 `[skip-routing-gate]` override
+
+### Honest tradeoff
+
+setup 의 routing accuracy/drift 는 이번 릴리즈에서 측정하지 않았어요 — `skills/setup/SKILL.md` 가 routing-affecting 인데 corpus baseline fixture(LLM 측정 필요)를 갱신하지 않고 `[skip-routing-gate]` override 로 머지했기 때문이에요. trigger 어구를 온보딩 축(셋업해줘/처음인데/온보딩/getting started)으로 좁히고 bare "셋업"/"환경"/"초기" 를 제외해 doctor/init 충돌 위험을 설계 단계에서 줄였지만, 실제 accuracy ≥95% / drift ≤5% 검증은 후속 PR (TODOS "setup routing baseline fixture 측정") 로 미뤘어요 — 그 전까지 다음 routing-affecting SKILL 변경은 같은 override 가 필요할 수 있어요. node 자동설치는 consent-gate + 도메인 제한 + 버전 핀으로 supply-chain 노출을 최소화했지만 axhub 의 단일-채널 원칙에서 벗어나는 유일 예외라, setup 외 다른 skill 로 확산하지 않도록 SKILL 의 NEVER 섹션에 못박았어요.
+
+### Added
+
+* **install-cli:** official installer only, drop Homebrew/Scoop channels ([7106a1c](https://github.com/jocoding-ax-partners/axhub/commit/7106a1c01d3798ea98d47a4546dc403306414fa1))
+* **skills:** setup 온보딩 orchestrator 스킬 추가 ([#131](https://github.com/jocoding-ax-partners/axhub/issues/131)) ([188b3ad](https://github.com/jocoding-ax-partners/axhub/commit/188b3ade6d4b15da4a6101f90c518ca5d8ef7cd6))
+
+
+### Fixed
+
+* **preflight:** make Windows preflight tests portable ([8751bf6](https://github.com/jocoding-ax-partners/axhub/commit/8751bf62f8bee9aa2d3a399b1f56917beaa34e65)), closes [#1](https://github.com/jocoding-ax-partners/axhub/issues/1) [#125](https://github.com/jocoding-ax-partners/axhub/issues/125)
+* **preflight:** widen CLI compat max to <1.0.0 ([241f238](https://github.com/jocoding-ax-partners/axhub/commit/241f238b99413f168a409434f0a83f61bc786285))
+
+
+### Docs
+
+* **readme:** refresh legacy version/endpoint/surface counts ([b6b898a](https://github.com/jocoding-ax-partners/axhub/commit/b6b898a1634940e8390b8f92da9e59cc486b753d))
+
 ## [0.9.12](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.11...v0.9.12) (2026-05-22)
 
 v0.9.11 의 wrapper 가 `wait $AUTH_PID` 로 login process 종료까지 block 해서 사용자가 OAuth device flow URL 을 끝까지 못 보던 회귀를 차단했어요. Claude Code shell tool 은 명령 종료 시점에 stdout 을 한 번에 surface 하니까 wrapper 가 OAuth polling (최대 15분) 끝까지 block 하면 URL printf 라인이 버퍼에 갇혀서 사용자 화면에는 "Running ... 22s · 4 lines" hang 상태만 보였어요. 사용자가 SKILL 이 멈춘 줄 알고 폐기. 새 흐름은 3 단계 분리로 교체. Step 5b 는 `nohup axhub auth login --force --no-browser ... </dev/null & disown` 으로 login process 를 detach 한 뒤 15초 (0.5s × 30회) log file polling 으로 URL + code 추출하면 즉시 stdout 으로 printf + `exit 0` 으로 빠져나와요. Claude Code 가 bash 종료를 인식해서 URL/code 안내가 사용자 화면에 즉시 보이고, login process 는 백그라운드에서 OAuth polling 계속해요. Step 5c (신규) 는 별도 bash call 로 `axhub auth status --json` 을 5초 간격 60회 (최대 5분) 폴링해요. user_email 이 비지 않으면 인증 완료, 5분 timeout 시 안내 후 `/axhub:auth` 재호출 라우팅 — background login process 는 자체 15분 timeout 으로 자연 정리돼요. SKILL 본문에 detach / surface / poll 3 단계 분리의 필요성을 명문화했어요.
