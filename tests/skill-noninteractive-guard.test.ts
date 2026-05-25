@@ -87,6 +87,16 @@ describe("v0.15.3 — watch/follow CLI auto-degrade contract", () => {
     }
   });
 
+  test("init/github do not reintroduce pre-0.15.3 detach wrappers", () => {
+    for (const path of [INIT_SKILL, GITHUB_SKILL]) {
+      const content = readFileSync(path, "utf8");
+      expect(content).not.toContain("nohup axhub apps");
+      expect(content).not.toContain("disown 2>/dev/null");
+      expect(content).not.toContain("BOOT_LOG=");
+      expect(content).not.toContain("GIT_LOG=");
+    }
+  });
+
   test("auth fresh device-flow lane matches the CLI's stdout gate", () => {
     const content = readFileSync(AUTH_SKILL, "utf8");
     expect(content).toContain("stdout non-TTY");
