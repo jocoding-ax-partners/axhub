@@ -9,6 +9,12 @@
 // regression lock. The hang protection now lives in the CLI, not the skill body;
 // the D1 AskUserQuestion guard (`[ -t 1 ]` + `$CLAUDE_NON_INTERACTIVE`) is a
 // separate concern and must still survive (asserted at the end).
+//
+// deploy/status/init pass --watch-timeout (an explicit streaming override) so the
+// CLI keeps polling to terminal under agent context instead of degrading to a
+// snapshot — no second user prompt ("아직도 진행 중이야?"). logs uses its own
+// override (--reconnect-attempts N) because --follow is an open-ended tail with no
+// terminal status.
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
@@ -26,9 +32,9 @@ const GITHUB_SKILL = join(REPO_ROOT, "skills/github/SKILL.md");
 const AUTO_DEGRADE_NOTE = "axhub-cli 0.15.3";
 
 describe("v0.15.3 — watch/follow CLI auto-degrade contract", () => {
-  test("status passes --watch directly and documents the 0.15.3 auto-degrade dependency", () => {
+  test("status watch uses --watch-timeout override so CLI polls to terminal under agent context", () => {
     const content = readFileSync(STATUS_SKILL, "utf8");
-    expect(content).toContain("--watch --json");
+    expect(content).toContain("--watch --watch-timeout");
     expect(content).toContain(AUTO_DEGRADE_NOTE);
   });
 
@@ -50,9 +56,12 @@ describe("v0.15.3 — watch/follow CLI auto-degrade contract", () => {
     expect(content).not.toContain("FOLLOW=;");
   });
 
-  test("deploy post-deploy chain passes --watch directly and documents the 0.15.3 auto-degrade dependency", () => {
+  test("deploy watch uses --watch-timeout override so CLI polls to terminal under agent context", () => {
     const content = readFileSync(DEPLOY_SKILL, "utf8");
-    expect(content).toContain("--watch --json");
+    // --watch-timeout (explicit streaming override) keeps the CLI watch() loop
+    // alive under agent context instead of degrading to a single snapshot. The CLI
+    // owns terminal detection + NDJSON stage_transition, so there is no manual loop.
+    expect(content).toContain("--watch --watch-timeout");
     expect(content).toContain(AUTO_DEGRADE_NOTE);
   });
 
@@ -67,9 +76,9 @@ describe("v0.15.3 — watch/follow CLI auto-degrade contract", () => {
     expect(content).toContain(AUTO_DEGRADE_NOTE);
   });
 
-  test("init bootstrap passes --watch directly and dropped the obsolete manual WATCH= toggle", () => {
+  test("init bootstrap uses --watch-timeout override (CLI polls to terminal) and no manual WATCH= toggle", () => {
     const content = readFileSync(INIT_SKILL, "utf8");
-    expect(content).toContain("--execute --yes --watch --json");
+    expect(content).toContain("--execute --yes --watch --watch-timeout");
     expect(content).toContain(AUTO_DEGRADE_NOTE);
     expect(content).not.toContain("WATCH=--watch");
     expect(content).not.toContain("WATCH=;");

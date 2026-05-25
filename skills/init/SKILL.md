@@ -185,14 +185,14 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    동의 받으면 saga 를 실행해요:
 
    ```bash
-   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --yes --watch --json
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --yes --watch --watch-timeout 9m --json
    ```
 
-   **에이전트 컨텍스트 자동 degrade (axhub-cli 0.15.3+).** `--watch` 를 항상 그대로 전달해요. CLI 가 비-TTY/에이전트 컨텍스트를 자동 감지해서 bootstrap / bootstrap-status 의 `--watch` 를 단일 스냅샷으로 degrade 한 뒤 종료하니 (수동 toggle 불필요), saga 가 무한 block 되지 않아요. 에이전트는 `--no-input` 같은 플래그도 따로 안 붙여도 돼요 (비-TTY 면 CLI 가 자동 감지). 진행을 더 따라가려면 별도 `axhub apps bootstrap-status` 를 호출해요:
+   **에이전트도 terminal 까지 폴링해요 (axhub-cli 0.15.3+).** bare `--watch` 는 비-TTY/에이전트 컨텍스트에서 단일 스냅샷으로 degrade 하지만, `--watch-timeout` (또는 `--watch-interval`) 을 붙이면 explicit streaming override 라 CLI 가 degrade 하지 않고 terminal(saga 완료 / 실패) 까지 직접 폴링해요. 그래서 saga 가 끝까지 진행돼 `repo_full_name` 을 받을 수 있어요 (snapshot 으로 끊기지 않아요). `--no-input` 같은 플래그는 따로 안 붙여도 돼요 (비-TTY 면 CLI 가 자동 감지). 이 bash 는 Bash tool `timeout: 570000` (9.5분) 으로 호출하고, 9분 초과 시 CLI Timeout + resume hint 를 받으면 "아직 만드는 중이에요, 계속 확인할게요" 후 아래 bootstrap-status 를 한 번 더 호출해요:
 
    ```bash
    BOOTSTRAP_ID=$(echo "$ACCEPTED_JSON" | jq -r '.data.bootstrap_id')
-   axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --json
+   axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json
    ```
 
    진행 중 매 ~30s 마다 한국어 한 줄로 narrate 해요 — "앱 만들고 있어요" / "GitHub repo 만들고 있어요" / "첫 배포 중이에요. 거의 다 왔어요". 60s 이상 같은 stage 머무르면 "조용하네요, 계속 기다리고 있어요" 한 줄을 추가해요.
