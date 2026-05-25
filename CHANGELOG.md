@@ -4,6 +4,33 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.17](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.16...v0.9.17) (2026-05-25)
+
+이번 릴리즈는 SKILL UX 를 에이전트 친화적으로 다듬은 패치예요. watch/follow 흐름을 에이전트 자동 폴링으로 전환하고, init 라우팅과 inventory 조회 렌더를 보강했어요. 안전 측면으로는 deploy 가 status-first 게이트로 배포 루프를 차단하고(#138), doctor 가 CLI 미설치를 발견하면 install-cli(바이너리만) 대신 setup 온보딩으로 이어줘서(#140) 미온보딩 사용자가 CLI 설치 → 로그인 → node 까지 한 번에 도달해요.
+
+### Test baseline
+
+- doctor 라우팅 변경(#140): `bun run skill:doctor --strict` exit 0, `bun run lint:tone --strict` 0 err/46 files, `bun run lint:keywords --check` no diff, `bun test`(ux-ask-fallback-registry/e2e-claude-cli-registry/routing-fixture-sync) 51 pass, `bunx tsc --noEmit` exit 0 통과예요.
+- PR #140 GitHub checks 는 rust(ubuntu/macos/windows) + corpus.100 drift gate + T2 helper-bin 전부 pass, mergeStateStatus CLEAN 에서 squash merge 했어요.
+- release postbump 에서 `bun run codegen:version` + `bun run release:check`(host 바이너리 빌드 + 버전 assert + release.yml 5타깃 선언 확인) 통과예요.
+
+### Honest tradeoff
+
+전체 `bun test` 의 기존 18 fail 은 본 릴리즈 변경과 무관해요 — axhub-helpers Rust 바이너리 로컬 미빌드 + README/schema 버전 drift 이고, doctor 변경 stash 후에도 동일하게 재현돼서 확인했어요. 0.9.17 에 함께 나가는 나머지 4커밋(watch 폴링/init 라우팅/inventory 렌더/deploy status-first)은 각자 PR 에서 검증됐고 본 세션에서 재검증하진 않았어요. release:check 는 host 바이너리만 빌드했고, 5-platform cross 빌드와 cosign 서명은 tag push 후 release.yml 매트릭스가 수행해요.
+
+
+### Added
+
+* init 라우팅 강화 + @ax-hub/sdk 데이터 접근 권장 ([649262c](https://github.com/jocoding-ax-partners/axhub/commit/649262c7f82edf4a2bcfc135db4d556b3dcb5f30))
+* inventory 스킬 조회 결과를 테이블 형식으로 렌더 ([9b6e571](https://github.com/jocoding-ax-partners/axhub/commit/9b6e571d604c9ed7cda7576ab3a009dd7236091e))
+* 배포/상태/init watch 를 에이전트 자동 폴링으로 전환 ([273e1ed](https://github.com/jocoding-ax-partners/axhub/commit/273e1eda85db002d2d8c7871670cf748f210a8e4))
+
+
+### Fixed
+
+* deploy 스킬 status-first 게이트 추가 ([4f7fd74](https://github.com/jocoding-ax-partners/axhub/commit/4f7fd74d1f5675b40c85e2ef16a87164f43a04cb))
+* doctor 미설치 감지 시 install-cli 대신 setup 온보딩으로 라우팅 ([#140](https://github.com/jocoding-ax-partners/axhub/issues/140)) ([304df86](https://github.com/jocoding-ax-partners/axhub/commit/304df86fb5cb983eee3ece82accbccad58609005))
+
 ## [0.9.16](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.15...v0.9.16) (2026-05-25)
 
 이번 릴리즈는 agent-safe CLI floor(0.15.3) 위에서 watch/follow auto-degrade 와 native device-code surface 를 믿도록 SKILL surface 를 정리하고, data SKILL 을 CLI-only catalog workflow 로 추가한 패치예요. data sync 는 first-run `.axhub` mutation 을 consent-gate 로 감싸고 private catalog snapshot 에 PAT metadata 를 저장하지 않게 해요. shell/Python/TS/Go snippet 은 auth 경계와 escaping 을 회귀 테스트로 잠가서 agent 가 안전하게 dry-run/read 흐름을 안내할 수 있게 했어요.
