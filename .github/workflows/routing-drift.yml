@@ -48,7 +48,12 @@ jobs:
 
       - name: Check routing fixture freshness
         run: |
-          git fetch origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}" --depth=1
+          # Force-update the tracking ref (leading '+') and do NOT shallow-fetch:
+          # checkout uses fetch-depth:0, so a `--depth=1` fetch introduces a shallow
+          # boundary that cannot fast-forward the full-history ref and git rejects it
+          # with "[rejected] main -> origin/main (non-fast-forward)" whenever the base
+          # branch advanced (e.g. another PR merged) since this PR was branched.
+          git fetch origin "+${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
           bun scripts/check-routing-fixture-sync.ts --base "origin/${{ github.base_ref }}" --head HEAD
 
       - name: Run corpus.100 drift gate
