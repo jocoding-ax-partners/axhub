@@ -470,6 +470,14 @@
     }
   },
   "data": {
+    "catalog context 를 처음 만들까요?": {
+      "safe_default": "Skip sync",
+      "rationale": "First catalog sync creates .axhub files and edits .gitignore. Headless runs must not mutate a workspace without explicit consent.",
+      "allowed_safe_defaults": [
+        "Skip sync",
+        "Create context"
+      ]
+    },
     "실데이터 read 를 실행할까요?": {
       "safe_default": "Dry-run only",
       "rationale": "Live catalog reads can expose sensitive rows. In non-interactive contexts, do not execute reads; show SQL, allowed_columns, and snippet only.",

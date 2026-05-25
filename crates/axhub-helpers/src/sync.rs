@@ -6,7 +6,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 use chrono::Utc;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 const EXIT_USAGE: i32 = 64;
@@ -111,6 +111,7 @@ pub fn run_sync(args: &[String]) -> Result<i32> {
 
     let principal = axhub_json!("auth", "whoami", "--json");
     let pat = axhub_json!("auth", "pat", "whoami", "--json");
+    let pat_metadata = sanitize_pat_metadata(&pat);
     let identity_fingerprint = identity_fingerprint(&resolved_target, &principal, &pat);
 
     let axhub_dir = out_root.join(".axhub");
@@ -160,7 +161,7 @@ pub fn run_sync(args: &[String]) -> Result<i32> {
         "generated_at": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
         "target": resolved_target,
         "principal": principal,
-        "pat": pat,
+        "pat": pat_metadata,
         "identity_fingerprint": identity_fingerprint,
         "resources": resources,
     });
@@ -389,6 +390,42 @@ fn identity_fingerprint(target: &str, principal: &Value, pat: &Value) -> String 
     hasher.update(b"\n");
     hasher.update(serde_json::to_string(pat).unwrap_or_default().as_bytes());
     format!("sha256:{:x}", hasher.finalize())
+}
+
+fn sanitize_pat_metadata(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let mut sanitized = Map::new();
+            for (key, value) in map {
+                if is_secret_pat_key(key) {
+                    continue;
+                }
+                sanitized.insert(key.clone(), sanitize_pat_metadata(value));
+            }
+            Value::Object(sanitized)
+        }
+        Value::Array(items) => Value::Array(items.iter().map(sanitize_pat_metadata).collect()),
+        Value::String(s) => Value::String(crate::redact::redact(s)),
+        _ => value.clone(),
+    }
+}
+
+fn is_secret_pat_key(key: &str) -> bool {
+    let normalized = key.to_ascii_lowercase().replace(['-', ' '], "_");
+    matches!(
+        normalized.as_str(),
+        "access_token"
+            | "refresh_token"
+            | "id_token"
+            | "token"
+            | "pat"
+            | "api_key"
+            | "x_api_key"
+            | "secret"
+            | "client_secret"
+            | "authorization"
+            | "bearer"
+    )
 }
 
 fn atomic_write_private(path: &Path, data: &[u8]) -> Result<()> {

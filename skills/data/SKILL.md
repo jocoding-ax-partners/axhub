@@ -50,6 +50,24 @@ echo "$PREFLIGHT_JSON"
 
 1. **Sync local catalog snapshot.** Use the helper, not MCP server config. Default output is the git toplevel `.axhub/`; use `--out` only when the user gives a separate workspace.
 
+   Before the first sync, check whether `.axhub/` already exists. If it does not exist, explain that sync will create `.axhub/AXHUB.md`, `.axhub/AXHUB_TARGET`, private `.axhub/catalog.json`, and append `.axhub/catalog.json` to `.gitignore`; then ask once before mutating files.
+
+   ```json
+   {
+     "questions": [{
+       "question": "catalog context 를 처음 만들까요?",
+       "header": "Catalog",
+       "multiSelect": false,
+       "options": [
+         {"label": "Skip sync", "description": "파일을 만들지 않고 catalog search/get 또는 snippet dry-run 만 진행해요."},
+         {"label": "Create context", "description": ".axhub 규칙 파일과 private catalog snapshot 을 만들어요."}
+       ]
+     }]
+   }
+   ```
+
+   In non-interactive mode, use `Skip sync`. If the user skips, do not run `axhub-helpers sync`; continue with live `axhub catalog search/get` only when the request can be answered without local snapshot writes.
+
    ```bash
    axhub-helpers sync --target auto --json
    axhub-helpers sync --target local-python --json
