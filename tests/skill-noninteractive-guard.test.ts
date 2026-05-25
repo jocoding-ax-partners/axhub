@@ -101,9 +101,18 @@ describe("v0.15.3 — watch/follow CLI auto-degrade contract", () => {
     const content = readFileSync(AUTH_SKILL, "utf8");
     expect(content).toContain("stdout non-TTY");
     expect(content).toContain("`--no-input` / `--non-interactive`");
+    expect(content).toContain("PTY harness");
     expect(content).toContain("fresh device flow");
-    expect(content).toContain("exit 65");
+    expect(content).not.toContain("fresh device flow 시작 전에 exit 65");
     expect(content).toContain("axhub auth login --force --no-browser --json $AUTH_EXTRA");
+  });
+
+  test("device-flow follow-up references point at committed docs", () => {
+    for (const path of [AUTH_SKILL, INIT_SKILL, GITHUB_SKILL]) {
+      const content = readFileSync(path, "utf8");
+      expect(content).not.toContain(".omc/plans/device-flow-agent-completion-gap.md");
+      expect(content).toContain("docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md");
+    }
   });
 
   test("status/logs/deploy/verify keep the D1 non-interactive AskUserQuestion guard", () => {

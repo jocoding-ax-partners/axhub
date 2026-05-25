@@ -205,7 +205,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    >
    > 대화형 TTY 에서는 브라우저 승인 뒤 CLI 가 폴링을 계속해 다음 단계를 이어가요. 에이전트 컨텍스트에서는 이 안내를 보여준 뒤 멈춰요. (유효시간 약 `<expires_in/60>` 분)
 
-   `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 그 다음은 컨텍스트에 따라 갈라져요 (axhub-cli 0.15.3+): **대화형 TTY** 면 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. **에이전트 / 비-TTY 컨텍스트** 면 CLI 가 `device_code_issued` emit 직후 fast-exit 하므로 다음 stage event 가 안 와요. challenge 를 보여준 뒤 멈추고, "이 호출은 승인 완료를 polling 하지 않아요. 계속하려면 대화형 터미널에서 `axhub init` 을 다시 실행해 새 device flow 를 완료해 주세요" 라고 안내해요. 이전 `user_code` 를 승인한 뒤 같은 에이전트 명령을 재호출해도 이어지지 않아요. CLI 가 internal `device_code` 를 노출하지 않기 때문이에요. 완전 autonomous 완료는 CLI device_code persist resume 기능을 기다려요 (`.omc/plans/device-flow-agent-completion-gap.md`). 코드가 expire 되면 `/axhub:github` 안내로 재시도해요.
+   `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 그 다음은 컨텍스트에 따라 갈라져요 (axhub-cli 0.15.3+): **대화형 TTY** 면 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. **에이전트 / 비-TTY 컨텍스트** 면 CLI 가 `device_code_issued` emit 직후 fast-exit 하므로 다음 stage event 가 안 와요. challenge 를 보여준 뒤 멈추고, "이 호출은 승인 완료를 polling 하지 않아요. 계속하려면 대화형 터미널에서 `axhub init` 을 다시 실행해 새 device flow 를 완료해 주세요" 라고 안내해요. 이전 `user_code` 를 승인한 뒤 같은 에이전트 명령을 재호출해도 이어지지 않아요. CLI 가 internal `device_code` 를 노출하지 않기 때문이에요. 완전 autonomous 완료는 CLI device_code persist resume 기능을 기다려요 (`docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md`). 코드가 expire 되면 `/axhub:github` 안내로 재시도해요.
 
    상세한 device flow 안내 패턴은 `../github/SKILL.md` 의 OAuth device flow 섹션을 따라요.
 

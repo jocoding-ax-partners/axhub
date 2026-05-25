@@ -195,7 +195,7 @@ echo "$PREFLIGHT_JSON"
 
    `verification_uri_complete` 가 있으면 우선 표시 (코드 입력 자동). 없으면 `verification_uri` + 별도 `user_code` 표시.
 
-   **컨텍스트별 완료 (axhub-cli 0.15.3+).** 대화형 TTY 면 connect 가 승인까지 polling 해서 자동으로 다음 단계로 진행돼요. 에이전트 / 비-TTY 컨텍스트면 connect 가 `device_code_issued` emit 직후 fast-exit 하므로 자동 진행이 안 돼요. challenge 를 보여준 뒤 멈추고, 사용자에게 "이 호출은 승인 완료를 polling 하지 않아요. 계속하려면 대화형 터미널에서 같은 `axhub apps git connect ... --execute` 흐름을 다시 시작해 새 device flow 를 완료해 주세요" 라고 안내해요. 이전 `user_code` 를 승인한 뒤 같은 에이전트 명령을 재호출해도 이어지지 않아요. CLI 가 internal `device_code` 를 노출하지 않기 때문이에요. 완전 autonomous 완료는 CLI 의 device_code persist resume 기능을 기다려요 (`.omc/plans/device-flow-agent-completion-gap.md`).
+   **컨텍스트별 완료 (axhub-cli 0.15.3+).** 대화형 TTY 면 connect 가 승인까지 polling 해서 자동으로 다음 단계로 진행돼요. 에이전트 / 비-TTY 컨텍스트면 connect 가 `device_code_issued` emit 직후 fast-exit 하므로 자동 진행이 안 돼요. challenge 를 보여준 뒤 멈추고, 사용자에게 "이 호출은 승인 완료를 polling 하지 않아요. 계속하려면 대화형 터미널에서 같은 `axhub apps git connect ... --execute` 흐름을 다시 시작해 새 device flow 를 완료해 주세요" 라고 안내해요. 이전 `user_code` 를 승인한 뒤 같은 에이전트 명령을 재호출해도 이어지지 않아요. CLI 가 internal `device_code` 를 노출하지 않기 때문이에요. 완전 autonomous 완료는 CLI 의 device_code persist resume 기능을 기다려요 (`docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md`).
 
    `CLAUDE_PLUGIN_ROOT` 가 훅 환경에 없더라도 사용자에게 수동 실행이나 bang-prefixed connect 우회를 요청하지 말고, PATH 의 `axhub-helpers` 로 pending token 을 민 뒤 같은 흐름에서 top-level Bash 로 connect 를 실행해요.
 

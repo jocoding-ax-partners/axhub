@@ -165,7 +165,7 @@ To handle auth:
    # scope 변경하면 (default read,write): AUTH_EXTRA="--scopes read,write,deploy"
    ```
 
-   - **에이전트 / 비-TTY 컨텍스트**: Claude Code Bash tool 처럼 stdout 이 캡처/pipe 되는 환경에서 `--json` 으로 호출해요. CLI 의 fast-exit 기준은 stdout non-TTY 예요. `$CI` / `$CLAUDE_NON_INTERACTIVE` 는 SKILL 의 질문 guard 신호일 뿐 CLI 가 직접 읽는 fresh-login gate 가 아니므로, TTY stdout 에서 이 env 만 켠 상태를 fast-exit 로 가정하지 않아요. 비-TTY 면 CLI 가 자동 감지하니 `--no-input` / `--non-interactive` 를 붙이지 않아요. fresh device flow 시작 전에 exit 65 로 막히기 때문이에요. CLI 가 `device_code_issued` event 를 emit 한 **직후 fast-exit** 하니 (출력이 데드락 없이 바로 surface 됨), challenge 를 보여주고 멈춰요.
+   - **에이전트 / 비-TTY 컨텍스트**: Claude Code Bash tool 처럼 stdout 이 캡처/pipe 되는 환경에서 `--json` 으로 호출해요. CLI 의 fresh device flow fast-exit 기준은 stdout non-TTY 예요. `$CI` / `$CLAUDE_NON_INTERACTIVE` 는 SKILL 의 질문 guard 신호일 뿐 CLI 가 직접 읽는 fresh-login gate 가 아니므로, TTY stdout 에서 이 env 만 켠 상태를 fast-exit 로 가정하지 않아요. 일반 에이전트 Bash tool 은 비-TTY stdout 이라 `--no-input` / `--non-interactive` 를 따로 안 붙여도 CLI 가 자동 감지해요. 단, PTY harness 처럼 stdout 이 TTY 로 잡히는 자동화에서는 `--non-interactive` 로 같은 fast-exit 를 명시해도 돼요. CLI 가 `device_code_issued` event 를 emit 한 **직후 fast-exit** 하니 (출력이 데드락 없이 바로 surface 됨), challenge 를 보여주고 멈춰요.
 
      ```bash
      axhub auth login --force --no-browser --json $AUTH_EXTRA
@@ -178,7 +178,7 @@ To handle auth:
      >   1. 브라우저에서 열기: `<verification_uri_complete 우선, 없으면 verification_uri>`
      >   2. 코드 입력: `<user_code>`
 
-     **에이전트 컨텍스트는 여기서 멈춰요.** 0.15.3 fast-exit 는 토큰 교환 polling 을 안 하니 승인해도 이 호출만으로는 로그인이 완료되지 않아요. "승인까지 자동으로 끝내려면 터미널에서 직접 `axhub auth login` 을 실행해 주세요 (대화형이면 CLI 가 승인까지 기다려요)" 라고 안내해요. 완전 autonomous 완료는 CLI 의 device_code persist resume 기능을 기다려요 (`.omc/plans/device-flow-agent-completion-gap.md`).
+     **에이전트 컨텍스트는 여기서 멈춰요.** 0.15.3 fast-exit 는 토큰 교환 polling 을 안 하니 승인해도 이 호출만으로는 로그인이 완료되지 않아요. "승인까지 자동으로 끝내려면 터미널에서 직접 `axhub auth login` 을 실행해 주세요 (대화형이면 CLI 가 승인까지 기다려요)" 라고 안내해요. 완전 autonomous 완료는 CLI 의 device_code persist resume 기능을 기다려요 (`docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md`).
 
    - **대화형 TTY 컨텍스트**: 그대로 호출하면 CLI 가 URL/code 를 stderr 로 보여주고 승인까지 polling 해서 완료해요:
 
