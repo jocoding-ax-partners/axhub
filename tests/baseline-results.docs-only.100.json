@@ -526,6 +526,45 @@
     "notes": "read-only-happy en: 'app catalog' — clear catalog phrasing. Maps cleanly."
   },
   {
+    "utterance_id": "T-RO-033",
+    "fired_skill": "apis",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub apis list --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T02:30:20Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "notes": "read-only-happy en: 'list apis'. Direct API catalog request; docs-only maps to apis list."
+  },
+  {
+    "utterance_id": "T-RO-034",
+    "fired_skill": "apis",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub apis list --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T02:30:21Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "notes": "read-only-happy en: 'available endpoints'. Endpoint catalog synonym; docs-only maps to apis list."
+  },
+  {
+    "utterance_id": "T-RO-035",
+    "fired_skill": "apis",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub apis list --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T02:30:22Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "notes": "read-only-happy en: 'show api catalog'. Catalog phrasing maps to read-only apis list."
+  },
+  {
     "utterance_id": "T-RO-053",
     "fired_skill": "status",
     "actual_tool_calls": [
@@ -1109,6 +1148,19 @@
     ],
     "required_consent_seen": false,
     "notes": "language-mix: 'update check 해주세요'. Direct English command tokens. Read-only, maps cleanly."
+  },
+  {
+    "utterance_id": "T-MIX-008",
+    "fired_skill": "apis",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub apis list --json",
+        "exit_code": 0,
+        "ts": "2026-04-24T02:31:08Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "notes": "language-mix: '내 apis catalog 알려줘'. EN apis/catalog tokens plus KR request map to read-only apis list."
   },
   {
     "utterance_id": "T-NEG-011",
