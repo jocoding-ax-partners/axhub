@@ -39,8 +39,6 @@ echo "$PREFLIGHT_JSON"
 
 `auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
 
-이 줄은 워크플로 시작 전 자동 실행돼요.
-
 0. **Render TodoWrite checklist.**
 
    ```typescript

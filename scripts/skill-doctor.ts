@@ -235,9 +235,12 @@ const inspectSkill = (slug: string): SkillCheck => {
         // ...preflight...`` injection; a needs-preflight:true skill MUST invoke preflight
         // in its body so the call goes through the standard interactive Bash permission flow.
         const hasInjection = /^!`node -e "[^\n]*axhub-helpers[^\n]*preflight[^\n]*"`$/m.test(content);
-        // helper is picked into `$HELPER` then invoked, so `preflight --json` is the
-        // stable in-body signal (the literal `axhub-helpers preflight` adjacency no longer holds).
-        const invokesPreflight = /preflight\s+--json/.test(content) && content.includes("axhub-helpers");
+        // Require the canonical block's assignment signature, NOT a bare `preflight --json`
+        // mention. A loose `/preflight\s+--json/` would false-pass any skill that references
+        // preflight in a later/legacy step (e.g. deploy's command-reference at deploy:388)
+        // even if its upfront canonical block were deleted. The `PREFLIGHT_JSON=$("$HELPER" ...`
+        // form is unique to the canonical block and also enforces the helper-pick fallback.
+        const invokesPreflight = /PREFLIGHT_JSON=\$\("\$HELPER" preflight --json/.test(content);
         const present = needsPreflight ? !hasInjection && invokesPreflight : !hasInjection;
         return {
           name: "in-body preflight",

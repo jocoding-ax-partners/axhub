@@ -110,6 +110,16 @@ content = content.replace(/\{\{TODOWRITE_BLOCK\}\}/g, todoWriteBlock);
 content = content.replace(/\{\{D1_GUARD_BLOCK\}\}/g, d1GuardBlock);
 
 if (!needsPreflight) {
+  // Fail loudly on template drift: if the template's preflight block no longer matches
+  // CANONICAL_PREFLIGHT_BLOCK byte-for-byte, the literal replace would silently no-op and
+  // ship a --no-preflight skill that still carries the block.
+  if (!content.includes(CANONICAL_PREFLIGHT_BLOCK + "\n\n")) {
+    process.stderr.write(
+      "error: template drift — CANONICAL_PREFLIGHT_BLOCK not found in scaffold output. " +
+        "Sync skills/_template/SKILL.md.tmpl with scripts/preflight-block.ts.\n",
+    );
+    process.exit(1);
+  }
   content = content.replace(CANONICAL_PREFLIGHT_BLOCK + "\n\n", "");
 }
 
