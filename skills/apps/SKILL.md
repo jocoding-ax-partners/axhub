@@ -164,7 +164,7 @@ Deletion is consent-gated. Do **not** run `axhub apps delete ... --dry-run --jso
 5. Run exactly one delete command using the same target string:
 
    ```bash
-   axhub apps delete "$COMMAND_TARGET" --yes --json
+   axhub apps delete "$COMMAND_TARGET" --execute --json
    ```
 
 ### apps open delegation

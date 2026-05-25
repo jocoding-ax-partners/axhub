@@ -12,7 +12,7 @@ describe("apps delete consent UX contract", () => {
     expect(skill).toContain("COMMAND_TARGET");
     expect(skill).toContain('app_id":"$COMMAND_TARGET"');
     expect(skill).toContain('"slug":"$COMMAND_TARGET"');
-    expect(skill).toContain('axhub apps delete "$COMMAND_TARGET" --yes --json');
+    expect(skill).toContain('axhub apps delete "$COMMAND_TARGET" --execute --json');
     expect(skill).not.toContain('axhub apps delete "$APP" --dry-run --json');
     expect(skill).toContain("context.slug");
   });

@@ -1,6 +1,6 @@
 ---
 name: verify
-description: '이 스킬은 사용자가 배포가 진짜 라이브 됐는지 evidence 기반으로 확인하고 싶어할 때 사용해요. 다음 표현에서 활성화: "확인해", "검증해", "라이브 됐어", "정말 됐어", "진짜 올라갔어", "확실해", "테스트해", "smoke test", "is it live", "check live", "verify", "방금 거 확인해줘". axhub status + axhub logs tail + (선택) health endpoint 호출로 evidence 수집해서 verdict 한 줄로 보여줘요.'
+description: '이 스킬은 사용자가 배포가 진짜 라이브 됐는지 evidence 기반으로 확인하고 싶어할 때 사용해요. 다음 표현에서 활성화: "확인해", "검증해", "라이브 됐어", "정말 됐어", "진짜 올라갔어", "확실해", "테스트해", "smoke test", "is it live", "check live", "verify", "방금 거 확인해줘". axhub deploy status + axhub deploy logs --source pod + (선택) health endpoint 호출로 evidence 수집해서 verdict 한 줄로 보여줘요.'
 examples:
   - utterance: "방금 거 진짜 됐어"
     intent: "verify last deploy is live"
@@ -23,7 +23,7 @@ axhub 배포가 진짜 라이브 됐는지 evidence 기반으로 1 화면 verdic
 
 <!-- AUTHOR: Phase 26 PR 26.4 — vibe coder 가 "방금 거 진짜 됐어?" 라고 물을 때
 1. preflight 가 current_app / auth_ok 자동 주입
-2. axhub status + axhub logs tail 두 호출로 evidence 수집 (5s timeout 각각)
+2. axhub deploy status + axhub deploy logs --source pod 두 호출로 evidence 수집 (5s timeout 각각)
 3. 헬스 endpoint 가 설정돼 있으면 GET 200 추가 검증 (선택)
 4. verdict: ✅ 라이브 확정 / ⚠️ 의심 / ❌ 라이브 안 됨 — 한 줄
 -->
@@ -40,10 +40,10 @@ To verify the latest deploy is live:
 
    ```typescript
    TodoWrite({ todos: [
-     { content: "최근 배포 식별",       status: "in_progress", activeForm: "최근 배포 식별하는 중" },
-     { content: "axhub status 호출",    status: "pending",     activeForm: "상태 확인하는 중" },
-     { content: "axhub logs tail 확인", status: "pending",     activeForm: "로그 확인하는 중" },
-     { content: "verdict 안내",         status: "pending",     activeForm: "마무리하는 중" }
+     { content: "최근 배포 식별",              status: "in_progress", activeForm: "최근 배포 식별하는 중" },
+     { content: "axhub deploy status 호출",    status: "pending",     activeForm: "상태 확인하는 중" },
+     { content: "axhub deploy logs 확인",      status: "pending",     activeForm: "로그 확인하는 중" },
+     { content: "verdict 안내",                status: "pending",     activeForm: "마무리하는 중" }
    ]})
    ```
 
@@ -51,9 +51,9 @@ To verify the latest deploy is live:
 
 1. **최근 배포 식별.** preflight 의 `current_app` + `last_deploy_id` 사용해요. 둘 다 비어 있으면 `axhub-helpers list-deployments --app-id=$APP --limit 1` 로 보강해요. 후보 없으면 "최근 배포 없음" 안내 + 종료.
 
-2. **`axhub status --json` 호출 (5s timeout).** 응답 `state` 가 `live` / `running` / `deployed` / `succeeded` 면 health 신호 OK. 그 외 → 의심 사유 기록.
+2. **`axhub deploy status <DEPLOY_ID> --app <APP> --json` 호출 (5s timeout).** `<DEPLOY_ID>` 는 Step 1 의 `last_deploy_id`. 없으면 `axhub deploy list --app <APP> --json` 의 최신 배포로 보강해요. 응답 `.status` 가 `active` / `succeeded` / `live` / `running` / `deployed` 면 health 신호 OK (배포가 끝나서 떠 있는 상태). `.current_stage` 도 같이 읽어서 어느 단계인지 안내해요. `.status` 가 `pending` / `building` / `deploying` 면 아직 진행 중 → 의심, `failed` / `stopped` 면 → 라이브 안 됨 사유 기록.
 
-3. **`axhub logs --runtime --tail 50` 호출 (5s timeout).** 마지막 50 라인에서 `ERROR` / `FATAL` 패턴 grep. 한 줄도 없으면 OK. 있으면 first 3 라인을 그대로 quote 해요 (Vibe Coder Visibility 원칙).
+3. **`axhub deploy logs --app <APP> --source pod --json` 호출 (5s timeout).** 런타임 pod 로그를 받아서 마지막 ~50 라인 (client-side trim) 에서 `ERROR` / `FATAL` 패턴 grep. 한 줄도 없으면 OK. 있으면 first 3 라인을 그대로 quote 해요 (Vibe Coder Visibility 원칙). `--tail` 같은 N-라인 플래그는 CLI 에 없으니 출력을 받아서 직접 마지막 50 라인만 잘라요. 비대화형이면 `--follow` 없이 단발 스냅샷으로 받아요.
 
 4. **(선택) health endpoint GET.** apphub.yaml 에 `health_endpoint` 가 정의돼 있으면 `curl -sS -o /dev/null -w "%{http_code}" $URL` 5s timeout 호출해요. 응답 200 = OK. 그 외 → 의심 사유.
 
@@ -81,7 +81,7 @@ To verify the latest deploy is live:
    ✅ 라이브 확정
      - 앱: <APP_SLUG> (id=<APP_ID>) — <PROFILE>
      - 마지막 배포: <DEPLOY_ID> (<RELATIVE_TIME>)
-     - 상태: live / 에러 0 건 / health 200
+     - 상태: status=active / 에러 0 건 / health 200
      - 다음: "방금 거 로그 보여줘" / "방금 거 상태"
 
    ⚠️ 의심
@@ -90,7 +90,7 @@ To verify the latest deploy is live:
      - 다시 확인하려면 1 분 뒤 "다시 확인해줘"
 
    ❌ 라이브 안 됨
-     - state = <state> (live 아님)
+     - status = <status> (live 아님)
      - 마지막 배포 ID: <DEPLOY_ID>
      - 추적하려면 "왜 실패했어"
    ```
@@ -101,7 +101,7 @@ To verify the latest deploy is live:
 사용자: "방금 거 진짜 됐어?"
 → verify skill 호출
 → Step 1-5 실행
-→ 결과: "✅ 라이브 확정. 마지막 배포 2 분 전, state=live, 에러 0 건."
+→ 결과: "✅ 라이브 확정. 마지막 배포 2 분 전, status=active, 에러 0 건."
 
 ### CI 자동화
 ```bash
@@ -111,8 +111,8 @@ $ axhub-helpers verify --json --app-id=paydrop
 
 ## NEVER
 
-- NEVER `axhub status` 응답 stderr 를 사용자 화면에 그대로 노출해요. JSON / NDJSON / payload / transport 같은 jargon 이 들어가요 (Vibe Coder Visibility 위반).
-- NEVER 5s timeout 무시해요. axhub status 가 hang 되면 verdict 를 못 내려요. timeout 도달 시 "의심" verdict 로 표시해요.
+- NEVER `axhub deploy status` 응답 stderr 를 사용자 화면에 그대로 노출해요. JSON / NDJSON / payload / transport 같은 jargon 이 들어가요 (Vibe Coder Visibility 위반).
+- NEVER 5s timeout 무시해요. axhub deploy status 가 hang 되면 verdict 를 못 내려요. timeout 도달 시 "의심" verdict 로 표시해요.
 - NEVER health endpoint URL 을 사용자 화면에 그대로 출력해요. 회사 endpoint 가 노출될 수 있어요. 응답 code 만 표시해요.
 
 ## Additional Resources
