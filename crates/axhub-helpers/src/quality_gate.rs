@@ -176,7 +176,7 @@ mod tests {
             auth_error_code: None,
             scopes: vec!["deploy".to_string()],
             profile: Some("prod".to_string()),
-            endpoint: Some("https://hub-api.jocodingax.ai".to_string()),
+            endpoint: Some("https://axhub-api.jocodingax.ai".to_string()),
             user_email: Some("test@example.com".to_string()),
             expires_at: None,
             expires_human: None,
@@ -191,7 +191,7 @@ mod tests {
     fn happy_resolve() -> ResolveOutput {
         ResolveOutput {
             profile: Some("prod".to_string()),
-            endpoint: Some("https://hub-api.jocodingax.ai".to_string()),
+            endpoint: Some("https://axhub-api.jocodingax.ai".to_string()),
             app_id: Some(42),
             app_slug: Some("paydrop".to_string()),
             candidate_slug: None,

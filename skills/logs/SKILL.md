@@ -41,7 +41,7 @@ To fetch logs:
    On exit 65 (token missing — Phase 7 US-701 이후엔 SessionStart 가 자동 setup):
    > "토큰을 찾을 수 없어요. 'axhub auth login' 또는 CC 세션 재시작."
 
-   ax-hub-cli has no `axhub deploy list`; helper uses REST API directly via the token from auto-bootstrap.
+   v0.15 CLI 는 `axhub deploy list --app <APP> --json` 으로 직접 배포 목록을 조회할 수 있어요 (아래 build-log snapshot fallback 에서도 이 명령을 써요). 위 helper 는 같은 데이터를 REST API 로 받아 캐시 친화적으로 정리해 주는 경로예요 — auto-bootstrap 토큰을 그대로 써요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — source pick → `build` (가장 흔한 use case), 전체 보기 → `last 50` (subprocess 에서는 trimmed 만 보여줘요).
 

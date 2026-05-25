@@ -34,7 +34,7 @@
 - `bun run lint:keywords --check` → OK.
 - `bun run skill:doctor --strict` → pass.
 - `bun run release:check` → 5 cross-arch binaries rebuilt/checked at `0.1.21`.
-- `AXHUB_E2E_STAGING_ENDPOINT=https://hub-api.jocodingax.ai bun run test:e2e` → 4 pass / 1 skip / 0 fail.
+- `AXHUB_E2E_STAGING_ENDPOINT=https://axhub-api.jocodingax.ai bun run test:e2e` → 4 pass / 1 skip / 0 fail.
 - GitHub Actions release workflow `25028614673` → success; 21 release assets uploaded.
 - `bash scripts/release/verify-release.sh v0.1.21` → manifest cosign verification + 5 binary signature/checksum checks all OK.
 - v0.1.22 hotfix pre-release gate: `bun test`, `bash tests/auto-download.test.sh`, `bunx tsc --noEmit`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bun run skill:doctor --strict`, `bun run release:check`, `git diff --check`.
@@ -202,7 +202,7 @@ axhub deploy status dep_363 --app app-3 --json
    (system PATH 또는 plugin bin/axhub-shim)
         │
         ▼
-   https://hub-api.jocodingax.ai
+   https://axhub-api.jocodingax.ai
 ```
 
 **핵심**: 플러그인은 **얇은 routing layer**다. 비즈니스 로직은 모두 CLI에 있고, 플러그인은 (1) 자연어 인텐트 → 명령어 매핑, (2) 안전한 기본값 강제, (3) exit code 기반 자동 복구 안내만 담당한다.
@@ -663,7 +663,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
   "version": "0.8.0",
   "description": "Claude Code plugin for axhub — vibe coder app hub. Korean-first natural-language deploy and manage with HMAC-bound consent gates, live profile/app resolution, and exit-code recovery routing. Wraps ax-hub-cli (v0.1.0+).",
   "author": {"name": "Jocoding AX Partners", "url": "https://jocodingax.ai"},
-  "homepage": "https://hub-api.jocodingax.ai",
+  "homepage": "https://axhub-api.jocodingax.ai",
   "repository": "https://github.com/jocoding-ax-partners/axhub.git",
   "license": "MIT",
   "keywords": ["axhub", "vibe-coding", "deploy", "korean", "claude-code-plugin"]
@@ -1141,7 +1141,7 @@ axhub CLI binary ⚠ MIN_CLI_VERSION not enforced (E5)
    │
    ├──▶ OS keychain (per-machine, ⚠ no Codespaces story E12)
    ├──▶ ~/.config/axhub/deployments.json cache (per-machine, ⚠ E4 mutation risk)
-   └──▶ https://hub-api.jocodingax.ai
+   └──▶ https://axhub-api.jocodingax.ai
               ▲
               │
 M7 (v0.2): MCP server ⚠ unbuilt; coupling risk if skills/ stay markdown-only (E1, E3)
@@ -1222,7 +1222,7 @@ M7 (v0.2): MCP server ⚠ unbuilt; coupling risk if skills/ stay markdown-only (
 | 57 | Phase 6 | Hook schema versioning (fixtures v0/v1) + state files (no ordering dependency) | Auto | F15 (Adv + Codex) | harness payload drift = full session 깨짐 | unpinned |
 | 58 | Phase 6 | MCP server (M7) embeds consent in MCP tools (`request_consent` + `consent_token` param), fail-closed | Auto | F16 (Sec HIGH) | cross-agent (Codex/Cursor) skip Claude Code hooks | host hook only |
 | 59 | Phase 6 | Default `AXHUB_REQUIRE_COSIGN=1` (override = `AXHUB_ALLOW_UNSIGNED=1` with Korean warning) | Auto | Sec HIGH #8 | MITM swap binary + checksums | opt-in cosign |
-| 60 | Phase 6 | TLS pinning for hub-api.jocodingax.ai SPKI hash (override = AXHUB_ALLOW_PROXY=1) | Auto | Sec defense-in-depth | corporate MITM proxy 구별 불가 | 무 pinning |
+| 60 | Phase 6 | TLS pinning for axhub-api.jocodingax.ai SPKI hash (override = AXHUB_ALLOW_PROXY=1) | Auto | Sec defense-in-depth | corporate MITM proxy 구별 불가 | 무 pinning |
 | 61 | Phase 6.5 | **CANCEL row 7 + 12 + 39 + 40 + 58**: M7 plugin MCP server, cross-agent portability, .mcp.json placeholder, MCP tool naming, MCP consent enforcement | **User clarification (2nd)** | "plugin이 MCP를 쓰는게 아니라 cli를 쓰는거야" | Plugin이 자체 MCP 서버 expose 또는 MCP 호출 = 사용자 의도 아님. backend의 CLI-replaceable MCP 기능만 ax-hub-cli로 마이그레이션. Plugin은 ax-hub-cli만 호출 | M7 MCP server (Phase 1/5/6 모두 잘못 추가) |
 | 62 | Phase 6.5 | §11 milestones 재정렬: M7 삭제. M0~M6만 유지. v0.2는 별도 PLAN | Auto (cascade from #61) | row 61 | M7 (plugin MCP server)이 빠지면 milestone list 정정 | M7 유지 |
 | 63 | Phase 6.5 | "Day-1 host-agnostic helper contract" (row 12) 의미 변경: cross-agent용 X, 단지 testable Go API design (skill markdown은 thin caller, helper는 CLI 호출 + state 관리) | Auto (cascade) | row 61 | Helper layer는 여전히 가치 (E1 maintainability) but 이유는 cross-agent 아니라 testability/maintainability | row 12 그대로 |

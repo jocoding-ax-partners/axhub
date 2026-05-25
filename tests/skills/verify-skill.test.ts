@@ -37,7 +37,7 @@ describe("verify SKILL Phase 26 invariants", () => {
     const identify = body.indexOf("1. **최근 배포 식별");
     expect(step0).toBeGreaterThan(-1);
     expect(identify).toBeGreaterThan(step0);
-    for (const marker of ["최근 배포 식별", "axhub status 호출", "axhub logs tail 확인", "verdict 안내"]) {
+    for (const marker of ["최근 배포 식별", "axhub deploy status 호출", "axhub deploy logs 확인", "verdict 안내"]) {
       expect(body).toContain(marker);
     }
   });
@@ -56,8 +56,8 @@ describe("verify SKILL Phase 26 invariants", () => {
 
   test("verdict workflow is evidence based and exposes JSON automation", () => {
     const body = verifySkill();
-    expect(body).toContain("axhub status --json");
-    expect(body).toContain("axhub logs --runtime --tail 50");
+    expect(body).toContain("axhub deploy status");
+    expect(body).toContain("axhub deploy logs --app <APP> --source pod");
     expect(body).toContain("ERROR");
     expect(body).toContain("FATAL");
     expect(body).toContain("axhub-helpers verify --json --app-id=paydrop");

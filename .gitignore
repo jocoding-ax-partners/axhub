@@ -66,3 +66,6 @@ test-results.json
 # Test runtime tmp dirs (afterAll cleanup may miss on test interrupt)
 tests/.tmp-*/
 .codegraph/
+
+# axhub quality auto-mode runtime state (session-local, not for commit)
+.axhub-state/

@@ -86,7 +86,7 @@ echo "$PREFLIGHT_JSON"
 5. **delete 는 exact confirm 을 요구해요.**
 
    ```bash
-   axhub env delete "$KEY" --app "$APP" --force --confirm "$KEY" --json
+   axhub env delete "$KEY" --app "$APP" --execute --json
    ```
 
    실행 전 `consent-mint` 에 `action=env_delete`, top-level `app_id`, `context={key}` 를 사용해요.
