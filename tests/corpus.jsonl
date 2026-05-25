@@ -345,3 +345,6 @@
 {"id": "M13", "utterance": "키워드 체인 한계가 명확하지 않아?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
 {"id": "M14", "utterance": "is the routing layer well-designed?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "en", "category": "meta_question"}
 {"id": "M15", "utterance": "이 코드 리팩토링 어떻게 해야 해?", "intent": "meta_question", "expected_skill": null, "expected_cmd_pattern": null, "destructive": false, "lang": "ko", "category": "meta_question"}
+{"id":"DATA-1","utterance":"orders 데이터 조회해줘","intent":"data_query","expected_skill":"data","expected_cmd_pattern":"axhub catalog search --json --limit 200 && axhub catalog invoke --execute --json","destructive":false,"lang":"ko"}
+{"id":"DATA-2","utterance":"describe snowflake analytics orders table","intent":"data_describe","expected_skill":"data","expected_cmd_pattern":"axhub catalog get --connector .* --path .* --json","destructive":false,"lang":"en"}
+{"id":"DATA-3","utterance":"이 테이블 읽는 python snippet 만들어줘","intent":"data_snippet","expected_skill":"data","expected_cmd_pattern":"axhub catalog get --connector .* --path .* --json && axhub-helpers snippet","destructive":false,"lang":"ko"}

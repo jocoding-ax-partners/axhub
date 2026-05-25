@@ -60,7 +60,7 @@ echo "$PREFLIGHT_JSON"
 
 2. **`axhub deploy status <DEPLOY_ID> --app <APP> --json` 호출 (5s timeout).** `<DEPLOY_ID>` 는 Step 1 의 `last_deploy_id`. 없으면 `axhub deploy list --app <APP> --json` 의 최신 배포로 보강해요. 응답 `.status` 가 `active` / `succeeded` / `live` / `running` / `deployed` 면 health 신호 OK (배포가 끝나서 떠 있는 상태). `.current_stage` 도 같이 읽어서 어느 단계인지 안내해요. `.status` 가 `pending` / `building` / `deploying` 면 아직 진행 중 → 의심, `failed` / `stopped` 면 → 라이브 안 됨 사유 기록.
 
-3. **`axhub deploy logs --app <APP> --source pod --json` 호출 (5s timeout).** 런타임 pod 로그를 받아서 마지막 ~50 라인 (client-side trim) 에서 `ERROR` / `FATAL` 패턴 grep. 한 줄도 없으면 OK. 있으면 first 3 라인을 그대로 quote 해요 (Vibe Coder Visibility 원칙). `--tail` 같은 N-라인 플래그는 CLI 에 없으니 출력을 받아서 직접 마지막 50 라인만 잘라요. 비대화형이면 `--follow` 없이 단발 스냅샷으로 받아요.
+3. **`axhub deploy logs --app <APP> --source pod --json` 호출 (5s timeout).** 런타임 pod 로그를 받아서 마지막 ~50 라인 (client-side trim) 에서 `ERROR` / `FATAL` 패턴 grep. 한 줄도 없으면 OK. 있으면 first 3 라인을 그대로 quote 해요 (Vibe Coder Visibility 원칙). `--tail` 같은 N-라인 플래그는 CLI 에 없으니 출력을 받아서 직접 마지막 50 라인만 잘라요. (verify 는 `--follow` 를 안 써서 항상 단발 스냅샷이고, 혹시 watch/follow 계열을 호출해도 CLI 가 비-TTY/에이전트 컨텍스트면 자동으로 단일 스냅샷으로 degrade 해요 — axhub-cli 0.15.3+.)
 
 4. **(선택) health endpoint GET.** apphub.yaml 에 `health_endpoint` 가 정의돼 있으면 `curl -sS -o /dev/null -w "%{http_code}" $URL` 5s timeout 호출해요. 응답 200 = OK. 그 외 → 의심 사유.
 

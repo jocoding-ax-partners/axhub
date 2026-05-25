@@ -7,12 +7,12 @@ use regex::Regex;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-pub const MIN_AXHUB_CLI_VERSION: &str = "0.1.0";
-// Upper bound is the next major. The CLI's Rust/cargo-dist era (v0.13.0+, which
-// ships the UUID OAuth client_id) advances through the 0.x line, so a 0.13.0-tight
-// max made every current release (v0.15.x) read as `cli_too_new`. Widen to <1.0.0
-// so the plugin validates the whole 0.x compatibility window instead of warning
-// on every CLI minor; re-evaluate at the 1.0.0 breaking boundary.
+pub const MIN_AXHUB_CLI_VERSION: &str = "0.15.3";
+// Minimum is pinned to the first CLI that provides agent-safe watch/follow
+// auto-degrade plus native `device_code_issued` fast-exit. Older 0.15.x
+// binaries can deadlock plugin subprocesses because the skills now pass
+// `--watch`/`--follow` directly and rely on the CLI guard. Upper bound stays
+// at the next major; re-evaluate at the 1.0.0 breaking boundary.
 pub const MAX_AXHUB_CLI_VERSION: &str = "1.0.0";
 pub const EXIT_OK: i32 = 0;
 pub const EXIT_USAGE: i32 = 64;
@@ -697,7 +697,7 @@ mod tests {
         ));
         fs::create_dir_all(&dir).unwrap();
         let fake = dir.join(AXHUB_BIN_NAME);
-        fs::write(&fake, b"#!/bin/sh\necho axhub 0.12.0\n").unwrap();
+        fs::write(&fake, b"#!/bin/sh\necho axhub 0.15.3\n").unwrap();
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;

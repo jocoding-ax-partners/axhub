@@ -41,7 +41,7 @@ fn auth_ok_stdout() -> &'static str {
 
 fn happy_runner(cmd: &[&str]) -> SpawnResult {
     if cmd.contains(&"--version") {
-        ok("axhub 0.12.1\n")
+        ok("axhub 0.15.3\n")
     } else if cmd.contains(&"auth") && cmd.contains(&"status") {
         ok(auth_ok_stdout())
     } else {
@@ -120,7 +120,7 @@ fn parallel_walltime_is_bounded_by_slowest_cli_probe_not_sum() {
             std::thread::sleep(Duration::from_millis(80));
             active_cli_probes.fetch_sub(1, Ordering::SeqCst);
             if cmd.contains(&"--version") {
-                ok("axhub 0.12.1\n")
+                ok("axhub 0.15.3\n")
             } else {
                 ok(auth_ok_stdout())
             }

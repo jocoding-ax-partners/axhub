@@ -26,7 +26,7 @@ case "${1:-}" in
     if [ -n "${AXHUB_FIXTURE_VERSION:-}" ]; then
       echo "ax-hub-cli ${AXHUB_FIXTURE_VERSION} (commit fake, built fake, fake)"
     else
-      echo "ax-hub-cli 0.1.0-mock"
+      echo "ax-hub-cli 0.15.3-mock"
     fi
     exit 0
     ;;

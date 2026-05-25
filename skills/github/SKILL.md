@@ -166,9 +166,7 @@ echo "$PREFLIGHT_JSON"
 
       Re-list before connect if any create/push happened. If the repo is not listed for the account, stop on the unsupported gap and show the GitHub App install/access URL when available.
 
-4. **connect 는 consent 후 실행해요.** interactive 에서 device flow 가 승인까지 block 하니까, `/axhub:auth` Step 5b 와 동일하게 consent-mint 를 별도 호출로 분리한 뒤 connect 를 detach + tail 로 호출해서 verification URL 을 먼저 surface 해요. sync 호출하면 Claude Code 가 종료까지 출력을 buffer 해서 URL 이 안 보이고 OAuth 가 timeout 으로 멈춰요.
-
-   **4a. consent token 을 먼저 민어요** (별도 bash call — PreToolUse gate 가 다음 connect call 의 pending claim 을 검증해요):
+4. **connect 는 consent 후 실행해요.**
 
    ```bash
    APP_ID="${APP_ID:-$APP}"
@@ -179,78 +177,27 @@ echo "$PREFLIGHT_JSON"
    cat <<JSON | "$HELPER" consent-mint
    {"tool_call_id":"pending","action":"github_connect","app_id":"${APP_ID}","profile":"","branch":"${BRANCH}","commit_sha":"","context":{"repo":"${OWNER_REPO}","branch":"${BRANCH}","account":"${ACCOUNT}"}}
    JSON
+
+   axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json
    ```
 
-   `consent-mint` 에 `action=github_connect`, top-level `app_id`, `context={repo,branch,account}` 를 넣어요. `CLAUDE_PLUGIN_ROOT` 가 훅 환경에 없어도 PATH 의 `axhub-helpers` 로 민어요 — 사용자에게 수동 실행이나 bang-prefixed 우회를 요청하지 마세요.
+   `consent-mint` 에 `action=github_connect`, top-level `app_id`, `context={repo,branch,account}` 를 넣어요. `axhub apps git connect` 가 `--execute` 없이 호출되면 dry-run 이라 mutate 하지 않아요 — 실제 연결은 `--execute` 가 필요해요. GitHub App 설치 / installation 다중 후보가 있으면 CLI 가 자동 OAuth device flow 로 처리하고, 안 되면 install_url 을 emit 해요. `installation_id` 가 여러 개로 모호하면 `--installation-id <id>` 로 disambiguate 해요.
 
-   **4b. connect 를 detach 후 device challenge 먼저 surface.** challenge 의 verification URL + user_code 는 stderr(unbuffered) 로 나오니까 nohup detach + tail 로 즉시 잡혀요. `axhub apps git connect` 는 `--execute` 가 있어야 실제 연결돼요 (없으면 dry-run):
+   **OAuth device flow 가 시작되면 사용자에게 verification URL + user_code 를 즉시 보여주세요.** CLI 는 `device_code_issued` JSON event (`{user_code, verification_uri, verification_uri_complete}`) + stderr plain (`To connect GitHub, visit: <verification_uri>` / `Enter code: <user_code>` / `Or open directly: <verification_uri_complete>`) 를 emit 해요. JSON 이벤트나 stderr 한 줄도 사용자에게 안 보여주면 OAuth 가 timeout 으로 멈춰요. 다음 형식으로 사용자에게 한 번에 안내해요:
 
-   ```bash
-   APP_ID="${APP_ID:-$APP}"
-   GIT_LOG=$(mktemp -t axhub-gitconnect-XXXXXX)
-   nohup axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json >"$GIT_LOG" 2>&1 </dev/null &
-   GIT_PID=$!
-   disown 2>/dev/null || true
+   ```
+   GitHub OAuth 인증이 필요해요. 다음 두 단계를 진행해주세요:
 
-   URL=""; CODE=""; INSTALL_URL=""; DONE=""
-   for _ in $(seq 1 40); do
-     if [ -s "$GIT_LOG" ]; then
-       # verification_uri_complete (코드 자동입력 ?user_code=...) 를 우선, 없으면 basic verification_uri
-       URL=$(grep -oE 'https?://github\.com/login/device\?[A-Za-z0-9._~+%/?=#&-]+' "$GIT_LOG" | head -1)
-       [ -n "$URL" ] || URL=$(grep -oE 'https?://github\.com/login/device[A-Za-z0-9._~+%/?=#&-]*' "$GIT_LOG" | head -1)
-       CODE=$(grep -oE '[A-Z0-9]{4}-[A-Z0-9]{4}' "$GIT_LOG" | head -1)
-       INSTALL_URL=$(grep -oE '"install_url":"[^"]+"' "$GIT_LOG" | head -1 | sed 's/.*:"//; s/"$//')
-       DONE=$(grep -oE '"repo_full_name":"[^"]+"' "$GIT_LOG" | head -1 | sed 's/.*:"//; s/"$//')
-       { [ -n "$URL" ] && [ -n "$CODE" ]; } && break
-       [ -n "$INSTALL_URL" ] && break
-       [ -n "$DONE" ] && break
-     fi
-     kill -0 "$GIT_PID" 2>/dev/null || break
-     sleep 0.5
-   done
+   1. 브라우저에서 열기: <verification_uri_complete or verification_uri>
+   2. 코드 입력: <user_code>
 
-   # 프로세스가 빨리 끝나며(App 이미 설치 등) exit 시 flush 한 stdout 값을 마지막으로 한 번 더 긁어요
-   [ -z "$URL" ] && URL=$(grep -oE 'https?://github\.com/login/device[A-Za-z0-9._~+%/?=#&-]*' "$GIT_LOG" 2>/dev/null | head -1)
-   [ -z "$CODE" ] && CODE=$(grep -oE '[A-Z0-9]{4}-[A-Z0-9]{4}' "$GIT_LOG" 2>/dev/null | head -1)
-   [ -z "$INSTALL_URL" ] && INSTALL_URL=$(grep -oE '"install_url":"[^"]+"' "$GIT_LOG" 2>/dev/null | head -1 | sed 's/.*:"//; s/"$//')
-   [ -z "$DONE" ] && DONE=$(grep -oE '"repo_full_name":"[^"]+"' "$GIT_LOG" 2>/dev/null | head -1 | sed 's/.*:"//; s/"$//')
-
-   if [ -n "$URL" ] && [ -n "$CODE" ]; then
-     printf '\nGitHub OAuth 인증이 필요해요. 다음 두 단계를 진행해 주세요:\n\n  1. 브라우저에서 열기: %s\n  2. 코드 입력: %s\n\n완료되면 자동으로 연결돼요.\n[axhub] GIT_LOG=%s GIT_PID=%s APP_ID=%s (다음 step 확인에서 사용)\n' "$URL" "$CODE" "$GIT_LOG" "$GIT_PID" "$APP_ID"
-     exit 0
-   elif [ -n "$INSTALL_URL" ]; then
-     printf '\naxhub GitHub App 이 아직 설치 안 됐어요. 먼저 설치해 주세요:\n\n  %s\n\n설치 후 다시 연결을 시도해요.\n' "$INSTALL_URL"
-     exit 0
-   elif [ -n "$DONE" ]; then
-     printf 'GitHub 연결 완료: %s (device flow 불필요 — GitHub App 이 이미 설치돼 있었어요)\n' "$DONE"
-     exit 0
-   else
-     echo "device URL/code 를 20초 안에 추출 못 했어요. CLI 출력 형식이 바뀌었을 가능성. /axhub:doctor 로 진단해주세요."
-     tail -5 "$GIT_LOG" 2>/dev/null
-     kill "$GIT_PID" 2>/dev/null
-     exit 1
-   fi
    ```
 
-   `verification_uri_complete` 가 stderr 에 "Or open directly:" 로 같이 나오면 그 URL 을 1번에 우선 표시해요 (코드 자동 입력이라 2번 생략 가능). `installation_id` 가 여러 개로 모호하면 connect 에 `--installation-id <id>` 를 더해 재시도해요.
+   `verification_uri_complete` 가 있으면 우선 표시 (코드 입력 자동). 없으면 `verification_uri` + 별도 `user_code` 표시.
 
-   **4c. 승인 후 연결 결과를 확인해요.** device flow 를 surface 한 경우만 필요해요 (4b 가 이미 "연결 완료" 면 생략). 직전 step 의 `APP_ID` 로 `git status` 를 poll 해요 — 한 번에 최대 ~4.5분, 미완이면 이 step 을 다시 호출해요:
+   **컨텍스트별 완료 (axhub-cli 0.15.3+).** 대화형 TTY 면 connect 가 승인까지 polling 해서 자동으로 다음 단계로 진행돼요. 에이전트 / 비-TTY 컨텍스트면 connect 가 `device_code_issued` emit 직후 fast-exit 하므로 자동 진행이 안 돼요. challenge 를 보여준 뒤 멈추고, 사용자에게 "이 호출은 승인 완료를 polling 하지 않아요. 계속하려면 대화형 터미널에서 같은 `axhub apps git connect ... --execute` 흐름을 다시 시작해 새 device flow 를 완료해 주세요" 라고 안내해요. 이전 `user_code` 를 승인한 뒤 같은 에이전트 명령을 재호출해도 이어지지 않아요. CLI 가 internal `device_code` 를 노출하지 않기 때문이에요. 완전 autonomous 완료는 CLI 의 device_code persist resume 기능을 기다려요 (`docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md`).
 
-   ```bash
-   APP_ID="<직전 step 의 APP_ID>"
-   DEADLINE=$(( $(date +%s) + 270 ))
-   REPO=""
-   while [ "$(date +%s)" -lt "$DEADLINE" ]; do
-     REPO=$(axhub apps git status --app "$APP_ID" --json 2>/dev/null | jq -r '.data.repo_full_name // .repo_full_name // empty')
-     [ -n "$REPO" ] && break
-     sleep 4
-   done
-   if [ -n "$REPO" ]; then
-     printf 'GitHub 연결 완료: %s\n' "$REPO"
-   else
-     echo "아직 연결 확인이 안 돼요. 브라우저 승인을 마쳤는지 확인하고, 잠시 후 이 step 을 다시 호출해요."
-   fi
-   ```
+   `CLAUDE_PLUGIN_ROOT` 가 훅 환경에 없더라도 사용자에게 수동 실행이나 bang-prefixed connect 우회를 요청하지 말고, PATH 의 `axhub-helpers` 로 pending token 을 민 뒤 같은 흐름에서 top-level Bash 로 connect 를 실행해요.
 
 5. **disconnect 는 exact confirm 후 실행해요.**
 

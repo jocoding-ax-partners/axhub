@@ -24,7 +24,7 @@ set -euo pipefail
 trace="${SHIM_CASE_DIR}/argv.trace"
 printf '%s\n' "$*" >> "$trace"
 if [ "${1:-}" = "--version" ]; then
-  echo "axhub 0.10.2 (case35)"
+  echo "axhub 0.15.3 (case35)"
   exit 0
 fi
 if [ "${1:-}" = "auth" ] && [ "${2:-}" = "status" ] && [ "${3:-}" = "--json" ]; then

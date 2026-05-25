@@ -166,7 +166,7 @@ mod tests {
 
     fn happy_preflight() -> PreflightOutput {
         PreflightOutput {
-            cli_version: Some("0.12.1".to_string()),
+            cli_version: Some("0.15.3".to_string()),
             in_range: true,
             cli_too_old: false,
             cli_too_new: false,

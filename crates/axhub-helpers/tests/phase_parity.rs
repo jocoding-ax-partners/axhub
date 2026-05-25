@@ -255,7 +255,7 @@ fn preflight_semver_auth_and_exit_precedence_match_ts() {
     );
     let run = run_preflight_with_runner(|cmd| {
         match cmd {
-        ["axhub", "--version"] => SpawnResult { exit_code: EXIT_OK, stdout: "axhub 0.1.23".into(), stderr: String::new() },
+        ["axhub", "--version"] => SpawnResult { exit_code: EXIT_OK, stdout: "axhub 0.15.3".into(), stderr: String::new() },
         ["axhub", "auth", "status", "--json"] => SpawnResult { exit_code: EXIT_OK, stdout: r#"{"user_email":"u@example.com","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["deploy"]}"#.into(), stderr: String::new() },
         _ => SpawnResult { exit_code: 1, stdout: String::new(), stderr: String::new() },
     }
@@ -285,10 +285,7 @@ fn preflight_semver_auth_and_exit_precedence_match_ts() {
 
 #[test]
 fn preflight_admits_0_x_line_and_rejects_1_0_exclusive_max() {
-    for version in [
-        "0.1.0", "0.5.0", "0.7.5", "0.9.0", "0.10.2", "0.11.0", "0.12.1", "0.13.0", "0.14.0",
-        "0.15.2",
-    ] {
+    for version in ["0.15.3", "0.15.4", "0.16.0"] {
         let run = run_preflight_with_runner(|cmd| {
             match cmd {
             ["axhub", "--version"] => SpawnResult {
@@ -312,6 +309,26 @@ fn preflight_admits_0_x_line_and_rejects_1_0_exclusive_max() {
         assert!(run.output.in_range, "version {version}");
         assert!(!run.output.cli_too_new, "version {version}");
     }
+
+    let too_old = run_preflight_with_runner(|cmd| match cmd {
+        ["axhub", "--version"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: "axhub 0.15.2".into(),
+            stderr: String::new(),
+        },
+        ["axhub", "auth", "status", "--json"] => SpawnResult {
+            exit_code: EXIT_OK,
+            stdout: r#"{"user_email":"u@example.com","scopes":["read"]}"#.into(),
+            stderr: String::new(),
+        },
+        _ => SpawnResult {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr: String::new(),
+        },
+    });
+    assert_eq!(too_old.exit_code, EXIT_USAGE);
+    assert!(too_old.output.cli_too_old);
 
     let too_new = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
@@ -370,7 +387,7 @@ fn preflight_covers_auth_shapes_env_cache_and_cli_absence() {
     let auth_expired = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: EXIT_OK,
-            stdout: "axhub 0.1.5".into(),
+            stdout: "axhub 0.15.3".into(),
             stderr: String::new(),
         },
         ["axhub", "auth", "status", "--json"] => SpawnResult {
@@ -405,7 +422,7 @@ fn preflight_covers_auth_shapes_env_cache_and_cli_absence() {
     let default_plugin_version = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: EXIT_OK,
-            stdout: "axhub 0.1.5".into(),
+            stdout: "axhub 0.15.3".into(),
             stderr: String::new(),
         },
         ["axhub", "auth", "status", "--json"] => SpawnResult {
@@ -487,7 +504,7 @@ fn preflight_current_app_prefers_env_manifest_then_cache() {
     let ok_runner = |cmd: &[&str]| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: EXIT_OK,
-            stdout: "axhub 0.1.5".into(),
+            stdout: "axhub 0.15.3".into(),
             stderr: String::new(),
         },
         ["axhub", "auth", "status", "--json"] => SpawnResult {
@@ -556,7 +573,7 @@ fn preflight_uses_xdg_cache_home_for_last_deploy_cache() {
     let run = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: EXIT_OK,
-            stdout: "axhub 0.1.5".into(),
+            stdout: "axhub 0.15.3".into(),
             stderr: String::new(),
         },
         ["axhub", "auth", "status", "--json"] => SpawnResult {
