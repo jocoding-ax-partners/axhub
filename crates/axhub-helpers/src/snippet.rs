@@ -120,8 +120,15 @@ impl SnippetArgs {
 
 fn render(args: &SnippetArgs) -> Result<String, String> {
     let lang = args.language.to_ascii_lowercase();
-    if args.target == "local-bash" || lang == "shell" {
-        return Ok(render_local_bash(args));
+    let is_shell = matches!(lang.as_str(), "shell" | "bash" | "sh");
+    if args.target == "local-bash" {
+        if is_shell {
+            return Ok(render_local_bash(args));
+        }
+        return Err(
+            "target local-bash only supports shell snippets; use a local-* HTTP target for other languages"
+                .to_string(),
+        );
     }
 
     match (args.mode.as_str(), lang.as_str()) {
@@ -131,6 +138,7 @@ fn render(args: &SnippetArgs) -> Result<String, String> {
             Ok(render_mode_b_typescript(args))
         }
         ("B", "go") | ("B", "golang") => Ok(render_mode_b_go(args)),
+        ("B", "shell") | ("B", "bash") | ("B", "sh") => Ok(render_mode_b_shell(args)),
         _ => Err(format!(
             "unsupported mode/language combination: mode={} language={}",
             args.mode, args.language
@@ -180,6 +188,7 @@ export async function readAxhubData() {{
 }
 
 fn render_mode_b_python(args: &SnippetArgs) -> String {
+    let connector = py_string(&url_encode(&args.connector));
     let path = py_string(&url_encode(&args.path));
     let sql = py_string(&args.sql);
     let tenant_comment = args
@@ -197,7 +206,7 @@ import requests
 AXHUB_BASE_URL = os.environ.get("AXHUB_BASE_URL", {base_url})
 AXHUB_PAT = os.environ["AXHUB_PAT"]
 
-url = f"{{AXHUB_BASE_URL}}/api/v1/catalog/{connector}/" + {path} + ":read"
+url = f"{{AXHUB_BASE_URL}}/api/v1/catalog/" + {connector} + "/" + {path} + ":read"
 response = requests.post(
     url,
     headers={{"Content-Type": "application/json", "X-Api-Key": AXHUB_PAT}},
@@ -210,7 +219,7 @@ print(response.json())
         metadata = metadata(args),
         tenant_comment = tenant_comment,
         base_url = py_string(&args.base_url),
-        connector = args.connector,
+        connector = connector,
         path = path,
         sql = sql,
         row_limit = args.row_limit
@@ -286,6 +295,32 @@ func main() {{
         connector = url_encode(&args.connector),
         encoded_path = url_encode(&args.path),
         body = go_string(&body)
+    )
+}
+
+fn render_mode_b_shell(args: &SnippetArgs) -> String {
+    let body = json!({ "sql": args.sql, "row_limit": args.row_limit }).to_string();
+    format!(
+        r#"# axhub data snippet
+# {metadata}
+# Auth: export AXHUB_PAT; send it as X-Api-Key. Do not hardcode PATs.
+AXHUB_BASE_URL="${{AXHUB_BASE_URL:-}}"
+if [ -z "$AXHUB_BASE_URL" ]; then
+  AXHUB_BASE_URL={base_url}
+fi
+: "${{AXHUB_PAT:?Missing AXHUB_PAT}}"
+
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: $AXHUB_PAT" \
+  "$AXHUB_BASE_URL/api/v1/catalog/{connector}/{encoded_path}:read" \
+  --data {body}
+"#,
+        metadata = metadata(args),
+        base_url = shell_single(&args.base_url),
+        connector = url_encode(&args.connector),
+        encoded_path = url_encode(&args.path),
+        body = shell_single(&body)
     )
 }
 

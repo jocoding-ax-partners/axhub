@@ -20,6 +20,9 @@ describe("data SKILL contract", () => {
     expect(skill).toContain("axhub catalog search --json --limit 200");
     expect(skill).toContain("catalog invoke");
     expect(skill).toContain("--execute --json");
+    expect(skill).toContain("catalog context 를 처음 만들까요?");
+    expect(skill).toContain("Skip sync");
+    expect(skill).toContain("Create context");
   });
 
   test("data skill documents live-read consent and no governance/path guessing rules", () => {
@@ -30,6 +33,16 @@ describe("data SKILL contract", () => {
     expect(skill).toContain("NEVER governance");
     expect(skill).toContain("NEVER path guessing");
     expect(skill).toContain("NEVER retry denied");
+  });
+});
+
+describe("data AskUserQuestion safe defaults", () => {
+  test("first catalog sync defaults to no workspace mutation in non-interactive mode", () => {
+    const registry = JSON.parse(read("tests/fixtures/ask-defaults/registry.json"));
+    const firstSync = registry.data["catalog context 를 처음 만들까요?"];
+    expect(firstSync.safe_default).toBe("Skip sync");
+    expect(firstSync.allowed_safe_defaults).toContain("Create context");
+    expect(firstSync.rationale).toContain(".gitignore");
   });
 });
 

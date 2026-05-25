@@ -100,6 +100,43 @@ fn snippet_mode_b_python_uses_x_api_key_env_without_literal_pat_or_bearer() {
 }
 
 #[test]
+fn snippet_mode_b_python_encodes_connector_without_f_string_injection() {
+    let output = run(&[
+        "snippet",
+        "--mode",
+        "B",
+        "--language",
+        "python",
+        "--target",
+        "local-python",
+        "--connector",
+        "{os.system('id')}",
+        "--path",
+        "analytics/orders",
+        "--sql",
+        "SELECT id FROM orders",
+        "--allowed-columns",
+        "id",
+    ]);
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr={}",
+        stderr_text(&output)
+    );
+    let stdout = stdout_text(&output);
+    assert!(
+        stdout.contains("%7Bos.system%28%27id%27%29%7D"),
+        "stdout={stdout}"
+    );
+    assert!(
+        !stdout.contains("/{os.system"),
+        "connector must not be injected into a Python f-string: {stdout}"
+    );
+}
+
+#[test]
 fn snippet_local_bash_prefers_cli_keychain_backed_invoke() {
     let output = run(&[
         "snippet",
@@ -133,6 +170,40 @@ fn snippet_local_bash_prefers_cli_keychain_backed_invoke() {
     assert!(!stdout.contains("X-Api-Key"));
 }
 
+#[test]
+fn snippet_shell_for_non_local_bash_uses_pat_curl_not_cli_keychain() {
+    let output = run(&[
+        "snippet",
+        "--mode",
+        "B",
+        "--language",
+        "shell",
+        "--target",
+        "local-python",
+        "--connector",
+        "snowflake",
+        "--path",
+        "analytics/orders",
+        "--sql",
+        "SELECT id FROM orders",
+        "--allowed-columns",
+        "id",
+    ]);
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr={}",
+        stderr_text(&output)
+    );
+    let stdout = stdout_text(&output);
+    assert!(stdout.contains("curl -sS -X POST"));
+    assert!(stdout.contains("X-Api-Key: $AXHUB_PAT"));
+    assert!(stdout.contains("AXHUB_PAT:?Missing AXHUB_PAT"));
+    assert!(!stdout.contains("axhub catalog invoke"));
+    assert!(!stdout.contains("uses local axhub CLI/keychain"));
+}
+
 #[cfg(unix)]
 fn write_fake_axhub(dir: &std::path::Path) -> std::path::PathBuf {
     use std::os::unix::fs::PermissionsExt;
@@ -160,7 +231,7 @@ JSON
 fi
 if [ "$1" = "auth" ] && [ "$2" = "pat" ] && [ "$3" = "whoami" ]; then
   cat <<'JSON'
-{"source":"env:AXHUB_PAT","fingerprint":"fp_123"}
+{"source":"env:AXHUB_PAT","fingerprint":"fp_123","access_token":"axhub_pat_secret_should_not_persist_1234567890","nested":{"token":"axhub_pat_nested_should_not_persist_1234567890"}}
 JSON
   exit 0
 fi
@@ -251,6 +322,16 @@ fn sync_writes_git_root_catalog_with_private_snapshot_and_gitignore() {
     assert_eq!(catalog["target"], "local-python");
     assert_eq!(catalog["principal"]["tenant_id"], "ten_1");
     assert_eq!(catalog["principal"]["user_email"], "dev@example.com");
+    assert_eq!(catalog["pat"]["fingerprint"], "fp_123");
+    let catalog_raw = std::fs::read_to_string(&catalog_path).unwrap();
+    assert!(
+        !catalog_raw.contains("axhub_pat_"),
+        "raw PAT values must not be persisted: {catalog_raw}"
+    );
+    assert!(
+        !catalog_raw.contains("access_token"),
+        "secret PAT fields must not be persisted: {catalog_raw}"
+    );
     assert_eq!(
         catalog["resources"][0]["permissions"]["read"]["allowed_columns"][1],
         "total"
