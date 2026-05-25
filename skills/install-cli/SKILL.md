@@ -1,6 +1,6 @@
 ---
 name: install-cli
-description: '이 스킬은 사용자가 axhub CLI 가 설치되지 않은 상태에서 자동 설치를 요청할 때 사용해요. 다음 표현에서 활성화: "자동 설치", "ax-hub-cli 설치", "axhub 설치", "axhub cli 설치", "axhub CLI 설치", "cli 설치", "CLI 설치", "auto install", "axhub install", "install axhub", "install cli", 또는 axhub CLI 부재 상태에서 doctor / deploy 가 routing 한 install 의도. OS 감지 후 공식 채널 (curl install.sh / irm install.ps1 / Homebrew / Scoop) 중 하나로 설치하고 axhub --version 으로 검증해요.'
+description: '이 스킬은 사용자가 axhub CLI 가 설치되지 않은 상태에서 자동 설치를 요청할 때 사용해요. 다음 표현에서 활성화: "자동 설치", "ax-hub-cli 설치", "axhub 설치", "axhub cli 설치", "axhub CLI 설치", "cli 설치", "CLI 설치", "auto install", "axhub install", "install axhub", "install cli", 또는 axhub CLI 부재 상태에서 doctor / deploy 가 routing 한 install 의도. OS 감지 후 공식 installer (curl install.sh / irm install.ps1) 로 설치하고 axhub --version 으로 검증해요. Homebrew/Scoop 등 패키지 매니저 채널은 미지원.'
 examples:
   - utterance: "자동 설치"
     intent: "install axhub CLI binary"
@@ -20,7 +20,7 @@ model: sonnet
 
 # Install CLI (ax-hub-cli auto-installer)
 
-axhub CLI 가 설치되지 않았을 때 OS 별 공식 채널로 자동 설치해요. 설치 후 `axhub --version` 으로 검증하고 다음 단계 (`로그인해줘`) 로 안내해요.
+axhub CLI 가 설치되지 않았을 때 공식 installer (`cli.jocodingax.ai`) 로 자동 설치해요. Homebrew/Scoop 등 패키지 매니저 채널은 사용하지 않아요 — 공식 installer 단일 채널이에요 (패키지 매니저 채널은 갱신이 늦어 구버전 client_id 로 로그인 실패 위험). 설치 후 `axhub --version` 으로 검증하고 다음 단계 (`로그인해줘`) 로 안내해요.
 
 ## Workflow
 
@@ -63,18 +63,21 @@ To install ax-hub-cli on the user's host:
 
    **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — 설치 채널 → `manual` (subprocess 에서 자동 install 안 해요, 안내만).
 
-   macOS 옵션:
+   axhub 는 공식 installer (`cli.jocodingax.ai`) **단일 채널**로만 배포해요. Homebrew/Scoop
+   같은 패키지 매니저 채널은 사용하지 않아요 (구버전 client_id 로 로그인 실패 위험). 아래는
+   "자동 실행 vs 수동 안내" 확인용이에요.
+
+   macOS / Linux 옵션:
 
    ```json
    {
      "questions": [{
-       "question": "axhub CLI 어떤 채널로 설치해요?",
-       "header": "설치 채널",
+       "question": "axhub CLI 를 공식 installer 로 설치할까요?",
+       "header": "설치 방법",
        "multiSelect": false,
        "options": [
-         {"label": "1. 공식 installer (Recommended)", "description": "curl https://cli.jocodingax.ai/install.sh | bash"},
-         {"label": "2. Homebrew", "description": "brew install jocoding-ax-partners/tap/axhub"},
-         {"label": "3. 수동 안내", "description": "설치 명령어만 보고 직접 실행"}
+         {"label": "1. 공식 installer 자동 실행 (Recommended)", "description": "curl https://cli.jocodingax.ai/install.sh | bash"},
+         {"label": "2. 수동 안내", "description": "설치 명령어만 보고 직접 실행"}
        ]
      }]
    }
@@ -85,73 +88,21 @@ To install ax-hub-cli on the user's host:
    ```json
    {
      "questions": [{
-       "question": "axhub CLI 어떤 채널로 설치해요?",
-       "header": "설치 채널",
+       "question": "axhub CLI 를 공식 installer 로 설치할까요?",
+       "header": "설치 방법",
        "multiSelect": false,
        "options": [
-         {"label": "1. 공식 installer (Recommended)", "description": "irm https://cli.jocodingax.ai/install.ps1 | iex"},
-         {"label": "2. Scoop", "description": "scoop bucket add jocoding-ax-partners + scoop install axhub"},
-         {"label": "3. 수동 안내", "description": "설치 명령어만 보고 직접 실행"}
-       ]
-     }]
-   }
-   ```
-
-   Linux 옵션 (macOS 와 동일하되 Homebrew 대신 official installer 만):
-
-   ```json
-   {
-     "questions": [{
-       "question": "axhub CLI 어떤 채널로 설치해요?",
-       "header": "설치 채널",
-       "multiSelect": false,
-       "options": [
-         {"label": "1. 공식 installer (Recommended)", "description": "curl https://cli.jocodingax.ai/install.sh | bash"},
+         {"label": "1. 공식 installer 자동 실행 (Recommended)", "description": "irm https://cli.jocodingax.ai/install.ps1 | iex"},
          {"label": "2. 수동 안내", "description": "설치 명령어만 보고 직접 실행"}
        ]
      }]
    }
    ```
 
-3.5. **Validate package manager presence (brew/scoop 선택했을 때만).** 패키지 매니저 옵션을 골랐을 경우, 실행 직전에 해당 매니저가 설치돼 있는지 확인.
-
-    - Homebrew 선택 시:
-      ```bash
-      command -v brew >/dev/null 2>&1 || echo "brew-missing"
-      ```
-    - Scoop 선택 시:
-      ```powershell
-      Get-Command scoop -ErrorAction SilentlyContinue
-      ```
-
-    매니저 부재 시 사용자에게 한국어로 안내하고 공식 installer 로 자동 전환 제안. 두 옵션 제시:
-
-    macOS (brew 부재):
-
-    ```
-    brew 가 설치되어 있지 않아요. 두 가지 방법 중 골라주세요:
-      1. 공식 installer 로 axhub 설치 (Recommended) — brew 없이도 가능
-         (curl -fsSL https://cli.jocodingax.ai/install.sh | bash)
-      2. brew 먼저 설치 후 axhub — https://brew.sh 안내
-    ```
-
-    Windows (scoop 부재):
-
-    ```
-    scoop 이 설치되어 있지 않아요. 두 가지 방법 중 골라주세요:
-      1. 공식 installer 로 axhub 설치 (Recommended) — scoop 없이도 가능
-         (irm https://cli.jocodingax.ai/install.ps1 | iex)
-      2. scoop 먼저 설치 후 axhub — https://scoop.sh 안내
-    ```
-
-    AskUserQuestion 으로 처리하거나, 사용자가 즉시 답한 의도가 명확하면 (예: "brew 깔게요" / "공식꺼") 그대로 따름. 매니저 설치 책임은 사용자에게 — SKILL 이 brew / scoop 자체를 자동 설치하지 않아요 (supply-chain scope 위반).
-
 4. **Run installer (consent 받은 후).** 사용자가 직접 실행하도록 명령어를 안내하거나 (`! ` prefix), 또는 SKILL 이 Bash tool 로 실행. 두 흐름 모두 사용자가 의식적으로 confirm 한 후만.
 
    - macOS / Linux 공식: `! curl -fsSL https://cli.jocodingax.ai/install.sh | bash`
-   - Homebrew: `! brew install jocoding-ax-partners/tap/axhub`
    - Windows 공식: `! powershell -NoProfile -Command "irm https://cli.jocodingax.ai/install.ps1 | iex"`
-   - Scoop: `! powershell -NoProfile -Command "scoop bucket add jocoding-ax-partners https://github.com/jocoding-ax-partners/scoop-bucket; scoop install axhub"`
    - 수동 안내: 위 명령어 중 적절한 것을 출력만 하고 종료. 사용자에게 직접 실행 후 "설치 끝났어" 라고 말해달라고 안내.
 
 5. **Post-install verify.**
@@ -190,7 +141,7 @@ To install ax-hub-cli on the user's host:
 - NEVER `cli.jocodingax.ai` 외 다른 도메인의 install script 실행. supply chain 신뢰 채널 한정.
 - NEVER pre-existing CLI 덮어쓰기. Step 2 race check 필수.
 - NEVER 설치 도중 helper preflight 호출 — CLI 부재 상태로 fire 되므로 무한 루프.
-- NEVER brew / scoop 자체를 자동 설치. 패키지 매니저 부재 시 공식 installer 로 전환하거나 사용자가 직접 패키지 매니저 설치하도록 안내. supply-chain scope 한정.
+- NEVER Homebrew / Scoop 등 패키지 매니저 채널로 설치 안내. axhub 는 공식 installer (`cli.jocodingax.ai`) 단일 채널만 지원해요 — 패키지 매니저 채널은 갱신 지연으로 구버전 client_id 가 배포돼 로그인이 `invalid_client` 로 실패할 수 있어요.
 
 ## Additional Resources
 
