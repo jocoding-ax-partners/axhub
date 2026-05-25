@@ -14,6 +14,12 @@ examples:
     intent: "scaffold new axhub app"
   - utterance: "빈 디렉토리"
     intent: "scaffold new axhub app"
+  - utterance: "그걸로 앱 만들고 싶어"
+    intent: "scaffold new axhub app"
+  - utterance: "이제 앱 만들어줘"
+    intent: "scaffold new axhub app"
+  - utterance: "그거로 앱 만들어줘"
+    intent: "scaffold new axhub app"
 multi-step: true
 needs-preflight: false
 allows-dependency-execution: false
@@ -53,6 +59,8 @@ raw helper JSON 이 디버깅에 필요한 환경 (개발 검증) 은 `AXHUB_INI
 ## Workflow
 
 To start an axhub app:
+
+**이 SKILL 이 앱 생성 전체를 담당해요.** "앱 만들어줘" / "그걸로 앱 만들고 싶어" 류 발화에 generic 한 스택/데이터-fetch 질문 (예: "어떤 스택으로 만들까요?", "데이터를 어떻게 가져올까요?") 을 즉석에서 만들지 말고, 반드시 아래 Step 1-8 template flow 를 따라요. 스택 선택은 Step 3 (backend template registry), 데이터 접근은 Step 8 의 `@ax-hub/sdk` 안내로 처리해요.
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
 
@@ -241,6 +249,10 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    2. 로컬 실행 — README 의 dev 스크립트 (`npm run dev` 등)
    3. 배포 상태 보기 — `/axhub:status` (방금 만든 첫 배포 진행 상황)
    4. 다음 배포 — 코드 수정 후 `/axhub:deploy`
+   5. 데이터 읽기 — axhub API 를 raw fetch 로 직접 부르지 말고 template 에 설치된 @ax-hub/sdk 를 써요.
+      import { AxHubClient } from '@ax-hub/sdk' 로 client 만든 뒤
+      sdk.tenant(...).app(...).data.discover('<table>') 로 읽어요.
+      전체 사용법: https://www.npmjs.com/package/@ax-hub/sdk
    ```
 
    `error_code` 로 saga 가 실패했으면 다음 routing 을 써요:
