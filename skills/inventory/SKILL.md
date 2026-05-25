@@ -78,29 +78,60 @@ echo "$PREFLIGHT_JSON"
 
 4. **F4 privacy 필터.** 모든 family 응답에서 `team_id != $TEAM_ID` 항목 drop. tenants 자체는 사용자 멤버십 기준이라 filter 면제.
 
-5. **한국어 compact 렌더 (해요체).** 다음 형태로 한 응답에 출력해요:
+5. **한국어 테이블 렌더 (해요체).** 결과를 **코드 펜스 없이 GFM markdown 테이블**로 출력해요 (터미널이 정렬된 표로 렌더해요 — 펜스로 감싸면 raw `|` 텍스트로 깨져요). 머리말 한 줄 뒤에 표 2~3개를 순서대로 그려요.
 
-   ```
-   접근 가능 리소스 (team=<slug>):
+   머리말: `## 접근 가능 리소스 — team=<slug>`
 
-   ▸ Identity
-     • 팀(tenants): 2개  → <slug1>, <slug2>
-     • 앱(apps): 5개      → paydrop, checkout, mobile (+2)
-     • 멤버(members): 8명 (admin 2 / member 6)
+   **표 1 · Identity** (요약, 3행 고정):
 
-   ▸ Gateway
-     • Engines: 4 — postgres, bigquery, snowflake, redshift
-     • Connectors: 3 — bigquery-prod, postgres-prod, snowflake
-     • Resources: 47 (page 1) — top3: hr.employees, sales.orders, finance.ledger
-     • Catalog kinds: 12 — table, view, function, stream, …
-
-   ▸ 앱별 자원 (drill-down)
-     • 환경(env) / 테이블(tables) / API(apis) 는 앱 단위라 /axhub:apps 로 앱 고른 뒤 각 SKILL 호출해주세요.
-
-   자세히: /axhub:apps · /axhub:env · /axhub:github · /axhub:deploy
+   ```markdown
+   | 리소스 | 개수 | 상세 |
+   |---|---|---|
+   | 팀 (tenants) | 2개 | acme (admin), globex (member) |
+   | 앱 (apps) | 5개 | paydrop, checkout, mobile, web, admin |
+   | 멤버 (members) | 8명 | admin 2 · member 6 |
    ```
 
-   각 family 가 0개면 `0개` 로 표기하고 줄 유지. 7개 모두 실패면 종합 안내 한 줄 출력 후 종료.
+   **표 2 · Gateway** (요약, 4행 고정 — 개수를 한눈에):
+
+   ```markdown
+   | 리소스 | 개수 | 상세 |
+   |---|---|---|
+   | Engines | 4개 | postgres-table, postgres-column, mysql-table … |
+   | Connectors | 2개 | axhub-qa-pg (postgres), axhub-qa-mysql (mysql) |
+   | Resources | 6개 | 아래 표 3 참고 |
+   | Catalog kinds | 4개 | mysql-table, mysql-column, postgres-table … |
+   ```
+
+   **표 3 · Resources 상세** (resources 가 1개 이상일 때만 그려요, 최대 15행):
+
+   ```markdown
+   | 이름 | 커넥터 | kind | 경로 |
+   |---|---|---|---|
+   | employees | axhub-qa-mysql | mysql-table | 공개/employees |
+   | orders | axhub-qa-pg | postgres-table | sales/orders |
+   ```
+
+   15행 초과면 마지막에 overflow 행을 더해요: `| … N개 더 | | | /axhub:apps 로 확인 |`
+
+   표 뒤 안내 두 줄:
+
+   - `앱별 자원(env · tables · apis)은 앱 단위라 /axhub:apps 로 앱 고른 뒤 해당 SKILL 호출해요.`
+   - `자세히 → /axhub:apps · /axhub:env · /axhub:github · /axhub:deploy`
+
+   **셀 규칙.** 상세 셀은 50자 이하로 유지해요 (넘으면 터미널이 줄바꿈해서 표가 깨져요). 표 1·2 상세 셀은 항목을 앞에서부터 채우고 50자를 넘으면 `…` 로 줄여요. 개수는 정확히, 상세는 담을 수 있는 만큼만 담아요.
+
+   **실패·빈 family 처리** (행은 항상 유지해요):
+
+   | 상황 | 상세 셀 표기 |
+   |---|---|
+   | 0개 | 개수 `0개`, 상세 빈칸 |
+   | 미인증 (65) | `(미인증 — /axhub:auth)` |
+   | admin 부족 (67) | `(관리자 인증 — /axhub:auth login)` |
+   | scope 외 (68) | `(scope 외)` |
+   | 기타 오류 | `(조회 불가 — exit N)` |
+
+   7 family 모두 실패면 표 대신 종합 안내 한 줄 출력 후 종료해요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 은 대화형 질문 prompt 를 호출하지 않아요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 와 대화형 환경 모두에서 동일하게 동작해요. `tests/fixtures/ask-defaults/registry.json` 의 inventory 항목은 no-op stub (질문 없음).
 
