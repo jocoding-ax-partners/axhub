@@ -43,7 +43,7 @@ model: sonnet
 | Step 4 앱 이름 입력 | "앱 이름을 정해요." |
 | Step 5 bootstrap dry-run | "어떤 작업을 할지 미리 보여줘요." |
 | Step 6 사용자 동의 | "지금 만들고 배포까지 한 번에 진행해요." |
-| Step 7 bootstrap execute + watch | "앱 만들고, GitHub repo 만들고, 첫 배포까지 진행 중이에요. 보통 2~5분 정도 걸려요." |
+| Step 7 bootstrap execute + 진행 poll | "앱 만들고, GitHub repo 만들고, 첫 배포까지 진행 중이에요. 보통 2~5분 정도 걸려요." |
 | Step 7a GitHub 연결 필요 (saga 에서 `device_code_issued` 발생 시) | "GitHub 연결이 필요해요. 브라우저에서 `{verification_uri}` 열고 코드 `{user_code}` 를 입력해 주세요. 승인하면 자동으로 진행돼요." |
 | Step 8 git clone | "코드를 현재 폴더로 가져와요." |
 | Step 9 결과 안내 | "끝났어요. 이렇게 시작하면 돼요." |
@@ -174,46 +174,96 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    }
    ```
 
-   동의 받으면 saga 를 실행해요:
+   동의 받으면 saga 를 실행해요. **interactive 에서는 GitHub installation 해석이 saga 시작 *전*에 device flow 를 띄우고 승인까지 block 하니까, `/axhub:auth` Step 5b 와 동일하게 detach + tail 로 challenge 를 먼저 surface 해요.** sync 로 호출하면 Claude Code 가 명령 종료까지 출력을 buffer 해서 verification URL 이 안 보여요 (사용자는 멈춘 줄 알고 오래 대기).
+
+   **6a. Detach 후 device challenge 먼저 surface.** `--watch` 를 쓰지 마세요 — watch 는 중간 stage 를 stream 안 하고 `bootstrap_id` 도 종료까지 숨겨서 challenge 가 buffer 에 갇혀요. no-watch 로 detach 하면 resolve(device flow) → `start_bootstrap` → `bootstrap_id` 출력 후 종료해요. challenge 의 verification URL + user_code 는 stderr(unbuffered) 로 나오니까 tail 로 즉시 잡혀요:
 
    ```bash
-   if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then WATCH=--watch; else WATCH=; fi
-   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --yes $WATCH --json
+   if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]; then
+     # D1 non-interactive guard: 승인할 사람이 없는 subprocess 는 challenge emit 후 즉시 exit (block 안 함)
+     axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --yes --non-interactive --json
+     exit $?
+   fi
+
+   BOOT_LOG=$(mktemp -t axhub-init-XXXXXX)
+   nohup axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --yes --json >"$BOOT_LOG" 2>&1 </dev/null &
+   BOOT_PID=$!
+   disown 2>/dev/null || true
+
+   URL=""; CODE=""; INSTALL_URL=""; BOOTSTRAP_ID=""
+   for _ in $(seq 1 40); do
+     if [ -s "$BOOT_LOG" ]; then
+       # verification_uri_complete (코드 자동입력 ?user_code=...) 를 우선, 없으면 basic verification_uri
+       URL=$(grep -oE 'https?://github\.com/login/device\?[A-Za-z0-9._~+%/?=#&-]+' "$BOOT_LOG" | head -1)
+       [ -n "$URL" ] || URL=$(grep -oE 'https?://github\.com/login/device[A-Za-z0-9._~+%/?=#&-]*' "$BOOT_LOG" | head -1)
+       CODE=$(grep -oE '[A-Z0-9]{4}-[A-Z0-9]{4}' "$BOOT_LOG" | head -1)
+       INSTALL_URL=$(grep -oE '"install_url":"[^"]+"' "$BOOT_LOG" | head -1 | sed 's/.*:"//; s/"$//')
+       BOOTSTRAP_ID=$(grep -oE '"bootstrap_id":"[^"]+"' "$BOOT_LOG" | head -1 | sed 's/.*:"//; s/"$//')
+       { [ -n "$URL" ] && [ -n "$CODE" ]; } && break
+       [ -n "$INSTALL_URL" ] && break
+       [ -n "$BOOTSTRAP_ID" ] && break
+     fi
+     kill -0 "$BOOT_PID" 2>/dev/null || break
+     sleep 0.5
+   done
+
+   # 프로세스가 빨리 끝나며(App 이미 설치 등) exit 시 flush 한 stdout 값을 마지막으로 한 번 더 긁어요
+   [ -z "$URL" ] && URL=$(grep -oE 'https?://github\.com/login/device[A-Za-z0-9._~+%/?=#&-]*' "$BOOT_LOG" 2>/dev/null | head -1)
+   [ -z "$CODE" ] && CODE=$(grep -oE '[A-Z0-9]{4}-[A-Z0-9]{4}' "$BOOT_LOG" 2>/dev/null | head -1)
+   [ -z "$INSTALL_URL" ] && INSTALL_URL=$(grep -oE '"install_url":"[^"]+"' "$BOOT_LOG" 2>/dev/null | head -1 | sed 's/.*:"//; s/"$//')
+   [ -z "$BOOTSTRAP_ID" ] && BOOTSTRAP_ID=$(grep -oE '"bootstrap_id":"[^"]+"' "$BOOT_LOG" 2>/dev/null | head -1 | sed 's/.*:"//; s/"$//')
+
+   if [ -n "$URL" ] && [ -n "$CODE" ]; then
+     printf '\nGitHub 연결이 필요해요. 다음 단계로 진행해 주세요:\n\n  1. 브라우저에서 열기: %s\n  2. 코드 입력: %s\n  3. axhub GitHub App 설치 승인\n\n승인하면 자동으로 다음 단계로 넘어가요.\n[axhub] BOOT_LOG=%s BOOT_PID=%s (다음 step poll 에서 사용)\n' "$URL" "$CODE" "$BOOT_LOG" "$BOOT_PID"
+     exit 0
+   elif [ -n "$INSTALL_URL" ]; then
+     printf '\naxhub GitHub App 이 아직 설치 안 됐어요. 먼저 설치해 주세요:\n\n  %s\n\n설치 후 다시 /axhub:init 를 호출하면 이어서 진행해요.\n' "$INSTALL_URL"
+     exit 0
+   elif [ -n "$BOOTSTRAP_ID" ]; then
+     printf '앱 만들고 있어요. (GitHub App 이 이미 설치돼서 device flow 는 건너뛰었어요)\n[axhub] BOOT_LOG=%s BOOTSTRAP_ID=%s (다음 step poll 에서 사용)\n' "$BOOT_LOG" "$BOOTSTRAP_ID"
+     exit 0
+   else
+     echo "device URL/code 를 20초 안에 추출 못 했어요. CLI 출력 형식이 바뀌었을 가능성. /axhub:doctor 로 진단해주세요."
+     tail -5 "$BOOT_LOG" 2>/dev/null
+     kill "$BOOT_PID" 2>/dev/null
+     exit 1
+   fi
    ```
 
-   **Non-interactive guard:** subprocess (`$CI` / `$CLAUDE_NON_INTERACTIVE` / no TTY) 에서는 `--watch` 가 무한 block 돼서 SKILL 이 hang 해요. WATCH 변수가 비면 `--watch` 가 빠진 채로 saga 만 시작하고, 그 뒤 별도 `axhub apps bootstrap-status` 호출로 진행을 따라가요:
+   challenge 는 raw JSON 말고 위 humanize 형식으로만 보여줘요. stderr 에 "Or open directly:" 로 `verification_uri_complete` 가 같이 나오면 그 URL 을 1번에 우선 표시해요 (코드 자동 입력이라 2번 생략 가능).
+
+   **6b. 승인 + saga 완료 poll.** 직전 step 이 출력한 `BOOT_LOG` (있으면 `BOOTSTRAP_ID` 도) 를 아래 스크립트에 그대로 넣어요 — shell 변수는 bash call 사이에 유지 안 돼요. 사용자가 브라우저 승인을 마치면 detached 프로세스가 `bootstrap_id` 를 `BOOT_LOG` 에 쓰고 종료해요. one-shot `bootstrap-status` 를 반복 poll 해요 (`--watch` 는 출력을 buffer 하니까 안 써요). 한 번에 최대 ~4.5분만 돌고, 미완이면 이 step 을 다시 호출해요:
 
    ```bash
-   BOOTSTRAP_ID=$(echo "$ACCEPTED_JSON" | jq -r '.data.bootstrap_id')
-   axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --json
+   BOOT_LOG="<직전 step 의 BOOT_LOG>"
+   BOOTSTRAP_ID="<직전 step 의 BOOTSTRAP_ID, 없으면 빈 값>"
+   DEADLINE=$(( $(date +%s) + 270 ))
+   FINAL_JSON=""; STATUS=""
+   while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+     if [ -z "$BOOTSTRAP_ID" ]; then
+       BOOTSTRAP_ID=$(grep -oE '"bootstrap_id":"[^"]+"' "$BOOT_LOG" 2>/dev/null | head -1 | sed 's/.*:"//; s/"$//')
+     fi
+     if [ -n "$BOOTSTRAP_ID" ]; then
+       FINAL_JSON=$(axhub apps bootstrap-status "$BOOTSTRAP_ID" --json 2>/dev/null)
+       STATUS=$(echo "$FINAL_JSON" | jq -r '.data.status // empty')
+       case "$STATUS" in done|failed) break ;; esac
+     fi
+     sleep 4
+   done
+
+   case "$STATUS" in
+     done) echo "$FINAL_JSON" ;;
+     failed) echo "$FINAL_JSON" | jq -r '"배포 실패: " + (.data.error_message // .data.error_code // "원인 불명")'; exit 65 ;;
+     *) echo "아직 진행 중이거나 승인 대기 중이에요 (BOOTSTRAP_ID=${BOOTSTRAP_ID:-미확보}). 브라우저 승인을 마쳤는지 확인하고, 잠시 후 이 step 을 다시 호출해요." ;;
+   esac
    ```
 
-   진행 중 매 ~30s 마다 한국어 한 줄로 narrate 해요 — "앱 만들고 있어요" / "GitHub repo 만들고 있어요" / "첫 배포 중이에요. 거의 다 왔어요". 60s 이상 같은 stage 머무르면 "조용하네요, 계속 기다리고 있어요" 한 줄을 추가해요.
-
-   **GitHub 연결 필요 (saga stdout 의 `device_code_issued` event 처리).** saga 가 GitHub App 미설치 / installation 만료 / scope 부족 상태면 첫 stage 에서 다음과 같은 JSON line 을 emit 하고 사용자 승인을 기다리며 block 해요:
-
-   ```json
-   {"event":"device_code_issued","data":{"verification_uri":"https://github.com/login/device","verification_uri_complete":null,"user_code":"XXXX-XXXX","expires_in":899}}
-   ```
-
-   이 event 가 stdout 에서 나오면 narrate 보다 우선해서 즉시 사용자에게 한국어로 안내해요. raw JSON dump 금지 — `verification_uri` (또는 `verification_uri_complete` 가 non-null 이면 그걸 우선), `user_code`, `expires_in` 만 humanize 해요:
-
-   > GitHub 연결이 필요해요. 다음 단계로 진행해 주세요:
-   >
-   > 1. 브라우저에서 열기: `<verification_uri_complete 우선, 없으면 verification_uri>`
-   > 2. 코드 입력: `<user_code>`
-   > 3. axhub GitHub App 설치 승인
-   >
-   > 승인하면 자동으로 다음 단계로 넘어가요. (유효시간 약 `<expires_in/60>` 분)
-
-   `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 안내 후에는 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 별도 작업 없이 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. 코드가 expire 되면 saga 가 error 로 종료해요 — 그 때는 `/axhub:github` 안내로 보내서 재시도 안내해요.
-
-   상세한 device flow 안내 패턴은 `../github/SKILL.md` 의 OAuth device flow 섹션을 따라요.
+   `done` 이면 `FINAL_JSON` 을 Step 7 에서 써요. poll 중 stage 가 `app_created` / `repo_created` / 배포로 넘어가면 "앱 만들고 있어요" / "GitHub repo 만들고 있어요" / "첫 배포 중이에요. 거의 다 왔어요" 한 줄로 narrate 해요. device code 가 만료(약 15분)되면 saga 가 error 로 끝나요 — `/axhub:github` 로 재시도를 안내해요. 상세한 device flow 안내 패턴은 `../github/SKILL.md` 의 OAuth device flow 섹션을 따라요.
 
 7. **응답에서 `repo_full_name` 을 꺼내 CWD 로 받아요.**
 
    ```bash
-   REPO=$(echo "$FINAL_JSON" | jq -r '.data.status.repo_full_name // empty')
+   REPO=$(echo "$FINAL_JSON" | jq -r '.data.repo_full_name // .data.status.repo_full_name // empty')
    if [ -z "$REPO" ]; then
      echo '{"systemMessage":"GitHub repo 정보가 응답에 없어요. /axhub:doctor 로 진단해주세요."}'
      exit 65
