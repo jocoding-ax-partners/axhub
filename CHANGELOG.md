@@ -4,6 +4,43 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.16](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.15...v0.9.16) (2026-05-25)
+
+이번 릴리즈는 agent-safe CLI floor(0.15.3) 위에서 watch/follow auto-degrade 와 native device-code surface 를 믿도록 SKILL surface 를 정리하고, data SKILL 을 CLI-only catalog workflow 로 추가한 패치예요. data sync 는 first-run `.axhub` mutation 을 consent-gate 로 감싸고 private catalog snapshot 에 PAT metadata 를 저장하지 않게 해요. shell/Python/TS/Go snippet 은 auth 경계와 escaping 을 회귀 테스트로 잠가서 agent 가 안전하게 dry-run/read 흐름을 안내할 수 있게 했어요.
+
+### Test baseline
+
+- PR #135: `cargo test -p axhub-helpers --test data_layer_cli`, `cargo test -p axhub-helpers`, `cargo clippy -p axhub-helpers --all-targets -- -D warnings`, `bun test`, `bunx tsc --noEmit`, `skill:doctor`, `lint:tone`, `lint:keywords` 통과예요.
+- PR #134/#135 GitHub checks 는 merge 직전 주요 rust/hook/perf matrix 가 pass 였고, 사용자가 대기 생략을 지시해서 #134 마지막 rerun 은 더 기다리지 않고 merge 했어요.
+- release postbump 에서 `bun run codegen:version` + `bun run release:check` 통과예요.
+
+### Honest tradeoff
+
+실제 staging catalog read 는 토큰이 없어 실행하지 않았고, cost-aware/staging optional checks 는 설정대로 skip 됐어요. #134 마지막 CI rerun 은 사용자가 즉시 merge 를 요청해서 끝까지 기다리지 않았지만, 같은 변경 집합의 로컬/PR 검증과 release:check 로 릴리즈 가능성을 확인했어요.
+
+
+### Added
+
+* **data:** enable safe catalog reads through CLI workflows ([62bd368](https://github.com/jocoding-ax-partners/axhub/commit/62bd3680bf5e519fdfa6d081c9ed593d027c8fd3))
+
+
+### Fixed
+
+* **data:** protect catalog snippets from review-found risk ([386f0e6](https://github.com/jocoding-ax-partners/axhub/commit/386f0e666483f87f3dc56fbdd48c0e1e2a48f8b1))
+* init/github device flow 의 verification URL·code 를 즉시 surface ([847e4b5](https://github.com/jocoding-ax-partners/axhub/commit/847e4b5d09c4f167cc21820574ccd35236bc9fe9))
+
+
+### Changed
+
+* device-flow skill(auth/init/github) 을 0.15.3 native device_code_issued surface 로 전환 ([91f1d4a](https://github.com/jocoding-ax-partners/axhub/commit/91f1d4a558ec150c91f9477cd6f47affb11236c0))
+* init bootstrap watch 수동 toggle 제거 — CLI auto-degrade (PR-2 누락 init 보강) ([cc64312](https://github.com/jocoding-ax-partners/axhub/commit/cc6431275d8332e57722ddb354d23f80af2fb144))
+* watch/follow 비대화형 수동 drop guard 제거 — CLI auto-degrade 신뢰 ([f36b610](https://github.com/jocoding-ax-partners/axhub/commit/f36b610f433976046934ed5edbdd6ec964f92227))
+
+
+### Docs
+
+* SKILL 에 '에이전트는 플래그 명시 불필요 (비-TTY 자동 감지)' 명시 보강 ([6492dcb](https://github.com/jocoding-ax-partners/axhub/commit/6492dcbd5a1a096199add51fca857ae565d2666c))
+
 ## [0.9.15](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.14...v0.9.15) (2026-05-25)
 
 ADR-0011 의 "검증된 가정 #1" — Claude Code 가 SKILL `!command` 주입의 outer `node -e` wrapper 자체에는 권한을 안 묻는다 — 이 거짓으로 판명된 걸 고친 릴리즈예요. 실제로는 권한 게이트가 outer `node -e` 명령 그 자체를 검사해서, needs-preflight SKILL 첫 실행에서 raw 영문 "requires approval" 로 hard-fail 했고, 안에 있던 한국어 denialRegex fallback 은 자기 자신의 거부를 못 잡는 dead path 였어요 (inner `spawnSync` 는 OS raw spawn 이라 권한 게이트를 안 거쳐서 그 문자열을 낼 일이 없었어요). 16 SKILL + template 의 load-time `!command` preflight 주입을 전부 제거하고, preflight 를 workflow 첫머리의 in-body bash 스텝으로 옮겼어요 — normal Bash 호출이라 default 모드에서 정상 interactive 권한 prompt 로 가고 hard-fail 이 사라져요. 대안인 `plugin.json` `permissions` 필드는 Claude Code 미지원으로 확정돼서, 유일하게 문서화된 baseline Bash 동작에만 의존하는 in-body 이동을 택했어요 (ADR-0013, ADR-0011 supersede). 생성형 `codegen-preflight-injection.ts` + byte-identical lock 은 폐기하고 `scripts/preflight-block.ts` 정적 단일소스 + skill-doctor 역전 검사로 대체했어요. CE 멀티-persona 리뷰가 마이그레이션 잔재 (axhub-diagnose 의 고아 caption — 손-작성 변형이라 1차 regex 가 놓침) 와 가드 약점 (deploy 의 bare preflight 언급으로 인한 false-pass) 을 추가로 잡아서, skill-doctor 를 canonical 할당 signature 로 강화하고 orphan-debris 회귀 test 를 더했어요.
