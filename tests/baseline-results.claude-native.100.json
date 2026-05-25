@@ -1668,5 +1668,47 @@
     "required_consent_seen": false,
     "notes": "Phase 5 meta_question — code/architecture analysis intent. Approach E hook (preflight + audit only) does not route. Claude answers natively without firing axhub skill.",
     "ts": "2026-05-07T22:30:00Z"
+  },
+  {
+    "utterance_id": "DATA-1",
+    "fired_skill": "data",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub catalog search --json --limit 200 && axhub catalog invoke --execute --json --connector snowflake --path analytics.orders --action read --sql 'SELECT * FROM analytics.orders LIMIT 20' --row-limit 20",
+        "exit_code": 0,
+        "ts": "2026-05-25T16:40:01Z"
+      }
+    ],
+    "required_consent_seen": true,
+    "notes": "Data query intent. skills/data routes to catalog search, first live-read consent, then explicit --execute --json read with a bounded row limit. Plugin arm preserves the same routing decision as docs-only.",
+    "ts": "2026-05-25T16:40:01Z"
+  },
+  {
+    "utterance_id": "DATA-2",
+    "fired_skill": "data",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub catalog get --connector snowflake --path analytics.orders --json",
+        "exit_code": 0,
+        "ts": "2026-05-25T16:40:02Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "notes": "Data describe intent. skills/data describes catalog metadata only and does not run a live read. Plugin arm preserves the same routing decision as docs-only.",
+    "ts": "2026-05-25T16:40:02Z"
+  },
+  {
+    "utterance_id": "DATA-3",
+    "fired_skill": "data",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub catalog get --connector snowflake --path analytics.orders --json && axhub-helpers snippet --mode B --language python --target local-python --connector snowflake --path analytics.orders --sql 'SELECT * FROM analytics.orders LIMIT 20' --allowed-columns id,total,status --masked email",
+        "exit_code": 0,
+        "ts": "2026-05-25T16:40:03Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "notes": "Snippet intent. skills/data uses catalog describe context and axhub-helpers snippet; no PAT is printed. Plugin arm preserves the same routing decision as docs-only.",
+    "ts": "2026-05-25T16:40:03Z"
   }
 ]
