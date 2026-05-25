@@ -177,11 +177,10 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    동의 받으면 saga 를 실행해요:
 
    ```bash
-   if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then WATCH=--watch; else WATCH=; fi
-   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --yes $WATCH --json
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --yes --watch --json
    ```
 
-   **Non-interactive guard:** subprocess (`$CI` / `$CLAUDE_NON_INTERACTIVE` / no TTY) 에서는 `--watch` 가 무한 block 돼서 SKILL 이 hang 해요. WATCH 변수가 비면 `--watch` 가 빠진 채로 saga 만 시작하고, 그 뒤 별도 `axhub apps bootstrap-status` 호출로 진행을 따라가요:
+   **에이전트 컨텍스트 자동 degrade (axhub-cli 0.15.3+).** `--watch` 를 항상 그대로 전달해요. CLI 가 비-TTY/에이전트 컨텍스트를 자동 감지해서 bootstrap / bootstrap-status 의 `--watch` 를 단일 스냅샷으로 degrade 한 뒤 종료하니 (수동 toggle 불필요), saga 가 무한 block 되지 않아요. 진행을 더 따라가려면 별도 `axhub apps bootstrap-status` 를 호출해요:
 
    ```bash
    BOOTSTRAP_ID=$(echo "$ACCEPTED_JSON" | jq -r '.data.bootstrap_id')
