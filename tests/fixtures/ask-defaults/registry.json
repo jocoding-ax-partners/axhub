@@ -148,7 +148,7 @@
     },
     "axhub CLI 가 설치되어 있지 않아요. 지금 설치할까요?": {
       "safe_default": "나중에",
-      "rationale": "CLI install in subprocess (claude -p / CI / headless) writes new system binaries without explicit user consent. Non-interactive mode must surface the diagnosis and stop, never auto-route to install-cli SKILL.",
+      "rationale": "CLI install in subprocess (claude -p / CI / headless) writes new system binaries without explicit user consent. Non-interactive mode must surface the diagnosis and stop, never auto-route to the setup SKILL, which would chain CLI install + login + node install without consent.",
       "allowed_safe_defaults": [
         "나중에",
         "지금 설치"
