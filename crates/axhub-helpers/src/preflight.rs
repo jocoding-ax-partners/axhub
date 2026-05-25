@@ -34,9 +34,7 @@ pub fn default_runner(cmd: &[&str]) -> SpawnResult {
     // mock runners and never enter this branch, so integration mocks still match
     // ["axhub", ...] literals.
     let resolved;
-    let effective: Vec<&str> = if !cmd.is_empty()
-        && (cmd[0] == "axhub" || cmd[0] == "axhub.exe")
-    {
+    let effective: Vec<&str> = if !cmd.is_empty() && (cmd[0] == "axhub" || cmd[0] == "axhub.exe") {
         match resolve_axhub_path() {
             Some(path) => {
                 resolved = path;
@@ -321,7 +319,9 @@ fn cwd_has_project_marker() -> bool {
         "build.gradle.kts",
         "pom.xml",
     ];
-    MARKERS.iter().any(|marker| std::path::Path::new(marker).exists())
+    MARKERS
+        .iter()
+        .any(|marker| std::path::Path::new(marker).exists())
 }
 
 /// Classify the result of `axhub --version` into a discriminated CLI state so
@@ -595,7 +595,9 @@ mod tests {
 
     #[test]
     fn axhub_bin_honors_explicit_env_override() {
-        let _guard = axhub_bin_env_lock().lock().unwrap();
+        let _guard = axhub_bin_env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let prev = std::env::var("AXHUB_BIN").ok();
         std::env::set_var("AXHUB_BIN", "/custom/path/to/axhub");
         assert_eq!(axhub_bin(), "/custom/path/to/axhub");
@@ -636,7 +638,9 @@ mod tests {
 
     #[test]
     fn fallback_paths_include_cargo_and_local_bin_when_home_set() {
-        let _guard = axhub_bin_env_lock().lock().unwrap();
+        let _guard = axhub_bin_env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let prev_home = std::env::var("HOME").ok();
         let prev_user = std::env::var("USERPROFILE").ok();
         std::env::set_var("HOME", "/tmp/fake-home-for-test");
@@ -647,15 +651,18 @@ mod tests {
             .iter()
             .map(|p| p.to_string_lossy().into_owned())
             .collect();
+        // `PathBuf::join` uses `\` on Windows, so normalize separators before
+        // matching against the `/`-form expectations below (no-op on Unix).
+        let normalized: Vec<String> = path_strings.iter().map(|p| p.replace('\\', "/")).collect();
         assert!(
-            path_strings
+            normalized
                 .iter()
                 .any(|p| p.contains("/tmp/fake-home-for-test/.cargo/bin/axhub")),
             "fallback list missing cargo bin under HOME: {:?}",
             path_strings
         );
         assert!(
-            path_strings
+            normalized
                 .iter()
                 .any(|p| p.contains("/tmp/fake-home-for-test/.local/bin/axhub")),
             "fallback list missing $HOME/.local/bin (sh-native non-root path): {:?}",
@@ -673,7 +680,9 @@ mod tests {
 
     #[test]
     fn resolve_axhub_path_finds_binary_in_path() {
-        let _guard = axhub_bin_env_lock().lock().unwrap();
+        let _guard = axhub_bin_env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = std::env::temp_dir().join(format!(
             "axhub-resolve-test-{}",
             std::time::SystemTime::now()
