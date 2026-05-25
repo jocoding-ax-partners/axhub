@@ -1,5 +1,5 @@
 ---
-name: inventory
+name: my-resources
 description: '이 스킬은 사용자가 본인이 접근 가능한 axhub 리소스 전체 인벤토리를 한눈에 보고 싶을 때 사용해요. 다음 표현에서 활성화: "내 리소스", "내 리소스 봐", "내 리소스 보여", "내 리소스 보여줘", "내 리소스 목록", "리소스 봐", "리소스 보여", "리소스 보여줘", "리소스 목록", "리소스 뭐 있어", "리소스 조회", "뭐 접근 가능", "뭐 접근 가능해", "내가 뭐 봐", "내가 뭐 봐", "내 자산", "내 자산 봐", "내 스코프", "스코프 봐", "권한 봐", "권한 뭐 있어", "접근 가능한 거", "접근 권한", "접근 권한 봐", "쓸 수 있는 거", "available", "inventory", "list resources", "my resources", "my access", "my scope", "what can I access", "what do I have", "what i have access to", "access", "resources", "show my resources", 또는 사용자 scope 의 통합 리소스 카탈로그 조회. team scope 필터로 cross-tenant 데이터 노출 차단해요. 7 family (tenants / apps / members / engines / connectors / resources / catalog kinds) 를 병렬 호출해서 한 응답에 compact 한국어 요약 + drill-down hint 로 렌더해요.'
 examples:
   - utterance: "내 리소스 보여줘"
@@ -18,7 +18,7 @@ allows-dependency-execution: false
 model: haiku
 ---
 
-# Resource Inventory
+# My Resources
 
 사용자가 접근 가능한 axhub 리소스를 7개 family (tenants / apps / members / engines / connectors / resources / catalog kinds) 로 한 번에 조회해서 compact 한국어 요약으로 렌더해요. 읽기 전용, mutation 경로 없음, F4 privacy 로 cross-tenant 데이터 차단해요.
 
@@ -133,7 +133,7 @@ echo "$PREFLIGHT_JSON"
 
    7 family 모두 실패면 표 대신 종합 안내 한 줄 출력 후 종료해요.
 
-**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 은 대화형 질문 prompt 를 호출하지 않아요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 와 대화형 환경 모두에서 동일하게 동작해요. `tests/fixtures/ask-defaults/registry.json` 의 inventory 항목은 no-op stub (질문 없음).
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 은 대화형 질문 prompt 를 호출하지 않아요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 와 대화형 환경 모두에서 동일하게 동작해요. `tests/fixtures/ask-defaults/registry.json` 의 my-resources 항목은 no-op stub (질문 없음).
 
 6. **렌더 종료.** Step 5 의 한국어 요약 출력 후 trap 이 tmp dir cleanup. `exit 0`.
 

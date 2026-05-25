@@ -19,7 +19,7 @@
  *    (binary truly missing) so jq stays parseable.
  *  - `echo "$PREFLIGHT_JSON"` surfaces auth/team/app/env (and any auth_error_code) to the
  *    model, which the prose then routes to the right /axhub:* skill. Consumers
- *    (deploy, inventory) additionally read `$PREFLIGHT_JSON` in later steps.
+ *    (deploy, my-resources) additionally read `$PREFLIGHT_JSON` in later steps.
  */
 export const CANONICAL_PREFLIGHT_BLOCK = [
   "**Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.",

@@ -448,8 +448,8 @@
       ]
     }
   },
-  "inventory": {
-    "_note": "TODO: add per-question safe_default + rationale entries as AskUserQuestion call sites are added to skills/inventory/SKILL.md"
+  "my-resources": {
+    "_note": "TODO: add per-question safe_default + rationale entries as AskUserQuestion call sites are added to skills/my-resources/SKILL.md"
   },
   "setup": {
     "node 가 없어요. 지금 설치할까요?": {

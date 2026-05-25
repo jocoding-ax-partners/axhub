@@ -593,7 +593,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(skillDirs.length).toBeGreaterThanOrEqual(11);
   });
 
-  test("all 31 shipped skills are present, including quality expansion skills + auto-diagnose + inventory + setup", () => {
+  test("all 31 shipped skills are present, including quality expansion skills + auto-diagnose + my-resources + setup", () => {
     expect(skillDirs.sort()).toEqual([
       "apps",
       "auth",
@@ -612,9 +612,9 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "github",
       "init",
       "install-cli",
-      "inventory",
       "karpathy-guidelines",
       "logs",
+      "my-resources",
       "open",
       "profile",
       "recover",

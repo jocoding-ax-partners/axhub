@@ -47,7 +47,7 @@ describe("data AskUserQuestion safe defaults", () => {
 });
 
 describe("data routing corpus", () => {
-  test("corpus includes data-question routing examples that do not route to apps or inventory", () => {
+  test("corpus includes data-question routing examples that do not route to apps or my-resources", () => {
     const corpus = read("tests/corpus.100.jsonl")
       .trim()
       .split("\n")
@@ -57,7 +57,7 @@ describe("data routing corpus", () => {
     expect(dataRows.length).toBeGreaterThanOrEqual(3);
     for (const row of dataRows) {
       expect(row.expected_skill).not.toBe("apps");
-      expect(row.expected_skill).not.toBe("inventory");
+      expect(row.expected_skill).not.toBe("my-resources");
       expect(row.expected_cmd_pattern).toContain("axhub catalog");
       expect(row.destructive).toBe(false);
     }
