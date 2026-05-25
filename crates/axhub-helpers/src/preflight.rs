@@ -697,7 +697,7 @@ mod tests {
         ));
         fs::create_dir_all(&dir).unwrap();
         let fake = dir.join(AXHUB_BIN_NAME);
-        fs::write(&fake, b"#!/bin/sh\necho axhub 0.12.0\n").unwrap();
+        fs::write(&fake, b"#!/bin/sh\necho axhub 0.15.3\n").unwrap();
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;

@@ -17,7 +17,7 @@ use axhub_helpers::resolve::{AppMatch, ResolveOutput, ResolveRun, EXIT_NOT_FOUND
 fn ok_preflight() -> PreflightRun {
     PreflightRun {
         output: PreflightOutput {
-            cli_version: Some("0.12.1".into()),
+            cli_version: Some("0.15.3".into()),
             in_range: true,
             cli_too_old: false,
             cli_too_new: false,
@@ -134,7 +134,7 @@ fn run_deploy_prep_with_runner_dispatches_both_preflight_and_resolve() {
         if cmd.contains(&"--version") {
             SpawnResult {
                 exit_code: 0,
-                stdout: "axhub 0.12.1\n".into(),
+                stdout: "axhub 0.15.3\n".into(),
                 stderr: String::new(),
             }
         } else if cmd.contains(&"auth") && cmd.contains(&"status") {
@@ -203,7 +203,7 @@ fn respond_stub(cmd: &[&str], apps_list: &str) -> SpawnResult {
     if cmd.contains(&"--version") {
         SpawnResult {
             exit_code: 0,
-            stdout: "axhub 0.12.1\n".into(),
+            stdout: "axhub 0.15.3\n".into(),
             stderr: String::new(),
         }
     } else if cmd.contains(&"auth") && cmd.contains(&"status") {

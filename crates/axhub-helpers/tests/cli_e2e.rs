@@ -449,7 +449,7 @@ fn cli_verify_times_out_slow_status_probe() {
 #[test]
 fn cli_deploy_prep_quality_gate_passes_in_json() {
     let temp = tempfile::tempdir().unwrap();
-    let axhub = fake_deploy_prep_axhub(&temp, "axhub 0.12.1");
+    let axhub = fake_deploy_prep_axhub(&temp, "axhub 0.15.3");
 
     let output = run_env(
         &[
@@ -680,7 +680,7 @@ fn cli_auth_refresh_bg_records_success_and_failure_sentinels() {
         std::fs::write(
             &path,
             format!(
-                "#!/usr/bin/env sh\nif [ \"$1\" = \"--version\" ]; then echo 'axhub 0.12.5'; exit 0; fi\nif [ \"$1 $2 $3 $4\" = \"auth login --browser --force\" ]; then exit {login_exit}; fi\nexit 64\n"
+                "#!/usr/bin/env sh\nif [ \"$1\" = \"--version\" ]; then echo 'axhub 0.15.3'; exit 0; fi\nif [ \"$1 $2 $3 $4\" = \"auth login --browser --force\" ]; then exit {login_exit}; fi\nexit 64\n"
             ),
         )
         .unwrap();
