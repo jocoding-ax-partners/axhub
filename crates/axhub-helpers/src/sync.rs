@@ -110,7 +110,13 @@ pub fn run_sync(args: &[String]) -> Result<i32> {
     }
 
     let principal = axhub_json!("auth", "whoami", "--json");
-    let pat = axhub_json!("auth", "pat", "whoami", "--json");
+    // PAT is optional identity metadata recorded in catalog.json. OAuth-only users
+    // have no active PAT context, so `axhub auth pat whoami` exits 65 ("No active PAT
+    // context."). The catalog reads + `auth whoami` above already succeeded via OAuth,
+    // so a missing PAT must NOT abort the sync — otherwise .axhub/AXHUB.md (written
+    // below) never gets created. Treat PAT absence as null metadata and continue.
+    let pat =
+        run_axhub_json(&axhub_bin, ["auth", "pat", "whoami", "--json"]).unwrap_or(Value::Null);
     let pat_metadata = sanitize_pat_metadata(&pat);
     let identity_fingerprint = identity_fingerprint(&resolved_target, &principal, &pat);
 

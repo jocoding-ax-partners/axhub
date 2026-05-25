@@ -77,7 +77,11 @@
       "데이터 조회해줘",
       "테이블 설명",
       "SQL로 읽어줘",
-      "snippet 만들어줘"
+      "snippet 만들어줘",
+      "인사이트 뽑아줘",
+      "분석해줘",
+      "집계해줘",
+      "통계 내줘"
     ],
     "skills/enable-statusline/SKILL.md": [
       "statusline 켜줘",
@@ -955,5 +959,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-05-25T16:07:31.225Z"
+  "generated_at": "2026-05-25T22:16:22.255Z"
 }

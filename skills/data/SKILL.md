@@ -1,6 +1,6 @@
 ---
 name: data
-description: '이 스킬은 axhub data catalog search, resource describe, safe SQL read, and snippet generation workflow 에 사용해요. 다음 표현에서 활성화: "데이터 조회해줘", "catalog search", "테이블 설명", "SQL로 읽어줘", "snippet 만들어줘", "describe table", "generate snippet".'
+description: '이 스킬은 axhub data catalog search, resource describe, safe SQL read, aggregate insight, and snippet generation workflow 에 사용해요. catalog invoke 로 집계 SQL 을 돌려 데이터 인사이트도 뽑아줘요. 다음 표현에서 활성화: "데이터 조회해줘", "catalog search", "테이블 설명", "SQL로 읽어줘", "snippet 만들어줘", "describe table", "generate snippet", "인사이트 뽑아줘", "분석해줘", "집계해줘", "통계 내줘".'
 examples:
   - utterance: "orders 데이터 조회해줘"
     intent: "query axhub data catalog and generate safe read snippets"
@@ -12,6 +12,10 @@ examples:
     intent: "query axhub data catalog and generate safe read snippets"
   - utterance: "SQL로 읽어줘"
     intent: "query axhub data catalog and generate safe read snippets"
+  - utterance: "이 데이터로 인사이트 뽑아줘"
+    intent: "run aggregate SQL via catalog invoke and narrate insights"
+  - utterance: "부서별 인원 집계해줘"
+    intent: "run aggregate SQL via catalog invoke and narrate insights"
 multi-step: true
 needs-preflight: true
 allows-dependency-execution: false
@@ -20,7 +24,7 @@ model: sonnet
 
 # Data
 
-axhub catalog 를 CLI-only 방식으로 탐색하고, first live read consent 뒤에 read-only invoke 또는 snippet 을 만들어줘요.
+axhub catalog 를 CLI-only 방식으로 탐색하고, first live read consent 뒤에 read-only invoke (단순 조회 + 집계 인사이트) 또는 snippet 을 만들어줘요. 인사이트 요청은 `axhub data list` 로 헤매지 말고 catalog 로 connector/path 를 해석한 뒤 `catalog invoke --action read` 로 집계 SQL 을 돌려서 한국어로 요약해줘요.
 
 ## Workflow
 
@@ -106,10 +110,13 @@ echo "$PREFLIGHT_JSON"
 
    In non-interactive mode, use `Dry-run only`. If the server denies with `allowed:false` or `deny_reason`, show that reason and NEVER retry denied.
 
-4. **Invoke read safely when consent exists.** Live reads must include `--execute --json`, an explicit row limit, and read-only SQL. Keep row limit small unless the user explicitly asks for less-restricted output.
+4. **Invoke read safely when consent exists.** Live reads must include `--execute --json`, an explicit row limit, and read-only SQL. Keep row limit small unless the user explicitly asks for less-restricted output. 인사이트/집계 요청이면 같은 read 경로로 집계 SQL (GROUP BY / COUNT / AVG / SUM) 을 돌려요 — `allowed_columns` 안의, 마스킹 안 된 컬럼만 집계해요.
 
    ```bash
+   # 단순 조회
    axhub catalog invoke --connector <connector> --path <path> --action read --sql '<SELECT ...>' --row-limit 100 --execute --json
+   # 집계 인사이트 (예: 부서별 인원)
+   axhub catalog invoke --connector <connector> --path <path> --action read --sql 'SELECT department, COUNT(*) AS headcount FROM employees GROUP BY department ORDER BY headcount DESC' --row-limit 100 --execute --json
    ```
 
    Parse error output through the generated catalog empathy copy. For catalog internal errors, do not retry automatically; re-check `allowed_columns` with `catalog get` first.
@@ -125,6 +132,8 @@ echo "$PREFLIGHT_JSON"
    Mode A uses browser cookie auth with `credentials: 'include'`. Mode B uses `AXHUB_PAT` as `X-Api-Key`. Local bash uses `axhub catalog invoke --execute --json` via CLI/keychain and does not print PATs.
 
 6. **Final response.** Return the selected connector/path, row limit, allowed_columns, masked handling, whether live read ran, and exact commands or snippet produced. If no live read ran, say dry-run only.
+
+   **인사이트/집계 요청이면** raw JSON 을 그대로 쏟지 말고 humanize 해요: 핵심 수치를 GFM 마크다운 표로 (예: 부서 / 인원, 월 / 합계 — 셀이 길면 ~50자에서 잘라요), 표 아래 1~3문장으로 가장 큰 값·편중·추세·빈 그룹 같은 발견을 짚어줘요. 마스킹 컬럼 (`mask_hint` 있는 값) 은 집계가 null/●●● 일 수 있다고 안내해요.
 
 ## Identity-change question
 
@@ -153,6 +162,8 @@ Use this only after `axhub-helpers sync` returns `identity_changed`.
 - NEVER omit `--execute --json` for a live `catalog invoke`.
 - NEVER exceed the stated row limit or `allowed_columns`.
 - NEVER print `.axhub/catalog.json` or hardcode PATs in snippets.
+- NEVER 인사이트를 `axhub data list` 로 뽑으려고 헤매기 — connector/path 는 catalog search/get 으로 해석하고 집계는 `axhub catalog invoke --action read` 로 해요.
+- NEVER raw JSON 집계 결과를 그대로 출력 — 한국어 인사이트 표 + 발견으로 humanize 해요.
 
 ## Additional Resources
 
