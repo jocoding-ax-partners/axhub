@@ -102,6 +102,8 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 # axhub Skill Authoring (Phase 17/18 강제)
 
+> **Plugin 설계 레퍼런스**: 인증 2모드(SSO cookie / PAT), `.axhub/` AI 컨텍스트, MCP 통합, backend catalog API, v1 DoD 는 [`docs/plugin-developer-guide.md`](docs/plugin-developer-guide.md) 에 한 문서로 정리돼 있어요. plugin 동작/설계를 바꾸기 전에 먼저 읽어요.
+
 새 SKILL 을 `skills/<name>/SKILL.md` 에 작성할 때 **반드시** scaffold 사용. 직접 작성 금지.
 
 ## Always Do
