@@ -619,12 +619,12 @@ To deploy:
      echo '{"systemMessage":"배포 이력이 없어요. 먼저 /axhub:deploy 로 배포 후 다시 호출하세요."}'
      exit 0
    fi
-   axhub deploy status "$DEPLOY_ID" --app "$APP_ID" $WATCH --json
+   axhub deploy status "$DEPLOY_ID" --app "$APP_ID" --watch --json
    ```
 
-   **Non-interactive guard:** If running in non-interactive context (`$CI` or `$CLAUDE_NON_INTERACTIVE` env var set, OR no TTY, OR `claude -p` invocation), DROP `--watch` flag and render single snapshot — `--watch` blocks indefinitely in headless/subprocess mode and `/axhub:deploy` post-chain hangs forever (same root cause as v0.1.12 status/logs hotfix). Detection: `if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then WATCH=--watch; else WATCH=; fi` then use `$WATCH`.
+   **에이전트 컨텍스트 자동 degrade (axhub-cli 0.15.3+).** `--watch` 를 항상 그대로 전달해요. CLI 가 비-TTY/에이전트 컨텍스트를 자동 감지해서 단일 스냅샷으로 degrade 한 뒤 즉시 종료하니 (`/axhub:deploy` post-chain 이 더 이상 hang 안 나요), 플러그인 쪽 수동 `--watch` drop guard 는 불필요해요. 에이전트는 스냅샷 1개를 받고, 최신 상태가 필요하면 `/axhub:deploy` 또는 `/axhub:status` 를 다시 호출하면 돼요. 사람의 TTY 에서는 종전처럼 스트림으로 watch 해요.
 
-   Render humanized Korean progress every ~30s ("1분 경과, 빌드 중이에요 (정상)") per `references/recovery-flows.md` ("watch-narration").
+   **watch-narration 은 interactive TTY 전용이에요.** 사람이 TTY 로 watch 할 때만 ~30s 마다 humanized Korean progress 를 렌더해요 ("1분 경과, 빌드 중이에요 (정상)", `references/recovery-flows.md` "watch-narration"). 에이전트 컨텍스트(스냅샷)에서는 narration 대신 단일 상태 요약 + 재호출 안내를 보여줘요.
 
 6. **On any non-zero exit**, route to `references/error-empathy-catalog.md` by exit code:
    - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 앱은 안전해요. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.

@@ -55,7 +55,7 @@ To fetch logs:
 
    For pod logs, swap `--source build` with `--source pod`.
 
-   **Non-interactive guard:** If running in non-interactive context (`$CI` or `$CLAUDE_NON_INTERACTIVE` env var set, OR no TTY, OR `claude -p` invocation), DROP `--follow` flag and render single snapshot — `--follow` blocks indefinitely in headless/subprocess mode and `/axhub:logs` hangs forever. Detection: `if [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then FOLLOW=--follow; else FOLLOW=; fi` then use `$FOLLOW`.
+   **에이전트 컨텍스트 자동 degrade (axhub-cli 0.15.3+).** `--follow` 를 항상 그대로 전달해요. CLI 가 비-TTY/에이전트 컨텍스트를 자동 감지해서 단일 스냅샷으로 degrade 한 뒤 즉시 종료하니 (`/axhub:logs` 가 더 이상 hang 안 나요), 수동 drop guard 는 불필요해요. 명시적 `--reconnect-attempts N` (N>0) 을 주면 에이전트 컨텍스트에서도 N 회 forward 폴링을 유지해요 (의도된 bounded streaming opt-in).
 
    **Build-log snapshot fallback:** The current backend can return `validation.build_logs_require_follow` for `--source build` without `--follow`. In non-interactive mode, do not re-add `--follow` and do not treat this as a user-facing failure. Instead fetch the deployment snapshot and render the embedded build log:
 
