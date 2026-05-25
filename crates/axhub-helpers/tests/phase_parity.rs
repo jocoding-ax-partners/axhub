@@ -611,7 +611,7 @@ fn resolve_filters_apps_and_preserves_git_context_for_errors() {
     let data_apps =
         parse_apps_list(r#"{"data":[{"id":8,"slug":"paydrop-live","name":"Paydrop Live"}]}"#)
             .unwrap();
-    assert_eq!(data_apps[0].id, 8);
+    assert_eq!(data_apps[0].id, "8");
     assert_eq!(data_apps[0].slug, "paydrop-live");
     let run = run_resolve_with_runner(
         &["--user-utterance".into(), "paydrop 배포해".into()],
@@ -654,7 +654,7 @@ fn resolve_filters_apps_and_preserves_git_context_for_errors() {
         },
     );
     assert_eq!(run.exit_code, EXIT_OK);
-    assert_eq!(run.output.app_id, Some(42));
+    assert_eq!(run.output.app_id, Some("42".to_string()));
     assert_eq!(run.output.branch.as_deref(), Some("main"));
 }
 
@@ -694,7 +694,7 @@ fn resolve_marks_non_git_repositories_as_init_needed() {
     );
 
     assert_eq!(run.exit_code, EXIT_OK);
-    assert_eq!(run.output.app_id, Some(42));
+    assert_eq!(run.output.app_id, Some("42".to_string()));
     assert_eq!(run.output.branch, None);
     assert_eq!(run.output.commit_sha, None);
     assert!(!run.output.git_repo);
@@ -757,10 +757,123 @@ fn resolve_uses_manifest_name_slug_when_utterance_has_no_candidate() {
 
     assert_eq!(run.exit_code, EXIT_OK);
     assert_eq!(run.output.candidate_slug.as_deref(), Some("nextjs-axhub"));
-    assert_eq!(run.output.app_id, Some(165));
+    assert_eq!(run.output.app_id, Some("165".to_string()));
     assert_eq!(run.output.app_slug.as_deref(), Some("nextjs-axhub"));
     assert_eq!(run.output.branch.as_deref(), Some("main"));
     assert_eq!(run.output.commit_sha.as_deref(), Some("4fd1140"));
+}
+
+#[test]
+fn resolve_uses_git_remote_repo_name_when_no_utterance_or_manifest_slug() {
+    let _lock = env_lock().lock().unwrap();
+    let guard = EnvGuard::new(&["AXHUB_PROFILE", "AXHUB_ENDPOINT", "AXHUB_BIN"]);
+    let _cwd = CwdGuard::enter(guard._dir.path());
+    // No apphub.yaml/axhub.yaml here -> manifest yields no slug, so the candidate
+    // must come from the github `origin` remote (repo name == app slug). Also
+    // exercises the `{"items":[{"id":"<uuid>"}]}` apps-list shape end-to-end.
+
+    let run = run_resolve_with_runner(&["--user-utterance".into(), "배포해줘".into()], |cmd| {
+        match cmd {
+            ["axhub", "auth", "status", "--json"] => SpawnResult {
+                exit_code: 0,
+                stdout: r#"{"user_email":"u@example.com","scopes":["deploy"]}"#.into(),
+                stderr: String::new(),
+            },
+            ["axhub", "apps", "list", "--json"] => SpawnResult {
+                exit_code: 0,
+                stdout:
+                    r#"{"items":[{"id":"f349a303-a294-48c8-96f3-d85d85f5faa7","slug":"employee-directory"}],"total":1}"#
+                        .into(),
+                stderr: String::new(),
+            },
+            ["git", "config", "--get", "remote.origin.url"] => SpawnResult {
+                exit_code: 0,
+                stdout: "https://github.com/jocoding-ax-partners/employee-directory.git\n".into(),
+                stderr: String::new(),
+            },
+            ["git", "rev-parse", "--is-inside-work-tree"] => SpawnResult {
+                exit_code: 0,
+                stdout: "true\n".into(),
+                stderr: String::new(),
+            },
+            ["git", "branch", "--show-current"] => SpawnResult {
+                exit_code: 0,
+                stdout: "main\n".into(),
+                stderr: String::new(),
+            },
+            ["git", "rev-parse", "HEAD"] => SpawnResult {
+                exit_code: 0,
+                stdout: "abc123\n".into(),
+                stderr: String::new(),
+            },
+            ["git", "log", "-1", "--pretty=%s"] => SpawnResult {
+                exit_code: 0,
+                stdout: "init\n".into(),
+                stderr: String::new(),
+            },
+            _ => SpawnResult {
+                exit_code: 1,
+                stdout: String::new(),
+                stderr: String::new(),
+            },
+        }
+    });
+
+    assert_eq!(run.exit_code, EXIT_OK);
+    assert_eq!(
+        run.output.candidate_slug.as_deref(),
+        Some("employee-directory")
+    );
+    assert_eq!(
+        run.output.app_id.as_deref(),
+        Some("f349a303-a294-48c8-96f3-d85d85f5faa7")
+    );
+    assert_eq!(run.output.app_slug.as_deref(), Some("employee-directory"));
+    assert!(run.output.git_repo);
+}
+
+#[test]
+fn preflight_current_app_prefers_git_remote_over_stale_global_cache() {
+    let _lock = env_lock().lock().unwrap();
+    // Clear AXHUB_APP_SLUG so the env source doesn't shadow the remote path, and
+    // enter an empty tempdir so no apphub.yaml/axhub.yaml manifest exists. Then
+    // current_app must come from the git `origin` repo name, NOT the global
+    // last-deploy cache (which would leak a different app's slug into this dir).
+    let guard = EnvGuard::new(&[
+        "AXHUB_APP_SLUG",
+        "AXHUB_PROFILE",
+        "AXHUB_ENDPOINT",
+        "AXHUB_BIN",
+    ]);
+    let _cwd = CwdGuard::enter(guard._dir.path());
+
+    let run = run_preflight_with_runner(|cmd| match cmd {
+        ["axhub", "--version"] => SpawnResult {
+            exit_code: 0,
+            stdout: "axhub 0.15.3\n".into(),
+            stderr: String::new(),
+        },
+        ["axhub", "auth", "status", "--json"] => SpawnResult {
+            exit_code: 0,
+            stdout: r#"{"user_email":"u@example.com","scopes":["deploy"]}"#.into(),
+            stderr: String::new(),
+        },
+        ["git", "config", "--get", "remote.origin.url"] => SpawnResult {
+            exit_code: 0,
+            stdout: "https://github.com/jocoding-ax-partners/employee-directory.git\n".into(),
+            stderr: String::new(),
+        },
+        _ => SpawnResult {
+            exit_code: 0,
+            stdout: "[]".into(),
+            stderr: String::new(),
+        },
+    });
+
+    assert_eq!(
+        run.output.current_app.as_deref(),
+        Some("employee-directory")
+    );
 }
 
 #[test]
@@ -786,8 +899,11 @@ fn resolve_covers_arg_parsing_auth_parse_ambiguity_and_not_found_paths() {
     assert_eq!(extract_slug_candidate("그거 배포해줘"), None);
     assert!(parse_apps_list("not json").is_none());
     assert!(parse_apps_list(r#"{"apps":"not-array","total":1}"#).is_none());
+    // id is normalized to String now (UUID migration): a string id is valid, so
+    // the dropped entry must be one with a genuinely absent/null id, not merely
+    // non-numeric. Keeps the intent: one valid + one malformed -> len 1.
     assert_eq!(
-        parse_apps_list(r#"[{"id":1,"slug":"paydrop"},{"id":"bad","slug":"skip"}]"#)
+        parse_apps_list(r#"[{"id":1,"slug":"paydrop"},{"id":null,"slug":"skip"}]"#)
             .unwrap()
             .len(),
         1
@@ -915,7 +1031,7 @@ fn resolve_covers_arg_parsing_auth_parse_ambiguity_and_not_found_paths() {
 
     let contains_match = filter_apps_by_slug(
         &[axhub_helpers::resolve::AppRecord {
-            id: 1,
+            id: "1".into(),
             slug: "admin-paydrop".into(),
             name: None,
             github_repo_url: None,

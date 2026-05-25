@@ -147,9 +147,42 @@ fn read_manifest_slug() -> Option<String> {
     None
 }
 
+/// Derive an app-slug candidate from the `origin` git remote. For github-connected
+/// apps (the primary deploy model) the repository name *is* the app slug, so this
+/// covers the common case where the user says "배포해줘" from a connected project
+/// directory with no slug in the utterance or manifest. Returns None when there is
+/// no `origin` remote or the repo name is not a valid slug — callers then fall
+/// through to the existing `no_candidate_slug` path rather than guessing wrong.
+pub(crate) fn read_git_remote_slug<F>(runner: &F) -> Option<String>
+where
+    F: Fn(&[&str]) -> SpawnResult,
+{
+    let out = runner(&["git", "config", "--get", "remote.origin.url"]);
+    if out.exit_code != EXIT_OK {
+        return None;
+    }
+    // Last path segment, minus an optional `.git` suffix. Handles both
+    //   https://github.com/owner/employee-directory.git
+    //   git@github.com:owner/employee-directory.git
+    let last = out
+        .stdout
+        .trim()
+        .trim_end_matches('/')
+        .rsplit(['/', ':'])
+        .next()
+        .unwrap_or("");
+    let repo = last.strip_suffix(".git").unwrap_or(last);
+    // Do not coerce (e.g. lowercase): if the repo name is not already a valid slug,
+    // return None so we never silently resolve to the wrong app.
+    if repo.is_empty() || !SLUG_RE.is_match(repo) {
+        return None;
+    }
+    Some(repo.to_string())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AppRecord {
-    pub id: i64,
+    pub id: String,
     pub slug: String,
     pub name: Option<String>,
     #[serde(default)]
@@ -158,15 +191,26 @@ pub struct AppRecord {
 
 pub fn parse_apps_list(stdout: &str) -> Option<Vec<AppRecord>> {
     let parsed: serde_json::Value = serde_json::from_str(stdout).ok()?;
+    // Envelope key drifted across backend/CLI versions: bare array (legacy),
+    // `apps`/`data` (older `--json`), and `items` (current `axhub apps list --json`,
+    // emitted alongside `total`). Accept all so resolution survives shape changes.
     let arr = parsed
         .as_array()
+        .or_else(|| parsed.get("items").and_then(serde_json::Value::as_array))
         .or_else(|| parsed.get("apps").and_then(serde_json::Value::as_array))
         .or_else(|| parsed.get("data").and_then(serde_json::Value::as_array))?;
     Some(
         arr.iter()
             .filter_map(|item| {
+                let id_value = item.get("id")?;
+                // App IDs migrated integer -> UUID string. Accept either and
+                // normalize to String so a future flip never silently drops apps.
+                let id = id_value
+                    .as_str()
+                    .map(ToOwned::to_owned)
+                    .or_else(|| id_value.as_i64().map(|n| n.to_string()))?;
                 Some(AppRecord {
-                    id: item.get("id")?.as_i64()?,
+                    id,
                     slug: item.get("slug")?.as_str()?.to_string(),
                     name: item
                         .get("name")
@@ -250,7 +294,7 @@ where
 pub struct ResolveOutput {
     pub profile: Option<String>,
     pub endpoint: Option<String>,
-    pub app_id: Option<i64>,
+    pub app_id: Option<String>,
     pub app_slug: Option<String>,
     pub candidate_slug: Option<String>,
     pub matched_apps: Vec<AppMatch>,
@@ -267,7 +311,7 @@ pub struct ResolveOutput {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AppMatch {
-    pub id: i64,
+    pub id: String,
     pub slug: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -285,7 +329,9 @@ where
     F: Fn(&[&str]) -> SpawnResult,
 {
     let parsed_args = parse_resolve_args(args);
-    let candidate = extract_slug_candidate(&parsed_args.user_utterance).or_else(read_manifest_slug);
+    let candidate = extract_slug_candidate(&parsed_args.user_utterance)
+        .or_else(read_manifest_slug)
+        .or_else(|| read_git_remote_slug(&runner));
     let bin = axhub_bin();
     let base = ResolveOutput {
         profile: std::env::var("AXHUB_PROFILE")
@@ -368,7 +414,7 @@ where
         let matched_apps = matches
             .iter()
             .map(|a| AppMatch {
-                id: a.id,
+                id: a.id.clone(),
                 slug: a.slug.clone(),
             })
             .collect();
@@ -384,7 +430,7 @@ where
     let sole = matches[0].clone();
     ResolveRun {
         output: with_git(ResolveOutput {
-            app_id: Some(sole.id),
+            app_id: Some(sole.id.clone()),
             app_slug: Some(sole.slug.clone()),
             matched_apps: vec![AppMatch {
                 id: sole.id,
@@ -394,5 +440,66 @@ where
             ..base
         }),
         exit_code: EXIT_OK,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Current `axhub apps list --json` shape: array under `items`, `id` is a
+    /// UUID string. Regression guard for the silent-drop bug where
+    /// `parse_apps_list` looked only at `apps`/`data` and read `id` via `as_i64`,
+    /// returning None (`apps_list_parse_error`) which collapsed app resolution
+    /// (and, downstream, left `git_repo:false` because resolve returned early).
+    #[test]
+    fn parse_apps_list_handles_items_envelope_with_uuid_string_id() {
+        let stdout = r#"{"items":[{"id":"f349a303-a294-48c8-96f3-d85d85f5faa7","slug":"employee-directory","name":"employee-directory"}],"total":1}"#;
+        let apps = parse_apps_list(stdout).expect("items envelope with uuid id must parse");
+        assert_eq!(apps.len(), 1);
+        assert_eq!(apps[0].id, "f349a303-a294-48c8-96f3-d85d85f5faa7");
+        assert_eq!(apps[0].slug, "employee-directory");
+    }
+
+    /// Backward-compat: legacy `{"apps":[{"id":42,...}]}` numeric-id shape still
+    /// parses, coerced to the String id type.
+    #[test]
+    fn parse_apps_list_still_accepts_legacy_numeric_id() {
+        let stdout = r#"{"apps":[{"id":42,"slug":"legacy-app"}]}"#;
+        let apps = parse_apps_list(stdout).expect("legacy numeric-id envelope must still parse");
+        assert_eq!(apps.len(), 1);
+        assert_eq!(apps[0].id, "42");
+    }
+
+    /// Git-remote candidate derivation: for github-connected apps the repo name is
+    /// the app slug. Covers "배포해줘" from a connected dir with no utterance/manifest
+    /// slug. Invalid repo names (uppercase/underscore) and absent remotes -> None.
+    #[test]
+    fn read_git_remote_slug_extracts_repo_name() {
+        fn slug_for(url: &str, exit_code: i32) -> Option<String> {
+            let stdout = url.to_string();
+            read_git_remote_slug(&move |_: &[&str]| SpawnResult {
+                exit_code,
+                stdout: stdout.clone(),
+                stderr: String::new(),
+            })
+        }
+        assert_eq!(
+            slug_for("https://github.com/owner/employee-directory.git\n", 0).as_deref(),
+            Some("employee-directory")
+        );
+        assert_eq!(
+            slug_for("git@github.com:owner/employee-directory.git", 0).as_deref(),
+            Some("employee-directory")
+        );
+        // no `.git` suffix
+        assert_eq!(
+            slug_for("https://github.com/owner/plain-name", 0).as_deref(),
+            Some("plain-name")
+        );
+        // uppercase/underscore is not a valid slug -> None (no silent coercion)
+        assert_eq!(slug_for("https://github.com/owner/Some_Repo.git", 0), None);
+        // no `origin` remote (git config exits non-zero) -> None
+        assert_eq!(slug_for("", 1), None);
     }
 }

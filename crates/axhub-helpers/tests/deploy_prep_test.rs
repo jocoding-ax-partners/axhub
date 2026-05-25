@@ -54,11 +54,11 @@ fn ok_resolve() -> ResolveRun {
         output: ResolveOutput {
             profile: Some("prod".into()),
             endpoint: Some("https://api.axhub.dev".into()),
-            app_id: Some(42),
+            app_id: Some("42".into()),
             app_slug: Some("paydrop".into()),
             candidate_slug: Some("paydrop".into()),
             matched_apps: vec![AppMatch {
-                id: 42,
+                id: "42".into(),
                 slug: "paydrop".into(),
             }],
             branch: Some("main".into()),
@@ -103,7 +103,7 @@ fn warm_redeploy_merges_to_exit_zero_with_no_bootstrap_plan() {
     let result: DeployPrepResult = compose_deploy_prep(ok_preflight(), ok_resolve());
     assert_eq!(result.exit_code, EXIT_OK);
     assert!(result.preflight.auth_ok);
-    assert_eq!(result.resolve.app_id, Some(42));
+    assert_eq!(result.resolve.app_id, Some("42".to_string()));
     assert!(result.bootstrap_plan.is_none());
 }
 
@@ -190,7 +190,7 @@ fn unauth_preflight_short_circuits_exit_code_priority() {
     let result = compose_deploy_prep(unauth_preflight(), ok_resolve());
     assert_eq!(result.exit_code, EXIT_AUTH);
     assert!(!result.preflight.auth_ok);
-    assert_eq!(result.resolve.app_id, Some(42));
+    assert_eq!(result.resolve.app_id, Some("42".to_string()));
 }
 
 // ── PR B1 (issue #81 M3) — selective refresh tests ────────────────────────────
