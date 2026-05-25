@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("35 top-level keys (2 메타 + 31 SKILL slug + quality_gate + consent channel)", () => {
+  test("36 top-level keys (2 메타 + 32 SKILL slug + quality_gate + consent channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(35);
+    expect(keys).toHaveLength(36);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
@@ -63,6 +63,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "axhub-tdd",
       "clarify",
       "consent-megaskill",
+      "data",
       "deploy",
       "doctor",
       "enable-statusline",
@@ -89,9 +90,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("46 actual safe_default rationale 엔트리 including Phase 26 quality + Plan v6 diagnose + v0.9.3 auth PAT revoke + skill-cli-drift-fix (update.apply_consent + status.deployment_id_pick) + setup (node install + first app)", () => {
+  test("48 actual safe_default rationale 엔트리 including data live-read fallbacks + Phase 26 quality + Plan v6 diagnose + v0.9.3 auth PAT revoke + skill-cli-drift-fix (update.apply_consent + status.deployment_id_pick) + setup (node install + first app)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(46);
+    expect(paths).toHaveLength(48);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -109,6 +110,8 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "axhub-tdd",
       "clarify",
       "consent-megaskill",
+      "data",
+      "data",
       "deploy",
       "deploy",
       "deploy",

@@ -73,6 +73,12 @@
       "직전 버전으로 돌려줘",
       "직전 안정 버전으로 복구 부탁"
     ],
+    "skills/data/SKILL.md": [
+      "데이터 조회해줘",
+      "테이블 설명",
+      "SQL로 읽어줘",
+      "snippet 만들어줘"
+    ],
     "skills/enable-statusline/SKILL.md": [
       "statusline 켜줘",
       "status line 활성화",
@@ -949,5 +955,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-05-25T07:09:24.946Z"
+  "generated_at": "2026-05-25T16:07:31.225Z"
 }

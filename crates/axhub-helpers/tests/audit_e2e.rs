@@ -61,7 +61,7 @@ fn sample_record(label: &str) -> AuditRecord {
         ts: audit::now_iso8601(),
         prompt_hash: audit::sha256_hex(label),
         prompt_len: label.len() as u32,
-        cli_version: Some("0.1.0".into()),
+        cli_version: Some("0.14.0".into()),
         auth_ok: true,
         is_axhub_related: true,
         clarify_invoked: false,
@@ -103,7 +103,7 @@ fn clarify_invoked_default_false_backward_compat() {
         "ts": audit::now_iso8601(),
         "prompt_hash": "sha256:legacy",
         "prompt_len": 12,
-        "cli_version": "0.1.0",
+        "cli_version": "0.14.0",
         "auth_ok": true,
         "is_axhub_related": true
     });

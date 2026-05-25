@@ -256,3 +256,28 @@
 **Priority:** P2
 **Depends on:** setup skill merge (#131)
 **Blocks:** 다음 routing-affecting SKILL 변경의 override-free 통과
+
+## P2 — data skill agent-conformance eval suite
+
+**Why:** v1.1 데이터 레이어 plan (`docs/plans/v1.1-data-layer-cli.md`) 의 핵심 가치는 AXHUB.md + skill description 으로 AI 행동을 규제하는 것 (governance 엔드포인트 시도 0, deny→재시도·우회 0, read invoke 에 `--execute` 사용). plan-eng-review D4 에서 이 agent-conformance 자동 검증은 비용·flaky 우려로 이번 PR non-goal 로 결정했어요. 하지만 spec §8 체크리스트의 "AI 우회 시도 차단" 은 결국 실제 LLM 행동 eval 로만 완전 검증돼요.
+
+**What:**
+- claude-code 에 실프롬프트(예: "직원 데이터에서 부서별 평균 근속") 주고 AXHUB.md 규칙 준수를 eval.
+- 케이스: (a) `/grants`·`/tags`·`/subjects` governance 호출 시도 0, (b) deny(200) 응답에 재시도·다른 SQL 우회 0, (c) read invoke 에 `--execute` 사용, (d) catalog.json `allowed_columns` 밖 column 미사용.
+- 기존 eval 인프라(`eval:megaskill-*`) 재사용 가능성 검토.
+
+**Pros:**
+- AXHUB.md 규칙 회귀를 자동 catch — 규칙이 조용히 깨져도 잡힘.
+- spec §8 체크리스트의 행동 항목을 완전 검증 경로로 닫음.
+
+**Cons:**
+- LLM 비결정성 → flaky 위험. eval threshold/재시도 설계 필요.
+- eval 호출 비용(매 CI run LLM 호출).
+- eval 인프라 구축/유지 비용.
+
+**Context:** plan-eng-review D4 → A 에서 deterministic e2e(governance 미노출·응답형태 assert)만 이번 PR 에 넣고, 순수 agent-conformance 는 명시적 non-goal 로 단언했어요. data 레이어 baseline merge + 실수요 확인 후 진행해요.
+
+**Effort:** human ~3d / CC+gstack ~1h
+**Priority:** P2
+**Depends on:** v1.1 data 레이어 (data skill + sync/snippet) merge
+**Blocks:** 없음

@@ -468,5 +468,23 @@
         "네"
       ]
     }
+  },
+  "data": {
+    "실데이터 read 를 실행할까요?": {
+      "safe_default": "Dry-run only",
+      "rationale": "Live catalog reads can expose sensitive rows. In non-interactive contexts, do not execute reads; show SQL, allowed_columns, and snippet only.",
+      "allowed_safe_defaults": [
+        "Dry-run only",
+        "Run read"
+      ]
+    },
+    "인증 주체가 바뀌었어요. catalog 를 새로 쓸까요?": {
+      "safe_default": "Skip overwrite",
+      "rationale": "A changed auth principal can rewrite local catalog context. Headless runs preserve the existing snapshot and require explicit user confirmation.",
+      "allowed_safe_defaults": [
+        "Skip overwrite",
+        "Overwrite"
+      ]
+    }
   }
 }

@@ -604,6 +604,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "axhub-ship",
       "axhub-tdd",
       "clarify",
+      "data",
       "deploy",
       "doctor",
       "enable-statusline",

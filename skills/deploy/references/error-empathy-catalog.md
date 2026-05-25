@@ -503,3 +503,39 @@ npm install
 `npm install --force` 는 사용하지 마세요 — 의존성 불일치를 숨길 수 있어요.
 
 **버튼:** ["node_modules 삭제 후 재설치", "잠금 파일도 같이 삭제", "도와주세요"]
+
+---
+
+### exit 70 + `catalog.internal_error`
+
+**감정:** 잠깐만요. 데이터 조회를 안전하게 멈췄어요.
+
+**원인:** catalog 서버가 내부 오류를 돌려줬어요. `allowed_columns` 와 masked 정책을 확정하지 못한 상태라 결과를 추측하면 안 돼요.
+
+**해결:** 같은 live read 를 자동 재시도하지 않아요. 먼저 `axhub catalog get` 으로 `allowed_columns` 를 다시 확인하고, `deny_reason` 이 있으면 그대로 보여줘요.
+
+**버튼:** ["catalog get 확인", "관리자에게 전달", "닫기"]
+
+---
+
+### exit 67 + `catalog.not_found`
+
+**감정:** 찾는 데이터 리소스를 못 찾았어요.
+
+**원인:** connector/path 가 catalog 에 없거나 현재 인증 주체가 볼 수 없는 리소스예요.
+
+**해결:** path 를 추측하지 말고 `axhub catalog search --json --limit 200` 으로 후보를 다시 찾은 뒤 정확한 connector/path 만 사용해요.
+
+**버튼:** ["catalog search 실행", "path 다시 입력", "닫기"]
+
+---
+
+### exit 64 + `catalog.sql_format`
+
+**감정:** SQL 모양을 다시 확인해야 해요.
+
+**원인:** SQL 문이 read 전용 형식이 아니거나 catalog 가 허용하는 SELECT 형식을 벗어났어요.
+
+**해결:** row limit 과 `allowed_columns` 를 유지한 채 SELECT 쿼리만 다시 작성해요. write/update/delete 로 바꾸지 않아요.
+
+**버튼:** ["SQL 다시 작성", "schema 보기", "닫기"]
