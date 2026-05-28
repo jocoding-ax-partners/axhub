@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Phase 22.0.4 / 22.1 — fixture axhub shim.
-# Sentinel touch + AXHUB_ALLOW_PROXY=1 강제 + mock-hub forward.
+# Sentinel touch + current CLI-surface stub.
 # 시스템 /usr/local/bin/axhub 호출 0건 검증용 — sentinel 없으면 leak 발생.
 #
 # Phase 22.4 확장 — env-driven stub 분기:
@@ -17,7 +17,13 @@ touch "${SHIM_CASE_DIR}/shim-called"
 # Forward args to mock-impl 또는 simple stub.
 MOCK_IMPL="$(dirname "$0")/axhub-mock-impl.sh"
 if [ -x "$MOCK_IMPL" ]; then
-  AXHUB_ALLOW_PROXY=1 exec "$MOCK_IMPL" "$@"
+  exec "$MOCK_IMPL" "$@"
+fi
+
+JSON=0
+if [ "${1:-}" = "--json" ]; then
+  JSON=1
+  shift
 fi
 
 # mock-impl 부재 시 simple stub — 부재 subcommand 면 unknown 반환.
@@ -69,6 +75,19 @@ case "${1:-}" in
     ;;
   deploy)
     case "${2:-}" in
+      list)
+        if [ "${AXHUB_FIXTURE_DEPLOY_LIST_AUTH:-}" = "invalid" ]; then
+          echo '{"schema_version":"axhub-cli/v1","status":"error","error":{"code":"auth.token_invalid","message":"Bearer token is invalid"}}'
+          exit 65
+        fi
+        echo '{"items":[{"id":"dep-fixture","app_id":"paydrop","status":"running","created_at":"2026-05-11T00:00:00Z"}]}'
+        ;;
+      status)
+        echo '{"id":"dep-fixture","status":"live","created_at":"2026-05-11T00:00:00Z"}'
+        ;;
+      logs)
+        echo '{"items":[{"message":"INFO fixture log ready","source":"runtime"}]}'
+        ;;
       create)
         if [ "${AXHUB_FIXTURE_AUTH:-}" = "expired" ]; then
           echo '{"code":"token_expired","detail":"Bearer token has expired during deploy create"}' >&2

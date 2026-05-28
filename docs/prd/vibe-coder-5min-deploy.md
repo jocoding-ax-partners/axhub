@@ -232,7 +232,7 @@ Bootstrap 중간 실패. State 파일 `app_registered` 상태로 멈춤.
 
 ### W. 사용자 build 중 exit → 재실행 — likelihood HIGH (NEW)
 Step 5 watch 도중 사용자 laptop 닫음. State `deploying`. last_deploy_id pending.
-- Mitigation: bootstrap 재진입 시 state `deploying` + last_deploy_id 존재 → `axhub deploy logs --id <last_deploy_id>` 재 attach. **deploy_create 재 mint 금지** (double charge 방지).
+- Mitigation: bootstrap 재진입 시 state `deploying` + last_deploy_id 존재 → `axhub deploy logs <last_deploy_id> --app <app>` 재 attach. **deploy_create 재 mint 금지** (double charge 방지).
 - 추가: bootstrap state 에 `deploy_create_attempted_at` timestamp 저장. 24시간 경과 + status unknown 면 정상 retry 허용.
 
 ### V. apps_create 5xx transient — likelihood MED (NEW)

@@ -1,29 +1,13 @@
-use std::fs;
-#[cfg(not(coverage))]
-use std::net::{TcpStream, ToSocketAddrs};
-use std::path::PathBuf;
-#[cfg(not(coverage))]
-use std::sync::Arc;
-#[cfg(not(coverage))]
-use std::time::Duration;
-
-use base64::Engine;
-#[cfg(not(coverage))]
-use rustls::pki_types::ServerName;
-#[cfg(not(coverage))]
-use rustls::{ClientConfig, ClientConnection, RootCertStore};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use thiserror::Error;
+use serde_json::Value;
 
-pub const DEFAULT_ENDPOINT: &str = "https://axhub-api.jocodingax.ai";
-pub const HUB_API_HOST: &str = "axhub-api.jocodingax.ai";
+use crate::axhub_cli::{run_axhub, CliOutput, DEFAULT_AXHUB_TIMEOUT};
+use crate::cli_envelope::{
+    envelope_status, error_code, error_message, parse_json_stdout, rows, status_string,
+    string_at_any, unwrap_data,
+};
+
 pub const DEFAULT_LIMIT: usize = 5;
-pub const TLS_PIN_TIMEOUT_MS: u64 = 5_000;
-// SPKI pin for axhub-api.jocodingax.ai (hub-api.jocodingax.ai is decommissioned —
-// migrated host + matching leaf SPKI pin together so TLS pinning keeps working).
-pub const HUB_API_SPKI_SHA256_PINS: &[&str] =
-    &["sha256/8bK9T3frw7OUjaSrInC5bIcJxE6hVBmI81KjA6yr5xo="];
 pub const EXIT_LIST_OK: i32 = 0;
 pub const EXIT_LIST_AUTH: i32 = 65;
 pub const EXIT_LIST_NOT_FOUND: i32 = 67;
@@ -31,19 +15,24 @@ pub const EXIT_LIST_TRANSPORT: i32 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DeploymentSummary {
-    pub id: i64,
-    pub app_id: i64,
+    pub id: String,
+    pub app_id: String,
     pub status: String,
     pub commit_sha: String,
     pub commit_message: String,
     pub branch: String,
     pub created_at: String,
 }
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListDeploymentsArgs {
+    /// Legacy public name retained for CLI/API compatibility. Internally this is
+    /// a string app reference accepted by current `axhub deploy list --app`:
+    /// slug, UUID, or any future app ref the canonical CLI understands.
     pub app_id: String,
     pub limit: Option<usize>,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ListDeploymentsResult {
     pub deployments: Vec<DeploymentSummary>,
@@ -53,440 +42,177 @@ pub struct ListDeploymentsResult {
     pub error_message_kr: Option<String>,
 }
 
-#[derive(Debug, Error, Clone, PartialEq, Eq)]
-#[error("{message}")]
-pub struct TlsPinError {
-    pub message: String,
-    pub code: String,
-}
-impl TlsPinError {
-    pub fn new(message: impl Into<String>, code: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-            code: code.into(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HttpResponse {
-    pub status: u16,
-    pub body: String,
-}
-impl HttpResponse {
-    pub fn ok(&self) -> bool {
-        (200..300).contains(&self.status)
-    }
-}
-
-fn home_dir() -> PathBuf {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
-}
-fn token_from_env() -> Option<String> {
-    std::env::var("AXHUB_TOKEN").ok().filter(|s| !s.is_empty())
-}
-fn token_from_file() -> Option<String> {
-    let dir = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home_dir().join(".config"))
-        .join("axhub-plugin");
-    fs::read_to_string(dir.join("token"))
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-}
-pub fn resolve_token() -> Option<String> {
-    token_from_env().or_else(token_from_file)
-}
-pub fn resolve_endpoint() -> String {
-    std::env::var("AXHUB_ENDPOINT")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| DEFAULT_ENDPOINT.into())
-}
-pub fn proxy_override_enabled() -> bool {
-    std::env::var("AXHUB_ALLOW_PROXY").as_deref() == Ok("1")
-}
-
-pub fn pinned_hub_api_url(endpoint: &str) -> Result<Option<reqwest::Url>, TlsPinError> {
-    let url = reqwest::Url::parse(endpoint).map_err(|_| {
-        TlsPinError::new(
-            format!("잘못된 AXHUB_ENDPOINT 값이에요: {endpoint}"),
-            "security.endpoint_invalid",
-        )
-    })?;
-    if url.host_str() != Some(HUB_API_HOST) {
-        return Ok(None);
-    }
-    if url.scheme() != "https" {
-        return Err(TlsPinError::new(
-            "axhub-api.jocodingax.ai 는 HTTPS 로만 호출해야 해요.",
-            "security.tls_required",
-        ));
-    }
-    Ok(Some(url))
-}
-
-pub fn spki_hash_from_cert_der(raw: &[u8]) -> anyhow::Result<String> {
-    let (_, cert) = x509_parser::parse_x509_certificate(raw)
-        .map_err(|e| anyhow::anyhow!("x509 parse failed: {e}"))?;
-    let spki = cert.tbs_certificate.subject_pki.raw;
-    Ok(format!(
-        "sha256/{}",
-        base64::engine::general_purpose::STANDARD.encode(Sha256::digest(spki))
-    ))
-}
-
-#[cfg(coverage)]
-pub fn verify_hub_api_tls_pin(endpoint: &str) -> Result<(), TlsPinError> {
-    if proxy_override_enabled() {
-        return Ok(());
-    }
-    let Some(_url) = pinned_hub_api_url(endpoint)? else {
-        return Ok(());
-    };
-    Err(TlsPinError::new(
-        "coverage build skips live TLS socket validation",
-        "security.tls_pin_failed",
-    ))
-}
-
-#[cfg(not(coverage))]
-pub fn verify_hub_api_tls_pin(endpoint: &str) -> Result<(), TlsPinError> {
-    if proxy_override_enabled() {
-        return Ok(());
-    }
-    let Some(url) = pinned_hub_api_url(endpoint)? else {
-        return Ok(());
-    };
-    let host = url.host_str().unwrap_or(HUB_API_HOST).to_string();
-    let port = url.port().unwrap_or(443);
-    let addr = (host.as_str(), port)
-        .to_socket_addrs()
-        .map_err(|e| {
-            TlsPinError::new(
-                format!("hub-api TLS 연결에 실패했어요: {e}"),
-                "security.tls_pin_failed",
-            )
-        })?
-        .next()
-        .ok_or_else(|| {
-            TlsPinError::new(
-                "hub-api TLS 주소를 찾을 수 없어요.",
-                "security.tls_pin_failed",
-            )
-        })?;
-    let mut sock = TcpStream::connect_timeout(&addr, Duration::from_millis(TLS_PIN_TIMEOUT_MS))
-        .map_err(|e| {
-            TlsPinError::new(
-                format!("hub-api TLS 연결에 실패했어요: {e}"),
-                "security.tls_pin_failed",
-            )
-        })?;
-    sock.set_read_timeout(Some(Duration::from_millis(TLS_PIN_TIMEOUT_MS)))
-        .ok();
-    sock.set_write_timeout(Some(Duration::from_millis(TLS_PIN_TIMEOUT_MS)))
-        .ok();
-    let roots = RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    let config = Arc::new(
-        ClientConfig::builder()
-            .with_root_certificates(roots)
-            .with_no_client_auth(),
-    );
-    let server_name = ServerName::try_from(host.clone()).map_err(|_| {
-        TlsPinError::new(
-            "hub-api TLS 서버 이름이 올바르지 않아요.",
-            "security.endpoint_invalid",
-        )
-    })?;
-    let mut conn = ClientConnection::new(config, server_name).map_err(|e| {
-        TlsPinError::new(
-            format!("hub-api TLS 설정에 실패했어요: {e}"),
-            "security.tls_pin_failed",
-        )
-    })?;
-    while conn.is_handshaking() {
-        conn.complete_io(&mut sock).map_err(|e| {
-            TlsPinError::new(
-                format!("hub-api TLS pin 검증에 실패했어요: {e}"),
-                "security.tls_pin_failed",
-            )
-        })?;
-    }
-    let certs = conn.peer_certificates().ok_or_else(|| {
-        TlsPinError::new(
-            "hub-api 인증서 원본을 읽을 수 없어요.",
-            "security.tls_pin_failed",
-        )
-    })?;
-    let leaf = certs.first().ok_or_else(|| {
-        TlsPinError::new(
-            "hub-api 인증서 원본을 읽을 수 없어요.",
-            "security.tls_pin_failed",
-        )
-    })?;
-    let actual = spki_hash_from_cert_der(leaf.as_ref()).map_err(|e| {
-        TlsPinError::new(
-            format!("hub-api TLS pin 검증에 실패했어요: {e}"),
-            "security.tls_pin_failed",
-        )
-    })?;
-    if HUB_API_SPKI_SHA256_PINS.contains(&actual.as_str()) {
-        Ok(())
-    } else {
-        Err(TlsPinError::new(
-            format!("hub-api TLS pin mismatch: {actual}"),
-            "security.tls_pin_failed",
-        ))
-    }
-}
-
-fn parse_app_id(raw: &str) -> Option<i64> {
-    raw.parse::<i64>().ok().filter(|n| *n > 0)
-}
-fn status_name(status: i64) -> String {
-    match status {
-        0 => "pending",
-        1 => "building",
-        2 => "deploying",
-        3 => "active",
-        4 => "failed",
-        5 => "stopped",
-        _ => return format!("unknown_{status}"),
-    }
-    .to_string()
-}
-fn build_auth_error() -> ListDeploymentsResult {
-    ListDeploymentsResult { deployments: vec![], endpoint_used: resolve_endpoint(), exit_code: EXIT_LIST_AUTH, error_code: Some("auth.token_missing".into()), error_message_kr: Some("axhub 토큰을 찾을 수 없어요. 한 번만 로그인하시면 다음부터는 자동으로 작동해요:\n  axhub auth login\n또는 환경변수 우회: export AXHUB_TOKEN=axhub_pat_...".into()) }
-}
-
-#[derive(Debug, Deserialize)]
-struct BackendDeployment {
-    id: i64,
-    app_id: i64,
-    status: i64,
-    commit_sha: String,
-    commit_message: Option<String>,
-    branch: Option<String>,
-    created_at: String,
-}
-#[derive(Debug, Deserialize)]
-struct BackendData {
-    deployments: Option<Vec<BackendDeployment>>,
-}
-#[derive(Debug, Deserialize)]
-struct BackendListEnvelope {
-    data: Option<BackendData>,
-}
-
-pub fn run_list_deployments_with_fetch<F, T>(
-    args: ListDeploymentsArgs,
-    fetch_fn: F,
-    tls_pin_checker: Option<T>,
-) -> ListDeploymentsResult
-where
-    F: Fn(&str, &str) -> Result<HttpResponse, anyhow::Error>,
-    T: Fn(&str) -> Result<(), TlsPinError>,
-{
-    let endpoint = resolve_endpoint();
-    let token = match resolve_token() {
-        Some(t) => t,
-        None => return build_auth_error(),
-    };
-    let app_id = match parse_app_id(&args.app_id) { Some(id) => id, None => return ListDeploymentsResult { deployments: vec![], endpoint_used: endpoint, exit_code: EXIT_LIST_NOT_FOUND, error_code: Some("validation.app_id_invalid".into()), error_message_kr: Some(format!("앱 ID '{}' 형식이 잘못됐어요. 숫자만 입력해주세요. (slug 입력 시 axhub apps list 로 ID 확인)", args.app_id)) } };
-    let limit = args.limit.unwrap_or(DEFAULT_LIMIT);
-    let url = format!("{endpoint}/api/v1/apps/{app_id}/deployments?per_page={limit}");
-    let resp = match (|| -> Result<HttpResponse, anyhow::Error> {
-        if let Some(checker) = tls_pin_checker.as_ref() {
-            checker(&endpoint).map_err(|e| anyhow::anyhow!(e))?;
-        }
-        fetch_fn(&url, &token)
-    })() {
-        Ok(r) => r,
-        Err(e) => {
-            return ListDeploymentsResult {
-                deployments: vec![],
-                endpoint_used: endpoint,
-                exit_code: EXIT_LIST_TRANSPORT,
-                error_code: Some(if let Some(pin) = e.downcast_ref::<TlsPinError>() {
-                    pin.code.clone()
-                } else {
-                    "transport.network_error".into()
-                }),
-                error_message_kr: Some(format!(
-                    "axhub 서버까지 연결이 끊겼어요. 네트워크 확인 후 다시 시도해주세요. ({e})"
-                )),
-            }
-        }
-    };
-    match resp.status {
-        401 | 403 => {
-            return ListDeploymentsResult {
-                deployments: vec![],
-                endpoint_used: endpoint,
-                exit_code: EXIT_LIST_AUTH,
-                error_code: Some("auth.token_invalid".into()),
-                error_message_kr: Some(
-                    "토큰이 만료되었거나 권한이 없어요. axhub auth login 으로 다시 인증해주세요."
-                        .into(),
-                ),
-            }
-        }
-        404 => {
-            return ListDeploymentsResult {
-                deployments: vec![],
-                endpoint_used: endpoint,
-                exit_code: EXIT_LIST_NOT_FOUND,
-                error_code: Some("resource.app_not_found".into()),
-                error_message_kr: Some(format!(
-                    "app id {app_id} 를 찾을 수 없어요. axhub apps list 로 정확한 ID 확인해주세요."
-                )),
-            }
-        }
-        s if !(200..300).contains(&s) => {
-            return ListDeploymentsResult {
-                deployments: vec![],
-                endpoint_used: endpoint,
-                exit_code: EXIT_LIST_TRANSPORT,
-                error_code: Some(format!("http.{s}")),
-                error_message_kr: Some(format!(
-                    "서버 응답 에러 (HTTP {s}). 잠시 후 다시 시도해주세요."
-                )),
-            }
-        }
-        _ => {}
-    }
-    let env: BackendListEnvelope = match serde_json::from_str(&resp.body) {
-        Ok(v) => v,
-        Err(e) => {
-            return ListDeploymentsResult {
-                deployments: vec![],
-                endpoint_used: endpoint,
-                exit_code: EXIT_LIST_TRANSPORT,
-                error_code: Some("response.invalid_json".into()),
-                error_message_kr: Some(format!("응답 파싱 실패. ({e})")),
-            }
-        }
-    };
-    let deployments = env
-        .data
-        .and_then(|d| d.deployments)
-        .unwrap_or_default()
-        .into_iter()
-        .map(|d| DeploymentSummary {
-            id: d.id,
-            app_id: d.app_id,
-            status: status_name(d.status),
-            commit_sha: d.commit_sha,
-            commit_message: d.commit_message.unwrap_or_default(),
-            branch: d.branch.unwrap_or_default(),
-            created_at: d.created_at,
-        })
-        .collect();
-    ListDeploymentsResult {
-        deployments,
-        endpoint_used: endpoint,
-        exit_code: EXIT_LIST_OK,
-        error_code: None,
-        error_message_kr: None,
-    }
-}
-
-#[cfg(coverage)]
-pub fn run_list_deployments(args: ListDeploymentsArgs) -> ListDeploymentsResult {
-    run_list_deployments_with_fetch(
-        args,
-        |_url, _token| {
-            Ok(HttpResponse {
-                status: 200,
-                body: r#"{"data":{"deployments":[]}}"#.into(),
-            })
-        },
-        Some(verify_hub_api_tls_pin),
-    )
-}
-
-#[cfg(not(coverage))]
-pub fn run_list_deployments(args: ListDeploymentsArgs) -> ListDeploymentsResult {
-    run_list_deployments_with_fetch(
-        args,
-        |url, token| {
-            let client = reqwest::blocking::Client::new();
-            let resp = client
-                .get(url)
-                .bearer_auth(token)
-                .header("Accept", "application/json")
-                .send()?;
-            let status = resp.status().as_u16();
-            let body = resp.text()?;
-            Ok(HttpResponse { status, body })
-        },
-        Some(verify_hub_api_tls_pin),
-    )
-}
-
-// ── In-flight deploy detection ────────────────────────────────────────────────
-
 /// Default window for "recently pushed" classification (separate from
 /// `recovery_scan::DEFAULT_STALE_THRESHOLD_SECS` even though the numeric
 /// value is the same — the two thresholds serve different purposes).
 pub const RECENTLY_PUSHED_WINDOW_SECS: u64 = 60;
 
 /// Statuses that indicate a deploy is actively in progress.
-const IN_FLIGHT_STATUSES: &[&str] = &["pending", "building", "deploying"];
+const IN_FLIGHT_STATUSES: &[&str] = &[
+    "pending",
+    "queued",
+    "building",
+    "deploying",
+    "running",
+    "in_progress",
+];
 
 /// A deploy that is currently in-flight for a given app.
 ///
-/// JSON shape: `{"id": i64, "status": "<str>", "created_at": "<RFC3339>", "commit_sha": "<str>"}`.
+/// JSON shape: `{"id": "<str>", "status": "<str>", "created_at": "<RFC3339>", "commit_sha": "<str>"}`.
 /// `seconds_since_created` is kept for internal computation (saturating_sub
 /// clock-skew guard) but excluded from the public JSON envelope — the SKILL
 /// layer uses shell `date` arithmetic for deterministic timing comparisons.
-///
-/// `commit_sha` is the git commit hash of the deploy event, used by SKILL
-/// Step 1.6 to distinguish same-commit (current user's deploy) vs cross-tenant
-/// (another user's deploy on the same app). Empty string when backend response
-/// omits the field — routed to "uncertain" Step 1.6c branch (safe fallback).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InFlightDeploy {
-    pub id: i64,
+    pub id: String,
     pub status: String,
-    pub created_at: String, // RFC3339
+    pub created_at: String,
     #[serde(default)]
     pub commit_sha: String,
     #[serde(skip)]
     pub seconds_since_created: u64,
 }
 
-/// Testable core: fetches the deployment list via `fetch_fn` and returns the
-/// first in-flight deploy within `window_secs`, or `None`.
-///
-/// - Filters status ∈ {pending, building, deploying}.
-/// - Filters `created_at` within last `window_secs`.
-/// - `seconds_since_created` uses `saturating_sub` to defend against clock
-///   skew underflow (clock skew where created_at > now).
-/// - Does NOT match on `commit_sha`.
-pub fn find_app_in_flight_with_fetch<F, T>(
-    app_id: i64,
+pub fn list_deployments_cli_args(args: &ListDeploymentsArgs) -> Vec<String> {
+    let limit = args
+        .limit
+        .unwrap_or(DEFAULT_LIMIT)
+        .clamp(1, 100)
+        .to_string();
+    vec![
+        "--json".into(),
+        "deploy".into(),
+        "list".into(),
+        "--app".into(),
+        args.app_id.clone(),
+        "--page-size".into(),
+        limit,
+    ]
+}
+
+pub fn run_list_deployments(args: ListDeploymentsArgs) -> ListDeploymentsResult {
+    run_list_deployments_with_runner(args, |argv| {
+        let refs = argv.iter().map(String::as_str).collect::<Vec<_>>();
+        run_axhub(&refs)
+    })
+}
+
+pub fn run_list_deployments_with_runner<F>(
+    args: ListDeploymentsArgs,
+    runner: F,
+) -> ListDeploymentsResult
+where
+    F: Fn(&[String]) -> CliOutput,
+{
+    let argv = list_deployments_cli_args(&args);
+    let output = runner(&argv);
+    parse_list_deployments_cli_output(&args, output)
+}
+
+pub fn parse_list_deployments_cli_output(
+    args: &ListDeploymentsArgs,
+    output: CliOutput,
+) -> ListDeploymentsResult {
+    if output.timed_out {
+        return transport_error("transport.timeout", "axhub deploy list timeout (5초)");
+    }
+    if output.exit_code == 127 {
+        return transport_error("transport.spawn_failed", "axhub CLI 실행에 실패했어요.");
+    }
+
+    let parsed = match parse_json_stdout(&output.stdout) {
+        Ok(value) => value,
+        Err(err) => {
+            let code = exit_to_error_code(output.exit_code, None);
+            if output.exit_code == EXIT_LIST_OK {
+                return transport_error(
+                    "response.invalid_json",
+                    &format!("axhub deploy list 응답 파싱 실패. ({err})"),
+                );
+            }
+            return ListDeploymentsResult {
+                deployments: vec![],
+                endpoint_used: "cli".into(),
+                exit_code: exit_to_helper_exit(output.exit_code, code.as_deref()),
+                error_code: Some(code.unwrap_or_else(|| "response.invalid_json".into())),
+                error_message_kr: Some(first_non_empty(&[
+                    output.stderr.as_str(),
+                    "axhub deploy list 실행에 실패했어요.",
+                ])),
+            };
+        }
+    };
+
+    if output.exit_code != 0 || envelope_status(&parsed) == Some("error") {
+        let code = error_code(&parsed).or_else(|| exit_to_error_code(output.exit_code, None));
+        return ListDeploymentsResult {
+            deployments: vec![],
+            endpoint_used: "cli".into(),
+            exit_code: exit_to_helper_exit(output.exit_code, code.as_deref()),
+            error_code: code,
+            error_message_kr: Some(error_message(&parsed).unwrap_or_else(|| {
+                first_non_empty(&[
+                    output.stderr.as_str(),
+                    "axhub deploy list 실행에 실패했어요.",
+                ])
+            })),
+        };
+    }
+
+    let deployments = rows(&parsed)
+        .iter()
+        .filter_map(|row| deployment_summary_from_value(row, &args.app_id))
+        .collect::<Vec<_>>();
+
+    ListDeploymentsResult {
+        deployments,
+        endpoint_used: "cli".into(),
+        exit_code: EXIT_LIST_OK,
+        error_code: None,
+        error_message_kr: None,
+    }
+}
+
+pub fn find_app_in_flight_with_runner<F>(
+    app_ref: &str,
     now: chrono::DateTime<chrono::Utc>,
     window_secs: u64,
-    fetch_fn: F,
-    tls_pin_checker: Option<T>,
+    runner: F,
 ) -> Result<Option<InFlightDeploy>, anyhow::Error>
 where
-    F: Fn(&str, &str) -> Result<HttpResponse, anyhow::Error>,
-    T: Fn(&str) -> Result<(), TlsPinError>,
+    F: Fn(&[String]) -> CliOutput,
 {
-    let result = run_list_deployments_with_fetch(
+    let result = run_list_deployments_with_runner(
         ListDeploymentsArgs {
-            app_id: app_id.to_string(),
+            app_id: app_ref.to_string(),
             limit: Some(DEFAULT_LIMIT),
         },
-        fetch_fn,
-        tls_pin_checker,
+        runner,
     );
+    in_flight_from_list_result(result, now, window_secs)
+}
 
+pub fn find_app_in_flight_with_window(
+    app_ref: &str,
+    now: chrono::DateTime<chrono::Utc>,
+    window_secs: u64,
+) -> Result<Option<InFlightDeploy>, anyhow::Error> {
+    find_app_in_flight_with_runner(app_ref, now, window_secs, |argv| {
+        let refs = argv.iter().map(String::as_str).collect::<Vec<_>>();
+        crate::axhub_cli::run_axhub_with_timeout(
+            &crate::axhub_cli::axhub_bin_from_env(),
+            &refs,
+            DEFAULT_AXHUB_TIMEOUT,
+        )
+    })
+}
+
+fn in_flight_from_list_result(
+    result: ListDeploymentsResult,
+    now: chrono::DateTime<chrono::Utc>,
+    window_secs: u64,
+) -> Result<Option<InFlightDeploy>, anyhow::Error> {
     if result.exit_code != EXIT_LIST_OK {
         return Err(anyhow::anyhow!(result
             .error_message_kr
@@ -496,7 +222,10 @@ where
     let now_secs = now.timestamp().max(0) as u64;
 
     for d in result.deployments {
-        if !IN_FLIGHT_STATUSES.contains(&d.status.as_str()) {
+        if !IN_FLIGHT_STATUSES
+            .iter()
+            .any(|status| status.eq_ignore_ascii_case(&d.status))
+        {
             continue;
         }
         let created_dt = chrono::DateTime::parse_from_rfc3339(&d.created_at)
@@ -505,9 +234,6 @@ where
         let created_secs = created_dt.timestamp().max(0) as u64;
         let seconds_since_created = now_secs.saturating_sub(created_secs);
         if seconds_since_created <= window_secs {
-            // Preserve millisecond precision so SKILL `date` arithmetic
-            // doesn't lose up to 1 s near the 60 s window boundary
-            // (issue #81 C4 — correctness review finding).
             let canonical = created_dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
             return Ok(Some(InFlightDeploy {
                 id: d.id,
@@ -522,253 +248,273 @@ where
     Ok(None)
 }
 
-#[cfg(not(coverage))]
-pub fn find_app_in_flight_with_window(
-    app_id: i64,
-    now: chrono::DateTime<chrono::Utc>,
-    window_secs: u64,
-) -> Result<Option<InFlightDeploy>, anyhow::Error> {
-    find_app_in_flight_with_fetch(
-        app_id,
-        now,
-        window_secs,
-        |url, token| {
-            let client = reqwest::blocking::Client::new();
-            let resp = client
-                .get(url)
-                .bearer_auth(token)
-                .header("Accept", "application/json")
-                .send()?;
-            let status = resp.status().as_u16();
-            let body = resp.text()?;
-            Ok(HttpResponse { status, body })
-        },
-        Some(verify_hub_api_tls_pin),
+fn deployment_summary_from_value(value: &Value, fallback_app: &str) -> Option<DeploymentSummary> {
+    let value = unwrap_data(value);
+    let id = string_at_any(value, &["id", "deployment_id", "deploy_id"])?;
+    let app_id = string_at_any(value, &["app_id", "appId", "app", "app_slug"])
+        .unwrap_or_else(|| fallback_app.to_string());
+    let status = status_string(value).unwrap_or_else(|| "unknown".into());
+    let commit_sha = string_at_any(value, &["commit_sha", "commit", "sha"]).unwrap_or_default();
+    let commit_message = string_at_any(value, &["commit_message", "message"]).unwrap_or_default();
+    let branch = string_at_any(value, &["branch", "git_branch"]).unwrap_or_default();
+    let created_at = string_at_any(
+        value,
+        &[
+            "created_at",
+            "createdAt",
+            "started_at",
+            "startedAt",
+            "completed_at",
+            "completedAt",
+        ],
     )
+    .unwrap_or_default();
+
+    Some(DeploymentSummary {
+        id,
+        app_id,
+        status,
+        commit_sha,
+        commit_message,
+        branch,
+        created_at,
+    })
 }
 
-#[cfg(coverage)]
-pub fn find_app_in_flight_with_window(
-    _app_id: i64,
-    _now: chrono::DateTime<chrono::Utc>,
-    _window_secs: u64,
-) -> Result<Option<InFlightDeploy>, anyhow::Error> {
-    Ok(None)
+fn exit_to_error_code(exit_code: i32, parsed_code: Option<&str>) -> Option<String> {
+    if let Some(code) = parsed_code {
+        return Some(code.to_string());
+    }
+    match exit_code {
+        0 => None,
+        65 => Some("auth.token_invalid".into()),
+        67 => Some("resource.app_not_found".into()),
+        64 => Some("usage.invalid".into()),
+        124 => Some("transport.timeout".into()),
+        127 => Some("transport.spawn_failed".into()),
+        code => Some(format!("cli.exit_{code}")),
+    }
 }
 
-// ── Unit tests ─────────────────────────────────────────────────────────────────
+fn exit_to_helper_exit(exit_code: i32, code: Option<&str>) -> i32 {
+    match code.unwrap_or_default() {
+        c if c.starts_with("auth.") || exit_code == 65 => EXIT_LIST_AUTH,
+        c if c.contains("not_found") || c == "resource.app_not_found" || exit_code == 67 => {
+            EXIT_LIST_NOT_FOUND
+        }
+        _ => EXIT_LIST_TRANSPORT,
+    }
+}
+
+fn transport_error(code: &str, message: &str) -> ListDeploymentsResult {
+    ListDeploymentsResult {
+        deployments: vec![],
+        endpoint_used: "cli".into(),
+        exit_code: EXIT_LIST_TRANSPORT,
+        error_code: Some(code.into()),
+        error_message_kr: Some(message.into()),
+    }
+}
+
+fn first_non_empty(values: &[&str]) -> String {
+    values
+        .iter()
+        .map(|value| value.trim())
+        .find(|value| !value.is_empty())
+        .unwrap_or("axhub CLI 실행에 실패했어요.")
+        .to_string()
+}
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-
     use super::*;
 
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
-
-    fn ok_pin(_: &str) -> Result<(), TlsPinError> {
-        Ok(())
+    fn cli_ok(body: impl Into<String>) -> CliOutput {
+        CliOutput {
+            stdout: body.into(),
+            stderr: String::new(),
+            exit_code: 0,
+            timed_out: false,
+        }
     }
 
-    fn deployment_json(id: i64, status: i64, created_at: &str) -> serde_json::Value {
+    fn cli_err(code: i32, body: impl Into<String>) -> CliOutput {
+        CliOutput {
+            stdout: body.into(),
+            stderr: String::new(),
+            exit_code: code,
+            timed_out: false,
+        }
+    }
+
+    fn deployment_json(id: impl Into<String>, status: impl Into<Value>, created_at: &str) -> Value {
         serde_json::json!({
-            "id": id,
-            "app_id": 42_i64,
-            "status": status,
+            "id": id.into(),
+            "app_id": "app_42",
+            "status": status.into(),
             "commit_sha": "deadbeef",
             "commit_message": null,
             "branch": null,
-            "created_at": created_at
+            "started_at": created_at
         })
     }
 
-    fn list_response(deps: &[serde_json::Value]) -> String {
-        serde_json::json!({ "data": { "deployments": deps } }).to_string()
-    }
-
-    #[cfg(not(coverage))]
     #[test]
-    fn rustls_crypto_provider_is_unambiguous_without_proxy_override() {
-        let roots = rustls::RootCertStore::empty();
-        let _ = rustls::ClientConfig::builder()
-            .with_root_certificates(roots)
-            .with_no_client_auth();
+    fn builds_current_cli_deploy_list_args() {
+        let args = ListDeploymentsArgs {
+            app_id: "paydrop".into(),
+            limit: Some(3),
+        };
+        assert_eq!(
+            list_deployments_cli_args(&args),
+            vec![
+                "--json",
+                "deploy",
+                "list",
+                "--app",
+                "paydrop",
+                "--page-size",
+                "3"
+            ]
+        );
     }
 
-    /// Only deployments with status pending/building/deploying (0/1/2) are
-    /// returned; active (3), failed (4), stopped (5) must be excluded.
+    #[test]
+    fn parses_current_cli_items_shape_with_string_ids() {
+        let result = parse_list_deployments_cli_output(
+            &ListDeploymentsArgs {
+                app_id: "paydrop".into(),
+                limit: Some(1),
+            },
+            cli_ok(
+                r#"{"items":[{"id":"dep_7","app_id":"app_uuid","status":"running","commit_sha":"abc","started_at":"2026-04-29T00:00:00Z"}]}"#,
+            ),
+        );
+        assert_eq!(result.exit_code, EXIT_LIST_OK);
+        assert_eq!(result.endpoint_used, "cli");
+        assert_eq!(result.deployments[0].id, "dep_7");
+        assert_eq!(result.deployments[0].app_id, "app_uuid");
+        assert_eq!(result.deployments[0].status, "running");
+        assert_eq!(result.deployments[0].created_at, "2026-04-29T00:00:00Z");
+    }
+
+    #[test]
+    fn parses_enveloped_data_items_shape() {
+        let result = parse_list_deployments_cli_output(
+            &ListDeploymentsArgs {
+                app_id: "paydrop".into(),
+                limit: None,
+            },
+            cli_ok(
+                r#"{"schema_version":"1","status":"ok","data":{"items":[{"id":"dep_1","status":"succeeded","started_at":"2026-04-29T00:00:00Z"}]}}"#,
+            ),
+        );
+        assert_eq!(result.exit_code, EXIT_LIST_OK);
+        assert_eq!(result.deployments[0].app_id, "paydrop");
+    }
+
+    #[test]
+    fn maps_cli_auth_and_not_found_errors() {
+        let auth = parse_list_deployments_cli_output(
+            &ListDeploymentsArgs {
+                app_id: "paydrop".into(),
+                limit: None,
+            },
+            cli_err(
+                65,
+                r#"{"schema_version":"1","status":"error","error":{"code":"unauthorized","subcode":"auth.token_invalid","hint":"login"}}"#,
+            ),
+        );
+        assert_eq!(auth.exit_code, EXIT_LIST_AUTH);
+        assert_eq!(auth.error_code.as_deref(), Some("auth.token_invalid"));
+
+        let missing = parse_list_deployments_cli_output(
+            &ListDeploymentsArgs {
+                app_id: "missing".into(),
+                limit: None,
+            },
+            cli_err(
+                67,
+                r#"{"schema_version":"1","status":"error","error":{"subcode":"resource.app_not_found"}}"#,
+            ),
+        );
+        assert_eq!(missing.exit_code, EXIT_LIST_NOT_FOUND);
+    }
+
+    #[test]
+    fn invalid_json_response_body_returns_transport() {
+        let got = parse_list_deployments_cli_output(
+            &ListDeploymentsArgs {
+                app_id: "paydrop".into(),
+                limit: None,
+            },
+            cli_ok("not json"),
+        );
+        assert_eq!(got.exit_code, EXIT_LIST_TRANSPORT);
+        assert_eq!(got.error_code.as_deref(), Some("response.invalid_json"));
+    }
+
     #[test]
     fn filters_status_pending_building_deploying_only() {
-        let _g = ENV_LOCK.lock().unwrap();
-        std::env::set_var("AXHUB_TOKEN", "test_token");
         let now = chrono::Utc::now();
         let recent = (now - chrono::Duration::seconds(30)).to_rfc3339();
+        let body = serde_json::json!({
+            "items": [
+                deployment_json("dep_active", "succeeded", &recent),
+                deployment_json("dep_failed", "failed", &recent),
+                deployment_json("dep_stopped", "stopped", &recent)
+            ]
+        })
+        .to_string();
 
-        let body = list_response(&[
-            deployment_json(1, 3, &recent), // active   — excluded
-            deployment_json(2, 4, &recent), // failed   — excluded
-            deployment_json(3, 5, &recent), // stopped  — excluded
-        ]);
+        let result =
+            find_app_in_flight_with_runner("paydrop", now, 600, move |_argv| cli_ok(body.clone()))
+                .unwrap();
 
-        let result = find_app_in_flight_with_fetch(
-            42,
-            now,
-            600,
-            move |_url, _token| {
-                Ok(HttpResponse {
-                    status: 200,
-                    body: body.clone(),
-                })
-            },
-            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
-        )
-        .unwrap();
-
-        std::env::remove_var("AXHUB_TOKEN");
-        assert!(result.is_none(), "non-in-flight statuses must be excluded");
+        assert!(result.is_none(), "terminal statuses must be excluded");
     }
 
-    /// A pending deploy whose created_at is older than window_secs must be
-    /// excluded (now - created_at > window).
     #[test]
     fn filters_outside_window() {
-        let _g = ENV_LOCK.lock().unwrap();
-        std::env::set_var("AXHUB_TOKEN", "test_token");
         let now = chrono::Utc::now();
-        let old = (now - chrono::Duration::seconds(700)).to_rfc3339(); // 700 s > 600 s window
+        let old = (now - chrono::Duration::seconds(700)).to_rfc3339();
+        let body = serde_json::json!({ "items": [deployment_json("dep_old", "pending", &old)] })
+            .to_string();
 
-        let body = list_response(&[
-            deployment_json(1, 0, &old), // pending but outside window
-        ]);
+        let result =
+            find_app_in_flight_with_runner("paydrop", now, 600, move |_argv| cli_ok(body.clone()))
+                .unwrap();
 
-        let result = find_app_in_flight_with_fetch(
-            42,
-            now,
-            600,
-            move |_url, _token| {
-                Ok(HttpResponse {
-                    status: 200,
-                    body: body.clone(),
-                })
-            },
-            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
-        )
-        .unwrap();
-
-        std::env::remove_var("AXHUB_TOKEN");
         assert!(result.is_none(), "deploy outside window must be excluded");
     }
 
-    /// Happy path: pending deploy within window returns Some with canonical Z created_at.
     #[test]
     fn returns_some_for_in_flight_within_window() {
-        let _g = ENV_LOCK.lock().unwrap();
-        std::env::set_var("AXHUB_TOKEN", "test_token");
         let now = chrono::Utc::now();
         let recent = (now - chrono::Duration::seconds(30)).to_rfc3339();
+        let body = serde_json::json!({ "items": [deployment_json("dep_99", "building", &recent)] })
+            .to_string();
 
-        let body = list_response(&[
-            deployment_json(99, 1, &recent), // building, within window
-        ]);
+        let result =
+            find_app_in_flight_with_runner("paydrop", now, 600, move |_argv| cli_ok(body.clone()))
+                .unwrap()
+                .expect("expected Some for in-flight deploy");
 
-        let result = find_app_in_flight_with_fetch(
-            42,
-            now,
-            600,
-            move |_url, _token| {
-                Ok(HttpResponse {
-                    status: 200,
-                    body: body.clone(),
-                })
-            },
-            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
-        )
-        .unwrap()
-        .expect("expected Some for in-flight deploy");
-
-        std::env::remove_var("AXHUB_TOKEN");
-        assert_eq!(result.id, 99);
+        assert_eq!(result.id, "dep_99");
         assert_eq!(result.status, "building");
-        assert!(
-            result.created_at.ends_with('Z'),
-            "canonical Z form expected: {}",
-            result.created_at
-        );
+        assert!(result.created_at.ends_with('Z'));
         assert!(result.seconds_since_created >= 28 && result.seconds_since_created <= 35);
     }
 
-    /// HTTP 401 (auth failure) propagates as anyhow error from find_app_in_flight_with_fetch.
-    #[test]
-    fn fetch_auth_failure_returns_err() {
-        let _g = ENV_LOCK.lock().unwrap();
-        std::env::set_var("AXHUB_TOKEN", "test_token");
-        let now = chrono::Utc::now();
-
-        let result = find_app_in_flight_with_fetch(
-            42,
-            now,
-            600,
-            |_url, _token| {
-                Ok(HttpResponse {
-                    status: 401,
-                    body: r#"{"error":"unauthorized"}"#.to_string(),
-                })
-            },
-            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
-        );
-
-        std::env::remove_var("AXHUB_TOKEN");
-        assert!(result.is_err(), "401 must surface as Err");
-    }
-
-    /// Malformed created_at field raises a parse error from find_app_in_flight_with_fetch.
     #[test]
     fn malformed_created_at_returns_err() {
-        let _g = ENV_LOCK.lock().unwrap();
-        std::env::set_var("AXHUB_TOKEN", "test_token");
         let now = chrono::Utc::now();
+        let body = serde_json::json!({ "items": [deployment_json("dep_7", "pending", "not-an-rfc3339-timestamp")] })
+            .to_string();
 
-        let body = list_response(&[deployment_json(7, 0, "not-an-rfc3339-timestamp")]);
+        let result =
+            find_app_in_flight_with_runner("paydrop", now, 600, move |_argv| cli_ok(body.clone()));
 
-        let result = find_app_in_flight_with_fetch(
-            42,
-            now,
-            600,
-            move |_url, _token| {
-                Ok(HttpResponse {
-                    status: 200,
-                    body: body.clone(),
-                })
-            },
-            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
-        );
-
-        std::env::remove_var("AXHUB_TOKEN");
         assert!(result.is_err(), "malformed created_at must surface as Err");
-    }
-
-    /// HTTP 200 + non-JSON body must surface as Err from find_app_in_flight_with_fetch
-    /// (issue #81 testing M3 — covers run_list_deployments_with_fetch invalid_json branch).
-    #[test]
-    fn invalid_json_response_body_returns_err() {
-        let _g = ENV_LOCK.lock().unwrap();
-        std::env::set_var("AXHUB_TOKEN", "test_token");
-        let now = chrono::Utc::now();
-
-        let result = find_app_in_flight_with_fetch(
-            42,
-            now,
-            600,
-            |_url, _token| {
-                Ok(HttpResponse {
-                    status: 200,
-                    body: "not json".to_string(),
-                })
-            },
-            Some(ok_pin as fn(&str) -> Result<(), TlsPinError>),
-        );
-
-        std::env::remove_var("AXHUB_TOKEN");
-        assert!(result.is_err(), "invalid JSON body must surface as Err");
     }
 }

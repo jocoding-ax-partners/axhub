@@ -53,7 +53,6 @@ TIMEOUT_CMD="${TIMEOUT_CMD:-$(detect_timeout_cmd)}"
 DEFAULT_TIMEOUT="${DEFAULT_TIMEOUT:-90}"
 DEFAULT_MODEL="${CLAUDE_E2E_MODEL:-claude-haiku-4-5}"
 DEFAULT_CAP_USD="${CLAUDE_E2E_CAP_USD:-0.60}"  # 22.5.5 + 22.2 measurement: simple slash $0.09, multi-step doctor 60s+ overrun. cap 0.60 USD = 4x slash baseline 안전 마진.
-MOCK_HUB_URL="${MOCK_HUB_URL:-http://127.0.0.1:18080}"
 
 spawn_claude() {
   local case_id="$1"
@@ -97,8 +96,8 @@ spawn_claude() {
   #   - 없음 (local dev OAuth) → selective env override 만. env -i 사용 시 macOS Keychain 접근 깨져
   #     "Not logged in" 발생 (실측 22.5.5 후 측정). 부모 env inherit 후 sandbox 변수만 override.
   #
-  # axhub helper bin 은 XDG_CONFIG_HOME/axhub-plugin/token 로 token 위치 결정
-  # (`src/axhub-helpers/index.ts:404`, `list-deployments.ts:90`) — XDG 만 격리하면 token 격리 충분.
+  # axhub helper bin 은 XDG_CONFIG_HOME/axhub-plugin/token 로 token 위치 결정.
+  # list-deployments 같은 read helper 는 canonical axhub CLI shim 으로 위임해요.
   # 단, full env 통과 시 시스템 axhub binary 가 PATH 에 있으면 leak 위험 → fixture shim 을 PATH 1순위 로 prepend.
   local use_full_sandbox=0
   if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
@@ -127,8 +126,6 @@ spawn_claude() {
     CI=1
     TERM=dumb
     LANG=ko_KR.UTF-8
-    AXHUB_ALLOW_PROXY=1
-    AXHUB_ENDPOINT="${MOCK_HUB_URL}"
     AXHUB_SKIP_AUTODOWNLOAD=1
     SHIM_CASE_DIR="${case_out}"
   )

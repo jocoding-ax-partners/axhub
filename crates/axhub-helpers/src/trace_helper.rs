@@ -3,7 +3,7 @@
 // Aggregates three sources into one `TraceReport` for the `axhub:trace`
 // SKILL and the `axhub-helpers trace --json` CLI:
 //   A. event_log    — phase transitions + per-phase duration_ms
-//   B. build_log    — `axhub logs --build --tail N` ERROR/WARN excerpts
+//   B. build_log    — caller-provided deploy build log ERROR/WARN excerpts
 //   C. audit        — recent routing context, time-window correlated
 //
 // The helper is **pure** (no I/O) except for the optional `TraceProbes`
@@ -58,7 +58,8 @@ pub enum TraceError {
     Io(#[from] std::io::Error),
 }
 
-/// Caller-injected build-log probe. Real callers spawn `axhub logs --build`;
+/// Caller-injected build-log probe. Real callers delegate to current
+/// `axhub deploy logs <DEPLOY_ID> --app <APP> --source build`;
 /// tests pass a closure returning canned NDJSON or plain text.
 pub trait TraceProbes {
     fn axhub_build_log(&self, deploy_id: &str, tail: u32) -> String;

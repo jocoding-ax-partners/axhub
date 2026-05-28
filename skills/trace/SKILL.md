@@ -23,7 +23,7 @@ allows-dependency-execution: false
 배포가 왜 실패했는지 evidence 3 source (event_log + build_log + audit) 통합 분석으로 1 화면 안내해요.
 
 <!-- AUTHOR: Phase 25 PR 25.4 — vibe coder 가 "왜 실패했어" 라고 물을 때
-1. preflight 출력의 last_deploy_id 사용 (없으면 list-deployments 의 마지막 Failed)
+1. preflight 출력의 current_app / last_deploy_id 사용 (없으면 list-deployments 의 마지막 Failed)
 2. event_log (phase 전환 + duration) + build_log (마지막 ERROR/WARN) + audit (routing context) 3 source
 3. ERROR pattern catalog 매칭 → references/error-patterns.md 의 4-part empathy entry 출력
 4. 다음 액션 권유 (axhub env / axhub recover / 직접 수정 등)
@@ -59,10 +59,10 @@ echo "$PREFLIGHT_JSON"
 
    **워크플로를 마치면 (마지막 결과 출력 직후) TodoWrite 를 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.** `in_progress` / `pending` 이 하나라도 남으면 다음 SKILL 이 시작될 때 이 SKILL 의 미완료 todo 가 화면에 그대로 남아 버그처럼 보여요. 종료 시점에 미완료 todo 가 0 개여야 해요.
 
-1. **대상 deploy 식별.** preflight 의 `last_deploy_id` 사용해요. 없으면 `axhub-helpers list-deployments --limit 5 --json` 에서 마지막 Failed entry 의 deploy_id 추출. 후보 0 → "추적할 실패 배포 없음" 안내 + 종료.
+1. **대상 deploy 식별.** preflight 의 `current_app` + `last_deploy_id` 사용해요. 없으면 `axhub-helpers list-deployments --app "$APP" --limit 5 --json` 에서 마지막 Failed entry 의 deploy_id 추출. 앱도 모호하면 AskUserQuestion 으로 앱을 먼저 고르고, 후보 0 → "추적할 실패 배포 없음" 안내 + 종료.
 
 2. **3 source 수집 (sequential, 5s timeout per source, 평균 15s 상한).**
-   - **A: event_log** — `axhub-helpers trace --deploy-id=$ID --json` 호출 (내부에서 event_log read + axhub logs build + audit read 다 함)
+   - **A: event_log** — `axhub-helpers trace --deploy-id=$ID --app "$APP" --json` 호출 (내부에서 event_log read + current CLI deploy logs build + audit read 다 함)
    - **B: build_log** — A 가 포함 (helper 가 spawn). 마지막 ERROR/WARN 최대 5 줄
    - **C: audit** — A 가 포함. recent routing context (prompt_hash + is_axhub_related)
 

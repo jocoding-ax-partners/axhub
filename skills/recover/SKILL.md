@@ -70,7 +70,7 @@ To recover:
    ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP_ID> --limit 10
    ```
 
-   ax-hub-cli has no `axhub deploy list` — helper hits REST API directly. On exit 65 (token missing — Phase 7 US-701 이후엔 SessionStart 자동 setup):
+   helper 는 current `axhub deploy list --app <APP> --json` 을 감싼 CLI wrapper 예요. On exit 65 (token missing — Phase 7 US-701 이후엔 SessionStart 자동 setup):
    > "토큰을 찾을 수 없어요. 'axhub auth login' 또는 CC 세션 재시작."
 
    Filter to `status == "succeeded"` and pick the second-most-recent (the most recent succeeded ≠ current state because the user wants to back out).

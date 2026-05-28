@@ -1,5 +1,6 @@
 // Phase 22.2 — Bun mock-hub for axhub plugin E2E.
-// Localhost HTTP only (AXHUB_ALLOW_PROXY=1 우회로 helper bin 이 그대로 호출 가능).
+// Localhost HTTP only legacy backend fixture. Current helper paths should
+// delegate backend reads to the canonical axhub CLI shim.
 // Fixture-driven response, append-only log of every request.
 
 import { existsSync, appendFileSync, readFileSync } from "node:fs";
@@ -34,7 +35,7 @@ const json = (status: number, body: unknown): Response =>
   });
 
 // Phase 22.4 — MOCK_HUB_AUTH_FAIL=1 → 모든 /v1/* + /api/v1/* 가 401 token_expired 반환.
-// case 19 deploy 401 path / case 34 list-deployments 401 stdout error_code positive evidence.
+// Legacy backend-route fixture; current case 34 uses the CLI shim instead.
 const authFail = process.env["MOCK_HUB_AUTH_FAIL"] === "1";
 
 Bun.serve({

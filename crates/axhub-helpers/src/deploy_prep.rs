@@ -56,7 +56,7 @@ pub struct DeployPrepResult {
     pub preflight_exit_code: i32,
     /// In-flight deploy for this app, if one exists within the detection window.
     /// Serialises as JSON `null` when absent (not missing key) via `#[serde(default)]`.
-    /// JSON shape: `{"id": i64, "created_at": "<RFC3339>"}`.
+    /// JSON shape: `{"id": "<str>", "created_at": "<RFC3339>"}`.
     #[serde(default)]
     pub in_flight_deploy: Option<InFlightDeploy>,
     /// True when the resolved app has a linked GitHub repository.
@@ -265,33 +265,28 @@ where
         fresh
     };
 
-    // In-flight detection (skipped by kill switch).
-    //
-    // NOTE (status-first gate, follow-up): `find_app_in_flight_with_window` still
-    // fetches via the legacy numeric-id backend path (`i64` app_id). App IDs are
-    // now UUID strings, so this `parse::<i64>()` fails and in-flight detection
-    // stays None — the SKILL Step 1.7 status-first gate is best-effort until that
-    // path is migrated to the working CLI `axhub deploy list --json` surface.
-    // Deploy itself still resolves correctly via `resolve.app_id`; this only
-    // affects pre-empting a duplicate `deploy create` against an in-flight deploy.
+    // In-flight detection (skipped by kill switch). Current helper delegates the
+    // deployment list to the canonical CLI (`axhub deploy list --app <APP>`), so
+    // slug/UUID/string app references all stay inside the CLI contract instead
+    // of the removed numeric-id backend path.
     if in_flight_check_enabled() {
-        if let Some(numeric_app_id) = result
+        if let Some(app_ref) = result
             .resolve
             .app_id
-            .as_deref()
-            .and_then(|id| id.parse::<i64>().ok())
+            .clone()
+            .filter(|id| !id.trim().is_empty())
         {
             let now = chrono::Utc::now();
             #[cfg(not(coverage))]
             {
                 use crate::list_deployments::find_app_in_flight_with_window;
                 if let Ok(inflight) =
-                    find_app_in_flight_with_window(numeric_app_id, now, IN_FLIGHT_WINDOW_SECS)
+                    find_app_in_flight_with_window(app_ref.as_str(), now, IN_FLIGHT_WINDOW_SECS)
                 {
                     apply_in_flight(&mut result, inflight);
                 }
             }
-            let _ = (numeric_app_id, now); // suppress unused warnings in coverage builds
+            let _ = (app_ref, now); // suppress unused warnings in coverage builds
         }
     }
 
@@ -377,7 +372,7 @@ mod tests {
 
     fn in_flight_deploy() -> InFlightDeploy {
         InFlightDeploy {
-            id: 99,
+            id: "dep_99".into(),
             status: "building".into(),
             created_at: "2024-01-01T00:00:00Z".into(),
             commit_sha: "deadbeefcafe1234567890abcdef0123456789ab".into(),
@@ -423,9 +418,9 @@ mod tests {
     /// SKILL Step 1.6c (uncertain) 분기로 라우팅 가능.
     #[test]
     fn in_flight_deploy_deserializes_with_default_commit_sha() {
-        let json = r#"{"id":42,"status":"building","created_at":"2024-01-01T00:00:00Z"}"#;
+        let json = r#"{"id":"dep_42","status":"building","created_at":"2024-01-01T00:00:00Z"}"#;
         let parsed: InFlightDeploy = serde_json::from_str(json).unwrap();
-        assert_eq!(parsed.id, 42);
+        assert_eq!(parsed.id, "dep_42");
         assert_eq!(parsed.commit_sha, "", "missing commit_sha → empty default");
     }
 

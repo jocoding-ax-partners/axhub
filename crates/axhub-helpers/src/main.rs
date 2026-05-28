@@ -37,7 +37,7 @@ use chrono::Utc;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -200,6 +200,13 @@ fn cmd_token_init(args: &[String]) -> anyhow::Result<i32> {
     let (token, source) = match env_token() {
         Some(token) => (token, "env:AXHUB_TOKEN".to_string()),
         None => {
+            if cli_auth_status_ok() {
+                return store_and_report_token(
+                    json_output,
+                    "cli-auth-ok\n",
+                    "axhub-cli-auth-status",
+                );
+            }
             let keychain = read_keychain_token();
             match keychain.token {
                 Some(token) => (
@@ -223,10 +230,21 @@ fn cmd_token_init(args: &[String]) -> anyhow::Result<i32> {
     store_and_report_token(json_output, &token, &source)
 }
 
+fn cli_auth_status_ok() -> bool {
+    let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
+    let out = axhub_helpers::axhub_cli::run_axhub_with_timeout(
+        &axhub_bin,
+        &["--json", "auth", "status"],
+        std::time::Duration::from_secs(5),
+    );
+    out.exit_code == 0 && !out.timed_out && auth_status_stdout_is_authorized(&out.stdout)
+}
+
 /// Phase 3.5 token-freshness gate, Rust port of hooks/token-freshness-gate.sh.
 ///
-/// Polls the local axhub token file mtime against a "session_ts" anchor (now - 30s)
-/// and falls back to an inline `axhub auth status --json` probe on timeout. The
+/// Polls the local axhub compatibility token marker mtime against a
+/// "session_ts" anchor (now - 30s) and falls back to an inline
+/// `axhub auth status --json` probe on timeout. The
 /// SKILL deploy Step 3.5 calls this subcommand directly (NOT through hooks.json),
 /// so polling can block up to `AXHUB_GATE_POLL_INTERVAL * AXHUB_GATE_POLL_ITERATIONS`
 /// seconds without hitting Claude Code hook timeouts.
@@ -243,7 +261,7 @@ fn cmd_token_init(args: &[String]) -> anyhow::Result<i32> {
 ///                                wrapper but breaks pipes/env-assignments overrides.
 ///
 /// Exit codes:
-///   0   token fresh OR inline probe matches `"user_email"` OR hook disabled
+///   0   token marker fresh OR inline probe reports an authorized CLI auth state OR hook disabled
 ///   65  inline probe completed but did not match `"user_email"` (UNAUTHORIZED)
 ///   Any other error falls through to exit 0 (fail-open contract).
 fn cmd_token_gate(_rest: &[String]) -> anyhow::Result<i32> {
@@ -349,7 +367,7 @@ fn inline_auth_check() -> anyhow::Result<i32> {
     {
         Ok(out) => {
             let stdout_str = String::from_utf8_lossy(&out.stdout);
-            if stdout_str.contains("\"user_email\"") {
+            if auth_status_stdout_is_authorized(&stdout_str) {
                 Ok(0)
             } else {
                 eprintln!("[token-gate] auth UNAUTHORIZED, exit 65");
@@ -361,6 +379,36 @@ fn inline_auth_check() -> anyhow::Result<i32> {
             Ok(0)
         }
     }
+}
+
+fn auth_status_stdout_is_authorized(stdout: &str) -> bool {
+    let Ok(parsed) = serde_json::from_str::<Value>(stdout.trim()) else {
+        return stdout.contains("\"user_email\"");
+    };
+    if parsed
+        .get("status")
+        .and_then(Value::as_str)
+        .is_some_and(|status| status.eq_ignore_ascii_case("error"))
+    {
+        return false;
+    }
+    let data = if parsed.get("schema_version").is_some() || parsed.get("status").is_some() {
+        parsed.get("data").unwrap_or(&parsed)
+    } else {
+        &parsed
+    };
+    data.get("user_email")
+        .or_else(|| data.get("email"))
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.trim().is_empty())
+        || data
+            .get("authenticated")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        || data
+            .get("logged_in")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
 }
 
 /// Phase 3.1 post-install — handles symlink/copy + .gitignore + post-commit hook
@@ -1892,64 +1940,53 @@ fn run_probe_with_timeout(
     axhub_bin: &str,
     args: &[&str],
 ) -> axhub_helpers::verify_helper::ProbeResult {
-    let mut child = match std::process::Command::new(axhub_bin)
-        .args(args)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-    {
-        Ok(child) => child,
-        Err(_) => {
-            return axhub_helpers::verify_helper::ProbeResult {
-                stdout: String::new(),
-                exit_code: 127,
-                timed_out: false,
-            };
-        }
-    };
-
-    let start = std::time::Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => {
-                return match child.wait_with_output() {
-                    Ok(output) => axhub_helpers::verify_helper::ProbeResult {
-                        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                        exit_code: output.status.code().unwrap_or(127),
-                        timed_out: false,
-                    },
-                    Err(_) => axhub_helpers::verify_helper::ProbeResult {
-                        stdout: String::new(),
-                        exit_code: 127,
-                        timed_out: false,
-                    },
-                };
-            }
-            Ok(None) if start.elapsed() >= AXHUB_PROBE_TIMEOUT => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return axhub_helpers::verify_helper::ProbeResult {
-                    stdout: String::new(),
-                    exit_code: 124,
-                    timed_out: true,
-                };
-            }
-            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(25)),
-            Err(_) => {
-                return axhub_helpers::verify_helper::ProbeResult {
-                    stdout: String::new(),
-                    exit_code: 127,
-                    timed_out: false,
-                };
-            }
-        }
+    let out =
+        axhub_helpers::axhub_cli::run_axhub_with_timeout(axhub_bin, args, AXHUB_PROBE_TIMEOUT);
+    axhub_helpers::verify_helper::ProbeResult {
+        stdout: out.stdout,
+        exit_code: out.exit_code,
+        timed_out: out.timed_out,
     }
+}
+
+fn latest_deploy_id_for_app(axhub_bin: &str, app_id: &str) -> Option<String> {
+    let out = run_probe_with_timeout(
+        axhub_bin,
+        &[
+            "--json",
+            "deploy",
+            "list",
+            "--app",
+            app_id,
+            "--page-size",
+            "1",
+        ],
+    );
+    if out.exit_code != 0 || out.timed_out {
+        return None;
+    }
+    let parsed = serde_json::from_str::<serde_json::Value>(&out.stdout).ok()?;
+    axhub_helpers::cli_envelope::rows(&parsed)
+        .first()
+        .and_then(|row| {
+            axhub_helpers::cli_envelope::string_at_any(row, &["id", "deployment_id", "deploy_id"])
+        })
 }
 
 impl axhub_helpers::verify_helper::VerifyProbes for RealVerifyProbes {
     fn axhub_status(&self, app_id: &str) -> axhub_helpers::verify_helper::ProbeResult {
         let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
-        run_probe_with_timeout(&axhub_bin, &["status", "--json", "--app-id", app_id])
+        let Some(deploy_id) = latest_deploy_id_for_app(&axhub_bin, app_id) else {
+            return axhub_helpers::verify_helper::ProbeResult {
+                stdout: r#"{"state":"unknown","last_deploy_id":null}"#.to_string(),
+                exit_code: 0,
+                timed_out: false,
+            };
+        };
+        run_probe_with_timeout(
+            &axhub_bin,
+            &["--json", "deploy", "status", &deploy_id, "--app", app_id],
+        )
     }
 
     fn axhub_logs_tail(
@@ -1958,15 +1995,18 @@ impl axhub_helpers::verify_helper::VerifyProbes for RealVerifyProbes {
         lines: u32,
     ) -> axhub_helpers::verify_helper::ProbeResult {
         let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
+        let Some(deploy_id) = latest_deploy_id_for_app(&axhub_bin, app_id) else {
+            return axhub_helpers::verify_helper::ProbeResult {
+                stdout: String::new(),
+                exit_code: 0,
+                timed_out: false,
+            };
+        };
+        let limit = lines.to_string();
         run_probe_with_timeout(
             &axhub_bin,
             &[
-                "logs",
-                "--runtime",
-                "--tail",
-                &lines.to_string(),
-                "--app-id",
-                app_id,
+                "--json", "deploy", "logs", &deploy_id, "--app", app_id, "--limit", &limit,
             ],
         )
     }
@@ -2178,50 +2218,40 @@ fn cmd_doctor(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-struct RealTraceProbes;
+struct RealTraceProbes {
+    app_ref: Option<String>,
+}
 
 const AXHUB_TRACE_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 fn axhub_stdout_with_timeout(axhub_bin: &str, args: &[&str]) -> Result<String, &'static str> {
-    let mut child = std::process::Command::new(axhub_bin)
-        .args(args)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .map_err(|_| "spawn")?;
-
-    let start = std::time::Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => {
-                return child
-                    .wait_with_output()
-                    .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
-                    .map_err(|_| "wait");
-            }
-            Ok(None) if start.elapsed() >= AXHUB_TRACE_PROBE_TIMEOUT => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err("timeout");
-            }
-            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(25)),
-            Err(_) => return Err("wait"),
-        }
+    let out = axhub_helpers::axhub_cli::run_axhub_with_timeout(
+        axhub_bin,
+        args,
+        AXHUB_TRACE_PROBE_TIMEOUT,
+    );
+    if out.timed_out {
+        return Err("timeout");
     }
+    if out.exit_code == 127 && out.stdout.is_empty() {
+        return Err("spawn");
+    }
+    Ok(out.stdout)
 }
 
 impl axhub_helpers::trace_helper::TraceProbes for RealTraceProbes {
     fn axhub_build_log(&self, deploy_id: &str, tail: u32) -> String {
+        let Some(app_ref) = self.app_ref.as_deref() else {
+            return "WARN axhub build log probe skipped: --app is required for current deploy logs"
+                .to_string();
+        };
         let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
+        let tail = tail.to_string();
         match axhub_stdout_with_timeout(
             &axhub_bin,
             &[
-                "logs",
-                "--build",
-                "--tail",
-                &tail.to_string(),
-                "--deploy-id",
-                deploy_id,
+                "--json", "deploy", "logs", deploy_id, "--app", app_ref, "--source", "build",
+                "--limit", &tail,
             ],
         ) {
             Ok(stdout) => stdout,
@@ -2299,6 +2329,7 @@ fn humanize_trace_korean(report: &axhub_helpers::trace_helper::TraceReport) -> S
 
 fn cmd_trace(args: &[String]) -> anyhow::Result<i32> {
     let mut deploy_id: Option<String> = None;
+    let mut app_ref: Option<String> = None;
     let mut json_mode = false;
     let mut i = 0;
     while i < args.len() {
@@ -2313,6 +2344,15 @@ fn cmd_trace(args: &[String]) -> anyhow::Result<i32> {
             other if other.starts_with("--deploy-id=") => {
                 deploy_id = Some(other.trim_start_matches("--deploy-id=").to_string());
             }
+            "--app" => {
+                if i + 1 < args.len() {
+                    app_ref = Some(args[i + 1].clone());
+                    i += 1;
+                }
+            }
+            other if other.starts_with("--app=") => {
+                app_ref = Some(other.trim_start_matches("--app=").to_string());
+            }
             _ => {}
         }
         i += 1;
@@ -2323,7 +2363,7 @@ fn cmd_trace(args: &[String]) -> anyhow::Result<i32> {
         return Ok(64);
     };
 
-    let probes = RealTraceProbes;
+    let probes = RealTraceProbes { app_ref };
     let report = axhub_helpers::trace_helper::trace(&deploy_id, &probes)?;
 
     if json_mode {
@@ -2349,7 +2389,7 @@ fn cmd_auth_refresh_bg() -> anyhow::Result<i32> {
         return Ok(0);
     }
     let result = std::process::Command::new(&axhub_bin)
-        .args(["auth", "login", "--browser", "--force"])
+        .args(["--json", "auth", "refresh", "--no-browser"])
         .output();
     let success = result.as_ref().is_ok_and(|out| out.status.success());
     let status_label = if success { "ok" } else { "fail" };

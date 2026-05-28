@@ -1,6 +1,6 @@
 // Phase 26 PR 26.4 — verify helper.
 //
-// Wraps `axhub status` + `axhub logs --runtime --tail 50` for the
+// Wraps current `axhub deploy list/status/logs` probes for the
 // `axhub:verify` SKILL. Designed for both JSON-pipe consumers (CI scripts,
 // `axhub-helpers verify --json`) and the human-facing Korean verdict the
 // SKILL prints. Each external call is bounded at 5 s so an unreachable
@@ -78,15 +78,31 @@ pub fn run_verify<P: VerifyProbes>(app_id: &str, probes: &P) -> VerifyResult {
         reasons.push(format!("axhub status exit code {}", status.exit_code));
     } else if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&status.stdout) {
         status_observed = true;
-        state = parsed
+        let data = if parsed.get("schema_version").is_some() || parsed.get("status").is_some() {
+            parsed.get("data").unwrap_or(&parsed)
+        } else {
+            &parsed
+        };
+        state = data
             .get("state")
+            .or_else(|| data.get("status"))
             .and_then(|v| v.as_str())
             .map(str::to_string);
-        last_deploy_id = parsed
+        last_deploy_id = data
             .get("last_deploy_id")
+            .or_else(|| data.get("deployment_id"))
+            .or_else(|| data.get("id"))
             .and_then(|v| v.as_str())
             .map(str::to_string);
-        last_deploy_age_secs = parsed.get("last_deploy_age_secs").and_then(|v| v.as_u64());
+        last_deploy_age_secs = data
+            .get("last_deploy_age_secs")
+            .and_then(|v| v.as_u64())
+            .or_else(|| {
+                data.get("started_at")
+                    .or_else(|| data.get("created_at"))
+                    .and_then(|v| v.as_str())
+                    .and_then(age_secs_from_rfc3339)
+            });
     } else {
         reasons.push("axhub status JSON parse 실패".to_string());
     }
@@ -147,6 +163,14 @@ pub fn run_verify<P: VerifyProbes>(app_id: &str, probes: &P) -> VerifyResult {
         errors,
         reasons,
     }
+}
+
+fn age_secs_from_rfc3339(raw: &str) -> Option<u64> {
+    let ts = chrono::DateTime::parse_from_rfc3339(raw)
+        .ok()?
+        .with_timezone(&chrono::Utc);
+    let now = chrono::Utc::now();
+    Some(now.timestamp().saturating_sub(ts.timestamp()).max(0) as u64)
 }
 
 fn compute_verdict(

@@ -18,7 +18,6 @@ hmac = "0.12"
 jsonwebtoken = "9"
 libc = "0.2"
 regex = "1.10"
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 semver = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

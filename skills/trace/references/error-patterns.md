@@ -113,6 +113,6 @@ Phase 25 PR 25.4 — `axhub:trace` skill 이 빌드 로그에서 매칭하는 8 
 
 **원인:** build_log 의 마지막 ERROR/WARN 을 보여드릴게요 (최대 5 줄). raw 라인 인용은 Vibe Coder Visibility 원칙상 검열 없이 그대로 보여드려요.
 
-**해결:** 1) 에러 메시지 한 줄을 그대로 검색해보거나, 2) `axhub logs --build` 로 전체 로그를 받아서 직접 살펴봐주세요.
+**해결:** 1) 에러 메시지 한 줄을 그대로 검색해보거나, 2) `axhub deploy logs <deployment-id> --app <app> --source build` 로 전체 로그를 받아서 직접 살펴봐주세요.
 
 **버튼:** ["전체 빌드 로그 받기", "도와주세요", "취소"]

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Phase 22.2 — Bun-based localhost HTTP mock-hub.
-# AXHUB_ALLOW_PROXY=1 가 list-deployments.ts:140-141 에서 TLS pin 우회 시켜
-# http://127.0.0.1:18080 로 라우팅 가능. helper bin 변경 0건 (P0-2).
+# Legacy local backend fixture. Current helper tests prefer the canonical
+# axhub CLI shim instead of helper-owned HTTP transport.
 #
 # Usage: source mock-hub.sh; mock_hub_start; trap 'mock_hub_stop' EXIT
 
