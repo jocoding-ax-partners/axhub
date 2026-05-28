@@ -136,7 +136,7 @@ pub fn run_axhub_with_timeout(axhub_bin: &str, args: &[&str], timeout: Duration)
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use std::io::Write;
@@ -144,7 +144,6 @@ mod tests {
 
     /// Write an executable shell script to `path` with `body` as the
     /// `#!/bin/sh` script body. Returns the path.
-    #[cfg(unix)]
     fn write_script(path: &std::path::Path, body: &str) {
         let mut f = std::fs::File::create(path).expect("create script");
         writeln!(f, "#!/bin/sh\n{body}").expect("write script");
@@ -153,7 +152,6 @@ mod tests {
         std::fs::set_permissions(path, perms).unwrap();
     }
 
-    #[cfg(unix)]
     #[test]
     fn run_axhub_drains_large_stdout_without_deadlock() {
         // 256 KB of stdout — comfortably above macOS (~16 KB) and Linux
@@ -161,13 +159,12 @@ mod tests {
         // this test hits the 5s timeout and returns truncated stdout.
         let dir = tempfile::tempdir().unwrap();
         let script = dir.path().join("big_stdout.sh");
-        write_script(&script, "yes 'a' | head -c 262144");
-
-        let out = run_axhub_with_timeout(
-            script.to_str().unwrap(),
-            &[],
-            Duration::from_secs(5),
+        write_script(
+            &script,
+            "i=0\nwhile [ \"$i\" -lt 4096 ]; do\n  printf 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n  i=$((i + 1))\ndone",
         );
+
+        let out = run_axhub_with_timeout(script.to_str().unwrap(), &[], Duration::from_secs(5));
         assert!(
             !out.timed_out,
             "large stdout must not deadlock the wait loop (exit_code={}, len={})",
@@ -182,7 +179,6 @@ mod tests {
         );
     }
 
-    #[cfg(unix)]
     #[test]
     fn run_axhub_signals_timeout_on_slow_child() {
         // Pure timeout-classification check — partial-output recovery across
@@ -192,11 +188,7 @@ mod tests {
         let script = dir.path().join("slow.sh");
         write_script(&script, "exec sleep 30");
 
-        let out = run_axhub_with_timeout(
-            script.to_str().unwrap(),
-            &[],
-            Duration::from_millis(300),
-        );
+        let out = run_axhub_with_timeout(script.to_str().unwrap(), &[], Duration::from_millis(300));
         assert!(out.timed_out);
         assert_eq!(out.exit_code, 124);
     }

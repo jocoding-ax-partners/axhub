@@ -2108,8 +2108,7 @@ impl axhub_helpers::verify_helper::VerifyProbes for RealVerifyProbes {
                     ],
                 )
             }
-            DeployIdLookup::NoRecentDeploy
-            | DeployIdLookup::TransportFailure { .. } => {
+            DeployIdLookup::NoRecentDeploy | DeployIdLookup::TransportFailure { .. } => {
                 // logs path has no JSON shape to carry richer reasons; the
                 // status-side `transport_reason` already populates verdict
                 // reasons. Return empty stdout + exit 0 so the logs branch

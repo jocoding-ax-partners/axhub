@@ -233,6 +233,33 @@ exit 64
     axhub
 }
 
+#[cfg(windows)]
+fn fake_list_deployments_axhub(
+    temp: &tempfile::TempDir,
+    stdout: &str,
+    exit_code: i32,
+) -> std::path::PathBuf {
+    let axhub = temp.path().join("axhub-list-deployments.cmd");
+    std::fs::write(
+        &axhub,
+        format!(
+            r#"@echo off
+if "%~1"=="--version" (
+  echo axhub 0.15.3
+  exit /b 0
+)
+if "%~1 %~2 %~3"=="--json deploy list" (
+  echo {stdout}
+  exit /b {exit_code}
+)
+exit /b 64
+"#,
+        ),
+    )
+    .unwrap();
+    axhub
+}
+
 #[cfg(unix)]
 fn fake_deploy_prep_axhub(temp: &tempfile::TempDir, version_stdout: &str) -> std::path::PathBuf {
     let axhub = temp.path().join("axhub-deploy-prep");
@@ -375,7 +402,10 @@ fn cli_verify_requires_app_id() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     // Error must mention both the canonical --app and legacy --app-id alias
     // so users following either skill example get the same hint.
-    assert!(stderr.contains("--app"), "stderr should mention --app: {stderr}");
+    assert!(
+        stderr.contains("--app"),
+        "stderr should mention --app: {stderr}"
+    );
     assert!(
         stderr.contains("--app-id"),
         "stderr should keep --app-id alias hint: {stderr}"

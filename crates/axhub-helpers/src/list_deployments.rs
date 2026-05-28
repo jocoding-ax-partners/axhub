@@ -3,8 +3,8 @@ use serde_json::Value;
 
 use crate::axhub_cli::{run_axhub, CliOutput, DEFAULT_AXHUB_TIMEOUT};
 use crate::cli_envelope::{
-    envelope_status, error_code, error_message, looks_like_error_envelope, parse_json_stdout,
-    rows, status_string, string_at_any, unwrap_data,
+    envelope_status, error_code, error_message, looks_like_error_envelope, parse_json_stdout, rows,
+    status_string, string_at_any, unwrap_data,
 };
 use crate::redact::redact;
 
@@ -657,7 +657,10 @@ mod tests {
     fn stderr_or_generic_falls_back_when_empty() {
         assert_eq!(stderr_or_generic(""), GENERIC_LIST_FAILURE_MSG);
         assert_eq!(stderr_or_generic("   \n"), GENERIC_LIST_FAILURE_MSG);
-        assert_eq!(stderr_or_generic("real error text").trim(), "real error text");
+        assert_eq!(
+            stderr_or_generic("real error text").trim(),
+            "real error text"
+        );
     }
 
     #[test]

@@ -56,8 +56,7 @@ pub struct ProbeResult {
 /// `serde_json::from_str` so the typed "no recent deploy" outcome
 /// short-circuits straight to a NotLive verdict — eliminating the
 /// brittle JSON literal roundtrip review #18 flagged.
-pub(crate) const NO_RECENT_DEPLOY_STDOUT: &str =
-    r#"{"state":"unknown","last_deploy_id":null}"#;
+pub(crate) const NO_RECENT_DEPLOY_STDOUT: &str = r#"{"state":"unknown","last_deploy_id":null}"#;
 
 impl ProbeResult {
     /// "App has no recent deploys" outcome. Used by `axhub_status` /
@@ -421,10 +420,7 @@ mod tests {
         };
         let result = run_verify("paydrop", &probes);
         assert!(
-            result
-                .reasons
-                .iter()
-                .any(|r| r.contains("axhub auth 만료")),
+            result.reasons.iter().any(|r| r.contains("axhub auth 만료")),
             "reasons did not include auth-expired text: {:?}",
             result.reasons
         );

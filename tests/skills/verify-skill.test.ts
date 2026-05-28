@@ -60,7 +60,8 @@ describe("verify SKILL Phase 26 invariants", () => {
     expect(body).toContain("axhub deploy logs <DEPLOY_ID> --app <APP> --source pod");
     expect(body).toContain("ERROR");
     expect(body).toContain("FATAL");
-    expect(body).toContain("axhub-helpers verify --json --app-id=paydrop");
+    expect(body).toContain("axhub-helpers verify --json --app paydrop");
+    expect(body).toContain("--app-id 도 alias");
     expect(body).toContain("✅ 라이브 확정");
     expect(body).toContain("⚠️ 의심");
     expect(body).toContain("❌ 라이브 안 됨");
