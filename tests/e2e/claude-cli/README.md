@@ -23,9 +23,7 @@ tests/e2e/claude-cli/
 ├── fixtures/
 │   ├── token-headed.json              valid-shape token
 │   ├── token-expired.json             exp < now → exit 65
-│   ├── apps-list.json                 mock hub-api response
-│   ├── deploy-create-success.json     mock deploy create
-│   ├── deploy-status-stream.ndjson    NDJSON tick stream
+│   ├── apps-list.json                 mock hub-api response (/v1/apps)
 │   └── bin/
 │       ├── axhub                      shim — sentinel touch + current CLI-surface stub
 │       ├── axhub-mock-impl.sh         mock-hub wrapper

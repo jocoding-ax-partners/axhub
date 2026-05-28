@@ -97,3 +97,67 @@ fn legacy_status_name(status: i64) -> String {
     }
     .to_string()
 }
+
+/// Best-effort check: does this raw stdout *look* like an error-shaped
+/// envelope, even when full JSON parsing fails or yields an unknown shape?
+///
+/// Used by callers (e.g. `list_deployments::parse_list_deployments_cli_output`)
+/// to disambiguate "transport-level failure" from "CLI reported an error
+/// using a field shape we don't recognize yet". PR #149 / review #12.
+///
+/// Heuristic: presence of an `"error"` key or a `"status": "error"` token in
+/// the raw stdout. Substring-only — does not require full JSON validity, so
+/// it survives upstream envelopes that change field shape between versions.
+pub fn looks_like_error_envelope(raw: &str) -> bool {
+    let normalized = raw.trim();
+    if normalized.is_empty() {
+        return false;
+    }
+    // Cheap textual fingerprints — avoids re-parsing JSON the caller has
+    // already failed to parse. Either signal is sufficient.
+    normalized.contains("\"status\":\"error\"")
+        || normalized.contains("\"status\": \"error\"")
+        || normalized.contains("\"error\":")
+        || normalized.contains("\"error\" :")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn looks_like_error_envelope_recognizes_status_error() {
+        assert!(looks_like_error_envelope(
+            r#"{"schema_version":"1","status":"error","error":{}}"#
+        ));
+        // With whitespace tolerance:
+        assert!(looks_like_error_envelope(r#"{ "status": "error" }"#));
+    }
+
+    #[test]
+    fn looks_like_error_envelope_recognizes_unknown_shape_with_error_key() {
+        // Future CLI uses `error.slug` instead of `error.code`:
+        assert!(looks_like_error_envelope(
+            r#"{"error":{"slug":"resource.busy"}}"#
+        ));
+    }
+
+    #[test]
+    fn looks_like_error_envelope_rejects_success_envelopes() {
+        assert!(!looks_like_error_envelope(
+            r#"{"status":"ok","data":{"items":[]}}"#
+        ));
+        assert!(!looks_like_error_envelope(r#"{"items":[]}"#));
+        assert!(!looks_like_error_envelope(""));
+    }
+
+    #[test]
+    fn looks_like_error_envelope_rejects_word_in_unrelated_position() {
+        // `error_summary` field that just *mentions* the word "error" must
+        // not flip the heuristic — the substring needle requires the
+        // `"error":` prefix shape.
+        assert!(!looks_like_error_envelope(
+            r#"{"data":{"error_summary":"none"}}"#
+        ));
+    }
+}

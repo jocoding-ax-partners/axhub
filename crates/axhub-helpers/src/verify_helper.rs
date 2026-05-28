@@ -51,6 +51,29 @@ pub struct ProbeResult {
     pub timed_out: bool,
 }
 
+/// Sentinel `stdout` body emitted by [`ProbeResult::no_recent_deploy`].
+/// `run_verify` matches against this constant *before* attempting a
+/// `serde_json::from_str` so the typed "no recent deploy" outcome
+/// short-circuits straight to a NotLive verdict — eliminating the
+/// brittle JSON literal roundtrip review #18 flagged.
+pub(crate) const NO_RECENT_DEPLOY_STDOUT: &str =
+    r#"{"state":"unknown","last_deploy_id":null}"#;
+
+impl ProbeResult {
+    /// "App has no recent deploys" outcome. Used by `axhub_status` /
+    /// `axhub_logs_tail` when `latest_deploy_id_for_app` returns nothing
+    /// — distinct from a transport / auth failure (which should propagate
+    /// the underlying exit code). PR #149 / review #18 — single source of
+    /// truth for the sentinel `stdout` that `run_verify` recognises.
+    pub fn no_recent_deploy() -> Self {
+        Self {
+            stdout: NO_RECENT_DEPLOY_STDOUT.to_string(),
+            exit_code: 0,
+            timed_out: false,
+        }
+    }
+}
+
 /// Live state synonyms accepted from axhub status (`state` field).
 const LIVE_STATES: &[&str] = &["live", "running", "deployed", "active", "ok", "succeeded"];
 
@@ -76,6 +99,14 @@ pub fn run_verify<P: VerifyProbes>(app_id: &str, probes: &P) -> VerifyResult {
         reasons.push("axhub status timeout (5초)".to_string());
     } else if status.exit_code != 0 {
         reasons.push(format!("axhub status exit code {}", status.exit_code));
+    } else if status.stdout == NO_RECENT_DEPLOY_STDOUT {
+        // Typed short-circuit — caller signalled "no recent deploy" via
+        // ProbeResult::no_recent_deploy() instead of going through the
+        // serde_json roundtrip. Mark status_observed so the downstream
+        // verdict logic still computes (will fall through to NotLive via
+        // missing state_live + the explicit "최근 배포 없음" reason).
+        status_observed = true;
+        reasons.push("최근 배포 없음".to_string());
     } else if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&status.stdout) {
         status_observed = true;
         let data = if parsed.get("schema_version").is_some() || parsed.get("status").is_some() {
@@ -83,6 +114,13 @@ pub fn run_verify<P: VerifyProbes>(app_id: &str, probes: &P) -> VerifyResult {
         } else {
             &parsed
         };
+        // Transport-failure escape hatch (PR #149 / review #8): when the
+        // helper synthesised the status because deploy-list failed, surface
+        // the specific reason instead of letting "state = transport_error"
+        // be the only signal.
+        if let Some(reason) = data.get("transport_reason").and_then(|v| v.as_str()) {
+            reasons.push(reason.to_string());
+        }
         state = data
             .get("state")
             .or_else(|| data.get("status"))
@@ -362,6 +400,50 @@ mod tests {
             Verdict::Suspect | Verdict::NotLive
         ));
         assert!(result.reasons.iter().any(|r| r.contains("JSON parse")));
+    }
+
+    #[test]
+    fn transport_reason_field_surfaces_in_reasons() {
+        // Mimics what RealVerifyProbes synthesises when latest_deploy_id
+        // lookup fails with auth.token_invalid (review #8). The reason
+        // must reach reasons[] verbatim, NOT be silently collapsed to
+        // "state = transport_error".
+        // Matches what RealVerifyProbes synthesises post-PR-#149: exit_code 0
+        // + state="transport_error" + transport_reason field. exit_code 0
+        // routes through the JSON-parse branch where transport_reason is
+        // extracted into reasons[].
+        let probes = FakeProbes {
+            status_stdout: r#"{"state":"transport_error","last_deploy_id":null,"transport_reason":"axhub auth 만료 — axhub auth login 으로 재인증해주세요."}"#
+                .to_string(),
+            status_exit: 0,
+            logs_stdout: String::new(),
+            logs_exit: 0,
+        };
+        let result = run_verify("paydrop", &probes);
+        assert!(
+            result
+                .reasons
+                .iter()
+                .any(|r| r.contains("axhub auth 만료")),
+            "reasons did not include auth-expired text: {:?}",
+            result.reasons
+        );
+    }
+
+    #[test]
+    fn no_recent_deploy_constructor_round_trips_through_verify() {
+        // PR #149 / review #18: ProbeResult::no_recent_deploy() is the
+        // single source of truth for the synthesized literal. run_verify
+        // must still parse it and emit the "최근 배포 없음" reason.
+        let probes = FakeProbes {
+            status_stdout: ProbeResult::no_recent_deploy().stdout,
+            status_exit: 0,
+            logs_stdout: String::new(),
+            logs_exit: 0,
+        };
+        let result = run_verify("paydrop", &probes);
+        assert_eq!(result.verdict, Verdict::NotLive);
+        assert!(result.reasons.iter().any(|r| r.contains("최근 배포 없음")));
     }
 
     #[test]

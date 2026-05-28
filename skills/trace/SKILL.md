@@ -123,5 +123,6 @@ $ axhub-helpers trace --json --deploy-id=dep-abc
 ## Additional Resources
 
 - `references/error-patterns.md` — 8+ entry 4-part empathy catalog
+- `../recover/SKILL.md` (Step 7) — canonical helper `error_code` → user-facing 라우팅 표. trace 가 helper 의 transport/auth 실패를 만났을 때 그 표 그대로 안내해요.
 - `../deploy/references/error-empathy-catalog.md` — exit-code 별 4-part 템플릿
 - `../deploy/references/nl-lexicon.md` — trigger 어구 추가 시 참조

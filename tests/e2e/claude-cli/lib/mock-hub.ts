@@ -1,6 +1,9 @@
 // Phase 22.2 — Bun mock-hub for axhub plugin E2E.
-// Localhost HTTP only legacy backend fixture. Current helper paths should
-// delegate backend reads to the canonical axhub CLI shim.
+// Localhost HTTP fixture scoped to /v1/apps + /v1/apis + /v1/auth/whoami.
+// All deploy/auth-write traffic flows through the canonical axhub CLI shim
+// (fixtures/bin/axhub) — those endpoints intentionally do NOT live here.
+// PR #149 removed the deploy routes + MOCK_HUB_AUTH_FAIL env because the
+// proxy-baseline e2e case that consumed them was retired.
 // Fixture-driven response, append-only log of every request.
 
 import { existsSync, appendFileSync, readFileSync } from "node:fs";
@@ -34,10 +37,6 @@ const json = (status: number, body: unknown): Response =>
     headers: { "content-type": "application/json" },
   });
 
-// Phase 22.4 — MOCK_HUB_AUTH_FAIL=1 → 모든 /v1/* + /api/v1/* 가 401 token_expired 반환.
-// Legacy backend-route fixture; current case 34 uses the CLI shim instead.
-const authFail = process.env["MOCK_HUB_AUTH_FAIL"] === "1";
-
 Bun.serve({
   port,
   hostname: "127.0.0.1",
@@ -47,10 +46,6 @@ Bun.serve({
     log(`${stamp} ${req.method} ${url.pathname}${url.search}`);
 
     if (url.pathname === "/_ping") return new Response("ok");
-
-    if (authFail && (url.pathname.startsWith("/v1/") || url.pathname.startsWith("/api/v1/"))) {
-      return json(401, { code: "token_expired", detail: "Bearer token has expired" });
-    }
 
     if (req.method === "GET" && url.pathname === "/v1/apps") {
       const fix = readFixture("apps-list.json");
@@ -68,18 +63,6 @@ Bun.serve({
       const fix = readFixture("auth-whoami.json");
       if (fix) return json(200, fix);
       return json(401, { error: "not_authenticated" });
-    }
-
-    if (req.method === "GET" && url.pathname.startsWith("/v1/deployments/")) {
-      const fix = readFixture("deploy-status.json");
-      if (fix) return json(200, fix);
-      return json(404, { error: "deployment_not_found" });
-    }
-
-    if (req.method === "POST" && url.pathname === "/v1/deployments") {
-      const fix = readFixture("deploy-create-success.json");
-      if (fix) return json(201, fix);
-      return json(201, { deployment_id: "mock-dep-1" });
     }
 
     return json(404, { error: "mock_path_not_implemented", path: url.pathname });

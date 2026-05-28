@@ -141,7 +141,11 @@ describe.skipIf(!E2E_ENABLED)("ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGIN
     };
     expect(parsed.exit_code).toBe(0);
     expect(parsed.error_code ?? undefined).toBeUndefined();
-    expect(parsed.endpoint_used).toBe(E2E_ENDPOINT);
+    // endpoint_used: PR #149 collapsed helper-owned HTTP into a thin axhub
+    // CLI wrapper, so this field is now the literal "cli" regardless of
+    // AXHUB_ENDPOINT. Schema bump documented in CHANGELOG; consumers that
+    // branched on URL form must migrate.
+    expect(parsed.endpoint_used).toBe("cli");
     expect(Array.isArray(parsed.deployments)).toBe(true);
   });
 });

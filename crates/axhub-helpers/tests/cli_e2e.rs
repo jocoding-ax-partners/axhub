@@ -372,7 +372,14 @@ fn write_manifest(dir: &Path) {
 fn cli_verify_requires_app_id() {
     let output = run_env(&["verify", "--json"], &[]);
     assert_eq!(output.status.code(), Some(64));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("--app-id"));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Error must mention both the canonical --app and legacy --app-id alias
+    // so users following either skill example get the same hint.
+    assert!(stderr.contains("--app"), "stderr should mention --app: {stderr}");
+    assert!(
+        stderr.contains("--app-id"),
+        "stderr should keep --app-id alias hint: {stderr}"
+    );
 }
 
 #[cfg(unix)]
@@ -3139,13 +3146,20 @@ fn cli_trace_times_out_slow_build_log_probe() {
         String::from_utf8_lossy(&out.stderr)
     );
     let json = stdout_json(&out);
+    // PR #149 / US-017: probe timeout WARN now surfaces on TraceReport.warnings
+    // (separate channel) instead of polluting build_log_errors. SKILL parsers
+    // branch on warnings; build_log_errors stays evidence-only.
     assert!(
-        json["build_log_errors"]
+        json["warnings"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|v| v.as_str().unwrap().contains("timeout after 5s")),
+            .any(|v| v.as_str().unwrap().contains("build_log_probe_timeout")),
         "{json}",
+    );
+    assert!(
+        json["build_log_errors"].as_array().unwrap().is_empty(),
+        "build_log_errors must not carry probe-side timeout WARN: {json}"
     );
 }
 

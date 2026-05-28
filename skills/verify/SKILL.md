@@ -114,7 +114,7 @@ echo "$PREFLIGHT_JSON"
 
 ### CI 자동화
 ```bash
-$ axhub-helpers verify --json --app-id=paydrop
+$ axhub-helpers verify --json --app paydrop   # --app-id 도 alias 로 지원해요
 {"state":"live","last_deploy_age_secs":120,"errors":[],"verdict":"passed"}
 ```
 
@@ -126,5 +126,6 @@ $ axhub-helpers verify --json --app-id=paydrop
 
 ## Additional Resources
 
+- `../recover/SKILL.md` (Step 7) — canonical helper `error_code` → user-facing 라우팅 표 (`transport.cli_missing`, `auth.token_invalid`, `response.invalid_json` 등). 이 SKILL 은 그 표를 참조해서 동일하게 분기해요.
 - `../deploy/references/error-empathy-catalog.md` — 4-part Korean exit-code template.
 - `../deploy/references/nl-lexicon.md` — 활성화 trigger 어구 추가 시 참조.

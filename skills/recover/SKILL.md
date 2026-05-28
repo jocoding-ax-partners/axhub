@@ -129,6 +129,19 @@ To recover:
 
 7. **On non-zero exit from create**, route to `../deploy/references/error-empathy-catalog.md`. The `validation.deployment_in_progress` case is especially relevant here (user might recover during another deploy) — follow `../deploy/references/recovery-flows.md` ("deployment_in_progress") and offer to watch the in-flight deploy first.
 
+   **canonical helper exit-code → user-facing route map** (PR #149 / review #5). 이 표는 axhub-helpers 가 emit 하는 `error_code` 별 다음 행동을 정의해요. status/verify/trace 스킬도 같은 표를 참조해요 (이 SKILL 이 정본; 다른 SKILL 은 cross-link).
+
+   | `error_code` | helper exit | 사용자 안내 |
+   |---|---|---|
+   | `auth.token_invalid` | 65 | `/axhub:auth` 로 재인증을 안내해요. 4-part empathy 템플릿 참조. |
+   | `resource.app_not_found` | 67 | did-you-mean 으로 가까운 슬러그 제시 + `apps` 스킬로 라우팅해요. |
+   | `validation.app_id_invalid` | 1 | helper 가 argv 형태로 거부한 케이스. 정상 슬러그 형식 (`[A-Za-z0-9_-]{1,64}`) 으로 다시 받아요. |
+   | `transport.timeout` | 1 | 일시적 hang. 재시도 1회 + 그래도 실패면 네트워크 / CLI 버전 확인을 안내해요. |
+   | `transport.cli_missing` | 1 | `axhub` 바이너리가 PATH 에 없거나 실행 불가. 사용자에게 `axhub --version` 으로 확인하고, 안되면 `/axhub:install-cli` 또는 `/axhub:setup` 으로 재설치를 안내해요. |
+   | `response.invalid_json` | 1 | CLI 가 exit 0 인데 stdout 이 JSON 이 아닌 경우. CLI 버전 mismatch 가능성 — `/axhub:update` 또는 `/axhub:doctor` 안내. |
+   | `response.error_envelope_unknown_shape` | 1 | CLI 가 알수없는 error envelope 모양으로 응답. CLI 가 helper 보다 최신일 가능성 — `/axhub:upgrade` 안내. |
+   | `cli.exit_<N>` | 1 | catch-all (signal kill 등). retry 1회 + 그래도 실패면 `/axhub:doctor` 로 진단. |
+
 8. **No prior succeeded deploy found.** Surface: "되돌릴 수 있는 직전 안정 배포를 못 찾았어요. 이 앱의 첫 배포이거나, 모든 이전 배포가 실패한 상태일 수 있어요. 'logs'로 현재 배포 원인 먼저 볼래요?"
 
 9. **Cache last-deploy for statusline (Phase 17 US-1707).** After Step 5 terminal status, write the recovery summary so statusline readers can show it across sessions. The Bash block below is for POSIX/Git Bash/WSL tool execution; native Windows statusLine wiring must use the documented helper/PowerShell path only after the Windows packaging spike promotes it:
