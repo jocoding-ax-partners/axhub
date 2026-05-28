@@ -4,42 +4,29 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
-## [Unreleased]
+## [0.9.20](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.19...v0.9.20) (2026-05-28)
 
-PR #149 (fix/helper-cli-boundary) helper-CLI 경계 정리 후속으로, ce-code-review 가 surface 한 19 finding (P0 1 / P1 5 / P2 8 / P3 4 + advisory 1) 을 한 패스에 다 반영했어요. helper 가 자체 HTTP/TLS 스택을 들고 있던 시절이 끝났으니 이제 `axhub --json …` CLI subprocess 의 출력을 stripe + envelope unwrap 으로 처리하는 thin wrapper 만 남아요. 자세한 마이그레이션 가이드 + error_code 매핑 표는 [`docs/MIGRATION_v0.9_helper-cli-boundary.md`](docs/MIGRATION_v0.9_helper-cli-boundary.md) 에 정리해 뒀어요.
+이번 릴리즈는 PR #149 의 helper/CLI 경계 정합 패치예요. `list_deployments` 를 포함한 배포 probe 경로가 backend HTTP 세부 구현을 직접 따라가던 흐름을 axhub CLI 계약으로 맞추고, Windows/Ubuntu/macOS 테스트 경계를 보강해서 helper binary 와 skill 문서·routing fixture 가 같은 명령 표면을 보게 했어요.
 
-### Breaking Changes
+### Test baseline
 
-- `ListDeploymentsResult` JSON 출력에 `schema_version: 2` 가 새로 추가됐어요. 동시에 `DeploymentSummary.id` 와 `app_id` 는 `i64` → `String` 으로 바뀌어요 (CLI 가 canonical app-ref 슬러그·UUID 를 String 으로 emit). `id` 를 `number` 로 받던 TypeScript 소비자는 `string` 으로 옮겨야 해요.
-- `endpoint_used` 값이 resolved URL (예: `https://axhub-api.jocodingax.ai`) 에서 리터럴 `"cli"` 로 바뀌었어요. `tests/e2e/staging.test.ts` 의 assertion 을 업데이트했고, observability 가 transport 값으로 분기하던 곳은 dead signal 이 됐어요.
-- `error_code` 분류 체계가 정리됐어요. 사라진 코드 (`security.tls_pin_failed`, `security.tls_required`, `security.endpoint_invalid`, `auth.token_missing`, `transport.spawn_failed`) 와 새 코드 (`transport.cli_missing`, `transport.timeout`, `response.invalid_json`, `response.error_envelope_unknown_shape`, `validation.app_id_invalid`, `cli.exit_<N>`) 매핑은 위 마이그레이션 문서 §2 에 표로 담겨 있어요.
-- `AXHUB_ALLOW_PROXY` 환경 변수가 제거됐어요 (TLS pinning 자체가 사라진 결과). 프록시 posture 는 이제 CLI 가 담당해요.
+- PR #149 HEAD `5e242b8` 기준 rust ubuntu/macos/windows, perf ubuntu/macos/windows, hook integration, Local Rust-primary gate, T2 helper-bin, corpus.100 drift gate 가 모두 pass 했어요.
+- 로컬 검증으로 `cargo fmt --all -- --check`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `bun test`, `bun run typecheck`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, routing fixture sync 를 통과했어요.
+- release postbump 에서 `codegen:version` 과 `release:check` 가 host Rust helper build/version assert 및 release.yml 5-target asset wiring 확인을 통과했어요.
 
-### Fixed (review #1-#19 모음)
+### Honest tradeoff
 
-- (P0 #1) `parse_list_deployments_cli_output` 가 raw CLI stderr 를 사용자 가시 `error_message_kr` 에 직접 노출하던 경로를 `axhub_helpers::redact::redact` 통과로 막았어요.
-- (P1 #3) `axhub_cli::run_axhub_with_timeout` 가 stdout/stderr 를 동시에 drain 하는 reader thread 를 spawn 하도록 바꿔서, OS pipe buffer (~16KB macOS, ~64KB Linux) 한도를 넘는 출력이 child 를 block 시키는 deadlock 을 막았어요. 추가로 timeout 시 process group 단위로 SIGKILL 을 보내서 sh 의 grandchild (예: `sleep`) 가 pipe 를 잡고 EOF 를 막던 wall-clock 폭발도 해결했어요.
-- (P1 #5) 첫 실행/upgrade 직후 `axhub` 바이너리가 PATH 에 없을 때 `transport.cli_missing` 으로 명확히 분류하고, error_message 가 `axhub --version` 확인과 `axhub:setup` 재실행을 안내해요.
-- (P1 #6) `cmd_auth_refresh_bg` 가 `run_axhub_with_timeout` 으로 옮겨가서 더 이상 무한 hang 으로 orphan child 가 쌓이지 않아요 (`AUTH_REFRESH_TIMEOUT = 20s`).
-- (P2 #7) `cmd_auth_refresh_bg` 가 fslock 기반 single-flight 를 잡아요.
-- (P2 #8) `RealVerifyProbes` 가 transport-failure 의 reason 을 `transport_reason` JSON 필드로 `verify_helper.reasons[]` 까지 전달해요. fake-success 경로 제거.
-- (P2 #12) `cli_envelope::looks_like_error_envelope` 가 exit 0 + 미지의 error envelope shape 을 `response.error_envelope_unknown_shape` 로 분류해요.
-- (P2 #13) `validate_app_ref` 가 helper 경계에서 app_id 를 `^[A-Za-z0-9_-]{1,64}$` 로 검증해요.
-- (P2 #14) `RealVerifyProbes` 가 `DeployIdLookup` 을 `RefCell` 로 memoize 해서 verify 한 호출당 `axhub deploy list` 가 4 회에서 1 회로 줄어요.
-- (P2 #9) README 5 섹션이 캐노니컬 CLI wrapper 설명으로 다시 쓰여졌어요.
-- (P2 #10) `tests/e2e/claude-cli/lib/mock-hub.ts` 의 dead route + `MOCK_HUB_AUTH_FAIL` 제거.
-- (P3 #15) `--app` 과 `--app-id` 가 helper boundary 양쪽에서 모두 받히고, 에러 메시지가 양쪽 form 을 모두 안내해요.
-- (P3 #17) `TraceReport.warnings` 필드가 새로 생겨서, build-log probe degrade 신호가 `build_log_errors` 를 오염시키지 않아요.
+- `list_deployments` 의 TLS pinning 포함 직접 HTTP path 는 helper-local fallback 이 아니라 drift 원인이었으므로 제거 방향으로 정리했어요. CLI 실행 가능성이 helper 동작의 전제라서, 추후 axhub CLI JSON schema 가 바뀌면 helper fixture와 routing baseline을 함께 갱신해야 해요.
+- release:check 는 host binary 를 빌드하고, 5-platform cross build·cosign 서명은 tag push 뒤 release.yml matrix 가 수행해요.
 
-### Documentation
+### Fixed
 
-- `docs/MIGRATION_v0.9_helper-cli-boundary.md` 신규 — JSON wire 변경, error_code 매핑, 첫 실행 gap, argv 검증, residual risks 한 문서.
-- README + `skills/{status,recover,verify,trace}/SKILL.md` 새 error code + canonical wrapper 설명에 맞게 동기화.
+* **helpers:** align deploy probes with axhub CLI ([#149](https://github.com/jocoding-ax-partners/axhub/issues/149)) ([1e30adb](https://github.com/jocoding-ax-partners/axhub/commit/1e30adbe784b2160570b331483ffe9fc61350ab6))
 
-### Residual Risks
 
-- 단일 deploy 시도가 pre-PR 의 in-process HTTP 1 회에서 5+ subprocess fork+exec 로 바뀌어요. 각 호출은 CLI cold-start 비용 부담. verify 의 memoization 으로 일부 줄었고 polling loop 은 5s+ interval 이라 cumulative cost 작지만, 더 공격적인 caching/single-flight 는 follow-up 으로 결정해요.
+### Docs
 
+* README를 개발자 온보딩 문서로 재구성 ([01c308f](https://github.com/jocoding-ax-partners/axhub/commit/01c308f8f31fba2b9c29147f60986b2607dcd971))
 
 ## [0.9.19](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.18...v0.9.19) (2026-05-25)
 
