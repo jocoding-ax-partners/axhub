@@ -52,7 +52,7 @@ async function main(): Promise<void> {
       "<axhub-deploy-verify>",
       "[axhub hook | deploy artifact verification]",
       `Observed: ${violations.join("; ")}`,
-      "Suggested: run axhub verify or inspect deploy logs before claiming the app is live.",
+      "Suggested: run axhub-helpers verify --app-id <app> or inspect axhub deploy logs before claiming the app is live.",
       "Skip: AXHUB_DISABLE_HOOK=post-tool-verify-deploy-artifacts",
       "</axhub-deploy-verify>",
     ].join("\n");

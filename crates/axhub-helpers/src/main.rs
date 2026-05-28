@@ -37,7 +37,7 @@ use chrono::Utc;
 use serde_json::{json, Map, Value};
 
 const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -200,6 +200,13 @@ fn cmd_token_init(args: &[String]) -> anyhow::Result<i32> {
     let (token, source) = match env_token() {
         Some(token) => (token, "env:AXHUB_TOKEN".to_string()),
         None => {
+            if cli_auth_status_ok() {
+                return store_and_report_token(
+                    json_output,
+                    "cli-auth-ok\n",
+                    "axhub-cli-auth-status",
+                );
+            }
             let keychain = read_keychain_token();
             match keychain.token {
                 Some(token) => (
@@ -223,10 +230,21 @@ fn cmd_token_init(args: &[String]) -> anyhow::Result<i32> {
     store_and_report_token(json_output, &token, &source)
 }
 
+fn cli_auth_status_ok() -> bool {
+    let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
+    let out = axhub_helpers::axhub_cli::run_axhub_with_timeout(
+        &axhub_bin,
+        &["--json", "auth", "status"],
+        std::time::Duration::from_secs(5),
+    );
+    out.exit_code == 0 && !out.timed_out && auth_status_stdout_is_authorized(&out.stdout)
+}
+
 /// Phase 3.5 token-freshness gate, Rust port of hooks/token-freshness-gate.sh.
 ///
-/// Polls the local axhub token file mtime against a "session_ts" anchor (now - 30s)
-/// and falls back to an inline `axhub auth status --json` probe on timeout. The
+/// Polls the local axhub compatibility token marker mtime against a
+/// "session_ts" anchor (now - 30s) and falls back to an inline
+/// `axhub auth status --json` probe on timeout. The
 /// SKILL deploy Step 3.5 calls this subcommand directly (NOT through hooks.json),
 /// so polling can block up to `AXHUB_GATE_POLL_INTERVAL * AXHUB_GATE_POLL_ITERATIONS`
 /// seconds without hitting Claude Code hook timeouts.
@@ -243,7 +261,7 @@ fn cmd_token_init(args: &[String]) -> anyhow::Result<i32> {
 ///                                wrapper but breaks pipes/env-assignments overrides.
 ///
 /// Exit codes:
-///   0   token fresh OR inline probe matches `"user_email"` OR hook disabled
+///   0   token marker fresh OR inline probe reports an authorized CLI auth state OR hook disabled
 ///   65  inline probe completed but did not match `"user_email"` (UNAUTHORIZED)
 ///   Any other error falls through to exit 0 (fail-open contract).
 fn cmd_token_gate(_rest: &[String]) -> anyhow::Result<i32> {
@@ -349,7 +367,7 @@ fn inline_auth_check() -> anyhow::Result<i32> {
     {
         Ok(out) => {
             let stdout_str = String::from_utf8_lossy(&out.stdout);
-            if stdout_str.contains("\"user_email\"") {
+            if auth_status_stdout_is_authorized(&stdout_str) {
                 Ok(0)
             } else {
                 eprintln!("[token-gate] auth UNAUTHORIZED, exit 65");
@@ -361,6 +379,36 @@ fn inline_auth_check() -> anyhow::Result<i32> {
             Ok(0)
         }
     }
+}
+
+fn auth_status_stdout_is_authorized(stdout: &str) -> bool {
+    let Ok(parsed) = serde_json::from_str::<Value>(stdout.trim()) else {
+        return stdout.contains("\"user_email\"");
+    };
+    if parsed
+        .get("status")
+        .and_then(Value::as_str)
+        .is_some_and(|status| status.eq_ignore_ascii_case("error"))
+    {
+        return false;
+    }
+    let data = if parsed.get("schema_version").is_some() || parsed.get("status").is_some() {
+        parsed.get("data").unwrap_or(&parsed)
+    } else {
+        &parsed
+    };
+    data.get("user_email")
+        .or_else(|| data.get("email"))
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.trim().is_empty())
+        || data
+            .get("authenticated")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        || data
+            .get("logged_in")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
 }
 
 /// Phase 3.1 post-install — handles symlink/copy + .gitignore + post-commit hook
@@ -1803,7 +1851,7 @@ fn cmd_list_deployments(args: &[String]) -> anyhow::Result<i32> {
         i += 1;
     }
     let Some(app_id) = app_id else {
-        eprintln!("--app-id is required");
+        eprintln!("--app (alias: --app-id) is required");
         return Ok(64);
     };
     let result = run_list_deployments(ListDeploymentsArgs { app_id, limit });
@@ -1884,72 +1932,164 @@ fn cmd_config(rest: &[String]) -> anyhow::Result<i32> {
     }
 }
 
-struct RealVerifyProbes;
+/// Real verify probes. Holds a memoized cache of the latest `deploy_id`
+/// lookup outcome so that `axhub_status` and `axhub_logs_tail` do not
+/// each independently spawn `axhub deploy list` (PR #149 / review #14 —
+/// pre-fix verify spawned the same probe twice).
+struct RealVerifyProbes {
+    cached_lookup: std::cell::RefCell<Option<DeployIdLookup>>,
+}
 
-const AXHUB_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+impl RealVerifyProbes {
+    fn new() -> Self {
+        Self {
+            cached_lookup: std::cell::RefCell::new(None),
+        }
+    }
+
+    /// Resolve the latest deploy_id lookup for `app_id`, memoizing the
+    /// outcome. All three variants are cached — re-querying on every
+    /// probe call is the bug review #14 surfaced. The richer
+    /// `DeployIdLookup` (vs the prior `Option<String>`) lets review #8's
+    /// fix propagate transport reasons up to the verify verdict.
+    fn resolve_deploy_id(&self, axhub_bin: &str, app_id: &str) -> DeployIdLookup {
+        self.resolve_deploy_id_with(app_id, |args| run_probe_with_timeout(axhub_bin, args))
+    }
+
+    /// Testable seam: same memoization behaviour as `resolve_deploy_id`
+    /// but with an injected runner closure (so unit tests can count
+    /// spawns / assert single-flight without spinning up a subprocess).
+    fn resolve_deploy_id_with<F>(&self, app_id: &str, runner: F) -> DeployIdLookup
+    where
+        F: FnOnce(&[&str]) -> axhub_helpers::verify_helper::ProbeResult,
+    {
+        if let Some(cached) = self.cached_lookup.borrow().as_ref() {
+            return cached.clone();
+        }
+        let resolved = latest_deploy_id_with_runner(app_id, runner);
+        *self.cached_lookup.borrow_mut() = Some(resolved.clone());
+        resolved
+    }
+}
 
 fn run_probe_with_timeout(
     axhub_bin: &str,
     args: &[&str],
 ) -> axhub_helpers::verify_helper::ProbeResult {
-    let mut child = match std::process::Command::new(axhub_bin)
-        .args(args)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-    {
-        Ok(child) => child,
+    // PR #149 / architect note: collapse the three 5s timeout constants
+    // (formerly AXHUB_PROBE_TIMEOUT here + AXHUB_TRACE_PROBE_TIMEOUT in
+    // the trace path) onto the single public source in axhub_cli.
+    let out = axhub_helpers::axhub_cli::run_axhub_with_timeout(
+        axhub_bin,
+        args,
+        axhub_helpers::axhub_cli::DEFAULT_AXHUB_TIMEOUT,
+    );
+    axhub_helpers::verify_helper::ProbeResult {
+        stdout: out.stdout,
+        exit_code: out.exit_code,
+        timed_out: out.timed_out,
+    }
+}
+
+/// Outcome of looking up the latest `deploy_id` for an app. Distinguishes:
+/// - `Found` — the canonical happy path
+/// - `NoRecentDeploy` — list query succeeded but returned zero rows
+/// - `TransportFailure` — list query itself failed (auth expired, CLI
+///   missing, timeout, etc.). Carries the underlying exit code so the
+///   verify path can surface the real cause instead of synthesising a
+///   misleading "state = unknown" verdict (PR #149 / review #8).
+#[derive(Debug, Clone)]
+enum DeployIdLookup {
+    Found(String),
+    NoRecentDeploy,
+    TransportFailure { reason: String },
+}
+
+/// Resolve the latest deploy_id for an app via the canonical CLI. Takes
+/// a runner closure so unit tests can inject canned `ProbeResult`s +
+/// count spawn invocations (PR #149 / review #14 — the memoization test
+/// needs a non-process runner to assert "single spawn per cmd_verify").
+/// Production callers (`RealVerifyProbes::resolve_deploy_id`) wire this
+/// to `run_probe_with_timeout`.
+fn latest_deploy_id_with_runner<F>(app_id: &str, runner: F) -> DeployIdLookup
+where
+    F: FnOnce(&[&str]) -> axhub_helpers::verify_helper::ProbeResult,
+{
+    let out = runner(&[
+        "--json",
+        "deploy",
+        "list",
+        "--app",
+        app_id,
+        "--page-size",
+        "1",
+    ]);
+    if out.timed_out {
+        return DeployIdLookup::TransportFailure {
+            reason: "axhub deploy list timeout (5초)".to_string(),
+        };
+    }
+    if out.exit_code != 0 {
+        // Map known exit codes to actionable reasons; otherwise echo the raw
+        // exit code so verify_helper's verdict reasons aren't silently
+        // collapsed to "state = unknown".
+        let reason = match out.exit_code {
+            65 => "axhub auth 만료 — axhub auth login 으로 재인증해주세요.".to_string(),
+            67 => "axhub: 앱을 찾을 수 없어요 (resource not found).".to_string(),
+            127 => "axhub CLI 를 찾을 수 없어요 (axhub:setup 으로 재설치).".to_string(),
+            code => format!("axhub deploy list exit code {code}"),
+        };
+        return DeployIdLookup::TransportFailure { reason };
+    }
+    let parsed = match serde_json::from_str::<serde_json::Value>(&out.stdout) {
+        Ok(value) => value,
         Err(_) => {
-            return axhub_helpers::verify_helper::ProbeResult {
-                stdout: String::new(),
-                exit_code: 127,
-                timed_out: false,
-            };
+            return DeployIdLookup::TransportFailure {
+                reason: "axhub deploy list 응답 파싱 실패".to_string(),
+            }
         }
     };
-
-    let start = std::time::Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => {
-                return match child.wait_with_output() {
-                    Ok(output) => axhub_helpers::verify_helper::ProbeResult {
-                        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                        exit_code: output.status.code().unwrap_or(127),
-                        timed_out: false,
-                    },
-                    Err(_) => axhub_helpers::verify_helper::ProbeResult {
-                        stdout: String::new(),
-                        exit_code: 127,
-                        timed_out: false,
-                    },
-                };
-            }
-            Ok(None) if start.elapsed() >= AXHUB_PROBE_TIMEOUT => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return axhub_helpers::verify_helper::ProbeResult {
-                    stdout: String::new(),
-                    exit_code: 124,
-                    timed_out: true,
-                };
-            }
-            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(25)),
-            Err(_) => {
-                return axhub_helpers::verify_helper::ProbeResult {
-                    stdout: String::new(),
-                    exit_code: 127,
-                    timed_out: false,
-                };
-            }
-        }
+    let id = axhub_helpers::cli_envelope::rows(&parsed)
+        .first()
+        .and_then(|row| {
+            axhub_helpers::cli_envelope::string_at_any(row, &["id", "deployment_id", "deploy_id"])
+        });
+    match id {
+        Some(id) => DeployIdLookup::Found(id),
+        None => DeployIdLookup::NoRecentDeploy,
     }
 }
 
 impl axhub_helpers::verify_helper::VerifyProbes for RealVerifyProbes {
     fn axhub_status(&self, app_id: &str) -> axhub_helpers::verify_helper::ProbeResult {
         let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
-        run_probe_with_timeout(&axhub_bin, &["status", "--json", "--app-id", app_id])
+        match self.resolve_deploy_id(&axhub_bin, app_id) {
+            DeployIdLookup::Found(deploy_id) => run_probe_with_timeout(
+                &axhub_bin,
+                &["--json", "deploy", "status", &deploy_id, "--app", app_id],
+            ),
+            DeployIdLookup::NoRecentDeploy => {
+                axhub_helpers::verify_helper::ProbeResult::no_recent_deploy()
+            }
+            // Transport failure: synthesize a JSON body carrying the actual
+            // reason via `transport_reason`. exit_code stays 0 so
+            // verify_helper enters the JSON-parse branch (where it now
+            // recognises `transport_reason`). `state="transport_error"`
+            // ensures the verdict still degrades to NotLive — the
+            // synthesised "fake-success" of pre-PR-#149 is gone.
+            DeployIdLookup::TransportFailure { reason, .. } => {
+                let body = serde_json::json!({
+                    "state": "transport_error",
+                    "last_deploy_id": null,
+                    "transport_reason": reason,
+                });
+                axhub_helpers::verify_helper::ProbeResult {
+                    stdout: body.to_string(),
+                    exit_code: 0,
+                    timed_out: false,
+                }
+            }
+        }
     }
 
     fn axhub_logs_tail(
@@ -1958,17 +2098,28 @@ impl axhub_helpers::verify_helper::VerifyProbes for RealVerifyProbes {
         lines: u32,
     ) -> axhub_helpers::verify_helper::ProbeResult {
         let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
-        run_probe_with_timeout(
-            &axhub_bin,
-            &[
-                "logs",
-                "--runtime",
-                "--tail",
-                &lines.to_string(),
-                "--app-id",
-                app_id,
-            ],
-        )
+        match self.resolve_deploy_id(&axhub_bin, app_id) {
+            DeployIdLookup::Found(deploy_id) => {
+                let limit = lines.to_string();
+                run_probe_with_timeout(
+                    &axhub_bin,
+                    &[
+                        "--json", "deploy", "logs", &deploy_id, "--app", app_id, "--limit", &limit,
+                    ],
+                )
+            }
+            DeployIdLookup::NoRecentDeploy | DeployIdLookup::TransportFailure { .. } => {
+                // logs path has no JSON shape to carry richer reasons; the
+                // status-side `transport_reason` already populates verdict
+                // reasons. Return empty stdout + exit 0 so the logs branch
+                // doesn't pile a second redundant "exit code" reason.
+                axhub_helpers::verify_helper::ProbeResult {
+                    stdout: String::new(),
+                    exit_code: 0,
+                    timed_out: false,
+                }
+            }
+        }
     }
 }
 
@@ -2013,7 +2164,7 @@ fn cmd_verify(args: &[String]) -> anyhow::Result<i32> {
     while i < args.len() {
         match args[i].as_str() {
             "--json" => json_mode = true,
-            "--app-id" => {
+            "--app-id" | "--app" => {
                 if i + 1 < args.len() {
                     app_id = Some(args[i + 1].clone());
                     i += 1;
@@ -2022,17 +2173,20 @@ fn cmd_verify(args: &[String]) -> anyhow::Result<i32> {
             other if other.starts_with("--app-id=") => {
                 app_id = Some(other.trim_start_matches("--app-id=").to_string());
             }
+            other if other.starts_with("--app=") => {
+                app_id = Some(other.trim_start_matches("--app=").to_string());
+            }
             _ => {}
         }
         i += 1;
     }
 
     let Some(app_id) = app_id else {
-        eprintln!("axhub-helpers verify: --app-id <id> required");
+        eprintln!("axhub-helpers verify: --app (alias: --app-id) <id> required");
         return Ok(64);
     };
 
-    let probes = RealVerifyProbes;
+    let probes = RealVerifyProbes::new();
     let result = axhub_helpers::verify_helper::run_verify(&app_id, &probes);
 
     if json_mode {
@@ -2178,56 +2332,63 @@ fn cmd_doctor(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-struct RealTraceProbes;
-
-const AXHUB_TRACE_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+struct RealTraceProbes {
+    app_ref: Option<String>,
+    warnings: std::cell::RefCell<Vec<String>>,
+}
 
 fn axhub_stdout_with_timeout(axhub_bin: &str, args: &[&str]) -> Result<String, &'static str> {
-    let mut child = std::process::Command::new(axhub_bin)
-        .args(args)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .map_err(|_| "spawn")?;
-
-    let start = std::time::Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => {
-                return child
-                    .wait_with_output()
-                    .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
-                    .map_err(|_| "wait");
-            }
-            Ok(None) if start.elapsed() >= AXHUB_TRACE_PROBE_TIMEOUT => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err("timeout");
-            }
-            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(25)),
-            Err(_) => return Err("wait"),
-        }
+    // Single source of truth for the 5s helper-probe budget — see
+    // run_probe_with_timeout for the rationale.
+    let out = axhub_helpers::axhub_cli::run_axhub_with_timeout(
+        axhub_bin,
+        args,
+        axhub_helpers::axhub_cli::DEFAULT_AXHUB_TIMEOUT,
+    );
+    if out.timed_out {
+        return Err("timeout");
     }
+    if out.exit_code == 127 && out.stdout.is_empty() {
+        return Err("spawn");
+    }
+    Ok(out.stdout)
 }
 
 impl axhub_helpers::trace_helper::TraceProbes for RealTraceProbes {
     fn axhub_build_log(&self, deploy_id: &str, tail: u32) -> String {
+        let Some(app_ref) = self.app_ref.as_deref() else {
+            self.warnings.borrow_mut().push(
+                "build_log_probe_skipped: --app required for current deploy logs".to_string(),
+            );
+            return String::new();
+        };
         let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
+        let tail = tail.to_string();
         match axhub_stdout_with_timeout(
             &axhub_bin,
             &[
-                "logs",
-                "--build",
-                "--tail",
-                &tail.to_string(),
-                "--deploy-id",
-                deploy_id,
+                "--json", "deploy", "logs", deploy_id, "--app", app_ref, "--source", "build",
+                "--limit", &tail,
             ],
         ) {
             Ok(stdout) => stdout,
-            Err("timeout") => "WARN axhub build log probe timeout after 5s".to_string(),
-            Err(_) => String::new(),
+            Err("timeout") => {
+                self.warnings
+                    .borrow_mut()
+                    .push("build_log_probe_timeout: axhub deploy logs exceeded 5s".to_string());
+                String::new()
+            }
+            Err(_) => {
+                self.warnings
+                    .borrow_mut()
+                    .push("build_log_probe_failed: axhub CLI unavailable".to_string());
+                String::new()
+            }
         }
+    }
+
+    fn trace_warnings(&self) -> Vec<String> {
+        self.warnings.borrow().clone()
     }
 
     fn recent_routing_context(&self) -> Option<axhub_helpers::trace_helper::RoutingContext> {
@@ -2299,6 +2460,7 @@ fn humanize_trace_korean(report: &axhub_helpers::trace_helper::TraceReport) -> S
 
 fn cmd_trace(args: &[String]) -> anyhow::Result<i32> {
     let mut deploy_id: Option<String> = None;
+    let mut app_ref: Option<String> = None;
     let mut json_mode = false;
     let mut i = 0;
     while i < args.len() {
@@ -2313,6 +2475,15 @@ fn cmd_trace(args: &[String]) -> anyhow::Result<i32> {
             other if other.starts_with("--deploy-id=") => {
                 deploy_id = Some(other.trim_start_matches("--deploy-id=").to_string());
             }
+            "--app" => {
+                if i + 1 < args.len() {
+                    app_ref = Some(args[i + 1].clone());
+                    i += 1;
+                }
+            }
+            other if other.starts_with("--app=") => {
+                app_ref = Some(other.trim_start_matches("--app=").to_string());
+            }
             _ => {}
         }
         i += 1;
@@ -2323,7 +2494,10 @@ fn cmd_trace(args: &[String]) -> anyhow::Result<i32> {
         return Ok(64);
     };
 
-    let probes = RealTraceProbes;
+    let probes = RealTraceProbes {
+        app_ref,
+        warnings: std::cell::RefCell::new(Vec::new()),
+    };
     let report = axhub_helpers::trace_helper::trace(&deploy_id, &probes)?;
 
     if json_mode {
@@ -2334,26 +2508,76 @@ fn cmd_trace(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
+/// Background auth refresh runs from `hooks/session-start.sh` as `nohup …
+/// &`. The default 5s probe timeout is too aggressive for the OAuth round
+/// trip, so use a dedicated longer bound. Cap is still tight enough that
+/// an unreachable refresh server can never accumulate orphan children.
+const AUTH_REFRESH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
 fn cmd_auth_refresh_bg() -> anyhow::Result<i32> {
     if std::env::var("AXHUB_AUTH_BG_REFRESH").as_deref() == Ok("0") {
         return Ok(0);
     }
-    let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
-    let probe = std::process::Command::new(&axhub_bin)
-        .arg("--version")
-        .output();
-    if probe.is_err() {
+
+    // Single-flight gate: concurrent SessionStart hooks must not pile up
+    // parallel `axhub auth refresh` invocations that would race the token
+    // store. fslock::try_lock returns false when the lock is held — in
+    // that case we exit 0 silently (fail-open hook contract) so the other
+    // refresh runs uncontested. PR #149 / review #7.
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let lock_dir = PathBuf::from(&home).join(".config/axhub-plugin");
+    let _ = fs::create_dir_all(&lock_dir);
+    let lock_path = lock_dir.join("auth-refresh.lock");
+    let mut lock = match fslock::LockFile::open(&lock_path) {
+        Ok(lock) => lock,
+        // Lock-file open failure is itself not a hook regression: skip
+        // refresh, exit 0. Don't write a sentinel — preserve whatever
+        // the previous successful refresh recorded.
+        Err(_) => return Ok(0),
+    };
+    match lock.try_lock_with_pid() {
+        Ok(true) => {}
+        // Held by another invocation — peer is already refreshing.
+        Ok(false) => return Ok(0),
+        Err(_) => return Ok(0),
+    }
+
+    let axhub_bin = axhub_helpers::axhub_cli::axhub_bin_from_env();
+
+    // Probe whether the binary is invokable. A 5s bound matches the default
+    // helper probe budget — a slow `axhub --version` is itself a signal that
+    // something is wrong, no point waiting longer.
+    let probe = axhub_helpers::axhub_cli::run_axhub_with_timeout(
+        &axhub_bin,
+        &["--version"],
+        axhub_helpers::axhub_cli::DEFAULT_AXHUB_TIMEOUT,
+    );
+    if probe.exit_code == 127 {
         // axhub CLI missing — write a fail sentinel and exit cleanly so the
         // hook never blocks session-start on a stale install.
         let _ = write_refresh_sentinel(false, "axhub_cli_missing");
         return Ok(0);
     }
-    let result = std::process::Command::new(&axhub_bin)
-        .args(["auth", "login", "--browser", "--force"])
-        .output();
-    let success = result.as_ref().is_ok_and(|out| out.status.success());
-    let status_label = if success { "ok" } else { "fail" };
+    if probe.timed_out {
+        let _ = write_refresh_sentinel(false, "probe_timeout");
+        return Ok(0);
+    }
+
+    let result = axhub_helpers::axhub_cli::run_axhub_with_timeout(
+        &axhub_bin,
+        &["--json", "auth", "refresh", "--no-browser"],
+        AUTH_REFRESH_TIMEOUT,
+    );
+    let status_label = if result.timed_out {
+        "refresh_timeout"
+    } else if result.exit_code == 0 {
+        "ok"
+    } else {
+        "fail"
+    };
+    let success = result.exit_code == 0 && !result.timed_out;
     let _ = write_refresh_sentinel(success, status_label);
+    // fslock LockFile drops here, releasing the lock on scope exit.
     Ok(if success { 0 } else { 1 })
 }
 
@@ -2994,5 +3218,100 @@ fn cmd_diagnose_hitl(args: &[String]) -> anyhow::Result<i32> {
             eprintln!("axhub-helpers diagnose hitl: {e}");
             Ok(1)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// US-014: `RealVerifyProbes` must spawn `axhub deploy list` **at
+    /// most once** per `cmd_verify`. The pre-PR-#149 RealVerifyProbes
+    /// invoked `latest_deploy_id_for_app` twice (status + logs probe);
+    /// the new memoized `cached_lookup` ensures one spawn covers both
+    /// downstream probes for the lifetime of the probes struct.
+    #[test]
+    fn real_verify_probes_memoizes_deploy_id_lookup() {
+        let probes = RealVerifyProbes::new();
+        let count = AtomicUsize::new(0);
+        let runner = |_args: &[&str]| {
+            count.fetch_add(1, Ordering::SeqCst);
+            axhub_helpers::verify_helper::ProbeResult {
+                stdout: r#"{"items":[{"id":"dep-mem-1"}]}"#.to_string(),
+                exit_code: 0,
+                timed_out: false,
+            }
+        };
+        let first = probes.resolve_deploy_id_with("paydrop", runner);
+        let second = probes.resolve_deploy_id_with("paydrop", runner);
+        assert!(
+            matches!(first, DeployIdLookup::Found(ref id) if id == "dep-mem-1"),
+            "first resolve must surface Found(dep-mem-1): {first:?}"
+        );
+        assert!(
+            matches!(second, DeployIdLookup::Found(ref id) if id == "dep-mem-1"),
+            "second resolve must hit the cache and surface the same id: {second:?}"
+        );
+        assert_eq!(
+            count.load(Ordering::SeqCst),
+            1,
+            "axhub deploy list must be spawned exactly once across both probes"
+        );
+    }
+
+    /// US-014 corollary: even failing lookups (NoRecentDeploy /
+    /// TransportFailure) must be cached. Otherwise a transient auth
+    /// error gets re-issued on every probe within the same verify run.
+    #[test]
+    fn real_verify_probes_memoizes_transport_failure() {
+        let probes = RealVerifyProbes::new();
+        let count = AtomicUsize::new(0);
+        let runner = |_args: &[&str]| {
+            count.fetch_add(1, Ordering::SeqCst);
+            axhub_helpers::verify_helper::ProbeResult {
+                stdout: String::new(),
+                exit_code: 65,
+                timed_out: false,
+            }
+        };
+        let _ = probes.resolve_deploy_id_with("paydrop", runner);
+        let _ = probes.resolve_deploy_id_with("paydrop", runner);
+        assert_eq!(
+            count.load(Ordering::SeqCst),
+            1,
+            "transport-failure lookups must also be cached"
+        );
+    }
+
+    /// US-007: fslock single-flight contract that
+    /// `cmd_auth_refresh_bg` depends on. The fslock primitive itself is
+    /// upstream-tested; this test validates our specific use shape
+    /// (try_lock_with_pid returning false when held; drop releases).
+    #[cfg(unix)]
+    #[test]
+    fn auth_refresh_lock_is_single_flight() {
+        let dir = tempfile::tempdir().unwrap();
+        let lock_path = dir.path().join("auth-refresh.lock");
+
+        let mut first = fslock::LockFile::open(&lock_path).expect("open lock");
+        assert!(
+            first.try_lock_with_pid().expect("try_lock #1"),
+            "first acquire must succeed"
+        );
+
+        let mut second = fslock::LockFile::open(&lock_path).expect("open lock");
+        assert!(
+            !second.try_lock_with_pid().expect("try_lock #2"),
+            "second acquire must observe contention while first holds the lock"
+        );
+
+        drop(first);
+
+        let mut third = fslock::LockFile::open(&lock_path).expect("open lock");
+        assert!(
+            third.try_lock_with_pid().expect("try_lock #3"),
+            "lock must be acquirable after the first holder releases (drop)"
+        );
     }
 }

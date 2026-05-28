@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::{Mutex, OnceLock};
 
+use axhub_helpers::axhub_cli::CliOutput;
 use axhub_helpers::bootstrap::{
     interpret_apps_create_result, run_bootstrap, AppsCreateDecision, BootstrapState,
     BOOTSTRAP_RECORD_SCHEMA_VERSION,
@@ -19,10 +20,8 @@ use axhub_helpers::keychain_windows::{
     PS_TIMEOUT_MS,
 };
 use axhub_helpers::list_deployments::{
-    pinned_hub_api_url, proxy_override_enabled, resolve_endpoint, resolve_token,
-    run_list_deployments_with_fetch, spki_hash_from_cert_der, verify_hub_api_tls_pin, HttpResponse,
-    ListDeploymentsArgs, TlsPinError, DEFAULT_ENDPOINT, EXIT_LIST_AUTH, EXIT_LIST_NOT_FOUND,
-    EXIT_LIST_OK, EXIT_LIST_TRANSPORT,
+    list_deployments_cli_args, parse_list_deployments_cli_output, run_list_deployments_with_runner,
+    ListDeploymentsArgs, EXIT_LIST_AUTH, EXIT_LIST_NOT_FOUND, EXIT_LIST_OK, EXIT_LIST_TRANSPORT,
 };
 use axhub_helpers::preflight::{
     extract_semver, parse_auth_status, run_preflight_with_runner, AuthStatus, SpawnResult, EXIT_OK,
@@ -42,10 +41,6 @@ use serde_json::{json, Map, Value};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use tempfile::TempDir;
-
-fn ok_tls_pin(_: &str) -> Result<(), axhub_helpers::list_deployments::TlsPinError> {
-    Ok(())
-}
 
 fn env_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -1043,171 +1038,111 @@ fn resolve_covers_arg_parsing_auth_parse_ambiguity_and_not_found_paths() {
 }
 
 #[test]
-fn list_deployments_maps_auth_not_found_success_and_proxy_skip() {
-    let _lock = env_lock().lock().unwrap();
-    let guard = EnvGuard::new(&[
-        "AXHUB_TOKEN",
-        "AXHUB_ENDPOINT",
-        "AXHUB_ALLOW_PROXY",
-        "XDG_CONFIG_HOME",
-    ]);
-    std::env::remove_var("AXHUB_TOKEN");
-    std::env::set_var("XDG_CONFIG_HOME", guard.path("config"));
-    let missing = run_list_deployments_with_fetch(
-        ListDeploymentsArgs {
-            app_id: "42".into(),
-            limit: None,
-        },
-        |_url, _token| unreachable!(),
-        None::<fn(&str) -> Result<(), axhub_helpers::list_deployments::TlsPinError>>,
+fn list_deployments_wraps_current_cli_deploy_list() {
+    let args = ListDeploymentsArgs {
+        app_id: "paydrop".into(),
+        limit: Some(3),
+    };
+    assert_eq!(
+        list_deployments_cli_args(&args),
+        vec![
+            "--json",
+            "deploy",
+            "list",
+            "--app",
+            "paydrop",
+            "--page-size",
+            "3"
+        ]
     );
-    assert_eq!(missing.exit_code, EXIT_LIST_AUTH);
 
-    std::env::set_var("AXHUB_TOKEN", "axhub_pat_abcdefghijklmnop");
-    std::env::set_var("AXHUB_ENDPOINT", "https://example.test");
-    let bad = run_list_deployments_with_fetch(
-        ListDeploymentsArgs {
-            app_id: "paydrop".into(),
-            limit: None,
-        },
-        |_url, _token| unreachable!(),
-        None::<fn(&str) -> Result<(), axhub_helpers::list_deployments::TlsPinError>>,
-    );
-    assert_eq!(bad.exit_code, EXIT_LIST_NOT_FOUND);
-
-    let ok = run_list_deployments_with_fetch(
-        ListDeploymentsArgs {
-            app_id: "42".into(),
-            limit: Some(1),
-        },
-        |url, token| {
-            assert_eq!(
-                url,
-                "https://example.test/api/v1/apps/42/deployments?per_page=1"
-            );
-            assert_eq!(token, "axhub_pat_abcdefghijklmnop");
-            Ok(HttpResponse { status: 200, body: r#"{"data":{"deployments":[{"id":7,"app_id":42,"status":3,"commit_sha":"abc","commit_message":"ship","branch":"main","created_at":"2026-04-29T00:00:00Z"}]}}"#.into() })
-        },
-        Some(ok_tls_pin),
-    );
-    assert_eq!(ok.exit_code, EXIT_LIST_OK);
-    assert_eq!(ok.deployments[0].status, "active");
+    let got = run_list_deployments_with_runner(args, |argv| {
+        assert_eq!(
+            argv,
+            &[
+                "--json".to_string(),
+                "deploy".to_string(),
+                "list".to_string(),
+                "--app".to_string(),
+                "paydrop".to_string(),
+                "--page-size".to_string(),
+                "3".to_string(),
+            ]
+        );
+        CliOutput {
+            exit_code: 0,
+            stdout: r#"{"items":[{"id":"dep_7","app_id":"app_uuid","status":"running","commit_sha":"abc","started_at":"2026-04-29T00:00:00Z"}]}"#.into(),
+            stderr: String::new(),
+            timed_out: false,
+        }
+    });
+    assert_eq!(got.exit_code, EXIT_LIST_OK);
+    assert_eq!(got.endpoint_used, "cli");
+    assert_eq!(got.deployments[0].id, "dep_7");
+    assert_eq!(got.deployments[0].app_id, "app_uuid");
+    assert_eq!(got.deployments[0].status, "running");
 }
 
 #[test]
-fn list_deployments_covers_token_endpoint_http_and_error_matrix() {
-    let _lock = env_lock().lock().unwrap();
-    let guard = EnvGuard::new(&[
-        "AXHUB_TOKEN",
-        "AXHUB_ENDPOINT",
-        "AXHUB_ALLOW_PROXY",
-        "XDG_CONFIG_HOME",
-        "HOME",
-    ]);
-    std::env::remove_var("AXHUB_TOKEN");
-    std::env::remove_var("AXHUB_ENDPOINT");
-    std::env::remove_var("AXHUB_ALLOW_PROXY");
-    std::env::set_var("XDG_CONFIG_HOME", guard.path("config"));
-    fs::create_dir_all(guard.path("config/axhub-plugin")).unwrap();
-    fs::write(
-        guard.path("config/axhub-plugin/token"),
-        " axhub_pat_filetoken123456 \n",
-    )
-    .unwrap();
-    assert_eq!(
-        resolve_token().as_deref(),
-        Some("axhub_pat_filetoken123456")
-    );
-    std::env::remove_var("XDG_CONFIG_HOME");
-    std::env::set_var("HOME", guard.path("home"));
-    fs::create_dir_all(guard.path("home/.config/axhub-plugin")).unwrap();
-    fs::write(
-        guard.path("home/.config/axhub-plugin/token"),
-        "axhub_pat_hometoken123456",
-    )
-    .unwrap();
-    assert_eq!(
-        resolve_token().as_deref(),
-        Some("axhub_pat_hometoken123456")
-    );
-    std::env::set_var("XDG_CONFIG_HOME", guard.path("config"));
-    assert_eq!(resolve_endpoint(), DEFAULT_ENDPOINT);
-    assert!(!proxy_override_enabled());
-    std::env::set_var("AXHUB_ALLOW_PROXY", "1");
-    assert!(proxy_override_enabled());
-    std::env::set_var("AXHUB_ENDPOINT", "https://example.test");
-    assert_eq!(resolve_endpoint(), "https://example.test");
-
-    assert_eq!(
-        pinned_hub_api_url("not a url").unwrap_err().code,
-        "security.endpoint_invalid"
-    );
-    assert_eq!(
-        pinned_hub_api_url("http://axhub-api.jocodingax.ai")
-            .unwrap_err()
-            .code,
-        "security.tls_required"
-    );
-    assert!(pinned_hub_api_url("https://example.test")
-        .unwrap()
-        .is_none());
-    assert!(pinned_hub_api_url(DEFAULT_ENDPOINT).unwrap().is_some());
-    assert!(verify_hub_api_tls_pin("https://example.test").is_ok());
-    assert!(verify_hub_api_tls_pin(DEFAULT_ENDPOINT).is_ok());
-    #[cfg(coverage)]
-    {
-        std::env::remove_var("AXHUB_ALLOW_PROXY");
-        assert_eq!(
-            verify_hub_api_tls_pin(DEFAULT_ENDPOINT).unwrap_err().code,
-            "security.tls_pin_failed"
-        );
-        std::env::set_var("AXHUB_ALLOW_PROXY", "1");
-    }
-    assert!(spki_hash_from_cert_der(b"not a der cert").is_err());
-    assert!(HttpResponse {
-        status: 204,
-        body: String::new(),
-    }
-    .ok());
-    assert!(!HttpResponse {
-        status: 302,
-        body: String::new(),
-    }
-    .ok());
-
+fn list_deployments_covers_cli_envelope_shapes_and_error_matrix() {
     let args = ListDeploymentsArgs {
-        app_id: "42".into(),
+        app_id: "paydrop".into(),
         limit: None,
     };
-    for (status, expected_exit, expected_code) in [
-        (401, EXIT_LIST_AUTH, "auth.token_invalid"),
-        (403, EXIT_LIST_AUTH, "auth.token_invalid"),
-        (404, EXIT_LIST_NOT_FOUND, "resource.app_not_found"),
-        (500, EXIT_LIST_TRANSPORT, "http.500"),
+
+    let enveloped = parse_list_deployments_cli_output(
+        &args,
+        CliOutput {
+            exit_code: 0,
+            stdout: r#"{"schema_version":"1","status":"ok","data":{"items":[{"id":"dep_1","status":"succeeded","started_at":"2026-04-29T00:00:00Z"}]}}"#.into(),
+            stderr: String::new(),
+            timed_out: false,
+        },
+    );
+    assert_eq!(enveloped.exit_code, EXIT_LIST_OK);
+    assert_eq!(enveloped.deployments[0].app_id, "paydrop");
+
+    for (exit_code, error_json, expected_exit, expected_code) in [
+        (
+            65,
+            r#"{"schema_version":"1","status":"error","error":{"subcode":"auth.token_invalid","hint":"login"}}"#,
+            EXIT_LIST_AUTH,
+            "auth.token_invalid",
+        ),
+        (
+            67,
+            r#"{"schema_version":"1","status":"error","error":{"subcode":"resource.app_not_found"}}"#,
+            EXIT_LIST_NOT_FOUND,
+            "resource.app_not_found",
+        ),
+        (
+            1,
+            r#"{"schema_version":"1","status":"error","error":{"subcode":"transport.network_error"}}"#,
+            EXIT_LIST_TRANSPORT,
+            "transport.network_error",
+        ),
     ] {
-        let got = run_list_deployments_with_fetch(
-            args.clone(),
-            move |_url, _token| {
-                Ok(HttpResponse {
-                    status,
-                    body: "{}".into(),
-                })
+        let got = parse_list_deployments_cli_output(
+            &args,
+            CliOutput {
+                exit_code,
+                stdout: error_json.into(),
+                stderr: String::new(),
+                timed_out: false,
             },
-            Some(ok_tls_pin),
         );
         assert_eq!(got.exit_code, expected_exit);
         assert_eq!(got.error_code.as_deref(), Some(expected_code));
     }
 
-    let invalid_json = run_list_deployments_with_fetch(
-        args.clone(),
-        |_url, _token| {
-            Ok(HttpResponse {
-                status: 200,
-                body: "not json".into(),
-            })
+    let invalid_json = parse_list_deployments_cli_output(
+        &args,
+        CliOutput {
+            exit_code: 0,
+            stdout: "not json".into(),
+            stderr: String::new(),
+            timed_out: false,
         },
-        Some(ok_tls_pin),
     );
     assert_eq!(invalid_json.exit_code, EXIT_LIST_TRANSPORT);
     assert_eq!(
@@ -1215,43 +1150,34 @@ fn list_deployments_covers_token_endpoint_http_and_error_matrix() {
         Some("response.invalid_json")
     );
 
-    let transport = run_list_deployments_with_fetch(
-        args.clone(),
-        |_url, _token| Err(anyhow::anyhow!("network down")),
-        Some(ok_tls_pin),
-    );
-    assert_eq!(transport.exit_code, EXIT_LIST_TRANSPORT);
-    assert_eq!(
-        transport.error_code.as_deref(),
-        Some("transport.network_error")
-    );
-
-    let tls = run_list_deployments_with_fetch(
-        args.clone(),
-        |_url, _token| unreachable!(),
-        Some(|_endpoint: &str| Err(TlsPinError::new("pin mismatch", "security.tls_pin_failed"))),
-    );
-    assert_eq!(tls.exit_code, EXIT_LIST_TRANSPORT);
-    assert_eq!(tls.error_code.as_deref(), Some("security.tls_pin_failed"));
-
-    let all_statuses = run_list_deployments_with_fetch(
-        args,
-        |_url, _token| {
-            Ok(HttpResponse {
-                status: 200,
-                body: r#"{"data":{"deployments":[
-                {"id":1,"app_id":42,"status":0,"commit_sha":"a","created_at":"t"},
-                {"id":2,"app_id":42,"status":1,"commit_sha":"b","commit_message":"m","branch":"dev","created_at":"t"},
-                {"id":3,"app_id":42,"status":2,"commit_sha":"c","created_at":"t"},
-                {"id":4,"app_id":42,"status":3,"commit_sha":"d","created_at":"t"},
-                {"id":5,"app_id":42,"status":4,"commit_sha":"e","created_at":"t"},
-                {"id":6,"app_id":42,"status":5,"commit_sha":"f","created_at":"t"},
-                {"id":7,"app_id":42,"status":99,"commit_sha":"g","created_at":"t"}
-            ]}}"#
-                    .into(),
-            })
+    let timed_out = parse_list_deployments_cli_output(
+        &args,
+        CliOutput {
+            exit_code: 124,
+            stdout: String::new(),
+            stderr: String::new(),
+            timed_out: true,
         },
-        Some(ok_tls_pin),
+    );
+    assert_eq!(timed_out.exit_code, EXIT_LIST_TRANSPORT);
+    assert_eq!(timed_out.error_code.as_deref(), Some("transport.timeout"));
+
+    let all_statuses = parse_list_deployments_cli_output(
+        &args,
+        CliOutput {
+            exit_code: 0,
+            stdout: r#"{"items":[
+                {"id":"1","app_id":"app","status":0,"commit_sha":"a","created_at":"t"},
+                {"id":"2","app_id":"app","status":1,"commit_sha":"b","commit_message":"m","branch":"dev","created_at":"t"},
+                {"id":"3","app_id":"app","status":2,"commit_sha":"c","created_at":"t"},
+                {"id":"4","app_id":"app","status":3,"commit_sha":"d","created_at":"t"},
+                {"id":"5","app_id":"app","status":4,"commit_sha":"e","created_at":"t"},
+                {"id":"6","app_id":"app","status":5,"commit_sha":"f","created_at":"t"},
+                {"id":"7","app_id":"app","status":99,"commit_sha":"g","created_at":"t"}
+            ]}"#.into(),
+            stderr: String::new(),
+            timed_out: false,
+        },
     );
     assert_eq!(
         all_statuses
@@ -1271,20 +1197,6 @@ fn list_deployments_covers_token_endpoint_http_and_error_matrix() {
     );
     assert_eq!(all_statuses.deployments[0].commit_message, "");
     assert_eq!(all_statuses.deployments[1].branch, "dev");
-
-    #[cfg(coverage)]
-    {
-        std::env::set_var("AXHUB_TOKEN", "axhub_pat_coverage123456");
-        std::env::set_var("AXHUB_ENDPOINT", "https://example.test");
-        std::env::remove_var("AXHUB_ALLOW_PROXY");
-        let deterministic =
-            axhub_helpers::list_deployments::run_list_deployments(ListDeploymentsArgs {
-                app_id: "42".into(),
-                limit: Some(2),
-            });
-        assert_eq!(deterministic.exit_code, EXIT_LIST_OK);
-        assert!(deterministic.deployments.is_empty());
-    }
 }
 
 #[test]

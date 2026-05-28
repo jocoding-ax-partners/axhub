@@ -19,15 +19,13 @@ tests/e2e/claude-cli/
 │   ├── spawn.sh                       claude -p wrapper (timeout, env 격리)
 │   ├── assert.sh                      exit / grep / jq / file-presence helpers
 │   ├── isolate-env.sh                 XDG_CONFIG_HOME / HOME / MCP scrub
-│   └── mock-hub.sh                    Bun-based localhost HTTP mock (AXHUB_ALLOW_PROXY=1)
+│   └── mock-hub.sh                    legacy Bun-based localhost HTTP mock
 ├── fixtures/
 │   ├── token-headed.json              valid-shape token
 │   ├── token-expired.json             exp < now → exit 65
-│   ├── apps-list.json                 mock hub-api response
-│   ├── deploy-create-success.json     mock deploy create
-│   ├── deploy-status-stream.ndjson    NDJSON tick stream
+│   ├── apps-list.json                 mock hub-api response (/v1/apps)
 │   └── bin/
-│       ├── axhub                      shim — sentinel touch + ALLOW_PROXY=1 강제
+│       ├── axhub                      shim — sentinel touch + current CLI-surface stub
 │       ├── axhub-mock-impl.sh         mock-hub wrapper
 │       └── required-subcommands.txt   coverage closed-loop assertion (22.0 자동 생성)
 ├── cases/                             NN-name.case.sh (33 active)
@@ -52,9 +50,9 @@ bun scripts/measure-claude-baseline.ts
 
 ## 안전 가드
 
-1. **No prod side-effects** — 모든 mutate (`deploy create`, `auth login`, `update apply`) 는 `--dry-run` / mock-hub / 격리 fixture 만. read-only (`auth status --json`, `apps list --json`) 만 실제 hub-api 핑 허용.
+1. **No prod side-effects** — 모든 mutate (`deploy create`, `auth login`, `update apply`) 는 `--dry-run` / CLI shim / 격리 fixture 만. read-only (`auth status --json`, `apps list --json`) 만 실제 hub-api 핑 허용.
 2. **격리 sandbox** — `env -i` + 격리 `HOME`/`XDG_CONFIG_HOME` + `tests/e2e/claude-cli/fixtures/bin/axhub` shim PATH 1순위 + `/usr/local/bin` 제거. 시스템 axhub binary 호출 0건 (sentinel touch 검증).
-3. **mock-hub** — `AXHUB_ALLOW_PROXY=1` baseline path 활용 (`src/axhub-helpers/list-deployments.ts:109,141`). HTTP localhost 가능. helper bin 변경 0건.
+3. **CLI wrapper fixtures** — backend/auth/read path 는 helper 가 직접 HTTP 를 열지 않고 `fixtures/bin/axhub` shim 을 통해 현재 CLI surface (`deploy list/status/logs`, `auth status/refresh`) 를 검증해요.
 4. **TTL 강제** — per-case `timeout --kill-after=5 30s`. matrix total `<600s`.
 5. **5-state cap-hit** — `--max-budget-usd 0.30` cap-hit silent truncation 회피 — `(exit==124) AND (stdout<100byte) AND NOT (stop_reason ∈ {abort, user_cancelled, end_turn})` 트리거 시 BUDGET_EXCEEDED hard fail.
 6. **strict 단일 매칭** — `expected_route` OR-allow 폐기. flake budget 1-retry.
@@ -75,12 +73,12 @@ bun scripts/measure-claude-baseline.ts
 | BUDGET_EXCEEDED 발생 | 모델이 cap 안에서 못 끝남 | `claude --help` 의 `--max-budget-usd` 측정 + spawn.sh cap 상향 PR |
 | `expected_route` 불일치 | 모델 비결정성 | 1-retry 후 fail. nl-lexicon 첫 순위 어구로 trigger 변경 |
 | `command not found: axhub` | shim PATH 안 잡힘 | `chmod +x fixtures/bin/axhub` + PATH 순서 검토 |
-| `[security] hub-api TLS pin` | mock-hub HTTPS 미사용 | `AXHUB_ALLOW_PROXY=1` env 누락. spawn.sh 강제 검토 |
+| helper 가 실제 axhub 를 호출함 | shim PATH 안 잡힘 | `fixtures/bin/axhub` sentinel(`shim-called`)과 `AXHUB_BIN` override 검토 |
 
 ## Tier 정의
 
 - **T1 (PR-blocking, ubuntu, claude -p, 7 case)**: SKILL routing + preflight + AskFallback + consent + 한국어 4-part exit
-- **T2 (PR-blocking, ubuntu, helper-bin golden-file, 12 case)**: classify-exit 6 카탈로그 / redact / preflight / consent / statusline / registry walk / TLS-pin baseline
+- **T2 (PR-blocking, ubuntu, helper-bin golden-file, 12 case)**: classify-exit 6 카탈로그 / redact / preflight / consent / statusline / registry walk / CLI-wrapper baseline
 - **T3 (nightly + release-tag, ubuntu+macos, 33 active)**: T1+T2 union 재실행 + 14 unique active
 
 ## 관련 파일

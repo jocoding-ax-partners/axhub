@@ -1,10 +1,10 @@
 [
   {
     "_metadata": {
-      "measured_at": "2026-05-11T07:58:00Z",
+      "measured_at": "2026-05-28T00:00:00Z",
       "reviewer": "wongil",
       "corpus_version": "tests/corpus.100.jsonl@phase-11-gap-fill",
-      "skills_version": "phase-25-26-trace-verify",
+      "skills_version": "phase-149-helper-cli-boundary-verify",
       "claude_model": "committed-docs-only-fixture",
       "rows_measured": 115,
       "rows_skipped": 0,
@@ -13,7 +13,7 @@
         "override": 0,
         "null": 0
       },
-      "notes": "Metadata refreshed for data skill routing rows plus prior trace/verify routing descriptions. Row decisions preserve committed docs-only fixture semantics; data/trace/verify invariants are covered by dedicated tests."
+      "notes": "Metadata refreshed for axhub:verify helper-CLI-boundary routing description plus prior data/trace routing rows. Row decisions preserve committed docs-only fixture semantics; data/trace/verify invariants are covered by dedicated tests."
     }
   },
   {

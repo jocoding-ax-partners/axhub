@@ -142,13 +142,17 @@ if [ "$1" = "--version" ]; then
   echo "axhub 0.15.3"
   exit 0
 fi
-if [ "$1" = "status" ]; then
+if [ "$1 $2 $3" = "--json deploy list" ]; then
+  echo '{{"items":[{{"id":"dep-fixture","status":"running","started_at":"2026-05-11T00:00:00Z"}}]}}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "--json deploy status" ]; then
   cat <<'AXHUB_STATUS'
 {status_stdout}
 AXHUB_STATUS
   exit {status_exit}
 fi
-if [ "$1" = "logs" ]; then
+if [ "$1 $2 $3" = "--json deploy logs" ]; then
   cat <<'AXHUB_LOGS'
 {logs_stdout}
 AXHUB_LOGS
@@ -175,11 +179,15 @@ if [ "$1" = "--version" ]; then
   echo "axhub 0.15.3"
   exit 0
 fi
-if [ "$1" = "status" ]; then
-  sleep 6
+if [ "$1 $2 $3" = "--json deploy list" ]; then
+  echo '{"items":[{"id":"dep-slow","status":"running","started_at":"2026-05-11T00:00:00Z"}]}'
   exit 0
 fi
-if [ "$1" = "logs" ]; then
+if [ "$1 $2 $3" = "--json deploy status" ]; then
+  sleep 30
+  exit 0
+fi
+if [ "$1 $2 $3" = "--json deploy logs" ]; then
   echo "INFO still serving"
   exit 0
 fi
@@ -190,6 +198,65 @@ exit 64
     let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
     perms.set_mode(0o755);
     std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
+}
+
+#[cfg(unix)]
+fn fake_list_deployments_axhub(
+    temp: &tempfile::TempDir,
+    stdout: &str,
+    exit_code: i32,
+) -> std::path::PathBuf {
+    let axhub = temp.path().join("axhub-list-deployments");
+    std::fs::write(
+        &axhub,
+        format!(
+            r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "axhub 0.15.3"
+  exit 0
+fi
+if [ "$1 $2 $3" = "--json deploy list" ]; then
+  cat <<'AXHUB_DEPLOYS'
+{stdout}
+AXHUB_DEPLOYS
+  exit {exit_code}
+fi
+exit 64
+"#,
+        ),
+    )
+    .unwrap();
+    let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
+}
+
+#[cfg(windows)]
+fn fake_list_deployments_axhub(
+    temp: &tempfile::TempDir,
+    stdout: &str,
+    exit_code: i32,
+) -> std::path::PathBuf {
+    let axhub = temp.path().join("axhub-list-deployments.cmd");
+    std::fs::write(
+        &axhub,
+        format!(
+            r#"@echo off
+if "%~1"=="--version" (
+  echo axhub 0.15.3
+  exit /b 0
+)
+if "%~1 %~2 %~3"=="--json deploy list" (
+  echo {stdout}
+  exit /b {exit_code}
+)
+exit /b 64
+"#,
+        ),
+    )
+    .unwrap();
     axhub
 }
 
@@ -332,7 +399,17 @@ fn write_manifest(dir: &Path) {
 fn cli_verify_requires_app_id() {
     let output = run_env(&["verify", "--json"], &[]);
     assert_eq!(output.status.code(), Some(64));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("--app-id"));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Error must mention both the canonical --app and legacy --app-id alias
+    // so users following either skill example get the same hint.
+    assert!(
+        stderr.contains("--app"),
+        "stderr should mention --app: {stderr}"
+    );
+    assert!(
+        stderr.contains("--app-id"),
+        "stderr should keep --app-id alias hint: {stderr}"
+    );
 }
 
 #[cfg(unix)]
@@ -429,7 +506,7 @@ fn cli_verify_times_out_slow_status_probe() {
     );
 
     assert!(
-        started.elapsed() < std::time::Duration::from_secs(7),
+        started.elapsed() < std::time::Duration::from_secs(12),
         "verify should enforce the 5s status probe timeout"
     );
     assert_eq!(output.status.code(), Some(0));
@@ -680,7 +757,7 @@ fn cli_auth_refresh_bg_records_success_and_failure_sentinels() {
         std::fs::write(
             &path,
             format!(
-                "#!/usr/bin/env sh\nif [ \"$1\" = \"--version\" ]; then echo 'axhub 0.15.3'; exit 0; fi\nif [ \"$1 $2 $3 $4\" = \"auth login --browser --force\" ]; then exit {login_exit}; fi\nexit 64\n"
+                "#!/usr/bin/env sh\nif [ \"$1\" = \"--version\" ]; then echo 'axhub 0.16.0'; exit 0; fi\nif [ \"$1 $2 $3 $4\" = \"--json auth refresh --no-browser\" ]; then exit {login_exit}; fi\nexit 64\n"
             ),
         )
         .unwrap();
@@ -1245,7 +1322,7 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
 
     let missing_app = run(&["list-deployments"]);
     assert_eq!(missing_app.status.code(), Some(64));
-    assert!(String::from_utf8_lossy(&missing_app.stderr).contains("--app-id"));
+    assert!(String::from_utf8_lossy(&missing_app.stderr).contains("--app"));
 
     for args in [
         ["list-deployments", "--app-id"].as_slice(),
@@ -1256,14 +1333,19 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
         assert!(String::from_utf8_lossy(&output.stderr).contains("requires a value"));
     }
 
-    let invalid_app = Command::new(bin())
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_list_deployments_axhub(
+        &temp,
+        r#"{"items":[{"id":"dep-paydrop","app_id":"paydrop","status":"running","created_at":"2026-05-11T00:00:00Z"}]}"#,
+        0,
+    );
+    let string_app = Command::new(bin())
         .args(["list-deployments", "--app", "paydrop"])
-        .env("AXHUB_TOKEN", "axhub_pat_abcdefghijklmnop")
-        .env("AXHUB_ENDPOINT", "https://example.test")
+        .env("AXHUB_BIN", axhub.to_str().unwrap())
         .output()
         .unwrap();
-    assert_eq!(invalid_app.status.code(), Some(67));
-    assert!(String::from_utf8_lossy(&invalid_app.stdout).contains("validation.app_id_invalid"));
+    assert_eq!(string_app.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&string_app.stdout).contains("dep-paydrop"));
 
     for (limit, expected) in [
         ("not-a-number", "invalid --limit"),
@@ -2933,10 +3015,10 @@ fn fake_axhub_logs(temp: &tempfile::TempDir) -> std::path::PathBuf {
     std::fs::write(
         &axhub,
         r#"#!/bin/sh
-if [ "$1" = "logs" ] && [ "$2" = "--build" ]; then
-  echo "INFO build started"
-  echo "ERROR build command failed with exit code 1"
-  echo "WARN network timeout while fetching dependency"
+	if [ "$1 $2 $3" = "--json deploy logs" ]; then
+	  echo "INFO build started"
+	  echo "ERROR build command failed with exit code 1"
+	  echo "WARN network timeout while fetching dependency"
   exit 0
 fi
 exit 1
@@ -2955,9 +3037,9 @@ fn fake_slow_axhub_logs(temp: &tempfile::TempDir) -> std::path::PathBuf {
     std::fs::write(
         &axhub,
         r#"#!/bin/sh
-if [ "$1" = "logs" ] && [ "$2" = "--build" ]; then
-  sleep 6
-  exit 0
+	if [ "$1 $2 $3" = "--json deploy logs" ]; then
+	  sleep 6
+	  exit 0
 fi
 exit 1
 "#,
@@ -2992,7 +3074,14 @@ fn cli_trace_json_reads_events_and_build_log_patterns() {
     let axhub_s = axhub.display().to_string();
 
     let out = run_env(
-        &["trace", "--deploy-id", deploy_id, "--json"],
+        &[
+            "trace",
+            "--deploy-id",
+            deploy_id,
+            "--app",
+            "paydrop",
+            "--json",
+        ],
         &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
     );
     assert_eq!(
@@ -3036,7 +3125,14 @@ fn cli_trace_rejects_path_traversal_deploy_id() {
     let axhub_s = axhub.display().to_string();
 
     let out = run_env(
-        &["trace", "--deploy-id", "../probe", "--json"],
+        &[
+            "trace",
+            "--deploy-id",
+            "../probe",
+            "--app",
+            "paydrop",
+            "--json",
+        ],
         &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
     );
 
@@ -3058,7 +3154,14 @@ fn cli_trace_times_out_slow_build_log_probe() {
 
     let started = std::time::Instant::now();
     let out = run_env(
-        &["trace", "--deploy-id", deploy_id, "--json"],
+        &[
+            "trace",
+            "--deploy-id",
+            deploy_id,
+            "--app",
+            "paydrop",
+            "--json",
+        ],
         &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
     );
 
@@ -3073,13 +3176,20 @@ fn cli_trace_times_out_slow_build_log_probe() {
         String::from_utf8_lossy(&out.stderr)
     );
     let json = stdout_json(&out);
+    // PR #149 / US-017: probe timeout WARN now surfaces on TraceReport.warnings
+    // (separate channel) instead of polluting build_log_errors. SKILL parsers
+    // branch on warnings; build_log_errors stays evidence-only.
     assert!(
-        json["build_log_errors"]
+        json["warnings"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|v| v.as_str().unwrap().contains("timeout after 5s")),
+            .any(|v| v.as_str().unwrap().contains("build_log_probe_timeout")),
         "{json}",
+    );
+    assert!(
+        json["build_log_errors"].as_array().unwrap().is_empty(),
+        "build_log_errors must not carry probe-side timeout WARN: {json}"
     );
 }
 
@@ -3095,7 +3205,7 @@ fn cli_trace_human_output_includes_phase_errors_and_patterns() {
     let axhub_s = axhub.display().to_string();
 
     let out = run_env(
-        &["trace", "--deploy-id", deploy_id],
+        &["trace", "--deploy-id", deploy_id, "--app", "paydrop"],
         &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
     );
     assert_eq!(

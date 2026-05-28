@@ -25,10 +25,10 @@ bun run build
 
 ### 그대로 유지해요
 
-- Token/env 계약: `AXHUB_TOKEN`, `AXHUB_ENDPOINT`, `AXHUB_ALLOW_PROXY`.
+- Token/env 계약: `AXHUB_TOKEN`, `AXHUB_ENDPOINT`.
 - Consent token: HS256, zero leeway, 60초 TTL, session/tool-call binding.
 - keychain read path: macOS Keychain, Linux Secret Service, Windows Credential Manager guidance.
-- Hub API fallback: bearer token 전송 전 TLS SPKI pin 확인.
+- Hub/API transport: helper 가 직접 HTTP 를 열지 않고 canonical `axhub` CLI 의 transport/auth 정책을 따라가요.
 - Hook JSON schema: `hookSpecificOutput` / `systemMessage` 구조 유지.
 - 한국어 user-facing 메시지: 해요체 톤 유지.
 

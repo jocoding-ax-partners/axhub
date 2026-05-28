@@ -3,7 +3,7 @@
 // Aggregates three sources into one `TraceReport` for the `axhub:trace`
 // SKILL and the `axhub-helpers trace --json` CLI:
 //   A. event_log    — phase transitions + per-phase duration_ms
-//   B. build_log    — `axhub logs --build --tail N` ERROR/WARN excerpts
+//   B. build_log    — caller-provided deploy build log ERROR/WARN excerpts
 //   C. audit        — recent routing context, time-window correlated
 //
 // The helper is **pure** (no I/O) except for the optional `TraceProbes`
@@ -48,6 +48,12 @@ pub struct TraceReport {
     /// computed against `build_log_errors`. Used by the SKILL to pick the
     /// 4-part empathy entry.
     pub matched_patterns: Vec<String>,
+    /// Probe-emitted warnings — e.g. evidence sources skipped because a
+    /// required argument was omitted. Separated from `build_log_errors`
+    /// so SKILL parsers can branch on the warning without polluting the
+    /// build-log evidence collection.
+    #[serde(default)]
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Error)]
@@ -58,11 +64,19 @@ pub enum TraceError {
     Io(#[from] std::io::Error),
 }
 
-/// Caller-injected build-log probe. Real callers spawn `axhub logs --build`;
+/// Caller-injected build-log probe. Real callers delegate to current
+/// `axhub deploy logs <DEPLOY_ID> --app <APP> --source build`;
 /// tests pass a closure returning canned NDJSON or plain text.
 pub trait TraceProbes {
     fn axhub_build_log(&self, deploy_id: &str, tail: u32) -> String;
     fn recent_routing_context(&self) -> Option<RoutingContext>;
+    /// Warnings accumulated during probe execution. The default returns
+    /// an empty list; real probes that need to signal a degraded run
+    /// (e.g. skipped build-log probe because `--app` was omitted) should
+    /// override.
+    fn trace_warnings(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// Synthesize a `TraceReport` from a deploy_id. Pure-ish — depends on the
@@ -81,6 +95,7 @@ pub fn trace<P: TraceProbes>(deploy_id: &str, probes: &P) -> Result<TraceReport,
     let build_log_errors = extract_error_lines(&raw_build_log, 5);
     let matched_patterns = match_error_patterns(&build_log_errors);
     let routing_context = probes.recent_routing_context();
+    let warnings = probes.trace_warnings();
 
     Ok(TraceReport {
         deploy_id: deploy_id.to_string(),
@@ -90,6 +105,7 @@ pub fn trace<P: TraceProbes>(deploy_id: &str, probes: &P) -> Result<TraceReport,
         build_log_errors,
         routing_context,
         matched_patterns,
+        warnings,
     })
 }
 
@@ -290,6 +306,39 @@ mod tests {
     }
 
     #[test]
+    fn trace_propagates_probe_warnings_into_report() {
+        struct WarningProbes;
+        impl TraceProbes for WarningProbes {
+            fn axhub_build_log(&self, _deploy_id: &str, _tail: u32) -> String {
+                String::new()
+            }
+            fn recent_routing_context(&self) -> Option<RoutingContext> {
+                None
+            }
+            fn trace_warnings(&self) -> Vec<String> {
+                vec!["build_log_probe_skipped: --app required".to_string()]
+            }
+        }
+        // event_log read may fail in this synthetic env; we just exercise
+        // the warning-propagation path through TraceReport assembly.
+        let report = TraceReport {
+            deploy_id: "dep-test".to_string(),
+            last_phase: "unknown".to_string(),
+            failure_reason: None,
+            phase_durations: Vec::new(),
+            build_log_errors: Vec::new(),
+            routing_context: None,
+            matched_patterns: Vec::new(),
+            warnings: WarningProbes.trace_warnings(),
+        };
+        assert_eq!(report.warnings.len(), 1);
+        assert!(report.warnings[0].contains("build_log_probe_skipped"));
+        // Critically: warnings must NOT leak into build_log_errors —
+        // SKILL parsers split the two channels.
+        assert!(report.build_log_errors.is_empty());
+    }
+
+    #[test]
     fn trace_with_no_events_yields_unknown_last_phase() {
         // event_log read inside trace() depends on filesystem state; here we
         // just verify the algorithms that don't require I/O.
@@ -301,6 +350,7 @@ mod tests {
             build_log_errors: Vec::new(),
             routing_context: None,
             matched_patterns: Vec::new(),
+            warnings: Vec::new(),
         };
         assert_eq!(report.last_phase, "unknown");
         // Sanity-check FakeProbes interface stays buildable.

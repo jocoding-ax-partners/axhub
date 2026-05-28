@@ -84,8 +84,9 @@ To check status:
 
 7. **On any non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by exit code:
    - exit 65 → token expired template + AskUserQuestion to run auth login
-   - exit 67 → resource not found + did-you-mean from `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments`
+   - exit 67 → resource not found + did-you-mean from `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP>`
    - exit 68 → rate limit + Retry-After backoff
+   - exit 1 + `error_code = "transport.cli_missing"` → axhub CLI 가 PATH 에 없거나 실행 불가. 사용자에게 `axhub --version` 확인 또는 `axhub:setup` 재실행을 안내해요. canonical 표는 `../recover/SKILL.md` (Step 7).
    - exit 1 → transport error; retry the watch once for read paths
 
 ## NEVER
