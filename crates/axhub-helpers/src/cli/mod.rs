@@ -9,7 +9,7 @@
 
 use clap::Parser;
 
-mod args;
+pub(crate) mod args;
 
 #[derive(Parser)]
 #[command(
@@ -45,6 +45,7 @@ enum Commands {
     Verify(args::VerifyArgs),
     Trace(args::TraceArgs),
     Doctor(args::DoctorArgs),
+    SettingsMerge(args::SettingsMergeCliArgs),
 
     /// 전환기 raw passthrough — legacy dispatch 로 위임. Polish 에서 제거.
     #[command(external_subcommand)]
@@ -188,6 +189,7 @@ fn dispatch(command: Commands) -> i32 {
         Commands::Verify(a) => run_result(crate::cmd_verify(a.app_id, a.json)),
         Commands::Trace(a) => run_result(crate::cmd_trace(a.deploy_id, a.app, a.json)),
         Commands::Doctor(a) => run_result(crate::cmd_doctor(a.json, a.no_cooldown)),
+        Commands::SettingsMerge(a) => run_result(crate::cmd_settings_merge(a)),
 
         Commands::Passthrough(tokens) => {
             let Some((cmd, rest)) = tokens.split_first() else {

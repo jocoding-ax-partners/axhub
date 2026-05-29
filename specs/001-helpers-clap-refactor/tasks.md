@@ -77,16 +77,16 @@ description: "Task list: axhub-helpers clap 리팩토링"
 
 **Independent Test**: `cli_e2e.rs` + `data_layer_cli.rs` + `deploy_prep_test.rs` + `settings_merge.rs` + `bootstrap_*` green, exit code 0/64/65 + JSON 바이트 동일.
 
-- [ ] T019 [P] [US2] `deploy-prep` args (`--intent`(필수) `--user-utterance` `--refresh-in-flight` `--json`) → `run_deploy_prep` 연결 (seam 보존) in `crates/axhub-helpers/src/cli/args/deploy_prep.rs`
-- [ ] T020 [P] [US2] `sync` args → `run_sync(&[String])` 브리지 (clap 파싱 후 lib 호출, 시그니처 유지) in `crates/axhub-helpers/src/cli/args/sync.rs`
-- [ ] T021 [P] [US2] `snippet` args (`--mode A|B` `--language` `--target` `--connector` `--path` `--sql` `--allowed-columns`) → `run_snippet` 브리지 in `crates/axhub-helpers/src/cli/args/snippet.rs`
-- [ ] T022 [P] [US2] `config` 중첩 subcommand (`get <key> [--json]` | `set <key> <value>`) in `crates/axhub-helpers/src/cli/args/config.rs`
+- [X] T019 [P] [US2] `deploy-prep` args (`--intent`(필수) `--user-utterance` `--refresh-in-flight` `--json`) → `run_deploy_prep` 연결 (seam 보존) in `crates/axhub-helpers/src/cli/args/deploy_prep.rs`
+- [X] T020 [P] [US2] `sync` args → `run_sync(&[String])` 브리지 (clap 파싱 후 lib 호출, 시그니처 유지) in `crates/axhub-helpers/src/cli/args/sync.rs`
+- [X] T021 [P] [US2] `snippet` args (`--mode A|B` `--language` `--target` `--connector` `--path` `--sql` `--allowed-columns`) → `run_snippet` 브리지 in `crates/axhub-helpers/src/cli/args/snippet.rs`
+- [X] T022 [P] [US2] `config` 중첩 subcommand (`get <key> [--json]` | `set <key> <value>`) in `crates/axhub-helpers/src/cli/args/config.rs`
 - [X] T023 [P] [US2] `verify`(`--app-id` 필수 `--json`) + `trace`(`--deploy-id` 필수 `--app` `--json`) + `doctor`(`--json` `--no-cooldown`) typed args in `crates/axhub-helpers/src/cli/args/diag.rs`
-- [ ] T024 [P] [US2] `bootstrap` (`[--json|--dry-run|--plan-only|--auto-chain|--record <event>]` + `dependency-plan` 중첩) — 조건부 stdin(`--record apps_create|deploy_create`) 보존 in `crates/axhub-helpers/src/cli/args/bootstrap.rs`
+- [X] T024 [P] [US2] `bootstrap` (`[--json|--dry-run|--plan-only|--auto-chain|--record <event>]` + `dependency-plan` 중첩) — 조건부 stdin(`--record apps_create|deploy_create`) 보존 in `crates/axhub-helpers/src/cli/args/bootstrap.rs`
 - [X] T025 [P] [US2] `consent-mint`(`[--validate-only]`) + `consent-verify` — stdin 계약 + 한국어 stdin 에러(D6, handler-level exit 65) 보존 in `crates/axhub-helpers/src/cli/args/consent.rs`
 - [X] T026 [P] [US2] `token-init`/`token-import`(`[--json]`) + `token-gate`(SKILL gate, exit 0/65 의미 보존) in `crates/axhub-helpers/src/cli/args/token.rs`
-- [ ] T027 [P] [US2] `resolve`(lib `&[String]` 브리지) + `preflight`(무인자) + `settings-merge`(`--apply|--dry-run` 택1 `--scope` `--json`) in `crates/axhub-helpers/src/cli/args/misc_p2.rs`
-- [ ] T028 [US2] US2 검증 — `cargo test -p axhub-helpers --test cli_e2e --test data_layer_cli --test deploy_prep_test --test settings_merge --test bootstrap_coverage --test bootstrap_dependency_plan_test --test token_gate_test` green (token-gate 가 US2/T026 에서 migrate 되므로 token_gate_test 도 여기서 검증)
+- [X] T027 [P] [US2] `resolve`(lib `&[String]` 브리지) + `preflight`(무인자) + `settings-merge`(`--apply|--dry-run` 택1 `--scope` `--json`) in `crates/axhub-helpers/src/cli/args/misc_p2.rs`
+- [X] T028 [US2] US2 검증 — `cargo test -p axhub-helpers --test cli_e2e --test data_layer_cli --test deploy_prep_test --test settings_merge --test bootstrap_coverage --test bootstrap_dependency_plan_test --test token_gate_test` green (token-gate 가 US2/T026 에서 migrate 되므로 token_gate_test 도 여기서 검증)
 
 **Checkpoint**: 데이터/변경 명령 typed 완료, exit/JSON parity 검증.
 

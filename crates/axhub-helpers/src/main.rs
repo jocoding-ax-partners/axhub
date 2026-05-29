@@ -137,7 +137,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "snippet" => run_snippet(&rest),
         "auth-refresh-bg" => cmd_auth_refresh_bg(),
         // verify/trace/doctor: US2 typed (cli::Commands) — legacy arm 제거.
-        "settings-merge" => cmd_settings_merge(&rest),
+        // settings-merge: US2 typed (cli::Commands::SettingsMerge) — legacy arm 제거.
         // autowire-statusline: US1 typed (cli::Commands::AutowireStatusline) — legacy arm 제거.
         "orphan-stub" => cmd_orphan_stub(&rest),
         "diagnose" => cmd_diagnose(&rest),
@@ -2538,80 +2538,31 @@ struct SettingsMergeArgs {
     yes: bool,
 }
 
-fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArgs> {
-    let mut apply = false;
-    let mut dry_run_flag = false;
-    let mut scope = Scope::Auto;
-    let mut json = false;
-    let mut silent = false;
-    let mut command_path_override: Option<PathBuf> = None;
-    let mut migrate = false;
-    let mut yes = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--apply" => apply = true,
-            "--dry-run" => dry_run_flag = true,
-            "--json" => json = true,
-            "--silent" => silent = true,
-            "--migrate" => migrate = true,
-            "--yes" => yes = true,
-            "--scope" if i + 1 < args.len() => {
-                i += 1;
-                scope = match args[i].as_str() {
-                    "user" => Scope::User,
-                    "project" => Scope::Project,
-                    "auto" => Scope::Auto,
-                    other => anyhow::bail!(
-                        "--scope 값이 잘못됐어요: {other} (user|project|auto 만 가능)"
-                    ),
-                };
-            }
-            "--command-path" if i + 1 < args.len() => {
-                i += 1;
-                command_path_override = Some(PathBuf::from(&args[i]));
-            }
-            "-h" | "--help" => {
-                println!(
-                    "axhub-helpers settings-merge — ~/.claude/settings.json statusLine 병합\n\n\
-                     USAGE:\n  axhub-helpers settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n\
-                     \n  axhub-helpers settings-merge --migrate [--yes] [--dry-run] [--scope user|project|auto]\n\n\
-                     OPTIONS:\n  --apply           실제 병합 실행 (explicit consent gate)\n  \
-                     --dry-run         결정만 출력, 파일 변경 없음 (기본값)\n  \
-                     --migrate         stale ${{CLAUDE_PLUGIN_ROOT}} literal 를 orphan stub path 로 교체\n  \
-                     --yes             --migrate 와 함께: 대화형 확인 없이 자동 적용\n  \
-                     --scope <s>       user|project|auto (기본: auto)\n  \
-                     --json            결과를 JSON 으로 출력\n  \
-                     --silent          stderr 억제\n  \
-                     --command-path    statusLine command 경로 override\n  \
-                     -h, --help        도움말\n\n\
-                     EXIT CODES:\n  0 no-op  2 created  3 merged  4 preserved-other  \
-                     5 invalid-json  6 partial-schema  7 permission-denied"
-                );
-                std::process::exit(0);
-            }
-            other => {
-                anyhow::bail!("알 수 없는 flag: {other}");
-            }
+fn parse_settings_merge_args(cli: &cli::args::SettingsMergeCliArgs) -> anyhow::Result<SettingsMergeArgs> {
+    let scope = match cli.scope.as_deref() {
+        None | Some("auto") => Scope::Auto,
+        Some("user") => Scope::User,
+        Some("project") => Scope::Project,
+        Some(other) => {
+            anyhow::bail!("--scope 값이 잘못됐어요: {other} (user|project|auto 만 가능)")
         }
-        i += 1;
-    }
-    if apply && dry_run_flag {
+    };
+    if cli.apply && cli.dry_run {
         anyhow::bail!("--apply 와 --dry-run 은 같이 사용할 수 없어요");
     }
-    if migrate && apply {
+    if cli.migrate && cli.apply {
         anyhow::bail!("--migrate 와 --apply 는 같이 사용할 수 없어요");
     }
     Ok(SettingsMergeArgs {
         // --migrate and --apply are mutually exclusive, so `!apply` is always
-        // true in migrate mode — use explicit dry_run_flag instead.
-        dry_run: if migrate { dry_run_flag } else { !apply },
+        // true in migrate mode — use explicit dry_run flag instead.
+        dry_run: if cli.migrate { cli.dry_run } else { !cli.apply },
         scope,
-        json,
-        silent,
-        command_path_override,
-        migrate,
-        yes,
+        json: cli.json,
+        silent: cli.silent,
+        command_path_override: cli.command_path.clone().map(PathBuf::from),
+        migrate: cli.migrate,
+        yes: cli.yes,
     })
 }
 
@@ -2806,8 +2757,8 @@ fn cmd_orphan_stub(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_settings_merge(args: &[String]) -> anyhow::Result<i32> {
-    let parsed = match parse_settings_merge_args(args) {
+pub(crate) fn cmd_settings_merge(cli: cli::args::SettingsMergeCliArgs) -> anyhow::Result<i32> {
+    let parsed = match parse_settings_merge_args(&cli) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("axhub-helpers settings-merge: {e}");

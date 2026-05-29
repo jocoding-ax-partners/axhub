@@ -127,3 +127,34 @@ pub(crate) struct DoctorArgs {
     #[arg(long = "no-cooldown")]
     pub no_cooldown: bool,
 }
+
+/// `settings-merge` raw flags. mutual-excl(--apply/--dry-run, --migrate/--apply) 검증·dry_run
+/// 파생·scope 검증은 handler 가 담당(bail→64 보존). classify=Normal.
+#[derive(clap::Args, Debug)]
+#[command(long_about = "axhub-helpers settings-merge — ~/.claude/settings.json statusLine 병합\n\n\
+OPTIONS:\n  --apply           실제 병합 실행 (explicit consent gate)\n  \
+--dry-run         결정만 출력, 파일 변경 없음 (기본값)\n  \
+--migrate         stale ${CLAUDE_PLUGIN_ROOT} literal 를 orphan stub path 로 교체\n  \
+--yes             --migrate 와 함께: 대화형 확인 없이 자동 적용\n  \
+--scope <s>       user|project|auto (기본: auto)\n  \
+--json            결과를 JSON 으로 출력\n  --silent  stderr 억제\n  \
+--command-path    statusLine command 경로 override\n\n\
+EXIT CODES: 0 no-op  2 created  3 merged  4 preserved-other  5 invalid-json  6 partial-schema  7 permission-denied")]
+pub(crate) struct SettingsMergeCliArgs {
+    #[arg(long)]
+    pub apply: bool,
+    #[arg(long = "dry-run")]
+    pub dry_run: bool,
+    #[arg(long)]
+    pub migrate: bool,
+    #[arg(long)]
+    pub json: bool,
+    #[arg(long)]
+    pub silent: bool,
+    #[arg(long)]
+    pub yes: bool,
+    #[arg(long)]
+    pub scope: Option<String>,
+    #[arg(long = "command-path")]
+    pub command_path: Option<String>,
+}
