@@ -299,3 +299,8 @@ DISABLE_AXHUB=1   # stderr 에 경고 출력
 - [ ] `tests/hooks-kill-switch.test.ts` 매트릭스에 새 hook case 추가
 - [ ] `cargo test hook_safety` + `bun test tests/hooks-kill-switch.test.ts` 모두 pass
 - [ ] hook 실패 path 에서 `hook_safety::append_hook_error("name", &err)` 호출 확인
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
