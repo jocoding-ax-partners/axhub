@@ -192,3 +192,29 @@ pub(crate) struct ListDeploymentsCliArgs {
     #[arg(long)]
     pub limit: Option<String>,
 }
+
+/// `routing-stats` flags. since/top 파싱(→64)은 handler. 한국어 PRIVACY help 는
+/// 기존 const 를 long_about 으로 보존(D6, FR-006a). classify=Normal.
+#[derive(clap::Args, Debug)]
+#[command(long_about = crate::ROUTING_STATS_HELP)]
+pub(crate) struct RoutingStatsArgs {
+    #[arg(long)]
+    pub since: Option<String>,
+    #[arg(long)]
+    pub json: bool,
+    #[arg(long)]
+    pub top: Option<String>,
+    #[arg(long)]
+    pub confused: bool,
+}
+
+/// `diagnose hitl` flags (nested). session/prompts 필수·TTY 검증은 handler. classify=Normal.
+#[derive(clap::Args, Debug)]
+pub(crate) struct DiagnoseHitlArgs {
+    #[arg(long)]
+    pub session: Option<String>,
+    #[arg(long)]
+    pub prompts: Option<String>,
+    #[arg(long)]
+    pub output: Option<String>,
+}

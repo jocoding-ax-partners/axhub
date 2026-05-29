@@ -15,7 +15,6 @@ pub(crate) mod args;
 #[command(
     name = "axhub-helpers",
     bin_name = "axhub-helpers",
-    disable_help_flag = true,
     disable_version_flag = true
 )]
 struct Cli {
@@ -51,6 +50,11 @@ enum Commands {
     PostInstall(args::PostInstallArgs),
     AuditClarify(args::AuditClarifyArgs),
     ListDeployments(args::ListDeploymentsCliArgs),
+    RoutingStats(args::RoutingStatsArgs),
+    Diagnose {
+        #[command(subcommand)]
+        sub: DiagnoseSub,
+    },
 
     /// 전환기 raw passthrough — legacy dispatch 로 위임. Polish 에서 제거.
     #[command(external_subcommand)]
@@ -64,6 +68,12 @@ enum Commands {
 /// 경로**만 fail-open 이고 malformed/비-hook 입력은 handler 의 기존 exit code(64)를
 /// 보존해요. classify()→FailOpenHook 는 "clap parse 실패 시 비정상 종료 금지"를
 /// 의미하지, "무조건 exit 0" 이 아니에요 — typed handler 가 자체 exit code 를 반환해요.
+/// `diagnose` 중첩 subcommand (현재 hitl 만).
+#[derive(clap::Subcommand)]
+enum DiagnoseSub {
+    Hitl(args::DiagnoseHitlArgs),
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum HookClass {
     FailOpenHook,
@@ -207,6 +217,14 @@ fn dispatch(command: Commands) -> i32 {
         Commands::ListDeployments(a) => {
             run_result(crate::cmd_list_deployments(a.app_id, a.limit))
         }
+        Commands::RoutingStats(a) => {
+            run_result(crate::cmd_routing_stats(a.since, a.json, a.top, a.confused))
+        }
+        Commands::Diagnose { sub } => match sub {
+            DiagnoseSub::Hitl(h) => {
+                run_result(crate::cmd_diagnose_hitl(h.session, h.prompts, h.output))
+            }
+        },
 
         Commands::Passthrough(tokens) => {
             let Some((cmd, rest)) = tokens.split_first() else {

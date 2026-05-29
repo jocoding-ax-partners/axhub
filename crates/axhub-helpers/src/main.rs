@@ -112,7 +112,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
             Ok(run.exit_code)
         }
         // list-deployments: US3 typed (cli::Commands::ListDeployments) — legacy arm 제거.
-        "routing-stats" => cmd_routing_stats(&rest),
+        // routing-stats: US3 typed (cli::Commands::RoutingStats) — legacy arm 제거.
         "cleanup-audit" => cmd_cleanup_audit(&rest),
         // audit-clarify: US3 typed (cli::Commands::AuditClarify) — legacy arm 제거.
         "routing-dashboard" => cmd_routing_dashboard(&rest),
@@ -140,7 +140,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         // settings-merge: US2 typed (cli::Commands::SettingsMerge) — legacy arm 제거.
         // autowire-statusline: US1 typed (cli::Commands::AutowireStatusline) — legacy arm 제거.
         "orphan-stub" => cmd_orphan_stub(&rest),
-        "diagnose" => cmd_diagnose(&rest),
+        // diagnose: US3 typed (cli::Commands::Diagnose nested hitl) — legacy arm 제거.
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -1145,7 +1145,7 @@ fn format_preflight_context(preflight: &PreflightRun) -> String {
 // Local-only audit log analytics. AXHUB_NO_AUDIT respected. Silent skip on
 // disk read errors. Always Korean default + --json machine-readable.
 
-const ROUTING_STATS_HELP: &str = "axhub-helpers routing-stats — 라우팅 audit log 통계 조회
+pub(crate) const ROUTING_STATS_HELP: &str = "axhub-helpers routing-stats — 라우팅 audit log 통계 조회
 
 USAGE:
   axhub-helpers routing-stats [OPTIONS]
@@ -1163,39 +1163,6 @@ PRIVACY:
   끄려면: AXHUB_NO_AUDIT=1 환경 변수 설정.
   삭제: axhub-helpers cleanup-audit --all
 ";
-
-fn parse_routing_stats_args(
-    args: &[String],
-) -> anyhow::Result<(chrono::Duration, bool, u32, bool)> {
-    let mut since = chrono::Duration::days(7);
-    let mut json = false;
-    let mut top: u32 = 10;
-    let mut confused = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--since" if i + 1 < args.len() => {
-                i += 1;
-                since = parse_duration(&args[i])?;
-            }
-            "--json" => json = true,
-            "--top" if i + 1 < args.len() => {
-                i += 1;
-                top = args[i]
-                    .parse()
-                    .map_err(|_| anyhow::anyhow!("--top 은 숫자여야 해요"))?;
-            }
-            "--confused" => confused = true,
-            "-h" | "--help" => {
-                print!("{}", ROUTING_STATS_HELP);
-                std::process::exit(0);
-            }
-            other => anyhow::bail!("알 수 없는 flag: {other}"),
-        }
-        i += 1;
-    }
-    Ok((since, json, top, confused))
-}
 
 fn parse_duration(s: &str) -> anyhow::Result<chrono::Duration> {
     if s == "all" {
@@ -1225,15 +1192,33 @@ fn percentile(sorted: &[u32], p: f64) -> u32 {
     sorted[idx.min(sorted.len() - 1)]
 }
 
-fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
+pub(crate) fn cmd_routing_stats(
+    since_arg: Option<String>,
+    json: bool,
+    top_arg: Option<String>,
+    confused: bool,
+) -> anyhow::Result<i32> {
     use axhub_helpers::audit;
 
-    let (since, json, top, confused) = match parse_routing_stats_args(args) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("axhub-helpers routing-stats: {e}");
-            return Ok(64);
-        }
+    let since = match since_arg {
+        None => chrono::Duration::days(7),
+        Some(s) => match parse_duration(&s) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("axhub-helpers routing-stats: {e}");
+                return Ok(64);
+            }
+        },
+    };
+    let top: u32 = match top_arg {
+        None => 10,
+        Some(s) => match s.parse() {
+            Ok(t) => t,
+            Err(_) => {
+                eprintln!("axhub-helpers routing-stats: --top 은 숫자여야 해요");
+                return Ok(64);
+            }
+        },
     };
 
     // 매 호출마다 7-day rotation 자동 trigger (silent).
@@ -2839,21 +2824,6 @@ fn cmd_settings_merge_migrate(parsed: SettingsMergeArgs) -> anyhow::Result<i32> 
 /// (`run`) and probe sweep ship in follow-up PRs per the PR #113 honest
 /// tradeoff section. Unknown subcommands return exit 64 (EX_USAGE) so the
 /// shell sees a stable error code instead of a panic.
-fn cmd_diagnose(args: &[String]) -> anyhow::Result<i32> {
-    let Some(sub) = args.first().map(String::as_str) else {
-        eprintln!("axhub-helpers diagnose: missing subcommand (try `hitl`)");
-        return Ok(64);
-    };
-    let rest = &args[1..];
-    match sub {
-        "hitl" => cmd_diagnose_hitl(rest),
-        other => {
-            eprintln!("axhub-helpers diagnose: unknown subcommand \"{other}\"");
-            Ok(64)
-        }
-    }
-}
-
 /// `diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]`
 ///
 /// Drives the user through the prompt list via `StdioRunner`, applies
@@ -2865,34 +2835,15 @@ fn cmd_diagnose(args: &[String]) -> anyhow::Result<i32> {
 ///   64 — usage error (missing flags / invalid args)
 ///   65 — environment error (TTY missing, state dir unresolvable)
 ///   1 — operational error (spec parse failure, write failure, runner abort)
-fn cmd_diagnose_hitl(args: &[String]) -> anyhow::Result<i32> {
+pub(crate) fn cmd_diagnose_hitl(
+    session: Option<String>,
+    prompts: Option<String>,
+    output: Option<String>,
+) -> anyhow::Result<i32> {
     use axhub_helpers::diagnose::hitl::{run_from_files, StdioRunner};
 
-    let mut session: Option<String> = None;
-    let mut prompts: Option<PathBuf> = None;
-    let mut output: Option<PathBuf> = None;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--session" => {
-                i += 1;
-                session = args.get(i).cloned();
-            }
-            "--prompts" => {
-                i += 1;
-                prompts = args.get(i).map(PathBuf::from);
-            }
-            "--output" => {
-                i += 1;
-                output = args.get(i).map(PathBuf::from);
-            }
-            other => {
-                eprintln!("axhub-helpers diagnose hitl: unknown flag \"{other}\"");
-                return Ok(64);
-            }
-        }
-        i += 1;
-    }
+    let prompts = prompts.map(PathBuf::from);
+    let output = output.map(PathBuf::from);
     let Some(session) = session else {
         eprintln!("axhub-helpers diagnose hitl: --session <loop_id> required");
         return Ok(64);
