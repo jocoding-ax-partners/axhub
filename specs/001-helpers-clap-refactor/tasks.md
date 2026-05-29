@@ -83,8 +83,8 @@ description: "Task list: axhub-helpers clap 리팩토링"
 - [ ] T022 [P] [US2] `config` 중첩 subcommand (`get <key> [--json]` | `set <key> <value>`) in `crates/axhub-helpers/src/cli/args/config.rs`
 - [ ] T023 [P] [US2] `verify`(`--app-id` 필수 `--json`) + `trace`(`--deploy-id` 필수 `--app` `--json`) + `doctor`(`--json` `--no-cooldown`) typed args in `crates/axhub-helpers/src/cli/args/diag.rs`
 - [ ] T024 [P] [US2] `bootstrap` (`[--json|--dry-run|--plan-only|--auto-chain|--record <event>]` + `dependency-plan` 중첩) — 조건부 stdin(`--record apps_create|deploy_create`) 보존 in `crates/axhub-helpers/src/cli/args/bootstrap.rs`
-- [ ] T025 [P] [US2] `consent-mint`(`[--validate-only]`) + `consent-verify` — stdin 계약 + 한국어 stdin 에러(D6, handler-level exit 65) 보존 in `crates/axhub-helpers/src/cli/args/consent.rs`
-- [ ] T026 [P] [US2] `token-init`/`token-import`(`[--json]`) + `token-gate`(SKILL gate, exit 0/65 의미 보존) in `crates/axhub-helpers/src/cli/args/token.rs`
+- [X] T025 [P] [US2] `consent-mint`(`[--validate-only]`) + `consent-verify` — stdin 계약 + 한국어 stdin 에러(D6, handler-level exit 65) 보존 in `crates/axhub-helpers/src/cli/args/consent.rs`
+- [X] T026 [P] [US2] `token-init`/`token-import`(`[--json]`) + `token-gate`(SKILL gate, exit 0/65 의미 보존) in `crates/axhub-helpers/src/cli/args/token.rs`
 - [ ] T027 [P] [US2] `resolve`(lib `&[String]` 브리지) + `preflight`(무인자) + `settings-merge`(`--apply|--dry-run` 택1 `--scope` `--json`) in `crates/axhub-helpers/src/cli/args/misc_p2.rs`
 - [ ] T028 [US2] US2 검증 — `cargo test -p axhub-helpers --test cli_e2e --test data_layer_cli --test deploy_prep_test --test settings_merge --test bootstrap_coverage --test bootstrap_dependency_plan_test --test token_gate_test` green (token-gate 가 US2/T026 에서 migrate 되므로 token_gate_test 도 여기서 검증)
 

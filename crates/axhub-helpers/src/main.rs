@@ -97,8 +97,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
             Ok(0)
         }
         "path" => cmd_path(&rest),
-        "token-init" => cmd_token_init(&rest),
-        "token-import" => cmd_token_import(&rest),
+        // token-init/token-import: US2 typed (cli::Commands) — legacy arm 제거.
         "token-gate" => cmd_token_gate(&rest),
         "post-install" => cmd_post_install(&rest),
         // classify-exit: US1 typed (cli::Commands::ClassifyExit) — legacy arm 제거.
@@ -118,7 +117,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "audit-clarify" => cmd_audit_clarify(&rest),
         "routing-dashboard" => cmd_routing_dashboard(&rest),
         "bootstrap" => cmd_bootstrap(&rest),
-        "consent-mint" => cmd_consent_mint(&rest),
+        // consent-mint: US2 typed (cli::Commands::ConsentMint) — legacy arm 제거.
         "consent-verify" => cmd_consent_verify(),
         "state-show" => cmd_state_show(&rest),
         "state-update" => cmd_state_update(&rest),
@@ -182,11 +181,7 @@ fn cmd_path(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_token_init(args: &[String]) -> anyhow::Result<i32> {
-    let json_output = match parse_json_flag(args, "token-init") {
-        Ok(value) => value,
-        Err(code) => return Ok(code),
-    };
+pub(crate) fn cmd_token_init(json_output: bool) -> anyhow::Result<i32> {
     let (token, source) = match env_token() {
         Some(token) => (token, "env:AXHUB_TOKEN".to_string()),
         None => {
@@ -585,11 +580,7 @@ fn write_disclosure_marker_from_post_install() {
     let _ = fs::write(&marker_path, body);
 }
 
-fn cmd_token_import(args: &[String]) -> anyhow::Result<i32> {
-    let json_output = match parse_json_flag(args, "token-import") {
-        Ok(value) => value,
-        Err(code) => return Ok(code),
-    };
+pub(crate) fn cmd_token_import(json_output: bool) -> anyhow::Result<i32> {
     let raw = read_stdin()?;
     let Some(token) = extract_token_from_import_payload(&raw) else {
         return emit_token_error(
@@ -598,20 +589,6 @@ fn cmd_token_import(args: &[String]) -> anyhow::Result<i32> {
         );
     };
     store_and_report_token(json_output, &token, "stdin")
-}
-
-fn parse_json_flag(args: &[String], command: &str) -> Result<bool, i32> {
-    let mut json_output = false;
-    for arg in args {
-        match arg.as_str() {
-            "--json" => json_output = true,
-            _ => {
-                eprintln!("axhub-helpers {command}: unknown option");
-                return Err(64);
-            }
-        }
-    }
-    Ok(json_output)
 }
 
 fn env_token() -> Option<String> {
@@ -824,15 +801,7 @@ fn parse_consent_mint_binding(raw: &str) -> Result<ConsentBinding, i32> {
     })
 }
 
-fn cmd_consent_mint(args: &[String]) -> anyhow::Result<i32> {
-    let validate_only = match args {
-        [] => false,
-        [flag] if flag == "--validate-only" => true,
-        [flag, ..] => {
-            eprintln!("axhub-helpers consent-mint: unknown option \"{flag}\"");
-            return Ok(64);
-        }
-    };
+pub(crate) fn cmd_consent_mint(validate_only: bool) -> anyhow::Result<i32> {
     let raw = read_stdin()?;
     let b = match parse_consent_mint_binding(&raw) {
         Ok(binding) => binding,

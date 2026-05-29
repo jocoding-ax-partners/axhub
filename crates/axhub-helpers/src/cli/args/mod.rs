@@ -84,3 +84,17 @@ pub(crate) struct AutowireCliArgs {
     #[arg(long = "command-path")]
     pub command_path: Option<String>,
 }
+
+/// `consent-mint` flag. classify()=Normal (bad-arg→64). stdin 으로 JSON binding 읽음.
+#[derive(clap::Args, Debug)]
+pub(crate) struct ConsentMintArgs {
+    #[arg(long = "validate-only")]
+    pub validate_only: bool,
+}
+
+/// `token-init`/`token-import` 공용 flag. classify()=Normal (bad-arg→64).
+#[derive(clap::Args, Debug)]
+pub(crate) struct TokenArgs {
+    #[arg(long)]
+    pub json: bool,
+}

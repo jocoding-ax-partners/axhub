@@ -38,6 +38,11 @@ enum Commands {
     StateUpdate(args::StateUpdateArgs),
     AutowireStatusline(args::AutowireCliArgs),
 
+    // ── US2 — 데이터/auth 명령 (typed args) ──
+    ConsentMint(args::ConsentMintArgs),
+    TokenInit(args::TokenArgs),
+    TokenImport(args::TokenArgs),
+
     /// 전환기 raw passthrough — legacy dispatch 로 위임. Polish 에서 제거.
     #[command(external_subcommand)]
     Passthrough(Vec<String>),
@@ -116,11 +121,24 @@ fn handle_parse_error(e: clap::Error, hook_class: HookClass) -> i32 {
             0
         }
         ErrorKind::DisplayVersion => 0,
-        _ => {
+        kind => {
             if hook_class == HookClass::FailOpenHook {
                 0
             } else {
-                let _ = e.print();
+                // legacy per-command parity: generic 메시지만 출력하고 **인자 값은 echo
+                // 안 해요** (토큰류 값 누출 방지 — cli_e2e do_not_echo_token 테스트).
+                // clap raw 에러(`e.print()`)는 unrecognized arg 를 echo + "unexpected
+                // argument" 문구라 legacy "unknown option" 계약을 깨요(SC-001 은 top-level
+                // wording 만 변경 허용).
+                let msg = if matches!(
+                    kind,
+                    ErrorKind::MissingRequiredArgument | ErrorKind::MissingSubcommand
+                ) {
+                    "missing option"
+                } else {
+                    "unknown option"
+                };
+                eprintln!("axhub-helpers: {msg}");
                 64
             }
         }
@@ -161,6 +179,9 @@ fn dispatch(command: Commands) -> i32 {
             a.child,
             a.command_path.map(std::path::PathBuf::from),
         )),
+        Commands::ConsentMint(a) => run_result(crate::cmd_consent_mint(a.validate_only)),
+        Commands::TokenInit(a) => run_result(crate::cmd_token_init(a.json)),
+        Commands::TokenImport(a) => run_result(crate::cmd_token_import(a.json)),
 
         Commands::Passthrough(tokens) => {
             let Some((cmd, rest)) = tokens.split_first() else {
