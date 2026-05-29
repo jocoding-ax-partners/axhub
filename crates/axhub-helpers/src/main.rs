@@ -36,8 +36,10 @@ use axhub_helpers::{commit_gate, hook_output, quality_state};
 use chrono::Utc;
 use serde_json::{json, Map, Value};
 
-const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+mod cli;
+
+pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -62,23 +64,11 @@ fn enable_utf8_console() {}
 
 fn main() {
     enable_utf8_console();
-    std::process::exit(match run() {
-        Ok(code) => code,
-        Err(e) => {
-            eprintln!("{e}");
-            1
-        }
-    });
+    std::process::exit(cli::run());
 }
 
-fn run() -> anyhow::Result<i32> {
-    let mut args = std::env::args().skip(1);
-    let Some(cmd) = args.next() else {
-        eprintln!("{USAGE}");
-        return Ok(64);
-    };
-    let rest: Vec<String> = args.collect();
-    match cmd.as_str() {
+pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i32> {
+    match cmd {
         "version" | "--version" | "-v" => {
             // --quiet flag silences output (used by SessionStart Gatekeeper
             // warmup on macOS — invoking the binary primes codesign /
@@ -111,7 +101,7 @@ fn run() -> anyhow::Result<i32> {
         "token-import" => cmd_token_import(&rest),
         "token-gate" => cmd_token_gate(&rest),
         "post-install" => cmd_post_install(&rest),
-        "classify-exit" => cmd_classify_exit(&rest),
+        // classify-exit: US1 typed (cli::Commands::ClassifyExit) — legacy arm 제거.
         "preflight" => {
             let run = run_preflight();
             println!("{}", serde_json::to_string(&run.output)?);
@@ -748,7 +738,7 @@ fn verify_trace_suggestion(command: &str, exit_code: i32) -> Option<String> {
     None
 }
 
-fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {
+pub(crate) fn cmd_classify_exit(arg_exit_code: i32, arg_stdout: &str) -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("classify-exit") {
         out_json(json!({}));
         return Ok(0);
@@ -803,24 +793,7 @@ fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {
         return Ok(0);
     }
 
-    let mut exit_code = 1;
-    let mut stdout = String::new();
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--exit-code" if i + 1 < args.len() => {
-                i += 1;
-                exit_code = args[i].parse().unwrap_or(1);
-            }
-            "--stdout" if i + 1 < args.len() => {
-                i += 1;
-                stdout = args[i].clone();
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    out_json(serde_json::to_value(classify(exit_code, &stdout))?);
+    out_json(serde_json::to_value(classify(arg_exit_code, arg_stdout))?);
     Ok(0)
 }
 
@@ -891,7 +864,7 @@ fn cmd_state_show(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_state_update(args: &[String]) -> anyhow::Result<i32> {
+pub(crate) fn cmd_state_update(args: &[String]) -> anyhow::Result<i32> {
     let repo_root = quality_state::repo_root_from_cwd()?;
     match args.first().map(String::as_str) {
         Some("--review-acknowledged") => quality_state::update_review_acknowledged(&repo_root)?,
@@ -917,7 +890,7 @@ fn cmd_state_update(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_commit_gate() -> anyhow::Result<i32> {
+pub(crate) fn cmd_commit_gate() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("commit-gate") || hook_safety::is_quality_triggers_disabled() {
         println!("{}", hook_output::pre_tool_use_allow());
         return Ok(0);
@@ -947,7 +920,7 @@ fn cmd_commit_gate() -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_test_classifier() -> anyhow::Result<i32> {
+pub(crate) fn cmd_test_classifier() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("test-classifier")
         || hook_safety::is_quality_triggers_disabled()
     {
@@ -978,7 +951,7 @@ fn cmd_test_classifier() -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_tdd_inject() -> anyhow::Result<i32> {
+pub(crate) fn cmd_tdd_inject() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("tdd-inject") || hook_safety::is_quality_triggers_disabled() {
         out_json(json!({}));
         return Ok(0);
@@ -1037,7 +1010,7 @@ fn cmd_quality_consent(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_preauth_check() -> anyhow::Result<i32> {
+pub(crate) fn cmd_preauth_check() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("preauth-check") {
         out_json(
             json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}),
@@ -1130,7 +1103,7 @@ const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
 // No keyword chain, no skill enforcement, no `skills/<X>/SKILL.md` paths in
 // additionalContext. Claude Code matches skills via SKILL.md frontmatter
 // description natively (Phase 1 codegen merged main.rs phrases into descriptions).
-fn cmd_prompt_route() -> anyhow::Result<i32> {
+pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     use axhub_helpers::audit::{append as audit_append, now_iso8601, sha256_hex, AuditRecord};
 
     if hook_safety::is_hook_disabled("prompt-route") {
@@ -1689,7 +1662,7 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
 
 const WELCOME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn cmd_session_start() -> anyhow::Result<i32> {
+pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("session-start") {
         out_json(json!({}));
         return Ok(0);
