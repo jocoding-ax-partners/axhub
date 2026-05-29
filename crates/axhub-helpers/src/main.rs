@@ -141,7 +141,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "trace" => cmd_trace(&rest),
         "doctor" => cmd_doctor(&rest),
         "settings-merge" => cmd_settings_merge(&rest),
-        "autowire-statusline" => cmd_autowire_statusline(&rest),
+        // autowire-statusline: US1 typed (cli::Commands::AutowireStatusline) — legacy arm 제거.
         "orphan-stub" => cmd_orphan_stub(&rest),
         "diagnose" => cmd_diagnose(&rest),
         _ => {
@@ -2711,76 +2711,27 @@ fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArg
 // autowire-statusline subcommand
 // ---------------------------------------------------------------------------
 
-fn cmd_autowire_statusline(args: &[String]) -> anyhow::Result<i32> {
-    // sh/ps1-absorption Phase 2.2 (T6): added `auto` scope keyword + dispatch
-    // mode so shell wrappers can drop the manual scope-detection block. The
-    // `--child` worker mode is preserved unchanged for the dispatcher's
-    // self-spawn path.
-    let mut scope: Option<Scope> = None;
-    let mut auto_scope = false;
-    let mut silent = false;
-    let mut command_path: Option<PathBuf> = None;
-    let mut is_child = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--scope" if i + 1 < args.len() => {
-                i += 1;
-                match args[i].as_str() {
-                    "user" => scope = Some(Scope::User),
-                    "project" => scope = Some(Scope::Project),
-                    "auto" => auto_scope = true,
-                    other => {
-                        eprintln!(
-                            "axhub-helpers autowire-statusline: --scope 는 user|project|auto 만 가능해요 (받은 값: {other})"
-                        );
-                        return Ok(64);
-                    }
-                }
-            }
-            arg if arg.starts_with("--scope=") => {
-                let value = arg.trim_start_matches("--scope=");
-                match value {
-                    "user" => scope = Some(Scope::User),
-                    "project" => scope = Some(Scope::Project),
-                    "auto" => auto_scope = true,
-                    other => {
-                        eprintln!(
-                            "axhub-helpers autowire-statusline: --scope 는 user|project|auto 만 가능해요 (받은 값: {other})"
-                        );
-                        return Ok(64);
-                    }
-                }
-            }
-            "--silent" => silent = true,
-            "--child" => is_child = true,
-            "--command-path" if i + 1 < args.len() => {
-                i += 1;
-                command_path = Some(PathBuf::from(&args[i]));
-            }
-            arg if arg.starts_with("--command-path=") => {
-                command_path = Some(PathBuf::from(arg.trim_start_matches("--command-path=")));
-            }
-            "-h" | "--help" => {
-                println!(
-                    "axhub-helpers autowire-statusline — v0.6.0 SessionStart statusLine 자동 설정\n\n\
-                     USAGE:\n  axhub-helpers autowire-statusline --scope user|project [OPTIONS]\n\n\
-                     OPTIONS:\n  --scope user|project   대상 settings.json scope\n  \
-                     --silent               stderr 억제 (hook 호출 모드)\n  \
-                     --command-path <p>     statusLine.command 경로 override\n  \
-                     --child                child 프로세스 플래그 (marker write 안 함)\n  \
-                     -h, --help             도움말\n\n\
-                     ENV:\n  AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1   전체 skip"
-                );
-                return Ok(0);
-            }
-            other => {
-                eprintln!("axhub-helpers autowire-statusline: 알 수 없는 flag: {other}");
-                return Ok(64);
-            }
+pub(crate) fn cmd_autowire_statusline(
+    arg_scope: Option<&str>,
+    silent: bool,
+    is_child: bool,
+    command_path: Option<PathBuf>,
+) -> anyhow::Result<i32> {
+    // sh/ps1-absorption Phase 2.2 (T6): `auto` scope keyword + dispatch mode.
+    // flag 파싱은 clap(cli::args::AutowireCliArgs)이 담당하고, 여기선 scope 값
+    // 검증(한국어 에러 보존) + auto 해석만 해요. `--child` worker 모드 보존.
+    let (scope, auto_scope): (Option<Scope>, bool) = match arg_scope {
+        Some("user") => (Some(Scope::User), false),
+        Some("project") => (Some(Scope::Project), false),
+        Some("auto") => (None, true),
+        Some(other) => {
+            eprintln!(
+                "axhub-helpers autowire-statusline: --scope 는 user|project|auto 만 가능해요 (받은 값: {other})"
+            );
+            return Ok(64);
         }
-        i += 1;
-    }
+        None => (None, false),
+    };
     let scope = match (scope, auto_scope) {
         (Some(s), _) => s,
         (None, true) => match detect_scope_from_env() {

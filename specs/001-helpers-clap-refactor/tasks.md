@@ -64,8 +64,8 @@ description: "Task list: axhub-helpers clap 리팩토링"
 - [X] T014 [P] [US1] 무인자 hook 명령(`session-start`, `prompt-route`, `preauth-check`, `commit-gate`, `tdd-inject`, `test-classifier`)을 unit `Commands` variant 로 추가, passthrough 에서 제거, 기존 handler 연결 in `crates/axhub-helpers/src/cli/mod.rs`
 - [X] T015 [P] [US1] `classify-exit` typed args (`--exit-code <n>` `--stdout <s>` + stdin payload 분기) in `crates/axhub-helpers/src/cli/args/classify_exit.rs`, dispatch 연결 (stdin 계약 FR-009 보존)
 - [X] T016 [P] [US1] `state-update` flag-group (정확히 하나: `--review-acknowledged`|`--post-commit-promote`|`--debug-acknowledged`|`--shipped`|`--edit-event`|`--pull`) in `crates/axhub-helpers/src/cli/args/state_update.rs` — `--edit-event`(PostToolUse)·`--post-commit-promote`(git hook) fail-open 보존. 단 malformed/unknown flag·무인자는 기존 **exit 64 보존**(data-model §4 parity guard — blanket fail-open 금지)
-- [ ] T017 [P] [US1] `autowire-statusline` typed args (`--scope user|project|auto` `--silent` `--command-path <p>` `--child`) in `crates/axhub-helpers/src/cli/args/autowire.rs`
-- [ ] T018 [US1] US1 검증 — `cargo test -p axhub-helpers --test hook_safety_cli --test version_quiet_test --test classify_exit_suggest_test` green + wave-1 명령 fail-open exit 0 (quickstart §2 스크립트)
+- [X] T017 [P] [US1] `autowire-statusline` typed args (`--scope user|project|auto` `--silent` `--command-path <p>` `--child`) in `crates/axhub-helpers/src/cli/args/autowire.rs`
+- [X] T018 [US1] US1 검증 — `cargo test -p axhub-helpers --test hook_safety_cli --test version_quiet_test --test classify_exit_suggest_test` green + wave-1 명령 fail-open exit 0 (quickstart §2 스크립트)
 
 **Checkpoint**: hook 경로 typed 완료, fail-open 검증. MVP 배포 가능 슬라이스.
 

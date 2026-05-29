@@ -63,3 +63,24 @@ impl StateUpdateArgs {
         }
     }
 }
+
+/// `autowire-statusline` flags. classify()=Normal (legacy bad-arg→64). scope 값
+/// 검증·auto 해석은 handler 가 담당(한국어 에러 보존). long_about 으로 한국어
+/// help 콘텐츠 보존(D6).
+#[derive(clap::Args, Debug)]
+#[command(long_about = "axhub-helpers autowire-statusline — SessionStart statusLine 자동 설정\n\n\
+OPTIONS:\n  --scope user|project|auto   대상 settings.json scope (auto=환경 감지)\n  \
+--silent                    stderr 억제 (hook 호출 모드)\n  \
+--command-path <p>          statusLine.command 경로 override\n  \
+--child                     child 프로세스 플래그 (marker write 안 함)\n\n\
+ENV:\n  AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1   전체 skip")]
+pub(crate) struct AutowireCliArgs {
+    #[arg(long)]
+    pub scope: Option<String>,
+    #[arg(long)]
+    pub silent: bool,
+    #[arg(long)]
+    pub child: bool,
+    #[arg(long = "command-path")]
+    pub command_path: Option<String>,
+}

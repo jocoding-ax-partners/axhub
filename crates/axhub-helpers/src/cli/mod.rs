@@ -36,6 +36,7 @@ enum Commands {
     // ── US1 — flag-bearing hook 명령 (typed args) ──
     ClassifyExit(args::ClassifyExitArgs),
     StateUpdate(args::StateUpdateArgs),
+    AutowireStatusline(args::AutowireCliArgs),
 
     /// 전환기 raw passthrough — legacy dispatch 로 위임. Polish 에서 제거.
     #[command(external_subcommand)]
@@ -154,6 +155,12 @@ fn dispatch(command: Commands) -> i32 {
             let argv = [a.chosen_flag().to_string()];
             run_result(crate::cmd_state_update(&argv))
         }
+        Commands::AutowireStatusline(a) => run_result(crate::cmd_autowire_statusline(
+            a.scope.as_deref(),
+            a.silent,
+            a.child,
+            a.command_path.map(std::path::PathBuf::from),
+        )),
 
         Commands::Passthrough(tokens) => {
             let Some((cmd, rest)) = tokens.split_first() else {
