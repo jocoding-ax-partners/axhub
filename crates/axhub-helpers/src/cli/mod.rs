@@ -47,6 +47,11 @@ enum Commands {
     Doctor(args::DoctorArgs),
     SettingsMerge(args::SettingsMergeCliArgs),
 
+    // ── US3 — 분석/유지보수 명령 (typed args) ──
+    PostInstall(args::PostInstallArgs),
+    AuditClarify(args::AuditClarifyArgs),
+    ListDeployments(args::ListDeploymentsCliArgs),
+
     /// 전환기 raw passthrough — legacy dispatch 로 위임. Polish 에서 제거.
     #[command(external_subcommand)]
     Passthrough(Vec<String>),
@@ -190,6 +195,18 @@ fn dispatch(command: Commands) -> i32 {
         Commands::Trace(a) => run_result(crate::cmd_trace(a.deploy_id, a.app, a.json)),
         Commands::Doctor(a) => run_result(crate::cmd_doctor(a.json, a.no_cooldown)),
         Commands::SettingsMerge(a) => run_result(crate::cmd_settings_merge(a)),
+        Commands::PostInstall(a) => run_result(crate::cmd_post_install(
+            a.target_name,
+            a.bin_dir,
+            a.link_path,
+            a.repo_root,
+        )),
+        Commands::AuditClarify(a) => {
+            run_result(crate::cmd_audit_clarify(a.hash, a.prompt, a.chosen))
+        }
+        Commands::ListDeployments(a) => {
+            run_result(crate::cmd_list_deployments(a.app_id, a.limit))
+        }
 
         Commands::Passthrough(tokens) => {
             let Some((cmd, rest)) = tokens.split_first() else {

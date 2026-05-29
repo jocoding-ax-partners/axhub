@@ -99,7 +99,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "path" => cmd_path(&rest),
         // token-init/token-import: US2 typed (cli::Commands) — legacy arm 제거.
         "token-gate" => cmd_token_gate(&rest),
-        "post-install" => cmd_post_install(&rest),
+        // post-install: US3 typed (cli::Commands::PostInstall) — legacy arm 제거.
         // classify-exit: US1 typed (cli::Commands::ClassifyExit) — legacy arm 제거.
         "preflight" => {
             let run = run_preflight();
@@ -111,10 +111,10 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
             println!("{}", serde_json::to_string(&run.output)?);
             Ok(run.exit_code)
         }
-        "list-deployments" => cmd_list_deployments(&rest),
+        // list-deployments: US3 typed (cli::Commands::ListDeployments) — legacy arm 제거.
         "routing-stats" => cmd_routing_stats(&rest),
         "cleanup-audit" => cmd_cleanup_audit(&rest),
-        "audit-clarify" => cmd_audit_clarify(&rest),
+        // audit-clarify: US3 typed (cli::Commands::AuditClarify) — legacy arm 제거.
         "routing-dashboard" => cmd_routing_dashboard(&rest),
         "bootstrap" => cmd_bootstrap(&rest),
         // consent-mint: US2 typed (cli::Commands::ConsentMint) — legacy arm 제거.
@@ -414,41 +414,12 @@ fn auth_status_stdout_is_authorized(stdout: &str) -> bool {
 ///   AXHUB_SKIP_AUTODOWNLOAD=1  same effect (suppresses disclosure for CI / test
 ///                              paths that pipe install output through JSON parsers)
 ///   AXHUB_POSTCOMMIT_INSTALL=append → opt-in append to existing post-commit hook
-fn cmd_post_install(args: &[String]) -> anyhow::Result<i32> {
-    let mut target_name: Option<String> = None;
-    let mut bin_dir: Option<PathBuf> = None;
-    let mut link_path: Option<PathBuf> = None;
-    let mut repo_root: Option<PathBuf> = None;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--target-name" if i + 1 < args.len() => {
-                i += 1;
-                target_name = Some(args[i].clone());
-            }
-            "--bin-dir" if i + 1 < args.len() => {
-                i += 1;
-                bin_dir = Some(PathBuf::from(&args[i]));
-            }
-            "--link-path" if i + 1 < args.len() => {
-                i += 1;
-                link_path = Some(PathBuf::from(&args[i]));
-            }
-            "--repo-root" if i + 1 < args.len() => {
-                i += 1;
-                repo_root = Some(PathBuf::from(&args[i]));
-            }
-            "-h" | "--help" => {
-                println!("axhub-helpers post-install — sh/ps1-absorption Phase 3.1 post-install handler\n\nUSAGE:\n  axhub-helpers post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]");
-                return Ok(0);
-            }
-            other => {
-                eprintln!("axhub-helpers post-install: 알 수 없는 flag: {other}");
-                return Ok(64);
-            }
-        }
-        i += 1;
-    }
+pub(crate) fn cmd_post_install(
+    target_name: Option<String>,
+    bin_dir: Option<String>,
+    link_path: Option<String>,
+    repo_root: Option<String>,
+) -> anyhow::Result<i32> {
     let (Some(target_name), Some(bin_dir), Some(link_path)) = (target_name, bin_dir, link_path)
     else {
         eprintln!(
@@ -456,6 +427,9 @@ fn cmd_post_install(args: &[String]) -> anyhow::Result<i32> {
         );
         return Ok(64);
     };
+    let bin_dir = PathBuf::from(bin_dir);
+    let link_path = PathBuf::from(link_path);
+    let repo_root = repo_root.map(PathBuf::from);
 
     let target_path = bin_dir.join(&target_name);
     if !target_path.exists() {
@@ -1453,6 +1427,7 @@ fn cmd_cleanup_audit(args: &[String]) -> anyhow::Result<i32> {
 // user picks a final disambiguation. Adds an audit record with clarify_invoked=true
 // + chosen_skill=Some(name). routing-stats --confused filters on this signal.
 
+#[allow(dead_code)] // US3: -h 는 clap 자동 help 로 대체, 한국어 본문은 소스 보존
 const AUDIT_CLARIFY_HELP: &str = "axhub-helpers audit-clarify — clarify feedback record
 
 USAGE:
@@ -1465,37 +1440,12 @@ OPTIONS:
   -h, --help       도움말
 ";
 
-fn cmd_audit_clarify(args: &[String]) -> anyhow::Result<i32> {
+pub(crate) fn cmd_audit_clarify(
+    hash: Option<String>,
+    prompt: Option<String>,
+    chosen: Option<String>,
+) -> anyhow::Result<i32> {
     use axhub_helpers::audit::{self, sha256_hex, AuditRecord};
-    let mut hash: Option<String> = None;
-    let mut prompt: Option<String> = None;
-    let mut chosen: Option<String> = None;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--hash" if i + 1 < args.len() => {
-                hash = Some(args[i + 1].clone());
-                i += 1;
-            }
-            "--prompt" if i + 1 < args.len() => {
-                prompt = Some(args[i + 1].clone());
-                i += 1;
-            }
-            "--chosen" if i + 1 < args.len() => {
-                chosen = Some(args[i + 1].clone());
-                i += 1;
-            }
-            "-h" | "--help" => {
-                print!("{AUDIT_CLARIFY_HELP}");
-                return Ok(0);
-            }
-            other => {
-                eprintln!("axhub-helpers audit-clarify: 알 수 없는 flag: {other}");
-                return Ok(64);
-            }
-        }
-        i += 1;
-    }
     if hash.is_some() && prompt.is_some() {
         eprintln!("axhub-helpers audit-clarify: --hash 또는 --prompt 하나만 사용해요");
         return Ok(64);
@@ -1753,46 +1703,30 @@ fn write_session_start_bundle_best_effort() {
     let _ = write_session_bundle(&bundle, &path);
 }
 
-fn cmd_list_deployments(args: &[String]) -> anyhow::Result<i32> {
-    let mut app_id = None;
-    let mut limit = None;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--app-id" | "--app" => {
-                if i + 1 >= args.len() {
-                    eprintln!("{} requires a value", args[i]);
-                    return Ok(64);
-                }
-                i += 1;
-                app_id = Some(args[i].clone());
-            }
-            "--limit" => {
-                if i + 1 >= args.len() {
-                    eprintln!("--limit requires a value");
-                    return Ok(64);
-                }
-                i += 1;
-                let parsed = match args[i].parse::<usize>() {
-                    Ok(value) => value,
-                    Err(_) => {
-                        eprintln!("invalid --limit: {}", args[i]);
-                        return Ok(64);
-                    }
-                };
-                if !(1..=MAX_LIST_DEPLOYMENTS_LIMIT).contains(&parsed) {
-                    eprintln!("--limit must be between 1 and {MAX_LIST_DEPLOYMENTS_LIMIT}");
-                    return Ok(64);
-                }
-                limit = Some(parsed);
-            }
-            _ => {}
-        }
-        i += 1;
-    }
+pub(crate) fn cmd_list_deployments(
+    app_id: Option<String>,
+    limit_arg: Option<String>,
+) -> anyhow::Result<i32> {
     let Some(app_id) = app_id else {
         eprintln!("--app (alias: --app-id) is required");
         return Ok(64);
+    };
+    let limit = match limit_arg {
+        None => None,
+        Some(s) => {
+            let parsed = match s.parse::<usize>() {
+                Ok(value) => value,
+                Err(_) => {
+                    eprintln!("invalid --limit: {s}");
+                    return Ok(64);
+                }
+            };
+            if !(1..=MAX_LIST_DEPLOYMENTS_LIMIT).contains(&parsed) {
+                eprintln!("--limit must be between 1 and {MAX_LIST_DEPLOYMENTS_LIMIT}");
+                return Ok(64);
+            }
+            Some(parsed)
+        }
     };
     let result = run_list_deployments(ListDeploymentsArgs { app_id, limit });
     let code = result.exit_code;

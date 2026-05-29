@@ -158,3 +158,37 @@ pub(crate) struct SettingsMergeCliArgs {
     #[arg(long = "command-path")]
     pub command_path: Option<String>,
 }
+
+/// `post-install` flags. 필수(target-name/bin-dir/link-path) 검증은 handler. classify=Normal.
+#[derive(clap::Args, Debug)]
+#[command(long_about = "axhub-helpers post-install — sh/ps1-absorption Phase 3.1 post-install handler\n\nUSAGE:\n  axhub-helpers post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]")]
+pub(crate) struct PostInstallArgs {
+    #[arg(long = "target-name")]
+    pub target_name: Option<String>,
+    #[arg(long = "bin-dir")]
+    pub bin_dir: Option<String>,
+    #[arg(long = "link-path")]
+    pub link_path: Option<String>,
+    #[arg(long = "repo-root")]
+    pub repo_root: Option<String>,
+}
+
+/// `audit-clarify` flags. hash XOR prompt 검증은 handler. classify=Normal.
+#[derive(clap::Args, Debug)]
+pub(crate) struct AuditClarifyArgs {
+    #[arg(long)]
+    pub hash: Option<String>,
+    #[arg(long)]
+    pub prompt: Option<String>,
+    #[arg(long)]
+    pub chosen: Option<String>,
+}
+
+/// `list-deployments` flags. app_id 필수·limit 파싱/범위 검증은 handler. classify=Normal.
+#[derive(clap::Args, Debug)]
+pub(crate) struct ListDeploymentsCliArgs {
+    #[arg(long = "app-id", visible_alias = "app")]
+    pub app_id: Option<String>,
+    #[arg(long)]
+    pub limit: Option<String>,
+}

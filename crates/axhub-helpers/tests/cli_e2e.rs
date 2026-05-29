@@ -1330,7 +1330,9 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     ] {
         let output = run(args);
         assert_eq!(output.status.code(), Some(64), "{args:?}");
-        assert!(String::from_utf8_lossy(&output.stderr).contains("requires a value"));
+        // clap 마이그레이션: value 누락 usage-error 문구가 generic "unknown option" 으로
+        // (FR-006 dev-facing usage-error wording). exit 64 계약은 보존.
+        assert!(String::from_utf8_lossy(&output.stderr).contains("unknown option"));
     }
 
     let temp = tempfile::tempdir().unwrap();
