@@ -1787,7 +1787,7 @@ fn cli_routing_stats_help_and_invalid_args_are_stable() {
     assert!(String::from_utf8_lossy(&help.stdout).contains("routing-stats"));
 
     for (args, expected) in [
-        (&["routing-stats", "--unknown"][..], "unknown option"),
+        (&["routing-stats", "--unknown"][..], "알 수 없는 flag"),
         (
             &["routing-stats", "--top", "NaN"][..],
             "--top 은 숫자여야 해요",

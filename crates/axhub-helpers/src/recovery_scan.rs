@@ -103,7 +103,7 @@ pub fn detect_incomplete_deploys(threshold_secs: u64) -> Result<Vec<RecoveryStat
 
     // Newest first (smallest age first). `list_recent_deploys` already
     // sorts by file mtime; we sort by event ts to be authoritative.
-    states.sort_by(|a, b| a.age_secs.cmp(&b.age_secs));
+    states.sort_by_key(|state| state.age_secs);
     Ok(states)
 }
 

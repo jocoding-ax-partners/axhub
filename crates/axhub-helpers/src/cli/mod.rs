@@ -41,6 +41,7 @@ enum Commands {
     ConsentMint(args::ConsentMintArgs),
     TokenInit(args::TokenArgs),
     TokenImport(args::TokenArgs),
+    TokenGate,
     Verify(args::VerifyArgs),
     Trace(args::TraceArgs),
     Doctor(args::DoctorArgs),
@@ -85,15 +86,22 @@ fn classify(token: Option<&str>) -> HookClass {
     // (무인자 또는 unknown-flag-ignore). 이들은 typed 후 clap parse 실패 → exit 0 이
     // legacy 동작과 일치해요.
     //
-    // 제외(=Normal, parse error→64): `state-update`·`autowire-statusline` 는 legacy 가
-    // 잘못된 flag 에 **exit 64** 를 반환하므로(parity guard, FR-001) parse 실패도 64 여야
-    // 해요. autowire 의 hook fail-open 은 SessionStart wrapper 의 nohup detach 가
-    // 담당(helper exit 흡수)하지 직접 호출 exit code 가 아니에요. `token-gate` 도 Normal
-    // (SKILL gate, exit 0/65 의미 보존).
+    // 제외(=Normal, parse error→64): `state-update` 는 legacy 가 잘못된 flag 에
+    // **exit 64** 를 반환하므로(parity guard, FR-001) parse 실패도 64 여야 해요.
+    // `autowire-statusline` 은 SessionStart wrapper 경유라 hook 맥락에서 방어적
+    // fail-open(parse error→0) 으로 분류해요. `token-gate` 는 Normal (SKILL gate,
+    // exit 0/65 의미 보존).
     match token {
         Some(
-            "session-start" | "prompt-route" | "preauth-check" | "commit-gate"
-            | "tdd-inject" | "test-classifier" | "classify-exit" | "karpathy-inject",
+            "session-start"
+            | "prompt-route"
+            | "preauth-check"
+            | "commit-gate"
+            | "tdd-inject"
+            | "test-classifier"
+            | "classify-exit"
+            | "autowire-statusline"
+            | "karpathy-inject",
         ) => HookClass::FailOpenHook,
         _ => HookClass::Normal,
     }
@@ -132,7 +140,7 @@ fn help_intercept(args: &[String]) -> Option<i32> {
 
 /// D4: clap try_parse 에러 분기. help → stdout+0, version → 0(pre-intercepted),
 /// usage error → hook 이면 0(fail-open), 아니면 stderr + 64(clap 기본 2 아님).
-fn handle_parse_error(e: clap::Error, hook_class: HookClass) -> i32 {
+fn handle_parse_error(e: clap::Error, hook_class: HookClass, command_token: Option<&str>) -> i32 {
     use clap::error::ErrorKind;
     match e.kind() {
         ErrorKind::DisplayHelp => {
@@ -144,6 +152,12 @@ fn handle_parse_error(e: clap::Error, hook_class: HookClass) -> i32 {
             if hook_class == HookClass::FailOpenHook {
                 0
             } else {
+                if command_token == Some("routing-stats")
+                    && matches!(kind, ErrorKind::UnknownArgument)
+                {
+                    eprintln!("axhub-helpers routing-stats: 알 수 없는 flag");
+                    return 64;
+                }
                 // legacy per-command parity: generic 메시지만 출력하고 **인자 값은 echo
                 // 안 해요** (토큰류 값 누출 방지 — cli_e2e do_not_echo_token 테스트).
                 // clap raw 에러(`e.print()`)는 unrecognized arg 를 echo + "unexpected
@@ -185,9 +199,7 @@ fn dispatch(command: Commands) -> i32 {
         Commands::CommitGate => run_result(crate::cmd_commit_gate()),
         Commands::TddInject => run_result(crate::cmd_tdd_inject()),
         Commands::TestClassifier => run_result(crate::cmd_test_classifier()),
-        Commands::ClassifyExit(a) => {
-            run_result(crate::cmd_classify_exit(a.exit_code, &a.stdout))
-        }
+        Commands::ClassifyExit(a) => run_result(crate::cmd_classify_exit(a.exit_code, &a.stdout)),
         Commands::StateUpdate(a) => {
             let argv = [a.chosen_flag().to_string()];
             run_result(crate::cmd_state_update(&argv))
@@ -201,6 +213,7 @@ fn dispatch(command: Commands) -> i32 {
         Commands::ConsentMint(a) => run_result(crate::cmd_consent_mint(a.validate_only)),
         Commands::TokenInit(a) => run_result(crate::cmd_token_init(a.json)),
         Commands::TokenImport(a) => run_result(crate::cmd_token_import(a.json)),
+        Commands::TokenGate => run_result(crate::cmd_token_gate(&[])),
         Commands::Verify(a) => run_result(crate::cmd_verify(a.app_id, a.json)),
         Commands::Trace(a) => run_result(crate::cmd_trace(a.deploy_id, a.app, a.json)),
         Commands::Doctor(a) => run_result(crate::cmd_doctor(a.json, a.no_cooldown)),
@@ -214,9 +227,7 @@ fn dispatch(command: Commands) -> i32 {
         Commands::AuditClarify(a) => {
             run_result(crate::cmd_audit_clarify(a.hash, a.prompt, a.chosen))
         }
-        Commands::ListDeployments(a) => {
-            run_result(crate::cmd_list_deployments(a.app_id, a.limit))
-        }
+        Commands::ListDeployments(a) => run_result(crate::cmd_list_deployments(a.app_id, a.limit)),
         Commands::RoutingStats(a) => {
             run_result(crate::cmd_routing_stats(a.since, a.json, a.top, a.confused))
         }
@@ -253,10 +264,11 @@ pub fn run() -> i32 {
         return code;
     }
 
-    let hook_class = classify(argv.get(1).map(String::as_str));
+    let command_token = argv.get(1).map(String::as_str);
+    let hook_class = classify(command_token);
     match Cli::try_parse_from(std::env::args_os()) {
         Ok(cli) => dispatch(cli.command),
-        Err(e) => handle_parse_error(e, hook_class),
+        Err(e) => handle_parse_error(e, hook_class, command_token),
     }
 }
 
@@ -275,6 +287,7 @@ mod tests {
             "tdd-inject",
             "test-classifier",
             "classify-exit",
+            "autowire-statusline",
             "karpathy-inject",
         ] {
             assert_eq!(
@@ -291,14 +304,17 @@ mod tests {
         // token-gate = Normal (SKILL gate, exit 0/65 의미 보존).
         for t in [
             "state-update",
-            "autowire-statusline",
             "token-gate",
             "deploy-prep",
             "sync",
             "doctor",
             "bogus-subcommand",
         ] {
-            assert_eq!(classify(Some(t)), HookClass::Normal, "{t} must classify Normal");
+            assert_eq!(
+                classify(Some(t)),
+                HookClass::Normal,
+                "{t} must classify Normal"
+            );
         }
         assert_eq!(classify(None), HookClass::Normal);
     }

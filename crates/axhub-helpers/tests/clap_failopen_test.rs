@@ -44,3 +44,13 @@ fn tdd_inject_failopen_on_bad_flag() {
         "tdd-inject must fail-open (exit 0) on unknown flag"
     );
 }
+
+#[test]
+fn autowire_statusline_failopen_on_bad_flag() {
+    let out = run_stdin(&["autowire-statusline", "--bogus-unknown-flag"], "");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "autowire-statusline must fail-open (exit 0) on clap parse failures"
+    );
+}

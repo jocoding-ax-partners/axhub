@@ -68,12 +68,14 @@ impl StateUpdateArgs {
 /// 검증·auto 해석은 handler 가 담당(한국어 에러 보존). long_about 으로 한국어
 /// help 콘텐츠 보존(D6).
 #[derive(clap::Args, Debug)]
-#[command(long_about = "axhub-helpers autowire-statusline — SessionStart statusLine 자동 설정\n\n\
+#[command(
+    long_about = "axhub-helpers autowire-statusline — SessionStart statusLine 자동 설정\n\n\
 OPTIONS:\n  --scope user|project|auto   대상 settings.json scope (auto=환경 감지)\n  \
 --silent                    stderr 억제 (hook 호출 모드)\n  \
 --command-path <p>          statusLine.command 경로 override\n  \
 --child                     child 프로세스 플래그 (marker write 안 함)\n\n\
-ENV:\n  AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1   전체 skip")]
+ENV:\n  AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1   전체 skip"
+)]
 pub(crate) struct AutowireCliArgs {
     #[arg(long)]
     pub scope: Option<String>,
@@ -131,7 +133,8 @@ pub(crate) struct DoctorArgs {
 /// `settings-merge` raw flags. mutual-excl(--apply/--dry-run, --migrate/--apply) 검증·dry_run
 /// 파생·scope 검증은 handler 가 담당(bail→64 보존). classify=Normal.
 #[derive(clap::Args, Debug)]
-#[command(long_about = "axhub-helpers settings-merge — ~/.claude/settings.json statusLine 병합\n\n\
+#[command(
+    long_about = "axhub-helpers settings-merge — ~/.claude/settings.json statusLine 병합\n\n\
 OPTIONS:\n  --apply           실제 병합 실행 (explicit consent gate)\n  \
 --dry-run         결정만 출력, 파일 변경 없음 (기본값)\n  \
 --migrate         stale ${CLAUDE_PLUGIN_ROOT} literal 를 orphan stub path 로 교체\n  \
@@ -139,7 +142,8 @@ OPTIONS:\n  --apply           실제 병합 실행 (explicit consent gate)\n  \
 --scope <s>       user|project|auto (기본: auto)\n  \
 --json            결과를 JSON 으로 출력\n  --silent  stderr 억제\n  \
 --command-path    statusLine command 경로 override\n\n\
-EXIT CODES: 0 no-op  2 created  3 merged  4 preserved-other  5 invalid-json  6 partial-schema  7 permission-denied")]
+EXIT CODES: 0 no-op  2 created  3 merged  4 preserved-other  5 invalid-json  6 partial-schema  7 permission-denied"
+)]
 pub(crate) struct SettingsMergeCliArgs {
     #[arg(long)]
     pub apply: bool,
@@ -161,7 +165,9 @@ pub(crate) struct SettingsMergeCliArgs {
 
 /// `post-install` flags. 필수(target-name/bin-dir/link-path) 검증은 handler. classify=Normal.
 #[derive(clap::Args, Debug)]
-#[command(long_about = "axhub-helpers post-install — sh/ps1-absorption Phase 3.1 post-install handler\n\nUSAGE:\n  axhub-helpers post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]")]
+#[command(
+    long_about = "axhub-helpers post-install — sh/ps1-absorption Phase 3.1 post-install handler\n\nUSAGE:\n  axhub-helpers post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]"
+)]
 pub(crate) struct PostInstallArgs {
     #[arg(long = "target-name")]
     pub target_name: Option<String>,

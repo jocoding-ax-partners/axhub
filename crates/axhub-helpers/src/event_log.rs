@@ -157,7 +157,7 @@ pub fn list_recent_deploys(within_secs: u64) -> Result<Vec<String>, EventLogErro
     }
 
     // Newest first — recovery scan picks the most recent incomplete deploy.
-    deploys.sort_by(|a, b| b.1.cmp(&a.1));
+    deploys.sort_by_key(|(_, mtime)| std::cmp::Reverse(*mtime));
     Ok(deploys.into_iter().map(|(id, _)| id).collect())
 }
 

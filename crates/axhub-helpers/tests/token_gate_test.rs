@@ -251,3 +251,20 @@ fn malformed_probe_fails_open_with_exit_zero() {
         "expected shellwords fail-open log, got: {stderr}"
     );
 }
+
+#[test]
+fn unknown_token_gate_arg_is_usage_error_not_polling_path() {
+    let out = Command::new(bin())
+        .arg("token-gate")
+        .arg("--bogus")
+        .env("AXHUB_GATE_POLL_INTERVAL", "30")
+        .env("AXHUB_GATE_POLL_ITERATIONS", "30")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(64));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("unknown option"),
+        "expected clap usage remap, got: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}

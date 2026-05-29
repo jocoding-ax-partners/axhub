@@ -1145,7 +1145,8 @@ fn format_preflight_context(preflight: &PreflightRun) -> String {
 // Local-only audit log analytics. AXHUB_NO_AUDIT respected. Silent skip on
 // disk read errors. Always Korean default + --json machine-readable.
 
-pub(crate) const ROUTING_STATS_HELP: &str = "axhub-helpers routing-stats — 라우팅 audit log 통계 조회
+pub(crate) const ROUTING_STATS_HELP: &str =
+    "axhub-helpers routing-stats — 라우팅 audit log 통계 조회
 
 USAGE:
   axhub-helpers routing-stats [OPTIONS]
@@ -1284,7 +1285,7 @@ pub(crate) fn cmd_routing_stats(
         *hash_counts.entry(r.prompt_hash.clone()).or_insert(0) += 1;
     }
     let mut top_hashes: Vec<(String, u32)> = hash_counts.into_iter().collect();
-    top_hashes.sort_by(|a, b| b.1.cmp(&a.1));
+    top_hashes.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
     top_hashes.truncate(top as usize);
 
     let mut confused_counts: std::collections::HashMap<(String, Option<String>), (u32, String)> =
@@ -1504,7 +1505,7 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
         }
     }
     let mut rows: Vec<(String, u32)> = chosen_counts.into_iter().collect();
-    rows.sort_by(|a, b| b.1.cmp(&a.1));
+    rows.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
     if html_mode {
         let mut chosen_rows = String::new();
         for (skill, count) in &rows {
@@ -2457,7 +2458,9 @@ struct SettingsMergeArgs {
     yes: bool,
 }
 
-fn parse_settings_merge_args(cli: &cli::args::SettingsMergeCliArgs) -> anyhow::Result<SettingsMergeArgs> {
+fn parse_settings_merge_args(
+    cli: &cli::args::SettingsMergeCliArgs,
+) -> anyhow::Result<SettingsMergeArgs> {
     let scope = match cli.scope.as_deref() {
         None | Some("auto") => Scope::Auto,
         Some("user") => Scope::User,
