@@ -136,9 +136,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "sync" => run_sync(&rest),
         "snippet" => run_snippet(&rest),
         "auth-refresh-bg" => cmd_auth_refresh_bg(),
-        "verify" => cmd_verify(&rest),
-        "trace" => cmd_trace(&rest),
-        "doctor" => cmd_doctor(&rest),
+        // verify/trace/doctor: US2 typed (cli::Commands) — legacy arm 제거.
         "settings-merge" => cmd_settings_merge(&rest),
         // autowire-statusline: US1 typed (cli::Commands::AutowireStatusline) — legacy arm 제거.
         "orphan-stub" => cmd_orphan_stub(&rest),
@@ -2099,30 +2097,7 @@ fn humanize_verify_korean(result: &axhub_helpers::verify_helper::VerifyResult) -
     lines.join("\n")
 }
 
-fn cmd_verify(args: &[String]) -> anyhow::Result<i32> {
-    let mut app_id: Option<String> = None;
-    let mut json_mode = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--json" => json_mode = true,
-            "--app-id" | "--app" => {
-                if i + 1 < args.len() {
-                    app_id = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            other if other.starts_with("--app-id=") => {
-                app_id = Some(other.trim_start_matches("--app-id=").to_string());
-            }
-            other if other.starts_with("--app=") => {
-                app_id = Some(other.trim_start_matches("--app=").to_string());
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-
+pub(crate) fn cmd_verify(app_id: Option<String>, json_mode: bool) -> anyhow::Result<i32> {
     let Some(app_id) = app_id else {
         eprintln!("axhub-helpers verify: --app (alias: --app-id) <id> required");
         return Ok(64);
@@ -2215,17 +2190,7 @@ fn write_cooldown_now() -> std::io::Result<()> {
     std::fs::write(&path, serde_json::to_string(&payload)?)
 }
 
-fn cmd_doctor(args: &[String]) -> anyhow::Result<i32> {
-    let mut json_mode = false;
-    let mut no_cooldown = false;
-    for a in args {
-        match a.as_str() {
-            "--json" => json_mode = true,
-            "--no-cooldown" => no_cooldown = true,
-            _ => {}
-        }
-    }
-
+pub(crate) fn cmd_doctor(json_mode: bool, no_cooldown: bool) -> anyhow::Result<i32> {
     let (size_bytes, count) = measure_deploy_events_size();
     let last_warned = read_cooldown_last_warned();
     let cooldown_open = match last_warned {
@@ -2400,37 +2365,11 @@ fn humanize_trace_korean(report: &axhub_helpers::trace_helper::TraceReport) -> S
     lines.join("\n")
 }
 
-fn cmd_trace(args: &[String]) -> anyhow::Result<i32> {
-    let mut deploy_id: Option<String> = None;
-    let mut app_ref: Option<String> = None;
-    let mut json_mode = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--json" => json_mode = true,
-            "--deploy-id" => {
-                if i + 1 < args.len() {
-                    deploy_id = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            other if other.starts_with("--deploy-id=") => {
-                deploy_id = Some(other.trim_start_matches("--deploy-id=").to_string());
-            }
-            "--app" => {
-                if i + 1 < args.len() {
-                    app_ref = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            other if other.starts_with("--app=") => {
-                app_ref = Some(other.trim_start_matches("--app=").to_string());
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-
+pub(crate) fn cmd_trace(
+    deploy_id: Option<String>,
+    app_ref: Option<String>,
+    json_mode: bool,
+) -> anyhow::Result<i32> {
     let Some(deploy_id) = deploy_id else {
         eprintln!("axhub-helpers trace: --deploy-id <id> required");
         return Ok(64);

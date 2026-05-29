@@ -98,3 +98,32 @@ pub(crate) struct TokenArgs {
     #[arg(long)]
     pub json: bool,
 }
+
+/// `verify` flags. app_id 필수 검증은 handler 가 담당(한국어 메시지 보존).
+#[derive(clap::Args, Debug)]
+pub(crate) struct VerifyArgs {
+    #[arg(long = "app-id", visible_alias = "app")]
+    pub app_id: Option<String>,
+    #[arg(long)]
+    pub json: bool,
+}
+
+/// `trace` flags. deploy_id 필수 검증은 handler 가 담당.
+#[derive(clap::Args, Debug)]
+pub(crate) struct TraceArgs {
+    #[arg(long = "deploy-id")]
+    pub deploy_id: Option<String>,
+    #[arg(long)]
+    pub app: Option<String>,
+    #[arg(long)]
+    pub json: bool,
+}
+
+/// `doctor` flags.
+#[derive(clap::Args, Debug)]
+pub(crate) struct DoctorArgs {
+    #[arg(long)]
+    pub json: bool,
+    #[arg(long = "no-cooldown")]
+    pub no_cooldown: bool,
+}

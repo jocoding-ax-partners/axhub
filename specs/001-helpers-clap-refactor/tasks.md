@@ -81,7 +81,7 @@ description: "Task list: axhub-helpers clap 리팩토링"
 - [ ] T020 [P] [US2] `sync` args → `run_sync(&[String])` 브리지 (clap 파싱 후 lib 호출, 시그니처 유지) in `crates/axhub-helpers/src/cli/args/sync.rs`
 - [ ] T021 [P] [US2] `snippet` args (`--mode A|B` `--language` `--target` `--connector` `--path` `--sql` `--allowed-columns`) → `run_snippet` 브리지 in `crates/axhub-helpers/src/cli/args/snippet.rs`
 - [ ] T022 [P] [US2] `config` 중첩 subcommand (`get <key> [--json]` | `set <key> <value>`) in `crates/axhub-helpers/src/cli/args/config.rs`
-- [ ] T023 [P] [US2] `verify`(`--app-id` 필수 `--json`) + `trace`(`--deploy-id` 필수 `--app` `--json`) + `doctor`(`--json` `--no-cooldown`) typed args in `crates/axhub-helpers/src/cli/args/diag.rs`
+- [X] T023 [P] [US2] `verify`(`--app-id` 필수 `--json`) + `trace`(`--deploy-id` 필수 `--app` `--json`) + `doctor`(`--json` `--no-cooldown`) typed args in `crates/axhub-helpers/src/cli/args/diag.rs`
 - [ ] T024 [P] [US2] `bootstrap` (`[--json|--dry-run|--plan-only|--auto-chain|--record <event>]` + `dependency-plan` 중첩) — 조건부 stdin(`--record apps_create|deploy_create`) 보존 in `crates/axhub-helpers/src/cli/args/bootstrap.rs`
 - [X] T025 [P] [US2] `consent-mint`(`[--validate-only]`) + `consent-verify` — stdin 계약 + 한국어 stdin 에러(D6, handler-level exit 65) 보존 in `crates/axhub-helpers/src/cli/args/consent.rs`
 - [X] T026 [P] [US2] `token-init`/`token-import`(`[--json]`) + `token-gate`(SKILL gate, exit 0/65 의미 보존) in `crates/axhub-helpers/src/cli/args/token.rs`

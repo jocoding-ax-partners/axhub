@@ -42,6 +42,9 @@ enum Commands {
     ConsentMint(args::ConsentMintArgs),
     TokenInit(args::TokenArgs),
     TokenImport(args::TokenArgs),
+    Verify(args::VerifyArgs),
+    Trace(args::TraceArgs),
+    Doctor(args::DoctorArgs),
 
     /// 전환기 raw passthrough — legacy dispatch 로 위임. Polish 에서 제거.
     #[command(external_subcommand)]
@@ -182,6 +185,9 @@ fn dispatch(command: Commands) -> i32 {
         Commands::ConsentMint(a) => run_result(crate::cmd_consent_mint(a.validate_only)),
         Commands::TokenInit(a) => run_result(crate::cmd_token_init(a.json)),
         Commands::TokenImport(a) => run_result(crate::cmd_token_import(a.json)),
+        Commands::Verify(a) => run_result(crate::cmd_verify(a.app_id, a.json)),
+        Commands::Trace(a) => run_result(crate::cmd_trace(a.deploy_id, a.app, a.json)),
+        Commands::Doctor(a) => run_result(crate::cmd_doctor(a.json, a.no_cooldown)),
 
         Commands::Passthrough(tokens) => {
             let Some((cmd, rest)) = tokens.split_first() else {
