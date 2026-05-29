@@ -940,6 +940,50 @@ fn cli_token_commands_do_not_echo_token_like_unknown_options() {
 }
 
 #[test]
+fn cli_legacy_passthrough_rejects_unknown_args_without_secret_echo() {
+    let mistaken_token_arg = "axhub_pat_ultraqa_mistakenarg1234567890";
+    for args in [
+        ["preflight", "--bogus", mistaken_token_arg].as_slice(),
+        ["resolve", "--bogus", mistaken_token_arg].as_slice(),
+        ["routing-dashboard", "--bogus", mistaken_token_arg].as_slice(),
+        ["mark", "--bogus", mistaken_token_arg].as_slice(),
+        ["emit-deploy-complete", "--bogus", mistaken_token_arg].as_slice(),
+        ["deploy-prep", "--bogus", mistaken_token_arg].as_slice(),
+    ] {
+        let output = run(args);
+        assert_eq!(output.status.code(), Some(64), "{args:?}");
+        assert_output_does_not_contain(&output, mistaken_token_arg);
+    }
+}
+
+#[test]
+fn cli_legacy_json_compat_flags_remain_accepted() {
+    let preflight = Command::new(bin())
+        .args(["preflight", "--json"])
+        .env("AXHUB_BIN", "/definitely-not-axhub")
+        .output()
+        .unwrap();
+    assert_eq!(preflight.status.code(), Some(64));
+    assert!(String::from_utf8_lossy(&preflight.stdout).contains(r#""cli_present":false"#));
+    assert!(
+        !String::from_utf8_lossy(&preflight.stderr).contains("unknown option"),
+        "preflight --json must stay as a no-op compatibility flag"
+    );
+
+    let resolve = Command::new(bin())
+        .args(["resolve", "--user-utterance", "paydrop", "--json"])
+        .env("AXHUB_BIN", "/definitely-not-axhub")
+        .output()
+        .unwrap();
+    assert_eq!(resolve.status.code(), Some(65));
+    assert!(String::from_utf8_lossy(&resolve.stdout).contains("auth_parse_error"));
+    assert!(
+        !String::from_utf8_lossy(&resolve.stderr).contains("unknown option"),
+        "resolve --json must stay as a no-op compatibility flag"
+    );
+}
+
+#[test]
 fn cli_preauth_allows_axhub_help_flags_for_destructive_subcommands() {
     for command in [
         "axhub apps create --help",

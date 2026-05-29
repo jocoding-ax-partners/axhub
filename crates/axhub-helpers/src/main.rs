@@ -102,11 +102,17 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         // post-install: US3 typed (cli::Commands::PostInstall) — legacy arm 제거.
         // classify-exit: US1 typed (cli::Commands::ClassifyExit) — legacy arm 제거.
         "preflight" => {
+            if let Err(message) = validate_preflight_args(&rest) {
+                return legacy_usage_error("preflight", message);
+            }
             let run = run_preflight();
             println!("{}", serde_json::to_string(&run.output)?);
             Ok(run.exit_code)
         }
         "resolve" => {
+            if let Err(message) = validate_resolve_args(&rest) {
+                return legacy_usage_error("resolve", message);
+            }
             let run = run_resolve(&rest);
             println!("{}", serde_json::to_string(&run.output)?);
             Ok(run.exit_code)
@@ -152,6 +158,59 @@ fn read_stdin() -> anyhow::Result<String> {
     let mut s = String::new();
     io::stdin().read_to_string(&mut s)?;
     Ok(s)
+}
+
+fn legacy_usage_error(command: &str, message: &str) -> anyhow::Result<i32> {
+    eprintln!("axhub-helpers {command}: {message}");
+    Ok(64)
+}
+
+fn validate_preflight_args(rest: &[String]) -> Result<(), &'static str> {
+    for arg in rest {
+        match arg.as_str() {
+            // Historical SKILLs invoke `preflight --json`; preflight already
+            // renders JSON unconditionally, so keep this as a no-op compat flag.
+            "--json" => {}
+            _ => return Err("unknown option"),
+        }
+    }
+    Ok(())
+}
+
+fn validate_resolve_args(rest: &[String]) -> Result<(), &'static str> {
+    let mut index = 0;
+    while index < rest.len() {
+        match rest[index].as_str() {
+            // Historical SKILLs invoke `resolve ... --json`; resolve already
+            // renders JSON unconditionally, so keep this as a no-op compat flag.
+            "--json" => index += 1,
+            "--intent" | "--user-utterance" => {
+                if index + 1 >= rest.len() {
+                    return Err("missing value");
+                }
+                index += 2;
+            }
+            _ => return Err("unknown option"),
+        }
+    }
+    Ok(())
+}
+
+fn validate_deploy_prep_args(rest: &[String]) -> Result<(), &'static str> {
+    let mut index = 0;
+    while index < rest.len() {
+        match rest[index].as_str() {
+            "--json" | "--refresh-in-flight" => index += 1,
+            "--intent" | "--user-utterance" => {
+                if index + 1 >= rest.len() {
+                    return Err("missing value");
+                }
+                index += 2;
+            }
+            _ => return Err("unknown option"),
+        }
+    }
+    Ok(())
 }
 fn out_json(v: Value) {
     println!("{}", v);
@@ -1483,8 +1542,16 @@ fn html_escape(s: &str) -> String {
 
 fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
     use axhub_helpers::audit;
-    let html_mode = args.iter().any(|a| a == "--html");
-    if args.iter().any(|a| a == "-h" || a == "--help") {
+    let mut html_mode = false;
+    let mut help = false;
+    for arg in args {
+        match arg.as_str() {
+            "--html" => html_mode = true,
+            "-h" | "--help" => help = true,
+            _ => return legacy_usage_error("routing-dashboard", "unknown option"),
+        }
+    }
+    if help {
         print!("{ROUTING_DASHBOARD_HELP}");
         return Ok(0);
     }
@@ -1725,6 +1792,12 @@ fn cmd_mark(rest: &[String]) -> anyhow::Result<i32> {
         eprintln!("mark requires <phase_name>");
         return Ok(64);
     };
+    if rest.len() != 1 {
+        return legacy_usage_error("mark", "expected exactly one <phase_name>");
+    }
+    if phase_name.starts_with('-') {
+        return legacy_usage_error("mark", "unknown option");
+    }
     let path_env = match std::env::var("AXHUB_PHASE_MARKER_FILE") {
         Ok(v) if !v.is_empty() => v,
         _ => return Ok(0),
@@ -2409,6 +2482,9 @@ fn deploy_prep_output_with_quality(
 }
 
 fn cmd_deploy_prep(rest: &[String]) -> anyhow::Result<i32> {
+    if let Err(message) = validate_deploy_prep_args(rest) {
+        return legacy_usage_error("deploy-prep", message);
+    }
     if std::env::var("AXHUB_DEPLOY_PREP").as_deref() == Ok("0") {
         // Backwards-compat fallback signal: SKILL detects exit 0 + no JSON
         // payload and routes to the legacy 3x resolve / 2x preflight cascade.
@@ -2434,9 +2510,26 @@ fn cmd_deploy_prep(rest: &[String]) -> anyhow::Result<i32> {
 }
 
 fn cmd_emit_deploy_complete(rest: &[String]) -> anyhow::Result<i32> {
-    let exit_code: i32 = rest.first().and_then(|s| s.parse().ok()).unwrap_or(0);
+    if rest.len() > 2 {
+        return legacy_usage_error("emit-deploy-complete", "expected at most two arguments");
+    }
+    let exit_code: i32 = match rest.first() {
+        None => 0,
+        Some(raw) => match raw.parse() {
+            Ok(code) if code >= 0 => code,
+            _ => {
+                return legacy_usage_error(
+                    "emit-deploy-complete",
+                    "exit_code must be a non-negative integer",
+                )
+            }
+        },
+    };
     let default_class = "axhub deploy create".to_string();
     let command_class = rest.get(1).unwrap_or(&default_class);
+    if command_class.starts_with('-') {
+        return legacy_usage_error("emit-deploy-complete", "unknown option");
+    }
     if let Err(err) = emit_deploy_complete(exit_code, command_class) {
         eprintln!("emit-deploy-complete: {err}");
         return Ok(1);
