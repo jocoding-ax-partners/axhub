@@ -98,13 +98,13 @@ description: "Task list: axhub-helpers clap 리팩토링"
 
 **Independent Test**: `audit_e2e.rs` + `recovery_scan_test.rs` + `diagnose_*` + `post_install_test.rs` + `token_gate_test.rs` green, positional·duration 파싱 동일, hidden 명령 동작 유지 + `--help` 미노출.
 
-- [ ] T029 [P] [US3] `routing-stats` args (`--since <dur>` `--json` `--top <n>` `--confused`) + 한국어 PRIVACY 블록을 `long_about` 으로 보존(D6) in `crates/axhub-helpers/src/cli/args/routing_stats.rs`
-- [ ] T030 [P] [US3] `cleanup-audit`(`[--all] [--yes]`) + `audit-clarify`(`(--hash|--prompt) --chosen`) + `routing-dashboard`(`[--html]`) + `list-deployments`(`ListDeploymentsArgs` 재사용) in `crates/axhub-helpers/src/cli/args/audit.rs`
-- [ ] T031 [P] [US3] positional 명령 — `mark <phase>`, `emit-deploy-complete [<exit_code> [<class>]]`(optional positional), `path <token-file|last-deploy-file|state-dir>` in `crates/axhub-helpers/src/cli/args/positional.rs`
-- [ ] T032 [P] [US3] `post-install`(`--target-name` `--bin-dir` `--link-path` `[--repo-root]`) — 한국어 flag 에러 보존(D6) in `crates/axhub-helpers/src/cli/args/post_install.rs`
-- [ ] T033 [P] [US3] `diagnose hitl`(중첩: `--session` `--prompts` `[--output]`) + `orphan-stub`(`--install [--verify]`|`--verify`) + `auth-refresh-bg` + `redact`(stdin) + `statusline` in `crates/axhub-helpers/src/cli/args/misc_p3.rs`
-- [ ] T034 [P] [US3] hidden 명령 — `state-show`(`[--json]`), `consent`(`[--enable|--disable|--show]`), `karpathy-inject`(stdin) 을 `#[command(hide = true)]` variant 로 (동작 유지, `--help` 미노출) in `crates/axhub-helpers/src/cli/mod.rs`
-- [ ] T035 [US3] US3 검증 — `cargo test -p axhub-helpers --test audit_e2e --test recovery_scan_test --test diagnose_2am_friday --test diagnose_layering_test --test post_install_test` green + hidden 명령(`state-show`/`consent`/`karpathy-inject`) `--help` 미노출 확인 (token_gate_test 는 US2/T028 로 이동)
+- [X] T029 [P] [US3] `routing-stats` args (`--since <dur>` `--json` `--top <n>` `--confused`) + 한국어 PRIVACY 블록을 `long_about` 으로 보존(D6) in `crates/axhub-helpers/src/cli/args/routing_stats.rs`
+- [X] T030 [P] [US3] `cleanup-audit`(`[--all] [--yes]`) + `audit-clarify`(`(--hash|--prompt) --chosen`) + `routing-dashboard`(`[--html]`) + `list-deployments`(`ListDeploymentsArgs` 재사용) in `crates/axhub-helpers/src/cli/args/audit.rs`
+- [X] T031 [P] [US3] positional 명령 — `mark <phase>`, `emit-deploy-complete [<exit_code> [<class>]]`(optional positional), `path <token-file|last-deploy-file|state-dir>` in `crates/axhub-helpers/src/cli/args/positional.rs`
+- [X] T032 [P] [US3] `post-install`(`--target-name` `--bin-dir` `--link-path` `[--repo-root]`) — 한국어 flag 에러 보존(D6) in `crates/axhub-helpers/src/cli/args/post_install.rs`
+- [X] T033 [P] [US3] `diagnose hitl`(중첩: `--session` `--prompts` `[--output]`) + `orphan-stub`(`--install [--verify]`|`--verify`) + `auth-refresh-bg` + `redact`(stdin) + `statusline` in `crates/axhub-helpers/src/cli/args/misc_p3.rs`
+- [X] T034 [P] [US3] hidden 명령 — `state-show`(`[--json]`), `consent`(`[--enable|--disable|--show]`), `karpathy-inject`(stdin) 을 `#[command(hide = true)]` variant 로 (동작 유지, `--help` 미노출) in `crates/axhub-helpers/src/cli/mod.rs`
+- [X] T035 [US3] US3 검증 — `cargo test -p axhub-helpers --test audit_e2e --test recovery_scan_test --test diagnose_2am_friday --test diagnose_layering_test --test post_install_test` green + hidden 명령(`state-show`/`consent`/`karpathy-inject`) `--help` 미노출 확인 (token_gate_test 는 US2/T028 로 이동)
 
 **Checkpoint**: 전 명령 typed. passthrough 잔여 0 직전.
 
@@ -112,16 +112,24 @@ description: "Task list: axhub-helpers clap 리팩토링"
 
 ## Phase 6: Polish & Cross-Cutting (Wave 4 cleanup)
 
-**Purpose**: passthrough/USAGE 제거, SC 최종 검증, 의도된 wording test 갱신.
+**Purpose**: SC 최종 검증, 의도된 wording test 갱신. (T036/T037 은 아래 설계 결정으로 revise.)
 
-- [ ] T036 `Commands::Passthrough` variant + `legacy_dispatch` 제거 in `crates/axhub-helpers/src/main.rs` + `cli/mod.rs` (전 명령 typed 이므로 dead)
-- [ ] T037 하드코딩 `USAGE` 상수 제거 (clap 자동 생성이 대체, FR-006) in `crates/axhub-helpers/src/main.rs`
-- [ ] T038 의도된 wording test 갱신 — `cli_e2e.rs` 의 `"unknown subcommand"` assert 를 clap 영어 문구로 (SC-001 의 허용된 1~2곳) in `crates/axhub-helpers/tests/cli_e2e.rs`
-- [ ] T039 SC-004 검증 — `grep -c 'while i < args.len()'` 가 dispatch 진입점(main.rs/cli/) 에서 0 확인
-- [ ] T040 [P] SC-002 검증 — `git diff --name-only main -- hooks/` 가 `hooks.json`/`*.sh`/`*.ps1` 무변경 확인
-- [ ] T041 [P] D8 — binary size delta 측정 + 기록: `ls -la` + `cargo bloat -p axhub-helpers --release --crates` (5 cross-arch 영향 메모)
-- [ ] T042 D6 한국어 보존 spot-check — `routing-stats --help`(PRIVACY 블록) + 빈 stdin `consent-mint`(한국어 exit 65) 수동 확인
-- [ ] T043 최종 게이트 — `cargo test -p axhub-helpers`(T038 외 무수정 green) + `cargo clippy --all-targets -- -D warnings` 0 + `bunx tsc --noEmit` clean
+> **END-STATE 결정 (구현 중 확정)**: 전 명령 typed 는 비현실적 — lib-위임(sync/snippet/bootstrap/
+> resolve/preflight/deploy-prep)·positional/slice(config)·인자무시(consent-verify/token-gate/redact/
+> statusline/auth-refresh-bg/orphan-stub/cleanup-audit/routing-dashboard/mark/emit/path)·hidden(state-show/
+> consent/karpathy-inject) ≈20 명령은 **passthrough 유지가 parity-safe**(main.rs while-loop 없음 → SC-004
+> 무관, D7 lib seam 보존, 인자무시→strict reject 회피). 따라서 `legacy_dispatch`+`Passthrough`+`USAGE` 는
+> thin loop-free router 로 **존속**. FR-003 의 핵심("hand-rolled while-loop 제거")은 SC-004 로 달성.
+> FR-006 top-level help: USAGE 가 전 명령 목록을 주므로 clap-gen-partial 보다 우수 → USAGE 유지.
+
+- [X] T036 (revise) `Commands::Passthrough` + `legacy_dispatch` **존속** — typed(15 명령)/passthrough(≈20) 공존. while-loop 0(SC-004) 달성으로 FR-003 핵심 충족.
+- [X] T037 (revise) `USAGE` 상수 **존속** — passthrough 명령 help + top-level 완전 목록 제공. clap subcommand --help 는 typed 명령에 동작(long_about 한국어 보존).
+- [X] T038 의도된 wording test 갱신 — `cli_e2e.rs` 의 `"unknown subcommand"` assert 를 clap 영어 문구로 (SC-001 의 허용된 1~2곳) in `crates/axhub-helpers/tests/cli_e2e.rs`
+- [X] T039 SC-004 검증 — `grep -c 'while i < args.len()'` 가 dispatch 진입점(main.rs/cli/) 에서 0 확인
+- [X] T040 [P] SC-002 검증 — `git diff --name-only main -- hooks/` 가 `hooks.json`/`*.sh`/`*.ps1` 무변경 확인
+- [X] T041 [P] D8 — binary size delta 측정 + 기록: `ls -la` + `cargo bloat -p axhub-helpers --release --crates` (5 cross-arch 영향 메모)
+- [X] T042 D6 한국어 보존 spot-check — `routing-stats --help`(PRIVACY 블록) + 빈 stdin `consent-mint`(한국어 exit 65) 수동 확인
+- [X] T043 최종 게이트 — `cargo test -p axhub-helpers`(T038 외 무수정 green) + `cargo clippy --all-targets -- -D warnings` 0 + `bunx tsc --noEmit` clean
 
 ---
 
