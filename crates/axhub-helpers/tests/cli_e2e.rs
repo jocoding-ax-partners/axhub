@@ -47,6 +47,33 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
     child.wait_with_output().unwrap()
 }
 
+/// Like `run_stdin`, but can also *remove* inherited env vars (e.g.
+/// `XDG_RUNTIME_DIR`). `run_stdin` only adds vars, so it cannot reproduce the
+/// macOS Claude Code condition where `XDG_RUNTIME_DIR` is unset and the consent
+/// `runtime_root()` falls back to a per-process `$TMPDIR`.
+fn run_stdin_with_env(
+    args: &[&str],
+    stdin: &str,
+    envs: &[(&str, &str)],
+    remove_envs: &[&str],
+) -> Output {
+    let mut command = Command::new(bin());
+    command
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (k, v) in envs {
+        command.env(k, v);
+    }
+    for k in remove_envs {
+        command.env_remove(k);
+    }
+    let mut child = command.spawn().unwrap();
+    write_stdin_allowing_early_exit(child.stdin.as_mut().unwrap(), stdin);
+    child.wait_with_output().unwrap()
+}
+
 fn assert_no_consent_side_effects(state_dir: &Path, runtime_dir: &Path) {
     assert!(!state_dir.exists());
     assert!(!runtime_dir.exists());
@@ -1049,6 +1076,178 @@ fn cli_preauth_claims_pending_github_connect_consent() {
     assert!(
         stdout.contains("permissionDecision\":\"allow"),
         "preauth stdout: {stdout}"
+    );
+}
+
+/// FR-001/FR-002 regression: a pending consent minted in one `$TMPDIR` MUST be
+/// found by a `preauth-check` hook spawned with a DIFFERENT `$TMPDIR` when
+/// `XDG_RUNTIME_DIR` is unset (the macOS Claude Code condition). Before the
+/// `runtime_root()` fallback fix this DENYs (mint dir != read dir); after, it
+/// ALLOWs. Existing consent tests all set `XDG_RUNTIME_DIR`, which masked this.
+#[cfg(unix)]
+#[test]
+fn cli_preauth_allows_when_tmpdir_differs_and_xdg_runtime_unset() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let tmp_a = temp.path().join("tmp-a");
+    let tmp_b = temp.path().join("tmp-b");
+    std::fs::create_dir_all(&tmp_a).unwrap();
+    std::fs::create_dir_all(&tmp_b).unwrap();
+    let state_s = state.to_str().unwrap();
+    let tmp_a_s = tmp_a.to_str().unwrap();
+    let tmp_b_s = tmp_b.to_str().unwrap();
+
+    // mint a pending auth_login consent with TMPDIR=A, XDG_RUNTIME_DIR removed.
+    let binding = serde_json::json!({
+        "tool_call_id": "pending",
+        "action": "auth_login",
+        "app_id": "_",
+        "profile": "default",
+        "branch": "_",
+        "commit_sha": "_",
+        "context": {}
+    })
+    .to_string();
+    let mint = run_stdin_with_env(
+        &["consent-mint"],
+        &binding,
+        &[("XDG_STATE_HOME", state_s), ("TMPDIR", tmp_a_s)],
+        &["XDG_RUNTIME_DIR"],
+    );
+    assert_eq!(
+        mint.status.code(),
+        Some(0),
+        "mint stderr: {}",
+        String::from_utf8_lossy(&mint.stderr)
+    );
+
+    // preauth-check with a DIFFERENT TMPDIR=B (hook subprocess simulation).
+    let payload = r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_auth","tool_name":"Bash","tool_input":{"command":"axhub auth login"}}"#;
+    let out = run_stdin_with_env(
+        &["preauth-check"],
+        payload,
+        &[("XDG_STATE_HOME", state_s), ("TMPDIR", tmp_b_s)],
+        &["XDG_RUNTIME_DIR"],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("permissionDecision\":\"allow"),
+        "differing TMPDIR must still resolve consent; preauth stdout: {stdout}"
+    );
+
+    // FR-003 single-use: the pending consent is consumed (file removed) after a
+    // successful claim. With XDG_RUNTIME_DIR unset the fallback dir is
+    // <XDG_STATE_HOME>/axhub/runtime.
+    let runtime_dir = state.join("axhub").join("runtime");
+    let leftover_pending = std::fs::read_dir(&runtime_dir)
+        .map(|rd| {
+            rd.flatten()
+                .filter(|e| {
+                    e.file_name()
+                        .to_string_lossy()
+                        .starts_with("consent-pending-")
+                })
+                .count()
+        })
+        .unwrap_or(0);
+    assert_eq!(
+        leftover_pending, 0,
+        "pending consent must be consumed (single-use) after a successful claim"
+    );
+}
+
+/// FR-004: the no-XDG fallback consent dir (`<XDG_STATE_HOME>/axhub/runtime`) is
+/// created `0700` and consent files `0600`, so other users on a shared host
+/// can't read or hijack a consent token.
+#[cfg(unix)]
+#[test]
+fn cli_consent_fallback_dir_and_file_are_private() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let state_s = state.to_str().unwrap();
+    let binding = serde_json::json!({
+        "tool_call_id": "pending",
+        "action": "auth_login",
+        "app_id": "_",
+        "profile": "default",
+        "branch": "_",
+        "commit_sha": "_",
+        "context": {}
+    })
+    .to_string();
+    let mint = run_stdin_with_env(
+        &["consent-mint"],
+        &binding,
+        &[("XDG_STATE_HOME", state_s)],
+        &["XDG_RUNTIME_DIR"],
+    );
+    assert_eq!(mint.status.code(), Some(0));
+
+    let runtime_dir = state.join("axhub").join("runtime");
+    let dir_mode = std::fs::metadata(&runtime_dir)
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777;
+    assert_eq!(
+        dir_mode, 0o700,
+        "fallback runtime dir must be 0700, got {dir_mode:o}"
+    );
+
+    let pending: Vec<_> = std::fs::read_dir(&runtime_dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .starts_with("consent-pending-")
+        })
+        .collect();
+    assert_eq!(pending.len(), 1, "exactly one pending consent expected");
+    let file_mode = pending[0].metadata().unwrap().permissions().mode() & 0o777;
+    assert_eq!(
+        file_mode, 0o600,
+        "consent file must be 0600, got {file_mode:o}"
+    );
+}
+
+/// FR-006 / contract C4: a deny carries the Korean reason in BOTH the canonical
+/// `permissionDecisionReason` field (the one Claude Code's deny UI surfaces) and
+/// the `systemMessage` prose channel, and still exits 0 (fail-open).
+#[test]
+fn cli_preauth_deny_surfaces_reason_in_both_channels() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let runtime = temp.path().join("run");
+    std::fs::create_dir_all(&runtime).unwrap();
+    let envs = [
+        ("XDG_STATE_HOME", state.to_str().unwrap()),
+        ("XDG_RUNTIME_DIR", runtime.to_str().unwrap()),
+    ];
+    // auth login with no consent minted → deny.
+    let out = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"s","tool_call_id":"t","tool_name":"Bash","tool_input":{"command":"axhub auth login"}}"#,
+        &envs,
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("permissionDecision\":\"deny"),
+        "stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("permissionDecisionReason"),
+        "deny must carry the canonical reason field: {stdout}"
+    );
+    assert!(
+        stdout.contains("systemMessage"),
+        "deny must keep the systemMessage channel: {stdout}"
+    );
+    assert!(
+        stdout.contains("사전 승인이 필요해요"),
+        "reason must be the Korean hint: {stdout}"
     );
 }
 

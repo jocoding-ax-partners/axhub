@@ -18,10 +18,18 @@ pub fn state_root() -> PathBuf {
         .join("axhub")
 }
 pub fn runtime_root() -> PathBuf {
-    std::env::var_os("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-        .join("axhub")
+    // When XDG_RUNTIME_DIR is set (typically Linux) both the Bash tool and the
+    // hook subprocess inherit the same value, so consent mint/read agree. When
+    // it is unset (macOS Claude Code), the old `std::env::temp_dir()` fallback
+    // read each process's own `$TMPDIR`, which the harness sets differently per
+    // process — so the mint dir and the hook read dir diverged and consent was
+    // never found (PreToolUse deny). Fall back instead to a HOME-anchored,
+    // process-stable directory: the same `state_root()` the HMAC key already
+    // uses and that both processes provably resolve identically.
+    match std::env::var_os("XDG_RUNTIME_DIR").filter(|v| !v.is_empty()) {
+        Some(xdg) => PathBuf::from(xdg).join("axhub"),
+        None => state_root().join("runtime"),
+    }
 }
 pub fn hmac_key_path() -> PathBuf {
     state_root().join("hmac-key")

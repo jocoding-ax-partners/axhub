@@ -1089,7 +1089,8 @@ pub(crate) fn cmd_preauth_check() -> anyhow::Result<i32> {
         out_json(json!({
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
-                "permissionDecision": "deny"
+                "permissionDecision": "deny",
+                "permissionDecisionReason": deny_hint.clone()
             },
             "systemMessage": deny_hint
         }));

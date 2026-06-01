@@ -303,6 +303,6 @@ DISABLE_AXHUB=1   # stderr 에 경고 출력
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/001-helpers-clap-refactor/plan.md` (+ research.md, data-model.md,
-contracts/cli-commands.md, quickstart.md).
+`specs/003-fix-plugin-login-deny/plan.md` (+ research.md, data-model.md,
+contracts/preauth-check-output.md, quickstart.md).
 <!-- SPECKIT END -->
