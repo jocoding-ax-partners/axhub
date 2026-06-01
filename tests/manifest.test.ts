@@ -783,7 +783,11 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
     for (const slug of ["deploy", "recover", "auth"]) {
       const content = skillContents.get(slug)!;
-      expect(content).toMatch(/\|\s*\$\{CLAUDE_PLUGIN_ROOT\}\/bin\/axhub-helpers consent-mint/);
+      // consent-mint pipes stdin JSON into the resolved "$HELPER" (no flags), and
+      // "$HELPER" is resolved robustly (plugin-root → PATH → versioned cache scan)
+      // so an empty CLAUDE_PLUGIN_ROOT in the Bash tool no longer breaks the gate.
+      expect(content, slug).toMatch(/\|\s*"\$HELPER" consent-mint/);
+      expect(content, slug).toMatch(/HELPER="\$\{CLAUDE_PLUGIN_ROOT:\+\$CLAUDE_PLUGIN_ROOT\/bin\/axhub-helpers\}"/);
     }
   });
 

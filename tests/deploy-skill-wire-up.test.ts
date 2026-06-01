@@ -22,11 +22,11 @@ function deployRegistry(): any {
 describe("deploy SKILL Phase 3.5 wire-up invariants", () => {
   test("default path uses deploy-prep and legacy resolve/preflight are guarded", () => {
     const body = deploySkill();
-    expect(body).toContain("axhub-helpers deploy-prep --intent deploy");
+    expect(body).toContain('"$HELPER" deploy-prep --intent deploy');
     expect(body).toContain('if [[ "${AXHUB_DEPLOY_PREP:-1}" == "0" ]]; then');
     expect(body).toContain("[deploy:Step 2 preflight legacy] entered");
 
-    const deployPrepIndex = body.indexOf("axhub-helpers deploy-prep --intent deploy");
+    const deployPrepIndex = body.indexOf('"$HELPER" deploy-prep --intent deploy');
     const legacyResolveIndex = body.indexOf("[deploy:Step 1 resolve refresh]");
     const legacyPreflightIndex = body.indexOf("[deploy:Step 2 preflight legacy]");
     expect(deployPrepIndex).toBeGreaterThan(-1);
@@ -68,7 +68,7 @@ describe("deploy SKILL Phase 3.5 wire-up invariants", () => {
     // directly. Legacy `bash hooks/token-freshness-gate.sh` invocation removed;
     // the shim file still exists for backward compat but the SKILL no longer
     // references it.
-    const helperIndex = body.indexOf("axhub-helpers\" token-gate", gateIndex);
+    const helperIndex = body.indexOf('"$HELPER" token-gate', gateIndex);
     const consentIndex = body.indexOf("axhub-helpers consent-mint");
 
     expect(previewIndex).toBeGreaterThan(-1);

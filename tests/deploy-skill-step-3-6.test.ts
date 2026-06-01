@@ -22,7 +22,7 @@ describe("deploy SKILL Step 3.6 — refresh-in-flight invariants", () => {
   test("Step 3.6 calls deploy-prep for in-flight refresh", () => {
     const body = deploySkill();
     expect(body).toContain(
-      "axhub-helpers deploy-prep --intent deploy --user-utterance"
+      '"$HELPER" deploy-prep --intent deploy --user-utterance'
     );
   });
 

@@ -29,7 +29,10 @@ To check status:
 1. **최근 배포 목록 조회.** 앱을 확인하고 배포 목록을 가져와요:
 
    ```bash
-   APP=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent status --user-utterance "$ARGS" --json | jq -r '.resolve.app_id // empty')
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   APP=$("$HELPER" resolve --intent status --user-utterance "$ARGS" --json | jq -r '.resolve.app_id // empty')
    DEPLOY_LIST_JSON=$(axhub deploy list --app "$APP" --json)
    ```
 
@@ -57,7 +60,10 @@ To check status:
 2. **Pre-flight version check** (only if mutation chain is implied — pure read can skip):
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   "$HELPER" preflight --json
    ```
 
 3. **상태 확인.** NDJSON 스트림을 `--watch --watch-timeout` 으로 받아요:

@@ -14,7 +14,10 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
 
 1. **Detect cache miss.** Helper checks for the deixis-resolved `deployment_id`:
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent status --user-utterance "$ARGS" --json
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   "$HELPER" resolve --intent status --user-utterance "$ARGS" --json
    # Returns: {"cache_hit": false, "fallback": "deploy_list_required", "app_slug_hint": "<inferred or null>"}
    ```
 
@@ -27,7 +30,10 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
 
 3. **Fall back to live list.** Once the app is known:
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP_ID_OR_SLUG> --limit 3
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   "$HELPER" list-deployments --app <APP_ID_OR_SLUG> --limit 3
    ```
    (`axhub deploy list` is not available in ax-hub-cli v0.1.x, so the helper calls the REST fallback directly.)
 
@@ -99,7 +105,10 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
 4. **Receive token via AskUserQuestion (text input).** Save to `~/.config/axhub-plugin/token` with mode 0600:
    ```bash
    # POSIX: macOS / Linux / Git Bash / WSL
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-import
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   "$HELPER" token-import
    # Internally: umask 077; cat > ~/.config/axhub-plugin/token; chmod 600
    ```
 
@@ -266,7 +275,10 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
 
 1. **Detect mismatch.** Helper compares user's spoken environment against `$AXHUB_PROFILE`:
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   "$HELPER" resolve --intent deploy --user-utterance "$ARGS" --json
    # Returns: {
    #   "profile_intent": "production",
    #   "profile_env": "staging",

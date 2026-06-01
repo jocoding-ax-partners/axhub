@@ -29,13 +29,19 @@ To fetch logs:
 1. **Resolve the deployment.** Look up `dep_<id>` from cache or ask the user:
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent logs --user-utterance "$ARGS" --json
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   "$HELPER" resolve --intent logs --user-utterance "$ARGS" --json
    ```
 
    On `cache_hit: false`, follow `../deploy/references/recovery-flows.md` ("cold-cache"): ask the user which app first (`axhub apps list --json`), then surface the last 3 deploys via the helper:
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP_ID> --limit 3
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   "$HELPER" list-deployments --app <APP_ID> --limit 3
    ```
 
    On exit 65 (token missing — Phase 7 US-701 이후엔 SessionStart 가 자동 setup):

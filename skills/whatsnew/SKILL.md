@@ -80,11 +80,14 @@ To show what is new:
 > `axhub whatsnew` 는 zero-flag CLI예요 — 플래그를 전달하면 exit 64 에러가 나요. `axhub-helpers` 는 별도 바이너리이고, `--since` 플래그는 이 명령에서만 유효해요.
 
 ```bash
+HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 # 릴리즈 노트 — axhub CLI (플래그 없음)
 axhub whatsnew --json
 
 # 라우팅 감사 통계 — 별도 바이너리, --since 는 여기에만 써요
-"${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" routing-stats --since 7d
+"$HELPER" routing-stats --since 7d
 ```
 
 출력 예시:
