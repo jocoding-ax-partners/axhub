@@ -1,10 +1,10 @@
 [
   {
     "_metadata": {
-      "measured_at": "2026-05-28T00:00:00Z",
+      "measured_at": "2026-06-01T00:00:00Z",
       "reviewer": "wongil",
       "corpus_version": "tests/corpus.100.jsonl@phase-11-gap-fill",
-      "skills_version": "phase-149-helper-cli-boundary-verify",
+      "skills_version": "phase-004-migrate-existing-apps",
       "claude_model": "committed-docs-only-fixture",
       "rows_measured": 115,
       "rows_skipped": 0,
@@ -13,7 +13,7 @@
         "override": 0,
         "null": 0
       },
-      "notes": "Metadata refreshed for axhub:verify helper-CLI-boundary routing description plus prior data/trace routing rows. Row decisions preserve committed docs-only fixture semantics; data/trace/verify invariants are covered by dedicated tests."
+      "notes": "Metadata refreshed for scaffolded migrate SKILL routing metadata plus prior data/trace/verify rows. Row decisions preserve committed docs-only fixture semantics because migrate-specific utterances are covered by dedicated skill/manifest tests, not this corpus tier."
     }
   },
   {
