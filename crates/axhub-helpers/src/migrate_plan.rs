@@ -156,11 +156,7 @@ fn detect_candidates(root: &Path, files: &[PathBuf], env_refs: &[EnvRef]) -> Vec
             .find(|name| markers.contains(*name))
             .map(str::to_string);
         let has_compose = compose_file.is_some();
-        let path = if dir.as_os_str().is_empty() || dir == Path::new(".") {
-            ".".to_string()
-        } else {
-            dir.display().to_string()
-        };
+        let path = path_to_portable_json(&dir);
         let confidence = if has_dockerfile {
             0.95
         } else if compose_file.is_some() {
@@ -243,6 +239,14 @@ fn env_refs_for_candidate(dir: &Path, env_refs: &[EnvRef]) -> Vec<String> {
     env_refs.iter().map(|e| e.name.clone()).collect()
 }
 
+fn path_to_portable_json(path: &Path) -> String {
+    if path.as_os_str().is_empty() || path == Path::new(".") {
+        ".".to_string()
+    } else {
+        path.to_string_lossy().replace('\\', "/")
+    }
+}
+
 fn is_source_file(path: &Path) -> bool {
     matches!(
         path.extension().and_then(|s| s.to_str()),
@@ -282,4 +286,16 @@ fn render_manifest(candidate: Option<&AppCandidate>, env_refs: &[EnvRef]) -> Str
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::path_to_portable_json;
+    use std::path::Path;
+
+    #[test]
+    fn path_to_portable_json_uses_forward_slashes() {
+        assert_eq!(path_to_portable_json(Path::new(".")), ".");
+        assert_eq!(path_to_portable_json(Path::new("apps\\web")), "apps/web");
+    }
 }
