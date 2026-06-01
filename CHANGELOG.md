@@ -4,6 +4,27 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.23](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.22...v0.9.23) (2026-06-01)
+
+이번 패치는 `CLAUDE_PLUGIN_ROOT` 가 비어 전달되는 세션에서 플러그인 로그인·배포가 거부되던 회귀를 고쳐요. model 이 직접 실행하는 Bash 컨텍스트에서는 이 환경변수가 자주 비고 `axhub-helpers` 도 PATH 에 없어서, SKILL 이 bare `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers` 를 호출하면 경로가 `/bin/axhub-helpers` 로 깨졌어요. 이제 helper 를 env → PATH → 버전 cache 스캔 3단계로 해석해서 빈 환경에서도 최신 버전 바이너리를 찾아내요. cache 스캔은 `$HOME` 만 쓰고 `sort -V` 없이 awk zero-pad 로 semver 를 정렬해 BSD/GNU 양쪽에서 동작해요. 전 SKILL·reference 의 helper 호출과 scaffold 의 `CANONICAL_PREFLIGHT_BLOCK`·템플릿까지 같은 resolver 로 맞췄고, Windows auth PowerShell lane 과 deploy preamble 에도 같은 cache-scan tier 를 넣었어요.
+
+### Test baseline
+
+- macOS 빈-env 에서 resolver 가 캐시의 `0.9.22` 바이너리를 해석하고 `consent-mint` 토큰 발급까지 실증했어요.
+- `bun run skill:doctor --strict`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bunx tsc --noEmit` 가 통과했어요.
+- 전체 `bun test` 를 stash/diff 로 3회 비교해 변경이 도입한 새 실패가 0 임을 확인했고, 54개 canonical resolver 의 awk 라인을 byte-identical 로 전수 검증했어요.
+- PR #153 CI 의 rust·perf ubuntu/macos/windows, windows-smoke, T2 helper-bin, corpus.100 drift gate 가 모두 pass 했어요.
+
+### Honest tradeoff
+
+- Windows PowerShell 경로는 개발 환경에 `pwsh` 가 없어 런타임 검증을 못 했어요. 구조는 검증된 auth PS 패턴을 미러하지만 실제 Windows smoke test 가 필요해요.
+- consent gate 외 SKILL 의 Windows full-flow 는 아직 "Command lane" 모델-번역에 의존해서 별도 PS resolver pass 가 후속 과제로 남아요.
+- cache 스캔은 Claude Code 의 `~/.claude/plugins/cache/axhub/axhub/<ver>/bin/` 경로 안정성에 의존하므로, cache layout 이 바뀌면 fallback 을 갱신해야 해요.
+
+### Fixed
+
+* CLAUDE_PLUGIN_ROOT 빈 환경에서 axhub-helpers 못 찾던 로그인 deny 복구 ([#153](https://github.com/jocoding-ax-partners/axhub/issues/153)) ([13c269e](https://github.com/jocoding-ax-partners/axhub/commit/13c269ee12dbec5de747cd3e80a88fa29893486e))
+
 ## [0.9.22](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.21...v0.9.22) (2026-06-01)
 
 이번 릴리즈는 PR #152 의 플러그인 로그인 deny 복구 패치예요. XDG runtime 이 없는 macOS Claude Code 환경에서 consent mint 와 preauth hook 이 서로 다른 임시 디렉터리를 보던 문제를 안정적인 state runtime 경로로 맞추고, Windows 홈 경로 폴백·만료 pending consent·손상/서명 불일치 stale cleanup 까지 같이 보강했어요. 만료된 로그인 카드는 `token_expired` 사유를 한국어 deny 메시지로 드러내서 재로그인 행동이 바로 보이게 했어요.
