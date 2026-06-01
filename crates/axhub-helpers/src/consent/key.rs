@@ -6,22 +6,89 @@ pub const HMAC_KEY_BYTES: usize = 32;
 pub const FILE_MODE_PRIVATE: u32 = 0o600;
 pub const DIR_MODE_PRIVATE: u32 = 0o700;
 
-fn home_dir() -> PathBuf {
-    std::env::var_os("HOME")
+fn env_path(key: &str) -> Option<PathBuf> {
+    std::env::var_os(key)
+        .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
 }
-pub fn state_root() -> PathBuf {
-    std::env::var_os("XDG_STATE_HOME")
+
+fn home_dir() -> Option<PathBuf> {
+    home_dir_from(
+        env_path("HOME"),
+        env_path("USERPROFILE"),
+        env_path("HOMEDRIVE"),
+        env_path("HOMEPATH"),
+    )
+}
+
+fn home_dir_from(
+    home: Option<PathBuf>,
+    userprofile: Option<PathBuf>,
+    homedrive: Option<PathBuf>,
+    homepath: Option<PathBuf>,
+) -> Option<PathBuf> {
+    home.or(userprofile).or_else(|| {
+        let mut home = homedrive?;
+        home.push(homepath?);
+        Some(home)
+    })
+}
+
+fn stable_process_dir() -> PathBuf {
+    std::env::current_dir()
+        .or_else(|_| {
+            std::env::current_exe().map(|exe| {
+                exe.parent()
+                    .map(PathBuf::from)
+                    .unwrap_or_else(stable_root_dir)
+            })
+        })
+        .unwrap_or_else(|_| stable_root_dir())
+}
+
+#[cfg(windows)]
+fn stable_root_dir() -> PathBuf {
+    std::env::var_os("SystemDrive")
         .map(PathBuf::from)
-        .unwrap_or_else(|| home_dir().join(".local/state"))
+        .map(|mut drive| {
+            drive.push(std::path::MAIN_SEPARATOR.to_string());
+            drive
+        })
+        .unwrap_or_else(|| PathBuf::from(r"C:\"))
+}
+
+#[cfg(not(windows))]
+fn stable_root_dir() -> PathBuf {
+    PathBuf::from(std::path::MAIN_SEPARATOR.to_string())
+}
+
+pub fn state_root() -> PathBuf {
+    state_root_from(env_path("XDG_STATE_HOME"), home_dir(), stable_process_dir())
+}
+
+fn state_root_from(
+    xdg_state_home: Option<PathBuf>,
+    home: Option<PathBuf>,
+    stable_fallback: PathBuf,
+) -> PathBuf {
+    xdg_state_home
+        .or_else(|| home.map(|home| home.join(".local").join("state")))
+        .unwrap_or_else(|| stable_fallback.join(".local").join("state"))
         .join("axhub")
 }
 pub fn runtime_root() -> PathBuf {
-    std::env::var_os("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-        .join("axhub")
+    // When XDG_RUNTIME_DIR is set (typically Linux) both the Bash tool and the
+    // hook subprocess inherit the same value, so consent mint/read agree. When
+    // it is unset (macOS Claude Code), the old `std::env::temp_dir()` fallback
+    // read each process's own `$TMPDIR`, which the harness sets differently per
+    // process — so the mint dir and the hook read dir diverged and consent was
+    // never found (PreToolUse deny). Fall back instead to a HOME-anchored,
+    // process-stable directory: the same `state_root()` the HMAC key already
+    // uses and that both processes provably resolve identically.
+    match std::env::var_os("XDG_RUNTIME_DIR").filter(|v| !v.is_empty()) {
+        Some(xdg) => PathBuf::from(xdg).join("axhub"),
+        None => state_root().join("runtime"),
+    }
 }
 pub fn hmac_key_path() -> PathBuf {
     state_root().join("hmac-key")
@@ -128,5 +195,56 @@ pub fn set_private_dir_mode(path: &PathBuf) -> std::io::Result<()> {
     {
         let _ = path;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn state_root_ignores_empty_xdg_and_uses_home() {
+        assert_eq!(
+            state_root_from(
+                None,
+                Some(PathBuf::from("/home/alice")),
+                PathBuf::from("/cwd")
+            ),
+            PathBuf::from("/home/alice/.local/state/axhub")
+        );
+    }
+
+    #[test]
+    fn home_dir_supports_userprofile_when_home_missing() {
+        assert_eq!(
+            home_dir_from(
+                None,
+                Some(PathBuf::from("/Users/alice")),
+                Some(PathBuf::from("ignored-drive")),
+                Some(PathBuf::from("ignored-path")),
+            ),
+            Some(PathBuf::from("/Users/alice"))
+        );
+    }
+
+    #[test]
+    fn home_dir_supports_homedrive_homepath_when_home_and_userprofile_missing() {
+        assert_eq!(
+            home_dir_from(
+                None,
+                None,
+                Some(PathBuf::from("C:")),
+                Some(PathBuf::from("Users\\alice")),
+            ),
+            Some(PathBuf::from("C:").join("Users\\alice"))
+        );
+    }
+
+    #[test]
+    fn state_root_fallback_is_stable_and_absolute() {
+        let fallback = std::env::current_dir().unwrap();
+        let root = state_root_from(None, None, fallback.clone());
+        assert_eq!(root, fallback.join(".local").join("state").join("axhub"));
+        assert!(root.is_absolute());
     }
 }

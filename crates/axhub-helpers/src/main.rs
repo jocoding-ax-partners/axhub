@@ -809,6 +809,15 @@ fn parse_binding(raw: &str) -> anyhow::Result<ConsentBinding> {
     Ok(serde_json::from_str(raw)?)
 }
 
+fn preauth_deny_message(default_hint: &str, reason: Option<&str>) -> String {
+    match reason {
+        Some("token_expired") => format!(
+            "사전 승인이 만료됐어요. 로그인 카드를 다시 받은 뒤 명령을 재시도해 주세요.\n\n{default_hint}"
+        ),
+        _ => default_hint.to_string(),
+    }
+}
+
 fn consent_mint_json_stdin_help() -> &'static str {
     r#"PowerShell example: $binding | ConvertTo-Json -Compress | & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" consent-mint
 Temp-file fallback: Get-Content -Raw "$Path" | & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" consent-mint"#
@@ -1086,12 +1095,14 @@ pub(crate) fn cmd_preauth_check() -> anyhow::Result<i32> {
         );
         Ok(0)
     } else {
+        let deny_message = preauth_deny_message(&deny_hint, result.reason.as_deref());
         out_json(json!({
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
-                "permissionDecision": "deny"
+                "permissionDecision": "deny",
+                "permissionDecisionReason": deny_message.clone()
             },
-            "systemMessage": deny_hint
+            "systemMessage": deny_message
         }));
         Ok(0)
     }

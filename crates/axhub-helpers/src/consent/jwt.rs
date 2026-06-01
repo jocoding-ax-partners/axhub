@@ -136,6 +136,7 @@ fn mint_token_to_path(
     let jwt = encode(&header, &claims, &EncodingKey::from_secret(key))?;
     std::fs::create_dir_all(runtime_root())?;
     set_private_dir_mode(&runtime_root()).ok();
+    sweep_expired_consent_files(&runtime_root(), key);
     let expires_at = Utc
         .timestamp_opt(exp, 0)
         .single()
@@ -173,12 +174,20 @@ pub fn verify_or_claim_token(binding: ConsentBinding) -> VerifyResult {
                 valid: true,
                 reason: None,
             },
+            Err(pending_reason) if pending_reason == "token_expired" => VerifyResult {
+                valid: false,
+                reason: Some(pending_reason.to_string()),
+            },
             Err(_) => v,
         },
         Err(reason) => match claim_pending_token(&binding) {
             Ok(()) => VerifyResult {
                 valid: true,
                 reason: None,
+            },
+            Err(pending_reason) if pending_reason == "token_expired" => VerifyResult {
+                valid: false,
+                reason: Some(pending_reason.to_string()),
             },
             Err(_) => VerifyResult {
                 valid: false,
@@ -206,7 +215,8 @@ fn verify_token_result(binding: ConsentBinding) -> Result<VerifyResult, &'static
 
 fn claim_pending_token(binding: &ConsentBinding) -> Result<(), &'static str> {
     let key = load_or_mint_key().map_err(|_| "hmac_key_unreadable")?;
-    let entries = fs::read_dir(runtime_root()).map_err(|e| {
+    let dir = runtime_root();
+    let entries = fs::read_dir(&dir).map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
             "no_pending_consent_token"
         } else {
@@ -214,9 +224,11 @@ fn claim_pending_token(binding: &ConsentBinding) -> Result<(), &'static str> {
         }
     })?;
     let mut saw_pending = false;
+    let mut saw_expired_pending = false;
     for entry in entries.flatten() {
         let path = entry.path();
         if !is_pending_token_path(&path) {
+            remove_stale_consent_file(&path, &key);
             continue;
         }
         saw_pending = true;
@@ -231,13 +243,21 @@ fn claim_pending_token(binding: &ConsentBinding) -> Result<(), &'static str> {
                 }
             }
             Err("token_expired") => {
+                saw_expired_pending = true;
+                fs::remove_file(&path).ok();
+            }
+            Err("token_file_corrupt" | "token_file_missing_jwt" | "token_signature_invalid") => {
                 fs::remove_file(&path).ok();
             }
             _ => {}
         }
     }
     Err(if saw_pending {
-        "binding_mismatch:pending_consent"
+        if saw_expired_pending {
+            "token_expired"
+        } else {
+            "binding_mismatch:pending_consent"
+        }
     } else {
         "no_pending_consent_token"
     })
@@ -247,6 +267,45 @@ fn is_pending_token_path(path: &std::path::Path) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
         .is_some_and(|name| name.starts_with("consent-pending-") && name.ends_with(".json"))
+}
+
+/// Matches any consent token file — both session `consent-<sid>.json` and
+/// pending `consent-pending-<id>.json`.
+fn is_consent_token_path(path: &std::path::Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with("consent-") && name.ends_with(".json"))
+}
+
+fn remove_stale_consent_file(path: &std::path::Path, key: &[u8; HMAC_KEY_BYTES]) {
+    if is_consent_token_path(path)
+        && matches!(
+            decode_token_file(&path.to_path_buf(), key),
+            Err("token_expired"
+                | "token_file_corrupt"
+                | "token_file_missing_jwt"
+                | "token_signature_invalid")
+        )
+    {
+        fs::remove_file(path).ok();
+    }
+}
+
+/// Best-effort opportunistic GC (FR-007): remove already-expired consent files
+/// (session and pending) plus cryptographically invalid/corrupt consent files
+/// from `dir`. Valid tokens, unreadable/symlinked files, and unrelated files are
+/// left untouched. All errors are ignored — this is hygiene layered onto the
+/// existing mint/claim flows, never a correctness gate, so it must never block
+/// or fail them. It bounds stale-file accumulation now that the no-XDG fallback
+/// is a persistent HOME-anchored dir instead of a volatile `$TMPDIR`.
+fn sweep_expired_consent_files(dir: &std::path::Path, key: &[u8; HMAC_KEY_BYTES]) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        remove_stale_consent_file(&path, key);
+    }
 }
 
 fn decode_token_file(
@@ -321,4 +380,111 @@ fn binding_mismatch_reason(
     // contract. If a future design changes this to a trust class, add the
     // equality check here and update that test in the same PR.
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Writes a `TokenFile` to `dir/file_name` whose embedded JWT is signed with
+    /// `key` and expires `ttl_sec` from now (negative ⇒ already expired). No real
+    /// keystore or env is touched, so the test is hermetic and parallel-safe.
+    fn write_signed_token(
+        dir: &std::path::Path,
+        file_name: &str,
+        ttl_sec: i64,
+        key: &[u8; HMAC_KEY_BYTES],
+    ) {
+        let now = Utc::now().timestamp();
+        let claims = Claims {
+            tool_call_id: PENDING_TOOL_CALL_ID.into(),
+            action: "auth_login".into(),
+            app_id: "_".into(),
+            profile: "default".into(),
+            branch: "_".into(),
+            commit_sha: "_".into(),
+            context: HashMap::new(),
+            synthesized_by_helper: false,
+            jti: "test-jti".into(),
+            iat: now,
+            exp: now + ttl_sec,
+        };
+        let mut header = Header::new(JWT_ALG);
+        header.typ = Some("JWT".into());
+        let jwt = encode(&header, &claims, &EncodingKey::from_secret(key)).unwrap();
+        let body = serde_json::to_vec(&TokenFile {
+            token_id: "test".into(),
+            jwt,
+            expires_at: "test".into(),
+            session_id: PENDING_SESSION_ID.into(),
+        })
+        .unwrap();
+        // Use the production writer so the file gets 0600 perms; `read_private_file`
+        // (used by `decode_token_file`) rejects group/world-readable files.
+        write_private_file_no_follow(&dir.join(file_name), &body).unwrap();
+    }
+
+    #[test]
+    fn sweep_removes_expired_consent_files_and_keeps_valid_ones() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = [7u8; HMAC_KEY_BYTES];
+        write_signed_token(dir.path(), "consent-pending-expired.json", -10, &key);
+        write_signed_token(dir.path(), "consent-cli-session.json", -10, &key);
+        write_signed_token(dir.path(), "consent-pending-valid.json", 60, &key);
+        write_signed_token(
+            dir.path(),
+            "consent-pending-invalid-signature.json",
+            60,
+            &[9u8; HMAC_KEY_BYTES],
+        );
+        write_private_file_no_follow(
+            &dir.path().join("consent-pending-corrupt.json"),
+            b"{not-json",
+        )
+        .unwrap();
+        fs::write(dir.path().join("unrelated.txt"), b"keep me").unwrap();
+
+        sweep_expired_consent_files(dir.path(), &key);
+
+        assert!(
+            !dir.path().join("consent-pending-expired.json").exists(),
+            "expired pending consent must be swept"
+        );
+        assert!(
+            !dir.path().join("consent-cli-session.json").exists(),
+            "expired session consent must be swept"
+        );
+        assert!(
+            dir.path().join("consent-pending-valid.json").exists(),
+            "valid pending consent must NOT be swept"
+        );
+        assert!(
+            !dir.path().join("consent-pending-corrupt.json").exists(),
+            "corrupt consent files are stale and must be swept"
+        );
+        assert!(
+            !dir.path()
+                .join("consent-pending-invalid-signature.json")
+                .exists(),
+            "signature-invalid consent files are stale and must be swept"
+        );
+        assert!(
+            dir.path().join("unrelated.txt").exists(),
+            "non-consent files must be left untouched"
+        );
+    }
+
+    #[test]
+    fn is_consent_token_path_matches_session_and_pending_only() {
+        assert!(is_consent_token_path(std::path::Path::new(
+            "/x/consent-cli-session.json"
+        )));
+        assert!(is_consent_token_path(std::path::Path::new(
+            "/x/consent-pending-abc.json"
+        )));
+        assert!(!is_consent_token_path(std::path::Path::new("/x/hmac-key")));
+        assert!(!is_consent_token_path(std::path::Path::new(
+            "/x/other.json"
+        )));
+    }
 }
