@@ -4,6 +4,25 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.22](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.21...v0.9.22) (2026-06-01)
+
+이번 릴리즈는 PR #152 의 플러그인 로그인 deny 복구 패치예요. XDG runtime 이 없는 macOS Claude Code 환경에서 consent mint 와 preauth hook 이 서로 다른 임시 디렉터리를 보던 문제를 안정적인 state runtime 경로로 맞추고, Windows 홈 경로 폴백·만료 pending consent·손상/서명 불일치 stale cleanup 까지 같이 보강했어요. 만료된 로그인 카드는 `token_expired` 사유를 한국어 deny 메시지로 드러내서 재로그인 행동이 바로 보이게 했어요.
+
+### Test baseline
+
+- PR #152 squash HEAD `519e1e2` 기준 rust ubuntu/macos/windows, perf ubuntu/macos/windows, hook integration ubuntu/macos, Local Rust-primary gate, T2 helper-bin, corpus.100 drift gate 가 모두 pass 했어요.
+- 리뷰 수정 브랜치에서 `cargo test -p axhub-helpers`, `cargo clippy -p axhub-helpers --all-targets -- -D warnings`, `bun run lint:tone --strict`, `bunx tsc --noEmit`, `git diff --check`, GitNexus `detect_changes` 를 통과했어요.
+- 릴리즈 postbump 에서 `codegen:version` 과 `release:check` 가 host Rust helper build/version assert 를 통과했어요.
+
+### Honest tradeoff
+
+- PR 리뷰 때 실패했던 Windows perf p95 는 rerun 뒤 pass 했고, perf harness·baseline 파일 diff 가 비어 있어 코드 패치 대신 CI 재검증으로 닫았어요.
+- 유효 session token 이 이미 있는 preauth 경로는 빠르게 allow 를 반환하므로 opportunistic stale sweep 은 mint/claim/failure 경로에서 주로 수행돼요.
+
+### Fixed
+
+* **consent:** TMPDIR 불일치로 막히던 플러그인 로그인 복구 ([#152](https://github.com/jocoding-ax-partners/axhub/issues/152)) ([519e1e2](https://github.com/jocoding-ax-partners/axhub/commit/519e1e29ecbc1d5f164b4f6a5a087afee6f0f6b6))
+
 ## [0.9.21](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.20...v0.9.21) (2026-06-01)
 
 이번 릴리즈는 axhub-helpers 의 인자 파싱을 hand-rolled `match cmd` + `while i < args.len()` 루프에서 clap 4 derive 로 마이그레이션한 결과예요. 외부 동작(exit code 0/64/65, stdout/stderr 분리, JSON 출력, per-command 한국어 help 콘텐츠)을 byte-identical 로 보존하면서, typed clap 21 개 + parity-safe passthrough 20 개 구조로 SC-004 손파싱 루프를 0 으로 만들었어요. fail-open hook 계약(session-start/prompt-route 등 무인자 exit 0)도 그대로 유지했어요.
