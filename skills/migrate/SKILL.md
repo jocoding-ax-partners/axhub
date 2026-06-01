@@ -20,7 +20,32 @@ model: sonnet
 
 # 기존 앱 가져오기
 
-이미 만든 웹 앱을 axhub 앱으로 등록하고, 감지 결과를 확인한 뒤 기존 배포 경로로 올려요. 로컬 감지는 helper 가 하고, 권위 있는 감지와 배포는 backend/CLI 경로를 재사용해요.
+이미 만든 웹 앱을 axhub 앱으로 등록하고, 감지 결과를 확인한 뒤 기존 배포 경로로 올려요. 로컬 감지는 helper 가 하고, 원격 mutation 과 배포는 검증된 axhub CLI 경계만 재사용해요.
+
+## CLI boundary contract
+
+이 스킬은 backend URL 을 직접 호출하지 않아요. remote 감지나 mutation 이 필요하면 먼저 axhub CLI surface 로 가능한지 확인하고, CLI 가 없으면 raw endpoint 로 추측하지 말고 `axhub.yaml` 초안까지만 만들어요.
+
+현재 고정된 실행 가능 CLI 계약은 아래예요.
+
+```bash
+# 앱 등록
+axhub apps create --from-file axhub.yaml --yes --json
+
+# GitHub 연결 dry-run 검증
+axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --json
+
+# GitHub 연결 mutation
+axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json
+
+# env 값 저장. 값은 stdin 으로만 넣어요.
+printf '%s' "$VALUE" | axhub env set --app "$APP_ID" "$KEY" --secret --from-stdin --stage "$STAGE" --json
+
+# 배포 시작. deploy skill 과 같은 consent-mint / status-first gate 뒤에만 실행해요.
+axhub deploy create --app "$APP_ID" --branch "$BRANCH" --commit "$COMMIT_SHA" --json
+```
+
+remote detect CLI 가 추가된 환경에서는 `axhub apps detect --help` 가 성공할 때만 그 CLI 를 써요. 없으면 backend detect endpoint 를 직접 curl 하지 않아요.
 
 ## Workflow
 
@@ -56,7 +81,7 @@ echo "$PREFLIGHT_JSON"
    "$HELPER" migrate-plan --dir "${AXHUB_MIGRATE_DIR:-.}" --json
    ```
 
-2. **후보 선택과 confidence 확인.** 후보가 2개 이상이면 앱 하나를 고르게 해요. confidence 가 `0.80` 이상이면 확인 후 진행하고, `0.60..0.79` 는 수정 가능한 계획으로 보여줘요. `0.60` 미만, start command 없음, 후보 모호함은 진행을 막고 `axhub.yaml` 또는 Dockerfile/compose 를 요청해요.
+2. **후보 선택과 confidence 확인.** 후보가 2개 이상이면 앱 하나를 고르게 해요. helper 의 confidence 는 local marker 기반 힌트예요. `0.80` 이상이면 확인 후 진행하고, `0.60..0.79` 는 수정 가능한 계획으로 보여줘요. `0.60` 미만이나 후보 모호함은 진행을 막고 `axhub.yaml` 또는 Dockerfile/compose 를 요청해요. start command 유무는 remote detect CLI 가 제공하는 authoritative preview 가 있을 때만 차단 조건으로 삼아요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — 질문 별 safe_default.
 
@@ -92,16 +117,17 @@ echo "$PREFLIGHT_JSON"
 
 3. **manifest 초안 준비.** helper 의 `suggested_manifest` 를 `axhub.yaml` 초안으로 보여줘요. required env 는 이름과 scope 만 포함하고, 값 설정은 `axhub env set` 경로로 안내해요. 기존 `apphub.yaml` 이 있으면 읽기는 계속 되지만 새 파일은 `axhub.yaml` 로 만들어요.
 
-4. **기존 mutation 경로 재사용.** 앱 등록, git 연결, env 값 저장, 배포는 기존 CLI/consent 경로만 써요. helper 로 consent 를 우회하지 않아요. backend preview 는 `POST /api/v1/apps/detect` 를 사용하고, local dir 은 archive 또는 GitHub repo-ref 형태로만 넘겨요.
+4. **기존 mutation 경로 재사용.** 앱 등록, git 연결, env 값 저장, 배포는 위 CLI boundary contract 와 기존 consent 경로만 써요. helper 로 consent 를 우회하지 않아요. remote detect 는 `axhub apps detect --help` 가 성공할 때만 CLI 로 실행하고, local dir 은 archive 또는 GitHub repo-ref 형태로만 넘겨요. CLI 가 없으면 raw backend 호출 없이 manifest 초안과 다음 작업만 안내해요.
 
 5. **결과 검증.** 배포가 끝나면 live URL, deployment id, 감지된 build/runtime env 구분, Dockerfile/compose/auto 중 선택된 ladder 를 보여줘요. 실패하면 deploy error empathy catalog 형식으로 원인·확인 방법·재시도 명령을 짧게 안내해요.
 
 ## NEVER
 
-- NEVER secret 값을 `axhub.yaml`, 로그, 질문 옵션, TodoWrite 에 넣지 않아요.
+- NEVER secret 값을 `axhub.yaml`, 로그, 질문 옵션, TodoWrite 에 넣으면 안 돼요.
 - NEVER low confidence 나 다중 후보를 조용히 배포하지 않아요.
 - NEVER 앱 등록·git 연결·배포 consent 를 helper 로 우회하지 않아요.
-- NEVER 새 배포 경로를 만들지 않고 기존 CLI/backend 경로를 재사용해요.
+- NEVER raw backend endpoint 를 curl 하거나 추측한 HTTP payload 로 detect/mutation 을 실행하지 않아요.
+- NEVER 새 배포 경로를 만들면 안 돼요. 기존 CLI 경로를 재사용해요.
 
 ## Additional Resources
 

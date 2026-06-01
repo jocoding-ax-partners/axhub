@@ -6,14 +6,14 @@
       "corpus_version": "tests/corpus.100.jsonl@phase-11-gap-fill",
       "skills_version": "phase-004-migrate-existing-apps",
       "claude_model": "committed-docs-only-fixture",
-      "rows_measured": 115,
+      "rows_measured": 119,
       "rows_skipped": 0,
       "decisions": {
-        "accept": 115,
+        "accept": 119,
         "override": 0,
         "null": 0
       },
-      "notes": "Metadata refreshed for scaffolded migrate SKILL routing metadata plus prior data/trace/verify rows. Row decisions preserve committed docs-only fixture semantics because migrate-specific utterances are covered by dedicated skill/manifest tests, not this corpus tier."
+      "notes": "Metadata refreshed for migrate natural-language routing regression rows plus existing fixture decisions."
     }
   },
   {
@@ -1366,5 +1366,57 @@
     ],
     "required_consent_seen": false,
     "notes": "Snippet intent. skills/data uses catalog describe context and axhub-helpers snippet; no PAT is printed. Docs-only fixture records the expected routing decision for the new data skill."
+  },
+  {
+    "utterance_id": "MIGRATE-NL-1",
+    "fired_skill": "migrate",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub-helpers migrate-plan --dir . --json",
+        "exit_code": 0,
+        "ts": "2026-06-01T01:10:01Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "notes": "Migrate NL routing fixture. Docs-only arm records the migrate skill decision and starts with local helper pre-scan."
+  },
+  {
+    "utterance_id": "MIGRATE-NL-2",
+    "fired_skill": "migrate",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub-helpers migrate-plan --dir . --json",
+        "exit_code": 0,
+        "ts": "2026-06-01T01:10:02Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "notes": "Migrate NL routing fixture. Docs-only arm records the migrate skill decision and starts with local helper pre-scan."
+  },
+  {
+    "utterance_id": "MIGRATE-NL-3",
+    "fired_skill": "migrate",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub-helpers migrate-plan --dir . --json",
+        "exit_code": 0,
+        "ts": "2026-06-01T01:10:03Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "notes": "Migrate NL routing fixture. Docs-only arm records the migrate skill decision and starts with local helper pre-scan."
+  },
+  {
+    "utterance_id": "MIGRATE-NL-4",
+    "fired_skill": "migrate",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub-helpers migrate-plan --dir . --json",
+        "exit_code": 0,
+        "ts": "2026-06-01T01:10:04Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "notes": "Migrate NL routing fixture. Docs-only arm records the migrate skill decision and starts with local helper pre-scan."
   }
 ]
