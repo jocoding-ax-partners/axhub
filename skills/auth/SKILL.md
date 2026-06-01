@@ -121,8 +121,11 @@ To handle auth:
    POSIX/Git Bash/WSL lane:
 
    ```bash
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    echo '{"tool_call_id":"pending","action":"auth_login","app_id":"_","profile":"'"${AXHUB_PROFILE:-default}"'","branch":"_","commit_sha":"_","context":{}}' \
-     | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
+     | "$HELPER" consent-mint
    ```
 
    PowerShell lane:
@@ -138,6 +141,14 @@ To handle auth:
      if ($HelperCommand) { $AxhubHelper = $HelperCommand.Source }
    }
    if (-not $AxhubHelper) {
+     $AxhubCacheGlob = Join-Path $env:USERPROFILE ".claude\plugins\cache\axhub\axhub\*\bin\axhub-helpers.exe"
+     $AxhubCand = Get-ChildItem -Path $AxhubCacheGlob -ErrorAction SilentlyContinue |
+       Where-Object { $_.Directory.Parent.Name -match '^\d+\.\d+\.\d+$' } |
+       Sort-Object { [version]$_.Directory.Parent.Name } |
+       Select-Object -Last 1
+     if ($AxhubCand) { $AxhubHelper = $AxhubCand.FullName }
+   }
+   if (-not $AxhubHelper) {
      throw "axhub-helpers.exe 를 찾지 못했어요. axhub doctor 로 plugin helper 설치 상태를 확인해요."
    }
    @{
@@ -151,7 +162,7 @@ To handle auth:
    } | ConvertTo-Json -Compress | & $AxhubHelper consent-mint
    ```
 
-   PowerShell 에서도 `CLAUDE_PLUGIN_ROOT` 가 비어 있으면 PATH 의 `axhub-helpers.exe` 를 자동으로 찾아요. temp-file fallback 은 위 두 stdin lane 을 쓸 수 없을 때만 secondary 로 써요. JSON 파일을 만들더라도 raw token 값을 쓰지 말고, consent JSON 만 0600/사용자 전용 ACL 임시 파일에 저장한 뒤 helper stdin 으로 다시 넣어요.
+   두 lane (POSIX·PowerShell) 모두 `CLAUDE_PLUGIN_ROOT` 가 비어 있으면 PATH 의 `axhub-helpers` (Windows 는 `axhub-helpers.exe`) 를, 그래도 없으면 plugin cache (`~/.claude/plugins/cache/axhub/axhub/*/bin/`) 의 최신 버전 helper 를 자동으로 찾아요. 그래서 Claude Code 가 env 를 전달하지 않은 세션에서도 로그인이 막히지 않아요. temp-file fallback 은 위 두 stdin lane 을 쓸 수 없을 때만 secondary 로 써요. JSON 파일을 만들더라도 raw token 값을 쓰지 말고, consent JSON 만 0600/사용자 전용 ACL 임시 파일에 저장한 뒤 helper stdin 으로 다시 넣어요.
 
    `auth_login` binding은 실제 app/branch/commit이 필요 없지만 `asConsentBinding`이 모든 필드에서 비어있지 않은 문자열을 요구하므로 `"_"`를 플레이스홀더로 사용해요. 다음 Bash/PowerShell tool id는 consent-mint 이후에 생기므로 `pending` token을 한 번만 쓰게 해요.
    macOS/Linux/Windows 모두에서 `CLAUDE_SESSION_ID`를 지우지 마세요. `tool_call_id:"pending"` 자체가 helper에게 "다음 실제 tool call에서 한 번만 claim"하라는 명시 신호예요.

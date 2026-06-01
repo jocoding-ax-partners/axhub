@@ -25,7 +25,9 @@ Show registered axhub apps for the current team. Listing/details are read-only; 
 **Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
 
 ```bash
-HELPER="${CLAUDE_PLUGIN_ROOT:-.}/bin/axhub-helpers"; [ -x "$HELPER" ] || HELPER="axhub-helpers"
+HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 [ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
 echo "$PREFLIGHT_JSON"
@@ -40,7 +42,10 @@ To list apps:
 1. **Pre-flight (lightweight).** Confirm auth before the list call:
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   "$HELPER" preflight --json
    ```
 
    On `auth_ok: false`, halt and route to `../deploy/references/error-empathy-catalog.md` ("exit 65"). Suggest the auth skill via "다시 로그인해줘".
@@ -93,7 +98,10 @@ Use these paths only when the user intent is explicit. Listing remains the defau
 2. Mint consent with stdin JSON:
 
    ```bash
-   printf '%s\n' "$CONSENT_BINDING_JSON" | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   printf '%s\n' "$CONSENT_BINDING_JSON" | "$HELPER" consent-mint
    ```
 
    Required binding fields: `action=apps_create`, `context={source}`.
@@ -157,11 +165,14 @@ Deletion is consent-gated. Do **not** run `axhub apps delete ... --dry-run --jso
 4. Mint consent with the literal command-target invariant. For `apps_delete`, `context.slug` is the parser field name and may contain a numeric id when `COMMAND_TARGET` is numeric.
 
    ```bash
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    # Binding shape: {"action":"apps_delete","app_id":"$COMMAND_TARGET","context":{"slug":"$COMMAND_TARGET"}}
    CONSENT_BINDING_JSON=$(jq -nc \
      --arg target "$COMMAND_TARGET" \
      '{tool_call_id:"pending",action:"apps_delete",app_id:$target,profile:"",branch:"",commit_sha:"",context:{slug:$target}}')
-   printf '%s\n' "$CONSENT_BINDING_JSON" | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
+   printf '%s\n' "$CONSENT_BINDING_JSON" | "$HELPER" consent-mint
    ```
 
 5. Run exactly one delete command using the same target string:

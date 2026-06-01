@@ -103,7 +103,10 @@ The helper validates the pasted string before writing:
 
 ```bash
 # POSIX: macOS / Linux / Git Bash / WSL
-${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers token-import
+HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+"$HELPER" token-import
 ```
 
 ```powershell
@@ -178,7 +181,10 @@ Any `axhub_pat_*` string MUST be redacted before reaching the transcript. The ho
    ```
 2. **Skill output redaction** — when a skill renders status, error, or success cards, the `axhub-helpers redact` filter is the LAST step in the pipeline, after all formatting:
    ```bash
-   ... | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers redact
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   ... | "$HELPER" redact
    ```
 
 Skills MUST NOT interpolate the token value into their own templates even when masked — once the literal value is in skill markdown's variable scope, a future edit can leak it. The token never leaves the helper's memory; the helper hands back `auth status` output (which contains `user_email`, `scopes`, `expires_at` but never the raw token).

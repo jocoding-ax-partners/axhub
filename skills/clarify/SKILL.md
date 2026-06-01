@@ -103,6 +103,8 @@ To clarify:
    if [ -z "$HELPER_BIN" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -x "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" ]; then
      HELPER_BIN="${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers"
    fi
+   [ -n "$HELPER_BIN" ] && [ -x "$HELPER_BIN" ] || HELPER_BIN="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER_BIN" ] && [ -x "$HELPER_BIN" ] || HELPER_BIN="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [ -z "$HELPER_BIN" ]; then
      HELPER_BIN="axhub-helpers"
    fi

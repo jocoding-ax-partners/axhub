@@ -91,8 +91,11 @@ To enable the axhub statusline:
    User context 의 platform 단서로 적합한 명령을 골라서 실행해요. "PowerShell", "Windows", "cmd" 같은 단서 보이면 PowerShell 분기, 그 외 (macOS / Linux / Git Bash / WSL) 는 Unix 분기.
 
    ```bash
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    # Unix bash (macOS / Linux / Git Bash / WSL)
-   "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" settings-merge --apply --scope auto
+   "$HELPER" settings-merge --apply --scope auto
    ```
 
    ```powershell
@@ -174,8 +177,11 @@ To enable the axhub statusline:
    **lifecycle:** plugin uninstall 시에도 orphan stub 은 `state_dir` 거주라 유지돼요 — statusline 은 graceful exit 0 (빈 출력) 해요. dangling reference 안 만들어요.
 
    ```bash
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    # 자동 wire (Unix bash — macOS / Linux / Git Bash / WSL)
-   "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" settings-merge --apply --scope project
+   "$HELPER" settings-merge --apply --scope project
    ```
 
    ```powershell

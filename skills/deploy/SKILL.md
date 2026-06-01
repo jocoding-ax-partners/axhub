@@ -88,6 +88,11 @@ if (-not $env:CLAUDE_PLUGIN_ROOT) {
     $env:CLAUDE_PLUGIN_ROOT = (Resolve-Path (Join-Path (Split-Path $cmd.Source -Parent) "..")).Path
   } elseif (Test-Path ".\bin\axhub-helpers.exe") {
     $env:CLAUDE_PLUGIN_ROOT = (Get-Location).Path
+  } else {
+    $AxhubCand = Get-ChildItem -Path (Join-Path $env:USERPROFILE ".claude\plugins\cache\axhub\axhub\*\bin\axhub-helpers.exe") -ErrorAction SilentlyContinue |
+      Where-Object { $_.Directory.Parent.Name -match '^\d+\.\d+\.\d+$' } |
+      Sort-Object { [version]$_.Directory.Parent.Name } | Select-Object -Last 1
+    if ($AxhubCand) { $env:CLAUDE_PLUGIN_ROOT = $AxhubCand.Directory.Parent.FullName }
   }
 }
 if ($env:CLAUDE_PLUGIN_ROOT) {
@@ -98,7 +103,9 @@ if ($env:CLAUDE_PLUGIN_ROOT) {
 **Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
 
 ```bash
-HELPER="${CLAUDE_PLUGIN_ROOT:-.}/bin/axhub-helpers"; [ -x "$HELPER" ] || HELPER="axhub-helpers"
+HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 [ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
 echo "$PREFLIGHT_JSON"
@@ -146,7 +153,10 @@ To deploy:
 
    ```bash
    echo '[deploy:Step 1 deploy-prep] entered' >&2
-   DEPLOY_PREP_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --json)
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   DEPLOY_PREP_JSON=$("$HELPER" deploy-prep --intent deploy --user-utterance "$ARGS" --json)
    echo "$DEPLOY_PREP_JSON"
    ```
 
@@ -170,9 +180,12 @@ To deploy:
    **Backwards-compat fallback (1 release cycle):** when `AXHUB_DEPLOY_PREP=0` is set, the helper exits silently with no JSON — Step 1 falls through to the legacy `resolve` call below, and Step 1.2 / Step 2 re-runs are not skipped:
 
    ```bash
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [[ "${AXHUB_DEPLOY_PREP:-1}" == "0" ]]; then
      echo '[deploy:Step 1 resolve legacy] entered' >&2
-     ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
+     "$HELPER" resolve --intent deploy --user-utterance "$ARGS" --json
    fi
    ```
 
@@ -182,7 +195,10 @@ To deploy:
 
    ```bash
    echo '[deploy:Step 1 bootstrap-plan] entered' >&2
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers bootstrap --auto-chain --json
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   "$HELPER" bootstrap --auto-chain --json
    ```
 
    Treat this output as the source of truth for Sprint 3 bootstrap state. If it returns `template_required`, `git_init_required`, `first_commit_required`, `subdomain_collision`, `backend_contract_missing_defaults`, or `idempotency_unavailable`, stop at that user-decision state and surface a humanized one-line reason plus the safest next command (jargon-free per Vibe Coder Visibility Rules). If it returns `next_action: apps_create` or `next_action: deploy_create`, **internally bind** `command`, `binding_hash`, `pending_action_id`, `pending_action_hash`, `retry_policy`, and `consent_binding` into shell variables (PreToolUse hook consumes them for consent verification + retry policy enforcement) but **do not echo their raw values to the user chat** — those are internal verification primitives. Show the user a single humanized line such as "처음 배포라 앱을 먼저 만들고 있어요." and proceed to consent + execution. The helper is only a planner/recorder here; it must not be treated as approval to mutate. If `deploy_create` is executed and recorded here, do not mint or run a second `deploy_create` in Step 4; jump to Step 5 status-chain with the recorded deployment id.
@@ -191,6 +207,9 @@ To deploy:
 
    ```bash
    echo '[deploy:Step 1 bootstrap-record] entered' >&2
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    cat > /tmp/axhub-bootstrap-record.json <<JSON
    {
      "schema_version": "bootstrap-record/v1",
@@ -202,7 +221,7 @@ To deploy:
      "stderr": "$STDERR_JSON_ESCAPED"
    }
    JSON
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers bootstrap --record "$NEXT_ACTION" --json < /tmp/axhub-bootstrap-record.json
+   "$HELPER" bootstrap --record "$NEXT_ACTION" --json < /tmp/axhub-bootstrap-record.json
    ```
 
    S3B retry ownership lives in this skill because this skill runs the top-level command. Retry a create only when helper output explicitly provides an idempotency key and a retry policy that allows it. If the helper says `no_retry_without_confirmed_idempotency` or returns `idempotency_unavailable`, do not retry; show the typed stop.
@@ -210,9 +229,12 @@ To deploy:
 1.2. **Fresh resolve after local/bootstrap state changes (legacy fallback only).** Phase 1 default path skips this — `deploy-prep` already covers it. This block runs only when `AXHUB_DEPLOY_PREP=0` is set, or when Step 1.5 (git-init) materially changed local commit identity since the deploy-prep call:
 
    ```bash
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [[ "${AXHUB_DEPLOY_PREP:-1}" == "0" ]] || [[ "${AXHUB_RESOLVE_AFTER_GIT_INIT:-0}" == "1" ]]; then
      echo '[deploy:Step 1 resolve refresh] entered' >&2
-     ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
+     "$HELPER" resolve --intent deploy --user-utterance "$ARGS" --json
    fi
    ```
 
@@ -263,13 +285,16 @@ To deploy:
 
    ```bash
    echo '[deploy:Step 1.5 git-init] entered' >&2
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
      git init >/dev/null 2>&1
    fi
    git add -A >/dev/null 2>&1
    git commit -m "init: axhub deploy baseline" >/dev/null 2>&1 || true
    git branch -M main >/dev/null 2>&1
-   ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers resolve --intent deploy --user-utterance "$ARGS" --json
+   "$HELPER" resolve --intent deploy --user-utterance "$ARGS" --json
    ```
 
    git stderr 와 stdout 은 모두 `/dev/null` 로 보내요 — vibe coder chat 에 raw git output 이 노출되지 않게 구조적으로 막아요. `git commit` 이 실패하면 (no staged files / missing git identity) `|| true` 로 다음 줄로 넘어가고, 뒤따르는 resolve 호출이 `branch` / `commit_sha` 가 비어 있다고 알려서 humanized 한 줄로 사용자에게 안내해요. `AXHUB_DEPLOY_VERBOSE=1` 환경변수가 켜진 세션에서는 Visibility Rules 가 verbose lane 으로 전환되어 raw 출력이 다시 보여요 (개발 검증용).
@@ -397,6 +422,9 @@ To deploy:
 
    ```bash
    echo '[deploy:Step 1.7 status-first] entered' >&2
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    GITHUB_CONNECTED=$(echo "$DEPLOY_PREP_JSON" | jq -r '.github_connected // false')
    STATUS_FIRST_ID=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.id // ""')
    # github 연결 앱인데 in-flight 가 아직 안 보이면, push 자동배포가 backend 에 등록될 시간을 잠깐 줘요.
@@ -404,7 +432,7 @@ To deploy:
    if [ -z "$STATUS_FIRST_ID" ] && [ "$GITHUB_CONNECTED" = "true" ] && [ -t 1 ] && [ -z "$CI" ] && [ -z "$CLAUDE_NON_INTERACTIVE" ]; then
      for _ in 1 2 3; do
        sleep 5
-       REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --refresh-in-flight --json 2>/dev/null || echo '{}')
+       REFRESH_JSON=$("$HELPER" deploy-prep --intent deploy --user-utterance "$ARGS" --refresh-in-flight --json 2>/dev/null || echo '{}')
        STATUS_FIRST_ID=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
        if [ -n "$STATUS_FIRST_ID" ]; then
          DEPLOY_PREP_JSON="$REFRESH_JSON"
@@ -422,9 +450,12 @@ To deploy:
 2. **Pre-flight version check (legacy fallback only).** Phase 1 default path skips this — `deploy-prep` already returned the preflight envelope as `.preflight` in Step 1's JSON. Use the cached value: read `cli_too_old`, `cli_too_new`, `auth_ok` directly via `jq`. The block below is the legacy fallback path that fires only when `AXHUB_DEPLOY_PREP=0` is set:
 
    ```bash
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [[ "${AXHUB_DEPLOY_PREP:-1}" == "0" ]]; then
      echo '[deploy:Step 2 preflight legacy] entered' >&2
-     ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preflight --json
+     "$HELPER" preflight --json
    fi
    ```
 
@@ -435,8 +466,11 @@ To deploy:
 2.5. **cli_too_new dismiss bridge (Phase 3.5 B-11).** Read user preference, decide to halt / proceed / prompt:
 
    ```bash
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [[ "$CLI_TOO_NEW" == "true" ]]; then
-     IGNORE_UNTIL=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers config get ignore_too_new_until --json 2>/dev/null | jq -r '.value // ""')
+     IGNORE_UNTIL=$("$HELPER" config get ignore_too_new_until --json 2>/dev/null | jq -r '.value // ""')
      CLI_VER=$(echo "$PREFLIGHT_JSON" | jq -r '.cli_version // ""')
      # Skip prompt if user previously dismissed at this CLI_VER or higher.
      if [[ -n "$IGNORE_UNTIL" && "$IGNORE_UNTIL" == "$CLI_VER" ]]; then
@@ -445,7 +479,7 @@ To deploy:
        # AskUserQuestion: 3 options — continue / explain upgrade / dismiss permanently for this version.
        case "${CLI_TOO_NEW_ANSWER:-continue}" in
          dismiss)
-           ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers config set ignore_too_new_until "$CLI_VER"
+           "$HELPER" config set ignore_too_new_until "$CLI_VER"
            ;;
          explain)
            echo "업그레이드 안내: docs/migrate-rust.md 또는 axhub-helpers update 를 확인해요." >&2
@@ -536,7 +570,10 @@ To deploy:
 
    ```bash
    echo '[deploy:Step 3.5 token-freshness] entered' >&2
-   "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers" token-gate
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   "$HELPER" token-gate
    ```
 
    `axhub-helpers token-gate` (sh/ps1-absorption Phase 1.1, T3) captures `now - 30 s` locally as the freshness anchor (matches `.plan` §3.4), polls token mtime up to 30 s (5 s × 6 iter), and calls `axhub auth status --json` inline on timeout. UNAUTHORIZED → exit 65 routes to Step 6 recovery. Pre-Phase 1.1 SKILL invocations through `bash hooks/token-freshness-gate.sh` still work — the shim delegates to the Rust binary — but new flows should call the helper directly. The Rust subcommand uses `std::fs::metadata().modified()` so the GNU vs BSD `stat` flag matrix disappears; cross-platform parity (Windows previously missing this gate entirely) comes for free. Test fixtures inject `AXHUB_TOKEN_PATH` / `AXHUB_GATE_FAKE_NOW` / `AXHUB_GATE_POLL_*` to exercise the gate without a live OAuth flow.
@@ -545,8 +582,11 @@ To deploy:
 
    ```bash
    echo '[deploy:Step 3.6 refresh-in-flight] entered' >&2
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [ "${AXHUB_REFRESH_IN_FLIGHT:-0}" = "1" ]; then
-     REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --user-utterance "$ARGS" --refresh-in-flight --json 2>/dev/null || echo '{}')
+     REFRESH_JSON=$("$HELPER" deploy-prep --intent deploy --user-utterance "$ARGS" --refresh-in-flight --json 2>/dev/null || echo '{}')
      NEW_IN_FLIGHT=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
      if [ -n "$NEW_IN_FLIGHT" ]; then
        DEPLOY_PREP_JSON="$REFRESH_JSON"
@@ -562,13 +602,16 @@ To deploy:
 
    ```bash
    echo '[deploy:Step 4 consent-deploy] entered' >&2
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    CONSENT_PROFILE=""
    PROFILE_FLAG=()
    if [ -n "${PROFILE:-}" ] && [ "${PROFILE:-}" != "default" ]; then
      CONSENT_PROFILE="$PROFILE"
      PROFILE_FLAG=(--profile "$PROFILE")
    fi
-   cat <<JSON | ${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint
+   cat <<JSON | "$HELPER" consent-mint
    {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${CONSENT_PROFILE}","branch":"${BRANCH}","commit_sha":"${COMMIT_SHA}","context":{}}
    JSON
 
@@ -579,7 +622,7 @@ To deploy:
    # Format: "axhub-error-sub-key: 64:validation.deployment_in_progress" (main.rs:1845, quality_gate.rs:15)
    if [ $AXHUB_EXIT -eq 64 ] && grep -qE '^axhub-error-sub-key:.*64:validation\.deployment_in_progress' "$AXHUB_STDERR_TMP" 2>/dev/null; then
      # in-flight race: silent swallow raw stderr, then re-fetch in-flight id + commit + app_slug for Step 5 watch and Step 8 cache consistency.
-     REFRESH_JSON=$(${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers deploy-prep --intent deploy --refresh-in-flight --json 2>/dev/null || echo '{}')
+     REFRESH_JSON=$("$HELPER" deploy-prep --intent deploy --refresh-in-flight --json 2>/dev/null || echo '{}')
      IN_FLIGHT_ID=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
      if [ -n "$IN_FLIGHT_ID" ]; then
        DEPLOY_ID="$IN_FLIGHT_ID"
