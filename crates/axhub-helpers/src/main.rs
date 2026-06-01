@@ -36,8 +36,10 @@ use axhub_helpers::{commit_gate, hook_output, quality_state};
 use chrono::Utc;
 use serde_json::{json, Map, Value};
 
-const HOOK_SCHEMA_VERSION: &str = "v0";
-const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+mod cli;
+
+pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -62,23 +64,11 @@ fn enable_utf8_console() {}
 
 fn main() {
     enable_utf8_console();
-    std::process::exit(match run() {
-        Ok(code) => code,
-        Err(e) => {
-            eprintln!("{e}");
-            1
-        }
-    });
+    std::process::exit(cli::run());
 }
 
-fn run() -> anyhow::Result<i32> {
-    let mut args = std::env::args().skip(1);
-    let Some(cmd) = args.next() else {
-        eprintln!("{USAGE}");
-        return Ok(64);
-    };
-    let rest: Vec<String> = args.collect();
-    match cmd.as_str() {
+pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i32> {
+    match cmd {
         "version" | "--version" | "-v" => {
             // --quiet flag silences output (used by SessionStart Gatekeeper
             // warmup on macOS — invoking the binary primes codesign /
@@ -107,28 +97,33 @@ fn run() -> anyhow::Result<i32> {
             Ok(0)
         }
         "path" => cmd_path(&rest),
-        "token-init" => cmd_token_init(&rest),
-        "token-import" => cmd_token_import(&rest),
+        // token-init/token-import: US2 typed (cli::Commands) — legacy arm 제거.
         "token-gate" => cmd_token_gate(&rest),
-        "post-install" => cmd_post_install(&rest),
-        "classify-exit" => cmd_classify_exit(&rest),
+        // post-install: US3 typed (cli::Commands::PostInstall) — legacy arm 제거.
+        // classify-exit: US1 typed (cli::Commands::ClassifyExit) — legacy arm 제거.
         "preflight" => {
+            if let Err(message) = validate_preflight_args(&rest) {
+                return legacy_usage_error("preflight", message);
+            }
             let run = run_preflight();
             println!("{}", serde_json::to_string(&run.output)?);
             Ok(run.exit_code)
         }
         "resolve" => {
+            if let Err(message) = validate_resolve_args(&rest) {
+                return legacy_usage_error("resolve", message);
+            }
             let run = run_resolve(&rest);
             println!("{}", serde_json::to_string(&run.output)?);
             Ok(run.exit_code)
         }
-        "list-deployments" => cmd_list_deployments(&rest),
-        "routing-stats" => cmd_routing_stats(&rest),
+        // list-deployments: US3 typed (cli::Commands::ListDeployments) — legacy arm 제거.
+        // routing-stats: US3 typed (cli::Commands::RoutingStats) — legacy arm 제거.
         "cleanup-audit" => cmd_cleanup_audit(&rest),
-        "audit-clarify" => cmd_audit_clarify(&rest),
+        // audit-clarify: US3 typed (cli::Commands::AuditClarify) — legacy arm 제거.
         "routing-dashboard" => cmd_routing_dashboard(&rest),
         "bootstrap" => cmd_bootstrap(&rest),
-        "consent-mint" => cmd_consent_mint(&rest),
+        // consent-mint: US2 typed (cli::Commands::ConsentMint) — legacy arm 제거.
         "consent-verify" => cmd_consent_verify(),
         "state-show" => cmd_state_show(&rest),
         "state-update" => cmd_state_update(&rest),
@@ -147,13 +142,11 @@ fn run() -> anyhow::Result<i32> {
         "sync" => run_sync(&rest),
         "snippet" => run_snippet(&rest),
         "auth-refresh-bg" => cmd_auth_refresh_bg(),
-        "verify" => cmd_verify(&rest),
-        "trace" => cmd_trace(&rest),
-        "doctor" => cmd_doctor(&rest),
-        "settings-merge" => cmd_settings_merge(&rest),
-        "autowire-statusline" => cmd_autowire_statusline(&rest),
+        // verify/trace/doctor: US2 typed (cli::Commands) — legacy arm 제거.
+        // settings-merge: US2 typed (cli::Commands::SettingsMerge) — legacy arm 제거.
+        // autowire-statusline: US1 typed (cli::Commands::AutowireStatusline) — legacy arm 제거.
         "orphan-stub" => cmd_orphan_stub(&rest),
-        "diagnose" => cmd_diagnose(&rest),
+        // diagnose: US3 typed (cli::Commands::Diagnose nested hitl) — legacy arm 제거.
         _ => {
             eprintln!("axhub-helpers: unknown subcommand \"{cmd}\"\n\n{USAGE}");
             Ok(64)
@@ -165,6 +158,59 @@ fn read_stdin() -> anyhow::Result<String> {
     let mut s = String::new();
     io::stdin().read_to_string(&mut s)?;
     Ok(s)
+}
+
+fn legacy_usage_error(command: &str, message: &str) -> anyhow::Result<i32> {
+    eprintln!("axhub-helpers {command}: {message}");
+    Ok(64)
+}
+
+fn validate_preflight_args(rest: &[String]) -> Result<(), &'static str> {
+    for arg in rest {
+        match arg.as_str() {
+            // Historical SKILLs invoke `preflight --json`; preflight already
+            // renders JSON unconditionally, so keep this as a no-op compat flag.
+            "--json" => {}
+            _ => return Err("unknown option"),
+        }
+    }
+    Ok(())
+}
+
+fn validate_resolve_args(rest: &[String]) -> Result<(), &'static str> {
+    let mut index = 0;
+    while index < rest.len() {
+        match rest[index].as_str() {
+            // Historical SKILLs invoke `resolve ... --json`; resolve already
+            // renders JSON unconditionally, so keep this as a no-op compat flag.
+            "--json" => index += 1,
+            "--intent" | "--user-utterance" => {
+                if index + 1 >= rest.len() {
+                    return Err("missing value");
+                }
+                index += 2;
+            }
+            _ => return Err("unknown option"),
+        }
+    }
+    Ok(())
+}
+
+fn validate_deploy_prep_args(rest: &[String]) -> Result<(), &'static str> {
+    let mut index = 0;
+    while index < rest.len() {
+        match rest[index].as_str() {
+            "--json" | "--refresh-in-flight" => index += 1,
+            "--intent" | "--user-utterance" => {
+                if index + 1 >= rest.len() {
+                    return Err("missing value");
+                }
+                index += 2;
+            }
+            _ => return Err("unknown option"),
+        }
+    }
+    Ok(())
 }
 fn out_json(v: Value) {
     println!("{}", v);
@@ -192,11 +238,7 @@ fn cmd_path(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_token_init(args: &[String]) -> anyhow::Result<i32> {
-    let json_output = match parse_json_flag(args, "token-init") {
-        Ok(value) => value,
-        Err(code) => return Ok(code),
-    };
+pub(crate) fn cmd_token_init(json_output: bool) -> anyhow::Result<i32> {
     let (token, source) = match env_token() {
         Some(token) => (token, "env:AXHUB_TOKEN".to_string()),
         None => {
@@ -431,41 +473,12 @@ fn auth_status_stdout_is_authorized(stdout: &str) -> bool {
 ///   AXHUB_SKIP_AUTODOWNLOAD=1  same effect (suppresses disclosure for CI / test
 ///                              paths that pipe install output through JSON parsers)
 ///   AXHUB_POSTCOMMIT_INSTALL=append → opt-in append to existing post-commit hook
-fn cmd_post_install(args: &[String]) -> anyhow::Result<i32> {
-    let mut target_name: Option<String> = None;
-    let mut bin_dir: Option<PathBuf> = None;
-    let mut link_path: Option<PathBuf> = None;
-    let mut repo_root: Option<PathBuf> = None;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--target-name" if i + 1 < args.len() => {
-                i += 1;
-                target_name = Some(args[i].clone());
-            }
-            "--bin-dir" if i + 1 < args.len() => {
-                i += 1;
-                bin_dir = Some(PathBuf::from(&args[i]));
-            }
-            "--link-path" if i + 1 < args.len() => {
-                i += 1;
-                link_path = Some(PathBuf::from(&args[i]));
-            }
-            "--repo-root" if i + 1 < args.len() => {
-                i += 1;
-                repo_root = Some(PathBuf::from(&args[i]));
-            }
-            "-h" | "--help" => {
-                println!("axhub-helpers post-install — sh/ps1-absorption Phase 3.1 post-install handler\n\nUSAGE:\n  axhub-helpers post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]");
-                return Ok(0);
-            }
-            other => {
-                eprintln!("axhub-helpers post-install: 알 수 없는 flag: {other}");
-                return Ok(64);
-            }
-        }
-        i += 1;
-    }
+pub(crate) fn cmd_post_install(
+    target_name: Option<String>,
+    bin_dir: Option<String>,
+    link_path: Option<String>,
+    repo_root: Option<String>,
+) -> anyhow::Result<i32> {
     let (Some(target_name), Some(bin_dir), Some(link_path)) = (target_name, bin_dir, link_path)
     else {
         eprintln!(
@@ -473,6 +486,9 @@ fn cmd_post_install(args: &[String]) -> anyhow::Result<i32> {
         );
         return Ok(64);
     };
+    let bin_dir = PathBuf::from(bin_dir);
+    let link_path = PathBuf::from(link_path);
+    let repo_root = repo_root.map(PathBuf::from);
 
     let target_path = bin_dir.join(&target_name);
     if !target_path.exists() {
@@ -595,11 +611,7 @@ fn write_disclosure_marker_from_post_install() {
     let _ = fs::write(&marker_path, body);
 }
 
-fn cmd_token_import(args: &[String]) -> anyhow::Result<i32> {
-    let json_output = match parse_json_flag(args, "token-import") {
-        Ok(value) => value,
-        Err(code) => return Ok(code),
-    };
+pub(crate) fn cmd_token_import(json_output: bool) -> anyhow::Result<i32> {
     let raw = read_stdin()?;
     let Some(token) = extract_token_from_import_payload(&raw) else {
         return emit_token_error(
@@ -608,20 +620,6 @@ fn cmd_token_import(args: &[String]) -> anyhow::Result<i32> {
         );
     };
     store_and_report_token(json_output, &token, "stdin")
-}
-
-fn parse_json_flag(args: &[String], command: &str) -> Result<bool, i32> {
-    let mut json_output = false;
-    for arg in args {
-        match arg.as_str() {
-            "--json" => json_output = true,
-            _ => {
-                eprintln!("axhub-helpers {command}: unknown option");
-                return Err(64);
-            }
-        }
-    }
-    Ok(json_output)
 }
 
 fn env_token() -> Option<String> {
@@ -748,7 +746,7 @@ fn verify_trace_suggestion(command: &str, exit_code: i32) -> Option<String> {
     None
 }
 
-fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {
+pub(crate) fn cmd_classify_exit(arg_exit_code: i32, arg_stdout: &str) -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("classify-exit") {
         out_json(json!({}));
         return Ok(0);
@@ -803,24 +801,7 @@ fn cmd_classify_exit(args: &[String]) -> anyhow::Result<i32> {
         return Ok(0);
     }
 
-    let mut exit_code = 1;
-    let mut stdout = String::new();
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--exit-code" if i + 1 < args.len() => {
-                i += 1;
-                exit_code = args[i].parse().unwrap_or(1);
-            }
-            "--stdout" if i + 1 < args.len() => {
-                i += 1;
-                stdout = args[i].clone();
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    out_json(serde_json::to_value(classify(exit_code, &stdout))?);
+    out_json(serde_json::to_value(classify(arg_exit_code, arg_stdout))?);
     Ok(0)
 }
 
@@ -851,15 +832,7 @@ fn parse_consent_mint_binding(raw: &str) -> Result<ConsentBinding, i32> {
     })
 }
 
-fn cmd_consent_mint(args: &[String]) -> anyhow::Result<i32> {
-    let validate_only = match args {
-        [] => false,
-        [flag] if flag == "--validate-only" => true,
-        [flag, ..] => {
-            eprintln!("axhub-helpers consent-mint: unknown option \"{flag}\"");
-            return Ok(64);
-        }
-    };
+pub(crate) fn cmd_consent_mint(validate_only: bool) -> anyhow::Result<i32> {
     let raw = read_stdin()?;
     let b = match parse_consent_mint_binding(&raw) {
         Ok(binding) => binding,
@@ -891,7 +864,7 @@ fn cmd_state_show(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_state_update(args: &[String]) -> anyhow::Result<i32> {
+pub(crate) fn cmd_state_update(args: &[String]) -> anyhow::Result<i32> {
     let repo_root = quality_state::repo_root_from_cwd()?;
     match args.first().map(String::as_str) {
         Some("--review-acknowledged") => quality_state::update_review_acknowledged(&repo_root)?,
@@ -917,7 +890,7 @@ fn cmd_state_update(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_commit_gate() -> anyhow::Result<i32> {
+pub(crate) fn cmd_commit_gate() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("commit-gate") || hook_safety::is_quality_triggers_disabled() {
         println!("{}", hook_output::pre_tool_use_allow());
         return Ok(0);
@@ -947,7 +920,7 @@ fn cmd_commit_gate() -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_test_classifier() -> anyhow::Result<i32> {
+pub(crate) fn cmd_test_classifier() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("test-classifier")
         || hook_safety::is_quality_triggers_disabled()
     {
@@ -978,7 +951,7 @@ fn cmd_test_classifier() -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_tdd_inject() -> anyhow::Result<i32> {
+pub(crate) fn cmd_tdd_inject() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("tdd-inject") || hook_safety::is_quality_triggers_disabled() {
         out_json(json!({}));
         return Ok(0);
@@ -1037,7 +1010,7 @@ fn cmd_quality_consent(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_preauth_check() -> anyhow::Result<i32> {
+pub(crate) fn cmd_preauth_check() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("preauth-check") {
         out_json(
             json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}),
@@ -1130,7 +1103,7 @@ const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
 // No keyword chain, no skill enforcement, no `skills/<X>/SKILL.md` paths in
 // additionalContext. Claude Code matches skills via SKILL.md frontmatter
 // description natively (Phase 1 codegen merged main.rs phrases into descriptions).
-fn cmd_prompt_route() -> anyhow::Result<i32> {
+pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     use axhub_helpers::audit::{append as audit_append, now_iso8601, sha256_hex, AuditRecord};
 
     if hook_safety::is_hook_disabled("prompt-route") {
@@ -1231,7 +1204,8 @@ fn format_preflight_context(preflight: &PreflightRun) -> String {
 // Local-only audit log analytics. AXHUB_NO_AUDIT respected. Silent skip on
 // disk read errors. Always Korean default + --json machine-readable.
 
-const ROUTING_STATS_HELP: &str = "axhub-helpers routing-stats — 라우팅 audit log 통계 조회
+pub(crate) const ROUTING_STATS_HELP: &str =
+    "axhub-helpers routing-stats — 라우팅 audit log 통계 조회
 
 USAGE:
   axhub-helpers routing-stats [OPTIONS]
@@ -1249,39 +1223,6 @@ PRIVACY:
   끄려면: AXHUB_NO_AUDIT=1 환경 변수 설정.
   삭제: axhub-helpers cleanup-audit --all
 ";
-
-fn parse_routing_stats_args(
-    args: &[String],
-) -> anyhow::Result<(chrono::Duration, bool, u32, bool)> {
-    let mut since = chrono::Duration::days(7);
-    let mut json = false;
-    let mut top: u32 = 10;
-    let mut confused = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--since" if i + 1 < args.len() => {
-                i += 1;
-                since = parse_duration(&args[i])?;
-            }
-            "--json" => json = true,
-            "--top" if i + 1 < args.len() => {
-                i += 1;
-                top = args[i]
-                    .parse()
-                    .map_err(|_| anyhow::anyhow!("--top 은 숫자여야 해요"))?;
-            }
-            "--confused" => confused = true,
-            "-h" | "--help" => {
-                print!("{}", ROUTING_STATS_HELP);
-                std::process::exit(0);
-            }
-            other => anyhow::bail!("알 수 없는 flag: {other}"),
-        }
-        i += 1;
-    }
-    Ok((since, json, top, confused))
-}
 
 fn parse_duration(s: &str) -> anyhow::Result<chrono::Duration> {
     if s == "all" {
@@ -1311,15 +1252,33 @@ fn percentile(sorted: &[u32], p: f64) -> u32 {
     sorted[idx.min(sorted.len() - 1)]
 }
 
-fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
+pub(crate) fn cmd_routing_stats(
+    since_arg: Option<String>,
+    json: bool,
+    top_arg: Option<String>,
+    confused: bool,
+) -> anyhow::Result<i32> {
     use axhub_helpers::audit;
 
-    let (since, json, top, confused) = match parse_routing_stats_args(args) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("axhub-helpers routing-stats: {e}");
-            return Ok(64);
-        }
+    let since = match since_arg {
+        None => chrono::Duration::days(7),
+        Some(s) => match parse_duration(&s) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("axhub-helpers routing-stats: {e}");
+                return Ok(64);
+            }
+        },
+    };
+    let top: u32 = match top_arg {
+        None => 10,
+        Some(s) => match s.parse() {
+            Ok(t) => t,
+            Err(_) => {
+                eprintln!("axhub-helpers routing-stats: --top 은 숫자여야 해요");
+                return Ok(64);
+            }
+        },
     };
 
     // 매 호출마다 7-day rotation 자동 trigger (silent).
@@ -1385,7 +1344,7 @@ fn cmd_routing_stats(args: &[String]) -> anyhow::Result<i32> {
         *hash_counts.entry(r.prompt_hash.clone()).or_insert(0) += 1;
     }
     let mut top_hashes: Vec<(String, u32)> = hash_counts.into_iter().collect();
-    top_hashes.sort_by(|a, b| b.1.cmp(&a.1));
+    top_hashes.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
     top_hashes.truncate(top as usize);
 
     let mut confused_counts: std::collections::HashMap<(String, Option<String>), (u32, String)> =
@@ -1513,6 +1472,7 @@ fn cmd_cleanup_audit(args: &[String]) -> anyhow::Result<i32> {
 // user picks a final disambiguation. Adds an audit record with clarify_invoked=true
 // + chosen_skill=Some(name). routing-stats --confused filters on this signal.
 
+#[allow(dead_code)] // US3: -h 는 clap 자동 help 로 대체, 한국어 본문은 소스 보존
 const AUDIT_CLARIFY_HELP: &str = "axhub-helpers audit-clarify — clarify feedback record
 
 USAGE:
@@ -1525,37 +1485,12 @@ OPTIONS:
   -h, --help       도움말
 ";
 
-fn cmd_audit_clarify(args: &[String]) -> anyhow::Result<i32> {
+pub(crate) fn cmd_audit_clarify(
+    hash: Option<String>,
+    prompt: Option<String>,
+    chosen: Option<String>,
+) -> anyhow::Result<i32> {
     use axhub_helpers::audit::{self, sha256_hex, AuditRecord};
-    let mut hash: Option<String> = None;
-    let mut prompt: Option<String> = None;
-    let mut chosen: Option<String> = None;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--hash" if i + 1 < args.len() => {
-                hash = Some(args[i + 1].clone());
-                i += 1;
-            }
-            "--prompt" if i + 1 < args.len() => {
-                prompt = Some(args[i + 1].clone());
-                i += 1;
-            }
-            "--chosen" if i + 1 < args.len() => {
-                chosen = Some(args[i + 1].clone());
-                i += 1;
-            }
-            "-h" | "--help" => {
-                print!("{AUDIT_CLARIFY_HELP}");
-                return Ok(0);
-            }
-            other => {
-                eprintln!("axhub-helpers audit-clarify: 알 수 없는 flag: {other}");
-                return Ok(64);
-            }
-        }
-        i += 1;
-    }
     if hash.is_some() && prompt.is_some() {
         eprintln!("axhub-helpers audit-clarify: --hash 또는 --prompt 하나만 사용해요");
         return Ok(64);
@@ -1607,8 +1542,16 @@ fn html_escape(s: &str) -> String {
 
 fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
     use axhub_helpers::audit;
-    let html_mode = args.iter().any(|a| a == "--html");
-    if args.iter().any(|a| a == "-h" || a == "--help") {
+    let mut html_mode = false;
+    let mut help = false;
+    for arg in args {
+        match arg.as_str() {
+            "--html" => html_mode = true,
+            "-h" | "--help" => help = true,
+            _ => return legacy_usage_error("routing-dashboard", "unknown option"),
+        }
+    }
+    if help {
         print!("{ROUTING_DASHBOARD_HELP}");
         return Ok(0);
     }
@@ -1629,7 +1572,7 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
         }
     }
     let mut rows: Vec<(String, u32)> = chosen_counts.into_iter().collect();
-    rows.sort_by(|a, b| b.1.cmp(&a.1));
+    rows.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
     if html_mode {
         let mut chosen_rows = String::new();
         for (skill, count) in &rows {
@@ -1689,7 +1632,7 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
 
 const WELCOME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn cmd_session_start() -> anyhow::Result<i32> {
+pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("session-start") {
         out_json(json!({}));
         return Ok(0);
@@ -1813,46 +1756,30 @@ fn write_session_start_bundle_best_effort() {
     let _ = write_session_bundle(&bundle, &path);
 }
 
-fn cmd_list_deployments(args: &[String]) -> anyhow::Result<i32> {
-    let mut app_id = None;
-    let mut limit = None;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--app-id" | "--app" => {
-                if i + 1 >= args.len() {
-                    eprintln!("{} requires a value", args[i]);
-                    return Ok(64);
-                }
-                i += 1;
-                app_id = Some(args[i].clone());
-            }
-            "--limit" => {
-                if i + 1 >= args.len() {
-                    eprintln!("--limit requires a value");
-                    return Ok(64);
-                }
-                i += 1;
-                let parsed = match args[i].parse::<usize>() {
-                    Ok(value) => value,
-                    Err(_) => {
-                        eprintln!("invalid --limit: {}", args[i]);
-                        return Ok(64);
-                    }
-                };
-                if !(1..=MAX_LIST_DEPLOYMENTS_LIMIT).contains(&parsed) {
-                    eprintln!("--limit must be between 1 and {MAX_LIST_DEPLOYMENTS_LIMIT}");
-                    return Ok(64);
-                }
-                limit = Some(parsed);
-            }
-            _ => {}
-        }
-        i += 1;
-    }
+pub(crate) fn cmd_list_deployments(
+    app_id: Option<String>,
+    limit_arg: Option<String>,
+) -> anyhow::Result<i32> {
     let Some(app_id) = app_id else {
         eprintln!("--app (alias: --app-id) is required");
         return Ok(64);
+    };
+    let limit = match limit_arg {
+        None => None,
+        Some(s) => {
+            let parsed = match s.parse::<usize>() {
+                Ok(value) => value,
+                Err(_) => {
+                    eprintln!("invalid --limit: {s}");
+                    return Ok(64);
+                }
+            };
+            if !(1..=MAX_LIST_DEPLOYMENTS_LIMIT).contains(&parsed) {
+                eprintln!("--limit must be between 1 and {MAX_LIST_DEPLOYMENTS_LIMIT}");
+                return Ok(64);
+            }
+            Some(parsed)
+        }
     };
     let result = run_list_deployments(ListDeploymentsArgs { app_id, limit });
     let code = result.exit_code;
@@ -1865,6 +1792,12 @@ fn cmd_mark(rest: &[String]) -> anyhow::Result<i32> {
         eprintln!("mark requires <phase_name>");
         return Ok(64);
     };
+    if rest.len() != 1 {
+        return legacy_usage_error("mark", "expected exactly one <phase_name>");
+    }
+    if phase_name.starts_with('-') {
+        return legacy_usage_error("mark", "unknown option");
+    }
     let path_env = match std::env::var("AXHUB_PHASE_MARKER_FILE") {
         Ok(v) if !v.is_empty() => v,
         _ => return Ok(0),
@@ -2157,30 +2090,7 @@ fn humanize_verify_korean(result: &axhub_helpers::verify_helper::VerifyResult) -
     lines.join("\n")
 }
 
-fn cmd_verify(args: &[String]) -> anyhow::Result<i32> {
-    let mut app_id: Option<String> = None;
-    let mut json_mode = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--json" => json_mode = true,
-            "--app-id" | "--app" => {
-                if i + 1 < args.len() {
-                    app_id = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            other if other.starts_with("--app-id=") => {
-                app_id = Some(other.trim_start_matches("--app-id=").to_string());
-            }
-            other if other.starts_with("--app=") => {
-                app_id = Some(other.trim_start_matches("--app=").to_string());
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-
+pub(crate) fn cmd_verify(app_id: Option<String>, json_mode: bool) -> anyhow::Result<i32> {
     let Some(app_id) = app_id else {
         eprintln!("axhub-helpers verify: --app (alias: --app-id) <id> required");
         return Ok(64);
@@ -2273,17 +2183,7 @@ fn write_cooldown_now() -> std::io::Result<()> {
     std::fs::write(&path, serde_json::to_string(&payload)?)
 }
 
-fn cmd_doctor(args: &[String]) -> anyhow::Result<i32> {
-    let mut json_mode = false;
-    let mut no_cooldown = false;
-    for a in args {
-        match a.as_str() {
-            "--json" => json_mode = true,
-            "--no-cooldown" => no_cooldown = true,
-            _ => {}
-        }
-    }
-
+pub(crate) fn cmd_doctor(json_mode: bool, no_cooldown: bool) -> anyhow::Result<i32> {
     let (size_bytes, count) = measure_deploy_events_size();
     let last_warned = read_cooldown_last_warned();
     let cooldown_open = match last_warned {
@@ -2458,37 +2358,11 @@ fn humanize_trace_korean(report: &axhub_helpers::trace_helper::TraceReport) -> S
     lines.join("\n")
 }
 
-fn cmd_trace(args: &[String]) -> anyhow::Result<i32> {
-    let mut deploy_id: Option<String> = None;
-    let mut app_ref: Option<String> = None;
-    let mut json_mode = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--json" => json_mode = true,
-            "--deploy-id" => {
-                if i + 1 < args.len() {
-                    deploy_id = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            other if other.starts_with("--deploy-id=") => {
-                deploy_id = Some(other.trim_start_matches("--deploy-id=").to_string());
-            }
-            "--app" => {
-                if i + 1 < args.len() {
-                    app_ref = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            other if other.starts_with("--app=") => {
-                app_ref = Some(other.trim_start_matches("--app=").to_string());
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-
+pub(crate) fn cmd_trace(
+    deploy_id: Option<String>,
+    app_ref: Option<String>,
+    json_mode: bool,
+) -> anyhow::Result<i32> {
     let Some(deploy_id) = deploy_id else {
         eprintln!("axhub-helpers trace: --deploy-id <id> required");
         return Ok(64);
@@ -2608,6 +2482,9 @@ fn deploy_prep_output_with_quality(
 }
 
 fn cmd_deploy_prep(rest: &[String]) -> anyhow::Result<i32> {
+    if let Err(message) = validate_deploy_prep_args(rest) {
+        return legacy_usage_error("deploy-prep", message);
+    }
     if std::env::var("AXHUB_DEPLOY_PREP").as_deref() == Ok("0") {
         // Backwards-compat fallback signal: SKILL detects exit 0 + no JSON
         // payload and routes to the legacy 3x resolve / 2x preflight cascade.
@@ -2633,9 +2510,26 @@ fn cmd_deploy_prep(rest: &[String]) -> anyhow::Result<i32> {
 }
 
 fn cmd_emit_deploy_complete(rest: &[String]) -> anyhow::Result<i32> {
-    let exit_code: i32 = rest.first().and_then(|s| s.parse().ok()).unwrap_or(0);
+    if rest.len() > 2 {
+        return legacy_usage_error("emit-deploy-complete", "expected at most two arguments");
+    }
+    let exit_code: i32 = match rest.first() {
+        None => 0,
+        Some(raw) => match raw.parse() {
+            Ok(code) if code >= 0 => code,
+            _ => {
+                return legacy_usage_error(
+                    "emit-deploy-complete",
+                    "exit_code must be a non-negative integer",
+                )
+            }
+        },
+    };
     let default_class = "axhub deploy create".to_string();
     let command_class = rest.get(1).unwrap_or(&default_class);
+    if command_class.starts_with('-') {
+        return legacy_usage_error("emit-deploy-complete", "unknown option");
+    }
     if let Err(err) = emit_deploy_complete(exit_code, command_class) {
         eprintln!("emit-deploy-complete: {err}");
         return Ok(1);
@@ -2657,80 +2551,33 @@ struct SettingsMergeArgs {
     yes: bool,
 }
 
-fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArgs> {
-    let mut apply = false;
-    let mut dry_run_flag = false;
-    let mut scope = Scope::Auto;
-    let mut json = false;
-    let mut silent = false;
-    let mut command_path_override: Option<PathBuf> = None;
-    let mut migrate = false;
-    let mut yes = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--apply" => apply = true,
-            "--dry-run" => dry_run_flag = true,
-            "--json" => json = true,
-            "--silent" => silent = true,
-            "--migrate" => migrate = true,
-            "--yes" => yes = true,
-            "--scope" if i + 1 < args.len() => {
-                i += 1;
-                scope = match args[i].as_str() {
-                    "user" => Scope::User,
-                    "project" => Scope::Project,
-                    "auto" => Scope::Auto,
-                    other => anyhow::bail!(
-                        "--scope 값이 잘못됐어요: {other} (user|project|auto 만 가능)"
-                    ),
-                };
-            }
-            "--command-path" if i + 1 < args.len() => {
-                i += 1;
-                command_path_override = Some(PathBuf::from(&args[i]));
-            }
-            "-h" | "--help" => {
-                println!(
-                    "axhub-helpers settings-merge — ~/.claude/settings.json statusLine 병합\n\n\
-                     USAGE:\n  axhub-helpers settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n\
-                     \n  axhub-helpers settings-merge --migrate [--yes] [--dry-run] [--scope user|project|auto]\n\n\
-                     OPTIONS:\n  --apply           실제 병합 실행 (explicit consent gate)\n  \
-                     --dry-run         결정만 출력, 파일 변경 없음 (기본값)\n  \
-                     --migrate         stale ${{CLAUDE_PLUGIN_ROOT}} literal 를 orphan stub path 로 교체\n  \
-                     --yes             --migrate 와 함께: 대화형 확인 없이 자동 적용\n  \
-                     --scope <s>       user|project|auto (기본: auto)\n  \
-                     --json            결과를 JSON 으로 출력\n  \
-                     --silent          stderr 억제\n  \
-                     --command-path    statusLine command 경로 override\n  \
-                     -h, --help        도움말\n\n\
-                     EXIT CODES:\n  0 no-op  2 created  3 merged  4 preserved-other  \
-                     5 invalid-json  6 partial-schema  7 permission-denied"
-                );
-                std::process::exit(0);
-            }
-            other => {
-                anyhow::bail!("알 수 없는 flag: {other}");
-            }
+fn parse_settings_merge_args(
+    cli: &cli::args::SettingsMergeCliArgs,
+) -> anyhow::Result<SettingsMergeArgs> {
+    let scope = match cli.scope.as_deref() {
+        None | Some("auto") => Scope::Auto,
+        Some("user") => Scope::User,
+        Some("project") => Scope::Project,
+        Some(other) => {
+            anyhow::bail!("--scope 값이 잘못됐어요: {other} (user|project|auto 만 가능)")
         }
-        i += 1;
-    }
-    if apply && dry_run_flag {
+    };
+    if cli.apply && cli.dry_run {
         anyhow::bail!("--apply 와 --dry-run 은 같이 사용할 수 없어요");
     }
-    if migrate && apply {
+    if cli.migrate && cli.apply {
         anyhow::bail!("--migrate 와 --apply 는 같이 사용할 수 없어요");
     }
     Ok(SettingsMergeArgs {
         // --migrate and --apply are mutually exclusive, so `!apply` is always
-        // true in migrate mode — use explicit dry_run_flag instead.
-        dry_run: if migrate { dry_run_flag } else { !apply },
+        // true in migrate mode — use explicit dry_run flag instead.
+        dry_run: if cli.migrate { cli.dry_run } else { !cli.apply },
         scope,
-        json,
-        silent,
-        command_path_override,
-        migrate,
-        yes,
+        json: cli.json,
+        silent: cli.silent,
+        command_path_override: cli.command_path.clone().map(PathBuf::from),
+        migrate: cli.migrate,
+        yes: cli.yes,
     })
 }
 
@@ -2738,76 +2585,27 @@ fn parse_settings_merge_args(args: &[String]) -> anyhow::Result<SettingsMergeArg
 // autowire-statusline subcommand
 // ---------------------------------------------------------------------------
 
-fn cmd_autowire_statusline(args: &[String]) -> anyhow::Result<i32> {
-    // sh/ps1-absorption Phase 2.2 (T6): added `auto` scope keyword + dispatch
-    // mode so shell wrappers can drop the manual scope-detection block. The
-    // `--child` worker mode is preserved unchanged for the dispatcher's
-    // self-spawn path.
-    let mut scope: Option<Scope> = None;
-    let mut auto_scope = false;
-    let mut silent = false;
-    let mut command_path: Option<PathBuf> = None;
-    let mut is_child = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--scope" if i + 1 < args.len() => {
-                i += 1;
-                match args[i].as_str() {
-                    "user" => scope = Some(Scope::User),
-                    "project" => scope = Some(Scope::Project),
-                    "auto" => auto_scope = true,
-                    other => {
-                        eprintln!(
-                            "axhub-helpers autowire-statusline: --scope 는 user|project|auto 만 가능해요 (받은 값: {other})"
-                        );
-                        return Ok(64);
-                    }
-                }
-            }
-            arg if arg.starts_with("--scope=") => {
-                let value = arg.trim_start_matches("--scope=");
-                match value {
-                    "user" => scope = Some(Scope::User),
-                    "project" => scope = Some(Scope::Project),
-                    "auto" => auto_scope = true,
-                    other => {
-                        eprintln!(
-                            "axhub-helpers autowire-statusline: --scope 는 user|project|auto 만 가능해요 (받은 값: {other})"
-                        );
-                        return Ok(64);
-                    }
-                }
-            }
-            "--silent" => silent = true,
-            "--child" => is_child = true,
-            "--command-path" if i + 1 < args.len() => {
-                i += 1;
-                command_path = Some(PathBuf::from(&args[i]));
-            }
-            arg if arg.starts_with("--command-path=") => {
-                command_path = Some(PathBuf::from(arg.trim_start_matches("--command-path=")));
-            }
-            "-h" | "--help" => {
-                println!(
-                    "axhub-helpers autowire-statusline — v0.6.0 SessionStart statusLine 자동 설정\n\n\
-                     USAGE:\n  axhub-helpers autowire-statusline --scope user|project [OPTIONS]\n\n\
-                     OPTIONS:\n  --scope user|project   대상 settings.json scope\n  \
-                     --silent               stderr 억제 (hook 호출 모드)\n  \
-                     --command-path <p>     statusLine.command 경로 override\n  \
-                     --child                child 프로세스 플래그 (marker write 안 함)\n  \
-                     -h, --help             도움말\n\n\
-                     ENV:\n  AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1   전체 skip"
-                );
-                return Ok(0);
-            }
-            other => {
-                eprintln!("axhub-helpers autowire-statusline: 알 수 없는 flag: {other}");
-                return Ok(64);
-            }
+pub(crate) fn cmd_autowire_statusline(
+    arg_scope: Option<&str>,
+    silent: bool,
+    is_child: bool,
+    command_path: Option<PathBuf>,
+) -> anyhow::Result<i32> {
+    // sh/ps1-absorption Phase 2.2 (T6): `auto` scope keyword + dispatch mode.
+    // flag 파싱은 clap(cli::args::AutowireCliArgs)이 담당하고, 여기선 scope 값
+    // 검증(한국어 에러 보존) + auto 해석만 해요. `--child` worker 모드 보존.
+    let (scope, auto_scope): (Option<Scope>, bool) = match arg_scope {
+        Some("user") => (Some(Scope::User), false),
+        Some("project") => (Some(Scope::Project), false),
+        Some("auto") => (None, true),
+        Some(other) => {
+            eprintln!(
+                "axhub-helpers autowire-statusline: --scope 는 user|project|auto 만 가능해요 (받은 값: {other})"
+            );
+            return Ok(64);
         }
-        i += 1;
-    }
+        None => (None, false),
+    };
     let scope = match (scope, auto_scope) {
         (Some(s), _) => s,
         (None, true) => match detect_scope_from_env() {
@@ -2974,8 +2772,8 @@ fn cmd_orphan_stub(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-fn cmd_settings_merge(args: &[String]) -> anyhow::Result<i32> {
-    let parsed = match parse_settings_merge_args(args) {
+pub(crate) fn cmd_settings_merge(cli: cli::args::SettingsMergeCliArgs) -> anyhow::Result<i32> {
+    let parsed = match parse_settings_merge_args(&cli) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("axhub-helpers settings-merge: {e}");
@@ -3122,21 +2920,6 @@ fn cmd_settings_merge_migrate(parsed: SettingsMergeArgs) -> anyhow::Result<i32> 
 /// (`run`) and probe sweep ship in follow-up PRs per the PR #113 honest
 /// tradeoff section. Unknown subcommands return exit 64 (EX_USAGE) so the
 /// shell sees a stable error code instead of a panic.
-fn cmd_diagnose(args: &[String]) -> anyhow::Result<i32> {
-    let Some(sub) = args.first().map(String::as_str) else {
-        eprintln!("axhub-helpers diagnose: missing subcommand (try `hitl`)");
-        return Ok(64);
-    };
-    let rest = &args[1..];
-    match sub {
-        "hitl" => cmd_diagnose_hitl(rest),
-        other => {
-            eprintln!("axhub-helpers diagnose: unknown subcommand \"{other}\"");
-            Ok(64)
-        }
-    }
-}
-
 /// `diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]`
 ///
 /// Drives the user through the prompt list via `StdioRunner`, applies
@@ -3148,34 +2931,15 @@ fn cmd_diagnose(args: &[String]) -> anyhow::Result<i32> {
 ///   64 — usage error (missing flags / invalid args)
 ///   65 — environment error (TTY missing, state dir unresolvable)
 ///   1 — operational error (spec parse failure, write failure, runner abort)
-fn cmd_diagnose_hitl(args: &[String]) -> anyhow::Result<i32> {
+pub(crate) fn cmd_diagnose_hitl(
+    session: Option<String>,
+    prompts: Option<String>,
+    output: Option<String>,
+) -> anyhow::Result<i32> {
     use axhub_helpers::diagnose::hitl::{run_from_files, StdioRunner};
 
-    let mut session: Option<String> = None;
-    let mut prompts: Option<PathBuf> = None;
-    let mut output: Option<PathBuf> = None;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--session" => {
-                i += 1;
-                session = args.get(i).cloned();
-            }
-            "--prompts" => {
-                i += 1;
-                prompts = args.get(i).map(PathBuf::from);
-            }
-            "--output" => {
-                i += 1;
-                output = args.get(i).map(PathBuf::from);
-            }
-            other => {
-                eprintln!("axhub-helpers diagnose hitl: unknown flag \"{other}\"");
-                return Ok(64);
-            }
-        }
-        i += 1;
-    }
+    let prompts = prompts.map(PathBuf::from);
+    let output = output.map(PathBuf::from);
     let Some(session) = session else {
         eprintln!("axhub-helpers diagnose hitl: --session <loop_id> required");
         return Ok(64);

@@ -957,9 +957,28 @@ describe("cross-manifest consistency", () => {
 
   test("session-start shims only call implemented helper subcommands", async () => {
     const helperMain = await readFile(join(REPO_ROOT, "crates/axhub-helpers/src/main.rs"), "utf8");
+    const helperCli = await readFile(join(REPO_ROOT, "crates/axhub-helpers/src/cli/mod.rs"), "utf8");
+
+    // kebab-case subcommand → clap PascalCase variant (token-init → TokenInit).
+    const toVariant = (name: string) =>
+      name
+        .split("-")
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join("");
+
     for (const subcommand of ["session-start", "token-init"]) {
       expect(helperMain, `${subcommand} must be in usage`).toContain(`  ${subcommand}`);
-      expect(helperMain, `${subcommand} must be dispatched`).toContain(`"${subcommand}" =>`);
+      // "dispatched" = routed to a real handler. The clap migration (PR #151)
+      // moved data/auth subcommands like token-init to typed Commands variants,
+      // so accept either the legacy match arm (main.rs) or the typed clap
+      // dispatch arm (cli/mod.rs `Commands::Variant`).
+      const dispatched =
+        helperMain.includes(`"${subcommand}" =>`) ||
+        helperCli.includes(`Commands::${toVariant(subcommand)}`);
+      expect(
+        dispatched,
+        `${subcommand} must be dispatched (legacy arm or clap variant)`,
+      ).toBe(true);
     }
 
     for (const relPath of ["hooks/session-start.sh", "hooks/session-start.ps1"]) {

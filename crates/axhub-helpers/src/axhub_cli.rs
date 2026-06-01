@@ -61,23 +61,40 @@ pub fn run_axhub(args: &[&str]) -> CliOutput {
     run_axhub_with_timeout(&axhub_bin_from_env(), args, DEFAULT_AXHUB_TIMEOUT)
 }
 
-pub fn run_axhub_with_timeout(axhub_bin: &str, args: &[&str], timeout: Duration) -> CliOutput {
+fn axhub_command(axhub_bin: &str, args: &[&str], process_group: bool) -> Command {
     let mut cmd = Command::new(axhub_bin);
     cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
+    #[cfg(unix)]
+    if process_group {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    #[cfg(not(unix))]
+    let _ = process_group;
+    cmd
+}
+
+pub fn run_axhub_with_timeout(axhub_bin: &str, args: &[&str], timeout: Duration) -> CliOutput {
     // On Unix, place the child in its own process group so that any
     // grandchild it forks (sh -c "sleep 30" → sleep) can be killed
     // together via kill(-pgid). Without this, sh's child sleep inherits
     // the pipe write-end; when we kill sh on timeout, sleep keeps the
     // pipe open, the reader thread's read_to_end never sees EOF, and
     // the wall-clock blows past the timeout budget.
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        cmd.process_group(0);
-    }
+    let mut cmd = axhub_command(axhub_bin, args, true);
     let mut child = match cmd.spawn() {
         Ok(child) => child,
-        Err(_) => return CliOutput::spawn_failed(),
+        Err(_) => {
+            // Some sandboxed Linux runners reject `setpgid` during spawn and
+            // report it as a spawn failure. Retry once without process-group
+            // isolation so short, non-timeout probes still work; timeout paths
+            // keep the process-group behavior whenever the platform permits it.
+            let mut fallback = axhub_command(axhub_bin, args, false);
+            match fallback.spawn() {
+                Ok(child) => child,
+                Err(_) => return CliOutput::spawn_failed(),
+            }
+        }
     };
 
     // Drain stdout/stderr in dedicated threads BEFORE polling try_wait.
