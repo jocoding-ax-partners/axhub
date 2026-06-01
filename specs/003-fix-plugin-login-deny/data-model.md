@@ -37,7 +37,7 @@
 | Linux (systemd) | `XDG_RUNTIME_DIR=/run/user/$UID` | `/run/user/$UID/axhub` | **동일** | 무회귀 |
 | 테스트 | `XDG_RUNTIME_DIR=<tempdir>` | `<tempdir>/axhub` | **동일** | 기존 E2E 그대로 |
 | macOS (Claude Code) | 미설정 → `$TMPDIR` 폴백 | `$TMPDIR/axhub` (**프로세스마다 다름** → 버그) | `~/.local/state/axhub/runtime` (**프로세스 무관**) | **버그 수정** |
-| HOME 미설정 (Windows 등) | 미설정 | `$TMPDIR/axhub` | `./.local/state/axhub/runtime`(상대) | R4 경계 — 범위 외 |
+| HOME 미설정 (Windows 등) | `USERPROFILE` 또는 `HOMEDRIVE`+`HOMEPATH` | `$TMPDIR/axhub` | `<windows-home>/.local/state/axhub/runtime` | 상대경로 degrade 방지 |
 
 ### 파일 경로 (위치만 이동, 파일명 불변)
 
@@ -56,7 +56,7 @@
    pending --binding 불일치--> [유지] → deny (사유 표면화: P2)
 ```
 
-**FR-007 스윕 추가점**: `mint` / `preauth-check` 진입 시 `runtime_root()` 의 만료 `consent-*.json` 파일 정리(pending 과 session 파일 모두). 유효 토큰은 미영향.
+**FR-007 스윕 추가점**: `mint` / `preauth-check` 진입 시 `runtime_root()` 의 만료·corrupt·signature-invalid `consent-*.json` 파일 정리(pending 과 session 파일 모두). 유효 토큰과 unreadable/symlink 파일은 미영향.
 
 ## 영향 받는 심볼 (블라스트 반경)
 
@@ -69,4 +69,4 @@
 | `mint_token_to_path` | jwt.rs:137-138 | `create_dir_all` + `0700` |
 | `claim_pending_token` | jwt.rs:209 | `read_dir` + 스윕 |
 
-→ 외부 모듈 의존 없음. `state_root()`(learning.rs, audit_ledger.rs 사용)는 **변경하지 않음**.
+→ `runtime_root()` 소비처는 consent 모듈에 한정돼요. `state_root()` 는 learning/audit/consent 의 공유 state root 라 resolver 정합화 테스트로 보호해요.

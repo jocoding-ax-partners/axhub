@@ -78,7 +78,7 @@ fn preauth_allows_when_tmpdir_differs_and_xdg_runtime_unset() {
 추가 테스트:
 - **권한 보존**: 새 경로 `~/.local/state/axhub/runtime` 디렉터리 `0700`, consent 파일 `0600`.
 - **TTL 무력화**: 만료(`exp<=now`) consent 는 `$TMPDIR` 무관하게 deny.
-- **만료 스윕(FR-007)**: 만료 pending 파일과 만료 session consent 파일 존재 + mint/preauth 1회 → 만료 파일 제거, 미만료 파일 보존 확인.
+- **stale 스윕(FR-007)**: 만료 pending 파일, 만료 session consent 파일, corrupt/signature-invalid consent 파일 존재 + mint/preauth 1회 → stale 파일 제거, 미만료 파일 보존 확인.
 - **무회귀**: `XDG_RUNTIME_DIR` 세팅된 기존 consent E2E 전부 green 유지.
 - **문서 무회귀**: README 의 consent 경로 설명이 `XDG_RUNTIME_DIR` 설정/미설정 두 경로를 모두 설명하고, `${XDG_RUNTIME_DIR:-/tmp}/axhub` 같은 오래된 fallback 안내가 남지 않았는지 확인.
 
@@ -100,4 +100,4 @@ npx gitnexus analyze                 # PostToolUse hook 자동 (인덱스 갱신
 
 ## P2 검증 (선택, 분리 태스크)
 
-`permissionDecisionReason` 추가 후, deny payload 에 해당 필드 + `systemMessage` **둘 다** 존재 확인. 설치된 Claude Code 에서 실제 deny UI 에 사유가 보이는지 실측(research R3).
+`permissionDecisionReason` 추가 후, deny payload 에 해당 필드 + `systemMessage` **둘 다** 존재 확인. session token 과 pending login-card token 의 TTL 만료 deny 는 모두 `사전 승인이 만료됐어요` 메시지가 나오는지 확인. 설치된 Claude Code 에서 실제 deny UI 에 사유가 보이는지 실측(research R3).

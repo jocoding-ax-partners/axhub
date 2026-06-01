@@ -8,7 +8,7 @@ Technical Context 의 미해결 결정 4건을 해소해요.
 
 ## R1. consent 저장 경로 — 폴백을 어디로?
 
-**Decision**: `runtime_root()` 의 폴백을 `std::env::temp_dir()` 에서 `state_root().join("runtime")`(= `$XDG_STATE_HOME/axhub/runtime` 또는 `~/.local/state/axhub/runtime`)로 변경. **`XDG_RUNTIME_DIR` 가 설정된 경우의 분기는 그대로 둠.**
+**Decision**: `runtime_root()` 의 폴백을 `std::env::temp_dir()` 에서 `state_root().join("runtime")`(= `$XDG_STATE_HOME/axhub/runtime` 또는 `~/.local/state/axhub/runtime`)로 변경. **`XDG_RUNTIME_DIR` 가 설정된 경우의 분기는 그대로 두고**, 빈 `XDG_STATE_HOME` 은 무시하며 HOME 계열 fallback(`HOME` → `USERPROFILE` → `HOMEDRIVE`+`HOMEPATH`)을 `runtime_paths.rs` 패턴과 맞춰요.
 
 ```rust
 // crates/axhub-helpers/src/consent/key.rs
@@ -35,12 +35,12 @@ pub fn runtime_root() -> PathBuf {
 
 ## R2. FR-007 — 만료 consent 스윕 범위
 
-**Decision**: claim 경로의 기존 pending 만료 정리를 일반화하고, **mint/preauth 시점에 만료된 `consent-*.json` 전체를 스윕**해요(`consent-pending-*.json` 과 `consent-<session>.json` 모두). 별도 프로세스·스케줄 없음(clarification: opportunistic).
+**Decision**: claim 경로의 기존 pending 만료 정리를 일반화하고, **mint/preauth 시점에 만료되었거나 corrupt/signature-invalid 인 `consent-*.json` 전체를 스윕**해요(`consent-pending-*.json` 과 `consent-<session>.json` 모두). 별도 프로세스·스케줄 없음(clarification: opportunistic).
 
 **Rationale**:
 - **이미 절반 구현됨.** `claim_pending_token`(jwt.rs:233-235)은 pending 파일 decode 시 `Err("token_expired")` 면 `fs::remove_file` 로 정리해요. 즉 다음 preauth-check 가 claim 경로를 타면 만료 pending 이 정리돼요.
-- **빈틈**: 로그인을 중도 포기하면 claim 이 안 돌아 pending 파일이 남고, 기존 session consent 도 만료 후 같은 디렉터리에 남을 수 있어요. 다음 **mint/preauth** 때 같은 디렉터리의 만료분을 스윕하면, 비휘발 경로로 옮긴 뒤에도 누적이 bound 돼요.
-- **안전성**: 스윕은 `decode_token_file` 결과가 `Err("token_expired")` 인 파일만 제거. 동시 진행 중인 다른 로그인의 **유효(미만료)** consent 는 건드리지 않음 → 경쟁 무해.
+- **빈틈**: 로그인을 중도 포기하면 claim 이 안 돌아 pending 파일이 남고, 기존 session consent 도 만료 후 같은 디렉터리에 남을 수 있어요. 다음 **mint/preauth** 때 같은 디렉터리의 만료분과 cryptographic 검증이 불가능한 stale 파일을 스윕하면, 비휘발 경로로 옮긴 뒤에도 누적이 bound 돼요.
+- **안전성**: 스윕은 `decode_token_file` 결과가 `token_expired` / `token_file_corrupt` / `token_file_missing_jwt` / `token_signature_invalid` 인 consent 파일만 제거해요. 동시 진행 중인 다른 로그인의 **유효(미만료)** consent 와 unreadable/symlink 파일은 건드리지 않음 → 경쟁 무해.
 - 구현: `sweep_expired_consent_files(dir, key)` 헬퍼(기존 `decode_token_file` 재사용 + `is_consent_token_path`: `consent-*.json` 매칭)를 `mint_token_to_path` 의 `create_dir_all`/`set_private_dir_mode` 직후와 `claim_pending_token` 의 `read_dir` 직전에 호출. 실패는 무시(best-effort, hook fail-open 정신).
 
 **Alternatives considered**: SessionEnd hook 정리 — 기각(clarification 에서 사용자가 거부). 별도 GC 데몬 — 과설계.
@@ -75,13 +75,13 @@ pub fn runtime_root() -> PathBuf {
 
 ---
 
-## R4. Windows / HOME 경계 (명시만, 범위 외 수정)
+## R4. Windows / HOME 경계 (범위 내 정합화)
 
 **Finding**: `key.rs:9-13` 의 `home_dir()` 는 **`HOME` 만** 확인하고, 미설정 시 상대경로 `"."` 를 반환해요. 반면 `runtime_paths.rs:86-96` 의 `home_dir()` 는 `USERPROFILE`/`HOMEDRIVE`+`HOMEPATH` 도 처리해요. 따라서 `HOME` 이 없는 Windows 에서 `state_root()`(및 본 수정의 폴백)는 **CWD 상대경로로 degrade** 해서 프로세스 간 분기를 재유발할 수 있어요.
 
-**Decision**: 본 수정의 **범위 외**로 남기되 명시. 근거: (a) 주 타깃은 macOS, (b) 본 수정은 **이미 출시된 HMAC 키와 동일한 `HOME` 의존성**을 쓸 뿐 — *더 나빠지지 않음*(키가 동작하는 환경에선 consent 도 동작). 두 `home_dir()` 정합화는 별도 작업.
+**Decision**: 본 수정 범위에 포함해 `consent/key.rs` 의 resolver 를 `runtime_paths.rs` 패턴과 맞춰요. 빈 `XDG_STATE_HOME` 은 무시하고, `HOME` 이 없으면 `USERPROFILE`, 그다음 `HOMEDRIVE`+`HOMEPATH` 를 확인해요. 그래도 없으면 상대경로 `.` 대신 현재 실행 컨텍스트 기준의 안정 fallback 을 사용해요.
 
-**Action**: spec Assumptions 의 "Windows/Linux 도 같은 전략이 안전" 가정에 이 단서를 단다(아래). tasks 에 선택적 follow-up 으로 기록 가능.
+**Action**: `state_root` / `runtime_root` 회귀 테스트에 빈 `XDG_STATE_HOME` 과 HOME fallback 케이스를 포함해요.
 
 ---
 
@@ -96,8 +96,8 @@ pub fn runtime_root() -> PathBuf {
 | 미해결 항목 | 해소 |
 |---|---|
 | 저장 경로 선택 (spec Deferred) | R1 — `state_root().join("runtime")` 폴백 |
-| FR-007 스윕 구체화 | R2 — mint/preauth 시 만료 `consent-*.json` opportunistic |
+| FR-007 스윕 구체화 | R2 — mint/preauth 시 만료·corrupt·signature-invalid `consent-*.json` opportunistic |
 | P2 출력 필드 | R3 — `permissionDecisionReason` 추가, systemMessage 유지, UI smoke 검증 |
-| 크로스플랫폼 안전성 가정 | R4 — Windows HOME 경계 명시, 범위 외 |
+| 크로스플랫폼 안전성 가정 | R4 — Windows HOME 경계 정합화, 빈 XDG 방어 |
 
 NEEDS CLARIFICATION 잔여: 없음(R3 은 구현 후 UI smoke task 로 전환, plan 진행 차단 아님).

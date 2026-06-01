@@ -4,6 +4,8 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
+use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+
 fn bin() -> &'static str {
     env!("CARGO_BIN_EXE_axhub-helpers")
 }
@@ -77,6 +79,98 @@ fn run_stdin_with_env(
 fn assert_no_consent_side_effects(state_dir: &Path, runtime_dir: &Path) {
     assert!(!state_dir.exists());
     assert!(!runtime_dir.exists());
+}
+
+fn write_private_test_file(path: &Path, bytes: &[u8]) {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).unwrap();
+    }
+    std::fs::write(path, bytes).unwrap();
+    #[cfg(unix)]
+    {
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
+}
+
+fn write_expired_session_consent(
+    state: &Path,
+    runtime: &Path,
+    session_id: &str,
+    tool_call_id: &str,
+) {
+    let key = [11u8; 32];
+    write_private_test_file(&state.join("axhub").join("hmac-key"), &key);
+
+    let now = chrono::Utc::now().timestamp();
+    let claims = serde_json::json!({
+        "tool_call_id": format!("{session_id}:{tool_call_id}"),
+        "action": "auth_login",
+        "app_id": "_",
+        "profile": "default",
+        "branch": "_",
+        "commit_sha": "_",
+        "context": {},
+        "synthesized_by_helper": false,
+        "jti": "expired-test",
+        "iat": now - 120,
+        "exp": now - 60
+    });
+    let jwt = encode(
+        &Header::new(Algorithm::HS256),
+        &claims,
+        &EncodingKey::from_secret(&key),
+    )
+    .unwrap();
+    let body = serde_json::json!({
+        "token_id": "expired-test",
+        "jwt": jwt,
+        "expires_at": "expired",
+        "session_id": session_id
+    });
+    write_private_test_file(
+        &runtime
+            .join("axhub")
+            .join(format!("consent-{session_id}.json")),
+        serde_json::to_string(&body).unwrap().as_bytes(),
+    );
+}
+
+fn write_expired_pending_consent(state: &Path, runtime: &Path) {
+    let key = [13u8; 32];
+    write_private_test_file(&state.join("axhub").join("hmac-key"), &key);
+
+    let now = chrono::Utc::now().timestamp();
+    let claims = serde_json::json!({
+        "tool_call_id": "pending",
+        "action": "auth_login",
+        "app_id": "_",
+        "profile": "default",
+        "branch": "_",
+        "commit_sha": "_",
+        "context": {},
+        "synthesized_by_helper": false,
+        "jti": "expired-pending-test",
+        "iat": now - 120,
+        "exp": now - 60
+    });
+    let jwt = encode(
+        &Header::new(Algorithm::HS256),
+        &claims,
+        &EncodingKey::from_secret(&key),
+    )
+    .unwrap();
+    let body = serde_json::json!({
+        "token_id": "expired-pending-test",
+        "jwt": jwt,
+        "expires_at": "expired",
+        "session_id": "pending"
+    });
+    write_private_test_file(
+        &runtime
+            .join("axhub")
+            .join("consent-pending-expired-test.json"),
+        serde_json::to_string(&body).unwrap().as_bytes(),
+    );
 }
 
 #[test]
@@ -1212,6 +1306,51 @@ fn cli_consent_fallback_dir_and_file_are_private() {
     );
 }
 
+#[test]
+fn cli_consent_fallback_ignores_empty_xdg_state_home() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    let tmp = temp.path().join("tmp");
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::create_dir_all(&tmp).unwrap();
+    let binding = serde_json::json!({
+        "tool_call_id": "pending",
+        "action": "auth_login",
+        "app_id": "_",
+        "profile": "default",
+        "branch": "_",
+        "commit_sha": "_",
+        "context": {}
+    })
+    .to_string();
+    let mint = run_stdin_with_env(
+        &["consent-mint"],
+        &binding,
+        &[
+            ("XDG_STATE_HOME", ""),
+            ("HOME", home.to_str().unwrap()),
+            ("TMPDIR", tmp.to_str().unwrap()),
+        ],
+        &["XDG_RUNTIME_DIR"],
+    );
+    assert_eq!(
+        mint.status.code(),
+        Some(0),
+        "mint stderr: {}",
+        String::from_utf8_lossy(&mint.stderr)
+    );
+
+    let runtime_dir = home
+        .join(".local")
+        .join("state")
+        .join("axhub")
+        .join("runtime");
+    assert!(
+        runtime_dir.exists(),
+        "empty XDG_STATE_HOME must fall back to HOME, not cwd or TMPDIR"
+    );
+}
+
 /// FR-006 / contract C4: a deny carries the Korean reason in BOTH the canonical
 /// `permissionDecisionReason` field (the one Claude Code's deny UI surfaces) and
 /// the `systemMessage` prose channel, and still exits 0 (fail-open).
@@ -1248,6 +1387,71 @@ fn cli_preauth_deny_surfaces_reason_in_both_channels() {
     assert!(
         stdout.contains("사전 승인이 필요해요"),
         "reason must be the Korean hint: {stdout}"
+    );
+}
+
+#[test]
+fn cli_preauth_deny_surfaces_expired_consent_reason() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let runtime = temp.path().join("run");
+    let session_id = "expired-session";
+    let tool_call_id = "tool-expired";
+    write_expired_session_consent(&state, &runtime, session_id, tool_call_id);
+
+    let payload = format!(
+        r#"{{"session_id":"{session_id}","tool_call_id":"{tool_call_id}","tool_name":"Bash","tool_input":{{"command":"axhub auth login"}}}}"#
+    );
+    let out = run_stdin_with_env(
+        &["preauth-check"],
+        &payload,
+        &[
+            ("XDG_STATE_HOME", state.to_str().unwrap()),
+            ("XDG_RUNTIME_DIR", runtime.to_str().unwrap()),
+        ],
+        &["CLAUDE_SESSION_ID"],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("permissionDecision\":\"deny"),
+        "stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("permissionDecisionReason"),
+        "deny must carry the canonical reason field: {stdout}"
+    );
+    assert!(
+        stdout.contains("사전 승인이 만료됐어요"),
+        "expired consent must surface the TTL-specific reason: {stdout}"
+    );
+}
+
+#[test]
+fn cli_preauth_deny_surfaces_expired_pending_consent_reason() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let runtime = temp.path().join("run");
+    write_expired_pending_consent(&state, &runtime);
+
+    let out = run_stdin_with_env(
+        &["preauth-check"],
+        r#"{"session_id":"actual-session","tool_call_id":"tool-auth","tool_name":"Bash","tool_input":{"command":"axhub auth login"}}"#,
+        &[
+            ("XDG_STATE_HOME", state.to_str().unwrap()),
+            ("XDG_RUNTIME_DIR", runtime.to_str().unwrap()),
+        ],
+        &["CLAUDE_SESSION_ID"],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("permissionDecision\":\"deny"),
+        "stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("사전 승인이 만료됐어요"),
+        "expired pending consent must surface the TTL-specific reason: {stdout}"
     );
 }
 

@@ -8,11 +8,11 @@
 
 플러그인 로그인이 macOS Claude Code 에서 100% deny 되는 버그를 고쳐요. 근본 원인은 `consent/key.rs::runtime_root()` 가 `XDG_RUNTIME_DIR` 부재 시 `std::env::temp_dir()`(=`$TMPDIR`)로 폴백하는데, Claude Code 가 Bash tool 프로세스와 hook subprocess 에 **서로 다른 `$TMPDIR`** 를 부여해서 mint 가 쓴 consent 파일을 hook 이 못 찾는 거예요.
 
-**기술 접근**: `runtime_root()` 의 폴백을 `$TMPDIR` 에서 **HOME-anchored 안정 경로**(`state_root().join("runtime")` = `~/.local/state/axhub/runtime`)로 바꿔요. 이 경로는 이미 HMAC 키가 쓰는 `state_root()` 와 같은 뿌리라, **두 프로세스가 동일하게 해석된다는 게 실증돼 있어요**(키 검증이 양쪽에서 성공 중). XDG_RUNTIME_DIR 가 있는 경로(Linux)는 손대지 않아 회귀가 없어요. 곁들여 mint/preauth 시 만료된 `consent-*.json` 을 opportunistic 스윕하고(FR-007), deny 출력에 `permissionDecisionReason` 을 더해 사유가 표면화되게 해요(P2, additive).
+**기술 접근**: `runtime_root()` 의 폴백을 `$TMPDIR` 에서 **HOME-anchored 안정 경로**(`state_root().join("runtime")` = `~/.local/state/axhub/runtime`)로 바꿔요. 이 경로는 이미 HMAC 키가 쓰는 `state_root()` 와 같은 뿌리라, **두 프로세스가 동일하게 해석된다는 게 실증돼 있어요**(키 검증이 양쪽에서 성공 중). 빈 `XDG_STATE_HOME` 은 무시하고 Windows HOME 계열 fallback 도 맞춰 상대경로 degrade 를 막아요. XDG_RUNTIME_DIR 가 있는 경로(Linux)는 손대지 않아 회귀가 없어요. 곁들여 mint/preauth 시 만료·corrupt·signature-invalid `consent-*.json` 을 opportunistic 스윕하고(FR-007), deny 출력에 `permissionDecisionReason` 을 더해 사유가 표면화되게 해요(P2, additive).
 
 ## Technical Context
 
-**Language/Version**: Rust (2024 edition workspace), 도구/테스트 하니스는 bun(TypeScript)
+**Language/Version**: Rust (2021 edition workspace), 도구/테스트 하니스는 bun(TypeScript)
 
 **Primary Dependencies**: `jsonwebtoken`(HS256), `chrono`, `uuid`, `serde_json`, `anyhow`, `clap`, `libc`(O_NOFOLLOW). **새 런타임 의존성 추가 없음.**
 
@@ -28,7 +28,7 @@
 
 **Constraints**: hook fail-open(어떤 실패에서도 exit 0), `0600`/`0700` 권한 보존, consent TTL 60초·pending single-use·HMAC 계약 유지, `XDG_RUNTIME_DIR` 경로 무회귀
 
-**Scale/Scope**: 로그인 1회당 consent 파일 1개, 동시 pending 소수. 코드 변경 ~5줄 핵심 + 만료 consent 스윕 헬퍼 + deny 필드 + 회귀 테스트.
+**Scale/Scope**: 로그인 1회당 consent 파일 1개, 동시 pending 소수. 코드 변경은 consent 경로 resolver, stale consent 스윕 헬퍼, deny 필드/TTL 사유 매핑, 회귀 테스트에 한정해요.
 
 ## Constitution Check
 
@@ -41,7 +41,7 @@
 | hook fail-open (exit 0, panic 금지) | preauth-check 출력 경로 유지, `unwrap`/`panic` 미도입 | ✅ PASS |
 | 권한 보존 (`0600`/`0700`) | 저장 위치만 변경, 기존 `write_private_file_no_follow` + `set_private_dir_mode` 재사용 | ✅ PASS |
 | consent 보안 계약 (TTL·pending single-use·HMAC) | pending claim 소비·TTL·서명 로직 보존, 위치만 이동 | ✅ PASS |
-| surgical change (`CLAUDE.md` §3) | `runtime_root()` 폴백 한 줄 + 스윕 헬퍼 + deny 필드 추가, 무관 코드 미수정 | ✅ PASS |
+| surgical change (`CLAUDE.md` §3) | `runtime_root()` 폴백 + `state_root()` resolver 정합화 + 스윕 헬퍼 + deny 필드/TTL 사유 추가, 무관 코드 미수정 | ✅ PASS |
 | 무회귀 (`cargo test`/`tsc` green) | 기존 테스트는 XDG_RUNTIME_DIR 분기 고정 → 폴백 변경과 직교 | ✅ PASS (Phase 1 재확인) |
 
 **위반 없음** → Complexity Tracking 비움.
@@ -54,7 +54,7 @@
 specs/003-fix-plugin-login-deny/
 ├── plan.md              # 이 파일
 ├── spec.md              # 기능 명세 (specify + clarify 완료)
-├── research.md          # Phase 0 — 저장 경로·스윕·P2 필드·Windows 경계 결정
+├── research.md          # Phase 0 — 저장 경로·스윕·P2 필드·Windows HOME 정합화 결정
 ├── data-model.md        # Phase 1 — Consent Token(불변) + runtime_root 해석표
 ├── quickstart.md        # Phase 1 — fail-before/pass-after 재현·검증 절차
 ├── contracts/
@@ -70,8 +70,8 @@ specs/003-fix-plugin-login-deny/
 crates/axhub-helpers/
 ├── src/
 │   ├── consent/
-│   │   ├── key.rs       # ★ runtime_root() 폴백 수정 (핵심) — token_file_path / pending_token_file_path
-│   │   ├── jwt.rs       # mint_token_to_path(create_dir+write), claim_pending_token(read_dir+sweep) — 만료 consent 스윕 헬퍼 추가
+│   │   ├── key.rs       # ★ runtime_root() 폴백 + state_root HOME resolver 정합화 — token_file_path / pending_token_file_path
+│   │   ├── jwt.rs       # mint_token_to_path(create_dir+write), claim_pending_token(read_dir+sweep) — 만료·invalid consent 스윕 헬퍼 추가
 │   │   └── parser.rs    # format_preauth_deny_hint (P2 사유 텍스트, 변경 없음)
 │   └── main.rs          # cmd_preauth_check(deny 출력 → P2 permissionDecisionReason 추가), cmd_consent_mint
 └── tests/
@@ -86,7 +86,7 @@ crates/axhub-helpers/
 
 ## Phase 출력
 
-- **Phase 0** → [research.md](./research.md): 저장 경로 결정, FR-007 스윕 범위, P2 출력 필드(연구 필요), Windows HOME 경계, gitnexus 도구명 메모.
+- **Phase 0** → [research.md](./research.md): 저장 경로 결정, FR-007 스윕 범위, P2 출력 필드, Windows HOME 정합화, gitnexus 도구명 메모.
 - **Phase 1** → [data-model.md](./data-model.md), [contracts/preauth-check-output.md](./contracts/preauth-check-output.md), [quickstart.md](./quickstart.md), CLAUDE.md SPECKIT 마커 갱신.
 - **Phase 2** (다음 명령): `/speckit-tasks` 가 tasks.md 생성. P1(runtime_root 수정)이 **단독 ship 가능**하도록 정렬 — P2 는 분리 task.
 

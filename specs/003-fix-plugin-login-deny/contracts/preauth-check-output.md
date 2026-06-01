@@ -48,7 +48,7 @@
 ```
 
 - **불변식**: exit 0 유지. `permissionDecision: "deny"` 유지. `systemMessage` **제거 금지**(기존 채널 보존).
-- **추가**: `permissionDecisionReason` 에 동일 사유 텍스트(`format_preauth_deny_hint`). Claude Code hook 계약상 권한 결정 사유 필드이며, `systemMessage` 는 사용자-visible prose 채널 보존용으로 함께 유지해요(research R3).
+- **추가**: `permissionDecisionReason` 에 사유 텍스트를 싣고, `systemMessage` 는 사용자-visible prose 채널 보존용으로 함께 유지해요(research R3). 기본 deny 는 `format_preauth_deny_hint` 를 쓰고, session token 과 pending login-card token 의 TTL 만료 deny 는 모두 `사전 승인이 만료됐어요` 로 시작하는 만료 전용 안내를 써요.
 - 사유 텍스트는 `action` 별 한국어 안내(`parser.rs:302`) — 변경 없음.
 
 ## 불변식 요약 (계약 테스트 대상)
@@ -58,7 +58,7 @@
 | C1 | 어떤 입력에서도 **exit 0** | hook fail-open (CLAUDE.md Hook Safety) |
 | C2 | 출력은 유효 JSON 한 객체, `hookEventName: "PreToolUse"` 포함 | Claude Code hook 계약 |
 | C3 | 비파괴/유효consent → `permissionDecision: "allow"` | 기존 동작 보존 |
-| C4 | 파괴+consent부재 → `permissionDecision: "deny"` + 사유 텍스트 노출 | FR-002, FR-006 |
+| C4 | 파괴+consent부재/만료 → `permissionDecision: "deny"` + 사유 텍스트 노출 | FR-002, FR-006 |
 | C5 | `permissionDecision` enum = {allow, deny} 만 | 계약 안정성 |
 | C6 | (P1 핵심) mint 프로세스와 hook 프로세스의 `$TMPDIR` 가 달라도 유효 consent → allow | FR-001 |
 

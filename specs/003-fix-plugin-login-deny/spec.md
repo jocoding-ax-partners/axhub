@@ -22,7 +22,7 @@ axhub 플러그인의 로그인 흐름은 두 단계로 동작해요. (1) `conse
 
 ### Session 2026-06-01
 
-- Q: consent 저장을 비휘발 경로로 옮길 때 미소비(중도 포기) stale consent 정리 정책은? → A: **만료 스윕(opportunistic)** — `consent-mint` / `preauth-check` 가 실행되는 김에 같은 디렉터리의 **만료된** consent 파일(`consent-*.json`, pending 포함)을 함께 정리해요. 별도 프로세스·스케줄 없이 기존 흐름에만 얹어 누적을 막고, TTL·pending single-use·`0600` 보안 계약은 그대로 유지해요.
+- Q: consent 저장을 비휘발 경로로 옮길 때 미소비(중도 포기) stale consent 정리 정책은? → A: **만료 스윕(opportunistic)** — `consent-mint` / `preauth-check` 가 실행되는 김에 같은 디렉터리의 **만료되었거나 cryptographic 검증이 불가능한** consent 파일(`consent-*.json`, pending 포함)을 함께 정리해요. 별도 프로세스·스케줄 없이 기존 흐름에만 얹어 누적을 막고, TTL·pending single-use·`0600` 보안 계약은 그대로 유지해요.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -56,13 +56,13 @@ consent 가 정말로 없거나 만료돼서 preauth-check 가 deny 할 때, 사
 **Acceptance Scenarios**:
 
 1. **Given** 유효한 consent 가 없는 상태, **When** 보호 대상 명령(`axhub auth login`)이 실행돼 deny 되면, **Then** 사용자에게 "사전 승인이 필요하다"는 사유와 "먼저 로그인 카드를 받으라"는 다음 행동이 보여요.
-2. **Given** consent 가 TTL 만료로 거부되는 상태, **When** deny 되면, **Then** 만료가 원인임을 알 수 있는 메시지가 노출돼요.
+2. **Given** session consent 또는 pending login-card consent 가 TTL 만료로 거부되는 상태, **When** deny 되면, **Then** 만료가 원인임을 알 수 있는 메시지가 노출돼요.
 
 ---
 
 ### Edge Cases
 
-- **미소비 consent 누적**: 저장 위치를 비휘발 **폴백** 경로(macOS 폴백 한정 — Linux `XDG_RUNTIME_DIR` 경로는 휘발성 그대로)로 옮기면 로그인을 중도 포기한 consent 파일이 `$TMPDIR` 보다 오래 남을 수 있어요. TTL(60초) 만료 후에는 반드시 사용이 거부돼야 하고, `consent-mint` / `preauth-check` 가 실행될 때 같은 consent 디렉터리의 만료된 `consent-*.json` 파일을 opportunistic 하게 스윕해서 누적을 막아요.
+- **미소비 consent 누적**: 저장 위치를 비휘발 **폴백** 경로(macOS 폴백 한정 — Linux `XDG_RUNTIME_DIR` 경로는 휘발성 그대로)로 옮기면 로그인을 중도 포기한 consent 파일이 `$TMPDIR` 보다 오래 남을 수 있어요. TTL(60초) 만료 후에는 반드시 사용이 거부돼야 하고, `consent-mint` / `preauth-check` 가 실행될 때 같은 consent 디렉터리의 만료되었거나 corrupt/signature-invalid 인 `consent-*.json` 파일을 opportunistic 하게 스윕해서 누적을 막아요.
 - **파일 권한**: 다중 사용자 머신에서 다른 사용자가 consent 를 훔쳐 권한 상승하지 못하도록, consent 파일은 소유자 전용(파일 0600 / 디렉터리 0700) 권한을 유지해야 해요.
 - **Linux 회귀 금지**: `XDG_RUNTIME_DIR` 가 있는 환경에서는 이미 mint/read 가 같은 곳을 봐요. 수정은 **폴백 경로만** 바꿔야 하고 XDG 경로 동작을 건드리면 안 돼요.
 - **동시 세션**: 서로 다른 `CLAUDE_SESSION_ID` 의 로그인이 동시에 진행돼도 consent 가 서로 섞이거나 잘못 소비되면 안 돼요.
@@ -78,7 +78,7 @@ consent 가 정말로 없거나 만료돼서 preauth-check 가 deny 할 때, 사
 - **FR-004**: consent 파일은 소유자 전용 권한(파일 `0600` / 디렉터리 `0700`)으로 생성·유지돼야 해요.
 - **FR-005**: `XDG_RUNTIME_DIR` 가 설정된 환경(주로 Linux)의 기존 동작은 **회귀 없이 보존**돼야 해요. 변경은 해당 변수가 없을 때의 폴백 경로에 한정돼요.
 - **FR-006**: preauth-check 가 deny 할 때, 사용자에게 **사유와 다음 행동**(로그인 카드 요청 안내)이 노출돼야 해요. *(P2 — hook 출력 계약이 허용하는 범위 내에서)*
-- **FR-007**: 비휘발 폴백 경로로 옮겨도 **미소비 stale consent 파일이 무한정 누적되지 않아야** 해요. `consent-mint` / `preauth-check` 실행 시 같은 디렉터리의 **만료된** `consent-*.json` 파일(세션 consent 와 pending consent 모두)을 opportunistic 하게 정리해요(별도 프로세스·스케줄 없음). 만료 전 pending consent 는 TTL·pending single-use 계약으로 보호돼요.
+- **FR-007**: 비휘발 폴백 경로로 옮겨도 **미소비 stale consent 파일이 무한정 누적되지 않아야** 해요. `consent-mint` / `preauth-check` 실행 시 같은 디렉터리의 **만료되었거나 corrupt/signature-invalid 인** `consent-*.json` 파일(세션 consent 와 pending consent 모두)을 opportunistic 하게 정리해요(별도 프로세스·스케줄 없음). 만료 전 pending consent 는 TTL·pending single-use 계약으로 보호돼요.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -96,7 +96,7 @@ consent 가 정말로 없거나 만료돼서 preauth-check 가 deny 할 때, 사
 
 ## Assumptions
 
-- 주 재현 환경은 Claude Code 가 Bash tool 과 hook subprocess 에 서로 다른 `$TMPDIR` 를 부여하는 **macOS**예요. Windows/Linux 에서도 같은 전략이 안전해야 해요. 단, `HOME` 이 미설정인 Windows 환경은 별도 경계예요(plan research R4) — HOME-anchored 폴백이 상대경로로 degrade 할 수 있지만, 이미 출시된 HMAC 키와 **동일한 의존성**이라 *더 나빠지지 않고*, 두 `home_dir()` 정합화는 본 수정 범위 밖이에요.
+- 주 재현 환경은 Claude Code 가 Bash tool 과 hook subprocess 에 서로 다른 `$TMPDIR` 를 부여하는 **macOS**예요. Windows/Linux 에서도 같은 전략이 안전해야 해요. `HOME` 이 비어 있는 환경도 `USERPROFILE` / `HOMEDRIVE`+`HOMEPATH` 를 확인하고, 그래도 없으면 현재 실행 컨텍스트 기준의 안정 fallback 으로 내려가 상대경로 `.` 에 의존하지 않아요(plan research R4).
 - consent 의 의도된 수명은 **단명**(60초 TTL, pending consent 는 1회 claim 소비)이라, 저장 위치를 비휘발 폴백 경로로 옮겨도 이 계약으로 보안이 유지돼요.
 - HMAC 키가 이미 안정 경로(`~/.local/state/axhub`)에 저장 중이므로, **같은 부류의 안정 경로 전략을 consent 에도 적용**할 수 있어요(최종 경로 선택은 plan 단계 결정).
 - 구체적 저장 디렉터리 선택(state dir vs harness 가 모든 자식에 동일하게 주는 기준 경로 등)과 코드 변경 범위는 `/speckit-plan` 단계에서 정해요.
