@@ -4,6 +4,24 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.21](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.20...v0.9.21) (2026-06-01)
+
+이번 릴리즈는 axhub-helpers 의 인자 파싱을 hand-rolled `match cmd` + `while i < args.len()` 루프에서 clap 4 derive 로 마이그레이션한 결과예요. 외부 동작(exit code 0/64/65, stdout/stderr 분리, JSON 출력, per-command 한국어 help 콘텐츠)을 byte-identical 로 보존하면서, typed clap 21 개 + parity-safe passthrough 20 개 구조로 SC-004 손파싱 루프를 0 으로 만들었어요. fail-open hook 계약(session-start/prompt-route 등 무인자 exit 0)도 그대로 유지했어요.
+
+### Changed
+
+* axhub-helpers clap 마이그레이션 ([#151](https://github.com/jocoding-ax-partners/axhub/issues/151)) ([6b72209](https://github.com/jocoding-ax-partners/axhub/commit/6b72209543984381b0aef4cc84f9588cde5da170))
+
+### Test baseline
+
+- PR #151 squash HEAD `6b72209` 기준 rust ubuntu/macos/windows, perf 3종, hook integration, Local Rust-primary gate, T2 helper-bin, corpus.100 drift gate 가 모두 pass 했어요.
+- 릴리즈 artifact(main `c231d24`)에서 `cargo test -p axhub-helpers` 565 pass / 3 ignored, `cargo clippy --all-targets -- -D warnings` clean, release build OK, `bunx tsc --noEmit` clean, routing-drift green 을 통과했어요.
+
+### Honest tradeoff
+
+- lib 위임·positional·ignore-args 인 약 20 개 명령은 typed 전환 이득이 없어서 parity-safe passthrough 로 의도적으로 유지했어요 (USAGE 상수 존속). while-loop 가 없어 SC-004 는 충족해요.
+- deploy consent 의 branch 바인딩 개선(Option 2)은 corpus/baseline fixture 70+ 사이트 동기화가 필요해서 이 릴리즈에서 분리하고 별도 PR 로 진행해요.
+
 ## [0.9.20](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.19...v0.9.20) (2026-05-28)
 
 이번 릴리즈는 PR #149 의 helper/CLI 경계 정합 패치예요. `list_deployments` 를 포함한 배포 probe 경로가 backend HTTP 세부 구현을 직접 따라가던 흐름을 axhub CLI 계약으로 맞추고, Windows/Ubuntu/macOS 테스트 경계를 보강해서 helper binary 와 skill 문서·routing fixture 가 같은 명령 표면을 보게 했어요.
