@@ -20,9 +20,6 @@ pub struct ConsentBinding {
     pub action: String,
     pub app_id: String,
     pub profile: String,
-    // Optional (serde default ""): deploy_create binds on commit_sha, not the
-    // branch label. Actions that bind branch (auth_login) enforce it in schema.
-    #[serde(default)]
     pub branch: String,
     pub commit_sha: String,
     #[serde(default)]
@@ -48,7 +45,6 @@ struct Claims {
     action: String,
     app_id: String,
     profile: String,
-    #[serde(default)]
     branch: String,
     commit_sha: String,
     #[serde(default)]

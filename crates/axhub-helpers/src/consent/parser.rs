@@ -23,10 +23,6 @@ const COLLECT_MAX_DEPTH: usize = 5;
 fn flag_map(flag: &str) -> Option<&'static str> {
     match flag {
         "--app" => Some("app_id"),
-        // Retained intentionally: deploy_create no longer binds branch, but
-        // other actions (auth_login, github_connect) still do, and mapping a
-        // stray `--branch` to a claim makes a mismatched flag DENY rather than
-        // be silently ignored. Not dead code.
         "--branch" => Some("branch"),
         "--commit" => Some("commit_sha"),
         "--profile" => Some("profile"),

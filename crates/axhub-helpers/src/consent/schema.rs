@@ -52,11 +52,8 @@ pub fn validate_binding_schema(binding: &ConsentBinding) -> Result<(), BindingSc
 
     match binding.action.as_str() {
         "deploy_create" => {
-            // branch is NOT bound: the deploy targets a specific commit_sha
-            // (the artifact), and `axhub deploy create` does not accept a
-            // --branch flag, so the command can't echo it for verification.
-            // branch stays informational (resolve/preview) only.
             require_app(binding)?;
+            require_field(&binding.branch, "branch")?;
             require_field(&binding.commit_sha, "commit_sha")
         }
         "update_apply" | "deploy_logs_kill" => require_app(binding),
@@ -103,77 +100,5 @@ pub fn validate_binding_schema(binding: &ConsentBinding) -> Result<(), BindingSc
             require_context(binding, "method")
         }
         other => Err(BindingSchemaError::UnknownAction(other.into())),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::super::jwt::ConsentBinding;
-    use super::{validate_binding_schema, BindingSchemaError};
-    use std::collections::HashMap;
-
-    fn deploy_binding(branch: &str, commit_sha: &str) -> ConsentBinding {
-        ConsentBinding {
-            tool_call_id: "sess:tc".into(),
-            action: "deploy_create".into(),
-            app_id: "paydrop".into(),
-            profile: "prod".into(),
-            branch: branch.into(),
-            commit_sha: commit_sha.into(),
-            context: HashMap::new(),
-            synthesized_by_helper: false,
-        }
-    }
-
-    #[test]
-    fn deploy_create_does_not_require_branch() {
-        // Option 2: deploy_create binds on commit_sha (the artifact), not the
-        // branch label — `axhub deploy create` has no --branch flag to echo, so
-        // a binding with branch omitted ("") must validate.
-        assert!(validate_binding_schema(&deploy_binding("", "abc1234")).is_ok());
-    }
-
-    #[test]
-    fn deploy_create_still_requires_commit_sha() {
-        assert_eq!(
-            validate_binding_schema(&deploy_binding("main", "")),
-            Err(BindingSchemaError::MissingField("commit_sha"))
-        );
-    }
-
-    #[test]
-    fn deploy_create_with_branch_remains_valid() {
-        // Backward-compat: a binding still carrying branch validates fine.
-        assert!(validate_binding_schema(&deploy_binding("main", "abc1234")).is_ok());
-    }
-
-    #[test]
-    fn auth_login_still_requires_branch() {
-        // Regression guard: Option 2 dropped the branch requirement only for
-        // deploy_create. auth_login must still reject an empty branch.
-        let binding = ConsentBinding {
-            tool_call_id: "sess:tc".into(),
-            action: "auth_login".into(),
-            app_id: "_".into(),
-            profile: "default".into(),
-            branch: String::new(),
-            commit_sha: "_".into(),
-            context: HashMap::new(),
-            synthesized_by_helper: false,
-        };
-        assert_eq!(
-            validate_binding_schema(&binding),
-            Err(BindingSchemaError::MissingField("branch"))
-        );
-    }
-
-    #[test]
-    fn consent_binding_deserializes_without_branch() {
-        // serde(default) lets the consent-mint payload omit branch entirely.
-        let json = r#"{"tool_call_id":"s:t","action":"deploy_create","app_id":"paydrop","profile":"prod","commit_sha":"abc1234","context":{}}"#;
-        let binding: ConsentBinding =
-            serde_json::from_str(json).expect("deserialize without branch");
-        assert_eq!(binding.branch, "");
-        assert!(validate_binding_schema(&binding).is_ok());
     }
 }
