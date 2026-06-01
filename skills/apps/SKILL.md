@@ -100,7 +100,7 @@ Use these paths only when the user intent is explicit. Listing remains the defau
 3. Run one of the current CLI contracts:
 
    ```bash
-   axhub apps create --from-file apphub.yaml --yes --json
+   axhub apps create --from-file axhub.yaml --yes --json
    axhub apps create --interactive --json
    ```
 

@@ -51,6 +51,7 @@ enum Commands {
     PostInstall(args::PostInstallArgs),
     AuditClarify(args::AuditClarifyArgs),
     ListDeployments(args::ListDeploymentsCliArgs),
+    MigratePlan(args::MigratePlanArgs),
     RoutingStats(args::RoutingStatsArgs),
     Diagnose {
         #[command(subcommand)]
@@ -228,6 +229,17 @@ fn dispatch(command: Commands) -> i32 {
             run_result(crate::cmd_audit_clarify(a.hash, a.prompt, a.chosen))
         }
         Commands::ListDeployments(a) => run_result(crate::cmd_list_deployments(a.app_id, a.limit)),
+        Commands::MigratePlan(a) => {
+            let mut argv = Vec::new();
+            if let Some(dir) = a.dir {
+                argv.push("--dir".to_string());
+                argv.push(dir);
+            }
+            if a.json {
+                argv.push("--json".to_string());
+            }
+            run_result(axhub_helpers::migrate_plan::run_migrate_plan(&argv))
+        }
         Commands::RoutingStats(a) => {
             run_result(crate::cmd_routing_stats(a.since, a.json, a.top, a.confused))
         }

@@ -3,7 +3,7 @@
 > 바이브코더가 한국어 자연어로 axhub 앱을 안전하게 배포·관리하고, 코드 품질까지 보조받는 Claude Code 플러그인이에요.
 > 이 문서는 **이 플러그인을 개발·확장하려는 개발자를 위한 온보딩 문서**예요. 사용법만 필요하면 [§11 빠른 시작](#11-빠른-시작-사용자용)으로 바로 가요.
 
-**상태**: v0.9.19 · 32 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary 라이브.
+**상태**: v0.9.22 · 33 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary 라이브.
 
 ---
 
@@ -67,7 +67,7 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요:
 │                                                                      │
 │   hooks/        SessionStart·UserPromptSubmit·PreToolUse·PostToolUse  │
 │                 → 전부 bin/axhub-helpers 서브커맨드로 위임 (fail-open) │
-│   skills/       32개 SKILL.md — 자연어 트리거 워크플로우              │
+│   skills/       33개 SKILL.md — 자연어 트리거 워크플로우              │
 │   commands/     9개 슬래시 (+ 한글 alias)                            │
 │   agents/       3개 quality sub-agent                                │
 └───────────────────────────────┬──────────────────────────────────────┘
@@ -116,7 +116,7 @@ axhub/
 ├── .claude-plugin/
 │   ├── plugin.json          # 플러그인 메타데이터 (name/version/author/license)
 │   └── marketplace.json     # 마켓플레이스 등록 엔트리 — Claude Code 가 이걸로 플러그인 발견
-├── skills/<name>/SKILL.md    # 32개 NL 트리거 워크플로우 (+ _template 스캐폴드 원본)
+├── skills/<name>/SKILL.md    # 33개 NL 트리거 워크플로우 (+ _template 스캐폴드 원본)
 ├── commands/*.md             # 9개 슬래시 명령 (deploy/배포/login/status/logs/apps/doctor/update/help)
 ├── agents/*.md               # 3개 quality sub-agent (axhub-debugger/reviewer/shipper)
 ├── hooks/

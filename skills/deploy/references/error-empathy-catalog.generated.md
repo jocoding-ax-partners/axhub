@@ -281,7 +281,7 @@ The drift between this file and the hand-written sibling is checked by
 
 **감정:** 열 수 있는 axhub 앱 정보를 찾지 못했어요.
 
-**원인:** 현재 디렉토리에 apphub.yaml 또는 axhub.yaml 이 없고 최근 배포 cache 도 비어 있어요.
+**원인:** 현재 디렉토리에 axhub.yaml 또는 legacy apphub.yaml 이 없고 최근 배포 cache 도 비어 있어요.
 
 **해결:** 먼저 init 으로 앱 파일을 만들거나 apps 목록에서 열 앱을 골라요.
 

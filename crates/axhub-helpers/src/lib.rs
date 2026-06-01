@@ -31,6 +31,7 @@ pub mod keychain;
 pub mod keychain_windows;
 pub mod list_deployments;
 pub mod messages;
+pub mod migrate_plan;
 pub mod preflight;
 pub mod quality_gate;
 pub mod quality_state;

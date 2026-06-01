@@ -593,7 +593,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(skillDirs.length).toBeGreaterThanOrEqual(11);
   });
 
-  test("all 31 shipped skills are present, including quality expansion skills + auto-diagnose + my-resources + setup", () => {
+  test("all 33 shipped skills are present, including quality expansion skills + auto-diagnose + my-resources + setup", () => {
     expect(skillDirs.sort()).toEqual([
       "apps",
       "auth",
@@ -614,6 +614,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "install-cli",
       "karpathy-guidelines",
       "logs",
+      "migrate",
       "my-resources",
       "open",
       "profile",
@@ -996,7 +997,7 @@ describe("cross-manifest consistency", () => {
   test("README current-release summary matches package metadata and shipped surfaces", async () => {
     const readme = await readFile(join(REPO_ROOT, "README.md"), "utf8");
     expect(readme).toContain(`**상태**: v${packageJson.version}`);
-    expect(readme).toContain("32 SKILL / 9 command");
+    expect(readme).toContain("33 SKILL / 9 command");
     expect(readme).not.toContain("AXHUB_HELPERS_RUNTIME=ts");
     expect(readme).not.toContain("TypeScript fallback");
   });
