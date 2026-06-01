@@ -1380,13 +1380,20 @@ fn consent_binding_schema_accepts_known_actions_and_rejects_required_field_gaps(
         "binding_schema:unknown_action:unknown_publish"
     );
 
+    // Option 2: deploy_create binds on commit_sha (the deployed artifact), not
+    // the branch label (`axhub deploy create` has no --branch flag to echo).
+    // A cleared branch is now accepted; commit_sha remains required.
     let mut missing_branch = base_binding();
     missing_branch.branch.clear();
+    assert!(validate_binding_schema(&missing_branch).is_ok());
+
+    let mut missing_commit = base_binding();
+    missing_commit.commit_sha.clear();
     assert_eq!(
-        validate_binding_schema(&missing_branch)
+        validate_binding_schema(&missing_commit)
             .unwrap_err()
             .to_string(),
-        "binding_schema:missing_field:branch"
+        "binding_schema:missing_field:commit_sha"
     );
 
     let valid_cases = [

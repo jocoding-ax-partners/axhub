@@ -1,12 +1,12 @@
 {"id":"T1","utterance":"내 앱 목록 보여줘","intent":"apps_list","expected_skill":"apps","expected_cmd_pattern":"axhub apps list --json","destructive":false,"lang":"ko"}
 {"id":"T1-en","utterance":"list my apps","intent":"apps_list","expected_skill":"apps","expected_cmd_pattern":"axhub apps list --json","destructive":false,"lang":"en"}
-{"id":"T2","utterance":"paydrop 배포해","intent":"deploy","expected_skill":"deploy","expected_cmd_pattern":"axhub deploy create --app paydrop --branch .* --json","destructive":true,"requires_consent":true,"lang":"ko"}
-{"id":"T2-en","utterance":"ship paydrop","intent":"deploy","expected_skill":"deploy","expected_cmd_pattern":"axhub deploy create --app paydrop --branch .* --json","destructive":true,"requires_consent":true,"lang":"en"}
+{"id":"T2","utterance":"paydrop 배포해","intent":"deploy","expected_skill":"deploy","expected_cmd_pattern":"axhub deploy create --app paydrop --commit .* --json","destructive":true,"requires_consent":true,"lang":"ko"}
+{"id":"T2-en","utterance":"ship paydrop","intent":"deploy","expected_skill":"deploy","expected_cmd_pattern":"axhub deploy create --app paydrop --commit .* --json","destructive":true,"requires_consent":true,"lang":"en"}
 {"id":"T3","utterance":"지금 진행 중인 배포 어떻게 됐어","intent":"deploy_status","expected_skill":"status","expected_cmd_pattern":"axhub deploy status dep_.* --watch --json","destructive":false,"lang":"ko"}
 {"id":"T4","utterance":"로그 보여줘","intent":"deploy_logs","expected_skill":"logs","expected_cmd_pattern":"axhub deploy logs dep_.* --follow --source build --json","destructive":false,"lang":"ko"}
 {"id":"T5","utterance":"로그인 만료 같아","intent":"auth_recover","expected_skill":"auth","expected_cmd_pattern":"axhub auth status --json|axhub auth login","destructive":true,"requires_consent":true,"lang":"ko"}
 {"id":"T6","utterance":"axhub 새 버전 있어?","intent":"update_check","expected_skill":"update","expected_cmd_pattern":"axhub update check --json","destructive":false,"lang":"ko"}
-{"id":"T7","utterance":"/axhub:deploy paydrop --branch main","intent":"deploy","expected_skill":"deploy","expected_cmd_pattern":"axhub deploy create --app paydrop --branch main --json","destructive":true,"requires_consent":true,"lang":"slash"}
+{"id":"T7","utterance":"/axhub:deploy paydrop --branch main","intent":"deploy","expected_skill":"deploy","expected_cmd_pattern":"axhub deploy create --app paydrop --commit .* --json","destructive":true,"requires_consent":true,"lang":"slash"}
 {"id":"T8","utterance":"axhub 설치돼 있어?","intent":"doctor","expected_skill":"doctor","expected_cmd_pattern":"axhub --version|axhub-helpers session-start","destructive":false,"lang":"ko"}
 {"id":"T9","utterance":"프로젝트 초기화해줘","intent":"init_project","expected_skill":"init","expected_cmd_pattern":"axhub --json init --list-templates|axhub init --from-template .* --json","destructive":false,"lang":"ko","category":"read-only-happy","note":"Plain Korean init request without axhub prefix should activate init skill in empty project contexts."}
 {"id":"T-NEG-1","utterance":"오늘 점심 뭐 먹지","intent":"off-topic","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"ko","category":"negative"}
