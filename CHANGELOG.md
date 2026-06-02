@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.28](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.27...v0.9.28) (2026-06-02)
+
+이번 릴리스는 `specs/007-vibe-skill-gapfill` 의 CLI 소스 감사 결과를 실제 스킬·동의 게이트에 반영해요. current axhub CLI 표면을 기준으로 10개 gap-fill SKILL 을 추가하고, 기존 init/migrate/status/deploy/auth 흐름의 오래된 명령을 정리했어요. 특히 `apps detect` 는 최신 main CLI 에 없는 branch-only/future 경로로 분리하고, destructive payload 는 파일 digest·구체 profile·tenant/app context 로 묶어 preview 뒤 바꿔치기를 막아요.
+
+### Test baseline
+
+- PR #165 CI 가 rust ubuntu/macos/windows, perf ubuntu/macos/windows, hook integration, T2 helper-bin, corpus.100 drift gate 모두 pass 했어요.
+- 로컬에서 `bun run skill:doctor --strict`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, `bunx tsc --noEmit`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `cargo test -p axhub-helpers`, `bun test`, `git diff --check` 를 통과했어요.
+- 코드 리뷰어 `FINAL_RECOMMENDATION: APPROVE`, 아키텍트 `architectStatus: CLEAR`, CE adversarial reviewer `CE_FINAL_VERDICT: PASS` 로 최종 리뷰 게이트를 통과했어요.
+
+### Honest tradeoff
+
+- live staging mutation E2E 는 `AXHUB_E2E_STAGING_TOKEN` 이 없어 실행하지 않았고, CI 의 read-only staging/fuzz/advisory 일부 job 은 의도된 조건부 skip 이에요.
+- GitNexus impact 는 consent/preauth/deploy/bootstrap 경로 변경 때문에 HIGH/CRITICAL 로 나왔지만, scope 는 이번 릴리스의 fail-closed parser hardening 범위와 일치해요.
+
+
+### Added
+
+* align skills with audited CLI surface ([fedb7bd](https://github.com/jocoding-ax-partners/axhub/commit/fedb7bd752a10da86e8a7440e50f17ae488f76d6)), closes [#165](https://github.com/jocoding-ax-partners/axhub/issues/165)
+
 ## [0.9.27](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.26...v0.9.27) (2026-06-02)
 
 이번 릴리스는 ax-hub-cli 설치 도메인이 `cli.jocodingax.ai` 에서 `cli.axhub.ai` 로 바뀐 걸 반영해요. install-cli SKILL 의 installer 명령·AskUserQuestion 옵션·NEVER 절, 한국어 트러블슈팅 문서, ask-defaults registry rationale 까지 옛 주소가 남아 있던 12 곳을 한 번에 갱신해요. `docs.jocodingax.ai` 와 `axhub-api.jocodingax.ai` 서브도메인은 이번 변경 범위가 아니라 그대로 둬요.
