@@ -61,7 +61,7 @@ fn session_start_baseline_emits_welcome_lines() {
     assert!(out.status.success());
     let s = stdout(&out);
     assert!(
-        s.contains("axhub helper Rust runtime"),
+        s.contains("axhub 준비됐어요"),
         "baseline session-start should emit welcome line, got: {s}"
     );
 }
@@ -98,7 +98,7 @@ fn session_start_per_hook_csv_without_match_runs_normally() {
     );
     assert!(out.status.success());
     let s = stdout(&out);
-    assert!(s.contains("axhub helper Rust runtime"));
+    assert!(s.contains("axhub 준비됐어요"));
 }
 
 // --- legacy alias ---------------------------------------------------------

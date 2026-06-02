@@ -281,9 +281,6 @@
   "open": {
     "_note": "open SKILL is read-only and has no structured AskUserQuestion site. It only calls axhub open/URL display paths."
   },
-  "whatsnew": {
-    "_note": "whatsnew SKILL is read-only and has no structured AskUserQuestion site. It summarizes axhub whatsnew output."
-  },
   "profile": {
     "프로필 작업을 고를까요?": {
       "safe_default": "현재 프로필 보기",

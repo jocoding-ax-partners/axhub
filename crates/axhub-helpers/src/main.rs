@@ -1639,9 +1639,10 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
 
 // Phase 7 (Component 6): SessionStart magical-moment message.
 //
-// Base systemMessage (always 3 lines) + current-version first-session welcome
-// (6 extra lines, one-shot, gated by welcome marker file). Marker write is
-// best-effort — failure surfaces the welcome again next session, never blocks Claude.
+// Base systemMessage (onboarding: setup/doctor/help + 자주 쓰는 명령 + audit
+// disclosure) + current-version first-session welcome (one-shot, gated by the
+// welcome marker file). Marker write is best-effort — failure surfaces the
+// welcome again next session, never blocks Claude.
 
 const WELCOME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -1653,14 +1654,12 @@ pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
     write_session_start_bundle_best_effort();
 
     let mut lines: Vec<String> = vec![
-        format!(
-            "axhub helper Rust runtime 활성 (v{}).",
-            env!("CARGO_PKG_VERSION")
-        ),
-        "막히면 /axhub:help 로 명령 메뉴를, /axhub:clarify 로 모호한 의도 확인을 부탁해요."
+        format!("axhub 준비됐어요 (v{}).", env!("CARGO_PKG_VERSION")),
+        "- 처음이면 /axhub:setup — 설치·로그인·첫 배포까지 안내해요.".to_string(),
+        "- 막히거나 안 되면 /axhub:doctor (진단) · /axhub:help (전체 명령).".to_string(),
+        "- 자주 쓰는 것: 배포 /axhub:deploy · 상태 /axhub:status · 로그 /axhub:logs · 앱 목록 /axhub:apps."
             .to_string(),
-        "라우팅 통계는 axhub-helpers routing-stats 로 봐요.".to_string(),
-        "audit log 로컬 7일 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1. 삭제: axhub-helpers cleanup-audit --all"
+        "- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요."
             .to_string(),
     ];
 
@@ -1668,18 +1667,13 @@ pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
     let show_welcome = marker.as_ref().map(|p| !p.exists()).unwrap_or(false);
     if show_welcome {
         lines.push(String::new());
-        lines.push(format!(
-            "[axhub v{WELCOME_VERSION} 첫 세션] 라우팅 똑똑해졌어요."
-        ));
+        lines.push(format!("[axhub v{WELCOME_VERSION} 첫 세션] 환영해요."));
         lines.push(
-            "- Rust 키워드 체인 ~600줄 폐기. Claude 가 SKILL.md description 으로 직접 매칭해요."
+            "- 가장 쉬운 시작: \"안녕\" 또는 /axhub:setup — 설치부터 첫 배포까지 함께 가요."
                 .to_string(),
         );
-        lines.push("- 메타 질문 (\"왜 ~ 키워드 매칭이야?\") 자동 처리해요.".to_string());
-        lines.push(
-            "- routing audit log 7일 로컬 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1.".to_string(),
-        );
-        lines.push("- 변경점 보기: /axhub:whatsnew".to_string());
+        lines.push("- 이미 앱이 있으면 \"배포해\" 한마디면 돼요.".to_string());
+        lines.push("- 헷갈리면 /axhub:help (명령 메뉴) · /axhub:doctor (점검).".to_string());
 
         if let Some(path) = marker {
             if let Some(parent) = path.parent() {

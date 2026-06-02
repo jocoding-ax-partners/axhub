@@ -1874,9 +1874,9 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     let session = run(&["session-start"]);
     assert_eq!(session.status.code(), Some(0));
     let session_stdout = String::from_utf8_lossy(&session.stdout);
-    assert!(session_stdout.contains("Rust runtime"));
-    assert!(session_stdout.contains("AXHUB_NO_AUDIT"));
-    assert!(session_stdout.contains("cleanup-audit --all"));
+    assert!(session_stdout.contains("/axhub:setup"));
+    assert!(session_stdout.contains("말씀해주세요"));
+    assert!(session_stdout.contains("감사 로그"));
 }
 
 #[cfg(unix)]
@@ -2333,8 +2333,7 @@ fn cli_session_start_first_current_version_session() {
     let msg = session_start_systemmessage(&state_s);
     let helper_version = env!("CARGO_PKG_VERSION");
     assert!(msg.contains(&format!("v{helper_version} 첫 세션")), "{msg}");
-    assert!(msg.contains("/axhub:whatsnew"), "{msg}");
-    assert!(msg.contains("AXHUB_NO_AUDIT"), "{msg}");
+    assert!(msg.contains("감사 로그"), "{msg}");
 
     // Marker file 생성됐는지.
     let marker = state
@@ -2361,7 +2360,6 @@ fn cli_session_start_subsequent_session() {
         !msg.contains(&format!("v{} 첫 세션", env!("CARGO_PKG_VERSION"))),
         "magical moment should not repeat: {msg}"
     );
-    assert!(!msg.contains("/axhub:whatsnew"), "{msg}");
 }
 
 #[cfg(unix)]
@@ -2371,10 +2369,10 @@ fn cli_session_start_base_message_korean_tone() {
     let state = temp.path().join("state");
 
     let msg = session_start_systemmessage(&state.display().to_string());
-    assert!(msg.contains("axhub helper Rust runtime 활성"), "{msg}");
+    assert!(msg.contains("axhub 준비됐어요"), "{msg}");
+    assert!(msg.contains("/axhub:setup"), "{msg}");
     assert!(msg.contains("/axhub:help"), "{msg}");
-    assert!(msg.contains("/axhub:clarify"), "{msg}");
-    assert!(msg.contains("axhub-helpers routing-stats"), "{msg}");
+    assert!(msg.contains("/axhub:doctor"), "{msg}");
 }
 
 #[test]

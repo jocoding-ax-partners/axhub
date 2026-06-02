@@ -15,32 +15,32 @@ codex Ralph 추가 리뷰 의 Amendment 5 가 발견한 사실: 현재 `crates/a
 
 ## Base systemMessage (모든 세션)
 
-매 SessionStart 마다 출력해요. 한국어 해요체. 3-4 줄.
+매 SessionStart 마다 출력해요. 한국어 해요체. 온보딩 중심 (처음 쓰는 사용자가 바로 시작할 수 있게).
 
 ```
-axhub helper Rust runtime 활성 (v{VERSION}).
-막히면 /axhub:help 로 명령 메뉴를, /axhub:clarify 로 모호한 의도 확인을 부탁해요.
-라우팅 통계는 axhub-helpers routing-stats 로 봐요.
+axhub 준비됐어요 (v{VERSION}).
+- 처음이면 /axhub:setup — 설치·로그인·첫 배포까지 안내해요.
+- 막히거나 안 되면 /axhub:doctor (진단) · /axhub:help (전체 명령).
+- 자주 쓰는 것: 배포 /axhub:deploy · 상태 /axhub:status · 로그 /axhub:logs · 앱 목록 /axhub:apps.
+- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요.
 ```
 
 `{VERSION}` 은 `env!("CARGO_PKG_VERSION")` 으로 compile-time 주입.
 
 ---
 
-## v0.4.0 첫 세션 magical moment (한 번만)
+## 첫 세션 환영 메시지 (한 번만)
 
-marker 파일 (`runtime_paths::state_dir() / .v0.4.0-welcome-shown`) 부재 시 base 메시지 *뒤에* 추가 6 줄. marker write 후 다음 세션부터 표시 X.
+marker 파일 (`runtime_paths::state_dir() / .v{VERSION}-welcome-shown`) 부재 시 base 메시지 *뒤에* 온보딩 nudge 를 추가해요. marker write 후 다음 세션부터 표시 X.
 
 ```
-[axhub v0.4.0 첫 세션] 라우팅 똑똑해졌어요.
-- Rust 키워드 체인 ~600줄 폐기. Claude 가 SKILL.md description 으로 직접 매칭.
-- 메타 질문 ("왜 ~ 키워드 매칭이야?") 자동 처리.
-- routing audit log 7일 로컬 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1.
-- 짧은 prompt 의 hash 는 익명화 보장 안 돼요.
-- 변경점 보기: /axhub:whatsnew
+[axhub v{VERSION} 첫 세션] 환영해요.
+- 가장 쉬운 시작: "안녕" 또는 /axhub:setup — 설치부터 첫 배포까지 함께 가요.
+- 이미 앱이 있으면 "배포해" 한마디면 돼요.
+- 헷갈리면 /axhub:help (명령 메뉴) · /axhub:doctor (점검).
 ```
 
-audit privacy 한 줄 (`AXHUB_NO_AUDIT=1` + 익명화 한계) 가 docs/audit-privacy-contract.md 의 Disclosure 위치 #1 와 일치.
+base 메시지 마지막 줄이 audit 수집 + opt-out("끄려면 말씀해주세요")을 고지해요 — docs/audit-privacy-contract.md 의 Disclosure 위치 #1. 구체 env var(`AXHUB_NO_AUDIT=1`) + 익명화 한계는 disclosure #2-4 (routing-stats footer · README · `docs/routing.md`).
 
 ---
 
@@ -94,24 +94,20 @@ const WELCOME_VERSION: &str = "0.4.0";
 
 pub fn cmd_session_start() -> anyhow::Result<i32> {
     let mut lines = vec![
-        format!(
-            "axhub helper Rust runtime 활성 (v{}).",
-            env!("CARGO_PKG_VERSION")
-        ),
-        "막히면 /axhub:help 로 명령 메뉴를, /axhub:clarify 로 모호한 의도 확인을 부탁해요."
-            .to_string(),
-        "라우팅 통계는 axhub-helpers routing-stats 로 봐요.".to_string(),
+        format!("axhub 준비됐어요 (v{}).", env!("CARGO_PKG_VERSION")),
+        "- 처음이면 /axhub:setup — 설치·로그인·첫 배포까지 안내해요.".to_string(),
+        "- 막히거나 안 되면 /axhub:doctor (진단) · /axhub:help (전체 명령).".to_string(),
+        "- 자주 쓰는 것: 배포 /axhub:deploy · 상태 /axhub:status · 로그 /axhub:logs · 앱 목록 /axhub:apps.".to_string(),
+        "- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요.".to_string(),
     ];
 
     let marker_path = welcome_marker_path(WELCOME_VERSION);
     if !marker_path.exists() {
         lines.push(String::new()); // blank separator
-        lines.push("[axhub v0.4.0 첫 세션] 라우팅 똑똑해졌어요.".to_string());
-        lines.push("- Rust 키워드 체인 ~600줄 폐기. Claude 가 SKILL.md description 으로 직접 매칭.".to_string());
-        lines.push("- 메타 질문 (\"왜 ~ 키워드 매칭이야?\") 자동 처리.".to_string());
-        lines.push("- routing audit log 7일 로컬 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1.".to_string());
-        lines.push("- 짧은 prompt 의 hash 는 익명화 보장 안 돼요.".to_string());
-        lines.push("- 변경점 보기: /axhub:whatsnew".to_string());
+        lines.push(format!("[axhub v{WELCOME_VERSION} 첫 세션] 환영해요."));
+        lines.push("- 가장 쉬운 시작: \"안녕\" 또는 /axhub:setup — 설치부터 첫 배포까지 함께 가요.".to_string());
+        lines.push("- 이미 앱이 있으면 \"배포해\" 한마디면 돼요.".to_string());
+        lines.push("- 헷갈리면 /axhub:help (명령 메뉴) · /axhub:doctor (점검).".to_string());
 
         if let Some(parent) = marker_path.parent() {
             let _ = std::fs::create_dir_all(parent);
@@ -156,6 +152,6 @@ pub fn cmd_session_start() -> anyhow::Result<i32> {
 
 ## Linked Phase 0 Sub-tasks
 
-- **0.5** audit privacy disclosure → `[axhub v0.4.0 첫 세션]` 블록의 audit + 익명화 한계 문구
+- **0.5** audit privacy disclosure → base 메시지 마지막 줄이 수집 + opt-out 고지; 구체 env var(`AXHUB_NO_AUDIT=1`) · 익명화 한계는 routing-stats footer · README · `docs/routing.md`
 - **0.6** SessionStart fallback systemMessage → 이 문서 (base + v0.4.0 magical moment 정의)
 - **0.7** Migration Gate → Phase 7 implementation 후 Gate 1 (cli_e2e), Gate 4 (latency) 통과

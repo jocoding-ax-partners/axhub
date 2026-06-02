@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("37 top-level keys (2 메타 + 33 SKILL slug + quality_gate + consent channel)", () => {
+  test("36 top-level keys (2 메타 + 32 SKILL slug + quality_gate + consent channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(37);
+    expect(keys).toHaveLength(36);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
@@ -87,7 +87,6 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "upgrade",
       "using-axhub-quality",
       "verify",
-      "whatsnew",
     ]);
   });
 
@@ -245,9 +244,6 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
 
     const open = registry["open"] as Record<string, RegistryValue>;
     expect(open["_note"]).toBeString();
-
-    const whatsnew = registry["whatsnew"] as Record<string, RegistryValue>;
-    expect(whatsnew["_note"]).toBeString();
   });
 
   test("모든 safe_default 엔트리에 rationale 첨부 (drift catch)", () => {

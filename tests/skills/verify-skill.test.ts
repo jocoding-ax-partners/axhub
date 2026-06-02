@@ -57,11 +57,11 @@ describe("verify SKILL Phase 26 invariants", () => {
   test("verdict workflow is evidence based and exposes JSON automation", () => {
     const body = verifySkill();
     expect(body).toContain("axhub deploy status");
-    expect(body).toContain("axhub deploy logs <DEPLOY_ID> --app <APP> --source pod");
+    expect(body).toContain("axhub deploy logs --app <APP> --json");
     expect(body).toContain("ERROR");
     expect(body).toContain("FATAL");
-    expect(body).toContain("axhub-helpers verify --json --app paydrop");
-    expect(body).toContain("--app-id 도 alias");
+    expect(body).toContain("axhub-helpers verify --json --app-id paydrop");
+    expect(body).toContain("--app-id 가 primary");
     expect(body).toContain("✅ 라이브 확정");
     expect(body).toContain("⚠️ 의심");
     expect(body).toContain("❌ 라이브 안 됨");

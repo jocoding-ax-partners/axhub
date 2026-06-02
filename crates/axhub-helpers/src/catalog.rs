@@ -30,15 +30,22 @@ pub fn catalog_len() -> usize {
 }
 
 pub fn classify(exit_code: i32, stdout: &str) -> ErrorEntry {
-    let error_code = serde_json::from_str::<serde_json::Value>(stdout)
+    // The real CLI error envelope (axhub-output `ErrorEnvelope`) carries the
+    // fine-grained identifier in `error.subcode`; `error.code` is the coarse
+    // `ErrorCode` enum. Prefer `subcode` (matches `cli_envelope::error_code`
+    // precedence) so subclassified catalog entries actually match live output;
+    // fall back to `code` for envelopes that only carry the coarse field.
+    let fine_code = serde_json::from_str::<serde_json::Value>(stdout)
         .ok()
         .and_then(|v| {
-            v.get("error")
-                .and_then(|e| e.get("code"))
-                .and_then(|c| c.as_str())
-                .map(ToOwned::to_owned)
+            v.get("error").and_then(|e| {
+                e.get("subcode")
+                    .or_else(|| e.get("code"))
+                    .and_then(|c| c.as_str())
+                    .map(ToOwned::to_owned)
+            })
         });
-    if let Some(code) = error_code {
+    if let Some(code) = fine_code {
         let sub_key = format!("{exit_code}:{code}");
         if let Some(entry) = CATALOG.get(&sub_key) {
             return entry.clone();
@@ -58,8 +65,15 @@ mod tests {
     fn generated_catalog_has_expected_entries() {
         assert!(catalog_len() >= 13);
         assert!(classify(0, "").emotion.contains("축하해요"));
+        // `code`-only envelope still resolves via the fallback.
         let sub = classify(64, r#"{"error":{"code":"validation.app_ambiguous"}}"#);
         assert!(sub.emotion.contains("같은 이름이 두 개"));
+        // Real CLI shape: fine id in `subcode`, coarse `code` alongside — subcode wins.
+        let by_subcode = classify(
+            66,
+            r#"{"error":{"code":"other","subcode":"update.cosign_enforce_failed"}}"#,
+        );
+        assert!(by_subcode.action.contains("IT 보안 담당자"));
         assert!(classify(99, "not-json").cause.contains("알 수 없는 에러"));
     }
 }
