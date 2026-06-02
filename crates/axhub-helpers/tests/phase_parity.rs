@@ -209,12 +209,27 @@ fn catalog_classifies_base_subclassified_and_default_entries() {
     )
     .emotion
     .contains("다른 배포가 먼저 진행 중이에요"));
+    assert!(
+        classify(66, r#"{"error":{"code":"update.cosign_enforce_failed"}}"#)
+            .action
+            .contains("IT 보안 담당자")
+    );
+    // Real CLI cosign-enforce envelope: coarse `code` + fine `subcode`.
+    // classify must prefer `subcode` to reach the subclassified entry.
     assert!(classify(
         66,
         r#"{"error":{"code":"other","subcode":"update.cosign_enforce_failed"}}"#
     )
     .action
     .contains("IT 보안 담당자"));
+    // Real CLI downgrade-blocked envelope: distinct from scope.downgrade_blocked
+    // (binary version downgrade, not deploy-env). Must reach the update.* entry.
+    assert!(classify(
+        66,
+        r#"{"error":{"code":"other","subcode":"update.downgrade_blocked"}}"#
+    )
+    .emotion
+    .contains("더 낮은 버전으로 되돌리려는"));
     assert!(classify(99, "not-json{{").cause.contains("알 수 없는 에러"));
     assert!(
         classify(64, r#"{"error":{"code":"env.prod_force_required"}}"#)
@@ -222,7 +237,7 @@ fn catalog_classifies_base_subclassified_and_default_entries() {
             .contains("값은 절대")
     );
     assert!(
-        classify(67, r#"{"error":{"code":"github.install_not_found"}}"#)
+        classify(5, r#"{"error":{"code":"github.install_not_found"}}"#)
             .button
             .is_some_and(|button| button.contains("GitHub 연결 링크"))
     );
@@ -233,9 +248,20 @@ fn catalog_classifies_base_subclassified_and_default_entries() {
     .emotion
     .contains("허용 목록"));
     assert!(
-        classify(65, r#"{"error":{"code":"apis.call_consent_required"}}"#)
+        classify(64, r#"{"error":{"code":"apis.call_consent_required"}}"#)
             .cause
             .contains("서버 상태")
+    );
+    // spec 004: helper-output exits (65/67) normalize into the CLI space at the
+    // integration level too — not only in the catalog.rs unit test. classify()
+    // must route helper auth=65 / not_found=67 to the same template as 4/5.
+    assert!(classify(65, r#"{"error":{"code":"auth"}}"#)
+        .action
+        .contains("다시 로그인"));
+    assert!(
+        classify(67, r#"{"error":{"code":"github.install_not_found"}}"#)
+            .button
+            .is_some_and(|button| button.contains("GitHub 연결 링크"))
     );
 }
 

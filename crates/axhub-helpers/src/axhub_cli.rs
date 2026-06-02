@@ -74,27 +74,50 @@ fn axhub_command(axhub_bin: &str, args: &[&str], process_group: bool) -> Command
     cmd
 }
 
-pub fn run_axhub_with_timeout(axhub_bin: &str, args: &[&str], timeout: Duration) -> CliOutput {
-    // On Unix, place the child in its own process group so that any
-    // grandchild it forks (sh -c "sleep 30" → sleep) can be killed
-    // together via kill(-pgid). Without this, sh's child sleep inherits
-    // the pipe write-end; when we kill sh on timeout, sleep keeps the
-    // pipe open, the reader thread's read_to_end never sees EOF, and
-    // the wall-clock blows past the timeout budget.
-    let mut cmd = axhub_command(axhub_bin, args, true);
-    let mut child = match cmd.spawn() {
-        Ok(child) => child,
-        Err(_) => {
-            // Some sandboxed Linux runners reject `setpgid` during spawn and
-            // report it as a spawn failure. Retry once without process-group
-            // isolation so short, non-timeout probes still work; timeout paths
-            // keep the process-group behavior whenever the platform permits it.
-            let mut fallback = axhub_command(axhub_bin, args, false);
-            match fallback.spawn() {
-                Ok(child) => child,
-                Err(_) => return CliOutput::spawn_failed(),
-            }
+/// Spawn the `axhub` child for a timeout-bounded probe.
+///
+/// Prefers giving the child its own process group (so a forked grandchild
+/// — `sh -c "sleep 30"` → `sleep` — can be killed together via
+/// `kill(-pgid)` on timeout; otherwise the grandchild keeps the stdout
+/// pipe open, the reader thread never sees EOF, and wall-clock blows past
+/// the timeout budget). Some sandboxed Linux runners reject `setpgid`
+/// during spawn, so each attempt falls back to a plain spawn.
+///
+/// A spawn can also fail *transiently* for a perfectly valid command: on
+/// Linux a freshly-written executable returns `ETXTBSY` while another
+/// thread is mid `fork`+`execve`, and `fork` itself returns `EAGAIN`/
+/// `ENOMEM` under memory pressure (e.g. a CI runner also running a perf
+/// job). Those windows clear within a few milliseconds, so retry the whole
+/// primary→fallback sequence a few times with a short backoff before
+/// giving up. Retrying is side-effect-free: a failed spawn means `execve`
+/// never ran, so nothing was started.
+fn spawn_axhub_child(axhub_bin: &str, args: &[&str]) -> Option<std::process::Child> {
+    // Backoffs applied *between* attempts; total attempts = len + 1.
+    const BACKOFF_MS: [u64; 3] = [5, 25, 100];
+    let mut attempt = 0usize;
+    loop {
+        if let Ok(child) = axhub_command(axhub_bin, args, true).spawn() {
+            return Some(child);
         }
+        // Primary (process-group) spawn failed — the sandbox `setpgid`
+        // rejection is deterministic, so try once without it this attempt.
+        if let Ok(child) = axhub_command(axhub_bin, args, false).spawn() {
+            return Some(child);
+        }
+        match BACKOFF_MS.get(attempt) {
+            Some(&ms) => {
+                std::thread::sleep(Duration::from_millis(ms));
+                attempt += 1;
+            }
+            None => return None,
+        }
+    }
+}
+
+pub fn run_axhub_with_timeout(axhub_bin: &str, args: &[&str], timeout: Duration) -> CliOutput {
+    let mut child = match spawn_axhub_child(axhub_bin, args) {
+        Some(child) => child,
+        None => return CliOutput::spawn_failed(),
     };
 
     // Drain stdout/stderr in dedicated threads BEFORE polling try_wait.
@@ -156,32 +179,26 @@ pub fn run_axhub_with_timeout(axhub_bin: &str, args: &[&str], timeout: Duration)
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
-    use std::io::Write;
-    use std::os::unix::fs::PermissionsExt;
-
-    /// Write an executable shell script to `path` with `body` as the
-    /// `#!/bin/sh` script body. Returns the path.
-    fn write_script(path: &std::path::Path, body: &str) {
-        let mut f = std::fs::File::create(path).expect("create script");
-        writeln!(f, "#!/bin/sh\n{body}").expect("write script");
-        let mut perms = std::fs::metadata(path).unwrap().permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(path, perms).unwrap();
-    }
-
     #[test]
     fn run_axhub_drains_large_stdout_without_deadlock() {
         // 256 KB of stdout — comfortably above macOS (~16 KB) and Linux
         // (~64 KB) pipe-buffer thresholds. Without the reader-thread fix
         // this test hits the 5s timeout and returns truncated stdout.
-        let dir = tempfile::tempdir().unwrap();
-        let script = dir.path().join("big_stdout.sh");
-        write_script(
-            &script,
-            "i=0\nwhile [ \"$i\" -lt 4096 ]; do\n  printf 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n  i=$((i + 1))\ndone",
+        // Execute through /bin/sh instead of a temp executable so Ubuntu
+        // runners with unusual temp mount/shebang policies still exercise the
+        // pipe-drain behavior rather than failing before the loop starts.
+        let out = run_axhub_with_timeout(
+            "/bin/sh",
+            &[
+                "-c",
+                "i=0
+while [ \"$i\" -lt 4096 ]; do
+  printf 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  i=$((i + 1))
+done",
+            ],
+            Duration::from_secs(5),
         );
-
-        let out = run_axhub_with_timeout(script.to_str().unwrap(), &[], Duration::from_secs(5));
         assert!(
             !out.timed_out,
             "large stdout must not deadlock the wait loop (exit_code={}, len={})",
@@ -201,12 +218,16 @@ mod tests {
         // Pure timeout-classification check — partial-output recovery across
         // shells / pipe-orphans is intentionally not asserted because it's
         // flaky between sh/bash/dash + libc stdio buffering policies.
-        let dir = tempfile::tempdir().unwrap();
-        let script = dir.path().join("slow.sh");
-        write_script(&script, "exec sleep 30");
-
-        let out = run_axhub_with_timeout(script.to_str().unwrap(), &[], Duration::from_millis(300));
-        assert!(out.timed_out);
+        let out = run_axhub_with_timeout(
+            "/bin/sh",
+            &["-c", "while :; do sleep 1; done"],
+            Duration::from_millis(300),
+        );
+        assert!(
+            out.timed_out,
+            "expected timeout, got exit_code={}, stdout={:?}, stderr={:?}",
+            out.exit_code, out.stdout, out.stderr
+        );
         assert_eq!(out.exit_code, 124);
     }
 }

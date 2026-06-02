@@ -48,7 +48,7 @@ To list apps:
    "$HELPER" preflight --json
    ```
 
-   On `auth_ok: false`, halt and route to `../deploy/references/error-empathy-catalog.md` ("exit 65"). Suggest the auth skill via "다시 로그인해줘".
+   On `auth_ok: false`, halt and route to `../deploy/references/error-empathy-catalog.md` (auth 템플릿 — catalog "exit 4" 섹션; helper preflight 가 내는 65 는 거기로 정규화돼요). Suggest the auth skill via "다시 로그인해줘".
 
 2. **Fetch apps:**
 
@@ -86,7 +86,7 @@ To list apps:
 
 6. **On `validation.app_list_truncated`** (>100 apps server-side): route to `../deploy/references/error-empathy-catalog.md` ("exit 64 + validation.app_list_truncated"); ask user to provide a numeric `--app <id>` directly.
 
-7. **On non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by exit code (65 / 67 / 68 / 1). Read paths may auto-retry once on exit 1.
+7. **On non-zero exit**, route via `axhub-helpers classify-exit "$EXIT" "$STDOUT"` (spec 004 Fork-A — canonical router) or `../deploy/references/error-empathy-catalog.md` by current CLI exit code: 4 (auth, 옛 sysexits 65 아님) / 5 (not-found, 옛 67) / 6 (rate-limit, 옛 68) / 1 (transport). `axhub apps list` 는 CLI-direct 라 CLI-native 4/5/6 을 내요. Read paths may auto-retry once on exit 1.
 
 ## v0.2.0 command coverage polish
 
@@ -108,7 +108,7 @@ Use these paths only when the user intent is explicit. Listing remains the defau
 3. Run one of the current CLI contracts:
 
    ```bash
-   axhub apps create --from-file apphub.yaml --yes --json
+   axhub apps create --from-file axhub.yaml --yes --json
    axhub apps create --interactive --json
    ```
 

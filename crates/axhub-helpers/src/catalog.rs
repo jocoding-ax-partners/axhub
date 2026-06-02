@@ -29,36 +29,51 @@ pub fn catalog_len() -> usize {
     CATALOG.len()
 }
 
-/// Map an exit code + CLI stdout envelope to a user-facing empathy entry.
+/// Bridge the two frozen failure-exit spaces into the catalog's CLI-native keys.
 ///
-/// Dual exit-namespace (intentional, both coexist as base catalog keys):
-/// - `0`-`15`, `64`, `66` are CLI-raw exit codes emitted directly by the spawned
-///   `axhub` binary (its full contract; ax-hub-cli `docs/cli-exit-codes.md`).
-/// - `65`/`67`/`68` are THIS helper's OWN output namespace — the CLI never emits
-///   them; the helper produces them by translating a CLI result, then feeds its
-///   own exit back into `classify()` (see `tests/routing_lazy_auth_failure_ac10.rs`
-///   calling `classify(65)`). They are consumed by 30+ downstream skills.
+/// spec 004 surfaced that `classify-exit` is fed from BOTH frozen contracts:
+/// - the current ax-hub-cli emits native codes (auth=4, not_found=5,
+///   rate_limited=6, api/internal=7) — external, not editable here;
+/// - the axhub-helpers binaries (`preflight`, `quality_gate`, `bootstrap`,
+///   `deploy_prep`, `list_deployments`, `token-gate`, `sync`) keep a
+///   sysexits-derived OUTPUT contract (EXIT_AUTH=65, EXIT_NOT_FOUND=67,
+///   rate=68, internal=70) that is a TESTED PUBLIC surface and MUST NOT change.
 ///
-/// `64`/`66` are emitted by both. Any NEW base key MUST be assigned to exactly
-/// one namespace (CLI-raw or helper-own).
+/// The catalog is keyed on the CLI-native space, so a helper exit is normalized
+/// into it before lookup. This mirrors `list_deployments::exit_to_error_code`
+/// (`4 | 65 => auth`, `5 | 67 => not_found`), the existing dual-mapping
+/// precedent. 64 (usage) and 66 (scope/update) are shared across both spaces
+/// and pass through unchanged.
+pub(crate) fn normalize_helper_exit(exit_code: i32) -> i32 {
+    match exit_code {
+        65 => 4, // helper EXIT_AUTH       → CLI auth
+        67 => 5, // helper EXIT_NOT_FOUND  → CLI not_found
+        68 => 6, // helper rate-limit      → CLI rate_limited
+        70 => 7, // helper internal        → CLI api/internal
+        other => other,
+    }
+}
+
 pub fn classify(exit_code: i32, stdout: &str) -> ErrorEntry {
-    // The spawned `axhub` CLI emits a closed-enum `error.code` (auth, not_found,
-    // ...) plus an optional dotted `error.subcode` (update.downgrade_blocked,
-    // fleet_partial_failure, ...) carrying finer detail. Resolve most-specific
-    // first: `{exit}:{subcode}` -> `{exit}:{code}` -> `{exit}` -> default.
-    let envelope = serde_json::from_str::<serde_json::Value>(stdout).ok();
-    let field = |name: &str| -> Option<String> {
-        envelope.as_ref().and_then(|v| {
-            v.get("error")
-                .and_then(|e| e.get(name))
-                .and_then(|c| c.as_str())
-                .map(ToOwned::to_owned)
-        })
+    // Normalize helper-output exits (65/67/68/70) into the CLI-native space the
+    // catalog is keyed on, so both frozen contracts route to one template.
+    let exit_code = normalize_helper_exit(exit_code);
+    // spec 004 S3: the current CLI puts a coarse slug in `error.code` (e.g.
+    // "usage", "other") and the fine-grained discriminator in `error.subcode`
+    // (e.g. "update.cosign_enforce_failed"). Match the most specific key first:
+    // {exit}:{subcode} → {exit}:{code} → base {exit}. Falling through `code`
+    // preserves legacy callers/tests that put the fine value in `error.code`.
+    let parsed = serde_json::from_str::<serde_json::Value>(stdout).ok();
+    let field = |name: &str| {
+        parsed
+            .as_ref()
+            .and_then(|v| v.get("error"))
+            .and_then(|e| e.get(name))
+            .and_then(|c| c.as_str())
+            .map(ToOwned::to_owned)
     };
-    let subcode = field("subcode");
-    let code = field("code");
-    for detail in [subcode.as_deref(), code.as_deref()].into_iter().flatten() {
-        if let Some(entry) = CATALOG.get(&format!("{exit_code}:{detail}")) {
+    for key in [field("subcode"), field("code")].into_iter().flatten() {
+        if let Some(entry) = CATALOG.get(&format!("{exit_code}:{key}")) {
             return entry.clone();
         }
     }
@@ -76,97 +91,103 @@ mod tests {
     fn generated_catalog_has_expected_entries() {
         assert!(catalog_len() >= 13);
         assert!(classify(0, "").emotion.contains("축하해요"));
-        // Real envelope shape: dotted detail rides `error.subcode`, the closed
-        // enum rides `error.code`. The fine `{exit}:{subcode}` key wins.
+        let sub = classify(64, r#"{"error":{"code":"validation.app_ambiguous"}}"#);
+        assert!(sub.emotion.contains("같은 이름이 두 개"));
+        // Real CLI shape: fine id in `subcode`, coarse `code` alongside — subcode wins.
+        let by_subcode = classify(
+            66,
+            r#"{"error":{"code":"other","subcode":"update.cosign_enforce_failed"}}"#,
+        );
+        assert!(by_subcode.action.contains("IT 보안 담당자"));
+        let downgrade_subcode = classify(
+            66,
+            r#"{"error":{"code":"other","subcode":"update.downgrade_blocked"}}"#,
+        );
+        assert!(downgrade_subcode
+            .emotion
+            .contains("더 낮은 버전으로 되돌리려는"));
+        assert!(classify(99, "not-json").cause.contains("알 수 없는 에러"));
+        // US1 (spec 004): CLI auth = exit 4 + error.code "auth" (was sysexits 65).
+        assert!(classify(4, r#"{"error":{"code":"auth"}}"#)
+            .action
+            .contains("다시 로그인"));
+        // US2 (spec 004): CLI not_found = exit 5 + error.code "not_found" (was sysexits 67).
+        assert!(classify(5, r#"{"error":{"code":"not_found"}}"#)
+            .emotion
+            .contains("못 찾았어요"));
+        // US4 (spec 004): CLI rate_limited = exit 6 (was sysexits 68).
+        assert!(classify(6, r#"{"error":{"code":"rate_limited"}}"#)
+            .emotion
+            .contains("너무 많이"));
+        // S3: subcode is matched ahead of coarse code for {exit}:{subcode} keys.
         let sub = classify(
             64,
             r#"{"error":{"code":"usage","subcode":"validation.app_ambiguous"}}"#,
         );
         assert!(sub.emotion.contains("같은 이름이 두 개"));
-        assert!(classify(99, "not-json").cause.contains("알 수 없는 에러"));
     }
 
     #[test]
-    fn classify_prefers_subcode_tier_over_code_and_exit() {
-        // exit 66 + subcode update.cosign_enforce_failed must hit the most
-        // specific fine entry, not the generic base-66 safety-block copy.
-        let entry = classify(
-            66,
-            r#"{"error":{"code":"other","subcode":"update.cosign_enforce_failed"}}"#,
+    fn helper_output_exits_normalize_into_cli_space() {
+        // spec 004: the axhub-helpers OUTPUT contract (preflight/deploy_prep/
+        // bootstrap/list_deployments) keeps sysexits 65/67/68/70. Those reach
+        // classify-exit too and must resolve to the same template as the CLI
+        // native codes 4/5/6/7. Both frozen contracts → one empathy template.
+        assert_eq!(
+            classify(65, r#"{"error":{"code":"auth"}}"#),
+            classify(4, r#"{"error":{"code":"auth"}}"#)
         );
-        assert!(entry.action.contains("IT 보안 담당자"));
-        assert_ne!(entry, classify(66, ""));
+        assert_eq!(
+            classify(67, r#"{"error":{"code":"not_found"}}"#),
+            classify(5, r#"{"error":{"code":"not_found"}}"#)
+        );
+        assert_eq!(classify(68, ""), classify(6, ""));
+        assert_eq!(classify(70, ""), classify(7, ""));
+        // 70→7 is non-vacuous: base "7" exists, so this resolves a real
+        // internal-error template, NOT default_entry.
+        assert!(classify(70, "").emotion.contains("서버 내부"));
+        assert!(
+            classify(70, r#"{"error":{"code":"catalog.internal_error"}}"#)
+                .cause
+                .contains("catalog 서버")
+        );
+        // base fallback (no error.code) still lands on the right template
+        assert!(classify(65, "").action.contains("다시 로그인"));
+        assert!(classify(67, "").emotion.contains("못 찾았어요"));
+        assert!(classify(68, "").emotion.contains("너무 많이"));
+        // helper not_found (67) + plugin subcode resolves via the normalized key
+        assert!(
+            classify(67, r#"{"error":{"code":"github.install_not_found"}}"#)
+                .button
+                .is_some_and(|button| button.contains("GitHub 연결 링크"))
+        );
     }
 
     #[test]
-    fn classify_falls_to_code_tier_when_no_subcode_key() {
-        // exit 65 + code apis.call_consent_required has only a `{exit}:{code}`
-        // entry (no subcode key) — the code tier resolves it.
-        let entry = classify(65, r#"{"error":{"code":"apis.call_consent_required"}}"#);
-        assert!(entry.cause.contains("서버 상태"));
-    }
-
-    #[test]
-    fn classify_falls_to_exit_base_when_no_fine_key() {
-        // exit 4 (current CLI unauth) with an enum code that has no fine key
-        // resolves to the neutral base-4 auth entry, never the default.
-        let entry = classify(4, r#"{"error":{"code":"auth"}}"#);
-        assert!(!entry.cause.contains("알 수 없는 에러"));
-        assert!(entry.emotion.contains("로그인"));
-        assert_eq!(entry, classify(4, ""));
-    }
-
-    #[test]
-    fn classify_real_cli_exit_codes_never_default() {
-        // The live CLI emits 0/1/2/4..15/64/66 — none may fall through to the
-        // unknown-error default. (65/67/68 are the helper's own output namespace
-        // and are also covered.)
-        for exit in [
-            0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 64, 65, 66, 67, 68,
-        ] {
-            let entry = classify(exit, "");
-            assert!(
-                !entry.cause.contains("알 수 없는 에러"),
-                "exit {exit} must have a dedicated base entry, got default"
+    fn normalize_matches_pinned_contract_json() {
+        // spec 004 M1: cli-exit-contract.json::helper_output_normalization is a
+        // doc mirror of normalize_helper_exit. Cross-check them here so the JSON
+        // and the Rust fn cannot silently drift apart.
+        let contract_path = concat!(env!("CARGO_MANIFEST_DIR"), "/data/cli-exit-contract.json");
+        let raw = std::fs::read_to_string(contract_path).expect("read cli-exit-contract.json");
+        let json: serde_json::Value = serde_json::from_str(&raw).expect("valid contract JSON");
+        let map = json
+            .get("helper_output_normalization")
+            .and_then(|v| v.as_object())
+            .expect("helper_output_normalization object");
+        let mut checked = 0;
+        for (helper, cli) in map {
+            let Ok(helper_code) = helper.parse::<i32>() else {
+                continue; // skip the _comment string key
+            };
+            let cli_code = cli.as_i64().expect("normalization target is an integer") as i32;
+            assert_eq!(
+                normalize_helper_exit(helper_code),
+                cli_code,
+                "contract says {helper_code}->{cli_code}, normalize_helper_exit disagrees"
             );
+            checked += 1;
         }
-    }
-
-    #[test]
-    fn classify_unknown_exit_with_unmatched_detail_defaults() {
-        // An exit with no base entry and an envelope whose code/subcode match no
-        // fine key must fall to the default — the negative path stays reachable.
-        let entry = classify(
-            255,
-            r#"{"error":{"code":"auth","subcode":"nope.nonexistent"}}"#,
-        );
-        assert!(entry.cause.contains("알 수 없는 에러"));
-    }
-
-    #[test]
-    fn classify_unmatched_subcode_falls_to_exit_tier_not_default() {
-        // A present-but-unmatched subcode on a base-keyed exit must fall through
-        // to the exit tier (the helper's own base-65 entry), NOT default_entry.
-        let entry = classify(65, r#"{"error":{"subcode":"no_such_subcode"}}"#);
-        assert_eq!(entry, classify(65, ""));
-        assert_ne!(entry, default_entry());
-    }
-
-    #[test]
-    fn classify_resolves_fleet_preflight_fine_key() {
-        // exit 9 + subcode fleet_preflight_failed must hit the dedicated fleet
-        // entry (묶음 배포 preflight), never the generic base-9 conflict copy.
-        let entry = classify(9, r#"{"error":{"subcode":"fleet_preflight_failed"}}"#);
-        assert!(entry.emotion.contains("묶음 배포"));
-        assert!(entry.cause.contains("preflight"));
-        assert_ne!(entry, classify(9, ""));
-    }
-
-    #[test]
-    fn classify_base_entry_content_spot_checks() {
-        // Content pins so a placeholder/typo in a new base entry is caught — the
-        // existing never-default test only checks the negative.
-        assert!(classify(11, "").cause.contains("미리보기"));
-        assert!(classify(5, "").emotion.contains("못 찾았"));
+        assert_eq!(checked, 4, "expected 65/67/68/70 normalization entries");
     }
 }

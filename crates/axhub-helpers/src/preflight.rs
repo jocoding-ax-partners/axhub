@@ -293,7 +293,7 @@ fn parse_manifest_app_slug(raw: &str) -> Option<String> {
 }
 
 fn read_manifest_current_app() -> Option<String> {
-    ["apphub.yaml", "axhub.yaml"].into_iter().find_map(|path| {
+    ["axhub.yaml", "apphub.yaml"].into_iter().find_map(|path| {
         fs::read_to_string(path)
             .ok()
             .and_then(|raw| parse_manifest_app_slug(&raw))
@@ -309,8 +309,8 @@ fn read_manifest_current_app() -> Option<String> {
 /// users saw stale "현재 앱: nextjs-axhub" in unrelated empty directories.
 fn cwd_has_project_marker() -> bool {
     const MARKERS: &[&str] = &[
-        "apphub.yaml",
         "axhub.yaml",
+        "apphub.yaml",
         ".git",
         "package.json",
         "Cargo.toml",

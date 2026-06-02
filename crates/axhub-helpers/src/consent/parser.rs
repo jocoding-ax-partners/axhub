@@ -185,25 +185,26 @@ fn match_known_intent(tokens: &[String]) -> Option<ParsedAxhubCommand> {
     }
     let sub = tokens.get(1).map(String::as_str);
     let sub2 = tokens.get(2).map(String::as_str);
+    let sub3 = tokens.get(3).map(String::as_str);
     let flags = extract_flags(tokens.get(3..).unwrap_or_default());
-    let parsed = match (sub, sub2) {
-        (Some("deploy"), Some("create")) => destructive("deploy_create", tokens, None),
-        (Some("update"), Some("apply")) => destructive("update_apply", tokens, None),
-        (Some("deploy"), Some("logs")) if tokens.iter().any(|t| t == "--kill") => {
+    let parsed = match (sub, sub2, sub3) {
+        (Some("deploy"), Some("create"), _) => destructive("deploy_create", tokens, None),
+        (Some("update"), Some("apply"), _) => destructive("update_apply", tokens, None),
+        (Some("deploy"), Some("logs"), _) if tokens.iter().any(|t| t == "--kill") => {
             destructive("deploy_logs_kill", tokens, None)
         }
-        (Some("auth"), Some("login")) => destructive("auth_login", tokens, None),
-        (Some("env"), Some("set")) => {
+        (Some("auth"), Some("login"), _) => destructive("auth_login", tokens, None),
+        (Some("env"), Some("set"), _) => {
             let mut parsed = destructive("env_set", tokens, None);
             insert_if_some(&mut parsed.context, "key", positional(tokens, 3));
             parsed
         }
-        (Some("env"), Some("delete")) | (Some("env"), Some("unset")) => {
+        (Some("env"), Some("delete"), _) | (Some("env"), Some("unset"), _) => {
             let mut parsed = destructive("env_delete", tokens, None);
             insert_if_some(&mut parsed.context, "key", positional(tokens, 3));
             parsed
         }
-        (Some("apps"), Some("create")) => {
+        (Some("apps"), Some("create"), _) => {
             let app = flags.get("slug").cloned().or_else(|| positional(tokens, 3));
             let mut parsed = destructive("apps_create", tokens, app.clone());
             let interactive = tokens.iter().any(|t| t == "--interactive");
@@ -218,21 +219,28 @@ fn match_known_intent(tokens: &[String]) -> Option<ParsedAxhubCommand> {
             );
             parsed
         }
-        (Some("apps"), Some("update")) => {
+        (Some("apps"), Some("update"), _) => {
             let app = positional(tokens, 3).or_else(|| flags.get("slug").cloned());
             let mut parsed = destructive("apps_update", tokens, app.clone());
             insert_if_some(&mut parsed.context, "slug", app);
             insert_if_some(&mut parsed.context, "field", flags.get("field").cloned());
             parsed
         }
-        (Some("apps"), Some("delete")) | (Some("apps"), Some("rm")) => {
+        (Some("apps"), Some("delete"), _) | (Some("apps"), Some("rm"), _) => {
             let app = positional(tokens, 3).or_else(|| flags.get("slug").cloned());
             let mut parsed = destructive("apps_delete", tokens, app.clone());
             insert_if_some(&mut parsed.context, "slug", app);
             parsed
         }
-        (Some("github"), Some("connect")) => {
-            let app = positional(tokens, 3).or_else(|| flags.get("app_id").cloned());
+        (Some("github"), Some("connect"), _) | (Some("apps"), Some("git"), Some("connect")) => {
+            let app = if sub == Some("apps") {
+                flags
+                    .get("app_id")
+                    .cloned()
+                    .or_else(|| positional(tokens, 4))
+            } else {
+                positional(tokens, 3).or_else(|| flags.get("app_id").cloned())
+            };
             let mut parsed = destructive("github_connect", tokens, app);
             insert_if_some(&mut parsed.context, "repo", flags.get("repo").cloned());
             insert_if_some(&mut parsed.context, "branch", flags.get("branch").cloned());
@@ -243,18 +251,26 @@ fn match_known_intent(tokens: &[String]) -> Option<ParsedAxhubCommand> {
             );
             parsed
         }
-        (Some("github"), Some("disconnect")) => {
-            let app = positional(tokens, 3).or_else(|| flags.get("app_id").cloned());
+        (Some("github"), Some("disconnect"), _)
+        | (Some("apps"), Some("git"), Some("disconnect")) => {
+            let app = if sub == Some("apps") {
+                flags
+                    .get("app_id")
+                    .cloned()
+                    .or_else(|| positional(tokens, 4))
+            } else {
+                positional(tokens, 3).or_else(|| flags.get("app_id").cloned())
+            };
             let mut parsed = destructive("github_disconnect", tokens, app.clone());
             insert_if_some(&mut parsed.context, "slug", app);
             parsed
         }
-        (Some("deploy"), Some("cancel")) => {
+        (Some("deploy"), Some("cancel"), _) => {
             let mut parsed = destructive("deploy_cancel", tokens, None);
             insert_if_some(&mut parsed.context, "deployment_id", positional(tokens, 3));
             parsed
         }
-        (Some("profile"), Some("add")) => {
+        (Some("profile"), Some("add"), _) => {
             let mut parsed = destructive("profile_add", tokens, None);
             insert_if_some(&mut parsed.context, "profile", positional(tokens, 3));
             insert_if_some(
@@ -264,12 +280,12 @@ fn match_known_intent(tokens: &[String]) -> Option<ParsedAxhubCommand> {
             );
             parsed
         }
-        (Some("profile"), Some("use")) => {
+        (Some("profile"), Some("use"), _) => {
             let mut parsed = destructive("profile_use", tokens, None);
             insert_if_some(&mut parsed.context, "profile", positional(tokens, 3));
             parsed
         }
-        (Some("apis"), Some("call")) => {
+        (Some("apis"), Some("call"), _) => {
             let mut parsed = destructive("apis_call", tokens, None);
             insert_if_some(&mut parsed.context, "endpoint_id", positional(tokens, 3));
             insert_if_some(&mut parsed.context, "method", flags.get("method").cloned());
