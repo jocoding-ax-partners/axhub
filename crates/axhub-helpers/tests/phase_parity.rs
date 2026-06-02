@@ -217,6 +217,14 @@ fn catalog_classifies_base_subclassified_and_default_entries() {
     )
     .action
     .contains("IT 보안 담당자"));
+    // Real CLI downgrade-blocked envelope: distinct from scope.downgrade_blocked
+    // (binary version downgrade, not deploy-env). Must reach the update.* entry.
+    assert!(classify(
+        66,
+        r#"{"error":{"code":"other","subcode":"update.downgrade_blocked"}}"#
+    )
+    .emotion
+    .contains("더 낮은 버전으로 되돌리려는"));
     assert!(classify(99, "not-json{{").cause.contains("알 수 없는 에러"));
     assert!(
         classify(64, r#"{"error":{"code":"env.prod_force_required"}}"#)

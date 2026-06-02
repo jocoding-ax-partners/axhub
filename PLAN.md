@@ -127,7 +127,7 @@
 | 64 + `validation.app_list_truncated` | >100 apps | numeric `--app <id>` 사용 |
 | 65 | auth required/expired | `axhub auth login` 자동 트리거 |
 | 66 | scope insufficient | 사람 개입 필요 (token 발급자가 scope 부여) |
-| 66 + `update.cosign_verification_failed` | 공급망 검증 실패 | hard stop |
+| 66 + `update.cosign_enforce_failed` | 공급망 검증 실패 | hard stop |
 | 66 + `scope.downgrade_blocked` | 다운그레이드 시도 | 사용자 명시 `--force` 없으면 hard stop |
 | 67 | resource not found | id/slug 재확인, 재시도 금지 |
 | 68 | rate limited | `Retry-After` 또는 지수 backoff |
@@ -660,7 +660,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 // .claude-plugin/plugin.json
 {
   "name": "axhub",
-  "version": "0.9.19",
+  "version": "0.9.23",
   "description": "Claude Code plugin for axhub — vibe coder app hub. Korean-first natural-language deploy and manage with HMAC-bound consent gates, live profile/app resolution, and exit-code recovery routing. Wraps ax-hub-cli (v0.1.0+).",
   "author": {"name": "Jocoding AX Partners", "url": "https://jocodingax.ai"},
   "homepage": "https://axhub-api.jocodingax.ai",
@@ -677,7 +677,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
     "name": "axhub",
     "source": "./",
     "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders at customer companies",
-    "version": "0.9.19"
+    "version": "0.9.23"
   }]
 }
 ```

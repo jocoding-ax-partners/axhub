@@ -999,7 +999,7 @@ describe("cross-manifest consistency", () => {
   test("README current-release summary matches package metadata and shipped surfaces", async () => {
     const readme = await readFile(join(REPO_ROOT, "README.md"), "utf8");
     expect(readme).toContain(`**상태**: v${packageJson.version}`);
-    expect(readme).toContain("32 SKILL / 9 command");
+    expect(readme).toContain("31 SKILL / 9 command");
     expect(readme).not.toContain("AXHUB_HELPERS_RUNTIME=ts");
     expect(readme).not.toContain("TypeScript fallback");
   });

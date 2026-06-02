@@ -177,9 +177,9 @@ actual=$(shasum -a 256 axhub-helpers-darwin-arm64 | awk '{print $1}')
 
 ## When verification fails
 
-`COSIGN_REQUIRE` mode (env var `AXHUB_REQUIRE_COSIGN=1`) on the user's session causes the helper to **warn but not block** if no `.sig` sidecar is found alongside the helper binary at runtime. Hard failure (cosign verify rejects a .sig) is reported via the existing `update.cosign_verification_failed` error in `error-empathy-catalog.md` (exit 66).
+`COSIGN_REQUIRE` mode (env var `AXHUB_REQUIRE_COSIGN=1`) on the user's session causes the helper to **warn but not block** if no `.sig` sidecar is found alongside the helper binary at runtime. Hard failure (cosign verify rejects a .sig) is reported via the existing `update.cosign_enforce_failed` error in `error-empathy-catalog.md` (exit 66).
 
-If you see `update.cosign_verification_failed`:
+If you see `update.cosign_enforce_failed`:
 
 1. **DO NOT** override with `AXHUB_ALLOW_UNSIGNED=1` (IT-only escape hatch, see PLAN row 59).
 2. Notify your IT/security team. The binary may have been tampered with in transit.
