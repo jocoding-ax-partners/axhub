@@ -66,6 +66,7 @@ fn sample_record(label: &str) -> AuditRecord {
         is_axhub_related: true,
         clarify_invoked: false,
         chosen_skill: None,
+        ..Default::default()
     }
 }
 
@@ -88,6 +89,66 @@ fn clarify_invoked_field_persists() {
         .expect("clarify feedback record");
     assert!(found.clarify_invoked);
     assert_eq!(found.chosen_skill.as_deref(), Some("status"));
+}
+
+#[test]
+fn decision_and_routing_inputs_persist() {
+    use axhub_helpers::audit::AuditDecision;
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let mut record = sample_record("decision-roundtrip");
+    record.decision = Some(AuditDecision::Explicit);
+    record.marker_present = Some(false);
+    record.authed = Some(true);
+    record.explicit_invocation = Some(true);
+    record.axhub_keyword_present = Some(false);
+    record.foreign_keyword_present = Some(false);
+    let expected_hash = record.prompt_hash.clone();
+
+    audit::append(record).unwrap();
+
+    let records = audit::read_since(Duration::days(1)).unwrap();
+    let found = records
+        .iter()
+        .find(|r| r.prompt_hash == expected_hash)
+        .expect("decision record");
+    assert_eq!(found.decision, Some(AuditDecision::Explicit));
+    assert_eq!(found.marker_present, Some(false));
+    assert_eq!(found.authed, Some(true));
+    assert_eq!(found.explicit_invocation, Some(true));
+    assert_eq!(found.axhub_keyword_present, Some(false));
+    assert_eq!(found.foreign_keyword_present, Some(false));
+}
+
+#[test]
+fn decision_default_none_backward_compat() {
+    let temp = tempfile::tempdir().unwrap();
+    let _g = EnvGuard::new(&temp);
+
+    let dir = temp.path().join("axhub-plugin");
+    std::fs::create_dir_all(&dir).unwrap();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let path = dir.join(format!("routing-audit-{today}.jsonl"));
+    // Legacy line with no decision / routing-input fields must parse with None.
+    let legacy = serde_json::json!({
+        "ts": audit::now_iso8601(),
+        "prompt_hash": "sha256:legacy-decision",
+        "prompt_len": 9,
+        "cli_version": "0.14.0",
+        "auth_ok": true,
+        "is_axhub_related": false
+    });
+    std::fs::write(&path, format!("{legacy}\n")).unwrap();
+
+    let records = audit::read_since(Duration::days(1)).unwrap();
+    let found = records
+        .iter()
+        .find(|r| r.prompt_hash == "sha256:legacy-decision")
+        .expect("legacy decision record");
+    assert!(found.decision.is_none());
+    assert!(found.marker_present.is_none());
+    assert!(found.explicit_invocation.is_none());
 }
 
 #[test]

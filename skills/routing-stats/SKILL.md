@@ -43,17 +43,19 @@ echo "$PREFLIGHT_JSON"
 
    AXHUB_NO_AUDIT=1 환경 변수 set 일 때 audit_disabled=true JSON 반환해요. 그 경우 사용자에게 "audit log 가 비활성이에요" 안내 후 종료해요.
 
-2. **JSON parse + 한국어 narrative.** total_prompts / axhub_related rate / auth_failed / prompt_length p50/p95 / cli_versions / top_axhub_hashes 추출 후 다음 형식으로 요약해요:
+2. **JSON parse + 한국어 narrative.** total_prompts / axhub_related rate / auth_failed / prompt_length p50/p95 / cli_versions / top_axhub_hashes / decision_counts / ignore_rate 추출 후 다음 형식으로 요약해요:
 
    ```
    지난 7일 prompt {total} 개 처리했어요.
    axhub 관련: {axhub_related} ({rate}%)
+   결정 타입: axhub {decision_counts.axhub} / yield {decision_counts.yield} / ignore {decision_counts.ignore} / ask {decision_counts.ask} / explicit {decision_counts.explicit}
+   non-axhub ignore 율: {ignore_rate}%
    auth 실패: {auth_failed} 회
    prompt 길이 p50/p95: {p50}/{p95} bytes
    CLI 버전: {versions}
    ```
 
-   상위 axhub 관련 prompt hash 가 있으면 (~5 개) 추가해요. 없으면 생략해요.
+   `decision_counts` 는 공유 routing-decision 함수의 결정 타입 분포예요 (axhub/yield/ignore/ask/explicit). `ignore_rate` 는 non-axhub 프로젝트 pass-through 비율 신호예요. 결정 타입 데이터가 없으면 (legacy audit) 해당 줄은 생략해요. 상위 axhub 관련 prompt hash 가 있으면 (~5 개) 추가해요. 없으면 생략해요.
 
 3. **Privacy 안내.** 출력 끝에 한 줄 추가해요: "audit log 는 로컬 7일 보관, 외부 전송 X. AXHUB_NO_AUDIT=1 으로 끄거나 axhub-helpers cleanup-audit --all 으로 전체 삭제 가능해요."
 

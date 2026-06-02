@@ -1130,16 +1130,16 @@ fn list_deployments_covers_cli_envelope_shapes_and_error_matrix() {
 
     for (exit_code, error_json, expected_exit, expected_code) in [
         (
-            65,
-            r#"{"schema_version":"1","status":"error","error":{"subcode":"auth.token_invalid","hint":"login"}}"#,
+            4,
+            r#"{"schema_version":"1","status":"error","error":{"code":"auth","hint":"login"}}"#,
             EXIT_LIST_AUTH,
-            "auth.token_invalid",
+            "auth",
         ),
         (
-            67,
-            r#"{"schema_version":"1","status":"error","error":{"subcode":"resource.app_not_found"}}"#,
+            5,
+            r#"{"schema_version":"1","status":"error","error":{"code":"not_found"}}"#,
             EXIT_LIST_NOT_FOUND,
-            "resource.app_not_found",
+            "not_found",
         ),
         (
             1,

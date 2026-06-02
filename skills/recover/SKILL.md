@@ -141,8 +141,8 @@ To recover:
 
    | `error_code` | helper exit | 사용자 안내 |
    |---|---|---|
-   | `auth.token_invalid` | 65 | `/axhub:auth` 로 재인증을 안내해요. 4-part empathy 템플릿 참조. |
-   | `resource.app_not_found` | 67 | did-you-mean 으로 가까운 슬러그 제시 + `apps` 스킬로 라우팅해요. |
+   | `token_invalid` | 65 | `/axhub:auth` 로 재인증을 안내해요. 4-part empathy 템플릿 참조. |
+   | `not_found` | 67 | did-you-mean 으로 가까운 슬러그 제시 + `apps` 스킬로 라우팅해요. |
    | `validation.app_id_invalid` | 1 | helper 가 argv 형태로 거부한 케이스. 정상 슬러그 형식 (`[A-Za-z0-9_-]{1,64}`) 으로 다시 받아요. |
    | `transport.timeout` | 1 | 일시적 hang. 재시도 1회 + 그래도 실패면 네트워크 / CLI 버전 확인을 안내해요. |
    | `transport.cli_missing` | 1 | `axhub` 바이너리가 PATH 에 없거나 실행 불가. 사용자에게 `axhub --version` 으로 확인하고, 안되면 `/axhub:install-cli` 또는 `/axhub:setup` 으로 재설치를 안내해요. |

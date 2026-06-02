@@ -25,8 +25,69 @@ use sha2::{Digest, Sha256};
 use crate::redact::redact;
 use crate::runtime_paths::state_dir;
 
+/// Audit-side routing-decision label (spec 006 §80, §94, §109 "audit.rs — 결정타입
+/// enum 확장"). Mirrors [`crate::routing::RoutingDecision`]'s four wire values
+/// plus `Explicit` — the slash-invocation path (priority rule 0).
+///
+/// `routing::RoutingDecision` deliberately stays a **four**-variant enum: its
+/// hook/preflight action maps match it exhaustively and the AC-16 reference
+/// matrix enumerates exactly four outcomes, so a fifth variant there would force
+/// churn and break the no-drift lock. The "explicit" distinction lives only in
+/// the audit so `routing-stats` can separate explicit `/deploy` invocations from
+/// marker/keyword-driven axhub routing (both of which surface as `Axhub`).
+///
+/// Serialized lowercase (`"axhub"` / `"yield"` / `"ignore"` / `"ask"` /
+/// `"explicit"`) for the routing-audit jsonl.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AuditDecision {
+    Axhub,
+    Yield,
+    Ignore,
+    Ask,
+    Explicit,
+}
+
+impl AuditDecision {
+    /// Refine a [`crate::routing::RoutingDecision`] into its audit label.
+    ///
+    /// `explicit_invocation` is required as a separate input because it cannot be
+    /// recovered from the decision alone: priority rule 0 makes a slash invocation
+    /// always resolve to `Axhub`, which is indistinguishable from keyword/marker
+    /// driven `Axhub`. When `explicit_invocation` is true the routing decision is
+    /// *always* `Axhub` (rule 0 returns first), so no other label can co-occur.
+    #[must_use]
+    pub fn from_routing(
+        decision: crate::routing::RoutingDecision,
+        explicit_invocation: bool,
+    ) -> Self {
+        use crate::routing::RoutingDecision;
+        if explicit_invocation {
+            return AuditDecision::Explicit;
+        }
+        match decision {
+            RoutingDecision::Axhub => AuditDecision::Axhub,
+            RoutingDecision::Yield => AuditDecision::Yield,
+            RoutingDecision::Ignore => AuditDecision::Ignore,
+            RoutingDecision::Ask => AuditDecision::Ask,
+        }
+    }
+
+    /// Lowercase wire form, matching the serde representation.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuditDecision::Axhub => "axhub",
+            AuditDecision::Yield => "yield",
+            AuditDecision::Ignore => "ignore",
+            AuditDecision::Ask => "ask",
+            AuditDecision::Explicit => "explicit",
+        }
+    }
+}
+
 /// Single audit log line. prompt content never stored — hash + metadata only.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AuditRecord {
     pub ts: String,
     pub prompt_hash: String,
@@ -42,6 +103,29 @@ pub struct AuditRecord {
     /// Default None for legacy entries.
     #[serde(default)]
     pub chosen_skill: Option<String>,
+    /// Spec 006 §80 — shared routing-decision label for this prompt
+    /// (axhub/yield/ignore/ask/explicit). `None` for legacy + clarify-sentinel
+    /// lines that predate the decision-type field.
+    #[serde(default)]
+    pub decision: Option<AuditDecision>,
+    /// Spec 006 §53 input — `axhub.yaml` marker found via cwd→git-root walk-up.
+    #[serde(default)]
+    pub marker_present: Option<bool>,
+    /// Spec 006 §53 input — token-file `.exists()` stat (cheap, no bootstrap).
+    #[serde(default)]
+    pub authed: Option<bool>,
+    /// Spec 006 §53 input — prompt was an explicit slash invocation (`/deploy`,
+    /// `/axhub:…`).
+    #[serde(default)]
+    pub explicit_invocation: Option<bool>,
+    /// Spec 006 §94 — literal `"axhub"` keyword present (keyword-driven signal).
+    #[serde(default)]
+    pub axhub_keyword_present: Option<bool>,
+    /// Spec 006 §94 — a foreign deploy-target keyword present (named-target-wins
+    /// signal). Together with `axhub_keyword_present` this distinguishes
+    /// keyword-driven (rules a–c) from marker-driven (rules d–e) decisions.
+    #[serde(default)]
+    pub foreign_keyword_present: Option<bool>,
 }
 
 /// ISO 8601 UTC timestamp ("2026-05-07T19:00:00+00:00").
@@ -269,6 +353,52 @@ mod tests {
     }
 
     #[test]
+    fn audit_decision_from_routing_maps_explicit_and_four_variants() {
+        use crate::routing::RoutingDecision;
+        // explicit_invocation wins regardless of the routing decision (rule 0
+        // always yields Axhub, but the audit refines it to Explicit).
+        assert_eq!(
+            AuditDecision::from_routing(RoutingDecision::Axhub, true),
+            AuditDecision::Explicit
+        );
+        // Non-explicit: the four routing variants map 1:1.
+        assert_eq!(
+            AuditDecision::from_routing(RoutingDecision::Axhub, false),
+            AuditDecision::Axhub
+        );
+        assert_eq!(
+            AuditDecision::from_routing(RoutingDecision::Yield, false),
+            AuditDecision::Yield
+        );
+        assert_eq!(
+            AuditDecision::from_routing(RoutingDecision::Ignore, false),
+            AuditDecision::Ignore
+        );
+        assert_eq!(
+            AuditDecision::from_routing(RoutingDecision::Ask, false),
+            AuditDecision::Ask
+        );
+    }
+
+    #[test]
+    fn audit_decision_wire_strings_and_serde() {
+        assert_eq!(AuditDecision::Axhub.as_str(), "axhub");
+        assert_eq!(AuditDecision::Yield.as_str(), "yield");
+        assert_eq!(AuditDecision::Ignore.as_str(), "ignore");
+        assert_eq!(AuditDecision::Ask.as_str(), "ask");
+        assert_eq!(AuditDecision::Explicit.as_str(), "explicit");
+        // serde lowercase agrees with as_str().
+        assert_eq!(
+            serde_json::to_string(&AuditDecision::Explicit).expect("serialize"),
+            "\"explicit\""
+        );
+        assert_eq!(
+            serde_json::from_str::<AuditDecision>("\"ignore\"").expect("deserialize"),
+            AuditDecision::Ignore
+        );
+    }
+
+    #[test]
     fn now_iso8601_parseable() {
         let s = now_iso8601();
         let parsed = chrono::DateTime::parse_from_rfc3339(&s);
@@ -304,8 +434,7 @@ mod tests {
             cli_version: None,
             auth_ok: false,
             is_axhub_related: false,
-            clarify_invoked: false,
-            chosen_skill: None,
+            ..Default::default()
         });
         match prev {
             Some(v) => unsafe { std::env::set_var("AXHUB_NO_AUDIT", v) },

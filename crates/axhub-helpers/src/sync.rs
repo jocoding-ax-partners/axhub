@@ -111,7 +111,7 @@ pub fn run_sync(args: &[String]) -> Result<i32> {
 
     let principal = axhub_json!("auth", "whoami", "--json");
     // PAT is optional identity metadata recorded in catalog.json. OAuth-only users
-    // have no active PAT context, so `axhub auth pat whoami` exits 65 ("No active PAT
+    // have no active PAT context, so `axhub auth pat whoami` exits 4 ("No active PAT
     // context."). The catalog reads + `auth whoami` above already succeeded via OAuth,
     // so a missing PAT must NOT abort the sync — otherwise .axhub/AXHUB.md (written
     // below) never gets created. Treat PAT absence as null metadata and continue.

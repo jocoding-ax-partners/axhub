@@ -91,9 +91,48 @@ if (-not (Test-Path -Path $Helper -PathType Leaf)) {
   }
 }
 
+# spec 006 — marker gate for eager infra (mirror of session-start.sh). The
+# helper computes the axhub.yaml git-root walk-up marker + a cheap token-file
+# auth stat. Non-axhub projects (no marker) skip eager infra (token-init here;
+# quality-context is gated helper-side). Helper download above is NOT gated.
+#
+# `session-eager-gate` exits 0 = run, 1 = skip. Any other exit (spawn error)
+# falls open auth-conditionally: run iff a token-file exists (authed → preserve
+# existing axhub.yaml users; unauthed → stay zero-footprint).
+$EagerInfra = 'skip'
+$GateTokenDir = if ($env:XDG_CONFIG_HOME) {
+  Join-Path $env:XDG_CONFIG_HOME 'axhub-plugin'
+} else {
+  Join-Path $env:USERPROFILE '.config\axhub-plugin'
+}
+$GateTokenFile = Join-Path $GateTokenDir 'token'
+$GateRc = 99
+$GateOldEap = $ErrorActionPreference
+try {
+  # exit 1 = "skip" is a DECISION value, not an error. PS 7.4+ defaults
+  # $PSNativeCommandUseErrorActionPreference to on, so under the file's top-level
+  # 'Stop' a native non-zero exit would throw — misrouting the main (non-marker)
+  # skip path into the catch fallback. Force 'Continue' so $LASTEXITCODE is read.
+  $ErrorActionPreference = 'Continue'
+  & $Helper session-eager-gate 2>$null | Out-Null
+  $GateRc = $LASTEXITCODE
+} catch {
+  $GateRc = 99
+} finally {
+  $ErrorActionPreference = $GateOldEap
+}
+if ($GateRc -eq 0) {
+  $EagerInfra = 'run'            # marker present (or unknown+authed) → run
+} elseif ($GateRc -eq 1) {
+  $EagerInfra = 'skip'           # marker absent → zero-footprint
+} elseif (Test-Path -Path $GateTokenFile -PathType Leaf) {
+  $EagerInfra = 'run'           # spawn error + authed → run (fail-open)
+}                                # else: spawn error + unauthed → skip (default)
+
 # Step 2: auto-trigger token-init when helper token file is missing
 # but axhub CLI has a valid login. Silent skip on any failure.
-if ($env:AXHUB_SKIP_AUTODOWNLOAD -ne '1') {
+# spec 006: gated on $EagerInfra so non-axhub (no-marker) projects skip token-init.
+if ($EagerInfra -eq 'run' -and $env:AXHUB_SKIP_AUTODOWNLOAD -ne '1') {
   try {
     $TokenFile = (& $Helper path token-file 2>$null | Select-Object -First 1)
   } catch {

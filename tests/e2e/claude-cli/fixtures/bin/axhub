@@ -77,8 +77,10 @@ case "${1:-}" in
     case "${2:-}" in
       list)
         if [ "${AXHUB_FIXTURE_DEPLOY_LIST_AUTH:-}" = "invalid" ]; then
-          echo '{"schema_version":"axhub-cli/v1","status":"error","error":{"code":"auth.token_invalid","message":"Bearer token is invalid"}}'
-          exit 65
+          # Current axhub CLI auth-error contract (verified vs live 0.17.2):
+          # exit 4, flat closed-enum error.code "auth", bare subcode "token_invalid".
+          echo '{"schema_version":"1","status":"error","error":{"code":"auth","subcode":"token_invalid","category":"auth","message":"Bearer token is invalid"}}'
+          exit 4
         fi
         echo '{"items":[{"id":"dep-fixture","app_id":"paydrop","status":"running","created_at":"2026-05-11T00:00:00Z"}]}'
         ;;

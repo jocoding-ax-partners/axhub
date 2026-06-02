@@ -45,10 +45,42 @@ if [ ! -x "$HELPER" ]; then
   fi
 fi
 
+# spec 006 — marker gate for session-start eager infra (token-init / Gatekeeper
+# warmup / quality-context). The helper computes the axhub.yaml git-root walk-up
+# marker + a cheap token-file auth stat. Non-axhub projects (no marker) get a
+# zero-footprint session. The helper download above is NOT gated — it is the
+# prerequisite for this very call (spec §범위).
+#
+# `session-eager-gate` exits 0 = run, 1 = skip. Any other exit (spawn error /
+# timeout) falls open auth-conditionally: run iff a token-file exists (authed →
+# preserve existing axhub.yaml users; unauthed → stay zero-footprint).
+EAGER_INFRA="skip"
+GATE_TOKEN_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/axhub-plugin/token"
+if [ "$(uname -s)" = "Darwin" ] && ! command -v timeout >/dev/null 2>&1; then
+  # macOS without `timeout`: never spawn the gate unbounded (wedged-Gatekeeper
+  # hang risk — mirrors the warmup hard-skip below). Use the auth fallback.
+  if [ -f "$GATE_TOKEN_FILE" ]; then EAGER_INFRA="run"; fi
+else
+  GATE_RC=0
+  if [ "$(uname -s)" = "Darwin" ]; then
+    timeout 3 "$HELPER" session-eager-gate >/dev/null 2>&1 || GATE_RC=$?
+  else
+    "$HELPER" session-eager-gate >/dev/null 2>&1 || GATE_RC=$?
+  fi
+  if [ "$GATE_RC" = "0" ]; then
+    EAGER_INFRA="run"            # marker present (or unknown+authed) → run
+  elif [ "$GATE_RC" = "1" ]; then
+    EAGER_INFRA="skip"           # marker absent → zero-footprint
+  elif [ -f "$GATE_TOKEN_FILE" ]; then
+    EAGER_INFRA="run"            # spawn error/timeout + authed → run (fail-open)
+  fi                             # else: spawn error + unauthed → skip (default)
+fi
+
 # Phase 7 US-701: auto-trigger token-init when helper token file is missing
 # but axhub CLI has a valid login. Silent skip on any failure — never block
 # session-start. Honors AXHUB_SKIP_AUTODOWNLOAD as the single opt-out switch.
-if [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" != "1" ]; then
+# spec 006: gated on EAGER_INFRA so non-axhub (no-marker) projects skip token-init.
+if [ "$EAGER_INFRA" = "run" ] && [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" != "1" ]; then
   TOKEN_FILE="$("$HELPER" path token-file 2>/dev/null || true)"
   case "$TOKEN_FILE" in
     ""|\{*) TOKEN_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/axhub-plugin/token" ;;
@@ -66,7 +98,7 @@ fi
 # OS cache so the deploy hot path skips it. Best-effort + 3s timeout +
 # AXHUB_GATEKEEPER_WARMUP=0 opt-out so a wedged Gatekeeper never blocks
 # session-start.
-if [ "${AXHUB_GATEKEEPER_WARMUP:-1}" != "0" ] && [ "$(uname -s)" = "Darwin" ]; then
+if [ "$EAGER_INFRA" = "run" ] && [ "${AXHUB_GATEKEEPER_WARMUP:-1}" != "0" ] && [ "$(uname -s)" = "Darwin" ]; then
   # Hard-skip when `timeout` is unavailable: an unbounded warmup against a
   # wedged Gatekeeper would block session-start indefinitely. Losing the
   # 3-6s warmup on stripped macOS hosts is the right tradeoff vs hang risk.

@@ -404,7 +404,7 @@ mod tests {
     #[test]
     fn transport_reason_field_surfaces_in_reasons() {
         // Mimics what RealVerifyProbes synthesises when latest_deploy_id
-        // lookup fails with auth.token_invalid (review #8). The reason
+        // lookup fails with token_invalid (review #8). The reason
         // must reach reasons[] verbatim, NOT be silently collapsed to
         // "state = transport_error".
         // Matches what RealVerifyProbes synthesises post-PR-#149: exit_code 0

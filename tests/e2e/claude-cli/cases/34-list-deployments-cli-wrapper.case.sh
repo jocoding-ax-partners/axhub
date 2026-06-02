@@ -27,7 +27,7 @@ FAIL=0
 [ "$RC" -eq 65 ] || { echo "  FAIL: list-deployments exit=$RC (expected 65 from CLI auth error)" >&2; FAIL=1; }
 
 ERROR_CODE=$(jq -r '.error_code // empty' "${CASE_DIR}/stdout.json" 2>/dev/null)
-[ "$ERROR_CODE" = "auth.token_invalid" ] || { echo "  FAIL: stdout .error_code='${ERROR_CODE}' (expected auth.token_invalid from CLI wrapper)" >&2; FAIL=1; }
+[ "$ERROR_CODE" = "token_invalid" ] || { echo "  FAIL: stdout .error_code='${ERROR_CODE}' (expected token_invalid from CLI wrapper)" >&2; FAIL=1; }
 
 [ -f "${CASE_DIR}/shim/shim-called" ] || { echo "  FAIL: axhub fixture shim was not invoked" >&2; FAIL=1; }
 

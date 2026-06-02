@@ -100,6 +100,52 @@ if ($env:CLAUDE_PLUGIN_ROOT) {
 }
 ```
 
+**Routing 게이트 (Step 0 — auth/resolve 전에 실행).** 이 SKILL 은 `description:` 프론트매터의 "배포"·"deploy"·"ship" 같은 어구로도 자동 선택돼서, axhub 와 무관한 프로젝트나 다른 배포 타깃(`vercel` 등)을 쓰려는 발화에도 끌려올 수 있어요. 그래서 **인증·resolve 를 하기 전에** 공유 routing-decision 함수(`route-decision`)를 한 번 호출해서 정말 axhub 배포가 맞는지 먼저 확정해요. 이 함수는 hook 과 **똑같은** 결정 로직이라 두 레이어가 어긋나지 않아요 (named-target-wins 일관성).
+
+`EXPLICIT` 은 호출 모달리티예요. 이 SKILL 이 `/deploy`, `/axhub:deploy`, 또는 한글 alias `/배포` **슬래시 명령**으로 호출됐으면 `EXPLICIT=1`, 자연어 skill-selection("배포해", "vercel에 배포해")으로 왔으면 `EXPLICIT=0` 으로 둬요. 슬래시면 leading `/deploy`·`/배포` 토큰이 `$ARGS` 에 안 남을 수 있어서(command 가 `$ARGUMENTS` 만 넘겨요) 모델이 직접 신호를 줘야 해요. 확실하지 않으면 `EXPLICIT=1` 로 둬요 (explicit 으로 간주 — 명시 의도를 막지 않아요). `$ARGS` 에는 app slug 만이 아니라 사용자 발화 원문을 그대로 담아서 `vercel` 같은 타깃 키워드가 살아 있게 해요.
+
+```bash
+echo '[deploy:Step 0 routing-gate] entered' >&2
+HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+EXPLICIT_FLAG=""
+[ "${EXPLICIT:-0}" = "1" ] && EXPLICIT_FLAG="--explicit"
+ROUTE_JSON=$("$HELPER" route-decision --user-utterance "$ARGS" $EXPLICIT_FLAG 2>/dev/null)
+# fail-open: 빈 출력(헬퍼 자체가 없음)이면 axhub 로 진행해요 — SKILL 은 이미 선택된 상태고,
+# 실제 배포는 뒤의 AskUserQuestion preview card + HMAC consent gate 가 막아요(zero 피해).
+ROUTE_DECISION=$(printf '%s' "$ROUTE_JSON" | jq -r '.decision // "axhub"' 2>/dev/null || echo axhub)
+echo "[deploy:Step 0 routing-gate] decision=$ROUTE_DECISION" >&2
+echo "$ROUTE_JSON"
+```
+
+`ROUTE_DECISION` 값으로 분기해요. **`axhub` 일 때만 axhub 배포를 진행**해요:
+
+- **`axhub`** → 정상 경로. 아래 Preflight 부터 Step 1 (deploy-prep) 로 계속 진행해요.
+- **`yield`** → 사용자가 다른 배포 타깃(예: `vercel`/`netlify`/`cloudflare`/`fly`/`render`/`railway`)을 명시했어요 (marker 가 있어도 named-target-wins). axhub 배포를 멈추고 disambiguation 질문 없이 한 줄로 "다른 배포 타깃을 쓰려는 것 같아서 axhub 배포는 건너뛸게요." 만 안내한 뒤 일반 흐름에 양보해요. **Preflight·deploy-prep·consent-mint·`axhub deploy create` 를 하나도 호출하지 말아요.**
+- **`ignore`** (marker 없음 + 무명시) / **`ask`** (axhub 와 다른 타깃 둘 다 명시) → axhub 인지 확실하지 않아요. 아래 AskUserQuestion 으로 한 번 물어봐요. 사용자가 "axhub 에 배포" 를 고르면 그때 Preflight 부터 이어가고, "여기 말고 다른 곳" 을 고르면 axhub 배포를 멈춰요. **물어보기 전에는 auth/resolve/consent 를 호출하지 말아요.**
+
+```json
+{
+  "question": "axhub 에 배포할까요, 아니면 다른 곳에 배포할까요?",
+  "header": "배포 대상",
+  "options": [
+    {
+      "label": "axhub 에 배포",
+      "value": "axhub",
+      "description": "axhub 라이브로 배포를 이어가요."
+    },
+    {
+      "label": "여기 말고 다른 곳",
+      "value": "other",
+      "description": "axhub 배포를 멈춰요. 다른 배포 도구를 쓸게요."
+    }
+  ]
+}
+```
+
+이 게이트의 AskUserQuestion 도 아래 **Non-interactive AskUserQuestion guard (D1)** 를 따라요. subprocess(`claude -p` / CI / `$CLAUDE_NON_INTERACTIVE`) 에서는 질문을 건너뛰고 `tests/fixtures/ask-defaults/registry.json` 의 deploy 채널 safe default ("여기 말고 다른 곳" — axhub 배포 안 함) 로 멈춰요. once-per-project grace 경고는 prompt-route hook 소유라 여기서 다시 띄우지 않아요 (게이트는 매번 block — 의도적 이중 노출).
+
 **Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
 
 ```bash

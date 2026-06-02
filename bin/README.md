@@ -38,4 +38,4 @@ bun run smoke
 
 ## Contract
 
-All subcommands accept JSON on stdin and emit JSON on stdout. stderr carries diagnostics. Exit codes mirror ax-hub-cli (0/1/64/65/66/67/68). Hook-facing subcommands return `{"hookSpecificOutput": {...}, "systemMessage": "..."}` per Claude Code hook spec.
+All subcommands accept JSON on stdin and emit JSON on stdout. stderr carries diagnostics. Exit codes `0/1/64/65/66/67/68` are this **helper's own output namespace** (consumed by the skill error-routing tables), not a mirror of ax-hub-cli — the current `axhub` CLI emits `0/1/4-15/64/66`. The helper translates the CLI's exit/`error.code`/`error.subcode` into its namespace; the two are intentionally **not** identical. Hook-facing subcommands return `{"hookSpecificOutput": {...}, "systemMessage": "..."}` per Claude Code hook spec.

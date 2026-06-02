@@ -129,6 +129,6 @@ verdict 매핑: `live` → ✅ 라이브 / `suspect` → ⚠️ 의심 / `not_li
 
 ## Additional Resources
 
-- `../recover/SKILL.md` (Step 7) — canonical helper `error_code` → user-facing 라우팅 표 (`transport.cli_missing`, `auth.token_invalid`, `response.invalid_json` 등). 이 SKILL 은 그 표를 참조해서 동일하게 분기해요.
+- `../recover/SKILL.md` (Step 7) — canonical helper `error_code` → user-facing 라우팅 표 (`transport.cli_missing`, `token_invalid`, `response.invalid_json` 등). 이 SKILL 은 그 표를 참조해서 동일하게 분기해요.
 - `../deploy/references/error-empathy-catalog.md` — 4-part Korean exit-code template.
 - `../deploy/references/nl-lexicon.md` — 활성화 trigger 어구 추가 시 참조.
