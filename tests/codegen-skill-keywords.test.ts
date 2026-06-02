@@ -1,8 +1,18 @@
 // Phase 1 sub-task 1.4: codegen-skill-keywords-from-rust.ts unit + idempotency tests.
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+// Self-contained fixture: a SKILL.md with a YAML-escaped apostrophe in its
+// description. Decouples the apostrophe-parsing tests from any shipped skill.
+const APOS_FIXTURE = `---\nname: tmp-apos\ndescription: '테스트. 다음 표현에서 활성화: "release notes", "what''s new".'\n---\n# tmp\n`;
+function writeAposFixture(): string {
+  const path = join(mkdtempSync(join(tmpdir(), "skill-apos-")), "SKILL.md");
+  writeFileSync(path, APOS_FIXTURE);
+  return path;
+}
 import {
   parseMainRs,
   aggregatePerSkill,
@@ -70,7 +80,7 @@ describe("readSkillDescription", () => {
   });
 
   test("parses YAML-escaped apostrophes in single-quoted descriptions", () => {
-    const region = readSkillDescription(join(REPO_ROOT, "skills/whatsnew/SKILL.md"));
+    const region = readSkillDescription(writeAposFixture());
     expect(region).not.toBeNull();
     expect(region?.existingPhrases).toContain("what's new");
     expect(region?.existingPhrases.filter((phrase) => phrase === "what's new")).toHaveLength(1);
@@ -152,7 +162,7 @@ describe("end-to-end codegen idempotency", () => {
 
 describe("generated SKILL frontmatter", () => {
   test("single-quoted description lines escape apostrophes for YAML", () => {
-    const skillPath = join(REPO_ROOT, "skills/whatsnew/SKILL.md");
+    const skillPath = writeAposFixture();
     const line = readFileSync(skillPath, "utf8").split("\n").find((l) => l.startsWith("description: "));
     expect(line).toBeDefined();
     expect(line).toMatch(/^description:\s*'(?:[^']|'')*'$/);

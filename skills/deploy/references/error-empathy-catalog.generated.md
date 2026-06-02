@@ -229,7 +229,7 @@ The drift between this file and the hand-written sibling is checked by
 
 ---
 
-### exit 66:update.cosign_verification_failed
+### exit 66:update.cosign_enforce_failed
 
 **감정:** 잠깐만요. 보안 검증에 실패했어요. 절대 진행 안 해요.
 
@@ -238,6 +238,18 @@ The drift between this file and the hand-written sibling is checked by
 **해결:** 절대 강제로 진행하지 마세요. 회사 IT 보안 담당자에게 즉시 알려주세요. 그동안 axhub 는 현재 버전으로 계속 쓸 수 있어요.
 
 **버튼:** IT 보안팀에 알리기 / 업데이트 닫기 / 현재 버전 유지
+
+---
+
+### exit 66:update.downgrade_blocked
+
+**감정:** 잠깐만요. 더 낮은 버전으로 되돌리려는 걸 감지했어요.
+
+**원인:** 지금 설치된 axhub 보다 낮은 버전으로 업데이트하려고 해서 안전을 위해 막았어요. 보통 실수로 옛 버전을 가리킬 때 생겨요.
+
+**해결:** 정말 다운그레이드가 필요하면 "강제로 업데이트해" 라고 말해주세요. --force 는 다운그레이드 게이트만 우회하고 cosign 서명 검증은 그대로 지켜요. 그게 아니면 최신 버전으로 두는 게 안전해요.
+
+**버튼:** 최신 유지 / 강제 다운그레이드 (위험) / 취소
 
 ---
 
@@ -281,7 +293,7 @@ The drift between this file and the hand-written sibling is checked by
 
 **감정:** 열 수 있는 axhub 앱 정보를 찾지 못했어요.
 
-**원인:** 현재 디렉토리에 axhub.yaml 또는 apphub.yaml 이 없고 최근 배포 cache 도 비어 있어요.
+**원인:** 현재 디렉토리에 axhub.yaml 또는 legacy apphub.yaml 이 없고 최근 배포 cache 도 비어 있어요.
 
 **해결:** 먼저 init 으로 앱 파일을 만들거나 apps 목록에서 열 앱을 골라요.
 

@@ -39,7 +39,6 @@ export const SKILL_INTENTS: Record<string, string> = {
   env: "manage axhub environment variables",
   github: "connect github repo to axhub",
   open: "open axhub deployment in browser",
-  whatsnew: "show axhub release notes",
   profile: "manage axhub profile",
   "install-cli": "install axhub CLI binary",
   clarify: "disambiguate axhub intent",

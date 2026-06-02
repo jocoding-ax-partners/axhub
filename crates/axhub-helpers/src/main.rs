@@ -14,6 +14,7 @@ use axhub_helpers::deploy_prep::run_deploy_prep;
 use axhub_helpers::hook_safety;
 use axhub_helpers::keychain::{parse_keyring_value, read_keychain_token};
 use axhub_helpers::list_deployments::{run_list_deployments, ListDeploymentsArgs};
+use axhub_helpers::migrate_plan::run_migrate_plan;
 use axhub_helpers::preflight::{run_preflight, PreflightRun};
 use axhub_helpers::quality_gate::{validate_deploy_prep_quality, QualityCheckResult};
 use axhub_helpers::redact::redact;
@@ -39,7 +40,7 @@ use serde_json::{json, Map, Value};
 mod cli;
 
 pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
-pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -138,6 +139,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "mark" => cmd_mark(&rest),
         "emit-deploy-complete" => cmd_emit_deploy_complete(&rest),
         "deploy-prep" => cmd_deploy_prep(&rest),
+        "migrate-plan" => run_migrate_plan(&rest),
         "config" => cmd_config(&rest),
         "sync" => run_sync(&rest),
         "snippet" => run_snippet(&rest),
@@ -1637,9 +1639,10 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
 
 // Phase 7 (Component 6): SessionStart magical-moment message.
 //
-// Base systemMessage (always 3 lines) + current-version first-session welcome
-// (6 extra lines, one-shot, gated by welcome marker file). Marker write is
-// best-effort — failure surfaces the welcome again next session, never blocks Claude.
+// Base systemMessage (onboarding: setup/doctor/help + 자주 쓰는 명령 + audit
+// disclosure) + current-version first-session welcome (one-shot, gated by the
+// welcome marker file). Marker write is best-effort — failure surfaces the
+// welcome again next session, never blocks Claude.
 
 const WELCOME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -1651,14 +1654,12 @@ pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
     write_session_start_bundle_best_effort();
 
     let mut lines: Vec<String> = vec![
-        format!(
-            "axhub helper Rust runtime 활성 (v{}).",
-            env!("CARGO_PKG_VERSION")
-        ),
-        "막히면 /axhub:help 로 명령 메뉴를, /axhub:clarify 로 모호한 의도 확인을 부탁해요."
+        format!("axhub 준비됐어요 (v{}).", env!("CARGO_PKG_VERSION")),
+        "- 처음이면 /axhub:setup — 설치·로그인·첫 배포까지 안내해요.".to_string(),
+        "- 막히거나 안 되면 /axhub:doctor (진단) · /axhub:help (전체 명령).".to_string(),
+        "- 자주 쓰는 것: 배포 /axhub:deploy · 상태 /axhub:status · 로그 /axhub:logs · 앱 목록 /axhub:apps."
             .to_string(),
-        "라우팅 통계는 axhub-helpers routing-stats 로 봐요.".to_string(),
-        "audit log 로컬 7일 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1. 삭제: axhub-helpers cleanup-audit --all"
+        "- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요."
             .to_string(),
     ];
 
@@ -1666,18 +1667,13 @@ pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
     let show_welcome = marker.as_ref().map(|p| !p.exists()).unwrap_or(false);
     if show_welcome {
         lines.push(String::new());
-        lines.push(format!(
-            "[axhub v{WELCOME_VERSION} 첫 세션] 라우팅 똑똑해졌어요."
-        ));
+        lines.push(format!("[axhub v{WELCOME_VERSION} 첫 세션] 환영해요."));
         lines.push(
-            "- Rust 키워드 체인 ~600줄 폐기. Claude 가 SKILL.md description 으로 직접 매칭해요."
+            "- 가장 쉬운 시작: \"안녕\" 또는 /axhub:setup — 설치부터 첫 배포까지 함께 가요."
                 .to_string(),
         );
-        lines.push("- 메타 질문 (\"왜 ~ 키워드 매칭이야?\") 자동 처리해요.".to_string());
-        lines.push(
-            "- routing audit log 7일 로컬 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1.".to_string(),
-        );
-        lines.push("- 변경점 보기: /axhub:whatsnew".to_string());
+        lines.push("- 이미 앱이 있으면 \"배포해\" 한마디면 돼요.".to_string());
+        lines.push("- 헷갈리면 /axhub:help (명령 메뉴) · /axhub:doctor (점검).".to_string());
 
         if let Some(path) = marker {
             if let Some(parent) = path.parent() {
@@ -2266,36 +2262,85 @@ fn axhub_stdout_with_timeout(axhub_bin: &str, args: &[&str]) -> Result<String, &
 }
 
 impl axhub_helpers::trace_helper::TraceProbes for RealTraceProbes {
-    fn axhub_build_log(&self, deploy_id: &str, tail: u32) -> String {
+    fn axhub_build_log(&self, _deploy_id: &str, tail: u32) -> String {
         let Some(app_ref) = self.app_ref.as_deref() else {
             self.warnings.borrow_mut().push(
-                "build_log_probe_skipped: --app required for current deploy logs".to_string(),
+                "runtime_log_probe_skipped: --app required for current deploy logs".to_string(),
             );
             return String::new();
         };
         let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
         let tail = tail.to_string();
-        match axhub_stdout_with_timeout(
+        // R3γ: 현행 `axhub deploy logs` 는 app-level 런타임 로그 NDJSON 을 반환해요
+        // (build-log 엔드포인트 부재 — F3). `--source`/deploy-id 는 CLI 가 무시하므로
+        // 보내지 않고, NDJSON 각 라인의 `message` 만 unwrap 해서 plain 텍스트로 넘겨요.
+        let stdout = match axhub_stdout_with_timeout(
             &axhub_bin,
             &[
-                "--json", "deploy", "logs", deploy_id, "--app", app_ref, "--source", "build",
-                "--limit", &tail,
+                "--json", "deploy", "logs", "--app", app_ref, "--limit", &tail,
             ],
         ) {
             Ok(stdout) => stdout,
             Err("timeout") => {
                 self.warnings
                     .borrow_mut()
-                    .push("build_log_probe_timeout: axhub deploy logs exceeded 5s".to_string());
-                String::new()
+                    .push("runtime_log_probe_timeout: axhub deploy logs exceeded 5s".to_string());
+                return String::new();
             }
             Err(_) => {
                 self.warnings
                     .borrow_mut()
-                    .push("build_log_probe_failed: axhub CLI unavailable".to_string());
-                String::new()
+                    .push("runtime_log_probe_failed: axhub CLI unavailable".to_string());
+                return String::new();
+            }
+        };
+
+        let mut messages: Vec<String> = Vec::new();
+        let mut parse_failed = false;
+        let mut message_field_missing = false;
+        for line in stdout.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            match serde_json::from_str::<serde_json::Value>(trimmed) {
+                // valid JSON 인데 string `message` 가 없으면 (스키마 drift) silent
+                // drop 하지 않고 별도 신호를 남겨요 (CR #7).
+                Ok(value) => match value.get("message").and_then(|m| m.as_str()) {
+                    // 한 message 안의 embedded newline 은 공백으로 펴서 "1 message =
+                    // 1 라인" 을 유지 — multi-line stack-trace 가 display 5-라인 budget
+                    // 을 통째로 먹지 않게 해요 (CR P3).
+                    Some(msg) => messages.push(msg.replace('\n', " ")),
+                    None => message_field_missing = true,
+                },
+                Err(_) => parse_failed = true,
             }
         }
+        if messages.is_empty() {
+            // 하나도 못 뽑았으면 원인별로 **단일** warning 만 — parse_warning +
+            // unavailable 을 동시에 내보내 모순 신호를 주지 않게 해요 (CR P3).
+            let warn = if parse_failed {
+                "runtime_log_unparseable: 로그가 NDJSON 형식이 아니에요 (빌드 단계 실패 가능)"
+            } else if message_field_missing {
+                "runtime_log_schema_mismatch: 로그에 message 필드가 없어요 (CLI 스키마 변경 가능)"
+            } else {
+                "runtime_log_unavailable: 런타임 로그가 비어 있어요 (빌드 단계 실패 가능)"
+            };
+            self.warnings.borrow_mut().push(warn.to_string());
+            return String::new();
+        }
+        // 일부 message 는 뽑혔지만 noise 가 섞인 경우의 부분 경고.
+        if parse_failed {
+            self.warnings
+                .borrow_mut()
+                .push("runtime_log_parse_warning: 일부 로그 라인 NDJSON 파싱 실패".to_string());
+        }
+        if message_field_missing {
+            self.warnings
+                .borrow_mut()
+                .push("runtime_log_schema_warning: 일부 라인에 message 필드 없음".to_string());
+        }
+        messages.join("\n")
     }
 
     fn trace_warnings(&self) -> Vec<String> {
@@ -2359,6 +2404,12 @@ fn humanize_trace_korean(report: &axhub_helpers::trace_helper::TraceReport) -> S
         );
     } else if !report.build_log_errors.is_empty() {
         lines.push("  - 자동 매칭 실패. 위 raw 에러 라인 직접 검색해주세요.".to_string());
+    }
+    if !report.warnings.is_empty() {
+        lines.push("  - ⚠️ evidence 경고:".to_string());
+        for warn in &report.warnings {
+            lines.push(format!("    · {warn}"));
+        }
     }
     if let Some(rc) = &report.routing_context {
         lines.push(format!(

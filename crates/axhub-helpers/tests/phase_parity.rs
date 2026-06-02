@@ -209,12 +209,22 @@ fn catalog_classifies_base_subclassified_and_default_entries() {
     )
     .emotion
     .contains("다른 배포가 먼저 진행 중이에요"));
+    // Real CLI cosign-enforce envelope: coarse `code` + fine `subcode`.
+    // classify must prefer `subcode` to reach the subclassified entry.
     assert!(classify(
         66,
-        r#"{"error":{"code":"update.cosign_verification_failed"}}"#
+        r#"{"error":{"code":"other","subcode":"update.cosign_enforce_failed"}}"#
     )
     .action
     .contains("IT 보안 담당자"));
+    // Real CLI downgrade-blocked envelope: distinct from scope.downgrade_blocked
+    // (binary version downgrade, not deploy-env). Must reach the update.* entry.
+    assert!(classify(
+        66,
+        r#"{"error":{"code":"other","subcode":"update.downgrade_blocked"}}"#
+    )
+    .emotion
+    .contains("더 낮은 버전으로 되돌리려는"));
     assert!(classify(99, "not-json{{").cause.contains("알 수 없는 에러"));
     assert!(
         classify(64, r#"{"error":{"code":"env.prod_force_required"}}"#)
@@ -517,6 +527,14 @@ fn preflight_current_app_prefers_env_manifest_then_cache() {
     fs::write("apphub.yaml", "name: yaml-app\n").unwrap();
     let manifest = run_preflight_with_runner(ok_runner);
     assert_eq!(manifest.output.current_app.as_deref(), Some("yaml-app"));
+
+    fs::write("axhub.yaml", "name: canonical-app\n").unwrap();
+    let canonical_manifest = run_preflight_with_runner(ok_runner);
+    assert_eq!(
+        canonical_manifest.output.current_app.as_deref(),
+        Some("canonical-app")
+    );
+    fs::remove_file("axhub.yaml").unwrap();
 
     std::env::set_var("AXHUB_APP_SLUG", "env-app");
     let env_override = run_preflight_with_runner(ok_runner);
@@ -1396,7 +1414,7 @@ fn consent_binding_schema_accepts_known_actions_and_rejects_required_field_gaps(
             "",
             "",
             "",
-            [("source", "apphub.yaml")].as_slice(),
+            [("source", "axhub.yaml")].as_slice(),
         ),
         (
             "apps_create",
@@ -1576,10 +1594,10 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
             [("key", "DATABASE_URL")].as_slice(),
         ),
         (
-            "axhub apps create --from-file apphub.yaml --yes --json",
+            "axhub apps create --from-file axhub.yaml --yes --json",
             "apps_create",
             None,
-            [("source", "apphub.yaml")].as_slice(),
+            [("source", "axhub.yaml")].as_slice(),
         ),
         (
             "axhub apps create --interactive --json",
@@ -1618,7 +1636,19 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
             [("repo", "paydrop"), ("branch", "main")].as_slice(),
         ),
         (
+            "axhub apps git connect --app paydrop --repo jocoding/paydrop --branch main --execute --json",
+            "github_connect",
+            Some("paydrop"),
+            [("repo", "jocoding/paydrop"), ("branch", "main")].as_slice(),
+        ),
+        (
             "axhub github disconnect paydrop --force --confirm=paydrop --json",
+            "github_disconnect",
+            Some("paydrop"),
+            [("slug", "paydrop")].as_slice(),
+        ),
+        (
+            "axhub apps git disconnect --app paydrop --execute --json",
             "github_disconnect",
             Some("paydrop"),
             [("slug", "paydrop")].as_slice(),
