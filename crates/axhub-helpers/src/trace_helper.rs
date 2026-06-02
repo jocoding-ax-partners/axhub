@@ -91,9 +91,23 @@ pub fn trace<P: TraceProbes>(deploy_id: &str, probes: &P) -> Result<TraceReport,
         .unwrap_or_else(|| "unknown".to_string());
     let failure_reason = last_failed_reason(&events);
 
-    let raw_build_log = probes.axhub_build_log(deploy_id, 100);
-    let build_log_errors = extract_error_lines(&raw_build_log, 5);
-    let matched_patterns = match_error_patterns(&build_log_errors);
+    // R3γ: `axhub deploy logs` 는 app 런타임 로그를 반환해요 (build-log 엔드포인트
+    // 부재 — F3). probe 가 NDJSON `message` 를 unwrap 한 plain 텍스트를 넘겨줘요.
+    let runtime_log = probes.axhub_build_log(deploy_id, 100);
+
+    // Display (NEVER 규칙): ERROR/FATAL/WARN 라인 최대 5줄만 인용.
+    let build_log_errors = extract_error_lines(&runtime_log, 5);
+
+    // Matching (reachability): display 5-라인 cap 과 분리해서 전체 라인에 패턴 매칭.
+    // 런타임 로그가 비면 (빌드 단계 실패로 앱 미기동) 로컬 event_log 의
+    // failure_reason 을 매칭 입력으로 fallback.
+    let mut match_input: Vec<String> = runtime_log.lines().map(|l| l.to_string()).collect();
+    if match_input.is_empty() {
+        if let Some(reason) = &failure_reason {
+            match_input.push(reason.clone());
+        }
+    }
+    let matched_patterns = match_error_patterns(&match_input);
     let routing_context = probes.recent_routing_context();
     let warnings = probes.trace_warnings();
 
@@ -154,6 +168,7 @@ fn extract_error_lines(raw: &str, max: usize) -> Vec<String> {
 const ERROR_PATTERNS: &[(&str, &str)] = &[
     ("env: ", "env_not_found"),
     ("out of memory", "oom"),
+    ("oomkilled", "oom"),
     ("oom", "oom"),
     ("module not found", "module_not_found"),
     ("cannot find module", "module_not_found"),
@@ -174,7 +189,7 @@ fn match_error_patterns(errors: &[String]) -> Vec<String> {
     for line in errors {
         let lower = line.to_lowercase();
         for (needle, key) in ERROR_PATTERNS {
-            if lower.contains(needle) {
+            if needle_hit(&lower, needle) {
                 let k = key.to_string();
                 if !keys.contains(&k) {
                     keys.push(k);
@@ -184,6 +199,51 @@ fn match_error_patterns(errors: &[String]) -> Vec<String> {
         }
     }
     keys
+}
+
+/// 대부분의 needle 은 lowercase substring 으로 매칭해요. 일부 짧고 모호한 needle 은
+/// 전체 런타임 로그(R3γ)에 매칭하면 오탐이 나므로 더 엄격하게 봐요: `oom` 은
+/// "zoom"/"room" 에서 발화하면 안 되고, bare `exit code 1` 은 "exit code 127" 에서
+/// 발화하면 안 돼요.
+fn needle_hit(lower: &str, needle: &str) -> bool {
+    match needle {
+        "oom" => contains_word(lower, "oom"),
+        "exit code 1" => contains_not_followed_by_digit(lower, "exit code 1"),
+        _ => lower.contains(needle),
+    }
+}
+
+/// `word` 가 양쪽 모두 비-영숫자 경계로 둘러싸여 등장하는지.
+fn contains_word(hay: &str, word: &str) -> bool {
+    let bytes = hay.as_bytes();
+    let mut from = 0;
+    while let Some(rel) = hay[from..].find(word) {
+        let i = from + rel;
+        let before_ok = i == 0 || !bytes[i - 1].is_ascii_alphanumeric();
+        let after = i + word.len();
+        let after_ok = after >= bytes.len() || !bytes[after].is_ascii_alphanumeric();
+        if before_ok && after_ok {
+            return true;
+        }
+        from = i + 1;
+    }
+    false
+}
+
+/// `needle` 이 바로 뒤에 숫자가 오지 않는 위치에 등장하는지 (그래서 "exit code 1"
+/// 이 "exit code 127" 안에서 매칭되지 않게).
+fn contains_not_followed_by_digit(hay: &str, needle: &str) -> bool {
+    let bytes = hay.as_bytes();
+    let mut from = 0;
+    while let Some(rel) = hay[from..].find(needle) {
+        let i = from + rel;
+        let after = i + needle.len();
+        if after >= bytes.len() || !bytes[after].is_ascii_digit() {
+            return true;
+        }
+        from = i + 1;
+    }
+    false
 }
 
 #[cfg(test)]
@@ -277,6 +337,35 @@ mod tests {
     }
 
     #[test]
+    fn matching_is_decoupled_from_display_cap_and_severity_filter() {
+        // R3γ T006: 앞 5줄이 ERROR(=display cap 채움), 6번째 줄은 태그 없는 env: 라인.
+        let raw = "ERROR a\nERROR b\nERROR c\nERROR d\nERROR e\nenv: STRIPE_KEY not found\n";
+        // display 는 ERROR 5줄만 (env: 는 severity 토큰 없음 + cap 으로 제외).
+        let display = extract_error_lines(raw, 5);
+        assert_eq!(display.len(), 5);
+        assert!(!display.iter().any(|l| l.contains("env:")));
+        // 매칭은 전체 라인 기준이라 env_not_found 를 여전히 잡아요 (decoupled).
+        let all: Vec<String> = raw.lines().map(|l| l.to_string()).collect();
+        assert!(match_error_patterns(&all).contains(&"env_not_found".to_string()));
+    }
+
+    #[test]
+    fn oom_needle_is_word_bounded_no_false_positive() {
+        // R2 T012: zoom/room 에서 oom 발화 금지.
+        assert!(match_error_patterns(&["zoom meeting scheduled".to_string()]).is_empty());
+        assert!(match_error_patterns(&["building src/room/index.js".to_string()]).is_empty());
+        // 실제 oom 은 여전히 매칭 (단어 경계 + oomkilled).
+        assert_eq!(
+            match_error_patterns(&["OOM detected".to_string()]),
+            vec!["oom".to_string()]
+        );
+        assert_eq!(
+            match_error_patterns(&["process oomkilled".to_string()]),
+            vec!["oom".to_string()]
+        );
+    }
+
+    #[test]
     fn compute_phase_durations_emits_step_index_for_each_event() {
         let events = vec![
             make_event("d", "preflight", Some(120)),
@@ -316,7 +405,7 @@ mod tests {
                 None
             }
             fn trace_warnings(&self) -> Vec<String> {
-                vec!["build_log_probe_skipped: --app required".to_string()]
+                vec!["runtime_log_probe_skipped: --app required".to_string()]
             }
         }
         // event_log read may fail in this synthetic env; we just exercise
@@ -332,7 +421,7 @@ mod tests {
             warnings: WarningProbes.trace_warnings(),
         };
         assert_eq!(report.warnings.len(), 1);
-        assert!(report.warnings[0].contains("build_log_probe_skipped"));
+        assert!(report.warnings[0].contains("runtime_log_probe_skipped"));
         // Critically: warnings must NOT leak into build_log_errors —
         // SKILL parsers split the two channels.
         assert!(report.build_log_errors.is_empty());

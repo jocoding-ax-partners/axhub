@@ -1,6 +1,6 @@
 # Trace Error Pattern Catalog (4-Part Korean)
 
-Phase 25 PR 25.4 — `axhub:trace` skill 이 빌드 로그에서 매칭하는 8 + 패턴.
+Phase 25 PR 25.4 (R3γ 갱신) — `axhub:trace` skill 이 **런타임 로그**(현행 `axhub deploy logs`)에서 매칭하는 8 + 패턴. 순수 빌드타임 패턴(dependency_install_failed / docker_image_pull_failed)은 빌드 단계 실패 시 런타임 로그가 비므로 event_log `failure_reason` 경로로 안내돼요.
 각 entry 는 `deploy/references/error-empathy-catalog.md` 의 4-part empathy
 구조 (감정 / 원인 / 액션 / 다음 버튼) 를 따라요. `trace_helper.rs` 의
 `match_error_patterns` 가 build_log_errors 를 lowercase substring 으로

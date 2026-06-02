@@ -1,6 +1,6 @@
 ---
 name: trace
-description: '이 스킬은 사용자가 배포 실패 원인을 추적하고 싶어할 때 사용해요. 다음 표현에서 활성화: "왜 실패", "왜 안돼", "왜 죽었", "왜 깨졌", "왜 멈췄", "원인 알려줘", "디버그", "추적해", "분석해", "trace", "debug deploy", "why failed", "what went wrong", "diagnose". event_log + build_log + audit 3 source 통합 분석으로 phase duration anomaly + last error + routing context 를 1 화면 요약해요.'
+description: '이 스킬은 사용자가 배포 실패 원인을 추적하고 싶어할 때 사용해요. 다음 표현에서 활성화: "왜 실패", "왜 안돼", "왜 죽었", "왜 깨졌", "왜 멈췄", "원인 알려줘", "디버그", "추적해", "분석해", "trace", "debug deploy", "why failed", "what went wrong", "diagnose". event_log + runtime_log + audit 3 source 통합 분석으로 phase duration anomaly + last error + routing context 를 1 화면 요약해요.'
 examples:
   - utterance: "왜 실패했어"
     intent: "trace last failed deploy"
@@ -20,11 +20,11 @@ allows-dependency-execution: false
 
 # Trace
 
-배포가 왜 실패했는지 evidence 3 source (event_log + build_log + audit) 통합 분석으로 1 화면 안내해요.
+배포가 왜 실패했는지 evidence 3 source (event_log + runtime_log + audit) 통합 분석으로 1 화면 안내해요. (현행 backend 엔 build-log API 가 없어서 runtime_log 를 쓰고, 빌드 단계 실패는 event_log `failure_reason` 으로 안내해요.)
 
 <!-- AUTHOR: Phase 25 PR 25.4 — vibe coder 가 "왜 실패했어" 라고 물을 때
 1. preflight 출력의 current_app / last_deploy_id 사용 (없으면 list-deployments 의 마지막 Failed)
-2. event_log (phase 전환 + duration) + build_log (마지막 ERROR/WARN) + audit (routing context) 3 source
+2. event_log (phase 전환 + duration) + runtime_log (현행 `axhub deploy logs`, 마지막 ERROR/WARN) + audit (routing context) 3 source
 3. ERROR pattern catalog 매칭 → references/error-patterns.md 의 4-part empathy entry 출력
 4. 다음 액션 권유 (axhub env / axhub recover / 직접 수정 등)
 -->
@@ -64,13 +64,13 @@ echo "$PREFLIGHT_JSON"
 1. **대상 deploy 식별.** preflight 의 `current_app` + `last_deploy_id` 사용해요. 없으면 `axhub-helpers list-deployments --app "$APP" --limit 5 --json` 에서 마지막 Failed entry 의 deploy_id 추출. 앱도 모호하면 AskUserQuestion 으로 앱을 먼저 고르고, 후보 0 → "추적할 실패 배포 없음" 안내 + 종료.
 
 2. **3 source 수집 (sequential, 5s timeout per source, 평균 15s 상한).**
-   - **A: event_log** — `axhub-helpers trace --deploy-id=$ID --app "$APP" --json` 호출 (내부에서 event_log read + current CLI deploy logs build + audit read 다 함)
-   - **B: build_log** — A 가 포함 (helper 가 spawn). 마지막 ERROR/WARN 최대 5 줄
+   - **A: event_log** — `axhub-helpers trace --deploy-id=$ID --app "$APP" --json` 호출 (내부에서 event_log read + 현행 `axhub deploy logs` 런타임 로그 + audit read 다 함)
+   - **B: runtime_log** — A 가 포함 (helper 가 현행 `axhub deploy logs` 런타임 로그를 spawn + NDJSON `message` 파싱). 마지막 ERROR/WARN 최대 5 줄. 빌드 단계 실패로 런타임 로그가 비면 event_log `failure_reason` 으로 fallback 매칭
    - **C: audit** — A 가 포함. recent routing context (prompt_hash + is_axhub_related)
 
 3. **Error pattern 매칭.** `references/error-patterns.md` 의 8+ entry (env_not_found / oom / module_not_found / network_timeout / dependency_install_failed / docker_image_pull_failed / port_already_in_use / build_command_failed) 중 build_log_errors 에서 매칭되는 것 선택.
 
-**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — trace SKILL 의 `trace_target_selection` safe_default 는 "abort" (대상이 모호하면 비대화형 환경에선 추적 중단).
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 의 `trace` 채널 참조 — 추적 대상 질문(question text `"최근 Failed 배포가 여러 개예요. 어떤 거 추적할까요?"`)의 safe_default 는 "abort" (대상이 모호하면 비대화형 환경에선 추적 중단).
 
 4. **여러 후보 deploy 가 있을 때만 AskUserQuestion.**
 
@@ -118,7 +118,7 @@ $ axhub-helpers trace --json --deploy-id=dep-abc
 
 ## NEVER
 
-- NEVER raw build_log stderr 를 사용자 화면에 그대로 노출해요. ERROR/WARN 라인 max 5 까지만 인용해요 (Vibe Coder Visibility).
+- NEVER raw runtime_log stderr 를 사용자 화면에 그대로 노출해요. ERROR/WARN 라인 max 5 까지만 인용해요 (Vibe Coder Visibility).
 - NEVER axhub 내부 deploy_id 를 prompt 에 echo 해요. routing audit hash 와 cross-correlate 가능성 있어요.
 - NEVER 5s timeout 무시. axhub logs 가 hang 되면 evidence 불완전 상태로 안내해요.
 

@@ -2266,36 +2266,66 @@ fn axhub_stdout_with_timeout(axhub_bin: &str, args: &[&str]) -> Result<String, &
 }
 
 impl axhub_helpers::trace_helper::TraceProbes for RealTraceProbes {
-    fn axhub_build_log(&self, deploy_id: &str, tail: u32) -> String {
+    fn axhub_build_log(&self, _deploy_id: &str, tail: u32) -> String {
         let Some(app_ref) = self.app_ref.as_deref() else {
             self.warnings.borrow_mut().push(
-                "build_log_probe_skipped: --app required for current deploy logs".to_string(),
+                "runtime_log_probe_skipped: --app required for current deploy logs".to_string(),
             );
             return String::new();
         };
         let axhub_bin = std::env::var("AXHUB_BIN").unwrap_or_else(|_| "axhub".to_string());
         let tail = tail.to_string();
-        match axhub_stdout_with_timeout(
+        // R3γ: 현행 `axhub deploy logs` 는 app-level 런타임 로그 NDJSON 을 반환해요
+        // (build-log 엔드포인트 부재 — F3). `--source`/deploy-id 는 CLI 가 무시하므로
+        // 보내지 않고, NDJSON 각 라인의 `message` 만 unwrap 해서 plain 텍스트로 넘겨요.
+        let stdout = match axhub_stdout_with_timeout(
             &axhub_bin,
-            &[
-                "--json", "deploy", "logs", deploy_id, "--app", app_ref, "--source", "build",
-                "--limit", &tail,
-            ],
+            &["--json", "deploy", "logs", "--app", app_ref, "--limit", &tail],
         ) {
             Ok(stdout) => stdout,
             Err("timeout") => {
                 self.warnings
                     .borrow_mut()
-                    .push("build_log_probe_timeout: axhub deploy logs exceeded 5s".to_string());
-                String::new()
+                    .push("runtime_log_probe_timeout: axhub deploy logs exceeded 5s".to_string());
+                return String::new();
             }
             Err(_) => {
                 self.warnings
                     .borrow_mut()
-                    .push("build_log_probe_failed: axhub CLI unavailable".to_string());
-                String::new()
+                    .push("runtime_log_probe_failed: axhub CLI unavailable".to_string());
+                return String::new();
+            }
+        };
+
+        let mut messages: Vec<String> = Vec::new();
+        let mut parse_failed = false;
+        for line in stdout.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            match serde_json::from_str::<serde_json::Value>(trimmed) {
+                Ok(value) => {
+                    if let Some(msg) = value.get("message").and_then(|m| m.as_str()) {
+                        messages.push(msg.to_string());
+                    }
+                }
+                Err(_) => parse_failed = true,
             }
         }
+        if parse_failed {
+            self.warnings
+                .borrow_mut()
+                .push("runtime_log_parse_warning: 일부 로그 라인 NDJSON 파싱 실패".to_string());
+        }
+        if messages.is_empty() {
+            self.warnings.borrow_mut().push(
+                "runtime_log_unavailable: 런타임 로그가 비어 있어요 (빌드 단계 실패 가능)"
+                    .to_string(),
+            );
+            return String::new();
+        }
+        messages.join("\n")
     }
 
     fn trace_warnings(&self) -> Vec<String> {

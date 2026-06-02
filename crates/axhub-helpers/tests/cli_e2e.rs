@@ -3465,15 +3465,38 @@ fn fake_axhub_logs(temp: &tempfile::TempDir) -> std::path::PathBuf {
         &axhub,
         r#"#!/bin/sh
 	if [ "$1 $2 $3" = "--json deploy logs" ]; then
-	  echo "INFO build started"
-	  echo "ERROR build command failed with exit code 1"
-	  echo "WARN network timeout while fetching dependency"
+	  echo '{"type":"log","message":"INFO build started"}'
+	  echo '{"type":"log","message":"ERROR build command failed with exit code 1"}'
+	  echo '{"type":"log","message":"WARN network timeout while fetching dependency"}'
   exit 0
 fi
 exit 1
 "#,
     )
     .unwrap();
+    let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
+}
+
+#[cfg(unix)]
+fn fake_axhub_app_logs(
+    temp: &tempfile::TempDir,
+    name: &str,
+    messages: &[&str],
+) -> std::path::PathBuf {
+    // R3γ: 현행 `axhub --json deploy logs` 를 흉내내는 fake — message 들을 NDJSON
+    // (`{"type":"log","message":"..."}`) 한 줄씩 emit. messages 가 비면 아무것도
+    // 출력 안 해서 runtime_log_unavailable 경로를 테스트해요. (message 에 따옴표 금지)
+    let axhub = temp.path().join(name);
+    let mut body =
+        String::from("#!/bin/sh\nif [ \"$1 $2 $3\" = \"--json deploy logs\" ]; then\n");
+    for m in messages {
+        body.push_str(&format!("  echo '{{\"type\":\"log\",\"message\":\"{m}\"}}'\n"));
+    }
+    body.push_str("  exit 0\nfi\nexit 1\n");
+    std::fs::write(&axhub, body).unwrap();
     let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
     perms.set_mode(0o755);
     std::fs::set_permissions(&axhub, perms).unwrap();
@@ -3559,6 +3582,109 @@ fn cli_trace_json_reads_events_and_build_log_patterns() {
 
 #[cfg(unix)]
 #[test]
+fn cli_trace_json_matches_untagged_runtime_log_pattern() {
+    // R3γ T004: ERROR 태그 없는 런타임 로그 라인(`env: ...`)도 매칭돼야 해요 (reachability).
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let deploy_id = "dep-cli-trace-untagged";
+    write_trace_deploy_events(&state, deploy_id);
+    let axhub = fake_axhub_app_logs(&temp, "axhub-env", &["env: STRIPE_KEY not found"]);
+    let state_s = state.display().to_string();
+    let axhub_s = axhub.display().to_string();
+
+    let out = run_env(
+        &["trace", "--deploy-id", deploy_id, "--app", "paydrop", "--json"],
+        &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json = stdout_json(&out);
+    assert!(
+        json["matched_patterns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "env_not_found"),
+        "expected env_not_found in {:?}",
+        json["matched_patterns"]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_trace_json_matches_untagged_npm_err() {
+    // R2 T011: `npm ERR!` 는 "ERROR" 토큰이 없지만 dependency_install_failed 로 발화.
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let deploy_id = "dep-cli-trace-npmerr";
+    write_trace_deploy_events(&state, deploy_id);
+    let axhub = fake_axhub_app_logs(&temp, "axhub-npm", &["npm ERR! code ELIFECYCLE"]);
+    let state_s = state.display().to_string();
+    let axhub_s = axhub.display().to_string();
+
+    let out = run_env(
+        &["trace", "--deploy-id", deploy_id, "--app", "paydrop", "--json"],
+        &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let json = stdout_json(&out);
+    assert!(
+        json["matched_patterns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "dependency_install_failed"),
+        "expected dependency_install_failed in {:?}",
+        json["matched_patterns"]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_trace_json_warns_when_runtime_log_empty() {
+    // R3γ T005: 런타임 로그가 비면 (빌드 단계 실패) runtime_log_unavailable warning +
+    // event_log failure_reason 로 fallback 매칭.
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let deploy_id = "dep-cli-trace-empty";
+    write_trace_deploy_events(&state, deploy_id);
+    let axhub = fake_axhub_app_logs(&temp, "axhub-empty", &[]);
+    let state_s = state.display().to_string();
+    let axhub_s = axhub.display().to_string();
+
+    let out = run_env(
+        &["trace", "--deploy-id", deploy_id, "--app", "paydrop", "--json"],
+        &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let json = stdout_json(&out);
+    assert!(
+        json["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v.as_str().is_some_and(|s| s.starts_with("runtime_log_unavailable"))),
+        "expected runtime_log_unavailable in {:?}",
+        json["warnings"]
+    );
+    // 빌드 단계 fallback: event_log reason("build command failed") 으로 매칭.
+    assert!(
+        json["matched_patterns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "build_command_failed"),
+        "expected build_command_failed (event_log reason fallback) in {:?}",
+        json["matched_patterns"]
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn cli_trace_rejects_path_traversal_deploy_id() {
     let temp = tempfile::tempdir().unwrap();
     let state = temp.path().join("state");
@@ -3633,7 +3759,7 @@ fn cli_trace_times_out_slow_build_log_probe() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|v| v.as_str().unwrap().contains("build_log_probe_timeout")),
+            .any(|v| v.as_str().unwrap().contains("runtime_log_probe_timeout")),
         "{json}",
     );
     assert!(
