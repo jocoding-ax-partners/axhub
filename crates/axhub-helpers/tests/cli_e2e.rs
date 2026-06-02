@@ -492,7 +492,7 @@ fn init_git_with_commit(cwd: &Path) {
             .success());
     }
     assert!(Command::new("git")
-        .args(["add", "apphub.yaml", ".gitignore"])
+        .args(["add", "axhub.yaml", ".gitignore"])
         .current_dir(cwd)
         .output()
         .unwrap()
@@ -509,7 +509,7 @@ fn init_git_with_commit(cwd: &Path) {
 
 fn write_manifest(dir: &Path) {
     std::fs::write(
-        dir.join("apphub.yaml"),
+        dir.join("axhub.yaml"),
         "name: Paydrop\nslug: paydrop\nframework: nextjs\n",
     )
     .unwrap();
@@ -2431,7 +2431,7 @@ fn cli_consent_mint_rejects_binding_schema_drift_before_writing_tokens() {
         "profile":"",
         "branch":"",
         "commit_sha":"",
-        "context": {"source":"apphub.yaml"}
+        "context": {"source":"axhub.yaml"}
     })
     .to_string();
     let minted = run_stdin(&["consent-mint"], &valid_apps_create, &envs);
@@ -2729,6 +2729,37 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
     );
     assert_eq!(pending_auth_allowed.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&pending_auth_allowed.stdout)
+        .contains("permissionDecision\":\"allow"));
+
+    let apps_git_without_token = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-apps-git-deny","tool_name":"Bash","tool_input":{"command":"axhub apps git connect --app paydrop --repo jocoding/paydrop --branch main --execute --json"}}"#,
+        &envs,
+    );
+    assert_eq!(apps_git_without_token.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&apps_git_without_token.stdout)
+        .contains("permissionDecision\":\"deny"));
+
+    let pending_github_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"github_connect",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"main",
+        "commit_sha":"",
+        "context": {"repo":"jocoding/paydrop", "branch":"main"}
+    })
+    .to_string();
+    let pending_github_minted =
+        run_stdin(&["consent-mint"], &pending_github_binding, &pending_envs);
+    assert_eq!(pending_github_minted.status.code(), Some(0));
+    let pending_github_allowed = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_apps_git","tool_name":"Bash","tool_input":{"command":"axhub apps git connect --app paydrop --repo jocoding/paydrop --branch main --execute --json"}}"#,
+        &pending_envs,
+    );
+    assert_eq!(pending_github_allowed.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&pending_github_allowed.stdout)
         .contains("permissionDecision\":\"allow"));
 
     let wrong = binding.replace("\"paydrop\"", "\"otherapp\"");
@@ -3044,6 +3075,7 @@ fn cli_bootstrap_telemetry_markers_are_opt_in_redacted_and_re_entry_aware() {
         for forbidden in [
             "paydrop",
             "apphub.yaml",
+            "axhub.yaml",
             "axhub apps create",
             "Bearer ",
             "AXHUB_TOKEN",
@@ -3671,4 +3703,113 @@ fn cli_trace_human_output_includes_phase_errors_and_patterns() {
     );
     assert!(stdout.contains("build_log 마지막"), "stdout={stdout}");
     assert!(stdout.contains("매칭 패턴"), "stdout={stdout}");
+}
+
+#[test]
+fn cli_migrate_plan_detects_node_env_and_manifest_snippet() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(
+        temp.path().join("package.json"),
+        r#"{"scripts":{"start":"vite --host 0.0.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::create_dir_all(temp.path().join("src")).unwrap();
+    std::fs::write(
+        temp.path().join("src/main.ts"),
+        "console.log(process.env.DATABASE_URL, process.env['VITE_PUBLIC_URL']);",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/settings.py"),
+        "import os\nDATABASE_URL = os.environ['PY_DATABASE_URL']\n",
+    )
+    .unwrap();
+
+    let output = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(output.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["schema_version"], "migrate-plan/v1");
+    assert_eq!(json["monorepo"], false);
+    assert_eq!(json["container_contracts"]["dockerfile"], false);
+    assert_eq!(json["container_contracts"]["compose"], false);
+    assert_eq!(json["candidates"][0]["stack_hint"], "node");
+    assert!(json["candidates"][0]["env_refs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|name| name == "DATABASE_URL"));
+    assert!(json["suggested_manifest"]
+        .as_str()
+        .unwrap()
+        .contains("axhub/v1"));
+    let env_refs = json["env_refs"].as_array().unwrap();
+    assert!(env_refs
+        .iter()
+        .any(|e| e["name"] == "DATABASE_URL" && e["scope"] == "runtime"));
+    assert!(env_refs
+        .iter()
+        .any(|e| e["name"] == "VITE_PUBLIC_URL" && e["scope"] == "build"));
+    assert!(env_refs
+        .iter()
+        .any(|e| e["name"] == "PY_DATABASE_URL" && e["scope"] == "runtime"));
+}
+
+#[test]
+fn cli_migrate_plan_detects_monorepo_candidates_and_compose() {
+    let temp = tempfile::tempdir().unwrap();
+    let web = temp.path().join("apps/web");
+    std::fs::create_dir_all(&web).unwrap();
+    std::fs::write(web.join("package.json"), "{}").unwrap();
+    std::fs::write(
+        web.join("compose.yaml"),
+        "services:\n  web:\n    build: .\n",
+    )
+    .unwrap();
+    let api = temp.path().join("services/api");
+    std::fs::create_dir_all(&api).unwrap();
+    std::fs::write(api.join("go.mod"), "module example.com/api\n").unwrap();
+    std::fs::write(api.join("Dockerfile"), "FROM scratch\n").unwrap();
+    std::fs::write(api.join("main.go"), "package main\n// API_DSN\n").unwrap();
+
+    let output = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(output.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["monorepo"], true);
+    assert_eq!(json["container_contracts"]["compose"], true);
+    let candidates = json["candidates"].as_array().unwrap();
+    assert!(candidates.iter().any(|c| c["path"] == "apps/web"
+        && c["has_compose"] == true
+        && c["compose_file"] == "compose.yaml"));
+    assert!(candidates
+        .iter()
+        .any(|c| c["path"] == "services/api" && c["stack_hint"] == "go"));
+
+    let selected_output = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--app-path",
+        "services/api",
+        "--json",
+    ]);
+    assert_eq!(selected_output.status.code(), Some(0));
+    let selected_json: serde_json::Value = serde_json::from_slice(&selected_output.stdout).unwrap();
+    assert!(selected_json["suggested_manifest"]
+        .as_str()
+        .unwrap()
+        .contains("dockerfile: \"services/api/Dockerfile\""));
+    assert!(!selected_json["suggested_manifest"]
+        .as_str()
+        .unwrap()
+        .contains("apps/web/compose.yaml"));
 }

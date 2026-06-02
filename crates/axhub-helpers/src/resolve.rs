@@ -117,7 +117,7 @@ pub fn extract_slug_candidate(utterance: &str) -> Option<String> {
 }
 
 fn read_manifest_slug() -> Option<String> {
-    for path in ["apphub.yaml", "axhub.yaml"] {
+    for path in ["axhub.yaml", "apphub.yaml"] {
         let Ok(content) = fs::read_to_string(path) else {
             continue;
         };

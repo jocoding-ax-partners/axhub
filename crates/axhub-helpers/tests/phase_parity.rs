@@ -518,6 +518,14 @@ fn preflight_current_app_prefers_env_manifest_then_cache() {
     let manifest = run_preflight_with_runner(ok_runner);
     assert_eq!(manifest.output.current_app.as_deref(), Some("yaml-app"));
 
+    fs::write("axhub.yaml", "name: canonical-app\n").unwrap();
+    let canonical_manifest = run_preflight_with_runner(ok_runner);
+    assert_eq!(
+        canonical_manifest.output.current_app.as_deref(),
+        Some("canonical-app")
+    );
+    fs::remove_file("axhub.yaml").unwrap();
+
     std::env::set_var("AXHUB_APP_SLUG", "env-app");
     let env_override = run_preflight_with_runner(ok_runner);
     assert_eq!(env_override.output.current_app.as_deref(), Some("env-app"));
@@ -1396,7 +1404,7 @@ fn consent_binding_schema_accepts_known_actions_and_rejects_required_field_gaps(
             "",
             "",
             "",
-            [("source", "apphub.yaml")].as_slice(),
+            [("source", "axhub.yaml")].as_slice(),
         ),
         (
             "apps_create",
@@ -1576,10 +1584,10 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
             [("key", "DATABASE_URL")].as_slice(),
         ),
         (
-            "axhub apps create --from-file apphub.yaml --yes --json",
+            "axhub apps create --from-file axhub.yaml --yes --json",
             "apps_create",
             None,
-            [("source", "apphub.yaml")].as_slice(),
+            [("source", "axhub.yaml")].as_slice(),
         ),
         (
             "axhub apps create --interactive --json",
@@ -1618,7 +1626,19 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
             [("repo", "paydrop"), ("branch", "main")].as_slice(),
         ),
         (
+            "axhub apps git connect --app paydrop --repo jocoding/paydrop --branch main --execute --json",
+            "github_connect",
+            Some("paydrop"),
+            [("repo", "jocoding/paydrop"), ("branch", "main")].as_slice(),
+        ),
+        (
             "axhub github disconnect paydrop --force --confirm=paydrop --json",
+            "github_disconnect",
+            Some("paydrop"),
+            [("slug", "paydrop")].as_slice(),
+        ),
+        (
+            "axhub apps git disconnect --app paydrop --execute --json",
             "github_disconnect",
             Some("paydrop"),
             [("slug", "paydrop")].as_slice(),
