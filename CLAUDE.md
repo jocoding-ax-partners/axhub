@@ -162,7 +162,7 @@ bun test                      # 회귀
 
 새 SKILL 생성 시 `model:` frontmatter 를 권장해요 (25.5a 부터 scaffold + skill-doctor 가 지원). 기존 19 SKILL 의 일괄 마이그레이션은 25.5a.1 단일-skill A/B test 통과 후 25.5b (haiku) / 25.5c (sonnet) 에서 진행해요.
 
-- **haiku**: read-only / 단순 조회 (status / logs / open / clarify / doctor / routing-stats / whatsnew)
+- **haiku**: read-only / 단순 조회 (status / logs / open / clarify / doctor / routing-stats)
 - **sonnet**: multi-step / destructive / interactive (deploy / recover / env / apps / auth / github / init / install-cli / profile / update / upgrade / verify / trace)
 - **opus**: 사용 안 함 (axhub 도메인 외 — architecture decision / deep analysis 필요 없음)
 

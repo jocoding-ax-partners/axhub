@@ -2333,7 +2333,6 @@ fn cli_session_start_first_current_version_session() {
     let msg = session_start_systemmessage(&state_s);
     let helper_version = env!("CARGO_PKG_VERSION");
     assert!(msg.contains(&format!("v{helper_version} 첫 세션")), "{msg}");
-    assert!(msg.contains("/axhub:whatsnew"), "{msg}");
     assert!(msg.contains("AXHUB_NO_AUDIT"), "{msg}");
 
     // Marker file 생성됐는지.
@@ -2361,7 +2360,6 @@ fn cli_session_start_subsequent_session() {
         !msg.contains(&format!("v{} 첫 세션", env!("CARGO_PKG_VERSION"))),
         "magical moment should not repeat: {msg}"
     );
-    assert!(!msg.contains("/axhub:whatsnew"), "{msg}");
 }
 
 #[cfg(unix)]

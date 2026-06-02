@@ -1677,7 +1677,6 @@ pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
         lines.push(
             "- routing audit log 7일 로컬 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1.".to_string(),
         );
-        lines.push("- 변경점 보기: /axhub:whatsnew".to_string());
 
         if let Some(path) = marker {
             if let Some(parent) = path.parent() {

@@ -86,7 +86,6 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "upgrade",
       "using-axhub-quality",
       "verify",
-      "whatsnew",
     ]);
   });
 
@@ -238,9 +237,6 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
 
     const open = registry["open"] as Record<string, RegistryValue>;
     expect(open["_note"]).toBeString();
-
-    const whatsnew = registry["whatsnew"] as Record<string, RegistryValue>;
-    expect(whatsnew["_note"]).toBeString();
   });
 
   test("모든 safe_default 엔트리에 rationale 첨부 (drift catch)", () => {

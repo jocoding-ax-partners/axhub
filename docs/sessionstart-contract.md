@@ -37,7 +37,6 @@ marker 파일 (`runtime_paths::state_dir() / .v0.4.0-welcome-shown`) 부재 시 
 - 메타 질문 ("왜 ~ 키워드 매칭이야?") 자동 처리.
 - routing audit log 7일 로컬 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1.
 - 짧은 prompt 의 hash 는 익명화 보장 안 돼요.
-- 변경점 보기: /axhub:whatsnew
 ```
 
 audit privacy 한 줄 (`AXHUB_NO_AUDIT=1` + 익명화 한계) 가 docs/audit-privacy-contract.md 의 Disclosure 위치 #1 와 일치.
@@ -111,7 +110,6 @@ pub fn cmd_session_start() -> anyhow::Result<i32> {
         lines.push("- 메타 질문 (\"왜 ~ 키워드 매칭이야?\") 자동 처리.".to_string());
         lines.push("- routing audit log 7일 로컬 보관 (외부 전송 X). 끄려면 AXHUB_NO_AUDIT=1.".to_string());
         lines.push("- 짧은 prompt 의 hash 는 익명화 보장 안 돼요.".to_string());
-        lines.push("- 변경점 보기: /axhub:whatsnew".to_string());
 
         if let Some(parent) = marker_path.parent() {
             let _ = std::fs::create_dir_all(parent);

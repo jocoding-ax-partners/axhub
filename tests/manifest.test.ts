@@ -626,7 +626,6 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "upgrade",
       "using-axhub-quality",
       "verify",
-      "whatsnew",
     ]);
   });
 

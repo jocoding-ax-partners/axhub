@@ -47,7 +47,6 @@ axhub 플러그인으로 할 수 있는 것:
   profile: "회사 endpoint 바꿔"
   upgrade: "플러그인 업그레이드"
   install-cli: "axhub CLI 설치해줘"
-  whatsnew: "뭐 새로 나왔어"
 
 처음이라면 "안녕"이라고 말해보세요. 첫 배포까지 함께 도와줄게요.
 
