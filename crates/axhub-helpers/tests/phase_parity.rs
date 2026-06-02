@@ -209,9 +209,11 @@ fn catalog_classifies_base_subclassified_and_default_entries() {
     )
     .emotion
     .contains("다른 배포가 먼저 진행 중이에요"));
+    // Real CLI cosign-enforce envelope: coarse `code` + fine `subcode`.
+    // classify must prefer `subcode` to reach the subclassified entry.
     assert!(classify(
         66,
-        r#"{"error":{"code":"update.cosign_verification_failed"}}"#
+        r#"{"error":{"code":"other","subcode":"update.cosign_enforce_failed"}}"#
     )
     .action
     .contains("IT 보안 담당자"));

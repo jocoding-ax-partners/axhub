@@ -229,7 +229,7 @@ The drift between this file and the hand-written sibling is checked by
 
 ---
 
-### exit 66:update.cosign_verification_failed
+### exit 66:update.cosign_enforce_failed
 
 **감정:** 잠깐만요. 보안 검증에 실패했어요. 절대 진행 안 해요.
 
