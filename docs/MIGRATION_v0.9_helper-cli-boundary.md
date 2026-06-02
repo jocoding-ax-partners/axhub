@@ -24,7 +24,7 @@
 
 | 필드 | 이전 | 지금 |
 |------|------|------|
-| `warnings` | (없음) | `Vec<String>` (예: `"build_log_probe_skipped: --app required"`) — 신규 |
+| `warnings` | (없음) | `Vec<String>` (예: `"runtime_log_probe_skipped: --app required"`) — 신규 |
 
 `warnings` 는 probe 가 우아하게 degrade 했을 때 그 신호를 SKILL 이 잡을 수 있도록 마련된 분리 채널이에요. `build_log_errors` 와 합치지 마세요.
 
