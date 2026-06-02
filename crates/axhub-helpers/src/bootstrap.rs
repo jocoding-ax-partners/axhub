@@ -593,31 +593,34 @@ fn plan_after_app_registered(
         };
     }
 
-    let branch = git_output(cwd, &["branch", "--show-current"]).unwrap_or_else(|| "main".into());
     let commit = git_output(cwd, &["rev-parse", "HEAD"]).unwrap_or_else(|| "HEAD".into());
     let app = state
         .app_slug
         .clone()
         .or_else(|| state.app_id.clone())
         .unwrap_or_else(|| "".into());
-    let command = vec![
+    let profile = std::env::var("AXHUB_PROFILE").unwrap_or_default();
+    let mut command = vec![
         "axhub".into(),
         "deploy".into(),
         "create".into(),
         "--app".into(),
         app.clone(),
-        "--branch".into(),
-        branch.clone(),
         "--commit".into(),
         commit.clone(),
+        "--execute".into(),
         "--json".into(),
     ];
+    if !profile.is_empty() {
+        command.push("--profile".into());
+        command.push(profile.clone());
+    }
     let binding = ConsentBinding {
         tool_call_id: "pending".into(),
         action: "deploy_create".into(),
         app_id: app,
-        profile: std::env::var("AXHUB_PROFILE").unwrap_or_default(),
-        branch,
+        profile,
+        branch: String::new(),
         commit_sha: commit,
         context: HashMap::new(),
         synthesized_by_helper: true,
@@ -647,7 +650,8 @@ fn plan_apps_create(manifest: &ManifestInfo, plan_only: bool, persist_plan: bool
         BootstrapState::ConsentRequiredAppsCreate,
         Some(manifest.path.clone()),
     );
-    let command = vec![
+    let profile = std::env::var("AXHUB_PROFILE").unwrap_or_default();
+    let mut command = vec![
         "axhub".into(),
         "apps".into(),
         "create".into(),
@@ -655,13 +659,17 @@ fn plan_apps_create(manifest: &ManifestInfo, plan_only: bool, persist_plan: bool
         manifest.path.clone(),
         "--json".into(),
     ];
+    if !profile.is_empty() {
+        command.push("--profile".into());
+        command.push(profile.clone());
+    }
     let mut context = HashMap::new();
     context.insert("source".into(), manifest.path.clone());
     let binding = ConsentBinding {
         tool_call_id: "pending".into(),
         action: "apps_create".into(),
         app_id: String::new(),
-        profile: std::env::var("AXHUB_PROFILE").unwrap_or_default(),
+        profile,
         branch: String::new(),
         commit_sha: String::new(),
         context,

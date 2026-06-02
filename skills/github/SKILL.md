@@ -20,7 +20,7 @@ model: sonnet
 
 # GitHub
 
-axhub 앱과 GitHub repo 연결 상태를 안전하게 확인하고 connect/disconnect 를 consent 로 보호해요. CLI 는 `axhub apps git` 서브커맨드로 이동했어요 (구 `axhub github` 는 exit 7 GITHUB_CMD_DEPRECATED 로 거절돼요).
+axhub 앱과 GitHub repo 연결 상태를 안전하게 확인하고 connect/disconnect 를 consent 로 보호해요. CLI mutation 은 `axhub apps git` 서브커맨드가 담당해요. v0.17.3 의 top-level `axhub github accounts list` 와 `axhub github installations repos` 는 GitHub App read discovery 로 유효해요.
 
 ## Workflow
 
@@ -87,7 +87,14 @@ echo "$PREFLIGHT_JSON"
    axhub apps git status --app "$APP_ID" --json
    ```
 
-   출력에 `install_url` 이 들어 있으면 즉시 `GitHub 연결 링크: <install_url>` 로 안내해요. 다른 슬래시 커맨드 호출을 요구하지 마세요. 연결이 아직 없으면 status 가 404 / `git_connection` not_found 를 반환해요 — 이 경우 install_url 안내 후 Step 4 consent-connect 로 진행해요. 연결이 이미 있으면 `repo_full_name` / `branch` / `installation_id` 를 사용자에게 보여줘요.
+   GitHub App 설치 후보를 read-only 로 찾을 때는 top-level GitHub discovery 명령도 사용할 수 있어요.
+
+   ```bash
+   axhub github accounts list --json
+   axhub github installations repos --installation-id "$INSTALLATION_ID" --json
+   ```
+
+   `INSTALLATION_ID` 는 `accounts list` 출력의 `installation_id` 에서 가져와요. 출력에 `install_url` 이 들어 있으면 즉시 `GitHub 연결 링크: <install_url>` 로 안내해요. 다른 슬래시 커맨드 호출을 요구하지 마세요. 연결이 아직 없으면 status 가 404 / `git_connection` not_found 를 반환해요 — 이 경우 install_url 안내 후 Step 4 consent-connect 로 진행해요. 연결이 이미 있으면 `repo_full_name` / `branch` / `installation_id` 를 사용자에게 보여줘요.
 
 3.5. **Strict guided capability ladder for missing repo/remote/push.** Stay inside this ladder and stop on every unsupported gap. Do not skip ahead to connect while GitHub cannot see the repo.
 
@@ -226,7 +233,7 @@ echo "$PREFLIGHT_JSON"
 - NEVER disconnect 를 subprocess 에서 자동 실행하지 않아요.
 - NEVER `CLAUDE_PLUGIN_ROOT` 누락을 이유로 사용자에게 bang-prefixed connect 수동 우회를 요청하지 않아요.
 - NEVER `--json` 을 빼지 않아요.
-- NEVER 구 `axhub github connect|disconnect|repos list` 명령어를 호출하지 않아요. exit 7 GITHUB_CMD_DEPRECATED 로 거절돼요. 항상 `axhub apps git connect|disconnect|status` 를 써요.
+- NEVER 구 `axhub github connect|disconnect|repos list` mutation 명령어를 호출하지 않아요. repo 연결/해제는 항상 `axhub apps git connect|disconnect|status` 를 써요. 단, 읽기 탐색은 `axhub github accounts list` 와 `axhub github installations repos` 를 써도 돼요.
 - NEVER `axhub apps git connect|disconnect` 를 `--execute` 없이 mutate 한다고 가정하지 않아요. dry-run 이 기본이라 `--execute` 가 빠지면 backend mutation 은 발생 안 해요.
 - NEVER OAuth device flow 의 `verification_uri` + `user_code` 를 사용자에게 안 보여주지 않아요. CLI 가 emit 한 `device_code_issued` JSON event 또는 stderr "To connect GitHub, visit: …" 줄을 그대로 흘려보내면 OAuth 가 timeout 으로 멈춰요. 두 값을 한 번에 묶어서 위 형식으로 안내해요.
 - NEVER add a 4th option (e.g. "지금은 스킵") to Step 2 의 AskUserQuestion. backend 가 git_connection_required (HTTP 422) 로 거절해요. options 는 정확히 3개: list_only / connect / disconnect.

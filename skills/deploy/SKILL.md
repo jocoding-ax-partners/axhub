@@ -8,8 +8,8 @@ examples:
     intent: "deploy current branch to axhub live"
   - utterance: "ship paydrop"
     intent: "deploy current branch to axhub live"
-  - utterance: "/axhub:deploy paydrop --branch main"
-    intent: "deploy current branch to axhub live"
+  - utterance: "/axhub:deploy paydrop --commit abc123"
+    intent: "deploy specific commit to axhub live"
   - utterance: "이전에 승인한 거 그대로 다시 배포해"
     intent: "deploy current branch to axhub live"
 multi-step: true
@@ -464,7 +464,7 @@ To deploy:
    - `force_new` 선택 시: Step 2 로 진행해요. exit 64 + `validation.deployment_in_progress` 에러가 나도 retry 하지 않아요 (Step 6 라우팅 따름).
    - `abort` 선택 시: 배포를 멈춰요. consent 를 발급하지 않아요.
 
-1.7. **Status-first gate (배포는 status 먼저 — `deploy create` 는 fallback).** push 가 자동배포를 트리거하는 환경(`deploy-prep` 의 `.github_connected: true`)에서는 preview/consent 로 가기 전에 **지금 돌고 있는 배포가 있는지 먼저 확인**해요. push 로 이미 시작된 배포가 있는데 새 `deploy create` 를 실행하면, exit 64 충돌이나 consent/`--branch` 불일치 deny 로 이어져서 토큰 재발급·우회 루프에 빠져요. 도는 배포가 있으면 그걸 따라가고(create 생략), 없을 때만 Step 2 이후 명시적 create 로 진행해요 — 이게 "status 보고 배포가 아니면 그제서야 진짜 create" 예요. 단, Step 1.6 이 이미 in-flight 를 처리했으면 (특히 사용자가 거기서 `force_new` 를 골랐으면) 그 선택을 존중해서 이 gate 는 건너뛰고 Step 2 로 진행해요 — 같은 in-flight 를 다시 watch 로 되돌리지 않아요.
+1.7. **Status-first gate (배포는 status 먼저 — `deploy create` 는 fallback).** push 가 자동배포를 트리거하는 환경(`deploy-prep` 의 `.github_connected: true`)에서는 preview/consent 로 가기 전에 **지금 돌고 있는 배포가 있는지 먼저 확인**해요. push 로 이미 시작된 배포가 있는데 새 `deploy create` 를 실행하면, exit 64 충돌이나 consent/commit 불일치 deny 로 이어져서 토큰 재발급·우회 루프에 빠져요. 도는 배포가 있으면 그걸 따라가고(create 생략), 없을 때만 Step 2 이후 명시적 create 로 진행해요 — 이게 "status 보고 배포가 아니면 그제서야 진짜 create" 예요. 단, Step 1.6 이 이미 in-flight 를 처리했으면 (특히 사용자가 거기서 `force_new` 를 골랐으면) 그 선택을 존중해서 이 gate 는 건너뛰고 Step 2 로 진행해요 — 같은 in-flight 를 다시 watch 로 되돌리지 않아요.
 
    ```bash
    echo '[deploy:Step 1.7 status-first] entered' >&2
@@ -658,12 +658,12 @@ To deploy:
      PROFILE_FLAG=(--profile "$PROFILE")
    fi
    cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${CONSENT_PROFILE}","branch":"${BRANCH}","commit_sha":"${COMMIT_SHA}","context":{}}
+   {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${CONSENT_PROFILE}","branch":"","commit_sha":"${COMMIT_SHA}","context":{}}
    JSON
 
    AXHUB_STDERR_TMP=$(mktemp)
    AXHUB_STDOUT_TMP=$(mktemp)
-   axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --branch "$BRANCH" --commit "$COMMIT_SHA" --json >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
+   axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --commit "$COMMIT_SHA" --execute --json >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
    AXHUB_EXIT=$?
    # Format: "axhub-error-sub-key: 64:validation.deployment_in_progress" (main.rs:1845, quality_gate.rs:15)
    if [ $AXHUB_EXIT -eq 64 ] && grep -qE '^axhub-error-sub-key:.*64:validation\.deployment_in_progress' "$AXHUB_STDERR_TMP" 2>/dev/null; then
@@ -698,7 +698,7 @@ To deploy:
    ```powershell
    $AxhubStderrTmp = New-TemporaryFile
    $AxhubStdoutTmp = New-TemporaryFile
-   & axhub deploy create --app $env:APP_ID @ProfileFlag --branch $env:BRANCH --commit $env:COMMIT_SHA --json 1>$AxhubStdoutTmp.FullName 2>$AxhubStderrTmp.FullName
+   & axhub deploy create --app $env:APP_ID @ProfileFlag --commit $env:COMMIT_SHA --execute --json 1>$AxhubStdoutTmp.FullName 2>$AxhubStderrTmp.FullName
    $AxhubExit = $LASTEXITCODE
    # Format: "axhub-error-sub-key: 64:validation.deployment_in_progress" (main.rs:1845, quality_gate.rs:15)
    if ($AxhubExit -eq 64 -and (Select-String -Path $AxhubStderrTmp.FullName -Pattern '^axhub-error-sub-key:.*64:validation\.deployment_in_progress' -Quiet)) {
@@ -736,7 +736,7 @@ To deploy:
    Remove-Item $AxhubStdoutTmp.FullName -Force
    ```
 
-   The next Bash tool call id is created by Claude after consent-mint runs, so never invent `${NEXT_BASH_TOOL_CALL_ID}`, never set a fake `CLAUDE_SESSION_ID`, and never clear the real session env just to mint consent. `tool_call_id:"pending"` explicitly mints a short-lived pending token; the PreToolUse hook claims it once only when action/app/profile/branch/commit/context all match. If the token is absent, already used, expired, or non-matching, the command is blocked. This avoids POSIX-only session-unset commands and keeps the flow portable across macOS/Linux/Windows Claude Code environments.
+   The next Bash tool call id is created by Claude after consent-mint runs, so never invent `${NEXT_BASH_TOOL_CALL_ID}`, never set a fake `CLAUDE_SESSION_ID`, and never clear the real session env just to mint consent. `tool_call_id:"pending"` explicitly mints a short-lived pending token; the PreToolUse hook claims it once only when action/app/profile/commit/context all match. If the token is absent, already used, expired, or non-matching, the command is blocked. This avoids POSIX-only session-unset commands and keeps the flow portable across macOS/Linux/Windows Claude Code environments.
 
 5. **Post-deploy chain** — capture `.id` from the deploy create JSON, then auto-follow until terminal:
 
@@ -840,7 +840,7 @@ Cancel is a mutation. Preview the in-progress deployment first:
 Mint consent with stdin JSON using `action=deploy_cancel`, top-level `app_id`, and `context={deployment_id}` and then run:
 
 ```bash
-axhub deploy cancel "$DEPLOYMENT_ID" --app "$APP_ID" --yes --json
+axhub deploy cancel "$DEPLOYMENT_ID" --app "$APP_ID" --execute --json
 ```
 
 After cancellation, run a read-only status check and summarize the terminal state.
@@ -854,7 +854,7 @@ After cancellation, run a read-only status check and summarize the terminal stat
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop `--json` (parsing relies on it).
 - NEVER call `axhub deploy create` without going through `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint` first; the PreToolUse hook will deny.
-- NEVER bypass the `preauth-check` consent hook by stripping flags from the command (e.g. dropping `--branch`), building a command wrapper, symlinking `axhub` to a shim, or reordering `PATH` to shadow the real CLI. A denied `deploy create` means the consent binding did not match — improvising around the gate defeats the safety primitive. Surface the typed reason in one jargon-free line and stop, or fall back to the Step 1.7 status-first watch.
+- NEVER bypass the `preauth-check` consent hook by changing command semantics (e.g. omitting `--execute`, changing `--app`, or changing `--commit`), building a command wrapper, symlinking `axhub` to a shim, or reordering `PATH` to shadow the real CLI. A denied `deploy create` means the consent binding did not match — improvising around the gate defeats the safety primitive. Surface the typed reason in one jargon-free line and stop, or fall back to the Step 1.7 status-first watch.
 - NEVER instruct the user to run `axhub deploy create`, `axhub deploy watch`, or any other deploy CLI command themselves — in their own terminal or via a `!`-prefixed prompt. Handing the raw command to the user is a consent-hook bypass equivalent to flag-stripping: it defeats the same safety primitive and skips the `--watch-timeout` polling contract. The agent runs deploy and watch itself inside this SKILL flow; if blocked, surface the typed reason in one jargon-free line and stop, or fall back to the Step 1.7 status-first watch — never delegate the raw command to the user.
 - NEVER mint consent or run `deploy create` when Step 1.7 status-first already found an in-flight deploy for this app; route to watch instead. `deploy create` is the fallback only when no deploy is running.
 - NEVER call `axhub deploy cancel` without a matching `deploy_cancel` consent token.

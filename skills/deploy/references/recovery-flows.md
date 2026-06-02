@@ -318,7 +318,7 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
 
 4. **On `switch_prod`:** override profile for this single invocation:
    ```bash
-   axhub deploy create --profile production --app <APP_ID> --branch <BRANCH> --commit <SHA> --json
+   axhub deploy create --profile production --app <APP_ID> --commit <SHA> --execute --json
    ```
    Do NOT mutate `$AXHUB_PROFILE` globally — this is a single-shot override.
 

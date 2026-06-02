@@ -336,6 +336,7 @@ mod tests {
                 expires_at: None,
                 expires_human: None,
                 current_app: None,
+                current_team_id: None,
                 current_env: None,
                 last_deploy_id: None,
                 last_deploy_status: None,

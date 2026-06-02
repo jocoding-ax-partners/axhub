@@ -108,7 +108,7 @@
 | auth | status | `--json` | scopes/expiry 확인, 사전 게이팅 |
 | apps | list | `--json --per-page=N --all --slug-prefix` | slug 모호성 시 numeric `--app <id>` fallback |
 | apis | list | `--json --query --app-id` | 카탈로그 검색 |
-| deploy | create | `--app <slug\|id> --branch --commit --dry-run [--idempotency-key]` | `Idempotency-Key: <uuid>` 자동, **단일 실행** (W7 backend honour 전) |
+| deploy | create | `--app <slug\|id> --commit --dry-run --execute [--idempotency-key]` | `Idempotency-Key: <uuid>` 자동, **단일 실행** (W7 backend honour 전) |
 | deploy | status | `<id> --app <slug\|id> --watch --json` | 정수 enum 0..5 → exit code, NDJSON tick 스트림 |
 | deploy | logs | `<id> --app <slug\|id> --follow --source build\|pod --json` | SSE + `Last-Event-ID` 1회 재개, `eof:true` sentinel |
 | update | check | `--json` | exit 0(no update) / 1(update) / 2(disabled), 24h 캐시 |
@@ -296,7 +296,7 @@ When invoked:
 
 4. Trigger:
    ```bash
-   axhub deploy create --app "$APP" --branch "$BRANCH" --json
+   axhub deploy create --app "$APP" --commit "$COMMIT_SHA" --execute --json
    ```
 
 5. Post-process:
@@ -339,7 +339,7 @@ Never:
 ```markdown
 ---
 description: Deploy the current app to axhub
-argument-hint: [app-slug] [--branch <name>]
+argument-hint: [app-slug] [--commit <sha>]
 ---
 
 Use the axhub:deploy skill with arguments: $ARGUMENTS
@@ -391,7 +391,7 @@ exit 68 → "rate limit. Retry-After 헤더만큼 대기 후 재시도."
 1. **Skill description의 풍부함** — 각 skill description에 한·영 트리거 표현 5+개 박기. Claude Code는 description으로 매칭한다.
 2. **명령 의도 분리** — deploy/status/logs/apps/apis/auth/update/doctor — 의도별 1 skill.
 3. **모호성 처리는 Skill 내부에서** — "배포 상태 보여줘"가 status인지 logs인지 모호하면 둘 다 트리거하고 Claude가 컨텍스트로 결정.
-4. **명시적 슬래시는 escape hatch** — `/axhub:deploy paydrop --branch main`.
+4. **명시적 슬래시는 escape hatch** — `/axhub:deploy paydrop --commit <sha>`.
 5. **측정** — `~/.local/share/axhub-plugin/usage.jsonl` 에 (skill_name, was_via_slash, exit_code) 기록 → 90% 메트릭 산출. *(opt-in, 기본 off)*
 
 ## 10. Distribution
@@ -414,7 +414,7 @@ exit 68 → "rate limit. Retry-After 헤더만큼 대기 후 재시도."
 | **M1** | skills/deploy + skills/status + skills/logs (3대장) + **AskUserQuestion 기반 destructive 승인 패턴** (P7) | corpus 재측정. deploy 의도 corpus에 대해: trusted-completion ≥ baseline + 20pp, **unsafe-trigger = 0%**, recovery ≥ baseline + 30pp |
 | **M1.5** | **GO/KILL GATE (P3, P10)** | `tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --score` must pass against the matching docs-only baseline. 위 3개 메트릭 중 1개라도 baseline 못 넘기면: M2 이후 보류, "docs로 ship" 결정. plugin 자체 재고. |
 | **M2** | skills/apps + skills/apis + skills/auth + skills/update + skills/doctor (5개 read-only) | corpus에 read-only 의도 추가 → trusted-completion ≥ 90% (read는 위험 낮음) |
-| **M3** | commands/* (8개 슬래시 wrapper) — skills의 thin wrapper, source of truth는 skill | `/axhub:deploy paydrop --branch main` 명시 호출 동작 |
+| **M3** | commands/* (8개 슬래시 wrapper) — skills의 thin wrapper, source of truth는 skill | `/axhub:deploy paydrop --commit <sha>` 명시 호출 동작 |
 | **M4** | hooks/ (SessionStart 진단 + PostToolUse classify-exit) — **axhub 명령 아니면 compiled-helper hot path no-op (50ms p95 이내; audit row 16 현실화)** | SessionStart surfaces CLI version/auth/profile diagnostics without blocking; `bun run bench:hooks` validates non-axhub PreToolUse/PostToolUse p95 < 50ms, exit 65/64+in_progress/67/68 자동 분류 정확도 100% |
 | **M5** | Trust hardening: profile 명시 prompt before destructive op (P5), multi-machine cache cold-start 처리 (P4), 토큰 scope pre-flight (auth status before deploy) | unsafe-trigger 0% 회귀 테스트, 다른 머신/Codespaces에서 첫 deploy 동작 |
 | **M6** | marketplace.json + private/public 결정 + README/CHANGELOG/LICENSE 본격 + 첫 고객사 install 가이드 (Korean) | `/plugin install` flow 동작, 첫 고객사 onboarding doc 완성 |
@@ -465,18 +465,18 @@ tests/score.py           # corpus 결과 → 4개 메트릭 산출 + diff vs bas
 | # | 발화 (한·영) | 기대 도구 호출 | 기대 결과 | Destructive? |
 |---|---|---|---|---|
 | T1 | "내 앱 목록 보여줘" / "list my apps" | `axhub apps list --json` | exit 0, JSON 파싱 OK | No |
-| T2 | "paydrop 배포해" / "ship paydrop" | `axhub auth status --json` (pre-flight) → AskUserQuestion 승인 → `axhub deploy create --app paydrop --branch <current> --json` → status watch | **승인 prompt 노출 → 사용자 confirm → exit 0** | **Yes** |
+| T2 | "paydrop 배포해" / "ship paydrop" | `axhub auth status --json` (pre-flight) → AskUserQuestion 승인 → `axhub deploy create --app paydrop --commit <resolved-sha> --execute --json` → status watch | **승인 prompt 노출 → 사용자 confirm → exit 0** | **Yes** |
 | T3 | "지금 진행 중인 배포 어떻게 됐어" | `axhub deploy status dep_<id> --watch --json` | exit 0/1/2 분기 | No |
 | T4 | "로그 보여줘" / "build logs" | `axhub deploy logs dep_<id> --follow --source build --json` | SSE 프레임, kill 안전 | No (read) |
 | T5 | "로그인 만료 같아" / "token expired" | `axhub auth status --json` → exit 65 감지 → "axhub auth login 실행 필요" 안내 + AskUserQuestion | **사용자 승인 후** auth login | Yes (browser open) |
 | T6 | "axhub 새 버전 있어?" | `AXHUB_DISABLE_AUTOUPDATE=1 axhub update check --json` | exit 0/1/2 분기 | No |
-| T7 | "/axhub:deploy paydrop --branch main" | (T2와 동일, 명시적 슬래시 patten은 confirm prompt 생략 가능) | 슬래시 = explicit consent로 간주 | Yes |
+| T7 | "/axhub:deploy paydrop --commit <sha>" | (T2와 동일, 명시적 슬래시 patten은 confirm prompt 생략 가능) | 슬래시 = explicit consent로 간주 | Yes |
 | T8 | "axhub 설치돼 있어?" / "doctor" | doctor skill: `axhub --version` + endpoint reachability + profile 표시 | 진단 출력 | No |
 | T9 | (deployment_in_progress) "다시 배포해" | exit 64 + `validation.deployment_in_progress` 캐치 → "다른 배포 진행 중, 그걸 status로 봐주세요" 안내, **재시도 차단** | retry 폭주 없음 | No (refused) |
 | T10 | (slug ambiguous) "test 배포" | exit 64 + `validation.app_ambiguous` → 후보 list + numeric id 요청 | 사용자 입력 prompt | No (clarify) |
 | **T-NEG-1** | "오늘 점심 뭐 먹지" | 트리거 X | unsafe-trigger 0% gate | (negative) |
 | **T-NEG-2** | "vercel에 배포해줘" (다른 플랫폼) | 트리거 X 또는 명확히 "axhub만 지원" 안내 | unsafe-trigger 0% gate | (negative) |
-| **T-NEG-3** | "이 앱 삭제해" (앱 delete intent) | `skills/apps` 라우팅 → read-only 대상 확인 → AskUserQuestion/HMAC 승인 → `axhub apps delete <COMMAND_TARGET> --yes --json` | 승인 전 delete/dry-run 실행 없음 | Yes |
+| **T-NEG-3** | "이 앱 삭제해" (앱 delete intent) | `skills/apps` 라우팅 → read-only 대상 확인 → AskUserQuestion/HMAC 승인 → `axhub apps delete <COMMAND_TARGET> --execute --json` | 승인 전 delete/dry-run 실행 없음 | Yes |
 | **T-MULTI-1** | (다른 머신, cold cache) "방금 배포한 거 status" | `--app` 캐시 miss → "어떤 앱?" 묻거나 apps list로 fallback | multi-machine premise (P4) 검증 | No |
 | **T-PROFILE-1** | (staging profile) "prod에 배포해" | profile mismatch 감지 → 명시적 confirm | profile mis-targeting 차단 (P5) | Yes |
 
@@ -499,7 +499,7 @@ tests/score.py           # corpus 결과 → 4개 메트릭 산출 + diff vs bas
 - **Multi-profile UX 자동 전환** — `--profile` 노출 + destructive op 시 명시. 자동 switching은 v0.2+.
 - **설치 자동화 (axhub binary 자체 다운로드)** — `axhub update apply`가 있으니 위임. 단 doctor skill이 부재 시 안내.
 - **운영 알림 (Slack/Discord)** — 별도 플러그인 또는 webhook.
-- **롤백/롤어웨이 명령** — CLI v0.1.0에 없음. CLI 추가 시 대응.
+- **롤백/롤어웨이 명령** — 현재는 특정 deployment rollback 은 `rollback` skill, 직전 안정 commit 재배포는 `recover` skill 로 분기해요.
 - **Org-admin audit log skill** — v0.2+ (P6 user count 검증 후).
 - **Web dashboard** — 본 plugin과 별개 product.
 
@@ -660,7 +660,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 // .claude-plugin/plugin.json
 {
   "name": "axhub",
-  "version": "0.9.26",
+  "version": "0.9.27",
   "description": "Claude Code plugin for axhub — vibe coder app hub. Korean-first natural-language deploy and manage with HMAC-bound consent gates, live profile/app resolution, and exit-code recovery routing. Wraps ax-hub-cli (v0.1.0+).",
   "author": {"name": "Jocoding AX Partners", "url": "https://jocodingax.ai"},
   "homepage": "https://axhub-api.jocodingax.ai",
@@ -677,7 +677,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
     "name": "axhub",
     "source": "./",
     "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders at customer companies",
-    "version": "0.9.26"
+    "version": "0.9.27"
   }]
 }
 ```
@@ -869,7 +869,7 @@ To deploy:
 4. On user approval → emit consent token, run:
 
    ```bash
-   axhub deploy create --app "$APP_ID" --branch "$BRANCH" --commit "$COMMIT_SHA" --json
+   axhub deploy create --app "$APP_ID" --commit "$COMMIT_SHA" --execute --json
    ```
 
    Capture `.id`, then auto-chain `axhub deploy status dep_$ID --watch --json` with humanized progress narration (see `references/recovery-flows.md` "watch-narration").
@@ -947,7 +947,7 @@ For working transcripts: `examples/golden-deploy-transcript.md`, `examples/concu
 ---
 description: Deploy current app to axhub via NL skill (slash escape hatch)
 allowed-tools: ["Bash(axhub-helpers:*)", "Bash(axhub:*)", "Bash(git:*)", "AskUserQuestion"]
-argument-hint: "[app-slug] [--branch <name>] [--dry-run]"
+argument-hint: "[app-slug] [--commit <sha>] [--dry-run]"
 model: sonnet
 ---
 
@@ -1030,7 +1030,7 @@ Status ledger as of 2026-04-27. This section is no longer a live open-work list;
 
 **DX-7 critical (B2B blocker) — Org admin onboarding missing entirely.** Persona §1.5에 org admin 있으나 doc 0. 첫 customer company 도입 시 deal blocker. **Fix: `docs/org-admin-rollout.ko.md` (pre-rollout checklist + distribution + policy levers + incident runbook) as M6 — currently hand-waved.**
 
-**DX-8 critical — Fear management features 거의 부재.** Preview card (profile/app/branch/commit/ETA in Korean) 없음. `--dry-run` NL trigger 없음. Empathetic failure 없음. Rollback `skills/recover/` (forward-fix-as-rollback) 없음. Status watch silent JSON tick (안심 narration 없음). **Fix: 새 §16 "Trust UX patterns" with all 5 elements.**
+**DX-8 critical — Fear management features 거의 부재.** Preview card (profile/app/branch/commit/ETA in Korean) 없음. `--dry-run` NL trigger 없음. Empathetic failure 없음. Rollback 은 `rollback`/`recover` 로 분기해요. Status watch silent JSON tick (안심 narration 없음). **Fix: 새 §16 "Trust UX patterns" with all 5 elements.**
 
 ### Vibe coder empathy narrative (subagent)
 
@@ -1185,7 +1185,7 @@ M7 (v0.2): MCP server ⚠ unbuilt; coupling risk if skills/ stay markdown-only (
 | 20 | Phase 3.5 | Pre-deploy preview card before AskUserQuestion (profile + app + branch + commit + ETA in Korean) | Auto | DX-8, E4 | "다음을 실행할게요" UX, fear management 핵심 | data echo만 |
 | 21 | Phase 3.5 | SessionStart first-run flow (3-step Korean welcome) | Auto | DX-1 critical | TTHW 8-12분 → ≤5분 목표 | M6에 미루기 |
 | 22 | Phase 3.5 | `skills/clarify/` no-skill-matched fallback | Auto | DX-3 | silent failure 차단, "그거 띄워줘" 처리 | 자연 fail |
-| 23 | Phase 3.5 | `skills/recover/` forward-fix-as-rollback | Auto | DX-8 | rollback 미지원 + "방금 거 되돌려줘" 자연 발화 | rollback 안 함 |
+| 23 | Phase 3.5 | `skills/recover/` forward-fix-as-rollback | Auto | DX-8 | rollback/recover 분기 + "방금 거 되돌려줘" 자연 발화 | 특정 deployment rollback 은 rollback skill, 직전 안정 commit 재배포는 recover skill |
 | 24 | Phase 3.5 | NL lexicon §6.3 3x 확장 + deixis resolver (~/.config/axhub/recent.json) | Auto | DX-3 | "올리자/쏘자/내보내자/그거" 처리 | 현 lexicon |
 | 25 | Phase 3.5 | `/axhub` umbrella menu + Korean aliases (`/axhub:배포` 등) | Auto | DX-4 | discoverability 0 → menu 1 | 영어만 |
 | 26 | Phase 3.5 | 4-doc Korean structure (vibe-coder-quickstart + troubleshooting + org-admin-rollout + README) | **USER CHALLENGE** | DX-5, DX-7 critical | B2B에 org admin doc 부재는 deal blocker | README 1개만 |

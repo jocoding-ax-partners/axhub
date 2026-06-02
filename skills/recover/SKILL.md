@@ -1,6 +1,6 @@
 ---
 name: recover
-description: '이 스킬은 사용자가 직전 배포를 되돌리거나 이전 버전으로 복원하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "되돌", "되돌려", "롤백", "롤백 부탁드립니다", "롤백해", "마지막 정상", "마지막 정상 빌드로", "마지막 정상 빌드로 돌려주세요", "망했어 되돌려", "방금 거 되돌려", "방금 배포 취소해", "배포 취소", "복구", "복구해", "안정 버전", "안정 버전으로", "어제 거로 돌려줘", "이전 버전", "이전 버전으로", "이전 버전으로 되돌려주세요", "잘 되던 버전으로 돌려", "직전 버전", "직전 버전으로 돌려줘", "직전 안정 버전으로 복구 부탁", "forward fix", "hot fix", "hotfix", "redeploy previous", "restore", "restore previous", "revert", "roll back", "rollback", "undo", "undo deploy", 또는 이전 상태 복원 의도. 참고: v0.1.0 CLI 가 실제 rollback 미지원이므로 직전 안정 commit 재배포 (forward-fix) 방식으로 구현합니다.'
+description: '이 스킬은 사용자가 직전 배포를 되돌리거나 이전 버전으로 복원하고 싶어할 때 사용해요. 다음 표현에서 활성화: "되돌", "되돌려", "롤백", "롤백 부탁드립니다", "롤백해", "마지막 정상", "마지막 정상 빌드로", "마지막 정상 빌드로 돌려주세요", "망했어 되돌려", "방금 거 되돌려", "방금 배포 취소해", "배포 취소", "복구", "복구해", "안정 버전", "안정 버전으로", "어제 거로 돌려줘", "이전 버전", "이전 버전으로", "이전 버전으로 되돌려주세요", "잘 되던 버전으로 돌려", "직전 버전", "직전 버전으로 돌려줘", "직전 안정 버전으로 복구 부탁", "forward fix", "hot fix", "hotfix", "redeploy previous", "restore", "restore previous", "revert", "roll back", "rollback", "undo", "undo deploy", 또는 이전 상태 복원 의도. 참고: 특정 배포로 되돌리는 `deploy rollback` 은 rollback 스킬이 담당하고, 이 스킬은 직전 안정 commit 재배포 forward-fix 를 담당해요.'
 examples:
   - utterance: "되돌"
     intent: "rollback axhub deployment"
@@ -20,7 +20,7 @@ model: sonnet
 
 # Recover (forward-fix-as-rollback)
 
-Restore the previous known-good deploy by **redeploying the prior commit**, not by reversing the current one. The axhub v0.1.0 CLI has no `axhub deploy rollback` command — this skill is transparent about that.
+Restore the previous known-good deploy by **redeploying the prior commit**, not by reversing the current one. The current CLI also has `axhub deploy rollback`; use the rollback skill for deployment-id rollback. This recover skill stays focused on forward-fix redeploy of a known-good commit.
 
 > "이건 진짜 rollback이 아니라 forward-fix예요 — 직전 안정 커밋을 다시 배포하는 방식이에요. 결과는 같지만 새 배포가 한 건 더 생겨요."
 
@@ -123,10 +123,10 @@ To recover:
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${PROFILE}","branch":"${BRANCH}","commit_sha":"${PREV_SHA}","context":{}}
+   {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${PROFILE}","branch":"","commit_sha":"${PREV_SHA}","context":{}}
    JSON
 
-   axhub deploy create --app "$APP_ID" --branch "$BRANCH" --commit "$PREV_SHA" --json
+   axhub deploy create --app "$APP_ID" --commit "$PREV_SHA" --execute --json
    ```
 
    The PreToolUse hook verifies the consent token before allowing the bash call. Do not unset or fake `CLAUDE_SESSION_ID`; `tool_call_id:"pending"` is the portable macOS/Linux/Windows path for the next real tool call.

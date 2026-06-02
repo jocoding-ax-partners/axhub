@@ -3,7 +3,7 @@
 > 바이브코더가 한국어 자연어로 axhub 앱을 안전하게 배포·관리하고, 코드 품질까지 보조받는 Claude Code 플러그인이에요.
 > 이 문서는 **이 플러그인을 개발·확장하려는 개발자를 위한 온보딩 문서**예요. 사용법만 필요하면 [§11 빠른 시작](#11-빠른-시작-사용자용)으로 바로 가요.
 
-**상태**: v0.9.26 · 32 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary 라이브.
+**상태**: v0.9.27 · 42 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary 라이브.
 
 ---
 
@@ -82,7 +82,7 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요:
                                 │ 얇은 wrapper — 비즈니스 로직 위임
                                 ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ ④ ax-hub-cli (외부 Rust CLI, 지원 surface v0.15.3 ~ <1.0.0)          │
+│ ④ ax-hub-cli (외부 Rust CLI, 지원 surface v0.17.3 ~ <1.0.0)          │
 │    auth login/status · apps · deploy create/status/logs · catalog ... │
 │    계약: 모든 호출에 --json, 구조화된 exit code(0/1/64/65/66/67/68)    │
 └───────────────────────────────┬──────────────────────────────────────┘
@@ -400,7 +400,7 @@ model: sonnet                   # haiku|sonnet|opus
 
 | 필드 | 의미 |
 |------|------|
-| `cli_version` / `in_range` / `cli_too_old` / `cli_too_new` | CLI 버전과 지원 범위(0.15.3 ~ <1.0.0) |
+| `cli_version` / `in_range` / `cli_too_old` / `cli_too_new` | CLI 버전과 지원 범위(0.17.3 ~ <1.0.0) |
 | `cli_present` / `cli_state` | CLI 존재 + 상태(`ok`/`not_found`/`config_corrupted`/`runtime_error`) |
 | `auth_ok` / `auth_error_code` / `user_email` / `expires_at` / `scopes` | 인증 상태 |
 | `current_app` / `current_env` | 현재 앱 slug / profile |

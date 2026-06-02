@@ -593,8 +593,9 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(skillDirs.length).toBeGreaterThanOrEqual(11);
   });
 
-  test("all 32 shipped skills are present, including quality expansion skills + auto-diagnose + my-resources + setup", () => {
+  test("all 42 shipped skills are present, including v0.17.3 CLI gap-fill skills", () => {
     expect(skillDirs.sort()).toEqual([
+      "app-lifecycle",
       "apps",
       "auth",
       "axhub-debug",
@@ -603,7 +604,9 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "axhub-review",
       "axhub-ship",
       "axhub-tdd",
+      "browse",
       "clarify",
+      "connectors",
       "data",
       "deploy",
       "doctor",
@@ -611,6 +614,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "env",
       "github",
       "init",
+      "inspect",
       "install-cli",
       "karpathy-guidelines",
       "logs",
@@ -618,15 +622,21 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "my-resources",
       "open",
       "profile",
+      "publish",
       "recover",
+      "resources",
+      "rollback",
       "routing-stats",
       "setup",
       "status",
+      "tables",
+      "team",
       "trace",
       "update",
       "upgrade",
       "using-axhub-quality",
       "verify",
+      "workspace",
     ]);
   });
 
@@ -866,7 +876,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     const deploy = skillContents.get("deploy")!;
     expect(deploy).toContain('axhub deploy list --app "$APP_ID" --json');
     expect(deploy).toContain('action=deploy_cancel');
-    expect(deploy).toContain('axhub deploy cancel "$DEPLOYMENT_ID" --app "$APP_ID" --yes --json');
+    expect(deploy).toContain('axhub deploy cancel "$DEPLOYMENT_ID" --app "$APP_ID" --execute --json');
   });
 
   test("skill error-catalog cross references are resolvable relative paths", () => {
@@ -1000,7 +1010,7 @@ describe("cross-manifest consistency", () => {
   test("README current-release summary matches package metadata and shipped surfaces", async () => {
     const readme = await readFile(join(REPO_ROOT, "README.md"), "utf8");
     expect(readme).toContain(`**상태**: v${packageJson.version}`);
-    expect(readme).toContain("32 SKILL / 9 command");
+    expect(readme).toContain("42 SKILL / 9 command");
     expect(readme).not.toContain("AXHUB_HELPERS_RUNTIME=ts");
     expect(readme).not.toContain("TypeScript fallback");
   });

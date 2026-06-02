@@ -166,7 +166,7 @@ mod tests {
 
     fn happy_preflight() -> PreflightOutput {
         PreflightOutput {
-            cli_version: Some("0.15.3".to_string()),
+            cli_version: Some("0.17.3".to_string()),
             in_range: true,
             cli_too_old: false,
             cli_too_new: false,
@@ -181,6 +181,7 @@ mod tests {
             expires_at: None,
             expires_human: None,
             current_app: Some("paydrop".to_string()),
+            current_team_id: Some("acme".to_string()),
             current_env: Some("prod".to_string()),
             last_deploy_id: None,
             last_deploy_status: None,

@@ -9,8 +9,8 @@ use axhub_helpers::bootstrap::{
 };
 use axhub_helpers::catalog::classify;
 use axhub_helpers::consent::{
-    format_preauth_deny_hint, mint_token, parse_axhub_command, validate_binding_schema,
-    verify_or_claim_token, verify_token, ConsentBinding,
+    format_preauth_deny_hint, mint_token, parse_axhub_command, parse_axhub_commands,
+    validate_binding_schema, verify_or_claim_token, verify_token, ConsentBinding,
 };
 use axhub_helpers::keychain::{
     parse_keyring_value, read_keychain_token_with_runner, CommandOutput,
@@ -276,13 +276,14 @@ fn preflight_semver_auth_and_exit_precedence_match_ts() {
     );
     let run = run_preflight_with_runner(|cmd| {
         match cmd {
-        ["axhub", "--version"] => SpawnResult { exit_code: EXIT_OK, stdout: "axhub 0.15.3".into(), stderr: String::new() },
-        ["axhub", "auth", "status", "--json"] => SpawnResult { exit_code: EXIT_OK, stdout: r#"{"user_email":"u@example.com","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["deploy"]}"#.into(), stderr: String::new() },
+        ["axhub", "--version"] => SpawnResult { exit_code: EXIT_OK, stdout: "axhub 0.17.3".into(), stderr: String::new() },
+        ["axhub", "auth", "status", "--json"] => SpawnResult { exit_code: EXIT_OK, stdout: r#"{"user_email":"u@example.com","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["deploy"],"current_team_id":"acme","tenants":[{"tenant_slug":"other"}]}"#.into(), stderr: String::new() },
         _ => SpawnResult { exit_code: 1, stdout: String::new(), stderr: String::new() },
     }
     });
     assert_eq!(run.exit_code, EXIT_OK);
     assert_eq!(run.output.user_email.as_deref(), Some("u@example.com"));
+    assert_eq!(run.output.current_team_id.as_deref(), Some("acme"));
     let too_new = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: EXIT_OK,
@@ -306,7 +307,7 @@ fn preflight_semver_auth_and_exit_precedence_match_ts() {
 
 #[test]
 fn preflight_admits_0_x_line_and_rejects_1_0_exclusive_max() {
-    for version in ["0.15.3", "0.15.4", "0.16.0"] {
+    for version in ["0.17.3", "0.18.0", "0.99.0"] {
         let run = run_preflight_with_runner(|cmd| {
             match cmd {
             ["axhub", "--version"] => SpawnResult {
@@ -334,7 +335,7 @@ fn preflight_admits_0_x_line_and_rejects_1_0_exclusive_max() {
     let too_old = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: EXIT_OK,
-            stdout: "axhub 0.15.2".into(),
+            stdout: "axhub 0.17.2".into(),
             stderr: String::new(),
         },
         ["axhub", "auth", "status", "--json"] => SpawnResult {
@@ -392,6 +393,12 @@ fn preflight_covers_auth_shapes_env_cache_and_cli_absence() {
     assert!(
         matches!(parse_auth_status(r#"{"user_email":"u@example.com","scopes":["deploy",1,null]}"#), AuthStatus::Ok { user_id, scopes, .. } if user_id == 0 && scopes == vec!["deploy"])
     );
+    assert!(
+        matches!(parse_auth_status(r#"{"user_email":"u@example.com","scopes":["deploy"],"current_tenant":{"tenant_slug":"acme"},"tenants":[{"tenant_slug":"other"}]}"#), AuthStatus::Ok { current_team_id, .. } if current_team_id.as_deref() == Some("acme"))
+    );
+    assert!(
+        matches!(parse_auth_status(r#"{"user_email":"u@example.com","scopes":["deploy"],"tenants":[{"tenant_slug":"acme"}]}"#), AuthStatus::Ok { current_team_id, .. } if current_team_id.is_none())
+    );
 
     std::env::set_var("HOME", guard.path("home"));
     std::env::set_var("AXHUB_PROFILE", "prod");
@@ -408,7 +415,7 @@ fn preflight_covers_auth_shapes_env_cache_and_cli_absence() {
     let auth_expired = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: EXIT_OK,
-            stdout: "axhub 0.15.3".into(),
+            stdout: "axhub 0.17.3".into(),
             stderr: String::new(),
         },
         ["axhub", "auth", "status", "--json"] => SpawnResult {
@@ -443,7 +450,7 @@ fn preflight_covers_auth_shapes_env_cache_and_cli_absence() {
     let default_plugin_version = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: EXIT_OK,
-            stdout: "axhub 0.15.3".into(),
+            stdout: "axhub 0.17.3".into(),
             stderr: String::new(),
         },
         ["axhub", "auth", "status", "--json"] => SpawnResult {
@@ -525,7 +532,7 @@ fn preflight_current_app_prefers_env_manifest_then_cache() {
     let ok_runner = |cmd: &[&str]| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: EXIT_OK,
-            stdout: "axhub 0.15.3".into(),
+            stdout: "axhub 0.17.3".into(),
             stderr: String::new(),
         },
         ["axhub", "auth", "status", "--json"] => SpawnResult {
@@ -594,7 +601,7 @@ fn preflight_uses_xdg_cache_home_for_last_deploy_cache() {
     let run = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: EXIT_OK,
-            stdout: "axhub 0.15.3".into(),
+            stdout: "axhub 0.17.3".into(),
             stderr: String::new(),
         },
         ["axhub", "auth", "status", "--json"] => SpawnResult {
@@ -871,7 +878,7 @@ fn preflight_current_app_prefers_git_remote_over_stale_global_cache() {
     let run = run_preflight_with_runner(|cmd| match cmd {
         ["axhub", "--version"] => SpawnResult {
             exit_code: 0,
-            stdout: "axhub 0.15.3\n".into(),
+            stdout: "axhub 0.17.3\n".into(),
             stderr: String::new(),
         },
         ["axhub", "auth", "status", "--json"] => SpawnResult {
@@ -1406,13 +1413,13 @@ fn consent_binding_schema_accepts_known_actions_and_rejects_required_field_gaps(
         "binding_schema:unknown_action:unknown_publish"
     );
 
-    let mut missing_branch = base_binding();
-    missing_branch.branch.clear();
+    let mut missing_commit = base_binding();
+    missing_commit.commit_sha.clear();
     assert_eq!(
-        validate_binding_schema(&missing_branch)
+        validate_binding_schema(&missing_commit)
             .unwrap_err()
             .to_string(),
-        "binding_schema:missing_field:branch"
+        "binding_schema:missing_field:commit_sha"
     );
 
     let valid_cases = [
@@ -1438,7 +1445,13 @@ fn consent_binding_schema_accepts_known_actions_and_rejects_required_field_gaps(
             "",
             "",
             "",
-            [("slug", "paydrop"), ("field", "name=Paydrop")].as_slice(),
+            [
+                ("slug", "paydrop"),
+                ("fields", "name,visibility"),
+                ("name", "Paydrop"),
+                ("visibility", "private"),
+            ]
+            .as_slice(),
         ),
         (
             "apps_delete",
@@ -1516,6 +1529,419 @@ fn consent_binding_schema_accepts_known_actions_and_rejects_required_field_gaps(
             "",
             [("endpoint_id", "endpoint_123"), ("method", "POST")].as_slice(),
         ),
+        (
+            "publish_submit",
+            "paydrop",
+            "",
+            "",
+            "",
+            [
+                ("note_length", "4"),
+                (
+                    "note_digest",
+                    "sha256:e5d5b971139eefeb36d6edb9938fa246740c90da2003626487eb2d5d9646aec6",
+                ),
+            ]
+            .as_slice(),
+        ),
+        (
+            "deploy_rollback",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("from_deployment", "dep_123")].as_slice(),
+        ),
+        (
+            "invitation_send",
+            "",
+            "",
+            "",
+            "",
+            [("email", "user@example.com"), ("tenant", "acme")].as_slice(),
+        ),
+        (
+            "invitation_bulk",
+            "",
+            "",
+            "",
+            "",
+            [("source", "users.csv"), ("tenant", "acme")].as_slice(),
+        ),
+        (
+            "invitation_cancel",
+            "",
+            "",
+            "",
+            "",
+            [("invitation_id", "inv_123"), ("tenant", "acme")].as_slice(),
+        ),
+        (
+            "invitation_resend",
+            "",
+            "",
+            "",
+            "",
+            [("invitation_id", "inv_123"), ("tenant", "acme")].as_slice(),
+        ),
+        ("access_grant", "paydrop", "", "", "", [].as_slice()),
+        ("access_revoke", "paydrop", "", "", "", [].as_slice()),
+        (
+            "access_invite",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("user", "user_123")].as_slice(),
+        ),
+        (
+            "access_uninvite",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("user", "user_123")].as_slice(),
+        ),
+        (
+            "tables_create",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("table", "orders"), ("column", "title:text")].as_slice(),
+        ),
+        (
+            "tables_drop",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("table", "orders")].as_slice(),
+        ),
+        (
+            "tables_columns_add",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("table", "orders"), ("name", "title"), ("type", "text")].as_slice(),
+        ),
+        (
+            "tables_columns_remove",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("table", "orders"), ("name", "title")].as_slice(),
+        ),
+        (
+            "tables_grants_issue",
+            "paydrop",
+            "",
+            "",
+            "",
+            [
+                ("table", "orders"),
+                ("principal_id", "user_123"),
+                ("actions", "read,write"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "tables_grants_revoke",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("table", "orders"), ("grant_id", "grant_123")].as_slice(),
+        ),
+        (
+            "data_insert",
+            "paydrop",
+            "",
+            "",
+            "",
+            [
+                ("table", "orders"),
+                ("source", "body"),
+                (
+                    "body_digest",
+                    "sha256:3529d0a41555dcce5409451ca186444db8e972ff8d5867546e0e7928f37408f5",
+                ),
+            ]
+            .as_slice(),
+        ),
+        (
+            "data_update",
+            "paydrop",
+            "",
+            "",
+            "",
+            [
+                ("table", "orders"),
+                ("row_id", "row_123"),
+                ("source", "body"),
+                (
+                    "body_digest",
+                    "sha256:a1a06dd13348c8b021ec36ab4c9cc7ec3bb9dfc979e57017429ee59ea908a277",
+                ),
+            ]
+            .as_slice(),
+        ),
+        (
+            "data_delete",
+            "paydrop",
+            "",
+            "",
+            "",
+            [("table", "orders"), ("row_id", "row_123")].as_slice(),
+        ),
+        (
+            "connector_create",
+            "",
+            "",
+            "",
+            "",
+            [
+                ("name", "warehouse"),
+                ("source", "config_file"),
+                ("tenant", "acme"),
+                ("engine", "postgres"),
+                ("config_file", "cfg.json"),
+                ("config_digest", "sha256:cfg"),
+                ("credentials_file", "creds.json"),
+                ("credentials_digest", "sha256:creds"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "connector_update",
+            "",
+            "",
+            "",
+            "",
+            [
+                ("connector_id", "conn_123"),
+                ("fields", "config,enabled"),
+                ("source", "config_file"),
+                ("tenant", "acme"),
+                ("config_file", "cfg.json"),
+                ("config_digest", "sha256:cfg"),
+                ("enabled", "true"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "connector_credentials_set",
+            "",
+            "",
+            "",
+            "",
+            [
+                ("connector_id", "conn_123"),
+                ("source", "credentials_file"),
+                ("tenant", "acme"),
+                ("credentials_file", "creds.json"),
+                ("credentials_digest", "sha256:creds"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "connector_delete",
+            "",
+            "",
+            "",
+            "",
+            [("connector_id", "conn_123"), ("tenant", "acme")].as_slice(),
+        ),
+        (
+            "apps_fork",
+            "paydrop",
+            "",
+            "",
+            "",
+            [
+                ("source", "paydrop"),
+                ("slug", "paydrop-copy"),
+                ("subdomain", "paydrop-copy"),
+                ("tenant", "acme"),
+                ("name", "Paydrop"),
+                ("template", "<source>"),
+                ("repo_public", "false"),
+            ]
+            .as_slice(),
+        ),
+        ("apps_suspend", "paydrop", "", "", "", [].as_slice()),
+        ("apps_resume", "paydrop", "", "", "", [].as_slice()),
+        (
+            "auth_oauth_client_create",
+            "paydrop",
+            "",
+            "",
+            "",
+            [
+                ("name", "web"),
+                ("type", "confidential"),
+                ("redirect_uris", "https://example.test/callback"),
+                ("scopes", "openid,profile,email"),
+                ("grant_types", "authorization_code"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "auth_oauth_revoke",
+            "",
+            "",
+            "",
+            "",
+            [("target", "tok_123"), ("client_id", "default")].as_slice(),
+        ),
+        (
+            "auth_oauth_consent_revoke",
+            "",
+            "",
+            "",
+            "",
+            [("client_id", "client_123")].as_slice(),
+        ),
+        (
+            "auth_pat_issue",
+            "",
+            "",
+            "",
+            "",
+            [
+                ("name", "ci-token"),
+                ("expires_in_days", "90"),
+                ("use", "false"),
+                ("no_save", "false"),
+                ("show_token", "false"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "auth_pat_revoke",
+            "",
+            "",
+            "",
+            "",
+            [("pat_id", "pat_123")].as_slice(),
+        ),
+        (
+            "auth_pat_use",
+            "",
+            "",
+            "",
+            "",
+            [("pat_id", "pat_123"), ("profile", "default")].as_slice(),
+        ),
+        (
+            "auth_pat_unset",
+            "",
+            "",
+            "",
+            "",
+            [("target", "active_pat"), ("profile", "default")].as_slice(),
+        ),
+        (
+            "auth_logout",
+            "",
+            "",
+            "",
+            "",
+            [("profile", "default")].as_slice(),
+        ),
+        (
+            "auth_pat_rotate",
+            "",
+            "",
+            "",
+            "",
+            [("name", "rotated")].as_slice(),
+        ),
+        (
+            "resource_namespace_create",
+            "",
+            "",
+            "",
+            "",
+            [("name", "Finance"), ("tenant", "acme")].as_slice(),
+        ),
+        (
+            "resource_rename",
+            "",
+            "",
+            "",
+            "",
+            [
+                ("resource_id", "res_123"),
+                ("name", "Finance"),
+                ("tenant", "acme"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "resource_move",
+            "",
+            "",
+            "",
+            "",
+            [
+                ("resource_id", "res_123"),
+                ("parent_id", "root"),
+                ("tenant", "acme"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "resource_bulk_register",
+            "",
+            "",
+            "",
+            "",
+            [
+                ("connector_id", "conn_123"),
+                ("source", "items_file"),
+                ("tenant", "acme"),
+                ("items_file", "items.json"),
+                ("items_digest", "sha256:items"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "resource_delete",
+            "",
+            "",
+            "",
+            "",
+            [("resource_id", "res_123"), ("tenant", "acme")].as_slice(),
+        ),
+        (
+            "resource_tag_attach",
+            "",
+            "",
+            "",
+            "",
+            [
+                ("resource_id", "res_123"),
+                ("tag_id", "tag_123"),
+                ("tenant", "acme"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "resource_tag_detach",
+            "",
+            "",
+            "",
+            "",
+            [
+                ("resource_id", "res_123"),
+                ("tag_id", "tag_123"),
+                ("tenant", "acme"),
+            ]
+            .as_slice(),
+        ),
         ("update_apply", "paydrop", "", "", "", [].as_slice()),
         ("deploy_logs_kill", "paydrop", "", "", "", [].as_slice()),
         ("auth_login", "_", "default", "_", "_", [].as_slice()),
@@ -1581,9 +2007,325 @@ fn consent_parser_recognizes_nested_shell_destructive_intents_and_ignores_safe_c
     assert_eq!(login.action.as_deref(), Some("auth_login"));
     assert_eq!(login.profile.as_deref(), Some("dev"));
 
+    for shell in [
+        r#"bash -lc 'axhub apps delete paydrop --execute --json'"#,
+        r#"sh -lc 'axhub apps delete paydrop --execute --json'"#,
+        r#"sh -e -c 'axhub apps delete paydrop --execute --json'"#,
+        r#"zsh -lc 'axhub apps delete paydrop --execute --json'"#,
+    ] {
+        let wrapped = parse_axhub_command(shell);
+        assert!(wrapped.is_destructive, "{shell}");
+        assert_eq!(wrapped.action.as_deref(), Some("apps_delete"), "{shell}");
+        assert_eq!(wrapped.app_id.as_deref(), Some("paydrop"), "{shell}");
+    }
+
+    for wrapped in [
+        "/opt/homebrew/bin/axhub apps delete paydrop --execute --json",
+        "./axhub apps delete paydrop --execute --json",
+        "env -S 'axhub apps delete paydrop --execute --json'",
+        "env --split-string='axhub apps delete paydrop --execute --json'",
+    ] {
+        let parsed = parse_axhub_command(wrapped);
+        assert!(parsed.is_destructive, "{wrapped}");
+        assert_eq!(parsed.action.as_deref(), Some("apps_delete"), "{wrapped}");
+        assert_eq!(parsed.app_id.as_deref(), Some("paydrop"), "{wrapped}");
+    }
+
+    let dynamic_eval =
+        parse_axhub_command("eval $(echo axhub apps delete paydrop --execute --json)");
+    assert!(dynamic_eval.is_destructive);
+    assert_eq!(
+        dynamic_eval.action.as_deref(),
+        Some("unknown_axhub_mutation")
+    );
+    assert_eq!(
+        dynamic_eval.context.get("reason").map(String::as_str),
+        Some("dynamic_shell_axhub_mutation")
+    );
+
+    for variable_command in [
+        "AXHUB_BIN=axhub; $AXHUB_BIN apps delete paydrop --execute --json",
+        "${AXHUB_BIN:-axhub} apps delete paydrop --execute --json",
+        "CMD=axhub; $CMD apps delete paydrop --execute --json",
+    ] {
+        let parsed = parse_axhub_command(variable_command);
+        assert!(parsed.is_destructive, "{variable_command}");
+        assert_eq!(
+            parsed.action.as_deref(),
+            Some("unknown_axhub_mutation"),
+            "{variable_command}"
+        );
+        assert_eq!(
+            parsed.context.get("reason").map(String::as_str),
+            Some("variable_axhub_command"),
+            "{variable_command}"
+        );
+    }
+
+    for runner_command in [
+        "printf '%s\n' paydrop | xargs -I{} axhub apps delete {} --execute --json",
+        "find . -name apphub.yaml -exec axhub apps delete paydrop --execute --json ;",
+    ] {
+        let parsed = parse_axhub_command(runner_command);
+        assert!(parsed.is_destructive, "{runner_command}");
+        assert_eq!(
+            parsed.action.as_deref(),
+            Some("unknown_axhub_mutation"),
+            "{runner_command}"
+        );
+        assert_eq!(
+            parsed.context.get("reason").map(String::as_str),
+            Some("indirect_axhub_runner"),
+            "{runner_command}"
+        );
+    }
+
+    let stdin_shell =
+        parse_axhub_command("printf '%s\n' 'axhub apps delete paydrop --execute --json' | sh");
+    assert!(stdin_shell.is_destructive);
+    assert_eq!(
+        stdin_shell.action.as_deref(),
+        Some("unknown_axhub_mutation")
+    );
+    assert_eq!(
+        stdin_shell.context.get("reason").map(String::as_str),
+        Some("shell_script_axhub_mutation")
+    );
+
+    let shell_function =
+        parse_axhub_command(r#"a(){ axhub "$@"; }; a apps delete paydrop --execute --json"#);
+    assert!(shell_function.is_destructive);
+    assert_eq!(
+        shell_function.action.as_deref(),
+        Some("unknown_axhub_mutation")
+    );
+    assert_eq!(
+        shell_function.context.get("reason").map(String::as_str),
+        Some("shell_alias_axhub_mutation")
+    );
+
+    for shell_alias in [
+        "alias a=axhub; a apps delete paydrop --execute --json",
+        "shopt -s expand_aliases; alias a=axhub; a apps delete paydrop --execute --json",
+        "alias a=/opt/homebrew/bin/axhub; a apps delete paydrop --execute --json",
+        "a ()\n{ axhub \"$@\"; }\na apps delete paydrop --execute --json",
+    ] {
+        let parsed = parse_axhub_command(shell_alias);
+        assert!(parsed.is_destructive, "{shell_alias}");
+        assert_eq!(
+            parsed.action.as_deref(),
+            Some("unknown_axhub_mutation"),
+            "{shell_alias}"
+        );
+        assert_eq!(
+            parsed.context.get("reason").map(String::as_str),
+            Some("shell_alias_axhub_mutation"),
+            "{shell_alias}"
+        );
+    }
+
+    let deploy_with_dynamic_arg = parse_axhub_command(
+        "axhub deploy create --app paydrop --commit $(git rev-parse HEAD) --execute --json",
+    );
+    assert!(deploy_with_dynamic_arg.is_destructive);
+    assert_eq!(
+        deploy_with_dynamic_arg.action.as_deref(),
+        Some("deploy_create")
+    );
+
     let safe = parse_axhub_command("axhub deploy logs --app paydrop");
     assert!(!safe.is_destructive);
     assert!(safe.action.is_none());
+
+    let chained = parse_axhub_commands(
+        "axhub deploy create --app paydrop --commit abc123 --execute --json && axhub apps delete victim --execute --json",
+    );
+    assert_eq!(chained.len(), 2);
+    assert_eq!(chained[0].action.as_deref(), Some("deploy_create"));
+    assert_eq!(chained[1].action.as_deref(), Some("apps_delete"));
+
+    let hidden_wrapped = parse_axhub_commands(
+        "axhub deploy create --app paydrop --commit abc123 --execute --json && bash -lc 'axhub apps delete victim --execute --json'",
+    );
+    assert_eq!(hidden_wrapped.len(), 2);
+    assert_eq!(hidden_wrapped[0].action.as_deref(), Some("deploy_create"));
+    assert_eq!(hidden_wrapped[1].action.as_deref(), Some("apps_delete"));
+    assert_eq!(hidden_wrapped[1].app_id.as_deref(), Some("victim"));
+
+    let hidden_path_qualified = parse_axhub_commands(
+        "axhub deploy create --app paydrop --commit abc123 --execute --json && /opt/homebrew/bin/axhub apps delete victim --execute --json",
+    );
+    assert_eq!(hidden_path_qualified.len(), 2);
+    assert_eq!(
+        hidden_path_qualified[1].action.as_deref(),
+        Some("apps_delete")
+    );
+    assert_eq!(hidden_path_qualified[1].app_id.as_deref(), Some("victim"));
+
+    let repeated = parse_axhub_commands(
+        "axhub apps delete paydrop --execute --json ; axhub apps delete paydrop --execute --json",
+    );
+    assert_eq!(
+        repeated.len(),
+        2,
+        "identical destructive commands must not collapse into one consent check"
+    );
+
+    let loop_wrapped =
+        parse_axhub_command("for i in 1; do axhub apps delete paydrop --execute --json; done");
+    assert!(loop_wrapped.is_destructive);
+    assert_eq!(loop_wrapped.action.as_deref(), Some("apps_delete"));
+    assert_eq!(loop_wrapped.app_id.as_deref(), Some("paydrop"));
+
+    let newline_loop_wrapped =
+        parse_axhub_command("for i in 1\ndo axhub apps delete paydrop --execute --json\ndone");
+    assert!(newline_loop_wrapped.is_destructive);
+    assert_eq!(newline_loop_wrapped.action.as_deref(), Some("apps_delete"));
+    assert_eq!(newline_loop_wrapped.app_id.as_deref(), Some("paydrop"));
+
+    let env_wrapped =
+        parse_axhub_command("env AXHUB_PROFILE=prod axhub apps delete paydrop --execute --json");
+    assert!(env_wrapped.is_destructive);
+    assert_eq!(env_wrapped.action.as_deref(), Some("apps_delete"));
+    assert_eq!(env_wrapped.app_id.as_deref(), Some("paydrop"));
+
+    let sudo_wrapped =
+        parse_axhub_command("sudo -u deploy axhub apps delete paydrop --execute --json");
+    assert!(sudo_wrapped.is_destructive);
+    assert_eq!(sudo_wrapped.action.as_deref(), Some("apps_delete"));
+    assert_eq!(sudo_wrapped.app_id.as_deref(), Some("paydrop"));
+
+    let nohup_wrapped = parse_axhub_command("nohup axhub apps delete paydrop --execute --json");
+    assert!(nohup_wrapped.is_destructive);
+    assert_eq!(nohup_wrapped.action.as_deref(), Some("apps_delete"));
+    assert_eq!(nohup_wrapped.app_id.as_deref(), Some("paydrop"));
+
+    for wrapped in [
+        "time -p axhub apps delete paydrop --execute --json",
+        "command -p axhub apps delete paydrop --execute --json",
+        "exec -a axhub-proxy axhub apps delete paydrop --execute --json",
+        "nohup -- axhub apps delete paydrop --execute --json",
+    ] {
+        let parsed = parse_axhub_command(wrapped);
+        assert!(parsed.is_destructive, "{wrapped}");
+        assert_eq!(parsed.action.as_deref(), Some("apps_delete"), "{wrapped}");
+        assert_eq!(parsed.app_id.as_deref(), Some("paydrop"), "{wrapped}");
+    }
+
+    let unknown_fleet =
+        parse_axhub_command("axhub deploy fleet --apps paydrop,crm --commit abc --execute --json");
+    assert!(unknown_fleet.is_destructive);
+    assert_eq!(
+        unknown_fleet.action.as_deref(),
+        Some("unknown_axhub_mutation")
+    );
+    assert_eq!(
+        unknown_fleet
+            .context
+            .get("command_path")
+            .map(String::as_str),
+        Some("deploy fleet")
+    );
+
+    let env_profile_logout = parse_axhub_command("AXHUB_PROFILE=prod axhub auth logout --json");
+    assert!(env_profile_logout.is_destructive);
+    assert_eq!(env_profile_logout.action.as_deref(), Some("auth_logout"));
+    assert_eq!(
+        env_profile_logout
+            .context
+            .get("profile")
+            .map(String::as_str),
+        Some("prod")
+    );
+
+    let publish_note = parse_axhub_command(
+        r#"axhub publish --app paydrop --note "ship totally different note" --json"#,
+    );
+    assert_eq!(publish_note.action.as_deref(), Some("publish_submit"));
+    assert_eq!(
+        publish_note.context.get("note_length").map(String::as_str),
+        Some("27"),
+        "quoted multi-word publish note must stay intact"
+    );
+
+    let app_update = parse_axhub_command(
+        r#"axhub apps update paydrop --description "launch copy update" --json"#,
+    );
+    assert_eq!(app_update.action.as_deref(), Some("apps_update"));
+    assert_eq!(
+        app_update.context.get("description").map(String::as_str),
+        Some("launch copy update"),
+        "quoted multi-word app update value must stay intact"
+    );
+
+    let temp = tempfile::tempdir().unwrap();
+    let axhub_payload_dir = temp.path().join("axhub");
+    std::fs::create_dir_all(&axhub_payload_dir).unwrap();
+    let cfg = axhub_payload_dir.join("cfg.json").display().to_string();
+    let creds = temp.path().join("creds.json").display().to_string();
+    std::fs::write(&cfg, br#"{"host":"db.internal"}"#).unwrap();
+    std::fs::write(&creds, br#"{"username":"svc","password":"redacted"}"#).unwrap();
+    let same_bash_file_write = parse_axhub_command(&format!(
+        "printf '{{\"host\":\"evil\"}}' > \"{cfg}\" && axhub connectors create --tenant acme --name warehouse --engine postgres --config-file \"{cfg}\" --credentials-file \"{creds}\" --execute --json"
+    ));
+    assert!(same_bash_file_write.is_destructive);
+    assert_eq!(
+        same_bash_file_write.action.as_deref(),
+        Some("unknown_axhub_mutation")
+    );
+    assert_eq!(
+        same_bash_file_write
+            .context
+            .get("reason")
+            .map(String::as_str),
+        Some("same_bash_payload_file_write")
+    );
+
+    let python_payload_rewrite = parse_axhub_command(&format!(
+        "python3 -c 'from pathlib import Path; Path(\"{cfg}\").write_text(\"{{}}\")' && axhub connectors create --tenant acme --name warehouse --engine postgres --config-file \"{cfg}\" --credentials-file \"{creds}\" --execute --json"
+    ));
+    assert!(python_payload_rewrite.is_destructive);
+    assert_eq!(
+        python_payload_rewrite.action.as_deref(),
+        Some("unknown_axhub_mutation")
+    );
+    assert_eq!(
+        python_payload_rewrite
+            .context
+            .get("reason")
+            .map(String::as_str),
+        Some("same_bash_payload_file_write")
+    );
+
+    let parent = axhub_payload_dir.display().to_string();
+    let relative_payload_rewrite = parse_axhub_command(&format!(
+        "cd \"{parent}\" && printf '{{\"host\":\"evil\"}}' > cfg.json && axhub connectors create --tenant acme --name warehouse --engine postgres --config-file \"{cfg}\" --credentials-file \"{creds}\" --execute --json"
+    ));
+    assert!(relative_payload_rewrite.is_destructive);
+    assert_eq!(
+        relative_payload_rewrite.action.as_deref(),
+        Some("unknown_axhub_mutation")
+    );
+    assert_eq!(
+        relative_payload_rewrite
+            .context
+            .get("reason")
+            .map(String::as_str),
+        Some("same_bash_payload_file_write")
+    );
+
+    let link_payload_swap = parse_axhub_command(&format!(
+        "ln -sf \"{creds}\" \"{cfg}\" && axhub connectors create --tenant acme --name warehouse --engine postgres --config-file \"{cfg}\" --credentials-file \"{creds}\" --execute --json"
+    ));
+    assert!(link_payload_swap.is_destructive);
+    assert_eq!(
+        link_payload_swap.action.as_deref(),
+        Some("unknown_axhub_mutation")
+    );
+    assert_eq!(
+        link_payload_swap.context.get("reason").map(String::as_str),
+        Some("same_bash_payload_file_write")
+    );
 }
 
 #[test]
@@ -1614,10 +2356,16 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
             [("source", "interactive")].as_slice(),
         ),
         (
-            "axhub apps update paydrop --field name=Paydrop --json",
+            "axhub apps create --name Paydrop --slug paydrop --json",
+            "apps_create",
+            Some("paydrop"),
+            [("slug", "paydrop"), ("source", "inline")].as_slice(),
+        ),
+        (
+            "axhub apps update paydrop --name Paydrop --visibility private --json",
             "apps_update",
             Some("paydrop"),
-            [("slug", "paydrop"), ("field", "name=Paydrop")].as_slice(),
+            [("slug", "paydrop"), ("fields", "name,visibility"), ("name", "Paydrop"), ("visibility", "private")].as_slice(),
         ),
         (
             "axhub apps delete paydrop --yes --json",
@@ -1654,6 +2402,419 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
             "deploy_cancel",
             Some("paydrop"),
             [("deployment_id", "dep_123")].as_slice(),
+        ),
+        (
+            "axhub deploy rollback --app paydrop --from-deployment dep_123 --execute --json",
+            "deploy_rollback",
+            Some("paydrop"),
+            [("from_deployment", "dep_123")].as_slice(),
+        ),
+        (
+            "axhub publish --app paydrop --note ship --json",
+            "publish_submit",
+            Some("paydrop"),
+            [
+                ("note_length", "4"),
+                (
+                    "note_digest",
+                    "sha256:e5d5b971139eefeb36d6edb9938fa246740c90da2003626487eb2d5d9646aec6",
+                ),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub invitations send user@example.com --role member --tenant acme --json",
+            "invitation_send",
+            None,
+            [
+                ("email", "user@example.com"),
+                ("role", "member"),
+                ("tenant", "acme"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub invitations bulk --from-file users.csv --role member --strict --execute --tenant acme --json",
+            "invitation_bulk",
+            None,
+            [("source", "users.csv"), ("role", "member"), ("tenant", "acme")].as_slice(),
+        ),
+        (
+            "axhub invitations cancel inv_123 --execute --tenant acme --json",
+            "invitation_cancel",
+            None,
+            [("invitation_id", "inv_123"), ("tenant", "acme")].as_slice(),
+        ),
+        (
+            "axhub invitations resend inv_123 --role member --execute --tenant acme --json",
+            "invitation_resend",
+            None,
+            [
+                ("invitation_id", "inv_123"),
+                ("role", "member"),
+                ("tenant", "acme"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub access grant --app paydrop --json",
+            "access_grant",
+            Some("paydrop"),
+            [].as_slice(),
+        ),
+        (
+            "axhub access revoke --app paydrop --execute --json",
+            "access_revoke",
+            Some("paydrop"),
+            [].as_slice(),
+        ),
+        (
+            "axhub access invite --app paydrop --user user_123 --execute --json",
+            "access_invite",
+            Some("paydrop"),
+            [("user", "user_123")].as_slice(),
+        ),
+        (
+            "axhub access uninvite --app paydrop --user user_123 --execute --json",
+            "access_uninvite",
+            Some("paydrop"),
+            [("user", "user_123")].as_slice(),
+        ),
+        (
+            "axhub tables create orders --app paydrop --column title:text --owner-column owner_id --execute --json",
+            "tables_create",
+            Some("paydrop"),
+            [("table", "orders"), ("column", "title:text")].as_slice(),
+        ),
+        (
+            "axhub tables drop orders --app paydrop --confirm orders --execute --json",
+            "tables_drop",
+            Some("paydrop"),
+            [("table", "orders")].as_slice(),
+        ),
+        (
+            "axhub tables columns add orders --app paydrop --name title --type text --nullable --execute --json",
+            "tables_columns_add",
+            Some("paydrop"),
+            [("table", "orders"), ("name", "title"), ("type", "text")].as_slice(),
+        ),
+        (
+            "axhub tables columns remove orders --app paydrop --name title --execute --json",
+            "tables_columns_remove",
+            Some("paydrop"),
+            [("table", "orders"), ("name", "title")].as_slice(),
+        ),
+        (
+            "axhub tables grants issue orders --app paydrop --principal-id user_123 --principal-type user --actions read,write --execute --json",
+            "tables_grants_issue",
+            Some("paydrop"),
+            [
+                ("table", "orders"),
+                ("principal_id", "user_123"),
+                ("actions", "read,write"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub tables grants issue --app paydrop --table orders --principal-id user_123 --principal-type user --actions read,write --execute --json",
+            "tables_grants_issue",
+            Some("paydrop"),
+            [
+                ("table", "orders"),
+                ("principal_id", "user_123"),
+                ("actions", "read,write"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub tables grants revoke --app paydrop --table orders --grant-id grant_123 --execute --json",
+            "tables_grants_revoke",
+            Some("paydrop"),
+            [("table", "orders"), ("grant_id", "grant_123")].as_slice(),
+        ),
+        (
+            "axhub data insert orders --app paydrop --body '{\"title\":\"A\"}' --execute --json",
+            "data_insert",
+            Some("paydrop"),
+            [
+                ("table", "orders"),
+                ("source", "body"),
+                (
+                    "body_digest",
+                    "sha256:3529d0a41555dcce5409451ca186444db8e972ff8d5867546e0e7928f37408f5",
+                ),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub data update orders row_123 --app paydrop --body '{\"title\":\"B\"}' --execute --json",
+            "data_update",
+            Some("paydrop"),
+            [
+                ("table", "orders"),
+                ("row_id", "row_123"),
+                ("source", "body"),
+                (
+                    "body_digest",
+                    "sha256:a1a06dd13348c8b021ec36ab4c9cc7ec3bb9dfc979e57017429ee59ea908a277",
+                ),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub data delete orders row_123 --app paydrop --execute --json",
+            "data_delete",
+            Some("paydrop"),
+            [("table", "orders"), ("row_id", "row_123")].as_slice(),
+        ),
+        (
+            "axhub connectors create --tenant acme --name warehouse --engine postgres --config-file cfg.json --credentials-stdin --execute --json",
+            "connector_create",
+            None,
+            [
+                ("tenant", "acme"),
+                ("name", "warehouse"),
+                ("source", "config_file"),
+                ("engine", "postgres"),
+                ("config_file", "cfg.json"),
+                ("credentials_source", "stdin"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub connectors update conn_123 --tenant acme --config-file cfg.json --enabled --execute --json",
+            "connector_update",
+            None,
+            [
+                ("connector_id", "conn_123"),
+                ("tenant", "acme"),
+                ("fields", "config,enabled"),
+                ("source", "config_file"),
+                ("config_file", "cfg.json"),
+                ("enabled", "true"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub connectors credentials-set conn_123 --tenant acme --credentials-stdin --execute --json",
+            "connector_credentials_set",
+            None,
+            [
+                ("connector_id", "conn_123"),
+                ("tenant", "acme"),
+                ("source", "stdin"),
+                ("credentials_source", "stdin"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub connectors delete conn_123 --tenant acme --execute --json",
+            "connector_delete",
+            None,
+            [("connector_id", "conn_123"), ("tenant", "acme")].as_slice(),
+        ),
+        (
+            "axhub apps fork paydrop --slug paydrop-copy --subdomain paydrop-copy --name Paydrop --tenant acme --execute --json",
+            "apps_fork",
+            Some("paydrop"),
+            [
+                ("source", "paydrop"),
+                ("slug", "paydrop-copy"),
+                ("subdomain", "paydrop-copy"),
+                ("tenant", "acme"),
+                ("name", "Paydrop"),
+                ("template", "<source>"),
+                ("repo_public", "false"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub apps fork paydrop --slug paydrop-copy --subdomain paydrop-copy --repo-public --template tmpl_1 --execute --json",
+            "apps_fork",
+            Some("paydrop"),
+            [
+                ("source", "paydrop"),
+                ("slug", "paydrop-copy"),
+                ("subdomain", "paydrop-copy"),
+                ("tenant", "<active>"),
+                ("name", "paydrop-copy"),
+                ("template", "tmpl_1"),
+                ("repo_public", "true"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub apps suspend paydrop --execute --json",
+            "apps_suspend",
+            Some("paydrop"),
+            [].as_slice(),
+        ),
+        (
+            "axhub apps resume paydrop --execute --json",
+            "apps_resume",
+            Some("paydrop"),
+            [].as_slice(),
+        ),
+        (
+            "axhub resources namespace create --tenant acme --name Finance --parent-id root --execute --json",
+            "resource_namespace_create",
+            None,
+            [
+                ("name", "Finance"),
+                ("tenant", "acme"),
+                ("parent_id", "root"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub resources rename res_123 --tenant acme --name Finance --execute --json",
+            "resource_rename",
+            None,
+            [
+                ("resource_id", "res_123"),
+                ("name", "Finance"),
+                ("tenant", "acme"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub resources move res_123 --tenant acme --root --execute --json",
+            "resource_move",
+            None,
+            [
+                ("resource_id", "res_123"),
+                ("parent_id", "root"),
+                ("tenant", "acme"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub resources bulk-register --tenant acme --connector-id conn_123 --items-file items.json --include-columns --execute --json",
+            "resource_bulk_register",
+            None,
+            [
+                ("connector_id", "conn_123"),
+                ("source", "items_file"),
+                ("tenant", "acme"),
+                ("items_file", "items.json"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub resources bulk-register --tenant acme --connector-id conn_123 --items-json '[{\"id\":\"r1\"}]' --execute --json",
+            "resource_bulk_register",
+            None,
+            [
+                ("connector_id", "conn_123"),
+                ("source", "items_json"),
+                ("tenant", "acme"),
+                (
+                    "items_digest",
+                    "sha256:a10d3b7f0554b0797e1c7dd145507f71a2aecb2b2a3cc446d9a4642463978b28",
+                ),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub auth oauth client create --app paydrop --name web --type confidential --redirect-uri https://example.test/callback --scope openid --scope profile --scope email --grant-type authorization_code --execute --json",
+            "auth_oauth_client_create",
+            Some("paydrop"),
+            [
+                ("name", "web"),
+                ("type", "confidential"),
+                ("redirect_uris", "https://example.test/callback"),
+                ("scopes", "openid,profile,email"),
+                ("grant_types", "authorization_code"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub auth oauth revoke tok_123 --client-id client_123 --token-type-hint refresh_token --execute --json",
+            "auth_oauth_revoke",
+            None,
+            [
+                ("target", "tok_123"),
+                ("client_id", "client_123"),
+                ("token_type_hint", "refresh_token"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub auth oauth consent revoke client_123 --execute --json",
+            "auth_oauth_consent_revoke",
+            None,
+            [("client_id", "client_123")].as_slice(),
+        ),
+        (
+            "axhub auth pat issue --name ci-token --expires-in-days 90 --json",
+            "auth_pat_issue",
+            None,
+            [
+                ("name", "ci-token"),
+                ("expires_in_days", "90"),
+                ("use", "false"),
+                ("no_save", "false"),
+                ("show_token", "false"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub auth pat revoke pat_123 --execute --json",
+            "auth_pat_revoke",
+            None,
+            [("pat_id", "pat_123")].as_slice(),
+        ),
+        (
+            "axhub auth pat use pat_123 --profile default --json",
+            "auth_pat_use",
+            None,
+            [("pat_id", "pat_123"), ("profile", "default")].as_slice(),
+        ),
+        (
+            "axhub auth pat unset --profile default --json",
+            "auth_pat_unset",
+            None,
+            [("target", "active_pat"), ("profile", "default")].as_slice(),
+        ),
+        (
+            "axhub auth logout --profile default --json",
+            "auth_logout",
+            None,
+            [("profile", "default")].as_slice(),
+        ),
+        (
+            "axhub auth pat rotate --name rotated --expires-in-days 90 --json",
+            "auth_pat_rotate",
+            None,
+            [("name", "rotated"), ("expires_in_days", "90")].as_slice(),
+        ),
+        (
+            "axhub resources delete res_123 --tenant acme --cascade --execute --json",
+            "resource_delete",
+            None,
+            [("resource_id", "res_123"), ("tenant", "acme")].as_slice(),
+        ),
+        (
+            "axhub resources tag-attach res_123 --tenant acme --tag-id tag_123 --execute --json",
+            "resource_tag_attach",
+            None,
+            [
+                ("resource_id", "res_123"),
+                ("tag_id", "tag_123"),
+                ("tenant", "acme"),
+            ]
+            .as_slice(),
+        ),
+        (
+            "axhub resources tag-detach res_123 --tenant acme --tag-id tag_123 --execute --json",
+            "resource_tag_detach",
+            None,
+            [
+                ("resource_id", "res_123"),
+                ("tag_id", "tag_123"),
+                ("tenant", "acme"),
+            ]
+            .as_slice(),
         ),
         (
             "axhub profile add corp --endpoint https://corp.example.test --json",
@@ -1798,6 +2959,14 @@ fn bootstrap_synthesized_bindings_roundtrip_through_preauth_parser() {
     );
     let deploy_command = deploy_plan.output.command.clone().unwrap();
     let deploy_binding = deploy_plan.output.consent_binding.clone().unwrap();
+    assert!(
+        !deploy_command.iter().any(|arg| arg == "--branch"),
+        "{deploy_command:?}"
+    );
+    assert!(
+        deploy_command.iter().any(|arg| arg == "--execute"),
+        "{deploy_command:?}"
+    );
     let parsed_deploy = parse_axhub_command(&deploy_command.join(" "));
     assert_eq!(parsed_deploy.action.as_deref(), Some("deploy_create"));
     assert_eq!(

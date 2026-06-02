@@ -85,7 +85,7 @@ fn ok(stdout: &str) -> SpawnResult {
 /// a successfully logged-in user presents at deploy time.
 fn authed_cli_runner(cmd: &[&str]) -> SpawnResult {
     if cmd.contains(&"--version") {
-        ok("axhub 0.15.3\n")
+        ok("axhub 0.17.3\n")
     } else if cmd.contains(&"auth") && cmd.contains(&"status") {
         ok(
             r#"{"user_email":"dev@jocodingax.ai","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["deploy:write"]}"#,
@@ -99,7 +99,7 @@ fn authed_cli_runner(cmd: &[&str]) -> SpawnResult {
 /// must fail *closed* here (exit 65), never silently pass through.
 fn unauthed_cli_runner(cmd: &[&str]) -> SpawnResult {
     if cmd.contains(&"--version") {
-        ok("axhub 0.15.3\n")
+        ok("axhub 0.17.3\n")
     } else if cmd.contains(&"auth") && cmd.contains(&"status") {
         ok(r#"{"code":"unauthorized","detail":"no active session"}"#)
     } else {

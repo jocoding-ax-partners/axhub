@@ -73,7 +73,7 @@ fn ok(stdout: &str) -> SpawnResult {
 fn cli_with_auth(auth_json: &'static str) -> impl Fn(&[&str]) -> SpawnResult {
     move |cmd: &[&str]| {
         if cmd.contains(&"--version") {
-            ok("axhub 0.15.3\n")
+            ok("axhub 0.17.3\n")
         } else if cmd.contains(&"auth") && cmd.contains(&"status") {
             ok(auth_json)
         } else {

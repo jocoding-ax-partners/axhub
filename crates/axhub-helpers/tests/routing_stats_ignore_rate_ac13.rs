@@ -31,7 +31,7 @@ fn fake_axhub(dir: &Path) -> std::path::PathBuf {
         &axhub,
         r#"#!/bin/sh
 if [ "$1" = "--version" ]; then
-  echo "axhub 0.15.3 (commit fake, built fake, fake)"
+  echo "axhub 0.17.3 (commit fake, built fake, fake)"
   exit 0
 fi
 if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then

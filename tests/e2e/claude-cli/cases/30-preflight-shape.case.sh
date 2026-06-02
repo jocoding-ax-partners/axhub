@@ -8,7 +8,7 @@ t2_run_preflight "$CASE_ID" || true
 STDOUT="${OUTPUT_DIR}/${CASE_ID}/stdout.json"
 FAIL=0
 # Required fields per Phase 17 PreflightOutput
-for field in cli_version auth_ok current_app current_env last_deploy_id last_deploy_status plugin_version; do
+for field in cli_version auth_ok current_app current_team_id current_env last_deploy_id last_deploy_status plugin_version; do
   if ! jq -e "has(\"${field}\")" "$STDOUT" >/dev/null 2>&1; then
     echo "  FAIL [${CASE_ID}]: preflight missing field '${field}'" >&2
     FAIL=$((FAIL + 1))

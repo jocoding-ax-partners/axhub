@@ -19,7 +19,7 @@ EMPTY_STATE="${CASE_DIR}/empty-state"
 EMPTY_RUNTIME="${CASE_DIR}/empty-runtime"
 mkdir -p "$EMPTY_STATE" "$EMPTY_RUNTIME"
 
-PAYLOAD='{"session_id":"t2-preauth-23","tool_call_id":"t2-call-23","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --branch main --commit a3f9c1b"}}'
+PAYLOAD='{"session_id":"t2-preauth-23","tool_call_id":"t2-call-23","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --commit a3f9c1b --execute"}}'
 
 set +e
 printf '%s' "$PAYLOAD" \

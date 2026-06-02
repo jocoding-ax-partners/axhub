@@ -53,10 +53,15 @@ To list apps:
 2. **Fetch apps:**
 
    ```bash
-   axhub apps list --json
+   TEAM_ID="$(printf '%s\n' "$PREFLIGHT_JSON" | jq -r '.current_team_id // empty')"
+   if [ -n "$TEAM_ID" ]; then
+     axhub apps list --tenant "$TEAM_ID" --json
+   else
+     axhub apps list --json
+   fi
    ```
 
-3. **Filter to current team scope.** Drop entries whose `team_id` does not match `$AXHUB_TEAM_ID` (or the team derived from `axhub auth status --json`). Do NOT dump cross-team apps to the user — they are surface noise that breaks the F4 privacy guarantee.
+3. **Keep scope server-side.** Prefer the preflight `current_team_id` and pass it as `--tenant` so the CLI/server owns tenant filtering. If preflight has no team id, use the current profile scoped `axhub apps list --json` result as-is. Do not invent a client-side `team_id` filter, because v0.17.3 app rows do not expose that field.
 
 4. **Render top 10 in Korean.** Format as a numbered list with `slug (id=N) — <status>` per row:
 
@@ -92,6 +97,18 @@ To list apps:
 
 Use these paths only when the user intent is explicit. Listing remains the default.
 
+### apps owned / workspace / members
+
+Read-only inventory variants stay in this skill. Use them when the user asks for ownership, workspace-shared apps, or app membership/access details:
+
+```bash
+axhub apps owned --json
+axhub apps workspace --json
+axhub apps members "$APP" --page "$PAGE" --per-page "$PER_PAGE" --json
+```
+
+`apps owned` and `apps workspace` have no pagination flags in v0.17.3; do not invent filters. For `apps members`, keep `--page`/`--per-page` optional and render a small Korean summary instead of dumping the raw member payload.
+
 ### apps create
 
 1. Preview the source file or interactive intent first.
@@ -104,12 +121,13 @@ Use these paths only when the user intent is explicit. Listing remains the defau
    printf '%s\n' "$CONSENT_BINDING_JSON" | "$HELPER" consent-mint
    ```
 
-   Required binding fields: `action=apps_create`, `context={source}`.
+   Required binding fields: `action=apps_create`, `context={source}`. `apps create` has no dry-run/`--execute` in v0.17.3, so the preview must come from local file parsing or explicit user intent before the consent token is minted.
 3. Run one of the current CLI contracts:
 
    ```bash
-   axhub apps create --from-file axhub.yaml --yes --json
+   axhub apps create --from-file axhub.yaml --json
    axhub apps create --interactive --json
+   axhub apps create --name "$NAME" --slug "$SLUG" --json
    ```
 
 ### apps get
@@ -122,11 +140,15 @@ axhub apps get "$APP" --json
 
 ### apps update
 
-Preview each `key=value` field, then mint `action=apps_update` with top-level `app_id` and `context={slug,field}` before:
+Preview each changed field, then mint `action=apps_update` with top-level `app_id` and `context={slug,fields,<changed typed values>}` before using the real v0.17.3 typed flags:
 
 ```bash
-axhub apps update "$APP" --field "$FIELD" --json
+axhub apps update "$APP" --name "$NAME" --description "$DESCRIPTION" --visibility private --json
+axhub apps update "$APP" --resource-tier M --subdomain "$SUBDOMAIN" --json
+axhub apps update "$APP" --clear-subdomain --json
 ```
+
+`--field` is not a v0.17.3 CLI flag; do not generate it.
 
 ### apps delete
 
