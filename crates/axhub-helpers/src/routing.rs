@@ -217,7 +217,7 @@ pub fn is_slash_invocation(prompt: &str) -> bool {
 /// by a non-ASCII-alphanumeric byte (or a string edge), so foreign keywords like
 /// `"fly"`/`"render"` never fire inside `"butterfly"`/`"rendered"`. Non-ASCII
 /// bytes (e.g. Korean) count as boundaries, so `"vercel로"` still matches.
-fn contains_word(haystack: &str, keyword: &str) -> bool {
+pub(crate) fn contains_word(haystack: &str, keyword: &str) -> bool {
     let kw = keyword.as_bytes();
     let hay = haystack.as_bytes();
     if kw.is_empty() || hay.len() < kw.len() {

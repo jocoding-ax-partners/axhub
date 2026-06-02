@@ -145,7 +145,7 @@ Every entry uses these four parts, in this order:
 
 ---
 
-### exit 66 + `scope.downgrade_blocked`
+### exit 66 + `update.downgrade_blocked`
 
 **감정:** 잠깐만요. 안전장치가 작동했어요.
 
@@ -157,7 +157,7 @@ Every entry uses these four parts, in this order:
 
 ---
 
-### exit 66 + `update.cosign_verification_failed`
+### exit 66 + `update.cosign_enforce_failed`
 
 **감정:** 잠깐만요. 보안 검증에 실패했어요. 절대 진행하지 않아요.
 

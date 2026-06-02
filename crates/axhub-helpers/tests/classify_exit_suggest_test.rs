@@ -80,26 +80,27 @@ fn recover_success_suggests_verify_with_nl_trigger_first() {
 }
 
 // ---------------------------------------------------------------------------
-// trace suggest (axhub deploy create + exit 64..=68)
+// trace suggest (axhub deploy create — genuine server-side failures only)
 // ---------------------------------------------------------------------------
 
 #[test]
-fn deploy_create_validation_failure_suggests_trace() {
+fn deploy_create_validation_failure_no_trace_suggest() {
+    // exit 64 is a CLIENT-SIDE usage/validation gate — the request never
+    // reached the server, so the "왜 실패했어" trace nudge would mislead. The
+    // empathy catalog entry still renders, but the trace suggest is suppressed.
     let payload = r#"{"tool_input":{"command":"axhub deploy create"},"tool_response":{"exit_code":64,"stdout":""}}"#;
     let out = run_classify_exit(payload, &[]);
     assert!(out.status.success());
     let s = stdout(&out);
-    assert!(s.contains("배포 실패"), "got: {s}");
-    assert!(s.contains("왜 실패했어"));
-    assert!(s.contains("왜 실패했어"));
+    // empathy catalog entry for exit 64 is present...
     assert!(
-        !s.contains("/axhub:trace"),
-        "unregistered slash command leaked: {s}"
+        s.contains("배포는 시작"),
+        "empathy catalog entry must still render: {s}"
     );
-    // empathy catalog entry should still be present alongside the suggest.
+    // ...but the trace nudge must NOT fire for a client-side gate.
     assert!(
-        s.contains("배포는 시작") || s.contains("권한"),
-        "empathy catalog entry must coexist with suggest: {s}"
+        !s.contains("배포 실패") && !s.contains("왜 실패했어"),
+        "client-side gate must not get the trace suggest: {s}"
     );
 }
 

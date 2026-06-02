@@ -112,7 +112,7 @@ To handle updates:
 
    **On exit != 0:** Route to `/axhub:doctor` with the captured stderr (cosign verification failure path).
 
-5. **On exit 66 + `update.cosign_verification_failed`.** HARD STOP. Route to `../deploy/references/error-empathy-catalog.md` ("exit 66 + update.cosign_verification_failed"). Tell user:
+5. **On exit 66 + `update.cosign_enforce_failed`.** HARD STOP. Route to `../deploy/references/error-empathy-catalog.md` ("exit 66 + update.cosign_enforce_failed"). Tell user:
 
    > "보안 검증 실패. 절대 강제 진행하지 마세요. 회사 IT 보안팀에 즉시 알려주세요. 그동안 axhub는 현재 버전으로 계속 사용 가능해요."
 
@@ -149,7 +149,7 @@ Do not mention unsigned bypass env vars unless the current CLI help or release n
 
 - NEVER drop `AXHUB_REQUIRE_COSIGN=1` from the apply call (Phase 6 §16.10 default-on supply chain protection).
 - NEVER offer to set `AXHUB_ALLOW_UNSIGNED=1` (IT-only override per PLAN row 59).
-- NEVER continue past `update.cosign_verification_failed` under any circumstance.
+- NEVER continue past `update.cosign_enforce_failed` under any circumstance.
 - NEVER call `axhub update apply` without explicit AskUserQuestion confirmation.
 - NEVER auto-retry `update apply` on transport failure (binary may be partially swapped).
 - NEVER call `axhub update apply --execute` without first running `axhub update apply --dry-run --json` preview.

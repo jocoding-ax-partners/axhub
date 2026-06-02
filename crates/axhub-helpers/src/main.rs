@@ -737,11 +737,17 @@ fn verify_trace_suggestion(command: &str, exit_code: i32) -> Option<String> {
     if command.starts_with("axhub deploy create") && exit_code == 0 {
         return Some("배포 완료. \"확인해\" 라고 말하면 라이브 확인해 드려요.".to_string());
     }
-    // Any non-zero exit on a deploy-create is a failure worth tracing. The
-    // current `axhub` CLI surfaces deploy errors across 4..=15 / 64 / 66 (e.g.
-    // 9 conflict, 4 auth), so the prior 64..=68 window missed most real
-    // failures. exit 0 is handled by the success branch above.
-    if command.starts_with("axhub deploy create") && exit_code != 0 {
+    // Only genuine (server-side) deploy failures are trace-worthy. Client-side
+    // pre-attempt gates are NOT: exit 2 (clap usage), 4 (auth), 11 (dry-run
+    // preview — the COMMON `deploy create` path; contradicts classify(11)
+    // "괜찮아요 미리보기만 했어요"), 64 (usage). Those never reached the server, so
+    // "왜 실패했어" would mislead. Real server-side failures (1/5/7/8/9/10/12/13,
+    // ...) still get the trace nudge. exit 0 is handled by the success branch
+    // above.
+    if command.starts_with("axhub deploy create")
+        && exit_code != 0
+        && !matches!(exit_code, 2 | 4 | 11 | 64)
+    {
         return Some("배포 실패. \"왜 실패했어\" 라고 말하면 원인 추적해 드려요.".to_string());
     }
     if command.starts_with("axhub recover") && exit_code == 0 {
@@ -3308,22 +3314,30 @@ mod tests {
         }
     }
 
-    /// PR 25.7 / INPUT-contract repair: a failed `axhub deploy create` must
-    /// suggest the trace nl-trigger across the *current* CLI deploy-error
-    /// range. The prior `(64..=68)` gate missed real failures like exit 9
-    /// (conflict) and exit 4 (auth); the gate now fires on any non-zero exit.
+    /// PR 25.7 / INPUT-contract repair: only genuine *server-side* deploy
+    /// failures suggest the trace nl-trigger. Client-side pre-attempt gates
+    /// (2 clap usage / 4 auth / 11 dry-run preview / 64 usage) never reached
+    /// the server, so the "왜 실패했어" nudge would mislead — they return None.
     #[test]
     fn verify_trace_suggestion_fires_on_real_deploy_failure_exits() {
         // Success path: confirm nudge, never the failure trace.
         assert!(verify_trace_suggestion("axhub deploy create paydrop", 0)
             .is_some_and(|m| m.contains("확인해")));
 
-        // Real CLI deploy-failure exits — every one must suggest the trace.
-        for exit in [1, 4, 5, 7, 8, 9, 10, 11, 64, 66] {
+        // Genuine server-side deploy failures — every one must suggest the trace.
+        for exit in [1, 5, 7, 8, 9, 10, 12, 13] {
             assert!(
                 verify_trace_suggestion("axhub deploy create paydrop", exit)
                     .is_some_and(|m| m.contains("왜 실패했어")),
                 "exit {exit} on deploy create must suggest the failure trace"
+            );
+        }
+
+        // Client-side pre-attempt gates are NOT trace-worthy deploy failures.
+        for exit in [2, 4, 11, 64] {
+            assert!(
+                verify_trace_suggestion("axhub deploy create paydrop", exit).is_none(),
+                "exit {exit} is a client-side gate and must NOT suggest the trace"
             );
         }
 

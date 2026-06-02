@@ -29,6 +29,18 @@ pub fn catalog_len() -> usize {
     CATALOG.len()
 }
 
+/// Map an exit code + CLI stdout envelope to a user-facing empathy entry.
+///
+/// Dual exit-namespace (intentional, both coexist as base catalog keys):
+/// - `0`-`15`, `64`, `66` are CLI-raw exit codes emitted directly by the spawned
+///   `axhub` binary (its full contract; ax-hub-cli `docs/cli-exit-codes.md`).
+/// - `65`/`67`/`68` are THIS helper's OWN output namespace — the CLI never emits
+///   them; the helper produces them by translating a CLI result, then feeds its
+///   own exit back into `classify()` (see `tests/routing_lazy_auth_failure_ac10.rs`
+///   calling `classify(65)`). They are consumed by 30+ downstream skills.
+///
+/// `64`/`66` are emitted by both. Any NEW base key MUST be assigned to exactly
+/// one namespace (CLI-raw or helper-own).
 pub fn classify(exit_code: i32, stdout: &str) -> ErrorEntry {
     // The spawned `axhub` CLI emits a closed-enum `error.code` (auth, not_found,
     // ...) plus an optional dotted `error.subcode` (update.downgrade_blocked,
@@ -129,5 +141,32 @@ mod tests {
             r#"{"error":{"code":"auth","subcode":"nope.nonexistent"}}"#,
         );
         assert!(entry.cause.contains("알 수 없는 에러"));
+    }
+
+    #[test]
+    fn classify_unmatched_subcode_falls_to_exit_tier_not_default() {
+        // A present-but-unmatched subcode on a base-keyed exit must fall through
+        // to the exit tier (the helper's own base-65 entry), NOT default_entry.
+        let entry = classify(65, r#"{"error":{"subcode":"no_such_subcode"}}"#);
+        assert_eq!(entry, classify(65, ""));
+        assert_ne!(entry, default_entry());
+    }
+
+    #[test]
+    fn classify_resolves_fleet_preflight_fine_key() {
+        // exit 9 + subcode fleet_preflight_failed must hit the dedicated fleet
+        // entry (묶음 배포 preflight), never the generic base-9 conflict copy.
+        let entry = classify(9, r#"{"error":{"subcode":"fleet_preflight_failed"}}"#);
+        assert!(entry.emotion.contains("묶음 배포"));
+        assert!(entry.cause.contains("preflight"));
+        assert_ne!(entry, classify(9, ""));
+    }
+
+    #[test]
+    fn classify_base_entry_content_spot_checks() {
+        // Content pins so a placeholder/typo in a new base entry is caught — the
+        // existing never-default test only checks the negative.
+        assert!(classify(11, "").cause.contains("미리보기"));
+        assert!(classify(5, "").emotion.contains("못 찾았"));
     }
 }

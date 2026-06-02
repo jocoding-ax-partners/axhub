@@ -89,33 +89,7 @@ pub fn is_deploy_intent(prompt: &str) -> bool {
         .any(|stem| lower.contains(stem))
         || DEPLOY_INTENT_EN_WORDS
             .iter()
-            .any(|word| contains_ascii_word(&lower, word))
-}
-
-/// Whole-word ASCII match. `word` must be lowercase ASCII; `haystack` must
-/// already be lowercased by the caller. A hit must be bounded on both sides by a
-/// non-ASCII-alphanumeric byte (or a string edge). Mirrors the bounded-match
-/// contract of `routing::contains_word` (duplicated locally so this module never
-/// has to edit the locked shared routing source).
-fn contains_ascii_word(haystack: &str, word: &str) -> bool {
-    let w = word.as_bytes();
-    let hay = haystack.as_bytes();
-    if w.is_empty() || hay.len() < w.len() {
-        return false;
-    }
-    let mut i = 0;
-    while i + w.len() <= hay.len() {
-        if &hay[i..i + w.len()] == w {
-            let before_ok = i == 0 || !hay[i - 1].is_ascii_alphanumeric();
-            let after = i + w.len();
-            let after_ok = after == hay.len() || !hay[after].is_ascii_alphanumeric();
-            if before_ok && after_ok {
-                return true;
-            }
-        }
-        i += 1;
-    }
-    false
+            .any(|word| crate::routing::contains_word(&lower, word))
 }
 
 /// The project root used to key the once-per-project marker: the nearest

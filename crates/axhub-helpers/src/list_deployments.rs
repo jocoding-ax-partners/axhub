@@ -14,6 +14,13 @@ pub const EXIT_LIST_AUTH: i32 = 65;
 pub const EXIT_LIST_NOT_FOUND: i32 = 67;
 pub const EXIT_LIST_TRANSPORT: i32 = 1;
 
+// Compile-time pins: the helper OUTPUT exit-namespace values are a stable
+// contract consumed by 30+ downstream skills — they must not silently drift.
+#[allow(clippy::assertions_on_constants)]
+const _: () = assert!(EXIT_LIST_AUTH == 65);
+#[allow(clippy::assertions_on_constants)]
+const _: () = assert!(EXIT_LIST_NOT_FOUND == 67);
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DeploymentSummary {
     pub id: String,
