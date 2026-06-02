@@ -109,7 +109,7 @@ To start an axhub app:
 
    `schema_version` 은 응답 검증용 internal primitive 예요 — raw 값을 사용자 chat 에 echo 하지 않아요. `items[]` 의 `id` 또는 built-in alias (`react` / `nextjs` / `astro`) 를 `--template` 인자로 써요.
 
-   on exit 65 (auth 만료) → `/axhub:auth` 로 라우팅. on exit 8 (tenant 미해석) → `axhub profile current --json` 안내. 그 외 비정상 종료는 `/axhub:doctor` 권장.
+   on exit 4 (auth 만료, CLI `axhub apps templates list` — 옛 sysexits 65 아님) → `/axhub:auth` 로 라우팅. on exit 8 (tenant 미해석) → `axhub profile current --json` 안내. 그 외 비정상 종료는 `/axhub:doctor` 권장.
 
 ## 템플릿 선택 가이드
 
@@ -261,8 +261,8 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    - `github.installation_missing` / `github.repo_create_failed` → `/axhub:github` 가이드
    - `validation.template_not_found` → Step 2 로 돌아가 다시 목록을 보여줘요
    - `validation.slug_collision` → Step 4 로 돌아가 새 이름을 받아요
-   - exit 65 (auth 만료) → `/axhub:auth`
-   - exit 66 (forbidden / scope 부족) → 사용자에게 권한 부족 안내 + workspace admin 문의
+   - `auth` (CLI exit 4, auth 만료 — 옛 sysexits 65 아님) → `/axhub:auth`
+   - `forbidden` / `tenant_scope` (CLI exit 12 / 8, 권한·scope 부족) → 사용자에게 권한 부족 안내 + workspace admin 문의
    - 그 외 → `/axhub:doctor`
 
 ## NEVER
@@ -272,7 +272,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 - NEVER `axhub-helpers fetch-template` 또는 remote `templates.json` 을 source 로 쓰지 않아요. backend `axhub apps templates list` 만 source-of-truth 예요.
 - NEVER subprocess (`$CI` / `$CLAUDE_NON_INTERACTIVE` / no TTY) 에서 template 또는 앱 이름을 임의로 고르지 않아요. registry safe_default 가 `abort` 또는 `취소` 예요.
 - NEVER `--execute` 를 `--dry-run` 미리보기 + 사용자 동의 없이 호출하지 않아요. backend app + GitHub repo + deploy 가 한 번에 mutate 돼요.
-- NEVER auth 만료를 template 조회 실패로 오해하지 않아요. exit 65 는 `/axhub:auth` 로 라우팅 해요.
+- NEVER auth 만료를 template 조회 실패로 오해하지 않아요. CLI auth 실패 (exit 4 / error_code `auth`, 옛 sysexits 65 아님) 는 `/axhub:auth` 로 라우팅 해요.
 - NEVER `bootstrap --execute` 호출 직후 별도 `axhub deploy create` 를 다시 부르지 않아요. saga 가 첫 deploy 까지 포함해요.
 - NEVER saga stdout 에서 `event: device_code_issued` 가 나왔는데 `verification_uri` + `user_code` 를 사용자에게 즉시 보여주지 않고 silent 하게 narrate 만 반복하지 않아요. saga 가 GitHub App install 승인을 기다리며 block 돼서 사용자는 SKILL 이 멈춘 줄 알아요. internal `device_code` raw 값은 여전히 echo 금지 — humanize 대상은 `verification_uri` + `user_code` + `expires_in` 만이에요.
 - NEVER `repo_full_name` 응답이 비어 있는데 임의 URL 을 만들어 clone 시도하지 않아요. 응답이 비면 `/axhub:doctor` 로 라우팅 해요.

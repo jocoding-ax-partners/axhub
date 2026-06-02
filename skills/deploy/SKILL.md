@@ -40,9 +40,9 @@ Deploy a vibe coder's app to axhub with safety primitives. Use the adapter `axhu
 | Step 3 preview card | 5필드 한국어 카드만 (앱 / 환경 / 브랜치 / 커밋 / 예상 시간) |
 | Step 4 consent → deploy | "배포 동의를 받았어요. 시작해요." |
 | Step 5 watch | "빌드 시작했어요. 약 3분 뒤에 결과 알려드릴게요." |
-| Step 6 exit 65 | "axhub 로그인이 만료됐어요. 다시 로그인할까요?" |
+| Step 6 exit 4 / 65 | "axhub 로그인이 만료됐어요. 다시 로그인할까요?" |
 | Step 6 exit 64 | "다른 배포가 진행 중이라 지금은 못 올려요. 잠시 뒤에 다시 시도해요." |
-| Step 6 exit 67 | "이 이름의 앱을 못 찾았어요. 비슷한 이름을 알려드릴게요." |
+| Step 6 exit 5 / 67 | "이 이름의 앱을 못 찾았어요. 비슷한 이름을 알려드릴게요." |
 
 raw helper JSON 이 디버깅에 필요한 환경 (개발 검증) 은 `AXHUB_DEPLOY_VERBOSE=1` 환경변수가 켜진 경우에만 echo 해요. 기본 흐름은 항상 한 줄 자연어로 진행해요.
 
@@ -718,7 +718,7 @@ To deploy:
 
    **watch-narration 은 interactive TTY 전용이에요.** 사람이 TTY 로 watch 할 때만 ~30s 마다 humanized Korean progress 를 렌더해요 ("1분 경과, 빌드 중이에요 (정상)", `references/recovery-flows.md` "watch-narration"). 에이전트는 terminal 도달 시 단일 완료 요약만 보여줘요.
 
-6. **On any non-zero exit**, route to `references/error-empathy-catalog.md` by exit code:
+6. **On any non-zero exit**, route via `axhub-helpers classify-exit "$EXIT" "$STDOUT"` (spec 004 Fork-A — canonical router; 두 공간 다 처리: Step 5 `deploy status --watch` 는 CLI-native 4/5/6, Step 1 `deploy-prep` 는 helper-output 65/67/68 을 내고, classify-exit 가 65→4 / 67→5 / 68→6 으로 정규화해요) 또는 `references/error-empathy-catalog.md` by exit code:
    - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 앱은 안전해요. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.
    - exit 64/67 + `github.git_connection_required`, `github.git_connection_not_found`, `git_connection_required`, or CLI stderr containing "GitHub 저장소 연결" → do not ask "지금 GitHub repo 연결 진행할까요?" and do not ask the user to invoke `/axhub:github`. Immediately show a direct GitHub connection block:
 
@@ -734,9 +734,9 @@ To deploy:
      ```
 
      Do not present the command above as the user's next manual command. It is the final command that the GitHub skill may run only after its guided ladder verifies repo visibility and mints consent. If the account is already installed and the desired repo appears in `axhub apps git status --app "$APP_ID" --json` (or dry-run `axhub apps git connect`), tell the user the repo is ready and route directly to `skills/github/SKILL.md` Step 4 consent-connect without another yes/no handoff.
-   - exit 65 → token expired template + AskUserQuestion to run auth login
-   - exit 67 → resource not found + did-you-mean suggestion from apps list
-   - exit 68 → rate limit + Retry-After backoff
+   - exit 4 (CLI watch) / 65 (helper deploy-prep·preflight) → token expired template + AskUserQuestion to run auth login
+   - exit 5 (CLI watch) / 67 (helper deploy-prep) → resource not found + did-you-mean suggestion from apps list
+   - exit 6 (CLI watch) / 68 (helper) → rate limit + Retry-After backoff
    - exit 1 → transport error; retry at most once for read paths, never for create
 
 7. **Dry-run NL trigger** — if the user said "한번 해보기만", "리허설", "테스트로", "진짜 안 올리고", add `--dry-run` to step 4 and skip step 5.

@@ -739,7 +739,12 @@ fn verify_trace_suggestion(command: &str, exit_code: i32) -> Option<String> {
     if command.starts_with("axhub deploy create") && exit_code == 0 {
         return Some("배포 완료. \"확인해\" 라고 말하면 라이브 확인해 드려요.".to_string());
     }
-    if command.starts_with("axhub deploy create") && (64..=68).contains(&exit_code) {
+    // spec 004: ax-hub-cli 0.17.2 emits CLI-native failure codes (auth=4,
+    // not_found=5, rate=6, api=7); the legacy/helper sysexits band (64..=68)
+    // is kept so deploy-prep-mediated failures still nudge.
+    if command.starts_with("axhub deploy create")
+        && ((4..=7).contains(&exit_code) || (64..=68).contains(&exit_code))
+    {
         return Some("배포 실패. \"왜 실패했어\" 라고 말하면 원인 추적해 드려요.".to_string());
     }
     if command.starts_with("axhub recover") && exit_code == 0 {
