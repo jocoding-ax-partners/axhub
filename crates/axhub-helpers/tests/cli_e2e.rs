@@ -1874,9 +1874,9 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     let session = run(&["session-start"]);
     assert_eq!(session.status.code(), Some(0));
     let session_stdout = String::from_utf8_lossy(&session.stdout);
-    assert!(session_stdout.contains("Rust runtime"));
+    assert!(session_stdout.contains("/axhub:setup"));
     assert!(session_stdout.contains("AXHUB_NO_AUDIT"));
-    assert!(session_stdout.contains("cleanup-audit --all"));
+    assert!(session_stdout.contains("감사 로그"));
 }
 
 #[cfg(unix)]
@@ -2369,10 +2369,10 @@ fn cli_session_start_base_message_korean_tone() {
     let state = temp.path().join("state");
 
     let msg = session_start_systemmessage(&state.display().to_string());
-    assert!(msg.contains("axhub helper Rust runtime 활성"), "{msg}");
+    assert!(msg.contains("axhub 준비됐어요"), "{msg}");
+    assert!(msg.contains("/axhub:setup"), "{msg}");
     assert!(msg.contains("/axhub:help"), "{msg}");
-    assert!(msg.contains("/axhub:clarify"), "{msg}");
-    assert!(msg.contains("axhub-helpers routing-stats"), "{msg}");
+    assert!(msg.contains("/axhub:doctor"), "{msg}");
 }
 
 #[test]
