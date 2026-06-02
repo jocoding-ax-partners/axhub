@@ -63,6 +63,14 @@ describe("migrate SKILL contract", () => {
     }
   });
 
+  test("keeps bash-only Windows helper resolution executable", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    expect(skill).toContain("Git Bash/MSYS bash");
+    expect(skill).toContain('if [ ! -x "$HELPER" ] && [ -x "${HELPER}.exe" ]; then HELPER="${HELPER}.exe"; fi');
+    expect(skill).toContain("command -v axhub-helpers.exe");
+    expect(skill).toContain("PowerShell 호출을 요구하지 않아요");
+  });
+
   test("corpus.100 routes core existing-app natural language to migrate", () => {
     const rows = parseJsonl("tests/corpus.100.jsonl");
     for (const utterance of requiredUtterances) {
