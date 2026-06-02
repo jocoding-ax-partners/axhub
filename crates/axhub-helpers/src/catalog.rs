@@ -93,6 +93,17 @@ mod tests {
         assert!(classify(0, "").emotion.contains("축하해요"));
         let sub = classify(64, r#"{"error":{"code":"validation.app_ambiguous"}}"#);
         assert!(sub.emotion.contains("같은 이름이 두 개"));
+        // Real CLI shape: fine id in `subcode`, coarse `code` alongside — subcode wins.
+        let by_subcode = classify(
+            66,
+            r#"{"error":{"code":"other","subcode":"update.cosign_enforce_failed"}}"#,
+        );
+        assert!(by_subcode.action.contains("IT 보안 담당자"));
+        let downgrade_subcode = classify(
+            66,
+            r#"{"error":{"code":"other","subcode":"update.downgrade_blocked"}}"#,
+        );
+        assert!(downgrade_subcode.emotion.contains("더 낮은 버전으로 되돌리려는"));
         assert!(classify(99, "not-json").cause.contains("알 수 없는 에러"));
         // US1 (spec 004): CLI auth = exit 4 + error.code "auth" (was sysexits 65).
         assert!(classify(4, r#"{"error":{"code":"auth"}}"#)

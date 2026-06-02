@@ -113,3 +113,7 @@
 {"id":"DATA-1","utterance":"orders 데이터 조회해줘","intent":"data_query","expected_skill":"data","expected_cmd_pattern":"axhub catalog search --json --limit 200 && axhub catalog invoke --execute --json","destructive":false,"lang":"ko"}
 {"id":"DATA-2","utterance":"describe snowflake analytics orders table","intent":"data_describe","expected_skill":"data","expected_cmd_pattern":"axhub catalog get --connector .* --path .* --json","destructive":false,"lang":"en"}
 {"id":"DATA-3","utterance":"이 테이블 읽는 python snippet 만들어줘","intent":"data_snippet","expected_skill":"data","expected_cmd_pattern":"axhub catalog get --connector .* --path .* --json && axhub-helpers snippet","destructive":false,"lang":"ko"}
+{"id":"MIGRATE-NL-1","utterance":"기존 앱 올려줘","intent":"migrate_existing_app","expected_skill":"migrate","expected_cmd_pattern":"axhub-helpers migrate-plan --dir .* --json","destructive":false,"lang":"ko"}
+{"id":"MIGRATE-NL-2","utterance":"migrate this repo","intent":"migrate_existing_app","expected_skill":"migrate","expected_cmd_pattern":"axhub-helpers migrate-plan --dir .* --json","destructive":false,"lang":"en"}
+{"id":"MIGRATE-NL-3","utterance":"import existing app","intent":"migrate_existing_app","expected_skill":"migrate","expected_cmd_pattern":"axhub-helpers migrate-plan --dir .* --json","destructive":false,"lang":"en"}
+{"id":"MIGRATE-NL-4","utterance":"이미 만든 앱 배포해줘","intent":"migrate_existing_app","expected_skill":"migrate","expected_cmd_pattern":"axhub-helpers migrate-plan --dir .* --json","destructive":false,"lang":"ko"}

@@ -226,12 +226,6 @@
       "진행 중",
       "진행 중이야"
     ],
-    "skills/whatsnew/SKILL.md": [
-      "뭐 새로",
-      "뭐 새로 나왔어",
-      "새 기능 뭐야",
-      "신규 기능"
-    ],
     "skills/setup/SKILL.md": [
       "셋업해줘",
       "셋업 해줘",
@@ -965,5 +959,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-05-25T23:40:10.118Z"
+  "generated_at": "2026-06-02T04:23:16.501Z"
 }
