@@ -201,12 +201,16 @@ mod tests {
         // Pure timeout-classification check — partial-output recovery across
         // shells / pipe-orphans is intentionally not asserted because it's
         // flaky between sh/bash/dash + libc stdio buffering policies.
-        let dir = tempfile::tempdir().unwrap();
-        let script = dir.path().join("slow.sh");
-        write_script(&script, "exec sleep 30");
-
-        let out = run_axhub_with_timeout(script.to_str().unwrap(), &[], Duration::from_millis(300));
-        assert!(out.timed_out);
+        let out = run_axhub_with_timeout(
+            "/bin/sh",
+            &["-c", "while :; do sleep 1; done"],
+            Duration::from_millis(300),
+        );
+        assert!(
+            out.timed_out,
+            "expected timeout, got exit_code={}, stdout={:?}, stderr={:?}",
+            out.exit_code, out.stdout, out.stderr
+        );
         assert_eq!(out.exit_code, 124);
     }
 }
