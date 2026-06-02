@@ -4,6 +4,17 @@
   "deploy": {
     "_note": "deploy SKILL Step 3 uses a structured AskUserQuestion JSON block after the 5-field identity preview card. Default behavior in non-interactive subprocess: --dry-run (most conservative).",
     "default_subprocess_action": "--dry-run",
+    "axhub 에 배포할까요, 아니면 다른 곳에 배포할까요?": {
+      "safe_default": "여기 말고 다른 곳",
+      "rationale": "spec 006 Step 0 routing-gate disambiguation (decision=ignore: marker 없음+무명시, 또는 decision=ask: axhub+foreign 둘 다 명시). 비대화형 환경에서는 axhub 로 자동 라우팅하면 non-axhub 프로젝트의 zero-footprint 가 깨지므로, 명시 의도 없이는 axhub 배포를 진행하지 않고 멈춰요. 슬래시(/deploy)·'axhub' 명시는 decision=axhub 라 애초에 이 질문에 도달하지 않아요(explicit-always-works).",
+      "allowed_safe_defaults": [
+        "여기 말고 다른 곳",
+        "axhub 에 배포"
+      ],
+      "metadata": {
+        "decision_topic": "routing_target"
+      }
+    },
     "배포 전 저장 지점을 만들까요?": {
       "safe_default": "취소",
       "rationale": "Vibe Coder Visibility 갱신 — non-interactive contexts must not run git init/git add/git commit automatically. 'show_commands' option removed in Phase VC because exposing raw git CLI commands to a non-developer surface conflicts with the visibility rules; abort is the only safe default in subprocess mode.",

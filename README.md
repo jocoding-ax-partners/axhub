@@ -3,7 +3,7 @@
 > 바이브코더가 한국어 자연어로 axhub 앱을 안전하게 배포·관리하고, 코드 품질까지 보조받는 Claude Code 플러그인이에요.
 > 이 문서는 **이 플러그인을 개발·확장하려는 개발자를 위한 온보딩 문서**예요. 사용법만 필요하면 [§11 빠른 시작](#11-빠른-시작-사용자용)으로 바로 가요.
 
-**상태**: v0.9.19 · 32 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary 라이브.
+**상태**: v0.9.23 · 32 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary 라이브.
 
 ---
 

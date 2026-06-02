@@ -361,11 +361,15 @@ fn exit_to_error_code(exit_code: i32, parsed_code: Option<&str>) -> Option<Strin
     if let Some(code) = parsed_code {
         return Some(code.to_string());
     }
+    // Map the spawned `axhub` CLI's exit code to the flat closed-enum
+    // `error.code` it emits (auth, not_found, usage). Current CLI contract:
+    // 4=unauth, 5=not_found, 64=usage. 124/127 are shell-level (timeout /
+    // command-missing), not CLI codes.
     match exit_code {
         0 => None,
-        65 => Some("auth.token_invalid".into()),
-        67 => Some("resource.app_not_found".into()),
-        64 => Some("usage.invalid".into()),
+        4 => Some("auth".into()),
+        5 => Some("not_found".into()),
+        64 => Some("usage".into()),
         124 => Some("transport.timeout".into()),
         127 => Some("transport.cli_missing".into()),
         code => Some(format!("cli.exit_{code}")),
@@ -373,11 +377,12 @@ fn exit_to_error_code(exit_code: i32, parsed_code: Option<&str>) -> Option<Strin
 }
 
 fn exit_to_helper_exit(exit_code: i32, code: Option<&str>) -> i32 {
+    // OUTPUT namespace stays the helper's own (EXIT_LIST_AUTH=65 /
+    // EXIT_LIST_NOT_FOUND=67); only the INPUT side reads the current CLI
+    // contract: exit 4 / code "auth" -> auth, exit 5 / code "not_found".
     match code.unwrap_or_default() {
-        c if c.starts_with("auth.") || exit_code == 65 => EXIT_LIST_AUTH,
-        c if c.contains("not_found") || c == "resource.app_not_found" || exit_code == 67 => {
-            EXIT_LIST_NOT_FOUND
-        }
+        c if c == "auth" || exit_code == 4 => EXIT_LIST_AUTH,
+        c if c.contains("not_found") || exit_code == 5 => EXIT_LIST_NOT_FOUND,
         _ => EXIT_LIST_TRANSPORT,
     }
 }
@@ -501,18 +506,21 @@ mod tests {
 
     #[test]
     fn maps_cli_auth_and_not_found_errors() {
+        // Current CLI contract: unauth -> exit 4 + flat `error.code:"auth"`,
+        // not-found -> exit 5 + `error.code:"not_found"`. The helper OUTPUT
+        // namespace stays EXIT_LIST_AUTH(65) / EXIT_LIST_NOT_FOUND(67).
         let auth = parse_list_deployments_cli_output(
             &ListDeploymentsArgs {
                 app_id: "paydrop".into(),
                 limit: None,
             },
             cli_err(
-                65,
-                r#"{"schema_version":"1","status":"error","error":{"code":"unauthorized","subcode":"auth.token_invalid","hint":"login"}}"#,
+                4,
+                r#"{"schema_version":"1","status":"error","error":{"code":"auth","hint":"login"}}"#,
             ),
         );
         assert_eq!(auth.exit_code, EXIT_LIST_AUTH);
-        assert_eq!(auth.error_code.as_deref(), Some("auth.token_invalid"));
+        assert_eq!(auth.error_code.as_deref(), Some("auth"));
 
         let missing = parse_list_deployments_cli_output(
             &ListDeploymentsArgs {
@@ -520,11 +528,12 @@ mod tests {
                 limit: None,
             },
             cli_err(
-                67,
-                r#"{"schema_version":"1","status":"error","error":{"subcode":"resource.app_not_found"}}"#,
+                5,
+                r#"{"schema_version":"1","status":"error","error":{"code":"not_found"}}"#,
             ),
         );
         assert_eq!(missing.exit_code, EXIT_LIST_NOT_FOUND);
+        assert_eq!(missing.error_code.as_deref(), Some("not_found"));
     }
 
     #[test]
@@ -616,7 +625,7 @@ mod tests {
             CliOutput {
                 stdout: r#"{"schema_version":"1","status":"error","error":{}}"#.into(),
                 stderr: "Authorization: Bearer abcdefghij1234567890XYZ".into(),
-                exit_code: 65,
+                exit_code: 4,
                 timed_out: false,
             },
         );
@@ -642,7 +651,7 @@ mod tests {
             CliOutput {
                 stdout: "not json".into(),
                 stderr: "panicked at AXHUB_TOKEN=zzzzzzzzzzzzzzzzzzzzaaaaaaa".into(),
-                exit_code: 65,
+                exit_code: 4,
                 timed_out: false,
             },
         );

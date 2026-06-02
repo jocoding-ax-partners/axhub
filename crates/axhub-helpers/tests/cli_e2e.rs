@@ -1665,6 +1665,13 @@ exit 1
     permissions.set_mode(0o755);
     std::fs::set_permissions(&axhub, permissions).unwrap();
 
+    // Compare the AGENT-FACING channel only (`hookSpecificOutput` →
+    // additionalContext). The Rust router stays preflight-only there: it never
+    // classifies intent to force a skill. The orthogonal top-level
+    // `systemMessage` channel CAN differ by intent — the once-per-project
+    // deploy-migration grace nudge (spec 006 §43, AC 11) rides it for an
+    // authed/no-marker/implicit-deploy prompt — and is deliberately excluded
+    // here so this assertion is robust to the runner's ambient auth state.
     let snapshot = |prompt: &str| -> String {
         let input =
             serde_json::json!({"hook_event_name":"UserPromptSubmit","prompt":prompt}).to_string();
@@ -1674,10 +1681,14 @@ exit 1
             &[("AXHUB_BIN", axhub.to_str().unwrap())],
         );
         assert_eq!(output.status.code(), Some(0));
-        String::from_utf8_lossy(&output.stdout).into_owned()
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let json: serde_json::Value = serde_json::from_str(stdout.trim()).expect("hook JSON");
+        json.get("hookSpecificOutput")
+            .expect("hookSpecificOutput present")
+            .to_string()
     };
 
-    // Different intents → identical hook output (Rust router is preflight-only).
+    // Different intents → identical agent-facing context (Rust router is preflight-only).
     let a = snapshot("배포해줘");
     let b = snapshot("로그 봐");
     let c = snapshot("아무말 대잔치");
@@ -2046,6 +2057,104 @@ fn invoke_prompt_route(prompt: &str, axhub: &std::path::Path, state: &str) {
         "prompt-route stderr={}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[cfg(unix)]
+fn read_audit_records(state: &std::path::Path) -> Vec<serde_json::Value> {
+    let dir = audit_dir_path(state);
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if !name.starts_with("routing-audit-") || !name.ends_with(".jsonl") {
+            continue;
+        }
+        if let Ok(content) = std::fs::read_to_string(entry.path()) {
+            for line in content.lines() {
+                if line.trim().is_empty() {
+                    continue;
+                }
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+                    out.push(v);
+                }
+            }
+        }
+    }
+    out
+}
+
+// AC-12: prompt-route writes the shared routing decision type per prompt into
+// routing-audit-*.jsonl. Prompts chosen to hit deterministic priority rules
+// (0/b/c) so the decision is independent of cwd-marker and token-file state.
+#[cfg(unix)]
+#[test]
+fn cli_prompt_route_audit_records_decision_type() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_axhub(&temp);
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    invoke_prompt_route("/deploy", &axhub, &state_s); // rule 0 slash → explicit
+    invoke_prompt_route("vercel 로 배포해", &axhub, &state_s); // rule c foreign → yield
+    invoke_prompt_route("axhub 로 배포해", &axhub, &state_s); // rule b keyword → axhub
+
+    let records = read_audit_records(&state);
+    assert_eq!(records.len(), 3, "expected 3 audit lines, got {records:?}");
+
+    let by_decision = |d: &str| records.iter().find(|r| r["decision"] == d);
+
+    let explicit = by_decision("explicit").expect("explicit record");
+    assert_eq!(explicit["explicit_invocation"], serde_json::json!(true));
+
+    let yield_rec = by_decision("yield").expect("yield record");
+    assert_eq!(yield_rec["foreign_keyword_present"], serde_json::json!(true));
+    assert_eq!(yield_rec["explicit_invocation"], serde_json::json!(false));
+
+    let axhub_rec = by_decision("axhub").expect("axhub record");
+    assert_eq!(axhub_rec["axhub_keyword_present"], serde_json::json!(true));
+
+    // Each line carries the decision enum + the four decide() inputs.
+    for r in &records {
+        assert!(r["decision"].is_string(), "decision missing: {r}");
+        assert!(r["marker_present"].is_boolean(), "marker_present missing: {r}");
+        assert!(r["authed"].is_boolean(), "authed missing: {r}");
+        assert!(
+            r["explicit_invocation"].is_boolean(),
+            "explicit_invocation missing: {r}"
+        );
+    }
+}
+
+// AC-12: routing-stats reads & reports the decision breakdown + ignore rate.
+#[cfg(unix)]
+#[test]
+fn cli_routing_stats_reports_decision_breakdown() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_axhub(&temp);
+    let state = temp.path().join("state");
+    let state_s = state.display().to_string();
+
+    invoke_prompt_route("vercel 로 배포해", &axhub, &state_s); // yield
+    invoke_prompt_route("axhub 로 배포해", &axhub, &state_s); // axhub
+
+    let stats = run_stdin(
+        &["routing-stats", "--json"],
+        "",
+        &[("XDG_STATE_HOME", state_s.as_str())],
+    );
+    assert_eq!(stats.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&stats.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("valid JSON");
+    assert!(
+        parsed.get("decision_counts").is_some(),
+        "decision_counts missing: {stdout}"
+    );
+    assert_eq!(parsed["decision_counts"]["yield"], serde_json::json!(1));
+    assert_eq!(parsed["decision_counts"]["axhub"], serde_json::json!(1));
+    assert!(parsed.get("ignore_rate").is_some(), "ignore_rate missing");
 }
 
 #[cfg(unix)]

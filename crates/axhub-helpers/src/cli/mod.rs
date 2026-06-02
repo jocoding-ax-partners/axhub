@@ -31,6 +31,15 @@ enum Commands {
     CommitGate,
     TddInject,
     TestClassifier,
+    /// spec 006 — session-start eager-infra marker gate. exit 0 = run eager
+    /// infra (token-init/warmup/quality-context), exit 1 = skip (zero-footprint).
+    /// Consumed by the session-start shell wrapper before token-init/warmup.
+    SessionEagerGate,
+    /// spec 006 §57/§68 — shared routing-decision gate for the deploy SKILL
+    /// preflight (Step 0). Emits `{decision, marker, authed, …}` JSON so the
+    /// SKILL proceeds only when `decision == axhub`; `yield`/`ignore`/`ask`
+    /// block axhub deploy before any auth/resolve work.
+    RouteDecision(args::RouteDecisionArgs),
 
     // ── US1 — flag-bearing hook 명령 (typed args) ──
     ClassifyExit(args::ClassifyExitArgs),
@@ -199,6 +208,10 @@ fn dispatch(command: Commands) -> i32 {
         Commands::CommitGate => run_result(crate::cmd_commit_gate()),
         Commands::TddInject => run_result(crate::cmd_tdd_inject()),
         Commands::TestClassifier => run_result(crate::cmd_test_classifier()),
+        Commands::SessionEagerGate => run_result(crate::cmd_session_eager_gate()),
+        Commands::RouteDecision(a) => {
+            run_result(crate::cmd_route_decision(&a.user_utterance, a.explicit))
+        }
         Commands::ClassifyExit(a) => run_result(crate::cmd_classify_exit(a.exit_code, &a.stdout)),
         Commands::StateUpdate(a) => {
             let argv = [a.chosen_flag().to_string()];

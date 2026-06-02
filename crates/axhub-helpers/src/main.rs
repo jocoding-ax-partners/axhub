@@ -39,7 +39,7 @@ use serde_json::{json, Map, Value};
 mod cli;
 
 pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
-pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -737,7 +737,11 @@ fn verify_trace_suggestion(command: &str, exit_code: i32) -> Option<String> {
     if command.starts_with("axhub deploy create") && exit_code == 0 {
         return Some("배포 완료. \"확인해\" 라고 말하면 라이브 확인해 드려요.".to_string());
     }
-    if command.starts_with("axhub deploy create") && (64..=68).contains(&exit_code) {
+    // Any non-zero exit on a deploy-create is a failure worth tracing. The
+    // current `axhub` CLI surfaces deploy errors across 4..=15 / 64 / 66 (e.g.
+    // 9 conflict, 4 auth), so the prior 64..=68 window missed most real
+    // failures. exit 0 is handled by the success branch above.
+    if command.starts_with("axhub deploy create") && exit_code != 0 {
         return Some("배포 실패. \"왜 실패했어\" 라고 말하면 원인 추적해 드려요.".to_string());
     }
     if command.starts_with("axhub recover") && exit_code == 0 {
@@ -1115,7 +1119,13 @@ const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
 // additionalContext. Claude Code matches skills via SKILL.md frontmatter
 // description natively (Phase 1 codegen merged main.rs phrases into descriptions).
 pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
-    use axhub_helpers::audit::{append as audit_append, now_iso8601, sha256_hex, AuditRecord};
+    use axhub_helpers::audit::{
+        append as audit_append, now_iso8601, sha256_hex, AuditDecision, AuditRecord,
+    };
+    use axhub_helpers::routing::{
+        axhub_keyword_present, decide, find_marker, foreign_keyword_present, is_slash_invocation,
+        token_present, MarkerStatus,
+    };
 
     if hook_safety::is_hook_disabled("prompt-route") {
         out_json(json!({}));
@@ -1125,8 +1135,23 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     let payload: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
     let prompt = payload.get("prompt").and_then(Value::as_str).unwrap_or("");
 
+    // AC-12 / hook-integration: the shared routing decision, computed once here
+    // from pure reads (marker walk-up + token-file stat + slash detection). Both
+    // the AC-12 audit population below AND the hook action mapping consume this
+    // single `routing_decision` so the two layers cannot drift (spec 006 §53-57,
+    // composition-consistency). `token_present()` is a `.exists()` stat only — it
+    // never triggers bootstrap (constraint: auth-read must not be circular).
+    let marker = find_marker();
+    let authed = token_present();
+    let explicit = is_slash_invocation(prompt);
+    let routing_decision = decide(prompt, marker, authed, explicit);
+
     let preflight = run_preflight();
 
+    // AC-12: persist the decision label + the four decide() inputs + the two
+    // keyword-driven signals (spec 006 §80/§94) so routing-stats can read & report
+    // the non-axhub ignore rate. The jsonl line MUST carry the value for the AC to
+    // verify — do not drop this population.
     let record = AuditRecord {
         ts: now_iso8601(),
         prompt_hash: sha256_hex(prompt),
@@ -1136,8 +1161,27 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         is_axhub_related: heuristic_axhub_keyword(prompt),
         clarify_invoked: false,
         chosen_skill: None,
+        decision: Some(AuditDecision::from_routing(routing_decision, explicit)),
+        marker_present: Some(marker == MarkerStatus::Present),
+        authed: Some(authed),
+        explicit_invocation: Some(explicit),
+        axhub_keyword_present: Some(axhub_keyword_present(prompt)),
+        foreign_keyword_present: Some(foreign_keyword_present(prompt)),
     };
     let _ = audit_append(record);
+
+    // AC-11 (grace): once-per-project migration nudge for an authed user whose
+    // implicit deploy request resolved to `ignore` (no `axhub.yaml` marker). The
+    // `ignore→silent` action mapping itself is owned by hook-integration; this
+    // layers ONLY the educational systemMessage onto the existing output. It
+    // consumes the already-computed shared `routing_decision`/`authed` (no
+    // parallel chain → composition-consistency) and persists best-effort, so it
+    // never changes the fail-open `Ok(0)` exit (spec 006 §43, §86).
+    // HANDOFF (hook-integration-complete): when you implement the ignore→silent
+    // action mapping, KEEP this line and emit `grace` as systemMessage — do NOT
+    // re-add a second grace path from your action map, or it double-fires.
+    // `maybe_grace_message` IS the single composable seam for the grace nudge.
+    let grace = axhub_helpers::grace::maybe_grace_message(routing_decision, authed, prompt);
 
     let mut context = format_preflight_context(&preflight);
     if !hook_safety::is_karpathy_disabled() {
@@ -1146,7 +1190,10 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
             context.push_str(&karpathy);
         }
     }
-    println!("{}", hook_output::user_prompt_context(&context));
+    println!(
+        "{}",
+        hook_output::user_prompt_context_with_system(&context, grace)
+    );
     Ok(0)
 }
 
@@ -1338,6 +1385,28 @@ pub(crate) fn cmd_routing_stats(
     let axhub_related = records.iter().filter(|r| r.is_axhub_related).count() as u32;
     let auth_failed = records.iter().filter(|r| !r.auth_ok).count() as u32;
 
+    // AC-12 / spec §94: decision-type breakdown (axhub/yield/ignore/ask/explicit).
+    // Lines predating the decision field (legacy) carry `decision == None`; they
+    // are bucketed as "legacy" so counts never silently misattribute. ignore_rate
+    // measures the non-axhub pass-through signal (spec §82) over decided records.
+    let mut decision_counts: std::collections::BTreeMap<&'static str, u32> =
+        std::collections::BTreeMap::new();
+    for r in &records {
+        let label = r.decision.map_or("legacy", |d| d.as_str());
+        *decision_counts.entry(label).or_insert(0) += 1;
+    }
+    let ignore_count = decision_counts.get("ignore").copied().unwrap_or(0);
+    let decided_total: u32 = decision_counts
+        .iter()
+        .filter(|(label, _)| **label != "legacy")
+        .map(|(_, count)| *count)
+        .sum();
+    let ignore_rate = if decided_total > 0 {
+        ignore_count as f64 / decided_total as f64
+    } else {
+        0.0
+    };
+
     let mut lengths: Vec<u32> = records.iter().map(|r| r.prompt_len).collect();
     lengths.sort_unstable();
     let p50 = percentile(&lengths, 0.50);
@@ -1381,6 +1450,9 @@ pub(crate) fn cmd_routing_stats(
             "axhub_related": axhub_related,
             "axhub_related_rate": axhub_related as f64 / total as f64,
             "auth_failed": auth_failed,
+            "decision_counts": decision_counts,
+            "ignore_count": ignore_count,
+            "ignore_rate": ignore_rate,
             "prompt_length_p50": p50,
             "prompt_length_p95": p95,
             "cli_versions": versions,
@@ -1415,6 +1487,17 @@ pub(crate) fn cmd_routing_stats(
         for (h, c) in &top_hashes {
             println!("  {h}: {c:>4}");
         }
+    }
+    println!();
+    println!("결정 타입 분포 (axhub/yield/ignore/ask/explicit):");
+    for (label, count) in &decision_counts {
+        println!("  {label}: {count}");
+    }
+    if decided_total > 0 {
+        println!(
+            "non-axhub ignore 율: {:.1}% ({ignore_count}/{decided_total})",
+            100.0 * ignore_rate
+        );
     }
     println!();
     if let Some(dir) = axhub_helpers::runtime_paths::state_dir() {
@@ -1525,6 +1608,9 @@ pub(crate) fn cmd_audit_clarify(
         is_axhub_related: false,
         clarify_invoked: true,
         chosen_skill,
+        // Clarify is a feedback sentinel, not a routing-decision sample — leave the
+        // decision + routing-input fields at their `None` defaults.
+        ..Default::default()
     };
     audit::append(record).ok();
     println!("audit-clarify 기록했어요.");
@@ -1692,7 +1778,12 @@ pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
 
     let context = lines.join("\n");
     let mut output = json!({"systemMessage": context});
-    if !hook_safety::is_megaskill_disabled() {
+    // spec 006 — quality-context injection is eager axhub infra, gated on the
+    // project marker. Non-axhub projects (no axhub.yaml walk-up) get zero
+    // quality-context footprint; marker-error falls open auth-conditionally.
+    // The base systemMessage + welcome stay ungated (helper-runtime notice, not
+    // one of the three gated targets per spec §범위).
+    if !hook_safety::is_megaskill_disabled() && should_run_eager_infra() {
         if let Some(megaskill) = session_start_megaskill_context() {
             output["hookSpecificOutput"] = json!({
                 "hookEventName": "SessionStart",
@@ -1704,6 +1795,89 @@ pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
     let mut m = Map::new();
     m.insert("event".into(), Value::String("session_start".into()));
     emit_meta_envelope(m).ok();
+    Ok(0)
+}
+
+/// spec 006 — session-start eager-infra marker gate, shared by the shell wrapper
+/// (`session-eager-gate` subcommand) and the in-helper quality-context injection
+/// so the two can never disagree (composition-consistency).
+///
+/// "Run eager infra" is defined as **exactly** the bare-NL routing outcome
+/// `Axhub`: reusing the locked `routing::decide_from_flags` priority chain (no
+/// keywords, no slash) ties this gate to the single routing source of truth.
+/// That yields: marker Present → run; Absent → skip (zero-footprint even for an
+/// authed returning user); Unknown (fs error) → auth-conditional (token-file
+/// `.exists()` stat only — never spawns the CLI or token-init bootstrap).
+fn should_run_eager_infra() -> bool {
+    use axhub_helpers::routing::{decide_from_flags, find_marker, token_present, RoutingDecision};
+    matches!(
+        decide_from_flags(false, false, find_marker(), token_present(), false),
+        RoutingDecision::Axhub
+    )
+}
+
+/// `session-eager-gate` subcommand: the shell session-start wrapper calls this to
+/// decide whether to run the (token-init / Gatekeeper warmup) eager infra. Pure
+/// exit-code contract: `0` = run, `1` = skip. Never panics (fail-open: the shell
+/// treats any other rc as a spawn error and falls back auth-conditionally).
+pub(crate) fn cmd_session_eager_gate() -> anyhow::Result<i32> {
+    Ok(if should_run_eager_infra() { 0 } else { 1 })
+}
+
+/// `route-decision` subcommand (spec 006 §57/§68): the prompt-bearing consumer of
+/// the shared routing-decision function for the **deploy SKILL preflight Step 0**.
+///
+/// The hook (`prompt-route`) consumes `routing::decide_from_flags` in-process; the
+/// SKILL preflight is bash, so it needs this subcommand as its entry into the same
+/// single source of truth. Both paths therefore inherit one decision for identical
+/// inputs (composition-consistency, spec §49-59).
+///
+/// Inputs derived here (never spawns the axhub CLI, never triggers token-init
+/// bootstrap — auth is a cheap token-file `.exists()` stat, spec §102):
+/// - `marker` = cwd→git-root walk-up for `axhub.yaml` ([`routing::find_marker`]),
+/// - `authed` = [`routing::token_present`],
+/// - keyword flags = the shared detectors over `user_utterance`,
+/// - `explicit_invocation` = the model-passed `--explicit` (slash invocation, which
+///   the SKILL detects from its invocation context because `commands/deploy.md`
+///   forwards only `$ARGUMENTS` — the leading `/deploy` token is gone) OR a slash
+///   still detectable in the utterance text. Either signal alone makes it explicit.
+///
+/// Always prints JSON and exits 0 (fail-open): the SKILL branches on `.decision`
+/// and, if this emits nothing (binary truly missing), falls open to `axhub`.
+pub(crate) fn cmd_route_decision(user_utterance: &str, explicit: bool) -> anyhow::Result<i32> {
+    use axhub_helpers::routing::{
+        axhub_keyword_present, decide_from_flags, find_marker, foreign_keyword_present,
+        is_slash_invocation, token_present, MarkerStatus,
+    };
+
+    let marker = find_marker();
+    let authed = token_present();
+    let axhub_keyword = axhub_keyword_present(user_utterance);
+    let foreign_keyword = foreign_keyword_present(user_utterance);
+    // Either the model-passed slash signal OR a slash left in the utterance text
+    // counts as explicit — rule 0 must win even if only one signal survives.
+    let explicit_invocation = explicit || is_slash_invocation(user_utterance);
+    let decision = decide_from_flags(
+        axhub_keyword,
+        foreign_keyword,
+        marker,
+        authed,
+        explicit_invocation,
+    );
+    let marker_str = match marker {
+        MarkerStatus::Present => "present",
+        MarkerStatus::Absent => "absent",
+        MarkerStatus::Unknown => "unknown",
+    };
+    out_json(json!({
+        "decision": decision.as_str(),
+        "marker": marker_str,
+        "marker_present": marker == MarkerStatus::Present,
+        "authed": authed,
+        "axhub_keyword": axhub_keyword,
+        "foreign_keyword": foreign_keyword,
+        "explicit_invocation": explicit_invocation,
+    }));
     Ok(0)
 }
 
@@ -1974,12 +2148,14 @@ where
         };
     }
     if out.exit_code != 0 {
-        // Map known exit codes to actionable reasons; otherwise echo the raw
-        // exit code so verify_helper's verdict reasons aren't silently
-        // collapsed to "state = unknown".
+        // Map known CLI exit codes to actionable reasons; otherwise echo the
+        // raw exit code so verify_helper's verdict reasons aren't silently
+        // collapsed to "state = unknown". These are the *spawned* `axhub deploy
+        // list` exit codes — current CLI contract: 4=unauth, 5=not_found (not
+        // 65/67, which are this helper's own output namespace). 127 is shell.
         let reason = match out.exit_code {
-            65 => "axhub auth 만료 — axhub auth login 으로 재인증해주세요.".to_string(),
-            67 => "axhub: 앱을 찾을 수 없어요 (resource not found).".to_string(),
+            4 => "axhub auth 만료 — axhub auth login 으로 재인증해주세요.".to_string(),
+            5 => "axhub: 앱을 찾을 수 없어요 (resource not found).".to_string(),
             127 => "axhub CLI 를 찾을 수 없어요 (axhub:setup 으로 재설치).".to_string(),
             code => format!("axhub deploy list exit code {code}"),
         };
@@ -3088,5 +3264,71 @@ mod tests {
             third.try_lock_with_pid().expect("try_lock #3"),
             "lock must be acquirable after the first holder releases (drop)"
         );
+    }
+
+    /// INPUT-contract repair (I9 twin): `latest_deploy_id_with_runner` parses
+    /// the spawned `axhub deploy list` exit code. The current CLI emits 4=unauth
+    /// / 5=not_found (not 65/67), so the auth/not-found verdict reasons must key
+    /// off 4/5 — otherwise a real auth failure degrades to the generic "exit
+    /// code N" reason.
+    #[test]
+    fn latest_deploy_id_maps_current_cli_auth_and_not_found_exits() {
+        let auth = latest_deploy_id_with_runner("paydrop", |_args| {
+            axhub_helpers::verify_helper::ProbeResult {
+                stdout: String::new(),
+                exit_code: 4,
+                timed_out: false,
+            }
+        });
+        match auth {
+            DeployIdLookup::TransportFailure { reason } => {
+                assert!(reason.contains("만료"), "exit 4 must map to auth reason: {reason}");
+            }
+            other => panic!("exit 4 must be TransportFailure, got {other:?}"),
+        }
+
+        let missing = latest_deploy_id_with_runner("paydrop", |_args| {
+            axhub_helpers::verify_helper::ProbeResult {
+                stdout: String::new(),
+                exit_code: 5,
+                timed_out: false,
+            }
+        });
+        match missing {
+            DeployIdLookup::TransportFailure { reason } => {
+                assert!(
+                    reason.contains("찾을 수 없"),
+                    "exit 5 must map to not-found reason: {reason}"
+                );
+            }
+            other => panic!("exit 5 must be TransportFailure, got {other:?}"),
+        }
+    }
+
+    /// PR 25.7 / INPUT-contract repair: a failed `axhub deploy create` must
+    /// suggest the trace nl-trigger across the *current* CLI deploy-error
+    /// range. The prior `(64..=68)` gate missed real failures like exit 9
+    /// (conflict) and exit 4 (auth); the gate now fires on any non-zero exit.
+    #[test]
+    fn verify_trace_suggestion_fires_on_real_deploy_failure_exits() {
+        // Success path: confirm nudge, never the failure trace.
+        assert!(verify_trace_suggestion("axhub deploy create paydrop", 0)
+            .is_some_and(|m| m.contains("확인해")));
+
+        // Real CLI deploy-failure exits — every one must suggest the trace.
+        for exit in [1, 4, 5, 7, 8, 9, 10, 11, 64, 66] {
+            assert!(
+                verify_trace_suggestion("axhub deploy create paydrop", exit)
+                    .is_some_and(|m| m.contains("왜 실패했어")),
+                "exit {exit} on deploy create must suggest the failure trace"
+            );
+        }
+
+        // Non-deploy-create commands are out of scope for this nudge.
+        assert!(verify_trace_suggestion("axhub apps list", 9).is_none());
+
+        // recover success keeps its own confirm nudge.
+        assert!(verify_trace_suggestion("axhub recover paydrop", 0)
+            .is_some_and(|m| m.contains("확인해")));
     }
 }

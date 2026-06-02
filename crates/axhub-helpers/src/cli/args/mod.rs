@@ -214,6 +214,22 @@ pub(crate) struct RoutingStatsArgs {
     pub confused: bool,
 }
 
+/// `route-decision` flags (spec 006 §53). deploy SKILL preflight Step 0 가
+/// auth/resolve **전에** 호출해서 공유 routing-decision 함수의 결과를 받아요. 입력은
+/// 사용자 발화(`--user-utterance`) 와 explicit-invocation 신호(`--explicit`).
+/// `--explicit` 는 모델이 `/deploy`·`/axhub:deploy` 슬래시 호출일 때 세워요(슬래시
+/// 토큰이 발화에 안 남는 경우가 있어서 — `commands/deploy.md` 는 `$ARGUMENTS` 만
+/// 넘겨요). handler 가 발화에서 슬래시를 또 감지하므로 둘 중 하나만 맞아도 explicit.
+/// classify=Normal 이지만 출력이 항상 JSON+exit 0 이라 SKILL 이 `.decision` 으로
+/// 분기하고, 빈 출력이면 fail-open(axhub 진행)해요.
+#[derive(clap::Args, Debug)]
+pub(crate) struct RouteDecisionArgs {
+    #[arg(long = "user-utterance", default_value = "")]
+    pub user_utterance: String,
+    #[arg(long)]
+    pub explicit: bool,
+}
+
 /// `diagnose hitl` flags (nested). session/prompts 필수·TTY 검증은 handler. classify=Normal.
 #[derive(clap::Args, Debug)]
 pub(crate) struct DiagnoseHitlArgs {

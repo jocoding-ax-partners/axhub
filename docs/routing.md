@@ -83,7 +83,7 @@ axhub-helpers routing-dashboard --html > /tmp/axhub-routing.html
 JSONL line per prompt 예요:
 
 ```jsonl
-{"ts":"2026-05-07T14:30:00Z","prompt_hash":"sha256:abc...","prompt_len":42,"cli_version":"0.11.0","auth_ok":true,"is_axhub_related":true,"clarify_invoked":false,"chosen_skill":null}
+{"ts":"2026-05-07T14:30:00Z","prompt_hash":"sha256:abc...","prompt_len":42,"cli_version":"0.11.0","auth_ok":true,"is_axhub_related":true,"clarify_invoked":false,"chosen_skill":null,"decision":"ignore","marker_present":false,"authed":false,"explicit_invocation":false,"axhub_keyword_present":false,"foreign_keyword_present":false}
 ```
 
 ### Fields
@@ -98,6 +98,12 @@ JSONL line per prompt 예요:
 | `is_axhub_related` | bool | 단순 `prompt.contains("axhub")` boolean (measurement 분석용) |
 | `clarify_invoked` | bool | clarify feedback record 여부. legacy line 은 default false |
 | `chosen_skill` | string \| null | clarify 메뉴에서 사용자가 고른 최종 skill. prompt 원문은 저장하지 않아요 |
+| `decision` | string \| null | 공유 routing-decision 함수의 결정타입 (`axhub`/`yield`/`ignore`/`ask`/`explicit`). legacy + clarify sentinel line 은 null |
+| `marker_present` | bool \| null | `axhub.yaml` 마커가 cwd→git-root walk-up 에서 발견됐는지 (decide 입력) |
+| `authed` | bool \| null | token-file `.exists()` stat 결과 (decide 입력, bootstrap 안 함) |
+| `explicit_invocation` | bool \| null | prompt 가 slash invocation (`/deploy`, `/axhub:…`) 인지 (decide 입력) |
+| `axhub_keyword_present` | bool \| null | literal `"axhub"` 키워드 포함 여부 (keyword-driven 신호) |
+| `foreign_keyword_present` | bool \| null | foreign 타깃 키워드 (vercel/netlify/…) 포함 여부 (named-target-wins 신호) |
 
 ## Feedback loop
 
