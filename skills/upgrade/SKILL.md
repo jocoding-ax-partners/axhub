@@ -47,13 +47,23 @@ To upgrade the plugin:
 
 1. **Read current plugin version.** Fetch from the manifest baked into the plugin:
 
+   Unix / Git Bash:
+
    ```bash
    cat "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" | jq -r '.version'
+   ```
+
+   Windows PowerShell:
+
+   ```powershell
+   (Get-Content "$env:CLAUDE_PLUGIN_ROOT\.claude-plugin\plugin.json" -Raw | ConvertFrom-Json).version
    ```
 
    Cache the result for the session.
 
 2. **Check helper version stamp.** The helper binary embeds the same version:
+
+   Unix / Git Bash:
 
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
@@ -63,12 +73,27 @@ To upgrade the plugin:
    # → "axhub-helpers 0.1.0 (plugin v0.1.0, schema v0)"
    ```
 
+   Windows PowerShell:
+
+   ```powershell
+   & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" version
+   # → "axhub-helpers 0.1.0 (plugin v0.1.0, schema v0)"
+   ```
+
    If plugin.json version ≠ helper version, the install is corrupted; surface: "플러그인 파일이 일치하지 않아요. 재설치를 권해드려요. '/plugin install axhub@axhub --force' 라고 슬래시 명령으로 입력해주세요."
 
 3. **Check marketplace latest.** If the marketplace is reachable, fetch latest:
 
+   Unix / Git Bash:
+
    ```bash
    cat "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/marketplace.json" | jq -r '.plugins[] | select(.name=="axhub") | .latest_version'
+   ```
+
+   Windows PowerShell:
+
+   ```powershell
+   ((Get-Content "$env:CLAUDE_PLUGIN_ROOT\.claude-plugin\marketplace.json" -Raw | ConvertFrom-Json).plugins | Where-Object { $_.name -eq "axhub" }).latest_version
    ```
 
    On parse failure or absent entry, fall back to: "마켓플레이스 정보를 못 가져왔어요. 수동으로 확인해주세요."
@@ -113,7 +138,7 @@ To upgrade the plugin:
    >
    > Claude Code 자체가 플러그인 업데이트를 처리해요. 끝나면 새 세션을 시작해주세요."
 
-7. **Telemetry.** Append the dismissal/acceptance to `~/.cache/axhub-plugin/upgrade-prompts.ndjson` (per row 28: "다시 묻지 않기" preference persistence) so the same nudge does not fire repeatedly within the same plugin version.
+7. **Telemetry.** Append the dismissal/acceptance to `~/.cache/axhub-plugin/upgrade-prompts.ndjson` (Windows PowerShell: `$env:USERPROFILE\.cache\axhub-plugin\upgrade-prompts.ndjson`) (per row 28: "다시 묻지 않기" preference persistence) so the same nudge does not fire repeatedly within the same plugin version.
 
 8. **Cross-link to CLI upgrade.** If the user actually meant CLI upgrade ("axhub 새 버전 있어"), redirect to `skills/update` via the Skill tool. Detection heuristic: utterance contains "CLI", "binary", "axhub 명령" → that's CLI; "plugin", "플러그인", "skill" → that's this skill.
 
