@@ -29,6 +29,12 @@ model: sonnet
 현재 고정된 실행 가능 CLI 계약은 아래예요.
 
 ```bash
+# 원격 GitHub repo 감지 preview. 읽기 전용이고 mutation 이 없어요.
+axhub apps detect --repo "$OWNER_REPO" --json
+
+# monorepo 나 특정 ref 감지 preview. --repo 대신 split form 도 가능해요.
+axhub apps detect --owner "$OWNER" --repo-name "$REPO" --ref "$REF" --path "$APP_PATH" --json
+
 # 앱 등록
 axhub apps create --from-file axhub.yaml --yes --json
 
@@ -45,7 +51,25 @@ printf '%s' "$VALUE" | axhub env set --app "$APP_ID" "$KEY" --secret --from-stdi
 axhub deploy create --app "$APP_ID" --branch "$BRANCH" --commit "$COMMIT_SHA" --json
 ```
 
-remote detect CLI 가 추가된 환경에서는 `axhub apps detect --help` 가 성공할 때만 그 CLI 를 써요. 없으면 backend detect endpoint 를 직접 curl 하지 않아요.
+`axhub apps detect` 계약은 아래처럼 고정해요.
+
+- 입력은 GitHub repo source 만 받아요. `--repo owner/name` 또는 `--owner OWNER --repo-name NAME` 중 하나를 쓰고, monorepo 는 `--path`, 비기본 브랜치는 `--ref` 를 추가해요. local directory 는 helper `migrate-plan` 로만 pre-scan 해요.
+- 성공 JSON 은 `data.detected_providers`, `data.framework`, `data.install`, `data.build`, `data.start`, `data.port`, `data.health_path`, `data.deploy_method`, `data.confidence`, `data.env_refs[]` 를 읽어요. unknown future field 는 무시해요.
+- exit `0` 은 preview 성공이에요. exit `64` 는 owner/name 형식·필수 플래그 같은 CLI validation 실패예요. exit `4` 는 로그인 필요, `5` 는 repo/ref/path not found, `6` 은 rate limit, `7` 은 backend/API/detect 실패, `8` 은 tenant 권한 문제, `10` 은 timeout, `1` 은 local generic 실패로 다뤄요.
+- non-zero detect 는 앱 등록·git 연결·배포를 시작하지 않고, error envelope 의 request_id/subcode/doc_url 이 있으면 그대로 보여줘요. retry 는 `6`, `10`, 또는 envelope 의 `retryable:true` 에서만 해요.
+
+remote detect CLI 는 `axhub apps detect --help` 가 성공할 때만 써요. 없으면 backend detect endpoint 를 직접 curl 하지 않아요.
+
+현재 production 감지는 아래 패턴까지 기대해요.
+
+- Compose: `docker-compose.yml`, `docker-compose.yaml`, `compose.yml`, `compose.yaml`
+- Dockerfile: repo root 또는 선택한 `--path` 아래의 `Dockerfile`
+- Node: package start/build script, Next.js, Nuxt, SvelteKit, Remix
+- Python: FastAPI, Django, Flask
+- Go: 기본 `net/http`, Gin, Fiber, Echo, Chi
+- Ruby: Sinatra, Ruby on Rails
+- Java: Maven, Gradle
+- Rust: Cargo 기반 웹 앱
 
 ## Workflow
 
@@ -81,7 +105,9 @@ echo "$PREFLIGHT_JSON"
    "$HELPER" migrate-plan --dir "${AXHUB_MIGRATE_DIR:-.}" --json
    ```
 
-2. **후보 선택과 confidence 확인.** 후보가 2개 이상이면 앱 하나를 고르게 해요. helper 의 confidence 는 local marker 기반 힌트예요. `0.80` 이상이면 확인 후 진행하고, `0.60..0.79` 는 수정 가능한 계획으로 보여줘요. `0.60` 미만이나 후보 모호함은 진행을 막고 `axhub.yaml` 또는 Dockerfile/compose 를 요청해요. start command 유무는 remote detect CLI 가 제공하는 authoritative preview 가 있을 때만 차단 조건으로 삼아요.
+2. **후보 선택과 confidence 확인.** 후보가 2개 이상이면 앱 하나를 고르게 해요. helper 의 confidence 는 local marker 기반 힌트예요. `0.80` 이상이면 확인 후 진행하고, `0.60..0.79` 는 수정 가능한 계획으로 보여줘요. `0.60` 미만이나 후보 모호함은 진행을 막고 `axhub.yaml` 또는 Dockerfile/compose 를 요청해요.
+
+   remote detect CLI 가 있으면 앱 등록 전에 같은 repo/ref/path 로 preview 를 한 번 실행해요. `deploy_method=compose` 이면 compose file 이 start source 라서 `data.start` 누락을 차단하지 않아요. Dockerfile 이 선택되면 Dockerfile 이 start source 라서 추측 start command 를 만들지 않아요. auto/buildpack 계열에서 `data.start` 가 있으면 그 값을 그대로 manifest 후보에 반영하고, 없으면 사용자에게 start command 를 받거나 `manifest만` 으로 멈춰요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — 질문 별 safe_default.
 
@@ -117,7 +143,7 @@ echo "$PREFLIGHT_JSON"
 
 3. **manifest 초안 준비.** helper 의 `suggested_manifest` 를 `axhub.yaml` 초안으로 보여줘요. required env 는 이름과 scope 만 포함하고, 값 설정은 `axhub env set` 경로로 안내해요. 기존 `apphub.yaml` 이 있으면 읽기는 계속 되지만 새 파일은 `axhub.yaml` 로 만들어요.
 
-4. **기존 mutation 경로 재사용.** 앱 등록, git 연결, env 값 저장, 배포는 위 CLI boundary contract 와 기존 consent 경로만 써요. helper 로 consent 를 우회하지 않아요. remote detect 는 `axhub apps detect --help` 가 성공할 때만 CLI 로 실행하고, local dir 은 archive 또는 GitHub repo-ref 형태로만 넘겨요. CLI 가 없으면 raw backend 호출 없이 manifest 초안과 다음 작업만 안내해요.
+4. **기존 mutation 경로 재사용.** 앱 등록, git 연결, env 값 저장, 배포는 위 CLI boundary contract 와 기존 consent 경로만 써요. helper 로 consent 를 우회하지 않아요. remote detect 는 `axhub apps detect --help` 가 성공할 때만 CLI 로 실행하고, local dir 은 GitHub repo/ref/path 로 push 된 뒤에만 remote preview 대상이 돼요. CLI 가 없으면 raw backend 호출 없이 manifest 초안과 다음 작업만 안내해요.
 
 5. **결과 검증.** 배포가 끝나면 live URL, deployment id, 감지된 build/runtime env 구분, Dockerfile/compose/auto 중 선택된 ladder 를 보여줘요. 실패하면 deploy error empathy catalog 형식으로 원인·확인 방법·재시도 명령을 짧게 안내해요.
 

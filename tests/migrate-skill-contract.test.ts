@@ -36,11 +36,31 @@ describe("migrate SKILL contract", () => {
   test("keeps migration behind CLI/helper boundaries instead of raw backend endpoints", () => {
     const skill = read("skills/migrate/SKILL.md");
     expect(skill).toContain("CLI boundary contract");
+    expect(skill).toContain('axhub apps detect --repo "$OWNER_REPO" --json');
+    expect(skill).toContain('axhub apps detect --owner "$OWNER" --repo-name "$REPO" --ref "$REF" --path "$APP_PATH" --json');
+    expect(skill).toContain("exit `64`");
     expect(skill).toContain("axhub apps create --from-file axhub.yaml --yes --json");
     expect(skill).toContain('axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json');
     expect(skill).toContain('axhub deploy create --app "$APP_ID" --branch "$BRANCH" --commit "$COMMIT_SHA" --json');
     expect(skill).toContain("backend detect endpoint 를 직접 curl 하지 않아요");
     expect(skill).not.toContain("/api/v1/apps/detect");
+  });
+
+  test("documents the production detect matrix added after live QA", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    for (const expected of [
+      "docker-compose.yml",
+      "docker-compose.yaml",
+      "compose.yml",
+      "compose.yaml",
+      "Next.js, Nuxt, SvelteKit, Remix",
+      "FastAPI, Django, Flask",
+      "Gin, Fiber, Echo, Chi",
+      "Sinatra, Ruby on Rails",
+      "Maven, Gradle",
+    ]) {
+      expect(skill).toContain(expected);
+    }
   });
 
   test("corpus.100 routes core existing-app natural language to migrate", () => {
