@@ -981,7 +981,7 @@ pub fn interpret_apps_create_result(exit_code: i32, stdout_json: &Value) -> Apps
 }
 
 fn read_manifest(cwd: &Path) -> Option<ManifestInfo> {
-    ["apphub.yaml", "axhub.yaml"].into_iter().find_map(|path| {
+    ["axhub.yaml", "apphub.yaml"].into_iter().find_map(|path| {
         let raw = fs::read_to_string(cwd.join(path)).ok()?;
         Some(ManifestInfo {
             path: path.into(),

@@ -3,7 +3,8 @@
 // Aggregates three sources into one `TraceReport` for the `axhub:trace`
 // SKILL and the `axhub-helpers trace --json` CLI:
 //   A. event_log    — phase transitions + per-phase duration_ms
-//   B. build_log    — caller-provided deploy build log ERROR/WARN excerpts
+//   B. runtime_log  — app runtime log messages (NDJSON, probe-unwrapped); no
+//                     build-log endpoint exists (F3), build-stage cause via A
 //   C. audit        — recent routing context, time-window correlated
 //
 // The helper is **pure** (no I/O) except for the optional `TraceProbes`
@@ -44,14 +45,16 @@ pub struct TraceReport {
     pub phase_durations: Vec<PhaseDuration>,
     pub build_log_errors: Vec<String>,
     pub routing_context: Option<RoutingContext>,
-    /// Matched error-pattern keys from `skills/trace/references/error-patterns.md`,
-    /// computed against `build_log_errors`. Used by the SKILL to pick the
+    /// Matched error-pattern keys from `skills/trace/references/error-patterns.md`.
+    /// Computed against the event_log `failure_reason` (always — authoritative)
+    /// plus the severity-gated runtime-log lines — NOT `build_log_errors`
+    /// (display and matching are decoupled). Used by the SKILL to pick the
     /// 4-part empathy entry.
     pub matched_patterns: Vec<String>,
-    /// Probe-emitted warnings — e.g. evidence sources skipped because a
-    /// required argument was omitted. Separated from `build_log_errors`
-    /// so SKILL parsers can branch on the warning without polluting the
-    /// build-log evidence collection.
+    /// Probe-emitted warnings — e.g. `runtime_log_unavailable` /
+    /// `runtime_log_probe_skipped`. Separated from `build_log_errors` so SKILL
+    /// parsers can branch on the warning without polluting the runtime-log
+    /// evidence collection.
     #[serde(default)]
     pub warnings: Vec<String>,
 }
@@ -64,9 +67,12 @@ pub enum TraceError {
     Io(#[from] std::io::Error),
 }
 
-/// Caller-injected build-log probe. Real callers delegate to current
-/// `axhub deploy logs <DEPLOY_ID> --app <APP> --source build`;
-/// tests pass a closure returning canned NDJSON or plain text.
+/// Caller-injected runtime-log probe. Real callers invoke
+/// `axhub deploy logs --app <APP> --limit <N>` and unwrap the NDJSON `message`
+/// field — no deploy-id positional / `--source`: the current CLI ignores them
+/// and the app-level log route is not deploy-scoped (F3). Tests pass canned
+/// plain text. The method keeps its `axhub_build_log` name for wire-compat but
+/// now returns runtime-log text.
 pub trait TraceProbes {
     fn axhub_build_log(&self, deploy_id: &str, tail: u32) -> String;
     fn recent_routing_context(&self) -> Option<RoutingContext>;
@@ -91,9 +97,27 @@ pub fn trace<P: TraceProbes>(deploy_id: &str, probes: &P) -> Result<TraceReport,
         .unwrap_or_else(|| "unknown".to_string());
     let failure_reason = last_failed_reason(&events);
 
-    let raw_build_log = probes.axhub_build_log(deploy_id, 100);
-    let build_log_errors = extract_error_lines(&raw_build_log, 5);
-    let matched_patterns = match_error_patterns(&build_log_errors);
+    // R3γ: `axhub deploy logs` 는 app 런타임 로그를 반환해요 (build-log 엔드포인트
+    // 부재 — F3). probe 가 NDJSON `message` 를 unwrap 한 plain 텍스트를 넘겨줘요.
+    let runtime_log = probes.axhub_build_log(deploy_id, 100);
+
+    // Display (NEVER 규칙): ERROR/FATAL/WARN 라인 최대 5줄만 인용.
+    let build_log_errors = extract_error_lines(&runtime_log, 5);
+
+    // Matching: 두 소스를 합쳐요.
+    //  (1) event_log 의 `failure_reason` 을 **항상 우선** 매칭 — 빌드 단계 실패의
+    //      authoritative 원인(태그 없는 `env: …`/`npm err!` 포함)이라, 런타임 로그
+    //      noise 에 가려지면 안 돼요 (CR #1: masking 방지).
+    //  (2) 런타임 로그는 **severity-gated 라인(ERROR/FATAL/WARN)만** 매칭 — benign
+    //      INFO 라인(`INFO env: production`, `docker pull completed`)이 build-log 용
+    //      needle 을 오발화하지 않게 해요 (CR #1: false-positive 방지). display 5-라인
+    //      cap 과는 분리해서(전체 gated 라인 매칭) reachability 유지.
+    let mut match_input: Vec<String> = Vec::new();
+    if let Some(reason) = &failure_reason {
+        match_input.push(reason.clone());
+    }
+    match_input.extend(extract_error_lines(&runtime_log, usize::MAX));
+    let matched_patterns = match_error_patterns(&match_input);
     let routing_context = probes.recent_routing_context();
     let warnings = probes.trace_warnings();
 
@@ -149,32 +173,86 @@ fn extract_error_lines(raw: &str, max: usize) -> Vec<String> {
     out
 }
 
+/// How a needle is matched against a lowercased line. Strategy lives in the
+/// pattern table (not a literal-string special-case in `needle_hit`), so
+/// renaming a needle can't silently drop its strict matching.
+#[derive(Clone, Copy)]
+enum MatchKind {
+    /// Plain lowercase substring (the default).
+    Substring,
+    /// Whole-word match (non-alphanumeric boundaries) — keeps `oom` from
+    /// firing inside "zoom"/"room".
+    Word,
+    /// Substring not immediately followed by a digit — keeps `exit code 1`
+    /// from firing inside "exit code 127".
+    NotFollowedByDigit,
+}
+
 /// Error patterns mirroring `skills/trace/references/error-patterns.md`.
-/// Each tuple = (pattern needle, canonical key). Lowercase substring match.
-const ERROR_PATTERNS: &[(&str, &str)] = &[
-    ("env: ", "env_not_found"),
-    ("out of memory", "oom"),
-    ("oom", "oom"),
-    ("module not found", "module_not_found"),
-    ("cannot find module", "module_not_found"),
-    ("network timeout", "network_timeout"),
-    ("connection refused", "network_timeout"),
-    ("dependency install failed", "dependency_install_failed"),
-    ("npm err!", "dependency_install_failed"),
-    ("docker pull", "docker_image_pull_failed"),
-    ("image pull failed", "docker_image_pull_failed"),
-    ("address already in use", "port_already_in_use"),
-    ("eaddrinuse", "port_already_in_use"),
-    ("build command failed", "build_command_failed"),
-    ("exit code 1", "build_command_failed"),
+/// Each entry = (needle, canonical key, match kind). Most needles use plain
+/// lowercase substring; `oom` and `exit code 1` use tighter matching to avoid
+/// false positives on runtime-log input (R3γ).
+const ERROR_PATTERNS: &[(&str, &str, MatchKind)] = &[
+    ("env: ", "env_not_found", MatchKind::Substring),
+    ("out of memory", "oom", MatchKind::Substring),
+    ("oomkilled", "oom", MatchKind::Substring),
+    ("oom", "oom", MatchKind::Word),
+    ("module not found", "module_not_found", MatchKind::Substring),
+    (
+        "cannot find module",
+        "module_not_found",
+        MatchKind::Substring,
+    ),
+    ("network timeout", "network_timeout", MatchKind::Substring),
+    (
+        "connection refused",
+        "network_timeout",
+        MatchKind::Substring,
+    ),
+    (
+        "dependency install failed",
+        "dependency_install_failed",
+        MatchKind::Substring,
+    ),
+    (
+        "npm err!",
+        "dependency_install_failed",
+        MatchKind::Substring,
+    ),
+    (
+        "docker pull",
+        "docker_image_pull_failed",
+        MatchKind::Substring,
+    ),
+    (
+        "image pull failed",
+        "docker_image_pull_failed",
+        MatchKind::Substring,
+    ),
+    (
+        "address already in use",
+        "port_already_in_use",
+        MatchKind::Substring,
+    ),
+    ("eaddrinuse", "port_already_in_use", MatchKind::Substring),
+    (
+        "build command failed",
+        "build_command_failed",
+        MatchKind::Substring,
+    ),
+    (
+        "exit code 1",
+        "build_command_failed",
+        MatchKind::NotFollowedByDigit,
+    ),
 ];
 
 fn match_error_patterns(errors: &[String]) -> Vec<String> {
     let mut keys: Vec<String> = Vec::new();
     for line in errors {
         let lower = line.to_lowercase();
-        for (needle, key) in ERROR_PATTERNS {
-            if lower.contains(needle) {
+        for (needle, key, kind) in ERROR_PATTERNS {
+            if needle_hit(&lower, needle, *kind) {
                 let k = key.to_string();
                 if !keys.contains(&k) {
                     keys.push(k);
@@ -184,6 +262,49 @@ fn match_error_patterns(errors: &[String]) -> Vec<String> {
         }
     }
     keys
+}
+
+/// Dispatch matching by `MatchKind` — the strategy is carried in the pattern
+/// table, so it stays in sync with the needle automatically.
+fn needle_hit(lower: &str, needle: &str, kind: MatchKind) -> bool {
+    match kind {
+        MatchKind::Substring => lower.contains(needle),
+        MatchKind::Word => contains_word(lower, needle),
+        MatchKind::NotFollowedByDigit => contains_not_followed_by_digit(lower, needle),
+    }
+}
+
+/// `word` 가 양쪽 모두 비-영숫자 경계로 둘러싸여 등장하는지.
+fn contains_word(hay: &str, word: &str) -> bool {
+    let bytes = hay.as_bytes();
+    let mut from = 0;
+    while let Some(rel) = hay[from..].find(word) {
+        let i = from + rel;
+        let before_ok = i == 0 || !bytes[i - 1].is_ascii_alphanumeric();
+        let after = i + word.len();
+        let after_ok = after >= bytes.len() || !bytes[after].is_ascii_alphanumeric();
+        if before_ok && after_ok {
+            return true;
+        }
+        from = i + 1;
+    }
+    false
+}
+
+/// `needle` 이 바로 뒤에 숫자가 오지 않는 위치에 등장하는지 (그래서 "exit code 1"
+/// 이 "exit code 127" 안에서 매칭되지 않게).
+fn contains_not_followed_by_digit(hay: &str, needle: &str) -> bool {
+    let bytes = hay.as_bytes();
+    let mut from = 0;
+    while let Some(rel) = hay[from..].find(needle) {
+        let i = from + rel;
+        let after = i + needle.len();
+        if after >= bytes.len() || !bytes[after].is_ascii_digit() {
+            return true;
+        }
+        from = i + 1;
+    }
+    false
 }
 
 #[cfg(test)]
@@ -277,6 +398,35 @@ mod tests {
     }
 
     #[test]
+    fn matching_is_decoupled_from_display_cap_and_severity_filter() {
+        // R3γ T006: 앞 5줄이 ERROR(=display cap 채움), 6번째 줄은 태그 없는 env: 라인.
+        let raw = "ERROR a\nERROR b\nERROR c\nERROR d\nERROR e\nenv: STRIPE_KEY not found\n";
+        // display 는 ERROR 5줄만 (env: 는 severity 토큰 없음 + cap 으로 제외).
+        let display = extract_error_lines(raw, 5);
+        assert_eq!(display.len(), 5);
+        assert!(!display.iter().any(|l| l.contains("env:")));
+        // 매칭은 전체 라인 기준이라 env_not_found 를 여전히 잡아요 (decoupled).
+        let all: Vec<String> = raw.lines().map(|l| l.to_string()).collect();
+        assert!(match_error_patterns(&all).contains(&"env_not_found".to_string()));
+    }
+
+    #[test]
+    fn oom_needle_is_word_bounded_no_false_positive() {
+        // R2 T012: zoom/room 에서 oom 발화 금지.
+        assert!(match_error_patterns(&["zoom meeting scheduled".to_string()]).is_empty());
+        assert!(match_error_patterns(&["building src/room/index.js".to_string()]).is_empty());
+        // 실제 oom 은 여전히 매칭 (단어 경계 + oomkilled).
+        assert_eq!(
+            match_error_patterns(&["OOM detected".to_string()]),
+            vec!["oom".to_string()]
+        );
+        assert_eq!(
+            match_error_patterns(&["process oomkilled".to_string()]),
+            vec!["oom".to_string()]
+        );
+    }
+
+    #[test]
     fn compute_phase_durations_emits_step_index_for_each_event() {
         let events = vec![
             make_event("d", "preflight", Some(120)),
@@ -316,7 +466,7 @@ mod tests {
                 None
             }
             fn trace_warnings(&self) -> Vec<String> {
-                vec!["build_log_probe_skipped: --app required".to_string()]
+                vec!["runtime_log_probe_skipped: --app required".to_string()]
             }
         }
         // event_log read may fail in this synthetic env; we just exercise
@@ -332,7 +482,7 @@ mod tests {
             warnings: WarningProbes.trace_warnings(),
         };
         assert_eq!(report.warnings.len(), 1);
-        assert!(report.warnings[0].contains("build_log_probe_skipped"));
+        assert!(report.warnings[0].contains("runtime_log_probe_skipped"));
         // Critically: warnings must NOT leak into build_log_errors —
         // SKILL parsers split the two channels.
         assert!(report.build_log_errors.is_empty());

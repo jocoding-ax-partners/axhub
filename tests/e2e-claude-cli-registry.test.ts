@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("35 top-level keys (2 메타 + 31 SKILL slug + quality_gate + consent channel)", () => {
+  test("36 top-level keys (2 메타 + 32 SKILL slug + quality_gate + consent channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(35);
+    expect(keys).toHaveLength(36);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
@@ -73,6 +73,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "install-cli",
       "karpathy-guidelines",
       "logs",
+      "migrate",
       "my-resources",
       "open",
       "profile",
@@ -89,9 +90,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("49 actual safe_default rationale 엔트리 including data bootstrap/live-read fallbacks + Phase 26 quality + Plan v6 diagnose + v0.9.3 auth PAT revoke + skill-cli-drift-fix (update.apply_consent + status.deployment_id_pick) + setup (node install + first app)", () => {
+  test("51 actual safe_default rationale 엔트리 including data bootstrap/live-read fallbacks + Phase 26 quality + Plan v6 diagnose + v0.9.3 auth PAT revoke + skill-cli-drift-fix (update.apply_consent + status.deployment_id_pick) + setup (node install + first app)", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(49);
+    expect(paths).toHaveLength(51);
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
@@ -132,6 +133,8 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "init",
       "init",
       "install-cli",
+      "migrate",
+      "migrate",
       "profile",
       "quality_gate",
       "recover",
@@ -208,6 +211,10 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     expect(github["git remote 를 추가할까요?"]?.safe_default).toBe("abort");
     expect(github["첫 push 를 실행할까요?"]?.safe_default).toBe("abort");
     expect(github["axhub 앱에 repo 를 연결할까요?"]?.safe_default).toBe("abort");
+
+    const migrate = registry["migrate"] as Record<string, SafeDefaultEntry>;
+    expect(migrate["어느 앱을 가져올까요?"]?.safe_default).toBe("중단");
+    expect(migrate["감지 계획으로 배포할까요?"]?.safe_default).toBe("manifest만");
 
     const profile = registry["profile"] as Record<string, SafeDefaultEntry>;
     expect(profile["프로필 작업을 고를까요?"]?.safe_default).toBe(

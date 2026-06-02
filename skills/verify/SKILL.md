@@ -66,7 +66,7 @@ echo "$PREFLIGHT_JSON"
 
 3. **`axhub deploy logs --app <APP> --json` 호출 (5s timeout, app-level).** 로그는 이제 app-level 백엔드 라우트로 받아요 — `<DEPLOY_ID>` 는 legacy 라 스코핑에 안 써요. 받은 출력에서 마지막 ~50 라인 (client-side trim) 에서 `ERROR` / `FATAL` 패턴 grep. 한 줄도 없으면 OK. 있으면 first 3 라인을 그대로 quote 해요 (Vibe Coder Visibility 원칙). `--tail` 같은 N-라인 플래그는 CLI 에 없으니 출력을 받아서 직접 마지막 50 라인만 잘라요. `--source` 는 고정값(pod/runtime/build) 없는 passthrough 라 verify 는 생략해요. (verify 는 `--follow` 를 안 써서 항상 단발 스냅샷이고, watch/follow 계열을 호출해도 CLI 가 비-TTY/에이전트 컨텍스트면 자동으로 단일 스냅샷으로 degrade 해요 (axhub-cli 0.15.3+ 자동 degrade 계약).)
 
-4. **(선택) health endpoint GET.** apphub.yaml 에 `health_endpoint` 가 정의돼 있으면 `curl -sS -o /dev/null -w "%{http_code}" $URL` 5s timeout 호출해요. 응답 200 = OK. 그 외 → 의심 사유.
+4. **(선택) health endpoint GET.** axhub.yaml 에 `health_endpoint` 가 정의돼 있으면 `curl -sS -o /dev/null -w "%{http_code}" $URL` 5s timeout 호출해요. 응답 200 = OK. 그 외 → 의심 사유.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — verify SKILL 의 `health_endpoint_setup` safe_default 는 "skip" 이에요 (헬스 endpoint 미설정 시 axhub status + logs 만으로 verdict).
 
@@ -80,7 +80,7 @@ echo "$PREFLIGHT_JSON"
        "multiSelect": false,
        "options": [
          {"label": "skip", "description": "axhub status + logs 만으로 verdict 진행"},
-         {"label": "지금 설정", "description": "apphub.yaml 의 health_endpoint 필드 추가 가이드"}
+         {"label": "지금 설정", "description": "axhub.yaml 의 health_endpoint 필드 추가 가이드"}
        ]
      }]
    }

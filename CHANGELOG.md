@@ -4,6 +4,51 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.25](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.24...v0.9.25) (2026-06-02)
+
+v0.9.24 이후 사용자가 요청한 열린 PR 일괄 처리 범위에서 준비 완료된 trace·upgrade 변경을 추가로 실어요. trace 스킬은 build-log API 가 없어도 runtime log evidence 로 원인을 설명하고, upgrade 스킬은 Windows PowerShell 사용자가 Bash 없이도 업데이트 절차를 따라갈 수 있게 해요.
+
+### Test baseline
+
+- PR #162 CI 를 다시 확인했고 11 pass / 6 skipped / 0 fail / 0 pending 이었어요.
+- PR #160 CI 를 다시 확인했고 5 pass / 2 skipped / 0 fail / 0 pending 이었어요.
+- main merge 뒤 `git diff --check v0.9.24..HEAD`, `bun test tests/trace-skill.test.ts tests/migrate-skill-contract.test.ts`, `cargo test -p axhub-helpers trace -- --nocapture`, `bun run skill:doctor`, `bun run lint:tone --strict`, `bun run lint:keywords --check` 를 통과했어요.
+- release step 1 의 `codegen:version` 과 `release:check` 가 통과했어요.
+
+### Honest tradeoff
+
+- #155, #159, #161, #163 은 main 과 conflict 상태라 강제 머지하지 않았어요.
+- release workflow 의 staging E2E 와 vibe advisory job 은 repo 조건상 skipped 될 수 있어서 최종 workflow 결과에서 별도 확인해요.
+
+
+### Added
+
+* **skills:** add Windows compatibility to upgrade skill ([880c8d5](https://github.com/jocoding-ax-partners/axhub/commit/880c8d5a92fdbe6229e33c7a0a2ac014359a082a)), closes [#160](https://github.com/jocoding-ax-partners/axhub/issues/160)
+
+
+### Fixed
+
+* **trace:** use runtime logs for evidence source ([eeca0e8](https://github.com/jocoding-ax-partners/axhub/commit/eeca0e88cc5b2f53b3c23f68ca727b154c39f1a4)), closes [#162](https://github.com/jocoding-ax-partners/axhub/issues/162)
+
+## [0.9.24](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.23...v0.9.24) (2026-06-02)
+
+기존 앱 가져오기 흐름을 정식 릴리스에 올려서 에이전트가 로컬 감지, `axhub.yaml` 제어, GitHub 연결, 배포까지 CLI 경계 안에서 이어가게 해요. 선택형 Auth Migration 절차도 문서화해 backend/gateway 변경 없이 사용자 앱 로그인 전환 계획을 먼저 보여주도록 했어요.
+
+### Test baseline
+
+- PR #154 CI 를 다시 확인했고 11 pass / 6 skipped / 0 fail / 0 pending 이었어요.
+- main merge 뒤 `git diff --check HEAD^ HEAD`, `bun test tests/migrate-skill-contract.test.ts`, `bun run skill:doctor`, `bun run lint:tone --strict`, `bun run lint:keywords --check` 를 통과했어요.
+- release step 1 의 `codegen:version` 과 `release:check` 가 통과했어요.
+
+### Honest tradeoff
+
+- staging E2E, fuzz, full matrix 일부는 workflow 조건상 skipped 라서 태그 release workflow 의 5-platform artifact 결과를 별도로 확인해요.
+
+
+### Added
+
+* **migrate:** enable existing app migration flow ([2854bc4](https://github.com/jocoding-ax-partners/axhub/commit/2854bc4a03f6608517f830b0c9f0f3ca00933e61)), closes [#154](https://github.com/jocoding-ax-partners/axhub/issues/154)
+
 ## [0.9.23](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.22...v0.9.23) (2026-06-01)
 
 이번 패치는 `CLAUDE_PLUGIN_ROOT` 가 비어 전달되는 세션에서 플러그인 로그인·배포가 거부되던 회귀를 고쳐요. model 이 직접 실행하는 Bash 컨텍스트에서는 이 환경변수가 자주 비고 `axhub-helpers` 도 PATH 에 없어서, SKILL 이 bare `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers` 를 호출하면 경로가 `/bin/axhub-helpers` 로 깨졌어요. 이제 helper 를 env → PATH → 버전 cache 스캔 3단계로 해석해서 빈 환경에서도 최신 버전 바이너리를 찾아내요. cache 스캔은 `$HOME` 만 쓰고 `sort -V` 없이 awk zero-pad 로 semver 를 정렬해 BSD/GNU 양쪽에서 동작해요. 전 SKILL·reference 의 helper 호출과 scaffold 의 `CANONICAL_PREFLIGHT_BLOCK`·템플릿까지 같은 resolver 로 맞췄고, Windows auth PowerShell lane 과 deploy preamble 에도 같은 cache-scan tier 를 넣었어요.

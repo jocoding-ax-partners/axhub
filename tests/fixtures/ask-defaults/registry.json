@@ -491,5 +491,25 @@
         "Overwrite"
       ]
     }
+  },
+  "migrate": {
+    "어느 앱을 가져올까요?": {
+      "safe_default": "중단",
+      "rationale": "후보가 여러 개면 잘못된 앱 등록·git 연결·배포로 이어질 수 있어요. 비대화형 환경에서는 자동 선택하지 않고 멈춰요.",
+      "allowed_safe_defaults": [
+        "첫 후보",
+        "직접 선택",
+        "중단"
+      ]
+    },
+    "감지 계획으로 배포할까요?": {
+      "safe_default": "manifest만",
+      "rationale": "배포는 원격 mutation 이라 비대화형 환경에서는 axhub.yaml 초안까지만 만들고 실제 앱 등록·배포는 하지 않아요.",
+      "allowed_safe_defaults": [
+        "계속",
+        "manifest만",
+        "중단"
+      ]
+    }
   }
 }
