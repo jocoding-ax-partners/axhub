@@ -197,8 +197,13 @@ pub fn foreign_keyword_present(prompt: &str) -> bool {
 /// this detector is the fallback when the leading token survives in the text.
 #[must_use]
 pub fn is_slash_invocation(prompt: &str) -> bool {
-    let trimmed = prompt.trim_start();
-    trimmed.starts_with("/deploy") || trimmed.starts_with("/배포") || trimmed.starts_with("/axhub:")
+    // Match the **exact** leading command token, not a bare prefix: `/deployment`
+    // and `/배포해` are different tokens and must not be mistaken for the `/deploy`
+    // / `/배포` commands (over-detection would route unrelated slash text to axhub
+    // via priority rule 0). The `/axhub:` namespace stays a prefix — any
+    // `/axhub:<cmd>` is an explicit axhub invocation.
+    let first = prompt.trim_start().split_whitespace().next().unwrap_or("");
+    first == "/deploy" || first == "/배포" || first.starts_with("/axhub:")
 }
 
 /// Whole-word substring search. `keyword` is assumed lowercase ASCII; `haystack`
@@ -517,6 +522,13 @@ mod tests {
         assert!(!is_slash_invocation("deploy"));
         assert!(!is_slash_invocation("please /deploy"));
         assert!(!is_slash_invocation("배포해")); // bare Korean NL is NOT a slash
+        // Bounded to the exact command token: a prompt that merely *starts with*
+        // "/deploy"/"/배포" but is a different token must NOT be treated as the
+        // command (over-detection would route unrelated slash text to axhub via
+        // rule 0).
+        assert!(!is_slash_invocation("/deployment-plan 설명해줘"));
+        assert!(!is_slash_invocation("/deploy-history"));
+        assert!(!is_slash_invocation("/배포해")); // "/배포" + 해 = a different token
     }
 
     #[test]
