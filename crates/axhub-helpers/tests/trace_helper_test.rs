@@ -103,9 +103,12 @@ fn trace_reads_event_log_and_merges_probe_evidence() {
     assert_eq!(report.phase_durations.len(), 3);
     assert_eq!(report.phase_durations[1].phase, "push");
     assert_eq!(report.build_log_errors.len(), 2);
+    // failure_reason ("build command failed") is always matched first
+    // (authoritative), then the severity-gated runtime-log lines.
     assert_eq!(
         report.matched_patterns,
         vec![
+            "build_command_failed".to_string(),
             "module_not_found".to_string(),
             "network_timeout".to_string()
         ]

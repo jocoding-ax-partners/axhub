@@ -3525,13 +3525,35 @@ exit 1
 
 #[cfg(unix)]
 fn write_trace_deploy_events(state: &Path, deploy_id: &str) {
+    write_trace_deploy_events_with_reason(state, deploy_id, "build command failed");
+}
+
+#[cfg(unix)]
+fn write_trace_deploy_events_with_reason(state: &Path, deploy_id: &str, reason: &str) {
     let dir = state.join("axhub-plugin").join("deploy-events");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(format!("{deploy_id}.jsonl"));
     let body = format!(
-        "{{\"schema_version\":\"deploy-event/v1\",\"deploy_id\":\"{deploy_id}\",\"ts\":\"2026-05-11T00:00:00.000Z\",\"phase\":\"preflight\",\"duration_ms\":10}}\n{{\"schema_version\":\"deploy-event/v1\",\"deploy_id\":\"{deploy_id}\",\"ts\":\"2026-05-11T00:00:01.000Z\",\"phase\":\"failed\",\"duration_ms\":20,\"reason\":\"build command failed\"}}\n"
+        "{{\"schema_version\":\"deploy-event/v1\",\"deploy_id\":\"{deploy_id}\",\"ts\":\"2026-05-11T00:00:00.000Z\",\"phase\":\"preflight\",\"duration_ms\":10}}\n{{\"schema_version\":\"deploy-event/v1\",\"deploy_id\":\"{deploy_id}\",\"ts\":\"2026-05-11T00:00:01.000Z\",\"phase\":\"failed\",\"duration_ms\":20,\"reason\":\"{reason}\"}}\n"
     );
     std::fs::write(path, body).unwrap();
+}
+
+#[cfg(unix)]
+fn fake_axhub_raw_logs(temp: &tempfile::TempDir, name: &str, lines: &[&str]) -> std::path::PathBuf {
+    // NDJSON 이 아닌 raw 라인을 emit 하는 fake (파싱 실패 경로 테스트용, CR #7/#8).
+    let axhub = temp.path().join(name);
+    let mut body =
+        String::from("#!/bin/sh\nif [ \"$1 $2 $3\" = \"--json deploy logs\" ]; then\n");
+    for l in lines {
+        body.push_str(&format!("  echo '{l}'\n"));
+    }
+    body.push_str("  exit 0\nfi\nexit 1\n");
+    std::fs::write(&axhub, body).unwrap();
+    let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
 }
 
 #[cfg(unix)]
@@ -3582,13 +3604,22 @@ fn cli_trace_json_reads_events_and_build_log_patterns() {
 
 #[cfg(unix)]
 #[test]
-fn cli_trace_json_matches_untagged_runtime_log_pattern() {
-    // R3γ T004: ERROR 태그 없는 런타임 로그 라인(`env: ...`)도 매칭돼야 해요 (reachability).
+fn cli_trace_json_failure_reason_beats_benign_runtime() {
+    // CR #1: 빌드 단계 실패의 authoritative 원인(event_log failure_reason)은 항상
+    // 매칭되고, benign 런타임 로그 라인은 build-log needle 을 오발화하지 않아요.
     let temp = tempfile::tempdir().unwrap();
     let state = temp.path().join("state");
-    let deploy_id = "dep-cli-trace-untagged";
-    write_trace_deploy_events(&state, deploy_id);
-    let axhub = fake_axhub_app_logs(&temp, "axhub-env", &["env: STRIPE_KEY not found"]);
+    let deploy_id = "dep-cli-trace-reason";
+    write_trace_deploy_events_with_reason(&state, deploy_id, "env: STRIPE_KEY not found");
+    // 런타임 로그엔 ERROR/WARN 태그 없는 benign 라인만 (docker pull → 오발화 유혹).
+    let axhub = fake_axhub_app_logs(
+        &temp,
+        "axhub-benign",
+        &[
+            "INFO docker pull completed successfully",
+            "INFO listening on port 3000",
+        ],
+    );
     let state_s = state.display().to_string();
     let axhub_s = axhub.display().to_string();
 
@@ -3603,26 +3634,64 @@ fn cli_trace_json_matches_untagged_runtime_log_pattern() {
         String::from_utf8_lossy(&out.stderr)
     );
     let json = stdout_json(&out);
+    let patterns = json["matched_patterns"].as_array().unwrap();
+    // authoritative reason → env_not_found 매칭.
     assert!(
-        json["matched_patterns"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|v| v == "env_not_found"),
-        "expected env_not_found in {:?}",
-        json["matched_patterns"]
+        patterns.iter().any(|v| v == "env_not_found"),
+        "expected env_not_found (from failure_reason) in {patterns:?}"
+    );
+    // benign "docker pull completed" 가 docker_image_pull_failed 오발화 금지.
+    assert!(
+        !patterns.iter().any(|v| v == "docker_image_pull_failed"),
+        "benign runtime line must NOT false-positive docker_image_pull_failed: {patterns:?}"
     );
 }
 
 #[cfg(unix)]
 #[test]
-fn cli_trace_json_matches_untagged_npm_err() {
-    // R2 T011: `npm ERR!` 는 "ERROR" 토큰이 없지만 dependency_install_failed 로 발화.
+fn cli_trace_json_matches_severity_tagged_runtime_error() {
+    // CR #1: severity-tagged(ERROR/WARN) 런타임 라인은 매칭되고, benign INFO 라인
+    // (`env: production`)은 env_not_found 오발화 안 해요.
     let temp = tempfile::tempdir().unwrap();
     let state = temp.path().join("state");
-    let deploy_id = "dep-cli-trace-npmerr";
+    let deploy_id = "dep-cli-trace-runtime-err";
+    write_trace_deploy_events_with_reason(&state, deploy_id, "container crashed");
+    let axhub = fake_axhub_app_logs(
+        &temp,
+        "axhub-runtime",
+        &["INFO env: production", "ERROR cannot find module 'vite'"],
+    );
+    let state_s = state.display().to_string();
+    let axhub_s = axhub.display().to_string();
+
+    let out = run_env(
+        &["trace", "--deploy-id", deploy_id, "--app", "paydrop", "--json"],
+        &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
+    );
+    assert_eq!(out.status.code(), Some(0));
+    let json = stdout_json(&out);
+    let patterns = json["matched_patterns"].as_array().unwrap();
+    // tagged ERROR line → module_not_found.
+    assert!(
+        patterns.iter().any(|v| v == "module_not_found"),
+        "expected module_not_found (tagged runtime line) in {patterns:?}"
+    );
+    // benign "INFO env: production" 가 env_not_found 오발화 금지.
+    assert!(
+        !patterns.iter().any(|v| v == "env_not_found"),
+        "benign INFO env: line must NOT false-positive env_not_found: {patterns:?}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_trace_json_warns_on_unparseable_runtime_log() {
+    // CR #7/#8: 런타임 로그가 NDJSON 이 아니면 runtime_log_unparseable warning 단일.
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state");
+    let deploy_id = "dep-cli-trace-badjson";
     write_trace_deploy_events(&state, deploy_id);
-    let axhub = fake_axhub_app_logs(&temp, "axhub-npm", &["npm ERR! code ELIFECYCLE"]);
+    let axhub = fake_axhub_raw_logs(&temp, "axhub-raw", &["not json at all", "still not json"]);
     let state_s = state.display().to_string();
     let axhub_s = axhub.display().to_string();
 
@@ -3633,13 +3702,13 @@ fn cli_trace_json_matches_untagged_npm_err() {
     assert_eq!(out.status.code(), Some(0));
     let json = stdout_json(&out);
     assert!(
-        json["matched_patterns"]
+        json["warnings"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|v| v == "dependency_install_failed"),
-        "expected dependency_install_failed in {:?}",
-        json["matched_patterns"]
+            .any(|v| v.as_str().is_some_and(|s| s.starts_with("runtime_log_unparseable"))),
+        "expected runtime_log_unparseable in {:?}",
+        json["warnings"]
     );
 }
 

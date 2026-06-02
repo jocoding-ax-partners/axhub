@@ -2299,31 +2299,48 @@ impl axhub_helpers::trace_helper::TraceProbes for RealTraceProbes {
 
         let mut messages: Vec<String> = Vec::new();
         let mut parse_failed = false;
+        let mut message_field_missing = false;
         for line in stdout.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() {
                 continue;
             }
             match serde_json::from_str::<serde_json::Value>(trimmed) {
-                Ok(value) => {
-                    if let Some(msg) = value.get("message").and_then(|m| m.as_str()) {
-                        messages.push(msg.to_string());
-                    }
-                }
+                // valid JSON 인데 string `message` 가 없으면 (스키마 drift) silent
+                // drop 하지 않고 별도 신호를 남겨요 (CR #7).
+                Ok(value) => match value.get("message").and_then(|m| m.as_str()) {
+                    // 한 message 안의 embedded newline 은 공백으로 펴서 "1 message =
+                    // 1 라인" 을 유지 — multi-line stack-trace 가 display 5-라인 budget
+                    // 을 통째로 먹지 않게 해요 (CR P3).
+                    Some(msg) => messages.push(msg.replace('\n', " ")),
+                    None => message_field_missing = true,
+                },
                 Err(_) => parse_failed = true,
             }
         }
+        if messages.is_empty() {
+            // 하나도 못 뽑았으면 원인별로 **단일** warning 만 — parse_warning +
+            // unavailable 을 동시에 내보내 모순 신호를 주지 않게 해요 (CR P3).
+            let warn = if parse_failed {
+                "runtime_log_unparseable: 로그가 NDJSON 형식이 아니에요 (빌드 단계 실패 가능)"
+            } else if message_field_missing {
+                "runtime_log_schema_mismatch: 로그에 message 필드가 없어요 (CLI 스키마 변경 가능)"
+            } else {
+                "runtime_log_unavailable: 런타임 로그가 비어 있어요 (빌드 단계 실패 가능)"
+            };
+            self.warnings.borrow_mut().push(warn.to_string());
+            return String::new();
+        }
+        // 일부 message 는 뽑혔지만 noise 가 섞인 경우의 부분 경고.
         if parse_failed {
             self.warnings
                 .borrow_mut()
                 .push("runtime_log_parse_warning: 일부 로그 라인 NDJSON 파싱 실패".to_string());
         }
-        if messages.is_empty() {
-            self.warnings.borrow_mut().push(
-                "runtime_log_unavailable: 런타임 로그가 비어 있어요 (빌드 단계 실패 가능)"
-                    .to_string(),
-            );
-            return String::new();
+        if message_field_missing {
+            self.warnings
+                .borrow_mut()
+                .push("runtime_log_schema_warning: 일부 라인에 message 필드 없음".to_string());
         }
         messages.join("\n")
     }
@@ -2389,6 +2406,12 @@ fn humanize_trace_korean(report: &axhub_helpers::trace_helper::TraceReport) -> S
         );
     } else if !report.build_log_errors.is_empty() {
         lines.push("  - 자동 매칭 실패. 위 raw 에러 라인 직접 검색해주세요.".to_string());
+    }
+    if !report.warnings.is_empty() {
+        lines.push("  - ⚠️ evidence 경고:".to_string());
+        for warn in &report.warnings {
+            lines.push(format!("    · {warn}"));
+        }
     }
     if let Some(rc) = &report.routing_context {
         lines.push(format!(

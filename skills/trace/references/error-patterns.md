@@ -3,8 +3,8 @@
 Phase 25 PR 25.4 (R3γ 갱신) — `axhub:trace` skill 이 **런타임 로그**(현행 `axhub deploy logs`)에서 매칭하는 8 + 패턴. 순수 빌드타임 패턴(dependency_install_failed / docker_image_pull_failed)은 빌드 단계 실패 시 런타임 로그가 비므로 event_log `failure_reason` 경로로 안내돼요.
 각 entry 는 `deploy/references/error-empathy-catalog.md` 의 4-part empathy
 구조 (감정 / 원인 / 액션 / 다음 버튼) 를 따라요. `trace_helper.rs` 의
-`match_error_patterns` 가 build_log_errors 를 lowercase substring 으로
-매칭한 뒤 여기 키 (예: `env_not_found`) 를 SKILL 에 넘겨요. SKILL 은
+`match_error_patterns` 가 event_log `failure_reason`(authoritative) + 런타임
+로그의 ERROR/WARN 라인을 매칭한 뒤 여기 키 (예: `env_not_found`) 를 SKILL 에 넘겨요. SKILL 은
 매칭 key 의 entry 를 그대로 사용자에게 출력해요.
 
 ---
@@ -13,7 +13,7 @@ Phase 25 PR 25.4 (R3γ 갱신) — `axhub:trace` skill 이 **런타임 로그**(
 
 **감정:** 잠깐만요. 환경변수가 빠진 것뿐이에요. 앱은 안전해요.
 
-**원인:** 빌드 로그에서 `env: <KEY> not found` 가 발견됐어요. axhub env 에 해당 키가 등록 안 된 상태로 배포가 시작돼서 빌드가 막혔어요.
+**원인:** 실패 로그에서 `env: <KEY> not found` 가 발견됐어요. axhub env 에 해당 키가 등록 안 된 상태로 배포가 시작돼서 빌드가 막혔어요.
 
 **해결:** `axhub env set <KEY>=<값>` 으로 등록한 뒤 다시 배포해주세요. 키 이름이 정확한지 확인하고 production / staging 환경별로 따로 set 해야 해요.
 
@@ -111,8 +111,8 @@ Phase 25 PR 25.4 (R3γ 갱신) — `axhub:trace` skill 이 **런타임 로그**(
 
 **감정:** 잠깐만요. 정확한 원인을 자동으로 추적 못 했어요.
 
-**원인:** build_log 의 마지막 ERROR/WARN 을 보여드릴게요 (최대 5 줄). raw 라인 인용은 Vibe Coder Visibility 원칙상 검열 없이 그대로 보여드려요.
+**원인:** 런타임 로그의 마지막 ERROR/WARN 을 보여드릴게요 (최대 5 줄). raw 라인 인용은 Vibe Coder Visibility 원칙상 검열 없이 그대로 보여드려요.
 
 **해결:** 1) 에러 메시지 한 줄을 그대로 검색해보거나, 2) `axhub deploy logs <deployment-id> --app <app> --source build` 로 전체 로그를 받아서 직접 살펴봐주세요.
 
-**버튼:** ["전체 빌드 로그 받기", "도와주세요", "취소"]
+**버튼:** ["전체 런타임 로그 받기", "도와주세요", "취소"]

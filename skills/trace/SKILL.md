@@ -51,7 +51,7 @@ echo "$PREFLIGHT_JSON"
    ```typescript
    TodoWrite({ todos: [
      { content: "대상 deploy 식별",        status: "in_progress", activeForm: "deploy 식별하는 중" },
-     { content: "event_log + build_log + audit 수집", status: "pending", activeForm: "evidence 수집하는 중" },
+     { content: "event_log + runtime_log + audit 수집", status: "pending", activeForm: "evidence 수집하는 중" },
      { content: "error pattern 매칭",       status: "pending",     activeForm: "패턴 분석하는 중" },
      { content: "4-part empathy 안내",      status: "pending",     activeForm: "마무리하는 중" }
    ]})
@@ -68,7 +68,7 @@ echo "$PREFLIGHT_JSON"
    - **B: runtime_log** — A 가 포함 (helper 가 현행 `axhub deploy logs` 런타임 로그를 spawn + NDJSON `message` 파싱). 마지막 ERROR/WARN 최대 5 줄. 빌드 단계 실패로 런타임 로그가 비면 event_log `failure_reason` 으로 fallback 매칭
    - **C: audit** — A 가 포함. recent routing context (prompt_hash + is_axhub_related)
 
-3. **Error pattern 매칭.** `references/error-patterns.md` 의 8+ entry (env_not_found / oom / module_not_found / network_timeout / dependency_install_failed / docker_image_pull_failed / port_already_in_use / build_command_failed) 중 build_log_errors 에서 매칭되는 것 선택.
+3. **Error pattern 매칭.** helper 가 event_log `failure_reason`(authoritative) + 런타임 로그의 ERROR/WARN 라인을 대상으로 **이미 매칭**해서 JSON `matched_patterns` 로 줘요 — 그걸 그대로 써서 `references/error-patterns.md` 의 entry (env_not_found / oom / module_not_found / network_timeout / dependency_install_failed / docker_image_pull_failed / port_already_in_use / build_command_failed) 를 출력해요. `build_log_errors` 는 사용자 화면 인용용(최대 5줄)이지 매칭 소스가 아니에요. JSON `warnings` 에 `runtime_log_unavailable` / `runtime_log_probe_*` / `runtime_log_unparseable` / `runtime_log_schema_*` 가 있으면 evidence 불완전 상태로 안내하고 event_log `failure_reason` 을 우선 사용해요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 의 `trace` 채널 참조 — 추적 대상 질문(question text `"최근 Failed 배포가 여러 개예요. 어떤 거 추적할까요?"`)의 safe_default 는 "abort" (대상이 모호하면 비대화형 환경에선 추적 중단).
 
@@ -113,7 +113,7 @@ echo "$PREFLIGHT_JSON"
 $ axhub-helpers trace --json --deploy-id=dep-abc
 {"deploy_id":"dep-abc","last_phase":"push","failure_reason":"env: STRIPE_KEY not found",
  "phase_durations":[...],"build_log_errors":["ERROR env: STRIPE_KEY not found"],
- "matched_patterns":["env_not_found"]}
+ "matched_patterns":["env_not_found"],"warnings":["runtime_log_unavailable: ..."]}
 ```
 
 ## NEVER
