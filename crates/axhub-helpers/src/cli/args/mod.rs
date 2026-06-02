@@ -206,6 +206,8 @@ pub(crate) struct ListDeploymentsCliArgs {
 pub(crate) struct MigratePlanArgs {
     #[arg(long)]
     pub dir: Option<String>,
+    #[arg(long = "app-path")]
+    pub app_path: Option<String>,
     #[arg(long)]
     pub json: bool,
 }

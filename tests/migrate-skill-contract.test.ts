@@ -16,6 +16,10 @@ interface CorpusRow {
 interface BaselineRow {
   utterance_id?: string;
   fired_skill?: string | null;
+  actual_tool_calls?: Array<{
+    cmd?: string;
+    exit_code?: number;
+  }>;
 }
 
 const parseJsonl = (path: string) =>
@@ -72,6 +76,8 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain('Join-Path $PluginRoot "bin/axhub-helpers.exe"');
     expect(skill).toContain("Get-Command axhub-helpers.exe");
     expect(skill).toContain("& $Helper migrate-plan --dir $MigrateDir --json");
+    expect(skill).toContain('"$HELPER" migrate-plan --dir "${AXHUB_MIGRATE_DIR:-.}" --app-path "$APP_PATH" --json');
+    expect(skill).toContain("& $Helper migrate-plan --dir $MigrateDir --app-path $env:APP_PATH --json");
   });
 
   test("corpus.100 routes core existing-app natural language to migrate", () => {
@@ -102,7 +108,28 @@ describe("migrate SKILL contract", () => {
           throw new Error(`missing migrate baseline row: ${path}:${id}`);
         }
         expect(entry.fired_skill).toBe("migrate");
+        const expected = rows.find((row) => row.id === id)?.expected_cmd_pattern;
+        expect(expected).toBeTruthy();
+        const calls = entry.actual_tool_calls ?? [];
+        expect(
+          calls.some(
+            (call) =>
+              typeof call.cmd === "string" &&
+              new RegExp(expected!.replaceAll(".*", ".*")).test(call.cmd) &&
+              call.exit_code === 0,
+          ),
+        ).toBe(true);
       }
+    }
+  });
+
+  test("all axhub.yaml examples in migrate SKILL parse as YAML", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    const yamlBlocks = [...skill.matchAll(/```yaml\n([\s\S]*?)```/g)].map((match) => match[1]);
+    const yaml = (Bun as unknown as { YAML: { parse: (input: string) => unknown } }).YAML;
+    expect(yamlBlocks.length).toBeGreaterThan(0);
+    for (const block of yamlBlocks) {
+      expect(() => yaml.parse(block)).not.toThrow();
     }
   });
 });

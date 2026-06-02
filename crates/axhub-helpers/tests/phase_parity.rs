@@ -1626,7 +1626,19 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
             [("repo", "paydrop"), ("branch", "main")].as_slice(),
         ),
         (
+            "axhub apps git connect --app paydrop --repo jocoding/paydrop --branch main --execute --json",
+            "github_connect",
+            Some("paydrop"),
+            [("repo", "jocoding/paydrop"), ("branch", "main")].as_slice(),
+        ),
+        (
             "axhub github disconnect paydrop --force --confirm=paydrop --json",
+            "github_disconnect",
+            Some("paydrop"),
+            [("slug", "paydrop")].as_slice(),
+        ),
+        (
+            "axhub apps git disconnect --app paydrop --execute --json",
             "github_disconnect",
             Some("paydrop"),
             [("slug", "paydrop")].as_slice(),

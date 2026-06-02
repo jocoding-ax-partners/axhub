@@ -10,6 +10,12 @@ const MAX_SCAN_DEPTH: usize = 5;
 const MAX_SCAN_FILES: usize = 5_000;
 const MAX_SCAN_BYTES: u64 = 50 * 1024 * 1024;
 const MAX_SOURCE_FILE_BYTES: u64 = 1024 * 1024;
+const COMPOSE_FILES: [&str; 4] = [
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "compose.yaml",
+    "compose.yml",
+];
 
 #[derive(Debug, Serialize)]
 pub struct MigratePlanOutput {
@@ -48,6 +54,7 @@ pub struct EnvRef {
 
 pub fn run_migrate_plan(args: &[String]) -> Result<i32> {
     let mut dir: Option<PathBuf> = None;
+    let mut app_path: Option<String> = None;
     let mut json = false;
     let mut index = 0;
     while index < args.len() {
@@ -63,11 +70,18 @@ pub fn run_migrate_plan(args: &[String]) -> Result<i32> {
                 dir = Some(PathBuf::from(value));
                 index += 2;
             }
-            other => bail!("migrate-plan: 알 수 없는 옵션 {other}"),
+            "--app-path" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-plan: --app-path 값이 필요해요");
+                };
+                app_path = Some(value.clone());
+                index += 2;
+            }
+            _ => bail!("migrate-plan: unknown option"),
         }
     }
     let dir = dir.unwrap_or(std::env::current_dir()?);
-    let output = build_migrate_plan(&dir)?;
+    let output = build_migrate_plan_with_selection(&dir, app_path.as_deref())?;
     if json {
         println!("{}", serde_json::to_string(&output)?);
     } else {
@@ -80,6 +94,13 @@ pub fn run_migrate_plan(args: &[String]) -> Result<i32> {
 }
 
 pub fn build_migrate_plan(dir: &Path) -> Result<MigratePlanOutput> {
+    build_migrate_plan_with_selection(dir, None)
+}
+
+pub fn build_migrate_plan_with_selection(
+    dir: &Path,
+    selected_app_path: Option<&str>,
+) -> Result<MigratePlanOutput> {
     let root =
         fs::canonicalize(dir).with_context(|| format!("{} 경로를 읽지 못했어요", dir.display()))?;
     if !root.is_dir() {
@@ -88,13 +109,29 @@ pub fn build_migrate_plan(dir: &Path) -> Result<MigratePlanOutput> {
     let mut scan = ScanState::default();
     collect_files(&root, &root, 0, &mut scan)?;
     let files = scan.files;
-    let env_refs = scan_env_refs(&root, &files);
-    let candidates = detect_candidates(&root, &files, &env_refs);
+    let scanned_env_refs = scan_env_refs(&root, &files);
+    let env_refs = unique_env_refs(&scanned_env_refs);
+    let candidates = detect_candidates(&root, &files, &scanned_env_refs);
     let container_contracts = ContainerContracts {
         dockerfile: candidates.iter().any(|c| c.has_dockerfile),
         compose: candidates.iter().any(|c| c.has_compose),
     };
-    let suggested_manifest = render_manifest(candidates.first(), &env_refs);
+    let selected_path = selected_app_path
+        .map(normalize_selected_app_path)
+        .transpose()?;
+    let selected_candidate = match selected_path.as_deref() {
+        Some(path) => {
+            let Some(candidate) = candidates.iter().find(|candidate| candidate.path == path) else {
+                bail!("migrate-plan: 선택한 앱 경로가 후보에 없어요");
+            };
+            Some(candidate)
+        }
+        None => candidates.first(),
+    };
+    let suggested_manifest = render_manifest(
+        selected_candidate,
+        &manifest_env_refs(selected_candidate, &env_refs),
+    );
     Ok(MigratePlanOutput {
         schema_version: "migrate-plan/v1".to_string(),
         root: root.display().to_string(),
@@ -107,10 +144,35 @@ pub fn build_migrate_plan(dir: &Path) -> Result<MigratePlanOutput> {
     })
 }
 
+fn normalize_selected_app_path(value: &str) -> Result<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed == "." {
+        return Ok(".".to_string());
+    }
+    let replaced = trimmed.replace('\\', "/");
+    if replaced.starts_with('/') || replaced.contains(':') || replaced.contains('\0') {
+        bail!("migrate-plan: 선택한 앱 경로가 안전하지 않아요");
+    }
+    let normalized = replaced.trim_end_matches('/');
+    if normalized
+        .split('/')
+        .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+    {
+        bail!("migrate-plan: 선택한 앱 경로가 안전하지 않아요");
+    }
+    Ok(normalized.to_string())
+}
+
 #[derive(Default)]
 struct ScanState {
     files: Vec<PathBuf>,
     total_bytes: u64,
+}
+
+#[derive(Debug, Clone)]
+struct ScannedEnvRef {
+    rel_path: PathBuf,
+    env: EnvRef,
 }
 
 fn collect_files(root: &Path, dir: &Path, depth: usize, out: &mut ScanState) -> Result<()> {
@@ -172,18 +234,18 @@ fn collect_files(root: &Path, dir: &Path, depth: usize, out: &mut ScanState) -> 
     Ok(())
 }
 
-fn detect_candidates(root: &Path, files: &[PathBuf], env_refs: &[EnvRef]) -> Vec<AppCandidate> {
+fn detect_candidates(
+    root: &Path,
+    files: &[PathBuf],
+    env_refs: &[ScannedEnvRef],
+) -> Vec<AppCandidate> {
     let mut by_dir: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
     for rel in files {
         let Some(file) = rel.file_name().and_then(|s| s.to_str()) else {
             continue;
         };
         let dir = rel.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
-        if stack_for_marker(file).is_some()
-            || matches!(
-                file,
-                "Dockerfile" | "docker-compose.yml" | "compose.yaml" | "compose.yml"
-            )
+        if stack_for_marker(file).is_some() || file == "Dockerfile" || COMPOSE_FILES.contains(&file)
         {
             by_dir.entry(dir).or_default().insert(file.to_string());
         }
@@ -195,7 +257,7 @@ fn detect_candidates(root: &Path, files: &[PathBuf], env_refs: &[EnvRef]) -> Vec
             .find_map(|m| stack_for_marker(m))
             .unwrap_or("container");
         let has_dockerfile = markers.contains("Dockerfile");
-        let compose_file = ["docker-compose.yml", "compose.yaml", "compose.yml"]
+        let compose_file = COMPOSE_FILES
             .into_iter()
             .find(|name| markers.contains(*name))
             .map(str::to_string);
@@ -225,7 +287,7 @@ fn detect_candidates(root: &Path, files: &[PathBuf], env_refs: &[EnvRef]) -> Vec
             has_dockerfile: true,
             has_compose: false,
             compose_file: None,
-            env_refs: env_refs.iter().map(|e| e.name.clone()).collect(),
+            env_refs: env_refs_for_candidate(Path::new("."), env_refs),
             confidence: 0.95,
         });
     }
@@ -251,7 +313,7 @@ fn stack_for_marker(file: &str) -> Option<&'static str> {
     }
 }
 
-fn scan_env_refs(root: &Path, files: &[PathBuf]) -> Vec<EnvRef> {
+fn scan_env_refs(root: &Path, files: &[PathBuf]) -> Vec<ScannedEnvRef> {
     let patterns = [
         Regex::new(r#"process\.env\.([A-Z_][A-Z0-9_]*)"#).unwrap(),
         Regex::new(r#"process\.env\[['"]([A-Z_][A-Z0-9_]*)['"]\]"#).unwrap(),
@@ -277,24 +339,53 @@ fn scan_env_refs(root: &Path, files: &[PathBuf]) -> Vec<EnvRef> {
         for re in &patterns {
             for cap in re.captures_iter(&body) {
                 let name = cap[1].to_string();
-                refs.insert(EnvRef {
-                    scope: scope_for_env(&name).to_string(),
-                    name,
-                });
+                refs.insert((
+                    rel.clone(),
+                    EnvRef {
+                        scope: scope_for_env(&name).to_string(),
+                        name,
+                    },
+                ));
             }
         }
     }
-    refs.into_iter().collect()
+    refs.into_iter()
+        .map(|(rel_path, env)| ScannedEnvRef { rel_path, env })
+        .collect()
 }
 
-fn env_refs_for_candidate(dir: &Path, env_refs: &[EnvRef]) -> Vec<String> {
-    if dir.as_os_str().is_empty() || dir == Path::new(".") {
-        return env_refs.iter().map(|e| e.name.clone()).collect();
-    }
-    // The light pre-scan intentionally keeps env extraction simple. Candidate
-    // records expose the global env-ref names so the skill can show one compact
-    // confirmation card; backend detection remains authoritative.
-    env_refs.iter().map(|e| e.name.clone()).collect()
+fn unique_env_refs(scanned: &[ScannedEnvRef]) -> Vec<EnvRef> {
+    scanned
+        .iter()
+        .map(|entry| entry.env.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn env_refs_for_candidate(dir: &Path, env_refs: &[ScannedEnvRef]) -> Vec<String> {
+    let names = env_refs
+        .iter()
+        .filter(|entry| rel_belongs_to_candidate(&entry.rel_path, dir))
+        .map(|entry| entry.env.name.clone())
+        .collect::<BTreeSet<_>>();
+    names.into_iter().collect()
+}
+
+fn manifest_env_refs(candidate: Option<&AppCandidate>, env_refs: &[EnvRef]) -> Vec<EnvRef> {
+    let Some(candidate) = candidate else {
+        return Vec::new();
+    };
+    let candidate_names = candidate.env_refs.iter().collect::<BTreeSet<_>>();
+    env_refs
+        .iter()
+        .filter(|entry| candidate_names.contains(&entry.name))
+        .cloned()
+        .collect()
+}
+
+fn rel_belongs_to_candidate(rel: &Path, dir: &Path) -> bool {
+    dir.as_os_str().is_empty() || dir == Path::new(".") || rel.starts_with(dir)
 }
 
 fn path_to_portable_json(path: &Path) -> String {
@@ -331,10 +422,16 @@ fn render_manifest(candidate: Option<&AppCandidate>, env_refs: &[EnvRef]) -> Str
         yaml_double_quote(name)
     );
     if let Some(c) = candidate {
+        if c.has_dockerfile && !c.has_compose && c.path != "." {
+            out.push_str(&format!(
+                "  dockerfile: {}\n",
+                yaml_double_quote(&candidate_file_path(&c.path, "Dockerfile"))
+            ));
+        }
         if let Some(compose) = &c.compose_file {
             out.push_str(&format!(
                 "  deploy_method: compose\n  compose_file: {}\n",
-                yaml_double_quote(compose)
+                yaml_double_quote(&candidate_file_path(&c.path, compose))
             ));
         }
     }
@@ -343,11 +440,20 @@ fn render_manifest(candidate: Option<&AppCandidate>, env_refs: &[EnvRef]) -> Str
         for env in env_refs {
             out.push_str(&format!(
                 "    - {{ name: {}, scope: {} }}\n",
-                env.name, env.scope
+                yaml_double_quote(&env.name),
+                yaml_double_quote(&env.scope)
             ));
         }
     }
     out
+}
+
+fn candidate_file_path(candidate_path: &str, file: &str) -> String {
+    if candidate_path.is_empty() || candidate_path == "." {
+        file.to_string()
+    } else {
+        format!("{}/{}", candidate_path.trim_end_matches('/'), file)
+    }
 }
 
 fn yaml_double_quote(value: &str) -> String {
@@ -371,8 +477,9 @@ fn yaml_double_quote(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_migrate_plan, path_to_portable_json, render_manifest, yaml_double_quote,
-        AppCandidate, EnvRef, MAX_SOURCE_FILE_BYTES,
+        build_migrate_plan, build_migrate_plan_with_selection, candidate_file_path, collect_files,
+        path_to_portable_json, render_manifest, yaml_double_quote, AppCandidate, EnvRef, ScanState,
+        MAX_SCAN_BYTES, MAX_SCAN_DEPTH, MAX_SCAN_FILES, MAX_SOURCE_FILE_BYTES,
     };
     use std::path::Path;
 
@@ -414,6 +521,143 @@ mod tests {
             .candidates
             .iter()
             .any(|c| c.path == "." && c.stack_hint == "rust"));
+    }
+
+    #[test]
+    fn build_migrate_plan_detects_docker_compose_yaml() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            temp.path().join("docker-compose.yaml"),
+            "services:\n  web:\n    image: nginx\n",
+        )
+        .unwrap();
+
+        let plan = build_migrate_plan(temp.path()).unwrap();
+
+        assert_eq!(plan.candidates.len(), 1);
+        assert_eq!(plan.candidates[0].path, ".");
+        assert!(plan.candidates[0].has_compose);
+        assert_eq!(
+            plan.candidates[0].compose_file.as_deref(),
+            Some("docker-compose.yaml")
+        );
+        assert!(plan.container_contracts.compose);
+    }
+
+    #[test]
+    fn build_migrate_plan_scopes_candidate_env_refs() {
+        let temp = tempfile::tempdir().unwrap();
+        let web = temp.path().join("apps/web");
+        std::fs::create_dir_all(web.join("src")).unwrap();
+        std::fs::write(web.join("package.json"), "{}").unwrap();
+        std::fs::write(
+            web.join("src/main.ts"),
+            "console.log(process.env.WEB_SECRET);",
+        )
+        .unwrap();
+        let api = temp.path().join("services/api");
+        std::fs::create_dir_all(api.join("src")).unwrap();
+        std::fs::write(api.join("package.json"), "{}").unwrap();
+        std::fs::write(
+            api.join("src/main.ts"),
+            "console.log(process.env.API_SECRET);",
+        )
+        .unwrap();
+
+        let plan = build_migrate_plan(temp.path()).unwrap();
+        let web_candidate = plan
+            .candidates
+            .iter()
+            .find(|candidate| candidate.path == "apps/web")
+            .unwrap();
+        let api_candidate = plan
+            .candidates
+            .iter()
+            .find(|candidate| candidate.path == "services/api")
+            .unwrap();
+
+        assert_eq!(web_candidate.env_refs, vec!["WEB_SECRET"]);
+        assert_eq!(api_candidate.env_refs, vec!["API_SECRET"]);
+        assert!(plan.env_refs.iter().any(|env| env.name == "WEB_SECRET"));
+        assert!(plan.env_refs.iter().any(|env| env.name == "API_SECRET"));
+        assert!(plan.suggested_manifest.contains("WEB_SECRET"));
+        assert!(!plan.suggested_manifest.contains("API_SECRET"));
+    }
+
+    #[test]
+    fn build_migrate_plan_renders_selected_non_first_candidate_manifest() {
+        let temp = tempfile::tempdir().unwrap();
+        let api = temp.path().join("apps/api");
+        std::fs::create_dir_all(api.join("src")).unwrap();
+        std::fs::write(api.join("Dockerfile"), "FROM scratch\n").unwrap();
+        std::fs::write(api.join("src/main.ts"), "process.env.API_SECRET;").unwrap();
+        let web = temp.path().join("apps/web");
+        std::fs::create_dir_all(web.join("src")).unwrap();
+        std::fs::write(
+            web.join("docker-compose.yaml"),
+            "services:\n  web:\n    image: nginx\n",
+        )
+        .unwrap();
+        std::fs::write(web.join("src/main.ts"), "process.env.WEB_SECRET;").unwrap();
+
+        let plan = build_migrate_plan_with_selection(temp.path(), Some("apps/web")).unwrap();
+
+        assert_eq!(plan.candidates[0].path, "apps/api");
+        assert!(plan
+            .suggested_manifest
+            .contains("compose_file: \"apps/web/docker-compose.yaml\""));
+        assert!(plan.suggested_manifest.contains("WEB_SECRET"));
+        assert!(!plan.suggested_manifest.contains("API_SECRET"));
+        assert!(!plan.suggested_manifest.contains("apps/api/Dockerfile"));
+    }
+
+    #[test]
+    fn build_migrate_plan_rejects_selected_root_escape_path() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::write(temp.path().join("package.json"), "{}").unwrap();
+
+        let error = build_migrate_plan_with_selection(temp.path(), Some("../outside")).unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("선택한 앱 경로가 안전하지 않아요"));
+    }
+
+    #[test]
+    fn build_migrate_plan_respects_max_scan_depth() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut deep = temp.path().to_path_buf();
+        for index in 0..=MAX_SCAN_DEPTH {
+            deep = deep.join(format!("level-{index}"));
+        }
+        std::fs::create_dir_all(&deep).unwrap();
+        std::fs::write(deep.join("package.json"), "{}").unwrap();
+
+        let plan = build_migrate_plan(temp.path()).unwrap();
+
+        assert!(plan.candidates.is_empty());
+    }
+
+    #[test]
+    fn collect_files_respects_file_and_total_caps() {
+        let temp = tempfile::tempdir().unwrap();
+        for index in 0..(MAX_SCAN_FILES + 10) {
+            std::fs::write(temp.path().join(format!("file-{index}.txt")), "x").unwrap();
+        }
+        let mut scan = ScanState::default();
+        collect_files(temp.path(), temp.path(), 0, &mut scan).unwrap();
+        assert!(scan.files.len() <= MAX_SCAN_FILES);
+
+        let large_dir = tempfile::tempdir().unwrap();
+        for index in 0..60 {
+            let file =
+                std::fs::File::create(large_dir.path().join(format!("blob-{index}.bin"))).unwrap();
+            file.set_len(MAX_SOURCE_FILE_BYTES - 1).unwrap();
+        }
+        let mut scan = ScanState::default();
+        collect_files(large_dir.path(), large_dir.path(), 0, &mut scan).unwrap();
+        assert!(scan.total_bytes <= MAX_SCAN_BYTES);
+        assert!(scan.files.len() < 60);
     }
 
     #[cfg(unix)]
@@ -482,7 +726,38 @@ mod tests {
         );
 
         assert!(manifest.contains("name: \"weird:name\""));
-        assert!(manifest.contains("compose_file: \"compose:\\nfile.yml\""));
-        assert!(manifest.contains("name: DATABASE_URL"));
+        assert!(manifest.contains("compose_file: \"weird:name/compose:\\nfile.yml\""));
+        assert!(manifest.contains("name: \"DATABASE_URL\""));
+    }
+
+    #[test]
+    fn render_manifest_prefixes_monorepo_container_paths() {
+        let compose_candidate = AppCandidate {
+            path: "apps/web".to_string(),
+            stack_hint: "container".to_string(),
+            has_dockerfile: false,
+            has_compose: true,
+            compose_file: Some("docker-compose.yaml".to_string()),
+            env_refs: vec![],
+            confidence: 0.85,
+        };
+        let manifest = render_manifest(Some(&compose_candidate), &[]);
+        assert!(manifest.contains("compose_file: \"apps/web/docker-compose.yaml\""));
+
+        let dockerfile_candidate = AppCandidate {
+            path: "services/api".to_string(),
+            stack_hint: "container".to_string(),
+            has_dockerfile: true,
+            has_compose: false,
+            compose_file: None,
+            env_refs: vec![],
+            confidence: 0.95,
+        };
+        let manifest = render_manifest(Some(&dockerfile_candidate), &[]);
+        assert!(manifest.contains("dockerfile: \"services/api/Dockerfile\""));
+        assert_eq!(
+            candidate_file_path("apps/web", "compose.yaml"),
+            "apps/web/compose.yaml"
+        );
     }
 }

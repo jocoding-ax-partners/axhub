@@ -235,6 +235,10 @@ fn dispatch(command: Commands) -> i32 {
                 argv.push("--dir".to_string());
                 argv.push(dir);
             }
+            if let Some(app_path) = a.app_path {
+                argv.push("--app-path".to_string());
+                argv.push(app_path);
+            }
             if a.json {
                 argv.push("--json".to_string());
             }

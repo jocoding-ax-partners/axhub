@@ -2731,6 +2731,37 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
     assert!(String::from_utf8_lossy(&pending_auth_allowed.stdout)
         .contains("permissionDecision\":\"allow"));
 
+    let apps_git_without_token = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-apps-git-deny","tool_name":"Bash","tool_input":{"command":"axhub apps git connect --app paydrop --repo jocoding/paydrop --branch main --execute --json"}}"#,
+        &envs,
+    );
+    assert_eq!(apps_git_without_token.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&apps_git_without_token.stdout)
+        .contains("permissionDecision\":\"deny"));
+
+    let pending_github_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"github_connect",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"main",
+        "commit_sha":"",
+        "context": {"repo":"jocoding/paydrop", "branch":"main"}
+    })
+    .to_string();
+    let pending_github_minted =
+        run_stdin(&["consent-mint"], &pending_github_binding, &pending_envs);
+    assert_eq!(pending_github_minted.status.code(), Some(0));
+    let pending_github_allowed = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_apps_git","tool_name":"Bash","tool_input":{"command":"axhub apps git connect --app paydrop --repo jocoding/paydrop --branch main --execute --json"}}"#,
+        &pending_envs,
+    );
+    assert_eq!(pending_github_allowed.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&pending_github_allowed.stdout)
+        .contains("permissionDecision\":\"allow"));
+
     let wrong = binding.replace("\"paydrop\"", "\"otherapp\"");
     let rejected = run_stdin(&["consent-verify"], &wrong, &envs);
     assert_eq!(rejected.status.code(), Some(65));
@@ -3742,6 +3773,8 @@ fn cli_migrate_plan_detects_monorepo_candidates_and_compose() {
     let api = temp.path().join("services/api");
     std::fs::create_dir_all(&api).unwrap();
     std::fs::write(api.join("go.mod"), "module example.com/api\n").unwrap();
+    std::fs::write(api.join("Dockerfile"), "FROM scratch\n").unwrap();
+    std::fs::write(api.join("main.go"), "package main\n// API_DSN\n").unwrap();
 
     let output = run(&[
         "migrate-plan",
@@ -3760,4 +3793,23 @@ fn cli_migrate_plan_detects_monorepo_candidates_and_compose() {
     assert!(candidates
         .iter()
         .any(|c| c["path"] == "services/api" && c["stack_hint"] == "go"));
+
+    let selected_output = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--app-path",
+        "services/api",
+        "--json",
+    ]);
+    assert_eq!(selected_output.status.code(), Some(0));
+    let selected_json: serde_json::Value = serde_json::from_slice(&selected_output.stdout).unwrap();
+    assert!(selected_json["suggested_manifest"]
+        .as_str()
+        .unwrap()
+        .contains("dockerfile: \"services/api/Dockerfile\""));
+    assert!(!selected_json["suggested_manifest"]
+        .as_str()
+        .unwrap()
+        .contains("apps/web/compose.yaml"));
 }

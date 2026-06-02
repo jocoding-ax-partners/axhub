@@ -14,7 +14,7 @@
 - [ ] T002 [P] Backend: Railpack compile spike test (`app-hub-backend/internal/service/deploy/railpack_compile_test.go`) — `core.GenerateBuildPlan`, `app.NewApp`, `app.NewEnvironment`, `plan.BuildPlan` import/shape 고정
 - [ ] T003 [P] Backend: 6-언어 fixture repo 생성 (`app-hub-backend/internal/service/deploy/testdata/migrate-fixtures/{node,python,go,ruby,java,kotlin}/`) — golden 입력
 - [ ] T004 [P] Plugin: `bun run skill:new migrate --model sonnet` 로 `skills/migrate/SKILL.md` 스캐폴드 + registry stub 생성
-- [ ] T005 [P] Helper: `crates/axhub-helpers/src/migrate_plan.rs` stub + `main.rs`/typed clap 에 `migrate-plan --dir <path> --json` subcommand/USAGE 등록
+- [ ] T005 [P] Helper: `crates/axhub-helpers/src/migrate_plan.rs` stub + `main.rs`/typed clap 에 `migrate-plan --dir <path> [--app-path <candidate>] --json` subcommand/USAGE 등록
 - [ ] T006 [P] CLI(Rust): ax-hub-cli touchpoint audit — `crates/axhub-manifest`, `axhub/src/commands/*`, `crates/axhub-api` 에 필요한 변경 파일 목록 기록
 
 ---
