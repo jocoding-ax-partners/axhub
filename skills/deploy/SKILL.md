@@ -189,7 +189,7 @@ To deploy:
    fi
    ```
 
-   Never use cached `app_id` for mutation. If resolve returns an `app_id`, this is an existing app deploy: do **not** run `bootstrap apps_create`, and continue with git readiness, preview, and the normal consent-deploy path. If resolve returns ambiguity, ask the user to disambiguate (slug list with numeric IDs). If resolve cannot identify a registered app and the project has an `apphub.yaml`/`axhub.yaml`, enter the first-run bootstrap bridge below. The resolve JSON also includes `git_repo`, `git_has_commit`, and `git_init_needed`; deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
+   Never use cached `app_id` for mutation. If resolve returns an `app_id`, this is an existing app deploy: do **not** run `bootstrap apps_create`, and continue with git readiness, preview, and the normal consent-deploy path. If resolve returns ambiguity, ask the user to disambiguate (slug list with numeric IDs). If resolve cannot identify a registered app and the project has an `axhub.yaml`/`apphub.yaml`, enter the first-run bootstrap bridge below. The resolve JSON also includes `git_repo`, `git_has_commit`, and `git_init_needed`; deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
 
 1.1. **First-run bootstrap plan/record bridge (Sprint 3).** Use this only when Step 1 did not resolve an existing `app_id`. Before any first-run remote mutation, ask the Rust FSM for the next safe step:
 

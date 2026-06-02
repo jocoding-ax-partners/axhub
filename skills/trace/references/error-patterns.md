@@ -87,9 +87,9 @@ Phase 25 PR 25.4 — `axhub:trace` skill 이 빌드 로그에서 매칭하는 8 
 
 **원인:** `EADDRINUSE` 또는 `address already in use` 가 발견됐어요. 컨테이너 내부에서 같은 포트를 두 프로세스가 잡으려고 시도했거나, 이전 배포가 깔끔하게 종료되지 않아서 포트 점유 상태로 남았어요.
 
-**해결:** `axhub recover` 로 직전 배포 정리 후 다시 배포해 보세요. 또는 `apphub.yaml` 의 port 설정이 컨테이너 내부 포트와 일치하는지 확인해요.
+**해결:** `axhub recover` 로 직전 배포 정리 후 다시 배포해 보세요. 또는 `axhub.yaml`(또는 `apphub.yaml`)의 port 설정이 컨테이너 내부 포트와 일치하는지 확인해요.
 
-**버튼:** ["/axhub:recover", "apphub.yaml port 확인", "도와주세요"]
+**버튼:** ["/axhub:recover", "axhub.yaml port 확인", "도와주세요"]
 
 ---
 

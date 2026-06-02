@@ -38,12 +38,12 @@ To open deployed axhub resources:
 
 3. **브라우저 실행과 URL 표시를 분리해요.** CLI 가 URL 을 반환하면 먼저 URL 을 보여주고, CLI 가 브라우저를 열었다면 열린 대상을 요약해요.
 
-4. **manifest 없음 오류를 친절하게 안내해요.** `apphub.yaml` 또는 `axhub.yaml` 이 없다는 오류면 init skill 또는 apps skill 로 이어가요.
+4. **manifest 없음 오류를 친절하게 안내해요.** `axhub.yaml` 또는 `apphub.yaml` 이 없다는 오류면 init skill 또는 apps skill 로 이어가요.
 
 ## NEVER
 
 - NEVER deploy, mutate, login 을 대신 실행하지 않아요.
-- NEVER `apphub.yaml` 만 정답으로 가정하지 않아요. legacy `axhub.yaml` 도 안내해요.
+- NEVER `axhub.yaml` 만 정답으로 가정하지 않아요. `apphub.yaml` 도 인정해요.
 - NEVER browser open 실패를 deploy 실패로 말하지 않아요.
 
 ## Non-interactive AskUserQuestion guard

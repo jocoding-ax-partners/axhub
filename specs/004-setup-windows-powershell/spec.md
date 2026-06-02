@@ -10,6 +10,8 @@
 
 ## 배경 및 재검토 결과 *(컨텍스트)*
 
+> **갱신 노트 (2026-06-02, 본 spec 작성 이후 결정):** 프로젝트가 manifest canonical 을 `axhub.yaml` 로 전환하기로 정했어요. 아래 **mismatch ②** 의 "`apphub.yaml` 이 canonical" 서술은 그 결정으로 supersede 됐고, 구현 브랜치(#161)의 manifest 편집은 `axhub.yaml` 우선(detect-both, axhub-first)으로 반영됐어요. 단 이 manifest 부분은 `ax-hub-cli` 가 `axhub.yaml` 을 load 하도록 바뀐 뒤에 머지해야 해요 — 그 전엔 신규 사용자 deploy 가 NotFound 로 깨져요. US/FR 본문은 이 spec 의 실질 작업인 **Windows PowerShell 지원**이라 그대로 둬요 (manifest 전환은 별도 결정).
+
 `skills/setup/SKILL.md` 를 `ax-hub-cli` **v0.17.2** 와 1:1 로 독립 재검토했어요 (기존 `specs/002-skills-cli-alignment` 결론에 의존하지 않고 실증). setup 은 **위임 모델**이라 CLI 를 직접 호출하는 곳이 `axhub --version` 한 곳뿐이고, 나머지는 helper preflight 와 sibling skill(`install-cli`/`auth`/`init`) 위임이에요.
 
 재검토로 확정한 사실:
