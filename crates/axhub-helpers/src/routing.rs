@@ -33,8 +33,14 @@ use std::path::Path;
 /// slow-changing set, intentionally not externalized. Presence of any of these
 /// (with no explicit `"axhub"`) means the user named another target, so axhub
 /// yields ("named target wins").
-pub const FOREIGN_TARGET_KEYWORDS: &[&str] =
-    &["vercel", "netlify", "cloudflare", "fly", "render", "railway"];
+pub const FOREIGN_TARGET_KEYWORDS: &[&str] = &[
+    "vercel",
+    "netlify",
+    "cloudflare",
+    "fly",
+    "render",
+    "railway",
+];
 
 /// The literal keyword that marks an explicit axhub intent (marker-independent).
 pub const AXHUB_KEYWORD: &str = "axhub";
@@ -202,7 +208,7 @@ pub fn is_slash_invocation(prompt: &str) -> bool {
     // / `/배포` commands (over-detection would route unrelated slash text to axhub
     // via priority rule 0). The `/axhub:` namespace stays a prefix — any
     // `/axhub:<cmd>` is an explicit axhub invocation.
-    let first = prompt.trim_start().split_whitespace().next().unwrap_or("");
+    let first = prompt.split_whitespace().next().unwrap_or("");
     first == "/deploy" || first == "/배포" || first.starts_with("/axhub:")
 }
 
@@ -522,10 +528,10 @@ mod tests {
         assert!(!is_slash_invocation("deploy"));
         assert!(!is_slash_invocation("please /deploy"));
         assert!(!is_slash_invocation("배포해")); // bare Korean NL is NOT a slash
-        // Bounded to the exact command token: a prompt that merely *starts with*
-        // "/deploy"/"/배포" but is a different token must NOT be treated as the
-        // command (over-detection would route unrelated slash text to axhub via
-        // rule 0).
+                                                 // Bounded to the exact command token: a prompt that merely *starts with*
+                                                 // "/deploy"/"/배포" but is a different token must NOT be treated as the
+                                                 // command (over-detection would route unrelated slash text to axhub via
+                                                 // rule 0).
         assert!(!is_slash_invocation("/deployment-plan 설명해줘"));
         assert!(!is_slash_invocation("/deploy-history"));
         assert!(!is_slash_invocation("/배포해")); // "/배포" + 해 = a different token

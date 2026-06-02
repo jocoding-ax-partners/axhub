@@ -2110,7 +2110,10 @@ fn cli_prompt_route_audit_records_decision_type() {
     assert_eq!(explicit["explicit_invocation"], serde_json::json!(true));
 
     let yield_rec = by_decision("yield").expect("yield record");
-    assert_eq!(yield_rec["foreign_keyword_present"], serde_json::json!(true));
+    assert_eq!(
+        yield_rec["foreign_keyword_present"],
+        serde_json::json!(true)
+    );
     assert_eq!(yield_rec["explicit_invocation"], serde_json::json!(false));
 
     let axhub_rec = by_decision("axhub").expect("axhub record");
@@ -2119,7 +2122,10 @@ fn cli_prompt_route_audit_records_decision_type() {
     // Each line carries the decision enum + the four decide() inputs.
     for r in &records {
         assert!(r["decision"].is_string(), "decision missing: {r}");
-        assert!(r["marker_present"].is_boolean(), "marker_present missing: {r}");
+        assert!(
+            r["marker_present"].is_boolean(),
+            "marker_present missing: {r}"
+        );
         assert!(r["authed"].is_boolean(), "authed missing: {r}");
         assert!(
             r["explicit_invocation"].is_boolean(),

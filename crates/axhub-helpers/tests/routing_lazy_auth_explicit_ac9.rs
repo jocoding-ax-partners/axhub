@@ -87,7 +87,9 @@ fn authed_cli_runner(cmd: &[&str]) -> SpawnResult {
     if cmd.contains(&"--version") {
         ok("axhub 0.15.3\n")
     } else if cmd.contains(&"auth") && cmd.contains(&"status") {
-        ok(r#"{"user_email":"dev@jocodingax.ai","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["deploy:write"]}"#)
+        ok(
+            r#"{"user_email":"dev@jocodingax.ai","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["deploy:write"]}"#,
+        )
     } else {
         ok("[]")
     }
@@ -216,8 +218,14 @@ fn call_time_auth_probe_succeeds_for_authed_cli() {
 #[test]
 fn call_time_auth_probe_fails_closed_for_unauthed_cli() {
     let run = run_preflight_with_runner(unauthed_cli_runner);
-    assert!(run.output.cli_present, "CLI is present, only auth is missing");
-    assert!(!run.output.auth_ok, "UNAUTHORIZED CLI must not read as auth_ok");
+    assert!(
+        run.output.cli_present,
+        "CLI is present, only auth is missing"
+    );
+    assert!(
+        !run.output.auth_ok,
+        "UNAUTHORIZED CLI must not read as auth_ok"
+    );
     assert_eq!(
         run.output.auth_error_code.as_deref(),
         Some("unauthorized"),
@@ -250,7 +258,12 @@ fn lazy_bootstrap_endpoints_explicit_non_marker() {
 
     // Both explicit modalities reach the deploy path despite zero footprint.
     let via_slash = decide(EXPLICIT_SLASH_PROMPT, marker, /* authed */ false, true);
-    let via_keyword = decide(EXPLICIT_KEYWORD_PROMPT, marker, /* authed */ false, false);
+    let via_keyword = decide(
+        EXPLICIT_KEYWORD_PROMPT,
+        marker,
+        /* authed */ false,
+        false,
+    );
     assert_eq!(via_slash, RoutingDecision::Axhub, "slash must reach deploy");
     assert_eq!(
         via_keyword,

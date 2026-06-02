@@ -109,7 +109,9 @@ mod tests {
         // The live CLI emits 0/1/2/4..15/64/66 — none may fall through to the
         // unknown-error default. (65/67/68 are the helper's own output namespace
         // and are also covered.)
-        for exit in [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 64, 65, 66, 67, 68] {
+        for exit in [
+            0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 64, 65, 66, 67, 68,
+        ] {
             let entry = classify(exit, "");
             assert!(
                 !entry.cause.contains("알 수 없는 에러"),
@@ -122,7 +124,10 @@ mod tests {
     fn classify_unknown_exit_with_unmatched_detail_defaults() {
         // An exit with no base entry and an envelope whose code/subcode match no
         // fine key must fall to the default — the negative path stays reachable.
-        let entry = classify(255, r#"{"error":{"code":"auth","subcode":"nope.nonexistent"}}"#);
+        let entry = classify(
+            255,
+            r#"{"error":{"code":"auth","subcode":"nope.nonexistent"}}"#,
+        );
         assert!(entry.cause.contains("알 수 없는 에러"));
     }
 }

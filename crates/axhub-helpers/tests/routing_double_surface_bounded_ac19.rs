@@ -240,7 +240,10 @@ fn preflight_surface_is_invariant_across_grace_lifecycle() {
     // After grace is consumed: preflight decision is unchanged.
     let after = route_decision(repo.path(), config_home.path(), DEPLOY_PROMPT);
 
-    assert_eq!(before, "ignore", "preflight disambiguates before grace fires");
+    assert_eq!(
+        before, "ignore",
+        "preflight disambiguates before grace fires"
+    );
     assert_eq!(
         before, after,
         "preflight decision must be invariant across the grace lifecycle \

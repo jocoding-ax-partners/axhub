@@ -39,7 +39,14 @@ const BIN: &str = env!("CARGO_BIN_EXE_axhub-helpers");
 /// The six hardcoded foreign deploy-target keywords (spec 006 §45-47), mirrored
 /// here so a drift in `routing::FOREIGN_TARGET_KEYWORDS` surfaces as an AC-6
 /// failure (this list is the AC-6 contract, not a re-export).
-const FOREIGN_KEYWORDS: &[&str] = &["vercel", "netlify", "cloudflare", "fly", "render", "railway"];
+const FOREIGN_KEYWORDS: &[&str] = &[
+    "vercel",
+    "netlify",
+    "cloudflare",
+    "fly",
+    "render",
+    "railway",
+];
 
 /// Build a repo dir under a fresh tempdir. `.git` is always created so the marker
 /// walk-up terminates at this root (cannot escape to a tempdir ancestor);
@@ -186,7 +193,12 @@ fn conflict_ask_invariant_across_marker_and_auth() {
         let r = repo(marker);
         for authed in [true, false] {
             let cfg = config_home(authed);
-            let json = route(r.path(), cfg.path(), "axhub 랑 netlify 중에 골라줘 배포", false);
+            let json = route(
+                r.path(),
+                cfg.path(),
+                "axhub 랑 netlify 중에 골라줘 배포",
+                false,
+            );
             assert_eq!(
                 str_field(&json, "decision"),
                 "ask",
@@ -205,12 +217,18 @@ fn conflict_ask_distinct_from_single_keyword_decisions() {
     let r = repo(false);
     let cfg = config_home(true);
     assert_eq!(
-        str_field(&route(r.path(), cfg.path(), "axhub 로 배포해", false), "decision"),
+        str_field(
+            &route(r.path(), cfg.path(), "axhub 로 배포해", false),
+            "decision"
+        ),
         "axhub",
         "axhub-only (no foreign) must be axhub, not ask"
     );
     assert_eq!(
-        str_field(&route(r.path(), cfg.path(), "vercel 로 배포해", false), "decision"),
+        str_field(
+            &route(r.path(), cfg.path(), "vercel 로 배포해", false),
+            "decision"
+        ),
         "yield",
         "foreign-only (no axhub) must be yield, not ask"
     );

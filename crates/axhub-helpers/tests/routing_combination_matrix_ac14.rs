@@ -40,7 +40,7 @@
 use std::collections::BTreeSet;
 
 use axhub_helpers::routing::{
-    axhub_keyword_present, decide, foreign_keyword_present, find_marker_from, is_slash_invocation,
+    axhub_keyword_present, decide, find_marker_from, foreign_keyword_present, is_slash_invocation,
     MarkerStatus, RoutingDecision,
 };
 
@@ -62,31 +62,126 @@ struct Case {
 /// exercised across both scripts (e.g. `"vercel로"` vs `"to vercel"`).
 const CASES: &[Case] = &[
     // ── bare NL (no keyword, no slash) — drives rules d/e/err via the marker ──
-    Case { prompt: "배포해", axhub: false, foreign: false, slash: false },
-    Case { prompt: "그냥 빌드만 해줘", axhub: false, foreign: false, slash: false },
-    Case { prompt: "deploy this app for me", axhub: false, foreign: false, slash: false },
+    Case {
+        prompt: "배포해",
+        axhub: false,
+        foreign: false,
+        slash: false,
+    },
+    Case {
+        prompt: "그냥 빌드만 해줘",
+        axhub: false,
+        foreign: false,
+        slash: false,
+    },
+    Case {
+        prompt: "deploy this app for me",
+        axhub: false,
+        foreign: false,
+        slash: false,
+    },
     // ── axhub-only (rule b: marker-independent Axhub) ──
-    Case { prompt: "axhub 으로 배포해", axhub: true, foreign: false, slash: false },
-    Case { prompt: "use axhub to ship it", axhub: true, foreign: false, slash: false },
-    Case { prompt: "read axhub.yaml first", axhub: true, foreign: false, slash: false }, // bounded by '.'
+    Case {
+        prompt: "axhub 으로 배포해",
+        axhub: true,
+        foreign: false,
+        slash: false,
+    },
+    Case {
+        prompt: "use axhub to ship it",
+        axhub: true,
+        foreign: false,
+        slash: false,
+    },
+    Case {
+        prompt: "read axhub.yaml first",
+        axhub: true,
+        foreign: false,
+        slash: false,
+    }, // bounded by '.'
     // ── foreign-only (rule c: named-target-wins → Yield, beats marker) ──
-    Case { prompt: "vercel 로 배포해", axhub: false, foreign: true, slash: false },
-    Case { prompt: "push to netlify", axhub: false, foreign: true, slash: false },
-    Case { prompt: "deploy on fly.io", axhub: false, foreign: true, slash: false }, // bounded by '.'
-    Case { prompt: "cloudflare 에 올려줘", axhub: false, foreign: true, slash: false },
-    Case { prompt: "ship to render now", axhub: false, foreign: true, slash: false },
-    Case { prompt: "railway up please", axhub: false, foreign: true, slash: false },
+    Case {
+        prompt: "vercel 로 배포해",
+        axhub: false,
+        foreign: true,
+        slash: false,
+    },
+    Case {
+        prompt: "push to netlify",
+        axhub: false,
+        foreign: true,
+        slash: false,
+    },
+    Case {
+        prompt: "deploy on fly.io",
+        axhub: false,
+        foreign: true,
+        slash: false,
+    }, // bounded by '.'
+    Case {
+        prompt: "cloudflare 에 올려줘",
+        axhub: false,
+        foreign: true,
+        slash: false,
+    },
+    Case {
+        prompt: "ship to render now",
+        axhub: false,
+        foreign: true,
+        slash: false,
+    },
+    Case {
+        prompt: "railway up please",
+        axhub: false,
+        foreign: true,
+        slash: false,
+    },
     // ── axhub + foreign (rule a: ambiguous → Ask) ──
-    Case { prompt: "axhub 말고 vercel 로", axhub: true, foreign: true, slash: false },
-    Case { prompt: "deploy to axhub or netlify", axhub: true, foreign: true, slash: false },
+    Case {
+        prompt: "axhub 말고 vercel 로",
+        axhub: true,
+        foreign: true,
+        slash: false,
+    },
+    Case {
+        prompt: "deploy to axhub or netlify",
+        axhub: true,
+        foreign: true,
+        slash: false,
+    },
     // ── slash-text prompts. The slash axis is swept as an independent boolean
     //    below, so these also act as rule-c / rule-a "controls" when explicit is
     //    suppressed (the AC5 technique), and as rule-0 winners when it is set. ──
-    Case { prompt: "/deploy", axhub: false, foreign: false, slash: true },
-    Case { prompt: "/배포 paydrop", axhub: false, foreign: false, slash: true },
-    Case { prompt: "/axhub:deploy", axhub: true, foreign: false, slash: true }, // ':' bounds "axhub"
-    Case { prompt: "/deploy to vercel", axhub: false, foreign: true, slash: true },
-    Case { prompt: "/axhub:deploy to vercel", axhub: true, foreign: true, slash: true },
+    Case {
+        prompt: "/deploy",
+        axhub: false,
+        foreign: false,
+        slash: true,
+    },
+    Case {
+        prompt: "/배포 paydrop",
+        axhub: false,
+        foreign: false,
+        slash: true,
+    },
+    Case {
+        prompt: "/axhub:deploy",
+        axhub: true,
+        foreign: false,
+        slash: true,
+    }, // ':' bounds "axhub"
+    Case {
+        prompt: "/deploy to vercel",
+        axhub: false,
+        foreign: true,
+        slash: true,
+    },
+    Case {
+        prompt: "/axhub:deploy to vercel",
+        axhub: true,
+        foreign: true,
+        slash: true,
+    },
 ];
 
 const ALL_MARKERS: &[MarkerStatus] = &[
@@ -204,7 +299,8 @@ fn combination_matrix_matches_oracle_and_covers_all_branches() {
     let expected_branches: BTreeSet<&'static str> =
         ["0", "a", "b", "c", "d", "e", "err"].into_iter().collect();
     assert_eq!(
-        covered, expected_branches,
+        covered,
+        expected_branches,
         "matrix must exercise every priority branch; missing {:?}",
         expected_branches.difference(&covered).collect::<Vec<_>>()
     );
@@ -223,7 +319,12 @@ fn foreign_keyword_yields_even_with_marker_present() {
     for c in CASES.iter().filter(|c| c.foreign && !c.axhub && !c.slash) {
         for &authed in &[false, true] {
             assert_eq!(
-                decide(c.prompt, MarkerStatus::Present, authed, /* explicit */ false),
+                decide(
+                    c.prompt,
+                    MarkerStatus::Present,
+                    authed,
+                    /* explicit */ false
+                ),
                 RoutingDecision::Yield,
                 "named-target-wins must hold for {:?} on a marker-present repo (authed={authed})",
                 c.prompt
@@ -240,13 +341,23 @@ fn foreign_keyword_yields_even_with_marker_present() {
 fn bare_nl_unknown_marker_is_auth_conditional() {
     for c in CASES.iter().filter(|c| !c.foreign && !c.axhub && !c.slash) {
         assert_eq!(
-            decide(c.prompt, MarkerStatus::Unknown, /* authed */ true, false),
+            decide(
+                c.prompt,
+                MarkerStatus::Unknown,
+                /* authed */ true,
+                false
+            ),
             RoutingDecision::Axhub,
             "err branch: authed bare NL must fall open to axhub for {:?}",
             c.prompt
         );
         assert_eq!(
-            decide(c.prompt, MarkerStatus::Unknown, /* authed */ false, false),
+            decide(
+                c.prompt,
+                MarkerStatus::Unknown,
+                /* authed */ false,
+                false
+            ),
             RoutingDecision::Ignore,
             "err branch: unauthed bare NL must stay zero-footprint for {:?}",
             c.prompt

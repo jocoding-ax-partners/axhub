@@ -3282,7 +3282,10 @@ mod tests {
         });
         match auth {
             DeployIdLookup::TransportFailure { reason } => {
-                assert!(reason.contains("만료"), "exit 4 must map to auth reason: {reason}");
+                assert!(
+                    reason.contains("만료"),
+                    "exit 4 must map to auth reason: {reason}"
+                );
             }
             other => panic!("exit 4 must be TransportFailure, got {other:?}"),
         }

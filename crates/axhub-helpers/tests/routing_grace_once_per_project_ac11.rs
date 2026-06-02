@@ -82,7 +82,11 @@ fn make_authed(config_home: &Path) {
 /// The systemMessage channel carries the grace nudge; `additionalContext` is the
 /// agent-facing preflight. Returns the top-level `systemMessage`, if any.
 fn system_message(output: &Output) -> Option<String> {
-    assert_eq!(output.status.code(), Some(0), "prompt-route must fail-open exit 0");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "prompt-route must fail-open exit 0"
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let line = stdout
         .lines()
@@ -112,7 +116,8 @@ fn grace_fires_once_per_project_for_authed_no_marker_implicit_deploy() {
         config_home.path(),
         state_home.path(),
     );
-    let msg = system_message(&first).expect("first authed deploy prompt must emit grace systemMessage");
+    let msg =
+        system_message(&first).expect("first authed deploy prompt must emit grace systemMessage");
     assert!(
         msg.contains("axhub.yaml") && msg.contains("/init") && msg.contains("axhub 배포"),
         "grace must name the migration paths: {msg}"
@@ -164,7 +169,12 @@ fn grace_silent_for_non_deploy_prompt() {
     let state_home = tempfile::tempdir().expect("state home");
     make_authed(config_home.path());
 
-    let output = run_prompt_route("안녕하세요", repo.path(), config_home.path(), state_home.path());
+    let output = run_prompt_route(
+        "안녕하세요",
+        repo.path(),
+        config_home.path(),
+        state_home.path(),
+    );
     assert_eq!(
         system_message(&output),
         None,

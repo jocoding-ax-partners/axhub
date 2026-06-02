@@ -135,7 +135,12 @@ fn explicit_invocation_reaches_deploy_in_non_marker() {
         RoutingDecision::Axhub,
     );
     assert_eq!(
-        decide(EXPLICIT_KEYWORD_PROMPT, marker, /* authed */ false, false),
+        decide(
+            EXPLICIT_KEYWORD_PROMPT,
+            marker,
+            /* authed */ false,
+            false
+        ),
         RoutingDecision::Axhub,
     );
 }
@@ -324,7 +329,12 @@ fn lazy_auth_failure_is_actionable_stop_on_explicit_non_marker() {
 
     // Explicit → reaches deploy (no token-file required to get there).
     assert_eq!(
-        decide(EXPLICIT_KEYWORD_PROMPT, marker, /* authed */ false, false),
+        decide(
+            EXPLICIT_KEYWORD_PROMPT,
+            marker,
+            /* authed */ false,
+            false
+        ),
         RoutingDecision::Axhub,
     );
 
@@ -352,7 +362,11 @@ fn lazy_auth_failure_is_actionable_stop_on_explicit_non_marker() {
     // And that exit code renders concrete, actionable re-login guidance.
     let entry = classify(run.exit_code, "");
     assert!(
-        entry.action.contains("로그인") && entry.button.as_deref().is_some_and(|b| b.contains("로그인")),
+        entry.action.contains("로그인")
+            && entry
+                .button
+                .as_deref()
+                .is_some_and(|b| b.contains("로그인")),
         "exit-65 must render actionable axhub-auth-login guidance: {entry:?}"
     );
 }

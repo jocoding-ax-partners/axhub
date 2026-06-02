@@ -220,9 +220,6 @@ fn err_branch_auth_conditional_truth_table() {
     ];
     for (marker, authed, expected, why) in cases {
         let got = decide(BARE_NL_PROMPT, marker, authed, false);
-        assert_eq!(
-            got, expected,
-            "{why} (marker={marker:?} authed={authed})"
-        );
+        assert_eq!(got, expected, "{why} (marker={marker:?} authed={authed})");
     }
 }

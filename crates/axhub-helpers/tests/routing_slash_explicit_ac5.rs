@@ -199,7 +199,12 @@ fn non_marker_unauthed_slash_still_routes_axhub() {
     );
     // Rule 0: the slash overrides marker-absence AND the unauthed state → axhub.
     assert_eq!(
-        decide(SLASH, marker, /* authed */ false, is_slash_invocation(SLASH)),
+        decide(
+            SLASH,
+            marker,
+            /* authed */ false,
+            is_slash_invocation(SLASH)
+        ),
         RoutingDecision::Axhub,
         "spec §88: `axhub.yaml` 없음 + /deploy must still route axhub even unauthed"
     );

@@ -332,7 +332,8 @@ mod tests {
     fn grace_message_is_haeyo_and_names_recovery_paths() {
         // lint:tone 금지 토큰 전부 부재 (해요체). `lint:tone` 은 .md 만 스캔하므로
         // (.rs 미포함) 이 단위 테스트가 grace 메시지 톤의 유일한 가드 — 6개 전부 검사.
-        for banned in ["합니다", "입니다", "시겠어요", "드립니다", "당신", "아이고"] {
+        for banned in ["합니다", "입니다", "시겠어요", "드립니다", "당신", "아이고"]
+        {
             assert!(
                 !GRACE_MESSAGE.contains(banned),
                 "grace message must stay 해요체 (found {banned})"

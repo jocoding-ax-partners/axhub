@@ -190,8 +190,18 @@ fn bare_nl_ignores_where_explicit_keyword_routes_to_axhub() {
     let marker = find_marker_from(repo.path());
     assert_eq!(marker, MarkerStatus::Absent, "precondition: no marker");
 
-    let implicit = decide(IMPLICIT_DEPLOY_PROMPT, marker, /* authed */ false, false);
-    let explicit = decide(EXPLICIT_KEYWORD_PROMPT, marker, /* authed */ false, false);
+    let implicit = decide(
+        IMPLICIT_DEPLOY_PROMPT,
+        marker,
+        /* authed */ false,
+        false,
+    );
+    let explicit = decide(
+        EXPLICIT_KEYWORD_PROMPT,
+        marker,
+        /* authed */ false,
+        false,
+    );
 
     assert_eq!(
         implicit,

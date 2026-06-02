@@ -27,7 +27,8 @@ use axhub_helpers::routing::{
 
 /// Korean implicit deploy prompts: bare NL, no explicit `"axhub"`, no foreign
 /// target keyword, no slash. These are exactly the rule-d inputs.
-const IMPLICIT_KOREAN_DEPLOY_PROMPTS: &[&str] = &["배포해", "배포해줘", "그거 배포해줘", "지금 배포해"];
+const IMPLICIT_KOREAN_DEPLOY_PROMPTS: &[&str] =
+    &["배포해", "배포해줘", "그거 배포해줘", "지금 배포해"];
 
 /// The premises of rule d for every sample prompt: it is genuinely *bare NL*.
 /// If any of these flipped, the prompt would be routed by a higher-priority
@@ -59,7 +60,12 @@ fn implicit_korean_prompts_are_genuinely_bare_nl() {
 fn marker_present_implicit_korean_deploy_routes_to_axhub() {
     for &prompt in IMPLICIT_KOREAN_DEPLOY_PROMPTS {
         for &authed in &[false, true] {
-            let decision = decide(prompt, MarkerStatus::Present, authed, /* explicit */ false);
+            let decision = decide(
+                prompt,
+                MarkerStatus::Present,
+                authed,
+                /* explicit */ false,
+            );
             assert_eq!(
                 decision,
                 RoutingDecision::Axhub,
@@ -79,7 +85,12 @@ fn marker_present_implicit_korean_deploy_routes_to_axhub() {
 fn same_implicit_prompt_without_marker_does_not_activate_axhub() {
     for &prompt in IMPLICIT_KOREAN_DEPLOY_PROMPTS {
         for &authed in &[false, true] {
-            let decision = decide(prompt, MarkerStatus::Absent, authed, /* explicit */ false);
+            let decision = decide(
+                prompt,
+                MarkerStatus::Absent,
+                authed,
+                /* explicit */ false,
+            );
             assert_ne!(
                 decision,
                 RoutingDecision::Axhub,

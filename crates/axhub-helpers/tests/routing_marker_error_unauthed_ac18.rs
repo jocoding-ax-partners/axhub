@@ -142,14 +142,15 @@ fn real_walk_up_error_unauthed_routes_to_ignore() {
     let start = a_file.join("sub").join("deep");
 
     let marker = find_marker_from(&start);
-    assert_eq!(marker, MarkerStatus::Unknown, "precondition: error → Unknown");
+    assert_eq!(
+        marker,
+        MarkerStatus::Unknown,
+        "precondition: error → Unknown"
+    );
 
     let decision = decide_from_flags(
-        /* axhub_keyword = */ false,
-        /* foreign_keyword = */ false,
-        marker,
-        /* authed = */ false,
-        /* explicit_invocation = */ false,
+        /* axhub_keyword = */ false, /* foreign_keyword = */ false, marker,
+        /* authed = */ false, /* explicit_invocation = */ false,
     );
     assert_eq!(
         decision,

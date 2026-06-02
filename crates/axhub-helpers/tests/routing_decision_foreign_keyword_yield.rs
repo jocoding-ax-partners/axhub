@@ -31,9 +31,7 @@
 //! "axhub만 지원") encodes the same foreign-target rejection at the skill-scoring
 //! layer.
 
-use axhub_helpers::routing::{
-    decide, foreign_keyword_present, MarkerStatus, RoutingDecision,
-};
+use axhub_helpers::routing::{decide, foreign_keyword_present, MarkerStatus, RoutingDecision};
 
 /// The literal AC-3 utterance: no-space Korean particle attached to the target.
 const AC3_PROMPT: &str = "vercel에 배포해";
