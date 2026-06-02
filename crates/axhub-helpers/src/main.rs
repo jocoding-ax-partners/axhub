@@ -741,12 +741,12 @@ fn verify_trace_suggestion(command: &str, exit_code: i32) -> Option<String> {
     }
     // Only genuine server-attempt failures are trace-worthy. Client-side
     // pre-attempt gates are NOT: clap usage(2), CLI auth(4), dry-run preview(11),
-    // usage(64), and helper auth(65). Those never reached the deploy path, so
-    // "왜 실패했어" would mislead. CLI-native server-ish failures (5/6/7) and
-    // helper/server failures (67/68/70, plus other nonzero unknowns) still nudge.
+    // and usage(64). Those never reached the deploy path, so "왜 실패했어" would
+    // mislead. Helper auth(65) remains trace-worthy because the frozen helper
+    // output contract and existing regression test expect the deploy-failure nudge.
     if command.starts_with("axhub deploy create")
         && exit_code != 0
-        && !matches!(exit_code, 2 | 4 | 11 | 64 | 65)
+        && !matches!(exit_code, 2 | 4 | 11 | 64)
     {
         return Some("배포 실패. \"왜 실패했어\" 라고 말하면 원인 추적해 드려요.".to_string());
     }
