@@ -4,6 +4,25 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.27](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.26...v0.9.27) (2026-06-02)
+
+이번 릴리스는 ax-hub-cli 설치 도메인이 `cli.jocodingax.ai` 에서 `cli.axhub.ai` 로 바뀐 걸 반영해요. install-cli SKILL 의 installer 명령·AskUserQuestion 옵션·NEVER 절, 한국어 트러블슈팅 문서, ask-defaults registry rationale 까지 옛 주소가 남아 있던 12 곳을 한 번에 갱신해요. `docs.jocodingax.ai` 와 `axhub-api.jocodingax.ai` 서브도메인은 이번 변경 범위가 아니라 그대로 둬요.
+
+### Test baseline
+
+- `bun run lint:keywords --check` baseline no diff, `bun run skill:doctor --strict` OK, `bun test tests/ux-ask-fallback-registry.test.ts` 40 pass / 0 fail 를 확인했어요.
+- PR #164 를 admin merge 로 main 에 반영하고 release step 1 의 `codegen:version` 과 `release:check` (host helper build) 가 통과했어요.
+
+### Honest tradeoff
+
+- 사용자 요청으로 CI 를 기다리지 않고 admin merge 했어요. 전체 5-platform matrix 와 staging E2E 는 tag push 뒤 release workflow 에서 다시 확인해요.
+- 새 도메인 `cli.axhub.ai` 의 `install.sh` / `install.ps1` 실제 서빙 여부는 인프라 측 확인이 필요해요. 문서/스킬만 갱신한 상태예요.
+
+
+### Fixed
+
+* **skills:** install-cli CLI 도메인을 cli.axhub.ai 로 갱신 ([#164](https://github.com/jocoding-ax-partners/axhub/issues/164)) ([1b73a72](https://github.com/jocoding-ax-partners/axhub/commit/1b73a72a8e0e700d7a47804891c4a28acc5336f9))
+
 ## [0.9.26](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.25...v0.9.26) (2026-06-02)
 
 이번 릴리스는 남아 있던 DIRTY PR 을 최신 main 위에서 정리해, setup Windows PowerShell, update/verify CLI 계약, exit-code 라우팅, marker-gated routing 을 한 번에 실어요. axhub 프로젝트 marker 가 없는 일반 repo 에서는 eager footprint 를 줄이고, 명시적 axhub 호출과 deploy preflight 는 공유 route-decision 계약으로 안전하게 이어져요.
