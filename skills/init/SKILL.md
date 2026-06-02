@@ -267,7 +267,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
 ## NEVER
 
-- NEVER `axhub init` 또는 `axhub init --from-template` 을 호출하지 않아요. Rust v1.0.0-rc.1 에서 `--from-template` flag 가 미구현 stub (`initcmd.rs` run() 미사용) 이라 호출해도 generic docker apphub.yaml 만 만들어져요. SKILL 은 `axhub apps bootstrap` saga 만 써요.
+- NEVER `axhub init` 또는 `axhub init --from-template` 을 호출하지 않아요. Rust v1.0.0-rc.1 에서 `--from-template` flag 가 미구현 stub (`initcmd.rs` run() 미사용) 이라 호출해도 generic docker axhub.yaml 만 만들어져요. SKILL 은 `axhub apps bootstrap` saga 만 써요.
 - NEVER `axhub apps create` 또는 `axhub deploy create` 를 직접 호출하지 않아요. bootstrap saga 가 server-side 에서 둘 다 처리해요.
 - NEVER `axhub-helpers fetch-template` 또는 remote `templates.json` 을 source 로 쓰지 않아요. backend `axhub apps templates list` 만 source-of-truth 예요.
 - NEVER subprocess (`$CI` / `$CLAUDE_NON_INTERACTIVE` / no TTY) 에서 template 또는 앱 이름을 임의로 고르지 않아요. registry safe_default 가 `abort` 또는 `취소` 예요.
