@@ -84,9 +84,25 @@ PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 echo "$PREFLIGHT_JSON"
 ```
 
+Git Bash/MSYS bash 가 없는 Windows 에서는 PowerShell 로 같은 helper 계약을 실행해요.
+
+```powershell
+$PluginRoot = if ($env:CLAUDE_PLUGIN_ROOT) { $env:CLAUDE_PLUGIN_ROOT } else { "." }
+$Helper = Join-Path $PluginRoot "bin/axhub-helpers.exe"
+if (-not (Test-Path $Helper)) { $Helper = Join-Path $PluginRoot "bin/axhub-helpers" }
+if (-not (Test-Path $Helper)) {
+  $Cmd = Get-Command axhub-helpers.exe -ErrorAction SilentlyContinue
+  if (-not $Cmd) { $Cmd = Get-Command axhub-helpers -ErrorAction SilentlyContinue }
+  $Helper = if ($Cmd) { $Cmd.Source } else { "axhub-helpers" }
+}
+$PreflightJson = & $Helper preflight --json 2>$null
+if (-not $PreflightJson) { $PreflightJson = "{}" }
+$PreflightJson
+```
+
 `auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
 
-Windows 는 PowerShell 전용 가정을 하지 않아요. Git Bash/MSYS bash 만 있는 환경에서도 helper 를 찾을 수 있게 `bin/axhub-helpers.exe` 와 PATH 의 `axhub-helpers.exe` 를 함께 확인해요. 모든 shell snippet 은 bash 문법만 쓰고 `cmd.exe`/PowerShell 호출을 요구하지 않아요.
+Windows 는 특정 shell 을 단정하지 않아요. Git Bash/MSYS bash 만 있으면 bash snippet 을 쓰고, bash 가 없고 PowerShell 만 있으면 PowerShell snippet 을 써요. 두 경로 모두 `bin/axhub-helpers.exe` 와 PATH 의 `axhub-helpers.exe` 를 먼저 확인해요.
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
 
@@ -109,6 +125,21 @@ Windows 는 PowerShell 전용 가정을 하지 않아요. Git Bash/MSYS bash 만
    if [ ! -x "$HELPER" ] && [ -x "${HELPER}.exe" ]; then HELPER="${HELPER}.exe"; fi
    if [ ! -x "$HELPER" ]; then HELPER="$(command -v axhub-helpers 2>/dev/null || command -v axhub-helpers.exe 2>/dev/null || printf '%s\n' axhub-helpers)"; fi
    "$HELPER" migrate-plan --dir "${AXHUB_MIGRATE_DIR:-.}" --json
+   ```
+
+   Git Bash/MSYS bash 가 없는 Windows 에서는 PowerShell 로 같은 pre-scan 을 실행해요.
+
+   ```powershell
+   $PluginRoot = if ($env:CLAUDE_PLUGIN_ROOT) { $env:CLAUDE_PLUGIN_ROOT } else { "." }
+   $Helper = Join-Path $PluginRoot "bin/axhub-helpers.exe"
+   if (-not (Test-Path $Helper)) { $Helper = Join-Path $PluginRoot "bin/axhub-helpers" }
+   if (-not (Test-Path $Helper)) {
+     $Cmd = Get-Command axhub-helpers.exe -ErrorAction SilentlyContinue
+     if (-not $Cmd) { $Cmd = Get-Command axhub-helpers -ErrorAction SilentlyContinue }
+     $Helper = if ($Cmd) { $Cmd.Source } else { "axhub-helpers" }
+   }
+   $MigrateDir = if ($env:AXHUB_MIGRATE_DIR) { $env:AXHUB_MIGRATE_DIR } else { "." }
+   & $Helper migrate-plan --dir $MigrateDir --json
    ```
 
 2. **후보 선택과 confidence 확인.** 후보가 2개 이상이면 앱 하나를 고르게 해요. helper 의 confidence 는 local marker 기반 힌트예요. `0.80` 이상이면 확인 후 진행하고, `0.60..0.79` 는 수정 가능한 계획으로 보여줘요. `0.60` 미만이나 후보 모호함은 진행을 막고 `axhub.yaml` 또는 Dockerfile/compose 를 요청해요.

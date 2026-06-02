@@ -63,12 +63,15 @@ describe("migrate SKILL contract", () => {
     }
   });
 
-  test("keeps bash-only Windows helper resolution executable", () => {
+  test("keeps Windows helper resolution executable with or without bash", () => {
     const skill = read("skills/migrate/SKILL.md");
     expect(skill).toContain("Git Bash/MSYS bash");
     expect(skill).toContain('if [ ! -x "$HELPER" ] && [ -x "${HELPER}.exe" ]; then HELPER="${HELPER}.exe"; fi');
     expect(skill).toContain("command -v axhub-helpers.exe");
-    expect(skill).toContain("PowerShell 호출을 요구하지 않아요");
+    expect(skill).toContain("bash 가 없고 PowerShell 만 있으면 PowerShell snippet 을 써요");
+    expect(skill).toContain('Join-Path $PluginRoot "bin/axhub-helpers.exe"');
+    expect(skill).toContain("Get-Command axhub-helpers.exe");
+    expect(skill).toContain("& $Helper migrate-plan --dir $MigrateDir --json");
   });
 
   test("corpus.100 routes core existing-app natural language to migrate", () => {
