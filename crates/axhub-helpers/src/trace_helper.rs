@@ -198,16 +198,32 @@ const ERROR_PATTERNS: &[(&str, &str, MatchKind)] = &[
     ("oomkilled", "oom", MatchKind::Substring),
     ("oom", "oom", MatchKind::Word),
     ("module not found", "module_not_found", MatchKind::Substring),
-    ("cannot find module", "module_not_found", MatchKind::Substring),
+    (
+        "cannot find module",
+        "module_not_found",
+        MatchKind::Substring,
+    ),
     ("network timeout", "network_timeout", MatchKind::Substring),
-    ("connection refused", "network_timeout", MatchKind::Substring),
+    (
+        "connection refused",
+        "network_timeout",
+        MatchKind::Substring,
+    ),
     (
         "dependency install failed",
         "dependency_install_failed",
         MatchKind::Substring,
     ),
-    ("npm err!", "dependency_install_failed", MatchKind::Substring),
-    ("docker pull", "docker_image_pull_failed", MatchKind::Substring),
+    (
+        "npm err!",
+        "dependency_install_failed",
+        MatchKind::Substring,
+    ),
+    (
+        "docker pull",
+        "docker_image_pull_failed",
+        MatchKind::Substring,
+    ),
     (
         "image pull failed",
         "docker_image_pull_failed",

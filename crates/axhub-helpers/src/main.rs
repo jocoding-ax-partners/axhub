@@ -2280,7 +2280,9 @@ impl axhub_helpers::trace_helper::TraceProbes for RealTraceProbes {
         // 보내지 않고, NDJSON 각 라인의 `message` 만 unwrap 해서 plain 텍스트로 넘겨요.
         let stdout = match axhub_stdout_with_timeout(
             &axhub_bin,
-            &["--json", "deploy", "logs", "--app", app_ref, "--limit", &tail],
+            &[
+                "--json", "deploy", "logs", "--app", app_ref, "--limit", &tail,
+            ],
         ) {
             Ok(stdout) => stdout,
             Err("timeout") => {

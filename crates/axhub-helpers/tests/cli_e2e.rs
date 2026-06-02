@@ -3490,10 +3490,11 @@ fn fake_axhub_app_logs(
     // (`{"type":"log","message":"..."}`) 한 줄씩 emit. messages 가 비면 아무것도
     // 출력 안 해서 runtime_log_unavailable 경로를 테스트해요. (message 에 따옴표 금지)
     let axhub = temp.path().join(name);
-    let mut body =
-        String::from("#!/bin/sh\nif [ \"$1 $2 $3\" = \"--json deploy logs\" ]; then\n");
+    let mut body = String::from("#!/bin/sh\nif [ \"$1 $2 $3\" = \"--json deploy logs\" ]; then\n");
     for m in messages {
-        body.push_str(&format!("  echo '{{\"type\":\"log\",\"message\":\"{m}\"}}'\n"));
+        body.push_str(&format!(
+            "  echo '{{\"type\":\"log\",\"message\":\"{m}\"}}'\n"
+        ));
     }
     body.push_str("  exit 0\nfi\nexit 1\n");
     std::fs::write(&axhub, body).unwrap();
@@ -3543,8 +3544,7 @@ fn write_trace_deploy_events_with_reason(state: &Path, deploy_id: &str, reason: 
 fn fake_axhub_raw_logs(temp: &tempfile::TempDir, name: &str, lines: &[&str]) -> std::path::PathBuf {
     // NDJSON 이 아닌 raw 라인을 emit 하는 fake (파싱 실패 경로 테스트용, CR #7/#8).
     let axhub = temp.path().join(name);
-    let mut body =
-        String::from("#!/bin/sh\nif [ \"$1 $2 $3\" = \"--json deploy logs\" ]; then\n");
+    let mut body = String::from("#!/bin/sh\nif [ \"$1 $2 $3\" = \"--json deploy logs\" ]; then\n");
     for l in lines {
         body.push_str(&format!("  echo '{l}'\n"));
     }
@@ -3624,7 +3624,14 @@ fn cli_trace_json_failure_reason_beats_benign_runtime() {
     let axhub_s = axhub.display().to_string();
 
     let out = run_env(
-        &["trace", "--deploy-id", deploy_id, "--app", "paydrop", "--json"],
+        &[
+            "trace",
+            "--deploy-id",
+            deploy_id,
+            "--app",
+            "paydrop",
+            "--json",
+        ],
         &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
     );
     assert_eq!(
@@ -3665,7 +3672,14 @@ fn cli_trace_json_matches_severity_tagged_runtime_error() {
     let axhub_s = axhub.display().to_string();
 
     let out = run_env(
-        &["trace", "--deploy-id", deploy_id, "--app", "paydrop", "--json"],
+        &[
+            "trace",
+            "--deploy-id",
+            deploy_id,
+            "--app",
+            "paydrop",
+            "--json",
+        ],
         &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
     );
     assert_eq!(out.status.code(), Some(0));
@@ -3696,17 +3710,22 @@ fn cli_trace_json_warns_on_unparseable_runtime_log() {
     let axhub_s = axhub.display().to_string();
 
     let out = run_env(
-        &["trace", "--deploy-id", deploy_id, "--app", "paydrop", "--json"],
+        &[
+            "trace",
+            "--deploy-id",
+            deploy_id,
+            "--app",
+            "paydrop",
+            "--json",
+        ],
         &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
     );
     assert_eq!(out.status.code(), Some(0));
     let json = stdout_json(&out);
     assert!(
-        json["warnings"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|v| v.as_str().is_some_and(|s| s.starts_with("runtime_log_unparseable"))),
+        json["warnings"].as_array().unwrap().iter().any(|v| v
+            .as_str()
+            .is_some_and(|s| s.starts_with("runtime_log_unparseable"))),
         "expected runtime_log_unparseable in {:?}",
         json["warnings"]
     );
@@ -3726,17 +3745,22 @@ fn cli_trace_json_warns_when_runtime_log_empty() {
     let axhub_s = axhub.display().to_string();
 
     let out = run_env(
-        &["trace", "--deploy-id", deploy_id, "--app", "paydrop", "--json"],
+        &[
+            "trace",
+            "--deploy-id",
+            deploy_id,
+            "--app",
+            "paydrop",
+            "--json",
+        ],
         &[("XDG_STATE_HOME", &state_s), ("AXHUB_BIN", &axhub_s)],
     );
     assert_eq!(out.status.code(), Some(0));
     let json = stdout_json(&out);
     assert!(
-        json["warnings"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|v| v.as_str().is_some_and(|s| s.starts_with("runtime_log_unavailable"))),
+        json["warnings"].as_array().unwrap().iter().any(|v| v
+            .as_str()
+            .is_some_and(|s| s.starts_with("runtime_log_unavailable"))),
         "expected runtime_log_unavailable in {:?}",
         json["warnings"]
     );
