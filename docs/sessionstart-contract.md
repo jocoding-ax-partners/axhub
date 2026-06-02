@@ -22,7 +22,7 @@ axhub 준비됐어요 (v{VERSION}).
 - 처음이면 /axhub:setup — 설치·로그인·첫 배포까지 안내해요.
 - 막히거나 안 되면 /axhub:doctor (진단) · /axhub:help (전체 명령).
 - 자주 쓰는 것: 배포 /axhub:deploy · 상태 /axhub:status · 로그 /axhub:logs · 앱 목록 /axhub:apps.
-- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요 (AXHUB_NO_AUDIT=1).
+- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요.
 ```
 
 `{VERSION}` 은 `env!("CARGO_PKG_VERSION")` 으로 compile-time 주입.
@@ -40,7 +40,7 @@ marker 파일 (`runtime_paths::state_dir() / .v{VERSION}-welcome-shown`) 부재 
 - 헷갈리면 /axhub:help (명령 메뉴) · /axhub:doctor (점검).
 ```
 
-audit privacy disclosure (`AXHUB_NO_AUDIT=1`) 는 base 메시지 마지막 줄에 있어요 — docs/audit-privacy-contract.md 의 Disclosure 위치 #1 와 일치. (익명화 한계 등 상세는 disclosure #3 `docs/routing.md`.)
+base 메시지 마지막 줄이 audit 수집 + opt-out("끄려면 말씀해주세요")을 고지해요 — docs/audit-privacy-contract.md 의 Disclosure 위치 #1. 구체 env var(`AXHUB_NO_AUDIT=1`) + 익명화 한계는 disclosure #2-4 (routing-stats footer · README · `docs/routing.md`).
 
 ---
 
@@ -98,7 +98,7 @@ pub fn cmd_session_start() -> anyhow::Result<i32> {
         "- 처음이면 /axhub:setup — 설치·로그인·첫 배포까지 안내해요.".to_string(),
         "- 막히거나 안 되면 /axhub:doctor (진단) · /axhub:help (전체 명령).".to_string(),
         "- 자주 쓰는 것: 배포 /axhub:deploy · 상태 /axhub:status · 로그 /axhub:logs · 앱 목록 /axhub:apps.".to_string(),
-        "- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요 (AXHUB_NO_AUDIT=1).".to_string(),
+        "- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요.".to_string(),
     ];
 
     let marker_path = welcome_marker_path(WELCOME_VERSION);
@@ -152,6 +152,6 @@ pub fn cmd_session_start() -> anyhow::Result<i32> {
 
 ## Linked Phase 0 Sub-tasks
 
-- **0.5** audit privacy disclosure → base 메시지 마지막 줄의 audit 고지 (`AXHUB_NO_AUDIT=1`); 익명화 한계 등 상세는 `docs/routing.md`
+- **0.5** audit privacy disclosure → base 메시지 마지막 줄이 수집 + opt-out 고지; 구체 env var(`AXHUB_NO_AUDIT=1`) · 익명화 한계는 routing-stats footer · README · `docs/routing.md`
 - **0.6** SessionStart fallback systemMessage → 이 문서 (base + v0.4.0 magical moment 정의)
 - **0.7** Migration Gate → Phase 7 implementation 후 Gate 1 (cli_e2e), Gate 4 (latency) 통과

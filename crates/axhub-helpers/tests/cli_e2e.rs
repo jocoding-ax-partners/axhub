@@ -1875,7 +1875,7 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     assert_eq!(session.status.code(), Some(0));
     let session_stdout = String::from_utf8_lossy(&session.stdout);
     assert!(session_stdout.contains("/axhub:setup"));
-    assert!(session_stdout.contains("AXHUB_NO_AUDIT"));
+    assert!(session_stdout.contains("말씀해주세요"));
     assert!(session_stdout.contains("감사 로그"));
 }
 
@@ -2333,7 +2333,7 @@ fn cli_session_start_first_current_version_session() {
     let msg = session_start_systemmessage(&state_s);
     let helper_version = env!("CARGO_PKG_VERSION");
     assert!(msg.contains(&format!("v{helper_version} 첫 세션")), "{msg}");
-    assert!(msg.contains("AXHUB_NO_AUDIT"), "{msg}");
+    assert!(msg.contains("감사 로그"), "{msg}");
 
     // Marker file 생성됐는지.
     let marker = state

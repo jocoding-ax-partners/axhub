@@ -1657,7 +1657,7 @@ pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
         "- 막히거나 안 되면 /axhub:doctor (진단) · /axhub:help (전체 명령).".to_string(),
         "- 자주 쓰는 것: 배포 /axhub:deploy · 상태 /axhub:status · 로그 /axhub:logs · 앱 목록 /axhub:apps."
             .to_string(),
-        "- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요 (AXHUB_NO_AUDIT=1)."
+        "- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요."
             .to_string(),
     ];
 
