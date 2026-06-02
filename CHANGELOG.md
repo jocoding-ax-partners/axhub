@@ -4,6 +4,33 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.26](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.25...v0.9.26) (2026-06-02)
+
+이번 릴리스는 남아 있던 DIRTY PR 을 최신 main 위에서 정리해, setup Windows PowerShell, update/verify CLI 계약, exit-code 라우팅, marker-gated routing 을 한 번에 실어요. axhub 프로젝트 marker 가 없는 일반 repo 에서는 eager footprint 를 줄이고, 명시적 axhub 호출과 deploy preflight 는 공유 route-decision 계약으로 안전하게 이어져요.
+
+### Test baseline
+
+- PR #155, #159, #161, #163 의 conflict 를 isolated worktree 에서 정상 merge commit 으로 풀고 각 PR CI 를 green 으로 확인했어요.
+- main merge 뒤 `git diff --check v0.9.25..HEAD`, `bun run skill:doctor`, `bun run lint:tone --strict`, `bun run lint:keywords --check`, routing/migrate/manifest targeted `bun test`, `cargo fmt --all -- --check`, `cargo test -p axhub-helpers --test classify_exit_suggest_test -- --nocapture` 를 통과했어요.
+- release step 1 의 `codegen:version` 과 `release:check` 가 통과했어요.
+
+### Honest tradeoff
+
+- staging E2E, parser fuzz, full matrix 일부는 repo 조건상 skipped 될 수 있어서 tag push 뒤 release workflow 에서 artifact 와 skipped job 을 다시 확인해요.
+- GitNexus 는 isolated worktree 경로를 별도 repo 로 인식하지 못해서 conflict 해결 scope 는 git diff, 로컬 targeted test, PR CI 로 검증했어요.
+
+
+### Added
+
+* **routing:** marker 게이트 + 공유 결정 함수로 axhub 라우팅 decouple ([#159](https://github.com/jocoding-ax-partners/axhub/issues/159)) ([b8bc3be](https://github.com/jocoding-ax-partners/axhub/commit/b8bc3bef5c703d7d6f8d1f17ec6ff0f304bd9818))
+* **skills:** setup Windows PowerShell 지원 + manifest axhub.yaml canonical 전환 ([#161](https://github.com/jocoding-ax-partners/axhub/issues/161)) ([d523865](https://github.com/jocoding-ax-partners/axhub/commit/d5238652ee939b47f9a68bc5e7d0f73e341f33a6))
+
+
+### Fixed
+
+* **routing:** skill exit-code 라우팅을 ax-hub-cli 0.17.2 계약에 정합 (spec 004) ([#163](https://github.com/jocoding-ax-partners/axhub/issues/163)) ([9e5cc2c](https://github.com/jocoding-ax-partners/axhub/commit/9e5cc2c047013a7e536997b11745e0ca3c09fbcf))
+* **skills:** CLI 정렬(update/verify) + classify/cosign + whatsnew 제거 + sessionstart 온보딩 [skip-routing-gate] ([#155](https://github.com/jocoding-ax-partners/axhub/issues/155)) ([d3e4c1a](https://github.com/jocoding-ax-partners/axhub/commit/d3e4c1a1a088799272339f7456f92a0770fa4fa6)), closes [#1](https://github.com/jocoding-ax-partners/axhub/issues/1) [#2-4](https://github.com/jocoding-ax-partners/axhub/issues/2-4)
+
 ## [0.9.25](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.24...v0.9.25) (2026-06-02)
 
 v0.9.24 이후 사용자가 요청한 열린 PR 일괄 처리 범위에서 준비 완료된 trace·upgrade 변경을 추가로 실어요. trace 스킬은 build-log API 가 없어도 runtime log evidence 로 원인을 설명하고, upgrade 스킬은 Windows PowerShell 사용자가 Bash 없이도 업데이트 절차를 따라갈 수 있게 해요.
