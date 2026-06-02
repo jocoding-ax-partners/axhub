@@ -69,7 +69,10 @@ mod tests {
         let sub = classify(64, r#"{"error":{"code":"validation.app_ambiguous"}}"#);
         assert!(sub.emotion.contains("같은 이름이 두 개"));
         // Real CLI shape: fine id in `subcode`, coarse `code` alongside — subcode wins.
-        let by_subcode = classify(66, r#"{"error":{"code":"other","subcode":"update.cosign_enforce_failed"}}"#);
+        let by_subcode = classify(
+            66,
+            r#"{"error":{"code":"other","subcode":"update.cosign_enforce_failed"}}"#,
+        );
         assert!(by_subcode.action.contains("IT 보안 담당자"));
         assert!(classify(99, "not-json").cause.contains("알 수 없는 에러"));
     }
