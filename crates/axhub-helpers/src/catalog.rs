@@ -103,7 +103,9 @@ mod tests {
             66,
             r#"{"error":{"code":"other","subcode":"update.downgrade_blocked"}}"#,
         );
-        assert!(downgrade_subcode.emotion.contains("더 낮은 버전으로 되돌리려는"));
+        assert!(downgrade_subcode
+            .emotion
+            .contains("더 낮은 버전으로 되돌리려는"));
         assert!(classify(99, "not-json").cause.contains("알 수 없는 에러"));
         // US1 (spec 004): CLI auth = exit 4 + error.code "auth" (was sysexits 65).
         assert!(classify(4, r#"{"error":{"code":"auth"}}"#)
