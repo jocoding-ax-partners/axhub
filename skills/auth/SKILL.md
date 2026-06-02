@@ -229,13 +229,17 @@ To handle auth:
    사용자가 `confirm` 을 선택하면 destructive 실행 직전에 dry-run 으로 미리 보여줘요:
 
    ```bash
-   axhub auth logout --dry-run --json
+   LOGOUT_PREVIEW=$(axhub auth logout --dry-run --json)
+   AUTH_PROFILE=$(printf '%s' "$LOGOUT_PREVIEW" | jq -r '.profile // "default"')
    ```
 
-   `would_delete: true` / `profile: <name>` 출력을 사용자에게 한국어 한 줄로 요약 후 (예: "프로필 `default` 의 토큰이 제거돼요") 실제 실행:
+   `would_delete: true` / `profile: <name>` 출력을 사용자에게 한국어 한 줄로 요약 후 (예: "프로필 `default` 의 토큰이 제거돼요") 실제 실행해요. consent 와 실행 명령 모두 concrete profile 로 묶어 `AXHUB_PROFILE` 변경 swap 을 막아요:
 
    ```bash
-   axhub auth logout
+   cat <<JSON | "$HELPER" consent-mint
+   {"tool_call_id":"pending","action":"auth_logout","app_id":"","profile":"${AUTH_PROFILE}","branch":"","commit_sha":"","context":{"profile":"${AUTH_PROFILE}"}}
+   JSON
+   axhub auth logout --profile "$AUTH_PROFILE"
    ```
 
    Confirm to user: "로그아웃 완료. 이 노트북에서 토큰이 제거됐어요. 다른 노트북은 영향 없어요."
@@ -255,12 +259,22 @@ To handle auth:
    8b. **Issue a new PAT** (consent + raw-token 1회 표시):
 
    ```bash
-   axhub auth pat issue --name "<descriptive-name>" --expires-in-days 90 --json
+   PAT_NAME="<descriptive-name>"
+   PAT_EXPIRES_IN_DAYS="90"
+   PAT_USE="false"        # --use 를 붙이면 true 로 바꿔요
+   PAT_NO_SAVE="false"    # --no-save 를 붙이면 true 로 바꿔요
+   PAT_SHOW_TOKEN="false" # --show-token 을 붙이면 true 로 바꿔요
+   cat <<JSON | "$HELPER" consent-mint
+   {"tool_call_id":"pending","action":"auth_pat_issue","app_id":"","profile":"","branch":"","commit_sha":"","context":{"name":"${PAT_NAME}","expires_in_days":"${PAT_EXPIRES_IN_DAYS}","use":"${PAT_USE}","no_save":"${PAT_NO_SAVE}","show_token":"${PAT_SHOW_TOKEN}"}}
+   JSON
+   axhub auth pat issue --name "$PAT_NAME" --expires-in-days "$PAT_EXPIRES_IN_DAYS" --json
    # 즉시 활성 PAT 으로 사용하려면:
    axhub auth pat issue --name "<n>" --expires-in-days 90 --use --json
    # raw token 저장 없이 1회만 보여주려면:
-   axhub auth pat issue --name "<n>" --no-save --show-token
+   axhub auth pat issue --name "<n>" --expires-in-days 90 --no-save --show-token
    ```
+
+   `--use`, `--no-save`, `--show-token` 을 붙이는 변형은 consent context 의 `use` / `no_save` / `show_token` 값을 같은 `true` 로 바꾼 뒤 mint 해요. 저장·출력 동작이 바뀌는 modifier 라서 기본 발급 consent 를 재사용하지 않아요.
 
    **raw_token 은 응답 출력에 1회만 나타나요.** SKILL output / chat / log 에 echo 금지 (NEVER 섹션 참고). 사용자에게는 `id` / `fingerprint` / `expires_at` 만 표시. raw 는 keychain 에 저장되거나 `--show-token` 인 경우 stdout 으로 1회 표시되고 그 다음부터 다시 못 봐요.
 
@@ -270,6 +284,9 @@ To handle auth:
    # preview:
    axhub auth pat revoke <pat-id> --json
    # 실제 폐기:
+   cat <<JSON | "$HELPER" consent-mint
+   {"tool_call_id":"pending","action":"auth_pat_revoke","app_id":"","profile":"","branch":"","commit_sha":"","context":{"pat_id":"<pat-id>"}}
+   JSON
    axhub auth pat revoke <pat-id> --execute --json
    ```
 
@@ -289,6 +306,9 @@ To handle auth:
    8d. **Rotate active PAT** (replace + revoke old):
 
    ```bash
+   cat <<JSON | "$HELPER" consent-mint
+   {"tool_call_id":"pending","action":"auth_pat_rotate","app_id":"","profile":"","branch":"","commit_sha":"","context":{"name":"<new-name>","expires_in_days":"90"}}
+   JSON
    axhub auth pat rotate --name "<new-name>" --expires-in-days 90 --json
    ```
 
@@ -297,8 +317,16 @@ To handle auth:
    8e. **Switch active PAT** (saved PATs 중 선택):
 
    ```bash
-   axhub auth pat use <pat-id>
-   axhub auth pat unset            # 활성 PAT 해제
+   AUTH_PROFILE="${AXHUB_PROFILE:-default}"
+   cat <<JSON | "$HELPER" consent-mint
+   {"tool_call_id":"pending","action":"auth_pat_use","app_id":"","profile":"${AUTH_PROFILE}","branch":"","commit_sha":"","context":{"pat_id":"<pat-id>","profile":"${AUTH_PROFILE}"}}
+   JSON
+   axhub auth pat use <pat-id> --profile "$AUTH_PROFILE"
+
+   cat <<JSON | "$HELPER" consent-mint
+   {"tool_call_id":"pending","action":"auth_pat_unset","app_id":"","profile":"${AUTH_PROFILE}","branch":"","commit_sha":"","context":{"target":"active_pat","profile":"${AUTH_PROFILE}"}}
+   JSON
+   axhub auth pat unset --profile "$AUTH_PROFILE"            # 활성 PAT 해제
    ```
 
    8f. **PAT whoami** (출처 표시):

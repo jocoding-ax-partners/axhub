@@ -6,7 +6,7 @@
   "hook_event_name": "PreToolUse",
   "tool_name": "Bash",
   "tool_input": {
-    "command": "axhub deploy create --app paydrop --branch main --commit a3f9c1b --json",
+    "command": "axhub deploy create --app paydrop --commit a3f9c1b --execute --json",
     "description": "Deploy the paydrop app to production from main branch at commit a3f9c1b"
   }
 }

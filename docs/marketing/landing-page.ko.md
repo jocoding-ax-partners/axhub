@@ -29,7 +29,7 @@ Claude Code 플러그인 한 번 깔면, 비-개발 직군 vibe coder 도
 
   1. vibe coder 가 LLM으로 코드 짬 → git push
   2. 배포 명령 어떻게 쓰는지 몰라서 IT/개발팀에 슬랙 DM
-  3. IT 가 "axhub deploy create --app paydrop --branch main --commit abc..." 알려줌
+  3. IT 가 "axhub deploy create --app paydrop --commit abc... --execute" 알려줌
   4. vibe coder 가 복붙하다 commit sha 잘못 입력 → 에러
   5. "에러 났어요" → IT 가 또 봐줘야 함
   6. 토큰 만료되면 처음부터 반복

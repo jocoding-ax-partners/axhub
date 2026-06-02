@@ -46,13 +46,14 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("36 top-level keys (2 메타 + 32 SKILL slug + quality_gate + consent channel)", () => {
+  test("46 top-level keys (2 메타 + 42 SKILL slug + quality_gate + consent channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(36);
+    expect(keys).toHaveLength(46);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
     expect(channels).toEqual([
+      "app-lifecycle",
       "apps",
       "auth",
       "axhub-debug",
@@ -61,7 +62,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "axhub-review",
       "axhub-ship",
       "axhub-tdd",
+      "browse",
       "clarify",
+      "connectors",
       "consent-megaskill",
       "data",
       "deploy",
@@ -70,6 +73,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "env",
       "github",
       "init",
+      "inspect",
       "install-cli",
       "karpathy-guidelines",
       "logs",
@@ -77,26 +81,33 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "my-resources",
       "open",
       "profile",
+      "publish",
       "quality_gate",
       "recover",
+      "resources",
+      "rollback",
       "routing-stats",
       "setup",
       "status",
+      "tables",
+      "team",
       "trace",
       "update",
       "upgrade",
       "using-axhub-quality",
       "verify",
+      "workspace",
     ]);
   });
 
-  test("52 actual safe_default rationale 엔트리 including data bootstrap/live-read fallbacks + Phase 26 quality + Plan v6 diagnose + v0.9.3 auth PAT revoke + skill-cli-drift-fix + setup + migrate + deploy routing-gate disambiguation", () => {
+  test("66 actual safe_default rationale 엔트리 including v0.17.3 gap-fill skills", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(52);
+    expect(paths).toHaveLength(66);
 
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
+      "app-lifecycle",
       "apps",
       "apps",
       "auth",
@@ -110,6 +121,8 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "axhub-ship",
       "axhub-tdd",
       "clarify",
+      "connectors",
+      "connectors",
       "consent-megaskill",
       "data",
       "data",
@@ -138,12 +151,23 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "migrate",
       "migrate",
       "profile",
+      "publish",
       "quality_gate",
       "recover",
+      "resources",
+      "resources",
+      "rollback",
       "routing-stats",
       "setup",
       "setup",
       "status",
+      "tables",
+      "tables",
+      "tables",
+      "tables",
+      "team",
+      "team",
+      "team",
       "trace",
       "update",
       "update",

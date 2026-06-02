@@ -24,7 +24,7 @@ set -euo pipefail
 trace="${SHIM_CASE_DIR}/argv.trace"
 printf '%s\n' "$*" >> "$trace"
 if [ "${1:-}" = "--version" ]; then
-  echo "axhub 0.15.3 (case35)"
+  echo "axhub 0.17.3 (case35)"
   exit 0
 fi
 if [ "${1:-}" = "auth" ] && [ "${2:-}" = "status" ] && [ "${3:-}" = "--json" ]; then
@@ -102,7 +102,7 @@ preflight_expect_no_forced_route "결과 봐" open || FAIL=1
   jq -e '.schema_version == "init/v1" and ([.templates[].id] == ["nextjs-axhub","vite-react-axhub","express-axhub","remix-axhub","astro-axhub","hono-axhub"])' "$CASE_DIR/templates.json" >/dev/null || exit 1
   SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" init --from-template nextjs-axhub --json > "$CASE_DIR/init.json"
   test -f apphub.yaml || exit 1
-  SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" apps create --from-file apphub.yaml --yes --json > "$CASE_DIR/apps-create.json"
+  SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" apps create --from-file apphub.yaml --json > "$CASE_DIR/apps-create.json"
   SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" apps git status --app paydrop --json > "$CASE_DIR/github-repos.json"
   SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" apps git connect --app paydrop --repo jocoding/paydrop --branch main --execute --json > "$CASE_DIR/github-connect.json"
   SECRET='postgres://user:super-secret-lifecycle-value@localhost/db'
@@ -111,7 +111,7 @@ preflight_expect_no_forced_route "결과 봐" open || FAIL=1
     echo "secret leaked to argv trace" >&2
     exit 1
   fi
-  SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" deploy create --app paydrop --branch main --commit abc123 --json > "$CASE_DIR/deploy-create.json"
+  SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" deploy create --app paydrop --commit abc123 --execute --json > "$CASE_DIR/deploy-create.json"
   SHIM_CASE_DIR="$CASE_DIR" "$FAKE_AXHUB" open paydrop --json > "$CASE_DIR/open.json"
 ) || FAIL=1
 

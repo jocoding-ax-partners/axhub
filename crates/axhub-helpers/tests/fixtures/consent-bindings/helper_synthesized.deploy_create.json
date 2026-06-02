@@ -3,7 +3,7 @@
   "action": "deploy_create",
   "app_id": "paydrop",
   "profile": "prod",
-  "branch": "main",
+  "branch": "",
   "commit_sha": "abc123",
   "context": {},
   "synthesized_by_helper": true

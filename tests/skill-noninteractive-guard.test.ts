@@ -78,7 +78,8 @@ describe("v0.15.3 — watch/follow CLI auto-degrade contract", () => {
 
   test("init bootstrap uses --watch-timeout override (CLI polls to terminal) and no manual WATCH= toggle", () => {
     const content = readFileSync(INIT_SKILL, "utf8");
-    expect(content).toContain("--execute --yes --watch --watch-timeout");
+    expect(content).toContain("--execute --watch --watch-timeout");
+    expect(content).not.toContain("--execute --yes --watch");
     expect(content).toContain(AUTO_DEGRADE_NOTE);
     expect(content).not.toContain("WATCH=--watch");
     expect(content).not.toContain("WATCH=;");

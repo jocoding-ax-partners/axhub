@@ -6,7 +6,7 @@
   "hook_event_name": "PostToolUse",
   "tool_name": "Bash",
   "tool_input": {
-    "command": "axhub deploy create --app paydrop --branch main --json",
+    "command": "axhub deploy create --app paydrop --commit HEAD --execute --json",
     "description": "Deploy the paydrop app from main branch"
   },
   "tool_response": {

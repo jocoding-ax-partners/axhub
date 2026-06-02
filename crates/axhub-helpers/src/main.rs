@@ -7,7 +7,7 @@ use axhub_helpers::bootstrap::{cmd_bootstrap_dependency_plan, run_bootstrap};
 use axhub_helpers::catalog::classify;
 use axhub_helpers::config::{config_get, config_set, render_get_json};
 use axhub_helpers::consent::{
-    format_preauth_deny_hint, mint_token, parse_axhub_command, validate_binding_schema,
+    format_preauth_deny_hint, mint_token, parse_axhub_commands, validate_binding_schema,
     verify_or_claim_token, verify_token, write_private_file_no_follow, ConsentBinding,
 };
 use axhub_helpers::deploy_prep::run_deploy_prep;
@@ -1053,7 +1053,21 @@ pub(crate) fn cmd_preauth_check() -> anyhow::Result<i32> {
         .pointer("/tool_input/command")
         .and_then(Value::as_str)
         .unwrap_or("");
-    let parsed = parse_axhub_command(cmd);
+    let mut destructive_commands = parse_axhub_commands(cmd);
+    if destructive_commands.len() > 1 {
+        let deny_message =
+            "사전 승인은 한 번에 하나의 axhub 변경 명령에만 쓸 수 있어요. Bash 입력에 여러 destructive axhub 명령이 있어 차단했어요. 각 명령을 별도 승인 카드로 나눠 실행해요.";
+        out_json(json!({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": deny_message
+            },
+            "systemMessage": deny_message
+        }));
+        return Ok(0);
+    }
+    let parsed = destructive_commands.pop().unwrap_or_default();
     if !parsed.is_destructive {
         out_json(
             json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}),

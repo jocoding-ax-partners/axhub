@@ -522,5 +522,181 @@
         "중단"
       ]
     }
+  },
+  "publish": {
+    "이 앱을 마켓플레이스 심사에 제출할까요?": {
+      "safe_default": "abort",
+      "rationale": "게시는 외부 노출 mutation이라 비대화형 자동 제출을 막아요",
+      "allowed_safe_defaults": [
+        "abort",
+        "제출"
+      ],
+      "metadata": {
+        "decision_topic": "publish-confirm"
+      }
+    }
+  },
+  "team": {
+    "팀·접근 관련 어떤 작업을 할까요?": {
+      "safe_default": "list",
+      "rationale": "비대화형 기본은 read-only 목록이에요",
+      "allowed_safe_defaults": [
+        "list",
+        "invite",
+        "access"
+      ],
+      "metadata": {
+        "decision_topic": "team-action"
+      }
+    },
+    "이 초대를 보낼까요?": {
+      "safe_default": "abort",
+      "rationale": "초대 발송은 외부 메일 mutation이에요",
+      "allowed_safe_defaults": [
+        "abort",
+        "send"
+      ],
+      "metadata": {
+        "decision_topic": "invite-confirm"
+      }
+    },
+    "이 앱 접근을 변경할까요?": {
+      "safe_default": "abort",
+      "rationale": "접근 부여/회수는 mutation이에요",
+      "allowed_safe_defaults": [
+        "abort",
+        "change"
+      ],
+      "metadata": {
+        "decision_topic": "access-confirm"
+      }
+    }
+  },
+  "tables": {
+    "동적 테이블/데이터 작업을 골라요": {
+      "safe_default": "read",
+      "rationale": "비대화형 기본은 read-only예요 비대화형 환경에서는 안전한 조회 또는 중단만 허용해요.",
+      "allowed_safe_defaults": [
+        "read",
+        "schema",
+        "row",
+        "grant"
+      ],
+      "metadata": {
+        "decision_topic": "tables-action"
+      }
+    },
+    "이 테이블 스키마를 변경할까요?": {
+      "safe_default": "abort",
+      "rationale": "DDL 변경은 mutation이에요 비대화형 환경에서는 안전한 조회 또는 중단만 허용해요.",
+      "allowed_safe_defaults": [
+        "abort",
+        "change"
+      ],
+      "metadata": {
+        "decision_topic": "tables-schema-change"
+      }
+    },
+    "이 행 데이터를 변경할까요?": {
+      "safe_default": "abort",
+      "rationale": "행 쓰기는 mutation이에요 비대화형 환경에서는 안전한 조회 또는 중단만 허용해요.",
+      "allowed_safe_defaults": [
+        "abort",
+        "change"
+      ],
+      "metadata": {
+        "decision_topic": "tables-row-change"
+      }
+    },
+    "이 테이블 권한을 변경할까요?": {
+      "safe_default": "abort",
+      "rationale": "권한 변경은 mutation이에요 비대화형 환경에서는 안전한 조회 또는 중단만 허용해요.",
+      "allowed_safe_defaults": [
+        "abort",
+        "change"
+      ],
+      "metadata": {
+        "decision_topic": "tables-grant-change"
+      }
+    }
+  },
+  "connectors": {
+    "커넥터 작업을 골라요": {
+      "safe_default": "list",
+      "rationale": "비대화형 기본은 read-only 목록이에요",
+      "allowed_safe_defaults": [
+        "list",
+        "manage",
+        "delete"
+      ],
+      "metadata": {
+        "decision_topic": "connectors-action"
+      }
+    },
+    "이 커넥터를 변경할까요?": {
+      "safe_default": "abort",
+      "rationale": "커넥터 생성/수정/삭제와 credentials 갱신은 mutation이에요",
+      "allowed_safe_defaults": [
+        "abort",
+        "change"
+      ],
+      "metadata": {
+        "decision_topic": "connector-change"
+      }
+    }
+  },
+  "app-lifecycle": {
+    "앱 생명주기 작업을 실행할까요?": {
+      "safe_default": "abort",
+      "rationale": "fork/suspend/resume 은 앱 runtime 또는 앱 record 를 바꾸는 mutation이에요",
+      "allowed_safe_defaults": [
+        "abort",
+        "execute"
+      ],
+      "metadata": {
+        "decision_topic": "app-lifecycle-confirm"
+      }
+    }
+  },
+  "rollback": {
+    "이 배포로 롤백할까요?": {
+      "safe_default": "abort",
+      "rationale": "rollback 은 live 상태를 바꾸는 deployment mutation이라 비대화형 자동 실행을 막아요",
+      "allowed_safe_defaults": [
+        "abort",
+        "rollback"
+      ],
+      "metadata": {
+        "decision_topic": "rollback-confirm"
+      }
+    }
+  },
+  "inspect": {},
+  "workspace": {},
+  "browse": {},
+  "resources": {
+    "리소스 조직 작업을 골라요": {
+      "safe_default": "list",
+      "rationale": "비대화형 기본은 read-only 목록이에요",
+      "allowed_safe_defaults": [
+        "list",
+        "organize",
+        "delete"
+      ],
+      "metadata": {
+        "decision_topic": "resources-action"
+      }
+    },
+    "이 리소스를 변경할까요?": {
+      "safe_default": "abort",
+      "rationale": "리소스 이동/이름변경/삭제/태그는 mutation이에요",
+      "allowed_safe_defaults": [
+        "abort",
+        "change"
+      ],
+      "metadata": {
+        "decision_topic": "resource-change"
+      }
+    }
   }
 }

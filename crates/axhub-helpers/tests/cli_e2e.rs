@@ -5,6 +5,7 @@ use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use sha2::{Digest, Sha256};
 
 fn bin() -> &'static str {
     env!("CARGO_BIN_EXE_axhub-helpers")
@@ -12,6 +13,15 @@ fn bin() -> &'static str {
 
 fn run(args: &[&str]) -> Output {
     Command::new(bin()).args(args).output().unwrap()
+}
+
+fn sha256_context(value: &[u8]) -> String {
+    let digest = Sha256::digest(value);
+    let mut out = String::from("sha256:");
+    for byte in digest {
+        out.push_str(&format!("{byte:02x}"));
+    }
+    out
 }
 
 fn write_stdin_allowing_early_exit(writer: &mut impl Write, stdin: &str) {
@@ -260,7 +270,7 @@ fn fake_verify_axhub(
         format!(
             r#"#!/bin/sh
 if [ "$1" = "--version" ]; then
-  echo "axhub 0.15.3"
+  echo "axhub 0.17.3"
   exit 0
 fi
 if [ "$1 $2 $3" = "--json deploy list" ]; then
@@ -297,7 +307,7 @@ fn fake_slow_status_axhub(temp: &tempfile::TempDir) -> std::path::PathBuf {
         &axhub,
         r#"#!/bin/sh
 if [ "$1" = "--version" ]; then
-  echo "axhub 0.15.3"
+  echo "axhub 0.17.3"
   exit 0
 fi
 if [ "$1 $2 $3" = "--json deploy list" ]; then
@@ -334,7 +344,7 @@ fn fake_list_deployments_axhub(
         format!(
             r#"#!/bin/sh
 if [ "$1" = "--version" ]; then
-  echo "axhub 0.15.3"
+  echo "axhub 0.17.3"
   exit 0
 fi
 if [ "$1 $2 $3" = "--json deploy list" ]; then
@@ -366,7 +376,7 @@ fn fake_list_deployments_axhub(
         format!(
             r#"@echo off
 if "%~1"=="--version" (
-  echo axhub 0.15.3
+  echo axhub 0.17.3
   exit /b 0
 )
 if "%~1 %~2 %~3"=="--json deploy list" (
@@ -647,7 +657,7 @@ fn cli_verify_times_out_slow_status_probe() {
 #[test]
 fn cli_deploy_prep_quality_gate_passes_in_json() {
     let temp = tempfile::tempdir().unwrap();
-    let axhub = fake_deploy_prep_axhub(&temp, "axhub 0.15.3");
+    let axhub = fake_deploy_prep_axhub(&temp, "axhub 0.17.3");
 
     let output = run_env(
         &[
@@ -1515,7 +1525,7 @@ fn cli_prompt_route_injects_axhub_skill_contexts() {
         &axhub,
         r#"#!/bin/sh
 if [ "$1" = "--version" ]; then
-  echo "axhub 0.15.3 (commit fake, built fake, fake)"
+  echo "axhub 0.17.3 (commit fake, built fake, fake)"
   exit 0
 fi
 if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then
@@ -1601,7 +1611,7 @@ fn cli_prompt_route_no_forced_skills_context() {
         &axhub,
         r#"#!/bin/sh
 if [ "$1" = "--version" ]; then
-  echo "axhub 0.15.3 (commit fake, built fake, fake)"
+  echo "axhub 0.17.3 (commit fake, built fake, fake)"
   exit 0
 fi
 if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then
@@ -1657,7 +1667,7 @@ fn cli_prompt_route_no_intent_routing() {
         &axhub,
         r#"#!/bin/sh
 if [ "$1" = "--version" ]; then
-  echo "axhub 0.15.3 (commit fake, built fake, fake)"
+  echo "axhub 0.17.3 (commit fake, built fake, fake)"
   exit 0
 fi
 if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then
@@ -1737,7 +1747,7 @@ fn cli_prompt_route_audit_fail_silent() {
         &axhub,
         r#"#!/bin/sh
 if [ "$1" = "--version" ]; then
-  echo "axhub 0.15.3 (commit fake, built fake, fake)"
+  echo "axhub 0.17.3 (commit fake, built fake, fake)"
   exit 0
 fi
 if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then
@@ -2024,7 +2034,7 @@ fn fake_axhub(temp: &tempfile::TempDir) -> std::path::PathBuf {
         &axhub,
         r#"#!/bin/sh
 if [ "$1" = "--version" ]; then
-  echo "axhub 0.15.3 (commit fake, built fake, fake)"
+  echo "axhub 0.17.3 (commit fake, built fake, fake)"
   exit 0
 fi
 if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then
@@ -2586,6 +2596,965 @@ fn cli_consent_mint_rejects_binding_schema_drift_before_writing_tokens() {
 }
 
 #[test]
+fn cli_preauth_blocks_gapfill_mutations_without_consent() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("CLAUDE_SESSION_ID", "gapfill-deny-session"),
+    ];
+
+    for command in [
+        "axhub publish --app paydrop --note ship --json",
+        "axhub invitations send user@example.com --role member --tenant acme --json",
+        "axhub tables drop orders --app paydrop --confirm orders --execute --json",
+        "axhub connectors delete conn_1 --tenant acme --execute --json",
+        "axhub deploy rollback --app paydrop --from-deployment dep_1 --execute --json",
+        "axhub resources delete res_1 --tenant acme --cascade --execute --json",
+        "axhub auth oauth client create --app paydrop --name web --type confidential --redirect-uri https://example.test/callback --scope openid --grant-type authorization_code --execute --json",
+        "axhub apps fork paydrop --slug paydrop-copy --subdomain paydrop-copy --tenant acme --execute --json",
+        "axhub tables grants issue --app paydrop --table orders --principal-id user_123 --actions read --execute --json",
+        "axhub resources bulk-register --tenant acme --connector-id conn_1 --items-json '[{\"id\":\"r1\"}]' --execute --json",
+        "axhub auth pat use pat_123 --json",
+        "axhub auth pat unset --json",
+        "axhub auth logout --json",
+        "echo preparing\naxhub apps delete victim --execute --json",
+        "env AXHUB_PROFILE=prod axhub apps delete victim --execute --json",
+        "sudo axhub apps delete victim --execute --json",
+        "nohup axhub apps delete victim --execute --json",
+        "bash -lc 'axhub apps delete victim --execute --json'",
+        "sh -lc 'axhub apps delete victim --execute --json'",
+        "sh -e -c 'axhub apps delete victim --execute --json'",
+        "zsh -lc 'axhub apps delete victim --execute --json'",
+        "time -p axhub apps delete victim --execute --json",
+        "command -p axhub apps delete victim --execute --json",
+        "exec -a axhub-proxy axhub apps delete victim --execute --json",
+        "nohup -- axhub apps delete victim --execute --json",
+        "/opt/homebrew/bin/axhub apps delete victim --execute --json",
+        "./axhub apps delete victim --execute --json",
+        "env -S 'axhub apps delete victim --execute --json'",
+        "env --split-string='axhub apps delete victim --execute --json'",
+        "eval $(echo axhub apps delete victim --execute --json)",
+        "AXHUB_BIN=axhub; $AXHUB_BIN apps delete victim --execute --json",
+        "${AXHUB_BIN:-axhub} apps delete victim --execute --json",
+        "CMD=axhub; $CMD apps delete victim --execute --json",
+        "printf '%s\n' victim | xargs -I{} axhub apps delete {} --execute --json",
+        "find . -name apphub.yaml -exec axhub apps delete victim --execute --json ;",
+        "printf '%s\n' 'axhub apps delete victim --execute --json' | sh",
+        "a(){ axhub \"$@\"; }; a apps delete victim --execute --json",
+        "alias a=axhub; a apps delete victim --execute --json",
+        "shopt -s expand_aliases; alias a=axhub; a apps delete victim --execute --json",
+        "a ()\n{ axhub \"$@\"; }\na apps delete victim --execute --json",
+        "axhub deploy create --app paydrop --commit abc123 --execute --json && bash -lc 'axhub apps delete victim --execute --json'",
+        "axhub deploy create --app paydrop --commit abc123 --execute --json && /opt/homebrew/bin/axhub apps delete victim --execute --json",
+        "axhub deploy fleet --apps paydrop,crm --commit abc --execute --json",
+        "axhub gateway query --execute --json",
+        "printf '%s' '{\"password\":\"evil\"}' | axhub connectors credentials-set conn_1 --tenant acme --credentials-stdin --execute --json",
+    ] {
+        let input = serde_json::json!({
+            "session_id":"gapfill-deny-session",
+            "tool_call_id":format!("tc-gapfill-{}", command.len()),
+            "tool_name":"Bash",
+            "tool_input":{"command": command}
+        })
+        .to_string();
+        let output = run_stdin(&["preauth-check"], &input, &envs);
+        assert_eq!(output.status.code(), Some(0), "{command}");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("permissionDecision\":\"deny"),
+            "{command}: {stdout}"
+        );
+        assert!(stdout.contains("사전 승인"), "{command}: {stdout}");
+    }
+}
+
+#[test]
+fn cli_tenant_scoped_mutations_require_tenant_context_and_flag() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    for (action, context) in [
+        (
+            "invitation_send",
+            serde_json::json!({"email":"user@example.com"}),
+        ),
+        (
+            "connector_delete",
+            serde_json::json!({"connector_id":"conn_1"}),
+        ),
+        (
+            "resource_delete",
+            serde_json::json!({"resource_id":"res_1"}),
+        ),
+    ] {
+        let binding = serde_json::json!({
+            "tool_call_id":"pending",
+            "action":action,
+            "app_id":"",
+            "profile":"",
+            "branch":"",
+            "commit_sha":"",
+            "context": context
+        })
+        .to_string();
+        let rejected = run_stdin(
+            &["consent-mint", "--validate-only"],
+            &binding,
+            &pending_envs,
+        );
+        assert_eq!(rejected.status.code(), Some(1), "{action}");
+        assert!(
+            String::from_utf8_lossy(&rejected.stderr)
+                .contains("binding_schema:missing_context:tenant"),
+            "{action}"
+        );
+    }
+
+    let binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"connector_delete",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{"connector_id":"conn_1","tenant":"acme"}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let missing_flag = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_connector_delete_missing_tenant",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub connectors delete conn_1 --execute --json"}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &missing_flag, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+    let exact = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_connector_delete_exact",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub connectors delete conn_1 --tenant acme --execute --json"}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &exact, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+}
+
+#[test]
+fn cli_preauth_denies_chained_destructive_axhub_commands_even_with_first_consent() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    let binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"deploy_create",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"abc123",
+        "context":{}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let chained = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_chained_destructive",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub deploy create --app paydrop --commit abc123 --execute --json && axhub apps delete victim --execute --json"}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &chained, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+    assert!(stdout.contains("한 번에 하나"), "{stdout}");
+
+    let repeated_same = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_repeated_same_destructive",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub deploy create --app paydrop --commit abc123 --execute --json ; axhub deploy create --app paydrop --commit abc123 --execute --json"}
+    })
+    .to_string();
+    let denied_repeated = run_stdin(&["preauth-check"], &repeated_same, &pending_envs);
+    assert_eq!(denied_repeated.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied_repeated.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+    assert!(stdout.contains("한 번에 하나"), "{stdout}");
+
+    let control_flow = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_control_flow_destructive",
+        "tool_name":"Bash",
+        "tool_input":{"command":"for i in 1; do axhub apps delete victim --execute --json; done"}
+    })
+    .to_string();
+    let denied_control_flow = run_stdin(&["preauth-check"], &control_flow, &pending_envs);
+    assert_eq!(denied_control_flow.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied_control_flow.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+    assert!(stdout.contains("사전 승인"), "{stdout}");
+
+    let newline_control_flow = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_newline_control_flow_destructive",
+        "tool_name":"Bash",
+        "tool_input":{"command":"for i in 1\ndo axhub apps delete victim --execute --json\ndone"}
+    })
+    .to_string();
+    let denied_newline_control_flow =
+        run_stdin(&["preauth-check"], &newline_control_flow, &pending_envs);
+    assert_eq!(denied_newline_control_flow.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied_newline_control_flow.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+    assert!(stdout.contains("사전 승인"), "{stdout}");
+
+    let exact = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_single_destructive",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub deploy create --app paydrop --commit abc123 --execute --json"}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &exact, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+}
+
+#[test]
+fn cli_apps_update_typed_flags_consent_roundtrip() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    let old_field_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"apps_update",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{"slug":"paydrop", "field":"name=Paydrop"}
+    })
+    .to_string();
+    let rejected = run_stdin(
+        &["consent-mint", "--validate-only"],
+        &old_field_binding,
+        &pending_envs,
+    );
+    assert_eq!(rejected.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr).contains("binding_schema:missing_context:fields")
+    );
+
+    let binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"apps_update",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{
+            "slug":"paydrop",
+            "fields":"name,description,visibility",
+            "name":"Paydrop",
+            "description":"launch copy update",
+            "visibility":"private"
+        }
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&minted.stdout).contains("consent-pending-"));
+
+    let altered = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_apps_update_typed_altered",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub apps update paydrop --name Paydrop --description \"launch different update\" --visibility private --json"}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &altered, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+    let input = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_apps_update_typed",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub apps update paydrop --name Paydrop --description \"launch copy update\" --visibility private --json"}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &input, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+}
+
+#[test]
+fn cli_publish_submit_consent_binds_entire_quoted_note() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    let binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"publish_submit",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{
+            "note_length":"27",
+            "note_digest":"sha256:7d21250cbbeeb37149cba4d5f03387f176dcd1c44d7d7b27f2b3481e4363cbcf"
+        }
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let altered = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_publish_note_altered",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub publish --app paydrop --note \"ship altered different note\" --json"}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &altered, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+    let exact = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_publish_note_exact",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub publish --app paydrop --note \"ship totally different note\" --json"}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &exact, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+}
+
+#[test]
+fn cli_pat_issue_consent_binds_storage_and_display_modifiers() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    let old_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"auth_pat_issue",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{"name":"ci-token","expires_in_days":"90"}
+    })
+    .to_string();
+    let rejected = run_stdin(
+        &["consent-mint", "--validate-only"],
+        &old_binding,
+        &pending_envs,
+    );
+    assert_eq!(rejected.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr).contains("binding_schema:missing_context:use")
+    );
+
+    let binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"auth_pat_issue",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{
+            "name":"ci-token",
+            "expires_in_days":"90",
+            "use":"false",
+            "no_save":"false",
+            "show_token":"false"
+        }
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let with_use = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_pat_issue_altered",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub auth pat issue --name ci-token --expires-in-days 90 --use --show-token --json"}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &with_use, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+    let exact = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_pat_issue_exact",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub auth pat issue --name ci-token --expires-in-days 90 --json"}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &exact, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+}
+
+#[test]
+fn cli_auth_state_mutations_require_exact_consent() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    let use_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"auth_pat_use",
+        "app_id":"",
+        "profile":"default",
+        "branch":"",
+        "commit_sha":"",
+        "context":{"pat_id":"pat_123","profile":"default"}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &use_binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let altered_use = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_pat_use_altered",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub auth pat use pat_attacker --profile default --json"}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &altered_use, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+    let env_swapped_use = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_pat_use_env_swapped",
+        "tool_name":"Bash",
+        "tool_input":{"command":"AXHUB_PROFILE=prod axhub auth pat use pat_123 --json"}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &env_swapped_use, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+    let exact_use = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_pat_use_exact",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub auth pat use pat_123 --profile default --json"}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &exact_use, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+
+    let unset_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"auth_pat_unset",
+        "app_id":"",
+        "profile":"default",
+        "branch":"",
+        "commit_sha":"",
+        "context":{"target":"active_pat","profile":"default"}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &unset_binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+    let env_swapped_unset = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_pat_unset_env_swapped",
+        "tool_name":"Bash",
+        "tool_input":{"command":"AXHUB_PROFILE=prod axhub auth pat unset --json"}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &env_swapped_unset, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+    let exact_unset = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_pat_unset_exact",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub auth pat unset --profile default --json"}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &exact_unset, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+
+    let active_logout_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"auth_logout",
+        "app_id":"",
+        "profile":"default",
+        "branch":"",
+        "commit_sha":"",
+        "context":{"profile":"<active>"}
+    })
+    .to_string();
+    let rejected = run_stdin(
+        &["consent-mint", "--validate-only"],
+        &active_logout_binding,
+        &pending_envs,
+    );
+    assert_eq!(rejected.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&rejected.stderr)
+        .contains("binding_schema:missing_context:profile"));
+
+    let logout_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"auth_logout",
+        "app_id":"",
+        "profile":"default",
+        "branch":"",
+        "commit_sha":"",
+        "context":{"profile":"default"}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &logout_binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let altered_logout = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_logout_profile_altered",
+        "tool_name":"Bash",
+        "tool_input":{"command":"AXHUB_PROFILE=prod axhub auth logout --json"}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &altered_logout, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+    let exact_logout = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_logout_exact",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub auth logout --profile default --json"}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &exact_logout, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+}
+
+#[test]
+fn cli_payload_identity_context_rejects_post_preview_swaps() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+    let axhub_payload_dir = temp.path().join("axhub");
+    std::fs::create_dir_all(&axhub_payload_dir).unwrap();
+    let cfg_path = axhub_payload_dir.join("cfg.json");
+    let evil_cfg_path = temp.path().join("prod-secrets.json");
+    let creds_path = temp.path().join("creds.json");
+    std::fs::write(
+        &cfg_path,
+        br#"{"host":"db.internal","database":"warehouse"}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        &evil_cfg_path,
+        br#"{"host":"evil.internal","database":"warehouse"}"#,
+    )
+    .unwrap();
+    std::fs::write(&creds_path, br#"{"username":"svc","password":"redacted"}"#).unwrap();
+    let cfg_path = cfg_path.display().to_string();
+    let evil_cfg_path = evil_cfg_path.display().to_string();
+    let creds_path = creds_path.display().to_string();
+    let cfg_digest = sha256_context(br#"{"host":"db.internal","database":"warehouse"}"#);
+    let creds_digest = sha256_context(br#"{"username":"svc","password":"redacted"}"#);
+
+    let old_data_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"data_insert",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{"table":"members","source":"body"}
+    })
+    .to_string();
+    let rejected = run_stdin(
+        &["consent-mint", "--validate-only"],
+        &old_data_binding,
+        &pending_envs,
+    );
+    assert_eq!(rejected.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&rejected.stderr)
+        .contains("binding_schema:missing_context:body_digest"));
+
+    let data_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"data_insert",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{
+            "table":"members",
+            "source":"body",
+            "body_digest":"sha256:b721b2c9f05e5d747e0f42cca2172e837120afc8b9993e4ecc847de03932cac3"
+        }
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &data_binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let altered_data = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_data_insert_altered",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub data insert members --app paydrop --body '{\"email\":\"attacker@example.com\",\"role\":\"owner\"}' --execute --json"}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &altered_data, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+    let exact_data = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_data_insert_exact",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub data insert members --app paydrop --body '{\"email\":\"user@example.com\",\"role\":\"member\"}' --execute --json"}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &exact_data, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+
+    let old_connector_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"connector_create",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{"name":"warehouse","tenant":"acme","source":"config_file"}
+    })
+    .to_string();
+    let rejected = run_stdin(
+        &["consent-mint", "--validate-only"],
+        &old_connector_binding,
+        &pending_envs,
+    );
+    assert_eq!(rejected.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr).contains("binding_schema:missing_context:engine")
+    );
+
+    let stdin_connector_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"connector_credentials_set",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{
+            "connector_id":"conn_1",
+            "tenant":"acme",
+            "source":"stdin",
+            "credentials_source":"stdin"
+        }
+    })
+    .to_string();
+    let rejected = run_stdin(
+        &["consent-mint", "--validate-only"],
+        &stdin_connector_binding,
+        &pending_envs,
+    );
+    assert_eq!(rejected.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&rejected.stderr)
+        .contains("binding_schema:missing_context:credentials_digest"));
+
+    let connector_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"connector_create",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{
+            "name":"warehouse",
+            "tenant":"acme",
+            "engine":"postgres",
+            "source":"config_file",
+            "config_file":cfg_path.clone(),
+            "config_digest":cfg_digest.clone(),
+            "credentials_file":creds_path.clone(),
+            "credentials_digest":creds_digest.clone()
+        }
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &connector_binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    for command in [
+        format!("axhub connectors create --tenant acme --name warehouse --engine mysql --config-file \"{cfg_path}\" --credentials-file \"{creds_path}\" --execute --json"),
+        format!("axhub connectors create --tenant acme --name warehouse --engine postgres --config-file \"{evil_cfg_path}\" --credentials-file \"{creds_path}\" --execute --json"),
+        format!("printf '{{\"host\":\"evil.internal\",\"database\":\"warehouse\"}}' > \"{cfg_path}\" && axhub connectors create --tenant acme --name warehouse --engine postgres --config-file \"{cfg_path}\" --credentials-file \"{creds_path}\" --execute --json"),
+        format!("python3 -c 'from pathlib import Path; Path(\"{cfg_path}\").write_text(\"{{}}\")' && axhub connectors create --tenant acme --name warehouse --engine postgres --config-file \"{cfg_path}\" --credentials-file \"{creds_path}\" --execute --json"),
+        format!("cd \"{}\" && printf '{{\"host\":\"evil.internal\",\"database\":\"warehouse\"}}' > cfg.json && axhub connectors create --tenant acme --name warehouse --engine postgres --config-file \"{cfg_path}\" --credentials-file \"{creds_path}\" --execute --json", axhub_payload_dir.display()),
+        format!("ln -sf \"{evil_cfg_path}\" \"{cfg_path}\" && axhub connectors create --tenant acme --name warehouse --engine postgres --config-file \"{cfg_path}\" --credentials-file \"{creds_path}\" --execute --json"),
+    ] {
+        let altered = serde_json::json!({
+            "session_id":"actual-claude-session",
+            "tool_call_id":format!("toolu_connector_altered_{}", command.len()),
+            "tool_name":"Bash",
+            "tool_input":{"command": command}
+        })
+        .to_string();
+        let denied = run_stdin(&["preauth-check"], &altered, &pending_envs);
+        assert_eq!(denied.status.code(), Some(0), "{command}");
+        let stdout = String::from_utf8_lossy(&denied.stdout);
+        assert!(
+            stdout.contains("permissionDecision\":\"deny"),
+            "{command}: {stdout}"
+        );
+    }
+
+    let exact_connector = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_connector_create_exact",
+        "tool_name":"Bash",
+        "tool_input":{"command":format!("axhub connectors create --tenant acme --name warehouse --engine postgres --config-file \"{cfg_path}\" --credentials-file \"{creds_path}\" --execute --json")}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &exact_connector, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+
+    let old_update_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"connector_update",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{"connector_id":"conn_1","tenant":"acme","source":"config_file","config_file":cfg_path.clone()}
+    })
+    .to_string();
+    let rejected = run_stdin(
+        &["consent-mint", "--validate-only"],
+        &old_update_binding,
+        &pending_envs,
+    );
+    assert_eq!(rejected.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr).contains("binding_schema:missing_context:fields")
+    );
+
+    let update_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"connector_update",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{
+            "connector_id":"conn_1",
+            "tenant":"acme",
+            "fields":"config,enabled",
+            "source":"config_file",
+            "config_file":cfg_path.clone(),
+            "config_digest":cfg_digest.clone(),
+            "enabled":"true"
+        }
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &update_binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let altered_update = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_connector_update_altered",
+        "tool_name":"Bash",
+        "tool_input":{"command":format!("axhub connectors update conn_1 --tenant acme --config-file \"{evil_cfg_path}\" --enabled --execute --json")}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &altered_update, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+    let exact_update = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_connector_update_exact",
+        "tool_name":"Bash",
+        "tool_input":{"command":format!("axhub connectors update conn_1 --tenant acme --config-file \"{cfg_path}\" --enabled --execute --json")}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &exact_update, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+}
+
+#[test]
+fn cli_oauth_client_create_consent_roundtrip() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    let binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"auth_oauth_client_create",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{
+            "name":"web",
+            "type":"confidential",
+            "redirect_uris":"https://example.test/callback",
+            "scopes":"openid,profile,email",
+            "grant_types":"authorization_code"
+        }
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let input = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_oauth_client_create",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub auth oauth client create --app paydrop --name web --type confidential --redirect-uri https://example.test/callback --scope openid --scope profile --scope email --grant-type authorization_code --execute --json"}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &input, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+}
+
+#[test]
+fn cli_apps_fork_consent_binds_destination_context() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    let binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"apps_fork",
+        "app_id":"paydrop",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context":{
+            "source":"paydrop",
+            "tenant":"acme",
+            "slug":"paydrop-copy",
+            "subdomain":"paydrop-copy",
+            "name":"Paydrop",
+            "template":"<source>",
+            "repo_public":"false"
+        }
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &binding, &pending_envs);
+    assert_eq!(minted.status.code(), Some(0));
+
+    let altered = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_apps_fork_altered",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub apps fork paydrop --tenant acme --slug paydrop-copy --subdomain other-copy --name Paydrop --execute --json"}
+    })
+    .to_string();
+    let denied = run_stdin(&["preauth-check"], &altered, &pending_envs);
+    assert_eq!(denied.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&denied.stdout);
+    assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+    let exact = serde_json::json!({
+        "session_id":"actual-claude-session",
+        "tool_call_id":"toolu_apps_fork_exact",
+        "tool_name":"Bash",
+        "tool_input":{"command":"axhub apps fork paydrop --tenant acme --slug paydrop-copy --subdomain paydrop-copy --name Paydrop --execute --json"}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &exact, &pending_envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+}
+
+#[test]
 fn cli_consent_mint_validate_only_has_no_runtime_or_key_side_effects() {
     let temp = tempfile::tempdir().unwrap();
     let state_dir = temp.path().join("state");
@@ -2602,7 +3571,7 @@ fn cli_consent_mint_validate_only_has_no_runtime_or_key_side_effects() {
         "action":"deploy_create",
         "app_id":"paydrop",
         "profile":"prod",
-        "branch":"main",
+        "branch":"",
         "commit_sha":"abc123",
         "context": {}
     })
@@ -2622,7 +3591,7 @@ fn consent_mint_valid_binding(session_id: &str, tool_call_suffix: &str) -> Strin
         "action":"deploy_create",
         "app_id":"paydrop",
         "profile":"prod",
-        "branch":"main",
+        "branch":"",
         "commit_sha":"abc123",
         "context": {}
     })
@@ -2772,7 +3741,7 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
         "action":"deploy_create",
         "app_id":"paydrop",
         "profile":"prod",
-        "branch":"main",
+        "branch":"",
         "commit_sha":"abc123",
         "context": {}
     })
@@ -2788,7 +3757,7 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
 
     let allowed_deploy = run_stdin(
         &["preauth-check"],
-        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-1","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --profile prod --branch main --commit abc123"}}"#,
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-1","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --profile prod --commit abc123 --execute --json"}}"#,
         &envs,
     );
     assert_eq!(allowed_deploy.status.code(), Some(0));
@@ -2805,7 +3774,7 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
         "action":"deploy_create",
         "app_id":"paydrop",
         "profile":"prod",
-        "branch":"main",
+        "branch":"",
         "commit_sha":"def456",
         "context": {}
     })
@@ -2815,7 +3784,7 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
     assert!(String::from_utf8_lossy(&pending_minted.stdout).contains("consent-pending-"));
     let pending_allowed = run_stdin(
         &["preauth-check"],
-        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_actual","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --profile prod --branch main --commit def456"}}"#,
+        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_actual","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --profile prod --commit def456 --execute --json"}}"#,
         &pending_envs,
     );
     assert_eq!(pending_allowed.status.code(), Some(0));
@@ -2824,7 +3793,7 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
     );
     let pending_reused = run_stdin(
         &["preauth-check"],
-        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_actual_2","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --profile prod --branch main --commit def456"}}"#,
+        r#"{"session_id":"actual-claude-session","tool_call_id":"toolu_actual_2","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --profile prod --commit def456 --execute --json"}}"#,
         &pending_envs,
     );
     assert_eq!(pending_reused.status.code(), Some(0));
@@ -3065,7 +4034,15 @@ fn cli_bootstrap_auto_chain_plans_apps_create_without_hidden_remote_mutation() {
     let temp = tempfile::tempdir().unwrap();
     write_manifest(temp.path());
     let ledger = temp.path().join("axhub-call-ledger.txt");
-    let output = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+        ("AXHUB_PROFILE", "prod"),
+        ("CLAUDE_SESSION_ID", "bootstrap-profile-session"),
+    ];
+    let output = run_in_dir_env(&["bootstrap", "--auto-chain", "--json"], temp.path(), &envs);
     assert_eq!(output.status.code(), Some(0));
     let json = stdout_json(&output);
     assert_eq!(json["state"], "consent_required_apps_create");
@@ -3073,7 +4050,10 @@ fn cli_bootstrap_auto_chain_plans_apps_create_without_hidden_remote_mutation() {
     assert_eq!(json["command"][0], "axhub");
     assert_eq!(json["command"][1], "apps");
     assert_eq!(json["command"][2], "create");
+    assert_eq!(json["command"][6], "--profile");
+    assert_eq!(json["command"][7], "prod");
     assert_eq!(json["consent_binding"]["action"], "apps_create");
+    assert_eq!(json["consent_binding"]["profile"], "prod");
     assert_eq!(json["consent_binding"]["synthesized_by_helper"], true);
     assert!(json["binding_hash"].as_str().unwrap().len() >= 16);
     assert!(json["pending_action_id"]
@@ -3090,7 +4070,29 @@ fn cli_bootstrap_auto_chain_plans_apps_create_without_hidden_remote_mutation() {
         .unwrap()
         .contains(".axhub/bootstrap.state.json"));
 
-    let replayed = run_in_dir(&["bootstrap", "--auto-chain", "--json"], temp.path());
+    let binding = serde_json::to_string(&json["consent_binding"]).unwrap();
+    let minted = run_stdin(&["consent-mint"], &binding, &envs);
+    assert_eq!(minted.status.code(), Some(0));
+    let command = json["command"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|part| part.as_str().unwrap())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let preauth = serde_json::json!({
+        "session_id":"bootstrap-profile-session",
+        "tool_call_id":"bootstrap-apps-create",
+        "tool_name":"Bash",
+        "tool_input":{"command": command}
+    })
+    .to_string();
+    let allowed = run_stdin(&["preauth-check"], &preauth, &envs);
+    assert_eq!(allowed.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&allowed.stdout);
+    assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+
+    let replayed = run_in_dir_env(&["bootstrap", "--auto-chain", "--json"], temp.path(), &envs);
     assert_eq!(replayed.status.code(), Some(0));
     let replayed_json = stdout_json(&replayed);
     assert_eq!(

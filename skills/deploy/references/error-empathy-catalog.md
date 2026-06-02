@@ -61,6 +61,74 @@ Every entry uses these four parts, in this order:
 
 ---
 
+## Runtime compatibility aliases — generated catalog parity
+
+The runtime catalog also carries compact exit-code aliases used by
+`classify-exit` when it has no rich deploy context. Keep these headings in
+sync with `crates/axhub-helpers/data/catalog.json` and
+`error-empathy-catalog.generated.md` so catalog drift tests can prove the
+hand-written UX guide covers every emitted key.
+
+## exit 4 — auth required / token expired runtime alias
+
+**감정:** 잠깐만요. 로그인이 만료됐을 뿐이에요. 앱은 그대로예요.
+
+**원인:** axhub 로그인 토큰이 만료됐어요. 보안을 위해 일정 시간이 지나면 다시 로그인해야 해요.
+
+**해결:** "다시 로그인해줘" 라고 하면 브라우저로 안내해요. 브라우저가 안 열리는 환경이면 헤드리스 토큰 안내로 이어가요.
+
+**버튼:** ["다시 로그인", "토큰 파일로 로그인", "도와주세요"]
+
+---
+
+## exit 5 — resource not found runtime alias
+
+**감정:** 잠깐만요. 그런 이름은 못 찾았어요.
+
+**원인:** 그 이름의 앱/배포/API 가 회사 axhub 에 등록 안 돼 있어요. 오타이거나 다른 회사 계정의 앱일 수 있어요.
+
+**해결:** 가장 비슷한 후보를 보여줘요. 후보 중 하나를 고르거나 이름을 다시 입력하게 안내해요.
+
+**버튼:** ["가장 유사한 거로", "앱 목록 보기", "다시 입력"]
+
+---
+
+### exit 5:catalog.not_found
+
+**감정:** 찾는 데이터 리소스를 못 찾았어요.
+
+**원인:** connector/path 가 catalog 에 없거나 현재 인증 주체가 볼 수 없는 리소스예요.
+
+**해결:** path 를 추측하지 말고 `axhub catalog search --json --limit 200` 으로 후보를 다시 찾은 뒤 정확한 connector/path 만 사용해요.
+
+**버튼:** ["catalog search 실행", "path 다시 입력", "닫기"]
+
+---
+
+### exit 5:github.install_not_found
+
+**감정:** GitHub App 설치를 찾지 못했어요.
+
+**원인:** 선택한 account 에 axhub GitHub App 이 설치되어 있지 않거나 repo 권한이 없어요.
+
+**해결:** CLI 출력의 `install_url` 을 GitHub 연결 링크로 바로 보여줘요. 권한 부여는 자동으로 진행하지 않아요.
+
+**버튼:** ["GitHub 연결 링크", "repo 다시 고르기", "닫기"]
+
+---
+
+### exit 5:open.no_app_manifest
+
+**감정:** 열 수 있는 axhub 앱 정보를 찾지 못했어요.
+
+**원인:** 현재 디렉토리에 `apphub.yaml` 또는 `axhub.yaml` 이 없고 최근 배포 cache 도 비어 있어요.
+
+**해결:** 먼저 init 으로 앱 파일을 만들거나 apps 목록에서 열 앱을 골라요.
+
+**버튼:** ["init 시작", "앱 목록 보기", "닫기"]
+
+---
+
 ## exit 64 (base) — validation / usage error
 
 **감정:** 잠깐만요. 배포는 시작 안 됐어요. 당신 앱은 안전합니다.
@@ -262,7 +330,7 @@ This is the AskUserQuestion card rendered by `skills/deploy/SKILL.md` step 3 BEF
 - **Verbatim echo** — never substitute `app_id` from local cache. The five fields MUST come from the latest live `axhub auth status --json` + `axhub apps list --json --slug-prefix <slug>` resolution (E4 fix).
 - **Profile mismatch** — if `--profile` arg differs from `$AXHUB_PROFILE`, prepend a yellow warning row: `⚠️ 현재 환경(<ENV_PROFILE>) 과 다른 환경(<ARG_PROFILE>) 으로 배포하려 합니다. 의도하신 게 맞나요?` See `recovery-flows.md` ("profile-mismatch").
 - **Slash invocation does NOT skip this card.** `/axhub:deploy paydrop` still renders the card. Slash is consent for invoking the skill, not for the destructive op (E2 fix).
-- **Consent token binding** — on user "confirm", the helper mints a token bound to `{action=deploy_create, app_id, profile, branch, commit_sha}`. PreToolUse hook verifies the token before letting `axhub deploy create` run. Mismatch = deny.
+- **Consent token binding** — on user "confirm", the helper mints a token bound to `{action=deploy_create, app_id, profile, commit_sha}`. PreToolUse hook verifies the token before letting `axhub deploy create` run. Mismatch = deny.
 
 ## Special: ETA calculation
 
@@ -270,7 +338,7 @@ If `eta_sec` from helper resolution is null (first deploy on this app), render: 
 
 ## Special: dry-run preview output
 
-When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <ID> --branch <BRANCH> --commit <SHA> --dry-run --json` and render the response as:
+When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <ID> --commit <SHA> --dry-run --json` and render the response as:
 
 ```
 미리보기 결과 (실제로는 아무것도 안 올렸어요):

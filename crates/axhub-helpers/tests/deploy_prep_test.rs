@@ -17,7 +17,7 @@ use axhub_helpers::resolve::{AppMatch, ResolveOutput, ResolveRun, EXIT_NOT_FOUND
 fn ok_preflight() -> PreflightRun {
     PreflightRun {
         output: PreflightOutput {
-            cli_version: Some("0.15.3".into()),
+            cli_version: Some("0.17.3".into()),
             in_range: true,
             cli_too_old: false,
             cli_too_new: false,
@@ -32,6 +32,7 @@ fn ok_preflight() -> PreflightRun {
             expires_at: Some("2099-01-01T00:00:00Z".into()),
             expires_human: Some("never".into()),
             current_app: Some("paydrop".into()),
+            current_team_id: Some("acme".into()),
             current_env: Some("prod".into()),
             last_deploy_id: None,
             last_deploy_status: None,
@@ -134,7 +135,7 @@ fn run_deploy_prep_with_runner_dispatches_both_preflight_and_resolve() {
         if cmd.contains(&"--version") {
             SpawnResult {
                 exit_code: 0,
-                stdout: "axhub 0.15.3\n".into(),
+                stdout: "axhub 0.17.3\n".into(),
                 stderr: String::new(),
             }
         } else if cmd.contains(&"auth") && cmd.contains(&"status") {
@@ -203,7 +204,7 @@ fn respond_stub(cmd: &[&str], apps_list: &str) -> SpawnResult {
     if cmd.contains(&"--version") {
         SpawnResult {
             exit_code: 0,
-            stdout: "axhub 0.15.3\n".into(),
+            stdout: "axhub 0.17.3\n".into(),
             stderr: String::new(),
         }
     } else if cmd.contains(&"auth") && cmd.contains(&"status") {

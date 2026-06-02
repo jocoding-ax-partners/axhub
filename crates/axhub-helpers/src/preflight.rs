@@ -7,11 +7,11 @@ use regex::Regex;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-pub const MIN_AXHUB_CLI_VERSION: &str = "0.15.3";
-// Minimum is pinned to the first CLI that provides agent-safe watch/follow
-// auto-degrade plus native `device_code_issued` fast-exit. Older 0.15.x
-// binaries can deadlock plugin subprocesses because the skills now pass
-// `--watch`/`--follow` directly and rely on the CLI guard. Upper bound stays
+pub const MIN_AXHUB_CLI_VERSION: &str = "0.17.3";
+// Minimum is pinned to the CLI snapshot audited by specs/007-vibe-skill-gapfill.
+// New gap-fill skills call v0.17.3-only surfaces (team/resources/connectors/
+// table/app-lifecycle commands), so accepting older binaries would route users
+// to commands that fail after preflight marked the CLI healthy. Upper bound stays
 // at the next major; re-evaluate at the 1.0.0 breaking boundary.
 pub const MAX_AXHUB_CLI_VERSION: &str = "1.0.0";
 pub const EXIT_OK: i32 = 0;
@@ -149,6 +149,7 @@ pub enum AuthStatus {
         user_id: i64,
         expires_at: String,
         scopes: Vec<String>,
+        current_team_id: Option<String>,
     },
     Error {
         code: String,
@@ -160,6 +161,38 @@ impl AuthStatus {
     pub fn ok(&self) -> bool {
         matches!(self, Self::Ok { .. })
     }
+}
+
+fn auth_status_string_field(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|key| {
+        value
+            .get(*key)
+            .and_then(|field| {
+                field
+                    .as_str()
+                    .map(|text| text.trim().to_string())
+                    .or_else(|| field.as_i64().map(|id| id.to_string()))
+                    .or_else(|| field.as_u64().map(|id| id.to_string()))
+            })
+            .filter(|text| !text.is_empty())
+    })
+}
+
+fn current_team_id_from_auth_status(parsed: &serde_json::Value) -> Option<String> {
+    auth_status_string_field(
+        parsed,
+        &[
+            "current_team_id",
+            "current_tenant_id",
+            "tenant_slug",
+            "tenant_id",
+        ],
+    )
+    .or_else(|| {
+        parsed.get("current_tenant").and_then(|value| {
+            auth_status_string_field(value, &["tenant_slug", "slug", "tenant_id", "id"])
+        })
+    })
 }
 
 pub fn parse_auth_status(stdout: &str) -> AuthStatus {
@@ -201,6 +234,7 @@ pub fn parse_auth_status(stdout: &str) -> AuthStatus {
                 .unwrap_or("")
                 .to_string(),
             scopes,
+            current_team_id: current_team_id_from_auth_status(&parsed),
         };
     }
     AuthStatus::Error {
@@ -232,6 +266,8 @@ pub struct PreflightOutput {
     pub expires_at: Option<String>,
     pub expires_human: Option<String>,
     pub current_app: Option<String>,
+    #[serde(default)]
+    pub current_team_id: Option<String>,
     pub current_env: Option<String>,
     pub last_deploy_id: Option<String>,
     pub last_deploy_status: Option<String>,
@@ -466,15 +502,24 @@ where
             detail: String::new(),
         }
     };
-    let (auth_ok, auth_error_code, scopes, user_email, expires_at) = match auth_status {
-        AuthStatus::Ok {
-            user_email,
-            expires_at,
-            scopes,
-            ..
-        } => (true, None, scopes, Some(user_email), Some(expires_at)),
-        AuthStatus::Error { code, .. } => (false, Some(code), vec![], None, None),
-    };
+    let (auth_ok, auth_error_code, scopes, user_email, expires_at, current_team_id) =
+        match auth_status {
+            AuthStatus::Ok {
+                user_email,
+                expires_at,
+                scopes,
+                current_team_id,
+                ..
+            } => (
+                true,
+                None,
+                scopes,
+                Some(user_email),
+                Some(expires_at),
+                current_team_id,
+            ),
+            AuthStatus::Error { code, .. } => (false, Some(code), vec![], None, None, None),
+        };
     let expires_human = expires_at.as_deref().and_then(|iso| {
         crate::humanize::format_expires_human(
             iso,
@@ -522,6 +567,7 @@ where
                     None
                 }
             }),
+        current_team_id,
         current_env: std::env::var("AXHUB_PROFILE")
             .ok()
             .filter(|s| !s.is_empty()),
@@ -587,6 +633,7 @@ mod tests {
             user_id: 7,
             expires_at: "2099-01-01T00:00:00Z".into(),
             scopes: vec!["read".into()],
+            current_team_id: Some("acme".into()),
         }
         .ok());
 
@@ -701,7 +748,7 @@ mod tests {
         ));
         fs::create_dir_all(&dir).unwrap();
         let fake = dir.join(AXHUB_BIN_NAME);
-        fs::write(&fake, b"#!/bin/sh\necho axhub 0.15.3\n").unwrap();
+        fs::write(&fake, b"#!/bin/sh\necho axhub 0.17.3\n").unwrap();
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
