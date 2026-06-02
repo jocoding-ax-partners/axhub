@@ -306,7 +306,7 @@
   "install-cli": {
     "axhub CLI 를 공식 installer 로 설치할까요?": {
       "safe_default": "수동 안내",
-      "rationale": "Auto-running an installer in subprocess (claude -p / CI / headless) writes new system binaries without explicit user consent. Non-interactive mode must surface the official installer command only (cli.jocodingax.ai), never execute it. Homebrew/Scoop channels were removed — the official installer is the sole supported channel.",
+      "rationale": "Auto-running an installer in subprocess (claude -p / CI / headless) writes new system binaries without explicit user consent. Non-interactive mode must surface the official installer command only (cli.axhub.ai), never execute it. Homebrew/Scoop channels were removed — the official installer is the sole supported channel.",
       "allowed_safe_defaults": [
         "수동 안내",
         "curl"

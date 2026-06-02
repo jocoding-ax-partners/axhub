@@ -189,14 +189,14 @@ keychain 이 사용 불가한 환경 (특정 Linux 컨테이너, Windows headles
 
 **(1) axhub CLI 가 설치 안 됨.**
 
-axhub 는 공식 installer (`cli.jocodingax.ai`) 단일 채널로만 배포해요 (Homebrew/Scoop 미지원).
+axhub 는 공식 installer (`cli.axhub.ai`) 단일 채널로만 배포해요 (Homebrew/Scoop 미지원).
 
 ```bash
 # macOS / Linux (공식 installer)
-curl -fsSL https://cli.jocodingax.ai/install.sh | bash
+curl -fsSL https://cli.axhub.ai/install.sh | bash
 
 # Windows (공식 installer, PowerShell)
-irm https://cli.jocodingax.ai/install.ps1 | iex
+irm https://cli.axhub.ai/install.ps1 | iex
 ```
 
 **(2) 설치는 됐는데 PATH 에 없음.**
