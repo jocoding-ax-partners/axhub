@@ -303,6 +303,6 @@ DISABLE_AXHUB=1   # stderr 에 경고 출력
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/005-update-skill-cli-alignment/plan.md` (+ research.md, data-model.md,
-contracts/update-cli-contract.md, quickstart.md).
+`specs/006-verify-skill-cli-alignment/plan.md` (+ research.md, data-model.md,
+contracts/verify-cli-contract.md, quickstart.md).
 <!-- SPECKIT END -->
