@@ -122,7 +122,7 @@ axhub 로그인해줘
 
 ---
 
-### exit 66 + `cosign_verification_failed` — 보안 검증 실패 ⚠️
+### exit 66 + `cosign_enforce_failed` — 보안 검증 실패 ⚠️
 
 **무슨 감정** — "이거 진짜 무서운 메시지인 것 같은데?"
 

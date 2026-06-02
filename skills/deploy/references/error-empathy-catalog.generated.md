@@ -37,15 +37,99 @@ The drift between this file and the hand-written sibling is checked by
 
 ---
 
-## exit 2
+## exit 4
 
-**감정:** 정상이에요. 배포가 진행 중이에요.
+**감정:** 잠깐만요. 로그인이 만료됐을 뿐이에요. 앱은 그대로예요.
 
-**원인:** 지금 배포 단계예요. 보통 몇 분 걸려요.
+**원인:** axhub 로그인 토큰이 만료됐어요. 보안을 위해 일정 시간이 지나면 다시 로그인해야 해요. 평소 회사 메일·은행 사이트랑 똑같아요.
 
-**해결:** "계속 지켜봐줘" 라고 하면 끝날 때까지 자동으로 알려줄게요. 다른 일 하다가 끝나면 알림 줄게요.
+**해결:** "다시 로그인해줘" 라고 하면 브라우저로 안내해줄게요. (브라우저가 안 열리는 환경 — 예: GitHub Codespaces — 이면 별도로 안내해줄게요.)
 
-**버튼:** 계속 지켜보기 / 지금 그만 보기 / 로그도 같이 보기
+**버튼:** 다시 로그인 / 토큰 파일로 로그인 (헤드리스) / 도와주세요
+
+---
+
+## exit 5
+
+**감정:** 잠깐만요. 그런 이름은 못 찾았어요.
+
+**원인:** 그 이름의 앱/배포/API 가 회사 axhub 에 등록 안 돼 있어요. 오타이거나, 다른 회사 계정의 앱일 수도 있어요.
+
+**해결:** 가장 비슷한 후보를 보여줄게요. 아래 중 하나 선택하거나 다시 입력해주세요.
+
+**버튼:** 가장 유사한 거로 / 앱 목록 보기 / 다시 입력
+
+---
+
+### exit 5:catalog.not_found
+
+**감정:** 찾는 데이터 리소스를 못 찾았어요.
+
+**원인:** connector/path 가 catalog 에 없거나 현재 인증 주체가 볼 수 없는 리소스예요.
+
+**해결:** path 를 추측하지 말고 axhub catalog search --json --limit 200 으로 후보를 다시 찾은 뒤 정확한 connector/path 만 사용해요.
+
+**버튼:** catalog search 실행 / path 다시 입력 / 닫기
+
+---
+
+### exit 5:github.install_not_found
+
+**감정:** GitHub App 설치를 찾지 못했어요.
+
+**원인:** 선택한 account 에 axhub GitHub App 이 설치되어 있지 않거나 repo 권한이 없어요.
+
+**해결:** CLI 출력의 install_url 을 GitHub 연결 링크로 바로 보여줘요. 권한 부여는 자동으로 진행하지 않아요.
+
+**버튼:** GitHub 연결 링크 / repo 다시 고르기 / 닫기
+
+---
+
+### exit 5:open.no_app_manifest
+
+**감정:** 열 수 있는 axhub 앱 정보를 찾지 못했어요.
+
+**원인:** 현재 디렉토리에 apphub.yaml 또는 axhub.yaml 이 없고 최근 배포 cache 도 비어 있어요.
+
+**해결:** 먼저 init 으로 앱 파일을 만들거나 apps 목록에서 열 앱을 골라요.
+
+**버튼:** init 시작 / 앱 목록 보기 / 닫기
+
+---
+
+## exit 6
+
+**감정:** 잠깐만요. 너무 많이 요청해서 서버가 잠시 쉬자고 해요. 앱은 안전해요.
+
+**원인:** 짧은 시간 안에 axhub 호출이 많이 누적돼서 잠깐 멈춰야 해요. 보통 다른 사람이랑 같은 토큰을 공유하거나, 자동화 스크립트가 너무 빨리 돌 때 생겨요.
+
+**해결:** 잠시만 기다려주세요. 자동으로 다시 시도할게요. 그동안 커피 한 잔 어때요?
+
+**버튼:** 자동으로 기다리기 / 지금 닫기 / 도와주세요
+
+---
+
+## exit 7
+
+**감정:** 잠깐만요. axhub 서버 내부에서 문제가 생겼어요. 앱은 안전해요.
+
+**원인:** 요청은 잘 전달됐는데 서버가 처리 중에 내부 오류를 만났어요. 일시적인 경우가 많아요.
+
+**해결:** 잠시 뒤 다시 시도해볼래요? 계속 같은 오류면 'axhub doctor' 로 진단하거나 관리자에게 알려주세요.
+
+**버튼:** 다시 시도 / 진단 실행 / 도와주세요
+
+---
+
+### exit 7:catalog.internal_error
+
+**감정:** 잠깐만요. 데이터 조회를 안전하게 멈췄어요.
+
+**원인:** catalog 서버가 내부 오류를 돌려줬어요. allowed_columns 와 masked 정책을 확정하지 못한 상태라 결과를 추측하면 안 돼요.
+
+**해결:** 같은 live read 를 자동 재시도하지 않아요. 먼저 axhub catalog get 으로 allowed_columns 를 다시 확인하고, deny_reason 이 있으면 그대로 보여줘요.
+
+**버튼:** catalog get 확인 / 관리자에게 전달 / 닫기
 
 ---
 
@@ -58,6 +142,18 @@ The drift between this file and the hand-written sibling is checked by
 **해결:** 뭘 배포하려 했는지 다시 풀어서 말해줄래요? 예: "paydrop 메인 브랜치 최신 커밋 배포해" 처럼 구체적으로요.
 
 **버튼:** 다시 풀어 말하기 / 도와주세요 / 닫기
+
+---
+
+### exit 64:apis.call_consent_required
+
+**감정:** API 호출에는 사전 승인이 필요해요.
+
+**원인:** 이 endpoint 호출은 서버 상태를 바꿀 수 있어요. read-only 조회처럼 자동 실행할 수 없어요.
+
+**해결:** method, endpoint, body source 를 preview 로 확인한 뒤 동의 token 을 mint 해서 다시 실행해요.
+
+**버튼:** preview 보기 / 취소 / 도와주세요
 
 ---
 
@@ -169,30 +265,6 @@ The drift between this file and the hand-written sibling is checked by
 
 ---
 
-## exit 65
-
-**감정:** 잠깐만요. 로그인이 만료됐을 뿐이에요. 앱은 그대로예요.
-
-**원인:** axhub 로그인 토큰이 만료됐어요. 보안을 위해 일정 시간이 지나면 다시 로그인해야 해요. 평소 회사 메일·은행 사이트랑 똑같아요.
-
-**해결:** "다시 로그인해줘" 라고 하면 브라우저로 안내해줄게요. (브라우저가 안 열리는 환경 — 예: GitHub Codespaces — 이면 별도로 안내해줄게요.)
-
-**버튼:** 다시 로그인 / 토큰 파일로 로그인 (헤드리스) / 도와주세요
-
----
-
-### exit 65:apis.call_consent_required
-
-**감정:** API 호출에는 사전 승인이 필요해요.
-
-**원인:** 이 endpoint 호출은 서버 상태를 바꿀 수 있어요. read-only 조회처럼 자동 실행할 수 없어요.
-
-**해결:** method, endpoint, body source 를 preview 로 확인한 뒤 동의 token 을 mint 해서 다시 실행해요.
-
-**버튼:** preview 보기 / 취소 / 도와주세요
-
----
-
 ## exit 66
 
 **감정:** 잠깐만요. 권한 문제예요. 앱은 안전해요.
@@ -217,19 +289,7 @@ The drift between this file and the hand-written sibling is checked by
 
 ---
 
-### exit 66:scope.downgrade_blocked
-
-**감정:** 잠깐만요. 안전장치가 작동했어요.
-
-**원인:** 더 낮은 환경으로의 다운그레이드 시도가 감지됐어요. 예를 들어 production 에 있는 앱을 staging 빌드로 덮으려 했을 때 안전을 위해 막아줬어요.
-
-**해결:** 정말로 다운그레이드가 필요하면 명시적으로 "강제로 다운그레이드해" 라고 말해주세요. 그게 아니라면 의도한 환경 (보통 production) 의 빌드를 다시 확인해주세요.
-
-**버튼:** 환경 다시 확인 / 강제 다운그레이드 (위험) / 취소
-
----
-
-### exit 66:update.cosign_verification_failed
+### exit 66:update.cosign_enforce_failed
 
 **감정:** 잠깐만요. 보안 검증에 실패했어요. 절대 진행 안 해요.
 
@@ -241,75 +301,15 @@ The drift between this file and the hand-written sibling is checked by
 
 ---
 
-## exit 67
+### exit 66:update.downgrade_blocked
 
-**감정:** 잠깐만요. 그런 이름은 못 찾았어요.
+**감정:** 잠깐만요. 안전장치가 작동했어요.
 
-**원인:** 그 이름의 앱/배포/API 가 회사 axhub 에 등록 안 돼 있어요. 오타이거나, 다른 회사 계정의 앱일 수도 있어요.
+**원인:** 더 낮은 환경으로의 다운그레이드 시도가 감지됐어요. 예를 들어 production 에 있는 앱을 staging 빌드로 덮으려 했을 때 안전을 위해 막아줬어요.
 
-**해결:** 가장 비슷한 후보를 보여줄게요. 아래 중 하나 선택하거나 다시 입력해주세요.
+**해결:** 정말로 다운그레이드가 필요하면 명시적으로 "강제로 다운그레이드해" 라고 말해주세요. 그게 아니라면 의도한 환경 (보통 production) 의 빌드를 다시 확인해주세요.
 
-**버튼:** 가장 유사한 거로 / 앱 목록 보기 / 다시 입력
-
----
-
-### exit 67:catalog.not_found
-
-**감정:** 찾는 데이터 리소스를 못 찾았어요.
-
-**원인:** connector/path 가 catalog 에 없거나 현재 인증 주체가 볼 수 없는 리소스예요.
-
-**해결:** path 를 추측하지 말고 axhub catalog search --json --limit 200 으로 후보를 다시 찾은 뒤 정확한 connector/path 만 사용해요.
-
-**버튼:** catalog search 실행 / path 다시 입력 / 닫기
-
----
-
-### exit 67:github.install_not_found
-
-**감정:** GitHub App 설치를 찾지 못했어요.
-
-**원인:** 선택한 account 에 axhub GitHub App 이 설치되어 있지 않거나 repo 권한이 없어요.
-
-**해결:** CLI 출력의 install_url 을 GitHub 연결 링크로 바로 보여줘요. 권한 부여는 자동으로 진행하지 않아요.
-
-**버튼:** GitHub 연결 링크 / repo 다시 고르기 / 닫기
-
----
-
-### exit 67:open.no_app_manifest
-
-**감정:** 열 수 있는 axhub 앱 정보를 찾지 못했어요.
-
-**원인:** 현재 디렉토리에 apphub.yaml 또는 axhub.yaml 이 없고 최근 배포 cache 도 비어 있어요.
-
-**해결:** 먼저 init 으로 앱 파일을 만들거나 apps 목록에서 열 앱을 골라요.
-
-**버튼:** init 시작 / 앱 목록 보기 / 닫기
-
----
-
-## exit 68
-
-**감정:** 잠깐만요. 너무 많이 요청해서 서버가 잠시 쉬자고 해요. 앱은 안전해요.
-
-**원인:** 짧은 시간 안에 axhub 호출이 많이 누적돼서 잠깐 멈춰야 해요. 보통 다른 사람이랑 같은 토큰을 공유하거나, 자동화 스크립트가 너무 빨리 돌 때 생겨요.
-
-**해결:** 잠시만 기다려주세요. 자동으로 다시 시도할게요. 그동안 커피 한 잔 어때요?
-
-**버튼:** 자동으로 기다리기 / 지금 닫기 / 도와주세요
-
----
-
-### exit 70:catalog.internal_error
-
-**감정:** 잠깐만요. 데이터 조회를 안전하게 멈췄어요.
-
-**원인:** catalog 서버가 내부 오류를 돌려줬어요. allowed_columns 와 masked 정책을 확정하지 못한 상태라 결과를 추측하면 안 돼요.
-
-**해결:** 같은 live read 를 자동 재시도하지 않아요. 먼저 axhub catalog get 으로 allowed_columns 를 다시 확인하고, deny_reason 이 있으면 그대로 보여줘요.
-
-**버튼:** catalog get 확인 / 관리자에게 전달 / 닫기
+**버튼:** 환경 다시 확인 / 강제 다운그레이드 (위험) / 취소
 
 ---
 

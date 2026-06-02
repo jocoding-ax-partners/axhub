@@ -6,6 +6,14 @@ The **vibe coder is anxious** (P3 persona, 11pm demo scenario in PLAN §1000). C
 
 ---
 
+## Exit code 두 공간 (spec 004 — CLI ↔ helper)
+
+이 카탈로그의 heading 은 **CLI-native 실패 코드** (auth=4, not_found=5, rate_limited=6, api/internal=7, usage=64, scope/update=66) 로 키잉돼 있어요. axhub-helpers 바이너리 (`preflight` / `deploy-prep` / `bootstrap` / `list-deployments` / `token-gate` / `quality_gate` / `sync`) 는 sysexits 기반 OUTPUT 계약 (auth=65, not_found=67, rate=68, internal=70) 을 그대로 유지하는데 — 이건 테스트된 public 계약이라 안 바꿔요. 두 공간 다 `classify-exit` 로 들어오면 **65→4 / 67→5 / 68→6 / 70→7 로 정규화** 돼서 같은 template 으로 라우팅돼요 (`crates/axhub-helpers/src/catalog.rs::normalize_helper_exit`, `list_deployments::exit_to_error_code` 의 `4 | 65 => auth` 와 동일 매핑).
+
+그래서 SKILL 본문에서 "exit 65" (helper auth) 를 만나면 아래 **exit 4** 섹션을, "exit 67" (helper not_found) 는 **exit 5** 섹션을, "exit 68" 은 **exit 6** 섹션을 봐요. 64 / 66 은 두 공간 공통이라 그대로예요.
+
+---
+
 ## Template Structure (4 parts, MANDATORY order)
 
 Every entry uses these four parts, in this order:
@@ -46,18 +54,6 @@ Every entry uses these four parts, in this order:
 **해결:** 한 번 더 시도해보시겠어요? "다시 시도해줘" 라고 말씀하시면 한 번만 자동 재시도해요. 배포 명령은 자동 재시도하지 않아요 (중복 배포 방지).
 
 **버튼:** ["다시 시도", "잠시 후 다시", "도와주세요"]
-
----
-
-## exit 2 — deploy status in-progress
-
-**감정:** 정상이에요. 배포가 아직 진행 중일 뿐입니다.
-
-**원인:** `<DEPLOY_ID>` 가 현재 `<STATUS_PHASE>` 단계예요. 평균 `<ETA>` 정도 걸리는데, 지금까지 `<ELAPSED>` 경과했어요.
-
-**해결:** "계속 지켜봐줘" 라고 말씀하시면 끝날 때까지 자동으로 알려드려요. 다른 일 하시다가 끝나면 알림 드릴게요.
-
-**버튼:** ["계속 지켜보기", "지금 그만 보기", "로그도 같이 보기"]
 
 ---
 
@@ -121,7 +117,7 @@ Every entry uses these four parts, in this order:
 
 ---
 
-## exit 65 — auth required / token expired
+## exit 4 — auth required / token expired
 
 **감정:** 잠깐만요. 로그인이 만료됐을 뿐이에요. 당신 앱은 그대로예요.
 
@@ -145,7 +141,7 @@ Every entry uses these four parts, in this order:
 
 ---
 
-### exit 66 + `scope.downgrade_blocked`
+### exit 66 + `update.downgrade_blocked`
 
 **감정:** 잠깐만요. 안전장치가 작동했어요.
 
@@ -157,7 +153,7 @@ Every entry uses these four parts, in this order:
 
 ---
 
-### exit 66 + `update.cosign_verification_failed`
+### exit 66 + `update.cosign_enforce_failed`
 
 **감정:** 잠깐만요. 보안 검증에 실패했어요. 절대 진행하지 않아요.
 
@@ -169,7 +165,7 @@ Every entry uses these four parts, in this order:
 
 ---
 
-## exit 67 — resource not found (with did-you-mean)
+## exit 5 — resource not found (with did-you-mean)
 
 **감정:** 잠깐만요. 그런 이름은 못 찾았어요.
 
@@ -189,7 +185,7 @@ Every entry uses these four parts, in this order:
 
 ---
 
-## exit 68 — rate limit (with auto-backoff)
+## exit 6 — rate limit (with auto-backoff)
 
 **감정:** 잠깐만요. 너무 많이 요청해서 서버가 잠시 쉬자고 해요. 당신 앱은 안전합니다.
 
@@ -297,7 +293,7 @@ When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <I
 
 ---
 
-### exit 67 + `github.install_not_found`
+### exit 5 + `github.install_not_found`
 
 **감정:** GitHub App 설치를 찾지 못했어요.
 
@@ -333,7 +329,7 @@ When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <I
 
 ---
 
-### exit 67 + `open.no_app_manifest`
+### exit 5 + `open.no_app_manifest`
 
 **감정:** 열 수 있는 axhub 앱 정보를 찾지 못했어요.
 
@@ -357,7 +353,7 @@ When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <I
 
 ---
 
-### exit 65 + `apis.call_consent_required`
+### exit 64 + `apis.call_consent_required`
 
 **감정:** API 호출에는 사전 승인이 필요해요.
 
@@ -506,7 +502,7 @@ npm install
 
 ---
 
-### exit 70 + `catalog.internal_error`
+### exit 7 + `catalog.internal_error`
 
 **감정:** 잠깐만요. 데이터 조회를 안전하게 멈췄어요.
 
@@ -518,7 +514,7 @@ npm install
 
 ---
 
-### exit 67 + `catalog.not_found`
+### exit 5 + `catalog.not_found`
 
 **감정:** 찾는 데이터 리소스를 못 찾았어요.
 

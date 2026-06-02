@@ -44,7 +44,7 @@ To fetch logs:
    "$HELPER" list-deployments --app <APP_ID> --limit 3
    ```
 
-   On exit 65 (token missing — Phase 7 US-701 이후엔 SessionStart 가 자동 setup):
+   On exit 65 (`list-deployments` helper 의 EXIT_LIST_AUTH OUTPUT 계약 — classify-exit 가 4 로 정규화해요; token missing — Phase 7 US-701 이후엔 SessionStart 가 자동 setup):
    > "토큰을 찾을 수 없어요. 'axhub auth login' 또는 CC 세션 재시작."
 
    v0.15 CLI 는 `axhub deploy list --app <APP> --json` 으로 직접 배포 목록을 조회할 수 있어요 (아래 build-log snapshot fallback 에서도 이 명령을 써요). 위 helper 는 같은 데이터를 canonical CLI wrapper 로 받아 캐시 친화적으로 정리해 주는 경로예요 — auth/transport 정책은 CLI 를 그대로 따라가요.
@@ -77,10 +77,10 @@ To fetch logs:
 
 5. **Render trimmed output.** For non-failure logs, show the last 50 lines plus a "전체 보기" AskUserQuestion option. For failure logs, show the last 200 lines and surface the first error-level line at the top with "이 줄에서 멈춘 것 같아요:".
 
-6. **On non-zero exit**, route to `../deploy/references/error-empathy-catalog.md`:
-   - exit 65 → token expired
-   - exit 67 → deploy id not found + did-you-mean
-   - exit 68 → rate limit (logs is the most rate-limited surface)
+6. **On non-zero exit**, route via `axhub-helpers classify-exit "$EXIT" "$STDOUT"` (spec 004 Fork-A — canonical router) or the catalog `../deploy/references/error-empathy-catalog.md` by current CLI exit code:
+   - exit 4 → token expired (was sysexits 65)
+   - exit 5 → deploy id not found + did-you-mean (was 67)
+   - exit 6 → rate limit (logs is the most rate-limited surface; was 68)
    - exit 1 → transport; allow one retry on read path
 
 7. **No source available.** If both build and pod logs return empty, emit: "아직 로그가 없어요. 배포가 시작되기 전이거나, 빌드 단계가 너무 빨라서 출력이 캡처 안 됐을 수 있어요. 'status'로 단계 먼저 확인해볼래요?"

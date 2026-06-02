@@ -361,10 +361,14 @@ fn exit_to_error_code(exit_code: i32, parsed_code: Option<&str>) -> Option<Strin
     if let Some(code) = parsed_code {
         return Some(code.to_string());
     }
+    // spec 004 M2: the helper↔CLI exit equivalence (65≡4 auth, 67≡5 not_found)
+    // lives ONLY in catalog::normalize_helper_exit. Normalize first, then match
+    // CLI-native codes; the `cli.exit_{code}` fallback keeps the original code.
+    let cli = crate::catalog::normalize_helper_exit(exit_code);
     match exit_code {
         0 => None,
-        65 => Some("auth.token_invalid".into()),
-        67 => Some("resource.app_not_found".into()),
+        _ if cli == 4 => Some("auth.token_invalid".into()),
+        _ if cli == 5 => Some("resource.app_not_found".into()),
         64 => Some("usage.invalid".into()),
         124 => Some("transport.timeout".into()),
         127 => Some("transport.cli_missing".into()),
@@ -373,9 +377,13 @@ fn exit_to_error_code(exit_code: i32, parsed_code: Option<&str>) -> Option<Strin
 }
 
 fn exit_to_helper_exit(exit_code: i32, code: Option<&str>) -> i32 {
+    // OUTPUT contract EXIT_LIST_* is unchanged; the dual-input recognition
+    // (65 or 4 = auth, 67 or 5 = not_found) routes through the single
+    // catalog::normalize_helper_exit source instead of a local copy.
+    let cli = crate::catalog::normalize_helper_exit(exit_code);
     match code.unwrap_or_default() {
-        c if c.starts_with("auth.") || exit_code == 65 => EXIT_LIST_AUTH,
-        c if c.contains("not_found") || c == "resource.app_not_found" || exit_code == 67 => {
+        c if c == "auth" || c.starts_with("auth.") || cli == 4 => EXIT_LIST_AUTH,
+        c if c.contains("not_found") || c == "resource.app_not_found" || cli == 5 => {
             EXIT_LIST_NOT_FOUND
         }
         _ => EXIT_LIST_TRANSPORT,

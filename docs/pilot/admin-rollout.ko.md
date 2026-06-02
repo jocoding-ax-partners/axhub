@@ -38,7 +38,7 @@ ${XDG_STATE_HOME:-$HOME/.local/state}/axhub/hmac-key
 
 ## 3. 사고 대응 (incident response)
 
-### Severity 1: cosign verify failed (exit 66 + `update.cosign_verification_failed`)
+### Severity 1: cosign verify failed (exit 66 + `update.cosign_enforce_failed`)
 
 vibe coder가 이 에러를 보면:
 

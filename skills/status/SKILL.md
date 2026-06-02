@@ -82,16 +82,16 @@ To check status:
    - ~2m + `pushing_image` → "2분 경과, 이미지 푸시 중이에요 (정상). 거의 다 왔어요"
    - ~3m + `health_check` → "헬스체크 중. 마지막 단계예요"
    - terminal `succeeded` → trigger exit 0 success template
-   - terminal `failed` → trigger exit 1/65/66/67/68 template per emitted error
+   - terminal `failed` → trigger exit 1/4/5/6/66 template per emitted error
 
 5. **Silent stream guard.** If 60s pass with no NDJSON event, emit "조용하네요. 서버 응답 기다리는 중이에요 (정상). 30초 후 다시 알려줄게요."
 
 6. **User interrupt.** If the user says "그만 봐", "그만", "충분해", "stop watching", terminate the watch process and report the last observed phase. The deploy continues server-side regardless.
 
 7. **On any non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by exit code:
-   - exit 65 → token expired template + AskUserQuestion to run auth login
-   - exit 67 → resource not found + did-you-mean from `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP>`
-   - exit 68 → rate limit + Retry-After backoff
+   - exit 4 → token expired template + AskUserQuestion to run auth login. (canonical 분류는 `axhub-helpers classify-exit "$EXIT" "$STDOUT"` 가 담당해요 — spec 004 Fork-A. 옛 sysexits 65 아님.)
+   - exit 5 → resource not found + did-you-mean from `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP>` (helper-exit 67 OUTPUT 계약은 유지 — INPUT 만 CLI 5)
+   - exit 6 → rate limit + Retry-After backoff
    - exit 1 + `error_code = "transport.cli_missing"` → axhub CLI 가 PATH 에 없거나 실행 불가. 사용자에게 `axhub --version` 확인 또는 `axhub:setup` 재실행을 안내해요. canonical 표는 `../recover/SKILL.md` (Step 7).
    - exit 1 → transport error; retry the watch once for read paths
 
@@ -102,7 +102,7 @@ To check status:
 - NEVER auto-trigger `axhub deploy create` from the status path (read-only intent).
 - NEVER invent a `deployment_id` when the cache is cold; ask via AskUserQuestion.
 
-**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — cold cache deploy pick → `most_recent` (가장 최근 succeeded), exit-65 re-login → `abort` (subprocess 자동 로그인 안 해요).
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — cold cache deploy pick → `most_recent` (가장 최근 succeeded), exit-4 re-login → `abort` (subprocess 자동 로그인 안 해요).
 - NEVER throttle the terminal-state narration — success/failure must surface immediately.
 
 ## Additional Resources

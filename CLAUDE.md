@@ -303,6 +303,6 @@ DISABLE_AXHUB=1   # stderr 에 경고 출력
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/003-fix-plugin-login-deny/plan.md` (+ research.md, data-model.md,
-contracts/preauth-check-output.md, quickstart.md).
+`specs/004-skill-exit-code-alignment/plan.md` (+ research.md, data-model.md,
+verification-report.md, contracts/cli-error-envelope.md, quickstart.md).
 <!-- SPECKIT END -->

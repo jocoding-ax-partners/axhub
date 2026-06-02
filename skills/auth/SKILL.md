@@ -326,7 +326,7 @@ To handle auth:
 ## Additional Resources
 
 For Korean trigger lexicon (auth intent): `../deploy/references/nl-lexicon.md` (sections 6a/6b/6c).
-For 4-part Korean exit templates (exit 65, exit 66): `../deploy/references/error-empathy-catalog.md`.
+For 4-part Korean exit templates (auth = catalog "exit 4" 섹션 — CLI-native; 옛 sysexits 65 는 거기로 정규화돼요; exit 66 = scope): `../deploy/references/error-empathy-catalog.md`.
 For headless-auth + token-paste flow: `../deploy/references/recovery-flows.md` ("headless-auth").
 For headless / Codespaces / SSH auth fallback (token-paste flow), see `../deploy/references/headless-flow.md`.
 For expires_at humanization rule: `../deploy/references/time-render.md`.

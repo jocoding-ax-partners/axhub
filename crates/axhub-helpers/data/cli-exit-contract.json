@@ -1,0 +1,63 @@
+{
+  "_comment": "Pinned snapshot of the ax-hub-cli failure contract (spec 004 FR-012). Source of truth: ax-hub-cli crates/axhub-core/src/{exit_code.rs,error.rs} + axhub/src/main.rs::error_to_error_code. The empathy catalog (data/catalog.json) MUST key every entry on a base exit code present in `exit_codes`. Drift is enforced by tests/exit-contract-parity.test.ts (SC-008). When the CLI contract changes, the parity test fails -> re-verify against the CLI and update this snapshot.",
+  "cli_version": "0.17.2",
+  "exit_codes": {
+    "0": "success",
+    "1": "generic",
+    "2": "reserved_clap_usage",
+    "3": "reserved_shell",
+    "4": "auth",
+    "5": "not_found",
+    "6": "rate_limited",
+    "7": "api",
+    "8": "tenant_scope",
+    "9": "conflict",
+    "10": "timeout",
+    "11": "dry_run_blocked",
+    "12": "forbidden",
+    "13": "not_found",
+    "14": "other",
+    "15": "other",
+    "64": "usage",
+    "66": "other"
+  },
+  "error_code_slugs": [
+    "auth",
+    "not_found",
+    "rate_limited",
+    "api",
+    "tenant_scope",
+    "conflict",
+    "forbidden",
+    "timeout",
+    "dry_run_blocked",
+    "usage",
+    "other"
+  ],
+  "cli_subcodes": {
+    "7": ["backend_unimplemented"],
+    "14": ["update.verify_digest_mismatch"],
+    "15": ["update.swap_failed"],
+    "66": ["update.downgrade_blocked", "update.cosign_enforce_failed"],
+    "9": ["last_admin", "already_member", "already_settled", "already_deleted"],
+    "12": ["domain_blocked"],
+    "13": ["invitation_expired"]
+  },
+  "plugin_context_subcodes_note": "validation.* / github.* / open.* / catalog.* / profile.* / apis.* are PLUGIN-side context refinements. The current CLI does NOT emit them as error.subcode (Usage/NotFound/etc. -> subcode None). Skills select these catalog entries by command context, not by CLI subcode. Their catalog key BASE must still resolve to a valid CLI exit code so classify()'s base fallback is coherent.",
+  "helper_output_exit_codes": {
+    "_comment": "SECOND frozen contract (spec 004). The axhub-helpers binaries (preflight/deploy_prep/bootstrap/list_deployments/token-gate/quality_gate/sync) keep a sysexits-derived OUTPUT contract that predates the CLI's 4/5/6 migration and is a TESTED PUBLIC surface (e.g. EXIT_LIST_AUTH=65, preflight::EXIT_AUTH=65) that MUST NOT change. Skills that read helper exits (deploy via deploy-prep, apps via preflight, init via bootstrap, recover via list-deployments) see THESE numbers. The catalog is keyed on the CLI space; helper exits normalize into it (see helper_output_normalization). The catalog therefore does NOT carry 65/67/68/70 keys, and the parity test still requires catalog keys subset of `exit_codes`.",
+    "64": "usage",
+    "65": "auth",
+    "66": "scope",
+    "67": "not_found",
+    "68": "rate_limited",
+    "70": "internal"
+  },
+  "helper_output_normalization": {
+    "_comment": "classify-exit (catalog.rs::normalize_helper_exit) folds the helper-output space into the CLI space before catalog lookup, so both frozen contracts route to one empathy template. Mirrors list_deployments::exit_to_error_code (4|65=>auth, 5|67=>not_found). 64/66 are shared and pass through unchanged.",
+    "65": 4,
+    "67": 5,
+    "68": 6,
+    "70": 7
+  }
+}

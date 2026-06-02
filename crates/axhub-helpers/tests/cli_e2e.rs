@@ -738,9 +738,16 @@ fn cli_version_help_redact_and_classify_work() {
     assert!(redacted.status.success());
     assert_eq!(String::from_utf8_lossy(&redacted.stdout), "Bearer ***");
 
-    let classified = run(&["classify-exit", "--exit-code", "65", "--stdout", "{}"]);
+    let classified = run(&["classify-exit", "--exit-code", "4", "--stdout", "{}"]);
     assert!(classified.status.success());
     assert!(String::from_utf8_lossy(&classified.stdout).contains("로그인이 만료"));
+
+    // spec 004: a helper-output exit (65 = EXIT_LIST_AUTH / preflight::EXIT_AUTH)
+    // must normalize to the same auth template at the binary level, not only in
+    // the catalog.rs unit test.
+    let helper_auth = run(&["classify-exit", "--exit-code", "65", "--stdout", "{}"]);
+    assert!(helper_auth.status.success());
+    assert!(String::from_utf8_lossy(&helper_auth.stdout).contains("로그인이 만료"));
 }
 
 #[test]
@@ -927,7 +934,7 @@ fn cli_auth_refresh_bg_records_success_and_failure_sentinels() {
 fn cli_classify_exit_post_tool_use_payload_branches() {
     let non_axhub = serde_json::json!({
         "tool_input": {"command": "echo hello"},
-        "tool_response": {"exit_code": 65, "stdout": "{}"}
+        "tool_response": {"exit_code": 4, "stdout": "{}"}
     });
     let output = run_stdin(&["classify-exit"], &non_axhub.to_string(), &[]);
     assert_eq!(output.status.code(), Some(0));
@@ -943,7 +950,7 @@ fn cli_classify_exit_post_tool_use_payload_branches() {
 
     let deploy_failure = serde_json::json!({
         "tool_input": {"command": "axhub deploy create --app paydrop --json"},
-        "tool_response": {"exit_code": 65, "stdout": "{}"}
+        "tool_response": {"exit_code": 4, "stdout": "{}"}
     });
     let output = run_stdin(&["classify-exit"], &deploy_failure.to_string(), &[]);
     assert_eq!(output.status.code(), Some(0));
