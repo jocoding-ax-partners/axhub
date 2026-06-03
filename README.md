@@ -9,7 +9,7 @@
 [![version](https://img.shields.io/badge/version-0.9.28-blue)](https://github.com/jocoding-ax-partners/axhub/releases)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
-[![homepage](https://img.shields.io/badge/homepage-axhub.jocodingax.ai-orange)](https://axhub.jocodingax.ai)
+[![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
 **상태**: v0.9.28 · 42 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary
 
@@ -35,7 +35,7 @@
 
 ## 🤔 axhub 가 뭔가요?
 
-axhub 는 [axhub SaaS](https://axhub.jocodingax.ai) 를 도입한 회사의 **바이브코더**가 Claude Code 안에서 한국어 자연어만으로 앱을 만들고·배포하고·관리하게 해주는 플러그인이에요.
+axhub 는 [axhub SaaS](https://axhub.ai) 를 도입한 회사의 **바이브코더**가 Claude Code 안에서 한국어 자연어만으로 앱을 만들고·배포하고·관리하게 해주는 플러그인이에요.
 
 ```
 "결제 앱 만들어줘"  →  "GitHub 연결해"  →  "배포해"  →  "결과 봐"
