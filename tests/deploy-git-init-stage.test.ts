@@ -154,11 +154,23 @@ describe("deploy skill git init stage", () => {
 
     expect(content).toContain("github.git_connection_required");
     expect(content).toContain("GitHub 저장소 연결");
+    expect(content).toContain("precondition_failed");
+    expect(content).toContain("GitHub 연결이 먼저 필요해요");
     expect(content).toContain('axhub apps git status --app "$APP_ID" --json');
     expect(content).toContain("GitHub 연결 링크: <install_url>");
     expect(content).toContain("https://github.com/new?name=$APP_SLUG");
     expect(content).toContain('axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json');
     expect(content).not.toContain("(/axhub:github 호출)");
+  });
+
+  test("deploy precondition failures route subdomain setup before retrying deploy", () => {
+    const content = readFileSync(DEPLOY_SKILL, "utf8");
+
+    expect(content).toContain("subdomain_not_configured");
+    expect(content).toContain("axhub apps update <slug> --subdomain <subdomain> --json");
+    expect(content).toContain("subdomain 2..32자 제약");
+    expect(content).toContain("apps_update");
+    expect(content).toContain("deploy_create consent 를 새로 mint");
   });
 
   test("github connection blocker routes into guided github setup instead of ending on manual connect", () => {

@@ -8,6 +8,10 @@ examples:
     intent: "manage dynamic tables"
   - utterance: "행 넣어"
     intent: "manage table rows"
+  - utterance: "ultraqa-app 앱에 orders 동적 테이블 만들고 title:text 컬럼 추가해"
+    intent: "manage dynamic tables"
+  - utterance: "앱 테이블 스키마 변경하고 preview 보여줘"
+    intent: "manage dynamic tables"
   - utterance: "create table"
     intent: "manage dynamic tables"
   - utterance: "insert row"
@@ -21,6 +25,14 @@ model: sonnet
 # Dynamic tables and rows
 
 앱 동적 테이블의 schema, grants, row 데이터를 관리해요. destructive DDL/DML 은 dry-run preview 와 consent 뒤에만 `--execute` 해요.
+
+## Routing guard
+
+- 앱의 동적 테이블 create/drop, 컬럼 add/remove, grant, row insert/update/delete 의도는 이전 턴이 `help`/`data` 였어도 이 skill 에서 처리해요.
+- catalog connector 조회·SQL insight 는 `data` skill 로 넘기고, 앱 동적 테이블 스키마·행 작업은 `data` skill 로 우회하지 않아요.
+- CLI shortcut 을 만들지 않아요. 컬럼 추가는 `tables columns add`, 컬럼 삭제는 `tables columns remove` 만 사용해요. `add-column` 같은 alias 를 상상해서 실행하지 않아요.
+- create + column 같은 복합 요청은 먼저 대상 app/table/columns preview 를 보여주고, 동의가 확인된 뒤 `consent-mint` 를 별도 Bash 호출로 끝낸 다음, 다음 Bash 호출에서만 `--execute` 명령을 하나 실행해요.
+- `axhub tables create`, `axhub tables drop`, `axhub tables columns add/remove`, `axhub tables grants issue/revoke`, `axhub data insert/update/delete` 는 `--execute` 가 없어도 hook 이 destructive intent 로 차단할 수 있어요. 승인 전 preview 는 read-only 명령과 화면 설명으로만 만들고, mutation CLI 를 preview 용으로 실행하지 않아요.
 
 ## Workflow
 
@@ -80,16 +92,92 @@ echo "$PREFLIGHT_JSON"
 
 4. **schema/row/grant mutation.** create 전 availability 와 column-types 를 확인하고, body JSON 은 로컬에서 먼저 검증해요.
 
-   Consent binding 은 helper parser 와 같은 action/context 로 맞춰요: table/schema 는 `{app_id,table}` 에 컬럼·권한 키를 더하고, row 변경은 `{app_id,table,row_id?,source}` 와 payload identity 를 같이 써요. `--body` 는 `{source:"body",body_digest:"sha256:..."}`, `--body-file` 은 `{source:"body_file",body_file:"row.json",body_digest:"sha256:..."}`, `--batch` 는 `{source:"batch",batch:"rows.jsonl",batch_digest:"sha256:..."}` 로 mint 해요.
+   승인 전에는 아래 read-only 명령만 실행해요. `axhub tables create/drop/columns/grants` 와 `axhub data insert/update/delete` 는 preview 용으로도 실행하지 않아요.
 
    ```bash
    ROW_DIGEST="sha256:$(printf '%s' "$ROW_JSON" | shasum -a 256 | awk '{print $1}')"
    BATCH_DIGEST="sha256:$(shasum -a 256 rows.jsonl | awk '{print $1}')"
    axhub tables check-availability "$TABLE" --app "$APP_ID" --json
    axhub tables column-types --app "$APP_ID" --json
-   axhub tables create "$TABLE" --app "$APP_ID" --column 'title:text' --owner-column owner_id --execute --json
+   ```
+
+   Preview 카드에는 app id, table, action, columns/name/type, row_id 또는 grant target, 실행할 정확한 command line 을 텍스트로 보여줘요. Mutation 질문은 registry 에 있는 문구만 써요:
+
+   ```json
+   {
+     "questions": [{
+       "question": "이 테이블 스키마를 변경할까요?",
+       "header": "테이블",
+       "multiSelect": false,
+       "options": [
+         {"label": "변경", "value": "change", "description": "표시한 대상과 command 그대로 한 번 실행해요."},
+         {"label": "취소", "value": "abort", "description": "아무것도 바꾸지 않아요."}
+       ]
+     }]
+   }
+   ```
+
+   행 변경은 `이 행 데이터를 변경할까요?`, 권한 변경은 `이 테이블 권한을 변경할까요?` 를 써요. 비대화형 기본은 모두 `abort` 예요.
+
+5. **After approval, mint consent in its own Bash call.** Consent binding 은 helper parser 와 같은 action/context 로 맞춰요. `tool_call_id:"pending"` 이 다음 실제 Bash tool call 에 claim 되는 portable 경로예요. 같은 Bash block 안에 mutation CLI 를 함께 넣지 않아요.
+
+   Schema binding examples:
+
+   ```bash
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+
+   CONSENT_BINDING_JSON=$(jq -nc \
+     --arg app "$APP_ID" \
+     --arg table "$TABLE" \
+     --arg column "$COLUMN_SPEC" \
+     '{tool_call_id:"pending",action:"tables_create",app_id:$app,profile:"",branch:"",commit_sha:"",context:{table:$table,column:$column}}')
+   printf '%s\n' "$CONSENT_BINDING_JSON" | "$HELPER" consent-mint
+   ```
+
+   ```bash
+   CONSENT_BINDING_JSON=$(jq -nc \
+     --arg app "$APP_ID" \
+     --arg table "$TABLE" \
+     --arg name "$COL" \
+     --arg type "$COL_TYPE" \
+     '{tool_call_id:"pending",action:"tables_columns_add",app_id:$app,profile:"",branch:"",commit_sha:"",context:{table:$table,name:$name,type:$type}}')
+   printf '%s\n' "$CONSENT_BINDING_JSON" | "$HELPER" consent-mint
+   ```
+
+   Row payload binding examples:
+
+   ```bash
+   CONSENT_BINDING_JSON=$(jq -nc \
+     --arg app "$APP_ID" \
+     --arg table "$TABLE" \
+     --arg digest "$ROW_DIGEST" \
+     '{tool_call_id:"pending",action:"data_insert",app_id:$app,profile:"",branch:"",commit_sha:"",context:{table:$table,source:"body",body_digest:$digest}}')
+   printf '%s\n' "$CONSENT_BINDING_JSON" | "$HELPER" consent-mint
+   ```
+
+   Row update binding 은 row id 까지 묶어야 PreToolUse 의 binding schema 와 일치해요.
+
+   ```bash
+   CONSENT_BINDING_JSON=$(jq -nc \
+     --arg app "$APP_ID" \
+     --arg table "$TABLE" \
+     --arg row_id "$ROW_ID" \
+     --arg digest "$ROW_DIGEST" \
+     '{tool_call_id:"pending",action:"data_update",app_id:$app,profile:"",branch:"",commit_sha:"",context:{table:$table,row_id:$row_id,source:"body",body_digest:$digest}}')
+   printf '%s\n' "$CONSENT_BINDING_JSON" | "$HELPER" consent-mint
+   ```
+
+6. **Run exactly one mutation command in the next Bash call.** `consent-mint` 와 destructive command 를 같은 Bash block 에 섞지 않아요. 여러 컬럼·행·권한 변경은 각 명령마다 Step 4~6 을 반복해요.
+
+   `--owner-column owner_id` 를 쓰면 `owner_id` 가 같은 create schema 에 반드시 포함되어야 해요. owner column 이 필요 없으면 `--owner-column` 을 빼고, 필요하면 `--column 'owner_id:text'` 같은 실제 컬럼을 함께 넣어요. 컬럼 타입은 `axhub tables column-types --app "$APP_ID" --json` 출력값을 기준으로 고르고, 정수 타입은 `integer` 가 아니라 `int` 예요.
+
+   ```bash
+   axhub tables create "$TABLE" --app "$APP_ID" --column 'title:text' --execute --json
+   axhub tables create "$TABLE" --app "$APP_ID" --column 'owner_id:text' --column 'title:text' --owner-column owner_id --execute --json
    axhub tables drop "$TABLE" --app "$APP_ID" --confirm "$TABLE" --execute --json
-   axhub tables columns add "$TABLE" --app "$APP_ID" --name "$COL" --type text --nullable --execute --json
+   axhub tables columns add "$TABLE" --app "$APP_ID" --name "$COL" --type int --nullable --execute --json
    axhub tables columns remove "$TABLE" --app "$APP_ID" --name "$COL" --execute --json
    axhub tables grants issue "$TABLE" --app "$APP_ID" --principal-id "$PRINCIPAL_ID" --principal-type user --actions read,write --execute --json
    axhub tables grants revoke --app "$APP_ID" --table "$TABLE" --grant-id "$GRANT" --execute --json
@@ -98,7 +186,6 @@ echo "$PREFLIGHT_JSON"
    axhub data update "$TABLE" "$ROW_ID" --app "$APP_ID" --body "$ROW_JSON" --execute --json
    axhub data delete "$TABLE" "$ROW_ID" --app "$APP_ID" --execute --json
    ```
-
 
    Registry-backed confirmation questions used by mutation previews:
 

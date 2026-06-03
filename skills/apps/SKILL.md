@@ -112,7 +112,21 @@ axhub apps members "$APP" --page "$PAGE" --per-page "$PER_PAGE" --json
 ### apps create
 
 1. Preview the source file or interactive intent first.
-2. Mint consent with stdin JSON:
+2. If this is an interactive Claude Code session, render a short approval card before minting consent:
+
+   ```json
+   {
+     "question": "앱을 만들까요?",
+     "header": "앱 생성",
+     "options": [
+       {"label": "생성", "value": "create", "description": "표시한 앱을 실제로 만들어요."},
+       {"label": "취소", "value": "abort", "description": "앱을 만들지 않아요."}
+     ]
+   }
+   ```
+
+   In non-interactive mode, use the registry safe default `abort` and stop before `consent-mint`.
+3. Mint consent with stdin JSON:
 
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
@@ -121,8 +135,25 @@ axhub apps members "$APP" --page "$PAGE" --per-page "$PER_PAGE" --json
    printf '%s\n' "$CONSENT_BINDING_JSON" | "$HELPER" consent-mint
    ```
 
-   Required binding fields: `action=apps_create`, `context={source}`. `apps create` has no dry-run/`--execute` in v0.17.3, so the preview must come from local file parsing or explicit user intent before the consent token is minted.
-3. Run one of the current CLI contracts:
+   Required binding fields must match the exact command shape:
+
+   ```bash
+   # axhub apps create --from-file axhub.yaml --json
+   CONSENT_BINDING_JSON=$(jq -nc \
+     '{tool_call_id:"pending",action:"apps_create",app_id:"",profile:"",branch:"",commit_sha:"",context:{source:"axhub.yaml"}}')
+
+   # axhub apps create --interactive --json
+   CONSENT_BINDING_JSON=$(jq -nc \
+     '{tool_call_id:"pending",action:"apps_create",app_id:"",profile:"",branch:"",commit_sha:"",context:{source:"interactive"}}')
+
+   # axhub apps create --name "$NAME" --slug "$SLUG" --json
+   CONSENT_BINDING_JSON=$(jq -nc \
+     --arg slug "$SLUG" \
+     '{tool_call_id:"pending",action:"apps_create",app_id:$slug,profile:"",branch:"",commit_sha:"",context:{slug:$slug,source:"inline"}}')
+   ```
+
+   `apps create` has no dry-run/`--execute` in v0.17.3, so the preview must come from local file parsing or explicit user intent before the consent token is minted. For the `--name` + `--slug` path, `app_id` and `context.slug` must both equal the exact `$SLUG`; otherwise the PreToolUse HMAC gate rejects the command.
+4. Run one of the current CLI contracts. Use one mutation command per Bash tool call; do not batch another destructive axhub command into the same Bash input:
 
    ```bash
    axhub apps create --from-file axhub.yaml --json

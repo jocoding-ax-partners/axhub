@@ -53,6 +53,8 @@ To fetch logs:
 
 2. **Pick source.** Default `--source=build`. Switch to `--source=pod` only when the utterance contains "런타임 로그", "running logs", "컨테이너 로그", "pod logs", or when the deploy is already in a `health_check`/terminal `succeeded` phase. When uncertain, ask once via AskUserQuestion ("빌드 로그 / 런타임 로그 / 둘 다").
 
+   **No-deploy precheck.** Before any `axhub deploy logs ...` call, verify there is a concrete deployment id for the chosen app. Use the helper/CLI list result from Step 1; if it is empty, stop cleanly with "아직 배포가 없어서 로그도 없어요. 먼저 배포를 시작한 뒤 다시 로그를 볼 수 있어요." Do **not** call app-level `axhub deploy logs --app <APP>` without a deploy id: current backend returns exit 7 + API 500 `internal_error` ("로그를 불러오지 못했어요") for no-deploy apps, which is noisy and should not be user-facing.
+
 3. **Stream logs with SSE follow:**
 
    ```bash

@@ -15,4 +15,5 @@ for field in cli_version auth_ok current_app current_team_id current_env last_de
   fi
 done
 [ "$FAIL" -gt 0 ] && { echo "[case ${CASE_ID}] FAIL"; exit 1; }
+echo "0" > "${OUTPUT_DIR}/${CASE_ID}/exit-code"
 echo "[case ${CASE_ID}] OK"

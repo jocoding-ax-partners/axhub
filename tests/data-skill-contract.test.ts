@@ -34,6 +34,15 @@ describe("data SKILL contract", () => {
     expect(skill).toContain("NEVER path guessing");
     expect(skill).toContain("NEVER retry denied");
   });
+
+  test("data skill hands dynamic app table work back to tables", () => {
+    const skill = read("skills/data/SKILL.md");
+
+    expect(skill).toContain("dynamic app tables are not catalog data");
+    expect(skill).toContain("orders 동적 테이블 만들고 title:text 컬럼 추가해");
+    expect(skill).toContain("skills/tables/SKILL.md");
+    expect(skill).toContain("이 skill 에서 `axhub tables` 명령을 실행하지 않아요");
+  });
 });
 
 describe("data AskUserQuestion safe defaults", () => {

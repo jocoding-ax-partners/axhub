@@ -96,8 +96,9 @@ fn run_prompt_route(prompt: &str, cwd: &Path, config_home: &Path, state_home: &P
     child.wait_with_output().expect("wait prompt-route")
 }
 
-/// The top-level `systemMessage` (the grace channel), if any. `additionalContext`
-/// carries the agent-facing preflight and is intentionally ignored here.
+/// The top-level `systemMessage`, if any. Newer high-risk intent nudges share
+/// this channel with the migration grace, so tests below assert the distinctive
+/// grace text rather than treating any systemMessage as grace.
 fn grace_system_message(output: &Output) -> Option<String> {
     assert_eq!(
         output.status.code(),
@@ -113,6 +114,12 @@ fn grace_system_message(output: &Output) -> Option<String> {
     json.get("systemMessage")
         .and_then(|v| v.as_str())
         .map(str::to_owned)
+}
+
+fn contains_grace_nudge(message: Option<&str>) -> bool {
+    message
+        .map(|msg| msg.contains("axhub.yaml") && msg.contains("/init") && msg.contains("axhub 배포"))
+        .unwrap_or(false)
 }
 
 /// Drive the **preflight surface**: run `route-decision` exactly as the deploy
@@ -186,17 +193,19 @@ fn grace_once_then_preflight_only() {
     // silently-broken `make_authed` (an unauthed run would be silent and the test
     // would pass for the wrong reason).
     let g1 = grace_system_message(&r1)
-        .expect("round 1: authed non-marker implicit deploy must emit the grace systemMessage");
+        .expect("round 1: authed non-marker implicit deploy must emit a systemMessage");
     assert!(
-        g1.contains("axhub.yaml"),
+        contains_grace_nudge(Some(&g1)),
         "round 1 systemMessage must be the migration grace nudge: {g1}"
     );
 
-    // Round 2 hook surface: grace silent (bounded to once-per-project).
-    assert_eq!(
-        grace_system_message(&r2),
-        None,
-        "round 2: the grace nudge must NOT repeat within the same project"
+    // Round 2 hook surface: the migration grace is silent (bounded to
+    // once-per-project). A separate high-risk deploy intent nudge may still be
+    // present in `systemMessage`; it is not the grace nudge this AC bounds.
+    let g2 = grace_system_message(&r2);
+    assert!(
+        !contains_grace_nudge(g2.as_deref()),
+        "round 2: the grace nudge must NOT repeat within the same project; got {g2:?}"
     );
 
     // --- preflight surface: the same shared decision both rounds consume. It is

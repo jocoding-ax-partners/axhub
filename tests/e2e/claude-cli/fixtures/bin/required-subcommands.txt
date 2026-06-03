@@ -1,4 +1,4 @@
-apis list
+catalog resources
 apps list
 auth login
 auth logout

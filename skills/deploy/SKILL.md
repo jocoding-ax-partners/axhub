@@ -48,6 +48,14 @@ raw helper JSON 이 디버깅에 필요한 환경 (개발 검증) 은 `AXHUB_DEP
 
 ## Workflow
 
+**Headless first rule.** `claude -p`, CI, `$CLAUDE_NON_INTERACTIVE`, or an unavailable/denied AskUserQuestion tool means headless mode예요. In headless mode:
+
+- Do not call AskUserQuestion.
+- Do not render numbered choices and stop.
+- Use the registry safe default immediately.
+- For Step 3 preview, force `DEPLOY_DECISION=dry_run`.
+- Continue with the Bash dry-run command path so the QA run sees real CLI/auth behavior without mutating production.
+
 <!--
 phase markers (Phase 0 baseline naming — keep aligned with
 crates/axhub-helpers/src/telemetry.rs::record_phase_marker):
@@ -569,7 +577,27 @@ To deploy:
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — Step 3 preview → `--dry-run` (가장 안전해요), Step 6 exit-65 → `abort` (subprocess 자동 로그인 안 해요).
 
-3. **Render preview card via AskUserQuestion**. The card MUST echo all five identity fields verbatim in Korean:
+Headless 에서는 preview card 를 보여준 뒤 **"진행할까요?" 같은 대기형 문장을 출력하지 말아요.** 질문을 기다리면 `claude -p` / CI QA 가 자연어로 우회하거나 멈춘 것처럼 보여요. 대신 아래처럼 내부 결정을 먼저 확정해요:
+
+```bash
+AXHUB_HEADLESS=0
+if ! [ -t 1 ] || [ -n "${CI:-}" ] || [ -n "${CLAUDE_NON_INTERACTIVE:-}" ]; then
+  AXHUB_HEADLESS=1
+fi
+
+DEPLOY_DECISION="${DEPLOY_DECISION:-}"
+if [ "$AXHUB_HEADLESS" = "1" ]; then
+  # Headless subprocesses must never approve a live mutation, even if an env var
+  # or prompt attempts to pre-set approval. Destructive fixture coverage lives in
+  # deterministic helper/Rust E2E, not in Claude's headless approval path.
+  DEPLOY_DECISION="dry_run"
+  echo "비대화형이라 실제 배포 대신 dry-run 으로 CLI/auth 경로만 확인해요." >&2
+fi
+```
+
+`DEPLOY_DECISION=dry_run` 이면 Step 4 에서 consent 를 mint 하지 말고 `--dry-run` 만 실행해요. `DEPLOY_DECISION=approve` 는 대화형 AskUserQuestion 승인 뒤에만 가능해요. `DEPLOY_DECISION=abort` 이면 즉시 멈춰요. Headless 에서는 외부 환경변수가 approve 를 미리 넣어도 dry-run 으로 덮어써요.
+
+3. **Render preview card via AskUserQuestion**. AskUserQuestion is interactive-only; headless sessions use the safe default dry-run path below. The card MUST echo all five identity fields verbatim in Korean:
 
    ```
    다음을 실행할게요:
@@ -584,7 +612,7 @@ To deploy:
 
    Use the template in `references/error-empathy-catalog.md` ("deploy-preview"). Apply NFKC normalize to displayed slug; if NFKC altered the string, surface a warning.
 
-   Then ask with structured AskUserQuestion JSON:
+   Then ask with structured AskUserQuestion JSON in interactive sessions:
 
    ```json
    {
@@ -610,7 +638,7 @@ To deploy:
    }
    ```
 
-   If the user chooses `dry_run`, add `--dry-run` to Step 4 and skip Step 5. If the user chooses `abort`, stop without minting consent.
+   If the user chooses `dry_run`, add `--dry-run` to Step 4 and skip Step 5. In headless sessions (`claude -p`, CI, `$CLAUDE_NON_INTERACTIVE`, or AskUserQuestion denied/unavailable), **do not call AskUserQuestion and do not stop at the options list**. Apply `DEPLOY_DECISION=dry_run` from the Non-interactive guard directly, add `--dry-run` to Step 4, and skip Step 5. Headless sessions must not mint consent or run `--execute`.
 
 3.5. **Token freshness gate (Phase 3.5 B-08).** Before minting consent, confirm that the auth token is fresh — SessionStart may have fired `auth-refresh-bg` in the background while the user reviewed the preview card. Skip when `AXHUB_AUTH_BG_REFRESH=0`.
 
@@ -657,13 +685,20 @@ To deploy:
      CONSENT_PROFILE="$PROFILE"
      PROFILE_FLAG=(--profile "$PROFILE")
    fi
-   cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${CONSENT_PROFILE}","branch":"","commit_sha":"${COMMIT_SHA}","context":{}}
-   JSON
-
    AXHUB_STDERR_TMP=$(mktemp)
    AXHUB_STDOUT_TMP=$(mktemp)
-   axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --commit "$COMMIT_SHA" --execute --json >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
+   if [ "${DEPLOY_DECISION:-approve}" = "dry_run" ]; then
+     axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --commit "$COMMIT_SHA" --dry-run --json >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
+   elif [ "${DEPLOY_DECISION:-approve}" = "abort" ]; then
+     echo "배포를 멈춰요." >&2
+     rm -f "$AXHUB_STDERR_TMP" "$AXHUB_STDOUT_TMP"
+     exit 0
+   else
+     cat <<JSON | "$HELPER" consent-mint
+   {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${CONSENT_PROFILE}","branch":"","commit_sha":"${COMMIT_SHA}","context":{}}
+   JSON
+     axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --commit "$COMMIT_SHA" --execute --json >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
+   fi
    AXHUB_EXIT=$?
    # Format: "axhub-error-sub-key: 64:validation.deployment_in_progress" (main.rs:1845, quality_gate.rs:15)
    if [ $AXHUB_EXIT -eq 64 ] && grep -qE '^axhub-error-sub-key:.*64:validation\.deployment_in_progress' "$AXHUB_STDERR_TMP" 2>/dev/null; then
@@ -766,7 +801,8 @@ To deploy:
 
 6. **On any non-zero exit**, route via `axhub-helpers classify-exit "$EXIT" "$STDOUT"` (spec 004 Fork-A — canonical router; 두 공간 다 처리: Step 5 `deploy status --watch` 는 CLI-native 4/5/6, Step 1 `deploy-prep` 는 helper-output 65/67/68 을 내고, classify-exit 가 65→4 / 67→5 / 68→6 으로 정규화해요) 또는 `references/error-empathy-catalog.md` by exit code:
    - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 앱은 안전해요. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.
-   - exit 64/67 + `github.git_connection_required`, `github.git_connection_not_found`, `git_connection_required`, or CLI stderr containing "GitHub 저장소 연결" → do not ask "지금 GitHub repo 연결 진행할까요?" and do not ask the user to invoke `/axhub:github`. Immediately show a direct GitHub connection block:
+   - exit 9 + `subdomain_not_configured`, `validation.subdomain_not_configured`, or CLI stderr containing "subdomain_not_configured" / "subdomain" → backend precondition 이 먼저 막은 상태예요. `axhub apps update <slug> --subdomain <subdomain> --json` 는 별도 destructive mutation 이라 바로 실행하지 말고, subdomain 2..32자 제약을 적용한 후보를 preview card 로 보여준 뒤 consent-mint 해요. 승인 후에는 apps_update 를 단독 Bash 로 실행하고, 성공하면 같은 deploy preview 승인 맥락에서 deploy_create consent 를 새로 mint 해서 Step 4 를 한 번만 재시도해요. 재시도 결과가 다시 exit 9 이면 같은 branch 를 반복하지 말고 다음 precondition branch 로 라우팅해요.
+   - exit 9/64/67 + `github.git_connection_required`, `github.git_connection_not_found`, `git_connection_required`, `precondition_failed` with CLI stderr containing "GitHub 저장소 연결" / "GitHub 연결이 먼저 필요해요" → do not ask "지금 GitHub repo 연결 진행할까요?" and do not ask the user to invoke `/axhub:github`. Immediately show a direct GitHub connection block:
 
      ```bash
      echo '[deploy:Step 6 github-link] entered' >&2

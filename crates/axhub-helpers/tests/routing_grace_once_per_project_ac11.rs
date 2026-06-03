@@ -79,8 +79,9 @@ fn make_authed(config_home: &Path) {
     std::fs::write(&token, b"fake-delegation-token\n").expect("write token");
 }
 
-/// The systemMessage channel carries the grace nudge; `additionalContext` is the
-/// agent-facing preflight. Returns the top-level `systemMessage`, if any.
+/// The top-level `systemMessage`, if any. Newer high-risk intent nudges share
+/// this channel with the migration grace, so this file checks the distinctive
+/// grace text instead of equating every systemMessage with grace.
 fn system_message(output: &Output) -> Option<String> {
     assert_eq!(
         output.status.code(),
@@ -96,6 +97,12 @@ fn system_message(output: &Output) -> Option<String> {
     json.get("systemMessage")
         .and_then(|v| v.as_str())
         .map(str::to_owned)
+}
+
+fn contains_grace_nudge(message: Option<&str>) -> bool {
+    message
+        .map(|msg| msg.contains("axhub.yaml") && msg.contains("/init") && msg.contains("axhub 배포"))
+        .unwrap_or(false)
 }
 
 const DEPLOY_PROMPT: &str = "배포해";
@@ -119,7 +126,7 @@ fn grace_fires_once_per_project_for_authed_no_marker_implicit_deploy() {
     let msg =
         system_message(&first).expect("first authed deploy prompt must emit grace systemMessage");
     assert!(
-        msg.contains("axhub.yaml") && msg.contains("/init") && msg.contains("axhub 배포"),
+        contains_grace_nudge(Some(&msg)),
         "grace must name the migration paths: {msg}"
     );
 
@@ -130,10 +137,10 @@ fn grace_fires_once_per_project_for_authed_no_marker_implicit_deploy() {
         config_home.path(),
         state_home.path(),
     );
-    assert_eq!(
-        system_message(&second),
-        None,
-        "the grace nudge must NOT repeat within the same project"
+    let second_message = system_message(&second);
+    assert!(
+        !contains_grace_nudge(second_message.as_deref()),
+        "the grace nudge must NOT repeat within the same project; got {second_message:?}"
     );
 }
 
@@ -152,10 +159,10 @@ fn grace_silent_for_unauthed_user() {
         config_home.path(),
         state_home.path(),
     );
-    assert_eq!(
-        system_message(&output),
-        None,
-        "an unauthed user must never see the migration grace nudge"
+    let message = system_message(&output);
+    assert!(
+        !contains_grace_nudge(message.as_deref()),
+        "an unauthed user must never see the migration grace nudge; got {message:?}"
     );
 }
 
@@ -175,9 +182,9 @@ fn grace_silent_for_non_deploy_prompt() {
         config_home.path(),
         state_home.path(),
     );
-    assert_eq!(
-        system_message(&output),
-        None,
-        "a non-deploy prompt must not trigger the deploy migration nudge"
+    let message = system_message(&output);
+    assert!(
+        !contains_grace_nudge(message.as_deref()),
+        "a non-deploy prompt must not trigger the deploy migration nudge; got {message:?}"
     );
 }

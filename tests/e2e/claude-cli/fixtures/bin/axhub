@@ -6,6 +6,7 @@
 # Phase 22.4 확장 — env-driven stub 분기:
 #   AXHUB_FIXTURE_VERSION=X.Y.Z   --version 응답 가짜 버전 (cli_too_old/cli_too_new 강제)
 #   AXHUB_FIXTURE_AUTH=expired    auth status / deploy create 모두 exit 65 + token_expired stderr
+#   AXHUB_FIXTURE_AUTH=deploy_expired auth status 는 통과, deploy create 만 exit 65 + token_expired stderr
 
 set -euo pipefail
 
@@ -13,6 +14,7 @@ set -euo pipefail
 SHIM_CASE_DIR="${SHIM_CASE_DIR:-${HOME}/.cache/axhub-plugin}"
 mkdir -p "$SHIM_CASE_DIR"
 touch "${SHIM_CASE_DIR}/shim-called"
+printf '%s\n' "$*" >> "${SHIM_CASE_DIR}/axhub-argv.log"
 
 # Forward args to mock-impl 또는 simple stub.
 MOCK_IMPL="$(dirname "$0")/axhub-mock-impl.sh"
@@ -32,13 +34,13 @@ case "${1:-}" in
     if [ -n "${AXHUB_FIXTURE_VERSION:-}" ]; then
       echo "ax-hub-cli ${AXHUB_FIXTURE_VERSION} (commit fake, built fake, fake)"
     else
-      echo "ax-hub-cli 0.15.3-mock"
+      echo "ax-hub-cli 0.17.3-mock"
     fi
     exit 0
     ;;
   --help|help)
     echo "Usage: axhub <subcommand> [args]"
-    echo "Subcommands: deploy / apps / apis / auth / update / logs"
+    echo "Subcommands: deploy / apps / catalog / auth / update / logs"
     exit 0
     ;;
   auth)
@@ -48,8 +50,10 @@ case "${1:-}" in
           echo '{"code":"token_expired","detail":"Bearer token has expired"}' >&2
           exit 65
         fi
-        # 기본: unauth (token fixture 없을 때)
-        if [ -f "${HOME}/.config/axhub-plugin/token" ]; then
+        # 기본: unauth (token fixture 없을 때). Match helper token lookup:
+        # XDG_CONFIG_HOME/axhub-plugin/token first, not the developer's real HOME.
+        TOKEN_PATH="${XDG_CONFIG_HOME:-$HOME/.config}/axhub-plugin/token"
+        if [ -f "$TOKEN_PATH" ]; then
           echo '{"user_email":"test@axhub.local","token_expires_at":"2099-01-01T00:00:00Z"}'
         else
           echo '{"error":"not_authenticated"}' >&2
@@ -65,7 +69,7 @@ case "${1:-}" in
   apps)
     case "${2:-}" in
       list)
-        echo '{"apps":[{"slug":"paydrop","env":"prod"}]}'
+        echo '{"apps":[{"id":"app_paydrop","slug":"paydrop","name":"paydrop","env":"prod"}]}'
         ;;
       *)
         echo '{"error":"unknown_subcommand"}' >&2
@@ -91,7 +95,7 @@ case "${1:-}" in
         echo '{"items":[{"message":"INFO fixture log ready","source":"runtime"}]}'
         ;;
       create)
-        if [ "${AXHUB_FIXTURE_AUTH:-}" = "expired" ]; then
+        if [ "${AXHUB_FIXTURE_AUTH:-}" = "expired" ] || [ "${AXHUB_FIXTURE_AUTH:-}" = "deploy_expired" ]; then
           echo '{"code":"token_expired","detail":"Bearer token has expired during deploy create"}' >&2
           exit 65
         fi
@@ -104,7 +108,25 @@ case "${1:-}" in
         ;;
     esac
     ;;
-  apis|update|logs)
+  catalog)
+    case "${2:-}" in
+      resources|search)
+        echo '{"items":[{"connector":"paydrop-public","path":"/v1/paydrop/balance","kind":"http-endpoint","description":"balance 조회","app":"paydrop","allowed_actions":["read"]},{"connector":"paydrop-create","path":"/v1/paydrop","kind":"http-endpoint","description":"결제 생성","app":"paydrop","allowed_actions":["read"]}],"next_cursor":null}'
+        ;;
+      get)
+        echo '{"connector":"paydrop-public","path":"/v1/paydrop/balance","kind":"http-endpoint","description":"balance 조회","allowed_actions":["read"]}'
+        ;;
+      invoke)
+        echo '{"error":"mock_not_implemented","subcommand":"catalog invoke"}' >&2
+        exit 64
+        ;;
+      *)
+        echo '{"error":"mock_not_implemented","subcommand":"catalog '"${2:-}"'"}' >&2
+        exit 64
+        ;;
+    esac
+    ;;
+  update|logs)
     echo '{"error":"mock_not_implemented","subcommand":"'"$1"' '"${2:-}"'"}' >&2
     exit 64
     ;;

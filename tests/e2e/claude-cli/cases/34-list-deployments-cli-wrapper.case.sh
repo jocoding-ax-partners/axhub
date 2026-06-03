@@ -20,6 +20,7 @@ AXHUB_FIXTURE_DEPLOY_LIST_AUTH="invalid" \
 RC=$?
 set -e
 echo "$RC" > "${CASE_DIR}/exit-code"
+echo "$RC" > "${CASE_DIR}/helper-exit-code"
 echo "0" > "${CASE_DIR}/wall-seconds"
 echo "[case ${CASE_ID}] exit=${RC}"
 
@@ -38,4 +39,5 @@ if grep -i -q -e 'tls' -e 'cert' -e 'spki' "${CASE_DIR}/stderr.log"; then
 fi
 
 [ "$FAIL" -gt 0 ] && { echo "[case ${CASE_ID}] FAIL"; exit 1; }
+echo "0" > "${CASE_DIR}/exit-code"
 echo "[case ${CASE_ID}] OK"

@@ -163,7 +163,7 @@ All user-facing copy is Korean. All commands assume `${CLAUDE_PLUGIN_ROOT}/bin/a
    업그레이드 후 새 터미널을 여시면 됩니다.
    ```
 
-3. **Read-only commands stay allowed** (`apps list`, `apis list`, `auth status`, `deploy status`, `deploy logs`) so the user can still inspect their environment.
+3. **Read-only commands stay allowed** (`apps list`, `catalog resources`, `auth status`, `deploy status`, `deploy logs`) so the user can still inspect their environment.
 
 4. **Re-check on next SessionStart** — sentinel auto-clears when version condition is satisfied.
 

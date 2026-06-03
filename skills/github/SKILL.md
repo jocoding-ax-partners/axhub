@@ -20,7 +20,7 @@ model: sonnet
 
 # GitHub
 
-axhub 앱과 GitHub repo 연결 상태를 안전하게 확인하고 connect/disconnect 를 consent 로 보호해요. CLI mutation 은 `axhub apps git` 서브커맨드가 담당해요. v0.17.3 의 top-level `axhub github accounts list` 와 `axhub github installations repos` 는 GitHub App read discovery 로 유효해요.
+axhub 앱과 GitHub repo 연결 상태를 안전하게 확인하고 connect/disconnect 를 consent 로 보호해요. CLI mutation 은 `axhub apps git` 서브커맨드가 담당해요. 최신 CLI 의 top-level GitHub discovery 는 `axhub github accounts list` 와 `axhub github installations repos` 예요. `axhub github list` 는 존재하지 않는 구/추측 명령이므로 실행하지 않아요.
 
 ## Workflow
 
@@ -87,7 +87,7 @@ echo "$PREFLIGHT_JSON"
    axhub apps git status --app "$APP_ID" --json
    ```
 
-   GitHub App 설치 후보를 read-only 로 찾을 때는 top-level GitHub discovery 명령도 사용할 수 있어요.
+   GitHub App 설치 후보를 read-only 로 찾을 때는 top-level GitHub discovery 명령도 사용할 수 있어요. 항상 정확한 subcommand 까지 포함해요.
 
    ```bash
    axhub github accounts list --json
@@ -233,6 +233,7 @@ echo "$PREFLIGHT_JSON"
 - NEVER disconnect 를 subprocess 에서 자동 실행하지 않아요.
 - NEVER `CLAUDE_PLUGIN_ROOT` 누락을 이유로 사용자에게 bang-prefixed connect 수동 우회를 요청하지 않아요.
 - NEVER `--json` 을 빼지 않아요.
+- NEVER `axhub github list` 를 실행하지 않아요. 계정 목록은 `axhub github accounts list --json`, 설치 repository 목록은 `axhub github installations repos --installation-id "$INSTALLATION_ID" --json` 이에요.
 - NEVER 구 `axhub github connect|disconnect|repos list` mutation 명령어를 호출하지 않아요. repo 연결/해제는 항상 `axhub apps git connect|disconnect|status` 를 써요. 단, 읽기 탐색은 `axhub github accounts list` 와 `axhub github installations repos` 를 써도 돼요.
 - NEVER `axhub apps git connect|disconnect` 를 `--execute` 없이 mutate 한다고 가정하지 않아요. dry-run 이 기본이라 `--execute` 가 빠지면 backend mutation 은 발생 안 해요.
 - NEVER OAuth device flow 의 `verification_uri` + `user_code` 를 사용자에게 안 보여주지 않아요. CLI 가 emit 한 `device_code_issued` JSON event 또는 stderr "To connect GitHub, visit: …" 줄을 그대로 흘려보내면 OAuth 가 timeout 으로 멈춰요. 두 값을 한 번에 묶어서 위 형식으로 안내해요.

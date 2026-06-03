@@ -39,9 +39,9 @@
 {"id":"T-RO-018","utterance":"which apps","intent":"apps_list","expected_skill":"apps","expected_cmd_pattern":"axhub apps list --json","destructive":false,"lang":"en","category":"read-only-happy"}
 {"id":"T-RO-019","utterance":"available apps","intent":"apps_list","expected_skill":"apps","expected_cmd_pattern":"axhub apps list --json","destructive":false,"lang":"en","category":"read-only-happy"}
 {"id":"T-RO-020","utterance":"app catalog","intent":"apps_list","expected_skill":"apps","expected_cmd_pattern":"axhub apps list --json","destructive":false,"lang":"en","category":"read-only-happy"}
-{"id":"T-RO-033","utterance":"list apis","intent":"apis_list","expected_skill":"apis","expected_cmd_pattern":"axhub apis list --json","destructive":false,"lang":"en","category":"read-only-happy"}
-{"id":"T-RO-034","utterance":"available endpoints","intent":"apis_list","expected_skill":"apis","expected_cmd_pattern":"axhub apis list --json","destructive":false,"lang":"en","category":"read-only-happy"}
-{"id":"T-RO-035","utterance":"show api catalog","intent":"apis_list","expected_skill":"apis","expected_cmd_pattern":"axhub apis list --json","destructive":false,"lang":"en","category":"read-only-happy"}
+{"id":"T-RO-033","utterance":"list apis","intent":"apis_list","expected_skill":"apis","expected_cmd_pattern":"axhub catalog resources --json --limit 50","destructive":false,"lang":"en","category":"read-only-happy"}
+{"id":"T-RO-034","utterance":"available endpoints","intent":"apis_list","expected_skill":"apis","expected_cmd_pattern":"axhub catalog resources --json --limit 50","destructive":false,"lang":"en","category":"read-only-happy"}
+{"id":"T-RO-035","utterance":"show api catalog","intent":"apis_list","expected_skill":"apis","expected_cmd_pattern":"axhub catalog resources --json --limit 50","destructive":false,"lang":"en","category":"read-only-happy"}
 {"id":"T-RO-053","utterance":"status","intent":"inspect_status","expected_skill":"inspect","expected_cmd_pattern":"axhub status --json","destructive":false,"lang":"en","category":"read-only-happy"}
 {"id":"T-RO-054","utterance":"is it done","intent":"deploy_status","expected_skill":"status","expected_cmd_pattern":"axhub deploy status dep_.* --watch --json","destructive":false,"lang":"en","category":"read-only-happy"}
 {"id":"T-RO-055","utterance":"what's the status","intent":"inspect_status","expected_skill":"inspect","expected_cmd_pattern":"axhub status --json","destructive":false,"lang":"en","category":"read-only-happy"}
@@ -87,7 +87,7 @@
 {"id":"T-MIX-005","utterance":"paydrop release 부탁드려요","intent":"deploy","expected_skill":"deploy","expected_cmd_pattern":"axhub deploy create --app paydrop --commit .* --execute --json","destructive":true,"lang":"mixed","category":"language-mix","requires_consent":true}
 {"id":"T-MIX-006","utterance":"apps list 좀 보여주세요","intent":"apps_list","expected_skill":"apps","expected_cmd_pattern":"axhub apps list --json","destructive":false,"lang":"mixed","category":"language-mix"}
 {"id":"T-MIX-007","utterance":"update check 해주세요","intent":"update_check","expected_skill":"update","expected_cmd_pattern":"axhub update check --json","destructive":false,"lang":"mixed","category":"language-mix"}
-{"id":"T-MIX-008","utterance":"내 apis catalog 알려줘","intent":"apis_list","expected_skill":"apis","expected_cmd_pattern":"axhub apis list --json","destructive":false,"lang":"mixed","category":"language-mix"}
+{"id":"T-MIX-008","utterance":"내 apis catalog 알려줘","intent":"apis_list","expected_skill":"apis","expected_cmd_pattern":"axhub catalog resources --json --limit 50","destructive":false,"lang":"mixed","category":"language-mix"}
 {"id":"T-NEG-011","utterance":"cloudflare pages에 deploy","intent":"deploy_other_platform","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"en","category":"negative","expected_response_contains":"axhub만 지원"}
 {"id":"T-NEG-012","utterance":"docker push to ghcr","intent":"deploy_other_platform","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"en","category":"negative","expected_response_contains":"axhub만 지원"}
 {"id":"T-NEG-015","utterance":"git push origin main","intent":"git_push","expected_skill":null,"expected_cmd_pattern":null,"destructive":false,"lang":"en","category":"negative"}

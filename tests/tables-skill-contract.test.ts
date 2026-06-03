@@ -61,6 +61,33 @@ describe("vibe gap-fill SKILL contracts", () => {
     expect(skill).not.toContain("--data-file");
   });
 
+  test("tables skill owns dynamic table routing after help/data context", () => {
+    const skill = read("skills/tables/SKILL.md");
+
+    expect(skill).toContain("orders 동적 테이블 만들고 title:text 컬럼 추가해");
+    expect(skill).toContain("이전 턴이 `help`/`data` 였어도 이 skill 에서 처리해요");
+    expect(skill).toContain("컬럼 추가는 `tables columns add`");
+    expect(skill).toContain("`add-column` 같은 alias 를 상상해서 실행하지 않아요");
+    expect(skill).toContain("먼저 대상 app/table/columns preview 를 보여주고");
+  });
+
+  test("tables mutation flow mints consent separately before destructive commands", () => {
+    const skill = read("skills/tables/SKILL.md");
+    const bashBlocks = [...skill.matchAll(/```bash\n([\s\S]*?)```/g)].map((match) => match[1]);
+
+    expect(skill).toContain("승인 전에는 아래 read-only 명령만 실행해요");
+    expect(skill).toContain("preview 용으로도 실행하지 않아요");
+    expect(skill).toContain("tool_call_id:\"pending\",action:\"tables_create\"");
+    expect(skill).toContain("tool_call_id:\"pending\",action:\"tables_columns_add\"");
+    expect(skill).toContain("tool_call_id:\"pending\",action:\"data_insert\"");
+    expect(skill).toContain("destructive command 를 같은 Bash block 에 섞지 않아요");
+    expect(bashBlocks.some((block) => block.includes("consent-mint"))).toBe(true);
+    expect(bashBlocks.some((block) => block.includes('axhub tables create "$TABLE"'))).toBe(true);
+    expect(
+      bashBlocks.some((block) => block.includes("consent-mint") && block.includes("axhub tables create")),
+    ).toBe(false);
+  });
+
   test("publish skill separates consent mint from destructive publish execution", () => {
     const skill = read("skills/publish/SKILL.md");
     const bashBlocks = [...skill.matchAll(/```bash\n([\s\S]*?)```/g)].map((match) => match[1]);

@@ -194,6 +194,160 @@ pub fn foreign_keyword_present(prompt: &str) -> bool {
         .any(|kw| contains_word(&lower, kw))
 }
 
+/// True when a prompt asks for axhub app dynamic-table DDL/DML.
+///
+/// This is intentionally narrower than general skill routing: it only covers the
+/// destructive table surface where native skill matching has proved costly when
+/// it drifts into `help`/`apps` and then invents unsupported CLI flags. Catalog
+/// data prompts such as "describe snowflake orders table" or "테이블 설명" must
+/// stay outside this detector.
+#[must_use]
+pub fn dynamic_table_intent_present(prompt: &str) -> bool {
+    let lower = prompt.to_lowercase();
+    let p = lower.as_str();
+
+    if contains_any_text(
+        p,
+        &["동적 테이블", "앱 테이블", "dynamic table", "app table"],
+    ) {
+        return true;
+    }
+
+    if contains_any_text(
+        p,
+        &[
+            "테이블 만들",
+            "테이블을 만들",
+            "테이블 만들어",
+            "테이블 생성",
+            "create table",
+            "table create",
+        ],
+    ) {
+        return true;
+    }
+
+    let tableish = contains_any_text(p, &["테이블", "table", "tables"]);
+    if tableish
+        && contains_any_text(
+            p,
+            &[
+                "drop", "삭제", "지우", "컬럼", "column", "grant", "revoke", "권한",
+            ],
+        )
+    {
+        return true;
+    }
+
+    contains_any_text(
+        p,
+        &[
+            "행 추가",
+            "행 넣",
+            "레코드 삽입",
+            "insert row",
+            "delete row",
+            "row insert",
+            "row update",
+            "row delete",
+        ],
+    )
+}
+
+/// Narrow deploy/status progress detector for short Korean prompts like
+/// "어디까지 됐어" that native skill matching can otherwise treat as generic
+/// session progress. These phrases are already owned by `skills/status`; the
+/// hook hint only prevents memory-style answers in the Claude CLI E2E path.
+#[must_use]
+pub fn deploy_status_intent_present(prompt: &str) -> bool {
+    let lower = prompt.to_lowercase();
+    let p = lower.as_str();
+    contains_any_text(
+        p,
+        &[
+            "어디까지",
+            "어디쯤",
+            "진행 상황",
+            "어떻게 됐",
+            "다 됐",
+            "끝났",
+            "배포 상태",
+            "deploy status",
+            "deploy state",
+            "is it done",
+        ],
+    )
+}
+
+/// Narrow deploy/create detector for bare Korean prompts like "배포해" that can
+/// otherwise be interpreted as repo release work in non-interactive Claude E2E.
+#[must_use]
+pub fn deploy_create_intent_present(prompt: &str) -> bool {
+    let lower = prompt.to_lowercase();
+    let p = lower.as_str();
+    if deploy_status_intent_present(p) {
+        return false;
+    }
+    contains_any_text(
+        p,
+        &[
+            "배포해",
+            "배포 해",
+            "배포하",
+            "배포 진행",
+            "deploy",
+            "deploy this",
+        ],
+    )
+}
+
+/// Narrow doctor/preflight detector for bare health-check prompts like
+/// "환경 점검해" that should route to `skills/doctor`, not generic repo checks.
+#[must_use]
+pub fn doctor_intent_present(prompt: &str) -> bool {
+    let lower = prompt.to_lowercase();
+    let p = lower.as_str();
+    contains_any_text(
+        p,
+        &[
+            "환경 점검",
+            "환경 체크",
+            "진단해",
+            "진단 해",
+            "doctor",
+            "health check",
+        ],
+    )
+}
+
+/// Narrow API catalog detector for prompts that ask what axhub app APIs or
+/// endpoints are available. This avoids generic repository API inspection.
+#[must_use]
+pub fn apis_intent_present(prompt: &str) -> bool {
+    let lower = prompt.to_lowercase();
+    let p = lower.as_str();
+    let apiish = contains_any_text(p, &["api", "apis", "endpoint", "엔드포인트"]);
+    apiish
+        && contains_any_text(
+            p,
+            &[
+                "뭐",
+                "목록",
+                "카탈로그",
+                "쓸 수",
+                "사용 가능",
+                "보여",
+                "list",
+                "available",
+                "catalog",
+            ],
+        )
+}
+
+fn contains_any_text(haystack: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|needle| haystack.contains(needle))
+}
+
 /// True when `prompt` is an explicit slash invocation of an axhub command
 /// (`/deploy`, `/배포` — the Korean alias in `commands/배포.md`, `/axhub:…`). The
 /// deploy preflight detects this from its own invocation context; the hook detects
@@ -535,6 +689,77 @@ mod tests {
         assert!(!is_slash_invocation("/deployment-plan 설명해줘"));
         assert!(!is_slash_invocation("/deploy-history"));
         assert!(!is_slash_invocation("/배포해")); // "/배포" + 해 = a different token
+    }
+
+    #[test]
+    fn dynamic_table_intent_detection_is_narrow() {
+        for prompt in [
+            "ultraqa-app 앱에 orders 동적 테이블 만들고 title:text 컬럼 추가해",
+            "앱 테이블 스키마 변경하고 preview 보여줘",
+            "orders 테이블 컬럼 추가해",
+            "insert row into orders",
+            "orders table grant issue",
+        ] {
+            assert!(
+                dynamic_table_intent_present(prompt),
+                "expected dynamic table intent for {prompt:?}"
+            );
+        }
+
+        for prompt in [
+            "describe snowflake analytics orders table",
+            "이 테이블 읽는 python snippet 만들어줘",
+            "테이블 설명해줘",
+            "orders 데이터 조회해줘",
+        ] {
+            assert!(
+                !dynamic_table_intent_present(prompt),
+                "catalog/data prompt must not be captured: {prompt:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn deploy_status_intent_detection_covers_short_progress_prompts() {
+        for prompt in [
+            "어디까지 됐어",
+            "지금 어디까지야",
+            "진행 상황 알려줘",
+            "방금 배포 상태 봐줘",
+            "is it done",
+            "deploy status",
+        ] {
+            assert!(
+                deploy_status_intent_present(prompt),
+                "expected deploy status intent for {prompt:?}"
+            );
+        }
+
+        for prompt in ["테이블 설명해줘", "오늘 할 일 정리해줘", "그냥 빌드만"]
+        {
+            assert!(
+                !deploy_status_intent_present(prompt),
+                "non-deploy status prompt must not be captured: {prompt:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn deploy_create_and_doctor_intent_detection_is_narrow() {
+        assert!(deploy_create_intent_present("배포해"));
+        assert!(deploy_create_intent_present("deploy this"));
+        assert!(!deploy_create_intent_present("배포 상태 봐줘"));
+        assert!(!deploy_create_intent_present("deploy status"));
+
+        assert!(doctor_intent_present("환경 점검해"));
+        assert!(doctor_intent_present("doctor"));
+        assert!(!doctor_intent_present("테이블 점검해"));
+
+        assert!(apis_intent_present(
+            "axhub 앱이 어떤 API 쓸 수 있는지 보여줘"
+        ));
+        assert!(apis_intent_present("available endpoints"));
+        assert!(!apis_intent_present("repo API 코드 리팩토링해"));
     }
 
     #[test]

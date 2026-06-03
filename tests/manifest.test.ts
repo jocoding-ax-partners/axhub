@@ -515,6 +515,13 @@ describe("commands/*.md frontmatter", () => {
     expect(help).not.toContain("AskUserQuestion");
   });
 
+  test("help command refuses operational routing drift", () => {
+    const help = cmdContents.get("help.md")!;
+    expect(help).toContain("only for explicit help/menu requests");
+    expect(help).toContain("dynamic table creation");
+    expect(help).toContain("route to the matching axhub skill");
+  });
+
   test("Korean deploy alias delegates to deploy skill without forking deploy logic", () => {
     const alias = cmdContents.get("배포.md")!;
     const deploy = cmdContents.get("deploy.md")!;
@@ -593,8 +600,9 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(skillDirs.length).toBeGreaterThanOrEqual(11);
   });
 
-  test("all 42 shipped skills are present, including v0.17.3 CLI gap-fill skills", () => {
+  test("all 43 shipped skills are present, including v0.17.3 CLI gap-fill skills", () => {
     expect(skillDirs.sort()).toEqual([
+      "apis",
       "app-lifecycle",
       "apps",
       "auth",
@@ -1010,7 +1018,7 @@ describe("cross-manifest consistency", () => {
   test("README current-release summary matches package metadata and shipped surfaces", async () => {
     const readme = await readFile(join(REPO_ROOT, "README.md"), "utf8");
     expect(readme).toContain(`**상태**: v${packageJson.version}`);
-    expect(readme).toContain("42 SKILL / 9 command");
+    expect(readme).toContain("43 SKILL / 9 command");
     expect(readme).not.toContain("AXHUB_HELPERS_RUNTIME=ts");
     expect(readme).not.toContain("TypeScript fallback");
   });

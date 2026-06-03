@@ -56,6 +56,14 @@ describe("v0.15.3 — watch/follow CLI auto-degrade contract", () => {
     expect(content).not.toContain("FOLLOW=;");
   });
 
+  test("logs prechecks deployment existence before app-level logs to avoid no-deploy 500", () => {
+    const content = readFileSync(LOGS_SKILL, "utf8");
+    expect(content).toContain("No-deploy precheck");
+    expect(content).toContain("Before any `axhub deploy logs ...` call");
+    expect(content).toContain("Do **not** call app-level `axhub deploy logs --app <APP>` without a deploy id");
+    expect(content).toContain("exit 7 + API 500");
+  });
+
   test("deploy watch uses --watch-timeout override so CLI polls to terminal under agent context", () => {
     const content = readFileSync(DEPLOY_SKILL, "utf8");
     // --watch-timeout (explicit streaming override) keeps the CLI watch() loop
