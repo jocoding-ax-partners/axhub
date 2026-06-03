@@ -1169,6 +1169,13 @@ Suggested: call Skill(axhub:apis); use latest CLI `axhub catalog resources --jso
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
+const AUTH_STATUS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+[axhub hook | auth status]
+Observed: login/token/identity status prompt.
+Suggested: call Skill(axhub:auth); run `axhub auth status --json` and show account/expiry/scopes. Do not route to the heavier doctor diagnostic.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
 // Approach E (Phase 2): cmd_prompt_route is preflight + audit first.
 // It generally avoids keyword chains and `skills/<X>/SKILL.md` path enforcement;
 // a narrow dynamic-table hint exists because UltraQA caught native matching
@@ -1178,9 +1185,10 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         append as audit_append, now_iso8601, sha256_hex, AuditDecision, AuditRecord,
     };
     use axhub_helpers::routing::{
-        apis_intent_present, axhub_keyword_present, decide, deploy_create_intent_present,
-        deploy_status_intent_present, doctor_intent_present, dynamic_table_intent_present,
-        find_marker, foreign_keyword_present, is_slash_invocation, token_present, MarkerStatus,
+        apis_intent_present, auth_status_intent_present, axhub_keyword_present, decide,
+        deploy_create_intent_present, deploy_status_intent_present, doctor_intent_present,
+        dynamic_table_intent_present, find_marker, foreign_keyword_present, is_slash_invocation,
+        token_present, MarkerStatus,
     };
 
     if hook_safety::is_hook_disabled("prompt-route") {
@@ -1260,6 +1268,10 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         context.push_str("\n\n");
         context.push_str(DOCTOR_ROUTING_HINT);
     }
+    if auth_status_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(AUTH_STATUS_ROUTING_HINT);
+    }
     if !hook_safety::is_karpathy_disabled() {
         if let Some(karpathy) = axhub_helpers::karpathy_inject::user_prompt_karpathy_inject()? {
             context.push_str("\n\n");
@@ -1272,6 +1284,8 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         Some("axhub 배포 상태 요청이에요. Skill(axhub:status)를 사용하고, 로그인/토큰 확인이 필요하면 그 안내를 한국어로 말해요.")
     } else if deploy_create_intent_present(prompt) {
         Some("axhub 배포 요청이에요. Skill(axhub:deploy)를 사용해요. 토큰 만료나 인증 오류가 있으면 원인/해결을 한국어로 말해요.")
+    } else if auth_status_intent_present(prompt) {
+        Some("axhub 로그인/인증 상태 요청이에요. Skill(axhub:auth)로 `axhub auth status`를 확인해 계정·만료·scope 를 보여줘요. 무거운 doctor 진단 카드는 쓰지 않아요.")
     } else if doctor_intent_present(prompt) {
         Some("axhub 환경 점검 요청이에요. Skill(axhub:doctor)를 사용해요. CLI 버전이 오래됐으면 업그레이드/확인 안내를 한국어로 말해요.")
     } else {

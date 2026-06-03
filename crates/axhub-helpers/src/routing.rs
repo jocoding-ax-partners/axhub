@@ -344,6 +344,49 @@ pub fn apis_intent_present(prompt: &str) -> bool {
         )
 }
 
+/// Narrow auth identity/status detector for prompts like "로그인 돼 있어?" or
+/// "토큰 살아있어?" that ask about login/token state. Without this hint the model
+/// reads these status-shaped questions as a diagnosis request and routes to the
+/// heavier `skills/doctor` (full env card) instead of `skills/auth` (focused
+/// identity card). Every phrase is anchored on an auth noun (로그인/토큰/인증/누구/
+/// whoami) so deploy-status ("배포 상태"), doctor ("설치돼 있어?"), and apps prompts
+/// are never stolen. Login/logout *actions* keep routing via the auth SKILL
+/// description; this only fills the status-query gap.
+#[must_use]
+pub fn auth_status_intent_present(prompt: &str) -> bool {
+    let lower = prompt.to_lowercase();
+    let p = lower.as_str();
+    contains_any_text(
+        p,
+        &[
+            "로그인 돼",
+            "로그인 됐",
+            "로그인 되어",
+            "로그인했",
+            "로그인 상태",
+            "로그인 유지",
+            "로그인 살아",
+            "로그인 만료",
+            "로그인 안 돼",
+            "로그인 안돼",
+            "토큰 살아",
+            "토큰 만료",
+            "토큰 유효",
+            "토큰 상태",
+            "인증 상태",
+            "인증 됐",
+            "인증 돼",
+            "누구로 로그인",
+            "누구로 접속",
+            "어떤 계정",
+            "whoami",
+            "who am i",
+            "logged in",
+            "auth status",
+        ],
+    )
+}
+
 fn contains_any_text(haystack: &str, needles: &[&str]) -> bool {
     needles.iter().any(|needle| haystack.contains(needle))
 }
@@ -760,6 +803,23 @@ mod tests {
         ));
         assert!(apis_intent_present("available endpoints"));
         assert!(!apis_intent_present("repo API 코드 리팩토링해"));
+    }
+
+    #[test]
+    fn auth_status_intent_detection_is_narrow() {
+        // login/token/identity status questions route to auth, not doctor
+        assert!(auth_status_intent_present("나 지금 로그인 돼 있어?"));
+        assert!(auth_status_intent_present("로그인 됐어?"));
+        assert!(auth_status_intent_present("로그인 상태 확인해줘"));
+        assert!(auth_status_intent_present("토큰 살아있어?"));
+        assert!(auth_status_intent_present("어떤 계정으로 접속 중이야?"));
+        assert!(auth_status_intent_present("who am i"));
+        // must NOT steal doctor / deploy-status / apps / generic prompts
+        assert!(!auth_status_intent_present("axhub 설치돼 있어?"));
+        assert!(!auth_status_intent_present("환경 점검해줘"));
+        assert!(!auth_status_intent_present("배포 상태 봐줘"));
+        assert!(!auth_status_intent_present("내 앱 목록 보여줘"));
+        assert!(!auth_status_intent_present("배포 다 됐어?"));
     }
 
     #[test]
