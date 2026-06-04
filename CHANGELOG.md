@@ -4,6 +4,19 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.30](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.28...v0.9.30) (2026-06-04)
+
+이번 릴리스는 플러그인 SKILL 을 실제 axhub CLI QA 결과에 정합시켜요. 첫 배포(vibe bootstrap) 흐름에서 매니페스트 `name` 을 유효 슬러그로 변환해 배포 차단을 풀고, 앱 생성을 `--from-file`(YAML) 대신 `--name/--slug` 로 바꿨어요. quality-gate 의 첫 배포 `ExitCodeMismatch` false-positive 를 제거하고, 로그인 상태 질문은 doctor 가 아닌 auth 로 라우팅해요.
+
+### Fixed
+
+* align plugin skills with live axhub CLI QA ([#166](https://github.com/jocoding-ax-partners/axhub/issues/166)) ([bc250f9](https://github.com/jocoding-ax-partners/axhub/commit/bc250f9e93a34b8b885c6c6c738c43a1aca1a7df))
+
+
+### Docs
+
+* SKILL 슬래시 명령 전부 표기 (모든 skill 은 /axhub:<이름> 으로 호출) ([d273b44](https://github.com/jocoding-ax-partners/axhub/commit/d273b4422419f26165ecec5fc2eb9097c0fc010f))
+
 ## [0.9.29](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.28...v0.9.29) (2026-06-03)
 
 
