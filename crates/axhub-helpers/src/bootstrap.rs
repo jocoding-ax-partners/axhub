@@ -654,8 +654,8 @@ fn plan_apps_create(manifest: &ManifestInfo, plan_only: bool, persist_plan: bool
     // framework/build come from the manifest at deploy time, not at create). We
     // already parsed the slug from the manifest, so prescribe that command and stop
     // gracefully when the manifest has no name/slug to bind.
-    let slug = match manifest.slug.as_deref() {
-        Some(value) if !value.is_empty() => value.to_string(),
+    let raw_slug = match manifest.slug.as_deref() {
+        Some(value) if !value.is_empty() => value,
         _ => {
             return stop(
                 BootstrapState::BackendContractMissingDefaults,
@@ -665,6 +665,21 @@ fn plan_apps_create(manifest: &ManifestInfo, plan_only: bool, persist_plan: bool
                 ),
             );
         }
+    };
+    // The manifest value may be a human display name ("My Cool App") pulled from
+    // the `name:` key, but `apps create --slug` (and the HMAC binding) need a
+    // backend-valid slug `^[a-z0-9][a-z0-9-]*$`. Emitting the raw name would make
+    // the live CLI reject the command and re-deadlock first deploy — the same
+    // failure class the `--from-file` fix removed. Slugify so the create command
+    // is always valid; stop gracefully when nothing valid can be derived.
+    let Some(slug) = slugify(raw_slug) else {
+        return stop(
+            BootstrapState::BackendContractMissingDefaults,
+            format!(
+                "{} 의 이름 '{}' 으로 유효한 슬러그를 만들 수 없어요. 영문·숫자 'slug: <슬러그>' 를 추가하고 다시 배포해요.",
+                manifest.path, raw_slug
+            ),
+        );
     };
     let mut state = BootstrapStateFile::new(
         BootstrapState::ConsentRequiredAppsCreate,
@@ -1055,6 +1070,27 @@ fn parse_manifest_slug(raw: &str) -> Option<String> {
     None
 }
 
+/// Derive a backend-valid slug (`^[a-z0-9][a-z0-9-]*$`) from an arbitrary
+/// manifest value. The `name:` fallback in [`parse_manifest_slug`] may yield a
+/// human display name like `"My Cool App"`; lowercase it, collapse each run of
+/// space/`-`/`_`/`.` into a single hyphen, drop other punctuation and non-ASCII,
+/// and trim leading/trailing hyphens. Returns `None` when nothing valid remains
+/// (e.g. an all-non-ASCII name like `"내 앱"`), so the caller stops gracefully
+/// and asks for an explicit `slug:`. Already-valid slugs (`"paydrop"`) are
+/// returned unchanged.
+fn slugify(raw: &str) -> Option<String> {
+    let mut out = String::with_capacity(raw.len());
+    for ch in raw.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else if matches!(ch, ' ' | '-' | '_' | '.') && !out.is_empty() && !out.ends_with('-') {
+            out.push('-');
+        }
+    }
+    let slug = out.trim_matches('-');
+    (!slug.is_empty()).then(|| slug.to_string())
+}
+
 fn state_path(cwd: &Path) -> PathBuf {
     cwd.join(BOOTSTRAP_STATE_RELATIVE_PATH)
 }
@@ -1371,5 +1407,86 @@ mod tests {
         );
         assert_eq!(serialized["id"], "deploy");
         assert_eq!(serialized["required_for_deploy"], true);
+    }
+
+    #[test]
+    fn slugify_derives_valid_slug_from_display_name() {
+        // The bug: a manifest with `name: My Cool App` and no explicit slug fed
+        // the raw name straight into `apps create --slug`, which the live CLI
+        // rejects (`^[a-z0-9][a-z0-9-]*$`), re-deadlocking first deploy.
+        assert_eq!(slugify("My Cool App").as_deref(), Some("my-cool-app"));
+        assert_eq!(slugify("  Spaced  Out  ").as_deref(), Some("spaced-out"));
+        assert_eq!(
+            slugify("Under_score.dot-dash").as_deref(),
+            Some("under-score-dot-dash")
+        );
+        assert_eq!(slugify("Trailing---").as_deref(), Some("trailing"));
+        assert_eq!(slugify("App!!! v2").as_deref(), Some("app-v2"));
+    }
+
+    #[test]
+    fn slugify_passes_through_already_valid_slug() {
+        // Idempotent on canonical slugs so the proven `paydrop` path is unchanged.
+        assert_eq!(slugify("paydrop").as_deref(), Some("paydrop"));
+        assert_eq!(slugify("my-cool-app").as_deref(), Some("my-cool-app"));
+        assert_eq!(slugify("app123").as_deref(), Some("app123"));
+    }
+
+    #[test]
+    fn slugify_emitted_slug_matches_backend_regex() {
+        let re = regex::Regex::new(r"^[a-z0-9][a-z0-9-]*$").unwrap();
+        for name in ["My Cool App", "123 Start", "a.b_c-d", "MIXED Case 9"] {
+            let slug = slugify(name).expect("should derive a slug");
+            assert!(
+                re.is_match(&slug),
+                "slug {slug:?} from {name:?} must match backend regex"
+            );
+        }
+    }
+
+    #[test]
+    fn slugify_returns_none_when_nothing_valid_remains() {
+        // Non-ASCII (e.g. a Korean name) or punctuation-only input yields no valid
+        // slug → caller stops gracefully and asks for an explicit `slug:`.
+        assert_eq!(slugify("내 앱"), None);
+        assert_eq!(slugify("!!!"), None);
+        assert_eq!(slugify("   "), None);
+        assert_eq!(slugify(""), None);
+    }
+
+    #[test]
+    fn plan_apps_create_slugifies_display_name_into_valid_command() {
+        // End-to-end at the planner level: a display-name manifest must emit a
+        // valid `--slug` and bind the HMAC consent context to the same slug.
+        let manifest = ManifestInfo {
+            path: "axhub.yaml".into(),
+            slug: Some("My Cool App".into()),
+        };
+        let run = plan_apps_create(&manifest, true, false);
+        let cmd = run
+            .output
+            .command
+            .as_ref()
+            .expect("apps_create plan must carry a command");
+        let slug_idx = cmd
+            .iter()
+            .position(|a| a == "--slug")
+            .expect("--slug present");
+        assert_eq!(
+            cmd[slug_idx + 1],
+            "my-cool-app",
+            "emitted slug must be valid"
+        );
+        let binding = run
+            .output
+            .consent_binding
+            .as_ref()
+            .expect("create plan must carry a consent binding");
+        assert_eq!(binding.app_id, "my-cool-app");
+        assert_eq!(
+            binding.context.get("slug").map(String::as_str),
+            Some("my-cool-app"),
+            "HMAC context.slug must equal the slugified value so the PreToolUse parser binding matches"
+        );
     }
 }
