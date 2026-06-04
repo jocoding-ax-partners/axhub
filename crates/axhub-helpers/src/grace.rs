@@ -6,7 +6,8 @@
 //! previously leaned on that implicit nudge would otherwise lose it silently —
 //! a backward-compat regression surface (spec §86). So the prompt-route hook
 //! emits a **one-time** `systemMessage` that explains the new contract and names
-//! the two explicit paths (`/init` to drop a marker, or say "axhub 배포").
+//! the two explicit natural-language paths (initialize the project, or say
+//! "axhub 배포").
 //!
 //! Bounded to a single exposure **per project** (spec §43 "이중 노출 정책":
 //! grace educates *once*; the deploy preflight disambiguation blocks *every*
@@ -43,10 +44,11 @@ use crate::routing::RoutingDecision;
 use crate::runtime_paths;
 
 /// The once-per-project migration nudge, user-facing 해요체 (`lint:tone`).
-/// Names both explicit recovery paths from spec §43: `/init` (drop an
-/// `axhub.yaml` marker) or the literal `"axhub"` keyword.
+/// Names both explicit recovery paths from spec §43: a natural-language
+/// initialization request (drop an `axhub.yaml` marker) or the literal
+/// `"axhub"` keyword.
 pub const GRACE_MESSAGE: &str = "이 프로젝트엔 axhub.yaml 이 없어서 \"배포해\" 같은 \
-무명시 요청으로는 axhub 자동 배포를 더 안 해요. axhub 로 배포하려면 `/init` 으로 \
+무명시 요청으로는 axhub 자동 배포를 더 안 해요. axhub 로 배포하려면 \"axhub 프로젝트 초기화해줘\"라고 말해 \
 axhub.yaml 을 만들거나 \"axhub 배포\" 처럼 명시해 주세요. (이 안내는 프로젝트당 한 번만 나와요.)";
 
 /// Korean deploy-intent stems (substring match). Korean is agglutinative, so a
@@ -314,7 +316,7 @@ mod tests {
             );
         }
         // Both explicit recovery paths from spec §43 are named.
-        assert!(GRACE_MESSAGE.contains("/init"));
+        assert!(GRACE_MESSAGE.contains("axhub 프로젝트 초기화해줘"));
         assert!(GRACE_MESSAGE.contains("axhub 배포"));
     }
 }

@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: '이 스킬은 사용자가 현재 브랜치를 axhub 라이브로 배포하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "공개해", "내보내자", "띄워", "배포", "배포해", "배포해줘", "쏘자", "올려", "올리자", "터트려", "푸시한 거 띄워", "프로덕션", "프로덕션에 박아", "demo가 필요", "demo가 필요해", "deploy", "launch", "release", "rollout", "ship", 또는 현재 브랜치를 axhub 라이브로 push 하고 싶다는 모든 의도. axhub deploy create 를 안전 가드와 함께 트리거: 라이브 profile/app 해석, AskUserQuestion preview card 를 통한 HMAC consent gate, exit-code 기반 복구 라우팅.'
+description: '이 스킬은 사용자가 현재 브랜치를 axhub 라이브로 배포하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "공개해", "내보내자", "띄워", "배포", "배포해", "배포해줘", "쏘자", "올려", "올리자", "터트려", "푸시한 거 띄워", "프로덕션", "프로덕션에 박아", "demo가 필요", "demo가 필요해", "deploy", "launch", "release", "rollout", "ship", 또는 현재 브랜치를 axhub 라이브로 올리고 싶다는 모든 의도. 안전한 배포 준비 확인, 라이브 profile/app 해석, AskUserQuestion preview card 를 통한 HMAC consent gate, exit-code 기반 복구 라우팅을 담당합니다.'
 examples:
   - utterance: "paydrop 배포해"
     intent: "deploy current branch to axhub live"
@@ -21,6 +21,22 @@ model: sonnet
 # Deploy via axhub
 
 Deploy a vibe coder's app to axhub with safety primitives. Use the adapter `axhub-helpers` (auto on PATH while plugin is enabled) for live resolution and consent management. Do not call `axhub deploy create` directly without going through the helper flow.
+
+## Claude Desktop Natural-Language Path
+
+When the user says a human deployment phrase such as `배포해줘`, `올려줘`, or `프로덕션에 띄워줘`, keep the visible conversation human:
+
+- The first visible chat sentence must be exactly `배포 준비를 확인할게요.`
+- For the initial Desktop preview, stop reading this skill after this section. Do not read the long workflow below until the user has approved the preview card.
+- Immediately run one Bash/tool call with title `배포 준비 확인`: `axhub-helpers deploy-preview-summary --user-utterance "<latest user sentence>"`.
+- Copy that Korean stdout as the preview card and ask for explicit approval.
+- After the user explicitly approves, run one Bash/tool call with title `배포 실행`: `axhub-helpers deploy-approved-run --user-utterance "<latest user sentence>"`.
+- Copy that Korean stdout as the final deploy result. Do not call this skill again after approval.
+- Do not echo the user's phrase as a route conversion, such as `"배포해줘" → ...`.
+- Do not write `/axhub:deploy`, `axhub deploy`, `deploy skill`, `skill 호출`, `트리거`, `Invoke deploy skill`, `Read rest of SKILL`, `Read full SKILL`, `Route=axhub`, `preflight`, `deploy-prep`, `HMAC`, or `consent token` in the assistant body.
+- If a Bash/tool call is needed, use Korean titles only: `배포 준비 확인`, `배포 실행`, or `배포 상태 확인`.
+- Before any destructive deploy, show only the Korean preview card (앱 / 환경 / 브랜치 / 커밋 / 예상 시간) and ask for explicit approval.
+- If login is expired or missing, explain whether login is needed in Korean and ask before starting a login flow.
 
 ## Vibe Coder Visibility Rules
 
@@ -47,6 +63,8 @@ Deploy a vibe coder's app to axhub with safety primitives. Use the adapter `axhu
 raw helper JSON 이 디버깅에 필요한 환경 (개발 검증) 은 `AXHUB_DEPLOY_VERBOSE=1` 환경변수가 켜진 경우에만 echo 해요. 기본 흐름은 항상 한 줄 자연어로 진행해요.
 
 ## Workflow
+
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
 **Headless first rule.** `claude -p`, CI, `$CLAUDE_NON_INTERACTIVE`, or an unavailable/denied AskUserQuestion tool means headless mode예요. In headless mode:
 
@@ -116,7 +134,7 @@ if ($env:CLAUDE_PLUGIN_ROOT) {
 echo '[deploy:Step 0 routing-gate] entered' >&2
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 EXPLICIT_FLAG=""
 [ "${EXPLICIT:-0}" = "1" ] && EXPLICIT_FLAG="--explicit"
 ROUTE_JSON=$("$HELPER" route-decision --user-utterance "$ARGS" $EXPLICIT_FLAG 2>/dev/null)
@@ -159,19 +177,21 @@ echo "$ROUTE_JSON"
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 [ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
 echo "$PREFLIGHT_JSON"
 ```
 
-`auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
+`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 치명적이지 않으면 워크플로를 계속 진행해요.
 
 **Command lane.** POSIX/Git Bash/WSL 은 `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers` 를 쓰고, Windows PowerShell 은 `& "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe"` 를 써요. JSON stdin 이 필요한 helper 호출은 PowerShell 에서 `ConvertTo-Json -Compress | & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" <subcommand>` 형태로 실행해요. Bash 배열 예시는 Windows 에서 그대로 붙여넣지 말고 PowerShell 배열 (`$ProfileArgs = @("--profile", $env:PROFILE)`) 로 바꿔요.
 
 To deploy:
 
 0. **Render TodoWrite checklist — derive it from the actual deploy path (don't paste a fixed list).** Call TodoWrite at workflow start so the vibe coder sees real-time progress. The items depend on what `deploy-prep` returns in Step 1: a git-connected app whose push auto-deploys **watches** a deploy it did not create (status-first), while a first-deploy or non-git app mints consent and runs `deploy create`. Read the situation, then write the todos that match it — the two blocks below are reference shapes, not a script to paste. Reference shape A — git-connected / status-first watch:
+
+   **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue the workflow; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
 
    ```typescript
    TodoWrite({ todos: [
@@ -209,7 +229,7 @@ To deploy:
    echo '[deploy:Step 1 deploy-prep] entered' >&2
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    DEPLOY_PREP_JSON=$("$HELPER" deploy-prep --intent deploy --user-utterance "$ARGS" --json)
    echo "$DEPLOY_PREP_JSON"
    ```
@@ -236,7 +256,7 @@ To deploy:
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [[ "${AXHUB_DEPLOY_PREP:-1}" == "0" ]]; then
      echo '[deploy:Step 1 resolve legacy] entered' >&2
      "$HELPER" resolve --intent deploy --user-utterance "$ARGS" --json
@@ -251,7 +271,7 @@ To deploy:
    echo '[deploy:Step 1 bootstrap-plan] entered' >&2
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    "$HELPER" bootstrap --auto-chain --json
    ```
 
@@ -263,7 +283,7 @@ To deploy:
    echo '[deploy:Step 1 bootstrap-record] entered' >&2
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    cat > /tmp/axhub-bootstrap-record.json <<JSON
    {
      "schema_version": "bootstrap-record/v1",
@@ -285,7 +305,7 @@ To deploy:
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [[ "${AXHUB_DEPLOY_PREP:-1}" == "0" ]] || [[ "${AXHUB_RESOLVE_AFTER_GIT_INIT:-0}" == "1" ]]; then
      echo '[deploy:Step 1 resolve refresh] entered' >&2
      "$HELPER" resolve --intent deploy --user-utterance "$ARGS" --json
@@ -341,7 +361,7 @@ To deploy:
    echo '[deploy:Step 1.5 git-init] entered' >&2
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
      git init >/dev/null 2>&1
    fi
@@ -478,7 +498,7 @@ To deploy:
    echo '[deploy:Step 1.7 status-first] entered' >&2
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    GITHUB_CONNECTED=$(echo "$DEPLOY_PREP_JSON" | jq -r '.github_connected // false')
    STATUS_FIRST_ID=$(echo "$DEPLOY_PREP_JSON" | jq -r '.in_flight_deploy.id // ""')
    # github 연결 앱인데 in-flight 가 아직 안 보이면, push 자동배포가 backend 에 등록될 시간을 잠깐 줘요.
@@ -506,7 +526,7 @@ To deploy:
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [[ "${AXHUB_DEPLOY_PREP:-1}" == "0" ]]; then
      echo '[deploy:Step 2 preflight legacy] entered' >&2
      "$HELPER" preflight --json
@@ -522,7 +542,7 @@ To deploy:
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [[ "$CLI_TOO_NEW" == "true" ]]; then
      IGNORE_UNTIL=$("$HELPER" config get ignore_too_new_until --json 2>/dev/null | jq -r '.value // ""')
      CLI_VER=$(echo "$PREFLIGHT_JSON" | jq -r '.cli_version // ""')
@@ -646,7 +666,7 @@ fi
    echo '[deploy:Step 3.5 token-freshness] entered' >&2
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    "$HELPER" token-gate
    ```
 
@@ -658,7 +678,7 @@ fi
    echo '[deploy:Step 3.6 refresh-in-flight] entered' >&2
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [ "${AXHUB_REFRESH_IN_FLIGHT:-0}" = "1" ]; then
      REFRESH_JSON=$("$HELPER" deploy-prep --intent deploy --user-utterance "$ARGS" --refresh-in-flight --json 2>/dev/null || echo '{}')
      NEW_IN_FLIGHT=$(echo "$REFRESH_JSON" | jq -r '.in_flight_deploy.id // ""')
@@ -678,7 +698,7 @@ fi
    echo '[deploy:Step 4 consent-deploy] entered' >&2
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    CONSENT_PROFILE=""
    PROFILE_FLAG=()
    if [ -n "${PROFILE:-}" ] && [ "${PROFILE:-}" != "default" ]; then
@@ -779,7 +799,7 @@ fi
    echo '[deploy:Step 5 status-chain] entered' >&2
    DEPLOY_LIST_JSON=$(axhub deploy list --app "$APP_ID" --json 2>/dev/null || echo '{"items":[]}')
    if [ "$(echo "$DEPLOY_LIST_JSON" | jq '(.items // .) | length')" -eq 0 ]; then
-     echo '{"systemMessage":"배포 이력이 없어요. 먼저 /axhub:deploy 로 배포 후 다시 호출하세요."}'
+     echo '{"systemMessage":"배포 이력이 없어요. 먼저 배포해줘라고 말한 뒤 다시 확인해 주세요."}'
      exit 0
    fi
    ```
@@ -793,7 +813,7 @@ fi
    **에이전트도 terminal 까지 폴링해요 (axhub-cli 0.15.3+).** bare `--watch` 는 agent context(비-TTY / `--no-input`)에서 single-snapshot 으로 degrade 하지만, `--watch-timeout` (또는 `--watch-interval`) 을 붙이면 explicit streaming override 라 CLI 가 degrade 하지 않고 terminal status(`succeeded` / `failed` / `cancelled` / `rolled_back`) 까지 직접 폴링하면서 NDJSON `stage_transition` 을 emit 해요. 그래서 SKILL 이 따로 bash polling loop 를 돌릴 필요가 없어요 — terminal 판정도 CLI 가 해요. 이 bash 는 Bash tool `timeout: 570000` (9.5분, `--watch-timeout 9m` 보다 약간 큼) 으로 호출해요. 사람 TTY 에서도 같은 명령이 스트림으로 watch 돼요.
 
    - **terminal 도달**: CLI 가 폴링을 끝내고 exit 해요. Step 6 exit-code 라우팅 + 성공/실패 안내로 완료를 한 번에 알려줘요. 사용자가 "아직도 진행 중이야?" 하고 다시 안 물어도 돼요.
-   - **9분 timeout** (CLI 가 Timeout error + `axhub deploy watch ... resume` hint 를 줘요): 완료를 선언하지 말아요. "빌드가 아직 진행 중이에요 (9분+ 째). 계속 확인할게요." 한 줄을 보여주고 위 명령을 한 번 더 재호출해요 (총 2회 = 최대 ~19분). 2회 후에도 terminal 이 아니면 "빌드가 예상보다 길어요. `/axhub:status` 로 이어서 확인할 수 있어요." 로 안내하고 멈춰요.
+   - **9분 timeout** (CLI 가 Timeout error + `axhub deploy watch ... resume` hint 를 줘요): 완료를 선언하지 말아요. "빌드가 아직 진행 중이에요 (9분+ 째). 계속 확인할게요." 한 줄을 보여주고 위 명령을 한 번 더 재호출해요 (총 2회 = 최대 ~19분). 2회 후에도 terminal 이 아니면 "빌드가 예상보다 길어요. "배포 상태 계속 확인해줘"라고 말하면 이어서 볼 수 있어요." 로 안내하고 멈춰요.
 
    raw NDJSON / JSON dump 금지 — 진행은 NDJSON `stage_transition` 을 humanize 하고, terminal 시 단일 한국어 요약만 보여줘요.
 

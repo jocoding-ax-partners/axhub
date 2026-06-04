@@ -1,7 +1,11 @@
 ---
 name: github
-description: '이 스킬은 사용자가 axhub 앱과 GitHub repo 를 연결하거나 끊고 싶어할 때 사용해요. 다음 표현에서 활성화: "깃허브 연결", "내 repo 붙", "내 repo 붙여", "git 연결", "github 연결", "GitHub 연결", "GitHub repo 연결해", "repo 끊", "repo 끊어", "repo 연결", "github connect", "github disconnect", "github repo", 또는 GitHub 연동 의도. GitHub App 설치가 없으면 install URL 을 안내해요.'
+description: '이 스킬은 사용자가 axhub 앱과 GitHub repo 연결 상태를 보거나, repo 를 연결하거나, 연결을 끊고 싶어할 때 사용해요. 다음 표현에서 활성화: "이 앱 깃허브랑 연결돼 있어?", "GitHub 연결 상태 봐줘", "깃허브 연결", "내 repo 붙", "내 repo 붙여", "git 연결", "github 연결", "GitHub 연결", "GitHub repo 연결해", "repo 끊", "repo 끊어", "repo 연결", "github connect", "github disconnect", "github repo", 또는 GitHub 연동 의도. GitHub App 설치가 없으면 install URL 을 안내해요.'
 examples:
+  - utterance: "이 앱 깃허브랑 연결돼 있어?"
+    intent: "check axhub app github repo connection status"
+  - utterance: "GitHub 연결 상태 봐줘"
+    intent: "check axhub app github repo connection status"
   - utterance: "깃허브 연결"
     intent: "connect github repo to axhub"
   - utterance: "내 repo 붙"
@@ -22,7 +26,27 @@ model: sonnet
 
 axhub 앱과 GitHub repo 연결 상태를 안전하게 확인하고 connect/disconnect 를 consent 로 보호해요. CLI mutation 은 `axhub apps git` 서브커맨드가 담당해요. 최신 CLI 의 top-level GitHub discovery 는 `axhub github accounts list` 와 `axhub github installations repos` 예요. `axhub github list` 는 존재하지 않는 구/추측 명령이므로 실행하지 않아요.
 
+## Claude Desktop natural-language contract
+
+When the user asks a natural app-level GitHub question like `이 앱 깃허브랑 연결돼 있어?`, `GitHub 연결 상태 봐줘`, `내 repo 붙여`, or `repo 연결해줘`, treat it as an AXHub hosted-app GitHub integration request, not a local git repository audit.
+
+For a read-only status question, visible chat must start with exactly:
+
+`GitHub 연결 상태를 확인할게요.`
+
+Then use exactly one Bash tool titled `GitHub 연결 상태 확인`:
+
+```bash
+axhub-helpers github-summary --user-utterance "<latest user sentence>"
+```
+
+Copy the Korean stdout as the answer. Do not run `git remote`, `git config`, `gh`, repo source/file inspection, ToolSearch, or PR-related checks for this status question. Do not show raw command names, raw JSON, raw ids, account emails, installation ids, local git remote evidence, slash commands, skill names, route labels, or English tool-title fragments.
+
+Connect, disconnect, repo creation, remote add, and push are mutations. Show a Korean preview and wait for explicit approval before running any mutation.
+
 ## Workflow
+
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
 To connect GitHub:
 
@@ -31,15 +55,17 @@ To connect GitHub:
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 [ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
 echo "$PREFLIGHT_JSON"
 ```
 
-`auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
+`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 치명적이지 않으면 워크플로를 계속 진행해요.
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
+
+   **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue the workflow; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
 
    ```typescript
    TodoWrite({ todos: [
@@ -59,9 +85,9 @@ echo "$PREFLIGHT_JSON"
    **preflight 의 `cli_state` 를 보고 분기해요** (v0.9.6 부터 명시적 필드 emit). `cli_present:false` 만으로 "CLI 미설치 (PATH 에 없음)" 으로 해석하지 마세요 — cli_state 4 값에 따라 안내가 달라요:
 
    - `"ok"` → 정상, SKILL 흐름 그대로 진행
-   - `"not_found"` → "axhub CLI 가 PATH 에서 안 보여요." `/axhub:install-cli` 또는 macOS Apple Silicon Homebrew 사용 중이면 `/opt/homebrew/bin` inherit 안 됐을 가능성. `/axhub:doctor` 로 진단.
-   - `"config_corrupted"` → "axhub CLI 는 설치돼 있지만 `~/.config/axhub/config.yaml` 이 새 schema 와 안 맞아요 (예: user_id UUID vs int64 mismatch)." `/axhub:auth` 로 재로그인하면 fresh config 가 작성되면서 자동 fix 돼요. (CLI 미설치 아니라 config drift 임을 명확히 구분)
-   - `"runtime_error"` → "axhub CLI 가 실행은 됐지만 비정상 exit 했어요." `/axhub:doctor` 로 진단.
+   - `"not_found"` → "axhub CLI 가 PATH 에서 안 보여요." "설치 도와줘"라고 말하면 CLI 설치를 확인할 수 있고, macOS Apple Silicon Homebrew 사용 중이면 `/opt/homebrew/bin` inherit 안 됐을 가능성이 있어요. "설치 상태 진단해줘"라고 말하면 진단할 수 있다고 안내해요.
+   - `"config_corrupted"` → "axhub CLI 는 설치돼 있지만 `~/.config/axhub/config.yaml` 이 새 schema 와 안 맞아요 (예: user_id UUID vs int64 mismatch)." "다시 로그인해줘"라고 말하면 fresh config 가 작성되면서 자동 fix 될 수 있어요. (CLI 미설치 아니라 config drift 임을 명확히 구분)
+   - `"runtime_error"` → "axhub CLI 가 실행은 됐지만 비정상 exit 했어요. 설치 상태 진단해줘라고 말하면 이어서 점검할 수 있어요."
 
    진단 카드 / status 표시할 때 cli_state 별 메시지를 그대로 써요. `cli_present:false` 를 임의로 "PATH 에 없음" 으로 매핑하지 마세요.
 
@@ -183,7 +209,7 @@ echo "$PREFLIGHT_JSON"
    APP_ID="${APP_ID:-$APP}"
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    cat <<JSON | "$HELPER" consent-mint
    {"tool_call_id":"pending","action":"github_connect","app_id":"${APP_ID}","profile":"","branch":"${BRANCH}","commit_sha":"","context":{"repo":"${OWNER_REPO}","branch":"${BRANCH}","account":"${ACCOUNT}"}}
    JSON
@@ -216,7 +242,7 @@ echo "$PREFLIGHT_JSON"
    APP_ID_OR_SLUG="${APP_ID_OR_SLUG:-$APP_ID}"
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    cat <<JSON | "$HELPER" consent-mint
    {"tool_call_id":"pending","action":"github_disconnect","app_id":"${APP_ID}","profile":"","branch":"","commit_sha":"","context":{"slug":"${APP_ID_OR_SLUG}"}}
    JSON

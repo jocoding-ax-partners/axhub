@@ -1,11 +1,13 @@
 ---
 name: routing-stats
-description: '이 스킬은 사용자가 axhub plugin 의 routing 통계, 매칭 패턴, 사용 분석을 보고 싶어할 때 사용해요. 다음 표현에서 활성화: "라우팅 통계", "routing stats", "이번 주 routing 어땠어", "지난주 매칭", "어떤 skill 많이 썼어", "axhub routing 분석", "show routing analytics", "view audit summary", "show usage analytics", 또는 routing-stats CLI 의 자연어 invocation 의도. axhub-helpers routing-stats --json 을 호출하고 결과를 한국어 narrative 로 변환해요.'
+description: '이 스킬은 사용자가 axhub plugin 의 routing 통계, 매칭 패턴, 사용 분석을 보고 싶어할 때 사용해요. 특히 Claude Desktop에서 "이번 주 axhub 라우팅 어땠어?" 같은 자연어 요청은 QA 파일 읽기나 repo audit 이 아니라 routing-stats 요약으로 처리해요. 다음 표현에서 활성화: "이번 주 axhub 라우팅 어땠어?", "라우팅 통계", "라우팅 어땠어", "routing stats", "이번 주 routing 어땠어", "지난주 매칭", "어떤 skill 많이 썼어", "axhub routing 분석", "show routing analytics", "view audit summary", "show usage analytics", 또는 routing-stats CLI 의 자연어 invocation 의도. axhub-helpers routing-stats 를 호출하고 결과를 한국어 narrative 로 변환해요.'
 multi-step: false
 needs-preflight: true
 allows-dependency-execution: false
 model: haiku
 examples:
+  - utterance: "이번 주 axhub 라우팅 어땠어?"
+    intent: "show axhub routing statistics summary"
   - utterance: "라우팅 통계"
     intent: "show axhub routing statistics summary"
   - utterance: "이번 주 routing 어땠어"
@@ -22,7 +24,33 @@ examples:
 
 axhub plugin 의 자연어 routing 결과 통계를 한국어 narrative 로 보여줘요. audit log 7일 보관 + privacy 보장 (sha256 hash 만 저장).
 
+## Claude Desktop contract
+
+For ordinary Claude Desktop routing-stat questions such as `이번 주 axhub 라우팅 어땠어?`, do not read QA result files, repo files, plugin source files, `.omc`, `.claude`, git history, or local project notes.
+
+Start with exactly:
+
+```text
+라우팅 통계를 확인할게요.
+```
+
+For Bash tool calls, set the tool `description` or title exactly:
+
+```text
+라우팅 통계 확인
+```
+
+Then run exactly one command:
+
+```bash
+axhub-helpers routing-stats --since 7d
+```
+
+Answer with a short Korean summary from stdout. Do not show raw command names, internal routing labels, file contents, English tool-title fragments, or QA-result-file findings.
+
 ## Workflow
+
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
 To show routing stats:
 
@@ -31,13 +59,13 @@ To show routing stats:
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 [ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
 echo "$PREFLIGHT_JSON"
 ```
 
-`auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
+`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 치명적이지 않으면 워크플로를 계속 진행해요.
 
 1. **CLI 호출.** `axhub-helpers routing-stats --since 7d --json` 호출해요.
 

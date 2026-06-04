@@ -44,7 +44,7 @@ if [ "$STATE" = "PASS" ]; then
     echo "  FAIL: headless deploy case attempted AskUserQuestion instead of safe default" >&2
     FAIL=1
   fi
-  if ! printf '%s' "$RESULT_TEXT" | grep -Ei -q "exit 65"; then
+  if ! printf '%s' "$RESULT_TEXT" | grep -Eiq "exit[^0-9]{0,40}65"; then
     echo "  FAIL: final result did not surface fixture token-expired exit 65" >&2
     FAIL=1
   fi

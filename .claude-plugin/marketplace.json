@@ -1,5 +1,6 @@
 {
   "name": "axhub",
+  "description": "Claude Code marketplace for the axhub plugin and ax-hub-cli powered skills.",
   "owner": {
     "name": "Jocoding AX Partners",
     "url": "https://jocodingax.ai"
@@ -8,7 +9,7 @@
     {
       "name": "axhub",
       "source": "./",
-      "description": "Korean-first axhub Claude Code plugin wrapping ax-hub-cli v0.15 surfaces with NL skills and consent gates",
+      "description": "Korean-first axhub Claude Code plugin wrapping ax-hub-cli v0.17.4 surfaces with NL skills and consent gates",
       "version": "0.9.30"
     }
   ]

@@ -22,11 +22,34 @@ model: sonnet
 
 axhub CLI 가 설치되지 않았을 때 공식 installer (`cli.axhub.ai`) 로 자동 설치해요. Homebrew/Scoop 등 패키지 매니저 채널은 사용하지 않아요 — 공식 installer 단일 채널이에요 (패키지 매니저 채널은 갱신이 늦어 구버전 client_id 로 로그인 실패 위험). 설치 후 `axhub --version` 으로 검증하고 다음 단계 (`로그인해줘`) 로 안내해요.
 
+## Claude Desktop natural-language path
+
+For ordinary Desktop prompts like `axhub CLI 설치해줘`, `axhub 설치해줘`, or `cli 설치해줘`, start with the safe installed-or-missing check before any installer work.
+
+- First visible sentence, exactly: `설치 상태를 확인할게요.`
+- Use exactly one Bash tool call first.
+- Bash title/description, exactly: `설치 상태 확인`
+- Bash command:
+
+  ```bash
+  axhub-helpers install-summary --user-utterance "<latest user sentence>"
+  ```
+
+If stdout says the CLI is already installed, copy that Korean stdout as the answer and stop. Do not run installer commands, do not show installer commands, and do not continue into OS/channel selection.
+
+If stdout says the CLI is missing, copy the Korean stdout and ask for a normal chat approval (`진행` or `취소`) before any installer command. Actual installer execution remains destructive and requires explicit approval.
+
+Do not write route labels, slash commands, skill names, `preflight`, `auth status`, raw JSON fields, installer URLs, filesystem paths, English tool-title fragments, or internal workflow labels in visible user-facing text.
+
 ## Workflow
+
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
 To install ax-hub-cli on the user's host:
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).** Call TodoWrite at workflow start:
+
+   **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue the workflow; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
 
    ```typescript
    TodoWrite({ todos: [

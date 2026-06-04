@@ -1,7 +1,9 @@
 ---
 name: publish
-description: '이 스킬은 사용자가 만든 axhub 앱을 마켓플레이스에 공개 심사로 제출하고 싶어할 때 사용해요. 다음 표현에서 활성화: "앱 공개", "게시", "게시해", "마켓에 올려", "퍼블리시", "심사 제출", "심사 올려", "스토어에 올려", "publish", "submit for review", "make public", 또는 axhub 앱 공개 심사 제출 의도.'
+description: '이 스킬은 사용자가 만든 axhub 앱을 마켓플레이스에 공개 심사로 제출하고 싶어할 때 사용해요. 다음 표현에서 활성화: "이 앱 공개 심사 넣고 싶어", "앱 공개", "게시", "게시해", "마켓에 올려", "퍼블리시", "심사 제출", "심사 올려", "스토어에 올려", "submit for review", "make public", 또는 axhub 앱 공개 심사 제출 의도.'
 examples:
+  - utterance: "이 앱 공개 심사 넣고 싶어"
+    intent: "check app review submission readiness"
   - utterance: "앱 공개 심사 올려"
     intent: "submit app for marketplace review"
   - utterance: "paydrop 퍼블리시"
@@ -22,14 +24,34 @@ model: sonnet
 
 axhub 앱을 마켓플레이스 공개 심사로 제출해요. 현재 CLI v0.17.3 은 제출 생성까지만 구현되어 있고 `--watch` 는 backend 실행에서 읽지 않으니 승인/반려 polling 을 약속하지 않아요.
 
+## Claude Desktop natural-language path
+
+Use this path first for normal human prompts such as `이 앱 공개 심사 넣고 싶어`, `앱 공개 심사 올려줘`, `마켓에 올려`, or `스토어에 올려줘`.
+
+1. First visible sentence, exactly: `공개 심사 준비를 확인할게요.`
+2. Use exactly one Bash tool call. Bash description/title, exactly: `공개 심사 준비 확인`
+3. Bash command:
+
+   ```bash
+   axhub-helpers publish-summary --user-utterance "<latest user sentence>"
+   ```
+
+4. Copy the Korean stdout as the answer and stop unless the user has already provided both a review note and explicit approval.
+5. If a review note is missing, ask for the note naturally. Do not submit, mint consent, or call `axhub publish` yet.
+6. Actual submission requires a Korean preview of the target app and note, then explicit approval. Submission is an external marketplace mutation.
+
+Do not read `quality.json`, local state files, QA result files, plugin source, repo files, or package files before the preparation summary. Do not write `publish 스킬`, `publish 흐름`, `/axhub:publish`, `Preflight`, `auth ok`, `current_app`, `review=...`, command names, raw JSON fields, raw review status fields, file contents, ToolSearch narration, or English tool-title fragments in visible text.
+
 ## Workflow
+
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
 **Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
 
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s
 ' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d	%s
 ",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
@@ -37,9 +59,11 @@ PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 echo "$PREFLIGHT_JSON"
 ```
 
-`auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
+`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 치명적이지 않으면 워크플로를 계속 진행해요.
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
+
+   **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue the workflow; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
 
    ```typescript
    TodoWrite({ todos: [

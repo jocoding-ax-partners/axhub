@@ -660,10 +660,10 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 // .claude-plugin/plugin.json
 {
   "name": "axhub",
-  "version": "0.9.29",
-  "description": "Claude Code plugin for axhub — vibe coder app hub. Korean-first natural-language deploy and manage with HMAC-bound consent gates, live profile/app resolution, and exit-code recovery routing. Wraps ax-hub-cli (v0.1.0+).",
+  "version": "0.9.30",
+  "description": "Korean-first Claude Code plugin for axhub. Wraps ax-hub-cli v0.17.4 surfaces with natural-language skills, Rust prompt routing, and HMAC-bound consent gates.",
   "author": {"name": "Jocoding AX Partners", "url": "https://jocodingax.ai"},
-  "homepage": "https://axhub-api.jocodingax.ai",
+  "homepage": "https://axhub.jocodingax.ai",
   "repository": "https://github.com/jocoding-ax-partners/axhub.git",
   "license": "MIT",
   "keywords": ["axhub", "vibe-coding", "deploy", "korean", "claude-code-plugin"]
@@ -676,8 +676,8 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
   "plugins": [{
     "name": "axhub",
     "source": "./",
-    "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders at customer companies",
-    "version": "0.9.29"
+    "description": "Korean-first axhub Claude Code plugin wrapping ax-hub-cli v0.17.4 surfaces with NL skills and consent gates",
+    "version": "0.9.30"
   }]
 }
 ```

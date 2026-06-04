@@ -1564,6 +1564,7 @@ exit 1
         "axhub 에 누구로 로그인돼있어",
         "로그 보여줘",
         "배포 상태 봐",
+        "testnextjs 앱 잠깐 멈춰줘",
         "방금 거 되돌려",
         "axhub 새 버전 있어",
         "axhub 플러그인 업데이트",
@@ -1642,10 +1643,21 @@ exit 1
         .as_str()
         .expect("additionalContext");
     assert!(ctx.contains("<axhub-routing-hint>"), "{ctx}");
-    assert!(ctx.contains("Skill(axhub:tables)"), "{ctx}");
-    assert!(ctx.contains("Do not call Skill(axhub:help)"), "{ctx}");
-    assert!(ctx.contains("axhub tables create \"$TABLE\""), "{ctx}");
-    assert!(ctx.contains("axhub tables columns add \"$TABLE\""), "{ctx}");
+    assert!(ctx.contains("테이블 변경 내용을 확인할게요"), "{ctx}");
+    assert!(ctx.contains("Korean preview of the target app"), "{ctx}");
+    assert!(!ctx.contains("Skill(axhub:"), "{ctx}");
+    assert!(
+        ctx.contains("must not include raw CLI command lines"),
+        "{ctx}"
+    );
+    assert!(ctx.contains("do not call AskUserQuestion"), "{ctx}");
+    assert!(ctx.contains("raw question JSON"), "{ctx}");
+    assert!(!ctx.contains("AXHub tables workflow"), "{ctx}");
+    assert!(!ctx.contains("axhub tables create \"$TABLE\""), "{ctx}");
+    assert!(
+        !ctx.contains("axhub tables columns add \"$TABLE\""),
+        "{ctx}"
+    );
     assert!(ctx.contains("consent-mint"), "{ctx}");
 
     let data_input = serde_json::json!({
@@ -1661,9 +1673,65 @@ exit 1
     assert_eq!(data_output.status.code(), Some(0));
     let data_stdout = String::from_utf8_lossy(&data_output.stdout);
     assert!(
-        !data_stdout.contains("<axhub-routing-hint>"),
+        data_stdout.contains("데이터 리소스를 확인할게요"),
+        "catalog/data prompt should get the data hint: {data_stdout}"
+    );
+    assert!(
+        !data_stdout.contains("테이블 변경 내용을 확인할게요"),
         "catalog/data prompt must not get dynamic-table hint: {data_stdout}"
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_prompt_route_desktop_app_template_hints_are_surgical() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_axhub(&temp);
+    let cases = [
+        ("새 앱 만들어줘", "axhub 앱 생성 절차"),
+        ("내 앱 목록 보여줘", "현재 팀 scope"),
+        ("템플릿 뭐 있어?", "read-only"),
+    ];
+
+    for (prompt, expected) in cases {
+        let input = serde_json::json!({
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": prompt,
+        })
+        .to_string();
+        let output = run_stdin(
+            &["prompt-route"],
+            &input,
+            &[
+                ("AXHUB_BIN", axhub.to_str().unwrap()),
+                ("AXHUB_NO_AUDIT", "1"),
+            ],
+        );
+        assert_eq!(output.status.code(), Some(0));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains(expected),
+            "{prompt:?} should inject {expected}; stdout={stdout}"
+        );
+        assert!(
+            !stdout.contains("skills/") && !stdout.contains("SKILL.md"),
+            "hints must not regress to path enforcement: {stdout}"
+        );
+        assert!(
+            !stdout.contains("Skill(axhub:") && !stdout.contains("skill trigger"),
+            "hints must not leak internal skill labels into model-visible prose: {stdout}"
+        );
+        if prompt == "새 앱 만들어줘" {
+            assert!(
+                stdout.contains("브레인스토밍이나 일반 프로젝트 탐색이 아니라 axhub 앱 생성 절차"),
+                "new-app Desktop hint must steer away from brainstorming/generic discovery: {stdout}"
+            );
+            assert!(
+                stdout.contains("첫 문장은 정확히"),
+                "new-app Desktop hint must keep internal labels out of user-facing text: {stdout}"
+            );
+        }
+    }
 }
 
 #[cfg(unix)]
@@ -1706,7 +1774,8 @@ exit 1
         .as_str()
         .expect("additionalContext");
     assert!(ctx.contains("<axhub-routing-hint>"), "{ctx}");
-    assert!(ctx.contains("Skill(axhub:status)"), "{ctx}");
+    assert!(ctx.contains("AXHub status workflow"), "{ctx}");
+    assert!(!ctx.contains("Skill(axhub:"), "{ctx}");
     assert!(ctx.contains("do not answer from repo/git memory"), "{ctx}");
     assert!(ctx.contains("로그인/토큰 확인"), "{ctx}");
     let system_message = stdout_json["systemMessage"]
@@ -1738,24 +1807,162 @@ esac
     permissions.set_mode(0o755);
     std::fs::set_permissions(&axhub, permissions).unwrap();
 
-    for (prompt, skill, phrase, user_phrase) in [
+    for (prompt, workflow, phrase, user_phrase) in [
         (
             "배포해",
-            "Skill(axhub:deploy)",
-            "do not use git release",
-            "토큰 만료",
+            "First visible sentence, exactly",
+            "axhub-helpers deploy-preview-summary --user-utterance",
+            "배포 준비 확인",
         ),
         (
             "환경 점검해",
-            "Skill(axhub:doctor)",
-            "do not run generic repo health",
-            "CLI 버전",
+            "First visible sentence, exactly",
+            "axhub-helpers doctor-summary --user-utterance",
+            "설치 상태 확인",
         ),
         (
             "axhub 앱이 어떤 API 쓸 수 있는지 보여줘",
-            "Skill(axhub:apis)",
+            "AXHub API catalog workflow",
             "axhub catalog resources --json --limit 50",
             "API 카탈로그",
+        ),
+        (
+            "매니페스트랑 설정 괜찮은지 봐줘",
+            "First visible sentence, exactly",
+            "axhub-helpers inspect-config-summary",
+            "매니페스트와 설정 확인",
+        ),
+        (
+            "로그 좀 보여줘",
+            "First visible sentence, exactly",
+            "axhub-helpers logs-summary --user-utterance",
+            "로그 확인",
+        ),
+        (
+            "라이브 페이지 열어봐",
+            "First visible sentence, exactly",
+            "axhub-helpers open-summary --user-utterance",
+            "앱 페이지 확인",
+        ),
+        (
+            "방금 배포 진짜 열리는지 확인해줘",
+            "First visible sentence, exactly",
+            "axhub-helpers verify-summary --user-utterance",
+            "배포 검증",
+        ),
+        (
+            "배포 실패 원인 알려줘",
+            "First visible sentence, exactly",
+            "axhub-helpers trace-summary --user-utterance",
+            "배포 기록 확인",
+        ),
+        (
+            "방금 배포 되돌려줘",
+            "First visible sentence, exactly",
+            "axhub-helpers rollback-summary --user-utterance",
+            "배포 되돌리기 확인",
+        ),
+        (
+            "이번 주 axhub 라우팅 어땠어?",
+            "First visible sentence, exactly",
+            "axhub-helpers routing-stats --since 7d",
+            "라우팅 통계 확인",
+        ),
+        (
+            "환경변수 뭐 있어?",
+            "First visible sentence, exactly",
+            "axhub-helpers env-summary --user-utterance",
+            "환경변수 확인",
+        ),
+        (
+            "Postgres 데이터베이스 연결하고 싶어",
+            "AXHub external database connector",
+            "Do not inspect or edit local app code",
+            "데이터베이스 연결을 준비할게요",
+        ),
+        (
+            "리소스 정리하고 싶어",
+            "First visible sentence, exactly",
+            "axhub-helpers resources-summary --user-utterance",
+            "리소스 현황 확인",
+        ),
+        (
+            "이 앱 깃허브랑 연결돼 있어?",
+            "First visible sentence, exactly",
+            "axhub-helpers github-summary --user-utterance",
+            "GitHub 연결 상태 확인",
+        ),
+        (
+            "이 프로젝트 axhub로 옮길 수 있어?",
+            "First visible sentence, exactly",
+            "axhub-helpers migrate-summary --user-utterance",
+            "가져오기 상태 확인",
+        ),
+        (
+            "이 앱 공개 심사 넣고 싶어",
+            "First visible sentence, exactly",
+            "axhub-helpers publish-summary --user-utterance",
+            "공개 심사 준비 확인",
+        ),
+        (
+            "팀원 초대해",
+            "First visible sentence, exactly",
+            "axhub-helpers team-summary --user-utterance",
+            "팀 작업 확인",
+        ),
+        (
+            "testnextjs 앱 잠깐 멈춰줘",
+            "AXHub hosted app lifecycle request",
+            "앱 변경을 실행할까요?",
+            "앱 변경 실행",
+        ),
+        (
+            "testnextjs 다시 켜줘",
+            "AXHub hosted app lifecycle request",
+            "앱 변경을 실행할까요?",
+            "앱 변경 실행",
+        ),
+        (
+            "axhub CLI 설치 상태 괜찮아?",
+            "First visible sentence, exactly",
+            "axhub-helpers doctor-summary --user-utterance",
+            "설치 상태 확인",
+        ),
+        (
+            "axhub CLI 설치해줘",
+            "First visible sentence, exactly",
+            "axhub-helpers install-summary --user-utterance",
+            "설치 상태 확인",
+        ),
+        (
+            "업데이트 필요한지 봐줘",
+            "First visible sentence, exactly",
+            "axhub-helpers update-summary --user-utterance",
+            "업데이트 확인",
+        ),
+        (
+            "나 로그인 돼 있어?",
+            "First visible sentence, exactly",
+            "axhub-helpers auth-summary --user-utterance",
+            "로그인 상태 확인",
+        ),
+        (
+            "로그인 다시 해야 해?",
+            "로그인 상태를 확인할게요",
+            "axhub-helpers auth-summary --user-utterance",
+            "로그인 상태 확인",
+        ),
+        (
+            "상태바 켜줘",
+            "First visible sentence, exactly",
+            "axhub-helpers statusline-summary --user-utterance",
+            "상태바 설정",
+        ),
+        (
+            "axhub 좀 도와줘",
+            "First visible sentence, exactly",
+            "어떤 걸 도와드릴까요?",
+            "작업 선택",
         ),
     ] {
         let input = serde_json::json!({
@@ -1775,13 +1982,1749 @@ esac
             .as_str()
             .expect("additionalContext");
         assert!(ctx.contains("<axhub-routing-hint>"), "{ctx}");
-        assert!(ctx.contains(skill), "{ctx}");
+        assert!(ctx.contains(workflow), "{ctx}");
+        assert!(!ctx.contains("Skill(axhub:"), "{ctx}");
         assert!(ctx.contains(phrase), "{ctx}");
         let system_message = stdout_json["systemMessage"]
             .as_str()
             .expect("systemMessage");
         assert!(system_message.contains(user_phrase), "{system_message}");
+        if prompt == "매니페스트랑 설정 괜찮은지 봐줘" {
+            assert!(!ctx.contains("AXHub inspect summary helper"), "{ctx}");
+            assert!(
+                !system_message.contains("helper 로 처리"),
+                "{system_message}"
+            );
+            assert!(
+                !system_message.contains("점검 요청이에요"),
+                "{system_message}"
+            );
+        }
+        if prompt == "로그 좀 보여줘" {
+            assert!(ctx.contains("Do not inspect local repo log files"), "{ctx}");
+            assert!(
+                system_message.contains("로컬 파일 로그"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "배포해" {
+            assert!(
+                !ctx.contains("Observed: axhub deploy/create prompt"),
+                "{ctx}"
+            );
+            assert!(
+                !ctx.contains("Suggested: use the AXHub deploy workflow"),
+                "{ctx}"
+            );
+            assert!(
+                system_message.contains("visible chat 으로 정확히 \"배포 준비를 확인할게요.\""),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("deploy-preview-summary"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("deploy-approved-run"),
+                "{system_message}"
+            );
+            assert!(
+                system_message
+                    .contains("preview 전에는 긴 deploy skill 본문을 읽거나 요약하지 않아요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("승인 후에는 skill 을 다시 호출하거나"),
+                "{system_message}"
+            );
+        }
+        if prompt == "라이브 페이지 열어봐" {
+            assert!(ctx.contains("Do not inspect QA result files"), "{ctx}");
+            assert!(ctx.contains("ToolSearch narration"), "{ctx}");
+            assert!(system_message.contains("QA 결과 파일"), "{system_message}");
+            assert!(
+                system_message.contains("Chrome MCP 상태"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "방금 배포 진짜 열리는지 확인해줘" {
+            assert!(ctx.contains("Do not narrate routing"), "{ctx}");
+            assert!(ctx.contains("stale cache IDs"), "{ctx}");
+            assert!(
+                system_message.contains("배포가 실제로 열리는지 확인할게요"),
+                "{system_message}"
+            );
+            assert!(system_message.contains("user email"), "{system_message}");
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "배포 실패 원인 알려줘" {
+            assert!(ctx.contains("deployment failure-cause request"), "{ctx}");
+            assert!(ctx.contains("Do not narrate routing"), "{ctx}");
+            assert!(ctx.contains("failure_reason"), "{ctx}");
+            assert!(ctx.contains("matched_patterns"), "{ctx}");
+            assert!(
+                system_message.contains("배포 기록을 확인할게요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("trace-summary --user-utterance"),
+                "{system_message}"
+            );
+            assert!(system_message.contains("deploy id"), "{system_message}");
+            assert!(
+                system_message.contains("failure_reason"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "방금 배포 되돌려줘" {
+            assert!(
+                ctx.contains("deployment restore/rollback/recover request"),
+                "{ctx}"
+            );
+            assert!(ctx.contains("rollback-summary --user-utterance"), "{ctx}");
+            assert!(
+                system_message.contains("되돌릴 수 있는 배포를 확인할게요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("배포 되돌리기 확인"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("rollback-summary --user-utterance"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("명시적으로 승인하기 전에는 실행하지 않아요"),
+                "{system_message}"
+            );
+            for leaked in ["스킬 호출", "/axhub:rollback", "/axhub:recover"] {
+                assert!(
+                    !system_message.contains(leaked),
+                    "{leaked}: {system_message}"
+                );
+            }
+        }
+        if prompt == "이번 주 axhub 라우팅 어땠어?" {
+            assert!(ctx.contains("Do not inspect QA result files"), "{ctx}");
+            assert!(ctx.contains("desktop QA logs"), "{ctx}");
+            assert!(system_message.contains("QA 결과 파일"), "{system_message}");
+            assert!(
+                system_message.contains("라우팅 통계를 확인할게요"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "환경변수 뭐 있어?" {
+            assert!(
+                ctx.contains("Do not inspect shell environment variables"),
+                "{ctx}"
+            );
+            assert!(ctx.contains("raw values"), "{ctx}");
+            assert!(system_message.contains("환경변수를 확인할게요"));
+            assert!(system_message.contains(".env 파일"), "{system_message}");
+            assert!(system_message.contains("raw value"), "{system_message}");
+            assert!(system_message.contains("preflight"), "{system_message}");
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "Postgres 데이터베이스 연결하고 싶어" {
+            assert!(ctx.contains("server.js"), "{ctx}");
+            assert!(ctx.contains("package.json"), "{ctx}");
+            assert!(ctx.contains("DATABASE_URL"), "{ctx}");
+            assert!(
+                ctx.contains("Do not ask for secret values in chat"),
+                "{ctx}"
+            );
+            assert!(
+                system_message.contains("로컬 앱 코드 수정"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("데이터베이스 연결을 준비할게요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("workflow/워크플로"),
+                "{system_message}"
+            );
+            assert!(system_message.contains("계정 이메일"), "{system_message}");
+            assert!(
+                system_message.contains("A/B 구현 분기 라벨"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "이 프로젝트 axhub로 옮길 수 있어?" {
+            assert!(
+                ctx.contains("existing-app import/migration readiness"),
+                "{ctx}"
+            );
+            assert!(
+                ctx.contains("Do not answer from local server checks"),
+                "{ctx}"
+            );
+            assert!(ctx.contains("previous deployment failure state"), "{ctx}");
+            assert!(
+                system_message.contains("가져오기 상태를 확인할게요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("migrate-summary --user-utterance"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("로컬 서버 점검"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("이전 배포 실패 상태"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("raw deploy status field"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "이 앱 공개 심사 넣고 싶어" {
+            assert!(
+                ctx.contains("marketplace/public review submission"),
+                "{ctx}"
+            );
+            assert!(ctx.contains("Do not read quality files"), "{ctx}");
+            assert!(
+                system_message.contains("공개 심사 준비를 확인할게요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("publish-summary --user-utterance"),
+                "{system_message}"
+            );
+            assert!(system_message.contains("quality.json"), "{system_message}");
+            assert!(
+                system_message.contains("명시적 승인 전에는 실행하지 않아요"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "팀원 초대해" {
+            assert!(ctx.contains("workspace team invitation"), "{ctx}");
+            assert!(
+                ctx.contains("Do not reinterpret it as Claude/OMC multi-agent team setup"),
+                "{ctx}"
+            );
+            assert!(
+                system_message.contains("팀 작업을 확인할게요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("team-summary --user-utterance"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("Claude/OMC 멀티에이전트 작업 팀"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("명시적 승인 전에는 실행하지 않아요"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "testnextjs 앱 잠깐 멈춰줘" || prompt == "testnextjs 다시 켜줘" {
+            assert!(
+                ctx.contains("Do not inspect local Next.js/dev-server processes"),
+                "{ctx}"
+            );
+            assert!(ctx.contains("ps/lsof"), "{ctx}");
+            assert!(ctx.contains("앱 변경 준비"), "{ctx}");
+            assert!(ctx.contains("Continue in this same answer flow"), "{ctx}");
+            assert!(ctx.contains("Human-visible flow"), "{ctx}");
+            assert!(
+                ctx.contains("axhub-helpers consent-mint-app-lifecycle"),
+                "{ctx}"
+            );
+            assert!(
+                ctx.contains("literal app argument used in the following"),
+                "{ctx}"
+            );
+            assert!(ctx.contains("not a resolved UUID"), "{ctx}");
+            assert!(ctx.contains("Never say `User chose`"), "{ctx}");
+            assert!(ctx.contains("trailing success echo"), "{ctx}");
+            assert!(ctx.contains("raw JSON stdout"), "{ctx}");
+            assert!(ctx.contains("--execute --json >/dev/null"), "{ctx}");
+            assert!(ctx.contains("[DESTRUCTIVE] about to run"), "{ctx}");
+            assert!(
+                ctx.contains("Do not run another preparation/execution pair"),
+                "{ctx}"
+            );
+            assert!(ctx.contains("비공개 (private)"), "{ctx}");
+            assert!(ctx.contains("Do not build JSON by hand"), "{ctx}");
+            assert!(ctx.contains("schema inspection"), "{ctx}");
+            assert!(ctx.contains("fixture lookup"), "{ctx}");
+            assert!(
+                ctx.contains("Do not combine preparation and execution"),
+                "{ctx}"
+            );
+            assert!(ctx.contains("앱을 한 번 더 확인할게요"), "{ctx}");
+            assert!(
+                system_message.contains("로컬 Next.js/dev-server 프로세스"),
+                "{system_message}"
+            );
+            assert!(
+                system_message
+                    .contains("이 대화 안에서 바로 진행하고 slash command 를 호출하지 않아요"),
+                "{system_message}"
+            );
+            assert!(system_message.contains("앱 변경 준비"), "{system_message}");
+            assert!(
+                system_message.contains("둘을 한 Bash command 로 합치지 않아요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("axhub-helpers consent-mint-app-lifecycle"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("literal 앱 인자와 정확히 같아야 해요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("User chose`, `Mint consent"),
+                "{system_message}"
+            );
+            assert!(system_message.contains("계정 이메일"), "{system_message}");
+            assert!(
+                system_message.contains("JSON 을 직접 만들지 않고"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("schema/source/fixture/helper 탐색 없이"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("trailing success echo"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("raw JSON stdout"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("--execute --json >/dev/null"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("[DESTRUCTIVE] about to run"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("다시 준비하거나 다시 실행하지 않아요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("비공개 (private)"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("식별자 조회를 설명하지 않아요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("진행`을 고르기 전에는 앱 상태를 바꾸지 않아요"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+            assert!(
+                !system_message.contains("ID를 확인할게요"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("승인 토큰"), "{system_message}");
+            assert!(
+                !system_message.contains("app-lifecycle skill"),
+                "{system_message}"
+            );
+            assert!(!ctx.contains("app-lifecycle skill"), "{ctx}");
+            assert!(
+                !system_message.contains("/axhub:app-lifecycle"),
+                "{system_message}"
+            );
+            assert!(!ctx.contains("/axhub:app-lifecycle"), "{ctx}");
+        }
+        if prompt == "testnextjs 다시 켜줘" {
+            assert!(
+                ctx.contains("resume intent: <app> 앱을 다시 켤 준비를 할게요."),
+                "{ctx}"
+            );
+            assert!(
+                system_message.contains("resume 은 `<앱 이름> 앱을 다시 켤 준비를 할게요.`"),
+                "{system_message}"
+            );
+        }
+        if prompt == "axhub CLI 설치 상태 괜찮아?" {
+            assert!(
+                ctx.contains("Do not install, update, login, logout"),
+                "{ctx}"
+            );
+            assert!(ctx.contains("raw user emails"), "{ctx}");
+            assert!(
+                system_message.contains("설치 상태를 확인할게요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("doctor-summary --user-utterance"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("raw user email"),
+                "{system_message}"
+            );
+            assert!(system_message.contains("preflight"), "{system_message}");
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "axhub CLI 설치해줘" {
+            assert!(ctx.contains("install-summary --user-utterance"), "{ctx}");
+            assert!(
+                system_message.contains("설치 상태를 확인할게요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("install-summary --user-utterance"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("installer 를 실행하지 않아요"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "업데이트 필요한지 봐줘" {
+            assert!(ctx.contains("update-summary --user-utterance"), "{ctx}");
+            assert!(ctx.contains("has_update"), "{ctx}");
+            assert!(
+                system_message.contains("업데이트를 확인할게요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("update-summary --user-utterance"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("명시적으로 적용을 승인하기 전에는"),
+                "{system_message}"
+            );
+            for leaked in [
+                "Check axhub update",
+                "doctor-summary --user-utterance",
+                "install-summary --user-utterance",
+                "스킬 호출",
+            ] {
+                assert!(
+                    !system_message.contains(leaked),
+                    "{leaked}: {system_message}"
+                );
+            }
+        }
+        if prompt == "나 로그인 돼 있어?" || prompt == "로그인 다시 해야 해?" {
+            assert!(ctx.contains("로그인 상태를 확인할게요"), "{ctx}");
+            assert!(ctx.contains("auth-summary --user-utterance"), "{ctx}");
+            assert!(ctx.contains("다시 로그인 필요 여부만 확인"), "{ctx}");
+            assert!(
+                ctx.contains("설치 상태 점검, 환경 진단, 업데이트 확인"),
+                "{ctx}"
+            );
+            assert!(system_message.is_empty(), "{system_message}");
+            for leaked in [
+                "계정·만료·scope",
+                "Check axhub auth status",
+                "show account/expiry/scopes",
+                "doctor-summary --user-utterance",
+                "setup-summary",
+                "logs-summary --user-utterance",
+                "Do not route",
+                "slash command",
+                "skill name",
+                "preflight",
+                "axhub hook",
+                "Control only",
+                "스킬 호출",
+            ] {
+                assert!(!ctx.contains(leaked), "ctx leaked {leaked}: {ctx}");
+                assert!(
+                    !system_message.contains(leaked),
+                    "systemMessage leaked {leaked}: {system_message}"
+                );
+            }
+        }
+        if prompt == "상태바 켜줘" {
+            assert!(ctx.contains("Preserve an existing third-party"), "{ctx}");
+            assert!(ctx.contains("existing command strings"), "{ctx}");
+            assert!(
+                system_message.contains("상태바 설정을 확인할게요"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("statusline-summary --user-utterance"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("기존 다른 상태바"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("기존 command 문자열"),
+                "{system_message}"
+            );
+            assert!(!system_message.contains("스킬 호출"), "{system_message}");
+        }
+        if prompt == "axhub 좀 도와줘" {
+            assert!(ctx.contains("Use exactly one question card"), "{ctx}");
+            assert!(ctx.contains("환경 점검"), "{ctx}");
+            assert!(ctx.contains("앱 배포"), "{ctx}");
+            assert!(ctx.contains("앱과 리소스 조회"), "{ctx}");
+            assert!(ctx.contains("문제 원인 보기"), "{ctx}");
+            assert!(ctx.contains("처음부터 안내"), "{ctx}");
+            assert!(ctx.contains("hidden option values"), "{ctx}");
+            assert!(ctx.contains("do not call the Claude Skill tool"), "{ctx}");
+            assert!(ctx.contains("doctor-summary --user-utterance"), "{ctx}");
+            assert!(
+                system_message.contains("어떤 걸 도와드릴까요?"),
+                "{system_message}"
+            );
+            assert!(system_message.contains("작업 선택"), "{system_message}");
+            assert!(
+                system_message.contains("Claude Skill tool"),
+                "{system_message}"
+            );
+            assert!(
+                system_message.contains("doctor-summary --user-utterance"),
+                "{system_message}"
+            );
+            for leaked in [
+                "(doctor)",
+                "(deploy)",
+                "(status)",
+                "(logs)",
+                "(apps)",
+                "/axhub:",
+                "스킬 호출",
+                "skill trigger",
+                "\"value\": \"doctor\"",
+                "\"value\": \"deploy\"",
+                "너무 막연",
+            ] {
+                assert!(!ctx.contains(leaked), "ctx leaked {leaked}: {ctx}");
+                assert!(
+                    !system_message.contains(leaked),
+                    "system leaked {leaked}: {system_message}"
+                );
+            }
+        }
     }
+}
+
+#[cfg(unix)]
+#[test]
+fn deploy_preview_summary_outputs_human_card_without_raw_ids() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf '0.17.4\n'
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  printf '{"authenticated":true,"user_email":"qa@example.test","expires_at":"2099-01-01T00:00:00Z","scopes":["read","write"]}\n'
+  exit 0
+fi
+if [ "$1" = "apps" ] && [ "$2" = "list" ]; then
+  printf '{"items":[{"id":"raw-app-id-123","slug":"testnextjs"}]}\n'
+  exit 0
+fi
+printf '{}\n'
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let repo = temp.path().join("repo");
+    std::fs::create_dir(&repo).unwrap();
+    std::fs::write(
+        repo.join("axhub.yaml"),
+        "name: testnextjs\nslug: testnextjs\n",
+    )
+    .unwrap();
+    std::fs::write(repo.join(".gitignore"), "node_modules\n").unwrap();
+    init_git_with_commit(&repo);
+
+    let output = Command::new(bin())
+        .args(["deploy-preview-summary", "--user-utterance", "배포해줘"])
+        .env("AXHUB_BIN", &axhub)
+        .env("HOME", temp.path())
+        .env("XDG_CACHE_HOME", temp.path().join("cache"))
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("다음을 실행할게요:"), "{stdout}");
+    assert!(stdout.contains("- 앱: testnextjs"), "{stdout}");
+    assert!(stdout.contains("- 환경: production"), "{stdout}");
+    assert!(stdout.contains("- 커밋:"), "{stdout}");
+    assert!(stdout.contains("init: test"), "{stdout}");
+    assert!(stdout.contains("진행할까요?"), "{stdout}");
+    assert!(!stdout.contains("raw-app-id-123"), "{stdout}");
+    assert!(!stdout.contains("qa@example.test"), "{stdout}");
+    assert!(!stdout.contains("preflight"), "{stdout}");
+    assert!(!stdout.contains("deploy-prep"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn deploy_approved_run_outputs_human_result_without_internal_consent_terms() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf '0.17.4\n'
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  printf '{"authenticated":true,"user_email":"qa@example.test","expires_at":"2099-01-01T00:00:00Z","scopes":["read","write"]}\n'
+  exit 0
+fi
+if [ "$1" = "apps" ] && [ "$2" = "list" ]; then
+  printf '{"items":[{"id":"raw-app-id-123","slug":"testnextjs"}]}\n'
+  exit 0
+fi
+if [ "$1" = "deploy" ] && [ "$2" = "create" ]; then
+  printf '{"event":"deploy_trigger_start","app":"raw-app-id-123"}\n'
+  cat <<'JSON'
+{
+  "schema_version": "1",
+  "status": "ok",
+  "data": {
+    "id": "raw-deploy-id-456",
+    "app_slug": "testnextjs",
+    "status": "queued"
+  }
+}
+JSON
+  exit 0
+fi
+if [ "$1" = "deploy" ] && [ "$2" = "status" ]; then
+  printf '{"status":"succeeded","url":"https://testnextjs.test.axhub.ai","completed_at":"2099-01-01T00:00:30Z"}\n'
+  exit 0
+fi
+printf '{}\n'
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let repo = temp.path().join("repo");
+    std::fs::create_dir(&repo).unwrap();
+    std::fs::write(
+        repo.join("axhub.yaml"),
+        "name: testnextjs\nslug: testnextjs\n",
+    )
+    .unwrap();
+    std::fs::write(repo.join(".gitignore"), "node_modules\n").unwrap();
+    init_git_with_commit(&repo);
+
+    let output = Command::new(bin())
+        .args(["deploy-approved-run", "--user-utterance", "응 진행해줘"])
+        .env("AXHUB_BIN", &axhub)
+        .env("HOME", temp.path())
+        .env("XDG_CACHE_HOME", temp.path().join("cache"))
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("배포를 시작했어요"), "{stdout}");
+    assert!(stdout.contains("배포가 완료됐어요"), "{stdout}");
+    assert!(stdout.contains("- 앱: testnextjs"), "{stdout}");
+    assert!(stdout.contains("- 커밋:"), "{stdout}");
+    assert!(
+        stdout.contains("https://testnextjs.test.axhub.ai"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("raw-app-id-123"), "{stdout}");
+    assert!(!stdout.contains("raw-deploy-id-456"), "{stdout}");
+    assert!(!stdout.contains("qa@example.test"), "{stdout}");
+    assert!(!stdout.contains("HMAC"), "{stdout}");
+    assert!(!stdout.contains("consent"), "{stdout}");
+    assert!(!stdout.contains("token"), "{stdout}");
+    assert!(!stdout.contains("/axhub:deploy"), "{stdout}");
+    assert!(!stdout.contains("preflight"), "{stdout}");
+    assert!(!stdout.contains("deploy-prep"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn deploy_approved_run_reports_remote_commit_failure_without_recovery_trigger() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf '0.17.4\n'
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  printf '{"authenticated":true,"user_email":"qa@example.test","expires_at":"2099-01-01T00:00:00Z","scopes":["read","write"]}\n'
+  exit 0
+fi
+if [ "$1" = "apps" ] && [ "$2" = "list" ]; then
+  printf '{"items":[{"id":"raw-app-id-123","slug":"testnextjs"}]}\n'
+  exit 0
+fi
+if [ "$1" = "deploy" ] && [ "$2" = "create" ]; then
+  printf '{"event":"deploy_trigger_complete","deployment_id":"raw-deploy-id-456","status":"pending"}\n'
+  exit 0
+fi
+if [ "$1" = "deploy" ] && [ "$2" = "status" ]; then
+  cat <<'JSON'
+{
+  "schema_version": "1",
+  "status": "ok",
+  "data": {
+    "id": "raw-deploy-id-456",
+    "app_id": "raw-app-id-123",
+    "commit_sha": "8b6444052f6072398c45f9379a788deed4f50d9b",
+    "status": "failed",
+    "failure_reason": {
+      "category": "configuration",
+      "code": "resolve.commit_not_found",
+      "message": "커밋을 찾을 수 없어요",
+      "stage": "resolve"
+    }
+  }
+}
+JSON
+  exit 0
+fi
+printf '{}\n'
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let repo = temp.path().join("repo");
+    std::fs::create_dir(&repo).unwrap();
+    std::fs::write(
+        repo.join("axhub.yaml"),
+        "name: testnextjs\nslug: testnextjs\n",
+    )
+    .unwrap();
+    std::fs::write(repo.join(".gitignore"), "node_modules\n").unwrap();
+    init_git_with_commit(&repo);
+
+    let output = Command::new(bin())
+        .args(["deploy-approved-run", "--user-utterance", "응 진행해줘"])
+        .env("AXHUB_BIN", &axhub)
+        .env("HOME", temp.path())
+        .env("XDG_CACHE_HOME", temp.path().join("cache"))
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("배포를 시작했어요"), "{stdout}");
+    assert!(
+        stdout.contains("배포가 끝났지만 성공 상태는 아니에요"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("커밋을 원격 저장소에서 찾을 수 없어요"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("resolve.commit_not_found"), "{stdout}");
+    assert!(!stdout.contains("raw-app-id-123"), "{stdout}");
+    assert!(!stdout.contains("raw-deploy-id-456"), "{stdout}");
+    assert!(!stdout.contains("qa@example.test"), "{stdout}");
+    assert!(!stdout.contains("배포 번호"), "{stdout}");
+    assert!(!stdout.contains("명령"), "{stdout}");
+    assert!(!stdout.contains("preflight"), "{stdout}");
+    assert!(!stdout.contains("deploy-prep"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn inspect_config_summary_humanizes_raw_cli_json() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "manifest" ] && [ "$2" = "validate" ]; then
+  cat <<'JSON'
+{"schema_version":"1","status":"ok","data":{"app":null,"ci":null,"deploy":{"commands":[],"method":"docker","port":null}}}
+JSON
+  exit 0
+fi
+if [ "$1" = "config" ] && [ "$2" = "explain" ]; then
+  cat <<'JSON'
+{"active_profile":"default","agent_mode":true,"endpoint":"https://api.axhub.ai","token":{"present":false,"source":"keychain"}}
+JSON
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("inspect-config-summary")
+        .env("AXHUB_BIN", &axhub)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("매니페스트와 설정을 확인했어요."));
+    assert!(stdout.contains("매니페스트 문법은 맞지만 실제 배포에 필요한 항목이 아직 비어 있어요."));
+    assert!(stdout.contains("로그인 정보가 없어 배포 전에 다시 로그인 확인이 필요해요."));
+    assert!(!stdout.contains("app: null"), "{stdout}");
+    assert!(!stdout.contains("token"), "{stdout}");
+    assert!(!stdout.contains("[]"), "{stdout}");
+    assert!(!stdout.contains("https://api.axhub.ai"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn status_summary_resolves_manifest_and_humanizes_deploy_status() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(
+        temp.path().join("axhub.yaml"),
+        "app:\n  slug: testnextjs\n  name: testnextjs\n",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join(".git_marker"),
+        "unused but keeps temp populated\n",
+    )
+    .unwrap();
+    let axhub = temp.path().join("axhub-status");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","scopes":["read","write"]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "apps list --json" ]; then
+  echo '{"items":[{"id":"app_1","slug":"testnextjs"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3 $4 $5" = "--json deploy list --app testnextjs" ]; then
+  echo '{"items":[{"id":"dep_1","app_id":"app_1","status":"succeeded","commit_sha":"abcdef123456","commit_message":"ship test","branch":"main","created_at":"2026-06-04T01:00:00Z"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3 $4 $5 $6" = "--json deploy status dep_1 --app testnextjs" ]; then
+  echo '{"id":"dep_1","app_id":"app_1","status":"succeeded","started_at":"2026-06-04T01:00:00Z","completed_at":"2026-06-04T01:02:03Z","failure_reason":null}'
+  exit 0
+fi
+if [ "$1 $2" = "rev-parse --is-inside-work-tree" ]; then
+  echo false
+  exit 1
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("status-summary")
+        .arg("--user-utterance")
+        .arg("지금 진행 중인 배포 어디까지 됐어?")
+        .env("AXHUB_BIN", &axhub)
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("배포 상태를 확인했어요."));
+    assert!(stdout.contains("앱 testnextjs의 최근 배포는 성공했어요."));
+    assert!(stdout.contains("커밋: abcdef1"));
+    assert!(stdout.contains("배포는 끝난 상태예요."));
+    assert!(!stdout.contains("APP 미해석"), "{stdout}");
+    assert!(!stdout.contains("items[0]"), "{stdout}");
+    assert!(!stdout.contains("headless"), "{stdout}");
+    assert!(!stdout.contains("deploy list"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn logs_summary_resolves_latest_deploy_and_humanizes_logs() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(
+        temp.path().join("axhub.yaml"),
+        "app:\n  slug: testnextjs\n  name: testnextjs\n",
+    )
+    .unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","scopes":["read","write"]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "apps list --json" ]; then
+  echo '{"items":[{"id":"app_1","slug":"testnextjs"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3 $4 $5" = "--json deploy list --app testnextjs" ]; then
+  echo '{"items":[{"id":"dep_1","app_id":"app_1","status":"succeeded","commit_sha":"abcdef123456","commit_message":"ship test","branch":"main","created_at":"2026-06-04T01:00:00Z"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3 $4 $5 $6 $7 $8" = "--json deploy logs dep_1 --app testnextjs --limit 50" ]; then
+  echo '{"type":"log","message":"INFO server started"}'
+  echo '{"type":"log","message":"ERROR missing API key axhub_pat_abcdefghijklmnopqrstuvwxyz"}'
+  exit 0
+fi
+if [ "$1 $2" = "rev-parse --is-inside-work-tree" ]; then
+  echo false
+  exit 1
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("logs-summary")
+        .arg("--user-utterance")
+        .arg("로그 좀 보여줘")
+        .env("AXHUB_BIN", &axhub)
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("로그를 확인했어요."));
+    assert!(stdout.contains("앱 testnextjs의 최근 배포는 성공했어요."));
+    assert!(stdout.contains("커밋: abcdef1"));
+    assert!(stdout.contains("최근 로그:"));
+    assert!(stdout.contains("INFO server started"));
+    assert!(stdout.contains("눈에 띄는 오류: ERROR missing API key"));
+    assert!(
+        !stdout.contains("axhub_pat_abcdefghijklmnopqrstuvwxyz"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("Resolve deployment first"), "{stdout}");
+    assert!(!stdout.contains("No deploy id cached"), "{stdout}");
+    assert!(!stdout.contains("List deployments for app"), "{stdout}");
+    assert!(!stdout.contains("deploy logs"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn open_summary_resolves_current_app_and_humanizes_url() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(
+        temp.path().join("axhub.yaml"),
+        "app:\n  slug: testnextjs\n  name: testnextjs\n",
+    )
+    .unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","scopes":["read","write"]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "apps list --json" ]; then
+  echo '{"items":[{"id":"app_1","slug":"testnextjs"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "open testnextjs --json" ]; then
+  echo '{"schema_version":"1","status":"ok","data":{"opened":true,"status":"opening","url":"https://app.axhub.ai/apps/testnextjs"}}'
+  exit 0
+fi
+if [ "$1 $2" = "rev-parse --is-inside-work-tree" ]; then
+  echo false
+  exit 1
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("open-summary")
+        .arg("--user-utterance")
+        .arg("라이브 페이지 열어봐")
+        .env("AXHUB_BIN", &axhub)
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("앱 페이지를 확인했어요."));
+    assert!(stdout.contains("앱: testnextjs"));
+    assert!(stdout.contains("URL: https://app.axhub.ai/apps/testnextjs"));
+    assert!(stdout.contains("브라우저에서 열기 요청을 보냈어요."));
+    assert!(!stdout.contains("Read QA result files"), "{stdout}");
+    assert!(!stdout.contains("ToolSearch"), "{stdout}");
+    assert!(!stdout.contains("Chrome MCP"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn verify_summary_resolves_current_app_and_humanizes_live_verdict() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(
+        temp.path().join("axhub.yaml"),
+        "app:\n  slug: testnextjs\n  name: testnextjs\n",
+    )
+    .unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","scopes":["read","write"]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "apps list --json" ]; then
+  echo '{"items":[{"id":"app_1","slug":"testnextjs"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3 $4 $5" = "--json deploy list --app testnextjs" ]; then
+  echo '{"items":[{"id":"dep_1","app_id":"app_1","status":"succeeded","commit_sha":"abcdef123456","created_at":"2026-06-04T01:00:00Z"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3 $4 $5 $6" = "--json deploy status dep_1 --app testnextjs" ]; then
+  echo '{"state":"succeeded","last_deploy_id":"dep_1","last_deploy_age_secs":42}'
+  exit 0
+fi
+if [ "$1 $2 $3 $4 $5 $6 $7 $8" = "--json deploy logs dep_1 --app testnextjs --limit 50" ]; then
+  echo 'INFO server started'
+  echo 'INFO ready'
+  exit 0
+fi
+if [ "$1 $2" = "rev-parse --is-inside-work-tree" ]; then
+  echo false
+  exit 1
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("verify-summary")
+        .arg("--user-utterance")
+        .arg("방금 배포 진짜 열리는지 확인해줘")
+        .env("AXHUB_BIN", &axhub)
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("배포 검증을 완료했어요."));
+    assert!(stdout.contains("✅ 라이브 확정"));
+    assert!(stdout.contains("앱 testnextjs는 최근 배포 기준으로 열리는 상태예요."));
+    assert!(stdout.contains("ERROR/FATAL은 보이지 않았어요."));
+    assert!(!stdout.contains("u@example.com"), "{stdout}");
+    assert!(!stdout.contains("id="), "{stdout}");
+    assert!(!stdout.contains("deploy="), "{stdout}");
+    assert!(!stdout.contains("status="), "{stdout}");
+    assert!(!stdout.contains("preflight"), "{stdout}");
+    assert!(!stdout.contains("axhub verify"), "{stdout}");
+    assert!(!stdout.contains("stale"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn trace_summary_reports_no_recent_failure_without_internal_leaks() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(
+        temp.path().join("axhub.yaml"),
+        "app:\n  slug: testnextjs\n  name: testnextjs\n",
+    )
+    .unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "0.17.4"
+  exit 0
+fi
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","scopes":["read","write"]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "apps list --json" ]; then
+  echo '{"items":[{"id":"app_1","slug":"testnextjs"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3 $4 $5" = "--json deploy list --app testnextjs" ]; then
+  echo '{"items":[{"id":"dep_success_1","app_id":"app_1","status":"succeeded","commit_sha":"abcdef123456","created_at":"2026-06-04T01:00:00Z"},{"id":"dep_success_0","app_id":"app_1","status":"succeeded","commit_sha":"fff111222333","created_at":"2026-06-03T01:00:00Z"}]}'
+  exit 0
+fi
+if [ "$1 $2" = "rev-parse --is-inside-work-tree" ]; then
+  echo false
+  exit 1
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("trace-summary")
+        .arg("--user-utterance")
+        .arg("배포 실패 원인 알려줘")
+        .env("AXHUB_BIN", &axhub)
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("배포 기록을 확인했어요."), "{stdout}");
+    assert!(
+        stdout.contains("최근 실패한 배포는 찾지 못했어요."),
+        "{stdout}"
+    );
+    assert!(stdout.contains("최신 배포는 성공했어요."), "{stdout}");
+    assert!(stdout.contains("최근 커밋: abcdef1"), "{stdout}");
+    for forbidden in [
+        "u@example.com",
+        "dep_success",
+        "succeeded",
+        "failure_reason",
+        "matched_patterns",
+        "build_log_errors",
+        "preflight",
+        "/axhub:",
+        "axhub:trace",
+        "Run axhub",
+        "Trace latest deploy",
+        "deploy=",
+        "status=",
+    ] {
+        assert!(
+            !stdout.contains(forbidden),
+            "{forbidden} leaked in {stdout}"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn env_summary_resolves_current_app_and_masks_values() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(
+        temp.path().join("axhub.yaml"),
+        "app:\n  slug: testnextjs\n  name: testnextjs\n",
+    )
+    .unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "0.17.4"
+  exit 0
+fi
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","scopes":["read","write"]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "apps list --json" ]; then
+  echo '{"items":[{"id":"app_1","slug":"testnextjs"}]}'
+  exit 0
+fi
+if [ "$1" = "env" ] && [ "$2" = "list" ]; then
+  cat <<'JSON'
+{"items":[{"key":"TEST_KEY","stage":"runtime","secret":false,"value":"test_value_123"},{"key":"SECRET_KEY","stage":"runtime","secret":true,"value":"super_secret"}],"total":2}
+JSON
+  exit 0
+fi
+if [ "$1 $2" = "rev-parse --is-inside-work-tree" ]; then
+  echo false
+  exit 1
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("env-summary")
+        .arg("--user-utterance")
+        .arg("환경변수 뭐 있어?")
+        .env("AXHUB_BIN", &axhub)
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("환경변수 목록을 확인했어요."));
+    assert!(stdout.contains("총 2개"));
+    assert!(stdout.contains("TEST_KEY"));
+    assert!(stdout.contains("SECRET_KEY"));
+    assert!(stdout.contains("있음(숨김)"));
+    assert!(!stdout.contains("test_value_123"), "{stdout}");
+    assert!(!stdout.contains("super_secret"), "{stdout}");
+    assert!(!stdout.contains("preflight"), "{stdout}");
+    assert!(!stdout.contains("axhub env"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn resources_summary_keeps_desktop_cleanup_flow_human_readable() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "0.17.4"
+  exit 0
+fi
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","scopes":["read","write"]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "resources list --json" ]; then
+  echo '{"schema_version":"1","status":"ok","data":[]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "connectors list --enabled-only" ]; then
+  echo '{"schema_version":"1","status":"ok","data":[]}'
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("resources-summary")
+        .arg("--user-utterance")
+        .arg("리소스 정리하고 싶어")
+        .env("AXHUB_BIN", &axhub)
+        .env_remove("AXHUB_PROFILE")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("리소스 현황을 확인했어요."));
+    assert!(stdout.contains("데이터베이스 연결: 0개"));
+    assert!(stdout.contains("정리할 리소스: 0개"));
+    assert!(stdout.contains("어떤 정리를 할까요?"));
+    assert!(stdout.contains("미리보기와 승인 후 진행할게요."));
+    assert!(!stdout.contains("u@example.com"), "{stdout}");
+    assert!(!stdout.contains("connector/resource"), "{stdout}");
+    assert!(!stdout.contains("catalog kind"), "{stdout}");
+    assert!(!stdout.contains("read-only"), "{stdout}");
+    assert!(!stdout.contains("preflight"), "{stdout}");
+    assert!(!stdout.contains("/axhub:"), "{stdout}");
+    assert!(!stdout.contains("axhub resources"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn github_summary_checks_axhub_app_connection_without_local_git_remote() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(
+        temp.path().join("axhub.yaml"),
+        "app:\n  slug: testnextjs\n  name: testnextjs\n",
+    )
+    .unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "0.17.4"
+  exit 0
+fi
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","scopes":["read","write"]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "apps list --json" ]; then
+  echo '{"items":[{"id":"app_1","slug":"testnextjs"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3 $4 $5 $6" = "apps git status --app testnextjs --json" ]; then
+  echo '{"schema_version":"1","status":"ok","data":{"connected":true,"provider":"github","repo_full_name":"jocoding-ax-partners/testnextjs","branch":"main","installation_id":133340904}}'
+  exit 0
+fi
+if [ "$1 $2" = "rev-parse --is-inside-work-tree" ]; then
+  echo false
+  exit 1
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("github-summary")
+        .arg("--user-utterance")
+        .arg("이 앱 깃허브랑 연결돼 있어?")
+        .env("AXHUB_BIN", &axhub)
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("GitHub 연결 상태를 확인했어요."));
+    assert!(stdout.contains("GitHub 저장소에 연결되어 있어요."));
+    assert!(stdout.contains("저장소: jocoding-ax-partners/testnextjs"));
+    assert!(stdout.contains("브랜치: main"));
+    for forbidden in [
+        "u@example.com",
+        "installation_id",
+        "133340904",
+        "git remote",
+        "remote.origin",
+        "axhub apps git",
+        "/axhub:",
+        "preflight",
+    ] {
+        assert!(
+            !stdout.contains(forbidden),
+            "{forbidden} leaked in {stdout}"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn doctor_summary_masks_identity_and_avoids_internal_labels() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "0.17.4"
+  exit 0
+fi
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","expires_at":"2099-01-01T00:00:00Z","scopes":["read","write"]}'
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("doctor-summary")
+        .arg("--user-utterance")
+        .arg("axhub CLI 설치 상태 괜찮아?")
+        .env("AXHUB_BIN", &axhub)
+        .env_remove("AXHUB_PROFILE")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("설치 상태를 확인했어요."));
+    assert!(stdout.contains("CLI: v0.17.4, 플러그인과 호환돼요."));
+    assert!(stdout.contains("로그인: 되어 있어요"));
+    assert!(stdout.contains("다시 로그인할 필요 없어요"));
+    assert!(stdout.contains("권한: read, write"));
+    assert!(stdout.contains("프로필: default"));
+    assert!(!stdout.contains("u@example.com"), "{stdout}");
+    assert!(!stdout.contains("preflight"), "{stdout}");
+    assert!(!stdout.contains("axhub:doctor"), "{stdout}");
+    assert!(!stdout.contains("/axhub:"), "{stdout}");
+    assert!(!stdout.contains("auth status"), "{stdout}");
+    assert!(
+        !stdout.contains(temp.path().to_string_lossy().as_ref()),
+        "{stdout}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn install_summary_stops_when_cli_already_exists() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "0.17.4"
+  exit 0
+fi
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","expires_at":"2099-01-01T00:00:00Z","scopes":["read","write"]}'
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("install-summary")
+        .arg("--user-utterance")
+        .arg("axhub CLI 설치해줘")
+        .env("AXHUB_BIN", &axhub)
+        .env_remove("AXHUB_PROFILE")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("설치 상태를 확인했어요."));
+    assert!(stdout.contains("axhub CLI: 이미 설치되어 있어요. (v0.17.4)"));
+    assert!(stdout.contains("설치 작업: 지금은 필요 없어요."));
+    for forbidden in [
+        "u@example.com",
+        "auth status",
+        "preflight",
+        "프로필",
+        "권한:",
+        "/axhub:",
+        "curl ",
+        "install.sh",
+    ] {
+        assert!(
+            !stdout.contains(forbidden),
+            "{forbidden} leaked in {stdout}"
+        );
+    }
+    assert!(
+        !stdout.contains(temp.path().to_string_lossy().as_ref()),
+        "{stdout}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn update_summary_renders_korean_check_without_raw_fields() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1 $2 $3" = "update check --json" ]; then
+  echo '{"current":"v0.17.4","latest":"v0.17.5","has_update":true}'
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("update-summary")
+        .arg("--user-utterance")
+        .arg("업데이트 필요한지 봐줘")
+        .env("AXHUB_BIN", &axhub)
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("업데이트를 확인했어요."));
+    assert!(stdout.contains("현재 버전: v0.17.4"));
+    assert!(stdout.contains("새 버전: v0.17.5"));
+    assert!(stdout.contains("업데이트: 받을 수 있어요."));
+    assert!(stdout.contains("적용: 아직 시작하지 않았어요."));
+    assert!(stdout.contains("미리보기와 승인을 받을게요."));
+    for forbidden in [
+        "has_update",
+        "update check",
+        "axhub update",
+        "raw",
+        "/axhub:",
+        "preflight",
+    ] {
+        assert!(
+            !stdout.contains(forbidden),
+            "{forbidden} leaked in {stdout}"
+        );
+    }
+    assert!(
+        !stdout.contains(temp.path().to_string_lossy().as_ref()),
+        "{stdout}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn rollback_summary_explains_noop_without_raw_deploy_or_commit_leaks() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(temp.path().join("axhub.yaml"), "slug: rollbackapp\n").unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "0.17.4"
+  exit 0
+fi
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","expires_at":"2099-01-01T00:00:00Z","scopes":["read","write"],"current_app":"rollbackapp"}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "apps list --json" ]; then
+  echo '{"items":[{"id":"app_rollback","slug":"rollbackapp","name":"Rollback App"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3 $4" = "--json deploy list --app" ]; then
+  echo '{"items":[{"id":"dep_failed_123","app_slug":"rollbackapp","status":"failed","commit_sha":"abcdef1234567890","commit_message":"commit_not_found","created_at":"2026-06-04T01:02:03Z"},{"id":"dep_success_456","app_slug":"rollbackapp","status":"succeeded","commit_sha":"1234567890abcdef","commit_message":"stable","created_at":"2026-06-03T01:02:03Z"}]}'
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("rollback-summary")
+        .arg("--user-utterance")
+        .arg("방금 배포 되돌려줘")
+        .env("AXHUB_BIN", &axhub)
+        .env_remove("AXHUB_PROFILE")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("되돌릴 수 있는 배포를 확인했어요."));
+    assert!(stdout.contains("방금 시도한 배포는 공개 버전으로 반영되지 않았어요."));
+    assert!(stdout.contains("현재 공개된 버전은 이미 최근 성공 버전으로 보입니다."));
+    assert!(stdout.contains("더 이전에 되돌릴 성공 배포는 찾지 못했어요."));
+    assert!(stdout.contains("지금은 그대로 두는 게 안전해요."));
+    for forbidden in [
+        "u@example.com",
+        "rollbackapp",
+        "dep_failed",
+        "dep_success",
+        "abcdef",
+        "1234567",
+        "failed",
+        "succeeded",
+        "commit_not_found",
+        "no-op",
+        "preflight",
+        "axhub rollback",
+        "/axhub:",
+    ] {
+        assert!(
+            !stdout.contains(forbidden),
+            "{forbidden} leaked in {stdout}"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn auth_summary_answers_login_need_without_identity_leaks() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "0.17.4"
+  exit 0
+fi
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{"user_email":"u@example.com","expires_at":"2099-01-01T00:00:00Z","scopes":["read","write"],"profile":"default","tenants":[{"tenant_slug":"acme"}]}'
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let output = Command::new(bin())
+        .arg("auth-summary")
+        .arg("--user-utterance")
+        .arg("나 로그인 돼 있어?")
+        .env("AXHUB_BIN", &axhub)
+        .env_remove("AXHUB_PROFILE")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("로그인 상태를 확인했어요."));
+    assert!(stdout.contains("로그인: 되어 있어요."));
+    assert!(stdout.contains("다시 로그인: 지금은 필요 없어요."));
+    assert!(!stdout.contains("u@example.com"), "{stdout}");
+    assert!(!stdout.contains("read"), "{stdout}");
+    assert!(!stdout.contains("write"), "{stdout}");
+    assert!(!stdout.contains("default"), "{stdout}");
+    assert!(!stdout.contains("acme"), "{stdout}");
+    assert!(!stdout.contains("2099"), "{stdout}");
+    assert!(!stdout.contains("auth status"), "{stdout}");
+    assert!(!stdout.contains("preflight"), "{stdout}");
+    assert!(!stdout.contains("/axhub:"), "{stdout}");
+}
+
+#[cfg(unix)]
+#[test]
+fn statusline_summary_preserves_existing_statusbar_without_internal_leaks() {
+    let home = tempfile::tempdir().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    let claude_dir = home.path().join(".claude");
+    std::fs::create_dir_all(&claude_dir).unwrap();
+    let settings = claude_dir.join("settings.json");
+    let existing_command =
+        "sh ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hud/omc-hud-cache.sh --theme calm";
+    let existing_settings = serde_json::json!({
+        "statusLine": {
+            "type": "command",
+            "command": existing_command
+        }
+    });
+    std::fs::write(
+        &settings,
+        serde_json::to_string_pretty(&existing_settings).unwrap(),
+    )
+    .unwrap();
+
+    let output = Command::new(bin())
+        .arg("statusline-summary")
+        .arg("--user-utterance")
+        .arg("상태바 켜줘")
+        .env("HOME", home.path())
+        .env("XDG_STATE_HOME", state.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let combined = format!("{stdout}{stderr}");
+    assert!(stdout.contains("상태바 설정을 확인했어요."), "{stdout}");
+    assert!(
+        stdout.contains("이미 다른 상태바가 켜져 있어요."),
+        "{stdout}"
+    );
+    assert!(stdout.contains("덮어쓰지 않았어요."), "{stdout}");
+
+    for forbidden in [
+        existing_command,
+        "omc-hud-cache",
+        "CLAUDE_CONFIG_DIR",
+        "$HOME",
+        "settings.json",
+        "statusLine",
+        "settings-merge",
+        "autowire-statusline",
+        "axhub-helpers",
+        "Exit",
+        "exit",
+        "--scope",
+        "wire",
+        "PreservedOther",
+    ] {
+        assert!(
+            !combined.contains(forbidden),
+            "leaked {forbidden:?} in {combined}"
+        );
+    }
+
+    let stored = std::fs::read_to_string(settings).unwrap();
+    assert!(
+        stored.contains(existing_command),
+        "existing status bar command must be preserved"
+    );
 }
 
 // Approach E (Phase 2): no skill path enforcement for generic prompts.
@@ -1891,10 +3834,13 @@ exit 1
 
     // Generic non-axhub prompts → identical agent-facing context.
     let a = snapshot("배포해줘");
-    let b = snapshot("로그 봐");
+    let b = snapshot("문장 다듬어줘");
     let c = snapshot("아무말 대잔치");
     assert_eq!(b, c);
-    assert!(a.contains("Skill(axhub:deploy)"), "{a}");
+    assert!(a.contains("배포 준비를 확인할게요"), "{a}");
+    assert!(a.contains("consent-gated flow"), "{a}");
+    assert!(a.contains("Invoke deploy skill"), "{a}");
+    assert!(!a.contains("AXHub deploy workflow"), "{a}");
     assert!(!b.contains("Skill(axhub:"), "{b}");
 }
 
@@ -2087,10 +4033,12 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     let session = run(&["session-start"]);
     assert_eq!(session.status.code(), Some(0));
     let session_stdout = String::from_utf8_lossy(&session.stdout);
-    assert!(session_stdout.contains("/axhub:setup"));
+    assert!(session_stdout.contains("처음 설정 도와줘"));
     assert!(session_stdout.contains("말씀해주세요"));
     assert!(session_stdout.contains("감사 로그"));
-    assert!(session_stdout.contains("SKILL safe default"));
+    assert!(session_stdout.contains("안전한 기본값"));
+    assert!(!session_stdout.contains("/axhub:"), "{session_stdout}");
+    assert!(!session_stdout.contains("SKILL"), "{session_stdout}");
 }
 
 #[cfg(unix)]
@@ -2688,9 +4636,11 @@ fn cli_session_start_base_message_korean_tone() {
 
     let msg = session_start_systemmessage(&state.display().to_string());
     assert!(msg.contains("axhub 준비됐어요"), "{msg}");
-    assert!(msg.contains("/axhub:setup"), "{msg}");
-    assert!(msg.contains("/axhub:help"), "{msg}");
-    assert!(msg.contains("/axhub:doctor"), "{msg}");
+    assert!(msg.contains("처음 설정 도와줘"), "{msg}");
+    assert!(msg.contains("도움말 보여줘"), "{msg}");
+    assert!(msg.contains("설치 상태 확인해줘"), "{msg}");
+    assert!(!msg.contains("/axhub:"), "{msg}");
+    assert!(!msg.contains("SKILL"), "{msg}");
 }
 
 #[test]
@@ -2837,6 +4787,114 @@ fn cli_preauth_allows_apps_create_name_slug_when_binding_matches_parser() {
     );
     assert_eq!(allowed.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&allowed.stdout).contains("permissionDecision\":\"allow"));
+}
+
+#[test]
+fn cli_preauth_allows_apps_suspend_resume_when_binding_matches_parser() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    for (action, command) in [
+        (
+            "apps_suspend",
+            "axhub apps suspend testnextjs --execute --json",
+        ),
+        (
+            "apps_resume",
+            "axhub apps resume testnextjs --execute --json",
+        ),
+    ] {
+        let binding = serde_json::json!({
+            "tool_call_id":"pending",
+            "action":action,
+            "app_id":"testnextjs",
+            "profile":"",
+            "branch":"",
+            "commit_sha":"",
+            "context":{}
+        })
+        .to_string();
+        let minted = run_stdin(&["consent-mint"], &binding, &pending_envs);
+        assert_eq!(minted.status.code(), Some(0), "{action}");
+        assert!(
+            String::from_utf8_lossy(&minted.stdout).contains("consent-pending-"),
+            "{action}"
+        );
+
+        let altered = serde_json::json!({
+            "session_id":"actual-claude-session",
+            "tool_call_id":format!("toolu_{action}_altered"),
+            "tool_name":"Bash",
+            "tool_input":{"command": command.replace("testnextjs", "otherapp")}
+        })
+        .to_string();
+        let denied = run_stdin(&["preauth-check"], &altered, &pending_envs);
+        assert_eq!(denied.status.code(), Some(0), "{action}");
+        let stdout = String::from_utf8_lossy(&denied.stdout);
+        assert!(stdout.contains("permissionDecision\":\"deny"), "{stdout}");
+
+        let exact = serde_json::json!({
+            "session_id":"actual-claude-session",
+            "tool_call_id":format!("toolu_{action}_exact"),
+            "tool_name":"Bash",
+            "tool_input":{"command":command}
+        })
+        .to_string();
+        let allowed = run_stdin(&["preauth-check"], &exact, &pending_envs);
+        assert_eq!(allowed.status.code(), Some(0), "{action}");
+        let stdout = String::from_utf8_lossy(&allowed.stdout);
+        assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+    }
+}
+
+#[test]
+fn cli_consent_mint_app_lifecycle_allows_suspend_resume_without_json_shell() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let pending_envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+
+    for (action, command) in [
+        ("suspend", "axhub apps suspend testnextjs --execute --json"),
+        ("resume", "axhub apps resume testnextjs --execute --json"),
+    ] {
+        let minted = run_env(
+            &[
+                "consent-mint-app-lifecycle",
+                "--action",
+                action,
+                "--app",
+                "testnextjs",
+                "--quiet",
+            ],
+            &pending_envs,
+        );
+        assert_eq!(minted.status.code(), Some(0), "{action}");
+        assert!(
+            String::from_utf8_lossy(&minted.stdout).is_empty(),
+            "{action}"
+        );
+
+        let exact = serde_json::json!({
+            "session_id":"actual-claude-session",
+            "tool_call_id":format!("toolu_apps_{action}_exact"),
+            "tool_name":"Bash",
+            "tool_input":{"command":command}
+        })
+        .to_string();
+        let allowed = run_stdin(&["preauth-check"], &exact, &pending_envs);
+        assert_eq!(allowed.status.code(), Some(0), "{action}");
+        let stdout = String::from_utf8_lossy(&allowed.stdout);
+        assert!(stdout.contains("permissionDecision\":\"allow"), "{stdout}");
+    }
 }
 
 #[test]
@@ -4115,6 +6173,15 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
     );
     assert_eq!(read_only.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&read_only.stdout).contains("permissionDecision\":\"allow"));
+
+    let update_check_read_only = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-update-check","tool_name":"Bash","tool_input":{"command":"axhub update check --json"}}"#,
+        &envs,
+    );
+    assert_eq!(update_check_read_only.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&update_check_read_only.stdout)
+        .contains("permissionDecision\":\"allow"));
 
     let deploy_dry_run = run_stdin(
         &["preauth-check"],

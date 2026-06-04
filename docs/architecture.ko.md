@@ -82,7 +82,7 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요:
                                 │ 얇은 wrapper — 비즈니스 로직 위임
                                 ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ ④ ax-hub-cli (외부 Rust CLI, 지원 surface v0.17.3 ~ <1.0.0)          │
+│ ④ ax-hub-cli (외부 Rust CLI, 검증 surface v0.17.4 / 지원 범위 v0.17.3 ~ <1.0.0) │
 │    auth login/status · apps · deploy create/status/logs · catalog ... │
 │    계약: 모든 호출에 --json, 구조화된 exit code(0/1/64/65/66/67/68)    │
 └───────────────────────────────┬──────────────────────────────────────┘
@@ -862,7 +862,7 @@ envelope 빌더는 `src/hook_output.rs` 에 모여 있어요:
 ```
 <axhub-preflight-status>
 [axhub hook | session preflight]
-Observed: axhub CLI v0.15.4 healthy.
+Observed: axhub CLI v0.17.4 healthy.
 Suggested: no action required.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-preflight-status>

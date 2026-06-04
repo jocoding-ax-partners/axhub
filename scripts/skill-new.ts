@@ -92,6 +92,8 @@ content = content.replace(/\{\{MODEL\}\}/g, model);
 const todoWriteBlock = multiStep
   ? `0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
 
+   **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue the workflow; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
+
    \`\`\`typescript
    TodoWrite({ todos: [
      { content: "TODO 단계 1",      status: "in_progress", activeForm: "TODO 진행 중" },

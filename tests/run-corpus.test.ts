@@ -18,6 +18,7 @@ const run = (args: string[]) =>
   });
 
 const readJson = (path: string) => JSON.parse(readFileSync(path, "utf8"));
+const lineCount = (path: string) => readFileSync(path, "utf8").trimEnd().split("\n").length;
 
 describe("tests/run-corpus.sh fixture replay runner", () => {
   test("plugin mode writes committed 20-row plugin results (Phase 5: 20 base + init + 3 meta_question = 24)", () => {
@@ -57,8 +58,8 @@ describe("tests/run-corpus.sh fixture replay runner", () => {
       const out = join(dir, "plugin.json");
       const result = run(["--mode", "plugin", "--corpus", "tests/corpus.jsonl", "--out", out]);
       expect(result.status).toBe(2);
-      // Phase 5+v1.1 — corpus.jsonl row count is 350 after data routing rows.
-      expect(result.stderr).toContain("no committed plugin fixture for 350-row corpus");
+      const fullCorpusRows = lineCount(join(REPO_ROOT, "tests/corpus.jsonl"));
+      expect(result.stderr).toContain(`no committed plugin fixture for ${fullCorpusRows}-row corpus`);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

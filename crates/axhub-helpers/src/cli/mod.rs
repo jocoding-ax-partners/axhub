@@ -48,6 +48,7 @@ enum Commands {
 
     // ── US2 — 데이터/auth 명령 (typed args) ──
     ConsentMint(args::ConsentMintArgs),
+    ConsentMintAppLifecycle(args::ConsentMintAppLifecycleArgs),
     TokenInit(args::TokenArgs),
     TokenImport(args::TokenArgs),
     TokenGate,
@@ -225,6 +226,9 @@ fn dispatch(command: Commands) -> i32 {
             a.command_path.map(std::path::PathBuf::from),
         )),
         Commands::ConsentMint(a) => run_result(crate::cmd_consent_mint(a.validate_only)),
+        Commands::ConsentMintAppLifecycle(a) => {
+            run_result(crate::cmd_consent_mint_app_lifecycle(a))
+        }
         Commands::TokenInit(a) => run_result(crate::cmd_token_init(a.json)),
         Commands::TokenImport(a) => run_result(crate::cmd_token_import(a.json)),
         Commands::TokenGate => run_result(crate::cmd_token_gate(&[])),

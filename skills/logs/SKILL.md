@@ -24,14 +24,30 @@ Stream axhub deploy logs in either build or runtime mode. Default `--source=buil
 
 ## Workflow
 
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
+
 To fetch logs:
 
-1. **Resolve the deployment.** Look up `dep_<id>` from cache or ask the user:
+**Claude Desktop visible contract:** start with `로그를 확인할게요.` when the host permits visible text before tools. Use one Bash tool with the Korean title `로그 확인`. Do not show intermediate resolver text, English planning sentences, JSON field names, raw selector names, command names, or deployment-cache labels to the user.
+
+1. **일반 로그 요청은 한 번에 요약해요.** The helper resolves the app, picks the most recent deployment, fetches a bounded log snapshot, redacts secrets, and prints a Korean user-facing summary. Do not narrate resolver steps, cache state, raw deploy-list/log commands, or snapshot fallback mechanics to the user.
 
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   USER_UTTERANCE="<the user's exact latest sentence>"
+   "$HELPER" logs-summary --user-utterance "$USER_UTTERANCE"
+   ```
+
+   Show the Korean stdout as-is. If it says the app, deployment, or logs are missing, stop there and ask a natural follow-up. For ordinary Claude Desktop log questions, stop after this step.
+
+2. **Advanced manual path for explicit follow/stream/debug requests only.** Look up `dep_<id>` from cache or ask the user:
+
+   ```bash
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    "$HELPER" resolve --intent logs --user-utterance "$ARGS" --json
    ```
 
@@ -40,22 +56,22 @@ To fetch logs:
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    "$HELPER" list-deployments --app <APP_ID> --limit 3
    ```
 
    On exit 65 (`list-deployments` helper 의 EXIT_LIST_AUTH OUTPUT 계약 — classify-exit 가 4 로 정규화해요; token missing — Phase 7 US-701 이후엔 SessionStart 가 자동 setup):
    > "토큰을 찾을 수 없어요. 'axhub auth login' 또는 CC 세션 재시작."
 
-   v0.15 CLI 는 `axhub deploy list --app <APP> --json` 으로 직접 배포 목록을 조회할 수 있어요 (아래 build-log snapshot fallback 에서도 이 명령을 써요). 위 helper 는 같은 데이터를 canonical CLI wrapper 로 받아 캐시 친화적으로 정리해 주는 경로예요 — auth/transport 정책은 CLI 를 그대로 따라가요.
+   v0.17.4 CLI 는 `axhub deploy list --app <APP> --json` 으로 직접 배포 목록을 조회할 수 있어요 (아래 build-log snapshot fallback 에서도 이 명령을 써요). 위 helper 는 같은 데이터를 canonical CLI wrapper 로 받아 캐시 친화적으로 정리해 주는 경로예요 — auth/transport 정책은 CLI 를 그대로 따라가요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — source pick → `build` (가장 흔한 use case), 전체 보기 → `last 50` (subprocess 에서는 trimmed 만 보여줘요).
 
-2. **Pick source.** Default `--source=build`. Switch to `--source=pod` only when the utterance contains "런타임 로그", "running logs", "컨테이너 로그", "pod logs", or when the deploy is already in a `health_check`/terminal `succeeded` phase. When uncertain, ask once via AskUserQuestion ("빌드 로그 / 런타임 로그 / 둘 다").
+3. **Pick source.** Default `--source=build`. Switch to `--source=pod` only when the utterance contains "런타임 로그", "running logs", "컨테이너 로그", "pod logs", or when the deploy is already in a `health_check`/terminal `succeeded` phase. When uncertain, ask once via AskUserQuestion ("빌드 로그 / 런타임 로그 / 둘 다").
 
    **No-deploy precheck.** Before any `axhub deploy logs ...` call, verify there is a concrete deployment id for the chosen app. Use the helper/CLI list result from Step 1; if it is empty, stop cleanly with "아직 배포가 없어서 로그도 없어요. 먼저 배포를 시작한 뒤 다시 로그를 볼 수 있어요." Do **not** call app-level `axhub deploy logs --app <APP>` without a deploy id: current backend returns exit 7 + API 500 `internal_error` ("로그를 불러오지 못했어요") for no-deploy apps, which is noisy and should not be user-facing.
 
-3. **Stream logs with SSE follow:**
+4. **Stream logs with SSE follow:**
 
    ```bash
    axhub deploy logs dep_<DEPLOY_ID> --app <APP_ID> --follow --source build --json
@@ -75,17 +91,17 @@ To fetch logs:
 
    Select the matching deployment id from `.items[]` (or CLI envelope `.data.items[]`), read `.build_log`, and show the last 50 lines. If `.build_log` is still empty, explain that the backend has no build-log snapshot yet and suggest an interactive `--follow` run.
 
-4. **Handle SSE eof + resume.** Watch for the `eof:true` sentinel — that is the natural terminator, not a transport error. If the stream drops mid-flight, resume once via `Last-Event-ID` (CLI handles this automatically when re-invoked with `--follow`); never attempt a second resume from the agent side (avoids re-spam to the user).
+5. **Handle SSE eof + resume.** Watch for the `eof:true` sentinel — that is the natural terminator, not a transport error. If the stream drops mid-flight, resume once via `Last-Event-ID` (CLI handles this automatically when re-invoked with `--follow`); never attempt a second resume from the agent side (avoids re-spam to the user).
 
-5. **Render trimmed output.** For non-failure logs, show the last 50 lines plus a "전체 보기" AskUserQuestion option. For failure logs, show the last 200 lines and surface the first error-level line at the top with "이 줄에서 멈춘 것 같아요:".
+6. **Render trimmed output.** For non-failure logs, show the last 50 lines plus a "전체 보기" AskUserQuestion option. For failure logs, show the last 200 lines and surface the first error-level line at the top with "이 줄에서 멈춘 것 같아요:".
 
-6. **On non-zero exit**, route via `axhub-helpers classify-exit "$EXIT" "$STDOUT"` (spec 004 Fork-A — canonical router) or the catalog `../deploy/references/error-empathy-catalog.md` by current CLI exit code:
+7. **On non-zero exit**, route via `axhub-helpers classify-exit "$EXIT" "$STDOUT"` (spec 004 Fork-A — canonical router) or the catalog `../deploy/references/error-empathy-catalog.md` by current CLI exit code:
    - exit 4 → token expired (was sysexits 65)
    - exit 5 → deploy id not found + did-you-mean (was 67)
    - exit 6 → rate limit (logs is the most rate-limited surface; was 68)
    - exit 1 → transport; allow one retry on read path
 
-7. **No source available.** If both build and pod logs return empty, emit: "아직 로그가 없어요. 배포가 시작되기 전이거나, 빌드 단계가 너무 빨라서 출력이 캡처 안 됐을 수 있어요. 'status'로 단계 먼저 확인해볼래요?"
+8. **No source available.** If both build and pod logs return empty, emit: "아직 로그가 없어요. 배포가 시작되기 전이거나, 빌드 단계가 너무 빨라서 출력이 캡처 안 됐을 수 있어요. 'status'로 단계 먼저 확인해볼래요?"
 
 ## NEVER
 

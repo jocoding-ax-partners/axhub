@@ -26,45 +26,32 @@ Track an axhub deploy without dumping raw JSON ticks. Use the adapter `axhub-hel
 
 ## Workflow
 
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
+
 To check status:
 
-1. **최근 배포 목록 조회.** 앱을 확인하고 배포 목록을 가져와요:
+**Claude Desktop visible contract:** start with `배포 상태를 확인할게요.` when the host permits visible text before tools. Use one Bash tool with the Korean title `배포 상태 확인`. Do not show intermediate resolver failures, JSON field names, raw selector names, environment-mode labels, English tool titles, or command names to the user.
+
+1. **상태 요약 한 번만 실행해요.** The helper resolves the app, picks the most recent deployment, checks status, and prints a Korean user-facing summary. Do not read `axhub.yaml`, run raw `axhub deploy list`, or run raw `axhub deploy status` unless the user explicitly asks for raw details.
 
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
-   APP=$("$HELPER" resolve --intent status --user-utterance "$ARGS" --json | jq -r '.resolve.app_id // empty')
-   DEPLOY_LIST_JSON=$(axhub deploy list --app "$APP" --json)
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   USER_UTTERANCE="<the user's exact latest sentence>"
+   "$HELPER" status-summary --user-utterance "$USER_UTTERANCE"
    ```
 
-   배포 이력이 없으면 안내하고 종료해요:
+   Show the Korean stdout as-is. If it says the app or deployment is missing, stop there and ask a natural follow-up. Do not recover by reading files or showing raw command output. For ordinary Claude Desktop status questions, stop after this step.
 
-   ```bash
-   if [ "$(echo "$DEPLOY_LIST_JSON" | jq '(.items // .) | length')" -eq 0 ]; then
-     echo '{"systemMessage":"배포 이력이 없어요. 먼저 /axhub:deploy 로 배포 후 다시 호출하세요."}'
-     exit 0
-   fi
-   ```
+2. **Raw watch fallback for explicit advanced watch requests only** (ordinary Desktop status questions must skip this):
 
-   배포가 있으면 AskUserQuestion 으로 선택해요. 비대화형 환경에서는 `cold_cache_default: most_recent` (registry) 에 따라 `items[0]` 를 자동 선택해요:
-
-   ```json
-   {
-     "question": "어떤 배포 상태를 볼까요?",
-     "header": "배포 선택",
-     "options": "<list[0..N] — id + app_slug + branch + created_at 으로 구성한 옵션>"
-   }
-   ```
-
-   선택한 항목의 `id` 를 `$DEPLOYMENT_ID` 에 저장해요.
-
-2. **Pre-flight version check** (only if mutation chain is implied — pure read can skip):
+3. **Pre-flight version check** (only if mutation chain is implied — pure read can skip):
 
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    "$HELPER" preflight --json
    ```
 
@@ -94,7 +81,7 @@ To check status:
    - exit 4 → token expired template + AskUserQuestion to run auth login. (canonical 분류는 `axhub-helpers classify-exit "$EXIT" "$STDOUT"` 가 담당해요 — spec 004 Fork-A. 옛 sysexits 65 아님.)
    - exit 5 → resource not found + did-you-mean from `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP>` (helper-exit 67 OUTPUT 계약은 유지 — INPUT 만 CLI 5)
    - exit 6 → rate limit + Retry-After backoff
-   - exit 1 + `error_code = "transport.cli_missing"` → axhub CLI 가 PATH 에 없거나 실행 불가. 사용자에게 `axhub --version` 확인 또는 `axhub:setup` 재실행을 안내해요. canonical 표는 `../recover/SKILL.md` (Step 7).
+   - exit 1 + `error_code = "transport.cli_missing"` → axhub CLI 가 PATH 에 없거나 실행 불가. 사용자에게 `axhub --version` 확인 또는 "설치 도와줘"라고 말하면 이어서 도와줄 수 있다고 안내해요. canonical 표는 `../recover/SKILL.md` (Step 7).
    - exit 1 → transport error; retry the watch once for read paths
 
 ## NEVER
@@ -104,7 +91,7 @@ To check status:
 - NEVER auto-trigger `axhub deploy create` from the status path (read-only intent).
 - NEVER invent a `deployment_id` when the cache is cold; ask via AskUserQuestion.
 
-**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — cold cache deploy pick → `most_recent` (가장 최근 succeeded), exit-4 re-login → `abort` (subprocess 자동 로그인 안 해요).
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, 비대화형 실행) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — cold cache deploy pick → `most_recent` (가장 최근 succeeded), exit-4 re-login → `abort` (subprocess 자동 로그인 안 해요).
 - NEVER throttle the terminal-state narration — success/failure must surface immediately.
 
 ## Additional Resources

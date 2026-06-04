@@ -33,8 +33,13 @@ if [ -z "$ROOT" ]; then
   exit 0
 fi
 HELPER="${ROOT}/bin/axhub-helpers"
+WRAPPER="${ROOT}/hooks/axhub-helpers.sh"
 if [ ! -x "$HELPER" ]; then
-  exit 0
+  if [ -x "$WRAPPER" ] && "$WRAPPER" --resolve-helper >/dev/null 2>&1; then
+    HELPER="$WRAPPER"
+  else
+    exit 0
+  fi
 fi
 
 # ── background detach ─────────────────────────────────────────────────────────

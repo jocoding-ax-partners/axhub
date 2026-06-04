@@ -44,6 +44,16 @@ describe("Phase 17 C2/US-1702 + Phase 18 R1 — TodoWrite presence per multi-ste
         expect(content).toContain("Do not leave the initial Step 0 list stale");
       });
 
+      test(`skills/${slug}/SKILL.md silently skips TodoWrite when unavailable in Desktop`, () => {
+        expect(content).toContain("TodoWrite availability");
+        expect(content).toContain("available tool list");
+        expect(content).toContain("do not call TodoWrite");
+        expect(content).toContain("do not mention progress UI availability");
+        expect(content).not.toContain("TodoWrite 없음");
+        expect(content).not.toContain("TodoWrite unavailable");
+        expect(content).not.toContain("TodoWrite skipped");
+      });
+
       test(`skills/${slug}/SKILL.md TodoWrite activeForm in 해요체 (no forbidden tokens)`, () => {
         const activeFormMatches = content.match(/activeForm:\s*"([^"]+)"/g) ?? [];
         expect(activeFormMatches.length).toBeGreaterThan(0);
@@ -70,7 +80,9 @@ describe("Phase 17 C2/US-1702 + Phase 18 R1 — TodoWrite presence per multi-ste
     const template = readFileSync(join(SKILLS_DIR, "_template", "SKILL.md.tmpl"), "utf8");
 
     expect(scaffold).toContain("TodoWrite status sync");
+    expect(scaffold).toContain("TodoWrite availability");
     expect(scaffold).toContain("after every AskUserQuestion answer");
     expect(template).toContain("TodoWrite status sync");
+    expect(template).toContain("TodoWrite availability");
   });
 });

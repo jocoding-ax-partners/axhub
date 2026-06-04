@@ -81,7 +81,7 @@ case "${1:-}" in
     case "${2:-}" in
       list)
         if [ "${AXHUB_FIXTURE_DEPLOY_LIST_AUTH:-}" = "invalid" ]; then
-          # Current axhub CLI auth-error contract (verified vs live 0.17.2):
+          # Current axhub CLI auth-error contract (verified vs live 0.17.4):
           # exit 4, flat closed-enum error.code "auth", bare subcode "token_invalid".
           echo '{"schema_version":"1","status":"error","error":{"code":"auth","subcode":"token_invalid","category":"auth","message":"Bearer token is invalid"}}'
           exit 4
@@ -126,7 +126,22 @@ case "${1:-}" in
         ;;
     esac
     ;;
-  update|logs)
+  update)
+    case "${2:-}" in
+      check)
+        echo '{"current":"v0.17.4","latest":"v0.17.4","has_update":false}'
+        ;;
+      apply)
+        echo '{"error":"mock_not_implemented","subcommand":"update apply"}' >&2
+        exit 64
+        ;;
+      *)
+        echo '{"error":"mock_not_implemented","subcommand":"update '"${2:-}"'"}' >&2
+        exit 64
+        ;;
+    esac
+    ;;
+  logs)
     echo '{"error":"mock_not_implemented","subcommand":"'"$1"' '"${2:-}"'"}' >&2
     exit 64
     ;;

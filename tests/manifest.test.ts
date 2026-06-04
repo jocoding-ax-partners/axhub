@@ -57,6 +57,7 @@ let pluginJson: PluginJson;
 let marketplaceJson: MarketplaceJson;
 let packageJson: PackageJson;
 let hooksJson: HooksJson;
+let upgradeSkill: string;
 // helperSource removed v0.2.0 — TS shadow박멸.
 
 beforeAll(async () => {
@@ -64,6 +65,7 @@ beforeAll(async () => {
   marketplaceJson = JSON.parse(await readFile(join(REPO_ROOT, ".claude-plugin/marketplace.json"), "utf8"));
   packageJson = JSON.parse(await readFile(join(REPO_ROOT, "package.json"), "utf8"));
   hooksJson = JSON.parse(await readFile(join(REPO_ROOT, "hooks/hooks.json"), "utf8"));
+  upgradeSkill = await readFile(join(REPO_ROOT, "skills/upgrade/SKILL.md"), "utf8");
   // helperSource (TS shadow) removed v0.2.0 — equivalent validation now in
   // crates/axhub-helpers/tests/phase_parity.rs (cargo test).
 });
@@ -165,6 +167,25 @@ describe("marketplace.json schema", () => {
   test("plugins is non-empty array", () => {
     expect(Array.isArray(marketplaceJson.plugins)).toBe(true);
     expect(marketplaceJson.plugins.length).toBeGreaterThan(0);
+  });
+
+  test("upgrade skill reads marketplace version fallback", () => {
+    const marketplaceAxhub = marketplaceJson.plugins.find((p) => p.name === "axhub")!;
+    expect(marketplaceAxhub.version).toBeTypeOf("string");
+    expect(upgradeSkill).toContain("(.latest_version // .version // empty)");
+  });
+
+  test("upgrade helper fallback is cache-name agnostic", () => {
+    expect(upgradeSkill).toContain(".claude/plugins/cache");
+    expect(upgradeSkill).toContain("plugins/cache/*/*/*/bin/axhub-helpers");
+    expect(upgradeSkill).not.toContain("cache/axhub/axhub/*/bin/axhub-helpers");
+    expect(upgradeSkill).not.toContain("find \"$HOME/.claude/plugins/cache\"");
+  });
+
+  test("upgrade skill covers human plugin-latest phrasing", () => {
+    expect(upgradeSkill).toContain("Claude에 설치된 axhub 플러그인도 최신인지 봐줘");
+    expect(upgradeSkill).toContain("플러그인 최신인지 확인해줘");
+    expect(upgradeSkill).toContain("axhub plugin latest");
   });
 
   test("each plugin has name", () => {
@@ -304,7 +325,7 @@ describe("hooks.json structure", () => {
 
   test("UserPromptSubmit routes through axhub-helpers prompt-route", () => {
     const hook = hooksJson.hooks.UserPromptSubmit[0].hooks[0];
-    expect(hook.command).toBe("${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers prompt-route");
+    expect(hook.command).toBe("bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh prompt-route");
     expect(hook.timeout).toBe(5);
   });
 
@@ -681,6 +702,375 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
+  test("setup skill covers human first-run phrasing", () => {
+    const setup = skillContents.get("setup")!;
+    expect(setup).toContain("처음 쓰는데");
+    expect(setup).toContain("뭐부터 하면 돼");
+    expect(setup).toContain("axhub 처음 쓰는데 뭐부터 하면 돼?");
+  });
+
+  test("auth skill covers human login-status phrasing", () => {
+    const auth = skillContents.get("auth")!;
+    expect(auth).toContain("나 로그인 돼 있어?");
+    expect(auth).toContain("로그인 상태 좀 봐줘");
+    expect(auth).toContain("로그인 상태 확인해줘");
+    expect(auth).toContain("지금 로그인 필요한 상태인지 봐줘");
+    expect(auth).toContain("axhub 로그인 상태 좀 봐줘");
+  });
+
+  test("auth Desktop contract keeps plain login-status prompts safe", () => {
+    const auth = skillContents.get("auth")!;
+    expect(auth).toContain("Claude Desktop natural-language contract");
+    expect(auth).toContain("로그인 상태를 확인할게요");
+    expect(auth).toContain("axhub-helpers auth-summary --user-utterance");
+    expect(auth).toContain("설치 상태 점검, 환경 진단, 업데이트 확인, 새 로그인, 로그아웃, 계정 상세 표시 같은 다른 작업으로 넘어가지 않아요");
+    expect(auth).not.toContain("setup, doctor, update, install, login, logout 로 우회하지");
+    expect(auth).toContain("계정 상세 표시");
+    expect(auth).toContain("계정 이메일, raw user id, tenant/workspace 이름, profile 이름, scope, 정확한 만료 시각");
+    expect(auth).toContain("사용자가 `어떤 계정이야`, `whoami`, `권한 보여줘`, `scope 보여줘`처럼");
+    expect(auth).toContain("Do not show scopes for plain login-status questions");
+  });
+
+  test("auth status card does not default to full user_id disclosure", () => {
+    const auth = skillContents.get("auth")!;
+    expect(auth).not.toContain("계정: <user_email>  (user_id: <user_id>)");
+    expect(auth).toContain("기본 상태 카드에서는 `user_id` UUID 를 표시하지 마세요");
+    expect(auth).toContain("user_id: ...<last8>");
+  });
+
+  test("workspace skill covers human team/workspace membership phrasing", () => {
+    const workspace = skillContents.get("workspace")!;
+    expect(workspace).toContain("내가 속한 팀이랑 워크스페이스 보여줘");
+    expect(workspace).toContain("내가 속한 팀");
+    expect(workspace).toContain("자신의 axhub 팀/워크스페이스/테넌트 membership");
+    expect(workspace).toContain("my teams and workspaces");
+    expect(workspace).toContain("팀 멤버 초대/권한 변경 같은 관리는 team 스킬");
+  });
+
+  test("team skill handles pure Desktop invite phrasing without agent-team ambiguity", () => {
+    const team = skillContents.get("team")!;
+    expect(team).toContain("팀원 초대해");
+    expect(team).toContain("팀 작업을 확인할게요.");
+    expect(team).toContain("팀 작업 확인");
+    expect(team).toContain("axhub-helpers team-summary --user-utterance");
+    expect(team).toContain("do not ask whether the user means a Claude/OMC multi-agent team");
+    expect(team).toContain("Do not mention or display route labels");
+    expect(team).toContain("current_team_id");
+    expect(team).toContain("raw emails that the user did not type");
+  });
+
+  test("browse skill covers pure template discovery phrasing", () => {
+    const browse = skillContents.get("browse")!;
+    expect(browse).toContain("템플릿 뭐 있어");
+    expect(browse).toContain('utterance: "템플릿 뭐 있어?"');
+    expect(browse).toContain("내 앱 목록은 apps 스킬");
+  });
+
+  test("init skill forbids visible internal routing label narration", () => {
+    const init = skillContents.get("init")!;
+    expect(init).toContain('the first visible chat sentence must be exactly "새 앱을 만들 수 있는 템플릿을 확인할게요."');
+    expect(init).toContain("do not restate badge metadata in prose");
+    expect(init).toContain("새 앱을 만들 수 있는 템플릿을 확인할게요");
+  });
+
+  test("inspect skill covers human manifest/config review phrasing", () => {
+    const inspect = skillContents.get("inspect")!;
+    expect(inspect).toContain("매니페스트랑 설정 괜찮은지 봐줘");
+    expect(inspect).toContain("the first visible chat sentence must be exactly `매니페스트와 설정을 확인할게요.`");
+    expect(inspect).toContain("with no planning sentence before or after it");
+    expect(inspect).toContain("copy the Korean stdout as the answer and do not reinterpret it");
+    expect(inspect).toContain("Do not narrate internal routing labels");
+    expect(inspect).toContain("Do not start with repository file discovery");
+    expect(inspect).toContain("do not run raw `axhub manifest validate`");
+    expect(inspect).toContain("plugin package inspection");
+    expect(inspect).toContain("Read axhub.yaml");
+    expect(inspect).toContain("For Bash tool calls, set the tool `description` or title exactly");
+    expect(inspect).toContain("매니페스트와 설정 확인");
+    expect(inspect).toContain("inspect-config-summary");
+    expect(inspect).toContain("Natural-language summary contract");
+    expect(inspect).toContain("Do not use markdown tables");
+    expect(inspect).toContain("Do not show raw command names");
+    expect(inspect).toContain("raw JSON field names");
+    expect(inspect).toContain("hook labels");
+    expect(inspect).toContain("workflow labels");
+    expect(inspect).toContain("Use at most four concise bullets");
+    expect(inspect).toContain("로그인 정보가 서로 다르게 보여서 배포 전에 다시 로그인 확인이 필요할 수 있어요");
+    expect(inspect).not.toContain("AXHub inspect summary helper");
+    expect(inspect).not.toContain("summary helper command");
+  });
+
+  test("status skill uses a single human Desktop summary path", () => {
+    const status = skillContents.get("status")!;
+    expect(status).toContain("배포 상태를 확인할게요.");
+    expect(status).toContain("배포 상태 확인");
+    expect(status).toContain("status-summary --user-utterance");
+    expect(status).toContain("Do not show intermediate resolver failures");
+    expect(status).toContain("For ordinary Claude Desktop status questions, stop after this step");
+    expect(status).not.toContain("APP 미해석");
+    expect(status).not.toContain("items[0]");
+    expect(status).not.toContain("Resolve app and list deployments");
+  });
+
+  test("logs skill uses a single human Desktop summary path", () => {
+    const logs = skillContents.get("logs")!;
+    expect(logs).toContain("로그를 확인할게요.");
+    expect(logs).toContain("로그 확인");
+    expect(logs).toContain("logs-summary --user-utterance");
+    expect(logs).toContain("For ordinary Claude Desktop log questions, stop after this step");
+    expect(logs).toContain("Do not show intermediate resolver text");
+    expect(logs).not.toContain("Resolve deployment first");
+    expect(logs).not.toContain("No deploy id cached");
+    expect(logs).not.toContain("List deployments for app");
+    expect(logs).not.toContain("Fetch build logs snapshot");
+  });
+
+  test("open skill uses a single human Desktop summary path", () => {
+    const open = skillContents.get("open")!;
+    expect(open).toContain("라이브 페이지 열어봐");
+    expect(open).toContain("앱 페이지를 확인할게요.");
+    expect(open).toContain("앱 페이지 확인");
+    expect(open).toContain("open-summary --user-utterance");
+    expect(open).toContain("For ordinary Claude Desktop open/browser questions, stop after this step");
+    expect(open).toContain("Do not show QA-result-file reads");
+    expect(open).toContain("ToolSearch narration");
+  });
+
+  test("verify skill uses a single human Desktop summary path", () => {
+    const verify = skillContents.get("verify")!;
+    expect(verify).toContain("방금 배포 진짜 열리는지 확인해줘");
+    expect(verify).toContain("배포가 실제로 열리는지 확인할게요.");
+    expect(verify).toContain("배포 검증");
+    expect(verify).toContain("verify-summary --user-utterance");
+    expect(verify).toContain("For ordinary Claude Desktop verify questions, stop after this step");
+    expect(verify).toContain("Do not show routing labels");
+    expect(verify).toContain("stale cache IDs");
+    expect(verify).not.toContain("→ verify skill 호출");
+  });
+
+  test("trace skill uses a single human Desktop summary path", () => {
+    const trace = skillContents.get("trace")!;
+    expect(trace).toContain("배포 실패 원인 알려줘");
+    expect(trace).toContain("배포 기록을 확인할게요.");
+    expect(trace).toContain("배포 기록 확인");
+    expect(trace).toContain("trace-summary --user-utterance");
+    expect(trace).toContain("For ordinary Claude Desktop failure-cause questions, stop after this step");
+    expect(trace).toContain("Do not show routing labels");
+    expect(trace).toContain("failure_reason");
+    expect(trace).toContain("matched_patterns");
+    expect(trace).toContain("build_log_errors");
+    expect(trace).not.toContain("→ trace skill 호출");
+  });
+
+  test("routing-stats skill uses a single human Desktop summary path", () => {
+    const routingStats = skillContents.get("routing-stats")!;
+    expect(routingStats).toContain("이번 주 axhub 라우팅 어땠어?");
+    expect(routingStats).toContain("라우팅 통계를 확인할게요.");
+    expect(routingStats).toContain("라우팅 통계 확인");
+    expect(routingStats).toContain("routing-stats --since 7d");
+    expect(routingStats).toContain("do not read QA result files");
+    expect(routingStats).toContain("Do not show raw command names");
+  });
+
+  test("env skill uses a single masked Desktop summary path for read-only queries", () => {
+    const env = skillContents.get("env")!;
+    expect(env).toContain("환경변수 뭐 있어?");
+    expect(env).toContain("환경변수를 확인할게요.");
+    expect(env).toContain("환경변수 확인");
+    expect(env).toContain("env-summary --user-utterance");
+    expect(env).toContain("For ordinary Claude Desktop env questions, stop after this step");
+    expect(env).toContain("Do not show raw values or secret values");
+    expect(env).toContain("셸 환경변수");
+    expect(env).toContain(".env");
+  });
+
+  test("doctor skill uses a single safe Desktop install-status summary path", () => {
+    const doctor = skillContents.get("doctor")!;
+    expect(doctor).toContain("axhub CLI 설치 상태 괜찮아?");
+    expect(doctor).toContain("설치 상태를 확인할게요.");
+    expect(doctor).toContain("설치 상태 확인");
+    expect(doctor).toContain("doctor-summary --user-utterance");
+    expect(doctor).toContain("For ordinary Claude Desktop install/setup/status questions, stop after this step");
+    expect(doctor).toContain("Do not run installers, updates, login, logout");
+    expect(doctor).toContain("raw user emails");
+    expect(doctor).toContain("preflight narration");
+  });
+
+  test("install-cli skill checks existing install before installer flow", () => {
+    const install = skillContents.get("install-cli")!;
+    expect(install).toContain("axhub CLI 설치해줘");
+    expect(install).toContain("설치 상태를 확인할게요.");
+    expect(install).toContain("설치 상태 확인");
+    expect(install).toContain("install-summary --user-utterance");
+    expect(install).toContain("If stdout says the CLI is already installed");
+    expect(install).toContain("Do not run installer commands");
+    expect(install).toContain("preflight");
+    expect(install).toContain("English tool-title fragments");
+  });
+
+  test("update skill uses a single human Desktop summary path for check-only prompts", () => {
+    const update = skillContents.get("update")!;
+    expect(update).toContain("업데이트 필요한지 봐줘");
+    expect(update).toContain("업데이트를 확인할게요.");
+    expect(update).toContain("업데이트 확인");
+    expect(update).toContain("update-summary --user-utterance");
+    expect(update).toContain("raw JSON field names such as `has_update`");
+    expect(update).toContain("do not run `axhub update apply` yet");
+  });
+
+  test("rollback and recover use a safe Desktop restore summary before mutation", () => {
+    for (const slug of ["rollback", "recover"]) {
+      const content = skillContents.get(slug)!;
+      expect(content).toContain("Claude Desktop natural-language path");
+      expect(content).toContain("방금 배포 되돌려줘");
+      expect(content).toContain("되돌릴 수 있는 배포를 확인할게요.");
+      expect(content).toContain("배포 되돌리기 확인");
+      expect(content).toContain("rollback-summary --user-utterance");
+      expect(content).toContain("Copy the Korean stdout as the answer, then stop");
+      expect(content).toContain("do not run preflight/list/rollback/recover/create directly");
+      expect(content).toContain("raw deploy IDs");
+      expect(content).toContain("commit_not_found");
+      expect(content).toContain("no-op");
+      expect(content).toContain("explicitly approves in a later turn");
+    }
+  });
+
+  test("enable-statusline skill uses a single safe Desktop statusbar path", () => {
+    const statusline = skillContents.get("enable-statusline")!;
+    expect(statusline).toContain("상태바 켜줘");
+    expect(statusline).toContain("상태바 설정을 확인할게요.");
+    expect(statusline).toContain("상태바 설정");
+    expect(statusline).toContain("statusline-summary --user-utterance");
+    expect(statusline).toContain("For ordinary Claude Desktop prompts");
+    expect(statusline).toContain("Preserve an existing third-party status bar");
+    expect(statusline).toContain("Do not run `settings-merge`");
+    expect(statusline).toContain("existing command strings");
+    expect(statusline).toContain("statusLine");
+    expect(statusline).toContain("wire");
+  });
+
+  test("workspace helper fallback is cache-name agnostic", () => {
+    const workspace = skillContents.get("workspace")!;
+    expect(workspace).toContain("plugins/cache/*/*/*/bin/axhub-helpers");
+    expect(workspace).not.toContain("cache/axhub/axhub/*/bin/axhub-helpers");
+  });
+
+  test("all skill helper fallbacks are local-plugin cache-name agnostic", () => {
+    for (const [slug, content] of skillContents) {
+      expect(content, slug).not.toContain("cache/axhub/axhub/*/bin/axhub-helpers");
+      if (content.includes(".claude/plugins/cache") && content.includes("axhub-helpers")) {
+        expect(content, slug).toContain("plugins/cache/*/*/*/bin/axhub-helpers");
+      }
+    }
+  });
+
+  test("skills prefer natural-language handoffs for Desktop users", () => {
+    for (const [slug, content] of skillContents) {
+      expect(content, slug).toContain("User-facing handoff language");
+      expect(content, slug).toContain("prefer natural phrases the user can say");
+      expect(content, slug).toContain("do not tell a Desktop user to type `/axhub:*`");
+    }
+  });
+
+  test("preflight and failure handoffs do not surface slash commands to Desktop users", () => {
+    const forbidden = [
+      "auth_ok` 가 false 면 `/axhub:auth`",
+      "→ `/axhub:install-cli`",
+      "→ `/axhub:auth`",
+      "→ `/axhub:upgrade`",
+      "먼저 /axhub:deploy",
+      "/axhub:doctor 로 진단",
+      "/axhub:status <IN_FLIGHT_DEPLOY_ID>",
+    ];
+
+    for (const [slug, content] of skillContents) {
+      for (const needle of forbidden) {
+        expect(content, `${slug} should not contain ${needle}`).not.toContain(needle);
+      }
+    }
+  });
+
+  test("my-resources uses a single normalized summary flow in Desktop", () => {
+    const myResources = skillContents.get("my-resources")!;
+    expect(myResources).toContain("한 번에 요약을 만들어요");
+    expect(myResources).toContain("위 Bash 출력은 이미 최종 Markdown");
+    expect(myResources).toContain("추가 jq probing");
+    expect(myResources).toContain("다시 로그인해줘라고 말하면");
+    expect(myResources).not.toContain("로그인이 필요해요. /axhub:auth");
+  });
+
+  test("connectors Desktop contract treats database connection as AXHub connector work", () => {
+    const connectors = skillContents.get("connectors")!;
+    expect(connectors).toContain("Postgres 데이터베이스 연결하고 싶어");
+    expect(connectors).toContain("데이터베이스 연결을 준비할게요");
+    expect(connectors).toContain("로컬 앱 코드 수정으로 우회하지 않고 AXHub 외부 데이터베이스 연결 설정");
+    expect(connectors).toContain("workflow`, `워크플로`, skill 이름");
+    expect(connectors).toContain("계정 이메일, raw user id 를 쓰지 말고");
+    expect(connectors).toContain("SAFE_PREFLIGHT_JSON");
+    expect(connectors).toContain("server.js");
+    expect(connectors).toContain("DATABASE_URL");
+    expect(connectors).toContain("A/B");
+    expect(connectors).toContain("비밀값은 채팅 평문으로 받지 않아요");
+  });
+
+  test("data Desktop contract keeps natural data-read prompts human-readable", () => {
+    const data = skillContents.get("data")!;
+    expect(data).toContain("orders 데이터 조회해줘");
+    expect(data).toContain("데이터 리소스를 확인할게요");
+    expect(data).toContain("workflow`, `워크플로`, skill 이름");
+    expect(data).toContain("preflight`, `catalog 조회`, `catalog 비어있음`");
+    expect(data).toContain("계정 이메일, raw user id, scope 를 쓰지 말고");
+    expect(data).toContain("SAFE_PREFLIGHT_JSON");
+    expect(data).toContain("현재 연결된 데이터 리소스를 찾지 못했어요");
+    expect(data).toContain("명시적 승인 전에는 실행하지 않아요");
+  });
+
+  test("resources Desktop contract treats cleanup as AXHub resource organization", () => {
+    const resources = skillContents.get("resources")!;
+    expect(resources).toContain("리소스 정리하고 싶어");
+    expect(resources).toContain("리소스 정리 방식을 확인할게요");
+    expect(resources).toContain("axhub-helpers resources-summary --user-utterance");
+    expect(resources).toContain("리소스 현황 확인");
+    expect(resources).toContain("AXHub gateway resource organization");
+    expect(resources).toContain("not local file cleanup");
+    expect(resources).toContain("Do not say the prompt is `모호`");
+    expect(resources).toContain(".shim");
+    expect(resources).toContain(".omc");
+    expect(resources).toContain("QA result files");
+    expect(resources).toContain("git status");
+    expect(resources).toContain("어떤 정리를 할까요?");
+    expect(resources).toContain("AskUserQuestion, Question, or a question-card tool");
+    expect(resources).toContain("raw question JSON");
+    expect(resources).toContain("local artifact names");
+    expect(resources).toContain("Do not say resource changes are impossible");
+    expect(resources).toContain("`catalog kinds`, `connector/resource`");
+  });
+
+  test("tables Desktop contract keeps natural table mutations human-readable", () => {
+    const tables = skillContents.get("tables")!;
+    expect(tables).toContain("orders 테이블 만들고 title 컬럼도 넣어줘");
+    expect(tables).toContain("테이블 변경 내용을 확인할게요");
+    expect(tables).toContain("로컬 앱 코드, local database, SQL migration, ORM");
+    expect(tables).toContain("raw CLI command line 은 사용자 답변에 쓰지 말고");
+    expect(tables).toContain("Claude Desktop 에서는 AskUserQuestion, Question, 질문 카드 도구를 쓰지 않아요");
+    expect(tables).toContain("raw question JSON");
+    expect(tables).toContain("workflow`, `워크플로`, skill 이름");
+    expect(tables).toContain("preflight`, `consent-mint`, consent 내부값");
+    expect(tables).toContain("계정 이메일, raw user id, scope 를 쓰지 말고");
+    expect(tables).toContain("SAFE_PREFLIGHT_JSON");
+    expect(tables).toContain("표시한 변경만 한 번 실행해요");
+  });
+
+  test("apis empty catalog response stays human-readable in Desktop", () => {
+    const apis = skillContents.get("apis")!;
+    expect(apis).toContain("현재 권한에서 바로 사용할 수 있는 API 카탈로그는 없어요");
+    expect(apis).toContain("Do not say `preflight`, `catalog 조회`, `items 비어`, `items.length`, or `--search`");
+    expect(apis).toContain("the first visible chat sentence must be exactly `사용 가능한 API를 확인할게요.`");
+    expect(apis).toContain("Do not include raw email addresses, app slugs, profile IDs, team IDs, or `current_app` values");
+    expect(apis).toContain("use `로그인 상태 확인`");
+    expect(apis).toContain("use `사용 가능한 API 확인`");
+    expect(apis).toContain("검색어를 알려주면 더 좁혀볼게요");
+  });
+
   test("each description starts with 'This skill' or '이 스킬' (Korean equivalent — Phase 5 한국어 전환)", () => {
     for (const [, content] of skillContents) {
       const m = content.match(/^description:\s*(.+)/m);
@@ -783,6 +1173,108 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(deployContent).toContain("axhub-helpers");
   });
 
+  test("deploy skill forbids visible internal routing narration on Desktop", () => {
+    const deployContent = skillContents.get("deploy")!;
+    expect(deployContent).toContain("Claude Desktop Natural-Language Path");
+    expect(deployContent).toContain("The first visible chat sentence must be exactly `배포 준비를 확인할게요.`");
+    expect(deployContent).toContain("stop reading this skill after this section");
+    expect(deployContent).toContain("axhub-helpers deploy-preview-summary --user-utterance");
+    expect(deployContent).toContain("axhub-helpers deploy-approved-run --user-utterance");
+    expect(deployContent).toContain("Do not call this skill again after approval");
+    expect(deployContent).toContain("Do not echo the user's phrase as a route conversion");
+    expect(deployContent).toContain("Invoke deploy skill");
+    expect(deployContent).toContain("Read rest of SKILL");
+    expect(deployContent).toContain("Route=axhub");
+    expect(deployContent).toContain("consent token");
+    expect(deployContent).toContain("Korean titles only");
+    expect(deployContent).toContain("Before any destructive deploy, show only the Korean preview card");
+    expect(deployContent).not.toContain("Observed: axhub deploy/create prompt");
+    expect(deployContent).not.toContain("Suggested: use the AXHub deploy workflow");
+  });
+
+  test("clarify skill keeps Desktop question card natural", () => {
+    const clarifyContent = skillContents.get("clarify")!;
+    expect(clarifyContent).toContain("Claude Desktop Natural-Language Path");
+    expect(clarifyContent).toContain("First visible chat sentence must be exactly `어떤 걸 도와드릴까요?`");
+    expect(clarifyContent).toContain("환경 점검");
+    expect(clarifyContent).toContain("앱 배포");
+    expect(clarifyContent).toContain("앱과 리소스 조회");
+    expect(clarifyContent).toContain("문제 원인 보기");
+    expect(clarifyContent).toContain("처음부터 안내");
+    expect(clarifyContent).toContain("set each `value` to exactly the same Korean text as its visible `label`");
+    expect(clarifyContent).toContain("Selected Option Handoff");
+    expect(clarifyContent).toContain("Do not call another skill from this skill");
+    expect(clarifyContent).toContain("설치 상태를 확인할게요.");
+    expect(clarifyContent).toContain("axhub-helpers doctor-summary --user-utterance");
+    expect(clarifyContent).toContain('"value": "환경 점검"');
+    expect(clarifyContent).toContain('"value": "앱 배포"');
+    expect(clarifyContent).toContain("NEVER include parenthesized internal labels");
+    expect(clarifyContent).not.toContain('"value": "doctor"');
+    expect(clarifyContent).not.toContain('"value": "deploy"');
+    expect(clarifyContent).not.toContain("invoke the matching sibling skill");
+    expect(clarifyContent).not.toContain("Route to chosen skill");
+    expect(clarifyContent).not.toContain("CLI 설치/인증/버전 점검 (doctor)");
+    expect(clarifyContent).not.toContain("현재 브랜치 axhub 라이브 배포 (deploy)");
+    expect(clarifyContent).not.toContain("너무 막연");
+    expect(clarifyContent).not.toContain("axhub doctor 스킬 실행");
+    expect(clarifyContent).not.toContain("읽는 중 SKILL.md");
+  });
+
+  test("app-lifecycle skill keeps Desktop mutation path human-readable", () => {
+    const appLifecycleContent = skillContents.get("app-lifecycle")!;
+    expect(appLifecycleContent).toContain("Claude Desktop Natural-Language Path");
+    expect(appLifecycleContent).toContain("Claude Desktop 일반 자연어 요청은 UserPromptSubmit hook의 inline flow가 처리");
+    expect(appLifecycleContent).toContain("prompt-route inline flow in Claude Desktop");
+    expect(appLifecycleContent).toContain("앱 잠깐 멈춰");
+    expect(appLifecycleContent).toContain("앱 다시 올려");
+    expect(appLifecycleContent).toContain("testnextjs 다시 켜줘");
+    expect(appLifecycleContent).toContain("testnextjs 멈춰줘");
+    expect(appLifecycleContent).toContain("앱을 잠깐 멈출 준비를 할게요.");
+    expect(appLifecycleContent).toContain("앱을 다시 켤 준비를 할게요.");
+    expect(appLifecycleContent).toContain("앱 상태 확인");
+    expect(appLifecycleContent).toContain("앱 찾기");
+    expect(appLifecycleContent).toContain("앱 변경 준비");
+    expect(appLifecycleContent).toContain("앱 변경 실행");
+    expect(appLifecycleContent).toContain("앱 변경을 실행할까요?");
+    expect(appLifecycleContent).toContain('"label":"취소"');
+    expect(appLifecycleContent).toContain('"value":"취소"');
+    expect(appLifecycleContent).toContain('"label":"진행"');
+    expect(appLifecycleContent).toContain('"value":"진행"');
+    expect(appLifecycleContent).toContain("Pick exactly one branch");
+    expect(appLifecycleContent).toContain("Do not combine the preparation command and the app-changing command");
+    expect(appLifecycleContent).toContain("Between the user's `진행` answer and the first Bash tool call, do not write a visible chat sentence");
+    expect(appLifecycleContent).toContain("Never say `User chose`, `Mint consent`, `execute suspend`");
+    expect(appLifecycleContent).toContain("literal 앱 인자와 정확히 같아야 해요");
+    expect(appLifecycleContent).toContain("not a resolved UUID");
+    expect(appLifecycleContent).toContain("trailing success echo");
+    expect(appLifecycleContent).toContain("consent-mint-app-lifecycle");
+    expect(appLifecycleContent).toContain("--action suspend --app");
+    expect(appLifecycleContent).toContain("--action resume --app");
+    expect(appLifecycleContent).toContain("--action fork --app");
+    expect(appLifecycleContent).toContain('axhub apps suspend "$APP_ARG" --execute --json >/dev/null');
+    expect(appLifecycleContent).toContain('axhub apps resume "$APP_ARG" --execute --json >/dev/null');
+    expect(appLifecycleContent).toContain('axhub apps fork "$SOURCE_APP" --slug "$NEW_SLUG" --subdomain "$NEW_SUBDOMAIN" --name "$NAME" --tenant "$TENANT" --execute --json >/dev/null');
+    expect(appLifecycleContent).toContain("raw JSON stdout");
+    expect(appLifecycleContent).toContain("비공개 (private)");
+    expect(appLifecycleContent).toContain("[DESTRUCTIVE] about to run");
+    expect(appLifecycleContent).toContain("do not run another preparation/execution pair");
+    expect(appLifecycleContent).toContain("같은 변경을 다시 준비하거나 다시 실행하지 않아요");
+    expect(appLifecycleContent).toContain("APP_ARG");
+    expect(appLifecycleContent).toContain("account emails");
+    expect(appLifecycleContent).toContain("JSON, schema, fixture, helper source");
+    expect(appLifecycleContent).toContain("NEVER include parenthesized internal labels");
+    expect(appLifecycleContent).toContain("NEVER mention internal authorization primitives");
+    expect(appLifecycleContent).not.toContain("echo done");
+    expect(appLifecycleContent).not.toContain("auth OK, current_app");
+    expect(appLifecycleContent).not.toContain("app_id resolve");
+    expect(appLifecycleContent).not.toContain("ID를 확인할게요");
+    expect(appLifecycleContent).not.toContain("승인 토큰");
+    expect(appLifecycleContent).not.toContain("앱 resolve");
+    expect(appLifecycleContent).not.toContain("caveat 안내");
+    expect(appLifecycleContent).not.toContain("preview 준비");
+    expect(appLifecycleContent).not.toContain("実行");
+  });
+
   test("auth skill has body referencing consent-mint (US-004 outcome)", () => {
     const authContent = skillContents.get("auth")!;
     expect(authContent).toContain("consent-mint");
@@ -807,6 +1299,9 @@ describe("skills/*/SKILL.md frontmatter", () => {
       expect(content, slug).toMatch(/\|\s*"\$HELPER" consent-mint/);
       expect(content, slug).toMatch(/HELPER="\$\{CLAUDE_PLUGIN_ROOT:\+\$CLAUDE_PLUGIN_ROOT\/bin\/axhub-helpers\}"/);
     }
+    const appLifecycleContent = skillContents.get("app-lifecycle")!;
+    expect(appLifecycleContent).toContain('"$HELPER" consent-mint-app-lifecycle');
+    expect(appLifecycleContent).not.toMatch(/\|\s*"\$HELPER" consent-mint/);
   });
 
   test("destructive skill consent examples do not require POSIX-only session unsetting", () => {
@@ -848,6 +1343,10 @@ describe("skills/*/SKILL.md frontmatter", () => {
   test("github skill mints consent before connect/disconnect and avoids manual hook bypass", () => {
     const github = skillContents.get("github")!;
     expect(github).toContain("axhub-helpers");
+    expect(github).toContain("axhub-helpers github-summary --user-utterance");
+    expect(github).toContain("GitHub 연결 상태를 확인할게요.");
+    expect(github).toContain("GitHub 연결 상태 확인");
+    expect(github).toContain("Do not run `git remote`");
     expect(github).toContain('"action":"github_connect"');
     expect(github).toContain('"branch":"${BRANCH}"');
     expect(github).toContain('"context":{"repo":"${OWNER_REPO}","branch":"${BRANCH}","account":"${ACCOUNT}"}');
@@ -860,6 +1359,148 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(github).toContain('axhub apps git status --app "$APP_ID" --json');
     expect(github).toContain("NEVER `CLAUDE_PLUGIN_ROOT` 누락");
     expect(github).not.toContain("! axhub apps git connect");
+  });
+
+  test("migrate skill handles pure Desktop import-readiness phrasing without local detours", () => {
+    const migrate = skillContents.get("migrate")!;
+    expect(migrate).toContain("이 프로젝트 axhub로 옮길 수 있어?");
+    expect(migrate).toContain("가져오기 상태를 확인할게요.");
+    expect(migrate).toContain("가져오기 상태 확인");
+    expect(migrate).toContain("axhub-helpers migrate-summary --user-utterance");
+    expect(migrate).toContain("Copy the Korean stdout as the answer");
+    expect(migrate).toContain("Do not inspect local server state");
+    expect(migrate).toContain("package scripts");
+    expect(migrate).toContain("previous deployment failures");
+    expect(migrate).toContain("English tool-title fragments");
+    expect(migrate).toContain("App registration, GitHub connection, env writes, and deployment require");
+    expect(migrate).not.toContain("Check server and axhub apps");
+    expect(migrate).not.toContain("last_deployment_status");
+  });
+
+  test("publish skill handles pure Desktop review phrasing without route leakage", () => {
+    const publish = skillContents.get("publish")!;
+    expect(publish).toContain("이 앱 공개 심사 넣고 싶어");
+    expect(publish).toContain("공개 심사 준비를 확인할게요.");
+    expect(publish).toContain("공개 심사 준비 확인");
+    expect(publish).toContain("axhub-helpers publish-summary --user-utterance");
+    expect(publish).toContain("Copy the Korean stdout as the answer");
+    expect(publish).toContain("Do not read `quality.json`");
+    expect(publish).toContain("local state files");
+    expect(publish).toContain("plugin source");
+    expect(publish).toContain("English tool-title fragments");
+    expect(publish).toContain("Actual submission requires a Korean preview");
+    expect(publish).not.toContain("App store review submission");
+  });
+
+  test("quality auto-mode does not advertise direct quality prompts in frontmatter", () => {
+    const quality = skillContents.get("using-axhub-quality")!;
+    const frontmatter = quality.split("\n---\n")[0];
+    expect(frontmatter).toContain("background axhub quality auto-mode");
+    expect(frontmatter).not.toContain("리뷰해줘");
+    expect(frontmatter).not.toContain("코드 봐줘");
+    expect(frontmatter).not.toContain("디버그해");
+    expect(frontmatter).not.toContain("ship readiness");
+    expect(quality).toContain("DIRECT REQUEST OVERRIDE");
+    expect(quality).toContain("Direct explicit quality requests take precedence");
+  });
+
+  test("dedicated quality skills document Claude Desktop natural-language contracts", () => {
+    const contracts = [
+      ["axhub-review", "이 코드 리뷰해줘", "코드 리뷰를 시작할게요.", "리뷰 상태 저장"],
+      ["axhub-debug", "왜 테스트가 깨지는지 디버그해줘", "원인을 좁혀볼게요.", "디버그 상태 저장"],
+      ["axhub-diagnose", "loop 돌려서 원인 찾아줘", "진단 루프를 준비할게요.", "raw question JSON"],
+      ["axhub-plan", "큰 구조 변경 계획 세워줘", "변경 계획을 잡아볼게요.", "영향 범위 확인"],
+      ["axhub-ship", "PR 만들기 전에 배포 준비 봐줘", "출시 준비 상태를 확인할게요.", "출시 상태 저장"],
+      ["axhub-tdd", "테스트 먼저 TDD로 가자", "테스트부터 잡아볼게요.", "TDD 대상 확인"],
+      ["karpathy-guidelines", "작은 diff랑 테스트 우선 원칙 기억해줘", "Claude Desktop natural-language contract", "internal injection details"],
+    ] as const;
+
+    for (const [slug, utterance, firstSentence, guard] of contracts) {
+      const content = skillContents.get(slug)!;
+      expect(content, slug).toContain(utterance);
+      expect(content, slug).toContain(firstSentence);
+      expect(content, slug).toContain(guard);
+      expect(content, slug).not.toContain("Survey repo scope and code files");
+      expect(content, slug).not.toContain("Show git status and file listing");
+    }
+
+    const review = skillContents.get("axhub-review")!;
+    expect(review).toContain("review directly in the current session first");
+    expect(review).toContain("주요 변경 직접 검토");
+    expect(review).toContain("review-scope-summary");
+    expect(review).toContain("변경 범위 확인");
+    expect(review).toContain("desktop-pure-routing-results.md");
+    expect(review).toContain("QA 산출물");
+    expect(review).toContain("변경량이 커서 먼저 범위를 정할게요");
+    expect(review).not.toContain("Survey repo scope and code files");
+    expect(review).not.toContain("Show git status and file listing");
+    expect(review).not.toContain("axhub-reviewer agent 위임");
+
+    const debug = skillContents.get("axhub-debug")!;
+    expect(debug).toContain("debug directly in the current session first");
+    expect(debug).toContain("원인 가설 직접 검토");
+    expect(debug).not.toContain("axhub-debugger agent 위임");
+
+    const ship = skillContents.get("axhub-ship")!;
+    expect(ship).toContain("prepare the readiness summary directly in the current session first");
+    expect(ship).toContain("PR 또는 release 초안 직접 정리");
+    expect(ship).not.toContain("axhub-shipper agent 위임");
+  });
+
+  test("dedicated quality skill frontmatter does not auto-advertise plain Desktop prompts", () => {
+    const directQualitySkills = [
+      "axhub-review",
+      "axhub-debug",
+      "axhub-diagnose",
+      "axhub-plan",
+      "axhub-ship",
+      "axhub-tdd",
+    ];
+    const plainDesktopTriggers = [
+      "이 코드 리뷰해줘",
+      "리뷰해줘",
+      "코드 봐줘",
+      "왜 테스트가 깨지는지 디버그해줘",
+      "디버그해",
+      "왜 안 돼",
+      "loop 돌려서 원인 찾아줘",
+      "큰 구조 변경 계획 세워줘",
+      "플랜 짜줘",
+      "PR 만들기 전에 배포 준비 봐줘",
+      "배포 준비",
+      "PR 만들어",
+      "테스트 먼저 TDD로 가자",
+      "테스트 먼저",
+    ];
+
+    for (const slug of directQualitySkills) {
+      const content = skillContents.get(slug)!;
+      const frontmatter = content.split("\n---\n")[0];
+      expect(frontmatter, slug).toContain("Plain Desktop chat must be handled by prompt-route");
+      for (const trigger of plainDesktopTriggers) {
+        expect(frontmatter, `${slug} should not advertise ${trigger}`).not.toContain(trigger);
+      }
+    }
+  });
+
+  test("dedicated quality skills redact auth preflight before exposing output", () => {
+    const directQualitySkills = [
+      "axhub-review",
+      "axhub-debug",
+      "axhub-diagnose",
+      "axhub-plan",
+      "axhub-ship",
+      "axhub-tdd",
+    ];
+
+    for (const slug of directQualitySkills) {
+      const content = skillContents.get(slug)!;
+      expect(content, slug).toContain("SAFE_PREFLIGHT_JSON");
+      expect(content, slug).toContain("del(.user_email, .user_id, .email, .account_email, .scope, .scopes)");
+      expect(content, slug).toContain("echo \"$SAFE_PREFLIGHT_JSON\"");
+      expect(content, slug).toContain("계정 이메일, raw user id, scope 를 쓰지 말고");
+      expect(content, slug).not.toContain("echo \"$PREFLIGHT_JSON\"");
+    }
   });
 
   test("github skill locks guided repo setup capability ladder and consent gates", () => {
@@ -1107,7 +1748,7 @@ describe("Phase 4 (F3) hooks.json invariant baseline", () => {
     UserPromptSubmit: [
       {
         commands: [
-          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers prompt-route", timeout: 5 },
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh prompt-route", timeout: 5 },
         ],
       },
     ],
@@ -1115,14 +1756,14 @@ describe("Phase 4 (F3) hooks.json invariant baseline", () => {
       {
         matcher: "Bash",
         commands: [
-          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preauth-check", timeout: 5 },
-          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers commit-gate", timeout: 5 },
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh preauth-check", timeout: 5 },
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh commit-gate", timeout: 5 },
         ],
       },
       {
         matcher: "Edit|Write|MultiEdit|NotebookEdit",
         commands: [
-          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers tdd-inject", timeout: 5 },
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh tdd-inject", timeout: 5 },
         ],
       },
     ],
@@ -1130,15 +1771,15 @@ describe("Phase 4 (F3) hooks.json invariant baseline", () => {
       {
         matcher: "Bash",
         commands: [
-          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers classify-exit", timeout: 5 },
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh classify-exit", timeout: 5 },
           { command: "bun ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-verify-deploy-artifacts.ts", timeout: 7 },
-          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers test-classifier", timeout: 5 },
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh test-classifier", timeout: 5 },
         ],
       },
       {
         matcher: "Edit|Write|MultiEdit|NotebookEdit",
         commands: [
-          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers state-update --edit-event", timeout: 5 },
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh state-update --edit-event", timeout: 5 },
         ],
       },
     ],
@@ -1146,7 +1787,7 @@ describe("Phase 4 (F3) hooks.json invariant baseline", () => {
       {
         matcher: "Bash",
         commands: [
-          { command: "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers test-classifier", timeout: 5 },
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh test-classifier", timeout: 5 },
         ],
       },
     ],

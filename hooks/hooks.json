@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers prompt-route",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh prompt-route",
             "timeout": 5
           }
         ]
@@ -34,12 +34,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers preauth-check",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh preauth-check",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers commit-gate",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh commit-gate",
             "timeout": 5
           }
         ]
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers tdd-inject",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh tdd-inject",
             "timeout": 5
           }
         ]
@@ -61,7 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers classify-exit",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh classify-exit",
             "timeout": 5
           },
           {
@@ -71,7 +71,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers test-classifier",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh test-classifier",
             "timeout": 5
           }
         ]
@@ -81,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers state-update --edit-event",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh state-update --edit-event",
             "timeout": 5
           }
         ]
@@ -93,7 +93,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers test-classifier",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh test-classifier",
             "timeout": 5
           }
         ]

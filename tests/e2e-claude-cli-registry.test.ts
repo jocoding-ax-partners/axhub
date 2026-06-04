@@ -214,7 +214,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     expect(qualityGate["abort_or_proceed"]?.safe_default).toBe("abort");
 
     const clarify = registry["clarify"] as Record<string, SafeDefaultEntry>;
-    expect(clarify["어떤 작업 원해요?"]?.safe_default).toBe("abort");
+    expect(clarify["어떤 걸 도와드릴까요?"]?.safe_default).toBe("abort");
 
     const doctor = registry["doctor"] as Record<string, SafeDefaultEntry>;
     expect(

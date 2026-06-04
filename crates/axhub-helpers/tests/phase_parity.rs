@@ -2901,6 +2901,7 @@ echo "CLAUDE_PLUGIN_ROOT=${CLAUDE_PLUGIN_ROOT:-<unset>}"
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 "$HELPER" route-decision --user-utterance "paydrop 배포해" --explicit"#,
         r#"HELPER="/tmp/axhub/bin/axhub-helpers"; echo "CLAUDE_PLUGIN_ROOT=<not set>"; "$HELPER" route-decision --user-utterance "paydrop 배포" --explicit"#,
+        "axhub update check --json",
         "axhub bootstrap install-node",
         "axhub install-deps",
         "axhub admin setup team",
@@ -3410,9 +3411,10 @@ fn preauth_deny_hint_env_delete_routes_to_env_skill() {
 #[test]
 fn preauth_deny_hint_tables_routes_to_tables_skill_not_rephrase() {
     let hint = format_preauth_deny_hint(Some("tables_create"), Some("ultraqa-app"));
-    assert!(hint.contains("Skill(axhub:tables)"), "got: {hint}");
-    assert!(hint.contains("consent-mint"), "got: {hint}");
-    assert!(hint.contains("preview"), "got: {hint}");
+    assert!(hint.contains("테이블 변경 미리보기"), "got: {hint}");
+    assert!(hint.contains("승인 카드"), "got: {hint}");
+    assert!(!hint.contains("Skill(axhub:"), "got: {hint}");
+    assert!(!hint.contains("skill"), "got: {hint}");
     assert!(
         !hint.contains("라고 말해서 승인 카드를 받으세요"),
         "tables hint must not ask the user to rephrase: {hint}"

@@ -94,6 +94,30 @@ pub(crate) struct ConsentMintArgs {
     pub validate_only: bool,
 }
 
+/// `consent-mint-app-lifecycle` avoids fragile shell-quoted JSON in Desktop
+/// app-lifecycle flows.
+#[derive(clap::Args, Debug)]
+pub(crate) struct ConsentMintAppLifecycleArgs {
+    #[arg(long)]
+    pub action: String,
+    #[arg(long)]
+    pub app: String,
+    #[arg(long)]
+    pub slug: Option<String>,
+    #[arg(long)]
+    pub subdomain: Option<String>,
+    #[arg(long)]
+    pub tenant: Option<String>,
+    #[arg(long)]
+    pub name: Option<String>,
+    #[arg(long)]
+    pub template: Option<String>,
+    #[arg(long = "repo-public")]
+    pub repo_public: Option<String>,
+    #[arg(long)]
+    pub quiet: bool,
+}
+
 /// `token-init`/`token-import` 공용 flag. classify()=Normal (bad-arg→64).
 #[derive(clap::Args, Debug)]
 pub(crate) struct TokenArgs {
