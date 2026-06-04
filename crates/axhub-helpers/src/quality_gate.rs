@@ -146,12 +146,23 @@ fn recompute_exit_code(result: &DeployPrepResult) -> i32 {
     if !result.preflight.in_range {
         return EXIT_VALIDATION;
     }
-    // resolve failure surfaces via the resolve.error field.
+    // resolve failure surfaces via the resolve.error field. Mirror resolve's
+    // own exit-code taxonomy (resolve.rs): the ambiguous-match case (more than
+    // one matched_apps) is EXIT_USAGE (64); every other resolve error
+    // (app_not_found / no_candidate_slug / apps_list_parse_error) is
+    // NOT_FOUND (67). A genuine first deploy has no app yet, so resolve returns
+    // 67 and `merge_exit_code` surfaces it verbatim before the bootstrap branch.
+    // The earlier blanket `resolve.error.is_some() → 64` collapsed that 67 into
+    // 64, so ExitCodeMismatch mis-fired on every first deploy and blocked the
+    // happy-path bootstrap.
     if result.resolve.error.is_some() {
-        return EXIT_VALIDATION;
+        if result.resolve.matched_apps.len() > 1 {
+            return EXIT_VALIDATION; // ambiguous match → resolve's EXIT_USAGE (64)
+        }
+        return EXIT_NOT_FOUND;
     }
-    // bootstrap_plan = first-deploy path → 67 (NOT_FOUND) so recover skill
-    // takes over.
+    // bootstrap_plan with no resolve error = first-deploy path → 67 (NOT_FOUND)
+    // so the recover/bootstrap skill takes over.
     if result.bootstrap_plan.is_some() {
         return EXIT_NOT_FOUND;
     }
@@ -279,6 +290,71 @@ mod tests {
             })
             .expect("ExitCodeMismatch missing");
         assert_eq!(mismatch, (EXIT_OK, 64));
+    }
+
+    #[test]
+    fn first_deploy_no_app_recomputes_not_found_without_mismatch() {
+        // Genuine first deploy: resolve finds no app yet (app_not_found, empty
+        // matched_apps) so it returns NOT_FOUND (67), and derive_bootstrap_plan
+        // produces a first-deploy plan. The composer's merged exit_code is 67.
+        // recompute_exit_code MUST also yield 67 — the pre-fix blanket
+        // `resolve.error.is_some() → 64` made it 64, tripping a spurious
+        // ExitCodeMismatch that blocked every first deploy.
+        let mut result = happy_result();
+        result.resolve.app_id = None;
+        result.resolve.matched_apps = vec![];
+        result.resolve.error = Some("app_not_found".to_string());
+        result.bootstrap_plan = Some(crate::deploy_prep::BootstrapPlan {
+            is_first_deploy: true,
+            required_steps: vec!["template".to_string(), "apps_create".to_string()],
+        });
+        result.exit_code = EXIT_NOT_FOUND;
+
+        let gate = validate_deploy_prep_quality(&result);
+        assert!(
+            !gate
+                .violations
+                .iter()
+                .any(|v| matches!(v, QualityViolation::ExitCodeMismatch { .. })),
+            "first deploy must not trip ExitCodeMismatch: {:?}",
+            gate.violations
+        );
+    }
+
+    #[test]
+    fn ambiguous_match_recomputes_usage_without_mismatch() {
+        // Ambiguous match: app_id stays None but matched_apps has >1 entry, so
+        // resolve returns EXIT_USAGE (64), NOT 67. recompute must keep that 64
+        // distinct from the first-deploy NOT_FOUND path so the gate stays quiet
+        // on a legitimately ambiguous resolve.
+        let mut result = happy_result();
+        result.resolve.app_id = None;
+        result.resolve.matched_apps = vec![
+            crate::resolve::AppMatch {
+                id: "1".into(),
+                slug: "dup".into(),
+            },
+            crate::resolve::AppMatch {
+                id: "2".into(),
+                slug: "dup".into(),
+            },
+        ];
+        result.resolve.error = Some("app_ambiguous".to_string());
+        result.bootstrap_plan = Some(crate::deploy_prep::BootstrapPlan {
+            is_first_deploy: true,
+            required_steps: vec!["template".to_string()],
+        });
+        result.exit_code = 64;
+
+        let gate = validate_deploy_prep_quality(&result);
+        assert!(
+            !gate
+                .violations
+                .iter()
+                .any(|v| matches!(v, QualityViolation::ExitCodeMismatch { .. })),
+            "ambiguous match (64) must not trip ExitCodeMismatch: {:?}",
+            gate.violations
+        );
     }
 
     #[test]
