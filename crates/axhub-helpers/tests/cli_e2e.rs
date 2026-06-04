@@ -4371,13 +4371,23 @@ fn cli_bootstrap_auto_chain_plans_apps_create_without_hidden_remote_mutation() {
     let json = stdout_json(&output);
     assert_eq!(json["state"], "consent_required_apps_create");
     assert_eq!(json["next_action"], "apps_create");
+    // v0.17.3 `apps create --from-file` is JSON-only, so first-run app creation
+    // uses the `--name`/`--slug` lane (slug parsed from the manifest).
     assert_eq!(json["command"][0], "axhub");
     assert_eq!(json["command"][1], "apps");
     assert_eq!(json["command"][2], "create");
-    assert_eq!(json["command"][6], "--profile");
-    assert_eq!(json["command"][7], "prod");
+    assert_eq!(json["command"][3], "--name");
+    assert_eq!(json["command"][4], "paydrop");
+    assert_eq!(json["command"][5], "--slug");
+    assert_eq!(json["command"][6], "paydrop");
+    assert_eq!(json["command"][7], "--json");
+    assert_eq!(json["command"][8], "--profile");
+    assert_eq!(json["command"][9], "prod");
     assert_eq!(json["consent_binding"]["action"], "apps_create");
     assert_eq!(json["consent_binding"]["profile"], "prod");
+    // `--name`/`--slug` consent lane binds app_id + context.slug to the slug.
+    assert_eq!(json["consent_binding"]["app_id"], "paydrop");
+    assert_eq!(json["consent_binding"]["context"]["slug"], "paydrop");
     assert_eq!(json["consent_binding"]["synthesized_by_helper"], true);
     assert!(json["binding_hash"].as_str().unwrap().len() >= 16);
     assert!(json["pending_action_id"]

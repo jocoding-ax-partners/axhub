@@ -646,6 +646,26 @@ fn plan_apps_create(manifest: &ManifestInfo, plan_only: bool, persist_plan: bool
             )
         }
     };
+    // Live axhub CLI (v0.17.3) `apps create --from-file` accepts ONLY JSON app
+    // definitions — handing it the YAML `apphub.yaml` fails with "expected ident …;
+    // JSON app definitions are supported here", which deadlocked first-run deploy.
+    // The supported path for a manifest is `apps create --name <n> --slug <slug>`
+    // (axhub/src/commands/apps.rs::create_app builds the body from these flags;
+    // framework/build come from the manifest at deploy time, not at create). We
+    // already parsed the slug from the manifest, so prescribe that command and stop
+    // gracefully when the manifest has no name/slug to bind.
+    let slug = match manifest.slug.as_deref() {
+        Some(value) if !value.is_empty() => value.to_string(),
+        _ => {
+            return stop(
+                BootstrapState::BackendContractMissingDefaults,
+                format!(
+                    "{} 에 name/slug 가 없어서 앱을 만들 수 없어요. 'name: <앱이름>' (또는 'slug: <슬러그>') 을 추가하고 다시 배포해요.",
+                    manifest.path
+                ),
+            );
+        }
+    };
     let mut state = BootstrapStateFile::new(
         BootstrapState::ConsentRequiredAppsCreate,
         Some(manifest.path.clone()),
@@ -655,20 +675,28 @@ fn plan_apps_create(manifest: &ManifestInfo, plan_only: bool, persist_plan: bool
         "axhub".into(),
         "apps".into(),
         "create".into(),
-        "--from-file".into(),
-        manifest.path.clone(),
+        "--name".into(),
+        slug.clone(),
+        "--slug".into(),
+        slug.clone(),
         "--json".into(),
     ];
     if !profile.is_empty() {
         command.push("--profile".into());
         command.push(profile.clone());
     }
+    // The `--name`/`--slug` consent lane requires the HMAC binding to match the
+    // PreToolUse parser exactly (consent/parser.rs): app_id + context.slug equal
+    // the slug, and context.source is "inline" (source_marker maps a `--name`
+    // create with no file flag to "inline"). Binding the manifest path here would
+    // mismatch and get denied.
     let mut context = HashMap::new();
-    context.insert("source".into(), manifest.path.clone());
+    context.insert("slug".into(), slug.clone());
+    context.insert("source".into(), "inline".into());
     let binding = ConsentBinding {
         tool_call_id: "pending".into(),
         action: "apps_create".into(),
-        app_id: String::new(),
+        app_id: slug.clone(),
         profile,
         branch: String::new(),
         commit_sha: String::new(),
