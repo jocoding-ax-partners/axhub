@@ -118,7 +118,9 @@ fn grace_system_message(output: &Output) -> Option<String> {
 
 fn contains_grace_nudge(message: Option<&str>) -> bool {
     message
-        .map(|msg| msg.contains("axhub.yaml") && msg.contains("/init") && msg.contains("axhub 배포"))
+        .map(|msg| {
+            msg.contains("axhub.yaml") && msg.contains("/init") && msg.contains("axhub 배포")
+        })
         .unwrap_or(false)
 }
 
