@@ -2410,6 +2410,12 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
             [("from_deployment", "dep_123")].as_slice(),
         ),
         (
+            "axhub deploy create --app paydrop --commit abc123 --dry-run --execute --json",
+            "deploy_create",
+            Some("paydrop"),
+            [].as_slice(),
+        ),
+        (
             "axhub publish --app paydrop --note ship --json",
             "publish_submit",
             Some("paydrop"),
@@ -2863,6 +2869,38 @@ fn consent_parser_recognizes_current_cli_mutation_actions_with_stable_context() 
         "axhub apps create --help",
         "axhub apps create -h",
         "axhub deploy create --help",
+        "axhub deploy create --app paydrop --commit abc123 --dry-run --json",
+        r#"AXHUB_STDERR_TMP=$(mktemp)
+AXHUB_STDOUT_TMP=$(mktemp)
+APP_ID="paydrop"
+COMMIT_SHA="abc123"
+axhub deploy create --app "$APP_ID" --commit "$COMMIT_SHA" --dry-run --json >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP""#,
+        r#"PROFILE_FLAG=()
+PROFILE="paydrop"
+if [ -n "${PROFILE:-}" ]; then
+  PROFILE_FLAG=(--profile "$PROFILE")
+fi
+AXHUB_STDERR_TMP=$(mktemp)
+AXHUB_STDOUT_TMP=$(mktemp)
+axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --commit "$COMMIT_SHA" --dry-run --json >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP""#,
+        r#"AXHUB="/tmp/axhub-fixture/bin/axhub"
+APP_ID="app_paydrop"
+COMMIT_SHA="abc123"
+PROFILE="paydrop"
+"$AXHUB" deploy create --app "$APP_ID" --profile "$PROFILE" --commit "$COMMIT_SHA" --dry-run --json 2>&1"#,
+        r#"CLAUDE_PLUGIN_ROOT="/tmp/axhub"
+echo "CLAUDE_PLUGIN_ROOT=${CLAUDE_PLUGIN_ROOT:-<unset>}"
+HELPER="${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers"
+"$HELPER" route-decision --user-utterance "paydrop 배포해" --explicit"#,
+        r#"if [ -z "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  if HELPER_FROM_PATH="$(command -v axhub-helpers 2>/dev/null)"; then
+    export CLAUDE_PLUGIN_ROOT="$(cd "$(dirname "$HELPER_FROM_PATH")/.." && pwd)"
+  fi
+fi
+echo "CLAUDE_PLUGIN_ROOT=${CLAUDE_PLUGIN_ROOT:-<unset>}"
+HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+"$HELPER" route-decision --user-utterance "paydrop 배포해" --explicit"#,
+        r#"HELPER="/tmp/axhub/bin/axhub-helpers"; echo "CLAUDE_PLUGIN_ROOT=<not set>"; "$HELPER" route-decision --user-utterance "paydrop 배포" --explicit"#,
         "axhub bootstrap install-node",
         "axhub install-deps",
         "axhub admin setup team",
@@ -3367,6 +3405,18 @@ fn preauth_deny_hint_env_set_routes_to_env_skill() {
 fn preauth_deny_hint_env_delete_routes_to_env_skill() {
     let hint = format_preauth_deny_hint(Some("env_delete"), Some("paydrop"));
     assert!(hint.contains("'paydrop 환경변수 삭제해'"), "got: {hint}");
+}
+
+#[test]
+fn preauth_deny_hint_tables_routes_to_tables_skill_not_rephrase() {
+    let hint = format_preauth_deny_hint(Some("tables_create"), Some("ultraqa-app"));
+    assert!(hint.contains("Skill(axhub:tables)"), "got: {hint}");
+    assert!(hint.contains("consent-mint"), "got: {hint}");
+    assert!(hint.contains("preview"), "got: {hint}");
+    assert!(
+        !hint.contains("라고 말해서 승인 카드를 받으세요"),
+        "tables hint must not ask the user to rephrase: {hint}"
+    );
 }
 
 #[test]

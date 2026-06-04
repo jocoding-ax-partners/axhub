@@ -815,9 +815,8 @@ fn contains_axhub_tokenish(value: &str) -> bool {
                 .collect::<Vec<_>>()
         })
         .iter()
-        .any(|token| normalized_command_name(token) == "axhub")
+        .any(|token| !is_shell_assignment_token(token) && normalized_command_name(token) == "axhub")
         || value.contains("axhub ")
-        || value.contains("/axhub")
 }
 
 fn contains_mutation_signal(value: &str) -> bool {
@@ -834,6 +833,29 @@ fn contains_mutation_signal(value: &str) -> bool {
             .any(|token| is_mutating_verb(token))
 }
 
+fn contains_non_dry_run_mutation_signal(value: &str) -> bool {
+    if value.contains("--dry-run")
+        && !value.contains("--execute")
+        && value.contains("deploy create")
+    {
+        let mutating_tokens = shlex::split(value)
+            .unwrap_or_else(|| {
+                value
+                    .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-' && ch != '_')
+                    .filter(|token| !token.is_empty())
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .into_iter()
+            .filter(|token| is_mutating_verb(token))
+            .collect::<Vec<_>>();
+        if !mutating_tokens.is_empty() && mutating_tokens.iter().all(|token| token == "create") {
+            return false;
+        }
+    }
+    contains_mutation_signal(value)
+}
+
 fn contains_dynamic_axhub_mutation(cmd: &str) -> bool {
     if !(cmd.contains("$(") || cmd.contains('`')) {
         return false;
@@ -841,13 +863,18 @@ fn contains_dynamic_axhub_mutation(cmd: &str) -> bool {
     collect_command_positions(cmd, 0)
         .into_iter()
         .skip(1)
-        .any(|pos| contains_axhub_tokenish(&pos) && contains_mutation_signal(&pos))
+        .any(|pos| {
+            contains_structural_axhub_mutation(&pos)
+                || ((pos.contains("--execute") || pos.contains("echo axhub"))
+                    && contains_axhub_tokenish(&pos)
+                    && contains_non_dry_run_mutation_signal(&pos))
+        })
 }
 
 fn contains_indirect_runner_axhub_mutation(cmd: &str) -> bool {
     collect_indirect_runner_bodies(cmd)
         .iter()
-        .any(|body| contains_axhub_tokenish(body) && contains_mutation_signal(body))
+        .any(|body| contains_non_dry_run_axhub_mutation(body))
 }
 
 fn is_variable_command_token(token: &str) -> bool {
@@ -856,11 +883,37 @@ fn is_variable_command_token(token: &str) -> bool {
     trimmed.starts_with('$')
 }
 
+fn is_shell_assignment_token(token: &str) -> bool {
+    let trimmed =
+        token.trim_matches(|ch| matches!(ch, ';' | '&' | '|' | '(' | ')' | '`' | '\'' | '"'));
+    let Some((name, _)) = trimmed.split_once('=') else {
+        return false;
+    };
+    !name.is_empty()
+        && name
+            .chars()
+            .next()
+            .is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_')
+        && name
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+}
+
 fn strip_leading_wrappers(tokens: &mut Vec<String>) {
-    while let Some(first_name) = tokens
-        .first()
-        .map(|first| normalized_command_name(first).to_string())
-    {
+    loop {
+        if tokens
+            .first()
+            .is_some_and(|token| is_shell_assignment_token(token))
+        {
+            tokens.remove(0);
+            continue;
+        }
+        let Some(first_name) = tokens
+            .first()
+            .map(|first| normalized_command_name(first).to_string())
+        else {
+            break;
+        };
         match first_name.as_str() {
             "do" | "then" | "else" | "elif" | "if" | "while" | "until" => {
                 tokens.remove(0);
@@ -889,18 +942,53 @@ fn strip_leading_wrappers(tokens: &mut Vec<String>) {
                 tokens.remove(0);
                 strip_sudo_options(tokens);
             }
-            token
-                if token.contains('=')
-                    && token
-                        .chars()
-                        .next()
-                        .is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_') =>
-            {
-                tokens.remove(0);
-            }
             _ => break,
         }
     }
+}
+
+fn variable_command_has_non_dry_run_mutation(tokens: &[String]) -> bool {
+    let args = tokens.iter().skip(1).cloned().collect::<Vec<_>>();
+    let rest = args.join(" ");
+    if args
+        .first()
+        .map(|token| normalized_command_name(token))
+        .is_none_or(|token| !is_axhub_subcommandish(token))
+        && contains_axhub_tokenish(&rest)
+    {
+        return contains_non_dry_run_axhub_mutation(&rest);
+    }
+    if args.first().map(String::as_str) == Some("deploy")
+        && args.get(1).map(String::as_str) == Some("create")
+        && has_flag(&args, "--dry-run")
+        && !has_flag(&args, "--execute")
+    {
+        return false;
+    }
+    contains_mutation_signal(&rest)
+}
+
+fn is_axhub_subcommandish(token: &str) -> bool {
+    matches!(
+        token,
+        "admin"
+            | "apis"
+            | "apps"
+            | "auth"
+            | "bootstrap"
+            | "connectors"
+            | "data"
+            | "deploy"
+            | "env"
+            | "gateway"
+            | "install-deps"
+            | "logs"
+            | "profile"
+            | "publish"
+            | "resources"
+            | "tables"
+            | "update"
+    )
 }
 
 fn contains_variable_axhub_mutation(cmd: &str) -> bool {
@@ -914,9 +1002,7 @@ fn contains_variable_axhub_mutation(cmd: &str) -> bool {
         tokens
             .first()
             .is_some_and(|token| is_variable_command_token(token))
-            && contains_mutation_signal(
-                &tokens.iter().skip(1).cloned().collect::<Vec<_>>().join(" "),
-            )
+            && variable_command_has_non_dry_run_mutation(&tokens)
     })
 }
 
@@ -932,7 +1018,7 @@ fn is_shell_script_runner(tokens: &[String]) -> bool {
 }
 
 fn contains_shell_script_axhub_mutation(cmd: &str) -> bool {
-    if !(contains_axhub_tokenish(cmd) && contains_mutation_signal(cmd)) {
+    if !contains_non_dry_run_axhub_mutation(cmd) {
         return false;
     }
     collect_command_positions(cmd, 0).into_iter().any(|pos| {
@@ -997,9 +1083,7 @@ fn contains_axhub_alias_invocation(cmd: &str, aliases: &[String]) -> bool {
             };
             let command_name = normalized_command_name(first);
             aliases.iter().any(|alias| alias == command_name)
-                && contains_mutation_signal(
-                    &tokens.iter().skip(1).cloned().collect::<Vec<_>>().join(" "),
-                )
+                && variable_command_has_non_dry_run_mutation(&tokens)
         })
 }
 
@@ -1022,8 +1106,7 @@ fn contains_shell_function_block_marker(cmd: &str) -> bool {
 fn contains_shell_alias_axhub_mutation(cmd: &str) -> bool {
     let aliases = collect_axhub_alias_names(cmd);
     contains_axhub_alias_invocation(cmd, &aliases)
-        || (contains_axhub_tokenish(cmd)
-            && contains_mutation_signal(cmd)
+        || (contains_non_dry_run_axhub_mutation(cmd)
             && (contains_shell_function_block_marker(cmd) || cmd.contains("function ")))
 }
 
@@ -1138,6 +1221,30 @@ fn tokens_if_axhub_command(raw_position: &str) -> Option<Vec<String>> {
     Some(tokens)
 }
 
+fn contains_non_dry_run_axhub_mutation(value: &str) -> bool {
+    let mut saw_structural_axhub = false;
+    for pos in collect_command_positions(value, 0) {
+        let Some(tokens) = tokens_if_axhub_command(&pos) else {
+            continue;
+        };
+        saw_structural_axhub = true;
+        if match_known_intent(&tokens).is_some_and(|parsed| parsed.is_destructive) {
+            return true;
+        }
+    }
+    !saw_structural_axhub
+        && contains_axhub_tokenish(value)
+        && contains_non_dry_run_mutation_signal(value)
+}
+
+fn contains_structural_axhub_mutation(value: &str) -> bool {
+    collect_command_positions(value, 0).into_iter().any(|pos| {
+        tokens_if_axhub_command(&pos)
+            .and_then(|tokens| match_known_intent(&tokens))
+            .is_some_and(|parsed| parsed.is_destructive)
+    })
+}
+
 fn match_known_intent(tokens: &[String]) -> Option<ParsedAxhubCommand> {
     if is_help_request(tokens) {
         return None;
@@ -1157,6 +1264,11 @@ fn match_known_intent(tokens: &[String]) -> Option<ParsedAxhubCommand> {
                 .context
                 .insert("note_digest".into(), sha256_context_value(&note));
             parsed
+        }
+        (Some("deploy"), Some("create"), _)
+            if has_flag(tokens, "--dry-run") && !has_flag(tokens, "--execute") =>
+        {
+            return None;
         }
         (Some("deploy"), Some("create"), _) => destructive("deploy_create", tokens, None),
         (Some("deploy"), Some("rollback"), _) => {
@@ -1772,6 +1884,24 @@ pub fn parse_axhub_command(cmd: &str) -> ParsedAxhubCommand {
 
 pub fn format_preauth_deny_hint(action: Option<&str>, app_id: Option<&str>) -> String {
     let app = app_id.filter(|s| !s.is_empty()).unwrap_or("앱이름");
+    if matches!(
+        action,
+        Some(
+            "tables_create"
+                | "tables_drop"
+                | "tables_columns_add"
+                | "tables_columns_remove"
+                | "tables_grants_issue"
+                | "tables_grants_revoke"
+                | "data_insert"
+                | "data_update"
+                | "data_delete"
+        )
+    ) {
+        return format!(
+            "이 axhub 테이블/행 변경 명령은 사전 승인 없이는 실행할 수 없고, tables skill 의 preview + consent-mint 승인 뒤에만 실행할 수 있어요. 사용자에게 다시 말하라고 하지 말고 Skill(axhub:tables)를 로드해 {app} 대상 preview 와 승인 카드를 만든 뒤 같은 binding 으로 재시도해요."
+        );
+    }
     let phrase = match action {
         Some("deploy_create") => format!("'{} 배포해'", app),
         Some("deploy_rollback") => format!("'{} 배포 롤백해'", app),

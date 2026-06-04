@@ -46,13 +46,14 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("46 top-level keys (2 메타 + 42 SKILL slug + quality_gate + consent channel)", () => {
+  test("47 top-level keys (2 메타 + 43 SKILL slug + quality_gate + consent channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(46);
+    expect(keys).toHaveLength(47);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
     expect(channels).toEqual([
+      "apis",
       "app-lifecycle",
       "apps",
       "auth",
@@ -100,14 +101,16 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("66 actual safe_default rationale 엔트리 including v0.17.3 gap-fill skills", () => {
+  test("68 actual safe_default rationale 엔트리 including v0.17.3 gap-fill skills", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(66);
+    expect(paths).toHaveLength(68);
 
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
     expect(skills).toEqual([
+      "apis",
       "app-lifecycle",
+      "apps",
       "apps",
       "apps",
       "auth",
@@ -188,6 +191,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ).toBe("abort");
 
     const apps = registry["apps"] as Record<string, SafeDefaultEntry>;
+    expect(apps["앱을 만들까요?"]?.safe_default).toBe("abort");
     expect(apps["앱이 더 있어요. 전체 목록 볼래요?"]?.safe_default).toBe("skip");
     expect(apps["앱을 삭제할까요?"]?.safe_default).toBe("abort");
 
@@ -252,6 +256,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
 
     const data = registry["data"] as Record<string, SafeDefaultEntry>;
     expect(data["catalog context 를 처음 만들까요?"]?.safe_default).toBe("Skip sync");
+
+    const apis = registry["apis"] as Record<string, SafeDefaultEntry>;
+    expect(apis["이 API를 호출할까요?"]?.safe_default).toBe("abort");
   });
 
   test("read-only/no-question skills keep metadata without safe_default", () => {

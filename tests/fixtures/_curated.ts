@@ -7,7 +7,7 @@
 //
 // Categories (target: 40 total):
 //   10 destructive (deploy_create variants, update_apply, auth_login)
-//   10 read-only  (apps list, apis list, deploy status (incl. --watch explicit), deploy logs (incl. --follow explicit), auth status)
+//   10 read-only  (apps list, catalog resources, deploy status (incl. --watch explicit), deploy logs (incl. --follow explicit), auth status)
 //    8 adversarial (env-prefix, sub-shell, eval, &&, ;, parens, backticks, quote)
 //    4 unicode    (Cyrillic homoglyph, ZWJ, Bidi override, full-width digit)
 //    4 profile/headless (AXHUB_PROFILE override, --profile flag, $CODESPACES, $SSH_TTY)

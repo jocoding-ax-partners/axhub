@@ -26,6 +26,12 @@ model: sonnet
 
 axhub catalog 를 CLI-only 방식으로 탐색하고, first live read consent 뒤에 read-only invoke (단순 조회 + 집계 인사이트) 또는 snippet 을 만들어줘요. 인사이트 요청은 `axhub data list` 로 헤매지 말고 catalog 로 connector/path 를 해석한 뒤 `catalog invoke --action read` 로 집계 SQL 을 돌려서 한국어로 요약해줘요.
 
+## Routing boundary — dynamic app tables are not catalog data
+
+- `orders 동적 테이블 만들고 title:text 컬럼 추가해`, `앱 테이블 스키마 변경`, `컬럼 추가`, `행 넣어`, `grant/revoke` 처럼 앱 동적 테이블 DDL/DML 의도가 보이면 이 skill 을 즉시 멈추고 `skills/tables/SKILL.md` 를 로드해요.
+- 이 skill 에서 `axhub tables` 명령을 실행하지 않아요. 테이블 스키마·행·권한 작업은 tables skill 의 preview/consent/`--execute` 규칙으로 처리해요.
+- catalog connector/path 조회, safe SQL read, aggregate insight, snippet 생성만 이 skill 의 범위예요.
+
 ## Workflow
 
 **Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.

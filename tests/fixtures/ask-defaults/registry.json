@@ -122,6 +122,14 @@
     }
   },
   "apps": {
+    "앱을 만들까요?": {
+      "safe_default": "abort",
+      "rationale": "앱 생성은 실제 워크스페이스에 리소스를 추가하는 mutation 이라 비대화형 환경에서는 생성하지 않아요.",
+      "allowed_safe_defaults": [
+        "abort",
+        "생성"
+      ]
+    },
     "앱이 더 있어요. 전체 목록 볼래요?": {
       "safe_default": "skip",
       "rationale": "Top 10 sufficient for vibe-coder browse; full list rarely needed in non-interactive.",
@@ -696,6 +704,19 @@
       ],
       "metadata": {
         "decision_topic": "resource-change"
+      }
+    }
+  },
+  "apis": {
+    "이 API를 호출할까요?": {
+      "safe_default": "abort",
+      "rationale": "API call 은 외부 효과가 있을 수 있는 호출이에요. 비대화형 환경에서는 read-only catalog 조회만 허용해요.",
+      "allowed_safe_defaults": [
+        "abort",
+        "call"
+      ],
+      "metadata": {
+        "decision_topic": "apis-call-confirm"
       }
     }
   }

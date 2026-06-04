@@ -26,6 +26,9 @@ describe("Phase 25 PR 25.4 trace SKILL invariants", () => {
   test("workflow uses helper trace command and the 3-source evidence contract", () => {
     const body = traceSkill();
     expect(body).toContain('axhub-helpers trace --deploy-id=$ID --app "$APP" --json');
+    expect(body).toContain('axhub-helpers list-deployments --app "$APP" --limit 5');
+    expect(body).not.toContain('axhub-helpers list-deployments --app "$APP" --limit 5 --json');
+    expect(body).toContain("이 helper 는 JSON 을 기본 출력하고 `--json` flag 를 받지 않아요");
     expect(body).toContain("event_log + runtime_log + audit");
     expect(body).toContain("references/error-patterns.md");
   });

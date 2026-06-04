@@ -61,7 +61,7 @@ echo "$PREFLIGHT_JSON"
 
    **워크플로를 마치면 (마지막 결과 출력 직후) TodoWrite 를 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.** `in_progress` / `pending` 이 하나라도 남으면 다음 SKILL 이 시작될 때 이 SKILL 의 미완료 todo 가 화면에 그대로 남아 버그처럼 보여요. 종료 시점에 미완료 todo 가 0 개여야 해요.
 
-1. **대상 deploy 식별.** preflight 의 `current_app` + `last_deploy_id` 사용해요. 없으면 `axhub-helpers list-deployments --app "$APP" --limit 5 --json` 에서 마지막 Failed entry 의 deploy_id 추출. 앱도 모호하면 AskUserQuestion 으로 앱을 먼저 고르고, 후보 0 → "추적할 실패 배포 없음" 안내 + 종료.
+1. **대상 deploy 식별.** preflight 의 `current_app` + `last_deploy_id` 사용해요. 없으면 `axhub-helpers list-deployments --app "$APP" --limit 5` 에서 마지막 Failed entry 의 deploy_id 추출. 이 helper 는 JSON 을 기본 출력하고 `--json` flag 를 받지 않아요. 앱도 모호하면 AskUserQuestion 으로 앱을 먼저 고르고, 후보 0 → "추적할 실패 배포 없음" 안내 + 종료.
 
 2. **3 source 수집 (sequential, 5s timeout per source, 평균 15s 상한).**
    - **A: event_log** — `axhub-helpers trace --deploy-id=$ID --app "$APP" --json` 호출 (내부에서 event_log read + 현행 `axhub deploy logs` 런타임 로그 + audit read 다 함)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Case 22 (T1) — 한국어 NL "환경 점검해" + cli_too_old → doctor SKILL.
-# 22.4: AXHUB_FIXTURE_VERSION=0.0.5 (MIN_AXHUB_CLI_VERSION 0.15.3 미만) 강제 → preflight cli_too_old=true →
+# 22.4: AXHUB_FIXTURE_VERSION=0.0.5 (MIN_AXHUB_CLI_VERSION 0.17.3 미만) 강제 → preflight cli_too_old=true →
 #       doctor SKILL 의 version-skew 한국어 카피 ('너무 오래된 버전' / '업그레이드') 라우팅 검증.
 # 22.3 의 generic doctor routing 보다 강한 검증 — preflight 의 cli_too_old branch 정확 매칭.
 set -u

@@ -1540,9 +1540,10 @@ exit 1
     permissions.set_mode(0o755);
     std::fs::set_permissions(&axhub, permissions).unwrap();
 
-    // Approach E (Phase 2): Rust router does NOT classify intent. cmd_prompt_route emits
-    // preflight-only context regardless of utterance. Skill matching happens via Claude
-    // Code's native description matching against skills/*/SKILL.md frontmatter.
+    // Approach E (Phase 2): Rust router does NOT classify generic intent.
+    // cmd_prompt_route emits preflight context regardless of utterance. Skill
+    // matching happens via Claude Code's native description matching, except for
+    // the narrow dynamic-table anti-detour hint covered below.
     let prompts = [
         "결제 앱 만들어줘",
         "Next.js 앱 만들어줘",
@@ -1601,7 +1602,189 @@ exit 1
     // / `preflight_fail_soft` / `audit_fail_silent` tests below cover the contract.
 }
 
-// Approach E (Phase 2): no forced skill path enforcement, ever.
+#[cfg(unix)]
+#[test]
+fn cli_prompt_route_dynamic_table_hint_is_surgical() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "axhub 0.17.3 (commit fake, built fake, fake)"
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then
+  echo '{"user_email":"test@jocodingax.ai","user_id":1,"expires_at":"2026-04-29T00:00:00Z","scopes":["read"]}'
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let table_input = serde_json::json!({
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "ultraqa-app 앱에 orders 동적 테이블 만들고 title:text 컬럼 추가해",
+    })
+    .to_string();
+    let output = run_stdin(
+        &["prompt-route"],
+        &table_input,
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let stdout_json: serde_json::Value = serde_json::from_slice(&output.stdout).expect("hook JSON");
+    let ctx = stdout_json["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .expect("additionalContext");
+    assert!(ctx.contains("<axhub-routing-hint>"), "{ctx}");
+    assert!(ctx.contains("Skill(axhub:tables)"), "{ctx}");
+    assert!(ctx.contains("Do not call Skill(axhub:help)"), "{ctx}");
+    assert!(ctx.contains("axhub tables create \"$TABLE\""), "{ctx}");
+    assert!(ctx.contains("axhub tables columns add \"$TABLE\""), "{ctx}");
+    assert!(ctx.contains("consent-mint"), "{ctx}");
+
+    let data_input = serde_json::json!({
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "describe snowflake analytics orders table",
+    })
+    .to_string();
+    let data_output = run_stdin(
+        &["prompt-route"],
+        &data_input,
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(data_output.status.code(), Some(0));
+    let data_stdout = String::from_utf8_lossy(&data_output.stdout);
+    assert!(
+        !data_stdout.contains("<axhub-routing-hint>"),
+        "catalog/data prompt must not get dynamic-table hint: {data_stdout}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_prompt_route_status_hint_prevents_memory_answer() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "axhub 0.17.3 (commit fake, built fake, fake)"
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then
+  echo '{"status":"error","error":{"code":"auth","subcode":"token_missing"}}'
+  exit 65
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let input = serde_json::json!({
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "어디까지 됐어",
+    })
+    .to_string();
+    let output = run_stdin(
+        &["prompt-route"],
+        &input,
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let stdout_json: serde_json::Value = serde_json::from_slice(&output.stdout).expect("hook JSON");
+    let ctx = stdout_json["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .expect("additionalContext");
+    assert!(ctx.contains("<axhub-routing-hint>"), "{ctx}");
+    assert!(ctx.contains("Skill(axhub:status)"), "{ctx}");
+    assert!(ctx.contains("do not answer from repo/git memory"), "{ctx}");
+    assert!(ctx.contains("로그인/토큰 확인"), "{ctx}");
+    let system_message = stdout_json["systemMessage"]
+        .as_str()
+        .expect("systemMessage");
+    assert!(
+        system_message.contains("배포 상태 요청"),
+        "{system_message}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_prompt_route_deploy_and_doctor_hints_prevent_repo_answers() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+case "$1" in
+  --version) printf '0.17.3\n' ;;
+  auth) printf '{"authenticated":false}\n' ;;
+  *) printf '{}\n' ;;
+esac
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    for (prompt, skill, phrase, user_phrase) in [
+        (
+            "배포해",
+            "Skill(axhub:deploy)",
+            "do not use git release",
+            "토큰 만료",
+        ),
+        (
+            "환경 점검해",
+            "Skill(axhub:doctor)",
+            "do not run generic repo health",
+            "CLI 버전",
+        ),
+        (
+            "axhub 앱이 어떤 API 쓸 수 있는지 보여줘",
+            "Skill(axhub:apis)",
+            "axhub catalog resources --json --limit 50",
+            "API 카탈로그",
+        ),
+    ] {
+        let input = serde_json::json!({
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": prompt,
+        })
+        .to_string();
+        let output = run_stdin(
+            &["prompt-route"],
+            &input,
+            &[("AXHUB_BIN", axhub.to_str().unwrap())],
+        );
+        assert_eq!(output.status.code(), Some(0), "{prompt}");
+        let stdout_json: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("hook JSON");
+        let ctx = stdout_json["hookSpecificOutput"]["additionalContext"]
+            .as_str()
+            .expect("additionalContext");
+        assert!(ctx.contains("<axhub-routing-hint>"), "{ctx}");
+        assert!(ctx.contains(skill), "{ctx}");
+        assert!(ctx.contains(phrase), "{ctx}");
+        let system_message = stdout_json["systemMessage"]
+            .as_str()
+            .expect("systemMessage");
+        assert!(system_message.contains(user_phrase), "{system_message}");
+    }
+}
+
+// Approach E (Phase 2): no skill path enforcement for generic prompts.
 #[cfg(unix)]
 #[test]
 fn cli_prompt_route_no_forced_skills_context() {
@@ -1656,8 +1839,8 @@ exit 1
     }
 }
 
-// Approach E (Phase 2): different prompts produce identical preflight-only output
-// (no intent classification by Rust router).
+// Approach E (Phase 2): generic prompts produce identical preflight-only output
+// (no generic intent classification by Rust router).
 #[cfg(unix)]
 #[test]
 fn cli_prompt_route_no_intent_routing() {
@@ -1683,8 +1866,9 @@ exit 1
     std::fs::set_permissions(&axhub, permissions).unwrap();
 
     // Compare the AGENT-FACING channel only (`hookSpecificOutput` →
-    // additionalContext). The Rust router stays preflight-only there: it never
-    // classifies intent to force a skill. The orthogonal top-level
+    // additionalContext). The Rust router stays preflight-only for generic
+    // prompts, with narrow UltraQA-proven hints for high-risk axhub surfaces.
+    // The orthogonal top-level
     // `systemMessage` channel CAN differ by intent — the once-per-project
     // deploy-migration grace nudge (spec 006 §43, AC 11) rides it for an
     // authed/no-marker/implicit-deploy prompt — and is deliberately excluded
@@ -1705,12 +1889,13 @@ exit 1
             .to_string()
     };
 
-    // Different intents → identical agent-facing context (Rust router is preflight-only).
+    // Generic non-axhub prompts → identical agent-facing context.
     let a = snapshot("배포해줘");
     let b = snapshot("로그 봐");
     let c = snapshot("아무말 대잔치");
-    assert_eq!(a, b);
     assert_eq!(b, c);
+    assert!(a.contains("Skill(axhub:deploy)"), "{a}");
+    assert!(!b.contains("Skill(axhub:"), "{b}");
 }
 
 // Approach E (Phase 2): preflight failure must NOT block hook output.
@@ -1905,6 +2090,7 @@ fn cli_usage_preflight_resolve_list_and_session_start_paths_are_stable() {
     assert!(session_stdout.contains("/axhub:setup"));
     assert!(session_stdout.contains("말씀해주세요"));
     assert!(session_stdout.contains("감사 로그"));
+    assert!(session_stdout.contains("SKILL safe default"));
 }
 
 #[cfg(unix)]
@@ -2593,6 +2779,64 @@ fn cli_consent_mint_rejects_binding_schema_drift_before_writing_tokens() {
     assert_eq!(interactive_allowed.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&interactive_allowed.stdout)
         .contains("permissionDecision\":\"allow"));
+}
+
+#[test]
+fn cli_preauth_allows_apps_create_name_slug_when_binding_matches_parser() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = temp.path().join("state").display().to_string();
+    let runtime = temp.path().join("runtime").display().to_string();
+    let envs = [
+        ("XDG_STATE_HOME", state.as_str()),
+        ("XDG_RUNTIME_DIR", runtime.as_str()),
+    ];
+    let slug = "ultraqa-plugin-prod-test";
+
+    let stale_skill_binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"apps_create",
+        "app_id":"",
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"source":"inline"}
+    })
+    .to_string();
+    let stale_minted = run_stdin(&["consent-mint"], &stale_skill_binding, &envs);
+    assert_eq!(stale_minted.status.code(), Some(0));
+    let denied = run_stdin(
+        &["preauth-check"],
+        &format!(
+            r#"{{"session_id":"actual-claude-session","tool_call_id":"toolu_apps_create_stale","tool_name":"Bash","tool_input":{{"command":"axhub apps create --name \"UltraQA Plugin Prod\" --slug \"{slug}\" --json"}}}}"#
+        ),
+        &envs,
+    );
+    assert_eq!(denied.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&denied.stdout).contains("permissionDecision\":\"deny"));
+
+    let binding = serde_json::json!({
+        "tool_call_id":"pending",
+        "action":"apps_create",
+        "app_id":slug,
+        "profile":"",
+        "branch":"",
+        "commit_sha":"",
+        "context": {"slug":slug,"source":"inline"}
+    })
+    .to_string();
+    let minted = run_stdin(&["consent-mint"], &binding, &envs);
+    assert_eq!(minted.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&minted.stdout).contains("consent-pending-"));
+
+    let allowed = run_stdin(
+        &["preauth-check"],
+        &format!(
+            r#"{{"session_id":"actual-claude-session","tool_call_id":"toolu_apps_create","tool_name":"Bash","tool_input":{{"command":"axhub apps create --name \"UltraQA Plugin Prod\" --slug \"{slug}\" --json"}}}}"#
+        ),
+        &envs,
+    );
+    assert_eq!(allowed.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&allowed.stdout).contains("permissionDecision\":\"allow"));
 }
 
 #[test]
@@ -3872,6 +4116,86 @@ fn cli_consent_and_preauth_e2e_preserve_permission_contract() {
     assert_eq!(read_only.status.code(), Some(0));
     assert!(String::from_utf8_lossy(&read_only.stdout).contains("permissionDecision\":\"allow"));
 
+    let deploy_dry_run = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-dry-run","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --commit abc123 --dry-run --json"}}"#,
+        &envs,
+    );
+    assert_eq!(deploy_dry_run.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&deploy_dry_run.stdout).contains("permissionDecision\":\"allow")
+    );
+
+    let deploy_dry_run_with_shell_temps = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-dry-run-temps","tool_name":"Bash","tool_input":{"command":"AXHUB_STDERR_TMP=$(mktemp)\nAXHUB_STDOUT_TMP=$(mktemp)\nAPP_ID=\"paydrop\"\nCOMMIT_SHA=\"abc123\"\naxhub deploy create --app \"$APP_ID\" --commit \"$COMMIT_SHA\" --dry-run --json >\"$AXHUB_STDOUT_TMP\" 2>\"$AXHUB_STDERR_TMP\"}}"#,
+        &envs,
+    );
+    assert_eq!(deploy_dry_run_with_shell_temps.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&deploy_dry_run_with_shell_temps.stdout)
+            .contains("permissionDecision\":\"allow")
+    );
+
+    let deploy_dry_run_with_profile_array = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-dry-run-array","tool_name":"Bash","tool_input":{"command":"PROFILE_FLAG=()\nPROFILE=\"paydrop\"\nif [ -n \"${PROFILE:-}\" ]; then\n  PROFILE_FLAG=(--profile \"$PROFILE\")\nfi\nAXHUB_STDERR_TMP=$(mktemp)\nAXHUB_STDOUT_TMP=$(mktemp)\naxhub deploy create --app \"$APP_ID\" \"${PROFILE_FLAG[@]}\" --commit \"$COMMIT_SHA\" --dry-run --json >\"$AXHUB_STDOUT_TMP\" 2>\"$AXHUB_STDERR_TMP\"}}"#,
+        &envs,
+    );
+    assert_eq!(deploy_dry_run_with_profile_array.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&deploy_dry_run_with_profile_array.stdout)
+            .contains("permissionDecision\":\"allow")
+    );
+
+    let deploy_dry_run_with_axhub_assignment = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-dry-run-assignment","tool_name":"Bash","tool_input":{"command":"AXHUB=\"/tmp/axhub-fixture/bin/axhub\"\nAPP_ID=\"app_paydrop\"\nCOMMIT_SHA=\"abc123\"\nPROFILE=\"paydrop\"\n\"$AXHUB\" deploy create --app \"$APP_ID\" --profile \"$PROFILE\" --commit \"$COMMIT_SHA\" --dry-run --json 2>&1"}}"#,
+        &envs,
+    );
+    assert_eq!(deploy_dry_run_with_axhub_assignment.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&deploy_dry_run_with_axhub_assignment.stdout)
+            .contains("permissionDecision\":\"allow")
+    );
+
+    let helper_read_only_path = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-helper-read","tool_name":"Bash","tool_input":{"command":"HELPER=\"/tmp/axhub/bin/axhub-helpers\"; echo \"CLAUDE_PLUGIN_ROOT=<not set>\"; \"$HELPER\" route-decision --user-utterance \"paydrop 배포\" --explicit"}}"#,
+        &envs,
+    );
+    assert_eq!(helper_read_only_path.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&helper_read_only_path.stdout)
+        .contains("permissionDecision\":\"allow"));
+
+    let helper_read_only_with_axhub_root_assignment = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-helper-root-read","tool_name":"Bash","tool_input":{"command":"CLAUDE_PLUGIN_ROOT=\"/tmp/axhub\"\necho \"CLAUDE_PLUGIN_ROOT=${CLAUDE_PLUGIN_ROOT:-<unset>}\"\nHELPER=\"${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers\"\n\"$HELPER\" route-decision --user-utterance \"paydrop 배포해\" --explicit"}}"#,
+        &envs,
+    );
+    assert_eq!(
+        helper_read_only_with_axhub_root_assignment.status.code(),
+        Some(0)
+    );
+    assert!(
+        String::from_utf8_lossy(&helper_read_only_with_axhub_root_assignment.stdout)
+            .contains("permissionDecision\":\"allow")
+    );
+
+    let helper_read_only_with_dynamic_root_resolution = run_stdin(
+        &["preauth-check"],
+        r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-helper-dynamic-root","tool_name":"Bash","tool_input":{"command":"if [ -z \"${CLAUDE_PLUGIN_ROOT:-}\" ]; then\n  if HELPER_FROM_PATH=\"$(command -v axhub-helpers 2>/dev/null)\"; then\n    export CLAUDE_PLUGIN_ROOT=\"$(cd \"$(dirname \"$HELPER_FROM_PATH\")/..\" && pwd)\"\n  fi\nfi\necho \"CLAUDE_PLUGIN_ROOT=${CLAUDE_PLUGIN_ROOT:-<unset>}\"\nHELPER=\"${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}\"\n\"$HELPER\" route-decision --user-utterance \"paydrop 배포해\" --explicit"}}"#,
+        &envs,
+    );
+    assert_eq!(
+        helper_read_only_with_dynamic_root_resolution.status.code(),
+        Some(0)
+    );
+    assert!(
+        String::from_utf8_lossy(&helper_read_only_with_dynamic_root_resolution.stdout)
+            .contains("permissionDecision\":\"allow")
+    );
+
     let destructive_without_token = run_stdin(
         &["preauth-check"],
         r#"{"session_id":"cli-e2e-session","tool_call_id":"tc-deny","tool_name":"Bash","tool_input":{"command":"axhub deploy create --app paydrop --branch main --commit abc123"}}"#,
@@ -4047,13 +4371,23 @@ fn cli_bootstrap_auto_chain_plans_apps_create_without_hidden_remote_mutation() {
     let json = stdout_json(&output);
     assert_eq!(json["state"], "consent_required_apps_create");
     assert_eq!(json["next_action"], "apps_create");
+    // v0.17.3 `apps create --from-file` is JSON-only, so first-run app creation
+    // uses the `--name`/`--slug` lane (slug parsed from the manifest).
     assert_eq!(json["command"][0], "axhub");
     assert_eq!(json["command"][1], "apps");
     assert_eq!(json["command"][2], "create");
-    assert_eq!(json["command"][6], "--profile");
-    assert_eq!(json["command"][7], "prod");
+    assert_eq!(json["command"][3], "--name");
+    assert_eq!(json["command"][4], "paydrop");
+    assert_eq!(json["command"][5], "--slug");
+    assert_eq!(json["command"][6], "paydrop");
+    assert_eq!(json["command"][7], "--json");
+    assert_eq!(json["command"][8], "--profile");
+    assert_eq!(json["command"][9], "prod");
     assert_eq!(json["consent_binding"]["action"], "apps_create");
     assert_eq!(json["consent_binding"]["profile"], "prod");
+    // `--name`/`--slug` consent lane binds app_id + context.slug to the slug.
+    assert_eq!(json["consent_binding"]["app_id"], "paydrop");
+    assert_eq!(json["consent_binding"]["context"]["slug"], "paydrop");
     assert_eq!(json["consent_binding"]["synthesized_by_helper"], true);
     assert!(json["binding_hash"].as_str().unwrap().len() >= 16);
     assert!(json["pending_action_id"]

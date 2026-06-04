@@ -1134,16 +1134,60 @@ pub(crate) fn cmd_preauth_check() -> anyhow::Result<i32> {
 
 const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
 
-// Approach E (Phase 2): cmd_prompt_route is preflight + audit only.
-// No keyword chain, no skill enforcement, no `skills/<X>/SKILL.md` paths in
-// additionalContext. Claude Code matches skills via SKILL.md frontmatter
-// description natively (Phase 1 codegen merged main.rs phrases into descriptions).
+const DYNAMIC_TABLE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+[axhub hook | dynamic tables]
+Observed: dynamic app table/column/row/grant work.
+Suggested: call Skill(axhub:tables) first; preview + consent-mint; `axhub tables create "$TABLE"` or `axhub tables columns add "$TABLE"`. Do not call Skill(axhub:help) or add-column.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const DEPLOY_STATUS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+[axhub hook | deploy status]
+Observed: deploy progress/status prompt.
+Suggested: call Skill(axhub:status) now; do not answer from repo/git memory. If auth missing, say 로그인/토큰 확인.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const DEPLOY_CREATE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+[axhub hook | deploy]
+Observed: axhub deploy/create prompt.
+Suggested: call Skill(axhub:deploy); do not use git release or generic deploy. On auth error, say axhub 토큰 만료 원인.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const DOCTOR_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+[axhub hook | doctor]
+Observed: axhub environment/doctor prompt.
+Suggested: call Skill(axhub:doctor); do not run generic repo health only. If CLI is old, say axhub 버전 업그레이드 확인.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const APIS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+[axhub hook | apis]
+Observed: axhub API/endpoint catalog prompt.
+Suggested: call Skill(axhub:apis); use latest CLI `axhub catalog resources --json --limit 50`, not removed `axhub apis list` or repo API inspection.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const AUTH_STATUS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+[axhub hook | auth status]
+Observed: login/token/identity status prompt.
+Suggested: call Skill(axhub:auth); run `axhub auth status --json` and show account/expiry/scopes. Do not route to the heavier doctor diagnostic.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+// Approach E (Phase 2): cmd_prompt_route is preflight + audit first.
+// It generally avoids keyword chains and `skills/<X>/SKILL.md` path enforcement;
+// a narrow dynamic-table hint exists because UltraQA caught native matching
+// detouring through help/apps and inventing unsupported table commands.
 pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     use axhub_helpers::audit::{
         append as audit_append, now_iso8601, sha256_hex, AuditDecision, AuditRecord,
     };
     use axhub_helpers::routing::{
-        axhub_keyword_present, decide, find_marker, foreign_keyword_present, is_slash_invocation,
+        apis_intent_present, auth_status_intent_present, axhub_keyword_present, decide,
+        deploy_create_intent_present, deploy_status_intent_present, doctor_intent_present,
+        dynamic_table_intent_present, find_marker, foreign_keyword_present, is_slash_invocation,
         token_present, MarkerStatus,
     };
 
@@ -1204,15 +1248,58 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     let grace = axhub_helpers::grace::maybe_grace_message(routing_decision, authed, prompt);
 
     let mut context = format_preflight_context(&preflight);
+    if dynamic_table_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(DYNAMIC_TABLE_ROUTING_HINT);
+    }
+    if apis_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(APIS_ROUTING_HINT);
+    }
+    if deploy_status_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(DEPLOY_STATUS_ROUTING_HINT);
+    }
+    if deploy_create_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(DEPLOY_CREATE_ROUTING_HINT);
+    }
+    if doctor_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(DOCTOR_ROUTING_HINT);
+    }
+    if auth_status_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(AUTH_STATUS_ROUTING_HINT);
+    }
     if !hook_safety::is_karpathy_disabled() {
         if let Some(karpathy) = axhub_helpers::karpathy_inject::user_prompt_karpathy_inject()? {
             context.push_str("\n\n");
             context.push_str(&karpathy);
         }
     }
+    let intent_system = if apis_intent_present(prompt) {
+        Some("axhub API 카탈로그 요청이에요. Skill(axhub:apis)로 최신 CLI `axhub catalog resources --json --limit 50`를 실행해 connector/path/kind 목록을 보여줘요. 제거된 `axhub apis list`는 실행하지 않아요.")
+    } else if deploy_status_intent_present(prompt) {
+        Some("axhub 배포 상태 요청이에요. Skill(axhub:status)를 사용하고, 로그인/토큰 확인이 필요하면 그 안내를 한국어로 말해요.")
+    } else if deploy_create_intent_present(prompt) {
+        Some("axhub 배포 요청이에요. Skill(axhub:deploy)를 사용해요. 토큰 만료나 인증 오류가 있으면 원인/해결을 한국어로 말해요.")
+    } else if auth_status_intent_present(prompt) {
+        Some("axhub 로그인/인증 상태 요청이에요. Skill(axhub:auth)로 `axhub auth status`를 확인해 계정·만료·scope 를 보여줘요. 무거운 doctor 진단 카드는 쓰지 않아요.")
+    } else if doctor_intent_present(prompt) {
+        Some("axhub 환경 점검 요청이에요. Skill(axhub:doctor)를 사용해요. CLI 버전이 오래됐으면 업그레이드/확인 안내를 한국어로 말해요.")
+    } else {
+        None
+    };
+    let system_message = match (grace, intent_system) {
+        (Some(grace), Some(intent)) => Some(format!("{grace}\n\n{intent}")),
+        (Some(grace), None) => Some(grace.to_string()),
+        (None, Some(intent)) => Some(intent.to_string()),
+        (None, None) => None,
+    };
     println!(
         "{}",
-        hook_output::user_prompt_context_with_system(&context, grace)
+        hook_output::user_prompt_context_with_system(&context, system_message.as_deref())
     );
     Ok(0)
 }
@@ -1762,6 +1849,8 @@ pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
         "- 처음이면 /axhub:setup — 설치·로그인·첫 배포까지 안내해요.".to_string(),
         "- 막히거나 안 되면 /axhub:doctor (진단) · /axhub:help (전체 명령).".to_string(),
         "- 자주 쓰는 것: 배포 /axhub:deploy · 상태 /axhub:status · 로그 /axhub:logs · 앱 목록 /axhub:apps."
+            .to_string(),
+        "- 비대화형이면 AskUserQuestion 대신 SKILL safe default 로 바로 진행해요."
             .to_string(),
         "- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요."
             .to_string(),

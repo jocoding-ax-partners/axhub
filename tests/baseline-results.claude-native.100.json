@@ -617,42 +617,42 @@
     "fired_skill": "apis",
     "actual_tool_calls": [
       {
-        "cmd": "axhub apis list --json",
+        "cmd": "axhub catalog resources --json --limit 50",
         "exit_code": 0,
         "ts": "2026-04-24T10:00:56Z"
       }
     ],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:00:56Z",
-    "notes": "Read-only EN 'list apis'. Plugin routes API catalog intent to apis list; exit 0."
+    "notes": "Read-only EN 'list apis'. Plugin routes API catalog intent to catalog resources; exit 0."
   },
   {
     "utterance_id": "T-RO-034",
     "fired_skill": "apis",
     "actual_tool_calls": [
       {
-        "cmd": "axhub apis list --json",
+        "cmd": "axhub catalog resources --json --limit 50",
         "exit_code": 0,
         "ts": "2026-04-24T10:00:57Z"
       }
     ],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:00:57Z",
-    "notes": "Read-only EN 'available endpoints'. Endpoint synonym routes to apis list; exit 0."
+    "notes": "Read-only EN 'available endpoints'. Endpoint synonym routes to catalog resources; exit 0."
   },
   {
     "utterance_id": "T-RO-035",
     "fired_skill": "apis",
     "actual_tool_calls": [
       {
-        "cmd": "axhub apis list --json",
+        "cmd": "axhub catalog resources --json --limit 50",
         "exit_code": 0,
         "ts": "2026-04-24T10:00:58Z"
       }
     ],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:00:58Z",
-    "notes": "Read-only EN 'show api catalog'. API catalog synonym routes to apis list; exit 0."
+    "notes": "Read-only EN 'show api catalog'. API catalog synonym routes to catalog resources; exit 0."
   },
   {
     "utterance_id": "T-RO-053",
@@ -1472,14 +1472,14 @@
     "fired_skill": "apis",
     "actual_tool_calls": [
       {
-        "cmd": "axhub apis list --json",
+        "cmd": "axhub catalog resources --json --limit 50",
         "exit_code": 0,
         "ts": "2026-04-24T10:02:23Z"
       }
     ],
     "required_consent_seen": false,
     "ts": "2026-04-24T10:02:23Z",
-    "notes": "KR+EN mix '내 apis catalog 알려줘'. apis/catalog tokens route to read-only apis list; exit 0."
+    "notes": "KR+EN mix '내 apis catalog 알려줘'. apis/catalog tokens route to read-only catalog resources; exit 0."
   },
   {
     "utterance_id": "T-NEG-011",

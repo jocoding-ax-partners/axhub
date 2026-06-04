@@ -446,6 +446,14 @@
       "axhub 상태",
       "배포 코드"
     ],
+    "skills/apis/SKILL.md": [
+      "API 뭐 있어",
+      "어떤 API 있어",
+      "API 목록",
+      "API 카탈로그",
+      "쓸 수 있는 API",
+      "엔드포인트 뭐 있어"
+    ],
     "skills/upgrade/SKILL.md": [
       "플러그인 새 버전",
       "플러그인 업그레이드",
@@ -1059,5 +1067,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-06-02T18:24:02.869Z"
+  "generated_at": "2026-06-03T05:55:53.483Z"
 }

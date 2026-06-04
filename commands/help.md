@@ -7,6 +7,8 @@ model: haiku
 
 Show the axhub plugin command menu to the user. Render in Korean with friendly tone for vibe coders. Format:
 
+Use this command only for explicit help/menu requests. If the user asks an operational task such as app listing, deployment, logs, data/catalog reads, dynamic table creation, column edits, row mutations, or grants, do not render this menu or execute shell commands from here; route to the matching axhub skill instead.
+
 ```
 axhub 플러그인으로 할 수 있는 것:
 

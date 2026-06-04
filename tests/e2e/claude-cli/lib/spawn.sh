@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Phase 22.1 — claude -p wrapper. 격리 sandbox + cap + timeout.
+# Phase 26 QA hardening — keep NL skills enabled under Claude Code 2.1+:
+# --disable-slash-commands now disables skills too, so it is not a valid
+# "NL only" switch. Use project-only settings + bypass permissions instead.
 # Usage: source spawn.sh; spawn_claude <case_id> <utterance> [timeout_s]
 
 set -u
@@ -79,7 +82,9 @@ spawn_claude() {
   local fixture_bin="${CLAUDE_PLUGIN_ROOT}/tests/e2e/claude-cli/fixtures/bin"
 
   local extra_args=()
-  if [ "$enable_slash" = "0" ]; then
+  if [ "$enable_slash" = "0" ] && [ "${AXHUB_E2E_DISABLE_SKILLS:-0}" = "1" ]; then
+    # Current Claude Code labels this flag as "Disable all skills". Only use
+    # it for explicit negative-control tests; NL routing QA must leave skills on.
     extra_args+=("--disable-slash-commands")
   fi
 
@@ -137,6 +142,12 @@ spawn_claude() {
   if [ -n "${FIXTURE_AXHUB_AUTH:-}" ]; then
     cmd+=("AXHUB_FIXTURE_AUTH=${FIXTURE_AXHUB_AUTH}")
   fi
+  if [ -n "${AXHUB_PROFILE:-}" ]; then
+    cmd+=("AXHUB_PROFILE=${AXHUB_PROFILE}")
+  fi
+  if [ -n "${AXHUB_E2E_DESTRUCTIVE:-}" ]; then
+    cmd+=("AXHUB_E2E_DESTRUCTIVE=${AXHUB_E2E_DESTRUCTIVE}")
+  fi
 
   case "$TIMEOUT_CMD" in
     timeout)
@@ -155,8 +166,13 @@ spawn_claude() {
     -p "$utterance"
     --add-dir "${CLAUDE_PLUGIN_ROOT}"
     --plugin-dir "${CLAUDE_PLUGIN_ROOT}"
+    --append-system-prompt "You are running the axhub plugin E2E harness in a headless Claude subprocess. Treat CLAUDE_NON_INTERACTIVE=1 and CI=1 as active. Never call AskUserQuestion or render a textual approval menu in this subprocess; apply each skill's registry safe default and continue executing the command path. For destructive skills, the safe default is the non-destructive preview or dry-run path."
+  )
+  cmd+=(
+    --setting-sources project
     --strict-mcp-config
     --mcp-config '{"mcpServers":{}}'
+    --permission-mode bypassPermissions
     --output-format json
     --model "$DEFAULT_MODEL"
     --max-budget-usd "$DEFAULT_CAP_USD"

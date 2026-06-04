@@ -4,6 +4,16 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.29](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.28...v0.9.29) (2026-06-03)
+
+
+### Docs
+
+* README 를 spec-kit 스타일 사용자 문서로 재작성 ([2692643](https://github.com/jocoding-ax-partners/axhub/commit/2692643cecc53e0fb908f48311f2105287f25bd1))
+* README 홈페이지 URL 을 axhub.ai 로 수정 ([2df83f3](https://github.com/jocoding-ax-partners/axhub/commit/2df83f38f89225f2e4956fef0705daf0a0fce1b9))
+* SKILL 42개 전체 최신화 + 바이브코더용 친절 설명으로 재작성 ([1e73955](https://github.com/jocoding-ax-partners/axhub/commit/1e739555050d55e2c76b333693d616192867160d))
+* SKILL 슬래시 명령 전부 표기 (모든 skill 은 /axhub:<이름> 으로 호출) ([d273b44](https://github.com/jocoding-ax-partners/axhub/commit/d273b4422419f26165ecec5fc2eb9097c0fc010f))
+
 ## [0.9.28](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.27...v0.9.28) (2026-06-02)
 
 이번 릴리스는 `specs/007-vibe-skill-gapfill` 의 CLI 소스 감사 결과를 실제 스킬·동의 게이트에 반영해요. current axhub CLI 표면을 기준으로 10개 gap-fill SKILL 을 추가하고, 기존 init/migrate/status/deploy/auth 흐름의 오래된 명령을 정리했어요. 특히 `apps detect` 는 최신 main CLI 에 없는 branch-only/future 경로로 분리하고, destructive payload 는 파일 digest·구체 profile·tenant/app context 로 묶어 preview 뒤 바꿔치기를 막아요.

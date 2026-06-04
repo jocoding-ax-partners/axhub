@@ -6,12 +6,12 @@
 
 코드를 직접 짜는 대신, "내 앱 배포해" 한마디로 앱 lifecycle 전체를 안전하게 굴려요.
 
-[![version](https://img.shields.io/badge/version-0.9.28-blue)](https://github.com/jocoding-ax-partners/axhub/releases)
+[![version](https://img.shields.io/badge/version-0.9.29-blue)](https://github.com/jocoding-ax-partners/axhub/releases)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
-**상태**: v0.9.28 · 42 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary
+**상태**: v0.9.29 · 43 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary
 
 </div>
 
@@ -112,7 +112,7 @@ headless(CI 등)에서는 `AXHUB_TOKEN` env 또는 token-import 로 인증해요
 
 ## 💬 자연어로 할 수 있는 일
 
-플러그인에는 42개 SKILL 이 들어 있어요. 아래처럼 **그냥 평소 말투로 말하면** 알아서 맞는 기능을 찾아 실행해요. 명령어를 외울 필요 없어요. 슬래시로 부르고 싶으면 옆 칸의 `/axhub:<이름>` 을 쓰면 돼요 — 모든 SKILL 에 다 있어요.
+플러그인에는 43개 SKILL 이 들어 있어요. 아래처럼 **그냥 평소 말투로 말하면** 알아서 맞는 기능을 찾아 실행해요. 명령어를 외울 필요 없어요. 슬래시로 부르고 싶으면 옆 칸의 `/axhub:<이름>` 을 쓰면 돼요 — 모든 SKILL 에 다 있어요.
 
 ### 🚀 배포하고 운영하기
 
@@ -144,6 +144,7 @@ headless(CI 등)에서는 `AXHUB_TOKEN` env 또는 token-import 로 인증해요
 | 이렇게 말하면 | 이런 일을 해줘요 | 슬래시 |
 |---------------|------------------|--------|
 | "데이터 카탈로그 검색해줘" | 앱에서 쓸 수 있는 데이터가 뭐가 있는지 찾아줘요 | `/axhub:data` |
+| "쓸 수 있는 API 보여줘", "endpoint list" | 앱에서 호출할 수 있는 API endpoint 목록을 보여줘요 | `apis` skill |
 | "내가 쓸 수 있는 리소스 보여줘" | 내 권한으로 접근 가능한 데이터·리소스를 보여줘요 | `/axhub:my-resources` |
 | "리소스 정리해줘", "이름 바꿔줘" | 데이터 리소스를 이름변경·이동·태그·정리로 깔끔하게 관리해요 | `/axhub:resources` |
 | "DB 연결해줘", "postgres 붙여줘" | 외부 데이터베이스(postgres/mysql 등)를 연결하고 관리해요 | `/axhub:connectors` |
