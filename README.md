@@ -167,7 +167,7 @@ headless(CI 등)에서는 `AXHUB_TOKEN` env 또는 token-import 로 인증해요
 
 | 이렇게 말하면 | 이런 일을 해줘요 | 슬래시 |
 |---------------|------------------|--------|
-| "처음인데 셋업해줘", "온보딩", "getting started" | CLI·로그인·git/node·GitHub App·첫 앱·의존성·doctor 까지 `VIBE_READY` 상태로 이어줘요 | `/axhub:setup` |
+| "처음인데 셋업해줘", "온보딩", "getting started" | CLI·로그인·git/node·GitHub App·첫 앱·의존성·doctor 까지 `VIBE_READY` 상태로 이어줘요 | `/axhub:onboarding` |
 | "axhub 로그인해줘" | axhub 에 로그인해요 (브라우저로 승인) | `/axhub:login` `/axhub:auth` |
 | "axhub CLI 설치해줘" | axhub 명령줄 도구(CLI)를 설치해요 | `/axhub:install-cli` |
 | "CLI 최신 버전으로 올려줘" | axhub CLI 를 최신 버전으로 업데이트해요 | `/axhub:update` |

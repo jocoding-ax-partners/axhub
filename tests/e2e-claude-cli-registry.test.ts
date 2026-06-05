@@ -81,6 +81,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "logs",
       "migrate",
       "my-resources",
+      "onboarding",
       "open",
       "profile",
       "publish",
@@ -89,7 +90,6 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "resources",
       "rollback",
       "routing-stats",
-      "setup",
       "status",
       "tables",
       "team",
@@ -102,7 +102,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("77 actual safe_default rationale 엔트리 including setup onboarding gap machine AUQ", () => {
+  test("77 actual safe_default rationale 엔트리 including onboarding gap machine AUQ", () => {
     const paths = collectSafeDefaultPaths();
     expect(paths).toHaveLength(77);
 
@@ -157,6 +157,14 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "install-cli",
       "migrate",
       "migrate",
+      "onboarding",
+      "onboarding",
+      "onboarding",
+      "onboarding",
+      "onboarding",
+      "onboarding",
+      "onboarding",
+      "onboarding",
       "profile",
       "publish",
       "quality_gate",
@@ -165,14 +173,6 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "resources",
       "rollback",
       "routing-stats",
-      "setup",
-      "setup",
-      "setup",
-      "setup",
-      "setup",
-      "setup",
-      "setup",
-      "setup",
       "status",
       "tables",
       "tables",

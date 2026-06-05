@@ -1,8 +1,8 @@
 {
   "allows_dependency_execution": [
     {
-      "skill": "setup",
-      "rationale": "setup may run lockfile-based dependency install only after repo-on-disk detection, explicit consent, D1 guard, and mandatory --ignore-scripts to block postinstall execution."
+      "skill": "onboarding",
+      "rationale": "onboarding may run lockfile-based dependency install only after repo-on-disk detection, explicit consent, D1 guard, and mandatory --ignore-scripts to block postinstall execution."
     }
   ]
 }

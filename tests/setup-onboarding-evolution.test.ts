@@ -4,11 +4,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
-const SETUP_SKILL = join(REPO_ROOT, "skills/setup/SKILL.md");
+const ONBOARDING_SKILL = join(REPO_ROOT, "skills/onboarding/SKILL.md");
 const REGISTRY = join(REPO_ROOT, "tests/fixtures/ask-defaults/registry.json");
 const ALLOWLIST = join(REPO_ROOT, "scripts/skill-doctor-allowlist.json");
 
-const setup = () => readFileSync(SETUP_SKILL, "utf8");
+const onboarding = () => readFileSync(ONBOARDING_SKILL, "utf8");
 const registry = () => JSON.parse(readFileSync(REGISTRY, "utf8")) as Record<string, Record<string, unknown>>;
 const allowlist = () =>
   JSON.parse(readFileSync(ALLOWLIST, "utf8")) as {
@@ -84,9 +84,9 @@ const runNodeScript = (script: string, args: string[], stdin = "") => {
   return result;
 };
 
-describe("setup onboarding evolution — VIBE_READY contract", () => {
-  test("declares setup as the single user-facing onboarding entrypoint", () => {
-    const content = setup();
+describe("onboarding skill evolution — VIBE_READY contract", () => {
+  test("declares onboarding as the single user-facing onboarding entrypoint", () => {
+    const content = onboarding();
 
     expect(content).toContain("온보딩 단일 진입점");
     expect(content).toContain("사용자는 sibling skill 이름이나 slash command 를 몰라도");
@@ -98,7 +98,7 @@ describe("setup onboarding evolution — VIBE_READY contract", () => {
   });
 
   test("documents the full gap state machine and read-only detection surface", () => {
-    const content = setup();
+    const content = onboarding();
 
     for (const marker of [
       "Gap State Machine",
@@ -143,7 +143,7 @@ describe("setup onboarding evolution — VIBE_READY contract", () => {
   });
 
   test("locks first-gap state-machine order instead of only vocabulary", () => {
-    const content = setup();
+    const content = onboarding();
 
     expectInOrder(content, [
       "START",
@@ -169,7 +169,7 @@ describe("setup onboarding evolution — VIBE_READY contract", () => {
   });
 
   test("simulates the documented scenario matrix from first gap to owner and ready grade", () => {
-    const content = setup();
+    const content = onboarding();
     const transitions = parseTransitions(content);
     const rows = parseGapTable(content);
 
@@ -180,14 +180,14 @@ describe("setup onboarding evolution — VIBE_READY contract", () => {
       { id: "S1", gaps: ["cli_missing"], handler: "install-cli", owner: "install-cli", ready: "READY_WITH_USER_ACTION", detect: "axhub --version" },
       { id: "S2", gaps: ["cli_old"], handler: "update", owner: "update", ready: "VIBE_READY", detect: "cli_too_old=true" },
       { id: "S3", gaps: ["auth_missing"], handler: "auth", owner: "auth", ready: "READY_WITH_USER_ACTION", detect: "auth_ok=false" },
-      { id: "S4", gaps: ["git_missing"], handler: "install_git", owner: "setup", ready: "READY_WITH_USER_ACTION", detect: "git --version" },
-      { id: "S5", gaps: ["node_missing"], handler: "install_node", owner: "setup", ready: "READY_WITH_USER_ACTION", detect: "node --version" },
-      { id: "S6", gaps: ["node_mismatch"], handler: "fix_node", owner: "setup", ready: "READY_WITH_USER_ACTION", detect: "NODE_REQUIRED" },
-      { id: "S7", gaps: ["github_app_missing"], handler: "install_url", owner: "setup", ready: "READY_WITH_USER_ACTION", detect: "install_url" },
+      { id: "S4", gaps: ["git_missing"], handler: "install_git", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "git --version" },
+      { id: "S5", gaps: ["node_missing"], handler: "install_node", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "node --version" },
+      { id: "S6", gaps: ["node_mismatch"], handler: "fix_node", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "NODE_REQUIRED" },
+      { id: "S7", gaps: ["github_app_missing"], handler: "install_url", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "install_url" },
       { id: "S8", gaps: ["no_manifest_empty"], handler: "init", owner: "init", ready: "VIBE_READY", detect: "manifest 없음 + 빈 dir" },
       { id: "S9", gaps: ["existing_repo_gap"], handler: "github", owner: "github", ready: "READY_WITH_USER_ACTION", detect: ".git" },
-      { id: "S10", gaps: ["deps_missing"], handler: "install_deps", owner: "setup", ready: "VIBE_READY", detect: "node_modules" },
-      { id: "S11", gaps: ["deps_missing"], handler: "install_deps", owner: "setup", ready: "READY_WITH_USER_ACTION", detect: "--ignore-scripts" },
+      { id: "S10", gaps: ["deps_missing"], handler: "install_deps", owner: "onboarding", ready: "VIBE_READY", detect: "node_modules" },
+      { id: "S11", gaps: ["deps_missing"], handler: "install_deps", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "--ignore-scripts" },
       { id: "S12", gaps: ["cli_old"], handler: "update", owner: "update", ready: "SAFE_STOP_NONINTERACTIVE", detect: "CLAUDE_NON_INTERACTIVE" },
       { id: "S13", gaps: ["doctor_gap"], handler: "doctor", owner: "doctor", ready: "READY_WITH_USER_ACTION", detect: "PATH reload" },
       { id: "S14", gaps: ["doctor_gap"], handler: "doctor", owner: "doctor", ready: "READY_WITH_USER_ACTION", detect: "doctor 핵심 체크 fail" },
@@ -210,11 +210,11 @@ describe("setup onboarding evolution — VIBE_READY contract", () => {
     expect(clean).toEqual({ gap: "no_gap", owner: "VIBE_READY_CARD", next: "VIBE_READY_CARD" });
     expect(content).toContain("승인했어");
     expect(content).toContain("온보딩 계속");
-    expect(content).toContain("다시 셋업해줘");
+    expect(content).toContain("다시 온보딩해줘");
   });
 
   test("executes node version predicate fixtures to prevent VIBE_READY false green", () => {
-    const script = extractPosixNodePredicate(setup());
+    const script = extractPosixNodePredicate(onboarding());
 
     expect(runNodeScript(script, ["v20.11.1", "20.11.1"]).status).toBe(0);
     expect(runNodeScript(script, ["v20.0.0", "20.11.1"]).status).toBe(1);
@@ -224,7 +224,7 @@ describe("setup onboarding evolution — VIBE_READY contract", () => {
   });
 
   test("executes GitHub App predicate fixtures without conflating unknown and missing", () => {
-    const script = extractPosixGithubPredicate(setup());
+    const script = extractPosixGithubPredicate(onboarding());
 
     expect(runNodeScript(script, [], "").stdout.trim()).toBe("unknown");
     expect(runNodeScript(script, [], "not-json").stdout.trim()).toBe("unknown");
@@ -237,7 +237,7 @@ describe("setup onboarding evolution — VIBE_READY contract", () => {
   });
 
   test("locks non-interactive mutation denylist including git and node system changes", () => {
-    const content = setup();
+    const content = onboarding();
 
     expect(content).toContain("install/update/auth/init/deploy/deps mutation");
     expect(content).toContain("git/node system install");
@@ -246,7 +246,7 @@ describe("setup onboarding evolution — VIBE_READY contract", () => {
   });
 
   test("locks GitHub install_url-only frontloading and forbids duplicate deploy after init", () => {
-    const content = setup();
+    const content = onboarding();
 
     expect(content).toContain("install_url");
     expect(content).toContain("계정레벨 GitHub App 설치");
@@ -257,7 +257,7 @@ describe("setup onboarding evolution — VIBE_READY contract", () => {
   });
 
   test("allows dependency execution only with lockfile, consent, D1, and ignore-scripts", () => {
-    const content = setup();
+    const content = onboarding();
     const fm = content.split("\n---\n")[0];
 
     expect(fm).toContain("allows-dependency-execution: true");
@@ -269,14 +269,14 @@ describe("setup onboarding evolution — VIBE_READY contract", () => {
     expect(content).toContain("postinstall 자동 실행 금지");
     expect(content).toContain("SAFE_STOP_NONINTERACTIVE");
 
-    const setupAllowlist = allowlist().allows_dependency_execution.find((entry) => entry.skill === "setup");
-    expect(setupAllowlist).toBeDefined();
-    expect(setupAllowlist!.rationale.length).toBeGreaterThanOrEqual(50);
-    expect(setupAllowlist!.rationale).toContain("--ignore-scripts");
+    const onboardingAllowlist = allowlist().allows_dependency_execution.find((entry) => entry.skill === "onboarding");
+    expect(onboardingAllowlist).toBeDefined();
+    expect(onboardingAllowlist!.rationale.length).toBeGreaterThanOrEqual(50);
+    expect(onboardingAllowlist!.rationale).toContain("--ignore-scripts");
   });
 
   test("registers conservative safe defaults for every new onboarding consent", () => {
-    const setupRegistry = registry()["setup"] as Record<string, { safe_default?: string; allowed_safe_defaults?: string[] }>;
+    const onboardingRegistry = registry()["onboarding"] as Record<string, { safe_default?: string; allowed_safe_defaults?: string[] }>;
 
     for (const [question, expectedDefault] of [
       ["axhub CLI 업데이트를 적용할까요?", "취소"],
@@ -287,7 +287,7 @@ describe("setup onboarding evolution — VIBE_READY contract", () => {
       ["기존 repo 를 axhub 앱에 연결할까요?", "아니요"],
       ["첫 앱 만들래요?", "아니요"],
     ] as const) {
-      const entry = setupRegistry[question];
+      const entry = onboardingRegistry[question];
       expect(entry, `missing registry entry for ${question}`).toBeDefined();
       expect(entry.safe_default).toBe(expectedDefault);
       expect(entry.allowed_safe_defaults).toContain(expectedDefault);

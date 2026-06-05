@@ -19,7 +19,7 @@ codex Ralph 추가 리뷰 의 Amendment 5 가 발견한 사실: 현재 `crates/a
 
 ```
 axhub 준비됐어요 (v{VERSION}).
-- 처음이면 /axhub:setup — 설치·로그인·첫 배포까지 안내해요.
+- 처음이면 /axhub:onboarding — 설치·로그인·첫 배포까지 안내해요.
 - 막히거나 안 되면 /axhub:doctor (진단) · /axhub:help (전체 명령).
 - 자주 쓰는 것: 배포 /axhub:deploy · 상태 /axhub:status · 로그 /axhub:logs · 앱 목록 /axhub:apps.
 - 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요.
@@ -35,7 +35,7 @@ marker 파일 (`runtime_paths::state_dir() / .v{VERSION}-welcome-shown`) 부재 
 
 ```
 [axhub v{VERSION} 첫 세션] 환영해요.
-- 가장 쉬운 시작: "안녕" 또는 /axhub:setup — 설치부터 첫 배포까지 함께 가요.
+- 가장 쉬운 시작: "안녕" 또는 /axhub:onboarding — 설치부터 첫 배포까지 함께 가요.
 - 이미 앱이 있으면 "배포해" 한마디면 돼요.
 - 헷갈리면 /axhub:help (명령 메뉴) · /axhub:doctor (점검).
 ```
@@ -95,7 +95,7 @@ const WELCOME_VERSION: &str = "0.4.0";
 pub fn cmd_session_start() -> anyhow::Result<i32> {
     let mut lines = vec![
         format!("axhub 준비됐어요 (v{}).", env!("CARGO_PKG_VERSION")),
-        "- 처음이면 /axhub:setup — 설치·로그인·첫 배포까지 안내해요.".to_string(),
+        "- 처음이면 /axhub:onboarding — 설치·로그인·첫 배포까지 안내해요.".to_string(),
         "- 막히거나 안 되면 /axhub:doctor (진단) · /axhub:help (전체 명령).".to_string(),
         "- 자주 쓰는 것: 배포 /axhub:deploy · 상태 /axhub:status · 로그 /axhub:logs · 앱 목록 /axhub:apps.".to_string(),
         "- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요.".to_string(),
@@ -105,7 +105,7 @@ pub fn cmd_session_start() -> anyhow::Result<i32> {
     if !marker_path.exists() {
         lines.push(String::new()); // blank separator
         lines.push(format!("[axhub v{WELCOME_VERSION} 첫 세션] 환영해요."));
-        lines.push("- 가장 쉬운 시작: \"안녕\" 또는 /axhub:setup — 설치부터 첫 배포까지 함께 가요.".to_string());
+        lines.push("- 가장 쉬운 시작: \"안녕\" 또는 /axhub:onboarding — 설치부터 첫 배포까지 함께 가요.".to_string());
         lines.push("- 이미 앱이 있으면 \"배포해\" 한마디면 돼요.".to_string());
         lines.push("- 헷갈리면 /axhub:help (명령 메뉴) · /axhub:doctor (점검).".to_string());
 

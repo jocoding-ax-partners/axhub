@@ -650,6 +650,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "logs",
       "migrate",
       "my-resources",
+      "onboarding",
       "open",
       "profile",
       "publish",
@@ -657,7 +658,6 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "resources",
       "rollback",
       "routing-stats",
-      "setup",
       "status",
       "tables",
       "team",
@@ -703,11 +703,11 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
-  test("setup skill covers human first-run phrasing", () => {
-    const setup = skillContents.get("setup")!;
-    expect(setup).toContain("처음 쓰는데");
-    expect(setup).toContain("뭐부터 하면 돼");
-    expect(setup).toContain("axhub 처음 쓰는데 뭐부터 하면 돼?");
+  test("onboarding skill covers human first-run phrasing", () => {
+    const onboarding = skillContents.get("onboarding")!;
+    expect(onboarding).toContain("처음 쓰는데");
+    expect(onboarding).toContain("뭐부터 하면 돼");
+    expect(onboarding).toContain("axhub 처음 쓰는데 뭐부터 하면 돼?");
   });
 
   test("auth skill covers human login-status phrasing", () => {
