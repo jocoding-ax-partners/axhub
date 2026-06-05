@@ -83,6 +83,14 @@
       "metadata": {
         "decision_topic": "uncertain"
       }
+    },
+    "배포 전에 코드에서 필요한 테이블·환경변수를 먼저 추천받을래요?": {
+      "safe_default": "아니요, 바로 배포",
+      "rationale": "infer-tables-env pre-deploy nudge. Non-interactive/headless must not interrupt or delay deploy with an analysis prompt — default to continuing the deploy.",
+      "allowed_safe_defaults": [
+        "아니요, 바로 배포",
+        "네, 먼저 추천받기"
+      ]
     }
   },
   "auth": {
@@ -240,6 +248,14 @@
       "allowed_safe_defaults": [
         "취소",
         "execute"
+      ]
+    },
+    "방금 만든 코드에서 필요한 테이블·환경변수를 추천받을래요?": {
+      "safe_default": "아니요",
+      "rationale": "infer-tables-env post-init nudge. Non-interactive/headless must not run an analysis prompt automatically — default to skipping.",
+      "allowed_safe_defaults": [
+        "아니요",
+        "네, 추천받기"
       ]
     }
   },
@@ -718,6 +734,16 @@
       "metadata": {
         "decision_topic": "apis-call-confirm"
       }
+    }
+  },
+  "infer-tables-env": {
+    "추천 결과를 어떻게 할까요?": {
+      "safe_default": "추천만",
+      "rationale": "Apply path mutates tables/env. Non-interactive mode should only show the read-only recommendation.",
+      "allowed_safe_defaults": [
+        "추천만",
+        "적용"
+      ]
     }
   }
 }

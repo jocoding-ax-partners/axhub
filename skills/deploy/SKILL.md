@@ -66,6 +66,24 @@ raw helper JSON 이 디버깅에 필요한 환경 (개발 검증) 은 `AXHUB_DEP
 
 **User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
+**배포 직전 선택 점검(infer-tables-env 연계).** 배포 본 단계로 들어가기 전에, 코드에서 필요한 테이블·환경변수를 먼저 추천받을지 AskUserQuestion 으로 한 번 물어봐요. 비차단이라 헤드리스/비대화형(Headless first rule)에서는 묻지 않고 safe default(`아니요, 바로 배포`)로 그냥 배포를 이어가요.
+
+```json
+{
+  "questions": [{
+    "question": "배포 전에 코드에서 필요한 테이블·환경변수를 먼저 추천받을래요?",
+    "header": "사전 점검",
+    "multiSelect": false,
+    "options": [
+      {"label": "아니요, 바로 배포", "description": "점검 건너뛰고 바로 배포를 이어가요"},
+      {"label": "네, 먼저 추천받기", "description": "코드 분석으로 필요한 테이블·env 를 먼저 추천받아요"}
+    ]
+  }]
+}
+```
+
+`네, 먼저 추천받기` 면 infer-tables-env 분석으로 넘어가 추천을 보여준 뒤 배포로 돌아와요. `아니요, 바로 배포` 면 곧장 배포를 진행해요. 어느 쪽이든 배포를 막지 않아요.
+
 **Headless first rule.** `claude -p`, CI, `$CLAUDE_NON_INTERACTIVE`, or an unavailable/denied AskUserQuestion tool means headless mode예요. In headless mode:
 
 - Do not call AskUserQuestion.

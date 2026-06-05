@@ -273,6 +273,24 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    - `forbidden` / `tenant_scope` (CLI exit 12 / 8, 권한·scope 부족) → 사용자에게 권한 부족 안내 + workspace admin 문의
    - 그 외 → "설치 상태 진단해줘"
 
+   앱이 정상 생성됐으면, 방금 만든 코드에서 필요한 테이블·환경변수를 추천받을지 AskUserQuestion 으로 한 번 물어봐요(비대화형/D1 guard 에서는 묻지 않고 safe default `아니요` 로 넘어가요).
+
+   ```json
+   {
+     "questions": [{
+       "question": "방금 만든 코드에서 필요한 테이블·환경변수를 추천받을래요?",
+       "header": "사전 점검",
+       "multiSelect": false,
+       "options": [
+         {"label": "아니요", "description": "지금은 넘어가요"},
+         {"label": "네, 추천받기", "description": "코드 분석으로 필요한 테이블·env 를 추천받아요"}
+       ]
+     }]
+   }
+   ```
+
+   `네, 추천받기` 면 infer-tables-env 분석으로 넘어가요. `아니요` 면 그냥 마무리해요.
+
 ## NEVER
 
 - NEVER `axhub init` 또는 `axhub init --from-template` 을 호출하지 않아요. Rust v1.0.0-rc.1 에서 `--from-template` flag 가 미구현 stub (`initcmd.rs` run() 미사용) 이라 호출해도 generic docker manifest 만 만들어져요. SKILL 은 `axhub apps bootstrap` saga 만 써요.

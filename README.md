@@ -11,7 +11,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
-**상태**: v0.9.30 · 43 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary
+**상태**: v0.9.30 · 44 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary
 
 </div>
 
@@ -112,7 +112,7 @@ headless(CI 등)에서는 `AXHUB_TOKEN` env 또는 token-import 로 인증해요
 
 ## 💬 자연어로 할 수 있는 일
 
-플러그인에는 43개 SKILL 이 들어 있어요. 아래처럼 **그냥 평소 말투로 말하면** 알아서 맞는 기능을 찾아 실행해요. 명령어를 외울 필요 없어요. 슬래시로 부르고 싶으면 옆 칸의 `/axhub:<이름>` 을 쓰면 돼요 — 모든 SKILL 에 다 있어요.
+플러그인에는 44개 SKILL 이 들어 있어요. 아래처럼 **그냥 평소 말투로 말하면** 알아서 맞는 기능을 찾아 실행해요. 명령어를 외울 필요 없어요. 슬래시로 부르고 싶으면 옆 칸의 `/axhub:<이름>` 을 쓰면 돼요 — 모든 SKILL 에 다 있어요.
 
 ### 🚀 배포하고 운영하기
 
