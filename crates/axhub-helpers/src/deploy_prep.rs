@@ -30,6 +30,7 @@ pub const ENV_IN_FLIGHT_KILL_SWITCH: &str = "AXHUB_DEPLOY_IN_FLIGHT_CHECK";
 /// Window (seconds) used when calling `find_app_in_flight_with_window`.
 /// Intentionally separate from `recovery_scan::DEFAULT_STALE_THRESHOLD_SECS`
 /// even though numerically equal — the two thresholds serve different purposes.
+#[cfg(not(coverage))]
 const IN_FLIGHT_WINDOW_SECS: u64 = 600;
 
 /// Cache TTL for `--refresh-in-flight` mode (seconds).
@@ -240,6 +241,7 @@ where
     // PR B1 selective refresh — `--refresh-in-flight` 시 resolve 만 fresh fetch,
     // preflight 는 cache 재사용. bootstrap_plan + github_connected + exit_code 같은
     // derived state 는 fresh resolve 기준으로 모두 재유도해요 (issue #81 M3).
+    #[allow(unused_mut)]
     let mut result = if refresh_in_flight {
         let cached_with_ts = load_cache_with_timestamp();
         let fresh_resolve_run = run_resolve_with_runner(args, &runner);

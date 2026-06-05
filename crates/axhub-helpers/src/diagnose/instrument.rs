@@ -145,7 +145,8 @@ pub struct ApplyOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diagnose::probe::EnvVarProbe;
+    use crate::diagnose::probe::{EnvVarProbe, LoopShadowProbe};
+    use tempfile::TempDir;
 
     #[test]
     fn instrument_round_trip_env_var() {
@@ -173,5 +174,44 @@ mod tests {
         let snap = snapshot_path(std::path::Path::new("/nonexistent/abc/xyz/file"));
         assert!(snap.mtime.is_none());
         assert!(snap.sha256.is_none());
+    }
+
+    #[test]
+    fn snapshot_existing_file_records_hash_and_mtime() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("sample.txt");
+        std::fs::write(&path, b"hello").unwrap();
+        let snap = snapshot_path(&path);
+        assert!(snap.mtime.is_some());
+        assert_eq!(
+            snap.sha256,
+            Some("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824".into())
+        );
+    }
+
+    #[test]
+    fn instrument_round_trip_loop_shadow_file() {
+        let dir = TempDir::new().unwrap();
+        let probe = LoopShadowProbe {
+            id: "shadow-instrument".into(),
+            hypothesis_id: "H-shadow".into(),
+            relative_path: PathBuf::from("nested/file.txt"),
+            contents: b"shadow".to_vec(),
+        };
+        let ctx = ProbeContext {
+            loop_id: "loop-shadow-instrument".into(),
+            shadow_root: dir.path().to_path_buf(),
+        };
+
+        let (signal, outcome) = instrument(&probe, &ctx).unwrap();
+        assert!(signal.is_green());
+        assert_eq!(outcome.pre_snapshots.len(), 1);
+        let path = dir
+            .path()
+            .join("loop-shadow-instrument/cwd-shadow/nested/file.txt");
+        assert_eq!(std::fs::read(&path).unwrap(), b"shadow");
+
+        revert_with_guard(&probe, outcome).unwrap();
+        assert!(!path.exists());
     }
 }
