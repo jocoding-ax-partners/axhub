@@ -8,24 +8,17 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
+import {
+  cargoBinaryName,
+  hostPrimaryBinaryName,
+  hostRustTarget,
+  rustTargetByAlias,
+  rustTargetByTriple,
+  type RustTargetSpec,
+} from "./rust-targets.ts";
+
 const REPO_ROOT = join(import.meta.dir, "..");
 const BIN_DIR = join(REPO_ROOT, "bin");
-
-interface TargetSpec {
-  target: string;
-  name: string;
-  platform: NodeJS.Platform;
-  arch: NodeJS.Architecture;
-  exe: boolean;
-}
-
-const TARGETS: TargetSpec[] = [
-  { target: "aarch64-apple-darwin", name: "axhub-helpers-darwin-arm64", platform: "darwin", arch: "arm64", exe: false },
-  { target: "x86_64-apple-darwin", name: "axhub-helpers-darwin-amd64", platform: "darwin", arch: "x64", exe: false },
-  { target: "aarch64-unknown-linux-gnu", name: "axhub-helpers-linux-arm64", platform: "linux", arch: "arm64", exe: false },
-  { target: "x86_64-unknown-linux-gnu", name: "axhub-helpers-linux-amd64", platform: "linux", arch: "x64", exe: false },
-  { target: "x86_64-pc-windows-msvc", name: "axhub-helpers-windows-amd64.exe", platform: "win32", arch: "x64", exe: true },
-];
 
 const argValue = (flag: string): string | null => {
   const idx = process.argv.indexOf(flag);
@@ -43,22 +36,28 @@ const run = (cmd: string, args: string[]): void => {
   if (result.status !== 0) fail(`${cmd} exited with ${result.status ?? "signal"}`);
 };
 
-const hostSpec = (): TargetSpec => {
-  const spec = TARGETS.find((t) => t.platform === process.platform && t.arch === process.arch);
+const hostSpec = (): RustTargetSpec => {
+  const spec = hostRustTarget();
   return spec ?? fail(`unsupported host ${process.platform}/${process.arch}`);
 };
 
 const target = argValue("--target");
+const targetAlias = argValue("--target-alias");
 const requestedName = argValue("--name");
-const spec: TargetSpec = target ? (TARGETS.find((t) => t.target === target) ?? fail(`unknown target ${target}`)) : hostSpec();
-const outputName = requestedName ?? (target ? spec.name : "axhub-helpers");
+if (target && targetAlias) fail("use either --target or --target-alias, not both");
+const spec = target
+  ? (rustTargetByTriple(target) ?? fail(`unknown target ${target}`))
+  : targetAlias
+    ? (rustTargetByAlias(targetAlias) ?? fail(`unknown target alias ${targetAlias}`))
+    : hostSpec();
+const outputName = requestedName ?? (target || targetAlias ? spec.assetName : hostPrimaryBinaryName(spec.platform));
 
 const cargoArgs = ["build", "--release", "-p", "axhub-helpers"];
-if (target) cargoArgs.push("--target", target);
+if (target || targetAlias) cargoArgs.push("--target", spec.target);
 run("cargo", cargoArgs);
 
-const binaryName = `axhub-helpers${spec.exe ? ".exe" : ""}`;
-const source = target
+const binaryName = cargoBinaryName(spec);
+const source = target || targetAlias
   ? join(REPO_ROOT, "target", spec.target, "release", binaryName)
   : join(REPO_ROOT, "target", "release", binaryName);
 if (!existsSync(source)) fail(`cargo build did not produce ${source}`);
@@ -71,9 +70,9 @@ process.stdout.write(`[build-rust-helper] wrote bin/${outputName}\n`);
 
 // A host build also refreshes the host-specific release asset so smoke/release
 // checks catch stale version drift before tag creation.
-if (!target) {
-  const hostDest = join(BIN_DIR, spec.name);
+if (!target && !targetAlias) {
+  const hostDest = join(BIN_DIR, spec.assetName);
   copyFileSync(source, hostDest);
   chmodSync(hostDest, 0o755);
-  process.stdout.write(`[build-rust-helper] wrote bin/${spec.name}\n`);
+  process.stdout.write(`[build-rust-helper] wrote bin/${spec.assetName}\n`);
 }

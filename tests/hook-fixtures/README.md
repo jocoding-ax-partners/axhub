@@ -52,12 +52,18 @@ SessionStart omits `tool_name` and `tool_input` entirely.
 
 ```bash
 # Pipe a fixture directly into the binary subcommand:
-cat tests/hook-fixtures/v0/pretooluse-bash-axhub-deploy.json | ./bin/axhub-helpers preauth-check
-cat tests/hook-fixtures/v0/posttooluse-bash-exit65.json      | ./bin/axhub-helpers classify-exit
-cat tests/hook-fixtures/v0/sessionstart.json                 | ./bin/axhub-helpers session-start
+cat tests/hook-fixtures/v0/pretooluse-bash-axhub-deploy.json | bin/axhub-helpers preauth-check
+cat tests/hook-fixtures/v0/posttooluse-bash-exit65.json      | bin/axhub-helpers classify-exit
+cat tests/hook-fixtures/v0/sessionstart.json                 | bin/axhub-helpers session-start
 
 # Validate JSON syntax (all fixtures must parse cleanly):
 for f in tests/hook-fixtures/v0/*.json; do jq -e '.' < "$f" > /dev/null && echo "OK $f"; done
+```
+
+Windows PowerShell uses the `.exe` helper and native pipes:
+
+```powershell
+Get-Content .\tests\hook-fixtures\v0\sessionstart.json | .\bin\axhub-helpers.exe session-start
 ```
 
 ## Lint Rule

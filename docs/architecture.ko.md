@@ -549,7 +549,8 @@ bun run build               # → bin/axhub-helpers
 
 # 2. smoke
 bun run smoke               # build + version + help
-./bin/axhub-helpers version
+bin/axhub-helpers version
+# Windows PowerShell 에서는 `bin\axhub-helpers.exe version` 를 사용해요
 
 # 3. Rust 테스트
 bun run cargo:test          # cargo test --workspace
@@ -597,12 +598,12 @@ hook-driven 플러그인의 1순위 질문 — **"hook 은 떴는데 아무 일�
 cat "${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/hook-errors.jsonl"
 
 # 2. hook 을 로컬에서 직접 재현 — 이벤트 JSON 을 stdin 으로
-echo '{"prompt":"배포해"}' | ./bin/axhub-helpers prompt-route
-echo '{"tool_name":"Bash","tool_input":{"command":"axhub deploy create"}}' | ./bin/axhub-helpers preauth-check
+echo '{"prompt":"배포해"}' | bin/axhub-helpers prompt-route
+echo '{"tool_name":"Bash","tool_input":{"command":"axhub deploy create"}}' | bin/axhub-helpers preauth-check
 
 # 3. preflight 가 뭘 보는지
-./bin/axhub-helpers preflight --json | jq .
-AXHUB_PREFLIGHT_PARALLEL=0 ./bin/axhub-helpers preflight --json   # 순차(디버깅)
+bin/axhub-helpers preflight --json | jq .
+AXHUB_PREFLIGHT_PARALLEL=0 bin/axhub-helpers preflight --json   # 순차(디버깅)
 
 # 4. 특정 hook 만 끄고 격리
 AXHUB_DISABLE_HOOK=preauth-check,prompt-route claude
@@ -613,9 +614,13 @@ ls "$([ -n "$XDG_RUNTIME_DIR" ] && echo "$XDG_RUNTIME_DIR/axhub" || echo "${XDG_
 cat "${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/session-bundle.json"
 
 # 6. 라우팅 통계
-./bin/axhub-helpers routing-stats --since 7d
-./bin/axhub-helpers doctor --json | jq .
+bin/axhub-helpers routing-stats --since 7d
+bin/axhub-helpers doctor --json | jq .
 ```
+
+Windows PowerShell 에서는 같은 예제를 `bin\axhub-helpers.exe <subcommand>` 형태로
+실행해요. stdin 예시는 `Get-Content .\tests\hook-fixtures\v0\sessionstart.json |
+.\bin\axhub-helpers.exe session-start` 처럼 PowerShell 파이프를 사용해요.
 
 자주 겪는 사용자 에러(토큰 만료/동시 배포/slug 모호/Windows fallback) 한국어 가이드는 [`docs/troubleshooting.ko.md`](docs/troubleshooting.ko.md).
 

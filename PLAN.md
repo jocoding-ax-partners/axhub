@@ -15,7 +15,7 @@
 |---|---|---:|---|
 | **SHIPPED** | v0.1.20 exhaustive review bugfix baseline: consent-token safety, release automation drift, skill/docs contract drift | PR #3, tag `v0.1.20` | `tests/consent.test.ts`, `tests/release-config.test.ts`, `tests/manifest.test.ts`, `bun run release:check`, staging E2E |
 | **SHIPPED** | Phase 1 command-surface reconciliation: canceled plugin-server/MCP scope가 active plan으로 되살아나지 않도록 PLAN/commands 정리 | PR #4, merge `5227f94` | `tests/plan-consistency.test.ts`, `tests/manifest.test.ts`, `commands/help.md`, `commands/배포.md` |
-| **SHIPPED** | Phase 2 corpus runner replay: placeholder runner 대신 committed fixture를 replay/score 가능하게 전환 | PR #5, merge `d38f248` | `tests/run-corpus.sh`, `tests/run-corpus.test.ts`, `tests/README.md` |
+| **SHIPPED** | Phase 2 corpus runner replay: placeholder runner 대신 committed fixture를 replay/score 가능하게 전환 | PR #5, merge `d38f248` | `tests/run-corpus.ts`, `tests/run-corpus.sh` compatibility wrapper, `tests/run-corpus.test.ts`, `tests/README.md` |
 | **SHIPPED** | Phase 3 SessionStart preflight: 시작 시 axhub 설치/버전/auth/profile 진단을 실제 메시지로 노출 | PR #6, merge `4cf3baf` | `src/axhub-helpers/index.ts`, `tests/session-start.test.ts` |
 | **SHIPPED** | Phase 4 hook latency benchmark: impossible 5ms gate 제거, helper hot path p95 50ms gate를 측정 가능하게 고정 | PR #7, merge `f944fdf` | `scripts/benchmark-hooks.ts`, `tests/hook-latency.test.ts`, `package.json#bench:hooks` |
 | **SHIPPED** | Phase 5 supply-chain/release plan sync: 현재 signed Bun helper release artifact와 PLAN/docs를 일치 | PR #8, merge `6eb8779` | `docs/RELEASE.md`, `.github/workflows/release.yml`, `tests/release-config.test.ts`, `bun run release:check` |
@@ -42,7 +42,7 @@
 **남은 범위 정리**
 
 - 이번 라운드에서 PLAN.md의 stale/mismatch/open-list 성격 항목은 닫혔다. 새 구현 TODO를 추가하려면 반드시 test/script gate 또는 manual evidence row를 같이 추가한다.
-- `tests/run-corpus.sh`의 full live re-curation은 의도적으로 explicit `--fixture`가 필요하다. 자동으로 fabricated result를 만들지 않는 것이 현재 안전장치다.
+- `tests/run-corpus.ts`의 full live re-curation은 의도적으로 explicit `--fixture`가 필요하다. 자동으로 fabricated result를 만들지 않는 것이 현재 안전장치다.
 - §13.3의 최소 2개 고객사 사용자 검증, deferred outside M0–M6 항목(자동 rollback, org-admin audit log skill, multi-tenant marketplace policy, web dashboard)은 코드 미구현이 아니라 별도 제품/운영 단계로 남긴다.
 - GitHub Actions Node.js 20 deprecation 경고는 v0.1.21/v0.1.22 릴리즈 블로커가 아니었지만, 다음 release infra 라운드에서 runner/action Node 24 대응으로 추적한다.
 
@@ -412,7 +412,7 @@ exit 68 → "rate limit. Retry-After 헤더만큼 대기 후 재시도."
 | **M0** | git init / `.claude-plugin/plugin.json` / README skeleton / measurement harness scaffold (`tests/corpus.jsonl` empty + scoring script) | `claude --plugin-dir ./axhub` 로딩 OK + 빈 corpus runner 동작 |
 | **M0.5** | **Docs-only baseline 측정**: `agent-manual.md` + 200줄 CLAUDE.md 템플릿만 둔 상태에서 corpus 실행. trusted-completion / unsafe-trigger / recovery 측정. | baseline 숫자 기록 → §13 표에 baseline column 채움. Current runner replays committed 20/100-row fixtures and scores them deterministically; full 331-row live re-curation requires explicit `--fixture`. |
 | **M1** | skills/deploy + skills/status + skills/logs (3대장) + **AskUserQuestion 기반 destructive 승인 패턴** (P7) | corpus 재측정. deploy 의도 corpus에 대해: trusted-completion ≥ baseline + 20pp, **unsafe-trigger = 0%**, recovery ≥ baseline + 30pp |
-| **M1.5** | **GO/KILL GATE (P3, P10)** | `tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --score` must pass against the matching docs-only baseline. 위 3개 메트릭 중 1개라도 baseline 못 넘기면: M2 이후 보류, "docs로 ship" 결정. plugin 자체 재고. |
+| **M1.5** | **GO/KILL GATE (P3, P10)** | `bun tests/run-corpus.ts --mode plugin --corpus tests/corpus.100.jsonl --score` must pass against the matching docs-only baseline. 위 3개 메트릭 중 1개라도 baseline 못 넘기면: M2 이후 보류, "docs로 ship" 결정. plugin 자체 재고. |
 | **M2** | skills/apps + skills/apis + skills/auth + skills/update + skills/doctor (5개 read-only) | corpus에 read-only 의도 추가 → trusted-completion ≥ 90% (read는 위험 낮음) |
 | **M3** | commands/* (8개 슬래시 wrapper) — skills의 thin wrapper, source of truth는 skill | `/axhub:deploy paydrop --commit <sha>` 명시 호출 동작 |
 | **M4** | hooks/ (SessionStart 진단 + PostToolUse classify-exit) — **axhub 명령 아니면 compiled-helper hot path no-op (50ms p95 이내; audit row 16 현실화)** | SessionStart surfaces CLI version/auth/profile diagnostics without blocking; `bun run bench:hooks` validates non-axhub PreToolUse/PostToolUse p95 < 50ms, exit 65/64+in_progress/67/68 자동 분류 정확도 100% |
@@ -454,7 +454,7 @@ exit 68 → "rate limit. Retry-After 헤더만큼 대기 후 재시도."
 
 ```
 tests/corpus.jsonl       # 100+ 라인, {utterance, intent, expected_cmd, destructive: bool}
-tests/run-corpus.sh      # claude --plugin-dir 띄우고 corpus 한 줄씩 발화, tool calls + exit codes 캡처
+tests/run-corpus.ts      # cross-platform fixture replay/scoring; live recuration 결과를 --fixture 로 입력
 tests/score.py           # corpus 결과 → 4개 메트릭 산출 + diff vs baseline
 ```
 

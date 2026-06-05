@@ -53,7 +53,7 @@ jobs:
 
       - name: Run corpus.100 drift gate
         id: drift
-        run: bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --vs claude-native --score
+        run: bun tests/run-corpus.ts --mode plugin --corpus tests/corpus.100.jsonl --vs claude-native --score
         continue-on-error: true
 
       - name: Comment on failure
@@ -82,6 +82,28 @@ jobs:
       - name: Fail if drift gate failed
         if: steps.drift.outcome == 'failure'
         run: exit 1
+
+  windows-tooling-check:
+    name: Windows Bun routing tooling
+    runs-on: windows-latest
+    if: ${{ !contains(github.event.pull_request.title, '[skip-routing-gate]') }}
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install bun deps
+        run: bun install --frozen-lockfile
+
+      - name: Run Windows-native tooling guards
+        run: bun test tests/windows-cross-platform-tooling.test.ts tests/run-corpus.test.ts
+
+      - name: Run corpus.20 routing gate on Windows
+        run: bun run test:routing:20
 
   # Phase 11 fix — audit trail for [skip-routing-gate] manual override.
   # Posts a PR comment so reviewers see the skip explicitly.

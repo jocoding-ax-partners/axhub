@@ -1,4 +1,4 @@
-// Phase 2 PLAN execution — tests/run-corpus.sh must be a real deterministic
+// Phase 2 PLAN execution — tests/run-corpus.ts must be a real deterministic
 // fixture replay runner, not an empty placeholder writer.
 
 import { describe, expect, test } from "bun:test";
@@ -8,10 +8,10 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const REPO_ROOT = join(import.meta.dir, "..");
-const RUNNER = join(REPO_ROOT, "tests/run-corpus.sh");
+const RUNNER = join(REPO_ROOT, "tests/run-corpus.ts");
 
 const run = (args: string[]) =>
-  spawnSync("bash", [RUNNER, ...args], {
+  spawnSync("bun", [RUNNER, ...args], {
     cwd: REPO_ROOT,
     encoding: "utf8",
     timeout: 30000,
@@ -20,7 +20,7 @@ const run = (args: string[]) =>
 const readJson = (path: string) => JSON.parse(readFileSync(path, "utf8"));
 const lineCount = (path: string) => readFileSync(path, "utf8").trimEnd().split("\n").length;
 
-describe("tests/run-corpus.sh fixture replay runner", () => {
+describe("tests/run-corpus.ts fixture replay runner", () => {
   test("plugin mode writes committed 20-row plugin results (Phase 5: 20 base + init + 3 meta_question = 24)", () => {
     const dir = mkdtempSync(join(tmpdir(), "axhub-corpus-"));
     try {
@@ -79,11 +79,11 @@ describe("tests/run-corpus.sh fixture replay runner", () => {
       copy("tests/baseline-results.claude-native.20.json", "tests/baseline-results.claude-native.20.json");
       copy("tests/baseline-results.claude-native.20.json", "tests/baseline-results.docs-only.20.json");
       copy("tests/routing-score.ts", "tests/routing-score.ts");
-      copy("tests/run-corpus.sh", "tests/run-corpus.sh");
+      copy("tests/run-corpus.ts", "tests/run-corpus.ts");
 
       const result = spawnSync(
-        "bash",
-        [join(fakeRoot, "tests/run-corpus.sh"), "--mode", "plugin", "--corpus", "tests/corpus.20.jsonl", "--vs", "claude-native", "--score"],
+        "bun",
+        [join(fakeRoot, "tests/run-corpus.ts"), "--mode", "plugin", "--corpus", "tests/corpus.20.jsonl", "--vs", "claude-native", "--score"],
         {
           cwd: fakeRoot,
           encoding: "utf8",
@@ -130,11 +130,11 @@ describe("tests/run-corpus.sh fixture replay runner", () => {
       copy("tests/baseline-results.claude-native.20.json", "tests/baseline-results.claude-native.20.json");
       copy("tests/baseline-results.claude-native.20.json", "tests/baseline-results.docs-only.20.json");
       copy("tests/routing-score.ts", "tests/routing-score.ts");
-      copy("tests/run-corpus.sh", "tests/run-corpus.sh");
+      copy("tests/run-corpus.ts", "tests/run-corpus.ts");
 
       const result = spawnSync(
-        "bash",
-        [join(fakeRoot, "tests/run-corpus.sh"), "--mode", "plugin", "--corpus", "tests/corpus.20.jsonl", "--vs", "claude-native", "--score"],
+        "bun",
+        [join(fakeRoot, "tests/run-corpus.ts"), "--mode", "plugin", "--corpus", "tests/corpus.20.jsonl", "--vs", "claude-native", "--score"],
         { cwd: fakeRoot, encoding: "utf8", timeout: 30000, env: { ...process.env, PLUGIN_ROOT: fakeRoot } },
       );
       expect(result.status).toBe(0);
