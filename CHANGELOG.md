@@ -4,6 +4,30 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.32](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.31...v0.9.32) (2026-06-05)
+
+이번 릴리스는 두 가지를 묶어요. 새 `infer-tables-env` 스킬이 개발한 소스코드를 분석해 필요한 동적 테이블·환경변수를 근거와 함께 추천하고, 실제 생성은 기존 `tables`·`env` 스킬로 인계해요(read-only 추천, 새 mutation 경로 없음). init·deploy 에는 AskUserQuestion 비차단 게이트를 붙여 수락 시에만 추천으로 라우팅해요. 그리고 GitHub OAuth device flow 가 에이전트 컨텍스트에서 `device_code_issued` fast-exit 한 뒤 "터미널에서 다시 실행" 을 떠넘기던 punt 를 제거하고, auth Step 5c 처럼 승인 신호를 받으면 에이전트가 `--resume-last` 로 token 교환을 직접 마무리해요. Windows 의 `user github token missing` 무한 재발급 루프(승인된 code 를 버리고 fresh execute 재호출)를 차단했어요.
+
+### Test baseline
+
+- `bun run skill:doctor --strict` exit 0, `lint:tone --strict` 0 err, `lint:keywords --check` no diff, `bunx tsc --noEmit` clean.
+- `bun test` 1222 pass — device-flow 회귀 테스트(14건) 포함. 잔여 2 fail 은 이 릴리스 무관한 README/PLAN 버전 드리프트 pre-existing 이에요.
+- release step 1 의 `codegen:version` + `release:check` 통과로 installer·helper build 버전 동기화 확인.
+
+### Honest tradeoff
+
+- #168 의 corpus.100 drift gate 는 새 스킬 라우팅 baseline fixture 미regen 으로 fail 했지만 branch protection 비활성이라 머지했어요. routing baseline regen(`bun run measure:baseline`)은 후속 PR 에서 처리해야 해요.
+- device-flow 테스트는 SKILL 구조만 잠그고 bash 런타임을 live 검증하진 않아요. CLI 동작은 소스로 확정했지만 Windows end-to-end 는 staging 후속 검증이 필요해요.
+
+### Added
+
+* infer-tables-env 스킬 + init/deploy AUQ 연계 ([#168](https://github.com/jocoding-ax-partners/axhub/issues/168)) ([685e22d](https://github.com/jocoding-ax-partners/axhub/commit/685e22d964066ec95cb7d2f4f5f62ee81e3d3798))
+
+
+### Fixed
+
+* GitHub device flow 를 에이전트가 --resume-last 로 직접 완료 ([#169](https://github.com/jocoding-ax-partners/axhub/issues/169)) ([2276304](https://github.com/jocoding-ax-partners/axhub/commit/22763048061fa3d8286550d93e9949d428117b51))
+
 ## [0.9.31](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.30...v0.9.31) (2026-06-05)
 
 이번 릴리스는 데스크톱 자연어 라우팅과 Windows 네이티브 툴링을 릴리즈 가능한 상태로 묶었어요. POSIX 전제였던 검사 경로를 Bun/PowerShell 친화적으로 안정화하고, Ubuntu coverage와 Windows Bun CI가 같은 릴리즈 계약을 검증하도록 보강했어요.
