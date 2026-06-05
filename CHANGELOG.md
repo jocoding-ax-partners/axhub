@@ -4,6 +4,23 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.31](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.30...v0.9.31) (2026-06-05)
+
+이번 릴리스는 데스크톱 자연어 라우팅과 Windows 네이티브 툴링을 릴리즈 가능한 상태로 묶었어요. POSIX 전제였던 검사 경로를 Bun/PowerShell 친화적으로 안정화하고, Ubuntu coverage와 Windows Bun CI가 같은 릴리즈 계약을 검증하도록 보강했어요.
+
+### Test baseline
+
+- PR #167 GitHub Actions 전 체크가 통과했고, 로컬에서 `cargo fmt --all -- --check`, `cargo clippy --workspace -- -D warnings`, targeted Rust tests, `bun run cargo:coverage` 85.20%, Windows tooling Bun tests, routing drift, `bunx tsc --noEmit` 을 확인했어요.
+- release step 1의 `codegen:version` 과 `release:check` 가 통과해 installer와 helper build 버전 동기화를 확인했어요.
+
+### Honest tradeoff
+
+- PR 제목의 `[skip-routing-gate]` 로 corpus 본문 drift gate는 의도된 audit 경로를 탔어요. 이번 변경 초점은 데스크톱 helper label 누수 방지와 Windows 호환성이라 corpus 본문 재평가는 별도 변경에서 다루는 편이 안전해요.
+
+### Fixed
+
+* preserve Windows-native desktop routing contracts ([258e114](https://github.com/jocoding-ax-partners/axhub/commit/258e1140d7162e237ae0cfd4b536bf6ad63d877e)), closes [#167](https://github.com/jocoding-ax-partners/axhub/issues/167)
+
 ## [0.9.30](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.28...v0.9.30) (2026-06-04)
 
 이번 릴리스는 플러그인 SKILL 을 실제 axhub CLI QA 결과에 정합시켜요. 첫 배포(vibe bootstrap) 흐름에서 매니페스트 `name` 을 유효 슬러그로 변환해 배포 차단을 풀고, 앱 생성을 `--from-file`(YAML) 대신 `--name/--slug` 로 바꿨어요. quality-gate 의 첫 배포 `ExitCodeMismatch` false-positive 를 제거하고, 로그인 상태 질문은 doctor 가 아닌 auth 로 라우팅해요.
