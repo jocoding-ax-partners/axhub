@@ -38,6 +38,7 @@ pub mod quality_gate;
 pub mod quality_state;
 pub mod recovery_scan;
 pub mod redact;
+pub mod repair_path;
 pub mod resolve;
 pub mod routing;
 pub mod runtime_paths;

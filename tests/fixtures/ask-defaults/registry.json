@@ -793,5 +793,15 @@
         "연결"
       ]
     }
+  },
+  "repair": {
+    "PATH 를 고칠까요?": {
+      "safe_default": "나중에",
+      "rationale": "PATH repair mutates shell rc files or Windows User PATH. Non-interactive mode must not change the user environment without explicit consent.",
+      "allowed_safe_defaults": [
+        "나중에",
+        "고치기"
+      ]
+    }
   }
 }

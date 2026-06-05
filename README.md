@@ -170,6 +170,7 @@ headless(CI 등)에서는 `AXHUB_TOKEN` env 또는 token-import 로 인증해요
 | "처음인데 셋업해줘", "온보딩", "getting started" | CLI·로그인·git/node·GitHub App·첫 앱·의존성·doctor 까지 `VIBE_READY` 상태로 이어줘요 | `/axhub:onboarding` |
 | "axhub 로그인해줘" | axhub 에 로그인해요 (브라우저로 승인) | `/axhub:login` `/axhub:auth` |
 | "axhub CLI 설치해줘" | axhub 명령줄 도구(CLI)를 설치해요 | `/axhub:install-cli` |
+| "PATH 고쳐줘" | CLI 가 설치됐지만 새 터미널 PATH 에 없을 때 경로 설정을 고쳐요 | `/axhub:repair` |
 | "CLI 최신 버전으로 올려줘" | axhub CLI 를 최신 버전으로 업데이트해요 | `/axhub:update` |
 | "플러그인 업그레이드해줘" | 이 플러그인 자체를 새 버전으로 올려요 | `/axhub:upgrade` |
 | "axhub 잘 설치됐어?" | 설치·로그인·환경이 정상인지 한 번에 진단해요 | `/axhub:doctor` |

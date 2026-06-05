@@ -55,6 +55,7 @@ enum Commands {
     Verify(args::VerifyArgs),
     Trace(args::TraceArgs),
     Doctor(args::DoctorArgs),
+    RepairPath(args::RepairPathArgs),
     SettingsMerge(args::SettingsMergeCliArgs),
 
     // ── US3 — 분석/유지보수 명령 (typed args) ──
@@ -235,6 +236,7 @@ fn dispatch(command: Commands) -> i32 {
         Commands::Verify(a) => run_result(crate::cmd_verify(a.app_id, a.json)),
         Commands::Trace(a) => run_result(crate::cmd_trace(a.deploy_id, a.app, a.json)),
         Commands::Doctor(a) => run_result(crate::cmd_doctor(a.json, a.no_cooldown)),
+        Commands::RepairPath(a) => run_result(crate::cmd_repair_path(a.json, a.dir)),
         Commands::SettingsMerge(a) => run_result(crate::cmd_settings_merge(a)),
         Commands::PostInstall(a) => run_result(crate::cmd_post_install(
             a.target_name,

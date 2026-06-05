@@ -146,7 +146,7 @@ To run diagnostics:
    & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" preflight --json
    ```
 
-   This returns: `cli_version, in_range, cli_too_old, cli_too_new, cli_present, auth_ok, auth_error_code, scopes, profile, endpoint, user_email, expires_at`.
+   This returns: `cli_version, in_range, cli_too_old, cli_too_new, cli_present, cli_state, cli_on_path, cli_resolved_path, auth_ok, auth_error_code, scopes, profile, endpoint, user_email, expires_at`.
 
 3. **Fetch raw version + path** for the report:
 
@@ -188,12 +188,15 @@ To run diagnostics:
    | Windows artifact exists but `axhub-helpers.exe` missing | "다운로드 artifact 는 있지만 실행 파일 복사가 안 됐어요. 'powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:CLAUDE_PLUGIN_ROOT\\bin\\install.ps1\"' 로 다시 연결해요." |
    | Windows `install.ps1` missing | "install.ps1 이 없어서 플러그인 install 이 손상된 상태예요. '/plugin install axhub@axhub' 로 재설치해요." |
    | `cli_present: false` | "axhub CLI 가 설치되어 있지 않아요." → 즉시 Step 5.5 의 AskUserQuestion 으로 설치 의향 확인 (사용자가 phrase 다시 발화 안 해도 됨) |
+   | `cli_present:true` + `cli_state:on_disk_not_on_path` 또는 `cli_on_path:false` | "axhub CLI 는 설치됐지만 PATH 에 아직 없어요. 'PATH 고쳐줘' 라고 말씀해주세요." |
    | `cli_too_old: true` | "axhub가 너무 오래된 버전이에요 (v<CUR>). 'axhub 업그레이드해줘' 라고 말씀해주세요." |
    | `cli_too_new: true` | "axhub가 플러그인보다 최신이에요. 'axhub 플러그인 업데이트' 라고 말씀해주세요." |
    | `auth_ok: false` (token_expired) | "로그인이 만료됐어요. '다시 로그인해줘' 라고 말씀해주세요." |
    | `auth_ok: false` (not_logged_in) | "아직 로그인 안 했어요. '로그인해줘' 라고 말씀해주세요." |
 
    **Note**: `profile: null` 또는 `endpoint: null` 은 default 사용 중인 정상 상태. ✓ 로 표시하고 default 값을 괄호로 부연 설명. AXHUB_PROFILE 또는 AXHUB_ENDPOINT 설정은 회사 IT 정책에 따라 선택사항.
+
+   **Installed but PATH not registered:** `cli_present:true` 이면서 `cli_on_path:false` 또는 `cli_state:on_disk_not_on_path` 면 미설치가 아니에요. 알려진 설치 경로(`cli_resolved_path`)로 CLI 를 확인한 상태예요. 진단 카드에는 "설치는 됐는데 PATH 에 아직 없어요"를 표시하고, 다음 문구는 `PATH 고쳐줘`만 제안해요. doctor 는 직접 고치지 않고 sibling `repair` 스킬이 동의 후 `repair-path --json` 를 실행해요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — single CLI-missing pick → `나중에`, multi-failure pick → `later` (subprocess 에서 자동 fix 안 해요, 진단만 보여줘요).
 

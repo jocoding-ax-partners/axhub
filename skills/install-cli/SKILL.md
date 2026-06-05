@@ -20,7 +20,7 @@ model: sonnet
 
 # Install CLI (ax-hub-cli auto-installer)
 
-axhub CLI 가 설치되지 않았을 때 공식 installer (`cli.axhub.ai`) 로 자동 설치해요. Homebrew/Scoop 등 패키지 매니저 채널은 사용하지 않아요 — 공식 installer 단일 채널이에요 (패키지 매니저 채널은 갱신이 늦어 구버전 client_id 로 로그인 실패 위험). 설치 후 `axhub --version` 으로 검증하고 다음 단계 (`로그인해줘`) 로 안내해요.
+axhub CLI 가 설치되지 않았을 때 공식 installer (`cli.axhub.ai`) 로 자동 설치해요. Homebrew/Scoop 등 패키지 매니저 채널은 사용하지 않아요 — 공식 installer 단일 채널이에요 (패키지 매니저 채널은 갱신이 늦어 구버전 client_id 로 로그인 실패 위험). 설치 후 helper preflight 의 `cli_resolved_path` 와 `cli_state:on_disk_not_on_path` 까지 확인하고 다음 단계 (`로그인해줘` 또는 `PATH 고쳐줘`) 로 안내해요.
 
 ## Claude Desktop natural-language path
 
@@ -133,10 +133,18 @@ To install ax-hub-cli on the user's host:
 5. **Post-install verify.**
 
    ```bash
-   axhub --version
+   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+   "$HELPER" preflight --json
    ```
 
-   exit 0 + version semver 출력이면 성공. exit 0 인데 version 비어있거나 "command not found" 면 PATH 등록 누락 — 사용자에게 새 터미널 열거나 shell rc 재로드 안내.
+   `cli_present:true` + `in_range:true` 면 설치 성공이에요. `cli_on_path:false` 또는 `cli_state:on_disk_not_on_path` 면 설치는 됐지만 PATH 등록이 아직 안 된 상태예요. 이때 `cli_resolved_path` 의 parent 경로를 확인해서 `PATH 고쳐줘`라고 안내해요. raw `axhub --version` 만으로 실패 처리하지 않아요.
+
+   helper preflight 자체가 실패할 때만 fallback 으로 known path 를 직접 확인해요:
+
+   ```bash
+   "${HOME}/.axhub/bin/axhub" --version 2>/dev/null || axhub --version
+   ```
 
 6. **Render success card (해요체).**
 
@@ -144,9 +152,19 @@ To install ax-hub-cli on the user's host:
    axhub CLI 설치 완료:
      ✓ 채널: <selected channel>
      ✓ 버전: <CLI_VERSION>
-     ✓ 경로: <which axhub 또는 Get-Command axhub>
+     ✓ 경로: <cli_resolved_path 또는 which axhub/Get-Command axhub>
 
    다음 단계: '로그인해줘' 라고 말씀해주세요.
+   ```
+
+   설치는 됐지만 PATH 밖이면:
+
+   ```
+   axhub CLI 설치 완료:
+     ✓ 버전: <CLI_VERSION>
+     ⚠ PATH: 설치는 됐는데 새 터미널 PATH 에 아직 없어요.
+
+   다음 단계: 'PATH 고쳐줘' 라고 말씀해주세요.
    ```
 
    설치 실패 (post-install verify fail) 시:

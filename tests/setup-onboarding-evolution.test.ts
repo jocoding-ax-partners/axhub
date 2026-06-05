@@ -124,6 +124,8 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
     expect(content).toContain('MIN_AXHUB_CLI_VERSION="0.17.3"');
     expect(content).toContain("axhub update check --json");
     expect(content).toContain("cli_too_old");
+    expect(content).toContain("cli_on_path");
+    expect(content).toContain("on_disk_not_on_path");
     expect(content).toContain("has_update");
     expect(content).toContain("git --version");
     expect(content).toContain("node --version");
@@ -149,6 +151,7 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
       "START",
       "DETECT_ALL(read-only)",
       "cli_missing",
+      "cli_path_missing",
       "cli_old",
       "auth_missing",
       "git_missing",
@@ -173,24 +176,25 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
     const transitions = parseTransitions(content);
     const rows = parseGapTable(content);
 
-    expect(transitions).toHaveLength(13);
-    expect(rows).toHaveLength(12);
+    expect(transitions).toHaveLength(14);
+    expect(rows).toHaveLength(13);
 
     const scenarios = [
       { id: "S1", gaps: ["cli_missing"], handler: "install-cli", owner: "install-cli", ready: "READY_WITH_USER_ACTION", detect: "axhub --version" },
-      { id: "S2", gaps: ["cli_old"], handler: "update", owner: "update", ready: "VIBE_READY", detect: "cli_too_old=true" },
-      { id: "S3", gaps: ["auth_missing"], handler: "auth", owner: "auth", ready: "READY_WITH_USER_ACTION", detect: "auth_ok=false" },
-      { id: "S4", gaps: ["git_missing"], handler: "install_git", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "git --version" },
-      { id: "S5", gaps: ["node_missing"], handler: "install_node", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "node --version" },
-      { id: "S6", gaps: ["node_mismatch"], handler: "fix_node", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "NODE_REQUIRED" },
-      { id: "S7", gaps: ["github_app_missing"], handler: "install_url", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "install_url" },
-      { id: "S8", gaps: ["no_manifest_empty"], handler: "init", owner: "init", ready: "VIBE_READY", detect: "manifest 없음 + 빈 dir" },
-      { id: "S9", gaps: ["existing_repo_gap"], handler: "github", owner: "github", ready: "READY_WITH_USER_ACTION", detect: ".git" },
-      { id: "S10", gaps: ["deps_missing"], handler: "install_deps", owner: "onboarding", ready: "VIBE_READY", detect: "node_modules" },
-      { id: "S11", gaps: ["deps_missing"], handler: "install_deps", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "--ignore-scripts" },
-      { id: "S12", gaps: ["cli_old"], handler: "update", owner: "update", ready: "SAFE_STOP_NONINTERACTIVE", detect: "CLAUDE_NON_INTERACTIVE" },
-      { id: "S13", gaps: ["doctor_gap"], handler: "doctor", owner: "doctor", ready: "READY_WITH_USER_ACTION", detect: "PATH reload" },
-      { id: "S14", gaps: ["doctor_gap"], handler: "doctor", owner: "doctor", ready: "READY_WITH_USER_ACTION", detect: "doctor 핵심 체크 fail" },
+      { id: "S2", gaps: ["cli_path_missing"], handler: "repair", owner: "repair", ready: "READY_WITH_USER_ACTION", detect: "on_disk_not_on_path" },
+      { id: "S3", gaps: ["cli_old"], handler: "update", owner: "update", ready: "VIBE_READY", detect: "cli_too_old=true" },
+      { id: "S4", gaps: ["auth_missing"], handler: "auth", owner: "auth", ready: "READY_WITH_USER_ACTION", detect: "auth_ok=false" },
+      { id: "S5", gaps: ["git_missing"], handler: "install_git", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "git --version" },
+      { id: "S6", gaps: ["node_missing"], handler: "install_node", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "node --version" },
+      { id: "S7", gaps: ["node_mismatch"], handler: "fix_node", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "NODE_REQUIRED" },
+      { id: "S8", gaps: ["github_app_missing"], handler: "install_url", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "install_url" },
+      { id: "S9", gaps: ["no_manifest_empty"], handler: "init", owner: "init", ready: "VIBE_READY", detect: "manifest 없음 + 빈 dir" },
+      { id: "S10", gaps: ["existing_repo_gap"], handler: "github", owner: "github", ready: "READY_WITH_USER_ACTION", detect: ".git" },
+      { id: "S11", gaps: ["deps_missing"], handler: "install_deps", owner: "onboarding", ready: "VIBE_READY", detect: "node_modules" },
+      { id: "S12", gaps: ["deps_missing"], handler: "install_deps", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "--ignore-scripts" },
+      { id: "S13", gaps: ["cli_old"], handler: "update", owner: "update", ready: "SAFE_STOP_NONINTERACTIVE", detect: "CLAUDE_NON_INTERACTIVE" },
+      { id: "S14", gaps: ["doctor_gap"], handler: "doctor", owner: "doctor", ready: "READY_WITH_USER_ACTION", detect: "PATH reload" },
+      { id: "S15", gaps: ["doctor_gap"], handler: "doctor", owner: "doctor", ready: "READY_WITH_USER_ACTION", detect: "doctor 핵심 체크 fail" },
     ] as const;
 
     for (const scenario of scenarios) {

@@ -32,6 +32,12 @@
       "logs 페이지",
       "metrics 봐"
     ],
+    "skills/repair/SKILL.md": [
+      "PATH 고쳐줘",
+      "PATH 수리",
+      "PATH 등록",
+      "axhub PATH 고쳐"
+    ],
     "skills/apps/SKILL.md": [
       "내 앱",
       "내 앱 보여줘",
@@ -1112,5 +1118,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-06-05T14:53:17.568Z"
+  "generated_at": "2026-06-05T17:24:08.561Z"
 }

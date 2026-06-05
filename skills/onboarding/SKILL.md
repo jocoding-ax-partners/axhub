@@ -170,8 +170,9 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    ```text
    START
      ↓
-   DETECT_ALL(read-only)
+  DETECT_ALL(read-only)
      ├─ cli_missing         → Skill("axhub:install-cli") → DETECT_ALL
+     ├─ cli_path_missing    → Skill("axhub:repair") → DETECT_ALL
      ├─ cli_old             → update(consent+cosign) → DETECT_ALL
      ├─ auth_missing        → Skill("axhub:auth") → DETECT_ALL
      ├─ git_missing         → install_git(consent) → DETECT_ALL
@@ -191,6 +192,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    | gap id | 감지 조건 | 처리 owner | 완료 확인 |
    |--------|-----------|------------|-----------|
    | `cli_missing` | `axhub --version` 실패 | `install-cli` | `axhub --version` 성공 |
+   | `cli_path_missing` | preflight `cli_present=true`, `cli_on_path=false`, `cli_state=on_disk_not_on_path` | `repair` | repair-path 적용 후 새 터미널 또는 resolved path 로 재확인 |
    | `cli_old` | `MIN_AXHUB_CLI_VERSION=0.17.3` 미만, preflight `cli_too_old=true`, 또는 `axhub update check --json` 의 `has_update=true` | `update` | cosign apply 후 version 재확인 |
    | `auth_missing` | preflight `auth_ok=false` | `auth` | device approval/token import 후 preflight green |
    | `git_missing` | `git --version` 실패 | onboarding | 설치 후 `git --version` 성공 |

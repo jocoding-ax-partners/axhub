@@ -45,7 +45,7 @@ use serde_json::{json, Map, Value};
 mod cli;
 
 pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
-pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-mint-app-lifecycle --action suspend|resume|fork --app <app> [--slug <slug> --subdomain <subdomain> --tenant <tenant> --name <name> --template <template> --repo-public <bool>] [--quiet]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-mint-app-lifecycle --action suspend|resume|fork --app <app> [--slug <slug> --subdomain <subdomain> --tenant <tenant> --name <name> --template <template> --repo-public <bool>] [--quiet]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -1950,6 +1950,14 @@ fn format_preflight_context(preflight: &PreflightRun) -> String {
     } else if !preflight.output.cli_present {
         observed.push("axhub CLI not found on PATH.".to_string());
         "install axhub CLI before axhub commands."
+    } else if !preflight.output.cli_on_path {
+        observed.push(format!(
+            "axhub CLI v{cli_version} found on disk but not on PATH."
+        ));
+        if let Some(path) = preflight.output.cli_resolved_path.as_deref() {
+            observed.push(format!("resolved axhub path: {path}."));
+        }
+        "use the resolved axhub path for this session, or run PATH repair before new shell commands."
     } else {
         observed.push(format!("axhub CLI v{cli_version} healthy."));
         "no action required."
@@ -4062,12 +4070,20 @@ fn cmd_doctor_summary(rest: &[String]) -> anyhow::Result<i32> {
     let cli_version = output.cli_version.as_deref().unwrap_or("버전 확인 필요");
     if output.cli_too_old {
         println!("- CLI: v{cli_version}, 플러그인 기준보다 오래됐어요.");
+        if !output.cli_on_path {
+            println!("- PATH: 설치는 됐는데 PATH에는 아직 없어요.");
+            println!("- 다음: PATH를 고치려면 \"PATH 고쳐줘\"라고 말해 주세요.");
+        }
         println!("- 로그인: CLI 업데이트 뒤 다시 확인하는 편이 안전해요.");
         println!("- 다음: 업데이트하려면 \"axhub 업데이트 확인해줘\"라고 말해 주세요.");
         return Ok(0);
     }
     if output.cli_too_new {
         println!("- CLI: v{cli_version}, 현재 플러그인 검증 범위보다 최신이에요.");
+        if !output.cli_on_path {
+            println!("- PATH: 설치는 됐는데 PATH에는 아직 없어요.");
+            println!("- 다음: PATH를 고치려면 \"PATH 고쳐줘\"라고 말해 주세요.");
+        }
         println!("- 로그인: 플러그인 업데이트 뒤 다시 확인하는 편이 안전해요.");
         println!(
             "- 다음: 플러그인을 최신으로 보려면 \"axhub 플러그인 업데이트해줘\"라고 말해 주세요."
@@ -4075,7 +4091,11 @@ fn cmd_doctor_summary(rest: &[String]) -> anyhow::Result<i32> {
         return Ok(0);
     }
 
-    if output.in_range {
+    if output.in_range && !output.cli_on_path {
+        println!("- CLI: v{cli_version}, 설치는 됐는데 PATH에는 아직 없어요.");
+        println!("- 확인: 알려진 설치 경로에서 CLI를 찾았어요.");
+        println!("- 다음: PATH를 고치려면 \"PATH 고쳐줘\"라고 말해 주세요.");
+    } else if output.in_range {
         println!("- CLI: v{cli_version}, 플러그인과 호환돼요.");
     } else {
         println!("- CLI: v{cli_version}, 호환 범위를 다시 확인해야 해요.");
@@ -4971,6 +4991,8 @@ fn write_cooldown_now() -> std::io::Result<()> {
 }
 
 pub(crate) fn cmd_doctor(json_mode: bool, no_cooldown: bool) -> anyhow::Result<i32> {
+    let preflight = run_preflight();
+    let output = &preflight.output;
     let (size_bytes, count) = measure_deploy_events_size();
     let last_warned = read_cooldown_last_warned();
     let cooldown_open = match last_warned {
@@ -4986,6 +5008,14 @@ pub(crate) fn cmd_doctor(json_mode: bool, no_cooldown: bool) -> anyhow::Result<i
 
     let report = serde_json::json!({
         "axhub_helpers_version": env!("CARGO_PKG_VERSION"),
+        "helper_version_expected": output.helper_version_expected.clone(),
+        "helper_version_ok": output.helper_version_ok,
+        "cli_present": output.cli_present,
+        "cli_on_path": output.cli_on_path,
+        "cli_state": output.cli_state.clone(),
+        "cli_resolved_path": output.cli_resolved_path.clone(),
+        "cli_version": output.cli_version.clone(),
+        "preflight_exit_code": preflight.exit_code,
         "deploy_events_dir": axhub_helpers::runtime_paths::deploy_events_dir()
             .as_ref()
             .map(|p| p.display().to_string()),
@@ -5001,6 +5031,35 @@ pub(crate) fn cmd_doctor(json_mode: bool, no_cooldown: bool) -> anyhow::Result<i
         out_json(report);
     } else {
         println!("axhub-helpers v{}", env!("CARGO_PKG_VERSION"));
+        if output.helper_version_ok {
+            println!(
+                "helper version: OK (expected {})",
+                output
+                    .helper_version_expected
+                    .as_deref()
+                    .unwrap_or(env!("CARGO_PKG_VERSION"))
+            );
+        } else {
+            println!(
+                "helper version: mismatch (expected {}, actual {})",
+                output
+                    .helper_version_expected
+                    .as_deref()
+                    .unwrap_or("unknown"),
+                env!("CARGO_PKG_VERSION")
+            );
+        }
+        if output.cli_present {
+            let cli_version = output.cli_version.as_deref().unwrap_or("unknown");
+            if output.cli_on_path {
+                println!("axhub CLI: v{cli_version} on PATH");
+            } else {
+                println!("axhub CLI: v{cli_version} installed, but not on PATH");
+                println!("next: PATH 고쳐줘");
+            }
+        } else {
+            println!("axhub CLI: missing");
+        }
         println!("deploy-events: {count} files, {size_bytes} bytes");
         if over_threshold {
             if should_warn {
@@ -5014,6 +5073,31 @@ pub(crate) fn cmd_doctor(json_mode: bool, no_cooldown: bool) -> anyhow::Result<i
                     DEPLOY_EVENTS_WARN_THRESHOLD_BYTES / (1024 * 1024)
                 );
             }
+        }
+    }
+    Ok(0)
+}
+
+pub(crate) fn cmd_repair_path(json_mode: bool, dir: Option<String>) -> anyhow::Result<i32> {
+    let report = axhub_helpers::repair_path::repair_path(dir.map(PathBuf::from));
+    if json_mode {
+        out_json(serde_json::to_value(&report)?);
+    } else if report.disabled {
+        println!("PATH 자동 수리는 꺼져 있어요.");
+        println!("다시 켜려면 AXHUB_DISABLE_PATH_REPAIR 값을 비워 주세요.");
+    } else if report.already_present {
+        println!("PATH는 이미 axhub 설치 경로를 포함해요.");
+    } else if report.repaired {
+        println!("PATH 수리를 적용했어요.");
+        if let Some(rc) = report.shell_rc.as_ref() {
+            println!("- 설정 파일: {}", rc.display());
+        }
+        println!("- 다음: 새 터미널을 열거나 shell 설정을 다시 불러와 주세요.");
+    } else {
+        println!("PATH 수리를 완료하지 못했어요.");
+        println!("- 이유: {}", report.message);
+        if let Some(error) = report.error.as_deref() {
+            println!("- 상세: {error}");
         }
     }
     Ok(0)

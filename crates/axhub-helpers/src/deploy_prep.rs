@@ -329,6 +329,8 @@ mod tests {
                 cli_too_new: false,
                 cli_present: true,
                 cli_state: "ok".into(),
+                cli_on_path: true,
+                cli_resolved_path: None,
                 auth_ok: true,
                 auth_error_code: None,
                 scopes: vec![],
@@ -342,6 +344,8 @@ mod tests {
                 current_env: None,
                 last_deploy_id: None,
                 last_deploy_status: None,
+                helper_version_expected: Some("0.0.0".into()),
+                helper_version_ok: true,
                 plugin_version: "0.0.0".into(),
             },
             resolve: crate::resolve::ResolveOutput {

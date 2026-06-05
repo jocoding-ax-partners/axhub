@@ -183,6 +183,8 @@ mod tests {
             cli_too_new: false,
             cli_present: true,
             cli_state: "ok".to_string(),
+            cli_on_path: true,
+            cli_resolved_path: None,
             auth_ok: true,
             auth_error_code: None,
             scopes: vec!["deploy".to_string()],
@@ -196,6 +198,8 @@ mod tests {
             current_env: Some("prod".to_string()),
             last_deploy_id: None,
             last_deploy_status: None,
+            helper_version_expected: Some("0.5.6".to_string()),
+            helper_version_ok: true,
             plugin_version: "0.5.6".to_string(),
         }
     }
