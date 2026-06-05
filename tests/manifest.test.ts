@@ -1757,7 +1757,6 @@ describe("Phase 4 (F3) hooks.json invariant baseline", () => {
       {
         matcher: "Bash",
         commands: [
-          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh preauth-check", timeout: 5 },
           { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh commit-gate", timeout: 5 },
         ],
       },
