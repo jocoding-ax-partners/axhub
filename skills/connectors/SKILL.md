@@ -1,7 +1,9 @@
 ---
 name: connectors
-description: '이 스킬은 사용자가 axhub 외부 데이터베이스 커넥터를 등록·수정·삭제하거나 자격증명을 갱신하고 싶어할 때 사용해요. 다음 표현에서 활성화: "DB 연결", "데이터베이스 연결", "커넥터 추가", "커넥터 만들", "postgres 연결", "mysql 연결", "외부 DB 붙여", "DB 자격증명", "커넥터 삭제", "connector", "connect database", "add connector", "db credentials", 또는 axhub 데이터 커넥터 관리 의도.'
+description: '이 스킬은 사용자가 axhub 외부 데이터베이스 커넥터를 등록·수정·삭제하거나 자격증명을 갱신하고 싶어할 때 사용해요. "Postgres 데이터베이스 연결하고 싶어", "DB 연결", "데이터베이스 연결", "커넥터 추가", "커넥터 만들", "postgres 연결", "mysql 연결", "외부 DB 붙여", "DB 자격증명", "커넥터 삭제", "connector", "connect database", "add connector", "db credentials", 또는 axhub 데이터 커넥터 관리 의도에서 활성화해요. 로컬 앱 코드에 pg 패키지를 붙이거나 DATABASE_URL 코드를 수정하는 흐름이 아니라 AXHub 외부 데이터 커넥터 관리 흐름이에요.'
 examples:
+  - utterance: "Postgres 데이터베이스 연결하고 싶어"
+    intent: "manage database connector"
   - utterance: "DB 연결해"
     intent: "manage database connector"
   - utterance: "커넥터 추가"
@@ -22,22 +24,28 @@ model: sonnet
 
 외부 DB 커넥터를 등록·수정·삭제하고 자격증명을 갱신해요. credentials 는 로컬 파일 digest 로 고정하고, mutation 은 consent 뒤에만 `--execute` 해요.
 
-## Workflow
+## Steps
 
-**Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
+
+**Claude Desktop natural-language contract.** 일반 사용자가 `Postgres 데이터베이스 연결하고 싶어`처럼 말하면 로컬 앱 코드 수정으로 우회하지 않고 AXHub 외부 데이터베이스 연결 설정으로 시작해요. 첫 visible chat 문장은 정확히 `데이터베이스 연결을 준비할게요.` 로 시작해요. 그 뒤에도 `workflow`, `워크플로`, skill 이름, slash command, route label 을 말하지 않아요. `List dir`, `server.js`, `package.json`, `pg 설치`, `DATABASE_URL env var 로 연결`, `catalog`, `A/B`, `connector 조회` 같은 구현 분기나 로컬 파일 탐색을 사용자에게 보이지 않아요. 부족한 정보는 사람 말투로 짧게 물어요: 커넥터 이름, workspace, 엔진, host, port, database, username, SSL 모드, credentials 파일/안전한 입력 방식. 비밀값은 채팅 평문으로 받지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id 를 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요. Bash title 은 `커넥터 상태 확인`, `커넥터 목록 확인`, `커넥터 변경 준비`, `커넥터 변경 실행` 같은 한국어만 써요. 생성·수정·삭제는 preview 와 명시적 승인 전에는 실행하지 않아요.
+
+**인증/컨텍스트 확인.** 작업을 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
 
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s
 ' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d	%s
 ",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 [ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
-echo "$PREFLIGHT_JSON"
+SAFE_PREFLIGHT_JSON=$(printf '%s' "$PREFLIGHT_JSON" | jq 'del(.user_email, .user_id, .email, .account_email)' 2>/dev/null)
+[ -n "$SAFE_PREFLIGHT_JSON" ] || SAFE_PREFLIGHT_JSON='{"auth_ok":false,"auth_error_code":"preflight_summary_unavailable"}'
+echo "$SAFE_PREFLIGHT_JSON"
 ```
 
-`auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
+`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 계정 이메일이나 raw user id 는 사용자에게 쓰지 않아요. 치명적이지 않으면 계속 진행해요.
 
 **Tenant grounding.** 커넥터는 tenant-scoped 예요. 사용자가 tenant 를 명시하지 않았으면 preflight 의 active team 만 사용하고, active team 이 없으면 실행을 멈춰요. `tenants[]` 첫 항목을 추측해서 쓰지 않아요.
 
@@ -45,12 +53,14 @@ echo "$PREFLIGHT_JSON"
 TENANT="${AXHUB_TENANT:-$(printf '%s
 ' "$PREFLIGHT_JSON" | jq -r '.current_team_id // empty')}"
 if [ -z "$TENANT" ]; then
-  echo "현재 workspace 를 특정할 수 없어요. workspace skill 로 tenant 를 확인하거나 AXHUB_TENANT 를 명시해요." >&2
+  echo "현재 workspace 를 특정할 수 없어요. 먼저 workspace 목록을 확인하거나 AXHUB_TENANT 를 명시해요." >&2
   exit 64
 fi
 ```
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
+
+   **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue the workflow; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
 
    ```typescript
    TodoWrite({ todos: [
@@ -65,7 +75,7 @@ fi
 
    **TodoWrite status sync:** after every workflow step and after every AskUserQuestion answer, call TodoWrite again with the full current todos array. Mark finished items as `"completed"`, the active item as `"in_progress"`, and untouched items as `"pending"`. Do not leave the initial Step 0 list stale after commands, user answers, or final result.
 
-   **워크플로를 마치면 마지막 결과 출력 직후 TodoWrite 를 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.**
+   작업을 마치면 마지막 결과 출력 직후 TodoWrite 를 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.
 
 1. **엔진과 현재 커넥터를 확인해요.**
 

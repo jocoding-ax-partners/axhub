@@ -1,6 +1,6 @@
 ---
 name: clarify
-description: '이 스킬은 deploy / status / logs / apps / auth / update / doctor / recover / upgrade 어느 것도 매칭되지 않은 모호한 axhub 관련 발화의 fallback 입니다. 대상이 없는 bare 동사, 의도 혼합, 모순된 deixis, 또는 다음과 같은 불확실 컨텍스트에서 활성화: "도와줘 axhub", "뭔가 잘못된 것 같아", "환경", "axhub 관련", "axhub 관련해서", "axhub 도와줘", "axhub 뭐", "axhub 어떻게", "axhub 어떻게 써", "axhub 좀", "axhub로 뭐 해야 해", "axhub", "axhub thing", "do something with axhub", "help me with axhub", 또는 명확한 목적지가 없는 axhub 관련 발화. 번호가 매겨진 한국어 옵션을 제시한 후 Skill 도구로 선택된 sibling 스킬로 라우팅합니다.'
+description: '이 스킬은 사용자가 axhub에 대해 막연히 도와달라고 하거나 목적지를 정하지 않은 질문을 할 때 사용하는 자연어 질문 카드입니다. 대상이 없는 말, 의도 혼합, 모순된 지시어, 또는 다음과 같은 불확실 컨텍스트에서 활성화: "도와줘 axhub", "뭔가 잘못된 것 같아", "axhub 관련", "axhub 관련해서", "axhub 도와줘", "axhub 좀 도와줘", "axhub 좀", "axhub로 뭐 해야 해", "axhub", "axhub thing", "do something with axhub", "help me with axhub". 화면에는 내부 라우팅 이름을 보이지 말고 사람이 고르기 쉬운 한국어 선택지만 보여줍니다.'
 examples:
   - utterance: "도와줘 axhub"
     intent: "disambiguate axhub intent"
@@ -18,11 +18,23 @@ allows-dependency-execution: false
 model: haiku
 ---
 
-# Clarify (fallback router)
+# Clarify (intent chooser)
 
-When an axhub utterance is ambiguous or no specific sibling skill matched, surface a numbered Korean menu and route to the chosen skill. Never guess silently.
+When an axhub utterance is ambiguous or no specific sibling skill matched, surface a numbered Korean menu and continue from the chosen user-facing intent. Never guess silently.
+
+## Claude Desktop Natural-Language Path
+
+When the user says something broad like `axhub 좀 도와줘`, this is a UX surface, not a route-debug surface.
+
+- First visible chat sentence must be exactly `어떤 걸 도와드릴까요?`
+- Use one question card with natural Korean labels and descriptions.
+- Do not say the user was "too vague" or "too broad".
+- Do not show slash commands, skill names, routing labels, command mappings, or parenthesized internal names in the chat or question-card text.
+- Do not include option text like `(doctor)`, `(deploy)`, `(status)`, `(logs)`, `(apps)`, `(help)`, or `axhub:*`.
 
 ## Workflow
+
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
 To clarify:
 
@@ -34,18 +46,18 @@ To clarify:
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — clarify menu → `abort` (모호한 의도라 subprocess 에서는 추측 안 해요).
 
-2. **Render numbered Korean menu.** Use AskUserQuestion with the most relevant 4–5 options based on detected class. Default menu:
+2. **Render numbered Korean menu.** Use AskUserQuestion with the most relevant 4–5 options based on detected class. Labels and descriptions are user-facing. If the AskUserQuestion schema requires `value`, set each `value` to exactly the same Korean text as its visible `label`; never use skill names or command names as values. Claude Desktop can surface option values when it explains a selection. Default menu:
 
    ```json
    {
-     "question": "어떤 작업 원해요?",
+     "question": "어떤 걸 도와드릴까요?",
      "header": "작업 선택",
      "options": [
-       {"label": "1. 배포 (앱 올리기)", "value": "deploy", "description": "현재 코드를 axhub에 배포"},
-       {"label": "2. 상태 확인 (배포 어디까지?)", "value": "status", "description": "진행 중인 배포 추적"},
-       {"label": "3. 로그 보기 (왜 실패?)", "value": "logs", "description": "빌드/런타임 로그 확인"},
-       {"label": "4. 앱 목록", "value": "apps", "description": "등록된 앱 보기"},
-       {"label": "5. 모르겠어요 / 뭐 가능한지 보여줘", "value": "help", "description": "전체 명령 안내"}
+       {"label": "환경 점검", "value": "환경 점검", "description": "설치, 로그인, 버전 상태를 확인해요"},
+       {"label": "앱 배포", "value": "앱 배포", "description": "현재 프로젝트를 올릴 준비를 해요"},
+       {"label": "앱과 리소스 조회", "value": "앱과 리소스 조회", "description": "내 앱, 리소스, 테이블을 확인해요"},
+       {"label": "문제 원인 보기", "value": "문제 원인 보기", "description": "상태, 로그, 실패 원인을 확인해요"},
+       {"label": "처음부터 안내", "value": "처음부터 안내", "description": "가능한 작업을 한눈에 보여줘요"}
      ]
    }
    ```
@@ -55,24 +67,39 @@ To clarify:
    ```json
    {
      "options": [
-       {"label": "방금 배포 상태", "value": "status", "description": "dep_<RECENT_ID> 추적"},
-       {"label": "방금 배포 로그", "value": "logs", "description": "dep_<RECENT_ID> 로그"},
-       {"label": "다른 작업", "value": "other", "description": "메뉴 다시 보기"}
+       {"label": "방금 배포 상태", "value": "방금 배포 상태", "description": "최근 배포 진행 상황을 확인해요"},
+       {"label": "방금 배포 로그", "value": "방금 배포 로그", "description": "최근 배포 로그를 확인해요"},
+       {"label": "다른 작업", "value": "다른 작업", "description": "작업 선택지를 다시 보여줘요"}
      ]
    }
    ```
 
-4. **Route to chosen skill.** Use the Skill tool to invoke the sibling skill. Pass the original user utterance forward so the sibling can re-resolve context:
+4. **Continue from the selected user-facing intent.** Do not call the Claude Skill tool, do not invoke `/axhub:*`, and do not narrate a route transition. Match by the selected label text and run the narrow helper or natural follow-up below. Pass the original user utterance to helpers only as an argument, never as visible route text.
 
-   - `deploy` → invoke skill `axhub:deploy`
-   - `status` → invoke skill `axhub:status`
-   - `logs` → invoke skill `axhub:logs`
-   - `apps` → invoke skill `axhub:apps`
-   - `auth` → invoke skill `axhub:auth`
-   - `update` → invoke skill `axhub:update`
-   - `doctor` → invoke skill `axhub:doctor`
-   - `recover` → invoke skill `axhub:recover`
-   - `upgrade` → invoke skill `axhub:upgrade`
+### Selected Option Handoff
+
+After the user chooses an option, never narrate the route transition. The next visible sentence must be the destination flow's natural first sentence, not a meta sentence. Do not call another skill from this skill.
+
+Do not write phrases like "진행", "스킬 실행", "skill 실행", "skill 호출", "SKILL.md", "읽는 중", "route", "라우팅", "handoff", or an internal command name in visible chat.
+
+For the default menu options:
+
+- If the user chooses "환경 점검":
+  - First visible sentence, exactly: `설치 상태를 확인할게요.`
+  - Use one Bash tool call. Bash description/title, exactly: `설치 상태 확인`
+  - Bash command: `axhub-helpers doctor-summary --user-utterance "<original broad user sentence>"`
+  - Copy the Korean stdout as the answer.
+- If the user chooses "앱 배포":
+  - First visible sentence, exactly: `배포 준비를 확인할게요.`
+  - Use one Bash tool call. Bash description/title, exactly: `배포 준비 확인`
+  - Bash command: `axhub-helpers deploy-preview-summary --user-utterance "<original broad user sentence>"`
+  - Show the Korean preview and ask for explicit approval before any deploy execution.
+- If the user chooses "앱과 리소스 조회":
+  - First visible sentence, exactly: `앱과 리소스를 확인할게요.`
+  - Continue with the app/resource inventory flow without route narration.
+- If the user chooses "문제 원인 보기":
+  - First visible sentence, exactly: `문제 원인을 확인할게요.`
+  - If a recent failed deployment is available, use the failure-cause flow; otherwise ask whether they want status, logs, or configuration.
 
 5. **On `help`.** Render the full axhub command matrix from PLAN §3.1 in plain Korean:
 
@@ -104,7 +131,7 @@ To clarify:
      HELPER_BIN="${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers"
    fi
    [ -n "$HELPER_BIN" ] && [ -x "$HELPER_BIN" ] || HELPER_BIN="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER_BIN" ] && [ -x "$HELPER_BIN" ] || HELPER_BIN="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER_BIN" ] && [ -x "$HELPER_BIN" ] || HELPER_BIN="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    if [ -z "$HELPER_BIN" ]; then
      HELPER_BIN="axhub-helpers"
    fi
@@ -119,9 +146,12 @@ To clarify:
 
 - NEVER silently guess intent — always surface AskUserQuestion when ambiguity is detected.
 - NEVER auto-route without user confirmation (the destructive ops have their own consent gates, but read-only ops still benefit from intent confirmation).
+- NEVER call the Claude Skill tool after the user chooses a menu option; continue inline with the natural first sentence and helper command.
 - NEVER suggest more than 5 options at once (vibe coders can't compare beyond 5).
 - NEVER include cross-platform deploy targets (vercel/heroku/...) in the menu.
 - NEVER skip the help option ("모르겠어요" must always be selectable).
+- NEVER include parenthesized internal labels in choices or descriptions.
+- NEVER write dismissive "too broad/vague" wording, route names, slash commands, skill names, command names, or implementation values into the visible answer.
 
 ## Additional Resources
 

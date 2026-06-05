@@ -1,6 +1,6 @@
 ---
 name: tables
-description: '이 스킬은 사용자가 axhub 앱의 동적 테이블을 만들거나 지우거나, 컬럼·권한·행 데이터를 관리하고 싶어할 때 사용해요. 다음 표현에서 활성화: "테이블 만들", "테이블 생성", "동적 테이블", "컬럼 추가", "컬럼 삭제", "행 추가", "행 넣어", "레코드 삽입", "데이터 넣어", "행 삭제", "테이블 권한", "create table", "add column", "insert row", "delete row", 또는 axhub 동적 테이블 스키마·행 관리 의도. 외부 커넥터 SQL 조회·인사이트는 data 스킬이 담당해요.'
+description: '이 스킬은 사용자가 axhub 앱의 동적 테이블을 만들거나 지우거나, 컬럼·권한·행 데이터를 관리하고 싶어할 때 사용해요. 다음 표현에서 활성화: "테이블 만들", "테이블 생성", "동적 테이블", "컬럼 추가", "컬럼 삭제", "행 추가", "행 넣어", "레코드 삽입", "데이터 넣어", "행 삭제", "테이블 권한", "create table", "add column", "insert row", "delete row", 또는 axhub 동적 테이블 스키마·행 관리 의도. 외부 커넥터 SQL 조회·인사이트는 data 절차가 담당해요.'
 examples:
   - utterance: "테이블 만들어"
     intent: "manage dynamic tables"
@@ -26,32 +26,52 @@ model: sonnet
 
 앱 동적 테이블의 schema, grants, row 데이터를 관리해요. destructive DDL/DML 은 dry-run preview 와 consent 뒤에만 `--execute` 해요.
 
+## Desktop natural-language contract
+
+Claude Desktop 에서 자연어 요청으로 활성화되면 사용자에게는 사람 말처럼 보여야 해요.
+
+- 첫 visible chat 문장은 정확히 `테이블 변경 내용을 확인할게요.` 로만 말해요.
+- `orders 테이블 만들고 title 컬럼도 넣어줘` 같은 요청은 로컬 앱 코드, local database, SQL migration, ORM, `.env`, QA 결과 파일이 아니라 AXHub hosted app 의 테이블 변경으로 처리해요.
+- Bash title 은 `로그인 상태 확인`, `테이블 상태 확인`, `테이블 변경 준비`, `테이블 변경 실행` 같은 한국어만 써요.
+- visible preview 에는 앱, 테이블, 작업, 컬럼/행 요약만 보여줘요. raw CLI command line 은 사용자 답변에 쓰지 말고, 실제 명령은 승인 뒤 Bash tool call 안에서만 실행해요.
+- Claude Desktop 에서는 AskUserQuestion, Question, 질문 카드 도구를 쓰지 않아요. raw question JSON 이 사용자 화면에 보일 수 있으니, 일반 채팅으로 `이대로 만들까요? 진행 또는 취소라고 답해 주세요.` 라고 묻고 멈춰요.
+- 다음 사용자 답변이 `진행`이면 승인된 것으로 보고 `테이블 변경 준비`, `테이블 변경 실행` 순서로 이어가요. `취소`면 아무것도 바꾸지 않고 끝내요.
+- 사용자가 명시적으로 승인하기 전에는 create/drop/column/row/grant 변경을 실행하지 않아요.
+- 사용자에게 route label, slash command, `workflow`, `워크플로`, skill 이름, `preflight`, `consent-mint`, consent 내부값, command name, raw command line, raw question JSON, raw JSON, raw email, raw id, raw app slug, local file contents, repo inspection, 영어 tool title fragment, A/B 구현 라벨을 쓰지 않아요.
+- 로그인 확인 결과에는 계정 이메일, raw user id, scope 를 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.
+
 ## Routing guard
 
 - 앱의 동적 테이블 create/drop, 컬럼 add/remove, grant, row insert/update/delete 의도는 이전 턴이 `help`/`data` 였어도 이 skill 에서 처리해요.
-- catalog connector 조회·SQL insight 는 `data` skill 로 넘기고, 앱 동적 테이블 스키마·행 작업은 `data` skill 로 우회하지 않아요.
+- catalog connector 조회·SQL insight 는 `data` 절차로 넘기고, 앱 동적 테이블 스키마·행 작업은 `data` 절차로 처리하지 않아요.
 - CLI shortcut 을 만들지 않아요. 컬럼 추가는 `tables columns add`, 컬럼 삭제는 `tables columns remove` 만 사용해요. `add-column` 같은 alias 를 상상해서 실행하지 않아요.
 - create + column 같은 복합 요청은 먼저 대상 app/table/columns preview 를 보여주고, 동의가 확인된 뒤 `consent-mint` 를 별도 Bash 호출로 끝낸 다음, 다음 Bash 호출에서만 `--execute` 명령을 하나 실행해요.
 - `axhub tables create`, `axhub tables drop`, `axhub tables columns add/remove`, `axhub tables grants issue/revoke`, `axhub data insert/update/delete` 는 `--execute` 가 없어도 hook 이 destructive intent 로 차단할 수 있어요. 승인 전 preview 는 read-only 명령과 화면 설명으로만 만들고, mutation CLI 를 preview 용으로 실행하지 않아요.
 
-## Workflow
+## Steps
 
-**Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
+
+**Login/context check.** 절차를 시작하기 전에 인증 상태와 현재 team/app/env 컨텍스트를 확인해요. 첫 실행이면 Claude Code 가 helper 실행 허용을 물을 수 있어요. 허용되면 다음부터 자동으로 진행돼요.
 
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s
 ' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d	%s
 ",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 [ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
-echo "$PREFLIGHT_JSON"
+SAFE_PREFLIGHT_JSON=$(printf '%s' "$PREFLIGHT_JSON" | jq 'del(.user_email, .user_id, .email, .account_email, .scope, .scopes)' 2>/dev/null)
+[ -n "$SAFE_PREFLIGHT_JSON" ] || SAFE_PREFLIGHT_JSON='{"auth_ok":false,"auth_error_code":"preflight_summary_unavailable"}'
+echo "$SAFE_PREFLIGHT_JSON"
 ```
 
-`auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
+`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 치명적이지 않으면 절차를 계속 진행해요.
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
+
+   **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
 
    ```typescript
    TodoWrite({ todos: [
@@ -64,9 +84,9 @@ echo "$PREFLIGHT_JSON"
    ]})
    ```
 
-   **TodoWrite status sync:** after every workflow step and after every AskUserQuestion answer, call TodoWrite again with the full current todos array. Mark finished items as `"completed"`, the active item as `"in_progress"`, and untouched items as `"pending"`. Do not leave the initial Step 0 list stale after commands, user answers, or final result.
+   **TodoWrite status sync:** after every step and after every AskUserQuestion answer, call TodoWrite again with the full current todos array. Mark finished items as `"completed"`, the active item as `"in_progress"`, and untouched items as `"pending"`. Do not leave the initial Step 0 list stale after commands, user answers, or final result.
 
-   **워크플로를 마치면 마지막 결과 출력 직후 TodoWrite 를 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.**
+   **절차를 마치면 마지막 결과 출력 직후 TodoWrite 를 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.**
 
 1. **작업을 분기해요.** read/schema/row/grant 로 나눠요.
 
@@ -101,7 +121,11 @@ echo "$PREFLIGHT_JSON"
    axhub tables column-types --app "$APP_ID" --json
    ```
 
-   Preview 카드에는 app id, table, action, columns/name/type, row_id 또는 grant target, 실행할 정확한 command line 을 텍스트로 보여줘요. Mutation 질문은 registry 에 있는 문구만 써요:
+   Preview 카드에는 app, table, action, columns/name/type, row_id 또는 grant target 을 한국어로 보여줘요. raw CLI command line 은 사용자 답변에 쓰지 않아요.
+
+   Claude Desktop 에서는 AskUserQuestion, Question, 질문 카드 도구를 호출하지 않아요. 일반 채팅으로 `이대로 만들까요? 진행 또는 취소라고 답해 주세요.` 라고 묻고 멈춰요. 사용자가 다음 턴에 `진행`이라고 답하면 Step 5~6 을 이어가고, `취소`라고 답하면 변경 없이 끝내요.
+
+   Claude Desktop 이 아닌 대화형 호스트에서만 registry 에 있는 질문 문구를 써요:
 
    ```json
    {
@@ -110,7 +134,7 @@ echo "$PREFLIGHT_JSON"
        "header": "테이블",
        "multiSelect": false,
        "options": [
-         {"label": "변경", "value": "change", "description": "표시한 대상과 command 그대로 한 번 실행해요."},
+         {"label": "진행", "value": "change", "description": "표시한 변경만 한 번 실행해요."},
          {"label": "취소", "value": "abort", "description": "아무것도 바꾸지 않아요."}
        ]
      }]
@@ -126,7 +150,7 @@ echo "$PREFLIGHT_JSON"
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 
    CONSENT_BINDING_JSON=$(jq -nc \
      --arg app "$APP_ID" \
@@ -195,6 +219,6 @@ echo "$PREFLIGHT_JSON"
 
 ## NEVER
 
-- NEVER SQL/connector live read 를 이 skill 로 처리하지 않아요. `data` skill 로 넘겨요.
+- NEVER SQL/connector live read 를 이 절차로 처리하지 않아요. `data` 절차로 넘겨요.
 - NEVER drop/remove/delete/revoke 를 비대화형에서 자동 실행하지 않아요.
 - NEVER secret-looking row payload 를 chat/log 에 그대로 보여주지 않아요.

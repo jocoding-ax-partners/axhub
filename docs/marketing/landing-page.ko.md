@@ -110,7 +110,7 @@ Claude Code  ──→  axhub plugin
    Bash tool ────────────────────┘
         │
         ▼
-   ax-hub-cli binary (cosign 서명, v0.15.x surface)
+   ax-hub-cli binary (cosign 서명, v0.17.4 surface)
         │
         ▼
    https://axhub-api.jocodingax.ai

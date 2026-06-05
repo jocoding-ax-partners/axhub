@@ -1,7 +1,9 @@
 ---
 name: doctor
-description: '이 스킬은 사용자가 자신의 axhub 설치 또는 환경을 진단하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "닥터", "설정 봐", "설치 상태", "설치 상태 알려주세요", "셋업 다 됐어", "셋업이 다 끝났나요", "시스템 상태 확인해주세요", "잘 깔렸", "잘 깔렸어", "진단", "진단 부탁드려요", "진단해", "현재 상태 진단", "현재 상태 진단해", "현재 상태 진단해줘", "상태 진단", "상태 진단해", "상태 진단해줘", "헬스 체크", "헬스체크", "헬스체크 해", "환경 변수 확인해주세요", "환경 점검", "환경 점검해", "환경 점검해주세요", "환경점검", "axhub 설치돼 있어", "axhub 점검", "/axhub:doctor", "check", "diagnose", "doctor", "env check", "health check", "sanity check", "setup check", 또는 axhub 진단 요청. CLI 버전, 인증 상태, profile, endpoint, scopes 를 보고하고 실패 항목마다 다음에 할 수 있는 자연어 안내를 제공합니다.'
+description: '이 스킬은 사용자가 자신의 axhub 설치 또는 환경을 진단하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "닥터", "설정 봐", "설치 상태", "설치 상태 알려주세요", "셋업 다 됐어", "셋업이 다 끝났나요", "시스템 상태 확인해주세요", "잘 깔렸", "잘 깔렸어", "진단", "진단 부탁드려요", "진단해", "현재 상태 진단", "현재 상태 진단해", "현재 상태 진단해줘", "상태 진단", "상태 진단해", "상태 진단해줘", "헬스 체크", "헬스체크", "헬스체크 해", "환경 변수 확인해주세요", "환경 점검", "환경 점검해", "환경 점검해주세요", "환경점검", "axhub 설치돼 있어", "axhub 점검", "check", "diagnose", "doctor", "env check", "health check", "sanity check", "setup check", 또는 axhub 진단 요청. CLI 버전, 인증 상태, profile, endpoint, scopes 를 보고하고 실패 항목마다 다음에 할 수 있는 자연어 안내를 제공합니다.'
 examples:
+  - utterance: "axhub CLI 설치 상태 괜찮아?"
+    intent: "diagnose axhub setup"
   - utterance: "axhub 설치돼 있어?"
     intent: "diagnose axhub setup"
   - utterance: "닥터"
@@ -28,11 +30,29 @@ model: haiku
 
 Run a full axhub plugin health check. Report what's working, what's not, and the next natural-language phrase the user can say to fix each gap.
 
+**Execution contract:** This SKILL is the diagnostic execution surface, not a handoff. When triggered by natural language or the diagnostic command surface, execute the workflow commands in the current turn and render the diagnostic card. Never answer that the doctor skill "will run", "has been called", "will show results when complete", or that the user should wait for another process.
+
 ## Workflow
+
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
+
+### Claude Desktop natural-language contract
+
+For ordinary Desktop status questions such as `axhub CLI 설치 상태 괜찮아?`, `axhub 설치돼 있어?`, `잘 깔렸는지 봐줘`, or `셋업 다 됐어?`, use the single safe summary path below instead of the full diagnostic transcript.
+
+First visible sentence, exactly: 설치 상태를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 설치 상태 확인
+Bash command: `axhub-helpers doctor-summary --user-utterance "<latest user sentence>"`
+
+For ordinary Claude Desktop install/setup/status questions, stop after this step. Do not run installers, updates, login, logout, settings writes, raw `preflight`, raw `axhub auth status`, `which axhub`, repo file reads, plugin package reads, git history, `.omc`, `.claude`, or QA-result-file reads unless the user explicitly asks for that deeper action.
+
+After the tool call, copy the Korean stdout as the answer. Do not show slash commands, skill names, internal routing labels, raw command names, raw JSON fields, raw user emails, filesystem paths, preflight narration, or English tool-title fragments.
 
 To run diagnostics:
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).** Call TodoWrite at workflow start:
+
+   **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue the workflow; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
 
    ```typescript
    TodoWrite({ todos: [
@@ -48,7 +68,7 @@ To run diagnostics:
 
    각 step 가 끝날 때마다 해당 todo 의 `status` 를 `"completed"` 로 update 해요.
 
-   **진단을 마치면 (결과 카드 출력 직후) TodoWrite 를 마지막으로 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.** `in_progress` / `pending` 이 하나라도 남으면 다음 SKILL (예: `/axhub:auth`) 이 시작될 때 doctor 의 미완료 todo 가 화면에 그대로 남아 버그처럼 보여요. 진단 종료 시점에 미완료 todo 가 0 개여야 해요.
+   **진단을 마치면 (결과 카드 출력 직후) TodoWrite 를 마지막으로 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.** `in_progress` / `pending` 이 하나라도 남으면 다음 SKILL (예: "다시 로그인해줘") 이 시작될 때 doctor 의 미완료 todo 가 화면에 그대로 남아 버그처럼 보여요. 진단 종료 시점에 미완료 todo 가 0 개여야 해요.
 
 1. **Detect helper binary with OS-aware install-state rows** (Phase 5 US-503 + Windows helper bootstrap hotfix — `CLAUDE_PLUGIN_ROOT` or PATH may differ per shell):
 
@@ -78,7 +98,7 @@ To run diagnostics:
    **CLAUDE_PLUGIN_ROOT empty fallback** — Claude Code 가 env var 를 propagate 안 했거나 PowerShell session 에서 unset 된 경우, 알려진 cache path 패턴으로 scan:
 
    - Windows: `$env:USERPROFILE\.claude\plugins\cache\axhub\axhub\*\bin\axhub-helpers.exe`
-   - Unix: `$HOME/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers`
+   - Unix: `$HOME/.claude/plugins/cache/*/*/bin/axhub-helpers $HOME/.claude/plugins/cache/*/*/*/bin/axhub-helpers`
 
    가장 최신 버전 (semver descending) 의 binary 사용. 발견 시 row 는 ✓ 로 표시하되 본문에 사용한 절대경로 명시.
 
@@ -109,7 +129,7 @@ To run diagnostics:
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    "$HELPER" preflight --json
    ```
 
@@ -118,7 +138,7 @@ To run diagnostics:
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    "$HELPER" preflight --json
    ```
 
@@ -269,7 +289,7 @@ Keep this read-only. If audit export requires extra permission, explain the miss
 
 `should_warn=true` 시 사용자에게 다음 안내해요:
 - "deploy-events 가 100 MB 넘었어요. atomic_jsonl 의 7-day rotation 이 자동 정리하지만, 강제로 비우려면 `axhub-helpers cleanup-audit --all` 또는 디렉토리 수동 삭제."
-- 다음 anchor: "/axhub:doctor 다시" / "지금은 무시"
+- 다음 anchor: "설치 상태 다시 진단해줘" / "지금은 무시"
 
 ## NEVER
 

@@ -26,22 +26,44 @@ Restore the previous known-good deploy by **redeploying the prior commit**, not 
 
 ## Workflow
 
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
+
+## Claude Desktop natural-language path
+
+For ordinary Claude Desktop prompts such as `방금 배포 되돌려줘`, `방금 거 되돌려줘`, `직전 안정 버전으로 복구해줘`, or `잘 되던 버전으로 돌려`, start with exactly:
+
+`되돌릴 수 있는 배포를 확인할게요.`
+
+Then make exactly one Bash call with the tool description/title exactly:
+
+`배포 되돌리기 확인`
+
+Run:
+
+```bash
+axhub-helpers rollback-summary --user-utterance "<latest user sentence>"
+```
+
+Copy the Korean stdout as the answer, then stop. Do not read the rest of this workflow, do not call TodoWrite, do not run preflight/list/rollback/recover/create directly, and do not mention `rollback`, `recover`, slash commands, skill names, route labels, preflight, raw deploy IDs, raw commit hashes, raw status names, `commit_not_found`, `no-op`, app IDs/slugs, or English tool-title fragments in visible text. Any actual rollback or redeploy is destructive/external and must wait until the user sees a Korean preview and explicitly approves in a later turn.
+
 **Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
 
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 [ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
 echo "$PREFLIGHT_JSON"
 ```
 
-`auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
+`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 치명적이지 않으면 워크플로를 계속 진행해요.
 
 To recover:
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).** Call TodoWrite at workflow start so the user sees rollback steps as a journey:
+
+   **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue the workflow; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
 
    ```typescript
    TodoWrite({ todos: [
@@ -71,7 +93,7 @@ To recover:
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    "$HELPER" list-deployments --app <APP_ID> --limit 10
    ```
 
@@ -121,7 +143,7 @@ To recover:
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    cat <<JSON | "$HELPER" consent-mint
    {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${PROFILE}","branch":"","commit_sha":"${PREV_SHA}","context":{}}
    JSON
@@ -141,14 +163,14 @@ To recover:
 
    | `error_code` | helper exit | 사용자 안내 |
    |---|---|---|
-   | `token_invalid` | 65 | `/axhub:auth` 로 재인증을 안내해요. 4-part empathy 템플릿 참조. |
+   | `token_invalid` | 65 | "다시 로그인해줘"라고 말하면 재인증할 수 있다고 안내해요. 4-part empathy 템플릿 참조. |
    | `not_found` | 67 | did-you-mean 으로 가까운 슬러그 제시 + `apps` 스킬로 라우팅해요. |
    | `validation.app_id_invalid` | 1 | helper 가 argv 형태로 거부한 케이스. 정상 슬러그 형식 (`[A-Za-z0-9_-]{1,64}`) 으로 다시 받아요. |
    | `transport.timeout` | 1 | 일시적 hang. 재시도 1회 + 그래도 실패면 네트워크 / CLI 버전 확인을 안내해요. |
-   | `transport.cli_missing` | 1 | `axhub` 바이너리가 PATH 에 없거나 실행 불가. 사용자에게 `axhub --version` 으로 확인하고, 안되면 `/axhub:install-cli` 또는 `/axhub:setup` 으로 재설치를 안내해요. |
-   | `response.invalid_json` | 1 | CLI 가 exit 0 인데 stdout 이 JSON 이 아닌 경우. CLI 버전 mismatch 가능성 — `/axhub:update` 또는 `/axhub:doctor` 안내. |
-   | `response.error_envelope_unknown_shape` | 1 | CLI 가 알수없는 error envelope 모양으로 응답. CLI 가 helper 보다 최신일 가능성 — `/axhub:upgrade` 안내. |
-   | `cli.exit_<N>` | 1 | catch-all (signal kill 등). retry 1회 + 그래도 실패면 `/axhub:doctor` 로 진단. |
+   | `transport.cli_missing` | 1 | `axhub` 바이너리가 PATH 에 없거나 실행 불가. 사용자에게 `axhub --version` 으로 확인하고, 안되면 "설치 도와줘" 또는 "처음 쓰는데 뭐부터 하면 돼?"라고 말하면 재설치를 도울 수 있다고 안내해요. |
+   | `response.invalid_json` | 1 | CLI 가 exit 0 인데 stdout 이 JSON 이 아닌 경우. CLI 버전 mismatch 가능성 — "업데이트 확인해줘" 또는 "설치 상태 진단해줘"라고 말하면 점검할 수 있다고 안내해요. |
+   | `response.error_envelope_unknown_shape` | 1 | CLI 가 알수없는 error envelope 모양으로 응답. CLI 가 helper 보다 최신일 가능성 — "플러그인 최신인지 봐줘"라고 말하면 점검할 수 있다고 안내해요. |
+   | `cli.exit_<N>` | 1 | catch-all (signal kill 등). retry 1회 + 그래도 실패면 "설치 상태 진단해줘"라고 말하면 진단할 수 있다고 안내해요. |
 
 8. **No prior succeeded deploy found.** Surface: "되돌릴 수 있는 직전 안정 배포를 못 찾았어요. 이 앱의 첫 배포이거나, 모든 이전 배포가 실패한 상태일 수 있어요. 'logs'로 현재 배포 원인 먼저 볼래요?"
 

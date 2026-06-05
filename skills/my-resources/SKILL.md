@@ -24,6 +24,8 @@ model: sonnet
 
 ## Workflow
 
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
+
 To list resources:
 
 **Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
@@ -31,13 +33,13 @@ To list resources:
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 [ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
 echo "$PREFLIGHT_JSON"
 ```
 
-`auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
+`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 치명적이지 않으면 워크플로를 계속 진행해요.
 
 1. **인증/Scope 확정.** preflight 결과에서 `auth_ok` 와 `current_team_id` 를 추출해요. 미인증이면 즉시 안내 후 종료:
 
@@ -45,16 +47,16 @@ echo "$PREFLIGHT_JSON"
    AUTH_OK=$(echo "$PREFLIGHT_JSON" | jq -r '.auth_ok // false')
    TEAM_ID=$(echo "$PREFLIGHT_JSON" | jq -r '.current_team_id // empty')
    if [ "$AUTH_OK" != "true" ]; then
-     echo '{"systemMessage":"로그인이 필요해요. /axhub:auth 로 로그인하고 다시 호출해주세요."}'
+     echo '{"systemMessage":"로그인이 필요해요. 다시 로그인해줘라고 말하면 이어서 도와줄게요."}'
      exit 0
    fi
    ```
 
-2. **7 family 병렬 조회 (fail-soft, 격리 tmp dir).** 각 family 를 백그라운드로 띄우고 wait 로 동기화. tmp dir 은 `mktemp` 로 격리해서 동시 호출 race 차단해요:
+2. **한 번에 요약을 만들어요.** Desktop 에서 JSON shape 를 추리하느라 여러 번 우회하지 마세요. 아래 Bash 블록 하나만 실행해요. 이 블록은 known response shapes (`array`, `data[]`, `data.data[]`, `data.items[]`, `items[]`, `resources[]`) 를 직접 normalize 하고, 바로 렌더 가능한 Markdown 을 출력해요. 사용자가 보게 되는 진행 문구는 "리소스 인벤토리 요약 생성" 한 단계면 충분해요.
 
    ```bash
    INV_TMP=$(mktemp -d -t axhub-inv-XXXX)
-   trap "rm -rf '$INV_TMP'" EXIT
+   trap 'rm -rf "$INV_TMP"' EXIT
 
    ( axhub tenants list --json    >"$INV_TMP/tenants.json"    2>"$INV_TMP/tenants.err"    ; echo $? >"$INV_TMP/tenants.code"    ) &
    ( axhub apps mine --json       >"$INV_TMP/apps.json"       2>"$INV_TMP/apps.err"       ; echo $? >"$INV_TMP/apps.code"       ) &
@@ -64,80 +66,86 @@ echo "$PREFLIGHT_JSON"
    ( axhub resources list --json  >"$INV_TMP/resources.json"  2>"$INV_TMP/resources.err"  ; echo $? >"$INV_TMP/resources.code"  ) &
    ( axhub catalog kinds --json   >"$INV_TMP/catalog.json"    2>"$INV_TMP/catalog.err"    ; echo $? >"$INV_TMP/catalog.code"    ) &
    wait
+
+   for name in tenants apps members engines connectors resources catalog; do
+     [ -s "$INV_TMP/$name.json" ] || printf '{}' >"$INV_TMP/$name.json"
+     [ -s "$INV_TMP/$name.code" ] || printf '1' >"$INV_TMP/$name.code"
+   done
+
+   jq -nr \
+     --arg team_id "$TEAM_ID" \
+     --arg tenants_code "$(cat "$INV_TMP/tenants.code")" \
+     --arg apps_code "$(cat "$INV_TMP/apps.code")" \
+     --arg members_code "$(cat "$INV_TMP/members.code")" \
+     --arg engines_code "$(cat "$INV_TMP/engines.code")" \
+     --arg connectors_code "$(cat "$INV_TMP/connectors.code")" \
+     --arg resources_code "$(cat "$INV_TMP/resources.code")" \
+     --arg catalog_code "$(cat "$INV_TMP/catalog.code")" \
+     --slurpfile tenants "$INV_TMP/tenants.json" \
+     --slurpfile apps "$INV_TMP/apps.json" \
+     --slurpfile members "$INV_TMP/members.json" \
+     --slurpfile engines "$INV_TMP/engines.json" \
+     --slurpfile connectors "$INV_TMP/connectors.json" \
+     --slurpfile resources "$INV_TMP/resources.json" \
+     --slurpfile catalog "$INV_TMP/catalog.json" '
+     def root($v): $v[0] // {};
+     def arr($v):
+       if ($v|type) == "array" then $v
+       elif ($v.data|type) == "array" then $v.data
+       elif ($v.data.data|type) == "array" then $v.data.data
+       elif ($v.data.items|type) == "array" then $v.data.items
+       elif ($v.items|type) == "array" then $v.items
+       elif ($v.resources|type) == "array" then $v.resources
+       else [] end;
+     def clip: tostring | gsub("[\r\n|]"; " ") | if length > 50 then .[0:47] + "..." else . end;
+     def top($xs): ($xs[0:4] | map(clip) | join(", "));
+     def count($xs; $code): if $code == "0" then "\($xs|length)개" else "조회 불가" end;
+     def detail($xs; $code):
+       if $code == "0" then top($xs)
+       elif $code == "65" then "(미인증 - 다시 로그인해줘)"
+       elif $code == "67" then "(관리자 인증 필요 - 다시 로그인해줘)"
+       elif $code == "68" then "(scope 외)"
+       else "(조회 불가 - exit \($code))" end;
+     def scoped($xs):
+       if $team_id == "" then $xs
+       else [$xs[] | select((.tenant_id // .team_id // .app.tenant_id // "") as $tid | $tid == "" or $tid == $team_id)] end;
+     (arr(root($tenants))) as $tenant_rows |
+     (scoped([arr(root($apps))[] | (.app // .) | select((.deleted_at // null) == null)])) as $app_rows |
+     (scoped(arr(root($members)))) as $member_rows |
+     (arr(root($engines))) as $engine_rows |
+     (scoped(arr(root($connectors)))) as $connector_rows |
+     (scoped(arr(root($resources)))) as $resource_rows |
+     (arr(root($catalog))) as $catalog_rows |
+     ($tenant_rows | map((.tenant_slug // .slug // .name // .tenant_id // "unknown") + " (" + (.role // .member_role // "member") + ")")) as $tenant_top |
+     ($app_rows | map((.slug // .name // .app.slug // .app.name // "unknown") + " [" + (.operating_status // .status // .last_deployment_status // "unknown") + "]")) as $app_top |
+     ($member_rows | group_by(.role // "member") | map((.[0].role // "member") + " " + (length|tostring))) as $member_top |
+     ($engine_rows | map(.kind // .engine // .name // "unknown")) as $engine_top |
+     ($connector_rows | map((.name // .slug // .id // "unknown") + " (" + (.engine // .kind // "connector") + ")")) as $connector_top |
+     ($resource_rows | map(.name // .path // .id // "resource")) as $resource_top |
+     ($catalog_rows | map((.kind // .name // "kind") + (if (.invokable // false) then "(invokable)" else "" end))) as $catalog_top |
+     "## 접근 가능 리소스 - scope=내 계정" ,
+     "",
+     "| 리소스 | 개수 | 상세 |",
+     "|---|---:|---|",
+     "| 팀 (tenants) | \(count($tenant_rows; $tenants_code)) | \(detail($tenant_top; $tenants_code)) |",
+     "| 앱 (apps) | \(count($app_rows; $apps_code)) | \(detail($app_top; $apps_code)) |",
+     "| 멤버 (members) | \(count($member_rows; $members_code)) | \(detail($member_top; $members_code)) |",
+     "",
+     "| 리소스 | 개수 | 상세 |",
+     "|---|---:|---|",
+     "| Engines | \(count($engine_rows; $engines_code)) | \(detail($engine_top; $engines_code)) |",
+     "| Connectors | \(count($connector_rows; $connectors_code)) | \(detail($connector_top; $connectors_code)) |",
+     "| Resources | \(count($resource_rows; $resources_code)) | \(detail($resource_top; $resources_code)) |",
+     "| Catalog kinds | \(count($catalog_rows; $catalog_code)) | \(detail($catalog_top; $catalog_code)) |",
+     "",
+     "앱별 자원(env, tables, apis)은 앱을 고른 뒤 이어서 물어보면 돼요.",
+     "자세히 보고 싶으면 `내 앱 보여줘`, `환경변수 봐`, `깃허브 연결`, `배포 상태 봐`처럼 말해요."
+   '
    ```
 
-3. **Per-family 그레이스 핸들링.** 각 `.code` 파일 검사. `0` 이면 count + top3 추출. `1`/`64`/`65`/`67`/`68` 등은 다음 표로 한 줄 표기:
-
-   | exit | 의미 | 표시 |
-   |---|---|---|
-   | `0` | 정상 | `<count>개 — <top3>` |
-   | `65` | 미인증 | `(미인증 — /axhub:auth 로 로그인)` |
-   | `67` | admin 권한 부족 (PAT-only) | `(관리자 인증 필요 — /axhub:auth login 으로 OAuth 재인증)` |
-   | `68` | scope 외 | `(scope 외)` |
-   | 그 외 | 기타 오류 | `(조회 불가 — exit N)` |
-
-   카탈로그/엔진/리소스/커넥터는 backend AGENTS.md known limitation 으로 PAT 만 있으면 401 가능 → 친절 안내 출력.
-
-4. **F4 privacy 필터.** 모든 family 응답에서 `team_id != $TEAM_ID` 항목 drop. tenants 자체는 사용자 멤버십 기준이라 filter 면제.
-
-5. **한국어 테이블 렌더 (해요체).** 결과를 **코드 펜스 없이 GFM markdown 테이블**로 출력해요 (터미널이 정렬된 표로 렌더해요 — 펜스로 감싸면 raw `|` 텍스트로 깨져요). 머리말 한 줄 뒤에 표 2~3개를 순서대로 그려요.
-
-   머리말: `## 접근 가능 리소스 — team=<slug>`
-
-   **표 1 · Identity** (요약, 3행 고정):
-
-   ```markdown
-   | 리소스 | 개수 | 상세 |
-   |---|---|---|
-   | 팀 (tenants) | 2개 | acme (admin), globex (member) |
-   | 앱 (apps) | 5개 | paydrop, checkout, mobile, web, admin |
-   | 멤버 (members) | 8명 | admin 2 · member 6 |
-   ```
-
-   **표 2 · Gateway** (요약, 4행 고정 — 개수를 한눈에):
-
-   ```markdown
-   | 리소스 | 개수 | 상세 |
-   |---|---|---|
-   | Engines | 4개 | postgres-table, postgres-column, mysql-table … |
-   | Connectors | 2개 | axhub-qa-pg (postgres), axhub-qa-mysql (mysql) |
-   | Resources | 6개 | 아래 표 3 참고 |
-   | Catalog kinds | 4개 | mysql-table, mysql-column, postgres-table … |
-   ```
-
-   **표 3 · Resources 상세** (resources 가 1개 이상일 때만 그려요, 최대 15행):
-
-   ```markdown
-   | 이름 | 커넥터 | kind | 경로 |
-   |---|---|---|---|
-   | employees | axhub-qa-mysql | mysql-table | 공개/employees |
-   | orders | axhub-qa-pg | postgres-table | sales/orders |
-   ```
-
-   15행 초과면 마지막에 overflow 행을 더해요: `| … N개 더 | | | /axhub:apps 로 확인 |`
-
-   표 뒤 안내 두 줄:
-
-   - `앱별 자원(env · tables · apis)은 앱 단위라 /axhub:apps 로 앱 고른 뒤 해당 SKILL 호출해요.`
-   - `자세히 → /axhub:apps · /axhub:env · /axhub:github · /axhub:deploy`
-
-   **셀 규칙.** 상세 셀은 50자 이하로 유지해요 (넘으면 터미널이 줄바꿈해서 표가 깨져요). 표 1·2 상세 셀은 항목을 앞에서부터 채우고 50자를 넘으면 `…` 로 줄여요. 개수는 정확히, 상세는 담을 수 있는 만큼만 담아요.
-
-   **실패·빈 family 처리** (행은 항상 유지해요):
-
-   | 상황 | 상세 셀 표기 |
-   |---|---|
-   | 0개 | 개수 `0개`, 상세 빈칸 |
-   | 미인증 (65) | `(미인증 — /axhub:auth)` |
-   | admin 부족 (67) | `(관리자 인증 — /axhub:auth login)` |
-   | scope 외 (68) | `(scope 외)` |
-   | 기타 오류 | `(조회 불가 — exit N)` |
-
-   7 family 모두 실패면 표 대신 종합 안내 한 줄 출력 후 종료해요.
+3. **결과를 그대로 전달해요.** 위 Bash 출력은 이미 최종 Markdown 이에요. JSON path 재확인, 추가 jq probing, 전체 raw JSON 표시, family별 재시도 loop 를 하지 마세요. 일부 family 가 실패해도 표의 해당 행에만 `조회 불가`를 표시하고 종료해요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 은 대화형 질문 prompt 를 호출하지 않아요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 와 대화형 환경 모두에서 동일하게 동작해요. `tests/fixtures/ask-defaults/registry.json` 의 my-resources 항목은 no-op stub (질문 없음).
-
-6. **렌더 종료.** Step 5 의 한국어 요약 출력 후 trap 이 tmp dir cleanup. `exit 0`.
 
 ## NEVER
 

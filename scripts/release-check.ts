@@ -18,28 +18,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import packageJson from "../package.json" with { type: "json" };
+import { RELEASE_ASSET_NAMES, RUST_TARGETS, hostPrimaryBinaryName, hostRustTarget } from "./rust-targets.ts";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const BIN_DIR = join(REPO_ROOT, "bin");
 const EXPECTED = packageJson.version;
 const FULL_MATRIX = process.env.AXHUB_RELEASE_CHECK_FULL === "1";
 
-const ALL_BINARIES = [
-  "axhub-helpers-darwin-arm64",
-  "axhub-helpers-darwin-amd64",
-  "axhub-helpers-linux-arm64",
-  "axhub-helpers-linux-amd64",
-  "axhub-helpers-windows-amd64.exe",
-];
-
-const hostAssetName = (): string | null => {
-  if (process.platform === "darwin" && process.arch === "arm64") return "axhub-helpers-darwin-arm64";
-  if (process.platform === "darwin" && process.arch === "x64") return "axhub-helpers-darwin-amd64";
-  if (process.platform === "linux" && process.arch === "arm64") return "axhub-helpers-linux-arm64";
-  if (process.platform === "linux" && process.arch === "x64") return "axhub-helpers-linux-amd64";
-  if (process.platform === "win32" && process.arch === "x64") return "axhub-helpers-windows-amd64.exe";
-  return null;
-};
+const hostAssetName = (): string | null => hostRustTarget()?.assetName ?? null;
+const hostPrimaryName = (): string => hostPrimaryBinaryName();
 
 const exec = (cmd: string): string => execSync(cmd, { cwd: REPO_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const log = (msg: string) => process.stdout.write(`[release-check] ${msg}\n`);
@@ -64,16 +51,10 @@ const assertVersion = (relativePath: string): void => {
 
 const assertWorkflowMatrix = (): void => {
   const releaseYml = readFileSync(join(REPO_ROOT, ".github/workflows/release.yml"), "utf8");
-  for (const target of [
-    "x86_64-unknown-linux-gnu",
-    "aarch64-unknown-linux-gnu",
-    "x86_64-apple-darwin",
-    "aarch64-apple-darwin",
-    "x86_64-pc-windows-msvc",
-  ]) {
+  for (const { target } of RUST_TARGETS) {
     if (!releaseYml.includes(target)) fail(`release.yml missing Rust target ${target}`);
   }
-  for (const name of ALL_BINARIES) {
+  for (const name of RELEASE_ASSET_NAMES) {
     if (!releaseYml.includes(name)) fail(`release.yml missing asset name ${name}`);
   }
   log("  ✓ release.yml declares 5 Rust target assets");
@@ -89,9 +70,9 @@ const main = (): void => {
   process.stdout.write(exec("bun run build"));
 
   log("step 3/4: assert host runnable Rust binary version");
-  assertVersion("bin/axhub-helpers");
+  assertVersion(`bin/${hostPrimaryName()}`);
   const hostName = hostAssetName();
-  if (hostName) assertVersion(`bin/${hostName}`);
+  if (hostName && hostName !== hostPrimaryName()) assertVersion(`bin/${hostName}`);
 
   log("step 4/4: verify 5-asset release wiring");
   assertWorkflowMatrix();
@@ -99,7 +80,7 @@ const main = (): void => {
   if (FULL_MATRIX) {
     log("full matrix mode: bun run build:all");
     process.stdout.write(exec("bun run build:all"));
-    for (const bin of ALL_BINARIES) {
+    for (const bin of RELEASE_ASSET_NAMES) {
       if (!existsSync(join(BIN_DIR, bin))) fail(`bin/${bin} missing after build:all`);
     }
     if (hostName) assertVersion(`bin/${hostName}`);

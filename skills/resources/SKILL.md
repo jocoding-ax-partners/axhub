@@ -2,6 +2,8 @@
 name: resources
 description: '이 스킬은 사용자가 게이트웨이 리소스(외부 DB 테이블/뷰)를 이름 변경·이동·네임스페이스 구성·태그·삭제로 조직하고 싶어할 때 사용해요. 다음 표현에서 활성화: "리소스 이름 바꿔", "리소스 이동", "네임스페이스 만들", "리소스 태그", "리소스 정리", "리소스 삭제", "리소스 등록", "rename resource", "move resource", "namespace", "tag resource", "bulk register", 또는 axhub 게이트웨이 리소스 조직 의도. 리소스 조회/인벤토리는 my-resources, 데이터 읽기는 data 스킬이에요.'
 examples:
+  - utterance: "리소스 정리하고 싶어"
+    intent: "organize gateway resources"
   - utterance: "리소스 이름 바꿔"
     intent: "organize gateway resources"
   - utterance: "리소스 이동"
@@ -22,14 +24,34 @@ model: sonnet
 
 게이트웨이 리소스의 namespace, rename, move, bulk-register, delete, tag 작업을 담당해요. 조회는 가능하지만 인벤토리/데이터 읽기는 기존 skill 로 분리해요.
 
+## Claude Desktop Natural-Language Path
+
+For ordinary Claude Desktop prompts such as `리소스 정리하고 싶어`, treat the request as AXHub gateway resource organization, not local file cleanup.
+
+- The first visible chat sentence must be exactly `리소스 정리 방식을 확인할게요.`
+- Immediately after that sentence, use exactly one Bash tool titled `리소스 현황 확인`:
+  `axhub-helpers resources-summary --user-utterance "<latest user sentence>"`
+- After the Bash tool completes, use its Korean stdout as the answer. Do not add a second table, ToolSearch explanation, raw command name, or tool-result interpretation layer.
+- Do not say the prompt is `모호` or describe it as an internal ambiguity judgement.
+- Do not inspect local files, repo files, `.shim`, `.omc`, QA result files, git status, package files, plugin source files, or local cleanup candidates.
+- Check login/workspace/resource availability using Korean Bash titles only: `로그인 상태 확인`, `리소스 현황 확인`, `리소스 변경 준비`, or `리소스 변경 실행`.
+- If the user did not name the exact target or action, ask in normal chat: `어떤 정리를 할까요? 목록 확인, 이름 변경, 이동, 태그 정리, 등록, 삭제 중에서 골라주세요.`
+- Before delete, move, rename, tag changes, namespace create, or bulk-register, show a Korean preview of the target resource and action, then wait for explicit approval. Do not run a mutation before approval.
+- Do not say resource changes are impossible just because the initial status check only listed resources. If a change is requested, ask for the target and approval, then use the mutation flow below.
+- Do not call AskUserQuestion, Question, or a question-card tool in Claude Desktop for this first disambiguation; use normal chat so raw question JSON cannot leak.
+- Do not write route labels, slash commands, skill names, `workflow`, `워크플로`, `preflight`, `catalog kinds`, `connector/resource`, raw question JSON, command names, raw command lines, raw JSON fields, raw IDs, raw emails, local file paths, local artifact names, or English tool-title fragments in visible text.
+- Login checks should say only `로그인되어 있어요` or `다시 로그인이 필요해요`; do not show account email, raw user id, scope, tenant names, or exact expiry unless the user explicitly asks for identity details.
+
 ## Workflow
+
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
 **Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
 
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s
 ' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d	%s
 ",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
@@ -37,7 +59,7 @@ PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 echo "$PREFLIGHT_JSON"
 ```
 
-`auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
+`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 치명적이지 않으면 워크플로를 계속 진행해요.
 
 **Tenant grounding.** 리소스 조직 작업은 tenant-scoped 예요. 사용자가 tenant 를 명시하지 않았으면 preflight 의 active team 만 사용하고, active team 이 없으면 실행을 멈춰요. `tenants[]` 첫 항목을 추측해서 쓰지 않아요.
 
@@ -51,6 +73,8 @@ fi
 ```
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
+
+   **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue the workflow; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
 
    ```typescript
    TodoWrite({ todos: [

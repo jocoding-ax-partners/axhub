@@ -5,7 +5,7 @@
 //! decision is [`RoutingDecision::Ignore`] (rule `e`) so axhub yields the repo —
 //! but because this user previously leaned on the implicit nudge, the
 //! prompt-route hook emits a **one-time** `systemMessage` explaining the new
-//! contract (`/init` or `"axhub 배포"`). It must fire **exactly once per
+//! contract (`"axhub 프로젝트 초기화해줘"` or `"axhub 배포"`). It must fire **exactly once per
 //! project** (spec §43 "이중 노출 정책": grace educates once; the deploy
 //! preflight blocks every time thereafter).
 //!
@@ -102,7 +102,9 @@ fn system_message(output: &Output) -> Option<String> {
 fn contains_grace_nudge(message: Option<&str>) -> bool {
     message
         .map(|msg| {
-            msg.contains("axhub.yaml") && msg.contains("/init") && msg.contains("axhub 배포")
+            msg.contains("axhub.yaml")
+                && msg.contains("axhub 프로젝트 초기화해줘")
+                && msg.contains("axhub 배포")
         })
         .unwrap_or(false)
 }

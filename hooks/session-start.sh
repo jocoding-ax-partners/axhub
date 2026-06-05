@@ -28,6 +28,13 @@ esac
 ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set by Claude Code}"
 HELPER="${ROOT}/bin/axhub-helpers"
 INSTALL_SH="${ROOT}/bin/install.sh"
+WRAPPER="${ROOT}/hooks/axhub-helpers.sh"
+
+if [ ! -x "$HELPER" ] && [ -x "$WRAPPER" ]; then
+  if RESOLVED_HELPER="$("$WRAPPER" --resolve-helper 2>/dev/null)" && [ -x "$RESOLVED_HELPER" ]; then
+    HELPER="$WRAPPER"
+  fi
+fi
 
 if [ ! -x "$HELPER" ]; then
   if [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" = "1" ]; then
@@ -36,7 +43,7 @@ if [ ! -x "$HELPER" ]; then
   fi
   if [ -x "$INSTALL_SH" ]; then
     "$INSTALL_SH" >&2 || {
-      echo '{"systemMessage":"[axhub] helper 바이너리 설치 실패. 진단: /axhub:doctor"}'
+      echo '{"systemMessage":"[axhub] helper 바이너리 설치 실패. 설치 상태를 먼저 확인해 주세요."}'
       exit 0
     }
   else
@@ -113,7 +120,7 @@ fi
 # preview prompt. Helper writes the result sentinel; SKILL Step 3.5 polls
 # token mtime + reads sentinel before deploy_create.
 # AXHUB_AUTH_BG_REFRESH=0 disables. axhub CLI absent → skip.
-if [ "${AXHUB_AUTH_BG_REFRESH:-1}" != "0" ] && command -v axhub >/dev/null 2>&1; then
+if [ "${AXHUB_AUTH_BG_REFRESH:-1}" != "0" ] && [ -z "${CI:-}" ] && [ -z "${CLAUDE_NON_INTERACTIVE:-}" ] && command -v axhub >/dev/null 2>&1; then
   if ! axhub auth status --json 2>/dev/null | grep -q '"user_email"'; then
     nohup "$HELPER" auth-refresh-bg >/dev/null 2>&1 &
     disown >/dev/null 2>&1 || true

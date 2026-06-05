@@ -1,20 +1,25 @@
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, IsTerminal, Read};
 use std::path::PathBuf;
 
 use axhub_helpers::autowire::{autowire_statusline, AutowireArgs};
+use axhub_helpers::axhub_cli::run_axhub;
 use axhub_helpers::bootstrap::{cmd_bootstrap_dependency_plan, run_bootstrap};
 use axhub_helpers::catalog::classify;
 use axhub_helpers::config::{config_get, config_set, render_get_json};
 use axhub_helpers::consent::{
     format_preauth_deny_hint, mint_token, parse_axhub_commands, validate_binding_schema,
     verify_or_claim_token, verify_token, write_private_file_no_follow, ConsentBinding,
+    PENDING_TOOL_CALL_ID,
 };
 use axhub_helpers::deploy_prep::run_deploy_prep;
 use axhub_helpers::hook_safety;
 use axhub_helpers::keychain::{parse_keyring_value, read_keychain_token};
-use axhub_helpers::list_deployments::{run_list_deployments, ListDeploymentsArgs};
-use axhub_helpers::migrate_plan::run_migrate_plan;
+use axhub_helpers::list_deployments::{
+    run_list_deployments, DeploymentSummary, ListDeploymentsArgs,
+};
+use axhub_helpers::migrate_plan::{build_migrate_plan, run_migrate_plan};
 use axhub_helpers::preflight::{run_preflight, PreflightRun};
 use axhub_helpers::quality_gate::{validate_deploy_prep_quality, QualityCheckResult};
 use axhub_helpers::redact::redact;
@@ -40,7 +45,7 @@ use serde_json::{json, Map, Value};
 mod cli;
 
 pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
-pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-mint-app-lifecycle --action suspend|resume|fork --app <app> [--slug <slug> --subdomain <subdomain> --tenant <tenant> --name <name> --template <template> --repo-public <bool>] [--quiet]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -139,7 +144,28 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "mark" => cmd_mark(&rest),
         "emit-deploy-complete" => cmd_emit_deploy_complete(&rest),
         "deploy-prep" => cmd_deploy_prep(&rest),
+        "deploy-preview-summary" => cmd_deploy_preview_summary(&rest),
+        "deploy-approved-run" => cmd_deploy_approved_run(&rest),
         "migrate-plan" => run_migrate_plan(&rest),
+        "migrate-summary" => cmd_migrate_summary(&rest),
+        "publish-summary" => cmd_publish_summary(&rest),
+        "rollback-summary" => cmd_rollback_summary(&rest),
+        "team-summary" => cmd_team_summary(&rest),
+        "env-summary" => cmd_env_summary(&rest),
+        "github-summary" => cmd_github_summary(&rest),
+        "resources-summary" => cmd_resources_summary(&rest),
+        "review-scope-summary" => cmd_review_scope_summary(&rest),
+        "auth-summary" => cmd_auth_summary(&rest),
+        "install-summary" => cmd_install_summary(&rest),
+        "update-summary" => cmd_update_summary(&rest),
+        "inspect-config-summary" => cmd_inspect_config_summary(),
+        "status-summary" => cmd_status_summary(&rest),
+        "logs-summary" => cmd_logs_summary(&rest),
+        "open-summary" => cmd_open_summary(&rest),
+        "verify-summary" => cmd_verify_summary(&rest),
+        "trace-summary" => cmd_trace_summary(&rest),
+        "doctor-summary" => cmd_doctor_summary(&rest),
+        "statusline-summary" => cmd_statusline_summary(&rest),
         "config" => cmd_config(&rest),
         "sync" => run_sync(&rest),
         "snippet" => run_snippet(&rest),
@@ -866,6 +892,76 @@ pub(crate) fn cmd_consent_mint(validate_only: bool) -> anyhow::Result<i32> {
     out_json(serde_json::to_value(result)?);
     Ok(0)
 }
+
+pub(crate) fn cmd_consent_mint_app_lifecycle(
+    args: cli::args::ConsentMintAppLifecycleArgs,
+) -> anyhow::Result<i32> {
+    let action = match args.action.as_str() {
+        "suspend" | "apps_suspend" => "apps_suspend",
+        "resume" | "apps_resume" => "apps_resume",
+        "fork" | "apps_fork" => "apps_fork",
+        other => {
+            eprintln!(
+                "axhub-helpers consent-mint-app-lifecycle: unsupported action \"{other}\"; expected suspend, resume, or fork"
+            );
+            return Ok(64);
+        }
+    };
+    if args.app.trim().is_empty() {
+        eprintln!("axhub-helpers consent-mint-app-lifecycle: --app is required");
+        return Ok(64);
+    }
+
+    let mut context = HashMap::new();
+    if action == "apps_fork" {
+        let required = [
+            ("slug", args.slug.as_deref()),
+            ("subdomain", args.subdomain.as_deref()),
+            ("tenant", args.tenant.as_deref()),
+            ("name", args.name.as_deref()),
+        ];
+        for (field, value) in required {
+            let Some(value) = value.filter(|v| !v.trim().is_empty()) else {
+                eprintln!(
+                    "axhub-helpers consent-mint-app-lifecycle: --{field} is required for fork"
+                );
+                return Ok(64);
+            };
+            context.insert(field.to_string(), value.to_string());
+        }
+        context.insert("source".into(), args.app.clone());
+        context.insert(
+            "template".into(),
+            args.template
+                .filter(|v| !v.trim().is_empty())
+                .unwrap_or_else(|| args.app.clone()),
+        );
+        context.insert(
+            "repo_public".into(),
+            args.repo_public
+                .filter(|v| !v.trim().is_empty())
+                .unwrap_or_else(|| "false".into()),
+        );
+    }
+
+    let binding = ConsentBinding {
+        tool_call_id: PENDING_TOOL_CALL_ID.into(),
+        action: action.into(),
+        app_id: args.app,
+        profile: String::new(),
+        branch: String::new(),
+        commit_sha: String::new(),
+        context,
+        synthesized_by_helper: true,
+    };
+    validate_binding_schema(&binding)?;
+    let result = mint_token(binding, 60)?;
+    if !args.quiet {
+        out_json(serde_json::to_value(result)?);
+    }
+    Ok(0)
+}
+
 fn cmd_consent_verify() -> anyhow::Result<i32> {
     let b = parse_binding(&read_stdin()?)?;
     let result = verify_token(b);
@@ -1135,44 +1231,369 @@ pub(crate) fn cmd_preauth_check() -> anyhow::Result<i32> {
 const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
 
 const DYNAMIC_TABLE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
-[axhub hook | dynamic tables]
-Observed: dynamic app table/column/row/grant work.
-Suggested: call Skill(axhub:tables) first; preview + consent-mint; `axhub tables create "$TABLE"` or `axhub tables columns add "$TABLE"`. Do not call Skill(axhub:help) or add-column.
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 테이블 변경 내용을 확인할게요.
+This is an AXHub hosted-app table schema/row/grant request. Do not inspect or edit local app code, local database files, `server.js`, `package.json`, ORM files, `.env`, SQL migrations, or QA result files.
+Before any schema/row/grant mutation, check login/current app/table availability/column types, show a Korean preview of the target app, table, action, and columns/row summary, then ask for explicit approval.
+The visible preview must not include raw CLI command lines. The actual command belongs only in the Bash tool call after approval.
+In Claude Desktop, do not call AskUserQuestion, Question, or any question-card tool for this approval because raw question JSON may become visible. Ask in normal chat: `이대로 만들까요? 진행 또는 취소라고 답해 주세요.` Then stop. If the next user reply clearly says `진행`, continue with the approved execution.
+Bash titles must be Korean only, such as `로그인 상태 확인`, `테이블 상태 확인`, `테이블 변경 준비`, or `테이블 변경 실행`.
+Do not write route labels, slash commands, skill names, workflow/워크플로, preflight, consent-mint, consent internals, command names, raw command lines, raw question JSON, raw JSON fields, raw IDs, raw emails, raw app slugs, local file contents, repo inspection, English tool-title fragments, or A/B implementation labels in visible text.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const CONNECTORS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 데이터베이스 연결을 준비할게요.
+This is an AXHub external database connector setup/management request. Do not inspect or edit local app code, `server.js`, `package.json`, dependency files, ORM files, `.env`, or local DATABASE_URL wiring.
+Handle this as an AXHub external database connection setup. If information is missing, ask naturally for the connector name, database engine, workspace, host, port, database name, username, SSL mode, and a safe credentials-file/input path. Do not ask for secret values in chat.
+Before any create/update/delete, check the current workspace and existing connectors, show a Korean preview, and ask for explicit approval.
+Bash titles must be Korean only, such as `커넥터 상태 확인`, `커넥터 목록 확인`, `커넥터 변경 준비`, or `커넥터 변경 실행`.
+Do not write route labels, slash commands, skill names, local file contents, repo inspection, package-install plans, app-code DATABASE_URL setup, raw JSON fields, raw IDs, raw emails, preflight narration, consent internals, English tool-title fragments, or A/B implementation labels in visible text.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const DATA_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 데이터 리소스를 확인할게요.
+This is an AXHub governed data read/describe/snippet request. Do not inspect local app code, repo files, `.env`, `server.js`, package files, ORM files, QA result files, or plugin source files.
+Use AXHub data-resource lookup only. If no resource is registered, say naturally that no connected data resource was found and that a database connection must be added first.
+Never run a live data read until the user explicitly approves it after seeing the target, columns, row limit, and query shape.
+Bash titles must be Korean only, such as `로그인 상태 확인`, `데이터 리소스 확인`, `데이터 설명`, `실데이터 확인`, or `스니펫 준비`.
+Do not write route labels, slash commands, skill names, workflow/워크플로, preflight, catalog 조회, catalog 비어있음, connector 목록, catalog kinds, raw JSON fields, raw IDs, raw emails, account scopes, raw app slugs, governance/path-guessing jargon, command names, English tool-title fragments, A/B implementation labels, local file contents, or route-conversion narration in visible text.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const RESOURCES_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 리소스 정리 방식을 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 리소스 현황 확인
+Bash command: `axhub-helpers resources-summary --user-utterance "<latest user sentence>"`
+This is an AXHub gateway resource organization request for external DB tables/views/resources. It is not local filesystem cleanup, repo cleanup, QA artifact cleanup, shim cleanup, or git working-tree cleanup.
+Check login/workspace/resource availability first. If the user did not name the exact operation or resource, ask naturally which resource organization action they want: 목록 확인, 이름 변경, 이동, 태그 정리, 등록, or 삭제. Do not run any mutation before explicit approval.
+Bash titles must be Korean only, such as `로그인 상태 확인`, `리소스 현황 확인`, `리소스 변경 준비`, or `리소스 변경 실행`.
+Do not inspect local files, repo files, `.shim`, `.omc`, QA result files, git status, package files, plugin source files, or local cleanup candidates.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, JSON field names, internal labels, file contents, English tool-title fragments, or a claim that resource changes are impossible.
+Do not write route labels, slash commands, skill names, workflow/워크플로, preflight, catalog kinds, connector/resource, raw question JSON, command names, raw command lines, raw JSON fields, raw IDs, raw emails, local file paths, local artifact names, English tool-title fragments, or terse ambiguity labels such as `모호` in visible text.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const GITHUB_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: GitHub 연결 상태를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: GitHub 연결 상태 확인
+Bash command: `axhub-helpers github-summary --user-utterance "<latest user sentence>"`
+This is an AXHub hosted-app GitHub repository connection request. Do not answer from local git remotes, git config, GitHub CLI, GitHub PR state, repo source files, package files, `.git`, or QA result files.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, JSON field names, raw IDs, raw emails, installation IDs, local git remote evidence, file contents, route labels, slash commands, skill names, ToolSearch narration, or English tool-title fragments.
+Connect/disconnect/create repo/add remote/push are mutations. Do not run any mutation before showing a Korean preview and receiving explicit approval.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const MIGRATE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 가져오기 상태를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 가져오기 상태 확인
+Bash command: `axhub-helpers migrate-summary --user-utterance "<latest user sentence>"`
+This is an AXHub existing-app import/migration readiness request. Do not answer from local server checks, package scripts, git release state, generic deployment advice, QA result files, or previous deployment failure state.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, raw JSON fields, raw deploy status fields, local server evidence, file contents, route labels, slash commands, skill names, ToolSearch narration, emoji, or English tool-title fragments.
+App registration, GitHub connection, env writes, and deployment are mutations. Do not run any mutation before showing a Korean preview and receiving explicit approval.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const PUBLISH_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 공개 심사 준비를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 공개 심사 준비 확인
+Bash command: `axhub-helpers publish-summary --user-utterance "<latest user sentence>"`
+This is an AXHub marketplace/public review submission request. Do not read quality files, local state files, plugin source, repository files, package files, or prior QA artifacts before showing this preparation summary.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, raw JSON fields, raw review status fields, route labels, slash commands, skill names, ToolSearch narration, preflight wording, quality-state details, file contents, English tool-title fragments, or internal workflow labels.
+Submission is an external marketplace mutation. Do not submit until the user provides a review note, sees a Korean preview, and explicitly approves.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const DEPLOY_ROLLBACK_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 되돌릴 수 있는 배포를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 배포 되돌리기 확인
+Bash command: `axhub-helpers rollback-summary --user-utterance "<latest user sentence>"`
+This is an AXHub deployment restore/rollback/recover request. Do not expose whether it maps to rollback or recover; do not call recover, rollback, deploy create, or deploy rollback yet.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, route labels, slash commands, skill names, preflight, raw JSON fields, raw deploy IDs, raw commit hashes, raw status names, `commit_not_found`, `no-op`, app IDs/slugs, local file/repo inspection, English tool-title fragments, or workflow labels.
+Any rollback/redeploy is destructive/external. Do not mutate until the user sees the Korean preview and explicitly approves.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const TEAM_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 팀 작업을 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 팀 작업 확인
+Bash command: `axhub-helpers team-summary --user-utterance "<latest user sentence>"`
+This is an AXHub workspace team invitation, invitation-list, or hosted-app access request. Do not reinterpret it as Claude/OMC multi-agent team setup, local code collaboration, project staffing, or general task delegation.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, raw JSON fields, raw tenant IDs, raw user IDs, raw emails unless the user typed that email, route labels, slash commands, skill names, ToolSearch narration, preflight wording, tenant/workspace implementation terms, OMC/Claude team comparisons, file contents, English tool-title fragments, or internal workflow labels.
+Sending or canceling invitations and changing app access are external permission mutations. Do not mutate until the user provides the target person, sees a Korean preview, and explicitly approves.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const QUALITY_REVIEW_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+첫 문장: 코드 리뷰를 시작할게요.
+첫 확인: Bash title `변경 범위 확인`, 실행 `axhub-helpers review-scope-summary --user-utterance "<latest user sentence>"`.
+그 다음: 확인 요약의 실제 변경 범위를 기준으로 소스/설정 파일을 읽고 한국어 코드 리뷰를 작성.
+큰 변경이라고 나오면 파일을 읽기 전에 `변경량이 커서 먼저 범위를 정할게요. 전체를 볼까요, 핵심 파일만 볼까요?`라고 묻고 대기.
+마무리: 리뷰가 끝나면 Bash title `리뷰 상태 저장`, 실행 `axhub-helpers state-update --review-acknowledged`.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const QUALITY_DEBUG_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 원인을 좁혀볼게요.
+This is a direct code/test debugging request. Use the dedicated AXHub debug workflow now; do not let background quality auto-mode process this as a generic response first.
+Do not read `.axhub-state/quality.json` before starting the direct debug workflow. Do not run generic file-listing or repo-survey commands before the workflow preflight/symptom step.
+In Claude Desktop, debug directly in the current session first. Do not call Task/Subagent/agent delegation and do not use visible `디버그 위임` unless the user explicitly asks for a separate agent.
+Bash titles must be Korean only, such as `문제 신호 확인`, `최근 실패 확인`, or `디버그 상태 저장`.
+If auth is OK, visible text must say only `로그인되어 있어요.` or the next natural action. Never display account email, raw user id, account scope, exact expiry, or raw preflight fields.
+After finishing the debug pass, update debug state with `axhub-helpers state-update --debug-acknowledged` using the Korean title `디버그 상태 저장`.
+Do not write route labels, slash commands, skill names, quality auto-mode, workflow/워크플로 labels, TodoWrite availability, preflight internals, raw JSON fields, raw emails, account emails, raw user IDs, account scopes, file-listing narration, or English tool-title fragments in visible text.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const QUALITY_DIAGNOSE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 진단 루프를 준비할게요.
+This is a direct auto-diagnose loop request. Use the dedicated AXHub diagnose workflow now; do not let background quality auto-mode process this as a generic response first.
+Bash titles must be Korean only, such as `진단 루프 준비`, `실패 신호 확인`, or `검증 결과 확인`.
+In Claude Desktop, do not expose raw AskUserQuestion JSON. If a hypothesis choice is needed, ask in normal chat with short Korean choices and wait.
+If auth is OK, visible text must say only `로그인되어 있어요.` or the next natural action. Never display account email, raw user id, account scope, exact expiry, or raw preflight fields.
+Do not write route labels, slash commands, skill names, quality auto-mode, workflow/워크플로 labels, preflight internals, raw JSON fields, raw emails, account emails, raw user IDs, account scopes, file-listing narration, or English tool-title fragments in visible text.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const QUALITY_PLAN_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 변경 계획을 잡아볼게요.
+This is a direct planning request for code/design changes. Use the dedicated AXHub plan workflow now; do not let background quality auto-mode process this as a generic response first.
+Bash titles must be Korean only, such as `계획 범위 확인`, `영향 범위 확인`, or `계획 정리`.
+Do not implement changes during the planning workflow unless the user later gives a separate execution request.
+If auth is OK, visible text must say only `로그인되어 있어요.` or the next natural action. Never display account email, raw user id, account scope, exact expiry, or raw preflight fields.
+Do not write route labels, slash commands, skill names, quality auto-mode, workflow/워크플로 labels, TodoWrite availability, preflight internals, raw JSON fields, raw emails, account emails, raw user IDs, account scopes, file-listing narration, or English tool-title fragments in visible text.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const QUALITY_SHIP_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 출시 준비 상태를 확인할게요.
+This is a direct PR/release readiness request. Use the dedicated AXHub ship workflow now; do not let background quality auto-mode process this as a generic response first.
+In Claude Desktop, prepare the readiness summary directly in the current session first. Do not call Task/Subagent/agent delegation and do not use visible `ship 위임` unless the user explicitly asks for a separate agent.
+Bash titles must be Korean only, such as `출시 준비 확인`, `리뷰 상태 확인`, or `출시 상태 저장`.
+If auth is OK, visible text must say only `로그인되어 있어요.` or the next natural action. Never display account email, raw user id, account scope, exact expiry, or raw preflight fields.
+After finishing the readiness pass, update ship state with `axhub-helpers state-update --shipped` using the Korean title `출시 상태 저장` only when the ship workflow actually completed.
+Do not create a PR, push, publish, release, or deploy before explicit approval. Do not write route labels, slash commands, skill names, quality auto-mode, workflow/워크플로 labels, TodoWrite availability, preflight internals, raw JSON fields, raw emails, account emails, raw user IDs, account scopes, file-listing narration, or English tool-title fragments in visible text.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const QUALITY_TDD_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 테스트부터 잡아볼게요.
+This is a direct TDD-cycle request. Use the dedicated AXHub TDD workflow now; do not let background quality auto-mode process this as a generic response first.
+Bash titles must be Korean only, such as `TDD 대상 확인`, `테스트 확인`, or `테스트 실행`.
+Start by clarifying the target behavior when it is missing; do not silently pick an unrelated module.
+If auth is OK, visible text must say only `로그인되어 있어요.` or the next natural action. Never display account email, raw user id, account scope, exact expiry, or raw preflight fields.
+Do not write route labels, slash commands, skill names, quality auto-mode, workflow/워크플로 labels, TodoWrite availability, preflight internals, raw JSON fields, raw emails, account emails, raw user IDs, account scopes, file-listing narration, or English tool-title fragments in visible text.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
 const DEPLOY_STATUS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
 [axhub hook | deploy status]
 Observed: deploy progress/status prompt.
-Suggested: call Skill(axhub:status) now; do not answer from repo/git memory. If auth missing, say 로그인/토큰 확인.
+Suggested: use the AXHub status workflow now; do not answer from repo/git memory. If auth missing, say 로그인/토큰 확인.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
-const DEPLOY_CREATE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
-[axhub hook | deploy]
-Observed: axhub deploy/create prompt.
-Suggested: call Skill(axhub:deploy); do not use git release or generic deploy. On auth error, say axhub 토큰 만료 원인.
+const DEPLOY_LOGS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 로그를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 로그 확인
+Bash command: `axhub-helpers logs-summary --user-utterance "<latest user sentence>"`
+This is an AXHub app deployment log request. Do not inspect local repo log files, `.omc`, `.claude`, git logs, package logs, or plugin cache files.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, JSON field names, internal labels, file contents, or English tool-title fragments.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const OPEN_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 앱 페이지를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 앱 페이지 확인
+Bash command: `axhub-helpers open-summary --user-utterance "<latest user sentence>"`
+This is an AXHub app browser/open request. Do not inspect QA result files, `.omc`, `.claude`, plugin cache files, git logs, Chrome MCP state, or browser extension state.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, JSON field names, internal labels, file contents, ToolSearch narration, or English tool-title fragments.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const VERIFY_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 배포가 실제로 열리는지 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 배포 검증
+Bash command: `axhub-helpers verify-summary --user-utterance "<latest user sentence>"`
+This is an AXHub live-deploy verification request. Do not narrate routing, preflight, stale cache IDs, JSON fields, deploy IDs, user emails, raw status names, or intermediate fallback attempts.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, internal labels, raw JSON field names, file contents, or English tool-title fragments.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const TRACE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 배포 기록을 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 배포 기록 확인
+Bash command: `axhub-helpers trace-summary --user-utterance "<latest user sentence>"`
+This is an AXHub deployment failure-cause request. Do not narrate routing, slash commands, skill names, preflight, deploy IDs, raw status names, JSON field names, failure_reason, matched_patterns, build_log_errors, local QA files, plugin source files, or English tool-title fragments.
+After the tool call, copy the Korean stdout as the answer. Do not add a table, raw IDs, command names, internal labels, or another investigation layer.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const ROUTING_STATS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 라우팅 통계를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 라우팅 통계 확인
+Bash command: `axhub-helpers routing-stats --since 7d`
+This is an AXHub plugin routing analytics request. Do not inspect QA result files, desktop QA logs, repo files, plugin source files, git history, `.omc`, `.claude`, or local project notes.
+After the tool call, summarize the Korean stdout briefly. Do not add command names, internal labels, raw file contents, or English tool-title fragments.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const ENV_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 환경변수를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 환경변수 확인
+Bash command: `axhub-helpers env-summary --user-utterance "<latest user sentence>"`
+This is an AXHub app environment-variable request. Do not inspect shell environment variables, `.env` files, repo files, plugin source files, `.omc`, `.claude`, git history, or QA result files.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, internal labels, raw JSON fields, raw values, secret values, preflight narration, or English tool-title fragments.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
 const DOCTOR_ROUTING_HINT: &str = r#"<axhub-routing-hint>
-[axhub hook | doctor]
-Observed: axhub environment/doctor prompt.
-Suggested: call Skill(axhub:doctor); do not run generic repo health only. If CLI is old, say axhub 버전 업그레이드 확인.
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 설치 상태를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 설치 상태 확인
+Bash command: `axhub-helpers doctor-summary --user-utterance "<latest user sentence>"`
+This is an AXHub CLI/plugin/auth readiness check. Do not install, update, login, logout, or modify settings unless the user explicitly asks for that action.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, slash commands, skill names, internal labels, raw JSON fields, raw user emails, filesystem paths, preflight narration, or English tool-title fragments.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const INSTALL_CLI_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 설치 상태를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 설치 상태 확인
+Bash command: `axhub-helpers install-summary --user-utterance "<latest user sentence>"`
+This is an AXHub CLI install request. First check whether the CLI is already installed. If it is already installed, stop after the Korean stdout and do not run an installer. If it is missing, ask for explicit approval before any installer command.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, slash commands, skill names, internal labels, raw JSON fields, auth status fields, filesystem paths, installer URLs, preflight narration, or English tool-title fragments.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const UPDATE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 업데이트를 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 업데이트 확인
+Bash command: `axhub-helpers update-summary --user-utterance "<latest user sentence>"`
+This is an AXHub CLI update check. Do not run update apply, install, doctor, auth login/logout, plugin update, cache scans, or compatibility diagnostics before this summary. The summary helper itself runs the real read-only CLI update check.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, slash commands, skill names, internal labels, raw JSON fields, has_update, filesystem paths, installer URLs, plugin update suggestions, preflight narration, or English tool-title fragments.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const STATUSLINE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 상태바 설정을 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 상태바 설정
+Bash command: `axhub-helpers statusline-summary --user-utterance "<latest user sentence>"`
+This is an AXHub status bar enable request. Preserve an existing third-party status bar by default.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, slash commands, skill names, internal labels, raw file paths, raw settings JSON, existing command strings, exit codes, scope fallback narration, statusLine/wire/settings-merge terminology, or English tool-title fragments.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const CLARIFY_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 어떤 걸 도와드릴까요?
+Use exactly one question card. Header, exactly: 작업 선택
+Question, exactly: 어떤 걸 도와드릴까요?
+Visible options, exactly:
+- 환경 점검 — 설치, 로그인, 버전 상태를 확인해요
+- 앱 배포 — 현재 프로젝트를 올릴 준비를 해요
+- 앱과 리소스 조회 — 내 앱, 리소스, 테이블을 확인해요
+- 문제 원인 보기 — 상태, 로그, 실패 원인을 확인해요
+- 처음부터 안내 — 가능한 작업을 한눈에 보여줘요
+If the question-card tool requires option values, set each value to exactly the same Korean text as its visible label. Do not put hidden option values that contain English skill slugs or slash-command forms in the question-card JSON.
+After the user chooses an option, do not call the Claude Skill tool, do not invoke any slash command, and do not write a route-transition sentence.
+If the user chooses 환경 점검, visible sentence exactly: 설치 상태를 확인할게요. Then use exactly one Bash tool call with description/title exactly: 설치 상태 확인. Bash command: `axhub-helpers doctor-summary --user-utterance "<original broad user sentence>"`. Copy the Korean stdout as the answer.
+If the user chooses 앱 배포, visible sentence exactly: 배포 준비를 확인할게요. Then use exactly one Bash tool call with description/title exactly: 배포 준비 확인. Bash command: `axhub-helpers deploy-preview-summary --user-utterance "<original broad user sentence>"`. Show the Korean preview and ask for explicit approval before any deploy execution.
+If the user chooses 앱과 리소스 조회, visible sentence exactly: 앱과 리소스를 확인할게요.
+If the user chooses 문제 원인 보기, visible sentence exactly: 문제 원인을 확인할게요.
+Do not say the prompt is vague. Do not append parenthesized English/internal labels to any option. Do not show slash commands, skill names, command mappings, implementation values, route labels, raw tool names, or English tool-title fragments in visible text.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const APP_LIFECYCLE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence:
+- pause intent: <app> 앱을 잠깐 멈출 준비를 할게요.
+- resume intent: <app> 앱을 다시 켤 준비를 할게요.
+- fork intent: <app> 앱을 복제할 준비를 할게요.
+This is an AXHub hosted app lifecycle request. Do not inspect local Next.js/dev-server processes, ports, ps/lsof output, package scripts, or local server state.
+Continue in this same answer flow. Do not invoke slash commands, and do not write route-conversion or implementation explanation sentences.
+Verify login/current app, find the AXHub app, explain the service impact in Korean, then ask exactly `앱 변경을 실행할까요?` with visible options `취소` and `진행` before any change.
+Bash titles only: `앱 상태 확인`, `앱 찾기`, `앱 변경 준비`, `앱 변경 실행`.
+If another lookup is needed, say exactly `앱을 한 번 더 확인할게요.` Do not describe identifier lookup.
+When summarizing app metadata, translate raw enum values into Korean labels only. Say `비공개`, `공개`, `개발 단계`, or `운영 단계`; never write raw enum words such as `private`, `public`, `development`, `production`, and never write mixed labels such as `비공개 (private)`.
+Human-visible flow:
+- Use `앱 상태 확인` for `axhub-helpers preflight --json`.
+- Use `앱 찾기` for `axhub apps list --json` or the narrow AXHub app lookup needed to identify the named hosted app.
+- After the user chooses `진행`, do not write any visible sentence before tool calls. Never say `User chose`, `Mint consent`, `execute suspend`, `execute resume`, or similar implementation narration.
+- Use one `앱 변경 준비` Bash tool call for the app-lifecycle typed helper only: `axhub-helpers consent-mint-app-lifecycle --action suspend|resume|fork --app <literal-next-app-arg> --quiet` plus fork flags when needed.
+- Do not build JSON by hand. Do not run `consent-mint`, schema inspection, source lookup, fixture lookup, grep, rg, helper discovery, or any exploratory command in this flow.
+- Do not add a trailing success echo or otherwise mask a failed preparation command. The preparation tool output may be blank.
+- For suspend/resume, the prepared binding app value must be exactly the literal app argument used in the following `axhub apps suspend|resume ...` command, such as `testnextjs`, not a resolved UUID. Keep context empty for suspend/resume and do not invent app slug fields.
+- Then use one separate `앱 변경 실행` Bash tool call for the matching top-level `axhub apps suspend|resume|fork ... --execute --json >/dev/null` command. Do not combine preparation and execution in one Bash command, and do not leave raw JSON stdout visible in the tool panel.
+- The first `앱 변경 실행` tool call with exit code 0 is terminal. Treat a visible `[DESTRUCTIVE] about to run ...` line as a hook notice, not a failure. Do not run another preparation/execution pair, do not verify by re-running the mutation, and do not continue to a second app-changing command.
+If an internal security gate blocks the command, do not explain gate internals in visible chat; do not inspect schemas, source, fixtures, or helper locations; prepare the same approved change and retry exactly once, then say `앱 변경을 시작하지 못했어요. 다시 시도해 주세요.` if it still fails.
+Do not say route labels, slash commands, skill names, preflight details, internal app/context fields, auth results, runtime words, lifecycle verbs in English, raw JSON, raw identifiers, owner names, English tool-title fragments, permission-decision details, helper binding details, or parenthesized internal labels.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const DEPLOY_CREATE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 배포 준비를 확인할게요.
+Use exactly one Bash tool call before asking for approval. Bash description/title, exactly: 배포 준비 확인
+Bash command: `axhub-helpers deploy-preview-summary --user-utterance "<latest user sentence>"`
+This is an AXHub live deployment request, not a generic release, git release, Vercel, Netlify, Cloudflare, Fly, Render, or Railway deploy.
+After the tool call, copy the Korean preview stdout and ask for explicit approval. Do not read or summarize the long deploy skill body before this preview card is shown.
+After explicit approval, use exactly one Bash tool call. Bash description/title, exactly: 배포 실행
+Bash command: `axhub-helpers deploy-approved-run --user-utterance "<latest user sentence>"`
+Copy that Korean stdout as the result. Do not invoke a skill again after approval.
+Do not write route labels, slash commands, command mappings, skill names, `Invoke deploy skill`, `Read rest of SKILL`, `Read full SKILL`, `Route=axhub`, `preflight`, `deploy-prep`, HMAC, consent token, raw helper JSON, raw IDs, raw account email, or English tool-title fragments in the visible answer.
+Use Korean Bash tool titles only, such as `배포 준비 확인`, `배포 실행`, or `배포 상태 확인`.
+On auth error, explain token/login expiry safely in Korean and ask before login.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
 const APIS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
 [axhub hook | apis]
 Observed: axhub API/endpoint catalog prompt.
-Suggested: call Skill(axhub:apis); use latest CLI `axhub catalog resources --json --limit 50`, not removed `axhub apis list` or repo API inspection.
+Suggested: use the AXHub API catalog workflow; use latest CLI `axhub catalog resources --json --limit 50`, not removed `axhub apis list` or repo API inspection.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
+const INSPECT_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 매니페스트와 설정을 확인할게요.
+Use exactly one Bash tool call. Bash description/title, exactly: 매니페스트와 설정 확인
+Bash command: `axhub-helpers inspect-config-summary`
+After the tool call, copy the Korean stdout as the answer. Do not add a table, a second diagnosis, command names, JSON field names, internal labels, file contents, or English tool-title fragments.
+Do not call Read, LS, Glob, Grep, `find`, `cat`, raw `axhub manifest validate`, raw `axhub config explain`, plugin package inspection, marketplace inspection, or hook script auditing.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
 const AUTH_STATUS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
-[axhub hook | auth status]
-Observed: login/token/identity status prompt.
-Suggested: call Skill(axhub:auth); run `axhub auth status --json` and show account/expiry/scopes. Do not route to the heavier doctor diagnostic.
+첫 문장: 로그인 상태를 확인할게요.
+첫 확인: Bash title `로그인 상태 확인`, 실행 `axhub-helpers auth-summary --user-utterance "<latest user sentence>"`.
+답변: 확인 결과의 한국어 요약만 사용.
+범위: 로그인 여부와 다시 로그인 필요 여부만 확인. 설치 상태 점검, 환경 진단, 업데이트 확인, 새 로그인, 로그아웃, 계정 상세 표시는 사용자가 따로 물을 때만.
+표현: 계정 이메일, id, team/workspace/profile/scope, 정확한 만료 시각, JSON 같은 내부 값은 답변에 넣지 않음.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
@@ -1185,10 +1606,19 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         append as audit_append, now_iso8601, sha256_hex, AuditDecision, AuditRecord,
     };
     use axhub_helpers::routing::{
-        apis_intent_present, auth_status_intent_present, axhub_keyword_present, decide,
-        deploy_create_intent_present, deploy_status_intent_present, doctor_intent_present,
-        dynamic_table_intent_present, find_marker, foreign_keyword_present, is_slash_invocation,
-        token_present, MarkerStatus,
+        apis_intent_present, app_lifecycle_intent_present, apps_intent_present,
+        auth_status_intent_present, axhub_keyword_present, browse_template_intent_present,
+        clarify_intent_present, connectors_intent_present, data_intent_present, decide,
+        deploy_create_intent_present, deploy_logs_intent_present, deploy_restore_intent_present,
+        deploy_status_intent_present, deploy_trace_intent_present, deploy_verify_intent_present,
+        doctor_intent_present, dynamic_table_intent_present, env_intent_present, find_marker,
+        foreign_keyword_present, github_connection_intent_present, init_intent_present,
+        inspect_config_intent_present, install_cli_intent_present, is_slash_invocation,
+        migrate_intent_present, open_app_intent_present, publish_intent_present,
+        quality_debug_intent_present, quality_diagnose_intent_present, quality_plan_intent_present,
+        quality_review_intent_present, quality_ship_intent_present, quality_tdd_intent_present,
+        resources_intent_present, routing_stats_intent_present, statusline_intent_present,
+        team_intent_present, token_present, update_check_intent_present, MarkerStatus,
     };
 
     if hook_safety::is_hook_disabled("prompt-route") {
@@ -1247,47 +1677,219 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     // `maybe_grace_message` IS the single composable seam for the grace nudge.
     let grace = axhub_helpers::grace::maybe_grace_message(routing_decision, authed, prompt);
 
-    let mut context = format_preflight_context(&preflight);
+    let is_quality_review = quality_review_intent_present(prompt);
+    let is_auth_status = auth_status_intent_present(prompt);
+    let mut context = if is_quality_review {
+        QUALITY_REVIEW_ROUTING_HINT.to_string()
+    } else if is_auth_status {
+        AUTH_STATUS_ROUTING_HINT.to_string()
+    } else {
+        format_preflight_context(&preflight)
+    };
     if dynamic_table_intent_present(prompt) {
         context.push_str("\n\n");
         context.push_str(DYNAMIC_TABLE_ROUTING_HINT);
+    }
+    if connectors_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(CONNECTORS_ROUTING_HINT);
+    }
+    if data_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(DATA_ROUTING_HINT);
+    }
+    if resources_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(RESOURCES_ROUTING_HINT);
+    }
+    if github_connection_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(GITHUB_ROUTING_HINT);
+    }
+    if migrate_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(MIGRATE_ROUTING_HINT);
+    }
+    if publish_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(PUBLISH_ROUTING_HINT);
+    }
+    if team_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(TEAM_ROUTING_HINT);
+    }
+    if !is_quality_review && quality_review_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(QUALITY_REVIEW_ROUTING_HINT);
+    }
+    if quality_debug_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(QUALITY_DEBUG_ROUTING_HINT);
+    }
+    if quality_diagnose_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(QUALITY_DIAGNOSE_ROUTING_HINT);
+    }
+    if quality_plan_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(QUALITY_PLAN_ROUTING_HINT);
+    }
+    if quality_ship_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(QUALITY_SHIP_ROUTING_HINT);
+    }
+    if quality_tdd_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(QUALITY_TDD_ROUTING_HINT);
     }
     if apis_intent_present(prompt) {
         context.push_str("\n\n");
         context.push_str(APIS_ROUTING_HINT);
     }
+    if inspect_config_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(INSPECT_ROUTING_HINT);
+    }
+    if deploy_restore_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(DEPLOY_ROLLBACK_ROUTING_HINT);
+    }
     if deploy_status_intent_present(prompt) {
         context.push_str("\n\n");
         context.push_str(DEPLOY_STATUS_ROUTING_HINT);
+    }
+    if deploy_logs_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(DEPLOY_LOGS_ROUTING_HINT);
+    }
+    if deploy_trace_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(TRACE_ROUTING_HINT);
+    }
+    if open_app_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(OPEN_ROUTING_HINT);
+    }
+    if deploy_verify_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(VERIFY_ROUTING_HINT);
+    }
+    if routing_stats_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(ROUTING_STATS_ROUTING_HINT);
+    }
+    if env_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(ENV_ROUTING_HINT);
+    }
+    if app_lifecycle_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(APP_LIFECYCLE_ROUTING_HINT);
     }
     if deploy_create_intent_present(prompt) {
         context.push_str("\n\n");
         context.push_str(DEPLOY_CREATE_ROUTING_HINT);
     }
+    if install_cli_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(INSTALL_CLI_ROUTING_HINT);
+    }
+    if update_check_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(UPDATE_ROUTING_HINT);
+    }
     if doctor_intent_present(prompt) {
         context.push_str("\n\n");
         context.push_str(DOCTOR_ROUTING_HINT);
     }
-    if auth_status_intent_present(prompt) {
+    if statusline_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(STATUSLINE_ROUTING_HINT);
+    }
+    if !is_auth_status && auth_status_intent_present(prompt) {
         context.push_str("\n\n");
         context.push_str(AUTH_STATUS_ROUTING_HINT);
     }
-    if !hook_safety::is_karpathy_disabled() {
+    if clarify_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(CLARIFY_ROUTING_HINT);
+    }
+    if karpathy_intent_present(prompt) && !hook_safety::is_karpathy_disabled() {
         if let Some(karpathy) = axhub_helpers::karpathy_inject::user_prompt_karpathy_inject()? {
             context.push_str("\n\n");
             context.push_str(&karpathy);
         }
     }
-    let intent_system = if apis_intent_present(prompt) {
-        Some("axhub API 카탈로그 요청이에요. Skill(axhub:apis)로 최신 CLI `axhub catalog resources --json --limit 50`를 실행해 connector/path/kind 목록을 보여줘요. 제거된 `axhub apis list`는 실행하지 않아요.")
+    let intent_system = if dynamic_table_intent_present(prompt) {
+        Some("이 요청은 AXHub hosted app 의 테이블 생성/컬럼/행/권한 변경 요청이에요. 로컬 앱 코드, local database, server.js, package.json, ORM, .env, SQL migration, QA 결과 파일, plugin source 를 읽지 않아요. visible chat 첫 문장은 정확히 \"테이블 변경 내용을 확인할게요.\" 로만 말해요. 그 다음 문장도 내부 경로를 설명하지 말고 로그인 상태, 현재 앱, 대상 테이블, 컬럼 타입을 확인하겠다고만 자연스럽게 말해요. Bash title 은 `로그인 상태 확인`, `테이블 상태 확인`, `테이블 변경 준비`, `테이블 변경 실행` 같은 한국어만 써요. create/drop/column/row/grant 변경은 대상 앱, 테이블, 작업, 컬럼/행 요약을 한국어로 보여주고 사용자가 명시적으로 승인하기 전에는 실행하지 않아요. visible preview 에 raw CLI command line 을 쓰지 말고, 실제 명령은 승인 후 Bash tool call 안에서만 실행해요. Claude Desktop 에서는 AskUserQuestion, Question, 질문 카드 도구를 쓰지 말고 일반 채팅으로 `이대로 만들까요? 진행 또는 취소라고 답해 주세요.` 라고 묻고 멈춰요. 다음 사용자 답변이 `진행`이면 승인된 것으로 보고 바로 `테이블 변경 준비`, `테이블 변경 실행` 순서로 이어가요. 사용자에게 route label, slash command, skill name, workflow/워크플로, preflight, consent-mint, consent internals, command name, raw command line, raw question JSON, raw JSON, raw email, raw id, raw app slug, local file contents, repo inspection, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id, scope 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
+    } else if connectors_intent_present(prompt) {
+        Some("이 요청은 AXHub 외부 데이터베이스 연결 설정 요청이에요. 로컬 앱 코드 수정, server.js/package.json 읽기, pg 패키지 설치, DATABASE_URL 코드 연결, ORM 설정으로 우회하지 않아요. visible chat 첫 문장은 정확히 \"데이터베이스 연결을 준비할게요.\" 로만 말해요. 그 다음 문장도 내부 경로를 설명하지 말고, 현재 로그인 상태와 workspace 를 확인하겠다고만 자연스럽게 말해요. 필요한 정보가 부족하면 사람에게 묻듯이 엔진, 연결 이름, workspace, host/port/database/user/SSL 같은 연결 정보가 필요하다고 짧게 안내해요. 비밀값은 채팅에 평문으로 받지 말고 로컬 credentials 파일 또는 안전한 입력 방식을 쓰도록 안내해요. 변경 실행 전에는 현재 workspace 와 기존 연결 설정을 확인하고, 생성/수정/삭제 preview 를 보여준 뒤 명시적 승인을 받아요. Bash title 은 `커넥터 상태 확인`, `커넥터 목록 확인`, `커넥터 변경 준비`, `커넥터 변경 실행` 같은 한국어만 써요. 사용자에게 route label, slash command, skill name, workflow/워크플로, local file contents, repo inspection, package install plan, DATABASE_URL app-code path, raw JSON, raw email, raw id, preflight, consent internals, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
+    } else if data_intent_present(prompt) {
+        Some("이 요청은 AXHub 데이터 리소스 조회/설명/스니펫 요청이에요. 로컬 앱 코드, server.js, package.json, ORM, .env, QA 결과 파일, plugin source 를 읽지 않아요. visible chat 첫 문장은 정확히 \"데이터 리소스를 확인할게요.\" 로만 말해요. 이후에도 내부 경로를 설명하지 말고 로그인 상태와 연결된 데이터 리소스를 확인하겠다고만 자연스럽게 말해요. Bash title 은 `로그인 상태 확인`, `데이터 리소스 확인`, `데이터 설명`, `실데이터 확인`, `스니펫 준비` 같은 한국어만 써요. live read 는 대상, 컬럼, row limit, query shape 를 보여주고 사용자가 명시적으로 승인하기 전에는 실행하지 않아요. 리소스가 없으면 `현재 연결된 데이터 리소스를 찾지 못했어요. 먼저 데이터베이스 연결을 만들어야 해요.`처럼 말하고, raw CLI/JSON 세부값을 덧붙이지 않아요. 사용자에게 route label, slash command, skill name, workflow/워크플로, preflight, catalog 조회, catalog 비어있음, connector 목록, catalog kinds, raw JSON, raw email, raw id, account scope, raw app slug, governance/path guessing 용어, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id, scope 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
+    } else if resources_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"리소스 정리 방식을 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"리소스 현황 확인\" 으로 설정하고 `axhub-helpers resources-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 게이트웨이 리소스 정리/조직 요청이에요. 로컬 파일 정리, git 작업트리 정리, QA 산출물 정리, shim 로그 정리로 우회하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 추가 표, ToolSearch, catalog kinds, connector/resource, 원시 명령명, JSON field name, 내부 라벨, 영어 tool-title fragment, `모호`, 변경 작업을 못 한다는 단정, 로컬 파일 내용을 덧붙이지 않아요. 삭제, 이동, 이름 변경, 태그 변경, 등록 같은 변경은 대상과 작업 preview 를 보여주고 명시적 승인 전에는 실행하지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id, scope 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
+    } else if github_connection_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"GitHub 연결 상태를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"GitHub 연결 상태 확인\" 으로 설정하고 `axhub-helpers github-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub hosted app 과 GitHub 저장소의 연결 상태 확인이에요. 로컬 git remote, git config, gh CLI, GitHub PR, repo source, package 파일, .git, QA 결과 파일로 우회하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 추가 표, 원시 명령명, JSON field name, raw ID, 계정 이메일, installation ID, local git remote 증거, 파일 내용, route label, slash command, skill name, ToolSearch 설명, 영어 tool-title fragment 를 사용자에게 쓰지 않아요. 연결/해제/repo 생성/remote 추가/push 는 변경 작업이므로 대상 preview 와 명시적 승인 전에는 실행하지 않아요.")
+    } else if migrate_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"가져오기 상태를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"가져오기 상태 확인\" 으로 설정하고 `axhub-helpers migrate-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 기존 앱이나 현재 프로젝트를 AXHub로 가져올 수 있는지 확인하는 요청이에요. 로컬 서버 점검, package script 분석, git release 상태, 일반 배포 조언, QA 결과 파일, 이전 배포 실패 상태로 우회하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 추가 표, 원시 명령명, JSON field name, raw deploy status field, local server 증거, 파일 내용, route label, slash command, skill name, ToolSearch 설명, emoji, 영어 tool-title fragment 를 사용자에게 쓰지 않아요. 앱 등록, GitHub 연결, env 저장, 배포는 변경 작업이므로 대상 preview 와 명시적 승인 전에는 실행하지 않아요.")
+    } else if publish_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"공개 심사 준비를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"공개 심사 준비 확인\" 으로 설정하고 `axhub-helpers publish-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 마켓플레이스 공개 심사 제출 준비 요청이에요. quality.json, state file, QA 결과 파일, repo 파일, package 파일, plugin source, 로컬 상태 점검으로 우회하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 추가 표, 원시 명령명, JSON field name, raw review status field, route label, slash command, skill name, ToolSearch 설명, preflight, quality state, file 내용, 영어 tool-title fragment, workflow/워크플로 라벨을 사용자에게 쓰지 않아요. 공개 심사 제출은 외부 공개 변경 작업이므로 제출 사유, 대상 앱 preview, 명시적 승인 전에는 실행하지 않아요.")
+    } else if team_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"팀 작업을 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"팀 작업 확인\" 으로 설정하고 `axhub-helpers team-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 워크스페이스 팀원 초대, 초대 목록, 또는 앱 접근 공유 요청이에요. Claude/OMC 멀티에이전트 작업 팀, 코드 작업 팀, 일반 협업자 모집, 파일/프로젝트 탐색으로 우회하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 추가 표, 원시 명령명, JSON field name, raw tenant id, raw user id, 사용자가 직접 쓴 이메일 외의 raw email, route label, slash command, skill name, ToolSearch 설명, preflight, tenant/workspace 구현 용어, OMC/Claude 팀 비교, 파일 내용, 영어 tool-title fragment, workflow/워크플로 라벨을 사용자에게 쓰지 않아요. 초대 발송, 초대 취소, 앱 접근 변경은 권한 변경 작업이므로 대상자와 대상 preview, 명시적 승인 전에는 실행하지 않아요.")
+    } else if is_quality_review {
+        None
+    } else if quality_debug_intent_present(prompt) {
+        Some("visible chat 첫 문장은 정확히 \"원인을 좁혀볼게요.\" 한 문장만 말해요. 이 요청은 직접 코드/테스트 디버그 요청이에요. background quality auto-mode 나 일반 파일 탐색 답변으로 처리하지 말고 바로 전용 디버그 절차를 시작해요. `.axhub-state/quality.json` 은 직접 디버그 시작 전에 읽지 않아요. 첫 Bash tool call 은 `문제 신호 확인` 또는 `최근 실패 확인` 같은 한국어 title 만 써요. generic file listing, repo survey, local QA 결과 읽기부터 시작하지 않아요. 증상/로그 수집, 가설, 증거, 다음 probe 순서로 정리해요. 디버그 패스를 마치면 `디버그 상태 저장` title 로 `axhub-helpers state-update --debug-acknowledged` 를 실행해요. visible text 에 route label, slash command, skill name, quality auto-mode, workflow/워크플로, TodoWrite availability, preflight internals, raw JSON field, raw email, 파일 listing 설명, 영어 tool-title fragment 를 쓰지 않아요.")
+    } else if quality_diagnose_intent_present(prompt) {
+        Some("visible chat 첫 문장은 정확히 \"진단 루프를 준비할게요.\" 한 문장만 말해요. 이 요청은 직접 auto-diagnose loop 요청이에요. background quality auto-mode 나 일반 파일 탐색 답변으로 처리하지 말고 진단 루프 절차를 시작해요. 첫 Bash tool call 은 `진단 루프 준비` 또는 `실패 신호 확인` 같은 한국어 title 만 써요. Claude Desktop 에서는 raw AskUserQuestion JSON 이 보일 수 있으니 질문 카드 JSON 을 노출하지 말고, 선택이 필요하면 일반 채팅으로 짧은 한국어 선택지를 물은 뒤 멈춰요. visible text 에 route label, slash command, skill name, quality auto-mode, workflow/워크플로, preflight internals, raw JSON field, raw email, 영어 tool-title fragment 를 쓰지 않아요.")
+    } else if quality_plan_intent_present(prompt) {
+        Some("visible chat 첫 문장은 정확히 \"변경 계획을 잡아볼게요.\" 한 문장만 말해요. 이 요청은 직접 변경 계획 요청이에요. background quality auto-mode 나 일반 파일 탐색 답변으로 처리하지 말고 계획 절차를 시작해요. 첫 Bash tool call 은 `계획 범위 확인` 또는 `영향 범위 확인` 같은 한국어 title 만 써요. 요구 범위, 영향 범위, 3-5단계 계획, 검증 명령을 정리하고, 이 단계에서는 구현을 바로 시작하지 않아요. visible text 에 route label, slash command, skill name, quality auto-mode, workflow/워크플로, TodoWrite availability, preflight internals, raw JSON field, raw email, 영어 tool-title fragment 를 쓰지 않아요.")
+    } else if quality_ship_intent_present(prompt) {
+        Some("visible chat 첫 문장은 정확히 \"출시 준비 상태를 확인할게요.\" 한 문장만 말해요. 이 요청은 직접 PR/release readiness 요청이에요. background quality auto-mode 나 일반 파일 탐색 답변으로 처리하지 말고 출시 준비 절차를 시작해요. 첫 Bash tool call 은 `출시 준비 확인` 또는 `리뷰 상태 확인` 같은 한국어 title 만 써요. PR 생성, push, release, publish, deploy 같은 외부 변경은 대상 preview 와 명시적 승인 전에는 실행하지 않아요. 준비 패스가 실제로 완료되면 `출시 상태 저장` title 로 `axhub-helpers state-update --shipped` 를 실행해요. visible text 에 route label, slash command, skill name, quality auto-mode, workflow/워크플로, TodoWrite availability, preflight internals, raw JSON field, raw email, 영어 tool-title fragment 를 쓰지 않아요.")
+    } else if quality_tdd_intent_present(prompt) {
+        Some("visible chat 첫 문장은 정확히 \"테스트부터 잡아볼게요.\" 한 문장만 말해요. 이 요청은 직접 TDD 사이클 요청이에요. background quality auto-mode 나 일반 파일 탐색 답변으로 처리하지 말고 TDD 절차를 시작해요. 첫 Bash tool call 은 `TDD 대상 확인` 또는 `테스트 확인` 같은 한국어 title 만 써요. 대상 동작이 없으면 관련 없는 모듈을 임의 선택하지 말고 사람에게 묻듯이 어떤 동작부터 테스트할지 물어요. RED, GREEN, REFACTOR 순서를 유지해요. visible text 에 route label, slash command, skill name, quality auto-mode, workflow/워크플로, TodoWrite availability, preflight internals, raw JSON field, raw email, 영어 tool-title fragment 를 쓰지 않아요.")
+    } else if app_lifecycle_intent_present(prompt) {
+        Some("AXHub hosted app 을 멈추거나 다시 켜거나 복제하려는 요청이에요. 이 대화 안에서 바로 진행하고 slash command 를 호출하지 않아요. 내부 처리, route conversion, 라벨 설명 문장을 visible chat 에 쓰지 않아요. 로컬 Next.js/dev-server 프로세스, 포트, ps/lsof, package script, 로컬 서버 상태를 확인하지 않아요. pause 의 첫 visible chat 문장은 `<앱 이름> 앱을 잠깐 멈출 준비를 할게요.` 형태로 말하고, resume 은 `<앱 이름> 앱을 다시 켤 준비를 할게요.`, fork 는 `<앱 이름> 앱을 복제할 준비를 할게요.` 로 말해요. Bash tool title 은 `앱 상태 확인`, `앱 찾기`, `앱 변경 준비`, `앱 변경 실행` 같은 한국어만 써요. 추가 조회가 필요하면 visible chat 은 `앱을 한 번 더 확인할게요.` 로만 말하고 식별자 조회를 설명하지 않아요. 로그인과 현재 앱을 확인하고, AXHub 앱을 찾고, 서비스 영향 설명 뒤 `앱 변경을 실행할까요?` 라고 묻고 visible option 은 `취소`, `진행`만 써요. 로그인 확인 결과에는 계정 이메일, owner 이름, raw user id 를 쓰지 않아요. 앱 metadata 의 raw enum 값은 한국어 라벨로만 번역해요. `private`, `public`, `development`, `production` 같은 raw enum 이나 `비공개 (private)` 같은 혼합 표기를 쓰지 않아요. 사용자가 `진행`을 고르기 전에는 앱 상태를 바꾸지 않아요. `진행` 뒤에는 visible chat 에 아무 문장도 쓰지 말고 바로 Bash tool call 을 실행해요. `User chose`, `Mint consent`, `execute suspend`, `execute resume` 같은 영어 구현 문장을 쓰지 않아요. 승인 준비 Bash tool call 과 앱 변경 Bash tool call 을 분리하고, 둘을 한 Bash command 로 합치지 않아요. 승인 준비는 app-lifecycle 전용 typed helper 인 `axhub-helpers consent-mint-app-lifecycle --action suspend|resume|fork --app <literal-next-app-arg> --quiet` 만 써요. suspend/resume 승인 준비의 `--app` 값은 resolved UUID 가 아니라 바로 다음 `axhub apps suspend|resume ...` 명령에 들어갈 literal 앱 인자와 정확히 같아야 해요. 예: `axhub apps suspend testnextjs --execute --json >/dev/null` 를 실행할 거면 준비 명령의 `--app` 도 `testnextjs` 예요. JSON 을 직접 만들지 않고, `consent-mint`, schema 확인, source 탐색, fixture 탐색, helper 위치 탐색, grep, rg 같은 탐색 명령을 실행하지 않아요. trailing success echo 로 준비 실패를 숨기지 않아요. 앱 변경은 별도 Bash tool call 로 matching top-level `axhub apps ... --execute --json >/dev/null` 만 실행하고, raw JSON stdout 을 tool panel 에 남기지 않아요. 첫 `앱 변경 실행` 이 exit code 0 으로 끝나면 그것이 terminal success 예요. `[DESTRUCTIVE] about to run ...` 는 hook 안내일 뿐 실패가 아니므로 다시 준비하거나 다시 실행하지 않아요. mutation 을 재검증한다는 이유로 같은 변경 명령을 다시 실행하지 않아요. 내부 보안 gate 가 막으면 gate 내부를 설명하지 말고, schema/source/fixture/helper 탐색 없이 같은 변경 준비를 한 번만 재시도해요. 그래도 실패하면 `앱 변경을 시작하지 못했어요. 다시 시도해 주세요.` 라고만 말해요. route label, slash command, skill name, preflight details, internal app/context fields, auth results, runtime words, lifecycle verbs in English, raw JSON, raw identifier, owner name, 계정 이메일, 영어 tool title fragment, permission-decision details, helper binding details, 괄호 안 내부 라벨을 사용자에게 쓰지 않아요.")
+    } else if init_intent_present(prompt) {
+        Some("현재 axhub 프로젝트에서 새 앱 생성 요청이에요. 이 요청은 브레인스토밍이나 일반 프로젝트 탐색이 아니라 axhub 앱 생성 절차로 처리해요. 템플릿 목록을 먼저 보여주고, 앱 이름과 실행 승인을 받기 전에는 `axhub apps bootstrap --execute`를 실행하지 않아요. 사용자에게 내부 라벨 설명을 하지 말고 자연어로 템플릿/이름을 물어봐요. Visible chat 의 첫 문장은 정확히 \"새 앱을 만들 수 있는 템플릿을 확인할게요.\" 로 시작해요. 이 문장 앞에는 아무 말도 붙이지 않아요.")
+    } else if apps_intent_present(prompt) {
+        Some("axhub 내 앱 목록/관리 요청이에요. 현재 팀 scope 의 앱 목록을 보여줘요. 생성/수정/삭제는 별도 승인 전에는 실행하지 않아요. 사용자에게 내부 라벨 설명을 하지 말고 바로 결과 확인 문장으로 시작해요.")
+    } else if browse_template_intent_present(prompt) {
+        Some("axhub 템플릿 또는 마켓플레이스 탐색 요청이에요. 공개 앱/템플릿을 read-only 로 보여줘요. 내 앱 목록은 앱 목록 흐름, 새 앱 생성은 앱 생성 흐름으로 이어가요. 사용자에게 내부 라벨 설명을 하지 말고 바로 탐색 결과 확인 문장으로 시작해요.")
+    } else if apis_intent_present(prompt) {
+        Some("axhub API 카탈로그 요청이에요. 최신 CLI `axhub catalog resources --json --limit 50`를 실행해 connector/path/kind 목록을 보여줘요. 제거된 `axhub apis list`는 실행하지 않아요. 사용자에게 내부 라벨 설명을 하지 말고 바로 카탈로그 확인 문장으로 시작해요.")
+    } else if inspect_config_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"매니페스트와 설정을 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"매니페스트와 설정 확인\" 으로 설정하고 `axhub-helpers inspect-config-summary` 를 한 번만 실행해요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 추가 진단, 표, 원시 명령명, JSON field name, 파일 내용, 내부 라벨, 영어 tool title fragment 를 사용자에게 쓰지 않아요. raw `axhub manifest validate`, raw `axhub config explain`, Read tool, LS tool, Glob tool, Grep tool, `ls`, `find`, `cat`, `.claude-plugin/plugin.json`, marketplace.json, hooks.json 읽기는 호출하지 않아요. secret 은 복원하거나 추측하지 않아요.")
+    } else if deploy_restore_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"되돌릴 수 있는 배포를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"배포 되돌리기 확인\" 으로 설정하고 `axhub-helpers rollback-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 배포 되돌리기/복구 요청이에요. rollback 인지 recover 인지, slash command, skill name, route label 을 사용자에게 설명하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 실제 되돌리기나 재배포는 외부 변경 작업이므로 사용자가 한국어 preview 를 보고 명시적으로 승인하기 전에는 실행하지 않아요. 원시 명령명, raw deploy id, raw commit hash, raw status name, commit_not_found, no-op, app id/slug, preflight, JSON field name, 로컬 파일 탐색, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if deploy_status_intent_present(prompt) {
-        Some("axhub 배포 상태 요청이에요. Skill(axhub:status)를 사용하고, 로그인/토큰 확인이 필요하면 그 안내를 한국어로 말해요.")
+        Some("axhub 배포 상태 요청이에요. 로그인/토큰 확인이 필요하면 그 안내를 한국어로 말해요. 사용자에게 내부 라벨 설명을 하지 말고 바로 상태 확인 문장으로 시작해요.")
+    } else if deploy_trace_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"배포 기록을 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"배포 기록 확인\" 으로 설정하고 `axhub-helpers trace-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 배포 실패 원인 확인이에요. route, slash command, skill name, preflight, deploy id, raw status name, JSON field name, failure_reason, matched_patterns, build_log_errors, QA 결과 파일, plugin source, 영어 tool title fragment 를 사용자에게 쓰지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 표나 추가 조사 레이어를 덧붙이지 않아요.")
+    } else if deploy_logs_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"로그를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"로그 확인\" 으로 설정하고 `axhub-helpers logs-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 앱 배포 로그 확인이에요. 로컬 파일 로그, .omc 로그, git log, 플러그인 캐시, 패키지 로그를 찾지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 추가 진단, 원시 명령명, JSON field name, 파일 내용, 내부 라벨, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
+    } else if open_app_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"앱 페이지를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"앱 페이지 확인\" 으로 설정하고 `axhub-helpers open-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 앱 페이지 열기예요. QA 결과 파일, .omc, .claude, 플러그인 캐시, git log, Chrome MCP 상태, 브라우저 확장 상태를 찾지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 추가 진단, 원시 명령명, JSON field name, 파일 내용, 내부 라벨, ToolSearch 설명, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
+    } else if deploy_verify_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"배포가 실제로 열리는지 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"배포 검증\" 으로 설정하고 `axhub-helpers verify-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 배포 라이브 검증이에요. routing, preflight, stale cache id, deploy id, user email, raw status name, JSON field name, 중간 fallback 시도, 내부 라벨을 사용자에게 쓰지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요.")
+    } else if routing_stats_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"라우팅 통계를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"라우팅 통계 확인\" 으로 설정하고 `axhub-helpers routing-stats --since 7d` 를 한 번만 실행해요. 이 요청은 AXHub 플러그인 라우팅 통계 확인이에요. QA 결과 파일, desktop QA 로그, repo 파일, plugin source, git history, .omc, .claude, 로컬 프로젝트 노트를 읽지 않아요. 도구가 끝나면 stdout 의 한국어 요약만 짧게 답변해요. 원시 명령명, 파일 내용, 내부 라벨, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
+    } else if env_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"환경변수를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"환경변수 확인\" 으로 설정하고 `axhub-helpers env-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 앱 환경변수 확인이에요. 셸 환경변수, .env 파일, repo 파일, plugin source, git history, .omc, .claude, QA 결과 파일을 읽지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 원시 명령명, JSON field name, 내부 라벨, preflight, raw value, secret value, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if deploy_create_intent_present(prompt) {
-        Some("axhub 배포 요청이에요. Skill(axhub:deploy)를 사용해요. 토큰 만료나 인증 오류가 있으면 원인/해결을 한국어로 말해요.")
-    } else if auth_status_intent_present(prompt) {
-        Some("axhub 로그인/인증 상태 요청이에요. Skill(axhub:auth)로 `axhub auth status`를 확인해 계정·만료·scope 를 보여줘요. 무거운 doctor 진단 카드는 쓰지 않아요.")
+        Some("도구를 호출하거나 스킬 내용을 요약하기 전에 visible chat 으로 정확히 \"배포 준비를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"배포 준비 확인\" 으로 설정하고 `axhub-helpers deploy-preview-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 도구가 끝나면 stdout 의 한국어 preview 를 그대로 보여주고 명시적 승인 질문을 해요. 이 preview 전에는 긴 deploy skill 본문을 읽거나 요약하지 않아요. 사용자가 승인하면 두 번째 Bash tool call 의 description/title 은 정확히 \"배포 실행\" 으로 설정하고 `axhub-helpers deploy-approved-run --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 승인 후에는 skill 을 다시 호출하거나 긴 deploy skill 본문을 읽지 않아요. 이 요청은 AXHub 라이브 배포 요청이에요. 일반 release/git release/다른 호스팅 배포로 우회하지 않아요. 실제 배포 전에는 앱, 환경, 브랜치, 커밋, 예상 시간을 보여주고 명시적 사용자 승인을 받아요. 본문에는 route label, slash command, command mapping, skill name, `Invoke deploy skill`, `Read rest of SKILL`, `Read full SKILL`, `Route=axhub`, `preflight`, `deploy-prep`, HMAC, consent token, raw helper JSON, raw id, raw email, 영어 tool title fragment 를 쓰지 않아요. 승인 후 실행 단계의 Bash tool title 은 `배포 실행` 또는 `배포 상태 확인` 같은 한국어로만 써요. 토큰 만료나 인증 오류가 있으면 로그인 필요 여부를 한국어로 안전하게 설명하고 로그인은 묻기 전에는 시작하지 않아요.")
+    } else if is_auth_status {
+        None
+    } else if install_cli_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"설치 상태를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"설치 상태 확인\" 으로 설정하고 `axhub-helpers install-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub CLI 설치 요청이에요. 이미 설치되어 있으면 설치 작업이 필요 없다고만 말하고 installer 를 실행하지 않아요. 설치되어 있지 않으면 공식 설치를 진행할 수 있다고 안내하고, 실제 설치 명령은 명시적 승인 전에는 실행하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 원시 명령명, slash command, skill name, 내부 라벨, raw JSON field, auth status field, 파일 경로, installer URL, preflight, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
+    } else if update_check_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"업데이트를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"업데이트 확인\" 으로 설정하고 `axhub-helpers update-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub CLI 업데이트 확인이에요. update apply, install, doctor, auth login/logout, plugin update, cache scan, compatibility diagnostics 로 우회하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 사용자가 명시적으로 적용을 승인하기 전에는 업데이트를 실행하지 않아요. 원시 명령명, slash command, skill name, 내부 라벨, raw JSON field, has_update, 파일 경로, installer URL, plugin update 제안, preflight, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if doctor_intent_present(prompt) {
-        Some("axhub 환경 점검 요청이에요. Skill(axhub:doctor)를 사용해요. CLI 버전이 오래됐으면 업그레이드/확인 안내를 한국어로 말해요.")
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"설치 상태를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"설치 상태 확인\" 으로 설정하고 `axhub-helpers doctor-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub CLI/플러그인/로그인 준비 상태 확인이에요. 설치, 업데이트, 로그인, 로그아웃, 설정 변경은 사용자가 명시적으로 요청하지 않았으면 실행하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 원시 명령명, slash command, skill name, 내부 라벨, raw JSON field, raw user email, 파일 경로, preflight, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
+    } else if statusline_intent_present(prompt) {
+        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"상태바 설정을 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"상태바 설정\" 으로 설정하고 `axhub-helpers statusline-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 상태바 활성화예요. 기존 다른 상태바가 있으면 덮어쓰지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 원시 명령명, slash command, skill name, 내부 라벨, raw settings JSON, 기존 command 문자열, exit code, scope fallback 설명, statusLine/wire/settings-merge 용어, 파일 경로, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
+    } else if clarify_intent_present(prompt) {
+        Some("사용자가 AXHub에서 무엇을 할지 넓게 물었어요. visible chat 첫 문장은 정확히 \"어떤 걸 도와드릴까요?\" 로만 말해요. 곧바로 질문 카드 하나를 열고 header 는 \"작업 선택\", question 은 \"어떤 걸 도와드릴까요?\" 로 설정해요. 선택지는 \"환경 점검\", \"앱 배포\", \"앱과 리소스 조회\", \"문제 원인 보기\", \"처음부터 안내\" 다섯 개만 보여줘요. 질문 카드 도구가 value 를 요구하면 각 value 는 visible label 과 같은 한국어 문구로 설정해요. 영어 skill slug 나 slash-command form 을 담은 hidden value 는 넣지 말아요. 설명은 자연어로만 쓰고 괄호 안 영어/내부 라벨, slash command, skill name, command mapping, route label, raw tool name, 사용자를 탓하는 모호성 표현을 사용자에게 쓰지 않아요. 사용자가 고른 뒤에는 Claude Skill tool 이나 slash command 를 호출하지 말고 inline 으로 이어가요. \"환경 점검\" 선택 시 visible chat 은 정확히 \"설치 상태를 확인할게요.\" 한 문장으로 시작하고, 첫 Bash tool call 의 description/title 은 정확히 \"설치 상태 확인\" 으로 설정한 뒤 `axhub-helpers doctor-summary --user-utterance \"<처음 사용자가 한 넓은 문장>\"` 를 한 번만 실행해요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변해요. \"앱 배포\" 선택 시 visible chat 은 정확히 \"배포 준비를 확인할게요.\" 로 시작하고 `axhub-helpers deploy-preview-summary --user-utterance \"<처음 사용자가 한 넓은 문장>\"` 만 먼저 실행해요.")
     } else {
         None
     };
@@ -1307,6 +1909,24 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
 /// Single substring check for measurement only. NOT intent classification.
 fn heuristic_axhub_keyword(prompt: &str) -> bool {
     prompt.to_lowercase().contains("axhub")
+}
+
+/// Explicit coding-reminder phrases only. Do not inject this unrelated SKILL
+/// into ordinary axhub deploy/status/auth prompts.
+fn karpathy_intent_present(prompt: &str) -> bool {
+    let lower = prompt.to_lowercase();
+    [
+        "작은 diff",
+        "테스트 우선",
+        "과신 금지",
+        "evidence first",
+        "keep changes small",
+        "small diff",
+        "tests first",
+        "no overconfidence",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
 }
 
 /// Render preflight result as a tagged additionalContext block. User-facing
@@ -1830,7 +2450,7 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
 
 // Phase 7 (Component 6): SessionStart magical-moment message.
 //
-// Base systemMessage (onboarding: setup/doctor/help + 자주 쓰는 명령 + audit
+// Base systemMessage (onboarding, common natural-language actions, and audit
 // disclosure) + current-version first-session welcome (one-shot, gated by the
 // welcome marker file). Marker write is best-effort — failure surfaces the
 // welcome again next session, never blocks Claude.
@@ -1846,11 +2466,12 @@ pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
 
     let mut lines: Vec<String> = vec![
         format!("axhub 준비됐어요 (v{}).", env!("CARGO_PKG_VERSION")),
-        "- 처음이면 /axhub:setup — 설치·로그인·첫 배포까지 안내해요.".to_string(),
-        "- 막히거나 안 되면 /axhub:doctor (진단) · /axhub:help (전체 명령).".to_string(),
-        "- 자주 쓰는 것: 배포 /axhub:deploy · 상태 /axhub:status · 로그 /axhub:logs · 앱 목록 /axhub:apps."
+        "- 처음이면 \"처음 설정 도와줘\"라고 말하면 설치·로그인·첫 배포까지 안내해요.".to_string(),
+        "- 막히거나 안 되면 \"설치 상태 확인해줘\" 또는 \"도움말 보여줘\"라고 말해 주세요."
             .to_string(),
-        "- 비대화형이면 AskUserQuestion 대신 SKILL safe default 로 바로 진행해요."
+        "- 자주 쓰는 말: \"배포해\", \"상태 보여줘\", \"로그 보여줘\", \"앱 목록 보여줘\"."
+            .to_string(),
+        "- 비대화형 환경에서는 안전한 기본값으로 진행하고 위험 작업은 승인 없이는 실행하지 않아요."
             .to_string(),
         "- 외부로 전송하지 않는 감사 로그는 로컬에 일주일간 저장돼요. 끄려면 말씀해주세요."
             .to_string(),
@@ -1862,11 +2483,13 @@ pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
         lines.push(String::new());
         lines.push(format!("[axhub v{WELCOME_VERSION} 첫 세션] 환영해요."));
         lines.push(
-            "- 가장 쉬운 시작: \"안녕\" 또는 /axhub:setup — 설치부터 첫 배포까지 함께 가요."
+            "- 가장 쉬운 시작: \"안녕\" 또는 \"처음 설정 도와줘\" — 설치부터 첫 배포까지 함께 가요."
                 .to_string(),
         );
         lines.push("- 이미 앱이 있으면 \"배포해\" 한마디면 돼요.".to_string());
-        lines.push("- 헷갈리면 /axhub:help (명령 메뉴) · /axhub:doctor (점검).".to_string());
+        lines.push(
+            "- 헷갈리면 \"도움말 보여줘\" 또는 \"설치 상태 확인해줘\"라고 말해 주세요.".to_string(),
+        );
 
         if let Some(path) = marker {
             if let Some(parent) = path.parent() {
@@ -2098,6 +2721,1880 @@ fn cmd_mark(rest: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
+fn cmd_publish_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("publish-summary", rest)?;
+    let preflight = run_preflight();
+    let output = &preflight.output;
+
+    println!("공개 심사 준비를 확인했어요.");
+
+    if !output.cli_present {
+        println!("- CLI를 먼저 설치해야 공개 심사 준비를 확인할 수 있어요.");
+        println!("- 설치가 필요하면 \"axhub 설치해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+    if output.cli_too_old || output.cli_too_new {
+        println!("- 현재 CLI 버전으로는 공개 심사 제출을 안전하게 진행하지 않을게요.");
+        println!("- 먼저 설치 상태를 확인한 뒤 다시 시도해 주세요.");
+        return Ok(0);
+    }
+    if !output.auth_ok {
+        println!("- 로그인: 다시 로그인이 필요해요.");
+        println!("- 제출 준비를 계속하려면 \"로그인해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+
+    let resolve_args = vec![
+        "--intent".to_string(),
+        "publish".to_string(),
+        "--user-utterance".to_string(),
+        user_utterance.clone(),
+    ];
+    let resolved = run_resolve(&resolve_args);
+    let app = resolved
+        .output
+        .app_slug
+        .clone()
+        .or_else(|| resolved.output.app_id.clone())
+        .or_else(|| output.current_app.clone());
+
+    let Some(app) = app else {
+        println!("- 현재 폴더에서 연결된 앱을 찾지 못했어요.");
+        println!("- 앱 이름이 들어간 폴더에서 다시 묻거나, 먼저 앱을 골라 주세요.");
+        return Ok(0);
+    };
+
+    println!("- 대상 앱: {}", redact(&app));
+    if publish_note_present(&user_utterance) {
+        println!("- 제출 사유: 대화에 포함된 문구로 미리보기를 만들 수 있어요.");
+    } else {
+        println!("- 제출 사유: 아직 필요해요.");
+        println!("- 계속하려면 심사에 보낼 한 줄 사유를 알려 주세요.");
+    }
+    println!("- 공개 심사는 앱을 마켓플레이스 검토 대상으로 보내는 외부 변경 작업이에요.");
+    println!("제출은 대상 앱과 사유 미리보기를 보여드리고, 명시적으로 승인받은 뒤에만 진행할게요.");
+    Ok(0)
+}
+
+fn publish_note_present(utterance: &str) -> bool {
+    let lower = utterance.to_lowercase();
+    let p = lower.as_str();
+    [
+        "사유는",
+        "사유:",
+        "제출 사유",
+        "note",
+        "reason",
+        "왜냐면",
+        "설명은",
+    ]
+    .iter()
+    .any(|needle| p.contains(needle))
+}
+
+fn cmd_rollback_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("rollback-summary", rest)?;
+    let preflight = run_preflight();
+    let output = &preflight.output;
+
+    println!("되돌릴 수 있는 배포를 확인했어요.");
+
+    if !output.cli_present {
+        println!("- CLI를 먼저 설치해야 배포 기록을 확인할 수 있어요.");
+        println!("- 설치가 필요하면 \"axhub 설치해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+    if output.cli_too_old || output.cli_too_new {
+        println!("- 현재 CLI 버전으로는 되돌리기 여부를 안전하게 판단하지 않을게요.");
+        println!("- 먼저 설치 상태를 확인한 뒤 다시 시도해 주세요.");
+        return Ok(0);
+    }
+    if !output.auth_ok {
+        println!("- 로그인: 다시 로그인이 필요해요.");
+        println!("- 계속하려면 \"로그인해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+
+    let resolve_args = vec![
+        "--intent".to_string(),
+        "recover".to_string(),
+        "--user-utterance".to_string(),
+        user_utterance,
+    ];
+    let resolved = run_resolve(&resolve_args);
+    let app = resolved
+        .output
+        .app_slug
+        .clone()
+        .or_else(|| resolved.output.app_id.clone())
+        .or_else(|| output.current_app.clone());
+
+    let Some(app) = app else {
+        println!("- 현재 폴더에서 연결된 앱을 찾지 못했어요.");
+        println!("- 앱 이름이 들어간 폴더에서 다시 묻거나, 먼저 앱을 골라 주세요.");
+        return Ok(0);
+    };
+
+    let list = run_list_deployments(ListDeploymentsArgs {
+        app_id: app,
+        limit: Some(10),
+    });
+    if list.exit_code != 0 {
+        println!("- 배포 기록을 확인하지 못했어요.");
+        println!("- 로그인 상태나 앱 권한을 확인한 뒤 다시 시도해 주세요.");
+        return Ok(0);
+    }
+    if list.deployments.is_empty() {
+        println!("- 아직 배포 이력이 없어서 되돌릴 대상이 없어요.");
+        println!("- 먼저 배포를 시작한 뒤 다시 확인하면 돼요.");
+        return Ok(0);
+    }
+
+    let latest = &list.deployments[0];
+    let successful = list
+        .deployments
+        .iter()
+        .filter(|deploy| rollback_status_successish(&deploy.status))
+        .collect::<Vec<_>>();
+
+    if rollback_status_successish(&latest.status) {
+        describe_successful_latest_for_rollback(&successful);
+    } else {
+        describe_unsuccessful_latest_for_rollback(&successful, latest);
+    }
+
+    Ok(0)
+}
+
+fn describe_successful_latest_for_rollback(successful: &[&DeploymentSummary]) {
+    if successful.len() >= 2 {
+        println!("- 현재 공개된 버전에서 한 단계 이전 성공 버전으로 되돌릴 수 있어요.");
+        println!("- 이 작업은 이전 성공 버전을 새 배포로 다시 올리는 방식이에요.");
+        println!("진행하려면 \"진행\"이라고 답해 주세요. 실제 변경 전에는 한 번 더 미리보기와 승인을 받을게요.");
+    } else {
+        println!("- 현재 공개된 성공 배포는 찾았지만, 그보다 이전 성공 배포는 없어요.");
+        println!("- 되돌릴 대상이 부족해서 지금은 변경하지 않을게요.");
+    }
+}
+
+fn describe_unsuccessful_latest_for_rollback(
+    successful: &[&DeploymentSummary],
+    latest: &DeploymentSummary,
+) {
+    if rollback_status_in_flight(&latest.status) {
+        println!("- 방금 시도한 배포는 아직 진행 중이에요.");
+        println!("- 지금 되돌리기보다 먼저 상태가 끝나는지 확인하는 편이 안전해요.");
+        println!("- 계속 보려면 \"배포 상태 봐줘\"라고 말해 주세요.");
+        return;
+    }
+
+    if successful.is_empty() {
+        println!("- 방금 시도한 배포는 공개 버전으로 반영되지 않았어요.");
+        println!("- 이전에 성공한 배포를 찾지 못해서 되돌릴 대상이 없어요.");
+        println!("- 실패 원인을 본 뒤 다시 배포하는 쪽이 안전해요.");
+        return;
+    }
+
+    println!("- 방금 시도한 배포는 공개 버전으로 반영되지 않았어요.");
+    println!("- 현재 공개된 버전은 이미 최근 성공 버전으로 보입니다.");
+    if successful.len() >= 2 {
+        println!("- 그래도 한 단계 더 이전 성공 버전으로 되돌리는 선택지는 있어요.");
+        println!("진행하려면 \"진행\"이라고 답해 주세요. 실제 변경 전에는 한 번 더 미리보기와 승인을 받을게요.");
+    } else {
+        println!("- 더 이전에 되돌릴 성공 배포는 찾지 못했어요.");
+        println!("- 지금은 그대로 두는 게 안전해요.");
+    }
+}
+
+fn rollback_status_successish(status: &str) -> bool {
+    matches!(
+        status.to_ascii_lowercase().as_str(),
+        "succeeded" | "success" | "live" | "deployed" | "active" | "ok"
+    )
+}
+
+fn rollback_status_in_flight(status: &str) -> bool {
+    matches!(
+        status.to_ascii_lowercase().as_str(),
+        "pending" | "queued" | "building" | "deploying" | "running" | "in_progress"
+    )
+}
+
+fn cmd_team_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("team-summary", rest)?;
+    let preflight = run_preflight();
+    let output = &preflight.output;
+
+    println!("팀 작업을 확인했어요.");
+
+    if !output.cli_present {
+        println!("- CLI를 먼저 설치해야 팀 작업을 확인할 수 있어요.");
+        println!("- 설치가 필요하면 \"axhub 설치해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+    if output.cli_too_old || output.cli_too_new {
+        println!("- 현재 CLI 버전으로는 팀 작업을 안전하게 진행하지 않을게요.");
+        println!("- 먼저 설치 상태를 확인한 뒤 다시 시도해 주세요.");
+        return Ok(0);
+    }
+    if !output.auth_ok {
+        println!("- 로그인: 다시 로그인이 필요해요.");
+        println!("- 계속하려면 \"로그인해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+
+    let request = team_request_kind(&user_utterance);
+    let team = output
+        .current_team_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|team| !team.is_empty());
+
+    match request {
+        TeamRequestKind::ListInvitations => {
+            let Some(team) = team else {
+                println!("- 먼저 작업할 워크스페이스를 골라야 초대 목록을 볼 수 있어요.");
+                println!("- 워크스페이스 이름을 알려 주면 그 범위에서 다시 확인할게요.");
+                return Ok(0);
+            };
+            let list = run_axhub(&[
+                "invitations",
+                "list",
+                "--status",
+                "pending",
+                "--expires-within",
+                "168h",
+                "--tenant",
+                team,
+                "--json",
+            ]);
+            if list.exit_code != 0 {
+                println!("- 초대 목록을 확인하지 못했어요.");
+                if list.timed_out {
+                    println!("- 조회가 오래 걸려 중단했어요.");
+                } else {
+                    println!("- 워크스페이스 권한이나 로그인 상태를 확인한 뒤 다시 시도해 주세요.");
+                }
+                return Ok(0);
+            }
+            let parsed = serde_json::from_str::<Value>(&list.stdout).unwrap_or(Value::Null);
+            let items = response_items(&parsed)
+                .map(|items| items.as_slice())
+                .unwrap_or(&[]);
+            println!(
+                "- 현재 선택된 워크스페이스의 대기 중인 초대: {}개",
+                items.len()
+            );
+            for item in items.iter().take(5) {
+                let email = item
+                    .get("email")
+                    .or_else(|| item.get("invitee_email"))
+                    .and_then(Value::as_str)
+                    .map(redact)
+                    .unwrap_or_else(|| "이메일 숨김".to_string());
+                let role = item
+                    .get("role")
+                    .and_then(Value::as_str)
+                    .map(team_role_label)
+                    .unwrap_or("멤버");
+                println!("- {email}: {role}");
+            }
+            if items.len() > 5 {
+                println!("- 그 밖에 {}개가 더 있어요.", items.len() - 5);
+            }
+            println!("초대 취소나 재발송은 대상 미리보기와 승인 후 진행할게요.");
+        }
+        TeamRequestKind::AppAccess => {
+            let app = output
+                .current_app
+                .as_deref()
+                .map(str::trim)
+                .filter(|app| !app.is_empty());
+            println!("- 작업: 앱 접근 공유");
+            if let Some(app) = app {
+                println!("- 대상 앱: {}", redact(app));
+            } else {
+                println!("- 대상 앱: 먼저 앱을 골라야 해요.");
+            }
+            if let Some(email) = extract_email_like(&user_utterance) {
+                println!("- 대상자: {}", redact(&email));
+            } else {
+                println!("- 대상자 이메일이나 사용자 식별자가 아직 필요해요.");
+            }
+            println!("앱 접근 변경은 권한 변경 작업이에요. 대상 앱과 대상자를 확정한 뒤 미리보기와 승인 후 진행할게요.");
+        }
+        TeamRequestKind::InviteMember => {
+            println!("- 작업: 워크스페이스 팀원 초대");
+            if team.is_some() {
+                println!("- 워크스페이스: 현재 선택된 워크스페이스");
+            } else {
+                println!("- 워크스페이스: 먼저 작업할 워크스페이스를 골라야 해요.");
+            }
+            if let Some(email) = extract_email_like(&user_utterance) {
+                println!("- 초대 대상: {}", redact(&email));
+                println!(
+                    "- 역할: {}",
+                    team_role_label(team_role_from_utterance(&user_utterance))
+                );
+                println!("초대 메일 발송은 권한 변경 작업이에요. 이대로 보낼지 미리보기와 승인 후 진행할게요.");
+            } else {
+                println!("- 초대할 사람의 이메일이 아직 필요해요.");
+                println!("- 역할을 따로 말하지 않으면 기본 멤버로 준비할게요.");
+                println!("이메일을 알려 주면 보낼 내용 미리보기를 보여드리고, 명시적으로 승인받은 뒤에만 발송할게요.");
+            }
+        }
+    }
+
+    Ok(0)
+}
+
+#[derive(Clone, Copy)]
+enum TeamRequestKind {
+    InviteMember,
+    ListInvitations,
+    AppAccess,
+}
+
+fn team_request_kind(utterance: &str) -> TeamRequestKind {
+    let lower = utterance.to_lowercase();
+    let p = lower.as_str();
+    if [
+        "초대 목록",
+        "초대 리스트",
+        "pending invite",
+        "invitation list",
+        "list invitations",
+    ]
+    .iter()
+    .any(|needle| p.contains(needle))
+    {
+        TeamRequestKind::ListInvitations
+    } else if [
+        "앱 공유",
+        "공유해",
+        "접근 권한",
+        "access",
+        "grant access",
+        "share app",
+    ]
+    .iter()
+    .any(|needle| p.contains(needle))
+    {
+        TeamRequestKind::AppAccess
+    } else {
+        TeamRequestKind::InviteMember
+    }
+}
+
+fn team_role_from_utterance(utterance: &str) -> &str {
+    let lower = utterance.to_lowercase();
+    let p = lower.as_str();
+    if ["관리자", "admin", "owner"]
+        .iter()
+        .any(|needle| p.contains(needle))
+    {
+        "admin"
+    } else if ["viewer", "읽기", "read only", "readonly"]
+        .iter()
+        .any(|needle| p.contains(needle))
+    {
+        "viewer"
+    } else {
+        "member"
+    }
+}
+
+fn team_role_label(role: &str) -> &'static str {
+    match role.to_ascii_lowercase().as_str() {
+        "admin" | "owner" => "관리자",
+        "viewer" | "read" | "readonly" => "읽기",
+        _ => "멤버",
+    }
+}
+
+fn extract_email_like(utterance: &str) -> Option<String> {
+    utterance
+        .split(|ch: char| {
+            ch.is_whitespace()
+                || matches!(
+                    ch,
+                    ',' | ';' | '(' | ')' | '<' | '>' | '[' | ']' | '{' | '}' | '"' | '\''
+                )
+        })
+        .map(str::trim)
+        .find(|part| {
+            let part = part.trim_matches('.');
+            part.contains('@')
+                && part.contains('.')
+                && !part.starts_with('@')
+                && !part.ends_with('@')
+                && !part.ends_with('.')
+        })
+        .map(|part| part.trim_matches('.').to_string())
+}
+
+fn cmd_migrate_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let _user_utterance = parse_optional_user_utterance("migrate-summary", rest)?;
+    let preflight = run_preflight();
+    let output = &preflight.output;
+
+    println!("가져오기 상태를 확인했어요.");
+
+    if !output.cli_present {
+        println!("- CLI를 먼저 설치해야 앱 가져오기와 배포를 이어갈 수 있어요.");
+        println!("- 설치가 필요하면 \"axhub 설치해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+    if output.cli_too_old || output.cli_too_new {
+        println!("- 현재 CLI 버전으로는 가져오기 절차를 안전하게 진행하지 않을게요.");
+        println!("- 먼저 설치 상태를 확인한 뒤 다시 시도해 주세요.");
+        return Ok(0);
+    }
+    if !output.auth_ok {
+        println!("- 로그인: 다시 로그인이 필요해요.");
+        println!("- 계속하려면 \"로그인해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+
+    let cwd = std::env::current_dir()?;
+    let plan = match build_migrate_plan(&cwd) {
+        Ok(plan) => plan,
+        Err(err) => {
+            println!("- 현재 폴더를 앱 후보로 읽지 못했어요.");
+            println!("- 이유: {}", redact(&err.to_string()));
+            println!("- 앱 폴더에서 다시 묻거나, 가져올 폴더를 알려 주세요.");
+            return Ok(0);
+        }
+    };
+    let has_manifest = cwd.join("axhub.yaml").is_file();
+
+    if has_manifest {
+        println!("- 이 프로젝트는 이미 AXHub 앱 설정이 있어요.");
+        if let Some(app) = output
+            .current_app
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+        {
+            println!("- 연결된 앱: {}", redact(app));
+        }
+        if let Some(candidate) = plan.candidates.first() {
+            println!(
+                "- 감지된 앱 형태: {}",
+                migrate_stack_label(&candidate.stack_hint)
+            );
+        }
+        println!("- 새로 옮기는 작업은 필요 없고, 설정 점검이나 배포 준비로 이어갈 수 있어요.");
+        println!("변경 작업은 미리보기와 승인 후 진행할게요.");
+        return Ok(0);
+    }
+
+    if plan.candidates.is_empty() {
+        println!("- 현재 폴더에서 바로 가져올 웹 앱 후보를 찾지 못했어요.");
+        println!("- 앱 루트 폴더에서 다시 묻거나, 가져올 하위 폴더를 알려 주세요.");
+        return Ok(0);
+    }
+
+    println!(
+        "- 가져올 수 있는 앱 후보를 {}개 찾았어요.",
+        plan.candidates.len()
+    );
+    let first = &plan.candidates[0];
+    println!(
+        "- 우선 후보: {} ({})",
+        if first.path == "." {
+            "현재 폴더"
+        } else {
+            &first.path
+        },
+        migrate_stack_label(&first.stack_hint)
+    );
+    if first.has_compose {
+        println!("- 배포 방식: compose 설정을 사용할 수 있어 보여요.");
+    } else if first.has_dockerfile {
+        println!("- 배포 방식: Dockerfile을 사용할 수 있어 보여요.");
+    } else {
+        println!("- 배포 방식: 자동 감지로 시작할 수 있어 보여요.");
+    }
+    let env_count = plan.env_refs.len();
+    if env_count > 0 {
+        println!(
+            "- 필요한 환경변수 이름 {}개를 찾았어요. 값은 표시하지 않았어요.",
+            env_count
+        );
+    }
+    println!("앱 등록, GitHub 연결, 배포 같은 변경은 미리보기와 승인 후 진행할게요.");
+    Ok(0)
+}
+
+fn migrate_stack_label(stack_hint: &str) -> &'static str {
+    match stack_hint.to_ascii_lowercase().as_str() {
+        "nextjs" | "next.js" => "Next.js",
+        "node" | "nodejs" => "Node.js",
+        "python" => "Python 웹 앱",
+        "fastapi" => "FastAPI",
+        "django" => "Django",
+        "flask" => "Flask",
+        "go" => "Go 웹 앱",
+        "rust" => "Rust 웹 앱",
+        "ruby" => "Ruby 웹 앱",
+        "java" => "Java 웹 앱",
+        "kotlin" => "Kotlin 웹 앱",
+        "docker" => "Docker 앱",
+        "compose" => "Compose 앱",
+        _ => "웹 앱",
+    }
+}
+
+fn cmd_status_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("status-summary", rest)?;
+    let resolve_args = vec![
+        "--intent".to_string(),
+        "status".to_string(),
+        "--user-utterance".to_string(),
+        user_utterance,
+    ];
+    let resolved = run_resolve(&resolve_args);
+    let app = resolved
+        .output
+        .app_slug
+        .clone()
+        .or_else(|| resolved.output.app_id.clone());
+
+    println!("배포 상태를 확인했어요.");
+
+    let Some(app) = app else {
+        println!("- 현재 폴더에서 연결된 앱을 찾지 못했어요.");
+        println!("- 앱 이름이 들어간 폴더에서 다시 묻거나, 먼저 앱을 골라 주세요.");
+        return Ok(0);
+    };
+
+    let list = run_list_deployments(ListDeploymentsArgs {
+        app_id: app.clone(),
+        limit: Some(1),
+    });
+    if list.exit_code != 0 {
+        let message = list
+            .error_message_kr
+            .unwrap_or_else(|| "배포 목록을 가져오지 못했어요.".to_string());
+        println!("- {message}");
+        println!("- 잠시 뒤 다시 확인하거나 로그인 상태를 확인해 주세요.");
+        return Ok(0);
+    }
+
+    let Some(deploy) = list.deployments.first() else {
+        println!("- 아직 이 앱의 배포 이력이 없어요.");
+        println!("- 먼저 배포를 시작한 뒤 다시 확인하면 돼요.");
+        return Ok(0);
+    };
+
+    let status = run_axhub(&["--json", "deploy", "status", &deploy.id, "--app", &app]);
+    let status_json = serde_json::from_str::<Value>(&status.stdout).ok();
+    let status_text = status_json
+        .as_ref()
+        .and_then(|v| v.get("status"))
+        .and_then(Value::as_str)
+        .unwrap_or(deploy.status.as_str());
+    let started_at = status_json
+        .as_ref()
+        .and_then(|v| v.get("started_at"))
+        .and_then(Value::as_str)
+        .or({
+            if deploy.created_at.is_empty() {
+                None
+            } else {
+                Some(deploy.created_at.as_str())
+            }
+        });
+    let completed_at = status_json
+        .as_ref()
+        .and_then(|v| v.get("completed_at"))
+        .and_then(Value::as_str);
+    let failure_reason = status_json
+        .as_ref()
+        .and_then(|v| v.get("failure_reason"))
+        .and_then(Value::as_str)
+        .filter(|s| !s.trim().is_empty());
+
+    println!(
+        "- 앱 {}의 최근 배포는 {}",
+        app,
+        deploy_status_sentence(status_text)
+    );
+    if let Some(started_at) = started_at {
+        println!("- 시작 시간: {}", compact_time(started_at));
+    }
+    if let Some(completed_at) = completed_at {
+        println!("- 완료 시간: {}", compact_time(completed_at));
+    }
+    if !deploy.commit_sha.is_empty() {
+        println!("- 커밋: {}", short_commit(&deploy.commit_sha));
+    }
+    if let Some(reason) = failure_reason {
+        println!("- 실패 이유: {reason}");
+    }
+    if matches!(
+        status_text,
+        "queued" | "pending" | "building" | "deploying" | "running" | "in_progress"
+    ) {
+        println!("아직 진행 중이에요. 잠시 뒤 다시 확인하면 이어서 볼 수 있어요.");
+    } else if status_text == "succeeded" {
+        println!("배포는 끝난 상태예요.");
+    } else {
+        println!("자세한 원인은 로그나 실패 추적으로 이어서 확인할 수 있어요.");
+    }
+    Ok(0)
+}
+
+fn cmd_logs_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("logs-summary", rest)?;
+    let resolve_args = vec![
+        "--intent".to_string(),
+        "logs".to_string(),
+        "--user-utterance".to_string(),
+        user_utterance,
+    ];
+    let resolved = run_resolve(&resolve_args);
+    let app = resolved
+        .output
+        .app_slug
+        .clone()
+        .or_else(|| resolved.output.app_id.clone());
+
+    println!("로그를 확인했어요.");
+
+    let Some(app) = app else {
+        println!("- 현재 폴더에서 연결된 앱을 찾지 못했어요.");
+        println!("- 앱 이름이 들어간 폴더에서 다시 묻거나, 먼저 앱을 골라 주세요.");
+        return Ok(0);
+    };
+
+    let list = run_list_deployments(ListDeploymentsArgs {
+        app_id: app.clone(),
+        limit: Some(1),
+    });
+    if list.exit_code != 0 {
+        let message = list
+            .error_message_kr
+            .unwrap_or_else(|| "배포 목록을 가져오지 못했어요.".to_string());
+        println!("- {message}");
+        println!("- 로그인 상태나 앱 권한을 확인한 뒤 다시 로그를 볼 수 있어요.");
+        return Ok(0);
+    }
+
+    let Some(deploy) = list.deployments.first() else {
+        println!("- 아직 이 앱의 배포 이력이 없어서 보여줄 로그도 없어요.");
+        println!("- 먼저 배포를 시작한 뒤 다시 로그를 보면 돼요.");
+        return Ok(0);
+    };
+
+    let logs = run_axhub(&[
+        "--json", "deploy", "logs", &deploy.id, "--app", &app, "--limit", "50",
+    ]);
+    if logs.timed_out {
+        println!("- 로그 조회가 오래 걸려 중단했어요.");
+        println!("- 잠시 뒤 다시 묻거나, 실시간 로그가 필요하면 그렇게 말해 주세요.");
+        return Ok(0);
+    }
+    if logs.exit_code != 0 {
+        println!("- 로그를 가져오지 못했어요.");
+        println!(
+            "- 최근 배포 상태는 {}.",
+            deploy_status_sentence(&deploy.status)
+        );
+        println!("- 로그인 상태나 앱 권한을 확인한 뒤 다시 시도해 주세요.");
+        return Ok(0);
+    }
+
+    let lines = extract_log_lines(&logs.stdout, 50);
+    println!(
+        "- 앱 {}의 최근 배포는 {}",
+        app,
+        deploy_status_sentence(&deploy.status)
+    );
+    if !deploy.commit_sha.is_empty() {
+        println!("- 커밋: {}", short_commit(&deploy.commit_sha));
+    }
+    if lines.is_empty() {
+        println!("- 지금 가져올 수 있는 로그가 없어요.");
+        println!("- 배포가 너무 빨리 끝났거나 아직 로그가 저장되지 않았을 수 있어요.");
+        return Ok(0);
+    }
+
+    if let Some(error) = first_error_like_line(&lines) {
+        println!("- 눈에 띄는 오류: {error}");
+    }
+    println!("- 최근 로그:");
+    for line in lines {
+        println!("  {}", redact(&line));
+    }
+    Ok(0)
+}
+
+fn cmd_open_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("open-summary", rest)?;
+    let resolve_args = vec![
+        "--intent".to_string(),
+        "open".to_string(),
+        "--user-utterance".to_string(),
+        user_utterance,
+    ];
+    let resolved = run_resolve(&resolve_args);
+    let app = resolved
+        .output
+        .app_slug
+        .clone()
+        .or_else(|| resolved.output.app_id.clone());
+
+    println!("앱 페이지를 확인했어요.");
+
+    let Some(app) = app else {
+        println!("- 현재 폴더에서 연결된 앱을 찾지 못했어요.");
+        println!("- 앱 이름이 들어간 폴더에서 다시 묻거나, 먼저 앱을 골라 주세요.");
+        return Ok(0);
+    };
+
+    let opened = run_axhub(&["open", &app, "--json"]);
+    if opened.timed_out {
+        println!("- 앱 페이지 확인이 오래 걸려 중단했어요.");
+        println!("- 잠시 뒤 다시 묻거나 앱 이름을 함께 말해 주세요.");
+        return Ok(0);
+    }
+    if opened.exit_code != 0 {
+        println!("- 앱 페이지를 열지 못했어요.");
+        println!("- 로그인 상태나 앱 권한을 확인한 뒤 다시 시도해 주세요.");
+        return Ok(0);
+    }
+
+    let parsed = serde_json::from_str::<Value>(&opened.stdout).unwrap_or(Value::Null);
+    let data = parsed.get("data").unwrap_or(&parsed);
+    let url = data
+        .get("url")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .unwrap_or_default();
+    let status = data
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("opening");
+    let opened_flag = data.get("opened").and_then(Value::as_bool).unwrap_or(false);
+
+    println!("- 앱: {app}");
+    if !url.is_empty() {
+        println!("- URL: {}", redact(&url));
+    }
+    if opened_flag || status == "opening" {
+        println!("- 브라우저에서 열기 요청을 보냈어요.");
+    } else {
+        println!("- 브라우저가 자동으로 열리지 않으면 위 URL을 열면 돼요.");
+    }
+    Ok(0)
+}
+
+fn cmd_env_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("env-summary", rest)?;
+    let resolve_args = vec![
+        "--intent".to_string(),
+        "env".to_string(),
+        "--user-utterance".to_string(),
+        user_utterance,
+    ];
+    let resolved = run_resolve(&resolve_args);
+    let app = resolved
+        .output
+        .app_slug
+        .clone()
+        .or_else(|| resolved.output.app_id.clone());
+
+    println!("환경변수 목록을 확인했어요.");
+
+    let Some(app) = app else {
+        println!("- 현재 폴더에서 연결된 앱을 찾지 못했어요.");
+        println!("- 앱 폴더에서 다시 묻거나, 먼저 앱을 골라 주세요.");
+        return Ok(0);
+    };
+
+    let list = run_axhub(&["env", "list", "--app", &app, "--json"]);
+    if list.exit_code != 0 {
+        println!("⚠️ 환경변수를 확인하지 못했어요");
+        if list.timed_out {
+            println!("- 조회가 5초 안에 끝나지 않았어요.");
+        } else {
+            println!("- 로그인 상태나 앱 권한을 확인한 뒤 다시 물어봐 주세요.");
+        }
+        return Ok(0);
+    }
+
+    let parsed = serde_json::from_str::<Value>(&list.stdout).unwrap_or(Value::Null);
+    let items = parsed.get("items").and_then(Value::as_array).or_else(|| {
+        parsed
+            .get("data")
+            .and_then(|data| data.get("items"))
+            .and_then(Value::as_array)
+    });
+    let Some(items) = items else {
+        println!("⚠️ 환경변수 응답을 읽지 못했어요");
+        println!("- 값은 표시하지 않았어요.");
+        println!("- 잠시 뒤 다시 확인해 주세요.");
+        return Ok(0);
+    };
+
+    if items.is_empty() {
+        println!("- 앱 {app}에는 등록된 환경변수가 없어요.");
+        println!("- 추가가 필요하면 \"환경변수 추가하고 싶어\"라고 말하면 돼요.");
+        return Ok(0);
+    }
+
+    println!("- 앱: {app}");
+    println!("- 총 {}개가 있어요. 값은 안전하게 숨겼어요.", items.len());
+    println!();
+    println!("| 이름 | 단계 | 값 |");
+    println!("| --- | --- | --- |");
+    for item in items {
+        let key = item
+            .get("key")
+            .or_else(|| item.get("name"))
+            .and_then(Value::as_str)
+            .unwrap_or("(이름 없음)");
+        let stage = item
+            .get("stage")
+            .or_else(|| item.get("scope"))
+            .and_then(Value::as_str)
+            .unwrap_or("runtime");
+        let has_value = item.get("value").is_some_and(|v| !v.is_null());
+        let value_label = if has_value {
+            "있음(숨김)"
+        } else {
+            "없음"
+        };
+        println!(
+            "| {} | {} | {} |",
+            markdown_cell(&redact(key)),
+            markdown_cell(&redact(stage)),
+            value_label
+        );
+    }
+    println!();
+    println!(
+        "값을 직접 표시하지는 않았어요. 추가/수정/삭제가 필요하면 어떤 키를 바꿀지 말해 주세요."
+    );
+    Ok(0)
+}
+
+fn cmd_github_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("github-summary", rest)?;
+    let preflight = run_preflight();
+    let output = &preflight.output;
+
+    println!("GitHub 연결 상태를 확인했어요.");
+
+    if !output.cli_present {
+        println!("- CLI를 먼저 설치해야 GitHub 연결 상태를 확인할 수 있어요.");
+        println!("- 설치가 필요하면 \"axhub 설치해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+    if output.cli_too_old || output.cli_too_new {
+        println!("- 현재 CLI 버전으로는 GitHub 연결 상태를 안전하게 확인하지 않을게요.");
+        println!("- 먼저 설치 상태를 확인한 뒤 다시 시도해 주세요.");
+        return Ok(0);
+    }
+    if !output.auth_ok {
+        println!("- 로그인: 다시 로그인이 필요해요.");
+        println!("- 계속하려면 \"로그인해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+
+    let resolve_args = vec![
+        "--intent".to_string(),
+        "github".to_string(),
+        "--user-utterance".to_string(),
+        user_utterance,
+    ];
+    let resolved = run_resolve(&resolve_args);
+    let app = resolved
+        .output
+        .app_slug
+        .clone()
+        .or_else(|| resolved.output.app_id.clone())
+        .or_else(|| output.current_app.clone());
+
+    let Some(app) = app else {
+        println!("- 현재 폴더에서 연결된 앱을 찾지 못했어요.");
+        println!("- 앱 이름이 들어간 폴더에서 다시 묻거나, 먼저 앱을 골라 주세요.");
+        return Ok(0);
+    };
+
+    let status = run_axhub(&["apps", "git", "status", "--app", &app, "--json"]);
+    if status.timed_out {
+        println!("- GitHub 연결 상태 확인이 오래 걸려 중단했어요.");
+        println!("- 잠시 뒤 다시 묻거나 앱 이름을 함께 말해 주세요.");
+        return Ok(0);
+    }
+    if status.exit_code != 0 {
+        println!("- GitHub 연결 상태를 확인하지 못했어요.");
+        println!("- 앱 권한이나 로그인 상태를 확인한 뒤 다시 시도해 주세요.");
+        return Ok(0);
+    }
+
+    let parsed = serde_json::from_str::<Value>(&status.stdout).unwrap_or(Value::Null);
+    let data = parsed.get("data").unwrap_or(&parsed);
+    let connected = data
+        .get("connected")
+        .and_then(Value::as_bool)
+        .unwrap_or_else(|| {
+            data.get("repo_full_name")
+                .and_then(Value::as_str)
+                .is_some_and(|repo| !repo.trim().is_empty())
+        });
+    let repo = data
+        .get("repo_full_name")
+        .or_else(|| data.get("repository"))
+        .or_else(|| data.get("repo"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|repo| !repo.is_empty());
+    let branch = data
+        .get("branch")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|branch| !branch.is_empty());
+    let install_url = data
+        .get("install_url")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|url| !url.is_empty());
+
+    if connected {
+        println!("- 앱 {app}는 GitHub 저장소에 연결되어 있어요.");
+        if let Some(repo) = repo {
+            println!("- 저장소: {}", redact(repo));
+        }
+        if let Some(branch) = branch {
+            println!("- 브랜치: {}", redact(branch));
+        }
+        println!(
+            "연결 변경이나 해제가 필요하면 말해 주세요. 변경 작업은 미리보기와 승인 후 진행할게요."
+        );
+    } else {
+        println!("- 앱 {app}는 아직 GitHub 저장소에 연결되어 있지 않아요.");
+        if let Some(install_url) = install_url {
+            println!("- GitHub 연결 링크: {}", redact(install_url));
+        }
+        println!("연결하려면 저장소와 브랜치를 정한 뒤 미리보기와 승인 후 진행할게요.");
+    }
+
+    Ok(0)
+}
+
+fn cmd_resources_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let _user_utterance = parse_optional_user_utterance("resources-summary", rest)?;
+    let preflight = run_preflight();
+    let output = &preflight.output;
+
+    println!("리소스 현황을 확인했어요.");
+
+    if !output.cli_present {
+        println!("- CLI를 먼저 설치해야 리소스를 확인할 수 있어요.");
+        println!("- 설치가 필요하면 \"axhub 설치해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+    if output.cli_too_old || output.cli_too_new {
+        println!("- 현재 CLI 버전으로는 리소스 변경을 안전하게 진행하지 않을게요.");
+        println!("- 먼저 설치 상태를 확인한 뒤 다시 시도해 주세요.");
+        return Ok(0);
+    }
+    if !output.auth_ok {
+        println!("- 로그인: 다시 로그인이 필요해요.");
+        println!("- 계속하려면 \"로그인해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+
+    let resources = run_axhub(&["resources", "list", "--json"]);
+    if resources.exit_code != 0 {
+        println!("- 리소스 목록을 확인하지 못했어요.");
+        if resources.timed_out {
+            println!("- 조회가 5초 안에 끝나지 않았어요.");
+        } else {
+            println!("- 현재 워크스페이스 권한이나 로그인 상태를 다시 확인해 주세요.");
+        }
+        return Ok(0);
+    }
+    let connectors = run_axhub(&["connectors", "list", "--enabled-only", "--json"]);
+
+    let parsed_resources = serde_json::from_str::<Value>(&resources.stdout).unwrap_or(Value::Null);
+    let resource_items = response_items(&parsed_resources)
+        .map(|items| items.as_slice())
+        .unwrap_or(&[]);
+
+    let parsed_connectors =
+        serde_json::from_str::<Value>(&connectors.stdout).unwrap_or(Value::Null);
+    let connector_count = response_items(&parsed_connectors)
+        .map(|items| items.len())
+        .unwrap_or(0);
+
+    println!("- 데이터베이스 연결: {connector_count}개");
+    println!("- 정리할 리소스: {}개", resource_items.len());
+
+    if resource_items.is_empty() {
+        println!();
+        println!("지금 워크스페이스에서 정리할 리소스를 찾지 못했어요.");
+        println!("- 아직 외부 데이터베이스 연결이나 리소스 등록이 없을 수 있어요.");
+        println!("- 다른 워크스페이스를 쓰려는 거라면 워크스페이스 이름을 알려 주세요.");
+        println!();
+        println!("어떤 정리를 할까요? 목록 확인, 이름 변경, 이동, 태그 정리, 등록, 삭제 중에서 골라주세요.");
+        println!("변경 작업은 대상과 작업을 정한 뒤 미리보기와 승인 후 진행할게요.");
+        return Ok(0);
+    }
+
+    println!();
+    println!("| 리소스 | 종류 |");
+    println!("| --- | --- |");
+    for item in resource_items.iter().take(8) {
+        let name = item
+            .get("name")
+            .or_else(|| item.get("title"))
+            .or_else(|| item.get("display_name"))
+            .or_else(|| item.get("path"))
+            .and_then(Value::as_str)
+            .unwrap_or("이름 없는 리소스");
+        let kind = item
+            .get("kind")
+            .and_then(Value::as_str)
+            .map(resource_kind_label)
+            .unwrap_or("리소스");
+        println!("| {} | {} |", markdown_cell(&redact(name)), kind);
+    }
+    if resource_items.len() > 8 {
+        println!();
+        println!("- 그 밖에 {}개가 더 있어요.", resource_items.len() - 8);
+    }
+    println!();
+    println!("어떤 정리를 할까요? 이름 변경, 이동, 태그 정리, 등록, 삭제 중에서 골라주세요.");
+    println!("변경 작업은 대상과 작업을 정한 뒤 미리보기와 승인 후 진행할게요.");
+    Ok(0)
+}
+
+fn cmd_review_scope_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let _user_utterance = parse_optional_user_utterance("review-scope-summary", rest)?;
+    let preflight = run_preflight();
+    let output = &preflight.output;
+
+    println!("리뷰 범위를 확인했어요.");
+    if output.auth_ok {
+        println!("- 로그인되어 있어요. 변경 범위 확인할게요.");
+    } else {
+        println!(
+            "- 로그인 상태는 리뷰 진행을 막지 않아요. 필요한 AXHub 작업은 나중에 다시 확인할게요."
+        );
+    }
+
+    let pathspecs = [
+        ".",
+        ":!desktop-pure-routing-results.md",
+        ":!desktop-*routing-results.md",
+        ":!desktop-qa-results.md",
+        ":!.axhub-state/**",
+        ":!.omx/**",
+        ":!.omc/**",
+        ":!.shim/**",
+        ":!.shim-local-market/**",
+        ":!.claude/**",
+        ":!node_modules/**",
+        ":!*test-results*",
+        ":!*.log",
+    ];
+
+    let mut diff_args = vec!["diff", "HEAD", "--numstat", "--"];
+    diff_args.extend(pathspecs);
+    let diff = std::process::Command::new("git").args(&diff_args).output();
+
+    let Ok(diff) = diff else {
+        println!("- 변경 범위: 현재 폴더의 git 상태를 확인하지 못했어요.");
+        println!("- 다음: 현재 작업 폴더가 맞는지 확인한 뒤 실제 변경 파일을 열어 리뷰하면 돼요.");
+        return Ok(0);
+    };
+
+    if !diff.status.success() {
+        println!("- 변경 범위: HEAD 기준 diff 를 확인하지 못했어요.");
+        println!("- 다음: 현재 작업 폴더가 git 저장소인지 확인한 뒤 실제 변경 파일을 열어 리뷰하면 돼요.");
+        return Ok(0);
+    }
+
+    let stdout = String::from_utf8_lossy(&diff.stdout);
+    let mut files = std::collections::BTreeSet::new();
+    let mut added: u64 = 0;
+    let mut deleted: u64 = 0;
+    for line in stdout.lines() {
+        let mut parts = line.split('\t');
+        let add = parts.next().unwrap_or("0");
+        let del = parts.next().unwrap_or("0");
+        let path = parts.next().unwrap_or("").trim();
+        if path.is_empty() || review_path_excluded(path) {
+            continue;
+        }
+        if let Ok(n) = add.parse::<u64>() {
+            added += n;
+        }
+        if let Ok(n) = del.parse::<u64>() {
+            deleted += n;
+        }
+        files.insert(path.to_string());
+    }
+
+    let mut untracked_args = vec!["ls-files", "--others", "--exclude-standard", "--"];
+    untracked_args.extend(pathspecs);
+    if let Ok(untracked) = std::process::Command::new("git")
+        .args(&untracked_args)
+        .output()
+    {
+        if untracked.status.success() {
+            for path in String::from_utf8_lossy(&untracked.stdout).lines() {
+                let path = path.trim();
+                if !path.is_empty() && !review_path_excluded(path) && files.insert(path.to_string())
+                {
+                    if let Ok(content) = std::fs::read_to_string(path) {
+                        added += content.lines().count() as u64;
+                    }
+                }
+            }
+        }
+    }
+
+    let file_count = files.len();
+    let line_count = added + deleted;
+    println!("- 변경 범위: {file_count}개 파일, +{added}/-{deleted}줄");
+
+    if file_count == 0 {
+        println!("- 현재 HEAD 기준으로 리뷰할 변경 파일을 찾지 못했어요.");
+        println!("- 다음: 특정 파일이나 브랜치를 알려주면 그 범위로 리뷰하면 돼요.");
+    } else if file_count >= 100 || line_count >= 1000 {
+        println!("- 변경량이 커요. 전체를 볼지 핵심 파일만 볼지 먼저 정하면 좋아요.");
+    } else {
+        println!(
+            "- 다음: 이 범위의 실제 변경 파일을 열어 버그와 회귀 위험 중심으로 리뷰하면 돼요."
+        );
+    }
+
+    Ok(0)
+}
+
+fn review_path_excluded(path: &str) -> bool {
+    let normalized = path.replace('\\', "/");
+    normalized == "desktop-pure-routing-results.md"
+        || (normalized.starts_with("desktop-") && normalized.ends_with("routing-results.md"))
+        || normalized == "desktop-qa-results.md"
+        || normalized.contains("/desktop-pure-routing-results.md")
+        || normalized.contains("/desktop-") && normalized.ends_with("routing-results.md")
+        || normalized.contains("/desktop-qa-results.md")
+        || normalized.starts_with(".axhub-state/")
+        || normalized.contains("/.axhub-state/")
+        || normalized.starts_with(".omx/")
+        || normalized.contains("/.omx/")
+        || normalized.starts_with(".omc/")
+        || normalized.contains("/.omc/")
+        || normalized.starts_with(".shim/")
+        || normalized.contains("/.shim/")
+        || normalized.starts_with(".shim-local-market/")
+        || normalized.contains("/.shim-local-market/")
+        || normalized.starts_with(".claude/")
+        || normalized.contains("/.claude/")
+        || normalized.starts_with("node_modules/")
+        || normalized.contains("/node_modules/")
+        || normalized.contains("test-results")
+        || normalized.ends_with(".log")
+}
+
+fn cmd_auth_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let _user_utterance = parse_optional_user_utterance("auth-summary", rest)?;
+    let preflight = run_preflight();
+    let output = &preflight.output;
+
+    println!("로그인 상태를 확인했어요.");
+
+    if !output.cli_present {
+        println!("- 로그인: CLI 설치 후 확인할 수 있어요.");
+        println!("- 다시 로그인: 아직 판단하지 않을게요.");
+        println!("- 다음: 설치 상태를 먼저 확인하면 돼요.");
+        return Ok(0);
+    }
+
+    if output.cli_too_old || output.cli_too_new {
+        println!("- 로그인: 현재 CLI 상태 때문에 안전하게 확인하지 못했어요.");
+        println!("- 다시 로그인: 지금 바로 시작하지 않을게요.");
+        println!("- 다음: 설치 상태를 먼저 확인하면 돼요.");
+        return Ok(0);
+    }
+
+    if output.auth_ok {
+        println!("- 로그인: 되어 있어요.");
+        println!("- 다시 로그인: 지금은 필요 없어요.");
+        println!("- 다음: 그대로 조회나 배포 작업을 진행해도 돼요.");
+        return Ok(0);
+    }
+
+    match output.auth_error_code.as_deref() {
+        Some("token_expired") => {
+            println!("- 로그인: 만료됐어요.");
+            println!("- 다시 로그인: 필요해요.");
+            println!("- 다음: 계속하려면 \"로그인해줘\"라고 말해 주세요.");
+        }
+        Some("not_logged_in") => {
+            println!("- 로그인: 아직 되어 있지 않아요.");
+            println!("- 로그인: 필요해요.");
+            println!("- 다음: 계속하려면 \"로그인해줘\"라고 말해 주세요.");
+        }
+        Some("auth_unavailable") => {
+            println!("- 로그인: 상태를 확인하지 못했어요.");
+            println!("- 다시 로그인: 지금 바로 시작하지 않을게요.");
+            println!("- 다음: 설치 상태를 먼저 확인하면 돼요.");
+        }
+        Some(_) | None => {
+            println!("- 로그인: 확인이 필요해요.");
+            println!("- 다시 로그인: 지금 바로 시작하지 않을게요.");
+            println!("- 다음: 설치 상태를 먼저 확인하면 돼요.");
+        }
+    }
+
+    Ok(0)
+}
+
+fn cmd_install_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let _user_utterance = parse_optional_user_utterance("install-summary", rest)?;
+    let preflight = run_preflight();
+    let output = &preflight.output;
+
+    println!("설치 상태를 확인했어요.");
+
+    if output.cli_present {
+        let cli_version = output.cli_version.as_deref().unwrap_or("버전 확인 필요");
+        println!("- axhub CLI: 이미 설치되어 있어요. (v{cli_version})");
+        if output.in_range {
+            println!("- 호환성: 현재 플러그인과 함께 쓸 수 있어요.");
+        } else if output.cli_too_old {
+            println!("- 호환성: CLI가 오래되어 업데이트 확인이 필요해요.");
+        } else if output.cli_too_new {
+            println!("- 호환성: CLI가 플러그인 검증 범위보다 최신이에요.");
+        } else {
+            println!("- 호환성: 버전 범위를 다시 확인해야 해요.");
+        }
+        println!("- 설치 작업: 지금은 필요 없어요.");
+        return Ok(0);
+    }
+
+    println!("- axhub CLI: 아직 설치되어 있지 않아요.");
+    println!("- 설치 방식: 공식 설치 프로그램으로 설치할 수 있어요.");
+    println!("- 안전 장치: 자동 설치는 명시적으로 승인받은 뒤에만 실행할게요.");
+    println!("설치할까요? 진행 또는 취소라고 답해 주세요.");
+    Ok(0)
+}
+
+fn cmd_update_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let _user_utterance = parse_optional_user_utterance("update-summary", rest)?;
+    let check = run_axhub(&["update", "check", "--json"]);
+
+    println!("업데이트를 확인했어요.");
+
+    if check.timed_out {
+        println!("- 상태: 확인 시간이 초과됐어요.");
+        println!("- 업데이트 적용: 시작하지 않았어요.");
+        println!("- 다음: 잠시 뒤 다시 확인해 주세요.");
+        return Ok(0);
+    }
+
+    if check.exit_code != 0 {
+        println!("- 상태: 지금은 업데이트 정보를 확인하지 못했어요.");
+        println!("- 업데이트 적용: 시작하지 않았어요.");
+        println!("- 다음: 네트워크 상태를 확인한 뒤 다시 말해 주세요.");
+        return Ok(0);
+    }
+
+    let parsed = serde_json::from_str::<Value>(&check.stdout).unwrap_or(Value::Null);
+    if !parsed.is_object() {
+        println!("- 상태: 업데이트 응답을 해석하지 못했어요.");
+        println!("- 업데이트 적용: 시작하지 않았어요.");
+        println!("- 다음: 잠시 뒤 다시 확인해 주세요.");
+        return Ok(0);
+    }
+
+    let current = parsed
+        .get("current")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("현재 버전 확인 필요");
+    let latest = parsed
+        .get("latest")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(current);
+    let has_update = parsed
+        .get("has_update")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    if has_update {
+        println!("- 현재 버전: {current}");
+        println!("- 새 버전: {latest}");
+        println!("- 업데이트: 받을 수 있어요.");
+        println!("- 적용: 아직 시작하지 않았어요.");
+        println!("적용하려면 \"업데이트 적용해줘\"라고 말해 주세요. 적용 전에는 먼저 미리보기와 승인을 받을게요.");
+    } else {
+        println!("- 현재 버전: {current}");
+        println!("- 업데이트: 이미 최신이에요.");
+        println!("- 적용: 지금은 필요 없어요.");
+    }
+
+    Ok(0)
+}
+
+fn cmd_doctor_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let _user_utterance = parse_optional_user_utterance("doctor-summary", rest)?;
+    let preflight = run_preflight();
+    let output = &preflight.output;
+
+    println!("설치 상태를 확인했어요.");
+
+    if !output.cli_present {
+        println!("- CLI: 아직 설치되어 있지 않아요.");
+        println!("- 로그인: CLI 설치 후 확인할 수 있어요.");
+        println!("- 다음: 설치하려면 \"axhub 설치해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+
+    let cli_version = output.cli_version.as_deref().unwrap_or("버전 확인 필요");
+    if output.cli_too_old {
+        println!("- CLI: v{cli_version}, 플러그인 기준보다 오래됐어요.");
+        println!("- 로그인: CLI 업데이트 뒤 다시 확인하는 편이 안전해요.");
+        println!("- 다음: 업데이트하려면 \"axhub 업데이트 확인해줘\"라고 말해 주세요.");
+        return Ok(0);
+    }
+    if output.cli_too_new {
+        println!("- CLI: v{cli_version}, 현재 플러그인 검증 범위보다 최신이에요.");
+        println!("- 로그인: 플러그인 업데이트 뒤 다시 확인하는 편이 안전해요.");
+        println!(
+            "- 다음: 플러그인을 최신으로 보려면 \"axhub 플러그인 업데이트해줘\"라고 말해 주세요."
+        );
+        return Ok(0);
+    }
+
+    if output.in_range {
+        println!("- CLI: v{cli_version}, 플러그인과 호환돼요.");
+    } else {
+        println!("- CLI: v{cli_version}, 호환 범위를 다시 확인해야 해요.");
+    }
+
+    if output.auth_ok {
+        println!("- 로그인: 되어 있어요. 지금은 다시 로그인할 필요 없어요.");
+        if let Some(expires) = output.expires_human.as_deref() {
+            println!("- 만료: {expires}");
+        }
+        if !output.scopes.is_empty() {
+            println!("- 권한: {}", output.scopes.join(", "));
+        }
+        let profile = output.profile.as_deref().unwrap_or("default");
+        println!("- 프로필: {profile}");
+        println!("- 다음: 그대로 배포나 조회 작업을 진행해도 돼요.");
+    } else {
+        let reason = match output.auth_error_code.as_deref() {
+            Some("token_expired") => "로그인이 만료됐어요.",
+            Some("not_logged_in") => "아직 로그인되어 있지 않아요.",
+            Some("auth_unavailable") => "로그인 상태를 확인하지 못했어요.",
+            Some(_) => "로그인 확인이 필요해요.",
+            None => "로그인 확인이 필요해요.",
+        };
+        println!("- 로그인: {reason}");
+        println!("- 다음: 로그인하려면 \"로그인해줘\"라고 말해 주세요.");
+    }
+    Ok(0)
+}
+
+fn cmd_statusline_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let _user_utterance = parse_optional_user_utterance("statusline-summary", rest)?;
+
+    let Some(_stub_path) = axhub_helpers::orphan_stub::install_and_verify() else {
+        println!("상태바 설정을 확인했어요.");
+        println!("- 상태바 연결 파일을 준비하지 못했어요.");
+        println!("- Claude Code를 다시 연 뒤 다시 말해 주세요.");
+        return Ok(0);
+    };
+
+    let outcome = match run_settings_merge(MergeOptions {
+        silent: true,
+        command_path_override: None,
+        scope: Scope::User,
+        dry_run: false,
+    }) {
+        Ok(outcome) => outcome,
+        Err(_) => {
+            println!("상태바 설정을 확인했어요.");
+            println!("- 상태바 설정을 자동으로 바꾸지 못했어요.");
+            println!("- Claude Code를 다시 연 뒤 다시 말해 주세요.");
+            return Ok(0);
+        }
+    };
+
+    match outcome {
+        MergeOutcome::Created | MergeOutcome::Merged => {
+            println!("상태바를 켰어요.");
+            println!("- Claude Code를 다시 열면 axhub 상태가 보일 거예요.");
+        }
+        MergeOutcome::NoOp => {
+            println!("상태바는 이미 켜져 있어요.");
+            println!("- Claude Code를 다시 열면 axhub 상태가 보일 거예요.");
+        }
+        MergeOutcome::PreservedOther => {
+            println!("상태바 설정을 확인했어요.");
+            println!("- 이미 다른 상태바가 켜져 있어요.");
+            println!("- axhub가 기존 상태바를 덮어쓰지 않았어요.");
+            println!("- axhub 상태바로 바꾸고 싶으면 그렇게 말해 주세요.");
+        }
+        MergeOutcome::InvalidJson => {
+            println!("상태바 설정을 확인했어요.");
+            println!("- 설정 내용을 자동으로 읽지 못해 변경하지 않았어요.");
+            println!("- 문법을 정리한 뒤 다시 말해 주세요.");
+        }
+        MergeOutcome::PartialSchema => {
+            println!("상태바 설정을 확인했어요.");
+            println!("- 기존 상태바 설정이 완성된 형태가 아니어서 변경하지 않았어요.");
+            println!("- axhub 상태바로 정리하고 싶으면 그렇게 말해 주세요.");
+        }
+        MergeOutcome::PermissionDenied => {
+            println!("상태바 설정을 확인했어요.");
+            println!("- 상태바 설정을 쓸 권한이 없어 변경하지 못했어요.");
+            println!("- 권한을 확인한 뒤 다시 말해 주세요.");
+        }
+    }
+    Ok(0)
+}
+
+fn cmd_verify_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("verify-summary", rest)?;
+    let resolve_args = vec![
+        "--intent".to_string(),
+        "verify".to_string(),
+        "--user-utterance".to_string(),
+        user_utterance,
+    ];
+    let resolved = run_resolve(&resolve_args);
+    let app = resolved
+        .output
+        .app_slug
+        .clone()
+        .or_else(|| resolved.output.app_id.clone());
+
+    println!("배포 검증을 완료했어요.");
+
+    let Some(app) = app else {
+        println!("- 현재 폴더에서 연결된 앱을 찾지 못했어요.");
+        println!("- 앱 이름이 들어간 폴더에서 다시 묻거나, 먼저 앱을 골라 주세요.");
+        return Ok(0);
+    };
+
+    let list = run_list_deployments(ListDeploymentsArgs {
+        app_id: app.clone(),
+        limit: Some(1),
+    });
+    if list.exit_code != 0 {
+        let message = list
+            .error_message_kr
+            .unwrap_or_else(|| "최근 배포를 확인하지 못했어요.".to_string());
+        println!("⚠️ 확인이 더 필요해요");
+        println!("- {message}");
+        println!("- 로그인 상태나 앱 권한을 확인한 뒤 다시 검증해 주세요.");
+        return Ok(0);
+    }
+
+    let Some(deploy) = list.deployments.first() else {
+        println!("❌ 아직 라이브로 확인되지 않았어요");
+        println!("- 앱 {app}에서 최근 배포를 찾지 못했어요.");
+        println!("- 먼저 배포를 시작한 뒤 다시 확인하면 돼요.");
+        return Ok(0);
+    };
+
+    let status = run_axhub(&["--json", "deploy", "status", &deploy.id, "--app", &app]);
+    let status_json = serde_json::from_str::<Value>(&status.stdout).ok();
+    let status_data = status_json
+        .as_ref()
+        .and_then(|v| v.get("data"))
+        .or(status_json.as_ref());
+    let status_text = status_data
+        .and_then(|v| {
+            v.get("state")
+                .or_else(|| v.get("status"))
+                .and_then(Value::as_str)
+        })
+        .unwrap_or(deploy.status.as_str());
+
+    let logs = run_axhub(&[
+        "--json", "deploy", "logs", &deploy.id, "--app", &app, "--limit", "50",
+    ]);
+    let log_lines = if logs.exit_code == 0 && !logs.timed_out {
+        extract_log_lines(&logs.stdout, 50)
+    } else {
+        Vec::new()
+    };
+    let error_line = first_error_like_line(&log_lines);
+
+    let liveish = verify_status_liveish(status_text);
+    let failedish = verify_status_failedish(status_text);
+    if liveish && error_line.is_none() {
+        println!("✅ 라이브 확정");
+        println!("- 앱 {app}는 최근 배포 기준으로 열리는 상태예요.");
+        println!("- 최근 로그에서 눈에 띄는 ERROR/FATAL은 보이지 않았어요.");
+        println!("- 더 자세히 보려면 \"방금 거 로그 보여줘\"라고 말하면 돼요.");
+    } else if failedish {
+        println!("❌ 아직 라이브로 확인되지 않았어요");
+        println!("- 앱 {app}의 최근 배포 상태가 성공으로 보이지 않아요.");
+        if let Some(error) = error_line {
+            println!("- 첫 오류: {}", redact(&error));
+        }
+        println!("- 다음: \"왜 실패했어\"라고 물으면 원인을 이어서 추적할 수 있어요.");
+    } else {
+        println!("⚠️ 확인이 더 필요해요");
+        println!("- 앱 {app}의 최근 배포를 확인했지만 바로 확정하기는 어려워요.");
+        println!("- 상태 신호: {}", deploy_status_sentence(status_text));
+        if logs.timed_out {
+            println!("- 로그 확인이 5초 안에 끝나지 않았어요.");
+        } else if logs.exit_code != 0 {
+            println!("- 로그를 가져오지 못했어요.");
+        } else if let Some(error) = error_line {
+            println!("- 첫 오류: {}", redact(&error));
+        }
+        println!("- 잠시 뒤 \"다시 확인해줘\"라고 말하면 이어서 확인할 수 있어요.");
+    }
+    Ok(0)
+}
+
+fn cmd_trace_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("trace-summary", rest)?;
+    let resolve_args = vec![
+        "--intent".to_string(),
+        "trace".to_string(),
+        "--user-utterance".to_string(),
+        user_utterance,
+    ];
+    let resolved = run_resolve(&resolve_args);
+    let app = resolved
+        .output
+        .app_slug
+        .clone()
+        .or_else(|| resolved.output.app_id.clone());
+
+    println!("배포 기록을 확인했어요.");
+
+    let Some(app) = app else {
+        println!("- 현재 폴더에서 연결된 앱을 찾지 못했어요.");
+        println!("- 앱 이름이 들어간 폴더에서 다시 묻거나, 먼저 앱을 골라 주세요.");
+        return Ok(0);
+    };
+
+    let list = run_list_deployments(ListDeploymentsArgs {
+        app_id: app.clone(),
+        limit: Some(5),
+    });
+    if list.exit_code != 0 {
+        let message = list
+            .error_message_kr
+            .unwrap_or_else(|| "최근 배포 기록을 확인하지 못했어요.".to_string());
+        println!("- {message}");
+        println!("- 로그인 상태나 앱 권한을 확인한 뒤 다시 물어봐 주세요.");
+        return Ok(0);
+    }
+
+    let Some(failed) = list
+        .deployments
+        .iter()
+        .find(|deploy| verify_status_failedish(&deploy.status))
+    else {
+        println!("- 앱 {app}에서 최근 실패한 배포는 찾지 못했어요.");
+        if let Some(latest) = list.deployments.first() {
+            println!("- 최신 배포는 {}", deploy_status_sentence(&latest.status));
+            if !latest.commit_sha.is_empty() {
+                println!("- 최근 커밋: {}", short_commit(&latest.commit_sha));
+            }
+        } else {
+            println!("- 아직 이 앱의 배포 이력이 없어요.");
+        }
+        println!("- 실패 화면이나 에러 문구가 따로 보이면 그 문장을 붙여서 다시 물어봐 주세요.");
+        return Ok(0);
+    };
+
+    let status = run_axhub(&["--json", "deploy", "status", &failed.id, "--app", &app]);
+    let status_json = serde_json::from_str::<Value>(&status.stdout).ok();
+    let status_reason = status_json
+        .as_ref()
+        .and_then(trace_failure_reason_from_status);
+
+    let logs = run_axhub(&[
+        "--json", "deploy", "logs", &failed.id, "--app", &app, "--limit", "50",
+    ]);
+    let log_error = if logs.exit_code == 0 && !logs.timed_out {
+        let lines = extract_log_lines(&logs.stdout, 50);
+        first_error_like_line(&lines)
+    } else {
+        None
+    };
+
+    let probes = RealTraceProbes {
+        app_ref: Some(app.clone()),
+        warnings: std::cell::RefCell::new(Vec::new()),
+    };
+    let trace_report = axhub_helpers::trace_helper::trace(&failed.id, &probes).ok();
+    let trace_reason = trace_report
+        .as_ref()
+        .and_then(|report| report.failure_reason.as_deref())
+        .map(str::to_string);
+    let trace_log_error = trace_report
+        .as_ref()
+        .and_then(|report| report.build_log_errors.first())
+        .map(|line| redact(line));
+
+    println!("- 앱 {app}의 최근 실패 배포를 확인했어요.");
+    let reason = status_reason.or(trace_reason);
+    if let Some(reason) = reason {
+        println!("- 원인: {}", redact(&reason));
+    } else if let Some(error) = log_error.or(trace_log_error) {
+        println!("- 눈에 띄는 오류: {}", redact(&error));
+    } else {
+        println!("- 서버가 보관한 실패 메시지는 아직 확인되지 않았어요.");
+        println!("- 최근 로그에서도 뚜렷한 ERROR/FATAL 신호를 찾지 못했어요.");
+    }
+    if logs.timed_out {
+        println!("- 로그 확인이 오래 걸려 짧게 중단했어요.");
+    }
+    println!("- 다음: 원인을 고친 뒤 다시 배포하거나, 더 자세한 로그가 필요하면 \"로그 좀 보여줘\"라고 말해 주세요.");
+    Ok(0)
+}
+
+fn trace_failure_reason_from_status(value: &Value) -> Option<String> {
+    let data = value.get("data").unwrap_or(value);
+    [
+        "failure_reason",
+        "failureReason",
+        "error",
+        "error_message",
+        "message",
+    ]
+    .iter()
+    .find_map(|key| {
+        data.get(*key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty() && *s != "null")
+            .map(str::to_string)
+    })
+}
+
+fn parse_optional_user_utterance(command: &str, rest: &[String]) -> anyhow::Result<String> {
+    let mut user_utterance = String::new();
+    let mut index = 0;
+    while index < rest.len() {
+        match rest[index].as_str() {
+            "--user-utterance" => {
+                if index + 1 >= rest.len() {
+                    return legacy_usage_error(command, "missing --user-utterance value")
+                        .map(|_| String::new());
+                }
+                user_utterance = rest[index + 1].clone();
+                index += 2;
+            }
+            "--json" => index += 1,
+            _ => return legacy_usage_error(command, "unknown option").map(|_| String::new()),
+        }
+    }
+    Ok(user_utterance)
+}
+
+fn markdown_cell(value: &str) -> String {
+    value.replace('|', "\\|").replace('\n', " ")
+}
+
+fn response_items(value: &Value) -> Option<&Vec<Value>> {
+    value
+        .as_array()
+        .or_else(|| value.get("items").and_then(Value::as_array))
+        .or_else(|| value.get("resources").and_then(Value::as_array))
+        .or_else(|| value.get("data").and_then(Value::as_array))
+        .or_else(|| {
+            value
+                .get("data")
+                .and_then(|data| data.get("items"))
+                .and_then(Value::as_array)
+        })
+        .or_else(|| {
+            value
+                .get("data")
+                .and_then(|data| data.get("resources"))
+                .and_then(Value::as_array)
+        })
+}
+
+fn resource_kind_label(kind: &str) -> &'static str {
+    match kind.to_lowercase().as_str() {
+        "table" | "postgresql table" | "mysql table" => "테이블",
+        "view" | "postgresql view" | "mysql view" => "뷰",
+        "namespace" | "folder" => "폴더",
+        _ => "리소스",
+    }
+}
+
+fn extract_log_lines(stdout: &str, limit: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    for raw in stdout.lines() {
+        let line = raw.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let rendered = serde_json::from_str::<Value>(line)
+            .ok()
+            .and_then(|value| log_message_from_value(&value))
+            .unwrap_or_else(|| line.to_string());
+        let rendered = rendered.trim();
+        if !rendered.is_empty() {
+            lines.push(rendered.to_string());
+        }
+    }
+    let start = lines.len().saturating_sub(limit);
+    lines[start..].to_vec()
+}
+
+fn log_message_from_value(value: &Value) -> Option<String> {
+    value
+        .get("message")
+        .or_else(|| value.get("line"))
+        .or_else(|| value.get("log"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .or_else(|| {
+            value
+                .get("data")
+                .and_then(|data| data.get("message").or_else(|| data.get("line")))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+}
+
+fn first_error_like_line(lines: &[String]) -> Option<String> {
+    lines
+        .iter()
+        .find(|line| {
+            let lower = line.to_lowercase();
+            lower.contains("error")
+                || lower.contains("fatal")
+                || lower.contains("panic")
+                || lower.contains("failed")
+                || lower.contains("exception")
+        })
+        .map(|line| redact(line))
+}
+
+fn deploy_status_sentence(status: &str) -> &'static str {
+    match status {
+        "succeeded" => "성공했어요.",
+        "failed" => "실패했어요.",
+        "cancelled" => "취소됐어요.",
+        "rolled_back" => "롤백됐어요.",
+        "queued" | "pending" => "대기 중이에요.",
+        "building" => "빌드 중이에요.",
+        "deploying" | "running" | "in_progress" => "진행 중이에요.",
+        _ => "확인됐어요.",
+    }
+}
+
+fn verify_status_liveish(status: &str) -> bool {
+    matches!(
+        status.to_ascii_lowercase().as_str(),
+        "live" | "running" | "deployed" | "active" | "ok" | "succeeded" | "success"
+    )
+}
+
+fn verify_status_failedish(status: &str) -> bool {
+    matches!(
+        status.to_ascii_lowercase().as_str(),
+        "failed" | "error" | "cancelled" | "canceled" | "stopped" | "rolled_back"
+    )
+}
+
+fn compact_time(value: &str) -> String {
+    value
+        .strip_suffix('Z')
+        .unwrap_or(value)
+        .replace('T', " ")
+        .split('.')
+        .next()
+        .unwrap_or(value)
+        .to_string()
+}
+
+fn short_commit(value: &str) -> &str {
+    value.get(..7).unwrap_or(value)
+}
+
+fn cmd_inspect_config_summary() -> anyhow::Result<i32> {
+    let manifest = run_axhub(&["manifest", "validate", "--file", "axhub.yaml", "--json"]);
+    let config = run_axhub(&["config", "explain", "--json"]);
+
+    let manifest_json = serde_json::from_str::<Value>(&manifest.stdout).ok();
+    let config_json = serde_json::from_str::<Value>(&config.stdout).ok();
+
+    println!("매니페스트와 설정을 확인했어요.");
+
+    if manifest.exit_code == 0 {
+        let data = manifest_json.as_ref().and_then(|v| v.get("data"));
+        let app_missing = data.and_then(|v| v.get("app")).is_none_or(Value::is_null);
+        let ci_missing = data.and_then(|v| v.get("ci")).is_none_or(Value::is_null);
+        let deploy = data.and_then(|v| v.get("deploy"));
+        let port_missing = deploy
+            .and_then(|v| v.get("port"))
+            .is_none_or(Value::is_null);
+        let commands_missing = deploy
+            .and_then(|v| v.get("commands"))
+            .and_then(Value::as_array)
+            .is_none_or(Vec::is_empty);
+
+        if app_missing || ci_missing || port_missing || commands_missing {
+            println!("- 매니페스트 문법은 맞지만 실제 배포에 필요한 항목이 아직 비어 있어요.");
+        } else {
+            println!("- 매니페스트 문법과 주요 배포 설정이 괜찮아 보여요.");
+        }
+        if app_missing {
+            println!("- 연결된 앱 정보가 아직 없어요.");
+        }
+        if port_missing || commands_missing {
+            println!("- 배포 포트나 실행 명령이 비어 있어 컨테이너를 어떻게 띄울지 추가 설정이 필요해요.");
+        }
+    } else if manifest.timed_out {
+        println!(
+            "- 매니페스트 확인이 시간 안에 끝나지 않았어요. 잠시 뒤 다시 확인해보는 게 좋아요."
+        );
+    } else {
+        println!(
+            "- 매니페스트를 확인하지 못했어요. 현재 폴더에 axhub.yaml이 있는지 먼저 봐야 해요."
+        );
+    }
+
+    if config.exit_code == 0 {
+        let token_present = config_json
+            .as_ref()
+            .and_then(|v| v.pointer("/token/present"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        if token_present {
+            println!("- 로그인 정보는 확인됐어요.");
+        } else {
+            println!("- 로그인 정보가 없어 배포 전에 다시 로그인 확인이 필요해요.");
+        }
+    } else if config.timed_out {
+        println!(
+            "- 설정 확인이 시간 안에 끝나지 않았어요. 로그인 상태를 다시 확인하는 편이 안전해요."
+        );
+    } else {
+        println!("- 설정 정보를 확인하지 못했어요. 로그인 상태를 먼저 확인하는 편이 안전해요.");
+    }
+
+    println!();
+    println!("다음에는 앱의 포트와 실행 명령을 채우고, 로그인 상태를 다시 확인하면 돼요.");
+    Ok(0)
+}
+
 fn cmd_config(rest: &[String]) -> anyhow::Result<i32> {
     let Some(action) = rest.first() else {
         eprintln!("axhub-helpers config: expected 'get' or 'set'");
@@ -2259,7 +4756,7 @@ where
         let reason = match out.exit_code {
             4 => "axhub auth 만료 — axhub auth login 으로 재인증해주세요.".to_string(),
             5 => "axhub: 앱을 찾을 수 없어요 (resource not found).".to_string(),
-            127 => "axhub CLI 를 찾을 수 없어요 (axhub:setup 으로 재설치).".to_string(),
+            127 => "axhub CLI 를 찾을 수 없어요. 설치 도와줘라고 말해 주세요.".to_string(),
             code => format!("axhub deploy list exit code {code}"),
         };
         return DeployIdLookup::TransportFailure { reason };
@@ -2852,6 +5349,459 @@ fn cmd_deploy_prep(rest: &[String]) -> anyhow::Result<i32> {
         )?)?
     );
     Ok(exit_code)
+}
+
+fn cmd_deploy_preview_summary(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("deploy-preview-summary", rest)?;
+    let mut prep_args = vec!["--intent".to_string(), "deploy".to_string()];
+    if !user_utterance.trim().is_empty() {
+        prep_args.push("--user-utterance".to_string());
+        prep_args.push(user_utterance);
+    }
+    let result = run_deploy_prep(&prep_args);
+    let quality = validate_deploy_prep_quality(&result);
+
+    if !result.preflight.auth_ok {
+        println!("axhub 로그인이 필요해요.");
+        println!("- 지금은 배포 준비를 끝낼 수 없어요.");
+        println!("- 로그인부터 다시 확인할까요?");
+        return Ok(65);
+    }
+    if result.preflight.cli_too_old {
+        let version = result.preflight.cli_version.as_deref().unwrap_or("unknown");
+        println!("axhub CLI 버전이 낮아서 배포 전에 업데이트가 필요해요.");
+        println!("- 현재 버전: {version}");
+        println!("- 먼저 업데이트 확인을 진행할까요?");
+        return Ok(64);
+    }
+    if !quality.passed {
+        println!("배포 전에 품질 확인에서 막힌 항목이 있어요.");
+        for violation in quality.violations.iter().take(4) {
+            println!("- {}", quality_violation_label(violation));
+        }
+        println!("- 이 상태에서는 바로 배포하지 않는 게 안전해요.");
+        return Ok(64);
+    }
+    if let Some(in_flight) = result.in_flight_deploy.as_ref() {
+        println!("이미 진행 중인 배포가 있어요.");
+        if !in_flight.commit_sha.is_empty() {
+            println!("- 커밋: {}", short_commit(&in_flight.commit_sha));
+        }
+        println!("- 이 배포를 계속 볼지, 새 배포를 시작할지 확인이 필요해요.");
+        return Ok(0);
+    }
+
+    let app = result
+        .resolve
+        .app_slug
+        .as_deref()
+        .or(result.resolve.candidate_slug.as_deref())
+        .unwrap_or("확인 필요");
+    let branch = result.resolve.branch.as_deref().unwrap_or("확인 필요");
+    let commit = result.resolve.commit_sha.as_deref().unwrap_or("확인 필요");
+    let message = result
+        .resolve
+        .commit_message
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("커밋 메시지 없음");
+    let eta = deploy_eta_human(result.resolve.eta_sec);
+    let env = result
+        .resolve
+        .profile
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("production");
+
+    if result.resolve.app_id.is_none() {
+        println!("처음 배포라 앱 등록 준비가 먼저 필요해요.");
+        println!("- 앱 후보: {app}");
+        println!("- 브랜치: {branch}");
+        println!("- 커밋: {} — \"{}\"", short_commit(commit), message);
+        println!("- 계속 진행하기 전에 앱 등록 미리보기를 확인할게요.");
+        return Ok(0);
+    }
+
+    println!("다음을 실행할게요:");
+    println!("- 앱: {app}");
+    println!("- 환경: {env}");
+    println!("- 브랜치: {branch}");
+    println!("- 커밋: {} — \"{}\"", short_commit(commit), message);
+    println!("- 예상: {eta}");
+    println!();
+    println!("진행할까요?");
+    Ok(0)
+}
+
+fn cmd_deploy_approved_run(rest: &[String]) -> anyhow::Result<i32> {
+    let user_utterance = parse_optional_user_utterance("deploy-approved-run", rest)?;
+    let mut prep_args = vec!["--intent".to_string(), "deploy".to_string()];
+    if !user_utterance.trim().is_empty() {
+        prep_args.push("--user-utterance".to_string());
+        prep_args.push(user_utterance);
+    }
+    let result = run_deploy_prep(&prep_args);
+    let quality = validate_deploy_prep_quality(&result);
+
+    if !result.preflight.auth_ok {
+        println!("axhub 로그인이 필요해요.");
+        println!("- 지금은 배포를 시작하지 않았어요.");
+        println!("- 다시 로그인한 뒤 배포를 이어가면 돼요.");
+        return Ok(0);
+    }
+    if result.preflight.cli_too_old {
+        let version = result.preflight.cli_version.as_deref().unwrap_or("unknown");
+        println!("axhub CLI 버전이 낮아서 배포를 시작하지 않았어요.");
+        println!("- 현재 버전: {version}");
+        println!("- 업데이트 확인을 먼저 진행해 주세요.");
+        return Ok(0);
+    }
+    if !quality.passed {
+        println!("배포 전에 품질 확인에서 막힌 항목이 있어요.");
+        for violation in quality.violations.iter().take(4) {
+            println!("- {}", quality_violation_label(violation));
+        }
+        println!("- 이 상태에서는 바로 배포하지 않는 게 안전해요.");
+        return Ok(0);
+    }
+
+    let app_label = result
+        .resolve
+        .app_slug
+        .as_deref()
+        .or(result.resolve.candidate_slug.as_deref())
+        .unwrap_or("확인 필요");
+    let Some(app_id) = result.resolve.app_id.as_deref() else {
+        println!("처음 배포라 앱 등록 준비가 먼저 필요해요.");
+        println!("- 앱 후보: {app_label}");
+        println!("- 앱을 만든 뒤 다시 배포를 이어갈게요.");
+        return Ok(0);
+    };
+    let Some(commit) = result.resolve.commit_sha.as_deref() else {
+        println!("배포할 git 커밋을 확인하지 못했어요.");
+        println!("- 변경사항을 저장한 뒤 다시 배포해 주세요.");
+        return Ok(0);
+    };
+
+    if let Some(in_flight) = result.in_flight_deploy.as_ref() {
+        println!("이미 진행 중인 배포가 있어요. 그 배포를 계속 확인할게요.");
+        return watch_deploy_until_terminal(app_id, app_label, &in_flight.id, Some(commit));
+    }
+
+    let mut create_args = vec![
+        "deploy".to_string(),
+        "create".to_string(),
+        "--app".to_string(),
+        app_id.to_string(),
+        "--commit".to_string(),
+        commit.to_string(),
+        "--execute".to_string(),
+        "--json".to_string(),
+    ];
+    if let Some(profile) = result
+        .resolve
+        .profile
+        .as_deref()
+        .filter(|value| !value.trim().is_empty() && *value != "default")
+    {
+        create_args.push("--profile".to_string());
+        create_args.push(profile.to_string());
+    }
+
+    println!("배포를 시작했어요. 완료될 때까지 확인할게요.");
+    let create = run_axhub_long(&create_args, std::time::Duration::from_secs(180));
+    if create.timed_out {
+        println!("- 배포 시작 요청이 오래 걸리고 있어요.");
+        println!("- 잠시 뒤 배포 상태를 다시 확인해 주세요.");
+        return Ok(0);
+    }
+    if create.exit_code == 64 && create.stderr.contains("deployment_in_progress") {
+        let refresh = run_deploy_prep(&[
+            "--intent".to_string(),
+            "deploy".to_string(),
+            "--refresh-in-flight".to_string(),
+        ]);
+        if let Some(in_flight) = refresh.in_flight_deploy.as_ref() {
+            println!("- 이미 진행 중인 배포를 찾았어요. 그 배포를 확인할게요.");
+            return watch_deploy_until_terminal(app_id, app_label, &in_flight.id, Some(commit));
+        }
+    }
+    if create.exit_code != 0 {
+        println!("배포 시작에 실패했어요.");
+        if let Some(reason) = concise_cli_failure_reason(&create.stderr, &create.stdout) {
+            println!("- 이유: {reason}");
+        } else {
+            println!("- 로그인, 앱 설정, 진행 중인 배포 상태를 확인해 주세요.");
+        }
+        return Ok(0);
+    }
+
+    let deploy_id = deploy_id_from_create_stdout(&create.stdout);
+    let Some(deploy_id) = deploy_id else {
+        println!("배포 시작 요청은 보냈지만 결과 확인이 완전하지 않아요.");
+        if let Some(reason) = concise_cli_failure_reason(&create.stderr, &create.stdout) {
+            println!("- 이유: {reason}");
+        } else {
+            println!("- 잠시 뒤 배포 상태를 다시 확인해 주세요.");
+        }
+        return Ok(0);
+    };
+    watch_deploy_until_terminal(app_id, app_label, &deploy_id, Some(commit))
+}
+
+fn run_axhub_long(
+    args: &[String],
+    timeout: std::time::Duration,
+) -> axhub_helpers::axhub_cli::CliOutput {
+    let refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+    let axhub_bin = axhub_helpers::axhub_cli::axhub_bin_from_env();
+    axhub_helpers::axhub_cli::run_axhub_with_timeout(&axhub_bin, &refs, timeout)
+}
+
+fn watch_deploy_until_terminal(
+    app_id: &str,
+    app_label: &str,
+    deploy_id: &str,
+    commit: Option<&str>,
+) -> anyhow::Result<i32> {
+    let args = vec![
+        "deploy".to_string(),
+        "status".to_string(),
+        deploy_id.to_string(),
+        "--app".to_string(),
+        app_id.to_string(),
+        "--watch".to_string(),
+        "--watch-timeout".to_string(),
+        "9m".to_string(),
+        "--json".to_string(),
+    ];
+    let status = run_axhub_long(&args, std::time::Duration::from_secs(570));
+    if status.timed_out {
+        println!("- 배포가 아직 진행 중이에요.");
+        println!("- 잠시 뒤 상태를 다시 확인해 주세요.");
+        return Ok(0);
+    }
+    if status.exit_code != 0 {
+        println!("- 배포 상태 확인이 중간에 끊겼어요.");
+        if let Some(reason) = concise_cli_failure_reason(&status.stderr, &status.stdout) {
+            println!("- 이유: {reason}");
+        }
+        return Ok(0);
+    }
+
+    let status_values = parse_json_values(&status.stdout);
+    let state = status_values
+        .iter()
+        .rev()
+        .find_map(deploy_state_from_value)
+        .unwrap_or_else(|| "unknown".to_string());
+    let url = status_values.iter().rev().find_map(|value| {
+        deploy_data_candidates(value).find_map(|candidate| {
+            axhub_helpers::cli_envelope::string_at_any(
+                candidate,
+                &["url", "app_url", "public_url", "deployment_url"],
+            )
+        })
+    });
+    let failure_reason = status_values
+        .iter()
+        .rev()
+        .find_map(deploy_failure_reason_from_value)
+        .or_else(|| concise_cli_failure_reason(&status.stderr, &status.stdout));
+
+    if matches!(state.as_str(), "succeeded" | "success" | "ready" | "live") {
+        println!("- 배포가 완료됐어요.");
+        println!("- 앱: {app_label}");
+        if let Some(commit) = commit {
+            println!("- 커밋: {}", short_commit(commit));
+        }
+        if let Some(url) = url {
+            println!("- URL: {url}");
+        }
+        return Ok(0);
+    }
+
+    println!("- 배포가 끝났지만 성공 상태는 아니에요.");
+    println!("- 상태: {}", deploy_status_sentence(&state));
+    if let Some(reason) = failure_reason.filter(|value| !value.trim().is_empty()) {
+        println!("- 이유: {reason}");
+    }
+    Ok(0)
+}
+
+fn parse_json_values(raw: &str) -> Vec<Value> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    let mut values = Vec::new();
+    let stream = serde_json::Deserializer::from_str(trimmed).into_iter::<Value>();
+    for value in stream {
+        match value {
+            Ok(value) => values.push(value),
+            Err(_) => {
+                values.clear();
+                break;
+            }
+        }
+    }
+    if !values.is_empty() {
+        return values;
+    }
+    if let Ok(value) = serde_json::from_str::<Value>(trimmed) {
+        return vec![value];
+    }
+    trimmed
+        .lines()
+        .rev()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect()
+}
+
+fn deploy_id_from_create_stdout(stdout: &str) -> Option<String> {
+    parse_json_values(stdout)
+        .iter()
+        .rev()
+        .find_map(deploy_id_from_value)
+}
+
+fn deploy_id_from_value(value: &Value) -> Option<String> {
+    deploy_data_candidates(value)
+        .find_map(|candidate| {
+            axhub_helpers::cli_envelope::string_at_any(
+                candidate,
+                &["id", "deployment_id", "deploy_id"],
+            )
+        })
+        .or_else(|| {
+            axhub_helpers::cli_envelope::string_at_any(value, &["deployment_id", "deploy_id"])
+        })
+}
+
+fn deploy_data_candidates(value: &Value) -> impl Iterator<Item = &Value> {
+    let data = axhub_helpers::cli_envelope::unwrap_data(value);
+    [
+        Some(data),
+        data.get("deployment"),
+        data.get("deploy"),
+        value.get("deployment"),
+        value.get("deploy"),
+    ]
+    .into_iter()
+    .flatten()
+}
+
+fn deploy_state_from_value(value: &Value) -> Option<String> {
+    deploy_data_candidates(value).find_map(|candidate| {
+        axhub_helpers::cli_envelope::string_at_any(
+            candidate,
+            &["status", "state", "deployment_status"],
+        )
+    })
+}
+
+fn deploy_failure_reason_from_value(value: &Value) -> Option<String> {
+    deploy_data_candidates(value)
+        .filter_map(|candidate| {
+            candidate
+                .get("failure_reason")
+                .or_else(|| candidate.get("error"))
+                .or_else(|| candidate.get("message"))
+        })
+        .chain(
+            [
+                value.get("failure_reason"),
+                value.get("error"),
+                value.get("message"),
+            ]
+            .into_iter()
+            .flatten(),
+        )
+        .find_map(human_deploy_failure_reason)
+}
+
+fn human_deploy_failure_reason(value: &Value) -> Option<String> {
+    let raw = match value {
+        Value::String(value) => value.clone(),
+        Value::Object(_) => {
+            let code = axhub_helpers::cli_envelope::string_at_any(value, &["code", "subcode"]);
+            let message = axhub_helpers::cli_envelope::string_at_any(value, &["message", "hint"]);
+            [code, message]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join(" ")
+        }
+        _ => return None,
+    };
+    human_deploy_failure_text(&raw)
+}
+
+fn concise_cli_failure_reason(stderr: &str, stdout: &str) -> Option<String> {
+    let combined = [stderr, stdout].join("\n");
+    if let Some(reason) = human_deploy_failure_text(&combined) {
+        return Some(reason);
+    }
+    let lower = combined.to_lowercase();
+    if lower.contains("unauth") || lower.contains("login") || lower.contains("token") {
+        Some("로그인이 필요하거나 토큰이 만료됐어요.".to_string())
+    } else if lower.contains("deployment_in_progress") || lower.contains("in progress") {
+        Some("이미 진행 중인 배포가 있어요.".to_string())
+    } else if lower.contains("not found") || lower.contains("resource") {
+        Some("앱이나 배포 대상을 찾지 못했어요.".to_string())
+    } else {
+        combined
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty() && !line.starts_with('{'))
+            .map(|line| line.chars().take(160).collect())
+    }
+}
+
+fn human_deploy_failure_text(raw: &str) -> Option<String> {
+    let lower = raw.to_lowercase();
+    if lower.contains("commit_not_found") || lower.contains("커밋을 찾을 수 없") {
+        Some(
+            "커밋을 원격 저장소에서 찾을 수 없어요. 로컬 커밋을 원격에 올린 뒤 다시 배포해 주세요."
+                .to_string(),
+        )
+    } else if lower.contains("deployment_in_progress") || lower.contains("in progress") {
+        Some("이미 진행 중인 배포가 있어요.".to_string())
+    } else if lower.contains("unauth") || lower.contains("login") || lower.contains("token") {
+        Some("로그인이 필요하거나 토큰이 만료됐어요.".to_string())
+    } else {
+        None
+    }
+}
+
+fn quality_violation_label(
+    violation: &axhub_helpers::quality_gate::QualityViolation,
+) -> &'static str {
+    use axhub_helpers::quality_gate::QualityViolation;
+    match violation {
+        QualityViolation::MissingCliVersion => "CLI 버전을 확인하지 못했어요.",
+        QualityViolation::BootstrapPlanWithAppId => "앱 등록 상태가 서로 맞지 않아요.",
+        QualityViolation::ExitCodeMismatch { .. } => "배포 준비 상태 계산이 서로 맞지 않아요.",
+        QualityViolation::InvalidProfile { .. } => "프로필 정보가 서로 맞지 않아요.",
+        QualityViolation::AuthMismatch => "로그인 상태가 서로 맞지 않아요.",
+    }
+}
+
+fn deploy_eta_human(seconds: u64) -> String {
+    if seconds == 0 {
+        "곧 완료".to_string()
+    } else if seconds < 60 {
+        format!("약 {seconds}초")
+    } else {
+        let minutes = seconds.div_ceil(60);
+        format!("약 {minutes}분")
+    }
 }
 
 fn cmd_emit_deploy_complete(rest: &[String]) -> anyhow::Result<i32> {

@@ -2,9 +2,8 @@
 /**
  * Phase 8 AC wrapper — routing drift gate entry point.
  *
- * The GitHub workflow calls tests/run-corpus.sh directly for speed. This script
- * preserves the named plan artifact and gives maintainers the same gate through
- * a Bun entry point.
+ * Uses the canonical Bun corpus runner so the gate works on Windows without
+ * Git Bash while preserving the named plan artifact for maintainers.
  */
 
 import { spawnSync } from "node:child_process";
@@ -14,8 +13,8 @@ const root = join(import.meta.dir, "..");
 const args = process.argv.slice(2);
 const corpus = args.includes("--corpus") ? args[args.indexOf("--corpus") + 1] : "tests/corpus.100.jsonl";
 const result = spawnSync(
-  "bash",
-  ["tests/run-corpus.sh", "--mode", "plugin", "--corpus", corpus ?? "tests/corpus.100.jsonl", "--vs", "claude-native", "--score"],
+  process.execPath,
+  ["tests/run-corpus.ts", "--mode", "plugin", "--corpus", corpus ?? "tests/corpus.100.jsonl", "--vs", "claude-native", "--score"],
   { cwd: root, stdio: "inherit" },
 );
 

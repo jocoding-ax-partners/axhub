@@ -1280,6 +1280,7 @@ fn match_known_intent(tokens: &[String]) -> Option<ParsedAxhubCommand> {
             );
             parsed
         }
+        (Some("update"), Some("check"), _) => return None,
         (Some("update"), Some("apply"), _) => destructive("update_apply", tokens, None),
         (Some("deploy"), Some("logs"), _) if tokens.iter().any(|t| t == "--kill") => {
             destructive("deploy_logs_kill", tokens, None)
@@ -1899,7 +1900,7 @@ pub fn format_preauth_deny_hint(action: Option<&str>, app_id: Option<&str>) -> S
         )
     ) {
         return format!(
-            "이 axhub 테이블/행 변경 명령은 사전 승인 없이는 실행할 수 없고, tables skill 의 preview + consent-mint 승인 뒤에만 실행할 수 있어요. 사용자에게 다시 말하라고 하지 말고 Skill(axhub:tables)를 로드해 {app} 대상 preview 와 승인 카드를 만든 뒤 같은 binding 으로 재시도해요."
+            "이 axhub 테이블/행 변경 명령은 사전 승인 없이는 실행할 수 없어요. 사용자에게 다시 말하라고 하지 말고 {app} 대상 테이블 변경 미리보기와 승인 카드를 만든 뒤 같은 binding 으로 재시도해요."
         );
     }
     let phrase = match action {
@@ -1951,9 +1952,9 @@ pub fn format_preauth_deny_hint(action: Option<&str>, app_id: Option<&str>) -> S
         Some("connector_update") => "'connector 수정해'".to_string(),
         Some("connector_credentials_set") => "'connector 인증정보 바꿔'".to_string(),
         Some("connector_delete") => "'connector 삭제해'".to_string(),
-        Some("apps_fork") => format!("'{} 앱 fork 해'", app),
-        Some("apps_suspend") => format!("'{} 앱 suspend 해'", app),
-        Some("apps_resume") => format!("'{} 앱 resume 해'", app),
+        Some("apps_fork") => format!("'{} 앱 복제해줘'", app),
+        Some("apps_suspend") => format!("'{} 앱 잠깐 멈춰줘'", app),
+        Some("apps_resume") => format!("'{} 앱 다시 켜줘'", app),
         Some("resource_namespace_create") => "'resource namespace 만들어'".to_string(),
         Some("resource_rename") => "'resource 이름 바꿔'".to_string(),
         Some("resource_move") => "'resource 이동해'".to_string(),

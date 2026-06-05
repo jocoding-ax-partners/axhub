@@ -157,17 +157,7 @@ pub fn append_autowire_event(
 
     let line = serde_json::to_string(&event)?;
     let events_path = sd.join("events.jsonl");
-
-    let mut opts = OpenOptions::new();
-    opts.create(true).append(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        opts.mode(0o600);
-    }
-    let mut f = opts.open(&events_path)?;
-    writeln!(f, "{line}")?;
-    f.sync_all()?;
+    crate::atomic_jsonl::append_line(&events_path, &line)?;
     Ok(())
 }
 

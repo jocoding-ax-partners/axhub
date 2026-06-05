@@ -371,7 +371,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<MergeOutcome> {
         Err(_) => {
             emit(
                 opts.silent,
-                "axhub: settings.json JSON syntax error. 파싱 안 돼서 자동 작업 건너뛰었어요. 직접 수정 후 /axhub:doctor 실행해주세요.",
+                "axhub: settings.json JSON syntax error. 파싱 안 돼서 자동 작업 건너뛰었어요. 직접 수정 후 \"설치 상태 확인해줘\"라고 말해 주세요.",
             );
             return Ok(MergeOutcome::InvalidJson);
         }
@@ -383,7 +383,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<MergeOutcome> {
         _ => {
             emit(
                 opts.silent,
-                "axhub: settings.json JSON syntax error. 파싱 안 돼서 자동 작업 건너뛰었어요. 직접 수정 후 /axhub:doctor 실행해주세요.",
+                "axhub: settings.json JSON syntax error. 파싱 안 돼서 자동 작업 건너뛰었어요. 직접 수정 후 \"설치 상태 확인해줘\"라고 말해 주세요.",
             );
             return Ok(MergeOutcome::InvalidJson);
         }
@@ -438,7 +438,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<MergeOutcome> {
             if stored_type.is_none() || stored_cmd.is_none() {
                 emit(
                     opts.silent,
-                    "axhub: settings.json 의 statusLine 이 incomplete 해요. 자동 변경 안 했어요. /axhub:enable-statusline 으로 수동 결정해주세요.",
+                    "axhub: settings.json 의 statusLine 이 incomplete 해요. 자동 변경 안 했어요. \"statusLine 설정 도와줘\"라고 말해 수동으로 결정해 주세요.",
                 );
                 return Ok(MergeOutcome::PartialSchema);
             }
@@ -454,7 +454,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<MergeOutcome> {
             emit(
                 opts.silent,
                 &format!(
-                    "axhub: settings.json 에 다른 statusLine 이 있어요 ('{stored_cmd}'). 자동 변경 안 했어요. /axhub:enable-statusline 으로 수동 결정해주세요."
+                    "axhub: settings.json 에 다른 statusLine 이 있어요 ('{stored_cmd}'). 자동 변경 안 했어요. \"statusLine 설정 도와줘\"라고 말해 수동으로 결정해 주세요."
                 ),
             );
             Ok(MergeOutcome::PreservedOther)
@@ -463,7 +463,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<MergeOutcome> {
             // statusLine is not an object (string, number, etc.) → Branch 7 style.
             emit(
                 opts.silent,
-                "axhub: settings.json 의 statusLine 이 incomplete 해요. 자동 변경 안 했어요. /axhub:enable-statusline 으로 수동 결정해주세요.",
+                "axhub: settings.json 의 statusLine 이 incomplete 해요. 자동 변경 안 했어요. \"statusLine 설정 도와줘\"라고 말해 수동으로 결정해 주세요.",
             );
             Ok(MergeOutcome::PartialSchema)
         }

@@ -16,5 +16,13 @@ echo "[case ${CASE_ID}] state=${STATE} exit=${EXIT_CODE}"
 
 FAIL=0
 [ "$STATE" = "PASS" ] || { echo "  FAIL: state=${STATE}" >&2; FAIL=1; }
+grep -F -q "update check --json" "${CASE_DIR}/axhub-argv.log" || {
+  echo "  FAIL: update check command was not executed" >&2
+  FAIL=1
+}
+if grep -F -q "auth refresh" "${CASE_DIR}/axhub-argv.log"; then
+  echo "  FAIL: update check detoured through auth refresh" >&2
+  FAIL=1
+fi
 [ "$FAIL" -gt 0 ] && exit 1
 echo "[case ${CASE_ID}] OK"; exit 0

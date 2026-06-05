@@ -41,9 +41,9 @@ describe("migrate SKILL contract", () => {
     const skill = read("skills/migrate/SKILL.md");
     expect(skill).toContain("CLI boundary contract");
     expect(skill).toContain('"$HELPER" migrate-plan --dir "${AXHUB_MIGRATE_DIR:-.}" --json');
-    expect(skill).toContain("remote detect CLI 는 v0.17.3 기준 없으므로");
-    expect(skill).not.toContain('axhub apps detect --repo "$OWNER_REPO" --json');
-    expect(skill).not.toContain('axhub apps detect --owner "$OWNER" --repo-name "$REPO" --ref "$REF" --path "$APP_PATH" --json');
+    expect(skill).toContain('axhub apps detect --repo "$OWNER_REPO" --ref "$REF" --path "$APP_PATH" --json');
+    expect(skill).toContain('axhub apps detect --owner "$OWNER" --repo-name "$REPO" --ref "$REF" --path "$APP_PATH" --json');
+    expect(skill).toContain("remote detect 는 현재 CLI 로만 써요");
     expect(skill).toContain("exit `64` 는 local path");
     expect(skill).toContain("axhub apps create --from-file axhub.yaml --json");
     expect(skill).toContain('axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json');

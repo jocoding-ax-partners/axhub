@@ -148,7 +148,7 @@
     }
   },
   "clarify": {
-    "어떤 작업 원해요?": {
+    "어떤 걸 도와드릴까요?": {
       "safe_default": "abort",
       "rationale": "Ambiguous intent in non-interactive context — agent cannot guess; surface ambiguity message and stop.",
       "allowed_safe_defaults": [
@@ -654,12 +654,12 @@
     }
   },
   "app-lifecycle": {
-    "앱 생명주기 작업을 실행할까요?": {
-      "safe_default": "abort",
-      "rationale": "fork/suspend/resume 은 앱 runtime 또는 앱 record 를 바꾸는 mutation이에요",
+    "앱 변경을 실행할까요?": {
+      "safe_default": "취소",
+      "rationale": "복제/잠깐 멈춤/다시 켜기는 앱 상태를 바꾸는 mutation이에요",
       "allowed_safe_defaults": [
-        "abort",
-        "execute"
+        "취소",
+        "진행"
       ],
       "metadata": {
         "decision_topic": "app-lifecycle-confirm"

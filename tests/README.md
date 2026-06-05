@@ -6,18 +6,18 @@
 
 | Tier | rows | gate type | command |
 |------|------|-----------|---------|
-| `tests/corpus.20.jsonl` | 20 + meta | reliable CI | `bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.20.jsonl --score` |
-| `tests/corpus.100.jsonl` | 100 + meta | reliable CI | `bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --score` |
-| `tests/corpus.jsonl` | 331 + meta | **manual / advisory only** | `bash tests/run-corpus.sh --mode plugin --score` (exit 0 강제) |
+| `tests/corpus.20.jsonl` | 20 + meta | reliable CI | `bun tests/run-corpus.ts --mode plugin --corpus tests/corpus.20.jsonl --score` |
+| `tests/corpus.100.jsonl` | 100 + meta | reliable CI | `bun tests/run-corpus.ts --mode plugin --corpus tests/corpus.100.jsonl --score` |
+| `tests/corpus.jsonl` | 331 + meta | **manual / advisory only** | `bun tests/run-corpus.ts --mode plugin --score` (exit 0 강제) |
 
-`run-corpus.sh` 가 corpus row count 를 보고 자동 분기:
+`run-corpus.ts` 가 corpus row count 를 보고 자동 분기:
 - 20 / 100 → score exit code 그대로 propagate (CI fail 가능)
 - 그 외 → stderr 에 `ADVISORY ONLY` 경고 + score exit code 0 으로 강제
 
 `bun run test:routing` (100-row) 만 CI gate 로 사용해요.
 `bun run test:routing:full` (350-row) 은 분석 용 advisory.
 
-routing-specific scorer: `bun run tests/routing-score.ts --baseline <docs-only> --against <claude-native>`.
+routing-specific scorer: `bun tests/routing-score.ts --baseline <docs-only> --against <claude-native>`.
 
 ## Corpus structure
 
@@ -138,17 +138,17 @@ To collect a fresh docs-only baseline manually:
 
 ## How to run — M1.5 plugin arm (fixture replay, live re-curation optional)
 
-Committed result fixtures exist for the frozen 20-row M0.5 scope and the 100-row M2.5 scope. Use `tests/run-corpus.sh` to replay those fixtures into an output file and/or score them through the same gate used by CI.
+Committed result fixtures exist for the frozen 20-row M0.5 scope and the 100-row M2.5 scope. Use `tests/run-corpus.ts` to replay those fixtures into an output file and/or score them through the same gate used by CI.
 
 ```bash
 # Replay + score the 20-row docs-only baseline
-bash tests/run-corpus.sh --mode docs-only --corpus tests/corpus.20.jsonl --score
+bun tests/run-corpus.ts --mode docs-only --corpus tests/corpus.20.jsonl --score
 
 # Replay + score the 100-row plugin arm against the matching docs-only baseline
-bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.100.jsonl --score
+bun tests/run-corpus.ts --mode plugin --corpus tests/corpus.100.jsonl --score
 
 # Write replayed plugin results for downstream inspection
-bash tests/run-corpus.sh --mode plugin --corpus tests/corpus.20.jsonl --out results-plugin.json
+bun tests/run-corpus.ts --mode plugin --corpus tests/corpus.20.jsonl --out results-plugin.json
 ```
 
 For a fresh live re-curation, enable the plugin with `claude --plugin-dir /path/to/axhub`, run each corpus row in a fresh session, save the captured `ResultRow[]`, then pass it with `--fixture <results.json>`. The runner refuses to fabricate results for the full 350-row corpus when no explicit fixture is provided.
@@ -166,7 +166,7 @@ If any fail → plugin development pauses; evaluate whether docs-only is suffici
 
 ## Live automated runner (future)
 
-`tests/run-corpus.sh` now automates deterministic fixture replay and scoring. A fully live headless Claude eval runner remains a future optional layer because it requires:
+`tests/run-corpus.ts` now automates deterministic fixture replay and scoring. A fully live headless Claude eval runner remains a future optional layer because it requires:
 - Frozen model + temperature=0
 - 3-run median per utterance
 - Tool call capture from API response

@@ -1,6 +1,6 @@
 {
   "_comment": "Pinned snapshot of the ax-hub-cli failure contract (spec 004 FR-012). Source of truth: ax-hub-cli crates/axhub-core/src/{exit_code.rs,error.rs} + axhub/src/main.rs::error_to_error_code. The empathy catalog (data/catalog.json) MUST key every entry on a base exit code present in `exit_codes`. Drift is enforced by tests/exit-contract-parity.test.ts (SC-008). When the CLI contract changes, the parity test fails -> re-verify against the CLI and update this snapshot.",
-  "cli_version": "0.17.2",
+  "cli_version": "0.17.4",
   "exit_codes": {
     "0": "success",
     "1": "generic",

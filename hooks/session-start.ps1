@@ -66,12 +66,12 @@ if (-not (Test-Path -Path $Helper -PathType Leaf)) {
     $installOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $InstallPs1 2>&1
     $installExit = $LASTEXITCODE
     if ($installExit -ne 0) {
-      $failureMessage = "[axhub] helper 바이너리 설치 실패 (exit $installExit). 진단: /axhub:doctor"
+      $failureMessage = "[axhub] helper 바이너리 설치 실패 (exit $installExit). 설치 상태를 먼저 확인해 주세요."
       Write-InstallFailureOrFallback -InstallOutput $installOutput -FallbackMessage $failureMessage
       exit 0
     }
     if (-not (Test-Path -Path $Helper -PathType Leaf)) {
-      $failureMessage = "[axhub] install.ps1 실행 후에도 axhub-helpers.exe 를 찾지 못했어요. 진단: /axhub:doctor"
+      $failureMessage = "[axhub] install.ps1 실행 후에도 axhub-helpers.exe 를 찾지 못했어요. 설치 상태를 먼저 확인해 주세요."
       Write-InstallFailureOrFallback -InstallOutput $installOutput -FallbackMessage $failureMessage
       exit 0
     }
@@ -85,7 +85,7 @@ if (-not (Test-Path -Path $Helper -PathType Leaf)) {
     if ($errMsg -match '(AntiMalwareProvider|AMSI|quarantine|virus|threat)') {
       Write-Output (ConvertTo-Json @{ systemMessage = "[axhub] 보안 솔루션 (V3, AhnLab, CrowdStrike 등) 이 install.ps1 호출을 차단했어요. AXHUB_TOKEN 환경변수로 우회 가능 → `$env:AXHUB_TOKEN='axhub_pat_...' 후 token-init 재시도. v0.1.8 Authenticode 서명 후 EDR allowlist 가능." } -Compress)
     } else {
-      Write-Output (ConvertTo-Json @{ systemMessage = "[axhub] install.ps1 실행 중 알 수 없는 에러: $errMsg. 진단: /axhub:doctor" } -Compress)
+      Write-Output (ConvertTo-Json @{ systemMessage = "[axhub] install.ps1 실행 중 알 수 없는 에러: $errMsg. 설치 상태를 먼저 확인해 주세요." } -Compress)
     }
     exit 0
   }
@@ -222,6 +222,6 @@ try {
   & $Helper session-start
   exit $LASTEXITCODE
 } catch {
-  Write-Output (ConvertTo-Json @{ systemMessage = "[axhub] axhub-helpers session-start 실행 실패: $($_.Exception.Message). 진단: /axhub:doctor" } -Compress)
+  Write-Output (ConvertTo-Json @{ systemMessage = "[axhub] axhub-helpers session-start 실행 실패: $($_.Exception.Message). 설치 상태를 먼저 확인해 주세요." } -Compress)
   exit 0
 }

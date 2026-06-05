@@ -135,8 +135,14 @@ After the workflow finishes, the GitHub Release at `https://github.com/jocoding-
 ### Quick verify
 
 ```bash
-# Requires: gh, cosign, jq
+# macOS/Linux/Git Bash — requires: gh, cosign, jq
 bash scripts/release/verify-release.sh v0.1.1
+```
+
+```powershell
+# Windows PowerShell — run the same verifier through Git Bash, or use the manual
+# PowerShell commands below when Git Bash is unavailable.
+# Native repo smoke/routing scripts use Bun and do not require Bash.
 ```
 
 Verifies:

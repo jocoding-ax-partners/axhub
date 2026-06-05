@@ -17,7 +17,7 @@ Phase 25 PR 25.4 (R3γ 갱신) — `axhub:trace` skill 이 **런타임 로그**(
 
 **해결:** `axhub env set <KEY>=<값>` 으로 등록한 뒤 다시 배포해주세요. 키 이름이 정확한지 확인하고 production / staging 환경별로 따로 set 해야 해요.
 
-**버튼:** ["환경변수 추가", "/axhub:env", "값 확인하기"]
+**버튼:** ["환경변수 추가", "환경변수 보여줘", "값 확인하기"]
 
 ---
 
@@ -89,7 +89,7 @@ Phase 25 PR 25.4 (R3γ 갱신) — `axhub:trace` skill 이 **런타임 로그**(
 
 **해결:** `axhub recover` 로 직전 배포 정리 후 다시 배포해 보세요. 또는 `axhub.yaml` 의 port 설정이 컨테이너 내부 포트와 일치하는지 확인해요.
 
-**버튼:** ["/axhub:recover", "axhub.yaml port 확인", "도와주세요"]
+**버튼:** ["복구해줘", "axhub.yaml port 확인", "도와주세요"]
 
 ---
 

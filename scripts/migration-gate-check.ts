@@ -104,7 +104,7 @@ export function buildAllGates(): GateResult[] {
       },
     }),
     runGate("Routing-score 100-row", [
-      "bash", "tests/run-corpus.sh", "--mode", "plugin", "--corpus", "tests/corpus.100.jsonl", "--vs", "claude-native", "--score",
+      "bun", "tests/run-corpus.ts", "--mode", "plugin", "--corpus", "tests/corpus.100.jsonl", "--vs", "claude-native", "--score",
     ]),
     runGate("High-risk live canary", ["manual run: 배포해줘 / 이 앱 삭제해 / DB_URL=foo 설정 / 로그인"], { manual: true }),
   ];

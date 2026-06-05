@@ -124,4 +124,37 @@ mod tests {
         let b = hash_cwd(std::path::Path::new("/proj/y"));
         assert_ne!(a, b);
     }
+
+    #[test]
+    fn loop_signal_state_as_str_matches_serialized_contract() {
+        assert_eq!(LoopSignalState::Fail.as_str(), "fail");
+        assert_eq!(LoopSignalState::Pass.as_str(), "pass");
+        assert_eq!(
+            serde_json::to_string(&LoopSignalState::Fail).unwrap(),
+            "\"fail\""
+        );
+        assert_eq!(
+            serde_json::from_str::<LoopSignalState>("\"pass\"").unwrap(),
+            LoopSignalState::Pass
+        );
+    }
+
+    #[test]
+    fn read_all_skips_corrupt_lines() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("learnings.jsonl");
+        let mut e = builder("network_timeout");
+        e.loop_id = "L-corrupt".into();
+        std::fs::write(
+            &path,
+            format!(
+                "{}\nnot-json\n",
+                serde_json::to_string(&e).expect("entry serializes")
+            ),
+        )
+        .unwrap();
+
+        let all = read_all_from(&path).unwrap();
+        assert_eq!(all, vec![e]);
+    }
 }

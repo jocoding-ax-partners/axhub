@@ -37,6 +37,9 @@ describe("verify SKILL Phase 26 invariants", () => {
     const identify = body.indexOf("1. **최근 배포 식별");
     expect(step0).toBeGreaterThan(-1);
     expect(identify).toBeGreaterThan(step0);
+    expect(body).toContain("TodoWrite availability");
+    expect(body).toContain("available tool list");
+    expect(body).toContain("do not mention progress UI availability");
     for (const marker of ["최근 배포 식별", "axhub deploy status 호출", "axhub deploy logs 확인", "verdict 안내"]) {
       expect(body).toContain(marker);
     }

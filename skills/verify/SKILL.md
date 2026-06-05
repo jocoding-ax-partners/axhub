@@ -1,7 +1,9 @@
 ---
 name: verify
-description: '이 스킬은 사용자가 배포가 진짜 라이브 됐는지 evidence 기반으로 확인하고 싶어할 때 사용해요. 다음 표현에서 활성화: "확인해", "검증해", "라이브 됐어", "정말 됐어", "진짜 올라갔어", "확실해", "테스트해", "smoke test", "is it live", "check live", "verify", "방금 거 확인해줘". axhub-helpers verify 가 current CLI deploy list/status/logs 를 호출하고, (선택) health endpoint 로 evidence 를 보강해서 verdict 한 줄로 보여줘요.'
+description: '이 스킬은 사용자가 배포가 진짜 라이브 됐는지 evidence 기반으로 확인하고 싶어할 때 사용해요. 특히 Claude Desktop에서 "방금 배포 진짜 열리는지 확인해줘" 같은 자연어 요청은 내부 routing/preflight/status/logs 단계를 말하지 않고 단일 검증 요약으로 처리해요. 다음 표현에서 활성화: "방금 배포 진짜 열리는지 확인해줘", "확인해", "검증해", "라이브 됐어", "정말 됐어", "진짜 올라갔어", "확실해", "테스트해", "smoke test", "is it live", "check live", "verify", "방금 거 확인해줘". axhub-helpers verify-summary 가 current CLI deploy list/status/logs 를 호출하고, Desktop에 맞는 한국어 verdict 로 보여줘요.'
 examples:
+  - utterance: "방금 배포 진짜 열리는지 확인해줘"
+    intent: "verify last deploy is live"
   - utterance: "방금 거 진짜 됐어"
     intent: "verify last deploy is live"
   - utterance: "라이브 됐어"
@@ -30,6 +32,21 @@ axhub 배포가 진짜 라이브 됐는지 evidence 기반으로 1 화면 verdic
 
 ## Workflow
 
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
+
+**Claude Desktop visible contract:** begin with exactly `배포가 실제로 열리는지 확인할게요.`. For the first Bash tool call, set the tool `description` or title exactly to `배포 검증`. Do not show routing labels, skill names, preflight labels, stale cache IDs, deploy IDs, user emails, raw status names, JSON field names, command names, or intermediate fallback attempts in visible chat.
+
+Use this single helper path for ordinary Claude Desktop verification questions:
+
+```bash
+HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+"$HELPER" verify-summary --user-utterance "$USER_UTTERANCE"
+```
+
+Copy the helper's Korean stdout as the answer. For ordinary Claude Desktop verify questions, stop after this step. Do not continue with raw `axhub deploy status`, raw `axhub deploy logs`, `axhub-helpers preflight`, direct `axhub-helpers verify --app-id`, or manual status/log/list fallback unless the helper itself says it could not resolve the app and asks for a specific app.
+
 To verify the latest deploy is live:
 
 **Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
@@ -37,15 +54,17 @@ To verify the latest deploy is live:
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
 [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 [ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
 echo "$PREFLIGHT_JSON"
 ```
 
-`auth_ok` 가 false 면 `/axhub:auth` 로 로그인을 안내하고, `auth_error_code` 가 있으면 그에 맞게 안내해요 (`cli_not_found`/`cli_unavailable` → `/axhub:install-cli`, `cli_config_corrupted` → `/axhub:auth` 재로그인, `cli_too_old` → `/axhub:upgrade`). 치명적이지 않으면 워크플로를 계속 진행해요.
+`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 치명적이지 않으면 워크플로를 계속 진행해요.
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
+
+   **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue the workflow; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
 
    ```typescript
    TodoWrite({ todos: [
@@ -110,9 +129,9 @@ echo "$PREFLIGHT_JSON"
 
 ### 첫 배포 직후 검증
 사용자: "방금 거 진짜 됐어?"
-→ verify skill 호출
-→ Step 1-5 실행
-→ 결과: "✅ 라이브 확정. 마지막 배포 2 분 전, status=active, 에러 0 건."
+→ 배포 검증 흐름으로 진행
+→ 단일 검증 요약 실행
+→ 결과: "✅ 라이브 확정. 앱이 최근 배포 기준으로 열리는 상태예요."
 
 ### CI 자동화
 ```bash

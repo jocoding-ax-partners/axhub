@@ -1,11 +1,17 @@
 ---
 name: auth
-description: '이 스킬은 사용자가 로그인, 로그아웃, 토큰 상태, 또는 현재 계정 identity 를 묻거나 변경할 때 사용합니다. 다음 표현에서 활성화: "계정", "권한", "권한이 없대", "누구로", "누구로 접속하는 거야", "누구야", "다시 로그인", "다시 로그인해주세요", "로그아웃", "로그아웃해", "로그인", "로그인 됐어", "로그인 상태", "로그인 상태 알려주세요", "로그인해", "로그인해주세요", "로그인해줘", "어떤 계정으로 접속 중인가요", "어떤 계정이야", "인증", "인증 다시", "토큰", "토큰 갱신해줘", "토큰 만료됐어", "토큰 살아있어", "토큰 지워줘", "scope 없대", "auth", "authenticate", "log in", "log out", "login", "logout", "refresh token", "scope", "sign in", "sign out", "token expired", "who am I", "who am i", "whoami", 또는 axhub identity 관리 의도. 헤드리스 환경 (Codespaces, SSH) 을 자동 감지하여 브라우저 사용 불가 시 토큰 붙여넣기 흐름으로 전환합니다.'
+description: '이 스킬은 사용자가 로그인, 로그아웃, 토큰 상태, 또는 현재 계정 identity 를 묻거나 변경할 때 사용합니다. 다음 표현에서 활성화: "계정", "권한", "권한이 없대", "누구로", "누구로 접속하는 거야", "누구야", "다시 로그인", "다시 로그인해주세요", "로그아웃", "로그아웃해", "로그인", "로그인 돼 있어", "나 로그인 돼 있어?", "로그인 됐어", "로그인 됐나", "로그인 되어있나", "로그인 상태", "로그인 상태 봐줘", "로그인 상태 좀 봐줘", "로그인 상태 알려주세요", "로그인 상태 확인해줘", "로그인 필요한 상태인지", "로그인 필요 여부", "로그인 필요해", "로그인해", "로그인해주세요", "로그인해줘", "어떤 계정으로 접속 중인가요", "어떤 계정이야", "인증", "인증 다시", "토큰", "토큰 갱신해줘", "토큰 만료됐어", "토큰 살아있어", "토큰 지워줘", "scope 없대", "auth", "authenticate", "log in", "log out", "login", "logout", "refresh token", "scope", "sign in", "sign out", "token expired", "who am I", "who am i", "whoami", 또는 axhub identity 관리 의도. 헤드리스 환경 (Codespaces, SSH) 을 자동 감지하여 브라우저 사용 불가 시 토큰 붙여넣기 흐름으로 전환합니다.'
 examples:
   - utterance: "로그인 만료 같아"
     intent: "authenticate to axhub"
   - utterance: "로그인"
     intent: "authenticate to axhub"
+  - utterance: "axhub 로그인 상태 좀 봐줘"
+    intent: "check axhub auth status"
+  - utterance: "나 로그인 돼 있어?"
+    intent: "check whether axhub login is active"
+  - utterance: "지금 로그인 필요한 상태인지 봐줘"
+    intent: "check axhub auth status"
   - utterance: "login"
     intent: "authenticate to axhub"
   - utterance: "auth"
@@ -24,6 +30,10 @@ Manage axhub identity. Always check current state first via `axhub auth status` 
 
 ## Workflow
 
+**User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
+
+**Claude Desktop natural-language contract.** 일반 사용자가 `나 로그인 돼 있어?`, `로그인 됐어?`, `지금 로그인 필요한 상태인지 봐줘`처럼 묻는 경우 첫 visible chat 문장은 정확히 `로그인 상태를 확인할게요.` 로 시작해요. 첫 Bash title 은 정확히 `로그인 상태 확인` 으로 쓰고, `axhub-helpers auth-summary --user-utterance "<방금 사용자 문장>"` 를 한 번만 실행해요. 그 stdout 의 한국어 문장만 답해요. 이 흐름에서는 설치 상태 점검, 환경 진단, 업데이트 확인, 새 로그인, 로그아웃, 계정 상세 표시 같은 다른 작업으로 넘어가지 않아요. 계정 이메일, raw user id, tenant/workspace 이름, profile 이름, scope, 정확한 만료 시각, raw JSON, `preflight`, command name, slash command, skill name, route label, English tool title 을 사용자에게 쓰지 않아요. 사용자가 `어떤 계정이야`, `whoami`, `권한 보여줘`, `scope 보여줘`처럼 identity/권한 세부정보를 명시적으로 묻는 경우에만 Step 2 identity card 로 가요.
+
 To handle auth:
 
 1. **Check current state first:**
@@ -35,23 +45,25 @@ To handle auth:
    ```
 
    Parse the result to discriminate four cases:
-   - `user_email` present → currently logged in; show identity + scopes + expiry
+   - `user_email` present → currently logged in; for generic status questions, show only login/re-login-needed summary via the Desktop contract; show identity + scopes + expiry only when explicitly requested
    - `code: token_expired` → token expired; flow to refresh (Step 3a) 우선
    - `code: not_logged_in` → never logged in; flow to login (Step 3b)
    - `code: ...` other → surface the helper's classify-exit template
    - `auth_mode: "pat"` → PAT context; flow to PAT identity card (Step 2b)
 
-2. **On "logged in" (status query intent).** Render Korean identity card:
+2. **On explicit identity detail intent.** If the user explicitly asks `어떤 계정이야`, `whoami`, `권한 보여줘`, or `scope 보여줘`, render Korean identity card:
 
    ```
    현재 로그인:
-     · 계정: <user_email>  (user_id: <user_id>)
+     · 계정: <user_email>
      · 이름: <name>                          # name 이 있으면 표시, 없으면 줄 생략
      · 만료: <EXPIRES_HUMAN>
      · 권한: <scopes joined by ", ">
      · 환경: <profile> (<endpoint>)
      · Platform admin: 네                    # platform_admin=true 일 때만 표시
    ```
+
+   기본 상태 카드에서는 `user_id` UUID 를 표시하지 마세요. 사용자가 "user id", "계정 ID", "debug identity" 처럼 명시적으로 식별자를 요청한 경우에만 마지막 8자 정도로 축약해 `user_id: ...<last8>` 형태로 덧붙여요. 토큰/raw secret 은 어떤 경우에도 표시하지 않아요.
 
    tenants 가 있으면 아래에 이어서:
 
@@ -61,13 +73,13 @@ To handle auth:
      - ...
    ```
 
-   tenants 가 비어 있으면 `소속 tenants: 없음` 한 줄 표시. Stop here unless the user also asked for a re-login.
+   tenants 가 비어 있으면 `소속 tenants: 없음` 한 줄 표시. Stop here unless the user also asked for a re-login. For plain login-status questions, do not render this card; use the Claude Desktop natural-language contract instead.
 
 2b. **PAT context identity card** (when `auth_mode=pat` in status output):
 
    ```
    현재 인증: PAT (X-Api-Key)
-     · 계정: <user_email>  (user_id: <user_id>)
+     · 계정: <user_email>
      · 출처: <env:AXHUB_API_KEY | env:AXHUB_PAT_ID | profile:current_pat | keychain:current_pat>
      · Platform admin: 네                    # platform_admin=true 일 때만 표시
    ```
@@ -123,7 +135,7 @@ To handle auth:
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/axhub/axhub/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    echo '{"tool_call_id":"pending","action":"auth_login","app_id":"_","profile":"'"${AXHUB_PROFILE:-default}"'","branch":"_","commit_sha":"_","context":{}}' \
      | "$HELPER" consent-mint
    ```
@@ -162,7 +174,7 @@ To handle auth:
    } | ConvertTo-Json -Compress | & $AxhubHelper consent-mint
    ```
 
-   두 lane (POSIX·PowerShell) 모두 `CLAUDE_PLUGIN_ROOT` 가 비어 있으면 PATH 의 `axhub-helpers` (Windows 는 `axhub-helpers.exe`) 를, 그래도 없으면 plugin cache (`~/.claude/plugins/cache/axhub/axhub/*/bin/`) 의 최신 버전 helper 를 자동으로 찾아요. 그래서 Claude Code 가 env 를 전달하지 않은 세션에서도 로그인이 막히지 않아요. temp-file fallback 은 위 두 stdin lane 을 쓸 수 없을 때만 secondary 로 써요. JSON 파일을 만들더라도 raw token 값을 쓰지 말고, consent JSON 만 0600/사용자 전용 ACL 임시 파일에 저장한 뒤 helper stdin 으로 다시 넣어요.
+   두 lane (POSIX·PowerShell) 모두 `CLAUDE_PLUGIN_ROOT` 가 비어 있으면 PATH 의 `axhub-helpers` (Windows 는 `axhub-helpers.exe`) 를, 그래도 없으면 plugin cache (`~/.claude/plugins/cache/*/*/bin/ or ~/.claude/plugins/cache/*/*/*/bin/`) 의 최신 버전 helper 를 자동으로 찾아요. 그래서 Claude Code 가 env 를 전달하지 않은 세션에서도 로그인이 막히지 않아요. temp-file fallback 은 위 두 stdin lane 을 쓸 수 없을 때만 secondary 로 써요. JSON 파일을 만들더라도 raw token 값을 쓰지 말고, consent JSON 만 0600/사용자 전용 ACL 임시 파일에 저장한 뒤 helper stdin 으로 다시 넣어요.
 
    `auth_login` binding은 실제 app/branch/commit이 필요 없지만 `asConsentBinding`이 모든 필드에서 비어있지 않은 문자열을 요구하므로 `"_"`를 플레이스홀더로 사용해요. 다음 Bash/PowerShell tool id는 consent-mint 이후에 생기므로 `pending` token을 한 번만 쓰게 해요.
    macOS/Linux/Windows 모두에서 `CLAUDE_SESSION_ID`를 지우지 마세요. `tool_call_id:"pending"` 자체가 helper에게 "다음 실제 tool call에서 한 번만 claim"하라는 명시 신호예요.
@@ -244,7 +256,7 @@ To handle auth:
 
    Confirm to user: "로그아웃 완료. 이 노트북에서 토큰이 제거됐어요. 다른 노트북은 영향 없어요."
 
-7. **Show scopes after success.** Always echo `scopes` from the post-login `auth status` so the user sees what they can/cannot do (prevents downstream exit 66 surprises).
+7. **Show scopes after explicit login or permission-detail success.** Echo `scopes` from the post-login `auth status` only when the user just completed login or explicitly asked about permissions. Do not show scopes for plain login-status questions like `나 로그인 돼 있어?`.
 
 8. **PAT (Personal Access Token) management** — 사용자가 "PAT 발급", "토큰 발급", "agent token", "automation token", "CI 토큰" 등을 요청하거나, PAT context 에서 관리 작업 (list/revoke/rotate) 을 요청할 때 사용해요. PAT 는 X-Api-Key 인증 헤더로 동작하고 OAuth session 과 별도 storage 에 보관돼요.
 

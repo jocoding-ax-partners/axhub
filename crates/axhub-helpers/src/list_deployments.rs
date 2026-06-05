@@ -186,7 +186,7 @@ pub fn parse_list_deployments_cli_output(
     if output.exit_code == 127 {
         return transport_error(
             "transport.cli_missing",
-            "axhub CLI 가 PATH 에 없거나 실행할 수 없어요. `axhub --version` 으로 확인하거나 axhub:setup 으로 다시 설치해주세요.",
+            "axhub CLI 가 PATH 에 없거나 실행할 수 없어요. `axhub --version` 으로 확인하거나 설치 도와줘라고 말해 주세요.",
         );
     }
 

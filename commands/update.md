@@ -1,10 +1,28 @@
 ---
-description: axhub CLI 업데이트 (cosign 서명 검증 — 회사 보안 정책 호환, destructive 작업)
+description: axhub CLI 업데이트 확인 (기본 check-only, apply 는 명시 요청 때만)
 allowed-tools: Bash(axhub-helpers:*), Bash(axhub:*), AskUserQuestion
 argument-hint: "[--check-only] [--force]"
 model: sonnet
 ---
 
-Trigger the axhub `update` skill with arguments: $ARGUMENTS.
+Default behavior for `/axhub:update` is **check-only**.
 
-Apply the workflow defined in `${CLAUDE_PLUGIN_ROOT}/skills/update/SKILL.md`. Slash invocation does NOT bypass the AskUserQuestion preview card or HMAC consent token requirement for destructive operations — the PreToolUse hook will still verify consent before any destructive bash call. Note: AXHUB_REQUIRE_COSIGN=1 is the default; cosign signature verification runs before binary replacement.
+Critical: for check-only update/version requests, including QA or evidence-mode prompts, do not inspect helper binaries, plugin manifests, cache directories, auth, preflight, doctor, or compatibility state before the update check. Those are separate workflows.
+
+Run this command first:
+
+```bash
+axhub update check --json
+```
+
+Then summarize `current`, `latest`, and `has_update` in Korean.
+
+Rules:
+- Do not run `axhub auth status`, `axhub auth refresh`, `axhub auth login`, preflight, doctor, or environment diagnostics.
+- Do not run `axhub-helpers`, helper discovery, plugin manifest inspection, cache scanning, or compatibility diagnostics for a check-only update request.
+- Do not mention update-related env toggles; the CLI handles signature verification internally.
+- Do not claim the read-only check is blocked unless the Bash tool result actually says so.
+- If `has_update: false`, say the installed CLI is already current and stop.
+- If `has_update: true`, show the current/latest versions and stop unless the user explicitly asked to apply.
+- In non-interactive subprocesses (`CI`, `CLAUDE_NON_INTERACTIVE`, or no TTY), never apply; stop after the read-only check.
+- Destructive apply details live in `${CLAUDE_PLUGIN_ROOT}/skills/update/SKILL.md` and require explicit user intent.

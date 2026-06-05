@@ -125,6 +125,6 @@ bun run measure:baseline -- --skip-prompt   # 자동화 mode (Claude 추천 그�
 
 - script: `scripts/measure-docs-only-baseline.ts`
 - output: `tests/baseline-results.docs-only.{20,100}.json`
-- consumer: `tests/run-corpus.sh --vs claude-native --score` (Phase 8.3 의 routing-drift CI gate)
+- consumer: `bun tests/run-corpus.ts --vs claude-native --score` (Phase 8.3 의 routing-drift CI gate)
 - corpus source: `tests/corpus.{20,100,jsonl}.jsonl`
 - vision context: `.plan/ceo-review-nl-routing/2026-05-08-routing-95pct-vision.md`
