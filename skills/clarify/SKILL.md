@@ -1,6 +1,6 @@
 ---
 name: clarify
-description: '이 스킬은 사용자가 axhub에 대해 막연히 도와달라고 하거나 목적지를 정하지 않은 질문을 할 때 사용하는 자연어 질문 카드입니다. 대상이 없는 말, 의도 혼합, 모순된 지시어, 또는 다음 표현에서 활성화: "도와줘 axhub", "뭔가 잘못된 것 같아", "axhub 관련", "axhub 관련해서", "axhub 도와줘", "axhub 좀 도와줘", "axhub 좀", "axhub로 뭐 해야 해", "axhub", "axhub thing", "do something with axhub", "help me with axhub". 화면에는 내부 라우팅 이름을 보이지 말고 사람이 고르기 쉬운 한국어 선택지만 보여줍니다.'
+description: '이 스킬은 사용자가 axhub에 대해 막연히 도와달라고 하거나 목적지를 정하지 않은 질문을 할 때 사용하는 자연어 질문 카드입니다. 대상이 없는 말, 의도 혼합, 모순된 지시어, 또는 다음과 같은 불확실 컨텍스트에서 활성화: "도와줘 axhub", "뭔가 잘못된 것 같아", "axhub 관련", "axhub 관련해서", "axhub 도와줘", "axhub 좀 도와줘", "axhub 좀", "axhub로 뭐 해야 해", "axhub", "axhub thing", "do something with axhub", "help me with axhub". 화면에는 내부 라우팅 이름을 보이지 말고 사람이 고르기 쉬운 한국어 선택지만 보여줍니다.'
 examples:
   - utterance: "도와줘 axhub"
     intent: "disambiguate axhub intent"

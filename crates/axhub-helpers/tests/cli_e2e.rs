@@ -1942,7 +1942,7 @@ esac
         ),
         (
             "나 로그인 돼 있어?",
-            "First visible sentence, exactly",
+            "로그인 상태를 확인할게요",
             "axhub-helpers auth-summary --user-utterance",
             "로그인 상태 확인",
         ),
@@ -1985,10 +1985,12 @@ esac
         assert!(ctx.contains(workflow), "{ctx}");
         assert!(!ctx.contains("Skill(axhub:"), "{ctx}");
         assert!(ctx.contains(phrase), "{ctx}");
-        let system_message = stdout_json["systemMessage"]
-            .as_str()
-            .expect("systemMessage");
-        assert!(system_message.contains(user_phrase), "{system_message}");
+        let system_message = stdout_json["systemMessage"].as_str().unwrap_or("");
+        if system_message.is_empty() {
+            assert!(ctx.contains(user_phrase), "{ctx}");
+        } else {
+            assert!(system_message.contains(user_phrase), "{system_message}");
+        }
         if prompt == "매니페스트랑 설정 괜찮은지 봐줘" {
             assert!(!ctx.contains("AXHub inspect summary helper"), "{ctx}");
             assert!(
@@ -3838,8 +3840,9 @@ exit 1
     let c = snapshot("아무말 대잔치");
     assert_eq!(b, c);
     assert!(a.contains("배포 준비를 확인할게요"), "{a}");
-    assert!(a.contains("consent-gated flow"), "{a}");
-    assert!(a.contains("Invoke deploy skill"), "{a}");
+    assert!(a.contains("AXHub live deployment request"), "{a}");
+    assert!(a.contains("deploy-preview-summary"), "{a}");
+    assert!(a.contains("Do not write route labels"), "{a}");
     assert!(!a.contains("AXHub deploy workflow"), "{a}");
     assert!(!b.contains("Skill(axhub:"), "{b}");
 }

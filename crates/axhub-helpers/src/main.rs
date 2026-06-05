@@ -1339,6 +1339,7 @@ const QUALITY_REVIEW_ROUTING_HINT: &str = r#"<axhub-routing-hint>
 그 다음: 확인 요약의 실제 변경 범위를 기준으로 소스/설정 파일을 읽고 한국어 코드 리뷰를 작성.
 큰 변경이라고 나오면 파일을 읽기 전에 `변경량이 커서 먼저 범위를 정할게요. 전체를 볼까요, 핵심 파일만 볼까요?`라고 묻고 대기.
 마무리: 리뷰가 끝나면 Bash title `리뷰 상태 저장`, 실행 `axhub-helpers state-update --review-acknowledged`.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
 const QUALITY_DEBUG_ROUTING_HINT: &str = r#"<axhub-routing-hint>
@@ -1593,6 +1594,7 @@ const AUTH_STATUS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
 답변: 확인 결과의 한국어 요약만 사용.
 범위: 로그인 여부와 다시 로그인 필요 여부만 확인. 설치 상태 점검, 환경 진단, 업데이트 확인, 새 로그인, 로그아웃, 계정 상세 표시는 사용자가 따로 물을 때만.
 표현: 계정 이메일, id, team/workspace/profile/scope, 정확한 만료 시각, JSON 같은 내부 값은 답변에 넣지 않음.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
 // Approach E (Phase 2): cmd_prompt_route is preflight + audit first.
@@ -3296,7 +3298,7 @@ fn cmd_status_summary(rest: &[String]) -> anyhow::Result<i32> {
         .as_ref()
         .and_then(|v| v.get("started_at"))
         .and_then(Value::as_str)
-        .or_else(|| {
+        .or({
             if deploy.created_at.is_empty() {
                 None
             } else {
@@ -3847,11 +3849,10 @@ fn cmd_review_scope_summary(rest: &[String]) -> anyhow::Result<i32> {
         if untracked.status.success() {
             for path in String::from_utf8_lossy(&untracked.stdout).lines() {
                 let path = path.trim();
-                if !path.is_empty() && !review_path_excluded(path) {
-                    if files.insert(path.to_string()) {
-                        if let Ok(content) = std::fs::read_to_string(path) {
-                            added += content.lines().count() as u64;
-                        }
+                if !path.is_empty() && !review_path_excluded(path) && files.insert(path.to_string())
+                {
+                    if let Ok(content) = std::fs::read_to_string(path) {
+                        added += content.lines().count() as u64;
                     }
                 }
             }
@@ -4320,7 +4321,7 @@ fn cmd_trace_summary(rest: &[String]) -> anyhow::Result<i32> {
     let status_json = serde_json::from_str::<Value>(&status.stdout).ok();
     let status_reason = status_json
         .as_ref()
-        .and_then(|value| trace_failure_reason_from_status(value));
+        .and_then(trace_failure_reason_from_status);
 
     let logs = run_axhub(&[
         "--json", "deploy", "logs", &failed.id, "--app", &app, "--limit", "50",
@@ -5635,8 +5636,8 @@ fn parse_json_values(raw: &str) -> Vec<Value> {
     }
 
     let mut values = Vec::new();
-    let mut stream = serde_json::Deserializer::from_str(trimmed).into_iter::<Value>();
-    while let Some(value) = stream.next() {
+    let stream = serde_json::Deserializer::from_str(trimmed).into_iter::<Value>();
+    for value in stream {
         match value {
             Ok(value) => values.push(value),
             Err(_) => {

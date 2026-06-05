@@ -5,6 +5,17 @@ multi-step: true
 needs-preflight: true
 allows-dependency-execution: false
 model: sonnet
+examples:
+  - utterance: "앱 잠깐 멈춰줘"
+    intent: "suspend hosted app"
+  - utterance: "testnextjs 다시 켜줘"
+    intent: "resume hosted app"
+  - utterance: "앱 복제해줘"
+    intent: "fork hosted app"
+  - utterance: "fork app"
+    intent: "fork hosted app"
+  - utterance: "resume app"
+    intent: "resume hosted app"
 ---
 
 # App lifecycle
@@ -101,17 +112,17 @@ fi
 
    **워크플로를 마치면 마지막 결과 출력 직후 TodoWrite 를 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.**
 
-1. **작업을 분기해요.** fork/suspend/resume 중 하나예요. 내부 action 이름은 명령 구성에만 쓰고, Desktop 사용자에게는 복제/잠깐 멈춤/다시 켜기로 말해요.
+6. **작업을 분기해요.** fork/suspend/resume 중 하나예요. 내부 action 이름은 명령 구성에만 쓰고, Desktop 사용자에게는 복제/잠깐 멈춤/다시 켜기로 말해요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 에 있어요.
 
-2. **AskUserQuestion 으로 작업을 확인해요.** 비대화형 기본은 `취소`예요.
+7. **AskUserQuestion 으로 작업을 확인해요.** 비대화형 기본은 `취소`예요.
 
    ```json
    {"questions":[{"question":"앱 변경을 실행할까요?","header":"앱 확인","options":[{"label":"취소","value":"취소","description":"아무것도 바꾸지 않아요"},{"label":"진행","value":"진행","description":"위에 적은 앱 변경을 실행해요"}]}]}
    ```
 
-3. **CLI 명령.**
+8. **CLI 명령.**
 
    변경 명령을 실행하기 전에 먼저 같은 app/action 으로 내부 승인 준비를 해요. 이 준비 단계의 stdout 은 사용자에게 보여주거나 요약하지 않아요. 승인 준비는 app-lifecycle 전용 typed helper 만 써요: `"$HELPER" consent-mint-app-lifecycle --action suspend|resume|fork --app "$APP_ARG" --quiet`. JSON, schema, fixture, helper source, consent-mint stdin, grep/rg 탐색을 하지 않아요. suspend/resume 의 `--app` 값은 resolved UUID 가 아니라 바로 다음 `axhub apps suspend|resume ...` 명령에 들어갈 literal 앱 인자와 정확히 같아야 해요. 예를 들어 `axhub apps suspend testnextjs --execute --json >/dev/null` 를 실행할 거면 준비 명령도 `--app testnextjs` 예요. `app_slug` 같은 별도 값을 만들지 않아요. 준비 명령 뒤에는 trailing success echo 를 붙이지 않고, 준비 실패를 숨기지 않아요. 앱 변경 실행 명령의 raw JSON stdout 도 사용자 도구 패널에 남기지 않도록 `>/dev/null` 로 버려요. 첫 번째 `앱 변경 실행` 이 exit code 0 으로 끝나면 성공으로 보고 즉시 결과 문장으로 마무리해요. `[DESTRUCTIVE] about to run ...` 는 hook 안내일 뿐 실패가 아니므로 같은 변경을 다시 준비하거나 다시 실행하지 않아요. `--template` 을 안 쓰면 helper 가 source app 을 template 로 묶고, `--repo-public` 을 안 쓰면 `false` 로 묶어요.
 
@@ -167,7 +178,7 @@ fi
    axhub apps fork "$SOURCE_APP" --slug "$NEW_SLUG" --subdomain "$NEW_SUBDOMAIN" --name "$NAME" --tenant "$TENANT" --execute --json >/dev/null
    ```
 
-4. **후속 안내.** resume 은 자동 redeploy 를 보장하지 않으니 필요하면 `deploy` skill 로 이어가요.
+9. **후속 안내.** resume 은 자동 redeploy 를 보장하지 않으니 필요하면 `deploy` skill 로 이어가요.
 
 ## NEVER
 

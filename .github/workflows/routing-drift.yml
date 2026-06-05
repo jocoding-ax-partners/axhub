@@ -86,7 +86,6 @@ jobs:
   windows-tooling-check:
     name: Windows Bun routing tooling
     runs-on: windows-latest
-    if: ${{ !contains(github.event.pull_request.title, '[skip-routing-gate]') }}
     steps:
       - name: Checkout PR head
         uses: actions/checkout@v4

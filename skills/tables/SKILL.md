@@ -42,7 +42,7 @@ Claude Desktop 에서 자연어 요청으로 활성화되면 사용자에게는 
 
 ## Routing guard
 
-- 앱의 동적 테이블 create/drop, 컬럼 add/remove, grant, row insert/update/delete 의도는 이전 턴이 `help`/`data` 였어도 이 절차에서 처리해요.
+- 앱의 동적 테이블 create/drop, 컬럼 add/remove, grant, row insert/update/delete 의도는 이전 턴이 `help`/`data` 였어도 이 skill 에서 처리해요.
 - catalog connector 조회·SQL insight 는 `data` 절차로 넘기고, 앱 동적 테이블 스키마·행 작업은 `data` 절차로 처리하지 않아요.
 - CLI shortcut 을 만들지 않아요. 컬럼 추가는 `tables columns add`, 컬럼 삭제는 `tables columns remove` 만 사용해요. `add-column` 같은 alias 를 상상해서 실행하지 않아요.
 - create + column 같은 복합 요청은 먼저 대상 app/table/columns preview 를 보여주고, 동의가 확인된 뒤 `consent-mint` 를 별도 Bash 호출로 끝낸 다음, 다음 Bash 호출에서만 `--execute` 명령을 하나 실행해요.

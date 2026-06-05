@@ -42,7 +42,7 @@ To check status:
    "$HELPER" status-summary --user-utterance "$USER_UTTERANCE"
    ```
 
-   Show the Korean stdout as-is. If it says the app or deployment is missing, stop there and ask a natural follow-up. Do not recover by reading files or showing raw command output. For ordinary Claude Desktop status questions, stop after this step.
+   Show the Korean stdout as-is. If it says the app or deployment is missing, stop there and ask a natural follow-up. Cold-cache deploy selection uses the registered AskUserQuestion text `어떤 배포 상태를 볼까요?` and defaults to the most recent deployment in non-interactive hosts. Do not recover by reading files or showing raw command output. For ordinary Claude Desktop status questions, stop after this step.
 
 2. **Raw watch fallback for explicit advanced watch requests only** (ordinary Desktop status questions must skip this):
 
@@ -55,7 +55,7 @@ To check status:
    "$HELPER" preflight --json
    ```
 
-3. **상태 확인.** NDJSON 스트림을 `--watch --watch-timeout` 으로 받아요:
+4. **상태 확인.** NDJSON 스트림을 `--watch --watch-timeout` 으로 받아요:
 
    ```bash
    axhub deploy status "${DEPLOYMENT_ID}" --app "${APP}" --watch --watch-timeout 9m --json
@@ -63,7 +63,7 @@ To check status:
 
    **에이전트도 terminal 까지 폴링해요 (axhub-cli 0.15.3+).** bare `--watch` 는 비-TTY/에이전트 컨텍스트에서 단일 스냅샷으로 degrade 하지만, `--watch-timeout` (또는 `--watch-interval`) 을 붙이면 explicit streaming override 라 CLI 가 degrade 하지 않고 terminal status(`succeeded` / `failed` / `cancelled` / `rolled_back`) 까지 직접 폴링하면서 NDJSON `stage_transition` 을 emit 해요. 그래서 사용자가 "아직도 진행 중이야?" 하고 다시 안 물어도 돼요. 이 bash 는 Bash tool `timeout: 570000` (9.5분, `--watch-timeout 9m` 보다 약간 큼) 으로 호출해요. 9분 초과 시 CLI 가 Timeout error + resume hint 를 주니, 완료를 선언하지 말고 "아직 진행 중이에요, 계속 확인할게요" 후 같은 명령을 한 번 더 호출해요. 사람 TTY 에서도 같은 명령이 스트림으로 watch 돼요.
 
-4. **Render Korean narration (interactive TTY 전용).** 사람이 TTY 로 watch 할 때만 적용해요 — 에이전트 컨텍스트는 위에서 스냅샷으로 degrade 되니까 narration 대신 단일 상태 요약을 보여줘요. Apply the throttle + phase table from `../deploy/references/recovery-flows.md` ("watch-narration"): one line per ~25s, terminal-state lines are unthrottled. Examples:
+5. **Render Korean narration (interactive TTY 전용).** 사람이 TTY 로 watch 할 때만 적용해요 — 에이전트 컨텍스트는 위에서 스냅샷으로 degrade 되니까 narration 대신 단일 상태 요약을 보여줘요. Apply the throttle + phase table from `../deploy/references/recovery-flows.md` ("watch-narration"): one line per ~25s, terminal-state lines are unthrottled. Examples:
 
    - 0s + `queued` → "배포 요청 받았어요. 잠시 후 빌드 시작해요 (정상)"
    - ~30s + `building` → "30초 경과, 빌드 시작했어요 (정상)"
@@ -73,11 +73,11 @@ To check status:
    - terminal `succeeded` → trigger exit 0 success template
    - terminal `failed` → trigger exit 1/4/5/6/66 template per emitted error
 
-5. **Silent stream guard.** If 60s pass with no NDJSON event, emit "조용하네요. 서버 응답 기다리는 중이에요 (정상). 30초 후 다시 알려줄게요."
+6. **Silent stream guard.** If 60s pass with no NDJSON event, emit "조용하네요. 서버 응답 기다리는 중이에요 (정상). 30초 후 다시 알려줄게요."
 
-6. **User interrupt.** If the user says "그만 봐", "그만", "충분해", "stop watching", terminate the watch process and report the last observed phase. The deploy continues server-side regardless.
+7. **User interrupt.** If the user says "그만 봐", "그만", "충분해", "stop watching", terminate the watch process and report the last observed phase. The deploy continues server-side regardless.
 
-7. **On any non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by exit code:
+8. **On any non-zero exit**, route to `../deploy/references/error-empathy-catalog.md` by exit code:
    - exit 4 → token expired template + AskUserQuestion to run auth login. (canonical 분류는 `axhub-helpers classify-exit "$EXIT" "$STDOUT"` 가 담당해요 — spec 004 Fork-A. 옛 sysexits 65 아님.)
    - exit 5 → resource not found + did-you-mean from `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers list-deployments --app <APP>` (helper-exit 67 OUTPUT 계약은 유지 — INPUT 만 CLI 5)
    - exit 6 → rate limit + Retry-After backoff

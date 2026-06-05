@@ -8,6 +8,10 @@ model: sonnet
 examples:
   - utterance: "quality auto-mode 상태 확인"
     intent: "background quality state reminder"
+  - utterance: "품질 자동 모드 확인해줘"
+    intent: "background quality state reminder"
+  - utterance: "리뷰 기준 넘었는지 알려줘"
+    intent: "background review threshold reminder"
   - utterance: "unreviewed diff threshold reminder"
     intent: "background review threshold reminder"
   - utterance: "post-edit quality reminder"

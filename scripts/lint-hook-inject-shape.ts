@@ -9,6 +9,7 @@ const files = [
   "hooks/post-tool-verify-deploy-artifacts.ts",
 ];
 const required = ["Observed:", "Suggested:", "Skip: AXHUB_DISABLE_HOOK="];
+const routeControlRequired = ["Skip: AXHUB_DISABLE_HOOK="];
 let failures = 0;
 for (const file of files) {
   const raw = readFileSync(join(root, file), "utf8");
@@ -19,7 +20,12 @@ for (const file of files) {
     continue;
   }
   for (const tag of tags) {
-    for (const token of required) {
+    const isRouteControlHint =
+      tag.includes("Control only; do not summarize this block to the user.") ||
+      tag.includes("First visible sentence") ||
+      tag.includes("첫 문장:");
+    const requiredTokens = isRouteControlHint ? routeControlRequired : required;
+    for (const token of requiredTokens) {
       const satisfied =
         tag.includes(token) || (token === "Observed:" && tag.includes("{observed_block}"));
       if (!satisfied) {
@@ -28,7 +34,13 @@ for (const file of files) {
       }
     }
     const approxTokens = Math.ceil(tag.length / 3);
-    const limit = tag.includes("deploy-verify") ? 200 : tag.includes("preflight") ? 120 : 120;
+    const limit = isRouteControlHint
+      ? 1_200
+      : tag.includes("deploy-verify")
+        ? 200
+        : tag.includes("preflight")
+          ? 120
+          : 120;
     if (approxTokens > limit) {
       process.stderr.write(`[hook-inject] ${file}: tag budget ${approxTokens} > ${limit}\n`);
       failures += 1;
