@@ -34,11 +34,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh preauth-check",
-            "timeout": 5
-          },
-          {
-            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh commit-gate",
             "timeout": 5
           }
