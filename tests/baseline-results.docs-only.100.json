@@ -4,16 +4,16 @@
       "measured_at": "2026-06-01T00:00:00Z",
       "reviewer": "wongil",
       "corpus_version": "tests/corpus.100.jsonl@phase-11-gap-fill",
-      "skills_version": "phase-004-migrate-existing-apps",
+      "skills_version": "phase-onboarding-rename",
       "claude_model": "committed-docs-only-fixture",
-      "rows_measured": 119,
+      "rows_measured": 120,
       "rows_skipped": 0,
       "decisions": {
-        "accept": 119,
+        "accept": 120,
         "override": 0,
         "null": 0
       },
-      "notes": "Metadata refreshed for migrate natural-language routing regression rows plus existing fixture decisions."
+      "notes": "Metadata refreshed for onboarding slug rename and first-run routing regression row."
     }
   },
   {
@@ -1418,5 +1418,24 @@
     ],
     "required_consent_seen": false,
     "notes": "Migrate NL routing fixture. Docs-only arm records the migrate skill decision and starts with local helper pre-scan."
+  },
+  {
+    "utterance_id": "T-RO-120",
+    "fired_skill": "onboarding",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub --version",
+        "exit_code": 0,
+        "ts": "2026-06-05T15:10:01Z"
+      },
+      {
+        "cmd": "axhub-helpers preflight --json",
+        "exit_code": 0,
+        "ts": "2026-06-05T15:10:02Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "ts": "2026-06-05T15:10:02Z",
+    "notes": "First-run onboarding fixture. Docs-only arm maps first-run human phrasing to onboarding. setup remains a natural-language trigger phrase only, not a skill slug."
   }
 ]
