@@ -10,7 +10,10 @@ use axhub_helpers::hook_output::{
 use axhub_helpers::hook_safety::append_hook_error;
 use axhub_helpers::karpathy_inject::{user_prompt_karpathy_inject, MAX_KARPATHY_CHARS};
 use axhub_helpers::observability::append_autowire_event;
-use axhub_helpers::quality_state::{git_stdout, git_tree_hash, QualityState};
+use axhub_helpers::quality_state::{
+    git_stdout, git_tree_hash, mark_debug_acknowledged, mark_pull, mark_shipped, mark_test_failure,
+    migrate, state_path, state_show_json, QualityState,
+};
 use axhub_helpers::settings_merge::MergeOutcome;
 
 struct EnvGuard {
@@ -327,4 +330,65 @@ fn autowire_observability_reuses_existing_salt_and_hashes_preserved_commands() {
     assert_eq!(rows[3]["branch"], 6);
     assert_eq!(rows[4]["branch"], 7);
     assert_eq!(rows[5]["branch"], 8);
+}
+
+#[test]
+fn quality_state_round_trips_markers_and_corrupt_backups() {
+    let _lock = axhub_helpers::PROCESS_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+
+    assert_eq!(
+        QualityState::load_or_init(&repo).unwrap(),
+        QualityState::default()
+    );
+
+    let state = QualityState {
+        version: 0,
+        lines_since_review_user: 7,
+        files_changed_since_review: 2,
+        ..QualityState::default()
+    };
+    state.save_atomic(&repo).unwrap();
+    let loaded = QualityState::load_or_init(&repo).unwrap();
+    assert_eq!(loaded.version, 1);
+    assert_eq!(loaded.lines_since_review_user, 7);
+    assert!(state_show_json(&repo)
+        .unwrap()
+        .contains("\"files_changed_since_review\": 2"));
+
+    mark_test_failure(&repo).unwrap();
+    mark_debug_acknowledged(&repo).unwrap();
+    mark_shipped(&repo).unwrap();
+    mark_pull(&repo).unwrap();
+    let marked = QualityState::load_or_init(&repo).unwrap();
+    assert!(marked.last_test_failure_at.is_some());
+    assert!(marked.last_debug_at.is_some());
+    assert!(marked.last_shipped_at.is_some());
+    assert!(marked.last_pull_at.is_some());
+
+    let _xdg = EnvGuard::set("XDG_STATE_HOME", dir.path().join("xdg"));
+    std::fs::write(state_path(&repo), "{not-json").unwrap();
+    assert_eq!(
+        QualityState::load_or_init(&repo).unwrap(),
+        QualityState::default()
+    );
+    let state_dir_entries = std::fs::read_dir(repo.join(".axhub-state"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    assert!(state_dir_entries
+        .iter()
+        .any(|name| name.starts_with("quality.json.corrupt-")));
+    assert!(dir
+        .path()
+        .join("xdg/axhub-plugin/state-corrupt.jsonl")
+        .exists());
+
+    let migrated = migrate(serde_json::json!({"review_acknowledged": true}), 0, 1).unwrap();
+    assert!(migrated.review_acknowledged);
+    assert_eq!(migrated.version, 1);
 }

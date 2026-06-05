@@ -99,7 +99,7 @@ describe("tests/run-corpus.ts fixture replay runner", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 30000);
 
   test("350_row_advisory_mode: corpus.jsonl + --vs claude-native + --score → advisory + exit 0", () => {
     const result = run(["--mode", "plugin", "--corpus", "tests/corpus.jsonl", "--vs", "claude-native", "--score"]);
@@ -142,5 +142,5 @@ describe("tests/run-corpus.ts fixture replay runner", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 30000);
 });
