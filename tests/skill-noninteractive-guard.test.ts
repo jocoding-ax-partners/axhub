@@ -93,15 +93,25 @@ describe("v0.15.3 — watch/follow CLI auto-degrade contract", () => {
     expect(content).not.toContain("WATCH=;");
   });
 
-  test("device-flow fast-exit guidance does not promise stale approval resume", () => {
+  test("device-flow fast-exit completes via agent-driven --resume-last (no punt to user)", () => {
+    // CLI emits `device_code_issued` and fast-exits under agent context
+    // (`flow.rs::authorize_token` lines 440-452). The agent then surfaces the
+    // challenge and, after the user approves, redeems the cached code itself via
+    // `--resume-last` (`load_or_authorize_token` → `poll_device_token_once`) —
+    // it does NOT tell the user to re-run a command. This mirrors auth Step 5c.
     const init = readFileSync(INIT_SKILL, "utf8");
     const github = readFileSync(GITHUB_SKILL, "utf8");
 
     for (const content of [init, github]) {
       expect(content).toContain("device_code_issued");
-      expect(content).toContain("새 device flow");
-      expect(content).toContain("internal `device_code` 를 노출하지 않기 때문");
-      expect(content).not.toContain("승인한 뒤 터미널에서 직접");
+      // Agent completes the flow itself.
+      expect(content).toContain("--resume-last");
+      expect(content).toContain("제가 이어서 마무리할게요");
+      // Never re-issue a fresh code while one is outstanding (the Windows loop).
+      expect(content).toContain("outstanding code 가 있는 동안");
+      // The old punt language (telling the user the call can't poll to completion)
+      // is gone now that the agent resumes the cached device flow.
+      expect(content).not.toContain("이 호출은 승인 완료를 polling 하지 않아요");
     }
   });
 
