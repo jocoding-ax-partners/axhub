@@ -4,6 +4,23 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.33](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.32...v0.9.33) (2026-06-05)
+
+이번 릴리스는 consent preauth-check 게이트를 플러그인 hooks.json 에서 제거해요. bootstrap/deploy 같은 destructive axhub 명령이 consent 토큰 검증으로 차단되던 흐름을 풀어, 일부 환경(특히 consent-mint 가 helper 를 못 찾던 케이스)에서 막히지 않게 했어요. consent-mint/verify 코드와 바이너리 서브커맨드는 그대로 남겨, 되돌리기는 hooks.json 한 줄 복원이면 돼요. commit-gate(git)·tdd-inject 훅과 CLI 자체 로그인(auth)은 영향 없어요.
+
+### Test baseline
+
+- 변경 파일(hooks.json + manifest·phase26 테스트)은 `bun test` 에서 전부 pass, `bunx tsc --noEmit` clean.
+- 잔여 fail 은 이 릴리스 무관한 README/PLAN 버전 드리프트(pre-existing) + 풀스위트 병렬 부하에서만 나는 flaky prompt-route 타임아웃(격리 실행 시 6 pass / 0 fail).
+
+### Honest tradeoff
+
+- per-command consent 동의 게이트가 **전역으로 비활성**돼요 — destructive axhub 명령이 동의 토큰 없이 실행돼요(보안 컨트롤 제거). 동의 확인이 다시 필요하면 hooks.json 의 preauth-check 등록을 복원하거나, 근본 원인인 consent-mint helper 해석 실패("CLI not found on PATH")를 고쳐 게이트를 정상화하는 편이 안전해요. CLI 로그인 auth 는 그대로라 인증 자체는 유지돼요.
+
+### Fixed
+
+* consent preauth-check 게이트를 hooks.json 에서 제거 ([#170](https://github.com/jocoding-ax-partners/axhub/issues/170)) ([6a47845](https://github.com/jocoding-ax-partners/axhub/commit/6a47845c7a714365f3fa6728c6c9ccd1000a6b4a))
+
 ## [0.9.32](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.31...v0.9.32) (2026-06-05)
 
 이번 릴리스는 두 가지를 묶어요. 새 `infer-tables-env` 스킬이 개발한 소스코드를 분석해 필요한 동적 테이블·환경변수를 근거와 함께 추천하고, 실제 생성은 기존 `tables`·`env` 스킬로 인계해요(read-only 추천, 새 mutation 경로 없음). init·deploy 에는 AskUserQuestion 비차단 게이트를 붙여 수락 시에만 추천으로 라우팅해요. 그리고 GitHub OAuth device flow 가 에이전트 컨텍스트에서 `device_code_issued` fast-exit 한 뒤 "터미널에서 다시 실행" 을 떠넘기던 punt 를 제거하고, auth Step 5c 처럼 승인 신호를 받으면 에이전트가 `--resume-last` 로 token 교환을 직접 마무리해요. Windows 의 `user github token missing` 무한 재발급 루프(승인된 code 를 버리고 fresh execute 재호출)를 차단했어요.
