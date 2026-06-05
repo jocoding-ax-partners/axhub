@@ -1,8 +1,10 @@
 # GitHub device flow 즉시 surface — 설계
 
+> **SUPERSEDED (2026-06-05).** detach + tail wrapper 는 채택 안 됐어요. `/axhub:auth` 가 0.15.3+ 에서 fast-exit + `--resume-last` 패턴으로 진화했고 (auth Step 5b/5c), init/github 도 같은 패턴으로 통일했어요 — CLI 가 `device_code_issued` emit 직후 fast-exit (`flow.rs:440-452`, agent context), 에이전트가 challenge 를 surface 한 뒤 사용자 승인 신호를 받으면 `--resume-last` 로 token 교환을 직접 마무리해요 (사용자에게 떠넘기지 않아요). nohup/disown/tail 불필요. 아래 root-cause 분석은 여전히 유효하지만 "안 B 메커니즘" 섹션은 폐기됐어요.
+
 - 날짜: 2026-05-25
 - 범위: `skills/init/SKILL.md`, `skills/github/SKILL.md`
-- 메커니즘: 안 B (detach + tail, `/axhub:auth` Step 5b 패턴 이식)
+- 메커니즘: ~~안 B (detach + tail)~~ → fast-exit + `--resume-last` (auth Step 5b/5c 패턴 이식)
 
 ## 문제 (ax-hub-cli 소스로 확정)
 

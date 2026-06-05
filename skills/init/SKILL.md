@@ -221,9 +221,15 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    > 2. 코드 입력: `<user_code>`
    > 3. axhub GitHub App 설치 승인
    >
-   > 대화형 TTY 에서는 브라우저 승인 뒤 CLI 가 폴링을 계속해 다음 단계를 이어가요. 에이전트 컨텍스트에서는 이 안내를 보여준 뒤 멈춰요. (유효시간 약 `<expires_in/60>` 분)
+   > 브라우저에서 승인한 다음 '승인했어' 라고 알려주세요. 제가 이어서 마무리할게요. (유효시간 약 `<expires_in/60>` 분)
 
-   `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 그 다음은 컨텍스트에 따라 갈라져요 (axhub-cli 0.15.3+): **대화형 TTY** 면 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. **에이전트 / 비-TTY 컨텍스트** 면 CLI 가 `device_code_issued` emit 직후 fast-exit 하므로 다음 stage event 가 안 와요. challenge 를 보여준 뒤 멈추고, "이 호출은 승인 완료를 polling 하지 않아요. 계속하려면 대화형 터미널에서 `axhub init` 을 다시 실행해 새 device flow 를 완료해 주세요" 라고 안내해요. 이전 `user_code` 를 승인한 뒤 같은 에이전트 명령을 재호출해도 이어지지 않아요. CLI 가 internal `device_code` 를 노출하지 않기 때문이에요. 완전 autonomous 완료는 CLI device_code persist resume 기능을 기다려요 (`docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md`). 코드가 expire 되면 "GitHub 연결 다시 해줘"라고 말하면 재시도할 수 있다고 안내해요.
+   `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 그 다음은 컨텍스트에 따라 갈라져요 (axhub-cli 0.15.3+): **대화형 TTY** 면 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. **에이전트 / 비-TTY 컨텍스트** 면 CLI 가 `device_code_issued` emit 직후 fast-exit 하므로, challenge 를 보여준 뒤 **사용자에게 명령을 치라고 떠넘기지 말고** 브라우저 승인을 기다려요: "브라우저에서 승인한 다음 '승인했어' 라고 알려주세요. 제가 이어서 마무리할게요." 사용자가 승인 신호("승인했어" / "연결했어" / "됐어")를 주면 에이전트가 캐시된 device flow 를 `--resume-last` 로 직접 이어받아요 (resume 명령을 사용자에게 출력하지 말아요):
+
+   ```bash
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --resume-last --watch --watch-timeout 9m --json
+   ```
+
+   이 resume 호출은 캐시된 device code 로 token 교환을 마치고 같은 saga 를 terminal 까지 이어가요 (`--watch` 는 인증 완료 후 saga 폴링용이라 fast-exit 와 충돌하지 않아요). **outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 말아요 — 새 code 를 발급해 이미 승인한 code 를 버려요.** resume 응답이 아직 `device_code_pending` (`DEVICE_FLOW_PENDING`) 이면 "브라우저 승인이 아직 안 끝난 것 같아요. 승인 후 다시 알려주세요" 후 승인 신호를 받으면 한 번 더 resume 해요. device code 가 만료(약 15분)됐으면 이 Step 의 fresh `--execute` 부터 새 challenge 를 발급해요. backend 가 `github_relogin_required` (428) 를 주면 user GitHub 토큰 만료라, fresh `--execute` 로 새 device flow 를 발급해 같은 surface → resume 흐름으로 복구해요. 설계 + resume 계약은 `../github/SKILL.md` 의 OAuth device flow 섹션과 `docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md` 를 참조해요.
 
    상세한 device flow 안내 패턴은 `../github/SKILL.md` 의 OAuth device flow 섹션을 따라요.
 
