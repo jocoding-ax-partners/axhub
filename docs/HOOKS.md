@@ -122,6 +122,18 @@ stderr 에 한 번 deprecation warning 을 출력해요. 새 자동화 스크립
 
 검사: `scripts/skill-doctor.ts` 가 `needs-preflight: true` SKILL 에 (a) `!command` 주입이 없고 (b) body 가 `axhub-helpers preflight --json` 을 호출하는지 강제하고, 모든 SKILL 에 dead injection 이 없는지 확인해요. preprocessing 단계의 fail-open 계약은 더 이상 별도 layer 가 아니라 normal Bash 권한 흐름으로 흡수됐어요.
 
+### 3.7 setup 온보딩의 D1/consent boundary
+
+`skills/setup/SKILL.md` 는 사용자-facing 온보딩 단일 진입점이에요. `온보딩`, `처음인데 뭐부터`, `getting started` 같은 말은 setup 으로 들어가고, setup 이 `detect-first → 첫 gap 처리 → 재감지` 루프로 CLI·auth·git·node·GitHub App·repo/app·의존성·doctor gap 을 닫아요.
+
+hook 관점의 안전 계약은 이래요.
+
+- `claude -p` / CI / headless 에서는 setup 의 AskUserQuestion 이 D1 guard 로 safe default 를 사용해요.
+- install/update/auth/init/deploy/deps mutation 과 git/node system install 또는 version switch 는 non-interactive 에서 자동 실행하지 않아요. 이 경우 setup 은 `SAFE_STOP_NONINTERACTIVE` 또는 `READY_WITH_USER_ACTION` 문구로 멈춰요.
+- GitHub 전진배치는 auth 뒤 `install_url` 로 계정레벨 GitHub App 설치만 surface 해요. OAuth device-flow 와 app↔repo connect 는 init/github 단계에 남아요.
+- dependency install 은 repo on disk 뒤 lockfile 있을 때만, 명시 consent 뒤, `--ignore-scripts` 를 붙인 command 로만 허용해요. 이 예외는 `scripts/skill-doctor-allowlist.json` 의 `setup` allowlist 로 잠겨요.
+- 최종 `VIBE_READY` 카드는 확인된 항목만 green 으로 표시해야 해요. deployment URL 만 있고 status/watch evidence 가 없으면 degraded ready 로 낮춰요.
+
 ---
 
 ## 4. 구현 reference

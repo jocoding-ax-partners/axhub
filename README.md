@@ -6,12 +6,12 @@
 
 코드를 직접 짜는 대신, "내 앱 배포해" 한마디로 앱 lifecycle 전체를 안전하게 굴려요.
 
-[![version](https://img.shields.io/badge/version-0.9.30-blue)](https://github.com/jocoding-ax-partners/axhub/releases)
+[![version](https://img.shields.io/badge/version-0.9.33-blue)](https://github.com/jocoding-ax-partners/axhub/releases)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
-**상태**: v0.9.30 · 44 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary
+**상태**: v0.9.33 · 44 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary
 
 </div>
 
@@ -167,7 +167,7 @@ headless(CI 등)에서는 `AXHUB_TOKEN` env 또는 token-import 로 인증해요
 
 | 이렇게 말하면 | 이런 일을 해줘요 | 슬래시 |
 |---------------|------------------|--------|
-| "처음인데 셋업해줘" | 로그인·CLI 설치·앱 연결까지 처음 쓰는 데 필요한 걸 한 번에 잡아줘요 | `/axhub:setup` |
+| "처음인데 셋업해줘", "온보딩", "getting started" | CLI·로그인·git/node·GitHub App·첫 앱·의존성·doctor 까지 `VIBE_READY` 상태로 이어줘요 | `/axhub:setup` |
 | "axhub 로그인해줘" | axhub 에 로그인해요 (브라우저로 승인) | `/axhub:login` `/axhub:auth` |
 | "axhub CLI 설치해줘" | axhub 명령줄 도구(CLI)를 설치해요 | `/axhub:install-cli` |
 | "CLI 최신 버전으로 올려줘" | axhub CLI 를 최신 버전으로 업데이트해요 | `/axhub:update` |

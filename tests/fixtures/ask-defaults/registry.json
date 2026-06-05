@@ -499,6 +499,54 @@
         "아니요",
         "네"
       ]
+    },
+    "axhub CLI 업데이트를 적용할까요?": {
+      "safe_default": "취소",
+      "rationale": "CLI binary replacement mutates the local toolchain. Non-interactive onboarding must not self-replace a binary without explicit user consent, even though update owns cosign verification.",
+      "allowed_safe_defaults": [
+        "취소",
+        "적용"
+      ]
+    },
+    "git 이 없어요. 지금 설치할까요?": {
+      "safe_default": "나중에",
+      "rationale": "git 설치는 Xcode CLT, winget, scoop, OS package manager 같은 system-level mutation 이에요. 비대화형 환경에서는 자동 설치하지 않고 사용자가 대화형으로 다시 이어가게 해요.",
+      "allowed_safe_defaults": [
+        "나중에",
+        "지금 설치"
+      ]
+    },
+    "node 권장 버전으로 맞출까요?": {
+      "safe_default": "나중에",
+      "rationale": "node 버전 교정은 nvm install/use 또는 패키지 매니저 실행으로 개발환경을 바꿔요. headless/CI 에서는 자동 교정하지 않고 현재 상태와 재개 문구만 남겨요.",
+      "allowed_safe_defaults": [
+        "나중에",
+        "맞추기"
+      ]
+    },
+    "GitHub App 을 먼저 설치할까요?": {
+      "safe_default": "나중에",
+      "rationale": "GitHub App 설치는 외부 브라우저와 GitHub 계정 권한 승인이 필요해요. 비대화형 환경에서는 install_url 만 안내하고 자동으로 설치 완료를 가정하지 않아요.",
+      "allowed_safe_defaults": [
+        "나중에",
+        "설치"
+      ]
+    },
+    "의존성을 설치할까요?": {
+      "safe_default": "나중에",
+      "rationale": "dependency install 은 lockfile 이 있어도 파일시스템과 node_modules 를 변경해요. 비대화형 환경에서는 transitive postinstall 위험을 피하려고 자동 실행하지 않아요.",
+      "allowed_safe_defaults": [
+        "나중에",
+        "설치"
+      ]
+    },
+    "기존 repo 를 axhub 앱에 연결할까요?": {
+      "safe_default": "아니요",
+      "rationale": "기존 repo 연결은 app 생성, remote 확인, 첫 push, app↔repo connect 같은 원격/로컬 mutation 으로 이어져요. 비대화형 환경에서는 자동 연결하지 않아요.",
+      "allowed_safe_defaults": [
+        "아니요",
+        "연결"
+      ]
     }
   },
   "data": {

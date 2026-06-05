@@ -102,9 +102,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("71 actual safe_default rationale 엔트리 including v0.17.3 gap-fill skills + infer-tables-env + init/deploy AUQ", () => {
+  test("77 actual safe_default rationale 엔트리 including setup onboarding gap machine AUQ", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(71);
+    expect(paths).toHaveLength(77);
 
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
@@ -165,6 +165,12 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "resources",
       "rollback",
       "routing-stats",
+      "setup",
+      "setup",
+      "setup",
+      "setup",
+      "setup",
+      "setup",
       "setup",
       "setup",
       "status",
