@@ -136,7 +136,7 @@ fn default_unix_shell_rc(home: &Path) -> Option<PathBuf> {
 }
 
 #[cfg(unix)]
-fn unix_line_for_rc(rc_path: &Path, install_dir: &Path, home: &Path) -> String {
+fn unix_line_for_rc(_rc_path: &Path, install_dir: &Path, home: &Path) -> String {
     unix_path_line(install_dir, home)
 }
 
@@ -374,4 +374,283 @@ pub fn repair_path(explicit_dir: Option<PathBuf>) -> RepairPathReport {
 
     #[allow(unreachable_code)]
     RepairPathReport::no_install_dir("Unsupported OS for PATH repair".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::PROCESS_ENV_LOCK;
+
+    struct EnvGuard {
+        key: &'static str,
+        old: Option<std::ffi::OsString>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &'static str, value: impl AsRef<std::ffi::OsStr>) -> Self {
+            let old = std::env::var_os(key);
+            std::env::set_var(key, value);
+            Self { key, old }
+        }
+
+        fn remove(key: &'static str) -> Self {
+            let old = std::env::var_os(key);
+            std::env::remove_var(key);
+            Self { key, old }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match self.old.take() {
+                Some(value) => std::env::set_var(self.key, value),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
+
+    #[test]
+    fn find_installed_dir_uses_explicit_dir_without_probe() {
+        let dir = PathBuf::from("/tmp/axhub-explicit-test-dir");
+
+        assert_eq!(find_installed_dir(Some(dir.clone())), Some(dir));
+    }
+
+    #[test]
+    fn disabled_report_is_safe_noop_json_shape() {
+        let report = RepairPathReport::disabled();
+
+        assert!(!report.repaired);
+        assert!(!report.already_present);
+        assert!(report.disabled);
+        assert!(report.install_dir.is_none());
+        assert!(report.shell_rc.is_none());
+        assert!(report.backup_path.is_none());
+        assert!(report.error.is_none());
+        assert!(report.message.contains("AXHUB_DISABLE_PATH_REPAIR"));
+    }
+
+    #[test]
+    fn error_report_preserves_target_context() {
+        let install_dir = PathBuf::from("/tmp/axhub-install-error");
+        let shell_rc = PathBuf::from("/tmp/axhub-shell-error/.zshrc");
+        let report = RepairPathReport::error(
+            Some(install_dir.clone()),
+            Some(shell_rc.clone()),
+            anyhow::anyhow!("permission denied"),
+        );
+
+        assert!(!report.repaired);
+        assert!(!report.already_present);
+        assert!(!report.disabled);
+        assert_eq!(report.install_dir.as_deref(), Some(install_dir.as_path()));
+        assert_eq!(report.shell_rc.as_deref(), Some(shell_rc.as_path()));
+        assert_eq!(report.error.as_deref(), Some("permission denied"));
+    }
+
+    #[test]
+    fn path_contains_dir_uses_path_boundaries() {
+        let temp = tempfile::tempdir().unwrap();
+        let install_dir = temp.path().join("bin");
+        let near_match = temp.path().join("bin-extra");
+        let joined = std::env::join_paths([near_match.as_path(), install_dir.as_path()]).unwrap();
+        let joined = joined.to_string_lossy();
+
+        assert!(path_contains_dir(&joined, &install_dir));
+        assert!(!path_contains_dir(
+            &near_match.to_string_lossy(),
+            &install_dir
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_path_line_escapes_quotes_for_custom_dir() {
+        let home = Path::new("/tmp/home");
+        let install_dir = Path::new("/tmp/axhub\"quoted/bin");
+
+        assert_eq!(
+            unix_path_line(install_dir, home),
+            "export PATH=\"/tmp/axhub\\\"quoted/bin:$PATH\""
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn default_unix_shell_rc_selects_supported_shells_and_defaults() {
+        let _lock = PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path();
+
+        let _shell = EnvGuard::set("SHELL", "/bin/zsh");
+        assert_eq!(default_unix_shell_rc(home), Some(home.join(".zshrc")));
+        drop(_shell);
+
+        let _shell = EnvGuard::set("SHELL", "/usr/bin/bash");
+        assert_eq!(default_unix_shell_rc(home), Some(home.join(".bashrc")));
+        drop(_shell);
+
+        let _shell = EnvGuard::remove("SHELL");
+        #[cfg(target_os = "macos")]
+        assert_eq!(default_unix_shell_rc(home), Some(home.join(".zshrc")));
+        #[cfg(not(target_os = "macos"))]
+        assert_eq!(default_unix_shell_rc(home), Some(home.join(".bashrc")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repair_unix_shell_rc_creates_new_rc_without_backup() {
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("home");
+        let install_dir = home.join(".axhub/bin");
+        let rc_path = home.join(".bashrc");
+
+        let report = repair_unix_shell_rc(&rc_path, &install_dir, &home).unwrap();
+        let content = fs::read_to_string(&rc_path).unwrap();
+
+        assert!(report.repaired);
+        assert!(!report.already_present);
+        assert!(report.backup_path.is_none());
+        assert!(content.contains("# axhub CLI PATH"));
+        assert!(content.contains(r#"export PATH="$HOME/.axhub/bin:$PATH""#));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repair_unix_shell_rc_detects_absolute_existing_entry() {
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("home");
+        let install_dir = home.join("custom/bin");
+        let rc_path = home.join(".zshrc");
+        fs::create_dir_all(&home).unwrap();
+        fs::write(
+            &rc_path,
+            format!("export PATH=\"{}:$PATH\"\n", install_dir.to_string_lossy()),
+        )
+        .unwrap();
+
+        let report = repair_unix_shell_rc(&rc_path, &install_dir, &home).unwrap();
+
+        assert!(!report.repaired);
+        assert!(report.already_present);
+        assert!(report.backup_path.is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repair_path_honors_disable_env() {
+        let _lock = PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let _disable = EnvGuard::set("AXHUB_DISABLE_PATH_REPAIR", "1");
+
+        let report = repair_path(Some(PathBuf::from("/tmp/axhub-disabled")));
+
+        assert!(report.disabled);
+        assert!(!report.repaired);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repair_path_reports_current_path_already_present() {
+        let _lock = PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let temp = tempfile::tempdir().unwrap();
+        let install_dir = temp.path().join("bin");
+        let _disable = EnvGuard::remove("AXHUB_DISABLE_PATH_REPAIR");
+        let _path = EnvGuard::set(
+            "PATH",
+            std::env::join_paths([install_dir.as_path()]).unwrap(),
+        );
+
+        let report = repair_path(Some(install_dir.clone()));
+
+        assert!(!report.repaired);
+        assert!(report.already_present);
+        assert_eq!(report.install_dir.as_deref(), Some(install_dir.as_path()));
+        assert!(report.shell_rc.is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repair_path_writes_default_rc_for_explicit_dir() {
+        let _lock = PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("home");
+        let install_dir = home.join(".axhub/bin");
+        let _disable = EnvGuard::remove("AXHUB_DISABLE_PATH_REPAIR");
+        let _home = EnvGuard::set("HOME", &home);
+        let _shell = EnvGuard::set("SHELL", "/bin/zsh");
+        let _path = EnvGuard::set("PATH", "");
+
+        let report = repair_path(Some(install_dir.clone()));
+        let rc_path = home.join(".zshrc");
+        let content = fs::read_to_string(&rc_path).unwrap();
+
+        assert!(report.repaired);
+        assert_eq!(report.install_dir.as_deref(), Some(install_dir.as_path()));
+        assert_eq!(report.shell_rc.as_deref(), Some(rc_path.as_path()));
+        assert!(content.contains(r#"export PATH="$HOME/.axhub/bin:$PATH""#));
+        assert!(path_contains_dir(
+            &std::env::var("PATH").unwrap_or_default(),
+            &install_dir
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repair_path_reports_missing_home() {
+        let _lock = PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let temp = tempfile::tempdir().unwrap();
+        let install_dir = temp.path().join("bin");
+        let _disable = EnvGuard::remove("AXHUB_DISABLE_PATH_REPAIR");
+        let _home = EnvGuard::remove("HOME");
+        let _userprofile = EnvGuard::remove("USERPROFILE");
+        let _path = EnvGuard::set("PATH", "");
+
+        let report = repair_path(Some(install_dir));
+
+        assert!(!report.repaired);
+        assert!(!report.already_present);
+        assert!(report.message.contains("HOME is not set"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repair_path_reports_unsupported_shell_without_mutation() {
+        let _lock = PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("home");
+        let install_dir = home.join(".axhub/bin");
+        let _disable = EnvGuard::remove("AXHUB_DISABLE_PATH_REPAIR");
+        let _home = EnvGuard::set("HOME", &home);
+        let _shell = EnvGuard::set("SHELL", "/usr/bin/fish");
+        let _path = EnvGuard::set("PATH", "");
+
+        let report = repair_path(Some(install_dir));
+
+        assert!(!report.repaired);
+        assert!(!report.already_present);
+        assert!(report.shell_rc.is_none());
+        assert!(report.message.contains("supports zsh and bash"));
+        assert!(!home.join(".zshrc").exists());
+        assert!(!home.join(".bashrc").exists());
+    }
+
+    #[test]
+    fn repair_path_reports_missing_install_dir_when_no_candidate_exists() {
+        let _lock = PROCESS_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let temp = tempfile::tempdir().unwrap();
+        let _disable = EnvGuard::remove("AXHUB_DISABLE_PATH_REPAIR");
+        let _install = EnvGuard::remove("AXHUB_INSTALL_DIR");
+        let _dist = EnvGuard::remove("CARGO_DIST_INSTALL_DIR");
+        let _cargo = EnvGuard::remove("CARGO_HOME");
+        let _home = EnvGuard::set("HOME", temp.path().join("home"));
+        let _userprofile = EnvGuard::remove("USERPROFILE");
+        let _path = EnvGuard::set("PATH", "");
+
+        let report = repair_path(None);
+
+        assert!(!report.repaired);
+        assert!(!report.already_present);
+        assert!(report.install_dir.is_none());
+        assert!(report.message.contains("No axhub install directory"));
+    }
 }
