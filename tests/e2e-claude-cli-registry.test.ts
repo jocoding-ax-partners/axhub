@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("47 top-level keys (2 메타 + 43 SKILL slug + quality_gate + consent channel)", () => {
+  test("48 top-level keys (2 메타 + 44 SKILL slug + quality_gate + consent channel)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(47);
+    expect(keys).toHaveLength(48);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
@@ -73,6 +73,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "enable-statusline",
       "env",
       "github",
+      "infer-tables-env",
       "init",
       "inspect",
       "install-cli",
@@ -101,9 +102,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("68 actual safe_default rationale 엔트리 including v0.17.3 gap-fill skills", () => {
+  test("71 actual safe_default rationale 엔트리 including v0.17.3 gap-fill skills + infer-tables-env + init/deploy AUQ", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(68);
+    expect(paths).toHaveLength(71);
 
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
@@ -138,6 +139,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "deploy",
       "deploy",
       "deploy",
+      "deploy",
       "doctor",
       "doctor",
       "enable-statusline",
@@ -147,6 +149,8 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "github",
       "github",
       "github",
+      "infer-tables-env",
+      "init",
       "init",
       "init",
       "init",

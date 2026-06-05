@@ -621,7 +621,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(skillDirs.length).toBeGreaterThanOrEqual(11);
   });
 
-  test("all 43 shipped skills are present, including v0.17.3 CLI gap-fill skills", () => {
+  test("all 44 shipped skills are present, including v0.17.3 CLI gap-fill skills + infer-tables-env", () => {
     expect(skillDirs.sort()).toEqual([
       "apis",
       "app-lifecycle",
@@ -642,6 +642,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "enable-statusline",
       "env",
       "github",
+      "infer-tables-env",
       "init",
       "inspect",
       "install-cli",
@@ -1659,7 +1660,7 @@ describe("cross-manifest consistency", () => {
   test("README current-release summary matches package metadata and shipped surfaces", async () => {
     const readme = await readFile(join(REPO_ROOT, "README.md"), "utf8");
     expect(readme).toContain(`**상태**: v${packageJson.version}`);
-    expect(readme).toContain("43 SKILL / 9 command");
+    expect(readme).toContain("44 SKILL / 9 command");
     expect(readme).not.toContain("AXHUB_HELPERS_RUNTIME=ts");
     expect(readme).not.toContain("TypeScript fallback");
   });
