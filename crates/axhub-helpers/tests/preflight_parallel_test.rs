@@ -10,11 +10,42 @@
 //!   3. Sequential fallback — `AXHUB_PREFLIGHT_PARALLEL=0` env exercises the
 //!      non-scoped path and produces the same output shape.
 
+use std::ffi::OsString;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use axhub_helpers::preflight::{run_preflight_with_runner, SpawnResult, EXIT_OK};
+use axhub_helpers::preflight::{
+    run_preflight, run_preflight_with_runner, SpawnResult, EXIT_OK, EXIT_USAGE,
+};
+
+struct EnvVarGuard {
+    key: &'static str,
+    previous: Option<OsString>,
+}
+
+impl EnvVarGuard {
+    fn set(key: &'static str, value: impl AsRef<std::ffi::OsStr>) -> Self {
+        let previous = std::env::var_os(key);
+        std::env::set_var(key, value);
+        Self { key, previous }
+    }
+
+    fn remove(key: &'static str) -> Self {
+        let previous = std::env::var_os(key);
+        std::env::remove_var(key);
+        Self { key, previous }
+    }
+}
+
+impl Drop for EnvVarGuard {
+    fn drop(&mut self) {
+        match self.previous.as_ref() {
+            Some(value) => std::env::set_var(self.key, value),
+            None => std::env::remove_var(self.key),
+        }
+    }
+}
 
 fn parallel_env_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -135,5 +166,38 @@ fn parallel_walltime_is_bounded_by_slowest_cli_probe_not_sum() {
         max_active_cli_probes.load(Ordering::SeqCst),
         2,
         "version + auth probes should overlap instead of running sequentially"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn default_runner_times_out_hung_axhub_process_group() {
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+
+    let _parallel_guard = lock_parallel_env();
+    let _env_guard = axhub_helpers::PROCESS_ENV_LOCK.lock().unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    fs::write(&axhub, "#!/bin/sh\nsleep 20\nexit 0\n").unwrap();
+    let mut permissions = fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&axhub, permissions).unwrap();
+
+    let _bin = EnvVarGuard::set("AXHUB_BIN", axhub.as_os_str());
+    let _parallel = EnvVarGuard::remove("AXHUB_PREFLIGHT_PARALLEL");
+    let started = Instant::now();
+    let run = run_preflight();
+
+    assert!(
+        started.elapsed() < Duration::from_secs(8),
+        "hung axhub preflight must stay within the hook budget"
+    );
+    assert_eq!(run.exit_code, EXIT_USAGE);
+    assert!(!run.output.cli_present);
+    assert_eq!(run.output.cli_state, "runtime_error");
+    assert_eq!(
+        run.output.auth_error_code.as_deref(),
+        Some("cli_runtime_error")
     );
 }

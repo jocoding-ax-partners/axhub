@@ -74,6 +74,23 @@ fn axhub_command(axhub_bin: &str, args: &[&str], process_group: bool) -> Command
     cmd
 }
 
+#[cfg(unix)]
+fn is_transient_raw_spawn_error(code: i32) -> bool {
+    code == libc::ETXTBSY || code == libc::EAGAIN || code == libc::ENOMEM
+}
+
+#[cfg(not(unix))]
+fn is_transient_raw_spawn_error(_code: i32) -> bool {
+    false
+}
+
+fn is_transient_spawn_error(err: &std::io::Error) -> bool {
+    matches!(
+        err.kind(),
+        std::io::ErrorKind::Interrupted | std::io::ErrorKind::WouldBlock
+    ) || err.raw_os_error().is_some_and(is_transient_raw_spawn_error)
+}
+
 /// Spawn the `axhub` child for a timeout-bounded probe.
 ///
 /// Prefers giving the child its own process group (so a forked grandchild
@@ -90,19 +107,32 @@ fn axhub_command(axhub_bin: &str, args: &[&str], process_group: bool) -> Command
 /// job). Those windows clear within a few milliseconds, so retry the whole
 /// primary→fallback sequence a few times with a short backoff before
 /// giving up. Retrying is side-effect-free: a failed spawn means `execve`
-/// never ran, so nothing was started.
+/// never ran, so nothing was started. Permanent failures such as `NotFound`
+/// return immediately so the prompt-route hot path does not pay retry backoff
+/// when axhub is simply not installed.
 fn spawn_axhub_child(axhub_bin: &str, args: &[&str]) -> Option<std::process::Child> {
     // Backoffs applied *between* attempts; total attempts = len + 1.
     const BACKOFF_MS: [u64; 3] = [5, 25, 100];
     let mut attempt = 0usize;
     loop {
-        if let Ok(child) = axhub_command(axhub_bin, args, true).spawn() {
-            return Some(child);
+        let primary_err = match axhub_command(axhub_bin, args, true).spawn() {
+            Ok(child) => return Some(child),
+            Err(err) => err,
+        };
+        if primary_err.kind() == std::io::ErrorKind::NotFound {
+            return None;
         }
         // Primary (process-group) spawn failed — the sandbox `setpgid`
         // rejection is deterministic, so try once without it this attempt.
-        if let Ok(child) = axhub_command(axhub_bin, args, false).spawn() {
-            return Some(child);
+        let fallback_err = match axhub_command(axhub_bin, args, false).spawn() {
+            Ok(child) => return Some(child),
+            Err(err) => err,
+        };
+        if fallback_err.kind() == std::io::ErrorKind::NotFound {
+            return None;
+        }
+        if !is_transient_spawn_error(&primary_err) && !is_transient_spawn_error(&fallback_err) {
+            return None;
         }
         match BACKOFF_MS.get(attempt) {
             Some(&ms) => {

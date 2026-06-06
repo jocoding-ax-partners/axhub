@@ -63,10 +63,17 @@ post_json() {
 
 read_sse() {
   local url="$1"
-  # Mock SSE stream finishes in ~1s (4 events × 250ms). Cap at 5s gives 5×
-  # headroom; longer hangs indicate harness or mock backend wedged and
-  # should not be silently masked as deploy-cascade walltime.
-  if ! curl -fsS --max-time 5 -H "accept: text/event-stream" \
+  # Mock SSE stream starts after MOCK_BACKEND_LATENCY_MS and then finishes in
+  # ~1s (4 events × 250ms). Keep the cap above the configured latency so CI
+  # latency injection measures the full successful cascade instead of timing
+  # out exactly as the stream begins.
+  local latency_ms="${MOCK_BACKEND_LATENCY_MS:-5000}"
+  case "$latency_ms" in
+    ''|*[!0-9]*) latency_ms=5000 ;;
+  esac
+  local latency_sec=$(( (latency_ms + 999) / 1000 ))
+  local max_time=$(( latency_sec + 5 ))
+  if ! curl -fsS --max-time "$max_time" -H "accept: text/event-stream" \
     "$url" >/dev/null 2>"$TMP_CURL_ERR"; then
     echo "harness: SSE read failed for $url" >&2
     cat "$TMP_CURL_ERR" >&2

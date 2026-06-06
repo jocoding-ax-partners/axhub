@@ -52,17 +52,31 @@ pub fn default_runner(cmd: &[&str]) -> SpawnResult {
     } else {
         cmd.to_vec()
     };
-    match crate::spawn::spawn_sync(&effective) {
-        Ok(result) => SpawnResult {
-            exit_code: result.exit_code.unwrap_or(1),
-            stdout: result.stdout,
-            stderr: result.stderr,
-        },
-        Err(e) => SpawnResult {
+    if effective.is_empty() {
+        return SpawnResult {
             exit_code: 127,
             stdout: String::new(),
-            stderr: e.to_string(),
-        },
+            stderr: "command is empty".into(),
+        };
+    }
+
+    let output = crate::axhub_cli::run_axhub_with_timeout(
+        effective[0],
+        &effective[1..],
+        crate::axhub_cli::DEFAULT_AXHUB_TIMEOUT,
+    );
+    if output.exit_code == 127 && output.stderr.is_empty() && output.stdout.is_empty() {
+        SpawnResult {
+            exit_code: 127,
+            stdout: String::new(),
+            stderr: "failed to spawn axhub CLI".into(),
+        }
+    } else {
+        SpawnResult {
+            exit_code: output.exit_code,
+            stdout: output.stdout,
+            stderr: output.stderr,
+        }
     }
 }
 
