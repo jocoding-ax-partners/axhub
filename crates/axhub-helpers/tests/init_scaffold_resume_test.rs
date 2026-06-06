@@ -12,6 +12,17 @@ fn write(path: &std::path::Path, name: &str, body: &str) {
     fs::write(path.join(name), body).expect("write fixture");
 }
 
+fn expected_npm_executable() -> &'static str {
+    #[cfg(windows)]
+    {
+        "npm.cmd"
+    }
+    #[cfg(not(windows))]
+    {
+        "npm"
+    }
+}
+
 fn run_json(dir: &std::path::Path, args: &[&str]) -> (i32, Value) {
     let out = Command::new(bin())
         .args(args)
@@ -103,7 +114,7 @@ fn scaffold_dev_dry_run_plans_install_with_ignore_scripts() {
 
     assert_eq!(json["schema_version"], "scaffold-dev/v1");
     assert_eq!(json["action"], "planned");
-    assert_eq!(json["install_command"][0], "npm");
+    assert_eq!(json["install_command"][0], expected_npm_executable());
     assert!(
         json["install_command"]
             .as_array()
@@ -114,7 +125,7 @@ fn scaffold_dev_dry_run_plans_install_with_ignore_scripts() {
     );
     assert_eq!(
         json["dev_command"],
-        serde_json::json!(["npm", "run", "dev"])
+        serde_json::json!([expected_npm_executable(), "run", "dev"])
     );
 }
 
@@ -144,8 +155,9 @@ fn scaffold_dev_start_does_not_report_ready_when_no_url_is_detected() {
     write(
         dir.path(),
         "package.json",
-        r#"{"scripts":{"dev":"node -e \"process.exit(0)\""} }"#,
+        r#"{"scripts":{"dev":"node dev-no-url.js"} }"#,
     );
+    write(dir.path(), "dev-no-url.js", "process.exit(0);\n");
     write(dir.path(), "package-lock.json", "{}");
     fs::create_dir_all(dir.path().join("node_modules")).expect("node_modules");
 
@@ -172,7 +184,12 @@ fn scaffold_dev_start_ignores_stale_urls_from_previous_log() {
     write(
         dir.path(),
         "package.json",
-        r#"{"scripts":{"dev":"node -e \"setTimeout(() => process.exit(0), 250)\""} }"#,
+        r#"{"scripts":{"dev":"node dev-stale-log.js"} }"#,
+    );
+    write(
+        dir.path(),
+        "dev-stale-log.js",
+        "setTimeout(() => process.exit(0), 250);\n",
     );
     write(dir.path(), "package-lock.json", "{}");
     fs::create_dir_all(dir.path().join("node_modules")).expect("node_modules");
@@ -214,23 +231,20 @@ fn scaffold_dev_status_rejects_stale_or_mismatched_state() {
     let dir = tempdir().expect("tempdir");
     let axhub_dir = dir.path().join(".axhub");
     fs::create_dir_all(&axhub_dir).expect("mkdir .axhub");
+    let stale_state = serde_json::json!({
+        "schema_version": "scaffold-dev/v1",
+        "pid": std::process::id(),
+        "url": "http://localhost:5173",
+        "port": 5173,
+        "command": [expected_npm_executable(), "run", "dev"],
+        "log_path": axhub_dir.join("scaffold-dev.log").to_string_lossy(),
+        "cwd": "/not/the/current/workdir",
+        "started_at": "2000-01-01T00:00:00Z",
+        "updated_at": "2000-01-01T00:00:00Z"
+    });
     fs::write(
         axhub_dir.join("scaffold-dev.json"),
-        format!(
-            r#"{{
-  "schema_version": "scaffold-dev/v1",
-  "pid": {},
-  "url": "http://localhost:5173",
-  "port": 5173,
-  "command": ["npm", "run", "dev"],
-  "log_path": "{}",
-  "cwd": "/not/the/current/workdir",
-  "started_at": "2000-01-01T00:00:00Z",
-  "updated_at": "2000-01-01T00:00:00Z"
-}}"#,
-            std::process::id(),
-            axhub_dir.join("scaffold-dev.log").display()
-        ),
+        serde_json::to_vec_pretty(&stale_state).expect("serialize stale state"),
     )
     .expect("write stale state");
 

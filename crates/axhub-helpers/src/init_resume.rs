@@ -31,7 +31,7 @@ pub struct InitResumeState {
 enum StateRead {
     Missing,
     Corrupt,
-    Present(InitResumeState),
+    Present(Box<InitResumeState>),
 }
 
 pub fn run_init_resume(args: &[String]) -> anyhow::Result<i32> {
@@ -363,7 +363,7 @@ fn read_state(cwd: &Path) -> anyhow::Result<StateRead> {
     let raw = fs::read_to_string(&path)?;
     match serde_json::from_str::<InitResumeState>(&raw) {
         Ok(state) if state.schema_version == INIT_RESUME_SCHEMA_VERSION => {
-            Ok(StateRead::Present(state))
+            Ok(StateRead::Present(Box::new(state)))
         }
         _ => Ok(StateRead::Corrupt),
     }
@@ -382,4 +382,202 @@ fn write_state(cwd: &Path, state: &InitResumeState) -> anyhow::Result<()> {
 
 fn now_ts() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn state_with_updated_at(updated_at: &str) -> InitResumeState {
+        InitResumeState {
+            schema_version: INIT_RESUME_SCHEMA_VERSION.to_string(),
+            template: "nextjs".to_string(),
+            app_name: "테스트 앱".to_string(),
+            slug: "test-app".to_string(),
+            subdomain: None,
+            idempotency_key: "00000000-0000-4000-8000-000000000009".to_string(),
+            bootstrap_id: None,
+            repo_full_name: None,
+            clone_done: false,
+            pending_device_flow: false,
+            created_at: updated_at.to_string(),
+            updated_at: updated_at.to_string(),
+        }
+    }
+
+    fn argv(args: &[&str]) -> Vec<String> {
+        args.iter().map(|arg| arg.to_string()).collect()
+    }
+
+    #[test]
+    fn command_builders_preserve_resume_and_status_argv_contracts() {
+        assert_eq!(
+            bootstrap_status_command("00000000-0000-4000-8000-000000000001"),
+            vec![
+                "axhub",
+                "apps",
+                "bootstrap-status",
+                "00000000-0000-4000-8000-000000000001",
+                "--watch",
+                "--watch-timeout",
+                "9m",
+                "--json"
+            ]
+        );
+        assert_eq!(
+            resume_last_command("nextjs", "결제 앱", "pay-app", "idem-1"),
+            vec![
+                "axhub",
+                "apps",
+                "bootstrap",
+                "--template",
+                "nextjs",
+                "--name",
+                "결제 앱",
+                "--slug",
+                "pay-app",
+                "--execute",
+                "--resume-last",
+                "--watch",
+                "--watch-timeout",
+                "9m",
+                "--idempotency-key",
+                "idem-1",
+                "--json"
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_helpers_cover_empty_optional_and_boolean_edges() {
+        assert_eq!(empty_to_none(None), None);
+        assert_eq!(empty_to_none(Some("  ".to_string())), None);
+        assert_eq!(
+            empty_to_none(Some(" value ".to_string())),
+            Some("value".to_string())
+        );
+        assert_eq!(parse_bool("true").unwrap(), true);
+        assert_eq!(parse_bool("1").unwrap(), true);
+        assert_eq!(parse_bool("yes").unwrap(), true);
+        assert_eq!(parse_bool("false").unwrap(), false);
+        assert_eq!(parse_bool("0").unwrap(), false);
+        assert_eq!(parse_bool("no").unwrap(), false);
+        assert!(parse_bool("maybe").is_err());
+    }
+
+    #[test]
+    fn state_age_and_staleness_fail_closed_on_bad_or_old_timestamps() {
+        let fresh = state_with_updated_at(&now_ts());
+        assert_eq!(state_stale(&fresh), false);
+        assert!(state_age_secs(&fresh).unwrap() >= 0);
+
+        let old = state_with_updated_at("2000-01-01T00:00:00Z");
+        assert_eq!(state_stale(&old), true);
+        assert!(state_age_secs(&old).unwrap() > INIT_RESUME_STATE_TTL_SECS);
+
+        let invalid = state_with_updated_at("not-a-date");
+        assert_eq!(state_stale(&invalid), true);
+        assert_eq!(state_age_secs(&invalid), None);
+    }
+
+    #[test]
+    fn cmd_get_clears_corrupt_state_and_reports_missing_afterward() {
+        let dir = tempdir().expect("tempdir");
+        let axhub_dir = dir.path().join(".axhub");
+        fs::create_dir_all(&axhub_dir).expect("mkdir .axhub");
+        fs::write(axhub_dir.join("init-resume.json"), "{not json").expect("write corrupt state");
+
+        let corrupt = cmd_get(dir.path()).expect("cmd_get corrupt");
+        assert_eq!(corrupt["present"], false);
+        assert_eq!(corrupt["reason"], "state_corrupt");
+        assert!(!axhub_dir.join("init-resume.json").exists());
+
+        let missing = cmd_get(dir.path()).expect("cmd_get missing");
+        assert_eq!(missing["present"], false);
+        assert_eq!(missing["reason"], "state_missing");
+    }
+
+    #[test]
+    fn parse_put_and_write_state_roundtrip_present_state() {
+        let dir = tempdir().expect("tempdir");
+        let state = parse_put(&argv(&[
+            "--json",
+            "--template",
+            "nextjs",
+            "--app-name",
+            "결제 앱",
+            "--slug",
+            "pay-app",
+            "--subdomain",
+            " pay ",
+            "--idempotency-key",
+            "idem-1",
+            "--bootstrap-id",
+            "boot-1",
+            "--repo-full-name",
+            "owner/repo",
+            "--clone-done",
+            "true",
+            "--pending-device-flow",
+            "false",
+        ]))
+        .expect("parse_put");
+
+        assert_eq!(state.template, "nextjs");
+        assert_eq!(state.app_name, "결제 앱");
+        assert_eq!(state.slug, "pay-app");
+        assert_eq!(state.subdomain.as_deref(), Some("pay"));
+        assert_eq!(state.idempotency_key, "idem-1");
+        assert_eq!(state.bootstrap_id.as_deref(), Some("boot-1"));
+        assert_eq!(state.repo_full_name.as_deref(), Some("owner/repo"));
+        assert_eq!(state.clone_done, true);
+        assert_eq!(state.pending_device_flow, false);
+
+        write_state(dir.path(), &state).expect("write_state");
+        let present = cmd_get(dir.path()).expect("cmd_get present");
+        assert_eq!(present["present"], true);
+        assert_eq!(present["state"]["slug"], "pay-app");
+    }
+
+    #[test]
+    fn cmd_route_covers_resume_clone_done_and_bootstrap_branches() {
+        let dir = tempdir().expect("tempdir");
+
+        let fresh = cmd_route(dir.path()).expect("missing route");
+        assert_eq!(fresh["route"], "fresh");
+        assert_eq!(fresh["reason"], "state_missing");
+        assert_eq!(fresh["requires_status_authority"], false);
+
+        let mut resume = state_with_updated_at(&now_ts());
+        write_state(dir.path(), &resume).expect("write resume state");
+        let resume_route = cmd_route(dir.path()).expect("resume route");
+        assert_eq!(resume_route["route"], "resume_last");
+        assert_eq!(resume_route["reason"], "breadcrumb_only");
+        assert_eq!(
+            resume_route["args"]["resume_command"][0],
+            serde_json::json!("axhub")
+        );
+
+        resume.pending_device_flow = true;
+        write_state(dir.path(), &resume).expect("write pending state");
+        let pending_route = cmd_route(dir.path()).expect("pending route");
+        assert_eq!(pending_route["route"], "resume_last");
+        assert_eq!(pending_route["reason"], "pending_device_flow");
+
+        resume.bootstrap_id = Some("boot-1".to_string());
+        resume.updated_at = "2000-01-01T00:00:00Z".to_string();
+        write_state(dir.path(), &resume).expect("write bootstrap state");
+        let bootstrap_route = cmd_route(dir.path()).expect("bootstrap route");
+        assert_eq!(bootstrap_route["route"], "watch_status");
+        assert_eq!(bootstrap_route["reason"], "bootstrap_id_present_stale");
+        assert_eq!(bootstrap_route["state_stale"], true);
+        assert_eq!(bootstrap_route["requires_status_authority"], true);
+
+        resume.clone_done = true;
+        write_state(dir.path(), &resume).expect("write clone-done state");
+        let clone_done_route = cmd_route(dir.path()).expect("clone done route");
+        assert_eq!(clone_done_route["route"], "fresh");
+        assert_eq!(clone_done_route["reason"], "clone_done");
+    }
 }

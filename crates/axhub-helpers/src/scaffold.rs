@@ -430,20 +430,35 @@ fn package_manager_name(pm: PackageManager) -> &'static str {
     }
 }
 
-fn install_command_for(pm: PackageManager) -> Vec<String> {
-    match pm {
-        PackageManager::Npm => vec!["npm", "install", "--ignore-scripts"],
-        PackageManager::Pnpm => vec!["pnpm", "install", "--ignore-scripts"],
-        PackageManager::Yarn => vec!["yarn", "install", "--ignore-scripts"],
-        PackageManager::Bun => vec!["bun", "install", "--ignore-scripts"],
+fn package_manager_executable(pm: PackageManager) -> &'static str {
+    #[cfg(windows)]
+    {
+        match pm {
+            PackageManager::Npm => "npm.cmd",
+            PackageManager::Pnpm => "pnpm.cmd",
+            PackageManager::Yarn => "yarn.cmd",
+            PackageManager::Bun => "bun",
+        }
     }
+    #[cfg(not(windows))]
+    {
+        package_manager_name(pm)
+    }
+}
+
+fn install_command_for(pm: PackageManager) -> Vec<String> {
+    vec![
+        package_manager_executable(pm),
+        "install",
+        "--ignore-scripts",
+    ]
     .into_iter()
     .map(str::to_string)
     .collect()
 }
 
 fn dev_command_for(pm: PackageManager) -> Vec<String> {
-    vec![package_manager_name(pm), "run", "dev"]
+    vec![package_manager_executable(pm), "run", "dev"]
         .into_iter()
         .map(str::to_string)
         .collect()
@@ -649,4 +664,179 @@ fn terminate_pid_group(_pid: u32) -> bool {
 
 fn now_ts() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn expected_npm_executable() -> &'static str {
+        #[cfg(windows)]
+        {
+            "npm.cmd"
+        }
+        #[cfg(not(windows))]
+        {
+            "npm"
+        }
+    }
+
+    #[test]
+    fn package_manager_executables_are_platform_safe_for_process_spawn() {
+        assert_eq!(
+            package_manager_executable(PackageManager::Npm),
+            expected_npm_executable()
+        );
+        #[cfg(windows)]
+        {
+            assert_eq!(package_manager_executable(PackageManager::Pnpm), "pnpm.cmd");
+            assert_eq!(package_manager_executable(PackageManager::Yarn), "yarn.cmd");
+        }
+        #[cfg(not(windows))]
+        {
+            assert_eq!(package_manager_executable(PackageManager::Pnpm), "pnpm");
+            assert_eq!(package_manager_executable(PackageManager::Yarn), "yarn");
+        }
+        assert_eq!(package_manager_executable(PackageManager::Bun), "bun");
+    }
+
+    #[test]
+    fn install_and_dev_commands_keep_ignore_scripts_and_platform_executable() {
+        assert_eq!(
+            install_command_for(PackageManager::Npm),
+            vec![expected_npm_executable(), "install", "--ignore-scripts"]
+        );
+        assert_eq!(
+            dev_command_for(PackageManager::Npm),
+            vec![expected_npm_executable(), "run", "dev"]
+        );
+    }
+
+    #[test]
+    fn local_url_parser_normalizes_host_and_extracts_port() {
+        assert_eq!(
+            first_local_url("ready at http://0.0.0.0:5173/"),
+            Some("http://localhost:5173".to_string())
+        );
+        assert_eq!(
+            first_local_url("ready at http://127.0.0.1:3000/"),
+            Some("http://127.0.0.1:3000".to_string())
+        );
+        assert_eq!(first_local_url("https://example.com"), None);
+        assert_eq!(parse_port("http://localhost:5173"), Some(5173));
+        assert_eq!(parse_port("http://localhost:not-a-port"), None);
+    }
+
+    #[test]
+    fn stale_timestamp_and_command_basename_helpers_fail_closed() {
+        assert_eq!(timestamp_stale("not-a-date"), true);
+        assert_eq!(timestamp_stale(&now_ts()), false);
+        assert_eq!(
+            command_basename(&["/usr/local/bin/npm".to_string(), "run".to_string()]),
+            Some("npm".to_string())
+        );
+        assert_eq!(command_basename(&[]), None);
+    }
+
+    #[test]
+    fn read_dev_script_handles_missing_invalid_empty_and_present_scripts() {
+        let dir = tempdir().expect("tempdir");
+
+        assert_eq!(read_dev_script(dir.path()).expect("missing package"), None);
+
+        fs::write(dir.path().join("package.json"), "{not json").expect("write invalid json");
+        assert_eq!(read_dev_script(dir.path()).expect("invalid package"), None);
+
+        fs::write(
+            dir.path().join("package.json"),
+            r#"{"scripts":{"dev":"   "}}"#,
+        )
+        .expect("write empty dev script");
+        assert_eq!(read_dev_script(dir.path()).expect("empty dev script"), None);
+
+        fs::write(
+            dir.path().join("package.json"),
+            r#"{"scripts":{"dev":"vite --host 0.0.0.0"}}"#,
+        )
+        .expect("write dev script");
+        assert_eq!(
+            read_dev_script(dir.path()).expect("present dev script"),
+            Some("vite --host 0.0.0.0".to_string())
+        );
+    }
+
+    #[test]
+    fn scaffold_dev_state_roundtrips_and_corrupt_state_is_removed() {
+        let dir = tempdir().expect("tempdir");
+        let state = ScaffoldDevState {
+            schema_version: SCAFFOLD_DEV_SCHEMA_VERSION.to_string(),
+            pid: 123,
+            url: Some("http://localhost:5173".to_string()),
+            port: Some(5173),
+            command: vec![
+                expected_npm_executable().to_string(),
+                "run".to_string(),
+                "dev".to_string(),
+            ],
+            log_path: dir
+                .path()
+                .join(".axhub")
+                .join("scaffold-dev.log")
+                .to_string_lossy()
+                .to_string(),
+            cwd: dir.path().to_string_lossy().to_string(),
+            started_at: now_ts(),
+            updated_at: now_ts(),
+        };
+
+        assert_eq!(
+            read_scaffold_dev_state(dir.path()).expect("missing state"),
+            None
+        );
+        write_scaffold_dev_state(dir.path(), &state).expect("write state");
+        assert_eq!(
+            read_scaffold_dev_state(dir.path()).expect("present state"),
+            Some(state.clone())
+        );
+
+        let state_path = scaffold_dev_state_path(dir.path());
+        fs::write(&state_path, "{not json").expect("write corrupt state");
+        assert_eq!(
+            read_scaffold_dev_state(dir.path()).expect("corrupt state"),
+            None
+        );
+        assert!(!state_path.exists());
+    }
+
+    #[test]
+    fn scaffold_dev_stop_removes_stale_state_without_touching_processes() {
+        let dir = tempdir().expect("tempdir");
+        let state = ScaffoldDevState {
+            schema_version: SCAFFOLD_DEV_SCHEMA_VERSION.to_string(),
+            pid: std::process::id(),
+            url: None,
+            port: None,
+            command: vec![
+                expected_npm_executable().to_string(),
+                "run".to_string(),
+                "dev".to_string(),
+            ],
+            log_path: dir
+                .path()
+                .join(".axhub")
+                .join("scaffold-dev.log")
+                .to_string_lossy()
+                .to_string(),
+            cwd: dir.path().to_string_lossy().to_string(),
+            started_at: "2000-01-01T00:00:00Z".to_string(),
+            updated_at: "2000-01-01T00:00:00Z".to_string(),
+        };
+        write_scaffold_dev_state(dir.path(), &state).expect("write stale state");
+
+        let stopped = scaffold_dev_stop(dir.path()).expect("stop stale state");
+        assert_eq!(stopped["stopped"], false);
+        assert_eq!(stopped["reason"], "state_stale");
+        assert!(!scaffold_dev_state_path(dir.path()).exists());
+    }
 }
