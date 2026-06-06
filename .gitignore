@@ -69,3 +69,6 @@ tests/.tmp-*/
 
 # axhub quality auto-mode runtime state (session-local, not for commit)
 .axhub-state/
+.axhub/init-resume.json
+.axhub/scaffold-dev.json
+.axhub/scaffold-dev.log

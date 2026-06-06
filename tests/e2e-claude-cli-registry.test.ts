@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("48 top-level keys (2 메타 + 44 SKILL slug + quality_gate + consent channel)", () => {
+  test("49 top-level keys (2 메타 + 47 named channels)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(48);
+    expect(keys).toHaveLength(49);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
@@ -87,6 +87,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "publish",
       "quality_gate",
       "recover",
+      "repair",
       "resources",
       "rollback",
       "routing-stats",
@@ -102,9 +103,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("77 actual safe_default rationale 엔트리 including onboarding gap machine AUQ", () => {
+  test("80 actual safe_default rationale 엔트리 including onboarding gap machine AUQ", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(77);
+    expect(paths).toHaveLength(80);
 
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
@@ -154,6 +155,8 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "init",
       "init",
       "init",
+      "init",
+      "init",
       "install-cli",
       "migrate",
       "migrate",
@@ -169,6 +172,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "publish",
       "quality_gate",
       "recover",
+      "repair",
       "resources",
       "resources",
       "rollback",
@@ -241,6 +245,8 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
 
     const init = registry["init"] as Record<string, SafeDefaultEntry>;
     expect(init["어떤 템플릿으로 시작할까요?"]?.safe_default).toBe("abort");
+    expect(init["앱을 바로 실행해 볼까요?"]?.safe_default).toBe("아니요");
+    expect(init["저번에 만들던 앱을 이어서 할까요?"]?.safe_default).toBe("새로 시작");
 
     const env = registry["env"] as Record<string, SafeDefaultEntry>;
     expect(env["어떤 환경변수 작업을 할까요?"]?.safe_default).toBe("조회만");

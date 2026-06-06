@@ -15,6 +15,7 @@ use axhub_helpers::consent::{
 };
 use axhub_helpers::deploy_prep::run_deploy_prep;
 use axhub_helpers::hook_safety;
+use axhub_helpers::init_resume::run_init_resume;
 use axhub_helpers::keychain::{parse_keyring_value, read_keychain_token};
 use axhub_helpers::list_deployments::{
     run_list_deployments, DeploymentSummary, ListDeploymentsArgs,
@@ -25,6 +26,7 @@ use axhub_helpers::quality_gate::{validate_deploy_prep_quality, QualityCheckResu
 use axhub_helpers::redact::redact;
 use axhub_helpers::resolve::run_resolve;
 use axhub_helpers::runtime_paths::{last_deploy_file, state_dir, token_file, welcome_marker_path};
+use axhub_helpers::scaffold::{run_scaffold_detect, run_scaffold_dev};
 use axhub_helpers::session_bundle::{
     write_session_bundle, AuthStatusBundle, LastDeployBundle, SessionBundle,
 };
@@ -45,7 +47,7 @@ use serde_json::{json, Map, Value};
 mod cli;
 
 pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
-pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-mint-app-lifecycle --action suspend|resume|fork --app <app> [--slug <slug> --subdomain <subdomain> --tenant <tenant> --name <name> --template <template> --repo-public <bool>] [--quiet]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-mint-app-lifecycle --action suspend|resume|fork --app <app> [--slug <slug> --subdomain <subdomain> --tenant <tenant> --name <name> --template <template> --repo-public <bool>] [--quiet]\n  consent-verify\n  resolve\n  preflight\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -129,6 +131,9 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         // audit-clarify: US3 typed (cli::Commands::AuditClarify) — legacy arm 제거.
         "routing-dashboard" => cmd_routing_dashboard(&rest),
         "bootstrap" => cmd_bootstrap(&rest),
+        "scaffold-detect" => run_scaffold_detect(&rest),
+        "scaffold-dev" => run_scaffold_dev(&rest),
+        "init-resume" => run_init_resume(&rest),
         // consent-mint: US2 typed (cli::Commands::ConsentMint) — legacy arm 제거.
         "consent-verify" => cmd_consent_verify(),
         "state-show" => cmd_state_show(&rest),

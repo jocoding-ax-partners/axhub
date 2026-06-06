@@ -257,6 +257,22 @@
         "아니요",
         "네, 추천받기"
       ]
+    },
+    "앱을 바로 실행해 볼까요?": {
+      "safe_default": "아니요",
+      "rationale": "Auto-connect may run dependency install and start a local dev process. Non-interactive subprocess must skip it unless a human selects execution.",
+      "allowed_safe_defaults": [
+        "아니요",
+        "네, 실행까지"
+      ]
+    },
+    "저번에 만들던 앱을 이어서 할까요?": {
+      "safe_default": "새로 시작",
+      "rationale": "Resume may continue a previous bootstrap saga. Non-interactive subprocess should avoid surprise continuation and start the normal fresh flow.",
+      "allowed_safe_defaults": [
+        "새로 시작",
+        "이어서 하기"
+      ]
     }
   },
   "env": {

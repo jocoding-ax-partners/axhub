@@ -24,7 +24,7 @@ examples:
     intent: "scaffold new axhub app"
 multi-step: true
 needs-preflight: false
-allows-dependency-execution: false
+allows-dependency-execution: true
 model: sonnet
 ---
 
@@ -50,7 +50,7 @@ model: sonnet
 | Step 3 template 선택 | "어떤 종류 프로젝트를 만들지 골라요." |
 | Step 4 앱 이름 입력 | "앱 이름을 정해요." |
 | Step 5 bootstrap dry-run | "어떤 작업을 할지 미리 보여줘요." |
-| Step 6 사용자 동의 | "지금 만들고 배포까지 한 번에 진행해요." |
+| Step 6 실행 확인 | "지금 만들고 배포까지 한 번에 진행해요." |
 | Step 7 bootstrap execute + watch | "앱 만들고, GitHub repo 만들고, 첫 배포까지 진행 중이에요. 보통 2~5분 정도 걸려요." |
 | Step 7a GitHub 연결 필요 (`device_code_issued` 발생 시) | "GitHub 연결이 필요해요. 브라우저에서 `{verification_uri}` 열고 코드 `{user_code}` 를 입력해 주세요. 대화형 TTY 에서는 승인하면 자동으로 진행되고, 에이전트 컨텍스트에서는 안내 후 멈춰요." |
 | Step 8 git clone | "코드를 현재 폴더로 가져와요." |
@@ -62,11 +62,11 @@ raw helper JSON 이 디버깅에 필요한 환경 (개발 검증) 은 `AXHUB_INI
 
 **User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
-**Visible response contract:** the first visible chat sentence must be exactly "새 앱을 만들 수 있는 템플릿을 확인할게요." Do not add any preface before that sentence. The Claude Desktop badge already shows internal execution metadata separately; do not restate badge metadata in prose.
+**Visible response contract:** when no pending resume state exists, the first visible chat sentence must be exactly "새 앱을 만들 수 있는 템플릿을 확인할게요." Do not add any preface before that sentence. Step 0.5 에서 pending resume state 가 있으면 first visible chat sentence 는 이어서 할지 묻는 문장으로 시작해요. Claude Desktop badge already shows internal execution metadata separately; do not restate badge metadata in prose.
 
 To start an axhub app:
 
-**이 SKILL 이 앱 생성 전체를 담당해요.** "앱 만들어줘" / "그걸로 앱 만들고 싶어" 류 발화에 generic 한 스택/데이터-fetch 질문 (예: "어떤 스택으로 만들까요?", "데이터를 어떻게 가져올까요?") 을 즉석에서 만들지 말고, 반드시 아래 Step 1-8 template flow 를 따라요. 스택 선택은 Step 3 (backend template registry), 데이터 접근은 Step 8 의 `@ax-hub/sdk` 안내로 처리해요.
+**이 SKILL 이 앱 생성 전체를 담당해요.** "앱 만들어줘" / "그걸로 앱 만들고 싶어" 류 발화에 generic 한 스택/데이터-fetch 질문 (예: "어떤 스택으로 만들까요?", "데이터를 어떻게 가져올까요?") 을 즉석에서 만들지 말고, 반드시 아래 Step 0.5-8 template flow 를 따라요. 스택 선택은 Step 3 (backend template registry), 데이터 접근은 Step 8 의 `@ax-hub/sdk` 안내로 처리해요.
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
 
@@ -78,13 +78,41 @@ To start an axhub app:
      { content: "template 선택", status: "pending", activeForm: "template 고르는 중" },
      { content: "앱 이름 입력", status: "pending", activeForm: "앱 이름 정하는 중" },
      { content: "bootstrap saga 실행 (app + repo + deploy)", status: "pending", activeForm: "bootstrap 진행 중" },
-     { content: "git clone + 결과 안내", status: "pending", activeForm: "코드 가져오는 중" }
+     { content: "git clone + 자동 연결 + 결과 안내", status: "pending", activeForm: "코드 가져오는 중" }
    ]})
    ```
 
    **TodoWrite status sync:** after every workflow step and after every AskUserQuestion answer, call TodoWrite again with the full current todos array. Mark finished items as `"completed"`, the active item as `"in_progress"`, and untouched items as `"pending"`. Do not leave the initial Step 0 list stale after commands, user answers, or final result.
 
    **워크플로를 마치면 (마지막 결과 출력 직후) TodoWrite 를 한 번 더 호출해서 모든 todo 를 `"completed"` 로 만들어요.** `in_progress` / `pending` 이 하나라도 남으면 다음 SKILL 이 시작될 때 이 SKILL 의 미완료 todo 가 화면에 그대로 남아 버그처럼 보여요. 종료 시점에 미완료 todo 가 0 개여야 해요.
+
+
+0.5. **재진입 resume state 를 먼저 확인해요 (proactive resume).**
+
+   Step 1 로 새로 시작하기 전에 항상 repo-local state 를 확인해요. 이 state 는 품질 state 가 아니므로 품질 state helper 를 쓰지 않고, `.axhub/init-resume.json` 만 helper 로 읽어요.
+
+   ```bash
+   axhub-helpers init-resume route --json
+   ```
+
+   route 가 `watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 템플릿 목록을 보여주기 전에 먼저 이어서 할지 물어요. raw `bootstrap_id`, `idempotency_key`, repo, slug 값은 chat 에 echo 하지 않아요. slug 는 사용자에게 보이는 앱 별칭으로만 짧게 humanize 해요.
+
+   ```json
+   {
+     "question": "저번에 만들던 앱을 이어서 할까요?",
+     "header": "이어서",
+     "options": [
+       {"label": "이어서 하기", "value": "resume", "description": "이전 생성 흐름을 계속해요"},
+       {"label": "새로 시작", "value": "fresh", "description": "이전 기록은 두고 새 앱 생성을 시작해요"}
+     ]
+   }
+   ```
+
+   비대화형/D1 guard 에서는 safe default `새로 시작` 으로 진행해요. `이어서 하기` 를 고르면 helper 의 route enum 과 `args.*_command` 를 그대로 써요. SKILL 이 raw id 를 다시 조합하지 않아요:
+
+   - `watch_status` → helper 의 `args.status_command` 를 실행해요. 현재 command shape 은 `axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json` 예요.
+   - `resume_last` → helper 의 `args.resume_command` 를 실행해요. 현재 command shape 은 `axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json` 예요.
+   - 상태가 깨졌거나 오래돼 helper 가 `fresh` 를 주면 자연어로 "이전 기록을 찾지 못해서 새로 시작할게요." 라고 말하고 Step 1 로 가요.
 
 1. **CLI 존재를 확인해요.**
 
@@ -133,7 +161,7 @@ To start an axhub app:
 
 backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요. structured AskUserQuestion 은 UI 제한에 맞춰 **최대 3개 선택지** 만 써요. 알려진 alias 는 위 설명을 짧게 붙이고, 알 수 없는 항목은 backend `name` 과 `folder_name` 을 붙여요. 항상 `취소` 선택지를 함께 보여줘요.
 
-**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — template 선택은 `abort`, 앱 이름은 `abort`, bootstrap consent 는 `취소` 예요.
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — template 선택은 `abort`, 앱 이름은 `abort`, bootstrap 실행 확인은 `취소`, auto-connect 실행 확인은 `아니요`, resume offer 는 `새로 시작` 예요.
 
 3. **template 을 선택해요.**
 
@@ -179,7 +207,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
    응답 envelope 의 미리보기 카드 (template / slug / subdomain / repo_name / private/public / installation_id 후보) 를 사용자에게 한국어 한 줄씩 보여줘요. raw JSON dump 금지. `--dry-run` default 가 true 라 명시적으로 안 적어도 같지만, 가독성을 위해 명시해요.
 
-6. **사용자 동의 + execute.**
+6. **사용자 확인 + execute.**
 
    ```json
    {
@@ -192,16 +220,18 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    }
    ```
 
-   동의 받으면 saga 를 실행해요:
+   확인 받으면 saga 를 실행해요. 실행 직전 `.axhub/init-resume.json` 에 template/app_name/slug/subdomain/idempotency_key 를 먼저 저장해요:
 
    ```bash
-   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --watch --watch-timeout 9m --json
+   axhub-helpers init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --json
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
    ```
 
    **에이전트도 terminal 까지 폴링해요 (axhub-cli 0.15.3+).** bare `--watch` 는 비-TTY/에이전트 컨텍스트에서 단일 스냅샷으로 degrade 하지만, `--watch-timeout` (또는 `--watch-interval`) 을 붙이면 explicit streaming override 라 CLI 가 degrade 하지 않고 terminal(saga 완료 / 실패) 까지 직접 폴링해요. 그래서 saga 가 끝까지 진행돼 `repo_full_name` 을 받을 수 있어요 (snapshot 으로 끊기지 않아요). `--no-input` 같은 플래그는 따로 안 붙여도 돼요 (비-TTY 면 CLI 가 자동 감지). 이 bash 는 Bash tool `timeout: 570000` (9.5분) 으로 호출하고, 9분 초과 시 CLI Timeout + resume hint 를 받으면 "아직 만드는 중이에요, 계속 확인할게요" 후 아래 bootstrap-status 를 한 번 더 호출해요:
 
    ```bash
    BOOTSTRAP_ID=$(echo "$ACCEPTED_JSON" | jq -r '.data.bootstrap_id')
+   axhub-helpers init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --json
    axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json
    ```
 
@@ -213,7 +243,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    {"event":"device_code_issued","data":{"verification_uri":"https://github.com/login/device","verification_uri_complete":null,"user_code":"XXXX-XXXX","expires_in":899}}
    ```
 
-   이 event 가 stdout 에서 나오면 narrate 보다 우선해서 즉시 사용자에게 한국어로 안내해요. raw JSON dump 금지 — `verification_uri` (또는 `verification_uri_complete` 가 non-null 이면 그걸 우선), `user_code`, `expires_in` 만 humanize 해요:
+   이 event 가 stdout 에서 나오면 `axhub-helpers init-resume put ... --pending-device-flow true --json` 로 state 를 갱신한 뒤 narrate 보다 우선해서 즉시 사용자에게 한국어로 안내해요. raw JSON dump 금지 — `verification_uri` (또는 `verification_uri_complete` 가 non-null 이면 그걸 우선), `user_code`, `expires_in` 만 humanize 해요:
 
    > GitHub 연결이 필요해요. 다음 단계로 진행해 주세요:
    >
@@ -226,7 +256,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 그 다음은 컨텍스트에 따라 갈라져요 (axhub-cli 0.15.3+): **대화형 TTY** 면 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. **에이전트 / 비-TTY 컨텍스트** 면 CLI 가 `device_code_issued` emit 직후 fast-exit 하므로, challenge 를 보여준 뒤 **사용자에게 명령을 치라고 떠넘기지 말고** 브라우저 승인을 기다려요: "브라우저에서 승인한 다음 '승인했어' 라고 알려주세요. 제가 이어서 마무리할게요." 사용자가 승인 신호("승인했어" / "연결했어" / "됐어")를 주면 에이전트가 캐시된 device flow 를 `--resume-last` 로 직접 이어받아요 (resume 명령을 사용자에게 출력하지 말아요):
 
    ```bash
-   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --resume-last --watch --watch-timeout 9m --json
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
    ```
 
    이 resume 호출은 캐시된 device code 로 token 교환을 마치고 같은 saga 를 terminal 까지 이어가요 (`--watch` 는 인증 완료 후 saga 폴링용이라 fast-exit 와 충돌하지 않아요). **outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 말아요 — 새 code 를 발급해 이미 승인한 code 를 버려요.** resume 응답이 아직 `device_code_pending` (`DEVICE_FLOW_PENDING`) 이면 "브라우저 승인이 아직 안 끝난 것 같아요. 승인 후 다시 알려주세요" 후 승인 신호를 받으면 한 번 더 resume 해요. device code 가 만료(약 15분)됐으면 이 Step 의 fresh `--execute` 부터 새 challenge 를 발급해요. backend 가 `github_relogin_required` (428) 를 주면 user GitHub 토큰 만료라, fresh `--execute` 로 새 device flow 를 발급해 같은 surface → resume 흐름으로 복구해요. 설계 + resume 계약은 `../github/SKILL.md` 의 OAuth device flow 섹션과 `docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md` 를 참조해요.
@@ -255,21 +285,62 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
    항상 현재 dir (CWD) 에 코드를 받아요. 서브 dir (`$APP_SLUG/`) 만들지 않아서 사용자가 "cd $APP_SLUG" 추가 단계 안 해도 돼요. `.claude` / `.omc` / `.codegraph` 같은 IDE/도구 메타 dir 은 untracked 로 자연스럽게 보존돼요 (`git reset --hard` 는 tracked 파일만 건드려요). 이미 `.git` 이 있는 dir 은 안전을 위해 자동 clone 건너뛰고 수동 명령 안내를 한 줄로 보여줘요. clone 실패 시 (권한 / network) `repo_full_name` 만 사용자에게 알려주고 수동 clone 안내를 보여줘요.
 
+
+8.5. **Step 8.5 — clone 직후 자동 연결을 준비해요 (post-scaffold auto-connect).**
+
+   clone 이 성공하면 먼저 resume state 에 `clone_done=true` 를 기록하고 clear 해요. 그 다음 infer-tables-env handoff 보다 먼저 로컬 실행 가능 여부를 helper 로 감지해요.
+
+   ```bash
+   axhub-helpers init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --repo-full-name "$REPO" --clone-done true --json
+   axhub-helpers init-resume clear --json
+   axhub-helpers scaffold-detect --json
+   ```
+
+   `package.json` 이 없거나 lockfile 이 없거나 dev script 가 없으면 로컬 미리보기는 건너뛰고 Step 8 로 가요. node 가 없으면 "앱 실행 준비를 도와드릴게요" 라고 말하고 onboarding 으로 넘겨요. raw install/dev 명령은 기본 chat 에 보여주지 않아요.
+
+   감지 결과가 실행 가능하면 한 번만 물어요.
+
+   ```json
+   {
+     "question": "앱을 바로 실행해 볼까요?",
+     "header": "앱 실행",
+     "options": [
+       {"label": "아니요", "value": "skip", "description": "배포 결과만 확인해요"},
+       {"label": "네, 실행까지", "value": "start", "description": "의존성을 설치하고 로컬 미리보기를 띄워요"}
+     ]
+   }
+   ```
+
+   비대화형/D1 guard 에서는 safe default `아니요` 로 넘어가요. `네, 실행까지` 면 helper 를 실행해요. helper 내부 install 은 lockfile 이 있을 때만 실행하고 항상 `--ignore-scripts` 를 붙여 lifecycle script 실행을 막아요.
+
+   ```bash
+   axhub-helpers scaffold-dev start --json
+   ```
+
+   결과는 자연어로만 보여줘요:
+
+   - 성공/이미 실행 중 → "로컬 미리보기도 떠 있어요." + localhost URL 이 있으면 보조로 안내
+   - install/dev 실패 → "미리보기 자동 실행이 잠깐 안 됐어요. '다시 해줘' 하면 재시도할게요"
+   - postinstall 이 필요한 경우 → "로컬 미리보기는 잠깐 준비가 더 필요해요"
+   - lockfile 없음 → "코드는 준비됐어요" + localhost 생략
+
 8. **결과와 다음 액션을 안내해요.**
 
-   saga 응답의 `app_id` / `deployment_id` / `repo_full_name` 을 humanize 해서 한국어 한 줄씩 보여줘요. 예시:
+   saga 응답의 `app_id` / `deployment_id` / `repo_full_name` 을 humanize 해서 한국어 한 줄씩 보여줘요. **배포 공개 URL** 이 확인되면 첫 줄 hero 로 보여줘요. URL 은 절대 합성하지 않아요. terminal bootstrap/status 응답, `axhub deploy status`, `axhub open` 처럼 실제 확인된 값만 URL 로 써요. dry-run 의 subdomain 은 URL 이 아니라 내부 힌트라서 사용자에게 인터넷 주소처럼 조합하지 않아요.
 
    ```
-   끝났어요. 이렇게 시작하면 돼요:
-   1. 의존성 설치 — package manager 자유 (`npm i` / `pnpm i` / `bun install`)
-   2. 로컬 실행 — README 의 dev 스크립트 (`npm run dev` 등)
-   3. 배포 상태 보기 — "방금 배포 어디까지 됐어?" (방금 만든 첫 배포 진행 상황)
-   4. 다음 배포 — 코드 수정 후 "다시 배포해줘"
-   5. 데이터 읽기 — axhub API 를 raw fetch 로 직접 부르지 말고 template 에 설치된 @ax-hub/sdk 를 써요.
-      import { AxHubClient } from '@ax-hub/sdk' 로 client 만든 뒤
-      sdk.tenant(...).app(...).data.discover('<table>') 로 읽어요.
-      전체 사용법: https://www.npmjs.com/package/@ax-hub/sdk
+   🎉 인터넷에 올라갔어요: <confirmed-public-url>
+   친구한테 바로 보여줄 수 있어요.
+
+   로컬 미리보기가 성공했으면: 로컬 미리보기도 떠 있어요: <localhost-url>
+
+   다음에 뭐 할까요?
+   - 코드 고치고 "다시 배포해줘"
+   - "방금 배포 어디까지 됐어?"
+   - 데이터 읽기는 template 에 설치된 @ax-hub/sdk 를 써요.
    ```
+
+   확인된 공개 URL 이 없으면 "인터넷 배포가 시작됐어요. '방금 배포 어디까지 됐어?' 라고 물으면 이어서 확인할게요." 라고 낮춰 말해요.
 
    `error_code` 로 saga 가 실패했으면 다음 routing 을 써요:
    - `github.installation_missing` / `github.repo_create_failed` → "GitHub 연결 다시 해줘"라고 말하면 이어서 처리할 수 있다고 안내
@@ -303,7 +374,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 - NEVER `axhub apps create` 또는 `axhub deploy create` 를 직접 호출하지 않아요. bootstrap saga 가 server-side 에서 둘 다 처리해요.
 - NEVER `axhub-helpers fetch-template` 또는 remote `templates.json` 을 source 로 쓰지 않아요. backend `axhub apps templates list` 만 source-of-truth 예요.
 - NEVER subprocess (`$CI` / `$CLAUDE_NON_INTERACTIVE` / no TTY) 에서 template 또는 앱 이름을 임의로 고르지 않아요. registry safe_default 가 `abort` 또는 `취소` 예요.
-- NEVER `--execute` 를 `--dry-run` 미리보기 + 사용자 동의 없이 호출하지 않아요. backend app + GitHub repo + deploy 가 한 번에 mutate 돼요.
+- NEVER `--execute` 를 `--dry-run` 미리보기 + 사용자 확인 없이 호출하지 않아요. backend app + GitHub repo + deploy 가 한 번에 mutate 돼요.
 - NEVER auth 만료를 template 조회 실패로 오해하지 않아요. CLI auth 실패 (exit 4 / error_code `auth`, 옛 sysexits 65 아님) 는 "다시 로그인해줘"라고 말하면 이어서 처리할 수 있다고 안내해요.
 - NEVER `bootstrap --execute` 호출 직후 별도 `axhub deploy create` 를 다시 부르지 않아요. saga 가 첫 deploy 까지 포함해요.
 - NEVER saga stdout 에서 `event: device_code_issued` 가 나왔는데 `verification_uri` + `user_code` 를 사용자에게 즉시 보여주지 않고 silent 하게 narrate 만 반복하지 않아요. saga 가 GitHub App install 승인을 기다리며 block 돼서 사용자는 SKILL 이 멈춘 줄 알아요. internal `device_code` raw 값은 여전히 echo 금지 — humanize 대상은 `verification_uri` + `user_code` + `expires_in` 만이에요.
