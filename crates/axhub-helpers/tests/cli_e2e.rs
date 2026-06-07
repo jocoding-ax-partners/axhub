@@ -1794,6 +1794,22 @@ fn cli_prompt_route_desktop_app_template_hints_are_surgical() {
             "hints must not leak internal skill labels into model-visible prose: {stdout}"
         );
         if prompt == "새 앱 만들어줘" {
+            let stdout_json: serde_json::Value =
+                serde_json::from_slice(&output.stdout).expect("hook JSON");
+            let additional_context = stdout_json["hookSpecificOutput"]["additionalContext"]
+                .as_str()
+                .expect("additionalContext");
+            let system_message = stdout_json["systemMessage"]
+                .as_str()
+                .expect("systemMessage");
+            assert!(
+                additional_context.contains("Skill(\"axhub:init\")"),
+                "new-app Desktop context must route through the native init skill surface: {additional_context}"
+            );
+            assert!(
+                system_message.contains("Skill(\"axhub:init\")"),
+                "new-app Desktop hint must route through the native init skill surface: {stdout}"
+            );
             assert!(
                 stdout.contains("브레인스토밍, 일반 프로젝트 탐색, 또는 앱 아이디어 분류가 아니라 AXHub 앱 생성 절차"),
                 "new-app Desktop hint must steer away from brainstorming/generic discovery: {stdout}"

@@ -82,16 +82,23 @@ describe("prompt-route Karpathy context gating", () => {
 
   test("short new-app prompts receive Desktop init contract instead of generic app ideation", () => {
     const stdout = promptRoute("새 앱 만들어줘");
-    expect(stdout).toContain("새 앱을 만들 수 있는 템플릿을 확인할게요");
-    expect(stdout).toContain("AXHub app creation request");
-    expect(stdout).toContain("init-resume route --json");
-    expect(stdout).toContain("FastAPI");
-    expect(stdout).toContain("Next.js");
-    expect(stdout).toContain("빈 템플릿");
-    expect(stdout).toContain("Do not add an explicit 기타 option");
-    expect(stdout).toContain("Do not offer generic choices");
-    expect(stdout).toContain("axhub apps bootstrap --execute");
-    expect(stdout).not.toContain("무슨 앱 만들래");
+    const payload = JSON.parse(stdout);
+    const additionalContext = payload.hookSpecificOutput?.additionalContext ?? "";
+    const systemMessage = payload.systemMessage ?? "";
+    const routedText = [additionalContext, systemMessage].join("\n");
+    expect(additionalContext).toContain('Skill("axhub:init")');
+    expect(systemMessage).toContain('Skill("axhub:init")');
+    expect(routedText).toContain("새 앱을 만들 수 있는 템플릿을 확인할게요");
+    expect(routedText).toContain("AXHub app creation request");
+    expect(routedText).toContain("init-resume route --json");
+    expect(routedText).toContain("axhub apps templates list --json");
+    expect(routedText).toContain("backend template registry");
+    expect(routedText).toContain("Do not invent templates");
+    expect(routedText).toContain("Do not add an explicit 기타 option");
+    expect(routedText).toContain("Do not offer generic choices");
+    expect(routedText).toContain("axhub apps bootstrap --execute");
+    expect(routedText).not.toContain("/axhub:init");
+    expect(routedText).not.toContain("무슨 앱 만들래");
   });
 
   test("doctor status prompts receive doctor skill contract instead of generic diagnostics", () => {
