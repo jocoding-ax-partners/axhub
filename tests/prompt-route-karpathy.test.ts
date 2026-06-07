@@ -57,6 +57,28 @@ function promptRoute(prompt: string): string {
 }
 
 describe("prompt-route Karpathy context gating", () => {
+  test("first-run vibe prompts receive onboarding contract instead of generic advice", () => {
+    const stdout = promptRoute("처음인데 뭐부터 하면 돼?");
+    expect(stdout).toContain("처음 설정을 확인할게요");
+    expect(stdout).toContain("first-run onboarding");
+    expect(stdout).toContain("VIBE_READY");
+    expect(stdout).not.toContain("새 앱 만들어줘\" 하면 됨");
+  });
+
+  test("short new-app prompts receive Desktop init contract instead of generic app ideation", () => {
+    const stdout = promptRoute("새 앱 만들어줘");
+    expect(stdout).toContain("새 앱을 만들 수 있는 템플릿을 확인할게요");
+    expect(stdout).toContain("AXHub app creation request");
+    expect(stdout).toContain("init-resume route --json");
+    expect(stdout).toContain("FastAPI");
+    expect(stdout).toContain("Next.js");
+    expect(stdout).toContain("빈 템플릿");
+    expect(stdout).toContain("Do not add an explicit 기타 option");
+    expect(stdout).toContain("Do not offer generic choices");
+    expect(stdout).toContain("axhub apps bootstrap --execute");
+    expect(stdout).not.toContain("무슨 앱 만들래");
+  });
+
   test("ordinary deploy prompts do not receive unrelated Karpathy skill body", () => {
     const stdout = promptRoute("내 paydrop 앱 배포해");
     expect(stdout).toContain("배포 준비를 확인할게요");

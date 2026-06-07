@@ -1688,7 +1688,7 @@ fn cli_prompt_route_desktop_app_template_hints_are_surgical() {
     let temp = tempfile::tempdir().unwrap();
     let axhub = fake_axhub(&temp);
     let cases = [
-        ("새 앱 만들어줘", "axhub 앱 생성 절차"),
+        ("새 앱 만들어줘", "AXHub app creation request"),
         ("내 앱 목록 보여줘", "현재 팀 scope"),
         ("템플릿 뭐 있어?", "read-only"),
     ];
@@ -1723,8 +1723,12 @@ fn cli_prompt_route_desktop_app_template_hints_are_surgical() {
         );
         if prompt == "새 앱 만들어줘" {
             assert!(
-                stdout.contains("브레인스토밍이나 일반 프로젝트 탐색이 아니라 axhub 앱 생성 절차"),
+                stdout.contains("브레인스토밍, 일반 프로젝트 탐색, 또는 앱 아이디어 분류가 아니라 AXHub 앱 생성 절차"),
                 "new-app Desktop hint must steer away from brainstorming/generic discovery: {stdout}"
+            );
+            assert!(
+                stdout.contains("Do not add an explicit 기타 option"),
+                "new-app Desktop hint must avoid duplicate Other options: {stdout}"
             );
             assert!(
                 stdout.contains("첫 문장은 정확히"),

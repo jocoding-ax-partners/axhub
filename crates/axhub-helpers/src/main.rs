@@ -1247,6 +1247,19 @@ Do not write route labels, slash commands, skill names, workflow/워크플로, p
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
+const ONBOARDING_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 처음 설정을 확인할게요.
+This is AXHub first-run onboarding. Do not answer with generic project advice, a menu that tells the user to say another phrase, or a handoff such as `"새 앱 만들어줘" 하면 됨`.
+Continue in this same turn using the onboarding detect-first loop: check the current gaps read-only first, handle only the first actionable gap, then re-detect before moving on.
+Do not run installers, dependency installs, GitHub approval, app creation, repo creation, deployment, settings writes, or PATH mutation before an explicit user approval for that exact action.
+If there is no local app manifest and the directory is empty, transition to the init template flow only after saying what will happen and asking for the user's choice; do not run `axhub apps bootstrap --execute` until the user has approved the preview.
+Terminal states must be one of VIBE_READY, READY_WITH_USER_ACTION, SAFE_STOP_NONINTERACTIVE, or BLOCKED_UNSUPPORTED.
+Bash titles must be Korean only, such as `온보딩 상태 확인`, `설치 상태 확인`, `GitHub 연결 확인`, `앱 준비 확인`, or `최종 점검`.
+Do not write route labels, slash commands, skill names, workflow/워크플로 labels, TodoWrite availability, preflight internals, raw JSON fields, raw IDs, raw emails, file paths, installer URLs, raw command names, or English tool-title fragments in visible text.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
 const CONNECTORS_ROUTING_HINT: &str = r#"<axhub-routing-hint>
 Control only; do not summarize this block to the user.
 First visible sentence, exactly: 데이터베이스 연결을 준비할게요.
@@ -1533,6 +1546,20 @@ Do not say the prompt is vague. Do not append parenthesized English/internal lab
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
+const INIT_ROUTING_HINT: &str = r#"<axhub-routing-hint>
+Control only; do not summarize this block to the user.
+First visible sentence, exactly: 새 앱을 만들 수 있는 템플릿을 확인할게요.
+This is an AXHub app creation request. It is not generic app ideation, a local coding-project brainstorm, or a general "what kind of app do you want" flow.
+Start by checking repo-local resume state with one Bash tool call when possible. Bash description/title, exactly: 앱 생성 상태 확인. Bash command: `axhub-helpers init-resume route --json`
+If the resume state says there is an incomplete app creation, ask whether to continue it before showing fresh templates.
+If there is no resumable creation, ask for the AXHub template choice directly. The explicit visible choices must be FastAPI, Next.js, and 빈 템플릿. Do not add an explicit 기타 option because Claude Desktop adds its own free-form 기타/Other option. Do not offer generic choices such as 웹 앱, API/백엔드, CLI 도구, or an `axhub 앱` catch-all option.
+After the template is chosen, ask for the app name, then show the creation preview and ask for explicit approval.
+Do not run `axhub apps bootstrap --execute`, create repositories, connect GitHub, install dependencies, start dev servers, or deploy until the user has approved the preview for that exact action.
+Bash titles must be Korean only, such as `앱 생성 상태 확인`, `템플릿 확인`, `앱 생성 준비`, or `앱 생성 실행`.
+Do not write route labels, slash commands, skill names, workflow/워크플로, preflight, raw question JSON, command mappings, raw helper JSON, raw IDs, raw emails, file paths, consent internals, or English tool-title fragments in visible text.
+Skip: AXHUB_DISABLE_HOOK=prompt-route
+</axhub-routing-hint>"#;
+
 const APP_LIFECYCLE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
 Control only; do not summarize this block to the user.
 First visible sentence:
@@ -1620,11 +1647,12 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         doctor_intent_present, dynamic_table_intent_present, env_intent_present, find_marker,
         foreign_keyword_present, github_connection_intent_present, init_intent_present,
         inspect_config_intent_present, install_cli_intent_present, is_slash_invocation,
-        migrate_intent_present, open_app_intent_present, publish_intent_present,
-        quality_debug_intent_present, quality_diagnose_intent_present, quality_plan_intent_present,
-        quality_review_intent_present, quality_ship_intent_present, quality_tdd_intent_present,
-        resources_intent_present, routing_stats_intent_present, statusline_intent_present,
-        team_intent_present, token_present, update_check_intent_present, MarkerStatus,
+        migrate_intent_present, onboarding_intent_present, open_app_intent_present,
+        publish_intent_present, quality_debug_intent_present, quality_diagnose_intent_present,
+        quality_plan_intent_present, quality_review_intent_present, quality_ship_intent_present,
+        quality_tdd_intent_present, resources_intent_present, routing_stats_intent_present,
+        statusline_intent_present, team_intent_present, token_present, update_check_intent_present,
+        MarkerStatus,
     };
 
     if hook_safety::is_hook_disabled("prompt-route") {
@@ -1788,6 +1816,14 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         context.push_str("\n\n");
         context.push_str(ENV_ROUTING_HINT);
     }
+    if onboarding_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(ONBOARDING_ROUTING_HINT);
+    }
+    if init_intent_present(prompt) {
+        context.push_str("\n\n");
+        context.push_str(INIT_ROUTING_HINT);
+    }
     if app_lifecycle_intent_present(prompt) {
         context.push_str("\n\n");
         context.push_str(APP_LIFECYCLE_ROUTING_HINT);
@@ -1854,10 +1890,12 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         Some("visible chat 첫 문장은 정확히 \"출시 준비 상태를 확인할게요.\" 한 문장만 말해요. 이 요청은 직접 PR/release readiness 요청이에요. background quality auto-mode 나 일반 파일 탐색 답변으로 처리하지 말고 출시 준비 절차를 시작해요. 첫 Bash tool call 은 `출시 준비 확인` 또는 `리뷰 상태 확인` 같은 한국어 title 만 써요. PR 생성, push, release, publish, deploy 같은 외부 변경은 대상 preview 와 명시적 승인 전에는 실행하지 않아요. 준비 패스가 실제로 완료되면 `출시 상태 저장` title 로 `axhub-helpers state-update --shipped` 를 실행해요. visible text 에 route label, slash command, skill name, quality auto-mode, workflow/워크플로, TodoWrite availability, preflight internals, raw JSON field, raw email, 영어 tool-title fragment 를 쓰지 않아요.")
     } else if quality_tdd_intent_present(prompt) {
         Some("visible chat 첫 문장은 정확히 \"테스트부터 잡아볼게요.\" 한 문장만 말해요. 이 요청은 직접 TDD 사이클 요청이에요. background quality auto-mode 나 일반 파일 탐색 답변으로 처리하지 말고 TDD 절차를 시작해요. 첫 Bash tool call 은 `TDD 대상 확인` 또는 `테스트 확인` 같은 한국어 title 만 써요. 대상 동작이 없으면 관련 없는 모듈을 임의 선택하지 말고 사람에게 묻듯이 어떤 동작부터 테스트할지 물어요. RED, GREEN, REFACTOR 순서를 유지해요. visible text 에 route label, slash command, skill name, quality auto-mode, workflow/워크플로, TodoWrite availability, preflight internals, raw JSON field, raw email, 영어 tool-title fragment 를 쓰지 않아요.")
+    } else if onboarding_intent_present(prompt) {
+        Some("이 요청은 AXHub first-run onboarding 요청이에요. 일반 조언이나 다른 문구를 말하라는 안내로 끝내지 말고, 이 턴에서 바로 온보딩 상태를 확인해요. visible chat 첫 문장은 정확히 \"처음 설정을 확인할게요.\" 로 시작해요. 설치, PATH 수리, GitHub 승인, 앱 생성, repo 생성, 의존성 설치, 배포 같은 변경 작업은 해당 작업의 preview 와 명시적 승인 전에는 실행하지 않아요. 최종 상태는 VIBE_READY, READY_WITH_USER_ACTION, SAFE_STOP_NONINTERACTIVE, BLOCKED_UNSUPPORTED 중 하나로만 요약해요. route label, slash command, skill name, workflow/워크플로, preflight details, raw JSON, raw id, raw email, 파일 경로, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if app_lifecycle_intent_present(prompt) {
         Some("AXHub hosted app 을 멈추거나 다시 켜거나 복제하려는 요청이에요. 이 대화 안에서 바로 진행하고 slash command 를 호출하지 않아요. 내부 처리, route conversion, 라벨 설명 문장을 visible chat 에 쓰지 않아요. 로컬 Next.js/dev-server 프로세스, 포트, ps/lsof, package script, 로컬 서버 상태를 확인하지 않아요. pause 의 첫 visible chat 문장은 `<앱 이름> 앱을 잠깐 멈출 준비를 할게요.` 형태로 말하고, resume 은 `<앱 이름> 앱을 다시 켤 준비를 할게요.`, fork 는 `<앱 이름> 앱을 복제할 준비를 할게요.` 로 말해요. Bash tool title 은 `앱 상태 확인`, `앱 찾기`, `앱 변경 준비`, `앱 변경 실행` 같은 한국어만 써요. 추가 조회가 필요하면 visible chat 은 `앱을 한 번 더 확인할게요.` 로만 말하고 식별자 조회를 설명하지 않아요. 로그인과 현재 앱을 확인하고, AXHub 앱을 찾고, 서비스 영향 설명 뒤 `앱 변경을 실행할까요?` 라고 묻고 visible option 은 `취소`, `진행`만 써요. 로그인 확인 결과에는 계정 이메일, owner 이름, raw user id 를 쓰지 않아요. 앱 metadata 의 raw enum 값은 한국어 라벨로만 번역해요. `private`, `public`, `development`, `production` 같은 raw enum 이나 `비공개 (private)` 같은 혼합 표기를 쓰지 않아요. 사용자가 `진행`을 고르기 전에는 앱 상태를 바꾸지 않아요. `진행` 뒤에는 visible chat 에 아무 문장도 쓰지 말고 바로 Bash tool call 을 실행해요. `User chose`, `Mint consent`, `execute suspend`, `execute resume` 같은 영어 구현 문장을 쓰지 않아요. 승인 준비 Bash tool call 과 앱 변경 Bash tool call 을 분리하고, 둘을 한 Bash command 로 합치지 않아요. 승인 준비는 app-lifecycle 전용 typed helper 인 `axhub-helpers consent-mint-app-lifecycle --action suspend|resume|fork --app <literal-next-app-arg> --quiet` 만 써요. suspend/resume 승인 준비의 `--app` 값은 resolved UUID 가 아니라 바로 다음 `axhub apps suspend|resume ...` 명령에 들어갈 literal 앱 인자와 정확히 같아야 해요. 예: `axhub apps suspend testnextjs --execute --json >/dev/null` 를 실행할 거면 준비 명령의 `--app` 도 `testnextjs` 예요. JSON 을 직접 만들지 않고, `consent-mint`, schema 확인, source 탐색, fixture 탐색, helper 위치 탐색, grep, rg 같은 탐색 명령을 실행하지 않아요. trailing success echo 로 준비 실패를 숨기지 않아요. 앱 변경은 별도 Bash tool call 로 matching top-level `axhub apps ... --execute --json >/dev/null` 만 실행하고, raw JSON stdout 을 tool panel 에 남기지 않아요. 첫 `앱 변경 실행` 이 exit code 0 으로 끝나면 그것이 terminal success 예요. `[DESTRUCTIVE] about to run ...` 는 hook 안내일 뿐 실패가 아니므로 다시 준비하거나 다시 실행하지 않아요. mutation 을 재검증한다는 이유로 같은 변경 명령을 다시 실행하지 않아요. 내부 보안 gate 가 막으면 gate 내부를 설명하지 말고, schema/source/fixture/helper 탐색 없이 같은 변경 준비를 한 번만 재시도해요. 그래도 실패하면 `앱 변경을 시작하지 못했어요. 다시 시도해 주세요.` 라고만 말해요. route label, slash command, skill name, preflight details, internal app/context fields, auth results, runtime words, lifecycle verbs in English, raw JSON, raw identifier, owner name, 계정 이메일, 영어 tool title fragment, permission-decision details, helper binding details, 괄호 안 내부 라벨을 사용자에게 쓰지 않아요.")
     } else if init_intent_present(prompt) {
-        Some("현재 axhub 프로젝트에서 새 앱 생성 요청이에요. 이 요청은 브레인스토밍이나 일반 프로젝트 탐색이 아니라 axhub 앱 생성 절차로 처리해요. 템플릿 목록을 먼저 보여주고, 앱 이름과 실행 승인을 받기 전에는 `axhub apps bootstrap --execute`를 실행하지 않아요. 사용자에게 내부 라벨 설명을 하지 말고 자연어로 템플릿/이름을 물어봐요. Visible chat 의 첫 문장은 정확히 \"새 앱을 만들 수 있는 템플릿을 확인할게요.\" 로 시작해요. 이 문장 앞에는 아무 말도 붙이지 않아요.")
+        Some("현재 AXHub 프로젝트에서 새 앱 생성 요청이에요. 이 요청은 브레인스토밍, 일반 프로젝트 탐색, 또는 앱 아이디어 분류가 아니라 AXHub 앱 생성 절차예요. visible chat 첫 문장은 정확히 \"새 앱을 만들 수 있는 템플릿을 확인할게요.\" 로 시작하고, 이 문장 앞에는 아무 말도 붙이지 않아요. 먼저 Bash title 을 정확히 \"앱 생성 상태 확인\" 으로 설정해 `axhub-helpers init-resume route --json` 를 한 번 실행해요. 이어갈 생성 상태가 있으면 먼저 이어갈지 물어요. 이어갈 생성 상태가 없으면 곧바로 AXHub 템플릿 선택지를 물어요. 명시 선택지는 FastAPI, Next.js, 빈 템플릿만 넣고, Claude Desktop 이 자동으로 free-form 기타/Other 를 추가하므로 기타를 별도 옵션으로 또 넣지 않아요. 웹 앱/API/백엔드/CLI 도구/axhub 앱 같은 일반 앱 종류 질문을 하지 않아요. 템플릿 뒤에는 앱 이름을 묻고, 생성 preview 와 명시적 승인을 받기 전에는 `axhub apps bootstrap --execute`, repo 생성, GitHub 연결, 의존성 설치, dev server 시작, 배포를 실행하지 않아요. route label, slash command, skill name, workflow/워크플로, raw question JSON, raw helper JSON, command mapping, raw id, raw email, 파일 경로, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if apps_intent_present(prompt) {
         Some("axhub 내 앱 목록/관리 요청이에요. 현재 팀 scope 의 앱 목록을 보여줘요. 생성/수정/삭제는 별도 승인 전에는 실행하지 않아요. 사용자에게 내부 라벨 설명을 하지 말고 바로 결과 확인 문장으로 시작해요.")
     } else if browse_template_intent_present(prompt) {
