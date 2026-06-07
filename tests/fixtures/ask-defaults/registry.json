@@ -48,6 +48,15 @@
         "강제로 진행"
       ]
     },
+    "axhub 매니페스트(axhub.yaml)가 없어요. Vite React 앱으로 어떻게 초기화할까요?": {
+      "safe_default": "취소",
+      "rationale": "manifest_missing 회복은 로컬 axhub.yaml 파일 생성이라는 쓰기 작업이므로 비대화형 환경에서는 자동 초기화하지 않고 멈춰요.",
+      "allowed_safe_defaults": [
+        "취소",
+        "React/Vite로 초기화",
+        "다른 템플릿 선택"
+      ]
+    },
     "이미 배포가 진행 중이에요. 어떻게 할까요?": {
       "safe_default": "취소",
       "rationale": "Step 1.6a (same-commit duplicate). non-interactive 에서 본인 배포 중복 차단.",

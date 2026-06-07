@@ -103,9 +103,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("80 actual safe_default rationale 엔트리 including onboarding gap machine AUQ", () => {
+  test("81 actual safe_default rationale 엔트리 including onboarding gap machine AUQ", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(80);
+    expect(paths).toHaveLength(81);
 
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
@@ -132,6 +132,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "data",
       "data",
       "data",
+      "deploy",
       "deploy",
       "deploy",
       "deploy",
@@ -219,6 +220,11 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ).toBe("계속해요");
     expect(
       deploy["품질 게이트가 막았어요. 그래도 진행할까요?"]?.safe_default,
+    ).toBe("취소");
+    expect(
+      deploy[
+        "axhub 매니페스트(axhub.yaml)가 없어요. Vite React 앱으로 어떻게 초기화할까요?"
+      ]?.safe_default,
     ).toBe("취소");
 
     const qualityGate = registry["quality_gate"] as Record<

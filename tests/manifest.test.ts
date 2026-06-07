@@ -131,10 +131,30 @@ describe("plugin.json schema", () => {
   });
 
   test("no unknown top-level keys", () => {
-    const allowed = new Set(["name", "version", "description", "author", "homepage", "repository", "license", "keywords"]);
+    const allowed = new Set([
+      "name",
+      "version",
+      "description",
+      "author",
+      "homepage",
+      "repository",
+      "license",
+      "keywords",
+    ]);
     for (const key of Object.keys(pluginJson)) {
       expect(allowed.has(key)).toBe(true);
     }
+  });
+
+  test("plugin.json does not duplicate default component paths", () => {
+    const raw = pluginJson as Record<string, unknown>;
+    expect(raw.commands).toBeUndefined();
+    expect(raw.skills).toBeUndefined();
+    expect(raw.hooks).toBeUndefined();
+
+    expect(existsSync(join(REPO_ROOT, "commands"))).toBe(true);
+    expect(existsSync(join(REPO_ROOT, "skills"))).toBe(true);
+    expect(existsSync(join(REPO_ROOT, "hooks/hooks.json"))).toBe(true);
   });
 
   test("version matches package.json version", () => {

@@ -1,5 +1,6 @@
-# Build outputs (Bun-compiled binary — single multi-cmd, gitignored)
+# Build outputs. Keep the committed bootstrap shim, ignore native release builds.
 bin/axhub-helpers
+!bin/axhub-helpers
 bin/axhub-helpers-*
 dist/
 *.exe
