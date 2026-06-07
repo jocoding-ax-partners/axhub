@@ -147,7 +147,7 @@ describe("plugin.json schema", () => {
   });
 
   test("plugin.json does not duplicate default component paths", () => {
-    const raw = pluginJson as Record<string, unknown>;
+    const raw = pluginJson as unknown as Record<string, unknown>;
     expect(raw.commands).toBeUndefined();
     expect(raw.skills).toBeUndefined();
     expect(raw.hooks).toBeUndefined();
