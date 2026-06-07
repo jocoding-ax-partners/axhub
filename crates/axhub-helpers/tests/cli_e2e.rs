@@ -2443,6 +2443,11 @@ esac
             );
         }
         if prompt == "axhub CLI 설치 상태 괜찮아?" {
+            assert!(ctx.contains("Skill(\"axhub:doctor\")"), "{ctx}");
+            assert!(
+                system_message.contains("Skill(\"axhub:doctor\")"),
+                "{system_message}"
+            );
             assert!(
                 ctx.contains("Do not install, update, login, logout"),
                 "{ctx}"

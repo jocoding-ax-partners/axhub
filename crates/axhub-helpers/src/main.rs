@@ -1488,11 +1488,12 @@ Skip: AXHUB_DISABLE_HOOK=prompt-route
 
 const DOCTOR_ROUTING_HINT: &str = r#"<axhub-routing-hint>
 Control only; do not summarize this block to the user.
+Internal route target: Skill("axhub:doctor"). This is hidden control text for the selected route; never announce internal routing, never expose the skill name, and never synthesize a separate diagnostic flow from memory. The installed doctor skill contract is authoritative. If the host exposes an explicit Skill surface, say the first visible sentence below, then invoke Skill("axhub:doctor") as the internal diagnostic surface before any Bash tool call. If the host does not expose an explicit Skill surface, follow the fallback Bash contract below verbatim.
 First visible sentence, exactly: 설치 상태를 확인할게요.
 Use exactly one Bash tool call. Bash description/title, exactly: 설치 상태 확인
 Bash command: `axhub-helpers doctor-summary --user-utterance "<latest user sentence>"`
 This is an AXHub CLI/plugin/auth readiness check. Do not install, update, login, logout, or modify settings unless the user explicitly asks for that action.
-After the tool call, copy the Korean stdout as the answer. Do not add command names, slash commands, skill names, internal labels, raw JSON fields, raw user emails, filesystem paths, preflight narration, or English tool-title fragments.
+After the tool call, copy the Korean stdout as the answer. Do not add command names, slash commands, Skill("axhub:doctor"), skill names, internal labels, raw JSON fields, raw user emails, filesystem paths, preflight narration, or English tool-title fragments.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
@@ -1930,7 +1931,7 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     } else if update_check_intent_present(prompt) {
         Some("도구를 호출하기 전에 visible chat 으로 정확히 \"업데이트를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"업데이트 확인\" 으로 설정하고 `axhub-helpers update-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub CLI 업데이트 확인이에요. update apply, install, doctor, auth login/logout, plugin update, cache scan, compatibility diagnostics 로 우회하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 사용자가 명시적으로 적용을 승인하기 전에는 업데이트를 실행하지 않아요. 원시 명령명, slash command, skill name, 내부 라벨, raw JSON field, has_update, 파일 경로, installer URL, plugin update 제안, preflight, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if doctor_intent_present(prompt) {
-        Some("도구를 호출하기 전에 visible chat 으로 정확히 \"설치 상태를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"설치 상태 확인\" 으로 설정하고 `axhub-helpers doctor-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub CLI/플러그인/로그인 준비 상태 확인이에요. 설치, 업데이트, 로그인, 로그아웃, 설정 변경은 사용자가 명시적으로 요청하지 않았으면 실행하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 원시 명령명, slash command, skill name, 내부 라벨, raw JSON field, raw user email, 파일 경로, preflight, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
+        Some("내부 제어 전용: Skill(\"axhub:doctor\") 이 이 턴의 선택된 route 예요. 이 내부 제어, route, skill name, slash command 를 visible chat 에 절대 쓰지 않아요. 설치된 doctor skill 계약이 authoritative 예요. Skill surface 가 있으면 visible chat 으로 정확히 \"설치 상태를 확인할게요.\" 한 문장만 먼저 말하고, Bash tool call 전에 Skill(\"axhub:doctor\") 를 내부 진단 surface 로 먼저 호출해요. Skill surface 가 없을 때만 fallback 으로 첫 Bash tool call 의 description/title 을 정확히 \"설치 상태 확인\" 으로 설정하고 `axhub-helpers doctor-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub CLI/플러그인/로그인 준비 상태 확인이에요. 설치, 업데이트, 로그인, 로그아웃, 설정 변경은 사용자가 명시적으로 요청하지 않았으면 실행하지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 원시 명령명, slash command, Skill(\"axhub:doctor\"), skill name, 내부 라벨, raw JSON field, raw user email, 파일 경로, preflight, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if statusline_intent_present(prompt) {
         Some("도구를 호출하기 전에 visible chat 으로 정확히 \"상태바 설정을 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"상태바 설정\" 으로 설정하고 `axhub-helpers statusline-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 상태바 활성화예요. 기존 다른 상태바가 있으면 덮어쓰지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 원시 명령명, slash command, skill name, 내부 라벨, raw settings JSON, 기존 command 문자열, exit code, scope fallback 설명, statusLine/wire/settings-merge 용어, 파일 경로, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if clarify_intent_present(prompt) {

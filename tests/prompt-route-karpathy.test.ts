@@ -94,6 +94,22 @@ describe("prompt-route Karpathy context gating", () => {
     expect(stdout).not.toContain("무슨 앱 만들래");
   });
 
+  test("doctor status prompts receive doctor skill contract instead of generic diagnostics", () => {
+    const stdout = promptRoute("axhub CLI 설치 상태 괜찮아?");
+    const payload = JSON.parse(stdout);
+    const additionalContext = payload.hookSpecificOutput?.additionalContext ?? "";
+    const systemMessage = payload.systemMessage ?? "";
+    const routedText = [additionalContext, systemMessage].join("\n");
+    expect(additionalContext).toContain('Skill("axhub:doctor")');
+    expect(systemMessage).toContain('Skill("axhub:doctor")');
+    expect(routedText).toContain("설치 상태를 확인할게요");
+    expect(routedText).toContain("doctor-summary --user-utterance");
+    expect(routedText).toContain("Do not install, update, login, logout");
+    expect(routedText).toContain("visible chat 에 절대 쓰지 않아요");
+    expect(routedText).not.toContain("/axhub:doctor");
+    expect(routedText).not.toContain("I'll invoke the doctor skill");
+  });
+
   test("ordinary deploy prompts do not receive unrelated Karpathy skill body", () => {
     const stdout = promptRoute("내 paydrop 앱 배포해");
     expect(stdout).toContain("배포 준비를 확인할게요");
