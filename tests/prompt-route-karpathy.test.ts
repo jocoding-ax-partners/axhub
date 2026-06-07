@@ -62,6 +62,9 @@ describe("prompt-route Karpathy context gating", () => {
     expect(stdout).toContain("배포 준비를 확인할게요");
     expect(stdout).toContain("deploy-preview-summary");
     expect(stdout).toContain("deploy-approved-run");
+    expect(stdout).toContain("사용자에게 보이는 앱 폴더");
+    expect(stdout).toContain("axhub 매니페스트(axhub.yaml)가 없어요.");
+    expect(stdout).toContain("React/Vite로 초기화");
     expect(stdout).toContain("Invoke deploy skill");
     expect(stdout).toContain("consent token");
     expect(stdout).not.toContain("AXHub deploy workflow");

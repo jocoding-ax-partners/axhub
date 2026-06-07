@@ -1526,7 +1526,7 @@ Visible options, exactly:
 If the question-card tool requires option values, set each value to exactly the same Korean text as its visible label. Do not put hidden option values that contain English skill slugs or slash-command forms in the question-card JSON.
 After the user chooses an option, do not call the Claude Skill tool, do not invoke any slash command, and do not write a route-transition sentence.
 If the user chooses 환경 점검, visible sentence exactly: 설치 상태를 확인할게요. Then use exactly one Bash tool call with description/title exactly: 설치 상태 확인. Bash command: `axhub-helpers doctor-summary --user-utterance "<original broad user sentence>"`. Copy the Korean stdout as the answer.
-If the user chooses 앱 배포, visible sentence exactly: 배포 준비를 확인할게요. Then use exactly one Bash tool call with description/title exactly: 배포 준비 확인. Bash command: `axhub-helpers deploy-preview-summary --user-utterance "<original broad user sentence>"`. Show the Korean preview and ask for explicit approval before any deploy execution.
+If the user chooses 앱 배포, visible sentence exactly: 배포 준비를 확인할게요. Before the Bash call, make sure it runs in the user-visible app folder; if an added folder is the only Vite/React app, `cd` there first, and if multiple app folders are plausible, ask which folder and stop. Then use exactly one Bash tool call with description/title exactly: 배포 준비 확인. Bash command: `axhub-helpers deploy-preview-summary --user-utterance "<original broad user sentence>"`. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, show the local choices React/Vite로 초기화, 다른 템플릿 선택, 취소, then stop without deploy approval. Otherwise show the Korean preview and ask for explicit approval before any deploy execution.
 If the user chooses 앱과 리소스 조회, visible sentence exactly: 앱과 리소스를 확인할게요.
 If the user chooses 문제 원인 보기, visible sentence exactly: 문제 원인을 확인할게요.
 Do not say the prompt is vague. Do not append parenthesized English/internal labels to any option. Do not show slash commands, skill names, command mappings, implementation values, route labels, raw tool names, or English tool-title fragments in visible text.
@@ -1566,7 +1566,8 @@ First visible sentence, exactly: 배포 준비를 확인할게요.
 Use exactly one Bash tool call before asking for approval. Bash description/title, exactly: 배포 준비 확인
 Bash command: `axhub-helpers deploy-preview-summary --user-utterance "<latest user sentence>"`
 This is an AXHub live deployment request, not a generic release, git release, Vercel, Netlify, Cloudflare, Fly, Render, or Railway deploy.
-After the tool call, copy the Korean preview stdout and ask for explicit approval. Do not read or summarize the long deploy skill body before this preview card is shown.
+Before that Bash command, make sure it runs in the user-visible app folder; if an added folder is the only Vite/React app, `cd` there first, and if multiple app folders are plausible, ask which folder and stop.
+After the tool call, copy the Korean preview stdout and ask for explicit approval. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, show the local choices React/Vite로 초기화, 다른 템플릿 선택, 취소, then stop without deploy approval. Do not read or summarize the long deploy skill body before this preview card is shown.
 After explicit approval, use exactly one Bash tool call. Bash description/title, exactly: 배포 실행
 Bash command: `axhub-helpers deploy-approved-run --user-utterance "<latest user sentence>"`
 Copy that Korean stdout as the result. Do not invoke a skill again after approval.
@@ -1882,7 +1883,7 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     } else if env_intent_present(prompt) {
         Some("도구를 호출하기 전에 visible chat 으로 정확히 \"환경변수를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"환경변수 확인\" 으로 설정하고 `axhub-helpers env-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 앱 환경변수 확인이에요. 셸 환경변수, .env 파일, repo 파일, plugin source, git history, .omc, .claude, QA 결과 파일을 읽지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 원시 명령명, JSON field name, 내부 라벨, preflight, raw value, secret value, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if deploy_create_intent_present(prompt) {
-        Some("도구를 호출하거나 스킬 내용을 요약하기 전에 visible chat 으로 정확히 \"배포 준비를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"배포 준비 확인\" 으로 설정하고 `axhub-helpers deploy-preview-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 도구가 끝나면 stdout 의 한국어 preview 를 그대로 보여주고 명시적 승인 질문을 해요. 이 preview 전에는 긴 deploy skill 본문을 읽거나 요약하지 않아요. 사용자가 승인하면 두 번째 Bash tool call 의 description/title 은 정확히 \"배포 실행\" 으로 설정하고 `axhub-helpers deploy-approved-run --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 승인 후에는 skill 을 다시 호출하거나 긴 deploy skill 본문을 읽지 않아요. 이 요청은 AXHub 라이브 배포 요청이에요. 일반 release/git release/다른 호스팅 배포로 우회하지 않아요. 실제 배포 전에는 앱, 환경, 브랜치, 커밋, 예상 시간을 보여주고 명시적 사용자 승인을 받아요. 본문에는 route label, slash command, command mapping, skill name, `Invoke deploy skill`, `Read rest of SKILL`, `Read full SKILL`, `Route=axhub`, `preflight`, `deploy-prep`, HMAC, consent token, raw helper JSON, raw id, raw email, 영어 tool title fragment 를 쓰지 않아요. 승인 후 실행 단계의 Bash tool title 은 `배포 실행` 또는 `배포 상태 확인` 같은 한국어로만 써요. 토큰 만료나 인증 오류가 있으면 로그인 필요 여부를 한국어로 안전하게 설명하고 로그인은 묻기 전에는 시작하지 않아요.")
+        Some("도구를 호출하거나 스킬 내용을 요약하기 전에 visible chat 으로 정확히 \"배포 준비를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 전에 사용자에게 보이는 앱 폴더에서 실행되는지 확인해요. active root 와 추가 폴더가 다르고 추가 폴더만 Vite/React 앱이면 그 폴더로 `cd` 한 뒤 실행해요. 후보가 여러 개면 어떤 폴더를 배포할지 묻고 멈춰요. 첫 Bash tool call 의 description/title 은 정확히 \"배포 준비 확인\" 으로 설정하고 `axhub-helpers deploy-preview-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. stdout 이 `axhub 매니페스트(axhub.yaml)가 없어요.` 라고 하면 React/Vite로 초기화, 다른 템플릿 선택, 취소 선택지만 보여주고 배포 승인 질문 없이 멈춰요. 그 외에는 stdout 의 한국어 preview 를 그대로 보여주고 명시적 승인 질문을 해요. 이 preview 전에는 긴 deploy skill 본문을 읽거나 요약하지 않아요. 사용자가 승인하면 두 번째 Bash tool call 의 description/title 은 정확히 \"배포 실행\" 으로 설정하고 `axhub-helpers deploy-approved-run --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 승인 후에는 skill 을 다시 호출하거나 긴 deploy skill 본문을 읽지 않아요. 이 요청은 AXHub 라이브 배포 요청이에요. 일반 release/git release/다른 호스팅 배포로 우회하지 않아요. 실제 배포 전에는 앱, 환경, 브랜치, 커밋, 예상 시간을 보여주고 명시적 사용자 승인을 받아요. 본문에는 route label, slash command, command mapping, skill name, `Invoke deploy skill`, `Read rest of SKILL`, `Read full SKILL`, `Route=axhub`, `preflight`, `deploy-prep`, HMAC, consent token, raw helper JSON, raw id, raw email, 영어 tool title fragment 를 쓰지 않아요. 승인 후 실행 단계의 Bash tool title 은 `배포 실행` 또는 `배포 상태 확인` 같은 한국어로만 써요. 토큰 만료나 인증 오류가 있으면 로그인 필요 여부를 한국어로 안전하게 설명하고 로그인은 묻기 전에는 시작하지 않아요.")
     } else if is_auth_status {
         None
     } else if install_cli_intent_present(prompt) {
@@ -1894,7 +1895,7 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     } else if statusline_intent_present(prompt) {
         Some("도구를 호출하기 전에 visible chat 으로 정확히 \"상태바 설정을 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"상태바 설정\" 으로 설정하고 `axhub-helpers statusline-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 상태바 활성화예요. 기존 다른 상태바가 있으면 덮어쓰지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 원시 명령명, slash command, skill name, 내부 라벨, raw settings JSON, 기존 command 문자열, exit code, scope fallback 설명, statusLine/wire/settings-merge 용어, 파일 경로, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if clarify_intent_present(prompt) {
-        Some("사용자가 AXHub에서 무엇을 할지 넓게 물었어요. visible chat 첫 문장은 정확히 \"어떤 걸 도와드릴까요?\" 로만 말해요. 곧바로 질문 카드 하나를 열고 header 는 \"작업 선택\", question 은 \"어떤 걸 도와드릴까요?\" 로 설정해요. 선택지는 \"환경 점검\", \"앱 배포\", \"앱과 리소스 조회\", \"문제 원인 보기\", \"처음부터 안내\" 다섯 개만 보여줘요. 질문 카드 도구가 value 를 요구하면 각 value 는 visible label 과 같은 한국어 문구로 설정해요. 영어 skill slug 나 slash-command form 을 담은 hidden value 는 넣지 말아요. 설명은 자연어로만 쓰고 괄호 안 영어/내부 라벨, slash command, skill name, command mapping, route label, raw tool name, 사용자를 탓하는 모호성 표현을 사용자에게 쓰지 않아요. 사용자가 고른 뒤에는 Claude Skill tool 이나 slash command 를 호출하지 말고 inline 으로 이어가요. \"환경 점검\" 선택 시 visible chat 은 정확히 \"설치 상태를 확인할게요.\" 한 문장으로 시작하고, 첫 Bash tool call 의 description/title 은 정확히 \"설치 상태 확인\" 으로 설정한 뒤 `axhub-helpers doctor-summary --user-utterance \"<처음 사용자가 한 넓은 문장>\"` 를 한 번만 실행해요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변해요. \"앱 배포\" 선택 시 visible chat 은 정확히 \"배포 준비를 확인할게요.\" 로 시작하고 `axhub-helpers deploy-preview-summary --user-utterance \"<처음 사용자가 한 넓은 문장>\"` 만 먼저 실행해요.")
+        Some("사용자가 AXHub에서 무엇을 할지 넓게 물었어요. visible chat 첫 문장은 정확히 \"어떤 걸 도와드릴까요?\" 로만 말해요. 곧바로 질문 카드 하나를 열고 header 는 \"작업 선택\", question 은 \"어떤 걸 도와드릴까요?\" 로 설정해요. 선택지는 \"환경 점검\", \"앱 배포\", \"앱과 리소스 조회\", \"문제 원인 보기\", \"처음부터 안내\" 다섯 개만 보여줘요. 질문 카드 도구가 value 를 요구하면 각 value 는 visible label 과 같은 한국어 문구로 설정해요. 영어 skill slug 나 slash-command form 을 담은 hidden value 는 넣지 말아요. 설명은 자연어로만 쓰고 괄호 안 영어/내부 라벨, slash command, skill name, command mapping, route label, raw tool name, 사용자를 탓하는 모호성 표현을 사용자에게 쓰지 않아요. 사용자가 고른 뒤에는 Claude Skill tool 이나 slash command 를 호출하지 말고 inline 으로 이어가요. \"환경 점검\" 선택 시 visible chat 은 정확히 \"설치 상태를 확인할게요.\" 한 문장으로 시작하고, 첫 Bash tool call 의 description/title 은 정확히 \"설치 상태 확인\" 으로 설정한 뒤 `axhub-helpers doctor-summary --user-utterance \"<처음 사용자가 한 넓은 문장>\"` 를 한 번만 실행해요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변해요. \"앱 배포\" 선택 시 visible chat 은 정확히 \"배포 준비를 확인할게요.\" 로 시작하고, 사용자에게 보이는 앱 폴더에서 실행되는지 확인한 뒤 `axhub-helpers deploy-preview-summary --user-utterance \"<처음 사용자가 한 넓은 문장>\"` 만 먼저 실행해요. stdout 이 `axhub 매니페스트(axhub.yaml)가 없어요.` 라고 하면 React/Vite로 초기화, 다른 템플릿 선택, 취소 선택지만 보여주고 배포 승인 질문 없이 멈춰요.")
     } else {
         None
     };
@@ -5442,6 +5443,10 @@ fn cmd_deploy_prep(rest: &[String]) -> anyhow::Result<i32> {
 
 fn cmd_deploy_preview_summary(rest: &[String]) -> anyhow::Result<i32> {
     let user_utterance = parse_optional_user_utterance("deploy-preview-summary", rest)?;
+    if local_deploy_manifest_missing()? {
+        print_missing_manifest_choices();
+        return Ok(0);
+    }
     let mut prep_args = vec!["--intent".to_string(), "deploy".to_string()];
     if !user_utterance.trim().is_empty() {
         prep_args.push("--user-utterance".to_string());
@@ -5522,8 +5527,32 @@ fn cmd_deploy_preview_summary(rest: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
+fn local_deploy_manifest_missing() -> anyhow::Result<bool> {
+    let cwd = std::env::current_dir()?;
+    if cwd.join("axhub.yaml").is_file() || cwd.join("apphub.yaml").is_file() {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn print_missing_manifest_choices() {
+    println!("axhub 매니페스트(axhub.yaml)가 없어요.");
+    println!("- React/Vite로 초기화");
+    println!("- 다른 템플릿 선택");
+    println!("- 취소");
+    println!("원격 앱 등록이나 배포는 아직 시작하지 않았어요.");
+}
+
 fn cmd_deploy_approved_run(rest: &[String]) -> anyhow::Result<i32> {
     let user_utterance = parse_optional_user_utterance("deploy-approved-run", rest)?;
+    if local_deploy_manifest_missing()? {
+        println!("axhub 매니페스트(axhub.yaml)가 없어서 배포를 시작하지 않았어요.");
+        println!("- React/Vite로 초기화");
+        println!("- 다른 템플릿 선택");
+        println!("- 취소");
+        println!("원격 앱 등록이나 배포는 아직 시작하지 않았어요.");
+        return Ok(0);
+    }
     let mut prep_args = vec!["--intent".to_string(), "deploy".to_string()];
     if !user_utterance.trim().is_empty() {
         prep_args.push("--user-utterance".to_string());

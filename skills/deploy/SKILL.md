@@ -28,6 +28,8 @@ When the user says a human deployment phrase such as `배포해줘`, `올려줘`
 
 - The first visible chat sentence must be exactly `배포 준비를 확인할게요.`
 - For the initial Desktop preview, stop reading this skill after this section. Do not read the long workflow below until the user has approved the preview card.
+- Before the Bash/tool call, make sure the command runs in the user-visible app folder. In Claude Desktop, if the active root and an added folder differ and the added folder is the only Vite/React app (`package.json` has `vite` + `react`/`react-dom`), run the helper from that folder (`cd "<that folder>" && ...`). If multiple app folders are plausible, ask which folder to deploy and stop; do not preview or register the wrong folder.
+- If helper stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, render the local initialization choices (`React/Vite로 초기화`, `다른 템플릿 선택`, `취소`) and stop. Do not ask for deploy approval, app registration approval, or call `deploy-approved-run` from this state.
 - Immediately run one Bash/tool call with title `배포 준비 확인`: `axhub-helpers deploy-preview-summary --user-utterance "<latest user sentence>"`.
 - Copy that Korean stdout as the preview card and ask for explicit approval.
 - After the user explicitly approves, run one Bash/tool call with title `배포 실행`: `axhub-helpers deploy-approved-run --user-utterance "<latest user sentence>"`.

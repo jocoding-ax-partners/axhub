@@ -52,6 +52,16 @@ describe("deploy SKILL Step 1.1 — template-required hard stop", () => {
     expect(body).toContain("do not call `apps bootstrap`, `apps create`, or `deploy create`");
   });
 
+  test("Desktop short-prompt fast path must not deploy the wrong folder", () => {
+    const body = deploySkill();
+    expect(body).toContain("make sure the command runs in the user-visible app folder");
+    expect(body).toContain("added folder is the only Vite/React app");
+    expect(body).toContain("ask which folder to deploy and stop");
+    expect(body).toContain("do not preview or register the wrong folder");
+    expect(body).toContain("If helper stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`");
+    expect(body).toContain("Do not ask for deploy approval, app registration approval, or call `deploy-approved-run`");
+  });
+
   test("React/Vite choice writes a local manifest before retrying deploy", () => {
     const body = deploySkill();
     expect(body).toContain("axhub init --framework react-vite --target auto");
