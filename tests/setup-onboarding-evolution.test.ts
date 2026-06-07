@@ -144,6 +144,18 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
     expect(content).toContain("succeeded/live/running/deployed");
   });
 
+  test("ignores Claude Desktop state folders when classifying empty project dirs", () => {
+    const content = onboarding();
+
+    expect(content).toContain("! -name .omc");
+    expect(content).toContain("! -name .claude");
+    expect(content).toContain("! -name .axhub-state");
+    expect(content).toContain("! -name .DS_Store");
+    expect(content).toContain(
+      '@(".git", "node_modules", ".omc", ".claude", ".axhub-state", ".DS_Store")',
+    );
+  });
+
   test("locks first-gap state-machine order instead of only vocabulary", () => {
     const content = onboarding();
 

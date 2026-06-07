@@ -59,10 +59,25 @@ function promptRoute(prompt: string): string {
 describe("prompt-route Karpathy context gating", () => {
   test("first-run vibe prompts receive onboarding contract instead of generic advice", () => {
     const stdout = promptRoute("처음인데 뭐부터 하면 돼?");
-    expect(stdout).toContain("처음 설정을 확인할게요");
-    expect(stdout).toContain("first-run onboarding");
-    expect(stdout).toContain("VIBE_READY");
-    expect(stdout).not.toContain("새 앱 만들어줘\" 하면 됨");
+    const payload = JSON.parse(stdout);
+    const additionalContext = payload.hookSpecificOutput?.additionalContext ?? "";
+    const systemMessage = payload.systemMessage ?? "";
+    const routedText = [
+      additionalContext,
+      systemMessage,
+    ].join("\n");
+    expect(additionalContext).toContain('Skill("axhub:onboarding")');
+    expect(systemMessage).toContain('Skill("axhub:onboarding")');
+    expect(routedText).toContain("처음 설정을 확인할게요");
+    expect(routedText).toContain("first-run onboarding");
+    expect(routedText).toContain("첫 앱 만들래요?");
+    expect(routedText).toContain("never announce internal routing");
+    expect(systemMessage).toContain("내부 제어");
+    expect(systemMessage).toContain("visible chat 에 절대 쓰지 않아요");
+    expect(systemMessage).toContain("내부 실행 선언");
+    expect(routedText).toContain("VIBE_READY");
+    expect(routedText).not.toContain("새 앱 만들어줘\" 하면 됨");
+    expect(routedText).not.toContain("I'll invoke the onboarding skill");
   });
 
   test("short new-app prompts receive Desktop init contract instead of generic app ideation", () => {

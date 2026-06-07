@@ -1,6 +1,6 @@
 ---
 name: onboarding
-description: '이 스킬은 axhub 를 처음 쓰는 사람이 셋업/온보딩 전체 과정을 한 번에 진행하고 싶어할 때 사용해요. 다음 표현에서 활성화: "셋업해줘", "셋업 해줘", "처음인데", "처음 사용", "처음 써", "처음 쓰는데", "처음 쓰는데 뭐부터", "뭐부터 하면 돼", "뭐부터 하면 되나요", "어떻게 시작하면 돼", "어떻게 시작해", "온보딩", "온보딩해줘", "시작하기", "axhub 시작", "axhub 처음", "초기 셋업", "setup", "set up", "onboard", "onboarding", "getting started", "get started", "first time", 또는 첫 사용자 셋업 의도. axhub CLI 설치(install-cli)·로그인(auth)·node 환경 감지를 순서대로 안내하고, node 가 없으면 consent 후 설치해요. 끝나면 첫 앱 만들기(init)로 연결해요. 환경 진단(doctor)이나 새 앱 초기화(init)와 달리 처음 사용자의 순차 온보딩을 담당해요.'
+description: 'This skill should be used when the user is new to axhub, asks what to do first, requests setup/onboarding/getting started, or says a short first-run phrase. 이 스킬은 axhub 를 처음 쓰는 사람이 셋업/온보딩 전체 과정을 한 번에 진행하고 싶어할 때 사용해요. 다음 표현에서 활성화: "셋업해줘", "셋업 해줘", "처음인데", "처음 사용", "처음 써", "처음 쓰는데", "처음 쓰는데 뭐부터", "뭐부터 하면 돼", "뭐부터 하면 되나요", "어떻게 시작하면 돼", "어떻게 시작해", "온보딩", "온보딩해줘", "시작하기", "axhub 시작", "axhub 처음", "초기 셋업", "setup", "set up", "onboard", "onboarding", "getting started", "get started", "first time", 또는 첫 사용자 셋업 의도. axhub CLI 설치(install-cli)·로그인(auth)·node 환경 감지를 순서대로 안내하고, node 가 없으면 consent 후 설치해요. 빈 폴더에서는 바로 템플릿을 묻지 말고 "첫 앱 만들래요?"를 먼저 물은 뒤, 사용자가 원하면 첫 앱 만들기(init)로 연결해요. 환경 진단(doctor)이나 새 앱 초기화(init)와 달리 처음 사용자의 순차 온보딩을 담당해요.'
 examples:
   - utterance: "셋업해줘"
     intent: "onboard axhub first-time onboarding"
@@ -82,7 +82,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    git rev-parse --verify HEAD 2>/dev/null || echo "git_commit_missing"
    ls bun.lockb bun.lock pnpm-lock.yaml package-lock.json yarn.lock 2>/dev/null || echo "lockfile_missing"
    test -d node_modules || { (test -f axhub.yaml || test -f apphub.yaml) && ls bun.lockb bun.lock pnpm-lock.yaml package-lock.json yarn.lock >/dev/null 2>&1 && echo "deps_missing"; }
-   find . -mindepth 1 -maxdepth 1 ! -name .git ! -name node_modules -print -quit 2>/dev/null | grep -q . && echo "dir_non_empty" || echo "dir_empty"
+   find . -mindepth 1 -maxdepth 1 ! -name .git ! -name node_modules ! -name .omc ! -name .claude ! -name .axhub-state ! -name .DS_Store -print -quit 2>/dev/null | grep -q . && echo "dir_non_empty" || echo "dir_empty"
    NODE_ACTIVE="$(node --version 2>/dev/null || true)"
    NODE_REQUIRED="$(cat .nvmrc 2>/dev/null || node -p "require('./package.json').engines?.node || ''" 2>/dev/null || true)"
    if [ -n "$NODE_ACTIVE" ] && [ -n "$NODE_REQUIRED" ]; then
@@ -105,7 +105,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    git rev-parse --verify HEAD 2>$null; if ($LASTEXITCODE -ne 0) { "git_commit_missing" }
    Get-ChildItem bun.lockb,bun.lock,pnpm-lock.yaml,package-lock.json,yarn.lock -ErrorAction SilentlyContinue
    if (-not (Test-Path node_modules) -and ((Test-Path axhub.yaml) -or (Test-Path apphub.yaml)) -and (Get-ChildItem bun.lockb,bun.lock,pnpm-lock.yaml,package-lock.json,yarn.lock -ErrorAction SilentlyContinue)) { "deps_missing" }
-   $visible = Get-ChildItem -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -notin @(".git", "node_modules") } | Select-Object -First 1
+   $visible = Get-ChildItem -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -notin @(".git", "node_modules", ".omc", ".claude", ".axhub-state", ".DS_Store") } | Select-Object -First 1
    if ($visible) { "dir_non_empty" } else { "dir_empty" }
    $nodeActive = if (Get-Command node -ErrorAction SilentlyContinue) { node --version } else { "" }
    $nodeRequired = if (Test-Path .nvmrc) { Get-Content .nvmrc -TotalCount 1 } else { node -p "require('./package.json').engines?.node || ''" 2>$null }
