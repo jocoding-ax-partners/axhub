@@ -1643,12 +1643,12 @@ exit 1
     let ctx = stdout_json["hookSpecificOutput"]["additionalContext"]
         .as_str()
         .expect("additionalContext");
-    let system = stdout_json["systemMessage"]
-        .as_str()
-        .expect("systemMessage");
+    let system = stdout_json["systemMessage"].as_str().unwrap_or("");
     let combined = format!("{ctx}\n{system}");
     assert!(ctx.contains("Skill(\"axhub:onboarding\")"), "{ctx}");
-    assert!(system.contains("Skill(\"axhub:onboarding\")"), "{system}");
+    // routing control rides additionalContext (agent-facing); it must NOT leak
+    // into the user-visible systemMessage.
+    assert!(!system.contains("Skill(\"axhub:onboarding\")"), "{system}");
     assert!(
         combined.contains("Skill(\"axhub:onboarding\")"),
         "{combined}"
@@ -1657,11 +1657,8 @@ exit 1
         combined.contains("never announce internal routing"),
         "{combined}"
     );
-    assert!(system.contains("내부 제어"), "{system}");
-    assert!(
-        system.contains("visible chat 에 절대 쓰지 않아요"),
-        "{system}"
-    );
+    assert!(ctx.contains("내부 제어"), "{ctx}");
+    assert!(ctx.contains("visible chat 에 절대 쓰지 않아요"), "{ctx}");
     assert!(combined.contains("first-run onboarding"), "{combined}");
     assert!(combined.contains("첫 앱 만들래요?"), "{combined}");
     assert!(
@@ -1799,16 +1796,16 @@ fn cli_prompt_route_desktop_app_template_hints_are_surgical() {
             let additional_context = stdout_json["hookSpecificOutput"]["additionalContext"]
                 .as_str()
                 .expect("additionalContext");
-            let system_message = stdout_json["systemMessage"]
-                .as_str()
-                .expect("systemMessage");
+            let system_message = stdout_json["systemMessage"].as_str().unwrap_or("");
             assert!(
                 additional_context.contains("Skill(\"axhub:init\")"),
                 "new-app Desktop context must route through the native init skill surface: {additional_context}"
             );
+            // routing control rides additionalContext (agent-facing); it must NOT
+            // leak into the user-visible systemMessage.
             assert!(
-                system_message.contains("Skill(\"axhub:init\")"),
-                "new-app Desktop hint must route through the native init skill surface: {stdout}"
+                !system_message.contains("Skill(\"axhub:init\")"),
+                "new-app Desktop hint must keep internal routing out of systemMessage: {stdout}"
             );
             assert!(
                 stdout.contains("브레인스토밍, 일반 프로젝트 탐색, 또는 앱 아이디어 분류가 아니라 AXHub 앱 생성 절차"),
@@ -1870,11 +1867,12 @@ exit 1
     assert!(!ctx.contains("Skill(axhub:"), "{ctx}");
     assert!(ctx.contains("do not answer from repo/git memory"), "{ctx}");
     assert!(ctx.contains("로그인/토큰 확인"), "{ctx}");
-    let system_message = stdout_json["systemMessage"]
-        .as_str()
-        .expect("systemMessage");
+    let system_message = stdout_json["systemMessage"].as_str().unwrap_or("");
+    // the status route contract now rides additionalContext (agent-facing), not
+    // the user-visible systemMessage.
+    assert!(ctx.contains("배포 상태 요청"), "{ctx}");
     assert!(
-        system_message.contains("배포 상태 요청"),
+        !system_message.contains("배포 상태 요청"),
         "{system_message}"
     );
 }
@@ -2077,12 +2075,16 @@ esac
         assert!(ctx.contains(workflow), "{ctx}");
         assert!(!ctx.contains("Skill(axhub:"), "{ctx}");
         assert!(ctx.contains(phrase), "{ctx}");
-        let system_message = stdout_json["systemMessage"].as_str().unwrap_or("");
-        if system_message.is_empty() {
-            assert!(ctx.contains(user_phrase), "{ctx}");
-        } else {
-            assert!(system_message.contains(user_phrase), "{system_message}");
-        }
+        // The whole route contract — first-sentence cue, helper command, and
+        // guardrail prose — now ships in additionalContext (agent-facing); the
+        // user-facing systemMessage carries only the grace nudge (empty here:
+        // unauthed). The per-prompt content assertions below check the contract
+        // on additionalContext, the channel it now rides, so `system_message` is
+        // aliased to `ctx`. `system_message_raw` holds the ACTUAL systemMessage
+        // for the checks that assert the user-facing channel stays empty/clean.
+        let system_message_raw = stdout_json["systemMessage"].as_str().unwrap_or("");
+        let system_message = ctx;
+        assert!(ctx.contains(user_phrase), "{ctx}");
         if prompt == "매니페스트랑 설정 괜찮은지 봐줘" {
             assert!(!ctx.contains("AXHub inspect summary helper"), "{ctx}");
             assert!(
@@ -2535,7 +2537,7 @@ esac
                 ctx.contains("설치 상태 점검, 환경 진단, 업데이트 확인"),
                 "{ctx}"
             );
-            assert!(system_message.is_empty(), "{system_message}");
+            assert!(system_message_raw.is_empty(), "{system_message_raw}");
             for leaked in [
                 "계정·만료·scope",
                 "Check axhub auth status",
@@ -2553,8 +2555,8 @@ esac
             ] {
                 assert!(!ctx.contains(leaked), "ctx leaked {leaked}: {ctx}");
                 assert!(
-                    !system_message.contains(leaked),
-                    "systemMessage leaked {leaked}: {system_message}"
+                    !system_message_raw.contains(leaked),
+                    "systemMessage leaked {leaked}: {system_message_raw}"
                 );
             }
         }

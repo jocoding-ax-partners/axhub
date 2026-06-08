@@ -78,11 +78,13 @@ describe("init route hint surfaces the GitHub App install state", () => {
     expect(routedText).toContain("새 앱을 만들 수 있는 템플릿을 확인할게요");
     expect(routedText).toContain("axhub apps templates list --json");
 
-    // the GitHub App surface step is now present in BOTH route-hint parts —
-    // the English control hint (additionalContext) and the Korean visible
-    // contract (systemMessage)
+    // the GitHub App surface step is present in the agent-facing route hint.
+    // PR #178 moved route control out of user-visible systemMessage, so this
+    // regression now locks both properties: the surface remains, and internals
+    // do not leak into `UserPromptSubmit says:`.
     expect(additionalContext).toContain("axhub github accounts list --json");
-    expect(systemMessage).toContain("GitHub App 계정 설치 상태");
+    expect(additionalContext).toContain("GitHub App 계정 설치 상태");
+    expect(systemMessage).not.toContain("GitHub App 계정 설치 상태");
 
     // install_url must be shown even for already-installed accounts (the
     // add-another-org entry point). The "그냥 넘어가요" / "just move on"
@@ -90,7 +92,7 @@ describe("init route hint surfaces the GitHub App install state", () => {
     expect(additionalContext).toContain("Always show `install_url`");
     expect(additionalContext).toContain("already-installed");
     expect(additionalContext).not.toContain("just move on");
-    expect(systemMessage).toContain("항상 같이 보여줘요");
+    expect(additionalContext).toContain("항상 같이 보여줘요");
     expect(systemMessage).not.toContain("그냥 넘어가요");
 
     // the surface sits before the app-name step, not after approval

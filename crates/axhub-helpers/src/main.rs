@@ -1957,17 +1957,21 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     } else {
         None
     };
-    let system_message = match (grace, intent_system, plugin_drift_system) {
-        (Some(grace), Some(intent), Some(plugin)) => {
-            Some(format!("{grace}\n\n{intent}\n\n{plugin}"))
-        }
-        (Some(grace), Some(intent), None) => Some(format!("{grace}\n\n{intent}")),
-        (Some(grace), None, Some(plugin)) => Some(format!("{grace}\n\n{plugin}")),
-        (Some(grace), None, None) => Some(grace.to_string()),
-        (None, Some(intent), Some(plugin)) => Some(format!("{intent}\n\n{plugin}")),
-        (None, Some(intent), None) => Some(intent.to_string()),
-        (None, None, Some(plugin)) => Some(plugin),
-        (None, None, None) => None,
+    // `intent_system` is internal routing control for the model, not a message
+    // for the user — append it to `additionalContext` (agent-facing, hidden from
+    // the user, the same channel the routing hints already ride) so the raw route
+    // contract never surfaces as a user-visible `UserPromptSubmit says:` block.
+    // Only genuinely user-facing nudges (`grace` and plugin drift) stay on
+    // `systemMessage`.
+    if let Some(intent) = intent_system {
+        context.push_str("\n\n");
+        context.push_str(intent);
+    }
+    let system_message = match (grace, plugin_drift_system) {
+        (Some(grace), Some(plugin)) => Some(format!("{grace}\n\n{plugin}")),
+        (Some(grace), None) => Some(grace.to_string()),
+        (None, Some(plugin)) => Some(plugin),
+        (None, None) => None,
     };
     println!(
         "{}",
