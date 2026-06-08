@@ -33,7 +33,18 @@ use crate::runtime_paths::{
 
 const RELEASES_LATEST_URL: &str =
     "https://api.github.com/repos/jocoding-ax-partners/axhub/releases/latest";
+/// Nudge-side cache staleness bound: a cache older than this never drives a
+/// nudge. Generous (24h) so an update keeps surfacing between background fetches.
 const CACHE_TTL_SECS: u64 = 24 * 60 * 60;
+/// Background re-fetch cadence when the cache shows we're **up to date** — short
+/// so a freshly-published release is detected within the hour (a same-day release
+/// otherwise wouldn't surface until the 24h bound). Mirrors gstack's 60-min
+/// up-to-date poll.
+const FETCH_FRESH_TTL_SECS: u64 = 60 * 60;
+/// Background re-fetch cadence when an update is already cached — longer, because
+/// the nudge already fires from the cache (per-version dedup); no need to re-poll
+/// the network often.
+const FETCH_DRIFT_TTL_SECS: u64 = 12 * 60 * 60;
 const FETCH_TIMEOUT_SECS: u64 = 5;
 
 /// Cached result of the most recent successful latest-release fetch.
@@ -203,9 +214,16 @@ fn cmd_plugin_latest_fetch_bg_with_url(url: &str) -> i32 {
     if is_hook_disabled("plugin-drift") {
         return 0;
     }
-    // Skip the network call entirely while the cache is still fresh.
+    // Skip the network call while the cache is still fresh — but use a short TTL
+    // when up to date (catch new releases fast) vs a longer one when an update is
+    // already cached (the nudge fires from the cache; re-poll less often).
     if let Some(cache) = read_cache() {
-        if now_unix().saturating_sub(cache.fetched_at) < CACHE_TTL_SECS {
+        let ttl = if is_newer(&cache.latest, current_version()) {
+            FETCH_DRIFT_TTL_SECS
+        } else {
+            FETCH_FRESH_TTL_SECS
+        };
+        if now_unix().saturating_sub(cache.fetched_at) < ttl {
             return 0;
         }
     }
@@ -619,6 +637,50 @@ mod tests {
 
         assert_eq!(read_cache().unwrap().latest, "99.0.0");
         handle.join().unwrap();
+    }
+
+    #[test]
+    fn fetch_refreshes_up_to_date_cache_past_one_hour() {
+        // The fast-detection fix: an "up to date" cache (latest == current) older
+        // than the 1h fresh TTL re-fetches, so a same-day release surfaces within
+        // the hour instead of waiting out the 24h staleness bound.
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        write_cache(&cache(
+            current_version(),
+            now_unix() - FETCH_FRESH_TTL_SECS - 1,
+        ))
+        .unwrap();
+        let (url, handle) = serve_once("200 OK", r#"{"tag_name":"v99.0.0"}"#);
+
+        assert_eq!(cmd_plugin_latest_fetch_bg_with_url(&url), 0);
+
+        assert_eq!(read_cache().unwrap().latest, "99.0.0");
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn fetch_skips_recent_up_to_date_cache() {
+        // Up to date and younger than the 1h fresh TTL → no needless network.
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        write_cache(&cache(current_version(), now_unix() - 60)).unwrap(); // 1 min old
+        let (url, handle) = serve_connection_probe("200 OK", r#"{"tag_name":"v99.0.0"}"#);
+
+        assert_eq!(cmd_plugin_latest_fetch_bg_with_url(&url), 0);
+
+        assert!(
+            !handle.join().unwrap(),
+            "recent up-to-date cache should skip the HTTP fetch"
+        );
     }
 
     #[test]
