@@ -984,6 +984,7 @@ fn cli_legacy_json_compat_flags_remain_accepted() {
         "resolve --json must stay as a no-op compatibility flag"
     );
 }
+#[cfg(unix)]
 #[test]
 fn cli_prompt_route_injects_doctor_context_for_version_skew() {
     let temp = tempfile::tempdir().unwrap();
