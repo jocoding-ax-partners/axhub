@@ -1,0 +1,331 @@
+//! Proactive plugin version-drift nudge (plan: docs/plans/plugin-update-proactive-nudge.md).
+//!
+//! Data flow — every path is fail-open (any error → no nudge, exit 0):
+//!
+//! ```text
+//!   plugin-latest-fetch-bg  (spawned detached from session-start.sh)
+//!     ureq GET releases/latest ──▶ parse tag_name ──▶ atomic cache write (TTL 24h)
+//!        │                            │                   │
+//!        ▼                            ▼                   ▼
+//!     [net fail] → skip          [malformed] → skip   [io fail] → skip
+//!
+//!   prompt-route  (UserPromptSubmit — the reliable steering surface; D4)
+//!     read cache ──▶ semver vs CARGO_PKG_VERSION ──▶ Some(nudge) + per-version marker
+//!        │              │                              │
+//!        ▼              ▼                              ▼
+//!     [absent/stale] [<= current]                 [marker/optout/non-interactive] → None
+//! ```
+//!
+//! D4: the nudge rides **UserPromptSubmit** `additionalContext`, NOT SessionStart.
+//! SessionStart `additionalContext` is advisory and arrives before any user turn,
+//! so it cannot reliably drive an AskUserQuestion. UserPromptSubmit fires with a
+//! real turn (the surface `prompt-route` already uses to steer the agent).
+
+use std::fs;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
+
+use crate::hook_safety::is_hook_disabled;
+use crate::runtime_paths::{
+    plugin_drift_nudge_marker_path, plugin_drift_optout_path, plugin_latest_cache_path,
+};
+
+const RELEASES_LATEST_URL: &str =
+    "https://api.github.com/repos/jocoding-ax-partners/axhub/releases/latest";
+const CACHE_TTL_SECS: u64 = 24 * 60 * 60;
+const FETCH_TIMEOUT_SECS: u64 = 5;
+
+/// Cached result of the most recent successful latest-release fetch.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LatestCache {
+    /// Normalized semver, no leading `v` (e.g. `"0.9.40"`).
+    pub latest: String,
+    /// Unix seconds at which the fetch succeeded.
+    pub fetched_at: u64,
+}
+
+fn now_unix() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Current plugin version (compile-time constant; plugin + helper co-version,
+/// see telemetry::PLUGIN_VERSION).
+fn current_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+/// Strip a leading `v` and surrounding whitespace from a release tag.
+fn normalize_tag(tag: &str) -> String {
+    tag.trim().trim_start_matches('v').to_string()
+}
+
+/// `true` when `latest` is a strictly newer semver than `current`. Unparseable
+/// input yields `false` (fail-open: never nudge on garbage).
+fn is_newer(latest: &str, current: &str) -> bool {
+    match (semver::Version::parse(latest), semver::Version::parse(current)) {
+        (Ok(l), Ok(c)) => l > c,
+        _ => false,
+    }
+}
+
+/// Pure drift decision — no IO, so every branch is unit-testable. Returns `true`
+/// when the nudge should fire this turn.
+fn should_nudge(
+    cache: Option<&LatestCache>,
+    current: &str,
+    now: u64,
+    marker_exists: bool,
+    optout: bool,
+    non_interactive: bool,
+) -> bool {
+    if optout || non_interactive {
+        return false;
+    }
+    let Some(cache) = cache else {
+        return false;
+    };
+    if now.saturating_sub(cache.fetched_at) >= CACHE_TTL_SECS {
+        return false; // stale cache
+    }
+    if !is_newer(&cache.latest, current) {
+        return false; // already current (or a preview/downgrade)
+    }
+    if marker_exists {
+        return false; // already nudged for this version
+    }
+    true
+}
+
+fn optout_present() -> bool {
+    plugin_drift_optout_path()
+        .map(|p| p.exists())
+        .unwrap_or(false)
+}
+
+fn is_non_interactive() -> bool {
+    std::env::var_os("CI").is_some() || std::env::var_os("CLAUDE_NON_INTERACTIVE").is_some()
+}
+
+fn read_cache() -> Option<LatestCache> {
+    let path = plugin_latest_cache_path()?;
+    let raw = fs::read_to_string(&path).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
+/// Atomic cache write: serialize to a sibling temp file then rename (atomic on
+/// the same filesystem), so a concurrent reader never sees a torn file.
+fn write_cache(cache: &LatestCache) -> std::io::Result<()> {
+    let path = plugin_latest_cache_path()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no cache path"))?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let json = serde_json::to_string(cache)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, json)?;
+    fs::rename(&tmp, &path)?;
+    Ok(())
+}
+
+fn fetch_latest_tag() -> Option<String> {
+    let config = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(FETCH_TIMEOUT_SECS)))
+        .build();
+    let agent: ureq::Agent = config.into();
+    let mut resp = agent
+        .get(RELEASES_LATEST_URL)
+        .header("User-Agent", "axhub-helpers")
+        .header("Accept", "application/vnd.github+json")
+        .call()
+        .ok()?;
+    let body = resp.body_mut().read_to_string().ok()?;
+    let value: serde_json::Value = serde_json::from_str(&body).ok()?;
+    let tag = value.get("tag_name").and_then(serde_json::Value::as_str)?;
+    let normalized = normalize_tag(tag);
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized)
+    }
+}
+
+/// Agent-facing nudge text. Instructs the agent to fire an AskUserQuestion that
+/// routes to the `upgrade` skill, and to include the permanent opt-out option.
+fn nudge_text(current: &str, latest: &str) -> String {
+    format!(
+        "<axhub-plugin-update>\n\
+         [axhub hook | 플러그인 새 버전 알림]\n\
+         플러그인 새 버전이 나왔어요: v{current} → v{latest}\n\
+         에이전트: 사용자에게 AskUserQuestion 으로 업데이트할지 물어요. upgrade 스킬로 \
+         라우팅하고 옵션에 '그만 볼래요 (다시 안 봄)' 를 포함해요 — 선택하면 \
+         `axhub-helpers plugin-drift-optout` 를 실행해 영구로 꺼요.\n\
+         Skip: AXHUB_DISABLE_HOOK=plugin-drift\n\
+         </axhub-plugin-update>"
+    )
+}
+
+/// Background fetch entry point (`axhub-helpers plugin-latest-fetch-bg`).
+/// Best-effort + TTL-gated; always returns 0 (fail-open hook contract).
+pub fn cmd_plugin_latest_fetch_bg() -> i32 {
+    if is_hook_disabled("plugin-drift") {
+        return 0;
+    }
+    // Skip the network call entirely while the cache is still fresh.
+    if let Some(cache) = read_cache() {
+        if now_unix().saturating_sub(cache.fetched_at) < CACHE_TTL_SECS {
+            return 0;
+        }
+    }
+    if let Some(latest) = fetch_latest_tag() {
+        let _ = write_cache(&LatestCache {
+            latest,
+            fetched_at: now_unix(),
+        });
+    }
+    0
+}
+
+/// Permanent opt-out (`axhub-helpers plugin-drift-optout`). Writes the marker the
+/// drift check honors. Always returns 0 (fail-open).
+pub fn cmd_plugin_drift_optout() -> i32 {
+    if let Some(path) = plugin_drift_optout_path() {
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::write(&path, b"");
+    }
+    0
+}
+
+/// UserPromptSubmit nudge text, or `None` when no nudge should fire. On a `Some`
+/// result the per-version marker is recorded as a side effect, so the nudge
+/// fires at most once per latest version. Called from `cmd_prompt_route`.
+pub fn plugin_drift_context() -> Option<String> {
+    if is_hook_disabled("plugin-drift") {
+        return None;
+    }
+    let cache = read_cache();
+    let current = current_version();
+    let marker_path = cache
+        .as_ref()
+        .and_then(|c| plugin_drift_nudge_marker_path(&c.latest));
+    let marker_exists = marker_path.as_ref().map(|p| p.exists()).unwrap_or(false);
+
+    if !should_nudge(
+        cache.as_ref(),
+        current,
+        now_unix(),
+        marker_exists,
+        optout_present(),
+        is_non_interactive(),
+    ) {
+        return None;
+    }
+
+    // Record the per-version marker before returning so re-entry (this turn's
+    // later prompts, or the next session) is a no-op.
+    if let Some(path) = marker_path {
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::write(&path, b"");
+    }
+    // `cache` is Some here (should_nudge returned true).
+    cache.map(|c| nudge_text(current, &c.latest))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cache(latest: &str, fetched_at: u64) -> LatestCache {
+        LatestCache {
+            latest: latest.to_string(),
+            fetched_at,
+        }
+    }
+
+    #[test]
+    fn normalize_tag_strips_v_and_space() {
+        assert_eq!(normalize_tag("v0.9.40"), "0.9.40");
+        assert_eq!(normalize_tag("  0.9.40 "), "0.9.40");
+        assert_eq!(normalize_tag("v1.2.3"), "1.2.3");
+    }
+
+    #[test]
+    fn is_newer_compares_semver_numerically() {
+        assert!(is_newer("0.9.40", "0.9.34"));
+        assert!(is_newer("0.10.0", "0.9.99")); // not string compare
+        assert!(!is_newer("0.9.34", "0.9.34")); // equal
+        assert!(!is_newer("0.9.30", "0.9.34")); // older (preview/downgrade)
+        assert!(!is_newer("garbage", "0.9.34")); // unparseable → no nudge
+        assert!(!is_newer("0.9.40", "garbage"));
+    }
+
+    #[test]
+    fn should_nudge_fires_on_fresh_newer_unmarked() {
+        let c = cache("0.9.40", 1000);
+        assert!(should_nudge(Some(&c), "0.9.34", 1000, false, false, false));
+    }
+
+    #[test]
+    fn should_nudge_false_when_no_cache() {
+        assert!(!should_nudge(None, "0.9.34", 1000, false, false, false));
+    }
+
+    #[test]
+    fn should_nudge_false_when_equal_or_older() {
+        let eq = cache("0.9.34", 1000);
+        assert!(!should_nudge(Some(&eq), "0.9.34", 1000, false, false, false));
+        let older = cache("0.9.30", 1000);
+        assert!(!should_nudge(Some(&older), "0.9.34", 1000, false, false, false));
+    }
+
+    #[test]
+    fn should_nudge_false_when_stale() {
+        let c = cache("0.9.40", 1000);
+        let now = 1000 + CACHE_TTL_SECS; // exactly TTL → stale
+        assert!(!should_nudge(Some(&c), "0.9.34", now, false, false, false));
+    }
+
+    #[test]
+    fn should_nudge_false_when_already_marked() {
+        let c = cache("0.9.40", 1000);
+        assert!(!should_nudge(Some(&c), "0.9.34", 1000, true, false, false));
+    }
+
+    #[test]
+    fn should_nudge_false_on_optout() {
+        let c = cache("0.9.40", 1000);
+        assert!(!should_nudge(Some(&c), "0.9.34", 1000, false, true, false));
+    }
+
+    #[test]
+    fn should_nudge_false_when_non_interactive() {
+        let c = cache("0.9.40", 1000);
+        assert!(!should_nudge(Some(&c), "0.9.34", 1000, false, false, true));
+    }
+
+    #[test]
+    fn nudge_text_contains_versions_and_optout() {
+        let t = nudge_text("0.9.34", "0.9.40");
+        assert!(t.contains("v0.9.34"));
+        assert!(t.contains("v0.9.40"));
+        assert!(t.contains("그만 볼래요"));
+        assert!(t.contains("plugin-drift-optout"));
+        assert!(t.contains("AXHUB_DISABLE_HOOK=plugin-drift"));
+    }
+
+    #[test]
+    fn cache_roundtrip_serde() {
+        let c = cache("0.9.40", 12345);
+        let json = serde_json::to_string(&c).unwrap();
+        let back: LatestCache = serde_json::from_str(&json).unwrap();
+        assert_eq!(c, back);
+    }
+}

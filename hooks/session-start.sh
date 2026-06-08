@@ -127,6 +127,16 @@ if [ "${AXHUB_AUTH_BG_REFRESH:-1}" != "0" ] && [ -z "${CI:-}" ] && [ -z "${CLAUD
   fi
 fi
 
+# Plugin version-drift fetch (proactive update nudge): warm the latest-release
+# TTL cache in the background so the first prompt-route turn can compare versions
+# without a network call on the hot path. Detached + best-effort; never blocks
+# session-start. The helper is TTL-gated (24h) and honors AXHUB_DISABLE_HOOK=
+# plugin-drift internally, so the spawn is cheap even when opted out.
+if [ -z "${CI:-}" ] && [ -z "${CLAUDE_NON_INTERACTIVE:-}" ]; then
+  nohup "$HELPER" plugin-latest-fetch-bg >/dev/null 2>&1 &
+  disown >/dev/null 2>&1 || true
+fi
+
 # Phase 26: warn once when superpowers using-superpowers may conflict with axhub megaskill.
 if [ "${AXHUB_DISABLE_MEGASKILL:-0}" != "1" ] && [ -d "$HOME/.codex/superpowers/skills/using-superpowers" ]; then
   MARKER="${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/megaskill-superpowers-warning"

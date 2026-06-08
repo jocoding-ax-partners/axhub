@@ -198,3 +198,78 @@ fn classify_exit_per_hook_csv_skips() {
     assert!(out.status.success());
     assert_eq!(stdout(&out).trim(), "{}");
 }
+
+// --- plugin-drift (proactive update nudge) --------------------------------
+//
+// End-to-end: seed a fresh "newer version available" cache, then run
+// prompt-route. The nudge rides UserPromptSubmit additionalContext (D4) and is
+// gated by AXHUB_DISABLE_HOOK=plugin-drift. Tempdirs isolate the per-version
+// marker so neither test leaks state into the other.
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+fn run_prompt_route_with_fresh_newer_cache(extra_env: &[(&str, &str)]) -> Output {
+    let cache_dir = tempfile::tempdir().unwrap();
+    let state_dir = tempfile::tempdir().unwrap();
+    let plugin_cache = cache_dir.path().join("axhub-plugin");
+    std::fs::create_dir_all(&plugin_cache).unwrap();
+    // "99.0.0" is unconditionally newer than the compiled CARGO_PKG_VERSION.
+    std::fs::write(
+        plugin_cache.join("plugin-latest.json"),
+        format!(r#"{{"latest":"99.0.0","fetched_at":{}}}"#, now_secs()),
+    )
+    .unwrap();
+
+    let mut command = Command::new(bin());
+    command
+        .args(["prompt-route"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    command.env_remove("AXHUB_DISABLE_HOOKS");
+    command.env_remove("AXHUB_DISABLE_HOOK");
+    command.env_remove("DISABLE_AXHUB");
+    command.env_remove("CI");
+    command.env_remove("CLAUDE_NON_INTERACTIVE");
+    command.env("XDG_CACHE_HOME", cache_dir.path());
+    command.env("XDG_STATE_HOME", state_dir.path());
+    command.env("AXHUB_NO_AUDIT", "1");
+    for (k, v) in extra_env {
+        command.env(k, v);
+    }
+    let mut child = command.spawn().unwrap();
+    let _ = child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(br#"{"prompt":"hello"}"#);
+    // tempdirs stay alive until wait_with_output returns (child has exited).
+    child.wait_with_output().unwrap()
+}
+
+#[test]
+fn plugin_drift_nudge_fires_when_newer_version_cached() {
+    let out = run_prompt_route_with_fresh_newer_cache(&[]);
+    assert!(out.status.success());
+    let s = stdout(&out);
+    assert!(
+        s.contains("플러그인 새 버전") && s.contains("그만 볼래요"),
+        "expected drift nudge with opt-out option in additionalContext, got: {s}"
+    );
+}
+
+#[test]
+fn plugin_drift_kill_switch_suppresses_nudge() {
+    let out = run_prompt_route_with_fresh_newer_cache(&[("AXHUB_DISABLE_HOOK", "plugin-drift")]);
+    assert!(out.status.success());
+    let s = stdout(&out);
+    assert!(
+        !s.contains("플러그인 새 버전"),
+        "AXHUB_DISABLE_HOOK=plugin-drift must suppress the nudge, got: {s}"
+    );
+}
