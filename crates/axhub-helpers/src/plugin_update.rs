@@ -66,7 +66,10 @@ fn normalize_tag(tag: &str) -> String {
 /// `true` when `latest` is a strictly newer semver than `current`. Unparseable
 /// input yields `false` (fail-open: never nudge on garbage).
 fn is_newer(latest: &str, current: &str) -> bool {
-    match (semver::Version::parse(latest), semver::Version::parse(current)) {
+    match (
+        semver::Version::parse(latest),
+        semver::Version::parse(current),
+    ) {
         (Ok(l), Ok(c)) => l > c,
         _ => false,
     }
@@ -281,9 +284,23 @@ mod tests {
     #[test]
     fn should_nudge_false_when_equal_or_older() {
         let eq = cache("0.9.34", 1000);
-        assert!(!should_nudge(Some(&eq), "0.9.34", 1000, false, false, false));
+        assert!(!should_nudge(
+            Some(&eq),
+            "0.9.34",
+            1000,
+            false,
+            false,
+            false
+        ));
         let older = cache("0.9.30", 1000);
-        assert!(!should_nudge(Some(&older), "0.9.34", 1000, false, false, false));
+        assert!(!should_nudge(
+            Some(&older),
+            "0.9.34",
+            1000,
+            false,
+            false,
+            false
+        ));
     }
 
     #[test]

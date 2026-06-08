@@ -193,6 +193,21 @@ if ($env:AXHUB_AUTH_BG_REFRESH -ne '0') {
   }
 }
 
+# Step 2.6: detached plugin version-drift fetch (proactive update nudge).
+# Warm the latest-release TTL cache in the background so the first prompt-route
+# turn can compare versions without a network call on the hot path. Detached +
+# best-effort; never blocks session-start. The helper is TTL-gated (24h) and
+# honors AXHUB_DISABLE_HOOK=plugin-drift internally. Windows parity with
+# session-start.sh; -NoNewWindow per the auth-refresh-bg rationale above.
+if ((-not $env:CI) -and (-not $env:CLAUDE_NON_INTERACTIVE)) {
+  try {
+    Start-Process -FilePath $Helper -ArgumentList 'plugin-latest-fetch-bg' `
+      -NoNewWindow -ErrorAction SilentlyContinue | Out-Null
+  } catch {
+    # Silent — fire-and-forget, never block session-start.
+  }
+}
+
 # Step 3: optional telemetry breadcrumb (only when AXHUB_TELEMETRY=1)
 # State dir mirrors telemetry.ts:40-44 (XDG_STATE_HOME envvar with HOME-relative fallback)
 if ($env:AXHUB_TELEMETRY -eq '1') {
