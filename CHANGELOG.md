@@ -4,6 +4,31 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.39](///compare/v0.9.38...v0.9.39) (2026-06-08)
+
+이번 릴리스는 axhub 업데이트 감지를 proactive nudge 와 reactive `upgrade` 스킬 양쪽에서 같은 진짜 원격 소스(GitHub releases)로 일관되게 맞춰요. Windows VM 사용자가 "새 버전이 릴리스됐는데 알림이 안 뜬다" 고 알려준 두 증상을 고쳤어요. 첫째, drift 캐시 재조회 TTL 을 24h flat 에서 조건부(최신이면 1h, 업데이트 대기면 12h)로 바꿔서 같은 날 나온 릴리스도 한 시간 안에 잡혀요. 둘째, #181 이 `.sh` 에만 넣었던 `cli-latest-fetch-bg` 백그라운드 fetch 를 `session-start.ps1` 에도 미러해서 Windows 에서도 CLI drift 캐시가 warm 돼요. 셋째, `upgrade` 스킬이 번들된 `marketplace.json`(플러그인과 함께 배포되는 stale 스냅샷)을 읽던 걸 새 helper subcommand `plugin-update-check`(live GitHub releases fetch)로 바꿔서 실제 새 버전을 감지해요 — 네트워크 실패 시엔 틀린 "최신이에요" 대신 "확인 못 했어요" 라고 정직하게 안내해요. 함께 Bun 없는 환경에서 배포 검증 훅이 동작하도록 고친 #182 도 들어갔어요.
+
+### Test baseline
+
+- `cargo test --workspace -- --test-threads=1` 로 3 OS(ubuntu/macos/windows) green. 직렬 실행은 helper 테스트의 process-global env(`std::env::set_var(XDG_*)`) race 와 `PROCESS_ENV_LOCK` poison-cascade 를 없애는 fix 예요.
+- `cargo fmt --all --check` / `clippy --workspace` / `bun run skill:doctor --strict` / `lint:tone --strict` / `lint:keywords --check` / `bunx tsc --noEmit` 전부 green.
+- CE adversarial 코드리뷰로 cli-drift 의 latest-sanitization 회귀(P2: hostile/over-long latest 가 marker write 를 깨서 nudge 가 매 턴 재발)를 ship 전에 잡아 고쳤어요.
+
+### Honest tradeoff
+
+- CI 의 `--test-threads=1` 은 env-global 테스트 race 를 막지만 전체 테스트를 직렬화해서 CI 가 다소 느려져요. 장기적으로는 `serial_test` 로 env-test 만 직렬화하는 게 더 나아요.
+- `plugin-update-check` 는 explicit 사용자 요청마다 fresh GitHub fetch 를 해요. hook hot path 가 아니라 적절하지만, 무인증 GitHub rate-limit(60/h)에 걸리면 `checked:false` 로 degrade 해요.
+
+### Added
+
+* 업데이트 감지 일관화 + Windows parity + CI 직렬화 ([#185](undefined/undefined/undefined/issues/185)) 1dacd0f, closes #183 #184
+
+
+### Fixed
+
+* 배포 검증 훅이 Bun 없이 동작하게 해요 1a14e85
+* 배포 검증 훅이 Bun 없이 동작하게 해요 ([#182](undefined/undefined/undefined/issues/182)) 76bbe0e
+
 ## [0.9.38](///compare/v0.9.37...v0.9.38) (2026-06-08)
 
 이번 릴리스는 열린 PR 두 개를 정리해요. destructive axhub 워크플로의 안전 계약을 preview-first 명시 승인으로 정렬했어요 — 이미 #170 에서 비활성화됐던 HMAC consent helper surface(`preauth-check` / `consent-mint` / `consent-verify`)와 dead 코드를 마저 제거하고, private file/state helper(`write_private_file_no_follow` / `state_root` 등)는 중립 `runtime_paths` 모듈로 옮겨 남은 호출자(audit/diagnose/token write)가 그대로 쓰게 했어요. 동시에 axhub CLI 버전 드리프트를 plugin 드리프트와 분리된 cli-drift 채널로 알리는 nudge 를 추가했어요. CE 멀티에이전트 코드리뷰에서 나온 recover preflight `$HELPER` resolver 회귀, ADR 0009 / CLAUDE.md / layering 주석의 consent 잔존물, windows `#[cfg(unix)]` 가드 누락도 함께 고쳤어요.
