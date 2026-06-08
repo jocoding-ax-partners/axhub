@@ -976,7 +976,13 @@ pub fn deploy_logs_intent_present(prompt: &str) -> bool {
         return false;
     }
     let lower = prompt.to_lowercase();
-    let p = lower.as_str();
+    // Korean "로그인"(login)/"로그아웃"(logout) carry the "로그"(log) prefix, so the
+    // bare "로그" keyword below would steal auth-action prompts ("로그인 해줘"). Blank
+    // those tokens out (with a space, so we never splice a false "로그" across the
+    // gap) before scanning — auth actions route via the auth SKILL description, not
+    // the deploy-logs hint. A standalone "로그" elsewhere still matches.
+    let scrubbed = lower.replace("로그인", " ").replace("로그아웃", " ");
+    let p = scrubbed.as_str();
     contains_any_text(
         p,
         &[
@@ -2538,6 +2544,9 @@ mod tests {
             "런타임 로그 확인해줘",
             "tail logs",
             "console log",
+            // genuine log request that merely mentions login alongside it: the
+            // standalone "로그" must still win even when "로그인" is also present.
+            "로그인 후 로그 보여줘",
         ] {
             assert!(
                 deploy_logs_intent_present(prompt),
@@ -2556,6 +2565,13 @@ mod tests {
             "배포 실패 원인 알려줘",
             "왜 실패했어",
             "왜 안돼",
+            // login/logout ACTIONS must not be stolen by the "로그" keyword just
+            // because Korean "로그인"/"로그아웃" carry the "로그" prefix — these
+            // route via the auth SKILL description, not the deploy-logs hint.
+            "axhub 로그인 해줘",
+            "로그인 해줘",
+            "로그인해줘",
+            "로그아웃 해줘",
         ] {
             assert!(
                 !deploy_logs_intent_present(prompt),
