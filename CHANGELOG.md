@@ -4,6 +4,34 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.35](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.33...v0.9.35) (2026-06-08)
+
+이번 릴리스는 GitHub App 설치 진입점을 설치 여부와 무관하게 항상 보이게 해요. init 은 template 목록 직후 sub-step 2.5 로 `accounts list` 를 읽어 설치된 계정과 install_url 을 비차단으로 보여주고, onboarding 은 #171 의 `github_app_missing` gap 이 미설치일 때만 떴던 한계를 메워 VIBE_READY ready card 에 "다른 org/계정 추가" install_url 을 항상 남겨요. 이미 설치한 사용자도 새 org 를 붙일 링크를 보고, 아무 데도 설치 안 한 사용자도 진입점을 놓치지 않아요. gap state machine·predicate·consent registry 는 그대로 두고 표시면만 더했어요.
+
+### Test baseline
+
+- `bun run skill:doctor --strict`, `bun run lint:tone --strict` (0 err), `bunx tsc --noEmit` 를 통과했어요.
+- onboarding·init 영향 테스트 (`setup-onboarding-evolution`, `init-skill-step-numbering`, `init-skill-visibility-rules`, `skill-noninteractive-guard`) 34개가 모두 통과했어요 — gap state machine 잠금 테스트도 그대로 green 이에요.
+- PR #173 의 GitHub Actions PR-blocking gate (T2 helper-bin, corpus.100 drift, Windows routing, Rust ubuntu/macos/windows) 가 모두 통과한 뒤 squash merge 했어요.
+- release step 1 의 `bun run release:check` (host Rust 빌드 + version assert) 를 통과했어요.
+
+### Honest tradeoff
+
+- onboarding 의 always-on 링크는 mid-flow 가 아니라 VIBE_READY ready card 에 있어요. gap state machine 이 테스트로 transitions 14 / rows 13 에 잠겨 있어서, 설치된 사용자용 mid-flow surface 는 gap 추가 없이는 못 넣었어요.
+- `bun run lint:keywords --check` 는 이 변경 전 clean main 에서도 동일하게 드리프트로 실패해요 (baseline 541 / current 541). 이번 릴리스와 무관한 사전 드리프트라 별도 baseline regen 이 필요해요.
+- 5-platform cosign 서명 바이너리는 tag push 뒤 release.yml 매트릭스가 만들어요 — 그게 최종 배포 검증 경로예요.
+
+
+### Added
+
+* GitHub App 설치 surface 상시 노출 (init + onboarding) ([#173](https://github.com/jocoding-ax-partners/axhub/issues/173)) ([37c7e5e](https://github.com/jocoding-ax-partners/axhub/commit/37c7e5ea7fa6a60b3e9c5856559b2f411cc7b138))
+* make onboarding sufficient for first-run vibe coding ([#171](https://github.com/jocoding-ax-partners/axhub/issues/171)) ([28fe3fe](https://github.com/jocoding-ax-partners/axhub/commit/28fe3fe12807be1f9a7990dd4c8424e43c1387d5))
+
+
+### Fixed
+
+* marketplace.json 에 $schema·author·category·homepage·tags 추가 ([10ae0cc](https://github.com/jocoding-ax-partners/axhub/commit/10ae0cce362874fa53c7b52d095af835816990e0))
+
 ## [0.9.34](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.33...v0.9.34) (2026-06-08)
 
 이번 릴리스는 첫 실행 바이브코딩 파이프라인을 Claude Desktop 에서 실제로 쓸 수 있는 수준으로 묶어요. 자연어 첫 질문은 onboarding 스킬로, 설치 상태 확인은 doctor 스킬로, 새 앱 생성은 init 스킬로 라우팅되고, init 은 GitHub App 설치 승인 뒤 CLI resume cache 가 비어 있어도 같은 idempotency key 로 안전하게 이어받아요. Vite React 앱을 실제 axhub 배포까지 흘려 보낸 QA 결과를 반영해 Desktop template picker 도 backend template registry 와만 동기화되도록 고쳤어요.
