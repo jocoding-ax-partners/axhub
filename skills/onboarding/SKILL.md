@@ -64,106 +64,27 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
    이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 `tests/fixtures/ask-defaults/registry.json` 의 안전 기본값으로 진행해요. 이 모드의 최종 상태는 `SAFE_STOP_NONINTERACTIVE`예요. install/update/auth/init/deploy/deps mutation 과 git/node system install 또는 version switch 는 자동 실행하지 않아요.
 
-2. **DETECT_ALL(read-only) — 모든 gap 을 먼저 봐요.**
+2. **DETECT_ALL(read-only) — helper 한 번으로 모든 gap 을 봐요.**
 
-   preflight 를 CLI 확인 전에 부르지 말아요. CLI 가 아직 없을 수 있어요.
-
-   Unix / Git Bash:
-
-   ```bash
-   MIN_AXHUB_CLI_VERSION="0.17.3"
-   AXHUB_CLI_VERSION="$(axhub --version 2>/dev/null || true)"
-   test -n "$AXHUB_CLI_VERSION" || echo "cli_missing"
-   test -z "$AXHUB_CLI_VERSION" || axhub update check --json 2>/dev/null || echo "cli_update_check_unavailable"
-   git --version 2>/dev/null || echo "git_missing"
-   node --version 2>/dev/null || echo "node_missing"
-   test -f axhub.yaml || test -f apphub.yaml || echo "manifest_missing"
-   git rev-parse --is-inside-work-tree 2>/dev/null || echo "git_repo_missing"
-   git rev-parse --verify HEAD 2>/dev/null || echo "git_commit_missing"
-   ls bun.lockb bun.lock pnpm-lock.yaml package-lock.json yarn.lock 2>/dev/null || echo "lockfile_missing"
-   test -d node_modules || { (test -f axhub.yaml || test -f apphub.yaml) && ls bun.lockb bun.lock pnpm-lock.yaml package-lock.json yarn.lock >/dev/null 2>&1 && echo "deps_missing"; }
-   find . -mindepth 1 -maxdepth 1 ! -name .git ! -name node_modules ! -name .omc ! -name .claude ! -name .axhub-state ! -name .DS_Store -print -quit 2>/dev/null | grep -q . && echo "dir_non_empty" || echo "dir_empty"
-   NODE_ACTIVE="$(node --version 2>/dev/null || true)"
-   NODE_REQUIRED="$(cat .nvmrc 2>/dev/null || node -p "require('./package.json').engines?.node || ''" 2>/dev/null || true)"
-   if [ -n "$NODE_ACTIVE" ] && [ -n "$NODE_REQUIRED" ]; then
-     node -e 'const ver=s=>{const m=String(s||"").trim().replace(/^v/,"").match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?/);return m?[Number(m[1]),Number(m[2]||0),Number(m[3]||0)]:null};const len=s=>{const m=String(s||"").trim().replace(/^v/,"").match(/^(\d+(?:\.\d+){0,2})/);return m?m[1].split(".").length:0};const cmp=(a,b)=>{if(!a||!b)return NaN;for(let i=0;i<3;i++){if(a[i]!==b[i])return a[i]>b[i]?1:-1}return 0};const active=ver(process.argv[1]);const required=String(process.argv[2]||"").trim();let ok=false;if(!active||!required){ok=true}else if(/^\s*v?\d+(?:\.\d+){0,2}\s*$/.test(required)){const req=ver(required);const n=len(required);ok=cmp(active,req)>=0&&active.slice(0,n).every((v,i)=>v===req[i])}else{const tokens=[...required.matchAll(/(?:^|\s)(>=|>|<=|<|=)\s*v?(\d+(?:\.\d+){0,2})(?=\s|$)/g)];ok=tokens.length>0&&tokens.every(m=>{const c=cmp(active,ver(m[2]));return m[1]===">="?c>=0:m[1]===">"?c>0:m[1]==="<="?c<=0:m[1]==="<"?c<0:c===0})}process.exit(ok?0:1)' "$NODE_ACTIVE" "$NODE_REQUIRED" || echo "node_mismatch"
-   fi
-   ```
-
-   Windows PowerShell:
-
-   ```powershell
-   $minAxhubCliVersion = "0.17.3"
-   if (Get-Command axhub -ErrorAction SilentlyContinue) {
-     axhub --version
-     axhub update check --json 2>$null; if ($LASTEXITCODE -ne 0) { "cli_update_check_unavailable" }
-   } else { "cli_missing" }
-   if (Get-Command git -ErrorAction SilentlyContinue) { git --version } else { "git_missing" }
-   if (Get-Command node -ErrorAction SilentlyContinue) { node --version } else { "node_missing" }
-   if (-not ((Test-Path axhub.yaml) -or (Test-Path apphub.yaml))) { "manifest_missing" }
-   git rev-parse --is-inside-work-tree 2>$null; if ($LASTEXITCODE -ne 0) { "git_repo_missing" }
-   git rev-parse --verify HEAD 2>$null; if ($LASTEXITCODE -ne 0) { "git_commit_missing" }
-   Get-ChildItem bun.lockb,bun.lock,pnpm-lock.yaml,package-lock.json,yarn.lock -ErrorAction SilentlyContinue
-   if (-not (Test-Path node_modules) -and ((Test-Path axhub.yaml) -or (Test-Path apphub.yaml)) -and (Get-ChildItem bun.lockb,bun.lock,pnpm-lock.yaml,package-lock.json,yarn.lock -ErrorAction SilentlyContinue)) { "deps_missing" }
-   $visible = Get-ChildItem -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -notin @(".git", "node_modules", ".omc", ".claude", ".axhub-state", ".DS_Store") } | Select-Object -First 1
-   if ($visible) { "dir_non_empty" } else { "dir_empty" }
-   $nodeActive = if (Get-Command node -ErrorAction SilentlyContinue) { node --version } else { "" }
-   $nodeRequired = if (Test-Path .nvmrc) { Get-Content .nvmrc -TotalCount 1 } else { node -p "require('./package.json').engines?.node || ''" 2>$null }
-   if ($nodeActive -and $nodeRequired) {
-     node -e "const ver=s=>{const m=String(s||'').trim().replace(/^v/,'').match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?/);return m?[Number(m[1]),Number(m[2]||0),Number(m[3]||0)]:null};const len=s=>{const m=String(s||'').trim().replace(/^v/,'').match(/^(\d+(?:\.\d+){0,2})/);return m?m[1].split('.').length:0};const cmp=(a,b)=>{if(!a||!b)return NaN;for(let i=0;i<3;i++){if(a[i]!==b[i])return a[i]>b[i]?1:-1}return 0};const active=ver(process.argv[1]);const required=String(process.argv[2]||'').trim();let ok=false;if(!active||!required){ok=true}else if(/^\s*v?\d+(?:\.\d+){0,2}\s*$/.test(required)){const req=ver(required);const n=len(required);ok=cmp(active,req)>=0&&active.slice(0,n).every((v,i)=>v===req[i])}else{const tokens=[...required.matchAll(/(?:^|\s)(>=|>|<=|<|=)\s*v?(\d+(?:\.\d+){0,2})(?=\s|$)/g)];ok=tokens.length>0&&tokens.every(m=>{const c=cmp(active,ver(m[2]));return m[1]==='>='?c>=0:m[1]==='>'?c>0:m[1]==='<='?c<=0:m[1]==='<'?c<0:c===0})}process.exit(ok?0:1)" $nodeActive $nodeRequired
-     if ($LASTEXITCODE -ne 0) { "node_mismatch" }
-   }
-   ```
-
-   CLI 가 확인된 뒤에만 auth/helper/GitHub 상태를 봐요.
-
-   Unix / Git Bash:
+   감지 로직은 `axhub-helpers onboarding-detect` 가 cross-platform 으로 한 번에 처리해요 (CLI/auth/git/node/manifest/github/deploy). 이 블록은 **Bash/PowerShell tool 로 실행만 하고, 스크립트나 명령 본문을 chat 에 출력하지 말아요** — 사용자에겐 "도구·로그인·환경을 한 번에 확인하고 있어요" 같은 한 줄만 보여줘요. preflight 와 같은 helper-pick 패턴이라 CLI 가 아직 없어도 안전해요 (helper 가 `cli_present:false` 로 fail-soft 해요). 단일 opaque 호출이라 예전 dual-platform DETECT 스크립트가 chat 으로 새던 문제도 사라져요.
 
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
-   "$HELPER" preflight --json
-   # preflight JSON 의 cli_too_old/cli_too_new/in_range 도 cli_old 판단에 사용해요.
-   GITHUB_ACCOUNTS_JSON="$(axhub github accounts list --json 2>/dev/null || true)"
-   GITHUB_APP_STATE="$(printf '%s' "$GITHUB_ACCOUNTS_JSON" | node -e 'const fs=require("fs");const raw=fs.readFileSync(0,"utf8").trim();if(!raw){console.log("unknown");process.exit(0)}let j={};try{j=JSON.parse(raw)}catch{console.log("unknown");process.exit(0)}const rows=j.accounts||j.installations||j.data?.accounts||[];const installed=Array.isArray(rows)&&rows.some(a=>a&&(a.installed===true||a.installation_id||a.installationId));const url=j.install_url||j.installUrl||j.data?.install_url||j.data?.installUrl||"";if(installed)console.log("installed");else if(url)console.log("missing:"+url);else console.log("unknown")' 2>/dev/null || echo "unknown")"
-   case "$GITHUB_APP_STATE" in
-     installed) ;;
-     missing:*) printf '%s\n' "${GITHUB_APP_STATE#missing:}"; echo "github_app_missing" ;;
-     *) echo "github_app_unknown" ;;
-   esac
-   BOOTSTRAP_STATE=".axhub/bootstrap.state.json"
-   APP_ID="$(node -p "const fs=require('fs');const p='$BOOTSTRAP_STATE';if(!fs.existsSync(p)) ''; else { const j=JSON.parse(fs.readFileSync(p,'utf8')); j.app_id || j.appId || '' }" 2>/dev/null || true)"
-   DEPLOYMENT_ID="$(node -p "const fs=require('fs');const p='$BOOTSTRAP_STATE';if(!fs.existsSync(p)) ''; else { const j=JSON.parse(fs.readFileSync(p,'utf8')); j.last_deploy_id || j.deployment_id || j.deploymentId || '' }" 2>/dev/null || true)"
-   if [ -n "$APP_ID" ] && [ -n "$DEPLOYMENT_ID" ]; then
-     axhub deploy status "$DEPLOYMENT_ID" --app "$APP_ID" --watch --watch-timeout 1m --json 2>/dev/null \
-       | node -e 'const fs=require("fs");let raw=fs.readFileSync(0,"utf8");let j={};try{j=JSON.parse(raw)}catch{process.exit(1)};let s=String(j.status||j.data?.status||j.deployment?.status||"").toLowerCase();process.exit(/succeeded|live|running|deployed/.test(s)?0:1)' \
-       || echo "deploy_unverified"
-   fi
+   DETECT_JSON=$("$HELPER" onboarding-detect --json 2>/dev/null)
+   [ -n "$DETECT_JSON" ] || DETECT_JSON='{"cli_present":false,"first_gap":"cli_missing","github":{"state":"unavailable","install_url":null}}'
+   echo "$DETECT_JSON"
    ```
 
-   Windows PowerShell:
+   `axhub-helpers` 를 못 찾으면 `DETECT_JSON` 이 비어 fallback(`cli_missing`)으로 가요. 출력 JSON 주요 field:
 
-   ```powershell
-   $helper = "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe"
-   if (-not (Test-Path $helper)) { $helper = (Get-Command axhub-helpers.exe -ErrorAction SilentlyContinue).Source }
-   if ($helper) { & $helper preflight --json }
-   $githubAccountsJson = axhub github accounts list --json 2>$null
-   $githubAppState = $githubAccountsJson | node -e "const fs=require('fs');const raw=fs.readFileSync(0,'utf8').trim();if(!raw){console.log('unknown');process.exit(0)}let j={};try{j=JSON.parse(raw)}catch{console.log('unknown');process.exit(0)}const rows=j.accounts||j.installations||j.data?.accounts||[];const installed=Array.isArray(rows)&&rows.some(a=>a&&(a.installed===true||a.installation_id||a.installationId));const url=j.install_url||j.installUrl||j.data?.install_url||j.data?.installUrl||'';if(installed)console.log('installed');else if(url)console.log('missing:'+url);else console.log('unknown')" 2>$null
-   if (-not $githubAppState) { $githubAppState = "unknown" }
-   if ($githubAppState -eq "installed") { }
-   elseif ($githubAppState.StartsWith("missing:")) { $githubAppState.Substring(8); "github_app_missing" }
-   else { "github_app_unknown" }
-   $bootstrapState = ".axhub/bootstrap.state.json"
-   if (Test-Path $bootstrapState) {
-     $appId = node -p "const fs=require('fs');const j=JSON.parse(fs.readFileSync('$bootstrapState','utf8'));j.app_id||j.appId||''" 2>$null
-     $deploymentId = node -p "const fs=require('fs');const j=JSON.parse(fs.readFileSync('$bootstrapState','utf8'));j.last_deploy_id||j.deployment_id||j.deploymentId||''" 2>$null
-     if ($appId -and $deploymentId) {
-       axhub deploy status $deploymentId --app $appId --watch --watch-timeout 1m --json 2>$null | node -e "const fs=require('fs');let raw=fs.readFileSync(0,'utf8');let j={};try{j=JSON.parse(raw)}catch{process.exit(1)};let s=String(j.status||j.data?.status||j.deployment?.status||'').toLowerCase();process.exit(/succeeded|live|running|deployed/.test(s)?0:1)"
-       if ($LASTEXITCODE -ne 0) { "deploy_unverified" }
-     }
-   }
-   ```
+   - `first_gap` / `gaps`: 처리할 첫 gap (아래 state machine 순서). 이걸 그대로 따라요.
+   - `cli_present` / `cli_version` / `cli_state` / `cli_on_path` / `cli_too_old` / `has_update` / `latest_version`
+   - `auth_ok` / `auth_error_code`
+   - `git_present` / `git_repo` / `git_commit` / `node_present` / `node_version` / `node_required` / `node_mismatch` / `manifest_present` / `lockfile_present` / `deps_missing` / `dir_empty`
+   - `github`: `{state, installed_logins[], uninstalled_logins[], install_url, multiple_installed}`. `state` 는 `installed` / `mixed` / `uninstalled` / `empty` / `auth_error` / `unavailable` 중 하나예요. **`install_url` 은 GitHub 조회가 성공하면 (`installed`/`mixed`/`uninstalled`/`empty`) 설치 여부·계정 수와 무관하게 항상 채워져요** (계정이 0개여도 app-level 링크로 fallback) — ready card(Step 10)와 GitHub 안내(Step 6)에서 무조건 보여줘요. `state` 가 `auth_error`/`unavailable` 면 null 이고, `auth_error` 면 `unknown` 으로 넘기지 말고 "다시 로그인해줘" 로 안내해요.
+   - `deploy_checked` / `deploy_verified`
 
 3. **Gap State Machine — 첫 gap 하나만 처리하고 재감지해요.**
 
@@ -187,29 +108,28 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
      └─ no_gap              → VIBE_READY_CARD
    ```
 
-   상태 테이블:
+   상태 테이블 — 감지 조건은 Step 2 helper JSON field 기준이에요. 보통은 helper 가 준 `first_gap` 을 그대로 따라가면 돼요. 아래는 gap → 처리 owner 매핑이에요:
 
-   | gap id | 감지 조건 | 처리 owner | 완료 확인 |
+   | gap id | 감지 조건 (Step 2 JSON) | 처리 owner | 완료 확인 |
    |--------|-----------|------------|-----------|
-   | `cli_missing` | `axhub --version` 실패 | `install-cli` | `axhub --version` 성공 |
-   | `cli_path_missing` | preflight `cli_present=true`, `cli_on_path=false`, `cli_state=on_disk_not_on_path` | `repair` | repair-path 적용 후 새 터미널 또는 resolved path 로 재확인 |
-   | `cli_old` | `MIN_AXHUB_CLI_VERSION=0.17.3` 미만, preflight `cli_too_old=true`, 또는 `axhub update check --json` 의 `has_update=true` | `update` | cosign apply 후 version 재확인 |
-   | `auth_missing` | preflight `auth_ok=false` | `auth` | device approval/token import 후 preflight green |
-   | `git_missing` | `git --version` 실패 | onboarding | 설치 후 `git --version` 성공 |
-   | `node_missing` | `node --version` 실패 | onboarding | 설치 후 `node --version` 성공 |
-   | `node_mismatch` | `NODE_ACTIVE` 가 `.nvmrc` 또는 `package.json engines.node` 의 `NODE_REQUIRED` 를 만족하지 않음 | onboarding | target version active |
-   | `github_app_missing` | `axhub github accounts list --json` 의 `accounts/installations` 에 `installed=true` 또는 `installation_id` 가 없고 `install_url` 이 있음 | onboarding | install_url 완료 후 accounts 재조회 |
-   | `existing_repo_gap` | `.git` 있음 + commit 있음 + manifest 없음 | `github` | app↔repo connect 완료 |
-   | `no_manifest_empty` | manifest 없음 + 빈 dir/신규 흐름 | `init` | manifest+repo+deployment evidence 존재 |
-   | `deps_missing` | lockfile+manifest 있음, install marker/node_modules 없음 | onboarding | lockfile install exit 0 |
-   | `deploy_unverified` | `.axhub/bootstrap.state.json` 의 `app_id`+`last_deploy_id` 는 있으나 `axhub deploy status ... --watch --json` 이 `succeeded/live/running/deployed` 를 못 확인 | onboarding/status/deploy | live/running/deployed 확인 |
-   | `doctor_gap` | doctor 핵심 체크 fail | `doctor` | doctor 핵심 green 또는 PATH reload 안내 |
+   | `cli_missing` | `cli_present=false` (또는 DETECT_JSON 비어 fallback) | `install-cli` | 재감지 시 `cli_present=true` |
+   | `cli_path_missing` | `cli_present=true` + `cli_on_path=false` (`cli_state=on_disk_not_on_path`) | `repair` | repair-path 적용 후 새 터미널 또는 resolved path 로 재확인 |
+   | `cli_old` | `cli_too_old=true` 또는 `has_update=true` (`latest_version` 참고) | `update` | cosign apply 후 version 재확인 |
+   | `auth_missing` | `auth_ok=false` (`auth_error_code` 참고) | `auth` | device approval/token import 후 재감지 green |
+   | `git_missing` | `git_present=false` | onboarding | 설치 후 `git_present=true` |
+   | `node_missing` | `node_present=false` | onboarding | 설치 후 `node_present=true` |
+   | `node_mismatch` | `node_mismatch=true` (`node_version` vs `node_required`) | onboarding | target version active |
+   | `github_app_missing` | `github.state` 가 `uninstalled`/`empty` (installed 계정 없음). `github.install_url` 로 안내 | onboarding | install_url 완료 후 재감지 |
+   | `existing_repo_gap` | `git_repo=true` + `git_commit=true` + `manifest_present=false` | `github` | app↔repo connect 완료 |
+   | `no_manifest_empty` | `manifest_present=false` + `dir_empty=true` | `init` | manifest+repo+deployment evidence 존재 |
+   | `deps_missing` | `deps_missing=true` (lockfile+manifest 있고 node_modules 없음) | onboarding | lockfile install exit 0 |
+   | `deploy_unverified` | `deploy_checked=true` + `deploy_verified=false` | onboarding/status/deploy | live/running/deployed 확인 |
+   | `doctor_gap` | (helper 범위 밖) 온보딩 끝 doctor 핵심 체크 fail | `doctor` | doctor 핵심 green 또는 PATH reload 안내 |
 
 4. **CLI 버전 gap (`cli_old`).**
 
-   CLI mismatch 또는 update available 은 구체적으로 `MIN_AXHUB_CLI_VERSION=0.17.3`, helper preflight 의
-   `cli_too_old`/`cli_too_new`/`in_range`, 그리고 read-only `axhub update check --json` 의
-   `has_update`/`current`/`latest` 로 판단해요. 하나라도 업데이트 필요 신호면 먼저 물어요.
+   CLI mismatch 또는 update available 은 Step 2 helper JSON 의 `cli_too_old=true` 또는
+   `has_update=true` (`latest_version` 참고) 로 판단해요. 하나라도 업데이트 필요 신호면 먼저 물어요.
 
    ```json
    {
@@ -288,9 +208,13 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    - Linux: OS 패키지 매니저 또는 nvm `v0.40.1` 태그
    - 모두 실패하면 `https://nodejs.org` LTS 링크와 `온보딩 계속` 재개 phrase 를 줘요
 
-6. **GitHub App frontload (`github_app_missing`).**
+6. **GitHub App 안내 — install_url 은 무조건, 미설치면 설치 제안 (`github_app_missing`).**
 
-   auth 가 green 이 된 뒤 `axhub github accounts list --json` 로 계정레벨 GitHub App 설치 상태를 봐요. 가능한 전진배치는 **계정레벨 GitHub App 설치(install_url)만**이에요. OAuth device-flow 인가는 connect 단계에 남아요.
+   Step 2 helper JSON 의 `github` 를 그대로 써요 (여기서 accounts list 를 다시 안 돌려도 돼요). 두 가지를 해요:
+
+   **(a) install_url 무조건 표시 + 연결 안내 — 이미 설치돼 있어도 항상.** `github.install_url` 이 있으면 설치 여부와 무관하게 한 줄로 **연결을 안내**해요: "GitHub App 을 설치·연결하려면 여기로 가요: `<github.install_url>`. 이미 설치돼 있어도 다른 org/계정을 더 연결할 수 있어요." `github.installed_logins` 가 있으면 "이미 연결된 계정: `<login...>`" 도 덧붙여요. 링크는 안내만 하고 브라우저를 자동으로 열지는 않아요.
+
+   **(b) 미설치면 (`github.state` 가 `uninstalled`/`empty`) 먼저 설치 제안.** 가능한 전진배치는 **계정레벨 GitHub App 설치(install_url)만**이에요. OAuth device-flow 인가는 connect 단계에 남아요. `github.state` 가 `auth_error` 면 인증 만료로 install_url 을 못 읽으니 "다시 로그인해줘" 로 안내하고, 재로그인 후 재감지하면 링크가 다시 떠요.
 
    ```json
    {
@@ -306,7 +230,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    }
    ```
 
-   설치 선택 시 `install_url` 을 보여주고 브라우저를 열어요. 사용자가 "승인했어" 또는 "온보딩 계속" 이라고 말하면 `axhub github accounts list --json` 를 다시 실행해요. `apps git connect` OAuth device-flow 인가는 app id 가 생기는 init/github 단계에서 처리해요.
+   설치 선택 시 `github.install_url` 을 보여주고 브라우저를 열어요. 사용자가 "승인했어" 또는 "온보딩 계속" 이라고 말하면 Step 2 재감지를 한 번 해요. `apps git connect` OAuth device-flow 인가는 app id 가 생기는 init/github 단계에서 처리해요.
 
 7. **Repo/App gap.**
 
@@ -393,7 +317,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    다음에 말할 수 있는 것: "배포해", "로그 봐줘", "환경변수 추가해줘", "테이블 추천해줘"
    ```
 
-   GitHub App 줄의 `<install_url>` 은 설치 여부와 무관하게 항상 보여줘요. 카드를 만들 때 `axhub github accounts list --json` 를 한 번 더 실행해서 `data.accounts[]` 의 아무 entry 의 `install_url` 을 읽어 채워요 (전부 같아요). Step 2 DETECT_ALL 은 이 값을 stdout 으로 내보내지 않으니 (`GITHUB_ACCOUNTS_JSON` 은 셸 변수로만 남아요) 카드 단계에서 직접 다시 읽어요. 이미 설치된 사용자도 다른 org/계정을 더 붙일 수 있게 링크를 남기는 거예요. `installation_id` 같은 internal 값은 echo 하지 말고, 링크는 보여주기만 하고 자동으로 열지 않아요. 명령이 실패하거나 accounts 가 비어 `install_url` 을 못 읽으면 이 줄은 생략해요. 미설치(`github_app_missing`)는 Step 6 의 install_url 경로가 이미 처리하니, 이 줄은 설치된 사용자의 계정 추가 진입점이에요.
+   GitHub App 줄의 `<install_url>` 은 설치 여부와 무관하게 **항상** 보여줘요 (무조건). Step 2 helper JSON 의 `github.install_url` 을 그대로 채워요 (GitHub 조회가 성공하면 계정이 0개여도 app-level 링크로 항상 채워져요). 이미 설치된 사용자도 다른 org/계정을 더 붙일 수 있게 링크를 남기는 거예요. 링크는 보여주기만 하고 자동으로 열지 않아요. `github.install_url` 이 null 인 경우(=`github.state` 가 `auth_error`/`unavailable`, 조회 자체 실패)에만 이 줄을 생략하고, `auth_error` 면 재로그인 안내로 낮춰요.
 
    degraded 상태는 명확히 표시해요.
    - `READY_WITH_USER_ACTION`: 외부 승인, OS installer GUI, PATH reload, native build 처럼 사용자가 해야 하는 행동만 남음

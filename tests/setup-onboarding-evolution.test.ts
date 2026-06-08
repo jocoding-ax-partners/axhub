@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -66,24 +65,6 @@ const transitionForFirstGap = (transitions: Transition[], activeGaps: readonly s
   return transitions.find((transition) => active.has(transition.gap)) ?? transitions.find((transition) => transition.gap === "no_gap");
 };
 
-const extractPosixNodePredicate = (content: string) => {
-  const match = content.match(/node -e '([^'\n]+)' "\$NODE_ACTIVE" "\$NODE_REQUIRED"/);
-  expect(match, "missing POSIX node_mismatch predicate script").toBeTruthy();
-  return match![1];
-};
-
-const extractPosixGithubPredicate = (content: string) => {
-  const match = content.match(/GITHUB_APP_STATE="\$\(printf '%s' "\$GITHUB_ACCOUNTS_JSON" \| node -e '([^']+)'/);
-  expect(match, "missing POSIX GitHub App predicate script").toBeTruthy();
-  return match![1];
-};
-
-const runNodeScript = (script: string, args: string[], stdin = "") => {
-  const result = spawnSync("node", ["-e", script, ...args], { input: stdin, encoding: "utf8" });
-  expect(result.error, result.stderr).toBeUndefined();
-  return result;
-};
-
 describe("onboarding skill evolution — VIBE_READY contract", () => {
   test("declares onboarding as the single user-facing onboarding entrypoint", () => {
     const content = onboarding();
@@ -120,40 +101,46 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
       expect(content).toContain(marker);
     }
 
-    expect(content).toContain("axhub --version");
-    expect(content).toContain('MIN_AXHUB_CLI_VERSION="0.17.3"');
-    expect(content).toContain("axhub update check --json");
+    // Detection runs through the cross-platform `onboarding-detect` helper, not
+    // inline bash/PowerShell. The SKILL routes on the helper's JSON fields; the
+    // detection LOGIC (node version, github predicate, deploy, dir-ignore) is
+    // unit-tested in crates/axhub-helpers/src/onboarding_detect.rs.
+    expect(content).toContain("onboarding-detect");
+    expect(content).toContain("first_gap");
+    expect(content).toContain("cli_present");
     expect(content).toContain("cli_too_old");
     expect(content).toContain("cli_on_path");
     expect(content).toContain("on_disk_not_on_path");
     expect(content).toContain("has_update");
-    expect(content).toContain("git --version");
-    expect(content).toContain("node --version");
-    expect(content).toContain("node_modules");
+    expect(content).toContain("auth_ok");
+    expect(content).toContain("git_present");
+    expect(content).toContain("node_present");
+    expect(content).toContain("node_required");
+    expect(content).toContain("node_mismatch");
+    expect(content).toContain("manifest_present");
+    expect(content).toContain("deps_missing");
     expect(content).toContain("dir_empty");
-    expect(content).toContain("dir_non_empty");
-    expect(content).toContain("NODE_ACTIVE");
-    expect(content).toContain("NODE_REQUIRED");
-    expect(content).toContain("axhub github accounts list --json");
+    expect(content).toContain("github");
+    expect(content).toContain("install_url");
+    expect(content).toContain("multiple_installed");
     expect(content).toContain("github_app_missing");
-    expect(content).toContain("installed=true");
-    expect(content).toContain("installation_id");
-    expect(content).toContain(".axhub/bootstrap.state.json");
-    expect(content).toContain("last_deploy_id");
+    expect(content).toContain("deploy_verified");
     expect(content).toContain("deploy_unverified");
-    expect(content).toContain("succeeded/live/running/deployed");
   });
 
-  test("ignores Claude Desktop state folders when classifying empty project dirs", () => {
+  test("delegates empty-dir + environment detection to the cross-platform helper", () => {
     const content = onboarding();
 
-    expect(content).toContain("! -name .omc");
-    expect(content).toContain("! -name .claude");
-    expect(content).toContain("! -name .axhub-state");
-    expect(content).toContain("! -name .DS_Store");
-    expect(content).toContain(
-      '@(".git", "node_modules", ".omc", ".claude", ".axhub-state", ".DS_Store")',
-    );
+    // The dual bash/PowerShell DETECT_ALL — and its Claude Desktop ignore-list —
+    // moved into `axhub-helpers onboarding-detect` (crates/axhub-helpers/src/
+    // onboarding_detect.rs DIR_IGNORE). The SKILL now reads the `dir_empty` field.
+    expect(content).toContain("onboarding-detect");
+    expect(content).toContain("dir_empty");
+    // The leak-prone inline detection scripts must not return to the SKILL body
+    // (the original bug: a condensed copy was narrated into user-facing chat).
+    expect(content).not.toContain('echo "dir_non_empty"');
+    expect(content).not.toContain("Get-ChildItem -Force");
+    expect(content).not.toContain("node -e");
   });
 
   test("locks first-gap state-machine order instead of only vocabulary", () => {
@@ -192,16 +179,16 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
     expect(rows).toHaveLength(13);
 
     const scenarios = [
-      { id: "S1", gaps: ["cli_missing"], handler: "install-cli", owner: "install-cli", ready: "READY_WITH_USER_ACTION", detect: "axhub --version" },
+      { id: "S1", gaps: ["cli_missing"], handler: "install-cli", owner: "install-cli", ready: "READY_WITH_USER_ACTION", detect: "cli_present=false" },
       { id: "S2", gaps: ["cli_path_missing"], handler: "repair", owner: "repair", ready: "READY_WITH_USER_ACTION", detect: "on_disk_not_on_path" },
       { id: "S3", gaps: ["cli_old"], handler: "update", owner: "update", ready: "VIBE_READY", detect: "cli_too_old=true" },
       { id: "S4", gaps: ["auth_missing"], handler: "auth", owner: "auth", ready: "READY_WITH_USER_ACTION", detect: "auth_ok=false" },
-      { id: "S5", gaps: ["git_missing"], handler: "install_git", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "git --version" },
-      { id: "S6", gaps: ["node_missing"], handler: "install_node", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "node --version" },
-      { id: "S7", gaps: ["node_mismatch"], handler: "fix_node", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "NODE_REQUIRED" },
+      { id: "S5", gaps: ["git_missing"], handler: "install_git", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "git_present=false" },
+      { id: "S6", gaps: ["node_missing"], handler: "install_node", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "node_present=false" },
+      { id: "S7", gaps: ["node_mismatch"], handler: "fix_node", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "node_required" },
       { id: "S8", gaps: ["github_app_missing"], handler: "install_url", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "install_url" },
-      { id: "S9", gaps: ["no_manifest_empty"], handler: "init", owner: "init", ready: "VIBE_READY", detect: "manifest 없음 + 빈 dir" },
-      { id: "S10", gaps: ["existing_repo_gap"], handler: "github", owner: "github", ready: "READY_WITH_USER_ACTION", detect: ".git" },
+      { id: "S9", gaps: ["no_manifest_empty"], handler: "init", owner: "init", ready: "VIBE_READY", detect: "dir_empty" },
+      { id: "S10", gaps: ["existing_repo_gap"], handler: "github", owner: "github", ready: "READY_WITH_USER_ACTION", detect: "git_repo=true" },
       { id: "S11", gaps: ["deps_missing"], handler: "install_deps", owner: "onboarding", ready: "VIBE_READY", detect: "node_modules" },
       { id: "S12", gaps: ["deps_missing"], handler: "install_deps", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "--ignore-scripts" },
       { id: "S13", gaps: ["cli_old"], handler: "update", owner: "update", ready: "SAFE_STOP_NONINTERACTIVE", detect: "CLAUDE_NON_INTERACTIVE" },
@@ -229,27 +216,19 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
     expect(content).toContain("다시 온보딩해줘");
   });
 
-  test("executes node version predicate fixtures to prevent VIBE_READY false green", () => {
-    const script = extractPosixNodePredicate(onboarding());
+  // The node-version and GitHub-App predicate logic moved from inline SKILL
+  // scripts into `axhub-helpers onboarding-detect`. Its behavior (auth_error vs
+  // empty vs installed/mixed, node major/range matching) is unit-tested in
+  // crates/axhub-helpers/src/onboarding_detect.rs — not re-executed here.
+  test("invokes the onboarding-detect helper instead of inline predicates", () => {
+    const content = onboarding();
 
-    expect(runNodeScript(script, ["v20.11.1", "20.11.1"]).status).toBe(0);
-    expect(runNodeScript(script, ["v20.0.0", "20.11.1"]).status).toBe(1);
-    expect(runNodeScript(script, ["v22.0.0", ">=20 <23"]).status).toBe(0);
-    expect(runNodeScript(script, ["v25.0.0", ">=20 <23"]).status).toBe(1);
-    expect(runNodeScript(script, ["v20.11.1", "unsupported-range"]).status).toBe(1);
-  });
-
-  test("executes GitHub App predicate fixtures without conflating unknown and missing", () => {
-    const script = extractPosixGithubPredicate(onboarding());
-
-    expect(runNodeScript(script, [], "").stdout.trim()).toBe("unknown");
-    expect(runNodeScript(script, [], "not-json").stdout.trim()).toBe("unknown");
-    expect(runNodeScript(script, [], JSON.stringify({ accounts: [] })).stdout.trim()).toBe("unknown");
-    expect(runNodeScript(script, [], JSON.stringify({ install_url: "https://github.com/apps/axhub/installations/new", accounts: [] })).stdout.trim()).toBe(
-      "missing:https://github.com/apps/axhub/installations/new",
-    );
-    expect(runNodeScript(script, [], JSON.stringify({ accounts: [{ installed: true }] })).stdout.trim()).toBe("installed");
-    expect(runNodeScript(script, [], JSON.stringify({ installations: [{ installation_id: 123 }] })).stdout.trim()).toBe("installed");
+    expect(content).toContain('"$HELPER" onboarding-detect --json');
+    // auth-error is now a distinct github state (no longer collapsed to unknown).
+    expect(content).toContain("auth_error");
+    // No inline node / github predicate scripts remain in the SKILL body.
+    expect(content).not.toContain("node -e");
+    expect(content).not.toContain("GITHUB_APP_STATE");
   });
 
   test("locks non-interactive mutation denylist including git and node system changes", () => {
@@ -270,6 +249,21 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
     expect(content).toContain("init 경로는 saga 배포 URL surface");
     expect(content).toContain("재배포 X");
     expect(content).toContain("status/watch");
+  });
+
+  test("always surfaces github install_url + connect guidance, even when installed", () => {
+    const content = onboarding();
+
+    // User contract: show the GitHub App install_url unconditionally — even for
+    // already-installed users — and actively tell them to connect.
+    expect(content).toContain("github.install_url");
+    expect(content).toContain("설치 여부와 무관하게");
+    expect(content).toContain("무조건");
+    expect(content).toContain("연결");
+    // An auth-error github state routes to re-login instead of swallowing the
+    // install_url surface as the old "unknown" did.
+    expect(content).toContain("auth_error");
+    expect(content).toContain("다시 로그인해줘");
   });
 
   test("allows dependency execution only with lockfile, consent, D1, and ignore-scripts", () => {
