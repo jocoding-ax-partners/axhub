@@ -1,6 +1,7 @@
 pub mod atomic_jsonl;
 pub mod autowire;
 pub mod axhub_cli;
+pub mod cli_drift;
 pub mod cli_envelope;
 pub mod observability;
 pub mod orphan_stub;
