@@ -340,12 +340,11 @@ mod tests {
     #[test]
     fn state_root_fallback_is_stable_and_absolute() {
         // No HOME and no XDG_STATE_HOME: state_root must still resolve to a
-        // stable, absolute location derived from the process-stable fallback.
-        let root = state_root_from(None, None, PathBuf::from("/var/lib/axhub-runner"));
-        assert_eq!(
-            root,
-            PathBuf::from("/var/lib/axhub-runner/.local/state/axhub")
-        );
+        // stable, absolute location. Use current_dir() (absolute on every
+        // platform, including Windows) so the is_absolute() invariant holds.
+        let fallback = std::env::current_dir().unwrap();
+        let root = state_root_from(None, None, fallback.clone());
+        assert_eq!(root, fallback.join(".local").join("state").join("axhub"));
         assert!(root.is_absolute());
     }
 }
