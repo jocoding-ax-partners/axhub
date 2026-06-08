@@ -87,4 +87,4 @@ raw psql · mysql · 직접 자격증명 사용은 금지예요.
 
 - `axhub catalog search --json --limit 200` — 사용 가능한 리소스 발견.
 - `axhub catalog get --connector <name> --path <path> --json` — live read 전에 컬럼/정책 확인.
-- `axhub catalog invoke --connector <name> --path <path> --action read --sql '<SELECT ...>' --row-limit 100 --execute --json` — first live read consent 뒤에만.
+- `axhub catalog invoke --connector <name> --path <path> --action read --sql '<SELECT ...>' --row-limit 100 --execute --json` — first live read preview 확인 뒤에만.

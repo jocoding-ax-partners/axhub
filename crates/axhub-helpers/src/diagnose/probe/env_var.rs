@@ -26,7 +26,7 @@ impl Probe for EnvVarProbe {
     fn apply(&self, _ctx: &ProbeContext) -> Result<ApplyHandle, DiagnoseError> {
         // Use the crate-wide PROCESS_ENV_LOCK so this probe serialises with
         // every other env-mutating site (recurrence threshold overrides,
-        // preflight wall-budget overrides, consent headless guards, tests).
+        // preflight wall-budget overrides, approval headless guards, tests).
         // Recover from poisoning instead of panicking — fail-open hook
         // contract (CLAUDE.md axhub Hook Safety §10.6).
         let _guard = crate::PROCESS_ENV_LOCK

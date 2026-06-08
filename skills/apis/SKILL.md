@@ -1,6 +1,6 @@
 ---
 name: apis
-description: '이 스킬은 사용자가 axhub 앱에서 사용할 수 있는 API·endpoint·service catalog 를 보고 싶거나, 등록된 API endpoint 를 호출하고 싶어할 때 사용해요. 다음 표현에서 활성화: "API 뭐 있어", "어떤 API 있어", "API 목록", "API 카탈로그", "쓸 수 있는 API", "엔드포인트 뭐 있어", "endpoint list", "available endpoints", "list apis", "service catalog". API 목록은 read-only 이고, API call 은 consent 뒤에만 실행해요.'
+description: '이 스킬은 사용자가 axhub 앱에서 사용할 수 있는 API·endpoint·service catalog 를 보고 싶거나, 등록된 API endpoint 를 호출하고 싶어할 때 사용해요. 다음 표현에서 활성화: "API 뭐 있어", "어떤 API 있어", "API 목록", "API 카탈로그", "쓸 수 있는 API", "엔드포인트 뭐 있어", "endpoint list", "available endpoints", "list apis", "service catalog". API 목록은 read-only 이고, API call 은 preview 와 명시 확인 뒤에만 실행해요.'
 examples:
   - utterance: "axhub 앱이 어떤 API 쓸 수 있는지 보여줘"
     intent: "list available API endpoints"
@@ -11,7 +11,7 @@ examples:
   - utterance: "show api catalog"
     intent: "list available API endpoints"
   - utterance: "이 API 호출해"
-    intent: "call API endpoint after consent"
+    intent: "call API endpoint after approval"
 multi-step: false
 needs-preflight: true
 allows-dependency-execution: false
@@ -20,7 +20,7 @@ model: sonnet
 
 # APIs
 
-axhub 앱에서 사용할 수 있는 API/service catalog 를 최신 CLI 의 catalog resource 표면으로 보여줘요. 최신 CLI 에는 구 `axhub apis list|call` 명령이 없으므로, API 목록 의도는 `axhub catalog resources` 로 처리하고 실데이터 read/invoke 는 `data` skill 의 consent 흐름으로 넘겨요.
+axhub 앱에서 사용할 수 있는 API/service catalog 를 최신 CLI 의 catalog resource 표면으로 보여줘요. 최신 CLI 에는 구 `axhub apis list|call` 명령이 없으므로, API 목록 의도는 `axhub catalog resources` 로 처리하고 실데이터 read/invoke 는 `data` skill 의 approval 흐름으로 넘겨요.
 
 ## Workflow
 
@@ -60,7 +60,7 @@ echo "$PREFLIGHT_JSON"
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — API call 확인 → `abort`.
 
-3. **API call 요청은 data skill 로 넘겨요.** 사용자가 그래도 “이 API 호출해”라고 명시하면 connector/path, action, 예상 SQL 또는 body 필요 여부를 보여주고, 이 skill 에서 직접 실행하지 말지 확인해요. 호출을 원하면 `data` skill 로 이어서 first live read consent 를 받아요.
+3. **API call 요청은 data skill 로 넘겨요.** 사용자가 그래도 “이 API 호출해”라고 명시하면 connector/path, action, 예상 SQL 또는 body 필요 여부를 보여주고, 이 skill 에서 직접 실행하지 말지 확인해요. 호출을 원하면 `data` skill 로 이어서 first live read approval 를 받아요.
 
    ```json
    {
@@ -76,7 +76,7 @@ echo "$PREFLIGHT_JSON"
    }
    ```
 
-   승인되면 `data` skill 의 first live read consent + `axhub catalog invoke --execute --json` 흐름으로 전환해요. 이 skill 에서는 `consent-mint` 나 live call 을 직접 실행하지 않아요.
+   승인되면 `data` skill 의 `axhub catalog invoke --execute --json` 흐름으로 전환해요. 이 skill 에서는 `preview 확인` 나 live call 을 직접 실행하지 않아요.
 
 ## NEVER
 

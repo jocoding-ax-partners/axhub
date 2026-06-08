@@ -49,9 +49,6 @@ Copy the Korean stdout as the answer, then stop. Do not read the rest of this wo
 **Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
 
 ```bash
-HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-[ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
 PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 [ -n "$PREFLIGHT_JSON" ] || PREFLIGHT_JSON='{}'
 echo "$PREFLIGHT_JSON"
@@ -91,9 +88,6 @@ To recover:
    Find the most recent entry where `status == "succeeded"` for the current app. If the cache is cold, fall back to:
 
    ```bash
-   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    "$HELPER" list-deployments --app <APP_ID> --limit 10
    ```
 
@@ -138,20 +132,12 @@ To recover:
    }
    ```
 
-4. **On `confirm`.** Mint consent token and run deploy create with the prior commit:
+4. **On `confirm`.** Run deploy create with the prior commit:
 
    ```bash
-   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
-   cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${PROFILE}","branch":"","commit_sha":"${PREV_SHA}","context":{}}
-   JSON
 
    axhub deploy create --app "$APP_ID" --commit "$PREV_SHA" --execute --json
    ```
-
-   The PreToolUse hook verifies the consent token before allowing the bash call. Do not unset or fake `CLAUDE_SESSION_ID`; `tool_call_id:"pending"` is the portable macOS/Linux/Windows path for the next real tool call.
 
 5. **Auto-watch.** Capture the new `dep_<id>` and route to `skills/status` for narrated tracking. Do not block on completion — the user wanted the recovery action; status is a courtesy follow-up.
 
@@ -186,7 +172,6 @@ To recover:
 ## NEVER
 
 - NEVER claim this is a real rollback — always say "forward-fix" / "직전 커밋 재배포" in the confirmation card.
-- NEVER skip the consent token mint (PreToolUse hook will deny).
 - NEVER skip the AskUserQuestion confirmation — destructive op needs explicit yes.
 - NEVER auto-pick the most-recent succeeded deploy without showing the candidate to the user (commit_sha + commit_message in the card).
 - NEVER drop `--json` from `axhub deploy create`.

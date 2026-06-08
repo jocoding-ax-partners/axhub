@@ -48,7 +48,7 @@
 
 **왜 안전한가** (회사 IT/보안 입장):
 
-- 모든 destructive 명령 (deploy/update/login) 은 HMAC consent token 으로 보호 — vibe coder 의도 없이 LLM 단독으로 prod 변경 불가
+- 모든 destructive 명령 (deploy/update/login) 은 preview confirmation token 으로 보호 — vibe coder 의도 없이 LLM 단독으로 prod 변경 불가
 - 토큰은 per-user 격리 (다른 사람 노트북에 복사 X), mode 0600
 - helper 바이너리 cosign 키리스 서명 (sigstore OIDC) — supply chain 검증
 - 옵션 telemetry default OFF — 회사 보안 정책 우선

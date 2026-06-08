@@ -1,5 +1,5 @@
 {
-  "description": "axhub plugin hooks: SessionStart diagnostics + quality auto-mode context + UserPromptSubmit preflight/Karpathy context + PreToolUse consent/review/TDD gates + PostToolUse classifiers (Phase 26)",
+  "description": "axhub plugin hooks: SessionStart diagnostics + quality auto-mode context + UserPromptSubmit preflight/Karpathy context + PreToolUse review/TDD gates + PostToolUse classifiers (Phase 26)",
   "hooks": {
     "SessionStart": [
       {

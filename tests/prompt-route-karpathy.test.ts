@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -38,7 +38,6 @@ echo '{"ok":true}'
 }
 
 function promptRoute(prompt: string): string {
-  ensureHelperBuilt();
   const dir = mkdtempSync(join(tmpdir(), "axhub-prompt-route-karpathy-"));
   const out = spawnSync(helperBinary, ["prompt-route"], {
     cwd: dir,
@@ -55,6 +54,10 @@ function promptRoute(prompt: string): string {
   expect(out.status).toBe(0);
   return out.stdout;
 }
+
+beforeAll(() => {
+  ensureHelperBuilt();
+});
 
 describe("prompt-route Karpathy context gating", () => {
   test("first-run vibe prompts receive onboarding contract instead of generic advice", () => {
@@ -128,7 +131,8 @@ describe("prompt-route Karpathy context gating", () => {
     expect(stdout).toContain("axhub 매니페스트(axhub.yaml)가 없어요.");
     expect(stdout).toContain("React/Vite로 초기화");
     expect(stdout).toContain("Invoke deploy skill");
-    expect(stdout).toContain("consent token");
+    expect(stdout).toContain("explicit approval");
+    expect(stdout).toContain("Korean preview stdout");
     expect(stdout).not.toContain("AXHub deploy workflow");
     expect(stdout).not.toContain("Skill(axhub:");
     expect(stdout).not.toContain("karpathy-guidelines");

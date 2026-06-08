@@ -69,9 +69,9 @@ describe("deploy preflight Step 0 routing gate (spec 006 AC 15)", () => {
 
   test("blocking decisions must not call consent/deploy create", () => {
     // Anchored to the gate's yield block (not the pre-existing NEVER clauses):
-    // yield must run NONE of preflight/deploy-prep/consent-mint/deploy create.
+    // yield must run NONE of preflight/deploy-prep/preview card/deploy create.
     expect(SKILL).toContain(
-      "Preflight·deploy-prep·consent-mint·`axhub deploy create` 를 하나도 호출하지 말아요",
+      "Preflight·deploy-prep·`axhub deploy create` 를 하나도 호출하지 말아요",
     );
   });
 

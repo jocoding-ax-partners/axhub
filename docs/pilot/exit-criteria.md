@@ -36,7 +36,7 @@ Pilot Day 7 (월요일) 까지 5개 metric 평가. 5개 모두 통과 → GO (Ph
 - token leak: vibe coder의 axhub_pat_* 가 transcript / 공유 파일 / 외부 시스템에 노출
 - cross-team list bypass: AskUserQuestion 거치지 않고 다른 팀의 endpoint 가 노출
 - cosign verification override: `AXHUB_ALLOW_UNSIGNED=1` 으로 검증 우회 (vibe coder 노트북에서 발견 시)
-- destructive op 가 consent gate 우회: PreToolUse hook deny 없이 deploy_create / update_apply / auth_login 실행 (telemetry usage.jsonl 의 `preauth_check_deny` 없이 destructive command 가 fired)
+- destructive op 가 preview gate 우회: PreToolUse hook deny 없이 deploy_create / update_apply / auth_login 실행 (telemetry usage.jsonl 의 `preauth_check_deny` 없이 destructive command 가 fired)
 
 **측정**:
 - audit log 검토 (~/.cache/axhub-plugin/cross-team-list.ndjson, telemetry usage.jsonl)

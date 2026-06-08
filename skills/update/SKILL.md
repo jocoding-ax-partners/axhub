@@ -146,7 +146,7 @@ To handle updates:
    }
    ```
 
-   **Non-interactive guard (D1):** `[ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 면 → 기본값 "취소" (registry key: `update.apply_consent`).
+   **Non-interactive guard (D1):** `[ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 면 → 기본값 "취소" (registry key: `update.apply_consent` (legacy key name)).
 
    **On "적용":** cosign 은 기본 enforce 라 env 접두 없이 실행해요:
 

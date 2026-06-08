@@ -69,7 +69,7 @@ disown
 
 기존 `axhub apps git connect --app ... --execute --json`(blocking) 를 교체:
 
-1. **consent-mint 분리.** 현재 한 fence 안의 `consent-mint`+`connect` 를 별도 call 로 분리 — PreToolUse consent gate 가 detached connect call 에서 pending token 을 claim 하도록 (auth 5b 와 동일 이유).
+1. **승인 준비 분리.** 현재 한 fence 안의 승인 준비+connect 를 별도 call 로 분리 — detached connect call 이 사용자 확인 이후 실행되도록 해요.
 2. **Call 1 — detach + challenge surface.** `nohup axhub apps git connect ... --execute --json` 를 $LOG 로 detach, tail loop 로 stderr URL/code surface 후 `exit 0`.
 3. **Call 2 — 결과 확인.** $LOG tail 로 terminal connect 결과(success/error) 또는 별도 `axhub apps git status --app $APP_ID --json` 로 연결 확인.
 
@@ -95,7 +95,7 @@ disown
 
 ## 구현 중 해소된 확인 사항
 
-- **consent gate**: `consent/parser.rs` 의 `match_known_intent` 에 `apps bootstrap` 미포함 (`_ => is_destructive:false`) → bootstrap 은 consent-mint 불필요 (현 Step 6 도 mint 없이 ship). github `apps git connect` 도 parser 는 구 `github connect` 만 매핑 → 사실상 비-enforced 이지만 기존 consent-mint 를 보존하고 별도 call 로만 분리 (enforced 면 claim timing 정확, 아니면 무해).
+- **legacy approval gate**: 이 문서는 예전 승인 준비 설계를 기록한 사양이에요. 현재 구현은 helper subcommand 없이 preview-confirm 뒤 직접 실행해요.
 - **`ctx.no_input()` (context.rs:116)** = `self.global.no_input || self.global.non_interactive` — 순수 flag 기반(isatty 아님). interactive detach 명령은 두 flag 다 안 주므로 device flow 가 interactive 경로(stderr eprintln URL/code + `poll_device_token` block)를 타요. 따라서 `</dev/null` detach 여도 challenge 가 stderr 로 나와 tail 로 잡히고, 프로세스는 살아서 poll → 승인 후 `bootstrap_id` flush 후 종료 = one-shot. (만약 추후 isatty 기반으로 바뀌어도, exit 전 emit 되는 `device_code_issued` JSON 의 URL/code substring 을 같은 regex 가 잡아 surface 는 유지 — defense-in-depth.)
 - **`BootstrapStatusResponse` (apps.rs:143)** 은 `status`(string "done"/"failed")·`repo_full_name`·`app_id`·`stage` 를 flat 으로 가짐. one-shot `bootstrap-status --json` = `{"data":{...flat...}}`. → Step 7 의 repo 추출을 `.data.repo_full_name // .data.status.repo_full_name`(flat 우선, 구 nested fallback)로 수정.
 

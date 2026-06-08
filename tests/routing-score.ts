@@ -15,7 +15,7 @@
  *
  * Schema:
  *   - corpus row:    { id, utterance, intent, expected_skill, expected_cmd_pattern, destructive, lang }
- *   - result row:    { utterance_id, fired_skill, actual_tool_calls, required_consent_seen, ts }
+ *   - result row:    { utterance_id, fired_skill, actual_tool_calls, required_preview_seen, ts }
  *
  * Metrics:
  *   - per-skill precision / recall
@@ -45,7 +45,7 @@ const CorpusRowSchema = z.object({
 type CorpusRow = z.infer<typeof CorpusRowSchema>;
 
 // ResultRow only depends on utterance_id + fired_skill for routing-score purposes;
-// pass through other fields (actual_tool_calls, required_consent_seen, ts) without
+// pass through other fields (actual_tool_calls, required_preview_seen, ts) without
 // requiring callers (e.g. unit tests) to populate them.
 const ResultRowSchema = z
   .object({

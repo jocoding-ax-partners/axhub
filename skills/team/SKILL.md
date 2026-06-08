@@ -20,7 +20,7 @@ model: sonnet
 
 # Team invitations and access
 
-워크스페이스 초대와 앱 접근 권한을 CLI 경계 안에서 처리해요. 읽기는 바로 조회하고, 초대/취소/접근 변경은 preview 와 consent 뒤에만 실행해요.
+워크스페이스 초대와 앱 접근 권한을 CLI 경계 안에서 처리해요. 읽기는 바로 조회하고, 초대/취소/접근 변경은 preview 와 명시 확인 뒤에만 실행해요.
 
 ## Claude Desktop natural-language path
 
@@ -120,7 +120,7 @@ fi
 
 4. **mutation 은 preview 후 실행해요.**
 
-   Consent binding 은 helper parser 와 같은 action/context 로 맞춰요: `invitation_send={email,tenant,role}`, `invitation_bulk={source,tenant,role}`, `invitation_cancel={invitation_id,tenant}`, `invitation_resend={invitation_id,tenant,role}`, `access_grant|access_revoke={app_id}`, `access_invite|access_uninvite={app_id,user}` 예요.
+   Approval context 은 helper parser 와 같은 action/context 로 맞춰요: `invitation_send={email,tenant,role}`, `invitation_bulk={source,tenant,role}`, `invitation_cancel={invitation_id,tenant}`, `invitation_resend={invitation_id,tenant,role}`, `access_grant|access_revoke={app_id}`, `access_invite|access_uninvite={app_id,user}` 예요.
 
    ```bash
    axhub invitations send "$EMAIL" --role member --tenant "$TENANT" --json

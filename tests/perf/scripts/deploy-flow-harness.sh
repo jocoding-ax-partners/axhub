@@ -97,7 +97,7 @@ mark "step_1_1_bootstrap_plan"
 post_json "$AXHUB_BACKEND_URL/api/v1/apps"
 
 mark "step_2_preview_card"
-mark "step_3_consent"
+mark "step_3_preview_confirm"
 
 mark "step_4_deploy_create"
 post_json "$AXHUB_BACKEND_URL/api/v1/deploys"

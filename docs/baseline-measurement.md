@@ -48,7 +48,7 @@ script 가 `tests/baseline-results.docs-only.100.json` 으로 결과 정규화:
     "utterance_id": "T1",
     "fired_skill": "apps",
     "actual_tool_calls": [],
-    "required_consent_seen": false,
+    "required_preview_seen": false,
     "notes": "docs-only fresh baseline 2026-05-XX. reviewer: accept (claude high)."
   },
   ...

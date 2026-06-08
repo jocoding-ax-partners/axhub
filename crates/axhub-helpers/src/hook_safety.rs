@@ -196,9 +196,9 @@ mod tests {
         let _guard = env_lock!();
         clear_envs();
         reset_legacy_flag();
-        std::env::set_var(ENV_DISABLE_LIST, "session-start , preauth-check");
+        std::env::set_var(ENV_DISABLE_LIST, "session-start , prompt-route");
         assert!(is_hook_disabled("session-start"));
-        assert!(is_hook_disabled("preauth-check"));
+        assert!(is_hook_disabled("prompt-route"));
         assert!(!is_hook_disabled("classify-exit"));
         clear_envs();
     }

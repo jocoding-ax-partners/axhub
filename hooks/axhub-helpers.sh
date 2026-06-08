@@ -51,13 +51,8 @@ if HELPER="$(resolve_helper)"; then
   exec "$HELPER" "$@"
 fi
 
-# Fail-open for context/telemetry hooks, fail-closed for destructive Bash gates.
+# Fail-open for context/telemetry hooks and local quality helper gates.
 case "${1:-}" in
-  preauth-check)
-    cat >/dev/null || true
-    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"axhub helper unavailable"},"systemMessage":"[axhub] helper 바이너리를 찾지 못해 변경 작업을 차단했어요. 설치 상태를 먼저 확인해 주세요."}'
-    exit 0
-    ;;
   prompt-route|classify-exit|test-classifier|state-update|commit-gate|tdd-inject)
     cat >/dev/null || true
     exit 0

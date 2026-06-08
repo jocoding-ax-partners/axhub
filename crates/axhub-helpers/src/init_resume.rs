@@ -457,27 +457,27 @@ mod tests {
             empty_to_none(Some(" value ".to_string())),
             Some("value".to_string())
         );
-        assert_eq!(parse_bool("true").unwrap(), true);
-        assert_eq!(parse_bool("1").unwrap(), true);
-        assert_eq!(parse_bool("yes").unwrap(), true);
-        assert_eq!(parse_bool("false").unwrap(), false);
-        assert_eq!(parse_bool("0").unwrap(), false);
-        assert_eq!(parse_bool("no").unwrap(), false);
+        assert!(parse_bool("true").unwrap());
+        assert!(parse_bool("1").unwrap());
+        assert!(parse_bool("yes").unwrap());
+        assert!(!parse_bool("false").unwrap());
+        assert!(!parse_bool("0").unwrap());
+        assert!(!parse_bool("no").unwrap());
         assert!(parse_bool("maybe").is_err());
     }
 
     #[test]
     fn state_age_and_staleness_fail_closed_on_bad_or_old_timestamps() {
         let fresh = state_with_updated_at(&now_ts());
-        assert_eq!(state_stale(&fresh), false);
+        assert!(!state_stale(&fresh));
         assert!(state_age_secs(&fresh).unwrap() >= 0);
 
         let old = state_with_updated_at("2000-01-01T00:00:00Z");
-        assert_eq!(state_stale(&old), true);
+        assert!(state_stale(&old));
         assert!(state_age_secs(&old).unwrap() > INIT_RESUME_STATE_TTL_SECS);
 
         let invalid = state_with_updated_at("not-a-date");
-        assert_eq!(state_stale(&invalid), true);
+        assert!(state_stale(&invalid));
         assert_eq!(state_age_secs(&invalid), None);
     }
 
@@ -531,8 +531,8 @@ mod tests {
         assert_eq!(state.idempotency_key, "idem-1");
         assert_eq!(state.bootstrap_id.as_deref(), Some("boot-1"));
         assert_eq!(state.repo_full_name.as_deref(), Some("owner/repo"));
-        assert_eq!(state.clone_done, true);
-        assert_eq!(state.pending_device_flow, false);
+        assert!(state.clone_done);
+        assert!(!state.pending_device_flow);
 
         write_state(dir.path(), &state).expect("write_state");
         let present = cmd_get(dir.path()).expect("cmd_get present");

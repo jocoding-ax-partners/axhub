@@ -7,9 +7,9 @@
 
 ## 한 줄 요약
 
-axhub 플러그인은 **사내 바이브코더 (LLM 으로 앱 만드는 비기술 / 주니어 직원) 가 자연어로 자기 앱을 prod 에 안전하게 배포할 수 있게 하는 Claude Code 플러그인** 입니다. 시니어 개발자에게 매번 묻지 않아도 되어 시간이 절약되고, 동시에 모든 destructive 동작이 HMAC consent gate 와 cosign 서명 검증을 거쳐 무권한 배포 / 공급망 공격을 차단합니다.
+axhub 플러그인은 **사내 바이브코더 (LLM 으로 앱 만드는 비기술 / 주니어 직원) 가 자연어로 자기 앱을 prod 에 안전하게 배포할 수 있게 하는 Claude Code 플러그인** 입니다. 시니어 개발자에게 매번 묻지 않아도 되어 시간이 절약되고, 동시에 모든 destructive 동작이 preview confirmation gate 와 cosign 서명 검증을 거쳐 무권한 배포 / 공급망 공격을 차단합니다.
 
-**관리되는 위험**: 무단 prod 배포 (HMAC consent token), 공급망 공격 (cosign default-on), cross-team 데이터 유출 (team-scope filter + audit log), 토큰 leak (per-machine OS keychain + headless flow), 잘못된 환경 배포 (live profile resolve + preview card 의무 표시).
+**관리되는 위험**: 무단 prod 배포 (preview confirmation token), 공급망 공격 (cosign default-on), cross-team 데이터 유출 (team-scope filter + audit log), 토큰 leak (per-machine OS keychain + headless flow), 잘못된 환경 배포 (live profile resolve + preview card 의무 표시).
 
 **남는 위험 (회사가 정책으로 관리해야 함)**: 적절한 토큰 scope 발급 정책, 공유 머신에서의 logout 의무화, SSO 통합, audit log 수집/보관 정책.
 
@@ -152,7 +152,7 @@ T+1일  postmortem 문서 + 재발 방지 항목 (테스트 추가, preview card
 다음 audit 이벤트가 보이면 Severity 2 로 다룹니다:
 
 - `unsafe_trigger` (deploy intent 가 잘못된 앱 / 환경에 라우팅됨)
-- `consent_bypass_attempt` (HMAC consent token 없이 destructive 시도)
+- `consent_bypass_attempt` (preview confirmation token 없이 destructive 시도)
 - `app_ambiguous` 후 사용자가 명백히 다른 사람 앱을 선택
 - `apis_list_cross_team` 가 정당한 사유 없이 빈번히 발생
 

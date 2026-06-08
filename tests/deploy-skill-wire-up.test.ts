@@ -60,7 +60,7 @@ describe("deploy SKILL Phase 3.5 wire-up invariants", () => {
     expect(body).toContain("preferences 는 바꾸지 않아요");
   });
 
-  test("token freshness gate runs after preview and before consent-mint", () => {
+  test("token freshness gate runs after preview and before deploy execution", () => {
     const body = deploySkill();
     const previewIndex = body.indexOf("3. **Render preview card via AskUserQuestion**");
     const gateIndex = body.indexOf("3.5. **Token freshness gate");
@@ -69,12 +69,12 @@ describe("deploy SKILL Phase 3.5 wire-up invariants", () => {
     // the shim file still exists for backward compat but the SKILL no longer
     // references it.
     const helperIndex = body.indexOf('"$HELPER" token-gate', gateIndex);
-    const consentIndex = body.indexOf("axhub-helpers consent-mint");
+    const executeIndex = body.indexOf("[deploy:Step 4 execute-deploy]");
 
     expect(previewIndex).toBeGreaterThan(-1);
     expect(gateIndex).toBeGreaterThan(previewIndex);
     expect(helperIndex).toBeGreaterThan(gateIndex);
-    expect(consentIndex).toBeGreaterThan(helperIndex);
+    expect(executeIndex).toBeGreaterThan(helperIndex);
   });
 
   test("cli_too_new registry default continues without mutating preferences", () => {

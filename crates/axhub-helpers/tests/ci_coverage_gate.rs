@@ -1,8 +1,4 @@
-use std::collections::HashMap;
-
 use axhub_helpers::commit_gate::{evaluate_bash_command, GateDecision};
-use axhub_helpers::consent::decision::{check_decision, issue_decision_token, DecisionVariant};
-use axhub_helpers::consent::jwt::ConsentBinding;
 use axhub_helpers::hook_output::{
     post_tool_use_context, pre_tool_use_allow, pre_tool_use_ask, pre_tool_use_context,
     pre_tool_use_deny, session_start_context, user_prompt_context, user_prompt_context_with_system,
@@ -48,18 +44,6 @@ fn json(value: &str) -> serde_json::Value {
     serde_json::from_str(value).expect("hook output should be valid json")
 }
 
-fn binding() -> ConsentBinding {
-    ConsentBinding {
-        tool_call_id: "test-tc-coverage".into(),
-        action: "diagnose".into(),
-        app_id: "axhub".into(),
-        profile: "default".into(),
-        branch: "main".into(),
-        commit_sha: "abc1234".into(),
-        context: HashMap::new(),
-        synthesized_by_helper: false,
-    }
-}
 
 #[test]
 fn hook_output_helpers_emit_all_permission_and_context_shapes() {
@@ -140,41 +124,6 @@ fn karpathy_injection_respects_disable_missing_and_cap_paths() {
     std::fs::write(skills_dir.join("SKILL.md.sha256"), "not-the-current-hash").unwrap();
     let drifted = user_prompt_karpathy_inject().unwrap().unwrap();
     assert_eq!(drifted.chars().count(), MAX_KARPATHY_CHARS);
-}
-
-#[test]
-fn consent_decision_mints_pending_and_session_tokens() {
-    let _lock = axhub_helpers::PROCESS_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|p| p.into_inner());
-    let dir = tempfile::tempdir().unwrap();
-    let _state = EnvGuard::set("XDG_STATE_HOME", dir.path().join("state"));
-    let _runtime = EnvGuard::set("XDG_RUNTIME_DIR", dir.path().join("runtime"));
-
-    let _session = EnvGuard::remove("CLAUDE_SESSION_ID");
-    let pending = issue_decision_token(DecisionVariant::Once, binding())
-        .expect("once can mint without session")
-        .expect("once returns a token");
-    assert!(pending.file_path.contains("consent-pending-"));
-    assert!(std::path::Path::new(&pending.file_path).exists());
-    drop(_session);
-
-    let _session = EnvGuard::set("CLAUDE_SESSION_ID", "session-decision-test");
-    let b = binding();
-    let minted = issue_decision_token(DecisionVariant::AllowSession, b.clone())
-        .expect("session decision mints")
-        .expect("allow-session returns a token");
-    assert!(minted
-        .file_path
-        .contains("consent-session-decision-test.json"));
-    assert!(std::path::Path::new(&minted.file_path).exists());
-    assert!(check_decision(b.clone()).valid);
-
-    let mut mismatched = b;
-    mismatched.action = "different-action".into();
-    let verified = check_decision(mismatched);
-    assert!(!verified.valid);
-    assert_eq!(verified.reason.as_deref(), Some("binding_mismatch:action"));
 }
 
 #[test]

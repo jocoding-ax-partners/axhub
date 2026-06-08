@@ -5,8 +5,8 @@
 //! the source-of-truth for the state machine, phase contracts, and budgets.
 //!
 //! Layering rule (plan §14):
-//! `diagnose/*` MAY import: consent::{decision,jwt,key}, audit_ledger, redact,
-//!                          recovery_scan, event_log, telemetry, hook_safety.
+//! `diagnose/*` MAY import: audit_ledger, redact, runtime_paths, recovery_scan,
+//!                          event_log, telemetry, hook_safety.
 //! `diagnose/*` MUST NOT import: bootstrap, list_deployments, deploy_prep,
 //!                                statusline, preflight (deploy-preflight).
 //! Enforced by `tests/diagnose_layering_test.rs`.
@@ -100,10 +100,6 @@ pub enum DiagnoseError {
     /// Phase 5P learning emit failed (best-effort).
     #[error("learning emit failed: {0}")]
     LearningEmitFailed(String),
-
-    /// Consent layer denied or could not be issued.
-    #[error("consent missing or denied")]
-    ConsentMissing,
 
     /// SessionStart preflight panicked. Fail-open; no systemMessage injected.
     #[error("preflight panic: {0}")]

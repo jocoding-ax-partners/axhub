@@ -1295,7 +1295,7 @@ pub fn routing_stats_intent_present(prompt: &str) -> bool {
 /// Narrow read-only env detector for Desktop prompts like "환경변수 뭐 있어?".
 ///
 /// Mutation phrases must stay on the full env skill path because set/delete need
-/// consent and stdin-only value handling.
+/// approval and stdin-only value handling.
 #[must_use]
 pub fn env_intent_present(prompt: &str) -> bool {
     let lower = prompt.to_lowercase();
@@ -1350,7 +1350,7 @@ pub fn deploy_create_intent_present(prompt: &str) -> bool {
 }
 
 /// Narrow app-creation detector for Desktop prompts like "새 앱 만들어줘".
-/// These should enter `skills/init` and ask for template/name/consent, not answer
+/// These should enter `skills/init` and ask for template/name/approval, not answer
 /// with internal labels such as `axhub:init` or generic project advice.
 #[must_use]
 pub fn init_intent_present(prompt: &str) -> bool {
@@ -1840,8 +1840,8 @@ pub fn find_marker() -> MarkerStatus {
 /// token-init bootstrap, or we create an "auth-read → bootstrap → marker-gate"
 /// cycle. Token presence is a *proxy* for authed (a CLI-authed user with no
 /// helper token reads as not-authed → pass-through, an accepted under-detection
-/// on the error path). NOTE: this is the auth token, distinct from
-/// `consent::…` HMAC consent tokens — do not conflate.
+/// on the error path). NOTE: this is the persisted auth token used by helper auth/delegation paths,
+/// distinct from the megaskill `consent` on/off flag.
 #[must_use]
 pub fn token_present() -> bool {
     crate::runtime_paths::token_file()

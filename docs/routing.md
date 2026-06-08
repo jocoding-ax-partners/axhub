@@ -19,7 +19,7 @@ UserPromptSubmit hook (5초 budget)
 Claude 가 SKILL.md description 보고 native 매칭
     │
     ▼
-PreToolUse Bash hook (HMAC consent gate)
+PreToolUse Bash hook (preview confirmation gate)
     │
     ▼
 PostToolUse Bash hook (exit-code classifier)
@@ -47,9 +47,9 @@ description: '이 스킬은 사용자가 현재 브랜치를 axhub 라이브로 
 
 이 정보가 `additionalContext` 로 Claude 에게 전달돼서 매칭 시 context-aware 결정이 가능해요 (예: 로그인 안 되어 있으면 deploy intent 도 auth 부터 안내).
 
-### Layer 3 — HMAC consent gate (PreToolUse)
+### Layer 3 — preview confirmation gate (PreToolUse)
 
-destructive 작업 (deploy / apps delete / env set) 은 `PreToolUse` Bash hook 에서 HMAC consent token 검증으로 결정론을 보장해요.
+destructive 작업 (deploy / apps delete / env set) 은 `PreToolUse` Bash hook 에서 preview confirmation token 검증으로 결정론을 보장해요.
 
 ### Layer 4 — Exit-code classifier (PostToolUse)
 

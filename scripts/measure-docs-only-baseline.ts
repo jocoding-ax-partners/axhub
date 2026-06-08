@@ -49,7 +49,7 @@ export interface BaselineEntry {
   utterance_id: string;
   fired_skill: string | null;
   actual_tool_calls: never[];
-  required_consent_seen: boolean;
+  required_preview_seen: boolean;
   notes: string;
 }
 
@@ -151,7 +151,7 @@ export function entryFromDecision(
     utterance_id: row.id,
     fired_skill: firedSkill,
     actual_tool_calls: [],
-    required_consent_seen: false,
+    required_preview_seen: false,
     notes: `docs-only fresh baseline ${measuredAt.slice(0, 10)}. reviewer: ${decisionLabel}.`,
   };
 }

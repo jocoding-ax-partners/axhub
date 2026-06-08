@@ -19,8 +19,8 @@
 | 1:00 | AskUserQuestion "어떻게 진행?" → 사용자 "axhub init 먼저" |
 | 1:30 | init template scaffold 충돌 (.editorconfig 등) → AskUserQuestion → 사용자 "--force" |
 | 2:00 | apphub.yaml 생성. 다시 deploy 시도 |
-| 2:30 | apps_create 차단 (consent token 부재) |
-| 2:30~6:30 | consent mint 시도 4회 모두 차단 (action/slug/source/positional 각 mismatch) |
+| 2:30 | apps_create 가 예전 승인 게이트 불일치로 차단 |
+| 2:30~6:30 | 예전 승인 준비 시도 4회 모두 차단 (action/slug/source/positional 각 mismatch) |
 | 6:30 | apphub.yaml 에 `subdomain`/`domain_id` 누락 → API 거부 |
 | 7:00 | AskUserQuestion subdomain → 사용자 "trash5" |
 | 7:30 | yaml 수동 편집 + apps_create 재시도 |
@@ -40,14 +40,14 @@
 | 1 | `cli_too_new: true` false positive | `crates/axhub-helpers/src/telemetry.rs:resolve_cli_version` Mutex cache, **TTL 없음** | 코드 확인 |
 | 2 | `apps_list_parse_error` (exit 67) | `crates/axhub-helpers/src/resolve.rs:125-142` `parse_apps_list` 가 **bare JSON array 만 지원**, backend `{apps:[...],total:N}` envelope 미지원 | 코드 확인 |
 | 3 | init scaffold non-empty dir 충돌 | init SKILL `--force` 사용자 결정 떠넘김. CLI 자체가 안전 분기 없음 | SKILL 확인 |
-| 4 | apps_create consent 차단 4회 | `crates/axhub-helpers/src/main.rs:184-189 cmd_consent_mint` **binding schema validator 없음**. agent 가 매번 다른 shape 추측 → 매번 mismatch. helper 가 `apphub.yaml` 에서 binding 자동 합성 안 함 | 코드 확인 |
+| 4 | apps_create 승인 준비 차단 4회 | 예전 approval helper 에 schema validator 가 없어 agent 가 매번 다른 shape 를 추측했고 mismatch 가 반복됨 | 코드 확인 |
 | 5 | apphub.yaml `subdomain`+`domain_id` 누락 | template registry default 없음. backend default 도 없음. client/server 양쪽 source 모호 | template + backend 확인 필요 |
 | 6 | git init 단계 늦음 | deploy SKILL Step 1 manifest 가정 + git_init 분기는 Step 1.5. 빈 dir 분기 없음 | SKILL 확인 |
 | 7 | non-idempotent flow | bootstrap state file 없음. 부분 진행 후 재시도 시 처음부터 | 부재 |
 | **8** | apphub.yaml 있는데 init 재실행 | `preflight.rs:220-223` `current_app` 이 **`AXHUB_APP_SLUG` env + `last-deploy.json` cache 만 읽음**. **`apphub.yaml` 미읽음**. 즉 init 가 yaml 만들어도 helper 가 다시 못 봄 → 매 session fresh | **코드 확인 (b 가설 confirmed)** |
 
 Architect/Critic 추가 우려:
-- Helper auto-mint 시 preview card 가 ceremonial 됨 — consent integrity 침식
+- Helper 자동 승인 준비 시 preview card 가 ceremonial 됨 — 확인 절차 의미 약화
 - "5분 hard budget" 은 backend build 시간 (Next.js ~3min) 무시한 KPI
 - bootstrap FSM 구체 spec 부재 시 SKILL prose chain = LLM 추측
 
@@ -58,9 +58,9 @@ Architect/Critic 추가 우려:
 ### Goals
 - 빈 dir → live URL **P50 ≤ 5min / P95 ≤ 8min**
 - AskUserQuestion **≤ 3개** (template / subdomain (collision 시) / 최종 동의)
-- consent 차단 메시지 **0회**
+- 승인 준비 차단 메시지 **0회**
 - bug regression 회귀 0 (P1, P2, P8)
-- HMAC consent gate 보안 surface 그대로 유지 (preview card 의 "네/아니요" 가 의미 있는 stop point)
+- Preview card 의 "네/아니요" 가 의미 있는 stop point 로 유지
 
 ### Non-Goals
 - backend build 시간 단축 (architecture 가 줄일 수 없는 floor)
@@ -217,9 +217,9 @@ Architect/Critic 추가 우려:
 ## 7. Pre-mortem (5 scenarios)
 
 ### X. Helper bug → 100% deploy block — likelihood MED
-P4 helper 가 binding 자동 합성. helper bug 시 token 항상 invalid → 전체 fleet block.
-- Mitigation 1: `consent-mint --validate-only` dry-run flag 로 binding 검증
-- Mitigation 2: helper version mismatch 감지 시 P4 auto-synth 비활성, agent-binding flow fallback
+P4 helper 가 approval context 를 자동 합성. helper bug 시 전체 fleet block 가능.
+- Mitigation 1: validate-only dry-run flag 로 context 검증
+- Mitigation 2: helper version mismatch 감지 시 P4 auto-synth 비활성, agent approval flow fallback
 - Mitigation 3: `synthesized_by_helper` audit flag → backend log 30일 retention
 
 ### Y. Subdomain collision — likelihood HIGH
@@ -300,7 +300,7 @@ apphub.yaml CRLF, git init defaults, path separator.
 ## 10. ADR
 
 - **Decision**: 7개 confirmed bug 를 4 sprint × 별도 PR 로 점진적 ship. helper bug fix → consent layer hardening → bootstrap FSM 명령 → measurement-based SLA. 단일 hard 5min KPI 폐기, P50/P95 SLA 채택.
-- **Drivers**: vibe coder 5min smooth UX, backend↔helper contract resilience, consent gate 보안 유지, FSM Rust enforce (Markdown prose chain 폐기)
+- **Drivers**: vibe coder 5min smooth UX, backend↔helper contract resilience, preview gate 보안 유지, FSM Rust enforce (Markdown prose chain 폐기)
 - **Alternatives 검토**:
   - **B (helper bug fix only)** — bug 4/6/7/8 미해결, 5min 미달
   - **C (atomic bootstrap helper command 단독)** — Architect 권고. P4-P6 으로 흡수
@@ -309,11 +309,11 @@ apphub.yaml CRLF, git init defaults, path separator.
 - **Consequences**:
   - 4 PR + 4 ralplan 세션 추가 필요 (각 sprint)
   - backend 협업 필요 (P3 server-side subdomain)
-  - helper auto-mint 보안 review 필요 (S2 + S3 사이)
+  - helper auto-approval 보안 review 필요 (S2 + S3 사이)
   - e2e CI cost 증가 (실제 staging backend hit)
 - **Follow-ups**:
   - HTML comment sentinel 패턴 (`<!-- stage-checklist:allow -->`) — Phase 24.10 carry-over
-  - dev escape hatch (`AXHUB_PREAUTH_BYPASS` vs `consent-mint --dev-mode`) — ralplan iter 1-2 ADR 보관
+  - dev escape hatch ADR 보관
   - CLI 자체 (`ax-hub-cli` 별도 repo) 의 init template + apps create 응답 shape 통일 backend 팀 협업
   - production grade Next.js deploy (Demo 수준 넘어선 hardening) — 별도 PRD
 
@@ -336,7 +336,7 @@ apphub.yaml CRLF, git init defaults, path separator.
 - `crates/axhub-helpers/src/resolve.rs:125-142` — parse_apps_list bare-array (Issue #2)
 - `crates/axhub-helpers/src/resolve.rs:281-292` — apps_list_parse_error exit 67
 - `crates/axhub-helpers/src/telemetry.rs:24-32` — resolve_cli_version no TTL (Issue #1)
-- `crates/axhub-helpers/src/main.rs:184-189` — cmd_consent_mint no validator (Issue #4)
+- `crates/axhub-helpers/src/main.rs:184-189` — cmd_preview_approval_removed no validator (Issue #4)
 - `crates/axhub-helpers/src/main.rs:197-275` — cmd_preauth_check verify path
 - `skills/deploy/SKILL.md` — Step 1 manifest assumption + Step 1.5 git_init
 - `skills/init/SKILL.md` — non-empty dir 분기 부재 (Issue #3)

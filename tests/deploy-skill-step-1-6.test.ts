@@ -69,7 +69,7 @@ describe("deploy SKILL Step 1.1 — template-required hard stop", () => {
     expect(body).toContain("axhub manifest validate --file axhub.yaml --json");
     expect(body).toContain("Do not stop after saying \"프로젝트 확인\"");
     expect(body).toContain("current CLI `axhub init --framework react-vite` is the manifest-only source of truth");
-    expect(body).toContain("show the preview approval card");
+    expect(body).toContain("show the preview card");
   });
 
   test("local manifest writes must be committed before preview", () => {

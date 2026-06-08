@@ -25,7 +25,7 @@ describe("data SKILL contract", () => {
     expect(skill).toContain("Create context");
   });
 
-  test("data skill documents live-read consent and no governance/path guessing rules", () => {
+  test("data skill documents live-read approval and no governance/path guessing rules", () => {
     const skill = read("skills/data/SKILL.md");
     expect(skill).toContain("first live read");
     expect(skill).toContain("row limit");

@@ -76,12 +76,9 @@ describe("Windows compatibility docs", () => {
 
     expect(auth).toContain("PowerShell lane");
     expect(auth).toContain("$env:CLAUDE_PLUGIN_ROOT");
-    expect(auth).toContain("$AxhubHelper");
-    expect(auth).toContain("Get-Command axhub-helpers.exe");
-    expect(auth).toContain("ConvertTo-Json -Compress");
-    expect(auth).toContain("& $AxhubHelper consent-mint");
-    expect(auth).toContain("temp-file fallback");
-    expect(auth.indexOf("PowerShell lane")).toBeLessThan(auth.indexOf("temp-file fallback"));
+    expect(auth).toContain("PowerShell lane");
+    expect(auth).toContain("axhub auth login --force --no-browser");
+    expect(auth).not.toContain("$AxhubHelper preview approval");
     expect(auth).toContain("axhub auth login --force --no-browser");
     // v0.15.3 agent-safe device flow: consume the native device_code_issued event and
     // fast-exit in agent context (no detach wrapper), surface the challenge, and never

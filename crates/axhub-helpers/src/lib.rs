@@ -8,10 +8,10 @@ pub mod orphan_stub;
 /// Process-wide mutex for ANY code that mutates process environment variables.
 ///
 /// All env-mutating sites (production probes, hooks, recurrence env overrides,
-/// preflight wall-budget overrides, consent headless guards) MUST acquire this
-/// lock. Single source of truth so concurrent set_var/remove_var across
-/// threads/modules never tears the process env block. Tests share the same
-/// lock so cargo's parallel test runner stays correct.
+/// preflight wall-budget overrides, headless guards) MUST acquire this lock.
+/// Single source of truth so concurrent set_var/remove_var across threads/modules
+/// never tears the process env block. Tests share the same lock so cargo's
+/// parallel test runner stays correct.
 pub static PROCESS_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 pub mod audit;
 pub mod audit_ledger;
@@ -19,7 +19,6 @@ pub mod bootstrap;
 pub mod catalog;
 pub mod commit_gate;
 pub mod config;
-pub mod consent;
 pub mod deploy_prep;
 pub mod diagnose;
 pub mod event_log;
