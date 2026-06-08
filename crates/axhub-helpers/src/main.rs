@@ -45,7 +45,7 @@ use serde_json::{json, Map, Value};
 mod cli;
 
 pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
-pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  prompt-route\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  prompt-route\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  verify-deploy-artifact\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -853,6 +853,90 @@ pub(crate) fn cmd_classify_exit(arg_exit_code: i32, arg_stdout: &str) -> anyhow:
 
     out_json(serde_json::to_value(classify(arg_exit_code, arg_stdout))?);
     Ok(0)
+}
+
+pub(crate) fn cmd_verify_deploy_artifact() -> anyhow::Result<i32> {
+    const HOOK_NAME: &str = "verify-deploy-artifact";
+    const LEGACY_HOOK_NAME: &str = "post-tool-verify-deploy-artifacts";
+    if hook_safety::is_hook_disabled(HOOK_NAME) || hook_safety::is_hook_disabled(LEGACY_HOOK_NAME) {
+        return Ok(0);
+    }
+
+    let raw = match read_stdin() {
+        Ok(raw) => raw,
+        Err(err) => {
+            hook_safety::append_hook_error(HOOK_NAME, &err);
+            return Ok(0);
+        }
+    };
+    let payload: Value = match serde_json::from_str(&raw) {
+        Ok(payload) => payload,
+        Err(_) => return Ok(0),
+    };
+    let command = payload
+        .pointer("/tool_input/command")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if !is_axhub_deploy_create_command(command) {
+        return Ok(0);
+    }
+    let exit_code = payload
+        .pointer("/tool_response/exit_code")
+        .and_then(Value::as_i64);
+    if exit_code != Some(0) {
+        return Ok(0);
+    }
+    let stdout = payload
+        .pointer("/tool_response/stdout")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if stdout.trim().is_empty() {
+        return Ok(0);
+    }
+
+    let result = axhub_helpers::verify_deploy_artifact::verify_user_app_artifact(stdout);
+    if result.passed {
+        return Ok(0);
+    }
+
+    let observed = result.violations.join("; ");
+    let system_message = format!(
+        "⚠️ 배포 artifact 검증에서 의심 신호를 발견했어요: {observed}. 라이브 결과를 한 번 더 확인해주세요."
+    );
+    let context = format!(
+        "<axhub-deploy-verify>\n[axhub hook | deploy artifact verification]\nObserved: {observed}\nSuggested: run axhub-helpers verify --app-id <app> or inspect axhub deploy logs before claiming the app is live.\nSkip: AXHUB_DISABLE_HOOK=verify-deploy-artifact\n</axhub-deploy-verify>"
+    );
+    println!(
+        "{}",
+        hook_output::post_tool_use_context_with_system(&context, &system_message)
+    );
+    Ok(0)
+}
+
+fn is_axhub_deploy_create_command(command: &str) -> bool {
+    let Some(rest) = command.trim_start().strip_prefix("axhub") else {
+        return false;
+    };
+    let Some(rest) = strip_required_whitespace(rest) else {
+        return false;
+    };
+    let Some(rest) = rest.strip_prefix("deploy") else {
+        return false;
+    };
+    let Some(rest) = strip_required_whitespace(rest) else {
+        return false;
+    };
+    let Some(rest) = rest.strip_prefix("create") else {
+        return false;
+    };
+    rest.chars()
+        .next()
+        .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_')
+}
+
+fn strip_required_whitespace(input: &str) -> Option<&str> {
+    let trimmed = input.trim_start();
+    (trimmed.len() != input.len()).then_some(trimmed)
 }
 
 fn cmd_state_show(args: &[String]) -> anyhow::Result<i32> {

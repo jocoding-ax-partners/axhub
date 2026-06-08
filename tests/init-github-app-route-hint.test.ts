@@ -16,6 +16,7 @@ import { join } from "node:path";
 
 const repoRoot = join(import.meta.dir, "..");
 const helperBinary = join(repoRoot, "target", "debug", "axhub-helpers");
+const TEST_TIMEOUT_MS = 130_000;
 
 function ensureHelperBuilt() {
   const build = spawnSync("cargo", ["build", "-p", "axhub-helpers"], {
@@ -100,5 +101,5 @@ describe("init route hint surfaces the GitHub App install state", () => {
     const nameIndex = additionalContext.indexOf("ask for the app name");
     expect(ghIndex).toBeGreaterThanOrEqual(0);
     expect(nameIndex).toBeGreaterThan(ghIndex);
-  });
+  }, TEST_TIMEOUT_MS);
 });

@@ -26,7 +26,6 @@
     "lint:tone": "bun scripts/check-toss-tone-conformance.ts --strict",
     "lint:keywords": "bun scripts/check-skill-keywords-preserved.ts --check",
     "release:check": "bun scripts/release-check.ts",
-    "verify:user-app-artifact": "bun scripts/verify-user-app-artifact.ts",
     "release": "commit-and-tag-version",
     "release:tag": "bun scripts/release-tag.ts",
     "skill:new": "bun scripts/skill-new.ts",

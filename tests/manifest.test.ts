@@ -309,17 +309,15 @@ describe("hooks.json structure", () => {
   });
 
   test("each hook command references axhub-helpers binary or session-start shim", () => {
-    // SessionStart uses the universal bash shim; most hooks call the binary
-    // directly; Phase 25 PR 25.3 introduces a TS PostToolUse hook executed
-    // via the host bun runtime (hooks/*.ts).
+    // SessionStart uses universal bash shims; all other hooks dispatch through
+    // axhub-helpers so hook startup never depends on a host Bun runtime.
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {
         for (const h of g.hooks) {
           const refsBinary = h.command.includes("axhub-helpers");
           const refsShim = h.command.includes("hooks/session-start.sh");
           const refsAutowireShim = h.command.includes("hooks/session-start-autowire.sh");
-          const refsTsHook = /hooks\/[a-z0-9_-]+\.ts\b/.test(h.command);
-          expect(refsBinary || refsShim || refsAutowireShim || refsTsHook).toBe(true);
+          expect(refsBinary || refsShim || refsAutowireShim).toBe(true);
         }
       }
     }
@@ -1628,7 +1626,7 @@ describe("cross-manifest consistency", () => {
       "resolve", "preflight", "classify-exit", "redact", "version", "help",
       "list-deployments", "prompt-route", "token-init", "token-import",
       "commit-gate", "test-classifier", "tdd-inject", "state-update",
-      "repair-path",
+      "repair-path", "verify-deploy-artifact",
     ]);
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {
@@ -1636,9 +1634,6 @@ describe("cross-manifest consistency", () => {
           // Skip shim paths: universal hooks.json registers bash SessionStart shims (v0.5.x base + v0.6.0 autowire).
           if (h.command.includes("hooks/session-start.sh")) continue;
           if (h.command.includes("hooks/session-start-autowire.sh")) continue;
-          // Phase 25 PR 25.3 — bun-launched TS hooks live under hooks/*.ts and
-          // are not axhub-helpers subcommands, so they're outside this check.
-          if (/hooks\/[a-z0-9_-]+\.ts\b/.test(h.command)) continue;
           const parts = h.command.split(/\s+/);
           const helperIdx = parts.findIndex((part) => part.includes("axhub-helpers"));
           const sub = helperIdx >= 0 ? parts[helperIdx + 1] : parts.at(-1);
@@ -1803,7 +1798,7 @@ describe("Phase 4 (F3) hooks.json invariant baseline", () => {
         matcher: "Bash",
         commands: [
           { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh classify-exit", timeout: 5 },
-          { command: "bun ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-verify-deploy-artifacts.ts", timeout: 7 },
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh verify-deploy-artifact", timeout: 7 },
           { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh test-classifier", timeout: 5 },
         ],
       },

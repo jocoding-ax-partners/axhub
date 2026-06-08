@@ -156,6 +156,7 @@ fn cmd_my_new_hook() -> anyhow::Result<i32> {
 
 `out_json` 의 payload 는 hook 종류별로 spec 이 달라요:
 - UserPromptSubmit / PostToolUse 계열 → `{}` 또는 hook별 additionalContext (no destructive permission decision)
+- PostToolUse deploy verifier (`verify-deploy-artifact`) → kill-switch/skip 은 stdout 없이 `Ok(0)`, 의심 신호가 있을 때만 `systemMessage` + `PostToolUse.additionalContext`
 
 ### 4.2 Shell hook (mirror)
 

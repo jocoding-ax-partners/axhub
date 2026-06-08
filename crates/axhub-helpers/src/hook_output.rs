@@ -59,6 +59,17 @@ pub fn post_tool_use_context(text: &str) -> String {
     .to_string()
 }
 
+pub fn post_tool_use_context_with_system(text: &str, system_message: &str) -> String {
+    json!({
+        "systemMessage": system_message,
+        "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": text,
+        }
+    })
+    .to_string()
+}
+
 pub fn pre_tool_use_ask(reason: &str) -> String {
     json!({
         "hookSpecificOutput": {

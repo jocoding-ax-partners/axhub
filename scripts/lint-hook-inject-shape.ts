@@ -6,7 +6,6 @@ const root = join(import.meta.dir, "..");
 const files = [
   "crates/axhub-helpers/src/main.rs",
   "crates/axhub-helpers/src/tdd_inject.rs",
-  "hooks/post-tool-verify-deploy-artifacts.ts",
 ];
 const required = ["Observed:", "Suggested:", "Skip: AXHUB_DISABLE_HOOK="];
 const routeControlRequired = ["Skip: AXHUB_DISABLE_HOOK="];
