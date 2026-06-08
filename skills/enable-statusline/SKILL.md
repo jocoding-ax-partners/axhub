@@ -262,7 +262,7 @@ To enable the axhub statusline:
 
 ## NEVER
 
-- NEVER `~/.claude/settings.json` 을 explicit consent (install-time disclosure 동의) 없이 수정해요. install-time disclosure 가 표시됐고 `AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1` 미설정이면 동의로 간주해요. orphan stub 이 uninstall 시 graceful degradation 을 보장해요. manual `axhub-helpers settings-merge --apply` 명령은 explicit consent 후 OK. SessionStart autowire (`session-start-autowire.sh`) 는 disclosure marker 존재 시에만 자동 실행해요 — 별도 prompt 없음.
+- NEVER `~/.claude/settings.json` 을 explicit approval (install-time disclosure 동의) 없이 수정해요. install-time disclosure 가 표시됐고 `AXHUB_DISABLE_STATUSLINE_AUTOWIRE=1` 미설정이면 동의로 간주해요. orphan stub 이 uninstall 시 graceful degradation 을 보장해요. manual `axhub-helpers settings-merge --apply` 명령은 explicit approval 후 OK. SessionStart autowire (`session-start-autowire.sh`) 는 disclosure marker 존재 시에만 자동 실행해요 — 별도 prompt 없음.
 - NEVER 비대화형 환경에서 pbcopy / clip.exe / xclip 호출. clipboard mutation 은 interactive 선택 후에만 해요.
 - NEVER Claude Code 를 자동으로 재시작해요. 사용자가 직접 해야 해요.
 

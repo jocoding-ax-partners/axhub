@@ -8,9 +8,9 @@ describe("Phase 26 quality surfaces", () => {
   test("hooks.json wires quality gates and tdd injectors", () => {
     const hooks = JSON.parse(readFileSync(join(root, "hooks/hooks.json"), "utf8"));
     const preBash = hooks.hooks.PreToolUse.find((entry: any) => entry.matcher === "Bash");
-    // preauth-check consent gate intentionally unwired from hooks.json (plugin-wide
-    // opt-out): bootstrap/deploy --execute no longer blocks on a consent token.
-    expect(JSON.stringify(preBash)).not.toContain("preauth-check");
+    // preview-check preview gate intentionally unwired from hooks.json (plugin-wide
+    // opt-out): bootstrap/deploy --execute no longer blocks on a preview confirmation.
+    expect(JSON.stringify(preBash)).not.toContain("preview-check");
     expect(JSON.stringify(preBash)).toContain("commit-gate");
     const preEdit = hooks.hooks.PreToolUse.find((entry: any) =>
       String(entry.matcher).includes("Edit"),

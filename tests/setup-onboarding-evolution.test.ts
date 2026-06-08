@@ -267,13 +267,13 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
     expect(content).toContain("다시 로그인해줘");
   });
 
-  test("allows dependency execution only with lockfile, consent, D1, and ignore-scripts", () => {
+  test("allows dependency execution only with lockfile, explicit confirmation, D1, and ignore-scripts", () => {
     const content = onboarding();
     const fm = content.split("\n---\n")[0];
 
     expect(fm).toContain("allows-dependency-execution: true");
     expect(content).toContain("lockfile 있을 때만");
-    expect(content).toContain("consent 필수");
+    expect(content).toContain("명시 확인 필수");
     expect(content).toContain("deps_missing");
     expect(content).toContain("lockfile 없으면 package manager 선택을 묻지 말고 skip");
     expect(content).toContain("--ignore-scripts");
@@ -286,7 +286,7 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
     expect(onboardingAllowlist!.rationale).toContain("--ignore-scripts");
   });
 
-  test("registers conservative safe defaults for every new onboarding consent", () => {
+  test("registers conservative safe defaults for every new onboarding confirmation", () => {
     const onboardingRegistry = registry()["onboarding"] as Record<string, { safe_default?: string; allowed_safe_defaults?: string[] }>;
 
     for (const [question, expectedDefault] of [

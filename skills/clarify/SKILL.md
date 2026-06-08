@@ -145,7 +145,7 @@ For the default menu options:
 ## NEVER
 
 - NEVER silently guess intent — always surface AskUserQuestion when ambiguity is detected.
-- NEVER auto-route without user confirmation (the destructive ops have their own consent gates, but read-only ops still benefit from intent confirmation).
+- NEVER auto-route without user confirmation (the destructive ops have their own preview gates, but read-only ops still benefit from intent confirmation).
 - NEVER call the Claude Skill tool after the user chooses a menu option; continue inline with the natural first sentence and helper command.
 - NEVER suggest more than 5 options at once (vibe coders can't compare beyond 5).
 - NEVER include cross-platform deploy targets (vercel/heroku/...) in the menu.

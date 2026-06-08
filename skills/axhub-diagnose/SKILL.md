@@ -99,7 +99,7 @@ echo "$SAFE_PREFLIGHT_JSON"
 - NEVER grep 으로 사용자 코드에서 debug line 지우기 (probe manifest 만 truth).
 - NEVER LOOP_VERIFY 우회 — fix 적용 직후 반드시 loop 재실행.
 - NEVER 가설 검증 없이 첫 후보 fix 바로 적용 (사용자가 "검증 건너뛰기" 명시 선택한 경우 제외).
-- NEVER session_id="unknown" 환경에서 AllowSession / AllowAlways consent grant 발급.
+- NEVER session_id="unknown" 환경에서 AllowSession / AllowAlways approval grant 발급.
 
 ## Additional Resources
 

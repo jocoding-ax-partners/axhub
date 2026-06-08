@@ -55,7 +55,7 @@ ${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/usage.jsonl
   "plugin_version": "0.1.0",
   "cli_version": "0.1.3",
   "helper_version": "0.1.0",
-  "event": "preauth_check_deny",
+  "event": "preview_aborted",
   "action": "deploy_create"
 }
 ```
@@ -69,7 +69,7 @@ ${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/usage.jsonl
 | `helper_version` | ✓ | helper 바이너리 버전 (hardcoded `"0.1.0"`) |
 | `event` | ✓ | 이벤트 이름 (아래 목록 참고) |
 | `action` | 일부 | `deploy_create` / `update_apply` / `auth_login` 등 |
-| `reason` | 일부 | `non_bash` / `non_destructive` / `consent_verified` |
+| `reason` | 일부 | `non_bash` / `non_destructive` / `approval_confirmed` |
 | `exit_code` | 일부 | classify-exit 가 본 axhub exit code |
 | `command_class` | 일부 | command의 첫 3 토큰 (`"axhub deploy create"`) — 인자 X |
 
@@ -82,9 +82,8 @@ ${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/usage.jsonl
 | event | 발생 시점 | 페이로드 |
 |---|---|---|
 | `session_start` | SessionStart hook (Claude Code 세션 시작 직후) | (없음) |
-| `preauth_check_allow` | PreToolUse hook이 명령 통과 | `reason`, optional `action` |
-| `preauth_check_deny` | PreToolUse hook이 명령 거부 (consent token 없음/만료) | `action` |
-| `consent_mint` | 스킬이 consent token 발급 성공 | `action` |
+| `preview_aborted` | 사용자가 preview card 에서 실행을 취소 | `action` |
+| `deploy_execute` | 스킬이 승인된 실행 명령을 시작 | `action` |
 | `classify_exit` | PostToolUse hook이 axhub 명령 종료 분류 | `exit_code`, `command_class` |
 
 ---
@@ -92,7 +91,7 @@ ${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/usage.jsonl
 ## 5. Privacy guarantee (절대 기록 안 함)
 
 - ❌ 명령어 인자 원문 (`--app paydrop --commit abc` 같은 값)
-- ❌ HMAC consent token 값
+- ❌ 승인/실행 내부 상태값
 - ❌ axhub_pat_* OAuth token
 - ❌ 사용자 이메일, 이름, 회사명
 - ❌ 깃 commit 메시지, branch 이름
@@ -118,10 +117,10 @@ ${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/usage.jsonl
 # 가장 자주 fire 한 이벤트
 jq -r '.event' "${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/usage.jsonl" | sort | uniq -c | sort -rn
 
-# preauth-check deny 율
-total=$(grep -c preauth_check usage.jsonl)
-deny=$(grep -c preauth_check_deny usage.jsonl)
-echo "deny 비율: $((deny * 100 / total))%"
+# preview abort 율
+total=$(grep -c deploy_execute usage.jsonl)
+deny=$(grep -c preview_aborted usage.jsonl)
+echo "abort 비율: $((deny * 100 / (total + deny)))%"
 
 # 세션당 이벤트 카운트
 jq -r '.session_id' usage.jsonl | sort | uniq -c | sort -rn | head

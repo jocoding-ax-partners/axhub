@@ -102,12 +102,9 @@ describe("deploy skill git init stage", () => {
 
     // internal primitives enum 명시 — 모든 항목이 본문 안에 등장해야 잠금됨
     const lockedFields = [
-      "binding_hash",
       "pending_action_id",
       "pending_action_hash",
       "command_argv",
-      "consent_binding",
-      "synthesized_by_helper",
       "retry_policy",
       "idempotency_key",
       "exit_code",
@@ -140,12 +137,11 @@ describe("deploy skill git init stage", () => {
       content.indexOf("First-run bootstrap plan/record bridge"),
     );
     expect(content).toContain("do **not** run `bootstrap apps_create`");
-    expect(content).toContain("do not mint or run a second `deploy_create`");
+    expect(content).toContain("do not run a second `deploy_create`");
     expect(content).toContain("axhub-helpers bootstrap --auto-chain --json");
     expect(content).toContain("bootstrap --record");
     expect(content).toContain("pending_action_id");
     expect(content).toContain("pending_action_hash");
-    expect(content).toContain("binding_hash");
     expect(content).toContain("no_retry_without_confirmed_idempotency");
     expect(content).toContain("schema_version");
     expect(content).toContain("bootstrap-record/v1");
@@ -172,7 +168,7 @@ describe("deploy skill git init stage", () => {
     expect(content).toContain("axhub apps update <slug> --subdomain <subdomain> --json");
     expect(content).toContain("subdomain 2..32자 제약");
     expect(content).toContain("apps_update");
-    expect(content).toContain("deploy_create consent 를 새로 mint");
+    expect(content).toContain("같은 deploy preview 승인 맥락에서 Step 4 를 한 번만 재시도");
   });
 
   test("github connection blocker routes into guided github setup instead of ending on manual connect", () => {
@@ -180,7 +176,7 @@ describe("deploy skill git init stage", () => {
 
     expect(content).toContain("route into `skills/github/SKILL.md` guided setup/connect");
     expect(content).toContain("do not end with a manual connect command as the next step");
-    expect(content).toContain("GitHub guided setup/connect owns repo create, remote add, first push, and connect consent");
+    expect(content).toContain("GitHub guided setup/connect owns repo create, remote add, first push, and connect approval");
     expect(content).not.toContain("Then show the exact follow-up command without executing it until consent is minted in the github skill flow");
   });
 

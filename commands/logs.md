@@ -7,4 +7,4 @@ model: haiku
 
 Trigger the axhub `logs` skill with arguments: $ARGUMENTS.
 
-Apply the workflow defined in `${CLAUDE_PLUGIN_ROOT}/skills/logs/SKILL.md`. Slash invocation does NOT bypass the AskUserQuestion preview card or HMAC consent token requirement for destructive operations — the PreToolUse hook will still verify consent before any destructive bash call.
+Apply the workflow defined in `${CLAUDE_PLUGIN_ROOT}/skills/logs/SKILL.md`. Logs are read-only; slash invocation does not bypass preview/confirmation rules for any follow-up destructive workflow.

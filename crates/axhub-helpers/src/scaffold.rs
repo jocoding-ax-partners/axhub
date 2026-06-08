@@ -730,8 +730,8 @@ mod tests {
 
     #[test]
     fn stale_timestamp_and_command_basename_helpers_fail_closed() {
-        assert_eq!(timestamp_stale("not-a-date"), true);
-        assert_eq!(timestamp_stale(&now_ts()), false);
+        assert!(timestamp_stale("not-a-date"));
+        assert!(!timestamp_stale(&now_ts()));
         assert_eq!(
             command_basename(&["/usr/local/bin/npm".to_string(), "run".to_string()]),
             Some("npm".to_string())

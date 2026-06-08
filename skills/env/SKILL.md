@@ -103,7 +103,7 @@ echo "$PREFLIGHT_JSON"
    printf %s "$VALUE" | axhub env set "$KEY" --app "$APP" --from-stdin --json
    ```
 
-   실행 전 `consent-mint` 에 `action=env_set`, top-level `app_id`, `context={key}` 를 사용해요. 값은 출력하지 말고 즉시 마스킹해요.
+   실행 전 `preview confirmation` 에 `action=env_set`, top-level `app_id`, `context={key}` 를 사용해요. 값은 출력하지 말고 즉시 마스킹해요.
 
 5. **delete 는 exact confirm 을 요구해요.**
 
@@ -111,7 +111,7 @@ echo "$PREFLIGHT_JSON"
    axhub env delete "$KEY" --app "$APP" --execute --json
    ```
 
-   실행 전 `consent-mint` 에 `action=env_delete`, top-level `app_id`, `context={key}` 를 사용해요.
+   실행 전 `preview confirmation` 에 `action=env_delete`, top-level `app_id`, `context={key}` 를 사용해요.
 
 ## NEVER
 

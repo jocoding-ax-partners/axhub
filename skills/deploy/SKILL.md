@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: '이 스킬은 사용자가 현재 브랜치를 axhub 라이브로 배포하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "공개해", "내보내자", "띄워", "배포", "배포해", "배포해줘", "쏘자", "올려", "올리자", "터트려", "푸시한 거 띄워", "프로덕션", "프로덕션에 박아", "demo가 필요", "demo가 필요해", "deploy", "launch", "release", "rollout", "ship", 또는 현재 브랜치를 axhub 라이브로 올리고 싶다는 모든 의도. 안전한 배포 준비 확인, 라이브 profile/app 해석, AskUserQuestion preview card 를 통한 HMAC consent gate, exit-code 기반 복구 라우팅을 담당합니다.'
+description: '이 스킬은 사용자가 현재 브랜치를 axhub 라이브로 배포하고 싶어할 때 사용합니다. 다음 표현에서 활성화: "공개해", "내보내자", "띄워", "배포", "배포해", "배포해줘", "쏘자", "올려", "올리자", "터트려", "푸시한 거 띄워", "프로덕션", "프로덕션에 박아", "demo가 필요", "demo가 필요해", "deploy", "launch", "release", "rollout", "ship", 또는 현재 브랜치를 axhub 라이브로 올리고 싶다는 모든 의도. 안전한 배포 준비 확인, 라이브 profile/app 해석, AskUserQuestion preview card 를 통한 AskUserQuestion preview-confirm gate, exit-code 기반 복구 라우팅을 담당합니다.'
 examples:
   - utterance: "paydrop 배포해"
     intent: "deploy current branch to axhub live"
@@ -20,7 +20,7 @@ model: sonnet
 
 # Deploy via axhub
 
-Deploy a vibe coder's app to axhub with safety primitives. Use the adapter `axhub-helpers` (auto on PATH while plugin is enabled) for live resolution and consent management. Do not call `axhub deploy create` directly without going through the helper flow.
+Deploy a vibe coder's app to axhub with safety primitives. Use the adapter `axhub-helpers` (auto on PATH while plugin is enabled) for live resolution, preview, and recovery planning. Do not call `axhub deploy create` directly without the preview-confirm flow.
 
 ## Claude Desktop Natural-Language Path
 
@@ -35,17 +35,17 @@ When the user says a human deployment phrase such as `배포해줘`, `올려줘`
 - After the user explicitly approves, run one Bash/tool call with title `배포 실행`: `axhub-helpers deploy-approved-run --user-utterance "<latest user sentence>"`.
 - Copy that Korean stdout as the final deploy result. Do not call this skill again after approval.
 - Do not echo the user's phrase as a route conversion, such as `"배포해줘" → ...`.
-- Do not write `/axhub:deploy`, `axhub deploy`, `deploy skill`, `skill 호출`, `트리거`, `Invoke deploy skill`, `Read rest of SKILL`, `Read full SKILL`, `Route=axhub`, `preflight`, `deploy-prep`, `HMAC`, or `consent token` in the assistant body.
+- Do not write `/axhub:deploy`, `axhub deploy`, `deploy skill`, `skill 호출`, `트리거`, `Invoke deploy skill`, `Read rest of SKILL`, `Read full SKILL`, `Route=axhub`, `preflight`, `deploy-prep`, or internal preview-state names in the assistant body.
 - If a Bash/tool call is needed, use Korean titles only: `배포 준비 확인`, `배포 실행`, or `배포 상태 확인`.
 - Before any destructive deploy, show only the Korean preview card (앱 / 환경 / 브랜치 / 커밋 / 예상 시간) and ask for explicit approval.
 - If login is expired or missing, explain whether login is needed in Korean and ask before starting a login flow.
 
 ## Vibe Coder Visibility Rules
 
-이 SKILL 을 쓰는 사람은 대부분 개발 지식이 없어요. helper 가 돌려주는 다음 field 는 **internal verification primitives** 예요. PreToolUse hook 가 동의 토큰 검증에 쓰고, retry / record FSM 도 같은 값으로 동작해요. 그래서 SKILL 안에서는 이 field 들을 변수에 담아 helper 와 주고받되, **raw 값을 사용자 chat 에 echo 하면 안 돼요**:
+이 SKILL 을 쓰는 사람은 대부분 개발 지식이 없어요. helper 가 돌려주는 다음 field 는 **internal verification primitives** 예요. retry / record FSM 이 같은 값으로 동작해요. 그래서 SKILL 안에서는 이 field 들을 변수에 담아 helper 와 주고받되, **raw 값을 사용자 chat 에 echo 하면 안 돼요**:
 
 - `binding_hash`, `pending_action_id`, `pending_action_hash`, `command_argv`, `command_id`
-- `consent_binding`, `synthesized_by_helper`, `retry_policy`, `idempotency_key`
+- `retry_policy`, `idempotency_key`
 - `exit_code`, `next_action`, `schema_version`, `stdout_json`, `stderr` (raw)
 - `bootstrap_plan`, `required_steps`, `decision_inputs`
 
@@ -56,7 +56,7 @@ When the user says a human deployment phrase such as `배포해줘`, `올려줘`
 | Step 1 첫 배포 / app 등록 | "처음 배포라 앱을 먼저 만들고 있어요." |
 | Step 1.5 git 저장 지점 준비 | "배포 전에 파일 저장 지점을 만들어두고 있어요." |
 | Step 3 preview card | 5필드 한국어 카드만 (앱 / 환경 / 브랜치 / 커밋 / 예상 시간) |
-| Step 4 consent → deploy | "배포 동의를 받았어요. 시작해요." |
+| Step 4 approval → deploy | "배포 확인을 받았어요. 시작해요." |
 | Step 5 watch | "빌드 시작했어요. 약 3분 뒤에 결과 알려드릴게요." |
 | Step 6 exit 4 / 65 | "axhub 로그인이 만료됐어요. 다시 로그인할까요?" |
 | Step 6 exit 64 | "다른 배포가 진행 중이라 지금은 못 올려요. 잠시 뒤에 다시 시도해요." |
@@ -101,7 +101,7 @@ crates/axhub-helpers/src/telemetry.rs::record_phase_marker):
   - phase marker: step_1_resolve
   - phase marker: step_1_1_bootstrap_plan
   - phase marker: step_2_preview_card
-  - phase marker: step_3_consent
+  - phase marker: step_3_preview_confirm
   - phase marker: step_4_deploy_create
   - phase marker: step_5_watch
 runtime impact 0 — comments only.
@@ -159,7 +159,7 @@ EXPLICIT_FLAG=""
 [ "${EXPLICIT:-0}" = "1" ] && EXPLICIT_FLAG="--explicit"
 ROUTE_JSON=$("$HELPER" route-decision --user-utterance "$ARGS" $EXPLICIT_FLAG 2>/dev/null)
 # fail-open: 빈 출력(헬퍼 자체가 없음)이면 axhub 로 진행해요 — SKILL 은 이미 선택된 상태고,
-# 실제 배포는 뒤의 AskUserQuestion preview card + HMAC consent gate 가 막아요(zero 피해).
+# 실제 배포는 뒤의 AskUserQuestion preview card + AskUserQuestion preview-confirm gate 가 막아요(zero 피해).
 ROUTE_DECISION=$(printf '%s' "$ROUTE_JSON" | jq -r '.decision // "axhub"' 2>/dev/null || echo axhub)
 echo "[deploy:Step 0 routing-gate] decision=$ROUTE_DECISION" >&2
 echo "$ROUTE_JSON"
@@ -168,8 +168,8 @@ echo "$ROUTE_JSON"
 `ROUTE_DECISION` 값으로 분기해요. **`axhub` 일 때만 axhub 배포를 진행**해요:
 
 - **`axhub`** → 정상 경로. 아래 Preflight 부터 Step 1 (deploy-prep) 로 계속 진행해요.
-- **`yield`** → 사용자가 다른 배포 타깃(예: `vercel`/`netlify`/`cloudflare`/`fly`/`render`/`railway`)을 명시했어요 (marker 가 있어도 named-target-wins). axhub 배포를 멈추고 disambiguation 질문 없이 한 줄로 "다른 배포 타깃을 쓰려는 것 같아서 axhub 배포는 건너뛸게요." 만 안내한 뒤 일반 흐름에 양보해요. **Preflight·deploy-prep·consent-mint·`axhub deploy create` 를 하나도 호출하지 말아요.**
-- **`ignore`** (marker 없음 + 무명시) / **`ask`** (axhub 와 다른 타깃 둘 다 명시) → axhub 인지 확실하지 않아요. 아래 AskUserQuestion 으로 한 번 물어봐요. 사용자가 "axhub 에 배포" 를 고르면 그때 Preflight 부터 이어가고, "여기 말고 다른 곳" 을 고르면 axhub 배포를 멈춰요. **물어보기 전에는 auth/resolve/consent 를 호출하지 말아요.**
+- **`yield`** → 사용자가 다른 배포 타깃(예: `vercel`/`netlify`/`cloudflare`/`fly`/`render`/`railway`)을 명시했어요 (marker 가 있어도 named-target-wins). axhub 배포를 멈추고 disambiguation 질문 없이 한 줄로 "다른 배포 타깃을 쓰려는 것 같아서 axhub 배포는 건너뛸게요." 만 안내한 뒤 일반 흐름에 양보해요. **Preflight·deploy-prep·`axhub deploy create` 를 하나도 호출하지 말아요.**
+- **`ignore`** (marker 없음 + 무명시) / **`ask`** (axhub 와 다른 타깃 둘 다 명시) → axhub 인지 확실하지 않아요. 아래 AskUserQuestion 으로 한 번 물어봐요. 사용자가 "axhub 에 배포" 를 고르면 그때 Preflight 부터 이어가고, "여기 말고 다른 곳" 을 고르면 axhub 배포를 멈춰요. **물어보기 전에는 auth/resolve 를 호출하지 말아요.**
 
 ```json
 {
@@ -209,7 +209,7 @@ echo "$PREFLIGHT_JSON"
 
 To deploy:
 
-0. **Render TodoWrite checklist — derive it from the actual deploy path (don't paste a fixed list).** Call TodoWrite at workflow start so the vibe coder sees real-time progress. The items depend on what `deploy-prep` returns in Step 1: a git-connected app whose push auto-deploys **watches** a deploy it did not create (status-first), while a first-deploy or non-git app mints consent and runs `deploy create`. Read the situation, then write the todos that match it — the two blocks below are reference shapes, not a script to paste. Reference shape A — git-connected / status-first watch:
+0. **Render TodoWrite checklist — derive it from the actual deploy path (don't paste a fixed list).** Call TodoWrite at workflow start so the vibe coder sees real-time progress. The items depend on what `deploy-prep` returns in Step 1: a git-connected app whose push auto-deploys **watches** a deploy it did not create (status-first), while a first-deploy or non-git app gets explicit approval and runs `deploy create`. Read the situation, then write the todos that match it — the two blocks below are reference shapes, not a script to paste. Reference shape A — git-connected / status-first watch:
 
    **TodoWrite availability:** call TodoWrite only when the current Claude host exposes an actual TodoWrite tool in the available tool list. In Claude Desktop or any host where TodoWrite is absent, do not call TodoWrite, do not create a fallback todo message, and silently continue the workflow; do not mention progress UI availability, missing tools, omitted tools, or internal fallback behavior to the user.
 
@@ -283,7 +283,7 @@ To deploy:
    fi
    ```
 
-   Never use cached `app_id` for mutation. If resolve returns an `app_id`, this is an existing app deploy: do **not** run `bootstrap apps_create`, and continue with git readiness, preview, and the normal consent-deploy path. If resolve returns ambiguity, ask the user to disambiguate (slug list with numeric IDs). If resolve cannot identify a registered app and the project has an `axhub.yaml`/`apphub.yaml`, enter the first-run bootstrap bridge below. The resolve JSON also includes `git_repo`, `git_has_commit`, and `git_init_needed`; deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
+   Never use cached `app_id` for mutation. If resolve returns an `app_id`, this is an existing app deploy: do **not** run `bootstrap apps_create`, and continue with git readiness, preview, and the normal approval-deploy path. If resolve returns ambiguity, ask the user to disambiguate (slug list with numeric IDs). If resolve cannot identify a registered app and the project has an `axhub.yaml`/`apphub.yaml`, enter the first-run bootstrap bridge below. The resolve JSON also includes `git_repo`, `git_has_commit`, and `git_init_needed`; deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
 
 1.1. **First-run bootstrap plan/record bridge (Sprint 3).** Use this only when Step 1 did not resolve an existing `app_id`. Before any first-run remote mutation, ask the Rust FSM for the next safe step:
 
@@ -295,7 +295,7 @@ To deploy:
    "$HELPER" bootstrap --auto-chain --json
    ```
 
-   Treat this output as the source of truth for Sprint 3 bootstrap state. If it returns `template_required`, `git_init_required`, `first_commit_required`, `subdomain_collision`, `backend_contract_missing_defaults`, or `idempotency_unavailable`, stop at that user-decision state and surface a humanized one-line reason plus the safest next command (jargon-free per Vibe Coder Visibility Rules). If it returns `next_action: apps_create` or `next_action: deploy_create`, **internally bind** `command`, `binding_hash`, `pending_action_id`, `pending_action_hash`, `retry_policy`, and `consent_binding` into shell variables (PreToolUse hook consumes them for consent verification + retry policy enforcement) but **do not echo their raw values to the user chat** — those are internal verification primitives. Show the user a single humanized line such as "처음 배포라 앱을 먼저 만들고 있어요." and proceed to consent + execution. The helper is only a planner/recorder here; it must not be treated as approval to mutate. If `deploy_create` is executed and recorded here, do not mint or run a second `deploy_create` in Step 4; jump to Step 5 status-chain with the recorded deployment id.
+   Treat this output as the source of truth for Sprint 3 bootstrap state. If it returns `template_required`, `git_init_required`, `first_commit_required`, `subdomain_collision`, `backend_contract_missing_defaults`, or `idempotency_unavailable`, stop at that user-decision state and surface a humanized one-line reason plus the safest next command (jargon-free per Vibe Coder Visibility Rules). If it returns `next_action: apps_create` or `next_action: deploy_create`, **internally bind** `command`, `pending_action_id`, `pending_action_hash`, and `retry_policy` into shell variables (retry policy enforcement consumes them) but **do not echo their raw values to the user chat** — those are internal verification primitives. Show the user a single humanized line such as "처음 배포라 앱을 먼저 만들고 있어요." and proceed to preview-confirmed execution. The helper is only a planner/recorder here; it must not be treated as approval to mutate. If `deploy_create` is executed and recorded here, do not run a second `deploy_create` in Step 4; jump to Step 5 status-chain with the recorded deployment id.
 
    **Desktop hard-stop for `template_required` / `manifest_missing`:** After the single `bootstrap --auto-chain --json` call returns `state: "template_required"` or `reason: "manifest_missing"`, do not run more context/file-inspection commands, do not keep thinking, and do not call `apps bootstrap`, `apps create`, or `deploy create`. Render one AskUserQuestion immediately:
 
@@ -323,7 +323,7 @@ To deploy:
    axhub manifest validate --file axhub.yaml --json
    ```
 
-   Do not stop after saying "프로젝트 확인" once the user has chosen this option. Do not invent deprecated `axhub init --from-template` or hand-written YAML in this branch; current CLI `axhub init --framework react-vite` is the manifest-only source of truth. If the local write or validate command fails, surface the validation reason and stop before any remote command. If it succeeds, rerun Step 1 (`deploy-prep` / bootstrap plan) so the new `axhub.yaml` is the source of truth, then show the preview approval card.
+   Do not stop after saying "프로젝트 확인" once the user has chosen this option. Do not invent deprecated `axhub init --from-template` or hand-written YAML in this branch; current CLI `axhub init --framework react-vite` is the manifest-only source of truth. If the local write or validate command fails, surface the validation reason and stop before any remote command. If it succeeds, rerun Step 1 (`deploy-prep` / bootstrap plan) so the new `axhub.yaml` is the source of truth, then show the preview card.
 
    Before rerunning Step 1, check whether the local initialization created deploy-affecting uncommitted changes:
 
@@ -331,9 +331,9 @@ To deploy:
    git status --porcelain --untracked-files=normal -- axhub.yaml apphub.yaml .gitignore package.json package-lock.json pnpm-lock.yaml bun.lockb bun.lock yarn.lock vite.config.* index.html src
    ```
 
-   If that command prints anything, do **not** show a preview using the previous commit. Route to Step 1.5 (`배포 전 저장 지점을 만들까요?`) first, so the generated manifest and any related deploy config are included in a fresh commit. Only after that fresh resolve returns the new `commit_sha` may the preview approval card appear.
+   If that command prints anything, do **not** show a preview using the previous commit. Route to Step 1.5 (`배포 전 저장 지점을 만들까요?`) first, so the generated manifest and any related deploy config are included in a fresh commit. Only after that fresh resolve returns the new `commit_sha` may the preview card appear.
 
-   Execute returned destructive `axhub ... --json` commands only as top-level Bash after the consent path runs (consent token mint via `consent-mint`). Then record the observed result back into the FSM with the same pending metadata — keep `pending_action_id` / `pending_action_hash` / `command_argv` / `exit_code` / `stdout_json` / `stderr` strictly inside the record JSON envelope, never as user-facing chat text:
+   Execute returned destructive `axhub ... --json` commands only as top-level Bash after the preview confirmation path runs. Then record the observed result back into the FSM with the same pending metadata — keep `pending_action_id` / `pending_action_hash` / `command_argv` / `exit_code` / `stdout_json` / `stderr` strictly inside the record JSON envelope, never as user-facing chat text:
 
    ```bash
    echo '[deploy:Step 1 bootstrap-record] entered' >&2
@@ -431,7 +431,7 @@ To deploy:
 
    git stderr 와 stdout 은 모두 `/dev/null` 로 보내요 — vibe coder chat 에 raw git output 이 노출되지 않게 구조적으로 막아요. `git commit` 이 실패하면 (no staged files / missing git identity) `|| true` 로 다음 줄로 넘어가고, 뒤따르는 resolve 호출이 `branch` / `commit_sha` 가 비어 있다고 알려서 humanized 한 줄로 사용자에게 안내해요. `AXHUB_DEPLOY_VERBOSE=1` 환경변수가 켜진 세션에서는 Visibility Rules 가 verbose lane 으로 전환되어 raw 출력이 다시 보여요 (개발 검증용).
 
-   If `git commit` fails because there are no staged files or git identity is missing, stop before deploy and surface a humanized one-line reason ("저장 지점을 만들지 못했어요. 잠시 뒤에 다시 시도해요." 같은 한 줄). 내부 git stderr 는 user chat 에 직접 echo 하지 마요. Do not mint deploy consent until a fresh resolve returns both `branch` and `commit_sha`.
+   If `git commit` fails because there are no staged files or git identity is missing, stop before deploy and surface a humanized one-line reason ("저장 지점을 만들지 못했어요. 잠시 뒤에 다시 시도해요." 같은 한 줄). 내부 git stderr 는 user chat 에 직접 echo 하지 마요. Do not execute deploy until a fresh resolve returns both `branch` and `commit_sha`.
    If the user chooses "취소", stop deploy without running any git command. In non-interactive mode (subprocess / CI / `claude -p`), use the registry safe default "취소" — never run `git init` automatically in headless context.
 
 1.6. **In-flight deploy 감지 (배포 충돌 방지) — 3-way 분기.** `deploy-prep` 응답에 `.in_flight_deploy.id` 가 non-null 이면 이미 진행 중인 배포가 있어요. `in_flight_deploy.commit_sha` 와 `resolve.commit_sha` 비교로 3 가지 sub-step (1.6a / 1.6b / 1.6c) 중 어느 분기로 진입할지 결정해요.
@@ -548,9 +548,9 @@ To deploy:
 
    - `monitor` 선택 시: Step 5 status-chain 으로 바로 이동해 `$IN_FLIGHT_ID` 를 watch 해요. 새 `deploy create` 는 실행하지 않아요.
    - `force_new` 선택 시: Step 2 로 진행해요. exit 64 + `validation.deployment_in_progress` 에러가 나도 retry 하지 않아요 (Step 6 라우팅 따름).
-   - `abort` 선택 시: 배포를 멈춰요. consent 를 발급하지 않아요.
+   - `abort` 선택 시: 배포를 멈춰요. 실행하지 않아요.
 
-1.7. **Status-first gate (배포는 status 먼저 — `deploy create` 는 fallback).** push 가 자동배포를 트리거하는 환경(`deploy-prep` 의 `.github_connected: true`)에서는 preview/consent 로 가기 전에 **지금 돌고 있는 배포가 있는지 먼저 확인**해요. push 로 이미 시작된 배포가 있는데 새 `deploy create` 를 실행하면, exit 64 충돌이나 consent/commit 불일치 deny 로 이어져서 토큰 재발급·우회 루프에 빠져요. 도는 배포가 있으면 그걸 따라가고(create 생략), 없을 때만 Step 2 이후 명시적 create 로 진행해요 — 이게 "status 보고 배포가 아니면 그제서야 진짜 create" 예요. 단, Step 1.6 이 이미 in-flight 를 처리했으면 (특히 사용자가 거기서 `force_new` 를 골랐으면) 그 선택을 존중해서 이 gate 는 건너뛰고 Step 2 로 진행해요 — 같은 in-flight 를 다시 watch 로 되돌리지 않아요.
+1.7. **Status-first gate (배포는 status 먼저 — `deploy create` 는 fallback).** push 가 자동배포를 트리거하는 환경(`deploy-prep` 의 `.github_connected: true`)에서는 preview/approval 로 가기 전에 **지금 돌고 있는 배포가 있는지 먼저 확인**해요. push 로 이미 시작된 배포가 있는데 새 `deploy create` 를 실행하면, exit 64 충돌이나 commit 불일치 또는 deploy 충돌 로 이어져서 재시도 루프에 빠져요. 도는 배포가 있으면 그걸 따라가고(create 생략), 없을 때만 Step 2 이후 명시적 create 로 진행해요 — 이게 "status 보고 배포가 아니면 그제서야 진짜 create" 예요. 단, Step 1.6 이 이미 in-flight 를 처리했으면 (특히 사용자가 거기서 `force_new` 를 골랐으면) 그 선택을 존중해서 이 gate 는 건너뛰고 Step 2 로 진행해요 — 같은 in-flight 를 다시 watch 로 되돌리지 않아요.
 
    ```bash
    echo '[deploy:Step 1.7 status-first] entered' >&2
@@ -575,9 +575,9 @@ To deploy:
    fi
    ```
 
-   - `STATUS_FIRST_ID` 가 non-empty → 이미 배포가 돌고 있어요. **여기서 Step 1.6 의 3-way 분기를 그대로 재사용**해요: `.in_flight_deploy.commit_sha` 와 `.resolve.commit_sha` 를 비교해서 same-commit 이면 본인 push 배포라 바로 Step 5 watch (`monitor`) 로 가고, cross-tenant / uncertain 이면 1.6b / 1.6c AskUserQuestion 으로 사용자에게 물어요. 이 경로에서는 **consent-mint 도 `deploy create` 도 실행하지 않아요** — 남의 배포를 말없이 본인 것처럼 따라가지 않으려고 same-commit 일 때만 자동 watch 예요.
+   - `STATUS_FIRST_ID` 가 non-empty → 이미 배포가 돌고 있어요. **여기서 Step 1.6 의 3-way 분기를 그대로 재사용**해요: `.in_flight_deploy.commit_sha` 와 `.resolve.commit_sha` 를 비교해서 same-commit 이면 본인 push 배포라 바로 Step 5 watch (`monitor`) 로 가고, cross-tenant / uncertain 이면 1.6b / 1.6c AskUserQuestion 으로 사용자에게 물어요. 이 경로에서는 **새 `deploy create` 를 실행하지 않아요** — 남의 배포를 말없이 본인 것처럼 따라가지 않으려고 same-commit 일 때만 자동 watch 예요.
    - `STATUS_FIRST_ID` 가 empty (도는 배포 없음) → Step 2 이후 명시적 create 경로로 진행해요. github 연결이 아니거나, 폴링 동안에도 자동배포가 안 잡힌 경우예요.
-   - hook 이 `deploy create` 를 deny 하면 (consent/binding 불일치) flag 를 빼거나 wrapper 로 우회하지 말고, 사유를 한 줄로 알린 뒤 멈추거나 이 status-first watch 로 돌아와요 (NEVER 절 참조).
+   - `deploy create` 가 거절되면 flag 를 빼거나 wrapper 로 우회하지 말고, 사유를 한 줄로 알린 뒤 멈추거나 이 status-first watch 로 돌아와요 (NEVER 절 참조).
 
 2. **Pre-flight version check (legacy fallback only).** Phase 1 default path skips this — `deploy-prep` already returned the preflight envelope as `.preflight` in Step 1's JSON. Use the cached value: read `cli_too_old`, `cli_too_new`, `auth_ok` directly via `jq`. The block below is the legacy fallback path that fires only when `AXHUB_DEPLOY_PREP=0` is set:
 
@@ -673,7 +673,7 @@ if [ "$AXHUB_HEADLESS" = "1" ]; then
 fi
 ```
 
-`DEPLOY_DECISION=dry_run` 이면 Step 4 에서 consent 를 mint 하지 말고 `--dry-run` 만 실행해요. `DEPLOY_DECISION=approve` 는 대화형 AskUserQuestion 승인 뒤에만 가능해요. `DEPLOY_DECISION=abort` 이면 즉시 멈춰요. Headless 에서는 외부 환경변수가 approve 를 미리 넣어도 dry-run 으로 덮어써요.
+`DEPLOY_DECISION=dry_run` 이면 Step 4 에서 `--dry-run` 만 실행해요. `DEPLOY_DECISION=approve` 는 대화형 AskUserQuestion 승인 뒤에만 가능해요. `DEPLOY_DECISION=abort` 이면 즉시 멈춰요. Headless 에서는 외부 환경변수가 approve 를 미리 넣어도 dry-run 으로 덮어써요.
 
 3. **Render preview card via AskUserQuestion**. AskUserQuestion is interactive-only; headless sessions use the safe default dry-run path below. The card MUST echo all five identity fields verbatim in Korean:
 
@@ -716,9 +716,9 @@ fi
    }
    ```
 
-   If the user chooses `dry_run`, add `--dry-run` to Step 4 and skip Step 5. In headless sessions (`claude -p`, CI, `$CLAUDE_NON_INTERACTIVE`, or AskUserQuestion denied/unavailable), **do not call AskUserQuestion and do not stop at the options list**. Apply `DEPLOY_DECISION=dry_run` from the Non-interactive guard directly, add `--dry-run` to Step 4, and skip Step 5. Headless sessions must not mint consent or run `--execute`.
+   If the user chooses `dry_run`, add `--dry-run` to Step 4 and skip Step 5. In headless sessions (`claude -p`, CI, `$CLAUDE_NON_INTERACTIVE`, or AskUserQuestion denied/unavailable), **do not call AskUserQuestion and do not stop at the options list**. Apply `DEPLOY_DECISION=dry_run` from the Non-interactive guard directly, add `--dry-run` to Step 4, and skip Step 5. Headless sessions must not confirm approval or run `--execute`.
 
-3.5. **Token freshness gate (Phase 3.5 B-08).** Before minting consent, confirm that the auth token is fresh — SessionStart may have fired `auth-refresh-bg` in the background while the user reviewed the preview card. Skip when `AXHUB_AUTH_BG_REFRESH=0`.
+3.5. **Token freshness gate (Phase 3.5 B-08).** Before running deploy, confirm that the auth token is fresh — SessionStart may have fired `auth-refresh-bg` in the background while the user reviewed the preview card. Skip when `AXHUB_AUTH_BG_REFRESH=0`.
 
    ```bash
    echo '[deploy:Step 3.5 token-freshness] entered' >&2
@@ -750,17 +750,15 @@ fi
 
    in_flight 가 발견되면 Step 1.6 의 3-way 분기 (1.6a / 1.6b / 1.6c) logic 을 동일하게 적용해요. `IN_FLIGHT_COMMIT` vs `RESOLVE_COMMIT` 비교 후 same-commit / cross-tenant / uncertain 분기 선택 → 해당 AskUserQuestion → `monitor` (Step 5 watch) / `force_new` (Step 4 계속) / `abort` (중단). non-interactive 환경에서는 건너뛰어요 (`AXHUB_REFRESH_IN_FLIGHT` 기본값 0 → no-op).
 
-4. **On user approval**, mint a consent token and run deploy. Run this step only when Step 1.1 did not already execute and record `deploy_create`; never double-submit a deploy for the same pending bootstrap action. 이 Step 은 **fallback create 경로**예요 — Step 1.7 status-first 가 도는 배포를 못 찾았을 때만 도달해요.
+4. **On user approval**, run deploy. Run this step only when Step 1.1 did not already execute and record `deploy_create`; never double-submit a deploy for the same pending bootstrap action. 이 Step 은 **fallback create 경로**예요 — Step 1.7 status-first 가 도는 배포를 못 찾았을 때만 도달해요.
 
    ```bash
-   echo '[deploy:Step 4 consent-deploy] entered' >&2
+   echo '[deploy:Step 4 execute-deploy] entered' >&2
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
-   CONSENT_PROFILE=""
    PROFILE_FLAG=()
    if [ -n "${PROFILE:-}" ] && [ "${PROFILE:-}" != "default" ]; then
-     CONSENT_PROFILE="$PROFILE"
      PROFILE_FLAG=(--profile "$PROFILE")
    fi
    AXHUB_STDERR_TMP=$(mktemp)
@@ -772,9 +770,6 @@ fi
      rm -f "$AXHUB_STDERR_TMP" "$AXHUB_STDOUT_TMP"
      exit 0
    else
-     cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"deploy_create","app_id":"${APP_ID}","profile":"${CONSENT_PROFILE}","branch":"","commit_sha":"${COMMIT_SHA}","context":{}}
-   JSON
      axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --commit "$COMMIT_SHA" --execute --json >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
    fi
    AXHUB_EXIT=$?
@@ -849,8 +844,6 @@ fi
    Remove-Item $AxhubStdoutTmp.FullName -Force
    ```
 
-   The next Bash tool call id is created by Claude after consent-mint runs, so never invent `${NEXT_BASH_TOOL_CALL_ID}`, never set a fake `CLAUDE_SESSION_ID`, and never clear the real session env just to mint consent. `tool_call_id:"pending"` explicitly mints a short-lived pending token; the PreToolUse hook claims it once only when action/app/profile/commit/context all match. If the token is absent, already used, expired, or non-matching, the command is blocked. This avoids POSIX-only session-unset commands and keeps the flow portable across macOS/Linux/Windows Claude Code environments.
-
 5. **Post-deploy chain** — capture `.id` from the deploy create JSON, then auto-follow until terminal:
 
    ```bash
@@ -879,7 +872,7 @@ fi
 
 6. **On any non-zero exit**, route via `axhub-helpers classify-exit "$EXIT" "$STDOUT"` (spec 004 Fork-A — canonical router; 두 공간 다 처리: Step 5 `deploy status --watch` 는 CLI-native 4/5/6, Step 1 `deploy-prep` 는 helper-output 65/67/68 을 내고, classify-exit 가 65→4 / 67→5 / 68→6 으로 정규화해요) 또는 `references/error-empathy-catalog.md` by exit code:
    - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 앱은 안전해요. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.
-   - exit 9 + `subdomain_not_configured`, `validation.subdomain_not_configured`, or CLI stderr containing "subdomain_not_configured" / "subdomain" → backend precondition 이 먼저 막은 상태예요. `axhub apps update <slug> --subdomain <subdomain> --json` 는 별도 destructive mutation 이라 바로 실행하지 말고, subdomain 2..32자 제약을 적용한 후보를 preview card 로 보여준 뒤 consent-mint 해요. 승인 후에는 apps_update 를 단독 Bash 로 실행하고, 성공하면 같은 deploy preview 승인 맥락에서 deploy_create consent 를 새로 mint 해서 Step 4 를 한 번만 재시도해요. 재시도 결과가 다시 exit 9 이면 같은 branch 를 반복하지 말고 다음 precondition branch 로 라우팅해요.
+   - exit 9 + `subdomain_not_configured`, `validation.subdomain_not_configured`, or CLI stderr containing "subdomain_not_configured" / "subdomain" → backend precondition 이 먼저 막은 상태예요. `axhub apps update <slug> --subdomain <subdomain> --json` 는 별도 destructive mutation 이라 바로 실행하지 말고, subdomain 2..32자 제약을 적용한 후보를 preview card 로 보여준 뒤 preview confirmation 해요. 승인 후에는 apps_update 를 단독 Bash 로 실행하고, 성공하면 같은 deploy preview 승인 맥락에서 Step 4 를 한 번만 재시도해요. 재시도 결과가 다시 exit 9 이면 같은 branch 를 반복하지 말고 다음 precondition branch 로 라우팅해요.
    - exit 9/64/67 + `github.git_connection_required`, `github.git_connection_not_found`, `git_connection_required`, `precondition_failed` with CLI stderr containing "GitHub 저장소 연결" / "GitHub 연결이 먼저 필요해요" → do not ask "지금 GitHub repo 연결 진행할까요?" and do not ask the user to invoke `/axhub:github`. Immediately show a direct GitHub connection block:
 
      ```bash
@@ -887,13 +880,13 @@ fi
      axhub apps git status --app "$APP_ID" --json
      ```
 
-     Render the first `install_url` from that output as `GitHub 연결 링크: <install_url>` so the user can grant repo access directly. If the repo itself does not exist yet, also show `GitHub repo 만들기: https://github.com/new?name=$APP_SLUG` as context only. Then route into `skills/github/SKILL.md` guided setup/connect; do not end with a manual connect command as the next step. GitHub guided setup/connect owns repo create, remote add, first push, and connect consent.
+     Render the first `install_url` from that output as `GitHub 연결 링크: <install_url>` so the user can grant repo access directly. If the repo itself does not exist yet, also show `GitHub repo 만들기: https://github.com/new?name=$APP_SLUG` as context only. Then route into `skills/github/SKILL.md` guided setup/connect; do not end with a manual connect command as the next step. GitHub guided setup/connect owns repo create, remote add, first push, and connect approval.
 
      ```bash
      axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json
      ```
 
-     Do not present the command above as the user's next manual command. It is the final command that the GitHub skill may run only after its guided ladder verifies repo visibility and mints consent. If the account is already installed and the desired repo appears in `axhub apps git status --app "$APP_ID" --json` (or dry-run `axhub apps git connect`), tell the user the repo is ready and route directly to `skills/github/SKILL.md` Step 4 consent-connect without another yes/no handoff.
+     Do not present the command above as the user's next manual command. It is the final command that the GitHub skill may run only after its guided ladder verifies repo visibility and receives explicit approval. If the account is already installed and the desired repo appears in `axhub apps git status --app "$APP_ID" --json` (or dry-run `axhub apps git connect`), tell the user the repo is ready and route directly to `skills/github/SKILL.md` Step 4 approved-connect without another yes/no handoff.
    - exit 4 (CLI watch) / 65 (helper deploy-prep·preflight) → token expired template + AskUserQuestion to run auth login
    - exit 5 (CLI watch) / 67 (helper deploy-prep) → resource not found + did-you-mean suggestion from apps list
    - exit 6 (CLI watch) / 68 (helper) → rate limit + Retry-After backoff
@@ -951,7 +944,7 @@ Cancel is a mutation. Preview the in-progress deployment first:
 - current status
 - expected effect
 
-Mint consent with stdin JSON using `action=deploy_cancel`, top-level `app_id`, and `context={deployment_id}` and then run:
+Confirm approval with stdin JSON using `action=deploy_cancel`, top-level `app_id`, and `context={deployment_id}` and then run:
 
 ```bash
 axhub deploy cancel "$DEPLOYMENT_ID" --app "$APP_ID" --execute --json
@@ -967,13 +960,13 @@ After cancellation, run a read-only status check and summarize the terminal stat
 
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop `--json` (parsing relies on it).
-- NEVER call `axhub deploy create` without going through `${CLAUDE_PLUGIN_ROOT}/bin/axhub-helpers consent-mint` first; the PreToolUse hook will deny.
-- NEVER bypass the `preauth-check` consent hook by changing command semantics (e.g. omitting `--execute`, changing `--app`, or changing `--commit`), building a command wrapper, symlinking `axhub` to a shim, or reordering `PATH` to shadow the real CLI. A denied `deploy create` means the consent binding did not match — improvising around the gate defeats the safety primitive. Surface the typed reason in one jargon-free line and stop, or fall back to the Step 1.7 status-first watch.
-- NEVER instruct the user to run `axhub deploy create`, `axhub deploy watch`, or any other deploy CLI command themselves — in their own terminal or via a `!`-prefixed prompt. Handing the raw command to the user is a consent-hook bypass equivalent to flag-stripping: it defeats the same safety primitive and skips the `--watch-timeout` polling contract. The agent runs deploy and watch itself inside this SKILL flow; if blocked, surface the typed reason in one jargon-free line and stop, or fall back to the Step 1.7 status-first watch — never delegate the raw command to the user.
-- NEVER mint consent or run `deploy create` when Step 1.7 status-first already found an in-flight deploy for this app; route to watch instead. `deploy create` is the fallback only when no deploy is running.
-- NEVER call `axhub deploy cancel` without a matching `deploy_cancel` consent token.
+- NEVER call `axhub deploy create --execute` without the AskUserQuestion preview decision, except when bootstrap has already returned a recorded pending action to execute exactly once.
+- NEVER change command semantics after approval (e.g. omitting `--execute`, changing `--app`, or changing `--commit`). Surface the typed reason in one jargon-free line and stop, or fall back to the Step 1.7 status-first watch.
+- NEVER instruct the user to run `axhub deploy create`, `axhub deploy watch`, or any other deploy CLI command themselves — in their own terminal or via a `!`-prefixed prompt. Handing the raw command to the user is a approval bypass equivalent to flag-stripping: it defeats the same safety primitive and skips the `--watch-timeout` polling contract. The agent runs deploy and watch itself inside this SKILL flow; if blocked, surface the typed reason in one jargon-free line and stop, or fall back to the Step 1.7 status-first watch — never delegate the raw command to the user.
+- NEVER run `deploy create` when Step 1.7 status-first already found an in-flight deploy for this app; route to watch instead. `deploy create` is the fallback only when no deploy is running.
+- NEVER call `axhub deploy cancel` without explicit confirmation.
 - NEVER infer `app_id` from `pwd` or git remote alone in the mutation path; always live resolve through the helper.
-- NEVER bypass the AskUserQuestion preview card on slash invocation; slash is explicit consent for the SKILL invocation, not for the destructive operation.
+- NEVER bypass the AskUserQuestion preview card on slash invocation; slash is explicit confirmation for the SKILL invocation, not for the destructive operation.
 
 ## Additional Resources
 

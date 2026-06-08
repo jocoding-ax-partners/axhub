@@ -52,7 +52,7 @@ if [ "$STATE" = "PASS" ]; then
     echo "  FAIL: fixture shim did not observe deploy create --dry-run argv" >&2
     FAIL=1
   fi
-  for forbidden_tool in "auth login" "consent-mint" "DEPLOY_DECISION=approve" "AXHUB_E2E_DESTRUCTIVE" "--execute"; do
+  for forbidden_tool in "auth login" "approval preview" "DEPLOY_DECISION=approve" "AXHUB_E2E_DESTRUCTIVE" "--execute"; do
     if jq -r '.permission_denials[]?.tool_input?.command? // ""' "$STDOUT" | grep -F -q -- "$forbidden_tool"; then
       echo "  FAIL: headless deploy case attempted forbidden tool detour '$forbidden_tool'" >&2
       FAIL=1

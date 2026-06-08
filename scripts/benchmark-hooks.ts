@@ -2,8 +2,8 @@
 /**
  * M4 hook latency benchmark.
  *
- * Measures the hot no-op paths that run on every non-axhub Bash command:
- * - PreToolUse: `preauth-check` should allow a non-destructive Bash command.
+ * Measures hot no-op hook paths that run on common agent events:
+ * - UserPromptSubmit: `prompt-route` should stay below the accepted latency gate.
  * - PostToolUse: `classify-exit` should emit `{}` for a non-axhub Bash command.
  *
  * The original PLAN text demanded 5ms p95, but audit row 16 accepted the
@@ -45,21 +45,6 @@ exit 0
 chmodSync(fakeAxhub, 0o755);
 
 const scenarios = [
-  {
-    name: "preauth-check non-axhub Bash allow",
-    subcommand: "preauth-check",
-    thresholdMs: 30,
-    payload: {
-      hook_event_name: "PreToolUse",
-      tool_name: "Bash",
-      tool_input: { command: "echo hello" },
-    },
-    assertOutput(stdout: string): void {
-      const parsed = JSON.parse(stdout);
-      const decision = parsed?.hookSpecificOutput?.permissionDecision;
-      if (decision !== "allow") throw new Error(`expected PreToolUse allow, got ${stdout}`);
-    },
-  },
   {
     name: "classify-exit non-axhub Bash no-op",
     subcommand: "classify-exit",
@@ -118,21 +103,6 @@ const scenarios = [
       const parsed = JSON.parse(stdout);
       const ctx = parsed?.hookSpecificOutput?.additionalContext;
       if (typeof ctx !== "string") throw new Error(`expected preflight string context, got ${stdout}`);
-    },
-  },
-  {
-    name: "cumulative PreToolUse Bash chain",
-    subcommand: "preauth-check+commit-gate",
-    thresholdMs: 90,
-    payload: {
-      hook_event_name: "PreToolUse",
-      tool_name: "Bash",
-      tool_input: { command: "echo hello" },
-    },
-    assertOutput(stdout: string): void {
-      const parsed = JSON.parse(stdout.split("\n").filter(Boolean).at(-1) ?? "{}");
-      const decision = parsed?.hookSpecificOutput?.permissionDecision;
-      if (decision !== "allow") throw new Error(`expected cumulative allow, got ${stdout}`);
     },
   },
   {

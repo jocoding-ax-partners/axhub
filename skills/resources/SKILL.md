@@ -106,7 +106,7 @@ fi
 
 3. **mutation 명령.** delete cascade 는 별도 강한 확인 문구를 보여줘요.
 
-   Consent binding 은 helper parser 와 같은 action/context 로 맞춰요: namespace 는 `{name,tenant,parent_id?}`, rename/move/delete/tag 는 `{resource_id,tenant,...}`, bulk-register 는 `{connector_id,source,tenant,items_file?,items_digest}` 예요. bulk-register `source` 는 `--items-file` 일 때 `items_file`, `--items-json` 일 때 `items_json` 으로 맞추고, 파일과 inline JSON 모두 `items_digest:"sha256:..."` 를 같이 mint 해요.
+   Approval context 은 helper parser 와 같은 action/context 로 맞춰요: namespace 는 `{name,tenant,parent_id?}`, rename/move/delete/tag 는 `{resource_id,tenant,...}`, bulk-register 는 `{connector_id,source,tenant,items_file?,items_digest}` 예요. bulk-register `source` 는 `--items-file` 일 때 `items_file`, `--items-json` 일 때 `items_json` 으로 맞추고, 파일과 inline JSON 모두 `items_digest:"sha256:..."` 를 같이 확인해요.
 
    ```bash
    ITEMS_DIGEST="sha256:$(shasum -a 256 items.json | awk '{print $1}')"

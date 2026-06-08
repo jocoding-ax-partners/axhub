@@ -19,14 +19,14 @@ When Claude Code ships a new payload shape:
 
 1. Create `tests/hook-fixtures/v1/` with new fixtures matching the updated schema.
 2. Bump `HOOK_SCHEMA_VERSION` constant in `src/axhub-helpers/index.ts` from `"v0"` to `"v1"`.
-3. Update parser/validator logic in the affected subcommands (`preauth-check`, `classify-exit`, `session-start`).
+3. Update parser/validator logic in the affected subcommands (`preview-check`, `classify-exit`, `session-start`).
 4. Keep `v0/` fixtures in place — they serve as regression tests for the old shape.
 
 ## Fixture Index (v0/)
 
 | File | Hook Event | Tool | Purpose |
 |------|-----------|------|---------|
-| `pretooluse-bash-axhub-deploy.json` | PreToolUse | Bash | Destructive `axhub deploy create` — consent gate must intercept |
+| `pretooluse-bash-axhub-deploy.json` | PreToolUse | Bash | Destructive `axhub deploy create` — preview gate must intercept |
 | `pretooluse-non-axhub.json` | PreToolUse | Bash | Non-axhub command — helper must early-return (exit 0) |
 | `pretooluse-non-bash.json` | PreToolUse | Read | Non-Bash tool — helper must early-return (exit 0) |
 | `posttooluse-bash-success.json` | PostToolUse | Bash | Successful `axhub apps list` (exit 0) |
@@ -52,7 +52,7 @@ SessionStart omits `tool_name` and `tool_input` entirely.
 
 ```bash
 # Pipe a fixture directly into the binary subcommand:
-cat tests/hook-fixtures/v0/pretooluse-bash-axhub-deploy.json | bin/axhub-helpers preauth-check
+cat tests/hook-fixtures/v0/pretooluse-bash-axhub-deploy.json | bin/axhub-helpers preview-check
 cat tests/hook-fixtures/v0/posttooluse-bash-exit65.json      | bin/axhub-helpers classify-exit
 cat tests/hook-fixtures/v0/sessionstart.json                 | bin/axhub-helpers session-start
 

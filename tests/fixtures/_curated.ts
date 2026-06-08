@@ -108,7 +108,7 @@ const FIXTURES: Fixture[] = [
   {
     id: "ro-001-apps-list",
     category: "read-only",
-    description: "Apps list — pure read, no consent gate",
+    description: "Apps list — pure read, no preview gate",
     input: { command: "axhub apps list --json" },
     expected: { is_destructive: false },
   },

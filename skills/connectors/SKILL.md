@@ -22,7 +22,7 @@ model: sonnet
 
 # External data connectors
 
-외부 DB 커넥터를 등록·수정·삭제하고 자격증명을 갱신해요. credentials 는 로컬 파일 digest 로 고정하고, mutation 은 consent 뒤에만 `--execute` 해요.
+외부 DB 커넥터를 등록·수정·삭제하고 자격증명을 갱신해요. credentials 는 로컬 파일 digest 로 고정하고, mutation 은 preview 와 명시 확인 뒤에만 `--execute` 해요.
 
 ## Steps
 
@@ -97,7 +97,7 @@ fi
 
 4. **mutation 명령.**
 
-   Consent binding 은 helper parser 와 같은 action/context 로 맞춰요: create 는 `{name,tenant,engine,source,config_file,config_digest,credentials_file,credentials_digest}`, update 는 `{connector_id,tenant,fields,source?,config_file?,config_digest?,description_digest?,enabled?,disabled?}`, credentials 는 `{connector_id,tenant,source,credentials_file,credentials_digest}`, delete 는 `{connector_id,tenant}` 예요. 파일 payload 는 preview 직후 `shasum -a 256` 으로 digest 를 계산하고 같은 digest 로 mint 해요.
+   Approval context 은 helper parser 와 같은 action/context 로 맞춰요: create 는 `{name,tenant,engine,source,config_file,config_digest,credentials_file,credentials_digest}`, update 는 `{connector_id,tenant,fields,source?,config_file?,config_digest?,description_digest?,enabled?,disabled?}`, credentials 는 `{connector_id,tenant,source,credentials_file,credentials_digest}`, delete 는 `{connector_id,tenant}` 예요. 파일 payload 는 preview 직후 `shasum -a 256` 으로 digest 를 계산하고 같은 digest 로 확인해요.
 
    ```bash
    CFG_DIGEST="sha256:$(shasum -a 256 cfg.json | awk '{print $1}')"
@@ -116,5 +116,5 @@ fi
 ## NEVER
 
 - NEVER credentials 를 argv, telemetry, chat 에 평문으로 넣지 않아요.
-- NEVER `--credentials-stdin` 을 destructive consent 경로에 쓰지 않아요. PreToolUse 가 stdin payload digest 를 검증할 수 없어요.
+- NEVER `--credentials-stdin` 을 destructive approval 경로에 쓰지 않아요. PreToolUse 가 stdin payload digest 를 검증할 수 없어요.
 - NEVER 비대화형에서 커넥터 생성/수정/삭제를 자동 실행하지 않아요.

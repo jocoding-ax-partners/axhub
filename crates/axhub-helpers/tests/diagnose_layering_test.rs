@@ -1,6 +1,6 @@
 //! Plan v6 §14 — layering rule enforcement for `diagnose/*`.
 //!
-//! `diagnose/*` MAY import: consent::{decision,jwt,key}, audit_ledger, redact,
+//! `diagnose/*` MAY import: audit_ledger, redact,
 //!                          recovery_scan, event_log, telemetry, hook_safety,
 //!                          atomic_jsonl, runtime_paths, plus std/external deps.
 //! `diagnose/*` MUST NOT import: bootstrap, list_deployments, deploy_prep,

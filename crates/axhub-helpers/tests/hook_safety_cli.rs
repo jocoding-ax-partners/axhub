@@ -1,7 +1,7 @@
 // Phase 25 PR 25.2 — Hook safety CLI integration tests.
 //
-// Verifies that the four axhub hook entry points (session-start, preauth-check,
-// prompt-route, classify-exit) honor `AXHUB_DISABLE_HOOKS`,
+// Verifies that the axhub hook entry points (session-start, prompt-route,
+// classify-exit) honor `AXHUB_DISABLE_HOOKS`,
 // `AXHUB_DISABLE_HOOK=<csv>`, and the legacy `DISABLE_AXHUB` alias per the
 // kill-switch precedence rules in `docs/HOOKS.md`. Each test spawns the
 // helper binary the same way `cli_e2e.rs` does so we exercise the real
@@ -94,7 +94,7 @@ fn session_start_per_hook_csv_without_match_runs_normally() {
     let out = run_stdin(
         &["session-start"],
         "",
-        &[("AXHUB_DISABLE_HOOK", "preauth-check,prompt-route")],
+        &[("AXHUB_DISABLE_HOOK", "prompt-route,classify-exit")],
     );
     assert!(out.status.success());
     let s = stdout(&out);
@@ -131,35 +131,6 @@ fn legacy_alias_loses_to_canonical_global() {
         !err.contains("deprecated"),
         "canonical should short-circuit legacy warning, got stderr: {err:?}"
     );
-}
-
-// --- preauth-check --------------------------------------------------------
-
-#[test]
-fn preauth_check_kill_switch_returns_allow() {
-    let out = run_stdin(
-        &["preauth-check"],
-        r#"{"tool_name":"Bash","tool_input":{"command":"axhub deploy create"}}"#,
-        &[("AXHUB_DISABLE_HOOKS", "1")],
-    );
-    assert!(out.status.success());
-    let s = stdout(&out);
-    assert!(
-        s.contains("\"permissionDecision\":\"allow\""),
-        "preauth-check skip should still emit allow, got: {s}"
-    );
-}
-
-#[test]
-fn preauth_check_per_hook_csv_skips_only_listed() {
-    let out = run_stdin(
-        &["preauth-check"],
-        r#"{"tool_name":"Bash","tool_input":{"command":"axhub deploy create"}}"#,
-        &[("AXHUB_DISABLE_HOOK", "preauth-check")],
-    );
-    assert!(out.status.success());
-    let s = stdout(&out);
-    assert!(s.contains("\"permissionDecision\":\"allow\""));
 }
 
 // --- prompt-route ---------------------------------------------------------

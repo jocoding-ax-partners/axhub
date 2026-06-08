@@ -65,7 +65,7 @@ describe("hooks/session-start.sh kill switch", () => {
 
   test("per-hook list naming a different hook does NOT skip session-start", () => {
     const out = runShell("hooks/session-start.sh", {
-      AXHUB_DISABLE_HOOK: "preauth-check,prompt-route",
+      AXHUB_DISABLE_HOOK: "prompt-route,classify-exit",
     });
     expect(out.status).toBe(0);
     // Should produce some output (wrapper kept going past kill switch).

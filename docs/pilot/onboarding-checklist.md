@@ -40,7 +40,7 @@
   - OFF: 별다른 액션 필요 없음 (default)
 - [ ] `AXHUB_REQUIRE_COSIGN=1` 강제 enable 결정
   - 권장: 회사 노트북 표준 환경변수에 포함 (signed binary가 아닐 시 session-start에서 경고)
-- [ ] HMAC consent 키 보관 정책: 각 vibe coder의 `~/.local/state/axhub/hmac-key` 는 IT 백업 X (per-user 격리)
+- [ ] preview confirmation 키 보관 정책: 각 vibe coder의 `~/.local/state/axhub/hmac-key` 는 IT 백업 X (per-user 격리)
 
 ### Day -1 dry-run
 

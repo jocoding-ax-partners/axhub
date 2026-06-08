@@ -229,7 +229,7 @@ pub fn fallback_axhub_paths() -> Vec<PathBuf> {
 /// Returns `true` when `AXHUB_PERF_AUTO_APPROVE=1` is set.
 ///
 /// Test/CI only — never set in user production. Used by the perf walltime
-/// test suite (Phase 0) to bypass `AskUserQuestion` consent so that walltime
+/// test suite (Phase 0) to bypass `AskUserQuestion` approval so that walltime
 /// excludes user think time. Production flows ignore this signal entirely.
 pub fn auto_approve_enabled() -> bool {
     std::env::var("AXHUB_PERF_AUTO_APPROVE").as_deref() == Ok("1")

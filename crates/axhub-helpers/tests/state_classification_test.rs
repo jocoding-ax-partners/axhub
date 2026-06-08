@@ -11,7 +11,7 @@ fn state_is_terminal_stop(state: BootstrapState) -> bool {
 }
 
 #[test]
-fn matrix_thirteen_variants_user_decision_and_terminal_stop() {
+fn matrix_pending_variants_user_decision_and_terminal_stop() {
     let cases: Vec<(BootstrapState, bool, bool)> = vec![
         (BootstrapState::TemplateRequired, true, false),
         (BootstrapState::ConflictExistingFiles, true, false),
@@ -19,8 +19,8 @@ fn matrix_thirteen_variants_user_decision_and_terminal_stop() {
         (BootstrapState::FirstCommitRequired, true, false),
         (BootstrapState::SubdomainCollision, true, true),
         (BootstrapState::AlreadyDeployed, true, true),
-        (BootstrapState::ConsentRequiredAppsCreate, true, false),
-        (BootstrapState::ConsentRequiredDeployCreate, true, false),
+        (BootstrapState::AppsCreatePending, true, false),
+        (BootstrapState::DeployCreatePending, true, false),
         (BootstrapState::BackendContractMissingDefaults, true, true),
         (BootstrapState::IdempotencyUnavailable, true, true),
         (BootstrapState::AppRegistered, false, false),

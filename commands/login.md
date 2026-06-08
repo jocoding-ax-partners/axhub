@@ -7,4 +7,4 @@ model: sonnet
 
 Trigger the axhub `auth` skill with arguments: $ARGUMENTS.
 
-Apply the workflow defined in `${CLAUDE_PLUGIN_ROOT}/skills/auth/SKILL.md`. Slash invocation does NOT bypass the AskUserQuestion preview card or HMAC consent token requirement for destructive operations — the PreToolUse hook will still verify consent before any destructive bash call. Note: this command opens a browser window to complete the OAuth flow.
+Apply the workflow defined in `${CLAUDE_PLUGIN_ROOT}/skills/auth/SKILL.md`. Slash invocation starts the auth skill, but login/logout/PAT mutations still follow the skill preview and confirmation rules. Note: this command may open a browser window to complete the OAuth flow.

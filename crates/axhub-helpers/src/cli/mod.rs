@@ -27,7 +27,6 @@ enum Commands {
     // ── US1 (P1 hook 진입점) — 무인자 hook 명령, typed unit variant ──
     SessionStart,
     PromptRoute,
-    PreauthCheck,
     CommitGate,
     TddInject,
     TestClassifier,
@@ -47,8 +46,6 @@ enum Commands {
     AutowireStatusline(args::AutowireCliArgs),
 
     // ── US2 — 데이터/auth 명령 (typed args) ──
-    ConsentMint(args::ConsentMintArgs),
-    ConsentMintAppLifecycle(args::ConsentMintAppLifecycleArgs),
     TokenInit(args::TokenArgs),
     TokenImport(args::TokenArgs),
     TokenGate,
@@ -107,7 +104,6 @@ fn classify(token: Option<&str>) -> HookClass {
         Some(
             "session-start"
             | "prompt-route"
-            | "preauth-check"
             | "commit-gate"
             | "tdd-inject"
             | "test-classifier"
@@ -207,7 +203,6 @@ fn dispatch(command: Commands) -> i32 {
         // US1 무인자 hook — 기존 handler 직접 호출(로직 0 변경).
         Commands::SessionStart => run_result(crate::cmd_session_start()),
         Commands::PromptRoute => run_result(crate::cmd_prompt_route()),
-        Commands::PreauthCheck => run_result(crate::cmd_preauth_check()),
         Commands::CommitGate => run_result(crate::cmd_commit_gate()),
         Commands::TddInject => run_result(crate::cmd_tdd_inject()),
         Commands::TestClassifier => run_result(crate::cmd_test_classifier()),
@@ -226,10 +221,6 @@ fn dispatch(command: Commands) -> i32 {
             a.child,
             a.command_path.map(std::path::PathBuf::from),
         )),
-        Commands::ConsentMint(a) => run_result(crate::cmd_consent_mint(a.validate_only)),
-        Commands::ConsentMintAppLifecycle(a) => {
-            run_result(crate::cmd_consent_mint_app_lifecycle(a))
-        }
         Commands::TokenInit(a) => run_result(crate::cmd_token_init(a.json)),
         Commands::TokenImport(a) => run_result(crate::cmd_token_import(a.json)),
         Commands::TokenGate => run_result(crate::cmd_token_gate(&[])),
@@ -317,7 +308,6 @@ mod tests {
         for t in [
             "session-start",
             "prompt-route",
-            "preauth-check",
             "commit-gate",
             "tdd-inject",
             "test-classifier",

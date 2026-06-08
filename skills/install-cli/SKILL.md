@@ -124,7 +124,7 @@ To install ax-hub-cli on the user's host:
    }
    ```
 
-4. **Run installer (consent 받은 후).** 사용자가 직접 실행하도록 명령어를 안내하거나 (`! ` prefix), 또는 SKILL 이 Bash tool 로 실행. 두 흐름 모두 사용자가 의식적으로 confirm 한 후만.
+4. **Run installer (명시 확인 후).** 사용자가 직접 실행하도록 명령어를 안내하거나 (`! ` prefix), 또는 SKILL 이 Bash tool 로 실행. 두 흐름 모두 사용자가 의식적으로 confirm 한 후만.
 
    - macOS / Linux 공식: `! curl -fsSL https://cli.axhub.ai/install.sh | bash`
    - Windows 공식: `! powershell -NoProfile -Command "irm https://cli.axhub.ai/install.ps1 | iex"`

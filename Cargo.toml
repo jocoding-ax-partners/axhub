@@ -15,7 +15,6 @@ chrono = { version = "0.4", features = ["serde", "clock"] }
 clap = { version = "4", features = ["derive"] }
 getrandom = "0.2"
 hmac = "0.12"
-jsonwebtoken = "9"
 libc = "0.2"
 regex = "1.10"
 semver = "1"

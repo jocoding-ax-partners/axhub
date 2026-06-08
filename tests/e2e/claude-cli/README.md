@@ -4,7 +4,7 @@
 
 ## 목적
 
-vibe coder 가 Claude Code 안에서 axhub 자연어를 입력했을 때의 끝-끝 흐름 (SKILL routing → preflight injection → AskUserQuestion D1 fallback → HMAC consent gate → exit-code 한국어 분류 → statusline cache) 을 subprocess `claude -p` 로 직접 driving 해서 회귀를 catch 해요.
+vibe coder 가 Claude Code 안에서 axhub 자연어를 입력했을 때의 끝-끝 흐름 (SKILL routing → preflight injection → AskUserQuestion D1 fallback → preview confirmation gate → exit-code 한국어 분류 → statusline cache) 을 subprocess `claude -p` 로 직접 driving 해서 회귀를 catch 해요.
 
 ## 디렉토리
 

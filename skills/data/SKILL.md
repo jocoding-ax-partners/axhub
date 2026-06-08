@@ -24,12 +24,12 @@ model: sonnet
 
 # Data
 
-AXHub 데이터 리소스를 CLI-only 방식으로 탐색하고, first live read consent 뒤에 read-only invoke (단순 조회 + 집계 인사이트) 또는 snippet 을 만들어줘요. 인사이트 요청은 `axhub data list` 로 헤매지 말고 catalog 로 connector/path 를 해석한 뒤 `catalog invoke --action read` 로 집계 SQL 을 돌려서 한국어로 요약해줘요.
+AXHub 데이터 리소스를 CLI-only 방식으로 탐색하고, first live read approval 뒤에 read-only invoke (단순 조회 + 집계 인사이트) 또는 snippet 을 만들어줘요. 인사이트 요청은 `axhub data list` 로 헤매지 말고 catalog 로 connector/path 를 해석한 뒤 `catalog invoke --action read` 로 집계 SQL 을 돌려서 한국어로 요약해줘요.
 
 ## Routing boundary — dynamic app tables are not catalog data
 
 - `orders 동적 테이블 만들고 title:text 컬럼 추가해`, `앱 테이블 스키마 변경`, `컬럼 추가`, `행 넣어`, `grant/revoke` 처럼 앱 동적 테이블 DDL/DML 의도가 보이면 이 skill 을 즉시 멈추고 `skills/tables/SKILL.md` 를 로드해요.
-- 이 skill 에서 `axhub tables` 명령을 실행하지 않아요. 테이블 스키마·행·권한 작업은 tables skill 의 preview/consent/`--execute` 규칙으로 처리해요.
+- 이 skill 에서 `axhub tables` 명령을 실행하지 않아요. 테이블 스키마·행·권한 작업은 tables skill 의 preview/approval/`--execute` 규칙으로 처리해요.
 - catalog connector/path 조회, safe SQL read, aggregate insight, snippet 생성만 이 skill 의 범위예요.
 
 ## Steps
@@ -60,7 +60,7 @@ echo "$SAFE_PREFLIGHT_JSON"
    TodoWrite({ todos: [
      { content: "catalog context 동기화", status: "in_progress", activeForm: "catalog context 동기화 중" },
      { content: "resource 검색과 describe", status: "pending", activeForm: "resource 확인 중" },
-     { content: "first live read consent 확인", status: "pending", activeForm: "live read 안전 확인 중" },
+     { content: "first live read approval 확인", status: "pending", activeForm: "live read 안전 확인 중" },
      { content: "read invoke 또는 snippet 생성", status: "pending", activeForm: "결과 생성 중" }
    ]})
    ```
@@ -125,7 +125,7 @@ echo "$SAFE_PREFLIGHT_JSON"
 
    In non-interactive mode, use `Dry-run only`. If the server denies with `allowed:false` or `deny_reason`, show that reason and NEVER retry denied.
 
-4. **Invoke read safely when consent exists.** Live reads must include `--execute --json`, an explicit row limit, and read-only SQL. Keep row limit small unless the user explicitly asks for less-restricted output. 인사이트/집계 요청이면 같은 read 경로로 집계 SQL (GROUP BY / COUNT / AVG / SUM) 을 돌려요 — `allowed_columns` 안의, 마스킹 안 된 컬럼만 집계해요.
+4. **Invoke read safely after approval.** Live reads must include `--execute --json`, an explicit row limit, and read-only SQL. Keep row limit small unless the user explicitly asks for less-restricted output. 인사이트/집계 요청이면 같은 read 경로로 집계 SQL (GROUP BY / COUNT / AVG / SUM) 을 돌려요 — `allowed_columns` 안의, 마스킹 안 된 컬럼만 집계해요.
 
    ```bash
    # 단순 조회
@@ -173,7 +173,7 @@ Use this only after `axhub-helpers sync` returns `identity_changed`.
 - NEVER governance bypass: do not invent policies, scopes, row access, or masked output.
 - NEVER path guessing: use connector/path from `catalog search` or `catalog get` only.
 - NEVER retry denied: if `allowed:false`, `deny_reason`, 66, or catalog internal error appears, stop and show the reason.
-- NEVER run a live read without first live read consent in the current session/resource.
+- NEVER run a live read without first live read approval in the current session/resource.
 - NEVER omit `--execute --json` for a live `catalog invoke`.
 - NEVER exceed the stated row limit or `allowed_columns`.
 - NEVER print `.axhub/catalog.json` or hardcode PATs in snippets.
