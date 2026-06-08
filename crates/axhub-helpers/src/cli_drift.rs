@@ -35,7 +35,14 @@ use crate::runtime_paths::{
     cli_drift_nudge_marker_path, cli_drift_optout_path, cli_latest_cache_path,
 };
 
+/// Nudge-side cache staleness bound (24h) — a cache older than this never nudges.
 const CACHE_TTL_SECS: u64 = 24 * 60 * 60;
+/// Background re-fetch cadence when up to date — short, so a freshly-released CLI
+/// version is detected within the hour instead of waiting out the 24h bound.
+const FETCH_FRESH_TTL_SECS: u64 = 60 * 60;
+/// Background re-fetch cadence when an update is already cached — longer; the
+/// nudge already fires from the cache (per-version dedup).
+const FETCH_DRIFT_TTL_SECS: u64 = 12 * 60 * 60;
 
 /// Cached result of the most recent `axhub update check --json`. Unlike the
 /// plugin's `LatestCache`, this stores `current` (the CLI's installed version,
@@ -211,9 +218,17 @@ fn cmd_cli_latest_fetch_bg_with(fetch: impl Fn() -> Option<CliLatestCache>) -> i
     if is_hook_disabled("cli-drift") {
         return 0;
     }
-    // Skip the subprocess entirely while the cache is still fresh.
+    // Skip the subprocess while the cache is still fresh — short TTL when up to
+    // date (catch a new CLI release fast) vs longer when an update is already
+    // cached (the nudge fires from the cache; re-poll less often).
     if let Some(cache) = read_cache() {
-        if now_unix().saturating_sub(cache.fetched_at) < CACHE_TTL_SECS {
+        let pending = cache.has_update && is_newer(&cache.latest, &cache.current);
+        let ttl = if pending {
+            FETCH_DRIFT_TTL_SECS
+        } else {
+            FETCH_FRESH_TTL_SECS
+        };
+        if now_unix().saturating_sub(cache.fetched_at) < ttl {
             return 0;
         }
     }
@@ -592,6 +607,63 @@ mod tests {
         let refreshed = read_cache().unwrap();
         assert_eq!(refreshed.latest, "0.18.2");
         assert!(refreshed.has_update);
+    }
+
+    #[test]
+    fn fetch_refreshes_up_to_date_cache_past_one_hour() {
+        // Fast-detection fix: an up-to-date CLI cache (has_update=false) older than
+        // the 1h fresh TTL re-fetches, so a newly-released CLI surfaces within the
+        // hour instead of waiting out the 24h bound.
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        write_cache(&cache(
+            "0.18.1",
+            "0.18.1",
+            false,
+            false,
+            now_unix() - FETCH_FRESH_TTL_SECS - 1,
+        ))
+        .unwrap();
+
+        let called = std::cell::Cell::new(false);
+        assert_eq!(
+            cmd_cli_latest_fetch_bg_with(|| {
+                called.set(true);
+                Some(cache("0.18.1", "0.18.2", true, false, now_unix()))
+            }),
+            0
+        );
+        assert!(called.get(), "up-to-date cache past 1h must re-fetch");
+        assert!(read_cache().unwrap().has_update); // refreshed to update-available
+    }
+
+    #[test]
+    fn fetch_skips_recent_up_to_date_cache() {
+        // Up to date and younger than the 1h fresh TTL → no needless subprocess.
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        write_cache(&cache("0.18.1", "0.18.1", false, false, now_unix() - 60)).unwrap();
+
+        let called = std::cell::Cell::new(false);
+        assert_eq!(
+            cmd_cli_latest_fetch_bg_with(|| {
+                called.set(true);
+                Some(cache("0.18.1", "0.18.2", true, false, now_unix()))
+            }),
+            0
+        );
+        assert!(
+            !called.get(),
+            "recent up-to-date cache should skip the fetch"
+        );
     }
 
     #[test]
