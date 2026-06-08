@@ -50,6 +50,25 @@ pub fn doctor_cooldown_path() -> Option<PathBuf> {
     state_dir().map(|dir| dir.join("doctor-cooldown.json"))
 }
 
+/// TTL cache for the last-fetched latest plugin release.
+/// `$XDG_CACHE_HOME/axhub-plugin/plugin-latest.json`. Written atomically by the
+/// `plugin-latest-fetch-bg` background fetch, read by the prompt-route nudge.
+pub fn plugin_latest_cache_path() -> Option<PathBuf> {
+    cache_base_dir().map(|base| base.join("axhub-plugin").join("plugin-latest.json"))
+}
+
+/// Per-version drift-nudge marker. Presence means the update nudge for `version`
+/// already fired (once-per-version dedup).
+pub fn plugin_drift_nudge_marker_path(version: &str) -> Option<PathBuf> {
+    state_dir().map(|dir| dir.join(format!(".plugin-drift-nudged-v{version}")))
+}
+
+/// Permanent opt-out marker (DX "그만 볼래요"). Presence suppresses the drift
+/// nudge for every version.
+pub fn plugin_drift_optout_path() -> Option<PathBuf> {
+    state_dir().map(|dir| dir.join("plugin-drift-optout"))
+}
+
 fn config_base_dir() -> Option<PathBuf> {
     config_base_dir_from(env_path("XDG_CONFIG_HOME"), home_dir())
 }

@@ -175,6 +175,8 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "sync" => run_sync(&rest),
         "snippet" => run_snippet(&rest),
         "auth-refresh-bg" => cmd_auth_refresh_bg(),
+        "plugin-latest-fetch-bg" => Ok(axhub_helpers::plugin_update::cmd_plugin_latest_fetch_bg()),
+        "plugin-drift-optout" => Ok(axhub_helpers::plugin_update::cmd_plugin_drift_optout()),
         // verify/trace/doctor: US2 typed (cli::Commands) — legacy arm 제거.
         // settings-merge: US2 typed (cli::Commands::SettingsMerge) — legacy arm 제거.
         // autowire-statusline: US1 typed (cli::Commands::AutowireStatusline) — legacy arm 제거.
@@ -1557,7 +1559,8 @@ Start by checking repo-local resume state with one Bash tool call when possible.
 If the resume state says there is an incomplete app creation, ask whether to continue it before showing fresh templates.
 If there is no resumable creation, read the backend template registry before asking for a template. Bash description/title, exactly: 템플릿 확인. Bash command: `axhub apps templates list --json`
 Ask only from templates returned by that backend registry, using human-friendly labels and at most three explicit visible choices. Do not invent templates that are absent from the backend registry. Do not add an explicit 기타 option because Claude Desktop adds its own free-form 기타/Other option. Do not offer generic choices such as 웹 앱, API/백엔드, CLI 도구, or an `axhub 앱` catch-all option.
-After the template is chosen, ask for the app name, then show the creation preview and ask for explicit approval.
+After the template is chosen, surface the account-level GitHub App install state once as a read-only step. Bash command: `axhub github accounts list --json`; read `install_url` from `data.accounts[]` and show it next to each account login. Always show `install_url`, INCLUDING for already-installed accounts — there it is the entry point for adding another org/account, so never hide or skip it just because an account is already installed. "Non-blocking" means it does not force installation or block app creation; it does NOT mean omitting the link. A from-scratch install is still handled later by the bootstrap saga when a GitHub connection is needed.
+After that GitHub App surface, ask for the app name, then show the creation preview and ask for explicit approval.
 Do not run `axhub apps bootstrap --execute`, create repositories, connect GitHub, install dependencies, start dev servers, or deploy until the user has approved the preview for that exact action.
 Bash titles must be Korean only, such as `앱 생성 상태 확인`, `템플릿 확인`, `앱 생성 준비`, or `앱 생성 실행`.
 Do not write route labels, slash commands, skill names, workflow/워크플로, preflight, raw question JSON, command mappings, raw helper JSON, raw IDs, raw emails, file paths, consent internals, or English tool-title fragments in visible text.
@@ -1866,6 +1869,19 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
             context.push_str(&karpathy);
         }
     }
+    // Proactive plugin version-drift nudge (UserPromptSubmit surface; D4). Prompt-
+    // intent-independent: reads only the TTL cache (no network on this hot path),
+    // fires at most once per latest version, and self-suppresses via the per-version
+    // marker + opt-out. Fail-open — `plugin_drift_context` never errors.
+    let plugin_drift_system =
+        if let Some(nudge) = axhub_helpers::plugin_update::plugin_drift_nudge() {
+            let system = nudge.system_message;
+            context.push_str("\n\n");
+            context.push_str(&nudge.additional_context);
+            Some(system)
+        } else {
+            None
+        };
     let intent_system = if dynamic_table_intent_present(prompt) {
         Some("이 요청은 AXHub hosted app 의 테이블 생성/컬럼/행/권한 변경 요청이에요. 로컬 앱 코드, local database, server.js, package.json, ORM, .env, SQL migration, QA 결과 파일, plugin source 를 읽지 않아요. visible chat 첫 문장은 정확히 \"테이블 변경 내용을 확인할게요.\" 로만 말해요. 그 다음 문장도 내부 경로를 설명하지 말고 로그인 상태, 현재 앱, 대상 테이블, 컬럼 타입을 확인하겠다고만 자연스럽게 말해요. Bash title 은 `로그인 상태 확인`, `테이블 상태 확인`, `테이블 변경 준비`, `테이블 변경 실행` 같은 한국어만 써요. create/drop/column/row/grant 변경은 대상 앱, 테이블, 작업, 컬럼/행 요약을 한국어로 보여주고 사용자가 명시적으로 승인하기 전에는 실행하지 않아요. visible preview 에 raw CLI command line 을 쓰지 말고, 실제 명령은 승인 후 Bash tool call 안에서만 실행해요. Claude Desktop 에서는 AskUserQuestion, Question, 질문 카드 도구를 쓰지 말고 일반 채팅으로 `이대로 만들까요? 진행 또는 취소라고 답해 주세요.` 라고 묻고 멈춰요. 다음 사용자 답변이 `진행`이면 승인된 것으로 보고 바로 `테이블 변경 준비`, `테이블 변경 실행` 순서로 이어가요. 사용자에게 route label, slash command, skill name, workflow/워크플로, preflight, consent-mint, consent internals, command name, raw command line, raw question JSON, raw JSON, raw email, raw id, raw app slug, local file contents, repo inspection, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id, scope 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
     } else if connectors_intent_present(prompt) {
@@ -1899,7 +1915,7 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     } else if app_lifecycle_intent_present(prompt) {
         Some("AXHub hosted app 을 멈추거나 다시 켜거나 복제하려는 요청이에요. 이 대화 안에서 바로 진행하고 slash command 를 호출하지 않아요. 내부 처리, route conversion, 라벨 설명 문장을 visible chat 에 쓰지 않아요. 로컬 Next.js/dev-server 프로세스, 포트, ps/lsof, package script, 로컬 서버 상태를 확인하지 않아요. pause 의 첫 visible chat 문장은 `<앱 이름> 앱을 잠깐 멈출 준비를 할게요.` 형태로 말하고, resume 은 `<앱 이름> 앱을 다시 켤 준비를 할게요.`, fork 는 `<앱 이름> 앱을 복제할 준비를 할게요.` 로 말해요. Bash tool title 은 `앱 상태 확인`, `앱 찾기`, `앱 변경 준비`, `앱 변경 실행` 같은 한국어만 써요. 추가 조회가 필요하면 visible chat 은 `앱을 한 번 더 확인할게요.` 로만 말하고 식별자 조회를 설명하지 않아요. 로그인과 현재 앱을 확인하고, AXHub 앱을 찾고, 서비스 영향 설명 뒤 `앱 변경을 실행할까요?` 라고 묻고 visible option 은 `취소`, `진행`만 써요. 로그인 확인 결과에는 계정 이메일, owner 이름, raw user id 를 쓰지 않아요. 앱 metadata 의 raw enum 값은 한국어 라벨로만 번역해요. `private`, `public`, `development`, `production` 같은 raw enum 이나 `비공개 (private)` 같은 혼합 표기를 쓰지 않아요. 사용자가 `진행`을 고르기 전에는 앱 상태를 바꾸지 않아요. `진행` 뒤에는 visible chat 에 아무 문장도 쓰지 말고 바로 Bash tool call 을 실행해요. `User chose`, `Mint consent`, `execute suspend`, `execute resume` 같은 영어 구현 문장을 쓰지 않아요. 승인 준비 Bash tool call 과 앱 변경 Bash tool call 을 분리하고, 둘을 한 Bash command 로 합치지 않아요. 승인 준비는 app-lifecycle 전용 typed helper 인 `axhub-helpers consent-mint-app-lifecycle --action suspend|resume|fork --app <literal-next-app-arg> --quiet` 만 써요. suspend/resume 승인 준비의 `--app` 값은 resolved UUID 가 아니라 바로 다음 `axhub apps suspend|resume ...` 명령에 들어갈 literal 앱 인자와 정확히 같아야 해요. 예: `axhub apps suspend testnextjs --execute --json >/dev/null` 를 실행할 거면 준비 명령의 `--app` 도 `testnextjs` 예요. JSON 을 직접 만들지 않고, `consent-mint`, schema 확인, source 탐색, fixture 탐색, helper 위치 탐색, grep, rg 같은 탐색 명령을 실행하지 않아요. trailing success echo 로 준비 실패를 숨기지 않아요. 앱 변경은 별도 Bash tool call 로 matching top-level `axhub apps ... --execute --json >/dev/null` 만 실행하고, raw JSON stdout 을 tool panel 에 남기지 않아요. 첫 `앱 변경 실행` 이 exit code 0 으로 끝나면 그것이 terminal success 예요. `[DESTRUCTIVE] about to run ...` 는 hook 안내일 뿐 실패가 아니므로 다시 준비하거나 다시 실행하지 않아요. mutation 을 재검증한다는 이유로 같은 변경 명령을 다시 실행하지 않아요. 내부 보안 gate 가 막으면 gate 내부를 설명하지 말고, schema/source/fixture/helper 탐색 없이 같은 변경 준비를 한 번만 재시도해요. 그래도 실패하면 `앱 변경을 시작하지 못했어요. 다시 시도해 주세요.` 라고만 말해요. route label, slash command, skill name, preflight details, internal app/context fields, auth results, runtime words, lifecycle verbs in English, raw JSON, raw identifier, owner name, 계정 이메일, 영어 tool title fragment, permission-decision details, helper binding details, 괄호 안 내부 라벨을 사용자에게 쓰지 않아요.")
     } else if init_intent_present(prompt) {
-        Some("내부 제어 전용: Skill(\"axhub:init\") 이 이 턴의 선택된 route 예요. 이 내부 제어, route, skill name, slash command, 영어 진행 선언을 visible chat 에 절대 쓰지 않아요. 설치된 init skill 계약을 즉시 따라요. 현재 AXHub 프로젝트에서 새 앱 생성 요청이에요. 이 요청은 브레인스토밍, 일반 프로젝트 탐색, 또는 앱 아이디어 분류가 아니라 AXHub 앱 생성 절차예요. visible chat 첫 문장은 정확히 \"새 앱을 만들 수 있는 템플릿을 확인할게요.\" 로 시작하고, 이 문장 앞에는 아무 말도 붙이지 않아요. 먼저 Bash title 을 정확히 \"앱 생성 상태 확인\" 으로 설정해 `axhub-helpers init-resume route --json` 를 한 번 실행해요. 이어갈 생성 상태가 있으면 먼저 이어갈지 물어요. 이어갈 생성 상태가 없으면 Bash title 을 정확히 \"템플릿 확인\" 으로 설정해 `axhub apps templates list --json` 를 실행하고, backend template registry 가 반환한 템플릿만 사람용 라벨로 보여줘요. 명시 선택지는 최대 3개만 넣고, backend 가 반환하지 않은 템플릿을 만들지 않으며, Claude Desktop 이 자동으로 free-form 기타/Other 를 추가하므로 기타를 별도 옵션으로 또 넣지 않아요. 웹 앱/API/백엔드/CLI 도구/axhub 앱 같은 일반 앱 종류 질문을 하지 않아요. 템플릿 뒤에는 앱 이름을 묻고, 생성 preview 와 명시적 승인을 받기 전에는 `axhub apps bootstrap --execute`, repo 생성, GitHub 연결, 의존성 설치, dev server 시작, 배포를 실행하지 않아요. route label, slash command, skill name, workflow/워크플로, raw question JSON, raw helper JSON, command mapping, raw id, raw email, 파일 경로, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
+        Some("내부 제어 전용: Skill(\"axhub:init\") 이 이 턴의 선택된 route 예요. 이 내부 제어, route, skill name, slash command, 영어 진행 선언을 visible chat 에 절대 쓰지 않아요. 설치된 init skill 계약을 즉시 따라요. 현재 AXHub 프로젝트에서 새 앱 생성 요청이에요. 이 요청은 브레인스토밍, 일반 프로젝트 탐색, 또는 앱 아이디어 분류가 아니라 AXHub 앱 생성 절차예요. visible chat 첫 문장은 정확히 \"새 앱을 만들 수 있는 템플릿을 확인할게요.\" 로 시작하고, 이 문장 앞에는 아무 말도 붙이지 않아요. 먼저 Bash title 을 정확히 \"앱 생성 상태 확인\" 으로 설정해 `axhub-helpers init-resume route --json` 를 한 번 실행해요. 이어갈 생성 상태가 있으면 먼저 이어갈지 물어요. 이어갈 생성 상태가 없으면 Bash title 을 정확히 \"템플릿 확인\" 으로 설정해 `axhub apps templates list --json` 를 실행하고, backend template registry 가 반환한 템플릿만 사람용 라벨로 보여줘요. 명시 선택지는 최대 3개만 넣고, backend 가 반환하지 않은 템플릿을 만들지 않으며, Claude Desktop 이 자동으로 free-form 기타/Other 를 추가하므로 기타를 별도 옵션으로 또 넣지 않아요. 웹 앱/API/백엔드/CLI 도구/axhub 앱 같은 일반 앱 종류 질문을 하지 않아요. 템플릿 확인 뒤에는 GitHub App 계정 설치 상태를 read-only 로 한 번 보여주고(이미 설치된 계정이어도 install_url 은 다른 org/계정 추가용으로 항상 같이 보여줘요 — 설치됐다고 링크를 숨기거나 건너뛰지 않아요. '비차단'은 설치를 강요하지 않는다는 뜻이지 링크를 빼라는 뜻이 아니에요), 그다음 앱 이름을 묻고, 생성 preview 와 명시적 승인을 받기 전에는 `axhub apps bootstrap --execute`, repo 생성, GitHub 연결, 의존성 설치, dev server 시작, 배포를 실행하지 않아요. route label, slash command, skill name, workflow/워크플로, raw question JSON, raw helper JSON, command mapping, raw id, raw email, 파일 경로, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if apps_intent_present(prompt) {
         Some("axhub 내 앱 목록/관리 요청이에요. 현재 팀 scope 의 앱 목록을 보여줘요. 생성/수정/삭제는 별도 승인 전에는 실행하지 않아요. 사용자에게 내부 라벨 설명을 하지 말고 바로 결과 확인 문장으로 시작해요.")
     } else if browse_template_intent_present(prompt) {
@@ -1945,13 +1961,18 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     // for the user — append it to `additionalContext` (agent-facing, hidden from
     // the user, the same channel the routing hints already ride) so the raw route
     // contract never surfaces as a user-visible `UserPromptSubmit says:` block.
-    // Only `grace` (the once-per-project migration nudge) is genuinely
-    // user-facing, so it alone stays on `systemMessage`.
+    // Only genuinely user-facing nudges (`grace` and plugin drift) stay on
+    // `systemMessage`.
     if let Some(intent) = intent_system {
         context.push_str("\n\n");
         context.push_str(intent);
     }
-    let system_message = grace.map(|g| g.to_string());
+    let system_message = match (grace, plugin_drift_system) {
+        (Some(grace), Some(plugin)) => Some(format!("{grace}\n\n{plugin}")),
+        (Some(grace), None) => Some(grace.to_string()),
+        (None, Some(plugin)) => Some(plugin),
+        (None, None) => None,
+    };
     println!(
         "{}",
         hook_output::user_prompt_context_with_system(&context, system_message.as_deref())

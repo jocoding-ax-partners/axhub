@@ -151,7 +151,7 @@ To start an axhub app:
 
 2.5. **GitHub App 설치 상태를 보여줘요 (read-only, 비차단).**
 
-   template 목록이 정상적으로 오면 로그인이 된 거라, 이어서 GitHub App 설치 상태를 한 번 보여줘요. 이건 앱 만들기를 막지 않아요 — 이미 설치했거나 나중에 할 사람은 그냥 다음으로 넘어가요.
+   template 목록이 정상적으로 오면 로그인이 된 거라, 이어서 GitHub App 설치 상태를 한 번 보여줘요. 이건 read-only 안내라 앱 만들기를 막지 않아요. 다만 '막지 않는다'는 건 설치를 강요하지 않는다는 뜻이지 안내를 통째로 건너뛴다는 뜻이 아니에요 — 이미 설치된 계정이어도 `install_url` 은 다른 org/계정 추가용으로 항상 같이 보여줘요.
 
    ```bash
    axhub github accounts list --json   # data.accounts[]: login, installed, install_url
