@@ -384,7 +384,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
      ✓ 로그인 <masked-email>
      ✓ git v<GIT_VERSION>
      ✓ node v<NODE_VERSION> (pm: <bun|pnpm|npm|yarn>)
-     ✓ GitHub App 설치됨
+     ✓ GitHub App 설치됨 — 다른 org/계정 추가: <install_url>
      ✓ 앱 <app-slug> 연결됨
      ✓ 첫 배포 live: <deployment-url>
      ✓ doctor 점검 통과
@@ -392,6 +392,8 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    이제 바로 코딩하면 돼요.
    다음에 말할 수 있는 것: "배포해", "로그 봐줘", "환경변수 추가해줘", "테이블 추천해줘"
    ```
+
+   GitHub App 줄의 `<install_url>` 은 설치 여부와 무관하게 항상 보여줘요. Step 2 DETECT_ALL 의 `GITHUB_ACCOUNTS_JSON` 에서 아무 account entry 의 `install_url` 을 읽어 채워요 (전부 같아요). 이미 설치된 사용자도 다른 org/계정을 더 붙일 수 있게 링크를 남기는 거예요. 링크는 보여주기만 하고 자동으로 열지 않아요. accounts 가 비어 `install_url` 을 못 읽으면 이 줄은 생략해요. 미설치(`github_app_missing`)는 Step 6 의 install_url 경로가 이미 처리하니, 이 줄은 설치된 사용자의 계정 추가 진입점이에요.
 
    degraded 상태는 명확히 표시해요.
    - `READY_WITH_USER_ACTION`: 외부 승인, OS installer GUI, PATH reload, native build 처럼 사용자가 해야 하는 행동만 남음

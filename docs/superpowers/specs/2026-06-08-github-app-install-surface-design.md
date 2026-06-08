@@ -1,13 +1,14 @@
 # GitHub App 설치 surface 상시 노출 — 설계
 
 - 날짜: 2026-06-08
-- 범위: `skills/init/SKILL.md` (onboarding 은 #171 이 이미 충족 — 아래 status 참조)
+- 범위: `skills/init/SKILL.md` (sub-step 2.5) + `skills/onboarding/SKILL.md` (ready card add-account install_url — 아래 status 참조)
 - 접근: A — 각 skill 인라인 (helper 추출은 3번째 사이트 등장 시점으로 보류)
 
 ## Status (2026-06-08 갱신)
 
-- **onboarding(setup)**: #171 (`make onboarding sufficient for first-run`, v0.9.34) 이 `setup → onboarding` rename 과 함께 GitHub App surface 를 이미 구현했어요. onboarding Step 2 DETECT_ALL 이 `axhub github accounts list --json` 를 파싱해 `github_app_missing` gap 을 emit 하고, Step 6 "GitHub App frontload" 가 install_url 을 전진배치해요. 그래서 이 설계의 onboarding 부분은 **이미 main 에 들어가 있어요** — 중복 구현하지 않아요.
-- **init**: 직접 `init` 호출(온보딩을 거치지 않는 "앱 만들어줘") 흐름에는 proactive GitHub App surface 가 아직 없어요. 이 브랜치가 그 부분만 채워요.
+- **onboarding(setup)** — 미설치 케이스: #171 (`make onboarding sufficient for first-run`, v0.9.34) 이 `setup → onboarding` rename 과 함께 `github_app_missing` gap 을 구현했어요 (Step 2 DETECT_ALL 파싱 → Step 6 install_url 전진배치). 0 설치 사용자는 이 경로로 처리돼요.
+- **onboarding(setup)** — 설치된 케이스(이 브랜치 추가): #171 의 gap 은 **미설치일 때만** 뜨고, 이미 설치된 사용자는 GitHub App 단계가 skip 돼서 "다른 org/계정 추가" install_url 을 못 봤어요. predicate 가 `installed` 일 때 URL 을 버리기 때문이에요. gap state machine 은 테스트로 잠겨 있어서(transitions 14 / rows 13 고정) 새 gap 을 못 넣으므로, **VIBE_READY ready card 의 GitHub App 줄에 add-account install_url 을 항상 노출**하도록 추가했어요 (`GITHUB_ACCOUNTS_JSON` entry 에서 읽음, 비차단).
+- **init**: 직접 `init` 호출 흐름에는 proactive surface 가 없어서 sub-step `2.5.` 로 채웠어요.
 
 ## 문제
 
@@ -19,7 +20,7 @@ init 에서 GitHub 연결은 reactive 로만 일어나요 — `axhub apps bootst
 |---|---|
 | 시나리오 | 신규(0 설치) + 일부 설치(새 org 추가) 둘 다 |
 | 강도 | 항상 노출, skip 가능 (비차단). 차단 gate 아님. 새 AskUserQuestion 없음 |
-| 적용 skill | init (onboarding 은 #171 이 충족) |
+| 적용 skill | init (sub-step 2.5) + onboarding (ready card add-account 링크). 미설치는 #171 gap 이 충족 |
 | 구현 접근 | A — 인라인 |
 
 ## 핵심 사실 (ax-hub-cli 0.17.4 소스 확정)
