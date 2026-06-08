@@ -268,7 +268,7 @@ axhub Claude Code hook 의 fail-open 계약을 명문화했어요. 모든 hook �
 AXHUB_DISABLE_HOOKS=1
 
 # 특정 hook 만 비활성화 (csv)
-AXHUB_DISABLE_HOOK=session-start,preauth-check,prompt-route,classify-exit
+AXHUB_DISABLE_HOOK=session-start,prompt-route,classify-exit
 
 # Legacy alias (6 개월 deprecation, v0.8.0 에서 제거)
 DISABLE_AXHUB=1   # stderr 에 경고 출력
