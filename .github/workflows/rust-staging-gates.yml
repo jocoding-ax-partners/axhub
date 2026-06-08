@@ -96,7 +96,13 @@ jobs:
         run: |
           cargo fmt --all -- --check
           cargo clippy --workspace -- -D warnings
-          cargo test --workspace
+          # --test-threads=1: many helper tests mutate process-global env
+          # (std::env::set_var on XDG_*), which races under the default parallel
+          # runner and poisons the shared PROCESS_ENV_LOCK on a single panic →
+          # a cascade of unrelated failures. Serializing makes the suite
+          # deterministic. (Per-test serialization via serial_test is the
+          # longer-term option.)
+          cargo test --workspace -- --test-threads=1
       - name: Build Rust helper
         run: |
           bun run build
