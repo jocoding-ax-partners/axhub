@@ -4,6 +4,34 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.36](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.35...v0.9.36) (2026-06-08)
+
+이번 릴리스는 열린 PR 5개를 한 번에 정리해요. 로그인 문장이 로그 훅으로 새는 오라우팅을 고치고, 플러그인 버전 드리프트를 실제 Claude TUI 에서 업데이트 카드로 확인되게 만들며, onboarding/init 의 GitHub App 설치 링크를 놓치지 않게 해요. 마지막으로 prompt-route 내부 제어 문구는 사용자 화면이 아니라 hidden additionalContext 로만 흐르게 해서 Desktop 에서 raw routing contract 가 보이지 않게 했어요.
+
+### Test baseline
+
+- PR #174, #175, #176, #177, #178 을 모두 GitHub Actions green 상태에서 merge 했어요.
+- #175 는 실제 GitHub releases/latest fetch, `prompt-route` systemMessage, `claude -p` AskUserQuestion 호출 시도, interactive Claude TUI 카드 렌더와 `지금은 그대로` 선택까지 확인했어요.
+- #178 충돌 해결 뒤 `cargo fmt --all --check`, `cargo test -p axhub-helpers --test cli_e2e prompt_route -- --test-threads=1`, `cargo test -p axhub-helpers --test hook_safety_cli -- --test-threads=1`, `bun test tests/prompt-route-karpathy.test.ts tests/init-github-app-route-hint.test.ts` 를 통과했어요.
+- release step 1 의 `bun run release:check` 로 host Rust helper build 와 version assert 를 통과했어요.
+
+### Honest tradeoff
+
+- #178 은 앞선 PR들이 main 에 들어간 뒤 충돌이 생겨 브랜치에 main merge commit 을 추가해 해결했어요. 실제 release main 에는 squash merge 로 들어가므로 최종 히스토리는 PR 단위로 남아요.
+- v0.9.36 tag push 뒤 release.yml 이 5-platform artifact 와 GitHub Release 를 만드는 경로가 최종 배포 검증이에요.
+
+### Added
+
+* 플러그인 버전 드리프트 자동 업데이트 알림 ([#175](https://github.com/jocoding-ax-partners/axhub/issues/175)) 843cd31
+
+
+### Fixed
+
+* init route hint 가 GitHub App 설치 surface(Step 2.5)를 건너뛰는 문제 ([#177](https://github.com/jocoding-ax-partners/axhub/issues/177)) ba383ae
+* onboarding ready card 의 GitHub App 설치 링크가 안 뜨는 문제 ([#176](https://github.com/jocoding-ax-partners/axhub/issues/176)) fe9f727
+* prompt-route 내부 라우팅 control 을 systemMessage 에서 숨김 ([#178](https://github.com/jocoding-ax-partners/axhub/issues/178)) 7b9590b
+* 로그인 의도가 로그 훅으로 오라우팅되는 문제 ([#174](https://github.com/jocoding-ax-partners/axhub/issues/174)) 993ea74
+
 ## [0.9.35](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.33...v0.9.35) (2026-06-08)
 
 이번 릴리스는 GitHub App 설치 진입점을 설치 여부와 무관하게 항상 보이게 해요. init 은 template 목록 직후 sub-step 2.5 로 `accounts list` 를 읽어 설치된 계정과 install_url 을 비차단으로 보여주고, onboarding 은 #171 의 `github_app_missing` gap 이 미설치일 때만 떴던 한계를 메워 VIBE_READY ready card 에 "다른 org/계정 추가" install_url 을 항상 남겨요. 이미 설치한 사용자도 새 org 를 붙일 링크를 보고, 아무 데도 설치 안 한 사용자도 진입점을 놓치지 않아요. gap state machine·predicate·consent registry 는 그대로 두고 표시면만 더했어요.
