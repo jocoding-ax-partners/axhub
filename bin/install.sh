@@ -8,7 +8,7 @@ set -euo pipefail
 
 # --- install-time disclosure (idempotent, marker-gated) ---
 # Maintainer: keep _AXHUB_DISCLOSURE_VER in sync with RELEASE_VERSION below.
-_AXHUB_DISCLOSURE_VER="v0.9.33"
+_AXHUB_DISCLOSURE_VER="v0.9.34"
 _AXHUB_STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/axhub-plugin"
 _AXHUB_DISCLOSURE_MARKER="${_AXHUB_STATE_DIR}/install-disclosure-shown.txt"
 # CI / scripted contexts suppress disclosure (AXHUB_SKIP_AUTODOWNLOAD=1 indicates
@@ -79,7 +79,7 @@ TARGET_PATH="${BIN_DIR}/${TARGET_NAME}"
 
 # Maintainer: when bumping plugin version (package.json + .claude-plugin/*),
 # update this default to match the new release tag. Override via AXHUB_PLUGIN_RELEASE.
-RELEASE_VERSION="${AXHUB_PLUGIN_RELEASE:-v0.9.33}"
+RELEASE_VERSION="${AXHUB_PLUGIN_RELEASE:-v0.9.34}"
 RELEASE_BASE="https://github.com/jocoding-ax-partners/axhub/releases/download/${RELEASE_VERSION}"
 
 if [ ! -f "$TARGET_PATH" ]; then

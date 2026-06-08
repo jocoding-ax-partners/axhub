@@ -4,6 +4,30 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.34](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.33...v0.9.34) (2026-06-08)
+
+이번 릴리스는 첫 실행 바이브코딩 파이프라인을 Claude Desktop 에서 실제로 쓸 수 있는 수준으로 묶어요. 자연어 첫 질문은 onboarding 스킬로, 설치 상태 확인은 doctor 스킬로, 새 앱 생성은 init 스킬로 라우팅되고, init 은 GitHub App 설치 승인 뒤 CLI resume cache 가 비어 있어도 같은 idempotency key 로 안전하게 이어받아요. Vite React 앱을 실제 axhub 배포까지 흘려 보낸 QA 결과를 반영해 Desktop template picker 도 backend template registry 와만 동기화되도록 고쳤어요.
+
+### Test baseline
+
+- PR #171 새 HEAD `7a17df7` 기준 GitHub Actions 가 Rust ubuntu/macos/windows, perf ubuntu/macos/windows, hook integration, Local Rust-primary gate, T2 helper-bin, corpus.100 drift gate 를 모두 통과했어요.
+- 로컬에서 `git diff --check`, init/onboarding/doctor 라우팅 targeted Bun 99개 테스트, Rust Desktop prompt-route 회귀 테스트, `bun run release:check` 를 통과했어요.
+- Claude Desktop 실제 QA 로 onboarding, doctor, init, GitHub App device-flow recovery, Vite React bootstrap/deploy 흐름을 확인했고, 원격 배포는 `e2e-pipeline-20260607-1753.test.axhub.ai` 까지 생성됐어요.
+
+### Honest tradeoff
+
+- 배포된 E2E 앱은 private/bearer 설정이라 공개 콘텐츠 확인은 로그인 리다이렉트까지만 확인했어요. tag push 뒤 release.yml 이 5-platform artifact 를 다시 만드는 경로가 최종 배포 검증이에요.
+
+
+### Added
+
+* make onboarding sufficient for first-run vibe coding ([#171](https://github.com/jocoding-ax-partners/axhub/issues/171)) ([28fe3fe](https://github.com/jocoding-ax-partners/axhub/commit/28fe3fe12807be1f9a7990dd4c8424e43c1387d5))
+
+
+### Fixed
+
+* marketplace.json 에 $schema·author·category·homepage·tags 추가 ([10ae0cc](https://github.com/jocoding-ax-partners/axhub/commit/10ae0cce362874fa53c7b52d095af835816990e0))
+
 ## [0.9.33](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.32...v0.9.33) (2026-06-05)
 
 이번 릴리스는 consent preauth-check 게이트를 플러그인 hooks.json 에서 제거해요. bootstrap/deploy 같은 destructive axhub 명령이 consent 토큰 검증으로 차단되던 흐름을 풀어, 일부 환경(특히 consent-mint 가 helper 를 못 찾던 케이스)에서 막히지 않게 했어요. consent-mint/verify 코드와 바이너리 서브커맨드는 그대로 남겨, 되돌리기는 hooks.json 한 줄 복원이면 돼요. commit-gate(git)·tdd-inject 훅과 CLI 자체 로그인(auth)은 영향 없어요.

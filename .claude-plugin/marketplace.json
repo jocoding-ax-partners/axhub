@@ -10,7 +10,7 @@
     {
       "name": "axhub",
       "description": "Korean-first axhub Claude Code plugin wrapping ax-hub-cli v0.17.4 surfaces with NL skills and consent gates",
-      "version": "0.9.33",
+      "version": "0.9.34",
       "author": {
         "name": "Jocoding AX Partners",
         "url": "https://jocodingax.ai"
@@ -18,7 +18,13 @@
       "source": "./",
       "category": "code",
       "homepage": "https://axhub.jocodingax.ai",
-      "tags": ["axhub", "vibe-coding", "deploy", "korean", "ax-hub-cli"]
+      "tags": [
+        "axhub",
+        "vibe-coding",
+        "deploy",
+        "korean",
+        "ax-hub-cli"
+      ]
     }
   ]
 }
