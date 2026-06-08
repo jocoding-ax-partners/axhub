@@ -1872,10 +1872,15 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     // intent-independent: reads only the TTL cache (no network on this hot path),
     // fires at most once per latest version, and self-suppresses via the per-version
     // marker + opt-out. Fail-open — `plugin_drift_context` never errors.
-    if let Some(nudge) = axhub_helpers::plugin_update::plugin_drift_context() {
-        context.push_str("\n\n");
-        context.push_str(&nudge);
-    }
+    let plugin_drift_system =
+        if let Some(nudge) = axhub_helpers::plugin_update::plugin_drift_nudge() {
+            let system = nudge.system_message;
+            context.push_str("\n\n");
+            context.push_str(&nudge.additional_context);
+            Some(system)
+        } else {
+            None
+        };
     let intent_system = if dynamic_table_intent_present(prompt) {
         Some("이 요청은 AXHub hosted app 의 테이블 생성/컬럼/행/권한 변경 요청이에요. 로컬 앱 코드, local database, server.js, package.json, ORM, .env, SQL migration, QA 결과 파일, plugin source 를 읽지 않아요. visible chat 첫 문장은 정확히 \"테이블 변경 내용을 확인할게요.\" 로만 말해요. 그 다음 문장도 내부 경로를 설명하지 말고 로그인 상태, 현재 앱, 대상 테이블, 컬럼 타입을 확인하겠다고만 자연스럽게 말해요. Bash title 은 `로그인 상태 확인`, `테이블 상태 확인`, `테이블 변경 준비`, `테이블 변경 실행` 같은 한국어만 써요. create/drop/column/row/grant 변경은 대상 앱, 테이블, 작업, 컬럼/행 요약을 한국어로 보여주고 사용자가 명시적으로 승인하기 전에는 실행하지 않아요. visible preview 에 raw CLI command line 을 쓰지 말고, 실제 명령은 승인 후 Bash tool call 안에서만 실행해요. Claude Desktop 에서는 AskUserQuestion, Question, 질문 카드 도구를 쓰지 말고 일반 채팅으로 `이대로 만들까요? 진행 또는 취소라고 답해 주세요.` 라고 묻고 멈춰요. 다음 사용자 답변이 `진행`이면 승인된 것으로 보고 바로 `테이블 변경 준비`, `테이블 변경 실행` 순서로 이어가요. 사용자에게 route label, slash command, skill name, workflow/워크플로, preflight, consent-mint, consent internals, command name, raw command line, raw question JSON, raw JSON, raw email, raw id, raw app slug, local file contents, repo inspection, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id, scope 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
     } else if connectors_intent_present(prompt) {
@@ -1951,11 +1956,17 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     } else {
         None
     };
-    let system_message = match (grace, intent_system) {
-        (Some(grace), Some(intent)) => Some(format!("{grace}\n\n{intent}")),
-        (Some(grace), None) => Some(grace.to_string()),
-        (None, Some(intent)) => Some(intent.to_string()),
-        (None, None) => None,
+    let system_message = match (grace, intent_system, plugin_drift_system) {
+        (Some(grace), Some(intent), Some(plugin)) => {
+            Some(format!("{grace}\n\n{intent}\n\n{plugin}"))
+        }
+        (Some(grace), Some(intent), None) => Some(format!("{grace}\n\n{intent}")),
+        (Some(grace), None, Some(plugin)) => Some(format!("{grace}\n\n{plugin}")),
+        (Some(grace), None, None) => Some(grace.to_string()),
+        (None, Some(intent), Some(plugin)) => Some(format!("{intent}\n\n{plugin}")),
+        (None, Some(intent), None) => Some(intent.to_string()),
+        (None, None, Some(plugin)) => Some(plugin),
+        (None, None, None) => None,
     };
     println!(
         "{}",

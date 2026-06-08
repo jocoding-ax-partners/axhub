@@ -164,12 +164,33 @@ fn nudge_text(current: &str, latest: &str) -> String {
         "<axhub-plugin-update>\n\
          [axhub hook | 플러그인 새 버전 알림]\n\
          플러그인 새 버전이 나왔어요: v{current} → v{latest}\n\
-         에이전트: 사용자에게 AskUserQuestion 으로 업데이트할지 물어요. upgrade 스킬로 \
-         라우팅하고 옵션에 '그만 볼래요 (다시 안 봄)' 를 포함해요 — 선택하면 \
-         `axhub-helpers plugin-drift-optout` 를 실행해 영구로 꺼요.\n\
+         에이전트 필수 동작: 이 턴의 다른 답변을 시작하기 전에 먼저 사용자에게 \
+         AskUserQuestion 으로 업데이트할지 물어요. 질문 header 는 '업데이트' 로, \
+         선택지는 '업데이트할래요', '지금은 그대로', '그만 볼래요 (다시 안 봄)' 를 \
+         포함해요. '업데이트할래요' 는 upgrade 스킬로 라우팅해요. '그만 볼래요 \
+         (다시 안 봄)' 를 선택하면 `axhub-helpers plugin-drift-optout` 를 실행해 영구로 \
+         꺼요. AskUserQuestion 도구가 없으면 일반 채팅으로 같은 세 선택지를 묻고 \
+         멈춰요.\n\
          Skip: AXHUB_DISABLE_HOOK=plugin-drift\n\
          </axhub-plugin-update>"
     )
+}
+
+/// User-facing fallback for the same drift nudge. This rides on the
+/// UserPromptSubmit `systemMessage` channel so live users still see the update
+/// notice even when the agent ignores `additionalContext` or cannot render an
+/// AskUserQuestion card.
+fn nudge_system_message(current: &str, latest: &str) -> String {
+    format!(
+        "플러그인 새 버전이 나왔어요: v{current} → v{latest}\n\
+         업데이트할까요? `업데이트할래요`, `지금은 그대로`, `그만 볼래요` 중 하나로 답해 주세요."
+    )
+}
+
+/// Paired UserPromptSubmit outputs for a plugin drift event.
+pub struct PluginDriftNudge {
+    pub additional_context: String,
+    pub system_message: String,
 }
 
 /// Background fetch entry point (`axhub-helpers plugin-latest-fetch-bg`).
@@ -213,6 +234,13 @@ pub fn cmd_plugin_drift_optout() -> i32 {
 /// result the per-version marker is recorded as a side effect, so the nudge
 /// fires at most once per latest version. Called from `cmd_prompt_route`.
 pub fn plugin_drift_context() -> Option<String> {
+    plugin_drift_nudge().map(|n| n.additional_context)
+}
+
+/// UserPromptSubmit nudge payloads, or `None` when no nudge should fire. On a
+/// `Some` result the per-version marker is recorded as a side effect, so the
+/// nudge fires at most once per latest version.
+pub fn plugin_drift_nudge() -> Option<PluginDriftNudge> {
     if is_hook_disabled("plugin-drift") {
         return None;
     }
@@ -243,7 +271,10 @@ pub fn plugin_drift_context() -> Option<String> {
         let _ = fs::write(&path, b"");
     }
     // `cache` is Some here (should_nudge returned true).
-    cache.map(|c| nudge_text(current, &c.latest))
+    cache.map(|c| PluginDriftNudge {
+        additional_context: nudge_text(current, &c.latest),
+        system_message: nudge_system_message(current, &c.latest),
+    })
 }
 
 #[cfg(test)]
@@ -437,9 +468,25 @@ mod tests {
         let t = nudge_text("0.9.34", "0.9.40");
         assert!(t.contains("v0.9.34"));
         assert!(t.contains("v0.9.40"));
+        assert!(t.contains("에이전트 필수 동작"));
+        assert!(t.contains("이 턴의 다른 답변을 시작하기 전에 먼저"));
+        assert!(t.contains("업데이트할래요"));
+        assert!(t.contains("지금은 그대로"));
         assert!(t.contains("그만 볼래요"));
         assert!(t.contains("plugin-drift-optout"));
         assert!(t.contains("AXHUB_DISABLE_HOOK=plugin-drift"));
+    }
+
+    #[test]
+    fn nudge_system_message_is_user_facing_fallback() {
+        let t = nudge_system_message("0.9.34", "0.9.40");
+        assert!(t.contains("플러그인 새 버전이 나왔어요: v0.9.34 → v0.9.40"));
+        assert!(t.contains("업데이트할까요?"));
+        assert!(t.contains("업데이트할래요"));
+        assert!(t.contains("지금은 그대로"));
+        assert!(t.contains("그만 볼래요"));
+        assert!(!t.contains("AskUserQuestion"));
+        assert!(!t.contains("axhub-helpers"));
     }
 
     #[test]

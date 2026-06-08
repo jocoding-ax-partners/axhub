@@ -202,9 +202,11 @@ fn classify_exit_per_hook_csv_skips() {
 // --- plugin-drift (proactive update nudge) --------------------------------
 //
 // End-to-end: seed a fresh "newer version available" cache, then run
-// prompt-route. The nudge rides UserPromptSubmit additionalContext (D4) and is
-// gated by AXHUB_DISABLE_HOOK=plugin-drift. Tempdirs isolate the per-version
-// marker so neither test leaks state into the other.
+// prompt-route. The nudge rides UserPromptSubmit additionalContext (D4) and the
+// user-facing systemMessage fallback (live QA found agents may ignore the
+// context-only instruction). It is gated by AXHUB_DISABLE_HOOK=plugin-drift.
+// Tempdirs isolate the per-version marker so neither test leaks state into the
+// other.
 
 fn now_secs() -> u64 {
     std::time::SystemTime::now()
@@ -257,9 +259,25 @@ fn plugin_drift_nudge_fires_when_newer_version_cached() {
     let out = run_prompt_route_with_fresh_newer_cache(&[]);
     assert!(out.status.success());
     let s = stdout(&out);
+    let json: serde_json::Value = serde_json::from_str(&s).unwrap();
+    let ctx = json["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .unwrap();
+    let msg = json["systemMessage"].as_str().unwrap();
     assert!(
-        s.contains("플러그인 새 버전") && s.contains("그만 볼래요"),
+        ctx.contains("플러그인 새 버전")
+            && ctx.contains("에이전트 필수 동작")
+            && ctx.contains("AskUserQuestion")
+            && ctx.contains("그만 볼래요"),
         "expected drift nudge with opt-out option in additionalContext, got: {s}"
+    );
+    assert!(
+        msg.contains("플러그인 새 버전")
+            && msg.contains("업데이트할까요?")
+            && msg.contains("업데이트할래요")
+            && msg.contains("지금은 그대로")
+            && msg.contains("그만 볼래요"),
+        "expected user-facing plugin drift systemMessage, got: {s}"
     );
 }
 
