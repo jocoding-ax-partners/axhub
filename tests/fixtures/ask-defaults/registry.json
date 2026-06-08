@@ -282,6 +282,13 @@
         "새로 시작",
         "이어서 하기"
       ]
+    },
+    "어느 GitHub 계정에 저장소를 만들까요?": {
+      "safe_default": "취소",
+      "rationale": "GitHub App 이 여러 계정/org 에 설치되면 bootstrap 이 --github-owner 없이 ambiguous_installation (CLI exit 9) 으로 멈춰서 owner 를 골라야 해요. 옵션은 installed:true 인 login 들로 동적으로 채워져요. 비대화형/D1 환경에서는 임의 계정에 repo 를 만들지 않도록 owner 를 추측하지 않고 bootstrap 을 멈춰요.",
+      "allowed_safe_defaults": [
+        "취소"
+      ]
     }
   },
   "env": {
