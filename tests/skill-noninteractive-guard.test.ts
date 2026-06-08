@@ -115,6 +115,19 @@ describe("v0.15.3 — watch/follow CLI auto-degrade contract", () => {
     }
   });
 
+  test("init recovers Claude Desktop approved-but-uncached device flow safely", () => {
+    const init = readFileSync(INIT_SKILL, "utf8");
+
+    expect(init).toContain("no pending github device flow");
+    expect(init).toContain("axhub github accounts list --json");
+    expect(init).toContain("선택한 owner 설치가 확인될 때만");
+    expect(init).toContain("--github-owner \"$GITHUB_OWNER\"");
+    expect(init).toContain("--repo-name \"$APP_SLUG\"");
+    expect(init).toContain("--idempotency-key \"$IDEMPOTENCY_KEY\"");
+    expect(init).toContain("device_code_pending");
+    expect(init).toContain("owner 설치 확인이 안 되면 fresh execute 를 하지 말고");
+  });
+
   test("init/github do not reintroduce pre-0.15.3 detach wrappers", () => {
     for (const path of [INIT_SKILL, GITHUB_SKILL]) {
       const content = readFileSync(path, "utf8");

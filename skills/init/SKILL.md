@@ -112,6 +112,7 @@ To start an axhub app:
 
    - `watch_status` → helper 의 `args.status_command` 를 실행해요. 현재 command shape 은 `axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json` 예요.
    - `resume_last` → helper 의 `args.resume_command` 를 실행해요. 현재 command shape 은 `axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json` 예요.
+     - 만약 resume 명령이 `no pending github device flow` 로 실패하면 바로 사용자에게 막혔다고 하지 않아요. 먼저 `axhub github accounts list --json` 를 읽기 전용으로 재조회하고, 선택한 GitHub owner 의 installation 이 `installed=true` 또는 `installation_id` 로 확인될 때만 같은 template/name/slug/subdomain/github-owner/repo-name/idempotency-key 로 `--resume-last` 없는 `bootstrap --execute --watch --watch-timeout 9m` 복구를 한 번 실행해요. 이 분기는 이미 승인된 device flow 가 CLI cache 에 남지 않았지만 GitHub App 설치/연결은 완료된 Claude Desktop 상태를 복구하기 위한 것이며, `device_code_pending` 이거나 owner 설치 확인이 안 되면 fresh execute 를 하지 않아요.
    - 상태가 깨졌거나 오래돼 helper 가 `fresh` 를 주면 자연어로 "이전 기록을 찾지 못해서 새로 시작할게요." 라고 말하고 Step 1 로 가요.
 
 1. **CLI 존재를 확인해요.**
@@ -159,27 +160,27 @@ To start an axhub app:
 | `astro` (또는 `astro-axhub`) | 회사 소개, 랜딩 페이지, 블로그, 문서처럼 글과 이미지 중심이고 자주 바뀌지 않는 사이트에 좋아요. |
 | `react` (또는 `react-axhub`) | 로그인한 뒤 쓰는 설정 화면, 입력 폼, 관리 화면처럼 버튼을 눌러 내용이 자주 바뀌는 화면에 좋아요. |
 
-backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요. structured AskUserQuestion 은 UI 제한에 맞춰 **최대 3개 선택지** 만 써요. 알려진 alias 는 위 설명을 짧게 붙이고, 알 수 없는 항목은 backend `name` 과 `folder_name` 을 붙여요. 항상 `취소` 선택지를 함께 보여줘요.
+backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요. structured AskUserQuestion 은 UI 제한에 맞춰 **최대 3개 선택지** 만 쓰고, 선택지는 모두 실제 backend template 이어야 해요. Claude Desktop AskUserQuestion 은 skip/free-text 입력을 자동으로 붙여요. 그래서 template picker 에는 `기타` / `Other` / `직접 고르기` / `취소` 같은 generic 선택지를 직접 넣지 말아요. 알려진 alias 는 위 설명을 짧게 붙이고, 알 수 없는 항목은 backend `name` 과 `folder_name` 을 붙여요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — template 선택은 `abort`, 앱 이름은 `abort`, bootstrap 실행 확인은 `취소`, auto-connect 실행 확인은 `아니요`, resume offer 는 `새로 시작` 예요.
 
 3. **template 을 선택해요.**
 
-   먼저 위 가이드와 backend 가 반환한 template 전체 목록을 텍스트로 보여줘요. 사용자가 발화에 exact alias 또는 backend folder_name 을 이미 적었다면 (예: "nextjs 앱 만들어줘") AskUserQuestion 없이 그 alias 로 진행해요. id 가 없으면 structured AskUserQuestion 은 3개 이하 선택지만 써요.
+   먼저 위 가이드와 backend 가 반환한 template 전체 목록을 텍스트로 보여줘요. 사용자가 발화에 exact alias 또는 backend folder_name 을 이미 적었다면 (예: "nextjs 앱 만들어줘") AskUserQuestion 없이 그 alias 로 진행해요. id 가 없으면 structured AskUserQuestion 은 3개 이하 선택지만 쓰고, 각 option 은 실제 backend template 하나에 대응해야 해요. 선택 label 과 template id/alias 매핑은 chat 에 노출하지 말고 SKILL 내부 상태로만 들고 있어요.
 
    ```json
    {
      "question": "어떤 템플릿으로 시작할까요?",
      "header": "템플릿",
      "options": [
-       {"label": "Next.js 추천", "value": "nextjs", "description": "쇼핑몰·예약·결제·로그인·관리자 화면"},
-       {"label": "직접 고르기", "value": "manual_template_id", "description": "위 목록에서 alias 또는 folder_name 을 말해요"},
-       {"label": "취소", "value": "abort", "description": "프로젝트를 만들지 않아요"}
+       {"label": "Next.js 추천", "description": "쇼핑몰·예약·결제·로그인·관리자 화면"},
+       {"label": "Vite + React", "description": "로그인 뒤 쓰는 설정·입력·관리 화면"},
+       {"label": "Astro", "description": "회사 소개·랜딩 페이지·블로그·문서"}
      ]
    }
    ```
 
-   위 JSON 은 예시예요. `Next.js 추천` 은 backend 가 `nextjs` alias 또는 `nextjs-axhub` folder 를 반환할 때만 보여줘요. backend 가 두 표현 모두 반환하지 않으면 첫 번째 알려진 항목 하나를 추천 버튼으로 쓰거나, 추천 없이 `직접 고르기` + `취소` 만 보여줘요. `manual_template_id` 를 고르면 AskUserQuestion 을 다시 호출하지 말고, 이미 보여준 텍스트 목록에서 exact alias 또는 folder_name 을 한 번만 물어요. 사용자가 답한 값이 backend 목록에 없으면 saga 를 시작하지 말고 다시 목록을 보여줘요. subprocess 에서는 자동 선택하지 않아요.
+   위 JSON 은 예시예요. 각 버튼은 backend 가 해당 alias 또는 folder 를 반환할 때만 보여줘요. `Next.js 추천` 은 `nextjs` alias 또는 `nextjs-axhub` folder, `Vite + React` 는 `react` alias 또는 `react-axhub` folder, `Astro` 는 `astro` alias 또는 `astro-axhub` folder 로 매핑해요. backend 가 알려진 template 을 3개보다 많이 반환하면 먼저 추천할 실제 template 3개만 버튼으로 만들고, 나머지는 이미 보여준 텍스트 목록에서 free-text 입력으로 고를 수 있게 둬요. backend 가 알려진 template 을 반환하지 않으면 `직접 고르기` 같은 generic 버튼을 만들지 말고 실제 backend `name` 을 최대 3개 버튼 label 로 써요. 사용자가 free-text 로 답한 값이 backend 목록의 exact alias / folder_name / name 과 맞지 않으면 saga 를 시작하지 말고 다시 목록을 보여줘요. subprocess 에서는 자동 선택하지 않아요.
 
 4. **앱 이름을 정해요.**
 
@@ -259,7 +260,14 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
    ```
 
-   이 resume 호출은 캐시된 device code 로 token 교환을 마치고 같은 saga 를 terminal 까지 이어가요 (`--watch` 는 인증 완료 후 saga 폴링용이라 fast-exit 와 충돌하지 않아요). **outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 말아요 — 새 code 를 발급해 이미 승인한 code 를 버려요.** resume 응답이 아직 `device_code_pending` (`DEVICE_FLOW_PENDING`) 이면 "브라우저 승인이 아직 안 끝난 것 같아요. 승인 후 다시 알려주세요" 후 승인 신호를 받으면 한 번 더 resume 해요. device code 가 만료(약 15분)됐으면 이 Step 의 fresh `--execute` 부터 새 challenge 를 발급해요. backend 가 `github_relogin_required` (428) 를 주면 user GitHub 토큰 만료라, fresh `--execute` 로 새 device flow 를 발급해 같은 surface → resume 흐름으로 복구해요. 설계 + resume 계약은 `../github/SKILL.md` 의 OAuth device flow 섹션과 `docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md` 를 참조해요.
+   이 resume 호출은 캐시된 device code 로 token 교환을 마치고 같은 saga 를 terminal 까지 이어가요 (`--watch` 는 인증 완료 후 saga 폴링용이라 fast-exit 와 충돌하지 않아요). **outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 말아요 — 새 code 를 발급해 이미 승인한 code 를 버려요.** resume 응답이 아직 `device_code_pending` (`DEVICE_FLOW_PENDING`) 이면 "브라우저 승인이 아직 안 끝난 것 같아요. 승인 후 다시 알려주세요" 후 승인 신호를 받으면 한 번 더 resume 해요. resume 응답이 `no pending github device flow` 이면 Claude Desktop 이 이미 device approval 을 끝냈지만 CLI cache 가 비어 있는지 확인해야 해요: `axhub github accounts list --json` 로 선택한 owner 설치가 확인될 때만 같은 idempotency key 로 아래 복구 명령을 한 번 실행해요. owner 설치 확인이 안 되면 fresh execute 를 하지 말고 새 device flow 안내로 돌아가요.
+
+   ```bash
+   axhub github accounts list --json
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --github-owner "$GITHUB_OWNER" --repo-name "$APP_SLUG" --repo-private --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+   ```
+
+   device code 가 만료(약 15분)됐으면 이 Step 의 fresh `--execute` 부터 새 challenge 를 발급해요. backend 가 `github_relogin_required` (428) 를 주면 user GitHub 토큰 만료라, fresh `--execute` 로 새 device flow 를 발급해 같은 surface → resume 흐름으로 복구해요. 설계 + resume 계약은 `../github/SKILL.md` 의 OAuth device flow 섹션과 `docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md` 를 참조해요.
 
    상세한 device flow 안내 패턴은 `../github/SKILL.md` 의 OAuth device flow 섹션을 따라요.
 
