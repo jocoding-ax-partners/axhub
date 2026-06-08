@@ -181,6 +181,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "snippet" => run_snippet(&rest),
         "auth-refresh-bg" => cmd_auth_refresh_bg(),
         "plugin-latest-fetch-bg" => Ok(axhub_helpers::plugin_update::cmd_plugin_latest_fetch_bg()),
+        "plugin-update-check" => Ok(axhub_helpers::plugin_update::cmd_plugin_update_check()),
         "plugin-drift-optout" => Ok(axhub_helpers::plugin_update::cmd_plugin_drift_optout()),
         "cli-latest-fetch-bg" => Ok(axhub_helpers::cli_drift::cmd_cli_latest_fetch_bg()),
         "cli-drift-optout" => Ok(axhub_helpers::cli_drift::cmd_cli_drift_optout()),

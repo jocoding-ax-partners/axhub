@@ -218,6 +218,51 @@ fn cmd_plugin_latest_fetch_bg_with_url(url: &str) -> i32 {
     0
 }
 
+/// Explicit plugin update check (`axhub-helpers plugin-update-check --json`).
+/// Called by the `upgrade` skill on an explicit user request. Unlike the passive
+/// plugin-drift nudge, this does a **fresh** GitHub releases fetch — the bundled
+/// `.claude-plugin/marketplace.json` is stale-by-design (it ships *with* the
+/// plugin, so it always reports the installed version as the latest). Mirrors the
+/// CLI's `axhub update check --json` contract. Always exits 0; emits one JSON line:
+///   `{"current":"0.9.37","latest":"0.9.38","has_update":true,"checked":true}`
+/// On a network/parse failure `checked` is `false` and `latest` is `null`, so the
+/// skill can say "couldn't check" instead of a false "up to date".
+pub fn cmd_plugin_update_check() -> i32 {
+    cmd_plugin_update_check_with_url(RELEASES_LATEST_URL)
+}
+
+fn cmd_plugin_update_check_with_url(url: &str) -> i32 {
+    println!("{}", plugin_update_check_payload(url));
+    0
+}
+
+fn plugin_update_check_payload(url: &str) -> serde_json::Value {
+    let current = current_version();
+    match fetch_latest_tag_from_url(url) {
+        Some(latest) => {
+            let has_update = is_newer(&latest, current);
+            // Warm the nudge cache as a side benefit so the proactive nudge and
+            // this explicit check agree on the latest version.
+            let _ = write_cache(&LatestCache {
+                latest: latest.clone(),
+                fetched_at: now_unix(),
+            });
+            serde_json::json!({
+                "current": current,
+                "latest": latest,
+                "has_update": has_update,
+                "checked": true,
+            })
+        }
+        None => serde_json::json!({
+            "current": current,
+            "latest": serde_json::Value::Null,
+            "has_update": false,
+            "checked": false,
+        }),
+    }
+}
+
 /// Permanent opt-out (`axhub-helpers plugin-drift-optout`). Writes the marker the
 /// drift check honors. Always returns 0 (fail-open).
 pub fn cmd_plugin_drift_optout() -> i32 {
@@ -604,5 +649,77 @@ mod tests {
         assert_eq!(cmd_plugin_drift_optout(), 0);
 
         assert!(plugin_drift_optout_path().unwrap().exists());
+    }
+
+    // ── plugin-update-check (explicit fresh check for the upgrade skill) ──
+
+    #[test]
+    fn update_check_reports_has_update_on_newer_remote() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        let (url, handle) = serve_once("200 OK", r#"{"tag_name":"v99.0.0"}"#);
+
+        let p = plugin_update_check_payload(&url);
+        assert_eq!(p["current"], current_version());
+        assert_eq!(p["latest"], "99.0.0");
+        assert_eq!(p["has_update"], true);
+        assert_eq!(p["checked"], true);
+        // side benefit: the explicit check warms the nudge cache.
+        assert_eq!(read_cache().unwrap().latest, "99.0.0");
+
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn update_check_reports_up_to_date_when_remote_equals_current() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        let body = format!(r#"{{"tag_name":"v{}"}}"#, current_version());
+        let (url, handle) = serve_once("200 OK", &body);
+
+        let p = plugin_update_check_payload(&url);
+        assert_eq!(p["has_update"], false);
+        assert_eq!(p["checked"], true);
+
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn update_check_reports_checked_false_on_network_failure() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+
+        let p = plugin_update_check_payload(&closed_local_url());
+        // No false "up to date" — the skill distinguishes checked:false.
+        assert_eq!(p["checked"], false);
+        assert_eq!(p["has_update"], false);
+        assert!(p["latest"].is_null());
+        assert!(
+            read_cache().is_none(),
+            "failed check must not warm the cache"
+        );
+    }
+
+    #[test]
+    fn update_check_command_exits_zero() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        assert_eq!(cmd_plugin_update_check_with_url(&closed_local_url()), 0);
     }
 }
