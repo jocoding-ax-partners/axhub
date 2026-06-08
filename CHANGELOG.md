@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.37](///compare/v0.9.36...v0.9.37) (2026-06-08)
+
+이번 패치는 온보딩/init 의 GitHub App 연결 경험을 손봤어요. 온보딩의 환경 감지 스크립트가 채팅에 그대로 노출되던 문제를, cross-platform `onboarding-detect` helper subcommand 로 한 번에 감지하게 바꿔 구조적으로 없앴어요. GitHub App install_url 은 이미 설치돼 있어도 항상 보여주고(계정 0개여도 app-level 링크로 fallback), 인증 만료는 `unknown` 으로 삼키지 않고 재로그인 안내로 구분해요. init 은 GitHub App 이 여러 계정/org 에 설치됐을 때 owner 를 미리 골라 `ambiguous_installation`(exit 9) 으로 앱 생성이 멈추던 걸 고치고, 비대화형 agent 는 `AXHUB_GITHUB_OWNER` 로 owner 를 지정할 수 있어요. CE 코드리뷰에서 나온 deploy 검증 timeout 버그(5s probe cap 이 `--watch-timeout 1m` 을 죽이던 것), install_url 호스트 검증, CLI probe 병렬화도 같이 반영했어요.
+
+### Test baseline
+
+- PR #179 를 GitHub Actions green (Local Rust gate / rust ×3 / corpus.100 drift / coverage 85.48% / perf ×3 / hook integration) 에서 squash merge 했어요.
+- `cargo test -p axhub-helpers` 876 pass (`onboarding_detect` unit 33 개), `cargo clippy --workspace -- -D warnings` clean, `bunx tsc --noEmit` / `bun run skill:doctor --strict` / `bun run lint:tone --strict` green, `bun test` 1280 pass.
+- release step 1 의 `bun run release:check` 로 host Rust helper build + version assert 를 통과했어요.
+
+### Honest tradeoff
+
+- `onboarding-detect` 는 새 helper 바이너리와 SKILL 이 함께 배포돼야 해요. 구버전 바이너리에서는 `helper_outdated` 로 구분해 작동하는 CLI 를 install-cli 로 오라우팅하지 않아요.
+- 계정 0개 install_url fallback 은 기본 `ax-hub-deploy` SaaS App 을 상수로 쓰되 `AXHUB_GITHUB_APP_INSTALL_URL` env 로 self-hosted 백엔드에서 덮어쓸 수 있어요.
+- onboarding 의 helper/install_url 동작은 실제 Claude Desktop 도그푸딩이 최종 검증이에요 (모델 행동 계약은 CI 가 못 잡아요). compute_gaps 의 non-empty·non-git·no-manifest dead-end 와 lint:keywords description drift 는 pre-existing 으로 별도 처리해요.
+
+### Fixed
+
+* 온보딩/init GitHub App install_url 상시 노출 + DETECT 누출 제거 + ambiguous owner 선택 ([#179](undefined/undefined/undefined/issues/179)) b8adcf1
+
 ## [0.9.36](https://github.com/jocoding-ax-partners/axhub/compare/v0.9.35...v0.9.36) (2026-06-08)
 
 이번 릴리스는 열린 PR 5개를 한 번에 정리해요. 로그인 문장이 로그 훅으로 새는 오라우팅을 고치고, 플러그인 버전 드리프트를 실제 Claude TUI 에서 업데이트 카드로 확인되게 만들며, onboarding/init 의 GitHub App 설치 링크를 놓치지 않게 해요. 마지막으로 prompt-route 내부 제어 문구는 사용자 화면이 아니라 hidden additionalContext 로만 흐르게 해서 Desktop 에서 raw routing contract 가 보이지 않게 했어요.
