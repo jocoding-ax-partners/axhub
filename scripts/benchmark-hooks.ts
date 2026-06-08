@@ -27,6 +27,7 @@ const shouldBuild = !process.argv.includes("--no-build");
 const printConfigOnly = process.argv.includes("--print-config");
 const fakeBinDir = mkdtempSync(join(tmpdir(), "axhub-hook-bench-"));
 const fakeAxhub = join(fakeBinDir, "axhub");
+const missingAxhub = join(fakeBinDir, "axhub-missing");
 writeFileSync(
   fakeAxhub,
   `#!/bin/sh
@@ -80,6 +81,10 @@ const scenarios = [
     name: "prompt-route no-preflight",
     subcommand: "prompt-route",
     thresholdMs: 120,
+    // Keep this hot-path measurement deterministic on developer machines that
+    // have a real axhub CLI installed; the fake-preflight scenarios below cover
+    // the healthy-CLI path explicitly.
+    env: { AXHUB_BIN: missingAxhub },
     payload: { hook_event_name: "UserPromptSubmit", prompt: "결과 봐" },
     assertOutput(stdout: string): void {
       if (stdout.includes("skills/")) throw new Error(`Approach E: no skill path expected, got ${stdout}`);

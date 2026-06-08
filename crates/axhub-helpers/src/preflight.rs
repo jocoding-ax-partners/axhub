@@ -40,9 +40,9 @@ pub fn default_runner(cmd: &[&str]) -> SpawnResult {
     // ["axhub", ...] literals.
     let resolved;
     let effective: Vec<&str> = if !cmd.is_empty() && (cmd[0] == "axhub" || cmd[0] == "axhub.exe") {
-        match resolve_axhub_path() {
-            Some(path) => {
-                resolved = path;
+        match resolve_axhub_path_info() {
+            Some(info) => {
+                resolved = info.path.to_string_lossy().into_owned();
                 std::iter::once(resolved.as_str())
                     .chain(cmd.iter().skip(1).copied())
                     .collect()
@@ -52,17 +52,31 @@ pub fn default_runner(cmd: &[&str]) -> SpawnResult {
     } else {
         cmd.to_vec()
     };
-    match crate::spawn::spawn_sync(&effective) {
-        Ok(result) => SpawnResult {
-            exit_code: result.exit_code.unwrap_or(1),
-            stdout: result.stdout,
-            stderr: result.stderr,
-        },
-        Err(e) => SpawnResult {
+    if effective.is_empty() {
+        return SpawnResult {
             exit_code: 127,
             stdout: String::new(),
-            stderr: e.to_string(),
-        },
+            stderr: "command is empty".into(),
+        };
+    }
+
+    let output = crate::axhub_cli::run_axhub_with_timeout(
+        effective[0],
+        &effective[1..],
+        crate::axhub_cli::DEFAULT_AXHUB_TIMEOUT,
+    );
+    if output.exit_code == 127 && output.stderr.is_empty() && output.stdout.is_empty() {
+        SpawnResult {
+            exit_code: 127,
+            stdout: String::new(),
+            stderr: "failed to spawn axhub CLI".into(),
+        }
+    } else {
+        SpawnResult {
+            exit_code: output.exit_code,
+            stdout: output.stdout,
+            stderr: output.stderr,
+        }
     }
 }
 
@@ -79,6 +93,18 @@ pub const AXHUB_BIN_NAME: &str = "axhub.exe";
 #[cfg(not(windows))]
 pub const AXHUB_BIN_NAME: &str = "axhub";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxhubPathSource {
+    Path,
+    Fallback,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedAxhubPath {
+    pub path: PathBuf,
+    pub source: AxhubPathSource,
+}
+
 /// Search for `axhub` binary on PATH plus well-known OS fallback locations.
 ///
 /// macOS GUI app subprocesses (incl. Claude Code Desktop) don't inherit shell-profile
@@ -92,38 +118,110 @@ pub const AXHUB_BIN_NAME: &str = "axhub";
 /// Returns the first absolute path that exists, else `None` (caller keeps bare basename
 /// — spawn proceeds with PATH semantics so test mocks that match `["axhub", ...]` work).
 pub fn resolve_axhub_path() -> Option<String> {
+    resolve_axhub_path_info().map(|info| info.path.to_string_lossy().into_owned())
+}
+
+pub fn resolve_axhub_path_info() -> Option<ResolvedAxhubPath> {
     if let Some(path) = std::env::var_os("PATH") {
         for dir in std::env::split_paths(&path) {
             let candidate = dir.join(AXHUB_BIN_NAME);
             if candidate.is_file() {
-                return Some(candidate.to_string_lossy().into_owned());
+                return Some(ResolvedAxhubPath {
+                    path: candidate,
+                    source: AxhubPathSource::Path,
+                });
             }
         }
     }
     for candidate in fallback_axhub_paths() {
         if candidate.is_file() {
-            return Some(candidate.to_string_lossy().into_owned());
+            return Some(ResolvedAxhubPath {
+                path: candidate,
+                source: AxhubPathSource::Fallback,
+            });
         }
     }
     None
 }
 
+fn push_unique_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
+    if path.as_os_str().is_empty() {
+        return;
+    }
+    if !paths.iter().any(|existing| existing == &path) {
+        paths.push(path);
+    }
+}
+
+fn env_path(name: &str) -> Option<PathBuf> {
+    std::env::var_os(name)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+fn home_env_path() -> Option<PathBuf> {
+    std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+/// Candidate directories where official or cargo-dist installers can place `axhub`.
+///
+/// Priority is explicit install override first, then cargo-dist's install dir,
+/// then cargo home, then the official user-local `~/.axhub/bin` path. The
+/// returned values are directories, not binary paths.
+pub fn install_dir_candidates() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(path) = env_path("AXHUB_INSTALL_DIR") {
+        push_unique_path(&mut dirs, path);
+    }
+    if let Some(path) = env_path("CARGO_DIST_INSTALL_DIR") {
+        push_unique_path(&mut dirs, path);
+    }
+    if let Some(path) = env_path("CARGO_HOME") {
+        push_unique_path(&mut dirs, path.join("bin"));
+    }
+    if let Some(home) = home_env_path() {
+        push_unique_path(&mut dirs, home.join(".cargo/bin"));
+        push_unique_path(&mut dirs, home.join(".axhub/bin"));
+    }
+    #[cfg(windows)]
+    {
+        if let Some(local_app_data) = env_path("LOCALAPPDATA") {
+            push_unique_path(&mut dirs, local_app_data.join("AxHub/bin"));
+        }
+    }
+    dirs
+}
+
 pub fn fallback_axhub_paths() -> Vec<PathBuf> {
     let mut paths: Vec<PathBuf> = Vec::new();
-    if cfg!(target_os = "macos") {
-        paths.push(PathBuf::from("/opt/homebrew/bin").join(AXHUB_BIN_NAME));
-        paths.push(PathBuf::from("/usr/local/bin").join(AXHUB_BIN_NAME));
-    } else if cfg!(target_os = "linux") {
-        paths.push(PathBuf::from("/usr/local/bin").join(AXHUB_BIN_NAME));
-        paths.push(PathBuf::from("/usr/bin").join(AXHUB_BIN_NAME));
-        paths.push(PathBuf::from("/home/linuxbrew/.linuxbrew/bin").join(AXHUB_BIN_NAME));
+    for dir in install_dir_candidates() {
+        push_unique_path(&mut paths, dir.join(AXHUB_BIN_NAME));
     }
-    let home = std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from);
-    if let Some(home) = home {
-        paths.push(home.join(".cargo/bin").join(AXHUB_BIN_NAME));
-        paths.push(home.join(".local/bin").join(AXHUB_BIN_NAME));
+    if cfg!(target_os = "macos") {
+        push_unique_path(
+            &mut paths,
+            PathBuf::from("/opt/homebrew/bin").join(AXHUB_BIN_NAME),
+        );
+        push_unique_path(
+            &mut paths,
+            PathBuf::from("/usr/local/bin").join(AXHUB_BIN_NAME),
+        );
+    } else if cfg!(target_os = "linux") {
+        push_unique_path(
+            &mut paths,
+            PathBuf::from("/usr/local/bin").join(AXHUB_BIN_NAME),
+        );
+        push_unique_path(&mut paths, PathBuf::from("/usr/bin").join(AXHUB_BIN_NAME));
+        push_unique_path(
+            &mut paths,
+            PathBuf::from("/home/linuxbrew/.linuxbrew/bin").join(AXHUB_BIN_NAME),
+        );
+    }
+    if let Some(home) = home_env_path() {
+        push_unique_path(&mut paths, home.join(".local/bin").join(AXHUB_BIN_NAME));
     }
     paths
 }
@@ -257,6 +355,14 @@ pub struct PreflightOutput {
     /// `default` so older callers reading JSON keep deserializing as before.
     #[serde(default = "default_cli_state")]
     pub cli_state: String,
+    /// `true` means the bare `axhub` command resolves from PATH. `false` with
+    /// `cli_present:true` means the CLI exists on disk in a known installer
+    /// directory, but new shells may still say "command not found" until PATH is
+    /// repaired.
+    #[serde(default = "default_cli_on_path")]
+    pub cli_on_path: bool,
+    #[serde(default)]
+    pub cli_resolved_path: Option<String>,
     pub auth_ok: bool,
     pub auth_error_code: Option<String>,
     pub scopes: Vec<String>,
@@ -271,11 +377,23 @@ pub struct PreflightOutput {
     pub current_env: Option<String>,
     pub last_deploy_id: Option<String>,
     pub last_deploy_status: Option<String>,
+    #[serde(default)]
+    pub helper_version_expected: Option<String>,
+    #[serde(default = "default_helper_version_ok")]
+    pub helper_version_ok: bool,
     pub plugin_version: String,
 }
 
 fn default_cli_state() -> String {
     "ok".to_string()
+}
+
+fn default_cli_on_path() -> bool {
+    true
+}
+
+fn default_helper_version_ok() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -397,6 +515,7 @@ fn diagnose_cli_state(version_result: &SpawnResult) -> CliState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CliState {
     Ok,
+    OnDiskNotOnPath,
     NotFound,
     ConfigCorrupted,
     RuntimeError,
@@ -406,6 +525,7 @@ impl CliState {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Ok => "ok",
+            Self::OnDiskNotOnPath => "on_disk_not_on_path",
             Self::NotFound => "not_found",
             Self::ConfigCorrupted => "config_corrupted",
             Self::RuntimeError => "runtime_error",
@@ -418,6 +538,7 @@ impl CliState {
     pub fn auth_error_code(&self) -> Option<&'static str> {
         match self {
             Self::Ok => None,
+            Self::OnDiskNotOnPath => None,
             Self::NotFound => Some("cli_not_found"),
             Self::ConfigCorrupted => Some("cli_config_corrupted"),
             Self::RuntimeError => Some("cli_runtime_error"),
@@ -441,6 +562,17 @@ where
 {
     let bin = axhub_bin();
     let parallel_disabled = std::env::var("AXHUB_PREFLIGHT_PARALLEL").as_deref() == Ok("0");
+    let bare_axhub_bin = bin == "axhub" || bin == "axhub.exe";
+    let resolved_axhub_info = if bare_axhub_bin {
+        resolve_axhub_path_info()
+    } else if PathBuf::from(&bin).is_absolute() {
+        Some(ResolvedAxhubPath {
+            path: PathBuf::from(&bin),
+            source: AxhubPathSource::Path,
+        })
+    } else {
+        None
+    };
 
     // Phase 3 B-06: spawn the four independent probes in parallel
     // (version + auth + last-deploy cache + manifest read). The auth
@@ -472,8 +604,31 @@ where
         })
     };
 
-    let cli_state = diagnose_cli_state(&version_result);
-    let cli_present = cli_state == CliState::Ok;
+    let probed_cli_state = diagnose_cli_state(&version_result);
+    let cli_present = probed_cli_state == CliState::Ok;
+    let cli_on_path = if cli_present {
+        resolved_axhub_info
+            .as_ref()
+            .map(|info| info.source == AxhubPathSource::Path)
+            // Mock runners do not always create a real binary on disk. Preserve
+            // the historical "OK means on PATH" behavior unless disk discovery
+            // actually proves it came from a fallback installer dir.
+            .unwrap_or(true)
+    } else {
+        false
+    };
+    let cli_state = if cli_present && !cli_on_path {
+        CliState::OnDiskNotOnPath
+    } else {
+        probed_cli_state
+    };
+    let cli_resolved_path = if cli_present {
+        resolved_axhub_info
+            .as_ref()
+            .map(|info| info.path.to_string_lossy().into_owned())
+    } else {
+        None
+    };
     let cli_version = if cli_present {
         extract_semver(&version_result.stdout)
     } else {
@@ -527,6 +682,11 @@ where
             chrono::Utc::now(),
         )
     });
+    let helper_version = env!("CARGO_PKG_VERSION").to_string();
+    let helper_version_expected = std::env::var("AXHUB_PLUGIN_VERSION")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| helper_version.clone());
     let output = PreflightOutput {
         cli_version,
         in_range,
@@ -534,6 +694,8 @@ where
         cli_too_new: too_new,
         cli_present,
         cli_state: cli_state.as_str().to_string(),
+        cli_on_path,
+        cli_resolved_path,
         auth_ok,
         auth_error_code,
         scopes,
@@ -573,8 +735,9 @@ where
             .filter(|s| !s.is_empty()),
         last_deploy_id: cache.as_ref().map(|c| c.deployment_id.clone()),
         last_deploy_status: cache.as_ref().map(|c| c.status.clone()),
-        plugin_version: std::env::var("AXHUB_PLUGIN_VERSION")
-            .unwrap_or_else(|_| env!("CARGO_PKG_VERSION").into()),
+        helper_version_expected: Some(helper_version_expected.clone()),
+        helper_version_ok: helper_version_expected == helper_version,
+        plugin_version: helper_version_expected,
     };
     let exit_code = if !cli_present || !in_range {
         EXIT_USAGE
@@ -735,6 +898,110 @@ mod tests {
     }
 
     #[test]
+    fn install_dir_candidates_prefer_installer_env_then_cargo_then_axhub_home() {
+        let _guard = axhub_bin_env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let prev_path = std::env::var("PATH").ok();
+        let prev_home = std::env::var("HOME").ok();
+        let prev_user = std::env::var("USERPROFILE").ok();
+        let prev_install = std::env::var("AXHUB_INSTALL_DIR").ok();
+        let prev_dist = std::env::var("CARGO_DIST_INSTALL_DIR").ok();
+        let prev_cargo = std::env::var("CARGO_HOME").ok();
+
+        std::env::set_var("PATH", "");
+        std::env::set_var("HOME", "/tmp/axhub-install-candidates-home");
+        std::env::remove_var("USERPROFILE");
+        std::env::set_var("AXHUB_INSTALL_DIR", "/tmp/axhub-explicit");
+        std::env::set_var("CARGO_DIST_INSTALL_DIR", "/tmp/axhub-cargo-dist");
+        std::env::set_var("CARGO_HOME", "/tmp/axhub-cargo-home");
+
+        let candidates = install_dir_candidates();
+        let normalized: Vec<String> = candidates
+            .iter()
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .collect();
+
+        assert_eq!(
+            normalized.first().map(String::as_str),
+            Some("/tmp/axhub-explicit")
+        );
+        assert_eq!(
+            normalized.get(1).map(String::as_str),
+            Some("/tmp/axhub-cargo-dist")
+        );
+        assert_eq!(
+            normalized.get(2).map(String::as_str),
+            Some("/tmp/axhub-cargo-home/bin")
+        );
+        assert!(
+            normalized
+                .iter()
+                .any(|p| p == "/tmp/axhub-install-candidates-home/.axhub/bin"),
+            "candidate list must include ~/.axhub/bin for official installer output: {:?}",
+            normalized
+        );
+
+        match prev_path {
+            Some(v) => std::env::set_var("PATH", v),
+            None => std::env::remove_var("PATH"),
+        }
+        match prev_home {
+            Some(v) => std::env::set_var("HOME", v),
+            None => std::env::remove_var("HOME"),
+        }
+        match prev_user {
+            Some(v) => std::env::set_var("USERPROFILE", v),
+            None => std::env::remove_var("USERPROFILE"),
+        }
+        match prev_install {
+            Some(v) => std::env::set_var("AXHUB_INSTALL_DIR", v),
+            None => std::env::remove_var("AXHUB_INSTALL_DIR"),
+        }
+        match prev_dist {
+            Some(v) => std::env::set_var("CARGO_DIST_INSTALL_DIR", v),
+            None => std::env::remove_var("CARGO_DIST_INSTALL_DIR"),
+        }
+        match prev_cargo {
+            Some(v) => std::env::set_var("CARGO_HOME", v),
+            None => std::env::remove_var("CARGO_HOME"),
+        }
+    }
+
+    #[test]
+    fn fallback_paths_include_dot_axhub_bin_when_home_set() {
+        let _guard = axhub_bin_env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let prev_home = std::env::var("HOME").ok();
+        let prev_user = std::env::var("USERPROFILE").ok();
+        std::env::set_var("HOME", "/tmp/fake-home-for-axhub-bin-test");
+        std::env::remove_var("USERPROFILE");
+
+        let paths = fallback_axhub_paths();
+        let normalized: Vec<String> = paths
+            .iter()
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .collect();
+        assert!(
+            normalized
+                .iter()
+                .any(|p| p.contains("/tmp/fake-home-for-axhub-bin-test/.axhub/bin/axhub")),
+            "fallback list missing official ~/.axhub/bin install path: {:?}",
+            normalized
+        );
+
+        match prev_home {
+            Some(v) => std::env::set_var("HOME", v),
+            None => std::env::remove_var("HOME"),
+        }
+        match prev_user {
+            Some(v) => std::env::set_var("USERPROFILE", v),
+            None => std::env::remove_var("USERPROFILE"),
+        }
+    }
+
+    #[test]
     fn resolve_axhub_path_finds_binary_in_path() {
         let _guard = axhub_bin_env_lock()
             .lock()
@@ -768,5 +1035,150 @@ mod tests {
             None => std::env::remove_var("PATH"),
         }
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn resolve_axhub_path_info_marks_fallback_binary_as_not_on_path() {
+        let _guard = axhub_bin_env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let home = tempfile::tempdir().unwrap();
+        let bin_dir = home.path().join(".axhub/bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let fake = bin_dir.join(AXHUB_BIN_NAME);
+        fs::write(&fake, b"fake").unwrap();
+
+        let prev_path = std::env::var("PATH").ok();
+        let prev_home = std::env::var("HOME").ok();
+        let prev_user = std::env::var("USERPROFILE").ok();
+        let prev_install = std::env::var("AXHUB_INSTALL_DIR").ok();
+        let prev_dist = std::env::var("CARGO_DIST_INSTALL_DIR").ok();
+        let prev_cargo = std::env::var("CARGO_HOME").ok();
+        std::env::set_var("PATH", "");
+        std::env::set_var("HOME", home.path());
+        std::env::remove_var("USERPROFILE");
+        std::env::remove_var("AXHUB_INSTALL_DIR");
+        std::env::remove_var("CARGO_DIST_INSTALL_DIR");
+        std::env::remove_var("CARGO_HOME");
+
+        let resolved = resolve_axhub_path_info().expect("fallback binary should resolve");
+        assert_eq!(resolved.path, fake);
+        assert_eq!(resolved.source, AxhubPathSource::Fallback);
+
+        match prev_path {
+            Some(v) => std::env::set_var("PATH", v),
+            None => std::env::remove_var("PATH"),
+        }
+        match prev_home {
+            Some(v) => std::env::set_var("HOME", v),
+            None => std::env::remove_var("HOME"),
+        }
+        match prev_user {
+            Some(v) => std::env::set_var("USERPROFILE", v),
+            None => std::env::remove_var("USERPROFILE"),
+        }
+        match prev_install {
+            Some(v) => std::env::set_var("AXHUB_INSTALL_DIR", v),
+            None => std::env::remove_var("AXHUB_INSTALL_DIR"),
+        }
+        match prev_dist {
+            Some(v) => std::env::set_var("CARGO_DIST_INSTALL_DIR", v),
+            None => std::env::remove_var("CARGO_DIST_INSTALL_DIR"),
+        }
+        match prev_cargo {
+            Some(v) => std::env::set_var("CARGO_HOME", v),
+            None => std::env::remove_var("CARGO_HOME"),
+        }
+    }
+
+    #[test]
+    fn preflight_reports_disk_only_cli_without_treating_it_as_missing() {
+        let _guard = axhub_bin_env_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let home = tempfile::tempdir().unwrap();
+        let bin_dir = home.path().join(".axhub/bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let fake = bin_dir.join(AXHUB_BIN_NAME);
+        fs::write(&fake, b"fake").unwrap();
+
+        let prev_path = std::env::var("PATH").ok();
+        let prev_home = std::env::var("HOME").ok();
+        let prev_user = std::env::var("USERPROFILE").ok();
+        let prev_install = std::env::var("AXHUB_INSTALL_DIR").ok();
+        let prev_dist = std::env::var("CARGO_DIST_INSTALL_DIR").ok();
+        let prev_cargo = std::env::var("CARGO_HOME").ok();
+        let prev_parallel = std::env::var("AXHUB_PREFLIGHT_PARALLEL").ok();
+        let prev_axhub_bin = std::env::var("AXHUB_BIN").ok();
+        std::env::set_var("PATH", "");
+        std::env::set_var("HOME", home.path());
+        std::env::remove_var("USERPROFILE");
+        std::env::remove_var("AXHUB_INSTALL_DIR");
+        std::env::remove_var("CARGO_DIST_INSTALL_DIR");
+        std::env::remove_var("CARGO_HOME");
+        std::env::remove_var("AXHUB_BIN");
+        std::env::set_var("AXHUB_PREFLIGHT_PARALLEL", "0");
+
+        let run = run_preflight_with_runner(|cmd| {
+            match cmd {
+            ["axhub", "--version"] => SpawnResult {
+                exit_code: EXIT_OK,
+                stdout: format!("axhub {MIN_AXHUB_CLI_VERSION}\n"),
+                stderr: String::new(),
+            },
+            ["axhub", "auth", "status", "--json"] => SpawnResult {
+                exit_code: EXIT_OK,
+                stdout: r#"{"user_email":"dev@example.test","user_id":1,"expires_at":"2099-01-01T00:00:00Z","scopes":["deploy"]}"#.into(),
+                stderr: String::new(),
+            },
+            _ => SpawnResult {
+                exit_code: 127,
+                stdout: String::new(),
+                stderr: "unexpected probe".into(),
+            },
+        }
+        });
+
+        assert_eq!(run.exit_code, EXIT_OK);
+        assert!(run.output.cli_present);
+        assert!(!run.output.cli_on_path);
+        assert_eq!(run.output.cli_state, "on_disk_not_on_path");
+        assert_eq!(
+            run.output.cli_resolved_path.as_deref(),
+            Some(fake.to_string_lossy().as_ref())
+        );
+
+        match prev_path {
+            Some(v) => std::env::set_var("PATH", v),
+            None => std::env::remove_var("PATH"),
+        }
+        match prev_home {
+            Some(v) => std::env::set_var("HOME", v),
+            None => std::env::remove_var("HOME"),
+        }
+        match prev_user {
+            Some(v) => std::env::set_var("USERPROFILE", v),
+            None => std::env::remove_var("USERPROFILE"),
+        }
+        match prev_install {
+            Some(v) => std::env::set_var("AXHUB_INSTALL_DIR", v),
+            None => std::env::remove_var("AXHUB_INSTALL_DIR"),
+        }
+        match prev_dist {
+            Some(v) => std::env::set_var("CARGO_DIST_INSTALL_DIR", v),
+            None => std::env::remove_var("CARGO_DIST_INSTALL_DIR"),
+        }
+        match prev_cargo {
+            Some(v) => std::env::set_var("CARGO_HOME", v),
+            None => std::env::remove_var("CARGO_HOME"),
+        }
+        match prev_parallel {
+            Some(v) => std::env::set_var("AXHUB_PREFLIGHT_PARALLEL", v),
+            None => std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL"),
+        }
+        match prev_axhub_bin {
+            Some(v) => std::env::set_var("AXHUB_BIN", v),
+            None => std::env::remove_var("AXHUB_BIN"),
+        }
     }
 }

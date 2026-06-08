@@ -179,6 +179,26 @@ describe("rust-staging-gates.yml workflow shape", () => {
   });
 });
 
+describe("plugin helper bootstrap", () => {
+  test("ships executable bin/axhub-helpers bootstrap shim for plugin PATH", () => {
+    const path = join(REPO_ROOT, "bin/axhub-helpers");
+    expect(existsSync(path)).toBe(true);
+    expect(statSync(path).mode & 0o111).not.toBe(0);
+
+    const content = readFileSync(path, "utf8");
+    expect(content).toContain("AXHUB_HELPER_BOOTSTRAP_SHIM=1");
+    expect(content).toContain("install.sh");
+    expect(content).toContain('exec "$TARGET_PATH" "$@"');
+  });
+
+  test("host build preserves the bootstrap shim while writing host release asset", () => {
+    const script = readFileSync(join(REPO_ROOT, "scripts/build-rust-helper.ts"), "utf8");
+    expect(script).toContain("AXHUB_HELPER_BOOTSTRAP_SHIM=1");
+    expect(script).toContain("preserved bin/${outputName} bootstrap shim");
+    expect(script).toContain("const hostDest = join(BIN_DIR, spec.assetName)");
+  });
+});
+
 describe("Rust CI workflow toolchain compatibility", () => {
   const workflowPaths = [
     ".github/workflows/rust-ci.yml",

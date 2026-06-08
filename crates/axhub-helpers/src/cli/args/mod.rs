@@ -154,6 +154,15 @@ pub(crate) struct DoctorArgs {
     pub no_cooldown: bool,
 }
 
+/// `repair-path` flags.
+#[derive(clap::Args, Debug)]
+pub(crate) struct RepairPathArgs {
+    #[arg(long)]
+    pub json: bool,
+    #[arg(long)]
+    pub dir: Option<String>,
+}
+
 /// `settings-merge` raw flags. mutual-excl(--apply/--dry-run, --migrate/--apply) 검증·dry_run
 /// 파생·scope 검증은 handler 가 담당(bail→64 보존). classify=Normal.
 #[derive(clap::Args, Debug)]

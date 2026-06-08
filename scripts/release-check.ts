@@ -4,8 +4,8 @@
  *
  * Default local mode:
  *   1. codegen:version syncs generated version files + Cargo workspace version
- *   2. bun run build builds the host Rust helper into bin/axhub-helpers
- *   3. host runnable binary reports package.json version
+ *   2. bun run build builds the host Rust helper asset and preserves the shim
+ *   3. host runnable helper path reports package.json version
  *   4. workflow/package wiring for the 5 release assets is present
  *
  * Full matrix mode (`AXHUB_RELEASE_CHECK_FULL=1`) also runs `bun run build:all`
@@ -66,7 +66,7 @@ const main = (): void => {
   log("step 1/4: codegen:version (sync version constants)");
   process.stdout.write(exec("bun run codegen:version"));
 
-  log("step 2/4: bun run build (Cargo host build → bin/axhub-helpers)");
+  log("step 2/4: bun run build (Cargo host build → host asset, shim preserved)");
   process.stdout.write(exec("bun run build"));
 
   log("step 3/4: assert host runnable Rust binary version");

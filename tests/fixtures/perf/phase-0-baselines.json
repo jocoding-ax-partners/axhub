@@ -1,21 +1,21 @@
 {
-  "generated_from": "gh run 25652348589 perf artifacts for phase26/pr-26-1a-atomic-jsonl (2026-05-11)",
+  "generated_from": "gh run 27083670304 perf artifacts for PR #171 full-SSE success path recalibration (2026-06-07)",
   "max_delta_ratio": 0.05,
   "baselines": {
     "ubuntu-latest": {
-      "scenario-1-warm-redeploy": { "avg": 20043, "p95": 20045, "runs": 5 },
-      "scenario-2-cold-first-deploy": { "avg": 20044, "p95": 20045, "runs": 5 },
-      "scenario-3-fresh-home-no-token": { "avg": 25052, "p95": 25053, "runs": 5 }
+      "scenario-1-warm-redeploy": { "avg": 21301, "p95": 21307, "runs": 5 },
+      "scenario-2-cold-first-deploy": { "avg": 21300, "p95": 21302, "runs": 5 },
+      "scenario-3-fresh-home-no-token": { "avg": 26310, "p95": 26312, "runs": 5 }
     },
     "macos-latest": {
-      "scenario-1-warm-redeploy": { "avg": 20216, "p95": 20255, "runs": 5 },
-      "scenario-2-cold-first-deploy": { "avg": 20168, "p95": 20192, "runs": 5 },
-      "scenario-3-fresh-home-no-token": { "avg": 25194, "p95": 25201, "runs": 5 }
+      "scenario-1-warm-redeploy": { "avg": 21526, "p95": 21725, "runs": 5 },
+      "scenario-2-cold-first-deploy": { "avg": 21436, "p95": 21487, "runs": 5 },
+      "scenario-3-fresh-home-no-token": { "avg": 26463, "p95": 26528, "runs": 5 }
     },
     "windows-latest": {
-      "scenario-1-warm-redeploy": { "avg": 20392, "p95": 20490, "runs": 5 },
-      "scenario-2-cold-first-deploy": { "avg": 20370, "p95": 20393, "runs": 5 },
-      "scenario-3-fresh-home-no-token": { "avg": 25484, "p95": 25751, "runs": 5 }
+      "scenario-1-warm-redeploy": { "avg": 21768, "p95": 21798, "runs": 5 },
+      "scenario-2-cold-first-deploy": { "avg": 22488, "p95": 25580, "runs": 5 },
+      "scenario-3-fresh-home-no-token": { "avg": 26780, "p95": 26827, "runs": 5 }
     }
   }
 }

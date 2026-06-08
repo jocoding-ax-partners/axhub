@@ -179,6 +179,7 @@ async function runScenario(
     const { env, cleanup } = await setup();
     try {
       const r = await runHarnessOnce(env);
+      expect(r.exit_code).toBe(0);
       runs.push(r);
     } finally {
       await cleanup();

@@ -66,6 +66,28 @@ describe("init template guidance UX (bootstrap saga workflow)", () => {
     expect(optionCount).toBeLessThanOrEqual(3);
   });
 
+  test("uses only real backend templates in the Desktop template picker", () => {
+    const questionStart = initSkill.indexOf('"question": "어떤 템플릿으로 시작할까요?"');
+    expect(questionStart).toBeGreaterThanOrEqual(0);
+
+    const questionEnd = initSkill.indexOf("```", questionStart);
+    expect(questionEnd).toBeGreaterThan(questionStart);
+
+    const questionBlock = initSkill.slice(questionStart, questionEnd);
+    for (const label of ["Next.js 추천", "Vite + React", "Astro"]) {
+      expect(questionBlock).toContain(`"label": "${label}"`);
+    }
+    expect(questionBlock).not.toContain('"value"');
+    expect(questionBlock).not.toContain("manual_template_id");
+    expect(questionBlock).not.toContain("직접 고르기");
+    expect(questionBlock).not.toContain("취소");
+
+    const guide = guidanceSection();
+    expect(guide).toContain("Claude Desktop AskUserQuestion");
+    expect(guide).toContain("skip/free-text");
+    expect(guide).toContain("선택지는 모두 실제 backend template");
+  });
+
   test("avoids unexplained developer jargon in user-facing guidance", () => {
     const guide = guidanceSection();
     expect(guide).not.toMatch(/\bSPA\b/i);

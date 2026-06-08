@@ -37,7 +37,7 @@
 | `security.endpoint_invalid` | (제거) | 동상 — `AXHUB_ENDPOINT` 검증은 CLI 가 담당 |
 | `auth.token_missing` | `auth.token_invalid` | CLI 가 exit 65 일 때 모두 `auth.token_invalid` 로 통일 |
 | `validation.app_id_invalid` | `validation.app_id_invalid` | 의미만 좁아짐 — argv injection 방어(`validate_app_ref`) 차원의 helper-side 검증으로만 emit |
-| `transport.spawn_failed` (PR #149 초기) | `transport.cli_missing` | exit 127 의 의미를 더 actionable 하게 만들었어요. SKILL 이 `axhub:setup` 으로 라우팅 가능 |
+| `transport.spawn_failed` (PR #149 초기) | `transport.cli_missing` | exit 127 의 의미를 더 actionable 하게 만들었어요. SKILL 이 `axhub:onboarding` 으로 라우팅 가능 |
 | (없음) | `response.invalid_json` | exit 0 인데 stdout JSON 파싱 실패 |
 | (없음) | `transport.timeout` | helper-side 5s 타임아웃 (auth-refresh 20s) |
 | (없음) | `cli.exit_<N>` | catch-all — CLI 가 미지의 비-0 exit 으로 죽었을 때 |
@@ -48,7 +48,7 @@
 
 helper 는 이제 `axhub` 바이너리가 PATH 에 있고 실행 가능해야 작동해요.
 
-- 바이너리 없음 → `error_code = "transport.cli_missing"`, `error_message_kr` 에 `axhub --version` 확인 + `axhub:setup` 재실행 안내. exit 1.
+- 바이너리 없음 → `error_code = "transport.cli_missing"`, `error_message_kr` 에 `axhub --version` 확인 + `axhub:onboarding` 재실행 안내. exit 1.
 - 바이너리 hang → `error_code = "transport.timeout"` (deploy/list/status: 5s, auth refresh: 20s)
 - 바이너리 crash (signal kill) → exit 137 / 143 등 → `error_code = "cli.exit_<N>"`
 

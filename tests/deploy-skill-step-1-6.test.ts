@@ -34,3 +34,50 @@ describe("deploy SKILL Step 1.6 — in-flight deploy guard invariants", () => {
     expect(body).toContain("in_flight_deploy.created_at");
   });
 });
+
+describe("deploy SKILL Step 1.1 — template-required hard stop", () => {
+  test("manifest_missing stops instead of spinning on context checks", () => {
+    const body = deploySkill();
+    expect(body).toContain('state: "template_required"');
+    expect(body).toContain('reason: "manifest_missing"');
+    expect(body).toContain('do not run more context/file-inspection commands');
+    expect(body).toContain('never spin on "컨텍스트 확인" after `manifest_missing`');
+  });
+
+  test("template-required branch asks for local manifest initialization, not remote mutation", () => {
+    const body = deploySkill();
+    expect(body).toContain("React/Vite로 초기화");
+    expect(body).toContain("다른 템플릿 선택");
+    expect(body).toContain("취소");
+    expect(body).toContain("do not call `apps bootstrap`, `apps create`, or `deploy create`");
+  });
+
+  test("Desktop short-prompt fast path must not deploy the wrong folder", () => {
+    const body = deploySkill();
+    expect(body).toContain("make sure the command runs in the user-visible app folder");
+    expect(body).toContain("added folder is the only Vite/React app");
+    expect(body).toContain("ask which folder to deploy and stop");
+    expect(body).toContain("do not preview or register the wrong folder");
+    expect(body).toContain("If helper stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`");
+    expect(body).toContain("Do not ask for deploy approval, app registration approval, or call `deploy-approved-run`");
+  });
+
+  test("React/Vite choice writes a local manifest before retrying deploy", () => {
+    const body = deploySkill();
+    expect(body).toContain("axhub init --framework react-vite --target auto");
+    expect(body).toContain("--no-git --json");
+    expect(body).toContain("axhub manifest validate --file axhub.yaml --json");
+    expect(body).toContain("Do not stop after saying \"프로젝트 확인\"");
+    expect(body).toContain("current CLI `axhub init --framework react-vite` is the manifest-only source of truth");
+    expect(body).toContain("show the preview approval card");
+  });
+
+  test("local manifest writes must be committed before preview", () => {
+    const body = deploySkill();
+    expect(body).toContain("git status --porcelain --untracked-files=normal -- axhub.yaml apphub.yaml .gitignore");
+    expect(body).toContain("do **not** show a preview using the previous commit");
+    expect(body).toContain("Route to Step 1.5");
+    expect(body).toContain("generated manifest");
+    expect(body).toContain("new `commit_sha`");
+  });
+});

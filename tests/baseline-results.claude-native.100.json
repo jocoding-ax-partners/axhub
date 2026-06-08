@@ -1762,5 +1762,24 @@
     ],
     "required_consent_seen": false,
     "notes": "Migrate NL routing fixture. Plugin arm preserves the migrate skill decision and starts with local helper pre-scan."
+  },
+  {
+    "utterance_id": "T-RO-120",
+    "fired_skill": "onboarding",
+    "actual_tool_calls": [
+      {
+        "cmd": "axhub --version",
+        "exit_code": 0,
+        "ts": "2026-06-05T15:10:01Z"
+      },
+      {
+        "cmd": "axhub-helpers preflight --json",
+        "exit_code": 0,
+        "ts": "2026-06-05T15:10:02Z"
+      }
+    ],
+    "required_consent_seen": false,
+    "ts": "2026-06-05T15:10:02Z",
+    "notes": "First-run onboarding fixture. Plugin arm maps first-run human phrasing to onboarding. setup remains a natural-language trigger phrase only, not a skill slug."
   }
 ]

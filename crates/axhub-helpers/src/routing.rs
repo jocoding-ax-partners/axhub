@@ -1418,12 +1418,58 @@ pub fn browse_template_intent_present(prompt: &str) -> bool {
         )
 }
 
+/// Narrow first-run onboarding detector for Desktop prompts like
+/// "처음인데 뭐부터 하면 돼?".
+///
+/// Specialized requests still win: "새 앱 만들어줘" stays with init, "설치 상태
+/// 괜찮아?" stays with doctor, and explicit installer/deploy prompts stay with
+/// their smaller safe summaries.
+#[must_use]
+pub fn onboarding_intent_present(prompt: &str) -> bool {
+    let lower = prompt.to_lowercase();
+    let p = lower.as_str();
+    if init_intent_present(p)
+        || doctor_intent_present(p)
+        || install_cli_intent_present(p)
+        || deploy_create_intent_present(p)
+    {
+        return false;
+    }
+    contains_any_text(
+        p,
+        &[
+            "처음인데",
+            "처음 쓰",
+            "처음 사용",
+            "처음 써",
+            "axhub 처음",
+            "뭐부터 하면",
+            "뭐부터 해야",
+            "어떻게 시작",
+            "어떻게 시작해",
+            "온보딩",
+            "온보딩해",
+            "시작하기",
+            "초기 셋업",
+            "셋업해",
+            "셋업 해",
+            "setup axhub",
+            "set up axhub",
+            "onboard",
+            "onboarding",
+            "getting started",
+            "get started",
+            "first time",
+        ],
+    )
+}
+
 /// Narrow clarify/help detector for broad Desktop prompts like "axhub 좀 도와줘".
 ///
-/// This is deliberately smaller than setup/onboarding matching: first-use prompts
-/// such as "axhub 처음 쓰는데 뭐부터 하면 돼?" must stay with setup, while broad
-/// "help me choose what to do" prompts should get a clean question card without
-/// internal route labels.
+/// This is deliberately smaller than onboarding matching: first-use prompts
+/// such as "axhub 처음 쓰는데 뭐부터 하면 돼?" must stay with onboarding, while
+/// broad "help me choose what to do" prompts should get a clean question card
+/// without internal route labels.
 #[must_use]
 pub fn clarify_intent_present(prompt: &str) -> bool {
     let lower = prompt.to_lowercase();

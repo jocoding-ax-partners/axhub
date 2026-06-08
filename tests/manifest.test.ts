@@ -131,10 +131,30 @@ describe("plugin.json schema", () => {
   });
 
   test("no unknown top-level keys", () => {
-    const allowed = new Set(["name", "version", "description", "author", "homepage", "repository", "license", "keywords"]);
+    const allowed = new Set([
+      "name",
+      "version",
+      "description",
+      "author",
+      "homepage",
+      "repository",
+      "license",
+      "keywords",
+    ]);
     for (const key of Object.keys(pluginJson)) {
       expect(allowed.has(key)).toBe(true);
     }
+  });
+
+  test("plugin.json does not duplicate default component paths", () => {
+    const raw = pluginJson as unknown as Record<string, unknown>;
+    expect(raw.commands).toBeUndefined();
+    expect(raw.skills).toBeUndefined();
+    expect(raw.hooks).toBeUndefined();
+
+    expect(existsSync(join(REPO_ROOT, "commands"))).toBe(true);
+    expect(existsSync(join(REPO_ROOT, "skills"))).toBe(true);
+    expect(existsSync(join(REPO_ROOT, "hooks/hooks.json"))).toBe(true);
   });
 
   test("version matches package.json version", () => {
@@ -621,7 +641,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(skillDirs.length).toBeGreaterThanOrEqual(11);
   });
 
-  test("all 44 shipped skills are present, including v0.17.3 CLI gap-fill skills + infer-tables-env", () => {
+  test("all 45 shipped skills are present, including v0.17.3 CLI gap-fill skills + infer-tables-env", () => {
     expect(skillDirs.sort()).toEqual([
       "apis",
       "app-lifecycle",
@@ -650,14 +670,15 @@ describe("skills/*/SKILL.md frontmatter", () => {
       "logs",
       "migrate",
       "my-resources",
+      "onboarding",
       "open",
       "profile",
       "publish",
       "recover",
+      "repair",
       "resources",
       "rollback",
       "routing-stats",
-      "setup",
       "status",
       "tables",
       "team",
@@ -703,11 +724,11 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
-  test("setup skill covers human first-run phrasing", () => {
-    const setup = skillContents.get("setup")!;
-    expect(setup).toContain("처음 쓰는데");
-    expect(setup).toContain("뭐부터 하면 돼");
-    expect(setup).toContain("axhub 처음 쓰는데 뭐부터 하면 돼?");
+  test("onboarding skill covers human first-run phrasing", () => {
+    const onboarding = skillContents.get("onboarding")!;
+    expect(onboarding).toContain("처음 쓰는데");
+    expect(onboarding).toContain("뭐부터 하면 돼");
+    expect(onboarding).toContain("axhub 처음 쓰는데 뭐부터 하면 돼?");
   });
 
   test("auth skill covers human login-status phrasing", () => {
@@ -896,6 +917,23 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(doctor).toContain("preflight narration");
   });
 
+  test("doctor skill routes installed-but-not-on-PATH state to repair", () => {
+    const doctor = skillContents.get("doctor")!;
+    expect(doctor).toContain("on_disk_not_on_path");
+    expect(doctor).toContain("PATH 고쳐줘");
+    expect(doctor).toContain("repair");
+    expect(doctor).toContain("설치는 됐는데 PATH");
+  });
+
+  test("repair skill wraps repair-path with consent and self-check", () => {
+    const repair = skillContents.get("repair")!;
+    expect(repair).toContain("PATH 고쳐줘");
+    expect(repair).toContain("repair-path --json");
+    expect(repair).toContain("AXHUB_DISABLE_PATH_REPAIR");
+    expect(repair).toContain("preflight --json");
+    expect(repair).toContain("Non-interactive AskUserQuestion guard");
+  });
+
   test("install-cli skill checks existing install before installer flow", () => {
     const install = skillContents.get("install-cli")!;
     expect(install).toContain("axhub CLI 설치해줘");
@@ -906,6 +944,13 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(install).toContain("Do not run installer commands");
     expect(install).toContain("preflight");
     expect(install).toContain("English tool-title fragments");
+  });
+
+  test("install-cli post-install verification can use the resolved helper fallback path", () => {
+    const install = skillContents.get("install-cli")!;
+    expect(install).toContain("cli_resolved_path");
+    expect(install).toContain("on_disk_not_on_path");
+    expect(install).toContain("PATH 고쳐줘");
   });
 
   test("update skill uses a single human Desktop summary path for check-only prompts", () => {
@@ -1598,6 +1643,7 @@ describe("cross-manifest consistency", () => {
       "resolve", "preflight", "classify-exit", "redact", "version", "help",
       "list-deployments", "prompt-route", "token-init", "token-import",
       "commit-gate", "test-classifier", "tdd-inject", "state-update",
+      "repair-path",
     ]);
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {

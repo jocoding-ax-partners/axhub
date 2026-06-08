@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# AXHUB_HELPER_BOOTSTRAP_SHIM=1
+# Bootstrap shim committed with the plugin package so Claude's Bash PATH has an
+# axhub-helpers executable immediately after plugin install. The native release
+# binary is downloaded lazily by bin/install.sh on first use when necessary.
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$BIN_DIR/.." && pwd)"
+OS="${AXHUB_OS:-$(uname -s)}"
+ARCH="${AXHUB_ARCH:-$(uname -m)}"
+
+case "$OS" in
+  Darwin) OS_KEY="darwin" ;;
+  Linux) OS_KEY="linux" ;;
+  MINGW*|MSYS_NT*|CYGWIN*|Windows_NT) OS_KEY="windows" ;;
+  *)
+    echo "Unsupported OS for axhub-helpers bootstrap: $OS" >&2
+    exit 127
+    ;;
+esac
+
+case "$ARCH" in
+  arm64|aarch64) ARCH_KEY="arm64" ;;
+  x86_64|amd64) ARCH_KEY="amd64" ;;
+  *)
+    echo "Unsupported architecture for axhub-helpers bootstrap: $ARCH" >&2
+    exit 127
+    ;;
+esac
+
+EXT=""
+[ "$OS_KEY" = "windows" ] && EXT=".exe"
+TARGET_NAME="axhub-helpers-${OS_KEY}-${ARCH_KEY}${EXT}"
+TARGET_PATH="${BIN_DIR}/${TARGET_NAME}"
+
+if [ -x "$TARGET_PATH" ]; then
+  exec "$TARGET_PATH" "$@"
+fi
+
+if [ -x "${ROOT}/target/release/axhub-helpers" ]; then
+  exec "${ROOT}/target/release/axhub-helpers" "$@"
+fi
+
+if [ -x "${ROOT}/target/debug/axhub-helpers" ]; then
+  exec "${ROOT}/target/debug/axhub-helpers" "$@"
+fi
+
+if [ "${AXHUB_SKIP_AUTODOWNLOAD:-0}" = "1" ]; then
+  echo "axhub-helpers native binary is missing and AXHUB_SKIP_AUTODOWNLOAD=1 is set." >&2
+  echo "Run: bash ${BIN_DIR}/install.sh" >&2
+  exit 127
+fi
+
+if [ -x "${BIN_DIR}/install.sh" ]; then
+  "${BIN_DIR}/install.sh" >&2
+  if [ -x "$TARGET_PATH" ]; then
+    exec "$TARGET_PATH" "$@"
+  fi
+fi
+
+echo "axhub-helpers bootstrap failed: native binary not found at ${TARGET_PATH}" >&2
+exit 127

@@ -1,5 +1,6 @@
-# Build outputs (Bun-compiled binary — single multi-cmd, gitignored)
+# Build outputs. Keep the committed bootstrap shim, ignore native release builds.
 bin/axhub-helpers
+!bin/axhub-helpers
 bin/axhub-helpers-*
 dist/
 *.exe
@@ -69,3 +70,6 @@ tests/.tmp-*/
 
 # axhub quality auto-mode runtime state (session-local, not for commit)
 .axhub-state/
+.axhub/init-resume.json
+.axhub/scaffold-dev.json
+.axhub/scaffold-dev.log

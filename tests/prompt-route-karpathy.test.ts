@@ -57,11 +57,74 @@ function promptRoute(prompt: string): string {
 }
 
 describe("prompt-route Karpathy context gating", () => {
+  test("first-run vibe prompts receive onboarding contract instead of generic advice", () => {
+    const stdout = promptRoute("처음인데 뭐부터 하면 돼?");
+    const payload = JSON.parse(stdout);
+    const additionalContext = payload.hookSpecificOutput?.additionalContext ?? "";
+    const systemMessage = payload.systemMessage ?? "";
+    const routedText = [
+      additionalContext,
+      systemMessage,
+    ].join("\n");
+    expect(additionalContext).toContain('Skill("axhub:onboarding")');
+    expect(systemMessage).toContain('Skill("axhub:onboarding")');
+    expect(routedText).toContain("처음 설정을 확인할게요");
+    expect(routedText).toContain("first-run onboarding");
+    expect(routedText).toContain("첫 앱 만들래요?");
+    expect(routedText).toContain("never announce internal routing");
+    expect(systemMessage).toContain("내부 제어");
+    expect(systemMessage).toContain("visible chat 에 절대 쓰지 않아요");
+    expect(systemMessage).toContain("내부 실행 선언");
+    expect(routedText).toContain("VIBE_READY");
+    expect(routedText).not.toContain("새 앱 만들어줘\" 하면 됨");
+    expect(routedText).not.toContain("I'll invoke the onboarding skill");
+  });
+
+  test("short new-app prompts receive Desktop init contract instead of generic app ideation", () => {
+    const stdout = promptRoute("새 앱 만들어줘");
+    const payload = JSON.parse(stdout);
+    const additionalContext = payload.hookSpecificOutput?.additionalContext ?? "";
+    const systemMessage = payload.systemMessage ?? "";
+    const routedText = [additionalContext, systemMessage].join("\n");
+    expect(additionalContext).toContain('Skill("axhub:init")');
+    expect(systemMessage).toContain('Skill("axhub:init")');
+    expect(routedText).toContain("새 앱을 만들 수 있는 템플릿을 확인할게요");
+    expect(routedText).toContain("AXHub app creation request");
+    expect(routedText).toContain("init-resume route --json");
+    expect(routedText).toContain("axhub apps templates list --json");
+    expect(routedText).toContain("backend template registry");
+    expect(routedText).toContain("Do not invent templates");
+    expect(routedText).toContain("Do not add an explicit 기타 option");
+    expect(routedText).toContain("Do not offer generic choices");
+    expect(routedText).toContain("axhub apps bootstrap --execute");
+    expect(routedText).not.toContain("/axhub:init");
+    expect(routedText).not.toContain("무슨 앱 만들래");
+  });
+
+  test("doctor status prompts receive doctor skill contract instead of generic diagnostics", () => {
+    const stdout = promptRoute("axhub CLI 설치 상태 괜찮아?");
+    const payload = JSON.parse(stdout);
+    const additionalContext = payload.hookSpecificOutput?.additionalContext ?? "";
+    const systemMessage = payload.systemMessage ?? "";
+    const routedText = [additionalContext, systemMessage].join("\n");
+    expect(additionalContext).toContain('Skill("axhub:doctor")');
+    expect(systemMessage).toContain('Skill("axhub:doctor")');
+    expect(routedText).toContain("설치 상태를 확인할게요");
+    expect(routedText).toContain("doctor-summary --user-utterance");
+    expect(routedText).toContain("Do not install, update, login, logout");
+    expect(routedText).toContain("visible chat 에 절대 쓰지 않아요");
+    expect(routedText).not.toContain("/axhub:doctor");
+    expect(routedText).not.toContain("I'll invoke the doctor skill");
+  });
+
   test("ordinary deploy prompts do not receive unrelated Karpathy skill body", () => {
     const stdout = promptRoute("내 paydrop 앱 배포해");
     expect(stdout).toContain("배포 준비를 확인할게요");
     expect(stdout).toContain("deploy-preview-summary");
     expect(stdout).toContain("deploy-approved-run");
+    expect(stdout).toContain("사용자에게 보이는 앱 폴더");
+    expect(stdout).toContain("axhub 매니페스트(axhub.yaml)가 없어요.");
+    expect(stdout).toContain("React/Vite로 초기화");
     expect(stdout).toContain("Invoke deploy skill");
     expect(stdout).toContain("consent token");
     expect(stdout).not.toContain("AXHub deploy workflow");

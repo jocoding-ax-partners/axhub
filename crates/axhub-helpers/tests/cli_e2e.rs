@@ -1605,6 +1605,78 @@ exit 1
 
 #[cfg(unix)]
 #[test]
+fn cli_prompt_route_onboarding_prompt_forces_onboarding_skill_contract() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = temp.path().join("axhub");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "axhub 0.17.3 (commit fake, built fake, fake)"
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--json" ]; then
+  echo '{"user_email":"test@jocodingax.ai","user_id":1,"expires_at":"2026-04-29T00:00:00Z","scopes":["read"]}'
+  exit 0
+fi
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&axhub).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&axhub, permissions).unwrap();
+
+    let input = serde_json::json!({
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "처음인데 뭐부터 하면 돼?",
+    })
+    .to_string();
+    let output = run_stdin(
+        &["prompt-route"],
+        &input,
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+
+    let stdout_json: serde_json::Value = serde_json::from_slice(&output.stdout).expect("hook JSON");
+    let ctx = stdout_json["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .expect("additionalContext");
+    let system = stdout_json["systemMessage"]
+        .as_str()
+        .expect("systemMessage");
+    let combined = format!("{ctx}\n{system}");
+    assert!(ctx.contains("Skill(\"axhub:onboarding\")"), "{ctx}");
+    assert!(system.contains("Skill(\"axhub:onboarding\")"), "{system}");
+    assert!(
+        combined.contains("Skill(\"axhub:onboarding\")"),
+        "{combined}"
+    );
+    assert!(
+        combined.contains("never announce internal routing"),
+        "{combined}"
+    );
+    assert!(system.contains("내부 제어"), "{system}");
+    assert!(
+        system.contains("visible chat 에 절대 쓰지 않아요"),
+        "{system}"
+    );
+    assert!(combined.contains("first-run onboarding"), "{combined}");
+    assert!(combined.contains("첫 앱 만들래요?"), "{combined}");
+    assert!(
+        combined.contains("do not ask template choices first"),
+        "{combined}"
+    );
+    assert!(!combined.contains("새 앱 만들어줘\" 하면 됨"), "{combined}");
+    assert!(
+        !combined.contains("I'll invoke the onboarding skill"),
+        "{combined}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn cli_prompt_route_dynamic_table_hint_is_surgical() {
     let temp = tempfile::tempdir().unwrap();
     let axhub = temp.path().join("axhub");
@@ -1688,7 +1760,7 @@ fn cli_prompt_route_desktop_app_template_hints_are_surgical() {
     let temp = tempfile::tempdir().unwrap();
     let axhub = fake_axhub(&temp);
     let cases = [
-        ("새 앱 만들어줘", "axhub 앱 생성 절차"),
+        ("새 앱 만들어줘", "AXHub app creation request"),
         ("내 앱 목록 보여줘", "현재 팀 scope"),
         ("템플릿 뭐 있어?", "read-only"),
     ];
@@ -1722,9 +1794,29 @@ fn cli_prompt_route_desktop_app_template_hints_are_surgical() {
             "hints must not leak internal skill labels into model-visible prose: {stdout}"
         );
         if prompt == "새 앱 만들어줘" {
+            let stdout_json: serde_json::Value =
+                serde_json::from_slice(&output.stdout).expect("hook JSON");
+            let additional_context = stdout_json["hookSpecificOutput"]["additionalContext"]
+                .as_str()
+                .expect("additionalContext");
+            let system_message = stdout_json["systemMessage"]
+                .as_str()
+                .expect("systemMessage");
             assert!(
-                stdout.contains("브레인스토밍이나 일반 프로젝트 탐색이 아니라 axhub 앱 생성 절차"),
+                additional_context.contains("Skill(\"axhub:init\")"),
+                "new-app Desktop context must route through the native init skill surface: {additional_context}"
+            );
+            assert!(
+                system_message.contains("Skill(\"axhub:init\")"),
+                "new-app Desktop hint must route through the native init skill surface: {stdout}"
+            );
+            assert!(
+                stdout.contains("브레인스토밍, 일반 프로젝트 탐색, 또는 앱 아이디어 분류가 아니라 AXHub 앱 생성 절차"),
                 "new-app Desktop hint must steer away from brainstorming/generic discovery: {stdout}"
+            );
+            assert!(
+                stdout.contains("Do not add an explicit 기타 option"),
+                "new-app Desktop hint must avoid duplicate Other options: {stdout}"
             );
             assert!(
                 stdout.contains("첫 문장은 정확히"),
@@ -2367,6 +2459,11 @@ esac
             );
         }
         if prompt == "axhub CLI 설치 상태 괜찮아?" {
+            assert!(ctx.contains("Skill(\"axhub:doctor\")"), "{ctx}");
+            assert!(
+                system_message.contains("Skill(\"axhub:doctor\")"),
+                "{system_message}"
+            );
             assert!(
                 ctx.contains("Do not install, update, login, logout"),
                 "{ctx}"

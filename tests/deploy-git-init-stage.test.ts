@@ -11,6 +11,8 @@ describe("deploy skill git init stage", () => {
     const content = readFileSync(DEPLOY_SKILL, "utf8");
 
     expect(content).toContain("git_init_needed");
+    expect(content).toContain("deploy-affecting uncommitted changes");
+    expect(content).toContain("Deploy MUST NOT show a preview card for an old `commit_sha`");
     expect(content).toContain("배포 전 저장 지점을 만들까요?");
     expect(content).toContain("Do not render this plan as a markdown checklist");
     expect(content).not.toContain("작업 단계");

@@ -113,15 +113,23 @@ fi
 LINK_PATH="${BIN_DIR}/axhub-helpers"
 [ "$OS_KEY" = "windows" ] && LINK_PATH="${BIN_DIR}/axhub-helpers.exe"
 
-# Remove existing link/file before relinking
-if [ -e "$LINK_PATH" ] || [ -L "$LINK_PATH" ]; then
-  rm -f "$LINK_PATH"
-fi
-
 if [ "$OS_KEY" = "windows" ]; then
+  # Remove existing link/file before relinking
+  if [ -e "$LINK_PATH" ] || [ -L "$LINK_PATH" ]; then
+    rm -f "$LINK_PATH"
+  fi
   cp "$TARGET_PATH" "$LINK_PATH"
 else
-  ln -s "$TARGET_NAME" "$LINK_PATH"
+  # Keep the committed bootstrap shim in source/plugin packages. It delegates to
+  # the downloaded native binary without mutating the tracked file in checkouts.
+  if [ -f "$LINK_PATH" ] && [ ! -L "$LINK_PATH" ] && grep -q "AXHUB_HELPER_BOOTSTRAP_SHIM=1" "$LINK_PATH" 2>/dev/null; then
+    chmod +x "$LINK_PATH" 2>/dev/null || true
+  else
+    if [ -e "$LINK_PATH" ] || [ -L "$LINK_PATH" ]; then
+      rm -f "$LINK_PATH"
+    fi
+    ln -s "$TARGET_NAME" "$LINK_PATH"
+  fi
 fi
 
 chmod +x "$LINK_PATH" 2>/dev/null || true

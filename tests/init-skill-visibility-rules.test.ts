@@ -42,7 +42,7 @@ describe("init SKILL — Vibe Coder Visibility Rules block (bootstrap saga refac
     expect(block).toMatch(/Step 3 template 선택/);
     expect(block).toMatch(/Step 4.*앱 이름/);
     expect(block).toMatch(/Step 5.*dry-run/);
-    expect(block).toMatch(/Step 6.*동의/);
+    expect(block).toMatch(/Step 6.*실행 확인/);
     expect(block).toMatch(/Step 7.*execute/);
     expect(block).toMatch(/Step 8.*clone/);
   });

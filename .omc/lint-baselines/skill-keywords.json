@@ -1,5 +1,24 @@
 {
   "description_phrases": {
+    "skills/onboarding/SKILL.md": [
+      "셋업해줘",
+      "셋업 해줘",
+      "처음인데",
+      "처음 사용",
+      "처음 써",
+      "처음 쓰는데",
+      "처음 쓰는데 뭐부터",
+      "뭐부터 하면 돼",
+      "뭐부터 하면 되나요",
+      "어떻게 시작하면 돼",
+      "어떻게 시작해",
+      "온보딩",
+      "온보딩해줘",
+      "시작하기",
+      "axhub 시작",
+      "axhub 처음",
+      "초기 셋업"
+    ],
     "skills/open/SKILL.md": [
       "라이브 페이지 열어봐",
       "결과 봐",
@@ -12,6 +31,12 @@
       "deploy URL 봐",
       "logs 페이지",
       "metrics 봐"
+    ],
+    "skills/repair/SKILL.md": [
+      "PATH 고쳐줘",
+      "PATH 수리",
+      "PATH 등록",
+      "axhub PATH 고쳐"
     ],
     "skills/apps/SKILL.md": [
       "내 앱",
@@ -281,25 +306,6 @@
       "어떤 테이블 필요해",
       "필요한 env 뭐 있어",
       "소스 분석 추천"
-    ],
-    "skills/setup/SKILL.md": [
-      "셋업해줘",
-      "셋업 해줘",
-      "처음인데",
-      "처음 사용",
-      "처음 써",
-      "처음 쓰는데",
-      "처음 쓰는데 뭐부터",
-      "뭐부터 하면 돼",
-      "뭐부터 하면 되나요",
-      "어떻게 시작하면 돼",
-      "어떻게 시작해",
-      "온보딩",
-      "온보딩해줘",
-      "시작하기",
-      "axhub 시작",
-      "axhub 처음",
-      "초기 셋업"
     ],
     "skills/doctor/SKILL.md": [
       "닥터",
@@ -1112,5 +1118,5 @@
     "\"보고서 올려줘\" → file upload, not deploy.",
     "\"발표자료 띄워\" → presentation, \"띄워\" is overloaded."
   ],
-  "generated_at": "2026-06-05T03:25:27.415Z"
+  "generated_at": "2026-06-05T17:24:08.561Z"
 }

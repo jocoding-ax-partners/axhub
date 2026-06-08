@@ -5,7 +5,7 @@
  * artifact itself is produced by Cargo.
  */
 import { spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -28,6 +28,15 @@ const argValue = (flag: string): string | null => {
 const fail = (message: string): never => {
   process.stderr.write(`[build-rust-helper] FAIL: ${message}\n`);
   process.exit(1);
+};
+
+const isBootstrapShim = (path: string): boolean => {
+  if (!existsSync(path)) return false;
+  try {
+    return readFileSync(path, "utf8").includes("AXHUB_HELPER_BOOTSTRAP_SHIM=1");
+  } catch {
+    return false;
+  }
 };
 
 const run = (cmd: string, args: string[]): void => {
@@ -64,9 +73,14 @@ if (!existsSync(source)) fail(`cargo build did not produce ${source}`);
 
 mkdirSync(BIN_DIR, { recursive: true });
 const primaryDest = join(BIN_DIR, outputName);
-copyFileSync(source, primaryDest);
-chmodSync(primaryDest, 0o755);
-process.stdout.write(`[build-rust-helper] wrote bin/${outputName}\n`);
+if (!target && !targetAlias && outputName === "axhub-helpers" && isBootstrapShim(primaryDest)) {
+  chmodSync(primaryDest, 0o755);
+  process.stdout.write(`[build-rust-helper] preserved bin/${outputName} bootstrap shim\n`);
+} else {
+  copyFileSync(source, primaryDest);
+  chmodSync(primaryDest, 0o755);
+  process.stdout.write(`[build-rust-helper] wrote bin/${outputName}\n`);
+}
 
 // A host build also refreshes the host-specific release asset so smoke/release
 // checks catch stale version drift before tag creation.

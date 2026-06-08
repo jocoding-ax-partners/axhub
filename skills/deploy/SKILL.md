@@ -28,6 +28,8 @@ When the user says a human deployment phrase such as `배포해줘`, `올려줘`
 
 - The first visible chat sentence must be exactly `배포 준비를 확인할게요.`
 - For the initial Desktop preview, stop reading this skill after this section. Do not read the long workflow below until the user has approved the preview card.
+- Before the Bash/tool call, make sure the command runs in the user-visible app folder. In Claude Desktop, if the active root and an added folder differ and the added folder is the only Vite/React app (`package.json` has `vite` + `react`/`react-dom`), run the helper from that folder (`cd "<that folder>" && ...`). If multiple app folders are plausible, ask which folder to deploy and stop; do not preview or register the wrong folder.
+- If helper stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, render the local initialization choices (`React/Vite로 초기화`, `다른 템플릿 선택`, `취소`) and stop. Do not ask for deploy approval, app registration approval, or call `deploy-approved-run` from this state.
 - Immediately run one Bash/tool call with title `배포 준비 확인`: `axhub-helpers deploy-preview-summary --user-utterance "<latest user sentence>"`.
 - Copy that Korean stdout as the preview card and ask for explicit approval.
 - After the user explicitly approves, run one Bash/tool call with title `배포 실행`: `axhub-helpers deploy-approved-run --user-utterance "<latest user sentence>"`.
@@ -295,6 +297,42 @@ To deploy:
 
    Treat this output as the source of truth for Sprint 3 bootstrap state. If it returns `template_required`, `git_init_required`, `first_commit_required`, `subdomain_collision`, `backend_contract_missing_defaults`, or `idempotency_unavailable`, stop at that user-decision state and surface a humanized one-line reason plus the safest next command (jargon-free per Vibe Coder Visibility Rules). If it returns `next_action: apps_create` or `next_action: deploy_create`, **internally bind** `command`, `binding_hash`, `pending_action_id`, `pending_action_hash`, `retry_policy`, and `consent_binding` into shell variables (PreToolUse hook consumes them for consent verification + retry policy enforcement) but **do not echo their raw values to the user chat** — those are internal verification primitives. Show the user a single humanized line such as "처음 배포라 앱을 먼저 만들고 있어요." and proceed to consent + execution. The helper is only a planner/recorder here; it must not be treated as approval to mutate. If `deploy_create` is executed and recorded here, do not mint or run a second `deploy_create` in Step 4; jump to Step 5 status-chain with the recorded deployment id.
 
+   **Desktop hard-stop for `template_required` / `manifest_missing`:** After the single `bootstrap --auto-chain --json` call returns `state: "template_required"` or `reason: "manifest_missing"`, do not run more context/file-inspection commands, do not keep thinking, and do not call `apps bootstrap`, `apps create`, or `deploy create`. Render one AskUserQuestion immediately:
+
+   ```json
+   {
+     "question": "axhub 매니페스트(axhub.yaml)가 없어요. Vite React 앱으로 어떻게 초기화할까요?",
+     "header": "초기화",
+     "options": [
+       {"label": "React/Vite로 초기화", "description": "현재 Vite 앱 기준으로 로컬 axhub.yaml만 만들고 배포 미리보기로 돌아가요."},
+       {"label": "다른 템플릿 선택", "description": "템플릿 이름을 받아 새 앱 생성 흐름으로 넘어가요."},
+       {"label": "취소", "description": "로컬 파일과 원격 리소스를 만들지 않고 멈춰요."}
+     ]
+   }
+   ```
+
+   In subprocess/CI/non-interactive contexts, choose `취소`. In Desktop, never spin on "컨텍스트 확인" after `manifest_missing`; this state means the user must choose or approve local manifest initialization before any remote app registration.
+
+   If the user chooses `React/Vite로 초기화` (or a host-rendered equivalent such as `React/Vite 정적 빌드`), the hard-stop is over. Immediately perform only this local manifest initialization, then return to deploy Step 1 and show the normal preview before any remote mutation:
+
+   ```bash
+   echo '[deploy:Step 1 local-manifest-init] entered' >&2
+   APP_NAME="$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-' | sed 's/^-//;s/-$//')"
+   [ -n "$APP_NAME" ] || APP_NAME="axhub-app"
+   axhub init --framework react-vite --target auto --app "$APP_NAME" --no-git --json
+   axhub manifest validate --file axhub.yaml --json
+   ```
+
+   Do not stop after saying "프로젝트 확인" once the user has chosen this option. Do not invent deprecated `axhub init --from-template` or hand-written YAML in this branch; current CLI `axhub init --framework react-vite` is the manifest-only source of truth. If the local write or validate command fails, surface the validation reason and stop before any remote command. If it succeeds, rerun Step 1 (`deploy-prep` / bootstrap plan) so the new `axhub.yaml` is the source of truth, then show the preview approval card.
+
+   Before rerunning Step 1, check whether the local initialization created deploy-affecting uncommitted changes:
+
+   ```bash
+   git status --porcelain --untracked-files=normal -- axhub.yaml apphub.yaml .gitignore package.json package-lock.json pnpm-lock.yaml bun.lockb bun.lock yarn.lock vite.config.* index.html src
+   ```
+
+   If that command prints anything, do **not** show a preview using the previous commit. Route to Step 1.5 (`배포 전 저장 지점을 만들까요?`) first, so the generated manifest and any related deploy config are included in a fresh commit. Only after that fresh resolve returns the new `commit_sha` may the preview approval card appear.
+
    Execute returned destructive `axhub ... --json` commands only as top-level Bash after the consent path runs (consent token mint via `consent-mint`). Then record the observed result back into the FSM with the same pending metadata — keep `pending_action_id` / `pending_action_hash` / `command_argv` / `exit_code` / `stdout_json` / `stderr` strictly inside the record JSON envelope, never as user-facing chat text:
 
    ```bash
@@ -332,7 +370,9 @@ To deploy:
 
    Never use cached `app_id` for mutation. If resolve still returns ambiguity, ask the user to disambiguate (slug list with numeric IDs). Deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
 
-1.5. **Git 저장 지점 준비** — if resolve returns `git_init_needed: true` OR `git_has_commit: false` OR either `branch`/`commit_sha` is empty, do not show the deploy preview yet. Before showing any explanatory copy or AskUserQuestion, replace the full TodoWrite list with the local git readiness checklist. Do not render this plan as a markdown checklist; Claude Code TodoWrite is the progress UI for every 3+ step branch.
+1.5. **Git 저장 지점 준비** — if resolve returns `git_init_needed: true` OR `git_has_commit: false` OR either `branch`/`commit_sha` is empty OR a local manifest/bootstrap step created deploy-affecting uncommitted changes (`git status --porcelain` non-empty for `axhub.yaml`, `apphub.yaml`, `.gitignore`, package/lock files, Vite config, `index.html`, or `src/`), do not show the deploy preview yet. Before showing any explanatory copy or AskUserQuestion, replace the full TodoWrite list with the local git readiness checklist. Do not render this plan as a markdown checklist; Claude Code TodoWrite is the progress UI for every 3+ step branch.
+
+   Deploy MUST NOT show a preview card for an old `commit_sha` while the manifest or deploy config that will make that deploy work is still uncommitted. Fresh local writes require a fresh save point and a fresh resolve.
 
    ```typescript
    TodoWrite({ todos: [

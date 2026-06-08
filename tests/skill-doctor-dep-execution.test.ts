@@ -111,10 +111,21 @@ describe("dep-execution negative cases — doctor must pass", () => {
     });
   });
 
-  test("init SKILL with allows-dependency-execution: false is not flagged by doctor", () => {
-    // After the bootstrap-saga refactor, init no longer claims dep-execution.
-    // Doctor must not flag init for allowlist concerns since the SKILL does
-    // not require an allowlist entry.
+  test("init SKILL can claim dependency execution only through the allowlist", () => {
+    // Post-scaffold auto-connect lets init trigger a lockfile-based install.
+    // Doctor must accept it only when the skill frontmatter and allowlist agree.
+    const initSkill = readFileSync(join(SKILLS_DIR, "init", "SKILL.md"), "utf8");
+    const allowlist = JSON.parse(
+      readFileSync(join(REPO_ROOT, "scripts", "skill-doctor-allowlist.json"), "utf8"),
+    );
+    expect(initSkill).toContain("allows-dependency-execution: true");
+    expect(allowlist.allows_dependency_execution).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          skill: "init",
+        }),
+      ]),
+    );
     const result = runDoctor();
     const lines = result.stdout.split("\n").filter(Boolean);
     expect(lines.filter((l) => l.includes("skills/init/SKILL.md")).length).toBe(0);
