@@ -24,7 +24,7 @@ model: sonnet
 
 # GitHub
 
-axhub 앱과 GitHub repo 연결 상태를 안전하게 확인하고 connect/disconnect 를 consent 로 보호해요. CLI mutation 은 `axhub apps git` 서브커맨드가 담당해요. 최신 CLI 의 top-level GitHub discovery 는 `axhub github accounts list` 와 `axhub github installations repos` 예요. `axhub github list` 는 존재하지 않는 구/추측 명령이므로 실행하지 않아요.
+axhub 앱과 GitHub repo 연결 상태를 안전하게 확인하고 connect/disconnect 는 preview 와 명시 확인 뒤에 실행해요. CLI mutation 은 `axhub apps git` 서브커맨드가 담당해요. 최신 CLI 의 top-level GitHub discovery 는 `axhub github accounts list` 와 `axhub github installations repos` 예요. `axhub github list` 는 존재하지 않는 구/추측 명령이므로 실행하지 않아요.
 
 ## Claude Desktop natural-language contract
 
@@ -102,7 +102,7 @@ echo "$PREFLIGHT_JSON"
      "options": [
        {"label": "현재 상태", "value": "list_only", "description": "앱의 현재 GitHub 연결 상태를 봐요"},
        {"label": "연결", "value": "connect", "description": "앱에 GitHub 저장소를 연결해요"},
-       {"label": "연결 해제", "value": "disconnect", "description": "exact confirm 과 consent 가 필요해요"}
+       {"label": "연결 해제", "value": "disconnect", "description": "exact confirm 이 필요해요"}
      ]
    }
    ```
@@ -120,7 +120,7 @@ echo "$PREFLIGHT_JSON"
    axhub github installations repos --installation-id "$INSTALLATION_ID" --json
    ```
 
-   `INSTALLATION_ID` 는 `accounts list` 출력의 `installation_id` 에서 가져와요. 출력에 `install_url` 이 들어 있으면 즉시 `GitHub 연결 링크: <install_url>` 로 안내해요. 다른 슬래시 커맨드 호출을 요구하지 마세요. 연결이 아직 없으면 status 가 404 / `git_connection` not_found 를 반환해요 — 이 경우 install_url 안내 후 Step 4 consent-connect 로 진행해요. 연결이 이미 있으면 `repo_full_name` / `branch` / `installation_id` 를 사용자에게 보여줘요.
+   `INSTALLATION_ID` 는 `accounts list` 출력의 `installation_id` 에서 가져와요. 출력에 `install_url` 이 들어 있으면 즉시 `GitHub 연결 링크: <install_url>` 로 안내해요. 다른 슬래시 커맨드 호출을 요구하지 마세요. 연결이 아직 없으면 status 가 404 / `git_connection` not_found 를 반환해요 — 이 경우 install_url 안내 후 Step 4 approved-connect 로 진행해요. 연결이 이미 있으면 `repo_full_name` / `branch` / `installation_id` 를 사용자에게 보여줘요.
 
 3.5. **Strict guided capability ladder for missing repo/remote/push.** Stay inside this ladder and stop on every unsupported gap. Do not skip ahead to connect while GitHub cannot see the repo.
 
@@ -141,9 +141,9 @@ echo "$PREFLIGHT_JSON"
       axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --json
       ```
 
-      dry-run 결과의 `installation_id` + `repo_full_name` 이 채워지면 visibility 확인됨 — Step 4 consent-connect 로 진행해요. dry-run 이 install_url 을 emit 하거나 `not_in_installation` 류 에러를 내면 Step 3.5 의 다음 단계 (repo 생성 / remote 추가 / push) 로 내려가요.
+      dry-run 결과의 `installation_id` + `repo_full_name` 이 채워지면 visibility 확인됨 — Step 4 approved-connect 로 진행해요. dry-run 이 install_url 을 emit 하거나 `not_in_installation` 류 에러를 내면 Step 3.5 의 다음 단계 (repo 생성 / remote 추가 / push) 로 내려가요.
 
-   3. **Create repo only when every gate is true:** gh exists/authenticated (`gh auth status` succeeds for the target host/account), owner-repo-visibility confirmed by the user, visibility is explicit (`private`/`public`), and the user consents. If any gate is missing, stop with an unsupported gap and show the smallest next manual action.
+   3. **Create repo only when every gate is true:** gh exists/authenticated (`gh auth status` succeeds for the target host/account), owner-repo-visibility confirmed by the user, visibility is explicit (`private`/`public`), and the user approves. If any gate is missing, stop with an unsupported gap and show the smallest next manual action.
 
       ```json
       {
@@ -158,7 +158,7 @@ echo "$PREFLIGHT_JSON"
 
       Only after `create`, run a concrete `gh repo create "$OWNER_REPO" --private|--public` command that matches the confirmed visibility. Then re-list after create/push with `axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --json` (dry-run). If the repo still does not appear, stop with the install/access gap.
 
-   4. **Add remote only with separate consent.**
+   4. **Add remote only with separate approval.**
 
       ```json
       {
@@ -171,9 +171,9 @@ echo "$PREFLIGHT_JSON"
       }
       ```
 
-      If the user consents, run `git remote add origin "$GITHUB_URL"` only when no `origin` exists. If a different `origin` exists, stop and ask the user to resolve it outside this skill.
+      If the user approves, run `git remote add origin "$GITHUB_URL"` only when no `origin` exists. If a different `origin` exists, stop and ask the user to resolve it outside this skill.
 
-   5. **First push only with separate consent.**
+   5. **First push only with separate approval.**
 
       ```json
       {
@@ -186,9 +186,9 @@ echo "$PREFLIGHT_JSON"
       }
       ```
 
-      If the user consents, run `git push -u origin "$BRANCH"`. Then re-list after create/push with `axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --json` (dry-run) before connect.
+      If the user approves, run `git push -u origin "$BRANCH"`. Then re-list after create/push with `axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --json` (dry-run) before connect.
 
-   6. **Connect only after the repo is visible and with separate consent.**
+   6. **Connect only after the repo is visible and with separate approval.**
 
       ```json
       {
@@ -196,28 +196,25 @@ echo "$PREFLIGHT_JSON"
         "header": "저장소 연결",
         "options": [
           {"label": "취소", "value": "abort", "description": "앱 연결 없이 멈춰요"},
-          {"label": "연결", "value": "connect", "description": "동의를 받고 axhub 앱과 GitHub 저장소를 연결해요"}
+          {"label": "연결", "value": "connect", "description": "확인한 뒤 axhub 앱과 GitHub 저장소를 연결해요"}
         ]
       }
       ```
 
       Re-list before connect if any create/push happened. If the repo is not listed for the account, stop on the unsupported gap and show the GitHub App install/access URL when available.
 
-4. **connect 는 consent 후 실행해요.**
+4. **connect 는 preview and explicit approval before connect 뒤에 실행해요.**
 
    ```bash
    APP_ID="${APP_ID:-$APP}"
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
-   cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"github_connect","app_id":"${APP_ID}","profile":"","branch":"${BRANCH}","commit_sha":"","context":{"repo":"${OWNER_REPO}","branch":"${BRANCH}","account":"${ACCOUNT}"}}
-   JSON
 
    axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json
    ```
 
-   `consent-mint` 에 `action=github_connect`, top-level `app_id`, `context={repo,branch,account}` 를 넣어요. `axhub apps git connect` 가 `--execute` 없이 호출되면 dry-run 이라 mutate 하지 않아요 — 실제 연결은 `--execute` 가 필요해요. GitHub App 설치 / installation 다중 후보가 있으면 CLI 가 자동 OAuth device flow 로 처리하고, 안 되면 install_url 을 emit 해요. `installation_id` 가 여러 개로 모호하면 `--installation-id <id>` 로 disambiguate 해요.
+   `axhub apps git connect` 가 `--execute` 없이 호출되면 dry-run 이라 mutate 하지 않아요 — 실제 연결은 `--execute` 가 필요해요. GitHub App 설치 / installation 다중 후보가 있으면 CLI 가 자동 OAuth device flow 로 처리하고, 안 되면 install_url 을 emit 해요. `installation_id` 가 여러 개로 모호하면 `--installation-id <id>` 로 disambiguate 해요.
 
    **OAuth device flow 가 시작되면 사용자에게 verification URL + user_code 를 즉시 보여주세요.** CLI 는 `device_code_issued` JSON event (`{user_code, verification_uri, verification_uri_complete}`) + stderr plain (`To connect GitHub, visit: <verification_uri>` / `Enter code: <user_code>` / `Or open directly: <verification_uri_complete>`) 를 emit 해요. JSON 이벤트나 stderr 한 줄도 사용자에게 안 보여주면 OAuth 가 timeout 으로 멈춰요. 다음 형식으로 사용자에게 한 번에 안내해요:
 
@@ -231,21 +228,18 @@ echo "$PREFLIGHT_JSON"
 
    `verification_uri_complete` 가 있으면 우선 표시 (코드 입력 자동). 없으면 `verification_uri` + 별도 `user_code` 표시.
 
-   **컨텍스트별 완료 (axhub-cli 0.15.3+) — 에이전트가 직접 마무리해요.** 대화형 TTY 면 connect 가 승인까지 polling 해서 자동으로 다음 단계로 진행돼요. 에이전트 / 비-TTY 컨텍스트면 connect 가 `device_code_issued` emit 직후 fast-exit 해요. 이때 challenge 를 보여준 뒤 **사용자에게 명령을 치라고 떠넘기지 말고** 브라우저 승인을 기다려요: "브라우저에서 승인한 다음 '승인했어' 라고 알려주세요. 제가 이어서 마무리할게요." 사용자가 승인 신호("승인했어" / "연결했어" / "됐어")를 주면, 에이전트가 consent 를 다시 mint 한 뒤 캐시된 device flow 를 `--resume-last` 로 직접 이어받아요 (resume 명령을 사용자에게 출력하지 말아요):
+   **컨텍스트별 완료 (axhub-cli 0.15.3+) — 에이전트가 직접 마무리해요.** 대화형 TTY 면 connect 가 승인까지 polling 해서 자동으로 다음 단계로 진행돼요. 에이전트 / 비-TTY 컨텍스트면 connect 가 `device_code_issued` emit 직후 fast-exit 해요. 이때 challenge 를 보여준 뒤 **사용자에게 명령을 치라고 떠넘기지 말고** 브라우저 승인을 기다려요: "브라우저에서 승인한 다음 '승인했어' 라고 알려주세요. 제가 이어서 마무리할게요." 사용자가 승인 신호("승인했어" / "연결했어" / "됐어")를 주면, 에이전트가 승인된 같은 흐름에서 캐시된 device flow 를 `--resume-last` 로 직접 이어받아요 (resume 명령을 사용자에게 출력하지 말아요):
 
    ```bash
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
-   cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"github_connect","app_id":"${APP_ID}","profile":"","branch":"${BRANCH}","commit_sha":"","context":{"repo":"${OWNER_REPO}","branch":"${BRANCH}","account":"${ACCOUNT}"}}
-   JSON
    axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --resume-last --json
    ```
 
    resume 응답이 성공이면 connect 가 완료돼요. **outstanding code 가 있는 동안 `--resume-last` 없이 fresh `--execute` 를 다시 호출하지 말아요 — 새 code 를 발급해 이미 승인한 code 를 버려요.** 아직 `device_code_pending` (`DEVICE_FLOW_PENDING`) 이면 "브라우저 승인이 아직 안 끝난 것 같아요. 승인 후 다시 알려주세요" 라고 안내하고 승인 신호를 받으면 한 번 더 resume 해요. device code 가 만료(약 15분)됐으면 이 Step 의 fresh `--execute` 부터 새 challenge 를 발급해요. backend 가 `github_relogin_required` (428) 를 주면 user GitHub 토큰 만료라, fresh `--execute` 로 새 device flow 를 발급해 같은 surface → resume 흐름으로 복구해요. 설계 + resume 계약은 `docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md` 를 참조해요.
 
-   `CLAUDE_PLUGIN_ROOT` 가 훅 환경에 없더라도 사용자에게 수동 실행이나 bang-prefixed connect 우회를 요청하지 말고, PATH 의 `axhub-helpers` 로 pending token 을 민 뒤 같은 흐름에서 top-level Bash 로 connect 를 실행해요.
+   `CLAUDE_PLUGIN_ROOT` 가 훅 환경에 없더라도 사용자에게 수동 실행이나 bang-prefixed connect 우회를 요청하지 말고, PATH 의 `axhub-helpers` 로 준비 상태를 확인한 뒤 같은 흐름에서 top-level Bash 로 connect 를 실행해요.
 
 5. **disconnect 는 exact confirm 후 실행해요.**
 
@@ -255,14 +249,11 @@ echo "$PREFLIGHT_JSON"
    HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
-   cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"github_disconnect","app_id":"${APP_ID}","profile":"","branch":"","commit_sha":"","context":{"slug":"${APP_ID_OR_SLUG}"}}
-   JSON
 
    axhub apps git disconnect --app "$APP_ID" --execute --json
    ```
 
-   `consent-mint` 에 `action=github_disconnect`, top-level `app_id`, `context={slug}` 를 넣어요. `--execute` 없이는 dry-run 이라 mutate 하지 않아요. 구 `--force` / `--confirm` 플래그는 제거됐어요.
+   `--execute` 없이는 dry-run 이라 mutate 하지 않아요. 구 `--force` / `--confirm` 플래그는 제거됐어요.
 
 ## NEVER
 

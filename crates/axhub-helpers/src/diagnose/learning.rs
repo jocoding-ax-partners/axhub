@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 
 use super::DiagnoseError;
 use crate::atomic_jsonl::{append_line, read_lines};
-use crate::consent::key::state_root;
+use crate::runtime_paths::state_root;
 
 const LEARNINGS_DIR: &str = "learnings";
 const LEARNINGS_FILE: &str = "learnings.jsonl";

@@ -87,37 +87,6 @@ pub(crate) struct AutowireCliArgs {
     pub command_path: Option<String>,
 }
 
-/// `consent-mint` flag. classify()=Normal (bad-arg→64). stdin 으로 JSON binding 읽음.
-#[derive(clap::Args, Debug)]
-pub(crate) struct ConsentMintArgs {
-    #[arg(long = "validate-only")]
-    pub validate_only: bool,
-}
-
-/// `consent-mint-app-lifecycle` avoids fragile shell-quoted JSON in Desktop
-/// app-lifecycle flows.
-#[derive(clap::Args, Debug)]
-pub(crate) struct ConsentMintAppLifecycleArgs {
-    #[arg(long)]
-    pub action: String,
-    #[arg(long)]
-    pub app: String,
-    #[arg(long)]
-    pub slug: Option<String>,
-    #[arg(long)]
-    pub subdomain: Option<String>,
-    #[arg(long)]
-    pub tenant: Option<String>,
-    #[arg(long)]
-    pub name: Option<String>,
-    #[arg(long)]
-    pub template: Option<String>,
-    #[arg(long = "repo-public")]
-    pub repo_public: Option<String>,
-    #[arg(long)]
-    pub quiet: bool,
-}
-
 /// `token-init`/`token-import` 공용 flag. classify()=Normal (bad-arg→64).
 #[derive(clap::Args, Debug)]
 pub(crate) struct TokenArgs {
@@ -168,7 +137,7 @@ pub(crate) struct RepairPathArgs {
 #[derive(clap::Args, Debug)]
 #[command(
     long_about = "axhub-helpers settings-merge — ~/.claude/settings.json statusLine 병합\n\n\
-OPTIONS:\n  --apply           실제 병합 실행 (explicit consent gate)\n  \
+OPTIONS:\n  --apply           실제 병합 실행 (explicit approval gate)\n  \
 --dry-run         결정만 출력, 파일 변경 없음 (기본값)\n  \
 --migrate         stale ${CLAUDE_PLUGIN_ROOT} literal 를 orphan stub path 로 교체\n  \
 --yes             --migrate 와 함께: 대화형 확인 없이 자동 적용\n  \

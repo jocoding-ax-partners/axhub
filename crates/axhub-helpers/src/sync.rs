@@ -137,7 +137,7 @@ pub fn run_sync(args: &[String]) -> Result<i32> {
                 json!({
                     "schema_version": "1",
                     "status": "identity_changed",
-                    "message": "auth principal or PAT fingerprint changed; re-run with explicit consent before overwriting .axhub/catalog.json",
+                    "message": "auth principal or PAT fingerprint changed; re-run with explicit approval before overwriting .axhub/catalog.json",
                     "out_dir": axhub_dir,
                     "target": resolved_target,
                 }),

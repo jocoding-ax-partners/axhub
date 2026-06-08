@@ -54,27 +54,6 @@ t2_run_preflight() {
   return "$rc"
 }
 
-# t2_run_consent_mint <case_id>
-# binding JSON 은 stdin 으로. CLAUDE_SESSION_ID env + sandbox config home 필수.
-t2_run_consent_mint() {
-  local case_id="$1"
-  local case_out="${OUTPUT_DIR}/${case_id}"
-  rm -rf "$case_out"
-  mkdir -p "$case_out/.config/axhub-plugin/consent"
-  local commit_sha
-  commit_sha="$(printf '%040d' 0)"
-  printf '{"tool_call_id":"t2-tool-%s","action":"deploy_create","app_id":"mock-app","profile":"prod","branch":"main","commit_sha":"%s"}' \
-    "$case_id" "$commit_sha" \
-    | CLAUDE_SESSION_ID="t2-consent-${case_id}-$$" \
-      XDG_CONFIG_HOME="${case_out}/.config" \
-      "$T2_HELPER_BIN" consent-mint \
-        > "${case_out}/stdout.json" 2> "${case_out}/stderr.log"
-  local rc=$?
-  echo "$rc" > "${case_out}/exit-code"
-  echo "0" > "${case_out}/wall-seconds"
-  return "$rc"
-}
-
 # t2_assert_korean_systemmessage <case_id> <expected_phrase>
 t2_assert_korean_systemmessage() {
   local case_id="$1"

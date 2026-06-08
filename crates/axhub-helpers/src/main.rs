@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs;
 use std::io::{self, IsTerminal, Read};
 use std::path::PathBuf;
@@ -8,11 +7,6 @@ use axhub_helpers::axhub_cli::run_axhub;
 use axhub_helpers::bootstrap::{cmd_bootstrap_dependency_plan, run_bootstrap};
 use axhub_helpers::catalog::classify;
 use axhub_helpers::config::{config_get, config_set, render_get_json};
-use axhub_helpers::consent::{
-    format_preauth_deny_hint, mint_token, parse_axhub_commands, validate_binding_schema,
-    verify_or_claim_token, verify_token, write_private_file_no_follow, ConsentBinding,
-    PENDING_TOOL_CALL_ID,
-};
 use axhub_helpers::deploy_prep::run_deploy_prep;
 use axhub_helpers::hook_safety;
 use axhub_helpers::init_resume::run_init_resume;
@@ -26,7 +20,10 @@ use axhub_helpers::preflight::{run_preflight, PreflightRun};
 use axhub_helpers::quality_gate::{validate_deploy_prep_quality, QualityCheckResult};
 use axhub_helpers::redact::redact;
 use axhub_helpers::resolve::run_resolve;
-use axhub_helpers::runtime_paths::{last_deploy_file, state_dir, token_file, welcome_marker_path};
+use axhub_helpers::runtime_paths::{
+    last_deploy_file, set_private_dir_mode, state_dir, token_file, welcome_marker_path,
+    write_private_file_no_follow,
+};
 use axhub_helpers::scaffold::{run_scaffold_detect, run_scaffold_dev};
 use axhub_helpers::session_bundle::{
     write_session_bundle, AuthStatusBundle, LastDeployBundle, SessionBundle,
@@ -48,7 +45,7 @@ use serde_json::{json, Map, Value};
 mod cli;
 
 pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
-pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  preauth-check\n  prompt-route\n  consent-mint [--validate-only]\n  consent-mint-app-lifecycle --action suspend|resume|fork --app <app> [--slug <slug> --subdomain <subdomain> --tenant <tenant> --name <name> --template <template> --repo-public <bool>] [--quiet]\n  consent-verify\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  verify-deploy-artifact\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  prompt-route\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  verify-deploy-artifact\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -145,8 +142,6 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "scaffold-detect" => run_scaffold_detect(&rest),
         "scaffold-dev" => run_scaffold_dev(&rest),
         "init-resume" => run_init_resume(&rest),
-        // consent-mint: US2 typed (cli::Commands::ConsentMint) — legacy arm 제거.
-        "consent-verify" => cmd_consent_verify(),
         "state-show" => cmd_state_show(&rest),
         "state-update" => cmd_state_update(&rest),
         "commit-gate" => cmd_commit_gate(),
@@ -154,7 +149,6 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "tdd-inject" => cmd_tdd_inject(),
         "karpathy-inject" => cmd_karpathy_inject(),
         "consent" => cmd_quality_consent(&rest),
-        "preauth-check" => cmd_preauth_check(),
         "prompt-route" => cmd_prompt_route(),
         "session-start" => cmd_session_start(),
         "mark" => cmd_mark(&rest),
@@ -188,6 +182,8 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "auth-refresh-bg" => cmd_auth_refresh_bg(),
         "plugin-latest-fetch-bg" => Ok(axhub_helpers::plugin_update::cmd_plugin_latest_fetch_bg()),
         "plugin-drift-optout" => Ok(axhub_helpers::plugin_update::cmd_plugin_drift_optout()),
+        "cli-latest-fetch-bg" => Ok(axhub_helpers::cli_drift::cmd_cli_latest_fetch_bg()),
+        "cli-drift-optout" => Ok(axhub_helpers::cli_drift::cmd_cli_drift_optout()),
         // verify/trace/doctor: US2 typed (cli::Commands) — legacy arm 제거.
         // settings-merge: US2 typed (cli::Commands::SettingsMerge) — legacy arm 제거.
         // autowire-statusline: US1 typed (cli::Commands::AutowireStatusline) — legacy arm 제거.
@@ -748,7 +744,7 @@ fn store_plugin_token(token: &str) -> anyhow::Result<PathBuf> {
         .ok_or_else(|| anyhow::anyhow!("cannot resolve axhub plugin token directory"))?
         .to_path_buf();
     fs::create_dir_all(&parent)?;
-    axhub_helpers::consent::set_private_dir_mode(&parent).ok();
+    set_private_dir_mode(&parent).ok();
     write_private_file_no_follow(&path, token.as_bytes())?;
     Ok(path)
 }
@@ -943,134 +939,6 @@ fn strip_required_whitespace(input: &str) -> Option<&str> {
     (trimmed.len() != input.len()).then_some(trimmed)
 }
 
-fn parse_binding(raw: &str) -> anyhow::Result<ConsentBinding> {
-    Ok(serde_json::from_str(raw)?)
-}
-
-fn preauth_deny_message(default_hint: &str, reason: Option<&str>) -> String {
-    match reason {
-        Some("token_expired") => format!(
-            "사전 승인이 만료됐어요. 로그인 카드를 다시 받은 뒤 명령을 재시도해 주세요.\n\n{default_hint}"
-        ),
-        _ => default_hint.to_string(),
-    }
-}
-
-fn consent_mint_json_stdin_help() -> &'static str {
-    r#"PowerShell example: $binding | ConvertTo-Json -Compress | & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" consent-mint
-Temp-file fallback: Get-Content -Raw "$Path" | & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" consent-mint"#
-}
-
-fn parse_consent_mint_binding(raw: &str) -> Result<ConsentBinding, i32> {
-    let binding_json = raw.trim().trim_start_matches('\u{feff}').trim();
-    if binding_json.is_empty() {
-        eprintln!(
-            "axhub-helpers consent-mint: empty stdin; no JSON binding was provided.\n{}",
-            consent_mint_json_stdin_help()
-        );
-        return Err(65);
-    }
-    serde_json::from_str(binding_json).map_err(|err| {
-        eprintln!(
-            "axhub-helpers consent-mint: invalid JSON; consent-mint expects one JSON object binding on stdin.\nError: {err}\n{}",
-            consent_mint_json_stdin_help()
-        );
-        65
-    })
-}
-
-pub(crate) fn cmd_consent_mint(validate_only: bool) -> anyhow::Result<i32> {
-    let raw = read_stdin()?;
-    let b = match parse_consent_mint_binding(&raw) {
-        Ok(binding) => binding,
-        Err(code) => return Ok(code),
-    };
-    validate_binding_schema(&b)?;
-    if validate_only {
-        out_json(json!({"valid": true, "action": b.action}));
-        return Ok(0);
-    }
-    let result = mint_token(b, 60)?;
-    out_json(serde_json::to_value(result)?);
-    Ok(0)
-}
-
-pub(crate) fn cmd_consent_mint_app_lifecycle(
-    args: cli::args::ConsentMintAppLifecycleArgs,
-) -> anyhow::Result<i32> {
-    let action = match args.action.as_str() {
-        "suspend" | "apps_suspend" => "apps_suspend",
-        "resume" | "apps_resume" => "apps_resume",
-        "fork" | "apps_fork" => "apps_fork",
-        other => {
-            eprintln!(
-                "axhub-helpers consent-mint-app-lifecycle: unsupported action \"{other}\"; expected suspend, resume, or fork"
-            );
-            return Ok(64);
-        }
-    };
-    if args.app.trim().is_empty() {
-        eprintln!("axhub-helpers consent-mint-app-lifecycle: --app is required");
-        return Ok(64);
-    }
-
-    let mut context = HashMap::new();
-    if action == "apps_fork" {
-        let required = [
-            ("slug", args.slug.as_deref()),
-            ("subdomain", args.subdomain.as_deref()),
-            ("tenant", args.tenant.as_deref()),
-            ("name", args.name.as_deref()),
-        ];
-        for (field, value) in required {
-            let Some(value) = value.filter(|v| !v.trim().is_empty()) else {
-                eprintln!(
-                    "axhub-helpers consent-mint-app-lifecycle: --{field} is required for fork"
-                );
-                return Ok(64);
-            };
-            context.insert(field.to_string(), value.to_string());
-        }
-        context.insert("source".into(), args.app.clone());
-        context.insert(
-            "template".into(),
-            args.template
-                .filter(|v| !v.trim().is_empty())
-                .unwrap_or_else(|| args.app.clone()),
-        );
-        context.insert(
-            "repo_public".into(),
-            args.repo_public
-                .filter(|v| !v.trim().is_empty())
-                .unwrap_or_else(|| "false".into()),
-        );
-    }
-
-    let binding = ConsentBinding {
-        tool_call_id: PENDING_TOOL_CALL_ID.into(),
-        action: action.into(),
-        app_id: args.app,
-        profile: String::new(),
-        branch: String::new(),
-        commit_sha: String::new(),
-        context,
-        synthesized_by_helper: true,
-    };
-    validate_binding_schema(&binding)?;
-    let result = mint_token(binding, 60)?;
-    if !args.quiet {
-        out_json(serde_json::to_value(result)?);
-    }
-    Ok(0)
-}
-
-fn cmd_consent_verify() -> anyhow::Result<i32> {
-    let b = parse_binding(&read_stdin()?)?;
-    let result = verify_token(b);
-    out_json(serde_json::to_value(&result)?);
-    Ok(if result.valid { 0 } else { 65 })
-}
-
 fn cmd_state_show(args: &[String]) -> anyhow::Result<i32> {
     if !args.is_empty() && args != ["--json".to_string()] {
         eprintln!("axhub-helpers state-show: expected --json or no args");
@@ -1227,109 +1095,6 @@ fn cmd_quality_consent(args: &[String]) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-pub(crate) fn cmd_preauth_check() -> anyhow::Result<i32> {
-    if hook_safety::is_hook_disabled("preauth-check") {
-        out_json(
-            json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}),
-        );
-        return Ok(0);
-    }
-    let raw = read_stdin()?;
-    let payload: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
-    if let Some(sid) = payload.get("session_id").and_then(Value::as_str) {
-        if std::env::var("CLAUDE_SESSION_ID").is_err() {
-            std::env::set_var("CLAUDE_SESSION_ID", sid);
-        }
-    }
-    if payload.get("tool_name").and_then(Value::as_str) != Some("Bash") {
-        out_json(
-            json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}),
-        );
-        return Ok(0);
-    }
-    let cmd = payload
-        .pointer("/tool_input/command")
-        .and_then(Value::as_str)
-        .unwrap_or("");
-    let mut destructive_commands = parse_axhub_commands(cmd);
-    if destructive_commands.len() > 1 {
-        let deny_message =
-            "사전 승인은 한 번에 하나의 axhub 변경 명령에만 쓸 수 있어요. Bash 입력에 여러 destructive axhub 명령이 있어 차단했어요. 각 명령을 별도 승인 카드로 나눠 실행해요.";
-        out_json(json!({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": deny_message
-            },
-            "systemMessage": deny_message
-        }));
-        return Ok(0);
-    }
-    let parsed = destructive_commands.pop().unwrap_or_default();
-    if !parsed.is_destructive {
-        out_json(
-            json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}),
-        );
-        return Ok(0);
-    }
-    let deny_hint = format_preauth_deny_hint(parsed.action.as_deref(), parsed.app_id.as_deref());
-    let is_identity = parsed.action.as_deref() == Some("auth_login");
-    let binding = ConsentBinding {
-        tool_call_id: format!(
-            "{}:{}",
-            payload
-                .get("session_id")
-                .and_then(Value::as_str)
-                .unwrap_or(""),
-            payload
-                .get("tool_call_id")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-        ),
-        action: parsed.action.unwrap_or_default(),
-        app_id: parsed
-            .app_id
-            .unwrap_or_else(|| if is_identity { "_".into() } else { "".into() }),
-        profile: parsed.profile.unwrap_or_else(|| {
-            if is_identity {
-                std::env::var("AXHUB_PROFILE").unwrap_or_else(|_| "default".into())
-            } else {
-                "".into()
-            }
-        }),
-        branch: parsed
-            .branch
-            .unwrap_or_else(|| if is_identity { "_".into() } else { "".into() }),
-        commit_sha: parsed.commit_sha.unwrap_or_else(|| {
-            if is_identity {
-                "_".into()
-            } else {
-                "".into()
-            }
-        }),
-        context: parsed.context,
-        synthesized_by_helper: false,
-    };
-    let result = verify_or_claim_token(binding);
-    if result.valid {
-        out_json(
-            json!({"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}),
-        );
-        Ok(0)
-    } else {
-        let deny_message = preauth_deny_message(&deny_hint, result.reason.as_deref());
-        out_json(json!({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": deny_message.clone()
-            },
-            "systemMessage": deny_message
-        }));
-        Ok(0)
-    }
-}
-
 const MAX_LIST_DEPLOYMENTS_LIMIT: usize = 100;
 
 const DYNAMIC_TABLE_ROUTING_HINT: &str = r#"<axhub-routing-hint>
@@ -1340,7 +1105,7 @@ Before any schema/row/grant mutation, check login/current app/table availability
 The visible preview must not include raw CLI command lines. The actual command belongs only in the Bash tool call after approval.
 In Claude Desktop, do not call AskUserQuestion, Question, or any question-card tool for this approval because raw question JSON may become visible. Ask in normal chat: `이대로 만들까요? 진행 또는 취소라고 답해 주세요.` Then stop. If the next user reply clearly says `진행`, continue with the approved execution.
 Bash titles must be Korean only, such as `로그인 상태 확인`, `테이블 상태 확인`, `테이블 변경 준비`, or `테이블 변경 실행`.
-Do not write route labels, slash commands, skill names, workflow/워크플로, preflight, consent-mint, consent internals, command names, raw command lines, raw question JSON, raw JSON fields, raw IDs, raw emails, raw app slugs, local file contents, repo inspection, English tool-title fragments, or A/B implementation labels in visible text.
+Do not write route labels, slash commands, skill names, workflow/워크플로, preflight, command names, raw command lines, raw question JSON, raw JSON fields, raw IDs, raw emails, raw app slugs, local file contents, repo inspection, English tool-title fragments, or A/B implementation labels in visible text.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
@@ -1365,7 +1130,7 @@ This is an AXHub external database connector setup/management request. Do not in
 Handle this as an AXHub external database connection setup. If information is missing, ask naturally for the connector name, database engine, workspace, host, port, database name, username, SSL mode, and a safe credentials-file/input path. Do not ask for secret values in chat.
 Before any create/update/delete, check the current workspace and existing connectors, show a Korean preview, and ask for explicit approval.
 Bash titles must be Korean only, such as `커넥터 상태 확인`, `커넥터 목록 확인`, `커넥터 변경 준비`, or `커넥터 변경 실행`.
-Do not write route labels, slash commands, skill names, local file contents, repo inspection, package-install plans, app-code DATABASE_URL setup, raw JSON fields, raw IDs, raw emails, preflight narration, consent internals, English tool-title fragments, or A/B implementation labels in visible text.
+Do not write route labels, slash commands, skill names, local file contents, repo inspection, package-install plans, app-code DATABASE_URL setup, raw JSON fields, raw IDs, raw emails, preflight narration, English tool-title fragments, or A/B implementation labels in visible text.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
@@ -1658,7 +1423,7 @@ After the template is chosen, surface the account-level GitHub App install state
 After that GitHub App surface, ask for the app name, then show the creation preview and ask for explicit approval.
 Do not run `axhub apps bootstrap --execute`, create repositories, connect GitHub, install dependencies, start dev servers, or deploy until the user has approved the preview for that exact action.
 Bash titles must be Korean only, such as `앱 생성 상태 확인`, `템플릿 확인`, `앱 생성 준비`, or `앱 생성 실행`.
-Do not write route labels, slash commands, skill names, workflow/워크플로, preflight, raw question JSON, command mappings, raw helper JSON, raw IDs, raw emails, file paths, consent internals, or English tool-title fragments in visible text.
+Do not write route labels, slash commands, skill names, workflow/워크플로, preflight, raw question JSON, command mappings, raw helper JSON, raw IDs, raw emails, file paths, or English tool-title fragments in visible text.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
@@ -1671,21 +1436,17 @@ First visible sentence:
 This is an AXHub hosted app lifecycle request. Do not inspect local Next.js/dev-server processes, ports, ps/lsof output, package scripts, or local server state.
 Continue in this same answer flow. Do not invoke slash commands, and do not write route-conversion or implementation explanation sentences.
 Verify login/current app, find the AXHub app, explain the service impact in Korean, then ask exactly `앱 변경을 실행할까요?` with visible options `취소` and `진행` before any change.
-Bash titles only: `앱 상태 확인`, `앱 찾기`, `앱 변경 준비`, `앱 변경 실행`.
+Bash titles only: `앱 상태 확인`, `앱 찾기`, `앱 변경 실행`.
 If another lookup is needed, say exactly `앱을 한 번 더 확인할게요.` Do not describe identifier lookup.
 When summarizing app metadata, translate raw enum values into Korean labels only. Say `비공개`, `공개`, `개발 단계`, or `운영 단계`; never write raw enum words such as `private`, `public`, `development`, `production`, and never write mixed labels such as `비공개 (private)`.
 Human-visible flow:
 - Use `앱 상태 확인` for `axhub-helpers preflight --json`.
 - Use `앱 찾기` for `axhub apps list --json` or the narrow AXHub app lookup needed to identify the named hosted app.
-- After the user chooses `진행`, do not write any visible sentence before tool calls. Never say `User chose`, `Mint consent`, `execute suspend`, `execute resume`, or similar implementation narration.
-- Use one `앱 변경 준비` Bash tool call for the app-lifecycle typed helper only: `axhub-helpers consent-mint-app-lifecycle --action suspend|resume|fork --app <literal-next-app-arg> --quiet` plus fork flags when needed.
-- Do not build JSON by hand. Do not run `consent-mint`, schema inspection, source lookup, fixture lookup, grep, rg, helper discovery, or any exploratory command in this flow.
-- Do not add a trailing success echo or otherwise mask a failed preparation command. The preparation tool output may be blank.
-- For suspend/resume, the prepared binding app value must be exactly the literal app argument used in the following `axhub apps suspend|resume ...` command, such as `testnextjs`, not a resolved UUID. Keep context empty for suspend/resume and do not invent app slug fields.
-- Then use one separate `앱 변경 실행` Bash tool call for the matching top-level `axhub apps suspend|resume|fork ... --execute --json >/dev/null` command. Do not combine preparation and execution in one Bash command, and do not leave raw JSON stdout visible in the tool panel.
-- The first `앱 변경 실행` tool call with exit code 0 is terminal. Treat a visible `[DESTRUCTIVE] about to run ...` line as a hook notice, not a failure. Do not run another preparation/execution pair, do not verify by re-running the mutation, and do not continue to a second app-changing command.
-If an internal security gate blocks the command, do not explain gate internals in visible chat; do not inspect schemas, source, fixtures, or helper locations; prepare the same approved change and retry exactly once, then say `앱 변경을 시작하지 못했어요. 다시 시도해 주세요.` if it still fails.
-Do not say route labels, slash commands, skill names, preflight details, internal app/context fields, auth results, runtime words, lifecycle verbs in English, raw JSON, raw identifiers, owner names, English tool-title fragments, permission-decision details, helper binding details, or parenthesized internal labels.
+- After the user chooses `진행`, do not write any visible sentence before tool calls. Never say `User chose`, `execute suspend`, `execute resume`, or similar implementation narration.
+- Use exactly one `앱 변경 실행` Bash tool call for the matching top-level `axhub apps suspend|resume|fork ... --execute --json >/dev/null` command, and do not leave raw JSON stdout visible in the tool panel.
+- The first `앱 변경 실행` tool call with exit code 0 is terminal. Do not verify by re-running the mutation, and do not continue to a second app-changing command.
+If an internal safety check blocks the command, do not explain internals in visible chat; retry the same approved top-level command exactly once, then say `앱 변경을 시작하지 못했어요. 다시 시도해 주세요.` if it still fails.
+Do not say route labels, slash commands, skill names, preflight details, internal app/context fields, auth results, runtime words, lifecycle verbs in English, raw JSON, raw identifiers, owner names, English tool-title fragments, or parenthesized internal labels.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
 </axhub-routing-hint>"#;
 
@@ -1700,7 +1461,7 @@ After the tool call, copy the Korean preview stdout and ask for explicit approva
 After explicit approval, use exactly one Bash tool call. Bash description/title, exactly: 배포 실행
 Bash command: `axhub-helpers deploy-approved-run --user-utterance "<latest user sentence>"`
 Copy that Korean stdout as the result. Do not invoke a skill again after approval.
-Do not write route labels, slash commands, command mappings, skill names, `Invoke deploy skill`, `Read rest of SKILL`, `Read full SKILL`, `Route=axhub`, `preflight`, `deploy-prep`, HMAC, consent token, raw helper JSON, raw IDs, raw account email, or English tool-title fragments in the visible answer.
+Do not write route labels, slash commands, command mappings, skill names, `Invoke deploy skill`, `Read rest of SKILL`, `Read full SKILL`, `Route=axhub`, `preflight`, `deploy-prep`, raw helper JSON, raw IDs, raw account email, or English tool-title fragments in the visible answer.
 Use Korean Bash tool titles only, such as `배포 준비 확인`, `배포 실행`, or `배포 상태 확인`.
 On auth error, explain token/login expiry safely in Korean and ask before login.
 Skip: AXHUB_DISABLE_HOOK=prompt-route
@@ -1977,10 +1738,28 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         } else {
             None
         };
+    // Proactive CLI binary version-drift nudge. Turn-cap: at most one update
+    // nudge per turn — plugin takes priority, and its per-version marker
+    // naturally yields the slot to CLI on the next turn (no cross-turn state
+    // needed). Suppressed when the prompt is already an update-check intent (the
+    // reactive update-summary path owns that turn). Fail-open.
+    let cli_drift_system = if plugin_drift_system.is_none() && !update_check_intent_present(prompt)
+    {
+        if let Some(nudge) = axhub_helpers::cli_drift::cli_drift_nudge() {
+            context.push_str("\n\n");
+            context.push_str(&nudge.additional_context);
+            Some(nudge.system_message)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let drift_system = plugin_drift_system.or(cli_drift_system);
     let intent_system = if dynamic_table_intent_present(prompt) {
-        Some("이 요청은 AXHub hosted app 의 테이블 생성/컬럼/행/권한 변경 요청이에요. 로컬 앱 코드, local database, server.js, package.json, ORM, .env, SQL migration, QA 결과 파일, plugin source 를 읽지 않아요. visible chat 첫 문장은 정확히 \"테이블 변경 내용을 확인할게요.\" 로만 말해요. 그 다음 문장도 내부 경로를 설명하지 말고 로그인 상태, 현재 앱, 대상 테이블, 컬럼 타입을 확인하겠다고만 자연스럽게 말해요. Bash title 은 `로그인 상태 확인`, `테이블 상태 확인`, `테이블 변경 준비`, `테이블 변경 실행` 같은 한국어만 써요. create/drop/column/row/grant 변경은 대상 앱, 테이블, 작업, 컬럼/행 요약을 한국어로 보여주고 사용자가 명시적으로 승인하기 전에는 실행하지 않아요. visible preview 에 raw CLI command line 을 쓰지 말고, 실제 명령은 승인 후 Bash tool call 안에서만 실행해요. Claude Desktop 에서는 AskUserQuestion, Question, 질문 카드 도구를 쓰지 말고 일반 채팅으로 `이대로 만들까요? 진행 또는 취소라고 답해 주세요.` 라고 묻고 멈춰요. 다음 사용자 답변이 `진행`이면 승인된 것으로 보고 바로 `테이블 변경 준비`, `테이블 변경 실행` 순서로 이어가요. 사용자에게 route label, slash command, skill name, workflow/워크플로, preflight, consent-mint, consent internals, command name, raw command line, raw question JSON, raw JSON, raw email, raw id, raw app slug, local file contents, repo inspection, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id, scope 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
+        Some("이 요청은 AXHub hosted app 의 테이블 생성/컬럼/행/권한 변경 요청이에요. 로컬 앱 코드, local database, server.js, package.json, ORM, .env, SQL migration, QA 결과 파일, plugin source 를 읽지 않아요. visible chat 첫 문장은 정확히 \"테이블 변경 내용을 확인할게요.\" 로만 말해요. 그 다음 문장도 내부 경로를 설명하지 말고 로그인 상태, 현재 앱, 대상 테이블, 컬럼 타입을 확인하겠다고만 자연스럽게 말해요. Bash title 은 `로그인 상태 확인`, `테이블 상태 확인`, `테이블 변경 준비`, `테이블 변경 실행` 같은 한국어만 써요. create/drop/column/row/grant 변경은 대상 앱, 테이블, 작업, 컬럼/행 요약을 한국어로 보여주고 사용자가 명시적으로 승인하기 전에는 실행하지 않아요. visible preview 에 raw CLI command line 을 쓰지 말고, 실제 명령은 승인 후 Bash tool call 안에서만 실행해요. Claude Desktop 에서는 AskUserQuestion, Question, 질문 카드 도구를 쓰지 말고 일반 채팅으로 `이대로 만들까요? 진행 또는 취소라고 답해 주세요.` 라고 묻고 멈춰요. 다음 사용자 답변이 `진행`이면 승인된 것으로 보고 바로 `테이블 변경 준비`, `테이블 변경 실행` 순서로 이어가요. 사용자에게 route label, slash command, skill name, workflow/워크플로, preflight, command name, raw command line, raw question JSON, raw JSON, raw email, raw id, raw app slug, local file contents, repo inspection, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id, scope 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
     } else if connectors_intent_present(prompt) {
-        Some("이 요청은 AXHub 외부 데이터베이스 연결 설정 요청이에요. 로컬 앱 코드 수정, server.js/package.json 읽기, pg 패키지 설치, DATABASE_URL 코드 연결, ORM 설정으로 우회하지 않아요. visible chat 첫 문장은 정확히 \"데이터베이스 연결을 준비할게요.\" 로만 말해요. 그 다음 문장도 내부 경로를 설명하지 말고, 현재 로그인 상태와 workspace 를 확인하겠다고만 자연스럽게 말해요. 필요한 정보가 부족하면 사람에게 묻듯이 엔진, 연결 이름, workspace, host/port/database/user/SSL 같은 연결 정보가 필요하다고 짧게 안내해요. 비밀값은 채팅에 평문으로 받지 말고 로컬 credentials 파일 또는 안전한 입력 방식을 쓰도록 안내해요. 변경 실행 전에는 현재 workspace 와 기존 연결 설정을 확인하고, 생성/수정/삭제 preview 를 보여준 뒤 명시적 승인을 받아요. Bash title 은 `커넥터 상태 확인`, `커넥터 목록 확인`, `커넥터 변경 준비`, `커넥터 변경 실행` 같은 한국어만 써요. 사용자에게 route label, slash command, skill name, workflow/워크플로, local file contents, repo inspection, package install plan, DATABASE_URL app-code path, raw JSON, raw email, raw id, preflight, consent internals, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
+        Some("이 요청은 AXHub 외부 데이터베이스 연결 설정 요청이에요. 로컬 앱 코드 수정, server.js/package.json 읽기, pg 패키지 설치, DATABASE_URL 코드 연결, ORM 설정으로 우회하지 않아요. visible chat 첫 문장은 정확히 \"데이터베이스 연결을 준비할게요.\" 로만 말해요. 그 다음 문장도 내부 경로를 설명하지 말고, 현재 로그인 상태와 workspace 를 확인하겠다고만 자연스럽게 말해요. 필요한 정보가 부족하면 사람에게 묻듯이 엔진, 연결 이름, workspace, host/port/database/user/SSL 같은 연결 정보가 필요하다고 짧게 안내해요. 비밀값은 채팅에 평문으로 받지 말고 로컬 credentials 파일 또는 안전한 입력 방식을 쓰도록 안내해요. 변경 실행 전에는 현재 workspace 와 기존 연결 설정을 확인하고, 생성/수정/삭제 preview 를 보여준 뒤 명시적 승인을 받아요. Bash title 은 `커넥터 상태 확인`, `커넥터 목록 확인`, `커넥터 변경 준비`, `커넥터 변경 실행` 같은 한국어만 써요. 사용자에게 route label, slash command, skill name, workflow/워크플로, local file contents, repo inspection, package install plan, DATABASE_URL app-code path, raw JSON, raw email, raw id, preflight, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
     } else if data_intent_present(prompt) {
         Some("이 요청은 AXHub 데이터 리소스 조회/설명/스니펫 요청이에요. 로컬 앱 코드, server.js, package.json, ORM, .env, QA 결과 파일, plugin source 를 읽지 않아요. visible chat 첫 문장은 정확히 \"데이터 리소스를 확인할게요.\" 로만 말해요. 이후에도 내부 경로를 설명하지 말고 로그인 상태와 연결된 데이터 리소스를 확인하겠다고만 자연스럽게 말해요. Bash title 은 `로그인 상태 확인`, `데이터 리소스 확인`, `데이터 설명`, `실데이터 확인`, `스니펫 준비` 같은 한국어만 써요. live read 는 대상, 컬럼, row limit, query shape 를 보여주고 사용자가 명시적으로 승인하기 전에는 실행하지 않아요. 리소스가 없으면 `현재 연결된 데이터 리소스를 찾지 못했어요. 먼저 데이터베이스 연결을 만들어야 해요.`처럼 말하고, raw CLI/JSON 세부값을 덧붙이지 않아요. 사용자에게 route label, slash command, skill name, workflow/워크플로, preflight, catalog 조회, catalog 비어있음, connector 목록, catalog kinds, raw JSON, raw email, raw id, account scope, raw app slug, governance/path guessing 용어, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id, scope 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
     } else if resources_intent_present(prompt) {
@@ -2008,7 +1787,7 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     } else if onboarding_intent_present(prompt) {
         Some("내부 제어 전용: Skill(\"axhub:onboarding\") 이 이 턴의 선택된 route 예요. 이 내부 제어, route, skill name, slash command, 영어 진행 선언을 visible chat 에 절대 쓰지 않아요. 설치된 onboarding skill 계약을 즉시 따라요. 이 요청은 AXHub first-run onboarding 요청이에요. 일반 조언이나 다른 문구를 말하라는 안내로 끝내지 말고, 이 턴에서 바로 온보딩 상태를 확인해요. visible chat 첫 문장은 정확히 \"처음 설정을 확인할게요.\" 로 시작해요. 첫 문장 뒤에도 내부 실행 선언, 라우팅 선언, 영어 진행 선언을 쓰지 않아요. 빈 폴더이고 manifest 가 없으면 템플릿을 먼저 묻지 말고 \"첫 앱 만들래요?\" 를 먼저 물어요. 설치, PATH 수리, GitHub 승인, 앱 생성, repo 생성, 의존성 설치, 배포 같은 변경 작업은 해당 작업의 preview 와 명시적 승인 전에는 실행하지 않아요. 최종 상태는 VIBE_READY, READY_WITH_USER_ACTION, SAFE_STOP_NONINTERACTIVE, BLOCKED_UNSUPPORTED 중 하나로만 요약해요. route label, slash command, skill name, workflow/워크플로, preflight details, raw JSON, raw id, raw email, 파일 경로, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if app_lifecycle_intent_present(prompt) {
-        Some("AXHub hosted app 을 멈추거나 다시 켜거나 복제하려는 요청이에요. 이 대화 안에서 바로 진행하고 slash command 를 호출하지 않아요. 내부 처리, route conversion, 라벨 설명 문장을 visible chat 에 쓰지 않아요. 로컬 Next.js/dev-server 프로세스, 포트, ps/lsof, package script, 로컬 서버 상태를 확인하지 않아요. pause 의 첫 visible chat 문장은 `<앱 이름> 앱을 잠깐 멈출 준비를 할게요.` 형태로 말하고, resume 은 `<앱 이름> 앱을 다시 켤 준비를 할게요.`, fork 는 `<앱 이름> 앱을 복제할 준비를 할게요.` 로 말해요. Bash tool title 은 `앱 상태 확인`, `앱 찾기`, `앱 변경 준비`, `앱 변경 실행` 같은 한국어만 써요. 추가 조회가 필요하면 visible chat 은 `앱을 한 번 더 확인할게요.` 로만 말하고 식별자 조회를 설명하지 않아요. 로그인과 현재 앱을 확인하고, AXHub 앱을 찾고, 서비스 영향 설명 뒤 `앱 변경을 실행할까요?` 라고 묻고 visible option 은 `취소`, `진행`만 써요. 로그인 확인 결과에는 계정 이메일, owner 이름, raw user id 를 쓰지 않아요. 앱 metadata 의 raw enum 값은 한국어 라벨로만 번역해요. `private`, `public`, `development`, `production` 같은 raw enum 이나 `비공개 (private)` 같은 혼합 표기를 쓰지 않아요. 사용자가 `진행`을 고르기 전에는 앱 상태를 바꾸지 않아요. `진행` 뒤에는 visible chat 에 아무 문장도 쓰지 말고 바로 Bash tool call 을 실행해요. `User chose`, `Mint consent`, `execute suspend`, `execute resume` 같은 영어 구현 문장을 쓰지 않아요. 승인 준비 Bash tool call 과 앱 변경 Bash tool call 을 분리하고, 둘을 한 Bash command 로 합치지 않아요. 승인 준비는 app-lifecycle 전용 typed helper 인 `axhub-helpers consent-mint-app-lifecycle --action suspend|resume|fork --app <literal-next-app-arg> --quiet` 만 써요. suspend/resume 승인 준비의 `--app` 값은 resolved UUID 가 아니라 바로 다음 `axhub apps suspend|resume ...` 명령에 들어갈 literal 앱 인자와 정확히 같아야 해요. 예: `axhub apps suspend testnextjs --execute --json >/dev/null` 를 실행할 거면 준비 명령의 `--app` 도 `testnextjs` 예요. JSON 을 직접 만들지 않고, `consent-mint`, schema 확인, source 탐색, fixture 탐색, helper 위치 탐색, grep, rg 같은 탐색 명령을 실행하지 않아요. trailing success echo 로 준비 실패를 숨기지 않아요. 앱 변경은 별도 Bash tool call 로 matching top-level `axhub apps ... --execute --json >/dev/null` 만 실행하고, raw JSON stdout 을 tool panel 에 남기지 않아요. 첫 `앱 변경 실행` 이 exit code 0 으로 끝나면 그것이 terminal success 예요. `[DESTRUCTIVE] about to run ...` 는 hook 안내일 뿐 실패가 아니므로 다시 준비하거나 다시 실행하지 않아요. mutation 을 재검증한다는 이유로 같은 변경 명령을 다시 실행하지 않아요. 내부 보안 gate 가 막으면 gate 내부를 설명하지 말고, schema/source/fixture/helper 탐색 없이 같은 변경 준비를 한 번만 재시도해요. 그래도 실패하면 `앱 변경을 시작하지 못했어요. 다시 시도해 주세요.` 라고만 말해요. route label, slash command, skill name, preflight details, internal app/context fields, auth results, runtime words, lifecycle verbs in English, raw JSON, raw identifier, owner name, 계정 이메일, 영어 tool title fragment, permission-decision details, helper binding details, 괄호 안 내부 라벨을 사용자에게 쓰지 않아요.")
+        Some("AXHub hosted app 을 멈추거나 다시 켜거나 복제하려는 요청이에요. 이 대화 안에서 바로 진행하고 slash command 를 호출하지 않아요. 내부 처리, route conversion, 라벨 설명 문장을 visible chat 에 쓰지 않아요. 로컬 Next.js/dev-server 프로세스, 포트, ps/lsof, package script, 로컬 서버 상태를 확인하지 않아요. pause 의 첫 visible chat 문장은 `<앱 이름> 앱을 잠깐 멈출 준비를 할게요.` 형태로 말하고, resume 은 `<앱 이름> 앱을 다시 켤 준비를 할게요.`, fork 는 `<앱 이름> 앱을 복제할 준비를 할게요.` 로 말해요. Bash tool title 은 `앱 상태 확인`, `앱 찾기`, `앱 변경 실행` 같은 한국어만 써요. 추가 조회가 필요하면 visible chat 은 `앱을 한 번 더 확인할게요.` 로만 말하고 식별자 조회를 설명하지 않아요. 로그인과 현재 앱을 확인하고, AXHub 앱을 찾고, 서비스 영향 설명 뒤 `앱 변경을 실행할까요?` 라고 묻고 visible option 은 `취소`, `진행`만 써요. 로그인 확인 결과에는 계정 이메일, owner 이름, raw user id 를 쓰지 않아요. 앱 metadata 의 raw enum 값은 한국어 라벨로만 번역해요. `private`, `public`, `development`, `production` 같은 raw enum 이나 `비공개 (private)` 같은 혼합 표기를 쓰지 않아요. 사용자가 `진행`을 고르기 전에는 앱 상태를 바꾸지 않아요. `진행` 뒤에는 visible chat 에 아무 문장도 쓰지 말고 바로 Bash tool call 을 실행해요. `User chose`, `execute suspend`, `execute resume` 같은 영어 구현 문장을 쓰지 않아요. JSON 을 직접 만들지 않고, schema 확인, source 탐색, fixture 탐색, helper 위치 탐색, grep, rg 같은 탐색 명령을 실행하지 않아요. 앱 변경은 Bash tool call 하나로 matching top-level `axhub apps ... --execute --json >/dev/null` 만 실행하고, raw JSON stdout 을 tool panel 에 남기지 않아요. 첫 `앱 변경 실행` 이 exit code 0 으로 끝나면 그것이 terminal success 예요. mutation 을 재검증한다는 이유로 같은 변경 명령을 다시 실행하지 않아요. 내부 안전 점검이 막으면 내부를 설명하지 말고 같은 top-level 명령을 한 번만 재시도해요. 그래도 실패하면 `앱 변경을 시작하지 못했어요. 다시 시도해 주세요.` 라고만 말해요. route label, slash command, skill name, preflight details, internal app/context fields, auth results, runtime words, lifecycle verbs in English, raw JSON, raw identifier, owner name, 계정 이메일, 영어 tool title fragment, 괄호 안 내부 라벨을 사용자에게 쓰지 않아요.")
     } else if init_intent_present(prompt) {
         Some("내부 제어 전용: Skill(\"axhub:init\") 이 이 턴의 선택된 route 예요. 이 내부 제어, route, skill name, slash command, 영어 진행 선언을 visible chat 에 절대 쓰지 않아요. 설치된 init skill 계약을 즉시 따라요. 현재 AXHub 프로젝트에서 새 앱 생성 요청이에요. 이 요청은 브레인스토밍, 일반 프로젝트 탐색, 또는 앱 아이디어 분류가 아니라 AXHub 앱 생성 절차예요. visible chat 첫 문장은 정확히 \"새 앱을 만들 수 있는 템플릿을 확인할게요.\" 로 시작하고, 이 문장 앞에는 아무 말도 붙이지 않아요. 먼저 Bash title 을 정확히 \"앱 생성 상태 확인\" 으로 설정해 `axhub-helpers init-resume route --json` 를 한 번 실행해요. 이어갈 생성 상태가 있으면 먼저 이어갈지 물어요. 이어갈 생성 상태가 없으면 Bash title 을 정확히 \"템플릿 확인\" 으로 설정해 `axhub apps templates list --json` 를 실행하고, backend template registry 가 반환한 템플릿만 사람용 라벨로 보여줘요. 명시 선택지는 최대 3개만 넣고, backend 가 반환하지 않은 템플릿을 만들지 않으며, Claude Desktop 이 자동으로 free-form 기타/Other 를 추가하므로 기타를 별도 옵션으로 또 넣지 않아요. 웹 앱/API/백엔드/CLI 도구/axhub 앱 같은 일반 앱 종류 질문을 하지 않아요. 템플릿 확인 뒤에는 GitHub App 계정 설치 상태를 read-only 로 한 번 보여주고(이미 설치된 계정이어도 install_url 은 다른 org/계정 추가용으로 항상 같이 보여줘요 — 설치됐다고 링크를 숨기거나 건너뛰지 않아요. '비차단'은 설치를 강요하지 않는다는 뜻이지 링크를 빼라는 뜻이 아니에요), 그다음 앱 이름을 묻고, 생성 preview 와 명시적 승인을 받기 전에는 `axhub apps bootstrap --execute`, repo 생성, GitHub 연결, 의존성 설치, dev server 시작, 배포를 실행하지 않아요. route label, slash command, skill name, workflow/워크플로, raw question JSON, raw helper JSON, command mapping, raw id, raw email, 파일 경로, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if apps_intent_present(prompt) {
@@ -2036,7 +1815,7 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     } else if env_intent_present(prompt) {
         Some("도구를 호출하기 전에 visible chat 으로 정확히 \"환경변수를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 의 description/title 은 정확히 \"환경변수 확인\" 으로 설정하고 `axhub-helpers env-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 이 요청은 AXHub 앱 환경변수 확인이에요. 셸 환경변수, .env 파일, repo 파일, plugin source, git history, .omc, .claude, QA 결과 파일을 읽지 않아요. 도구가 끝나면 stdout 의 한국어 문장을 그대로 답변으로 사용해요. 원시 명령명, JSON field name, 내부 라벨, preflight, raw value, secret value, 영어 tool title fragment 를 사용자에게 쓰지 않아요.")
     } else if deploy_create_intent_present(prompt) {
-        Some("도구를 호출하거나 스킬 내용을 요약하기 전에 visible chat 으로 정확히 \"배포 준비를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 전에 사용자에게 보이는 앱 폴더에서 실행되는지 확인해요. active root 와 추가 폴더가 다르고 추가 폴더만 Vite/React 앱이면 그 폴더로 `cd` 한 뒤 실행해요. 후보가 여러 개면 어떤 폴더를 배포할지 묻고 멈춰요. 첫 Bash tool call 의 description/title 은 정확히 \"배포 준비 확인\" 으로 설정하고 `axhub-helpers deploy-preview-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. stdout 이 `axhub 매니페스트(axhub.yaml)가 없어요.` 라고 하면 React/Vite로 초기화, 다른 템플릿 선택, 취소 선택지만 보여주고 배포 승인 질문 없이 멈춰요. 그 외에는 stdout 의 한국어 preview 를 그대로 보여주고 명시적 승인 질문을 해요. 이 preview 전에는 긴 deploy skill 본문을 읽거나 요약하지 않아요. 사용자가 승인하면 두 번째 Bash tool call 의 description/title 은 정확히 \"배포 실행\" 으로 설정하고 `axhub-helpers deploy-approved-run --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 승인 후에는 skill 을 다시 호출하거나 긴 deploy skill 본문을 읽지 않아요. 이 요청은 AXHub 라이브 배포 요청이에요. 일반 release/git release/다른 호스팅 배포로 우회하지 않아요. 실제 배포 전에는 앱, 환경, 브랜치, 커밋, 예상 시간을 보여주고 명시적 사용자 승인을 받아요. 본문에는 route label, slash command, command mapping, skill name, `Invoke deploy skill`, `Read rest of SKILL`, `Read full SKILL`, `Route=axhub`, `preflight`, `deploy-prep`, HMAC, consent token, raw helper JSON, raw id, raw email, 영어 tool title fragment 를 쓰지 않아요. 승인 후 실행 단계의 Bash tool title 은 `배포 실행` 또는 `배포 상태 확인` 같은 한국어로만 써요. 토큰 만료나 인증 오류가 있으면 로그인 필요 여부를 한국어로 안전하게 설명하고 로그인은 묻기 전에는 시작하지 않아요.")
+        Some("도구를 호출하거나 스킬 내용을 요약하기 전에 visible chat 으로 정확히 \"배포 준비를 확인할게요.\" 한 문장만 말해요. 첫 Bash tool call 전에 사용자에게 보이는 앱 폴더에서 실행되는지 확인해요. active root 와 추가 폴더가 다르고 추가 폴더만 Vite/React 앱이면 그 폴더로 `cd` 한 뒤 실행해요. 후보가 여러 개면 어떤 폴더를 배포할지 묻고 멈춰요. 첫 Bash tool call 의 description/title 은 정확히 \"배포 준비 확인\" 으로 설정하고 `axhub-helpers deploy-preview-summary --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. stdout 이 `axhub 매니페스트(axhub.yaml)가 없어요.` 라고 하면 React/Vite로 초기화, 다른 템플릿 선택, 취소 선택지만 보여주고 배포 승인 질문 없이 멈춰요. 그 외에는 stdout 의 한국어 preview 를 그대로 보여주고 명시적 승인 질문을 해요. 이 preview 전에는 긴 deploy skill 본문을 읽거나 요약하지 않아요. 사용자가 승인하면 두 번째 Bash tool call 의 description/title 은 정확히 \"배포 실행\" 으로 설정하고 `axhub-helpers deploy-approved-run --user-utterance \"<방금 사용자 문장>\"` 를 한 번만 실행해요. 승인 후에는 skill 을 다시 호출하거나 긴 deploy skill 본문을 읽지 않아요. 이 요청은 AXHub 라이브 배포 요청이에요. 일반 release/git release/다른 호스팅 배포로 우회하지 않아요. 실제 배포 전에는 앱, 환경, 브랜치, 커밋, 예상 시간을 보여주고 명시적 사용자 승인을 받아요. 본문에는 route label, slash command, command mapping, skill name, `Invoke deploy skill`, `Read rest of SKILL`, `Read full SKILL`, `Route=axhub`, `preflight`, `deploy-prep`, raw helper JSON, raw id, raw email, 영어 tool title fragment 를 쓰지 않아요. 승인 후 실행 단계의 Bash tool title 은 `배포 실행` 또는 `배포 상태 확인` 같은 한국어로만 써요. 토큰 만료나 인증 오류가 있으면 로그인 필요 여부를 한국어로 안전하게 설명하고 로그인은 묻기 전에는 시작하지 않아요.")
     } else if is_auth_status {
         None
     } else if install_cli_intent_present(prompt) {
@@ -2062,10 +1841,10 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         context.push_str("\n\n");
         context.push_str(intent);
     }
-    let system_message = match (grace, plugin_drift_system) {
-        (Some(grace), Some(plugin)) => Some(format!("{grace}\n\n{plugin}")),
+    let system_message = match (grace, drift_system) {
+        (Some(grace), Some(drift)) => Some(format!("{grace}\n\n{drift}")),
         (Some(grace), None) => Some(grace.to_string()),
-        (None, Some(plugin)) => Some(plugin),
+        (None, Some(drift)) => Some(drift),
         (None, None) => None,
     };
     println!(

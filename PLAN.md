@@ -660,8 +660,8 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 // .claude-plugin/plugin.json
 {
   "name": "axhub",
-  "version": "0.9.37",
-  "description": "Korean-first Claude Code plugin for axhub. Wraps ax-hub-cli v0.17.4 surfaces with natural-language skills, Rust prompt routing, and HMAC-bound consent gates.",
+  "version": "0.9.38",
+  "description": "Korean-first Claude Code plugin for axhub. Wraps ax-hub-cli v0.17.4 surfaces with natural-language skills, Rust prompt routing, and preview-first destructive workflows.",
   "author": {"name": "Jocoding AX Partners", "url": "https://jocodingax.ai"},
   "homepage": "https://axhub.jocodingax.ai",
   "repository": "https://github.com/jocoding-ax-partners/axhub.git",
@@ -676,15 +676,15 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
   "plugins": [{
     "name": "axhub",
     "source": "./",
-    "description": "Korean-first axhub Claude Code plugin wrapping ax-hub-cli v0.17.4 surfaces with NL skills and consent gates",
-    "version": "0.9.37"
+    "description": "Korean-first axhub Claude Code plugin wrapping ax-hub-cli v0.17.4 surfaces with NL skills and preview-first destructive workflows",
+    "version": "0.9.38"
   }]
 }
 ```
 
 **§16.13 bin/axhub-helpers (single binary spec)**:
 - Single Rust helper binary at `bin/axhub-helpers` (no nested dir). TypeScript helper sources remain only as transition fallback and parity reference during the monitor window.
-- Subcommands: `session-start`, `preauth-check`, `prompt-route`, `consent-mint`, `consent-verify`, `resolve`, `preflight`, `classify-exit`, `redact`, `list-deployments`, `verify-deploy-artifact`, `version`, `help`.
+- Subcommands: `session-start`, `preauth-check`, `prompt-route`, `consent-mint`, `consent-verify`, `resolve`, `preflight`, `classify-exit`, `redact`, `list-deployments`, `version`, `help`.
 - Multi-arch release builds use the Rust matrix in `.github/workflows/release.yml`; local `bun run build` is a Cargo wrapper because Bun remains the repo scripting runtime.
 - Release artifacts are signed/verified by the release workflow; plugin helper always calls `ax-hub-cli`.
 

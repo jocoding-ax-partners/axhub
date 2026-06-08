@@ -3,7 +3,7 @@ members = ["crates/axhub-helpers"]
 resolver = "2"
 
 [workspace.package]
-version = "0.9.37"
+version = "0.9.38"
 edition = "2021"
 rust-version = "1.83"
 license = "MIT"
@@ -15,7 +15,6 @@ chrono = { version = "0.4", features = ["serde", "clock"] }
 clap = { version = "4", features = ["derive"] }
 getrandom = "0.2"
 hmac = "0.12"
-jsonwebtoken = "9"
 libc = "0.2"
 regex = "1.10"
 semver = "1"

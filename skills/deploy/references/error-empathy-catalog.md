@@ -329,8 +329,8 @@ This is the AskUserQuestion card rendered by `skills/deploy/SKILL.md` step 3 BEF
 - **NFKC normalize** every displayed string before showing. If NFKC altered the slug (Cyrillic lookalike attack, ZWJ injection), surface a warning row above the card: `⚠️ 앱 이름에 비정상 문자가 감지됐어요. 확인해주세요: 원본=<RAW_SLUG>, 정규화=<NFKC_SLUG>`. (Reference: PLAN §16.11 Unicode + F14 Korean Unicode 공격.)
 - **Verbatim echo** — never substitute `app_id` from local cache. The five fields MUST come from the latest live `axhub auth status --json` + `axhub apps list --json --slug-prefix <slug>` resolution (E4 fix).
 - **Profile mismatch** — if `--profile` arg differs from `$AXHUB_PROFILE`, prepend a yellow warning row: `⚠️ 현재 환경(<ENV_PROFILE>) 과 다른 환경(<ARG_PROFILE>) 으로 배포하려 합니다. 의도하신 게 맞나요?` See `recovery-flows.md` ("profile-mismatch").
-- **Slash invocation does NOT skip this card.** `/axhub:deploy paydrop` still renders the card. Slash is consent for invoking the skill, not for the destructive op (E2 fix).
-- **Consent token binding** — on user "confirm", the helper mints a token bound to `{action=deploy_create, app_id, profile, commit_sha}`. PreToolUse hook verifies the token before letting `axhub deploy create` run. Mismatch = deny.
+- **Slash invocation does NOT skip this card.** `/axhub:deploy paydrop` still renders the card. Slash is confirmation for invoking the skill, not for the destructive op (E2 fix).
+- **Legacy note** — older builds used a confirmation token here. Current builds rely on the preview card plus explicit approval before `axhub deploy create`.
 
 ## Special: ETA calculation
 
@@ -437,13 +437,13 @@ When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <I
 
 ---
 
-### exit 65 + `apis.call_consent_required`
+### exit 65 + `apis.call_consent_required` (backend approval-required code)
 
 **감정:** API 호출에는 사전 승인이 필요해요.
 
 **원인:** 이 API 호출은 서버 상태를 바꿀 수 있어요. 단순 조회처럼 자동으로 실행할 수 없어요.
 
-**해결:** 어떤 요청인지 (요청 방식 / 주소 / 보낼 내용) 미리 보고 확인한 뒤, 동의를 받아 다시 실행해요.
+**해결:** 어떤 요청인지 (요청 방식 / 주소 / 보낼 내용) 미리 보고 확인한 뒤, 명시 승인을 받아 다시 실행해요.
 
 **버튼:** ["미리보기", "취소", "도와주세요"]
 

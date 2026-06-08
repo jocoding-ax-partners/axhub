@@ -29,7 +29,7 @@ describe("deploy SKILL Step 1.7 — status-first gate (create is the fallback)",
 
   test("an already-running deploy is watched, not re-created (no consent / no create)", () => {
     const body = deploySkill();
-    expect(body).toContain("consent-mint 도 `deploy create` 도 실행하지 않아요");
+    expect(body).toContain("새 `deploy create` 를 실행하지 않아요");
     expect(body).toContain("status 보고 배포가 아니면 그제서야 진짜 create");
   });
 

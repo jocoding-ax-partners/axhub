@@ -145,13 +145,13 @@ The drift between this file and the hand-written sibling is checked by
 
 ---
 
-### exit 64:apis.call_consent_required
+### exit 64:apis.call_consent_required (backend approval-required code)
 
 **감정:** API 호출에는 사전 승인이 필요해요.
 
 **원인:** 이 endpoint 호출은 서버 상태를 바꿀 수 있어요. read-only 조회처럼 자동 실행할 수 없어요.
 
-**해결:** method, endpoint, body source 를 preview 로 확인한 뒤 동의 token 을 mint 해서 다시 실행해요.
+**해결:** method, endpoint, body source 를 preview 로 확인한 뒤 명시 승인을 받아 다시 실행해요.
 
 **버튼:** preview 보기 / 취소 / 도와주세요
 

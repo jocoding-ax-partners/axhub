@@ -19,9 +19,9 @@
 
 ---
 
-## 2. HMAC consent 키 분리 정책
+## 2. preview confirmation 키 분리 정책
 
-각 vibe coder의 컴퓨터에 HMAC consent 키 (32 bytes, mode 0600) 가 자동 생성됩니다:
+각 vibe coder의 컴퓨터에 preview confirmation 키 (32 bytes, mode 0600) 가 자동 생성됩니다:
 
 ```
 ${XDG_STATE_HOME:-$HOME/.local/state}/axhub/hmac-key
@@ -69,7 +69,7 @@ helper의 redact 필터 (`axhub-helpers redact`) 가 1차 방어선이지만 100
 
 1. `~/.cache/axhub-plugin/cross-team-list.ndjson` 파일에서 해당 호출 timestamp + utterance hash 확인
 2. 의도된 cross-team 조회였는지 (AskUserQuestion에서 "네, 전체 보기" 답변) vs 우회 시도였는지 검증
-3. 우회로 판명되면: helper preauth-check 로그 (telemetry 활성화 시 usage.jsonl) 검토 + 우리에게 보고
+3. 우회로 판명되면: helper preview-check 로그 (telemetry 활성화 시 usage.jsonl) 검토 + 우리에게 보고
 
 ---
 

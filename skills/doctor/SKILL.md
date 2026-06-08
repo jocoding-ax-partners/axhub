@@ -215,7 +215,7 @@ To run diagnostics:
    }
    ```
 
-   "1. 자동 설치" 선택 시 → `Skill("axhub:onboarding")` 즉시 호출. onboarding 은 detect-first 라 CLI 설치 → 로그인 → node 순으로 빈 곳만 채워요 (CLI 만 없으면 install-cli 한 번 위임하고 돌아와요). doctor SKILL 의 `NEVER auto-fix` 규칙은 보존 — direct install 안 하고 sibling skill 로 consent route 만 함. multi-failure 가 아닌 단일 cli-missing 시나리오에서만 fire (다른 row 도 fail 이면 Step 6 (multi-failure summary) 가 우선).
+   "1. 자동 설치" 선택 시 → `Skill("axhub:onboarding")` 즉시 호출. onboarding 은 detect-first 라 CLI 설치 → 로그인 → node 순으로 빈 곳만 채워요 (CLI 만 없으면 install-cli 한 번 위임하고 돌아와요). doctor SKILL 의 `NEVER auto-fix` 규칙은 보존 — direct install 안 하고 sibling skill 로 approval route 만 함. multi-failure 가 아닌 단일 cli-missing 시나리오에서만 fire (다른 row 도 fail 이면 Step 6 (multi-failure summary) 가 우선).
 
 6. **Multi-failure summary.** If multiple rows fail, list all of them and surface AskUserQuestion to pick the first one to fix:
 

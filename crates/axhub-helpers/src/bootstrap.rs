@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -9,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
-use crate::consent::{validate_binding_schema, ConsentBinding};
 use crate::telemetry::emit_meta_envelope;
 
 pub const BOOTSTRAP_STATE_VERSION: &str = "bootstrap-state/v1";
@@ -26,8 +24,8 @@ pub enum BootstrapState {
     FirstCommitRequired,
     SubdomainCollision,
     AlreadyDeployed,
-    ConsentRequiredAppsCreate,
-    ConsentRequiredDeployCreate,
+    AppsCreatePending,
+    DeployCreatePending,
     BackendContractMissingDefaults,
     IdempotencyUnavailable,
     AppRegistered,
@@ -45,8 +43,8 @@ impl BootstrapState {
             Self::FirstCommitRequired => "first_commit_required",
             Self::SubdomainCollision => "subdomain_collision",
             Self::AlreadyDeployed => "already_deployed",
-            Self::ConsentRequiredAppsCreate => "consent_required_apps_create",
-            Self::ConsentRequiredDeployCreate => "consent_required_deploy_create",
+            Self::AppsCreatePending => "apps_create_pending",
+            Self::DeployCreatePending => "deploy_create_pending",
             Self::BackendContractMissingDefaults => "backend_contract_missing_defaults",
             Self::IdempotencyUnavailable => "idempotency_unavailable",
             Self::AppRegistered => "app_registered",
@@ -65,8 +63,8 @@ impl BootstrapState {
                 | Self::FirstCommitRequired
                 | Self::SubdomainCollision
                 | Self::AlreadyDeployed
-                | Self::ConsentRequiredAppsCreate
-                | Self::ConsentRequiredDeployCreate
+                | Self::AppsCreatePending
+                | Self::DeployCreatePending
                 | Self::BackendContractMissingDefaults
                 | Self::IdempotencyUnavailable
                 | Self::DependencyInstallRequired
@@ -148,10 +146,6 @@ pub struct PendingAction {
     pub hash: String,
     pub event: String,
     pub command_argv: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub consent_binding: Option<ConsentBinding>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub binding_hash: Option<String>,
     pub created_at: String,
 }
 
@@ -233,10 +227,6 @@ pub struct BootstrapOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub command: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub consent_binding: Option<ConsentBinding>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub binding_hash: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub pending_action_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pending_action_hash: Option<String>,
@@ -258,8 +248,6 @@ impl BootstrapOutput {
             next_action: None,
             user_decision,
             command: None,
-            consent_binding: None,
-            binding_hash: None,
             pending_action_id: None,
             pending_action_hash: None,
             idempotency_key: None,
@@ -427,9 +415,9 @@ fn emit_bootstrap_re_entry(state: BootstrapState) {
     );
 }
 
-fn emit_consent_synthesized_by_helper(event: &str, state: BootstrapState, pending: &PendingAction) {
+fn emit_remote_action_planned(event: &str, state: BootstrapState, pending: &PendingAction) {
     emit_bootstrap_marker(
-        "consent_synthesized_by_helper",
+        "remote_action_planned_by_helper",
         [
             ("phase", Value::String("plan_remote_action".into())),
             ("state", Value::String(state.as_str().into())),
@@ -615,23 +603,12 @@ fn plan_after_app_registered(
         command.push("--profile".into());
         command.push(profile.clone());
     }
-    let binding = ConsentBinding {
-        tool_call_id: "pending".into(),
-        action: "deploy_create".into(),
-        app_id: app,
-        profile,
-        branch: String::new(),
-        commit_sha: commit,
-        context: HashMap::new(),
-        synthesized_by_helper: true,
-    };
     plan_remote_action(
         cwd,
         &mut state,
-        BootstrapState::ConsentRequiredDeployCreate,
+        BootstrapState::DeployCreatePending,
         "deploy_create",
         command,
-        binding,
         persist_plan,
     )
 }
@@ -667,8 +644,8 @@ fn plan_apps_create(manifest: &ManifestInfo, plan_only: bool, persist_plan: bool
         }
     };
     // The manifest value may be a human display name ("My Cool App") pulled from
-    // the `name:` key, but `apps create --slug` (and the HMAC binding) need a
-    // backend-valid slug `^[a-z0-9][a-z0-9-]*$`. Emitting the raw name would make
+    // the `name:` key, but `apps create --slug` needs a backend-valid slug
+    // `^[a-z0-9][a-z0-9-]*$`. Emitting the raw name would make
     // the live CLI reject the command and re-deadlock first deploy — the same
     // failure class the `--from-file` fix removed. Slugify so the create command
     // is always valid; stop gracefully when nothing valid can be derived.
@@ -682,7 +659,7 @@ fn plan_apps_create(manifest: &ManifestInfo, plan_only: bool, persist_plan: bool
         );
     };
     let mut state = BootstrapStateFile::new(
-        BootstrapState::ConsentRequiredAppsCreate,
+        BootstrapState::AppsCreatePending,
         Some(manifest.path.clone()),
     );
     let profile = std::env::var("AXHUB_PROFILE").unwrap_or_default();
@@ -700,31 +677,12 @@ fn plan_apps_create(manifest: &ManifestInfo, plan_only: bool, persist_plan: bool
         command.push("--profile".into());
         command.push(profile.clone());
     }
-    // The `--name`/`--slug` consent lane requires the HMAC binding to match the
-    // PreToolUse parser exactly (consent/parser.rs): app_id + context.slug equal
-    // the slug, and context.source is "inline" (source_marker maps a `--name`
-    // create with no file flag to "inline"). Binding the manifest path here would
-    // mismatch and get denied.
-    let mut context = HashMap::new();
-    context.insert("slug".into(), slug.clone());
-    context.insert("source".into(), "inline".into());
-    let binding = ConsentBinding {
-        tool_call_id: "pending".into(),
-        action: "apps_create".into(),
-        app_id: slug.clone(),
-        profile,
-        branch: String::new(),
-        commit_sha: String::new(),
-        context,
-        synthesized_by_helper: true,
-    };
     plan_remote_action(
         &cwd,
         &mut state,
-        BootstrapState::ConsentRequiredAppsCreate,
+        BootstrapState::AppsCreatePending,
         "apps_create",
         command,
-        binding,
         persist_plan && !plan_only,
     )
 }
@@ -735,28 +693,17 @@ fn plan_remote_action(
     bootstrap_state: BootstrapState,
     event: &str,
     command: Vec<String>,
-    binding: ConsentBinding,
     persist_plan: bool,
 ) -> BootstrapRun {
-    if let Err(err) = validate_binding_schema(&binding) {
-        return stop(
-            BootstrapState::BackendContractMissingDefaults,
-            err.to_string(),
-        );
-    }
-    let binding_hash = stable_hash(&json!({"binding": binding, "command": command}));
     let pending_hash = stable_hash(&json!({
         "event": event,
-        "binding_hash": binding_hash,
         "command_argv": command,
     }));
     let pending = PendingAction {
-        id: format!("{event}:{}", &binding_hash[..16]),
+        id: format!("{event}:{}", &pending_hash[..16]),
         hash: pending_hash,
         event: event.into(),
         command_argv: command.clone(),
-        consent_binding: Some(binding.clone()),
-        binding_hash: Some(binding_hash.clone()),
         created_at: now_ts(),
     };
     state.state = bootstrap_state;
@@ -767,29 +714,21 @@ fn plan_remote_action(
             return stop(BootstrapState::BackendContractMissingDefaults, err);
         }
     }
-    emit_consent_synthesized_by_helper(event, bootstrap_state, &pending);
+    emit_remote_action_planned(event, bootstrap_state, &pending);
     BootstrapRun {
         output: BootstrapOutput::state(bootstrap_state)
             .with_action(event, command)
             .with_pending(&pending)
-            .with_retry_policy_for(event)
-            .with_binding(binding, binding_hash),
+            .with_retry_policy_for(event),
         exit_code: 0,
     }
 }
 
 trait BootstrapOutputExt {
-    fn with_binding(self, binding: ConsentBinding, hash: String) -> Self;
     fn with_retry_policy_for(self, event: &str) -> Self;
 }
 
 impl BootstrapOutputExt for BootstrapOutput {
-    fn with_binding(mut self, binding: ConsentBinding, hash: String) -> Self {
-        self.consent_binding = Some(binding);
-        self.binding_hash = Some(hash);
-        self
-    }
-
     fn with_retry_policy_for(mut self, event: &str) -> Self {
         if event == "apps_create" {
             self.retry_policy = Some("no_retry_without_confirmed_idempotency".into());
@@ -806,14 +745,10 @@ fn output_pending(
     let mut output = BootstrapOutput::state(state.state)
         .with_action(pending.event.clone(), pending.command_argv.clone())
         .with_pending(pending);
-    output.consent_binding = pending.consent_binding.clone();
-    output.binding_hash = pending.binding_hash.clone();
     if pending.event == "apps_create" {
         output.retry_policy = Some("no_retry_without_confirmed_idempotency".into());
     }
-    if pending.consent_binding.is_some() {
-        emit_consent_synthesized_by_helper(&pending.event, state.state, pending);
-    }
+    emit_remote_action_planned(&pending.event, state.state, pending);
     BootstrapRun { output, exit_code }
 }
 
@@ -1457,7 +1392,7 @@ mod tests {
     #[test]
     fn plan_apps_create_slugifies_display_name_into_valid_command() {
         // End-to-end at the planner level: a display-name manifest must emit a
-        // valid `--slug` and bind the HMAC consent context to the same slug.
+        // valid backend slug in the command.
         let manifest = ManifestInfo {
             path: "axhub.yaml".into(),
             slug: Some("My Cool App".into()),
@@ -1477,16 +1412,7 @@ mod tests {
             "my-cool-app",
             "emitted slug must be valid"
         );
-        let binding = run
-            .output
-            .consent_binding
-            .as_ref()
-            .expect("create plan must carry a consent binding");
-        assert_eq!(binding.app_id, "my-cool-app");
-        assert_eq!(
-            binding.context.get("slug").map(String::as_str),
-            Some("my-cool-app"),
-            "HMAC context.slug must equal the slugified value so the PreToolUse parser binding matches"
-        );
+        assert!(run.output.pending_action_id.is_some());
+        assert!(run.output.pending_action_hash.is_some());
     }
 }

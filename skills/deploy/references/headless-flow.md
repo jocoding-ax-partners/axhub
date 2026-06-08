@@ -249,6 +249,6 @@ The `auto_fallback: true` field is read by the corpus scorer (`tests/score.ts`) 
 - **Fail-closed on storage errors.** If the token file can't be written safely, the skill refuses the session — never falls back to env-var or memory-only credentials.
 - **Sibling reference:** `recovery-flows.md` §2 (`headless-auth`) holds the cross-skill state-machine summary. This file holds the implementation detail. Both must stay in sync — when this file changes substantively, update `recovery-flows.md` §2's cross-link only (not the body).
 
-For the consent state machine that decides when to prompt at all: PLAN E9 / `error-empathy-catalog.md`.
+For the prompt state machine: PLAN E9 / `error-empathy-catalog.md`.
 For the single-binary helper this file calls into: PLAN §16.13.
 For PLAN reference: E12 (headless-auth fix), §16.16 (multi-tenant credential isolation), E7 (token redaction enforcement), §16.11 (Unicode hardening — applies to user_email display in identity card).

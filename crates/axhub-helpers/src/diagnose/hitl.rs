@@ -13,7 +13,7 @@
 //!
 //! Privacy: `run_from_files` enforces `crate::redact::redact_for_handoff` on
 //! every capture value BEFORE writing to disk, and writes the output JSON
-//! using `consent::key::write_private_file_no_follow` so the file lands at
+//! using `runtime_paths::write_private_file_no_follow` so the file lands at
 //! mode 0o600 on Unix.
 
 use std::path::Path;
@@ -22,8 +22,8 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use super::DiagnoseError;
-use crate::consent::key::write_private_file_no_follow;
 use crate::redact::redact_for_handoff;
+use crate::runtime_paths::write_private_file_no_follow;
 
 /// Hard cap on the size of a `PromptSpec` file we will deserialise. Bounded
 /// to prevent pathological JSON from DoS-ing the helper on a malicious
@@ -160,7 +160,7 @@ pub fn run_from_files(
         std::fs::create_dir_all(parent)?;
     }
     let json = serde_json::to_vec_pretty(&result)?;
-    write_private_file_no_follow(&output_path.to_path_buf(), &json).map_err(|e| {
+    write_private_file_no_follow(output_path, &json).map_err(|e| {
         DiagnoseError::HitlAborted(format!("private write of captured.json failed: {e}"))
     })?;
     Ok(result)

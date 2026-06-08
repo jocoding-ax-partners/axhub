@@ -1,5 +1,10 @@
 use std::env;
-use std::path::PathBuf;
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+
+pub const FILE_MODE_PRIVATE: u32 = 0o600;
+pub const DIR_MODE_PRIVATE: u32 = 0o700;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimePaths {
@@ -28,6 +33,16 @@ pub fn last_deploy_file() -> Option<PathBuf> {
 
 pub fn state_dir() -> Option<PathBuf> {
     state_base_dir().map(|base| base.join("axhub-plugin"))
+}
+
+/// Shared non-plugin state root used by helper subsystems that need a stable,
+/// user-private location outside the plugin cache/config tree.
+///
+/// This intentionally preserves the historical `$XDG_STATE_HOME/axhub` (or
+/// `$HOME/.local/state/axhub`) location that older approval-key helpers used so
+/// audit/diagnose data stays in place while the legacy approval gate is removed.
+pub fn state_root() -> PathBuf {
+    state_root_from(env_path("XDG_STATE_HOME"), home_dir(), stable_process_dir())
 }
 
 /// Path to the per-version SessionStart welcome marker. Presence means the
@@ -69,6 +84,26 @@ pub fn plugin_drift_optout_path() -> Option<PathBuf> {
     state_dir().map(|dir| dir.join("plugin-drift-optout"))
 }
 
+/// TTL cache for the last `axhub update check --json` result (CLI binary drift).
+/// `$XDG_CACHE_HOME/axhub-plugin/cli-latest.json`. Written atomically by the
+/// `cli-latest-fetch-bg` background fetch, read by the prompt-route CLI nudge.
+/// Sibling of `plugin_latest_cache_path` — separate channel, separate file.
+pub fn cli_latest_cache_path() -> Option<PathBuf> {
+    cache_base_dir().map(|base| base.join("axhub-plugin").join("cli-latest.json"))
+}
+
+/// Per-version CLI-drift-nudge marker. Presence means the CLI update nudge for
+/// `version` already fired (once-per-version dedup).
+pub fn cli_drift_nudge_marker_path(version: &str) -> Option<PathBuf> {
+    state_dir().map(|dir| dir.join(format!(".cli-drift-nudged-v{version}")))
+}
+
+/// Permanent CLI-drift opt-out marker ("그만 볼래요"). Presence suppresses the
+/// CLI update nudge for every version. Independent of the plugin opt-out.
+pub fn cli_drift_optout_path() -> Option<PathBuf> {
+    state_dir().map(|dir| dir.join("cli-drift-optout"))
+}
+
 fn config_base_dir() -> Option<PathBuf> {
     config_base_dir_from(env_path("XDG_CONFIG_HOME"), home_dir())
 }
@@ -96,6 +131,17 @@ fn state_base_dir_from(xdg_state_home: Option<PathBuf>, home: Option<PathBuf>) -
     xdg_state_home.or_else(|| home.map(|home| home.join(".local").join("state")))
 }
 
+fn state_root_from(
+    xdg_state_home: Option<PathBuf>,
+    home: Option<PathBuf>,
+    stable_fallback: PathBuf,
+) -> PathBuf {
+    xdg_state_home
+        .or_else(|| home.map(|home| home.join(".local").join("state")))
+        .unwrap_or_else(|| stable_fallback.join(".local").join("state"))
+        .join("axhub")
+}
+
 fn env_path(key: &str) -> Option<PathBuf> {
     env::var_os(key)
         .filter(|value| !value.is_empty())
@@ -103,15 +149,118 @@ fn env_path(key: &str) -> Option<PathBuf> {
 }
 
 fn home_dir() -> Option<PathBuf> {
-    env_path("HOME")
-        .or_else(|| env_path("USERPROFILE"))
-        .or_else(|| {
-            let drive = env::var_os("HOMEDRIVE")?;
-            let path = env::var_os("HOMEPATH")?;
-            let mut home = PathBuf::from(drive);
-            home.push(path);
-            Some(home)
+    home_dir_from(
+        env_path("HOME"),
+        env_path("USERPROFILE"),
+        env_path("HOMEDRIVE"),
+        env_path("HOMEPATH"),
+    )
+}
+
+fn home_dir_from(
+    home: Option<PathBuf>,
+    userprofile: Option<PathBuf>,
+    homedrive: Option<PathBuf>,
+    homepath: Option<PathBuf>,
+) -> Option<PathBuf> {
+    home.or(userprofile).or_else(|| {
+        let mut home = homedrive?;
+        home.push(homepath?);
+        Some(home)
+    })
+}
+
+fn stable_process_dir() -> PathBuf {
+    std::env::current_dir()
+        .or_else(|_| {
+            std::env::current_exe().map(|exe| {
+                exe.parent()
+                    .map(PathBuf::from)
+                    .unwrap_or_else(stable_root_dir)
+            })
         })
+        .unwrap_or_else(|_| stable_root_dir())
+}
+
+#[cfg(windows)]
+fn stable_root_dir() -> PathBuf {
+    std::env::var_os("SystemDrive")
+        .map(PathBuf::from)
+        .map(|mut drive| {
+            drive.push(std::path::MAIN_SEPARATOR.to_string());
+            drive
+        })
+        .unwrap_or_else(|| PathBuf::from(r"C:\"))
+}
+
+#[cfg(not(windows))]
+fn stable_root_dir() -> PathBuf {
+    PathBuf::from(std::path::MAIN_SEPARATOR.to_string())
+}
+
+pub fn read_private_file(path: &Path) -> anyhow::Result<Vec<u8>> {
+    let meta = fs::symlink_metadata(path)?;
+    anyhow::ensure!(
+        !meta.file_type().is_symlink(),
+        "private file path is a symlink"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = meta.permissions().mode() & 0o777;
+        anyhow::ensure!(mode & 0o077 == 0, "private file is group/world-readable");
+    }
+    let mut buf = Vec::new();
+    File::open(path)?.read_to_end(&mut buf)?;
+    Ok(buf)
+}
+
+pub fn write_private_file_no_follow(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
+    if let Ok(meta) = fs::symlink_metadata(path) {
+        anyhow::ensure!(
+            !meta.file_type().is_symlink(),
+            "private file path is a symlink"
+        );
+    }
+    let mut opts = OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(FILE_MODE_PRIVATE);
+        opts.custom_flags(libc::O_NOFOLLOW);
+    }
+    let mut file = opts.open(path)?;
+    file.write_all(bytes)?;
+    file.sync_all().ok();
+    set_private_file_mode(path).ok();
+    Ok(())
+}
+
+pub fn set_private_file_mode(path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(FILE_MODE_PRIVATE))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        Ok(())
+    }
+}
+
+pub fn set_private_dir_mode(path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(DIR_MODE_PRIVATE))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -168,5 +317,54 @@ mod tests {
             .last_deploy_file
             .ends_with("axhub-plugin/last-deploy.json"));
         assert!(paths.state_dir.ends_with("axhub-plugin"));
+    }
+
+    #[test]
+    fn state_root_ignores_empty_xdg_and_uses_home() {
+        assert_eq!(
+            state_root_from(
+                None,
+                Some(PathBuf::from("/home/alice")),
+                PathBuf::from("/cwd")
+            ),
+            PathBuf::from("/home/alice/.local/state/axhub")
+        );
+    }
+
+    #[test]
+    fn home_dir_supports_userprofile_when_home_missing() {
+        assert_eq!(
+            home_dir_from(
+                None,
+                Some(PathBuf::from("/Users/alice")),
+                Some(PathBuf::from("ignored-drive")),
+                Some(PathBuf::from("ignored-path")),
+            ),
+            Some(PathBuf::from("/Users/alice"))
+        );
+    }
+
+    #[test]
+    fn home_dir_supports_homedrive_homepath_when_home_and_userprofile_missing() {
+        assert_eq!(
+            home_dir_from(
+                None,
+                None,
+                Some(PathBuf::from("C:")),
+                Some(PathBuf::from("Users\\alice")),
+            ),
+            Some(PathBuf::from("C:").join("Users\\alice"))
+        );
+    }
+
+    #[test]
+    fn state_root_fallback_is_stable_and_absolute() {
+        // No HOME and no XDG_STATE_HOME: state_root must still resolve to a
+        // stable, absolute location. Use current_dir() (absolute on every
+        // platform, including Windows) so the is_absolute() invariant holds.
+        let fallback = std::env::current_dir().unwrap();
+        let root = state_root_from(None, None, fallback.clone());
+        assert_eq!(root, fallback.join(".local").join("state").join("axhub"));
+        assert!(root.is_absolute());
     }
 }

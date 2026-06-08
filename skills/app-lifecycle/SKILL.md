@@ -61,11 +61,11 @@ Natural phrases such as `앱 복제`, `앱 포크`, `앱 복사해`, `앱 일시
 
 5. **After answer.**
    - If the answer is `취소`, say exactly `알겠어요. 아무것도 바꾸지 않았어요.`
-   - If the answer is `진행`, do not write any visible sentence before tool calls. Never say `User chose`, `Mint consent`, `execute suspend`, `execute resume`, `execute fork`, or similar implementation narration. Do not run the app-changing command first. First run the matching internal approval preparation with Bash title `앱 변경 준비`, hide its stdout from chat, then run the matching top-level `axhub` command with Bash title `앱 변경 실행`. The app-changing command also returns raw JSON; redirect that stdout away from the visible tool panel and use the zero exit status as success. Treat a visible `[DESTRUCTIVE] about to run ...` line as a hook notice, not a failure. The first `앱 변경 실행` with exit code 0 is terminal success: do not run another preparation/execution pair, do not re-run the same mutation for verification, and do not continue to a second app-changing command. After it succeeds, say exactly one short result sentence in Korean: `<앱 이름> 앱을 잠깐 멈췄어요.` or `<앱 이름> 앱을 다시 켰어요.`
+   - If the answer is `진행`, do not write any visible sentence before tool calls. Never say `User chose`, `Confirm approval`, `execute suspend`, `execute resume`, `execute fork`, or similar implementation narration. Do not run the app-changing command first. First run the matching internal approval preparation with Bash title `앱 변경 준비`, hide its stdout from chat, then run the matching top-level `axhub` command with Bash title `앱 변경 실행`. The app-changing command also returns raw JSON; redirect that stdout away from the visible tool panel and use the zero exit status as success. Treat a visible `[DESTRUCTIVE] about to run ...` line as a hook notice, not a failure. The first `앱 변경 실행` with exit code 0 is terminal success: do not run another preparation/execution pair, do not re-run the same mutation for verification, and do not continue to a second app-changing command. 같은 변경을 다시 준비하거나 다시 실행하지 않아요. After it succeeds, say exactly one short result sentence in Korean: `<앱 이름> 앱을 잠깐 멈췄어요.` or `<앱 이름> 앱을 다시 켰어요.`
    - If the security gate still blocks the change, do not explain the gate internals. Prepare the same approved change once more and retry once. If it still fails, say exactly `앱 변경을 시작하지 못했어요. 다시 시도해 주세요.`
 
 NEVER include parenthesized internal labels such as `(suspend)`, `(resume)`, `(preflight)`, or `(execute)` in visible chat.
-NEVER mention internal authorization primitives, token words, permission-decision details, helper binding details, or English implementation words in visible chat.
+NEVER mention internal authorization primitives, token words, permission-decision details, helper binding details, JSON, schema, fixture, helper source, or English implementation words in visible chat.
 
 **Preflight (인증/컨텍스트 확인).** 워크플로를 시작하기 전에 preflight 를 한 번 실행해서 인증 상태와 현재 team/app/env 컨텍스트를 확보해요. 첫 실행이면 Claude Code 가 `axhub-helpers preflight` 실행 허용을 물어요 — '허용' 하면 다음부터 자동으로 진행돼요.
 
@@ -124,52 +124,22 @@ fi
 
 8. **CLI 명령.**
 
-   변경 명령을 실행하기 전에 먼저 같은 app/action 으로 내부 승인 준비를 해요. 이 준비 단계의 stdout 은 사용자에게 보여주거나 요약하지 않아요. 승인 준비는 app-lifecycle 전용 typed helper 만 써요: `"$HELPER" consent-mint-app-lifecycle --action suspend|resume|fork --app "$APP_ARG" --quiet`. JSON, schema, fixture, helper source, consent-mint stdin, grep/rg 탐색을 하지 않아요. suspend/resume 의 `--app` 값은 resolved UUID 가 아니라 바로 다음 `axhub apps suspend|resume ...` 명령에 들어갈 literal 앱 인자와 정확히 같아야 해요. 예를 들어 `axhub apps suspend testnextjs --execute --json >/dev/null` 를 실행할 거면 준비 명령도 `--app testnextjs` 예요. `app_slug` 같은 별도 값을 만들지 않아요. 준비 명령 뒤에는 trailing success echo 를 붙이지 않고, 준비 실패를 숨기지 않아요. 앱 변경 실행 명령의 raw JSON stdout 도 사용자 도구 패널에 남기지 않도록 `>/dev/null` 로 버려요. 첫 번째 `앱 변경 실행` 이 exit code 0 으로 끝나면 성공으로 보고 즉시 결과 문장으로 마무리해요. `[DESTRUCTIVE] about to run ...` 는 hook 안내일 뿐 실패가 아니므로 같은 변경을 다시 준비하거나 다시 실행하지 않아요. `--template` 을 안 쓰면 helper 가 source app 을 template 로 묶고, `--repo-public` 을 안 쓰면 `false` 로 묶어요.
+   변경 명령은 AskUserQuestion 에서 `진행`을 받은 뒤 정확히 한 번만 실행해요. 준비용 helper 호출이나 별도 approval subcommand 는 없어요. `--app` 값은 resolved UUID 가 아니라 바로 다음 `axhub apps suspend|resume ...` 명령에 들어갈 literal 앱 인자와 정확히 같아야 해요. 앱 변경 실행 명령의 raw JSON stdout 은 사용자 도구 패널에 남기지 않도록 `>/dev/null` 로 버려요. 첫 번째 `앱 변경 실행` 이 exit code 0 으로 끝나면 성공으로 보고 즉시 결과 문장으로 마무리해요.
 
-   Pick exactly one branch. Do not combine the preparation command and the app-changing command in the same Bash tool call. The first Bash tool call is only `앱 변경 준비`; the next Bash tool call is only `앱 변경 실행`. Between the user's `진행` answer and the first Bash tool call, do not write a visible chat sentence.
-
-   ```bash
-   set -euo pipefail
-   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s
-' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d	%s
-",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
-   ```
-
-   Pause preparation:
-
-   ```bash
-   set -euo pipefail
-   APP_ARG="${APP_ARG:-testnextjs}"  # literal argument used in the next axhub apps command, not a resolved UUID
-   "$HELPER" consent-mint-app-lifecycle --action suspend --app "$APP_ARG" --quiet
-   ```
+   Pick exactly one branch. Between the user's `진행` answer and the Bash tool call, do not write a visible chat sentence.
 
    Pause execution:
 
    ```bash
+   APP_ARG="${APP_ARG:-testnextjs}"  # literal argument used in the axhub apps command, not a resolved UUID
    axhub apps suspend "$APP_ARG" --execute --json >/dev/null
-   ```
-
-   Resume preparation:
-
-   ```bash
-   set -euo pipefail
-   APP_ARG="${APP_ARG:-testnextjs}"  # literal argument used in the next axhub apps command, not a resolved UUID
-   "$HELPER" consent-mint-app-lifecycle --action resume --app "$APP_ARG" --quiet
    ```
 
    Resume execution:
 
    ```bash
+   APP_ARG="${APP_ARG:-testnextjs}"  # literal argument used in the axhub apps command, not a resolved UUID
    axhub apps resume "$APP_ARG" --execute --json >/dev/null
-   ```
-
-   Fork preparation:
-
-   ```bash
-   set -euo pipefail
-   "$HELPER" consent-mint-app-lifecycle --action fork --app "$SOURCE_APP" --slug "$NEW_SLUG" --subdomain "$NEW_SUBDOMAIN" --tenant "$TENANT" --name "$NAME" --template "${TEMPLATE:-$SOURCE_APP}" --repo-public "${REPO_PUBLIC:-false}" --quiet
    ```
 
    Fork execution:

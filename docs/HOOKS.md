@@ -17,13 +17,12 @@
 | 진입점 | 위치 | 호출 시점 |
 |---|---|---|
 | `session-start` | `hooks/session-start.sh`, `hooks/session-start.ps1`, `axhub-helpers session-start` | Claude Code SessionStart |
-| `preauth-check` | `axhub-helpers preauth-check` | PreToolUse (Bash) |
 | `prompt-route` | `axhub-helpers prompt-route` | UserPromptSubmit |
 | `classify-exit` | `axhub-helpers classify-exit` | PostToolUse (Bash `axhub …`) |
-| `verify-deploy-artifact` | `axhub-helpers verify-deploy-artifact` via `hooks/axhub-helpers.sh` | PostToolUse (successful `axhub deploy create`; advisory artifact sanity check) |
 | `token-freshness-gate` | `axhub-helpers token-gate` | Phase 3.5 deploy gate. sh body 가 Rust 로 흡수됐어요 (Phase 1.1 sh/ps1 absorption, T3). 기존 env 컨트랙트 (`AXHUB_GATE_*`) 와 exit 65 UNAUTHORIZED 시맨틱 그대로 보존했어요. Windows 사용자도 동일 binary 가 자동 동작해요 (parity gap #1 해소). Phase 4 (F1) 에서 `hooks/token-freshness-gate.sh` thin shim 도 삭제 — SKILL deploy Step 3.5 가 helper 직접 호출. |
 | `session-start-autowire` | `hooks/session-start-autowire.{sh,ps1}` | Claude Code SessionStart — fail-open exit 0; `AXHUB_DISABLE_HOOKS` / `AXHUB_DISABLE_HOOK=session-start-autowire` / `AXHUB_DISABLE_STATUSLINE_AUTOWIRE` 지원; background detach (non-blocking) |
 | `plugin-drift` | `axhub-helpers plugin-latest-fetch-bg` (SessionStart 에서 detached 스폰) + 드리프트 nudge in `cmd_prompt_route` | 플러그인 버전 드리프트 알림. fetch 는 SessionStart 에 캐시 warm (24h TTL, fail-open), nudge 는 UserPromptSubmit 에서 캐시 비교 후 버전당 1회 주입. `AXHUB_DISABLE_HOOKS` / `AXHUB_DISABLE_HOOK=plugin-drift` 지원 (helper 내부 `is_hook_disabled("plugin-drift")` 게이트). 영구 opt-out 은 `plugin-drift-optout` 마커 |
+| `cli-drift` | `axhub-helpers cli-latest-fetch-bg` (SessionStart 에서 detached 스폰, **`command -v axhub` 가드**) + 드리프트 nudge in `cmd_prompt_route` | axhub **CLI 바이너리** 버전 드리프트 알림 (플러그인과 별개 채널). fetch 는 `axhub update check --json` 의 backend `has_update` 를 24h TTL 캐시에 기록 (fail-open). nudge 는 UserPromptSubmit 에서 plugin nudge 가 안 뜬 턴 + update-check intent 가 아닌 턴에만 버전당 1회 주입 (턴당 1-nudge cap). `AXHUB_DISABLE_HOOKS` / `AXHUB_DISABLE_HOOK=cli-drift` 지원 (`is_hook_disabled("cli-drift")` 게이트). `AXHUB_DISABLE_AUTOUPDATE`(CLI 자체 토글) 면 nudge 안 뜸. 영구 opt-out 은 `cli-drift-optout` 마커 |
 
 여기서 다루지 않는 helper subcommand (예: `deploy-prep`, `bootstrap`,
 `list-deployments`) 는 사용자 명시 호출이라 kill switch 적용 대상 아니에요.
@@ -55,7 +54,7 @@ AXHUB_DISABLE_HOOKS=1
 ### 2.2 특정 hook 만 비활성화
 
 ```bash
-AXHUB_DISABLE_HOOK=session-start,preauth-check
+AXHUB_DISABLE_HOOK=session-start,prompt-route
 ```
 
 쉼표로 구분한 hook 이름 목록. 공백 주변은 무시해요 (`"foo , bar"` →
@@ -124,7 +123,7 @@ stderr 에 한 번 deprecation warning 을 출력해요. 새 자동화 스크립
 
 검사: `scripts/skill-doctor.ts` 가 `needs-preflight: true` SKILL 에 (a) `!command` 주입이 없고 (b) body 가 `axhub-helpers preflight --json` 을 호출하는지 강제하고, 모든 SKILL 에 dead injection 이 없는지 확인해요. preprocessing 단계의 fail-open 계약은 더 이상 별도 layer 가 아니라 normal Bash 권한 흐름으로 흡수됐어요.
 
-### 3.7 onboarding 온보딩의 D1/consent boundary
+### 3.7 onboarding 온보딩의 D1/explicit-confirm boundary
 
 `skills/onboarding/SKILL.md` 는 사용자-facing 온보딩 단일 진입점이에요. `온보딩`, `처음인데 뭐부터`, `getting started` 같은 말은 onboarding 으로 들어가고, onboarding 이 `detect-first → 첫 gap 처리 → 재감지` 루프로 CLI·auth·git·node·GitHub App·repo/app·의존성·doctor gap 을 닫아요.
 
@@ -133,7 +132,7 @@ hook 관점의 안전 계약은 이래요.
 - `claude -p` / CI / headless 에서는 onboarding 의 AskUserQuestion 이 D1 guard 로 safe default 를 사용해요.
 - install/update/auth/init/deploy/deps mutation 과 git/node system install 또는 version switch 는 non-interactive 에서 자동 실행하지 않아요. 이 경우 onboarding 은 `SAFE_STOP_NONINTERACTIVE` 또는 `READY_WITH_USER_ACTION` 문구로 멈춰요.
 - GitHub 전진배치는 auth 뒤 `install_url` 로 계정레벨 GitHub App 설치만 surface 해요. OAuth device-flow 와 app↔repo connect 는 init/github 단계에 남아요.
-- dependency install 은 repo on disk 뒤 lockfile 있을 때만, 명시 consent 뒤, `--ignore-scripts` 를 붙인 command 로만 허용해요. 이 예외는 `scripts/skill-doctor-allowlist.json` 의 `onboarding` allowlist 로 잠겨요.
+- dependency install 은 repo on disk 뒤 lockfile 있을 때만, 명시 확인 뒤, `--ignore-scripts` 를 붙인 command 로만 허용해요. 이 예외는 `scripts/skill-doctor-allowlist.json` 의 `onboarding` allowlist 로 잠겨요.
 - 최종 `VIBE_READY` 카드는 확인된 항목만 green 으로 표시해야 해요. deployment URL 만 있고 status/watch evidence 가 없으면 degraded ready 로 낮춰요.
 
 ---
@@ -156,9 +155,8 @@ fn cmd_my_new_hook() -> anyhow::Result<i32> {
 ```
 
 `out_json` 의 payload 는 hook 종류별로 spec 이 달라요:
-- PreToolUse (`preauth-check`) → `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}`
-- PostToolUse advisory verifier (`verify-deploy-artifact`) → kill-switch/skip 은 stdout 없이 `Ok(0)`, 의심 신호가 있을 때만 `systemMessage` + `PostToolUse.additionalContext`
-- 그 외 → `{}` (no systemMessage, no decision)
+- UserPromptSubmit / PostToolUse 계열 → `{}` 또는 hook별 additionalContext (no destructive permission decision)
+- PostToolUse deploy verifier (`verify-deploy-artifact`) → kill-switch/skip 은 stdout 없이 `Ok(0)`, 의심 신호가 있을 때만 `systemMessage` + `PostToolUse.additionalContext`
 
 ### 4.2 Shell hook (mirror)
 
@@ -186,10 +184,7 @@ if ($env:AXHUB_DISABLE_HOOK) {
 ```
 
 shell stub 은 일찍 (binary 호출 전) skip 해서 helper 자체 invocation 도
-회피해요. `hooks/axhub-helpers.sh` 는 source checkout / clean install 처럼
-helper binary 가 아직 없을 때도 context/telemetry 계열 hook 을 fail-open 해요
-(`verify-deploy-artifact` 포함). helper 가 다시 한 번 더 체크하는 건 정합성용
-안전망이에요.
+회피해요. helper 가 다시 한 번 더 체크하는 건 정합성용 안전망이에요.
 
 ---
 
@@ -202,7 +197,7 @@ helper binary 가 아직 없을 때도 context/telemetry 계열 hook 을 fail-op
 | 둘 다 unset | hook 정상 동작 |
 | `AXHUB_DISABLE_HOOKS=1` | 모든 hook skip |
 | `AXHUB_DISABLE_HOOK=session-start` | session-start 만 skip, 나머지 동작 |
-| `AXHUB_DISABLE_HOOK=session-start,preauth-check` | 두 hook skip |
+| `AXHUB_DISABLE_HOOK=session-start,prompt-route` | 두 hook skip |
 | `DISABLE_AXHUB=1` (legacy) | 모든 hook skip + stderr 경고 1 회 |
 | `AXHUB_DISABLE_HOOKS=1` + `AXHUB_DISABLE_HOOK=foo` | global 이 per-hook 무시 |
 

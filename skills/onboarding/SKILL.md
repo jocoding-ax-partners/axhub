@@ -1,6 +1,6 @@
 ---
 name: onboarding
-description: 'This skill should be used when the user is new to axhub, asks what to do first, requests setup/onboarding/getting started, or says a short first-run phrase. 이 스킬은 axhub 를 처음 쓰는 사람이 셋업/온보딩 전체 과정을 한 번에 진행하고 싶어할 때 사용해요. 다음 표현에서 활성화: "셋업해줘", "셋업 해줘", "처음인데", "처음 사용", "처음 써", "처음 쓰는데", "처음 쓰는데 뭐부터", "뭐부터 하면 돼", "뭐부터 하면 되나요", "어떻게 시작하면 돼", "어떻게 시작해", "온보딩", "온보딩해줘", "시작하기", "axhub 시작", "axhub 처음", "초기 셋업", "setup", "set up", "onboard", "onboarding", "getting started", "get started", "first time", 또는 첫 사용자 셋업 의도. axhub CLI 설치(install-cli)·로그인(auth)·node 환경 감지를 순서대로 안내하고, node 가 없으면 consent 후 설치해요. 빈 폴더에서는 바로 템플릿을 묻지 말고 ‘첫 앱 만들래요?’를 먼저 물은 뒤, 사용자가 원하면 첫 앱 만들기(init)로 연결해요. 환경 진단(doctor)이나 새 앱 초기화(init)와 달리 처음 사용자의 순차 온보딩을 담당해요.'
+description: 'This skill should be used when the user is new to axhub, asks what to do first, requests setup/onboarding/getting started, or says a short first-run phrase. 이 스킬은 axhub 를 처음 쓰는 사람이 셋업/온보딩 전체 과정을 한 번에 진행하고 싶어할 때 사용해요. 다음 표현에서 활성화: "셋업해줘", "셋업 해줘", "처음인데", "처음 사용", "처음 써", "처음 쓰는데", "처음 쓰는데 뭐부터", "뭐부터 하면 돼", "뭐부터 하면 되나요", "어떻게 시작하면 돼", "어떻게 시작해", "온보딩", "온보딩해줘", "시작하기", "axhub 시작", "axhub 처음", "초기 셋업", "setup", "set up", "onboard", "onboarding", "getting started", "get started", "first time", 또는 첫 사용자 셋업 의도. axhub CLI 설치(install-cli)·로그인(auth)·node 환경 감지를 순서대로 안내하고, node 가 없으면 명시 확인 후 설치해요. 빈 폴더에서는 바로 템플릿을 묻지 말고 ‘첫 앱 만들래요?’를 먼저 물은 뒤, 사용자가 원하면 첫 앱 만들기(init)로 연결해요. 환경 진단(doctor)이나 새 앱 초기화(init)와 달리 처음 사용자의 순차 온보딩을 담당해요.'
 examples:
   - utterance: "셋업해줘"
     intent: "onboard axhub first-time onboarding"
@@ -105,15 +105,15 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
   DETECT_ALL(read-only)
      ├─ cli_missing         → Skill("axhub:install-cli") → DETECT_ALL
      ├─ cli_path_missing    → Skill("axhub:repair") → DETECT_ALL
-     ├─ cli_old             → update(consent+cosign) → DETECT_ALL
+     ├─ cli_old             → update(explicit-confirm+cosign) → DETECT_ALL
      ├─ auth_missing        → Skill("axhub:auth") → DETECT_ALL
-     ├─ git_missing         → install_git(consent) → DETECT_ALL
-     ├─ node_missing        → install_node(consent) → DETECT_ALL
-     ├─ node_mismatch       → fix_node(consent+nvm) → DETECT_ALL
+     ├─ git_missing         → install_git(explicit-confirm) → DETECT_ALL
+     ├─ node_missing        → install_node(explicit-confirm) → DETECT_ALL
+     ├─ node_mismatch       → fix_node(explicit-confirm+nvm) → DETECT_ALL
      ├─ github_app_missing  → install_url → DETECT_ALL
      ├─ existing_repo_gap   → Skill("axhub:github") guided onboarding/connect → DETECT_ALL
      ├─ no_manifest_empty   → Skill("axhub:init") saga(app+repo+deploy+clone) → DETECT_ALL
-     ├─ deps_missing        → install_deps(consent+ignore-scripts) → DETECT_ALL
+     ├─ deps_missing        → install_deps(explicit-confirm+ignore-scripts) → DETECT_ALL
      ├─ deploy_unverified   → status/watch or deploy(existingrepo only) → DETECT_ALL
      ├─ doctor_gap          → Skill("axhub:doctor") → DETECT_ALL
      └─ no_gap              → VIBE_READY_CARD
@@ -266,7 +266,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    ```json
    {
      "questions": [{
-       "question": "첫 앱 만들래요?",
+       "question": ‘첫 앱 만들래요?’,
        "header": "첫 앱",
        "multiSelect": false,
        "options": [
@@ -281,7 +281,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
 8. **Dependency gap (`deps_missing`).**
 
-   onboarding 은 프로젝트 의존성 설치를 할 수 있지만 `allows-dependency-execution: true` 의 보안 계약을 지켜야 해요. 의존성 설치는 repo on disk 뒤, manifest+lockfile 있을 때만, consent 필수, D1 guard 필수, 모든 command 에 `--ignore-scripts` 필수예요. lockfile 없으면 package manager 선택을 묻지 말고 skip 해요.
+   onboarding 은 프로젝트 의존성 설치를 할 수 있지만 `allows-dependency-execution: true` 의 보안 계약을 지켜야 해요. 의존성 설치는 repo on disk 뒤, manifest+lockfile 있을 때만, 명시 확인 필수, D1 guard 필수, 모든 command 에 `--ignore-scripts` 필수예요. lockfile 없으면 package manager 선택을 묻지 말고 skip 해요.
 
    ```json
    {

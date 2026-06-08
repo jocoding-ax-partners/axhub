@@ -70,7 +70,7 @@ Claude Code 플러그인 한 번 깔면, 비-개발 직군 vibe coder 도
 ```
 다 자동화해도 안전합니다. 핵심 가드 3개:
 
-[1] HMAC consent token gate
+[1] preview confirmation token gate
   - 모든 destructive 명령 (deploy/update/login) 은 vibe coder 본인 OK 없이 실행 불가
   - LLM 이 자율적으로 prod 변경 시도 → PreToolUse hook 가 deny
   - HMAC 키는 per-user, mode 0600, 다른 노트북에 복사 X
@@ -103,7 +103,7 @@ Claude Code 플러그인 한 번 깔면, 비-개발 직군 vibe coder 도
 Claude Code  ──→  axhub plugin
         │              ├── skills/* (NL 자동 트리거)
         │              ├── commands/* (슬래시)
-        │              ├── hooks/* (PreToolUse HMAC consent)
+        │              ├── hooks/* (PreToolUse preview confirmation)
         │              └── bin/axhub-helpers (Rust native)
         │                       │
         ▼                       │
@@ -118,7 +118,7 @@ Claude Code  ──→  axhub plugin
 
 플러그인 = **얇은 routing/recovery layer**. 비즈니스 로직은 모두 ax-hub-cli (회사 SaaS) 에. 플러그인이 하는 일:
 1. 자연어 인텐트 → CLI 명령어 매핑
-2. HMAC consent token 으로 destructive op 보호
+2. preview confirmation token 으로 destructive op 보호
 3. Exit code 기반 한국어 자동 복구
 
 ---

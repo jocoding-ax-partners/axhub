@@ -85,7 +85,7 @@ impl QualityCheckResult {
 /// Run every gate check against a composed `DeployPrepResult`. Pure: no I/O,
 /// no env reads, no interactive prompts. The deploy_prep integration layer
 /// is the one that prints `Self::SUB_KEY` to stderr and calls
-/// `std::process::exit(EXIT_VALIDATION)` when interactive consent is absent.
+/// `std::process::exit(EXIT_VALIDATION)` when interactive approval is absent.
 pub fn validate_deploy_prep_quality(result: &DeployPrepResult) -> QualityCheckResult {
     let mut violations = Vec::new();
 

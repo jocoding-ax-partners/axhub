@@ -18,10 +18,10 @@ describe("deploy SKILL step ordering invariants (1.6 / 3.6)", () => {
     expect(step1_6Index).toBeLessThan(previewCardIndex);
   });
 
-  test("Step 3.6 appears before Step 4 consent-deploy", () => {
+  test("Step 3.6 appears before Step 4 execute-deploy", () => {
     const body = deploySkill();
     const step3_6Index = body.indexOf("Step 3.6");
-    const step4Index = body.indexOf("Step 4 consent-deploy");
+    const step4Index = body.indexOf("[deploy:Step 4 execute-deploy]");
     expect(step3_6Index).toBeGreaterThan(-1);
     expect(step4Index).toBeGreaterThan(-1);
     expect(step3_6Index).toBeLessThan(step4Index);

@@ -128,56 +128,19 @@ To handle auth:
 
 5. **On `browser`** (browser available):
 
-   **5a. Mint consent token with the current shell lane** (PreToolUse gate requires it before any `axhub auth login` command). Do not use one POSIX-only pipe for every environment.
+   **5a. Run the login lane directly after the preview decision.** Do not use one POSIX-only pipe for every environment.
 
    POSIX/Git Bash/WSL lane:
 
    ```bash
-   HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
-   [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
-   echo '{"tool_call_id":"pending","action":"auth_login","app_id":"_","profile":"'"${AXHUB_PROFILE:-default}"'","branch":"_","commit_sha":"_","context":{}}' \
-     | "$HELPER" consent-mint
+   axhub auth login --force --no-browser --json $AUTH_EXTRA
    ```
 
    PowerShell lane:
 
    ```powershell
-   $AxhubHelper = $null
-   if ($env:CLAUDE_PLUGIN_ROOT) {
-     $PluginHelper = Join-Path $env:CLAUDE_PLUGIN_ROOT "bin\axhub-helpers.exe"
-     if (Test-Path $PluginHelper) { $AxhubHelper = $PluginHelper }
-   }
-   if (-not $AxhubHelper) {
-     $HelperCommand = Get-Command axhub-helpers.exe -ErrorAction SilentlyContinue
-     if ($HelperCommand) { $AxhubHelper = $HelperCommand.Source }
-   }
-   if (-not $AxhubHelper) {
-     $AxhubCacheGlob = Join-Path $env:USERPROFILE ".claude\plugins\cache\axhub\axhub\*\bin\axhub-helpers.exe"
-     $AxhubCand = Get-ChildItem -Path $AxhubCacheGlob -ErrorAction SilentlyContinue |
-       Where-Object { $_.Directory.Parent.Name -match '^\d+\.\d+\.\d+$' } |
-       Sort-Object { [version]$_.Directory.Parent.Name } |
-       Select-Object -Last 1
-     if ($AxhubCand) { $AxhubHelper = $AxhubCand.FullName }
-   }
-   if (-not $AxhubHelper) {
-     throw "axhub-helpers.exe 를 찾지 못했어요. axhub doctor 로 plugin helper 설치 상태를 확인해요."
-   }
-   @{
-     tool_call_id = "pending"
-     action = "auth_login"
-     app_id = "_"
-     profile = if ($env:AXHUB_PROFILE) { $env:AXHUB_PROFILE } else { "default" }
-     branch = "_"
-     commit_sha = "_"
-     context = @{}
-   } | ConvertTo-Json -Compress | & $AxhubHelper consent-mint
+   axhub auth login --force --no-browser --json $AUTH_EXTRA
    ```
-
-   두 lane (POSIX·PowerShell) 모두 `CLAUDE_PLUGIN_ROOT` 가 비어 있으면 PATH 의 `axhub-helpers` (Windows 는 `axhub-helpers.exe`) 를, 그래도 없으면 plugin cache (`~/.claude/plugins/cache/*/*/bin/ or ~/.claude/plugins/cache/*/*/*/bin/`) 의 최신 버전 helper 를 자동으로 찾아요. 그래서 Claude Code 가 env 를 전달하지 않은 세션에서도 로그인이 막히지 않아요. temp-file fallback 은 위 두 stdin lane 을 쓸 수 없을 때만 secondary 로 써요. JSON 파일을 만들더라도 raw token 값을 쓰지 말고, consent JSON 만 0600/사용자 전용 ACL 임시 파일에 저장한 뒤 helper stdin 으로 다시 넣어요.
-
-   `auth_login` binding은 실제 app/branch/commit이 필요 없지만 `asConsentBinding`이 모든 필드에서 비어있지 않은 문자열을 요구하므로 `"_"`를 플레이스홀더로 사용해요. 다음 Bash/PowerShell tool id는 consent-mint 이후에 생기므로 `pending` token을 한 번만 쓰게 해요.
-   macOS/Linux/Windows 모두에서 `CLAUDE_SESSION_ID`를 지우지 마세요. `tool_call_id:"pending"` 자체가 helper에게 "다음 실제 tool call에서 한 번만 claim"하라는 명시 신호예요.
 
    **5b. Surface OAuth challenge, then complete by context (axhub-cli 0.15.3+).** `axhub auth login --no-browser` 은 device flow 라 verification URL + code 를 먼저 보여준 뒤 승인을 기다려요. 0.15.3+ CLI 가 컨텍스트를 자동 감지하니 더 이상 detach wrapper 가 필요 없어요. 먼저 tenant/scope 옵션을 정해요:
 
@@ -209,7 +172,7 @@ To handle auth:
      axhub auth login --force --no-browser $AUTH_EXTRA
      ```
 
-   **5c. 완료 — 사용자 승인 후 에이전트가 resume 로 마무리.** 대화형 TTY 면 `axhub auth login` 이 승인까지 polling 해서 바로 완료돼요. 에이전트(비-TTY) 컨텍스트면, 사용자가 "로그인했어" / "승인했어" / "됐어" 로 브라우저 승인을 알린 뒤 에이전트가 step 5a 처럼 consent 를 다시 mint 하고 아래를 직접 실행해요 (사용자에게 치라고 출력 금지):
+   **5c. 완료 — 사용자 승인 후 에이전트가 resume 로 마무리.** 대화형 TTY 면 `axhub auth login` 이 승인까지 polling 해서 바로 완료돼요. 에이전트(비-TTY) 컨텍스트면, 사용자가 "로그인했어" / "승인했어" / "됐어" 로 브라우저 승인을 알린 뒤 에이전트가 아래를 직접 실행해요 (사용자에게 치라고 출력 금지):
 
      ```bash
      axhub auth login --resume-last --json
@@ -218,8 +181,6 @@ To handle auth:
      이어서 `axhub auth status --json` 로 검증해서 `authenticated` 면 "로그인됐어요" 라고 알려요. 아직 `pending` / 실패면 "브라우저 승인이 아직 안 끝난 것 같아요. 승인 후 다시 알려주세요" 로 안내하고 한 번 더 resume 해요. device code 가 만료(약 15분)됐으면 Step 5b 부터 새 challenge 를 발급해요. device-flow surface 설계 + resume 계약은 `docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md` 를 참조해요.
 
    어느 경우든 device URL/code 가 보이기 전에 silent 하게 block 하지 않아요 — CLI 가 challenge 를 못 내놓으면 hidden/blocking auth flow 를 임의로 만들지 말고 CLI follow-up gap 으로 멈춰요.
-
-   PreToolUse hook이 step 5a에서 발급한 consent token을 검증해요. 유효하면 OAuth Device Flow가 시작돼요. 만료되거나 없으면 hook이 한국어 메시지와 함께 deny 해요.
 
    After completion, re-run `axhub auth status --json` and render the identity card from step 2.
 
@@ -245,12 +206,9 @@ To handle auth:
    AUTH_PROFILE=$(printf '%s' "$LOGOUT_PREVIEW" | jq -r '.profile // "default"')
    ```
 
-   `would_delete: true` / `profile: <name>` 출력을 사용자에게 한국어 한 줄로 요약 후 (예: "프로필 `default` 의 토큰이 제거돼요") 실제 실행해요. consent 와 실행 명령 모두 concrete profile 로 묶어 `AXHUB_PROFILE` 변경 swap 을 막아요:
+   `would_delete: true` / `profile: <name>` 출력을 사용자에게 한국어 한 줄로 요약 후 (예: "프로필 `default` 의 토큰이 제거돼요") 실제 실행해요. 실행 명령은 concrete profile 로 묶어 `AXHUB_PROFILE` 변경 swap 을 막아요:
 
    ```bash
-   cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"auth_logout","app_id":"","profile":"${AUTH_PROFILE}","branch":"","commit_sha":"","context":{"profile":"${AUTH_PROFILE}"}}
-   JSON
    axhub auth logout --profile "$AUTH_PROFILE"
    ```
 
@@ -268,7 +226,7 @@ To handle auth:
 
    출력의 `id` / `name` / `revoked_at` 을 한국어 한 줄씩 요약. revoked 는 "(폐기됨)" 로 표시.
 
-   8b. **Issue a new PAT** (consent + raw-token 1회 표시):
+   8b. **Issue a new PAT** (preview + raw-token 1회 표시):
 
    ```bash
    PAT_NAME="<descriptive-name>"
@@ -276,9 +234,6 @@ To handle auth:
    PAT_USE="false"        # --use 를 붙이면 true 로 바꿔요
    PAT_NO_SAVE="false"    # --no-save 를 붙이면 true 로 바꿔요
    PAT_SHOW_TOKEN="false" # --show-token 을 붙이면 true 로 바꿔요
-   cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"auth_pat_issue","app_id":"","profile":"","branch":"","commit_sha":"","context":{"name":"${PAT_NAME}","expires_in_days":"${PAT_EXPIRES_IN_DAYS}","use":"${PAT_USE}","no_save":"${PAT_NO_SAVE}","show_token":"${PAT_SHOW_TOKEN}"}}
-   JSON
    axhub auth pat issue --name "$PAT_NAME" --expires-in-days "$PAT_EXPIRES_IN_DAYS" --json
    # 즉시 활성 PAT 으로 사용하려면:
    axhub auth pat issue --name "<n>" --expires-in-days 90 --use --json
@@ -286,7 +241,7 @@ To handle auth:
    axhub auth pat issue --name "<n>" --expires-in-days 90 --no-save --show-token
    ```
 
-   `--use`, `--no-save`, `--show-token` 을 붙이는 변형은 consent context 의 `use` / `no_save` / `show_token` 값을 같은 `true` 로 바꾼 뒤 mint 해요. 저장·출력 동작이 바뀌는 modifier 라서 기본 발급 consent 를 재사용하지 않아요.
+   `--use`, `--no-save`, `--show-token` 을 붙이는 변형은 approval context 의 `use` / `no_save` / `show_token` 값을 같은 `true` 로 바꾼 뒤 확인해요. 저장·출력 동작이 바뀌는 modifier 라서 기본 발급 확인을 재사용하지 않아요.
 
    **raw_token 은 응답 출력에 1회만 나타나요.** SKILL output / chat / log 에 echo 금지 (NEVER 섹션 참고). 사용자에게는 `id` / `fingerprint` / `expires_at` 만 표시. raw 는 keychain 에 저장되거나 `--show-token` 인 경우 stdout 으로 1회 표시되고 그 다음부터 다시 못 봐요.
 
@@ -296,9 +251,6 @@ To handle auth:
    # preview:
    axhub auth pat revoke <pat-id> --json
    # 실제 폐기:
-   cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"auth_pat_revoke","app_id":"","profile":"","branch":"","commit_sha":"","context":{"pat_id":"<pat-id>"}}
-   JSON
    axhub auth pat revoke <pat-id> --execute --json
    ```
 
@@ -318,9 +270,6 @@ To handle auth:
    8d. **Rotate active PAT** (replace + revoke old):
 
    ```bash
-   cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"auth_pat_rotate","app_id":"","profile":"","branch":"","commit_sha":"","context":{"name":"<new-name>","expires_in_days":"90"}}
-   JSON
    axhub auth pat rotate --name "<new-name>" --expires-in-days 90 --json
    ```
 
@@ -330,14 +279,8 @@ To handle auth:
 
    ```bash
    AUTH_PROFILE="${AXHUB_PROFILE:-default}"
-   cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"auth_pat_use","app_id":"","profile":"${AUTH_PROFILE}","branch":"","commit_sha":"","context":{"pat_id":"<pat-id>","profile":"${AUTH_PROFILE}"}}
-   JSON
    axhub auth pat use <pat-id> --profile "$AUTH_PROFILE"
 
-   cat <<JSON | "$HELPER" consent-mint
-   {"tool_call_id":"pending","action":"auth_pat_unset","app_id":"","profile":"${AUTH_PROFILE}","branch":"","commit_sha":"","context":{"target":"active_pat","profile":"${AUTH_PROFILE}"}}
-   JSON
    axhub auth pat unset --profile "$AUTH_PROFILE"            # 활성 PAT 해제
    ```
 
@@ -359,8 +302,7 @@ To handle auth:
 - NEVER persist tokens outside `~/.config/axhub-plugin/token` (0600).
 - NEVER call `axhub auth logout` without confirming via AskUserQuestion (destructive — kills active session). dry-run preview 를 먼저 보여주세요.
 - NEVER call `axhub auth pat revoke` without `--execute` 를 mutate intent 로 가정 안 해요. dry-run 이 기본이라 `--execute` 가 빠지면 backend revoke 발생 안 해요.
-- NEVER call `axhub auth login` without running the stdin JSON `consent-mint` step (step 5a) first — PreToolUse hook이 consent token 없이 deny 해요.
-- NEVER 사용자에게 `axhub auth login` / `axhub auth login --resume-last` (또는 raw resume 명령) 을 터미널이나 `!` 프롬프트로 직접 치라고 안내하지 말아요. 브라우저 승인만 사용자 몫이고, device code resume + token 교환 완료는 에이전트가 `--resume-last` 로 직접 수행해요. 명령 떠넘김은 deploy 의 consent 우회 punt 와 동급 안티패턴이에요.
+- NEVER 사용자에게 `axhub auth login` / `axhub auth login --resume-last` (또는 raw resume 명령) 을 터미널이나 `!` 프롬프트로 직접 치라고 안내하지 말아요. 브라우저 승인만 사용자 몫이고, device code resume + token 교환 완료는 에이전트가 `--resume-last` 로 직접 수행해요. 명령 떠넘김은 deploy 의 approval 우회 punt 와 동급 안티패턴이에요.
 - NEVER OAuth device flow 의 `verification_uri` + `user_code` 를 사용자에게 안 보여주지 않아요. CLI 가 stderr "To continue, visit: …" / "Enter code: …" 줄을 emit 한 직후 한국어로 묶어서 표시.
 
 ## Additional Resources

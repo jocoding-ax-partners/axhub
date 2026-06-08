@@ -95,7 +95,7 @@ echo "$PREFLIGHT_JSON"
 
 4. **동의 후 실행해요.**
 
-   Consent binding 은 `action=deploy_rollback`, `app_id=$APP_ID`, `context={from_deployment}` 로 맞춰요.
+   Approval context 은 `action=deploy_rollback`, `app_id=$APP_ID`, `context={from_deployment}` 로 맞춰요.
 
    ```bash
    axhub deploy rollback --app "$APP_ID" --from-deployment "$DEPLOYMENT_ID" --execute --json

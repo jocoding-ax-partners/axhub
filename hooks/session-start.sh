@@ -137,6 +137,16 @@ if [ -z "${CI:-}" ] && [ -z "${CLAUDE_NON_INTERACTIVE:-}" ]; then
   disown >/dev/null 2>&1 || true
 fi
 
+# CLI binary version-drift fetch (separate channel). Mirrors the plugin fetch but
+# shells `axhub update check --json`, so — unlike the ureq-based plugin fetch — it
+# MUST be guarded by `command -v axhub` (same as auth-refresh-bg). Merging the two
+# fetches into one unguarded fork would hit exit-127 for pre-onboarding users who
+# have not installed the CLI yet. TTL-gated (24h) + honors AXHUB_DISABLE_HOOK=cli-drift.
+if [ -z "${CI:-}" ] && [ -z "${CLAUDE_NON_INTERACTIVE:-}" ] && command -v axhub >/dev/null 2>&1; then
+  nohup "$HELPER" cli-latest-fetch-bg >/dev/null 2>&1 &
+  disown >/dev/null 2>&1 || true
+fi
+
 # Phase 26: warn once when superpowers using-superpowers may conflict with axhub megaskill.
 if [ "${AXHUB_DISABLE_MEGASKILL:-0}" != "1" ] && [ -d "$HOME/.codex/superpowers/skills/using-superpowers" ]; then
   MARKER="${XDG_STATE_HOME:-$HOME/.local/state}/axhub-plugin/megaskill-superpowers-warning"

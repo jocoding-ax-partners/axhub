@@ -1098,7 +1098,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(tables).toContain("Claude Desktop 에서는 AskUserQuestion, Question, 질문 카드 도구를 쓰지 않아요");
     expect(tables).toContain("raw question JSON");
     expect(tables).toContain("workflow`, `워크플로`, skill 이름");
-    expect(tables).toContain("preflight`, `consent-mint`, consent 내부값");
+    expect(tables).toContain("`preflight`, approval context, command name");
     expect(tables).toContain("계정 이메일, raw user id, scope 를 쓰지 말고");
     expect(tables).toContain("SAFE_PREFLIGHT_JSON");
     expect(tables).toContain("표시한 변경만 한 번 실행해요");
@@ -1229,7 +1229,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(deployContent).toContain("Invoke deploy skill");
     expect(deployContent).toContain("Read rest of SKILL");
     expect(deployContent).toContain("Route=axhub");
-    expect(deployContent).toContain("consent token");
+    expect(deployContent).toContain("preview confirmation");
     expect(deployContent).toContain("Korean titles only");
     expect(deployContent).toContain("Before any destructive deploy, show only the Korean preview card");
     expect(deployContent).not.toContain("Observed: axhub deploy/create prompt");
@@ -1285,17 +1285,13 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(appLifecycleContent).toContain('"label":"진행"');
     expect(appLifecycleContent).toContain('"value":"진행"');
     expect(appLifecycleContent).toContain("Pick exactly one branch");
-    expect(appLifecycleContent).toContain("Do not combine the preparation command and the app-changing command");
-    expect(appLifecycleContent).toContain("Between the user's `진행` answer and the first Bash tool call, do not write a visible chat sentence");
-    expect(appLifecycleContent).toContain("Never say `User chose`, `Mint consent`, `execute suspend`");
+    expect(appLifecycleContent).toContain("Pick exactly one branch");
+    expect(appLifecycleContent).toContain("Between the user's `진행` answer and the Bash tool call, do not write a visible chat sentence");
+    expect(appLifecycleContent).toContain("Never say `User chose`, `Confirm approval`, `execute suspend`");
     expect(appLifecycleContent).toContain("literal 앱 인자와 정확히 같아야 해요");
     expect(appLifecycleContent).toContain("not a resolved UUID");
-    expect(appLifecycleContent).toContain("trailing success echo");
-    expect(appLifecycleContent).toContain("consent-mint-app-lifecycle");
-    expect(appLifecycleContent).toContain("--action suspend --app");
-    expect(appLifecycleContent).toContain("--action resume --app");
-    expect(appLifecycleContent).toContain("--action fork --app");
-    expect(appLifecycleContent).toContain('axhub apps suspend "$APP_ARG" --execute --json >/dev/null');
+    expect(appLifecycleContent).toContain("After it succeeds, say exactly one short result sentence");
+        expect(appLifecycleContent).toContain('axhub apps suspend "$APP_ARG" --execute --json >/dev/null');
     expect(appLifecycleContent).toContain('axhub apps resume "$APP_ARG" --execute --json >/dev/null');
     expect(appLifecycleContent).toContain('axhub apps fork "$SOURCE_APP" --slug "$NEW_SLUG" --subdomain "$NEW_SUBDOMAIN" --name "$NAME" --tenant "$TENANT" --execute --json >/dev/null');
     expect(appLifecycleContent).toContain("raw JSON stdout");
@@ -1319,9 +1315,10 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(appLifecycleContent).not.toContain("実行");
   });
 
-  test("auth skill has body referencing consent-mint (US-004 outcome)", () => {
+  test("auth skill uses direct browser login after preview decision", () => {
     const authContent = skillContents.get("auth")!;
-    expect(authContent).toContain("consent-mint");
+    expect(authContent).toContain("Run the login lane directly after the preview decision");
+    expect(authContent).toContain("axhub auth login --force --no-browser");
   });
 
   test("Phase 5 US-505: update skill does NOT force-set AXHUB_DISABLE_AUTOUPDATE=1", () => {
@@ -1331,21 +1328,12 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(updateContent).not.toMatch(/AXHUB_DISABLE_AUTOUPDATE=1\s+axhub/);
   });
 
-  test("skills use stdin JSON consent-mint instead of unsupported flags", () => {
+  test("skills do not reference removed preview approval helper commands", () => {
     for (const [slug, content] of skillContents) {
-      expect(content, slug).not.toMatch(/consent-mint\s+--/);
+      expect(content, slug).not.toContain("approval preview");
+      expect(content, slug).not.toContain("preview-check");
+      expect(content, slug).not.toContain("preview verify");
     }
-    for (const slug of ["deploy", "recover", "auth"]) {
-      const content = skillContents.get(slug)!;
-      // consent-mint pipes stdin JSON into the resolved "$HELPER" (no flags), and
-      // "$HELPER" is resolved robustly (plugin-root → PATH → versioned cache scan)
-      // so an empty CLAUDE_PLUGIN_ROOT in the Bash tool no longer breaks the gate.
-      expect(content, slug).toMatch(/\|\s*"\$HELPER" consent-mint/);
-      expect(content, slug).toMatch(/HELPER="\$\{CLAUDE_PLUGIN_ROOT:\+\$CLAUDE_PLUGIN_ROOT\/bin\/axhub-helpers\}"/);
-    }
-    const appLifecycleContent = skillContents.get("app-lifecycle")!;
-    expect(appLifecycleContent).toContain('"$HELPER" consent-mint-app-lifecycle');
-    expect(appLifecycleContent).not.toMatch(/\|\s*"\$HELPER" consent-mint/);
   });
 
   test("destructive skill consent examples do not require POSIX-only session unsetting", () => {
@@ -1384,19 +1372,16 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
-  test("github skill mints consent before connect/disconnect and avoids manual hook bypass", () => {
+  test("github skill runs connect/disconnect only after explicit approval and avoids manual hook bypass", () => {
     const github = skillContents.get("github")!;
     expect(github).toContain("axhub-helpers");
     expect(github).toContain("axhub-helpers github-summary --user-utterance");
     expect(github).toContain("GitHub 연결 상태를 확인할게요.");
     expect(github).toContain("GitHub 연결 상태 확인");
     expect(github).toContain("Do not run `git remote`");
-    expect(github).toContain('"action":"github_connect"');
-    expect(github).toContain('"branch":"${BRANCH}"');
-    expect(github).toContain('"context":{"repo":"${OWNER_REPO}","branch":"${BRANCH}","account":"${ACCOUNT}"}');
+    expect(github).toContain("preview and explicit approval before connect");
     expect(github).toContain('axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json');
-    expect(github).toContain('"action":"github_disconnect"');
-    expect(github).toContain('"context":{"slug":"${APP_ID_OR_SLUG}"}');
+    expect(github).toContain("disconnect 는 exact confirm 후");
     expect(github).toContain('axhub apps git disconnect --app "$APP_ID" --execute --json');
     expect(github).toContain("PATH 의 `axhub-helpers`");
     expect(github).toContain("GitHub 연결 링크: <install_url>");
@@ -1547,7 +1532,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     }
   });
 
-  test("github skill locks guided repo setup capability ladder and consent gates", () => {
+  test("github skill locks guided repo setup capability ladder and preview gates", () => {
     const github = skillContents.get("github")!;
     expect(github).toContain("Strict guided capability ladder");
     expect(github).toContain("read-only git inspect");
@@ -1609,7 +1594,7 @@ describe("cross-manifest consistency", () => {
       const content = await readFile(join(REPO_ROOT, relPath), "utf8");
       expect(content, relPath).not.toContain("AXHUB_TOKEN_FILE");
       expect(content, relPath).not.toContain("--token-file");
-      expect(content, relPath).not.toMatch(/consent-mint\s+--/);
+      expect(content, relPath).not.toMatch(/preview approval\s+--/);
     }
   });
 
@@ -1637,7 +1622,7 @@ describe("cross-manifest consistency", () => {
 
   test("hooks.json command paths reference existing helper subcommands or shim", () => {
     const knownSubcommands = new Set([
-      "session-start", "preauth-check", "consent-mint", "consent-verify",
+      "session-start",
       "resolve", "preflight", "classify-exit", "redact", "version", "help",
       "list-deployments", "prompt-route", "token-init", "token-import",
       "commit-gate", "test-classifier", "tdd-inject", "state-update",

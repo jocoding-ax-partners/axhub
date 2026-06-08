@@ -5,29 +5,27 @@ import { join } from "node:path";
 const root = join(import.meta.dir, "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 
-describe("apps delete consent UX contract", () => {
-  test("apps create slug path binds app_id and context slug before mutation", () => {
+describe("apps delete explicit-confirmation UX contract", () => {
+  test("apps create slug path keeps preview confirmation before mutation", () => {
     const skill = read("skills/apps/SKILL.md");
     const registry = JSON.parse(read("tests/fixtures/ask-defaults/registry.json"));
 
     expect(skill).toContain("앱을 만들까요?");
-    expect(skill).toContain('action:"apps_create"');
-    expect(skill).toContain("app_id:$slug");
-    expect(skill).toContain("context:{slug:$slug,source:\"inline\"}");
+    expect(skill).toContain("AskUserQuestion preview plus explicit confirmation");
     expect(skill).toContain('axhub apps create --name "$NAME" --slug "$SLUG" --json');
     expect(skill).toContain("one mutation command per Bash tool call");
     expect(registry.apps["앱을 만들까요?"]?.safe_default).toBe("abort");
   });
 
-  test("apps skill binds one command target across preview, token, and delete command", () => {
+  test("apps skill binds one command target across preview and delete command", () => {
     const skill = read("skills/apps/SKILL.md");
 
     expect(skill).toContain("COMMAND_TARGET");
-    expect(skill).toContain('app_id":"$COMMAND_TARGET"');
-    expect(skill).toContain('"slug":"$COMMAND_TARGET"');
+    expect(skill).toContain("read-only data");
+    expect(skill).toContain("use only `COMMAND_TARGET`");
     expect(skill).toContain('axhub apps delete "$COMMAND_TARGET" --execute --json');
     expect(skill).not.toContain('axhub apps delete "$APP" --dry-run --json');
-    expect(skill).toContain("context.slug");
+    expect(skill).toContain("Keep `COMMAND_TARGET` identical");
   });
 
   test("delete confirmation has a non-interactive abort default", () => {

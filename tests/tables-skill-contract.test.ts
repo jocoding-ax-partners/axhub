@@ -71,32 +71,25 @@ describe("vibe gap-fill SKILL contracts", () => {
     expect(skill).toContain("먼저 대상 app/table/columns preview 를 보여주고");
   });
 
-  test("tables mutation flow mints consent separately before destructive commands", () => {
+  test("tables mutation flow keeps read-only preview separate from destructive commands", () => {
     const skill = read("skills/tables/SKILL.md");
     const bashBlocks = [...skill.matchAll(/```bash\n([\s\S]*?)```/g)].map((match) => match[1]);
 
     expect(skill).toContain("승인 전에는 아래 read-only 명령만 실행해요");
     expect(skill).toContain("preview 용으로도 실행하지 않아요");
-    expect(skill).toContain("tool_call_id:\"pending\",action:\"tables_create\"");
-    expect(skill).toContain("tool_call_id:\"pending\",action:\"tables_columns_add\"");
-    expect(skill).toContain("tool_call_id:\"pending\",action:\"data_insert\"");
-    expect(skill).toContain("destructive command 를 같은 Bash block 에 섞지 않아요");
-    expect(bashBlocks.some((block) => block.includes("consent-mint"))).toBe(true);
+    expect(skill).toContain("Run exactly one mutation command after approval");
+    expect(skill).not.toContain("approval preview");
     expect(bashBlocks.some((block) => block.includes('axhub tables create "$TABLE"'))).toBe(true);
-    expect(
-      bashBlocks.some((block) => block.includes("consent-mint") && block.includes("axhub tables create")),
-    ).toBe(false);
+    expect(bashBlocks.some((block) => block.includes("axhub tables create"))).toBe(true);
   });
 
-  test("publish skill separates consent mint from destructive publish execution", () => {
+  test("publish skill separates preview confirmation from destructive publish execution", () => {
     const skill = read("skills/publish/SKILL.md");
     const bashBlocks = [...skill.matchAll(/```bash\n([\s\S]*?)```/g)].map((match) => match[1]);
 
     expect(skill).toContain("다음 Bash 호출에서만 destructive publish 를 실행해요");
-    expect(bashBlocks.some((block) => block.includes("consent-mint"))).toBe(true);
+    expect(skill).not.toContain("approval preview");
     expect(bashBlocks.some((block) => block.includes('axhub publish --app "$APP"'))).toBe(true);
-    expect(
-      bashBlocks.some((block) => block.includes("consent-mint") && block.includes("axhub publish")),
-    ).toBe(false);
+    expect(skill).toContain("비대화형에서 자동 제출하지 않아요");
   });
 });

@@ -76,15 +76,15 @@ To manage profiles:
    axhub profile add "$NAME" --endpoint "$ENDPOINT" --json
    ```
 
-   allowlist 밖 endpoint 면 위험을 설명하고 exact confirm 을 받아요. `consent-mint` 에 `action=profile_add`, `context={profile,endpoint}` 를 넣어요.
+   allowlist 밖 endpoint 면 위험을 설명하고 exact confirm 을 받아요. allowlist 밖 endpoint 는 실행 전에 한 번 더 preview 로 확인해요.
 
-5. **use 는 consent 후 실행해요.**
+5. **use 는 명시 확인 후 실행해요.**
 
    ```bash
    axhub profile use "$NAME" --json
    ```
 
-   `consent-mint` 에 `action=profile_use`, `context={profile}` 를 넣어요.
+   프로필 전환 대상 이름을 preview 에 다시 표시해요.
 
 ## NEVER
 

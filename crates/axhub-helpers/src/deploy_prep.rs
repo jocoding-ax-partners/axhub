@@ -313,12 +313,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-
     use super::*;
     use crate::list_deployments::InFlightDeploy;
-
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     fn make_result(github_connected: bool) -> DeployPrepResult {
         DeployPrepResult {
@@ -434,7 +430,7 @@ mod tests {
     /// Kill switch `AXHUB_DEPLOY_IN_FLIGHT_CHECK=0` must force in_flight_deploy to None.
     #[test]
     fn kill_switch_disables_in_flight_check() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _g = crate::PROCESS_ENV_LOCK.lock().unwrap();
         std::env::set_var(ENV_IN_FLIGHT_KILL_SWITCH, "0");
 
         let mut result = make_result(true);
@@ -452,7 +448,7 @@ mod tests {
     /// exercises the atomic rename path (.tmp → final).
     #[test]
     fn save_cache_load_cache_roundtrip() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _g = crate::PROCESS_ENV_LOCK.lock().unwrap();
         let tmpdir = std::env::temp_dir().join(format!(
             "axhub-test-cache-{}",
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
@@ -484,7 +480,7 @@ mod tests {
     /// load_cache returns None when the cache file is missing or corrupt.
     #[test]
     fn load_cache_returns_none_on_missing_and_corrupt() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _g = crate::PROCESS_ENV_LOCK.lock().unwrap();
         let tmpdir = std::env::temp_dir().join(format!(
             "axhub-test-cache-corrupt-{}",
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
