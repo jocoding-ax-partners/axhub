@@ -28,9 +28,14 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
     command.env_remove("AXHUB_DISABLE_HOOK");
     command.env_remove("DISABLE_AXHUB");
 
-    // Sandbox audit + telemetry writes for prompt-route.
+    // Sandbox audit + telemetry writes for prompt-route. Both XDG_STATE_HOME and
+    // XDG_CACHE_HOME are isolated so prompt-route never reads the developer's real
+    // plugin-latest.json / cli-latest.json (which would inject a real drift nudge
+    // and falsify systemMessage assertions).
     let state_dir = tempfile::tempdir().unwrap();
+    let cache_dir = tempfile::tempdir().unwrap();
     command.env("XDG_STATE_HOME", state_dir.path());
+    command.env("XDG_CACHE_HOME", cache_dir.path());
     command.env("AXHUB_NO_AUDIT", "1");
 
     for (k, v) in envs {
@@ -299,15 +304,18 @@ fn plugin_drift_kill_switch_suppresses_nudge() {
 // opt-out, and kill switch (AXHUB_DISABLE_HOOK=cli-drift). Verifies the turn-cap
 // (plugin priority) and the update-check-intent suppression (E3 / CE-3).
 
-fn run_prompt_route_with_caches(
+// Seed caches into the given dirs and run prompt-route once. Taking the dir
+// paths (not fresh TempDirs) lets a caller drive multiple turns that SHARE state
+// — required to exercise the cross-turn marker yield (plugin turn 1 → CLI turn 2).
+fn run_prompt_route_in(
+    cache_root: &std::path::Path,
+    state_root: &std::path::Path,
     plugin_latest: Option<&str>,
     cli_cache: Option<&str>,
     prompt: &str,
     extra_env: &[(&str, &str)],
 ) -> Output {
-    let cache_dir = tempfile::tempdir().unwrap();
-    let state_dir = tempfile::tempdir().unwrap();
-    let plugin_cache = cache_dir.path().join("axhub-plugin");
+    let plugin_cache = cache_root.join("axhub-plugin");
     std::fs::create_dir_all(&plugin_cache).unwrap();
     if let Some(latest) = plugin_latest {
         std::fs::write(
@@ -331,8 +339,8 @@ fn run_prompt_route_with_caches(
     command.env_remove("DISABLE_AXHUB");
     command.env_remove("CI");
     command.env_remove("CLAUDE_NON_INTERACTIVE");
-    command.env("XDG_CACHE_HOME", cache_dir.path());
-    command.env("XDG_STATE_HOME", state_dir.path());
+    command.env("XDG_CACHE_HOME", cache_root);
+    command.env("XDG_STATE_HOME", state_root);
     command.env("AXHUB_NO_AUDIT", "1");
     for (k, v) in extra_env {
         command.env(k, v);
@@ -341,6 +349,24 @@ fn run_prompt_route_with_caches(
     let payload = format!(r#"{{"prompt":"{prompt}"}}"#);
     let _ = child.stdin.as_mut().unwrap().write_all(payload.as_bytes());
     child.wait_with_output().unwrap()
+}
+
+fn run_prompt_route_with_caches(
+    plugin_latest: Option<&str>,
+    cli_cache: Option<&str>,
+    prompt: &str,
+    extra_env: &[(&str, &str)],
+) -> Output {
+    let cache_dir = tempfile::tempdir().unwrap();
+    let state_dir = tempfile::tempdir().unwrap();
+    run_prompt_route_in(
+        cache_dir.path(),
+        state_dir.path(),
+        plugin_latest,
+        cli_cache,
+        prompt,
+        extra_env,
+    )
 }
 
 fn fresh_cli_cache(has_update: bool, disabled: bool) -> String {
@@ -352,8 +378,7 @@ fn fresh_cli_cache(has_update: bool, disabled: bool) -> String {
 
 #[test]
 fn cli_drift_nudge_fires_when_cli_update_cached() {
-    let out =
-        run_prompt_route_with_caches(None, Some(&fresh_cli_cache(true, false)), "hello", &[]);
+    let out = run_prompt_route_with_caches(None, Some(&fresh_cli_cache(true, false)), "hello", &[]);
     assert!(out.status.success());
     let s = stdout(&out);
     let json: serde_json::Value = serde_json::from_str(&s).unwrap();
@@ -391,8 +416,7 @@ fn cli_drift_kill_switch_suppresses_nudge() {
 
 #[test]
 fn cli_drift_suppressed_when_cli_autoupdate_disabled() {
-    let out =
-        run_prompt_route_with_caches(None, Some(&fresh_cli_cache(true, true)), "hello", &[]);
+    let out = run_prompt_route_with_caches(None, Some(&fresh_cli_cache(true, true)), "hello", &[]);
     assert!(out.status.success());
     let s = stdout(&out);
     assert!(
@@ -439,5 +463,50 @@ fn cli_drift_suppressed_when_prompt_is_update_check_intent() {
     assert!(
         !s.contains("axhub CLI 새 버전"),
         "update-check intent must suppress the proactive CLI nudge, got: {s}"
+    );
+}
+
+#[test]
+fn turn_cap_yields_across_turns_plugin_turn1_then_cli_turn2() {
+    // Proves the "no cross-turn state needed" claim: with BOTH channels drifting
+    // and a SHARED state dir (markers persist), turn 1 fires plugin (writes its
+    // per-version marker), turn 2 sees the plugin marker → plugin None → CLI
+    // fires. The per-version marker is the only yield mechanism.
+    let cache_dir = tempfile::tempdir().unwrap();
+    let state_dir = tempfile::tempdir().unwrap();
+    let cli = fresh_cli_cache(true, false);
+
+    let turn1 = stdout(&run_prompt_route_in(
+        cache_dir.path(),
+        state_dir.path(),
+        Some("99.0.0"),
+        Some(&cli),
+        "hello",
+        &[],
+    ));
+    assert!(
+        turn1.contains("플러그인 새 버전"),
+        "turn 1 = plugin, got: {turn1}"
+    );
+    assert!(
+        !turn1.contains("axhub CLI 새 버전"),
+        "turn 1 must NOT also fire CLI (1-nudge cap), got: {turn1}"
+    );
+
+    let turn2 = stdout(&run_prompt_route_in(
+        cache_dir.path(),
+        state_dir.path(),
+        Some("99.0.0"),
+        Some(&cli),
+        "hello",
+        &[],
+    ));
+    assert!(
+        !turn2.contains("플러그인 새 버전"),
+        "turn 2 plugin must be deduped by its marker, got: {turn2}"
+    );
+    assert!(
+        turn2.contains("axhub CLI 새 버전"),
+        "turn 2 = CLI yields in after plugin marker, got: {turn2}"
     );
 }

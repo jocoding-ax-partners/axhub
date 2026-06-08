@@ -1900,7 +1900,8 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     // naturally yields the slot to CLI on the next turn (no cross-turn state
     // needed). Suppressed when the prompt is already an update-check intent (the
     // reactive update-summary path owns that turn). Fail-open.
-    let cli_drift_system = if plugin_drift_system.is_none() && !update_check_intent_present(prompt) {
+    let cli_drift_system = if plugin_drift_system.is_none() && !update_check_intent_present(prompt)
+    {
         if let Some(nudge) = axhub_helpers::cli_drift::cli_drift_nudge() {
             context.push_str("\n\n");
             context.push_str(&nudge.additional_context);

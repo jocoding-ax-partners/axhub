@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::axhub_cli::run_axhub;
 use crate::hook_safety::is_hook_disabled;
-use crate::plugin_update::{is_non_interactive, normalize_tag, now_unix};
+use crate::plugin_update::{is_newer, is_non_interactive, normalize_tag, now_unix};
 use crate::runtime_paths::{
     cli_drift_nudge_marker_path, cli_drift_optout_path, cli_latest_cache_path,
 };
@@ -147,6 +147,20 @@ fn cli_should_nudge(
     }
     if !cache.has_update {
         return false; // backend says current (authoritative)
+    }
+    // Defense in depth: `has_update` is the backend's authoritative signal for
+    // *whether* an update exists, but we still require `latest` to be a
+    // well-formed version strictly newer than the CLI's OWN `current` before it
+    // flows into a marker filename and user-facing text. This rejects a
+    // malformed / empty / equal / backwards `latest` (a backend inconsistency,
+    // or a corrupted / hand-edited cache) that would otherwise (a) defeat the
+    // per-version marker — `fs::write` of a filesystem-hostile or over-long
+    // filename fails silently, so the nudge would re-fire every turn — or
+    // (b) inject multi-line content into the user-facing systemMessage. NOTE:
+    // this compares the CLI's own current↔latest (the correct baseline), NOT the
+    // plugin-version comparison the CE-1 review removed.
+    if !is_newer(&cache.latest, &cache.current) {
+        return false;
     }
     if marker_exists {
         return false; // already nudged for this version
@@ -269,7 +283,13 @@ mod tests {
     use super::*;
     use std::ffi::OsString;
 
-    fn cache(current: &str, latest: &str, has_update: bool, disabled: bool, at: u64) -> CliLatestCache {
+    fn cache(
+        current: &str,
+        latest: &str,
+        has_update: bool,
+        disabled: bool,
+        at: u64,
+    ) -> CliLatestCache {
         CliLatestCache {
             current: current.to_string(),
             latest: latest.to_string(),
@@ -333,14 +353,66 @@ mod tests {
     }
 
     #[test]
-    fn nudge_decision_uses_backend_has_update_not_semver() {
-        // latest < current numerically, but backend says has_update=true → still nudge.
-        // (Proves we trust backend has_update, not a local is_newer recompute.)
-        let weird = cache("0.18.5", "0.18.2", true, false, 1000);
-        assert!(cli_should_nudge(Some(&weird), 1000, false, false, false));
-        // backend says no update even though latest > current numerically → no nudge.
+    fn nudge_requires_backend_has_update_and_a_strictly_newer_latest() {
+        // Backend `has_update=false` is authoritative for the NO case — never
+        // nudge, even if latest > current numerically.
         let no = cache("0.18.1", "0.18.9", false, false, 1000);
         assert!(!cli_should_nudge(Some(&no), 1000, false, false, false));
+        // Backend `has_update=true` but `latest` is NOT strictly newer than the
+        // CLI's own `current` (backwards / equal) → suppressed as a defense-in-
+        // depth sanity gate (CLI current↔latest, not the plugin-version CE-1 trap).
+        let backwards = cache("0.18.5", "0.18.2", true, false, 1000);
+        assert!(!cli_should_nudge(
+            Some(&backwards),
+            1000,
+            false,
+            false,
+            false
+        ));
+        let equal = cache("0.18.2", "0.18.2", true, false, 1000);
+        assert!(!cli_should_nudge(Some(&equal), 1000, false, false, false));
+        // has_update=true AND strictly newer → fire.
+        let real = cache("0.18.1", "0.18.2", true, false, 1000);
+        assert!(cli_should_nudge(Some(&real), 1000, false, false, false));
+    }
+
+    #[test]
+    fn nudge_suppressed_for_malformed_or_hostile_latest() {
+        // These would otherwise (a) defeat the per-version marker — fs::write of a
+        // hostile/over-long filename fails silently → re-fire every turn — or
+        // (b) inject multi-line content into the user-facing systemMessage.
+        // The is_newer gate rejects every non-semver `latest` before it is used.
+        let bad = |latest: &str| cache("0.18.1", latest, true, false, 1000);
+        assert!(!cli_should_nudge(Some(&bad("")), 1000, false, false, false)); // empty → "v → v"
+        assert!(!cli_should_nudge(
+            Some(&bad("0.18.2\ninjected")),
+            1000,
+            false,
+            false,
+            false
+        )); // newline injection
+        assert!(!cli_should_nudge(
+            Some(&bad("0.18.2\0evil")),
+            1000,
+            false,
+            false,
+            false
+        )); // NUL → marker write fails
+        let overlong = "9.".repeat(300); // > NAME_MAX → ENAMETOOLONG on marker write
+        assert!(!cli_should_nudge(
+            Some(&bad(&overlong)),
+            1000,
+            false,
+            false,
+            false
+        ));
+        assert!(!cli_should_nudge(
+            Some(&bad("garbage")),
+            1000,
+            false,
+            false,
+            false
+        ));
     }
 
     // ── parse fail-open ──
@@ -498,11 +570,23 @@ mod tests {
         let state_dir = tempfile::tempdir().unwrap();
         std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
         std::env::set_var("XDG_STATE_HOME", state_dir.path());
-        write_cache(&cache("0.18.1", "0.18.1", false, false, now_unix() - CACHE_TTL_SECS - 1))
-            .unwrap();
+        write_cache(&cache(
+            "0.18.1",
+            "0.18.1",
+            false,
+            false,
+            now_unix() - CACHE_TTL_SECS - 1,
+        ))
+        .unwrap();
 
         assert_eq!(
-            cmd_cli_latest_fetch_bg_with(|| Some(cache("0.18.1", "0.18.2", true, false, now_unix()))),
+            cmd_cli_latest_fetch_bg_with(|| Some(cache(
+                "0.18.1",
+                "0.18.2",
+                true,
+                false,
+                now_unix()
+            ))),
             0
         );
         let refreshed = read_cache().unwrap();
@@ -535,7 +619,10 @@ mod tests {
         write_cache(&cache("0.18.1", "0.18.2", true, false, 12345)).unwrap();
 
         let path = cli_latest_cache_path().unwrap();
-        assert_eq!(read_cache(), Some(cache("0.18.1", "0.18.2", true, false, 12345)));
+        assert_eq!(
+            read_cache(),
+            Some(cache("0.18.1", "0.18.2", true, false, 12345))
+        );
         assert!(path.exists());
         assert!(
             !path.with_extension("json.tmp").exists(),
@@ -563,6 +650,52 @@ mod tests {
     }
 
     #[test]
+    fn cli_drift_nudge_none_and_no_refire_for_hostile_cache_latest() {
+        // A cache (corrupt / hand-edited / buggy backend) with has_update=true but
+        // an over-long `latest` must NOT nudge, must NOT panic, and must NOT
+        // re-fire: the is_newer gate suppresses it before the marker-write path.
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        let overlong = "9.".repeat(300);
+        write_cache(&cache("0.18.1", &overlong, true, false, now_unix())).unwrap();
+
+        assert!(cli_drift_nudge().is_none(), "hostile latest must not nudge");
+        // No marker leaked, and a second turn is still None (no re-fire loop).
+        assert!(
+            cli_drift_nudge().is_none(),
+            "still suppressed next turn (no re-fire)"
+        );
+        assert!(
+            cli_drift_nudge_marker_path(&overlong)
+                .map(|p| !p.exists())
+                .unwrap_or(true),
+            "no junk marker written for hostile latest"
+        );
+    }
+
+    #[test]
+    fn cli_drift_nudge_none_on_truncated_cache_file() {
+        // Hostile/truncated cache content → read_cache swallows the parse error →
+        // None, exit-0 contract, no panic.
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        let path = cli_latest_cache_path().unwrap();
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, br#"{"current":"0.18.1","latest":"0.1"#).unwrap(); // truncated
+
+        assert!(read_cache().is_none());
+        assert!(cli_drift_nudge().is_none());
+    }
+
+    #[test]
     fn cli_drift_nudge_none_when_disabled_cache() {
         let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
         let _env = EnvGuard::clear();
@@ -587,7 +720,10 @@ mod tests {
 
         assert_eq!(cmd_cli_drift_optout(), 0);
         assert!(cli_drift_optout_path().unwrap().exists());
-        assert!(cli_drift_nudge().is_none(), "opt-out suppresses every version");
+        assert!(
+            cli_drift_nudge().is_none(),
+            "opt-out suppresses every version"
+        );
     }
 
     #[test]

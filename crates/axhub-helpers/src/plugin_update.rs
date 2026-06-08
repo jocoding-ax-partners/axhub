@@ -65,7 +65,7 @@ pub(crate) fn normalize_tag(tag: &str) -> String {
 
 /// `true` when `latest` is a strictly newer semver than `current`. Unparseable
 /// input yields `false` (fail-open: never nudge on garbage).
-fn is_newer(latest: &str, current: &str) -> bool {
+pub(crate) fn is_newer(latest: &str, current: &str) -> bool {
     match (
         semver::Version::parse(latest),
         semver::Version::parse(current),
