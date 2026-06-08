@@ -188,6 +188,8 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "auth-refresh-bg" => cmd_auth_refresh_bg(),
         "plugin-latest-fetch-bg" => Ok(axhub_helpers::plugin_update::cmd_plugin_latest_fetch_bg()),
         "plugin-drift-optout" => Ok(axhub_helpers::plugin_update::cmd_plugin_drift_optout()),
+        "cli-latest-fetch-bg" => Ok(axhub_helpers::cli_drift::cmd_cli_latest_fetch_bg()),
+        "cli-drift-optout" => Ok(axhub_helpers::cli_drift::cmd_cli_drift_optout()),
         // verify/trace/doctor: US2 typed (cli::Commands) — legacy arm 제거.
         // settings-merge: US2 typed (cli::Commands::SettingsMerge) — legacy arm 제거.
         // autowire-statusline: US1 typed (cli::Commands::AutowireStatusline) — legacy arm 제거.
@@ -1893,6 +1895,23 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         } else {
             None
         };
+    // Proactive CLI binary version-drift nudge. Turn-cap: at most one update
+    // nudge per turn — plugin takes priority, and its per-version marker
+    // naturally yields the slot to CLI on the next turn (no cross-turn state
+    // needed). Suppressed when the prompt is already an update-check intent (the
+    // reactive update-summary path owns that turn). Fail-open.
+    let cli_drift_system = if plugin_drift_system.is_none() && !update_check_intent_present(prompt) {
+        if let Some(nudge) = axhub_helpers::cli_drift::cli_drift_nudge() {
+            context.push_str("\n\n");
+            context.push_str(&nudge.additional_context);
+            Some(nudge.system_message)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let drift_system = plugin_drift_system.or(cli_drift_system);
     let intent_system = if dynamic_table_intent_present(prompt) {
         Some("이 요청은 AXHub hosted app 의 테이블 생성/컬럼/행/권한 변경 요청이에요. 로컬 앱 코드, local database, server.js, package.json, ORM, .env, SQL migration, QA 결과 파일, plugin source 를 읽지 않아요. visible chat 첫 문장은 정확히 \"테이블 변경 내용을 확인할게요.\" 로만 말해요. 그 다음 문장도 내부 경로를 설명하지 말고 로그인 상태, 현재 앱, 대상 테이블, 컬럼 타입을 확인하겠다고만 자연스럽게 말해요. Bash title 은 `로그인 상태 확인`, `테이블 상태 확인`, `테이블 변경 준비`, `테이블 변경 실행` 같은 한국어만 써요. create/drop/column/row/grant 변경은 대상 앱, 테이블, 작업, 컬럼/행 요약을 한국어로 보여주고 사용자가 명시적으로 승인하기 전에는 실행하지 않아요. visible preview 에 raw CLI command line 을 쓰지 말고, 실제 명령은 승인 후 Bash tool call 안에서만 실행해요. Claude Desktop 에서는 AskUserQuestion, Question, 질문 카드 도구를 쓰지 말고 일반 채팅으로 `이대로 만들까요? 진행 또는 취소라고 답해 주세요.` 라고 묻고 멈춰요. 다음 사용자 답변이 `진행`이면 승인된 것으로 보고 바로 `테이블 변경 준비`, `테이블 변경 실행` 순서로 이어가요. 사용자에게 route label, slash command, skill name, workflow/워크플로, preflight, consent-mint, consent internals, command name, raw command line, raw question JSON, raw JSON, raw email, raw id, raw app slug, local file contents, repo inspection, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id, scope 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
     } else if connectors_intent_present(prompt) {
@@ -1978,10 +1997,10 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
         context.push_str("\n\n");
         context.push_str(intent);
     }
-    let system_message = match (grace, plugin_drift_system) {
-        (Some(grace), Some(plugin)) => Some(format!("{grace}\n\n{plugin}")),
+    let system_message = match (grace, drift_system) {
+        (Some(grace), Some(drift)) => Some(format!("{grace}\n\n{drift}")),
         (Some(grace), None) => Some(grace.to_string()),
-        (None, Some(plugin)) => Some(plugin),
+        (None, Some(drift)) => Some(drift),
         (None, None) => None,
     };
     println!(

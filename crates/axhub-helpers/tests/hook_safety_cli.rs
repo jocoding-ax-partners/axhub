@@ -291,3 +291,153 @@ fn plugin_drift_kill_switch_suppresses_nudge() {
         "AXHUB_DISABLE_HOOK=plugin-drift must suppress the nudge, got: {s}"
     );
 }
+
+// --- cli-drift (proactive CLI binary update nudge) ------------------------
+//
+// End-to-end: seed a fresh `cli-latest.json` (backend has_update=true), then run
+// prompt-route. Separate channel from plugin-drift — its own cache file, marker,
+// opt-out, and kill switch (AXHUB_DISABLE_HOOK=cli-drift). Verifies the turn-cap
+// (plugin priority) and the update-check-intent suppression (E3 / CE-3).
+
+fn run_prompt_route_with_caches(
+    plugin_latest: Option<&str>,
+    cli_cache: Option<&str>,
+    prompt: &str,
+    extra_env: &[(&str, &str)],
+) -> Output {
+    let cache_dir = tempfile::tempdir().unwrap();
+    let state_dir = tempfile::tempdir().unwrap();
+    let plugin_cache = cache_dir.path().join("axhub-plugin");
+    std::fs::create_dir_all(&plugin_cache).unwrap();
+    if let Some(latest) = plugin_latest {
+        std::fs::write(
+            plugin_cache.join("plugin-latest.json"),
+            format!(r#"{{"latest":"{latest}","fetched_at":{}}}"#, now_secs()),
+        )
+        .unwrap();
+    }
+    if let Some(cli_json) = cli_cache {
+        std::fs::write(plugin_cache.join("cli-latest.json"), cli_json).unwrap();
+    }
+
+    let mut command = Command::new(bin());
+    command
+        .args(["prompt-route"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    command.env_remove("AXHUB_DISABLE_HOOKS");
+    command.env_remove("AXHUB_DISABLE_HOOK");
+    command.env_remove("DISABLE_AXHUB");
+    command.env_remove("CI");
+    command.env_remove("CLAUDE_NON_INTERACTIVE");
+    command.env("XDG_CACHE_HOME", cache_dir.path());
+    command.env("XDG_STATE_HOME", state_dir.path());
+    command.env("AXHUB_NO_AUDIT", "1");
+    for (k, v) in extra_env {
+        command.env(k, v);
+    }
+    let mut child = command.spawn().unwrap();
+    let payload = format!(r#"{{"prompt":"{prompt}"}}"#);
+    let _ = child.stdin.as_mut().unwrap().write_all(payload.as_bytes());
+    child.wait_with_output().unwrap()
+}
+
+fn fresh_cli_cache(has_update: bool, disabled: bool) -> String {
+    format!(
+        r#"{{"current":"0.18.1","latest":"0.18.2","has_update":{has_update},"disabled":{disabled},"fetched_at":{}}}"#,
+        now_secs()
+    )
+}
+
+#[test]
+fn cli_drift_nudge_fires_when_cli_update_cached() {
+    let out =
+        run_prompt_route_with_caches(None, Some(&fresh_cli_cache(true, false)), "hello", &[]);
+    assert!(out.status.success());
+    let s = stdout(&out);
+    let json: serde_json::Value = serde_json::from_str(&s).unwrap();
+    let ctx = json["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .unwrap();
+    let msg = json["systemMessage"].as_str().unwrap();
+    assert!(
+        ctx.contains("CLI 새 버전 알림")
+            && ctx.contains("update 스킬")
+            && ctx.contains("cli-drift-optout"),
+        "expected CLI drift nudge in additionalContext, got: {s}"
+    );
+    assert!(
+        msg.contains("axhub CLI 새 버전이 나왔어요"),
+        "expected user-facing CLI drift systemMessage, got: {s}"
+    );
+}
+
+#[test]
+fn cli_drift_kill_switch_suppresses_nudge() {
+    let out = run_prompt_route_with_caches(
+        None,
+        Some(&fresh_cli_cache(true, false)),
+        "hello",
+        &[("AXHUB_DISABLE_HOOK", "cli-drift")],
+    );
+    assert!(out.status.success());
+    let s = stdout(&out);
+    assert!(
+        !s.contains("axhub CLI 새 버전"),
+        "AXHUB_DISABLE_HOOK=cli-drift must suppress the nudge, got: {s}"
+    );
+}
+
+#[test]
+fn cli_drift_suppressed_when_cli_autoupdate_disabled() {
+    let out =
+        run_prompt_route_with_caches(None, Some(&fresh_cli_cache(true, true)), "hello", &[]);
+    assert!(out.status.success());
+    let s = stdout(&out);
+    assert!(
+        !s.contains("axhub CLI 새 버전"),
+        "disabled:true (AXHUB_DISABLE_AUTOUPDATE) must suppress the nudge, got: {s}"
+    );
+}
+
+#[test]
+fn turn_cap_plugin_priority_suppresses_cli_when_both_drift() {
+    // Both channels have a fresh, newer cache → only ONE nudge fires this turn.
+    // Plugin takes priority; CLI yields (its per-version marker stays unwritten,
+    // so it fires on a later turn once plugin's marker suppresses the plugin nudge).
+    let out = run_prompt_route_with_caches(
+        Some("99.0.0"),
+        Some(&fresh_cli_cache(true, false)),
+        "hello",
+        &[],
+    );
+    assert!(out.status.success());
+    let s = stdout(&out);
+    assert!(
+        s.contains("플러그인 새 버전"),
+        "plugin nudge should win the single turn slot, got: {s}"
+    );
+    assert!(
+        !s.contains("axhub CLI 새 버전"),
+        "CLI nudge must be suppressed when plugin fires (1-nudge turn cap), got: {s}"
+    );
+}
+
+#[test]
+fn cli_drift_suppressed_when_prompt_is_update_check_intent() {
+    // The reactive update-check path owns the turn when the user is already
+    // asking about updates — the proactive CLI nudge must not double up.
+    let out = run_prompt_route_with_caches(
+        None,
+        Some(&fresh_cli_cache(true, false)),
+        "업데이트 확인해줘",
+        &[],
+    );
+    assert!(out.status.success());
+    let s = stdout(&out);
+    assert!(
+        !s.contains("axhub CLI 새 버전"),
+        "update-check intent must suppress the proactive CLI nudge, got: {s}"
+    );
+}

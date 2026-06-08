@@ -69,6 +69,26 @@ pub fn plugin_drift_optout_path() -> Option<PathBuf> {
     state_dir().map(|dir| dir.join("plugin-drift-optout"))
 }
 
+/// TTL cache for the last `axhub update check --json` result (CLI binary drift).
+/// `$XDG_CACHE_HOME/axhub-plugin/cli-latest.json`. Written atomically by the
+/// `cli-latest-fetch-bg` background fetch, read by the prompt-route CLI nudge.
+/// Sibling of `plugin_latest_cache_path` — separate channel, separate file.
+pub fn cli_latest_cache_path() -> Option<PathBuf> {
+    cache_base_dir().map(|base| base.join("axhub-plugin").join("cli-latest.json"))
+}
+
+/// Per-version CLI-drift-nudge marker. Presence means the CLI update nudge for
+/// `version` already fired (once-per-version dedup).
+pub fn cli_drift_nudge_marker_path(version: &str) -> Option<PathBuf> {
+    state_dir().map(|dir| dir.join(format!(".cli-drift-nudged-v{version}")))
+}
+
+/// Permanent CLI-drift opt-out marker ("그만 볼래요"). Presence suppresses the
+/// CLI update nudge for every version. Independent of the plugin opt-out.
+pub fn cli_drift_optout_path() -> Option<PathBuf> {
+    state_dir().map(|dir| dir.join("cli-drift-optout"))
+}
+
 fn config_base_dir() -> Option<PathBuf> {
     config_base_dir_from(env_path("XDG_CONFIG_HOME"), home_dir())
 }

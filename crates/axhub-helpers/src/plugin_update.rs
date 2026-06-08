@@ -45,7 +45,7 @@ pub struct LatestCache {
     pub fetched_at: u64,
 }
 
-fn now_unix() -> u64 {
+pub(crate) fn now_unix() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -59,7 +59,7 @@ fn current_version() -> &'static str {
 }
 
 /// Strip a leading `v` and surrounding whitespace from a release tag.
-fn normalize_tag(tag: &str) -> String {
+pub(crate) fn normalize_tag(tag: &str) -> String {
     tag.trim().trim_start_matches('v').to_string()
 }
 
@@ -109,7 +109,7 @@ fn optout_present() -> bool {
         .unwrap_or(false)
 }
 
-fn is_non_interactive() -> bool {
+pub(crate) fn is_non_interactive() -> bool {
     std::env::var_os("CI").is_some() || std::env::var_os("CLAUDE_NON_INTERACTIVE").is_some()
 }
 
