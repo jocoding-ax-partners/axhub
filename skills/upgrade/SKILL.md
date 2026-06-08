@@ -132,10 +132,13 @@ To upgrade the plugin:
      "options": [
        {"label": "네, 명령 보여줘", "value": "show", "description": "/plugin update 슬래시 명령 안내"},
        {"label": "릴리즈 노트 보기", "value": "notes", "description": "변경사항 자세히"},
-       {"label": "지금은 그대로", "value": "skip", "description": "현재 버전 유지"}
+       {"label": "지금은 그대로", "value": "skip", "description": "현재 버전 유지"},
+       {"label": "그만 볼래요 (다시 안 봄)", "value": "optout", "description": "버전 알림을 영구히 꺼요"}
      ]
    }
    ```
+
+   **`optout` 옵션은 자동 버전 드리프트 알림 (prompt-route 가 띄우는 nudge) 에서 들어왔을 때만 의미 있어요.** 사용자가 알림 자체를 그만 보고 싶을 때 고르는 escape hatch 예요.
 
 6. **On `show`.** Render the literal slash command for the user to invoke:
 
@@ -144,6 +147,14 @@ To upgrade the plugin:
    > `/plugin update axhub@axhub`
    >
    > Claude Code 자체가 플러그인 업데이트를 처리해요. 끝나면 새 세션을 시작해주세요."
+
+6.5. **On `optout`.** 사용자가 버전 알림을 영구히 끄고 싶어 해요. 영구 opt-out 마커를 기록해요:
+
+   ```bash
+   axhub-helpers plugin-drift-optout
+   ```
+
+   그다음 안내해요: "버전 알림을 껐어요. 다시 켜려면 `~/.local/state/axhub-plugin/plugin-drift-optout` 파일을 지우면 돼요." (이 명령은 fail-open 이라 어떤 경우에도 세션을 막지 않아요.)
 
 7. **Telemetry.** Append the dismissal/acceptance to `~/.cache/axhub-plugin/upgrade-prompts.ndjson` (Windows PowerShell: `$env:USERPROFILE\.cache\axhub-plugin\upgrade-prompts.ndjson`) (per row 28: "다시 묻지 않기" preference persistence) so the same nudge does not fire repeatedly within the same plugin version.
 
