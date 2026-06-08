@@ -67,14 +67,16 @@ describe("prompt-route Karpathy context gating", () => {
       systemMessage,
     ].join("\n");
     expect(additionalContext).toContain('Skill("axhub:onboarding")');
-    expect(systemMessage).toContain('Skill("axhub:onboarding")');
+    // routing control rides additionalContext (agent-facing); it must NOT leak
+    // into the user-visible systemMessage.
+    expect(systemMessage).not.toContain('Skill("axhub:onboarding")');
     expect(routedText).toContain("처음 설정을 확인할게요");
     expect(routedText).toContain("first-run onboarding");
     expect(routedText).toContain("첫 앱 만들래요?");
     expect(routedText).toContain("never announce internal routing");
-    expect(systemMessage).toContain("내부 제어");
-    expect(systemMessage).toContain("visible chat 에 절대 쓰지 않아요");
-    expect(systemMessage).toContain("내부 실행 선언");
+    expect(additionalContext).toContain("내부 제어");
+    expect(additionalContext).toContain("visible chat 에 절대 쓰지 않아요");
+    expect(additionalContext).toContain("내부 실행 선언");
     expect(routedText).toContain("VIBE_READY");
     expect(routedText).not.toContain("새 앱 만들어줘\" 하면 됨");
     expect(routedText).not.toContain("I'll invoke the onboarding skill");
@@ -87,7 +89,7 @@ describe("prompt-route Karpathy context gating", () => {
     const systemMessage = payload.systemMessage ?? "";
     const routedText = [additionalContext, systemMessage].join("\n");
     expect(additionalContext).toContain('Skill("axhub:init")');
-    expect(systemMessage).toContain('Skill("axhub:init")');
+    expect(systemMessage).not.toContain('Skill("axhub:init")');
     expect(routedText).toContain("새 앱을 만들 수 있는 템플릿을 확인할게요");
     expect(routedText).toContain("AXHub app creation request");
     expect(routedText).toContain("init-resume route --json");
@@ -108,7 +110,7 @@ describe("prompt-route Karpathy context gating", () => {
     const systemMessage = payload.systemMessage ?? "";
     const routedText = [additionalContext, systemMessage].join("\n");
     expect(additionalContext).toContain('Skill("axhub:doctor")');
-    expect(systemMessage).toContain('Skill("axhub:doctor")');
+    expect(systemMessage).not.toContain('Skill("axhub:doctor")');
     expect(routedText).toContain("설치 상태를 확인할게요");
     expect(routedText).toContain("doctor-summary --user-utterance");
     expect(routedText).toContain("Do not install, update, login, logout");

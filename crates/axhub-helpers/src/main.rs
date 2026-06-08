@@ -1941,12 +1941,17 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     } else {
         None
     };
-    let system_message = match (grace, intent_system) {
-        (Some(grace), Some(intent)) => Some(format!("{grace}\n\n{intent}")),
-        (Some(grace), None) => Some(grace.to_string()),
-        (None, Some(intent)) => Some(intent.to_string()),
-        (None, None) => None,
-    };
+    // `intent_system` is internal routing control for the model, not a message
+    // for the user — append it to `additionalContext` (agent-facing, hidden from
+    // the user, the same channel the routing hints already ride) so the raw route
+    // contract never surfaces as a user-visible `UserPromptSubmit says:` block.
+    // Only `grace` (the once-per-project migration nudge) is genuinely
+    // user-facing, so it alone stays on `systemMessage`.
+    if let Some(intent) = intent_system {
+        context.push_str("\n\n");
+        context.push_str(intent);
+    }
+    let system_message = grace.map(|g| g.to_string());
     println!(
         "{}",
         hook_output::user_prompt_context_with_system(&context, system_message.as_deref())
