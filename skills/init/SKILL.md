@@ -167,7 +167,7 @@ To start an axhub app:
 
    이 안내는 인지 + 다른 계정 추가용이에요. 실제 from-scratch 설치는 bootstrap saga 가 GitHub 연결이 필요할 때 자동으로 처리해요 (Step 7a 의 `device_code_issued`).
 
-   **owner 를 미리 정해 둬요 (`ambiguous_installation` 예방).** bootstrap 은 GitHub App 이 **여러 계정/org 에 설치**돼 있으면 `--github-owner` 없이는 어디에 repo 를 만들지 몰라서 `ambiguous_installation` (CLI exit 9) 으로 멈춰요. 그래서 `installed:true` 인 `login` 개수로 미리 갈라요:
+   **owner 를 미리 정해 둬요 (`ambiguous_installation` 예방).** bootstrap 은 GitHub App 이 **여러 계정/org 에 설치**돼 있으면 `--github-owner` 없이는 어디에 repo 를 만들지 몰라서 `ambiguous_installation` (CLI exit 9) 으로 멈춰요. **먼저 `AXHUB_GITHUB_OWNER` env 가 설정돼 있으면 그 값을 `$GITHUB_OWNER` 로 바로 써요** (질문 없이 — 비대화형 agent/CI 가 owner 를 미리 지정하는 경로, single-login auto-pick 과 동일). 없으면 `installed:true` 인 `login` 개수로 미리 갈라요:
 
    - **정확히 1개**: 묻지 말고 그 `login` 을 `$GITHUB_OWNER` 로 자동으로 잡아요.
    - **2개 이상**: 아래 질문으로 한 번 물어서 고른 `login` 을 `$GITHUB_OWNER` 로 잡아요. 그래야 Step 5/6 이 멈추지 않아요.
@@ -187,7 +187,7 @@ To start an axhub app:
    }
    ```
 
-   옵션 label 은 `installed:true` 인 `login` 값으로 채워요 (UI 제한상 최대 3개; 더 많으면 먼저 전체를 텍스트로 보여주고 3개만 버튼으로). `installation_id` 같은 internal 값은 옵션에 넣지 말고 `login` 만 보여줘요. 비대화형/D1 guard 에서는 묻지 않고 safe default `취소` 로 bootstrap 을 멈춰요 — 설치가 여러 개인데 owner 를 못 정하면 임의 계정에 repo 를 만들지 않아요.
+   옵션 label 은 `installed:true` 인 `login` 값으로 채워요 (UI 제한상 최대 3개; 더 많으면 먼저 전체를 텍스트로 보여주고 3개만 버튼으로). `installation_id` 같은 internal 값은 옵션에 넣지 말고 `login` 만 보여줘요. 비대화형/D1 guard 에서는 `AXHUB_GITHUB_OWNER` env 가 있으면 그 owner 로 진행하고, 없으면 묻지 않고 safe default `취소` 로 bootstrap 을 멈춰요 — 설치가 여러 개인데 owner 를 못 정하면 임의 계정에 repo 를 만들지 않아요.
 
 ## 템플릿 선택 가이드
 
@@ -203,7 +203,7 @@ To start an axhub app:
 
 backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요. structured AskUserQuestion 은 UI 제한에 맞춰 **최대 3개 선택지** 만 쓰고, 선택지는 모두 실제 backend template 이어야 해요. Claude Desktop AskUserQuestion 은 skip/free-text 입력을 자동으로 붙여요. 그래서 template picker 에는 `기타` / `Other` / `직접 고르기` / `취소` 같은 generic 선택지를 직접 넣지 말아요. 알려진 alias 는 위 설명을 짧게 붙이고, 알 수 없는 항목은 backend `name` 과 `folder_name` 을 붙여요.
 
-**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — template 선택은 `abort`, 앱 이름은 `abort`, bootstrap 실행 확인은 `취소`, auto-connect 실행 확인은 `아니요`, resume offer 는 `새로 시작` 예요.
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — template 선택은 `abort`, 앱 이름은 `abort`, bootstrap 실행 확인은 `취소`, GitHub owner 선택은 `취소`(단 `AXHUB_GITHUB_OWNER` env 가 있으면 그 owner), auto-connect 실행 확인은 `아니요`, resume offer 는 `새로 시작` 예요.
 
 3. **template 을 선택해요.**
 
@@ -394,7 +394,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    확인된 공개 URL 이 없으면 "인터넷 배포가 시작됐어요. '방금 배포 어디까지 됐어?' 라고 물으면 이어서 확인할게요." 라고 낮춰 말해요.
 
    `error_code` 로 saga 가 실패했으면 다음 routing 을 써요:
-   - `conflict` / `ambiguous_installation` (CLI exit 9, GitHub App 이 여러 계정/org 에 설치돼 owner 가 모호함) → 먼저 **install_url 을 한 줄로 보여주고**(무조건), 이어서 **즉석에서 새 질문을 만들지 말고** Step 2.5 의 owner 선택("어느 GitHub 계정에 저장소를 만들까요?")을 다시 띄워요. 옵션은 에러 hint 의 `owner=installation_id` 목록 또는 `axhub github accounts list --json` 의 `installed:true` 인 `login` 들로 채워요 (raw `installation_id` 는 옵션에 echo 하지 말고 `login` 만). 고른 `login` 을 `$GITHUB_OWNER` 로 잡고 같은 idempotency key 로 Step 6 execute 를 `--github-owner "$GITHUB_OWNER"` 와 함께 한 번 다시 실행해요. install_url 은 이미 설치된 경우에도 항상 같이 보여주되, 이 에러는 "설치 없음" 이 아니라 "설치가 여러 개라 owner 선택 필요" 라서 url 만으로는 안 풀려요 — owner 선택까지 이어가요.
+   - `conflict` / `ambiguous_installation` (CLI exit 9, GitHub App 이 여러 계정/org 에 설치돼 owner 가 모호함) → 먼저 **install_url 을 한 줄로 보여주고**(무조건), 이어서 **즉석에서 새 질문을 만들지 말고** Step 2.5 의 owner 선택("어느 GitHub 계정에 저장소를 만들까요?")을 다시 띄워요. 옵션은 에러 hint 의 `owner=installation_id` 목록 또는 `axhub github accounts list --json` 의 `installed:true` 인 `login` 들로 채워요 (raw `installation_id` 는 옵션에 echo 하지 말고 `login` 만). 고른 `login` 을 `$GITHUB_OWNER` 로 잡고 같은 idempotency key 로 Step 6 execute 를 `--github-owner "$GITHUB_OWNER"` 와 함께 한 번 다시 실행해요. 비대화형/D1 에서는 `AXHUB_GITHUB_OWNER` env 가 있으면 그 owner 로 바로 재실행하고, 없으면 `취소` 로 멈춰요(추측 금지). install_url 은 이미 설치된 경우에도 항상 같이 보여주되, 이 에러는 "설치 없음" 이 아니라 "설치가 여러 개라 owner 선택 필요" 라서 url 만으로는 안 풀려요 — owner 선택까지 이어가요.
    - `github.installation_missing` / `github.repo_create_failed` → "GitHub 연결 다시 해줘"라고 말하면 이어서 처리할 수 있다고 안내
    - `validation.template_not_found` → Step 2 로 돌아가 다시 목록을 보여줘요
    - `validation.slug_collision` → Step 4 로 돌아가 새 이름을 받아요

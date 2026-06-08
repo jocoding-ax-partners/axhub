@@ -23,11 +23,12 @@
 
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::axhub_cli::run_axhub;
+use crate::axhub_cli::{axhub_bin_from_env, run_axhub, run_axhub_with_timeout};
 use crate::preflight::run_preflight;
 
 pub const SCHEMA_VERSION: &str = "onboarding-detect/v1";
@@ -38,20 +39,49 @@ pub const SCHEMA_VERSION: &str = "onboarding-detect/v1";
 /// nowhere — the person who most needs the link). Every per-account `install_url`
 /// observed is this exact URL. Applied ONLY to a successful (`status:ok`)
 /// response; auth/transport errors stay `None` so the SKILL routes to re-login
-/// first. Assumes the default `ax-hub-deploy` app; a non-default backend would
-/// need this surfaced from config instead.
+/// first. Defaults to the `ax-hub-deploy` SaaS app but is overridable via
+/// `AXHUB_GITHUB_APP_INSTALL_URL` for self-hosted / non-default backends.
 const DEFAULT_INSTALL_URL: &str = "https://github.com/apps/ax-hub-deploy/installations/new";
+
+/// The install-url fallback, honoring the `AXHUB_GITHUB_APP_INSTALL_URL` override
+/// (only when it is a valid github.com URL).
+fn default_install_url() -> String {
+    std::env::var("AXHUB_GITHUB_APP_INSTALL_URL")
+        .ok()
+        .filter(|u| is_github_install_url(u))
+        .unwrap_or_else(|| DEFAULT_INSTALL_URL.to_string())
+}
+
+/// Guard a surfaced install link to an `https://github.com/` URL. The SKILL
+/// renders this as a clickable install link, so a compromised/misconfigured
+/// backend (or env override) must not be able to point it at an arbitrary host.
+fn is_github_install_url(url: &str) -> bool {
+    url.starts_with("https://github.com/")
+}
+
+/// Normalized GitHub App install state. Serializes to the same lowercase strings
+/// the SKILL switches on (`installed`/`mixed`/`uninstalled`/`empty`/`auth_error`/
+/// `unavailable`) — a closed set instead of a stringly-typed field.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GithubStateKind {
+    Installed,
+    Mixed,
+    Uninstalled,
+    Empty,
+    AuthError,
+    Unavailable,
+}
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct GithubState {
-    /// `installed` | `mixed` | `uninstalled` | `empty` | `auth_error` | `unavailable`
-    pub state: String,
+    pub state: GithubStateKind,
     pub installed_logins: Vec<String>,
     pub uninstalled_logins: Vec<String>,
     /// App-level install/add-account URL. All accounts share the same value, so
-    /// it is populated whenever any account carries it. The SKILL surfaces this
-    /// in every state (including `installed`) per the "always show install_url"
-    /// contract.
+    /// it is populated whenever any account carries it (validated to github.com).
+    /// The SKILL surfaces this in every state (including `installed`) per the
+    /// "always show install_url" contract.
     pub install_url: Option<String>,
     /// `true` when ≥2 accounts have the App installed — bootstrap then needs
     /// `--github-owner`/`--installation-id` or it fails with `ambiguous_installation`.
@@ -61,7 +91,7 @@ pub struct GithubState {
 impl GithubState {
     fn unavailable() -> Self {
         Self {
-            state: "unavailable".to_string(),
+            state: GithubStateKind::Unavailable,
             installed_logins: Vec::new(),
             uninstalled_logins: Vec::new(),
             install_url: None,
@@ -126,9 +156,9 @@ pub fn parse_github_state(stdout: &str, timed_out: bool) -> GithubState {
             .and_then(Value::as_str);
         return GithubState {
             state: if code == Some("auth") {
-                "auth_error".to_string()
+                GithubStateKind::AuthError
             } else {
-                "unavailable".to_string()
+                GithubStateKind::Unavailable
             },
             ..GithubState::unavailable()
         };
@@ -144,19 +174,33 @@ pub fn parse_github_state(stdout: &str, timed_out: bool) -> GithubState {
 
     let mut installed_logins = Vec::new();
     let mut uninstalled_logins = Vec::new();
+    let mut installed_count = 0usize;
+    let mut uninstalled_count = 0usize;
     let mut install_url: Option<String> = None;
 
     for account in &accounts {
         if install_url.is_none() {
-            if let Some(url) = account.get("install_url").and_then(Value::as_str) {
-                if !url.is_empty() {
-                    install_url = Some(url.to_string());
-                }
+            // Only surface a github.com URL — never an arbitrary host from a
+            // misconfigured/compromised backend (the SKILL renders it clickable).
+            if let Some(url) = account
+                .get("install_url")
+                .and_then(Value::as_str)
+                .filter(|u| is_github_install_url(u))
+            {
+                install_url = Some(url.to_string());
             }
         }
         let installed = account.get("installed").and_then(Value::as_bool) == Some(true)
             || account.get("installation_id").is_some_and(|x| !x.is_null())
             || account.get("installationId").is_some_and(|x| !x.is_null());
+        // Count every account by install state — `multiple_installed` and the
+        // state discriminant must not under-count a login-less installed account
+        // (else the SKILL skips the owner-pick and bootstrap still hits exit-9).
+        if installed {
+            installed_count += 1;
+        } else {
+            uninstalled_count += 1;
+        }
         if let Some(login) = account.get("login").and_then(Value::as_str) {
             if installed {
                 installed_logins.push(login.to_string());
@@ -167,24 +211,24 @@ pub fn parse_github_state(stdout: &str, timed_out: bool) -> GithubState {
     }
 
     let state = if accounts.is_empty() {
-        "empty"
-    } else if !installed_logins.is_empty() && !uninstalled_logins.is_empty() {
-        "mixed"
-    } else if !installed_logins.is_empty() {
-        "installed"
+        GithubStateKind::Empty
+    } else if installed_count > 0 && uninstalled_count > 0 {
+        GithubStateKind::Mixed
+    } else if installed_count > 0 {
+        GithubStateKind::Installed
     } else {
-        "uninstalled"
+        GithubStateKind::Uninstalled
     };
 
     GithubState {
-        multiple_installed: installed_logins.len() >= 2,
-        state: state.to_string(),
+        multiple_installed: installed_count >= 2,
+        state,
         installed_logins,
         uninstalled_logins,
         // Successful response → always expose an install_url, falling back to the
-        // app-level page when no account carried one (e.g. an empty list for a
-        // brand-new user). Honors the "always show install_url" contract.
-        install_url: install_url.or_else(|| Some(DEFAULT_INSTALL_URL.to_string())),
+        // app-level page (env-overridable) when no account carried a valid one —
+        // e.g. an empty list for a brand-new user. Honors "always show install_url".
+        install_url: install_url.or_else(|| Some(default_install_url())),
     }
 }
 
@@ -229,8 +273,14 @@ const DIR_IGNORE: [&str; 6] = [
 ];
 
 fn dir_is_empty() -> bool {
-    let Ok(entries) = std::fs::read_dir(".") else {
-        // Can't read CWD — treat as non-empty (conservative: don't offer fresh init).
+    dir_is_empty_at(Path::new("."))
+}
+
+/// `true` when `dir` contains nothing but ignorable scaffolding (`DIR_IGNORE`).
+/// Split from the CWD entry point so it is unit-testable against a temp dir.
+fn dir_is_empty_at(dir: &Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        // Can't read the dir — treat as non-empty (conservative: don't offer fresh init).
         return false;
     };
     for entry in entries.flatten() {
@@ -348,17 +398,24 @@ fn detect_deploy(cli_present: bool, auth_ok: bool) -> (bool, bool) {
     let (Some(app_id), Some(deploy_id)) = (app_id, deploy_id) else {
         return (false, false);
     };
-    let out = run_axhub(&[
-        "deploy",
-        "status",
-        deploy_id,
-        "--app",
-        app_id,
-        "--watch",
-        "--watch-timeout",
-        "1m",
-        "--json",
-    ]);
+    // This call carries `--watch-timeout 1m`, so it must NOT inherit the default
+    // 5s probe cap (which would kill the child first and report every in-progress
+    // deploy as unverified). Give it 65s — just past the watch budget.
+    let out = run_axhub_with_timeout(
+        &axhub_bin_from_env(),
+        &[
+            "deploy",
+            "status",
+            deploy_id,
+            "--app",
+            app_id,
+            "--watch",
+            "--watch-timeout",
+            "1m",
+            "--json",
+        ],
+        Duration::from_secs(65),
+    );
     (true, parse_deploy_verified(&out.stdout))
 }
 
@@ -375,9 +432,9 @@ fn parse_deploy_verified(stdout: &str) -> bool {
                 .and_then(Value::as_str)
                 .unwrap_or("")
                 .to_lowercase();
-            ["succeeded", "live", "running", "deployed"]
-                .iter()
-                .any(|s| status.contains(s))
+            // Exact match, not substring — a status like `not_running` or
+            // `deploy_failed` must not false-positive on `running`/`deployed`.
+            ["succeeded", "live", "running", "deployed"].contains(&status.as_str())
         })
         .unwrap_or(false)
 }
@@ -407,7 +464,12 @@ fn compute_gaps(d: &OnboardingDetect) -> Vec<String> {
         gaps.push("node_mismatch".to_string());
     }
     // GitHub gap only when authenticated and no account has the App installed.
-    if d.auth_ok && matches!(d.github.state.as_str(), "uninstalled" | "empty") {
+    if d.auth_ok
+        && matches!(
+            d.github.state,
+            GithubStateKind::Uninstalled | GithubStateKind::Empty
+        )
+    {
         gaps.push("github_app_missing".to_string());
     }
     if d.git_repo && d.git_commit && !d.manifest_present {
@@ -446,16 +508,29 @@ pub fn detect() -> OnboardingDetect {
     let deps_missing = manifest_present && lockfile_present && !Path::new("node_modules").exists();
     let dir_empty = dir_is_empty();
 
-    let (has_update, latest_version) = detect_has_update(pf.cli_present);
-
-    let github = if pf.cli_present {
-        let out = run_axhub(&["github", "accounts", "list", "--json"]);
-        parse_github_state(&out.stdout, out.timed_out)
-    } else {
-        GithubState::unavailable()
-    };
-
-    let (deploy_checked, deploy_verified) = detect_deploy(pf.cli_present, pf.auth_ok);
+    // The three CLI probes (update check / github accounts / deploy status) are
+    // independent and each can block on a slow backend (deploy waits up to ~65s).
+    // Run them concurrently instead of serially — mirrors run_preflight's parallel
+    // probe pattern — so a degraded backend doesn't stall every onboarding turn.
+    let auth_ok = pf.auth_ok;
+    let ((has_update, latest_version), github, (deploy_checked, deploy_verified)) =
+        if pf.cli_present {
+            std::thread::scope(|scope| {
+                let update = scope.spawn(|| detect_has_update(true));
+                let gh = scope.spawn(|| {
+                    let out = run_axhub(&["github", "accounts", "list", "--json"]);
+                    parse_github_state(&out.stdout, out.timed_out)
+                });
+                let deploy = scope.spawn(|| detect_deploy(true, auth_ok));
+                (
+                    update.join().unwrap_or((false, None)),
+                    gh.join().unwrap_or_else(|_| GithubState::unavailable()),
+                    deploy.join().unwrap_or((false, false)),
+                )
+            })
+        } else {
+            ((false, None), GithubState::unavailable(), (false, false))
+        };
 
     let mut detect = OnboardingDetect {
         schema_version: SCHEMA_VERSION.to_string(),
@@ -510,7 +585,7 @@ mod tests {
             {"login":"jocoding-ax-partners","type":"Organization","installed":true,"installation_id":133340904,"install_url":"https://github.com/apps/ax-hub-deploy/installations/new"}
         ]}}"#;
         let s = parse_github_state(json, false);
-        assert_eq!(s.state, "installed");
+        assert_eq!(s.state, GithubStateKind::Installed);
         assert_eq!(s.installed_logins.len(), 3);
         assert!(s.multiple_installed);
         // install_url must be populated even though everything is installed.
@@ -525,14 +600,17 @@ mod tests {
         // The pre-re-login envelope that previously collapsed to "unknown".
         let json = r#"{"schema_version":"1","status":"error","error":{"code":"auth","category":"auth","hint":"not authenticated"}}"#;
         let s = parse_github_state(json, false);
-        assert_eq!(s.state, "auth_error");
+        assert_eq!(s.state, GithubStateKind::AuthError);
         assert!(s.install_url.is_none());
     }
 
     #[test]
     fn github_non_auth_error_is_unavailable() {
         let json = r#"{"status":"error","error":{"code":"server_error"}}"#;
-        assert_eq!(parse_github_state(json, false).state, "unavailable");
+        assert_eq!(
+            parse_github_state(json, false).state,
+            GithubStateKind::Unavailable
+        );
     }
 
     #[test]
@@ -541,7 +619,7 @@ mod tests {
             {"login":"solo","installed":false,"install_url":"https://github.com/apps/ax-hub-deploy/installations/new"}
         ]}}"#;
         let s = parse_github_state(json, false);
-        assert_eq!(s.state, "uninstalled");
+        assert_eq!(s.state, GithubStateKind::Uninstalled);
         assert!(!s.multiple_installed);
         assert_eq!(s.uninstalled_logins, vec!["solo".to_string()]);
         assert!(s.install_url.is_some());
@@ -554,7 +632,7 @@ mod tests {
             {"login":"b","installed":false,"install_url":"u"}
         ]}}"#;
         let s = parse_github_state(json, false);
-        assert_eq!(s.state, "mixed");
+        assert_eq!(s.state, GithubStateKind::Mixed);
         assert!(!s.multiple_installed);
         assert_eq!(s.installed_logins, vec!["a".to_string()]);
         assert_eq!(s.uninstalled_logins, vec!["b".to_string()]);
@@ -567,15 +645,114 @@ mod tests {
         // connect link — the "무조건 install_url" contract.
         let json = r#"{"status":"ok","data":{"accounts":[]}}"#;
         let s = parse_github_state(json, false);
-        assert_eq!(s.state, "empty");
+        assert_eq!(s.state, GithubStateKind::Empty);
         assert_eq!(s.install_url.as_deref(), Some(DEFAULT_INSTALL_URL));
     }
 
     #[test]
     fn github_empty_or_timeout_stdout_is_unavailable() {
-        assert_eq!(parse_github_state("", false).state, "unavailable");
-        assert_eq!(parse_github_state("anything", true).state, "unavailable");
-        assert_eq!(parse_github_state("not json", false).state, "unavailable");
+        assert_eq!(
+            parse_github_state("", false).state,
+            GithubStateKind::Unavailable
+        );
+        assert_eq!(
+            parse_github_state("anything", true).state,
+            GithubStateKind::Unavailable
+        );
+        assert_eq!(
+            parse_github_state("not json", false).state,
+            GithubStateKind::Unavailable
+        );
+    }
+
+    #[test]
+    fn github_installed_account_without_login_still_counts() {
+        // An installed account missing `login` must still count toward
+        // `multiple_installed` (else the SKILL skips owner-pick and bootstrap
+        // still hits exit-9 ambiguous_installation).
+        let json = r#"{"status":"ok","data":{"accounts":[
+            {"installed":true,"installation_id":1,"install_url":"https://github.com/apps/x/installations/new"},
+            {"login":"b","installed":true,"installation_id":2}
+        ]}}"#;
+        let s = parse_github_state(json, false);
+        assert_eq!(s.state, GithubStateKind::Installed);
+        assert!(
+            s.multiple_installed,
+            "2 installed (one login-less) → multiple"
+        );
+        assert_eq!(s.installed_logins, vec!["b".to_string()]);
+    }
+
+    #[test]
+    fn github_non_github_install_url_is_rejected() {
+        // A non-github.com install_url (misconfigured/compromised backend) is
+        // dropped; the validated app-level fallback is surfaced instead.
+        let json = r#"{"status":"ok","data":{"accounts":[
+            {"login":"a","installed":false,"install_url":"https://evil.example.com/phish"}
+        ]}}"#;
+        let s = parse_github_state(json, false);
+        assert_eq!(s.install_url.as_deref(), Some(DEFAULT_INSTALL_URL));
+    }
+
+    #[test]
+    fn is_github_install_url_guards_host() {
+        assert!(is_github_install_url(
+            "https://github.com/apps/x/installations/new"
+        ));
+        assert!(!is_github_install_url("https://evil.example.com/x"));
+        assert!(!is_github_install_url("http://github.com/x"));
+        assert!(!is_github_install_url("javascript:alert(1)"));
+    }
+
+    #[test]
+    fn default_install_url_honors_valid_env_override_only() {
+        let _guard = crate::PROCESS_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        // SAFETY: env mutation serialized by PROCESS_ENV_LOCK (crate-wide).
+        unsafe {
+            std::env::set_var(
+                "AXHUB_GITHUB_APP_INSTALL_URL",
+                "https://github.com/apps/custom/installations/new",
+            );
+        }
+        assert_eq!(
+            default_install_url(),
+            "https://github.com/apps/custom/installations/new"
+        );
+        // A non-github override is rejected → constant default.
+        unsafe {
+            std::env::set_var("AXHUB_GITHUB_APP_INSTALL_URL", "https://evil.example.com/x");
+        }
+        assert_eq!(default_install_url(), DEFAULT_INSTALL_URL);
+        unsafe {
+            std::env::remove_var("AXHUB_GITHUB_APP_INSTALL_URL");
+        }
+    }
+
+    #[test]
+    fn probes_short_circuit_without_cli() {
+        // The cli-gated probes must early-return safe defaults when the CLI is
+        // absent (the realistic CI environment, where the parallel scope is skipped).
+        assert_eq!(detect_has_update(false), (false, None));
+        assert_eq!(detect_deploy(false, true), (false, false));
+        assert_eq!(detect_deploy(true, false), (false, false));
+    }
+
+    #[test]
+    fn dir_is_empty_at_ignores_scaffolding() {
+        let base = std::env::temp_dir().join(format!("ax-onb-detect-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).expect("mk tmp");
+        assert!(dir_is_empty_at(&base), "fresh temp dir is empty");
+        // Only ignorable scaffolding → still empty.
+        std::fs::create_dir_all(base.join(".git")).expect("mk .git");
+        std::fs::write(base.join(".DS_Store"), b"x").expect("write .DS_Store");
+        assert!(dir_is_empty_at(&base), "only ignorable entries → empty");
+        // A real file → non-empty.
+        std::fs::write(base.join("README.md"), b"hi").expect("write README");
+        assert!(!dir_is_empty_at(&base), "a real file → non-empty");
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]
@@ -617,13 +794,13 @@ mod tests {
     fn gaps_github_only_when_authed_and_uninstalled() {
         let mut d = bare_detect();
         d.github = GithubState {
-            state: "uninstalled".to_string(),
+            state: GithubStateKind::Uninstalled,
             ..GithubState::unavailable()
         };
         assert!(compute_gaps(&d).contains(&"github_app_missing".to_string()));
         // Installed → no github gap.
         d.github = GithubState {
-            state: "installed".to_string(),
+            state: GithubStateKind::Installed,
             ..GithubState::unavailable()
         };
         assert!(!compute_gaps(&d).contains(&"github_app_missing".to_string()));
@@ -662,11 +839,21 @@ mod tests {
         assert!(d.gaps.len() <= 13);
         // first_gap is the head of the ordered gap list (or None when clean).
         assert_eq!(d.first_gap.as_deref(), d.gaps.first().map(String::as_str));
-        // github is always one of the known states.
-        assert!(matches!(
-            d.github.state.as_str(),
-            "installed" | "mixed" | "uninstalled" | "empty" | "auth_error" | "unavailable"
-        ));
+        // github.state serializes to one of the SKILL-facing strings (locks the
+        // serde rename → the JSON contract the SKILL switches on).
+        let state_json = serde_json::to_string(&d.github.state).unwrap_or_default();
+        assert!(
+            [
+                "\"installed\"",
+                "\"mixed\"",
+                "\"uninstalled\"",
+                "\"empty\"",
+                "\"auth_error\"",
+                "\"unavailable\"",
+            ]
+            .contains(&state_json.as_str()),
+            "unexpected github.state serialization: {state_json}"
+        );
     }
 
     #[test]
@@ -730,7 +917,7 @@ mod tests {
             deps_missing: false,
             dir_empty: false,
             github: GithubState {
-                state: "installed".to_string(),
+                state: GithubStateKind::Installed,
                 ..GithubState::unavailable()
             },
             deploy_checked: false,

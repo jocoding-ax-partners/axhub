@@ -73,11 +73,20 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null)"
    [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
    DETECT_JSON=$("$HELPER" onboarding-detect --json 2>/dev/null)
-   [ -n "$DETECT_JSON" ] || DETECT_JSON='{"cli_present":false,"first_gap":"cli_missing","github":{"state":"unavailable","install_url":null}}'
+   if [ -z "$DETECT_JSON" ]; then
+     if command -v axhub >/dev/null 2>&1; then
+       # axhub CLI 는 되는데 onboarding-detect 가 빈 출력 → helper 바이너리가 이
+       # subcommand 보다 오래된 것. 작동하는 CLI 를 cli_missing 으로 오라우팅하지 말고
+       # helper_outdated 로 표시해요.
+       DETECT_JSON='{"cli_present":true,"first_gap":"helper_outdated","helper_outdated":true,"github":{"state":"unavailable","install_url":null}}'
+     else
+       DETECT_JSON='{"cli_present":false,"first_gap":"cli_missing","github":{"state":"unavailable","install_url":null}}'
+     fi
+   fi
    echo "$DETECT_JSON"
    ```
 
-   `axhub-helpers` 를 못 찾으면 `DETECT_JSON` 이 비어 fallback(`cli_missing`)으로 가요. 출력 JSON 주요 field:
+   fallback 분기: `axhub-helpers` 도 `axhub` 도 없으면 `cli_missing`. helper 가 없/오래됐지만 `axhub` 는 되면 `helper_outdated` 예요 (보통 plugin 이 binary+skill 을 함께 배포해서 안 생겨요). `first_gap=helper_outdated` 면 install-cli 로 가지 말고 "플러그인·도구가 오래된 것 같아요. `/plugin update` 후 새 세션에서 다시 시도해 주세요" 라고 안내하고 멈춰요. 출력 JSON 주요 field:
 
    - `first_gap` / `gaps`: 처리할 첫 gap (아래 state machine 순서). 이걸 그대로 따라요.
    - `cli_present` / `cli_version` / `cli_state` / `cli_on_path` / `cli_too_old` / `has_update` / `latest_version`
@@ -87,6 +96,8 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    - `deploy_checked` / `deploy_verified`
 
 3. **Gap State Machine — 첫 gap 하나만 처리하고 재감지해요.**
+
+   **gap 순서의 single source of truth 는 helper 의 `first_gap` 이에요.** 아래 ASCII tree 와 Step 3 상태표는 gap→처리 owner 매핑 참고용 문서일 뿐이라, 순서가 어긋나 보이면 트리·표를 재구현하지 말고 항상 `first_gap` 을 따라요.
 
    ```text
    START

@@ -132,8 +132,9 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
     const content = onboarding();
 
     // The dual bash/PowerShell DETECT_ALL — and its Claude Desktop ignore-list —
-    // moved into `axhub-helpers onboarding-detect` (crates/axhub-helpers/src/
-    // onboarding_detect.rs DIR_IGNORE). The SKILL now reads the `dir_empty` field.
+    // moved into `axhub-helpers onboarding-detect`; the empty-dir logic
+    // (DIR_IGNORE) is unit-tested in onboarding_detect.rs
+    // (`dir_is_empty_at_ignores_scaffolding`). The SKILL now reads `dir_empty`.
     expect(content).toContain("onboarding-detect");
     expect(content).toContain("dir_empty");
     // The leak-prone inline detection scripts must not return to the SKILL body
