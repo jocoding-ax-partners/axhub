@@ -22,8 +22,8 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use super::DiagnoseError;
-use crate::runtime_paths::write_private_file_no_follow;
 use crate::redact::redact_for_handoff;
+use crate::runtime_paths::write_private_file_no_follow;
 
 /// Hard cap on the size of a `PromptSpec` file we will deserialise. Bounded
 /// to prevent pathological JSON from DoS-ing the helper on a malicious

@@ -3,9 +3,7 @@ use std::fs;
 use std::sync::{Mutex, OnceLock};
 
 use axhub_helpers::axhub_cli::CliOutput;
-use axhub_helpers::bootstrap::{
-    interpret_apps_create_result, AppsCreateDecision, BootstrapState,
-};
+use axhub_helpers::bootstrap::{interpret_apps_create_result, AppsCreateDecision, BootstrapState};
 use axhub_helpers::catalog::classify;
 use axhub_helpers::keychain::{
     parse_keyring_value, read_keychain_token_with_runner, CommandOutput,
@@ -89,8 +87,6 @@ impl Drop for CwdGuard {
         std::env::set_current_dir(&self.saved).unwrap();
     }
 }
-
-
 
 #[test]
 fn redact_matches_typescript_secret_and_unicode_contract() {
@@ -1220,6 +1216,34 @@ fn runtime_paths_reject_symlink_and_world_readable_private_files_on_unix() {
         fs::write(&public, b"secret").unwrap();
         fs::set_permissions(&public, fs::Permissions::from_mode(0o644)).unwrap();
         assert!(read_private_file(&public).is_err());
+    }
+}
+
+#[test]
+fn runtime_paths_private_file_roundtrip_and_dir_mode_on_unix() {
+    #[cfg(unix)]
+    {
+        use axhub_helpers::runtime_paths::{
+            read_private_file, set_private_dir_mode, write_private_file_no_follow,
+        };
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+
+        // write happy path: file is created 0600 and round-trips through read.
+        let secret = tmp.path().join("token");
+        write_private_file_no_follow(&secret, b"axhub-secret").unwrap();
+        assert_eq!(read_private_file(&secret).unwrap(), b"axhub-secret");
+        let fmode = fs::symlink_metadata(&secret).unwrap().permissions().mode() & 0o777;
+        assert_eq!(fmode, 0o600);
+
+        // set_private_dir_mode strips group/world bits down to 0700.
+        let dir = tmp.path().join("state");
+        fs::create_dir_all(&dir).unwrap();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
+        set_private_dir_mode(&dir).unwrap();
+        let dmode = fs::symlink_metadata(&dir).unwrap().permissions().mode() & 0o777;
+        assert_eq!(dmode & 0o077, 0);
+        assert_eq!(dmode, 0o700);
     }
 }
 

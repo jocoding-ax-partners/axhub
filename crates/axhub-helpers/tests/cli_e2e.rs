@@ -12,7 +12,6 @@ fn run(args: &[&str]) -> Output {
     Command::new(bin()).args(args).output().unwrap()
 }
 
-
 fn write_stdin_allowing_early_exit(writer: &mut impl Write, stdin: &str) {
     match writer.write_all(stdin.as_bytes()) {
         Ok(()) => {}
@@ -47,7 +46,6 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
     write_stdin_allowing_early_exit(child.stdin.as_mut().unwrap(), stdin);
     child.wait_with_output().unwrap()
 }
-
 
 #[test]
 fn cli_diagnose_hitl_rejects_non_tty_stdin_without_empty_capture_success() {

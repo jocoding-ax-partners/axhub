@@ -44,7 +44,6 @@ fn json(value: &str) -> serde_json::Value {
     serde_json::from_str(value).expect("hook output should be valid json")
 }
 
-
 #[test]
 fn hook_output_helpers_emit_all_permission_and_context_shapes() {
     let session = json(&session_start_context("session ctx"));

@@ -336,4 +336,16 @@ mod tests {
             Some(PathBuf::from("C:").join("Users\\alice"))
         );
     }
+
+    #[test]
+    fn state_root_fallback_is_stable_and_absolute() {
+        // No HOME and no XDG_STATE_HOME: state_root must still resolve to a
+        // stable, absolute location derived from the process-stable fallback.
+        let root = state_root_from(None, None, PathBuf::from("/var/lib/axhub-runner"));
+        assert_eq!(
+            root,
+            PathBuf::from("/var/lib/axhub-runner/.local/state/axhub")
+        );
+        assert!(root.is_absolute());
+    }
 }
