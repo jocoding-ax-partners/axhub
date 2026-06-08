@@ -208,6 +208,20 @@ if ((-not $env:CI) -and (-not $env:CLAUDE_NON_INTERACTIVE)) {
   }
 }
 
+# Step 2.7: detached CLI binary version-drift fetch (separate channel). Mirrors
+# session-start.sh's cli-latest-fetch-bg fork. Unlike the ureq-based plugin fetch,
+# this shells `axhub update check --json`, so it MUST be guarded by the presence
+# of the `axhub` CLI (Windows parity with the `command -v axhub` guard in the .sh)
+# — otherwise a pre-onboarding user without the CLI hits a spawn error.
+if ((-not $env:CI) -and (-not $env:CLAUDE_NON_INTERACTIVE) -and (Get-Command axhub -ErrorAction SilentlyContinue)) {
+  try {
+    Start-Process -FilePath $Helper -ArgumentList 'cli-latest-fetch-bg' `
+      -NoNewWindow -ErrorAction SilentlyContinue | Out-Null
+  } catch {
+    # Silent — fire-and-forget, never block session-start.
+  }
+}
+
 # Step 3: optional telemetry breadcrumb (only when AXHUB_TELEMETRY=1)
 # State dir mirrors telemetry.ts:40-44 (XDG_STATE_HOME envvar with HOME-relative fallback)
 if ($env:AXHUB_TELEMETRY -eq '1') {
