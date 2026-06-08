@@ -31,6 +31,7 @@ enum Commands {
     CommitGate,
     TddInject,
     TestClassifier,
+    VerifyDeployArtifact,
     /// spec 006 — session-start eager-infra marker gate. exit 0 = run eager
     /// infra (token-init/warmup/quality-context), exit 1 = skip (zero-footprint).
     /// Consumed by the session-start shell wrapper before token-init/warmup.
@@ -111,6 +112,7 @@ fn classify(token: Option<&str>) -> HookClass {
             | "commit-gate"
             | "tdd-inject"
             | "test-classifier"
+            | "verify-deploy-artifact"
             | "classify-exit"
             | "autowire-statusline"
             | "karpathy-inject",
@@ -211,6 +213,7 @@ fn dispatch(command: Commands) -> i32 {
         Commands::CommitGate => run_result(crate::cmd_commit_gate()),
         Commands::TddInject => run_result(crate::cmd_tdd_inject()),
         Commands::TestClassifier => run_result(crate::cmd_test_classifier()),
+        Commands::VerifyDeployArtifact => run_result(crate::cmd_verify_deploy_artifact()),
         Commands::SessionEagerGate => run_result(crate::cmd_session_eager_gate()),
         Commands::RouteDecision(a) => {
             run_result(crate::cmd_route_decision(&a.user_utterance, a.explicit))
@@ -321,6 +324,7 @@ mod tests {
             "commit-gate",
             "tdd-inject",
             "test-classifier",
+            "verify-deploy-artifact",
             "classify-exit",
             "autowire-statusline",
             "karpathy-inject",

@@ -20,6 +20,7 @@
 | `preauth-check` | `axhub-helpers preauth-check` | PreToolUse (Bash) |
 | `prompt-route` | `axhub-helpers prompt-route` | UserPromptSubmit |
 | `classify-exit` | `axhub-helpers classify-exit` | PostToolUse (Bash `axhub …`) |
+| `verify-deploy-artifact` | `axhub-helpers verify-deploy-artifact` via `hooks/axhub-helpers.sh` | PostToolUse (successful `axhub deploy create`; advisory artifact sanity check) |
 | `token-freshness-gate` | `axhub-helpers token-gate` | Phase 3.5 deploy gate. sh body 가 Rust 로 흡수됐어요 (Phase 1.1 sh/ps1 absorption, T3). 기존 env 컨트랙트 (`AXHUB_GATE_*`) 와 exit 65 UNAUTHORIZED 시맨틱 그대로 보존했어요. Windows 사용자도 동일 binary 가 자동 동작해요 (parity gap #1 해소). Phase 4 (F1) 에서 `hooks/token-freshness-gate.sh` thin shim 도 삭제 — SKILL deploy Step 3.5 가 helper 직접 호출. |
 | `session-start-autowire` | `hooks/session-start-autowire.{sh,ps1}` | Claude Code SessionStart — fail-open exit 0; `AXHUB_DISABLE_HOOKS` / `AXHUB_DISABLE_HOOK=session-start-autowire` / `AXHUB_DISABLE_STATUSLINE_AUTOWIRE` 지원; background detach (non-blocking) |
 | `plugin-drift` | `axhub-helpers plugin-latest-fetch-bg` (SessionStart 에서 detached 스폰) + 드리프트 nudge in `cmd_prompt_route` | 플러그인 버전 드리프트 알림. fetch 는 SessionStart 에 캐시 warm (24h TTL, fail-open), nudge 는 UserPromptSubmit 에서 캐시 비교 후 버전당 1회 주입. `AXHUB_DISABLE_HOOKS` / `AXHUB_DISABLE_HOOK=plugin-drift` 지원 (helper 내부 `is_hook_disabled("plugin-drift")` 게이트). 영구 opt-out 은 `plugin-drift-optout` 마커 |
@@ -156,6 +157,7 @@ fn cmd_my_new_hook() -> anyhow::Result<i32> {
 
 `out_json` 의 payload 는 hook 종류별로 spec 이 달라요:
 - PreToolUse (`preauth-check`) → `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}`
+- PostToolUse advisory verifier (`verify-deploy-artifact`) → kill-switch/skip 은 stdout 없이 `Ok(0)`, 의심 신호가 있을 때만 `systemMessage` + `PostToolUse.additionalContext`
 - 그 외 → `{}` (no systemMessage, no decision)
 
 ### 4.2 Shell hook (mirror)
@@ -184,7 +186,10 @@ if ($env:AXHUB_DISABLE_HOOK) {
 ```
 
 shell stub 은 일찍 (binary 호출 전) skip 해서 helper 자체 invocation 도
-회피해요. helper 가 다시 한 번 더 체크하는 건 정합성용 안전망이에요.
+회피해요. `hooks/axhub-helpers.sh` 는 source checkout / clean install 처럼
+helper binary 가 아직 없을 때도 context/telemetry 계열 hook 을 fail-open 해요
+(`verify-deploy-artifact` 포함). helper 가 다시 한 번 더 체크하는 건 정합성용
+안전망이에요.
 
 ---
 

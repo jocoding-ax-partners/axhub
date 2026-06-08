@@ -22,15 +22,20 @@ resolve_helper() {
     Darwin:x86_64|Darwin:amd64) suffix="darwin-amd64" ;;
     Linux:arm64|Linux:aarch64) suffix="linux-arm64" ;;
     Linux:x86_64|Linux:amd64) suffix="linux-amd64" ;;
+    MINGW*:x86_64|MINGW*:amd64|MSYS*:x86_64|MSYS*:amd64|CYGWIN*:x86_64|CYGWIN*:amd64) suffix="windows-amd64" ;;
   esac
 
   local candidates=()
   candidates+=("${ROOT}/bin/axhub-helpers")
+  candidates+=("${ROOT}/bin/axhub-helpers.exe")
   if [ -n "$suffix" ]; then
     candidates+=("${ROOT}/bin/axhub-helpers-${suffix}")
+    candidates+=("${ROOT}/bin/axhub-helpers-${suffix}.exe")
   fi
   candidates+=("${ROOT}/target/release/axhub-helpers")
+  candidates+=("${ROOT}/target/release/axhub-helpers.exe")
   candidates+=("${ROOT}/target/debug/axhub-helpers")
+  candidates+=("${ROOT}/target/debug/axhub-helpers.exe")
 
   local candidate
   for candidate in "${candidates[@]}"; do
@@ -58,7 +63,7 @@ case "${1:-}" in
     printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"axhub helper unavailable"},"systemMessage":"[axhub] helper 바이너리를 찾지 못해 변경 작업을 차단했어요. 설치 상태를 먼저 확인해 주세요."}'
     exit 0
     ;;
-  prompt-route|classify-exit|test-classifier|state-update|commit-gate|tdd-inject)
+  prompt-route|classify-exit|test-classifier|state-update|commit-gate|tdd-inject|verify-deploy-artifact)
     cat >/dev/null || true
     exit 0
     ;;

@@ -56,4 +56,5 @@ pub mod tdd_inject;
 pub mod telemetry;
 pub mod test_classifier;
 pub mod trace_helper;
+pub mod verify_deploy_artifact;
 pub mod verify_helper;

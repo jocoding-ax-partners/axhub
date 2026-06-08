@@ -61,7 +61,7 @@
           },
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-verify-deploy-artifacts.ts",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh verify-deploy-artifact",
             "timeout": 7
           },
           {

@@ -54,3 +54,13 @@ fn autowire_statusline_failopen_on_bad_flag() {
         "autowire-statusline must fail-open (exit 0) on clap parse failures"
     );
 }
+
+#[test]
+fn verify_deploy_artifact_failopen_on_bad_flag() {
+    let out = run_stdin(&["verify-deploy-artifact", "--bogus-unknown-flag"], "");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "verify-deploy-artifact must fail-open (exit 0) on clap parse failures"
+    );
+}

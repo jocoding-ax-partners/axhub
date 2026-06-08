@@ -4,8 +4,9 @@ use axhub_helpers::commit_gate::{evaluate_bash_command, GateDecision};
 use axhub_helpers::consent::decision::{check_decision, issue_decision_token, DecisionVariant};
 use axhub_helpers::consent::jwt::ConsentBinding;
 use axhub_helpers::hook_output::{
-    post_tool_use_context, pre_tool_use_allow, pre_tool_use_ask, pre_tool_use_context,
-    pre_tool_use_deny, session_start_context, user_prompt_context, user_prompt_context_with_system,
+    post_tool_use_context, post_tool_use_context_with_system, pre_tool_use_allow, pre_tool_use_ask,
+    pre_tool_use_context, pre_tool_use_deny, session_start_context, user_prompt_context,
+    user_prompt_context_with_system,
 };
 use axhub_helpers::hook_safety::append_hook_error;
 use axhub_helpers::karpathy_inject::{user_prompt_karpathy_inject, MAX_KARPATHY_CHARS};
@@ -91,6 +92,12 @@ fn hook_output_helpers_emit_all_permission_and_context_shapes() {
     assert_eq!(pre["hookSpecificOutput"]["additionalContext"], "pre ctx");
     let post = json(&post_tool_use_context("post ctx"));
     assert_eq!(post["hookSpecificOutput"]["hookEventName"], "PostToolUse");
+    let post_with_system = json(&post_tool_use_context_with_system("post ctx", "visible"));
+    assert_eq!(post_with_system["systemMessage"], "visible");
+    assert_eq!(
+        post_with_system["hookSpecificOutput"]["additionalContext"],
+        "post ctx"
+    );
 
     let ask = json(&pre_tool_use_ask("needs review"));
     assert_eq!(ask["hookSpecificOutput"]["permissionDecision"], "ask");

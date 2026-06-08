@@ -7,6 +7,8 @@
 
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
@@ -25,6 +27,23 @@ function runShell(script: string, env: Record<string, string>) {
     if (!(key in env)) delete finalEnv[key];
   }
   return spawnSync("bash", [join(root, script)], {
+    env: finalEnv,
+    input: "",
+    timeout: 5_000,
+  });
+}
+
+function runHelperWrapper(args: string[], env: Record<string, string>) {
+  const emptyPluginRoot = mkdtempSync(join(tmpdir(), "axhub-helper-missing-"));
+  const finalEnv: Record<string, string> = {
+    ...process.env,
+    CLAUDE_PLUGIN_ROOT: emptyPluginRoot,
+    ...env,
+  };
+  for (const key of ["AXHUB_DISABLE_HOOKS", "AXHUB_DISABLE_HOOK", "DISABLE_AXHUB"]) {
+    if (!(key in env)) delete finalEnv[key];
+  }
+  return spawnSync("bash", [join(root, "hooks/axhub-helpers.sh"), ...args], {
     env: finalEnv,
     input: "",
     timeout: 5_000,
@@ -78,3 +97,21 @@ describe("hooks/session-start.sh kill switch", () => {
 // migrated to crates/axhub-helpers/tests/token_gate_test.rs (kill switch
 // AXHUB_DISABLE_HOOKS / AXHUB_DISABLE_HOOK / DISABLE_AXHUB) which exercises
 // the Rust subcommand the SKILL now calls directly.
+
+describe("hooks/axhub-helpers.sh deploy verifier fail-open", () => {
+  test("missing helper binary silently fail-opens verify-deploy-artifact", () => {
+    const out = runHelperWrapper(["verify-deploy-artifact"], {});
+    expect(out.status).toBe(0);
+    expect(out.stdout.toString()).toBe("");
+    expect(out.stderr.toString()).toBe("");
+  });
+
+  test("per-hook kill-switch name still stays silent when helper is missing", () => {
+    const out = runHelperWrapper(["verify-deploy-artifact"], {
+      AXHUB_DISABLE_HOOK: "verify-deploy-artifact,other",
+    });
+    expect(out.status).toBe(0);
+    expect(out.stdout.toString()).toBe("");
+    expect(out.stderr.toString()).toBe("");
+  });
+});
