@@ -135,13 +135,13 @@ fn write_cache(cache: &LatestCache) -> std::io::Result<()> {
     Ok(())
 }
 
-fn fetch_latest_tag() -> Option<String> {
+fn fetch_latest_tag_from_url(url: &str) -> Option<String> {
     let config = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(FETCH_TIMEOUT_SECS)))
         .build();
     let agent: ureq::Agent = config.into();
     let mut resp = agent
-        .get(RELEASES_LATEST_URL)
+        .get(url)
         .header("User-Agent", "axhub-helpers")
         .header("Accept", "application/vnd.github+json")
         .call()
@@ -175,6 +175,10 @@ fn nudge_text(current: &str, latest: &str) -> String {
 /// Background fetch entry point (`axhub-helpers plugin-latest-fetch-bg`).
 /// Best-effort + TTL-gated; always returns 0 (fail-open hook contract).
 pub fn cmd_plugin_latest_fetch_bg() -> i32 {
+    cmd_plugin_latest_fetch_bg_with_url(RELEASES_LATEST_URL)
+}
+
+fn cmd_plugin_latest_fetch_bg_with_url(url: &str) -> i32 {
     if is_hook_disabled("plugin-drift") {
         return 0;
     }
@@ -184,7 +188,7 @@ pub fn cmd_plugin_latest_fetch_bg() -> i32 {
             return 0;
         }
     }
-    if let Some(latest) = fetch_latest_tag() {
+    if let Some(latest) = fetch_latest_tag_from_url(url) {
         let _ = write_cache(&LatestCache {
             latest,
             fetched_at: now_unix(),
@@ -245,12 +249,112 @@ pub fn plugin_drift_context() -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsString;
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::thread;
 
     fn cache(latest: &str, fetched_at: u64) -> LatestCache {
         LatestCache {
             latest: latest.to_string(),
             fetched_at,
         }
+    }
+
+    struct EnvGuard {
+        vars: Vec<(&'static str, Option<OsString>)>,
+    }
+
+    impl EnvGuard {
+        fn clear() -> Self {
+            let keys = [
+                "AXHUB_DISABLE_HOOKS",
+                "AXHUB_DISABLE_HOOK",
+                "DISABLE_AXHUB",
+                "CI",
+                "CLAUDE_NON_INTERACTIVE",
+                "XDG_CACHE_HOME",
+                "XDG_STATE_HOME",
+            ];
+            let vars = keys
+                .into_iter()
+                .map(|key| (key, std::env::var_os(key)))
+                .collect();
+            for key in keys {
+                std::env::remove_var(key);
+            }
+            Self { vars }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            for (key, value) in self.vars.drain(..) {
+                match value {
+                    Some(value) => std::env::set_var(key, value),
+                    None => std::env::remove_var(key),
+                }
+            }
+        }
+    }
+
+    fn serve_once(status: &str, body: &str) -> (String, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let status = status.to_string();
+        let body = body.to_string();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            drain_request(&mut stream);
+            let response = format!(
+                "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+        });
+        (format!("http://{addr}/latest"), handle)
+    }
+
+    fn serve_connection_probe(status: &str, body: &str) -> (String, thread::JoinHandle<bool>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let status = status.to_string();
+        let body = body.to_string();
+        let handle = thread::spawn(move || {
+            let deadline = std::time::Instant::now() + Duration::from_millis(150);
+            while std::time::Instant::now() < deadline {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        drain_request(&mut stream);
+                        let response = format!(
+                            "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+                            body.len()
+                        );
+                        stream.write_all(response.as_bytes()).unwrap();
+                        return true;
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(_) => return false,
+                }
+            }
+            false
+        });
+        (format!("http://{addr}/latest"), handle)
+    }
+
+    fn drain_request(stream: &mut TcpStream) {
+        let mut buf = [0_u8; 1024];
+        let _ = stream.read(&mut buf);
+    }
+
+    fn closed_local_url() -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        format!("http://{addr}/latest")
     }
 
     #[test]
@@ -344,5 +448,114 @@ mod tests {
         let json = serde_json::to_string(&c).unwrap();
         let back: LatestCache = serde_json::from_str(&json).unwrap();
         assert_eq!(c, back);
+    }
+
+    #[test]
+    fn fetch_latest_tag_from_url_reads_and_normalizes_release_tag() {
+        let (url, handle) = serve_once("200 OK", r#"{"tag_name":"v99.0.0"}"#);
+
+        assert_eq!(fetch_latest_tag_from_url(&url), Some("99.0.0".to_string()));
+
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn fetch_latest_tag_from_url_fails_open_for_rate_limit_malformed_and_network() {
+        let (rate_url, rate_handle) = serve_once("429 Too Many Requests", r#"{"message":"rate"}"#);
+        assert_eq!(fetch_latest_tag_from_url(&rate_url), None);
+        rate_handle.join().unwrap();
+
+        let (malformed_url, malformed_handle) = serve_once("200 OK", r#"{"name":"missing tag"}"#);
+        assert_eq!(fetch_latest_tag_from_url(&malformed_url), None);
+        malformed_handle.join().unwrap();
+
+        assert_eq!(fetch_latest_tag_from_url(&closed_local_url()), None);
+    }
+
+    #[test]
+    fn write_cache_is_atomic_and_roundtrips() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+
+        write_cache(&cache("99.0.0", 12345)).unwrap();
+
+        let path = plugin_latest_cache_path().unwrap();
+        assert_eq!(read_cache(), Some(cache("99.0.0", 12345)));
+        assert!(path.exists());
+        assert!(
+            !path.with_extension("json.tmp").exists(),
+            "atomic temp file should not remain after successful rename"
+        );
+    }
+
+    #[test]
+    fn fetch_command_skips_network_while_cache_is_fresh() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        write_cache(&cache("88.0.0", now_unix())).unwrap();
+        let (url, handle) = serve_connection_probe("200 OK", r#"{"tag_name":"v99.0.0"}"#);
+
+        assert_eq!(cmd_plugin_latest_fetch_bg_with_url(&url), 0);
+
+        assert_eq!(read_cache().unwrap().latest, "88.0.0");
+        assert!(
+            !handle.join().unwrap(),
+            "fresh cache should skip HTTP fetch"
+        );
+    }
+
+    #[test]
+    fn fetch_command_refreshes_stale_cache() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        write_cache(&cache("88.0.0", now_unix() - CACHE_TTL_SECS - 1)).unwrap();
+        let (url, handle) = serve_once("200 OK", r#"{"tag_name":"v99.0.0"}"#);
+
+        assert_eq!(cmd_plugin_latest_fetch_bg_with_url(&url), 0);
+
+        assert_eq!(read_cache().unwrap().latest, "99.0.0");
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn fetch_command_returns_zero_when_cache_write_fails() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_home_file = tempfile::NamedTempFile::new().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_home_file.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        let (url, handle) = serve_once("200 OK", r#"{"tag_name":"v99.0.0"}"#);
+
+        assert_eq!(cmd_plugin_latest_fetch_bg_with_url(&url), 0);
+        assert!(read_cache().is_none());
+
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn optout_command_writes_marker() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+
+        assert_eq!(cmd_plugin_drift_optout(), 0);
+
+        assert!(plugin_drift_optout_path().unwrap().exists());
     }
 }
