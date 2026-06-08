@@ -84,6 +84,15 @@ describe("init route hint surfaces the GitHub App install state", () => {
     expect(additionalContext).toContain("axhub github accounts list --json");
     expect(systemMessage).toContain("GitHub App 계정 설치 상태");
 
+    // install_url must be shown even for already-installed accounts (the
+    // add-another-org entry point). The "그냥 넘어가요" / "just move on"
+    // wording suppressed the link for installed accounts — lock against it.
+    expect(additionalContext).toContain("Always show `install_url`");
+    expect(additionalContext).toContain("already-installed");
+    expect(additionalContext).not.toContain("just move on");
+    expect(systemMessage).toContain("항상 같이 보여줘요");
+    expect(systemMessage).not.toContain("그냥 넘어가요");
+
     // the surface sits before the app-name step, not after approval
     const ghIndex = additionalContext.indexOf("GitHub App install state");
     const nameIndex = additionalContext.indexOf("ask for the app name");
