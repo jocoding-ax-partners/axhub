@@ -47,6 +47,7 @@ model: sonnet
 |------|-------------------|
 | Step 1 CLI 존재 확인 | "axhub 도구가 있는지 보고 있어요." |
 | Step 2 template 목록 조회 | "사용할 수 있는 템플릿을 확인하고 있어요." |
+| Step 2.5 GitHub App 설치 안내 | "GitHub App 설치 상태를 보여줘요. 이미 됐으면 넘어가요." |
 | Step 3 template 선택 | "어떤 종류 프로젝트를 만들지 골라요." |
 | Step 4 앱 이름 입력 | "앱 이름을 정해요." |
 | Step 5 bootstrap dry-run | "어떤 작업을 할지 미리 보여줘요." |
@@ -118,6 +119,22 @@ To start an axhub app:
    `schema_version` 은 응답 검증용 internal primitive 예요 — raw 값을 사용자 chat 에 echo 하지 않아요. `items[]` 의 `id` 또는 built-in alias (`react` / `nextjs` / `astro`) 를 `--template` 인자로 써요.
 
    on exit 4 (auth 만료, CLI `axhub apps templates list` — 옛 sysexits 65 아님) → "다시 로그인해줘"라고 말하면 이어서 처리할 수 있다고 안내해요. on exit 8 (tenant 미해석) → `axhub profile current --json` 안내. 그 외 비정상 종료는 "설치 상태 진단해줘"라고 말하면 점검할 수 있다고 안내해요.
+
+2.5. **GitHub App 설치 상태를 보여줘요 (read-only, 비차단).**
+
+   template 목록이 정상적으로 오면 로그인이 된 거라, 이어서 GitHub App 설치 상태를 한 번 보여줘요. 이건 앱 만들기를 막지 않아요 — 이미 설치했거나 나중에 할 사람은 그냥 다음으로 넘어가요.
+
+   ```bash
+   axhub github accounts list --json   # data.accounts[]: login, installed, install_url
+   ```
+
+   `data.accounts[]` 를 `installed:true` / `installed:false` 로 나눠서 아래 셋 중 하나를 한국어로 보여줘요. `install_url` 은 아무 entry 에서나 읽어요 (전부 같아요). `installation_id` 같은 internal 값은 echo 하지 말고 `login` 과 `install_url` 만 보여줘요. 링크는 보여주기만 하고 자동으로 열지 않아요.
+
+   - 설치된 계정 ≥1: "GitHub App 이 설치된 계정: `<login...>`. 다른 org/계정을 더 붙이려면: `<install_url>`"
+   - 미설치 계정만/혼재: "GitHub App 이 안 깔린 계정: `<login...>`. 설치 링크: `<install_url>`"
+   - 빈 목록: "아직 GitHub App 이 설치된 계정이 없어요. 아래 만들기를 진행하면 GitHub 연결이 필요한 순간 자동으로 안내가 떠요."
+
+   이 안내는 인지 + 다른 계정 추가용이에요. 실제 from-scratch 설치는 bootstrap saga 가 GitHub 연결이 필요할 때 자동으로 처리해요 (Step 7a 의 `device_code_issued`).
 
 ## 템플릿 선택 가이드
 
