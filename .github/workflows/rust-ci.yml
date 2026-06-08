@@ -25,7 +25,10 @@ jobs:
       # failure. ubuntu / windows cache 유지.
       - uses: Swatinem/rust-cache@v2
         if: matrix.os != 'macos-latest'
-      - run: cargo test --workspace
+      # --test-threads=1: helper tests mutate process-global env (XDG_*), which
+      # races under the default parallel runner and poisons the shared
+      # PROCESS_ENV_LOCK on a single panic. Serial execution is deterministic.
+      - run: cargo test --workspace -- --test-threads=1
       - uses: oven-sh/setup-bun@v2
         if: matrix.os == 'ubuntu-latest'
       - uses: taiki-e/install-action@cargo-llvm-cov

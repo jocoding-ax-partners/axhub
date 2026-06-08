@@ -88,22 +88,24 @@ To upgrade the plugin:
 
    If plugin.json version ≠ helper version, the install is corrupted; surface: "플러그인 파일이 일치하지 않아요. 재설치를 권해드려요. '/plugin install axhub@axhub --force' 라고 슬래시 명령으로 입력해주세요."
 
-3. **Check marketplace latest.** If the marketplace is reachable, fetch latest:
+3. **Check the latest release (live).** Run the helper's explicit update check. It does a **fresh GitHub releases fetch**, so it sees real new versions — the bundled `marketplace.json` is stale-by-design (it ships *with* the plugin, so it always reports the installed version as latest). Mirrors the CLI's `axhub update check`. `$HELPER` was resolved in Step 2.
 
    Unix / Git Bash:
 
    ```bash
-   cat "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/marketplace.json" | jq -r '.plugins[] | select(.name=="axhub") | (.latest_version // .version // empty)'
+   "$HELPER" plugin-update-check
    ```
 
    Windows PowerShell:
 
    ```powershell
-   $entry = ((Get-Content "$env:CLAUDE_PLUGIN_ROOT\.claude-plugin\marketplace.json" -Raw | ConvertFrom-Json).plugins | Where-Object { $_.name -eq "axhub" } | Select-Object -First 1)
-   if ($entry.latest_version) { $entry.latest_version } else { $entry.version }
+   & "$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe" plugin-update-check
    ```
 
-   On parse failure or absent entry, fall back to: "마켓플레이스 정보를 못 가져왔어요. 수동으로 확인해주세요."
+   항상 한 줄 JSON 을 반환해요: `{"current":"0.9.37","latest":"0.9.38","has_update":true,"checked":true}` (버전은 `v` 접두 없음 — 표시할 때 `v` 를 붙여요).
+
+   - **`checked:false`** (네트워크/원격 확인 실패): "지금은 원격 버전 확인이 안 돼요. 잠시 후 다시 시도하거나 수동으로 봐주세요." 라고 안내하고 멈춰요. **틀린 "최신이에요" 를 말하지 않아요** (이게 stale marketplace.json 의 핵심 버그였어요).
+   - `checked:true` 면 `current` / `latest` / `has_update` 로 다음 Step 으로 진행해요.
 
 4. **Compare and render Korean diff card:**
 
@@ -116,10 +118,10 @@ To upgrade the plugin:
    <STATE_LINE>
    ```
 
-   `STATE_LINE`:
-   - `current == latest` → "이미 최신 플러그인이에요. 업그레이드 안 받아도 돼요."
-   - `current < latest` → "새 플러그인이 나왔어요. 업그레이드 권장."
-   - `current > latest` → "프리뷰 버전이에요. 안정판 (v<LATEST>)으로 다운그레이드 가능해요."
+   `STATE_LINE` (Step 3 JSON 기준):
+   - `has_update: true` → "새 플러그인이 나왔어요. 업그레이드 권장."
+   - `has_update: false` 이고 `current == latest` → "이미 최신 플러그인이에요. 업그레이드 안 받아도 돼요."
+   - `has_update: false` 이고 `current != latest` (설치본이 릴리즈보다 높음) → "프리뷰 버전이에요. 안정판 (v<LATEST>)으로 다운그레이드 가능해요."
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — upgrade 명령 안내 → `show` (안내만, destructive 작업 안 해요).
 
@@ -165,7 +167,8 @@ To upgrade the plugin:
 - NEVER attempt to modify `${CLAUDE_PLUGIN_ROOT}` files directly — plugin self-modification is out of scope for v0.1 (recovery-flows.md "version-skew §3b" rule).
 - NEVER auto-execute the slash command on the user's behalf — they must type it themselves.
 - NEVER conflate plugin version with CLI version — they upgrade independently and have separate skills.
-- NEVER drop the marketplace check silently — if unreachable, tell the user.
+- NEVER 번들된 `marketplace.json` / `plugin.json` 버전을 "최신" 판단의 원격 소스로 쓰지 않아요 — 둘 다 플러그인과 함께 배포되는 stale 스냅샷이에요. 원격 최신은 항상 `plugin-update-check` (live GitHub releases fetch) 로 확인해요.
+- NEVER `checked:false` (원격 확인 실패) 를 "최신이에요" 로 말하지 않아요 — 확인 못 했다고 정직하게 안내해요.
 
 ## Additional Resources
 
