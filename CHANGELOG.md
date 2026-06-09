@@ -4,6 +4,29 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.45](///compare/v0.9.44...v0.9.45) (2026-06-09)
+
+업데이트 알림과 Windows 헬퍼 발견을 실제로 써 보며 드러난 세 가지를 고쳤어요. 첫째, Windows 에서 `upgrade` 같은 스킬이 `$env:CLAUDE_PLUGIN_ROOT` 가 빈 값이라 `C:\.claude-plugin\plugin.json` 을 찾다 helper 를 못 찾았어요 — Claude Code 가 hook 에는 `CLAUDE_PLUGIN_ROOT` 를 주지만 tool-call 셸에는 안 줘서예요. 스킬을 N개 고치는 대신 session-start 가 `$CLAUDE_ENV_FILE` 에 `export CLAUDE_PLUGIN_ROOT` 한 줄을 append 해서 이후 tool-call 셸로 전파하게 했어요(매 세션 rewrite 라 버전 bump 에도 stale 안 됨). 둘째, 플러그인과 CLI 둘 다 새 버전이면 알림이 턴을 갈라치며 따로따로 떴는데, 둘 다 pending 이면 하나의 통합 `<axhub-update>` AskUserQuestion 으로 합쳤어요. 셋째, 플러그인 업데이트가 `/plugin update` 슬래시 안내로만 끝났는데, `claude plugin update <plugin>` 은 슬래시가 아니라 `claude` CLI 명령이라 에이전트가 직접 실행할 수 있다는 걸 확인하고(검증: `axhub@axhub` 0.9.43→0.9.44), scope 자동 감지 후 직접 받도록 바꿨어요. 적용은 재시작 1번만 사용자 몫이에요.
+
+### Test baseline
+
+- `cargo test -p axhub-helpers`: all green. unified nudge 통합/스누즈/단일채널 테스트 + `unified_drift_*` 빌더 유닛.
+- `tests/session-start-env-file.test.ts` 3 pass (CLAUDE_ENV_FILE append / 보존 / fail-open). 전체 session-start 훅 16 pass.
+- `bun run lint:hook-inject` OK (`<axhub-update>` route-control 마커), `skill:doctor` 45/45, `lint:tone` 0 err, `lint:keywords` no diff.
+- `bun test`: 1471 pass / 2 fail (둘 다 pre-existing README·PLAN 버전 snapshot drift, 무관).
+- `release:check` 5 cross-arch 바이너리 빌드 + 버전 assert green (0.9.45).
+
+### Honest tradeoff
+
+- CLAUDE_ENV_FILE 의 PowerShell cross-shell 전파는 Claude Code 문서가 "Bash commands" 만 보장해서 **Windows 수동 검증**이 필요해요. 안 닿으면 후속으로 스킬별 resolution fallback 을 추가해요(변경은 fail-open append 라 regression 위험 없음).
+- 플러그인 **적용**은 Claude Code 가 시작 때 로드해서 재시작 1번이 불가피해요. 다운로드·교체는 자동이고 적용 트리거만 사용자예요.
+
+### Fixed
+
+* session-start 가 CLAUDE_PLUGIN_ROOT 를 tool-call 셸로 전파 ([#194](undefined/undefined/undefined/issues/194)) 780085d
+* 플러그인 업데이트를 에이전트가 직접 실행 (claude plugin update) ([#196](undefined/undefined/undefined/issues/196)) 52bf608
+* 플러그인+CLI 업데이트 알림을 단일 통합 nudge 로 합침 ([#195](undefined/undefined/undefined/issues/195)) b1c0640
+
 ## [0.9.44](///compare/v0.9.43...v0.9.44) (2026-06-09)
 
 0.9.43 의 tenant-picker(#188)를 실제로 온보딩으로 첫 앱을 만들어 보니 두 버그가 드러나 고쳤어요. 첫째, tenant L1 resolver(`tenant.rs`)가 실제 axhub CLI v0.18 스키마를 한 번도 안 거치고 가짜 스키마로 작성돼서, 사용자가 테넌트 2개에 속해 있어도 picker 가 영영 안 뜨고 빈 tenant 로 배포됐어요. 세 군데가 어긋났어요 — `tenants list --json` 은 bare 배열이 아니라 `{data:{data:[...]}}` envelope 이고, 식별자 키는 `id`/`slug` 가 아니라 `tenant_id`/`tenant_slug` 이고, L3 fallback 이 찾던 `auth status.current_team_id` 필드는 존재하지 않고 대신 `tenants[]`+`is_active` 로 나와요. 유닛 테스트 14개가 전부 가짜 스키마라 통과해서 false confidence 로 버그가 그대로 ship 됐던 거라, 이번엔 테스트를 실제 CLI 스키마 fixture(envelope + tenant_id + tenants[] active)로 교체해서 재발을 막았어요. 둘째, 배포 후 hero URL 이 라이브 주소(`https://<subdomain>.<tenant_slug>.axhub.ai`)가 아니라 관리 페이지(`app.axhub.ai/apps/<slug>`)였어서, `axhub apps get` 의 `access_url` 을 우선 쓰도록 `watch_deploy_until_terminal` 과 init SKILL 을 바꿨어요.
