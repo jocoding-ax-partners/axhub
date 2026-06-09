@@ -5,7 +5,7 @@
 ### 신규
 
 - 5 quality SKILL: axhub-review, axhub-debug, axhub-ship, axhub-tdd, axhub-plan
-- 3 agent: axhub-reviewer, axhub-debugger, axhub-shipper
+- 8 agent md: 3 quality (`axhub-reviewer`, `axhub-debugger`, `axhub-shipper`) + 5 migrate planning (`axhub-migrate-discoverer`, `axhub-migrate-planner`, `axhub-migrate-architect`, `axhub-migrate-critic`, `axhub-migrate-reviewer`)
 - using-axhub-quality megaskill
 - karpathy-guidelines UserPromptSubmit reminder
 - `.axhub-state/quality.json` per-repo state

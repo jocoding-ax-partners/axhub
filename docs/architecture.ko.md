@@ -69,7 +69,8 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요:
 │                 → 전부 bin/axhub-helpers 서브커맨드로 위임 (fail-open) │
 │   skills/       32개 SKILL.md — 자연어 트리거 워크플로우              │
 │   commands/     9개 슬래시 (+ 한글 alias)                            │
-│   agents/       3개 quality sub-agent                                │
+│   agents/       8개 agent md (3 quality + 5 migrate planning)       │
+
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │ Bash tool 호출
                                 ▼
@@ -118,7 +119,8 @@ axhub/
 │   └── marketplace.json     # 마켓플레이스 등록 엔트리 — Claude Code 가 이걸로 플러그인 발견
 ├── skills/<name>/SKILL.md    # 32개 NL 트리거 워크플로우 (+ _template 스캐폴드 원본)
 ├── commands/*.md             # 9개 슬래시 명령 (deploy/배포/login/status/logs/apps/doctor/update/help)
-├── agents/*.md               # 3개 quality sub-agent (axhub-debugger/reviewer/shipper)
+├── agents/*.md               # 8개 agent md (quality 3 + migrate planning 5)
+
 ├── hooks/
 │   ├── hooks.json            # 모든 hook 이벤트 → 명령 매핑 (단일 등록 파일)
 │   ├── session-start.sh/.ps1 # SessionStart 부트스트랩 (binary 자동설치·warmup·token-init)
@@ -465,6 +467,7 @@ env AXHUB_TOKEN (PAT) → $XDG_CONFIG_HOME/axhub-plugin/token (파일) → OS ke
 - full consensus 에서는 planner/architect/critic role-agent 결과를 `.axhub/plan/runs/<run_id>/stages/*.md` 와 meta 로 남겨요. reviewer stage 는 전용 task agent 가 없어서 read-only `executor` lane 으로 completeness / scope sanity check 를 남겨요. 최종에 `approval.json.state=pending_approval`, `run.json.state=pending_approval` 로 올린 뒤 멈춰요.
 - 승인되면 helper 의 `migrate-approve` 가 `.axhub/spec/apps/<app_key>/latest.json` 을 승격하고 run/approval/spec 상태를 `approved` 로 올려요. approval 전에는 latest pointer 를 만들지 않아요.
 - wave 병렬화는 full consensus 내부의 same-app 독립 unit 에서만 허용해요. planner → architect → critic → reviewer 순서 자체는 직렬이고, write target 충돌·cycle·app_key mismatch·independence proof 부족이면 즉시 serial fallback 이에요.
+- 플러그인 전용 migrate planning agent prompt 는 `agents/axhub-migrate-{discoverer,planner,architect,critic,reviewer}.md` 로 따로 ship 해요. plugin runtime 이 GJC built-in role-agent 없이 이 md 파일을 직접 읽어도 같은 책임 분리와 출력 형식을 유지하게 해요.
 
 ### 4.8 부가 시스템 (품질·관측·UX)
 

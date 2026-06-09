@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 
 const read = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
+
 
 interface CorpusRow {
   id: string;
@@ -151,6 +152,17 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain("& $Helper migrate-plan --dir $MigrateDir --app-path $env:APP_PATH --json");
   });
 
+  test("ships dedicated migrate planning agent markdown files", () => {
+    for (const agent of [
+      "axhub-migrate-discoverer",
+      "axhub-migrate-planner",
+      "axhub-migrate-architect",
+      "axhub-migrate-critic",
+      "axhub-migrate-reviewer",
+    ]) {
+      expect(existsSync(join(REPO_ROOT, "agents", `${agent}.md`))).toBe(true);
+    }
+  });
   test("corpus.100 routes core existing-app natural language to migrate", () => {
     const rows = parseJsonl("tests/corpus.100.jsonl");
     for (const utterance of requiredUtterances) {
