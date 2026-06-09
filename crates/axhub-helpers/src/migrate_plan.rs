@@ -2512,83 +2512,49 @@ mod tests {
     }
 
     #[test]
-    fn render_wrapper_preview_carries_the_pack_constructor_contract() {
-        // Cross-drift guard: each SDK knowledge pack §1 is a normalized copy of
-        // render_wrapper_preview — the wrapper seed of truth. These per-language
-        // tokens are the client-construction contract both must carry; if the
-        // helper's wrapper drifts off them, the packs must be regenerated. The
-        // pack side is asserted in tests/sdk-knowledge-pack.test.ts.
-        let cases: &[(&str, &[&str])] = &[
-            (
-                "node",
-                &[
-                    "new AxHubClient(",
-                    "tokenType: 'pat'",
-                    "AX_HUB_PAT",
-                    "defaultTenantId",
-                ],
-            ),
-            (
-                "python",
-                &[
-                    "AxHubClient(",
-                    "token_type=TokenType.PAT",
-                    "AXHUB_TOKEN",
-                    "default_tenant_id",
-                ],
-            ),
-            (
-                "go",
-                &[
-                    "axhub.NewClient(",
-                    "TokenTypePAT",
-                    "AXHUB_TOKEN",
-                    "DefaultTenantID",
-                ],
-            ),
-            (
-                "ruby",
-                &[
-                    "AxHub::Client.new(",
-                    "token_type: :pat",
-                    "AXHUB_TOKEN",
-                    "default_tenant_id",
-                ],
-            ),
-            (
-                "java",
-                &[
-                    "AxHubClient.builder()",
-                    ".tokenType(TokenType.PAT)",
-                    "AXHUB_TOKEN",
-                    ".defaultTenantId(",
-                ],
-            ),
-            (
-                "kotlin",
-                &[
-                    "AxHubKotlinClient(",
-                    "tokenType = TokenType.PAT",
-                    "AXHUB_TOKEN",
-                    "defaultTenantId =",
-                ],
-            ),
-        ];
-        for (lang, tokens) in cases {
-            let wrapper = super::render_wrapper_preview(lang, "", &[]);
-            for token in *tokens {
-                assert!(
-                    wrapper.contains(token),
-                    "{lang} wrapper seed missing contract token {token:?}"
-                );
-            }
+    fn pack_client_init_equals_render_wrapper_preview_full_body() {
+        // Full-body cross-drift guard (Item 2): each SDK knowledge pack §1 is the
+        // canonical wrapper, a normalized copy of render_wrapper_preview (the seed
+        // of truth). Assert the WHOLE body matches, not just tokens — any drift in
+        // either copy fails. Normalization mirrors the distiller: drop the node
+        // `// framework:` line and map the go/java/kotlin package default (used
+        // when no source files are scanned) to the `{package}` placeholder the
+        // pack carries. This supersedes the curated token list in
+        // tests/sdk-knowledge-pack.test.ts.
+        fn normalize_seed(lang: &str, seed: &str) -> String {
+            seed.lines()
+                .filter(|line| !line.trim_start().starts_with("// framework:"))
+                .map(|line| match lang {
+                    "go" => line.replace("package main", "package {package}"),
+                    "java" => line.replace("package ai.axhub.sdk;", "package {package};"),
+                    "kotlin" => line.replace("package ai.axhub.sdk", "package {package}"),
+                    _ => line.to_string(),
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+                .trim_end()
+                .to_string()
         }
-        // base_url is identical across the typed-init languages (node omits it).
-        // Guards an api.axhub.ai change in the helper from drifting off the packs.
-        for lang in ["python", "go", "ruby", "java", "kotlin"] {
-            assert!(
-                super::render_wrapper_preview(lang, "", &[]).contains("https://api.axhub.ai"),
-                "{lang} wrapper seed missing base_url contract"
+        fn pack_client_init(md: &str) -> String {
+            let body = &md[md.find("## 1. Client init").expect("pack has §1")..];
+            let after_open = &body[body.find("```").expect("§1 opening fence") + 3..];
+            let content = &after_open[after_open.find('\n').expect("fence lang tag") + 1..];
+            content[..content.find("```").expect("fence close")]
+                .trim_end()
+                .to_string()
+        }
+        let pack_dir = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../skills/migrate/sdk-knowledge"
+        );
+        for lang in ["node", "python", "go", "ruby", "java", "kotlin"] {
+            let seed = normalize_seed(lang, &super::render_wrapper_preview(lang, "", &[]));
+            let pack = std::fs::read_to_string(format!("{pack_dir}/{lang}.md"))
+                .unwrap_or_else(|e| panic!("read {lang}.md: {e}"));
+            assert_eq!(
+                pack_client_init(&pack),
+                seed,
+                "{lang}: pack §1 drifted from render_wrapper_preview — regenerate the pack"
             );
         }
     }
