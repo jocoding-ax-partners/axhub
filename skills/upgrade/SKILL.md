@@ -123,16 +123,16 @@ To upgrade the plugin:
    - `has_update: false` 이고 `current == latest` → "이미 최신 플러그인이에요. 업그레이드 안 받아도 돼요."
    - `has_update: false` 이고 `current != latest` (설치본이 릴리즈보다 높음) → "프리뷰 버전이에요. 안정판 (v<LATEST>)으로 다운그레이드 가능해요."
 
-**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — upgrade 명령 안내 → `show` (안내만, destructive 작업 안 해요).
+**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — 업데이트 묻기 → `지금은 그대로` (비대화형에서는 플러그인 업데이트를 자동 실행하지 않아요).
 
-5. **Surface upgrade instructions (manual — Claude Code does not auto-execute plugin self-modification).** AskUserQuestion:
+5. **Offer to update.** AskUserQuestion:
 
    ```json
    {
-     "question": "플러그인 업그레이드 명령 보여줄까요?",
-     "header": "업그레이드 안내",
+     "question": "플러그인을 최신 버전으로 업데이트할까요?",
+     "header": "업데이트",
      "options": [
-       {"label": "네, 명령 보여줘", "value": "show", "description": "/plugin update 슬래시 명령 안내"},
+       {"label": "업데이트할래요", "value": "update", "description": "claude plugin update 로 바로 받아요 (적용은 Claude Code 재시작)"},
        {"label": "릴리즈 노트 보기", "value": "notes", "description": "변경사항 자세히"},
        {"label": "지금은 그대로", "value": "skip", "description": "현재 버전 유지"},
        {"label": "그만 볼래요 (다시 안 봄)", "value": "optout", "description": "버전 알림을 영구히 꺼요"}
@@ -142,13 +142,18 @@ To upgrade the plugin:
 
    **`optout` 옵션은 자동 버전 드리프트 알림 (prompt-route 가 띄우는 nudge) 에서 들어왔을 때만 의미 있어요.** 사용자가 알림 자체를 그만 보고 싶을 때 고르는 escape hatch 예요.
 
-6. **On `show`.** Render the literal slash command for the user to invoke:
+6. **On `update`.** 플러그인을 직접 받아요. `claude plugin update` 는 슬래시가 아니라 `claude` CLI 명령이라 에이전트가 실행할 수 있어요 (적용은 Claude Code 재시작 때 돼요).
 
-   > "Claude Code 채팅창에 다음 슬래시 명령을 입력해주세요:
-   >
-   > `/plugin update axhub@axhub`
-   >
-   > Claude Code 자체가 플러그인 업데이트를 처리해요. 끝나면 새 세션을 시작해주세요."
+   먼저 설치 scope 를 확인해요 — `claude plugin list` 출력에서 `axhub@axhub` 항목의 `Scope:` 값(user/project/local/managed 중 하나)을 읽은 뒤, 그 scope 로 업데이트해요:
+
+   ```bash
+   claude plugin update axhub@axhub --scope <scope>
+   ```
+
+   결과 처리:
+   - `✔ … updated from v<X> to v<Y> … Restart to apply` → "v<Y> 받았어요. Claude Code 를 재시작하면 적용돼요." 라고 안내해요. 에이전트가 세션을 재시작할 수는 없어서 재시작은 사용자가 해요.
+   - 이미 최신 (`up to date`) → "이미 최신이에요." 라고만 말해요.
+   - `claude` CLI 가 없거나 update 가 실패하면 fallback 으로 슬래시 명령을 안내해요: "Claude Code 채팅창에 `/plugin update axhub@axhub` 를 입력해주세요. 끝나면 재시작해주세요."
 
 6.5. **On `optout`.** 사용자가 버전 알림을 영구히 끄고 싶어 해요. 영구 opt-out 마커를 기록해요:
 
@@ -164,8 +169,8 @@ To upgrade the plugin:
 
 ## NEVER
 
-- NEVER attempt to modify `${CLAUDE_PLUGIN_ROOT}` files directly — plugin self-modification is out of scope for v0.1 (recovery-flows.md "version-skew §3b" rule).
-- NEVER auto-execute the slash command on the user's behalf — they must type it themselves.
+- NEVER attempt to modify `${CLAUDE_PLUGIN_ROOT}` files directly — 플러그인 업데이트는 공식 `claude plugin update` 로만 해요 (cache 디렉토리 직접 조작은 Claude Code state 와 desync — recovery-flows.md "version-skew §3b" rule).
+- NEVER 슬래시 명령(`/plugin …`)을 사용자 대신 실행하려 하지 말아요 — 슬래시는 사용자 입력 전용이에요. 단 `claude plugin update` 는 슬래시가 아니라 `claude` CLI 명령이라 에이전트가 직접 실행해요 (Step 6).
 - NEVER conflate plugin version with CLI version — they upgrade independently and have separate skills.
 - NEVER 번들된 `marketplace.json` / `plugin.json` 버전을 "최신" 판단의 원격 소스로 쓰지 않아요 — 둘 다 플러그인과 함께 배포되는 stale 스냅샷이에요. 원격 최신은 항상 `plugin-update-check` (live GitHub releases fetch) 로 확인해요.
 - NEVER `checked:false` (원격 확인 실패) 를 "최신이에요" 로 말하지 않아요 — 확인 못 했다고 정직하게 안내해요.
