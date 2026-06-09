@@ -1500,6 +1500,48 @@ Skip: AXHUB_DISABLE_HOOK=prompt-route
 // It generally avoids keyword chains and `skills/<X>/SKILL.md` path enforcement;
 // narrow high-risk/Desktop hints exist where UltraQA caught native matching
 // detouring through generic/model-synthesized flows.
+/// Agent-facing context for a UNIFIED plugin+CLI update nudge — used when both
+/// drift channels have a pending update on the same turn, so the user sees one
+/// AskUserQuestion instead of two separate prompts spread across turns.
+fn unified_drift_context(
+    plugin_current: &str,
+    plugin_latest: &str,
+    cli_current: &str,
+    cli_latest: &str,
+) -> String {
+    format!(
+        "<axhub-update>\n\
+         [axhub hook | 업데이트 알림]\n\
+         업데이트가 두 가지 있어요:\n\
+         - 플러그인: v{plugin_current} → v{plugin_latest}\n\
+         - CLI: v{cli_current} → v{cli_latest}\n\
+         에이전트 필수 동작: 이 턴의 다른 답변을 시작하기 전에 먼저 사용자에게 \
+         AskUserQuestion 하나로 업데이트할지 물어요. 질문 header 는 '업데이트' 로, \
+         선택지는 '둘 다 업데이트할래요', '지금은 그대로', '그만 볼래요 (다시 안 봄)' \
+         를 포함해요. '둘 다 업데이트할래요' 는 먼저 플러그인 upgrade 스킬, 이어서 \
+         CLI update 스킬로 라우팅해요. '그만 볼래요 (다시 안 봄)' 를 선택하면 \
+         `axhub-helpers plugin-drift-optout` 와 `axhub-helpers cli-drift-optout` 를 \
+         모두 실행해 영구로 꺼요. AskUserQuestion 도구가 없으면 일반 채팅으로 같은 \
+         선택지를 묻고 멈춰요.\n\
+         Skip: AXHUB_DISABLE_HOOK=plugin-drift,cli-drift\n\
+         </axhub-update>"
+    )
+}
+
+/// User-facing systemMessage for the unified plugin+CLI update nudge.
+fn unified_drift_system_message(
+    plugin_current: &str,
+    plugin_latest: &str,
+    cli_current: &str,
+    cli_latest: &str,
+) -> String {
+    format!(
+        "업데이트가 두 가지 있어요 — 플러그인 v{plugin_current}→v{plugin_latest}, \
+         CLI v{cli_current}→v{cli_latest}. 업데이트할까요? \
+         `둘 다 업데이트할래요`, `지금은 그대로`, `그만 볼래요` 중 하나로 답해 주세요."
+    )
+}
+
 pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     use axhub_helpers::audit::{
         append as audit_append, now_iso8601, sha256_hex, AuditDecision, AuditRecord,
@@ -1735,37 +1777,43 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
             context.push_str(&karpathy);
         }
     }
-    // Proactive plugin version-drift nudge (UserPromptSubmit surface; D4). Prompt-
-    // intent-independent: reads only the TTL cache (no network on this hot path),
-    // fires at most once per latest version, and self-suppresses via the per-version
-    // marker + opt-out. Fail-open — `plugin_drift_context` never errors.
-    let plugin_drift_system =
-        if let Some(nudge) = axhub_helpers::plugin_update::plugin_drift_nudge(session_id) {
-            let system = nudge.system_message;
-            context.push_str("\n\n");
-            context.push_str(&nudge.additional_context);
-            Some(system)
-        } else {
-            None
-        };
-    // Proactive CLI binary version-drift nudge. Turn-cap: at most one update
-    // nudge per turn — plugin takes priority, and its per-version marker
-    // naturally yields the slot to CLI on the next turn (no cross-turn state
-    // needed). Suppressed when the prompt is already an update-check intent (the
-    // reactive update-summary path owns that turn). Fail-open.
-    let cli_drift_system = if plugin_drift_system.is_none() && !update_check_intent_present(prompt)
-    {
-        if let Some(nudge) = axhub_helpers::cli_drift::cli_drift_nudge(session_id) {
-            context.push_str("\n\n");
-            context.push_str(&nudge.additional_context);
-            Some(nudge.system_message)
-        } else {
-            None
-        }
-    } else {
+    // Proactive version-drift nudge (UserPromptSubmit surface; D4). Both the
+    // plugin and CLI channels are checked; when BOTH have a pending update we
+    // fold them into ONE unified prompt rather than showing two separate nudges
+    // (the old turn-cap rotated them across turns, so a user with both updates
+    // saw them one-at-a-time). Each channel still self-snoozes per-version
+    // (calling its nudge fn stamps the marker on a Some), so the unified prompt
+    // shows once per session and re-surfaces next session. CLI is suppressed on
+    // an explicit update-check intent (that reactive path owns the turn). Reads
+    // only the TTL caches (no network on this hot path). Fail-open.
+    let plugin_nudge = axhub_helpers::plugin_update::plugin_drift_nudge(session_id);
+    let cli_nudge = if update_check_intent_present(prompt) {
         None
+    } else {
+        axhub_helpers::cli_drift::cli_drift_nudge(session_id)
     };
-    let drift_system = plugin_drift_system.or(cli_drift_system);
+    let drift_system = match (plugin_nudge, cli_nudge) {
+        (Some(p), Some(c)) => {
+            context.push_str("\n\n");
+            context.push_str(&unified_drift_context(
+                &p.current, &p.latest, &c.current, &c.latest,
+            ));
+            Some(unified_drift_system_message(
+                &p.current, &p.latest, &c.current, &c.latest,
+            ))
+        }
+        (Some(p), None) => {
+            context.push_str("\n\n");
+            context.push_str(&p.additional_context);
+            Some(p.system_message)
+        }
+        (None, Some(c)) => {
+            context.push_str("\n\n");
+            context.push_str(&c.additional_context);
+            Some(c.system_message)
+        }
+        (None, None) => None,
+    };
     let intent_system = if dynamic_table_intent_present(prompt) {
         Some("이 요청은 AXHub hosted app 의 테이블 생성/컬럼/행/권한 변경 요청이에요. 로컬 앱 코드, local database, server.js, package.json, ORM, .env, SQL migration, QA 결과 파일, plugin source 를 읽지 않아요. visible chat 첫 문장은 정확히 \"테이블 변경 내용을 확인할게요.\" 로만 말해요. 그 다음 문장도 내부 경로를 설명하지 말고 로그인 상태, 현재 앱, 대상 테이블, 컬럼 타입을 확인하겠다고만 자연스럽게 말해요. Bash title 은 `로그인 상태 확인`, `테이블 상태 확인`, `테이블 변경 준비`, `테이블 변경 실행` 같은 한국어만 써요. create/drop/column/row/grant 변경은 대상 앱, 테이블, 작업, 컬럼/행 요약을 한국어로 보여주고 사용자가 명시적으로 승인하기 전에는 실행하지 않아요. visible preview 에 raw CLI command line 을 쓰지 말고, 실제 명령은 승인 후 Bash tool call 안에서만 실행해요. Claude Desktop 에서는 AskUserQuestion, Question, 질문 카드 도구를 쓰지 말고 일반 채팅으로 `이대로 만들까요? 진행 또는 취소라고 답해 주세요.` 라고 묻고 멈춰요. 다음 사용자 답변이 `진행`이면 승인된 것으로 보고 바로 `테이블 변경 준비`, `테이블 변경 실행` 순서로 이어가요. 사용자에게 route label, slash command, skill name, workflow/워크플로, preflight, command name, raw command line, raw question JSON, raw JSON, raw email, raw id, raw app slug, local file contents, repo inspection, 영어 tool title fragment, A/B 구현 분기 라벨을 쓰지 않아요. 로그인 확인 결과에는 계정 이메일, raw user id, scope 를 절대 쓰지 말고 `로그인되어 있어요`처럼 상태만 말해요.")
     } else if connectors_intent_present(prompt) {
@@ -6480,6 +6528,22 @@ mod tests {
     fn access_url_from_apps_get_is_none_when_missing_or_blank() {
         assert!(access_url_from_apps_get(&serde_json::json!({ "slug": "x" })).is_none());
         assert!(access_url_from_apps_get(&serde_json::json!({ "access_url": "  " })).is_none());
+    }
+
+    #[test]
+    fn unified_drift_nudge_names_both_in_one_question() {
+        let ctx = unified_drift_context("0.9.44", "0.9.45", "0.18.3", "0.18.4");
+        // Both channels + versions appear in a single AskUserQuestion instruction.
+        assert!(ctx.contains("0.9.44") && ctx.contains("0.9.45"));
+        assert!(ctx.contains("0.18.3") && ctx.contains("0.18.4"));
+        assert!(ctx.contains("AskUserQuestion 하나로"));
+        assert!(ctx.contains("둘 다 업데이트할래요"));
+        // Permanent opt-out covers BOTH channels.
+        assert!(ctx.contains("plugin-drift-optout") && ctx.contains("cli-drift-optout"));
+
+        let sys = unified_drift_system_message("0.9.44", "0.9.45", "0.18.3", "0.18.4");
+        assert!(sys.contains("플러그인 v0.9.44→v0.9.45"));
+        assert!(sys.contains("CLI v0.18.3→v0.18.4"));
     }
 
     /// US-014: `RealVerifyProbes` must spawn `axhub deploy list` **at

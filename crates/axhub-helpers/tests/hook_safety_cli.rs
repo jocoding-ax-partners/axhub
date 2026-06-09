@@ -475,10 +475,10 @@ fn cli_drift_suppressed_when_cli_autoupdate_disabled() {
 }
 
 #[test]
-fn turn_cap_plugin_priority_suppresses_cli_when_both_drift() {
-    // Both channels have a fresh, newer cache → only ONE nudge fires this turn.
-    // Plugin takes priority; CLI yields (its per-version marker stays unwritten,
-    // so it fires on a later turn once plugin's marker suppresses the plugin nudge).
+fn both_drift_emits_one_unified_nudge() {
+    // When BOTH channels have a fresh, newer cache, the user sees ONE unified
+    // prompt instead of two separate plugin/CLI nudges (the old turn-cap rotated
+    // them across turns). Both per-version markers are stamped.
     let out = run_prompt_route_with_caches(
         Some("99.0.0"),
         Some(&fresh_cli_cache(true, false)),
@@ -488,12 +488,17 @@ fn turn_cap_plugin_priority_suppresses_cli_when_both_drift() {
     assert!(out.status.success());
     let s = stdout(&out);
     assert!(
-        s.contains("플러그인 새 버전"),
-        "plugin nudge should win the single turn slot, got: {s}"
+        s.contains("업데이트가 두 가지 있어요"),
+        "both updates must fold into one unified nudge, got: {s}"
     );
     assert!(
-        !s.contains("axhub CLI 새 버전"),
-        "CLI nudge must be suppressed when plugin fires (1-nudge turn cap), got: {s}"
+        s.contains("플러그인") && s.contains("CLI"),
+        "unified nudge must name both channels, got: {s}"
+    );
+    // Not the two separate single-channel nudges.
+    assert!(
+        !s.contains("플러그인 새 버전") && !s.contains("axhub CLI 새 버전"),
+        "must not emit the two separate single-channel nudges, got: {s}"
     );
 }
 
@@ -516,11 +521,11 @@ fn cli_drift_suppressed_when_prompt_is_update_check_intent() {
 }
 
 #[test]
-fn turn_cap_yields_across_turns_plugin_turn1_then_cli_turn2() {
-    // Proves the "no cross-turn state needed" claim: with BOTH channels drifting
-    // and a SHARED state dir (markers persist), turn 1 fires plugin (writes its
-    // per-version marker), turn 2 sees the plugin marker → plugin None → CLI
-    // fires. The per-version marker is the only yield mechanism.
+fn both_drift_unified_once_then_snoozed_same_session() {
+    // With BOTH channels drifting and a SHARED state dir (markers persist), turn
+    // 1 fires ONE unified nudge and stamps both per-version markers; turn 2 (same
+    // session) finds both snoozed → no drift nudge at all. The unified prompt
+    // re-surfaces only in a new session.
     let cache_dir = tempfile::tempdir().unwrap();
     let state_dir = tempfile::tempdir().unwrap();
     let cli = fresh_cli_cache(true, false);
@@ -534,12 +539,8 @@ fn turn_cap_yields_across_turns_plugin_turn1_then_cli_turn2() {
         &[],
     ));
     assert!(
-        turn1.contains("플러그인 새 버전"),
-        "turn 1 = plugin, got: {turn1}"
-    );
-    assert!(
-        !turn1.contains("axhub CLI 새 버전"),
-        "turn 1 must NOT also fire CLI (1-nudge cap), got: {turn1}"
+        turn1.contains("업데이트가 두 가지 있어요"),
+        "turn 1 = one unified nudge, got: {turn1}"
     );
 
     let turn2 = stdout(&run_prompt_route_in(
@@ -551,11 +552,9 @@ fn turn_cap_yields_across_turns_plugin_turn1_then_cli_turn2() {
         &[],
     ));
     assert!(
-        !turn2.contains("플러그인 새 버전"),
-        "turn 2 plugin must be deduped by its marker, got: {turn2}"
-    );
-    assert!(
-        turn2.contains("axhub CLI 새 버전"),
-        "turn 2 = CLI yields in after plugin marker, got: {turn2}"
+        !turn2.contains("업데이트가 두 가지 있어요")
+            && !turn2.contains("플러그인 새 버전")
+            && !turn2.contains("axhub CLI 새 버전"),
+        "turn 2 same session must be snoozed (no drift nudge), got: {turn2}"
     );
 }

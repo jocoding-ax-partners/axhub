@@ -245,10 +245,14 @@ fn nudge_system_message(current: &str, latest: &str) -> String {
     )
 }
 
-/// Paired UserPromptSubmit outputs for a CLI drift event.
+/// Paired UserPromptSubmit outputs for a CLI drift event. `current`/`latest`
+/// are exposed so `cmd_prompt_route` can fold this with a co-occurring plugin
+/// nudge into one unified update prompt instead of two separate ones.
 pub struct CliDriftNudge {
     pub additional_context: String,
     pub system_message: String,
+    pub current: String,
+    pub latest: String,
 }
 
 /// Background fetch entry point (`axhub-helpers cli-latest-fetch-bg`).
@@ -354,6 +358,8 @@ pub fn cli_drift_nudge(session: &str) -> Option<CliDriftNudge> {
     cache.map(|c| CliDriftNudge {
         additional_context: nudge_text(&c.current, &c.latest),
         system_message: nudge_system_message(&c.current, &c.latest),
+        current: c.current.clone(),
+        latest: c.latest.clone(),
     })
 }
 
