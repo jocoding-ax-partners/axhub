@@ -289,6 +289,14 @@
       "allowed_safe_defaults": [
         "취소"
       ]
+    },
+    "GitHub App 설치를 끝냈을까요?": {
+      "safe_default": "취소",
+      "rationale": "Step 2.5 GitHub App install gate. App 이 아무 GitHub 계정에도 설치 안 됨(github.state=uninstalled/empty)이면 repo 생성이 불가능해요 — OAuth device flow 는 사용자 토큰만 인증하고, App 설치(저장소 접근 권한)는 GitHub 웹 UI 에서 사람이 직접 눌러야 하는 별도 1회 단계예요. 비대화형 subprocess 는 브라우저 설치를 완료할 수 없으니 bootstrap --execute 로 진행하지 않고 install_url + 재개 phrase 를 남기고 멈춰요. 이미 설치됨(installed/mixed)이면 이 질문에 도달하지 않아요.",
+      "allowed_safe_defaults": [
+        "취소",
+        "설치 완료"
+      ]
     }
   },
   "env": {
@@ -342,6 +350,14 @@
       "allowed_safe_defaults": [
         "abort",
         "connect"
+      ]
+    },
+    "GitHub App 설치를 끝냈을까요?": {
+      "safe_default": "취소",
+      "rationale": "Step 3.5 connect ladder gate. App 이 아무 GitHub 계정에도 설치 안 됨(uninstalled/empty)이면 repo 생성·연결이 불가능해요 — OAuth 는 사용자 토큰만 주고 App 설치는 저장소 접근 권한을 따로 부여해야 해요. 비대화형 subprocess 는 브라우저 설치를 완료할 수 없으니 connect ladder 를 시작하지 않고 install_url + 재개 phrase 를 남기고 멈춰요. 이미 설치됨(installed/mixed)이면 이 질문에 도달하지 않아요.",
+      "allowed_safe_defaults": [
+        "취소",
+        "설치 완료"
       ]
     }
   },

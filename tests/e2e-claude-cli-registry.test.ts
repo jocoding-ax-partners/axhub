@@ -104,9 +104,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("83 actual safe_default rationale 엔트리 including onboarding gap machine AUQ", () => {
+  test("85 actual safe_default rationale 엔트리 including init/github App-install gate AUQ", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(84);
+    expect(paths).toHaveLength(86);
 
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
@@ -152,7 +152,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "github",
       "github",
       "github",
+      "github",
       "infer-tables-env",
+      "init",
       "init",
       "init",
       "init",

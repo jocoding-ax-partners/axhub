@@ -124,6 +124,27 @@ echo "$PREFLIGHT_JSON"
 
 3.5. **Strict guided capability ladder for missing repo/remote/push.** Stay inside this ladder and stop on every unsupported gap. Do not skip ahead to connect while GitHub cannot see the repo.
 
+   **GitHub App 설치 gate (connect/create 전 필수).** ladder 를 내려가기 전에 `axhub github accounts list --json` 로 App 설치 상태를 먼저 봐요. **확인할 수 없는 상태에서는 막지 않아요:** 출력이 비었거나(타임아웃) JSON 파싱이 안 되면 (`unavailable`) 막지 말고 ladder 로 진행하고, auth 에러 envelope (`{"status":"error","error":{"code":"auth"}}`) 면 "다시 로그인해줘" 로 안내하고 재로그인 후 다시 확인해요. 정상 응답이면 install_url 이 있을 때 한 줄로 보여주고 ("GitHub 연결·설치 링크: `<install_url>`"), `installed:true` 개수로 갈라요:
+
+   - **1개 이상 (installed/mixed)**: App 이 설치돼 있으니 막지 않고 아래 ladder 로 진행해요. 다른 org 을 더 붙이고 싶으면 같은 install_url 로 추가해요.
+   - **설치 0개로 확인됨 (`uninstalled`/`empty`)**: 여기서 막아요 (위 degraded-state 는 해당 안 돼요). App 이 아무 GitHub 계정에도 설치 안 돼 있으면 repo 생성·연결이 안 돼요 — OAuth 인증은 사용자 토큰만 주고, App 설치는 저장소 접근 권한을 따로 부여해야 해요. install_url 이 있으면 또렷이 보여주고, 없으면 "axhub 대시보드의 GitHub 연결 메뉴에서 AxHub 앱을 설치해요" 로 안내한 뒤, 아래 질문으로 설치 완료를 기다려요. 설치가 확인(재조회 `installed:true`)되기 전에는 repo 생성/remote/push/connect 로 내려가지 않아요. 재조회가 또 `unavailable`/auth 에러면 무한 차단하지 말고 진행하거나 재인증으로 라우팅해요.
+
+     ```json
+     {
+       "questions": [{
+         "question": "GitHub App 설치를 끝냈을까요?",
+         "header": "GitHub App",
+         "multiSelect": false,
+         "options": [
+           {"label": "설치 완료", "description": "설치·연결을 끝냈으면 다시 확인하고 연결을 이어가요"},
+           {"label": "취소", "description": "지금은 연결을 멈춰요"}
+         ]
+       }]
+     }
+     ```
+
+     `설치 완료` 면 `axhub github accounts list --json` 를 다시 읽어요. `installed:true` 가 보이면 ladder 로 진행하고, 아직 없으면 install_url 을 한 번 더 보여주고 이 질문을 다시 띄워요. **D1 guard:** `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 면 설치 브라우저 단계를 완료할 수 없으니 safe default `취소` (registry `github` 채널) 로 ladder 를 시작하지 않고 install_url + 재개 phrase(`연결 다시 해줘`)를 남기고 멈춰요.
+
    1. **read-only git inspect** — gather local facts only:
 
       ```bash
