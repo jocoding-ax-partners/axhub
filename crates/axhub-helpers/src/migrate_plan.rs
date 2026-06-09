@@ -2582,5 +2582,13 @@ mod tests {
                 );
             }
         }
+        // base_url is identical across the typed-init languages (node omits it).
+        // Guards an api.axhub.ai change in the helper from drifting off the packs.
+        for lang in ["python", "go", "ruby", "java", "kotlin"] {
+            assert!(
+                super::render_wrapper_preview(lang, "", &[]).contains("https://api.axhub.ai"),
+                "{lang} wrapper seed missing base_url contract"
+            );
+        }
     }
 }
