@@ -5316,6 +5316,16 @@ fn cli_migrate_plan_detects_node_env_and_manifest_snippet() {
             .as_str()
             .unwrap()
             .contains("검증 명령 또는 테스트 anchor")));
+    // devex-D1=C: per-reason override policy ships alongside the reasons, and
+    // plan_only is exposed for the SKILL's structural plan-only gate.
+    let policy = node_candidate["hard_stop_policy"].as_array().unwrap();
+    assert!(!policy.is_empty());
+    let missing_verification = policy
+        .iter()
+        .find(|entry| entry["code"] == "missing_verification")
+        .expect("missing_verification policy present");
+    assert_eq!(missing_verification["overridable"], true);
+    assert!(node_candidate["plan_only"].is_boolean());
 }
 
 #[test]
@@ -6264,10 +6274,9 @@ fn cli_migrate_wave_plan_complete_accepts_present_artifact() {
         "stderr: {}",
         String::from_utf8_lossy(&completed.stderr)
     );
-    let wave_a: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(run_dir.join("waves/wave-a.json")).unwrap(),
-    )
-    .unwrap();
+    let wave_a: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(run_dir.join("waves/wave-a.json")).unwrap())
+            .unwrap();
     assert_eq!(wave_a["state"], "complete");
 }
 
@@ -6410,10 +6419,9 @@ fn cli_migrate_wave_plan_persisted_complete_not_rerejected() {
         "second same-run write must not re-reject persisted complete wave, stderr: {}",
         String::from_utf8_lossy(&wave_b.stderr)
     );
-    let wave_a: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(run_dir.join("waves/wave-a.json")).unwrap(),
-    )
-    .unwrap();
+    let wave_a: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(run_dir.join("waves/wave-a.json")).unwrap())
+            .unwrap();
     assert_eq!(wave_a["state"], "complete");
 }
 

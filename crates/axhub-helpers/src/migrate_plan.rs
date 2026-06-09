@@ -99,6 +99,24 @@ pub struct SdkConversionCandidate {
     pub risk: String,
     pub expected_diff_summary: Vec<String>,
     pub hard_stop_reasons: Vec<String>,
+    /// Per-reason override policy (devex-D1=C). Parallel to `hard_stop_reasons`
+    /// (which stays byte-identical for existing consumers); classifies each
+    /// reason as overridable or absolute.
+    pub hard_stop_policy: Vec<HardStopPolicy>,
+    /// True when any absolute (non-overridable) reason is present. The SKILL
+    /// MUST keep the conversion plan-only — there is no execute path to override.
+    pub plan_only: bool,
+}
+
+/// Override policy for one hard-stop reason. Absolute reasons (secret exposure,
+/// custom/unclear auth, unsupported language) are never overridable: a git
+/// rollback cannot un-leak a secret, so the conversion stays structurally
+/// plan-only rather than relying on the agent to decline.
+#[derive(Debug, Clone, Serialize)]
+pub struct HardStopPolicy {
+    pub code: String,
+    pub message: String,
+    pub overridable: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize)]
@@ -554,7 +572,7 @@ fn build_sdk_candidate(
     let wrapper_preview = render_wrapper_preview(&language, &framework, &source_files);
     let data_candidates = detect_data_candidates(&language, &source_files);
     let auth_candidates = detect_auth_candidates(&language, &source_files);
-    let hard_stop_reasons = detect_hard_stop_reasons(
+    let hard_stop_policy = detect_hard_stop_reasons(
         root,
         files,
         candidate,
@@ -565,6 +583,10 @@ fn build_sdk_candidate(
         &auth_candidates,
         &source_files,
     );
+    let hard_stop_reasons: Vec<String> =
+        hard_stop_policy.iter().map(|p| p.message.clone()).collect();
+    // Absolute (non-overridable) reason present → conversion is structurally plan-only.
+    let plan_only = hard_stop_policy.iter().any(|p| !p.overridable);
     let risk = if !hard_stop_reasons.is_empty() {
         "high"
     } else if !data_candidates.is_empty() || !auth_candidates.is_empty() {
@@ -618,6 +640,8 @@ fn build_sdk_candidate(
         risk,
         expected_diff_summary,
         hard_stop_reasons,
+        hard_stop_policy,
+        plan_only,
     }
 }
 
@@ -996,6 +1020,14 @@ fn detect_signals(source_files: &[SourceScanFile], patterns: &[(&str, &str)]) ->
     clippy::too_many_arguments,
     reason = "The hard-stop classifier intentionally combines multiple explicit signals into one risk gate."
 )]
+/// Single source of truth for hard-stop override policy (devex-D1=C). Fail-closed:
+/// only the three explicitly-listed reasons are overridable; secret_exposure,
+/// custom_auth, unsupported_language, and any future/unknown reason default to
+/// absolute. A git rollback cannot un-leak a secret, so those stay plan-only.
+pub fn hard_stop_reason_overridable(code: &str) -> bool {
+    matches!(code, "missing_verification" | "raw_query" | "broad_diff")
+}
+
 fn detect_hard_stop_reasons(
     root: &Path,
     files: &[PathBuf],
@@ -1006,42 +1038,65 @@ fn detect_hard_stop_reasons(
     data_candidates: &[SdkSignal],
     auth_candidates: &[SdkSignal],
     source_files: &[SourceScanFile],
-) -> Vec<String> {
-    let mut reasons = BTreeSet::new();
+) -> Vec<HardStopPolicy> {
+    fn policy(code: &str, message: &str) -> HardStopPolicy {
+        HardStopPolicy {
+            code: code.to_string(),
+            message: message.to_string(),
+            overridable: hard_stop_reason_overridable(code),
+        }
+    }
+    let mut policies: Vec<HardStopPolicy> = Vec::new();
     if !matches!(
         language,
         "node" | "python" | "go" | "ruby" | "java" | "kotlin"
     ) {
-        reasons
-            .insert("지원되는 SDK wrapper 언어 범위 밖이라 manual review 가 필요해요".to_string());
+        // Absolute: no expert/pack exists for this language — cannot be forced.
+        policies.push(policy(
+            "unsupported_language",
+            "지원되는 SDK wrapper 언어 범위 밖이라 manual review 가 필요해요",
+        ));
     }
     if !has_verification_anchor(files, dir) {
-        reasons.insert(
-            "검증 명령 또는 테스트 anchor 를 찾지 못해서 automatic patch 를 막아요".to_string(),
-        );
+        // Overridable: a power user can accept the risk; the git checkpoint is the net.
+        policies.push(policy(
+            "missing_verification",
+            "검증 명령 또는 테스트 anchor 를 찾지 못해서 automatic patch 를 막아요",
+        ));
     }
     if has_raw_query_signal(data_candidates) {
-        reasons.insert(
-            "raw query 중심 데이터 접근 가능성이 있어 automatic data patch 를 막아요".to_string(),
-        );
+        policies.push(policy(
+            "raw_query",
+            "raw query 중심 데이터 접근 가능성이 있어 automatic data patch 를 막아요",
+        ));
     }
     if !auth_candidates.is_empty() && !has_known_auth_library(language, source_files) {
-        reasons.insert(
-            "auth 구조가 커스텀 또는 불명확해 보여서 auth patch 는 plan-only 예요".to_string(),
-        );
+        // Absolute: custom/unclear auth — getting it wrong can leak credentials.
+        policies.push(policy(
+            "custom_auth",
+            "auth 구조가 커스텀 또는 불명확해 보여서 auth patch 는 plan-only 예요",
+        ));
     }
     if env_refs.iter().any(|env| is_secretish_env(&env.name)) {
-        reasons.insert("secret 성격 env reference 가 보여서 preview-only 로 유지해요".to_string());
+        // Absolute: a git rollback cannot un-leak a secret that hit a commit/log.
+        policies.push(policy(
+            "secret_exposure",
+            "secret 성격 env reference 가 보여서 preview-only 로 유지해요",
+        ));
     }
     if data_candidates.len() + auth_candidates.len() > 6
         || touches_core_entry(candidate, root, dir, source_files)
     {
-        reasons.insert(
-            "wide diff 또는 핵심 진입 파일 blast radius 가능성이 있어 plan-only 로 멈춰요"
-                .to_string(),
-        );
+        policies.push(policy(
+            "broad_diff",
+            "wide diff 또는 핵심 진입 파일 blast radius 가능성이 있어 plan-only 로 멈춰요",
+        ));
     }
-    reasons.into_iter().collect()
+    // Preserve the prior BTreeSet<String> ordering of the derived `hard_stop_reasons`
+    // (sorted + deduped by message) so existing consumers stay byte-identical.
+    policies.sort_by(|a, b| a.message.cmp(&b.message));
+    policies.dedup_by(|a, b| a.message == b.message);
+    policies
 }
 
 fn has_verification_anchor(files: &[PathBuf], dir: &Path) -> bool {
@@ -1336,6 +1391,7 @@ fn persist_migrate_planning(
         "escalation_reason": planning.escalation_reason.as_str(),
         "confidence": format!("{:.2}", candidate.confidence),
         "hard_stop_reasons": selected_sdk.map(|sdk| sdk.hard_stop_reasons.clone()).unwrap_or_default(),
+        "plan_only": selected_sdk.map(|sdk| sdk.plan_only).unwrap_or(false),
         "workspace_scope": planning.workspace_scope,
         "parallelism": {
             "enabled": false,
@@ -2423,5 +2479,34 @@ mod tests {
             candidate_file_path("apps/web", "compose.yaml"),
             "apps/web/compose.yaml"
         );
+    }
+
+    #[test]
+    fn absolute_hard_stop_reasons_are_never_overridable() {
+        // SAFETY INVARIANT (devex-D1=C): a git rollback cannot un-leak a secret,
+        // so these reasons must NEVER become overridable. If this flips, the
+        // conversion could execute a credential-leaking patch behind a runtime
+        // "강행" override instead of staying structurally plan-only.
+        for code in ["secret_exposure", "custom_auth", "unsupported_language"] {
+            assert!(
+                !super::hard_stop_reason_overridable(code),
+                "{code} must stay absolute (plan-only)"
+            );
+        }
+    }
+
+    #[test]
+    fn power_user_hard_stop_reasons_are_overridable() {
+        for code in ["missing_verification", "raw_query", "broad_diff"] {
+            assert!(
+                super::hard_stop_reason_overridable(code),
+                "{code} should be overridable with the git checkpoint net"
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_hard_stop_reasons_fail_closed() {
+        assert!(!super::hard_stop_reason_overridable("some_future_reason"));
     }
 }
