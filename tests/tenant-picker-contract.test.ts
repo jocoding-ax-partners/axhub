@@ -15,9 +15,18 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { CANONICAL_TENANT_PICKER_BLOCK } from "../scripts/tenant-picker-block";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const read = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
+
+// canonical L1 bash (between the ```bash fences) — codemod 가 19 skill 에 삽입한 원본.
+const CANONICAL_L1_BASH = (() => {
+  const lines = CANONICAL_TENANT_PICKER_BLOCK.split("\n");
+  const s = lines.findIndex((l) => l.trim() === "```bash");
+  const e = lines.findIndex((l, i) => i > s && l.trim() === "```");
+  return lines.slice(s + 1, e).join("\n");
+})();
 
 // ── manifest ────────────────────────────────────────────────────────────────
 
@@ -100,15 +109,27 @@ describe("tenant-picker structural contract — L1/L2 sentinel + marker", () => 
       expect(content).toContain(".axhub/state/tenant.json");
     });
 
-    test(`${slug}: L1 digit-sanitizes $_TS before arithmetic (RCE guard, 회귀 방지)`, () => {
+    test(`${slug}: L1 delegates to the Rust helper (tenant-resolve --json)`, () => {
       const content = read(skillPath);
-      // 신뢰 못 하는 캐시 ts 가 $(( )) 산술 injection 으로 코드 실행되는 걸 막아요.
-      const guardIdx = content.indexOf('case "$_TS"');
-      const arithIdx = content.indexOf("_AGE=$(( _NOW - _TS ))");
-      expect(guardIdx, `${slug}: L1 digit-only guard for $_TS missing`).toBeGreaterThan(-1);
-      expect(arithIdx).toBeGreaterThan(-1);
-      // guard 는 산술 평가보다 먼저 와야 효력이 있어요
-      expect(arithIdx).toBeGreaterThan(guardIdx);
+      expect(content).toContain("tenant-resolve --json");
+    });
+
+    test(`${slug}: L1 carries NO bash arithmetic (RCE class moved to Rust, 회귀 방지)`, () => {
+      const bash = extractBashLines(read(skillPath)).join("\n");
+      // 위험한 산술 injection 클래스는 Rust 가 소유 — 어떤 fence 도 $(( )) 를 갖지 않아요.
+      expect(bash).not.toContain("$(( ");
+      expect(bash).not.toContain("_AGE=");
+    });
+
+    test(`${slug}: L1 retains the R4 non-TTY multi-tenant warning`, () => {
+      const content = read(skillPath);
+      expect(content).toContain("여러 tenant 에 속해 있는데 picker 를 건너뛰고 기본 tenant");
+    });
+
+    test(`${slug}: L1 block is byte-identical to the canonical thin block (render-equality)`, () => {
+      // codemod 가 mis-render(heredoc 들여쓰기 등) 없이 정확히 삽입했는지 잠가요.
+      const content = read(skillPath);
+      expect(content).toContain(CANONICAL_L1_BASH);
     });
   }
 });
