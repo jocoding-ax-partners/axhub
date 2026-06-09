@@ -461,7 +461,9 @@ env AXHUB_TOKEN (PAT) → $XDG_CONFIG_HOME/axhub-plugin/token (파일) → OS ke
 - `catalog.json` — `allowed_columns`·PII 태그·리소스 경로 스냅샷. `tenant_id`/`user_email` 포함이라 **gitignore**.
 - `spec/` — migrate planning 전용. 앱별 승인 target-state spec 과 `latest.json` 포인터를 저장해요. execution 전 approval 이 나기 전에는 `latest.json` 을 갱신하지 않아요.
 - `plan/` — migrate planning 전용. run별 stage artifact, approval, receipt, ADR, latest-run pointer 를 저장해요. 기본 root 는 repo-local 이고, `.axhub-workspace` marker opt-in 이 있을 때만 workspace 공유 root 로 확장해요.
-- migrate planning 승격 규칙: simple high-confidence 는 기존 simple flow, low confidence/모호함은 serial `spec_only`, hard-stop/복잡 조건은 `discover → planner → architect → critic → reviewer` full consensus 예요. wave 병렬화는 full consensus 내부의 same-app 독립 unit 에서만 허용하고 multi-app wave 는 v1 에서 금지예요.
+- migrate planning 승격 규칙: simple high-confidence 는 기존 simple flow, low confidence/모호함은 serial `spec_only`, hard-stop/복잡 조건은 `discover → planner → architect → critic → reviewer` full consensus 예요.
+- full consensus 에서는 planner/architect/critic/reviewer 서브 에이전트 결과를 `.axhub/plan/runs/<run_id>/stages/*.md` 와 meta 로 남기고, 최종에 `approval.json.state=pending_approval`, `run.json.state=pending_approval` 로 올린 뒤 멈춰요.
+- wave 병렬화는 full consensus 내부의 same-app 독립 unit 에서만 허용해요. planner → architect → critic → reviewer 순서 자체는 직렬이고, write target 충돌·cycle·app_key mismatch·independence proof 부족이면 즉시 serial fallback 이에요.
 
 ### 4.8 부가 시스템 (품질·관측·UX)
 

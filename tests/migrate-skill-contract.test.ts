@@ -91,8 +91,16 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain("& $Helper migrate-plan --dir $MigrateDir --app-path $env:APP_PATH --persist-planning --json");
     expect(skill).toContain("serial `spec_only`");
     expect(skill).toContain("discover → planner → architect → critic → reviewer");
+    expect(skill).toContain("planner/architect/critic/reviewer 를 자동으로 띄우지 않아요");
+    expect(skill).toContain("planner → architect → critic → reviewer");
+    expect(skill).toContain("`.axhub/plan/runs/<run_id>/stages/02-planner.md`");
+    expect(skill).toContain("approval.json.state=pending_approval");
+    expect(skill).toContain("run.json.state=pending_approval");
+    expect(skill).toContain("`.axhub/spec/apps/<app_key>/latest.json`");
     expect(skill).toContain("conditional wave 병렬화");
+    expect(skill).toContain("같은 app 안의 독립 unit");
     expect(skill).toContain("multi-app wave 는 v1 에서 금지");
+    expect(skill).toContain("stage 안쪽 병렬화");
     expect(skill).toContain("serial fallback");
     expect(skill).toContain("simple flow 에서는 wave 나 consensus jargon");
   });
