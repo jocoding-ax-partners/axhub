@@ -1526,6 +1526,13 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     let raw = read_stdin()?;
     let payload: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
     let prompt = payload.get("prompt").and_then(Value::as_str).unwrap_or("");
+    // Stable per-session id from the UserPromptSubmit payload (snake_case, always
+    // present per the hooks input schema). Empty when absent → the drift nudge
+    // degrades to a time-only snooze. Drives the per-session re-surface.
+    let session_id = payload
+        .get("session_id")
+        .and_then(Value::as_str)
+        .unwrap_or("");
 
     // AC-12 / hook-integration: the shared routing decision, computed once here
     // from pure reads (marker walk-up + token-file stat + slash detection). Both
@@ -1731,7 +1738,7 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     // fires at most once per latest version, and self-suppresses via the per-version
     // marker + opt-out. Fail-open — `plugin_drift_context` never errors.
     let plugin_drift_system =
-        if let Some(nudge) = axhub_helpers::plugin_update::plugin_drift_nudge() {
+        if let Some(nudge) = axhub_helpers::plugin_update::plugin_drift_nudge(session_id) {
             let system = nudge.system_message;
             context.push_str("\n\n");
             context.push_str(&nudge.additional_context);
