@@ -5353,6 +5353,9 @@ fn cli_migrate_plan_detects_monorepo_candidates_and_compose() {
 #[cfg(unix)]
 fn fake_tenants_axhub(temp: &tempfile::TempDir, tenants_json: &str) -> std::path::PathBuf {
     let axhub = temp.path().join("axhub-tenants");
+    // Mirror the REAL CLI shapes: `tenants list --json` wraps the rows in a
+    // status envelope (`{status, data:{data:[...]}}`); `auth status --json`
+    // exposes `tenants[]` with `is_active` (no `current_team_id` field).
     std::fs::write(
         &axhub,
         format!(
@@ -5360,12 +5363,12 @@ fn fake_tenants_axhub(temp: &tempfile::TempDir, tenants_json: &str) -> std::path
 if [ "$1" = "--version" ]; then echo "axhub 0.17.3"; exit 0; fi
 if [ "$1 $2 $3" = "tenants list --json" ]; then
   cat <<'AXHUB_TENANTS'
-{tenants_json}
+{{"schema_version":"1","status":"ok","data":{{"data":{tenants_json}}}}}
 AXHUB_TENANTS
   exit 0
 fi
 if [ "$1 $2 $3" = "auth status --json" ]; then
-  echo '{{"current_team_id":"team-from-preflight"}}'
+  echo '{{"tenants":[{{"is_active":true,"tenant_id":"team-from-preflight","tenant_slug":"preflight"}}]}}'
   exit 0
 fi
 exit 64
@@ -5400,7 +5403,10 @@ exit 64
 #[test]
 fn cli_tenant_resolve_count_one_auto_picks() {
     let temp = tempfile::tempdir().unwrap();
-    let axhub = fake_tenants_axhub(&temp, r#"[{"id":"t-alpha","slug":"alpha"}]"#);
+    let axhub = fake_tenants_axhub(
+        &temp,
+        r#"[{"is_active":true,"role":"tenant_admin","tenant_id":"t-alpha","tenant_slug":"alpha"}]"#,
+    );
     let cwd = tempfile::tempdir().unwrap();
     let output = run_in_dir_env(
         &["tenant-resolve", "--json"],
@@ -5420,7 +5426,7 @@ fn cli_tenant_resolve_count_many_needs_pick() {
     let temp = tempfile::tempdir().unwrap();
     let axhub = fake_tenants_axhub(
         &temp,
-        r#"[{"id":"t-a","slug":"a"},{"id":"t-b","slug":"b"}]"#,
+        r#"[{"is_active":true,"tenant_id":"t-a","tenant_slug":"a"},{"is_active":true,"tenant_id":"t-b","tenant_slug":"b"}]"#,
     );
     let cwd = tempfile::tempdir().unwrap();
     let output = run_in_dir_env(
@@ -5432,7 +5438,13 @@ fn cli_tenant_resolve_count_many_needs_pick() {
     let json = stdout_json(&output);
     assert_eq!(json["needs_pick"], true);
     assert_eq!(json["tenant"], "");
-    assert_eq!(json["candidates"].as_array().unwrap().len(), 2);
+    let candidates = json["candidates"].as_array().unwrap();
+    assert_eq!(candidates.len(), 2);
+    // Candidates are normalized to the {id, slug, name} picker contract so the
+    // L2 picker skills never need to know the CLI's tenant_id/tenant_slug keys.
+    assert_eq!(candidates[0]["id"], "t-a");
+    assert_eq!(candidates[0]["slug"], "a");
+    assert_eq!(candidates[0]["name"], "a");
 }
 
 #[cfg(unix)]

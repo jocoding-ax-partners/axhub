@@ -95,7 +95,7 @@ fn resolve_with(
                     tenant: String::new(),
                     source: "list".to_string(),
                     needs_pick: true,
-                    candidates: tenants,
+                    candidates: tenants.iter().map(normalize_candidate).collect(),
                 };
             }
         }
@@ -138,14 +138,33 @@ fn cache_hit(raw: &str, now_secs: i64, ttl_secs: i64) -> Option<ResolveOutput> {
     })
 }
 
-/// Pick the stable identifier from a tenant object: `id`, else `slug`, else "".
+/// Pick the stable identifier from a tenant object. The real `axhub tenants
+/// list --json` rows key the id as `tenant_id` / `tenant_slug`; a generic
+/// `id` / `slug` shape is tolerated for forward-compat. Returns "" when none
+/// are present.
 fn tenant_identifier(tenant: &Value) -> String {
-    tenant
-        .get("id")
-        .and_then(Value::as_str)
-        .or_else(|| tenant.get("slug").and_then(Value::as_str))
+    let pick = |key: &str| tenant.get(key).and_then(Value::as_str);
+    pick("tenant_id")
+        .or_else(|| pick("id"))
+        .or_else(|| pick("tenant_slug"))
+        .or_else(|| pick("slug"))
         .unwrap_or_default()
         .to_string()
+}
+
+/// Normalize a CLI tenant row into the `{id, slug, name}` shape the L2 picker
+/// skills (connectors / init) read, so the picker never needs to know the CLI's
+/// `tenant_id` / `tenant_slug` field names. `name` falls back to the slug.
+fn normalize_candidate(tenant: &Value) -> Value {
+    let pick = |key: &str| tenant.get(key).and_then(Value::as_str).map(str::to_string);
+    let id = pick("tenant_id").or_else(|| pick("id")).unwrap_or_default();
+    let slug = pick("tenant_slug")
+        .or_else(|| pick("slug"))
+        .unwrap_or_default();
+    let name = pick("name")
+        .or_else(|| pick("tenant_name"))
+        .unwrap_or_else(|| slug.clone());
+    json!({ "id": id, "slug": slug, "name": name })
 }
 
 /// Read TTL from the override env, falling back to the default on parse error
@@ -175,15 +194,34 @@ fn list_tenants_via_axhub() -> Option<Vec<Value>> {
     if out.timed_out || out.exit_code != 0 {
         return None;
     }
-    match serde_json::from_str::<Value>(&out.stdout) {
-        Ok(Value::Array(items)) => Some(items),
-        _ => None,
-    }
+    let parsed: Value = serde_json::from_str(&out.stdout).ok()?;
+    extract_tenant_array(&parsed)
 }
 
-/// Real preflight provider: read the active team id from
-/// `axhub auth status --json` (`.current_team_id`). Returns `None` on any
-/// failure so resolution can fall through to an empty result.
+/// Pull the tenant array out of `axhub tenants list --json`. The real CLI wraps
+/// the list in a status envelope: `{"status":"ok","data":{"data":[ ... ]}}`.
+/// A single-level `{"data":[ ... ]}` and a bare `[ ... ]` are also accepted for
+/// forward/backward compat. Any other shape yields `None`.
+fn extract_tenant_array(parsed: &Value) -> Option<Vec<Value>> {
+    if let Value::Array(items) = parsed {
+        return Some(items.clone());
+    }
+    let data = parsed.get("data")?;
+    if let Value::Array(items) = data {
+        return Some(items.clone());
+    }
+    if let Some(Value::Array(items)) = data.get("data") {
+        return Some(items.clone());
+    }
+    None
+}
+
+/// Real preflight provider: derive the active tenant id from
+/// `axhub auth status --json`. The status payload has no `current_team_id`; it
+/// lists `tenants[]`, each with an `is_active` flag and a `tenant_id`. We only
+/// auto-resolve when EXACTLY one tenant is active — zero or many active is
+/// ambiguous, so we return `None` and let the L2 picker decide. Any failure
+/// also yields `None` so resolution falls through to an empty result.
 fn current_team_id_via_axhub() -> Option<String> {
     let out = run_axhub_with_timeout(
         &axhub_bin_from_env(),
@@ -194,10 +232,21 @@ fn current_team_id_via_axhub() -> Option<String> {
         return None;
     }
     let parsed: Value = serde_json::from_str(&out.stdout).ok()?;
-    let id = parsed
-        .get("current_team_id")
-        .and_then(Value::as_str)?
-        .to_string();
+    active_tenant_id(&parsed)
+}
+
+/// Return the lone active tenant's id from an `auth status` payload, or `None`
+/// when zero or more than one tenant is active (ambiguous → defer to picker).
+fn active_tenant_id(parsed: &Value) -> Option<String> {
+    let tenants = parsed.get("tenants").and_then(Value::as_array)?;
+    let mut active = tenants
+        .iter()
+        .filter(|t| t.get("is_active").and_then(Value::as_bool).unwrap_or(false));
+    let first = active.next()?;
+    if active.next().is_some() {
+        return None; // more than one active → ambiguous
+    }
+    let id = tenant_identifier(first);
     (!id.is_empty()).then_some(id)
 }
 
@@ -385,21 +434,27 @@ mod tests {
     }
 
     #[test]
-    fn list_count_many_needs_pick_with_candidates() {
+    fn list_count_many_needs_pick_with_normalized_candidates() {
         let now = 1_000_000;
-        let candidates = vec![
-            json!({ "id": "team-a", "name": "A" }),
-            json!({ "id": "team-b", "name": "B" }),
-        ];
-        let list = {
-            let candidates = candidates.clone();
-            move || Some(candidates)
+        // Real `axhub tenants list --json` rows key id/slug as tenant_id/tenant_slug.
+        let list = || {
+            Some(vec![
+                json!({ "is_active": true, "role": "tenant_admin", "tenant_id": "uuid-a", "tenant_slug": "acme" }),
+                json!({ "is_active": true, "role": "tenant_admin", "tenant_id": "uuid-b", "tenant_slug": "globex" }),
+            ])
         };
         let out = resolve_with(None, now, TTL, list, no_team);
         assert_eq!(out.tenant, "");
         assert_eq!(out.source, "list");
         assert!(out.needs_pick);
-        assert_eq!(out.candidates, candidates);
+        // Candidates are normalized to the {id, slug, name} picker contract.
+        assert_eq!(
+            out.candidates,
+            vec![
+                json!({ "id": "uuid-a", "slug": "acme", "name": "acme" }),
+                json!({ "id": "uuid-b", "slug": "globex", "name": "globex" }),
+            ]
+        );
     }
 
     #[test]
@@ -440,5 +495,101 @@ mod tests {
         let out = resolve_with(None, now, TTL, no_list, team);
         assert_eq!(out.tenant, "");
         assert_eq!(out.source, "");
+    }
+
+    // --- Real CLI schema regression guards (axhub v0.18.x) ---------------
+    // The original suite asserted a synthetic `[{ "id": .. }]` shape that the
+    // real CLI never emits, so the resolver shipped broken. These lock the
+    // ACTUAL `axhub tenants list --json` / `auth status --json` shapes.
+
+    #[test]
+    fn extract_tenant_array_unwraps_status_envelope() {
+        // Exactly what `axhub tenants list --json` returns.
+        let raw = json!({
+            "schema_version": "1",
+            "status": "ok",
+            "data": { "data": [
+                { "is_active": true, "tenant_id": "uuid-a", "tenant_slug": "test" },
+                { "is_active": true, "tenant_id": "uuid-b", "tenant_slug": "jocodingax" }
+            ]}
+        });
+        let items = extract_tenant_array(&raw).expect("envelope must unwrap");
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].get("tenant_slug").unwrap(), "test");
+    }
+
+    #[test]
+    fn extract_tenant_array_accepts_single_level_and_bare() {
+        let single = json!({ "data": [ { "tenant_id": "x" } ] });
+        assert_eq!(extract_tenant_array(&single).unwrap().len(), 1);
+        let bare = json!([ { "tenant_id": "x" } ]);
+        assert_eq!(extract_tenant_array(&bare).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn extract_tenant_array_rejects_unrelated_object() {
+        assert!(extract_tenant_array(&json!({ "status": "ok" })).is_none());
+        assert!(extract_tenant_array(&json!({ "data": { "nope": 1 } })).is_none());
+    }
+
+    #[test]
+    fn tenant_identifier_prefers_tenant_id_over_slug() {
+        let row = json!({ "tenant_id": "uuid-1", "tenant_slug": "acme" });
+        assert_eq!(tenant_identifier(&row), "uuid-1");
+        let slug_only = json!({ "tenant_slug": "acme" });
+        assert_eq!(tenant_identifier(&slug_only), "acme");
+    }
+
+    #[test]
+    fn normalize_candidate_maps_cli_fields_to_picker_contract() {
+        let row = json!({ "is_active": true, "tenant_id": "uuid-1", "tenant_slug": "acme" });
+        assert_eq!(
+            normalize_candidate(&row),
+            json!({ "id": "uuid-1", "slug": "acme", "name": "acme" })
+        );
+    }
+
+    #[test]
+    fn resolve_with_auto_picks_single_real_cli_tenant() {
+        let now = 1_000_000;
+        let list = || {
+            Some(vec![
+                json!({ "tenant_id": "solo-uuid", "tenant_slug": "solo" }),
+            ])
+        };
+        let out = resolve_with(None, now, TTL, list, no_team);
+        assert_eq!(out.tenant, "solo-uuid");
+        assert_eq!(out.source, "auto");
+        assert!(!out.needs_pick);
+    }
+
+    #[test]
+    fn active_tenant_id_resolves_single_active() {
+        // `auth status --json` shape.
+        let status = json!({
+            "user_email": "u@example.com",
+            "tenants": [
+                { "is_active": true, "tenant_id": "only-active", "tenant_slug": "test" },
+                { "is_active": false, "tenant_id": "inactive", "tenant_slug": "old" }
+            ]
+        });
+        assert_eq!(active_tenant_id(&status).as_deref(), Some("only-active"));
+    }
+
+    #[test]
+    fn active_tenant_id_is_none_when_many_active() {
+        // The reported bug: a user with two active memberships must NOT be
+        // auto-resolved — the picker has to run.
+        let status = json!({ "tenants": [
+            { "is_active": true, "tenant_id": "a" },
+            { "is_active": true, "tenant_id": "b" }
+        ]});
+        assert!(active_tenant_id(&status).is_none());
+    }
+
+    #[test]
+    fn active_tenant_id_is_none_when_absent_or_empty() {
+        assert!(active_tenant_id(&json!({ "user_email": "u@example.com" })).is_none());
+        assert!(active_tenant_id(&json!({ "tenants": [] })).is_none());
     }
 }
