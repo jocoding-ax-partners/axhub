@@ -63,6 +63,7 @@ enum Commands {
     MigratePlan(args::MigratePlanArgs),
     MigrateStageWrite(args::MigrateStageWriteArgs),
     MigrateWavePlan(args::MigrateWavePlanArgs),
+    MigrateApprove(args::MigrateApproveArgs),
     RoutingStats(args::RoutingStatsArgs),
     Diagnose {
         #[command(subcommand)]
@@ -329,6 +330,22 @@ fn dispatch(command: Commands) -> i32 {
             run_result(axhub_helpers::migrate_planning::run_migrate_wave_plan(
                 &argv,
             ))
+        }
+        Commands::MigrateApprove(a) => {
+            let mut argv = vec![
+                "--run-json".to_string(),
+                a.run_json,
+                "--approved-by".to_string(),
+                a.approved_by,
+            ];
+            if let Some(note) = a.approval_note {
+                argv.push("--approval-note".to_string());
+                argv.push(note);
+            }
+            if a.json {
+                argv.push("--json".to_string());
+            }
+            run_result(axhub_helpers::migrate_planning::run_migrate_approve(&argv))
         }
         Commands::RoutingStats(a) => {
             run_result(crate::cmd_routing_stats(a.since, a.json, a.top, a.confused))

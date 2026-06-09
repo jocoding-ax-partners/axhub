@@ -934,6 +934,18 @@ pub struct WavePlanOutput {
     pub fallback_reason: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct ApproveOutput {
+    pub schema_version: String,
+    pub run_json_path: String,
+    pub approval_json_path: String,
+    pub spec_meta_path: String,
+    pub latest_json_path: String,
+    pub run_state: String,
+    pub approval_state: String,
+    pub spec_state: String,
+}
+
 pub fn run_migrate_stage_write(args: &[String]) -> Result<i32> {
     let mut run_json = None;
     let mut stage = None;
@@ -1117,6 +1129,56 @@ pub fn run_migrate_wave_plan(args: &[String]) -> Result<i32> {
     Ok(0)
 }
 
+pub fn run_migrate_approve(args: &[String]) -> Result<i32> {
+    let mut run_json = None;
+    let mut approved_by = None;
+    let mut approval_note = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--run-json" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-approve: --run-json 값이 필요해요");
+                };
+                run_json = Some(PathBuf::from(value));
+                index += 2;
+            }
+            "--approved-by" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-approve: --approved-by 값이 필요해요");
+                };
+                approved_by = Some(value.clone());
+                index += 2;
+            }
+            "--approval-note" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-approve: --approval-note 값이 필요해요");
+                };
+                approval_note = Some(value.clone());
+                index += 2;
+            }
+            "--json" => {
+                json = true;
+                index += 1;
+            }
+            _ => bail!("migrate-approve: unknown option"),
+        }
+    }
+
+    let output = migrate_approve(
+        &required_path(run_json, "--run-json")?,
+        &required_string(approved_by, "--approved-by")?,
+        approval_note.as_deref(),
+    )?;
+    if json {
+        println!("{}", serde_json::to_string(&output)?);
+    } else {
+        println!("{}", output.latest_json_path);
+    }
+    Ok(0)
+}
+
 pub fn migrate_stage_write(
     run_json_path: &Path,
     stage: &str,
@@ -1222,9 +1284,34 @@ pub fn migrate_stage_write(
         approval.state
     };
 
+    let (spec_markdown_path, spec_meta_path, _) =
+        spec_artifact_paths(run_dir, &run.app_key, &approval.target_spec_id)?;
     write_json_atomically(run_json_path, &serde_json::to_value(&run)?)?;
     approval.requested_at = now.clone();
     write_json_atomically(&approval_path, &serde_json::to_value(&approval)?)?;
+    if effective_approval_state == ApprovalState::PendingApproval {
+        update_spec_meta_state(
+            &spec_meta_path,
+            "pending_approval",
+            Some(effective_approval_state.state_str()),
+            None,
+            None,
+            None,
+            &now,
+        )?;
+    } else if effective_run_state == RunState::NeedsRevision {
+        update_spec_meta_state(
+            &spec_meta_path,
+            "needs_revision",
+            Some(effective_approval_state.state_str()),
+            None,
+            None,
+            None,
+            &now,
+        )?;
+    } else if !spec_markdown_path.exists() {
+        bail!("migrate-stage-write: target spec markdown 를 찾지 못했어요");
+    }
     update_latest_run_state(&run, run_dir)?;
 
     if approval.state == ApprovalState::PendingApproval {
@@ -1252,6 +1339,122 @@ pub fn migrate_stage_write(
         meta_path: meta_target.map(|path| path.display().to_string()),
         run_state: effective_run_state.as_str().to_string(),
         approval_state: Some(effective_approval_state.state_str().to_string()),
+    })
+}
+
+pub fn migrate_approve(
+    run_json_path: &Path,
+    approved_by: &str,
+    approval_note: Option<&str>,
+) -> Result<ApproveOutput> {
+    let mut run = read_json::<MigratePlanRunRecord>(run_json_path)?;
+    run.validate()?;
+    run.assert_repo_fingerprint_matches(Path::new(&run.repo_root))?;
+    if run.mode == PlanningMode::Simple {
+        bail!("migrate-approve: simple flow 는 planning approval 대상이 아니에요");
+    }
+    if run.state != RunState::PendingApproval {
+        bail!("migrate-approve: pending_approval run 에서만 승인할 수 있어요");
+    }
+    let run_dir = run_json_path
+        .parent()
+        .context("migrate-approve: run_json parent 가 없어요")?;
+    let approval_path = run_dir.join("approval.json");
+    let mut approval = read_json::<MigratePlanApprovalRecord>(&approval_path)?;
+    approval.validate(run.mode)?;
+    if approval.state != ApprovalState::PendingApproval {
+        bail!("migrate-approve: approval state 가 pending_approval 이어야 해요");
+    }
+
+    let now = now_ts();
+    let approval_hash = sha256_hex(approval_note.unwrap_or("approved"));
+    let (spec_markdown_path, spec_meta_path, latest_json_path) =
+        spec_artifact_paths(run_dir, &run.app_key, &approval.target_spec_id)?;
+    let spec_markdown = fs::read_to_string(&spec_markdown_path).with_context(|| {
+        format!(
+            "{} spec markdown 를 읽지 못했어요",
+            spec_markdown_path.display()
+        )
+    })?;
+    let spec_sha = sha256_hex(&spec_markdown);
+    if spec_sha != approval.target_spec_sha256 {
+        bail!("migrate-approve: target spec sha 가 approval record 와 달라요");
+    }
+
+    if run.state != RunState::Approved && !run.state.can_transition_to(RunState::Approved) {
+        bail!("migrate-approve: invalid run state transition");
+    }
+    run.state = RunState::Approved;
+    run.updated_at = now.clone();
+
+    if approval.state != ApprovalState::Approved
+        && !approval.state.can_transition_to(ApprovalState::Approved)
+    {
+        bail!("migrate-approve: invalid approval state transition");
+    }
+    approval.state = ApprovalState::Approved;
+    approval.approved_at = Some(now.clone());
+    approval.approved_by = Some(approved_by.to_string());
+    approval.approval_prompt_sha256 = approval_hash.clone();
+
+    write_json_atomically(run_json_path, &serde_json::to_value(&run)?)?;
+    write_json_atomically(&approval_path, &serde_json::to_value(&approval)?)?;
+    update_spec_meta_state(
+        &spec_meta_path,
+        "approved",
+        Some("approved"),
+        Some(&now),
+        Some(approved_by),
+        Some(&approval_hash),
+        &now,
+    )?;
+
+    let latest = json!({
+        "schema_version": MIGRATE_SPEC_LATEST_SCHEMA_VERSION,
+        "app_key": run.app_key,
+        "latest_spec_id": approval.target_spec_id,
+        "latest_spec_path": spec_markdown_path.display().to_string(),
+        "source_plan_run_id": run.run_id,
+        "approval_state": "approved",
+        "approved_at": now,
+        "approved_by": approved_by,
+        "approval_prompt_sha256": approval_hash,
+        "sha256": spec_sha,
+        "updated_at": now
+    });
+    write_json_atomically(&latest_json_path, &latest)?;
+    update_latest_run_state(&run, run_dir)?;
+
+    append_receipt(
+        &run_dir.join("receipts.jsonl"),
+        &now,
+        "approval_approved",
+        None,
+        None,
+        &approval_path,
+        &sha256_hex(&serde_json::to_string(&approval)?),
+        "migrate planning approved",
+    )?;
+    append_receipt(
+        &run_dir.join("receipts.jsonl"),
+        &now,
+        "spec_latest_promoted",
+        None,
+        None,
+        &latest_json_path,
+        &sha256_hex(&serde_json::to_string(&latest)?),
+        "approved spec promoted to latest pointer",
+    )?;
+
+    Ok(ApproveOutput {
+        schema_version: "migrate-approve/v1".to_string(),
+        run_json_path: run_json_path.display().to_string(),
+        approval_json_path: approval_path.display().to_string(),
+        spec_meta_path: spec_meta_path.display().to_string(),
+        latest_json_path: latest_json_path.display().to_string(),
+        run_state: run.state.as_str().to_string(),
+        approval_state: approval.state.state_str().to_string(),
+        spec_state: "approved".to_string(),
     })
 }
 
@@ -1557,6 +1760,52 @@ fn update_latest_run_state(run: &MigratePlanRunRecord, run_dir: &Path) -> Result
         "updated_at": run.updated_at
     });
     write_json_atomically(&latest_run, &payload)
+}
+
+fn spec_artifact_paths(
+    run_dir: &Path,
+    app_key: &str,
+    spec_id: &str,
+) -> Result<(PathBuf, PathBuf, PathBuf)> {
+    let planning_root = run_dir
+        .parent()
+        .and_then(|path| path.parent())
+        .and_then(|path| path.parent())
+        .context("migrate planning: spec root 를 계산하지 못했어요")?;
+    let spec_app_dir = planning_root.join("spec").join("apps").join(app_key);
+    let spec_dir = spec_app_dir.join("specs");
+    Ok((
+        spec_dir.join(format!("{spec_id}.md")),
+        spec_dir.join(format!("{spec_id}.meta.json")),
+        spec_app_dir.join("latest.json"),
+    ))
+}
+
+fn update_spec_meta_state(
+    spec_meta_path: &Path,
+    status: &str,
+    approval_state: Option<&str>,
+    approved_at: Option<&str>,
+    approved_by: Option<&str>,
+    approval_prompt_sha256: Option<&str>,
+    updated_at: &str,
+) -> Result<()> {
+    let mut value = read_json::<Value>(spec_meta_path)?;
+    value["status"] = Value::String(status.to_string());
+    value["updated_at"] = Value::String(updated_at.to_string());
+    if let Some(state) = approval_state {
+        value["approval"]["state"] = Value::String(state.to_string());
+    }
+    value["approval"]["approved_at"] = approved_at
+        .map(|value| Value::String(value.to_string()))
+        .unwrap_or(Value::Null);
+    value["approval"]["approved_by"] = approved_by
+        .map(|value| Value::String(value.to_string()))
+        .unwrap_or(Value::Null);
+    if let Some(prompt_sha) = approval_prompt_sha256 {
+        value["approval"]["approval_prompt_sha256"] = Value::String(prompt_sha.to_string());
+    }
+    write_json_atomically(spec_meta_path, &value)
 }
 
 fn write_json_atomically(path: &Path, value: &Value) -> Result<()> {

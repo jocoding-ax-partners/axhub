@@ -258,6 +258,18 @@ pub(crate) struct MigrateWavePlanArgs {
     pub json: bool,
 }
 
+#[derive(clap::Args, Debug)]
+pub(crate) struct MigrateApproveArgs {
+    #[arg(long = "run-json")]
+    pub run_json: String,
+    #[arg(long = "approved-by")]
+    pub approved_by: String,
+    #[arg(long = "approval-note")]
+    pub approval_note: Option<String>,
+    #[arg(long)]
+    pub json: bool,
+}
+
 /// `routing-stats` flags. since/top 파싱(→64)은 handler. 한국어 PRIVACY help 는
 /// 기존 const 를 long_about 으로 보존(D6, FR-006a). classify=Normal.
 #[derive(clap::Args, Debug)]

@@ -5758,6 +5758,188 @@ fn cli_migrate_wave_plan_accepts_same_app_and_falls_back_on_conflict() {
 }
 
 #[test]
+fn cli_migrate_approve_promotes_spec_only_latest_pointer() {
+    let temp = tempfile::tempdir().unwrap();
+    let web = temp.path().join("apps/web");
+    let api = temp.path().join("services/api");
+    std::fs::create_dir_all(web.join("src")).unwrap();
+    std::fs::create_dir_all(web.join("tests")).unwrap();
+    std::fs::create_dir_all(&api).unwrap();
+    std::fs::write(
+        web.join("package.json"),
+        r#"{"dependencies":{"vite":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(web.join("src/web.ts"), "export const web = true;").unwrap();
+    std::fs::write(web.join("tests/app.test.ts"), "expect(true).toBe(true);").unwrap();
+    std::fs::write(api.join("go.mod"), "module example.com/api\n").unwrap();
+
+    let seeded = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--app-path",
+        "apps/web",
+        "--persist-planning",
+        "--json",
+    ]);
+    assert_eq!(seeded.status.code(), Some(0));
+    let seeded_json: serde_json::Value = serde_json::from_slice(&seeded.stdout).unwrap();
+    let run_json = seeded_json["planning_persistence"]["paths"]["run_json"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let app_key = seeded_json["planning"]["app_key"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let approved = run(&[
+        "migrate-approve",
+        "--run-json",
+        &run_json,
+        "--approved-by",
+        "tester",
+        "--approval-note",
+        "approved spec only",
+        "--json",
+    ]);
+    assert_eq!(approved.status.code(), Some(0));
+    let approved_json: serde_json::Value = serde_json::from_slice(&approved.stdout).unwrap();
+    assert_eq!(approved_json["run_state"], "approved");
+    assert_eq!(approved_json["approval_state"], "approved");
+    assert_eq!(approved_json["spec_state"], "approved");
+
+    let latest_path = temp
+        .path()
+        .join(".axhub/spec/apps")
+        .join(app_key)
+        .join("latest.json");
+    let latest: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&latest_path).unwrap()).unwrap();
+    assert_eq!(latest["approval_state"], "approved");
+    assert_eq!(latest["approved_by"], "tester");
+}
+
+#[test]
+fn cli_migrate_approve_promotes_full_consensus_after_pending_approval() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(temp.path().join("src")).unwrap();
+    std::fs::write(
+        temp.path().join("package.json"),
+        r#"{"dependencies":{"next-auth":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/db.ts"),
+        "export async function rows(db: any) { return db.query('select * from users'); }",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/auth.ts"),
+        "import passport from 'passport';\nexport const current_user = (req: any) => req.user;",
+    )
+    .unwrap();
+
+    let seeded = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--persist-planning",
+        "--json",
+    ]);
+    let seeded_json: serde_json::Value = serde_json::from_slice(&seeded.stdout).unwrap();
+    let run_json = seeded_json["planning_persistence"]["paths"]["run_json"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let app_key = seeded_json["planning"]["app_key"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let planner_md = temp.path().join("planner.md");
+    let architect_md = temp.path().join("architect.md");
+    let critic_md = temp.path().join("critic.md");
+    let reviewer_md = temp.path().join("reviewer.md");
+    let adr_md = temp.path().join("adr.md");
+    std::fs::write(&planner_md, "# Planner").unwrap();
+    std::fs::write(&architect_md, "# Architect").unwrap();
+    std::fs::write(&critic_md, "# Critic").unwrap();
+    std::fs::write(&reviewer_md, "# Reviewer").unwrap();
+    std::fs::write(&adr_md, "# ADR").unwrap();
+
+    for (stage, file) in [
+        ("planner", &planner_md),
+        ("architect", &architect_md),
+        ("critic", &critic_md),
+        ("adr", &adr_md),
+    ] {
+        let output = run(&[
+            "migrate-stage-write",
+            "--run-json",
+            &run_json,
+            "--stage",
+            stage,
+            "--markdown-file",
+            file.to_str().unwrap(),
+            "--json",
+        ]);
+        assert_eq!(output.status.code(), Some(0));
+    }
+    let reviewer_output = run(&[
+        "migrate-stage-write",
+        "--run-json",
+        &run_json,
+        "--stage",
+        "reviewer",
+        "--markdown-file",
+        reviewer_md.to_str().unwrap(),
+        "--run-state",
+        "pending_approval",
+        "--approval-state",
+        "pending_approval",
+        "--json",
+    ]);
+    assert_eq!(reviewer_output.status.code(), Some(0));
+
+    let approved = run(&[
+        "migrate-approve",
+        "--run-json",
+        &run_json,
+        "--approved-by",
+        "tester",
+        "--approval-note",
+        "approved consensus",
+        "--json",
+    ]);
+    assert_eq!(approved.status.code(), Some(0));
+    let approved_json: serde_json::Value = serde_json::from_slice(&approved.stdout).unwrap();
+    assert_eq!(approved_json["run_state"], "approved");
+    assert_eq!(approved_json["approval_state"], "approved");
+    assert_eq!(approved_json["spec_state"], "approved");
+
+    let latest_path = temp
+        .path()
+        .join(".axhub/spec/apps")
+        .join(app_key)
+        .join("latest.json");
+    let latest: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&latest_path).unwrap()).unwrap();
+    assert_eq!(latest["approval_state"], "approved");
+    assert_eq!(latest["approved_by"], "tester");
+
+    let approval_path = std::path::Path::new(&run_json)
+        .parent()
+        .unwrap()
+        .join("approval.json");
+    let approval: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&approval_path).unwrap()).unwrap();
+    assert_eq!(approval["state"], "approved");
+    assert!(approval["approved_at"].as_str().is_some());
+}
+
+#[test]
 fn cli_migrate_plan_emits_six_language_wrapper_previews_without_secret_leak() {
     let temp = tempfile::tempdir().unwrap();
 
