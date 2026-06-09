@@ -4,6 +4,27 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.42](///compare/v0.9.41...v0.9.42) (2026-06-09)
+
+v0.9.41 이 플러그인 업데이트 알림을 고쳤다면, 이번엔 별개 채널인 **CLI 바이너리 업데이트 알림(cli-drift)**을 같은 방식으로 고쳤어요. Windows 사용자가 CLI 새 버전(v0.18.3 → v0.18.4)이 있는데도 알림이 안 떠서 파일 덤프로 원인을 좁혔어요. 두 버그가 겹쳐 있었어요. 첫째, 업데이트가 cache 에 pending 이면 12시간마다만 재조회해서, 사용자가 CLI 를 업데이트해도(예: 0.18.2 → 0.18.3) cache 가 한참 stale 인 채로 남아 새 latest(0.18.4)를 못 봤어요 — fetch TTL 을 pending 여부와 무관하게 1시간으로 통일해서 cache 가 현재/최신 버전을 한 시간 안에 현실과 맞추도록 했어요. 둘째, 버전당 한 번 fire 후 per-version marker 로 영구 억제되던 one-shot 버그를 plugin-drift 와 동일하게 세션+타임스탬프 snooze 로 바꿔서, 새 세션마다 재노출하고 같은 세션 안에서는 4시간 snooze 로 turn-cap 을 유지해요. `prompt-route` 가 UserPromptSubmit payload 의 session_id 를 cli_drift_nudge 에 넘겨요.
+
+### Test baseline
+
+- `cargo test -p axhub-helpers`: cli_drift 단위 32 pass (snooze 단위 3개 + 세션별 재노출 integration), hook_safety_cli 19 pass (turn-cap 회전 `turn_cap_yields_across_turns...` 유지). 전체 helper 스위트 exit 0.
+- `cargo fmt --check` / `clippy` 변경 3파일 새 경고 0. PR #191 CI 12 SUCCESS / 0 fail.
+- `release:check` 5 cross-arch 바이너리 빌드 + 버전 assert green (0.9.42).
+- end-to-end(실 바이너리): A세션 fire → 같은 세션 snooze → B세션 재노출.
+
+### Honest tradeoff
+
+- pending cache 도 1시간마다 재조회해서 session-start 당 `axhub update check` 호출이 기존 12시간 대비 최대 시간당 1회 늘어요 (detached, TTL-gated, 무시 가능).
+- 잔여 staleness: 사용자가 CLI 를 업데이트하면 cache 가 1시간 안에 따라잡아요(즉시 아님). advisory nudge 라 허용 가능한 수준이에요.
+- 별개 후속: `session-start.ps1` 은 hooks.json 미등록 dead code 라 Windows 도 `.sh`(git-bash) 로 도는데, 이번 PR 범위 밖이라 그대로 뒀어요. fetch warming 을 `cmd_session_start`(Rust)로 흡수하면 .ps1 dead-code 와 .sh/.ps1 중복이 같이 정리돼요.
+
+### Fixed
+
+* CLI 업데이트 알림 재노출 + stale 캐시 (cli-drift) ([#191](undefined/undefined/undefined/issues/191)) 730c327
+
 ## [0.9.41](///compare/v0.9.40...v0.9.41) (2026-06-09)
 
 플러그인 새 버전이 나와도 사용자가 어떤 채팅을 쳐도 알림 + AskUserQuestion 이 떠야 하는데, 한 번 뜨고는 다시 안 뜨거나 아예 안 뜨던 문제를 고쳤어요. plugin-drift nudge 가 버전당 한 번 fire 후 per-version marker 로 영구 억제돼서, cold-start race(첫 턴은 latest-release 캐시가 아직 warm 안 됨)와 겹치면 그 한 번이 사용자가 못 본 턴에 소모되어 영영 안 떴어요. marker 가 turn-cap(plugin↔CLI 드리프트 교대) yield 도 겸해서 그냥 삭제할 수 없어, "영구 억제"를 "세션 + 타임스탬프 snooze"로 바꿨어요. 이제 새 세션 시작마다 재노출하고(`session_id` 불일치), 같은 세션 안에서는 fire 후 4시간 snooze 로 turn-cap 인접턴 dedup 을 유지해요. `그만 볼래요`(영구 optout)와 버전 업 재노출은 그대로고, legacy 빈 marker 파일은 `None` 으로 파싱돼 마이그레이션 없이 재노출돼요. UserPromptSubmit payload 의 `session_id` 를 `prompt-route` 가 추출해 `plugin_drift_nudge` 에 넘겨요.
