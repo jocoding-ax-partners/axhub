@@ -251,7 +251,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
    **(a) install_url 무조건 표시 + 연결 안내 — 이미 설치돼 있어도 항상.** `github.install_url` 이 있으면 설치 여부와 무관하게 한 줄로 **연결을 안내**해요: "GitHub App 을 설치·연결하려면 여기로 가요: `<github.install_url>`. 이미 설치돼 있어도 다른 org/계정을 더 연결할 수 있어요." `github.installed_logins` 가 있으면 "이미 연결된 계정: `<login...>`" 도 덧붙여요. 링크는 안내만 하고 브라우저를 자동으로 열지는 않아요.
 
-   **(b) 미설치면 (`github.state` 가 `uninstalled`/`empty`) 먼저 설치 제안.** 가능한 전진배치는 **계정레벨 GitHub App 설치(install_url)만**이에요. OAuth device-flow 인가는 connect 단계에 남아요. `github.state` 가 `auth_error` 면 인증 만료로 install_url 을 못 읽으니 "다시 로그인해줘" 로 안내하고, 재로그인 후 재감지하면 링크가 다시 떠요.
+   **(b) 미설치면 (`github.state` 가 `uninstalled`/`empty`) 설치까지 막아요 (gate).** 설치가 확인되기 전에는 Step 7 (첫 앱 만들기, init 위임) 으로 진행하지 않아요. 가능한 전진배치는 **계정레벨 GitHub App 설치(install_url)만**이에요. OAuth device-flow 인가는 connect 단계에 남아요. `github.state` 가 `auth_error` 면 인증 만료로 install_url 을 못 읽으니 "다시 로그인해줘" 로 안내하고, 재로그인 후 재감지하면 링크가 다시 떠요.
 
    ```json
    {
@@ -261,13 +261,15 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
        "multiSelect": false,
        "options": [
          {"label": "설치", "description": "install_url 을 열어 계정레벨 GitHub App 설치를 먼저 끝내요"},
-         {"label": "나중에", "description": "init/connect 중 멈출 수 있어 READY_WITH_USER_ACTION 으로 안내해요"}
+         {"label": "나중에", "description": "설치를 미루면 첫 앱 만들기로 넘어가지 않고 READY_WITH_USER_ACTION 으로 멈춰요. 설치 후 `온보딩 계속`"}
        ]
      }]
    }
    ```
 
    설치 선택 시 `github.install_url` 을 보여주고 브라우저를 열어요. 사용자가 "승인했어" 또는 "온보딩 계속" 이라고 말하면 Step 2 재감지를 한 번 해요. `apps git connect` OAuth device-flow 인가는 app id 가 생기는 init/github 단계에서 처리해요.
+
+   **미설치 동안 진행 차단 (gate).** `github.state` 가 `uninstalled`/`empty` 인 동안에는 Step 7 (repo/app gap, 첫 앱 만들기) 로 advance 하지 않아요. 설치를 확인(재감지 결과 `github.state` 가 `installed`/`mixed`)했거나, 사용자가 "나중에" 로 명시적으로 미뤄 READY_WITH_USER_ACTION 으로 멈출 때까지 `github_app_missing` 이 first_gap 으로 남아요. "나중에" 면 install_url + 재개 phrase(`승인했어`/`온보딩 계속`)를 남기고 멈춰요 — 미설치 상태로 init 으로 위임하지 않아요. 이미 설치돼 있으면(installed/mixed) 막지 않고 그대로 다음 gap 으로 가요 (install_url 은 (a) 에서 추가 설치용으로 계속 보여줘요).
 
 7. **Repo/App gap.**
 

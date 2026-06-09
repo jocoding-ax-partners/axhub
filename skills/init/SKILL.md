@@ -47,7 +47,7 @@ model: sonnet
 |------|-------------------|
 | Step 1 CLI 존재 확인 | "axhub 도구가 있는지 보고 있어요." |
 | Step 2 template 목록 조회 | "사용할 수 있는 템플릿을 확인하고 있어요." |
-| Step 2.5 GitHub App 설치 안내 | "GitHub App 설치 상태를 보여줘요. 이미 됐으면 넘어가요." |
+| Step 2.5 GitHub App 설치 확인 | "GitHub App 이 설치돼 있는지 봐요. 안 돼 있으면 설치 링크를 주고 기다려요." |
 | Step 3 template 선택 | "어떤 종류 프로젝트를 만들지 골라요." |
 | Step 4 앱 이름 입력 | "앱 이름을 정해요." |
 | Step 5 bootstrap dry-run | "어떤 작업을 할지 미리 보여줘요." |
@@ -217,29 +217,33 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 
    on exit 4 (auth 만료, CLI `axhub apps templates list` — 옛 sysexits 65 아님) → "다시 로그인해줘"라고 말하면 이어서 처리할 수 있다고 안내해요. on exit 8 (tenant 미해석) → `axhub profile current --json` 안내. 그 외 비정상 종료는 "설치 상태 진단해줘"라고 말하면 점검할 수 있다고 안내해요.
 
-2.5. **GitHub App 설치 상태를 보여줘요 (read-only, 비차단).**
+2.5. **GitHub App 설치 확인 — 미설치면 설치까지 막아요 (gate).**
 
-   template 목록이 정상적으로 오면 로그인이 된 거라, 이어서 GitHub App 설치 상태를 한 번 보여줘요. 이건 앱 만들기를 막지 않아요 — 이미 설치했거나 나중에 할 사람은 그냥 다음으로 넘어가요.
+   template 목록이 정상적으로 오면 로그인이 된 거예요. 이어서 GitHub App 설치 상태를 확인해요. 규칙은 두 가지예요: **install_url 은 어떤 상태에서도 무조건 보여줘요.** 그리고 **아무 GitHub 계정에도 설치가 안 됐으면(미설치) 설치·연결이 확인될 때까지 앱 만들기를 막아요.** 이미 어딘가 설치돼 있으면 막지 않고 바로 진행하고, 다른 org 을 더 붙이고 싶으면 같은 install_url 로 추가해요.
+
+   왜 막냐면, OAuth device flow (Step 7a) 는 GitHub **사용자 인증**만 해요. repo 를 만들려면 AxHub GitHub App 을 계정/org 에 **설치(저장소 접근 권한 부여)**하는 별도 1회 단계가 필요한데, 이건 GitHub 웹 UI 에서 사람이 직접 눌러야 해요. 설치 없이 진행하면 bootstrap 이 repo 생성에서 막혀서 사용자가 멈춘 줄 알아요.
 
    ```bash
    axhub github accounts list --json   # data.accounts[]: login, installed, install_url
    ```
 
-   `data.accounts[]` 를 읽어서 **install_url 을 무조건 먼저 한 줄로 보여줘요 — 이미 설치돼 있어도 항상이에요.** `install_url` 은 아무 entry 에서나 읽어요 (전부 같아요). account 가 하나도 없을 때만 읽을 게 없어 생략해요 (그땐 아래 만들기 진행 중 device flow 가 GitHub 연결을 처리해요). `installation_id` 같은 internal 값은 echo 하지 말고 `login` 과 `install_url` 만 보여줘요. 링크는 보여주기만 하고 자동으로 열지 않아요.
+   먼저 출력 상태를 봐요. **확인할 수 없는 상태에서는 막지 않아요** (helper 의 gap 계약과 동일 — `auth_ok` + `uninstalled`/`empty` 일 때만 막아요):
 
-   - **install_url (항상 표시)**: "GitHub App 설치·계정 추가 링크: `<install_url>`" — 설치 여부와 무관하게 매번 보여줘요. 이미 설치된 사용자도 다른 org/계정을 더 붙일 수 있게 항상 남겨요.
-   - 그 아래에 현재 상태를 한 줄 덧붙여요:
-     - 설치된 계정 ≥1: "이미 설치된 계정: `<login...>` (다른 계정/org 은 위 링크로 더 붙일 수 있어요)"
-     - 미설치 계정만/혼재: "아직 안 깔린 계정: `<login...>` — 위 링크로 설치해요"
-     - 빈 목록: "아직 보이는 GitHub 계정이 없어요. 아래 만들기를 진행하면 GitHub 연결이 필요한 순간 자동으로 안내가 떠요."
+   - 출력이 비었거나(타임아웃) JSON 파싱이 안 되면 (`unavailable`) — 설치 상태를 확인 못 하니 **막지 않고 그대로 진행**해요. 일시적 CLI 문제로 앱 만들기를 멈추지 않아요.
+   - auth 에러 envelope (`{"status":"error","error":{"code":"auth"}}`) 면 — 인증 만료라 "다시 로그인해줘" 로 안내하고 재로그인 후 이 단계를 다시 해요 (막지 않고 재인증으로 라우팅).
+   - 정상 응답이면 아래로 진행해요.
 
-   이 안내는 인지 + 다른 계정 추가용이에요. 실제 from-scratch 설치는 bootstrap saga 가 GitHub 연결이 필요할 때 자동으로 처리해요 (Step 7a 의 `device_code_issued`).
+   `data.accounts[]` 를 읽어서 **install_url 이 있으면 무조건 먼저 한 줄로 보여줘요 — 설치 여부와 무관하게 항상이에요.** `install_url` 은 아무 entry 에서나 읽어요 (전부 같아요). `installation_id` 같은 internal 값은 echo 하지 말고 `login` 과 `install_url` 만 보여줘요. 링크는 보여주기만 하고 자동으로 열지 않아요.
 
-   **owner 를 미리 정해 둬요 (`ambiguous_installation` 예방).** bootstrap 은 GitHub App 이 **여러 계정/org 에 설치**돼 있으면 `--github-owner` 없이는 어디에 repo 를 만들지 몰라서 `ambiguous_installation` (CLI exit 9) 으로 멈춰요. **먼저 `AXHUB_GITHUB_OWNER` env 가 설정돼 있으면 그 값을 `$GITHUB_OWNER` 로 바로 써요** (질문 없이 — 비대화형 agent/CI 가 owner 를 미리 지정하는 경로, single-login auto-pick 과 동일). 없으면 `installed:true` 인 `login` 개수로 미리 갈라요:
+   - **install_url (항상 표시)**: "GitHub App 설치·계정 추가 링크: `<install_url>`" — 설치 여부와 무관하게 매번 보여줘요. 이미 설치된 사람도 다른 org/계정을 더 붙일 수 있게 항상 남겨요.
 
+   그 다음 `installed:true` 인 `login` 개수로 갈라요.
+
+   **(A) 설치된 계정이 1개 이상 (`github.state` = installed/mixed) — 막지 않아요.** "이미 설치된 계정: `<login...>` (다른 계정/org 은 위 링크로 더 붙일 수 있어요)" 를 한 줄 덧붙이고 owner 를 정해요 (`ambiguous_installation` 예방). bootstrap 은 App 이 **여러 계정/org 에 설치**돼 있으면 `--github-owner` 없이는 `ambiguous_installation` (CLI exit 9) 으로 멈춰요:
+
+   - **`AXHUB_GITHUB_OWNER` env 가 있으면** 그 값을 `$GITHUB_OWNER` 로 바로 써요 (질문 없이 — 비대화형 agent/CI 경로, single-login auto-pick 과 동일).
    - **정확히 1개**: 묻지 말고 그 `login` 을 `$GITHUB_OWNER` 로 자동으로 잡아요.
    - **2개 이상**: 아래 질문으로 한 번 물어서 고른 `login` 을 `$GITHUB_OWNER` 로 잡아요. 그래야 Step 5/6 이 멈추지 않아요.
-   - **0개 (미설치)**: `$GITHUB_OWNER` 를 비워 둬요. bootstrap 의 device flow (Step 7a) 가 설치/연결을 처리해요.
 
    ```json
    {
@@ -256,6 +260,33 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
    ```
 
    옵션 label 은 `installed:true` 인 `login` 값으로 채워요 (UI 제한상 최대 3개; 더 많으면 먼저 전체를 텍스트로 보여주고 3개만 버튼으로). `installation_id` 같은 internal 값은 옵션에 넣지 말고 `login` 만 보여줘요. 비대화형/D1 guard 에서는 `AXHUB_GITHUB_OWNER` env 가 있으면 그 owner 로 진행하고, 없으면 묻지 않고 safe default `취소` 로 bootstrap 을 멈춰요 — 설치가 여러 개인데 owner 를 못 정하면 임의 계정에 repo 를 만들지 않아요.
+
+   **(B) 설치된 계정이 0개로 확인됨 (`uninstalled` = 계정은 있는데 전부 미설치 / `empty` = 보이는 계정 자체가 없음) — 설치까지 막아요 (gate).** 위 degraded-state(`unavailable`/auth 에러)는 여기 해당 안 돼요 — 그건 막지 않아요. install_url 이 있으면 또렷이 다시 보여주고, 빈 목록이라 링크를 못 읽으면 "axhub 대시보드의 GitHub 연결 메뉴에서 AxHub 앱을 설치해요" 로 안내해요. 그런 다음 설치·연결을 요청해요:
+
+   > GitHub App 이 아직 어떤 GitHub 계정에도 설치 안 됐어요. repo 를 만들려면 먼저 설치가 필요해요.
+   > 1. 위 링크 `<install_url>` 를 브라우저에서 열어요.
+   > 2. repo 를 만들 계정/org 을 고르고 저장소 접근을 승인해요.
+   > 3. 끝나면 "설치했어" 라고 알려줘요.
+
+   그리고 아래 질문으로 설치 완료를 기다려요. **설치가 확인되기 전에는 Step 3 (template 선택) 이후로 절대 진행하지 않아요 — bootstrap dry-run/execute 도 시작하지 않아요.**
+
+   ```json
+   {
+     "questions": [{
+       "question": "GitHub App 설치를 끝냈을까요?",
+       "header": "GitHub App",
+       "multiSelect": false,
+       "options": [
+         {"label": "설치 완료", "description": "설치·연결을 끝냈으면 다시 확인하고 이어서 만들어요"},
+         {"label": "취소", "description": "지금은 앱 만들기를 멈춰요"}
+       ]
+     }]
+   }
+   ```
+
+   `설치 완료` 를 고르면 `axhub github accounts list --json` 를 다시 읽어요. 이제 `installed:true` 가 보이면 (A) 로 가서 owner 를 정하고 진행해요. 아직 `installed` 가 하나도 없으면 같은 install_url 을 한 번 더 보여주고 이 질문을 다시 띄워요 (설치가 확인될 때까지 반복). 재조회가 `unavailable`/auth 에러로 돌아오면 무한 차단하지 말고 위 degraded-state 규칙대로 진행하거나 재인증으로 라우팅해요. `취소` 면 "GitHub App 을 설치하면 '다시 만들어줘' 라고 말해 주세요. 이어서 만들게요." 로 멈춰요.
+
+   **Non-interactive AskUserQuestion guard (D1):** `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 환경에서는 설치 브라우저 단계를 사람이 완료할 수 없어요. 이 gate 의 safe default 는 `취소` (registry `init` 채널) 라 bootstrap 을 시작하지 않고, install_url + 재개 phrase(`다시 만들어줘`)를 남기고 멈춰요. 미설치인데 owner 를 추측해 repo 를 만들지 않아요.
 
 ## 템플릿 선택 가이드
 
@@ -507,6 +538,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
 ## NEVER
 
+- NEVER GitHub App 이 아무 계정에도 설치 안 된 상태(`github.state` = uninstalled/empty)에서 Step 3 (template 선택) 이후로 진행하거나 bootstrap dry-run/execute 를 호출하지 않아요. Step 2.5 gate 에서 install_url 을 보여주고 설치가 확인(재조회 `installed:true`)될 때까지 멈춰요. 이미 설치된(installed/mixed) 경우는 막지 않고, install_url 은 추가 설치용으로 계속 보여줘요.
 - NEVER `axhub init` 또는 `axhub init --from-template` 을 호출하지 않아요. Rust v1.0.0-rc.1 에서 `--from-template` flag 가 미구현 stub (`initcmd.rs` run() 미사용) 이라 호출해도 generic docker manifest 만 만들어져요. SKILL 은 `axhub apps bootstrap` saga 만 써요.
 - NEVER `axhub apps create` 또는 `axhub deploy create` 를 직접 호출하지 않아요. bootstrap saga 가 server-side 에서 둘 다 처리해요.
 - NEVER `axhub-helpers fetch-template` 또는 remote `templates.json` 을 source 로 쓰지 않아요. backend `axhub apps templates list` 만 source-of-truth 예요.
