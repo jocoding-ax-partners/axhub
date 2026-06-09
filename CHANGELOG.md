@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.41](///compare/v0.9.40...v0.9.41) (2026-06-09)
+
+플러그인 새 버전이 나와도 사용자가 어떤 채팅을 쳐도 알림 + AskUserQuestion 이 떠야 하는데, 한 번 뜨고는 다시 안 뜨거나 아예 안 뜨던 문제를 고쳤어요. plugin-drift nudge 가 버전당 한 번 fire 후 per-version marker 로 영구 억제돼서, cold-start race(첫 턴은 latest-release 캐시가 아직 warm 안 됨)와 겹치면 그 한 번이 사용자가 못 본 턴에 소모되어 영영 안 떴어요. marker 가 turn-cap(plugin↔CLI 드리프트 교대) yield 도 겸해서 그냥 삭제할 수 없어, "영구 억제"를 "세션 + 타임스탬프 snooze"로 바꿨어요. 이제 새 세션 시작마다 재노출하고(`session_id` 불일치), 같은 세션 안에서는 fire 후 4시간 snooze 로 turn-cap 인접턴 dedup 을 유지해요. `그만 볼래요`(영구 optout)와 버전 업 재노출은 그대로고, legacy 빈 marker 파일은 `None` 으로 파싱돼 마이그레이션 없이 재노출돼요. UserPromptSubmit payload 의 `session_id` 를 `prompt-route` 가 추출해 `plugin_drift_nudge` 에 넘겨요.
+
+### Test baseline
+
+- `cargo test -p axhub-helpers`: `hook_safety_cli` 19 pass / `plugin_update` 단위 27 pass (snooze 단위테스트 3개 + 세션별 재노출 integration 2개 추가). turn-cap 회전 테스트(`turn_cap_yields_across_turns_plugin_turn1_then_cli_turn2`) 유지.
+- `cargo fmt --check` / `clippy` 변경 4파일 새 경고 0. PR #190 CI 전 체크(perf/rust matrix 3 OS, hook integration, corpus drift) green.
+- `release:check` 5 cross-arch 바이너리 빌드 + 버전 assert green (0.9.41).
+
+### Honest tradeoff
+
+- nudge 는 latest-release 캐시가 warm 해야 떠요. 캐시는 session-start background fetch 또는 explicit update check 가 채워요(둘 다 검증됨). fix 후에도 안 보이면 다음 용의자는 nudge 로직이 아니라 Windows `nohup &` background spawn 이에요.
+- `session_id` 의 resume/restart 안정성은 공식 docs 미명시예요. 불안정하면 4h-snooze-only 로 graceful degrade 해요(그래도 기존 one-shot 보다 나아요).
+- cli-drift 채널은 여전히 one-shot marker 예요(의도적 scope 밖). 같은 latent 버그가 남아 있어 동일 snooze 패치 후속이 필요해요.
+
+### Fixed
+
+* 플러그인 업데이트 알림 재노출 (한 번 뜨고 다시 안 뜨는 문제) ([#190](undefined/undefined/undefined/issues/190)) 52beaf0
+
 ## [0.9.40](///compare/v0.9.39...v0.9.40) (2026-06-09)
 
 온보딩 흐름에서 GitHub App `install_url` 노출을 `DETECT_ALL` 직후 branch-independent `Step 2.5` 로 끌어올렸어요. 이미 GitHub App 이 설치된 계정 + 빈 폴더 경로가 `init` 으로 바로 라우팅되며 install_url 을 노출하는 두 지점(github gap / ready card)을 둘 다 우회하던 문제를 막아, 어느 gap 으로 라우팅되든 흐름 맨 앞에서 install_url 을 한 번은 보장해요. `installed`/`mixed` 일 땐 "다른 org/계정에 설치할래요?" actionable 질문까지 더했고, 비대화형 default 는 mutation 없이 그대로 진행해요. `#173`→`#176`→`#177`→`#179` 로 이어진 conditional-surface whack-a-mole 를 단일 branch-independent 지점으로 종결했어요.
