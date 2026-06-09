@@ -2,15 +2,21 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
+use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+
+use crate::atomic_jsonl;
 
 pub const MIGRATE_PLANNING_PREVIEW_SCHEMA_VERSION: &str = "migrate-planning-preview/v1";
 pub const MIGRATE_SPEC_LATEST_SCHEMA_VERSION: &str = "axhub/migrate-spec-latest/v1";
 pub const MIGRATE_SPEC_META_SCHEMA_VERSION: &str = "axhub/migrate-spec/v1";
 pub const MIGRATE_PLAN_RUN_SCHEMA_VERSION: &str = "axhub/migrate-plan-run/v1";
 pub const MIGRATE_PLAN_APPROVAL_SCHEMA_VERSION: &str = "axhub/migrate-plan-approval/v1";
+pub const MIGRATE_PLAN_STAGE_SCHEMA_VERSION: &str = "axhub/migrate-plan-stage/v1";
+pub const MIGRATE_PLAN_APP_INDEX_SCHEMA_VERSION: &str = "axhub/migrate-plan-app-index/v1";
 pub const MIGRATE_PLAN_WAVES_SCHEMA_VERSION: &str = "axhub/migrate-plan-waves/v1";
 pub const MIGRATE_PLAN_WAVE_SCHEMA_VERSION: &str = "axhub/migrate-plan-wave/v1";
 pub const WORKSPACE_MARKER_SCHEMA_VERSION: &str = "axhub/workspace-marker/v1";
@@ -73,6 +79,19 @@ pub enum RunState {
 }
 
 impl RunState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Draft => "draft",
+            Self::Running => "running",
+            Self::PendingApproval => "pending_approval",
+            Self::Approved => "approved",
+            Self::NeedsRevision => "needs_revision",
+            Self::Rejected => "rejected",
+            Self::Aborted => "aborted",
+            Self::Superseded => "superseded",
+        }
+    }
+
     pub fn can_transition_to(self, next: Self) -> bool {
         matches!(
             (self, next),
@@ -891,6 +910,708 @@ fn has_cycle(graph: &BTreeMap<String, Vec<String>>) -> bool {
     graph
         .keys()
         .any(|node| visit(node, graph, &mut visiting, &mut visited))
+}
+
+#[derive(Debug, Serialize)]
+pub struct StageWriteOutput {
+    pub schema_version: String,
+    pub stage: String,
+    pub ordinal: u32,
+    pub markdown_path: String,
+    pub meta_path: Option<String>,
+    pub run_state: String,
+    pub approval_state: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WavePlanOutput {
+    pub schema_version: String,
+    pub wave_id: String,
+    pub wave_path: Option<String>,
+    pub wave_index_path: Option<String>,
+    pub parallelism_enabled: bool,
+    pub serial_fallback: bool,
+    pub fallback_reason: Option<String>,
+}
+
+pub fn run_migrate_stage_write(args: &[String]) -> Result<i32> {
+    let mut run_json = None;
+    let mut stage = None;
+    let mut markdown_file = None;
+    let mut summary = None;
+    let mut run_state = None;
+    let mut approval_state = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--run-json" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-stage-write: --run-json 값이 필요해요");
+                };
+                run_json = Some(PathBuf::from(value));
+                index += 2;
+            }
+            "--stage" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-stage-write: --stage 값이 필요해요");
+                };
+                stage = Some(value.clone());
+                index += 2;
+            }
+            "--markdown-file" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-stage-write: --markdown-file 값이 필요해요");
+                };
+                markdown_file = Some(PathBuf::from(value));
+                index += 2;
+            }
+            "--summary" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-stage-write: --summary 값이 필요해요");
+                };
+                summary = Some(value.clone());
+                index += 2;
+            }
+            "--run-state" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-stage-write: --run-state 값이 필요해요");
+                };
+                run_state = Some(parse_run_state(value)?);
+                index += 2;
+            }
+            "--approval-state" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-stage-write: --approval-state 값이 필요해요");
+                };
+                approval_state = Some(parse_approval_state(value)?);
+                index += 2;
+            }
+            "--json" => {
+                json = true;
+                index += 1;
+            }
+            _ => bail!("migrate-stage-write: unknown option"),
+        }
+    }
+
+    let output = migrate_stage_write(
+        &required_path(run_json, "--run-json")?,
+        &required_string(stage, "--stage")?,
+        &required_path(markdown_file, "--markdown-file")?,
+        summary.as_deref(),
+        run_state,
+        approval_state,
+    )?;
+    if json {
+        println!("{}", serde_json::to_string(&output)?);
+    } else {
+        println!("{}", output.markdown_path);
+    }
+    Ok(0)
+}
+
+pub fn run_migrate_wave_plan(args: &[String]) -> Result<i32> {
+    let mut run_json = None;
+    let mut wave_id = None;
+    let mut stage_scope = None;
+    let mut participants = Vec::new();
+    let mut depends_on = Vec::new();
+    let mut artifact_list = Vec::new();
+    let mut write_targets = Vec::new();
+    let mut independence_proof = Vec::new();
+    let mut state = WaveState::Planned;
+    let mut json = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--run-json" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-wave-plan: --run-json 값이 필요해요");
+                };
+                run_json = Some(PathBuf::from(value));
+                index += 2;
+            }
+            "--wave-id" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-wave-plan: --wave-id 값이 필요해요");
+                };
+                wave_id = Some(value.clone());
+                index += 2;
+            }
+            "--stage-scope" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-wave-plan: --stage-scope 값이 필요해요");
+                };
+                stage_scope = Some(value.clone());
+                index += 2;
+            }
+            "--participant" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-wave-plan: --participant 값이 필요해요");
+                };
+                participants.push(value.clone());
+                index += 2;
+            }
+            "--depends-on" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-wave-plan: --depends-on 값이 필요해요");
+                };
+                depends_on.push(value.clone());
+                index += 2;
+            }
+            "--artifact" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-wave-plan: --artifact 값이 필요해요");
+                };
+                artifact_list.push(value.clone());
+                index += 2;
+            }
+            "--write-target" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-wave-plan: --write-target 값이 필요해요");
+                };
+                write_targets.push(value.clone());
+                index += 2;
+            }
+            "--independence-proof" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-wave-plan: --independence-proof 값이 필요해요");
+                };
+                independence_proof.push(value.clone());
+                index += 2;
+            }
+            "--state" => {
+                let Some(value) = args.get(index + 1) else {
+                    bail!("migrate-wave-plan: --state 값이 필요해요");
+                };
+                state = parse_wave_state(value)?;
+                index += 2;
+            }
+            "--json" => {
+                json = true;
+                index += 1;
+            }
+            _ => bail!("migrate-wave-plan: unknown option"),
+        }
+    }
+
+    let output = migrate_wave_plan(
+        &required_path(run_json, "--run-json")?,
+        &required_string(wave_id, "--wave-id")?,
+        &required_string(stage_scope, "--stage-scope")?,
+        participants,
+        depends_on,
+        artifact_list,
+        write_targets,
+        independence_proof,
+        state,
+    )?;
+    if json {
+        println!("{}", serde_json::to_string(&output)?);
+    } else if let Some(path) = output.wave_path.as_deref() {
+        println!("{}", path);
+    } else {
+        println!("serial-fallback");
+    }
+    Ok(0)
+}
+
+pub fn migrate_stage_write(
+    run_json_path: &Path,
+    stage: &str,
+    markdown_file: &Path,
+    summary: Option<&str>,
+    run_state: Option<RunState>,
+    approval_state: Option<ApprovalState>,
+) -> Result<StageWriteOutput> {
+    let mut run = read_json::<MigratePlanRunRecord>(run_json_path)?;
+    run.validate()?;
+    run.assert_repo_fingerprint_matches(Path::new(&run.repo_root))?;
+    if run.mode != PlanningMode::FullConsensus {
+        bail!("migrate-stage-write: full_consensus run 만 stage artifact 를 써요");
+    }
+    let run_dir = run_json_path
+        .parent()
+        .context("migrate-stage-write: run_json parent 가 없어요")?;
+    let approval_path = run_dir.join("approval.json");
+    let mut approval = read_json::<MigratePlanApprovalRecord>(&approval_path)?;
+    let now = now_ts();
+    let markdown = fs::read_to_string(markdown_file).with_context(|| {
+        format!(
+            "{} stage markdown 를 읽지 못했어요",
+            markdown_file.display()
+        )
+    })?;
+    let markdown_sha = sha256_hex(&markdown);
+
+    let (markdown_target, meta_target, event_name) = if stage == "adr" {
+        (run_dir.join("adr.md"), None, "adr_written")
+    } else {
+        ensure_allowed_stage(stage)?;
+        let stages_dir = run_dir.join("stages");
+        let ordinal = next_stage_ordinal(&stages_dir)?;
+        (
+            stages_dir.join(format!("{ordinal:02}-{stage}.md")),
+            Some(stages_dir.join(format!("{ordinal:02}-{stage}.meta.json"))),
+            "stage_written",
+        )
+    };
+
+    write_text_atomically(&markdown_target, &markdown)?;
+    if let Some(meta_path) = meta_target.as_ref() {
+        let ordinal = stage_ordinal_from_path(&markdown_target)?;
+        let meta = json!({
+            "schema_version": MIGRATE_PLAN_STAGE_SCHEMA_VERSION,
+            "run_id": run.run_id,
+            "app_key": run.app_key,
+            "stage": stage,
+            "stage_n": ordinal,
+            "state": "complete",
+            "artifact_sha256": markdown_sha,
+            "created_at": now,
+            "updated_at": now
+        });
+        write_json_atomically(meta_path, &meta)?;
+    }
+
+    let receipt_summary = summary
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| format!("{stage} artifact written"));
+    append_receipt(
+        &run_dir.join("receipts.jsonl"),
+        &now,
+        event_name,
+        if stage == "adr" { None } else { Some(stage) },
+        if stage == "adr" {
+            None
+        } else {
+            Some(stage_ordinal_from_path(&markdown_target)?)
+        },
+        &markdown_target,
+        &markdown_sha,
+        &receipt_summary,
+    )?;
+
+    let effective_run_state = if let Some(next) = run_state {
+        if run.state != next && !run.state.can_transition_to(next) {
+            bail!("migrate-stage-write: invalid run state transition");
+        }
+        run.state = next;
+        next
+    } else {
+        run.state
+    };
+    run.updated_at = now.clone();
+
+    let effective_approval_state = if let Some(next) = approval_state {
+        if approval.state != next && !approval.state.can_transition_to(next) {
+            bail!("migrate-stage-write: invalid approval state transition");
+        }
+        approval.state = next;
+        if next == ApprovalState::PendingApproval && run.mode == PlanningMode::FullConsensus {
+            approval.approved_stage_artifacts = collect_stage_sha_list(&run_dir.join("stages"))?;
+            let adr_path = run_dir.join("adr.md");
+            if !adr_path.exists() {
+                bail!("migrate-stage-write: full_consensus approval 전에는 adr.md 가 필요해요");
+            }
+            approval.adr_sha256 = Some(sha256_hex(&fs::read_to_string(&adr_path)?));
+        }
+        next
+    } else {
+        approval.state
+    };
+
+    write_json_atomically(run_json_path, &serde_json::to_value(&run)?)?;
+    approval.requested_at = now.clone();
+    write_json_atomically(&approval_path, &serde_json::to_value(&approval)?)?;
+    update_latest_run_state(&run, run_dir)?;
+
+    if approval.state == ApprovalState::PendingApproval {
+        append_receipt(
+            &run_dir.join("receipts.jsonl"),
+            &now,
+            "approval_requested",
+            None,
+            None,
+            &approval_path,
+            &sha256_hex(&serde_json::to_string(&approval)?),
+            "consensus review complete; pending approval",
+        )?;
+    }
+
+    Ok(StageWriteOutput {
+        schema_version: "migrate-stage-write/v1".to_string(),
+        stage: stage.to_string(),
+        ordinal: if stage == "adr" {
+            0
+        } else {
+            stage_ordinal_from_path(&markdown_target)?
+        },
+        markdown_path: markdown_target.display().to_string(),
+        meta_path: meta_target.map(|path| path.display().to_string()),
+        run_state: effective_run_state.as_str().to_string(),
+        approval_state: Some(effective_approval_state.state_str().to_string()),
+    })
+}
+
+pub fn migrate_wave_plan(
+    run_json_path: &Path,
+    wave_id: &str,
+    stage_scope: &str,
+    participants: Vec<String>,
+    depends_on: Vec<String>,
+    artifact_list: Vec<String>,
+    write_targets: Vec<String>,
+    independence_proof: Vec<String>,
+    state: WaveState,
+) -> Result<WavePlanOutput> {
+    let mut run = read_json::<MigratePlanRunRecord>(run_json_path)?;
+    run.validate()?;
+    run.assert_repo_fingerprint_matches(Path::new(&run.repo_root))?;
+    if run.mode != PlanningMode::FullConsensus {
+        bail!("migrate-wave-plan: full_consensus run 에서만 wave 를 써요");
+    }
+    let run_dir = run_json_path
+        .parent()
+        .context("migrate-wave-plan: run_json parent 가 없어요")?;
+    let waves_dir = run_dir.join("waves");
+    let wave_path = waves_dir.join(format!("{wave_id}.json"));
+    let index_path = waves_dir.join("waves.json");
+    let now = now_ts();
+    let participant_list = if participants.is_empty() {
+        vec![run.app_key.clone()]
+    } else {
+        participants
+    };
+
+    let mut existing = load_existing_waves(&waves_dir)?;
+    existing.retain(|wave| wave.wave_id != wave_id);
+    let graph_seed = existing
+        .iter()
+        .map(|wave| (wave.wave_id.clone(), wave.depends_on.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let candidate_wave = MigratePlanWaveRecord {
+        schema_version: MIGRATE_PLAN_WAVE_SCHEMA_VERSION.to_string(),
+        run_id: run.run_id.clone(),
+        app_key: run.app_key.clone(),
+        wave_id: wave_id.to_string(),
+        wave_n: (existing.len() + 1) as u32,
+        stage_scope: stage_scope.to_string(),
+        depends_on,
+        dependency_graph: graph_seed,
+        participants: participant_list,
+        artifact_list,
+        write_targets,
+        state,
+        receipts: vec![],
+        independence_proof,
+        conflict_policy: "fallback_to_serial".to_string(),
+        created_at: now.clone(),
+        updated_at: now.clone(),
+    };
+    existing.push(candidate_wave);
+    let graph = existing
+        .iter()
+        .map(|wave| (wave.wave_id.clone(), wave.depends_on.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let waves = existing
+        .into_iter()
+        .map(|mut wave| {
+            wave.dependency_graph = graph.clone();
+            wave
+        })
+        .collect::<Vec<_>>();
+    let index = MigratePlanWaveIndex {
+        schema_version: MIGRATE_PLAN_WAVES_SCHEMA_VERSION.to_string(),
+        run_id: run.run_id.clone(),
+        app_key: run.app_key.clone(),
+        enabled: true,
+        policy: "conditional_parallel".to_string(),
+        multi_app_allowed: false,
+        fallback_reason: None,
+        waves: waves.iter().map(|wave| wave.wave_id.clone()).collect(),
+        dependency_graph_sha256: sha256_hex(&serde_json::to_string(&graph)?),
+        created_at: now.clone(),
+        updated_at: now.clone(),
+    };
+
+    match validate_wave_plan(&index, &waves) {
+        Ok(()) => {
+            fs::create_dir_all(&waves_dir)?;
+            for wave in &waves {
+                write_json_atomically(
+                    &waves_dir.join(format!("{}.json", wave.wave_id)),
+                    &serde_json::to_value(wave)?,
+                )?;
+            }
+            write_json_atomically(&index_path, &serde_json::to_value(&index)?)?;
+            run.parallelism.enabled = true;
+            run.parallelism.fallback_reason = None;
+            run.wave_index_path = Some(index_path.display().to_string());
+            run.updated_at = now.clone();
+            write_json_atomically(run_json_path, &serde_json::to_value(&run)?)?;
+            update_latest_run_state(&run, run_dir)?;
+            append_receipt(
+                &run_dir.join("receipts.jsonl"),
+                &now,
+                "wave_planned",
+                Some(stage_scope),
+                Some(waves.len() as u32),
+                &wave_path,
+                &sha256_hex(&serde_json::to_string(&waves)?),
+                "same-app wave planned",
+            )?;
+            Ok(WavePlanOutput {
+                schema_version: "migrate-wave-plan/v1".to_string(),
+                wave_id: wave_id.to_string(),
+                wave_path: Some(wave_path.display().to_string()),
+                wave_index_path: Some(index_path.display().to_string()),
+                parallelism_enabled: true,
+                serial_fallback: false,
+                fallback_reason: None,
+            })
+        }
+        Err(err) => {
+            run.parallelism.enabled = false;
+            run.parallelism.fallback_reason = Some(err.to_string());
+            run.wave_index_path = None;
+            run.updated_at = now.clone();
+            write_json_atomically(run_json_path, &serde_json::to_value(&run)?)?;
+            update_latest_run_state(&run, run_dir)?;
+            append_receipt(
+                &run_dir.join("receipts.jsonl"),
+                &now,
+                "wave_serial_fallback",
+                Some(stage_scope),
+                None,
+                run_json_path,
+                &sha256_hex(&serde_json::to_string(&run)?),
+                &format!("serial fallback: {err}"),
+            )?;
+            Ok(WavePlanOutput {
+                schema_version: "migrate-wave-plan/v1".to_string(),
+                wave_id: wave_id.to_string(),
+                wave_path: None,
+                wave_index_path: None,
+                parallelism_enabled: false,
+                serial_fallback: true,
+                fallback_reason: Some(err.to_string()),
+            })
+        }
+    }
+}
+
+impl ApprovalState {
+    fn state_str(self) -> &'static str {
+        match self {
+            Self::PendingApproval => "pending_approval",
+            Self::Approved => "approved",
+            Self::Rejected => "rejected",
+            Self::NeedsRevision => "needs_revision",
+        }
+    }
+}
+
+fn parse_run_state(value: &str) -> Result<RunState> {
+    match value {
+        "draft" => Ok(RunState::Draft),
+        "running" => Ok(RunState::Running),
+        "pending_approval" => Ok(RunState::PendingApproval),
+        "approved" => Ok(RunState::Approved),
+        "needs_revision" => Ok(RunState::NeedsRevision),
+        "rejected" => Ok(RunState::Rejected),
+        "aborted" => Ok(RunState::Aborted),
+        "superseded" => Ok(RunState::Superseded),
+        _ => bail!("migrate planning: unknown run state"),
+    }
+}
+
+fn parse_approval_state(value: &str) -> Result<ApprovalState> {
+    match value {
+        "pending_approval" => Ok(ApprovalState::PendingApproval),
+        "approved" => Ok(ApprovalState::Approved),
+        "rejected" => Ok(ApprovalState::Rejected),
+        "needs_revision" => Ok(ApprovalState::NeedsRevision),
+        _ => bail!("migrate planning: unknown approval state"),
+    }
+}
+
+fn parse_wave_state(value: &str) -> Result<WaveState> {
+    match value {
+        "planned" => Ok(WaveState::Planned),
+        "running" => Ok(WaveState::Running),
+        "complete" => Ok(WaveState::Complete),
+        "needs_revision" => Ok(WaveState::NeedsRevision),
+        "blocked" => Ok(WaveState::Blocked),
+        "aborted" => Ok(WaveState::Aborted),
+        _ => bail!("migrate planning: unknown wave state"),
+    }
+}
+
+fn required_path(value: Option<PathBuf>, flag: &str) -> Result<PathBuf> {
+    value.with_context(|| format!("migrate planning: {flag} 값이 필요해요"))
+}
+
+fn required_string(value: Option<String>, flag: &str) -> Result<String> {
+    let value = value.with_context(|| format!("migrate planning: {flag} 값이 필요해요"))?;
+    if value.trim().is_empty() {
+        bail!("migrate planning: {flag} 값이 비어 있어요");
+    }
+    Ok(value)
+}
+
+fn ensure_allowed_stage(stage: &str) -> Result<()> {
+    let allowed = ["discover", "planner", "architect", "critic", "reviewer"];
+    if allowed.contains(&stage) {
+        Ok(())
+    } else {
+        bail!("migrate-stage-write: 지원하지 않는 stage 예요")
+    }
+}
+
+fn next_stage_ordinal(stages_dir: &Path) -> Result<u32> {
+    fs::create_dir_all(stages_dir)?;
+    let mut max_seen = 0;
+    for entry in fs::read_dir(stages_dir)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if let Some((prefix, _)) = name.split_once('-') {
+            if let Ok(value) = prefix.parse::<u32>() {
+                max_seen = max_seen.max(value);
+            }
+        }
+    }
+    Ok(max_seen + 1)
+}
+
+fn stage_ordinal_from_path(path: &Path) -> Result<u32> {
+    let name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .context("migrate planning: stage file name 이 없어요")?;
+    let prefix = name
+        .split_once('-')
+        .map(|(prefix, _)| prefix)
+        .context("migrate planning: stage file prefix 를 읽지 못했어요")?;
+    prefix
+        .parse::<u32>()
+        .with_context(|| format!("migrate planning: invalid stage ordinal {prefix}"))
+}
+
+fn collect_stage_sha_list(stages_dir: &Path) -> Result<Vec<String>> {
+    if !stages_dir.exists() {
+        return Ok(vec![]);
+    }
+    let mut items = Vec::new();
+    for entry in fs::read_dir(stages_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let raw = fs::read_to_string(&path)?;
+        items.push(format!("{}:{}", path.display(), sha256_hex(&raw)));
+    }
+    items.sort();
+    Ok(items)
+}
+
+fn load_existing_waves(waves_dir: &Path) -> Result<Vec<MigratePlanWaveRecord>> {
+    if !waves_dir.exists() {
+        return Ok(vec![]);
+    }
+    let mut out = Vec::new();
+    for entry in fs::read_dir(waves_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.file_name().and_then(|name| name.to_str()) == Some("waves.json") {
+            continue;
+        }
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        out.push(read_json::<MigratePlanWaveRecord>(&path)?);
+    }
+    out.sort_by(|left, right| left.wave_id.cmp(&right.wave_id));
+    Ok(out)
+}
+
+fn update_latest_run_state(run: &MigratePlanRunRecord, run_dir: &Path) -> Result<()> {
+    let plan_root = run_dir
+        .parent()
+        .and_then(|path| path.parent())
+        .context("migrate planning: latest-run root 를 계산하지 못했어요")?;
+    let latest_run = plan_root
+        .join("apps")
+        .join(&run.app_key)
+        .join("latest-run.json");
+    let payload = json!({
+        "schema_version": MIGRATE_PLAN_APP_INDEX_SCHEMA_VERSION,
+        "app_key": run.app_key,
+        "latest_run_id": run.run_id,
+        "latest_run_path": run_dir.display().to_string(),
+        "run_state": run.state.as_str(),
+        "repo_fingerprint": run.repo_fingerprint,
+        "updated_at": run.updated_at
+    });
+    write_json_atomically(&latest_run, &payload)
+}
+
+fn write_json_atomically(path: &Path, value: &Value) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, serde_json::to_vec_pretty(value)?)?;
+    fs::rename(tmp, path)?;
+    Ok(())
+}
+
+fn write_text_atomically(path: &Path, content: &str) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let tmp = path.with_extension("tmp");
+    fs::write(&tmp, content)?;
+    fs::rename(tmp, path)?;
+    Ok(())
+}
+
+fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T> {
+    let raw = fs::read_to_string(path)
+        .with_context(|| format!("{} 파일을 읽지 못했어요", path.display()))?;
+    serde_json::from_str(&raw)
+        .with_context(|| format!("{} JSON 을 해석하지 못했어요", path.display()))
+}
+
+fn append_receipt(
+    receipts_path: &Path,
+    now: &str,
+    event: &str,
+    stage: Option<&str>,
+    stage_n: Option<u32>,
+    artifact_path: &Path,
+    sha256: &str,
+    summary: &str,
+) -> Result<()> {
+    let line = json!({
+        "ts": now,
+        "event": event,
+        "stage": stage,
+        "stage_n": stage_n,
+        "artifact_path": artifact_path.display().to_string(),
+        "sha256": sha256,
+        "summary": summary,
+        "redacted": true
+    });
+    atomic_jsonl::append_line(receipts_path, &serde_json::to_string(&line)?)?;
+    Ok(())
+}
+
+fn now_ts() -> String {
+    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
 #[cfg(test)]

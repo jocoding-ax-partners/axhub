@@ -93,6 +93,14 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain("discover → planner → architect → critic → reviewer");
     expect(skill).toContain("planner/architect/critic/reviewer 를 자동으로 띄우지 않아요");
     expect(skill).toContain("planner → architect → critic → reviewer");
+    expect(skill).toContain('"$HELPER" migrate-stage-write \\');
+    expect(skill).toContain("--stage planner");
+    expect(skill).toContain("--stage architect");
+    expect(skill).toContain("--stage critic");
+    expect(skill).toContain("--stage reviewer");
+    expect(skill).toContain("--stage adr");
+    expect(skill).toContain('"$HELPER" migrate-wave-plan \\');
+    expect(skill).toContain("--wave-id reviewer-a");
     expect(skill).toContain("`.axhub/plan/runs/<run_id>/stages/02-planner.md`");
     expect(skill).toContain("approval.json.state=pending_approval");
     expect(skill).toContain("run.json.state=pending_approval");

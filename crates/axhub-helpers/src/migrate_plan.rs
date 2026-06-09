@@ -1338,7 +1338,7 @@ fn persist_migrate_planning(
         "hard_stop_reasons": selected_sdk.map(|sdk| sdk.hard_stop_reasons.clone()).unwrap_or_default(),
         "workspace_scope": planning.workspace_scope,
         "parallelism": {
-            "enabled": planning.mode == PlanningMode::FullConsensus && planning.parallelism.enabled,
+            "enabled": false,
             "scope": planning.parallelism.scope,
             "reason": planning.parallelism.reason,
             "fallback_reason": planning.parallelism.fallback_reason
