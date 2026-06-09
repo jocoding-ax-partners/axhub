@@ -275,6 +275,7 @@ describe("migrate SKILL contract", () => {
       const agent = read(`agents/axhub-sdk-${lang}-expert.md`);
       expect(agent).toContain("data_patch_plan");
       expect(agent).toContain("discover()-verify");
+      expect(agent).toContain("migrate-data-verify");
       expect(agent).toContain("advisory");
     }
   });

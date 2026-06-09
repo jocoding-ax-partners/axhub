@@ -14,7 +14,7 @@ tools: Read, Edit, Write, Bash, Grep, Glob
 
 ## action 별 동작
 - `sdk_wrapper_generate`: pack §1 Client init 블록을 그대로 emit 해요. Go/Java/Kotlin 은 `{package}` 만 사용자 앱 package 로 치환해요.
-- `data_patch_plan`: pack §6 data surface 를 **그대로** 읽고 사용자 ORM/raw-query 데이터 접근을 변환해요. §6 가 fluent builder 를 보여주면(node) 그 정확한 shape(`tenant(slug).app(slug).data.table()/.discover()` + `.list/.insert/.update/.delete/.count`)으로 codegen 하고, §6 의 mapping guide 와 pagination 규칙(offset-only, `after`/`before` 금지)을 지켜요. **apply 전에 §6 의 discover()-verify 를 반드시 수행** — 참조하는 table·column 이 discover 한 실제 schema 에 전부 있는지 확인하고, 없으면 hard-stop 으로 preview 에 알리고 apply 하지 않아요. §6 가 **PLAN-ONLY** 마커면(passthrough SDK) data-call 코드를 emit 하지 말고 의도만 한국어로 기술해요.
+- `data_patch_plan`: pack §6 data surface 를 **그대로** 읽고 사용자 ORM/raw-query 데이터 접근을 변환해요. §6 가 fluent builder 를 보여주면(node) 그 정확한 shape(`tenant(slug).app(slug).data.table()/.discover()` + `.list/.insert/.update/.delete/.count`)으로 codegen 하고, §6 의 mapping guide 와 pagination 규칙(offset-only, `after`/`before` 금지)을 지켜요. **apply 전에 discover()-verify 를 반드시 수행해요:** (1) 변환이 참조하는 table·column 을 `{"table": ["col", ...]}` JSON(`refs.json`)으로 모아요. (2) 각 table 을 SDK `discover()` 로 조회해 실제 schema 를 같은 형식(`schemas.json`)으로 만들어요. (3) `axhub-helpers migrate-data-verify --refs refs.json --schemas schemas.json --json` 을 실행해요. (4) `ok=false`(exit 2)면 hard-stop — 결과의 `preview_kr` 을 사용자에게 보여주고 apply 하지 않아요. 빌드는 통과하지만 틀린 table·column 을 조회하는(리뷰 안 하는 vibe coder 가 못 잡는) 케이스를 결정적으로 막는 게이트예요. §6 가 **PLAN-ONLY** 마커면(passthrough SDK) data-call 코드를 emit 하지 말고 의도만 한국어로 기술해요.
 - `auth_patch_plan`: **plan(advisory)만** 만들어요. auth 코드는 patch 하지 않아요 — 권장 변경을 문서로만 제시해요.
 
 ## 규칙

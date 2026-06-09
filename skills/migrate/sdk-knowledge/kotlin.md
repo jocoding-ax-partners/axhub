@@ -1,8 +1,8 @@
 ---
 lang: kotlin
 sdk_version: 0.2.1
-source_sha: 9e3b365601a3a0876eeeb4b8b3cad976c87cc088
-route_surface_sha: 6e5939f93661c04d9fa6284986e072fe3177619c
+source_sha: 6fdf7a3e2ecfab0f5b0ec9b695d81062d5e6f126
+route_surface_sha: 44c6dcc5e413595098d2ea037c26b2cf238d2216
 conformance_baseline: ax-hub-backend@5a7b57d
 generated_by: scripts/gen-sdk-distill.py
 note: generated knowledge pack — do not hand-edit; regenerate from the SDK source
