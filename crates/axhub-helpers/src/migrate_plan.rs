@@ -6,6 +6,15 @@ use anyhow::{bail, Context, Result};
 use regex::Regex;
 use serde::Serialize;
 
+use chrono::{SecondsFormat, Utc};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+
+use crate::atomic_jsonl;
+use crate::migrate_planning::{
+    build_planning_preview, PlanningMode, PlanningPreview, FULL_CONSENSUS_STAGE_ORDER,
+};
+
 const MAX_SCAN_DEPTH: usize = 5;
 const MAX_SCAN_FILES: usize = 5_000;
 const MAX_SCAN_BYTES: u64 = 50 * 1024 * 1024;
@@ -28,6 +37,23 @@ pub struct MigratePlanOutput {
     pub env_refs: Vec<EnvRef>,
     pub suggested_manifest: String,
     pub sdk_conversion: SdkConversionPlan,
+    pub planning: Option<PlanningPreview>,
+    pub planning_persistence: Option<PlanningPersistenceOutput>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PlanningPersistenceOutput {
+    pub schema_version: String,
+    pub persisted: bool,
+    pub mode: PlanningMode,
+    pub reason: String,
+    pub run_id: Option<String>,
+    pub spec_id: Option<String>,
+    pub run_state: Option<String>,
+    pub approval_state: Option<String>,
+    pub wrote_latest_pointer: bool,
+    pub next_required_stages: Vec<String>,
+    pub paths: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -85,11 +111,16 @@ pub fn run_migrate_plan(args: &[String]) -> Result<i32> {
     let mut dir: Option<PathBuf> = None;
     let mut app_path: Option<String> = None;
     let mut json = false;
+    let mut persist_planning = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
             "--json" => {
                 json = true;
+                index += 1;
+            }
+            "--persist-planning" => {
+                persist_planning = true;
                 index += 1;
             }
             "--dir" => {
@@ -110,7 +141,7 @@ pub fn run_migrate_plan(args: &[String]) -> Result<i32> {
         }
     }
     let dir = dir.unwrap_or(std::env::current_dir()?);
-    let output = build_migrate_plan_with_selection(&dir, app_path.as_deref())?;
+    let output = build_migrate_plan_with_options(&dir, app_path.as_deref(), persist_planning)?;
     if json {
         println!("{}", serde_json::to_string(&output)?);
     } else {
@@ -123,12 +154,20 @@ pub fn run_migrate_plan(args: &[String]) -> Result<i32> {
 }
 
 pub fn build_migrate_plan(dir: &Path) -> Result<MigratePlanOutput> {
-    build_migrate_plan_with_selection(dir, None)
+    build_migrate_plan_with_options(dir, None, false)
 }
 
 pub fn build_migrate_plan_with_selection(
     dir: &Path,
     selected_app_path: Option<&str>,
+) -> Result<MigratePlanOutput> {
+    build_migrate_plan_with_options(dir, selected_app_path, false)
+}
+
+fn build_migrate_plan_with_options(
+    dir: &Path,
+    selected_app_path: Option<&str>,
+    persist_planning: bool,
 ) -> Result<MigratePlanOutput> {
     let root =
         fs::canonicalize(dir).with_context(|| format!("{} 경로를 읽지 못했어요", dir.display()))?;
@@ -162,6 +201,39 @@ pub fn build_migrate_plan_with_selection(
         &manifest_env_refs(selected_candidate, &env_refs),
     );
     let sdk_conversion = build_sdk_conversion(&root, &files, &candidates, &scanned_env_refs);
+    let planning = if let Some(candidate) = selected_candidate {
+        let hard_stop_reasons = sdk_conversion
+            .candidates
+            .iter()
+            .find(|sdk_candidate| sdk_candidate.path == candidate.path)
+            .map(|sdk_candidate| sdk_candidate.hard_stop_reasons.clone())
+            .unwrap_or_default();
+        build_planning_preview(
+            &root,
+            Some(candidate.path.as_str()),
+            candidates.len(),
+            selected_path.is_some() || candidates.len() <= 1,
+            Some(candidate.confidence),
+            &hard_stop_reasons,
+        )?
+    } else {
+        None
+    };
+    let planning_persistence = if persist_planning {
+        if candidates.len() > 1 && selected_path.is_none() {
+            bail!("migrate-plan: planning persistence 는 다중 후보에서 --app-path 가 필요해요");
+        }
+        persist_migrate_planning(
+            &root,
+            selected_candidate,
+            &env_refs,
+            &suggested_manifest,
+            &sdk_conversion,
+            planning.as_ref(),
+        )?
+    } else {
+        None
+    };
     Ok(MigratePlanOutput {
         schema_version: "migrate-plan/v1".to_string(),
         root: root.display().to_string(),
@@ -172,6 +244,8 @@ pub fn build_migrate_plan_with_selection(
         env_refs,
         suggested_manifest,
         sdk_conversion,
+        planning,
+        planning_persistence,
     })
 }
 
@@ -1140,14 +1214,515 @@ fn yaml_double_quote(value: &str) -> String {
     out
 }
 
+fn persist_migrate_planning(
+    root: &Path,
+    selected_candidate: Option<&AppCandidate>,
+    env_refs: &[EnvRef],
+    suggested_manifest: &str,
+    sdk_conversion: &SdkConversionPlan,
+    planning: Option<&PlanningPreview>,
+) -> Result<Option<PlanningPersistenceOutput>> {
+    let (Some(candidate), Some(planning)) = (selected_candidate, planning) else {
+        return Ok(None);
+    };
+    if planning.mode == PlanningMode::Simple {
+        return Ok(Some(PlanningPersistenceOutput {
+            schema_version: "migrate-plan-persistence/v1".to_string(),
+            persisted: false,
+            mode: planning.mode,
+            reason: "simple_flow_preserved".to_string(),
+            run_id: None,
+            spec_id: None,
+            run_state: None,
+            approval_state: None,
+            wrote_latest_pointer: false,
+            next_required_stages: vec![],
+            paths: BTreeMap::new(),
+        }));
+    }
+
+    let now = now_ts();
+    let planning_root = PathBuf::from(&planning.path_templates.planning_root);
+    let run_id = format!(
+        "{}-{}",
+        now.replace([':', '-'], "")
+            .replace('T', "-")
+            .replace('Z', "")
+            .trim_matches('-'),
+        short_sha256(
+            &format!("{}:{}:{}", planning.app_key, candidate.path, now),
+            6
+        )
+    );
+    let spec_id = format!(
+        "{}-{}",
+        planning.app_key,
+        short_sha256(&format!("{}:{}", run_id, candidate.path), 8)
+    );
+    let paths = persistence_paths(&planning_root, &planning.app_key, &run_id, &spec_id);
+
+    ensure_repo_fingerprint_matches(paths.latest_run_json.as_path(), &planning.repo_fingerprint)?;
+    ensure_repo_fingerprint_matches(paths.run_json.as_path(), &planning.repo_fingerprint)?;
+
+    let selected_sdk = sdk_conversion
+        .candidates
+        .iter()
+        .find(|sdk_candidate| sdk_candidate.path == candidate.path);
+    let spec_markdown = render_planning_spec_markdown(
+        root,
+        candidate,
+        env_refs,
+        suggested_manifest,
+        selected_sdk,
+        planning,
+    );
+    let spec_sha = sha256_hex(&spec_markdown);
+    let spec_meta_status = if planning.mode == PlanningMode::SpecOnly {
+        "pending_approval"
+    } else {
+        "draft"
+    };
+    let approval_state = if planning.mode == PlanningMode::SpecOnly {
+        "pending_approval"
+    } else {
+        "needs_revision"
+    };
+    let run_state = if planning.mode == PlanningMode::SpecOnly {
+        "pending_approval"
+    } else {
+        "running"
+    };
+
+    let spec_meta = json!({
+        "schema_version": "axhub/migrate-spec/v1",
+        "spec_id": spec_id,
+        "app_key": planning.app_key,
+        "app_path": candidate.path,
+        "repo_root": root.display().to_string(),
+        "status": spec_meta_status,
+        "mode": planning.mode.as_str(),
+        "source_plan_run_id": run_id,
+        "candidate_confidence": format!("{:.2}", candidate.confidence),
+        "escalation_reason": planning.escalation_reason.as_str(),
+        "approval": {
+            "state": approval_state,
+            "approved_at": Value::Null,
+            "approved_by": Value::Null,
+            "approval_prompt_sha256": sha256_hex(&format!("{}:{}", planning.app_key, approval_state))
+        },
+        "artifact_sha256": spec_sha,
+        "created_at": now,
+        "updated_at": now,
+        "redaction": {
+            "secret_values": false,
+            "raw_prompt_body": false
+        }
+    });
+
+    let run_json = json!({
+        "schema_version": "axhub/migrate-plan-run/v1",
+        "run_id": run_id,
+        "app_key": planning.app_key,
+        "app_path": candidate.path,
+        "repo_root": root.display().to_string(),
+        "owned_app_keys": [planning.app_key.clone()],
+        "mode": planning.mode.as_str(),
+        "stage_order": if planning.mode == PlanningMode::FullConsensus {
+            FULL_CONSENSUS_STAGE_ORDER.iter().map(|stage| stage.to_string()).collect::<Vec<_>>()
+        } else {
+            Vec::<String>::new()
+        },
+        "state": run_state,
+        "escalation_reason": planning.escalation_reason.as_str(),
+        "confidence": format!("{:.2}", candidate.confidence),
+        "hard_stop_reasons": selected_sdk.map(|sdk| sdk.hard_stop_reasons.clone()).unwrap_or_default(),
+        "workspace_scope": planning.workspace_scope,
+        "parallelism": {
+            "enabled": planning.mode == PlanningMode::FullConsensus && planning.parallelism.enabled,
+            "scope": planning.parallelism.scope,
+            "reason": planning.parallelism.reason,
+            "fallback_reason": planning.parallelism.fallback_reason
+        },
+        "wave_policy": {
+            "mode": planning.wave_policy.mode,
+            "independence_required": planning.wave_policy.independence_required,
+            "multi_app_allowed": planning.wave_policy.multi_app_allowed
+        },
+        "wave_index_path": Value::Null,
+        "repo_fingerprint": planning.repo_fingerprint,
+        "created_at": now,
+        "updated_at": now
+    });
+
+    let approval_json = json!({
+        "schema_version": "axhub/migrate-plan-approval/v1",
+        "run_id": run_id,
+        "app_key": planning.app_key,
+        "state": approval_state,
+        "required_before_execution": true,
+        "target_spec_id": spec_id,
+        "target_spec_sha256": spec_sha,
+        "approved_stage_artifacts": if planning.mode == PlanningMode::SpecOnly { Value::Array(vec![]) } else { Value::Array(vec![]) },
+        "adr_sha256": Value::Null,
+        "requested_at": now,
+        "approved_at": Value::Null,
+        "approved_by": Value::Null,
+        "approval_prompt_sha256": sha256_hex(&format!("{}:{}", planning.app_key, run_state))
+    });
+
+    let latest_run_json = json!({
+        "schema_version": "axhub/migrate-plan-app-index/v1",
+        "app_key": planning.app_key,
+        "latest_run_id": run_id,
+        "latest_run_path": paths.run_dir.display().to_string(),
+        "run_state": run_state,
+        "repo_fingerprint": planning.repo_fingerprint,
+        "updated_at": now
+    });
+
+    write_text_atomically(&paths.spec_markdown, &spec_markdown)?;
+    write_json_atomically(&paths.spec_meta, &spec_meta)?;
+    write_json_atomically(&paths.run_json, &run_json)?;
+    write_json_atomically(&paths.approval_json, &approval_json)?;
+    write_json_atomically(&paths.latest_run_json, &latest_run_json)?;
+
+    append_receipt(
+        &paths.receipts_jsonl,
+        &now,
+        "run_created",
+        None,
+        None,
+        &paths.run_json,
+        &sha256_hex(&serde_json::to_string(&run_json)?),
+        "migrate planning run scaffold created",
+    )?;
+    append_receipt(
+        &paths.receipts_jsonl,
+        &now,
+        "spec_draft_written",
+        None,
+        None,
+        &paths.spec_markdown,
+        &spec_sha,
+        "migrate planning spec draft written",
+    )?;
+
+    let mut next_required_stages = vec![];
+    if planning.mode == PlanningMode::FullConsensus {
+        let discover_markdown =
+            render_discover_stage_markdown(root, candidate, env_refs, selected_sdk);
+        let discover_sha = sha256_hex(&discover_markdown);
+        let discover_meta = json!({
+            "schema_version": "axhub/migrate-plan-stage/v1",
+            "run_id": run_id,
+            "app_key": planning.app_key,
+            "stage": "discover",
+            "stage_n": 1,
+            "state": "complete",
+            "artifact_sha256": discover_sha,
+            "created_at": now,
+            "updated_at": now
+        });
+        write_text_atomically(&paths.discover_markdown, &discover_markdown)?;
+        write_json_atomically(&paths.discover_meta, &discover_meta)?;
+        append_receipt(
+            &paths.receipts_jsonl,
+            &now,
+            "stage_written",
+            Some("discover"),
+            Some(1),
+            &paths.discover_markdown,
+            &discover_sha,
+            "discover stage scaffold written",
+        )?;
+        next_required_stages = vec!["planner", "architect", "critic", "reviewer"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+    } else {
+        append_receipt(
+            &paths.receipts_jsonl,
+            &now,
+            "approval_requested",
+            None,
+            None,
+            &paths.approval_json,
+            &sha256_hex(&serde_json::to_string(&approval_json)?),
+            "spec-only migrate planning requested approval",
+        )?;
+    }
+
+    let mut out_paths = BTreeMap::new();
+    out_paths.insert(
+        "spec_markdown".to_string(),
+        paths.spec_markdown.display().to_string(),
+    );
+    out_paths.insert(
+        "spec_meta".to_string(),
+        paths.spec_meta.display().to_string(),
+    );
+    out_paths.insert("run_json".to_string(), paths.run_json.display().to_string());
+    out_paths.insert(
+        "approval_json".to_string(),
+        paths.approval_json.display().to_string(),
+    );
+    out_paths.insert(
+        "receipts_jsonl".to_string(),
+        paths.receipts_jsonl.display().to_string(),
+    );
+    out_paths.insert(
+        "latest_run_json".to_string(),
+        paths.latest_run_json.display().to_string(),
+    );
+    if planning.mode == PlanningMode::FullConsensus {
+        out_paths.insert(
+            "discover_markdown".to_string(),
+            paths.discover_markdown.display().to_string(),
+        );
+        out_paths.insert(
+            "discover_meta".to_string(),
+            paths.discover_meta.display().to_string(),
+        );
+    }
+
+    Ok(Some(PlanningPersistenceOutput {
+        schema_version: "migrate-plan-persistence/v1".to_string(),
+        persisted: true,
+        mode: planning.mode,
+        reason: if planning.mode == PlanningMode::SpecOnly {
+            "spec_only_pending_approval_written".to_string()
+        } else {
+            "full_consensus_scaffold_written".to_string()
+        },
+        run_id: Some(run_id),
+        spec_id: Some(spec_id),
+        run_state: Some(run_state.to_string()),
+        approval_state: Some(approval_state.to_string()),
+        wrote_latest_pointer: false,
+        next_required_stages,
+        paths: out_paths,
+    }))
+}
+
+struct PersistencePaths {
+    run_dir: PathBuf,
+    spec_markdown: PathBuf,
+    spec_meta: PathBuf,
+    run_json: PathBuf,
+    approval_json: PathBuf,
+    receipts_jsonl: PathBuf,
+    latest_run_json: PathBuf,
+    discover_markdown: PathBuf,
+    discover_meta: PathBuf,
+}
+
+fn persistence_paths(
+    planning_root: &Path,
+    app_key: &str,
+    run_id: &str,
+    spec_id: &str,
+) -> PersistencePaths {
+    let spec_app_dir = planning_root.join("spec").join("apps").join(app_key);
+    let spec_dir = spec_app_dir.join("specs");
+    let run_dir = planning_root.join("plan").join("runs").join(run_id);
+    let stages_dir = run_dir.join("stages");
+    PersistencePaths {
+        run_dir: run_dir.clone(),
+        spec_markdown: spec_dir.join(format!("{spec_id}.md")),
+        spec_meta: spec_dir.join(format!("{spec_id}.meta.json")),
+        run_json: run_dir.join("run.json"),
+        approval_json: run_dir.join("approval.json"),
+        receipts_jsonl: run_dir.join("receipts.jsonl"),
+        latest_run_json: planning_root
+            .join("plan")
+            .join("apps")
+            .join(app_key)
+            .join("latest-run.json"),
+        discover_markdown: stages_dir.join("01-discover.md"),
+        discover_meta: stages_dir.join("01-discover.meta.json"),
+    }
+}
+
+fn render_planning_spec_markdown(
+    root: &Path,
+    candidate: &AppCandidate,
+    env_refs: &[EnvRef],
+    suggested_manifest: &str,
+    selected_sdk: Option<&SdkConversionCandidate>,
+    planning: &PlanningPreview,
+) -> String {
+    let mut out = String::new();
+    out.push_str("# AXHub migrate planning spec draft\n\n");
+    out.push_str(&format!("- mode: {}\n", planning.mode.as_str()));
+    out.push_str(&format!(
+        "- escalation_reason: {}\n",
+        planning.escalation_reason.as_str()
+    ));
+    out.push_str(&format!("- app_key: {}\n", planning.app_key));
+    out.push_str(&format!("- app_path: {}\n", candidate.path));
+    out.push_str(&format!("- repo_root: {}\n", root.display()));
+    out.push_str(&format!(
+        "- candidate_confidence: {:.2}\n\n",
+        candidate.confidence
+    ));
+    out.push_str("## Candidate\n");
+    out.push_str(&format!("- stack_hint: {}\n", candidate.stack_hint));
+    out.push_str(&format!("- has_dockerfile: {}\n", candidate.has_dockerfile));
+    out.push_str(&format!("- has_compose: {}\n", candidate.has_compose));
+    if let Some(compose_file) = candidate.compose_file.as_deref() {
+        out.push_str(&format!("- compose_file: {}\n", compose_file));
+    }
+    out.push_str("\n## Env refs\n");
+    if env_refs.is_empty() {
+        out.push_str("- none\n");
+    } else {
+        for env in env_refs {
+            out.push_str(&format!("- {} ({})\n", env.name, env.scope));
+        }
+    }
+    out.push_str("\n## Suggested manifest\n\n```yaml\n");
+    out.push_str(suggested_manifest.trim_end());
+    out.push_str("\n```\n");
+    if let Some(selected_sdk) = selected_sdk {
+        out.push_str("\n## SDK conversion\n");
+        out.push_str(&format!("- language: {}\n", selected_sdk.language));
+        out.push_str(&format!("- framework: {}\n", selected_sdk.framework));
+        out.push_str(&format!(
+            "- dependency_hint: {}\n",
+            selected_sdk.dependency_hint
+        ));
+        out.push_str(&format!(
+            "- wrapper_target_path: {}\n",
+            selected_sdk.wrapper_target_path
+        ));
+        out.push_str(&format!("- risk: {}\n", selected_sdk.risk));
+        if !selected_sdk.hard_stop_reasons.is_empty() {
+            out.push_str("- hard_stop_reasons:\n");
+            for reason in &selected_sdk.hard_stop_reasons {
+                out.push_str(&format!("  - {}\n", reason));
+            }
+        }
+    }
+    out
+}
+
+fn render_discover_stage_markdown(
+    root: &Path,
+    candidate: &AppCandidate,
+    env_refs: &[EnvRef],
+    selected_sdk: Option<&SdkConversionCandidate>,
+) -> String {
+    let mut out = String::new();
+    out.push_str("# Discover\n\n");
+    out.push_str(&format!("- repo_root: {}\n", root.display()));
+    out.push_str(&format!("- app_path: {}\n", candidate.path));
+    out.push_str(&format!("- stack_hint: {}\n", candidate.stack_hint));
+    out.push_str(&format!("- confidence: {:.2}\n", candidate.confidence));
+    out.push_str("\n## Evidence\n");
+    for env in env_refs {
+        out.push_str(&format!("- env_ref: {} ({})\n", env.name, env.scope));
+    }
+    if let Some(selected_sdk) = selected_sdk {
+        out.push_str(&format!("- language: {}\n", selected_sdk.language));
+        out.push_str(&format!("- framework: {}\n", selected_sdk.framework));
+        out.push_str(&format!(
+            "- wrapper_target_path: {}\n",
+            selected_sdk.wrapper_target_path
+        ));
+        for reason in &selected_sdk.hard_stop_reasons {
+            out.push_str(&format!("- hard_stop_reason: {}\n", reason));
+        }
+    }
+    out
+}
+
+fn append_receipt(
+    path: &Path,
+    now: &str,
+    event: &str,
+    stage: Option<&str>,
+    stage_n: Option<u32>,
+    artifact_path: &Path,
+    sha256: &str,
+    summary: &str,
+) -> Result<()> {
+    let line = json!({
+        "ts": now,
+        "event": event,
+        "stage": stage,
+        "stage_n": stage_n,
+        "artifact_path": artifact_path.display().to_string(),
+        "sha256": sha256,
+        "summary": summary,
+        "redacted": true
+    });
+    atomic_jsonl::append_line(path, &serde_json::to_string(&line)?)?;
+    Ok(())
+}
+
+fn ensure_repo_fingerprint_matches(path: &Path, expected: &str) -> Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let raw = fs::read_to_string(path)?;
+    let parsed: Value = serde_json::from_str(&raw)?;
+    if let Some(existing) = parsed.get("repo_fingerprint").and_then(Value::as_str) {
+        if existing != expected {
+            bail!("migrate-plan: repo fingerprint mismatch; workspace-shared planning root collision detected");
+        }
+    }
+    Ok(())
+}
+
+fn write_text_atomically(path: &Path, content: &str) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let tmp = path.with_extension(format!(
+        "{}.tmp",
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("txt")
+    ));
+    fs::write(&tmp, content)?;
+    fs::rename(tmp, path)?;
+    Ok(())
+}
+
+fn write_json_atomically(path: &Path, value: &Value) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, serde_json::to_vec_pretty(value)?)?;
+    fs::rename(tmp, path)?;
+    Ok(())
+}
+
+fn now_ts() -> String {
+    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
+}
+
+fn sha256_hex(input: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+fn short_sha256(input: &str, len: usize) -> String {
+    let full = sha256_hex(input);
+    full[..len.min(full.len())].to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        build_migrate_plan, build_migrate_plan_with_selection, candidate_file_path, collect_files,
-        path_to_portable_json, render_manifest, source_files_for_candidate, yaml_double_quote,
-        AppCandidate, EnvRef, ScanState, MAX_SCAN_BYTES, MAX_SCAN_DEPTH, MAX_SCAN_FILES,
-        MAX_SOURCE_FILE_BYTES,
+        build_migrate_plan, build_migrate_plan_with_options, build_migrate_plan_with_selection,
+        candidate_file_path, collect_files, path_to_portable_json, render_manifest,
+        source_files_for_candidate, yaml_double_quote, AppCandidate, EnvRef, PlanningMode,
+        ScanState, MAX_SCAN_BYTES, MAX_SCAN_DEPTH, MAX_SCAN_FILES, MAX_SOURCE_FILE_BYTES,
     };
+    use serde_json::Value;
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -1651,6 +2226,148 @@ mod tests {
             yaml_double_quote("quote\"slash\\"),
             "\"quote\\\"slash\\\\\""
         );
+    }
+
+    #[test]
+    fn build_migrate_plan_persists_spec_only_pending_approval_for_selected_monorepo_candidate() {
+        let temp = tempfile::tempdir().unwrap();
+        let web = temp.path().join("apps/web");
+        let api = temp.path().join("services/api");
+        std::fs::create_dir_all(web.join("src")).unwrap();
+        std::fs::create_dir_all(web.join("tests")).unwrap();
+        std::fs::create_dir_all(&api).unwrap();
+        std::fs::write(
+            web.join("package.json"),
+            r#"{"dependencies":{"vite":"1.0.0"}}"#,
+        )
+        .unwrap();
+        std::fs::write(web.join("src/web.ts"), "export const web = true;").unwrap();
+        std::fs::write(web.join("tests/app.test.ts"), "expect(true).toBe(true);").unwrap();
+        std::fs::write(api.join("go.mod"), "module example.com/api\n").unwrap();
+
+        let plan = build_migrate_plan_with_options(temp.path(), Some("apps/web"), true).unwrap();
+        let persistence = plan.planning_persistence.as_ref().unwrap();
+        let app_key = plan.planning.as_ref().unwrap().app_key.clone();
+        assert_eq!(persistence.mode, PlanningMode::SpecOnly);
+        assert_eq!(persistence.reason, "spec_only_pending_approval_written");
+        assert_eq!(persistence.run_state.as_deref(), Some("pending_approval"));
+        assert_eq!(
+            persistence.approval_state.as_deref(),
+            Some("pending_approval")
+        );
+        assert!(persistence.next_required_stages.is_empty());
+
+        let run_json: Value = serde_json::from_str(
+            &std::fs::read_to_string(persistence.paths.get("run_json").unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(run_json["mode"], "spec_only");
+        assert_eq!(run_json["state"], "pending_approval");
+        assert_eq!(run_json["stage_order"], Value::Array(vec![]));
+
+        let approval_json: Value = serde_json::from_str(
+            &std::fs::read_to_string(persistence.paths.get("approval_json").unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(approval_json["state"], "pending_approval");
+        assert_eq!(approval_json["required_before_execution"], true);
+
+        let receipts =
+            std::fs::read_to_string(persistence.paths.get("receipts_jsonl").unwrap()).unwrap();
+        assert!(receipts.contains("run_created"));
+        assert!(receipts.contains("spec_draft_written"));
+        assert!(receipts.contains("approval_requested"));
+        assert!(!temp
+            .path()
+            .join(".axhub/spec/apps")
+            .join(app_key)
+            .join("latest.json")
+            .exists());
+    }
+
+    #[test]
+    fn build_migrate_plan_persists_full_consensus_scaffold_for_hard_stop_candidate() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(temp.path().join("src")).unwrap();
+        std::fs::write(
+            temp.path().join("package.json"),
+            r#"{"dependencies":{"next-auth":"1.0.0"}}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            temp.path().join("src/db.ts"),
+            "export async function rows(db: any) { return db.query('select * from users'); }",
+        )
+        .unwrap();
+        std::fs::write(
+            temp.path().join("src/auth.ts"),
+            "import passport from 'passport';\nexport const current_user = (req: any) => req.user;",
+        )
+        .unwrap();
+
+        let plan = build_migrate_plan_with_options(temp.path(), Some("."), true).unwrap();
+        let persistence = plan.planning_persistence.as_ref().unwrap();
+        let app_key = plan.planning.as_ref().unwrap().app_key.clone();
+        assert_eq!(persistence.mode, PlanningMode::FullConsensus);
+        assert_eq!(persistence.reason, "full_consensus_scaffold_written");
+        assert_eq!(persistence.run_state.as_deref(), Some("running"));
+        assert_eq!(
+            persistence.approval_state.as_deref(),
+            Some("needs_revision")
+        );
+        assert_eq!(
+            persistence.next_required_stages,
+            vec!["planner", "architect", "critic", "reviewer"]
+        );
+
+        let run_json: Value = serde_json::from_str(
+            &std::fs::read_to_string(persistence.paths.get("run_json").unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(run_json["mode"], "full_consensus");
+        assert_eq!(run_json["state"], "running");
+        assert_eq!(run_json["stage_order"].as_array().unwrap().len(), 5);
+
+        assert!(std::path::Path::new(persistence.paths.get("discover_markdown").unwrap()).exists());
+        assert!(std::path::Path::new(persistence.paths.get("discover_meta").unwrap()).exists());
+        assert!(!temp
+            .path()
+            .join(".axhub/spec/apps")
+            .join(app_key)
+            .join("latest.json")
+            .exists());
+        let receipts =
+            std::fs::read_to_string(persistence.paths.get("receipts_jsonl").unwrap()).unwrap();
+        assert!(receipts.contains("run_created"));
+        assert!(receipts.contains("spec_draft_written"));
+        assert!(receipts.contains("stage_written"));
+    }
+
+    #[test]
+    fn build_migrate_plan_preserves_simple_flow_when_persist_flag_is_set() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(temp.path().join("src")).unwrap();
+        std::fs::create_dir_all(temp.path().join("tests")).unwrap();
+        std::fs::write(
+            temp.path().join("package.json"),
+            r#"{"dependencies":{"vite":"1.0.0"}}"#,
+        )
+        .unwrap();
+        std::fs::write(temp.path().join("src/web.ts"), "export const web = true;").unwrap();
+        std::fs::write(
+            temp.path().join("tests/app.test.ts"),
+            "expect(true).toBe(true);",
+        )
+        .unwrap();
+
+        let plan = build_migrate_plan_with_options(temp.path(), Some("."), true).unwrap();
+        let persistence = plan.planning_persistence.as_ref().unwrap();
+        assert_eq!(persistence.mode, PlanningMode::Simple);
+        assert_eq!(persistence.reason, "simple_flow_preserved");
+        assert_eq!(persistence.persisted, false);
+        assert!(persistence.paths.is_empty());
+        assert!(!temp.path().join(".axhub/spec").exists());
+        assert!(!temp.path().join(".axhub/plan").exists());
     }
 
     #[test]

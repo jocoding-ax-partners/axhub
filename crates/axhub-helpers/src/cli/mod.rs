@@ -252,6 +252,9 @@ fn dispatch(command: Commands) -> i32 {
                 argv.push("--app-path".to_string());
                 argv.push(app_path);
             }
+            if a.persist_planning {
+                argv.push("--persist-planning".to_string());
+            }
             if a.json {
                 argv.push("--json".to_string());
             }

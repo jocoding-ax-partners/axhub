@@ -459,6 +459,9 @@ env AXHUB_TOKEN (PAT) → $XDG_CONFIG_HOME/axhub-plugin/token (파일) → OS ke
 - `AXHUB.md` — Claude 가 데이터 접근 코드를 짜기 전에 **가장 먼저 읽는** 규칙 문서(인증 모드, SQL 규칙, 응답 처리).
 - `AXHUB_TARGET` — 현재 모드(`web-axhub`/`local-*`). PII 없어서 commit 가능.
 - `catalog.json` — `allowed_columns`·PII 태그·리소스 경로 스냅샷. `tenant_id`/`user_email` 포함이라 **gitignore**.
+- `spec/` — migrate planning 전용. 앱별 승인 target-state spec 과 `latest.json` 포인터를 저장해요. execution 전 approval 이 나기 전에는 `latest.json` 을 갱신하지 않아요.
+- `plan/` — migrate planning 전용. run별 stage artifact, approval, receipt, ADR, latest-run pointer 를 저장해요. 기본 root 는 repo-local 이고, `.axhub-workspace` marker opt-in 이 있을 때만 workspace 공유 root 로 확장해요.
+- migrate planning 승격 규칙: simple high-confidence 는 기존 simple flow, low confidence/모호함은 serial `spec_only`, hard-stop/복잡 조건은 `discover → planner → architect → critic → reviewer` full consensus 예요. wave 병렬화는 full consensus 내부의 same-app 독립 unit 에서만 허용하고 multi-app wave 는 v1 에서 금지예요.
 
 ### 4.8 부가 시스템 (품질·관측·UX)
 

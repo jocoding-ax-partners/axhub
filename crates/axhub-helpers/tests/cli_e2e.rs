@@ -5397,12 +5397,104 @@ fn cli_migrate_plan_detects_monorepo_candidates_and_compose() {
 }
 
 #[test]
+fn cli_migrate_plan_persist_planning_writes_spec_only_pending_approval_artifacts() {
+    let temp = tempfile::tempdir().unwrap();
+    let web = temp.path().join("apps/web");
+    let api = temp.path().join("services/api");
+    std::fs::create_dir_all(web.join("src")).unwrap();
+    std::fs::create_dir_all(web.join("tests")).unwrap();
+    std::fs::create_dir_all(&api).unwrap();
+    std::fs::write(
+        web.join("package.json"),
+        r#"{"dependencies":{"vite":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(web.join("src/web.ts"), "export const web = true;").unwrap();
+    std::fs::write(web.join("tests/app.test.ts"), "expect(true).toBe(true);").unwrap();
+    std::fs::write(api.join("go.mod"), "module example.com/api\n").unwrap();
+
+    let output = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--app-path",
+        "apps/web",
+        "--persist-planning",
+        "--json",
+    ]);
+    assert_eq!(output.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["planning"]["mode"], "spec_only");
+    assert_eq!(
+        json["planning_persistence"]["reason"],
+        "spec_only_pending_approval_written"
+    );
+    assert_eq!(
+        json["planning_persistence"]["run_state"],
+        "pending_approval"
+    );
+    assert!(json["planning_persistence"]["paths"]["run_json"]
+        .as_str()
+        .unwrap()
+        .contains(".axhub/plan/runs/"));
+}
+
+#[test]
+fn cli_migrate_plan_persist_planning_writes_full_consensus_discover_scaffold() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(temp.path().join("src")).unwrap();
+    std::fs::write(
+        temp.path().join("package.json"),
+        r#"{"dependencies":{"next-auth":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/db.ts"),
+        "export async function rows(db: any) { return db.query('select * from users'); }",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/auth.ts"),
+        "import passport from 'passport';\nexport const current_user = (req: any) => req.user;",
+    )
+    .unwrap();
+
+    let output = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--persist-planning",
+        "--json",
+    ]);
+    assert_eq!(output.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["planning"]["mode"], "full_consensus");
+    assert_eq!(
+        json["planning_persistence"]["reason"],
+        "full_consensus_scaffold_written"
+    );
+    assert_eq!(json["planning_persistence"]["run_state"], "running");
+    assert_eq!(
+        json["planning_persistence"]["approval_state"],
+        "needs_revision"
+    );
+    assert!(json["planning_persistence"]["paths"]["discover_markdown"]
+        .as_str()
+        .unwrap()
+        .contains("01-discover.md"));
+}
+
+#[test]
 fn cli_migrate_plan_emits_six_language_wrapper_previews_without_secret_leak() {
     let temp = tempfile::tempdir().unwrap();
 
     let node = temp.path().join("apps/node");
     std::fs::create_dir_all(node.join("src")).unwrap();
-    std::fs::write(node.join("package.json"), r#"{"dependencies":{"vite":"1.0.0"}}"#).unwrap();
+    std::fs::write(
+        node.join("package.json"),
+        r#"{"dependencies":{"vite":"1.0.0"}}"#,
+    )
+    .unwrap();
     std::fs::write(
         node.join("src/main.ts"),
         "const hardcoded = 'ultra_secret_value_123'; export const boot = () => hardcoded;",
@@ -5416,7 +5508,11 @@ fn cli_migrate_plan_emits_six_language_wrapper_previews_without_secret_leak() {
         "[project]\nname='demo'\ndependencies=['fastapi']\n",
     )
     .unwrap();
-    std::fs::write(python.join("src/app.py"), "from fastapi import FastAPI\napp = FastAPI()\n").unwrap();
+    std::fs::write(
+        python.join("src/app.py"),
+        "from fastapi import FastAPI\napp = FastAPI()\n",
+    )
+    .unwrap();
 
     let go = temp.path().join("apps/go");
     std::fs::create_dir_all(&go).unwrap();
@@ -5425,8 +5521,16 @@ fn cli_migrate_plan_emits_six_language_wrapper_previews_without_secret_leak() {
 
     let ruby = temp.path().join("apps/ruby");
     std::fs::create_dir_all(ruby.join("lib")).unwrap();
-    std::fs::write(ruby.join("Gemfile"), "source 'https://rubygems.org'\ngem 'sinatra'\n").unwrap();
-    std::fs::write(ruby.join("app.rb"), "require 'sinatra'\nget('/') { 'ok' }\n").unwrap();
+    std::fs::write(
+        ruby.join("Gemfile"),
+        "source 'https://rubygems.org'\ngem 'sinatra'\n",
+    )
+    .unwrap();
+    std::fs::write(
+        ruby.join("app.rb"),
+        "require 'sinatra'\nget('/') { 'ok' }\n",
+    )
+    .unwrap();
 
     let java = temp.path().join("apps/java");
     std::fs::create_dir_all(java.join("src/main/java/com/example/demo")).unwrap();
@@ -5467,11 +5571,32 @@ fn cli_migrate_plan_emits_six_language_wrapper_previews_without_secret_leak() {
             .unwrap()
     };
 
-    assert!(by_path("apps/node")["wrapper_preview"].as_str().unwrap().contains("@ax-hub/sdk"));
-    assert!(!by_path("apps/node")["wrapper_preview"].as_str().unwrap().contains("ultra_secret_value_123"));
-    assert!(by_path("apps/python")["wrapper_preview"].as_str().unwrap().contains("from axhub_sdk import AxHubClient, TokenType"));
-    assert!(by_path("apps/go")["wrapper_preview"].as_str().unwrap().contains("package main"));
-    assert!(by_path("apps/ruby")["wrapper_preview"].as_str().unwrap().contains("require 'axhub_sdk'"));
-    assert!(by_path("apps/java")["wrapper_preview"].as_str().unwrap().contains("package ai.axhub.sdk;"));
-    assert!(by_path("apps/kotlin")["wrapper_preview"].as_str().unwrap().contains("package ai.axhub.sdk"));
+    assert!(by_path("apps/node")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("@ax-hub/sdk"));
+    assert!(!by_path("apps/node")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("ultra_secret_value_123"));
+    assert!(by_path("apps/python")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("from axhub_sdk import AxHubClient, TokenType"));
+    assert!(by_path("apps/go")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("package main"));
+    assert!(by_path("apps/ruby")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("require 'axhub_sdk'"));
+    assert!(by_path("apps/java")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("package ai.axhub.sdk;"));
+    assert!(by_path("apps/kotlin")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("package ai.axhub.sdk"));
 }

@@ -210,6 +210,8 @@ pub(crate) struct MigratePlanArgs {
     pub dir: Option<String>,
     #[arg(long = "app-path")]
     pub app_path: Option<String>,
+    #[arg(long = "persist-planning")]
+    pub persist_planning: bool,
     #[arg(long)]
     pub json: bool,
 }

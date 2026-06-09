@@ -79,6 +79,24 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain("NEVER 앱 등록·git 연결·배포 approval 을 helper 로 우회하지 않아요");
   });
 
+  test("documents migrate planning escalation and persistence boundaries", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    expect(skill).toContain("helper 의 confidence 와 `planning` field");
+    expect(skill).toContain("repo-local `.axhub/`");
+    expect(skill).toContain("`.axhub/spec` 은 앱별 승인 target-state planning state");
+    expect(skill).toContain("`.axhub/plan` 은 run별 stage ledger · approval · receipt 저장소");
+    expect(skill).toContain(".axhub-workspace");
+    expect(skill).toContain('shared_planning: true');
+    expect(skill).toContain('"$HELPER" migrate-plan --dir "${AXHUB_MIGRATE_DIR:-.}" --app-path "$APP_PATH" --persist-planning --json');
+    expect(skill).toContain("& $Helper migrate-plan --dir $MigrateDir --app-path $env:APP_PATH --persist-planning --json");
+    expect(skill).toContain("serial `spec_only`");
+    expect(skill).toContain("discover → planner → architect → critic → reviewer");
+    expect(skill).toContain("conditional wave 병렬화");
+    expect(skill).toContain("multi-app wave 는 v1 에서 금지");
+    expect(skill).toContain("serial fallback");
+    expect(skill).toContain("simple flow 에서는 wave 나 consensus jargon");
+  });
+
   test("documents the production detect matrix added after live QA", () => {
     const skill = read("skills/migrate/SKILL.md");
     for (const expected of [
