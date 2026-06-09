@@ -30,6 +30,18 @@ HELPER="${ROOT}/bin/axhub-helpers"
 INSTALL_SH="${ROOT}/bin/install.sh"
 WRAPPER="${ROOT}/hooks/axhub-helpers.sh"
 
+# Propagate CLAUDE_PLUGIN_ROOT to later tool-call shells via $CLAUDE_ENV_FILE.
+# Claude Code exposes CLAUDE_PLUGIN_ROOT to SessionStart hooks but does NOT
+# reliably set it in the agent's later Bash/PowerShell tool calls, so skills
+# can't locate the helper (`$env:CLAUDE_PLUGIN_ROOT\bin\axhub-helpers.exe`
+# resolves to `C:\bin\…` when empty). Appending an `export` line here loads it
+# into subsequent tool-call shells. Rewritten every session, so a plugin
+# version bump (new versioned cache path) never goes stale. Best-effort +
+# fail-open: absent CLAUDE_ENV_FILE just skips.
+if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+  printf "export CLAUDE_PLUGIN_ROOT='%s'\n" "$CLAUDE_PLUGIN_ROOT" >> "$CLAUDE_ENV_FILE" 2>/dev/null || true
+fi
+
 if [ ! -x "$HELPER" ] && [ -x "$WRAPPER" ]; then
   if RESOLVED_HELPER="$("$WRAPPER" --resolve-helper 2>/dev/null)" && [ -x "$RESOLVED_HELPER" ]; then
     HELPER="$WRAPPER"
