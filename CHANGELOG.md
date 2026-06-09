@@ -4,6 +4,23 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.40](///compare/v0.9.39...v0.9.40) (2026-06-09)
+
+온보딩 흐름에서 GitHub App `install_url` 노출을 `DETECT_ALL` 직후 branch-independent `Step 2.5` 로 끌어올렸어요. 이미 GitHub App 이 설치된 계정 + 빈 폴더 경로가 `init` 으로 바로 라우팅되며 install_url 을 노출하는 두 지점(github gap / ready card)을 둘 다 우회하던 문제를 막아, 어느 gap 으로 라우팅되든 흐름 맨 앞에서 install_url 을 한 번은 보장해요. `installed`/`mixed` 일 땐 "다른 org/계정에 설치할래요?" actionable 질문까지 더했고, 비대화형 default 는 mutation 없이 그대로 진행해요. `#173`→`#176`→`#177`→`#179` 로 이어진 conditional-surface whack-a-mole 를 단일 branch-independent 지점으로 종결했어요.
+
+### Test baseline
+
+- `bun test` 1262 pass / 0 new fail. `bun run skill:doctor --strict` exit 0 (Step 2.5 sub-step step-numbering collision 면제), `lint:tone --strict` 0 err, `lint:keywords --check` no diff, `bunx tsc --noEmit` exit 0.
+- `release:check` 5 cross-arch 바이너리 빌드 + 버전 assert green (0.9.40).
+
+### Honest tradeoff
+
+- base(`main`)부터 있던 release 메타 drift 테스트 3개(marketplace fallback / README current-release / PLAN schema snippet)는 이 PR 범위 밖이라 그대로 뒀어요. 0.9.40 bump 가 marketplace/plugin/package 는 갱신하지만 README/PLAN 스냅샷은 별도 경로라 잔존할 수 있어요.
+
+### Fixed
+
+* onboarding GitHub App install_url 을 DETECT 직후 무조건 노출 (branch-independent) ([#186](undefined/undefined/undefined/issues/186)) 52a998c, closes #173 #176 #177 #179
+
 ## [0.9.39](///compare/v0.9.38...v0.9.39) (2026-06-08)
 
 이번 릴리스는 axhub 업데이트 감지를 proactive nudge 와 reactive `upgrade` 스킬 양쪽에서 같은 진짜 원격 소스(GitHub releases)로 일관되게 맞춰요. Windows VM 사용자가 "새 버전이 릴리스됐는데 알림이 안 뜬다" 고 알려준 두 증상을 고쳤어요. 첫째, drift 캐시 재조회 TTL 을 24h flat 에서 조건부(최신이면 1h, 업데이트 대기면 12h)로 바꿔서 같은 날 나온 릴리스도 한 시간 안에 잡혀요. 둘째, #181 이 `.sh` 에만 넣었던 `cli-latest-fetch-bg` 백그라운드 fetch 를 `session-start.ps1` 에도 미러해서 Windows 에서도 CLI drift 캐시가 warm 돼요. 셋째, `upgrade` 스킬이 번들된 `marketplace.json`(플러그인과 함께 배포되는 stale 스냅샷)을 읽던 걸 새 helper subcommand `plugin-update-check`(live GitHub releases fetch)로 바꿔서 실제 새 버전을 감지해요 — 네트워크 실패 시엔 틀린 "최신이에요" 대신 "확인 못 했어요" 라고 정직하게 안내해요. 함께 Bun 없는 환경에서 배포 검증 훅이 동작하도록 고친 #182 도 들어갔어요.
