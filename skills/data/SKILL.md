@@ -68,6 +68,8 @@ if [ -z "$AXHUB_TENANT" ]; then
   if [ -f "$TENANT_CACHE" ]; then
     _T=$(jq -r '.tenant // empty' "$TENANT_CACHE" 2>/dev/null || true)
     _TS=$(jq -r '.ts // 0' "$TENANT_CACHE" 2>/dev/null || echo '0')
+    # ts 는 신뢰할 수 없는 캐시 값 — 산술 $(( )) injection 방지로 숫자만 남겨요
+    case "$_TS" in *[!0-9]*|"") _TS=0;; esac
     _NOW=$(date +%s 2>/dev/null || echo '0')
     _AGE=$(( _NOW - _TS ))
     if [ -n "$_T" ] && [ "$_AGE" -ge 0 ] && [ "$_AGE" -lt "$TENANT_CACHE_TTL" ]; then

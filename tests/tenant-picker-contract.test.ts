@@ -99,6 +99,17 @@ describe("tenant-picker structural contract — L1/L2 sentinel + marker", () => 
       // L2 stanza는 write-back 지시를 포함해요 (L1 re-read marker와 동일 문자열)
       expect(content).toContain(".axhub/state/tenant.json");
     });
+
+    test(`${slug}: L1 digit-sanitizes $_TS before arithmetic (RCE guard, 회귀 방지)`, () => {
+      const content = read(skillPath);
+      // 신뢰 못 하는 캐시 ts 가 $(( )) 산술 injection 으로 코드 실행되는 걸 막아요.
+      const guardIdx = content.indexOf('case "$_TS"');
+      const arithIdx = content.indexOf("_AGE=$(( _NOW - _TS ))");
+      expect(guardIdx, `${slug}: L1 digit-only guard for $_TS missing`).toBeGreaterThan(-1);
+      expect(arithIdx).toBeGreaterThan(-1);
+      // guard 는 산술 평가보다 먼저 와야 효력이 있어요
+      expect(arithIdx).toBeGreaterThan(guardIdx);
+    });
   }
 });
 

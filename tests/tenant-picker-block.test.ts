@@ -484,3 +484,55 @@ describe("tenant-picker inline substitution — resolves cache at point of use (
     }
   });
 });
+
+// ════════════════════════════════════════════════════════════════
+// 보안 — 신뢰할 수 없는 캐시 ts 가 bash 산술 $(( )) injection 으로
+// 임의 코드를 실행하면 안 돼요 (CVE-class: array-subscript arithmetic RCE)
+// ════════════════════════════════════════════════════════════════
+describe("tenant-picker-block security — untrusted cache ts arithmetic injection", () => {
+  test("L1 bash digit-sanitizes $_TS before $(( )) (guard present, before arithmetic)", () => {
+    const guardIdx = L1_BASH.indexOf('case "$_TS"');
+    const arithIdx = L1_BASH.indexOf("_AGE=$(( _NOW - _TS ))");
+    expect(guardIdx).toBeGreaterThan(-1);
+    expect(arithIdx).toBeGreaterThan(-1);
+    // guard 는 산술보다 먼저 와야 효력이 있어요
+    expect(arithIdx).toBeGreaterThan(guardIdx);
+  });
+
+  test("poisoned cache ts (array-subscript payload) does NOT execute and is treated as stale", () => {
+    const cwd = makeTmpDir("rce-ts");
+    try {
+      // bash 산술 RCE 페이로드: $(( _NOW - _TS )) 가 _TS 를 산술식으로 평가하면
+      // array-subscript 안의 $(...) 가 실행돼요. digit-only guard 가 막아야 해요.
+      writeTenantCache(cwd, {
+        tenant: "poisoned-should-be-ignored",
+        source: "auto",
+        ts: "a[$(touch PWNED_SENTINEL)]",
+      });
+      const { stdout } = runPicker({ cwd, fakeTenants: [TENANT_A] });
+
+      // 1) RCE 미발생: sentinel 파일이 생성되면 안 돼요
+      expect(existsSync(join(cwd, "PWNED_SENTINEL"))).toBe(false);
+      // 2) 악성 ts → 숫자 아님 → 0 → stale → 캐시 무시 → tenants list 로 재해소
+      expect(stdout).toContain(`AXHUB_TENANT=${TENANT_A.id}`);
+      expect(stdout).not.toContain("poisoned-should-be-ignored");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("numeric-string ts payload variant also blocked", () => {
+    const cwd = makeTmpDir("rce-ts2");
+    try {
+      writeTenantCache(cwd, {
+        tenant: "poisoned2",
+        source: "auto",
+        ts: "1+x[$(touch PWNED_SENTINEL2)]",
+      });
+      runPicker({ cwd, fakeTenants: [TENANT_A] });
+      expect(existsSync(join(cwd, "PWNED_SENTINEL2"))).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+});
