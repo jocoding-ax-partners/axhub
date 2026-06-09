@@ -534,6 +534,12 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
    - `checkpoint_ref` 가 잡히면 expert 의 unified diff 를 한국어 preview 로 보여주고 승인받은 뒤에만 apply 해요. `needs_decision` 이면 사용자에게 묻고, checkpoint 없이는 apply 하지 않아요.
    - apply 뒤에는 스캔에서 찾은 검증 명령을 돌려요. 실패하면 guard 가 준 `rollback_command` 를 보여주고 되돌릴지 물어요. 변환은 자동 배포로 이어지지 않아요 — 원격 mutation 은 그대로 CLI gating 이에요.
 
+2.7. **data 변환 실행 (승인된 `data_patch_plan`) · auth 는 advisory.** wrapper 와 같은 expert·guard 경로로 data 접근을 변환해요.
+   - 같은 `axhub-sdk-<lang>-expert` 를 `data_patch_plan` mode 로 dispatch 해요. expert 는 pack §6 data operation surface 를 읽고 ORM/raw-query 를 `client.data` 호출로 바꿔요. row body 는 schemaless object 라 사용자 table 컬럼 키를 그대로 쓰고, list 는 §6 query 어휘(page/per_page/_select/sort)를 써요.
+   - hard-stop 게이팅은 §2.5 와 동일해요. `raw_query`/`broad_diff`/`missing_verification` 면 기본 preview-only 지만 "강행할래요" 확인 + git checkpoint 뒤에만 apply 해요. `plan_only=true`(secret_exposure·custom_auth·unsupported_language)면 실행 경로 없이 plan 만 남겨요.
+   - apply 는 §2.6 과 같은 `migrate-guard` checkpoint → 한국어 preview → 승인 → apply → verify → 실패 시 rollback 경로를 그대로 따라요. apply 전 installed-SDK 체크도 동일해요.
+   - `auth_patch_plan` 은 **실행하지 않아요** — auth 는 plan(advisory)만 만들어요. 인식된 auth 라이브러리여도 자동 코드 변환은 안 해요. login 이 runtime 에서 조용히 깨질 위험이 크고 generic verify 가 그걸 못 잡으니, auth 는 사용자에게 권장 변경을 문서로만 제시해요.
+
 3. **manifest 초안 준비.** helper 의 `suggested_manifest` 를 `axhub.yaml` 초안으로 보여줘요. 후보를 직접 골랐으면 같은 helper 를 `--app-path "$APP_PATH"` 로 한 번 더 실행해서 선택한 후보 기준 manifest 를 다시 만들어요. 위 control contract 표에 있는 field 만 남기고, required env 는 선택한 후보 앱 안에서 발견된 이름과 scope 만 포함해요. 값 설정은 `axhub env set` 경로로 안내해요. 기존 `apphub.yaml` 이 있으면 읽기는 계속 되지만 새 파일은 `axhub.yaml` 로 만들어요.
 
    ```bash

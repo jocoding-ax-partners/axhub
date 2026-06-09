@@ -255,4 +255,22 @@ describe("migrate SKILL contract", () => {
       expect(agent).toContain("paraphrase");
     }
   });
+
+  test("wires data_patch_plan conversion behind the same guard, keeps auth advisory", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    // data execution stage (§2.7): same expert/guard path, reads pack §6
+    expect(skill).toContain("data_patch_plan");
+    expect(skill).toContain("client.data");
+    expect(skill).toContain("schemaless");
+    expect(skill).toContain("page/per_page/_select/sort");
+    // auth stays advisory — there is NO auth-execute path
+    expect(skill).toContain("`auth_patch_plan` 은 **실행하지 않아요**");
+    // each generated expert declares the data mode + auth-advisory contract
+    for (const lang of ["go", "java", "kotlin", "node", "python", "ruby"]) {
+      const agent = read(`agents/axhub-sdk-${lang}-expert.md`);
+      expect(agent).toContain("data_patch_plan");
+      expect(agent).toContain("client.data");
+      expect(agent).toContain("advisory");
+    }
+  });
 });

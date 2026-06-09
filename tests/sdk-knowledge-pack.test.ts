@@ -96,5 +96,13 @@ describe("SDK knowledge pack freshness + integrity", () => {
       expect(md).toContain("oauth-token-form-urlencoded"); // a systemic contract id
       expect(md).toContain(pinned.conformance_baseline);
     });
+
+    test(`${lang}: carries the §6 data-operation surface (schemaless)`, () => {
+      const md = read(`${lang}.md`);
+      expect(md).toContain("## 6. Data operations");
+      expect(md).toContain("schemaless"); // rows are schemaless, not typed bodies
+      expect(md).toContain("client.data"); // the data facade pattern
+      expect(md).toContain("page"); // list query vocabulary
+    });
   }
 });
