@@ -2421,11 +2421,62 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
 
 const WELCOME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Warm the plugin + CLI version-drift caches in the background so the user's
+/// first prompt this session can already see a freshly-published release —
+/// without adding any session-start latency.
+///
+/// This replaces the detached `nohup …-fetch-bg &` spawns the shell wrappers
+/// used to do, consolidating the trigger into one cross-platform Rust spot (no
+/// `.ps1`/`.sh` fork to drift). The fetch itself stays detached: session-start
+/// returns immediately while a child process warms the cache. A human takes
+/// more than a second to type their first message, so the sub-second fetch
+/// lands before the first prompt-route turn and the turn-1 nudge still fires —
+/// at zero startup cost. A short cache TTL (`FETCH_TTL_SECS`) means a restart
+/// re-fetches almost immediately, eliminating the detection lag a long TTL caused.
+///
+/// Fully fail-open: only a channel whose cache is stale/absent (`needs_refresh`)
+/// is spawned, any spawn error is swallowed, and the next session retries.
+fn warm_drift_caches() {
+    // Only warm inside a real Claude Code plugin session. The session-start
+    // shell wrapper hard-requires CLAUDE_PLUGIN_ROOT (exported by Claude Code),
+    // so its presence marks a live hook invocation. Direct `cargo test`
+    // invocations of `session-start` don't set it → the test suite never spawns
+    // a network fetch.
+    if std::env::var_os("CLAUDE_PLUGIN_ROOT").is_none() {
+        return;
+    }
+    // Same gate the legacy shell fetch used: never fetch in CI / non-interactive.
+    if std::env::var_os("CI").is_some() || std::env::var_os("CLAUDE_NON_INTERACTIVE").is_some() {
+        return;
+    }
+    let Ok(exe) = std::env::current_exe() else {
+        return; // can't locate ourselves → skip warming, never block
+    };
+    let exe = exe.to_string_lossy().into_owned();
+
+    if axhub_helpers::plugin_update::needs_refresh() {
+        let _ = axhub_helpers::spawn::spawn_detached_with_fallback(&[
+            exe.as_str(),
+            "plugin-latest-fetch-bg",
+        ]);
+    }
+    if axhub_helpers::cli_drift::needs_refresh() {
+        let _ = axhub_helpers::spawn::spawn_detached_with_fallback(&[
+            exe.as_str(),
+            "cli-latest-fetch-bg",
+        ]);
+    }
+}
+
 pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("session-start") {
         out_json(json!({}));
         return Ok(0);
     }
+    // Warm the version-drift caches in the background (detached, fail-open) so the
+    // user's first prompt this session can see a freshly-published plugin/CLI
+    // release — without adding any session-start latency. See fn doc.
+    warm_drift_caches();
     write_session_start_bundle_best_effort();
 
     let mut lines: Vec<String> = vec![

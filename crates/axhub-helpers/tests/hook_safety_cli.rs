@@ -27,6 +27,10 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
     command.env_remove("AXHUB_DISABLE_HOOKS");
     command.env_remove("AXHUB_DISABLE_HOOK");
     command.env_remove("DISABLE_AXHUB");
+    // session-start's drift-cache warm only fires when CLAUDE_PLUGIN_ROOT marks a
+    // real plugin session; removing it here keeps the suite hermetic (never spawns
+    // a network fetch) even if a dev runs `cargo test` with it exported.
+    command.env_remove("CLAUDE_PLUGIN_ROOT");
 
     // Sandbox audit + telemetry writes for prompt-route. Both XDG_STATE_HOME and
     // XDG_CACHE_HOME are isolated so prompt-route never reads the developer's real
