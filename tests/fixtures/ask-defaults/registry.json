@@ -210,12 +210,12 @@
     }
   },
   "upgrade": {
-    "플러그인 업그레이드 명령 보여줄까요?": {
-      "safe_default": "show",
-      "rationale": "Read-only display action, safe in subprocess. Show the upgrade command without executing it.",
+    "플러그인을 최신 버전으로 업데이트할까요?": {
+      "safe_default": "skip",
+      "rationale": "플러그인 업데이트(claude plugin update)는 mutation 이라 비대화형 subprocess 에서는 자동 실행하지 않고 현재 버전을 유지해요.",
       "allowed_safe_defaults": [
-        "show",
-        "skip"
+        "skip",
+        "update"
       ]
     }
   },

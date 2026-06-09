@@ -250,8 +250,8 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
 
     const upgrade = registry["upgrade"] as Record<string, SafeDefaultEntry>;
     expect(
-      upgrade["플러그인 업그레이드 명령 보여줄까요?"]?.safe_default,
-    ).toBe("show");
+      upgrade["플러그인을 최신 버전으로 업데이트할까요?"]?.safe_default,
+    ).toBe("skip");
 
     const init = registry["init"] as Record<string, SafeDefaultEntry>;
     expect(init["어떤 템플릿으로 시작할까요?"]?.safe_default).toBe("abort");
