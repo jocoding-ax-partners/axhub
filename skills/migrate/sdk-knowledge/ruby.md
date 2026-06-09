@@ -374,3 +374,26 @@ _Total 189 operations across 12 tags. Identity only (operationId/method/path); r
 - **email-domains-api-v1-prefix** — `GET /api/v1/tenants/{tenantID}/email-domains` (tenantsGetApiV1TenantsByTenantIDEmailDomains)
 - **public-invite-links-api-v1-prefix** — `GET /api/v1/invite-links/{token}` (tenantsGetApiV1InviteLinksByToken)
 - **cost-first-class-context** — `GET /api/v1/tenants/{tenantID}/cost/summary` (costGetApiV1TenantsByTenantIDCostSummary)
+
+## 6. Data operations (for `data_patch_plan` — rows are schemaless)
+
+_Data rows are SCHEMALESS: the request body is an arbitrary JSON object keyed by the user's table columns, not a typed schema. Call through the generic `client.data` facade `method(path_params, query, body)`. List query params: `page`, `per_page`, `_select`, `sort`._
+
+- `schemaGetApiV1AppsByAppIDTables` — GET /api/v1/apps/{appID}/tables
+- `schemaPostApiV1AppsByAppIDTables` — POST /api/v1/apps/{appID}/tables
+- `schemaGetApiV1AppsByAppIDTablesCheckAvailability` — GET /api/v1/apps/{appID}/tables/check-availability
+- `schemaGetApiV1AppsByAppIDTablesColumnTypes` — GET /api/v1/apps/{appID}/tables/column-types
+- `schemaDeleteApiV1AppsByAppIDTablesByTableName` — DELETE /api/v1/apps/{appID}/tables/{tableName}
+- `schemaGetApiV1AppsByAppIDTablesByTableName` — GET /api/v1/apps/{appID}/tables/{tableName}
+- `schemaPostApiV1AppsByAppIDTablesByTableNameColumns` — POST /api/v1/apps/{appID}/tables/{tableName}/columns
+- `schemaDeleteApiV1AppsByAppIDTablesByTableNameColumnsByColumnName` — DELETE /api/v1/apps/{appID}/tables/{tableName}/columns/{columnName}
+- `schemaGetApiV1AppsByAppIDTablesByTableNameGrants` — GET /api/v1/apps/{appID}/tables/{tableName}/grants
+- `schemaPostApiV1AppsByAppIDTablesByTableNameGrants` — POST /api/v1/apps/{appID}/tables/{tableName}/grants
+- `schemaDeleteApiV1AppsByAppIDTablesByTableNameGrantsByGrantID` — DELETE /api/v1/apps/{appID}/tables/{tableName}/grants/{grantID}
+- `schemaGetApiV1AppsByAppIDTablesByTableNameRows` — GET /api/v1/apps/{appID}/tables/{tableName}/rows
+- `schemaGetDataByTenantSlugByAppSlugByTable` — GET /data/{tenantSlug}/{appSlug}/{table}
+- `schemaPostDataByTenantSlugByAppSlugByTable` — POST /data/{tenantSlug}/{appSlug}/{table}
+- `schemaGetDataByTenantSlugByAppSlugByTableCount` — GET /data/{tenantSlug}/{appSlug}/{table}/_count
+- `schemaDeleteDataByTenantSlugByAppSlugByTableById` — DELETE /data/{tenantSlug}/{appSlug}/{table}/{id}
+- `schemaGetDataByTenantSlugByAppSlugByTableById` — GET /data/{tenantSlug}/{appSlug}/{table}/{id}
+- `schemaPatchDataByTenantSlugByAppSlugByTableById` — PATCH /data/{tenantSlug}/{appSlug}/{table}/{id}
