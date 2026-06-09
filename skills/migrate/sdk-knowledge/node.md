@@ -329,25 +329,51 @@ _Total 189 operations across 12 tags. Identity only (operationId/method/path); r
 - **public-invite-links-api-v1-prefix** — `GET /api/v1/invite-links/{token}` (tenantsGetApiV1InviteLinksByToken)
 - **cost-first-class-context** — `GET /api/v1/tenants/{tenantID}/cost/summary` (costGetApiV1TenantsByTenantIDCostSummary)
 
-## 6. Data operations (for `data_patch_plan` — rows are schemaless)
+## 6. Data operations (for `data_patch_plan`)
 
-_Data rows are SCHEMALESS: the request body is an arbitrary JSON object keyed by the user's table columns, not a typed schema. Call through the generic `client.data` facade `method(path_params, query, body)`. List query params: `page`, `per_page`, `_select`, `sort`._
+**node data access is the ergonomic FLUENT builder — NOT a generic `method()` facade.** Convert the user's ORM / raw-SQL data access to this exact shape (source: `@ax-hub/sdk` `packages/sdk/src/resources/data`).
 
-- `schemaGetApiV1AppsByAppIDTables` — GET /api/v1/apps/{appID}/tables
-- `schemaPostApiV1AppsByAppIDTables` — POST /api/v1/apps/{appID}/tables
-- `schemaGetApiV1AppsByAppIDTablesCheckAvailability` — GET /api/v1/apps/{appID}/tables/check-availability
-- `schemaGetApiV1AppsByAppIDTablesColumnTypes` — GET /api/v1/apps/{appID}/tables/column-types
-- `schemaDeleteApiV1AppsByAppIDTablesByTableName` — DELETE /api/v1/apps/{appID}/tables/{tableName}
-- `schemaGetApiV1AppsByAppIDTablesByTableName` — GET /api/v1/apps/{appID}/tables/{tableName}
-- `schemaPostApiV1AppsByAppIDTablesByTableNameColumns` — POST /api/v1/apps/{appID}/tables/{tableName}/columns
-- `schemaDeleteApiV1AppsByAppIDTablesByTableNameColumnsByColumnName` — DELETE /api/v1/apps/{appID}/tables/{tableName}/columns/{columnName}
-- `schemaGetApiV1AppsByAppIDTablesByTableNameGrants` — GET /api/v1/apps/{appID}/tables/{tableName}/grants
-- `schemaPostApiV1AppsByAppIDTablesByTableNameGrants` — POST /api/v1/apps/{appID}/tables/{tableName}/grants
-- `schemaDeleteApiV1AppsByAppIDTablesByTableNameGrantsByGrantID` — DELETE /api/v1/apps/{appID}/tables/{tableName}/grants/{grantID}
-- `schemaGetApiV1AppsByAppIDTablesByTableNameRows` — GET /api/v1/apps/{appID}/tables/{tableName}/rows
-- `schemaGetDataByTenantSlugByAppSlugByTable` — GET /data/{tenantSlug}/{appSlug}/{table}
-- `schemaPostDataByTenantSlugByAppSlugByTable` — POST /data/{tenantSlug}/{appSlug}/{table}
-- `schemaGetDataByTenantSlugByAppSlugByTableCount` — GET /data/{tenantSlug}/{appSlug}/{table}/_count
-- `schemaDeleteDataByTenantSlugByAppSlugByTableById` — DELETE /data/{tenantSlug}/{appSlug}/{table}/{id}
-- `schemaGetDataByTenantSlugByAppSlugByTableById` — GET /data/{tenantSlug}/{appSlug}/{table}/{id}
-- `schemaPatchDataByTenantSlugByAppSlugByTableById` — PATCH /data/{tenantSlug}/{appSlug}/{table}/{id}
+### Scope a table
+```ts
+import { AxHubClient, defineSchema, where, and } from '@ax-hub/sdk';
+
+// (a) typed — preferred when the table/columns are known at conversion time:
+const Orders = defineSchema({
+  table: 'orders',
+  columns: { id: 'uuid', total: 'number', status: { type: 'enum', values: ['paid', 'pending'] as const } },
+});
+const orders = axhub.tenant(process.env.AX_HUB_TENANT_SLUG!).app(process.env.AX_HUB_APP_SLUG!).data.table(Orders);
+
+// (b) runtime-discovered — schema fetched from the backend (no compile-time schema):
+const orders = await axhub.tenant(t).app(a).data.discover<{ id: string; total: number; status: 'paid' | 'pending' }>('orders');
+```
+`.tenant(slug)` / `.app(slug)` take **slugs**, not ids. Reuse the §1 env contract: tenant = `AX_HUB_TENANT_SLUG`, app = `AX_HUB_APP_SLUG` (add the latter to the app's env; do NOT invent `AX_HUB_TENANT` / `AX_HUB_APP` — the SDK examples are inconsistent, §1/§6 pin the `_SLUG` names).
+
+### CRUD (DataTableClient)
+- `await orders.list({ where, orderBy, select, page, pageSize })` → `{ items, nextCursor, firstCursor, hasNext, hasPrev }`
+- `for await (const row of orders.listAll({ where })) { … }` — auto-paginate every page
+- `await orders.count({ where })` → `number`
+- `await orders.get(id, { select })` → row
+- `await orders.insert({ …row })` → inserted row · `await orders.insertMany([{…}, {…}])` → `{ items, count }`
+- `await orders.update(id, { …patch })` → updated row
+- `await orders.delete(id)` → `void`
+
+### Query DSL
+- filter: `where(Orders.cols.status).eq('paid')`, combine with `and(…)`. (discovered handle: `where(orders.schema!.cols.status)`)
+- projection: `select: ['id', 'total'] as const`
+- sort: `orderBy`
+- **pagination is OFFSET-ONLY**: `page` (1-based) + `pageSize` (clamped 1..100), or `cursor` = the numeric `nextCursor` a prior `list()` returned. NEVER `after` / `before` / keyset cursors — the SDK throws `LegacyCursorError`. `list()` does NOT return a total count (`totalIsExact: false`).
+
+### Wire paths (grounding only — call the methods above, do not hand-roll requests)
+list/insert `GET|POST /data/{tenant}/{app}/{table}` · get/update/delete `…/{table}/{id}` · count `…/{table}/_count` · discover `GET /api/v1/tenants/{t}/apps/{a}/tables/{table}/inspect`.
+
+### Mapping guide (user code → fluent call)
+- `SELECT … WHERE x = v` → `.list({ where: where(cols.x).eq(v) })`
+- `SELECT … LIMIT n OFFSET m` → `.list({ pageSize: n, page: Math.floor(m / n) + 1 })`
+- `INSERT INTO t (…) VALUES (…)` → `.insert({ … })`
+- `UPDATE t SET … WHERE id = ?` → `.update(id, { … })`
+- `DELETE FROM t WHERE id = ?` → `.delete(id)`
+- `SELECT COUNT(*) …` → `.count({ where })`
+
+### Reliability — discover()-verify (REQUIRED before apply)
+Docs + LLM codegen cannot guarantee correct table/column names on their own. Before applying any `data_patch_plan` diff, run `discover(table)` against the real tenant/app and assert that **every** `.table(name)` / `.discover(name)` table AND every column referenced by `where(cols.X)` / `select: [X]` / `insert`/`update` keys exists in the discovered schema. A reference to a missing table or column is a HARD-STOP (it compiles but silently queries the wrong thing, and no vibe-coder will catch it in review) — surface it in the Korean preview, do not apply.

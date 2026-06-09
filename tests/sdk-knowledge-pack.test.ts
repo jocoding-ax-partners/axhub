@@ -97,12 +97,27 @@ describe("SDK knowledge pack freshness + integrity", () => {
       expect(md).toContain(pinned.conformance_baseline);
     });
 
-    test(`${lang}: carries the §6 data-operation surface (schemaless)`, () => {
+    test(`${lang}: carries the §6 data-operation surface`, () => {
       const md = read(`${lang}.md`);
       expect(md).toContain("## 6. Data operations");
-      expect(md).toContain("schemaless"); // rows are schemaless, not typed bodies
-      expect(md).toContain("client.data"); // the data facade pattern
-      expect(md).toContain("page"); // list query vocabulary
+      const data = md.slice(md.indexOf("## 6. Data operations"));
+      if (lang === "node") {
+        // node ships the real ergonomic fluent data builder — the expert must
+        // codegen against it (not a generic facade), and run discover()-verify.
+        expect(data).toContain("FLUENT");
+        expect(data).toContain(".data.table(");
+        expect(data).toContain(".data.discover");
+        expect(data).toContain("AX_HUB_TENANT_SLUG");
+        expect(data).toContain("AX_HUB_APP_SLUG");
+        expect(data).toContain("OFFSET-ONLY"); // pagination contract
+        expect(data).toContain("discover()-verify"); // reliability lever
+        expect(data).not.toContain("schemaless"); // node rows are typed/discovered
+      } else {
+        // the 5 passthrough SDKs have no ergonomic data layer yet — §6 is plan-only,
+        // so the expert describes intent and emits NO data-call code for them.
+        expect(data).toContain("PLAN-ONLY");
+        expect(data).toContain("method(path_params, query, body)");
+      }
     });
   }
 });

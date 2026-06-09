@@ -381,9 +381,9 @@ _Total 189 operations across 12 tags. Identity only (operationId/method/path); r
 - **public-invite-links-api-v1-prefix** — `GET /api/v1/invite-links/{token}` (tenantsGetApiV1InviteLinksByToken)
 - **cost-first-class-context** — `GET /api/v1/tenants/{tenantID}/cost/summary` (costGetApiV1TenantsByTenantIDCostSummary)
 
-## 6. Data operations (for `data_patch_plan` — rows are schemaless)
+## 6. Data operations (for `data_patch_plan`)
 
-_Data rows are SCHEMALESS: the request body is an arbitrary JSON object keyed by the user's table columns, not a typed schema. Call through the generic `client.data` facade `method(path_params, query, body)`. List query params: `page`, `per_page`, `_select`, `sort`._
+_The java SDK has NO ergonomic data layer yet — it is a route-table passthrough (data access = raw `method(path_params, query, body)` against the route surface in §4). Reliable ORM→SDK data conversion is NOT available for java until the ergonomic fluent data layer ships (tracked: the SDK expansion program). For java, `data_patch_plan` stays **PLAN-ONLY**: describe the intended change in the Korean preview, do NOT emit data-call code. Data route identities for reference:_
 
 - `schemaGetApiV1AppsByAppIDTables` — GET /api/v1/apps/{appID}/tables
 - `schemaPostApiV1AppsByAppIDTables` — POST /api/v1/apps/{appID}/tables
