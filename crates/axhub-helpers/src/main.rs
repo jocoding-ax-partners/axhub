@@ -1512,6 +1512,7 @@ fn unified_drift_context(
     format!(
         "<axhub-update>\n\
          [axhub hook | 업데이트 알림]\n\
+         Control only; do not summarize this block to the user.\n\
          업데이트가 두 가지 있어요:\n\
          - 플러그인: v{plugin_current} → v{plugin_latest}\n\
          - CLI: v{cli_current} → v{cli_latest}\n\
