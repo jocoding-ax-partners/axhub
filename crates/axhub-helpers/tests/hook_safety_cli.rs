@@ -268,6 +268,80 @@ fn plugin_drift_kill_switch_suppresses_nudge() {
     );
 }
 
+// Run prompt-route with a fresh newer cache AND a pre-seeded per-version snooze
+// marker, passing `session_id` in the payload. Proves the re-surface contract
+// end-to-end: the marker no longer silences the nudge forever — only within the
+// same session inside the snooze window.
+fn run_prompt_route_with_marker_and_session(
+    marker_session: &str,
+    marker_age_secs: u64,
+    payload_session: &str,
+) -> Output {
+    let cache_dir = tempfile::tempdir().unwrap();
+    let state_dir = tempfile::tempdir().unwrap();
+    let plugin_cache = cache_dir.path().join("axhub-plugin");
+    std::fs::create_dir_all(&plugin_cache).unwrap();
+    std::fs::write(
+        plugin_cache.join("plugin-latest.json"),
+        format!(r#"{{"latest":"99.0.0","fetched_at":{}}}"#, now_secs()),
+    )
+    .unwrap();
+    // Pre-seed the snooze marker for v99.0.0 in the state dir.
+    let state_plugin = state_dir.path().join("axhub-plugin");
+    std::fs::create_dir_all(&state_plugin).unwrap();
+    std::fs::write(
+        state_plugin.join(".plugin-drift-nudged-v99.0.0"),
+        format!(
+            r#"{{"session":"{marker_session}","at":{}}}"#,
+            now_secs() - marker_age_secs
+        ),
+    )
+    .unwrap();
+
+    let mut command = Command::new(bin());
+    command
+        .args(["prompt-route"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    command.env_remove("AXHUB_DISABLE_HOOKS");
+    command.env_remove("AXHUB_DISABLE_HOOK");
+    command.env_remove("DISABLE_AXHUB");
+    command.env_remove("CI");
+    command.env_remove("CLAUDE_NON_INTERACTIVE");
+    command.env("XDG_CACHE_HOME", cache_dir.path());
+    command.env("XDG_STATE_HOME", state_dir.path());
+    command.env("AXHUB_NO_AUDIT", "1");
+    let mut child = command.spawn().unwrap();
+    let payload = format!(r#"{{"prompt":"hello","session_id":"{payload_session}"}}"#);
+    let _ = child.stdin.as_mut().unwrap().write_all(payload.as_bytes());
+    child.wait_with_output().unwrap()
+}
+
+#[test]
+fn plugin_drift_renudges_in_a_new_session() {
+    // Already nudged in "session-A"; a NEW session "session-B" re-surfaces it.
+    let out = run_prompt_route_with_marker_and_session("session-A", 60, "session-B");
+    assert!(out.status.success());
+    let s = stdout(&out);
+    assert!(
+        s.contains("플러그인 새 버전"),
+        "a new session must re-surface the plugin drift nudge despite the marker, got: {s}"
+    );
+}
+
+#[test]
+fn plugin_drift_snoozes_within_the_same_session() {
+    // Same session, marker still fresh (60s old) → suppressed (turn-cap intact).
+    let out = run_prompt_route_with_marker_and_session("session-A", 60, "session-A");
+    assert!(out.status.success());
+    let s = stdout(&out);
+    assert!(
+        !s.contains("플러그인 새 버전"),
+        "a fresh same-session marker must snooze the plugin drift nudge, got: {s}"
+    );
+}
+
 // --- cli-drift (proactive CLI binary update nudge) ------------------------
 //
 // End-to-end: seed a fresh `cli-latest.json` (backend has_update=true), then run

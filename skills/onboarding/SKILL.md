@@ -95,6 +95,32 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    - `github`: `{state, installed_logins[], uninstalled_logins[], install_url, multiple_installed}`. `state` 는 `installed` / `mixed` / `uninstalled` / `empty` / `auth_error` / `unavailable` 중 하나예요. **`install_url` 은 GitHub 조회가 성공하면 (`installed`/`mixed`/`uninstalled`/`empty`) 설치 여부·계정 수와 무관하게 항상 채워져요** (계정이 0개여도 app-level 링크로 fallback) — ready card(Step 10)와 GitHub 안내(Step 6)에서 무조건 보여줘요. `state` 가 `auth_error`/`unavailable` 면 null 이고, `auth_error` 면 `unknown` 으로 넘기지 말고 "다시 로그인해줘" 로 안내해요.
    - `deploy_checked` / `deploy_verified`
 
+2.5. **GitHub App 설치·계정 추가 surface — DETECT 직후 무조건 (branch-independent, 비차단).**
+
+   Step 2 helper JSON 의 `github` 를 그대로 써요 (accounts list 재호출 안 해요). `github.install_url` 이 null 이 아니면 (`github.state` 가 `installed`/`mixed`/`uninstalled`/`empty`) **설치 여부·계정 수·`first_gap` 과 무관하게 항상** 이 블록을 먼저 실행한 뒤 Step 3 gap 라우팅으로 가요. 모든 onboarding 경로가 gap 처리 전에 이 지점을 지나서, 빈 폴더(→ init) 처럼 GitHub 단계를 건너뛰는 경로에서도 install_url 을 맨 앞에서 한 번은 보장해요. 이게 Step 6(미설치 gap)·Step 10(ready card)의 조건부 노출에 의존하던 누락을 닫아요.
+
+   **(a) install_url 한 줄 무조건 표시.** "GitHub App 설치·계정 추가 링크: `<github.install_url>`. 이미 설치돼 있어도 다른 org/계정을 더 붙일 수 있어요." `github.installed_logins` 가 있으면 "이미 연결된 계정: `<login...>`" 도 덧붙여요. `installation_id` 등 internal 값은 echo 하지 말고 `login` + `install_url` 만 보여줘요. 링크는 안내만 하고 자동으로 열지 않아요.
+
+   **(b) 이미 1개 이상 설치된 경우 (`github.state` 가 `installed`/`mixed`) 다른 계정 설치를 한 번 물어요 (actionable, 비차단).** `uninstalled`/`empty` 면 (b) 를 건너뛰어요 — 미설치 설치 제안은 Step 6 이 소유해서 중복 질문을 막아요.
+
+   ```json
+   {
+     "questions": [{
+       "question": "다른 org/계정에도 GitHub App 을 설치할래요?",
+       "header": "GitHub App",
+       "multiSelect": false,
+       "options": [
+         {"label": "아니요, 계속", "description": "설치를 더 하지 않고 Step 3 gap 처리로 그대로 이어가요 (비차단 기본값)"},
+         {"label": "설치할래요", "description": "install_url 을 보여주고 브라우저를 열어요. '설치했어' 또는 '온보딩 계속' 이라고 말하면 Step 2 재감지를 한 번 해요"}
+       ]
+     }]
+   }
+   ```
+
+   `설치할래요` 면 `github.install_url` 을 열고, 사용자가 "설치했어" 또는 "온보딩 계속" 이라고 말하면 Step 2 재감지를 한 번 해요. `아니요, 계속` 은 아무 mutation 없이 Step 3 으로 이어가요. `github.install_url` 이 null (`github.state` 가 `auth_error`/`unavailable`, 조회 실패) 이면 이 블록 전체를 생략하고, `auth_error` 면 "다시 로그인해줘" 로 낮춰요.
+
+   **D1 비대화형 가드.** `claude -p`/CI/headless 에서는 (b) AskUserQuestion 을 호출하지 말고 `tests/fixtures/ask-defaults/registry.json` 의 안전 기본값(`아니요, 계속`)으로 진행하고, install/connect mutation 이나 브라우저 열기를 자동 실행하지 않아요. (a) 표시 줄은 그대로 출력해요.
+
 3. **Gap State Machine — 첫 gap 하나만 처리하고 재감지해요.**
 
    **gap 순서의 single source of truth 는 helper 의 `first_gap` 이에요.** 아래 ASCII tree 와 Step 3 상태표는 gap→처리 owner 매핑 참고용 문서일 뿐이라, 순서가 어긋나 보이면 트리·표를 재구현하지 말고 항상 `first_gap` 을 따라요.

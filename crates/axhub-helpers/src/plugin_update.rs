@@ -10,18 +10,29 @@
 //!     [net fail] → skip          [malformed] → skip   [io fail] → skip
 //!
 //!   prompt-route  (UserPromptSubmit — the reliable steering surface; D4)
-//!     read cache ──▶ semver vs CARGO_PKG_VERSION ──▶ Some(nudge) + per-version marker
+//!     read cache ──▶ semver vs CARGO_PKG_VERSION ──▶ Some(nudge) + snooze marker
 //!        │              │                              │
 //!        ▼              ▼                              ▼
-//!     [absent/stale] [<= current]                 [marker/optout/non-interactive] → None
+//!     [absent/stale] [<= current]                 [fresh same-session snooze /
+//!                                                   optout / non-interactive] → None
 //! ```
 //!
 //! D4: the nudge rides **UserPromptSubmit** `additionalContext`, NOT SessionStart.
 //! SessionStart `additionalContext` is advisory and arrives before any user turn,
 //! so it cannot reliably drive an AskUserQuestion. UserPromptSubmit fires with a
 //! real turn (the surface `prompt-route` already uses to steer the agent).
+//!
+//! Re-surface model (not once-per-version): after firing, the per-version marker
+//! records the current `session_id` + timestamp. The nudge stays suppressed only
+//! within the SAME session for `NUDGE_SNOOZE_SECS`; a NEW session (session-id
+//! mismatch) or an expired snooze re-surfaces it. So an outstanding update is
+//! shown again at the start of every session — and at most once per snooze window
+//! within a session — instead of a single fragile shot that a cold-start race or
+//! an ignored turn could burn forever. `그만 볼래요` (permanent opt-out) is the
+//! only way to silence it for good.
 
 use std::fs;
+use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -46,6 +57,12 @@ const FETCH_FRESH_TTL_SECS: u64 = 60 * 60;
 /// the network often.
 const FETCH_DRIFT_TTL_SECS: u64 = 12 * 60 * 60;
 const FETCH_TIMEOUT_SECS: u64 = 5;
+/// In-session re-nudge snooze. After the nudge fires, it stays suppressed within
+/// the SAME session for this long, then re-surfaces. A NEW session re-surfaces
+/// immediately (session-id mismatch), so the user always sees an outstanding
+/// update at session start without being nagged every turn (and the plugin/CLI
+/// turn-cap still rotates, since adjacent turns share a session + fresh marker).
+const NUDGE_SNOOZE_SECS: u64 = 4 * 60 * 60;
 
 /// Cached result of the most recent successful latest-release fetch.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,6 +71,21 @@ pub struct LatestCache {
     pub latest: String,
     /// Unix seconds at which the fetch succeeded.
     pub fetched_at: u64,
+}
+
+/// Per-version nudge marker contents. Records which session last saw the nudge
+/// and when, so the drift check can snooze within a session yet re-surface in a
+/// new one. A legacy empty/garbage marker file deserializes to `None` and is
+/// treated as "never nudged" — so existing users get the corrected re-surface
+/// behavior without a migration step.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct NudgeMarker {
+    /// `session_id` from the UserPromptSubmit payload the nudge last fired in
+    /// (empty when the host did not supply one — degrades to a time-only snooze).
+    #[serde(default)]
+    session: String,
+    /// Unix seconds at which the nudge last fired.
+    at: u64,
 }
 
 pub(crate) fn now_unix() -> u64 {
@@ -88,11 +120,17 @@ pub(crate) fn is_newer(latest: &str, current: &str) -> bool {
 
 /// Pure drift decision — no IO, so every branch is unit-testable. Returns `true`
 /// when the nudge should fire this turn.
+///
+/// `marker` is the previously-recorded nudge stamp for this version (if any) and
+/// `session` is the current session id. The nudge is suppressed only while the
+/// marker belongs to the SAME session AND is younger than `NUDGE_SNOOZE_SECS`; a
+/// new session or an expired snooze lets it re-surface.
 fn should_nudge(
     cache: Option<&LatestCache>,
     current: &str,
     now: u64,
-    marker_exists: bool,
+    marker: Option<&NudgeMarker>,
+    session: &str,
     optout: bool,
     non_interactive: bool,
 ) -> bool {
@@ -108,10 +146,22 @@ fn should_nudge(
     if !is_newer(&cache.latest, current) {
         return false; // already current (or a preview/downgrade)
     }
-    if marker_exists {
-        return false; // already nudged for this version
+    if let Some(marker) = marker {
+        // Snooze: suppress only within the same session and inside the window.
+        // A new session (id mismatch) or an elapsed snooze re-surfaces the nudge.
+        if marker.session == session && now.saturating_sub(marker.at) < NUDGE_SNOOZE_SECS {
+            return false;
+        }
     }
     true
+}
+
+/// Read the per-version nudge marker. A missing, empty, or malformed file (e.g.
+/// the legacy zero-byte marker from the once-per-version design) yields `None`,
+/// which `should_nudge` treats as "never nudged" → re-surface.
+fn read_marker(path: &Path) -> Option<NudgeMarker> {
+    let raw = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&raw).ok()
 }
 
 fn optout_present() -> bool {
@@ -294,16 +344,18 @@ pub fn cmd_plugin_drift_optout() -> i32 {
 }
 
 /// UserPromptSubmit nudge text, or `None` when no nudge should fire. On a `Some`
-/// result the per-version marker is recorded as a side effect, so the nudge
-/// fires at most once per latest version. Called from `cmd_prompt_route`.
-pub fn plugin_drift_context() -> Option<String> {
-    plugin_drift_nudge().map(|n| n.additional_context)
+/// result the per-version snooze marker is stamped with `session` as a side
+/// effect, so the nudge re-surfaces in a new session or after the snooze window.
+/// Called from `cmd_prompt_route`.
+pub fn plugin_drift_context(session: &str) -> Option<String> {
+    plugin_drift_nudge(session).map(|n| n.additional_context)
 }
 
 /// UserPromptSubmit nudge payloads, or `None` when no nudge should fire. On a
-/// `Some` result the per-version marker is recorded as a side effect, so the
-/// nudge fires at most once per latest version.
-pub fn plugin_drift_nudge() -> Option<PluginDriftNudge> {
+/// `Some` result the per-version snooze marker is stamped with the current
+/// `session` + time, so the nudge stays suppressed only within that session for
+/// `NUDGE_SNOOZE_SECS` and re-surfaces in a new session or after the window.
+pub fn plugin_drift_nudge(session: &str) -> Option<PluginDriftNudge> {
     if is_hook_disabled("plugin-drift") {
         return None;
     }
@@ -312,26 +364,35 @@ pub fn plugin_drift_nudge() -> Option<PluginDriftNudge> {
     let marker_path = cache
         .as_ref()
         .and_then(|c| plugin_drift_nudge_marker_path(&c.latest));
-    let marker_exists = marker_path.as_ref().map(|p| p.exists()).unwrap_or(false);
+    let marker = marker_path.as_ref().and_then(|p| read_marker(p));
 
     if !should_nudge(
         cache.as_ref(),
         current,
         now_unix(),
-        marker_exists,
+        marker.as_ref(),
+        session,
         optout_present(),
         is_non_interactive(),
     ) {
         return None;
     }
 
-    // Record the per-version marker before returning so re-entry (this turn's
-    // later prompts, or the next session) is a no-op.
+    // Stamp the snooze marker with this session + time before returning, so
+    // re-entry within the same session (this turn's later prompts, or the next
+    // few turns) is a no-op until the snooze elapses — preserving the plugin/CLI
+    // turn-cap — while a new session re-surfaces the nudge.
     if let Some(path) = marker_path {
         if let Some(parent) = path.parent() {
             let _ = fs::create_dir_all(parent);
         }
-        let _ = fs::write(&path, b"");
+        let stamp = NudgeMarker {
+            session: session.to_string(),
+            at: now_unix(),
+        };
+        if let Ok(json) = serde_json::to_string(&stamp) {
+            let _ = fs::write(&path, json);
+        }
     }
     // `cache` is Some here (should_nudge returned true).
     cache.map(|c| PluginDriftNudge {
@@ -468,15 +529,32 @@ mod tests {
         assert!(!is_newer("0.9.40", "garbage"));
     }
 
+    fn marker(session: &str, at: u64) -> NudgeMarker {
+        NudgeMarker {
+            session: session.to_string(),
+            at,
+        }
+    }
+
     #[test]
     fn should_nudge_fires_on_fresh_newer_unmarked() {
         let c = cache("0.9.40", 1000);
-        assert!(should_nudge(Some(&c), "0.9.34", 1000, false, false, false));
+        assert!(should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000,
+            None,
+            "s1",
+            false,
+            false
+        ));
     }
 
     #[test]
     fn should_nudge_false_when_no_cache() {
-        assert!(!should_nudge(None, "0.9.34", 1000, false, false, false));
+        assert!(!should_nudge(
+            None, "0.9.34", 1000, None, "s1", false, false
+        ));
     }
 
     #[test]
@@ -486,7 +564,8 @@ mod tests {
             Some(&eq),
             "0.9.34",
             1000,
-            false,
+            None,
+            "s1",
             false,
             false
         ));
@@ -495,7 +574,8 @@ mod tests {
             Some(&older),
             "0.9.34",
             1000,
-            false,
+            None,
+            "s1",
             false,
             false
         ));
@@ -505,25 +585,92 @@ mod tests {
     fn should_nudge_false_when_stale() {
         let c = cache("0.9.40", 1000);
         let now = 1000 + CACHE_TTL_SECS; // exactly TTL → stale
-        assert!(!should_nudge(Some(&c), "0.9.34", now, false, false, false));
+        assert!(!should_nudge(
+            Some(&c),
+            "0.9.34",
+            now,
+            None,
+            "s1",
+            false,
+            false
+        ));
     }
 
     #[test]
-    fn should_nudge_false_when_already_marked() {
+    fn should_nudge_snoozes_within_same_session() {
+        // Marker stamped this session, inside the snooze window → suppressed
+        // (this is what preserves the plugin/CLI turn-cap across adjacent turns).
         let c = cache("0.9.40", 1000);
-        assert!(!should_nudge(Some(&c), "0.9.34", 1000, true, false, false));
+        let m = marker("s1", 1000);
+        assert!(!should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000 + 60,
+            Some(&m),
+            "s1",
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn should_nudge_refires_in_new_session() {
+        // Same version already nudged, but in a DIFFERENT session → re-surfaces.
+        let c = cache("0.9.40", 1000);
+        let m = marker("old-session", 1000);
+        assert!(should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000 + 60,
+            Some(&m),
+            "new-session",
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn should_nudge_refires_after_snooze_window() {
+        // Same session, but the snooze has elapsed → re-surfaces.
+        let c = cache("0.9.40", 1000);
+        let m = marker("s1", 1000);
+        assert!(should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000 + NUDGE_SNOOZE_SECS,
+            Some(&m),
+            "s1",
+            false,
+            false
+        ));
     }
 
     #[test]
     fn should_nudge_false_on_optout() {
         let c = cache("0.9.40", 1000);
-        assert!(!should_nudge(Some(&c), "0.9.34", 1000, false, true, false));
+        assert!(!should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000,
+            None,
+            "s1",
+            true,
+            false
+        ));
     }
 
     #[test]
     fn should_nudge_false_when_non_interactive() {
         let c = cache("0.9.40", 1000);
-        assert!(!should_nudge(Some(&c), "0.9.34", 1000, false, false, true));
+        assert!(!should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000,
+            None,
+            "s1",
+            false,
+            true
+        ));
     }
 
     #[test]

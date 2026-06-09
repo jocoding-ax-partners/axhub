@@ -4,6 +4,64 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.42](///compare/v0.9.41...v0.9.42) (2026-06-09)
+
+v0.9.41 이 플러그인 업데이트 알림을 고쳤다면, 이번엔 별개 채널인 **CLI 바이너리 업데이트 알림(cli-drift)**을 같은 방식으로 고쳤어요. Windows 사용자가 CLI 새 버전(v0.18.3 → v0.18.4)이 있는데도 알림이 안 떠서 파일 덤프로 원인을 좁혔어요. 두 버그가 겹쳐 있었어요. 첫째, 업데이트가 cache 에 pending 이면 12시간마다만 재조회해서, 사용자가 CLI 를 업데이트해도(예: 0.18.2 → 0.18.3) cache 가 한참 stale 인 채로 남아 새 latest(0.18.4)를 못 봤어요 — fetch TTL 을 pending 여부와 무관하게 1시간으로 통일해서 cache 가 현재/최신 버전을 한 시간 안에 현실과 맞추도록 했어요. 둘째, 버전당 한 번 fire 후 per-version marker 로 영구 억제되던 one-shot 버그를 plugin-drift 와 동일하게 세션+타임스탬프 snooze 로 바꿔서, 새 세션마다 재노출하고 같은 세션 안에서는 4시간 snooze 로 turn-cap 을 유지해요. `prompt-route` 가 UserPromptSubmit payload 의 session_id 를 cli_drift_nudge 에 넘겨요.
+
+### Test baseline
+
+- `cargo test -p axhub-helpers`: cli_drift 단위 32 pass (snooze 단위 3개 + 세션별 재노출 integration), hook_safety_cli 19 pass (turn-cap 회전 `turn_cap_yields_across_turns...` 유지). 전체 helper 스위트 exit 0.
+- `cargo fmt --check` / `clippy` 변경 3파일 새 경고 0. PR #191 CI 12 SUCCESS / 0 fail.
+- `release:check` 5 cross-arch 바이너리 빌드 + 버전 assert green (0.9.42).
+- end-to-end(실 바이너리): A세션 fire → 같은 세션 snooze → B세션 재노출.
+
+### Honest tradeoff
+
+- pending cache 도 1시간마다 재조회해서 session-start 당 `axhub update check` 호출이 기존 12시간 대비 최대 시간당 1회 늘어요 (detached, TTL-gated, 무시 가능).
+- 잔여 staleness: 사용자가 CLI 를 업데이트하면 cache 가 1시간 안에 따라잡아요(즉시 아님). advisory nudge 라 허용 가능한 수준이에요.
+- 별개 후속: `session-start.ps1` 은 hooks.json 미등록 dead code 라 Windows 도 `.sh`(git-bash) 로 도는데, 이번 PR 범위 밖이라 그대로 뒀어요. fetch warming 을 `cmd_session_start`(Rust)로 흡수하면 .ps1 dead-code 와 .sh/.ps1 중복이 같이 정리돼요.
+
+### Fixed
+
+* CLI 업데이트 알림 재노출 + stale 캐시 (cli-drift) ([#191](undefined/undefined/undefined/issues/191)) 730c327
+
+## [0.9.41](///compare/v0.9.40...v0.9.41) (2026-06-09)
+
+플러그인 새 버전이 나와도 사용자가 어떤 채팅을 쳐도 알림 + AskUserQuestion 이 떠야 하는데, 한 번 뜨고는 다시 안 뜨거나 아예 안 뜨던 문제를 고쳤어요. plugin-drift nudge 가 버전당 한 번 fire 후 per-version marker 로 영구 억제돼서, cold-start race(첫 턴은 latest-release 캐시가 아직 warm 안 됨)와 겹치면 그 한 번이 사용자가 못 본 턴에 소모되어 영영 안 떴어요. marker 가 turn-cap(plugin↔CLI 드리프트 교대) yield 도 겸해서 그냥 삭제할 수 없어, "영구 억제"를 "세션 + 타임스탬프 snooze"로 바꿨어요. 이제 새 세션 시작마다 재노출하고(`session_id` 불일치), 같은 세션 안에서는 fire 후 4시간 snooze 로 turn-cap 인접턴 dedup 을 유지해요. `그만 볼래요`(영구 optout)와 버전 업 재노출은 그대로고, legacy 빈 marker 파일은 `None` 으로 파싱돼 마이그레이션 없이 재노출돼요. UserPromptSubmit payload 의 `session_id` 를 `prompt-route` 가 추출해 `plugin_drift_nudge` 에 넘겨요.
+
+### Test baseline
+
+- `cargo test -p axhub-helpers`: `hook_safety_cli` 19 pass / `plugin_update` 단위 27 pass (snooze 단위테스트 3개 + 세션별 재노출 integration 2개 추가). turn-cap 회전 테스트(`turn_cap_yields_across_turns_plugin_turn1_then_cli_turn2`) 유지.
+- `cargo fmt --check` / `clippy` 변경 4파일 새 경고 0. PR #190 CI 전 체크(perf/rust matrix 3 OS, hook integration, corpus drift) green.
+- `release:check` 5 cross-arch 바이너리 빌드 + 버전 assert green (0.9.41).
+
+### Honest tradeoff
+
+- nudge 는 latest-release 캐시가 warm 해야 떠요. 캐시는 session-start background fetch 또는 explicit update check 가 채워요(둘 다 검증됨). fix 후에도 안 보이면 다음 용의자는 nudge 로직이 아니라 Windows `nohup &` background spawn 이에요.
+- `session_id` 의 resume/restart 안정성은 공식 docs 미명시예요. 불안정하면 4h-snooze-only 로 graceful degrade 해요(그래도 기존 one-shot 보다 나아요).
+- cli-drift 채널은 여전히 one-shot marker 예요(의도적 scope 밖). 같은 latent 버그가 남아 있어 동일 snooze 패치 후속이 필요해요.
+
+### Fixed
+
+* 플러그인 업데이트 알림 재노출 (한 번 뜨고 다시 안 뜨는 문제) ([#190](undefined/undefined/undefined/issues/190)) 52beaf0
+
+## [0.9.40](///compare/v0.9.39...v0.9.40) (2026-06-09)
+
+온보딩 흐름에서 GitHub App `install_url` 노출을 `DETECT_ALL` 직후 branch-independent `Step 2.5` 로 끌어올렸어요. 이미 GitHub App 이 설치된 계정 + 빈 폴더 경로가 `init` 으로 바로 라우팅되며 install_url 을 노출하는 두 지점(github gap / ready card)을 둘 다 우회하던 문제를 막아, 어느 gap 으로 라우팅되든 흐름 맨 앞에서 install_url 을 한 번은 보장해요. `installed`/`mixed` 일 땐 "다른 org/계정에 설치할래요?" actionable 질문까지 더했고, 비대화형 default 는 mutation 없이 그대로 진행해요. `#173`→`#176`→`#177`→`#179` 로 이어진 conditional-surface whack-a-mole 를 단일 branch-independent 지점으로 종결했어요.
+
+### Test baseline
+
+- `bun test` 1262 pass / 0 new fail. `bun run skill:doctor --strict` exit 0 (Step 2.5 sub-step step-numbering collision 면제), `lint:tone --strict` 0 err, `lint:keywords --check` no diff, `bunx tsc --noEmit` exit 0.
+- `release:check` 5 cross-arch 바이너리 빌드 + 버전 assert green (0.9.40).
+
+### Honest tradeoff
+
+- base(`main`)부터 있던 release 메타 drift 테스트 3개(marketplace fallback / README current-release / PLAN schema snippet)는 이 PR 범위 밖이라 그대로 뒀어요. 0.9.40 bump 가 marketplace/plugin/package 는 갱신하지만 README/PLAN 스냅샷은 별도 경로라 잔존할 수 있어요.
+
+### Fixed
+
+* onboarding GitHub App install_url 을 DETECT 직후 무조건 노출 (branch-independent) ([#186](undefined/undefined/undefined/issues/186)) 52a998c, closes #173 #176 #177 #179
+
 ## [0.9.39](///compare/v0.9.38...v0.9.39) (2026-06-08)
 
 이번 릴리스는 axhub 업데이트 감지를 proactive nudge 와 reactive `upgrade` 스킬 양쪽에서 같은 진짜 원격 소스(GitHub releases)로 일관되게 맞춰요. Windows VM 사용자가 "새 버전이 릴리스됐는데 알림이 안 뜬다" 고 알려준 두 증상을 고쳤어요. 첫째, drift 캐시 재조회 TTL 을 24h flat 에서 조건부(최신이면 1h, 업데이트 대기면 12h)로 바꿔서 같은 날 나온 릴리스도 한 시간 안에 잡혀요. 둘째, #181 이 `.sh` 에만 넣었던 `cli-latest-fetch-bg` 백그라운드 fetch 를 `session-start.ps1` 에도 미러해서 Windows 에서도 CLI drift 캐시가 warm 돼요. 셋째, `upgrade` 스킬이 번들된 `marketplace.json`(플러그인과 함께 배포되는 stale 스냅샷)을 읽던 걸 새 helper subcommand `plugin-update-check`(live GitHub releases fetch)로 바꿔서 실제 새 버전을 감지해요 — 네트워크 실패 시엔 틀린 "최신이에요" 대신 "확인 못 했어요" 라고 정직하게 안내해요. 함께 Bun 없는 환경에서 배포 검증 훅이 동작하도록 고친 #182 도 들어갔어요.
