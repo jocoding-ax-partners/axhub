@@ -1469,6 +1469,7 @@ pub fn migrate_approve(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn migrate_wave_plan(
     run_json_path: &Path,
     wave_id: &str,
@@ -1510,7 +1511,9 @@ pub fn migrate_wave_plan(
     match prior_wave_state {
         None => {
             if state != WaveState::Planned {
-                bail!("migrate-wave-plan: 새 wave 는 planned 상태로 시작해야 해요 (none → {state:?})");
+                bail!(
+                    "migrate-wave-plan: 새 wave 는 planned 상태로 시작해야 해요 (none → {state:?})"
+                );
             }
         }
         Some(prior) => {
@@ -1851,9 +1854,7 @@ fn update_spec_meta_state(
     // migrate_approve's re-approve `approved → approved`). Skip silently if either status is
     // unparseable so legacy/foreign meta files are not hard-failed.
     if let Some(current_str) = value["status"].as_str() {
-        if let (Ok(current), Ok(next)) =
-            (parse_spec_state(current_str), parse_spec_state(status))
-        {
+        if let (Ok(current), Ok(next)) = (parse_spec_state(current_str), parse_spec_state(status)) {
             if current != next && !current.can_transition_to(next) {
                 bail!("migrate planning: invalid spec state transition ({current_str} → {status})");
             }
@@ -1903,6 +1904,7 @@ fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T> {
         .with_context(|| format!("{} JSON 을 해석하지 못했어요", path.display()))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn append_receipt(
     receipts_path: &Path,
     now: &str,
@@ -2115,7 +2117,10 @@ mod tests {
             "other-87654321".to_string(),
         ]);
         let error = record.validate().unwrap_err().to_string();
-        assert!(error.contains("owned_app_keys"), "unexpected error: {error}");
+        assert!(
+            error.contains("owned_app_keys"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]
@@ -2131,8 +2136,7 @@ mod tests {
     fn run_record_rejects_spec_only_wave_metadata() {
         // §8.4: spec_only must not declare wave metadata (reaches the wave_index_path validator).
         let mut record = spec_only_run_fixture();
-        record.wave_index_path =
-            Some("/repo/.axhub/plan/runs/run-1/waves/waves.json".to_string());
+        record.wave_index_path = Some("/repo/.axhub/plan/runs/run-1/waves/waves.json".to_string());
         let error = record.validate().unwrap_err().to_string();
         assert!(error.contains("wave metadata"), "unexpected error: {error}");
     }
@@ -2447,9 +2451,18 @@ mod tests {
         // #2 §8.5: a target appearing twice in ONE wave is rejected, across all 7 target classes.
         let categories = [
             ("artifact_path", "stages/05-reviewer.md"),
-            ("latest_pointer", ".axhub/spec/apps/root-12345678/latest.json"),
-            ("plan_app_index", ".axhub/plan/apps/root-12345678/latest-run.json"),
-            ("spec_app_dir", ".axhub/spec/apps/root-12345678/specs/spec-1.md"),
+            (
+                "latest_pointer",
+                ".axhub/spec/apps/root-12345678/latest.json",
+            ),
+            (
+                "plan_app_index",
+                ".axhub/plan/apps/root-12345678/latest-run.json",
+            ),
+            (
+                "spec_app_dir",
+                ".axhub/spec/apps/root-12345678/specs/spec-1.md",
+            ),
             ("run_metadata", "run.json"),
             ("approval_metadata", "approval.json"),
             ("receipt_target", "receipts.jsonl"),

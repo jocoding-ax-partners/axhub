@@ -5450,6 +5450,8 @@ fn cli_migrate_plan_persist_planning_writes_spec_only_pending_approval_artifacts
     assert!(json["planning_persistence"]["paths"]["run_json"]
         .as_str()
         .unwrap()
+        // normalize separators: the path is OS-native (backslashes on Windows)
+        .replace('\\', "/")
         .contains(".axhub/plan/runs/"));
 }
 

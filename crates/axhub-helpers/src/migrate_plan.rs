@@ -1016,10 +1016,6 @@ fn detect_signals(source_files: &[SourceScanFile], patterns: &[(&str, &str)]) ->
     out.into_iter().collect()
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "The hard-stop classifier intentionally combines multiple explicit signals into one risk gate."
-)]
 /// Single source of truth for hard-stop override policy (devex-D1=C). Fail-closed:
 /// only the three explicitly-listed reasons are overridable; secret_exposure,
 /// custom_auth, unsupported_language, and any future/unknown reason default to
@@ -1028,6 +1024,10 @@ pub fn hard_stop_reason_overridable(code: &str) -> bool {
     matches!(code, "missing_verification" | "raw_query" | "broad_diff")
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The hard-stop classifier intentionally combines multiple explicit signals into one risk gate."
+)]
 fn detect_hard_stop_reasons(
     root: &Path,
     files: &[PathBuf],
@@ -1418,7 +1418,7 @@ fn persist_migrate_planning(
         "required_before_execution": true,
         "target_spec_id": spec_id,
         "target_spec_sha256": spec_sha,
-        "approved_stage_artifacts": if planning.mode == PlanningMode::SpecOnly { Value::Array(vec![]) } else { Value::Array(vec![]) },
+        "approved_stage_artifacts": Value::Array(vec![]),
         "adr_sha256": Value::Null,
         "requested_at": now,
         "approved_at": Value::Null,
@@ -1692,6 +1692,7 @@ fn render_discover_stage_markdown(
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 fn append_receipt(
     path: &Path,
     now: &str,
