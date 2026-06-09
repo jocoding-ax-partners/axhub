@@ -45,11 +45,38 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain('axhub apps detect --owner "$OWNER" --repo-name "$REPO" --ref "$REF" --path "$APP_PATH" --json');
     expect(skill).toContain("remote detect 는 현재 CLI 로만 써요");
     expect(skill).toContain("exit `64` 는 local path");
-    expect(skill).toContain("axhub apps create --from-file axhub.yaml --json");
+    expect(skill).toContain("`axhub.yaml` 은 deploy manifest 전용");
+    expect(skill).toContain('axhub apps create --name "$APP_NAME" --slug "$APP_SLUG" --deploy-method "$DEPLOY_METHOD" --json');
+    expect(skill).toContain("axhub apps create --from-file app-create.json --json");
+    expect(skill).not.toContain("axhub apps create --from-file axhub.yaml --json");
     expect(skill).toContain('axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json');
     expect(skill).toContain('axhub deploy create --app "$APP_ID" --commit "$COMMIT_SHA" --execute --json');
     expect(skill).toContain("raw backend endpoint 를 curl 하지");
     expect(skill).not.toContain("/api/v1/apps/detect");
+  });
+
+  test("separates preview planes and approval actions for sdk conversion vs remote mutation", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    expect(skill).toContain("remote_deploy_detect");
+    expect(skill).toContain("local_sdk_conversion_detect");
+    expect(skill).toContain("sdk_wrapper_generate");
+    expect(skill).toContain("data_patch_plan");
+    expect(skill).toContain("auth_patch_plan");
+    expect(skill).toContain("auth_oauth_client_create");
+    expect(skill).toContain("app_create");
+    expect(skill).toContain("git_connect");
+    expect(skill).toContain("env_set");
+    expect(skill).toContain("deploy_create");
+    expect(skill).toContain("preview-only 로 낮추고 local patch 실행을 막아요");
+  });
+
+  test("keeps remote mutation behind explicit preview and approval boundaries", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    expect(skill).toContain("require a Korean preview and explicit approval before execution");
+    expect(skill).toContain("helper 로 preview/approval 을 우회하지 않아요");
+    expect(skill).toContain("mutation 은 preview+approval 뒤의 current CLI 명령으로만 진행해요");
+    expect(skill).toContain("action 별로 따로 유지해요");
+    expect(skill).toContain("NEVER 앱 등록·git 연결·배포 approval 을 helper 로 우회하지 않아요");
   });
 
   test("documents the production detect matrix added after live QA", () => {

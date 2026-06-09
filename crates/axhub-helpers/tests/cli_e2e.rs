@@ -5287,6 +5287,31 @@ fn cli_migrate_plan_detects_node_env_and_manifest_snippet() {
     assert!(env_refs
         .iter()
         .any(|e| e["name"] == "PY_DATABASE_URL" && e["scope"] == "runtime"));
+    assert_eq!(
+        json["sdk_conversion"]["schema_version"],
+        "sdk-conversion/v1"
+    );
+    let sdk_candidates = json["sdk_conversion"]["candidates"].as_array().unwrap();
+    let node_candidate = sdk_candidates
+        .iter()
+        .find(|candidate| candidate["path"] == ".")
+        .unwrap();
+    assert_eq!(node_candidate["language"], "node");
+    assert_eq!(node_candidate["dependency_hint"], "npm install @ax-hub/sdk");
+    assert_eq!(node_candidate["wrapper_target_path"], "src/axhub.ts");
+    assert!(node_candidate["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("import { AxHubClient } from '@ax-hub/sdk'"));
+    assert_eq!(node_candidate["risk"], "high");
+    assert!(node_candidate["hard_stop_reasons"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reason| reason
+            .as_str()
+            .unwrap()
+            .contains("검증 명령 또는 테스트 anchor")));
 }
 
 #[test]
@@ -5323,6 +5348,33 @@ fn cli_migrate_plan_detects_monorepo_candidates_and_compose() {
     assert!(candidates
         .iter()
         .any(|c| c["path"] == "services/api" && c["stack_hint"] == "go"));
+    let sdk_candidates = json["sdk_conversion"]["candidates"].as_array().unwrap();
+    let web_sdk = sdk_candidates
+        .iter()
+        .find(|candidate| candidate["path"] == "apps/web")
+        .unwrap();
+    assert_eq!(web_sdk["language"], "node");
+    assert!(web_sdk["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("import { AxHubClient } from '@ax-hub/sdk'"));
+    let api_sdk = sdk_candidates
+        .iter()
+        .find(|candidate| candidate["path"] == "services/api")
+        .unwrap();
+    assert_eq!(api_sdk["language"], "go");
+    assert_eq!(
+        api_sdk["dependency_hint"],
+        "go get github.com/jocoding-ax-partners/axhub-sdk-go"
+    );
+    assert_eq!(
+        api_sdk["wrapper_target_path"],
+        "services/api/axhub_client.go"
+    );
+    assert!(api_sdk["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("NewAxHubClient"));
 
     let selected_output = run(&[
         "migrate-plan",
@@ -5342,4 +5394,84 @@ fn cli_migrate_plan_detects_monorepo_candidates_and_compose() {
         .as_str()
         .unwrap()
         .contains("apps/web/compose.yaml"));
+}
+
+#[test]
+fn cli_migrate_plan_emits_six_language_wrapper_previews_without_secret_leak() {
+    let temp = tempfile::tempdir().unwrap();
+
+    let node = temp.path().join("apps/node");
+    std::fs::create_dir_all(node.join("src")).unwrap();
+    std::fs::write(node.join("package.json"), r#"{"dependencies":{"vite":"1.0.0"}}"#).unwrap();
+    std::fs::write(
+        node.join("src/main.ts"),
+        "const hardcoded = 'ultra_secret_value_123'; export const boot = () => hardcoded;",
+    )
+    .unwrap();
+
+    let python = temp.path().join("apps/python");
+    std::fs::create_dir_all(python.join("src")).unwrap();
+    std::fs::write(
+        python.join("pyproject.toml"),
+        "[project]\nname='demo'\ndependencies=['fastapi']\n",
+    )
+    .unwrap();
+    std::fs::write(python.join("src/app.py"), "from fastapi import FastAPI\napp = FastAPI()\n").unwrap();
+
+    let go = temp.path().join("apps/go");
+    std::fs::create_dir_all(&go).unwrap();
+    std::fs::write(go.join("go.mod"), "module example.com/demo\n").unwrap();
+    std::fs::write(go.join("main.go"), "package main\nfunc main() {}\n").unwrap();
+
+    let ruby = temp.path().join("apps/ruby");
+    std::fs::create_dir_all(ruby.join("lib")).unwrap();
+    std::fs::write(ruby.join("Gemfile"), "source 'https://rubygems.org'\ngem 'sinatra'\n").unwrap();
+    std::fs::write(ruby.join("app.rb"), "require 'sinatra'\nget('/') { 'ok' }\n").unwrap();
+
+    let java = temp.path().join("apps/java");
+    std::fs::create_dir_all(java.join("src/main/java/com/example/demo")).unwrap();
+    std::fs::write(java.join("build.gradle"), "plugins { id 'java-library' }\n").unwrap();
+    std::fs::write(
+        java.join("src/main/java/com/example/demo/Application.java"),
+        "package com.example.demo;\npublic class Application {}\n",
+    )
+    .unwrap();
+
+    let kotlin = temp.path().join("apps/kotlin");
+    std::fs::create_dir_all(kotlin.join("src/main/kotlin/com/example/demo")).unwrap();
+    std::fs::write(
+        kotlin.join("build.gradle.kts"),
+        "plugins { kotlin(\"jvm\") version \"2.4.0\" }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        kotlin.join("src/main/kotlin/com/example/demo/Application.kt"),
+        "package com.example.demo\nclass Application\n",
+    )
+    .unwrap();
+
+    let output = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(output.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let sdk_candidates = json["sdk_conversion"]["candidates"].as_array().unwrap();
+
+    let by_path = |path: &str| {
+        sdk_candidates
+            .iter()
+            .find(|candidate| candidate["path"] == path)
+            .unwrap()
+    };
+
+    assert!(by_path("apps/node")["wrapper_preview"].as_str().unwrap().contains("@ax-hub/sdk"));
+    assert!(!by_path("apps/node")["wrapper_preview"].as_str().unwrap().contains("ultra_secret_value_123"));
+    assert!(by_path("apps/python")["wrapper_preview"].as_str().unwrap().contains("from axhub_sdk import AxHubClient, TokenType"));
+    assert!(by_path("apps/go")["wrapper_preview"].as_str().unwrap().contains("package main"));
+    assert!(by_path("apps/ruby")["wrapper_preview"].as_str().unwrap().contains("require 'axhub_sdk'"));
+    assert!(by_path("apps/java")["wrapper_preview"].as_str().unwrap().contains("package ai.axhub.sdk;"));
+    assert!(by_path("apps/kotlin")["wrapper_preview"].as_str().unwrap().contains("package ai.axhub.sdk"));
 }

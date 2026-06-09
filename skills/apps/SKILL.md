@@ -131,7 +131,7 @@ axhub apps members "$APP" --page "$PAGE" --per-page "$PER_PAGE" --json
 3. After approval, run one of the current CLI contracts. Use one mutation command per Bash tool call; do not batch another destructive axhub command into the same Bash input:
 
    ```bash
-   axhub apps create --from-file axhub.yaml --json
+   axhub apps create --from-file app-create.json --json
    axhub apps create --interactive --json
    axhub apps create --name "$NAME" --slug "$SLUG" --json
    ```
