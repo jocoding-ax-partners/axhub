@@ -112,7 +112,7 @@ To start an axhub app:
    비대화형/D1 guard 에서는 safe default `새로 시작` 으로 진행해요. `이어서 하기` 를 고르면 helper 의 route enum 과 `args.*_command` 를 그대로 써요. SKILL 이 raw id 를 다시 조합하지 않아요:
 
    - `watch_status` → helper 의 `args.status_command` 를 실행해요. 현재 command shape 은 `axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json` 예요.
-   - `resume_last` → helper 의 `args.resume_command` 를 실행해요. 현재 command shape 은 `axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json` 예요.
+   - `resume_last` → helper 의 `args.resume_command` 를 실행해요. 현재 command shape 은 `axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json` 예요.
      - 만약 resume 명령이 `no pending github device flow` 로 실패하면 바로 사용자에게 막혔다고 하지 않아요. 먼저 `axhub github accounts list --json` 를 읽기 전용으로 재조회하고, 선택한 GitHub owner 의 installation 이 `installed=true` 또는 `installation_id` 로 확인될 때만 같은 template/name/slug/subdomain/github-owner/repo-name/idempotency-key 로 `--resume-last` 없는 `bootstrap --execute --watch --watch-timeout 9m` 복구를 한 번 실행해요. 이 분기는 이미 승인된 device flow 가 CLI cache 에 남지 않았지만 GitHub App 설치/연결은 완료된 Claude Desktop 상태를 복구하기 위한 것이며, `device_code_pending` 이거나 owner 설치 확인이 안 되면 fresh execute 를 하지 않아요.
    - 상태가 깨졌거나 오래돼 helper 가 `fresh` 를 주면 자연어로 "이전 기록을 찾지 못해서 새로 시작할게요." 라고 말하고 Step 1 로 가요.
 
@@ -124,10 +124,78 @@ To start an axhub app:
 
    실패하면 "CLI 설치가 필요해요. 설치 도와줘라고 말해 주세요"처럼 자연어로 짧게 안내하고 중단해요.
 
+**Tenant 선택 (axhub-tenant-picker:L1).** axhub-helpers `tenant-resolve` 가 캐시(`.axhub/state/tenant.json`)/tenants list/preflight 로 tenant 를 결정해요. fence 간 env 는 휘발하므로 결정된 tenant 를 캐시에 영속화해서 다음 fence 가 re-read 해요. 명시 `AXHUB_TENANT` override 가 있으면 helper 를 건너뛰어요.
+
+```bash
+# axhub-tenant-picker:L1 — thin resolver (위험 로직은 Rust axhub-helpers tenant-resolve 가 소유)
+TENANT_CACHE=".axhub/state/tenant.json"
+NEEDS_PICK="false"
+CANDIDATES_JSON="[]"
+# Precedence 1: 명시 AXHUB_TENANT env override → helper 호출 skip
+if [ -z "${AXHUB_TENANT:-}" ]; then
+  HELPER="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/axhub-helpers}"
+  if [ -n "$HELPER" ] && [ ! -x "$HELPER" ] && [ -x "${HELPER}.exe" ]; then HELPER="${HELPER}.exe"; fi
+  [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(command -v axhub-helpers 2>/dev/null || command -v axhub-helpers.exe 2>/dev/null)"
+  [ -n "$HELPER" ] && [ -x "$HELPER" ] || HELPER="$(for c in "$HOME"/.claude/plugins/cache/*/*/bin/axhub-helpers* "$HOME"/.claude/plugins/cache/*/*/*/bin/axhub-helpers*; do [ -x "$c" ] && printf '%s\n' "$c"; done | awk -F/ '{v=$(NF-2);split(v,a,".");printf "%010d%010d%010d\t%s\n",a[1]+0,a[2]+0,a[3]+0,$0}' | sort | tail -n1 | cut -f2-)"
+  TENANT_JSON=$([ -n "$HELPER" ] && "$HELPER" tenant-resolve --json 2>/dev/null)
+  [ -n "$TENANT_JSON" ] || TENANT_JSON='{}'
+  AXHUB_TENANT=$(printf '%s' "$TENANT_JSON" | jq -r '.tenant // empty' 2>/dev/null || true)
+  _NEEDS_PICK_RAW=$(printf '%s' "$TENANT_JSON" | jq -r '.needs_pick // false' 2>/dev/null || echo false)
+  # no-loop: needs_pick 는 비어있지 않은 resolve 에서만 true; 빈/부재 helper → false (재프롬프트 안 함)
+  if [ "$_NEEDS_PICK_RAW" = "true" ]; then
+    CANDIDATES_JSON=$(printf '%s' "$TENANT_JSON" | jq -c '.candidates // []' 2>/dev/null || echo '[]')
+    if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]; then
+      # non-TTY: active fallback + 경고 (R4 fail-wrong guard — bash 위치 필수)
+      AXHUB_TENANT=$(printf '%s' "$CANDIDATES_JSON" | jq -r '.[0].id // .[0].slug // empty' 2>/dev/null || true)
+      echo "여러 tenant 에 속해 있는데 picker 를 건너뛰고 기본 tenant($AXHUB_TENANT)로 진행해요"
+    else
+      NEEDS_PICK="true"
+    fi
+  fi
+fi
+# 결정된 tenant 영속화 (fence 간 source of truth) — needs_pick 대기 중엔 미기록(L2 가 기록)
+if [ -n "${AXHUB_TENANT:-}" ] && [ "$NEEDS_PICK" = "false" ]; then
+  mkdir -p "$(dirname "$TENANT_CACHE")"
+  printf '{"tenant":"%s","source":"resolved","ts":%s}\n' "$AXHUB_TENANT" "$(date +%s 2>/dev/null || echo '0')" > "$TENANT_CACHE"
+fi
+export AXHUB_TENANT
+export NEEDS_PICK
+export CANDIDATES_JSON
+```
+
+`AXHUB_TENANT` 가 비어 있으면 tenant 를 확정할 수 없어요 — preflight `auth_ok` 와 `current_team_id` 를 먼저 확인하고 `다시 로그인해줘` 라고 안내해요. 구버전·부재 helper 면 빈 값 → active tenant 로 진행하고, picker 는 helper 업데이트 후 돌아와요.
+
+**Tenant picker (axhub-tenant-picker:L2).** `NEEDS_PICK=true` 이고 대화형 TTY 일 때만 실행해요. `CANDIDATES_JSON` 에서 후보 목록을 읽어 AskUserQuestion 으로 사용자에게 선택을 요청해요. 선택 결과를 `.axhub/state/tenant.json` 에 `{tenant, source:"picker", ts}` 형태로 기록해요 (이후 fence 가 re-read 해서 상속).
+
+```typescript
+if (NEEDS_PICK === "true") {
+  const candidates = JSON.parse(CANDIDATES_JSON);
+  AskUserQuestion({
+    questions: [{
+      question: "어떤 tenant 로 진행할까요?",
+      header: "Tenant",
+      multiSelect: false,
+      options: candidates.map((t: { id?: string; slug?: string; name?: string }) => ({
+        label: t.name ?? t.slug ?? t.id ?? "unknown",
+        description: `ID: ${t.id ?? t.slug}`,
+      })),
+    }],
+  });
+  // 선택된 tenant ID 를 .axhub/state/tenant.json 에 write-back
+  // mkdir -p .axhub/state && echo '{"tenant":"<선택값>","source":"picker","ts":<epoch>}' > .axhub/state/tenant.json
+}
+```
+
+AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 확정하고 `.axhub/state/tenant.json` 에 `{"tenant": "<id>", "source": "picker", "ts": <epoch>}` 를 기록해요. 이후 fence 가 이 파일을 re-read 해서 같은 tenant 를 재사용해요.
+
+**Non-interactive AskUserQuestion guard (D1):** `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 환경에서는 L2 AskUserQuestion 을 건너뛰어요 — L1 블록이 이미 active fallback + 경고를 처리했어요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 의 `picker` 채널 참조.
+
 2. **Backend template registry 를 읽어요.**
 
    ```bash
-   axhub apps templates list --json
+   # tenant fence re-read — fence 간 env 휘발, .axhub/state/tenant.json 재읽기 (L1 이 영속화한 값)
+   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
+   axhub apps templates list --tenant "$AXHUB_TENANT" --json
    ```
 
    응답 envelope shape:
@@ -244,7 +312,9 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 5. **Bootstrap dry-run 으로 미리보기를 만들어요.**
 
    ```bash
-   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --dry-run --json
+   # tenant fence re-read — fence 간 env 휘발, .axhub/state/tenant.json 재읽기 (L1 이 영속화한 값)
+   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --dry-run --json
    ```
 
    `$GITHUB_OWNER` 가 Step 2.5 에서 정해졌을 때만 `--github-owner` 를 붙여요 (설치 0개라 비어 있으면 생략). 응답 envelope 의 미리보기 카드 (template / slug / subdomain / repo_name / private/public / installation_id 후보) 를 사용자에게 한국어 한 줄씩 보여줘요. raw JSON dump 금지. `--dry-run` default 가 true 라 명시적으로 안 적어도 같지만, 가독성을 위해 명시해요.
@@ -265,8 +335,10 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    확인 받으면 saga 를 실행해요. 실행 직전 `.axhub/init-resume.json` 에 template/app_name/slug/subdomain/idempotency_key 를 먼저 저장해요:
 
    ```bash
+   # tenant fence re-read — fence 간 env 휘발, .axhub/state/tenant.json 재읽기 (L1 이 영속화한 값)
+   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
    axhub-helpers init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --json
-   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
    ```
 
    Step 2.5 에서 owner 를 정했으면 `--github-owner "$GITHUB_OWNER"` 를 그대로 붙여요 (설치 여러 개일 때 `ambiguous_installation` 을 막아요). 비어 있으면 생략하고 device flow 에 맡겨요.
@@ -274,9 +346,11 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    **에이전트도 terminal 까지 폴링해요 (axhub-cli 0.15.3+).** bare `--watch` 는 비-TTY/에이전트 컨텍스트에서 단일 스냅샷으로 degrade 하지만, `--watch-timeout` (또는 `--watch-interval`) 을 붙이면 explicit streaming override 라 CLI 가 degrade 하지 않고 terminal(saga 완료 / 실패) 까지 직접 폴링해요. 그래서 saga 가 끝까지 진행돼 `repo_full_name` 을 받을 수 있어요 (snapshot 으로 끊기지 않아요). `--no-input` 같은 플래그는 따로 안 붙여도 돼요 (비-TTY 면 CLI 가 자동 감지). 이 bash 는 Bash tool `timeout: 570000` (9.5분) 으로 호출하고, 9분 초과 시 CLI Timeout + resume hint 를 받으면 "아직 만드는 중이에요, 계속 확인할게요" 후 아래 bootstrap-status 를 한 번 더 호출해요:
 
    ```bash
+   # tenant fence re-read — fence 간 env 휘발, .axhub/state/tenant.json 재읽기 (L1 이 영속화한 값)
+   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
    BOOTSTRAP_ID=$(echo "$ACCEPTED_JSON" | jq -r '.data.bootstrap_id')
    axhub-helpers init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --json
-   axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json
+   axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --watch --watch-timeout 9m --json
    ```
 
    진행 중 매 ~30s 마다 한국어 한 줄로 narrate 해요 — "앱 만들고 있어요" / "GitHub repo 만들고 있어요" / "첫 배포 중이에요. 거의 다 왔어요". 60s 이상 같은 stage 머무르면 "조용하네요, 계속 기다리고 있어요" 한 줄을 추가해요.
@@ -300,14 +374,18 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    `verification_uri_complete` 가 있으면 코드가 자동 입력되니 2번을 생략해도 돼요. 그 다음은 컨텍스트에 따라 갈라져요 (axhub-cli 0.15.3+): **대화형 TTY** 면 saga 가 polling 으로 GitHub App install 완료를 기다리니까 SKILL 은 stdout 의 다음 stage event (예: `app_created`, `repo_created`) 가 도착할 때까지 narrate 만 계속해요. **에이전트 / 비-TTY 컨텍스트** 면 CLI 가 `device_code_issued` emit 직후 fast-exit 하므로, challenge 를 보여준 뒤 **사용자에게 명령을 치라고 떠넘기지 말고** 브라우저 승인을 기다려요: "브라우저에서 승인한 다음 '승인했어' 라고 알려주세요. 제가 이어서 마무리할게요." 사용자가 승인 신호("승인했어" / "연결했어" / "됐어")를 주면 에이전트가 캐시된 device flow 를 `--resume-last` 로 직접 이어받아요 (resume 명령을 사용자에게 출력하지 말아요):
 
    ```bash
-   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+   # tenant fence re-read — fence 간 env 휘발, .axhub/state/tenant.json 재읽기 (L1 이 영속화한 값)
+   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
    ```
 
    이 resume 호출은 캐시된 device code 로 token 교환을 마치고 같은 saga 를 terminal 까지 이어가요 (`--watch` 는 인증 완료 후 saga 폴링용이라 fast-exit 와 충돌하지 않아요). **outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 말아요 — 새 code 를 발급해 이미 승인한 code 를 버려요.** resume 응답이 아직 `device_code_pending` (`DEVICE_FLOW_PENDING`) 이면 "브라우저 승인이 아직 안 끝난 것 같아요. 승인 후 다시 알려주세요" 후 승인 신호를 받으면 한 번 더 resume 해요. resume 응답이 `no pending github device flow` 이면 Claude Desktop 이 이미 device approval 을 끝냈지만 CLI cache 가 비어 있는지 확인해야 해요: `axhub github accounts list --json` 로 선택한 owner 설치가 확인될 때만 같은 idempotency key 로 아래 복구 명령을 한 번 실행해요. owner 설치 확인이 안 되면 fresh execute 를 하지 말고 새 device flow 안내로 돌아가요.
 
    ```bash
+   # tenant fence re-read — fence 간 env 휘발, .axhub/state/tenant.json 재읽기 (L1 이 영속화한 값)
+   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
    axhub github accounts list --json
-   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --github-owner "$GITHUB_OWNER" --repo-name "$APP_SLUG" --repo-private --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+   axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --github-owner "$GITHUB_OWNER" --repo-name "$APP_SLUG" --repo-private --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
    ```
 
    device code 가 만료(약 15분)됐으면 이 Step 의 fresh `--execute` 부터 새 challenge 를 발급해요. backend 가 `github_relogin_required` (428) 를 주면 user GitHub 토큰 만료라, fresh `--execute` 로 새 device flow 를 발급해 같은 surface → resume 흐름으로 복구해요. 설계 + resume 계약은 `../github/SKILL.md` 의 OAuth device flow 섹션과 `docs/superpowers/specs/2026-05-25-github-device-flow-surface-design.md` 를 참조해요.

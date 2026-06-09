@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { CANONICAL_TENANT_PICKER_INLINE } from "../scripts/tenant-picker-block";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 
@@ -50,8 +51,9 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain('axhub apps create --name "$APP_NAME" --slug "$APP_SLUG" --deploy-method "$DEPLOY_METHOD" --json');
     expect(skill).toContain("axhub apps create --from-file app-create.json --json");
     expect(skill).not.toContain("axhub apps create --from-file axhub.yaml --json");
-    expect(skill).toContain('axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --execute --json');
-    expect(skill).toContain('axhub deploy create --app "$APP_ID" --commit "$COMMIT_SHA" --execute --json');
+    // 메뉴 fence (CLI boundary contract) 이므로 --tenant 는 inline cache 치환식으로 thread 해요.
+    expect(skill).toContain(`axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --tenant "${CANONICAL_TENANT_PICKER_INLINE}" --execute --json`);
+    expect(skill).toContain(`axhub deploy create --app "$APP_ID" --commit "$COMMIT_SHA" --execute --tenant "${CANONICAL_TENANT_PICKER_INLINE}" --json`);
     expect(skill).toContain("raw backend endpoint 를 curl 하지");
     expect(skill).not.toContain("/api/v1/apps/detect");
   });

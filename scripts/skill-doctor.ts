@@ -99,6 +99,27 @@ const loadDependencyAllowlist = (): Allowlist => {
 
 const DEP_EXEC_ALLOWLIST = loadDependencyAllowlist();
 
+// A4 — tenant-picker gated check manifest.
+// Required only for skills in scripts/tenant-target-skills.json.
+// Non-listed ~45 skills are exempt → day-1 redball guard.
+const TENANT_TARGET_PATH = join(REPO_ROOT, "scripts/tenant-target-skills.json");
+
+interface TenantTargetManifest {
+  tenant_picker_targets: string[];
+}
+
+const loadTenantTargets = (): Set<string> => {
+  try {
+    const raw = readFileSync(TENANT_TARGET_PATH, "utf8");
+    const manifest = JSON.parse(raw) as TenantTargetManifest;
+    return new Set(manifest.tenant_picker_targets ?? []);
+  } catch {
+    return new Set();
+  }
+};
+
+const TENANT_TARGETS = loadTenantTargets();
+
 const VALID_MODELS = ["haiku", "sonnet", "opus"] as const;
 
 // FU-3 — extracted to scripts/skill-doctor-step-numbering.ts so tests can import
@@ -280,6 +301,24 @@ const inspectSkill = (slug: string): SkillCheck => {
           reason: `duplicate top-level step numbers in ## Workflow: ${collisions.join(", ")} (FU-3 — F′ regression guard; sub-steps like 3.5 and ### subsection numbering are exempt)`,
         };
       })(),
+      // A4 — tenant-picker L1 gated check (required only for manifest-listed skills)
+      {
+        name: "tenant-picker L1",
+        required: TENANT_TARGETS.has(slug),
+        present: /axhub-tenant-picker:L1/.test(content) && /\.axhub\/state\/tenant\.json/.test(content),
+        reason: TENANT_TARGETS.has(slug)
+          ? "tenant-target-skills.json 등재 skill — L1 sentinel(axhub-tenant-picker:L1) + .axhub/state/tenant.json marker 필수"
+          : "tenant-target-skills.json 미등재 → exempt",
+      },
+      // A4 — tenant-picker L2 gated check (required only for manifest-listed skills)
+      {
+        name: "tenant-picker L2",
+        required: TENANT_TARGETS.has(slug),
+        present: /axhub-tenant-picker:L2/.test(content) && /\.axhub\/state\/tenant\.json/.test(content),
+        reason: TENANT_TARGETS.has(slug)
+          ? "tenant-target-skills.json 등재 skill — L2 sentinel(axhub-tenant-picker:L2) + .axhub/state/tenant.json write-back marker 필수"
+          : "tenant-target-skills.json 미등재 → exempt",
+      },
     ],
   };
 };

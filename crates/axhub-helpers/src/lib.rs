@@ -55,6 +55,7 @@ pub mod statusline;
 pub mod sync;
 pub mod tdd_inject;
 pub mod telemetry;
+pub mod tenant;
 pub mod test_classifier;
 pub mod trace_helper;
 pub mod verify_deploy_artifact;

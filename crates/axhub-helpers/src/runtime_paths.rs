@@ -72,8 +72,9 @@ pub fn plugin_latest_cache_path() -> Option<PathBuf> {
     cache_base_dir().map(|base| base.join("axhub-plugin").join("plugin-latest.json"))
 }
 
-/// Per-version drift-nudge marker. Presence means the update nudge for `version`
-/// already fired (once-per-version dedup).
+/// Per-version drift-nudge snooze marker. Stores the session id + timestamp of
+/// the last nudge for `version`, so the nudge snoozes within a session yet
+/// re-surfaces in a new session or after the snooze window (see plugin_update).
 pub fn plugin_drift_nudge_marker_path(version: &str) -> Option<PathBuf> {
     state_dir().map(|dir| dir.join(format!(".plugin-drift-nudged-v{version}")))
 }
@@ -92,8 +93,9 @@ pub fn cli_latest_cache_path() -> Option<PathBuf> {
     cache_base_dir().map(|base| base.join("axhub-plugin").join("cli-latest.json"))
 }
 
-/// Per-version CLI-drift-nudge marker. Presence means the CLI update nudge for
-/// `version` already fired (once-per-version dedup).
+/// Per-version CLI-drift-nudge snooze marker. Stores the session id + timestamp
+/// of the last nudge for `version`, so the nudge snoozes within a session yet
+/// re-surfaces in a new session or after the window (see cli_drift).
 pub fn cli_drift_nudge_marker_path(version: &str) -> Option<PathBuf> {
     state_dir().map(|dir| dir.join(format!(".cli-drift-nudged-v{version}")))
 }

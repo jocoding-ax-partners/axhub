@@ -27,6 +27,10 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    // session-start's drift-cache warm only fires under CLAUDE_PLUGIN_ROOT (real
+    // plugin session). Strip it so the suite never spawns a network fetch even if
+    // a dev runs `cargo test` with it exported.
+    command.env_remove("CLAUDE_PLUGIN_ROOT");
     let needs_prompt_route_sandbox = args.contains(&"prompt-route")
         && !envs
             .iter()
@@ -6581,4 +6585,167 @@ fn cli_migrate_stage_write_seals_with_planned_wave_present() {
     );
     let sealed_json: serde_json::Value = serde_json::from_slice(&sealed.stdout).unwrap();
     assert_eq!(sealed_json["approval_state"], "pending_approval");
+}
+// ── tenant-resolve (#189) ────────────────────────────────────────────────────
+
+#[cfg(unix)]
+fn fake_tenants_axhub(temp: &tempfile::TempDir, tenants_json: &str) -> std::path::PathBuf {
+    let axhub = temp.path().join("axhub-tenants");
+    std::fs::write(
+        &axhub,
+        format!(
+            r#"#!/bin/sh
+if [ "$1" = "--version" ]; then echo "axhub 0.17.3"; exit 0; fi
+if [ "$1 $2 $3" = "tenants list --json" ]; then
+  cat <<'AXHUB_TENANTS'
+{tenants_json}
+AXHUB_TENANTS
+  exit 0
+fi
+if [ "$1 $2 $3" = "auth status --json" ]; then
+  echo '{{"current_team_id":"team-from-preflight"}}'
+  exit 0
+fi
+exit 64
+"#,
+        ),
+    )
+    .unwrap();
+    let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
+}
+
+#[cfg(unix)]
+fn fake_slow_tenants_axhub(temp: &tempfile::TempDir) -> std::path::PathBuf {
+    let axhub = temp.path().join("axhub-slow-tenants");
+    std::fs::write(
+        &axhub,
+        r#"#!/bin/sh
+if [ "$1 $2 $3" = "tenants list --json" ]; then sleep 30; exit 0; fi
+exit 64
+"#,
+    )
+    .unwrap();
+    let mut perms = std::fs::metadata(&axhub).unwrap().permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&axhub, perms).unwrap();
+    axhub
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_tenant_resolve_count_one_auto_picks() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_tenants_axhub(&temp, r#"[{"id":"t-alpha","slug":"alpha"}]"#);
+    let cwd = tempfile::tempdir().unwrap();
+    let output = run_in_dir_env(
+        &["tenant-resolve", "--json"],
+        cwd.path(),
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["tenant"], "t-alpha");
+    assert_eq!(json["source"], "auto");
+    assert_eq!(json["needs_pick"], false);
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_tenant_resolve_count_many_needs_pick() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_tenants_axhub(
+        &temp,
+        r#"[{"id":"t-a","slug":"a"},{"id":"t-b","slug":"b"}]"#,
+    );
+    let cwd = tempfile::tempdir().unwrap();
+    let output = run_in_dir_env(
+        &["tenant-resolve", "--json"],
+        cwd.path(),
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["needs_pick"], true);
+    assert_eq!(json["tenant"], "");
+    assert_eq!(json["candidates"].as_array().unwrap().len(), 2);
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_tenant_resolve_missing_axhub_fails_open() {
+    let cwd = tempfile::tempdir().unwrap();
+    let output = run_in_dir_env(
+        &["tenant-resolve", "--json"],
+        cwd.path(),
+        &[("AXHUB_BIN", "/nonexistent/axhub-binary-xyz")],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["tenant"], "");
+    assert_eq!(json["needs_pick"], false);
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_tenant_resolve_slow_axhub_times_out_to_empty() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_slow_tenants_axhub(&temp);
+    let cwd = tempfile::tempdir().unwrap();
+    let output = run_in_dir_env(
+        &["tenant-resolve", "--json"],
+        cwd.path(),
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["tenant"], "");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_tenant_resolve_count_zero_uses_preflight_fallback() {
+    let temp = tempfile::tempdir().unwrap();
+    let axhub = fake_tenants_axhub(&temp, "[]");
+    let cwd = tempfile::tempdir().unwrap();
+    let output = run_in_dir_env(
+        &["tenant-resolve", "--json"],
+        cwd.path(),
+        &[("AXHUB_BIN", axhub.to_str().unwrap())],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["tenant"], "team-from-preflight");
+    assert_eq!(json["source"], "preflight");
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_tenant_resolve_cache_hit_short_circuits_without_axhub() {
+    let cwd = tempfile::tempdir().unwrap();
+    let state_dir = cwd.path().join(".axhub/state");
+    std::fs::create_dir_all(&state_dir).unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    std::fs::write(
+        state_dir.join("tenant.json"),
+        format!(r#"{{"tenant":"cached-x","source":"picker","ts":{now}}}"#),
+    )
+    .unwrap();
+    // A fresh cache hit must short-circuit BEFORE any axhub call, so a
+    // nonexistent AXHUB_BIN must not matter.
+    let output = run_in_dir_env(
+        &["tenant-resolve", "--json"],
+        cwd.path(),
+        &[("AXHUB_BIN", "/nonexistent/axhub-binary-xyz")],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let json = stdout_json(&output);
+    assert_eq!(json["tenant"], "cached-x");
+    assert_eq!(json["source"], "picker");
+    assert_eq!(json["needs_pick"], false);
 }

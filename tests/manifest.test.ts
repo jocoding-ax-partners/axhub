@@ -8,6 +8,7 @@ import { describe, expect, test, beforeAll } from "bun:test";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { CANONICAL_TENANT_PICKER_INLINE } from "../scripts/tenant-picker-block";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 
@@ -189,10 +190,16 @@ describe("marketplace.json schema", () => {
     expect(marketplaceJson.plugins.length).toBeGreaterThan(0);
   });
 
-  test("upgrade skill reads marketplace version fallback", () => {
+  test("upgrade skill uses live plugin-update-check, not stale marketplace fallback", () => {
+    // #185 redesigned the skill: remote-latest comes from a live `plugin-update-check`
+    // GitHub fetch, and the bundled marketplace.json is stale-by-design and must NEVER
+    // be the remote-latest source. The old `(.latest_version // .version // empty)` jq
+    // fallback (over a phantom field) is the abandoned anti-pattern that bug fixed.
     const marketplaceAxhub = marketplaceJson.plugins.find((p) => p.name === "axhub")!;
     expect(marketplaceAxhub.version).toBeTypeOf("string");
-    expect(upgradeSkill).toContain("(.latest_version // .version // empty)");
+    expect(upgradeSkill).toContain("plugin-update-check");
+    expect(upgradeSkill).toContain("stale-by-design");
+    expect(upgradeSkill).not.toContain("(.latest_version // .version // empty)");
   });
 
   test("upgrade helper fallback is cache-name agnostic", () => {
@@ -1293,7 +1300,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(appLifecycleContent).toContain("After it succeeds, say exactly one short result sentence");
         expect(appLifecycleContent).toContain('axhub apps suspend "$APP_ARG" --execute --json >/dev/null');
     expect(appLifecycleContent).toContain('axhub apps resume "$APP_ARG" --execute --json >/dev/null');
-    expect(appLifecycleContent).toContain('axhub apps fork "$SOURCE_APP" --slug "$NEW_SLUG" --subdomain "$NEW_SUBDOMAIN" --name "$NAME" --tenant "$TENANT" --execute --json >/dev/null');
+    expect(appLifecycleContent).toContain(`axhub apps fork "$SOURCE_APP" --slug "$NEW_SLUG" --subdomain "$NEW_SUBDOMAIN" --name "$NAME" --tenant "${CANONICAL_TENANT_PICKER_INLINE}" --execute --json >/dev/null`);
     expect(appLifecycleContent).toContain("raw JSON stdout");
     expect(appLifecycleContent).toContain("비공개 (private)");
     expect(appLifecycleContent).toContain("[DESTRUCTIVE] about to run");

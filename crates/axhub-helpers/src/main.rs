@@ -38,6 +38,7 @@ use axhub_helpers::sync::run_sync;
 use axhub_helpers::telemetry::{
     append_phase_marker_to_file, emit_deploy_complete, emit_meta_envelope,
 };
+use axhub_helpers::tenant::run_tenant_resolve;
 use axhub_helpers::{commit_gate, hook_output, quality_state};
 use chrono::Utc;
 use serde_json::{json, Map, Value};
@@ -45,7 +46,7 @@ use serde_json::{json, Map, Value};
 mod cli;
 
 pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
-pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  prompt-route\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  verify-deploy-artifact\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--persist-planning] [--json]\n  migrate-stage-write --run-json <path> --stage <name> --markdown-file <file> [--run-state <state>] [--approval-state <state>] [--json]\n  migrate-wave-plan --run-json <path> --wave-id <id> --stage-scope <stage> [--participant <app_key>]... [--depends-on <wave_id>]... [--artifact <path>]... [--write-target <target>]... [--independence-proof <text>]... [--state <planned|running|complete>] [--json]\n  migrate-approve --run-json <path> --approved-by <name> [--approval-note <text>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  prompt-route\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  verify-deploy-artifact\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  tenant-resolve [--json]\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--persist-planning] [--json]\n  migrate-stage-write --run-json <path> --stage <name> --markdown-file <file> [--run-state <state>] [--approval-state <state>] [--json]\n  migrate-wave-plan --run-json <path> --wave-id <id> --stage-scope <stage> [--participant <app_key>]... [--depends-on <wave_id>]... [--artifact <path>]... [--write-target <target>]... [--independence-proof <text>]... [--state <planned|running|complete>] [--json]\n  migrate-approve --run-json <path> --approved-by <name> [--approval-note <text>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -142,6 +143,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "scaffold-detect" => run_scaffold_detect(&rest),
         "scaffold-dev" => run_scaffold_dev(&rest),
         "init-resume" => run_init_resume(&rest),
+        "tenant-resolve" => run_tenant_resolve(&rest),
         "state-show" => cmd_state_show(&rest),
         "state-update" => cmd_state_update(&rest),
         "commit-gate" => cmd_commit_gate(),
@@ -1526,6 +1528,13 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     let raw = read_stdin()?;
     let payload: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
     let prompt = payload.get("prompt").and_then(Value::as_str).unwrap_or("");
+    // Stable per-session id from the UserPromptSubmit payload (snake_case, always
+    // present per the hooks input schema). Empty when absent → the drift nudge
+    // degrades to a time-only snooze. Drives the per-session re-surface.
+    let session_id = payload
+        .get("session_id")
+        .and_then(Value::as_str)
+        .unwrap_or("");
 
     // AC-12 / hook-integration: the shared routing decision, computed once here
     // from pure reads (marker walk-up + token-file stat + slash detection). Both
@@ -1731,7 +1740,7 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     // fires at most once per latest version, and self-suppresses via the per-version
     // marker + opt-out. Fail-open — `plugin_drift_context` never errors.
     let plugin_drift_system =
-        if let Some(nudge) = axhub_helpers::plugin_update::plugin_drift_nudge() {
+        if let Some(nudge) = axhub_helpers::plugin_update::plugin_drift_nudge(session_id) {
             let system = nudge.system_message;
             context.push_str("\n\n");
             context.push_str(&nudge.additional_context);
@@ -1746,7 +1755,7 @@ pub(crate) fn cmd_prompt_route() -> anyhow::Result<i32> {
     // reactive update-summary path owns that turn). Fail-open.
     let cli_drift_system = if plugin_drift_system.is_none() && !update_check_intent_present(prompt)
     {
-        if let Some(nudge) = axhub_helpers::cli_drift::cli_drift_nudge() {
+        if let Some(nudge) = axhub_helpers::cli_drift::cli_drift_nudge(session_id) {
             context.push_str("\n\n");
             context.push_str(&nudge.additional_context);
             Some(nudge.system_message)
@@ -2414,11 +2423,62 @@ fn cmd_routing_dashboard(args: &[String]) -> anyhow::Result<i32> {
 
 const WELCOME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Warm the plugin + CLI version-drift caches in the background so the user's
+/// first prompt this session can already see a freshly-published release —
+/// without adding any session-start latency.
+///
+/// This replaces the detached `nohup …-fetch-bg &` spawns the shell wrappers
+/// used to do, consolidating the trigger into one cross-platform Rust spot (no
+/// `.ps1`/`.sh` fork to drift). The fetch itself stays detached: session-start
+/// returns immediately while a child process warms the cache. A human takes
+/// more than a second to type their first message, so the sub-second fetch
+/// lands before the first prompt-route turn and the turn-1 nudge still fires —
+/// at zero startup cost. A short cache TTL (`FETCH_TTL_SECS`) means a restart
+/// re-fetches almost immediately, eliminating the detection lag a long TTL caused.
+///
+/// Fully fail-open: only a channel whose cache is stale/absent (`needs_refresh`)
+/// is spawned, any spawn error is swallowed, and the next session retries.
+fn warm_drift_caches() {
+    // Only warm inside a real Claude Code plugin session. The session-start
+    // shell wrapper hard-requires CLAUDE_PLUGIN_ROOT (exported by Claude Code),
+    // so its presence marks a live hook invocation. Direct `cargo test`
+    // invocations of `session-start` don't set it → the test suite never spawns
+    // a network fetch.
+    if std::env::var_os("CLAUDE_PLUGIN_ROOT").is_none() {
+        return;
+    }
+    // Same gate the legacy shell fetch used: never fetch in CI / non-interactive.
+    if std::env::var_os("CI").is_some() || std::env::var_os("CLAUDE_NON_INTERACTIVE").is_some() {
+        return;
+    }
+    let Ok(exe) = std::env::current_exe() else {
+        return; // can't locate ourselves → skip warming, never block
+    };
+    let exe = exe.to_string_lossy().into_owned();
+
+    if axhub_helpers::plugin_update::needs_refresh() {
+        let _ = axhub_helpers::spawn::spawn_detached_with_fallback(&[
+            exe.as_str(),
+            "plugin-latest-fetch-bg",
+        ]);
+    }
+    if axhub_helpers::cli_drift::needs_refresh() {
+        let _ = axhub_helpers::spawn::spawn_detached_with_fallback(&[
+            exe.as_str(),
+            "cli-latest-fetch-bg",
+        ]);
+    }
+}
+
 pub(crate) fn cmd_session_start() -> anyhow::Result<i32> {
     if hook_safety::is_hook_disabled("session-start") {
         out_json(json!({}));
         return Ok(0);
     }
+    // Warm the version-drift caches in the background (detached, fail-open) so the
+    // user's first prompt this session can see a freshly-published plugin/CLI
+    // release — without adding any session-start latency. See fn doc.
+    warm_drift_caches();
     write_session_start_bundle_best_effort();
 
     let mut lines: Vec<String> = vec![

@@ -10,18 +10,29 @@
 //!     [net fail] → skip          [malformed] → skip   [io fail] → skip
 //!
 //!   prompt-route  (UserPromptSubmit — the reliable steering surface; D4)
-//!     read cache ──▶ semver vs CARGO_PKG_VERSION ──▶ Some(nudge) + per-version marker
+//!     read cache ──▶ semver vs CARGO_PKG_VERSION ──▶ Some(nudge) + snooze marker
 //!        │              │                              │
 //!        ▼              ▼                              ▼
-//!     [absent/stale] [<= current]                 [marker/optout/non-interactive] → None
+//!     [absent/stale] [<= current]                 [fresh same-session snooze /
+//!                                                   optout / non-interactive] → None
 //! ```
 //!
 //! D4: the nudge rides **UserPromptSubmit** `additionalContext`, NOT SessionStart.
 //! SessionStart `additionalContext` is advisory and arrives before any user turn,
 //! so it cannot reliably drive an AskUserQuestion. UserPromptSubmit fires with a
 //! real turn (the surface `prompt-route` already uses to steer the agent).
+//!
+//! Re-surface model (not once-per-version): after firing, the per-version marker
+//! records the current `session_id` + timestamp. The nudge stays suppressed only
+//! within the SAME session for `NUDGE_SNOOZE_SECS`; a NEW session (session-id
+//! mismatch) or an expired snooze re-surfaces it. So an outstanding update is
+//! shown again at the start of every session — and at most once per snooze window
+//! within a session — instead of a single fragile shot that a cold-start race or
+//! an ignored turn could burn forever. `그만 볼래요` (permanent opt-out) is the
+//! only way to silence it for good.
 
 use std::fs;
+use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -36,16 +47,20 @@ const RELEASES_LATEST_URL: &str =
 /// Nudge-side cache staleness bound: a cache older than this never drives a
 /// nudge. Generous (24h) so an update keeps surfacing between background fetches.
 const CACHE_TTL_SECS: u64 = 24 * 60 * 60;
-/// Background re-fetch cadence when the cache shows we're **up to date** — short
-/// so a freshly-published release is detected within the hour (a same-day release
-/// otherwise wouldn't surface until the 24h bound). Mirrors gstack's 60-min
-/// up-to-date poll.
-const FETCH_FRESH_TTL_SECS: u64 = 60 * 60;
-/// Background re-fetch cadence when an update is already cached — longer, because
-/// the nudge already fires from the cache (per-version dedup); no need to re-poll
-/// the network often.
-const FETCH_DRIFT_TTL_SECS: u64 = 12 * 60 * 60;
+/// Background re-fetch cadence — short and uniform so a newly-published release
+/// (and the user's own restart-to-check) surfaces almost immediately instead of
+/// an hour later. `cmd_session_start` spawns a detached warm fetch on each new
+/// session, so a fresh session past this TTL re-checks and the nudge can fire
+/// from turn 1. Kept short (60s) so a rapid release→restart→check loop never
+/// skips the fetch.
+const FETCH_TTL_SECS: u64 = 60;
 const FETCH_TIMEOUT_SECS: u64 = 5;
+/// In-session re-nudge snooze. After the nudge fires, it stays suppressed within
+/// the SAME session for this long, then re-surfaces. A NEW session re-surfaces
+/// immediately (session-id mismatch), so the user always sees an outstanding
+/// update at session start without being nagged every turn (and the plugin/CLI
+/// turn-cap still rotates, since adjacent turns share a session + fresh marker).
+const NUDGE_SNOOZE_SECS: u64 = 4 * 60 * 60;
 
 /// Cached result of the most recent successful latest-release fetch.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,6 +69,21 @@ pub struct LatestCache {
     pub latest: String,
     /// Unix seconds at which the fetch succeeded.
     pub fetched_at: u64,
+}
+
+/// Per-version nudge marker contents. Records which session last saw the nudge
+/// and when, so the drift check can snooze within a session yet re-surface in a
+/// new one. A legacy empty/garbage marker file deserializes to `None` and is
+/// treated as "never nudged" — so existing users get the corrected re-surface
+/// behavior without a migration step.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct NudgeMarker {
+    /// `session_id` from the UserPromptSubmit payload the nudge last fired in
+    /// (empty when the host did not supply one — degrades to a time-only snooze).
+    #[serde(default)]
+    session: String,
+    /// Unix seconds at which the nudge last fired.
+    at: u64,
 }
 
 pub(crate) fn now_unix() -> u64 {
@@ -88,11 +118,17 @@ pub(crate) fn is_newer(latest: &str, current: &str) -> bool {
 
 /// Pure drift decision — no IO, so every branch is unit-testable. Returns `true`
 /// when the nudge should fire this turn.
+///
+/// `marker` is the previously-recorded nudge stamp for this version (if any) and
+/// `session` is the current session id. The nudge is suppressed only while the
+/// marker belongs to the SAME session AND is younger than `NUDGE_SNOOZE_SECS`; a
+/// new session or an expired snooze lets it re-surface.
 fn should_nudge(
     cache: Option<&LatestCache>,
     current: &str,
     now: u64,
-    marker_exists: bool,
+    marker: Option<&NudgeMarker>,
+    session: &str,
     optout: bool,
     non_interactive: bool,
 ) -> bool {
@@ -108,10 +144,22 @@ fn should_nudge(
     if !is_newer(&cache.latest, current) {
         return false; // already current (or a preview/downgrade)
     }
-    if marker_exists {
-        return false; // already nudged for this version
+    if let Some(marker) = marker {
+        // Snooze: suppress only within the same session and inside the window.
+        // A new session (id mismatch) or an elapsed snooze re-surfaces the nudge.
+        if marker.session == session && now.saturating_sub(marker.at) < NUDGE_SNOOZE_SECS {
+            return false;
+        }
     }
     true
+}
+
+/// Read the per-version nudge marker. A missing, empty, or malformed file (e.g.
+/// the legacy zero-byte marker from the once-per-version design) yields `None`,
+/// which `should_nudge` treats as "never nudged" → re-surface.
+fn read_marker(path: &Path) -> Option<NudgeMarker> {
+    let raw = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&raw).ok()
 }
 
 fn optout_present() -> bool {
@@ -214,16 +262,12 @@ fn cmd_plugin_latest_fetch_bg_with_url(url: &str) -> i32 {
     if is_hook_disabled("plugin-drift") {
         return 0;
     }
-    // Skip the network call while the cache is still fresh — but use a short TTL
-    // when up to date (catch new releases fast) vs a longer one when an update is
-    // already cached (the nudge fires from the cache; re-poll less often).
+    // Skip the network call only while the cache is still fresh (uniform short
+    // TTL, pending or not). A long "drift" TTL used to keep a stale cache for 12h
+    // even after a new release, so the nudge lagged; the short TTL re-checks on
+    // each new session.
     if let Some(cache) = read_cache() {
-        let ttl = if is_newer(&cache.latest, current_version()) {
-            FETCH_DRIFT_TTL_SECS
-        } else {
-            FETCH_FRESH_TTL_SECS
-        };
-        if now_unix().saturating_sub(cache.fetched_at) < ttl {
+        if now_unix().saturating_sub(cache.fetched_at) < FETCH_TTL_SECS {
             return 0;
         }
     }
@@ -234,6 +278,19 @@ fn cmd_plugin_latest_fetch_bg_with_url(url: &str) -> i32 {
         });
     }
     0
+}
+
+/// `true` when the plugin-latest cache is absent or older than `FETCH_TTL_SECS`
+/// (so `cmd_session_start` knows whether to spawn a detached warm fetch).
+/// Returns `false` when the drift channel is disabled — no point fetching.
+pub fn needs_refresh() -> bool {
+    if is_hook_disabled("plugin-drift") {
+        return false;
+    }
+    match read_cache() {
+        None => true,
+        Some(cache) => now_unix().saturating_sub(cache.fetched_at) >= FETCH_TTL_SECS,
+    }
 }
 
 /// Explicit plugin update check (`axhub-helpers plugin-update-check --json`).
@@ -294,16 +351,18 @@ pub fn cmd_plugin_drift_optout() -> i32 {
 }
 
 /// UserPromptSubmit nudge text, or `None` when no nudge should fire. On a `Some`
-/// result the per-version marker is recorded as a side effect, so the nudge
-/// fires at most once per latest version. Called from `cmd_prompt_route`.
-pub fn plugin_drift_context() -> Option<String> {
-    plugin_drift_nudge().map(|n| n.additional_context)
+/// result the per-version snooze marker is stamped with `session` as a side
+/// effect, so the nudge re-surfaces in a new session or after the snooze window.
+/// Called from `cmd_prompt_route`.
+pub fn plugin_drift_context(session: &str) -> Option<String> {
+    plugin_drift_nudge(session).map(|n| n.additional_context)
 }
 
 /// UserPromptSubmit nudge payloads, or `None` when no nudge should fire. On a
-/// `Some` result the per-version marker is recorded as a side effect, so the
-/// nudge fires at most once per latest version.
-pub fn plugin_drift_nudge() -> Option<PluginDriftNudge> {
+/// `Some` result the per-version snooze marker is stamped with the current
+/// `session` + time, so the nudge stays suppressed only within that session for
+/// `NUDGE_SNOOZE_SECS` and re-surfaces in a new session or after the window.
+pub fn plugin_drift_nudge(session: &str) -> Option<PluginDriftNudge> {
     if is_hook_disabled("plugin-drift") {
         return None;
     }
@@ -312,26 +371,35 @@ pub fn plugin_drift_nudge() -> Option<PluginDriftNudge> {
     let marker_path = cache
         .as_ref()
         .and_then(|c| plugin_drift_nudge_marker_path(&c.latest));
-    let marker_exists = marker_path.as_ref().map(|p| p.exists()).unwrap_or(false);
+    let marker = marker_path.as_ref().and_then(|p| read_marker(p));
 
     if !should_nudge(
         cache.as_ref(),
         current,
         now_unix(),
-        marker_exists,
+        marker.as_ref(),
+        session,
         optout_present(),
         is_non_interactive(),
     ) {
         return None;
     }
 
-    // Record the per-version marker before returning so re-entry (this turn's
-    // later prompts, or the next session) is a no-op.
+    // Stamp the snooze marker with this session + time before returning, so
+    // re-entry within the same session (this turn's later prompts, or the next
+    // few turns) is a no-op until the snooze elapses — preserving the plugin/CLI
+    // turn-cap — while a new session re-surfaces the nudge.
     if let Some(path) = marker_path {
         if let Some(parent) = path.parent() {
             let _ = fs::create_dir_all(parent);
         }
-        let _ = fs::write(&path, b"");
+        let stamp = NudgeMarker {
+            session: session.to_string(),
+            at: now_unix(),
+        };
+        if let Ok(json) = serde_json::to_string(&stamp) {
+            let _ = fs::write(&path, json);
+        }
     }
     // `cache` is Some here (should_nudge returned true).
     cache.map(|c| PluginDriftNudge {
@@ -468,15 +536,32 @@ mod tests {
         assert!(!is_newer("0.9.40", "garbage"));
     }
 
+    fn marker(session: &str, at: u64) -> NudgeMarker {
+        NudgeMarker {
+            session: session.to_string(),
+            at,
+        }
+    }
+
     #[test]
     fn should_nudge_fires_on_fresh_newer_unmarked() {
         let c = cache("0.9.40", 1000);
-        assert!(should_nudge(Some(&c), "0.9.34", 1000, false, false, false));
+        assert!(should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000,
+            None,
+            "s1",
+            false,
+            false
+        ));
     }
 
     #[test]
     fn should_nudge_false_when_no_cache() {
-        assert!(!should_nudge(None, "0.9.34", 1000, false, false, false));
+        assert!(!should_nudge(
+            None, "0.9.34", 1000, None, "s1", false, false
+        ));
     }
 
     #[test]
@@ -486,7 +571,8 @@ mod tests {
             Some(&eq),
             "0.9.34",
             1000,
-            false,
+            None,
+            "s1",
             false,
             false
         ));
@@ -495,7 +581,8 @@ mod tests {
             Some(&older),
             "0.9.34",
             1000,
-            false,
+            None,
+            "s1",
             false,
             false
         ));
@@ -505,25 +592,92 @@ mod tests {
     fn should_nudge_false_when_stale() {
         let c = cache("0.9.40", 1000);
         let now = 1000 + CACHE_TTL_SECS; // exactly TTL → stale
-        assert!(!should_nudge(Some(&c), "0.9.34", now, false, false, false));
+        assert!(!should_nudge(
+            Some(&c),
+            "0.9.34",
+            now,
+            None,
+            "s1",
+            false,
+            false
+        ));
     }
 
     #[test]
-    fn should_nudge_false_when_already_marked() {
+    fn should_nudge_snoozes_within_same_session() {
+        // Marker stamped this session, inside the snooze window → suppressed
+        // (this is what preserves the plugin/CLI turn-cap across adjacent turns).
         let c = cache("0.9.40", 1000);
-        assert!(!should_nudge(Some(&c), "0.9.34", 1000, true, false, false));
+        let m = marker("s1", 1000);
+        assert!(!should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000 + 60,
+            Some(&m),
+            "s1",
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn should_nudge_refires_in_new_session() {
+        // Same version already nudged, but in a DIFFERENT session → re-surfaces.
+        let c = cache("0.9.40", 1000);
+        let m = marker("old-session", 1000);
+        assert!(should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000 + 60,
+            Some(&m),
+            "new-session",
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn should_nudge_refires_after_snooze_window() {
+        // Same session, but the snooze has elapsed → re-surfaces.
+        let c = cache("0.9.40", 1000);
+        let m = marker("s1", 1000);
+        assert!(should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000 + NUDGE_SNOOZE_SECS,
+            Some(&m),
+            "s1",
+            false,
+            false
+        ));
     }
 
     #[test]
     fn should_nudge_false_on_optout() {
         let c = cache("0.9.40", 1000);
-        assert!(!should_nudge(Some(&c), "0.9.34", 1000, false, true, false));
+        assert!(!should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000,
+            None,
+            "s1",
+            true,
+            false
+        ));
     }
 
     #[test]
     fn should_nudge_false_when_non_interactive() {
         let c = cache("0.9.40", 1000);
-        assert!(!should_nudge(Some(&c), "0.9.34", 1000, false, false, true));
+        assert!(!should_nudge(
+            Some(&c),
+            "0.9.34",
+            1000,
+            None,
+            "s1",
+            false,
+            true
+        ));
     }
 
     #[test]
@@ -640,21 +794,17 @@ mod tests {
     }
 
     #[test]
-    fn fetch_refreshes_up_to_date_cache_past_one_hour() {
-        // The fast-detection fix: an "up to date" cache (latest == current) older
-        // than the 1h fresh TTL re-fetches, so a same-day release surfaces within
-        // the hour instead of waiting out the 24h staleness bound.
+    fn fetch_refreshes_cache_past_ttl() {
+        // The fast-detection fix: any cache older than the short fetch TTL
+        // re-fetches, so a fresh session detects a same-day release within minutes
+        // instead of waiting out the old 1h/12h cadence.
         let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
         let _env = EnvGuard::clear();
         let cache_dir = tempfile::tempdir().unwrap();
         let state_dir = tempfile::tempdir().unwrap();
         std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
         std::env::set_var("XDG_STATE_HOME", state_dir.path());
-        write_cache(&cache(
-            current_version(),
-            now_unix() - FETCH_FRESH_TTL_SECS - 1,
-        ))
-        .unwrap();
+        write_cache(&cache(current_version(), now_unix() - FETCH_TTL_SECS - 1)).unwrap();
         let (url, handle) = serve_once("200 OK", r#"{"tag_name":"v99.0.0"}"#);
 
         assert_eq!(cmd_plugin_latest_fetch_bg_with_url(&url), 0);
@@ -665,14 +815,14 @@ mod tests {
 
     #[test]
     fn fetch_skips_recent_up_to_date_cache() {
-        // Up to date and younger than the 1h fresh TTL → no needless network.
+        // Younger than the short fetch TTL → no needless network.
         let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
         let _env = EnvGuard::clear();
         let cache_dir = tempfile::tempdir().unwrap();
         let state_dir = tempfile::tempdir().unwrap();
         std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
         std::env::set_var("XDG_STATE_HOME", state_dir.path());
-        write_cache(&cache(current_version(), now_unix() - 60)).unwrap(); // 1 min old
+        write_cache(&cache(current_version(), now_unix() - 10)).unwrap(); // 10s old, well within 60s TTL
         let (url, handle) = serve_connection_probe("200 OK", r#"{"tag_name":"v99.0.0"}"#);
 
         assert_eq!(cmd_plugin_latest_fetch_bg_with_url(&url), 0);
@@ -681,6 +831,33 @@ mod tests {
             !handle.join().unwrap(),
             "recent up-to-date cache should skip the HTTP fetch"
         );
+    }
+
+    #[test]
+    fn needs_refresh_true_when_absent_false_when_fresh_true_when_stale() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        assert!(needs_refresh(), "absent cache needs refresh");
+        write_cache(&cache("99.0.0", now_unix())).unwrap();
+        assert!(!needs_refresh(), "fresh cache does not need refresh");
+        write_cache(&cache("99.0.0", now_unix() - FETCH_TTL_SECS - 1)).unwrap();
+        assert!(needs_refresh(), "cache past TTL needs refresh");
+    }
+
+    #[test]
+    fn needs_refresh_false_when_channel_disabled() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        std::env::set_var("AXHUB_DISABLE_HOOK", "plugin-drift");
+        assert!(!needs_refresh(), "disabled channel never needs refresh");
     }
 
     #[test]
