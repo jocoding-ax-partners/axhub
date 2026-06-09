@@ -2509,4 +2509,78 @@ mod tests {
     fn unknown_hard_stop_reasons_fail_closed() {
         assert!(!super::hard_stop_reason_overridable("some_future_reason"));
     }
+
+    #[test]
+    fn render_wrapper_preview_carries_the_pack_constructor_contract() {
+        // Cross-drift guard: each SDK knowledge pack §1 is a normalized copy of
+        // render_wrapper_preview — the wrapper seed of truth. These per-language
+        // tokens are the client-construction contract both must carry; if the
+        // helper's wrapper drifts off them, the packs must be regenerated. The
+        // pack side is asserted in tests/sdk-knowledge-pack.test.ts.
+        let cases: &[(&str, &[&str])] = &[
+            (
+                "node",
+                &[
+                    "new AxHubClient(",
+                    "tokenType: 'pat'",
+                    "AX_HUB_PAT",
+                    "defaultTenantId",
+                ],
+            ),
+            (
+                "python",
+                &[
+                    "AxHubClient(",
+                    "token_type=TokenType.PAT",
+                    "AXHUB_TOKEN",
+                    "default_tenant_id",
+                ],
+            ),
+            (
+                "go",
+                &[
+                    "axhub.NewClient(",
+                    "TokenTypePAT",
+                    "AXHUB_TOKEN",
+                    "DefaultTenantID",
+                ],
+            ),
+            (
+                "ruby",
+                &[
+                    "AxHub::Client.new(",
+                    "token_type: :pat",
+                    "AXHUB_TOKEN",
+                    "default_tenant_id",
+                ],
+            ),
+            (
+                "java",
+                &[
+                    "AxHubClient.builder()",
+                    ".tokenType(TokenType.PAT)",
+                    "AXHUB_TOKEN",
+                    ".defaultTenantId(",
+                ],
+            ),
+            (
+                "kotlin",
+                &[
+                    "AxHubKotlinClient(",
+                    "tokenType = TokenType.PAT",
+                    "AXHUB_TOKEN",
+                    "defaultTenantId =",
+                ],
+            ),
+        ];
+        for (lang, tokens) in cases {
+            let wrapper = super::render_wrapper_preview(lang, "", &[]);
+            for token in *tokens {
+                assert!(
+                    wrapper.contains(token),
+                    "{lang} wrapper seed missing contract token {token:?}"
+                );
+            }
+        }
+    }
 }

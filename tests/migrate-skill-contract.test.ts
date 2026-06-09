@@ -70,7 +70,7 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain("git_connect");
     expect(skill).toContain("env_set");
     expect(skill).toContain("deploy_create");
-    expect(skill).toContain("preview-only 로 낮추고 local patch 실행을 막아요");
+    expect(skill).toContain("plan/preview-only 로 고정");
   });
 
   test("keeps remote mutation behind explicit preview and approval boundaries", () => {
@@ -222,6 +222,37 @@ describe("migrate SKILL contract", () => {
     expect(yamlBlocks.length).toBeGreaterThan(0);
     for (const block of yamlBlocks) {
       expect(() => yaml.parse(block)).not.toThrow();
+    }
+  });
+
+  test("wires SDK conversion experts behind the git-guarded execution stage", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    for (const lang of ["go", "java", "kotlin", "node", "python", "ruby"]) {
+      expect(skill).toContain(`axhub-sdk-${lang}-expert`);
+      expect(existsSync(join(REPO_ROOT, "agents", `axhub-sdk-${lang}-expert.md`))).toBe(true);
+    }
+    // experts load the vendored knowledge pack §1 verbatim
+    expect(skill).toContain("skills/migrate/sdk-knowledge/<lang>.md");
+    // deterministic git guard owns the rollback net
+    expect(skill).toContain('"$HELPER" migrate-guard --dir');
+    expect(skill).toContain("--checkpoint");
+    expect(skill).toContain("checkpoint_ref");
+    expect(skill).toContain("rollback_command");
+    // per-reason hard-stop override (devex-D1=C)
+    expect(skill).toContain("plan_only");
+    expect(skill).toContain("hard_stop_policy");
+    expect(skill).toContain("secret_exposure");
+    expect(skill).toContain("강행할래요");
+  });
+
+  test("ships 6 generated SDK expert agents with valid frontmatter", () => {
+    for (const lang of ["go", "java", "kotlin", "node", "python", "ruby"]) {
+      const agent = read(`agents/axhub-sdk-${lang}-expert.md`);
+      expect(agent).toContain(`name: axhub-sdk-${lang}-expert`);
+      expect(agent).toContain("model: sonnet");
+      expect(agent).toContain("tools: Read, Edit, Write, Bash, Grep, Glob");
+      expect(agent).toContain(`skills/migrate/sdk-knowledge/${lang}.md`);
+      expect(agent).toContain("paraphrase");
     }
   });
 });

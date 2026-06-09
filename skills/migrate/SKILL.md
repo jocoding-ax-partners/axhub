@@ -506,7 +506,26 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
    - `env_set`: env 저장 preview/실행
    - `deploy_create`: 배포 시작 preview/실행
 
-   hard-stop reason 이 하나라도 있으면 `sdk_wrapper_generate`, `data_patch_plan`, `auth_patch_plan` 은 preview-only 로 낮추고 local patch 실행을 막아요. 원격 mutation approval 도 helper 가 자동으로 묶지 말고 action 별로 따로 유지해요.
+   hard-stop 게이팅은 helper 의 `plan_only` 와 `hard_stop_policy` (`{code, message, overridable}`) 를 읽어서 reason 별로 다뤄요.
+   - `plan_only=true` 이면 (secret_exposure · custom_auth · unsupported_language 같은 절대 reason 이 있을 때) `sdk_wrapper_generate`, `data_patch_plan`, `auth_patch_plan` 은 plan/preview-only 로 고정하고 실행 경로를 아예 두지 않아요. git rollback 으로 secret 유출을 되돌릴 수 없으니 "강행" override 도 막아요.
+   - `plan_only=false` 이고 overridable reason (broad_diff · missing_verification · raw_query) 만 있으면 기본은 preview-only 지만, 사용자가 "강행할래요" 를 한 번 더 명시적으로 확인하면 git checkpoint 를 잡은 뒤에만 실행해요.
+   - hard-stop reason 이 없으면 일반 preview → 승인 → 실행 흐름이에요.
+
+   원격 mutation approval 은 helper 가 자동으로 묶지 말고 action 별로 따로 유지해요.
+
+2.6. **SDK 변환 실행 (승인된 `sdk_wrapper_generate`).** 변환은 helper 가 아니라 언어별 expert agent 가 user source 를 써요. 안전망은 helper 가 deterministic 하게 잡아요.
+   - detected language 로 `axhub-sdk-<lang>-expert` 를 `task` tool 로 dispatch 해요 (`axhub-sdk-go-expert`, `axhub-sdk-java-expert`, `axhub-sdk-kotlin-expert`, `axhub-sdk-node-expert`, `axhub-sdk-python-expert`, `axhub-sdk-ruby-expert`). 6개 언어(go/java/kotlin/node/python/ruby) 밖이면 expert 가 없으니 plan-only 로 남기고 알려요.
+   - expert 는 `skills/migrate/sdk-knowledge/<lang>.md` knowledge pack 의 §1 client init 을 그대로 emit 해요. paraphrase 하지 않아요. pack 이 없거나 비면 apply 하지 말고 preview/plan 만 내요.
+   - apply 전에 git guard 를 먼저 잡아요. probe 로 상태를 보고, 필요한 동의를 받은 뒤 checkpoint 를 만들어요.
+
+   ```bash
+   "$HELPER" migrate-guard --dir "${AXHUB_MIGRATE_DIR:-.}" --json
+   # git_dirty 면 --allow-dirty (WIP commit), git repo 가 아니면 --init-ok 동의를 받은 뒤에:
+   "$HELPER" migrate-guard --dir "${AXHUB_MIGRATE_DIR:-.}" --checkpoint --json
+   ```
+
+   - `checkpoint_ref` 가 잡히면 expert 의 unified diff 를 한국어 preview 로 보여주고 승인받은 뒤에만 apply 해요. `needs_decision` 이면 사용자에게 묻고, checkpoint 없이는 apply 하지 않아요.
+   - apply 뒤에는 스캔에서 찾은 검증 명령을 돌려요. 실패하면 guard 가 준 `rollback_command` 를 보여주고 되돌릴지 물어요. 변환은 자동 배포로 이어지지 않아요 — 원격 mutation 은 그대로 CLI gating 이에요.
 
 3. **manifest 초안 준비.** helper 의 `suggested_manifest` 를 `axhub.yaml` 초안으로 보여줘요. 후보를 직접 골랐으면 같은 helper 를 `--app-path "$APP_PATH"` 로 한 번 더 실행해서 선택한 후보 기준 manifest 를 다시 만들어요. 위 control contract 표에 있는 field 만 남기고, required env 는 선택한 후보 앱 안에서 발견된 이름과 scope 만 포함해요. 값 설정은 `axhub env set` 경로로 안내해요. 기존 `apphub.yaml` 이 있으면 읽기는 계속 되지만 새 파일은 `axhub.yaml` 로 만들어요.
 
