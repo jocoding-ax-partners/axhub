@@ -2540,6 +2540,8 @@ mod tests {
             let after_open = &body[body.find("```").expect("§1 opening fence") + 3..];
             let content = &after_open[after_open.find('\n').expect("fence lang tag") + 1..];
             content[..content.find("```").expect("fence close")]
+                // git may check the pack out with CRLF on Windows; the seed is LF
+                .replace("\r\n", "\n")
                 .trim_end()
                 .to_string()
         }
