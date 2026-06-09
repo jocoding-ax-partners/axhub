@@ -46,9 +46,9 @@ const collectSafeDefaultPaths = (): string[] => {
 };
 
 describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
-  test("49 top-level keys (2 메타 + 47 named channels)", () => {
+  test("50 top-level keys (2 메타 + 48 named channels)", () => {
     const keys = Object.keys(registry);
-    expect(keys).toHaveLength(49);
+    expect(keys).toHaveLength(50);
     expect(keys).toContain("_schema");
     expect(keys).toContain("_path_history");
     const channels = keys.filter((k) => !k.startsWith("_")).sort();
@@ -83,6 +83,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "my-resources",
       "onboarding",
       "open",
+      "picker",
       "profile",
       "publish",
       "quality_gate",
@@ -105,7 +106,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
 
   test("83 actual safe_default rationale 엔트리 including onboarding gap machine AUQ", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(83);
+    expect(paths).toHaveLength(84);
 
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
@@ -171,6 +172,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "onboarding",
       "onboarding",
       "onboarding",
+      "picker",
       "profile",
       "publish",
       "quality_gate",
