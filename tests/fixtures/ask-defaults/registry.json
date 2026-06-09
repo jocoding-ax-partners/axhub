@@ -824,6 +824,14 @@
         "아니요",
         "연결"
       ]
+    },
+    "다른 org/계정에도 GitHub App 을 설치할래요?": {
+      "safe_default": "아니요, 계속",
+      "rationale": "Step 2.5 의 add-account 설치 제안은 외부 브라우저와 GitHub 계정 권한 승인이 필요한 actionable 흐름이에요. 비대화형(claude -p / CI / headless)에서는 install_url 표시만 하고 설치 브라우저를 자동으로 열지 않아요. onboarding 은 그대로 이어가요(비차단). 미설치 설치는 'GitHub App 을 먼저 설치할까요?'(Step 6)가 따로 소유해요.",
+      "allowed_safe_defaults": [
+        "아니요, 계속",
+        "설치할래요"
+      ]
     }
   },
   "repair": {
