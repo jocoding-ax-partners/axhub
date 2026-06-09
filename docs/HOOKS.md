@@ -16,7 +16,7 @@
 
 | 진입점 | 위치 | 호출 시점 |
 |---|---|---|
-| `session-start` | `hooks/session-start.sh`, `hooks/session-start.ps1`, `axhub-helpers session-start` | Claude Code SessionStart |
+| `session-start` | `hooks/session-start.sh`, `hooks/session-start.ps1`, `axhub-helpers session-start` | Claude Code SessionStart. `$CLAUDE_ENV_FILE` 가 있으면 `export CLAUDE_PLUGIN_ROOT='<root>'` 한 줄을 append 해서 이후 tool-call 셸로 전파해요 — skill 이 helper 경로를 매번 재해석 안 해도 돼요 (매 세션 rewrite 라 버전 bump 에도 stale 안 됨, fail-open). |
 | `prompt-route` | `axhub-helpers prompt-route` | UserPromptSubmit |
 | `classify-exit` | `axhub-helpers classify-exit` | PostToolUse (Bash `axhub …`) |
 | `token-freshness-gate` | `axhub-helpers token-gate` | Phase 3.5 deploy gate. sh body 가 Rust 로 흡수됐어요 (Phase 1.1 sh/ps1 absorption, T3). 기존 env 컨트랙트 (`AXHUB_GATE_*`) 와 exit 65 UNAUTHORIZED 시맨틱 그대로 보존했어요. Windows 사용자도 동일 binary 가 자동 동작해요 (parity gap #1 해소). Phase 4 (F1) 에서 `hooks/token-freshness-gate.sh` thin shim 도 삭제 — SKILL deploy Step 3.5 가 helper 직접 호출. |
