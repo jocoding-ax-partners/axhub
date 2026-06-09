@@ -33,6 +33,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CANONICAL_PREFLIGHT_BLOCK } from "./preflight-block";
+import { CANONICAL_TENANT_PICKER_BLOCK, CANONICAL_TENANT_PICKER_L2_STANZA } from "./tenant-picker-block";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const TEMPLATE = join(REPO_ROOT, "skills/_template/SKILL.md.tmpl");
@@ -42,7 +43,7 @@ const argv = process.argv.slice(2);
 const slug = argv[0];
 
 if (!slug || slug.startsWith("-") || !/^[a-z][a-z0-9-]*$/.test(slug)) {
-  process.stderr.write(`usage: bun run skill:new <slug> [--no-multi-step] [--no-preflight] [--action <verb>] [--title <text>] [--model <haiku|sonnet|opus>]\n`);
+  process.stderr.write(`usage: bun run skill:new <slug> [--no-multi-step] [--no-preflight] [--tenant-scoped] [--action <verb>] [--title <text>] [--model <haiku|sonnet|opus>]\n`);
   process.stderr.write(`  slug must be lowercase alphanumeric + hyphens (e.g. "my-skill")\n`);
   process.exit(1);
 }
@@ -58,6 +59,7 @@ type SkillModel = (typeof VALID_MODELS)[number];
 
 const multiStep = !flag("--no-multi-step");
 const needsPreflight = !flag("--no-preflight");
+const tenantScoped = flag("--tenant-scoped");
 const action = flagValue("--action") ?? "do something";
 const title = flagValue("--title") ?? slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 const modelRaw = flagValue("--model") ?? "sonnet";
@@ -111,6 +113,28 @@ const d1GuardBlock = `**Non-interactive AskUserQuestion guard (D1):** 이 SKILL 
 content = content.replace(/\{\{TODOWRITE_BLOCK\}\}/g, todoWriteBlock);
 content = content.replace(/\{\{D1_GUARD_BLOCK\}\}/g, d1GuardBlock);
 
+if (tenantScoped) {
+  if (!needsPreflight) {
+    process.stderr.write(
+      "error: --tenant-scoped requires preflight (remove --no-preflight); " +
+        "the tenant-picker L1 block relies on PREFLIGHT_JSON for its current_team_id fallback.\n",
+    );
+    process.exit(1);
+  }
+  // Drift guard: CANONICAL_PREFLIGHT_BLOCK must be present as insertion anchor.
+  if (!content.includes(CANONICAL_PREFLIGHT_BLOCK)) {
+    process.stderr.write(
+      "error: template drift — CANONICAL_PREFLIGHT_BLOCK not found in scaffold output. " +
+        "Sync skills/_template/SKILL.md.tmpl with scripts/preflight-block.ts before using --tenant-scoped.\n",
+    );
+    process.exit(1);
+  }
+  // Insert L1 block + L2 stanza immediately after the preflight block.
+  // Use a replacer function to avoid special-pattern interpretation of $ in bash strings.
+  const tenantPickerInsertion = "\n\n" + CANONICAL_TENANT_PICKER_BLOCK + "\n\n" + CANONICAL_TENANT_PICKER_L2_STANZA;
+  content = content.replace(CANONICAL_PREFLIGHT_BLOCK, () => CANONICAL_PREFLIGHT_BLOCK + tenantPickerInsertion);
+}
+
 if (!needsPreflight) {
   // Fail loudly on template drift: if the template's preflight block no longer matches
   // CANONICAL_PREFLIGHT_BLOCK byte-for-byte, the literal replace would silently no-op and
@@ -136,7 +160,7 @@ if (!registry[slug]) {
 }
 
 process.stdout.write(`✓ Created skills/${slug}/SKILL.md\n`);
-process.stdout.write(`  multi-step: ${multiStep}, needs-preflight: ${needsPreflight}, model: ${model}\n`);
+process.stdout.write(`  multi-step: ${multiStep}, needs-preflight: ${needsPreflight}, tenant-scoped: ${tenantScoped}, model: ${model}\n`);
 process.stdout.write(`✓ Appended registry stub to tests/fixtures/ask-defaults/registry.json\n`);
 process.stdout.write(`\nNext steps:\n`);
 process.stdout.write(`  1. Edit skills/${slug}/SKILL.md — replace TODO placeholders\n`);

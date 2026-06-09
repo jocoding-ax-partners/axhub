@@ -1,0 +1,9 @@
+#!/bin/sh
+# Fake axhub stub for tenant-picker-block tests (Decision 2C).
+# Controlled by FAKE_AXHUB_TENANTS_JSON env var.
+# Only intercepts: axhub tenants list --json
+if [ "$1" = "tenants" ] && [ "$2" = "list" ]; then
+  printf '%s\n' "${FAKE_AXHUB_TENANTS_JSON:-[]}"
+  exit 0
+fi
+exit 0

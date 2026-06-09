@@ -61,7 +61,7 @@ describe("init cross-session resume contract", () => {
 
   test("resume-last includes template, name, slug, and idempotency key", () => {
     expect(initSkill).toMatch(
-      /axhub apps bootstrap --template "\$TEMPLATE" --name "\$APP_NAME" --slug "\$APP_SLUG" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "\$IDEMPOTENCY_KEY" --json/,
+      /axhub apps bootstrap --template "\$TEMPLATE" --name "\$APP_NAME" --slug "\$APP_SLUG" --tenant "\$AXHUB_TENANT" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "\$IDEMPOTENCY_KEY" --json/,
     );
   });
 

@@ -181,3 +181,17 @@ Append-only log of unresolved decisions across plans.
 - [ ] Q4: D1 sunset SLA v0.1.18 escalation path — at v0.1.18 release with no copywriter ADR, who triggers D1-c mechanical fallback? Engineering manager auto-trigger or explicit ticket required? Affects sunset enforceability.
 - [ ] Q5: `docs/marketing/README.md` creation — N4 verified `ls docs/README.md` exit=1 (file does NOT exist). Greenfield with no parent README precedent. Acceptable to add new file vs alternative (note in `landing-page.ko.md` header)?
 - [ ] Q6: D3 fence-tag default-deny conservatism — if future SKILL.md uses ```korean``` or ```ko``` language tag for KR-tagged content, would current default-deny (skip on unknown) flip to TOUCH be needed? Extend allowlist now or defer to PR-time judgment?
+
+## tenant-picker-consensus - 2026-06-09 (iter 1 — superseded by iter 2)
+
+- [x] TP-Q1 (RESOLVED in iter 2): session_id 키 세션 캐시 → **구현 불가**. VERIFIED로 SKILL.md bash fence에 `CLAUDE_SESSION_ID`/`CLAUDECODE_SESSION_ID` 부재. 캐시는 project-local + TTL staleness(`{tenant,source,ts}`, init-resume `state_stale` 미러, session id 아님). TP-Q6로 대체(TTL default 값).
+- [x] TP-Q5 (RESOLVED in iter 2): Rust `tenant-resolve` 릴리스 타이밍 → **무효**. Decision 2C 채택으로 `axhub-helpers` 무변경(인라인 bash + bun-test fixture). 빌드/릴리스 의존·version-skew 경로 소멸.
+- [ ] TP-Q2: auth skill 포함 여부 — auth는 picker가 의존하는 세션을 *수립*하므로 표준 블록은 EXCLUDE 권장. 단 로그인 후 캐시 seed(고른 tenant를 캐시에 기록)는 별개 follow-up. Phase B에서 body 확인 후 확정. — fan-out 정밀도.
+- [ ] TP-Q3: routing-stats 포함 여부 — spec line 77(포함)과 line 79(보류)가 모순. 기계적 규칙(tenant-scoped axhub 호출 유무)으로 tie-break: `cli::Commands::RoutingStats`는 로컬 진단이라 EXCLUDE 가능성 높음. Phase B에서 body 확인. — spec 모순 해소.
+- [ ] TP-Q4: onboarding 포함 여부 — 첫 앱 생성 흐름에 tenant-scoped resolve/mutate 호출 있는지 body 확인 후 manifest 등재 결정. — fan-out 경계.
+
+## tenant-picker-consensus - 2026-06-09 (iter 2 — Architect+Critic REJECT 반영, 2C 채택)
+
+- [ ] TP-Q6: 캐시 TTL default 값 — `AXHUB_TENANT_CACHE_TTL_SECS` env-configurable, plan은 default 8h 제안(init-resume 24h보다 짧게). 적정 값 검토 필요(너무 길면 wrong-tenant 위험, 너무 짧으면 재질문 빈발). — AC4 staleness 정밀도.
+- [ ] TP-Q7: (선택) Rust `install_axhub_state_gitignore`에 `.axhub/state/` 추가 — 신규 사용자 설치 시 자동 무시 편의. "skill만" 유지 위해 non-required로 분리. repo `.gitignore`만으로 worktree는 충분 — 신규-설치 follow-up으로 진행할지 결정. — 설치 UX vs scope 경계.
+- [ ] TP-Q8: multi-tenant fallback 경고 라인 위치/표현 — non-TTY·`tenants list` 실패 시 L2 stanza가 emit하는 `여러 tenant 에 속해 있는데...` 경고를 systemMessage vs stdout 어느 채널로? lint:tone 해요체 통과 + observability 정렬 필요. — R4 fail-wrong 방어 정밀도.

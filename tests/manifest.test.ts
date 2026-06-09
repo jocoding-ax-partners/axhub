@@ -8,6 +8,7 @@ import { describe, expect, test, beforeAll } from "bun:test";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { CANONICAL_TENANT_PICKER_INLINE } from "../scripts/tenant-picker-block";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 
@@ -1293,7 +1294,7 @@ describe("skills/*/SKILL.md frontmatter", () => {
     expect(appLifecycleContent).toContain("After it succeeds, say exactly one short result sentence");
         expect(appLifecycleContent).toContain('axhub apps suspend "$APP_ARG" --execute --json >/dev/null');
     expect(appLifecycleContent).toContain('axhub apps resume "$APP_ARG" --execute --json >/dev/null');
-    expect(appLifecycleContent).toContain('axhub apps fork "$SOURCE_APP" --slug "$NEW_SLUG" --subdomain "$NEW_SUBDOMAIN" --name "$NAME" --tenant "$TENANT" --execute --json >/dev/null');
+    expect(appLifecycleContent).toContain(`axhub apps fork "$SOURCE_APP" --slug "$NEW_SLUG" --subdomain "$NEW_SUBDOMAIN" --name "$NAME" --tenant "${CANONICAL_TENANT_PICKER_INLINE}" --execute --json >/dev/null`);
     expect(appLifecycleContent).toContain("raw JSON stdout");
     expect(appLifecycleContent).toContain("비공개 (private)");
     expect(appLifecycleContent).toContain("[DESTRUCTIVE] about to run");
