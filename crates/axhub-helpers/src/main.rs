@@ -5679,6 +5679,45 @@ fn run_axhub_long(
     axhub_helpers::axhub_cli::run_axhub_with_timeout(&axhub_bin, &refs, timeout)
 }
 
+/// Pull the live public `access_url` out of an `axhub apps get <app> --json`
+/// payload. The app object is returned flat (`{..., "access_url": "..."}`); a
+/// `{"data": {...}}` envelope is tolerated. This is the canonical live URL
+/// (`https://<subdomain>.<tenant_slug>.axhub.ai`); the `axhub open` dashboard
+/// link is intentionally not used as the public URL.
+fn access_url_from_apps_get(parsed: &Value) -> Option<String> {
+    use axhub_helpers::cli_envelope::string_at_any;
+    string_at_any(parsed, &["access_url"])
+        .or_else(|| {
+            parsed
+                .get("data")
+                .and_then(|d| string_at_any(d, &["access_url"]))
+        })
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// Best-effort fetch of an app's live `access_url` via `axhub apps get`. Returns
+/// `None` on timeout / non-zero exit / missing field so callers can fall back.
+fn live_app_url_via_apps_get(app_id: &str) -> Option<String> {
+    if app_id.is_empty() {
+        return None;
+    }
+    let out = run_axhub_long(
+        &[
+            "apps".to_string(),
+            "get".to_string(),
+            app_id.to_string(),
+            "--json".to_string(),
+        ],
+        std::time::Duration::from_secs(15),
+    );
+    if out.timed_out || out.exit_code != 0 {
+        return None;
+    }
+    let parsed: Value = serde_json::from_str(&out.stdout).ok()?;
+    access_url_from_apps_get(&parsed)
+}
+
 fn watch_deploy_until_terminal(
     app_id: &str,
     app_label: &str,
@@ -5720,7 +5759,13 @@ fn watch_deploy_until_terminal(
         deploy_data_candidates(value).find_map(|candidate| {
             axhub_helpers::cli_envelope::string_at_any(
                 candidate,
-                &["url", "app_url", "public_url", "deployment_url"],
+                &[
+                    "access_url",
+                    "url",
+                    "app_url",
+                    "public_url",
+                    "deployment_url",
+                ],
             )
         })
     });
@@ -5736,7 +5781,10 @@ fn watch_deploy_until_terminal(
         if let Some(commit) = commit {
             println!("- 커밋: {}", short_commit(commit));
         }
-        if let Some(url) = url {
+        // Prefer the app's live access_url (https://<subdomain>.<tenant>.axhub.ai)
+        // from `axhub apps get` — the canonical public URL — over whatever the
+        // deploy-status stream happened to carry (which can be a dashboard link).
+        if let Some(url) = live_app_url_via_apps_get(app_id).or(url) {
             println!("- URL: {url}");
         }
         return Ok(0);
@@ -6405,6 +6453,34 @@ pub(crate) fn cmd_diagnose_hitl(
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn access_url_from_apps_get_reads_flat_and_enveloped() {
+        // Real `axhub apps get <app> --json` returns the app object flat.
+        let flat = serde_json::json!({
+            "id": "uuid", "slug": "my-first-app-2", "subdomain": "my-first-app-2",
+            "access_url": "https://my-first-app-2.oktatest.axhub.ai"
+        });
+        assert_eq!(
+            access_url_from_apps_get(&flat).as_deref(),
+            Some("https://my-first-app-2.oktatest.axhub.ai")
+        );
+        // A status envelope is tolerated.
+        let enveloped = serde_json::json!({
+            "status": "ok",
+            "data": { "access_url": "https://x.test.axhub.ai" }
+        });
+        assert_eq!(
+            access_url_from_apps_get(&enveloped).as_deref(),
+            Some("https://x.test.axhub.ai")
+        );
+    }
+
+    #[test]
+    fn access_url_from_apps_get_is_none_when_missing_or_blank() {
+        assert!(access_url_from_apps_get(&serde_json::json!({ "slug": "x" })).is_none());
+        assert!(access_url_from_apps_get(&serde_json::json!({ "access_url": "  " })).is_none());
+    }
 
     /// US-014: `RealVerifyProbes` must spawn `axhub deploy list` **at
     /// most once** per `cmd_verify`. The pre-PR-#149 RealVerifyProbes

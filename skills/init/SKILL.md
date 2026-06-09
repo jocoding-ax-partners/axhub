@@ -455,7 +455,14 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
 8. **결과와 다음 액션을 안내해요.**
 
-   saga 응답의 `app_id` / `deployment_id` / `repo_full_name` 을 humanize 해서 한국어 한 줄씩 보여줘요. **배포 공개 URL** 이 확인되면 첫 줄 hero 로 보여줘요. URL 은 절대 합성하지 않아요. terminal bootstrap/status 응답, `axhub deploy status`, `axhub open` 처럼 실제 확인된 값만 URL 로 써요. dry-run 의 subdomain 은 URL 이 아니라 내부 힌트라서 사용자에게 인터넷 주소처럼 조합하지 않아요.
+   saga 응답의 `app_id` / `deployment_id` / `repo_full_name` 을 humanize 해서 한국어 한 줄씩 보여줘요. **배포 공개 URL(라이브 앱 주소)** 은 배포 성공 후 `axhub apps get` 으로 앱의 `access_url` 을 읽어서 hero 첫 줄로 보여줘요. 이건 `https://<subdomain>.<tenant_slug>.axhub.ai` 형식의 **실제 접속 주소**예요. URL 은 절대 합성하지 않아요.
+
+   ```bash
+   # 라이브 공개 URL = 앱의 access_url (axhub apps get). saga 의 app_id(또는 slug)로 조회해요.
+   PUBLIC_URL="$(axhub apps get "$APP_ID" --json --no-input 2>/dev/null | jq -r '.access_url // .data.access_url // empty')"
+   ```
+
+   dry-run 의 subdomain 은 내부 힌트라 인터넷 주소처럼 조합하지 않아요. `access_url` 을 못 읽으면 아래 낮춤 문장으로 안내해요.
 
    ```
    🎉 인터넷에 올라갔어요: <confirmed-public-url>
