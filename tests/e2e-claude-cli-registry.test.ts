@@ -103,9 +103,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("82 actual safe_default rationale 엔트리 including onboarding gap machine AUQ", () => {
+  test("83 actual safe_default rationale 엔트리 including onboarding gap machine AUQ", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(82);
+    expect(paths).toHaveLength(83);
 
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
@@ -162,6 +162,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "install-cli",
       "migrate",
       "migrate",
+      "onboarding",
       "onboarding",
       "onboarding",
       "onboarding",
