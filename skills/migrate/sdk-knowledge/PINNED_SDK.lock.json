@@ -1,31 +1,31 @@
 {
   "_comment": "Deliberate SDK release pin (Item 1A). Human-bumped, NOT regenerated. scripts/gen-sdk-distill.py asserts each axhub-sdk-<lang> repo HEAD == this pin before emitting and stamps pack/PINNED_SDK.json source_sha from here, so a generation against an unpinned SDK checkout fails loud. To bump: check out the new SDK release, update these shas + versions, regenerate, re-vendor into the axhub plugin. Vendored copy lives at axhub/skills/migrate/sdk-knowledge/PINNED_SDK.lock.json.",
-  "route_surface_sha": "44c6dcc5e413595098d2ea037c26b2cf238d2216",
+  "route_surface_sha": "b36fa731424b039bd11f53819b6b668596368339",
   "conformance_baseline": "ax-hub-backend@5a7b57d",
   "languages": {
     "go": {
-      "source_sha": "2dc388083fa57b83cac5c8b6ec781fb7a0833905",
-      "sdk_version": "0.2.0"
+      "source_sha": "ec287e04c76f45b305f341588b7193358b15f6be",
+      "sdk_version": "0.3.0"
     },
     "java": {
-      "source_sha": "7698664ced8f892943b1ea55ba9edbfa1fad4715",
-      "sdk_version": "0.2.0"
+      "source_sha": "fe57d36dc18f12d26e544d0fc1c7991bb44e5072",
+      "sdk_version": "0.3.0"
     },
     "kotlin": {
-      "source_sha": "6fdf7a3e2ecfab0f5b0ec9b695d81062d5e6f126",
-      "sdk_version": "0.2.1"
+      "source_sha": "f952318f641c6e5f34cf728e4c57442b8de4373e",
+      "sdk_version": "0.3.0"
     },
     "node": {
-      "source_sha": "e75032f79aed03bf138c67e8b12b8f0cffac29bb",
-      "sdk_version": "2.0.0"
+      "source_sha": "81c9c2d7f33bdb35b8169e6ec514d23c0bf92b79",
+      "sdk_version": "2.1.0"
     },
     "python": {
-      "source_sha": "44c6dcc5e413595098d2ea037c26b2cf238d2216",
-      "sdk_version": "0.2.0"
+      "source_sha": "b36fa731424b039bd11f53819b6b668596368339",
+      "sdk_version": "0.3.0"
     },
     "ruby": {
-      "source_sha": "74c899ae66f201cae71874a9776c5ddd0637b4bd",
-      "sdk_version": "0.2.0"
+      "source_sha": "c82407e681ec7df6e8a49e31a68c531a3c837386",
+      "sdk_version": "0.3.0"
     }
   }
 }

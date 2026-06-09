@@ -1,8 +1,8 @@
 ---
 lang: python
-sdk_version: 0.2.0
-source_sha: 44c6dcc5e413595098d2ea037c26b2cf238d2216
-route_surface_sha: 44c6dcc5e413595098d2ea037c26b2cf238d2216
+sdk_version: 0.3.0
+source_sha: b36fa731424b039bd11f53819b6b668596368339
+route_surface_sha: b36fa731424b039bd11f53819b6b668596368339
 conformance_baseline: ax-hub-backend@5a7b57d
 generated_by: scripts/gen-sdk-distill.py
 note: generated knowledge pack — do not hand-edit; regenerate from the SDK source
