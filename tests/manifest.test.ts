@@ -190,10 +190,16 @@ describe("marketplace.json schema", () => {
     expect(marketplaceJson.plugins.length).toBeGreaterThan(0);
   });
 
-  test("upgrade skill reads marketplace version fallback", () => {
+  test("upgrade skill uses live plugin-update-check, not stale marketplace fallback", () => {
+    // #185 redesigned the skill: remote-latest comes from a live `plugin-update-check`
+    // GitHub fetch, and the bundled marketplace.json is stale-by-design and must NEVER
+    // be the remote-latest source. The old `(.latest_version // .version // empty)` jq
+    // fallback (over a phantom field) is the abandoned anti-pattern that bug fixed.
     const marketplaceAxhub = marketplaceJson.plugins.find((p) => p.name === "axhub")!;
     expect(marketplaceAxhub.version).toBeTypeOf("string");
-    expect(upgradeSkill).toContain("(.latest_version // .version // empty)");
+    expect(upgradeSkill).toContain("plugin-update-check");
+    expect(upgradeSkill).toContain("stale-by-design");
+    expect(upgradeSkill).not.toContain("(.latest_version // .version // empty)");
   });
 
   test("upgrade helper fallback is cache-name agnostic", () => {
