@@ -25,11 +25,32 @@ import { join } from "node:path";
 const REPO_ROOT = join(import.meta.dir, "..");
 const HELPER_BINARY = join(REPO_ROOT, "target", "debug", "axhub-helpers");
 
-// The canonical invocation the SKILL (§2.7) and every SDK expert agent name.
-// Kept here as the single source the e2e exercises, so a doc edit that changes
-// the flags without changing the binary (or vice-versa) trips the parity test.
-const DOCUMENTED_CMD =
+// The canonical shape the SKILL (§2.7) and every SDK expert agent must name.
+const CANONICAL_CMD =
   "migrate-data-verify --refs refs.json --schemas schemas.json --json";
+
+// Parse the ACTUAL command out of SKILL.md §2.7 so the documented text — not a
+// hardcoded constant — drives the binary invocation below. If the SKILL renames
+// a flag (or drops the command), extraction changes and every execution arm runs
+// the binary with the drifted flags → the binary rejects them → tests fail. That
+// is the real doc↔binary parity lock; a `toContain` on a self-defined constant
+// would only restate the doc, never bind it to the binary.
+function extractDocumentedCmd(): {
+  command: string;
+  refsToken: string;
+  schemasToken: string;
+} {
+  const skill = readFileSync(join(REPO_ROOT, "skills/migrate/SKILL.md"), "utf8");
+  const m = skill.match(/migrate-data-verify --refs (\S+) --schemas (\S+) --json/);
+  if (!m) {
+    throw new Error(
+      "SKILL.md §2.7 no longer documents `migrate-data-verify --refs <f> --schemas <f> --json` — doc/binary parity lock broken",
+    );
+  }
+  return { command: m[0], refsToken: m[1], schemasToken: m[2] };
+}
+
+const DOCUMENTED = extractDocumentedCmd();
 
 function ensureHelperBuilt(): void {
   const build = spawnSync("cargo", ["build", "-p", "axhub-helpers"], {
@@ -83,20 +104,24 @@ function runVerify(refs: RefMap, schemas: RefMap): VerifyResult {
 // placeholders. This is what makes the test a *parity* lock rather than a
 // hand-written re-statement of the flags.
 function documentedArgs(refsPath: string, schemasPath: string): string[] {
-  return DOCUMENTED_CMD.split(/\s+/).map((token) => {
-    if (token === "refs.json") return refsPath;
-    if (token === "schemas.json") return schemasPath;
+  return DOCUMENTED.command.split(/\s+/).map((token) => {
+    if (token === DOCUMENTED.refsToken) return refsPath;
+    if (token === DOCUMENTED.schemasToken) return schemasPath;
     return token;
   });
 }
 
 describe("migrate-data-verify enforces the discover()-verify hard-stop end-to-end", () => {
-  test("the binary accepts the exact command the SKILL §2.7 documents", () => {
-    const skill = readFileSync(join(REPO_ROOT, "skills/migrate/SKILL.md"), "utf8");
-    // doc names the canonical invocation (also covered by the contract test, but
-    // re-asserted here so this e2e fails loudly if the lever string ever drifts)
-    expect(skill).toContain(DOCUMENTED_CMD);
-    // and every SDK expert agent names the same subcommand
+  test("the §2.7 command parsed from SKILL.md matches the canonical shape the binary parses", () => {
+    // DOCUMENTED is extracted from SKILL.md at load (above); assert it still has
+    // the exact flag skeleton the binary accepts. A flag rename in the doc would
+    // change DOCUMENTED.command and trip both this and every execution arm below,
+    // because the execution arms build argv from DOCUMENTED — the doc text, not a
+    // hardcoded constant, drives the binary invocation.
+    expect(DOCUMENTED.command).toBe(CANONICAL_CMD);
+    expect(DOCUMENTED.refsToken).toBe("refs.json");
+    expect(DOCUMENTED.schemasToken).toBe("schemas.json");
+    // every SDK expert agent the migrate flow dispatches names the same lever
     for (const lang of ["go", "java", "kotlin", "node", "python", "ruby"]) {
       const agent = readFileSync(join(REPO_ROOT, "agents", `axhub-sdk-${lang}-expert.md`), "utf8");
       expect(agent).toContain("migrate-data-verify");
@@ -164,5 +189,37 @@ describe("migrate-data-verify enforces the discover()-verify hard-stop end-to-en
     // ref would let a vibe-coder ship the silently-wrong query. Lock both arms.
     expect(runVerify({ t: ["a"] }, { t: ["a"] }).status).toBe(0);
     expect(runVerify({ t: ["a"] }, { t: ["b"] }).status).toBe(2);
+  });
+
+  test("fail-closed on broken input — malformed JSON and a missing flag both hard-stop (exit 2, ok:false)", () => {
+    // The most safety-critical branch: bad/missing input must NOT fall through to
+    // a silent pass. A verify that returned 0 / ok:true on unparseable refs or a
+    // dropped flag would let a conversion ship past a gate that did nothing — the
+    // exact "passes even though it verified nothing" hazard, just on the
+    // input-validation arm rather than the set-diff arm.
+    ensureHelperBuilt();
+    const dir = mkdtempSync(join(tmpdir(), "axhub-data-verify-e2e-bad-"));
+    const refsPath = join(dir, "refs.json");
+    const schemasPath = join(dir, "schemas.json");
+
+    // 1) malformed refs JSON
+    writeFileSync(refsPath, "{ this is not valid json");
+    writeFileSync(schemasPath, JSON.stringify({ orders: ["id"] }));
+    const malformed = spawnSync(HELPER_BINARY, documentedArgs(refsPath, schemasPath), {
+      encoding: "utf8",
+      timeout: 15_000,
+    });
+    expect(malformed.status).toBe(2);
+    expect(JSON.parse(malformed.stdout).ok).toBe(false);
+
+    // 2) missing --schemas flag entirely (no schema to diff against → cannot pass)
+    writeFileSync(refsPath, JSON.stringify({ orders: ["id"] }));
+    const missingFlag = spawnSync(
+      HELPER_BINARY,
+      ["migrate-data-verify", "--refs", refsPath, "--json"],
+      { encoding: "utf8", timeout: 15_000 },
+    );
+    expect(missingFlag.status).toBe(2);
+    expect(JSON.parse(missingFlag.stdout).ok).toBe(false);
   });
 });
