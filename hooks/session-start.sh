@@ -127,25 +127,12 @@ if [ "${AXHUB_AUTH_BG_REFRESH:-1}" != "0" ] && [ -z "${CI:-}" ] && [ -z "${CLAUD
   fi
 fi
 
-# Plugin version-drift fetch (proactive update nudge): warm the latest-release
-# TTL cache in the background so the first prompt-route turn can compare versions
-# without a network call on the hot path. Detached + best-effort; never blocks
-# session-start. The helper is TTL-gated (24h) and honors AXHUB_DISABLE_HOOK=
-# plugin-drift internally, so the spawn is cheap even when opted out.
-if [ -z "${CI:-}" ] && [ -z "${CLAUDE_NON_INTERACTIVE:-}" ]; then
-  nohup "$HELPER" plugin-latest-fetch-bg >/dev/null 2>&1 &
-  disown >/dev/null 2>&1 || true
-fi
-
-# CLI binary version-drift fetch (separate channel). Mirrors the plugin fetch but
-# shells `axhub update check --json`, so — unlike the ureq-based plugin fetch — it
-# MUST be guarded by `command -v axhub` (same as auth-refresh-bg). Merging the two
-# fetches into one unguarded fork would hit exit-127 for pre-onboarding users who
-# have not installed the CLI yet. TTL-gated (24h) + honors AXHUB_DISABLE_HOOK=cli-drift.
-if [ -z "${CI:-}" ] && [ -z "${CLAUDE_NON_INTERACTIVE:-}" ] && command -v axhub >/dev/null 2>&1; then
-  nohup "$HELPER" cli-latest-fetch-bg >/dev/null 2>&1 &
-  disown >/dev/null 2>&1 || true
-fi
+# Plugin + CLI version-drift cache warming now lives INSIDE the Rust helper's
+# `session-start` subcommand (warm_drift_caches): it spawns the same detached
+# `…-fetch-bg` children this shell used to `nohup`, but from one cross-platform
+# place (no separate .sh/.ps1 fork to drift). The fetch stays detached so
+# session-start adds zero latency; a short cache TTL makes a restart re-check
+# almost immediately. The old `nohup …-fetch-bg &` spawns were removed here.
 
 # Phase 26: warn once when superpowers using-superpowers may conflict with axhub megaskill.
 if [ "${AXHUB_DISABLE_MEGASKILL:-0}" != "1" ] && [ -d "$HOME/.codex/superpowers/skills/using-superpowers" ]; then

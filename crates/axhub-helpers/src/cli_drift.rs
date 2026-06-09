@@ -48,11 +48,12 @@ use crate::runtime_paths::{
 /// Nudge-side cache staleness bound (24h) — a cache older than this never nudges.
 const CACHE_TTL_SECS: u64 = 24 * 60 * 60;
 /// Background re-fetch cadence — short and uniform whether or not an update is
-/// pending. A freshly-released CLI is detected within the hour, AND a cache that
-/// went stale because the user *updated the CLI* (cached `current` no longer
-/// matches the installed binary) is corrected within the hour instead of
-/// lingering for a long "drift" TTL.
-const FETCH_FRESH_TTL_SECS: u64 = 60 * 60;
+/// pending. A freshly-released CLI (and a cache that went stale because the user
+/// *updated the CLI*) is corrected almost immediately. `cmd_session_start` spawns
+/// a detached warm fetch each new session, so a fresh session past this TTL
+/// re-checks and the nudge can fire from turn 1. Kept short (60s) so a rapid
+/// update→restart→check loop never skips.
+const FETCH_TTL_SECS: u64 = 60;
 /// In-session re-nudge snooze (mirrors `plugin_update`). After the nudge fires it
 /// stays suppressed within the SAME session for this long, then re-surfaces; a
 /// NEW session re-surfaces immediately (session-id mismatch). Preserves the
@@ -260,12 +261,13 @@ fn cmd_cli_latest_fetch_bg_with(fetch: impl Fn() -> Option<CliLatestCache>) -> i
     if is_hook_disabled("cli-drift") {
         return 0;
     }
-    // Skip the subprocess only while the cache is still fresh (uniform 1h cadence,
-    // pending or not). The old longer "pending" TTL kept a stale cache after the
-    // user updated the CLI mid-session, so a newer release wasn't noticed for up
-    // to 12h. Re-polling hourly corrects `current`/`latest` against reality.
+    // Skip the subprocess only while the cache is still fresh (uniform short
+    // cadence). The old longer "pending" TTL kept a stale cache after the user
+    // updated the CLI mid-session, so a newer release wasn't noticed for up to
+    // 12h. The short TTL re-polls each new session and corrects `current`/`latest`
+    // against reality within minutes.
     if let Some(cache) = read_cache() {
-        if now_unix().saturating_sub(cache.fetched_at) < FETCH_FRESH_TTL_SECS {
+        if now_unix().saturating_sub(cache.fetched_at) < FETCH_TTL_SECS {
             return 0;
         }
     }
@@ -273,6 +275,19 @@ fn cmd_cli_latest_fetch_bg_with(fetch: impl Fn() -> Option<CliLatestCache>) -> i
         let _ = write_cache(&parsed);
     }
     0
+}
+
+/// `true` when the cli-latest cache is absent or older than `FETCH_TTL_SECS` (so
+/// `cmd_session_start` knows whether to spawn a detached warm fetch).
+/// Returns `false` when the CLI drift channel is disabled.
+pub fn needs_refresh() -> bool {
+    if is_hook_disabled("cli-drift") {
+        return false;
+    }
+    match read_cache() {
+        None => true,
+        Some(cache) => now_unix().saturating_sub(cache.fetched_at) >= FETCH_TTL_SECS,
+    }
 }
 
 /// Permanent opt-out (`axhub-helpers cli-drift-optout`). Writes the marker the
@@ -732,10 +747,10 @@ mod tests {
     }
 
     #[test]
-    fn fetch_refreshes_up_to_date_cache_past_one_hour() {
-        // Fast-detection fix: an up-to-date CLI cache (has_update=false) older than
-        // the 1h fresh TTL re-fetches, so a newly-released CLI surfaces within the
-        // hour instead of waiting out the 24h bound.
+    fn fetch_refreshes_cache_past_ttl() {
+        // Fast-detection fix: any CLI cache older than the short fetch TTL
+        // re-fetches, so a newly-released CLI (or the user's own CLI update)
+        // surfaces within minutes instead of waiting out the old 1h/12h cadence.
         let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
         let _env = EnvGuard::clear();
         let cache_dir = tempfile::tempdir().unwrap();
@@ -747,7 +762,7 @@ mod tests {
             "0.18.1",
             false,
             false,
-            now_unix() - FETCH_FRESH_TTL_SECS - 1,
+            now_unix() - FETCH_TTL_SECS - 1,
         ))
         .unwrap();
 
@@ -759,20 +774,20 @@ mod tests {
             }),
             0
         );
-        assert!(called.get(), "up-to-date cache past 1h must re-fetch");
+        assert!(called.get(), "cache past TTL must re-fetch");
         assert!(read_cache().unwrap().has_update); // refreshed to update-available
     }
 
     #[test]
     fn fetch_skips_recent_up_to_date_cache() {
-        // Up to date and younger than the 1h fresh TTL → no needless subprocess.
+        // Younger than the short fetch TTL → no needless subprocess.
         let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
         let _env = EnvGuard::clear();
         let cache_dir = tempfile::tempdir().unwrap();
         let state_dir = tempfile::tempdir().unwrap();
         std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
         std::env::set_var("XDG_STATE_HOME", state_dir.path());
-        write_cache(&cache("0.18.1", "0.18.1", false, false, now_unix() - 60)).unwrap();
+        write_cache(&cache("0.18.1", "0.18.1", false, false, now_unix() - 10)).unwrap();
 
         let called = std::cell::Cell::new(false);
         assert_eq!(
@@ -786,6 +801,40 @@ mod tests {
             !called.get(),
             "recent up-to-date cache should skip the fetch"
         );
+    }
+
+    #[test]
+    fn needs_refresh_true_when_absent_false_when_fresh_true_when_stale() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        assert!(needs_refresh(), "absent cache needs refresh");
+        write_cache(&cache("0.18.1", "0.18.2", true, false, now_unix())).unwrap();
+        assert!(!needs_refresh(), "fresh cache does not need refresh");
+        write_cache(&cache(
+            "0.18.1",
+            "0.18.2",
+            true,
+            false,
+            now_unix() - FETCH_TTL_SECS - 1,
+        ))
+        .unwrap();
+        assert!(needs_refresh(), "cache past TTL needs refresh");
+    }
+
+    #[test]
+    fn needs_refresh_false_when_channel_disabled() {
+        let _guard = crate::PROCESS_ENV_LOCK.lock().unwrap();
+        let _env = EnvGuard::clear();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let state_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", cache_dir.path());
+        std::env::set_var("XDG_STATE_HOME", state_dir.path());
+        std::env::set_var("AXHUB_DISABLE_HOOK", "cli-drift");
+        assert!(!needs_refresh(), "disabled channel never needs refresh");
     }
 
     #[test]

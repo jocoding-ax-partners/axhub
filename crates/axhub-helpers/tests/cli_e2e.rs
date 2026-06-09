@@ -27,6 +27,10 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    // session-start's drift-cache warm only fires under CLAUDE_PLUGIN_ROOT (real
+    // plugin session). Strip it so the suite never spawns a network fetch even if
+    // a dev runs `cargo test` with it exported.
+    command.env_remove("CLAUDE_PLUGIN_ROOT");
     let needs_prompt_route_sandbox = args.contains(&"prompt-route")
         && !envs
             .iter()
