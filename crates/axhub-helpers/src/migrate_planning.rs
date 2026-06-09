@@ -225,7 +225,7 @@ pub struct ParallelismPolicy {
     pub enabled: bool,
     pub scope: String,
     pub reason: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    // #6 §5-required: emit `null` (not dropped) so strict consumers always see the key.
     pub fallback_reason: Option<String>,
 }
 
@@ -255,7 +255,8 @@ pub struct MigratePlanRunRecord {
     pub escalation_reason: EscalationReason,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub confidence: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    // #6 §5-required: emit `[]` (not dropped) so strict consumers always see the key.
+    #[serde(default)]
     pub hard_stop_reasons: Vec<String>,
     pub workspace_scope: WorkspaceScope,
     pub parallelism: ParallelismPolicy,
@@ -395,7 +396,7 @@ pub struct MigratePlanWaveIndex {
     pub enabled: bool,
     pub policy: String,
     pub multi_app_allowed: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    // #6 §5-required: emit `null` (not dropped) so strict consumers always see the key.
     pub fallback_reason: Option<String>,
     pub waves: Vec<String>,
     pub dependency_graph_sha256: String,
@@ -421,7 +422,8 @@ pub struct MigratePlanWaveRecord {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub write_targets: Vec<String>,
     pub state: WaveState,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    // #6 §5-required: emit `[]` (not dropped) so strict consumers always see the key.
+    #[serde(default)]
     pub receipts: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub independence_proof: Vec<String>,
@@ -1272,6 +1274,21 @@ pub fn migrate_stage_write(
         }
         approval.state = next;
         if next == ApprovalState::PendingApproval && run.mode == PlanningMode::FullConsensus {
+            // §8.10: refuse to seal running → pending_approval while any wave is
+            // in-progress-unfinished. `planned`/`complete` waves are acceptable at seal.
+            let seal_waves = load_existing_waves(&run_dir.join("waves"))?;
+            if let Some(blocking) = seal_waves.iter().find(|wave| {
+                matches!(
+                    wave.state,
+                    WaveState::Running | WaveState::NeedsRevision | WaveState::Blocked
+                )
+            }) {
+                bail!(
+                    "migrate-stage-write: 진행 중 wave 가 있어 seal 할 수 없어요 ({} = {:?}) (§8.10)",
+                    blocking.wave_id,
+                    blocking.state
+                );
+            }
             approval.approved_stage_artifacts = collect_stage_sha_list(&run_dir.join("stages"))?;
             let adr_path = run_dir.join("adr.md");
             if !adr_path.exists() {
@@ -1299,19 +1316,13 @@ pub fn migrate_stage_write(
             None,
             &now,
         )?;
-    } else if effective_run_state == RunState::NeedsRevision {
-        update_spec_meta_state(
-            &spec_meta_path,
-            "needs_revision",
-            Some(effective_approval_state.state_str()),
-            None,
-            None,
-            None,
-            &now,
-        )?;
     } else if !spec_markdown_path.exists() {
         bail!("migrate-stage-write: target spec markdown 를 찾지 못했어요");
     }
+    // #3 restructure: the spec stays `draft` through the revision loop. The run/approval
+    // states carry the revision signal (via the wired Run guard above), so the over-propagating
+    // `draft → needs_revision` spec-meta write was removed. The only production spec transition
+    // on this path is now `draft → pending_approval` (legal per the §7 SpecState matrix).
     update_latest_run_state(&run, run_dir)?;
 
     if approval.state == ApprovalState::PendingApproval {
@@ -1489,6 +1500,38 @@ pub fn migrate_wave_plan(
     };
 
     let mut existing = load_existing_waves(&waves_dir)?;
+    // #3 §7 WaveState guard (with idempotency escape). Capture the prior state BEFORE `retain`
+    // discards it: `None` is a fresh wave (must be born `planned`); `Some(prior)` allows the
+    // idempotent same-state upsert (`prior == state`) plus any legal §7 transition.
+    let prior_wave_state = existing
+        .iter()
+        .find(|wave| wave.wave_id == wave_id)
+        .map(|wave| wave.state);
+    match prior_wave_state {
+        None => {
+            if state != WaveState::Planned {
+                bail!("migrate-wave-plan: 새 wave 는 planned 상태로 시작해야 해요 (none → {state:?})");
+            }
+        }
+        Some(prior) => {
+            if prior != state && !prior.can_transition_to(state) {
+                bail!("migrate-wave-plan: invalid wave state transition ({prior:?} → {state:?})");
+            }
+        }
+    }
+    // #2 §8.9 (candidate-scoped, before `existing.push`): a `complete` wave must declare
+    // artifact backing that actually exists on disk. The record has no sha/output_ref field
+    // and `receipts` is always empty, so `artifact_list` + fs-existence is the only signal.
+    if state == WaveState::Complete {
+        if artifact_list.is_empty() {
+            bail!("migrate-wave-plan: complete wave 는 artifact_list backing 이 필요해요 (§8.9)");
+        }
+        for artifact in &artifact_list {
+            if !run_dir.join(artifact).exists() {
+                bail!("migrate-wave-plan: complete wave artifact 가 디스크에 없어요: {artifact} (§8.9)");
+            }
+        }
+    }
     existing.retain(|wave| wave.wave_id != wave_id);
     let graph_seed = existing
         .iter()
@@ -1652,6 +1695,18 @@ fn parse_wave_state(value: &str) -> Result<WaveState> {
     }
 }
 
+fn parse_spec_state(value: &str) -> Result<SpecState> {
+    match value {
+        "draft" => Ok(SpecState::Draft),
+        "pending_approval" => Ok(SpecState::PendingApproval),
+        "approved" => Ok(SpecState::Approved),
+        "needs_revision" => Ok(SpecState::NeedsRevision),
+        "rejected" => Ok(SpecState::Rejected),
+        "superseded" => Ok(SpecState::Superseded),
+        _ => bail!("migrate planning: unknown spec state"),
+    }
+}
+
 fn required_path(value: Option<PathBuf>, flag: &str) -> Result<PathBuf> {
     value.with_context(|| format!("migrate planning: {flag} 값이 필요해요"))
 }
@@ -1791,6 +1846,19 @@ fn update_spec_meta_state(
     updated_at: &str,
 ) -> Result<()> {
     let mut value = read_json::<Value>(spec_meta_path)?;
+    // #3 §7 SpecState guard (with idempotency escape). The matrices have no reflexive edges,
+    // so the `current != next` escape is required for legal same-state re-writes (e.g.
+    // migrate_approve's re-approve `approved → approved`). Skip silently if either status is
+    // unparseable so legacy/foreign meta files are not hard-failed.
+    if let Some(current_str) = value["status"].as_str() {
+        if let (Ok(current), Ok(next)) =
+            (parse_spec_state(current_str), parse_spec_state(status))
+        {
+            if current != next && !current.can_transition_to(next) {
+                bail!("migrate planning: invalid spec state transition ({current_str} → {status})");
+            }
+        }
+    }
     value["status"] = Value::String(status.to_string());
     value["updated_at"] = Value::String(updated_at.to_string());
     if let Some(state) = approval_state {
@@ -1989,9 +2057,10 @@ mod tests {
         assert_eq!(resolved.planning_root, canonical_repo.join(".axhub"));
     }
 
-    #[test]
-    fn run_record_rejects_multi_app_and_spec_only_parallelism() {
-        let record = MigratePlanRunRecord {
+    // A valid spec_only run that passes `validate()`. Each #7/§8 reach-test mutates exactly
+    // one field so the injected defect is the only reason the validator can bail.
+    fn spec_only_run_fixture() -> MigratePlanRunRecord {
+        MigratePlanRunRecord {
             schema_version: MIGRATE_PLAN_RUN_SCHEMA_VERSION.to_string(),
             run_id: "run-1".to_string(),
             app_key: "root-12345678".to_string(),
@@ -1999,12 +2068,9 @@ mod tests {
             repo_root: "/repo".to_string(),
             remote_repo: None,
             r#ref: None,
-            owned_app_keys: Some(vec![
-                "root-12345678".to_string(),
-                "other-87654321".to_string(),
-            ]),
+            owned_app_keys: Some(vec!["root-12345678".to_string()]),
             mode: PlanningMode::SpecOnly,
-            stage_order: vec!["discover".to_string()],
+            stage_order: vec![],
             state: RunState::Draft,
             escalation_reason: EscalationReason::LowConfidence,
             confidence: Some("0.61".to_string()),
@@ -2017,9 +2083,9 @@ mod tests {
                 conflict: None,
             },
             parallelism: ParallelismPolicy {
-                enabled: true,
+                enabled: false,
                 scope: "serial".to_string(),
-                reason: "wrong".to_string(),
+                reason: "spec_only_serial_required".to_string(),
                 fallback_reason: None,
             },
             wave_policy: WavePolicy {
@@ -2027,13 +2093,120 @@ mod tests {
                 independence_required: true,
                 multi_app_allowed: false,
             },
-            wave_index_path: Some("/repo/.axhub/plan/runs/run-1/waves/waves.json".to_string()),
+            wave_index_path: None,
             repo_fingerprint: "abc".to_string(),
             created_at: "2026-01-01T00:00:00Z".to_string(),
             updated_at: "2026-01-01T00:00:00Z".to_string(),
-        };
+        }
+    }
+
+    #[test]
+    fn spec_only_run_fixture_is_valid() {
+        // Guards the reach-tests below: the baseline must pass so each mutation is the sole defect.
+        spec_only_run_fixture().validate().unwrap();
+    }
+
+    #[test]
+    fn run_record_rejects_multi_owned_app_keys() {
+        // #7 split: the owned_app_keys defect is reached on its own (no `||` short-circuit).
+        let mut record = spec_only_run_fixture();
+        record.owned_app_keys = Some(vec![
+            "root-12345678".to_string(),
+            "other-87654321".to_string(),
+        ]);
         let error = record.validate().unwrap_err().to_string();
-        assert!(error.contains("owned_app_keys") || error.contains("spec_only"));
+        assert!(error.contains("owned_app_keys"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn run_record_rejects_spec_only_parallelism() {
+        // #7 split: the spec_only parallelism branch is reached independently.
+        let mut record = spec_only_run_fixture();
+        record.parallelism.enabled = true;
+        let error = record.validate().unwrap_err().to_string();
+        assert!(error.contains("serial"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn run_record_rejects_spec_only_wave_metadata() {
+        // §8.4: spec_only must not declare wave metadata (reaches the wave_index_path validator).
+        let mut record = spec_only_run_fixture();
+        record.wave_index_path =
+            Some("/repo/.axhub/plan/runs/run-1/waves/waves.json".to_string());
+        let error = record.validate().unwrap_err().to_string();
+        assert!(error.contains("wave metadata"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn run_record_rejects_multi_app_allowed() {
+        // §8.2: multi_app_allowed must remain false in v1.
+        let mut record = spec_only_run_fixture();
+        record.wave_policy.multi_app_allowed = true;
+        let error = record.validate().unwrap_err().to_string();
+        assert!(error.contains("multi_app"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn required_fields_serialize_as_empty_not_dropped() {
+        // #6: §5-required fields emit []/null even when empty, instead of being dropped by
+        // `skip_serializing_if`, so a strict consumer always sees the key.
+        let run_json = serde_json::to_value(spec_only_run_fixture()).unwrap();
+        assert!(
+            run_json.get("hard_stop_reasons").is_some(),
+            "run.json hard_stop_reasons key was dropped"
+        );
+        assert!(run_json["hard_stop_reasons"].is_array());
+        assert!(
+            run_json["parallelism"].get("fallback_reason").is_some(),
+            "run.json parallelism.fallback_reason key was dropped"
+        );
+        assert!(run_json["parallelism"]["fallback_reason"].is_null());
+
+        let index = MigratePlanWaveIndex {
+            schema_version: MIGRATE_PLAN_WAVES_SCHEMA_VERSION.to_string(),
+            run_id: "run-1".to_string(),
+            app_key: "root-12345678".to_string(),
+            enabled: true,
+            policy: "conditional_parallel".to_string(),
+            multi_app_allowed: false,
+            fallback_reason: None,
+            waves: vec![],
+            dependency_graph_sha256: "sha".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: "2026-01-01T00:00:00Z".to_string(),
+        };
+        let index_json = serde_json::to_value(&index).unwrap();
+        assert!(
+            index_json.get("fallback_reason").is_some(),
+            "waves.json fallback_reason key was dropped"
+        );
+        assert!(index_json["fallback_reason"].is_null());
+
+        let wave = MigratePlanWaveRecord {
+            schema_version: MIGRATE_PLAN_WAVE_SCHEMA_VERSION.to_string(),
+            run_id: "run-1".to_string(),
+            app_key: "root-12345678".to_string(),
+            wave_id: "wave-a".to_string(),
+            wave_n: 1,
+            stage_scope: "reviewer".to_string(),
+            depends_on: vec![],
+            dependency_graph: BTreeMap::new(),
+            participants: vec!["root-12345678".to_string()],
+            artifact_list: vec![],
+            write_targets: vec![],
+            state: WaveState::Planned,
+            receipts: vec![],
+            independence_proof: vec!["disjoint inputs".to_string()],
+            conflict_policy: "fallback_to_serial".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: "2026-01-01T00:00:00Z".to_string(),
+        };
+        let wave_json = serde_json::to_value(&wave).unwrap();
+        assert!(
+            wave_json.get("receipts").is_some(),
+            "wave record receipts key was dropped"
+        );
+        assert!(wave_json["receipts"].is_array());
     }
 
     #[test]
@@ -2165,7 +2338,50 @@ mod tests {
     }
 
     #[test]
-    fn wave_validation_rejects_multi_app_and_cycles() {
+    fn wave_validation_rejects_multi_app_participant() {
+        // #7 split / §8.3: a participant outside the run app_key is the sole, identifiable defect.
+        let index = MigratePlanWaveIndex {
+            schema_version: MIGRATE_PLAN_WAVES_SCHEMA_VERSION.to_string(),
+            run_id: "run-1".to_string(),
+            app_key: "root-12345678".to_string(),
+            enabled: true,
+            policy: "conditional_parallel".to_string(),
+            multi_app_allowed: false,
+            fallback_reason: Some("conflict".to_string()),
+            waves: vec!["wave-a".to_string()],
+            dependency_graph_sha256: "sha".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: "2026-01-01T00:00:00Z".to_string(),
+        };
+        let waves = vec![MigratePlanWaveRecord {
+            schema_version: MIGRATE_PLAN_WAVE_SCHEMA_VERSION.to_string(),
+            run_id: "run-1".to_string(),
+            app_key: "root-12345678".to_string(),
+            wave_id: "wave-a".to_string(),
+            wave_n: 1,
+            stage_scope: "discover".to_string(),
+            depends_on: vec![],
+            dependency_graph: BTreeMap::new(),
+            participants: vec!["root-12345678".to_string(), "other-87654321".to_string()],
+            artifact_list: vec!["01-discover.md".to_string()],
+            write_targets: vec!["run.json".to_string()],
+            state: WaveState::Planned,
+            receipts: vec![],
+            independence_proof: vec!["disjoint inputs".to_string()],
+            conflict_policy: "fallback_to_serial".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: "2026-01-01T00:00:00Z".to_string(),
+        }];
+        let error = validate_wave_plan(&index, &waves).unwrap_err().to_string();
+        assert!(
+            error.contains("participants must share the run app_key"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn wave_validation_rejects_dependency_cycles() {
+        // #7 split / §8.7: a depends_on cycle is the sole, identifiable defect (participants valid).
         let index = MigratePlanWaveIndex {
             schema_version: MIGRATE_PLAN_WAVES_SCHEMA_VERSION.to_string(),
             run_id: "run-1".to_string(),
@@ -2188,11 +2404,8 @@ mod tests {
                 wave_n: 1,
                 stage_scope: "discover".to_string(),
                 depends_on: vec!["wave-b".to_string()],
-                dependency_graph: BTreeMap::from([
-                    ("wave-a".to_string(), vec!["wave-b".to_string()]),
-                    ("wave-b".to_string(), vec!["wave-a".to_string()]),
-                ]),
-                participants: vec!["root-12345678".to_string(), "other-87654321".to_string()],
+                dependency_graph: BTreeMap::new(),
+                participants: vec!["root-12345678".to_string()],
                 artifact_list: vec!["01-discover.md".to_string()],
                 write_targets: vec!["run.json".to_string()],
                 state: WaveState::Planned,
@@ -2210,10 +2423,7 @@ mod tests {
                 wave_n: 2,
                 stage_scope: "discover".to_string(),
                 depends_on: vec!["wave-a".to_string()],
-                dependency_graph: BTreeMap::from([
-                    ("wave-a".to_string(), vec!["wave-b".to_string()]),
-                    ("wave-b".to_string(), vec!["wave-a".to_string()]),
-                ]),
+                dependency_graph: BTreeMap::new(),
                 participants: vec!["root-12345678".to_string()],
                 artifact_list: vec!["02-discover.md".to_string()],
                 write_targets: vec!["approval.json".to_string()],
@@ -2225,7 +2435,65 @@ mod tests {
                 updated_at: "2026-01-01T00:00:00Z".to_string(),
             },
         ];
-        assert!(validate_wave_plan(&index, &waves).is_err());
+        let error = validate_wave_plan(&index, &waves).unwrap_err().to_string();
+        assert!(
+            error.contains("dependency cycles are not allowed"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn wave_validation_rejects_same_wave_target_overlap_per_category() {
+        // #2 §8.5: a target appearing twice in ONE wave is rejected, across all 7 target classes.
+        let categories = [
+            ("artifact_path", "stages/05-reviewer.md"),
+            ("latest_pointer", ".axhub/spec/apps/root-12345678/latest.json"),
+            ("plan_app_index", ".axhub/plan/apps/root-12345678/latest-run.json"),
+            ("spec_app_dir", ".axhub/spec/apps/root-12345678/specs/spec-1.md"),
+            ("run_metadata", "run.json"),
+            ("approval_metadata", "approval.json"),
+            ("receipt_target", "receipts.jsonl"),
+        ];
+        for (category, target) in categories {
+            let index = MigratePlanWaveIndex {
+                schema_version: MIGRATE_PLAN_WAVES_SCHEMA_VERSION.to_string(),
+                run_id: "run-1".to_string(),
+                app_key: "root-12345678".to_string(),
+                enabled: true,
+                policy: "conditional_parallel".to_string(),
+                multi_app_allowed: false,
+                fallback_reason: None,
+                waves: vec!["wave-a".to_string()],
+                dependency_graph_sha256: "sha".to_string(),
+                created_at: "2026-01-01T00:00:00Z".to_string(),
+                updated_at: "2026-01-01T00:00:00Z".to_string(),
+            };
+            let waves = vec![MigratePlanWaveRecord {
+                schema_version: MIGRATE_PLAN_WAVE_SCHEMA_VERSION.to_string(),
+                run_id: "run-1".to_string(),
+                app_key: "root-12345678".to_string(),
+                wave_id: "wave-a".to_string(),
+                wave_n: 1,
+                stage_scope: "reviewer".to_string(),
+                depends_on: vec![],
+                dependency_graph: BTreeMap::new(),
+                participants: vec!["root-12345678".to_string()],
+                artifact_list: vec![],
+                // same target twice inside one wave -> §8.5 overlap.
+                write_targets: vec![target.to_string(), target.to_string()],
+                state: WaveState::Planned,
+                receipts: vec![],
+                independence_proof: vec!["disjoint inputs".to_string()],
+                conflict_policy: "fallback_to_serial".to_string(),
+                created_at: "2026-01-01T00:00:00Z".to_string(),
+                updated_at: "2026-01-01T00:00:00Z".to_string(),
+            }];
+            let error = validate_wave_plan(&index, &waves).unwrap_err().to_string();
+            assert!(
+                error.contains("duplicate write target inside one wave"),
+                "{category}: unexpected error: {error}"
+            );
+        }
     }
 
     #[test]
@@ -2284,5 +2552,55 @@ mod tests {
             },
         ];
         assert!(validate_wave_plan(&index, &waves).is_err());
+    }
+
+    #[test]
+    fn update_spec_meta_state_rejects_illegal_transition() {
+        let temp = tempfile::tempdir().unwrap();
+        let meta = temp.path().join("spec.meta.json");
+        write_json_atomically(
+            &meta,
+            &json!({"status": "approved", "approval": {"state": "approved"}}),
+        )
+        .unwrap();
+        // approved -> needs_revision is illegal per the SpecState matrix (Approved -> Superseded only).
+        let error = update_spec_meta_state(
+            &meta,
+            "needs_revision",
+            Some("needs_revision"),
+            None,
+            None,
+            None,
+            "2026-01-01T00:00:00Z",
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            error.contains("invalid spec state transition"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn update_spec_meta_state_allows_idempotent_same_state() {
+        let temp = tempfile::tempdir().unwrap();
+        let meta = temp.path().join("spec.meta.json");
+        write_json_atomically(
+            &meta,
+            &json!({"status": "approved", "approval": {"state": "approved"}}),
+        )
+        .unwrap();
+        // approved -> approved must NOT bail: the matrices have no reflexive edges, so the
+        // `current != next` escape (mirroring migrate_approve's re-approve path) is required.
+        update_spec_meta_state(
+            &meta,
+            "approved",
+            Some("approved"),
+            None,
+            None,
+            None,
+            "2026-01-01T00:00:00Z",
+        )
+        .unwrap();
     }
 }

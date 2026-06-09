@@ -6055,3 +6055,530 @@ fn cli_migrate_plan_emits_six_language_wrapper_previews_without_secret_leak() {
         .unwrap()
         .contains("package ai.axhub.sdk"));
 }
+
+fn seed_full_consensus_run(temp: &Path) -> (String, String) {
+    std::fs::create_dir_all(temp.join("src")).unwrap();
+    std::fs::write(
+        temp.join("package.json"),
+        r#"{"dependencies":{"next-auth":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.join("src/db.ts"),
+        "export async function rows(db: any) { return db.query('select * from users'); }",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.join("src/auth.ts"),
+        "import passport from 'passport';\nexport const current_user = (req: any) => req.user;",
+    )
+    .unwrap();
+    let seeded = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.to_str().unwrap(),
+        "--persist-planning",
+        "--json",
+    ]);
+    assert_eq!(seeded.status.code(), Some(0));
+    let seeded_json: serde_json::Value = serde_json::from_slice(&seeded.stdout).unwrap();
+    let run_json = seeded_json["planning_persistence"]["paths"]["run_json"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let app_key = seeded_json["planning"]["app_key"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    (run_json, app_key)
+}
+
+#[test]
+fn cli_migrate_wave_plan_rejects_illegal_state_jump() {
+    // §7 WaveState guard: a fresh wave must be born `planned` (none -> complete is illegal).
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    let output = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-x",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--state",
+        "complete",
+        "--json",
+    ]);
+    assert_ne!(output.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("planned"),
+        "expected wave-birth guard, got stderr: {stderr}"
+    );
+}
+
+#[test]
+fn cli_migrate_wave_plan_complete_requires_artifact_backing() {
+    // §8.9: a wave reaching `complete` via the legal 3-call path must have on-disk artifact backing.
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    let planned = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--json",
+    ]);
+    assert_eq!(planned.status.code(), Some(0));
+    let running = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--state",
+        "running",
+        "--json",
+    ]);
+    assert_eq!(running.status.code(), Some(0));
+    // complete declaring an artifact whose file is absent on disk -> §8.9 reject.
+    let completed = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--state",
+        "complete",
+        "--artifact",
+        "missing-backing.md",
+        "--json",
+    ]);
+    assert_ne!(completed.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&completed.stderr);
+    assert!(
+        stderr.contains("§8.9") || stderr.contains("artifact"),
+        "expected §8.9 backing reject, got stderr: {stderr}"
+    );
+}
+
+#[test]
+fn cli_migrate_wave_plan_complete_accepts_present_artifact() {
+    // §8.9 positive: a `complete` wave whose declared artifacts exist on disk is accepted.
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    let run_dir = std::path::Path::new(&run_json)
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    std::fs::write(run_dir.join("backing-a.md"), "# backing").unwrap();
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--state",
+            "running",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    let completed = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--state",
+        "complete",
+        "--artifact",
+        "backing-a.md",
+        "--json",
+    ]);
+    assert_eq!(
+        completed.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&completed.stderr)
+    );
+    let wave_a: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(run_dir.join("waves/wave-a.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(wave_a["state"], "complete");
+}
+
+#[test]
+fn cli_migrate_wave_plan_idempotent_replan_at_planned_stays_ok() {
+    // Idempotency escape: re-running the SAME wave_id at the SAME planned state is a legal upsert.
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    let first = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--json",
+    ]);
+    assert_eq!(first.status.code(), Some(0));
+    let second = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--json",
+    ]);
+    assert_eq!(
+        second.status.code(),
+        Some(0),
+        "idempotent re-plan must stay exit-0, stderr: {}",
+        String::from_utf8_lossy(&second.stderr)
+    );
+}
+
+#[test]
+fn cli_migrate_wave_plan_persisted_complete_not_rerejected() {
+    // Candidate-scoping (non-regression): a persisted `complete` wave must NOT be re-validated
+    // for §8.9 backing when a second, different wave is written in the same run.
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    let run_dir = std::path::Path::new(&run_json)
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    std::fs::write(run_dir.join("backing-a.md"), "# backing").unwrap();
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--state",
+            "running",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--state",
+            "complete",
+            "--artifact",
+            "backing-a.md",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    // wave-b is a NEW planned wave in the same run; persisted complete wave-a must survive.
+    let wave_b = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-b",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence b",
+        "--write-target",
+        "stages/05-reviewer-b.md",
+        "--json",
+    ]);
+    assert_eq!(
+        wave_b.status.code(),
+        Some(0),
+        "second same-run write must not re-reject persisted complete wave, stderr: {}",
+        String::from_utf8_lossy(&wave_b.stderr)
+    );
+    let wave_a: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(run_dir.join("waves/wave-a.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(wave_a["state"], "complete");
+}
+
+#[test]
+fn cli_migrate_stage_write_rejects_seal_with_incomplete_wave() {
+    // §8.10: sealing running -> pending_approval must reject while a wave is in-progress-unfinished.
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--state",
+            "running",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--state",
+            "needs_revision",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    let reviewer_md = temp.path().join("reviewer.md");
+    std::fs::write(&reviewer_md, "# Reviewer\n\n- approve").unwrap();
+    let sealed = run(&[
+        "migrate-stage-write",
+        "--run-json",
+        &run_json,
+        "--stage",
+        "reviewer",
+        "--markdown-file",
+        reviewer_md.to_str().unwrap(),
+        "--run-state",
+        "pending_approval",
+        "--approval-state",
+        "pending_approval",
+        "--json",
+    ]);
+    assert_ne!(sealed.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&sealed.stderr);
+    assert!(
+        stderr.contains("§8.10") || stderr.contains("진행 중 wave"),
+        "expected §8.10 incomplete-wave reject, got stderr: {stderr}"
+    );
+}
+
+#[test]
+fn cli_migrate_stage_write_seals_with_planned_wave_present() {
+    // §8.10 positive: a `planned` wave is acceptable at seal time (only Running/NeedsRevision/Blocked bail).
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    let planner_md = temp.path().join("planner.md");
+    let architect_md = temp.path().join("architect.md");
+    let critic_md = temp.path().join("critic.md");
+    let reviewer_md = temp.path().join("reviewer.md");
+    let adr_md = temp.path().join("adr.md");
+    std::fs::write(&planner_md, "# Planner\n\n- plan").unwrap();
+    std::fs::write(&architect_md, "# Architect\n\n- clear").unwrap();
+    std::fs::write(&critic_md, "# Critic\n\n- okay").unwrap();
+    std::fs::write(&reviewer_md, "# Reviewer\n\n- approve").unwrap();
+    std::fs::write(&adr_md, "# ADR\n\n- chosen").unwrap();
+    for (stage, file) in [
+        ("planner", &planner_md),
+        ("architect", &architect_md),
+        ("critic", &critic_md),
+        ("adr", &adr_md),
+    ] {
+        assert_eq!(
+            run(&[
+                "migrate-stage-write",
+                "--run-json",
+                &run_json,
+                "--stage",
+                stage,
+                "--markdown-file",
+                file.to_str().unwrap(),
+                "--json",
+            ])
+            .status
+            .code(),
+            Some(0)
+        );
+    }
+    let sealed = run(&[
+        "migrate-stage-write",
+        "--run-json",
+        &run_json,
+        "--stage",
+        "reviewer",
+        "--markdown-file",
+        reviewer_md.to_str().unwrap(),
+        "--run-state",
+        "pending_approval",
+        "--approval-state",
+        "pending_approval",
+        "--json",
+    ]);
+    assert_eq!(
+        sealed.status.code(),
+        Some(0),
+        "planned-only run must still seal, stderr: {}",
+        String::from_utf8_lossy(&sealed.stderr)
+    );
+    let sealed_json: serde_json::Value = serde_json::from_slice(&sealed.stdout).unwrap();
+    assert_eq!(sealed_json["approval_state"], "pending_approval");
+}

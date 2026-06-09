@@ -152,7 +152,8 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain("& $Helper migrate-plan --dir $MigrateDir --app-path $env:APP_PATH --json");
   });
 
-  test("ships dedicated migrate planning agent markdown files", () => {
+  test("ships migrate planning agent markdown files as reference scaffolds (not yet dispatched)", () => {
+    const skill = read("skills/migrate/SKILL.md");
     for (const agent of [
       "axhub-migrate-discoverer",
       "axhub-migrate-planner",
@@ -162,6 +163,8 @@ describe("migrate SKILL contract", () => {
     ]) {
       expect(existsSync(join(REPO_ROOT, "agents", `${agent}.md`))).toBe(true);
     }
+    // SKILL must label these files as reference scaffolds, not dispatched lanes
+    expect(skill).toContain("reference scaffold");
   });
   test("corpus.100 routes core existing-app natural language to migrate", () => {
     const rows = parseJsonl("tests/corpus.100.jsonl");

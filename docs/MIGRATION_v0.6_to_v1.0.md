@@ -5,7 +5,7 @@
 ### 신규
 
 - 5 quality SKILL: axhub-review, axhub-debug, axhub-ship, axhub-tdd, axhub-plan
-- 8 agent md: 3 quality (`axhub-reviewer`, `axhub-debugger`, `axhub-shipper`) + 5 migrate planning (`axhub-migrate-discoverer`, `axhub-migrate-planner`, `axhub-migrate-architect`, `axhub-migrate-critic`, `axhub-migrate-reviewer`)
+- 8 agent md: 3 quality (`axhub-reviewer`, `axhub-debugger`, `axhub-shipper`) + 5 migrate planning (`axhub-migrate-discoverer`, `axhub-migrate-planner`, `axhub-migrate-architect`, `axhub-migrate-critic`, `axhub-migrate-reviewer`) — reference scaffold 로 배포됨, 아직 dispatch 연결 안 됨
 - using-axhub-quality megaskill
 - karpathy-guidelines UserPromptSubmit reminder
 - `.axhub-state/quality.json` per-repo state
