@@ -111,6 +111,12 @@ fn git_dirty_allow_dirty_wip_commits_and_cleans_tree() {
     assert_eq!(v["ok"], true);
     assert_eq!(v["mode"], "git_dirty_wip");
     assert_eq!(v["checkpoint_ref"].as_str().unwrap().len(), 40);
+    // rollback must also remove the expert's post-checkpoint untracked files,
+    // not just reset tracked state
+    assert!(v["rollback_command"]
+        .as_str()
+        .unwrap()
+        .contains("clean -fd"));
     // the pre-existing change is saved in the WIP commit → tree is clean again
     let after = guard(tmp.path(), &[]);
     assert_eq!(after["mode"], "git_clean");

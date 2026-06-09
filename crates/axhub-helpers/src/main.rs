@@ -3279,7 +3279,10 @@ fn cmd_migrate_guard(rest: &[String]) -> anyhow::Result<i32> {
         let sha = git(&["rev-parse", "HEAD"]).1;
         out_json(json!({
             "ok": true, "dir": dir, "mode": "git_dirty_wip", "checkpoint_ref": sha,
-            "rollback_command": format!("git -C {dir} reset --hard {sha}"),
+            // clean -fd removes only files created AFTER this checkpoint (the
+            // expert's wrapper); the user's pre-existing changes are already in
+            // the WIP commit, so reset --hard restores them untouched.
+            "rollback_command": reset_rollback(&sha),
             "message": "기존 변경을 WIP commit 으로 저장하고 checkpoint 로 잡았어요. rollback_command 로 변환을 되돌려요.",
         }));
         return Ok(0);
