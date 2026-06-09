@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.46](///compare/v0.9.45...v0.9.46) (2026-06-09)
+
+GitHub App 이 어떤 GitHub 계정에도 설치되지 않은 상태에서 앱을 만들려 하면 bootstrap 이 repo 생성에서 조용히 막혀 사용자가 멈춘 줄 알던 문제를 고쳤어요. OAuth device flow 는 GitHub 사용자 인증(토큰)만 해주고, App 설치(저장소 접근 권한 부여)는 GitHub 웹 UI 에서 사람이 직접 눌러야 하는 별도 1회 단계라 device flow 가 대신 처리하지 못했어요. 그래서 init·onboarding·github 세 스킬이 미설치(`uninstalled`/`empty`)를 감지하면 install_url 을 먼저 보여주고, 설치·연결이 재조회로 확인될 때까지 진행을 막아요. 이미 어딘가 설치된 경우(`installed`/`mixed`)는 막지 않고 install_url 을 다른 org 추가용으로 계속 노출하고 owner 선택 흐름을 유지해요. 단, accounts 조회가 타임아웃(`unavailable`)이거나 인증이 만료(`auth_error`)된 일시적 상태는 helper 의 gap 계약대로 막지 않고 그대로 진행하거나 재로그인으로 안내해서, CLI 일시 문제로 앱 생성이 막히는 회귀를 피했어요.
+
+### Test baseline
+
+- `bun test`: 1474 pass / 2 fail (둘 다 pre-existing README·PLAN 0.9.42 버전 snapshot drift, 이번 변경 무관 — clean 트리에서도 동일 fail 확인).
+- `skill:doctor --strict` / `lint:tone --strict` 0 err / `lint:keywords --check` no diff / `bunx tsc --noEmit` green.
+- `tests/e2e-claude-cli-registry.test.ts` baseline count 84→86 (새 AskUserQuestion 2채널 반영).
+- `release:check` 5 cross-arch 바이너리 빌드 + 버전 assert green (0.9.46).
+
+### Honest tradeoff
+
+- 미설치 차단은 비대화형(D1) 환경에서 safe default `취소` 로 멈춰요 — 설치 브라우저 단계를 에이전트가 대신 못 눌러서, install_url + 재개 phrase 만 남기고 사용자가 설치 후 이어가야 해요.
+- README·PLAN 문서의 버전 snapshot 이 0.9.42 라 이번 bump 로 drift 가 한 칸 더 벌어졌어요. release 게이트(codegen 버전 파일 assert)와는 무관하지만, 후속으로 문서 버전 동기화가 필요해요.
+
+### Fixed
+
+* GitHub App 미설치 시 설치 게이트 강제 (init·onboarding·github) ([#199](undefined/undefined/undefined/issues/199)) d4ebca8
+
 ## [0.9.45](///compare/v0.9.44...v0.9.45) (2026-06-09)
 
 업데이트 알림과 Windows 헬퍼 발견을 실제로 써 보며 드러난 세 가지를 고쳤어요. 첫째, Windows 에서 `upgrade` 같은 스킬이 `$env:CLAUDE_PLUGIN_ROOT` 가 빈 값이라 `C:\.claude-plugin\plugin.json` 을 찾다 helper 를 못 찾았어요 — Claude Code 가 hook 에는 `CLAUDE_PLUGIN_ROOT` 를 주지만 tool-call 셸에는 안 줘서예요. 스킬을 N개 고치는 대신 session-start 가 `$CLAUDE_ENV_FILE` 에 `export CLAUDE_PLUGIN_ROOT` 한 줄을 append 해서 이후 tool-call 셸로 전파하게 했어요(매 세션 rewrite 라 버전 bump 에도 stale 안 됨). 둘째, 플러그인과 CLI 둘 다 새 버전이면 알림이 턴을 갈라치며 따로따로 떴는데, 둘 다 pending 이면 하나의 통합 `<axhub-update>` AskUserQuestion 으로 합쳤어요. 셋째, 플러그인 업데이트가 `/plugin update` 슬래시 안내로만 끝났는데, `claude plugin update <plugin>` 은 슬래시가 아니라 `claude` CLI 명령이라 에이전트가 직접 실행할 수 있다는 걸 확인하고(검증: `axhub@axhub` 0.9.43→0.9.44), scope 자동 감지 후 직접 받도록 바꿨어요. 적용은 재시작 1번만 사용자 몫이에요.
