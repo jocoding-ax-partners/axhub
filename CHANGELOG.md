@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.44](///compare/v0.9.43...v0.9.44) (2026-06-09)
+
+0.9.43 의 tenant-picker(#188)를 실제로 온보딩으로 첫 앱을 만들어 보니 두 버그가 드러나 고쳤어요. 첫째, tenant L1 resolver(`tenant.rs`)가 실제 axhub CLI v0.18 스키마를 한 번도 안 거치고 가짜 스키마로 작성돼서, 사용자가 테넌트 2개에 속해 있어도 picker 가 영영 안 뜨고 빈 tenant 로 배포됐어요. 세 군데가 어긋났어요 — `tenants list --json` 은 bare 배열이 아니라 `{data:{data:[...]}}` envelope 이고, 식별자 키는 `id`/`slug` 가 아니라 `tenant_id`/`tenant_slug` 이고, L3 fallback 이 찾던 `auth status.current_team_id` 필드는 존재하지 않고 대신 `tenants[]`+`is_active` 로 나와요. 유닛 테스트 14개가 전부 가짜 스키마라 통과해서 false confidence 로 버그가 그대로 ship 됐던 거라, 이번엔 테스트를 실제 CLI 스키마 fixture(envelope + tenant_id + tenants[] active)로 교체해서 재발을 막았어요. 둘째, 배포 후 hero URL 이 라이브 주소(`https://<subdomain>.<tenant_slug>.axhub.ai`)가 아니라 관리 페이지(`app.axhub.ai/apps/<slug>`)였어서, `axhub apps get` 의 `access_url` 을 우선 쓰도록 `watch_deploy_until_terminal` 과 init SKILL 을 바꿨어요.
+
+### Test baseline
+
+- `cargo test -p axhub-helpers`: all green. tenant 유닛 24개(실 CLI 스키마 regression 11개 신규) + tenant-resolve 통합 6개(real envelope/`tenants[]` fixture) + `access_url_from_apps_get` 2개.
+- `cargo clippy` / `fmt --check` clean. `bun run skill:doctor` 45/45 OK, `lint:tone` 0 err, `lint:keywords` no diff.
+- `bun test`: 1471 pass / 2 fail (둘 다 pre-existing README·PLAN 버전 snapshot drift, 이 릴리스 무관).
+- `release:check` 5 cross-arch 바이너리 빌드 + 버전 assert green (0.9.44).
+
+### Honest tradeoff
+
+- `tenant.rs`/`main.rs` 는 바이너리라 기존 사용자는 다음 바이너리 갱신 때 적용돼요(install-when-missing 특성). init SKILL 변경은 플러그인 업데이트 시 즉시 적용.
+- L3 는 active 테넌트가 정확히 1개일 때만 auto-resolve 하고, 다중이면 picker 로 위임해요(추측 안 함).
+
+### Fixed
+
+* tenant 선택 + 배포 공개 URL 을 실제 CLI 스키마에 맞춤 ([#193](undefined/undefined/undefined/issues/193)) 60ac6c7
+
 ## [0.9.43](///compare/v0.9.42...v0.9.43) (2026-06-09)
 
 이번 릴리스는 두 PR 을 묶었어요. 핵심은 0.9.41(plugin-drift)·0.9.42(cli-drift)로 이어진 버전 업데이트 알림 사가의 근본 해결(#192)이에요. 그동안 fetch TTL 이 길어서(1시간/12시간) 재시작해도 stale 캐시를 재사용해 새 릴리스를 한참 못 보는 detection 지연이 남아 있었어요. 이번에 TTL 을 60초로 통일하고, 셸 래퍼의 nohup fetch 스폰을 Rust `cmd_session_start` 의 `warm_drift_caches()` 로 흡수해서 detached child 로 스폰하게 했어요. detached 라 session-start 에 지연이 0 이고, 사람이 첫 메시지를 치는 1초 남짓 사이 sub-second fetch 가 캐시를 warm 해서 첫 턴부터 nudge 가 떠요. 동기 블록이 모든 프로젝트 session-start 에 ~1초 tax 를 매기는 대안은 사용자와 상의해 기각했어요. warm 은 `CLAUDE_PLUGIN_ROOT` 가 있는 real 세션에서만 돌아서 CI·테스트는 네트워크를 안 쳐요. 함께 tenant-picker 19개 skill 과 L1 resolver 의 Rust 이관(#188)도 들어갔어요.
