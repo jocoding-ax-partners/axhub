@@ -4,6 +4,32 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.9.43](///compare/v0.9.42...v0.9.43) (2026-06-09)
+
+이번 릴리스는 두 PR 을 묶었어요. 핵심은 0.9.41(plugin-drift)·0.9.42(cli-drift)로 이어진 버전 업데이트 알림 사가의 근본 해결(#192)이에요. 그동안 fetch TTL 이 길어서(1시간/12시간) 재시작해도 stale 캐시를 재사용해 새 릴리스를 한참 못 보는 detection 지연이 남아 있었어요. 이번에 TTL 을 60초로 통일하고, 셸 래퍼의 nohup fetch 스폰을 Rust `cmd_session_start` 의 `warm_drift_caches()` 로 흡수해서 detached child 로 스폰하게 했어요. detached 라 session-start 에 지연이 0 이고, 사람이 첫 메시지를 치는 1초 남짓 사이 sub-second fetch 가 캐시를 warm 해서 첫 턴부터 nudge 가 떠요. 동기 블록이 모든 프로젝트 session-start 에 ~1초 tax 를 매기는 대안은 사용자와 상의해 기각했어요. warm 은 `CLAUDE_PLUGIN_ROOT` 가 있는 real 세션에서만 돌아서 CI·테스트는 네트워크를 안 쳐요. 함께 tenant-picker 19개 skill 과 L1 resolver 의 Rust 이관(#188)도 들어갔어요.
+
+### Test baseline
+
+- `cargo test -p axhub-helpers`: 876 pass / 0 fail (lib + 전체 integration). 신규 유닛: `needs_refresh_*` ×4, `fetch_refreshes_cache_past_ttl` ×2, `fetch_skips_recent_up_to_date_cache`(60초 경계 갱신), `spawn_detached*` ×4.
+- `cargo clippy` / `fmt --check` 변경 파일 새 경고 0.
+- 양방향 E2E(실 바이너리): `CLAUDE_PLUGIN_ROOT` 세션 → stale `{0.0.1}` 캐시가 detached fetch 로 `{0.9.42}` 갱신 / 게이트 없으면 캐시 untouched(네트워크 0).
+- `release:check` 5 cross-arch 바이너리 빌드 + 버전 assert green (0.9.43).
+- PR #188·#192 CI 전 체크(perf/rust 3 OS, hook integration, corpus drift) green 후 머지.
+
+### Honest tradeoff
+
+- 60초 TTL + unauth GitHub fetch: 1분에 한 번씩 재시작하는 극단적 디버깅 루프에서만 GitHub unauth rate limit(60/시간/IP)에 닿을 수 있어요. 403 은 graceful fail-open(이전 캐시 유지)이고 steady-state 는 근처도 안 가요. cli-drift 는 backend(`axhub update check`)라 GitHub limit 무관이에요.
+- 배포 셸↔바이너리 skew: 플러그인 업데이트 시 새 `.sh`(fetch 제거됨)가 아직 교체 안 된 구 바이너리(`warm_drift_caches` 없음) 앞에 놓이면 그 세션 warming 이 잠깐 regress 해요. fail-open + 바이너리 갱신 시 self-heal. install.sh 가 install-when-missing 이라 생기는 기존 특성이고 버전-aware reinstall 은 후속 과제예요.
+
+### Added
+
+* tenant-picker 19개 skill + L1 resolver Rust 이관 (cross-fence·RCE·[#189](undefined/undefined/undefined/issues/189)) ([#188](undefined/undefined/undefined/issues/188)) a67370e, closes #185 #185 #1
+
+
+### Fixed
+
+* session-start 드리프트 캐시 warming 을 detached 로 흡수 ([#192](undefined/undefined/undefined/issues/192)) b14d7bc
+
 ## [0.9.42](///compare/v0.9.41...v0.9.42) (2026-06-09)
 
 v0.9.41 이 플러그인 업데이트 알림을 고쳤다면, 이번엔 별개 채널인 **CLI 바이너리 업데이트 알림(cli-drift)**을 같은 방식으로 고쳤어요. Windows 사용자가 CLI 새 버전(v0.18.3 → v0.18.4)이 있는데도 알림이 안 떠서 파일 덤프로 원인을 좁혔어요. 두 버그가 겹쳐 있었어요. 첫째, 업데이트가 cache 에 pending 이면 12시간마다만 재조회해서, 사용자가 CLI 를 업데이트해도(예: 0.18.2 → 0.18.3) cache 가 한참 stale 인 채로 남아 새 latest(0.18.4)를 못 봤어요 — fetch TTL 을 pending 여부와 무관하게 1시간으로 통일해서 cache 가 현재/최신 버전을 한 시간 안에 현실과 맞추도록 했어요. 둘째, 버전당 한 번 fire 후 per-version marker 로 영구 억제되던 one-shot 버그를 plugin-drift 와 동일하게 세션+타임스탬프 snooze 로 바꿔서, 새 세션마다 재노출하고 같은 세션 안에서는 4시간 snooze 로 turn-cap 을 유지해요. `prompt-route` 가 UserPromptSubmit payload 의 session_id 를 cli_drift_nudge 에 넘겨요.
