@@ -383,23 +383,47 @@ _Total 189 operations across 12 tags. Identity only (operationId/method/path); r
 
 ## 6. Data operations (for `data_patch_plan`)
 
-_The java SDK has NO ergonomic data layer yet — it is a route-table passthrough (data access = raw `method(path_params, query, body)` against the route surface in §4). Reliable ORM→SDK data conversion is NOT available for java until the ergonomic fluent data layer ships (tracked: the SDK expansion program). For java, `data_patch_plan` stays **PLAN-ONLY**: describe the intended change in the Korean preview, do NOT emit data-call code. Data route identities for reference:_
+**java data access is the ergonomic FLUENT data layer — NOT a generic `method()` facade.** Convert the user's ORM / raw-SQL data access to this exact shape. `tenant(slug)` / `app(slug)` take **slugs**, not ids — reuse the §1 env contract (`AX_HUB_TENANT_SLUG` / `AX_HUB_APP_SLUG`; do NOT invent `AX_HUB_TENANT` / `AX_HUB_APP`).
 
-- `schemaGetApiV1AppsByAppIDTables` — GET /api/v1/apps/{appID}/tables
-- `schemaPostApiV1AppsByAppIDTables` — POST /api/v1/apps/{appID}/tables
-- `schemaGetApiV1AppsByAppIDTablesCheckAvailability` — GET /api/v1/apps/{appID}/tables/check-availability
-- `schemaGetApiV1AppsByAppIDTablesColumnTypes` — GET /api/v1/apps/{appID}/tables/column-types
-- `schemaDeleteApiV1AppsByAppIDTablesByTableName` — DELETE /api/v1/apps/{appID}/tables/{tableName}
-- `schemaGetApiV1AppsByAppIDTablesByTableName` — GET /api/v1/apps/{appID}/tables/{tableName}
-- `schemaPostApiV1AppsByAppIDTablesByTableNameColumns` — POST /api/v1/apps/{appID}/tables/{tableName}/columns
-- `schemaDeleteApiV1AppsByAppIDTablesByTableNameColumnsByColumnName` — DELETE /api/v1/apps/{appID}/tables/{tableName}/columns/{columnName}
-- `schemaGetApiV1AppsByAppIDTablesByTableNameGrants` — GET /api/v1/apps/{appID}/tables/{tableName}/grants
-- `schemaPostApiV1AppsByAppIDTablesByTableNameGrants` — POST /api/v1/apps/{appID}/tables/{tableName}/grants
-- `schemaDeleteApiV1AppsByAppIDTablesByTableNameGrantsByGrantID` — DELETE /api/v1/apps/{appID}/tables/{tableName}/grants/{grantID}
-- `schemaGetApiV1AppsByAppIDTablesByTableNameRows` — GET /api/v1/apps/{appID}/tables/{tableName}/rows
-- `schemaGetDataByTenantSlugByAppSlugByTable` — GET /data/{tenantSlug}/{appSlug}/{table}
-- `schemaPostDataByTenantSlugByAppSlugByTable` — POST /data/{tenantSlug}/{appSlug}/{table}
-- `schemaGetDataByTenantSlugByAppSlugByTableCount` — GET /data/{tenantSlug}/{appSlug}/{table}/_count
-- `schemaDeleteDataByTenantSlugByAppSlugByTableById` — DELETE /data/{tenantSlug}/{appSlug}/{table}/{id}
-- `schemaGetDataByTenantSlugByAppSlugByTableById` — GET /data/{tenantSlug}/{appSlug}/{table}/{id}
-- `schemaPatchDataByTenantSlugByAppSlugByTableById` — PATCH /data/{tenantSlug}/{appSlug}/{table}/{id}
+### Scope + CRUD + DSL
+```java
+var data = sdk.tenant(TENANT_SLUG).app(APP_SLUG).data();
+
+// (a) typed:
+DataTableClient orders = data.table(Schema.defineSchema("orders",
+    Map.of("id", "uuid", "total", "number", "status", "string")));
+// (b) runtime-discovered (discover(table, true, null) re-introspects after live DDL):
+DataTableClient orders = data.discover("orders");
+
+PaginatedList page = orders.list(ListOptions.create()
+    .where(Ops.where("status").eq("paid")).orderBy("-total").select("id", "total").page(1).pageSize(50));
+Iterator<ListAllItem> it = orders.listAll(ListOptions.create().where(Ops.where("total").gte(0)).pageSize(100));
+int n = orders.count(Ops.and(Ops.where("total").gte(10), Ops.where("total").in(List.of(10, 30))));
+Map<String, Object> row = orders.get(id, List.of("id", "total"));
+orders.insert(Map.of("total", 10, "status", "paid"));
+orders.insertMany(List.of(Map.of("total", 20), Map.of("total", 30)));
+orders.update(id, Map.of("status", "shipped"));
+orders.delete(id);
+// async twins: listAsync / countAsync / getAsync / insertAsync / insertManyAsync / updateAsync / deleteAsync
+```
+Filter builder: `Ops.where(col).eq/ne/gt/gte/lt/lte(v)`, `.in(List.of(...))`, `.like.contains(s)` (auto-escape), combined ONLY with top-level `Ops.and(...)`. Errors: `AxHubException` with `.code()/.status()` (404 → `code()="not_found"`, guards → `"where_required"` / `"legacy_cursor"`).
+### Live data contract (applies to EVERY language — verified live)
+- **`list`/`count` REQUIRE at least one `where` filter** (backend mass-scan guard). A filterless call fails fast in the SDK with `ValidationError(code: where_required)` — never emit one. When the user's code reads "everything", convert with an always-true range filter (e.g. `where(created_at).gte('1970-01-01T00:00:00Z')`) and say so in the Korean preview.
+- **Pushable filters are a top-level AND of `eq/ne/gt/gte/lt/lte/in/like` ONLY.** `or`/`not` combinators exist in each DSL but are NOT pushable — the SDK rejects them with `ValidationError`. Express "A or B" on one column as `in([...])`; otherwise split into separate calls and merge in app code.
+- **Pagination is OFFSET-ONLY**: 1-based `page` + `pageSize` (clamped 1..100; `limit` aliases `pageSize` where offered), or `cursor` = the numeric next-cursor a prior `list` returned. `after`/`before` keyset options throw `LegacyCursorError`. `list` does NOT return an exact total.
+- **Tables/columns must already exist** — inserts do NOT auto-create them (DDL is owned by `axhub tables create` / `axhub tables columns add`). `discover` caches the schema per table; after live DDL re-introspect with the `fresh` option.
+### Mapping guide (user code → fluent call; notation is per-language §6 above)
+- `SELECT … WHERE x = v` → `list(where: where(x).eq(v))`
+- `SELECT … WHERE a = v AND b > w` → `list(where: and(where(a).eq(v), where(b).gt(w)))`
+- `SELECT … WHERE x IN (…)` / `WHERE a = v OR a = w` → `list(where: where(x).in([...]))`
+- `SELECT … LIMIT n OFFSET m` → `list(where: <required filter>, pageSize: n, page: m/n + 1)` — the where stays REQUIRED
+- `INSERT INTO t (…) VALUES (…)` → `insert({...})` · multi-VALUES → `insertMany([...])`
+- `UPDATE t SET … WHERE id = ?` → `update(id, {...})`
+- `DELETE FROM t WHERE id = ?` → `delete(id)`
+- `SELECT COUNT(*) … WHERE …` → `count(where: ...)` — the where stays REQUIRED
+
+### Wire paths (grounding only — call the methods above, do not hand-roll requests)
+list/insert `GET|POST /data/{tenant}/{app}/{table}` · get/update/delete `…/{table}/{id}` · count `…/{table}/_count` · discover `GET /api/v1/tenants/{t}/apps/{a}/tables/{table}/inspect` (appId fallback inside the SDK).
+
+### Reliability — discover()-verify (REQUIRED before apply)
+Docs + LLM codegen cannot guarantee correct table/column names on their own. Before applying any `data_patch_plan` diff, run `discover(table)` against the real tenant/app and assert that **every** `.table(name)` / `.discover(name)` table AND every column referenced by where/select/insert/update keys exists in the discovered schema. A reference to a missing table or column is a HARD-STOP (it compiles but silently queries the wrong thing, and no vibe-coder will catch it in review) — surface it in the Korean preview, do not apply.

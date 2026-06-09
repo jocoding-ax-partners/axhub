@@ -331,9 +331,9 @@ _Total 189 operations across 12 tags. Identity only (operationId/method/path); r
 
 ## 6. Data operations (for `data_patch_plan`)
 
-**node data access is the ergonomic FLUENT builder — NOT a generic `method()` facade.** Convert the user's ORM / raw-SQL data access to this exact shape (source: `@ax-hub/sdk` `packages/sdk/src/resources/data`).
+**node data access is the ergonomic FLUENT data layer — NOT a generic `method()` facade.** Convert the user's ORM / raw-SQL data access to this exact shape. `tenant(slug)` / `app(slug)` take **slugs**, not ids — reuse the §1 env contract (`AX_HUB_TENANT_SLUG` / `AX_HUB_APP_SLUG`; do NOT invent `AX_HUB_TENANT` / `AX_HUB_APP`).
 
-### Scope a table
+### Scope + CRUD + DSL
 ```ts
 import { AxHubClient, defineSchema, where, and } from '@ax-hub/sdk';
 
@@ -344,36 +344,37 @@ const Orders = defineSchema({
 });
 const orders = axhub.tenant(process.env.AX_HUB_TENANT_SLUG!).app(process.env.AX_HUB_APP_SLUG!).data.table(Orders);
 
-// (b) runtime-discovered — schema fetched from the backend (no compile-time schema):
-const orders = await axhub.tenant(t).app(a).data.discover<{ id: string; total: number; status: 'paid' | 'pending' }>('orders');
+// (b) runtime-discovered — schema introspected from the backend (pass { fresh: true } after live DDL):
+const orders = await axhub.tenant(t).app(a).data.discover<{ id: string; total: number; status: string }>('orders');
+
+// CRUD (DataTableClient)
+const page = await orders.list({ where: where(Orders.cols.status).eq('paid'), orderBy: '-total', select: ['id', 'total'] as const, page: 1, pageSize: 50 });
+for await (const entry of orders.listAll({ where: where('total').gte(0) })) { if (entry.type === 'item') use(entry.value); }
+const n = await orders.count({ where: and(where('total').gte(10), where('status').in(['paid', 'pending'])) });
+const row = await orders.get(id, { select: ['id', 'total'] });
+await orders.insert({ total: 10, status: 'paid' });
+await orders.insertMany([{ total: 20 }, { total: 30 }]);   // → { items, count }
+await orders.update(id, { status: 'shipped' });
+await orders.delete(id);
 ```
-`.tenant(slug)` / `.app(slug)` take **slugs**, not ids. Reuse the §1 env contract: tenant = `AX_HUB_TENANT_SLUG`, app = `AX_HUB_APP_SLUG` (add the latter to the app's env; do NOT invent `AX_HUB_TENANT` / `AX_HUB_APP` — the SDK examples are inconsistent, §1/§6 pin the `_SLUG` names).
-
-### CRUD (DataTableClient)
-- `await orders.list({ where, orderBy, select, page, pageSize })` → `{ items, nextCursor, firstCursor, hasNext, hasPrev }`
-- `for await (const row of orders.listAll({ where })) { … }` — auto-paginate every page
-- `await orders.count({ where })` → `number`
-- `await orders.get(id, { select })` → row
-- `await orders.insert({ …row })` → inserted row · `await orders.insertMany([{…}, {…}])` → `{ items, count }`
-- `await orders.update(id, { …patch })` → updated row
-- `await orders.delete(id)` → `void`
-
-### Query DSL
-- filter: `where(Orders.cols.status).eq('paid')`, combine with `and(…)`. (discovered handle: `where(orders.schema!.cols.status)`)
-- projection: `select: ['id', 'total'] as const`
-- sort: `orderBy`
-- **pagination is OFFSET-ONLY**: `page` (1-based) + `pageSize` (clamped 1..100), or `cursor` = the numeric `nextCursor` a prior `list()` returned. NEVER `after` / `before` / keyset cursors — the SDK throws `LegacyCursorError`. `list()` does NOT return a total count (`totalIsExact: false`).
+Filter builder: `where(col).eq/ne/gt/gte/lt/lte(v)`, `where(col).in([...])`, `where(col).like.contains/startsWith/endsWith(s)` (auto-escape + ReDoS guard), combined ONLY with top-level `and(...)`. Typed column refs work on both handles: `where(Orders.cols.status)` (defineSchema) and `where(orders.schema!.cols.status)` (discovered). Data guard errors are minify-safe classes: `ValidationError`, `LegacyCursorError`, `TableNotFoundError` (check `e.code` too).
+### Live data contract (applies to EVERY language — verified live)
+- **`list`/`count` REQUIRE at least one `where` filter** (backend mass-scan guard). A filterless call fails fast in the SDK with `ValidationError(code: where_required)` — never emit one. When the user's code reads "everything", convert with an always-true range filter (e.g. `where(created_at).gte('1970-01-01T00:00:00Z')`) and say so in the Korean preview.
+- **Pushable filters are a top-level AND of `eq/ne/gt/gte/lt/lte/in/like` ONLY.** `or`/`not` combinators exist in each DSL but are NOT pushable — the SDK rejects them with `ValidationError`. Express "A or B" on one column as `in([...])`; otherwise split into separate calls and merge in app code.
+- **Pagination is OFFSET-ONLY**: 1-based `page` + `pageSize` (clamped 1..100; `limit` aliases `pageSize` where offered), or `cursor` = the numeric next-cursor a prior `list` returned. `after`/`before` keyset options throw `LegacyCursorError`. `list` does NOT return an exact total.
+- **Tables/columns must already exist** — inserts do NOT auto-create them (DDL is owned by `axhub tables create` / `axhub tables columns add`). `discover` caches the schema per table; after live DDL re-introspect with the `fresh` option.
+### Mapping guide (user code → fluent call; notation is per-language §6 above)
+- `SELECT … WHERE x = v` → `list(where: where(x).eq(v))`
+- `SELECT … WHERE a = v AND b > w` → `list(where: and(where(a).eq(v), where(b).gt(w)))`
+- `SELECT … WHERE x IN (…)` / `WHERE a = v OR a = w` → `list(where: where(x).in([...]))`
+- `SELECT … LIMIT n OFFSET m` → `list(where: <required filter>, pageSize: n, page: m/n + 1)` — the where stays REQUIRED
+- `INSERT INTO t (…) VALUES (…)` → `insert({...})` · multi-VALUES → `insertMany([...])`
+- `UPDATE t SET … WHERE id = ?` → `update(id, {...})`
+- `DELETE FROM t WHERE id = ?` → `delete(id)`
+- `SELECT COUNT(*) … WHERE …` → `count(where: ...)` — the where stays REQUIRED
 
 ### Wire paths (grounding only — call the methods above, do not hand-roll requests)
-list/insert `GET|POST /data/{tenant}/{app}/{table}` · get/update/delete `…/{table}/{id}` · count `…/{table}/_count` · discover `GET /api/v1/tenants/{t}/apps/{a}/tables/{table}/inspect`.
-
-### Mapping guide (user code → fluent call)
-- `SELECT … WHERE x = v` → `.list({ where: where(cols.x).eq(v) })`
-- `SELECT … LIMIT n OFFSET m` → `.list({ pageSize: n, page: Math.floor(m / n) + 1 })`
-- `INSERT INTO t (…) VALUES (…)` → `.insert({ … })`
-- `UPDATE t SET … WHERE id = ?` → `.update(id, { … })`
-- `DELETE FROM t WHERE id = ?` → `.delete(id)`
-- `SELECT COUNT(*) …` → `.count({ where })`
+list/insert `GET|POST /data/{tenant}/{app}/{table}` · get/update/delete `…/{table}/{id}` · count `…/{table}/_count` · discover `GET /api/v1/tenants/{t}/apps/{a}/tables/{table}/inspect` (appId fallback inside the SDK).
 
 ### Reliability — discover()-verify (REQUIRED before apply)
-Docs + LLM codegen cannot guarantee correct table/column names on their own. Before applying any `data_patch_plan` diff, run `discover(table)` against the real tenant/app and assert that **every** `.table(name)` / `.discover(name)` table AND every column referenced by `where(cols.X)` / `select: [X]` / `insert`/`update` keys exists in the discovered schema. A reference to a missing table or column is a HARD-STOP (it compiles but silently queries the wrong thing, and no vibe-coder will catch it in review) — surface it in the Korean preview, do not apply.
+Docs + LLM codegen cannot guarantee correct table/column names on their own. Before applying any `data_patch_plan` diff, run `discover(table)` against the real tenant/app and assert that **every** `.table(name)` / `.discover(name)` table AND every column referenced by where/select/insert/update keys exists in the discovered schema. A reference to a missing table or column is a HARD-STOP (it compiles but silently queries the wrong thing, and no vibe-coder will catch it in review) — surface it in the Korean preview, do not apply.
