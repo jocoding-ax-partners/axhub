@@ -97,10 +97,10 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain("planner/architect/critic/reviewer 를 자동으로 띄우지 않아요");
     expect(skill).toContain("`task` tool");
     expect(skill).toContain("architect 와 critic 은 한 parallel batch 로 묶지 말고");
-    expect(skill).toContain("`planner` role-agent 실행");
-    expect(skill).toContain("`architect` role-agent 실행");
-    expect(skill).toContain("`critic` role-agent 실행");
-    expect(skill).toContain("read-only `executor` lane");
+    expect(skill).toContain("`axhub-migrate-planner` agent 실행");
+    expect(skill).toContain("`axhub-migrate-architect` agent 실행");
+    expect(skill).toContain("`axhub-migrate-critic` agent 실행");
+    expect(skill).toContain("read-only `axhub-migrate-reviewer` lane");
     expect(skill).toContain('"$HELPER" migrate-stage-write \\');
     expect(skill).toContain("--stage planner");
     expect(skill).toContain("--stage architect");
@@ -154,7 +154,7 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain("& $Helper migrate-plan --dir $MigrateDir --app-path $env:APP_PATH --json");
   });
 
-  test("ships migrate planning agent markdown files as reference scaffolds (not yet dispatched)", () => {
+  test("dispatches migrate planning agents by name (axhub-native, no OMC dependency)", () => {
     const skill = read("skills/migrate/SKILL.md");
     for (const agent of [
       "axhub-migrate-discoverer",
@@ -163,10 +163,14 @@ describe("migrate SKILL contract", () => {
       "axhub-migrate-critic",
       "axhub-migrate-reviewer",
     ]) {
+      // each agent file ships AND the SKILL dispatches it by name
       expect(existsSync(join(REPO_ROOT, "agents", `${agent}.md`))).toBe(true);
+      expect(skill).toContain(agent);
     }
-    // SKILL must label these files as reference scaffolds, not dispatched lanes
-    expect(skill).toContain("reference scaffold");
+    // the planning lanes are now wired — no longer reference-only scaffolds
+    expect(skill).not.toContain("reference scaffold");
+    // and migrate no longer leans on the generic OMC catalog role-agents
+    expect(skill).not.toContain("role-agent");
   });
   test("corpus.100 routes core existing-app natural language to migrate", () => {
     const rows = parseJsonl("tests/corpus.100.jsonl");

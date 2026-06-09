@@ -391,15 +391,15 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 
 `planning.mode=full_consensus` 이면 선택된 단일 `app_key` 기준으로 서브 에이전트를 실제로 실행해요. 이때 helper 가 이미 만든 `discover` scaffold 와 `planning_persistence.paths` 를 seed 로 읽고, 아래 순서를 **그대로** 따라요.
 
-- `discover` scaffold 확인 → 누락 evidence 보강
-- `planner` role-agent 실행 → `.axhub/plan/runs/<run_id>/stages/02-planner.md` + meta 저장
-- `architect` role-agent 실행 → `.axhub/plan/runs/<run_id>/stages/03-architect.md` + meta 저장
-- `critic` role-agent 실행 → `.axhub/plan/runs/<run_id>/stages/04-critic.md` + meta 저장
-- `reviewer` stage 는 **read-only `executor` lane** 으로 completeness / scope sanity check 를 실행하고 `.axhub/plan/runs/<run_id>/stages/05-reviewer.md` + meta 저장
+- `discover` scaffold 확인 → `axhub-migrate-discoverer` agent 로 누락 evidence 보강
+- `axhub-migrate-planner` agent 실행 → `.axhub/plan/runs/<run_id>/stages/02-planner.md` + meta 저장
+- `axhub-migrate-architect` agent 실행 → `.axhub/plan/runs/<run_id>/stages/03-architect.md` + meta 저장
+- `axhub-migrate-critic` agent 실행 → `.axhub/plan/runs/<run_id>/stages/04-critic.md` + meta 저장
+- `reviewer` stage 는 **read-only `axhub-migrate-reviewer` lane** 으로 completeness / scope sanity check 를 실행하고 `.axhub/plan/runs/<run_id>/stages/05-reviewer.md` + meta 저장
 - 최종 ADR 저장 → `.axhub/plan/runs/<run_id>/adr.md`
 - `approval.json.state=pending_approval`, `run.json.state=pending_approval` 로 올리고 멈춰요
 
-   runtime 에서는 `task` tool 로 bundled agent 를 명시해요. 즉 planner stage 는 `planner`, architect stage 는 `architect`, critic stage 는 `critic`, reviewer stage 는 read-only `executor` lane 이에요. architect 와 critic 은 한 parallel batch 로 묶지 말고 항상 architect 완료 후 critic 을 실행해요. `agents/axhub-migrate-*.md` 파일은 reference scaffold 로 배포됐지만 아직 runtime dispatch 에 연결되지 않아요 — 미래 wiring PR 을 위한 참조 자료예요.
+   runtime 에서는 `task` tool 로 axhub 전용 agent 를 명시해요. 즉 discover stage 는 `axhub-migrate-discoverer`, planner stage 는 `axhub-migrate-planner`, architect stage 는 `axhub-migrate-architect`, critic stage 는 `axhub-migrate-critic`, reviewer stage 는 read-only `axhub-migrate-reviewer` lane 이에요. architect 와 critic 은 한 parallel batch 로 묶지 말고 항상 architect 완료 후 critic 을 실행해요. 이 5개 `agents/axhub-migrate-*.md` 는 plugin.json 의 `agents` 자동 등록으로 oh-my-claudecode 같은 외부 plugin 없이 axhub plugin 자체에서 dispatch 돼요.
 
 
    stage artifact 저장은 helper command 로 고정해요. 서브 에이전트 결과를 바로 prose 로 흘려버리지 말고 아래처럼 저장해요.
