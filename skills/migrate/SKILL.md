@@ -536,7 +536,7 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 
 2.7. **data 변환 실행 (승인된 `data_patch_plan`) · auth 는 advisory.** wrapper 와 같은 expert·guard 경로로 data 접근을 변환해요.
    - 같은 `axhub-sdk-<lang>-expert` 를 `data_patch_plan` mode 로 dispatch 해요. expert 는 pack §6 data surface 를 **그대로** 읽어 변환해요 — §6 가 fluent builder 면(node) 그 정확한 shape(`tenant(slug).app(slug).data.table()/.discover()`)으로 codegen 하고 §6 의 mapping guide·offset-only pagination 규칙을 지켜요. §6 가 plan-only 마커면(passthrough SDK) data-call 코드는 emit 하지 않고 의도만 한국어로 기술해요.
-   - **apply 전에 §6 의 discover()-verify 를 반드시 수행해요.** 생성 코드가 참조하는 table·column 이 discover 한 실제 schema 에 전부 있는지 확인하고, 없으면 hard-stop 으로 preview 에 알리고 apply 하지 않아요. 바이브코더가 리뷰 안 해도 "조용히 틀린 table·column 조회"를 막는 결정적 게이트예요 — generic verify(빌드 통과)는 이걸 못 잡아요.
+   - **apply 전에 discover()-verify 를 반드시 수행해요.** expert 가 변환이 참조하는 table·column 을 `refs.json` 으로 모으고, 각 table 을 SDK `discover()` 로 조회해 실제 schema 를 `schemas.json` 으로 만든 뒤, `"$HELPER" migrate-data-verify --refs refs.json --schemas schemas.json --json` 을 실행해요. `ok=false`(exit 2)면 hard-stop — 결과의 `preview_kr` 을 사용자에게 보여주고 apply 하지 않아요. 바이브코더가 리뷰 안 해도 "조용히 틀린 table·column 조회"를 막는 결정적 게이트예요 — generic verify(빌드 통과)는 이걸 못 잡아요.
    - hard-stop 게이팅은 §2.5 와 동일해요. `raw_query`/`broad_diff`/`missing_verification` 면 기본 preview-only 지만 "강행할래요" 확인 + git checkpoint 뒤에만 apply 해요. `plan_only=true`(secret_exposure·custom_auth·unsupported_language)면 실행 경로 없이 plan 만 남겨요.
    - apply 는 §2.6 과 같은 `migrate-guard` checkpoint → 한국어 preview → 승인 → apply → verify → 실패 시 rollback 경로를 그대로 따라요. apply 전 installed-SDK 체크도 동일해요.
    - `auth_patch_plan` 은 **실행하지 않아요** — auth 는 plan(advisory)만 만들어요. 인식된 auth 라이브러리여도 자동 코드 변환은 안 해요. login 이 runtime 에서 조용히 깨질 위험이 크고 generic verify 가 그걸 못 잡으니, auth 는 사용자에게 권장 변경을 문서로만 제시해요.

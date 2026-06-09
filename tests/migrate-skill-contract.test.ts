@@ -266,6 +266,8 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain("data.table()");
     expect(skill).toContain("discover()-verify");
     expect(skill).toContain("plan-only 마커");
+    // discover-verify is wired to the deterministic helper command, not just prose
+    expect(skill).toContain("migrate-data-verify --refs refs.json --schemas schemas.json");
     // auth stays advisory — there is NO auth-execute path
     expect(skill).toContain("`auth_patch_plan` 은 **실행하지 않아요**");
     // each generated expert declares the data mode + discover-verify + auth-advisory
