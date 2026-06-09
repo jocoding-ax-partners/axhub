@@ -46,7 +46,7 @@ use serde_json::{json, Map, Value};
 mod cli;
 
 pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
-pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  prompt-route\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  verify-deploy-artifact\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  tenant-resolve [--json]\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--persist-planning] [--json]\n  migrate-stage-write --run-json <path> --stage <name> --markdown-file <file> [--run-state <state>] [--approval-state <state>] [--json]\n  migrate-wave-plan --run-json <path> --wave-id <id> --stage-scope <stage> [--participant <app_key>]... [--depends-on <wave_id>]... [--artifact <path>]... [--write-target <target>]... [--independence-proof <text>]... [--state <planned|running|complete>] [--json]\n  migrate-approve --run-json <path> --approved-by <name> [--approval-note <text>] [--json]\n  migrate-guard --dir <path> [--checkpoint] [--allow-dirty] [--init-ok] [--label <s>] [--json]\n  migrate-sdk-installed --dir <path> --lang <lang> [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  prompt-route\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  verify-deploy-artifact\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  tenant-resolve [--json]\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--persist-planning] [--json]\n  migrate-stage-write --run-json <path> --stage <name> --markdown-file <file> [--run-state <state>] [--approval-state <state>] [--json]\n  migrate-wave-plan --run-json <path> --wave-id <id> --stage-scope <stage> [--participant <app_key>]... [--depends-on <wave_id>]... [--artifact <path>]... [--write-target <target>]... [--independence-proof <text>]... [--state <planned|running|complete>] [--json]\n  migrate-approve --run-json <path> --approved-by <name> [--approval-note <text>] [--json]\n  migrate-guard --dir <path> [--checkpoint] [--allow-dirty] [--init-ok] [--label <s>] [--json]\n  migrate-sdk-installed --dir <path> --lang <lang> [--json]\n  migrate-data-verify --refs <json> --schemas <json> [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -161,6 +161,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "migrate-plan" => run_migrate_plan(&rest),
         "migrate-guard" => cmd_migrate_guard(&rest),
         "migrate-sdk-installed" => cmd_migrate_sdk_installed(&rest),
+        "migrate-data-verify" => cmd_migrate_data_verify(&rest),
         "migrate-summary" => cmd_migrate_summary(&rest),
         "publish-summary" => cmd_publish_summary(&rest),
         "rollback-summary" => cmd_rollback_summary(&rest),
@@ -3328,6 +3329,73 @@ fn cmd_migrate_sdk_installed(rest: &[String]) -> anyhow::Result<i32> {
         }
     }
     Ok(0)
+}
+
+/// Deterministic discover()-verify gate for `data_patch_plan` — the reliability
+/// lever for non-reviewing users. Inputs are two `{table:[col,…]}` JSON files:
+/// `--refs` = what the conversion uses, `--schemas` = the real schema the expert
+/// got from the SDK's own `discover()`. The set-diff lives in
+/// `migrate_data_verify` (pure, network-free, unit-tested); a referenced table or
+/// column the real schema lacks is a hard-stop. Exit 2 on violation so the SKILL
+/// gates apply; 0 when clean. Fail-closed on bad input (exit 2, no false pass).
+fn cmd_migrate_data_verify(rest: &[String]) -> anyhow::Result<i32> {
+    use axhub_helpers::migrate_data_verify::{parse_ref_map, render_verdict_kr, verify_data_refs};
+    use std::fs;
+    let mut refs_path: Option<String> = None;
+    let mut schemas_path: Option<String> = None;
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--refs" => {
+                refs_path = rest.get(i + 1).cloned();
+                i += 2;
+            }
+            "--schemas" => {
+                schemas_path = rest.get(i + 1).cloned();
+                i += 2;
+            }
+            // JSON is always emitted; the flag is accepted for call-site symmetry.
+            "--json" => i += 1,
+            _ => i += 1,
+        }
+    }
+    let (refs_path, schemas_path) = match (refs_path, schemas_path) {
+        (Some(r), Some(s)) => (r, s),
+        _ => {
+            out_json(json!({
+                "ok": false,
+                "message": "--refs <json> 와 --schemas <json> 둘 다 필요해요",
+            }));
+            return Ok(2);
+        }
+    };
+    let read_map = |label: &str, p: &str| -> Result<_, String> {
+        let raw = fs::read_to_string(p).map_err(|e| format!("{label} 읽기 실패: {e}"))?;
+        parse_ref_map(&raw).map_err(|e| format!("{label} 파싱 실패: {e}"))
+    };
+    let refs = match read_map("--refs", &refs_path) {
+        Ok(m) => m,
+        Err(message) => {
+            out_json(json!({ "ok": false, "message": message }));
+            return Ok(2);
+        }
+    };
+    let schemas = match read_map("--schemas", &schemas_path) {
+        Ok(m) => m,
+        Err(message) => {
+            out_json(json!({ "ok": false, "message": message }));
+            return Ok(2);
+        }
+    };
+    let verdict = verify_data_refs(&refs, &schemas);
+    out_json(json!({
+        "ok": verdict.ok,
+        "violations": verdict.violations,
+        "tables_checked": verdict.tables_checked,
+        "columns_checked": verdict.columns_checked,
+        "preview_kr": render_verdict_kr(&verdict),
+    }));
+    Ok(if verdict.ok { 0 } else { 2 })
 }
 
 /// Deterministic git safety guard for SDK conversion (D2 = git-guarded preview-first).
