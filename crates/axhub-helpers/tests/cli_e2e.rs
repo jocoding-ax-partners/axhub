@@ -988,6 +988,23 @@ fn cli_legacy_json_compat_flags_remain_accepted() {
         "resolve --json must stay as a no-op compatibility flag"
     );
 }
+#[test]
+fn preflight_reports_axhub_bin_invalid_when_override_dead() {
+    let preflight = Command::new(bin())
+        .args(["preflight", "--json"])
+        .env("AXHUB_BIN", "/definitely-not-axhub")
+        .output()
+        .unwrap();
+    // Exit code stays on the cli_present=false branch (64) — the remap changes
+    // diagnosis fields only, never the exit contract.
+    assert_eq!(preflight.status.code(), Some(64));
+    let stdout = String::from_utf8_lossy(&preflight.stdout);
+    assert!(stdout.contains(r#""cli_present":false"#));
+    assert!(stdout.contains(r#""cli_state":"axhub_bin_invalid""#));
+    assert!(stdout.contains(r#""auth_error_code":"axhub_bin_invalid""#));
+    assert!(stdout.contains(r#""cli_resolved_path":"/definitely-not-axhub""#));
+}
+
 #[cfg(unix)]
 #[test]
 fn cli_prompt_route_injects_doctor_context_for_version_skew() {

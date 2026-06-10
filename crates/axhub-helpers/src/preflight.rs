@@ -512,6 +512,16 @@ fn cwd_has_project_marker() -> bool {
         .any(|marker| std::path::Path::new(marker).exists())
 }
 
+/// Promote `NotFound` to `BinOverrideInvalid` when the probe ran through an
+/// `AXHUB_BIN` override — the env var is the failure, not the install.
+fn apply_bin_override_state(probed: CliState, bin_is_override: bool) -> CliState {
+    if bin_is_override && probed == CliState::NotFound {
+        CliState::BinOverrideInvalid
+    } else {
+        probed
+    }
+}
+
 /// Classify the result of `axhub --version` into a discriminated CLI state so
 /// downstream SKILL wrappers + systemMessage emitters can route the user to
 /// the correct fix (install / re-auth / upgrade / report) instead of the
@@ -548,6 +558,10 @@ pub enum CliState {
     NotFound,
     ConfigCorrupted,
     RuntimeError,
+    /// `AXHUB_BIN` override points at a path that cannot be spawned. Distinct
+    /// from `NotFound` so SKILLs route the user to fix/unset the env var
+    /// instead of reinstalling a CLI that may already be healthy on PATH.
+    BinOverrideInvalid,
 }
 
 impl CliState {
@@ -558,6 +572,7 @@ impl CliState {
             Self::NotFound => "not_found",
             Self::ConfigCorrupted => "config_corrupted",
             Self::RuntimeError => "runtime_error",
+            Self::BinOverrideInvalid => "axhub_bin_invalid",
         }
     }
 
@@ -571,6 +586,7 @@ impl CliState {
             Self::NotFound => Some("cli_not_found"),
             Self::ConfigCorrupted => Some("cli_config_corrupted"),
             Self::RuntimeError => Some("cli_runtime_error"),
+            Self::BinOverrideInvalid => Some("axhub_bin_invalid"),
         }
     }
 }
@@ -633,7 +649,8 @@ where
         })
     };
 
-    let probed_cli_state = diagnose_cli_state(&version_result);
+    let probed_cli_state =
+        apply_bin_override_state(diagnose_cli_state(&version_result), !bare_axhub_bin);
     let cli_present = probed_cli_state == CliState::Ok;
     let cli_on_path = if cli_present {
         resolved_axhub_info
@@ -655,6 +672,10 @@ where
         resolved_axhub_info
             .as_ref()
             .map(|info| info.path.to_string_lossy().into_owned())
+    } else if cli_state == CliState::BinOverrideInvalid {
+        // Surface the dead AXHUB_BIN value so the SKILL can show the user
+        // exactly which path their env var points at.
+        Some(bin.clone())
     } else {
         None
     };
@@ -1243,6 +1264,32 @@ mod tests {
         let resolved = resolve_axhub_path_with(Some(&path_value), &[]).expect("must resolve");
         assert_eq!(resolved.path, good);
         assert_eq!(resolved.source, AxhubPathSource::Path);
+    }
+
+    #[test]
+    fn bin_override_invalid_remaps_not_found_only() {
+        // Override set + spawn NotFound → distinct state (the user's AXHUB_BIN
+        // points at a dead path; reinstalling won't fix it).
+        assert_eq!(
+            apply_bin_override_state(CliState::NotFound, true),
+            CliState::BinOverrideInvalid
+        );
+        // No override → keep NotFound (genuinely missing CLI).
+        assert_eq!(
+            apply_bin_override_state(CliState::NotFound, false),
+            CliState::NotFound
+        );
+        // Override that exists but fails at runtime stays RuntimeError.
+        assert_eq!(
+            apply_bin_override_state(CliState::RuntimeError, true),
+            CliState::RuntimeError
+        );
+        assert_eq!(apply_bin_override_state(CliState::Ok, true), CliState::Ok);
+        assert_eq!(CliState::BinOverrideInvalid.as_str(), "axhub_bin_invalid");
+        assert_eq!(
+            CliState::BinOverrideInvalid.auth_error_code(),
+            Some("axhub_bin_invalid")
+        );
     }
 
     #[cfg(unix)]
