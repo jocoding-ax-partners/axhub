@@ -392,10 +392,10 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 `planning.mode=full_consensus` 이면 선택된 단일 `app_key` 기준으로 서브 에이전트를 실제로 실행해요. 이때 helper 가 이미 만든 `discover` scaffold 와 `planning_persistence.paths` 를 seed 로 읽고, 아래 순서를 **그대로** 따라요.
 
 - `discover` scaffold 확인 → `axhub-migrate-discoverer` agent 로 누락 evidence 보강
-- `axhub-migrate-planner` agent 실행 → `.axhub/plan/runs/<run_id>/stages/02-planner.md` + meta 저장
-- `axhub-migrate-architect` agent 실행 → `.axhub/plan/runs/<run_id>/stages/03-architect.md` + meta 저장
-- `axhub-migrate-critic` agent 실행 → `.axhub/plan/runs/<run_id>/stages/04-critic.md` + meta 저장
-- `reviewer` stage 는 **read-only `axhub-migrate-reviewer` lane** 으로 completeness / scope sanity check 를 실행하고 `.axhub/plan/runs/<run_id>/stages/05-reviewer.md` + meta 저장
+- `axhub-migrate-planner` agent 실행 → 초안을 `drafts/planner.md` 에 두고 helper 가 `.axhub/plan/runs/<run_id>/stages/02-planner.md` + meta 로 기록
+- `axhub-migrate-architect` agent 실행 → 초안을 `drafts/architect.md` 에 두고 helper 가 `.axhub/plan/runs/<run_id>/stages/03-architect.md` + meta 로 기록
+- `axhub-migrate-critic` agent 실행 → 초안을 `drafts/critic.md` 에 두고 helper 가 `.axhub/plan/runs/<run_id>/stages/04-critic.md` + meta 로 기록
+- `reviewer` stage 는 **read-only `axhub-migrate-reviewer` lane** 으로 completeness / scope sanity check 를 실행하고, 초안을 `drafts/reviewer.md` 에 두면 helper 가 `.axhub/plan/runs/<run_id>/stages/05-reviewer.md` + meta 로 기록
 - 최종 ADR 저장 → `.axhub/plan/runs/<run_id>/adr.md`
 - `approval.json.state=pending_approval`, `run.json.state=pending_approval` 로 올리고 멈춰요
 
