@@ -29,7 +29,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::axhub_cli::{axhub_bin_from_env, run_axhub, run_axhub_with_timeout};
-use crate::preflight::run_preflight;
+use crate::preflight::{run_preflight, CliState};
 
 pub const SCHEMA_VERSION: &str = "onboarding-detect/v1";
 
@@ -108,6 +108,9 @@ pub struct OnboardingDetect {
     pub cli_version: Option<String>,
     pub cli_state: String,
     pub cli_on_path: bool,
+    /// Resolved path of the healthy CLI; when `cli_state` is `axhub_bin_invalid`
+    /// it instead carries the dead `AXHUB_BIN` override value (see preflight.rs).
+    pub cli_resolved_path: Option<String>,
     pub cli_too_old: bool,
     pub has_update: bool,
     pub latest_version: Option<String>,
@@ -444,7 +447,7 @@ fn parse_deploy_verified(stdout: &str) -> bool {
 fn compute_gaps(d: &OnboardingDetect) -> Vec<String> {
     let mut gaps = Vec::new();
     if !d.cli_present {
-        if d.cli_state == "axhub_bin_invalid" {
+        if d.cli_state == CliState::BinOverrideInvalid.as_str() {
             // AXHUB_BIN override is broken — reinstalling won't help, so route
             // to an env-fix gap instead of the install flow.
             gaps.push("cli_env_invalid".to_string());
@@ -544,6 +547,7 @@ pub fn detect() -> OnboardingDetect {
         cli_version: pf.cli_version,
         cli_state: pf.cli_state,
         cli_on_path: pf.cli_on_path,
+        cli_resolved_path: pf.cli_resolved_path,
         cli_too_old: pf.cli_too_old,
         has_update,
         latest_version,
@@ -795,8 +799,12 @@ mod tests {
         let mut d = bare_detect();
         d.cli_present = false;
         d.cli_state = "axhub_bin_invalid".to_string();
+        d.git_present = false;
         let gaps = compute_gaps(&d);
-        assert_eq!(gaps.first().map(String::as_str), Some("cli_env_invalid"));
+        assert_eq!(
+            gaps,
+            vec!["cli_env_invalid".to_string(), "git_missing".to_string()]
+        );
         assert!(!gaps.contains(&"cli_missing".to_string()));
     }
 
@@ -916,6 +924,7 @@ mod tests {
             cli_version: Some("0.18.0".to_string()),
             cli_state: "ok".to_string(),
             cli_on_path: true,
+            cli_resolved_path: Some("/usr/local/bin/axhub".to_string()),
             cli_too_old: false,
             has_update: false,
             latest_version: None,
