@@ -28,6 +28,48 @@ crossterm.workspace = true
 shlex.workspace = true
 ureq = "3.2.1"
 
+# ── Track H: AST validator (feature "ast", default-on) ──
+# tree-sitter core + 8 grammar 는 전부 `tree-sitter-language ^0.1` LanguageFn ABI
+# 계약을 공유해요 (core 0.26 이 최신이라 모든 grammar 의 parser ABI 14/15 수용).
+# kotlin 은 community next-gen fork 를 정확 버전 고정(Risk#1). fancy-regex 는
+# vendored 룰의 lookahead/lookbehind regex 를 컴파일하려고 써요(std regex 미지원).
+tree-sitter = { version = "0.26", optional = true }
+tree-sitter-typescript = { version = "0.23", optional = true }
+tree-sitter-javascript = { version = "0.25", optional = true }
+tree-sitter-python = { version = "0.25", optional = true }
+tree-sitter-go = { version = "0.25", optional = true }
+tree-sitter-java = { version = "0.23", optional = true }
+tree-sitter-ruby = { version = "0.23", optional = true }
+tree-sitter-kotlin-ng = { version = "=1.1.0", optional = true }
+fancy-regex = { version = "0.18", optional = true }
+
+# Track H frontend 3 (stdio MCP): rmcp 의 stdio transport(`transport-io`)만 — http
+# 스택(axum/reqwest/rustls)은 피해요. rmcp 1.7 = edition 2024 manifest → workspace
+# rust-version 1.85 필요(rust-toolchain.toml 고정).
+rmcp = { version = "1.7", features = ["server", "transport-io"], optional = true }
+
+[features]
+# `mcp` 는 default-ON: shipped 바이너리에 mcp-serve 가 있어야 .mcp.json 의 local
+# stdio 항목이 죽은 참조가 안 돼요.
+default = ["ast", "mcp"]
+mcp = ["dep:rmcp", "ast"]
+# `ast` 끄면(--no-default-features) tree-sitter/grammar/C 컴파일 0, 바이너리 불변.
+# size assert(T4)는 ast-enabled 빌드 대상이에요.
+ast = [
+    "dep:tree-sitter",
+    "dep:tree-sitter-typescript",
+    "dep:tree-sitter-javascript",
+    "dep:tree-sitter-python",
+    "dep:tree-sitter-go",
+    "dep:tree-sitter-java",
+    "dep:tree-sitter-ruby",
+    "dep:tree-sitter-kotlin-ng",
+    "dep:fancy-regex",
+]
+
+[lints]
+workspace = true
+
 [build-dependencies]
 anyhow.workspace = true
 

@@ -301,6 +301,46 @@ pub(crate) struct RouteDecisionArgs {
     pub explicit: bool,
 }
 
+/// `validate` flags (Track H, 정적 AST 패턴 검사). 1개 이상의 파일/디렉터리 경로를
+/// 받아 SDK 데이터/HTTP 계약 위반을 tree-sitter 로 검출해요. exit 0=클린/advisory,
+/// 1=block 위반, 파싱 실패는 exit 0+경고(fail-open). 배포·런타임 검증인 `verify`
+/// 계열과 의미가 달라요. classify=Normal.
+#[cfg(feature = "ast")]
+#[derive(clap::Args, Debug)]
+pub(crate) struct ValidateArgs {
+    /// 검사할 파일 또는 디렉터리 경로 (1개 이상)
+    #[arg(required = true, value_name = "PATHS")]
+    pub paths: Vec<String>,
+    #[arg(long)]
+    pub json: bool,
+}
+
+/// `scan-sites` flags (Track H §H2). migrate 변환 후보(raw HTTP client 직타, 직접
+/// DB driver, 하드코딩 API URL)를 6언어 AST 로 찾아 `{file,line,kind,snippet}` 로
+/// 내요. 항상 exit 0(finder). classify=Normal.
+#[cfg(feature = "ast")]
+#[derive(clap::Args, Debug)]
+pub(crate) struct ScanSitesArgs {
+    /// 스캔할 파일 또는 디렉터리 경로 (1개 이상)
+    #[arg(required = true, value_name = "PATHS")]
+    pub paths: Vec<String>,
+    #[arg(long)]
+    pub json: bool,
+}
+
+/// `mcp-install` flags (Track H §D.2). `<dir>/.mcp.json` 에 axhub local(stdio mcp-serve)
+/// + remote(ax-mcp) 항목을 idempotent 머지해요(기존 사용자 항목 보존). classify=Normal.
+#[cfg(feature = "mcp")]
+#[derive(clap::Args, Debug)]
+pub(crate) struct McpInstallArgs {
+    /// 대상 디렉터리 (기본: 현재 디렉터리). `<dir>/.mcp.json` 을 머지해요.
+    #[arg(long)]
+    pub dir: Option<String>,
+    /// local stdio 서버 command override (기본: `axhub-helpers`).
+    #[arg(long)]
+    pub command: Option<String>,
+}
+
 /// `diagnose hitl` flags (nested). session/prompts 필수·TTY 검증은 handler. classify=Normal.
 #[derive(clap::Args, Debug)]
 pub(crate) struct DiagnoseHitlArgs {

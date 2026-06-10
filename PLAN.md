@@ -503,10 +503,10 @@ tests/score.py           # corpus 결과 → 4개 메트릭 산출 + diff vs bas
 - **Org-admin audit log skill** — v0.2+ (P6 user count 검증 후).
 - **Web dashboard** — 본 plugin과 별개 product.
 
-**v0.x 전체에서 영구 제외 (rows 61–64):**
-- Plugin이 자체 MCP server를 expose하는 것.
-- Plugin이 backend MCP를 직접 호출하거나 MCP를 primary interface로 삼는 것.
-- `.mcp.json` placeholder, MCP tool naming, MCP consent-token tool 설계.
+**MCP 도입 (2026-06-10 ralplan 으로 rows 61–64 철회 — §16.6 supersession):**
+- helpers 가 stdio MCP 서버(`axhub-helpers mcp-serve`, rmcp transport-io)를 겸해 `validate`/`scan_sites` tool 을 노출해요. 사용자 코드는 로컬에서만 분석하고 서버로 전송하지 않아요.
+- init/migrate 가 `.mcp.json`(local stdio mcp-serve + remote ax-mcp)을 idempotent 설치해요. MCP tool naming(validate/scan_sites/sdk_search)도 도입했어요.
+- **여전히 제외**: helpers 가 backend 데이터 op 를 MCP 로 우회하는 것 — backend 호출은 항상 `ax-hub-cli` 경유예요. MCP consent-token tool 설계도 미도입이에요.
 
 **유지되는 설계 원칙:**
 - `skills/`와 `commands/`는 Claude Code presentation layer다.
@@ -821,7 +821,7 @@ axhub/                                      # plugin root
 │   └── hook-fixtures/                      # E11 fix, hook stdin payload pinning
 │
 ├── .claude-plugin/marketplace.json         # B2B install (M6)
-└── (no .mcp.json)                          # rows 61–64: plugin MCP server placeholder canceled
+└── .mcp.json (init/migrate 가 설치)         # 2026-06-10 ralplan: local stdio mcp-serve + remote ax-mcp (rows 61–64 철회)
 ```
 
 **Critical rules:**
@@ -962,6 +962,16 @@ Apply skill workflow as defined in skills/deploy/SKILL.md. Slash invocation does
 - Slash NEVER bypasses safety (G3/E2 alignment).
 
 ### 16.6 CANCELED Plugin MCP Placeholder Spec (historical only)
+
+> **⚠️ 2026-06-10 재철회 (un-cancel) — supersession.** 아래 rows 61–64 의 MCP 제외
+> 결정은 `.omc/plans/ralplan-mcp-md-complement.md` (Planner/Architect/Critic
+> consensus) + 사용자 명시 승인으로 **철회**됐어요. 이제 helpers 가 **stdio MCP
+> 서버**(`axhub-helpers mcp-serve`, rmcp `transport-io` 만 — http 스택 없음)를 겸하고,
+> init/migrate 가 `.mcp.json` (local stdio `axhub-helpers` + remote ax-mcp `axhub`)을
+> 설치해요. "plugin이 MCP 를 호출" 우려와 다른 점: helpers 는 **서버로서 tool 을
+> 노출**할 뿐 사용자 코드는 로컬에서만 분석하고 서버로 전송하지 않아요(위치 원칙,
+> deep-interview R5 에서 거짓 이분법 해소). 본 §16.6 의 원문은 이력 보존용이에요 —
+> 현 진실의 원천은 ralplan 입니다. (rust-version 1.88 로 상향: rmcp 의존 트리 요구.)
 
 Rows 61–64 supersede the earlier M7 placeholder. The repository should **not** contain `.mcp.json`, a server-mode helper subcommand, MCP tool naming, or MCP consent-tool scaffolding for this plugin.
 

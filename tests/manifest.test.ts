@@ -1633,7 +1633,7 @@ describe("cross-manifest consistency", () => {
       "resolve", "preflight", "classify-exit", "redact", "version", "help",
       "list-deployments", "prompt-route", "token-init", "token-import",
       "commit-gate", "test-classifier", "tdd-inject", "state-update",
-      "repair-path", "verify-deploy-artifact",
+      "repair-path", "verify-deploy-artifact", "ast-validate",
     ]);
     for (const [, group] of Object.entries(hooksJson.hooks)) {
       for (const g of group) {
@@ -1813,6 +1813,7 @@ describe("Phase 4 (F3) hooks.json invariant baseline", () => {
         matcher: "Edit|Write|MultiEdit|NotebookEdit",
         commands: [
           { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh state-update --edit-event", timeout: 5 },
+          { command: "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh ast-validate", timeout: 7 },
         ],
       },
     ],

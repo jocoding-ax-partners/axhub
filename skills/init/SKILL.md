@@ -536,6 +536,17 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
    `네, 추천받기` 면 infer-tables-env 분석으로 넘어가요. `아니요` 면 그냥 마무리해요.
 
+9. **axhub MCP 도구를 설치해요 (선택, 비차단).**
+
+   clone 된 repo 루트에 `.mcp.json` 을 설치해서 편집기·에이전트가 axhub MCP 도구를 쓸 수 있게 해요 — 로컬 코드 정적 검증(`validate` / `scan_sites`, `axhub-helpers mcp-serve` stdio) + 원격 SDK 지식·스키마(`axhub`, ax-mcp). 기존 `.mcp.json` 이 있으면 사용자 항목은 보존하고 axhub 두 항목만 추가·갱신해요(idempotent).
+
+   ```bash
+   # clone 된 앱 디렉터리에서 실행해요. 기존 사용자 mcpServers 항목은 보존돼요.
+   axhub-helpers mcp-install
+   ```
+
+   helper 가 없거나 실패해도 **막지 않아요** — vendored packs floor 가 그대로 동작하니 "MCP 도구는 나중에 설치해도 돼요" 한 줄만 안내하고 넘어가요. 원격 MCP URL 은 `AXHUB_MCP_URL` env 로 override 할 수 있어요.
+
 ## NEVER
 
 - NEVER GitHub App 이 아무 계정에도 설치 안 된 상태(`github.state` = uninstalled/empty)에서 Step 3 (template 선택) 이후로 진행하거나 bootstrap dry-run/execute 를 호출하지 않아요. Step 2.5 gate 에서 install_url 을 보여주고 설치가 확인(재조회 `installed:true`)될 때까지 멈춰요. 이미 설치된(installed/mixed) 경우는 막지 않고, install_url 은 추가 설치용으로 계속 보여줘요.

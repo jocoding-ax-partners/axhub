@@ -1,0 +1,307 @@
+[
+  {
+    "id": "where-required-non-owner-scoped-list",
+    "rule_kind": "where_required",
+    "applies_lang": [
+      "go",
+      "java",
+      "kotlin",
+      "node",
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "\\.list\\s*\\((?![^)]*\\bwhere\\b)",
+    "derived_from": "COMMON_DATA_CONTRACT§list/count",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    },
+    "advisory_only": true,
+    "advisory_reason": "owner_column is runtime information — owner-scoped tables legitimately accept filterless list; static analysis cannot distinguish."
+  },
+  {
+    "id": "where-required-non-owner-scoped-count",
+    "rule_kind": "where_required",
+    "applies_lang": [
+      "go",
+      "java",
+      "kotlin",
+      "node",
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "\\.count\\s*\\((?![^)]*\\bwhere\\b)",
+    "derived_from": "COMMON_DATA_CONTRACT§list/count",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    },
+    "advisory_only": true,
+    "advisory_reason": "owner_column is runtime information — owner-scoped tables legitimately accept filterless count; static analysis cannot distinguish."
+  },
+  {
+    "id": "or-combinator-not-pushable-node",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "node"
+    ],
+    "pattern_hint": "\\bor\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "or-combinator-not-pushable-go",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "go"
+    ],
+    "pattern_hint": "\\bOr\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "or-combinator-not-pushable-python-ruby",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "\\bor_\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "or-combinator-not-pushable-jvm",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "java",
+      "kotlin"
+    ],
+    "pattern_hint": "\\bOps\\.or\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "not-combinator-not-pushable-node",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "node"
+    ],
+    "pattern_hint": "\\bnot\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "not-combinator-not-pushable-go",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "go"
+    ],
+    "pattern_hint": "\\bNot\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "not-combinator-not-pushable-python-ruby",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "\\bnot_\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "not-combinator-not-pushable-jvm",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "java",
+      "kotlin"
+    ],
+    "pattern_hint": "\\bOps\\.not\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "cursor-keyset-after-before-forbidden-node-ruby",
+    "rule_kind": "cursor",
+    "applies_lang": [
+      "node",
+      "ruby"
+    ],
+    "pattern_hint": "\\bafter\\s*:|\\bbefore\\s*:",
+    "derived_from": "COMMON_DATA_CONTRACT§pagination",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "cursor-keyset-after-before-forbidden-python",
+    "rule_kind": "cursor",
+    "applies_lang": [
+      "python"
+    ],
+    "pattern_hint": "\\bafter=(?!=)|\\bbefore=(?!=)",
+    "derived_from": "COMMON_DATA_CONTRACT§pagination",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "cursor-keyset-after-before-forbidden-go",
+    "rule_kind": "cursor",
+    "applies_lang": [
+      "go"
+    ],
+    "pattern_hint": "\\bAfter\\s*:|\\bBefore\\s*:",
+    "derived_from": "COMMON_DATA_CONTRACT§pagination",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "cursor-keyset-after-before-forbidden-jvm",
+    "rule_kind": "cursor",
+    "applies_lang": [
+      "java",
+      "kotlin"
+    ],
+    "pattern_hint": "\\.after\\s*\\(|\\.before\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pagination",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "table-columns-must-exist-boundary",
+    "rule_kind": "boundary",
+    "applies_lang": [
+      "go",
+      "java",
+      "kotlin",
+      "node",
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "\\.insert(?:Many)?\\s*\\(|\\.insert_many\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§table-existence",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    },
+    "advisory_only": true,
+    "advisory_reason": "Static analysis cannot verify that referenced tables/columns exist in the live schema — this is a runtime boundary, not a static pattern."
+  },
+  {
+    "id": "oauth-token-must-be-form-urlencoded",
+    "rule_kind": "pushable_filter",
+    "applies_lang": [
+      "*"
+    ],
+    "pattern_hint": "POST\\s+/oauth/token",
+    "derived_from": "oauth-token-form-urlencoded",
+    "source": {
+      "pack_section": "§5",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "oauth-revoke-must-be-form-urlencoded",
+    "rule_kind": "pushable_filter",
+    "applies_lang": [
+      "*"
+    ],
+    "pattern_hint": "POST\\s+/oauth/revoke",
+    "derived_from": "oauth-revoke-form-urlencoded",
+    "source": {
+      "pack_section": "§5",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "email-domains-must-use-api-v1-prefix",
+    "rule_kind": "boundary",
+    "applies_lang": [
+      "*"
+    ],
+    "pattern_hint": "(?<!/api/v1)/tenants/[^/]+/email-domains",
+    "derived_from": "email-domains-api-v1-prefix",
+    "source": {
+      "pack_section": "§5",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "public-invite-links-must-use-api-v1-prefix",
+    "rule_kind": "boundary",
+    "applies_lang": [
+      "*"
+    ],
+    "pattern_hint": "(?<!/api/v1)/invite-links/",
+    "derived_from": "public-invite-links-api-v1-prefix",
+    "source": {
+      "pack_section": "§5",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "raw-http-axhub-data-endpoint-forbidden",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "go",
+      "java",
+      "kotlin",
+      "node",
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "fetch\\s*\\(['\\\"]https?://[^'\\\"]*/(data|api/v1/tenants)|axios\\.[a-z]+\\s*\\(['\\\"]https?://[^'\\\"]*/(data|api/v1/tenants)|http\\.(?:get|post|put|delete)\\s*\\(['\\\"]https?://[^'\\\"]*/(data|api/v1/tenants)",
+    "derived_from": "DATA_RELIABILITY§wire-paths",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "use-client-imports-server-only-axhub",
+    "rule_kind": "boundary",
+    "applies_lang": [
+      "node"
+    ],
+    "pattern_hint": "['\\\"]use client['\\\"][\\s\\S]{0,300}import[^;]*@ax-hub/sdk|import[^;]*@ax-hub/sdk[\\s\\S]{0,300}['\\\"]use client['\\\"]",
+    "derived_from": "CANONICAL_WRAPPER§node-server-side-only",
+    "source": {
+      "pack_section": "§1",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  }
+]

@@ -23,9 +23,26 @@
 | `session-start-autowire` | `hooks/session-start-autowire.{sh,ps1}` | Claude Code SessionStart — fail-open exit 0; `AXHUB_DISABLE_HOOKS` / `AXHUB_DISABLE_HOOK=session-start-autowire` / `AXHUB_DISABLE_STATUSLINE_AUTOWIRE` 지원; background detach (non-blocking) |
 | `plugin-drift` | `axhub-helpers plugin-latest-fetch-bg` (`cmd_session_start` 가 `warm_drift_caches` 로 **detached warm spawn**) + 드리프트 nudge in `cmd_prompt_route` | 플러그인 버전 드리프트 알림. fetch 는 SessionStart 에 캐시 warm — 캐시가 짧은 TTL(60초)보다 오래됐을 때만 detached `…-fetch-bg` child 를 spawn (session-start 지연 0, fail-open; 사람이 첫 메시지 치는 >1s 사이 캐시 warm 돼서 첫 prompt 부터 nudge 가능 + 재시작 시 거의 즉시 fresh). warm 은 `CLAUDE_PLUGIN_ROOT` 있는 real 세션에서만 (CI/non-interactive/`cargo test` 는 skip). nudge 는 UserPromptSubmit 에서 캐시 비교 후 세션+snooze 로 주입 (nudge staleness 24h). `AXHUB_DISABLE_HOOKS` / `AXHUB_DISABLE_HOOK=plugin-drift` 지원 (helper 내부 `is_hook_disabled("plugin-drift")` 게이트). 영구 opt-out 은 `plugin-drift-optout` 마커 |
 | `cli-drift` | `axhub-helpers cli-latest-fetch-bg` (`cmd_session_start` 가 `warm_drift_caches` 로 **detached warm spawn**) + 드리프트 nudge in `cmd_prompt_route` | axhub **CLI 바이너리** 버전 드리프트 알림 (플러그인과 별개 채널). fetch 는 `axhub update check --json` 의 backend `has_update` 를 캐시에 기록 — 캐시가 짧은 TTL(60초)보다 오래됐을 때만 detached fetch (fail-open). warm 은 `CLAUDE_PLUGIN_ROOT` 있는 real 세션에서만. nudge 는 UserPromptSubmit 에서 update-check intent 가 아닌 턴에 세션+snooze 로 주입. 플러그인 업데이트와 **동시에** 있으면 두 알림을 단일 통합 nudge (`<axhub-update>`, AskUserQuestion 하나)로 합쳐서 따로따로 안 뜨고 한 번에 떠요. `AXHUB_DISABLE_HOOKS` / `AXHUB_DISABLE_HOOK=cli-drift` 지원 (`is_hook_disabled("cli-drift")` 게이트). `AXHUB_DISABLE_AUTOUPDATE`(CLI 자체 토글) 면 nudge 안 뜸. 영구 opt-out 은 `cli-drift-optout` 마커 |
+| `ast-validate` | `axhub-helpers ast-validate` (shell wrapper `hooks/axhub-helpers.sh ast-validate`) | PostToolUse (`Edit\|Write\|MultiEdit\|NotebookEdit`). 편집된 파일 1개만 tree-sitter 로 정적 검사해 SDK 데이터/HTTP 계약 block 위반을 검출해요(전체 스캔 X — 레이턴시). **항상 exit 0**(fail-open): 위반은 systemMessage(warn-only)로만 노출, `AXHUB_AST_VALIDATE=block` opt-in 시 additionalContext 교정 지시도 함께. advisory 룰(무필터 list/count 등)은 노이즈라 hook 에서 노출 안 해요. `AXHUB_DISABLE_HOOKS` / `AXHUB_DISABLE_HOOK=ast-validate` 지원 (`is_hook_disabled("ast-validate")` 게이트). 룰 로드/파싱 실패는 `append_hook_error("ast-validate", …)` 기록 후 침묵. |
 
 여기서 다루지 않는 helper subcommand (예: `deploy-prep`, `bootstrap`,
 `list-deployments`) 는 사용자 명시 호출이라 kill switch 적용 대상 아니에요.
+
+### 1.2 ast-validate 강제 수위 (warn-only → block 졸업)
+
+`ast-validate` 는 v1 에서 **warn-only** 예요 — block 위반을 찾아도 systemMessage 로
+알리기만 하고 편집을 막지 않아요(PostToolUse 는 이미 적용된 편집이고, axhub hook 은
+exit 0 계약이라 차단 안 해요).
+
+- **default (warn-only)**: block 위반 → systemMessage. advisory → 침묵.
+- **`AXHUB_AST_VALIDATE=block` (opt-in)**: block 위반 → systemMessage + `additionalContext`
+  에 에이전트 교정 지시. (§10.6 polarity: `AXHUB_<scope>=<value>` 형. opt-in 이라
+  default 안전, 차단이 아니라 교정-유도.)
+
+**졸업 기준**: block-트랙 룰만, good-fixture false-positive 0 + 실사용 false-positive
+리포트 0 이 **연속 2 릴리즈** 유지되면 block-트랙을 default 로 승격하고 env 를
+opt-out 으로 반전해요. **advisory-전용 트랙**(무필터 list/count — owner_column 은
+런타임 정보라 정적 미결정)은 **영구 warn** 이고 block 으로 승격하지 않아요.
 
 ### 1.1 session-start-autowire 와 settings-merge --migrate (v0.6.2)
 

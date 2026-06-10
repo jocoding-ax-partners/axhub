@@ -115,3 +115,28 @@ describe("hooks/axhub-helpers.sh deploy verifier fail-open", () => {
     expect(out.stderr.toString()).toBe("");
   });
 });
+
+describe("hooks/axhub-helpers.sh ast-validate fail-open", () => {
+  test("missing helper binary silently fail-opens ast-validate", () => {
+    const out = runHelperWrapper(["ast-validate"], {});
+    expect(out.status).toBe(0);
+    expect(out.stdout.toString()).toBe("");
+    expect(out.stderr.toString()).toBe("");
+  });
+
+  test("global AXHUB_DISABLE_HOOKS=1 stays silent when helper is missing", () => {
+    const out = runHelperWrapper(["ast-validate"], { AXHUB_DISABLE_HOOKS: "1" });
+    expect(out.status).toBe(0);
+    expect(out.stdout.toString()).toBe("");
+    expect(out.stderr.toString()).toBe("");
+  });
+
+  test("per-hook AXHUB_DISABLE_HOOK=ast-validate stays silent when helper is missing", () => {
+    const out = runHelperWrapper(["ast-validate"], {
+      AXHUB_DISABLE_HOOK: "ast-validate,other",
+    });
+    expect(out.status).toBe(0);
+    expect(out.stdout.toString()).toBe("");
+    expect(out.stderr.toString()).toBe("");
+  });
+});

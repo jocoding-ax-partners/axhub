@@ -70,6 +70,42 @@ enum Commands {
         sub: DiagnoseSub,
     },
 
+    /// 정적 AST 패턴 검사 (Track H, 신규). 편집된 사용자 코드를 tree-sitter 로 파싱해
+    /// SDK 데이터/HTTP 계약 위반(or()/not() 비-pushable 필터, after:/before: 커서,
+    /// /api/v1 prefix 누락 등)을 정적으로 검출해요. exit 0=클린/advisory, 1=block
+    /// 위반, 파싱 실패는 exit 0+경고(fail-open).
+    ///
+    /// 의미 분리(혼동 금지): `validate` = **정적 AST 패턴**(편집 코드 계약 검사).
+    /// `verify`/`verify-deploy-artifact` = **배포·런타임 검증**(배포 산출물·런타임
+    /// 상태). 서로 대체 관계가 아니에요.
+    #[cfg(feature = "ast")]
+    Validate(args::ValidateArgs),
+
+    /// PostToolUse hook 진입점 (Track H). stdin 의 PostToolUse payload 에서 편집된
+    /// 파일 경로를 뽑아 `validate` 엔진으로 검사해요. **항상 exit 0**(fail-open) —
+    /// block 위반은 systemMessage(warn-only)로만, `AXHUB_AST_VALIDATE=block` opt-in
+    /// 시 additionalContext 교정 지시도 함께. 사용자 직접 호출이 아니라 hook 전용.
+    #[cfg(feature = "ast")]
+    AstValidate,
+
+    /// 변환 사이트 스캐너 (Track H §H2, 신규). migrate 플로우용 finder — raw HTTP
+    /// client 직타, 직접 DB driver, 하드코딩 API URL 을 6언어 AST 로 찾아
+    /// `{file,line,kind,snippet}` JSON 으로 내요. 항상 exit 0(gate 아님).
+    #[cfg(feature = "ast")]
+    ScanSites(args::ScanSitesArgs),
+
+    /// stdio MCP 서버 (Track H frontend 3). validate/scan-sites 엔진을 MCP tool 로
+    /// 노출해요. `.mcp.json` 의 local 항목이 이 명령을 stdio 로 띄워요. 클라이언트
+    /// 연결이 닫힐 때까지 실행돼요.
+    #[cfg(feature = "mcp")]
+    McpServe,
+
+    /// `.mcp.json` 설치/머지 (Track H §D.2). 대상 프로젝트의 `.mcp.json` 에 axhub
+    /// local(stdio mcp-serve) + remote(ax-mcp) 두 항목만 추가/갱신하고 기존 사용자
+    /// 항목은 보존해요. init/migrate SKILL 이 호출해요.
+    #[cfg(feature = "mcp")]
+    McpInstall(args::McpInstallArgs),
+
     /// 전환기 raw passthrough — legacy dispatch 로 위임. Polish 에서 제거.
     #[command(external_subcommand)]
     Passthrough(Vec<String>),
@@ -114,7 +150,8 @@ fn classify(token: Option<&str>) -> HookClass {
             | "verify-deploy-artifact"
             | "classify-exit"
             | "autowire-statusline"
-            | "karpathy-inject",
+            | "karpathy-inject"
+            | "ast-validate",
         ) => HookClass::FailOpenHook,
         _ => HookClass::Normal,
     }
@@ -356,11 +393,44 @@ fn dispatch(command: Commands) -> i32 {
             }
         },
 
+        #[cfg(feature = "ast")]
+        Commands::Validate(a) => {
+            run_result(axhub_helpers::ast_validate::run_validate(&a.paths, a.json))
+        }
+
+        // hook 진입점 — run_hook 은 항상 i32(0) 반환(fail-open). run_result 경유 X
+        // (Err 변환으로 인한 비정상 exit code 회피).
+        #[cfg(feature = "ast")]
+        Commands::AstValidate => axhub_helpers::ast_validate::run_hook(),
+
+        #[cfg(feature = "ast")]
+        Commands::ScanSites(a) => {
+            run_result(axhub_helpers::site_scan::run_scan_sites(&a.paths, a.json))
+        }
+
+        #[cfg(feature = "mcp")]
+        Commands::McpServe => run_result(axhub_helpers::mcp_serve::run_mcp_serve()),
+
+        #[cfg(feature = "mcp")]
+        Commands::McpInstall(a) => {
+            run_result(axhub_helpers::mcp_config::run_mcp_install(a.dir, a.command))
+        }
+
         Commands::Passthrough(tokens) => {
             let Some((cmd, rest)) = tokens.split_first() else {
                 eprintln!("{}", crate::USAGE);
                 return 64;
             };
+            // feature-off 변형(--no-default-features): `AstValidate` variant 가 없어
+            // ast-validate 가 여기로 떨어져요. hook 진입점은 fail-open 계약(전 경로
+            // exit 0)이라 legacy USAGE+64 대신 stdin drain 후 조용히 no-op 해요 —
+            // ast 미탑재 바이너리에 hook 이 걸려도 main 흐름을 막지 않아요.
+            #[cfg(not(feature = "ast"))]
+            if cmd == "ast-validate" {
+                let mut sink = String::new();
+                let _ = std::io::Read::read_to_string(&mut std::io::stdin(), &mut sink);
+                return 0;
+            }
             run_result(crate::legacy_dispatch(cmd, rest.to_vec()))
         }
     }
@@ -408,6 +478,7 @@ mod tests {
             "classify-exit",
             "autowire-statusline",
             "karpathy-inject",
+            "ast-validate",
         ] {
             assert_eq!(
                 classify(Some(t)),

@@ -53,7 +53,7 @@ fi
 
 # Fail-open for context/telemetry hooks and local quality helper gates.
 case "${1:-}" in
-  prompt-route|classify-exit|test-classifier|state-update|commit-gate|tdd-inject|verify-deploy-artifact)
+  prompt-route|classify-exit|test-classifier|state-update|commit-gate|tdd-inject|verify-deploy-artifact|ast-validate)
     cat >/dev/null || true
     exit 0
     ;;

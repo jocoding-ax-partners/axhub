@@ -2,10 +2,20 @@
 members = ["crates/axhub-helpers"]
 resolver = "2"
 
+[workspace.lints.clippy]
+# Track H MSRV bump(1.83→1.88, rmcp 의존) 부수효과: 1.88 toolchain 의 clippy 가
+# 기존 코드베이스 전반의 stylistic 패턴을 새로 warn 해요. 의미 변화 0 이고 13개
+# 무관 파일을 건드리지 않으려고 floor 상향의 부수효과로 allow 해요.
+uninlined_format_args = "allow"
+useless_vec = "allow"
+
 [workspace.package]
 version = "0.9.46"
 edition = "2021"
-rust-version = "1.83"
+# Track H: rmcp 1.7(stdio MCP) 의존 트리 floor. rmcp edition 2024(Cargo ≥1.85) +
+# 전이 의존 schemars 1.2 → darling 0.23(rustc ≥1.88) → floor = 1.88.
+# crate edition 은 2021 유지(rmcp 가 consumer edition 강제 안 함) — MSRV floor 만 상향.
+rust-version = "1.88"
 license = "MIT"
 
 [workspace.dependencies]
