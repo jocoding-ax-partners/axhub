@@ -32,3 +32,15 @@ distiller 가 신규 emit 한 block 룰 2종 반영:
 각 룰은 `derived_from` (origin 참조) 필수 — 없으면 `ast_validate` 로드가 실패해요
 (enforcement drift 차단). `advisory_only:true` 룰은 정적 미결정이라 영구 warn 트랙이고
 block 으로 승격하지 않아요.
+
+## Follow-up: PR #198 스택 머지 시
+
+현재 advisory 메시지는 **위임 문구 없는 권고 warn** 만 방출해요 (plan fallback (ii) —
+`migrate-data-verify` 가 PR #187←#197←#198 스택 산출물이라 미머지 환경에선 死문구가 되기
+때문, `ast_validate.rs` `rule_message` doc-comment 및 `advisory_messages_recommend_without_delegation`
+테스트로 잠금). 스택 머지 후 활성화할 것:
+
+1. advisory 메시지에 `axhub-helpers migrate-data-verify` 런타임 위임 문구 추가.
+2. 선행 의존성 기계 분기 추가 — `migrate-data-verify --help` 존재 체크(exit 0) 또는
+   PR #198 merge commit 의 `git merge-base --is-ancestor` assert 로 위임/권고 모드 자동 전환.
+3. 위 잠금 테스트를 분기-aware 로 갱신 (위임 모드에선 위임 문구 포함을 assert).
