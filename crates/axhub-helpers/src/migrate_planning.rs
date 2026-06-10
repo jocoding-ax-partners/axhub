@@ -1224,10 +1224,9 @@ pub fn migrate_stage_write(
             markdown_file.display()
         )
     })?;
-    // Backstop: never persist secrets to disk. Redaction also normalizes the text,
-    // so `was_redacted` is true whenever masking or normalization changed anything.
-    let markdown = crate::redact::redact(&raw_markdown);
-    let was_redacted = markdown != raw_markdown;
+    // Backstop: never persist secrets to disk.
+    // redacted = secret mask 가 실제로 발화했는지 (정규화-only 변경은 제외).
+    let (markdown, was_redacted) = crate::redact::redact_with_mask_flag(&raw_markdown);
     // SHA is computed over the redacted bytes — the same content written to disk —
     // so the approval seal hash matches what `collect_stage_sha_list` later reads.
     let markdown_sha = sha256_hex(&markdown);
@@ -1245,6 +1244,9 @@ pub fn migrate_stage_write(
         )
     };
 
+    // md 와 meta 는 각각 atomic write 라 중간 실패 시 meta 가 stale 할 수 있어요.
+    // seal(collect_stage_sha_list)은 디스크 md 를 재해싱하므로 진실원천은 md 본문이고,
+    // meta 의 revision/redacted 는 best-effort 감사 메타데이터예요.
     write_text_atomically(&markdown_target, &markdown)?;
     if let Some(meta_path) = meta_target.as_ref() {
         let ordinal = stage_ordinal_from_path(&markdown_target)?;
