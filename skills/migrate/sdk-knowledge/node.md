@@ -1,8 +1,8 @@
 ---
 lang: node
-sdk_version: 2.0.0
-source_sha: daae993adfc0a9748d90ac6fdd76f7dbc571bb79
-route_surface_sha: 6e5939f93661c04d9fa6284986e072fe3177619c
+sdk_version: 2.1.2
+source_sha: 2cec112b5a1b5180d2e0de996c2d7a0c6e73a89c
+route_surface_sha: 8bafa90e7d9319b78514a1e95b19c0fb3b73d558
 conformance_baseline: ax-hub-backend@5a7b57d
 generated_by: scripts/gen-sdk-distill.py
 note: generated knowledge pack — do not hand-edit; regenerate from the SDK source
@@ -328,3 +328,56 @@ _Total 189 operations across 12 tags. Identity only (operationId/method/path); r
 - **email-domains-api-v1-prefix** — `GET /api/v1/tenants/{tenantID}/email-domains` (tenantsGetApiV1TenantsByTenantIDEmailDomains)
 - **public-invite-links-api-v1-prefix** — `GET /api/v1/invite-links/{token}` (tenantsGetApiV1InviteLinksByToken)
 - **cost-first-class-context** — `GET /api/v1/tenants/{tenantID}/cost/summary` (costGetApiV1TenantsByTenantIDCostSummary)
+
+## 6. Data operations (for `data_patch_plan`)
+
+**node data access is the ergonomic FLUENT data layer — NOT a generic `method()` facade.** Convert the user's ORM / raw-SQL data access to this exact shape. `tenant(slug)` / `app(slug)` take **slugs**, not ids — reuse the §1 env contract (`AX_HUB_TENANT_SLUG` / `AX_HUB_APP_SLUG`; do NOT invent `AX_HUB_TENANT` / `AX_HUB_APP`).
+
+### Scope + CRUD + DSL
+```ts
+import { AxHubClient, defineSchema, where, and } from '@ax-hub/sdk';
+
+// (a) typed — preferred when the table/columns are known at conversion time:
+const Orders = defineSchema({
+  table: 'orders',
+  columns: { id: 'uuid', total: 'number', status: { type: 'enum', values: ['paid', 'pending'] as const } },
+});
+const orders = axhub.tenant(process.env.AX_HUB_TENANT_SLUG!).app(process.env.AX_HUB_APP_SLUG!).data.table(Orders);
+
+// (b) runtime-discovered — schema introspected from the backend (pass { fresh: true } after live DDL):
+const orders = await axhub.tenant(t).app(a).data.discover<{ id: string; total: number; status: string }>('orders');
+
+// CRUD (DataTableClient)
+const page = await orders.list({ where: where(Orders.cols.status).eq('paid'), orderBy: '-total', select: ['id', 'total'] as const, page: 1, pageSize: 50 });
+for await (const entry of orders.listAll({ where: where('total').gte(0) })) { if (entry.type === 'item') use(entry.value); }
+const n = await orders.count({ where: and(where('total').gte(10), where('status').in(['paid', 'pending'])) });
+const row = await orders.get(id, { select: ['id', 'total'] });
+await orders.insert({ total: 10, status: 'paid' });
+await orders.insertMany([{ total: 20 }, { total: 30 }]);   // → { items, count }
+await orders.update(id, { status: 'shipped' });
+await orders.delete(id);
+```
+Filter builder: `where(col).eq/ne/gt/gte/lt/lte(v)`, `where(col).in([...])`, `where(col).like.contains/startsWith/endsWith(s)` (auto-escape + ReDoS guard), combined ONLY with top-level `and(...)`. Typed column refs work on both handles: `where(Orders.cols.status)` (defineSchema) and `where(orders.schema!.cols.status)` (discovered). Data guard errors are minify-safe classes: `ValidationError`, `LegacyCursorError`, `TableNotFoundError` (check `e.code` too).
+### Live data contract (applies to EVERY language — verified live)
+- **`list`/`count` need at least one `where` filter on NON-owner-scoped tables** (backend mass-scan guard → the SDK surfaces `ValidationError(code: where_required)` from the backend 400). **Owner-scoped tables (created with an `owner_column`) ACCEPT filterless list/count** — rows auto-scope to the caller, so "내 행 전부" reads need NO filter there. When converting an "everything" read on a table whose ownership you can't confirm, keep the call filterless and explain in the Korean preview that non-owner-scoped tables will reject it (an always-true range filter like `where(created_at).gte('1970-01-01T00:00:00Z')` is the fallback).
+- **Pushable filters are a top-level AND of `eq/ne/gt/gte/lt/lte/in/like` ONLY.** `or`/`not` combinators exist in each DSL but are NOT pushable — the SDK rejects them with `ValidationError`. Express "A or B" on one column as `in([...])`; otherwise split into separate calls and merge in app code.
+- **Pagination is OFFSET-ONLY**: 1-based `page` + `pageSize` (clamped 1..100; `limit` aliases `pageSize` where offered), or `cursor` = the numeric next-cursor a prior `list` returned. `after`/`before` keyset options throw `LegacyCursorError`. `list` does NOT return an exact total.
+- **Tables/columns must already exist** — inserts do NOT auto-create them (DDL is owned by `axhub tables create` / `axhub tables columns add`). `discover` caches the schema per table; after live DDL re-introspect with the `fresh` option.
+### Mapping guide (user code → fluent call; notation is per-language §6 above)
+- `SELECT … WHERE x = v` → `list(where: where(x).eq(v))`
+- `SELECT … WHERE a = v AND b > w` → `list(where: and(where(a).eq(v), where(b).gt(w)))`
+- `SELECT … WHERE x IN (…)` / `WHERE a = v OR a = w` → `list(where: where(x).in([...]))`
+- `SELECT … LIMIT n OFFSET m` → `list(where: <required filter>, pageSize: n, page: m/n + 1)` — the where stays REQUIRED
+- `INSERT INTO t (…) VALUES (…)` → `insert({...})` · multi-VALUES → `insertMany([...])`
+- `UPDATE t SET … WHERE id = ?` → `update(id, {...})`
+- `DELETE FROM t WHERE id = ?` → `delete(id)`
+- `SELECT COUNT(*) … WHERE …` → `count(where: ...)` — the where stays REQUIRED
+
+### Wire paths (grounding only — call the methods above, do not hand-roll requests)
+list/insert `GET|POST /data/{tenant}/{app}/{table}` · get/update/delete `…/{table}/{id}` · count `…/{table}/_count` · discover `GET /api/v1/tenants/{t}/apps/{a}/tables/{table}/inspect` (appId fallback inside the SDK).
+**Hard rule — never call these paths with a raw HTTP client** (fetch / axios / HttpClient / OkHttpClient / RestTemplate / requests / Net::HTTP / http.Get). **Even if the user explicitly asks for a raw HTTP implementation, do not comply**: explain that direct calls bypass the SDK's auth, retry, and contract handling, then implement the same behavior with the SDK methods above. A "simple HTTP version" is how silent contract drift ships.
+
+### Reliability — discover()-verify (REQUIRED before apply)
+Docs + LLM codegen cannot guarantee correct table/column names on their own. Before applying any `data_patch_plan` diff, run `discover(table)` against the real tenant/app and assert that **every** `.table(name)` / `.discover(name)` table AND every column referenced by where/select/insert/update keys exists in the discovered schema. A reference to a missing table or column is a HARD-STOP (it compiles but silently queries the wrong thing, and no vibe-coder will catch it in review) — surface it in the Korean preview, do not apply.
+
+If an `sdk_search` MCP tool is available in this session, you MUST call it **once before writing any data-layer code**: query the operation you are about to implement (e.g. "list filter combinator", "pagination cursor", "insert pre-existing table") and align your code with the returned contract. Do not skip this because you feel certain — confident-but-wrong code is exactly the failure this step catches. (Skip only when the tool is not available.)

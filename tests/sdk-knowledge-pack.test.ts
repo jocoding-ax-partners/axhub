@@ -96,5 +96,32 @@ describe("SDK knowledge pack freshness + integrity", () => {
       expect(md).toContain("oauth-token-form-urlencoded"); // a systemic contract id
       expect(md).toContain(pinned.conformance_baseline);
     });
+
+    test(`${lang}: carries the §6 data-operation surface`, () => {
+      const md = read(`${lang}.md`);
+      expect(md).toContain("## 6. Data operations");
+      const data = md.slice(md.indexOf("## 6. Data operations"));
+      // Every SDK now ships the ergonomic fluent data layer (go/java/kotlin/
+      // python/ruby 0.3.0, node 2.1.1 — live-verified per language). The expert
+      // codegens against the language's exact fluent snippet; the old
+      // passthrough PLAN-ONLY marker must be gone everywhere.
+      expect(data).toContain("FLUENT");
+      expect(data).not.toContain("PLAN-ONLY");
+      expect(data).not.toContain("method(path_params, query, body)");
+      expect(data).toContain("AX_HUB_TENANT_SLUG");
+      expect(data).toContain("AX_HUB_APP_SLUG");
+      // per-language scope idiom (typed + runtime-discovered handles)
+      const tableIdiom = lang === "go" ? "TableSchema(" : ".table(";
+      expect(data).toContain(tableIdiom);
+      expect(data.toLowerCase()).toContain("discover(");
+      // live data contract — the rules a conversion silently breaks at runtime
+      expect(data).toContain("where_required"); // filterless list/count guard
+      expect(data).toContain("NOT pushable"); // or/not rejected with ValidationError
+      expect(data).toContain("OFFSET-ONLY"); // after/before → LegacyCursorError
+      // bulk insert in the language's own spelling (insertMany/insert_many/InsertMany)
+      expect(data.includes("insertMany") || data.includes("insert_many") || data.includes("InsertMany")).toBe(true);
+      expect(data).toContain("discover()-verify"); // reliability lever
+      expect(data).not.toContain("schemaless"); // rows are typed/discovered
+    });
   }
 });

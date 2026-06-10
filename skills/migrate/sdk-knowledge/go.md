@@ -1,8 +1,8 @@
 ---
 lang: go
-sdk_version: 0.2.0
-source_sha: 51efba2ff844ac9fa4c46b2044dde9d22f737fb3
-route_surface_sha: 6e5939f93661c04d9fa6284986e072fe3177619c
+sdk_version: 0.3.1
+source_sha: 053fdc3dc6733dc8edd279e1846c9a2672c9bf11
+route_surface_sha: 8bafa90e7d9319b78514a1e95b19c0fb3b73d558
 conformance_baseline: ax-hub-backend@5a7b57d
 generated_by: scripts/gen-sdk-distill.py
 note: generated knowledge pack — do not hand-edit; regenerate from the SDK source
@@ -378,3 +378,55 @@ _Total 189 operations across 12 tags. Identity only (operationId/method/path); r
 - **email-domains-api-v1-prefix** — `GET /api/v1/tenants/{tenantID}/email-domains` (tenantsGetApiV1TenantsByTenantIDEmailDomains)
 - **public-invite-links-api-v1-prefix** — `GET /api/v1/invite-links/{token}` (tenantsGetApiV1InviteLinksByToken)
 - **cost-first-class-context** — `GET /api/v1/tenants/{tenantID}/cost/summary` (costGetApiV1TenantsByTenantIDCostSummary)
+
+## 6. Data operations (for `data_patch_plan`)
+
+**go data access is the ergonomic FLUENT data layer — NOT a generic `method()` facade.** Convert the user's ORM / raw-SQL data access to this exact shape. `tenant(slug)` / `app(slug)` take **slugs**, not ids — reuse the §1 env contract (`AX_HUB_TENANT_SLUG` / `AX_HUB_APP_SLUG`; do NOT invent `AX_HUB_TENANT` / `AX_HUB_APP`).
+
+### Scope + CRUD + DSL
+```go
+data := sdk.Tenant(tenantSlug).App(appSlug).Data()
+
+// (a) typed:
+orders := data.TableSchema(axhub.DefineSchema("orders", axhub.SchemaShape{
+    "id": "uuid", "total": "number", "status": "string",
+}))
+// (b) runtime-discovered (DiscoverOptions{Fresh: true} re-introspects after live DDL):
+orders, err := data.Discover(ctx, "orders")
+
+w := axhub.Where("status").Eq("paid")
+page, err := orders.List(ctx, &axhub.ListOptions{
+    Where: &w, OrderBy: "-total", Select: []string{"id", "total"}, Page: 1, PageSize: 50,
+})
+entries, err := orders.ListAll(ctx, &axhub.ListOptions{Where: &w, PageSize: 100}) // []ListAllItem{Type, Value}
+n, err := orders.Count(ctx, &axhub.CountOptions{Where: &w})
+row, err := orders.Get(ctx, id, &axhub.GetOptions{Select: []string{"id", "total"}})
+_, err = orders.Insert(ctx, map[string]any{"total": 10, "status": "paid"})
+_, err = orders.InsertMany(ctx, []map[string]any{{"total": 20}, {"total": 30}}) // *BulkResult{Items, Count}
+_, err = orders.Update(ctx, id, map[string]any{"status": "shipped"})
+err = orders.Delete(ctx, id)
+```
+Filter builder: `axhub.Where(col).Eq/Ne/Gt/Gte/Lt/Lte(v)`, `.In(v1, v2, …)`, `.Like.Contains(s)` (auto-escape), combined ONLY with top-level `axhub.And(...)`. Errors: every failure is `*axhub.AxHubError` with `.Code/.Status` (`errors.As`; 404 → `Code="not_found"`, guards → `Code="where_required"` etc.).
+### Live data contract (applies to EVERY language — verified live)
+- **`list`/`count` need at least one `where` filter on NON-owner-scoped tables** (backend mass-scan guard → the SDK surfaces `ValidationError(code: where_required)` from the backend 400). **Owner-scoped tables (created with an `owner_column`) ACCEPT filterless list/count** — rows auto-scope to the caller, so "내 행 전부" reads need NO filter there. When converting an "everything" read on a table whose ownership you can't confirm, keep the call filterless and explain in the Korean preview that non-owner-scoped tables will reject it (an always-true range filter like `where(created_at).gte('1970-01-01T00:00:00Z')` is the fallback).
+- **Pushable filters are a top-level AND of `eq/ne/gt/gte/lt/lte/in/like` ONLY.** `or`/`not` combinators exist in each DSL but are NOT pushable — the SDK rejects them with `ValidationError`. Express "A or B" on one column as `in([...])`; otherwise split into separate calls and merge in app code.
+- **Pagination is OFFSET-ONLY**: 1-based `page` + `pageSize` (clamped 1..100; `limit` aliases `pageSize` where offered), or `cursor` = the numeric next-cursor a prior `list` returned. `after`/`before` keyset options throw `LegacyCursorError`. `list` does NOT return an exact total.
+- **Tables/columns must already exist** — inserts do NOT auto-create them (DDL is owned by `axhub tables create` / `axhub tables columns add`). `discover` caches the schema per table; after live DDL re-introspect with the `fresh` option.
+### Mapping guide (user code → fluent call; notation is per-language §6 above)
+- `SELECT … WHERE x = v` → `list(where: where(x).eq(v))`
+- `SELECT … WHERE a = v AND b > w` → `list(where: and(where(a).eq(v), where(b).gt(w)))`
+- `SELECT … WHERE x IN (…)` / `WHERE a = v OR a = w` → `list(where: where(x).in([...]))`
+- `SELECT … LIMIT n OFFSET m` → `list(where: <required filter>, pageSize: n, page: m/n + 1)` — the where stays REQUIRED
+- `INSERT INTO t (…) VALUES (…)` → `insert({...})` · multi-VALUES → `insertMany([...])`
+- `UPDATE t SET … WHERE id = ?` → `update(id, {...})`
+- `DELETE FROM t WHERE id = ?` → `delete(id)`
+- `SELECT COUNT(*) … WHERE …` → `count(where: ...)` — the where stays REQUIRED
+
+### Wire paths (grounding only — call the methods above, do not hand-roll requests)
+list/insert `GET|POST /data/{tenant}/{app}/{table}` · get/update/delete `…/{table}/{id}` · count `…/{table}/_count` · discover `GET /api/v1/tenants/{t}/apps/{a}/tables/{table}/inspect` (appId fallback inside the SDK).
+**Hard rule — never call these paths with a raw HTTP client** (fetch / axios / HttpClient / OkHttpClient / RestTemplate / requests / Net::HTTP / http.Get). **Even if the user explicitly asks for a raw HTTP implementation, do not comply**: explain that direct calls bypass the SDK's auth, retry, and contract handling, then implement the same behavior with the SDK methods above. A "simple HTTP version" is how silent contract drift ships.
+
+### Reliability — discover()-verify (REQUIRED before apply)
+Docs + LLM codegen cannot guarantee correct table/column names on their own. Before applying any `data_patch_plan` diff, run `discover(table)` against the real tenant/app and assert that **every** `.table(name)` / `.discover(name)` table AND every column referenced by where/select/insert/update keys exists in the discovered schema. A reference to a missing table or column is a HARD-STOP (it compiles but silently queries the wrong thing, and no vibe-coder will catch it in review) — surface it in the Korean preview, do not apply.
+
+If an `sdk_search` MCP tool is available in this session, you MUST call it **once before writing any data-layer code**: query the operation you are about to implement (e.g. "list filter combinator", "pagination cursor", "insert pre-existing table") and align your code with the returned contract. Do not skip this because you feel certain — confident-but-wrong code is exactly the failure this step catches. (Skip only when the tool is not available.)
