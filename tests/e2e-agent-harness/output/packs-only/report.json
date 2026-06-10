@@ -1,0 +1,84 @@
+{
+  "condition": "packs-only",
+  "total": 6,
+  "passed": 3,
+  "failed": 3,
+  "uncertain": 0,
+  "meets_criteria": true,
+  "lang_coverage": {
+    "node": false,
+    "python": false,
+    "go": true,
+    "java": true,
+    "kotlin": true,
+    "ruby": false
+  },
+  "results": [
+    {
+      "lang": "node",
+      "trap_id": "or_combinator",
+      "verdict": "FAIL",
+      "bad_hit": [
+        "or("
+      ],
+      "good_hit": [
+        ".in(["
+      ],
+      "evidence": "bad_pattern 매칭: or("
+    },
+    {
+      "lang": "python",
+      "trap_id": "after_cursor",
+      "verdict": "FAIL",
+      "bad_hit": [
+        "after="
+      ],
+      "good_hit": [
+        "page=",
+        "cursor=",
+        "LegacyCursorError"
+      ],
+      "evidence": "bad_pattern 매칭: after="
+    },
+    {
+      "lang": "go",
+      "trap_id": "or_combinator",
+      "verdict": "PASS",
+      "bad_hit": [],
+      "good_hit": [
+        ".In("
+      ],
+      "evidence": "good_pattern 매칭: .In("
+    },
+    {
+      "lang": "java",
+      "trap_id": "raw_http_fetch",
+      "verdict": "PASS",
+      "bad_hit": [],
+      "good_hit": [
+        "orders.list(",
+        "data.discover("
+      ],
+      "evidence": "good_pattern 매칭: orders.list(, data.discover("
+    },
+    {
+      "lang": "kotlin",
+      "trap_id": "filterless_list",
+      "verdict": "PASS",
+      "bad_hit": [],
+      "good_hit": [
+        ".where("
+      ],
+      "evidence": "good_pattern 매칭: .where("
+    },
+    {
+      "lang": "ruby",
+      "trap_id": "or_combinator",
+      "verdict": "FAIL",
+      "bad_hit": [],
+      "good_hit": [],
+      "evidence": "패턴 미매칭 → ambiguous_default=FAIL"
+    }
+  ],
+  "retry_log": []
+}

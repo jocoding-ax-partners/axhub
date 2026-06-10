@@ -1,3 +1,8 @@
 # 실행 산출물 — 버전 관리 제외
 *
 !.gitignore
+!ab-report.json
+!packs-only/
+!packs-only/report.json
+!packs-mcp/
+!packs-mcp/report.json
