@@ -1201,20 +1201,43 @@ pub fn migrate_stage_write(
     let approval_path = run_dir.join("approval.json");
     let mut approval = read_json::<MigratePlanApprovalRecord>(&approval_path)?;
     let now = now_ts();
-    let markdown = fs::read_to_string(markdown_file).with_context(|| {
+
+    // Refuse agent-authored drafts placed inside stages/: the helper owns that
+    // directory. Feeding such a file back as --markdown-file would clone it under
+    // the next ordinal (the duplicate-stage-md regression).
+    let stages_dir_guard = run_dir.join("stages");
+    let canonical_md = markdown_file
+        .canonicalize()
+        .unwrap_or_else(|_| markdown_file.to_path_buf());
+    let canonical_stages = stages_dir_guard
+        .canonicalize()
+        .unwrap_or_else(|_| stages_dir_guard.clone());
+    if canonical_md.starts_with(&canonical_stages) {
+        bail!(
+            "migrate-stage-write: --markdown-file 은 stages/ 밖(예: <run_dir>/drafts/)에 두세요 — stages/ 는 helper 전용 경로예요"
+        );
+    }
+
+    let raw_markdown = fs::read_to_string(markdown_file).with_context(|| {
         format!(
             "{} stage markdown 를 읽지 못했어요",
             markdown_file.display()
         )
     })?;
+    // Backstop: never persist secrets to disk. Redaction also normalizes the text,
+    // so `was_redacted` is true whenever masking or normalization changed anything.
+    let markdown = crate::redact::redact(&raw_markdown);
+    let was_redacted = markdown != raw_markdown;
+    // SHA is computed over the redacted bytes — the same content written to disk —
+    // so the approval seal hash matches what `collect_stage_sha_list` later reads.
     let markdown_sha = sha256_hex(&markdown);
 
     let (markdown_target, meta_target, event_name) = if stage == "adr" {
         (run_dir.join("adr.md"), None, "adr_written")
     } else {
-        ensure_allowed_stage(stage)?;
+        let ordinal = stage_fixed_ordinal(stage)?;
         let stages_dir = run_dir.join("stages");
-        let ordinal = next_stage_ordinal(&stages_dir)?;
+        fs::create_dir_all(&stages_dir)?;
         (
             stages_dir.join(format!("{ordinal:02}-{stage}.md")),
             Some(stages_dir.join(format!("{ordinal:02}-{stage}.meta.json"))),
@@ -1225,12 +1248,25 @@ pub fn migrate_stage_write(
     write_text_atomically(&markdown_target, &markdown)?;
     if let Some(meta_path) = meta_target.as_ref() {
         let ordinal = stage_ordinal_from_path(&markdown_target)?;
+        // Idempotent overwrite: re-recording the same stage bumps `revision`
+        // instead of producing a new file, so drift is visible without duplication.
+        let revision = if meta_path.exists() {
+            read_json::<serde_json::Value>(meta_path)
+                .ok()
+                .and_then(|v| v.get("revision").and_then(serde_json::Value::as_u64))
+                .unwrap_or(0)
+                + 1
+        } else {
+            1
+        };
         let meta = json!({
             "schema_version": MIGRATE_PLAN_STAGE_SCHEMA_VERSION,
             "run_id": run.run_id,
             "app_key": run.app_key,
             "stage": stage,
             "stage_n": ordinal,
+            "revision": revision,
+            "redacted": was_redacted,
             "state": "complete",
             "artifact_sha256": markdown_sha,
             "created_at": now,
@@ -1722,29 +1758,15 @@ fn required_string(value: Option<String>, flag: &str) -> Result<String> {
     Ok(value)
 }
 
-fn ensure_allowed_stage(stage: &str) -> Result<()> {
-    let allowed = ["discover", "planner", "architect", "critic", "reviewer"];
-    if allowed.contains(&stage) {
-        Ok(())
-    } else {
-        bail!("migrate-stage-write: 지원하지 않는 stage 예요")
+fn stage_fixed_ordinal(stage: &str) -> Result<u32> {
+    match stage {
+        "discover" => Ok(1),
+        "planner" => Ok(2),
+        "architect" => Ok(3),
+        "critic" => Ok(4),
+        "reviewer" => Ok(5),
+        _ => bail!("migrate-stage-write: 지원하지 않는 stage 예요"),
     }
-}
-
-fn next_stage_ordinal(stages_dir: &Path) -> Result<u32> {
-    fs::create_dir_all(stages_dir)?;
-    let mut max_seen = 0;
-    for entry in fs::read_dir(stages_dir)? {
-        let entry = entry?;
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        if let Some((prefix, _)) = name.split_once('-') {
-            if let Ok(value) = prefix.parse::<u32>() {
-                max_seen = max_seen.max(value);
-            }
-        }
-    }
-    Ok(max_seen + 1)
 }
 
 fn stage_ordinal_from_path(path: &Path) -> Result<u32> {
@@ -2615,5 +2637,190 @@ mod tests {
             "2026-01-01T00:00:00Z",
         )
         .unwrap();
+    }
+
+    /// Scaffold a full_consensus run on disk and return the run.json path.
+    ///
+    /// Layout mirrors production: `<planning_root>/plan/runs/<run_id>/run.json`
+    /// (run_dir 3 levels under planning_root) so `spec_artifact_paths` resolves
+    /// the target spec under `<planning_root>/spec/apps/<app_key>/specs/`.
+    fn scaffold_full_consensus_run(planning_root: &Path) -> PathBuf {
+        // repo_root must canonicalize to a real path so the fingerprint matches.
+        let repo_root = planning_root.join("repo");
+        std::fs::create_dir_all(&repo_root).unwrap();
+        let canonical_repo = repo_root.canonicalize().unwrap();
+        let app_key = build_app_key(&canonical_repo, ".");
+        let spec_id = "spec-1";
+
+        let run_dir = planning_root.join("plan").join("runs").join("run-1");
+        std::fs::create_dir_all(&run_dir).unwrap();
+
+        let run = MigratePlanRunRecord {
+            schema_version: MIGRATE_PLAN_RUN_SCHEMA_VERSION.to_string(),
+            run_id: "run-1".to_string(),
+            app_key: app_key.clone(),
+            app_path: ".".to_string(),
+            repo_root: canonical_repo.display().to_string(),
+            remote_repo: None,
+            r#ref: None,
+            owned_app_keys: Some(vec![app_key.clone()]),
+            mode: PlanningMode::FullConsensus,
+            stage_order: FULL_CONSENSUS_STAGE_ORDER
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            state: RunState::Running,
+            escalation_reason: EscalationReason::HardStop,
+            confidence: Some("0.91".to_string()),
+            hard_stop_reasons: vec!["wide diff".to_string()],
+            workspace_scope: WorkspaceScope {
+                scope_type: "repo".to_string(),
+                marker_path: None,
+                workspace_root: Some(canonical_repo.display().to_string()),
+                marker_sha256: None,
+                conflict: None,
+            },
+            parallelism: ParallelismPolicy {
+                enabled: false,
+                scope: "serial".to_string(),
+                reason: "fallback".to_string(),
+                fallback_reason: None,
+            },
+            wave_policy: WavePolicy {
+                mode: "conditional_parallel".to_string(),
+                independence_required: true,
+                multi_app_allowed: false,
+            },
+            wave_index_path: None,
+            repo_fingerprint: sha256_hex(&canonical_repo.display().to_string()),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: "2026-01-01T00:00:00Z".to_string(),
+        };
+        let run_json = run_dir.join("run.json");
+        write_json_atomically(&run_json, &serde_json::to_value(&run).unwrap()).unwrap();
+
+        let approval = MigratePlanApprovalRecord {
+            schema_version: MIGRATE_PLAN_APPROVAL_SCHEMA_VERSION.to_string(),
+            run_id: "run-1".to_string(),
+            app_key: app_key.clone(),
+            state: ApprovalState::NeedsRevision,
+            required_before_execution: true,
+            target_spec_id: spec_id.to_string(),
+            target_spec_sha256: "sha".to_string(),
+            approved_stage_artifacts: vec![],
+            adr_sha256: None,
+            requested_at: "2026-01-01T00:00:00Z".to_string(),
+            approved_at: None,
+            approved_by: None,
+            approval_prompt_sha256: "prompt".to_string(),
+        };
+        write_json_atomically(
+            &run_dir.join("approval.json"),
+            &serde_json::to_value(&approval).unwrap(),
+        )
+        .unwrap();
+
+        // Target spec markdown + meta must exist: when approval stays non-pending,
+        // migrate_stage_write asserts the spec markdown is present.
+        let (spec_md, spec_meta, _) =
+            spec_artifact_paths(&run_dir, &app_key, spec_id).unwrap();
+        write_text_atomically(&spec_md, "# target spec").unwrap();
+        write_json_atomically(
+            &spec_meta,
+            &json!({"status": "draft", "approval": {"state": "needs_revision"}}),
+        )
+        .unwrap();
+
+        run_json
+    }
+
+    #[test]
+    fn stage_write_uses_fixed_ordinal_and_overwrites() {
+        let temp = tempfile::tempdir().unwrap();
+        let run_json = scaffold_full_consensus_run(temp.path());
+        let run_dir = run_json.parent().unwrap().to_path_buf();
+        let stages_dir = run_dir.join("stages");
+
+        // Draft lives OUTSIDE the run_dir (a separate temp dir).
+        let draft_dir = tempfile::tempdir().unwrap();
+        let draft = draft_dir.path().join("planner-draft.md");
+
+        std::fs::write(&draft, "# planner v1").unwrap();
+        migrate_stage_write(&run_json, "planner", &draft, None, None, None).unwrap();
+
+        std::fs::write(&draft, "# planner v2 (revision)").unwrap();
+        migrate_stage_write(&run_json, "planner", &draft, None, None, None).unwrap();
+
+        // Exactly one stage .md file, deterministically named 02-planner.md.
+        let md_files: Vec<_> = std::fs::read_dir(&stages_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.ends_with(".md"))
+            .collect();
+        assert_eq!(md_files, vec!["02-planner.md".to_string()]);
+
+        let planner_md = stages_dir.join("02-planner.md");
+        assert_eq!(
+            std::fs::read_to_string(&planner_md).unwrap(),
+            "# planner v2 (revision)"
+        );
+
+        // meta revision is bumped to 2 on the second write.
+        let meta: Value = read_json(&stages_dir.join("02-planner.meta.json")).unwrap();
+        assert_eq!(meta["revision"].as_u64(), Some(2));
+    }
+
+    #[test]
+    fn stage_write_rejects_markdown_inside_stages_dir() {
+        let temp = tempfile::tempdir().unwrap();
+        let run_json = scaffold_full_consensus_run(temp.path());
+        let run_dir = run_json.parent().unwrap().to_path_buf();
+        let stages_dir = run_dir.join("stages");
+        std::fs::create_dir_all(&stages_dir).unwrap();
+
+        // An agent-authored draft placed directly under stages/ must be refused.
+        let inside = stages_dir.join("99-manual.md");
+        std::fs::write(&inside, "# manual draft").unwrap();
+
+        let err = migrate_stage_write(&run_json, "planner", &inside, None, None, None)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("stages/"),
+            "expected error to mention stages/, got: {err}"
+        );
+    }
+
+    #[test]
+    fn stage_write_redacts_secret_values_on_disk() {
+        let temp = tempfile::tempdir().unwrap();
+        let run_json = scaffold_full_consensus_run(temp.path());
+        let run_dir = run_json.parent().unwrap().to_path_buf();
+        let stages_dir = run_dir.join("stages");
+
+        let draft_dir = tempfile::tempdir().unwrap();
+        let draft = draft_dir.path().join("discover-draft.md");
+        std::fs::write(
+            &draft,
+            "SLACK_BOT_TOKEN=xoxb-1073512345678-abcDEF123ghi 가 노출됐어요",
+        )
+        .unwrap();
+
+        migrate_stage_write(&run_json, "discover", &draft, None, None, None).unwrap();
+
+        let discover_md = stages_dir.join("01-discover.md");
+        let written = std::fs::read_to_string(&discover_md).unwrap();
+        assert!(
+            !written.contains("xoxb-1073512345678"),
+            "secret leaked to disk: {written}"
+        );
+        assert!(
+            written.contains("<REDACTED_SLACK_TOKEN>"),
+            "redaction marker missing: {written}"
+        );
+
+        let meta: Value = read_json(&stages_dir.join("01-discover.meta.json")).unwrap();
+        assert_eq!(meta["redacted"].as_bool(), Some(true));
     }
 }

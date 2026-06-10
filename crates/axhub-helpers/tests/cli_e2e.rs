@@ -5675,10 +5675,34 @@ fn cli_migrate_stage_write_supports_revision_loop() {
         .parent()
         .unwrap()
         .join("stages");
-    let entries = std::fs::read_dir(stages_dir).unwrap().count();
-    assert!(
-        entries >= 10,
-        "expected discover + planner/architect/critic/planner markdown+meta files"
+    // Fixed-ordinal contract: re-recording `planner` overwrites 02-planner.md in
+    // place (revision bump) instead of minting a 5th file. The seed step records
+    // discover(01); the loop adds planner(02)/architect(03)/critic(04) and the
+    // planner revision overwrites 02 — so 4 distinct stages → exactly 8 files.
+    let md_files: Vec<String> = std::fs::read_dir(&stages_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.ends_with(".md"))
+        .collect();
+    assert_eq!(
+        md_files.len(),
+        4,
+        "expected exactly 4 stage markdown files (fixed ordinal, overwrite-in-place), got {md_files:?}"
+    );
+    let entries = std::fs::read_dir(&stages_dir).unwrap().count();
+    assert_eq!(
+        entries, 8,
+        "expected discover/planner/architect/critic markdown+meta pairs (no duplicate revision files)"
+    );
+    let planner_meta: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(stages_dir.join("02-planner.meta.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        planner_meta["revision"].as_u64(),
+        Some(2),
+        "second planner write must bump revision to 2"
     );
 }
 
