@@ -39,7 +39,7 @@ PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 echo "$PREFLIGHT_JSON"
 ```
 
-`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 치명적이지 않으면 워크플로를 계속 진행해요. API/service catalog 조회는 read-only 라서 `profile`, `team`, `current_app`, 또는 버전 경고가 비어 있어도 중단하지 말고 최신 CLI 의 `axhub catalog resources --json --limit 50` 까지 실행해요.
+`auth_ok` 가 false 면 먼저 인증 상태를 설명하고, 로그인이 필요할 때는 `다시 로그인해줘`라고 말하면 된다고 안내해요. `auth_error_code` 가 있으면 자연어로 복구 안내를 붙여요: `cli_not_found`/`cli_unavailable` 는 CLI 설치 안내, `axhub_bin_invalid` 는 `AXHUB_BIN` 환경변수가 잘못된 경로 (`cli_resolved_path` 값) 를 가리키는 상태라 재설치 대신 `unset AXHUB_BIN` 후 새 세션 재시도 안내, `cli_config_corrupted` 는 재로그인 안내, `cli_too_old` 는 업데이트 안내. 치명적이지 않으면 워크플로를 계속 진행해요. API/service catalog 조회는 read-only 라서 `profile`, `team`, `current_app`, 또는 버전 경고가 비어 있어도 중단하지 말고 최신 CLI 의 `axhub catalog resources --json --limit 50` 까지 실행해요.
 
 1. **API/service catalog 조회.** 사용자가 “어떤 API”, “endpoint list”, “service catalog” 처럼 목록·카탈로그를 물으면 read-only 명령만 실행해요. 특정 검색어가 있으면 `--search "$QUERY"` 를 붙이고, 없으면 기본 50개만 봐요.
 
