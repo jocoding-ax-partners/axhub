@@ -11,6 +11,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { SMOKE_CASES } from "./fixtures.ts";
 
 export type TrapKind =
   | "or_combinator"
@@ -457,115 +458,9 @@ if (import.meta.main) {
 function runSmokeGrade() {
   console.log("▶ grade.ts smoke — 합성 출력 채점기 자가검증\n");
 
-  const cases: Array<{ lang: string; text: string; expect: "PASS" | "FAIL" }> =
-    [
-      // node: or( 함정에 빠진 케이스
-      {
-        lang: "node",
-        text: `const result = await orders.list({ where: or(where('status').eq('paid'), where('status').eq('pending')) });`,
-        expect: "FAIL",
-      },
-      // node: .in([ 올바른 케이스
-      {
-        lang: "node",
-        text: `const result = await orders.list({ where: where('status').in(['paid', 'pending']) });`,
-        expect: "PASS",
-      },
-      // python: after= 함정
-      {
-        lang: "python",
-        text: `page = events.list(after=prev_cursor, page_size=50)`,
-        expect: "FAIL",
-      },
-      // python: page= 올바른 케이스
-      {
-        lang: "python",
-        text: `page = events.list(where=where('id').gte(0), page=2, page_size=50)`,
-        expect: "PASS",
-      },
-      // go: axhub.Or( 함정
-      {
-        lang: "go",
-        text: `page, err := tasks.List(ctx, &axhub.ListOptions{ Where: axhub.Or(axhub.Where("priority").Eq("high"), axhub.Where("priority").Eq("urgent")) })`,
-        expect: "FAIL",
-      },
-      // go: .In( 올바른 케이스
-      {
-        lang: "go",
-        text: `w := axhub.Where("priority").In("high", "urgent"); page, err := tasks.List(ctx, &axhub.ListOptions{Where: &w})`,
-        expect: "PASS",
-      },
-      // java: raw HTTP 함정
-      {
-        lang: "java",
-        text: `HttpClient client = HttpClient.newHttpClient(); HttpRequest req = HttpRequest.newBuilder().uri(URI.create("https://api.axhub.ai/data/my-tenant/my-app/orders")).header("X-Api-Key", token).build();`,
-        expect: "FAIL",
-      },
-      // java: SDK 사용 올바른 케이스
-      {
-        lang: "java",
-        text: `DataTableClient orders = data.table(Schema.defineSchema("orders", ...)); PaginatedList page = orders.list(ListOptions.create().where(Ops.where("status").eq("paid")));`,
-        expect: "PASS",
-      },
-      // kotlin: 무필터 list — 빈 ListOptions (non-owner 테이블 함정)
-      {
-        lang: "kotlin",
-        text: `val results = reports.list(ListOptions.create())`,
-        expect: "FAIL",
-      },
-      // kotlin: .where( 필터 포함 — 올바른 케이스
-      {
-        lang: "kotlin",
-        text: `val results = reports.list(ListOptions.create().where(Ops.where("created_at").gte("1970-01-01T00:00:00Z")).pageSize(50))`,
-        expect: "PASS",
-      },
-      // ruby: or_( 함정
-      {
-        lang: "ruby",
-        text: `result = products.list(where: or_(where('category').eq('electronics'), where('category').eq('appliances')))`,
-        expect: "FAIL",
-      },
-      // ruby: .in_( 올바른 케이스
-      {
-        lang: "ruby",
-        text: `result = products.list(where: where('category').in_(['electronics', 'appliances']))`,
-        expect: "PASS",
-      },
-      // ── false-negative 회귀 케이스 (설명문 bad 언급 + 코드 블록 정상) ──────
-      // node: 설명에 or( 언급, 코드 블록은 .in([ 정상 → PASS
-      {
-        lang: "node",
-        text: "SDK rejects `or()` combinator — not pushable.\n```ts\nconst r = await orders.list({ where: where('status').in(['paid','pending']) });\n```",
-        expect: "PASS",
-      },
-      // python: 설명에 after= 언급, 코드 블록은 page= 정상 → PASS
-      {
-        lang: "python",
-        text: "Do not use after=/before= (LegacyCursorError).\n```python\npage2 = logs.list(where=where('id').gte(0), page=2, page_size=50)\n```",
-        expect: "PASS",
-      },
-      // go: 설명에 axhub.Or( 언급, 코드 블록은 .In( 정상 → PASS
-      {
-        lang: "go",
-        text: "axhub.Or(...) causes ValidationError.\n```go\nw := axhub.Where(\"priority\").In(\"high\", \"urgent\")\npage, err := tasks.List(ctx, &axhub.ListOptions{Where: &w})\n```",
-        expect: "PASS",
-      },
-      // ruby: %w[ 구문 .in_(%w[...]) → PASS
-      {
-        lang: "ruby",
-        text: "result = products.list(where: where('category').in_(%w[electronics appliances]))",
-        expect: "PASS",
-      },
-      // python: 코드 블록 내 주석에 after= 언급, 실제 코드는 page= → PASS
-      {
-        lang: "python",
-        text: "```python\n# after=prev_cursor → LegacyCursorError (사용 금지)\npage2 = logs.list(where=where('id').gte(0), page=2, page_size=50)\n```",
-        expect: "PASS",
-      },
-    ];
-
+  // 케이스는 fixtures.ts 단일 소스 — bun test (grade.test.ts) 와 공유
   let all_ok = true;
-  for (const c of cases) {
+  for (const c of SMOKE_CASES) {
     const result = grade(c.lang, c.text);
     const ok = result.verdict === c.expect;
     const icon = ok ? "✓" : "✗";
@@ -575,7 +470,7 @@ function runSmokeGrade() {
     );
   }
 
-  console.log(`\nsmoke 결과: ${all_ok ? "모두 통과 ✓" : "실패 있음 ✗"}`);
+  console.log(`\nsmoke 결과: ${all_ok ? "모두 통과 ✓" : "실패 있음 ✗"} (${SMOKE_CASES.length} 케이스)`);
   if (!all_ok) process.exit(1);
 }
 
