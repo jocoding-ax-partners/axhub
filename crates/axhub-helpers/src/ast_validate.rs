@@ -26,6 +26,7 @@
 //!   (문자열 안의 URL 을 봐야 하므로).
 
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
@@ -490,6 +491,101 @@ fn emit_human(output: &ValidateOutput) {
     }
 }
 
+// ──────────────────────────── PostToolUse hook 진입점 ────────────────────────────
+
+/// PostToolUse hook 의 stdin payload 에서 편집된 파일 경로를 뽑아요. Edit/Write/
+/// MultiEdit 는 `tool_input.file_path`, NotebookEdit 는 `tool_input.notebook_path`.
+fn extract_edited_path(payload: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(payload).ok()?;
+    let tool_input = value.get("tool_input")?;
+    tool_input
+        .get("file_path")
+        .or_else(|| tool_input.get("notebook_path"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+}
+
+/// `ast-validate` PostToolUse hook 진입점. 편집된 파일 1개만 검사해요(전체 스캔 X —
+/// hook 레이턴시). **fail-open: 어떤 실패에서도 exit 0**, 위반은 systemMessage 로만
+/// 노출(warn-only). `AXHUB_AST_VALIDATE=block` opt-in(§10.6 polarity, AXHUB_<scope>=
+/// <value>) 시 additionalContext 로 교정 지시도 같이 실어요. advisory 는 노이즈라
+/// hook 에서 노출 안 해요(명시적 `validate` CLI 로만).
+///
+/// 졸업 기준: block-트랙 룰만, good-fixture FP 0 + 실사용 FP 리포트 0 이 연속 2
+/// 릴리즈 유지되면 block 을 default 로 승격(env 는 opt-out 으로 반전). advisory-전용
+/// 트랙(무필터 list/count)은 영구 warn — 정적 미결정.
+#[must_use]
+pub fn run_hook() -> i32 {
+    if crate::hook_safety::is_hook_disabled("ast-validate") {
+        return 0;
+    }
+    let mut payload = String::new();
+    if std::io::stdin().read_to_string(&mut payload).is_err() {
+        return 0;
+    }
+    let Some(path) = extract_edited_path(&payload) else {
+        return 0;
+    };
+    let target = Path::new(&path);
+    if detect_lang(target).is_none() {
+        return 0; // 미지원 확장자 — no-op
+    }
+    let rules = match load_rules() {
+        Ok(r) => r,
+        Err(e) => {
+            crate::hook_safety::append_hook_error("ast-validate", &e);
+            return 0;
+        }
+    };
+    let violations = match scan_file(target, &rules) {
+        ScanOutcome::Scanned(v) => v,
+        ScanOutcome::Skipped => return 0,
+        ScanOutcome::Failed(reason) => {
+            crate::hook_safety::append_hook_error("ast-validate", &reason);
+            return 0;
+        }
+    };
+    let blocks: Vec<&Violation> = violations.iter().filter(|v| !v.advisory_only).collect();
+    if blocks.is_empty() {
+        return 0; // 클린(또는 advisory 만) — hook 침묵
+    }
+    print!("{}", render_hook_output(&path, &blocks));
+    0
+}
+
+/// hook 출력 JSON 을 만들어요(테스트용으로 분리). warn-only=systemMessage 만,
+/// block 모드=systemMessage + additionalContext(에이전트 교정 지시).
+fn render_hook_output(path: &str, blocks: &[&Violation]) -> String {
+    let block_mode = matches!(std::env::var("AXHUB_AST_VALIDATE").as_deref(), Ok("block"));
+    let summary = blocks
+        .iter()
+        .map(|v| format!("{}:{} {}", v.line, v.column, v.rule_id))
+        .collect::<Vec<_>>()
+        .join(", ");
+    if block_mode {
+        let detail = blocks
+            .iter()
+            .map(|v| format!("- {}:{} {} — {}", v.line, v.column, v.rule_id, v.message))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let agent = format!(
+            "{path} 에 axhub SDK 계약 block 위반 {}건이 있어요. 고쳐주세요:\n{detail}",
+            blocks.len()
+        );
+        let system = format!(
+            "🚫 axhub AST validator (block 모드) — {path}: block 위반 {}건",
+            blocks.len()
+        );
+        crate::hook_output::post_tool_use_context_with_system(&agent, &system)
+    } else {
+        let system = format!(
+            "⚠️ axhub AST validator — {path} 에서 SDK 계약 block 위반 {}건: {summary}. 검토를 권장해요. (강제하려면 AXHUB_AST_VALIDATE=block)",
+            blocks.len()
+        );
+        serde_json::json!({ "systemMessage": system }).to_string()
+    }
+}
+
 // ──────────────────────────── 테스트 ────────────────────────────
 
 #[cfg(test)]
@@ -577,6 +673,42 @@ export function f() {
         let src = "export function f(ownerId) { return db.table(\"p\").eq(\"owner_id\", ownerId).limit(10).list(); }";
         let v = scan_source(src, Grammar::Typescript, "node", "<t>", &r).unwrap();
         assert_eq!(block_ids(&v).len(), 0);
+    }
+
+    // ── hook 헬퍼 ──
+    #[test]
+    fn extract_path_from_edit_payload() {
+        let p = r#"{"tool_name":"Edit","tool_input":{"file_path":"/x/a.ts","old_string":"a"}}"#;
+        assert_eq!(extract_edited_path(p).as_deref(), Some("/x/a.ts"));
+        let nb = r#"{"tool_input":{"notebook_path":"/x/n.ipynb"}}"#;
+        assert_eq!(extract_edited_path(nb).as_deref(), Some("/x/n.ipynb"));
+        assert_eq!(extract_edited_path("not json"), None);
+        assert_eq!(extract_edited_path(r#"{"tool_input":{}}"#), None);
+    }
+
+    #[test]
+    fn hook_output_warn_only_is_systemmessage_only() {
+        let v = Violation {
+            file: "a.ts".into(),
+            line: 3,
+            column: 5,
+            rule_id: "or-combinator-not-pushable".into(),
+            rule_kind: "forbidden_call".into(),
+            advisory_only: false,
+            message: "x".into(),
+            derived_from: "y".into(),
+            lock_sha: "z".into(),
+        };
+        let refs = vec![&v];
+        // 기본(warn-only): systemMessage 만, additionalContext 없음.
+        let _guard = crate::PROCESS_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        std::env::remove_var("AXHUB_AST_VALIDATE");
+        let out = render_hook_output("a.ts", &refs);
+        let json: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert!(json.get("systemMessage").is_some());
+        assert!(json.get("hookSpecificOutput").is_none(), "warn-only 는 additionalContext 없음");
     }
 
     // ── 6언어 fixture 매트릭스 ──

@@ -78,6 +78,13 @@ enum Commands {
     #[cfg(feature = "ast")]
     Validate(args::ValidateArgs),
 
+    /// PostToolUse hook 진입점 (Track H). stdin 의 PostToolUse payload 에서 편집된
+    /// 파일 경로를 뽑아 `validate` 엔진으로 검사해요. **항상 exit 0**(fail-open) —
+    /// block 위반은 systemMessage(warn-only)로만, `AXHUB_AST_VALIDATE=block` opt-in
+    /// 시 additionalContext 교정 지시도 함께. 사용자 직접 호출이 아니라 hook 전용.
+    #[cfg(feature = "ast")]
+    AstValidate,
+
     /// 전환기 raw passthrough — legacy dispatch 로 위임. Polish 에서 제거.
     #[command(external_subcommand)]
     Passthrough(Vec<String>),
@@ -122,7 +129,8 @@ fn classify(token: Option<&str>) -> HookClass {
             | "verify-deploy-artifact"
             | "classify-exit"
             | "autowire-statusline"
-            | "karpathy-inject",
+            | "karpathy-inject"
+            | "ast-validate",
         ) => HookClass::FailOpenHook,
         _ => HookClass::Normal,
     }
@@ -282,6 +290,11 @@ fn dispatch(command: Commands) -> i32 {
             run_result(axhub_helpers::ast_validate::run_validate(&a.paths, a.json))
         }
 
+        // hook 진입점 — run_hook 은 항상 i32(0) 반환(fail-open). run_result 경유 X
+        // (Err 변환으로 인한 비정상 exit code 회피).
+        #[cfg(feature = "ast")]
+        Commands::AstValidate => axhub_helpers::ast_validate::run_hook(),
+
         Commands::Passthrough(tokens) => {
             let Some((cmd, rest)) = tokens.split_first() else {
                 eprintln!("{}", crate::USAGE);
@@ -334,6 +347,7 @@ mod tests {
             "classify-exit",
             "autowire-statusline",
             "karpathy-inject",
+            "ast-validate",
         ] {
             assert_eq!(
                 classify(Some(t)),

@@ -78,6 +78,11 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh state-update --edit-event",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/axhub-helpers.sh ast-validate",
+            "timeout": 7
           }
         ]
       }
