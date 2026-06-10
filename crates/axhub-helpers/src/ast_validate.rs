@@ -91,9 +91,7 @@ pub(crate) struct CompiledRule {
 
 impl CompiledRule {
     fn applies_to(&self, lang_key: &str) -> bool {
-        self.applies_lang
-            .iter()
-            .any(|l| l == "*" || l == lang_key)
+        self.applies_lang.iter().any(|l| l == "*" || l == lang_key)
     }
 }
 
@@ -114,7 +112,10 @@ fn compile_rules_json(json: &str) -> Result<Vec<CompiledRule>> {
     let mut out = Vec::with_capacity(raw.len());
     for r in raw {
         if r.derived_from.trim().is_empty() {
-            bail!("룰 '{}' 에 derived_from 이 없어요 (원천 없는 룰 금지)", r.id);
+            bail!(
+                "룰 '{}' 에 derived_from 이 없어요 (원천 없는 룰 금지)",
+                r.id
+            );
         }
         if r.advisory_only && r.advisory_reason.as_deref().unwrap_or("").trim().is_empty() {
             bail!("advisory 룰 '{}' 에 advisory_reason 이 없어요", r.id);
@@ -195,7 +196,11 @@ fn is_string_kind(kind: &str) -> bool {
 
 /// 주석/문자열 노드의 byte span 을 수집해요. 해당 노드 안으로는 재귀하지 않아요
 /// (보수적: 보간 코드도 마스킹 → false-positive 0 우선, false-negative 는 허용).
-fn collect_mask_spans(root: Node, comments: &mut Vec<(usize, usize)>, strings: &mut Vec<(usize, usize)>) {
+fn collect_mask_spans(
+    root: Node,
+    comments: &mut Vec<(usize, usize)>,
+    strings: &mut Vec<(usize, usize)>,
+) {
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
         let kind = node.kind();
@@ -391,8 +396,8 @@ pub(crate) fn scan_source(
     file: &str,
     rules: &[CompiledRule],
 ) -> Result<Vec<Violation>> {
-    let (masked_no_comments, masked_code_only) = build_masks(source, grammar)
-        .ok_or_else(|| anyhow::anyhow!("tree-sitter parse 실패"))?;
+    let (masked_no_comments, masked_code_only) =
+        build_masks(source, grammar).ok_or_else(|| anyhow::anyhow!("tree-sitter parse 실패"))?;
     let line_index = LineIndex::new(source);
 
     let mut violations = Vec::new();
@@ -448,7 +453,13 @@ fn scan_file(path: &Path, rules: &[CompiledRule]) -> ScanOutcome {
         Ok(s) => s,
         Err(e) => return ScanOutcome::Failed(format!("read: {e}")),
     };
-    match scan_source(&source, grammar, lang_key, &path.display().to_string(), rules) {
+    match scan_source(
+        &source,
+        grammar,
+        lang_key,
+        &path.display().to_string(),
+        rules,
+    ) {
         Ok(v) => ScanOutcome::Scanned(v),
         Err(e) => ScanOutcome::Failed(format!("{e}")),
     }
@@ -562,15 +573,16 @@ pub fn run_validate(paths: &[String], json: bool) -> Result<i32> {
 fn emit_human(output: &ValidateOutput) {
     for v in &output.violations {
         let tag = if v.advisory_only { "advisory" } else { "BLOCK" };
-        println!("{}:{}:{} [{}] {} — {}", v.file, v.line, v.column, tag, v.rule_id, v.message);
+        println!(
+            "{}:{}:{} [{}] {} — {}",
+            v.file, v.line, v.column, tag, v.rule_id, v.message
+        );
     }
     for f in &output.parse_failures {
         eprintln!("⚠️  파싱 건너뜀(fail-open): {} — {}", f.file, f.reason);
     }
     if output.truncated {
-        eprintln!(
-            "⚠️  파일 수 cap({MAX_SCAN_FILES}) 도달 — 일부 파일은 검사하지 못했어요"
-        );
+        eprintln!("⚠️  파일 수 cap({MAX_SCAN_FILES}) 도달 — 일부 파일은 검사하지 못했어요");
     }
     if output.block_count > 0 {
         println!(
@@ -738,11 +750,18 @@ mod tests {
             "vendored 룰 21개 로드 (F1 re-vendor: or/not/cursor 언어별 분리)"
         );
         for rule in &r {
-            assert!(!rule.derived_from.is_empty(), "{} derived_from 필수", rule.id);
+            assert!(
+                !rule.derived_from.is_empty(),
+                "{} derived_from 필수",
+                rule.id
+            );
             assert!(!rule.lock_sha.is_empty(), "{} lock_sha 필수", rule.id);
         }
         let advisory = r.iter().filter(|x| x.advisory_only).count();
-        assert_eq!(advisory, 3, "advisory_only 룰 3개(list/count/table-columns)");
+        assert_eq!(
+            advisory, 3,
+            "advisory_only 룰 3개(list/count/table-columns)"
+        );
     }
 
     // ── 룰 로딩 검증 3분기 — compile_rules_json 직접 테스트 ──
@@ -832,7 +851,11 @@ export function f() {
     #[test]
     fn run_validate_exit_mapping() {
         let bad = fixture_dir().join("node/bad.ts").display().to_string();
-        assert_eq!(run_validate(&[bad], true).unwrap(), 1, "block 위반 → exit 1");
+        assert_eq!(
+            run_validate(&[bad], true).unwrap(),
+            1,
+            "block 위반 → exit 1"
+        );
         let good = fixture_dir().join("node/good.ts").display().to_string();
         assert_eq!(
             run_validate(&[good], true).unwrap(),
@@ -846,7 +869,8 @@ export function f() {
     fn validate_json_envelope_has_all_fields() {
         let bad = fixture_dir().join("node/bad.ts").display().to_string();
         let out = validate_paths(&[bad]).unwrap();
-        let json: serde_json::Value = serde_json::from_str(&serde_json::to_string(&out).unwrap()).unwrap();
+        let json: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&out).unwrap()).unwrap();
         assert_eq!(json["schema_version"], "validate/v1");
         assert_eq!(json["status"], "violations");
         assert_eq!(json["files_scanned"], 1);
@@ -856,8 +880,15 @@ export function f() {
         assert!(json["parse_failures"].as_array().unwrap().is_empty());
         let v = &json["violations"].as_array().unwrap()[0];
         for field in [
-            "file", "line", "column", "rule_id", "rule_kind", "advisory_only", "message",
-            "derived_from", "lock_sha",
+            "file",
+            "line",
+            "column",
+            "rule_id",
+            "rule_kind",
+            "advisory_only",
+            "message",
+            "derived_from",
+            "lock_sha",
         ] {
             assert!(!v[field].is_null(), "violations[0].{field} 필드 누락");
         }
@@ -884,7 +915,10 @@ export function f() {
             msg.contains("server-only helper") && msg.contains("client 컴포넌트"),
             "use-client 룰은 /api/v1 boundary 공통 메시지가 아니라 고유 메시지여야 해요: {msg}"
         );
-        assert!(!msg.contains("/api/v1"), "boundary 공통 메시지 누출 금지: {msg}");
+        assert!(
+            !msg.contains("/api/v1"),
+            "boundary 공통 메시지 누출 금지: {msg}"
+        );
     }
 
     // ── hook 헬퍼 ──
@@ -920,7 +954,10 @@ export function f() {
         let out = render_hook_output("a.ts", &refs);
         let json: serde_json::Value = serde_json::from_str(&out).unwrap();
         assert!(json.get("systemMessage").is_some());
-        assert!(json.get("hookSpecificOutput").is_none(), "warn-only 는 additionalContext 없음");
+        assert!(
+            json.get("hookSpecificOutput").is_none(),
+            "warn-only 는 additionalContext 없음"
+        );
     }
 
     // ── 6언어 fixture 매트릭스 ──
@@ -931,7 +968,8 @@ export function f() {
     fn scan_fixture(rel: &str, grammar: Grammar, lang_key: &str) -> Vec<Violation> {
         let r = rules();
         let path = fixture_dir().join(rel);
-        let src = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{} 읽기 실패: {e}", path.display()));
+        let src = fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("{} 읽기 실패: {e}", path.display()));
         scan_source(&src, grammar, lang_key, rel, &r).expect("parse")
     }
 
@@ -973,7 +1011,10 @@ export function f() {
         let v = scan_fixture(rel, grammar, lang_key);
         let ids = block_ids(&v);
         for expected in expected_block_ids(lang_key) {
-            assert!(ids.contains(expected), "{rel}: {expected} 미검출, got {ids:?}");
+            assert!(
+                ids.contains(expected),
+                "{rel}: {expected} 미검출, got {ids:?}"
+            );
         }
     }
 
@@ -984,7 +1025,10 @@ export function f() {
         assert!(ids.is_empty(), "{rel}: block FP {ids:?} (advisory 는 허용)");
         // owner-scoped 무필터 정당 호출이 advisory 로 떠야 해요(케이스 존재 증명).
         let has_advisory = v.iter().any(|x| x.advisory_only);
-        assert!(has_advisory, "{rel}: owner-scoped advisory 케이스가 있어야 해요");
+        assert!(
+            has_advisory,
+            "{rel}: owner-scoped advisory 케이스가 있어야 해요"
+        );
     }
 
     #[test]
@@ -1060,14 +1104,11 @@ export function f() {
         let v = scan_source(&src, Grammar::Typescript, "node", "<dense>", &r).unwrap();
         let elapsed = started.elapsed();
         assert!(
-            v.iter().any(|x| x.rule_id == "or-combinator-not-pushable-node"),
+            v.iter()
+                .any(|x| x.rule_id == "or-combinator-not-pushable-node"),
             "dense or() 위반이 검출돼야 해요"
         );
-        assert!(
-            v.len() <= 500,
-            "파일당 위반 cap 500, got {}",
-            v.len()
-        );
+        assert!(v.len() <= 500, "파일당 위반 cap 500, got {}", v.len());
         assert!(
             elapsed < std::time::Duration::from_secs(1),
             "250KB+ dense 스캔은 1초 미만이어야 해요 (실측 {elapsed:?})"
@@ -1104,7 +1145,10 @@ export function f() {
                 !msg.contains("migrate-data-verify"),
                 "위임 문구 금지(미머지 fallback): {msg}"
             );
-            assert!(!msg.contains("위임"), "위임 문구 금지(미머지 fallback): {msg}");
+            assert!(
+                !msg.contains("위임"),
+                "위임 문구 금지(미머지 fallback): {msg}"
+            );
             assert!(msg.contains("권장"), "권고 문구('권장') 필수: {msg}");
         }
     }

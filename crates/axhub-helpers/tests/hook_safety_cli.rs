@@ -569,7 +569,10 @@ fn both_drift_unified_once_then_snoozed_same_session() {
 // warn-only by default (systemMessage), block mode adds additionalContext.
 
 fn fixture(rel: &str) -> String {
-    format!("{}/tests/fixtures/ast-validate/{rel}", env!("CARGO_MANIFEST_DIR"))
+    format!(
+        "{}/tests/fixtures/ast-validate/{rel}",
+        env!("CARGO_MANIFEST_DIR")
+    )
 }
 
 fn ast_validate_payload(rel: &str) -> String {
@@ -618,7 +621,11 @@ fn ast_validate_hook_block_mode_adds_agent_context() {
 
 #[test]
 fn ast_validate_hook_clean_file_stays_silent() {
-    let out = run_stdin(&["ast-validate"], &ast_validate_payload("node/good.ts"), &[]);
+    let out = run_stdin(
+        &["ast-validate"],
+        &ast_validate_payload("node/good.ts"),
+        &[],
+    );
     assert!(out.status.success());
     assert_eq!(
         stdout(&out).trim(),

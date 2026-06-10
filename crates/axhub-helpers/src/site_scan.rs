@@ -31,21 +31,86 @@ struct SiteRule {
 
 const SITE_RULES: &[SiteRule] = &[
     // ── raw HTTP client (code 식별자 — 문자열/주석 제외) ──
-    SiteRule { kind: "raw_http_client", pattern: r"\b(?:fetch|axios)\s*[(.]", langs: &["node"], scans_strings: false },
-    SiteRule { kind: "raw_http_client", pattern: r"\bnew\s+XMLHttpRequest\b", langs: &["node"], scans_strings: false },
-    SiteRule { kind: "raw_http_client", pattern: r"\b(?:requests|httpx)\s*\.\s*(?:get|post|put|delete|patch|request)\b", langs: &["python"], scans_strings: false },
-    SiteRule { kind: "raw_http_client", pattern: r"\bhttp\s*\.\s*(?:Get|Post|NewRequest|PostForm)\b", langs: &["go"], scans_strings: false },
-    SiteRule { kind: "raw_http_client", pattern: r"\b(?:HttpClient|HttpURLConnection|OkHttpClient)\b", langs: &["java", "kotlin"], scans_strings: false },
-    SiteRule { kind: "raw_http_client", pattern: r"\b(?:Net::HTTP|Faraday|HTTParty)\b", langs: &["ruby"], scans_strings: false },
+    SiteRule {
+        kind: "raw_http_client",
+        pattern: r"\b(?:fetch|axios)\s*[(.]",
+        langs: &["node"],
+        scans_strings: false,
+    },
+    SiteRule {
+        kind: "raw_http_client",
+        pattern: r"\bnew\s+XMLHttpRequest\b",
+        langs: &["node"],
+        scans_strings: false,
+    },
+    SiteRule {
+        kind: "raw_http_client",
+        pattern: r"\b(?:requests|httpx)\s*\.\s*(?:get|post|put|delete|patch|request)\b",
+        langs: &["python"],
+        scans_strings: false,
+    },
+    SiteRule {
+        kind: "raw_http_client",
+        pattern: r"\bhttp\s*\.\s*(?:Get|Post|NewRequest|PostForm)\b",
+        langs: &["go"],
+        scans_strings: false,
+    },
+    SiteRule {
+        kind: "raw_http_client",
+        pattern: r"\b(?:HttpClient|HttpURLConnection|OkHttpClient)\b",
+        langs: &["java", "kotlin"],
+        scans_strings: false,
+    },
+    SiteRule {
+        kind: "raw_http_client",
+        pattern: r"\b(?:Net::HTTP|Faraday|HTTParty)\b",
+        langs: &["ruby"],
+        scans_strings: false,
+    },
     // ── direct DB driver (import 지정자 문자열 + 코드 — 문자열 스캔) ──
-    SiteRule { kind: "direct_db_driver", pattern: r#"['"](?:pg|mysql2|better-sqlite3|sqlite3)['"]"#, langs: &["node"], scans_strings: true },
-    SiteRule { kind: "direct_db_driver", pattern: r"\bnew\s+Pool\s*\(|\.\$(?:queryRaw|executeRaw)\b", langs: &["node"], scans_strings: true },
-    SiteRule { kind: "direct_db_driver", pattern: r"\b(?:psycopg2|pymysql|MySQLdb)\b|\bsqlite3\s*\.\s*connect\b|\bcreate_engine\s*\(", langs: &["python"], scans_strings: true },
-    SiteRule { kind: "direct_db_driver", pattern: r#""database/sql"|\bsql\.Open\s*\(|\bpgx\s*\.\s*(?:Connect|New)\b"#, langs: &["go"], scans_strings: true },
-    SiteRule { kind: "direct_db_driver", pattern: r"\bDriverManager\s*\.\s*getConnection\b|\bjava\.sql\.", langs: &["java", "kotlin"], scans_strings: true },
-    SiteRule { kind: "direct_db_driver", pattern: r"\bPG\.connect\b|\bMysql2::Client\b|\bSQLite3::Database\b", langs: &["ruby"], scans_strings: true },
+    SiteRule {
+        kind: "direct_db_driver",
+        pattern: r#"['"](?:pg|mysql2|better-sqlite3|sqlite3)['"]"#,
+        langs: &["node"],
+        scans_strings: true,
+    },
+    SiteRule {
+        kind: "direct_db_driver",
+        pattern: r"\bnew\s+Pool\s*\(|\.\$(?:queryRaw|executeRaw)\b",
+        langs: &["node"],
+        scans_strings: true,
+    },
+    SiteRule {
+        kind: "direct_db_driver",
+        pattern: r"\b(?:psycopg2|pymysql|MySQLdb)\b|\bsqlite3\s*\.\s*connect\b|\bcreate_engine\s*\(",
+        langs: &["python"],
+        scans_strings: true,
+    },
+    SiteRule {
+        kind: "direct_db_driver",
+        pattern: r#""database/sql"|\bsql\.Open\s*\(|\bpgx\s*\.\s*(?:Connect|New)\b"#,
+        langs: &["go"],
+        scans_strings: true,
+    },
+    SiteRule {
+        kind: "direct_db_driver",
+        pattern: r"\bDriverManager\s*\.\s*getConnection\b|\bjava\.sql\.",
+        langs: &["java", "kotlin"],
+        scans_strings: true,
+    },
+    SiteRule {
+        kind: "direct_db_driver",
+        pattern: r"\bPG\.connect\b|\bMysql2::Client\b|\bSQLite3::Database\b",
+        langs: &["ruby"],
+        scans_strings: true,
+    },
     // ── 하드코딩 절대 URL (문자열) ──
-    SiteRule { kind: "hardcoded_api_url", pattern: r#"https?://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+"#, langs: &["*"], scans_strings: true },
+    SiteRule {
+        kind: "hardcoded_api_url",
+        pattern: r#"https?://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+"#,
+        langs: &["*"],
+        scans_strings: true,
+    },
 ];
 
 struct CompiledSiteRule {
@@ -164,7 +229,13 @@ pub fn scan_paths(paths: &[String]) -> ScanSitesOutput {
                 continue;
             }
         };
-        match scan_source_sites(&source, grammar, lang_key, &file.display().to_string(), &rules) {
+        match scan_source_sites(
+            &source,
+            grammar,
+            lang_key,
+            &file.display().to_string(),
+            &rules,
+        ) {
             Some(mut found) => {
                 files_scanned += 1;
                 sites.append(&mut found);
@@ -246,14 +317,19 @@ mod tests {
 
     #[test]
     fn rules_compile() {
-        assert_eq!(compile_rules().len(), SITE_RULES.len(), "전 룰 regex 컴파일");
+        assert_eq!(
+            compile_rules().len(),
+            SITE_RULES.len(),
+            "전 룰 regex 컴파일"
+        );
     }
 
     #[test]
     fn comment_does_not_false_positive() {
         // 주석 안의 fetch/URL 은 검출 안 돼야 해요.
         let src = "// fetch(\"https://api.example.com/x\") 는 주석이에요\nexport const a = 1;\n";
-        let sites = scan_source_sites(src, Grammar::Typescript, "node", "<t>", &compile_rules()).unwrap();
+        let sites =
+            scan_source_sites(src, Grammar::Typescript, "node", "<t>", &compile_rules()).unwrap();
         assert!(sites.is_empty(), "주석 FP, got {sites:?}");
     }
 
