@@ -1,8 +1,8 @@
 ---
 lang: ruby
-sdk_version: 0.3.0
-source_sha: c82407e681ec7df6e8a49e31a68c531a3c837386
-route_surface_sha: b36fa731424b039bd11f53819b6b668596368339
+sdk_version: 0.3.1
+source_sha: aa62027c2a31353315775c1531d90c59d343d46c
+route_surface_sha: 8bafa90e7d9319b78514a1e95b19c0fb3b73d558
 conformance_baseline: ax-hub-backend@5a7b57d
 generated_by: scripts/gen-sdk-distill.py
 note: generated knowledge pack — do not hand-edit; regenerate from the SDK source
@@ -403,7 +403,7 @@ orders.delete(row_id)
 ```
 Filter builder: `where(col).eq/ne/gt/gte/lt/lte(v)`, `.in_([...])`, `.like.contains(s)` (auto-escape), combined ONLY with top-level `and_(...)`. Errors: `AxHub::Error` carries `.code/.status` (404 → `code='not_found'`); data guards raise `AxHub::Data::ValidationError` / `LegacyCursorError` / `TableNotFoundError`.
 ### Live data contract (applies to EVERY language — verified live)
-- **`list`/`count` REQUIRE at least one `where` filter** (backend mass-scan guard). A filterless call fails fast in the SDK with `ValidationError(code: where_required)` — never emit one. When the user's code reads "everything", convert with an always-true range filter (e.g. `where(created_at).gte('1970-01-01T00:00:00Z')`) and say so in the Korean preview.
+- **`list`/`count` need at least one `where` filter on NON-owner-scoped tables** (backend mass-scan guard → the SDK surfaces `ValidationError(code: where_required)` from the backend 400). **Owner-scoped tables (created with an `owner_column`) ACCEPT filterless list/count** — rows auto-scope to the caller, so "내 행 전부" reads need NO filter there. When converting an "everything" read on a table whose ownership you can't confirm, keep the call filterless and explain in the Korean preview that non-owner-scoped tables will reject it (an always-true range filter like `where(created_at).gte('1970-01-01T00:00:00Z')` is the fallback).
 - **Pushable filters are a top-level AND of `eq/ne/gt/gte/lt/lte/in/like` ONLY.** `or`/`not` combinators exist in each DSL but are NOT pushable — the SDK rejects them with `ValidationError`. Express "A or B" on one column as `in([...])`; otherwise split into separate calls and merge in app code.
 - **Pagination is OFFSET-ONLY**: 1-based `page` + `pageSize` (clamped 1..100; `limit` aliases `pageSize` where offered), or `cursor` = the numeric next-cursor a prior `list` returned. `after`/`before` keyset options throw `LegacyCursorError`. `list` does NOT return an exact total.
 - **Tables/columns must already exist** — inserts do NOT auto-create them (DDL is owned by `axhub tables create` / `axhub tables columns add`). `discover` caches the schema per table; after live DDL re-introspect with the `fresh` option.
