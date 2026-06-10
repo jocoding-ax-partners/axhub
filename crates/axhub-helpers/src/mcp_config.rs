@@ -13,10 +13,11 @@ use std::path::PathBuf;
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
 
-/// 원격 ax-mcp 기본 URL. **canonical 도메인 미확정** — 현 prod Cloud Run 엔드포인트.
-// TODO(canonical-domain): 안정 도메인(예: mcp.axhub.dev) 확정 시 이 기본값을 교체해요.
-// 사용자는 `AXHUB_MCP_URL` env 로 언제든 override 할 수 있어요.
-const DEFAULT_REMOTE_MCP_URL: &str = "https://axhub-mcp-zqnabsu67a-du.a.run.app";
+/// 원격 ax-mcp 기본 URL — **canonical 도메인 확정** (2026-06-10, 사용자 승인).
+// canonical 주소 = https://mcp.jocodingax.ai/mcp. probe(2026-06-10): DNS ✓ / TCP 443
+// ✓ / TLS handshake reset(인증서 아직 미활성). TLS 활성화 대기 중 — 미활성 환경에서는
+// `AXHUB_MCP_URL` env 로 다른 엔드포인트(예: Cloud Run 직주소)를 override 할 수 있어요.
+const DEFAULT_REMOTE_MCP_URL: &str = "https://mcp.jocodingax.ai/mcp";
 
 /// remote MCP URL override env. 비어있지 않을 때만 적용.
 const ENV_REMOTE_MCP_URL: &str = "AXHUB_MCP_URL";
