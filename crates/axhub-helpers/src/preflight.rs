@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use chrono::FixedOffset;
@@ -122,10 +122,39 @@ pub fn resolve_axhub_path() -> Option<String> {
 }
 
 pub fn resolve_axhub_path_info() -> Option<ResolvedAxhubPath> {
-    if let Some(path) = std::env::var_os("PATH") {
-        for dir in std::env::split_paths(&path) {
+    resolve_axhub_path_with(std::env::var_os("PATH").as_deref(), &fallback_axhub_paths())
+}
+
+/// Executable regular file check. The shell's PATH search skips files without
+/// the +x bit, so resolution must do the same — `is_file()` alone lets a
+/// non-executable `axhub` file earlier in PATH hijack resolution, making the
+/// spawn fail and preflight report `cli_present: false` for a working install.
+fn is_executable_file(path: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        path.metadata()
+            .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false)
+    }
+    #[cfg(not(unix))]
+    {
+        path.is_file()
+    }
+}
+
+/// Search for `axhub` binary on PATH plus well-known OS fallback locations.
+///
+/// Accepts the PATH value and fallback list as parameters so callers can inject
+/// controlled values in tests without touching real environment variables.
+fn resolve_axhub_path_with(
+    path_value: Option<&std::ffi::OsStr>,
+    fallbacks: &[PathBuf],
+) -> Option<ResolvedAxhubPath> {
+    if let Some(path) = path_value {
+        for dir in std::env::split_paths(path) {
             let candidate = dir.join(AXHUB_BIN_NAME);
-            if candidate.is_file() {
+            if is_executable_file(&candidate) {
                 return Some(ResolvedAxhubPath {
                     path: candidate,
                     source: AxhubPathSource::Path,
@@ -133,10 +162,10 @@ pub fn resolve_axhub_path_info() -> Option<ResolvedAxhubPath> {
             }
         }
     }
-    for candidate in fallback_axhub_paths() {
-        if candidate.is_file() {
+    for candidate in fallbacks {
+        if is_executable_file(candidate) {
             return Some(ResolvedAxhubPath {
-                path: candidate,
+                path: candidate.clone(),
                 source: AxhubPathSource::Fallback,
             });
         }
@@ -1047,6 +1076,11 @@ mod tests {
         fs::create_dir_all(&bin_dir).unwrap();
         let fake = bin_dir.join(AXHUB_BIN_NAME);
         fs::write(&fake, b"fake").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&fake, fs::Permissions::from_mode(0o755)).unwrap();
+        }
 
         let prev_path = std::env::var("PATH").ok();
         let prev_home = std::env::var("HOME").ok();
@@ -1101,6 +1135,11 @@ mod tests {
         fs::create_dir_all(&bin_dir).unwrap();
         let fake = bin_dir.join(AXHUB_BIN_NAME);
         fs::write(&fake, b"fake").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&fake, fs::Permissions::from_mode(0o755)).unwrap();
+        }
 
         let prev_path = std::env::var("PATH").ok();
         let prev_home = std::env::var("HOME").ok();
@@ -1180,5 +1219,45 @@ mod tests {
             Some(v) => std::env::set_var("AXHUB_BIN", v),
             None => std::env::remove_var("AXHUB_BIN"),
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn resolve_skips_non_executable_path_entry() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let bad_dir = tmp.path().join("bad");
+        let good_dir = tmp.path().join("good");
+        std::fs::create_dir_all(&bad_dir).unwrap();
+        std::fs::create_dir_all(&good_dir).unwrap();
+        // Regression: a non-executable file named `axhub` earlier in PATH must not
+        // hijack resolution — the shell's PATH search skips it, so we must too.
+        let bad = bad_dir.join(AXHUB_BIN_NAME);
+        std::fs::write(&bad, "not a binary").unwrap();
+        std::fs::set_permissions(&bad, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let good = good_dir.join(AXHUB_BIN_NAME);
+        std::fs::write(&good, "#!/bin/sh\nexit 0\n").unwrap();
+        std::fs::set_permissions(&good, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let path_value = std::env::join_paths([&bad_dir, &good_dir]).unwrap();
+        let resolved = resolve_axhub_path_with(Some(&path_value), &[]).expect("must resolve");
+        assert_eq!(resolved.path, good);
+        assert_eq!(resolved.source, AxhubPathSource::Path);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn resolve_returns_none_when_only_non_executable_candidates() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("only");
+        std::fs::create_dir_all(&dir).unwrap();
+        let bad = dir.join(AXHUB_BIN_NAME);
+        std::fs::write(&bad, "x").unwrap();
+        std::fs::set_permissions(&bad, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let path_value = std::env::join_paths([&dir]).unwrap();
+        // Non-executable candidate must be skipped in BOTH the PATH loop and the
+        // fallback-dir loop.
+        assert!(resolve_axhub_path_with(Some(&path_value), std::slice::from_ref(&bad)).is_none());
     }
 }
