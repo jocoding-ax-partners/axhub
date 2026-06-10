@@ -100,8 +100,14 @@ impl CompiledRule {
 /// vendored 룰을 로드·컴파일해요. `derived_from` 누락(또는 advisory 인데
 /// `advisory_reason` 누락), regex 컴파일 실패 시 에러로 빌드/실행을 막아요.
 pub(crate) fn load_rules() -> Result<Vec<CompiledRule>> {
+    compile_rules_json(RULES_JSON)
+}
+
+/// 룰 JSON 문자열 → 컴파일된 룰. embed 본문과 분리해 검증 3분기(derived_from /
+/// advisory_reason / regex 실패)를 직접 테스트할 수 있게 해요.
+fn compile_rules_json(json: &str) -> Result<Vec<CompiledRule>> {
     let raw: Vec<RawRule> =
-        serde_json::from_str(RULES_JSON).context("data-contract-rules.json 파싱 실패")?;
+        serde_json::from_str(json).context("data-contract-rules.json 파싱 실패")?;
     if raw.is_empty() {
         bail!("data-contract-rules.json 에 룰이 없어요");
     }
@@ -321,6 +327,8 @@ pub struct ValidateOutput {
     pub advisory_count: usize,
     pub violations: Vec<Violation>,
     pub parse_failures: Vec<ParseFailure>,
+    /// 파일 수집이 MAX_SCAN_FILES cap 으로 잘렸으면 true — "전부 검사" 오독 방지.
+    pub truncated: bool,
 }
 
 /// 룰 종류별 해요체 메시지. advisory 무필터 list/count 는 plan 이 못박은 문구를
@@ -446,23 +454,34 @@ fn scan_file(path: &Path, rules: &[CompiledRule]) -> ScanOutcome {
     }
 }
 
-pub(crate) fn collect_target_files(paths: &[String]) -> Vec<PathBuf> {
+/// 대상 파일 수집. 반환 bool = MAX_SCAN_FILES cap 도달로 결과가 잘렸는지 신호 —
+/// 조용한 truncation 은 "전부 검사했다"로 오독되니 호출부가 경고/필드로 노출해요.
+pub(crate) fn collect_target_files(paths: &[String]) -> (Vec<PathBuf>, bool) {
     let mut out = Vec::new();
+    let mut truncated = false;
     for p in paths {
         let path = Path::new(p);
         if path.is_file() {
+            if out.len() >= MAX_SCAN_FILES {
+                truncated = true;
+                break;
+            }
             out.push(path.to_path_buf());
         } else if path.is_dir() {
-            walk_dir(path, 0, &mut out);
+            walk_dir(path, 0, &mut out, &mut truncated);
         } else {
             eprintln!("axhub-helpers: 경로를 찾을 수 없어요 — {p} (건너뛰어요)");
         }
     }
-    out
+    (out, truncated)
 }
 
-fn walk_dir(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
-    if depth > MAX_SCAN_DEPTH || out.len() >= MAX_SCAN_FILES {
+fn walk_dir(dir: &Path, depth: usize, out: &mut Vec<PathBuf>, truncated: &mut bool) {
+    if depth > MAX_SCAN_DEPTH {
+        return;
+    }
+    if out.len() >= MAX_SCAN_FILES {
+        *truncated = true;
         return;
     }
     let Ok(entries) = fs::read_dir(dir) else {
@@ -477,13 +496,14 @@ fn walk_dir(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
                 .map(|n| SKIP_DIRS.contains(&n))
                 .unwrap_or(false);
             if !skip {
-                walk_dir(&p, depth + 1, out);
+                walk_dir(&p, depth + 1, out, truncated);
             }
         } else if detect_lang(&p).is_some() {
-            out.push(p);
             if out.len() >= MAX_SCAN_FILES {
+                *truncated = true;
                 return;
             }
+            out.push(p);
         }
     }
 }
@@ -493,7 +513,7 @@ fn walk_dir(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
 /// 경로들을 검사해 구조화된 결과를 만들어요(출력/exit 없음 — CLI 와 MCP tool 공용).
 pub fn validate_paths(paths: &[String]) -> Result<ValidateOutput> {
     let rules = load_rules()?;
-    let files = collect_target_files(paths);
+    let (files, truncated) = collect_target_files(paths);
 
     let mut violations = Vec::new();
     let mut parse_failures = Vec::new();
@@ -523,6 +543,7 @@ pub fn validate_paths(paths: &[String]) -> Result<ValidateOutput> {
         advisory_count,
         violations,
         parse_failures,
+        truncated,
     })
 }
 
@@ -545,6 +566,11 @@ fn emit_human(output: &ValidateOutput) {
     }
     for f in &output.parse_failures {
         eprintln!("⚠️  파싱 건너뜀(fail-open): {} — {}", f.file, f.reason);
+    }
+    if output.truncated {
+        eprintln!(
+            "⚠️  파일 수 cap({MAX_SCAN_FILES}) 도달 — 일부 파일은 검사하지 못했어요"
+        );
     }
     if output.block_count > 0 {
         println!(
@@ -719,13 +745,37 @@ mod tests {
         assert_eq!(advisory, 3, "advisory_only 룰 3개(list/count/table-columns)");
     }
 
+    // ── 룰 로딩 검증 3분기 — compile_rules_json 직접 테스트 ──
+
     #[test]
     fn load_fails_without_derived_from() {
         // derived_from 빈 룰은 로드 거부 (enforcement drift 차단).
         let bad = r#"[{"id":"x-bad","rule_kind":"forbidden_call","applies_lang":["node"],"pattern_hint":"\\bor\\s*\\(","derived_from":"","source":{"pack_section":"§6","lock_sha":"abc"}}]"#;
-        let raw: Vec<RawRule> = serde_json::from_str(bad).unwrap();
-        // load_rules 는 embed 된 JSON 을 쓰므로, derived_from 검증 로직을 직접 확인.
-        assert!(raw[0].derived_from.trim().is_empty());
+        let err = compile_rules_json(bad).err().expect("로드가 실패해야 해요");
+        assert!(
+            err.to_string().contains("derived_from"),
+            "derived_from 누락 에러여야 해요: {err}"
+        );
+    }
+
+    #[test]
+    fn load_fails_when_advisory_lacks_reason() {
+        let bad = r#"[{"id":"x-adv","rule_kind":"where_required","applies_lang":["node"],"pattern_hint":"\\blist\\s*\\(","derived_from":"§6","advisory_only":true,"source":{"pack_section":"§6","lock_sha":"abc"}}]"#;
+        let err = compile_rules_json(bad).err().expect("로드가 실패해야 해요");
+        assert!(
+            err.to_string().contains("advisory_reason"),
+            "advisory_reason 누락 에러여야 해요: {err}"
+        );
+    }
+
+    #[test]
+    fn load_fails_on_invalid_regex() {
+        let bad = r#"[{"id":"x-regex","rule_kind":"forbidden_call","applies_lang":["node"],"pattern_hint":"(unclosed","derived_from":"§6","source":{"pack_section":"§6","lock_sha":"abc"}}]"#;
+        let err = compile_rules_json(bad).err().expect("로드가 실패해야 해요");
+        assert!(
+            err.to_string().contains("regex 컴파일 실패"),
+            "regex 컴파일 실패 에러여야 해요: {err}"
+        );
     }
 
     // ── "*" HTTP/URL 룰: 문자열 안에서 매칭돼야 해요 ──
@@ -768,13 +818,49 @@ export function f() {
         assert_eq!(block_ids(&v).len(), 0, "주석/문자열 FP 0, got {:?}", v);
     }
 
+    // (구명: run_validate_returns_zero_on_clean — run_validate 를 호출하지 않는
+    // 오명명이라 정정. 실제 exit 매핑은 아래 run_validate_exit_mapping 이 잠궈요.)
     #[test]
-    fn run_validate_returns_zero_on_clean() {
-        // 임시 파일 없이 run path 의 exit 의미만: clean 소스는 block 0.
+    fn clean_source_has_no_block_violations() {
         let r = rules();
         let src = "export function f(ownerId) { return db.table(\"p\").eq(\"owner_id\", ownerId).limit(10).list(); }";
         let v = scan_source(src, Grammar::Typescript, "node", "<t>", &r).unwrap();
         assert_eq!(block_ids(&v).len(), 0);
+    }
+
+    /// run_validate 의 exit 매핑: block 위반 → Ok(1), 클린/advisory → Ok(0).
+    #[test]
+    fn run_validate_exit_mapping() {
+        let bad = fixture_dir().join("node/bad.ts").display().to_string();
+        assert_eq!(run_validate(&[bad], true).unwrap(), 1, "block 위반 → exit 1");
+        let good = fixture_dir().join("node/good.ts").display().to_string();
+        assert_eq!(
+            run_validate(&[good], true).unwrap(),
+            0,
+            "클린(advisory 만) → exit 0"
+        );
+    }
+
+    /// `validate --json` envelope 전 필드 잠금 — 소비자(SKILL/MCP)가 의존하는 계약.
+    #[test]
+    fn validate_json_envelope_has_all_fields() {
+        let bad = fixture_dir().join("node/bad.ts").display().to_string();
+        let out = validate_paths(&[bad]).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&serde_json::to_string(&out).unwrap()).unwrap();
+        assert_eq!(json["schema_version"], "validate/v1");
+        assert_eq!(json["status"], "violations");
+        assert_eq!(json["files_scanned"], 1);
+        assert!(json["block_count"].as_u64().unwrap() > 0);
+        assert!(json["advisory_count"].is_u64());
+        assert_eq!(json["truncated"], false);
+        assert!(json["parse_failures"].as_array().unwrap().is_empty());
+        let v = &json["violations"].as_array().unwrap()[0];
+        for field in [
+            "file", "line", "column", "rule_id", "rule_kind", "advisory_only", "message",
+            "derived_from", "lock_sha",
+        ] {
+            assert!(!v[field].is_null(), "violations[0].{field} 필드 누락");
+        }
     }
 
     /// rule_kind 공통 메시지가 아니라 rule id 고유 메시지를 내는 룰 2종 잠금.

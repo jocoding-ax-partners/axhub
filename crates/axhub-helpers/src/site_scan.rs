@@ -93,6 +93,8 @@ pub struct ScanSitesOutput {
     pub files_scanned: usize,
     pub sites: Vec<Site>,
     pub parse_failures: Vec<ScanParseFailure>,
+    /// 파일 수집이 MAX_SCAN_FILES cap 으로 잘렸으면 true — "전부 검사" 오독 방지.
+    pub truncated: bool,
 }
 
 /// offset 이 속한 줄의 텍스트(trim)를 잘라 snippet 으로 써요. 줄 경계는
@@ -143,7 +145,7 @@ fn scan_source_sites(
 /// 경로들을 스캔해 구조화된 결과를 만들어요(출력/exit 없음 — CLI 와 MCP tool 공용).
 pub fn scan_paths(paths: &[String]) -> ScanSitesOutput {
     let rules = compile_rules();
-    let files = collect_target_files(paths);
+    let (files, truncated) = collect_target_files(paths);
 
     let mut sites = Vec::new();
     let mut parse_failures = Vec::new();
@@ -179,6 +181,7 @@ pub fn scan_paths(paths: &[String]) -> ScanSitesOutput {
         files_scanned,
         sites,
         parse_failures,
+        truncated,
     }
 }
 
@@ -191,6 +194,9 @@ pub fn run_scan_sites(paths: &[String], json: bool) -> Result<i32> {
     } else {
         for s in &output.sites {
             println!("{}:{} [{}] {}", s.file, s.line, s.kind, s.snippet);
+        }
+        if output.truncated {
+            eprintln!("⚠️  파일 수 cap 도달 — 일부 파일은 스캔하지 못했어요");
         }
         println!(
             "🔎 변환 후보 {}건 — 파일 {}개 검사",
