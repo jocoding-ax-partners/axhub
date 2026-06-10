@@ -1,7 +1,7 @@
 use std::io::{ErrorKind, Write};
 use std::process::{Command, Output, Stdio};
 
-use axhub_helpers::verify_deploy_artifact::verify_user_app_artifact;
+use axhub_helpers::verify_deploy_artifact::{verify_user_app_artifact, VerifyOutcome};
 use serde_json::Value;
 
 fn bin() -> &'static str {
@@ -51,9 +51,10 @@ fn verifier_accepts_ts_parity_happy_paths() {
         .to_string(),
     );
 
-    assert!(
-        result.passed,
-        "uppercase sha + success + deploy_id should pass"
+    assert_eq!(
+        result.outcome,
+        VerifyOutcome::Confirmed,
+        "uppercase sha + success + deploy_id should be Confirmed"
     );
     assert!(result.violations.is_empty());
 }
@@ -70,7 +71,7 @@ fn verifier_flags_ts_parity_violations() {
         .to_string(),
     );
 
-    assert!(!result.passed);
+    assert_eq!(result.outcome, VerifyOutcome::Violation);
     let violations = result.violations.join("\n");
     assert!(violations.contains("sha256 hex"));
     assert!(violations.contains("rolled_back"));
@@ -79,15 +80,22 @@ fn verifier_flags_ts_parity_violations() {
 }
 
 #[test]
-fn verifier_fail_opens_non_object_or_non_json_stdout() {
+fn verifier_downgrades_non_object_or_non_json_stdout_to_unconfirmed() {
+    // No parseable object → no signal to confirm success. This is advisory
+    // (Unconfirmed), never a hard Violation that would break a normal deploy.
     for stdout in [
         "Deployment started\nLive at https://app.example.com\n",
         "[1,2,3]",
         "null",
     ] {
         let result = verify_user_app_artifact(stdout);
-        assert!(result.passed, "{stdout:?} should be treated as no signal");
+        assert_eq!(
+            result.outcome,
+            VerifyOutcome::Unconfirmed,
+            "{stdout:?} should be Unconfirmed, not a violation"
+        );
         assert!(result.violations.is_empty());
+        assert!(!result.advisories.is_empty());
     }
 }
 
