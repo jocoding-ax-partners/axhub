@@ -392,10 +392,10 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 `planning.mode=full_consensus` 이면 선택된 단일 `app_key` 기준으로 서브 에이전트를 실제로 실행해요. 이때 helper 가 이미 만든 `discover` scaffold 와 `planning_persistence.paths` 를 seed 로 읽고, 아래 순서를 **그대로** 따라요.
 
 - `discover` scaffold 확인 → `axhub-migrate-discoverer` agent 로 누락 evidence 보강
-- `axhub-migrate-planner` agent 실행 → `.axhub/plan/runs/<run_id>/stages/02-planner.md` + meta 저장
-- `axhub-migrate-architect` agent 실행 → `.axhub/plan/runs/<run_id>/stages/03-architect.md` + meta 저장
-- `axhub-migrate-critic` agent 실행 → `.axhub/plan/runs/<run_id>/stages/04-critic.md` + meta 저장
-- `reviewer` stage 는 **read-only `axhub-migrate-reviewer` lane** 으로 completeness / scope sanity check 를 실행하고 `.axhub/plan/runs/<run_id>/stages/05-reviewer.md` + meta 저장
+- `axhub-migrate-planner` agent 실행 → 초안을 `drafts/planner.md` 에 두고 helper 가 `.axhub/plan/runs/<run_id>/stages/02-planner.md` + meta 로 기록
+- `axhub-migrate-architect` agent 실행 → 초안을 `drafts/architect.md` 에 두고 helper 가 `.axhub/plan/runs/<run_id>/stages/03-architect.md` + meta 로 기록
+- `axhub-migrate-critic` agent 실행 → 초안을 `drafts/critic.md` 에 두고 helper 가 `.axhub/plan/runs/<run_id>/stages/04-critic.md` + meta 로 기록
+- `reviewer` stage 는 **read-only `axhub-migrate-reviewer` lane** 으로 completeness / scope sanity check 를 실행하고, 초안을 `drafts/reviewer.md` 에 두면 helper 가 `.axhub/plan/runs/<run_id>/stages/05-reviewer.md` + meta 로 기록
 - 최종 ADR 저장 → `.axhub/plan/runs/<run_id>/adr.md`
 - `approval.json.state=pending_approval`, `run.json.state=pending_approval` 로 올리고 멈춰요
 
@@ -404,29 +404,42 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 
    stage artifact 저장은 helper command 로 고정해요. 서브 에이전트 결과를 바로 prose 로 흘려버리지 말고 아래처럼 저장해요.
 
+   stage agent 산출물(markdown)은 `"$RUN_DIR/drafts/<stage>.md"` 에 먼저 저장하고, `stages/` 기록은 아래 helper 호출로만 해요. helper 는 `stages/` 내부 경로를 `--markdown-file` 로 받으면 거부하고, stage 별 고정 파일(`01-discover.md`…`05-reviewer.md`)을 멱등하게 overwrite 해요 — 같은 stage 를 다시 기록하면 meta 의 revision 이 올라가고 파일은 늘지 않아요.
+
+   ```bash
+   RUN_DIR="$(dirname "$RUN_JSON")"
+   DRAFTS_DIR="$RUN_DIR/drafts"
+   mkdir -p "$DRAFTS_DIR"
+   ```
+
+   critic/reviewer 는 `--verdict` 가 필수예요. verdict 값은 agent 산출물의 verdict 에서 추출해요 (`approve|lgtm|iterate|block|request_changes|comment`). discover/planner/architect 는 verdict 가 옵션이라 붙이지 않아요.
+
    ```bash
    "$HELPER" migrate-stage-write \
      --run-json "$RUN_JSON" \
      --stage planner \
-     --markdown-file "$PLANNER_MD" \
+     --markdown-file "$DRAFTS_DIR/planner.md" \
      --json
 
    "$HELPER" migrate-stage-write \
      --run-json "$RUN_JSON" \
      --stage architect \
-     --markdown-file "$ARCHITECT_MD" \
+     --markdown-file "$DRAFTS_DIR/architect.md" \
      --json
 
    "$HELPER" migrate-stage-write \
      --run-json "$RUN_JSON" \
      --stage critic \
-     --markdown-file "$CRITIC_MD" \
+     --markdown-file "$DRAFTS_DIR/critic.md" \
+     --verdict "$CRITIC_VERDICT" \
+     --summary "critic verdict: $CRITIC_VERDICT" \
      --json
 
    "$HELPER" migrate-stage-write \
      --run-json "$RUN_JSON" \
      --stage reviewer \
-     --markdown-file "$REVIEWER_MD" \
+     --markdown-file "$DRAFTS_DIR/reviewer.md" \
+     --verdict "$REVIEWER_VERDICT" \
      --run-state pending_approval \
      --approval-state pending_approval \
      --json
@@ -438,7 +451,7 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
    "$HELPER" migrate-stage-write \
      --run-json "$RUN_JSON" \
      --stage adr \
-     --markdown-file "$ADR_MD" \
+     --markdown-file "$DRAFTS_DIR/adr.md" \
      --json
    ```
 
@@ -454,10 +467,30 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 
    이 단계에서만 `.axhub/spec/apps/<app_key>/latest.json` 이 생겨요. 승인 전에는 계속 비어 있어야 해요.
 
+   사용자 승인 발화("승인할게요" / "진행해" / "전부 다 해")를 받으면 **mutation 으로 바로 가지 않고** 먼저 helper 승인을 기록해요.
+
+   ```bash
+   "$HELPER" migrate-approve --run-json "$RUN_JSON" --approved-by "user" --json
+   ```
+
+   migrate-approve 가 성공해야만 (`run.json`/`approval.json` 의 state 가 `approved`) mutation 단계로 넘어가요. mutation 직전에 매번 확인해요.
+
+   ```bash
+   RUN_DIR="$(dirname "$RUN_JSON")"
+   RUN_STATE=$(jq -r '.state // empty' "$RUN_JSON" 2>/dev/null)
+   APPROVAL_STATE=$(jq -r '.state // empty' "$RUN_DIR/approval.json" 2>/dev/null)
+   if [ "$RUN_STATE" != "approved" ] || [ "$APPROVAL_STATE" != "approved" ]; then
+     # 승인 전이에요 — mutation 을 시작하지 않고 migrate-approve 부터 안내해요
+     :
+   fi
+   ```
+
+   critic verdict 가 `approve`/`lgtm` 이 아니면(= `iterate`/`block`/`request_changes`/`comment`) reviewer 로 가지 않고 planner revision → architect → critic 을 다시 돌아요 (helper 가 critic verdict 기록 없이는 reviewer 를 거부해요). iterate 가 2회를 넘으면 자동 반복을 멈추고 미해소 항목을 사용자에게 에스컬레이션해요. reviewer verdict 가 `request_changes` 면 해소 후 reviewer 를 다시 기록해야 seal 이 돼요 (helper 가 reviewer verdict 가 `approve`/`lgtm` 이 아니면 seal 을 거부해요).
+
 
 중요한 순서 제약:
 - `planner → architect → critic → reviewer` 는 항상 **직렬** 예요.
-- `critic` 이 block/comment 를 내면 planner 로 되돌아가 revision 후 다시 architect → critic 으로 돌아요.
+- `critic` verdict 가 `approve`/`lgtm` 이 아니면 planner 로 되돌아가 revision 후 다시 architect → critic 으로 돌아요.
 - approval 전에는 `.axhub/spec/apps/<app_key>/latest.json` 을 갱신하지 않아요.
 - planner/architect/critic/reviewer 결과가 안 깨끗하면 mutation 단계로 넘어가지 않아요.
 
@@ -577,6 +610,12 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 
 4. **기존 mutation 경로 재사용.** 앱 등록, git 연결, env 값 저장, 배포는 위 CLI boundary contract 와 기존 approval 경로만 써요. helper 로 preview/approval 을 우회하지 않아요. `axhub apps git connect --execute` 는 GitHub 연결 승인 카드가 있어야만 실행해요. remote detect 는 v0.17.3 `axhub apps detect` read-only 로만 쓰고 (미배포 시 fallback 은 `axhub.yaml` 수동 입력이에요), mutation 은 preview+approval 뒤의 current CLI 명령으로만 진행해요.
 
+   git 연결 중 GitHub 인증·설치가 필요해지면 `../github/SKILL.md` 의 OAuth device flow 섹션과 installation gate 패턴을 그대로 따라요. 요약:
+
+   - **device flow (`device_code_issued` event):** verification URL + user_code 를 즉시 보여주고 이렇게만 안내해요 — "브라우저에서 승인한 다음 '승인했어' 라고 알려주세요. 제가 이어서 마무리할게요." 사용자가 승인 신호("승인했어" / "승인 완료" / "됐어")를 주면 에이전트가 같은 connect 를 `--execute --resume-last` 로 **직접** 이어받아요. resume 명령이나 `!` prefix 명령을 사용자에게 치라고 출력하지 않아요. outstanding code 가 있는 동안 `--resume-last` 없는 fresh `--execute` 재호출도 하지 않아요.
+   - **installation 누락 (`not_in_installation`):** axhub GitHub App 이 대상 org/repo 에 설치되지 않은 상태예요. `axhub github accounts list --json` 의 `install_url` 을 보여주고 org 선택 + repo 접근 허용을 안내한 뒤 "설치했어" 신호를 기다려요. 신호를 받으면 accounts list 를 다시 읽어 해당 owner 의 `installed:true` 를 확인한 뒤에만 같은 connect 를 재시도해요. installation 이 여러 개로 모호하면 dry-run 결과를 나열하고 `--installation-id` 로 disambiguate 해요.
+   - **D1 비대화형:** `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 면 브라우저 단계를 완료할 수 없으니 URL/코드와 재개 phrase("GitHub 연결 다시 해줘")를 남기고 멈춰요.
+
 5. **결과 검증.** 배포가 끝나면 live URL, deployment id, 감지된 build/runtime env 구분, Dockerfile/compose/auto 중 선택된 ladder 를 보여줘요. 실패하면 deploy error empathy catalog 형식으로 원인·확인 방법·재시도 명령을 짧게 안내해요.
 
 6. **선택형 Auth Migration.** 사용자가 원할 때만 기존 앱의 로그인 흐름을 AxHub OAuth/OIDC 로 바꾸는 절차를 진행해요. 기본 migrate 는 배포 완료가 끝이에요. 이 단계는 사용자 앱 auth 파일 변경을 다루는 절차이고, AxHub backend/gateway 코드나 Data Gateway/DB query refactor 는 범위가 아니에요.
@@ -636,6 +675,11 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 - NEVER password hash, session secret, OAuth client secret 을 manifest/log/TodoWrite/PR 본문에 출력하지 않아요.
 - NEVER 기존 auth 코드를 조용히 삭제하지 않아요. 먼저 계획과 변경 파일 목록을 보여줘요.
 - NEVER raw backend endpoint 를 curl 해서 OAuth client 를 만들지 않아요.
+- NEVER `migrate-approve` 성공 없이 mutation(앱 등록·git 연결·env 저장·배포)을 실행하지 않아요. "전부 다 해" 같은 포괄 발화도 migrate-approve 기록 후에만 진행해요.
+- NEVER plan_only hard-stop(`custom_auth`, `secret_exposure`) 범위의 코드 변경을 실행하지 않아요 — auth patch·secret 관련 수정은 포괄 승인("강행" 포함)으로도 풀리지 않고, 계획 문서만 산출해요. 사용자가 해당 파일을 직접 지목한 별도 요청만 migrate 범위 밖 일반 작업으로 다뤄요.
+- NEVER 사용자 repo 에 `git push` / `git push --force` / `git filter-repo` / BFG 같은 원격·히스토리 변경을 실행하지 않아요. secret rotation·history purge 는 명령어 안내문만 제공하고 실행은 사용자 몫이에요. 로컬 patch 전에는 `migrate-guard --checkpoint` 를 먼저 떠요.
+- NEVER GitHub device flow resume 이나 `apps git connect` 같은 명령을 사용자에게 직접 실행하라고 떠넘기지 않아요 — 승인 신호만 받고 에이전트가 직접 마무리해요 (`../github/SKILL.md` 패턴).
+- NEVER `stages/` 아래 파일을 Write/Edit 로 직접 만들거나 고치지 않아요 — stage 기록·수정(redaction 포함)은 `migrate-stage-write` 재호출로만 해요.
 
 ## Additional Resources
 

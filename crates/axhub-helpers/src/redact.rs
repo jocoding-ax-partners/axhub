@@ -31,6 +31,11 @@ static GH_TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| {
 // Covers temporary creds in CI logs that the prior `AKIA[0-9A-Z]{16}` missed.
 static AWS_KEY_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(AKIA|ASIA|AGPA|ANPA|ANVA|AROA|AIDA|AIPA)[0-9A-Z]{16}").unwrap());
+// Slack token taxonomy: xoxb(bot)/xoxp(user)/xoxa(app)/xoxo(workspace)/xoxs(session)/xoxr(refresh)/xoxe(export)
+static SLACK_TOKEN_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"xox[abeoprs]-[0-9A-Za-z-]{4,}").unwrap());
+static SLACK_WEBHOOK_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"https://hooks\.slack\.com/services/[A-Za-z0-9/_-]+").unwrap());
 static PRIVATE_KEY_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?s)-----BEGIN [A-Z ]+PRIVATE KEY-----.*?-----END [A-Z ]+PRIVATE KEY-----")
         .unwrap()
@@ -38,24 +43,57 @@ static PRIVATE_KEY_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| {
 static URL_CREDS_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\bhttps?://[A-Za-z0-9._~+\-]+:[^\s@/]+@").unwrap());
 
-pub fn redact(text: &str) -> String {
+/// Normalization-only pass: NFKC + bidi/zero-width stripping.
+/// No secret masking happens here — this is the baseline against which
+/// `redact_with_mask_flag` decides whether a real secret mask fired.
+fn normalize(text: &str) -> String {
     let normalized: String = text.nfkc().collect();
     let s = BIDI_RE.replace_all(&normalized, "");
-    let s = ZW_RE.replace_all(&s, "");
+    ZW_RE.replace_all(&s, "").into_owned()
+}
+
+/// Apply the secret-class mask chain to already-normalized text.
+fn mask_secrets(normalized: &str) -> String {
     // Run secret-class redaction BEFORE byte cap so a token can never be
     // half-truncated and then partially exposed. Order matters: private key
     // blocks before single-line tokens to avoid mid-block matches.
-    let s = PRIVATE_KEY_BLOCK_RE.replace_all(&s, "<REDACTED_PRIVATE_KEY>");
+    let s = PRIVATE_KEY_BLOCK_RE.replace_all(normalized, "<REDACTED_PRIVATE_KEY>");
     let s = BEARER_RE.replace_all(&s, "Bearer ***");
     let s = AXHUB_TOKEN_RE.replace_all(&s, "AXHUB_TOKEN=***");
     let s = AXHUB_PAT_RE.replace_all(&s, "axhub_pat_[redacted]");
     let s = OPENAI_KEY_RE.replace_all(&s, "<REDACTED_OPENAI_KEY>");
     let s = GH_TOKEN_RE.replace_all(&s, "<REDACTED_GH_TOKEN>");
     let s = AWS_KEY_RE.replace_all(&s, "<REDACTED_AWS_KEY>");
+    let s = SLACK_TOKEN_RE.replace_all(&s, "<REDACTED_SLACK_TOKEN>");
+    let s = SLACK_WEBHOOK_RE.replace_all(&s, "<REDACTED_SLACK_WEBHOOK>");
     let s = URL_CREDS_RE.replace_all(&s, "https://<REDACTED_CREDS>@");
     let s = SERVICE_BASE_URL_JSON_RE.replace_all(&s, r#""service_base_url":"[redacted]""#);
-    let s = SERVICE_BASE_URL_TEXT_RE.replace_all(&s, "service_base_url: [redacted]");
-    ANSI_RE.replace_all(&s, "").into_owned()
+    SERVICE_BASE_URL_TEXT_RE
+        .replace_all(&s, "service_base_url: [redacted]")
+        .into_owned()
+}
+
+pub fn redact(text: &str) -> String {
+    redact_with_mask_flag(text).0
+}
+
+/// Redact + report whether any secret-class mask actually fired
+/// (normalization-only changes — NFKC, bidi/zero-width/ANSI stripping —
+/// do not count).
+///
+/// The flag is computed by applying the final ANSI strip equally to both a
+/// mask-free baseline and the masked text, then comparing them. Because ANSI
+/// stripping is identical on both sides it cancels out, so only a genuine
+/// secret mask flips the flag — and `redact()` stays byte-identical.
+pub fn redact_with_mask_flag(text: &str) -> (String, bool) {
+    let normalized = normalize(text);
+    let masked = mask_secrets(&normalized);
+    // ANSI escapes are stripped last (as the original pipeline did), applied
+    // to both baseline and masked so the comparison isolates masking only.
+    let baseline_out = ANSI_RE.replace_all(&normalized, "");
+    let masked_out = ANSI_RE.replace_all(&masked, "").into_owned();
+    let mask_fired = masked_out != baseline_out;
+    (masked_out, mask_fired)
 }
 
 /// Redact + enforce byte cap. Used by HITL capture path (plan v6 §4.2).
@@ -167,11 +205,38 @@ mod tests {
     }
 
     #[test]
+    fn redacts_slack_tokens_and_webhooks() {
+        let input = "SLACK_BOT_TOKEN=xoxb-1073512345678-abcDEF123ghi SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T0B6XAAAA/B0BBBB/secretpart123";
+        let out = redact(input);
+        assert!(!out.contains("xoxb-1073512345678"));
+        assert!(out.contains("<REDACTED_SLACK_TOKEN>"));
+        assert!(!out.contains("secretpart123"));
+        assert!(out.contains("<REDACTED_SLACK_WEBHOOK>"));
+    }
+
+    #[test]
     fn redacts_url_creds() {
         let s = "git remote: https://user:hunter2@example.com/repo.git";
         let r = redact(s);
         assert!(r.contains("<REDACTED_CREDS>"), "got: {r}");
         assert!(!r.contains("hunter2"), "password leaked: {r}");
+    }
+
+    #[test]
+    fn mask_flag_false_for_normalization_only_changes() {
+        // NFKC 가 바꾸는 입력 (전각 "Ａ") + zero-width 문자, 시크릿 없음 → flag false
+        let (out, masked) = redact_with_mask_flag("전각 Ａ 문자와 \u{200B} zero-width");
+        assert!(!masked, "normalization-only change must not set mask flag");
+        assert!(
+            !out.contains('\u{200B}'),
+            "zero-width must be stripped: {out}"
+        );
+    }
+
+    #[test]
+    fn mask_flag_true_when_secret_masked() {
+        let (_, masked) = redact_with_mask_flag("token: xoxb-1073512345678-abc");
+        assert!(masked, "a fired secret mask must set the flag");
     }
 
     #[test]

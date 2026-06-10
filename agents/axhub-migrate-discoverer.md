@@ -23,3 +23,4 @@ Rules:
 - 추측하지 말고 file/path evidence 를 붙여요.
 - 코드 수정은 하지 않아요.
 - cross-app 조사로 범위를 넓히지 말아요. 선택된 app_key 안에서만 정리해요.
+- secret 후보(env 값, token, webhook URL)는 이름과 reason code 로만 기록해요. 값·값 일부(prefix, 마스킹된 조각 포함)는 어떤 산출물에도 적지 않아요.

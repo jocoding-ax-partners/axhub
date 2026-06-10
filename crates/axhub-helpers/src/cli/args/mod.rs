@@ -231,6 +231,8 @@ pub(crate) struct MigrateStageWriteArgs {
     #[arg(long = "approval-state")]
     pub approval_state: Option<String>,
     #[arg(long)]
+    pub verdict: Option<String>,
+    #[arg(long)]
     pub json: bool,
 }
 
