@@ -21,7 +21,7 @@
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { grade, buildReport, compareAB, type GradeResult } from "./grade.ts";
+import { grade, buildReport, compareAB, computeGate, type GradeResult } from "./grade.ts";
 
 const HARNESS_DIR = dirname(new URL(import.meta.url).pathname);
 const SDK_PACKS_DIR = "/Users/wongil/Desktop/work/jocoding/sdk/dist/sdk-knowledge";
@@ -425,10 +425,12 @@ function runCompareAb(retryLog?: RetryEntry[]) {
   printReport(pm);
 
   const cmp = compareAB(po, pm);
-  const gate_pass = cmp.ok && po.meets_criteria;
+  // 게이트 산술: A/B 비교 + 기준충족 + UNCERTAIN 0건 (실행 실패가 게이트를 통과 못 하게)
+  const gate = computeGate(po, pm);
+  const gate_pass = gate.pass;
 
   console.log(`\nA/B 판정: ${cmp.ok ? "✓" : "✗"}  ${cmp.reason}`);
-  console.log(`게이트:   ${gate_pass ? "PASS ✓" : "FAIL ✗"}`);
+  console.log(`게이트:   ${gate_pass ? "PASS ✓" : "FAIL ✗"}  (${gate.reason})`);
 
   // 언어×조건 표
   console.log("\n언어×조건 표:");

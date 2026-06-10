@@ -187,6 +187,18 @@ export function grade(lang: string, outputText: string): GradeResult {
     };
   }
 
+  // 빈 출력 = 채점 불가 → UNCERTAIN (FAIL 로 둔갑시키지 않고 게이트에서 차단)
+  if (outputText.trim() === "") {
+    return {
+      lang,
+      trap_id: rule.trap_id,
+      verdict: "UNCERTAIN",
+      bad_hit: [],
+      good_hit: [],
+      evidence: "빈 출력 — 채점 불가",
+    };
+  }
+
   // 코드 블록 내부만 스캔, 주석 줄 제거 — 설명·주의문·인라인 주석 false-negative 방지
   const scanText = stripCommentLines(extractCodeBlocks(outputText));
 
@@ -253,13 +265,16 @@ export function buildReport(
 
   // 기계 판정 기준 (Plan §D.4 Architect F3 산술 정정):
   //   함정 수 ≥ SDK 언어 수(현 6) AND 각 언어 ≥1
+  // UNCERTAIN (실행 실패/출력 없음) 은 "측정된 함정" 이 아니므로 집계에서 제외해요.
+  // 제외하지 않으면 전부 실행 실패해도 meets_criteria 가 true 가 되는 구멍이 생겨요.
   const SDK_LANG_COUNT = 6;
+  const graded = results.filter((r) => r.verdict !== "UNCERTAIN");
   const lang_coverage: Record<string, boolean> = {};
-  for (const r of results) {
+  for (const r of graded) {
     lang_coverage[r.lang] = r.verdict === "PASS";
   }
 
-  const trap_count_ok = total >= SDK_LANG_COUNT;
+  const trap_count_ok = graded.length >= SDK_LANG_COUNT;
   const lang_coverage_ok = Object.keys(lang_coverage).length === SDK_LANG_COUNT;
   const meets_criteria = trap_count_ok && lang_coverage_ok;
 
@@ -293,6 +308,26 @@ export function compareAB(
     ok: false,
     reason: `packs+MCP(${packsMcp.passed}) < packs-only(${packsOnly.passed}) ✗ — 회귀`,
   };
+}
+
+/**
+ * 최종 게이트: A/B 비교 통과 AND 기준 충족 AND 양 조건 UNCERTAIN 0건.
+ * UNCERTAIN 이 하나라도 있으면 측정 자체가 불완전하므로 게이트 FAIL 이에요.
+ */
+export function computeGate(
+  packsOnly: HarnessReport,
+  packsMcp: HarnessReport
+): { pass: boolean; reason: string } {
+  const cmp = compareAB(packsOnly, packsMcp);
+  const uncertainOk = packsOnly.uncertain === 0 && packsMcp.uncertain === 0;
+  const pass = cmp.ok && packsOnly.meets_criteria && packsMcp.meets_criteria && uncertainOk;
+
+  const parts = [
+    `A/B ${cmp.ok ? "✓" : "✗"}`,
+    `기준충족 A=${packsOnly.meets_criteria ? "✓" : "✗"} B=${packsMcp.meets_criteria ? "✓" : "✗"}`,
+    `UNCERTAIN A=${packsOnly.uncertain} B=${packsMcp.uncertain}${uncertainOk ? " ✓" : " ✗"}`,
+  ];
+  return { pass, reason: parts.join("  ") };
 }
 
 // ── CLI 진입점 ────────────────────────────────────────────────────────────────
