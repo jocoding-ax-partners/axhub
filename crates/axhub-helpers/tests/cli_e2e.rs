@@ -1005,6 +1005,20 @@ fn preflight_reports_axhub_bin_invalid_when_override_dead() {
     assert!(stdout.contains(r#""cli_resolved_path":"/definitely-not-axhub""#));
 }
 
+#[test]
+fn onboarding_detect_reports_cli_env_invalid_when_override_dead() {
+    let detect = Command::new(bin())
+        .args(["onboarding-detect"])
+        .env("AXHUB_BIN", "/definitely-not-axhub")
+        .output()
+        .unwrap();
+    // onboarding-detect is fail-open: always exits 0 regardless of gap state.
+    assert_eq!(detect.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&detect.stdout);
+    assert!(stdout.contains(r#""first_gap":"cli_env_invalid""#));
+    assert!(stdout.contains(r#""cli_resolved_path":"/definitely-not-axhub""#));
+}
+
 #[cfg(unix)]
 #[test]
 fn cli_prompt_route_injects_doctor_context_for_version_skew() {

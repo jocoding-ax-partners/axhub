@@ -130,6 +130,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
      ↓
   DETECT_ALL(read-only)
      ├─ cli_missing         → Skill("axhub:install-cli") → DETECT_ALL
+     ├─ cli_env_invalid     → AXHUB_BIN env 수정 안내(재설치 금지) → DETECT_ALL
      ├─ cli_path_missing    → Skill("axhub:repair") → DETECT_ALL
      ├─ cli_old             → update(explicit-confirm+cosign) → DETECT_ALL
      ├─ auth_missing        → Skill("axhub:auth") → DETECT_ALL
@@ -150,6 +151,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    | gap id | 감지 조건 (Step 2 JSON) | 처리 owner | 완료 확인 |
    |--------|-----------|------------|-----------|
    | `cli_missing` | `cli_present=false` (또는 DETECT_JSON 비어 fallback) | `install-cli` | 재감지 시 `cli_present=true` |
+   | `cli_env_invalid` | `cli_present=false` + `cli_state=axhub_bin_invalid` (`cli_resolved_path` 가 잘못된 `AXHUB_BIN` 경로) | onboarding | `unset AXHUB_BIN` 또는 경로 수정 후 재감지 시 `cli_present=true` |
    | `cli_path_missing` | `cli_present=true` + `cli_on_path=false` (`cli_state=on_disk_not_on_path`) | `repair` | repair-path 적용 후 새 터미널 또는 resolved path 로 재확인 |
    | `cli_old` | `cli_too_old=true` 또는 `has_update=true` (`latest_version` 참고) | `update` | cosign apply 후 version 재확인 |
    | `auth_missing` | `auth_ok=false` (`auth_error_code` 참고) | `auth` | device approval/token import 후 재감지 green |
@@ -162,6 +164,8 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    | `deps_missing` | `deps_missing=true` (lockfile+manifest 있고 node_modules 없음) | onboarding | lockfile install exit 0 |
    | `deploy_unverified` | `deploy_checked=true` + `deploy_verified=false` | onboarding/status/deploy | live/running/deployed 확인 |
    | `doctor_gap` | (helper 범위 밖) 온보딩 끝 doctor 핵심 체크 fail | `doctor` | doctor 핵심 green 또는 PATH reload 안내 |
+
+   `cli_env_invalid` 면 install-cli 로 가지 말아요. `AXHUB_BIN` 환경변수가 spawn 할 수 없는 경로 (`cli_resolved_path` 값) 를 가리키는 상태라서, 재설치해도 해결되지 않아요. 사용자에게 해당 경로를 보여주고 `unset AXHUB_BIN` (셸 프로필에 export 가 있으면 그 줄 제거) 후 새 세션에서 다시 시도하라고 안내하고 멈춰요.
 
 4. **CLI 버전 gap (`cli_old`).**
 

@@ -85,6 +85,7 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
       "Gap State Machine",
       "DETECT_ALL(read-only)",
       "cli_missing",
+      "cli_env_invalid",
       "cli_old",
       "auth_missing",
       "git_missing",
@@ -151,6 +152,7 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
       "START",
       "DETECT_ALL(read-only)",
       "cli_missing",
+      "cli_env_invalid",
       "cli_path_missing",
       "cli_old",
       "auth_missing",
@@ -176,11 +178,12 @@ describe("onboarding skill evolution — VIBE_READY contract", () => {
     const transitions = parseTransitions(content);
     const rows = parseGapTable(content);
 
-    expect(transitions).toHaveLength(14);
-    expect(rows).toHaveLength(13);
+    expect(transitions).toHaveLength(15);
+    expect(rows).toHaveLength(14);
 
     const scenarios = [
       { id: "S1", gaps: ["cli_missing"], handler: "install-cli", owner: "install-cli", ready: "READY_WITH_USER_ACTION", detect: "cli_present=false" },
+      { id: "S1b", gaps: ["cli_env_invalid"], handler: "AXHUB_BIN env", owner: "onboarding", ready: "READY_WITH_USER_ACTION", detect: "axhub_bin_invalid" },
       { id: "S2", gaps: ["cli_path_missing"], handler: "repair", owner: "repair", ready: "READY_WITH_USER_ACTION", detect: "on_disk_not_on_path" },
       { id: "S3", gaps: ["cli_old"], handler: "update", owner: "update", ready: "VIBE_READY", detect: "cli_too_old=true" },
       { id: "S4", gaps: ["auth_missing"], handler: "auth", owner: "auth", ready: "READY_WITH_USER_ACTION", detect: "auth_ok=false" },
