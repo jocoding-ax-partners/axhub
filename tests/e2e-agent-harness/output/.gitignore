@@ -2,6 +2,7 @@
 *
 !.gitignore
 !ab-report.json
+!mcp-probe.json
 !packs-only/
 !packs-only/report.json
 !packs-mcp/

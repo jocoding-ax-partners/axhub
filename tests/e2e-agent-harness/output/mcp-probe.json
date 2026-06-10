@@ -1,0 +1,52 @@
+{
+  "probe": "stream-json 단일 프로브 — B 조건(packs-mcp) MCP 실호출 횟수 계측",
+  "generated_at": "2026-06-10T05:24:36Z",
+  "condition": "packs-mcp",
+  "lang": "node",
+  "runs": 1,
+  "cli_flags": [
+    "-p",
+    "--output-format stream-json",
+    "--verbose",
+    "--max-turns 40",
+    "--mcp-config mcp-config.json",
+    "--allowedTools Bash,Read,Write,Edit,Glob,Grep,mcp__axhub-mcp__sdk_search"
+  ],
+  "mcp_server": {
+    "name": "axhub-mcp",
+    "url": "http://127.0.0.1:8001/mcp",
+    "init_status": "connected",
+    "tools_exposed": [
+      "mcp__axhub-mcp__catalog_connectors",
+      "mcp__axhub-mcp__catalog_kinds",
+      "mcp__axhub-mcp__catalog_resources",
+      "mcp__axhub-mcp__data_read",
+      "mcp__axhub-mcp__resource_read",
+      "mcp__axhub-mcp__sdk_search"
+    ],
+    "server_side_tools_call_log_entries": 0
+  },
+  "tool_use": {
+    "total_tool_use_blocks": 0,
+    "mcp_tool_use_blocks": 0,
+    "mcp_tools_called": []
+  },
+  "run_meta": {
+    "num_turns": 1,
+    "duration_ms": 12095,
+    "total_cost_usd": 0.25945,
+    "is_error": false,
+    "subtype": "success"
+  },
+  "response_quality": {
+    "trap_id": "or_combinator",
+    "verdict": "PASS",
+    "evidence": "or() 비푸시 결합자 회피 — `.in(['paid', 'pending'])` 사용, or() 시 ValidationError 라고 명시"
+  },
+  "zero_call_reason_estimate": "팩 본문에 or_combinator 함정 해답이 이미 문서화돼 있고 시스템 프롬프트가 'when uncertain' 일 때만 sdk_search 호출하라고 지시해서, 에이전트가 불확실성 없이 1턴 만에 팩 지식만으로 정답을 생성했어요.",
+  "caveats": [
+    "이 프로브는 게이트 재판정이 아니에요 — A/B v2 게이트는 이미 PASS, 본 결과는 증거 보강용이에요.",
+    "claude CLI 가 사용자 전역 설정의 다른 MCP 서버들(plugin/gitnexus 등)도 init 에 함께 로드했지만, allowedTools 제한으로 호출 가능 MCP tool 은 mcp__axhub-mcp__sdk_search 뿐이었어요.",
+    "기존 B 조건 풀런(--output-format text)과 동일한 시스템 프롬프트/태스크/플래그를 재사용했고, 출력 포맷만 stream-json 으로 바꿨어요."
+  ]
+}
