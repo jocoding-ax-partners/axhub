@@ -46,7 +46,7 @@ use serde_json::{json, Map, Value};
 mod cli;
 
 pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
-pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  prompt-route\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  verify-deploy-artifact\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  tenant-resolve [--json]\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--persist-planning] [--json]\n  migrate-stage-write --run-json <path> --stage <name> --markdown-file <file> [--run-state <state>] [--approval-state <state>] [--json]\n  migrate-wave-plan --run-json <path> --wave-id <id> --stage-scope <stage> [--participant <app_key>]... [--depends-on <wave_id>]... [--artifact <path>]... [--write-target <target>]... [--independence-proof <text>]... [--state <planned|running|complete>] [--json]\n  migrate-approve --run-json <path> --approved-by <name> [--approval-note <text>] [--json]\n  migrate-guard --dir <path> [--checkpoint] [--allow-dirty] [--init-ok] [--label <s>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  prompt-route\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  verify-deploy-artifact\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  tenant-resolve [--json]\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--persist-planning] [--json]\n  migrate-stage-write --run-json <path> --stage <name> --markdown-file <file> [--run-state <state>] [--approval-state <state>] [--json]\n  migrate-wave-plan --run-json <path> --wave-id <id> --stage-scope <stage> [--participant <app_key>]... [--depends-on <wave_id>]... [--artifact <path>]... [--write-target <target>]... [--independence-proof <text>]... [--state <planned|running|complete>] [--json]\n  migrate-approve --run-json <path> --approved-by <name> [--approval-note <text>] [--json]\n  migrate-guard --dir <path> [--checkpoint] [--allow-dirty] [--init-ok] [--label <s>] [--json]\n  migrate-sdk-installed --dir <path> --lang <lang> [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -160,6 +160,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "deploy-approved-run" => cmd_deploy_approved_run(&rest),
         "migrate-plan" => run_migrate_plan(&rest),
         "migrate-guard" => cmd_migrate_guard(&rest),
+        "migrate-sdk-installed" => cmd_migrate_sdk_installed(&rest),
         "migrate-summary" => cmd_migrate_summary(&rest),
         "publish-summary" => cmd_publish_summary(&rest),
         "rollback-summary" => cmd_rollback_summary(&rest),
@@ -3198,6 +3199,135 @@ fn extract_email_like(utterance: &str) -> Option<String> {
                 && !part.ends_with('.')
         })
         .map(|part| part.trim_matches('.').to_string())
+}
+
+/// Runtime installed-SDK check (Item 1C). Reads the user app's package manifest
+/// to report whether an AxHub SDK is already a dependency and at what version, so
+/// the SKILL can warn on a version mismatch vs the pack before applying. Gated on
+/// presence: at first conversion the app has not adopted the SDK yet, so the
+/// normal answer is `present: false` (expected state, not an error).
+fn cmd_migrate_sdk_installed(rest: &[String]) -> anyhow::Result<i32> {
+    use regex::Regex;
+    use std::fs;
+    let mut dir = ".".to_string();
+    let mut lang = String::new();
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--dir" => {
+                if let Some(v) = rest.get(i + 1) {
+                    dir = v.clone();
+                }
+                i += 2;
+            }
+            "--lang" => {
+                if let Some(v) = rest.get(i + 1) {
+                    lang = v.clone();
+                }
+                i += 2;
+            }
+            _ => i += 1,
+        }
+    }
+    let read = |name: &str| -> String {
+        fs::read_to_string(std::path::Path::new(&dir).join(name)).unwrap_or_default()
+    };
+    let cap1 = |pattern: &str, hay: &str| -> Option<String> {
+        Regex::new(pattern)
+            .ok()
+            .and_then(|re| re.captures(hay).map(|c| c[1].to_string()))
+    };
+    let ver = r"([0-9]+\.[0-9]+\.[0-9]+)";
+    // (present, version) per ecosystem. Presence is a robust substring check;
+    // version is best-effort (None → "present, version unknown", still useful).
+    let probe: Option<(bool, Option<String>)> = match lang.as_str() {
+        "node" => {
+            let pkg = read("package.json");
+            let lock = read("package-lock.json");
+            let present = pkg.contains("@ax-hub/sdk") || lock.contains("@ax-hub/sdk");
+            let v = cap1(&format!(r#""@ax-hub/sdk"\s*:\s*"[~^]?v?{ver}"#), &pkg).or_else(|| {
+                // package-lock v1 key is "@ax-hub/sdk", v3 is "node_modules/@ax-hub/sdk";
+                // drop the leading quote so both match the version that follows.
+                cap1(
+                    &format!(r#"(?s)@ax-hub/sdk".*?"version"\s*:\s*"{ver}"#),
+                    &lock,
+                )
+            });
+            Some((present, v))
+        }
+        "python" => {
+            let blob = format!(
+                "{}\n{}\n{}",
+                read("requirements.txt"),
+                read("pyproject.toml"),
+                read("poetry.lock")
+            );
+            let present = blob.contains("axhub-sdk") || blob.contains("axhub_sdk");
+            let v = cap1(&format!(r"axhub[-_]sdk\s*==\s*{ver}"), &blob).or_else(|| {
+                cap1(
+                    &format!(r#"(?s)axhub[-_]sdk["\s,=]+.*?version[="\s:]+{ver}"#),
+                    &blob,
+                )
+            });
+            Some((present, v))
+        }
+        "go" => {
+            let m = read("go.mod");
+            let present = m.contains("axhub-sdk-go") || read("go.sum").contains("axhub-sdk-go");
+            let v = cap1(&format!(r"axhub-sdk-go\s+v{ver}"), &m);
+            Some((present, v))
+        }
+        "ruby" => {
+            let lock = read("Gemfile.lock");
+            let gem = read("Gemfile");
+            let present = lock.contains("axhub-sdk") || gem.contains("axhub-sdk");
+            let v = cap1(&format!(r"axhub-sdk \({ver}\)"), &lock)
+                .or_else(|| cap1(&format!(r#"gem\s+["']axhub-sdk["'][^0-9]*{ver}"#), &gem));
+            Some((present, v))
+        }
+        "java" => {
+            let pom = read("pom.xml");
+            let gradle = format!("{}{}", read("build.gradle"), read("build.gradle.kts"));
+            let present = pom.contains("axhub-sdk-java") || gradle.contains("axhub-sdk-java");
+            let v = cap1(&format!(r"axhub-sdk-java:{ver}"), &gradle).or_else(|| {
+                cap1(
+                    &format!(r"(?s)axhub-sdk-java</artifactId>.*?<version>{ver}</version>"),
+                    &pom,
+                )
+            });
+            Some((present, v))
+        }
+        "kotlin" => {
+            let gradle = format!("{}{}", read("build.gradle"), read("build.gradle.kts"));
+            let present = gradle.contains("axhub-sdk-kotlin");
+            let v = cap1(&format!(r"axhub-sdk-kotlin:{ver}"), &gradle);
+            Some((present, v))
+        }
+        _ => None,
+    };
+    match probe {
+        None => out_json(json!({
+            "ok": false, "lang": lang, "present": false, "installed_version": Value::Null,
+            "message": format!("지원하지 않는 언어예요: {lang}"),
+        })),
+        Some((false, _)) => out_json(json!({
+            "ok": true, "lang": lang, "present": false, "installed_version": Value::Null,
+            "message": "AxHub SDK 가 아직 의존성에 없어요 — 첫 변환이면 정상이에요 (체크 생략)",
+        })),
+        Some((true, version)) => {
+            let message = match &version {
+                Some(v) => format!("설치된 AxHub SDK {v} — pack 버전과 비교해요"),
+                None => {
+                    "AxHub SDK 가 설치돼 있어요 (버전 미상) — 생성 코드 확인이 필요해요".to_string()
+                }
+            };
+            out_json(json!({
+                "ok": true, "lang": lang, "present": true,
+                "installed_version": version, "message": message,
+            }));
+        }
+    }
+    Ok(0)
 }
 
 /// Deterministic git safety guard for SDK conversion (D2 = git-guarded preview-first).

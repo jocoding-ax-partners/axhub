@@ -516,6 +516,13 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 2.6. **SDK 변환 실행 (승인된 `sdk_wrapper_generate`).** 변환은 helper 가 아니라 언어별 expert agent 가 user source 를 써요. 안전망은 helper 가 deterministic 하게 잡아요.
    - detected language 로 `axhub-sdk-<lang>-expert` 를 `task` tool 로 dispatch 해요 (`axhub-sdk-go-expert`, `axhub-sdk-java-expert`, `axhub-sdk-kotlin-expert`, `axhub-sdk-node-expert`, `axhub-sdk-python-expert`, `axhub-sdk-ruby-expert`). 6개 언어(go/java/kotlin/node/python/ruby) 밖이면 expert 가 없으니 plan-only 로 남기고 알려요.
    - expert 는 `skills/migrate/sdk-knowledge/<lang>.md` knowledge pack 의 §1 client init 을 그대로 emit 해요. paraphrase 하지 않아요. pack 이 없거나 비면 apply 하지 말고 preview/plan 만 내요.
+   - apply 전에 설치된 SDK 버전을 확인해요. 재변환·업그레이드 flow 에서만 의미가 있고, 첫 변환이면 `present:false` 로 그냥 넘어가요.
+
+   ```bash
+   "$HELPER" migrate-sdk-installed --dir "${AXHUB_MIGRATE_DIR:-.}" --lang "$LANG" --json
+   ```
+
+   `present:true` 이고 `installed_version` 이 pack 의 `sdk_version` 과 다르면 preview-only 로 낮추고 사용자 확인 전에는 auto-apply 하지 않아요. `present:false` 면 정상 상태라 건너뛰어요.
    - apply 전에 git guard 를 먼저 잡아요. probe 로 상태를 보고, 필요한 동의를 받은 뒤 checkpoint 를 만들어요.
 
    ```bash
