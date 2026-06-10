@@ -19,12 +19,16 @@
  */
 
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { grade, buildReport, compareAB, computeGate, type GradeResult } from "./grade.ts";
 
-const HARNESS_DIR = dirname(new URL(import.meta.url).pathname);
-const SDK_PACKS_DIR = "/Users/wongil/Desktop/work/jocoding/sdk/dist/sdk-knowledge";
+const HARNESS_DIR = dirname(fileURLToPath(import.meta.url));
+// SDK packs: env override > sibling repo 상대 기본값 (axhub/../sdk)
+const SDK_PACKS_DIR =
+  process.env.AXHUB_SDK_PACKS_DIR ??
+  join(HARNESS_DIR, "..", "..", "..", "sdk", "dist", "sdk-knowledge");
 const OUTPUT_DIR = join(HARNESS_DIR, "output");
 
 const ALL_LANGS = ["node", "python", "go", "java", "kotlin", "ruby"] as const;
@@ -298,12 +302,16 @@ function runClaude(
   const taskPath = join(HARNESS_DIR, "tasks", lang, "TASK.md");
   // frontmatter (trap_id 등 채점 메타) 는 프롬프트 파이프 전에 strip — 정답 누출 방지
   const taskText = stripTaskFrontmatter(readFileSync(taskPath, "utf8"));
-  const systemPrompt = buildSystemPrompt(lang, condition);
 
-  const outDir = join(OUTPUT_DIR, condition, lang);
-  mkdirSync(outDir, { recursive: true });
-
-  writeFileSync(join(outDir, "system.txt"), systemPrompt);
+  // dry-run 은 pack 부재 허용 (경고만) — 다른 머신에서 실행 계획 확인 가능하게
+  let systemPrompt: string;
+  try {
+    systemPrompt = buildSystemPrompt(lang, condition);
+  } catch (e) {
+    if (!args.dryRun) throw e;
+    console.warn(`[dry-run] 경고: ${e instanceof Error ? e.message : String(e)}`);
+    systemPrompt = "";
+  }
 
   if (args.dryRun) {
     const mcpNote = args.mcpConfig ? ` --mcp-config ${args.mcpConfig}` : "";
@@ -311,6 +319,11 @@ function runClaude(
     console.log(`[dry-run] task: ${taskPath}`);
     return { lang, condition, stdout: "", stderr: "", status: 0, duration_ms: 0, attempts: 0 };
   }
+
+  const outDir = join(OUTPUT_DIR, condition, lang);
+  mkdirSync(outDir, { recursive: true });
+
+  writeFileSync(join(outDir, "system.txt"), systemPrompt);
 
   const t0 = Date.now();
   let result = runClaudeOnce(lang, condition, claudeBin, systemPrompt, taskText, args.mcpConfig, args.maxTurns, outDir);
@@ -331,7 +344,19 @@ function runClaude(
   }
 
   const duration_ms = Date.now() - t0;
-  writeFileSync(join(outDir, "response.txt"), result.stdout ?? "");
+
+  // 실패 런은 response.txt 미기록 — 재채점 시 실패가 FAIL/PASS 로 둔갑하는 것 방지.
+  // 이전 성공 런의 stale response.txt 도 제거해 missing → UNCERTAIN 으로 떨어지게 해요.
+  const responsePath = join(outDir, "response.txt");
+  if ((result.status ?? -1) === 0) {
+    writeFileSync(responsePath, result.stdout ?? "");
+  } else {
+    rmSync(responsePath, { force: true });
+    writeFileSync(
+      join(outDir, "error.txt"),
+      `exit=${result.status}\n${(result.stderr ?? "").slice(0, 2000)}`
+    );
+  }
 
   return {
     lang,
