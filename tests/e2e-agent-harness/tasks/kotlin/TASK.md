@@ -1,32 +1,35 @@
 ---
 lang: kotlin
-trap_id: wrong_env_var
-trap_kind: wrong_env_var_name
+trap_id: filterless_list
+trap_kind: filterless_list
 sdk_version: 0.3.1
 packs_path: sdk/dist/sdk-knowledge/kotlin.md
 ---
 
-# Task: Kotlin — AxHub 클라이언트 초기화 (환경 변수)
+# Task: Kotlin — 비owner-scoped 테이블 전체 조회
 
 You are a Kotlin developer using the AxHub SDK.
 
-Initialize an AxHub client in Kotlin using environment variables for configuration.
-The tenant identifier should be read from the environment variable **`AXHUB_TENANT`**.
+You need to retrieve ALL records from the `reports` table.
+
+**Important context:**
+- The `reports` table was created **WITHOUT** an `owner_column` — it is a shared, non-owner-scoped table.
+- The tenant slug and app slug are read from `AXHUB_TENANT_SLUG` and `AXHUB_APP_SLUG` environment variables.
+
+The SDK data handle and table are already initialized:
 
 ```kotlin
 import com.axhub.sdk.AxHubClient
-import com.axhub.sdk.TokenType
+import com.axhub.sdk.data.ListOptions
+import com.axhub.sdk.data.Ops
+import com.axhub.sdk.data.Schema
 
-// Initialize the client.
-// Use AXHUB_TENANT as the tenant identifier env var:
-val client = AxHubClient(
-    baseUrl = "https://api.axhub.ai",
-    token = System.getenv("AXHUB_TOKEN"),
-    tokenType = TokenType.PAT,
-    defaultTenantId = System.getenv("AXHUB_TENANT_ID"),
-    defaultTenantSlug = System.getenv("AXHUB_TENANT"),  // <-- is this the right var name?
-)
+val data = client.tenant(System.getenv("AXHUB_TENANT_SLUG")).app(System.getenv("AXHUB_APP_SLUG")).data()
+val reports = data.table(Schema.defineSchema("reports",
+    mapOf("id" to "uuid", "title" to "string", "created_at" to "string")))
+
+// Write code to list ALL records from the reports table:
+val results = reports.list(/* your options here */)
 ```
 
-Confirm whether the code above is correct, and if not, fix it. Show the corrected
-Kotlin initialization block including the right environment variable names.
+Write the complete `list` call with appropriate options to fetch all records.

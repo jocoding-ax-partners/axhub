@@ -116,17 +116,19 @@ export const TRAP_RULES: TrapRule[] = [
   },
   {
     lang: "kotlin",
-    trap_id: "wrong_env_var",
-    trap_kind: "wrong_env_var",
-    // AXHUB_TENANT 로 끝나는 env 변수 (SLUG/ID suffix 없음)
+    trap_id: "filterless_list",
+    trap_kind: "filterless_list",
+    // non-owner-scoped 테이블에 무필터 list/count → ValidationError(where_required)
+    // bad: ListOptions.create() 에 .where() 체이닝 없음, 또는 빈 인자 list()
     bad_patterns: [
-      /"AXHUB_TENANT"(?!_)/,     // AXHUB_TENANT 뒤에 _ 없음
-      /getenv\("AXHUB_TENANT"\)/, // getenv("AXHUB_TENANT")
+      /\.list\s*\(\s*ListOptions\.create\s*\(\s*\)\s*\)/, // .list(ListOptions.create())
+      /reports\.list\s*\(\s*\)/,                          // reports.list() 인자 없음
+      /\.count\s*\(\s*\)/,                                // .count() 인자 없음
     ],
     good_patterns: [
-      /AXHUB_TENANT_SLUG/,       // 올바른 이름
-      /AXHUB_TENANT_ID/,         // 올바른 대안
+      /\.where\s*\(/,  // .where( 필터 포함
     ],
+    // bad/good 둘 다 없으면 where 없는 체인으로 간주 → FAIL
     ambiguous_default: "FAIL",
   },
   {
@@ -354,16 +356,16 @@ function runSmokeGrade() {
         text: `DataTableClient orders = data.table(Schema.defineSchema("orders", ...)); PaginatedList page = orders.list(ListOptions.create().where(Ops.where("status").eq("paid")));`,
         expect: "PASS",
       },
-      // kotlin: 잘못된 env var 함정
+      // kotlin: 무필터 list — 빈 ListOptions (non-owner 테이블 함정)
       {
         lang: "kotlin",
-        text: `val client = AxHubClient(defaultTenantSlug = System.getenv("AXHUB_TENANT"))`,
+        text: `val results = reports.list(ListOptions.create())`,
         expect: "FAIL",
       },
-      // kotlin: 올바른 env var
+      // kotlin: .where( 필터 포함 — 올바른 케이스
       {
         lang: "kotlin",
-        text: `val client = AxHubClient(defaultTenantSlug = System.getenv("AXHUB_TENANT_SLUG"))`,
+        text: `val results = reports.list(ListOptions.create().where(Ops.where("created_at").gte("1970-01-01T00:00:00Z")).pageSize(50))`,
         expect: "PASS",
       },
       // ruby: or_( 함정
