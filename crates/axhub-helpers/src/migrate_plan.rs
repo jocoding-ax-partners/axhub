@@ -15,7 +15,10 @@ use crate::migrate_planning::{
     build_planning_preview, PlanningMode, PlanningPreview, FULL_CONSENSUS_STAGE_ORDER,
 };
 
-const MAX_SCAN_DEPTH: usize = 5;
+// conventional JVM `src/main/java/<pkg>/` 레이아웃 수용 — root 기준
+// `apps/<app>/src/main/java/com/<org>/<app>/` = depth 7, 하위 패키지 여유로 8.
+// (depth 5 면 conventional 패키지 트리를 못 닿아 data_candidates 가 비어요.)
+const MAX_SCAN_DEPTH: usize = 8;
 const MAX_SCAN_FILES: usize = 5_000;
 const MAX_SCAN_BYTES: u64 = 50 * 1024 * 1024;
 const MAX_SOURCE_FILE_BYTES: u64 = 1024 * 1024;
@@ -324,9 +327,27 @@ fn collect_files(root: &Path, dir: &Path, depth: usize, out: &mut ScanState) -> 
         }
         let name = entry.file_name();
         let name = name.to_string_lossy();
+        // depth 8 까지 내려가면 JVM/Python 빌드·IDE·캐시 산출물이 새로 노출돼요.
+        // 이것들을 prune 해서 깊은 트리 스캔 폭발을 막아요 (MAX_SCAN_FILES backstop 보강).
         if matches!(
             name.as_ref(),
-            ".git" | "node_modules" | "target" | "dist" | "build" | ".next" | "vendor"
+            ".git"
+                | "node_modules"
+                | "target"
+                | "dist"
+                | "build"
+                | ".next"
+                | "vendor"
+                | "out"
+                | "bin"
+                | ".gradle"
+                | ".idea"
+                | ".mvn"
+                | "__pycache__"
+                | ".venv"
+                | ".cache"
+                | "coverage"
+                | ".dart_tool"
         ) {
             continue;
         }
@@ -1893,25 +1914,30 @@ mod tests {
         )
         .unwrap();
 
+        // conventional JVM 레이아웃 (root 기준 depth 8) — 버그3 회귀 lock.
+        // depth 5 이던 시절엔 이 경로를 못 닿아 data_candidates 가 비었어요.
         let java = temp.path().join("apps/java");
-        std::fs::create_dir_all(java.join("src")).unwrap();
+        let java_src = java.join("src/main/java/com/example/app");
+        std::fs::create_dir_all(&java_src).unwrap();
         std::fs::write(java.join("build.gradle"), "plugins { id 'java-library' }\n").unwrap();
         std::fs::write(
-            java.join("src/UserRepo.java"),
-            "package app;\n\nimport java.sql.*;\n\npublic final class UserRepo {\n    public String find(int id) throws Exception {\n        try (Connection conn = DriverManager.getConnection(System.getenv(\"DB_URL\"))) {\n            PreparedStatement stmt = conn.prepareStatement(\"SELECT id FROM users WHERE id = ?\");\n            stmt.setInt(1, id);\n            ResultSet rs = stmt.executeQuery();\n            return rs.next() ? rs.getString(1) : null;\n        }\n    }\n}\n",
+            java_src.join("UserRepo.java"),
+            "package com.example.app;\n\nimport java.sql.*;\n\npublic final class UserRepo {\n    public String find(int id) throws Exception {\n        try (Connection conn = DriverManager.getConnection(System.getenv(\"DB_URL\"))) {\n            PreparedStatement stmt = conn.prepareStatement(\"SELECT id FROM users WHERE id = ?\");\n            stmt.setInt(1, id);\n            ResultSet rs = stmt.executeQuery();\n            return rs.next() ? rs.getString(1) : null;\n        }\n    }\n}\n",
         )
         .unwrap();
 
+        // conventional JVM 레이아웃 (root 기준 depth 8) — 버그3 회귀 lock.
         let kotlin = temp.path().join("apps/kotlin");
-        std::fs::create_dir_all(kotlin.join("src")).unwrap();
+        let kotlin_src = kotlin.join("src/main/kotlin/com/example/app");
+        std::fs::create_dir_all(&kotlin_src).unwrap();
         std::fs::write(
             kotlin.join("build.gradle.kts"),
             "plugins { kotlin(\"jvm\") version \"2.4.0\" }\n",
         )
         .unwrap();
         std::fs::write(
-            kotlin.join("src/UserRepo.kt"),
-            "package app\n\nimport java.sql.DriverManager\nimport java.sql.PreparedStatement\n\nclass UserRepo {\n    fun find(id: Int): String? {\n        DriverManager.getConnection(System.getenv(\"DB_URL\")).use { conn ->\n            val stmt: PreparedStatement = conn.prepareStatement(\"SELECT id FROM users WHERE id = ?\")\n            stmt.setInt(1, id)\n            val rs = stmt.executeQuery()\n            return if (rs.next()) rs.getString(1) else null\n        }\n    }\n}\n",
+            kotlin_src.join("UserRepo.kt"),
+            "package com.example.app\n\nimport java.sql.DriverManager\nimport java.sql.PreparedStatement\n\nclass UserRepo {\n    fun find(id: Int): String? {\n        DriverManager.getConnection(System.getenv(\"DB_URL\")).use { conn ->\n            val stmt: PreparedStatement = conn.prepareStatement(\"SELECT id FROM users WHERE id = ?\")\n            stmt.setInt(1, id)\n            val rs = stmt.executeQuery()\n            return if (rs.next()) rs.getString(1) else null\n        }\n    }\n}\n",
         )
         .unwrap();
 
@@ -2309,6 +2335,43 @@ mod tests {
         collect_files(large_dir.path(), large_dir.path(), 0, &mut scan).unwrap();
         assert!(scan.total_bytes <= MAX_SCAN_BYTES);
         assert!(scan.files.len() < 60);
+    }
+
+    #[test]
+    fn collect_files_prunes_build_artifacts_but_keeps_source() {
+        let temp = tempfile::tempdir().unwrap();
+        // 강화된 ignore 목록이 잡아야 하는 빌드/IDE/캐시 산출물.
+        for noise in [".gradle", ".idea", "out", "bin", "__pycache__", ".venv"] {
+            let dir = temp.path().join(noise);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("artifact.bin"), "noise").unwrap();
+        }
+        // conventional JVM source — prune 대상이 아니라 반드시 수집돼야 해요.
+        let src = temp.path().join("src/main/java/com/example/app");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::write(src.join("UserRepo.java"), "package com.example.app;\n").unwrap();
+
+        // build_migrate_plan 과 동일하게 root 를 canonicalize 해야 해요
+        // (macOS tempdir 의 /var → /private/var 심링크로 starts_with 검사가 어긋남).
+        let root = std::fs::canonicalize(temp.path()).unwrap();
+        let mut scan = ScanState::default();
+        collect_files(&root, &root, 0, &mut scan).unwrap();
+
+        let collected: Vec<String> = scan
+            .files
+            .iter()
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .collect();
+        assert!(
+            collected
+                .iter()
+                .any(|p| p == "src/main/java/com/example/app/UserRepo.java"),
+            "conventional source 가 prune 되면 안 돼요: {collected:?}"
+        );
+        assert!(
+            !collected.iter().any(|p| p.contains("artifact.bin")),
+            "빌드/IDE 산출물은 prune 돼야 해요: {collected:?}"
+        );
     }
 
     #[cfg(unix)]
