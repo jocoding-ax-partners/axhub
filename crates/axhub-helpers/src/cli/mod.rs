@@ -331,6 +331,16 @@ fn dispatch(command: Commands) -> i32 {
                 eprintln!("{}", crate::USAGE);
                 return 64;
             };
+            // feature-off 변형(--no-default-features): `AstValidate` variant 가 없어
+            // ast-validate 가 여기로 떨어져요. hook 진입점은 fail-open 계약(전 경로
+            // exit 0)이라 legacy USAGE+64 대신 stdin drain 후 조용히 no-op 해요 —
+            // ast 미탑재 바이너리에 hook 이 걸려도 main 흐름을 막지 않아요.
+            #[cfg(not(feature = "ast"))]
+            if cmd == "ast-validate" {
+                let mut sink = String::new();
+                let _ = std::io::Read::read_to_string(&mut std::io::stdin(), &mut sink);
+                return 0;
+            }
             run_result(crate::legacy_dispatch(cmd, rest.to_vec()))
         }
     }

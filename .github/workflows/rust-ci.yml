@@ -29,6 +29,12 @@ jobs:
       # races under the default parallel runner and poisons the shared
       # PROCESS_ENV_LOCK on a single panic. Serial execution is deterministic.
       - run: cargo test --workspace -- --test-threads=1
+      # feature-off 변형 잠금: --no-default-features(ast/mcp 꺼짐)에서도 컴파일이
+      # 깨지지 않고 ast-validate hook no-op arm 이 빌드에 포함되는지 확인해요.
+      # ubuntu 만 — 변형 빌드 비용 절약.
+      - name: Check no-default-features variant (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo check -p axhub-helpers --no-default-features
       - uses: oven-sh/setup-bun@v2
         if: matrix.os == 'ubuntu-latest'
       - uses: taiki-e/install-action@cargo-llvm-cov
