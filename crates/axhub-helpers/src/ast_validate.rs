@@ -112,7 +112,7 @@ pub(crate) fn load_rules() -> Result<Vec<CompiledRule>> {
         }
         let regex = Regex::new(&r.pattern_hint)
             .with_context(|| format!("룰 '{}' 의 pattern_hint regex 컴파일 실패", r.id))?;
-        // URL/path(`/` 포함) 타겟 룰은 문자열을 스캔해요 — 12룰 전부 정확 분류:
+        // URL/path(`/` 포함) 타겟 룰은 문자열을 스캔해요 — 21룰 전부 정확 분류:
         // oauth/api-v1/raw-http/use-client(문자열 타겟) vs or/not/cursor/list/count(코드).
         let scans_strings = r.pattern_hint.contains('/');
         out.push(CompiledRule {
@@ -621,7 +621,11 @@ mod tests {
     #[test]
     fn rules_load_with_provenance() {
         let r = rules();
-        assert_eq!(r.len(), 12, "vendored 룰 12개 로드 (worker-m 12룰 갱신)");
+        assert_eq!(
+            r.len(),
+            21,
+            "vendored 룰 21개 로드 (F1 re-vendor: or/not/cursor 언어별 분리)"
+        );
         for rule in &r {
             assert!(!rule.derived_from.is_empty(), "{} derived_from 필수", rule.id);
             assert!(!rule.lock_sha.is_empty(), "{} lock_sha 필수", rule.id);
@@ -736,15 +740,44 @@ export function f() {
         scan_source(&src, grammar, lang_key, rel, &r).expect("parse")
     }
 
+    /// 언어별 핵심 block 룰 id (F1 re-vendor 로 or/not/cursor 가 언어별 분리됨 —
+    /// boolean 키워드 `or (`/`not (` FP 차단).
+    fn expected_block_ids(lang_key: &str) -> [&'static str; 3] {
+        match lang_key {
+            "node" => [
+                "or-combinator-not-pushable-node",
+                "not-combinator-not-pushable-node",
+                "cursor-keyset-after-before-forbidden-node-ruby",
+            ],
+            "go" => [
+                "or-combinator-not-pushable-go",
+                "not-combinator-not-pushable-go",
+                "cursor-keyset-after-before-forbidden-go",
+            ],
+            "python" => [
+                "or-combinator-not-pushable-python-ruby",
+                "not-combinator-not-pushable-python-ruby",
+                "cursor-keyset-after-before-forbidden-python",
+            ],
+            "ruby" => [
+                "or-combinator-not-pushable-python-ruby",
+                "not-combinator-not-pushable-python-ruby",
+                "cursor-keyset-after-before-forbidden-node-ruby",
+            ],
+            "java" | "kotlin" => [
+                "or-combinator-not-pushable-jvm",
+                "not-combinator-not-pushable-jvm",
+                "cursor-keyset-after-before-forbidden-jvm",
+            ],
+            other => panic!("unknown lang_key {other}"),
+        }
+    }
+
     /// bad fixture 는 핵심 block 데이터 룰(or/not/cursor)을 전부 검출해야 해요.
     fn assert_bad(rel: &str, grammar: Grammar, lang_key: &str) {
         let v = scan_fixture(rel, grammar, lang_key);
         let ids = block_ids(&v);
-        for expected in [
-            "or-combinator-not-pushable",
-            "not-combinator-not-pushable",
-            "cursor-keyset-after-before-forbidden",
-        ] {
+        for expected in expected_block_ids(lang_key) {
             assert!(ids.contains(expected), "{rel}: {expected} 미검출, got {ids:?}");
         }
     }
@@ -771,7 +804,7 @@ export function f() {
         assert_good("node/good.tsx", Grammar::Tsx, "node");
     }
 
-    /// worker-m 12룰 갱신분 — raw-http(bad.ts) + use-client(bad.tsx) block 검출.
+    /// F1 re-vendor 룰 — raw-http(bad.ts) + use-client(bad.tsx, 단따옴표) block 검출.
     #[test]
     fn fixtures_node_new_block_rules() {
         let ts = block_ids(&scan_fixture("node/bad.ts", Grammar::Typescript, "node"));

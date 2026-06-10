@@ -8,9 +8,21 @@ PINNED_SDK.lock.json 의 고정 sha 에서 파생해 emit 한 산출물의 **byt
 | 원본 경로 | `sdk/dist/sdk-knowledge/data-contract-rules.json` (branch `feat/knowledge-artifacts`) |
 | 스키마 | `sdk/dist/sdk-knowledge/schemas/data-contract-rules.schema.json` |
 | lock_sha (route_surface_sha) | `8bafa90e7d9319b78514a1e95b19c0fb3b73d558` |
-| 룰 수 | 12 (block 9 / advisory 3) |
-| 복사일 | 2026-06-10 (re-vendor: 10→12룰) |
+| 룰 수 | 21 (block 18 / advisory 3) |
+| 복사일 | 2026-06-10 (re-vendor: 12→21룰, F1 FP 수정분) |
 | 소비처 | `crates/axhub-helpers/src/ast_validate.rs` (`include_str!`) |
+
+### 21룰 re-vendor (2026-06-10, F1 distiller FP 수정)
+
+distiller regex FP 수정분 반영 (sdk repo `feat/knowledge-artifacts`, CE 리뷰 5건):
+- **or/not/cursor 룰 언어별 분리** (12→21룰의 본체) — 전언어 공통 `\bor\s*\(`/`\bnot\s*\(`
+  가 Python `not (a)`, Ruby `(a) or (b)` boolean 키워드에 FP 를 내서 언어별 SDK 표면
+  시그니처로 분리: node `or(`/`not(`, go `Or(`/`Not(`, python/ruby `or_(`/`not_(`,
+  jvm `Ops.or(`/`Ops.not(`. cursor 도 node/ruby `after:`, python `after=`, go `After:`,
+  jvm `.after(` 로 분리.
+- **email-domains lookbehind 방향 수정** — lookahead `(?!\s*/api/v1)` (항상 통과)
+  → invite-links 와 같은 lookbehind `(?<!/api/v1)` 로. 정상 prefix URL FP 해소.
+- **use-client 따옴표 무관** — `['\"]use client['\"]` 로 단따옴표 `'use client'` 도 검출.
 
 ### 12룰 re-vendor (2026-06-10)
 

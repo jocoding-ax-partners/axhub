@@ -40,15 +40,10 @@
     "advisory_reason": "owner_column is runtime information — owner-scoped tables legitimately accept filterless count; static analysis cannot distinguish."
   },
   {
-    "id": "or-combinator-not-pushable",
+    "id": "or-combinator-not-pushable-node",
     "rule_kind": "forbidden_call",
     "applies_lang": [
-      "go",
-      "java",
-      "kotlin",
-      "node",
-      "python",
-      "ruby"
+      "node"
     ],
     "pattern_hint": "\\bor\\s*\\(",
     "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
@@ -58,15 +53,51 @@
     }
   },
   {
-    "id": "not-combinator-not-pushable",
+    "id": "or-combinator-not-pushable-go",
     "rule_kind": "forbidden_call",
     "applies_lang": [
-      "go",
-      "java",
-      "kotlin",
-      "node",
+      "go"
+    ],
+    "pattern_hint": "\\bOr\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "or-combinator-not-pushable-python-ruby",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
       "python",
       "ruby"
+    ],
+    "pattern_hint": "\\bor_\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "or-combinator-not-pushable-jvm",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "java",
+      "kotlin"
+    ],
+    "pattern_hint": "\\bOps\\.or\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "not-combinator-not-pushable-node",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "node"
     ],
     "pattern_hint": "\\bnot\\s*\\(",
     "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
@@ -76,17 +107,94 @@
     }
   },
   {
-    "id": "cursor-keyset-after-before-forbidden",
-    "rule_kind": "cursor",
+    "id": "not-combinator-not-pushable-go",
+    "rule_kind": "forbidden_call",
     "applies_lang": [
-      "go",
-      "java",
-      "kotlin",
-      "node",
+      "go"
+    ],
+    "pattern_hint": "\\bNot\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "not-combinator-not-pushable-python-ruby",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
       "python",
       "ruby"
     ],
-    "pattern_hint": "\\bafter\\s*[:=]|\\bbefore\\s*[:=]",
+    "pattern_hint": "\\bnot_\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "not-combinator-not-pushable-jvm",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "java",
+      "kotlin"
+    ],
+    "pattern_hint": "\\bOps\\.not\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "cursor-keyset-after-before-forbidden-node-ruby",
+    "rule_kind": "cursor",
+    "applies_lang": [
+      "node",
+      "ruby"
+    ],
+    "pattern_hint": "\\bafter\\s*:|\\bbefore\\s*:",
+    "derived_from": "COMMON_DATA_CONTRACT§pagination",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "cursor-keyset-after-before-forbidden-python",
+    "rule_kind": "cursor",
+    "applies_lang": [
+      "python"
+    ],
+    "pattern_hint": "\\bafter=(?!=)|\\bbefore=(?!=)",
+    "derived_from": "COMMON_DATA_CONTRACT§pagination",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "cursor-keyset-after-before-forbidden-go",
+    "rule_kind": "cursor",
+    "applies_lang": [
+      "go"
+    ],
+    "pattern_hint": "\\bAfter\\s*:|\\bBefore\\s*:",
+    "derived_from": "COMMON_DATA_CONTRACT§pagination",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "cursor-keyset-after-before-forbidden-jvm",
+    "rule_kind": "cursor",
+    "applies_lang": [
+      "java",
+      "kotlin"
+    ],
+    "pattern_hint": "\\.after\\s*\\(|\\.before\\s*\\(",
     "derived_from": "COMMON_DATA_CONTRACT§pagination",
     "source": {
       "pack_section": "§6",
@@ -145,7 +253,7 @@
     "applies_lang": [
       "*"
     ],
-    "pattern_hint": "/tenants/[^/]+/email-domains(?!\\s*/api/v1)",
+    "pattern_hint": "(?<!/api/v1)/tenants/[^/]+/email-domains",
     "derived_from": "email-domains-api-v1-prefix",
     "source": {
       "pack_section": "§5",
@@ -189,7 +297,7 @@
     "applies_lang": [
       "node"
     ],
-    "pattern_hint": "\"use client\"[\\s\\S]{0,300}import[^;]*@ax-hub/sdk|import[^;]*@ax-hub/sdk[\\s\\S]{0,300}\"use client\"",
+    "pattern_hint": "['\\\"]use client['\\\"][\\s\\S]{0,300}import[^;]*@ax-hub/sdk|import[^;]*@ax-hub/sdk[\\s\\S]{0,300}['\\\"]use client['\\\"]",
     "derived_from": "CANONICAL_WRAPPER§node-server-side-only",
     "source": {
       "pack_section": "§1",
