@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.10.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.1...v0.10.2) (2026-06-10)
+
+migrate 워크플로우를 실제 Claude Code 서브프로세스로 e2e QA(깨끗한 Node 앱 → jocodingax 실제 배포 성공)하며 발견한 선재 결함 3건을 닫았어요. **외래어 라우팅** — 한글 "마이그레이션"이 prompt-route migrate lexicon 에 없어 "마이그레이션해서 배포" 발화가 deploy 로 새던 실사용 차단 버그를 routing.rs 에 "마이그레" 토큰 추가로 고쳐, 배포 의도가 섞여도 migrate 가 우선해요. **deploy verify 오보** — `verify-deploy-artifact` hook 이 비동기 배포의 state 부재·파싱 실패를 silent pass("성공")로 보고하던 걸 3값 분류(Confirmed/Violation/**Unconfirmed**)로 바꿔, in-flight·미확정은 advisory 로만 노출하고 정상 async 흐름은 안 깨요. **릴리즈 메타 복구** — v0.10.1 이 README "상태"·PLAN schema snippet 동기화를 누락해 main 이 manifest 테스트 fail 상태였던 걸 바로잡았어요. 셋 다 PR #204/#205(stage 하드닝)와 무관한 선재 버그예요.
+
+### Test baseline
+
+- cargo `-p axhub-helpers`: lib 569 pass(라우팅 한글 케이스 + verify 3값 회귀 테스트 9건 포함), 통합 pass / 1 pre-existing fail(`cli_prompt_route_deploy_and_doctor_hints_prevent_repo_answers` — main 동일).
+- `tests/manifest.test.ts` 209 pass(메타 drift 복구), corpus drift gate 7 pass(라우팅 변경이 기존 120 케이스 무손상).
+- `clippy`/`fmt` clean, verify hook fail-open(exit 0) 유지.
+
+### Honest tradeoff
+
+- verify hook 의 state 토큰 분류는 backend 202 응답 계약이 코드에 미문서화돼 잠정이에요 — known success 만 Confirmed, 미지 토큰은 Unconfirmed(보수적)라 거짓 성공은 확실히 막되 정상 async 는 안 깨요.
+- e2e 에서 깨끗한 앱이 한 번에 안 올라간 원인(init↔validator 스키마 불일치·Node detect all-zero·PORT manifest hard-stop)은 `ax-hub-cli` repo 영역이라 이번 범위 밖이에요 — 별도 처리 필요.
+- release flow codegen 이 README "상태"·PLAN snippet 을 자동 동기화 안 해서 이번에도 수동 동기화했어요. codegen 보강이 후속 과제예요.
+
+### Fixed
+
+* migrate QA 하드닝 — 외래어 라우팅·deploy verify 오보·릴리즈 메타 복구 ([#206](https://github.com/jocoding-ax-partners/axhub/issues/206)) ([b35b089](https://github.com/jocoding-ax-partners/axhub/commit/b35b089290f67362820f0269916d0d0071d24aca))
+
 ## [0.10.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.0...v0.10.1) (2026-06-10)
 
 migrate 를 실제 기존 앱(Rails/Kamal)에 첫 드라이런하며 드러난 플로우 결함을 두 갈래로 닫았어요. **하드닝(#205)** — stage 산출물이 dir-scan ordinal 과 에이전트의 `stages/` 직접 Write 충돌로 10개까지 중복 생성되고, critic ITERATE·reviewer REQUEST_CHANGES 를 무시한 채 `migrate-approve` 없이 mutation 이 실행되고, plan_only hard-stop 인데 auth patch·force-push 까지 진행되고, discoverer 가 token prefix 를 평문 기록하던 문제를 4계층으로 막아요: helper hard gate(stage 별 고정 ordinal 멱등 overwrite + `drafts/` 격리 + `--verdict` 순서·seal 게이트 + write 직전 redact backstop·Slack 패턴), SKILL 계약(migrate-approve 필수, plan_only 불가침, push/히스토리 재작성 금지, GitHub device-flow·installation gate 를 github SKILL 패턴으로 위임 — "승인했어" 신호 후 에이전트가 `--resume-last` 직접 수행), stage agent 5종 secret 값 기록 금지 rule, contract test 7건. **배선 갭 마감(#204)** — Track H 가 만들어 둔 scan-sites·mcp-install 이 migrate SKILL 에 연결되지 않았던 것을 §2.6 변환 준비(비차단 mcp-install + expert dispatch 전 scan-sites site 목록)·§2.7 재사용으로 잇고, advisory 의 `migrate-data-verify` 위임 fallback 을 해제했어요.

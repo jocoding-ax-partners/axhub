@@ -10,7 +10,7 @@ uninlined_format_args = "allow"
 useless_vec = "allow"
 
 [workspace.package]
-version = "0.10.1"
+version = "0.10.2"
 edition = "2021"
 # Track H: rmcp 1.7(stdio MCP) 의존 트리 floor. rmcp edition 2024(Cargo ≥1.85) +
 # 전이 의존 schemars 1.2 → darling 0.23(rustc ≥1.88) → floor = 1.88.
