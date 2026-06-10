@@ -201,7 +201,7 @@ To run diagnostics:
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — single CLI-missing pick → `나중에`, multi-failure pick → `later` (subprocess 에서 자동 fix 안 해요, 진단만 보여줘요).
 
-5.5. **Single failure: cli_present:false 즉시 AskUserQuestion.** CLI 만 부재이고 다른 row 가 모두 ✓ 일 때, 사용자가 "CLI 설치해줘" 라고 다시 발화 안 해도 되도록 즉시 AskUserQuestion 으로 설치 의향 확인:
+5.5. **Single failure: cli_present:false 즉시 AskUserQuestion (cli_state 가 `axhub_bin_invalid` 면 제외 — Step 5 표의 해당 행을 따라요).** CLI 만 부재이고 다른 row 가 모두 ✓ 일 때, 사용자가 "CLI 설치해줘" 라고 다시 발화 안 해도 되도록 즉시 AskUserQuestion 으로 설치 의향 확인:
 
    ```json
    {

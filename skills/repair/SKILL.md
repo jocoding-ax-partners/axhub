@@ -37,7 +37,7 @@ PREFLIGHT_JSON=$("$HELPER" preflight --json 2>/dev/null)
 echo "$PREFLIGHT_JSON"
 ```
 
-`cli_present:false` 이면 수리를 실행하지 말고 `axhub 설치해줘`라고 말하면 된다고 안내해요. `cli_present:true` 이고 `cli_on_path:true` 면 이미 PATH 에 있어요. `cli_present:true`, `cli_on_path:false`, `cli_state:on_disk_not_on_path` 면 수리를 진행할 수 있어요.
+`cli_present:false` 이면 수리를 실행하지 말고 `axhub 설치해줘`라고 말하면 된다고 안내해요. 단, `cli_state` 가 `axhub_bin_invalid` 면 설치 안내 대신 — `AXHUB_BIN` 환경변수가 잘못된 경로 (`cli_resolved_path` 값) 를 가리키는 상태라 재설치로 해결 안 되고, `unset AXHUB_BIN` (셸 프로필 export 제거) 또는 올바른 경로로 수정 후 새 세션에서 다시 시도하라고 안내하고 멈춰요. `cli_present:true` 이고 `cli_on_path:true` 면 이미 PATH 에 있어요. `cli_present:true`, `cli_on_path:false`, `cli_state:on_disk_not_on_path` 면 수리를 진행할 수 있어요.
 
 0. **Render TodoWrite checklist (vibe coder sees real-time progress).**
 
@@ -57,7 +57,8 @@ echo "$PREFLIGHT_JSON"
 
 1. **Classify current state.** Use the preflight JSON only for routing.
 
-   - `cli_present:false` → stop with: `axhub CLI 가 아직 없어요. 먼저 "axhub 설치해줘"라고 말해 주세요.`
+   - `cli_state:axhub_bin_invalid` → stop with: `AXHUB_BIN 환경변수가 잘못된 경로 (cli_resolved_path 값) 를 가리키고 있어요. 재설치로는 해결 안 돼요. unset AXHUB_BIN (셸 프로필 export 제거) 또는 올바른 경로로 수정 후 새 세션에서 다시 시도해 주세요.`
+   - `cli_present:false` (그 외) → stop with: `axhub CLI 가 아직 없어요. 먼저 "axhub 설치해줘"라고 말해 주세요.`
    - `cli_on_path:true` → stop with: `PATH 는 이미 괜찮아요. "진단해줘"로 전체 상태를 다시 볼 수 있어요.`
    - `on_disk_not_on_path` → continue.
    - `AXHUB_DISABLE_PATH_REPAIR=1` → stop with: `PATH 자동 수리가 꺼져 있어요. 직접 고치거나 값을 비운 뒤 다시 "PATH 고쳐줘"라고 말해 주세요.`
