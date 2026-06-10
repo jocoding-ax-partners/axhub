@@ -27,6 +27,9 @@ fn run_stdin(args: &[&str], stdin: &str, envs: &[(&str, &str)]) -> Output {
     command.env_remove("AXHUB_DISABLE_HOOKS");
     command.env_remove("AXHUB_DISABLE_HOOK");
     command.env_remove("DISABLE_AXHUB");
+    // ast-validate hook block-mode opt-in must not leak from the host shell into
+    // warn-only baselines.
+    command.env_remove("AXHUB_AST_VALIDATE");
     // session-start's drift-cache warm only fires when CLAUDE_PLUGIN_ROOT marks a
     // real plugin session; removing it here keeps the suite hermetic (never spawns
     // a network fetch) even if a dev runs `cargo test` with it exported.
@@ -557,4 +560,100 @@ fn both_drift_unified_once_then_snoozed_same_session() {
             && !turn2.contains("axhub CLI 새 버전"),
         "turn 2 same session must be snoozed (no drift nudge), got: {turn2}"
     );
+}
+
+// --- ast-validate (PostToolUse static validator hook) ---------------------
+//
+// The hook reads a PostToolUse payload on stdin, extracts the edited file
+// path, and statically validates it. Contract: ALWAYS exit 0 (fail-open),
+// warn-only by default (systemMessage), block mode adds additionalContext.
+
+fn fixture(rel: &str) -> String {
+    format!("{}/tests/fixtures/ast-validate/{rel}", env!("CARGO_MANIFEST_DIR"))
+}
+
+fn ast_validate_payload(rel: &str) -> String {
+    format!(r#"{{"tool_input":{{"file_path":"{}"}}}}"#, fixture(rel))
+}
+
+#[test]
+fn ast_validate_hook_warn_only_emits_systemmessage_on_block() {
+    let out = run_stdin(&["ast-validate"], &ast_validate_payload("node/bad.ts"), &[]);
+    assert!(out.status.success(), "hook must exit 0 (fail-open)");
+    let s = stdout(&out);
+    let json: serde_json::Value = serde_json::from_str(s.trim()).unwrap();
+    assert!(
+        json["systemMessage"]
+            .as_str()
+            .unwrap_or("")
+            .contains("AST validator"),
+        "warn-only must surface a systemMessage, got: {s}"
+    );
+    assert!(
+        json.get("hookSpecificOutput").is_none(),
+        "warn-only must NOT inject additionalContext, got: {s}"
+    );
+}
+
+#[test]
+fn ast_validate_hook_block_mode_adds_agent_context() {
+    let out = run_stdin(
+        &["ast-validate"],
+        &ast_validate_payload("node/bad.ts"),
+        &[("AXHUB_AST_VALIDATE", "block")],
+    );
+    assert!(out.status.success(), "hook must exit 0 even in block mode");
+    let s = stdout(&out);
+    let json: serde_json::Value = serde_json::from_str(s.trim()).unwrap();
+    assert!(
+        json["hookSpecificOutput"]["additionalContext"]
+            .as_str()
+            .unwrap_or("")
+            .contains("고쳐주세요"),
+        "block mode must inject corrective additionalContext, got: {s}"
+    );
+}
+
+#[test]
+fn ast_validate_hook_clean_file_stays_silent() {
+    let out = run_stdin(&["ast-validate"], &ast_validate_payload("node/good.ts"), &[]);
+    assert!(out.status.success());
+    assert_eq!(
+        stdout(&out).trim(),
+        "",
+        "clean file (advisory only) must produce no hook output"
+    );
+}
+
+#[test]
+fn ast_validate_hook_global_kill_switch_silent() {
+    let out = run_stdin(
+        &["ast-validate"],
+        &ast_validate_payload("node/bad.ts"),
+        &[("AXHUB_DISABLE_HOOKS", "1")],
+    );
+    assert!(out.status.success());
+    assert_eq!(stdout(&out).trim(), "");
+}
+
+#[test]
+fn ast_validate_hook_per_hook_kill_switch_silent() {
+    let out = run_stdin(
+        &["ast-validate"],
+        &ast_validate_payload("node/bad.ts"),
+        &[("AXHUB_DISABLE_HOOK", "ast-validate,other")],
+    );
+    assert!(out.status.success());
+    assert_eq!(stdout(&out).trim(), "");
+}
+
+#[test]
+fn ast_validate_hook_unsupported_path_silent() {
+    let out = run_stdin(
+        &["ast-validate"],
+        r#"{"tool_input":{"file_path":"/tmp/readme.md"}}"#,
+        &[],
+    );
+    assert!(out.status.success());
+    assert_eq!(stdout(&out).trim(), "");
 }
