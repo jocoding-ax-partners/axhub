@@ -444,7 +444,13 @@ fn parse_deploy_verified(stdout: &str) -> bool {
 fn compute_gaps(d: &OnboardingDetect) -> Vec<String> {
     let mut gaps = Vec::new();
     if !d.cli_present {
-        gaps.push("cli_missing".to_string());
+        if d.cli_state == "axhub_bin_invalid" {
+            // AXHUB_BIN override is broken — reinstalling won't help, so route
+            // to an env-fix gap instead of the install flow.
+            gaps.push("cli_env_invalid".to_string());
+        } else {
+            gaps.push("cli_missing".to_string());
+        }
     } else if !d.cli_on_path {
         gaps.push("cli_path_missing".to_string());
     }
@@ -782,6 +788,16 @@ mod tests {
         d.cli_present = false;
         let gaps = compute_gaps(&d);
         assert_eq!(gaps.first().map(String::as_str), Some("cli_missing"));
+    }
+
+    #[test]
+    fn gaps_axhub_bin_invalid_routes_to_env_gap_not_install() {
+        let mut d = bare_detect();
+        d.cli_present = false;
+        d.cli_state = "axhub_bin_invalid".to_string();
+        let gaps = compute_gaps(&d);
+        assert_eq!(gaps.first().map(String::as_str), Some("cli_env_invalid"));
+        assert!(!gaps.contains(&"cli_missing".to_string()));
     }
 
     #[test]
