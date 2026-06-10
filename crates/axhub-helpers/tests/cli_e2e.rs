@@ -5551,7 +5551,7 @@ fn cli_migrate_stage_write_advances_full_consensus_to_pending_approval() {
         ("critic", &critic_md),
         ("adr", &adr_md),
     ] {
-        let output = run(&[
+        let mut argv = vec![
             "migrate-stage-write",
             "--run-json",
             &run_json,
@@ -5560,7 +5560,11 @@ fn cli_migrate_stage_write_advances_full_consensus_to_pending_approval() {
             "--markdown-file",
             file.to_str().unwrap(),
             "--json",
-        ]);
+        ];
+        if stage == "critic" {
+            argv.extend(["--verdict", "approve"]);
+        }
+        let output = run(&argv);
         assert_eq!(output.status.code(), Some(0));
     }
 
@@ -5572,6 +5576,8 @@ fn cli_migrate_stage_write_advances_full_consensus_to_pending_approval() {
         "reviewer",
         "--markdown-file",
         reviewer_md.to_str().unwrap(),
+        "--verdict",
+        "approve",
         "--run-state",
         "pending_approval",
         "--approval-state",
@@ -5661,6 +5667,10 @@ fn cli_migrate_stage_write_supports_revision_loop() {
             file.to_str().unwrap(),
             "--json",
         ];
+        // critic carries an iterate verdict (this revision loop sends planner back).
+        if stage == "critic" {
+            argv.extend(["--verdict", "iterate"]);
+        }
         if let Some(state) = run_state {
             argv.extend(["--run-state", state]);
         }
@@ -5915,7 +5925,7 @@ fn cli_migrate_approve_promotes_full_consensus_after_pending_approval() {
         ("critic", &critic_md),
         ("adr", &adr_md),
     ] {
-        let output = run(&[
+        let mut argv = vec![
             "migrate-stage-write",
             "--run-json",
             &run_json,
@@ -5924,7 +5934,11 @@ fn cli_migrate_approve_promotes_full_consensus_after_pending_approval() {
             "--markdown-file",
             file.to_str().unwrap(),
             "--json",
-        ]);
+        ];
+        if stage == "critic" {
+            argv.extend(["--verdict", "approve"]);
+        }
+        let output = run(&argv);
         assert_eq!(output.status.code(), Some(0));
     }
     let reviewer_output = run(&[
@@ -5935,6 +5949,8 @@ fn cli_migrate_approve_promotes_full_consensus_after_pending_approval() {
         "reviewer",
         "--markdown-file",
         reviewer_md.to_str().unwrap(),
+        "--verdict",
+        "approve",
         "--run-state",
         "pending_approval",
         "--approval-state",
@@ -6131,6 +6147,39 @@ fn seed_full_consensus_run(temp: &Path) -> (String, String) {
         .unwrap()
         .to_string();
     (run_json, app_key)
+}
+
+/// Record planner→architect→critic(approve) via the CLI so the pipeline-order and
+/// reviewer-record verdict gates are satisfied before a reviewer write/seal. The
+/// `discover` upstream is already seeded by `migrate-plan --persist-planning`.
+fn write_consensus_chain_via_cli(temp: &Path, run_json: &str) {
+    let planner_md = temp.join("chain-planner.md");
+    let architect_md = temp.join("chain-architect.md");
+    let critic_md = temp.join("chain-critic.md");
+    std::fs::write(&planner_md, "# Planner").unwrap();
+    std::fs::write(&architect_md, "# Architect").unwrap();
+    std::fs::write(&critic_md, "# Critic\n\n- okay").unwrap();
+    for (stage, file) in [
+        ("planner", &planner_md),
+        ("architect", &architect_md),
+        ("critic", &critic_md),
+    ] {
+        let mut argv = vec![
+            "migrate-stage-write",
+            "--run-json",
+            run_json,
+            "--stage",
+            stage,
+            "--markdown-file",
+            file.to_str().unwrap(),
+            "--json",
+        ];
+        if stage == "critic" {
+            argv.extend(["--verdict", "approve"]);
+        }
+        let output = run(&argv);
+        assert_eq!(output.status.code(), Some(0), "chain stage {stage} failed");
+    }
 }
 
 #[test]
@@ -6517,6 +6566,9 @@ fn cli_migrate_stage_write_rejects_seal_with_incomplete_wave() {
         .code(),
         Some(0)
     );
+    // The reviewer-record verdict gate runs before the §8.10 wave check, so record the
+    // full chain to critic(approve) first; the §8.10 reject is what we want to surface.
+    write_consensus_chain_via_cli(temp.path(), &run_json);
     let reviewer_md = temp.path().join("reviewer.md");
     std::fs::write(&reviewer_md, "# Reviewer\n\n- approve").unwrap();
     let sealed = run(&[
@@ -6527,6 +6579,8 @@ fn cli_migrate_stage_write_rejects_seal_with_incomplete_wave() {
         "reviewer",
         "--markdown-file",
         reviewer_md.to_str().unwrap(),
+        "--verdict",
+        "approve",
         "--run-state",
         "pending_approval",
         "--approval-state",
@@ -6581,21 +6635,20 @@ fn cli_migrate_stage_write_seals_with_planned_wave_present() {
         ("critic", &critic_md),
         ("adr", &adr_md),
     ] {
-        assert_eq!(
-            run(&[
-                "migrate-stage-write",
-                "--run-json",
-                &run_json,
-                "--stage",
-                stage,
-                "--markdown-file",
-                file.to_str().unwrap(),
-                "--json",
-            ])
-            .status
-            .code(),
-            Some(0)
-        );
+        let mut argv = vec![
+            "migrate-stage-write",
+            "--run-json",
+            &run_json,
+            "--stage",
+            stage,
+            "--markdown-file",
+            file.to_str().unwrap(),
+            "--json",
+        ];
+        if stage == "critic" {
+            argv.extend(["--verdict", "approve"]);
+        }
+        assert_eq!(run(&argv).status.code(), Some(0));
     }
     let sealed = run(&[
         "migrate-stage-write",
@@ -6605,6 +6658,8 @@ fn cli_migrate_stage_write_seals_with_planned_wave_present() {
         "reviewer",
         "--markdown-file",
         reviewer_md.to_str().unwrap(),
+        "--verdict",
+        "approve",
         "--run-state",
         "pending_approval",
         "--approval-state",

@@ -321,6 +321,10 @@ fn dispatch(command: Commands) -> i32 {
                 argv.push("--approval-state".to_string());
                 argv.push(approval_state);
             }
+            if let Some(verdict) = a.verdict {
+                argv.push("--verdict".to_string());
+                argv.push(verdict);
+            }
             if a.json {
                 argv.push("--json".to_string());
             }
