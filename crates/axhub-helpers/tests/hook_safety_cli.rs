@@ -659,3 +659,53 @@ fn ast_validate_hook_unsupported_path_silent() {
     assert!(out.status.success());
     assert_eq!(stdout(&out).trim(), "");
 }
+
+// --- ast-validate project gate ---------------------------------------------
+//
+// The hook only speaks inside axhub projects (marker: axhub.yaml | .axhub/ |
+// .mcp.json containing an axhub entry, searched up to 10 levels up from the
+// edited file). Non-axhub projects stay silent — prevents false alarms when the
+// plugin is installed globally. The CLI `validate` command has NO gate (explicit
+// invocation). Fixture tests above pass the gate via the marker file
+// tests/fixtures/ast-validate/axhub.yaml.
+
+fn payload_for(path: &std::path::Path) -> String {
+    serde_json::json!({"tool_input": {"file_path": path.to_string_lossy()}}).to_string()
+}
+
+#[test]
+fn ast_validate_hook_silent_outside_axhub_project() {
+    // 마커 없는 tempdir 의 block-위반 파일 — 프로젝트 게이트가 hook 을 침묵시켜요.
+    let dir = tempfile::tempdir().unwrap();
+    let bad = std::fs::read_to_string(fixture("node/bad.ts")).unwrap();
+    let target = dir.path().join("bad.ts");
+    std::fs::write(&target, bad).unwrap();
+    let out = run_stdin(&["ast-validate"], &payload_for(&target), &[]);
+    assert!(out.status.success(), "게이트 경로도 fail-open exit 0");
+    assert_eq!(
+        stdout(&out).trim(),
+        "",
+        "비-axhub 프로젝트(마커 없음)에서는 hook 이 침묵해야 해요"
+    );
+}
+
+#[test]
+fn ast_validate_hook_fires_with_axhub_marker_in_tempdir() {
+    // 같은 위반 파일이라도 axhub.yaml 마커가 있으면 게이트를 통과해 nudge 가 떠요.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("axhub.yaml"), "# marker\n").unwrap();
+    let bad = std::fs::read_to_string(fixture("node/bad.ts")).unwrap();
+    let target = dir.path().join("bad.ts");
+    std::fs::write(&target, bad).unwrap();
+    let out = run_stdin(&["ast-validate"], &payload_for(&target), &[]);
+    assert!(out.status.success());
+    let s = stdout(&out);
+    let json: serde_json::Value = serde_json::from_str(s.trim()).unwrap();
+    assert!(
+        json["systemMessage"]
+            .as_str()
+            .unwrap_or("")
+            .contains("AST validator"),
+        "axhub 마커가 있으면 게이트를 통과해 systemMessage 가 나와야 해요, got: {s}"
+    );
+}

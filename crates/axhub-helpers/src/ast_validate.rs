@@ -573,6 +573,33 @@ fn extract_edited_path(payload: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+/// hook 전용 프로젝트 게이트 — 편집 파일 기준 상향 최대 10단계에서 axhub 마커를
+/// 찾아요. 마커: `axhub.yaml` 파일 | `.axhub/` 디렉터리 | "axhub" 항목이 든
+/// `.mcp.json`. 마커가 없으면 비-axhub 프로젝트라 hook 이 조용히 no-op 해요(오발
+/// 차단). CLI `validate` 는 명시 호출이라 게이트 없이 항상 검사해요.
+fn is_axhub_project(start: &Path) -> bool {
+    let mut dir = if start.is_dir() {
+        Some(start)
+    } else {
+        start.parent()
+    };
+    for _ in 0..10 {
+        let Some(d) = dir else { return false };
+        if d.join("axhub.yaml").is_file() || d.join(".axhub").is_dir() {
+            return true;
+        }
+        // .mcp.json 은 내용에 axhub 항목이 있을 때만 마커예요 (다른 MCP 만 쓰는
+        // 프로젝트 오발 방지). 읽기 실패는 마커 아님(fail-open no-op 방향).
+        if let Ok(s) = fs::read_to_string(d.join(".mcp.json")) {
+            if s.contains("axhub") {
+                return true;
+            }
+        }
+        dir = d.parent();
+    }
+    false
+}
+
 /// `ast-validate` PostToolUse hook 진입점. 편집된 파일 1개만 검사해요(전체 스캔 X —
 /// hook 레이턴시). **fail-open: 어떤 실패에서도 exit 0**, 위반은 systemMessage 로만
 /// 노출(warn-only). `AXHUB_AST_VALIDATE=block` opt-in(§10.6 polarity, AXHUB_<scope>=
@@ -597,6 +624,9 @@ pub fn run_hook() -> i32 {
     let target = Path::new(&path);
     if detect_lang(target).is_none() {
         return 0; // 미지원 확장자 — no-op
+    }
+    if !is_axhub_project(target) {
+        return 0; // 비-axhub 프로젝트 — hook 침묵(오발 차단)
     }
     let rules = match load_rules() {
         Ok(r) => r,

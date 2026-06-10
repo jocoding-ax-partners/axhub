@@ -1,0 +1,5 @@
+# 테스트 fixture 전용 axhub 프로젝트 마커예요.
+# ast-validate PostToolUse hook 의 프로젝트 게이트(상향 10단계 마커 탐색)가
+# 이 fixture 트리를 axhub 프로젝트로 인식해야 hook 통합 테스트
+# (tests/hook_safety_cli.rs)가 systemMessage 를 관찰할 수 있어요.
+# 비-axhub 프로젝트 침묵 계약은 마커 없는 tempdir 테스트로 따로 잠궈요.
