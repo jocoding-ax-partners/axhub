@@ -454,6 +454,26 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 
    이 단계에서만 `.axhub/spec/apps/<app_key>/latest.json` 이 생겨요. 승인 전에는 계속 비어 있어야 해요.
 
+   사용자 승인 발화("승인할게요" / "진행해" / "전부 다 해")를 받으면 **mutation 으로 바로 가지 않고** 먼저 helper 승인을 기록해요.
+
+   ```bash
+   "$HELPER" migrate-approve --run-json "$RUN_JSON" --approved-by "user" --json
+   ```
+
+   migrate-approve 가 성공해야만 (`run.json`/`approval.json` 의 state 가 `approved`) mutation 단계로 넘어가요. mutation 직전에 매번 확인해요.
+
+   ```bash
+   RUN_DIR="$(dirname "$RUN_JSON")"
+   RUN_STATE=$(jq -r '.state // empty' "$RUN_JSON" 2>/dev/null)
+   APPROVAL_STATE=$(jq -r '.state // empty' "$RUN_DIR/approval.json" 2>/dev/null)
+   if [ "$RUN_STATE" != "approved" ] || [ "$APPROVAL_STATE" != "approved" ]; then
+     # 승인 전이에요 — mutation 을 시작하지 않고 migrate-approve 부터 안내해요
+     :
+   fi
+   ```
+
+   critic verdict 가 `iterate`/`block` 이면 reviewer 로 가지 않고 planner revision → architect → critic 을 다시 돌아요 (helper 가 순서를 강제해요). iterate 가 2회를 넘으면 자동 반복을 멈추고 미해소 항목을 사용자에게 에스컬레이션해요. reviewer verdict 가 `request_changes` 면 해소 후 reviewer 를 다시 기록해야 seal 이 돼요.
+
 
 중요한 순서 제약:
 - `planner → architect → critic → reviewer` 는 항상 **직렬** 예요.
@@ -622,6 +642,9 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 - NEVER password hash, session secret, OAuth client secret 을 manifest/log/TodoWrite/PR 본문에 출력하지 않아요.
 - NEVER 기존 auth 코드를 조용히 삭제하지 않아요. 먼저 계획과 변경 파일 목록을 보여줘요.
 - NEVER raw backend endpoint 를 curl 해서 OAuth client 를 만들지 않아요.
+- NEVER `migrate-approve` 성공 없이 mutation(앱 등록·git 연결·env 저장·배포)을 실행하지 않아요. "전부 다 해" 같은 포괄 발화도 migrate-approve 기록 후에만 진행해요.
+- NEVER plan_only hard-stop(`custom_auth`, `secret_exposure`) 범위의 코드 변경을 실행하지 않아요 — auth patch·secret 관련 수정은 포괄 승인("강행" 포함)으로도 풀리지 않고, 계획 문서만 산출해요. 사용자가 해당 파일을 직접 지목한 별도 요청만 migrate 범위 밖 일반 작업으로 다뤄요.
+- NEVER 사용자 repo 에 `git push` / `git push --force` / `git filter-repo` / BFG 같은 원격·히스토리 변경을 실행하지 않아요. secret rotation·history purge 는 명령어 안내문만 제공하고 실행은 사용자 몫이에요. 로컬 patch 전에는 `migrate-guard --checkpoint` 를 먼저 떠요.
 
 ## Additional Resources
 
