@@ -900,23 +900,40 @@ pub(crate) fn cmd_verify_deploy_artifact() -> anyhow::Result<i32> {
         return Ok(0);
     }
 
+    use axhub_helpers::verify_deploy_artifact::VerifyOutcome;
     let result = axhub_helpers::verify_deploy_artifact::verify_user_app_artifact(stdout);
-    if result.passed {
-        return Ok(0);
+    match result.outcome {
+        VerifyOutcome::Confirmed => Ok(0),
+        VerifyOutcome::Violation => {
+            let observed = result.violations.join("; ");
+            let system_message = format!(
+                "⚠️ 배포 artifact 검증에서 의심 신호를 발견했어요: {observed}. 라이브 결과를 한 번 더 확인해주세요."
+            );
+            let context = format!(
+                "<axhub-deploy-verify>\n[axhub hook | deploy artifact verification]\nObserved: {observed}\nSuggested: run axhub-helpers verify --app-id <app> or inspect axhub deploy logs before claiming the app is live.\nSkip: AXHUB_DISABLE_HOOK=verify-deploy-artifact\n</axhub-deploy-verify>"
+            );
+            println!(
+                "{}",
+                hook_output::post_tool_use_context_with_system(&context, &system_message)
+            );
+            Ok(0)
+        }
+        VerifyOutcome::Unconfirmed => {
+            // Async deploy in flight or no usable signal: advisory only, in a
+            // distinct tone from a violation so the agent doesn't claim the
+            // deploy succeeded yet, and doesn't read it as a failure either.
+            let observed = result.advisories.join("; ");
+            let system_message = format!("ℹ️ 배포 결과 미확정: {observed}");
+            let context = format!(
+                "<axhub-deploy-verify>\n[axhub hook | deploy artifact verification — unconfirmed]\nObserved: {observed}\nSuggested: deploy may still be in flight; run axhub deploy logs (or axhub-helpers verify --app-id <app>) before claiming the app is live.\nSkip: AXHUB_DISABLE_HOOK=verify-deploy-artifact\n</axhub-deploy-verify>"
+            );
+            println!(
+                "{}",
+                hook_output::post_tool_use_context_with_system(&context, &system_message)
+            );
+            Ok(0)
+        }
     }
-
-    let observed = result.violations.join("; ");
-    let system_message = format!(
-        "⚠️ 배포 artifact 검증에서 의심 신호를 발견했어요: {observed}. 라이브 결과를 한 번 더 확인해주세요."
-    );
-    let context = format!(
-        "<axhub-deploy-verify>\n[axhub hook | deploy artifact verification]\nObserved: {observed}\nSuggested: run axhub-helpers verify --app-id <app> or inspect axhub deploy logs before claiming the app is live.\nSkip: AXHUB_DISABLE_HOOK=verify-deploy-artifact\n</axhub-deploy-verify>"
-    );
-    println!(
-        "{}",
-        hook_output::post_tool_use_context_with_system(&context, &system_message)
-    );
-    Ok(0)
 }
 
 fn is_axhub_deploy_create_command(command: &str) -> bool {

@@ -74,7 +74,18 @@ impl ProbeResult {
 }
 
 /// Live state synonyms accepted from axhub status (`state` field).
-const LIVE_STATES: &[&str] = &["live", "running", "deployed", "active", "ok", "succeeded"];
+// TODO: this token set drifted from verify_deploy_artifact::classify_state
+// (which also recognises "success"). Long-term, extract one shared classifier
+// so both the post-deploy hook and the verify SKILL agree on state synonyms.
+const LIVE_STATES: &[&str] = &[
+    "live",
+    "running",
+    "deployed",
+    "active",
+    "ok",
+    "succeeded",
+    "success",
+];
 
 const ERROR_PATTERNS: &[&str] = &["ERROR", "FATAL"];
 
