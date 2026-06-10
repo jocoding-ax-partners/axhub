@@ -1,17 +1,17 @@
 {
-  "generated_at": "2026-06-10T06:38:55.788Z",
+  "generated_at": "2026-06-10T07:30:43.125Z",
   "a": {
     "condition": "packs-only",
     "total": 6,
-    "passed": 5,
-    "failed": 1,
+    "passed": 6,
+    "failed": 0,
     "uncertain": 0,
     "meets_criteria": true,
     "lang_coverage": {
       "node": true,
       "python": true,
       "go": true,
-      "java": false,
+      "java": true,
       "kotlin": true,
       "ruby": true
     },
@@ -32,11 +32,10 @@
         "verdict": "PASS",
         "bad_hit": [],
         "good_hit": [
-          ",↵        page=",
-          "cursor=",
-          "LegacyCursorError"
+          ", page=",
+          "cursor="
         ],
-        "evidence": "good_pattern 매칭: ,↵        page=, cursor=, LegacyCursorError"
+        "evidence": "good_pattern 매칭: , page=, cursor="
       },
       {
         "lang": "go",
@@ -51,12 +50,14 @@
       {
         "lang": "java",
         "trap_id": "raw_http_fetch",
-        "verdict": "FAIL",
-        "bad_hit": [
-          "HttpClient client = HttpClient.newHttpClient();↵    HttpRequ"
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          "orders.list(",
+          "data.discover(",
+          "DataTableClient"
         ],
-        "good_hit": [],
-        "evidence": "bad_pattern 매칭: HttpClient client = HttpClient.newHttpClient();↵    HttpRequ"
+        "evidence": "good_pattern 매칭: orders.list(, data.discover(, DataTableClient"
       },
       {
         "lang": "kotlin",
@@ -83,15 +84,15 @@
   "b": {
     "condition": "packs-mcp",
     "total": 6,
-    "passed": 5,
-    "failed": 1,
+    "passed": 6,
+    "failed": 0,
     "uncertain": 0,
     "meets_criteria": true,
     "lang_coverage": {
       "node": true,
       "python": true,
       "go": true,
-      "java": false,
+      "java": true,
       "kotlin": true,
       "ruby": true
     },
@@ -112,10 +113,9 @@
         "verdict": "PASS",
         "bad_hit": [],
         "good_hit": [
-          ",↵    page=",
-          "cursor="
+          ",↵    page="
         ],
-        "evidence": "good_pattern 매칭: ,↵    page=, cursor="
+        "evidence": "good_pattern 매칭: ,↵    page="
       },
       {
         "lang": "go",
@@ -130,12 +130,14 @@
       {
         "lang": "java",
         "trap_id": "raw_http_fetch",
-        "verdict": "FAIL",
-        "bad_hit": [
-          "HttpClient client = HttpClient.newHttpClient();↵    HttpRequ"
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          "orders.list(",
+          "data.discover(",
+          "DataTableClient"
         ],
-        "good_hit": [],
-        "evidence": "bad_pattern 매칭: HttpClient client = HttpClient.newHttpClient();↵    HttpRequ"
+        "evidence": "good_pattern 매칭: orders.list(, data.discover(, DataTableClient"
       },
       {
         "lang": "kotlin",
@@ -161,7 +163,7 @@
   },
   "comparison": {
     "ok": true,
-    "reason": "packs+MCP(5) ≥ packs-only(5) ✓"
+    "reason": "packs+MCP(6) ≥ packs-only(6) ✓"
   },
   "gate_pass": true,
   "retry_log": []
