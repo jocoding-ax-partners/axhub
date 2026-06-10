@@ -16,6 +16,7 @@ export type TrapKind =
   | "or_combinator"
   | "after_cursor"
   | "raw_http_fetch"
+  | "filterless_list"
   | "wrong_env_var";
 
 export interface TrapRule {
@@ -117,7 +118,7 @@ export const TRAP_RULES: TrapRule[] = [
   {
     lang: "kotlin",
     trap_id: "filterless_list",
-    trap_kind: "filterless_list",
+    trap_kind: "filterless_list" as TrapKind,
     // non-owner-scoped 테이블에 무필터 list/count → ValidationError(where_required)
     // bad: ListOptions.create() 에 .where() 체이닝 없음, 또는 빈 인자 list()
     bad_patterns: [
@@ -140,11 +141,26 @@ export const TRAP_RULES: TrapRule[] = [
       /\.or\s*\(/,     // .or( 패턴
     ],
     good_patterns: [
-      /\.in_\s*\(\s*\[/,  // .in_([...]) — 올바른 대안
+      /\.in_\s*\(\s*(\[|%w\[)/,  // .in_([...]) 또는 .in_(%w[...]) — 올바른 대안
     ],
     ambiguous_default: "FAIL",
   },
 ];
+
+// ── 코드 블록 추출 ────────────────────────────────────────────────────────────
+/**
+ * 마크다운 코드 블록(``` ... ```) 내부 텍스트만 추출해요.
+ * 코드 블록이 없으면 원문 그대로 반환해요 (하위 호환 — 합성 smoke 케이스 지원).
+ */
+export function extractCodeBlocks(text: string): string {
+  const blocks: string[] = [];
+  const re = /```[^\n]*\n([\s\S]*?)```/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    blocks.push(m[1]);
+  }
+  return blocks.length > 0 ? blocks.join("\n") : text;
+}
 
 // ── 채점 로직 ─────────────────────────────────────────────────────────────────
 export function grade(lang: string, outputText: string): GradeResult {
@@ -160,15 +176,18 @@ export function grade(lang: string, outputText: string): GradeResult {
     };
   }
 
+  // 코드 블록 내부만 스캔 — 설명·주의문에서의 false-negative 방지
+  const scanText = extractCodeBlocks(outputText);
+
   const bad_hit: string[] = [];
   for (const pat of rule.bad_patterns) {
-    const m = outputText.match(pat);
+    const m = scanText.match(pat);
     if (m) bad_hit.push(m[0].slice(0, 60).replace(/\n/g, "↵"));
   }
 
   const good_hit: string[] = [];
   for (const pat of rule.good_patterns) {
-    const m = outputText.match(pat);
+    const m = scanText.match(pat);
     if (m) good_hit.push(m[0].slice(0, 60).replace(/\n/g, "↵"));
   }
 
@@ -378,6 +397,31 @@ function runSmokeGrade() {
       {
         lang: "ruby",
         text: `result = products.list(where: where('category').in_(['electronics', 'appliances']))`,
+        expect: "PASS",
+      },
+      // ── false-negative 회귀 케이스 (설명문 bad 언급 + 코드 블록 정상) ──────
+      // node: 설명에 or( 언급, 코드 블록은 .in([ 정상 → PASS
+      {
+        lang: "node",
+        text: "SDK rejects `or()` combinator — not pushable.\n```ts\nconst r = await orders.list({ where: where('status').in(['paid','pending']) });\n```",
+        expect: "PASS",
+      },
+      // python: 설명에 after= 언급, 코드 블록은 page= 정상 → PASS
+      {
+        lang: "python",
+        text: "Do not use after=/before= (LegacyCursorError).\n```python\npage2 = logs.list(where=where('id').gte(0), page=2, page_size=50)\n```",
+        expect: "PASS",
+      },
+      // go: 설명에 axhub.Or( 언급, 코드 블록은 .In( 정상 → PASS
+      {
+        lang: "go",
+        text: "axhub.Or(...) causes ValidationError.\n```go\nw := axhub.Where(\"priority\").In(\"high\", \"urgent\")\npage, err := tasks.List(ctx, &axhub.ListOptions{Where: &w})\n```",
+        expect: "PASS",
+      },
+      // ruby: %w[ 구문 .in_(%w[...]) → PASS
+      {
+        lang: "ruby",
+        text: "result = products.list(where: where('category').in_(%w[electronics appliances]))",
         expect: "PASS",
       },
     ];

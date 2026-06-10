@@ -202,6 +202,11 @@ function runClaudeOnce(
 
   if (mcpConfig && condition === "packs-mcp") {
     cliArgs.push("--mcp-config", mcpConfig);
+    // MCP tool 명시 허용: 서버명 axhub-mcp → mcp__axhub-mcp__sdk_search
+    cliArgs.push(
+      "--allowedTools",
+      "Bash,Read,Write,Edit,Glob,Grep,mcp__axhub-mcp__sdk_search"
+    );
   }
 
   return spawnSync(claudeBin, cliArgs, {
