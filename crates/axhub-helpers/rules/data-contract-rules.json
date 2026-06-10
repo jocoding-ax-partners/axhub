@@ -164,5 +164,36 @@
       "pack_section": "§5",
       "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
     }
+  },
+  {
+    "id": "raw-http-axhub-data-endpoint-forbidden",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "go",
+      "java",
+      "kotlin",
+      "node",
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "fetch\\s*\\(['\\\"]https?://[^'\\\"]*/(data|api/v1/tenants)|axios\\.[a-z]+\\s*\\(['\\\"]https?://[^'\\\"]*/(data|api/v1/tenants)|http\\.(?:get|post|put|delete)\\s*\\(['\\\"]https?://[^'\\\"]*/(data|api/v1/tenants)",
+    "derived_from": "DATA_RELIABILITY§wire-paths",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "use-client-imports-server-only-axhub",
+    "rule_kind": "boundary",
+    "applies_lang": [
+      "node"
+    ],
+    "pattern_hint": "\"use client\"[\\s\\S]{0,300}import[^;]*@ax-hub/sdk|import[^;]*@ax-hub/sdk[\\s\\S]{0,300}\"use client\"",
+    "derived_from": "CANONICAL_WRAPPER§node-server-side-only",
+    "source": {
+      "pack_section": "§1",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
   }
 ]

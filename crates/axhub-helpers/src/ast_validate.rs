@@ -72,7 +72,9 @@ struct RawSource {
     lock_sha: String,
 }
 
-/// 컴파일된 룰. `scans_strings` = 언어무관(`*`) 룰이라 문자열을 스캔해요.
+/// 컴파일된 룰. `scans_strings` = pattern 이 URL/path(`/` 포함)를 타겟하므로 문자열을
+/// 스캔해야 하는 룰(oauth/api-v1/raw-http/use-client). 코드 구문 룰(or/not/cursor/
+/// list/count)은 `/` 가 없어 문자열을 마스킹해요(주석/문자열 내 우연 매칭 차단).
 pub(crate) struct CompiledRule {
     id: String,
     rule_kind: String,
@@ -110,7 +112,9 @@ pub(crate) fn load_rules() -> Result<Vec<CompiledRule>> {
         }
         let regex = Regex::new(&r.pattern_hint)
             .with_context(|| format!("룰 '{}' 의 pattern_hint regex 컴파일 실패", r.id))?;
-        let scans_strings = r.applies_lang.iter().any(|l| l == "*");
+        // URL/path(`/` 포함) 타겟 룰은 문자열을 스캔해요 — 12룰 전부 정확 분류:
+        // oauth/api-v1/raw-http/use-client(문자열 타겟) vs or/not/cursor/list/count(코드).
+        let scans_strings = r.pattern_hint.contains('/');
         out.push(CompiledRule {
             id: r.id,
             rule_kind: r.rule_kind,
@@ -612,7 +616,7 @@ mod tests {
     #[test]
     fn rules_load_with_provenance() {
         let r = rules();
-        assert_eq!(r.len(), 10, "vendored 룰 10개 로드");
+        assert_eq!(r.len(), 12, "vendored 룰 12개 로드 (worker-m 12룰 갱신)");
         for rule in &r {
             assert!(!rule.derived_from.is_empty(), "{} derived_from 필수", rule.id);
             assert!(!rule.lock_sha.is_empty(), "{} lock_sha 필수", rule.id);
@@ -760,6 +764,21 @@ export function f() {
     fn fixtures_node_tsx() {
         assert_bad("node/bad.tsx", Grammar::Tsx, "node");
         assert_good("node/good.tsx", Grammar::Tsx, "node");
+    }
+
+    /// worker-m 12룰 갱신분 — raw-http(bad.ts) + use-client(bad.tsx) block 검출.
+    #[test]
+    fn fixtures_node_new_block_rules() {
+        let ts = block_ids(&scan_fixture("node/bad.ts", Grammar::Typescript, "node"));
+        assert!(
+            ts.contains("raw-http-axhub-data-endpoint-forbidden"),
+            "raw-http 미검출: {ts:?}"
+        );
+        let tsx = block_ids(&scan_fixture("node/bad.tsx", Grammar::Tsx, "node"));
+        assert!(
+            tsx.contains("use-client-imports-server-only-axhub"),
+            "use-client 미검출: {tsx:?}"
+        );
     }
 
     #[test]

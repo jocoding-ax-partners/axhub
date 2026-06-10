@@ -7,5 +7,7 @@ export async function loadPosts() {
   const b = await db.table("posts").not(db.eq("x", 1)).count();
   // keyset 커서(after:)는 지원 안 해요.
   const c = await db.table("posts").list({ after: "cursor123" });
-  return [a, b, c];
+  // raw fetch 로 axhub data 엔드포인트 직타 — SDK 를 써야 해요.
+  const d = await fetch("https://api.axhub.dev/data");
+  return [a, b, c, d];
 }

@@ -5,11 +5,20 @@ PINNED_SDK.lock.json 의 고정 sha 에서 파생해 emit 한 산출물의 **byt
 
 | 항목 | 값 |
 |---|---|
-| 원본 경로 | `sdk/dist/sdk-knowledge/data-contract-rules.json` |
+| 원본 경로 | `sdk/dist/sdk-knowledge/data-contract-rules.json` (branch `feat/knowledge-artifacts`) |
 | 스키마 | `sdk/dist/sdk-knowledge/schemas/data-contract-rules.schema.json` |
 | lock_sha (route_surface_sha) | `8bafa90e7d9319b78514a1e95b19c0fb3b73d558` |
-| 복사일 | 2026-06-10 |
+| 룰 수 | 12 (block 9 / advisory 3) |
+| 복사일 | 2026-06-10 (re-vendor: 10→12룰) |
 | 소비처 | `crates/axhub-helpers/src/ast_validate.rs` (`include_str!`) |
+
+### 12룰 re-vendor (2026-06-10)
+
+distiller 가 신규 emit 한 block 룰 2종 반영:
+- `raw-http-axhub-data-endpoint-forbidden` (forbidden_call, 6언어, `DATA_RELIABILITY§wire-paths`) — raw fetch/axios/http 로 axhub data 엔드포인트 직타 금지.
+- `use-client-imports-server-only-axhub` (boundary, node, `CANONICAL_WRAPPER§node-server-side-only`) — `"use client"` 컴포넌트의 server-only `@ax-hub/sdk` import 금지.
+
+두 룰 모두 pattern 이 URL/path(`/`)를 타겟 → validator 가 문자열(주석 제외)을 스캔해요.
 
 ## 갱신 절차
 
