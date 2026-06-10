@@ -31,6 +31,12 @@ static GH_TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| {
 // Covers temporary creds in CI logs that the prior `AKIA[0-9A-Z]{16}` missed.
 static AWS_KEY_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(AKIA|ASIA|AGPA|ANPA|ANVA|AROA|AIDA|AIPA)[0-9A-Z]{16}").unwrap());
+// Slack token taxonomy: xoxb(bot)/xoxp(user)/xoxa(app)/xoxo(workspace)/xoxs(session)/xoxr(refresh)/xoxe(export)
+static SLACK_TOKEN_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"xox[abeoprs]-[0-9A-Za-z-]{4,}").unwrap());
+static SLACK_WEBHOOK_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"https://hooks\.slack\.com/services/[A-Za-z0-9/_-]+").unwrap()
+});
 static PRIVATE_KEY_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?s)-----BEGIN [A-Z ]+PRIVATE KEY-----.*?-----END [A-Z ]+PRIVATE KEY-----")
         .unwrap()
@@ -52,6 +58,8 @@ pub fn redact(text: &str) -> String {
     let s = OPENAI_KEY_RE.replace_all(&s, "<REDACTED_OPENAI_KEY>");
     let s = GH_TOKEN_RE.replace_all(&s, "<REDACTED_GH_TOKEN>");
     let s = AWS_KEY_RE.replace_all(&s, "<REDACTED_AWS_KEY>");
+    let s = SLACK_TOKEN_RE.replace_all(&s, "<REDACTED_SLACK_TOKEN>");
+    let s = SLACK_WEBHOOK_RE.replace_all(&s, "<REDACTED_SLACK_WEBHOOK>");
     let s = URL_CREDS_RE.replace_all(&s, "https://<REDACTED_CREDS>@");
     let s = SERVICE_BASE_URL_JSON_RE.replace_all(&s, r#""service_base_url":"[redacted]""#);
     let s = SERVICE_BASE_URL_TEXT_RE.replace_all(&s, "service_base_url: [redacted]");
@@ -164,6 +172,16 @@ mod tests {
         assert!(!r.contains("MIIBOgIBAAJBAKx"), "key body leaked: {r}");
         assert!(r.contains("before"));
         assert!(r.contains("after"));
+    }
+
+    #[test]
+    fn redacts_slack_tokens_and_webhooks() {
+        let input = "SLACK_BOT_TOKEN=xoxb-1073512345678-abcDEF123ghi SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T0B6XAAAA/B0BBBB/secretpart123";
+        let out = redact(input);
+        assert!(!out.contains("xoxb-1073512345678"));
+        assert!(out.contains("<REDACTED_SLACK_TOKEN>"));
+        assert!(!out.contains("secretpart123"));
+        assert!(out.contains("<REDACTED_SLACK_WEBHOOK>"));
     }
 
     #[test]
