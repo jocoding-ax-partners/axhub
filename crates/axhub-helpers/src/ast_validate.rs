@@ -815,4 +815,39 @@ export function f() {
         assert_bad("ruby/bad.rb", Grammar::Ruby, "ruby");
         assert_good("ruby/good.rb", Grammar::Ruby, "ruby");
     }
+
+    /// AC10 잠금 (fallback 강등 분기): PR #198 스택 미머지 환경에서 advisory 메시지는
+    /// migrate-data-verify 위임 문구 없이 권고("권장")만 방출해야 해요.
+    #[test]
+    fn advisory_messages_recommend_without_delegation() {
+        let r = rules();
+        // (a) 전 advisory 룰의 rule_message 출력.
+        let mut messages: Vec<String> = r
+            .iter()
+            .filter(|rule| rule.advisory_only)
+            .map(rule_message)
+            .collect();
+        assert!(!messages.is_empty(), "advisory 룰이 1개 이상이어야 해요");
+        // (b) 6언어 good fixture 스캔으로 얻은 실제 advisory violation 메시지.
+        for (rel, grammar, lang_key) in [
+            ("node/good.ts", Grammar::Typescript, "node"),
+            ("node/good.tsx", Grammar::Tsx, "node"),
+            ("python/good.py", Grammar::Python, "python"),
+            ("go/good.go", Grammar::Go, "go"),
+            ("java/good.java", Grammar::Java, "java"),
+            ("kotlin/good.kt", Grammar::Kotlin, "kotlin"),
+            ("ruby/good.rb", Grammar::Ruby, "ruby"),
+        ] {
+            let v = scan_fixture(rel, grammar, lang_key);
+            messages.extend(v.into_iter().filter(|x| x.advisory_only).map(|x| x.message));
+        }
+        for msg in &messages {
+            assert!(
+                !msg.contains("migrate-data-verify"),
+                "위임 문구 금지(미머지 fallback): {msg}"
+            );
+            assert!(!msg.contains("위임"), "위임 문구 금지(미머지 fallback): {msg}");
+            assert!(msg.contains("권장"), "권고 문구('권장') 필수: {msg}");
+        }
+    }
 }
