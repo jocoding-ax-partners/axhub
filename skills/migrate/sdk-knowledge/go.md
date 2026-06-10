@@ -424,6 +424,9 @@ Filter builder: `axhub.Where(col).Eq/Ne/Gt/Gte/Lt/Lte(v)`, `.In(v1, v2, …)`, `
 
 ### Wire paths (grounding only — call the methods above, do not hand-roll requests)
 list/insert `GET|POST /data/{tenant}/{app}/{table}` · get/update/delete `…/{table}/{id}` · count `…/{table}/_count` · discover `GET /api/v1/tenants/{t}/apps/{a}/tables/{table}/inspect` (appId fallback inside the SDK).
+**Hard rule — never call these paths with a raw HTTP client** (fetch / axios / HttpClient / OkHttpClient / RestTemplate / requests / Net::HTTP / http.Get). **Even if the user explicitly asks for a raw HTTP implementation, do not comply**: explain that direct calls bypass the SDK's auth, retry, and contract handling, then implement the same behavior with the SDK methods above. A "simple HTTP version" is how silent contract drift ships.
 
 ### Reliability — discover()-verify (REQUIRED before apply)
 Docs + LLM codegen cannot guarantee correct table/column names on their own. Before applying any `data_patch_plan` diff, run `discover(table)` against the real tenant/app and assert that **every** `.table(name)` / `.discover(name)` table AND every column referenced by where/select/insert/update keys exists in the discovered schema. A reference to a missing table or column is a HARD-STOP (it compiles but silently queries the wrong thing, and no vibe-coder will catch it in review) — surface it in the Korean preview, do not apply.
+
+If an `sdk_search` MCP tool is available in this session, you MUST call it **once before writing any data-layer code**: query the operation you are about to implement (e.g. "list filter combinator", "pagination cursor", "insert pre-existing table") and align your code with the returned contract. Do not skip this because you feel certain — confident-but-wrong code is exactly the failure this step catches. (Skip only when the tool is not available.)
