@@ -573,7 +573,9 @@ fn fixture(rel: &str) -> String {
 }
 
 fn ast_validate_payload(rel: &str) -> String {
-    format!(r#"{{"tool_input":{{"file_path":"{}"}}}}"#, fixture(rel))
+    // serde_json 으로 직렬화 — Windows 경로의 `\`(예: D:\a\…)를 raw 보간하면 JSON
+    // escape 가 깨져 hook 이 payload 파싱에 실패해요(Windows CI 빨강 원인).
+    serde_json::json!({"tool_input": {"file_path": fixture(rel)}}).to_string()
 }
 
 #[test]
