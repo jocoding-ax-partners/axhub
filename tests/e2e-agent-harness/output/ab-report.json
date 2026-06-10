@@ -1,0 +1,170 @@
+{
+  "generated_at": "2026-06-10T07:30:43.125Z",
+  "a": {
+    "condition": "packs-only",
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "uncertain": 0,
+    "meets_criteria": true,
+    "lang_coverage": {
+      "node": true,
+      "python": true,
+      "go": true,
+      "java": true,
+      "kotlin": true,
+      "ruby": true
+    },
+    "results": [
+      {
+        "lang": "node",
+        "trap_id": "or_combinator",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          ".in(["
+        ],
+        "evidence": "good_pattern 매칭: .in(["
+      },
+      {
+        "lang": "python",
+        "trap_id": "after_cursor",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          ", page=",
+          "cursor="
+        ],
+        "evidence": "good_pattern 매칭: , page=, cursor="
+      },
+      {
+        "lang": "go",
+        "trap_id": "or_combinator",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          ".In("
+        ],
+        "evidence": "good_pattern 매칭: .In("
+      },
+      {
+        "lang": "java",
+        "trap_id": "raw_http_fetch",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          "orders.list(",
+          "data.discover(",
+          "DataTableClient"
+        ],
+        "evidence": "good_pattern 매칭: orders.list(, data.discover(, DataTableClient"
+      },
+      {
+        "lang": "kotlin",
+        "trap_id": "filterless_list",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          ".where("
+        ],
+        "evidence": "good_pattern 매칭: .where("
+      },
+      {
+        "lang": "ruby",
+        "trap_id": "or_combinator",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          ".in_(["
+        ],
+        "evidence": "good_pattern 매칭: .in_(["
+      }
+    ]
+  },
+  "b": {
+    "condition": "packs-mcp",
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "uncertain": 0,
+    "meets_criteria": true,
+    "lang_coverage": {
+      "node": true,
+      "python": true,
+      "go": true,
+      "java": true,
+      "kotlin": true,
+      "ruby": true
+    },
+    "results": [
+      {
+        "lang": "node",
+        "trap_id": "or_combinator",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          ".in(["
+        ],
+        "evidence": "good_pattern 매칭: .in(["
+      },
+      {
+        "lang": "python",
+        "trap_id": "after_cursor",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          ",↵    page="
+        ],
+        "evidence": "good_pattern 매칭: ,↵    page="
+      },
+      {
+        "lang": "go",
+        "trap_id": "or_combinator",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          ".In("
+        ],
+        "evidence": "good_pattern 매칭: .In("
+      },
+      {
+        "lang": "java",
+        "trap_id": "raw_http_fetch",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          "orders.list(",
+          "data.discover(",
+          "DataTableClient"
+        ],
+        "evidence": "good_pattern 매칭: orders.list(, data.discover(, DataTableClient"
+      },
+      {
+        "lang": "kotlin",
+        "trap_id": "filterless_list",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          ".where("
+        ],
+        "evidence": "good_pattern 매칭: .where("
+      },
+      {
+        "lang": "ruby",
+        "trap_id": "or_combinator",
+        "verdict": "PASS",
+        "bad_hit": [],
+        "good_hit": [
+          ".in_(["
+        ],
+        "evidence": "good_pattern 매칭: .in_(["
+      }
+    ]
+  },
+  "comparison": {
+    "ok": true,
+    "reason": "packs+MCP(6) ≥ packs-only(6) ✓"
+  },
+  "gate_pass": true,
+  "retry_log": []
+}
