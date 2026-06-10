@@ -16,7 +16,7 @@ use axhub_helpers::list_deployments::{
 };
 use axhub_helpers::migrate_plan::{build_migrate_plan, run_migrate_plan};
 use axhub_helpers::onboarding_detect;
-use axhub_helpers::preflight::{run_preflight, PreflightRun};
+use axhub_helpers::preflight::{run_preflight, CliState, PreflightRun};
 use axhub_helpers::quality_gate::{validate_deploy_prep_quality, QualityCheckResult};
 use axhub_helpers::redact::redact;
 use axhub_helpers::resolve::run_resolve;
@@ -1955,8 +1955,24 @@ fn format_preflight_context(preflight: &PreflightRun) -> String {
         ));
         "check for an axhub plugin update before release-sensitive commands."
     } else if !preflight.output.cli_present {
-        observed.push("axhub CLI not found on PATH.".to_string());
-        "install axhub CLI before axhub commands."
+        if preflight.output.cli_state == CliState::BinOverrideInvalid.as_str() {
+            // Dead AXHUB_BIN override: the env var is the failure, not the
+            // install, so an install suggestion would contradict the
+            // `auth status: failed (axhub_bin_invalid)` line below. In this
+            // state cli_resolved_path carries the dead override value.
+            match preflight.output.cli_resolved_path.as_deref() {
+                Some(path) => observed.push(format!(
+                    "AXHUB_BIN env var points at {path} which cannot be spawned."
+                )),
+                None => observed.push(
+                    "AXHUB_BIN env var points at a path which cannot be spawned.".to_string(),
+                ),
+            }
+            "unset AXHUB_BIN (or fix it) and retry in a new session instead of reinstalling axhub CLI."
+        } else {
+            observed.push("axhub CLI not found on PATH.".to_string());
+            "install axhub CLI before axhub commands."
+        }
     } else if !preflight.output.cli_on_path {
         observed.push(format!(
             "axhub CLI v{cli_version} found on disk but not on PATH."
@@ -6502,6 +6518,76 @@ pub(crate) fn cmd_diagnose_hitl(
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn preflight_run_cli_absent(cli_state: &str, cli_resolved_path: Option<&str>) -> PreflightRun {
+        PreflightRun {
+            output: axhub_helpers::preflight::PreflightOutput {
+                cli_version: None,
+                in_range: false,
+                cli_too_old: false,
+                cli_too_new: false,
+                cli_present: false,
+                cli_state: cli_state.to_string(),
+                cli_on_path: false,
+                cli_resolved_path: cli_resolved_path.map(str::to_string),
+                auth_ok: false,
+                auth_error_code: Some(cli_state.to_string()),
+                scopes: vec![],
+                profile: None,
+                endpoint: None,
+                user_email: None,
+                expires_at: None,
+                expires_human: None,
+                current_app: None,
+                current_team_id: None,
+                current_env: None,
+                last_deploy_id: None,
+                last_deploy_status: None,
+                helper_version_expected: None,
+                helper_version_ok: true,
+                plugin_version: "0.0.0-test".to_string(),
+            },
+            exit_code: 64,
+        }
+    }
+
+    #[test]
+    fn preflight_context_routes_bin_override_invalid_to_env_fix_not_install() {
+        // Dead AXHUB_BIN override → env-fix guidance naming the dead path,
+        // never the contradictory install suggestion.
+        let ctx = format_preflight_context(&preflight_run_cli_absent(
+            "axhub_bin_invalid",
+            Some("/definitely-not-axhub"),
+        ));
+        assert!(
+            ctx.contains(
+                "AXHUB_BIN env var points at /definitely-not-axhub which cannot be spawned."
+            ),
+            "{ctx}"
+        );
+        assert!(ctx.contains("unset AXHUB_BIN"), "{ctx}");
+        assert!(!ctx.contains("install axhub CLI"), "{ctx}");
+
+        // Fail-safe: no resolved path recorded → still env guidance, path elided.
+        let no_path =
+            format_preflight_context(&preflight_run_cli_absent("axhub_bin_invalid", None));
+        assert!(
+            no_path.contains("AXHUB_BIN env var points at a path which cannot be spawned."),
+            "{no_path}"
+        );
+        assert!(!no_path.contains("install axhub CLI"), "{no_path}");
+
+        // Genuinely missing CLI (no override) keeps the install guidance.
+        let missing = format_preflight_context(&preflight_run_cli_absent("not_found", None));
+        assert!(
+            missing.contains("axhub CLI not found on PATH."),
+            "{missing}"
+        );
+        assert!(
+            missing.contains("install axhub CLI before axhub commands."),
+            "{missing}"
+        );
+    }
 
     #[test]
     fn access_url_from_apps_get_reads_flat_and_enveloped() {
