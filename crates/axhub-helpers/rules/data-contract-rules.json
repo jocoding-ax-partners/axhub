@@ -1,0 +1,168 @@
+[
+  {
+    "id": "where-required-non-owner-scoped-list",
+    "rule_kind": "where_required",
+    "applies_lang": [
+      "go",
+      "java",
+      "kotlin",
+      "node",
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "\\.list\\s*\\((?![^)]*\\bwhere\\b)",
+    "derived_from": "COMMON_DATA_CONTRACT§list/count",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    },
+    "advisory_only": true,
+    "advisory_reason": "owner_column is runtime information — owner-scoped tables legitimately accept filterless list; static analysis cannot distinguish."
+  },
+  {
+    "id": "where-required-non-owner-scoped-count",
+    "rule_kind": "where_required",
+    "applies_lang": [
+      "go",
+      "java",
+      "kotlin",
+      "node",
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "\\.count\\s*\\((?![^)]*\\bwhere\\b)",
+    "derived_from": "COMMON_DATA_CONTRACT§list/count",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    },
+    "advisory_only": true,
+    "advisory_reason": "owner_column is runtime information — owner-scoped tables legitimately accept filterless count; static analysis cannot distinguish."
+  },
+  {
+    "id": "or-combinator-not-pushable",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "go",
+      "java",
+      "kotlin",
+      "node",
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "\\bor\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "not-combinator-not-pushable",
+    "rule_kind": "forbidden_call",
+    "applies_lang": [
+      "go",
+      "java",
+      "kotlin",
+      "node",
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "\\bnot\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§pushable-filter",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "cursor-keyset-after-before-forbidden",
+    "rule_kind": "cursor",
+    "applies_lang": [
+      "go",
+      "java",
+      "kotlin",
+      "node",
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "\\bafter\\s*[:=]|\\bbefore\\s*[:=]",
+    "derived_from": "COMMON_DATA_CONTRACT§pagination",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "table-columns-must-exist-boundary",
+    "rule_kind": "boundary",
+    "applies_lang": [
+      "go",
+      "java",
+      "kotlin",
+      "node",
+      "python",
+      "ruby"
+    ],
+    "pattern_hint": "\\.insert(?:Many)?\\s*\\(|\\.insert_many\\s*\\(",
+    "derived_from": "COMMON_DATA_CONTRACT§table-existence",
+    "source": {
+      "pack_section": "§6",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    },
+    "advisory_only": true,
+    "advisory_reason": "Static analysis cannot verify that referenced tables/columns exist in the live schema — this is a runtime boundary, not a static pattern."
+  },
+  {
+    "id": "oauth-token-must-be-form-urlencoded",
+    "rule_kind": "pushable_filter",
+    "applies_lang": [
+      "*"
+    ],
+    "pattern_hint": "POST\\s+/oauth/token",
+    "derived_from": "oauth-token-form-urlencoded",
+    "source": {
+      "pack_section": "§5",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "oauth-revoke-must-be-form-urlencoded",
+    "rule_kind": "pushable_filter",
+    "applies_lang": [
+      "*"
+    ],
+    "pattern_hint": "POST\\s+/oauth/revoke",
+    "derived_from": "oauth-revoke-form-urlencoded",
+    "source": {
+      "pack_section": "§5",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "email-domains-must-use-api-v1-prefix",
+    "rule_kind": "boundary",
+    "applies_lang": [
+      "*"
+    ],
+    "pattern_hint": "/tenants/[^/]+/email-domains(?!\\s*/api/v1)",
+    "derived_from": "email-domains-api-v1-prefix",
+    "source": {
+      "pack_section": "§5",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  },
+  {
+    "id": "public-invite-links-must-use-api-v1-prefix",
+    "rule_kind": "boundary",
+    "applies_lang": [
+      "*"
+    ],
+    "pattern_hint": "(?<!/api/v1)/invite-links/",
+    "derived_from": "public-invite-links-api-v1-prefix",
+    "source": {
+      "pack_section": "§5",
+      "lock_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558"
+    }
+  }
+]

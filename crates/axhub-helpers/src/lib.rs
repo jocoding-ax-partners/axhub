@@ -1,4 +1,8 @@
 pub mod atomic_jsonl;
+/// Track H — 정적 AST 패턴 validator (feature "ast"). vendored data-contract 룰을
+/// tree-sitter 마스킹 + regex 로 검사해요. 배포/런타임 검증인 `verify*` 와 별개예요.
+#[cfg(feature = "ast")]
+pub mod ast_validate;
 pub mod autowire;
 pub mod axhub_cli;
 pub mod cli_drift;

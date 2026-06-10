@@ -67,6 +67,17 @@ enum Commands {
         sub: DiagnoseSub,
     },
 
+    /// 정적 AST 패턴 검사 (Track H, 신규). 편집된 사용자 코드를 tree-sitter 로 파싱해
+    /// SDK 데이터/HTTP 계약 위반(or()/not() 비-pushable 필터, after:/before: 커서,
+    /// /api/v1 prefix 누락 등)을 정적으로 검출해요. exit 0=클린/advisory, 1=block
+    /// 위반, 파싱 실패는 exit 0+경고(fail-open).
+    ///
+    /// 의미 분리(혼동 금지): `validate` = **정적 AST 패턴**(편집 코드 계약 검사).
+    /// `verify`/`verify-deploy-artifact` = **배포·런타임 검증**(배포 산출물·런타임
+    /// 상태). 서로 대체 관계가 아니에요.
+    #[cfg(feature = "ast")]
+    Validate(args::ValidateArgs),
+
     /// 전환기 raw passthrough — legacy dispatch 로 위임. Polish 에서 제거.
     #[command(external_subcommand)]
     Passthrough(Vec<String>),
@@ -265,6 +276,11 @@ fn dispatch(command: Commands) -> i32 {
                 run_result(crate::cmd_diagnose_hitl(h.session, h.prompts, h.output))
             }
         },
+
+        #[cfg(feature = "ast")]
+        Commands::Validate(a) => {
+            run_result(axhub_helpers::ast_validate::run_validate(&a.paths, a.json))
+        }
 
         Commands::Passthrough(tokens) => {
             let Some((cmd, rest)) = tokens.split_first() else {

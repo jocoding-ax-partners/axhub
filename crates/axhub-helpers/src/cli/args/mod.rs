@@ -245,6 +245,20 @@ pub(crate) struct RouteDecisionArgs {
     pub explicit: bool,
 }
 
+/// `validate` flags (Track H, 정적 AST 패턴 검사). 1개 이상의 파일/디렉터리 경로를
+/// 받아 SDK 데이터/HTTP 계약 위반을 tree-sitter 로 검출해요. exit 0=클린/advisory,
+/// 1=block 위반, 파싱 실패는 exit 0+경고(fail-open). 배포·런타임 검증인 `verify`
+/// 계열과 의미가 달라요. classify=Normal.
+#[cfg(feature = "ast")]
+#[derive(clap::Args, Debug)]
+pub(crate) struct ValidateArgs {
+    /// 검사할 파일 또는 디렉터리 경로 (1개 이상)
+    #[arg(required = true, value_name = "PATHS")]
+    pub paths: Vec<String>,
+    #[arg(long)]
+    pub json: bool,
+}
+
 /// `diagnose hitl` flags (nested). session/prompts 필수·TTY 검증은 handler. classify=Normal.
 #[derive(clap::Args, Debug)]
 pub(crate) struct DiagnoseHitlArgs {
