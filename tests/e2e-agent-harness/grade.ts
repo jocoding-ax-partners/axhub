@@ -162,6 +162,17 @@ export function extractCodeBlocks(text: string): string {
   return blocks.length > 0 ? blocks.join("\n") : text;
 }
 
+/**
+ * 코드에서 주석 줄을 제거해요 (# // -- * 로 시작하는 줄).
+ * 주석 안에 bad pattern 을 설명 목적으로 인용한 경우 false-negative 방지.
+ */
+export function stripCommentLines(code: string): string {
+  return code
+    .split("\n")
+    .filter((line) => !/^\s*(#|\/\/|--|\/\*)/.test(line))
+    .join("\n");
+}
+
 // ── 채점 로직 ─────────────────────────────────────────────────────────────────
 export function grade(lang: string, outputText: string): GradeResult {
   const rule = TRAP_RULES.find((r) => r.lang === lang);
@@ -176,8 +187,8 @@ export function grade(lang: string, outputText: string): GradeResult {
     };
   }
 
-  // 코드 블록 내부만 스캔 — 설명·주의문에서의 false-negative 방지
-  const scanText = extractCodeBlocks(outputText);
+  // 코드 블록 내부만 스캔, 주석 줄 제거 — 설명·주의문·인라인 주석 false-negative 방지
+  const scanText = stripCommentLines(extractCodeBlocks(outputText));
 
   const bad_hit: string[] = [];
   for (const pat of rule.bad_patterns) {
@@ -422,6 +433,12 @@ function runSmokeGrade() {
       {
         lang: "ruby",
         text: "result = products.list(where: where('category').in_(%w[electronics appliances]))",
+        expect: "PASS",
+      },
+      // python: 코드 블록 내 주석에 after= 언급, 실제 코드는 page= → PASS
+      {
+        lang: "python",
+        text: "```python\n# after=prev_cursor → LegacyCursorError (사용 금지)\npage2 = logs.list(where=where('id').gte(0), page=2, page_size=50)\n```",
         expect: "PASS",
       },
     ];
