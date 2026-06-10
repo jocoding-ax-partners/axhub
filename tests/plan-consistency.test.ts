@@ -28,16 +28,22 @@ describe("Phase 1 PLAN reconciliation", () => {
     expect(milestones).not.toContain("v0.2 (M7) entered");
   });
 
-  test("active scope permanently excludes plugin server work", () => {
-    expect(scope).toContain("v0.x 전체에서 영구 제외");
+  // 2026-06-10 ralplan(Track H) 으로 rows 61–64(plugin MCP 제외)이 철회됐어요 —
+  // helpers stdio MCP(mcp-serve) + .mcp.json 도입. 아래 두 테스트는 stale 한
+  // "MCP 영구 제외" prose 를 강제하던 drift-enforcer 였어서, §16.6 supersession
+  // 본문을 §14 scope / §16.2 layout 에 반영하고 assertion 도 현실(도입)로 갱신해요.
+  test("active scope documents the 2026-06-10 MCP re-introduction (rows 61–64 superseded)", () => {
+    expect(scope).toContain("철회");
     expect(scope).toContain(".mcp.json");
-    expect(scope).toContain("MCP tool naming");
+    expect(scope).toContain("mcp-serve");
+    // backend 데이터 op 를 MCP 로 우회하는 것은 여전히 제외 — CLI 경유 유지.
+    expect(scope).toContain("backend 호출은 항상");
   });
 
-  test("repository layout documents absence of plugin server placeholder", () => {
-    expect(layout).toContain("(no .mcp.json)");
-    expect(layout).toContain("plugin MCP server placeholder canceled");
-    expect(layout).not.toContain("mcp-serve");
+  test("repository layout documents the .mcp.json install (rows 61–64 superseded)", () => {
+    expect(layout).toContain(".mcp.json");
+    expect(layout).toContain("mcp-serve");
+    expect(layout).not.toContain("(no .mcp.json)");
   });
 
   test("repository layout mirrors current Rust helper primary implementation, not stale Go scaffolding", () => {
