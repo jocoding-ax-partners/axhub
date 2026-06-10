@@ -526,7 +526,18 @@ pub fn migrate_intent_present(prompt: &str) -> bool {
     let p = lower.as_str();
 
     if deploy_create_intent_present(p)
-        && !contains_any_text(p, &["기존", "이미 만든", "가져", "옮", "migrate", "import"])
+        && !contains_any_text(
+            p,
+            &[
+                "기존",
+                "이미 만든",
+                "가져",
+                "옮",
+                "마이그레",
+                "migrate",
+                "import",
+            ],
+        )
     {
         return false;
     }
@@ -557,6 +568,7 @@ pub fn migrate_intent_present(prompt: &str) -> bool {
             "기존 프로젝트",
             "이미 만든 앱",
             "이미 만든 프로젝트",
+            "마이그레",
             "migrate",
             "migration",
             "import existing",
@@ -2259,6 +2271,10 @@ mod tests {
             "migrate this repo",
             "import existing app",
             "bring this app into axhub",
+            // 한글 외래어 "마이그레이션" — "배포" 가 섞여도 deploy 에 안 뺏겨요 (QA Cycle 1 회귀)
+            "이 Rails 앱을 axhub로 마이그레이션해서 배포하고 싶어",
+            "이 앱 axhub로 마이그레이션해줘",
+            "프로젝트 마이그레이션하고 배포해줘",
         ] {
             assert!(
                 migrate_intent_present(prompt),
