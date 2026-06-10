@@ -227,7 +227,10 @@ ${pack}`;
     return `${base}
 
 Additionally, you have access to the \`sdk_search\` MCP tool to query the AxHub SDK knowledge index.
-Call it to verify patterns before generating code when uncertain.`;
+MANDATORY: before writing ANY data-layer code, call \`sdk_search\` at least once with the operation
+you are about to implement (e.g. "list filter combinator", "pagination cursor", "raw http data endpoint")
+and align your code with the returned contract. Do not skip this step even if you feel certain —
+confident-but-wrong answers are exactly the failure this step exists to catch.`;
   }
   return base;
 }
