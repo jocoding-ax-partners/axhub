@@ -89,7 +89,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    fallback 분기: `axhub-helpers` 도 `axhub` 도 없으면 `cli_missing`. helper 가 없/오래됐지만 `axhub` 는 되면 `helper_outdated` 예요 (보통 plugin 이 binary+skill 을 함께 배포해서 안 생겨요). `first_gap=helper_outdated` 면 install-cli 로 가지 말고 "플러그인·도구가 오래된 것 같아요. `/plugin update` 후 새 세션에서 다시 시도해 주세요" 라고 안내하고 멈춰요. 출력 JSON 주요 field:
 
    - `first_gap` / `gaps`: 처리할 첫 gap (아래 state machine 순서). 이걸 그대로 따라요.
-   - `cli_present` / `cli_version` / `cli_state` / `cli_on_path` / `cli_too_old` / `has_update` / `latest_version`
+   - `cli_present` / `cli_version` / `cli_state` / `cli_on_path` / `cli_resolved_path` / `cli_too_old` / `has_update` / `latest_version`
    - `auth_ok` / `auth_error_code`
    - `git_present` / `git_repo` / `git_commit` / `node_present` / `node_version` / `node_required` / `node_mismatch` / `manifest_present` / `lockfile_present` / `deps_missing` / `dir_empty`
    - `github`: `{state, installed_logins[], uninstalled_logins[], install_url, multiple_installed}`. `state` 는 `installed` / `mixed` / `uninstalled` / `empty` / `auth_error` / `unavailable` 중 하나예요. **`install_url` 은 GitHub 조회가 성공하면 (`installed`/`mixed`/`uninstalled`/`empty`) 설치 여부·계정 수와 무관하게 항상 채워져요** (계정이 0개여도 app-level 링크로 fallback) — ready card(Step 10)와 GitHub 안내(Step 6)에서 무조건 보여줘요. `state` 가 `auth_error`/`unavailable` 면 null 이고, `auth_error` 면 `unknown` 으로 넘기지 말고 "다시 로그인해줘" 로 안내해요.
@@ -150,7 +150,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
    | gap id | 감지 조건 (Step 2 JSON) | 처리 owner | 완료 확인 |
    |--------|-----------|------------|-----------|
-   | `cli_missing` | `cli_present=false` (또는 DETECT_JSON 비어 fallback) | `install-cli` | 재감지 시 `cli_present=true` |
+   | `cli_missing` | `cli_present=false` (`cli_state≠axhub_bin_invalid`, 또는 DETECT_JSON 비어 fallback) | `install-cli` | 재감지 시 `cli_present=true` |
    | `cli_env_invalid` | `cli_present=false` + `cli_state=axhub_bin_invalid` (`cli_resolved_path` 가 잘못된 `AXHUB_BIN` 경로) | onboarding | `unset AXHUB_BIN` 또는 경로 수정 후 재감지 시 `cli_present=true` |
    | `cli_path_missing` | `cli_present=true` + `cli_on_path=false` (`cli_state=on_disk_not_on_path`) | `repair` | repair-path 적용 후 새 터미널 또는 resolved path 로 재확인 |
    | `cli_old` | `cli_too_old=true` 또는 `has_update=true` (`latest_version` 참고) | `update` | cosign apply 후 version 재확인 |
@@ -165,7 +165,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    | `deploy_unverified` | `deploy_checked=true` + `deploy_verified=false` | onboarding/status/deploy | live/running/deployed 확인 |
    | `doctor_gap` | (helper 범위 밖) 온보딩 끝 doctor 핵심 체크 fail | `doctor` | doctor 핵심 green 또는 PATH reload 안내 |
 
-   `cli_env_invalid` 면 install-cli 로 가지 말아요. `AXHUB_BIN` 환경변수가 spawn 할 수 없는 경로 (`cli_resolved_path` 값) 를 가리키는 상태라서, 재설치해도 해결되지 않아요. 사용자에게 해당 경로를 보여주고 `unset AXHUB_BIN` (셸 프로필에 export 가 있으면 그 줄 제거) 후 새 세션에서 다시 시도하라고 안내하고 멈춰요.
+   `cli_env_invalid` 면 install-cli 로 가지 말아요. `AXHUB_BIN` 환경변수가 spawn 할 수 없는 경로 (`cli_resolved_path` 값) 를 가리키는 상태라서, 재설치해도 해결되지 않아요. 사용자에게 해당 경로를 보여주고 `unset AXHUB_BIN` (셸 프로필에 export 가 있으면 그 줄 제거) 하거나 올바른 CLI 경로로 수정한 후 새 세션에서 다시 시도하라고 안내하고 READY_WITH_USER_ACTION 으로 멈춰요.
 
 4. **CLI 버전 gap (`cli_old`).**
 
