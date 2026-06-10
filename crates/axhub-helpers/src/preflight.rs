@@ -390,6 +390,9 @@ pub struct PreflightOutput {
     /// repaired.
     #[serde(default = "default_cli_on_path")]
     pub cli_on_path: bool,
+    /// Resolved absolute path of the healthy CLI binary. When `cli_state` is
+    /// `axhub_bin_invalid`, this instead carries the dead `AXHUB_BIN` override
+    /// value so SKILLs can show exactly which path the env var points at.
     #[serde(default)]
     pub cli_resolved_path: Option<String>,
     pub auth_ok: bool,

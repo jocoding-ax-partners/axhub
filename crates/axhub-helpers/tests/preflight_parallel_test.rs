@@ -111,6 +111,10 @@ fn parallel_happy_path_merges_all_four_probes() {
 #[test]
 fn parallel_cli_absent_overrides_auth_to_cli_not_found() {
     let _guard = lock_parallel_env();
+    // A non-bare AXHUB_BIN exported in the developer shell would make
+    // apply_bin_override_state() remap NotFound to axhub_bin_invalid and break
+    // the cli_not_found assertion below — isolate the env var for this test.
+    let _bin_guard = EnvVarGuard::remove("AXHUB_BIN");
     std::env::remove_var("AXHUB_PREFLIGHT_PARALLEL");
     let run = run_preflight_with_runner(cli_absent_runner);
     // exit code reflects the cli_present=false / in_range=false branch.
