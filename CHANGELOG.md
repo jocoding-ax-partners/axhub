@@ -4,6 +4,22 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.10.0](///compare/v0.9.46...v0.10.0) (2026-06-10)
+
+MD(SKILL + vendored packs) 가 혼자 짊어지던 SDK 마이그레이션 품질을 2트랙으로 보강해요. **Track H** 는 axhub-helpers 에 tree-sitter 를 내장해 정적 계약 validator(or()/not()·after: 커서·raw HTTP 직타·use-client 경계 등 6언어), PostToolUse hook(warn-only·fail-open), site-scan, stdio MCP 서버를 추가하고, 룰은 손으로 쓰지 않고 distiller 가 pin 에서 emit 한 data-contract-rules 에서만 로드해요. **Track M** 은 ax-mcp 에 `sdk_search` lexical 인덱스 tool(임베디드 corpus, 무네트워크, suite replay CI 게이트)을 더하고, packs·tool·하니스 프롬프트를 "데이터 코드 작성 전 sdk_search 1회 필수 조회 + raw HTTP 요청은 거절하고 SDK 로 구현" 정책으로 강화했어요. 함께 들어온 e2e-agent-harness 가 6언어 함정으로 에이전트 행동을 라이브 채점해요.
+
+**검증**: CE 리뷰 13건(O(n²) hook 8.1s→0.32s, .mcp.json 사용자 설정 파괴, stale 죽은 코드, 함정 정답 누출 등) 전수 반영. helpers cargo 496+ pass·clippy clean, ax-mcp 51 pass(suite replay 134/134), A/B v4 6/6=6/6 게이트 통과 + sdk_search 실호출 0→1회 입증. MSRV 1.83→1.88(rmcp 의존 트리 강제).
+
+**정직한 한계**: 지금까지 검증은 함정 task 기반이고, 진짜 기존 앱(Express+Prisma 등)을 통째 변환하는 풀 브라운필드 리허설은 아직 안 돌렸어요. remote MCP 기본값은 현행 prod(mcp.axhub.ai)로, 차기 canonical(mcp.jocodingax.ai)은 TLS 활성화 후 교체 예정이에요.
+
+
+### Added
+
+* align migrate contract and sdk detection ([#187](undefined/undefined/undefined/issues/187)) 5c5da5f, closes #3 #2 #6 #7 #8 #1 #5 #4
+* helpers AST validator + hook + site-scan + stdio MCP (Track H) ([#202](undefined/undefined/undefined/issues/202)) cddaa65, closes #198
+* SDK data 변환 (data_patch_plan execute, auth advisory) — PR-2 ([#198](undefined/undefined/undefined/issues/198)) 229335f
+* SDK 변환 gate 강화 — deliberate pin + installed-check + full-body drift (PR-1) ([#197](undefined/undefined/undefined/issues/197)) 1493f26, closes #198
+
 ## [0.9.46](///compare/v0.9.45...v0.9.46) (2026-06-09)
 
 GitHub App 이 어떤 GitHub 계정에도 설치되지 않은 상태에서 앱을 만들려 하면 bootstrap 이 repo 생성에서 조용히 막혀 사용자가 멈춘 줄 알던 문제를 고쳤어요. OAuth device flow 는 GitHub 사용자 인증(토큰)만 해주고, App 설치(저장소 접근 권한 부여)는 GitHub 웹 UI 에서 사람이 직접 눌러야 하는 별도 1회 단계라 device flow 가 대신 처리하지 못했어요. 그래서 init·onboarding·github 세 스킬이 미설치(`uninstalled`/`empty`)를 감지하면 install_url 을 먼저 보여주고, 설치·연결이 재조회로 확인될 때까지 진행을 막아요. 이미 어딘가 설치된 경우(`installed`/`mixed`)는 막지 않고 install_url 을 다른 org 추가용으로 계속 노출하고 owner 선택 흐름을 유지해요. 단, accounts 조회가 타임아웃(`unavailable`)이거나 인증이 만료(`auth_error`)된 일시적 상태는 helper 의 gap 계약대로 막지 않고 그대로 진행하거나 재로그인으로 안내해서, CLI 일시 문제로 앱 생성이 막히는 회귀를 피했어요.
