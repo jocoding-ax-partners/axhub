@@ -337,17 +337,18 @@ pub struct ValidateOutput {
 }
 
 /// 룰 종류별 해요체 메시지. advisory 무필터 list/count 는 plan 이 못박은 문구를
-/// 그대로 써요 — **migrate-data-verify 위임 문구는 절대 넣지 않아요**(PR 스택
-/// 미머지 fallback).
+/// 그대로 써요. advisory 는 `migrate-data-verify` 런타임 검증 안내를 포함해요 —
+/// PR #198 스택 머지로 같은 바이너리 dispatch 가 항상 존재해서 기계 분기 없이
+/// 무조건 안내해요 (rules/PROVENANCE.md follow-up 완료분).
 fn rule_message(rule: &CompiledRule) -> String {
     if rule.advisory_only {
         return match rule.rule_kind.as_str() {
             "where_required" => {
-                "owner-scoped 테이블이면 정당해요. 런타임 스키마(owner_column) 확인을 권장해요."
+                "owner-scoped 테이블이면 정당해요. 런타임 스키마(owner_column) 확인을 권장해요 — `axhub-helpers migrate-data-verify` 로 검증해요."
                     .to_string()
             }
             _ => format!(
-                "정적으로 판정할 수 없는 경계예요({}). 런타임 스키마 확인을 권장해요.",
+                "정적으로 판정할 수 없는 경계예요({}). 런타임 스키마 확인을 권장해요 — `axhub-helpers migrate-data-verify` 로 검증해요.",
                 rule.id
             ),
         };
@@ -1117,10 +1118,11 @@ export function f() {
         );
     }
 
-    /// AC10 잠금 (fallback 강등 분기): PR #198 스택 미머지 환경에서 advisory 메시지는
-    /// migrate-data-verify 위임 문구 없이 권고("권장")만 방출해야 해요.
+    /// AC10 잠금 (위임 활성화): PR #198 스택 머지 후 advisory 메시지는 권고("권장")와
+    /// 함께 `migrate-data-verify` 런타임 검증 안내를 포함해야 해요. 안내 대상이 같은
+    /// 바이너리 dispatch 라 기계 분기 없이 무조건 포함해요 (rules/PROVENANCE.md).
     #[test]
-    fn advisory_messages_recommend_without_delegation() {
+    fn advisory_messages_delegate_to_migrate_data_verify() {
         let r = rules();
         // (a) 전 advisory 룰의 rule_message 출력.
         let mut messages: Vec<String> = r
@@ -1144,12 +1146,8 @@ export function f() {
         }
         for msg in &messages {
             assert!(
-                !msg.contains("migrate-data-verify"),
-                "위임 문구 금지(미머지 fallback): {msg}"
-            );
-            assert!(
-                !msg.contains("위임"),
-                "위임 문구 금지(미머지 fallback): {msg}"
+                msg.contains("migrate-data-verify"),
+                "위임 문구 필수(스택 머지 후 활성화): {msg}"
             );
             assert!(msg.contains("권장"), "권고 문구('권장') 필수: {msg}");
         }
