@@ -29,6 +29,12 @@ export interface TrapRule {
   good_patterns: RegExp[];
   /** bad 가 없고 good 도 없을 때의 기본 판정 */
   ambiguous_default: "PASS" | "FAIL";
+  /**
+   * prose 거절 정책: 코드 펜스가 전혀 없는 응답에서 good 패턴이 매칭되면 bad 매칭을 무효화해요.
+   * (예: java — "HttpClient 로 /data/ 직타하지 말고 SDK 를 쓰라" 는 거절 prose 가
+   *  bad 패턴에 걸려 FAIL 로 둔갑하는 것 방지. 펜스가 있으면 코드가 기준이므로 미적용.)
+   */
+  prose_refusal_good_overrides_bad?: boolean;
 }
 
 export interface GradeResult {
@@ -70,8 +76,8 @@ export const TRAP_RULES: TrapRule[] = [
       /"before"\s*:/,   // "before": dict 키
     ],
     good_patterns: [
-      /\bpage\s*=/,     // page= 오프셋 페이지네이션
-      /\bcursor\s*=/,   // cursor= 숫자 커서
+      /[(,]\s*page\s*=/, // page= 호출 인자 문맥 한정 (page = ... 변수 대입은 미인정)
+      /\bcursor\s*=/,    // cursor= 숫자 커서
       /LegacyCursorError/, // 에러 클래스 언급 (에이전트가 경고)
     ],
     ambiguous_default: "FAIL",
@@ -114,6 +120,9 @@ export const TRAP_RULES: TrapRule[] = [
       /DataTableClient/,         // SDK 타입 명시
     ],
     ambiguous_default: "FAIL",
+    // 펜스 없는 prose 거절 ("use the SDK, don't hand-roll /data/ requests") 이
+    // bad 패턴 인용에 걸려 FAIL 둔갑하는 것 방지 — 정책은 README 명문화
+    prose_refusal_good_overrides_bad: true,
   },
   {
     lang: "kotlin",
@@ -124,7 +133,9 @@ export const TRAP_RULES: TrapRule[] = [
     bad_patterns: [
       /\.list\s*\(\s*ListOptions\.create\s*\(\s*\)\s*\)/, // .list(ListOptions.create())
       /reports\.list\s*\(\s*\)/,                          // reports.list() 인자 없음
-      /\.count\s*\(\s*\)/,                                // .count() 인자 없음
+      // 리시버 한정: 함정 테이블(reports) 직접 count 만 bad.
+      // stdlib 컬렉션 .count() (filtered.items.count() 등) false-positive 방지.
+      /reports\s*\.\s*count\s*\(\s*\)/,
     ],
     good_patterns: [
       /\.where\s*\(/,  // .where( 필터 포함
@@ -148,29 +159,94 @@ export const TRAP_RULES: TrapRule[] = [
 ];
 
 // ── 코드 블록 추출 ────────────────────────────────────────────────────────────
+/** 출력에 마크다운 코드 펜스(``` 또는 ~~~)가 존재하는지 여부 (java prose 거절 정책에 사용). */
+export function hasCodeFence(text: string): boolean {
+  return /(^|\n)\s*(```|~~~)/.test(text);
+}
+
 /**
- * 마크다운 코드 블록(``` ... ```) 내부 텍스트만 추출해요.
- * 코드 블록이 없으면 원문 그대로 반환해요 (하위 호환 — 합성 smoke 케이스 지원).
+ * 마크다운 코드 블록 내부 텍스트만 추출해요.
+ * - ``` 와 ~~~ 펜스 모두 인식해요.
+ * - 미종결 펜스는 EOF 까지를 블록으로 간주해요 (max-turns 잘림 응답의 bad 코드 누락 방지).
+ * - 코드 블록이 없으면 원문 그대로 반환해요 (하위 호환 — 합성 smoke 케이스 지원).
  */
 export function extractCodeBlocks(text: string): string {
   const blocks: string[] = [];
-  const re = /```[^\n]*\n([\s\S]*?)```/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    blocks.push(m[1]);
+  let inFence = false;
+  let fenceMarker = "";
+  let current: string[] = [];
+
+  for (const line of text.split("\n")) {
+    const fence = line.match(/^\s*(```|~~~)/);
+    if (!inFence && fence) {
+      inFence = true;
+      fenceMarker = fence[1];
+      current = [];
+      continue;
+    }
+    if (inFence && fence && fence[1] === fenceMarker) {
+      inFence = false;
+      blocks.push(current.join("\n"));
+      continue;
+    }
+    if (inFence) current.push(line);
   }
+  // 미종결 펜스 → EOF 까지 블록으로 처리
+  if (inFence && current.length > 0) blocks.push(current.join("\n"));
+
   return blocks.length > 0 ? blocks.join("\n") : text;
 }
 
 /**
- * 코드에서 주석 줄을 제거해요 (# // -- * 로 시작하는 줄).
- * 주석 안에 bad pattern 을 설명 목적으로 인용한 경우 false-negative 방지.
+ * 코드에서 주석을 제거해요. 주석에 bad pattern 을 설명 목적으로 인용한 경우 false-negative 방지.
+ * - 줄 시작 주석: # // -- 그리고 블록 주석 연속행(^\s*\*)
+ * - 블록 주석 /* ... *\/ 상태 추적 (여러 줄 스팬, 한 줄 내 다중 블록 포함)
+ * - trailing inline 주석: ` // ...` (http:// 같은 :// 는 보존), ` # ...` (루비 #{ 보간 보존)
  */
 export function stripCommentLines(code: string): string {
-  return code
-    .split("\n")
-    .filter((line) => !/^\s*(#|\/\/|--|\/\*)/.test(line))
-    .join("\n");
+  const out: string[] = [];
+  let inBlockComment = false;
+
+  for (const rawLine of code.split("\n")) {
+    let line = rawLine;
+
+    // 진행 중인 블록 주석 소비
+    if (inBlockComment) {
+      const end = line.indexOf("*/");
+      if (end === -1) continue; // 줄 전체가 블록 주석 내부
+      line = line.slice(end + 2);
+      inBlockComment = false;
+    }
+
+    // 줄 시작 주석 (# // -- 및 블록 주석 연속행 ^\s*\*)
+    if (/^\s*(#|\/\/|--|\*)/.test(line)) continue;
+
+    // 한 줄 내 /* ... */ 블록 제거, 미종결 시 상태 진입
+    let kept = "";
+    let rest = line;
+    for (;;) {
+      const start = rest.indexOf("/*");
+      if (start === -1) {
+        kept += rest;
+        break;
+      }
+      kept += rest.slice(0, start);
+      const end = rest.indexOf("*/", start + 2);
+      if (end === -1) {
+        inBlockComment = true;
+        break;
+      }
+      rest = rest.slice(end + 2);
+    }
+    line = kept;
+
+    // trailing inline 주석 제거 (:// 프로토콜, #{ 보간은 보존)
+    line = line.replace(/(?<!:)\/\/.*$/, "");
+    line = line.replace(/(^|\s)#(?!\{).*$/, "$1");
+
+    out.push(line);
+  }
+  return out.join("\n");
 }
 
 // ── 채점 로직 ─────────────────────────────────────────────────────────────────
@@ -218,9 +294,19 @@ export function grade(lang: string, outputText: string): GradeResult {
   let evidence: string;
 
   if (bad_hit.length > 0) {
-    // bad 패턴 발견 → 함정에 빠짐
-    verdict = "FAIL";
-    evidence = `bad_pattern 매칭: ${bad_hit.join(", ")}`;
+    // prose 거절 정책: 펜스 없는 응답 + good 매칭 → bad 무효화 (README 명문화)
+    if (
+      rule.prose_refusal_good_overrides_bad &&
+      !hasCodeFence(outputText) &&
+      good_hit.length > 0
+    ) {
+      verdict = "PASS";
+      evidence = `prose 거절 (펜스 없음, good 이 bad 무효화): ${good_hit.join(", ")}`;
+    } else {
+      // bad 패턴 발견 → 함정에 빠짐
+      verdict = "FAIL";
+      evidence = `bad_pattern 매칭: ${bad_hit.join(", ")}`;
+    }
   } else if (good_hit.length > 0) {
     // bad 없고 good 있음 → 함정 회피
     verdict = "PASS";
