@@ -404,29 +404,42 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 
    stage artifact 저장은 helper command 로 고정해요. 서브 에이전트 결과를 바로 prose 로 흘려버리지 말고 아래처럼 저장해요.
 
+   stage agent 산출물(markdown)은 `"$RUN_DIR/drafts/<stage>.md"` 에 먼저 저장하고, `stages/` 기록은 아래 helper 호출로만 해요. helper 는 `stages/` 내부 경로를 `--markdown-file` 로 받으면 거부하고, stage 별 고정 파일(`01-discover.md`…`05-reviewer.md`)을 멱등하게 overwrite 해요 — 같은 stage 를 다시 기록하면 meta 의 revision 이 올라가고 파일은 늘지 않아요.
+
+   ```bash
+   RUN_DIR="$(dirname "$RUN_JSON")"
+   DRAFTS_DIR="$RUN_DIR/drafts"
+   mkdir -p "$DRAFTS_DIR"
+   ```
+
+   critic/reviewer 는 `--verdict` 가 필수예요. verdict 값은 agent 산출물의 verdict 에서 추출해요 (`approve|lgtm|iterate|block|request_changes|comment`). discover/planner/architect 는 verdict 가 옵션이라 붙이지 않아요.
+
    ```bash
    "$HELPER" migrate-stage-write \
      --run-json "$RUN_JSON" \
      --stage planner \
-     --markdown-file "$PLANNER_MD" \
+     --markdown-file "$DRAFTS_DIR/planner.md" \
      --json
 
    "$HELPER" migrate-stage-write \
      --run-json "$RUN_JSON" \
      --stage architect \
-     --markdown-file "$ARCHITECT_MD" \
+     --markdown-file "$DRAFTS_DIR/architect.md" \
      --json
 
    "$HELPER" migrate-stage-write \
      --run-json "$RUN_JSON" \
      --stage critic \
-     --markdown-file "$CRITIC_MD" \
+     --markdown-file "$DRAFTS_DIR/critic.md" \
+     --verdict "$CRITIC_VERDICT" \
+     --summary "critic verdict: $CRITIC_VERDICT" \
      --json
 
    "$HELPER" migrate-stage-write \
      --run-json "$RUN_JSON" \
      --stage reviewer \
-     --markdown-file "$REVIEWER_MD" \
+     --markdown-file "$DRAFTS_DIR/reviewer.md" \
+     --verdict "$REVIEWER_VERDICT" \
      --run-state pending_approval \
      --approval-state pending_approval \
      --json
@@ -438,7 +451,7 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
    "$HELPER" migrate-stage-write \
      --run-json "$RUN_JSON" \
      --stage adr \
-     --markdown-file "$ADR_MD" \
+     --markdown-file "$DRAFTS_DIR/adr.md" \
      --json
    ```
 
@@ -472,12 +485,12 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
    fi
    ```
 
-   critic verdict 가 `iterate`/`block` 이면 reviewer 로 가지 않고 planner revision → architect → critic 을 다시 돌아요 (helper 가 순서를 강제해요). iterate 가 2회를 넘으면 자동 반복을 멈추고 미해소 항목을 사용자에게 에스컬레이션해요. reviewer verdict 가 `request_changes` 면 해소 후 reviewer 를 다시 기록해야 seal 이 돼요.
+   critic verdict 가 `approve`/`lgtm` 이 아니면(= `iterate`/`block`/`request_changes`/`comment`) reviewer 로 가지 않고 planner revision → architect → critic 을 다시 돌아요 (helper 가 critic verdict 기록 없이는 reviewer 를 거부해요). iterate 가 2회를 넘으면 자동 반복을 멈추고 미해소 항목을 사용자에게 에스컬레이션해요. reviewer verdict 가 `request_changes` 면 해소 후 reviewer 를 다시 기록해야 seal 이 돼요 (helper 가 reviewer verdict 가 `approve`/`lgtm` 이 아니면 seal 을 거부해요).
 
 
 중요한 순서 제약:
 - `planner → architect → critic → reviewer` 는 항상 **직렬** 예요.
-- `critic` 이 block/comment 를 내면 planner 로 되돌아가 revision 후 다시 architect → critic 으로 돌아요.
+- `critic` verdict 가 `approve`/`lgtm` 이 아니면 planner 로 되돌아가 revision 후 다시 architect → critic 으로 돌아요.
 - approval 전에는 `.axhub/spec/apps/<app_key>/latest.json` 을 갱신하지 않아요.
 - planner/architect/critic/reviewer 결과가 안 깨끗하면 mutation 단계로 넘어가지 않아요.
 
@@ -652,6 +665,7 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 - NEVER plan_only hard-stop(`custom_auth`, `secret_exposure`) 범위의 코드 변경을 실행하지 않아요 — auth patch·secret 관련 수정은 포괄 승인("강행" 포함)으로도 풀리지 않고, 계획 문서만 산출해요. 사용자가 해당 파일을 직접 지목한 별도 요청만 migrate 범위 밖 일반 작업으로 다뤄요.
 - NEVER 사용자 repo 에 `git push` / `git push --force` / `git filter-repo` / BFG 같은 원격·히스토리 변경을 실행하지 않아요. secret rotation·history purge 는 명령어 안내문만 제공하고 실행은 사용자 몫이에요. 로컬 patch 전에는 `migrate-guard --checkpoint` 를 먼저 떠요.
 - NEVER GitHub device flow resume 이나 `apps git connect` 같은 명령을 사용자에게 직접 실행하라고 떠넘기지 않아요 — 승인 신호만 받고 에이전트가 직접 마무리해요 (`../github/SKILL.md` 패턴).
+- NEVER `stages/` 아래 파일을 Write/Edit 로 직접 만들거나 고치지 않아요 — stage 기록·수정(redaction 포함)은 `migrate-stage-write` 재호출로만 해요.
 
 ## Additional Resources
 
