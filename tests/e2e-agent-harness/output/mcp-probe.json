@@ -1,20 +1,23 @@
 {
-  "probe": "stream-json 단일 프로브 — B 조건(packs-mcp) MCP 실호출 횟수 계측",
-  "generated_at": "2026-06-10T05:24:36Z",
+  "probe": "stream-json 단일 프로브 — B 조건(packs-mcp) MCP 실호출 횟수 계측 (v3 재측정: frontmatter strip + 대칭 조건)",
+  "generated_at": "2026-06-10T06:45:00Z",
   "condition": "packs-mcp",
-  "lang": "node",
+  "lang": "java",
+  "lang_choice_reason": "v3 재측정에서 유일하게 FAIL 한 언어 — '실패 언어에서 sdk_search 를 호출했는가' 가 핵심 신호라 java 로 프로브",
   "runs": 1,
   "cli_flags": [
     "-p",
     "--output-format stream-json",
     "--verbose",
     "--max-turns 40",
+    "--strict-mcp-config",
     "--mcp-config mcp-config.json",
     "--allowedTools Bash,Read,Write,Edit,Glob,Grep,mcp__axhub-mcp__sdk_search"
   ],
   "mcp_server": {
     "name": "axhub-mcp",
     "url": "http://127.0.0.1:8001/mcp",
+    "binary": "ax-mcp feat/sdk-search @ 94eb936 (release, AXHUB_MCP_DEV_MODE=1)",
     "init_status": "connected",
     "tools_exposed": [
       "mcp__axhub-mcp__catalog_connectors",
@@ -23,8 +26,7 @@
       "mcp__axhub-mcp__data_read",
       "mcp__axhub-mcp__resource_read",
       "mcp__axhub-mcp__sdk_search"
-    ],
-    "server_side_tools_call_log_entries": 0
+    ]
   },
   "tool_use": {
     "total_tool_use_blocks": 0,
@@ -33,20 +35,20 @@
   },
   "run_meta": {
     "num_turns": 1,
-    "duration_ms": 12095,
-    "total_cost_usd": 0.25945,
+    "duration_ms": 14219,
+    "total_cost_usd": 0.24777,
     "is_error": false,
     "subtype": "success"
   },
   "response_quality": {
-    "trap_id": "or_combinator",
-    "verdict": "PASS",
-    "evidence": "or() 비푸시 결합자 회피 — `.in(['paid', 'pending'])` 사용, or() 시 ValidationError 라고 명시"
+    "trap_id": "raw_http_fetch",
+    "verdict": "FAIL",
+    "evidence": "프로브 런도 B 풀런과 동일하게 raw HttpClient + /data/ 직타 코드 생성 — sdk_search 0회, 1턴 종결"
   },
-  "zero_call_reason_estimate": "팩 본문에 or_combinator 함정 해답이 이미 문서화돼 있고 시스템 프롬프트가 'when uncertain' 일 때만 sdk_search 호출하라고 지시해서, 에이전트가 불확실성 없이 1턴 만에 팩 지식만으로 정답을 생성했어요.",
+  "zero_call_reason_estimate": "시스템 프롬프트가 'when uncertain' 일 때만 sdk_search 호출을 지시하는데, 에이전트가 raw HTTP 요청 태스크를 불확실성 없이 수행 가능하다고 판단해 팩/사전지식만으로 1턴에 코드를 생성했어요. 함정 회피 실패와 툴 미호출이 같은 원인(확신) 에서 나와요.",
   "caveats": [
-    "이 프로브는 게이트 재판정이 아니에요 — A/B v2 게이트는 이미 PASS, 본 결과는 증거 보강용이에요.",
-    "claude CLI 가 사용자 전역 설정의 다른 MCP 서버들(plugin/gitnexus 등)도 init 에 함께 로드했지만, allowedTools 제한으로 호출 가능 MCP tool 은 mcp__axhub-mcp__sdk_search 뿐이었어요.",
-    "기존 B 조건 풀런(--output-format text)과 동일한 시스템 프롬프트/태스크/플래그를 재사용했고, 출력 포맷만 stream-json 으로 바꿨어요."
+    "이 프로브는 게이트 재판정이 아니에요 — v3 게이트는 5/6=5/6 으로 PASS, 본 결과는 증거 보강용이에요.",
+    "--strict-mcp-config 로 전역 MCP 서버는 차단됐고 axhub-mcp 만 로드됐어요.",
+    "B 조건 풀런과 동일한 시스템 프롬프트(output/packs-mcp/java/system.txt)/태스크(frontmatter strip)/플래그를 재사용했고, 출력 포맷만 stream-json 이에요."
   ]
 }
