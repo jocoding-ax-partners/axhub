@@ -39,6 +39,9 @@ const RULES_JSON: &str = include_str!("../rules/data-contract-rules.json");
 const MAX_SCAN_DEPTH: usize = 12;
 const MAX_SCAN_FILES: usize = 5_000;
 const MAX_SOURCE_FILE_BYTES: u64 = 1024 * 1024;
+/// 파일당 위반 cap — dense 파일(수만 match)에서 출력 폭주/지연을 막아요.
+/// cap 도달 시 나머지 match 는 버려요(이미 충분한 신호).
+const MAX_VIOLATIONS_PER_FILE: usize = 500;
 const SKIP_DIRS: [&str; 7] = [
     "node_modules",
     ".git",
@@ -240,22 +243,52 @@ pub(crate) fn build_masks(source: &str, grammar: Grammar) -> Option<(String, Str
     Some((masked_no_comments, masked_code_only))
 }
 
-/// byte offset → (1-base line, 1-base column). column 은 문자 단위예요.
-pub(crate) fn line_col(source: &str, offset: usize) -> (usize, usize) {
-    let mut line = 1usize;
-    let mut col = 1usize;
-    for (idx, ch) in source.char_indices() {
-        if idx >= offset {
-            break;
+/// 파일당 1회 생성하는 개행 byte-offset 인덱스. match 마다 소스 처음부터 재스캔하던
+/// O(n²) line_col 을 binary_search O(log n)으로 바꿔요(dense 파일 회귀 수정).
+/// site_scan 의 line_col/snippet 도 같은 인덱스를 재사용해요(엔진 한 벌).
+pub(crate) struct LineIndex {
+    /// 각 줄의 시작 byte offset — `line_starts[0] == 0`, 이후 `\n` 다음 byte.
+    line_starts: Vec<usize>,
+}
+
+impl LineIndex {
+    pub(crate) fn new(source: &str) -> Self {
+        let mut line_starts = vec![0usize];
+        for (idx, b) in source.bytes().enumerate() {
+            if b == b'\n' {
+                line_starts.push(idx + 1);
+            }
         }
-        if ch == '\n' {
-            line += 1;
-            col = 1;
-        } else {
-            col += 1;
+        Self { line_starts }
+    }
+
+    /// offset 이 속한 줄의 0-base 인덱스.
+    fn line_idx(&self, offset: usize) -> usize {
+        match self.line_starts.binary_search(&offset) {
+            Ok(i) => i,
+            Err(i) => i - 1, // line_starts[0]==0 이라 i>=1 보장
         }
     }
-    (line, col)
+
+    /// byte offset → (1-base line, 1-base column). column 은 문자 단위예요.
+    pub(crate) fn line_col(&self, source: &str, offset: usize) -> (usize, usize) {
+        let offset = offset.min(source.len());
+        let idx = self.line_idx(offset);
+        let col = source[self.line_starts[idx]..offset].chars().count() + 1;
+        (idx + 1, col)
+    }
+
+    /// offset 이 속한 줄의 `[시작, 끝)` byte 범위 — 끝은 개행 직전(없으면 EOF).
+    pub(crate) fn line_span(&self, source: &str, offset: usize) -> (usize, usize) {
+        let offset = offset.min(source.len());
+        let idx = self.line_idx(offset);
+        let start = self.line_starts[idx];
+        let end = self
+            .line_starts
+            .get(idx + 1)
+            .map_or(source.len(), |next| next - 1);
+        (start, end)
+    }
 }
 
 // ──────────────────────────── 위반/출력 모델 ────────────────────────────
@@ -334,9 +367,10 @@ pub(crate) fn scan_source(
 ) -> Result<Vec<Violation>> {
     let (masked_no_comments, masked_code_only) = build_masks(source, grammar)
         .ok_or_else(|| anyhow::anyhow!("tree-sitter parse 실패"))?;
+    let line_index = LineIndex::new(source);
 
     let mut violations = Vec::new();
-    for rule in rules {
+    'rules: for rule in rules {
         if !rule.applies_to(lang_key) {
             continue;
         }
@@ -346,8 +380,11 @@ pub(crate) fn scan_source(
             &masked_code_only
         };
         for m in rule.regex.find_iter(haystack) {
+            if violations.len() >= MAX_VIOLATIONS_PER_FILE {
+                break 'rules;
+            }
             let Ok(mat) = m else { continue }; // regex 런타임 에러는 스킵(fail-open)
-            let (line, column) = line_col(source, mat.start());
+            let (line, column) = line_index.line_col(source, mat.start());
             violations.push(Violation {
                 file: file.to_string(),
                 line,
@@ -847,6 +884,36 @@ export function f() {
     fn fixtures_ruby() {
         assert_bad("ruby/bad.rb", Grammar::Ruby, "ruby");
         assert_good("ruby/good.rb", Grammar::Ruby, "ruby");
+    }
+
+    /// O(n²) 회귀 잠금: 250KB dense 파일(or() 2.8만개)도 1초 미만이어야 해요.
+    /// 수정 전 line_col 은 match 마다 파일 처음부터 재스캔(O(n²)) — 리뷰 실측
+    /// 4.67s(250KB), 같은 워크로드 release 재현 8.10s(440KB/5만 match) → 수정 후
+    /// 0.32s. LineIndex(개행 offset 인덱스 + binary_search) + 파일당 cap 500 잠금.
+    #[test]
+    fn dense_file_scan_under_one_second() {
+        let r = rules();
+        // `q.or(x);\n` 9 bytes × 28_000 = ~250KB, or( match 2.8만개.
+        let mut src = String::with_capacity(28_000 * 9 + 16);
+        for _ in 0..28_000 {
+            src.push_str("q.or(x);\n");
+        }
+        let started = std::time::Instant::now();
+        let v = scan_source(&src, Grammar::Typescript, "node", "<dense>", &r).unwrap();
+        let elapsed = started.elapsed();
+        assert!(
+            v.iter().any(|x| x.rule_id == "or-combinator-not-pushable-node"),
+            "dense or() 위반이 검출돼야 해요"
+        );
+        assert!(
+            v.len() <= 500,
+            "파일당 위반 cap 500, got {}",
+            v.len()
+        );
+        assert!(
+            elapsed < std::time::Duration::from_secs(1),
+            "250KB+ dense 스캔은 1초 미만이어야 해요 (실측 {elapsed:?})"
+        );
     }
 
     /// AC10 잠금 (fallback 강등 분기): PR #198 스택 미머지 환경에서 advisory 메시지는

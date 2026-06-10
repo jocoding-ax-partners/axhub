@@ -14,7 +14,10 @@ use anyhow::Result;
 use fancy_regex::Regex;
 use serde::Serialize;
 
-use crate::ast_validate::{build_masks, collect_target_files, detect_lang, line_col, Grammar};
+use crate::ast_validate::{build_masks, collect_target_files, detect_lang, Grammar, LineIndex};
+
+/// 파일당 site cap — ast_validate 의 위반 cap 과 같은 이유(dense 파일 폭주 방지).
+const MAX_SITES_PER_FILE: usize = 500;
 
 /// site-scan 휴리스틱 룰(하드코딩 — distiller 계약이 아니라 migration 탐지용).
 struct SiteRule {
@@ -92,14 +95,11 @@ pub struct ScanSitesOutput {
     pub parse_failures: Vec<ScanParseFailure>,
 }
 
-/// offset 이 속한 줄의 텍스트(trim)를 잘라 snippet 으로 써요.
-fn snippet_at(source: &str, offset: usize) -> String {
-    let start = source[..offset.min(source.len())]
-        .rfind('\n')
-        .map_or(0, |i| i + 1);
-    let end = source[start..]
-        .find('\n')
-        .map_or(source.len(), |i| start + i);
+/// offset 이 속한 줄의 텍스트(trim)를 잘라 snippet 으로 써요. 줄 경계는
+/// `LineIndex`(파일당 1회 생성)에서 가져와요 — match 마다 rfind/find 로 재스캔하던
+/// O(n²) 경로 제거.
+fn snippet_at(source: &str, index: &LineIndex, offset: usize) -> String {
+    let (start, end) = index.line_span(source, offset);
     source[start..end].trim().to_string()
 }
 
@@ -112,8 +112,9 @@ fn scan_source_sites(
     rules: &[CompiledSiteRule],
 ) -> Option<Vec<Site>> {
     let (masked_no_comments, masked_code_only) = build_masks(source, grammar)?;
+    let line_index = LineIndex::new(source);
     let mut sites = Vec::new();
-    for rule in rules {
+    'rules: for rule in rules {
         if !applies(rule.langs, lang_key) {
             continue;
         }
@@ -123,13 +124,16 @@ fn scan_source_sites(
             &masked_code_only
         };
         for m in rule.regex.find_iter(haystack) {
+            if sites.len() >= MAX_SITES_PER_FILE {
+                break 'rules;
+            }
             let Ok(mat) = m else { continue };
-            let (line, _col) = line_col(source, mat.start());
+            let (line, _col) = line_index.line_col(source, mat.start());
             sites.push(Site {
                 file: file.to_string(),
                 line,
                 kind: rule.kind.to_string(),
-                snippet: snippet_at(source, mat.start()),
+                snippet: snippet_at(source, &line_index, mat.start()),
             });
         }
     }
