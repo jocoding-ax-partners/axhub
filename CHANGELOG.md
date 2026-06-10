@@ -4,6 +4,34 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.10.1](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.0...v0.10.1) (2026-06-10)
+
+migrate 를 실제 기존 앱(Rails/Kamal)에 첫 드라이런하며 드러난 플로우 결함을 두 갈래로 닫았어요. **하드닝(#205)** — stage 산출물이 dir-scan ordinal 과 에이전트의 `stages/` 직접 Write 충돌로 10개까지 중복 생성되고, critic ITERATE·reviewer REQUEST_CHANGES 를 무시한 채 `migrate-approve` 없이 mutation 이 실행되고, plan_only hard-stop 인데 auth patch·force-push 까지 진행되고, discoverer 가 token prefix 를 평문 기록하던 문제를 4계층으로 막아요: helper hard gate(stage 별 고정 ordinal 멱등 overwrite + `drafts/` 격리 + `--verdict` 순서·seal 게이트 + write 직전 redact backstop·Slack 패턴), SKILL 계약(migrate-approve 필수, plan_only 불가침, push/히스토리 재작성 금지, GitHub device-flow·installation gate 를 github SKILL 패턴으로 위임 — "승인했어" 신호 후 에이전트가 `--resume-last` 직접 수행), stage agent 5종 secret 값 기록 금지 rule, contract test 7건. **배선 갭 마감(#204)** — Track H 가 만들어 둔 scan-sites·mcp-install 이 migrate SKILL 에 연결되지 않았던 것을 §2.6 변환 준비(비차단 mcp-install + expert dispatch 전 scan-sites site 목록)·§2.7 재사용으로 잇고, advisory 의 `migrate-data-verify` 위임 fallback 을 해제했어요.
+
+### Test baseline
+
+- cargo `-p axhub-helpers`: lib 559 pass(신규 게이트·redact 테스트 +11), cli_e2e 110 pass / 1 pre-existing fail(prompt-route 버전 알림 — main 동일 재현).
+- `bun test`: 1580 pass / 2 pre-existing fail(prompt-route 계열 — base 동일 재현), `migrate-skill-contract` 20 pass(+7, NEVER 삭제 시 red 검증).
+- `skill:doctor --strict` / `lint:tone --strict` 0 err / `lint:keywords --check` no diff / `bunx tsc --noEmit` green.
+- `release:check` 5 cross-arch 바이너리 빌드 + 버전 assert green (0.10.1).
+
+### Honest tradeoff
+
+- mutation 레벨(`axhub apps create` 등 외부 CLI)은 helper 가 가로채지 못해 SKILL 문구 + contract test 가 최대 방어예요 — hard gate 는 stage 기록·seal 레벨까지만 닿아요.
+- 자유 텍스트 hex prefix 는 regex 로 못 막아요 — agent rule 이 1차 방어고 redact backstop 은 알려진 포맷(Slack token/webhook·GH·AWS·OpenAI·Bearer·private key)만 잡아요.
+- stage 고정 ordinal 은 새 run 부터 적용돼요 — incremental ordinal 로 만든 과거 run 의 이어쓰기는 미지원이라 새 run 시작을 안내해요.
+
+### Fixed
+
+* migrate workflow 배선 갭 3건 마감 (scan-sites·mcp-install·advisory 위임) ([#204](https://github.com/jocoding-ax-partners/axhub/issues/204)) ([8fac76e](https://github.com/jocoding-ax-partners/axhub/commit/8fac76e97f2c2750c62cba9cc14e66a07eae1865))
+* migrate 플로우 하드닝 — stage 중복 생성·게이트 우회·GitHub UX·secret 노출 차단 ([#205](https://github.com/jocoding-ax-partners/axhub/issues/205)) ([4f82692](https://github.com/jocoding-ax-partners/axhub/commit/4f82692f0066dfa5c52cfa777fca6626984e225a))
+
+
+### Docs
+
+* PLAN plugin schema 스니펫 버전을 0.10.0 으로 동기화 ([392d847](https://github.com/jocoding-ax-partners/axhub/commit/392d847ff0c8127d553481857d1cdf1c1879f2aa))
+* README 상태 라인을 v0.10.0 으로 동기화 ([fec5d11](https://github.com/jocoding-ax-partners/axhub/commit/fec5d11371ca345f96ff13b4c94ab0cdb895848f))
+
 ## [0.10.0](///compare/v0.9.46...v0.10.0) (2026-06-10)
 
 MD(SKILL + vendored packs) 가 혼자 짊어지던 SDK 마이그레이션 품질을 2트랙으로 보강해요. **Track H** 는 axhub-helpers 에 tree-sitter 를 내장해 정적 계약 validator(or()/not()·after: 커서·raw HTTP 직타·use-client 경계 등 6언어), PostToolUse hook(warn-only·fail-open), site-scan, stdio MCP 서버를 추가하고, 룰은 손으로 쓰지 않고 distiller 가 pin 에서 emit 한 data-contract-rules 에서만 로드해요. **Track M** 은 ax-mcp 에 `sdk_search` lexical 인덱스 tool(임베디드 corpus, 무네트워크, suite replay CI 게이트)을 더하고, packs·tool·하니스 프롬프트를 "데이터 코드 작성 전 sdk_search 1회 필수 조회 + raw HTTP 요청은 거절하고 SDK 로 구현" 정책으로 강화했어요. 함께 들어온 e2e-agent-harness 가 6언어 함정으로 에이전트 행동을 라이브 채점해요.
