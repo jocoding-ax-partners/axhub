@@ -69,7 +69,8 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요:
 │                 → 전부 bin/axhub-helpers 서브커맨드로 위임 (fail-open) │
 │   skills/       32개 SKILL.md — 자연어 트리거 워크플로우              │
 │   commands/     9개 슬래시 (+ 한글 alias)                            │
-│   agents/       3개 quality sub-agent                                │
+│   agents/       8개 agent md (3 quality + 5 migrate planning)       │
+
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │ Bash tool 호출
                                 ▼
@@ -118,7 +119,8 @@ axhub/
 │   └── marketplace.json     # 마켓플레이스 등록 엔트리 — Claude Code 가 이걸로 플러그인 발견
 ├── skills/<name>/SKILL.md    # 32개 NL 트리거 워크플로우 (+ _template 스캐폴드 원본)
 ├── commands/*.md             # 9개 슬래시 명령 (deploy/배포/login/status/logs/apps/doctor/update/help)
-├── agents/*.md               # 3개 quality sub-agent (axhub-debugger/reviewer/shipper)
+├── agents/*.md               # 8개 agent md (quality 3 + migrate planning 5)
+
 ├── hooks/
 │   ├── hooks.json            # 모든 hook 이벤트 → 명령 매핑 (단일 등록 파일)
 │   ├── session-start.sh/.ps1 # SessionStart 부트스트랩 (binary 자동설치·warmup·token-init)
@@ -459,6 +461,13 @@ env AXHUB_TOKEN (PAT) → $XDG_CONFIG_HOME/axhub-plugin/token (파일) → OS ke
 - `AXHUB.md` — Claude 가 데이터 접근 코드를 짜기 전에 **가장 먼저 읽는** 규칙 문서(인증 모드, SQL 규칙, 응답 처리).
 - `AXHUB_TARGET` — 현재 모드(`web-axhub`/`local-*`). PII 없어서 commit 가능.
 - `catalog.json` — `allowed_columns`·PII 태그·리소스 경로 스냅샷. `tenant_id`/`user_email` 포함이라 **gitignore**.
+- `spec/` — migrate planning 전용. 앱별 승인 target-state spec 과 `latest.json` 포인터를 저장해요. execution 전 approval 이 나기 전에는 `latest.json` 을 갱신하지 않아요.
+- `plan/` — migrate planning 전용. run별 stage artifact, approval, receipt, ADR, latest-run pointer 를 저장해요. 기본 root 는 repo-local 이고, `.axhub-workspace` marker opt-in 이 있을 때만 workspace 공유 root 로 확장해요.
+- migrate planning 승격 규칙: simple high-confidence 는 기존 simple flow, low confidence/모호함은 serial `spec_only`, hard-stop/복잡 조건은 `discover → planner → architect → critic → reviewer` full consensus 예요.
+- full consensus 에서는 `axhub-migrate-planner`/`axhub-migrate-architect`/`axhub-migrate-critic` agent 결과를 `.axhub/plan/runs/<run_id>/stages/*.md` 와 meta 로 남겨요. reviewer stage 는 read-only `axhub-migrate-reviewer` lane 으로 completeness / scope sanity check 를 남겨요. 최종에 `approval.json.state=pending_approval`, `run.json.state=pending_approval` 로 올린 뒤 멈춰요.
+- 승인되면 helper 의 `migrate-approve` 가 `.axhub/spec/apps/<app_key>/latest.json` 을 승격하고 run/approval/spec 상태를 `approved` 로 올려요. approval 전에는 latest pointer 를 만들지 않아요.
+- wave 병렬화는 full consensus 내부의 same-app 독립 unit 에서만 허용해요. planner → architect → critic → reviewer 순서 자체는 직렬이고, write target 충돌·cycle·app_key mismatch·independence proof 부족이면 즉시 serial fallback 이에요.
+- 플러그인 전용 migrate planning agent prompt 는 `agents/axhub-migrate-{discoverer,planner,architect,critic,reviewer}.md` 로 따로 ship 해요. plugin runtime 이 이 md 파일을 직접 읽어도 같은 책임 분리와 출력 형식을 유지하게 해요.
 
 ### 4.8 부가 시스템 (품질·관측·UX)
 

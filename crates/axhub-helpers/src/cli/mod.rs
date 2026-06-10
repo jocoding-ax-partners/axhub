@@ -61,6 +61,9 @@ enum Commands {
     AuditClarify(args::AuditClarifyArgs),
     ListDeployments(args::ListDeploymentsCliArgs),
     MigratePlan(args::MigratePlanArgs),
+    MigrateStageWrite(args::MigrateStageWriteArgs),
+    MigrateWavePlan(args::MigrateWavePlanArgs),
+    MigrateApprove(args::MigrateApproveArgs),
     RoutingStats(args::RoutingStatsArgs),
     Diagnose {
         #[command(subcommand)]
@@ -252,10 +255,97 @@ fn dispatch(command: Commands) -> i32 {
                 argv.push("--app-path".to_string());
                 argv.push(app_path);
             }
+            if a.persist_planning {
+                argv.push("--persist-planning".to_string());
+            }
             if a.json {
                 argv.push("--json".to_string());
             }
             run_result(axhub_helpers::migrate_plan::run_migrate_plan(&argv))
+        }
+        Commands::MigrateStageWrite(a) => {
+            let mut argv = vec![
+                "--run-json".to_string(),
+                a.run_json,
+                "--stage".to_string(),
+                a.stage,
+                "--markdown-file".to_string(),
+                a.markdown_file,
+            ];
+            if let Some(summary) = a.summary {
+                argv.push("--summary".to_string());
+                argv.push(summary);
+            }
+            if let Some(run_state) = a.run_state {
+                argv.push("--run-state".to_string());
+                argv.push(run_state);
+            }
+            if let Some(approval_state) = a.approval_state {
+                argv.push("--approval-state".to_string());
+                argv.push(approval_state);
+            }
+            if a.json {
+                argv.push("--json".to_string());
+            }
+            run_result(axhub_helpers::migrate_planning::run_migrate_stage_write(
+                &argv,
+            ))
+        }
+        Commands::MigrateWavePlan(a) => {
+            let mut argv = vec![
+                "--run-json".to_string(),
+                a.run_json,
+                "--wave-id".to_string(),
+                a.wave_id,
+                "--stage-scope".to_string(),
+                a.stage_scope,
+            ];
+            for participant in a.participants {
+                argv.push("--participant".to_string());
+                argv.push(participant);
+            }
+            for depends_on in a.depends_on {
+                argv.push("--depends-on".to_string());
+                argv.push(depends_on);
+            }
+            for artifact in a.artifacts {
+                argv.push("--artifact".to_string());
+                argv.push(artifact);
+            }
+            for write_target in a.write_targets {
+                argv.push("--write-target".to_string());
+                argv.push(write_target);
+            }
+            for proof in a.independence_proofs {
+                argv.push("--independence-proof".to_string());
+                argv.push(proof);
+            }
+            if let Some(state) = a.state {
+                argv.push("--state".to_string());
+                argv.push(state);
+            }
+            if a.json {
+                argv.push("--json".to_string());
+            }
+            run_result(axhub_helpers::migrate_planning::run_migrate_wave_plan(
+                &argv,
+            ))
+        }
+        Commands::MigrateApprove(a) => {
+            let mut argv = vec![
+                "--run-json".to_string(),
+                a.run_json,
+                "--approved-by".to_string(),
+                a.approved_by,
+            ];
+            if let Some(note) = a.approval_note {
+                argv.push("--approval-note".to_string());
+                argv.push(note);
+            }
+            if a.json {
+                argv.push("--json".to_string());
+            }
+            run_result(axhub_helpers::migrate_planning::run_migrate_approve(&argv))
         }
         Commands::RoutingStats(a) => {
             run_result(crate::cmd_routing_stats(a.since, a.json, a.top, a.confused))

@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { CANONICAL_TENANT_PICKER_INLINE } from "../scripts/tenant-picker-block";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 
 const read = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
+
 
 interface CorpusRow {
   id: string;
@@ -46,12 +47,81 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain('axhub apps detect --owner "$OWNER" --repo-name "$REPO" --ref "$REF" --path "$APP_PATH" --json');
     expect(skill).toContain("remote detect 는 현재 CLI 로만 써요");
     expect(skill).toContain("exit `64` 는 local path");
-    expect(skill).toContain("axhub apps create --from-file axhub.yaml --json");
+    expect(skill).toContain("`axhub.yaml` 은 deploy manifest 전용");
+    expect(skill).toContain('axhub apps create --name "$APP_NAME" --slug "$APP_SLUG" --deploy-method "$DEPLOY_METHOD" --json');
+    expect(skill).toContain("axhub apps create --from-file app-create.json --json");
+    expect(skill).not.toContain("axhub apps create --from-file axhub.yaml --json");
     // 메뉴 fence (CLI boundary contract) 이므로 --tenant 는 inline cache 치환식으로 thread 해요.
     expect(skill).toContain(`axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --tenant "${CANONICAL_TENANT_PICKER_INLINE}" --execute --json`);
     expect(skill).toContain(`axhub deploy create --app "$APP_ID" --commit "$COMMIT_SHA" --execute --tenant "${CANONICAL_TENANT_PICKER_INLINE}" --json`);
     expect(skill).toContain("raw backend endpoint 를 curl 하지");
     expect(skill).not.toContain("/api/v1/apps/detect");
+  });
+
+  test("separates preview planes and approval actions for sdk conversion vs remote mutation", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    expect(skill).toContain("remote_deploy_detect");
+    expect(skill).toContain("local_sdk_conversion_detect");
+    expect(skill).toContain("sdk_wrapper_generate");
+    expect(skill).toContain("data_patch_plan");
+    expect(skill).toContain("auth_patch_plan");
+    expect(skill).toContain("auth_oauth_client_create");
+    expect(skill).toContain("app_create");
+    expect(skill).toContain("git_connect");
+    expect(skill).toContain("env_set");
+    expect(skill).toContain("deploy_create");
+    expect(skill).toContain("plan/preview-only 로 고정");
+  });
+
+  test("keeps remote mutation behind explicit preview and approval boundaries", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    expect(skill).toContain("require a Korean preview and explicit approval before execution");
+    expect(skill).toContain("helper 로 preview/approval 을 우회하지 않아요");
+    expect(skill).toContain("mutation 은 preview+approval 뒤의 current CLI 명령으로만 진행해요");
+    expect(skill).toContain("action 별로 따로 유지해요");
+    expect(skill).toContain("NEVER 앱 등록·git 연결·배포 approval 을 helper 로 우회하지 않아요");
+  });
+
+  test("documents migrate planning escalation and persistence boundaries", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    expect(skill).toContain("helper 의 confidence 와 `planning` field");
+    expect(skill).toContain("repo-local `.axhub/`");
+    expect(skill).toContain("`.axhub/spec` 은 앱별 승인 target-state planning state");
+    expect(skill).toContain("`.axhub/plan` 은 run별 stage ledger · approval · receipt 저장소");
+    expect(skill).toContain(".axhub-workspace");
+    expect(skill).toContain('shared_planning: true');
+    expect(skill).toContain('"$HELPER" migrate-plan --dir "${AXHUB_MIGRATE_DIR:-.}" --app-path "$APP_PATH" --persist-planning --json');
+    expect(skill).toContain("& $Helper migrate-plan --dir $MigrateDir --app-path $env:APP_PATH --persist-planning --json");
+    expect(skill).toContain("serial `spec_only`");
+    expect(skill).toContain("discover → planner → architect → critic → reviewer");
+    expect(skill).toContain("planner/architect/critic/reviewer 를 자동으로 띄우지 않아요");
+    expect(skill).toContain("`task` tool");
+    expect(skill).toContain("architect 와 critic 은 한 parallel batch 로 묶지 말고");
+    expect(skill).toContain("`axhub-migrate-planner` agent 실행");
+    expect(skill).toContain("`axhub-migrate-architect` agent 실행");
+    expect(skill).toContain("`axhub-migrate-critic` agent 실행");
+    expect(skill).toContain("read-only `axhub-migrate-reviewer` lane");
+    expect(skill).toContain('"$HELPER" migrate-stage-write \\');
+    expect(skill).toContain("--stage planner");
+    expect(skill).toContain("--stage architect");
+    expect(skill).toContain("--stage critic");
+    expect(skill).toContain("--stage reviewer");
+    expect(skill).toContain("--stage adr");
+    expect(skill).toContain('"$HELPER" migrate-approve \\');
+    expect(skill).toContain("--approved-by \"$APPROVER\"");
+    expect(skill).toContain('"$HELPER" migrate-wave-plan \\');
+    expect(skill).toContain("--wave-id reviewer-a");
+    expect(skill).toContain("`.axhub/plan/runs/<run_id>/stages/02-planner.md`");
+    expect(skill).toContain("approval.json.state=pending_approval");
+    expect(skill).toContain("run.json.state=pending_approval");
+    expect(skill).toContain("`.axhub/spec/apps/<app_key>/latest.json`");
+    expect(skill).toContain("이 단계에서만 `.axhub/spec/apps/<app_key>/latest.json` 이 생겨요");
+    expect(skill).toContain("conditional wave 병렬화");
+    expect(skill).toContain("같은 app 안의 독립 unit");
+    expect(skill).toContain("multi-app wave 는 v1 에서 금지");
+    expect(skill).toContain("stage 안쪽 병렬화");
+    expect(skill).toContain("serial fallback");
+    expect(skill).toContain("simple flow 에서는 wave 나 consensus jargon");
   });
 
   test("documents the production detect matrix added after live QA", () => {
@@ -84,6 +154,24 @@ describe("migrate SKILL contract", () => {
     expect(skill).toContain("& $Helper migrate-plan --dir $MigrateDir --app-path $env:APP_PATH --json");
   });
 
+  test("dispatches migrate planning agents by name (axhub-native, no OMC dependency)", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    for (const agent of [
+      "axhub-migrate-discoverer",
+      "axhub-migrate-planner",
+      "axhub-migrate-architect",
+      "axhub-migrate-critic",
+      "axhub-migrate-reviewer",
+    ]) {
+      // each agent file ships AND the SKILL dispatches it by name
+      expect(existsSync(join(REPO_ROOT, "agents", `${agent}.md`))).toBe(true);
+      expect(skill).toContain(agent);
+    }
+    // the planning lanes are now wired — no longer reference-only scaffolds
+    expect(skill).not.toContain("reference scaffold");
+    // and migrate no longer leans on the generic OMC catalog role-agents
+    expect(skill).not.toContain("role-agent");
+  });
   test("corpus.100 routes core existing-app natural language to migrate", () => {
     const rows = parseJsonl("tests/corpus.100.jsonl");
     for (const utterance of requiredUtterances) {
@@ -134,6 +222,37 @@ describe("migrate SKILL contract", () => {
     expect(yamlBlocks.length).toBeGreaterThan(0);
     for (const block of yamlBlocks) {
       expect(() => yaml.parse(block)).not.toThrow();
+    }
+  });
+
+  test("wires SDK conversion experts behind the git-guarded execution stage", () => {
+    const skill = read("skills/migrate/SKILL.md");
+    for (const lang of ["go", "java", "kotlin", "node", "python", "ruby"]) {
+      expect(skill).toContain(`axhub-sdk-${lang}-expert`);
+      expect(existsSync(join(REPO_ROOT, "agents", `axhub-sdk-${lang}-expert.md`))).toBe(true);
+    }
+    // experts load the vendored knowledge pack §1 verbatim
+    expect(skill).toContain("skills/migrate/sdk-knowledge/<lang>.md");
+    // deterministic git guard owns the rollback net
+    expect(skill).toContain('"$HELPER" migrate-guard --dir');
+    expect(skill).toContain("--checkpoint");
+    expect(skill).toContain("checkpoint_ref");
+    expect(skill).toContain("rollback_command");
+    // per-reason hard-stop override (devex-D1=C)
+    expect(skill).toContain("plan_only");
+    expect(skill).toContain("hard_stop_policy");
+    expect(skill).toContain("secret_exposure");
+    expect(skill).toContain("강행할래요");
+  });
+
+  test("ships 6 generated SDK expert agents with valid frontmatter", () => {
+    for (const lang of ["go", "java", "kotlin", "node", "python", "ruby"]) {
+      const agent = read(`agents/axhub-sdk-${lang}-expert.md`);
+      expect(agent).toContain(`name: axhub-sdk-${lang}-expert`);
+      expect(agent).toContain("model: sonnet");
+      expect(agent).toContain("tools: Read, Edit, Write, Bash, Grep, Glob");
+      expect(agent).toContain(`skills/migrate/sdk-knowledge/${lang}.md`);
+      expect(agent).toContain("paraphrase");
     }
   });
 });

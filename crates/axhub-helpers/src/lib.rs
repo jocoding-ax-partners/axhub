@@ -34,6 +34,7 @@ pub mod keychain_windows;
 pub mod list_deployments;
 pub mod messages;
 pub mod migrate_plan;
+pub mod migrate_planning;
 pub mod onboarding_detect;
 pub mod plugin_update;
 pub mod preflight;

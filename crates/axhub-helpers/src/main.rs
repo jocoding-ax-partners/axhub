@@ -46,7 +46,7 @@ use serde_json::{json, Map, Value};
 mod cli;
 
 pub(crate) const HOOK_SCHEMA_VERSION: &str = "v0";
-pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  prompt-route\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  verify-deploy-artifact\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  tenant-resolve [--json]\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
+pub(crate) const USAGE: &str = "axhub-helpers - axhub plugin adapter binary (Rust)\n\nUsage:\n  axhub-helpers <subcommand> [args]\n\nSubcommands:\n  session-start\n  session-eager-gate\n  route-decision [--user-utterance <s>] [--explicit]\n  prompt-route\n  resolve\n  preflight\n  onboarding-detect [--json]\n  classify-exit\n  verify-deploy-artifact\n  redact\n  statusline\n  path <token-file|last-deploy-file|state-dir>\n  token-init [--json]\n  token-import [--json]\n  token-gate\n  post-install --target-name <N> --bin-dir <D> --link-path <P> [--repo-root <R>]\n  list-deployments\n  bootstrap [--json] [--dry-run|--plan-only|--auto-chain|--record <event>|dependency-plan]\n  routing-stats [--since <D>] [--json] [--top <N>] [--confused]\n  cleanup-audit [--all] [--yes]\n  audit-clarify (--hash <H>|--prompt <P>) --chosen <S>\n  routing-dashboard [--html]\n  mark <phase_name>\n  emit-deploy-complete [<exit_code> [<command_class>]]\n  deploy-prep --intent <name> [--user-utterance <s>] [--refresh-in-flight] [--json]\n  scaffold-detect --json\n  scaffold-dev start|status|stop --json\n  init-resume get|put|route|clear --json\n  tenant-resolve [--json]\n  deploy-preview-summary [--user-utterance <s>]\n  deploy-approved-run [--user-utterance <s>]\n  migrate-plan --dir <path> [--app-path <candidate>] [--persist-planning] [--json]\n  migrate-stage-write --run-json <path> --stage <name> --markdown-file <file> [--run-state <state>] [--approval-state <state>] [--json]\n  migrate-wave-plan --run-json <path> --wave-id <id> --stage-scope <stage> [--participant <app_key>]... [--depends-on <wave_id>]... [--artifact <path>]... [--write-target <target>]... [--independence-proof <text>]... [--state <planned|running|complete>] [--json]\n  migrate-approve --run-json <path> --approved-by <name> [--approval-note <text>] [--json]\n  migrate-guard --dir <path> [--checkpoint] [--allow-dirty] [--init-ok] [--label <s>] [--json]\n  migrate-summary [--user-utterance <s>]\n  publish-summary [--user-utterance <s>]\n  env-summary [--user-utterance <s>]\n  open-summary [--user-utterance <s>]\n  config get <key> [--json]\n  config set <key> <value>\n  sync [--target <target>|auto] [--out <dir>] [--json] [--no-detail] [--allow-identity-change]\n  snippet --mode A|B --language <lang> --target <target> --connector <name> --path <path> --sql <sql> --allowed-columns <csv>\n  auth-refresh-bg\n  verify --app-id <id> [--json]\n  trace --deploy-id <id> [--app <app>] [--json]\n  doctor [--json] [--no-cooldown]\n  repair-path [--json] [--dir <path>]\n  settings-merge --apply|--dry-run [--scope user|project|auto] [--json]\n  autowire-statusline --scope user|project [--silent] [--command-path <p>] [--child]\n  orphan-stub --install [--verify] | --verify\n  diagnose hitl --session <loop_id> --prompts <prompts.json> [--output <captured.json>]\n  version [--quiet]\n  help";
 
 /// Force Windows console output codepage to UTF-8 (65001).
 ///
@@ -159,6 +159,7 @@ pub(crate) fn legacy_dispatch(cmd: &str, rest: Vec<String>) -> anyhow::Result<i3
         "deploy-preview-summary" => cmd_deploy_preview_summary(&rest),
         "deploy-approved-run" => cmd_deploy_approved_run(&rest),
         "migrate-plan" => run_migrate_plan(&rest),
+        "migrate-guard" => cmd_migrate_guard(&rest),
         "migrate-summary" => cmd_migrate_summary(&rest),
         "publish-summary" => cmd_publish_summary(&rest),
         "rollback-summary" => cmd_rollback_summary(&rest),
@@ -3197,6 +3198,168 @@ fn extract_email_like(utterance: &str) -> Option<String> {
                 && !part.ends_with('.')
         })
         .map(|part| part.trim_matches('.').to_string())
+}
+
+/// Deterministic git safety guard for SDK conversion (D2 = git-guarded preview-first).
+/// The expert agent writes user source; this guard owns the rollback net so the
+/// LLM never has to. A checkpoint snapshots existing state — it never authors
+/// user source — so it stays within the helper invariant. Fail-open: any failure
+/// returns `ok:false` with no checkpoint, and the SKILL refuses to apply.
+fn cmd_migrate_guard(rest: &[String]) -> anyhow::Result<i32> {
+    use std::process::Command;
+    let mut dir: Option<String> = None;
+    let mut checkpoint = false;
+    let mut allow_dirty = false;
+    let mut init_ok = false;
+    let mut label = "axhub SDK 변환 checkpoint".to_string();
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--dir" => {
+                dir = rest.get(i + 1).cloned();
+                i += 2;
+            }
+            "--checkpoint" => {
+                checkpoint = true;
+                i += 1;
+            }
+            "--allow-dirty" => {
+                allow_dirty = true;
+                i += 1;
+            }
+            "--init-ok" => {
+                init_ok = true;
+                i += 1;
+            }
+            "--label" => {
+                if let Some(value) = rest.get(i + 1) {
+                    label = value.clone();
+                }
+                i += 2;
+            }
+            // --json is implied; tolerate unknown flags (fail-open).
+            _ => i += 1,
+        }
+    }
+    let dir = dir.unwrap_or_else(|| ".".to_string());
+    if !std::path::Path::new(&dir).exists() {
+        out_json(json!({
+            "ok": false, "dir": dir, "mode": "missing_dir", "checkpoint_ref": Value::Null,
+            "message": format!("디렉터리를 찾지 못했어요: {dir}"),
+        }));
+        return Ok(0);
+    }
+
+    let git = |args: &[&str]| -> (bool, String) {
+        match Command::new("git").arg("-C").arg(&dir).args(args).output() {
+            Ok(out) => (
+                out.status.success(),
+                String::from_utf8_lossy(&out.stdout).trim().to_string(),
+            ),
+            Err(_) => (false, String::new()),
+        }
+    };
+    // Commit with a baked identity so checkpoints work even where git user.* is unset.
+    let git_commit = |msg: &str| -> bool {
+        git(&[
+            "-c",
+            "user.email=axhub@local",
+            "-c",
+            "user.name=axhub",
+            "commit",
+            "-m",
+            msg,
+        ])
+        .0
+    };
+
+    let (inside_ok, inside) = git(&["rev-parse", "--is-inside-work-tree"]);
+    let inside_git = inside_ok && inside == "true";
+    let dirty = inside_git && !git(&["status", "--porcelain"]).1.is_empty();
+    let reset_rollback =
+        |sha: &str| format!("git -C {dir} reset --hard {sha} && git -C {dir} clean -fd");
+
+    if !checkpoint {
+        let mode = if !inside_git {
+            "no_git"
+        } else if dirty {
+            "git_dirty"
+        } else {
+            "git_clean"
+        };
+        out_json(json!({
+            "ok": true, "dir": dir, "inside_git": inside_git, "dirty": dirty, "mode": mode,
+            "checkpoint_ref": Value::Null, "rollback_command": Value::Null,
+            "needs_decision": mode != "git_clean",
+            "message": match mode {
+                "git_clean" => "git clean tree — checkpoint 가능해요",
+                "git_dirty" => "변경사항을 commit 후 재시도하거나 --allow-dirty 로 WIP commit 후 진행할래요?",
+                _ => "git repo 가 아니에요 — --init-ok 로 git init + checkpoint 하거나 백업 후 진행할래요?",
+            },
+        }));
+        return Ok(0);
+    }
+
+    if inside_git && !dirty {
+        let sha = git(&["rev-parse", "HEAD"]).1;
+        out_json(json!({
+            "ok": true, "dir": dir, "mode": "git_clean", "checkpoint_ref": sha,
+            "rollback_command": reset_rollback(&sha),
+            "message": "clean tree HEAD 를 checkpoint 로 잡았어요. 변환 후 rollback_command 로 되돌려요.",
+        }));
+        return Ok(0);
+    }
+    if inside_git && dirty {
+        if !allow_dirty {
+            out_json(json!({
+                "ok": false, "dir": dir, "mode": "git_dirty", "needs_decision": true,
+                "checkpoint_ref": Value::Null,
+                "message": "working tree 에 변경사항이 있어요. commit 후 재시도하거나 --allow-dirty 로 WIP commit 후 진행해요.",
+            }));
+            return Ok(0);
+        }
+        if !git(&["add", "-A"]).0 || !git_commit(&format!("{label} (WIP)")) {
+            out_json(json!({
+                "ok": false, "dir": dir, "mode": "git_dirty", "checkpoint_ref": Value::Null,
+                "message": "WIP commit 에 실패했어요. 수동 commit 후 재시도해요.",
+            }));
+            return Ok(0);
+        }
+        let sha = git(&["rev-parse", "HEAD"]).1;
+        out_json(json!({
+            "ok": true, "dir": dir, "mode": "git_dirty_wip", "checkpoint_ref": sha,
+            // clean -fd removes only files created AFTER this checkpoint (the
+            // expert's wrapper); the user's pre-existing changes are already in
+            // the WIP commit, so reset --hard restores them untouched.
+            "rollback_command": reset_rollback(&sha),
+            "message": "기존 변경을 WIP commit 으로 저장하고 checkpoint 로 잡았어요. rollback_command 로 변환을 되돌려요.",
+        }));
+        return Ok(0);
+    }
+
+    // Not a git repo.
+    if !init_ok {
+        out_json(json!({
+            "ok": false, "dir": dir, "mode": "no_git", "needs_decision": true,
+            "checkpoint_ref": Value::Null,
+            "message": "git repo 가 아니에요. --init-ok 로 git init + checkpoint 하거나 touched 파일 백업 후 진행해요.",
+        }));
+        return Ok(0);
+    }
+    if !git(&["init"]).0 || !git(&["add", "-A"]).0 || !git_commit(&label) {
+        out_json(json!({
+            "ok": false, "dir": dir, "mode": "no_git", "checkpoint_ref": Value::Null,
+            "message": "git init/checkpoint 에 실패했어요. 수동 백업 후 진행해요.",
+        }));
+        return Ok(0);
+    }
+    let sha = git(&["rev-parse", "HEAD"]).1;
+    out_json(json!({
+        "ok": true, "dir": dir, "mode": "no_git_init", "checkpoint_ref": sha,
+        "rollback_command": reset_rollback(&sha),
+        "message": "git init 후 첫 commit 을 checkpoint 로 잡았어요. rollback_command 로 변환을 되돌려요.",
+    }));
+    Ok(0)
 }
 
 fn cmd_migrate_summary(rest: &[String]) -> anyhow::Result<i32> {

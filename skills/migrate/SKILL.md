@@ -34,12 +34,14 @@ model: sonnet
 # 로컬 디렉터리 감지: helper migrate-plan/local pre-scan 과 axhub.yaml preview 를 기본으로 써요.
 "$HELPER" migrate-plan --dir "${AXHUB_MIGRATE_DIR:-.}" --json
 
-# 원격 GitHub repo 감지: v0.17.4 CLI read-only surface 만 사용해요.
+# 원격 GitHub repo 감지: CLI read-only surface 만 사용해요. (apps detect 미배포 시 아래 fallback 참고)
 axhub apps detect --repo "$OWNER_REPO" --ref "$REF" --path "$APP_PATH" --json
 axhub apps detect --owner "$OWNER" --repo-name "$REPO" --ref "$REF" --path "$APP_PATH" --json
 
-# 앱 등록. apps create 는 --yes/--execute 없이 직접 mutation 이므로 preview+approval 뒤에만 실행해요.
-axhub apps create --from-file axhub.yaml --json
+# 앱 등록. `axhub.yaml` 은 deploy manifest 전용이라 apps create 입력으로 쓰지 않아요.
+axhub apps create --name "$APP_NAME" --slug "$APP_SLUG" --deploy-method "$DEPLOY_METHOD" --json
+# 또는 별도 JSON app-create DTO 를 준비했으면
+axhub apps create --from-file app-create.json --json
 
 # GitHub 연결 dry-run 검증
 axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --tenant "$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null)" --json
@@ -59,7 +61,7 @@ axhub auth oauth client create --app "$APP_ID" --name web --type confidential --
 axhub deploy create --app "$APP_ID" --commit "$COMMIT_SHA" --execute --tenant "$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null)" --json
 ```
 
-`axhub apps detect` 는 v0.17.4 의 현재 read-only remote 감지 계약이에요. 이 스킬 계약은 아래처럼 나뉘어요.
+`axhub apps detect` 는 v0.17.3 의 read-only remote 감지 계약이에요 — CLI 버전에 따라 미배포 시 `axhub.yaml` 수동 입력 fallback 으로 대체할 수 있어요. 이 스킬 계약은 아래처럼 나뉘어요.
 
 - 로컬 입력은 `AXHUB_MIGRATE_DIR` 또는 현재 디렉터리를 helper `--dir` 로 넘기고, monorepo 하위 앱은 `--app-path` 만 추가해요.
 - 원격 GitHub repo 입력은 `axhub apps detect --repo "$OWNER_REPO"` 또는 `--owner "$OWNER" --repo-name "$REPO"` 를 사용해요. `--ref` 와 `--path` 는 사용자가 준 경우에만 추가하고, raw backend endpoint 로 추측하지 않아요.
@@ -336,9 +338,23 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
    & $Helper migrate-plan --dir $MigrateDir --json
    ```
 
-2. **후보 선택과 confidence 확인.** 후보가 2개 이상이면 앱 하나를 고르게 해요. helper 의 confidence 는 local marker 기반 힌트예요. `0.80` 이상이면 확인 후 진행하고, `0.60..0.79` 는 수정 가능한 계획으로 보여줘요. `0.60` 미만이나 후보 모호함은 진행을 막고 `axhub.yaml` 또는 Dockerfile/compose 를 요청해요.
+2. **후보 선택과 confidence 확인.** 후보가 2개 이상이면 앱 하나를 고르게 해요. helper 의 confidence 와 `planning` field 를 같이 읽어요. 기본은 simple flow 유지예요. `0.80` 이상이고 hard-stop reason 이 없으면 기존 preview-first migrate 로 가요. confidence 가 낮거나 후보 모호함이 남아 있으면 serial `spec_only` planning 으로 승격해요. hard-stop reason 이 있거나 복잡 조건이 보이면 full `discover → planner → architect → critic → reviewer` consensus 로 승격해요.
 
-   로컬 디렉터리는 앱 등록 전에 helper `migrate-plan` 과 manifest preview 를 실행해요. 원격 GitHub repo/ref/path 는 먼저 `axhub apps detect` read-only 결과를 보여줘요. `deploy_method=compose` 이면 compose file 이 start source 라서 `data.start` 누락을 차단하지 않아요. Dockerfile 이 선택되면 Dockerfile 이 start source 라서 추측 start command 를 만들지 않아요. auto/buildpack 계열에서 `data.start` 가 있으면 그 값을 그대로 manifest 후보에 반영하고, 없으면 사용자에게 start command 를 받거나 `manifest만` 으로 멈춰요.
+   planning 이 필요한 경우 영속화 root 는 기본적으로 repo-local `.axhub/` 예요. 이때 `.axhub/spec` 은 앱별 승인 target-state planning state 이고, `.axhub/plan` 은 run별 stage ledger · approval · receipt 저장소예요. 상위 경로에 `.axhub-workspace` marker 가 있고 `shared_planning: true` 면 그 workspace root 의 `.axhub/` 로 확장해요. marker 가 malformed 하거나 unreadable 이면 parent marker 로 넘어가지 말고 repo-local 로 fail-closed 해요.
+
+   다중 후보에서는 먼저 `APP_PATH` 를 고정한 뒤 planning persistence 를 실행해요. simple flow 에서는 wave 나 consensus jargon 을 앞단 UI 에 끌고 오지 않아요.
+
+   ```bash
+   "$HELPER" migrate-plan --dir "${AXHUB_MIGRATE_DIR:-.}" --app-path "$APP_PATH" --persist-planning --json
+   ```
+
+   ```powershell
+   & $Helper migrate-plan --dir $MigrateDir --app-path $env:APP_PATH --persist-planning --json
+   ```
+
+   `spec_only` 는 항상 serial 이고 approval 전에는 `.axhub/spec/apps/<app_key>/latest.json` 을 갱신하지 않아요. full consensus 에서만 같은 app 안의 독립 unit 에 한해 conditional wave 병렬화를 허용해요. multi-app wave 는 v1 에서 금지예요. write target 충돌, dependency cycle, stage order 위반, app_key mismatch, independence proof 부족이 보이면 무조건 serial fallback 으로 내려가요.
+
+   로컬 디렉터리는 앱 등록 전에 helper `migrate-plan` 과 manifest preview 를 실행해요. 원격 GitHub repo/ref/path 는 먼저 `axhub apps detect` read-only 결과를 보여줘요 (설치된 CLI 에 없을 수 있어요 — 미배포 시 `axhub.yaml` 수동 입력으로 진행해요). 이 두 결과를 한 카드에 섞지 말고 `remote_deploy_detect` 와 `local_sdk_conversion_detect` 두 preview plane 으로 분리해요. `deploy_method=compose` 이면 compose file 이 start source 라서 `data.start` 누락을 차단하지 않아요. Dockerfile 이 선택되면 Dockerfile 이 start source 라서 추측 start command 를 만들지 않아요. auto/buildpack 계열에서 `data.start` 가 있으면 그 값을 그대로 manifest 후보에 반영하고, 없으면 사용자에게 start command 를 받거나 `manifest만` 으로 멈춰요.
 
 **Non-interactive AskUserQuestion guard (D1):** 이 SKILL 의 모든 AskUserQuestion 호출은 대화형 모드를 가정해요. `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 인 subprocess (`claude -p`, CI, headless) 에서는 AskUserQuestion 호출을 건너뛰고 안전한 기본값으로 진행해요. 기본값은 `tests/fixtures/ask-defaults/registry.json` 참조 — 질문 별 safe_default.
 
@@ -371,6 +387,145 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
      }]
    }
    ```
+2.3. **planning mode 별 서브 에이전트 실행.** `planning.mode=simple` 이면 서브 에이전트를 띄우지 않고 기존 migrate preview-first 흐름만 유지해요. `planning.mode=spec_only` 이면 helper 가 쓴 `.axhub/spec` / `.axhub/plan` artifact 를 보여주고 **pending approval 에서 멈춰요.** planner/architect/critic/reviewer 를 자동으로 띄우지 않아요.
+
+`planning.mode=full_consensus` 이면 선택된 단일 `app_key` 기준으로 서브 에이전트를 실제로 실행해요. 이때 helper 가 이미 만든 `discover` scaffold 와 `planning_persistence.paths` 를 seed 로 읽고, 아래 순서를 **그대로** 따라요.
+
+- `discover` scaffold 확인 → `axhub-migrate-discoverer` agent 로 누락 evidence 보강
+- `axhub-migrate-planner` agent 실행 → `.axhub/plan/runs/<run_id>/stages/02-planner.md` + meta 저장
+- `axhub-migrate-architect` agent 실행 → `.axhub/plan/runs/<run_id>/stages/03-architect.md` + meta 저장
+- `axhub-migrate-critic` agent 실행 → `.axhub/plan/runs/<run_id>/stages/04-critic.md` + meta 저장
+- `reviewer` stage 는 **read-only `axhub-migrate-reviewer` lane** 으로 completeness / scope sanity check 를 실행하고 `.axhub/plan/runs/<run_id>/stages/05-reviewer.md` + meta 저장
+- 최종 ADR 저장 → `.axhub/plan/runs/<run_id>/adr.md`
+- `approval.json.state=pending_approval`, `run.json.state=pending_approval` 로 올리고 멈춰요
+
+   runtime 에서는 `task` tool 로 axhub 전용 agent 를 명시해요. 즉 discover stage 는 `axhub-migrate-discoverer`, planner stage 는 `axhub-migrate-planner`, architect stage 는 `axhub-migrate-architect`, critic stage 는 `axhub-migrate-critic`, reviewer stage 는 read-only `axhub-migrate-reviewer` lane 이에요. architect 와 critic 은 한 parallel batch 로 묶지 말고 항상 architect 완료 후 critic 을 실행해요. 이 5개 `agents/axhub-migrate-*.md` 는 plugin.json 의 `agents` 자동 등록으로 oh-my-claudecode 같은 외부 plugin 없이 axhub plugin 자체에서 dispatch 돼요.
+
+
+   stage artifact 저장은 helper command 로 고정해요. 서브 에이전트 결과를 바로 prose 로 흘려버리지 말고 아래처럼 저장해요.
+
+   ```bash
+   "$HELPER" migrate-stage-write \
+     --run-json "$RUN_JSON" \
+     --stage planner \
+     --markdown-file "$PLANNER_MD" \
+     --json
+
+   "$HELPER" migrate-stage-write \
+     --run-json "$RUN_JSON" \
+     --stage architect \
+     --markdown-file "$ARCHITECT_MD" \
+     --json
+
+   "$HELPER" migrate-stage-write \
+     --run-json "$RUN_JSON" \
+     --stage critic \
+     --markdown-file "$CRITIC_MD" \
+     --json
+
+   "$HELPER" migrate-stage-write \
+     --run-json "$RUN_JSON" \
+     --stage reviewer \
+     --markdown-file "$REVIEWER_MD" \
+     --run-state pending_approval \
+     --approval-state pending_approval \
+     --json
+   ```
+
+   ADR 도 helper 로 저장해요.
+
+   ```bash
+   "$HELPER" migrate-stage-write \
+     --run-json "$RUN_JSON" \
+     --stage adr \
+     --markdown-file "$ADR_MD" \
+     --json
+   ```
+
+   사용자가 planning 결과를 승인하면 latest pointer 승격도 helper command 로 마무리해요.
+
+   ```bash
+   "$HELPER" migrate-approve \
+     --run-json "$RUN_JSON" \
+     --approved-by "$APPROVER" \
+     --approval-note "approved migrate planning" \
+     --json
+   ```
+
+   이 단계에서만 `.axhub/spec/apps/<app_key>/latest.json` 이 생겨요. 승인 전에는 계속 비어 있어야 해요.
+
+
+중요한 순서 제약:
+- `planner → architect → critic → reviewer` 는 항상 **직렬** 예요.
+- `critic` 이 block/comment 를 내면 planner 로 되돌아가 revision 후 다시 architect → critic 으로 돌아요.
+- approval 전에는 `.axhub/spec/apps/<app_key>/latest.json` 을 갱신하지 않아요.
+- planner/architect/critic/reviewer 결과가 안 깨끗하면 mutation 단계로 넘어가지 않아요.
+
+2.4. **wave 병렬 처리.** 병렬 처리는 full consensus 안에서만 써요. 그것도 `planning.parallelism.enabled=true` 이고 independence proof 가 있을 때만 허용해요. 병렬 wave 는 **같은 app 안의 독립 unit** 만 다뤄요.
+
+허용 예시:
+- discover 단계의 서로 다른 evidence probe
+- reviewer 단계의 서로 다른 completeness / scope sanity check
+- write target 이 분리된 planning 보조 조사 unit
+
+금지 예시:
+- app A 와 app B 를 한 wave 에 넣기
+- planner/architect/critic 순서를 겹치기
+- 같은 `approval.json`, `run.json`, `latest-run.json`, `latest.json`, stage artifact 를 동시에 쓰기
+
+실행 규칙:
+- wave 는 stage 안쪽 병렬화예요. stage 순서를 바꾸는 병렬화가 아니에요.
+- 각 wave participant 는 같은 `app_key` 여야 해요.
+- write target 충돌, dependency cycle, illegal stage order, app_key mismatch, independence proof 부족이면 **즉시 serial fallback** 으로 내려가요.
+- 병렬 wave 결과는 merge 후 하나의 stage artifact 로 정리해요.
+
+   wave 계획도 helper command 로 남겨요. stage 안쪽 분할이 필요할 때만 써요.
+
+   ```bash
+   "$HELPER" migrate-wave-plan \
+     --run-json "$RUN_JSON" \
+     --wave-id reviewer-a \
+     --stage-scope reviewer \
+     --participant "$APP_KEY" \
+     --write-target stages/05-reviewer-a.md \
+     --independence-proof "disjoint evidence set" \
+     --json
+   ```
+
+   이 command 가 write target 충돌이나 cycle 을 보면 wave artifact 를 강행하지 않고 serial fallback 이유를 남겨요.
+
+2.5. **preview plane 분리 + 승인 액션 분리.** `remote_deploy_detect` 는 원격 저장소 기준 build/start/port/health/deploy_method/env preview 예요. `local_sdk_conversion_detect` 는 helper 의 `sdk_conversion` 후보 기준 언어별 wrapper target, dependency hint, data 후보, auth 후보, risk, hard-stop reason preview 예요. 이 둘은 이름과 표기 순서를 고정해서 같이 보여줘요.
+
+   승인 액션은 아래처럼 분리해서 다뤄요. 하나의 “계속” 승인으로 로컬 patch 와 원격 mutation 을 같이 넘기지 않아요.
+   - `sdk_wrapper_generate`: language SDK wrapper 생성 preview/실행
+   - `data_patch_plan`: data 후보 파일 계획만 보여줘요
+   - `auth_patch_plan`: auth 후보 파일 계획만 보여줘요
+   - `auth_oauth_client_create`: OAuth client 생성 preview/실행
+   - `app_create`: 앱 등록 preview/실행
+   - `git_connect`: GitHub 연결 preview/실행
+   - `env_set`: env 저장 preview/실행
+   - `deploy_create`: 배포 시작 preview/실행
+
+   hard-stop 게이팅은 helper 의 `plan_only` 와 `hard_stop_policy` (`{code, message, overridable}`) 를 읽어서 reason 별로 다뤄요.
+   - `plan_only=true` 이면 (secret_exposure · custom_auth · unsupported_language 같은 절대 reason 이 있을 때) `sdk_wrapper_generate`, `data_patch_plan`, `auth_patch_plan` 은 plan/preview-only 로 고정하고 실행 경로를 아예 두지 않아요. git rollback 으로 secret 유출을 되돌릴 수 없으니 "강행" override 도 막아요.
+   - `plan_only=false` 이고 overridable reason (broad_diff · missing_verification · raw_query) 만 있으면 기본은 preview-only 지만, 사용자가 "강행할래요" 를 한 번 더 명시적으로 확인하면 git checkpoint 를 잡은 뒤에만 실행해요.
+   - hard-stop reason 이 없으면 일반 preview → 승인 → 실행 흐름이에요.
+
+   원격 mutation approval 은 helper 가 자동으로 묶지 말고 action 별로 따로 유지해요.
+
+2.6. **SDK 변환 실행 (승인된 `sdk_wrapper_generate`).** 변환은 helper 가 아니라 언어별 expert agent 가 user source 를 써요. 안전망은 helper 가 deterministic 하게 잡아요.
+   - detected language 로 `axhub-sdk-<lang>-expert` 를 `task` tool 로 dispatch 해요 (`axhub-sdk-go-expert`, `axhub-sdk-java-expert`, `axhub-sdk-kotlin-expert`, `axhub-sdk-node-expert`, `axhub-sdk-python-expert`, `axhub-sdk-ruby-expert`). 6개 언어(go/java/kotlin/node/python/ruby) 밖이면 expert 가 없으니 plan-only 로 남기고 알려요.
+   - expert 는 `skills/migrate/sdk-knowledge/<lang>.md` knowledge pack 의 §1 client init 을 그대로 emit 해요. paraphrase 하지 않아요. pack 이 없거나 비면 apply 하지 말고 preview/plan 만 내요.
+   - apply 전에 git guard 를 먼저 잡아요. probe 로 상태를 보고, 필요한 동의를 받은 뒤 checkpoint 를 만들어요.
+
+   ```bash
+   "$HELPER" migrate-guard --dir "${AXHUB_MIGRATE_DIR:-.}" --json
+   # git_dirty 면 --allow-dirty (WIP commit), git repo 가 아니면 --init-ok 동의를 받은 뒤에:
+   "$HELPER" migrate-guard --dir "${AXHUB_MIGRATE_DIR:-.}" --checkpoint --json
+   ```
+
+   - `checkpoint_ref` 가 잡히면 expert 의 unified diff 를 한국어 preview 로 보여주고 승인받은 뒤에만 apply 해요. `needs_decision` 이면 사용자에게 묻고, checkpoint 없이는 apply 하지 않아요.
+   - apply 뒤에는 스캔에서 찾은 검증 명령을 돌려요. 실패하면 guard 가 준 `rollback_command` 를 보여주고 되돌릴지 물어요. 변환은 자동 배포로 이어지지 않아요 — 원격 mutation 은 그대로 CLI gating 이에요.
 
 3. **manifest 초안 준비.** helper 의 `suggested_manifest` 를 `axhub.yaml` 초안으로 보여줘요. 후보를 직접 골랐으면 같은 helper 를 `--app-path "$APP_PATH"` 로 한 번 더 실행해서 선택한 후보 기준 manifest 를 다시 만들어요. 위 control contract 표에 있는 field 만 남기고, required env 는 선택한 후보 앱 안에서 발견된 이름과 scope 만 포함해요. 값 설정은 `axhub env set` 경로로 안내해요. 기존 `apphub.yaml` 이 있으면 읽기는 계속 되지만 새 파일은 `axhub.yaml` 로 만들어요.
 
@@ -392,7 +547,7 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 
    선택한 `APP_PATH` 를 backend 가 이해하는 위 field 로 고정할 수 없으면 앱 등록·git 연결·배포를 시작하지 않고 `manifest만` 으로 멈춰요. `source`, `app_path`, `priority` 같은 백엔드에 없는 field 를 만들어 넣으면 안 돼요.
 
-4. **기존 mutation 경로 재사용.** 앱 등록, git 연결, env 값 저장, 배포는 위 CLI boundary contract 와 기존 approval 경로만 써요. helper 로 preview/approval 을 우회하지 않아요. `axhub apps git connect --execute` 는 GitHub 연결 승인 카드가 있어야만 실행해요. remote detect 는 v0.17.4 `axhub apps detect` read-only 로만 쓰고, mutation 은 preview+approval 뒤의 current CLI 명령으로만 진행해요.
+4. **기존 mutation 경로 재사용.** 앱 등록, git 연결, env 값 저장, 배포는 위 CLI boundary contract 와 기존 approval 경로만 써요. helper 로 preview/approval 을 우회하지 않아요. `axhub apps git connect --execute` 는 GitHub 연결 승인 카드가 있어야만 실행해요. remote detect 는 v0.17.3 `axhub apps detect` read-only 로만 쓰고 (미배포 시 fallback 은 `axhub.yaml` 수동 입력이에요), mutation 은 preview+approval 뒤의 current CLI 명령으로만 진행해요.
 
 5. **결과 검증.** 배포가 끝나면 live URL, deployment id, 감지된 build/runtime env 구분, Dockerfile/compose/auto 중 선택된 ladder 를 보여줘요. 실패하면 deploy error empathy catalog 형식으로 원인·확인 방법·재시도 명령을 짧게 안내해요.
 

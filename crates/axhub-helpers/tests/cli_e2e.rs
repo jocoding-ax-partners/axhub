@@ -5291,6 +5291,41 @@ fn cli_migrate_plan_detects_node_env_and_manifest_snippet() {
     assert!(env_refs
         .iter()
         .any(|e| e["name"] == "PY_DATABASE_URL" && e["scope"] == "runtime"));
+    assert_eq!(
+        json["sdk_conversion"]["schema_version"],
+        "sdk-conversion/v1"
+    );
+    let sdk_candidates = json["sdk_conversion"]["candidates"].as_array().unwrap();
+    let node_candidate = sdk_candidates
+        .iter()
+        .find(|candidate| candidate["path"] == ".")
+        .unwrap();
+    assert_eq!(node_candidate["language"], "node");
+    assert_eq!(node_candidate["dependency_hint"], "npm install @ax-hub/sdk");
+    assert_eq!(node_candidate["wrapper_target_path"], "src/axhub.ts");
+    assert!(node_candidate["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("import { AxHubClient } from '@ax-hub/sdk'"));
+    assert_eq!(node_candidate["risk"], "high");
+    assert!(node_candidate["hard_stop_reasons"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reason| reason
+            .as_str()
+            .unwrap()
+            .contains("검증 명령 또는 테스트 anchor")));
+    // devex-D1=C: per-reason override policy ships alongside the reasons, and
+    // plan_only is exposed for the SKILL's structural plan-only gate.
+    let policy = node_candidate["hard_stop_policy"].as_array().unwrap();
+    assert!(!policy.is_empty());
+    let missing_verification = policy
+        .iter()
+        .find(|entry| entry["code"] == "missing_verification")
+        .expect("missing_verification policy present");
+    assert_eq!(missing_verification["overridable"], true);
+    assert!(node_candidate["plan_only"].is_boolean());
 }
 
 #[test]
@@ -5327,6 +5362,33 @@ fn cli_migrate_plan_detects_monorepo_candidates_and_compose() {
     assert!(candidates
         .iter()
         .any(|c| c["path"] == "services/api" && c["stack_hint"] == "go"));
+    let sdk_candidates = json["sdk_conversion"]["candidates"].as_array().unwrap();
+    let web_sdk = sdk_candidates
+        .iter()
+        .find(|candidate| candidate["path"] == "apps/web")
+        .unwrap();
+    assert_eq!(web_sdk["language"], "node");
+    assert!(web_sdk["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("import { AxHubClient } from '@ax-hub/sdk'"));
+    let api_sdk = sdk_candidates
+        .iter()
+        .find(|candidate| candidate["path"] == "services/api")
+        .unwrap();
+    assert_eq!(api_sdk["language"], "go");
+    assert_eq!(
+        api_sdk["dependency_hint"],
+        "go get github.com/jocoding-ax-partners/axhub-sdk-go"
+    );
+    assert_eq!(
+        api_sdk["wrapper_target_path"],
+        "services/api/axhub_client.go"
+    );
+    assert!(api_sdk["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("NewAxHubClient"));
 
     let selected_output = run(&[
         "migrate-plan",
@@ -5348,6 +5410,1192 @@ fn cli_migrate_plan_detects_monorepo_candidates_and_compose() {
         .contains("apps/web/compose.yaml"));
 }
 
+#[test]
+fn cli_migrate_plan_persist_planning_writes_spec_only_pending_approval_artifacts() {
+    let temp = tempfile::tempdir().unwrap();
+    let web = temp.path().join("apps/web");
+    let api = temp.path().join("services/api");
+    std::fs::create_dir_all(web.join("src")).unwrap();
+    std::fs::create_dir_all(web.join("tests")).unwrap();
+    std::fs::create_dir_all(&api).unwrap();
+    std::fs::write(
+        web.join("package.json"),
+        r#"{"dependencies":{"vite":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(web.join("src/web.ts"), "export const web = true;").unwrap();
+    std::fs::write(web.join("tests/app.test.ts"), "expect(true).toBe(true);").unwrap();
+    std::fs::write(api.join("go.mod"), "module example.com/api\n").unwrap();
+
+    let output = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--app-path",
+        "apps/web",
+        "--persist-planning",
+        "--json",
+    ]);
+    assert_eq!(output.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["planning"]["mode"], "spec_only");
+    assert_eq!(
+        json["planning_persistence"]["reason"],
+        "spec_only_pending_approval_written"
+    );
+    assert_eq!(
+        json["planning_persistence"]["run_state"],
+        "pending_approval"
+    );
+    assert!(json["planning_persistence"]["paths"]["run_json"]
+        .as_str()
+        .unwrap()
+        // normalize separators: the path is OS-native (backslashes on Windows)
+        .replace('\\', "/")
+        .contains(".axhub/plan/runs/"));
+}
+
+#[test]
+fn cli_migrate_plan_persist_planning_writes_full_consensus_discover_scaffold() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(temp.path().join("src")).unwrap();
+    std::fs::write(
+        temp.path().join("package.json"),
+        r#"{"dependencies":{"next-auth":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/db.ts"),
+        "export async function rows(db: any) { return db.query('select * from users'); }",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/auth.ts"),
+        "import passport from 'passport';\nexport const current_user = (req: any) => req.user;",
+    )
+    .unwrap();
+
+    let output = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--persist-planning",
+        "--json",
+    ]);
+    assert_eq!(output.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["planning"]["mode"], "full_consensus");
+    assert_eq!(
+        json["planning_persistence"]["reason"],
+        "full_consensus_scaffold_written"
+    );
+    assert_eq!(json["planning_persistence"]["run_state"], "running");
+    assert_eq!(
+        json["planning_persistence"]["approval_state"],
+        "needs_revision"
+    );
+    assert!(json["planning_persistence"]["paths"]["discover_markdown"]
+        .as_str()
+        .unwrap()
+        .contains("01-discover.md"));
+}
+
+#[test]
+fn cli_migrate_stage_write_advances_full_consensus_to_pending_approval() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(temp.path().join("src")).unwrap();
+    std::fs::write(
+        temp.path().join("package.json"),
+        r#"{"dependencies":{"next-auth":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/db.ts"),
+        "export async function rows(db: any) { return db.query('select * from users'); }",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/auth.ts"),
+        "import passport from 'passport';\nexport const current_user = (req: any) => req.user;",
+    )
+    .unwrap();
+
+    let seeded = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--persist-planning",
+        "--json",
+    ]);
+    assert_eq!(seeded.status.code(), Some(0));
+    let seeded_json: serde_json::Value = serde_json::from_slice(&seeded.stdout).unwrap();
+    let run_json = seeded_json["planning_persistence"]["paths"]["run_json"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let planner_md = temp.path().join("planner.md");
+    let architect_md = temp.path().join("architect.md");
+    let critic_md = temp.path().join("critic.md");
+    let reviewer_md = temp.path().join("reviewer.md");
+    let adr_md = temp.path().join("adr.md");
+    std::fs::write(&planner_md, "# Planner\n\n- plan").unwrap();
+    std::fs::write(&architect_md, "# Architect\n\n- clear").unwrap();
+    std::fs::write(&critic_md, "# Critic\n\n- okay").unwrap();
+    std::fs::write(&reviewer_md, "# Reviewer\n\n- approve").unwrap();
+    std::fs::write(&adr_md, "# ADR\n\n- chosen").unwrap();
+
+    for (stage, file) in [
+        ("planner", &planner_md),
+        ("architect", &architect_md),
+        ("critic", &critic_md),
+        ("adr", &adr_md),
+    ] {
+        let output = run(&[
+            "migrate-stage-write",
+            "--run-json",
+            &run_json,
+            "--stage",
+            stage,
+            "--markdown-file",
+            file.to_str().unwrap(),
+            "--json",
+        ]);
+        assert_eq!(output.status.code(), Some(0));
+    }
+
+    let reviewer_output = run(&[
+        "migrate-stage-write",
+        "--run-json",
+        &run_json,
+        "--stage",
+        "reviewer",
+        "--markdown-file",
+        reviewer_md.to_str().unwrap(),
+        "--run-state",
+        "pending_approval",
+        "--approval-state",
+        "pending_approval",
+        "--json",
+    ]);
+    assert_eq!(reviewer_output.status.code(), Some(0));
+    let reviewer_json: serde_json::Value = serde_json::from_slice(&reviewer_output.stdout).unwrap();
+    assert_eq!(reviewer_json["run_state"], "pending_approval");
+    assert_eq!(reviewer_json["approval_state"], "pending_approval");
+
+    let run_state: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&run_json).unwrap()).unwrap();
+    assert_eq!(run_state["state"], "pending_approval");
+    let approval_path = std::path::Path::new(&run_json)
+        .parent()
+        .unwrap()
+        .join("approval.json");
+    let approval: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&approval_path).unwrap()).unwrap();
+    assert_eq!(approval["state"], "pending_approval");
+    assert!(
+        approval["approved_stage_artifacts"]
+            .as_array()
+            .unwrap()
+            .len()
+            >= 4
+    );
+    assert!(approval["adr_sha256"].as_str().is_some());
+}
+
+#[test]
+fn cli_migrate_stage_write_supports_revision_loop() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(temp.path().join("src")).unwrap();
+    std::fs::write(
+        temp.path().join("package.json"),
+        r#"{"dependencies":{"next-auth":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/db.ts"),
+        "export async function rows(db: any) { return db.query('select * from users'); }",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/auth.ts"),
+        "import passport from 'passport';\nexport const current_user = (req: any) => req.user;",
+    )
+    .unwrap();
+
+    let seeded = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--persist-planning",
+        "--json",
+    ]);
+    let seeded_json: serde_json::Value = serde_json::from_slice(&seeded.stdout).unwrap();
+    let run_json = seeded_json["planning_persistence"]["paths"]["run_json"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let planner_md = temp.path().join("planner-r1.md");
+    let architect_md = temp.path().join("architect-r1.md");
+    let critic_md = temp.path().join("critic-r1.md");
+    let planner_r2_md = temp.path().join("planner-r2.md");
+    std::fs::write(&planner_md, "# Planner r1").unwrap();
+    std::fs::write(&architect_md, "# Architect r1").unwrap();
+    std::fs::write(&critic_md, "# Critic r1\n\n- revise").unwrap();
+    std::fs::write(&planner_r2_md, "# Planner r2").unwrap();
+
+    for (stage, file, run_state) in [
+        ("planner", &planner_md, None),
+        ("architect", &architect_md, None),
+        ("critic", &critic_md, Some("needs_revision")),
+        ("planner", &planner_r2_md, Some("running")),
+    ] {
+        let mut argv = vec![
+            "migrate-stage-write",
+            "--run-json",
+            &run_json,
+            "--stage",
+            stage,
+            "--markdown-file",
+            file.to_str().unwrap(),
+            "--json",
+        ];
+        if let Some(state) = run_state {
+            argv.extend(["--run-state", state]);
+        }
+        let output = run(&argv);
+        assert_eq!(output.status.code(), Some(0));
+    }
+
+    let run_state: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&run_json).unwrap()).unwrap();
+    assert_eq!(run_state["state"], "running");
+    let stages_dir = std::path::Path::new(&run_json)
+        .parent()
+        .unwrap()
+        .join("stages");
+    let entries = std::fs::read_dir(stages_dir).unwrap().count();
+    assert!(
+        entries >= 10,
+        "expected discover + planner/architect/critic/planner markdown+meta files"
+    );
+}
+
+#[test]
+fn cli_migrate_wave_plan_accepts_same_app_and_falls_back_on_conflict() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(temp.path().join("src")).unwrap();
+    std::fs::write(
+        temp.path().join("package.json"),
+        r#"{"dependencies":{"next-auth":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/db.ts"),
+        "export async function rows(db: any) { return db.query('select * from users'); }",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/auth.ts"),
+        "import passport from 'passport';\nexport const current_user = (req: any) => req.user;",
+    )
+    .unwrap();
+
+    let seeded = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--persist-planning",
+        "--json",
+    ]);
+    let seeded_json: serde_json::Value = serde_json::from_slice(&seeded.stdout).unwrap();
+    let run_json = seeded_json["planning_persistence"]["paths"]["run_json"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let app_key = seeded_json["planning"]["app_key"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let first = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "review-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--write-target",
+        "stages/05-reviewer-a.md",
+        "--independence-proof",
+        "disjoint evidence set",
+        "--json",
+    ]);
+    assert_eq!(first.status.code(), Some(0));
+    let first_json: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(first_json["serial_fallback"], false);
+    assert_eq!(first_json["parallelism_enabled"], true);
+
+    let second = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "review-b",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--write-target",
+        "stages/05-reviewer-a.md",
+        "--independence-proof",
+        "conflicting target",
+        "--json",
+    ]);
+    assert_eq!(second.status.code(), Some(0));
+    let second_json: serde_json::Value = serde_json::from_slice(&second.stdout).unwrap();
+    assert_eq!(second_json["serial_fallback"], true);
+    assert_eq!(second_json["parallelism_enabled"], false);
+    assert!(second_json["fallback_reason"]
+        .as_str()
+        .unwrap()
+        .contains("write target"));
+
+    let run_state: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&run_json).unwrap()).unwrap();
+    assert_eq!(run_state["parallelism"]["enabled"], false);
+    assert!(run_state["parallelism"]["fallback_reason"]
+        .as_str()
+        .is_some());
+}
+
+#[test]
+fn cli_migrate_approve_promotes_spec_only_latest_pointer() {
+    let temp = tempfile::tempdir().unwrap();
+    let web = temp.path().join("apps/web");
+    let api = temp.path().join("services/api");
+    std::fs::create_dir_all(web.join("src")).unwrap();
+    std::fs::create_dir_all(web.join("tests")).unwrap();
+    std::fs::create_dir_all(&api).unwrap();
+    std::fs::write(
+        web.join("package.json"),
+        r#"{"dependencies":{"vite":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(web.join("src/web.ts"), "export const web = true;").unwrap();
+    std::fs::write(web.join("tests/app.test.ts"), "expect(true).toBe(true);").unwrap();
+    std::fs::write(api.join("go.mod"), "module example.com/api\n").unwrap();
+
+    let seeded = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--app-path",
+        "apps/web",
+        "--persist-planning",
+        "--json",
+    ]);
+    assert_eq!(seeded.status.code(), Some(0));
+    let seeded_json: serde_json::Value = serde_json::from_slice(&seeded.stdout).unwrap();
+    let run_json = seeded_json["planning_persistence"]["paths"]["run_json"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let app_key = seeded_json["planning"]["app_key"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let approved = run(&[
+        "migrate-approve",
+        "--run-json",
+        &run_json,
+        "--approved-by",
+        "tester",
+        "--approval-note",
+        "approved spec only",
+        "--json",
+    ]);
+    assert_eq!(approved.status.code(), Some(0));
+    let approved_json: serde_json::Value = serde_json::from_slice(&approved.stdout).unwrap();
+    assert_eq!(approved_json["run_state"], "approved");
+    assert_eq!(approved_json["approval_state"], "approved");
+    assert_eq!(approved_json["spec_state"], "approved");
+
+    let latest_path = temp
+        .path()
+        .join(".axhub/spec/apps")
+        .join(app_key)
+        .join("latest.json");
+    let latest: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&latest_path).unwrap()).unwrap();
+    assert_eq!(latest["approval_state"], "approved");
+    assert_eq!(latest["approved_by"], "tester");
+}
+
+#[test]
+fn cli_migrate_approve_promotes_full_consensus_after_pending_approval() {
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(temp.path().join("src")).unwrap();
+    std::fs::write(
+        temp.path().join("package.json"),
+        r#"{"dependencies":{"next-auth":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/db.ts"),
+        "export async function rows(db: any) { return db.query('select * from users'); }",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.path().join("src/auth.ts"),
+        "import passport from 'passport';\nexport const current_user = (req: any) => req.user;",
+    )
+    .unwrap();
+
+    let seeded = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--persist-planning",
+        "--json",
+    ]);
+    let seeded_json: serde_json::Value = serde_json::from_slice(&seeded.stdout).unwrap();
+    let run_json = seeded_json["planning_persistence"]["paths"]["run_json"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let app_key = seeded_json["planning"]["app_key"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let planner_md = temp.path().join("planner.md");
+    let architect_md = temp.path().join("architect.md");
+    let critic_md = temp.path().join("critic.md");
+    let reviewer_md = temp.path().join("reviewer.md");
+    let adr_md = temp.path().join("adr.md");
+    std::fs::write(&planner_md, "# Planner").unwrap();
+    std::fs::write(&architect_md, "# Architect").unwrap();
+    std::fs::write(&critic_md, "# Critic").unwrap();
+    std::fs::write(&reviewer_md, "# Reviewer").unwrap();
+    std::fs::write(&adr_md, "# ADR").unwrap();
+
+    for (stage, file) in [
+        ("planner", &planner_md),
+        ("architect", &architect_md),
+        ("critic", &critic_md),
+        ("adr", &adr_md),
+    ] {
+        let output = run(&[
+            "migrate-stage-write",
+            "--run-json",
+            &run_json,
+            "--stage",
+            stage,
+            "--markdown-file",
+            file.to_str().unwrap(),
+            "--json",
+        ]);
+        assert_eq!(output.status.code(), Some(0));
+    }
+    let reviewer_output = run(&[
+        "migrate-stage-write",
+        "--run-json",
+        &run_json,
+        "--stage",
+        "reviewer",
+        "--markdown-file",
+        reviewer_md.to_str().unwrap(),
+        "--run-state",
+        "pending_approval",
+        "--approval-state",
+        "pending_approval",
+        "--json",
+    ]);
+    assert_eq!(reviewer_output.status.code(), Some(0));
+
+    let approved = run(&[
+        "migrate-approve",
+        "--run-json",
+        &run_json,
+        "--approved-by",
+        "tester",
+        "--approval-note",
+        "approved consensus",
+        "--json",
+    ]);
+    assert_eq!(approved.status.code(), Some(0));
+    let approved_json: serde_json::Value = serde_json::from_slice(&approved.stdout).unwrap();
+    assert_eq!(approved_json["run_state"], "approved");
+    assert_eq!(approved_json["approval_state"], "approved");
+    assert_eq!(approved_json["spec_state"], "approved");
+
+    let latest_path = temp
+        .path()
+        .join(".axhub/spec/apps")
+        .join(app_key)
+        .join("latest.json");
+    let latest: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&latest_path).unwrap()).unwrap();
+    assert_eq!(latest["approval_state"], "approved");
+    assert_eq!(latest["approved_by"], "tester");
+
+    let approval_path = std::path::Path::new(&run_json)
+        .parent()
+        .unwrap()
+        .join("approval.json");
+    let approval: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&approval_path).unwrap()).unwrap();
+    assert_eq!(approval["state"], "approved");
+    assert!(approval["approved_at"].as_str().is_some());
+}
+
+#[test]
+fn cli_migrate_plan_emits_six_language_wrapper_previews_without_secret_leak() {
+    let temp = tempfile::tempdir().unwrap();
+
+    let node = temp.path().join("apps/node");
+    std::fs::create_dir_all(node.join("src")).unwrap();
+    std::fs::write(
+        node.join("package.json"),
+        r#"{"dependencies":{"vite":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        node.join("src/main.ts"),
+        "const hardcoded = 'ultra_secret_value_123'; export const boot = () => hardcoded;",
+    )
+    .unwrap();
+
+    let python = temp.path().join("apps/python");
+    std::fs::create_dir_all(python.join("src")).unwrap();
+    std::fs::write(
+        python.join("pyproject.toml"),
+        "[project]\nname='demo'\ndependencies=['fastapi']\n",
+    )
+    .unwrap();
+    std::fs::write(
+        python.join("src/app.py"),
+        "from fastapi import FastAPI\napp = FastAPI()\n",
+    )
+    .unwrap();
+
+    let go = temp.path().join("apps/go");
+    std::fs::create_dir_all(&go).unwrap();
+    std::fs::write(go.join("go.mod"), "module example.com/demo\n").unwrap();
+    std::fs::write(go.join("main.go"), "package main\nfunc main() {}\n").unwrap();
+
+    let ruby = temp.path().join("apps/ruby");
+    std::fs::create_dir_all(ruby.join("lib")).unwrap();
+    std::fs::write(
+        ruby.join("Gemfile"),
+        "source 'https://rubygems.org'\ngem 'sinatra'\n",
+    )
+    .unwrap();
+    std::fs::write(
+        ruby.join("app.rb"),
+        "require 'sinatra'\nget('/') { 'ok' }\n",
+    )
+    .unwrap();
+
+    let java = temp.path().join("apps/java");
+    std::fs::create_dir_all(java.join("src/main/java/com/example/demo")).unwrap();
+    std::fs::write(java.join("build.gradle"), "plugins { id 'java-library' }\n").unwrap();
+    std::fs::write(
+        java.join("src/main/java/com/example/demo/Application.java"),
+        "package com.example.demo;\npublic class Application {}\n",
+    )
+    .unwrap();
+
+    let kotlin = temp.path().join("apps/kotlin");
+    std::fs::create_dir_all(kotlin.join("src/main/kotlin/com/example/demo")).unwrap();
+    std::fs::write(
+        kotlin.join("build.gradle.kts"),
+        "plugins { kotlin(\"jvm\") version \"2.4.0\" }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        kotlin.join("src/main/kotlin/com/example/demo/Application.kt"),
+        "package com.example.demo\nclass Application\n",
+    )
+    .unwrap();
+
+    let output = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.path().to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(output.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let sdk_candidates = json["sdk_conversion"]["candidates"].as_array().unwrap();
+
+    let by_path = |path: &str| {
+        sdk_candidates
+            .iter()
+            .find(|candidate| candidate["path"] == path)
+            .unwrap()
+    };
+
+    assert!(by_path("apps/node")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("@ax-hub/sdk"));
+    assert!(!by_path("apps/node")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("ultra_secret_value_123"));
+    assert!(by_path("apps/python")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("from axhub_sdk import AxHubClient, TokenType"));
+    assert!(by_path("apps/go")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("package main"));
+    assert!(by_path("apps/ruby")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("require 'axhub_sdk'"));
+    assert!(by_path("apps/java")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("package ai.axhub.sdk;"));
+    assert!(by_path("apps/kotlin")["wrapper_preview"]
+        .as_str()
+        .unwrap()
+        .contains("package ai.axhub.sdk"));
+}
+
+fn seed_full_consensus_run(temp: &Path) -> (String, String) {
+    std::fs::create_dir_all(temp.join("src")).unwrap();
+    std::fs::write(
+        temp.join("package.json"),
+        r#"{"dependencies":{"next-auth":"1.0.0"}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        temp.join("src/db.ts"),
+        "export async function rows(db: any) { return db.query('select * from users'); }",
+    )
+    .unwrap();
+    std::fs::write(
+        temp.join("src/auth.ts"),
+        "import passport from 'passport';\nexport const current_user = (req: any) => req.user;",
+    )
+    .unwrap();
+    let seeded = run(&[
+        "migrate-plan",
+        "--dir",
+        temp.to_str().unwrap(),
+        "--persist-planning",
+        "--json",
+    ]);
+    assert_eq!(seeded.status.code(), Some(0));
+    let seeded_json: serde_json::Value = serde_json::from_slice(&seeded.stdout).unwrap();
+    let run_json = seeded_json["planning_persistence"]["paths"]["run_json"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let app_key = seeded_json["planning"]["app_key"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    (run_json, app_key)
+}
+
+#[test]
+fn cli_migrate_wave_plan_rejects_illegal_state_jump() {
+    // §7 WaveState guard: a fresh wave must be born `planned` (none -> complete is illegal).
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    let output = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-x",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--state",
+        "complete",
+        "--json",
+    ]);
+    assert_ne!(output.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("planned"),
+        "expected wave-birth guard, got stderr: {stderr}"
+    );
+}
+
+#[test]
+fn cli_migrate_wave_plan_complete_requires_artifact_backing() {
+    // §8.9: a wave reaching `complete` via the legal 3-call path must have on-disk artifact backing.
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    let planned = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--json",
+    ]);
+    assert_eq!(planned.status.code(), Some(0));
+    let running = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--state",
+        "running",
+        "--json",
+    ]);
+    assert_eq!(running.status.code(), Some(0));
+    // complete declaring an artifact whose file is absent on disk -> §8.9 reject.
+    let completed = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--state",
+        "complete",
+        "--artifact",
+        "missing-backing.md",
+        "--json",
+    ]);
+    assert_ne!(completed.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&completed.stderr);
+    assert!(
+        stderr.contains("§8.9") || stderr.contains("artifact"),
+        "expected §8.9 backing reject, got stderr: {stderr}"
+    );
+}
+
+#[test]
+fn cli_migrate_wave_plan_complete_accepts_present_artifact() {
+    // §8.9 positive: a `complete` wave whose declared artifacts exist on disk is accepted.
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    let run_dir = std::path::Path::new(&run_json)
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    std::fs::write(run_dir.join("backing-a.md"), "# backing").unwrap();
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--state",
+            "running",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    let completed = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--state",
+        "complete",
+        "--artifact",
+        "backing-a.md",
+        "--json",
+    ]);
+    assert_eq!(
+        completed.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&completed.stderr)
+    );
+    let wave_a: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(run_dir.join("waves/wave-a.json")).unwrap())
+            .unwrap();
+    assert_eq!(wave_a["state"], "complete");
+}
+
+#[test]
+fn cli_migrate_wave_plan_idempotent_replan_at_planned_stays_ok() {
+    // Idempotency escape: re-running the SAME wave_id at the SAME planned state is a legal upsert.
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    let first = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--json",
+    ]);
+    assert_eq!(first.status.code(), Some(0));
+    let second = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-a",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence",
+        "--json",
+    ]);
+    assert_eq!(
+        second.status.code(),
+        Some(0),
+        "idempotent re-plan must stay exit-0, stderr: {}",
+        String::from_utf8_lossy(&second.stderr)
+    );
+}
+
+#[test]
+fn cli_migrate_wave_plan_persisted_complete_not_rerejected() {
+    // Candidate-scoping (non-regression): a persisted `complete` wave must NOT be re-validated
+    // for §8.9 backing when a second, different wave is written in the same run.
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    let run_dir = std::path::Path::new(&run_json)
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    std::fs::write(run_dir.join("backing-a.md"), "# backing").unwrap();
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--state",
+            "running",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--state",
+            "complete",
+            "--artifact",
+            "backing-a.md",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    // wave-b is a NEW planned wave in the same run; persisted complete wave-a must survive.
+    let wave_b = run(&[
+        "migrate-wave-plan",
+        "--run-json",
+        &run_json,
+        "--wave-id",
+        "wave-b",
+        "--stage-scope",
+        "reviewer",
+        "--participant",
+        &app_key,
+        "--independence-proof",
+        "disjoint evidence b",
+        "--write-target",
+        "stages/05-reviewer-b.md",
+        "--json",
+    ]);
+    assert_eq!(
+        wave_b.status.code(),
+        Some(0),
+        "second same-run write must not re-reject persisted complete wave, stderr: {}",
+        String::from_utf8_lossy(&wave_b.stderr)
+    );
+    let wave_a: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(run_dir.join("waves/wave-a.json")).unwrap())
+            .unwrap();
+    assert_eq!(wave_a["state"], "complete");
+}
+
+#[test]
+fn cli_migrate_stage_write_rejects_seal_with_incomplete_wave() {
+    // §8.10: sealing running -> pending_approval must reject while a wave is in-progress-unfinished.
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--state",
+            "running",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--state",
+            "needs_revision",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    let reviewer_md = temp.path().join("reviewer.md");
+    std::fs::write(&reviewer_md, "# Reviewer\n\n- approve").unwrap();
+    let sealed = run(&[
+        "migrate-stage-write",
+        "--run-json",
+        &run_json,
+        "--stage",
+        "reviewer",
+        "--markdown-file",
+        reviewer_md.to_str().unwrap(),
+        "--run-state",
+        "pending_approval",
+        "--approval-state",
+        "pending_approval",
+        "--json",
+    ]);
+    assert_ne!(sealed.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&sealed.stderr);
+    assert!(
+        stderr.contains("§8.10") || stderr.contains("진행 중 wave"),
+        "expected §8.10 incomplete-wave reject, got stderr: {stderr}"
+    );
+}
+
+#[test]
+fn cli_migrate_stage_write_seals_with_planned_wave_present() {
+    // §8.10 positive: a `planned` wave is acceptable at seal time (only Running/NeedsRevision/Blocked bail).
+    let temp = tempfile::tempdir().unwrap();
+    let (run_json, app_key) = seed_full_consensus_run(temp.path());
+    assert_eq!(
+        run(&[
+            "migrate-wave-plan",
+            "--run-json",
+            &run_json,
+            "--wave-id",
+            "wave-a",
+            "--stage-scope",
+            "reviewer",
+            "--participant",
+            &app_key,
+            "--independence-proof",
+            "disjoint evidence",
+            "--json",
+        ])
+        .status
+        .code(),
+        Some(0)
+    );
+    let planner_md = temp.path().join("planner.md");
+    let architect_md = temp.path().join("architect.md");
+    let critic_md = temp.path().join("critic.md");
+    let reviewer_md = temp.path().join("reviewer.md");
+    let adr_md = temp.path().join("adr.md");
+    std::fs::write(&planner_md, "# Planner\n\n- plan").unwrap();
+    std::fs::write(&architect_md, "# Architect\n\n- clear").unwrap();
+    std::fs::write(&critic_md, "# Critic\n\n- okay").unwrap();
+    std::fs::write(&reviewer_md, "# Reviewer\n\n- approve").unwrap();
+    std::fs::write(&adr_md, "# ADR\n\n- chosen").unwrap();
+    for (stage, file) in [
+        ("planner", &planner_md),
+        ("architect", &architect_md),
+        ("critic", &critic_md),
+        ("adr", &adr_md),
+    ] {
+        assert_eq!(
+            run(&[
+                "migrate-stage-write",
+                "--run-json",
+                &run_json,
+                "--stage",
+                stage,
+                "--markdown-file",
+                file.to_str().unwrap(),
+                "--json",
+            ])
+            .status
+            .code(),
+            Some(0)
+        );
+    }
+    let sealed = run(&[
+        "migrate-stage-write",
+        "--run-json",
+        &run_json,
+        "--stage",
+        "reviewer",
+        "--markdown-file",
+        reviewer_md.to_str().unwrap(),
+        "--run-state",
+        "pending_approval",
+        "--approval-state",
+        "pending_approval",
+        "--json",
+    ]);
+    assert_eq!(
+        sealed.status.code(),
+        Some(0),
+        "planned-only run must still seal, stderr: {}",
+        String::from_utf8_lossy(&sealed.stderr)
+    );
+    let sealed_json: serde_json::Value = serde_json::from_slice(&sealed.stdout).unwrap();
+    assert_eq!(sealed_json["approval_state"], "pending_approval");
+}
 // ── tenant-resolve (#189) ────────────────────────────────────────────────────
 
 #[cfg(unix)]

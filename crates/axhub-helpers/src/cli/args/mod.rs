@@ -210,6 +210,62 @@ pub(crate) struct MigratePlanArgs {
     pub dir: Option<String>,
     #[arg(long = "app-path")]
     pub app_path: Option<String>,
+    #[arg(long = "persist-planning")]
+    pub persist_planning: bool,
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(clap::Args, Debug)]
+pub(crate) struct MigrateStageWriteArgs {
+    #[arg(long = "run-json")]
+    pub run_json: String,
+    #[arg(long)]
+    pub stage: String,
+    #[arg(long = "markdown-file")]
+    pub markdown_file: String,
+    #[arg(long)]
+    pub summary: Option<String>,
+    #[arg(long = "run-state")]
+    pub run_state: Option<String>,
+    #[arg(long = "approval-state")]
+    pub approval_state: Option<String>,
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(clap::Args, Debug)]
+pub(crate) struct MigrateWavePlanArgs {
+    #[arg(long = "run-json")]
+    pub run_json: String,
+    #[arg(long = "wave-id")]
+    pub wave_id: String,
+    #[arg(long = "stage-scope")]
+    pub stage_scope: String,
+    #[arg(long = "participant")]
+    pub participants: Vec<String>,
+    #[arg(long = "depends-on")]
+    pub depends_on: Vec<String>,
+    #[arg(long = "artifact")]
+    pub artifacts: Vec<String>,
+    #[arg(long = "write-target")]
+    pub write_targets: Vec<String>,
+    #[arg(long = "independence-proof")]
+    pub independence_proofs: Vec<String>,
+    #[arg(long)]
+    pub state: Option<String>,
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(clap::Args, Debug)]
+pub(crate) struct MigrateApproveArgs {
+    #[arg(long = "run-json")]
+    pub run_json: String,
+    #[arg(long = "approved-by")]
+    pub approved_by: String,
+    #[arg(long = "approval-note")]
+    pub approval_note: Option<String>,
     #[arg(long)]
     pub json: bool,
 }
