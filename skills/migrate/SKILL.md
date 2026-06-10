@@ -514,6 +514,20 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
    원격 mutation approval 은 helper 가 자동으로 묶지 말고 action 별로 따로 유지해요.
 
 2.6. **SDK 변환 실행 (승인된 `sdk_wrapper_generate`).** 변환은 helper 가 아니라 언어별 expert agent 가 user source 를 써요. 안전망은 helper 가 deterministic 하게 잡아요.
+   - 변환 준비로 axhub MCP 도구를 먼저 설치해요 (선택, 비차단). `.mcp.json` 에 로컬 정적 검증(stdio `mcp-serve`) + 원격 SDK 지식(`axhub`, ax-mcp) 두 항목을 idempotent 머지해요 — 기존 사용자 항목은 보존돼요. 설치되면 expert 가 knowledge pack 의 sdk_search 1회 필수 조회 정책을 실제로 수행할 수 있어요.
+
+   ```bash
+   "$HELPER" mcp-install --dir "${AXHUB_MIGRATE_DIR:-.}"
+   ```
+
+   helper 가 없거나 실패해도 **막지 않아요** — vendored packs floor 만으로 변환은 그대로 진행되니 "MCP 도구는 나중에 설치해도 돼요" 한 줄만 안내하고 넘어가요. 원격 MCP URL 은 `AXHUB_MCP_URL` env 로 override 할 수 있어요.
+   - 변환 대상 site 를 expert dispatch 전에 deterministic 하게 찾아요. scan-sites 가 레거시 패턴(`raw_http_client` · `direct_db_driver` · `hardcoded_api_url`) 위치 목록을 만들어요.
+
+   ```bash
+   "$HELPER" scan-sites "${AXHUB_MIGRATE_DIR:-.}" --json
+   ```
+
+   결과 JSON 의 `sites[]`(`file` / `line` / `kind` / `snippet`)를 expert dispatch prompt 에 그대로 전달해요 — expert 는 이 목록에서 변환을 시작하고 수동 탐색은 보완으로만 써요. §2.7 data 변환도 같은 결과를 재사용해요 (두 번 스캔하지 않아요). `sites` 가 비었거나 명령이 실패해도 변환 흐름은 막지 않아요 — "site 후보를 못 찾았어요, expert 가 직접 탐색해요"로 안내하고 진행해요. `truncated:true` 면 파일 cap 으로 일부만 스캔됐다고 알려요.
    - detected language 로 `axhub-sdk-<lang>-expert` 를 `task` tool 로 dispatch 해요 (`axhub-sdk-go-expert`, `axhub-sdk-java-expert`, `axhub-sdk-kotlin-expert`, `axhub-sdk-node-expert`, `axhub-sdk-python-expert`, `axhub-sdk-ruby-expert`). 6개 언어(go/java/kotlin/node/python/ruby) 밖이면 expert 가 없으니 plan-only 로 남기고 알려요.
    - expert 는 `skills/migrate/sdk-knowledge/<lang>.md` knowledge pack 의 §1 client init 을 그대로 emit 해요. paraphrase 하지 않아요. pack 이 없거나 비면 apply 하지 말고 preview/plan 만 내요.
    - apply 전에 설치된 SDK 버전을 확인해요. 재변환·업그레이드 flow 에서만 의미가 있고, 첫 변환이면 `present:false` 로 그냥 넘어가요.
@@ -535,7 +549,7 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
    - apply 뒤에는 스캔에서 찾은 검증 명령을 돌려요. 실패하면 guard 가 준 `rollback_command` 를 보여주고 되돌릴지 물어요. 변환은 자동 배포로 이어지지 않아요 — 원격 mutation 은 그대로 CLI gating 이에요.
 
 2.7. **data 변환 실행 (승인된 `data_patch_plan`) · auth 는 advisory.** wrapper 와 같은 expert·guard 경로로 data 접근을 변환해요.
-   - 같은 `axhub-sdk-<lang>-expert` 를 `data_patch_plan` mode 로 dispatch 해요. expert 는 pack §6 data surface 를 **그대로** 읽어 변환해요 — §6 의 fluent data layer(6개 언어 전부)가 보여주는 정확한 shape(`tenant(slug).app(slug).data.table()/.discover()`)으로 codegen 하고 §6 의 mapping guide·live data contract(무필터 list/count 금지 — `where_required`, `or`/`not` push 불가, offset-only pagination)를 지켜요. §6 가 plan-only 마커면(아직 fluent data layer 가 없는 미래 언어 fallback) data-call 코드는 emit 하지 않고 의도만 한국어로 기술해요.
+   - 같은 `axhub-sdk-<lang>-expert` 를 `data_patch_plan` mode 로 dispatch 해요. §2.6 의 scan-sites 결과(`sites[]`)를 prompt 에 같이 전달해요 — 다시 스캔하지 않아요. expert 는 pack §6 data surface 를 **그대로** 읽어 변환해요 — §6 의 fluent data layer(6개 언어 전부)가 보여주는 정확한 shape(`tenant(slug).app(slug).data.table()/.discover()`)으로 codegen 하고 §6 의 mapping guide·live data contract(무필터 list/count 금지 — `where_required`, `or`/`not` push 불가, offset-only pagination)를 지켜요. §6 가 plan-only 마커면(아직 fluent data layer 가 없는 미래 언어 fallback) data-call 코드는 emit 하지 않고 의도만 한국어로 기술해요.
    - **apply 전에 discover()-verify 를 반드시 수행해요.** expert 가 변환이 참조하는 table·column 을 `refs.json` 으로 모으고, 각 table 을 SDK `discover()` 로 조회해 실제 schema 를 `schemas.json` 으로 만든 뒤, `"$HELPER" migrate-data-verify --refs refs.json --schemas schemas.json --json` 을 실행해요. `ok=false`(exit 2)면 hard-stop — 결과의 `preview_kr` 을 사용자에게 보여주고 apply 하지 않아요. 바이브코더가 리뷰 안 해도 "조용히 틀린 table·column 조회"를 막는 결정적 게이트예요 — generic verify(빌드 통과)는 이걸 못 잡아요.
    - hard-stop 게이팅은 §2.5 와 동일해요. `raw_query`/`broad_diff`/`missing_verification` 면 기본 preview-only 지만 "강행할래요" 확인 + git checkpoint 뒤에만 apply 해요. `plan_only=true`(secret_exposure·custom_auth·unsupported_language)면 실행 경로 없이 plan 만 남겨요.
    - apply 는 §2.6 과 같은 `migrate-guard` checkpoint → 한국어 preview → 승인 → apply → verify → 실패 시 rollback 경로를 그대로 따라요. apply 전 installed-SDK 체크도 동일해요.
