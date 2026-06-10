@@ -1,7 +1,7 @@
 ---
 lang: kotlin
 sdk_version: 0.3.1
-source_sha: cfb0eed75845fcb6c1d4715aded1f1a87a601fe9
+source_sha: 7c23a488f5ecdae6e6955b259dfe767226e82a87
 route_surface_sha: 8bafa90e7d9319b78514a1e95b19c0fb3b73d558
 conformance_baseline: ax-hub-backend@5a7b57d
 generated_by: scripts/gen-sdk-distill.py
