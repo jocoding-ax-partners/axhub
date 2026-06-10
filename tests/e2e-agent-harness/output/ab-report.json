@@ -1,46 +1,41 @@
 {
-  "generated_at": "2026-06-10T05:07:46.861Z",
+  "generated_at": "2026-06-10T05:18:35.517Z",
   "a": {
     "condition": "packs-only",
     "total": 6,
-    "passed": 3,
-    "failed": 3,
+    "passed": 6,
+    "failed": 0,
     "uncertain": 0,
     "meets_criteria": true,
     "lang_coverage": {
-      "node": false,
-      "python": false,
+      "node": true,
+      "python": true,
       "go": true,
       "java": true,
       "kotlin": true,
-      "ruby": false
+      "ruby": true
     },
     "results": [
       {
         "lang": "node",
         "trap_id": "or_combinator",
-        "verdict": "FAIL",
-        "bad_hit": [
-          "or("
-        ],
+        "verdict": "PASS",
+        "bad_hit": [],
         "good_hit": [
           ".in(["
         ],
-        "evidence": "bad_pattern 매칭: or("
+        "evidence": "good_pattern 매칭: .in(["
       },
       {
         "lang": "python",
         "trap_id": "after_cursor",
-        "verdict": "FAIL",
-        "bad_hit": [
-          "after="
-        ],
+        "verdict": "PASS",
+        "bad_hit": [],
         "good_hit": [
-          "page=",
-          "cursor=",
-          "LegacyCursorError"
+          "page =",
+          "cursor="
         ],
-        "evidence": "bad_pattern 매칭: after="
+        "evidence": "good_pattern 매칭: page =, cursor="
       },
       {
         "lang": "go",
@@ -76,67 +71,60 @@
       {
         "lang": "ruby",
         "trap_id": "or_combinator",
-        "verdict": "FAIL",
+        "verdict": "PASS",
         "bad_hit": [],
-        "good_hit": [],
-        "evidence": "패턴 미매칭 → ambiguous_default=FAIL"
+        "good_hit": [
+          ".in_(%w["
+        ],
+        "evidence": "good_pattern 매칭: .in_(%w["
       }
     ]
   },
   "b": {
     "condition": "packs-mcp",
     "total": 6,
-    "passed": 2,
-    "failed": 4,
+    "passed": 6,
+    "failed": 0,
     "uncertain": 0,
     "meets_criteria": true,
     "lang_coverage": {
-      "node": false,
-      "python": false,
-      "go": false,
+      "node": true,
+      "python": true,
+      "go": true,
       "java": true,
       "kotlin": true,
-      "ruby": false
+      "ruby": true
     },
     "results": [
       {
         "lang": "node",
         "trap_id": "or_combinator",
-        "verdict": "FAIL",
-        "bad_hit": [
-          "or("
-        ],
+        "verdict": "PASS",
+        "bad_hit": [],
         "good_hit": [
           ".in(["
         ],
-        "evidence": "bad_pattern 매칭: or("
+        "evidence": "good_pattern 매칭: .in(["
       },
       {
         "lang": "python",
         "trap_id": "after_cursor",
-        "verdict": "FAIL",
-        "bad_hit": [
-          "after=",
-          "before="
-        ],
+        "verdict": "PASS",
+        "bad_hit": [],
         "good_hit": [
-          "page=",
-          "cursor=",
-          "LegacyCursorError"
+          "page="
         ],
-        "evidence": "bad_pattern 매칭: after=, before="
+        "evidence": "good_pattern 매칭: page="
       },
       {
         "lang": "go",
         "trap_id": "or_combinator",
-        "verdict": "FAIL",
-        "bad_hit": [
-          "axhub.Or("
-        ],
+        "verdict": "PASS",
+        "bad_hit": [],
         "good_hit": [
           ".In("
         ],
-        "evidence": "bad_pattern 매칭: axhub.Or("
+        "evidence": "good_pattern 매칭: .In("
       },
       {
         "lang": "java",
@@ -146,10 +134,9 @@
         "good_hit": [
           "orders.list(",
           "data.discover(",
-          "do not hand-roll",
           "DataTableClient"
         ],
-        "evidence": "good_pattern 매칭: orders.list(, data.discover(, do not hand-roll, DataTableClient"
+        "evidence": "good_pattern 매칭: orders.list(, data.discover(, DataTableClient"
       },
       {
         "lang": "kotlin",
@@ -164,17 +151,19 @@
       {
         "lang": "ruby",
         "trap_id": "or_combinator",
-        "verdict": "FAIL",
+        "verdict": "PASS",
         "bad_hit": [],
-        "good_hit": [],
-        "evidence": "패턴 미매칭 → ambiguous_default=FAIL"
+        "good_hit": [
+          ".in_(["
+        ],
+        "evidence": "good_pattern 매칭: .in_(["
       }
     ]
   },
   "comparison": {
-    "ok": false,
-    "reason": "packs+MCP(2) < packs-only(3) ✗ — 회귀"
+    "ok": true,
+    "reason": "packs+MCP(6) ≥ packs-only(6) ✓"
   },
-  "gate_pass": false,
+  "gate_pass": true,
   "retry_log": []
 }
