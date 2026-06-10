@@ -280,3 +280,48 @@ describe("migrate SKILL contract", () => {
     }
   });
 });
+
+describe("migrate SKILL flow hardening (2026-06-10 드라이런 회귀 방지)", () => {
+  const skill = read("skills/migrate/SKILL.md");
+
+  test("device flow 는 승인 신호 후 에이전트가 직접 resume 해요", () => {
+    expect(skill).toContain("--resume-last");
+    expect(skill).toContain("승인했어");
+    expect(skill).toContain("제가 이어서 마무리할게요");
+    expect(skill).toContain("../github/SKILL.md");
+  });
+
+  test("installation gate 가 명시돼 있어요", () => {
+    expect(skill).toContain("not_in_installation");
+    expect(skill).toContain("install_url");
+    expect(skill).toContain("installed:true");
+  });
+
+  test("stage 기록은 drafts 초안 + helper 단일 경로예요", () => {
+    expect(skill).toContain("drafts/");
+    expect(skill).toMatch(/NEVER `stages\/` 아래 파일을 Write\/Edit 로 직접/);
+  });
+
+  test("mutation 은 migrate-approve 이후에만이에요", () => {
+    expect(skill).toContain("migrate-approve --run-json");
+    expect(skill).toMatch(/NEVER `migrate-approve` 성공 없이 mutation/);
+  });
+
+  test("plan_only hard-stop 과 push 는 불가침이에요", () => {
+    expect(skill).toMatch(/NEVER plan_only hard-stop/);
+    expect(skill).toContain("git filter-repo");
+    expect(skill).toMatch(/NEVER 사용자 repo 에 `git push`/);
+  });
+
+  test("critic/reviewer stage-write 는 verdict 를 전달해요", () => {
+    expect(skill).toContain("--verdict");
+  });
+
+  test("stage agent 5종에 secret 값 기록 금지 rule 이 있어요", () => {
+    const agents = ["discoverer", "planner", "architect", "critic", "reviewer"];
+    for (const name of agents) {
+      const agent = read(`agents/axhub-migrate-${name}.md`);
+      expect(agent).toContain("값·값 일부(prefix, 마스킹된 조각 포함)는 어떤 산출물에도 적지 않아요");
+    }
+  });
+});
