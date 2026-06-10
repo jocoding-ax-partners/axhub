@@ -91,6 +91,18 @@ enum Commands {
     #[cfg(feature = "ast")]
     ScanSites(args::ScanSitesArgs),
 
+    /// stdio MCP 서버 (Track H frontend 3). validate/scan-sites 엔진을 MCP tool 로
+    /// 노출해요. `.mcp.json` 의 local 항목이 이 명령을 stdio 로 띄워요. 클라이언트
+    /// 연결이 닫힐 때까지 실행돼요.
+    #[cfg(feature = "mcp")]
+    McpServe,
+
+    /// `.mcp.json` 설치/머지 (Track H §D.2). 대상 프로젝트의 `.mcp.json` 에 axhub
+    /// local(stdio mcp-serve) + remote(ax-mcp) 두 항목만 추가/갱신하고 기존 사용자
+    /// 항목은 보존해요. init/migrate SKILL 이 호출해요.
+    #[cfg(feature = "mcp")]
+    McpInstall(args::McpInstallArgs),
+
     /// 전환기 raw passthrough — legacy dispatch 로 위임. Polish 에서 제거.
     #[command(external_subcommand)]
     Passthrough(Vec<String>),
@@ -304,6 +316,14 @@ fn dispatch(command: Commands) -> i32 {
         #[cfg(feature = "ast")]
         Commands::ScanSites(a) => {
             run_result(axhub_helpers::site_scan::run_scan_sites(&a.paths, a.json))
+        }
+
+        #[cfg(feature = "mcp")]
+        Commands::McpServe => run_result(axhub_helpers::mcp_serve::run_mcp_serve()),
+
+        #[cfg(feature = "mcp")]
+        Commands::McpInstall(a) => {
+            run_result(axhub_helpers::mcp_config::run_mcp_install(a.dir, a.command))
         }
 
         Commands::Passthrough(tokens) => {

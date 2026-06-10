@@ -43,8 +43,16 @@ tree-sitter-ruby = { version = "0.23", optional = true }
 tree-sitter-kotlin-ng = { version = "=1.1.0", optional = true }
 fancy-regex = { version = "0.18", optional = true }
 
+# Track H frontend 3 (stdio MCP): rmcp 의 stdio transport(`transport-io`)만 — http
+# 스택(axum/reqwest/rustls)은 피해요. rmcp 1.7 = edition 2024 manifest → workspace
+# rust-version 1.85 필요(rust-toolchain.toml 고정).
+rmcp = { version = "1.7", features = ["server", "transport-io"], optional = true }
+
 [features]
-default = ["ast"]
+# `mcp` 는 default-ON: shipped 바이너리에 mcp-serve 가 있어야 .mcp.json 의 local
+# stdio 항목이 죽은 참조가 안 돼요.
+default = ["ast", "mcp"]
+mcp = ["dep:rmcp", "ast"]
 # `ast` 끄면(--no-default-features) tree-sitter/grammar/C 컴파일 0, 바이너리 불변.
 # size assert(T4)는 ast-enabled 빌드 대상이에요.
 ast = [
@@ -58,6 +66,9 @@ ast = [
     "dep:tree-sitter-kotlin-ng",
     "dep:fancy-regex",
 ]
+
+[lints]
+workspace = true
 
 [build-dependencies]
 anyhow.workspace = true

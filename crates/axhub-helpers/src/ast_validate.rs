@@ -435,7 +435,8 @@ fn walk_dir(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
 
 /// `validate <paths...> [--json]` 진입점. exit 0=클린/advisory, 1=block 위반.
 /// parse 실패는 위반으로 치지 않고 경고만(fail-open).
-pub fn run_validate(paths: &[String], json: bool) -> Result<i32> {
+/// 경로들을 검사해 구조화된 결과를 만들어요(출력/exit 없음 — CLI 와 MCP tool 공용).
+pub fn validate_paths(paths: &[String]) -> Result<ValidateOutput> {
     let rules = load_rules()?;
     let files = collect_target_files(paths);
 
@@ -458,9 +459,8 @@ pub fn run_validate(paths: &[String], json: bool) -> Result<i32> {
 
     let block_count = violations.iter().filter(|v| !v.advisory_only).count();
     let advisory_count = violations.len() - block_count;
-    let exit = i32::from(block_count > 0);
 
-    let output = ValidateOutput {
+    Ok(ValidateOutput {
         schema_version: "validate/v1".to_string(),
         status: if block_count > 0 { "violations" } else { "ok" }.to_string(),
         files_scanned,
@@ -468,8 +468,13 @@ pub fn run_validate(paths: &[String], json: bool) -> Result<i32> {
         advisory_count,
         violations,
         parse_failures,
-    };
+    })
+}
 
+/// `validate <paths...> [--json]` 진입점. exit 0=클린/advisory, 1=block 위반.
+pub fn run_validate(paths: &[String], json: bool) -> Result<i32> {
+    let output = validate_paths(paths)?;
+    let exit = i32::from(output.block_count > 0);
     if json {
         println!("{}", serde_json::to_string(&output)?);
     } else {

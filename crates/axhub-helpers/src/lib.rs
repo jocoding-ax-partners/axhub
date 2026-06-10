@@ -3,6 +3,13 @@ pub mod atomic_jsonl;
 /// tree-sitter 마스킹 + regex 로 검사해요. 배포/런타임 검증인 `verify*` 와 별개예요.
 #[cfg(feature = "ast")]
 pub mod ast_validate;
+/// Track H frontend 3 — stdio MCP 서버 (feature "mcp"). validator/site-scan 엔진을
+/// MCP tool 로 노출해요(transport-io stdio 만).
+#[cfg(feature = "mcp")]
+pub mod mcp_serve;
+/// Track H — `.mcp.json` idempotent 설치/머지 (feature "mcp"). 순수 JSON, rmcp 무의존.
+#[cfg(feature = "mcp")]
+pub mod mcp_config;
 pub mod autowire;
 pub mod axhub_cli;
 pub mod cli_drift;

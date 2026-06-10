@@ -272,6 +272,19 @@ pub(crate) struct ScanSitesArgs {
     pub json: bool,
 }
 
+/// `mcp-install` flags (Track H §D.2). `<dir>/.mcp.json` 에 axhub local(stdio mcp-serve)
+/// + remote(ax-mcp) 항목을 idempotent 머지해요(기존 사용자 항목 보존). classify=Normal.
+#[cfg(feature = "mcp")]
+#[derive(clap::Args, Debug)]
+pub(crate) struct McpInstallArgs {
+    /// 대상 디렉터리 (기본: 현재 디렉터리). `<dir>/.mcp.json` 을 머지해요.
+    #[arg(long)]
+    pub dir: Option<String>,
+    /// local stdio 서버 command override (기본: `axhub-helpers`).
+    #[arg(long)]
+    pub command: Option<String>,
+}
+
 /// `diagnose hitl` flags (nested). session/prompts 필수·TTY 검증은 handler. classify=Normal.
 #[derive(clap::Args, Debug)]
 pub(crate) struct DiagnoseHitlArgs {

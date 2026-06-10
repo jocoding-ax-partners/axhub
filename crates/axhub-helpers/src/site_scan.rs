@@ -136,9 +136,8 @@ fn scan_source_sites(
     Some(sites)
 }
 
-/// `scan-sites <paths...> [--json]` 진입점. 항상 exit 0(finder). parse 실패는
-/// parse_failures 로 기록하고 계속해요.
-pub fn run_scan_sites(paths: &[String], json: bool) -> Result<i32> {
+/// 경로들을 스캔해 구조화된 결과를 만들어요(출력/exit 없음 — CLI 와 MCP tool 공용).
+pub fn scan_paths(paths: &[String]) -> ScanSitesOutput {
     let rules = compile_rules();
     let files = collect_target_files(paths);
 
@@ -171,12 +170,17 @@ pub fn run_scan_sites(paths: &[String], json: bool) -> Result<i32> {
         }
     }
 
-    let output = ScanSitesOutput {
+    ScanSitesOutput {
         schema_version: "scan-sites/v1".to_string(),
         files_scanned,
         sites,
         parse_failures,
-    };
+    }
+}
+
+/// `scan-sites <paths...> [--json]` 진입점. 항상 exit 0(finder).
+pub fn run_scan_sites(paths: &[String], json: bool) -> Result<i32> {
+    let output = scan_paths(paths);
 
     if json {
         println!("{}", serde_json::to_string(&output)?);
