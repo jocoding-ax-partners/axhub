@@ -14,7 +14,7 @@
  * performs the authoritative 5-platform build in matrix jobs.
  */
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import packageJson from "../package.json" with { type: "json" };
@@ -49,6 +49,43 @@ const assertVersion = (relativePath: string): void => {
   log(`  ✓ ${relativePath} = ${version}`);
 };
 
+// ── Track H: AST validator binary size guard (측정-우선, plan §H1.7) ──
+//
+// `build-rust-helper.ts` 가 만드는 artifact = `cargo build --release` 산출물
+// (UNSTRIPPED — release.yml 가 배포 전 별도 strip). 그래서 한도도 unstripped 기준.
+//
+// 측정 (host darwin-arm64):
+//   baseline (ast off / grammar-free) = 7,405,936 B
+//   post     (ast on  / grammar 8종)  = 18,018,208 B  (+10.1 MiB, +143% unstripped;
+//                                                       배포물은 stripped 라 더 작음)
+//   host ceiling = post × 1.15 = 20,720,939 B
+//
+// cross-arch 한도 = host post × (arch_stripped_baseline / host_stripped_baseline)
+//                   × 1.15  (v0.9.44 배포 자산 크기 비율로 도출 — host 만 실측,
+//                   나머지는 release.yml 실측치로 후속 tighten 가능).
+const BINARY_SIZE_CEILING_BYTES: Record<string, number> = {
+  "axhub-helpers-darwin-arm64": 20_720_939,
+  "axhub-helpers-darwin-amd64": 22_370_925,
+  "axhub-helpers-linux-amd64": 24_753_667,
+  "axhub-helpers-linux-arm64": 29_129_663,
+  "axhub-helpers-windows-amd64.exe": 25_080_542,
+};
+
+const assertBinarySize = (relativePath: string, assetName: string): void => {
+  const ceiling = BINARY_SIZE_CEILING_BYTES[assetName];
+  if (ceiling === undefined) return; // 알 수 없는 asset — gate 걸지 않음
+  const binPath = join(REPO_ROOT, relativePath);
+  if (!existsSync(binPath)) fail(`${relativePath} missing for size assert`);
+  const size = statSync(binPath).size;
+  if (size > ceiling) {
+    fail(
+      `${relativePath} size ${size} B exceeds ceiling ${ceiling} B (measured baseline +15%). ` +
+        `grammar 추가로 바이너리 비대 — Cargo \`ast\` feature/strip/codegen 검토.`,
+    );
+  }
+  log(`  ✓ ${assetName} size ${size} B ≤ ${ceiling} B`);
+};
+
 const assertWorkflowMatrix = (): void => {
   const releaseYml = readFileSync(join(REPO_ROOT, ".github/workflows/release.yml"), "utf8");
   for (const { target } of RUST_TARGETS) {
@@ -74,6 +111,13 @@ const main = (): void => {
   const hostName = hostAssetName();
   if (hostName && hostName !== hostPrimaryName()) assertVersion(`bin/${hostName}`);
 
+  log("step 3b: host binary size assert (Track H AST validator — measured +15%)");
+  if (hostName) {
+    assertBinarySize(`bin/${hostName}`, hostName);
+  } else {
+    log("  · host arch not in release matrix — size assert delegated to full matrix");
+  }
+
   log("step 4/4: verify 5-asset release wiring");
   assertWorkflowMatrix();
 
@@ -84,6 +128,8 @@ const main = (): void => {
       if (!existsSync(join(BIN_DIR, bin))) fail(`bin/${bin} missing after build:all`);
     }
     if (hostName) assertVersion(`bin/${hostName}`);
+    log("full matrix: per-arch binary size assert (Track H)");
+    for (const { assetName } of RUST_TARGETS) assertBinarySize(`bin/${assetName}`, assetName);
   } else {
     log("full matrix build delegated to release.yml; set AXHUB_RELEASE_CHECK_FULL=1 to force local build:all");
   }
