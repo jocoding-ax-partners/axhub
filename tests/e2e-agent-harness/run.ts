@@ -142,6 +142,71 @@ function findClaudeBin(): string {
   throw new Error("claude 바이너리를 찾을 수 없어요. ~/.local/bin/claude 를 확인해요.");
 }
 
+// ── MCP 헬스체크 ─────────────────────────────────────────────────────────────
+/**
+ * MCP 서버 URL 결정: AXHUB_E2E_MCP_URL env 가 mcp-config 보다 우선해요.
+ */
+function resolveMcpServerUrl(mcpConfigPath: string): { url: string; source: string } {
+  const envUrl = process.env.AXHUB_E2E_MCP_URL;
+  if (envUrl) return { url: envUrl, source: "env AXHUB_E2E_MCP_URL" };
+  const cfg = JSON.parse(readFileSync(mcpConfigPath, "utf8"));
+  const url = cfg?.mcpServers?.["axhub-mcp"]?.url;
+  if (typeof url !== "string" || url === "") {
+    throw new Error(`mcp-config 에 mcpServers["axhub-mcp"].url 이 없어요: ${mcpConfigPath}`);
+  }
+  return { url, source: mcpConfigPath };
+}
+
+/**
+ * packs-mcp 실행 전 서버 도달성 확인. 도달 불가면 hard-fail 해요.
+ * (서버가 죽어 있으면 B 조건이 사실상 A 조건으로 측정돼 A/B 비교가 무효화돼요.)
+ * HTTP 응답이 오기만 하면 도달로 간주해요 (상태코드 무관 — 목적은 reachability).
+ */
+async function checkMcpReachable(url: string): Promise<void> {
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 0, method: "ping" }),
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch (e) {
+    throw new Error(
+      `MCP 서버 도달 불가: ${url}\n  원인: ${String(e)}\n  서버를 먼저 띄우거나 AXHUB_E2E_MCP_URL 로 URL/포트를 override 해요.`
+    );
+  }
+}
+
+/**
+ * AXHUB_E2E_MCP_URL override 시 URL 을 치환한 effective mcp-config 를 생성해요.
+ */
+function materializeEffectiveMcpConfig(mcpConfigPath: string, url: string): string {
+  const cfg = JSON.parse(readFileSync(mcpConfigPath, "utf8"));
+  const next = {
+    ...cfg,
+    mcpServers: {
+      ...cfg.mcpServers,
+      "axhub-mcp": { ...cfg.mcpServers?.["axhub-mcp"], url },
+    },
+  };
+  mkdirSync(OUTPUT_DIR, { recursive: true });
+  const effPath = join(OUTPUT_DIR, "mcp-config.effective.json");
+  writeFileSync(effPath, JSON.stringify(next, null, 2));
+  return effPath;
+}
+
+// ── TASK.md frontmatter 제거 ──────────────────────────────────────────────────
+/**
+ * TASK.md 의 YAML frontmatter (trap_id/trap_kind 등 채점 메타데이터) 를 제거해요.
+ * 함정 정답이 프롬프트로 누출되면 "에이전트가 스스로 함정을 피하는가" 측정이 무효화돼요.
+ */
+export function stripTaskFrontmatter(md: string): string {
+  return md.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "");
+}
+
 // ── 시스템 프롬프트 구성 ──────────────────────────────────────────────────────
 function buildSystemPrompt(lang: Lang, condition: RunArgs["condition"]): string {
   const packPath = join(SDK_PACKS_DIR, `${lang}.md`);
@@ -193,20 +258,23 @@ function runClaudeOnce(
   maxTurns: number,
   outDir: string
 ): SpawnSyncReturns<string> {
+  // A/B 조건 대칭화: 양 조건 동일 베이스 툴 + --strict-mcp-config (전역 MCP 차단).
+  // 차이는 mcp-config + sdk_search 허용 여부뿐이어야 측정이 유효해요.
+  const BASE_TOOLS = "Bash,Read,Write,Edit,Glob,Grep";
   const cliArgs = [
     "-p",
     "--system-prompt", systemPrompt,
     "--output-format", "text",
     "--max-turns", String(maxTurns),
+    "--strict-mcp-config",
   ];
 
   if (mcpConfig && condition === "packs-mcp") {
     cliArgs.push("--mcp-config", mcpConfig);
     // MCP tool 명시 허용: 서버명 axhub-mcp → mcp__axhub-mcp__sdk_search
-    cliArgs.push(
-      "--allowedTools",
-      "Bash,Read,Write,Edit,Glob,Grep,mcp__axhub-mcp__sdk_search"
-    );
+    cliArgs.push("--allowedTools", `${BASE_TOOLS},mcp__axhub-mcp__sdk_search`);
+  } else {
+    cliArgs.push("--allowedTools", BASE_TOOLS);
   }
 
   return spawnSync(claudeBin, cliArgs, {
@@ -228,7 +296,8 @@ function runClaude(
   retryLog: RetryEntry[]
 ): ClaudeResult {
   const taskPath = join(HARNESS_DIR, "tasks", lang, "TASK.md");
-  const taskText = readFileSync(taskPath, "utf8");
+  // frontmatter (trap_id 등 채점 메타) 는 프롬프트 파이프 전에 strip — 정답 누출 방지
+  const taskText = stripTaskFrontmatter(readFileSync(taskPath, "utf8"));
   const systemPrompt = buildSystemPrompt(lang, condition);
 
   const outDir = join(OUTPUT_DIR, condition, lang);
@@ -428,7 +497,23 @@ async function main() {
     }
   }
 
-  const gradeResults = runCondition(args, claudeBin, retryLog);
+  // packs-mcp 라이브 실행 전 MCP 헬스체크 (도달 불가 → hard-fail)
+  let effectiveArgs = args;
+  if (args.condition === "packs-mcp" && !args.smoke && !args.dryRun && args.mcpConfig) {
+    try {
+      const { url, source } = resolveMcpServerUrl(args.mcpConfig);
+      await checkMcpReachable(url);
+      console.log(`MCP 헬스체크 ✓ ${url} (${source})`);
+      if (process.env.AXHUB_E2E_MCP_URL) {
+        effectiveArgs = { ...args, mcpConfig: materializeEffectiveMcpConfig(args.mcpConfig, url) };
+      }
+    } catch (e) {
+      console.error(String(e instanceof Error ? e.message : e));
+      process.exit(1);
+    }
+  }
+
+  const gradeResults = runCondition(effectiveArgs, claudeBin, retryLog);
 
   if (!args.dryRun) {
     const condition = args.smoke ? "packs-only" : args.condition;
@@ -451,4 +536,7 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// 테스트에서 export 헬퍼 (stripTaskFrontmatter 등) import 시 실행 방지
+if (import.meta.main) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}
