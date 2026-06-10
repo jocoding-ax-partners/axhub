@@ -45,9 +45,7 @@ pub fn merge_mcp_json(existing: Option<&str>, local_command: &str) -> Result<Str
     if !root.is_object() {
         bail!(".mcp.json 최상위가 JSON object 가 아니에요");
     }
-    let obj = root
-        .as_object_mut()
-        .context(".mcp.json object 접근 실패")?;
+    let obj = root.as_object_mut().context(".mcp.json object 접근 실패")?;
     let servers_entry = obj.entry("mcpServers").or_insert_with(|| json!({}));
     if !servers_entry.is_object() {
         bail!(".mcp.json 의 mcpServers 가 object 가 아니에요");
@@ -69,6 +67,18 @@ pub fn merge_mcp_json(existing: Option<&str>, local_command: &str) -> Result<Str
     Ok(serde_json::to_string_pretty(&root)?)
 }
 
+/// `merged` 를 temp 파일에 쓴 뒤 rename 으로 원자 교체해요 — 쓰기 도중 크래시가
+/// 나도 기존 `.mcp.json` 이 반쯤 깨진 상태로 남지 않아요.
+fn write_atomic(path: &std::path::Path, content: &str) -> Result<()> {
+    let tmp = path.with_file_name(".mcp.json.tmp");
+    std::fs::write(&tmp, content).with_context(|| format!("{} 쓰기 실패", tmp.display()))?;
+    if let Err(e) = std::fs::rename(&tmp, path) {
+        let _ = std::fs::remove_file(&tmp); // best-effort 청소
+        return Err(e).with_context(|| format!("{} 교체 실패", path.display()));
+    }
+    Ok(())
+}
+
 /// `mcp-install [--dir <d>] [--command <c>]` 진입점. `<dir>/.mcp.json` 을 머지(없으면
 /// 생성)해요. 미설치/미연결 환경은 차단하지 않고 안내만 — packs floor 무손상.
 pub fn run_mcp_install(dir: Option<String>, local_command: Option<String>) -> Result<i32> {
@@ -77,11 +87,19 @@ pub fn run_mcp_install(dir: Option<String>, local_command: Option<String>) -> Re
         None => std::env::current_dir()?,
     };
     let path = dir.join(".mcp.json");
-    let existing = std::fs::read_to_string(&path).ok();
+    // NotFound 만 "신규 생성" — 그 외(비UTF8 InvalidData, PermissionDenied 등)는
+    // 기존 파일이 있는데 못 읽은 것이라 덮어쓰면 사용자 설정이 파괴돼요 → bail.
+    let existing = match std::fs::read_to_string(&path) {
+        Ok(s) => Some(s),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => bail!(
+            "{} 읽기 실패({e}) — 기존 파일을 덮어쓰지 않으려고 중단해요. 인코딩/권한을 확인해 주세요.",
+            path.display()
+        ),
+    };
     let command = local_command.unwrap_or_else(|| "axhub-helpers".to_string());
     let merged = merge_mcp_json(existing.as_deref(), &command)?;
-    std::fs::write(&path, format!("{merged}\n"))
-        .with_context(|| format!("{} 쓰기 실패", path.display()))?;
+    write_atomic(&path, &format!("{merged}\n"))?;
     println!(
         "✅ .mcp.json 갱신: {} (local: `{} mcp-serve`, remote: {})",
         path.display(),
@@ -112,7 +130,8 @@ mod tests {
 
     #[test]
     fn preserves_existing_user_servers() {
-        let existing = r#"{"mcpServers":{"my-tool":{"command":"my-tool","args":["x"]}},"other":42}"#;
+        let existing =
+            r#"{"mcpServers":{"my-tool":{"command":"my-tool","args":["x"]}},"other":42}"#;
         let out = merge_mcp_json(Some(existing), "axhub-helpers").unwrap();
         let v: Value = serde_json::from_str(&out).unwrap();
         // 사용자 항목 보존
@@ -153,6 +172,49 @@ mod tests {
     }
 
     #[test]
+    fn install_bails_on_unreadable_existing_and_preserves_original() {
+        // 비UTF8 기존 파일(read_to_string → InvalidData) → bail + 원본 byte 보존.
+        let _guard = crate::PROCESS_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".mcp.json");
+        let original: &[u8] = &[0xFF, 0xFE, b'{', 0x80, b'}'];
+        std::fs::write(&path, original).unwrap();
+        let r = run_mcp_install(Some(dir.path().to_string_lossy().into_owned()), None);
+        assert!(r.is_err(), "비UTF8 기존 파일은 bail 이어야 해요");
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            original,
+            "bail 시 원본이 byte 그대로 보존돼야 해요"
+        );
+    }
+
+    #[test]
+    fn install_creates_new_file_when_missing() {
+        // NotFound 는 "신규 생성" 경로 — bail 하지 않고 양 서버 항목을 써요.
+        let _guard = crate::PROCESS_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        std::env::remove_var(ENV_REMOTE_MCP_URL);
+        let dir = tempfile::tempdir().unwrap();
+        let code = run_mcp_install(
+            Some(dir.path().to_string_lossy().into_owned()),
+            Some("axhub-helpers".to_string()),
+        )
+        .unwrap();
+        assert_eq!(code, 0);
+        let written = std::fs::read_to_string(dir.path().join(".mcp.json")).unwrap();
+        let m = servers(&written);
+        assert!(m.contains_key("axhub-helpers"), "local 항목");
+        assert!(m.contains_key("axhub"), "remote 항목");
+        assert!(
+            !dir.path().join(".mcp.json.tmp").exists(),
+            "temp 파일이 남으면 안 돼요(rename 완료)"
+        );
+    }
+
+    #[test]
     fn env_override_changes_remote_url() {
         let _guard = crate::PROCESS_ENV_LOCK
             .lock()
@@ -160,7 +222,10 @@ mod tests {
         std::env::set_var(ENV_REMOTE_MCP_URL, "https://custom.example/mcp");
         let out = merge_mcp_json(None, "axhub-helpers").unwrap();
         let v: Value = serde_json::from_str(&out).unwrap();
-        assert_eq!(v["mcpServers"]["axhub"]["url"], "https://custom.example/mcp");
+        assert_eq!(
+            v["mcpServers"]["axhub"]["url"],
+            "https://custom.example/mcp"
+        );
         std::env::remove_var(ENV_REMOTE_MCP_URL);
     }
 }
