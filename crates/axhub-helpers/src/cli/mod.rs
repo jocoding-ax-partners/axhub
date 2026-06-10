@@ -85,6 +85,12 @@ enum Commands {
     #[cfg(feature = "ast")]
     AstValidate,
 
+    /// 변환 사이트 스캐너 (Track H §H2, 신규). migrate 플로우용 finder — raw HTTP
+    /// client 직타, 직접 DB driver, 하드코딩 API URL 을 6언어 AST 로 찾아
+    /// `{file,line,kind,snippet}` JSON 으로 내요. 항상 exit 0(gate 아님).
+    #[cfg(feature = "ast")]
+    ScanSites(args::ScanSitesArgs),
+
     /// 전환기 raw passthrough — legacy dispatch 로 위임. Polish 에서 제거.
     #[command(external_subcommand)]
     Passthrough(Vec<String>),
@@ -294,6 +300,11 @@ fn dispatch(command: Commands) -> i32 {
         // (Err 변환으로 인한 비정상 exit code 회피).
         #[cfg(feature = "ast")]
         Commands::AstValidate => axhub_helpers::ast_validate::run_hook(),
+
+        #[cfg(feature = "ast")]
+        Commands::ScanSites(a) => {
+            run_result(axhub_helpers::site_scan::run_scan_sites(&a.paths, a.json))
+        }
 
         Commands::Passthrough(tokens) => {
             let Some((cmd, rest)) = tokens.split_first() else {

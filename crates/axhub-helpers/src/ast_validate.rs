@@ -140,7 +140,8 @@ pub(crate) enum Grammar {
 }
 
 /// 확장자 → (grammar, 룰 `applies_lang` 키). ts/tsx/js 는 전부 "node" 키예요.
-fn detect_lang(path: &Path) -> Option<(Grammar, &'static str)> {
+/// site_scan 도 같은 언어 매핑을 써요(엔진 한 벌).
+pub(crate) fn detect_lang(path: &Path) -> Option<(Grammar, &'static str)> {
     let ext = path.extension()?.to_str()?.to_ascii_lowercase();
     let pair = match ext.as_str() {
         "ts" | "mts" | "cts" => (Grammar::Typescript, "node"),
@@ -156,7 +157,7 @@ fn detect_lang(path: &Path) -> Option<(Grammar, &'static str)> {
     Some(pair)
 }
 
-fn ts_language(grammar: Grammar) -> Language {
+pub(crate) fn ts_language(grammar: Grammar) -> Language {
     match grammar {
         Grammar::Typescript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
         Grammar::Tsx => tree_sitter_typescript::LANGUAGE_TSX.into(),
@@ -218,8 +219,25 @@ fn apply_mask(source: &str, spans: &[(usize, usize)]) -> String {
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
+/// 소스를 파싱해 2벌 마스킹 버퍼를 만들어요(엔진 한 벌 — site_scan 도 재사용).
+/// 반환: `(주석만 마스킹, 주석+문자열 마스킹)`. parse 실패면 None.
+pub(crate) fn build_masks(source: &str, grammar: Grammar) -> Option<(String, String)> {
+    let mut parser = Parser::new();
+    parser.set_language(&ts_language(grammar)).ok()?;
+    let tree = parser.parse(source.as_bytes(), None)?;
+    let mut comments = Vec::new();
+    let mut strings = Vec::new();
+    collect_mask_spans(tree.root_node(), &mut comments, &mut strings);
+    let masked_no_comments = apply_mask(source, &comments);
+    let mut all_spans = Vec::with_capacity(comments.len() + strings.len());
+    all_spans.extend_from_slice(&comments);
+    all_spans.extend_from_slice(&strings);
+    let masked_code_only = apply_mask(source, &all_spans);
+    Some((masked_no_comments, masked_code_only))
+}
+
 /// byte offset → (1-base line, 1-base column). column 은 문자 단위예요.
-fn line_col(source: &str, offset: usize) -> (usize, usize) {
+pub(crate) fn line_col(source: &str, offset: usize) -> (usize, usize) {
     let mut line = 1usize;
     let mut col = 1usize;
     for (idx, ch) in source.char_indices() {
@@ -310,22 +328,8 @@ pub(crate) fn scan_source(
     file: &str,
     rules: &[CompiledRule],
 ) -> Result<Vec<Violation>> {
-    let mut parser = Parser::new();
-    parser
-        .set_language(&ts_language(grammar))
-        .map_err(|e| anyhow::anyhow!("set_language 실패: {e}"))?;
-    let tree = parser
-        .parse(source.as_bytes(), None)
+    let (masked_no_comments, masked_code_only) = build_masks(source, grammar)
         .ok_or_else(|| anyhow::anyhow!("tree-sitter parse 실패"))?;
-
-    let mut comments = Vec::new();
-    let mut strings = Vec::new();
-    collect_mask_spans(tree.root_node(), &mut comments, &mut strings);
-    let masked_no_comments = apply_mask(source, &comments);
-    let mut all_spans = Vec::with_capacity(comments.len() + strings.len());
-    all_spans.extend_from_slice(&comments);
-    all_spans.extend_from_slice(&strings);
-    let masked_code_only = apply_mask(source, &all_spans);
 
     let mut violations = Vec::new();
     for rule in rules {
@@ -383,7 +387,7 @@ fn scan_file(path: &Path, rules: &[CompiledRule]) -> ScanOutcome {
     }
 }
 
-fn collect_target_files(paths: &[String]) -> Vec<PathBuf> {
+pub(crate) fn collect_target_files(paths: &[String]) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for p in paths {
         let path = Path::new(p);
@@ -392,7 +396,7 @@ fn collect_target_files(paths: &[String]) -> Vec<PathBuf> {
         } else if path.is_dir() {
             walk_dir(path, 0, &mut out);
         } else {
-            eprintln!("axhub-helpers validate: 경로를 찾을 수 없어요 — {p} (건너뛰어요)");
+            eprintln!("axhub-helpers: 경로를 찾을 수 없어요 — {p} (건너뛰어요)");
         }
     }
     out

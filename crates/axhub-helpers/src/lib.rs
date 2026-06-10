@@ -52,6 +52,9 @@ pub mod runtime_paths;
 pub mod scaffold;
 pub mod session_bundle;
 pub mod settings_merge;
+/// Track H — 변환 사이트 스캐너 (feature "ast"). ast_validate 엔진 재사용.
+#[cfg(feature = "ast")]
+pub mod site_scan;
 pub mod snippet;
 pub mod spawn;
 pub mod statusline;

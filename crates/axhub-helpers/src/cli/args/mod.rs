@@ -259,6 +259,19 @@ pub(crate) struct ValidateArgs {
     pub json: bool,
 }
 
+/// `scan-sites` flags (Track H §H2). migrate 변환 후보(raw HTTP client 직타, 직접
+/// DB driver, 하드코딩 API URL)를 6언어 AST 로 찾아 `{file,line,kind,snippet}` 로
+/// 내요. 항상 exit 0(finder). classify=Normal.
+#[cfg(feature = "ast")]
+#[derive(clap::Args, Debug)]
+pub(crate) struct ScanSitesArgs {
+    /// 스캔할 파일 또는 디렉터리 경로 (1개 이상)
+    #[arg(required = true, value_name = "PATHS")]
+    pub paths: Vec<String>,
+    #[arg(long)]
+    pub json: bool,
+}
+
 /// `diagnose hitl` flags (nested). session/prompts 필수·TTY 검증은 handler. classify=Normal.
 #[derive(clap::Args, Debug)]
 pub(crate) struct DiagnoseHitlArgs {
