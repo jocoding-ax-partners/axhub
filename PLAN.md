@@ -963,6 +963,16 @@ Apply skill workflow as defined in skills/deploy/SKILL.md. Slash invocation does
 
 ### 16.6 CANCELED Plugin MCP Placeholder Spec (historical only)
 
+> **⚠️ 2026-06-10 재철회 (un-cancel) — supersession.** 아래 rows 61–64 의 MCP 제외
+> 결정은 `.omc/plans/ralplan-mcp-md-complement.md` (Planner/Architect/Critic
+> consensus) + 사용자 명시 승인으로 **철회**됐어요. 이제 helpers 가 **stdio MCP
+> 서버**(`axhub-helpers mcp-serve`, rmcp `transport-io` 만 — http 스택 없음)를 겸하고,
+> init/migrate 가 `.mcp.json` (local stdio `axhub-helpers` + remote ax-mcp `axhub`)을
+> 설치해요. "plugin이 MCP 를 호출" 우려와 다른 점: helpers 는 **서버로서 tool 을
+> 노출**할 뿐 사용자 코드는 로컬에서만 분석하고 서버로 전송하지 않아요(위치 원칙,
+> deep-interview R5 에서 거짓 이분법 해소). 본 §16.6 의 원문은 이력 보존용이에요 —
+> 현 진실의 원천은 ralplan 입니다. (rust-version 1.88 로 상향: rmcp 의존 트리 요구.)
+
 Rows 61–64 supersede the earlier M7 placeholder. The repository should **not** contain `.mcp.json`, a server-mode helper subcommand, MCP tool naming, or MCP consent-tool scaffolding for this plugin.
 
 The adapter layer (`bin/axhub-helpers`) remains the source of truth for testable helper behavior, but its job is CLI orchestration: skills/commands/hooks call the helper, and the helper calls `ax-hub-cli`. It does not expose an MCP server.

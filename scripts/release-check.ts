@@ -49,26 +49,28 @@ const assertVersion = (relativePath: string): void => {
   log(`  ✓ ${relativePath} = ${version}`);
 };
 
-// ── Track H: AST validator binary size guard (측정-우선, plan §H1.7) ──
+// ── Track H: AST validator + mcp-serve binary size guard (측정-우선, plan §H1.7/§D) ──
 //
 // `build-rust-helper.ts` 가 만드는 artifact = `cargo build --release` 산출물
 // (UNSTRIPPED — release.yml 가 배포 전 별도 strip). 그래서 한도도 unstripped 기준.
 //
-// 측정 (host darwin-arm64):
-//   baseline (ast off / grammar-free) = 7,405,936 B
-//   post     (ast on  / grammar 8종)  = 18,018,208 B  (+10.1 MiB, +143% unstripped;
-//                                                       배포물은 stripped 라 더 작음)
-//   host ceiling = post × 1.15 = 20,720,939 B
+// 측정 이력 (host darwin-arm64):
+//   T4: ast off(grammar-free)=7,405,936 B → ast on(grammar 8종)=18,018,208 B,
+//       host ceiling = post × 1.15 = 20,720,939 B (toolchain 1.96)
+//   T6 재산정: mcp default-ON 추가(rmcp transport-io + schemars/darling/tokio-util,
+//       toolchain 1.88) → 20,604,672 B (+2.6 MiB). 구 ceiling 의 99.4% 라 헤드룸
+//       부족 → 새 host ceiling = mcp-on post × 1.15 = 23,695,373 B.
+//   (배포물은 stripped 라 실제 ship size 는 더 작음.)
 //
 // cross-arch 한도 = host post × (arch_stripped_baseline / host_stripped_baseline)
 //                   × 1.15  (v0.9.44 배포 자산 크기 비율로 도출 — host 만 실측,
 //                   나머지는 release.yml 실측치로 후속 tighten 가능).
 const BINARY_SIZE_CEILING_BYTES: Record<string, number> = {
-  "axhub-helpers-darwin-arm64": 20_720_939,
-  "axhub-helpers-darwin-amd64": 22_370_925,
-  "axhub-helpers-linux-amd64": 24_753_667,
-  "axhub-helpers-linux-arm64": 29_129_663,
-  "axhub-helpers-windows-amd64.exe": 25_080_542,
+  "axhub-helpers-darwin-arm64": 23_695_373,
+  "axhub-helpers-darwin-amd64": 25_582_210,
+  "axhub-helpers-linux-amd64": 28_306_988,
+  "axhub-helpers-linux-arm64": 33_311_146,
+  "axhub-helpers-windows-amd64.exe": 28_680_784,
 };
 
 const assertBinarySize = (relativePath: string, assetName: string): void => {
