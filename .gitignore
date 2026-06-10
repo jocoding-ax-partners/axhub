@@ -74,3 +74,6 @@ tests/.tmp-*/
 .axhub/init-resume.json
 .axhub/scaffold-dev.json
 .axhub/scaffold-dev.log
+
+# 로컬 도구 상태 (MCP 서버가 세션 중 실시간 생성)
+.serena/
