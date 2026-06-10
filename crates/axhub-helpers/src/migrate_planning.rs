@@ -2811,8 +2811,7 @@ mod tests {
 
         // Target spec markdown + meta must exist: when approval stays non-pending,
         // migrate_stage_write asserts the spec markdown is present.
-        let (spec_md, spec_meta, _) =
-            spec_artifact_paths(&run_dir, &app_key, spec_id).unwrap();
+        let (spec_md, spec_meta, _) = spec_artifact_paths(&run_dir, &app_key, spec_id).unwrap();
         write_text_atomically(&spec_md, "# target spec").unwrap();
         write_json_atomically(
             &spec_meta,
@@ -3027,7 +3026,16 @@ mod tests {
         let (_dp, planner_r2) = draft("# planner r2");
         migrate_stage_write(&run_json, "planner", &planner_r2, None, None, None, None).unwrap();
         let (_da, architect_r2) = draft("# architect r2");
-        migrate_stage_write(&run_json, "architect", &architect_r2, None, None, None, None).unwrap();
+        migrate_stage_write(
+            &run_json,
+            "architect",
+            &architect_r2,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
         let (_dc2, critic_ok) = draft("# critic\n\n- okay");
         migrate_stage_write(
             &run_json,

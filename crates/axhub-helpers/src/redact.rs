@@ -34,9 +34,8 @@ static AWS_KEY_RE: LazyLock<Regex> =
 // Slack token taxonomy: xoxb(bot)/xoxp(user)/xoxa(app)/xoxo(workspace)/xoxs(session)/xoxr(refresh)/xoxe(export)
 static SLACK_TOKEN_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"xox[abeoprs]-[0-9A-Za-z-]{4,}").unwrap());
-static SLACK_WEBHOOK_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"https://hooks\.slack\.com/services/[A-Za-z0-9/_-]+").unwrap()
-});
+static SLACK_WEBHOOK_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"https://hooks\.slack\.com/services/[A-Za-z0-9/_-]+").unwrap());
 static PRIVATE_KEY_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?s)-----BEGIN [A-Z ]+PRIVATE KEY-----.*?-----END [A-Z ]+PRIVATE KEY-----")
         .unwrap()
@@ -228,7 +227,10 @@ mod tests {
         // NFKC 가 바꾸는 입력 (전각 "Ａ") + zero-width 문자, 시크릿 없음 → flag false
         let (out, masked) = redact_with_mask_flag("전각 Ａ 문자와 \u{200B} zero-width");
         assert!(!masked, "normalization-only change must not set mask flag");
-        assert!(!out.contains('\u{200B}'), "zero-width must be stripped: {out}");
+        assert!(
+            !out.contains('\u{200B}'),
+            "zero-width must be stripped: {out}"
+        );
     }
 
     #[test]
