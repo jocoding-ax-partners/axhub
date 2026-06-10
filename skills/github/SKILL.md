@@ -82,12 +82,14 @@ echo "$PREFLIGHT_JSON"
 
 1. **preflight 와 current app 을 확인해요.** 앱이 없으면 `apps` skill 흐름으로 먼저 고르게 해요.
 
-   **preflight 의 `cli_state` 를 보고 분기해요** (v0.9.6 부터 명시적 필드 emit). `cli_present:false` 만으로 "CLI 미설치 (PATH 에 없음)" 으로 해석하지 마세요 — cli_state 4 값에 따라 안내가 달라요:
+   **preflight 의 `cli_state` 를 보고 분기해요** (v0.9.6 부터 명시적 필드 emit). `cli_present:false` 만으로 "CLI 미설치 (PATH 에 없음)" 으로 해석하지 마세요 — cli_state 6 값에 따라 안내가 달라요:
 
    - `"ok"` → 정상, SKILL 흐름 그대로 진행
+   - `"on_disk_not_on_path"` → "axhub CLI 는 설치됐지만 PATH 에 아직 없어요. 'PATH 고쳐줘' 라고 말하면 이어서 점검할 수 있어요."
    - `"not_found"` → "axhub CLI 가 PATH 에서 안 보여요." "설치 도와줘"라고 말하면 CLI 설치를 확인할 수 있고, macOS Apple Silicon Homebrew 사용 중이면 `/opt/homebrew/bin` inherit 안 됐을 가능성이 있어요. "설치 상태 진단해줘"라고 말하면 진단할 수 있다고 안내해요.
    - `"config_corrupted"` → "axhub CLI 는 설치돼 있지만 `~/.config/axhub/config.yaml` 이 새 schema 와 안 맞아요 (예: user_id UUID vs int64 mismatch)." "다시 로그인해줘"라고 말하면 fresh config 가 작성되면서 자동 fix 될 수 있어요. (CLI 미설치 아니라 config drift 임을 명확히 구분)
    - `"runtime_error"` → "axhub CLI 가 실행은 됐지만 비정상 exit 했어요. 설치 상태 진단해줘라고 말하면 이어서 점검할 수 있어요."
+   - `"axhub_bin_invalid"` → `AXHUB_BIN` 환경변수가 잘못된 경로 (`cli_resolved_path` 값) 를 가리켜요. 재설치가 아니라 `unset AXHUB_BIN` (또는 셸 프로필 export 제거) 후 새 세션 재시도를 안내해요.
 
    진단 카드 / status 표시할 때 cli_state 별 메시지를 그대로 써요. `cli_present:false` 를 임의로 "PATH 에 없음" 으로 매핑하지 마세요.
 

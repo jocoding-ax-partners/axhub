@@ -396,7 +396,7 @@ model: sonnet                   # haiku|sonnet|opus
 | 필드 | 의미 |
 |------|------|
 | `cli_version` / `in_range` / `cli_too_old` / `cli_too_new` | CLI 버전과 지원 범위(0.17.3 ~ <1.0.0) |
-| `cli_present` / `cli_state` | CLI 존재 + 상태(`ok`/`not_found`/`config_corrupted`/`runtime_error`) |
+| `cli_present` / `cli_state` | CLI 존재 + 상태(`ok`/`on_disk_not_on_path`/`not_found`/`config_corrupted`/`runtime_error`/`axhub_bin_invalid`) — `axhub_bin_invalid` 는 `AXHUB_BIN` env 가 존재하지 않는 경로를 가리키는 상태 |
 | `auth_ok` / `auth_error_code` / `user_email` / `expires_at` / `scopes` | 인증 상태 |
 | `current_app` / `current_env` | 현재 앱 slug / profile |
 | `last_deploy_id` / `last_deploy_status` | 마지막 배포 |

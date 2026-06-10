@@ -187,7 +187,8 @@ To run diagnostics:
    | helper missing on Windows (PATH + plugin-local both missing) | "axhub-helpers.exe 바이너리가 없어요. Windows native 는 자동 SessionStart 다운로드가 아직 deferred 예요. 'powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:CLAUDE_PLUGIN_ROOT\\bin\\install.ps1\"' 수동 실행으로 복구해요." |
    | Windows artifact exists but `axhub-helpers.exe` missing | "다운로드 artifact 는 있지만 실행 파일 복사가 안 됐어요. 'powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:CLAUDE_PLUGIN_ROOT\\bin\\install.ps1\"' 로 다시 연결해요." |
    | Windows `install.ps1` missing | "install.ps1 이 없어서 플러그인 install 이 손상된 상태예요. '/plugin install axhub@axhub' 로 재설치해요." |
-   | `cli_present: false` | "axhub CLI 가 설치되어 있지 않아요." → 즉시 Step 5.5 의 AskUserQuestion 으로 설치 의향 확인 (사용자가 phrase 다시 발화 안 해도 됨) |
+   | `cli_present: false` + `cli_state: axhub_bin_invalid` | `AXHUB_BIN` 환경변수가 잘못된 경로 (`cli_resolved_path` 값) 를 가리켜요. 재설치 대신 `unset AXHUB_BIN` (또는 셸 프로필에서 export 제거) 후 새 세션을 열어서 재시도해요. |
+   | `cli_present: false` (그 외) | "axhub CLI 가 설치되어 있지 않아요." → 즉시 Step 5.5 의 AskUserQuestion 으로 설치 의향 확인 (사용자가 phrase 다시 발화 안 해도 됨) |
    | `cli_present:true` + `cli_state:on_disk_not_on_path` 또는 `cli_on_path:false` | "axhub CLI 는 설치됐지만 PATH 에 아직 없어요. 'PATH 고쳐줘' 라고 말씀해주세요." |
    | `cli_too_old: true` | "axhub가 너무 오래된 버전이에요 (v<CUR>). 'axhub 업그레이드해줘' 라고 말씀해주세요." |
    | `cli_too_new: true` | "axhub가 플러그인보다 최신이에요. 'axhub 플러그인 업데이트' 라고 말씀해주세요." |
