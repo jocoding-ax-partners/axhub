@@ -583,6 +583,12 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 
 4. **기존 mutation 경로 재사용.** 앱 등록, git 연결, env 값 저장, 배포는 위 CLI boundary contract 와 기존 approval 경로만 써요. helper 로 preview/approval 을 우회하지 않아요. `axhub apps git connect --execute` 는 GitHub 연결 승인 카드가 있어야만 실행해요. remote detect 는 v0.17.3 `axhub apps detect` read-only 로만 쓰고 (미배포 시 fallback 은 `axhub.yaml` 수동 입력이에요), mutation 은 preview+approval 뒤의 current CLI 명령으로만 진행해요.
 
+   git 연결 중 GitHub 인증·설치가 필요해지면 `../github/SKILL.md` 의 OAuth device flow 섹션과 installation gate 패턴을 그대로 따라요. 요약:
+
+   - **device flow (`device_code_issued` event):** verification URL + user_code 를 즉시 보여주고 이렇게만 안내해요 — "브라우저에서 승인한 다음 '승인했어' 라고 알려주세요. 제가 이어서 마무리할게요." 사용자가 승인 신호("승인했어" / "승인 완료" / "됐어")를 주면 에이전트가 같은 connect 를 `--execute --resume-last` 로 **직접** 이어받아요. resume 명령이나 `!` prefix 명령을 사용자에게 치라고 출력하지 않아요. outstanding code 가 있는 동안 `--resume-last` 없는 fresh `--execute` 재호출도 하지 않아요.
+   - **installation 누락 (`not_in_installation`):** axhub GitHub App 이 대상 org/repo 에 설치되지 않은 상태예요. `axhub github accounts list --json` 의 `install_url` 을 보여주고 org 선택 + repo 접근 허용을 안내한 뒤 "설치했어" 신호를 기다려요. 신호를 받으면 accounts list 를 다시 읽어 해당 owner 의 `installed:true` 를 확인한 뒤에만 같은 connect 를 재시도해요. installation 이 여러 개로 모호하면 dry-run 결과를 나열하고 `--installation-id` 로 disambiguate 해요.
+   - **D1 비대화형:** `if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]` 면 브라우저 단계를 완료할 수 없으니 URL/코드와 재개 phrase("GitHub 연결 다시 해줘")를 남기고 멈춰요.
+
 5. **결과 검증.** 배포가 끝나면 live URL, deployment id, 감지된 build/runtime env 구분, Dockerfile/compose/auto 중 선택된 ladder 를 보여줘요. 실패하면 deploy error empathy catalog 형식으로 원인·확인 방법·재시도 명령을 짧게 안내해요.
 
 6. **선택형 Auth Migration.** 사용자가 원할 때만 기존 앱의 로그인 흐름을 AxHub OAuth/OIDC 로 바꾸는 절차를 진행해요. 기본 migrate 는 배포 완료가 끝이에요. 이 단계는 사용자 앱 auth 파일 변경을 다루는 절차이고, AxHub backend/gateway 코드나 Data Gateway/DB query refactor 는 범위가 아니에요.
@@ -645,6 +651,7 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 - NEVER `migrate-approve` 성공 없이 mutation(앱 등록·git 연결·env 저장·배포)을 실행하지 않아요. "전부 다 해" 같은 포괄 발화도 migrate-approve 기록 후에만 진행해요.
 - NEVER plan_only hard-stop(`custom_auth`, `secret_exposure`) 범위의 코드 변경을 실행하지 않아요 — auth patch·secret 관련 수정은 포괄 승인("강행" 포함)으로도 풀리지 않고, 계획 문서만 산출해요. 사용자가 해당 파일을 직접 지목한 별도 요청만 migrate 범위 밖 일반 작업으로 다뤄요.
 - NEVER 사용자 repo 에 `git push` / `git push --force` / `git filter-repo` / BFG 같은 원격·히스토리 변경을 실행하지 않아요. secret rotation·history purge 는 명령어 안내문만 제공하고 실행은 사용자 몫이에요. 로컬 patch 전에는 `migrate-guard --checkpoint` 를 먼저 떠요.
+- NEVER GitHub device flow resume 이나 `apps git connect` 같은 명령을 사용자에게 직접 실행하라고 떠넘기지 않아요 — 승인 신호만 받고 에이전트가 직접 마무리해요 (`../github/SKILL.md` 패턴).
 
 ## Additional Resources
 
