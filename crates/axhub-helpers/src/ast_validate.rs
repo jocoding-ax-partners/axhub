@@ -339,6 +339,24 @@ fn rule_message(rule: &CompiledRule) -> String {
             ),
         };
     }
+    // rule_kind 단위 분기는 같은 kind 의 다른 룰에 오답 메시지를 줬어요(예: boundary
+    // kind 의 use-client 룰이 "/api/v1 prefix" 메시지). 의미가 고유한 룰은 rule id
+    // 단위로 먼저 분기하고, 나머지만 kind 공통 메시지로 떨어져요.
+    match rule.id.as_str() {
+        "raw-http-axhub-data-endpoint-forbidden" => {
+            return format!(
+                "`{}`: axhub 데이터 API 는 SDK 경유로 호출해요 — raw HTTP 직타는 막혀 있어요.",
+                rule.id
+            );
+        }
+        "use-client-imports-server-only-axhub" => {
+            return format!(
+                "`{}`: server-only helper 는 client 컴포넌트에서 import 못 해요.",
+                rule.id
+            );
+        }
+        _ => {}
+    }
     match rule.rule_kind.as_str() {
         "forbidden_call" => format!(
             "`{}`: pushable 하지 않은 필터 조합이에요. 서버가 런타임에 거부해요.",
@@ -727,6 +745,30 @@ export function f() {
         let src = "export function f(ownerId) { return db.table(\"p\").eq(\"owner_id\", ownerId).limit(10).list(); }";
         let v = scan_source(src, Grammar::Typescript, "node", "<t>", &r).unwrap();
         assert_eq!(block_ids(&v).len(), 0);
+    }
+
+    /// rule_kind 공통 메시지가 아니라 rule id 고유 메시지를 내는 룰 2종 잠금.
+    #[test]
+    fn rule_messages_are_rule_id_specific() {
+        let r = rules();
+        let raw_http = r
+            .iter()
+            .find(|x| x.id == "raw-http-axhub-data-endpoint-forbidden")
+            .expect("raw-http 룰 존재");
+        assert!(
+            rule_message(raw_http).contains("raw HTTP 직타는 막혀 있어요"),
+            "raw-http 룰은 SDK 경유 안내 메시지여야 해요"
+        );
+        let use_client = r
+            .iter()
+            .find(|x| x.id == "use-client-imports-server-only-axhub")
+            .expect("use-client 룰 존재");
+        let msg = rule_message(use_client);
+        assert!(
+            msg.contains("server-only helper") && msg.contains("client 컴포넌트"),
+            "use-client 룰은 /api/v1 boundary 공통 메시지가 아니라 고유 메시지여야 해요: {msg}"
+        );
+        assert!(!msg.contains("/api/v1"), "boundary 공통 메시지 누출 금지: {msg}");
     }
 
     // ── hook 헬퍼 ──
