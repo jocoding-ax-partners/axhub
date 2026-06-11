@@ -4,15 +4,15 @@
   "conformance_baseline": "ax-hub-backend@5a7b57d",
   "languages": {
     "go": {
-      "source_sha": "053fdc3dc6733dc8edd279e1846c9a2672c9bf11",
+      "source_sha": "48f1f513519888495da5b7ba5e683dc811014697",
       "sdk_version": "0.3.1"
     },
     "java": {
-      "source_sha": "0e71a2f14621032ef48d54a81c1a10fd95cfe3da",
+      "source_sha": "fb545a6550b03a4cf4974865581cc21c9ab090f6",
       "sdk_version": "0.3.1"
     },
     "kotlin": {
-      "source_sha": "7c23a488f5ecdae6e6955b259dfe767226e82a87",
+      "source_sha": "ae20163c87d560151528bcf60590c35f102857ca",
       "sdk_version": "0.3.1"
     },
     "node": {
@@ -20,11 +20,11 @@
       "sdk_version": "2.1.2"
     },
     "python": {
-      "source_sha": "8bafa90e7d9319b78514a1e95b19c0fb3b73d558",
+      "source_sha": "b3e31106c77eb2daa093fa3ab9320641b261a621",
       "sdk_version": "0.3.1"
     },
     "ruby": {
-      "source_sha": "aa62027c2a31353315775c1531d90c59d343d46c",
+      "source_sha": "fa0c327a8bb404e6dcc2d8b83dbda2a9ba3c7af2",
       "sdk_version": "0.3.1"
     }
   }
