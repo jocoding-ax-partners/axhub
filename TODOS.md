@@ -281,3 +281,60 @@
 **Priority:** P2
 **Depends on:** v1.1 data 레이어 (data skill + sync/snippet) merge
 **Blocks:** 없음
+
+## P2 — migrate 언어 커버리지 +1 (PHP 또는 C#)
+
+**Why:** 6언어 밖 앱은 unsupported_language hard-stop이에요. 파일럿 앱 언어 분포에서 수요가 확인되면 다음 언어를 추가해요.
+
+**Pros:**
+- migrate 커버리지가 넓어져 hard-stop 이탈이 줄어요.
+- distiller/harness 파이프라인이 이미 있어 언어 추가 비용이 정형화돼 있어요.
+
+**Cons:**
+- SDK 자체가 그 언어를 먼저 지원해야 해요 (SDK repo 작업 선행).
+- 수요 증거 없이 추가하면 유지비만 늘어요.
+
+**Context:** 2026-06-11 migrate 고도화 CEO 리뷰(SELECTIVE EXPANSION)에서 E3로 제안, "수요 관찰 후"로 Defer. 파일럿 관찰(Assignment)과 blocker 텔레메트리가 근거를 줘요.
+
+**Effort:** human ~1-2주 / CC+gstack ~반나절+ (SDK 지원 전제)
+**Priority:** P2
+**Depends on:** SDK repo 해당 언어 지원 + 파일럿 수요 증거
+**Blocks:** 없음
+
+## P2 — secret rotation provider별 심화 (dotenv/gh-secrets 등)
+
+**Why:** PR1의 secret 해소 가이드는 일반론 + kamal 1종이에요. 실사례가 쌓이면 provider별(dotenv, GitHub Secrets 등) 구체 rotate 절차를 추가해요. 보안상 실행은 항상 사람, 명령은 제안만이에요.
+
+**Pros:**
+- 해소 속도가 빨라져 secret_exposure 이탈이 줄어요.
+- 카드 payload에 provider 식별이 이미 있어 얹기 쉬워요.
+
+**Cons:**
+- 잘못된 rotate 가이드는 운영 중단을 일으킬 수 있어요 — 실사례 검증 없이 작성 금지.
+- provider 수만큼 유지비가 늘어요.
+
+**Context:** 2026-06-11 CEO 리뷰 E6로 제안, Defer. 단 kamal 1종은 wedge 앱(os)이 kamal이라 PR1에 예외 포함(T2). Codex outside voice #9가 "일반 가이드만으로는 절반 해소" 반론을 남겼어요.
+
+**Effort:** human ~2-3d / CC+gstack ~1h (provider당)
+**Priority:** P2
+**Depends on:** PR1 secret 루프 출하 + 실사례 누적
+**Blocks:** 없음
+
+## P3 — blocker 클래스 빈도 텔레메트리 (routing-stats 패턴)
+
+**Why:** "어떤 blocker가 제일 많이 막나"를 일화가 아니라 숫자로 답하기 위해 카드 생성/해소/종착 이벤트를 로컬 jsonl로 적재해요. E3/E6 재판단의 근거 수집기예요.
+
+**Pros:**
+- 다음 분기 우선순위가 숫자로 정해져요.
+- routing-stats 선례 그대로라 구현이 싸요 (카드 전이 시 1줄 append).
+
+**Cons:**
+- wedge(os 통과)에는 불필요한 범위예요.
+- 수집만 하고 안 보면 죽은 데이터예요 — 집계 뷰까지 있어야 가치.
+
+**Context:** 2026-06-11 CEO 리뷰 11섹션 Section 8에서 제안(이슈 7), Defer. blocker ledger(PR1) 출하 후 카드 전이 지점에 얹으면 돼요.
+
+**Effort:** human ~1d / CC+gstack ~20min
+**Priority:** P3
+**Depends on:** PR1 blocker ledger 출하
+**Blocks:** E3/E6 재판단의 양적 근거
