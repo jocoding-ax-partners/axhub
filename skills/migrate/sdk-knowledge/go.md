@@ -1,8 +1,8 @@
 ---
 lang: go
 sdk_version: 0.3.1
-source_sha: 053fdc3dc6733dc8edd279e1846c9a2672c9bf11
-route_surface_sha: 8bafa90e7d9319b78514a1e95b19c0fb3b73d558
+source_sha: 48f1f513519888495da5b7ba5e683dc811014697
+route_surface_sha: b3e31106c77eb2daa093fa3ab9320641b261a621
 conformance_baseline: ax-hub-backend@5a7b57d
 generated_by: scripts/gen-sdk-distill.py
 note: generated knowledge pack — do not hand-edit; regenerate from the SDK source

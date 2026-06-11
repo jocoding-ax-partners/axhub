@@ -2,7 +2,7 @@
 lang: node
 sdk_version: 2.1.2
 source_sha: 2cec112b5a1b5180d2e0de996c2d7a0c6e73a89c
-route_surface_sha: 8bafa90e7d9319b78514a1e95b19c0fb3b73d558
+route_surface_sha: b3e31106c77eb2daa093fa3ab9320641b261a621
 conformance_baseline: ax-hub-backend@5a7b57d
 generated_by: scripts/gen-sdk-distill.py
 note: generated knowledge pack — do not hand-edit; regenerate from the SDK source

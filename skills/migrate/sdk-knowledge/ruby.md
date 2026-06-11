@@ -1,8 +1,8 @@
 ---
 lang: ruby
 sdk_version: 0.3.1
-source_sha: aa62027c2a31353315775c1531d90c59d343d46c
-route_surface_sha: 8bafa90e7d9319b78514a1e95b19c0fb3b73d558
+source_sha: fa0c327a8bb404e6dcc2d8b83dbda2a9ba3c7af2
+route_surface_sha: b3e31106c77eb2daa093fa3ab9320641b261a621
 conformance_baseline: ax-hub-backend@5a7b57d
 generated_by: scripts/gen-sdk-distill.py
 note: generated knowledge pack — do not hand-edit; regenerate from the SDK source
