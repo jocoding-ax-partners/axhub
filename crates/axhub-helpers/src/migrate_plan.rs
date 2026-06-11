@@ -15,7 +15,10 @@ use crate::migrate_planning::{
     build_planning_preview, PlanningMode, PlanningPreview, FULL_CONSENSUS_STAGE_ORDER,
 };
 
-const MAX_SCAN_DEPTH: usize = 5;
+// conventional JVM `src/main/java/<pkg>/` 레이아웃 수용 — root 기준
+// `apps/<app>/src/main/java/com/<org>/<app>/` = depth 7, 하위 패키지 여유로 8.
+// (depth 5 면 conventional 패키지 트리를 못 닿아 data_candidates 가 비어요.)
+const MAX_SCAN_DEPTH: usize = 8;
 const MAX_SCAN_FILES: usize = 5_000;
 const MAX_SCAN_BYTES: u64 = 50 * 1024 * 1024;
 const MAX_SOURCE_FILE_BYTES: u64 = 1024 * 1024;
@@ -324,9 +327,27 @@ fn collect_files(root: &Path, dir: &Path, depth: usize, out: &mut ScanState) -> 
         }
         let name = entry.file_name();
         let name = name.to_string_lossy();
+        // depth 8 까지 내려가면 JVM/Python 빌드·IDE·캐시 산출물이 새로 노출돼요.
+        // 이것들을 prune 해서 깊은 트리 스캔 폭발을 막아요 (MAX_SCAN_FILES backstop 보강).
         if matches!(
             name.as_ref(),
-            ".git" | "node_modules" | "target" | "dist" | "build" | ".next" | "vendor"
+            ".git"
+                | "node_modules"
+                | "target"
+                | "dist"
+                | "build"
+                | ".next"
+                | "vendor"
+                | "out"
+                | "bin"
+                | ".gradle"
+                | ".idea"
+                | ".mvn"
+                | "__pycache__"
+                | ".venv"
+                | ".cache"
+                | "coverage"
+                | ".dart_tool"
         ) {
             continue;
         }
@@ -864,28 +885,16 @@ fn render_wrapper_preview(
         ),
         "ruby" => "require 'axhub_sdk'\n\nAXHUB_CLIENT = AxHub::Client.new(\n  base_url: 'https://api.axhub.ai',\n  token: ENV.fetch('AXHUB_TOKEN'),\n  token_type: :pat,\n  default_tenant_id: ENV.fetch('AXHUB_TENANT_ID'),\n  default_tenant_slug: ENV.fetch('AXHUB_TENANT_SLUG', 'test'),\n)\n"
             .to_string(),
-        "java" => format!(
-            "package {};\n\nimport ai.axhub.sdk.AxHubClient;\nimport ai.axhub.sdk.TokenType;\n\npublic final class AxhubClientFactory {{\n    private AxhubClientFactory() {{}}\n\n    public static AxHubClient create() {{\n        return AxHubClient.builder()\n            .baseUrl(\"https://api.axhub.ai\")\n            .token(System.getenv(\"AXHUB_TOKEN\"))\n            .tokenType(TokenType.PAT)\n            .defaultTenantId(System.getenv(\"AXHUB_TENANT_ID\"))\n            .build();\n    }}\n}}\n",
-            detect_jvm_package(source_files).as_deref().unwrap_or("ai.axhub.sdk")
-        ),
-        "kotlin" => format!(
-            "package {}\n\nimport ai.axhub.sdk.AxHubKotlinClient\nimport ai.axhub.sdk.TokenType\n\nfun buildAxhubClient(): AxHubKotlinClient =\n    AxHubKotlinClient(\n        baseUrl = \"https://api.axhub.ai\",\n        token = System.getenv(\"AXHUB_TOKEN\"),\n        tokenType = TokenType.PAT,\n        defaultTenantId = System.getenv(\"AXHUB_TENANT_ID\"),\n    )\n",
-            detect_jvm_package(source_files).as_deref().unwrap_or("ai.axhub.sdk")
-        ),
+        "java" => "package ai.axhub.sdk;\n\nimport ai.axhub.sdk.AxHubClient;\nimport ai.axhub.sdk.TokenType;\n\npublic final class AxhubClientFactory {\n    private AxhubClientFactory() {}\n\n    public static AxHubClient create() {\n        return AxHubClient.builder()\n            .baseUrl(\"https://api.axhub.ai\")\n            .token(System.getenv(\"AXHUB_TOKEN\"))\n            .tokenType(TokenType.PAT)\n            .defaultTenantId(System.getenv(\"AXHUB_TENANT_ID\"))\n            .build();\n    }\n}\n"
+            .to_string(),
+        "kotlin" => "package ai.axhub.sdk\n\nimport ai.axhub.sdk.AxHubKotlinClient\nimport ai.axhub.sdk.TokenType\n\nfun buildAxhubClient(): AxHubKotlinClient =\n    AxHubKotlinClient(\n        baseUrl = \"https://api.axhub.ai\",\n        token = System.getenv(\"AXHUB_TOKEN\"),\n        tokenType = TokenType.PAT,\n        defaultTenantId = System.getenv(\"AXHUB_TENANT_ID\"),\n    )\n"
+            .to_string(),
         _ => "// manual review required before generating an SDK wrapper for this language\n".to_string(),
     }
 }
 
 fn detect_go_package(source_files: &[SourceScanFile]) -> Option<String> {
     let re = Regex::new(r"(?m)^package\s+([A-Za-z_][A-Za-z0-9_]*)$").unwrap();
-    source_files.iter().find_map(|source| {
-        re.captures(&source.body)
-            .and_then(|caps| caps.get(1).map(|value| value.as_str().to_string()))
-    })
-}
-
-fn detect_jvm_package(source_files: &[SourceScanFile]) -> Option<String> {
-    let re = Regex::new(r"(?m)^\s*package\s+([A-Za-z0-9_.]+)\s*;?").unwrap();
     source_files.iter().find_map(|source| {
         re.captures(&source.body)
             .and_then(|caps| caps.get(1).map(|value| value.as_str().to_string()))
@@ -930,6 +939,15 @@ fn detect_data_candidates(language: &str, source_files: &[SourceScanFile]) -> Ve
             ("webclient", "HTTP data fetch candidate"),
             ("resttemplate", "HTTP data fetch candidate"),
             ("httpclient", "HTTP data fetch candidate"),
+            (
+                "drivermanager.getconnection",
+                "driver-level data access candidate",
+            ),
+            ("java.sql.", "driver-level data access candidate"),
+            ("preparestatement", "raw query candidate"),
+            ("createstatement", "raw query candidate"),
+            ("executequery", "raw query candidate"),
+            ("executeupdate", "raw query candidate"),
         ],
         _ => &[],
     };
@@ -1775,9 +1793,10 @@ fn short_sha256(input: &str, len: usize) -> String {
 mod tests {
     use super::{
         build_migrate_plan, build_migrate_plan_with_options, build_migrate_plan_with_selection,
-        candidate_file_path, collect_files, path_to_portable_json, render_manifest,
-        source_files_for_candidate, yaml_double_quote, AppCandidate, EnvRef, PlanningMode,
-        ScanState, MAX_SCAN_BYTES, MAX_SCAN_DEPTH, MAX_SCAN_FILES, MAX_SOURCE_FILE_BYTES,
+        candidate_file_path, collect_files, detect_data_candidates, has_raw_query_signal,
+        path_to_portable_json, render_manifest, source_files_for_candidate, yaml_double_quote,
+        AppCandidate, EnvRef, PlanningMode, ScanState, SourceScanFile, MAX_SCAN_BYTES,
+        MAX_SCAN_DEPTH, MAX_SCAN_FILES, MAX_SOURCE_FILE_BYTES,
     };
     use serde_json::Value;
     use std::path::{Path, PathBuf};
@@ -1895,15 +1914,30 @@ mod tests {
         )
         .unwrap();
 
+        // conventional JVM 레이아웃 (root 기준 depth 8) — 버그3 회귀 lock.
+        // depth 5 이던 시절엔 이 경로를 못 닿아 data_candidates 가 비었어요.
         let java = temp.path().join("apps/java");
-        std::fs::create_dir_all(java.join("src/main/java")).unwrap();
+        let java_src = java.join("src/main/java/com/example/app");
+        std::fs::create_dir_all(&java_src).unwrap();
         std::fs::write(java.join("build.gradle"), "plugins { id 'java-library' }\n").unwrap();
+        std::fs::write(
+            java_src.join("UserRepo.java"),
+            "package com.example.app;\n\nimport java.sql.*;\n\npublic final class UserRepo {\n    public String find(int id) throws Exception {\n        try (Connection conn = DriverManager.getConnection(System.getenv(\"DB_URL\"))) {\n            PreparedStatement stmt = conn.prepareStatement(\"SELECT id FROM users WHERE id = ?\");\n            stmt.setInt(1, id);\n            ResultSet rs = stmt.executeQuery();\n            return rs.next() ? rs.getString(1) : null;\n        }\n    }\n}\n",
+        )
+        .unwrap();
 
+        // conventional JVM 레이아웃 (root 기준 depth 8) — 버그3 회귀 lock.
         let kotlin = temp.path().join("apps/kotlin");
-        std::fs::create_dir_all(kotlin.join("src/main/kotlin")).unwrap();
+        let kotlin_src = kotlin.join("src/main/kotlin/com/example/app");
+        std::fs::create_dir_all(&kotlin_src).unwrap();
         std::fs::write(
             kotlin.join("build.gradle.kts"),
             "plugins { kotlin(\"jvm\") version \"2.4.0\" }\n",
+        )
+        .unwrap();
+        std::fs::write(
+            kotlin_src.join("UserRepo.kt"),
+            "package com.example.app\n\nimport java.sql.DriverManager\nimport java.sql.PreparedStatement\n\nclass UserRepo {\n    fun find(id: Int): String? {\n        DriverManager.getConnection(System.getenv(\"DB_URL\")).use { conn ->\n            val stmt: PreparedStatement = conn.prepareStatement(\"SELECT id FROM users WHERE id = ?\")\n            stmt.setInt(1, id)\n            val rs = stmt.executeQuery()\n            return if (rs.next()) rs.getString(1) else null\n        }\n    }\n}\n",
         )
         .unwrap();
 
@@ -1981,9 +2015,17 @@ mod tests {
         assert!(java_candidate
             .wrapper_preview
             .contains("package ai.axhub.sdk;"));
+        // Bug 2 lock: wrapper package must be the fixed SDK package, never the user's `package app;`.
+        assert!(!java_candidate.wrapper_preview.contains("package app"));
         assert!(java_candidate
             .wrapper_preview
             .contains("AxhubClientFactory"));
+        // Bug 1 lock: pure JDBC source must surface a raw-query data candidate.
+        assert!(!java_candidate.data_candidates.is_empty());
+        assert!(java_candidate
+            .data_candidates
+            .iter()
+            .any(|candidate| candidate.reason == "raw query candidate"));
 
         let kotlin_candidate = sdk
             .iter()
@@ -2000,9 +2042,17 @@ mod tests {
         assert!(kotlin_candidate
             .wrapper_preview
             .contains("package ai.axhub.sdk"));
+        // Bug 2 lock: wrapper package must be the fixed SDK package, never the user's `package app`.
+        assert!(!kotlin_candidate.wrapper_preview.contains("package app"));
         assert!(kotlin_candidate
             .wrapper_preview
             .contains("fun buildAxhubClient()"));
+        // Bug 1 lock: pure JDBC source must surface a raw-query data candidate.
+        assert!(!kotlin_candidate.data_candidates.is_empty());
+        assert!(kotlin_candidate
+            .data_candidates
+            .iter()
+            .any(|candidate| candidate.reason == "raw query candidate"));
     }
 
     #[test]
@@ -2124,6 +2174,54 @@ mod tests {
     }
 
     #[test]
+    fn detect_data_candidates_flags_pure_jdbc_as_raw_query_for_java() {
+        let source = SourceScanFile {
+            rel_path: PathBuf::from("src/main/java/app/UserRepo.java"),
+            body: "package app;\nimport java.sql.*;\nDriverManager.getConnection(url);\nPreparedStatement ps = conn.prepareStatement(\"SELECT id FROM users WHERE id = ?\");\nResultSet rs = ps.executeQuery();\n".to_string(),
+        };
+
+        let candidates = detect_data_candidates("java", std::slice::from_ref(&source));
+
+        assert!(!candidates.is_empty());
+        assert!(candidates
+            .iter()
+            .any(|candidate| candidate.reason == "raw query candidate"));
+        // The raw-query reason is load-bearing for the hard-stop policy.
+        assert!(has_raw_query_signal(&candidates));
+    }
+
+    #[test]
+    fn build_migrate_plan_hard_stops_pure_jdbc_java_with_raw_query() {
+        let temp = tempfile::tempdir().unwrap();
+        let java = temp.path().join("apps/java");
+        std::fs::create_dir_all(java.join("src")).unwrap();
+        std::fs::write(java.join("build.gradle"), "plugins { id 'java-library' }\n").unwrap();
+        std::fs::write(
+            java.join("src/UserRepo.java"),
+            "package app;\n\nimport java.sql.*;\n\npublic final class UserRepo {\n    public String find(int id) throws Exception {\n        Connection conn = DriverManager.getConnection(System.getenv(\"DB_URL\"));\n        PreparedStatement stmt = conn.prepareStatement(\"SELECT id FROM users WHERE id = ?\");\n        stmt.setInt(1, id);\n        ResultSet rs = stmt.executeQuery();\n        return rs.next() ? rs.getString(1) : null;\n    }\n}\n",
+        )
+        .unwrap();
+
+        let plan = build_migrate_plan(temp.path()).unwrap();
+        let java_candidate = plan
+            .sdk_conversion
+            .candidates
+            .iter()
+            .find(|candidate| candidate.path == "apps/java")
+            .unwrap();
+
+        assert_eq!(java_candidate.language, "java");
+        assert!(java_candidate
+            .data_candidates
+            .iter()
+            .any(|candidate| candidate.reason == "raw query candidate"));
+        assert!(java_candidate
+            .hard_stop_reasons
+            .iter()
+            .any(|reason| reason.contains("raw query 중심 데이터 접근")));
+    }
+
+    #[test]
     fn build_migrate_plan_marks_nested_core_entries_preview_only() {
         let temp = tempfile::tempdir().unwrap();
         std::fs::write(
@@ -2237,6 +2335,43 @@ mod tests {
         collect_files(large_dir.path(), large_dir.path(), 0, &mut scan).unwrap();
         assert!(scan.total_bytes <= MAX_SCAN_BYTES);
         assert!(scan.files.len() < 60);
+    }
+
+    #[test]
+    fn collect_files_prunes_build_artifacts_but_keeps_source() {
+        let temp = tempfile::tempdir().unwrap();
+        // 강화된 ignore 목록이 잡아야 하는 빌드/IDE/캐시 산출물.
+        for noise in [".gradle", ".idea", "out", "bin", "__pycache__", ".venv"] {
+            let dir = temp.path().join(noise);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("artifact.bin"), "noise").unwrap();
+        }
+        // conventional JVM source — prune 대상이 아니라 반드시 수집돼야 해요.
+        let src = temp.path().join("src/main/java/com/example/app");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::write(src.join("UserRepo.java"), "package com.example.app;\n").unwrap();
+
+        // build_migrate_plan 과 동일하게 root 를 canonicalize 해야 해요
+        // (macOS tempdir 의 /var → /private/var 심링크로 starts_with 검사가 어긋남).
+        let root = std::fs::canonicalize(temp.path()).unwrap();
+        let mut scan = ScanState::default();
+        collect_files(&root, &root, 0, &mut scan).unwrap();
+
+        let collected: Vec<String> = scan
+            .files
+            .iter()
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .collect();
+        assert!(
+            collected
+                .iter()
+                .any(|p| p == "src/main/java/com/example/app/UserRepo.java"),
+            "conventional source 가 prune 되면 안 돼요: {collected:?}"
+        );
+        assert!(
+            !collected.iter().any(|p| p.contains("artifact.bin")),
+            "빌드/IDE 산출물은 prune 돼야 해요: {collected:?}"
+        );
     }
 
     #[cfg(unix)]
