@@ -37,10 +37,12 @@ optional `AXHUB_TENANT_SLUG`.
 
 ## 3. Idioms (distilled from the SDK README)
 
+> For data access (list/insert/update/delete/count/discover), §6 below is authoritative — convert to the fluent data layer, NOT the operation-ID facade that §3 prose may show.
+
 ### Install
 
 ```bash
-gem install axhub-sdk -v 0.2.0
+gem install axhub-sdk -v 0.3.1
 ```
 
 Local development:

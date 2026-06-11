@@ -122,6 +122,31 @@ describe("SDK knowledge pack freshness + integrity", () => {
       expect(data.includes("insertMany") || data.includes("insert_many") || data.includes("InsertMany")).toBe(true);
       expect(data).toContain("discover()-verify"); // reliability lever
       expect(data).not.toContain("schemaless"); // rows are typed/discovered
+      // §6 JVM snippets must carry resolvable imports — PaginatedList/ListAllItem
+      // are nested under Pagination, Ops/ListOptions live in ai.axhub.sdk.data.
+      // An import-less snippet makes the expert guess the wrong (top-level) path
+      // and the converted code fails to compile (QA-found trap 1/2).
+      if (lang === "java" || lang === "kotlin") {
+        expect(data).toContain("import ai.axhub.sdk.data.Pagination.PaginatedList");
+        expect(data).toContain("import ai.axhub.sdk.data.ListOptions");
+        expect(data).toContain("import ai.axhub.sdk.data.Ops");
+      }
+    });
+
+    test(`${lang}: §3 install version stays in sync with the pinned frontmatter`, () => {
+      // The §3 prose is sliced verbatim from each SDK README; a stale README
+      // install line (e.g. 0.2.x while the pin is 0.3.1) would tell the expert
+      // to install an SDK that lacks the fluent data layer (QA-found trap 3).
+      const md = read(`${lang}.md`);
+      const fm = frontmatter(md);
+      const body = md.slice(md.indexOf("\n---", 4)); // skip frontmatter block
+      // Any axhub-sdk-anchored install version literal must equal the pin.
+      const installVersions = body.matchAll(
+        /axhub[-_]sdk\S*[@:='"\sv-]+(\d+\.\d+\.\d+)/gi,
+      );
+      for (const m of installVersions) {
+        expect(m[1]).toBe(fm.sdk_version);
+      }
     });
   }
 });

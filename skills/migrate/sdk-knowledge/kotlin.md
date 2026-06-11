@@ -42,12 +42,14 @@ optional `AXHUB_TENANT_SLUG`.
 
 ## 3. Idioms (distilled from the SDK README)
 
+> For data access (list/insert/update/delete/count/discover), §6 below is authoritative — convert to the fluent data layer, NOT the operation-ID facade that §3 prose may show.
+
 ### Install
 
 Gradle Kotlin DSL:
 
 ```kotlin
-implementation("ai.axhub:axhub-sdk-kotlin:0.2.1")
+implementation("ai.axhub:axhub-sdk-kotlin:0.3.1")
 ```
 
 Requires JVM 21 and `kotlinx-coroutines-core`.
@@ -376,6 +378,12 @@ _Total 189 operations across 12 tags. Identity only (operationId/method/path); r
 
 ### Scope + CRUD + DSL
 ```kotlin
+import ai.axhub.sdk.data.ListOptions
+import ai.axhub.sdk.data.Ops
+import ai.axhub.sdk.data.Schema
+import ai.axhub.sdk.data.Pagination.ListAllItem
+import ai.axhub.sdk.data.Pagination.PaginatedList
+
 val data = client.tenant(TENANT_SLUG).app(APP_SLUG).data()
 
 // (a) typed:
