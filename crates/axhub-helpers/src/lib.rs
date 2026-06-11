@@ -27,6 +27,7 @@ pub mod orphan_stub;
 pub static PROCESS_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 pub mod audit;
 pub mod audit_ledger;
+pub mod blocker_state;
 pub mod bootstrap;
 pub mod catalog;
 pub mod commit_gate;

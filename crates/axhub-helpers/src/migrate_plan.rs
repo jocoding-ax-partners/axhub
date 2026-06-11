@@ -1168,7 +1168,7 @@ fn has_known_auth_library(language: &str, source_files: &[SourceScanFile]) -> bo
     })
 }
 
-fn is_secretish_env(name: &str) -> bool {
+pub(crate) fn is_secretish_env(name: &str) -> bool {
     [
         "SECRET",
         "TOKEN",

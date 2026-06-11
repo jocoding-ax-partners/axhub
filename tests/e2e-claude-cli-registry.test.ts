@@ -104,9 +104,9 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
     ]);
   });
 
-  test("85 actual safe_default rationale 엔트리 including init/github App-install gate AUQ", () => {
+  test("87 actual safe_default rationale 엔트리 including init/github App-install gate + migrate secret 해소 AUQ", () => {
     const paths = collectSafeDefaultPaths();
-    expect(paths).toHaveLength(86);
+    expect(paths).toHaveLength(87);
 
 
     const skills = paths.map((p) => p.split(".")[0]).sort();
@@ -163,6 +163,7 @@ describe("Phase 23 — registry.json baseline (CLI coverage v0.2.0)", () => {
       "init",
       "init",
       "install-cli",
+      "migrate",
       "migrate",
       "migrate",
       "onboarding",

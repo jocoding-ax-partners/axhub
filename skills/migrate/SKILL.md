@@ -540,11 +540,57 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
    - `deploy_create`: 배포 시작 preview/실행
 
    hard-stop 게이팅은 helper 의 `plan_only` 와 `hard_stop_policy` (`{code, message, overridable}`) 를 읽어서 reason 별로 다뤄요.
-   - `plan_only=true` 이면 (secret_exposure · custom_auth · unsupported_language 같은 절대 reason 이 있을 때) `sdk_wrapper_generate`, `data_patch_plan`, `auth_patch_plan` 은 plan/preview-only 로 고정하고 실행 경로를 아예 두지 않아요. git rollback 으로 secret 유출을 되돌릴 수 없으니 "강행" override 도 막아요.
+   - `plan_only=true` 이면 (secret_exposure · custom_auth · unsupported_language 같은 절대 reason 이 있을 때) `sdk_wrapper_generate`, `data_patch_plan`, `auth_patch_plan` 은 plan/preview-only 로 고정하고 실행 경로를 아예 두지 않아요. git rollback 으로 secret 유출을 되돌릴 수 없으니 "강행" override 도 막아요. 단 `secret_exposure` 는 종착점이 아니라 아래 해소 루프의 시작점이에요 — override 가 아니라 **해소 후 재검증 통과** 시에만 진행해요.
    - `plan_only=false` 이고 overridable reason (broad_diff · missing_verification · raw_query) 만 있으면 기본은 preview-only 지만, 사용자가 "강행할래요" 를 한 번 더 명시적으로 확인하면 git checkpoint 를 잡은 뒤에만 실행해요.
    - hard-stop reason 이 없으면 일반 preview → 승인 → 실행 흐름이에요.
 
    원격 mutation approval 은 helper 가 자동으로 묶지 말고 action 별로 따로 유지해요.
+
+   **secret_exposure 해소 루프 (blocker 카드).** detect 가 `secret_exposure` 를 보고하면 막다른 길로 끝내지 말고 카드를 만들어 해소를 안내해요.
+   - migrate-plan 결과를 파일로 잡아 카드를 reconcile 해요. 카드는 detect 출력에서만 파생돼요 — SKILL 이 직접 secret 패턴을 다시 찾지 않아요.
+
+   ```bash
+   "$HELPER" migrate-plan --dir "${AXHUB_MIGRATE_DIR:-.}" --json > /tmp/axhub-migrate-plan.json
+   "$HELPER" migrate-blockers reconcile --plan-json /tmp/axhub-migrate-plan.json \
+     --file "${AXHUB_MIGRATE_DIR:-.}/.axhub/state/blockers.json" \
+     --run-id "$RUN_ID" --repo-root "${AXHUB_MIGRATE_DIR:-.}"
+   ```
+
+   - 카드의 `payload.env_names`(키 **이름**만 — 값은 어떤 출력에도 싣지 않아요)를 보여주고 rotate 가이드를 안내해요: ① 노출된 키를 발급처에서 rotate ② 평문 파일을 secret manager 나 env 주입으로 분리 ③ `.gitignore` 에 등록 ④ 이미 커밋된 이력은 rotate 가 유일한 해소예요 — git history rewrite 는 push 된 이력을 되돌리지 못해요.
+   - **kamal 앱이면** (`.kamal/secrets` 평문이 전형) 구체 절차로 안내해요: `.kamal/secrets` 를 `.kamal/secrets-common` + 1Password/env 참조 방식으로 전환 (`kamal secrets fetch` 패턴) → 평문 값 전부 rotate → `.gitignore` 에 `.kamal/secrets*` 추가 → 커밋 이력에 남은 값은 rotate 로만 무효화돼요.
+   - 사용자가 해소를 마쳤다고 하면 migrate-plan 을 **다시 실행**해 재검증해요 — 판정은 카드 status 가 아니라 detect 재실행 결과예요. 카드를 손으로 resolved 로 바꿔도 증거가 남아 있으면 reconcile 이 카드를 다시 열어요.
+
+   ```bash
+   "$HELPER" migrate-plan --dir "${AXHUB_MIGRATE_DIR:-.}" --json > /tmp/axhub-migrate-plan.json
+   "$HELPER" migrate-blockers reconcile --plan-json /tmp/axhub-migrate-plan.json \
+     --file "${AXHUB_MIGRATE_DIR:-.}/.axhub/state/blockers.json" \
+     --run-id "$RUN_ID" --repo-root "${AXHUB_MIGRATE_DIR:-.}"
+   ```
+
+   - reconcile 요약의 `closed` 에 `secret_exposure` 가 있으면 해소 완료예요 — `attempt --outcome verified` 로 기록하고 일반 흐름으로 복귀해요. 여전히 `unchanged`/`reopened` 면 잔존이에요 — `attempt --outcome residual` 로 기록하고 남은 키 이름을 보여줘요. migrate-plan 실행 자체가 실패했으면 `--outcome scan_error` 로 기록해요 (시도 횟수를 소모하지 않아요).
+
+   ```bash
+   "$HELPER" migrate-blockers attempt --file "${AXHUB_MIGRATE_DIR:-.}/.axhub/state/blockers.json" \
+     --card secret_exposure --outcome residual --repo-root "${AXHUB_MIGRATE_DIR:-.}"
+   ```
+
+   - 잔존 3회(`cap_reached:true`)면 루프를 멈추고 plan_only 로 종착해요 — 카드는 열린 채 두고, 남은 키 이름·다음 행동을 최종 산출물 체크리스트에 실어요. "다음 행동 없는 종료" 는 금지예요.
+   - 재검증 여부는 AskUserQuestion 으로 물어요:
+
+   ```json
+   AskUserQuestion({
+     "questions": [{
+       "question": "secret 해소를 마쳤으면 재검증할게요. 어떻게 할까요?",
+       "header": "secret 해소",
+       "multiSelect": false,
+       "options": [
+         { "label": "재검증", "description": "rotate·분리·gitignore 를 마쳤어요 — detect 를 다시 돌려 확인해요" },
+         { "label": "가이드 다시 보기", "description": "rotate 절차를 한 번 더 보여줘요" },
+         { "label": "나중에", "description": "지금은 plan-only 로 종착하고 체크리스트만 남겨요" }
+       ]
+     }]
+   })
+   ```
 
 2.6. **SDK 변환 실행 (승인된 `sdk_wrapper_generate`).** 변환은 helper 가 아니라 언어별 expert agent 가 user source 를 써요. 안전망은 helper 가 deterministic 하게 잡아요.
    - 변환 준비로 axhub MCP 도구를 먼저 설치해요 (선택, 비차단). `.mcp.json` 에 로컬 정적 검증(stdio `mcp-serve`) + 원격 SDK 지식(`axhub`, ax-mcp) 두 항목을 idempotent 머지해요 — 기존 사용자 항목은 보존돼요. 설치되면 expert 가 knowledge pack 의 sdk_search 1회 필수 조회 정책을 실제로 수행할 수 있어요.
