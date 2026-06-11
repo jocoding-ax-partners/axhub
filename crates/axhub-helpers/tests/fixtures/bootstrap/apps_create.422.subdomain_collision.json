@@ -1,9 +1,0 @@
-{
-  "error": {
-    "code": "subdomain_collision",
-    "message": "subdomain is already taken"
-  },
-  "suggestion": {
-    "subdomain": "paydrop-2"
-  }
-}

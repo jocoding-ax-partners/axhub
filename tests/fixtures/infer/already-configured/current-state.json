@@ -1,5 +1,0 @@
-{
-  "_note": "cross-check 가 본다고 가정하는 기존 상태 (axhub tables list / env list mock). orders 테이블과 DATABASE_URL 이 이미 있음.",
-  "tables": ["orders"],
-  "env_keys": ["DATABASE_URL"]
-}
