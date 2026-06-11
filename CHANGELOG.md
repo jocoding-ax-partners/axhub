@@ -4,6 +4,22 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.10.4](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.3...v0.10.4) (2026-06-11)
+
+6언어 SDK 변환 e2e QA에서 드러난 knowledge pack 함정 4건을 SDK distiller(`gen-sdk-distill.py`) 수정 후 regenerate→vendor로 닫았어요. expert가 jar 검증으로 우회했지만 pack만 맹신하면 java/kotlin이 컴파일 실패하던 함정이에요. **java/kotlin §6 import 부재** — `PaginatedList`/`ListAllItem`이 nested(`Pagination.PaginatedList`)고 `Ops`/`ListOptions`가 `ai.axhub.sdk.data` 패키지인데 §6 스니펫에 import가 없어 expert가 top-level 경로로 추론하면 `cannot find symbol` 나던 걸 SDK 소스(`DataTableClient.java`/`KotlinData.kt`) 그대로의 import 블록 추가로 고쳤어요. **§3 install 버전 stale** — 5언어 README install이 0.2.x인데 pin/frontmatter는 0.3.1이라(fluent layer 없는 구버전 설치 유도), distiller가 §3 install 버전을 pin과 동기화해요. **go §3 facade 강조** — go README가 fluent data layer를 미문서화하고 operation-ID facade만 보여줘 §6 fluent 오변환 위험이 있어, render_pack §3 헤더에 "데이터 접근은 §6 fluent가 authoritative" precedence note를 넣었어요. 재발 방지로 `sdk-knowledge-pack.test.ts`에 §6 import resolvability + §3 버전 일치 assertion을 추가했어요(테스트 갭이 4 함정을 green으로 통과시킨 enabler였어요).
+
+### Test baseline
+
+- bun sdk-knowledge-pack 33 pass(신규 §6 import·§3 버전 assertion 6건 포함, java §6 import 삭제 시 red 검증), migrate-skill-contract 20 pass.
+- cargo `pack_client_init_equals_render_wrapper_preview_full_body` 1 pass(§1 무변경), skill:doctor --strict / lint:tone / lint:keywords green.
+- 6 pack §3 install 버전 == frontmatter(0.3.1 / node 2.1.2), stale 0.2.x 0건. regenerate 결정적 — git_sha==lock assert pass(README 무변경, pin bump 불필요).
+
+### Honest tradeoff
+
+- SDK repo는 no remote(dev-machine)라 distiller 수정은 SDK repo local commit이고 이 릴리즈엔 vendored pack만 들어가요 — 다음 regenerate는 그 distiller가 필요해요.
+- 모든 수정이 distiller-only(README 무변경)라 SDK README standalone은 여전히 0.2.x stale — pack(§3)은 distiller override로 정확하지만 README 자체 수정은 5 sub-repo + pin bump가 필요한 별도 작업이에요.
+- migrate_plan과 site_scan/ast_validate가 별도 detect 경로라 향후 drift 위험은 여전 — 공유 패턴 추출이 후속 과제예요.
+
 ## [0.10.3](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.2...v0.10.3) (2026-06-11)
 
 migrate SDK 변환 워크플로우를 6언어(node/go/java/kotlin/python/ruby) raw SQL 앱으로 실제 변환 e2e QA하며 발견한 java/kotlin 선재 결함 3건(PR #187 이후 잠재)을 닫았어요. **순수 JDBC 미감지** — `detect_data_candidates` java/kotlin arm이 `jdbctemplate`/`entitymanager`(framework)만 잡고 순수 JDBC(`DriverManager`/`java.sql`/`executeQuery`/`prepareStatement`)는 빠뜨려 raw SQL 변환 대상이 0이 되고 raw_query hard-stop도 미발화하던 걸 JDBC needle 6개 추가로 고쳤어요(site_scan은 잡는데 불일치였음). **wrapper package 컴파일 실패** — java/kotlin wrapper_preview가 사용자 앱 package(`package app;`)를 차용해 wrapper_target 경로(`ai/axhub/sdk/`)와 불일치, java 컴파일이 깨지던 걸 `detect_jvm_package` 제거 + `ai.axhub.sdk` 상수 고정으로 바로잡았어요. **scan 깊이** — `MAX_SCAN_DEPTH=5`가 conventional JVM 레이아웃(`src/main/java/<pkg>/`, depth 7)을 못 닿아 실전 앱 변환이 무력이던 걸 5→8 + 빌드/IDE 산출물 ignore 강화로 수용해요.

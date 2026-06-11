@@ -11,7 +11,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
-**상태**: v0.10.3 · 44 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary
+**상태**: v0.10.4 · 44 SKILL / 9 command / 3 quality sub-agent / 5 cross-arch cosign-signed binary
 
 </div>
 
