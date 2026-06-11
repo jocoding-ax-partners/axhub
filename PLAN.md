@@ -660,7 +660,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
 // .claude-plugin/plugin.json
 {
   "name": "axhub",
-  "version": "0.10.4",
+  "version": "0.10.5",
   "description": "Korean-first Claude Code plugin for axhub. Wraps ax-hub-cli v0.17.4 surfaces with natural-language skills, Rust prompt routing, and preview-first destructive workflows.",
   "author": {"name": "Jocoding AX Partners", "url": "https://jocodingax.ai"},
   "homepage": "https://axhub.jocodingax.ai",
@@ -677,7 +677,7 @@ Prompt-based hook KEPT as secondary/complementary layer for ambiguity classifica
     "name": "axhub",
     "source": "./",
     "description": "Korean-first axhub Claude Code plugin wrapping ax-hub-cli v0.17.4 surfaces with NL skills and preview-first destructive workflows",
-    "version": "0.10.4"
+    "version": "0.10.5"
   }]
 }
 ```

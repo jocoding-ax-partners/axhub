@@ -4,6 +4,21 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.10.5](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.4...v0.10.5) (2026-06-11)
+
+직전 v0.10.4(distiller가 §3 install 버전을 pin으로 override)에 이어 SDK README standalone 정확성을 맞췄어요. README install 라인이 0.2.x stale이라 README만 읽고 SDK를 설치하면 fluent data layer 없는 구버전을 받던 걸, 5언어(go `@v0.3.1` / java `:0.3.1`·`<version>0.3.1` / kotlin `:0.3.1` / python `==0.3.1` / ruby `-v 0.3.1`) README install을 0.3.1로 동기화하고, README 수정으로 이동한 sub-repo HEAD를 `PINNED_SDK.lock.json`(SDK + vendored)의 `source_sha`에 반영한 뒤 distiller(무변경) regenerate→vendor로 6 pack의 `source_sha`를 갱신했어요. node는 install 라인이 없어 무변경이에요.
+
+### Test baseline
+
+- pack `source_sha` == 5 sub-repo 새 HEAD(go `48f1f51`·java `fb545a6`·kotlin `ae20163`·python `b3e3110`·ruby `fa0c327`), node `2cec112` 유지. regenerate `git_sha==lock` assert pass(distiller 무변경).
+- bun sdk-knowledge-pack 33 pass(`source_sha`==lock 검증), migrate-skill-contract 20 pass, cargo `pack_client_init` 1 pass.
+- §3 install 0.3.1·§6 import는 v0.10.4 산물 그대로 byte-identical, README standalone stale 0.2.x 0건, skill:doctor/lint green.
+
+### Honest tradeoff
+
+- SDK repo는 no remote(dev-machine)라 5 sub-repo README commit + lock bump는 SDK repo local에 있고 이 릴리즈엔 vendored pack `source_sha` + lock만 들어가요.
+- `route_surface_sha`도 동반 갱신됐어요(python HEAD 파생) — route body는 byte-identical이라 정합성 회귀가 아니라 sha 스탬프만 이동한 거예요.
+
 ## [0.10.4](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.3...v0.10.4) (2026-06-11)
 
 6언어 SDK 변환 e2e QA에서 드러난 knowledge pack 함정 4건을 SDK distiller(`gen-sdk-distill.py`) 수정 후 regenerate→vendor로 닫았어요. expert가 jar 검증으로 우회했지만 pack만 맹신하면 java/kotlin이 컴파일 실패하던 함정이에요. **java/kotlin §6 import 부재** — `PaginatedList`/`ListAllItem`이 nested(`Pagination.PaginatedList`)고 `Ops`/`ListOptions`가 `ai.axhub.sdk.data` 패키지인데 §6 스니펫에 import가 없어 expert가 top-level 경로로 추론하면 `cannot find symbol` 나던 걸 SDK 소스(`DataTableClient.java`/`KotlinData.kt`) 그대로의 import 블록 추가로 고쳤어요. **§3 install 버전 stale** — 5언어 README install이 0.2.x인데 pin/frontmatter는 0.3.1이라(fluent layer 없는 구버전 설치 유도), distiller가 §3 install 버전을 pin과 동기화해요. **go §3 facade 강조** — go README가 fluent data layer를 미문서화하고 operation-ID facade만 보여줘 §6 fluent 오변환 위험이 있어, render_pack §3 헤더에 "데이터 접근은 §6 fluent가 authoritative" precedence note를 넣었어요. 재발 방지로 `sdk-knowledge-pack.test.ts`에 §6 import resolvability + §3 버전 일치 assertion을 추가했어요(테스트 갭이 4 함정을 green으로 통과시킨 enabler였어요).
