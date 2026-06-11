@@ -47,10 +47,12 @@ optional `AXHUB_TENANT_SLUG`.
 
 ## 3. Idioms (distilled from the SDK README)
 
+> For data access (list/insert/update/delete/count/discover), §6 below is authoritative — convert to the fluent data layer, NOT the operation-ID facade that §3 prose may show.
+
 ### Install
 
 ```bash
-go get github.com/jocoding-ax-partners/axhub-sdk-go@v0.2.0
+go get github.com/jocoding-ax-partners/axhub-sdk-go@v0.3.1
 ```
 
 ### Required environment for agent work
