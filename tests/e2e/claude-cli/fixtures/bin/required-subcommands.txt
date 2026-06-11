@@ -12,3 +12,6 @@ logs build
 logs runtime
 update apply
 update check
+tables list
+tables create
+env set

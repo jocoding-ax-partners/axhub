@@ -141,6 +141,40 @@ case "${1:-}" in
         ;;
     esac
     ;;
+  tables)
+    case "${2:-}" in
+      list)
+        echo '{"tables":[]}'
+        ;;
+      create)
+        # Phase 008 T024 — approve 경로 적용 위임 stub. 멱등 가정, 호출 기록은
+        # shim argv 로그가 담당.
+        echo '{"status":"ok","table":"'"${3:-unknown}"'"}'
+        ;;
+      add-column)
+        echo '{"status":"ok","table":"'"${3:-unknown}"'","column":"'"${4:-unknown}"'"}'
+        ;;
+      *)
+        echo '{"error":"mock_not_implemented","subcommand":"tables '"${2:-}"'"}' >&2
+        exit 64
+        ;;
+    esac
+    ;;
+  env)
+    case "${2:-}" in
+      set)
+        cat > /dev/null 2>&1 || true   # stdin 값은 버려요 — 값 비저장 계약
+        echo '{"status":"ok","key":"'"${3:-unknown}"'"}'
+        ;;
+      list)
+        echo '{"items":[]}'
+        ;;
+      *)
+        echo '{"error":"mock_not_implemented","subcommand":"env '"${2:-}"'"}' >&2
+        exit 64
+        ;;
+    esac
+    ;;
   logs)
     echo '{"error":"mock_not_implemented","subcommand":"'"$1"' '"${2:-}"'"}' >&2
     exit 64

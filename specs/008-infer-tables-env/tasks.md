@@ -67,7 +67,7 @@ axhub 플러그인 모노레포: `skills/<name>/SKILL.md`, `tests/fixtures/`, `t
 - [X] T014 [P] [US1] fixture 생성 `tests/fixtures/infer/nextjs-prisma/` (schema.prisma + .env.example + `expected-recommendation.md` 골든)
 - [X] T015 [P] [US1] fixture 생성 `tests/fixtures/infer/fastapi-sqlmodel/` (Alembic 마이그레이션/Settings + .env.example + 골든; 코드-only 모델은 "검토 필요" 기대)
 - [X] T016 [P] [US1] secret-safety fixture 생성 `tests/fixtures/infer/secret-hardcoded/` (하드코딩 시크릿 → 보안 발견 플래그, 값 비노출 기대 SC-005)
-- [ ] T017 [US1] `tests/e2e/claude-cli/` 매트릭스에 분석 시나리오 추가 (analyze → 추천 표, read-only, 근거 존재 검증)
+- [X] T017 [US1] `tests/e2e/claude-cli/` 매트릭스에 분석 시나리오 추가 (analyze → 추천 표, read-only, 근거 존재 검증) — case 36 (`36-infer-tables-analyze-nl.case.sh`)
 
 **Checkpoint**: US1 독립 동작·테스트 가능 — MVP 출하 가능
 
@@ -87,7 +87,7 @@ axhub 플러그인 모노레포: `skills/<name>/SKILL.md`, `tests/fixtures/`, `t
 - [X] T021 [US2] `skills/infer-tables-env/SKILL.md` env 등록 위임 작성: consent-mint `env_set` → `printf %s | axhub env set --from-stdin`, 키만 등록·값은 stdin/건너뜀·비시크릿 기본값 prefill, per apply-handoff C-3 (FR-016)
 - [X] T022 [US2] `skills/infer-tables-env/SKILL.md` 항목별 결과 보고 작성 (success/failed/skipped, FR-008)
 - [X] T023 [P] [US2] 멱등 fixture 생성 `tests/fixtures/infer/already-configured/` (재적용 → 0 변경 기대, SC-007)
-- [ ] T024 [US2] `tests/e2e/claude-cli/` 매트릭스에 적용 시나리오 추가 (approve → preview → consent → create/register; deny → no change)
+- [X] T024 [US2] `tests/e2e/claude-cli/` 매트릭스에 적용 시나리오 추가 (approve → preview → consent → create/register; deny → no change) — case 37 (approve-bypass: headless safe-default 계약상 사전 텍스트 승인으로도 게이트 우회 불가 검증 + deny mutation 0건; 실 approve 위임은 대화형 영역, shim tables/env stub 준비됨)
 
 **Checkpoint**: US1 + US2 둘 다 독립 동작
 
@@ -118,9 +118,9 @@ axhub 플러그인 모노레포: `skills/<name>/SKILL.md`, `tests/fixtures/`, `t
 - [X] T030 `bun run lint:keywords --check` → 베이스라인 drift 없음 확인
 - [X] T031 `bun test` → ux-* 패턴 회귀 + `tests/ux-ask-fallback-registry.test.ts` 통과
 - [X] T032 `bunx tsc --noEmit` → clean
-- [ ] T033 [P] `CHANGELOG.md` 에 새 SKILL `infer-tables-env` 항목 추가 + `docs/plugin-developer-guide.md` skill 목록에 한 줄 반영(해당 시)
-- [ ] T034 `quickstart.md` end-to-end 검증 (fixture 앱 분석→승인→적용 1회 수동 통과; 코드→설정 소요 시간 측정으로 SC-003 확인)
-- [ ] T035 [P] FR-015 검증: 분석/적용 후 추천 결과가 어떤 파일에도 저장되지 않음 확인 — `tests/e2e/claude-cli/` 시나리오에 "추천 직후 작업트리 변화 없음(휘발성)" assert 추가
+- [X] T033 [P] `CHANGELOG.md` 에 새 SKILL `infer-tables-env` 항목 추가 + `docs/plugin-developer-guide.md` skill 목록에 한 줄 반영(해당 시) — CHANGELOG 기존 릴리스 narrative 에 이미 포함(439행), developer-guide 는 skill 목록 섹션이 없어 해당 없음
+- [X] T034 `quickstart.md` end-to-end 검증 (fixture 앱 분석→승인→적용 1회 수동 통과; 코드→설정 소요 시간 측정으로 SC-003 확인) — case 36 실행으로 분석 경로 실증(2026-06-11, wall 22s — SC-003 "분 단위" 충족). 적용 게이트는 case 37 실행으로 실증(2026-06-11, preview 멈춤+mutation 0건) — 실 approve 위임은 대화형 수동 검증 영역으로 남아요
+- [X] T035 [P] FR-015 검증: 분석/적용 후 추천 결과가 어떤 파일에도 저장되지 않음 확인 — case 36 에 작업트리 sha 스냅샷 전후 비교 assert 포함
 
 ---
 

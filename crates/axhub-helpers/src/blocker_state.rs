@@ -1,4 +1,5 @@
-//! Blocker card state for the migrate remediation loop (PR1: secret class).
+//! Blocker card state for the migrate remediation loop
+//! (secret_exposure + missing_table 클래스; custom_auth 는 PR5).
 //!
 //! 성격: append-only 이벤트 로그(`audit_ledger.rs`)가 아니라 **현재-상태 문서**
 //! (idempotent overwrite + per-card revision). 카드 상태머신:
@@ -46,9 +47,14 @@ pub const BLOCKER_SCHEMA_VERSION: u32 = 1;
 /// 클래스 공통 기본 재시도 상한 (재검증 "잔존"만 소모, 스캔 자체 실패는 미소모).
 pub const DEFAULT_ATTEMPT_CAP: u32 = 3;
 
-/// PR1 에서 카드화하는 유일한 클래스. missing_table 은 PR3, custom_auth 는
-/// PR5 에서 합류해요. 그 외 hard-stop 은 기존 plan_only 경로 그대로예요.
+/// PR1 에서 합류한 클래스. custom_auth 는 PR5 에서 합류해요. 그 외
+/// hard-stop 은 기존 plan_only 경로 그대로예요.
 pub const CLASS_SECRET_EXPOSURE: &str = "secret_exposure";
+
+/// PR3 에서 합류한 클래스 — `migrate-data-verify` 의 Verdict 위반에서
+/// 파생돼요 (missing_table + missing_column 을 한 카드로 묶어요: 해소
+/// 행동이 같은 infer-tables-env handoff 라서요).
+pub const CLASS_MISSING_TABLE: &str = "missing_table";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -293,14 +299,118 @@ pub struct ReconcileSummary {
     pub unchanged: Vec<String>,
 }
 
+/// migrate-data-verify --json 출력(Verdict)의 좁은 읽기 뷰.
+#[derive(Debug, Deserialize)]
+struct VerdictView {
+    #[serde(default)]
+    violations: Vec<ViolationView>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ViolationView {
+    table: String,
+    #[serde(default)]
+    column: Option<String>,
+}
+
+/// Verdict 위반에서 missing_table 카드 증거를 파생해요. missing_table 과
+/// missing_column 을 한 카드로 묶는 이유: 해소 행동이 같은
+/// infer-tables-env handoff 라서요.
+fn table_evidence(verdict: &VerdictView) -> Option<Value> {
+    if verdict.violations.is_empty() {
+        return None;
+    }
+    let mut tables: Vec<String> = Vec::new();
+    let mut columns: Vec<String> = Vec::new();
+    for v in &verdict.violations {
+        match &v.column {
+            None => tables.push(v.table.clone()),
+            Some(col) => columns.push(format!("{}.{}", v.table, col)),
+        }
+    }
+    tables.sort();
+    tables.dedup();
+    columns.sort();
+    columns.dedup();
+    Some(json!({ "tables": tables, "columns": columns }))
+}
+
+/// 클래스 공통 양방향 재판정. evidence Some = 증거 존재(open/재개방),
+/// None = 증거 소멸(stale close). "이 run 에서 판정 불가"(예: data-verify
+/// 미실행)는 이 함수를 아예 호출하지 않는 것으로 표현해요 — 판정 불가와
+/// 증거 소멸을 섞지 않아요.
+fn apply_evidence(
+    envelope: &mut BlockerEnvelope,
+    summary: &mut ReconcileSummary,
+    class: &str,
+    evidence: Option<Value>,
+    now: &str,
+) {
+    let existing_index = envelope.cards.iter().position(|c| c.card_id == class);
+    match (evidence, existing_index) {
+        (Some(payload), None) => {
+            envelope.cards.push(BlockerCard {
+                card_id: class.to_string(),
+                class: class.to_string(),
+                status: CardStatus::Open,
+                attempts: 0,
+                revision: 1,
+                updated_at: now.to_string(),
+                skill: "migrate".to_string(),
+                payload,
+            });
+            summary.opened.push(class.to_string());
+        }
+        (Some(payload), Some(i)) => {
+            let card = &mut envelope.cards[i];
+            if card.status == CardStatus::Resolved {
+                // 비권위 핵심: resolved 라고 적혀 있어도 증거가 살아 있으면
+                // 재개방해요 — 카드 편집으로는 우회가 안 돼요.
+                debug_assert!(card.status.can_transition_to(CardStatus::Open));
+                card.status = CardStatus::Open;
+                card.revision += 1;
+                card.updated_at = now.to_string();
+                card.payload = payload;
+                summary.reopened.push(card.card_id.clone());
+            } else if card.payload != payload {
+                card.revision += 1;
+                card.updated_at = now.to_string();
+                card.payload = payload;
+                summary.unchanged.push(card.card_id.clone());
+            } else {
+                summary.unchanged.push(card.card_id.clone());
+            }
+        }
+        (None, Some(i)) => {
+            let card = &mut envelope.cards[i];
+            if card.status != CardStatus::Resolved {
+                debug_assert!(card.status.can_transition_to(CardStatus::Resolved));
+                card.status = CardStatus::Resolved;
+                card.revision += 1;
+                card.updated_at = now.to_string();
+                summary.closed.push(card.card_id.clone());
+            } else {
+                summary.unchanged.push(card.card_id.clone());
+            }
+        }
+        (None, None) => {}
+    }
+}
+
 pub fn reconcile(
     existing: ReadOutcome,
     plan: &str,
+    verify: Option<&str>,
     run_id: &str,
     fingerprint: &str,
 ) -> Result<(BlockerEnvelope, ReconcileSummary)> {
     let plan: PlanView =
         serde_json::from_str(plan).context("migrate-plan JSON 을 해석하지 못했어요")?;
+    let verdict: Option<VerdictView> = verify
+        .map(|raw| {
+            serde_json::from_str(raw).context("migrate-data-verify JSON 을 해석하지 못했어요")
+        })
+        .transpose()?;
     let mut summary = ReconcileSummary::default();
     let mut envelope = match existing {
         ReadOutcome::Ok(env) => env,
@@ -324,63 +434,27 @@ pub fn reconcile(
     envelope.run_id = run_id.to_string();
     envelope.repo_fingerprint = fingerprint.to_string();
 
-    let evidence = secret_evidence(&plan);
     let now = now_rfc3339();
-    let existing_index = envelope
-        .cards
-        .iter()
-        .position(|c| c.card_id == CLASS_SECRET_EXPOSURE);
-
-    match (evidence, existing_index) {
-        (Some(names), None) => {
-            envelope.cards.push(BlockerCard {
-                card_id: CLASS_SECRET_EXPOSURE.to_string(),
-                class: CLASS_SECRET_EXPOSURE.to_string(),
-                status: CardStatus::Open,
-                attempts: 0,
-                revision: 1,
-                updated_at: now,
-                skill: "migrate".to_string(),
-                payload: json!({ "env_names": names }),
-            });
-            summary.opened.push(CLASS_SECRET_EXPOSURE.to_string());
-        }
-        (Some(names), Some(i)) => {
-            let card = &mut envelope.cards[i];
-            let new_payload = json!({ "env_names": names });
-            if card.status == CardStatus::Resolved {
-                // 비권위 핵심: resolved 라고 적혀 있어도 증거가 살아 있으면
-                // 재개방해요 — 카드 편집으로는 우회가 안 돼요.
-                debug_assert!(card.status.can_transition_to(CardStatus::Open));
-                card.status = CardStatus::Open;
-                card.revision += 1;
-                card.updated_at = now;
-                card.payload = new_payload;
-                summary.reopened.push(card.card_id.clone());
-            } else if card.payload != new_payload {
-                card.revision += 1;
-                card.updated_at = now;
-                card.payload = new_payload;
-                summary.unchanged.push(card.card_id.clone());
-            } else {
-                summary.unchanged.push(card.card_id.clone());
-            }
-        }
-        (None, Some(i)) => {
-            let card = &mut envelope.cards[i];
-            if card.status != CardStatus::Resolved {
-                debug_assert!(card.status.can_transition_to(CardStatus::Resolved));
-                card.status = CardStatus::Resolved;
-                card.revision += 1;
-                card.updated_at = now;
-                summary.closed.push(card.card_id.clone());
-            } else {
-                summary.unchanged.push(card.card_id.clone());
-            }
-        }
-        (None, None) => {}
+    let secret = secret_evidence(&plan).map(|names| json!({ "env_names": names }));
+    apply_evidence(
+        &mut envelope,
+        &mut summary,
+        CLASS_SECRET_EXPOSURE,
+        secret,
+        &now,
+    );
+    // data-verify 가 이 run 에서 실행됐을 때만 missing_table 을 재판정해요 —
+    // 미실행 run 에서 카드를 닫으면 거짓 해소예요.
+    if let Some(verdict) = &verdict {
+        apply_evidence(
+            &mut envelope,
+            &mut summary,
+            CLASS_MISSING_TABLE,
+            table_evidence(verdict),
+            &now,
+        );
     }
-    // 미지 클래스 카드는 그대로 보존해요 (PR3/PR5 합류분 forward-compat).
+    // 미지 클래스 카드는 그대로 보존해요 (PR5 합류분 forward-compat).
     Ok((envelope, summary))
 }
 
@@ -551,6 +625,34 @@ fn next_actions_for(card: &BlockerCard, cap: u32) -> Vec<String> {
                 "재시도 상한({cap}회)에 도달했어요 — 위 항목을 마친 뒤 새로 시작해요"
             ));
         }
+    } else if card.class == CLASS_MISSING_TABLE {
+        let tables: Vec<String> = card.payload["tables"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if tables.is_empty() {
+            actions.push(
+                "변환 코드가 참조하는 테이블/컬럼이 catalog 스키마에 없어요 — infer-tables-env 로 추천을 받아 생성해요"
+                    .to_string(),
+            );
+        } else {
+            actions.push(format!(
+                "테이블 {} 가 catalog 에 없어요 — infer-tables-env 로 추천을 받아 생성해요",
+                tables.join(", ")
+            ));
+        }
+        actions.push(
+            "생성/등록 승인 후 migrate 를 다시 실행하면 재검증을 거쳐 이어서 진행해요".to_string(),
+        );
+        if card.attempts >= cap {
+            actions.push(format!(
+                "재시도 상한({cap}회)에 도달했어요 — 위 항목을 마친 뒤 새로 시작해요"
+            ));
+        }
     } else {
         actions.push(format!(
             "{} 카드는 현재 버전에서 자동 안내를 제공하지 않아요 — plan 산출물의 해당 섹션을 참고해요",
@@ -670,8 +772,19 @@ fn run_reconcile(args: &[String]) -> Result<i32> {
     let fingerprint = repo_fingerprint(Path::new(repo_root));
     let plan_raw =
         fs::read_to_string(plan_json).with_context(|| format!("{plan_json} 을 읽지 못했어요"))?;
+    // 선택 입력: migrate-data-verify --json 출력. 준 run 에서만 missing_table
+    // 을 재판정해요.
+    let verify_raw = flag_value(args, "--verify-json")
+        .map(|p| fs::read_to_string(p).with_context(|| format!("{p} 을 읽지 못했어요")))
+        .transpose()?;
     let existing = read_envelope(path, &fingerprint)?;
-    let (envelope, summary) = reconcile(existing, &plan_raw, run_id, &fingerprint)?;
+    let (envelope, summary) = reconcile(
+        existing,
+        &plan_raw,
+        verify_raw.as_deref(),
+        run_id,
+        &fingerprint,
+    )?;
     write_envelope(path, &envelope)?;
     println!(
         "{}",
@@ -776,6 +889,7 @@ mod tests {
         let (envelope, _) = reconcile(
             ReadOutcome::Missing,
             &plan_with_secret(&["SECRET_KEY"]),
+            None,
             "run-1",
             "fp",
         )
@@ -888,6 +1002,7 @@ mod tests {
         let (envelope, summary) = reconcile(
             ReadOutcome::Missing,
             &plan_with_secret(&["KAMAL_REGISTRY_PASSWORD", "SECRET_KEY_BASE"]),
+            None,
             "run-1",
             "fp",
         )
@@ -911,6 +1026,7 @@ mod tests {
         let (mut envelope, _) = reconcile(
             ReadOutcome::Missing,
             &plan_with_secret(&["SECRET_KEY"]),
+            None,
             "run-1",
             "fp",
         )
@@ -919,6 +1035,7 @@ mod tests {
         let (envelope, summary) = reconcile(
             ReadOutcome::Ok(envelope),
             &plan_with_secret(&["SECRET_KEY"]),
+            None,
             "run-2",
             "fp",
         )
@@ -933,6 +1050,7 @@ mod tests {
         let (envelope, _) = reconcile(
             ReadOutcome::Missing,
             &plan_with_secret(&["SECRET_KEY"]),
+            None,
             "run-1",
             "fp",
         )
@@ -940,6 +1058,7 @@ mod tests {
         let (envelope, summary) = reconcile(
             ReadOutcome::Ok(envelope),
             &plan_without_secret(),
+            None,
             "run-2",
             "fp",
         )
@@ -953,6 +1072,7 @@ mod tests {
         let (mut envelope, _) = reconcile(
             ReadOutcome::Missing,
             &plan_with_secret(&["SECRET_KEY"]),
+            None,
             "run-1",
             "fp",
         )
@@ -1006,6 +1126,7 @@ mod tests {
         let (mut envelope, _) = reconcile(
             ReadOutcome::Missing,
             &plan_with_secret(&["SECRET_KEY"]),
+            None,
             "run-1",
             "fp",
         )
@@ -1023,6 +1144,7 @@ mod tests {
         let (envelope, _) = reconcile(
             ReadOutcome::Ok(envelope),
             &plan_with_secret(&["SECRET_KEY"]),
+            None,
             "run-2",
             "fp",
         )
@@ -1036,6 +1158,98 @@ mod tests {
         assert_eq!(future.attempts, 1);
     }
 
+    fn verdict_with_violations() -> String {
+        json!({
+            "ok": false,
+            "violations": [
+                { "table": "orders", "kind": "missing_table" },
+                { "table": "users", "kind": "missing_column", "column": "nickname" }
+            ],
+            "tables_checked": 2,
+            "columns_checked": 5
+        })
+        .to_string()
+    }
+
+    fn verdict_clean() -> String {
+        json!({ "ok": true, "violations": [], "tables_checked": 2, "columns_checked": 5 })
+            .to_string()
+    }
+
+    #[test]
+    fn missing_table_card_opens_from_verify_and_closes_on_clean_rerun() {
+        let (envelope, summary) = reconcile(
+            ReadOutcome::Missing,
+            &plan_without_secret(),
+            Some(&verdict_with_violations()),
+            "run-1",
+            "fp",
+        )
+        .unwrap();
+        assert_eq!(summary.opened, vec![CLASS_MISSING_TABLE]);
+        let card = envelope
+            .cards
+            .iter()
+            .find(|c| c.card_id == CLASS_MISSING_TABLE)
+            .unwrap();
+        assert_eq!(card.payload["tables"], json!(["orders"]));
+        assert_eq!(card.payload["columns"], json!(["users.nickname"]));
+        // 해소 후 깨끗한 verify 로 재실행 → close
+        let (envelope, summary) = reconcile(
+            ReadOutcome::Ok(envelope),
+            &plan_without_secret(),
+            Some(&verdict_clean()),
+            "run-2",
+            "fp",
+        )
+        .unwrap();
+        assert_eq!(summary.closed, vec![CLASS_MISSING_TABLE]);
+        assert_eq!(envelope.cards[0].status, CardStatus::Resolved);
+    }
+
+    #[test]
+    fn missing_table_card_untouched_when_verify_not_run() {
+        // 판정 불가(verify 미실행)와 증거 소멸을 섞지 않아요 — verify 없는
+        // run 에서 카드를 닫으면 거짓 해소예요.
+        let (envelope, _) = reconcile(
+            ReadOutcome::Missing,
+            &plan_without_secret(),
+            Some(&verdict_with_violations()),
+            "run-1",
+            "fp",
+        )
+        .unwrap();
+        let before_revision = envelope.cards[0].revision;
+        let (envelope, summary) = reconcile(
+            ReadOutcome::Ok(envelope),
+            &plan_without_secret(),
+            None,
+            "run-2",
+            "fp",
+        )
+        .unwrap();
+        assert!(summary.closed.is_empty());
+        assert_eq!(envelope.cards[0].status, CardStatus::Open);
+        assert_eq!(envelope.cards[0].revision, before_revision);
+    }
+
+    #[test]
+    fn missing_table_doctor_actions_name_tables_and_handoff() {
+        let (envelope, _) = reconcile(
+            ReadOutcome::Missing,
+            &plan_without_secret(),
+            Some(&verdict_with_violations()),
+            "run-1",
+            "fp",
+        )
+        .unwrap();
+        let report = build_doctor_report(&envelope, 3);
+        let card = &report.cards[0];
+        assert!(!card.next_actions.is_empty());
+        assert!(card.next_actions[0].contains("orders"));
+        assert!(card.next_actions[0].contains("infer-tables-env"));
+    }
+
     #[test]
     fn doctor_report_open_cards_always_carry_next_actions() {
         // dead-end 0 의 집행 지점: open/remediating 카드는 다음 행동이
@@ -1043,6 +1257,7 @@ mod tests {
         let (mut envelope, _) = reconcile(
             ReadOutcome::Missing,
             &plan_with_secret(&["SECRET_KEY"]),
+            None,
             "run-1",
             "fp",
         )
@@ -1083,6 +1298,7 @@ mod tests {
         let (mut envelope, _) = reconcile(
             ReadOutcome::Missing,
             &plan_with_secret(&["SECRET_KEY"]),
+            None,
             "run-1",
             "fp",
         )
@@ -1107,6 +1323,7 @@ mod tests {
         let (mut envelope, _) = reconcile(
             ReadOutcome::Missing,
             &plan_with_secret(&["KAMAL_REGISTRY_PASSWORD"]),
+            None,
             "run-1",
             "fp",
         )
@@ -1186,7 +1403,7 @@ db.execute("SELECT * FROM orders WHERE status = ?", status)
         let plan_json = serde_json::to_string(&plan).unwrap();
         let fp = repo_fingerprint(root);
         let (envelope, summary) =
-            reconcile(ReadOutcome::Missing, &plan_json, "run-1", &fp).unwrap();
+            reconcile(ReadOutcome::Missing, &plan_json, None, "run-1", &fp).unwrap();
         assert_eq!(summary.opened, vec![CLASS_SECRET_EXPOSURE]);
         assert!(envelope.cards[0].payload["env_names"]
             .as_array()
@@ -1202,7 +1419,7 @@ db.execute("SELECT * FROM orders WHERE status = ?", status)
         let plan = crate::migrate_plan::build_migrate_plan(root).unwrap();
         let plan_json = serde_json::to_string(&plan).unwrap();
         let (envelope, summary) =
-            reconcile(ReadOutcome::Ok(envelope), &plan_json, "run-2", &fp).unwrap();
+            reconcile(ReadOutcome::Ok(envelope), &plan_json, None, "run-2", &fp).unwrap();
         assert_eq!(summary.closed, vec![CLASS_SECRET_EXPOSURE]);
         assert_eq!(envelope.cards[0].status, CardStatus::Resolved);
     }

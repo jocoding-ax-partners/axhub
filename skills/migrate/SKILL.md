@@ -639,6 +639,18 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
 2.7. **data 변환 실행 (승인된 `data_patch_plan`) · auth 는 advisory.** wrapper 와 같은 expert·guard 경로로 data 접근을 변환해요.
    - 같은 `axhub-sdk-<lang>-expert` 를 `data_patch_plan` mode 로 dispatch 해요. §2.6 의 scan-sites 결과(`sites[]`)를 prompt 에 같이 전달해요 — 다시 스캔하지 않아요. expert 는 pack §6 data surface 를 **그대로** 읽어 변환해요 — §6 의 fluent data layer(6개 언어 전부)가 보여주는 정확한 shape(`tenant(slug).app(slug).data.table()/.discover()`)으로 codegen 하고 §6 의 mapping guide·live data contract(무필터 list/count 금지 — `where_required`, `or`/`not` push 불가, offset-only pagination)를 지켜요. §6 가 plan-only 마커면(아직 fluent data layer 가 없는 미래 언어 fallback) data-call 코드는 emit 하지 않고 의도만 한국어로 기술해요.
    - **apply 전에 discover()-verify 를 반드시 수행해요.** expert 가 변환이 참조하는 table·column 을 `refs.json` 으로 모으고, 각 table 을 SDK `discover()` 로 조회해 실제 schema 를 `schemas.json` 으로 만든 뒤, `"$HELPER" migrate-data-verify --refs refs.json --schemas schemas.json --json` 을 실행해요. `ok=false`(exit 2)면 hard-stop — 결과의 `preview_kr` 을 사용자에게 보여주고 apply 하지 않아요. 바이브코더가 리뷰 안 해도 "조용히 틀린 table·column 조회"를 막는 결정적 게이트예요 — generic verify(빌드 통과)는 이걸 못 잡아요.
+   - **missing_table 해소 루프 (infer-tables-env handoff).** `ok=false` 는 §2.5 의 secret 루프와 같은 카드 패턴으로 다뤄요 — 종착점이 아니라 해소의 시작점이에요. verify 출력을 파일로 잡아 카드를 reconcile 해요.
+
+   ```bash
+   "$HELPER" migrate-data-verify --refs refs.json --schemas schemas.json --json > /tmp/axhub-data-verify.json || true
+   "$HELPER" migrate-blockers reconcile --plan-json /tmp/axhub-migrate-plan.json \
+     --verify-json /tmp/axhub-data-verify.json \
+     --file "${AXHUB_MIGRATE_DIR:-.}/.axhub/state/blockers.json" \
+     --run-id "$RUN_ID" --repo-root "${AXHUB_MIGRATE_DIR:-.}"
+   ```
+
+   - `missing_table` 카드가 열리면 **infer-tables-env 스킬로 위임**해요 — 새 mutation 경로를 만들지 않고, 누락 table·column 목록(카드 `payload.tables`/`payload.columns`)을 컨텍스트로 넘겨 분석→추천→승인→적용을 그 스킬 계약(consent-mint + 마스킹 미리보기 + 명시 확인, `specs/008-infer-tables-env/contracts/apply-handoff-contract.md`)대로 진행해요. 거절하면 어떤 변경도 없이 카드는 열린 채 plan_only 로 종착해요.
+   - 적용이 끝나면 `discover()` 를 다시 돌려 `schemas.json` 을 갱신하고 migrate-data-verify 를 **재실행**해요 — 판정은 카드가 아니라 verify 재실행 결과예요. `ok=true` 면 reconcile 이 카드를 닫고 apply 로 이어가요. 여전히 위반이 남으면 `attempt --outcome residual` 로 기록하고 남은 항목을 보여줘요 (시도 상한·종착 규칙은 §2.5 와 동일).
    - hard-stop 게이팅은 §2.5 와 동일해요. `raw_query`/`broad_diff`/`missing_verification` 면 기본 preview-only 지만 "강행할래요" 확인 + git checkpoint 뒤에만 apply 해요. `plan_only=true`(secret_exposure·custom_auth·unsupported_language)면 실행 경로 없이 plan 만 남겨요.
    - apply 는 §2.6 과 같은 `migrate-guard` checkpoint → 한국어 preview → 승인 → apply → verify → 실패 시 rollback 경로를 그대로 따라요. apply 전 installed-SDK 체크도 동일해요.
    - `auth_patch_plan` 은 **실행하지 않아요** — auth 는 plan(advisory)만 만들어요. 인식된 auth 라이브러리여도 자동 코드 변환은 안 해요. login 이 runtime 에서 조용히 깨질 위험이 크고 generic verify 가 그걸 못 잡으니, auth 는 사용자에게 권장 변경을 문서로만 제시해요.
