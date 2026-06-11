@@ -592,6 +592,15 @@ AskUserQuestion 답변을 받은 뒤 선택된 tenant ID 를 `AXHUB_TENANT` 로 
    })
    ```
 
+   - **종료 체크리스트 (모든 경로 공통).** 완주든 plan_only 종착이든, blocker 카드가 있었던 run 은 워크플로우를 끝내기 전에 점검 리포트를 산출해 보여줘요 — 생략하지 않아요.
+
+   ```bash
+   "$HELPER" migrate-blockers report --file "${AXHUB_MIGRATE_DIR:-.}/.axhub/state/blockers.json" \
+     --repo-root "${AXHUB_MIGRATE_DIR:-.}"
+   ```
+
+   리포트는 카드 전수와 카드별 다음 행동 체크박스를 담은 markdown 이에요 — 열린 카드가 있으면 해소 항목이, 전부 해소됐으면 진행 가능 안내가 나와요. 산출된 markdown 을 그대로 보여주고, 열린 카드가 남았으면 "해소 후 다시 실행하면 이어서 진행해요" 로 마무리해요.
+
 2.6. **SDK 변환 실행 (승인된 `sdk_wrapper_generate`).** 변환은 helper 가 아니라 언어별 expert agent 가 user source 를 써요. 안전망은 helper 가 deterministic 하게 잡아요.
    - 변환 준비로 axhub MCP 도구를 먼저 설치해요 (선택, 비차단). `.mcp.json` 에 로컬 정적 검증(stdio `mcp-serve`) + 원격 SDK 지식(`axhub`, ax-mcp) 두 항목을 idempotent 머지해요 — 기존 사용자 항목은 보존돼요. 설치되면 expert 가 knowledge pack 의 sdk_search 1회 필수 조회 정책을 실제로 수행할 수 있어요.
 

@@ -474,16 +474,181 @@ pub fn record_attempt(
 }
 
 // ---------------------------------------------------------------------------
+// Doctor 리포트 — partial 체크리스트의 표현형 (dead-end 0 원칙)
+//
+// 어떤 경로로 끝나든(완주/plan_only) 카드 전수 + 다음 행동을 산출해요.
+// 내부 typed struct 에서 markdown 을 렌더하는 2단 구조라(테스트는 struct
+// 단위) 포맷 변경이 판정 로직을 건드리지 않아요. 산출물은 런타임 생성
+// markdown 이라 lint:tone 스캔 대상이 아니지만 사용자에게 보이므로
+// 해요체로 써요.
+// ---------------------------------------------------------------------------
+
+/// 리포트 전체 판정. open 카드가 하나라도 있으면 해소가 먼저예요.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DoctorVerdict {
+    /// 카드가 없거나 전부 resolved — 일반 흐름 진행 가능.
+    Clear,
+    /// open/remediating 카드 잔존 — plan_only 종착 + 해소 안내.
+    NeedsRemediation,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DoctorCardLine {
+    pub card_id: String,
+    pub class: String,
+    pub status: CardStatus,
+    pub attempts: u32,
+    pub cap: u32,
+    pub cap_reached: bool,
+    /// 이 카드의 다음 행동 목록 — open 카드는 항상 1개 이상이어야 해요
+    /// ("다음 행동 없는 종료" 금지의 집행 지점).
+    pub next_actions: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DoctorReport {
+    pub verdict: DoctorVerdict,
+    pub run_id: String,
+    pub total: usize,
+    pub open: usize,
+    pub resolved: usize,
+    pub cards: Vec<DoctorCardLine>,
+}
+
+/// 클래스별 다음 행동 도출. 미지 클래스도 빈 목록을 돌려주지 않아요 —
+/// forward-compat 카드(PR3 missing_table / PR5 custom_auth 합류 전)도
+/// 사용자에게 최소한의 방향을 줘요.
+fn next_actions_for(card: &BlockerCard, cap: u32) -> Vec<String> {
+    if card.status == CardStatus::Resolved {
+        return Vec::new();
+    }
+    let mut actions = Vec::new();
+    if card.class == CLASS_SECRET_EXPOSURE {
+        let names: Vec<String> = card.payload["env_names"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if names.is_empty() {
+            actions.push("노출된 secret 키를 발급처에서 rotate 해요".to_string());
+        } else {
+            actions.push(format!(
+                "노출된 키 {} 를 발급처에서 rotate 해요",
+                names.join(", ")
+            ));
+        }
+        actions.push(
+            "평문 secret 파일을 secret manager 나 env 주입으로 분리하고 .gitignore 에 등록해요"
+                .to_string(),
+        );
+        actions.push("해소 후 migrate 를 다시 실행하면 재검증을 거쳐 이어서 진행해요".to_string());
+        if card.attempts >= cap {
+            actions.push(format!(
+                "재시도 상한({cap}회)에 도달했어요 — 위 항목을 마친 뒤 새로 시작해요"
+            ));
+        }
+    } else {
+        actions.push(format!(
+            "{} 카드는 현재 버전에서 자동 안내를 제공하지 않아요 — plan 산출물의 해당 섹션을 참고해요",
+            card.class
+        ));
+    }
+    actions
+}
+
+pub fn build_doctor_report(envelope: &BlockerEnvelope, cap: u32) -> DoctorReport {
+    let cards: Vec<DoctorCardLine> = envelope
+        .cards
+        .iter()
+        .map(|card| DoctorCardLine {
+            card_id: card.card_id.clone(),
+            class: card.class.clone(),
+            status: card.status,
+            attempts: card.attempts,
+            cap,
+            cap_reached: card.status != CardStatus::Resolved && card.attempts >= cap,
+            next_actions: next_actions_for(card, cap),
+        })
+        .collect();
+    let resolved = cards
+        .iter()
+        .filter(|c| c.status == CardStatus::Resolved)
+        .count();
+    let open = cards.len() - resolved;
+    DoctorReport {
+        verdict: if open == 0 {
+            DoctorVerdict::Clear
+        } else {
+            DoctorVerdict::NeedsRemediation
+        },
+        run_id: envelope.run_id.clone(),
+        total: cards.len(),
+        open,
+        resolved,
+        cards,
+    }
+}
+
+pub fn render_doctor_markdown(report: &DoctorReport) -> String {
+    let mut out = String::new();
+    out.push_str("## 마이그레이션 점검 리포트\n\n");
+    match report.verdict {
+        DoctorVerdict::Clear => {
+            if report.total == 0 {
+                out.push_str("막힘 카드가 없어요 — 일반 흐름으로 진행해요.\n");
+            } else {
+                out.push_str(&format!(
+                    "카드 {}개가 전부 해소됐어요 — 일반 흐름으로 진행해요.\n",
+                    report.total
+                ));
+            }
+        }
+        DoctorVerdict::NeedsRemediation => {
+            out.push_str(&format!(
+                "카드 {}개 중 {}개가 아직 열려 있어요 — 아래 다음 행동을 마치면 이어서 진행할 수 있어요.\n",
+                report.total, report.open
+            ));
+        }
+    }
+    for card in &report.cards {
+        let status_label = match card.status {
+            CardStatus::Open => "열림",
+            CardStatus::Remediating => "해소 중",
+            CardStatus::Resolved => "해소됨",
+        };
+        out.push_str(&format!(
+            "\n### {} — {}\n\n- 상태: {} (시도 {}/{})\n",
+            card.card_id, status_label, status_label, card.attempts, card.cap
+        ));
+        if card.cap_reached {
+            out.push_str("- 재시도 상한에 도달해 plan-only 로 종착했어요\n");
+        }
+        if !card.next_actions.is_empty() {
+            out.push_str("- 다음 행동:\n");
+            for action in &card.next_actions {
+                out.push_str(&format!("  - [ ] {action}\n"));
+            }
+        }
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
 pub fn run_migrate_blockers(args: &[String]) -> Result<i32> {
     let Some(op) = args.first() else {
-        bail!("사용법: migrate-blockers <reconcile|attempt> ...");
+        bail!("사용법: migrate-blockers <reconcile|attempt|report> ...");
     };
     match op.as_str() {
         "reconcile" => run_reconcile(&args[1..]),
         "attempt" => run_attempt(&args[1..]),
+        "report" => run_report(&args[1..]),
         other => bail!("알 수 없는 migrate-blockers 작업이에요: {other}"),
     }
 }
@@ -517,6 +682,31 @@ fn run_reconcile(args: &[String]) -> Result<i32> {
             "cards": envelope.cards,
         }))?
     );
+    Ok(0)
+}
+
+fn run_report(args: &[String]) -> Result<i32> {
+    let file = flag_value(args, "--file").context("--file <blockers.json 경로> 가 필요해요")?;
+    let repo_root = flag_value(args, "--repo-root").context("--repo-root 가 필요해요")?;
+    let as_json = args.iter().any(|a| a == "--json");
+    let fingerprint = repo_fingerprint(Path::new(repo_root));
+    let envelope = match read_envelope(Path::new(file), &fingerprint)? {
+        ReadOutcome::Ok(env) => env,
+        // 파일이 없거나 신뢰 불가면 빈 리포트가 정답이에요 — report 는
+        // 읽기 전용 표현형이라 재구축을 트리거하지 않아요 (reconcile 몫).
+        ReadOutcome::Missing | ReadOutcome::Rebuild { .. } => BlockerEnvelope {
+            schema_version: BLOCKER_SCHEMA_VERSION,
+            run_id: String::new(),
+            repo_fingerprint: fingerprint,
+            cards: Vec::new(),
+        },
+    };
+    let report = build_doctor_report(&envelope, DEFAULT_ATTEMPT_CAP);
+    if as_json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!("{}", render_doctor_markdown(&report));
+    }
     Ok(0)
 }
 
@@ -844,6 +1034,103 @@ mod tests {
             .unwrap();
         assert_eq!(future.revision, 7);
         assert_eq!(future.attempts, 1);
+    }
+
+    #[test]
+    fn doctor_report_open_cards_always_carry_next_actions() {
+        // dead-end 0 의 집행 지점: open/remediating 카드는 다음 행동이
+        // 비어 있으면 안 돼요 — 미지 클래스(forward-compat)도 포함.
+        let (mut envelope, _) = reconcile(
+            ReadOutcome::Missing,
+            &plan_with_secret(&["SECRET_KEY"]),
+            "run-1",
+            "fp",
+        )
+        .unwrap();
+        envelope.cards.push(BlockerCard {
+            card_id: "future_class".into(),
+            class: "future_class".into(),
+            status: CardStatus::Open,
+            attempts: 0,
+            revision: 1,
+            updated_at: "2026-06-11T00:00:00Z".into(),
+            skill: "migrate".into(),
+            payload: json!({}),
+        });
+        let report = build_doctor_report(&envelope, 3);
+        assert_eq!(report.verdict, DoctorVerdict::NeedsRemediation);
+        assert_eq!(report.total, 2);
+        assert_eq!(report.open, 2);
+        for card in &report.cards {
+            assert!(
+                !card.next_actions.is_empty(),
+                "{} 카드의 다음 행동이 비어 있어요",
+                card.card_id
+            );
+        }
+    }
+
+    #[test]
+    fn doctor_report_clear_when_all_resolved_or_empty() {
+        let empty = BlockerEnvelope {
+            schema_version: BLOCKER_SCHEMA_VERSION,
+            run_id: "r".into(),
+            repo_fingerprint: "fp".into(),
+            cards: vec![],
+        };
+        assert_eq!(build_doctor_report(&empty, 3).verdict, DoctorVerdict::Clear);
+
+        let (mut envelope, _) = reconcile(
+            ReadOutcome::Missing,
+            &plan_with_secret(&["SECRET_KEY"]),
+            "run-1",
+            "fp",
+        )
+        .unwrap();
+        record_attempt(
+            &mut envelope,
+            CLASS_SECRET_EXPOSURE,
+            AttemptOutcome::Verified,
+            3,
+        )
+        .unwrap();
+        let report = build_doctor_report(&envelope, 3);
+        assert_eq!(report.verdict, DoctorVerdict::Clear);
+        assert_eq!(report.resolved, 1);
+        assert!(report.cards[0].next_actions.is_empty());
+    }
+
+    #[test]
+    fn doctor_markdown_carries_key_names_only_and_checklist() {
+        // [보안] 리포트에는 키 이름만 — 값 패턴이 끼어들 입력 자체가 없는
+        // 구조지만, 렌더 출력에 체크박스·키 이름이 실제로 실리는지 고정해요.
+        let (mut envelope, _) = reconcile(
+            ReadOutcome::Missing,
+            &plan_with_secret(&["KAMAL_REGISTRY_PASSWORD"]),
+            "run-1",
+            "fp",
+        )
+        .unwrap();
+        // 상한 도달 시나리오 (plan_only 종착)
+        for _ in 0..3 {
+            record_attempt(
+                &mut envelope,
+                CLASS_SECRET_EXPOSURE,
+                AttemptOutcome::Residual,
+                3,
+            )
+            .unwrap();
+        }
+        let report = build_doctor_report(&envelope, 3);
+        let md = render_doctor_markdown(&report);
+        assert!(md.contains("KAMAL_REGISTRY_PASSWORD"));
+        assert!(md.contains("- [ ]"));
+        assert!(md.contains("재시도 상한"));
+        assert!(md.contains("아직 열려 있어요"));
+        // 키 이름 외 어떤 값도 렌더 입력에 없어요 — payload 가 env_names
+        // 뿐인 걸 카드 쪽 계약이 보장하고, 여기선 렌더가 payload 의 다른
+        // 키를 출력하지 않는 것만 재확인해요.
+        assert!(!md.contains("payload"));
     }
 
     #[test]
