@@ -4,6 +4,26 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [0.10.3](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.2...v0.10.3) (2026-06-11)
+
+migrate SDK 변환 워크플로우를 6언어(node/go/java/kotlin/python/ruby) raw SQL 앱으로 실제 변환 e2e QA하며 발견한 java/kotlin 선재 결함 3건(PR #187 이후 잠재)을 닫았어요. **순수 JDBC 미감지** — `detect_data_candidates` java/kotlin arm이 `jdbctemplate`/`entitymanager`(framework)만 잡고 순수 JDBC(`DriverManager`/`java.sql`/`executeQuery`/`prepareStatement`)는 빠뜨려 raw SQL 변환 대상이 0이 되고 raw_query hard-stop도 미발화하던 걸 JDBC needle 6개 추가로 고쳤어요(site_scan은 잡는데 불일치였음). **wrapper package 컴파일 실패** — java/kotlin wrapper_preview가 사용자 앱 package(`package app;`)를 차용해 wrapper_target 경로(`ai/axhub/sdk/`)와 불일치, java 컴파일이 깨지던 걸 `detect_jvm_package` 제거 + `ai.axhub.sdk` 상수 고정으로 바로잡았어요. **scan 깊이** — `MAX_SCAN_DEPTH=5`가 conventional JVM 레이아웃(`src/main/java/<pkg>/`, depth 7)을 못 닿아 실전 앱 변환이 무력이던 걸 5→8 + 빌드/IDE 산출물 ignore 강화로 수용해요.
+
+### Test baseline
+
+- cargo `-p axhub-helpers` lib 572 pass(순수 JDBC 감지·wrapper package·conventional 깊이·ignore prune 회귀 테스트 포함), 통합 pass / 1 pre-existing fail.
+- bun migrate-skill-contract + manifest 229 pass, clippy/fmt clean.
+- 6언어 변환 e2e: node/python/go/ruby/java 빌드 통과, kotlin jar 대조 — §1 client init byte-exact, §6 fluent shape(`tenant().app().data.table()`) 의미 보존, discover-verify hard-stop 6언어 전부 정상(catalog 0 → missing_table 차단).
+
+### Honest tradeoff
+
+- knowledge pack(`skills/migrate/sdk-knowledge/<lang>.md`)은 SDK repo distiller가 생성하는 vendored 산출물(hand-edit 금지)이라 이번에 발견한 pack 함정(java PaginatedList nested import, kotlin import 경로·버전 drift, go §3/§6 혼란)은 distiller 영역 — 별도 SDK repo 작업 필요.
+- migrate_plan과 site_scan/ast_validate가 별도 detect 경로(substring vs regex)라 향후 drift 위험 — 공유 패턴 추출이 follow-up.
+- discover-verify는 governed catalog table 필요 — jocodingax catalog 비어(table 0) 변환 결과의 실제 catalog 조회·apply는 connector 셋업 선행.
+
+### Fixed
+
+* migrate SDK 변환 java/kotlin 결함 3건 — 순수 JDBC 감지·wrapper package·scan 깊이 ([#207](https://github.com/jocoding-ax-partners/axhub/issues/207)) ([876cc0c](https://github.com/jocoding-ax-partners/axhub/commit/876cc0c997348c0fc84808be71e57399bd17f4f4))
+
 ## [0.10.2](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.1...v0.10.2) (2026-06-10)
 
 migrate 워크플로우를 실제 Claude Code 서브프로세스로 e2e QA(깨끗한 Node 앱 → jocodingax 실제 배포 성공)하며 발견한 선재 결함 3건을 닫았어요. **외래어 라우팅** — 한글 "마이그레이션"이 prompt-route migrate lexicon 에 없어 "마이그레이션해서 배포" 발화가 deploy 로 새던 실사용 차단 버그를 routing.rs 에 "마이그레" 토큰 추가로 고쳐, 배포 의도가 섞여도 migrate 가 우선해요. **deploy verify 오보** — `verify-deploy-artifact` hook 이 비동기 배포의 state 부재·파싱 실패를 silent pass("성공")로 보고하던 걸 3값 분류(Confirmed/Violation/**Unconfirmed**)로 바꿔, in-flight·미확정은 advisory 로만 노출하고 정상 async 흐름은 안 깨요. **릴리즈 메타 복구** — v0.10.1 이 README "상태"·PLAN schema snippet 동기화를 누락해 main 이 manifest 테스트 fail 상태였던 걸 바로잡았어요. 셋 다 PR #204/#205(stage 하드닝)와 무관한 선재 버그예요.
