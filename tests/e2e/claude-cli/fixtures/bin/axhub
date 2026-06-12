@@ -6,7 +6,17 @@
 # Phase 22.4 확장 — env-driven stub 분기:
 #   AXHUB_FIXTURE_VERSION=X.Y.Z   --version 응답 가짜 버전 (cli_too_old/cli_too_new 강제)
 #   AXHUB_FIXTURE_AUTH=expired    auth status / deploy create 모두 exit 65 + token_expired stderr
-#   AXHUB_FIXTURE_AUTH=deploy_expired auth status 는 통과, deploy create 만 exit 65 + token_expired stderr
+#   AXHUB_FIXTURE_AUTH=deploy_expired auth status / preflight 는 통과, deploy create /
+#                                 plugin-support deploy-approved-run / token-gate 만 exit 65 + token_expired stderr
+#
+# Post-diet 확장 — plugin-support 명령 family:
+#   plugin-support preflight [--json]        cli_present/cli_state/in_range + auth_ok=true (deploy_expired 도 true).
+#   plugin-support route-decision [...]      {"decision":"axhub"} (fail-open 정상 경로).
+#   plugin-support tenant-resolve [--json]   빈 tenant + needs_pick=false.
+#   plugin-support deploy-prep --intent ...  preflight/resolve/quality_gate envelope, exit_code 0.
+#   plugin-support deploy-preview-summary    한국어 preview text (해요체).
+#   plugin-support deploy-approved-run        deploy_expired → exit 65 token_expired (저장 토큰이 여기서 만료 판명).
+#   plugin-support token-gate                 deploy_expired → exit 65, else exit 0 (stdout 없음).
 
 set -euo pipefail
 
@@ -30,6 +40,68 @@ fi
 
 # mock-impl 부재 시 simple stub — 부재 subcommand 면 unknown 반환.
 case "${1:-}" in
+  plugin-support)
+    # Post-diet helper family. `axhub plugin-support <cmd> [flags]`.
+    PS_CMD="${2:-}"
+    case "$PS_CMD" in
+      preflight)
+        # preflight: token 은 아직 fine (deploy_expired 도 auth_ok=true).
+        # raw stderr/exit-jargon 미노출 — JSON contract 만.
+        echo '{"cli_present":true,"cli_state":"ok","in_range":true,"cli_too_old":false,"cli_too_new":false,"auth_ok":true,"auth_error_code":null,"profile":"paydrop"}'
+        exit 0
+        ;;
+      route-decision)
+        # fail-open 정상 경로 — axhub 배포 확정.
+        echo '{"decision":"axhub"}'
+        exit 0
+        ;;
+      tenant-resolve)
+        echo '{"tenant":"","source":"","needs_pick":false,"candidates":[]}'
+        exit 0
+        ;;
+      deploy-prep)
+        # resolve + preflight 한 번에. auth 는 prep 시점엔 통과 (저장 토큰 만료는 실행 순간 발견).
+        echo '{"preflight":{"auth_ok":true,"cli_too_old":false,"cli_too_new":false,"auth_error_code":null},"resolve":{"app_id":"app-123","app_slug":"paydrop","commit_sha":"abc1234","branch":"main","eta_sec":60},"bootstrap_plan":null,"exit_code":0,"preflight_exit_code":0,"in_flight_deploy":null,"github_connected":true,"quality_gate":{"passed":true,"violations":[]}}'
+        exit 0
+        ;;
+      deploy-preview-summary)
+        # 5필드 한국어 preview card (해요체). raw 값 미노출.
+        echo "다음을 올릴게요: 앱 paydrop / 환경 production / 브랜치 main / 커밋 abc1234 / 예상 약 1분 걸려요."
+        exit 0
+        ;;
+      deploy-approved-run)
+        # 승인 직후 실행 — 저장 토큰이 만료된 게 이 순간 드러나요.
+        if [ "${AXHUB_FIXTURE_AUTH:-}" = "deploy_expired" ] || [ "${AXHUB_FIXTURE_AUTH:-}" = "expired" ]; then
+          echo '{"code":"token_expired","detail":"저장된 토큰이 만료됐어요 (deploy-approved-run)"}' >&2
+          exit 65
+        fi
+        echo "배포를 시작했어요."
+        exit 0
+        ;;
+      token-gate)
+        # stdout 없음, exit code 가 계약.
+        if [ "${AXHUB_FIXTURE_AUTH:-}" = "deploy_expired" ] || [ "${AXHUB_FIXTURE_AUTH:-}" = "expired" ]; then
+          exit 65
+        fi
+        exit 0
+        ;;
+      classify-exit)
+        # canonical router — helper 65/67/68 → CLI 4/5/6 정규화.
+        RAW_EXIT="${3:-0}"
+        case "$RAW_EXIT" in
+          65) echo '{"exit_code":65,"normalized":4,"category":"auth","message":"token_expired"}' ;;
+          67) echo '{"exit_code":67,"normalized":5,"category":"not_found","message":"resource_not_found"}' ;;
+          68) echo '{"exit_code":68,"normalized":6,"category":"rate_limit","message":"rate_limited"}' ;;
+          *)  echo '{"exit_code":'"${RAW_EXIT}"',"normalized":'"${RAW_EXIT}"',"category":"unknown","message":""}' ;;
+        esac
+        exit 0
+        ;;
+      *)
+        echo '{"error":"mock_not_implemented","subcommand":"plugin-support '"${PS_CMD}"'"}' >&2
+        exit 64
+        ;;
+    esac
+    ;;
   --version)
     if [ -n "${AXHUB_FIXTURE_VERSION:-}" ]; then
       echo "ax-hub-cli ${AXHUB_FIXTURE_VERSION} (commit fake, built fake, fake)"

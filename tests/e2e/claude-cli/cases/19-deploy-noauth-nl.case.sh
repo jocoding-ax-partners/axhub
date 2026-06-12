@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Case 19 (T1) — 한국어 NL "paydrop 배포해" + token_expired → deploy SKILL.
-# 22.4: token-headed.json fixture + AXHUB_FIXTURE_AUTH=deploy_expired → 가짜 axhub shim 의 deploy create
-#       가 exit 65 + token_expired stderr → SKILL classify-exit 65 → 한국어 4-part 안내 (감정+원인+해결+선택).
-# 22.3 의 auth_missing path 보다 강한 검증 — preflight 가 token 검증 통과 후 deploy 단계에서 expired 발견.
-# 26.x: headless Claude subprocess 는 동의 UI/텍스트 메뉴 대신 safe default dry-run 으로
-#       deploy command path 까지 진행해야 해요. 실제 --execute 파괴적 fixture 는 Rust/helper E2E 에서 별도 검증해요.
+# Case 19 (T1) — 한국어 NL "paydrop 배포해" + token_expired → post-diet deploy SKILL.
+# post-diet flow: Step 1 guard 가 `axhub plugin-support preflight --json` 으로 게이트하고 (auth_ok=true —
+#       토큰은 preflight 시점엔 fine), Step 1.1 이 `axhub plugin-support deploy-prep` 으로 resolve+preflight 를
+#       한 번에 받아요. 이후 token-gate / deploy-approved-run / deploy create 가 실행되는 순간 저장된 토큰이
+#       만료된 게 드러나 exit 65 → SKILL 이 classify-exit 65 → 한국어 4-part 안내 (감정+원인+해결+선택).
+# 검증 강도: preflight 통과(auth_ok=true) 후 실행 단계에서 expired 발견 — auth_missing 보다 강한 path.
+# headless: Claude subprocess 는 동의 UI/텍스트 메뉴 대신 safe default 로 preview-confirm 없이 진행해요.
+# Visibility: 새 SKILL Visibility 룰상 raw exit code / 내부 helper 명(plugin-support) 은 사용자 result 에
+#       절대 노출되면 안 돼요 — 사용자에겐 한국어 한 줄 안내만.
 set -u
 : "${CLAUDE_E2E_MODEL:=sonnet}"
 : "${CLAUDE_E2E_CAP_USD:=1.50}"
@@ -44,12 +47,23 @@ if [ "$STATE" = "PASS" ]; then
     echo "  FAIL: headless deploy case attempted AskUserQuestion instead of safe default" >&2
     FAIL=1
   fi
-  if ! printf '%s' "$RESULT_TEXT" | grep -Eiq "exit[^0-9]{0,40}65"; then
-    echo "  FAIL: final result did not surface fixture token-expired exit 65" >&2
+  # Visibility 룰: raw exit-code jargon 이 사용자 result 에 노출되면 FAIL (감정+원인+해결 한국어만).
+  if printf '%s' "$RESULT_TEXT" | grep -Eiq "exit[^0-9]{0,40}65"; then
+    echo "  FAIL: final result leaked raw exit-code jargon (exit 65) to user-facing text" >&2
     FAIL=1
   fi
-  if ! grep -F -q -e "deploy create" -e "deploy create --" "${CASE_DIR}/axhub-argv.log" 2>/dev/null || ! grep -F -q -- "--dry-run" "${CASE_DIR}/axhub-argv.log" 2>/dev/null; then
-    echo "  FAIL: fixture shim did not observe deploy create --dry-run argv" >&2
+  # 내부 helper surface 명(plugin-support) 도 사용자 result 에 새면 안 돼요.
+  if printf '%s' "$RESULT_TEXT" | grep -F -q "plugin-support"; then
+    echo "  FAIL: internal helper surface name 'plugin-support' leaked to user-facing result" >&2
+    FAIL=1
+  fi
+  # post-diet flow: guard preflight + deploy-prep 가 실제로 실행됐는지 argv 로 검증.
+  if ! grep -F -q -- "plugin-support preflight" "${CASE_DIR}/axhub-argv.log" 2>/dev/null; then
+    echo "  FAIL: fixture shim did not observe 'plugin-support preflight' argv (Step 1 guard skipped)" >&2
+    FAIL=1
+  fi
+  if ! grep -F -q -- "plugin-support deploy-prep" "${CASE_DIR}/axhub-argv.log" 2>/dev/null; then
+    echo "  FAIL: fixture shim did not observe 'plugin-support deploy-prep' argv (Step 1.1 prep skipped)" >&2
     FAIL=1
   fi
   for forbidden_tool in "auth login" "approval preview" "DEPLOY_DECISION=approve" "AXHUB_E2E_DESTRUCTIVE" "--execute"; do
