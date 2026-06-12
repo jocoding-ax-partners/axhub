@@ -102,11 +102,11 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 # axhub plugin (diet 체제)
 
-이 repo 는 axhub Claude Code plugin 이에요. 45 skill 체제에서 **3 skill** (`onboarding` / `init` / `deploy`) 로 다이어트했어요. plugin 은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli (`axhub` 바이너리) 를 호출해요.
+이 repo 는 axhub Claude Code plugin 이에요. 45 skill 체제에서 **4 skill** (`onboarding` / `init` / `deploy` / `cli`) 로 다이어트했어요. plugin 은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli (`axhub` 바이너리) 를 호출해요. `cli` skill 은 나머지 3 skill 범위 밖의 axhub 작업을 라이브 `--help` 트리 탐색으로 명령을 찾아 무확인 실행하는 브리지예요 (카탈로그 내장 금지).
 
 제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 모든 hook, NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인.
 
-## 3 skill 이 CLI 를 부르는 법
+## skill 이 CLI 를 부르는 법
 
 - 흡수된 helper 표면은 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 — 예: `onboarding-detect`, `preflight`, `deploy-prep`.
 - 공개 검증 표면은 `axhub deploy verify <deployment-id>` 하나예요.
@@ -125,7 +125,7 @@ frontmatter validity check 와 e2e flow 1개도 살아남은 quality gate 예요
 ## Never Do
 
 - NEVER helper 바이너리 (`crates/axhub-helpers`) 나 hook / NL routing / scaffold 인프라 재추가 — diet 결정 위반.
-- NEVER 명시적 결정 없이 skill 추가 — 3 skill 체제 유지.
+- NEVER 명시적 결정 없이 skill 추가 — 4 skill 체제 유지 (cli skill 은 deep-interview spec `.omc/specs/deep-interview-axhub-cli-bridge-skill.md` 의 명시 결정).
 - NEVER `axhub --version` 최소 버전 가드 우회.
 - NEVER deploy 성공 선언을 `axhub deploy verify <deployment-id>` 1회 실행 없이 — deployment id 필수, latest 재탐색 금지.
 - NEVER release 를 manual `vim package.json` + `git tag` 로 — `bun run release` → narrative amend → `bun run release:tag` 2단계 flow (단순화된 postbump) 만 써요.
