@@ -4,7 +4,7 @@
 
 ## Status
 
-**LOCKED — measured 2026-04-28 against `claude 2.1.121 (Claude Code)`.** Sample artifacts: `tests/e2e/claude-cli/output/baseline-samples/*.stdout.json`. Sample run = 5 case dry-run, $1.32 USD total cost, all `error_max_budget_usd` (cap=0.05 USD intentional).
+**LOCKED — measured 2026-04-28 against `claude 2.1.121 (Claude Code)`.** Sample run = 5 case dry-run, $1.32 USD total cost, all `error_max_budget_usd` (cap=0.05 USD intentional).
 
 ## Top-level shape (실측)
 
@@ -145,11 +145,11 @@ baseline 5 case 에서 관측된 값:
 ## Verification command
 
 ```bash
-# 22.5.5 dry-run 재실행
-bun scripts/measure-claude-baseline.ts
+# 하네스 1회 실행으로 schema sample 생성
+bash tests/e2e/claude-cli/run-matrix.sh --only 19
 
 # schema sample 직접 검사
-jq '.' tests/e2e/claude-cli/output/baseline-samples/smoke-empty.stdout.json
+jq '.' tests/e2e/claude-cli/output/19/stdout.json
 ```
 
 ## Drift 정책
