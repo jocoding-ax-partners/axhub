@@ -44,7 +44,7 @@ model: sonnet
 ## Workflow
 
 **한눈에 — 실행 순서.** step 라벨은 히스토리상 순서가 섞여 있으니, 실제 실행은 이 순서로 읽어요:
-`1` CLI 가드 → `0.5` 재진입 resume 확인 → `2` template registry → `2.5` GitHub App 게이트 → `3` template 선택 → `4` 앱 이름 → `5` bootstrap dry-run 미리보기 → `6` 확인 + execute(saga) → `7` repo clone → `8.5` 자동 연결 준비 → `8` 결과 안내 → `8.6` 업데이트 알림 → `9` MCP 설치(선택). (`0` TodoWrite 는 가용 시 전 구간에 걸쳐 갱신.)
+`1` CLI 가드 → `1a` 버전 체크(신버전 안내) → `0.5` 재진입 resume 확인 → `2` template registry → `2.5` GitHub App 게이트 → `3` template 선택 → `4` 앱 이름 → `5` bootstrap dry-run 미리보기 → `6` 확인 + execute(saga) → `7` repo clone → `8.5` 자동 연결 준비 → `8` 결과 안내 → `9` MCP 설치(선택). (`0` TodoWrite 는 가용 시 전 구간에 걸쳐 갱신.)
 
 **User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
@@ -87,6 +87,21 @@ model: sonnet
    ```
 
    세 갈래예요: (a) `command -v axhub` 없음 → 온보딩 안내 후 멈춰요. (b) CLI 는 있는데 `plugin-support` 가 clap usage error (exit 64) 거나 빈 출력 → "axhub CLI가 오래됐어요. `axhub update apply`로 업데이트한 뒤 다시 시도해 주세요" 안내 후 멈춰요 (최소 0.20.0 필요 — 숫자 비교는 안 하고 preflight 동작 여부로만 판정). (c) preflight JSON 정상 → `auth_ok` 등을 그대로 읽어 계속 진행해요. raw stderr 는 chat 에 노출하지 않아요.
+
+1a. **버전 체크 (맨 처음, best-effort · 비차단 · 6h TTL).** preflight 가 정상이면 본 작업 전에 axhub CLI·플러그인 새 버전이 있는지 한 번 가볍게 확인해요. 매 호출 네트워크를 피하려 6시간 캐시하고, 실패·구 CLI 면 조용히 건너뛰어요 — 앱 생성을 막지 않아요.
+
+   ```bash
+   STAMP="${TMPDIR:-/tmp}/axhub-update-check.stamp"
+   if [ -z "$(find "$STAMP" -mmin -360 2>/dev/null)" ]; then
+     : > "$STAMP"
+     PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')
+     UPD=$(axhub update check ${PLUGIN_VER:+--plugin-version "$PLUGIN_VER"} --json 2>/dev/null)
+   fi
+   ```
+
+   `UPD` 의 `has_update`(CLI) / `plugin.has_update`(플러그인) 중 하나라도 true 면 한 줄만 안내한 뒤 이어가요. 둘 다 false 거나 `UPD` 가 비면(캐시 hit·네트워크 실패·구 CLI) 아무것도 안 보여줘요.
+   - CLI 새 버전: "axhub CLI 새 버전(`latest`)이 나왔어요 — '업데이트 해줘'라고 하면 적용할게요."
+   - 플러그인 새 버전: "axhub 플러그인 새 버전(`plugin.latest`)이 있어요 — `/plugin update` 로 받을 수 있어요."
 
 0.5. **재진입 resume state 를 먼저 확인해요 (proactive resume).**
 
@@ -478,16 +493,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    - 데이터 읽기는 template 에 설치된 @ax-hub/sdk 를 써요.
    ```
 
-8.6. **업데이트 알림 (성공 시 best-effort, 비차단).** 앱 생성이 성공한 직후에만, axhub CLI·플러그인 새 버전이 있는지 가볍게 확인해 안내 끝에 한 줄로 덧붙여요. 실패하면 조용히 건너뛰어요.
-
-   ```bash
-   PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')
-   UPD=$(axhub update check ${PLUGIN_VER:+--plugin-version "$PLUGIN_VER"} --json 2>/dev/null)
-   ```
-
-   `UPD` 의 `has_update` (CLI) / `plugin.has_update` (플러그인) 중 하나라도 true 면 한 줄만 덧붙여요. 둘 다 false 거나 `UPD` 가 비면 아무것도 보여주지 않아요.
-   - CLI 새 버전: "참고로 axhub CLI 새 버전(`latest`)이 나왔어요 — '업데이트 해줘'라고 하면 적용할게요."
-   - 플러그인 새 버전: "참고로 axhub 플러그인 새 버전(`plugin.latest`)이 있어요 — `/plugin update` 로 받을 수 있어요."
+   (업데이트 알림은 Step 1a 에서 맨 앞에 처리하니 여기선 다시 안 해요.)
 
    확인된 공개 URL 이 없으면 "인터넷 배포가 시작됐어요. '방금 배포 어디까지 됐어?' 라고 물으면 이어서 확인할게요." 라고 낮춰 말해요.
 
