@@ -475,6 +475,17 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    - 데이터 읽기는 template 에 설치된 @ax-hub/sdk 를 써요.
    ```
 
+8.6. **업데이트 알림 (성공 시 best-effort, 비차단).** 앱 생성이 성공한 직후에만, axhub CLI·플러그인 새 버전이 있는지 가볍게 확인해 안내 끝에 한 줄로 덧붙여요. 실패하면 조용히 건너뛰어요.
+
+   ```bash
+   PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')
+   UPD=$(axhub update check ${PLUGIN_VER:+--plugin-version "$PLUGIN_VER"} --json 2>/dev/null)
+   ```
+
+   `UPD` 의 `has_update` (CLI) / `plugin.has_update` (플러그인) 중 하나라도 true 면 한 줄만 덧붙여요. 둘 다 false 거나 `UPD` 가 비면 아무것도 보여주지 않아요.
+   - CLI 새 버전: "참고로 axhub CLI 새 버전(`latest`)이 나왔어요 — '업데이트 해줘'라고 하면 적용할게요."
+   - 플러그인 새 버전: "참고로 axhub 플러그인 새 버전(`plugin.latest`)이 있어요 — `/plugin update` 로 받을 수 있어요."
+
    확인된 공개 URL 이 없으면 "인터넷 배포가 시작됐어요. '방금 배포 어디까지 됐어?' 라고 물으면 이어서 확인할게요." 라고 낮춰 말해요.
 
    `error_code` 로 saga 가 실패했으면 다음 routing 을 써요:

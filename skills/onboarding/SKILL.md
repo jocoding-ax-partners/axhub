@@ -189,10 +189,13 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    **4c. `cli_old`.** `cli_too_old=true` 또는 `has_update=true` 면 업데이트를 물어요. 이 plugin 의 스킬들은 ax-hub-cli **v0.20.0 이상**(plugin-support 표면 포함)이 필요해요. update-summary 헬퍼는 폐기됐어요 — 공개 `axhub update` 를 직접 부르고 한국어 메시지는 이 SKILL 이 렌더해요.
 
    ```bash
-   axhub update check --json
+   PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')
+   axhub update check ${PLUGIN_VER:+--plugin-version "$PLUGIN_VER"} --json
    ```
 
-   check 응답은 `{current, latest, has_update}` 예요. `has_update:false` 면 "이미 최신 버전이에요" 한 줄로 끝내고 다음 gap 으로 가요. `has_update:true` 면 현재/최신 버전 diff 카드를 한국어로 보여주고 적용을 물어요.
+   `--plugin-version` 은 CLI v0.21.0+ 에서 플러그인 최신 여부도 함께 판정해요. 구 CLI 가 이 플래그를 거부하면 (exit 64) `axhub update check --json` 으로 한 번 더 호출해 CLI-only 로 떨어져요.
+
+   응답은 `{current, latest, has_update}` (CLI) 에 더해 `--plugin-version` 을 줬으면 `plugin: {current, latest, has_update}` 도 있어요. CLI `has_update:false` 면 "이미 최신 버전이에요" 한 줄로 넘어가고, `has_update:true` 면 현재/최신 버전 diff 카드를 한국어로 보여주고 적용을 물어요.
 
    ```json
    {
@@ -215,7 +218,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    - exit 15 (swap failed) → 자동 재시도하지 말고 "설치 상태 진단해줘" 로 안내해요.
    - exit 4 (미인증) → "다시 로그인해줘" 로 낮춰요.
 
-   플러그인 자체 업데이트는 gap 이 아니에요 — marketplace `/plugin update` 가 담당하니 끝단 advisory 로만 보여줘요.
+   **플러그인 업데이트** 는 위 응답의 `plugin` 블록으로 봐요 (CLI v0.21.0+). `plugin.has_update:true` 면 끝단에 한 줄 advisory 로 알려요 — "axhub 플러그인 새 버전(`plugin.latest`)이 있어요. Claude Code 에서 `/plugin update` 로 받을 수 있어요." 플러그인 교체 자체는 marketplace `/plugin update` 가 담당하니 gap 으로 막지 않고 안내만 해요. `plugin` 블록이 없으면 (구 CLI) 생략해요.
 
    **4d. `auth_missing`.** `auth_ok=false` 면 로그인 gap 이에요. 공개 `axhub auth` 표면을 직접 써요.
 
