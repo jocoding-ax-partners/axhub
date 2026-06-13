@@ -9,7 +9,7 @@ description: 'This skill resolves any axhub-related request that does NOT clearl
 
 ## 원칙
 
-- **카탈로그 금지.** 이 문서에 작업→명령 매핑을 적지 않아요. CLI 가 릴리즈될 때마다 표면이 변하니 진실은 항상 `axhub ... --help` 예요. (본문의 `axhub env` 류는 절차 예시일 뿐 매핑이 아니에요.)
+- **카탈로그 금지.** 이 문서에 작업→명령 매핑을 적지 않아요. CLI 가 릴리즈될 때마다 표면이 변하니 진실은 항상 라이브 `axhub --json-schema` (없으면 `axhub ... --help`) 예요. (본문의 `axhub env` 류는 절차 예시일 뿐 매핑이 아니에요.)
 - **무확인 자동 실행.** 조회·설정 변경·파괴적 작업(삭제·롤백) 구분 없이, 명령을 찾으면 즉시 실행해요. "실행할까요?" 를 묻지 않아요.
 - **공개 표면만.** `axhub plugin-support ...` (hidden 그룹) 는 plugin 내부 프로토콜이라 이 스킬의 탐색·실행 대상이 아니에요.
 - **지어내지 않기.** 탐색으로 못 찾은 기능은 "axhub 에 그 기능은 없어요" 라고 정직하게 말하고, 가장 가까운 명령을 제안해요.
@@ -20,16 +20,18 @@ description: 'This skill resolves any axhub-related request that does NOT clearl
 
 2. **의도 좁히기 (clarify).** 발화가 모호하면 먼저 핵심 동사·명사를 잡아요. 그래도 후보 동작이 여럿이면 한 번만 짧게 되물어요 — 단, 되묻기는 마지막 수단이고 대개는 다음 탐색으로 스스로 판별해요.
 
-3. **탐색 (discover).** `--help` 트리를 좁혀가요:
+3. **탐색 (discover).** axhub 는 **에이전트용 기계가독 표면** `--json-schema` 를 제공해요 — `--help` prose 를 긁는 것보다 안정적이니 이걸 우선 써요. 단 전체 schema 는 ~270KB 라 **반드시 `jq` 로 필요한 부분만 슬라이스**하고 통째로 읽지 않아요.
 
    ```bash
-   axhub --help                # 1단계: 최상위 명령에서 후보 고르기
-   axhub <후보> --help         # 2단계: 서브커맨드·플래그 확인
-   axhub <후보> <하위> --help  # 3단계: 필요하면 더 깊이
+   # 1단계: 최상위 명령 목록만 (작아요)
+   axhub --json-schema | jq -r '.commands | keys[]'
+   # 2단계: 후보 명령의 구조 (서브커맨드·플래그·alias) — 그 명령만 슬라이스
+   axhub --json-schema | jq '.commands["<후보>"]'
    ```
 
-   - 예: "환경변수 설정해줘" → 최상위에서 `env` 발견 → `axhub env --help` 로 set/list 확인 → 인자 조립.
-   - 후보가 여럿이면 help 설명으로 판별하고, 탐색 출력(help 본문)은 chat 에 붙이지 않아요 — 판단 재료로만 써요.
+   - 예: "환경변수 설정해줘" → keys 에서 `env` 발견 → `jq '.commands.env'` 로 set/list/get/delete 와 플래그 확인 → 인자 조립.
+   - `--json-schema` 가 없거나 비면(구 CLI) `--help` 트리로 폴백해요: `axhub --help` → `axhub <후보> --help` → 필요하면 더 깊이.
+   - 후보가 여럿이면 description 으로 판별하고, 탐색 출력(schema/help 본문)은 chat 에 붙이지 않아요 — 판단 재료로만 써요.
 
 4. **실행 (execute).** 조립한 명령을 바로 실행해요.
 
