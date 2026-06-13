@@ -100,131 +100,32 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 <!-- gitnexus:end -->
 
-# axhub Skill Authoring (Phase 17/18 강제)
+# axhub plugin (diet 체제)
 
-새 SKILL 을 `skills/<name>/SKILL.md` 에 작성할 때 **반드시** scaffold 사용. 직접 작성 금지.
+이 repo 는 axhub Claude Code plugin 이에요. 45 skill 체제에서 **4 skill** (`onboarding` / `init` / `deploy` / `cli`) 로 다이어트했어요. plugin 은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli (`axhub` 바이너리) 를 호출해요. `cli` skill 은 나머지 3 skill 범위 밖의 axhub 작업을 라이브 `--help` 트리 탐색으로 명령을 찾아 무확인 실행하는 브리지예요 (카탈로그 내장 금지).
 
-## Always Do
+제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 모든 hook, NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인.
 
-- **MUST `bun run skill:new <slug>` 로 스캐폴드 생성** — 직접 `mkdir skills/<name>` 후 SKILL.md 작성 시 Phase 17/18 패턴 (D1 TTY guard / TodoWrite Step 0 / `!command` preflight injection / AskUserQuestion header / registry stub) 누락되어 CI fail.
-- **MUST frontmatter 에 `multi-step:` + `needs-preflight:` 선언** — `multi-step: true` (deploy/recover/update/upgrade/doctor 같이 4+ 단계) 또는 `false` (apps/auth/clarify/logs/status 같이 단일/조회). `needs-preflight: true` (deploy/recover/apps 같이 live state 필요) 또는 `false`.
-- **MUST `bun run skill:doctor` 로 패턴 체크** — colored 한글 출력으로 SKILL 별 D1 sentinel / TodoWrite / `!command` preflight 누락 즉시 보임. CI 도 `--strict` mode 로 같은 검사 통과 필수.
-- **MUST `tests/fixtures/ask-defaults/registry.json` 에 AskUserQuestion 별 `safe_default` + `rationale` 등록** — scaffold 가 stub 자동 append. 새 question 추가 시 매번 channel 등록 (drift catch).
-- **MUST 모든 한글 텍스트 해요체 통일** — `bun run lint:tone --strict` 0 err 필수. 금지 token: 합니다 / 입니다 / 시겠어요 / 드립니다 / 당신 / 아이고. 사용: 해요 / 예요 / 이에요 / 할래요.
-- **MUST nl-lexicon trigger 어구는 frontmatter `description:` 에만** — `bun run lint:keywords --check` 베이스라인 잠금. SKILL body 에서 새 trigger 어구 추가하면 baseline 깨짐.
+## skill 이 CLI 를 부르는 법
 
-## Skill Authoring Workflow
+- 흡수된 helper 표면은 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 — 예: `onboarding-detect`, `preflight`, `deploy-prep`.
+- 공개 검증 표면은 `axhub deploy verify <deployment-id>` 하나예요.
+- init·deploy skill 은 시작 시 `axhub --version` 으로 최소 버전 (흡수 릴리즈 0.20.0) 을 가드해요. 미달이면 멈추고 안내해요 — 우회 금지.
+
+## 변경 검증
 
 ```bash
-# 1. Scaffold 생성 (mutate-aware safe defaults)
-bun run skill:new my-skill
-
-# Read-only SKILL 인 경우 flag opt-out:
-bun run skill:new my-readonly --no-multi-step --no-preflight
-
-# 2. skills/my-skill/SKILL.md TODO placeholder 채우기
-#    - description: nl-lexicon 활성화 trigger 어구
-#    - workflow Step 1..N
-#    - AskUserQuestion JSON block (필요 시)
-
-# 3. 진단 + lint + test
-bun run skill:doctor          # 패턴 누락 colored 출력
-bun run lint:tone --strict    # 톤 0 err
-bun run lint:keywords --check # nl-lexicon 베이스라인 lock
-bun test                      # 회귀
-
-# 4. 모두 green 이면 commit
+bun test               # skill / e2e 회귀
+bun run lint:tone --strict   # 해요체 0 err
+bunx tsc --noEmit      # 타입 clean
 ```
+
+frontmatter validity check 와 e2e flow 1개도 살아남은 quality gate 예요.
 
 ## Never Do
 
-- NEVER `mkdir skills/foo && touch skills/foo/SKILL.md` 후 빈 SKILL.md 직접 작성. scaffold 우회 시 패턴 누락.
-- NEVER `tests/ux-todowrite.test.ts` / `tests/ux-skill-preflight-injection.test.ts` 등에 hardcoded SKILL slug 추가. frontmatter 선언으로 자동 enforce — test 코드 편집 불필요.
-- NEVER `tests/fixtures/ask-defaults/registry.json` 에 AskUserQuestion 등록 없이 SKILL ship. `tests/ux-ask-fallback-registry.test.ts` 가 drift catch.
-- NEVER `description:` 의 nl-lexicon trigger 어구 변경 — baseline 깨짐. 필요 시 `.omc/lint-baselines/skill-keywords.json` baseline 재캡처 (rare event).
-- NEVER lint:tone scope 에 SKILL frontmatter 포함 시키기 — `description:` 은 nl-lexicon trigger 라 byte-identical lock 우선.
-
-## Self-Check Before Finishing Skill
-
-- [ ] `bun run skill:doctor --strict` exit 0
-- [ ] `bun run lint:tone --strict` 0 err
-- [ ] `bun run lint:keywords --check` no diff
-- [ ] `bun test` ≥498 pass / 0 fail (Phase 18 baseline)
-- [ ] `bunx tsc --noEmit` clean
-- [ ] frontmatter `multi-step:` + `needs-preflight:` 선언
-- [ ] AskUserQuestion 마다 registry entry 등록
-
-# axhub Release Workflow (Phase 19 v0.1.19+ 자동화)
-
-새 버전 ship 할 때 **반드시** `bun run release` 사용. 직접 `vim package.json` + `git tag` 절대 금지 (drift 위험).
-
-## Always Do
-
-- **MUST `bun run release` 로 자동 bump** — `commit-and-tag-version` (D2) 가 3 파일 (package.json + plugin.json + marketplace.json) bump + postbump hook (codegen:version + release:check) + CHANGELOG entry + git commit + tag 자동 chain.
-- **MUST CHANGELOG 본문 narrative 추가** — auto-bullets 위에 Phase NN 한국어 narrative paragraph (해요체) 작성. `git commit --amend --no-edit -a` 로 tag commit 에 narrative 합침.
-- **MUST `git push origin main --tags`** — release.yml 가 tag push 시 자동 fire (5 cross-arch binary cosign 서명 + GH release upload).
-- **MUST Conventional Commits** — `feat:` (minor) / `fix:` (patch) / `chore:` (no-bump) / `docs:` / `test:` / `refactor:` / `perf:` (Performance section). commit-and-tag-version 이 type 으로 bump 결정.
-
-## Release Workflow
-
-```bash
-# 1. clean working tree 확인
-git status
-
-# 2. release 한 줄 (auto-bump from commit history since last tag)
-bun run release
-# 또는 explicit:
-bun run release -- --release-as patch    # 0.1.X → 0.1.X+1
-bun run release -- --release-as minor    # 0.1.X → 0.2.0
-bun run release -- --release-as major    # 0.X.Y → 1.0.0
-bun run release -- --release-as 0.1.20   # explicit version
-
-# 자동 수행:
-#  ✓ 3 files bump (package/plugin/marketplace)
-#  ✓ postbump: codegen:version (install.sh/ps1/index.ts/telemetry.ts 동기화)
-#               + release:check (5 binary build + version assert — v0.1.14 stale binary 재발 방지)
-#  ✓ CHANGELOG.md auto entry (Conventional Commits parse)
-#  ✓ git commit + git tag vX.Y.Z
-
-# 3. CHANGELOG narrative 추가 (해요체 1-3 문장)
-vim CHANGELOG.md   # auto-bullets 위에 Phase NN narrative paragraph + Test baseline + Honest tradeoff sections
-git commit --amend --no-edit -a   # tag commit 에 narrative 흡수
-
-# 4. push
-git push origin main --tags
-# release.yml 자동 fire — 5 binary cosign 서명 + GH release v0.1.X 생성
-
-# 5. release 검증
-gh release view vX.Y.Z --json url -q .url
-```
-
-## Hotfix Workflow (긴급 fix mid-Phase)
-
-```bash
-git commit -am "fix: <urgent issue>"
-bun run release -- --release-as patch
-git push origin main --tags
-```
-
-## Never Do
-
-- NEVER `vim package.json` + `git tag` manual edit. drift + v0.1.14 stale binary 재발 위험.
-- NEVER `git push --force` to main. branch protection + hook block.
-- NEVER skip CHANGELOG narrative — auto-bullets 만으로는 Phase 의미 전달 부족.
-- NEVER tag without push (local-only tag = release.yml 안 fire).
-- NEVER use D1 release-please / standard-version / semantic-release — 이미 D2 commit-and-tag-version 결정 (.versionrc.json + ralplan ADR 기록).
-
-## Self-Check Before Push
-
-- [ ] `git status` clean
-- [ ] `bun run release` 자동 chain 완료 (3 files + postbump + CHANGELOG + commit + tag)
-- [ ] CHANGELOG narrative paragraph (해요체) 추가 + amend
-- [ ] `git push origin main --tags` 성공
-- [ ] release.yml workflow run completed: success
-- [ ] `gh release view vX.Y.Z` 5 cross-arch binaries 확인
-# axhub v1.0 Quality Agents
-
-- `axhub-review`, `axhub-debug`, `axhub-ship`, `axhub-tdd`, and `axhub-plan` are first-class quality SKILL surfaces.
-- `.axhub-state/quality.json` is local-only state and must not be committed.
-- Commit / push review gating is hard PreToolUse ask unless `AXHUB_SKIP_REVIEW=1` or `AXHUB_DISABLE_TRIGGERS=1` is set.
-- SessionStart quality auto-mode is a best-effort next-turn reminder, not a guaranteed router.
+- NEVER helper 바이너리 (`crates/axhub-helpers`) 나 hook / NL routing / scaffold 인프라 재추가 — diet 결정 위반.
+- NEVER 명시적 결정 없이 skill 추가 — 4 skill 체제 유지 (cli skill 은 deep-interview spec `.omc/specs/deep-interview-axhub-cli-bridge-skill.md` 의 명시 결정).
+- NEVER `axhub --version` 최소 버전 가드 우회.
+- NEVER deploy 성공 선언을 `axhub deploy verify <deployment-id>` 1회 실행 없이 — deployment id 필수, latest 재탐색 금지.
+- NEVER release 를 manual `vim package.json` + `git tag` 로 — `bun run release` → narrative amend → `bun run release:tag` 2단계 flow (단순화된 postbump) 만 써요.

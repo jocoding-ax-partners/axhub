@@ -1,9 +1,0 @@
-{
-  "input": {
-    "command": "axhub deploy status dep_42 --json"
-  },
-  "expected": {
-    "is_destructive": false
-  },
-  "description": "Deploy status without watch"
-}

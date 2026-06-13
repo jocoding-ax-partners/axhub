@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-# axhub post-commit — conditional review_commit_sha promotion
-set -eu
-[ "${AXHUB_DISABLE_POSTCOMMIT:-0}" = "1" ] && exit 0
-[ "${AXHUB_DISABLE_TRIGGERS:-0}" = "1" ] && exit 0
-[ "${AXHUB_DISABLE_HOOKS:-0}" = "1" ] && exit 0
-
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/axhub}"
-exec "$PLUGIN_ROOT/bin/axhub-helpers" state-update --post-commit-promote 2>/dev/null || true

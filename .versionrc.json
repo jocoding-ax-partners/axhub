@@ -27,8 +27,7 @@
     }
   ],
   "scripts": {
-    "postbump": "bun run codegen:version && bun run release:check && git add bin/install.sh bin/install.ps1 Cargo.toml Cargo.lock",
-    "postchangelog": "echo '\\n[release step 1/2 완료] CHANGELOG bump commit 생성됨 (tag 미생성).\\n\\n다음:\\n  1. CHANGELOG.md 의 ## [신버전] 섹션 아래에 해요체 narrative paragraph 추가\\n  2. git commit --amend --no-edit -a  (narrative 를 bump commit 에 흡수)\\n  3. bun run release:tag  (HEAD 에 tag 생성 + push --tags)\\n\\nrelease.yml 은 step 3 의 tag push 가 narrative 포함된 commit 가리킬 때 fire 돼서 GitHub release body + Slack narrative 가 비지 않아요.'"
+    "postchangelog": "echo '\\n[release step 1/2 완료] CHANGELOG bump commit 생성됨 (tag 미생성).\\n\\n다음:\\n  1. CHANGELOG.md 의 ## [신버전] 섹션 아래에 해요체 narrative paragraph 추가\\n  2. git commit --amend --no-edit -a  (narrative 를 bump commit 에 흡수)\\n  3. bun run release:tag  (HEAD 에 tag 생성 + push --tags)\\n\\nrelease.yml 은 step 3 의 tag push 가 narrative 포함된 commit 가리킬 때 fire 돼서 GitHub release body 가 비지 않아요.'"
   },
   "skip": {
     "commit": false,

@@ -1,8 +1,0 @@
-# Track H (mcp-serve) — rmcp 1.7(stdio MCP) 의존 트리가 요구하는 rustc floor 로 고정.
-# rmcp 1.7 = edition 2024 manifest(파싱에 Cargo ≥1.85) + 전이 의존 schemars 1.2 →
-# darling 0.23 이 rustc ≥1.88 을 요구해요. 그래서 floor 는 1.88. (crate 자체 edition 은
-# 2021 유지 — rmcp 의 edition 2024 는 consumer edition 을 강제하지 않아요.) CI/
-# contributor 가 동일 컴파일러로 빌드하도록 toolchain 을 고정해요.
-[toolchain]
-channel = "1.88"
-components = ["rustfmt", "clippy"]

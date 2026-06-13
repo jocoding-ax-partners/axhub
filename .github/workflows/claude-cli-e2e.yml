@@ -13,19 +13,11 @@ on:
     paths:
       - 'skills/**'
       - 'commands/**'
-      - 'hooks/**'
-      - 'crates/axhub-helpers/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
       - 'tests/e2e/claude-cli/**'
-      - 'tests/fixtures/ask-defaults/**'
   push:
     branches: [main]
     paths:
       - 'skills/**'
-      - 'crates/axhub-helpers/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
       - 'tests/e2e/claude-cli/**'
   schedule:
     - cron: "0 17 * * *"  # 02:00 KST nightly

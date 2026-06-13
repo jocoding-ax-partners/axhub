@@ -1,10 +1,9 @@
 name: release
 
-# Phase 4 Rust-primary release pipeline.
-# - Builds 5 native Rust helper binaries in a GitHub-hosted target matrix
-# - Generates manifest.json (binary → arch → sha256 mapping) + checksums.txt
-# - Cosign keyless signs each binary + manifest/checksums via sigstore OIDC
-# - Uploads binaries + .sig/.pem sidecars + checksums.txt + manifest.json
+# On tag push, create a GitHub release whose body is the matching
+# CHANGELOG.md section, then notify Slack with the lead narrative paragraph.
+# (Rust helper binary build / cosign signing / manifest generation removed —
+# the plugin ships as Claude Code skills, no native binaries.)
 
 on:
   push:
@@ -13,160 +12,23 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to upload (for example, v0.1.24)"
+        description: "Existing release tag to publish (for example, v0.1.24)"
         required: true
         type: string
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
-  build:
-    name: Build ${{ matrix.asset }}
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            asset: axhub-helpers-linux-amd64
-            runner: ubuntu-latest
-            cross: false
-          - target: aarch64-unknown-linux-gnu
-            asset: axhub-helpers-linux-arm64
-            runner: ubuntu-latest
-            cross: true
-          - target: x86_64-apple-darwin
-            asset: axhub-helpers-darwin-amd64
-            runner: macos-15-intel
-            cross: false
-          - target: aarch64-apple-darwin
-            asset: axhub-helpers-darwin-arm64
-            runner: macos-14
-            cross: false
-          - target: x86_64-pc-windows-msvc
-            asset: axhub-helpers-windows-amd64.exe
-            runner: windows-latest
-            cross: false
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.94.1
-          targets: ${{ matrix.target }}
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: release-${{ matrix.target }}
-
-      - name: Install cross for Linux ARM64
-        if: matrix.cross == true
-        run: cargo install cross --locked
-
-      - name: Build Rust helper
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${{ matrix.cross }}" = "true" ]; then
-            cross build --release -p axhub-helpers --target "${{ matrix.target }}"
-          else
-            cargo build --release -p axhub-helpers --target "${{ matrix.target }}"
-          fi
-
-      - name: Rename release asset
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          if [ "${{ matrix.runner }}" = "windows-latest" ]; then
-            SRC="target/${{ matrix.target }}/release/axhub-helpers.exe"
-          else
-            SRC="target/${{ matrix.target }}/release/axhub-helpers"
-            strip "$SRC" || true
-          fi
-          cp "$SRC" "dist/${{ matrix.asset }}"
-          chmod +x "dist/${{ matrix.asset }}" || true
-          "dist/${{ matrix.asset }}" --version || true
-
-      - name: Verify static CRT linkage (Windows only)
-        if: matrix.runner == 'windows-latest'
-        shell: pwsh
-        run: |
-          $exe = "dist/${{ matrix.asset }}"
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $vsPath = & $vswhere -latest -property installationPath
-          $msvcDir = Get-ChildItem "$vsPath\VC\Tools\MSVC" -Directory | Sort-Object Name -Descending | Select-Object -First 1
-          $dumpbin = Join-Path $msvcDir.FullName 'bin\Hostx64\x64\dumpbin.exe'
-          if (-not (Test-Path $dumpbin)) {
-            Write-Error "dumpbin.exe not found at $dumpbin"; exit 1
-          }
-          $deps = & $dumpbin /dependents $exe 2>&1 | Out-String
-          if ($deps -match '(?i)vcruntime140|msvcp140') {
-            Write-Error "FAIL: dynamic MSVC CRT linkage detected in $exe — expected +crt-static. Dependencies:`n$deps"
-            exit 1
-          }
-          Write-Output "PASS: static CRT verified for $exe"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.asset }}
-          path: dist/${{ matrix.asset }}
-          if-no-files-found: error
-
-  sign-and-upload:
-    name: Manifest + cosign + upload
-    needs: build
+  release:
+    name: Create GitHub release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
 
-      - uses: actions/download-artifact@v4
-        with:
-          path: release-assets
-
-      - name: Collect assets in bin/
-        run: |
-          set -euo pipefail
-          mkdir -p bin
-          find release-assets -type f -name 'axhub-helpers-*' -exec cp {} bin/ \;
-          ls -lh bin/axhub-helpers-*
-
-      - name: Install Bun for release manifest script
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.10"
-          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
-
-      - name: Generate manifest.json + checksums.txt
-        run: |
-          bun scripts/release/manifest.ts > bin/manifest.json
-          cd bin
-          shasum -a 256 axhub-helpers-* manifest.json > checksums.txt
-          cat checksums.txt
-
-      - uses: sigstore/cosign-installer@v3
-        with:
-          cosign-release: v2.4.0
-
-      - name: Cosign sign each release asset (keyless)
-        env:
-          COSIGN_EXPERIMENTAL: "1"
-        run: |
-          set -euo pipefail
-          for f in bin/axhub-helpers-* bin/manifest.json bin/checksums.txt; do
-            echo "Signing $f"
-            cosign sign-blob --yes \
-              --output-signature="${f}.sig" \
-              --output-certificate="${f}.pem" \
-              "$f"
-          done
-
-      - name: Upload release assets
+      - name: Create or update GitHub release from CHANGELOG section
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -180,10 +42,6 @@ jobs:
             echo "release tag must look like vX.Y.Z, got: $TAG" >&2
             exit 1
           fi
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
-            echo "release workflow must run from refs/tags/$TAG, got: $GITHUB_REF" >&2
-            exit 1
-          fi
           VERSION="${TAG#v}"
           NOTES_FILE="$(mktemp)"
           awk -v ver="$VERSION" '
@@ -193,7 +51,7 @@ jobs:
           ' CHANGELOG.md > "$NOTES_FILE"
           if [ ! -s "$NOTES_FILE" ]; then
             echo "CHANGELOG section for $VERSION not found — using fallback notes"
-            printf 'Automated Rust helper release. See CHANGELOG.md for details.\n' > "$NOTES_FILE"
+            printf 'See CHANGELOG.md for details.\n' > "$NOTES_FILE"
           fi
           echo "--- release notes preview ---"
           head -40 "$NOTES_FILE"
@@ -206,23 +64,6 @@ jobs:
               --title "$TAG" \
               --notes-file "$NOTES_FILE"
           fi
-          for f in bin/axhub-helpers-* bin/checksums.txt bin/manifest.json bin/*.sig bin/*.pem; do
-            [ -f "$f" ] || continue
-            echo "Uploading $f"
-            gh release upload "$TAG" "$f" --repo "$GITHUB_REPOSITORY" --clobber
-          done
-
-      - name: Verify uploaded release assets
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-          else
-            TAG="${GITHUB_REF#refs/tags/}"
-          fi
-          bash scripts/release/verify-release.sh "$TAG"
 
       - name: Notify Slack of new release
         if: success()
@@ -244,10 +85,9 @@ jobs:
 
           # Fetch the release body and extract ONLY the lead narrative
           # paragraph — the first non-heading paragraph that follows the
-          # `## [version]` line. Everything below (핵심 모듈 / 보안 강화 /
-          # 검증 baseline / 정직한 tradeoff / ### Added auto-bullets) belongs
-          # on the GitHub release page; Slack stays focused on the human
-          # "what shipped" summary. Strip CRLF for jq compatibility.
+          # `## [version]` line. Everything below (### Added auto-bullets etc.)
+          # belongs on the GitHub release page; Slack stays focused on the
+          # human "what shipped" summary. Strip CRLF for jq compatibility.
           BODY_RAW="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body 2>/dev/null | tr -d '\r' || echo '')"
           if [ -z "$BODY_RAW" ]; then
             BODY_TRIMMED="(릴리즈 노트 본문 없음 — GitHub 에서 확인해주세요)"
@@ -294,11 +134,6 @@ jobs:
 
           # Convert the narrative paragraph into per-sentence bullets so
           # Slack renders it as a scannable list instead of a wall of text.
-          # Split heuristic: ". " (period+space). Backtick-wrapped code such
-          # as `foo.ts`, `v0.5.13`, `{sh,ps1}` keeps dots tight (no trailing
-          # space) and survives the split intact. If the author already
-          # bulleted the narrative (`• ` / `- ` / `* ` line start) keep
-          # author intent verbatim.
           BODY_FILE="$(mktemp)"
           if printf '%s' "$BODY_TRIMMED" | head -1 | grep -qE '^[•\-\*] '; then
             printf '%s' "$BODY_TRIMMED" > "$BODY_FILE"
@@ -339,7 +174,7 @@ jobs:
                   type: "section",
                   text: {
                     type: "mrkdwn",
-                    text: "*📦 업데이트 방법*\n• Claude Code 플러그인: `/plugin update axhub@axhub`\n• 강제 재설치 (파일 불일치 시): `/plugin install axhub@axhub --force`\n• CLI 바이너리만 갱신: `/axhub:update`"
+                    text: "*📦 업데이트 방법*\n• Claude Code 플러그인: `/plugin update axhub@axhub`\n• 강제 재설치 (파일 불일치 시): `/plugin install axhub@axhub --force`"
                   }
                 },
                 {
@@ -359,54 +194,3 @@ jobs:
             --data "$PAYLOAD" "$SLACK_WEBHOOK_URL" \
             || echo "Slack notification failed (fail-open) — release succeeded"
           rm -f "$BODY_FILE"
-
-  e2e-staging:
-    name: ax-hub-cli staging E2E (gated by E2E_ENABLED repo var)
-    runs-on: ubuntu-latest
-    needs: sign-and-upload
-    if: ${{ vars.E2E_ENABLED == 'true' }}
-    env:
-      AXHUB_E2E_STAGING_TOKEN: ${{ secrets.AXHUB_E2E_STAGING_TOKEN }}
-      AXHUB_E2E_STAGING_ENDPOINT: ${{ secrets.AXHUB_E2E_STAGING_ENDPOINT }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - run: bun install --frozen-lockfile
-      - run: bun run test:e2e
-
-  vibe-bootstrap-measurement-advisory:
-    name: Vibe bootstrap SLA measurement (advisory)
-    runs-on: ubuntu-latest
-    needs: sign-and-upload
-    continue-on-error: true
-    if: ${{ vars.VIBE_BOOTSTRAP_MEASUREMENT_ENABLED == 'true' }}
-    env:
-      AXHUB_E2E_STAGING_TOKEN: ${{ secrets.AXHUB_E2E_STAGING_TOKEN }}
-      AXHUB_E2E_STAGING_ENDPOINT: ${{ secrets.AXHUB_E2E_STAGING_ENDPOINT }}
-      AXHUB_E2E_DESTRUCTIVE: ${{ vars.AXHUB_E2E_DESTRUCTIVE || '0' }}
-      AXHUB_E2E_MAX_RUNS: ${{ vars.AXHUB_E2E_MAX_RUNS || '1' }}
-      AXHUB_E2E_COST_BUDGET_USD: ${{ vars.AXHUB_E2E_COST_BUDGET_USD || '' }}
-      AXHUB_E2E_CLEANUP_MODE: ${{ vars.AXHUB_E2E_CLEANUP_MODE || '' }}
-      AXHUB_E2E_TTL_CONFIRMED: ${{ vars.AXHUB_E2E_TTL_CONFIRMED || '0' }}
-      AXHUB_E2E_PREPROVISIONED_APP_ID: ${{ vars.AXHUB_E2E_PREPROVISIONED_APP_ID || '' }}
-      AXHUB_E2E_COMMAND_TIMEOUT_MS: ${{ vars.AXHUB_E2E_COMMAND_TIMEOUT_MS || '120000' }}
-      AXHUB_E2E_FIXTURE_APP: tests/e2e/fixtures/vibe-static-app
-      AXHUB_E2E_MEASUREMENT_OUT: vibe-bootstrap-measurement-summary.json
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.94.1
-      - run: bun install --frozen-lockfile
-      - run: bun run build
-      - name: Run advisory measurement
-        run: |
-          bun run measure:vibe-bootstrap --out "$AXHUB_E2E_MEASUREMENT_OUT"
-          bun run check:vibe-sla --summary "$AXHUB_E2E_MEASUREMENT_OUT" --mode advisory --min-samples 20 --p95-seconds 480
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: release-vibe-bootstrap-measurement-summary
-          path: vibe-bootstrap-measurement-summary.json
-          if-no-files-found: ignore

@@ -13,14 +13,9 @@
 // staging access.
 
 import { describe, expect, test, beforeAll } from "bun:test";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 
 const E2E_TOKEN = process.env["AXHUB_E2E_STAGING_TOKEN"];
 const E2E_ENDPOINT = process.env["AXHUB_E2E_STAGING_ENDPOINT"];
-const E2E_APP_ID = process.env["AXHUB_E2E_STAGING_APP_ID"];
-const REQUIRE_RUST_HELPER = process.env["AXHUB_E2E_REQUIRE_RUST_HELPER"] === "1";
-const RUST_HELPER_PATH = join(import.meta.dir, "../../bin/axhub-helpers");
 
 const E2E_ENABLED = Boolean(E2E_TOKEN && E2E_TOKEN.length > 0);
 
@@ -110,44 +105,9 @@ describe.skipIf(!E2E_ENABLED)("ax-hub-cli staging E2E (gated by AXHUB_E2E_STAGIN
     expectAppListContract(extractAppsList(parsed));
   });
 
-  // parseAxhubCommand + classify-exit pure-logic tests = cargo test
-  // (crates/axhub-helpers) 가 동일하게 cover. TS shadow 박멸 후 Rust 만 검증.
-
-  test("Rust helper list-deployments hits staging when app id is provided", () => {
-    if (!E2E_APP_ID) {
-      if (REQUIRE_RUST_HELPER) {
-        throw new Error("AXHUB_E2E_REQUIRE_RUST_HELPER=1 requires AXHUB_E2E_STAGING_APP_ID");
-      }
-      process.stderr.write("Skipped Rust helper staging probe: AXHUB_E2E_STAGING_APP_ID not set.\n");
-      return;
-    }
-    if (!existsSync(RUST_HELPER_PATH)) {
-      throw new Error(`Rust helper binary missing at ${RUST_HELPER_PATH}; run bun run build first`);
-    }
-    const env = { ...process.env, AXHUB_TOKEN: E2E_TOKEN ?? "", AXHUB_ENDPOINT: E2E_ENDPOINT ?? "" };
-    const result = Bun.spawnSync({
-      cmd: [RUST_HELPER_PATH, "list-deployments", "--app-id", E2E_APP_ID, "--limit", "1"],
-      stdout: "pipe",
-      stderr: "pipe",
-      env,
-    });
-    const stdout = result.stdout.toString();
-    expect(result.exitCode, result.stderr.toString()).toBe(0);
-    const parsed = JSON.parse(stdout) as {
-      deployments?: unknown[];
-      endpoint_used?: string;
-      exit_code?: number;
-      error_code?: string | null;
-    };
-    expect(parsed.exit_code).toBe(0);
-    expect(parsed.error_code ?? undefined).toBeUndefined();
-    // endpoint_used: PR #149 collapsed helper-owned HTTP into a thin axhub
-    // CLI wrapper, so this field is now the literal "cli" regardless of
-    // AXHUB_ENDPOINT. Schema bump documented in CHANGELOG; consumers that
-    // branched on URL form must migrate.
-    expect(parsed.endpoint_used).toBe("cli");
-    expect(Array.isArray(parsed.deployments)).toBe(true);
-  });
+  // The Rust helper (bin/axhub-helpers, crates/axhub-helpers) staging probe was
+  // removed with the helper binary during the US-010 diet — its cargo-side
+  // coverage went away with the crate, so there is nothing left to shadow here.
 });
 
 // When E2E disabled, run a single placeholder test so the test runner shows

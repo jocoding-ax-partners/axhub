@@ -12,16 +12,9 @@
  *   --baseline N     warn-only with baseline N tolerated, exit 1 if exceeded
  *   --json           emit structured violations for CI consumption
  *
- * File scope (Phase 13 v2, Rust-only post TS migration):
- *   - crates/axhub-helpers/data/catalog.json (Tier A — exit-code Korean templates, JSON)
- *   - crates/axhub-helpers/src recursive .rs files (Tier A — Korean string literals via lint:tone:rust)
- *   - commands/*.md (Tier C — 9 slash commands)
- *   - bin/install.sh + bin/install.ps1 (Tier D — installer Korean)
- *   - hooks/session-start.sh + hooks/session-start.ps1 (Tier D — hook Korean)
- *
- * Phase 14 (docs + SKILL workflow) and Phase 15 (SKILL descriptions) are
- * EXCLUDED until those phases ship — running lint on them now would create
- * false positives.
+ * File scope:
+ *   - commands slash-command markdown (Tier C)
+ *   - skill SKILL.md workflow Korean
  *
  * Forbidden tokens map to Toss rule IDs (per plan v2 §1):
  *   T-01: 합니다 / 입니다 (해요체 의무 — verbatim Toss rule)
@@ -58,13 +51,7 @@ const FORBIDDEN: ForbiddenToken[] = [
 ];
 
 const PHASE_13_FILES = async (includePatterns: string[] = []): Promise<string[]> => {
-  const explicit = [
-    "crates/axhub-helpers/data/catalog.json",
-    "bin/install.sh",
-    "bin/install.ps1",
-    "hooks/session-start.sh",
-    "hooks/session-start.ps1",
-  ];
+  const explicit: string[] = [];
   const commandFiles: string[] = [];
   for await (const f of glob("commands/*.md", { cwd: REPO_ROOT })) {
     commandFiles.push(f);
@@ -101,10 +88,9 @@ const scan = async (includePatterns: string[] = []): Promise<Violation[]> => {
   for (const file of files) {
     const content = readFileSync(file, "utf8");
     const lines = content.split("\n");
-    // Phase 18 R4 — for SKILL.md files, skip YAML frontmatter (between first
-    // two `---` lines). description: contains nl-lexicon activation phrases
-    // anchored byte-identical via lint:keywords baseline. Phase 14/15 deferred
-    // territory — do NOT lint frontmatter prose.
+    // For SKILL.md files, skip YAML frontmatter (between first two `---`
+    // lines). description: contains nl-lexicon activation phrases — do NOT
+    // lint frontmatter prose.
     let frontmatterEnd = 0;
     if (file.endsWith("/SKILL.md") && lines[0] === "---") {
       for (let j = 1; j < lines.length; j++) {
