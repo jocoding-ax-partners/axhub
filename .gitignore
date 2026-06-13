@@ -70,6 +70,8 @@ tests/.tmp-*/
 .specify/
 .agents/
 fuzz/
+.cargo/
+.omc/
 .ouroboros/
 .ouroboros_eval_artifact.md
 .qa-live/
