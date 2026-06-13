@@ -52,11 +52,7 @@ const FORBIDDEN: ForbiddenToken[] = [
 
 const PHASE_13_FILES = async (includePatterns: string[] = []): Promise<string[]> => {
   const explicit: string[] = [];
-  const commandFiles: string[] = [];
-  for await (const f of glob("commands/*.md", { cwd: REPO_ROOT })) {
-    commandFiles.push(f);
-  }
-  // Phase 18 R4 — extend scope to skills/*/SKILL.md (verified clean by C0.5 prep run).
+  // diet 후 commands/ 디렉토리는 제거됨 — skills/*/SKILL.md 만 검사해요.
   const skillFiles: string[] = [];
   for await (const f of glob("skills/*/SKILL.md", { cwd: REPO_ROOT })) {
     skillFiles.push(f);
@@ -67,7 +63,7 @@ const PHASE_13_FILES = async (includePatterns: string[] = []): Promise<string[]>
       includeFiles.push(f);
     }
   }
-  const all = [...explicit, ...commandFiles, ...skillFiles, ...includeFiles].map((f) => join(REPO_ROOT, f));
+  const all = [...explicit, ...skillFiles, ...includeFiles].map((f) => join(REPO_ROOT, f));
   return Array.from(new Set(all)).filter((f) => existsSync(f));
 };
 
