@@ -18,11 +18,11 @@ description: 'This skill resolves any axhub-related request that does NOT clearl
 
 1. **CLI 가드.** `command -v axhub` 가 실패하면 멈추고 안내해요: "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요" → onboarding 스킬로 넘겨요. raw 에러는 chat 에 노출하지 않아요.
 
-1a. **버전 체크 (맨 처음, best-effort · 비차단 · 6h TTL).** CLI 가 있으면 본 작업 전에 axhub CLI·플러그인 새 버전이 있는지 한 번 가볍게 확인해요. 매 호출 네트워크를 피하려 6시간 캐시하고, 실패·구 CLI 면 조용히 건너뛰어요 — 작업을 막지 않아요.
+1a. **버전 체크 (맨 처음, best-effort · 비차단 · 10분 TTL).** CLI 가 있으면 본 작업 전에 axhub CLI·플러그인 새 버전이 있는지 한 번 가볍게 확인해요. 매 호출 네트워크를 피하려 10분 캐시하고, 실패·구 CLI 면 조용히 건너뛰어요 — 작업을 막지 않아요.
 
    ```bash
    STAMP="${TMPDIR:-/tmp}/axhub-update-check.stamp"
-   if [ -z "$(find "$STAMP" -mmin -360 2>/dev/null)" ]; then
+   if [ -z "$(find "$STAMP" -mmin -10 2>/dev/null)" ]; then
      : > "$STAMP"
      PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')
      UPD=$(axhub update check ${PLUGIN_VER:+--plugin-version "$PLUGIN_VER"} --json 2>/dev/null)

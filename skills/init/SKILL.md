@@ -88,11 +88,11 @@ model: sonnet
 
    세 갈래예요: (a) `command -v axhub` 없음 → 온보딩 안내 후 멈춰요. (b) CLI 는 있는데 `plugin-support` 가 clap usage error (exit 64) 거나 빈 출력 → "axhub CLI가 오래됐어요. `axhub update apply`로 업데이트한 뒤 다시 시도해 주세요" 안내 후 멈춰요 (최소 0.20.0 필요 — 숫자 비교는 안 하고 preflight 동작 여부로만 판정). (c) preflight JSON 정상 → `auth_ok` 등을 그대로 읽어 계속 진행해요. raw stderr 는 chat 에 노출하지 않아요.
 
-1a. **버전 체크 (맨 처음, best-effort · 비차단 · 6h TTL).** preflight 가 정상이면 본 작업 전에 axhub CLI·플러그인 새 버전이 있는지 한 번 가볍게 확인해요. 매 호출 네트워크를 피하려 6시간 캐시하고, 실패·구 CLI 면 조용히 건너뛰어요 — 앱 생성을 막지 않아요.
+1a. **버전 체크 (맨 처음, best-effort · 비차단 · 10분 TTL).** preflight 가 정상이면 본 작업 전에 axhub CLI·플러그인 새 버전이 있는지 한 번 가볍게 확인해요. 매 호출 네트워크를 피하려 10분 캐시하고, 실패·구 CLI 면 조용히 건너뛰어요 — 앱 생성을 막지 않아요.
 
    ```bash
    STAMP="${TMPDIR:-/tmp}/axhub-update-check.stamp"
-   if [ -z "$(find "$STAMP" -mmin -360 2>/dev/null)" ]; then
+   if [ -z "$(find "$STAMP" -mmin -10 2>/dev/null)" ]; then
      : > "$STAMP"
      PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')
      UPD=$(axhub update check ${PLUGIN_VER:+--plugin-version "$PLUGIN_VER"} --json 2>/dev/null)
