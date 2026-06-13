@@ -1,5 +1,0 @@
-name: s4-measure-fixture
-framework: static
-build:
-  command: "true"
-  output: "."

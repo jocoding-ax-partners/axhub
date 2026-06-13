@@ -64,3 +64,15 @@ tests/.tmp-*/
 
 # 로컬 도구 상태 (MCP 서버가 세션 중 실시간 생성)
 .serena/
+
+# 로컬 dev 도구 산출물 (플러그인 배포물 아님 — diet 후 추적 제외)
+.graphify_python
+.specify/
+.agents/
+fuzz/
+.ouroboros/
+.ouroboros_eval_artifact.md
+.qa-live/
+.omc/notepads/
+.omc/specs/
+.omc/ultragoal/
