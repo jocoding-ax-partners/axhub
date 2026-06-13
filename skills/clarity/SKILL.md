@@ -18,6 +18,21 @@ description: 'This skill resolves any axhub-related request that does NOT clearl
 
 1. **CLI 가드.** `command -v axhub` 가 실패하면 멈추고 안내해요: "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요" → onboarding 스킬로 넘겨요. raw 에러는 chat 에 노출하지 않아요.
 
+1a. **버전 체크 (맨 처음, best-effort · 비차단 · 6h TTL).** CLI 가 있으면 본 작업 전에 axhub CLI·플러그인 새 버전이 있는지 한 번 가볍게 확인해요. 매 호출 네트워크를 피하려 6시간 캐시하고, 실패·구 CLI 면 조용히 건너뛰어요 — 작업을 막지 않아요.
+
+   ```bash
+   STAMP="${TMPDIR:-/tmp}/axhub-update-check.stamp"
+   if [ -z "$(find "$STAMP" -mmin -360 2>/dev/null)" ]; then
+     : > "$STAMP"
+     PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')
+     UPD=$(axhub update check ${PLUGIN_VER:+--plugin-version "$PLUGIN_VER"} --json 2>/dev/null)
+   fi
+   ```
+
+   `UPD` 의 `has_update`(CLI) / `plugin.has_update`(플러그인) 중 하나라도 true 면 한 줄만 안내한 뒤 이어가요. 둘 다 false 거나 `UPD` 가 비면(캐시 hit·네트워크 실패·구 CLI) 아무것도 안 보여줘요.
+   - CLI 새 버전: "axhub CLI 새 버전(`latest`)이 나왔어요 — '업데이트 해줘'라고 하면 적용할게요."
+   - 플러그인 새 버전: "axhub 플러그인 새 버전(`plugin.latest`)이 있어요 — `/plugin update` 로 받을 수 있어요."
+
 2. **의도 좁히기 (clarify).** 발화가 모호하면 먼저 핵심 동사·명사를 잡아요. 그래도 후보 동작이 여럿이면 한 번만 짧게 되물어요 — 단, 되묻기는 마지막 수단이고 대개는 다음 탐색으로 스스로 판별해요.
 
 3. **탐색 (discover).** axhub 는 **에이전트용 기계가독 표면** `--json-schema` 를 제공해요 — `--help` prose 를 긁는 것보다 안정적이니 이걸 우선 써요. 단 전체 schema 는 ~270KB 라 **반드시 `jq` 로 필요한 부분만 슬라이스**하고 통째로 읽지 않아요.

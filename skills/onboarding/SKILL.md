@@ -44,6 +44,8 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 **한눈에 — 실행 흐름.** read-only 감지 → 첫 gap 하나 처리 → 재감지, gap 0 될 때까지 반복 → Ready card. 순서:
 `0` TodoWrite(가용 시) → `1` D1 비대화형 가드 → `2` DETECT_ALL(gap 일괄 스캔) + `2.5` GitHub App surface → `3` Gap 상태머신(첫 gap 하나 처리 후 재감지; `4`~`9` 핸들러로 분기 — CLI·인증 / git·node / GitHub App / repo·app / 의존성 / doctor) → `10` 모든 gap 해소 시 Ready card.
 
+**버전 체크.** onboarding 은 별도 step 없이 맨 앞 `2` DETECT_ALL 이 `cli_too_old`/`has_update` 를 잡고 `4c` 가 CLI·플러그인 업데이트를 안내해요 — 다른 3 스킬의 `1a 버전 체크` 와 같은 역할이에요 (중복 네트워크 호출을 피해 DETECT_ALL 로 통합).
+
 **User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `승인했어`, `온보딩 계속`, `다시 로그인해줘`, `배포해`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
 0. **TodoWrite 진행 체크리스트 (있을 때만).**
