@@ -35,6 +35,7 @@ description: 'This skill should be used for any axhub task that is NOT covered b
    - 기계 파싱이 필요하면 `--json`을 붙여요 (global flag).
    - help가 `--execute`, `--yes`, `--force` 같은 명시 실행 플래그를 요구하는 명령(파괴적 verb의 dry-run 기본값)이면 **그 플래그를 알아서 부가해서** 한 번에 실행해요. dry-run으로 멈춰 서서 확인을 구하지 않아요.
    - 인자가 부족하면(앱 이름 등) 먼저 조회 명령으로 채울 수 있는지 시도하고, 정말 사용자만 아는 값일 때만 물어요.
+   - help 의 어떤 플래그가 **플러그인 자신의 설치 버전**을 요구하면 (예: `update check` 의 `--plugin-version`), `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 의 `version` 을 읽어 채워요. 그러면 업데이트 확인 류 요청에서 CLI 와 플러그인 최신 여부를 한 번에 알려줄 수 있어요 (응답의 `plugin.has_update` 면 `/plugin update` 안내).
 
    ```bash
    OUT=$(mktemp)

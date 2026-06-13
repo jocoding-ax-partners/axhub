@@ -509,6 +509,17 @@ To deploy:
 
    `--dry-run` 경로에서는 verify 를 건너뛰어요 (실제 deploy 가 없어요).
 
+5b. **업데이트 알림 (성공 시 best-effort, 비차단).** verify exit 0 (배포 성공) 직후에만, axhub CLI·플러그인 새 버전이 있는지 가볍게 확인해 완료 요약 끝에 한 줄로 덧붙여요. 실패하면 조용히 건너뛰어요 — 성공 선언에는 영향이 없어요.
+
+   ```bash
+   PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')
+   UPD=$(axhub update check ${PLUGIN_VER:+--plugin-version "$PLUGIN_VER"} --json 2>/dev/null)
+   ```
+
+   `UPD` JSON 의 `has_update` (CLI) 와 `plugin.has_update` (플러그인) 를 읽어, 하나라도 true 면 한 줄만 덧붙여요. 둘 다 false 거나 `UPD` 가 비면 (구 CLI·네트워크 실패) 아무것도 보여주지 않아요.
+   - CLI 새 버전: "참고로 axhub CLI 새 버전(`latest`)이 나왔어요 — '업데이트 해줘'라고 하면 적용할게요."
+   - 플러그인 새 버전: "참고로 axhub 플러그인 새 버전(`plugin.latest`)이 있어요 — Claude Code 에서 `/plugin update` 로 받을 수 있어요."
+
 6. **On any non-zero exit**, route via `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` (canonical router; 두 공간 다 처리: CLI-native 4/5/6 와 helper-output 65/67/68 을 classify-exit 가 65→4 / 67→5 / 68→6 으로 정규화해요 — normalize_helper_exit 계약 불변) 또는 `references/error-empathy-catalog.md` by exit code:
    - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 앱은 안전해요. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.
    - exit 9 + `subdomain_not_configured` (or stderr contains "subdomain") → backend precondition. `axhub apps update <slug> --subdomain <subdomain> --json` 는 별도 destructive mutation 이라 바로 실행하지 말고, subdomain 2..32자 제약 후보를 preview card 로 보여주고 승인 받아요. 승인 후 apps_update 를 단독 Bash 로 실행하고, 성공하면 같은 deploy preview 승인 맥락에서 Step 4 를 한 번만 재시도해요. 다시 exit 9 면 다음 precondition branch 로 라우팅해요.
