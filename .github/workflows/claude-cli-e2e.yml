@@ -12,7 +12,6 @@ on:
   pull_request:
     paths:
       - 'skills/**'
-      - 'commands/**'
       - 'tests/e2e/claude-cli/**'
   push:
     branches: [main]
