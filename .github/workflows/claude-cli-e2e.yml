@@ -1,23 +1,17 @@
 name: claude-cli-e2e
 
-# Phase 22.6 — claude -p subprocess E2E harness CI.
+# claude -p subprocess E2E 하네스 CI.
 #
-# 두 job 분리 (Plan v3 SB-1 Tier overlay):
-#   e2e-pr      : T2 only ($0 model cost, 결정적, PR-blocking)
-#   e2e-nightly : T1+T2+T3 union (claude API cost burn — cron + workflow_dispatch + release tag)
+# diet 후 matrix 는 단일 T1 케이스(case 19, 한국어 NL deploy 회귀)만 남았어요.
+# T1 은 실제 `claude -p` 호출이라 cost burn (~$1.5/run) — 원설계대로 PR-blocking
+# 에 두지 않고 nightly + 수동 dispatch 로만 fire 해요.
 #
-# T1 (claude -p) 은 cost burn ($1.0/run) 우려로 PR-blocking 에서 제외. nightly 와 release tag 직전에만 fire.
+# (이전의 $0 "T2 helper-bin" PR-blocking job 은 Rust helper 바이너리 삭제로
+#  T2 케이스가 0개가 됐고 `bun run build`/`smoke`/`test:plugin-e2e` 스크립트도
+#  전부 제거돼 제거했어요. 하네스는 fixtures/bin/axhub shim 으로 동작해 Rust
+#  toolchain 이 필요 없어요.)
 
 on:
-  pull_request:
-    paths:
-      - 'skills/**'
-      - 'tests/e2e/claude-cli/**'
-  push:
-    branches: [main]
-    paths:
-      - 'skills/**'
-      - 'tests/e2e/claude-cli/**'
   schedule:
     - cron: "0 17 * * *"  # 02:00 KST nightly
   workflow_dispatch:
@@ -25,55 +19,21 @@ on:
       tier:
         description: "Run tier"
         required: false
-        default: "pr"
+        default: "nightly"
         type: choice
-        options: [pr, t1, t2, nightly]
+        options: [t1, nightly]
 
 jobs:
-  e2e-pr:
-    name: T2 helper-bin (PR-blocking, $0 cost)
-    runs-on: ubuntu-22.04
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.94.1
-      - uses: Swatinem/rust-cache@v2
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Build Rust helper bin
-        run: bun run build
-      - name: Smoke
-        run: bun run smoke
-      - name: Run T2 plugin E2E (helper-bin only)
-        run: bun run test:plugin-e2e:t2
-      - name: Upload artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: claude-cli-e2e-pr-t2
-          path: tests/e2e/claude-cli/output/
-          retention-days: 7
-
   e2e-nightly:
-    name: T1+T2+T3 full matrix (cost-aware)
+    name: T1 claude -p E2E (cost-aware)
     runs-on: ubuntu-22.04
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.94.1
-      - uses: Swatinem/rust-cache@v2
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Build Rust helper bin
-        run: bun run build
       - name: Install claude CLI
         run: |
           curl -fsSL https://claude.ai/install.sh | bash
@@ -88,12 +48,12 @@ jobs:
             exit 1
           fi
           echo "::notice::API key present, proceeding with T1 cost burn (~\$1.50/run)"
-      - name: Run E2E matrix (tier from input or default nightly)
+      - name: Run E2E matrix (claude -p)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           TIER="${{ inputs.tier || 'nightly' }}"
-          bun run test:plugin-e2e -- --tier "$TIER"
+          bash tests/e2e/claude-cli/run-matrix.sh --tier "$TIER"
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
