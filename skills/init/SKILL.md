@@ -43,6 +43,9 @@ model: sonnet
 
 ## Workflow
 
+**한눈에 — 실행 순서.** step 라벨은 히스토리상 순서가 섞여 있으니, 실제 실행은 이 순서로 읽어요:
+`1` CLI 가드 → `0.5` 재진입 resume 확인 → `2` template registry → `2.5` GitHub App 게이트 → `3` template 선택 → `4` 앱 이름 → `5` bootstrap dry-run 미리보기 → `6` 확인 + execute(saga) → `7` repo clone → `8.5` 자동 연결 준비 → `8` 결과 안내 → `8.6` 업데이트 알림 → `9` MCP 설치(선택). (`0` TodoWrite 는 가용 시 전 구간에 걸쳐 갱신.)
+
 **User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
 **Visible response contract:** when no pending resume state exists, the first visible chat sentence must be exactly "새 앱을 만들 수 있는 템플릿을 확인할게요." Step 0.5 에서 pending resume state 가 있으면 first visible chat sentence 는 이어서 할지 묻는 문장으로 시작해요.
