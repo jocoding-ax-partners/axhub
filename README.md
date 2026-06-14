@@ -6,12 +6,12 @@
 
 코드를 직접 짜는 대신, "내 앱 배포해" 한마디로 앱 lifecycle 전체를 안전하게 굴려요.
 
-[![version](https://img.shields.io/badge/version-0.10.5-blue)](https://github.com/jocoding-ax-partners/axhub/releases)
+[![version](https://img.shields.io/github/v/release/jocoding-ax-partners/axhub?color=blue)](https://github.com/jocoding-ax-partners/axhub/releases)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
-**상태**: v0.10.5 · 4 SKILL (onboarding · init · deploy · cli) · ax-hub-cli v0.20.0+ 직접 호출
+**상태**: 4 SKILL (onboarding · init · deploy · clarity) · ax-hub-cli v0.20.0+ 직접 호출
 
 </div>
 
