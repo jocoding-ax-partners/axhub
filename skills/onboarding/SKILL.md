@@ -42,7 +42,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 ## Workflow
 
 **한눈에 — 실행 흐름.** read-only 감지 → 첫 gap 하나 처리 → 재감지, gap 0 될 때까지 반복 → Ready card. 순서:
-`0` TodoWrite(가용 시) → `1` D1 비대화형 가드 → `2` DETECT_ALL(gap 일괄 스캔) + `2.5` GitHub App surface → `3` Gap 상태머신(첫 gap 하나 처리 후 재감지; `4`~`9` 핸들러로 분기 — CLI·인증 / git·node / GitHub App / repo·app / 의존성 / doctor) → `10` 모든 gap 해소 시 Ready card.
+`0` TodoWrite(가용 시) → `1` D1 비대화형 가드 → `2` DETECT_ALL(gap 일괄 스캔) + `2.5` GitHub App surface → `3` Gap 상태머신(첫 gap 하나 처리 후 재감지; `4`~`9` 핸들러로 분기 — CLI·인증 / git·node / GitHub App / repo·app / 의존성 / doctor) → `9.5` axhub MCP 설치(user scope, best-effort) → `10` 모든 gap 해소 시 Ready card.
 
 **버전 체크.** onboarding 은 별도 step 없이 맨 앞 `2` DETECT_ALL 이 `cli_too_old`/`has_update` 를 잡고 `4c` 가 CLI·플러그인 업데이트를 안내해요 — 다른 3 스킬의 `1a 버전 체크` 와 같은 역할이에요 (중복 네트워크 호출을 피해 DETECT_ALL 로 통합).
 
@@ -426,6 +426,16 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
    exit 0 이면 terminal success + 접근 가능 URL 이 확인된 거라 live evidence 로 써요. 비-0 이면 아직 진행 중이거나 실패라, URL surface 만 있고 live evidence 가 없으면 `READY_WITH_USER_ACTION` 으로 낮춰요. **latest 재탐색 없이 받은 deployment id 만 verify 해요** (correlation 계약, spec §2.3).
 
+9.5. **axhub MCP 도구 설치 (user scope, best-effort · 비차단).** Claude Code 에 axhub 원격 MCP 서버를 user scope 로 한 번 등록해서, 이후 모든 프로젝트에서 axhub MCP 도구(SDK 지식·스키마 등)를 쓸 수 있게 해요. 이미 등록돼 있으면 건너뛰고(idempotent), `claude` CLI 가 없거나 실패해도 막지 않아요.
+
+   ```bash
+   if command -v claude >/dev/null 2>&1; then
+     claude mcp get axhub >/dev/null 2>&1 || claude mcp add --transport http --scope user axhub https://mcp.axhub.ai/mcp
+   fi
+   ```
+
+   새로 등록했으면 "axhub MCP 도구를 설치했어요 (새 세션부터 도구가 보여요)" 한 줄로 안내해요. 이미 있으면 아무 말 안 하고, `claude` CLI 가 없으면 "axhub MCP 는 나중에 `claude mcp add --transport http --scope user axhub https://mcp.axhub.ai/mcp` 로 설치할 수 있어요" 한 줄만 안내하고 넘어가요.
+
 10. **Ready card.**
 
    모두 green 이면 `VIBE_READY` 카드로 끝내요.
@@ -440,6 +450,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
      ✓ 앱 <app-slug> 연결됨
      ✓ 첫 배포 live: <deployment-url>
      ✓ 점검 통과
+     ✓ axhub MCP 도구 등록됨 (Step 9.5 에서 설치됐을 때만 표시)
 
    이제 바로 코딩하면 돼요.
    다음에 말할 수 있는 것: "배포해", "로그 봐줘", "환경변수 추가해줘", "테이블 추천해줘"
