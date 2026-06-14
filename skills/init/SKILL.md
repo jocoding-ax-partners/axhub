@@ -44,7 +44,7 @@ model: sonnet
 ## Workflow
 
 **한눈에 — 실행 순서.** step 라벨은 히스토리상 순서가 섞여 있으니, 실제 실행은 이 순서로 읽어요:
-`1` CLI 가드 → `1a` 버전 체크(신버전 안내) → `0.5` 재진입 resume 확인 → `2` template registry → `2.5` GitHub App 게이트 → `3` template 선택 → `4` 앱 이름 → `5` bootstrap dry-run 미리보기 → `6` 확인 + execute(saga) → `7` repo clone → `8.5` 자동 연결 준비 → `8` 결과 안내 → `9` MCP 설치(선택). (`0` TodoWrite 는 가용 시 전 구간에 걸쳐 갱신.)
+`1` CLI 가드 → `1a` 버전 체크(신버전 안내) → `0.5` 재진입 resume 확인 → `2` template registry → `2.5` GitHub App 게이트 → `3` template 선택 → `4` 앱 이름 → `5` bootstrap dry-run 미리보기 → `6` 확인 + execute(saga) → `7` repo clone → `8.5` 자동 연결 준비 → `9` MCP 설치(선택) → `8` 결과 안내. (`0` TodoWrite 는 가용 시 전 구간에 걸쳐 갱신.)
 
 **User-facing handoff language:** slash commands and skill names are internal routing labels. In final guidance for Claude Desktop users, prefer natural phrases the user can say, such as `다시 로그인해줘`, `프로필 전환해줘`, or `업데이트 확인해줘`; do not tell a Desktop user to type `/axhub:*` unless they explicitly ask for slash-command syntax.
 
@@ -473,7 +473,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
 8. **결과와 다음 액션을 안내해요.**
 
-   saga 응답의 `app_id` / `deployment_id` / `repo_full_name` 을 humanize 해서 한국어 한 줄씩 보여줘요. **배포 공개 URL** 은 배포 성공 후 `axhub apps get` 으로 앱의 `access_url` 을 읽어서 hero 첫 줄로 보여줘요. URL 은 절대 합성하지 않아요.
+   이 최종 결과 카드는 Step 9 MCP 설치 시도를 마친 뒤에만 보여줘요. saga 응답의 `app_id` / `deployment_id` / `repo_full_name` 을 humanize 해서 한국어 한 줄씩 보여줘요. **배포 공개 URL** 은 배포 성공 후 `axhub apps get` 으로 앱의 `access_url` 을 읽어서 hero 첫 줄로 보여줘요. URL 은 절대 합성하지 않아요.
 
    ```bash
    PUBLIC_URL="$(axhub apps get "$APP_ID" --json --no-input 2>/dev/null | jq -r '.access_url // .data.access_url // empty')"
@@ -533,7 +533,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    axhub plugin-support mcp-install
    ```
 
-   `mcp-install` 은 사람용 텍스트 1줄을 출력해요 (JSON 아님). local stdio 항목 command 는 `axhub plugin-support mcp-serve` 로 CLI 가 직접 set 해요. 없거나 실패해도 **막지 않아요** — "MCP 도구는 나중에 설치해도 돼요" 한 줄만 안내하고 넘어가요. 원격 MCP URL 은 `AXHUB_MCP_URL` env 로 override 할 수 있어요.
+   `mcp-install` 은 사람용 텍스트 1줄을 출력해요 (JSON 아님). local stdio 항목 command 는 `axhub plugin-support mcp-serve` 로 CLI 가 직접 set 해요. 없거나 실패해도 **막지 않아요** — "MCP 도구는 나중에 설치해도 돼요" 한 줄만 안내하고 넘어가요. 원격 MCP URL 은 `AXHUB_MCP_URL` env 로 override 할 수 있어요. 결과 카드에는 **MCP 도구 설치 결과** 를 한 줄로 반드시 넣어요: `.mcp.json` 작성/갱신 성공, 이미 최신이라 변경 없음, 또는 실패했지만 비차단 중 어느 상태인지 사용자에게 자연어로 보여줘요. 이 줄이 없으면 Desktop 사용자는 앱은 배포됐는데 MCP 호출 가능 여부를 알 수 없어요.
 
 ## NEVER
 

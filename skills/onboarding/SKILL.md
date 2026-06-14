@@ -434,7 +434,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    fi
    ```
 
-   새로 등록했으면 "axhub MCP 도구를 설치했어요 (새 세션부터 도구가 보여요)" 한 줄로 안내해요. 이미 있으면 아무 말 안 하고, `claude` CLI 가 없으면 "axhub MCP 는 나중에 `claude mcp add --transport http --scope user axhub https://mcp.axhub.ai/mcp` 로 설치할 수 있어요" 한 줄만 안내하고 넘어가요.
+   새로 등록했거나 이미 등록돼 있으면 반드시 `claude mcp get axhub` 를 한 번 더 실행해 health 를 확인해요. 출력에 `Needs authentication` 이 있으면 **성공으로 말하지 말고** "axhub MCP 는 등록됐지만 인증이 아직 필요해요. Claude Desktop/Claude Code 의 MCP 인증을 완료한 뒤 새 세션에서 도구가 보여요." 라고 안내하고 `READY_WITH_USER_ACTION` 보조 항목으로 남겨요. `Status: ✔ Connected` 또는 인증 필요 문구 없이 정상 상태면 "axhub MCP 도구를 설치했어요 (새 세션부터 도구가 보여요)" 한 줄로 안내해요. 이미 등록돼 있고 정상 상태면 아무 말 안 해도 돼요. `claude` CLI 가 없으면 "axhub MCP 는 나중에 `claude mcp add --transport http --scope user axhub https://mcp.axhub.ai/mcp` 로 설치할 수 있어요" 한 줄만 안내하고 넘어가요.
 
 10. **Ready card.**
 
