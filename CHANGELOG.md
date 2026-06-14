@@ -4,6 +4,36 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.0.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.5...v1.0.0) (2026-06-14)
+
+axhub 플러그인의 첫 메이저 릴리즈예요. 45개 스킬 체제를 핵심 4개(`onboarding`·`init`·`deploy`·`clarity`)로 다이어트하고, 판정·실행 로직을 플러그인에서 들어내 ax-hub-cli 를 직접 호출하도록 전환했어요. Rust helper 바이너리·모든 hook·NL 라우팅 코퍼스·cosign 멀티-바이너리 릴리즈 파이프라인을 제거해 플러그인은 얇은 라우팅 레이어로 가벼워졌고, 흡수된 helper 표면은 CLI 의 hidden `plugin-support` 그룹으로 옮겼어요(최소 ax-hub-cli 0.20.0+ 게이트). 새 `clarity` 브리지가 3스킬 밖 모든 axhub 작업을 `--json-schema` 탐색으로 찾아 무확인 실행하고, 각 스킬은 시작 시 CLI·플러그인 새 버전을 확인해 안내하며, onboarding 은 axhub MCP(user scope)까지 등록해요. 배포 성공 선언은 공개 `axhub deploy verify` 한 번으로만 해요.
+
+
+### ⚠ BREAKING CHANGES
+
+* plugin v1 diet — 45→3 스킬, helpers·hooks 제거, ax-hub-cli 표면 직접 호출 전환
+
+### Added
+
+* clarity description 확장 — 공개 axhub 표면 전 도메인 라우팅 커버 ([722c992](https://github.com/jocoding-ax-partners/axhub/commit/722c99250400473c20cff5e561a42bafc8753669))
+* clarity 탐색을 axhub --json-schema 우선으로 전환 ([3db4366](https://github.com/jocoding-ax-partners/axhub/commit/3db4366acdc3559498ab80969ebd07e98e4248ec))
+* cli 브리지 스킬 신설 — 동적 --help 탐색으로 그 외 axhub 작업 무확인 실행 ([d8dfab5](https://github.com/jocoding-ax-partners/axhub/commit/d8dfab54015a866d02fafa83e1b981e07f05baaa))
+* onboarding 에 axhub MCP (user scope) 설치 추가 ([1edde36](https://github.com/jocoding-ax-partners/axhub/commit/1edde36308991e87cc4b480a0ce104a54aeb927d))
+* plugin v1 diet — 45→3 스킬, helpers·hooks 제거, ax-hub-cli 표면 직접 호출 전환 ([50d3a2e](https://github.com/jocoding-ax-partners/axhub/commit/50d3a2e13e082638b8fedad2d40efdaa38496c43))
+* 각 스킬 맨 처음에 버전 체크 + 신버전 안내 ([6912b3d](https://github.com/jocoding-ax-partners/axhub/commit/6912b3d9cb06d1553045ddf1bc46c24b2323b106))
+* 플러그인·CLI 업데이트 체크 알림 배선 (CLI 0.21.0 활용) ([17a9cb7](https://github.com/jocoding-ax-partners/axhub/commit/17a9cb7c91d5e433ddf9487abfad0d16561986c4))
+
+
+### Changed
+
+* cli→clarity 스킬 rename + 3 핵심 스킬 실행순서 맵 추가 ([ec24252](https://github.com/jocoding-ax-partners/axhub/commit/ec24252b174a717470456f8ff97c28b3638c4e9a))
+
+
+### Docs
+
+* e2e 하네스 README·JSON_SCHEMA stale 참조 정리 ([2341433](https://github.com/jocoding-ax-partners/axhub/commit/23414332b15153e963e158fe6059f0dcb356b4ca))
+* migrate 고도화 CEO 리뷰 Defer 3건 TODOS 등록 — 언어 커버리지·rotate provider 심화·blocker 텔레메트리 ([183f637](https://github.com/jocoding-ax-partners/axhub/commit/183f637e0089f630f4c70e1627570d7094d923e3))
+
 ## [0.10.5](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.4...v0.10.5) (2026-06-11)
 
 직전 v0.10.4(distiller가 §3 install 버전을 pin으로 override)에 이어 SDK README standalone 정확성을 맞췄어요. README install 라인이 0.2.x stale이라 README만 읽고 SDK를 설치하면 fluent data layer 없는 구버전을 받던 걸, 5언어(go `@v0.3.1` / java `:0.3.1`·`<version>0.3.1` / kotlin `:0.3.1` / python `==0.3.1` / ruby `-v 0.3.1`) README install을 0.3.1로 동기화하고, README 수정으로 이동한 sub-repo HEAD를 `PINNED_SDK.lock.json`(SDK + vendored)의 `source_sha`에 반영한 뒤 distiller(무변경) regenerate→vendor로 6 pack의 `source_sha`를 갱신했어요. node는 install 라인이 없어 무변경이에요.
