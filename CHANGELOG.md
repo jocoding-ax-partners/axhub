@@ -4,6 +4,20 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.0.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.0.0...v1.0.1) (2026-06-15)
+
+onboarding 이 빈 폴더에서 init 스킬로 자동 위임하던 동작을 없애서, 첫 앱 만들기는 사용자가 직접 말할 때만 진행하도록 Ready card 안내로만 남겼어요. axhub MCP 는 등록(add)에서 끝내지 않고 `claude mcp get` 으로 Connected 여부를 검증한 뒤 미연동이면 `/mcp` OAuth 인증을 안내해, '등록했는데 도구가 안 뜨는' 갭을 메웠어요. clarity 는 명령을 찾은 뒤 실행 전 그 명령의 `--help` 사용법을 반드시 숙지하도록 강제해 추측 실행을 막았어요.
+
+
+### Added
+
+* onboarding init 위임 제거 + MCP 연동 검증, clarity --help 게이트 ([4abe3c2](https://github.com/jocoding-ax-partners/axhub/commit/4abe3c2887bae5660f59d856e99f3d053c64cb97))
+
+
+### Docs
+
+* README 버전 배지 동적화 + 상태줄 stale 정정 ([7121a66](https://github.com/jocoding-ax-partners/axhub/commit/7121a66461ad3a363b74947fdffd0d9a2a0f6e45))
+
 ## [1.0.0](https://github.com/jocoding-ax-partners/axhub/compare/v0.10.5...v1.0.0) (2026-06-14)
 
 axhub 플러그인의 첫 메이저 릴리즈예요. 45개 스킬 체제를 핵심 4개(`onboarding`·`init`·`deploy`·`clarity`)로 다이어트하고, 판정·실행 로직을 플러그인에서 들어내 ax-hub-cli 를 직접 호출하도록 전환했어요. Rust helper 바이너리·모든 hook·NL 라우팅 코퍼스·cosign 멀티-바이너리 릴리즈 파이프라인을 제거해 플러그인은 얇은 라우팅 레이어로 가벼워졌고, 흡수된 helper 표면은 CLI 의 hidden `plugin-support` 그룹으로 옮겼어요(최소 ax-hub-cli 0.20.0+ 게이트). 새 `clarity` 브리지가 3스킬 밖 모든 axhub 작업을 `--json-schema` 탐색으로 찾아 무확인 실행하고, 각 스킬은 시작 시 CLI·플러그인 새 버전을 확인해 안내하며, onboarding 은 axhub MCP(user scope)까지 등록해요. 배포 성공 선언은 공개 `axhub deploy verify` 한 번으로만 해요.
