@@ -94,6 +94,10 @@ description: 'This skill is the catch-all for ANY axhub feature that is NOT owne
 
 경계가 섞여 오면(예: "배포하고 로그 봐줘") 배포는 deploy 에 양보하고 로그 부분만 이 스킬이 이어받아요.
 
+## 다음 단계 이어주기
+
+조회 결과가 앱으로 이어질 만한 리소스(connector·table·데이터 카탈로그 등)면, 결과 요약 끝에 다음 단계를 한 줄로 권해요 — 예: "이 데이터로 앱 만들래요? '이걸로 앱 만들어줘' 라고 하면 돼요." 순수 안내 문장이에요. 이때도 `axhub plugin-support` 같은 hidden 표면을 호출하거나 state 를 쓰지 않아요 — clarity 는 그대로 공개 표면만 탐색·실행하고, 실제 앱 생성은 init 이 같은 대화 맥락을 이어받아 처리해요.
+
 ## Visibility
 
 - 탐색의 `--help` 호출·명령 본문·raw stdout/stderr 는 chat 에 echo 하지 않아요.

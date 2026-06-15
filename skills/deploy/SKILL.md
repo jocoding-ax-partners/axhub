@@ -146,7 +146,7 @@ echo "$ROUTE_JSON"
 
 `route-decision` 의 binding 계약은 `.decision` 단일이에요. 현재 CLI 는 marker/auth 기반이라 실제로 **`axhub` 또는 `ignore`** 만 내요 (NL 타깃 판별은 (A) 가 이미 했고, 이 호출은 keyword 판정을 하지 않아요). exit 0 고정 fail-open (빈 출력 → `axhub`, 뒤 preview-confirm 이 backstop). `ROUTE_DECISION` 값으로 분기해요. **`axhub` 일 때만 진행**해요:
 
-- **`axhub`** → 정상 경로. 아래 Step 1.1 (deploy-prep) 로 계속 진행해요.
+- **`axhub`** → 정상 경로. 아래 Step 1.1 (deploy-prep) 로 계속 진행해요. **이 경로(axhub 확정)로 들어온 뒤에만**, 이 대화에서 온보딩/리소스 맥락이 보이면 중복 재설명을 줄이고 의도를 한 줄로 이어요 — route gate 통과 후에만 적용해서 다른 타깃(vercel 등) 핸드오프를 억제하지 않아요. 배포 결정·verify 경로는 그대로예요. 계약은 `references/session-carryover.md`.
 - **그 외 (`ignore` 등 axhub 가 아닌 모든 값)** → axhub 배포 맥락인지 확실치 않아요 (`axhub.yaml` 없음 등). 아래 AskUserQuestion 으로 한 번 물어봐요. **물어보기 전에는 deploy-prep 을 호출하지 말아요.**
 
 ```json
@@ -602,3 +602,4 @@ After cancellation, run a read-only status check and summarize the terminal stat
 
 For Korean trigger lexicon (informal, honorific, demo-context variants): `references/nl-lexicon.md`.
 For exit-code → 4-part Korean error template (emotion + cause + action + button): `references/error-empathy-catalog.md`.
+For same-conversation 조회·온보딩 맥락 carry-over·confabulation 가드·마찰 억제 단일 계약: `references/session-carryover.md`.

@@ -52,6 +52,8 @@ model: sonnet
 
 **이 SKILL 이 앱 생성 전체를 담당해요.** "앱 만들어줘" 류 발화에 generic 한 스택/데이터-fetch 질문을 즉석에서 만들지 말고, 반드시 아래 template flow 를 따라요. 스택 선택은 Step 3 (backend template registry), 데이터 접근은 Step 8 의 `@ax-hub/sdk` 안내로 처리해요.
 
+**같은 대화 맥락 이어받기 (carry-over).** 단, **이 대화에 구체 근거**(직전 `connector_query`/`connector_resources`/`row_list`/`table_list` 등 조회 도구의 실제 결과, 또는 이 대화의 온보딩 Ready card)가 보이면 그 맥락을 반영해도 돼요 — generic 즉석 질문을 새로 만드는 게 아니라 **이미 본 것만** 이어받는 거예요. 근거가 없으면 콜드(평소)로 가고, 리소스를 지어내지 않아요. 감지 휴리스틱·confabulation 가드·마찰 억제 범위·D1 가드는 `../deploy/references/session-carryover.md` 를 단일 계약으로 따라요. 조건부 ack("방금 본 `<리소스>` 데이터 반영할게요.")는 조회 근거가 있을 때만, 대화형(D1)에서만 보여줘요.
+
 **대표 여정에서의 역할.** onboarding 이 `VIBE_READY` 또는 `READY_WITH_USER_ACTION` 으로 첫 셋업 상태를 정리한 뒤, 사용자가 "첫 앱 만들어줘" 류로 넘어오면 이 SKILL 이 앱 생성·repo 준비·첫 배포 결과 안내까지 이어요. 실패해도 raw JSON/stderr 를 보여주지 말고, 재개 phrase(`다시 만들어줘`, `다시 로그인해줘`, `설치했어`)로 같은 saga 를 이어갈 수 있게 남겨요.
 
 0. **TodoWrite 진행 체크리스트 (있을 때만).**
@@ -234,6 +236,8 @@ if (NEEDS_PICK === "true") {
    - 정상 응답이면 아래로 진행해요.
 
    `data.accounts[]` 를 읽어서 **install_url 이 있으면 무조건 먼저 한 줄로 보여줘요 — 설치 여부와 무관하게 항상이에요.** `installation_id` 같은 internal 값은 echo 하지 말고 `login` 과 `install_url` 만 보여줘요.
+
+   **마찰 억제(같은 대화):** 이 대화에서 온보딩이 이미 이 install-link 를 보여줬으면 재안내는 생략해도 돼요. 단 줄이는 건 **재안내뿐**이라, 설치 판정(`accounts list`)·owner-pick(2+ 설치 시 선택)·0-install gate 는 맥락과 무관하게 그대로 실행해요 — 마찰만 줄이고 gate 는 우회하지 않아요. 계약은 `../deploy/references/session-carryover.md`.
 
    - **install_url (항상 표시)**: "GitHub App 설치·계정 추가 링크: `<install_url>`"
 
@@ -524,7 +528,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    }
    ```
 
-   `네, 추천받기` 면 infer-tables-env 분석으로 넘어가요. `아니요` 면 그냥 마무리해요.
+   `네, 추천받기` 면 infer-tables-env 분석으로 넘어가요. `아니요` 면 그냥 마무리해요. infer-tables-env 분석은 scaffold 코드뿐 아니라 **이 대화에서 실제 조회한 리소스**(connector/table 결과가 컨텍스트에 있을 때)도 함께 보고 테이블·env·필요하면 템플릿을 추천해요. 조회 근거가 없으면 코드 기준으로만 추천하고 carry-over 를 주장하지 않아요 (`../deploy/references/session-carryover.md`).
 
 
 ## NEVER
@@ -545,4 +549,5 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
 - `../deploy/references/nl-lexicon.md` — 활성화 trigger 어구 추가 시 참조.
 - `../deploy/references/error-empathy-catalog.md` — 4-part Korean exit-code template (Step 8 에서 사용).
+- `../deploy/references/session-carryover.md` — 같은 대화 조회·온보딩 맥락 carry-over·confabulation 가드·마찰 억제 단일 계약.
 - `../onboarding/SKILL.md` — 빈 폴더 외 gap 처리·CLI 부재 라우팅 source.

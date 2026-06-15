@@ -123,4 +123,47 @@ describe("smooth behavior contracts", () => {
     expect(failed.exitCode).toBe(7);
     expect(JSON.parse(failed.stdout.toString())).toMatchObject({ id: "dep-123", status: "failed" });
   });
+
+  test("session carry-over handoff contract is wired (Phase 1, instruction-first)", () => {
+    const carryover = readRepo("skills/deploy/references/session-carryover.md");
+    const init = readRepo("skills/init/SKILL.md");
+    const deploy = readRepo("skills/deploy/SKILL.md");
+    const clarity = readRepo("skills/clarity/SKILL.md");
+
+    // Shared single-source contract carries all four elements (DRY).
+    expect(carryover).toContain("감지 휴리스틱");
+    expect(carryover).toContain("Confabulation 가드");
+    expect(carryover).toContain("마찰 억제 범위");
+    expect(carryover).toContain("D1 헤드리스 가드");
+    // Confabulation default: no evidence -> stay silent, never invent.
+    expect(carryover).toContain("조회한 적 없으면 carry-over 침묵");
+    // Friction suppression must never bypass correctness gates.
+    expect(carryover).toContain("accounts list");
+    expect(carryover).toContain("owner-pick");
+    expect(carryover).toContain("0-install gate");
+
+    // init: evidence-gated carry-over + shared-contract include.
+    expect(init).toContain("같은 대화 맥락 이어받기");
+    expect(init).toContain("이미 본 것만");
+    expect(init).toContain("../deploy/references/session-carryover.md");
+    // E4: infer-tables-env also weighs actually-queried resources.
+    expect(init).toContain("infer-tables-env 분석은 scaffold 코드뿐 아니라");
+    // Confabulation negative guard (PR-gating proxy for the nightly behavioral case):
+    // with no evidence, init must go cold and never invent a resource.
+    expect(init).toContain("리소스를 지어내지 않아요");
+    expect(init).toContain("carry-over 를 주장하지 않아요");
+    // M2: gate relaxation suppresses re-narration only, never the gate.
+    expect(init).toContain("install-link 를 보여줬으면 재안내는 생략");
+    expect(init).toContain("0-install gate 는 맥락과 무관하게 그대로 실행해요");
+
+    // deploy: carry-over applies only AFTER the route gate (no vercel hijack).
+    expect(deploy).toContain("route gate 통과 후에만 적용해서 다른 타깃");
+    expect(deploy).toContain("references/session-carryover.md");
+
+    // clarity: pure-prose continuation, stays out of plugin-support.
+    expect(clarity).toContain("## 다음 단계 이어주기");
+    expect(clarity).toContain("이걸로 앱 만들어줘");
+    const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
+    expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
+  });
 });
