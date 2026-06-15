@@ -1,6 +1,6 @@
 ---
 name: onboarding
-description: 'This skill should be used when the user is new to axhub, asks what to do first, requests setup/onboarding/getting started, or says a short first-run phrase. 이 스킬은 axhub 를 처음 쓰는 사람이 셋업/온보딩 전체 과정을 한 번에 진행하고 싶어할 때 사용해요. 다음 표현에서 활성화: "셋업해줘", "셋업 해줘", "처음인데", "처음 사용", "처음 써", "처음 쓰는데", "처음 쓰는데 뭐부터", "뭐부터 하면 돼", "뭐부터 하면 되나요", "어떻게 시작하면 돼", "어떻게 시작해", "온보딩", "온보딩해줘", "시작하기", "axhub 시작", "axhub 처음", "초기 셋업", "setup", "set up", "onboard", "onboarding", "getting started", "get started", "first time", 또는 첫 사용자 셋업 의도. axhub CLI 설치(install-cli)·로그인(auth)·node 환경 감지를 순서대로 안내하고, node 가 없으면 명시 확인 후 설치해요. 빈 폴더에서는 바로 템플릿을 묻지 말고 ‘첫 앱 만들래요?’를 먼저 물은 뒤, 사용자가 원하면 첫 앱 만들기(init)로 연결해요. 환경 진단(doctor)이나 새 앱 초기화(init)와 달리 처음 사용자의 순차 온보딩을 담당해요.'
+description: 'This skill should be used when the user is new to axhub, asks what to do first, requests setup/onboarding/getting started, or says a short first-run phrase. 이 스킬은 axhub 를 처음 쓰는 사람이 셋업/온보딩 전체 과정을 한 번에 진행하고 싶어할 때 사용해요. 다음 표현에서 활성화: "셋업해줘", "셋업 해줘", "처음인데", "처음 사용", "처음 써", "처음 쓰는데", "처음 쓰는데 뭐부터", "뭐부터 하면 돼", "뭐부터 하면 되나요", "어떻게 시작하면 돼", "어떻게 시작해", "온보딩", "온보딩해줘", "시작하기", "axhub 시작", "axhub 처음", "초기 셋업", "setup", "set up", "onboard", "onboarding", "getting started", "get started", "first time", 또는 첫 사용자 셋업 의도. axhub CLI 설치(install-cli)·로그인(auth)·node 환경 감지를 순서대로 안내하고, node 가 없으면 명시 확인 후 설치해요. 빈 폴더에서도 첫 앱 만들기(init)로 자동 연결하지 않고, Ready card 에서 ‘첫 앱 만들어줘’ 같은 다음 단계만 안내해요. 환경 진단(doctor)이나 새 앱 초기화(init)와 달리 처음 사용자의 순차 온보딩을 담당해요.'
 examples:
   - utterance: "셋업해줘"
     intent: "onboard axhub first-time onboarding"
@@ -26,8 +26,8 @@ Frontmatter `description` 은 nl-lexicon trigger baseline 때문에 보수적으
 안전 계약은 이 본문을 authoritative source 로 봐요.
 
 처음 axhub 를 쓰는 사람을 위한 **온보딩 단일 진입점**이에요. 사용자는 `온보딩`, `처음인데 뭐부터`,
-`getting started` 한 마디만 하면 돼요. 내부에서는 gap 마다 적절한 공개 `axhub` 명령을 직접 부르거나
-(`axhub auth`, `axhub update`, `axhub apps git`), 빈 폴더면 init 스킬로만 위임해요. 사용자는 sibling
+`getting started` 한 마디만 하면 돼요. 내부에서는 gap 마다 적절한 공개 `axhub` 명령을 직접 불러요
+(`axhub auth`, `axhub update`, `axhub apps git`). 빈 폴더여도 init 스킬로 위임하지 않고, 첫 앱 만들기는 Ready card 안내로만 남겨요. 사용자는 sibling
 skill 이름이나 slash command 를 몰라도 온보딩을 끝낼 수 있어요.
 
 onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 루프예요. 안전하게 자동화할 수 있는 gap 은
@@ -42,7 +42,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 ## Workflow
 
 **한눈에 — 실행 흐름.** read-only 감지 → 첫 gap 하나 처리 → 재감지, gap 0 될 때까지 반복 → Ready card. 순서:
-`0` TodoWrite(가용 시) → `1` D1 비대화형 가드 → `2` DETECT_ALL(gap 일괄 스캔) + `2.5` GitHub App surface → `3` Gap 상태머신(첫 gap 하나 처리 후 재감지; `4`~`9` 핸들러로 분기 — CLI·인증 / git·node / GitHub App / repo·app / 의존성 / doctor) → `9.5` axhub MCP 설치(user scope, best-effort) → `10` 모든 gap 해소 시 Ready card.
+`0` TodoWrite(가용 시) → `1` D1 비대화형 가드 → `2` DETECT_ALL(gap 일괄 스캔) + `2.5` GitHub App surface → `3` Gap 상태머신(첫 gap 하나 처리 후 재감지; `4`~`9` 핸들러로 분기 — CLI·인증 / git·node / GitHub App / repo·app / 의존성 / doctor) → `9.5` axhub MCP 등록+OAuth 연동(user scope, best-effort) → `10` 모든 gap 해소 시 Ready card.
 
 **버전 체크.** onboarding 은 별도 step 없이 맨 앞 `2` DETECT_ALL 이 `cli_too_old`/`has_update` 를 잡고 `4c` 가 CLI·플러그인 업데이트를 안내해요 — 다른 3 스킬의 `1a 버전 체크` 와 같은 역할이에요 (중복 네트워크 호출을 피해 DETECT_ALL 로 통합).
 
@@ -97,7 +97,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
 2.5. **GitHub App 설치·계정 추가 surface — DETECT 직후 무조건 (branch-independent, 비차단).**
 
-   Step 2 detect JSON 의 `github` 를 그대로 써요 (accounts list 재호출 안 해요). `github.install_url` 이 null 이 아니면 (`github.state` 가 `installed`/`mixed`/`uninstalled`/`empty`) **설치 여부·계정 수·`first_gap` 과 무관하게 항상** 이 블록을 먼저 실행한 뒤 Step 3 gap 라우팅으로 가요. 모든 onboarding 경로가 gap 처리 전에 이 지점을 지나서, 빈 폴더(→ init) 처럼 GitHub 단계를 건너뛰는 경로에서도 install_url 을 맨 앞에서 한 번은 보장해요.
+   Step 2 detect JSON 의 `github` 를 그대로 써요 (accounts list 재호출 안 해요). `github.install_url` 이 null 이 아니면 (`github.state` 가 `installed`/`mixed`/`uninstalled`/`empty`) **설치 여부·계정 수·`first_gap` 과 무관하게 항상** 이 블록을 먼저 실행한 뒤 Step 3 gap 라우팅으로 가요. 모든 onboarding 경로가 gap 처리 전에 이 지점을 지나서, 빈 폴더처럼 GitHub 단계를 건너뛰는 경로에서도 install_url 을 맨 앞에서 한 번은 보장해요.
 
    **(a) install_url 한 줄 무조건 표시.** "GitHub App 설치·계정 추가 링크: `<github.install_url>`. 이미 설치돼 있어도 다른 org/계정을 더 붙일 수 있어요." `github.installed_logins` 가 있으면 "이미 연결된 계정: `<login...>`" 도 덧붙여요. `installation_id` 등 internal 값은 echo 하지 말고 `login` + `install_url` 만 보여줘요. 링크는 안내만 하고 자동으로 열지 않아요.
 
@@ -123,7 +123,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
 3. **Gap State Machine — 첫 gap 하나만 처리하고 재감지해요.**
 
-   **gap 순서의 single source of truth 는 detect 의 `first_gap` 이에요.** 아래 표는 gap→처리 owner 매핑 참고용 문서일 뿐이라, 순서가 어긋나 보이면 표를 재구현하지 말고 항상 `first_gap` 을 따라요. 7 개 gap 흐름은 모두 이 SKILL 본문 Step 4-9 에 인라인돼 있어요 — 별도 sibling skill 위임은 빈 폴더 init (Step 7) 하나뿐이에요.
+   **gap 순서의 single source of truth 는 detect 의 `first_gap` 이에요.** 아래 표는 gap→처리 owner 매핑 참고용 문서일 뿐이라, 순서가 어긋나 보이면 표를 재구현하지 말고 항상 `first_gap` 을 따라요. 모든 gap 흐름은 이 SKILL 본문 Step 4-9 에 인라인돼 있어요 — sibling skill 위임은 없어요 (빈 폴더도 init 으로 위임하지 않아요).
 
    ```text
    START
@@ -138,7 +138,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
      ├─ node_mismatch       → Step 5 fix_node(승인+nvm) → DETECT_ALL
      ├─ github_app_missing  → Step 6 install_url → DETECT_ALL
      ├─ existing_repo_gap   → Step 7a axhub apps git status/connect → DETECT_ALL
-     ├─ no_manifest_empty   → Step 7b Skill("axhub:init") saga → DETECT_ALL
+     ├─ no_manifest_empty   → Step 7b 첫 앱 안내(advisory) → VIBE_READY_CARD
      ├─ deps_missing        → Step 8 install_deps(승인+ignore-scripts) → DETECT_ALL
      ├─ deploy_unverified   → Step 9 axhub deploy verify → DETECT_ALL
      ├─ doctor_gap          → Step 9 preflight 안내 → DETECT_ALL
@@ -156,7 +156,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    | `node_mismatch` | `node_mismatch=true` | Step 5 | target version active |
    | `github_app_missing` | `github.state` 가 `uninstalled`/`empty` | Step 6 | install_url 완료 후 재감지 |
    | `existing_repo_gap` | `git_repo=true` + `git_commit=true` + `manifest_present=false` | Step 7a `axhub apps git` | app↔repo connect 완료 |
-   | `no_manifest_empty` | `manifest_present=false` + `dir_empty=true` | Step 7b `Skill("axhub:init")` | manifest+repo+deployment evidence 존재 |
+   | `no_manifest_empty` | `manifest_present=false` + `dir_empty=true` | Step 7b 첫 앱 안내 (advisory, init 위임 없음) | advisory 표시 후 Ready card |
    | `deps_missing` | `deps_missing=true` | Step 8 | lockfile install exit 0 |
    | `deploy_unverified` | `deploy_checked=true` + `deploy_verified=false` | Step 9 | live/running/deployed 확인 |
    | `doctor_gap` | 온보딩 끝 핵심 체크 fail | Step 9 | 핵심 green 또는 PATH reload 안내 |
@@ -320,7 +320,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
    **(a) install_url 무조건 표시 + 연결 안내 — 이미 설치돼 있어도 항상.** `github.install_url` 이 있으면 설치 여부와 무관하게 한 줄로 연결을 안내해요: "GitHub App 을 설치·연결하려면 여기로 가요: `<github.install_url>`. 이미 설치돼 있어도 다른 org/계정을 더 연결할 수 있어요." `github.installed_logins` 가 있으면 "이미 연결된 계정: `<login...>`" 도 덧붙여요. 링크는 안내만 하고 자동으로 열지 않아요.
 
-   **(b) 미설치면 (`github.state` 가 `uninstalled`/`empty`) 설치까지 막아요 (gate).** 설치가 확인되기 전에는 Step 7 (첫 앱 만들기, init 위임) 으로 진행하지 않아요. 가능한 전진배치는 **계정레벨 GitHub App 설치(install_url)만**이에요. OAuth device-flow 인가는 connect 단계에 남아요. `github.state` 가 `auth_error` 면 install_url 을 못 읽으니 "다시 로그인해줘" 로 안내하고, 재로그인 후 재감지하면 링크가 다시 떠요.
+   **(b) 미설치면 (`github.state` 가 `uninstalled`/`empty`) 설치까지 막아요 (gate).** 설치가 확인되기 전에는 Step 7 (기존 repo 연결) 으로 진행하지 않아요. 가능한 전진배치는 **계정레벨 GitHub App 설치(install_url)만**이에요. OAuth device-flow 인가는 connect 단계에 남아요. `github.state` 가 `auth_error` 면 install_url 을 못 읽으니 "다시 로그인해줘" 로 안내하고, 재로그인 후 재감지하면 링크가 다시 떠요.
 
    ```json
    {
@@ -330,7 +330,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
        "multiSelect": false,
        "options": [
          {"label": "설치", "description": "install_url 을 열어 계정레벨 GitHub App 설치를 먼저 끝내요"},
-         {"label": "나중에", "description": "설치를 미루면 첫 앱 만들기로 넘어가지 않고 READY_WITH_USER_ACTION 으로 멈춰요. 설치 후 `온보딩 계속`"}
+         {"label": "나중에", "description": "설치를 미루면 다음 단계로 넘어가지 않고 READY_WITH_USER_ACTION 으로 멈춰요. 설치 후 `온보딩 계속`"}
        ]
      }]
    }
@@ -338,7 +338,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
    설치 선택 시 `github.install_url` 을 보여주고 브라우저를 열어요. 사용자가 "승인했어" 또는 "온보딩 계속" 이라고 말하면 Step 2 재감지를 한 번 해요. 브라우저 App 설치가 차단점이에요.
 
-   **미설치 동안 진행 차단 (gate).** `github.state` 가 `uninstalled`/`empty` 인 동안에는 Step 7 로 advance 하지 않아요. 설치를 확인(재감지 결과 `installed`/`mixed`)했거나, 사용자가 "나중에" 로 명시적으로 미뤄 READY_WITH_USER_ACTION 으로 멈출 때까지 `github_app_missing` 이 first_gap 으로 남아요. "나중에" 면 install_url + 재개 phrase(`승인했어`/`온보딩 계속`)를 남기고 멈춰요 — 미설치 상태로 init 으로 위임하지 않아요. 이미 설치돼 있으면(installed/mixed) 막지 않고 그대로 다음 gap 으로 가요.
+   **미설치 동안 진행 차단 (gate).** `github.state` 가 `uninstalled`/`empty` 인 동안에는 Step 7 로 advance 하지 않아요. 설치를 확인(재감지 결과 `installed`/`mixed`)했거나, 사용자가 "나중에" 로 명시적으로 미뤄 READY_WITH_USER_ACTION 으로 멈출 때까지 `github_app_missing` 이 first_gap 으로 남아요. "나중에" 면 install_url + 재개 phrase(`승인했어`/`온보딩 계속`)를 남기고 멈춰요 — 미설치 상태로 다음 단계로 advance 하지 않아요. 이미 설치돼 있으면(installed/mixed) 막지 않고 그대로 다음 gap 으로 가요.
 
 7. **Repo/App gap (`existing_repo_gap` / `no_manifest_empty`).**
 
@@ -348,7 +348,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    axhub apps git status --app "$APP_ID" --json
    ```
 
-   `axhub apps git status` 출력은 `install_url` / `repo_full_name` / `branch` / `installation_id` / `installed_logins[]` 를 줘요. `install_url` 을 한 줄로 보여주고 (capability ladder 안내, `installation_id` 등 internal 값은 echo 금지), 연결을 물어요. connect 는 dry-run → 승인 → execute 순서로, OAuth 승인이 단계별 차단점이에요. **`$APP_ID` 가 아직 없으면** (앱이 backend 에 안 만들어진 기존-repo) status 를 못 부르니 이 gap 은 Step 7b init 위임으로 보내서 앱부터 만들어요.
+   `axhub apps git status` 출력은 `install_url` / `repo_full_name` / `branch` / `installation_id` / `installed_logins[]` 를 줘요. `install_url` 을 한 줄로 보여주고 (capability ladder 안내, `installation_id` 등 internal 값은 echo 금지), 연결을 물어요. connect 는 dry-run → 승인 → execute 순서로, OAuth 승인이 단계별 차단점이에요. **`$APP_ID` 가 아직 없으면** (앱이 backend 에 안 만들어진 기존-repo) status 를 못 부르니 앱부터 만들어야 해요 — onboarding 은 앱을 자동 생성하지 않으니 `첫 앱 만들어줘` 재개 phrase 를 남기고 READY_WITH_USER_ACTION 으로 멈춰요.
 
    ```json
    {
@@ -366,23 +366,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
    `연결` 이면 먼저 `axhub apps git connect --app "$APP_ID" --repo "$OWNER_REPO" --branch "$BRANCH" --json` 으로 미리봐요 — `--execute` 없이 부르면 dry-run 이라 OAuth/installation 검증만 하고 mutate 하지 않아요. dry-run 결과의 `installation_id` + `repo_full_name` 이 채워지면 승인 후 `--execute` 로 연결해요. 설치 개수 gate·ambiguous owner 처리는 status 출력의 `installed_logins` 기준으로 판단해요.
 
-   **7b. 빈 dir (`no_manifest_empty`) — init 위임 (유일한 delegation).** 빈 dir 이고 manifest 가 없으면 첫 앱 만들기를 제안해요.
-
-   ```json
-   {
-     "questions": [{
-       "question": "첫 앱 만들래요?",
-       "header": "첫 앱",
-       "multiSelect": false,
-       "options": [
-         {"label": "네", "description": "init saga 로 앱+repo+첫 배포+clone 을 진행해요"},
-         {"label": "아니요", "description": "새 앱을 만들지 않고 READY_WITH_USER_ACTION 으로 멈춰요"}
-       ]
-     }]
-   }
-   ```
-
-   `네` 선택 시 `Skill("axhub:init")` 로 위임해요. init 경로는 saga 가 이미 첫 배포를 포함해요. **init 경로는 saga 배포 URL surface 만 하고 재배포 X**예요. saga 가 deployment id/status 를 남기면 Step 9 verify 로 확인해요.
+   **7b. 빈 dir (`no_manifest_empty`) — 안내만, init 위임 없음.** 빈 dir 이고 manifest 가 없어도 onboarding 은 첫 앱 만들기를 자동으로 시작하지 않아요. AskUserQuestion 없이 "이 폴더는 비어 있어요. 첫 앱을 만들려면 `첫 앱 만들어줘` 라고 말해 주세요" 한 줄만 안내하고, 이 gap 은 재감지 루프를 돌지 않고 바로 Step 10 Ready card 로 가요 — `no_manifest_empty` 를 다시 first_gap 으로 받아 무한 루프 도는 걸 막아요. Ready card 는 `첫 앱 만들어줘` 를 다음 단계 phrase 로 보여줘요.
 
 8. **Dependency gap (`deps_missing`).**
 
@@ -418,7 +402,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    axhub plugin-support preflight --json
    ```
 
-   `auth_ok`/`cli_on_path` 등이 green 이면 진단 카드를 한국어로 보여주고, 막힌 항목이 있으면 next-phrase (`다시 로그인해줘` / 새 터미널 reload) 를 안내해요 (doctor_gap 은 차단점 없음). init saga 의 deployment id 가 있으면 공개 `axhub deploy verify` 로 성공을 확인해요 (deployment id 는 saga 출력에서 받아요).
+   `auth_ok`/`cli_on_path` 등이 green 이면 진단 카드를 한국어로 보여주고, 막힌 항목이 있으면 next-phrase (`다시 로그인해줘` / 새 터미널 reload) 를 안내해요 (doctor_gap 은 차단점 없음). 이전 배포의 deployment id 가 있으면 공개 `axhub deploy verify` 로 성공을 확인해요 (deployment id 는 배포 출력에서 받아요).
 
    ```bash
    axhub deploy verify "$DEPLOYMENT_ID"
@@ -426,15 +410,33 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
    exit 0 이면 terminal success + 접근 가능 URL 이 확인된 거라 live evidence 로 써요. 비-0 이면 아직 진행 중이거나 실패라, URL surface 만 있고 live evidence 가 없으면 `READY_WITH_USER_ACTION` 으로 낮춰요. **latest 재탐색 없이 받은 deployment id 만 verify 해요** (correlation 계약, spec §2.3).
 
-9.5. **axhub MCP 도구 설치 (user scope, best-effort · 비차단).** Claude Code 에 axhub 원격 MCP 서버를 user scope 로 한 번 등록해서, 이후 모든 프로젝트에서 axhub MCP 도구(SDK 지식·스키마 등)를 쓸 수 있게 해요. 이미 등록돼 있으면 건너뛰고(idempotent), `claude` CLI 가 없거나 실패해도 막지 않아요.
+9.5. **axhub MCP 등록 + OAuth 연동 (user scope, best-effort · 비차단).** 목표는 2단계예요: **(1) 서버 등록(add)** — 로컬 config mutation, **(2) OAuth 연동(authenticate)** — 브라우저 승인 차단점. **등록만 하면 도구가 안 떠요** — 원격 MCP 는 tenant-scoped OAuth 라 연동까지 끝나야 `mcp__axhub__*` 도구가 살아나요. Step 4d 의 CLI 로그인과 MCP OAuth 는 별개 자격이라 둘 다 필요해요. 이 블록은 Bash tool 로 실행만 하고 명령 본문은 chat 에 출력하지 않아요. 연동을 못 끝내도 onboarding 은 막지 않고 `READY_WITH_USER_ACTION` 으로 안내만 남겨요.
+
+   **D1 가드.** subprocess(`claude -p`/CI/headless)에서는 브라우저 OAuth 를 할 수 없으니 add·authenticate 를 자동 실행하지 말고, 수동 명령 한 줄만 남기고 넘어가요.
+
+   **(a) host 판정.** `claude` CLI 가 있으면 Claude Code 경로 (b–c) 로, 없으면 Claude Desktop/기타 host (d) 로 가요.
+
+   **(b) 등록 (idempotent).** 이미 있으면 건너뛰고, 없으면 user scope HTTP 로 추가해요.
 
    ```bash
    if command -v claude >/dev/null 2>&1; then
-     claude mcp get axhub >/dev/null 2>&1 || claude mcp add --transport http --scope user axhub https://mcp.axhub.ai/mcp
+     claude mcp get axhub >/dev/null 2>&1 \
+       || claude mcp add --transport http --scope user axhub https://mcp.axhub.ai/mcp
    fi
    ```
 
-   새로 등록했으면 "axhub MCP 도구를 설치했어요 (새 세션부터 도구가 보여요)" 한 줄로 안내해요. 이미 있으면 아무 말 안 하고, `claude` CLI 가 없으면 "axhub MCP 는 나중에 `claude mcp add --transport http --scope user axhub https://mcp.axhub.ai/mcp` 로 설치할 수 있어요" 한 줄만 안내하고 넘어가요.
+   **(c) 연동 상태 검증 + OAuth 안내.** add 만으로는 미연동일 수 있어서 health check 로 실제 상태를 확인해요 — 이게 기존에 빠졌던 핵심이에요.
+
+   ```bash
+   command -v claude >/dev/null 2>&1 && claude mcp get axhub 2>&1 | grep -i status
+   ```
+
+   `Status` 줄로 갈라요:
+   - `Connected` → "axhub MCP 연동 완료예요. `mcp__axhub__*` 도구를 쓸 수 있어요 (새 세션에서 보일 수 있어요)" 한 줄.
+   - `Needs authentication` (또는 status 줄 없음 = 미연동) → OAuth 가 남았어요. "Claude Code 에서 `/mcp` 를 실행하고 목록에서 **axhub** 를 골라 브라우저 인증(OAuth)을 끝내 주세요" 로 안내해요. 브라우저 승인이 차단점이라, 끝나면 "MCP 연동했어" 또는 "온보딩 계속" 이라고 말하면 이 검증을 한 번 다시 해요.
+   - `claude mcp get` 자체가 실패/미존재 → (b) add 를 한 번 더 시도하고, 그래도 안 되면 (d) 수동 안내로 낮춰요.
+
+   **(d) Claude Desktop/기타 host fallback.** `claude` CLI 가 없으면 자동 등록을 못 해요. 한 줄 안내: "Claude Desktop 은 설정 → 커넥터에서 커스텀 커넥터로 `https://mcp.axhub.ai/mcp` 를 추가하고 로그인하면 연동돼요. Claude Code 면 `claude mcp add --transport http --scope user axhub https://mcp.axhub.ai/mcp` 로 등록한 뒤 `/mcp` 로 OAuth 인증하면 돼요." 자동으로 링크를 열거나 mutate 하지 않아요.
 
 10. **Ready card.**
 
@@ -450,10 +452,10 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
      ✓ 앱 <app-slug> 연결됨
      ✓ 첫 배포 live: <deployment-url>
      ✓ 점검 통과
-     ✓ axhub MCP 도구 등록됨 (Step 9.5 에서 설치됐을 때만 표시)
+     ✓ axhub MCP 연동됨 — `mcp__axhub__*` 사용 가능 (`claude mcp get axhub` 가 Connected 일 때만 ✓; 미연동이면 `/mcp` OAuth 안내로 남겨요)
 
    이제 바로 코딩하면 돼요.
-   다음에 말할 수 있는 것: "배포해", "로그 봐줘", "환경변수 추가해줘", "테이블 추천해줘"
+   다음에 말할 수 있는 것: "첫 앱 만들어줘", "배포해", "로그 봐줘", "환경변수 추가해줘", "테이블 추천해줘"
    ```
 
    GitHub App 줄의 `<install_url>` 은 설치 여부와 무관하게 **항상** 보여줘요 (무조건). Step 2 detect JSON 의 `github.install_url` 을 그대로 채워요 (GitHub 조회가 성공하면 계정이 0개여도 app-level 링크로 항상 채워져요). 링크는 보여주기만 하고 자동으로 열지 않아요. `github.install_url` 이 null 인 경우(=`auth_error`/`unavailable`)에만 이 줄을 생략하고, `auth_error` 면 재로그인 안내로 낮춰요.
@@ -471,15 +473,16 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 - NEVER gap 마다 preflight/detect 를 중복 호출하지 말아요. `onboarding-detect` 한 번이 단일 판정원이에요.
 - NEVER plugin update 를 온보딩 중 실행하지 말아요. `/plugin update` 는 새 세션이 필요해서 끝단 advisory 로만 보여줘요.
 - NEVER GitHub OAuth device-flow 인가를 install_url 단계에서 전진배치한다고 쓰지 말아요. install_url 단계는 계정설치만이에요.
-- NEVER init saga 뒤 deploy 를 재호출하지 말아요. init 경로는 saga URL/evidence surface 만, 성공 확인은 `axhub deploy verify` 한 번이에요.
+- NEVER 빈 폴더에서 init 스킬로 위임하거나 앱을 자동 생성하지 말아요. 첫 앱 만들기는 Ready card 안내(`첫 앱 만들어줘`)로만 남겨요.
 - NEVER lockfile 없이 dependency install 을 실행하지 말아요.
 - NEVER dependency install 에서 `--ignore-scripts` 를 빼지 말아요. postinstall 자동 실행 금지예요.
 - NEVER subprocess(`claude -p`/CI/headless)에서 install/update/auth/init/deps mutation 이나 git/node system install/version switch 를 자동 실행하지 말아요.
 - NEVER `VIBE_READY` 카드에 확인하지 않은 항목을 green 으로 표시하지 말아요.
 - NEVER deploy verify 에 deployment id 없이 latest 를 재탐색하지 말아요 (correlation 계약).
+- NEVER axhub MCP 를 add(등록)만 하고 연동 완료로 선언하지 말아요. `claude mcp get axhub` 의 `Status: Connected` 확인 전까지는 미연동이라 `/mcp` OAuth 안내를 남겨요.
 
 ## Additional Resources
 
 - `../deploy/references/nl-lexicon.md` — 활성화 trigger 어구 추가 시 참조.
 - `../deploy/references/error-empathy-catalog.md` — 4-part Korean exit-code template.
-- `../init/SKILL.md` — bootstrap saga + 첫 deploy 포함 계약 source (빈 폴더 위임 대상).
+- `../init/SKILL.md` — bootstrap saga + 첫 deploy 포함 계약 source (참고용 — onboarding 은 더 이상 위임하지 않아요).
