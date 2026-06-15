@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.0.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.0.1...v1.0.2) (2026-06-15)
+
+일부 환경에서 `axhub` 가 깔려 있는데도 온보딩이 'CLI 없음' 으로 오판해 이미 설치된 CLI 를 또 설치하라고 안내하던 문제를 막았어요. detect 의 self-probe 가 프로세스의 PATH/HOME 이 사용자 셸과 다를 때(GUI 로 띄운 호스트·정리된 환경) `axhub` 를 못 찾던 게 원인이라, Step 2 에서 `command -v` 로 구한 절대경로를 `AXHUB_BIN` 으로 고정해 모든 self-probe 가 그 경로로 실행되도록 했어요. 더해서 `command -v axhub` 가 성공하는데도 `cli_missing` 으로 재설치를 안내하지 않도록 가드를 넣어, 구버전 CLI 에서도 온보딩이 깨지지 않아요.
+
+
+### Fixed
+
+* onboarding detect self-probe 오탐 가드 (AXHUB_BIN 절대경로 핀) ([c395b3f](https://github.com/jocoding-ax-partners/axhub/commit/c395b3f5b582ece44577c27477366b452a36556d))
+
 ## [1.0.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.0.0...v1.0.1) (2026-06-15)
 
 onboarding 이 빈 폴더에서 init 스킬로 자동 위임하던 동작을 없애서, 첫 앱 만들기는 사용자가 직접 말할 때만 진행하도록 Ready card 안내로만 남겼어요. axhub MCP 는 등록(add)에서 끝내지 않고 `claude mcp get` 으로 Connected 여부를 검증한 뒤 미연동이면 `/mcp` OAuth 인증을 안내해, '등록했는데 도구가 안 뜨는' 갭을 메웠어요. clarity 는 명령을 찾은 뒤 실행 전 그 명령의 `--help` 사용법을 반드시 숙지하도록 강제해 추측 실행을 막았어요.
