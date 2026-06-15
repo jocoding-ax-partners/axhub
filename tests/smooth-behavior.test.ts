@@ -88,6 +88,8 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("exit 6");
     expect(deploy).toContain("exit 7");
     expect(deploy).toContain("성공을 선언하지 않아요");
+    expect(deploy).not.toContain("deploy-approved-run");
+    expect(deploy).toContain("canonical workflow");
 
     expect(clarity).toContain("공개 표면만");
     expect(clarity).toContain("plugin-support");

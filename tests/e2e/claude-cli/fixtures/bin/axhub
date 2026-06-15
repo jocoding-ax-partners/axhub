@@ -7,7 +7,7 @@
 #   AXHUB_FIXTURE_VERSION=X.Y.Z   --version 응답 가짜 버전 (cli_too_old/cli_too_new 강제)
 #   AXHUB_FIXTURE_AUTH=expired    auth status / deploy create 모두 exit 65 + token_expired stderr
 #   AXHUB_FIXTURE_AUTH=deploy_expired auth status / preflight 는 통과, deploy create /
-#                                 plugin-support deploy-approved-run / token-gate 만 exit 65 + token_expired stderr
+#                                 token-gate 만 exit 65 + token_expired stderr
 #
 # Post-diet 확장 — plugin-support 명령 family:
 #   plugin-support preflight [--json]        cli_present/cli_state/in_range + auth_ok=true (deploy_expired 도 true).
@@ -15,7 +15,6 @@
 #   plugin-support tenant-resolve [--json]   빈 tenant + needs_pick=false.
 #   plugin-support deploy-prep --intent ...  preflight/resolve/quality_gate envelope, exit_code 0.
 #   plugin-support deploy-preview-summary    한국어 preview text (해요체).
-#   plugin-support deploy-approved-run        deploy_expired → exit 65 token_expired (저장 토큰이 여기서 만료 판명).
 #   plugin-support token-gate                 deploy_expired → exit 65, else exit 0 (stdout 없음).
 #   plugin-support onboarding-detect [--json]  detect-first onboarding envelope; env can force cli_missing/cli_old.
 
@@ -82,15 +81,6 @@ case "${1:-}" in
       deploy-preview-summary)
         # 5필드 한국어 preview card (해요체). raw 값 미노출.
         echo "다음을 올릴게요: 앱 paydrop / 환경 production / 브랜치 main / 커밋 abc1234 / 예상 약 1분 걸려요."
-        exit 0
-        ;;
-      deploy-approved-run)
-        # 승인 직후 실행 — 저장 토큰이 만료된 게 이 순간 드러나요.
-        if [ "${AXHUB_FIXTURE_AUTH:-}" = "deploy_expired" ] || [ "${AXHUB_FIXTURE_AUTH:-}" = "expired" ]; then
-          echo '{"code":"token_expired","detail":"저장된 토큰이 만료됐어요 (deploy-approved-run)"}' >&2
-          exit 65
-        fi
-        echo "배포를 시작했어요."
         exit 0
         ;;
       token-gate)

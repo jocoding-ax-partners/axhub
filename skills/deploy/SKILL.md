@@ -27,12 +27,12 @@ When the user says a human deployment phrase such as `배포해줘`, `올려줘`
 - The first visible chat sentence must be exactly `배포 준비를 확인할게요.`
 - For the initial Desktop preview, stop reading this skill after this section. Do not read the long workflow below until the user has approved the preview card.
 - Before the Bash/tool call, make sure the command runs in the user-visible app folder. In Claude Desktop, if the active root and an added folder differ and the added folder is the only Vite/React app (`package.json` has `vite` + `react`/`react-dom`), run the command from that folder (`cd "<that folder>" && ...`). If multiple app folders are plausible, ask which folder to deploy and stop.
-- If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, render the local initialization choices (`React/Vite로 초기화`, `다른 템플릿 선택`, `취소`) and stop. Do not ask for deploy approval or call `deploy-approved-run` from this state.
+- If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, render the local initialization choices (`React/Vite로 초기화`, `다른 템플릿 선택`, `취소`) and stop. Do not ask for deploy approval from this state.
 - Immediately run one Bash/tool call with title `배포 준비 확인`: `axhub plugin-support deploy-preview-summary --user-utterance "<latest user sentence>"`.
 - Copy that Korean stdout as the preview card and ask for explicit approval.
-- After the user explicitly approves, run one Bash/tool call with title `배포 실행`: `axhub plugin-support deploy-approved-run --user-utterance "<latest user sentence>"`. Treat stdout as progress text only until a deployment id is bound.
-- Bind `deployment_id` / `id` from the approved-run structured output into `DEPLOY_ID`. If no deployment id is present, do **not** declare success; say "배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. '배포 상태 확인해줘'라고 말하면 이어서 볼게요." and stop.
-- Confirm success only with `axhub deploy verify "$DEPLOY_ID"` (Step 5). Copy verify-derived Korean success/recovery text, not raw approved-run stdout, as the final deploy result. Do not call this skill again after approval.
+- After the user explicitly approves, continue into the canonical workflow below starting at Step 1.1 with the approval decision already captured. Use `deploy-prep`, bootstrap/git readiness/status-first checks, token gate, public `axhub deploy create --execute --json` when creation is actually required, and Step 5 verify. Do not insert a separate approved-run helper bridge between preview approval and the canonical workflow.
+- Bind `DEPLOY_ID` only from a recorded bootstrap deploy id, an in-flight deployment id, or public `axhub deploy create --execute --json` output. If no deployment id is present, do **not** declare success; say "배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. '배포 상태 확인해줘'라고 말하면 이어서 볼게요." and stop.
+- Confirm success only with `axhub deploy verify "$DEPLOY_ID"` (Step 5). Copy verify-derived Korean success/recovery text, not raw deploy-create stdout, as the final deploy result. Do not call this skill again after approval.
 - Do not echo the user's phrase as a route conversion, such as `"배포해줘" → ...`.
 - If a Bash/tool call is needed, use Korean titles only: `배포 준비 확인`, `배포 실행`, or `배포 상태 확인`.
 - Before any destructive deploy, show only the Korean preview card (앱 / 환경 / 브랜치 / 커밋 / 예상 시간) and ask for explicit approval.
@@ -596,6 +596,7 @@ After cancellation, run a read-only status check and summarize the terminal stat
 - NEVER call `axhub deploy cancel` without explicit confirmation.
 - NEVER infer `app_id` from `pwd` or git remote alone in the mutation path; always live resolve through deploy-prep.
 - NEVER bypass the AskUserQuestion preview card on slash invocation; slash is explicit confirmation for the SKILL invocation, not for the destructive operation.
+- NEVER insert the old approved-run helper bridge between preview approval and the canonical deploy workflow; approval must flow into `deploy-prep` / bootstrap / public `axhub deploy create --execute --json` / verify.
 
 ## Additional Resources
 
