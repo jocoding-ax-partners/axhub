@@ -4,6 +4,23 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.1.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.0.2...v1.1.0) (2026-06-15)
+
+온보딩이나 리소스 조회를 한 뒤 "이걸로 앱 만들어줘" 처럼 이어 말하면, 같은 대화에서 본 맥락을 init·deploy 가 그대로 이어받아요 — 별도 저장 없이 SKILL 지시로만 처리하고, 실제로 조회한 근거가 있을 때만 반영해 없는 리소스를 지어내지 않아요. 온보딩 직후의 중복 안내(설치 링크 재안내 등)는 줄이되 로그인·GitHub 설치 같은 안전 확인은 그대로 거쳐요. 더해서 deploy 라우팅의 죽은 분기와 approved-run 브리지, init 의 불필요한 MCP 설치 단계를 걷어내 동작을 더 매끄럽게 다듬었어요.
+
+
+### Added
+
+* align plugin smooth behavior contracts ([d53de82](https://github.com/jocoding-ax-partners/axhub/commit/d53de82e1fc7ccba1619e64d2a7a551106f74856))
+* 조회→생성 같은 대화 맥락 핸드오프 (instruction-first) ([aff9c1c](https://github.com/jocoding-ax-partners/axhub/commit/aff9c1c848b2f03ff7b3d9b721f09f6df270c91b))
+
+
+### Fixed
+
+* deploy 라우팅 死 yield/ask 분기 제거 + named-target-wins LLM 이관 ([9915cbb](https://github.com/jocoding-ax-partners/axhub/commit/9915cbb11c3e81ac43ee1d27c9e14d669732b821))
+* remove approved-run deploy bridge ([f802631](https://github.com/jocoding-ax-partners/axhub/commit/f8026318a9e541ce4e5b272ef8b550722a7aeb63))
+* remove init mcp install step ([3b071b6](https://github.com/jocoding-ax-partners/axhub/commit/3b071b6dfaf57a12e4c92f2e2eaa3eb651b0c737))
+
 ## [1.0.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.0.1...v1.0.2) (2026-06-15)
 
 일부 환경에서 `axhub` 가 깔려 있는데도 온보딩이 'CLI 없음' 으로 오판해 이미 설치된 CLI 를 또 설치하라고 안내하던 문제를 막았어요. detect 의 self-probe 가 프로세스의 PATH/HOME 이 사용자 셸과 다를 때(GUI 로 띄운 호스트·정리된 환경) `axhub` 를 못 찾던 게 원인이라, Step 2 에서 `command -v` 로 구한 절대경로를 `AXHUB_BIN` 으로 고정해 모든 self-probe 가 그 경로로 실행되도록 했어요. 더해서 `command -v axhub` 가 성공하는데도 `cli_missing` 으로 재설치를 안내하지 않도록 가드를 넣어, 구버전 CLI 에서도 온보딩이 깨지지 않아요.
