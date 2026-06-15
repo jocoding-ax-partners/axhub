@@ -526,16 +526,6 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
    `네, 추천받기` 면 infer-tables-env 분석으로 넘어가요. `아니요` 면 그냥 마무리해요.
 
-9. **axhub MCP 도구를 설치해요 (선택, 비차단).**
-
-   clone 된 repo 루트에 `.mcp.json` 을 설치해서 편집기·에이전트가 axhub MCP 도구를 쓸 수 있게 해요 — 로컬 코드 정적 검증(`validate` / `scan_sites`, `axhub plugin-support mcp-serve` stdio) + 원격 SDK 지식·스키마. 기존 `.mcp.json` 이 있으면 사용자 항목은 보존하고 axhub 두 항목만 추가·갱신해요(idempotent).
-
-   ```bash
-   # clone 된 앱 디렉터리에서 실행해요. 기존 사용자 mcpServers 항목은 보존돼요.
-   axhub plugin-support mcp-install
-   ```
-
-   `mcp-install` 은 사람용 텍스트 1줄을 출력해요 (JSON 아님). local stdio 항목 command 는 `axhub plugin-support mcp-serve` 로 CLI 가 직접 set 해요. 없거나 실패해도 **막지 않아요** — "MCP 도구는 나중에 설치해도 돼요" 한 줄만 안내하고 넘어가요. 원격 MCP URL 은 `AXHUB_MCP_URL` env 로 override 할 수 있어요.
 
 ## NEVER
 
