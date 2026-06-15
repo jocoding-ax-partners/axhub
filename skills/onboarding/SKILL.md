@@ -76,6 +76,10 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
    ```bash
    if command -v axhub >/dev/null 2>&1; then
+     # detect 의 self-probe 가 프로세스 PATH/HOME 차이로 axhub 를 못 찾아
+     # cli_present:false 를 거짓 보고하는 걸 막으려고, 해석된 절대경로를
+     # AXHUB_BIN 으로 고정해요 (axhub 가 모든 self-probe 를 이 경로로 spawn).
+     AXHUB_BIN="$(command -v axhub)"; export AXHUB_BIN
      DETECT_JSON=$(axhub plugin-support onboarding-detect --json 2>/dev/null)
      [ -n "$DETECT_JSON" ] || DETECT_JSON='{"cli_present":true,"first_gap":"doctor_gap","github":{"state":"unavailable","install_url":null}}'
    else
@@ -468,6 +472,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 ## NEVER
 
 - NEVER preflight 를 CLI 확인 이전에 호출 — CLI 부재 상태로 fire 되면 무한 루프 위험이에요. detect 는 fail-open 이라 먼저 써요.
+- NEVER `command -v axhub` 가 성공하는데 `cli_missing` 으로 재설치를 안내하지 말아요 — 그건 구 CLI 의 detect self-probe 오탐이에요. Step 2 의 `AXHUB_BIN` 절대경로 핀으로 재감지하면 present 로 잡히고, 그래도 false 면 CLI 를 present 로 간주하고 `auth_missing` 부터 이어가요.
 - NEVER 사용자가 sibling skill 이름이나 slash command 를 알아야만 끝나는 안내를 만들지 말아요.
 - NEVER 한 번에 여러 mutate gap 을 추측 실행하지 말아요. 항상 detect-first → 첫 gap 처리 → 재감지 루프예요.
 - NEVER gap 마다 preflight/detect 를 중복 호출하지 말아요. `onboarding-detect` 한 번이 단일 판정원이에요.
