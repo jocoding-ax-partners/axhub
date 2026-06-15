@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **axhub** (6798 symbols, 13019 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **axhub** (271 symbols, 280 relationships, 1 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -110,7 +110,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 - 흡수된 helper 표면은 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 — 예: `onboarding-detect`, `preflight`, `deploy-prep`.
 - 공개 검증 표면은 `axhub deploy verify <deployment-id>` 하나예요.
-- init·deploy skill 은 시작 시 `axhub --version` 으로 최소 버전 (흡수 릴리즈 0.20.0) 을 가드해요. 미달이면 멈추고 안내해요 — 우회 금지.
+- init·deploy skill 은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면(v0.20.0+) 을 가드해요. 미달이면 멈추고 안내해요 — 우회 금지.
 
 ## 변경 검증
 
@@ -122,10 +122,12 @@ bunx tsc --noEmit      # 타입 clean
 
 frontmatter validity check 와 e2e flow 1개도 살아남은 quality gate 예요.
 
+대표 여정 회귀는 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**을 문서·skill 본문·fixture 계약으로 같은 방향에 맞추는 방식이에요. 실제 ax-hub-cli 구현/schema parity/release 는 이 repo 범위 밖 follow-up 으로 남겨요.
+
 ## Never Do
 
 - NEVER helper 바이너리 (`crates/axhub-helpers`) 나 hook / NL routing / scaffold 인프라 재추가 — diet 결정 위반.
 - NEVER 명시적 결정 없이 skill 추가 — 4 skill 체제 유지 (`clarity` skill 은 deep-interview spec 의 명시 결정으로 신설된 axhub-cli 브리지예요).
-- NEVER `axhub --version` 최소 버전 가드 우회.
+- NEVER 최소 CLI 기능 게이트를 우회하지 말아요.
 - NEVER deploy 성공 선언을 `axhub deploy verify <deployment-id>` 1회 실행 없이 — deployment id 필수, latest 재탐색 금지.
 - NEVER release 를 manual `vim package.json` + `git tag` 로 — `bun run release` → narrative amend → `bun run release:tag` 2단계 flow (단순화된 postbump) 만 써요.

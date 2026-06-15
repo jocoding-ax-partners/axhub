@@ -2,7 +2,7 @@
 # Case 19 (T1) — 한국어 NL "paydrop 배포해" + token_expired → post-diet deploy SKILL.
 # post-diet flow: Step 1 guard 가 `axhub plugin-support preflight --json` 으로 게이트하고 (auth_ok=true —
 #       토큰은 preflight 시점엔 fine), Step 1.1 이 `axhub plugin-support deploy-prep` 으로 resolve+preflight 를
-#       한 번에 받아요. 이후 token-gate / deploy-approved-run / deploy create 가 실행되는 순간 저장된 토큰이
+#       한 번에 받아요. 이후 token-gate / deploy create 가 실행되는 순간 저장된 토큰이
 #       만료된 게 드러나 exit 65 → SKILL 이 classify-exit 65 → 한국어 4-part 안내 (감정+원인+해결+선택).
 # 검증 강도: preflight 통과(auth_ok=true) 후 실행 단계에서 expired 발견 — auth_missing 보다 강한 path.
 # headless: Claude subprocess 는 동의 UI/텍스트 메뉴 대신 safe default 로 preview-confirm 없이 진행해요.

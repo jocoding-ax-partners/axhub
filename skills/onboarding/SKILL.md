@@ -90,6 +90,8 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
    `first_gap=helper_outdated` 분기는 없어요 — detect 는 `axhub` CLI 안에 들어 있어서 "CLI 는 되는데 detect 가 빈 출력" 케이스가 구조적으로 사라졌어요. 위 fallback 처럼 빈 출력은 `doctor_gap` 으로 낮춰서 끝단 점검(Step 9)으로 보내요.
 
+**대표 안전 실패 흐름.** `cli_missing` 이면 preflight/doctor 를 먼저 부르지 말고 설치 안내와 재개 phrase 만 남겨요. `cli_old` 이면 "axhub CLI 가 오래됐어요. 업데이트한 뒤 다시 시도해 주세요" 처럼 원인·행동을 짧게 말하고, raw stderr 나 내부 subcommand 덤프는 보여주지 않아요. 두 경우 모두 detect-first 근거(`first_gap`)를 따른 뒤 멈추거나 재감지해요.
+
    출력 JSON 주요 field (spec §2.1 schema_version="onboarding-detect/v1"):
 
    - `first_gap` / `gaps`: 처리할 첫 gap (아래 state machine 순서). 이걸 그대로 따라요.

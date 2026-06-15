@@ -15,6 +15,8 @@ description: 'This skill is the catch-all for ANY axhub feature that is NOT owne
 - **공개 표면만.** `axhub plugin-support ...` (hidden 그룹) 는 plugin 내부 프로토콜이라 이 스킬의 탐색·실행 대상이 아니에요.
 - **지어내지 않기.** 탐색으로 못 찾은 기능은 "axhub 에 그 기능은 없어요" 라고 정직하게 말하고, 가장 가까운 명령을 제안해요.
 
+**대표 정직성 계약.** `clarity` 는 hidden `plugin-support` 를 탐색하지 않아요. 공개 `--json-schema` / `--help` 트리에서 맞는 leaf 를 찾지 못하면 존재하지 않는 명령을 만들지 말고, "axhub 에 그 기능은 없어요" + 가장 가까운 공개 명령만 말해요. 상태 확인·로그·환경변수처럼 대표 여정 뒤 작업은 이 경로로 이어가요.
+
 ## Workflow
 
 1. **CLI 가드.** `command -v axhub` 가 실패하면 멈추고 안내해요: "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요" → onboarding 스킬로 넘겨요. raw 에러는 chat 에 노출하지 않아요.
@@ -91,6 +93,10 @@ description: 'This skill is the catch-all for ANY axhub feature that is NOT owne
 | **그 외 전부 + 의도가 불분명한 axhub 발화** | **clarity (이 스킬)** |
 
 경계가 섞여 오면(예: "배포하고 로그 봐줘") 배포는 deploy 에 양보하고 로그 부분만 이 스킬이 이어받아요.
+
+## 다음 단계 이어주기
+
+조회 결과가 앱으로 이어질 만한 리소스(connector·table·데이터 카탈로그 등)면, 결과 요약 끝에 다음 단계를 한 줄로 권해요 — 예: "이 데이터로 앱 만들래요? '이걸로 앱 만들어줘' 라고 하면 돼요." 순수 안내 문장이에요. 이때도 `axhub plugin-support` 같은 hidden 표면을 호출하거나 state 를 쓰지 않아요 — clarity 는 그대로 공개 표면만 탐색·실행하고, 실제 앱 생성은 init 이 같은 대화 맥락을 이어받아 처리해요.
 
 ## Visibility
 

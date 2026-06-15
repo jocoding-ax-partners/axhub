@@ -7,7 +7,7 @@
 #   AXHUB_FIXTURE_VERSION=X.Y.Z   --version 응답 가짜 버전 (cli_too_old/cli_too_new 강제)
 #   AXHUB_FIXTURE_AUTH=expired    auth status / deploy create 모두 exit 65 + token_expired stderr
 #   AXHUB_FIXTURE_AUTH=deploy_expired auth status / preflight 는 통과, deploy create /
-#                                 plugin-support deploy-approved-run / token-gate 만 exit 65 + token_expired stderr
+#                                 token-gate 만 exit 65 + token_expired stderr
 #
 # Post-diet 확장 — plugin-support 명령 family:
 #   plugin-support preflight [--json]        cli_present/cli_state/in_range + auth_ok=true (deploy_expired 도 true).
@@ -15,8 +15,8 @@
 #   plugin-support tenant-resolve [--json]   빈 tenant + needs_pick=false.
 #   plugin-support deploy-prep --intent ...  preflight/resolve/quality_gate envelope, exit_code 0.
 #   plugin-support deploy-preview-summary    한국어 preview text (해요체).
-#   plugin-support deploy-approved-run        deploy_expired → exit 65 token_expired (저장 토큰이 여기서 만료 판명).
 #   plugin-support token-gate                 deploy_expired → exit 65, else exit 0 (stdout 없음).
+#   plugin-support onboarding-detect [--json]  detect-first onboarding envelope; env can force cli_missing/cli_old.
 
 set -euo pipefail
 
@@ -44,6 +44,20 @@ case "${1:-}" in
     # Post-diet helper family. `axhub plugin-support <cmd> [flags]`.
     PS_CMD="${2:-}"
     case "$PS_CMD" in
+      onboarding-detect)
+        case "${AXHUB_FIXTURE_ONBOARDING:-no_gap}" in
+          cli_missing)
+            echo '{"schema_version":"onboarding-detect/v1","cli_present":false,"cli_state":"missing","cli_on_path":false,"cli_too_old":false,"has_update":false,"first_gap":"cli_missing","gaps":["cli_missing"],"github":{"state":"unavailable","installed_logins":[],"uninstalled_logins":[],"install_url":null,"multiple_installed":false},"auth_ok":false,"git_present":true,"node_present":true,"manifest_present":false,"dir_empty":true,"deps_missing":false,"deploy_checked":false,"deploy_verified":false}'
+            ;;
+          cli_old)
+            echo '{"schema_version":"onboarding-detect/v1","cli_present":true,"cli_version":"0.19.0","cli_state":"too_old","cli_on_path":true,"cli_too_old":true,"has_update":true,"latest_version":"0.20.0","first_gap":"cli_old","gaps":["cli_old"],"github":{"state":"unavailable","installed_logins":[],"uninstalled_logins":[],"install_url":null,"multiple_installed":false},"auth_ok":true,"git_present":true,"node_present":true,"manifest_present":false,"dir_empty":true,"deps_missing":false,"deploy_checked":false,"deploy_verified":false}'
+            ;;
+          *)
+            echo '{"schema_version":"onboarding-detect/v1","cli_present":true,"cli_version":"0.20.0","cli_state":"ok","cli_on_path":true,"cli_too_old":false,"has_update":false,"latest_version":"0.20.0","first_gap":"no_gap","gaps":[],"github":{"state":"installed","installed_logins":["axhub-test"],"uninstalled_logins":[],"install_url":"https://github.com/apps/axhub/installations/new","multiple_installed":false},"auth_ok":true,"git_present":true,"node_present":true,"manifest_present":true,"dir_empty":false,"deps_missing":false,"deploy_checked":true,"deploy_verified":true}'
+            ;;
+        esac
+        exit 0
+        ;;
       preflight)
         # preflight: token 은 아직 fine (deploy_expired 도 auth_ok=true).
         # raw stderr/exit-jargon 미노출 — JSON contract 만.
@@ -67,15 +81,6 @@ case "${1:-}" in
       deploy-preview-summary)
         # 5필드 한국어 preview card (해요체). raw 값 미노출.
         echo "다음을 올릴게요: 앱 paydrop / 환경 production / 브랜치 main / 커밋 abc1234 / 예상 약 1분 걸려요."
-        exit 0
-        ;;
-      deploy-approved-run)
-        # 승인 직후 실행 — 저장 토큰이 만료된 게 이 순간 드러나요.
-        if [ "${AXHUB_FIXTURE_AUTH:-}" = "deploy_expired" ] || [ "${AXHUB_FIXTURE_AUTH:-}" = "expired" ]; then
-          echo '{"code":"token_expired","detail":"저장된 토큰이 만료됐어요 (deploy-approved-run)"}' >&2
-          exit 65
-        fi
-        echo "배포를 시작했어요."
         exit 0
         ;;
       token-gate)
@@ -159,6 +164,30 @@ case "${1:-}" in
           exit 4
         fi
         echo '{"items":[{"id":"dep-fixture","app_id":"paydrop","status":"running","created_at":"2026-05-11T00:00:00Z"}]}'
+        ;;
+      verify)
+        case "${AXHUB_FIXTURE_VERIFY:-success}" in
+          in_progress)
+            echo '{"id":"'"${3:-dep-fixture}"'","status":"running","url":"https://paydrop.axhub.ai"}'
+            exit 6
+            ;;
+          failed)
+            echo '{"id":"'"${3:-dep-fixture}"'","status":"failed","reason":"build_failed"}'
+            exit 7
+            ;;
+          unknown)
+            echo '{"id":"'"${3:-}"'","status":"unknown"}'
+            exit 5
+            ;;
+          auth)
+            echo '{"error":{"code":"auth","subcode":"token_expired"}}'
+            exit 4
+            ;;
+          *)
+            echo '{"id":"'"${3:-dep-fixture}"'","status":"live","url":"https://paydrop.axhub.ai"}'
+            exit 0
+            ;;
+        esac
         ;;
       status)
         echo '{"id":"dep-fixture","status":"live","created_at":"2026-05-11T00:00:00Z"}'

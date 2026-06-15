@@ -27,11 +27,12 @@ When the user says a human deployment phrase such as `배포해줘`, `올려줘`
 - The first visible chat sentence must be exactly `배포 준비를 확인할게요.`
 - For the initial Desktop preview, stop reading this skill after this section. Do not read the long workflow below until the user has approved the preview card.
 - Before the Bash/tool call, make sure the command runs in the user-visible app folder. In Claude Desktop, if the active root and an added folder differ and the added folder is the only Vite/React app (`package.json` has `vite` + `react`/`react-dom`), run the command from that folder (`cd "<that folder>" && ...`). If multiple app folders are plausible, ask which folder to deploy and stop.
-- If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, render the local initialization choices (`React/Vite로 초기화`, `다른 템플릿 선택`, `취소`) and stop. Do not ask for deploy approval or call `deploy-approved-run` from this state.
+- If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, render the local initialization choices (`React/Vite로 초기화`, `다른 템플릿 선택`, `취소`) and stop. Do not ask for deploy approval from this state.
 - Immediately run one Bash/tool call with title `배포 준비 확인`: `axhub plugin-support deploy-preview-summary --user-utterance "<latest user sentence>"`.
 - Copy that Korean stdout as the preview card and ask for explicit approval.
-- After the user explicitly approves, run one Bash/tool call with title `배포 실행`: `axhub plugin-support deploy-approved-run --user-utterance "<latest user sentence>"`.
-- Copy that Korean stdout as the deploy result, then confirm success with `axhub deploy verify <deployment-id>` (Step 5). Do not call this skill again after approval.
+- After the user explicitly approves, continue into the canonical workflow below starting at Step 1.1 with the approval decision already captured. Use `deploy-prep`, bootstrap/git readiness/status-first checks, token gate, public `axhub deploy create --execute --json` when creation is actually required, and Step 5 verify. Do not insert a separate approved-run helper bridge between preview approval and the canonical workflow.
+- Bind `DEPLOY_ID` only from a recorded bootstrap deploy id, an in-flight deployment id, or public `axhub deploy create --execute --json` output. If no deployment id is present, do **not** declare success; say "배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. '배포 상태 확인해줘'라고 말하면 이어서 볼게요." and stop.
+- Confirm success only with `axhub deploy verify "$DEPLOY_ID"` (Step 5). Copy verify-derived Korean success/recovery text, not raw deploy-create stdout, as the final deploy result. Do not call this skill again after approval.
 - Do not echo the user's phrase as a route conversion, such as `"배포해줘" → ...`.
 - If a Bash/tool call is needed, use Korean titles only: `배포 준비 확인`, `배포 실행`, or `배포 상태 확인`.
 - Before any destructive deploy, show only the Korean preview card (앱 / 환경 / 브랜치 / 커밋 / 예상 시간) and ask for explicit approval.
@@ -145,7 +146,7 @@ echo "$ROUTE_JSON"
 
 `route-decision` 의 binding 계약은 `.decision` 단일이에요. 현재 CLI 는 marker/auth 기반이라 실제로 **`axhub` 또는 `ignore`** 만 내요 (NL 타깃 판별은 (A) 가 이미 했고, 이 호출은 keyword 판정을 하지 않아요). exit 0 고정 fail-open (빈 출력 → `axhub`, 뒤 preview-confirm 이 backstop). `ROUTE_DECISION` 값으로 분기해요. **`axhub` 일 때만 진행**해요:
 
-- **`axhub`** → 정상 경로. 아래 Step 1.1 (deploy-prep) 로 계속 진행해요.
+- **`axhub`** → 정상 경로. 아래 Step 1.1 (deploy-prep) 로 계속 진행해요. **이 경로(axhub 확정)로 들어온 뒤에만**, 이 대화에서 온보딩/리소스 맥락이 보이면 중복 재설명을 줄이고 의도를 한 줄로 이어요 — route gate 통과 후에만 적용해서 다른 타깃(vercel 등) 핸드오프를 억제하지 않아요. 배포 결정·verify 경로는 그대로예요. 계약은 `references/session-carryover.md`.
 - **그 외 (`ignore` 등 axhub 가 아닌 모든 값)** → axhub 배포 맥락인지 확실치 않아요 (`axhub.yaml` 없음 등). 아래 AskUserQuestion 으로 한 번 물어봐요. **물어보기 전에는 deploy-prep 을 호출하지 말아요.**
 
 ```json
@@ -497,9 +498,13 @@ To deploy:
        echo "다른 배포가 진행 중이에요. 잠시 뒤에 다시 시도해요." >&2
        rm -f "$AXHUB_STDERR_TMP" "$AXHUB_STDOUT_TMP"; exit 0
      fi
-   elif [ $AXHUB_EXIT -eq 0 ]; then
-     DEPLOY_ID=$(jq -r '.id // .deployment_id // empty' "$AXHUB_STDOUT_TMP")
-     cat "$AXHUB_STDOUT_TMP"
+  elif [ $AXHUB_EXIT -eq 0 ]; then
+    DEPLOY_ID=$(jq -r '.id // .deployment_id // empty' "$AXHUB_STDOUT_TMP")
+    if [ -z "$DEPLOY_ID" ]; then
+      echo "배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. '배포 상태 확인해줘'라고 말하면 이어서 볼게요." >&2
+      rm -f "$AXHUB_STDERR_TMP" "$AXHUB_STDOUT_TMP"; exit 0
+    fi
+    echo "배포 결과를 확인하고 있어요." >&2
    else
      cat "$AXHUB_STDERR_TMP" >&2; cat "$AXHUB_STDOUT_TMP"
    fi
@@ -527,6 +532,8 @@ To deploy:
    - exit 4 (auth 만료, CLI-native) → Step 6 의 auth recovery (exit 4 / 65) 로 라우팅해요 ("axhub 로그인이 만료됐어요. 다시 로그인할까요?").
 
    `--dry-run` 경로에서는 verify 를 건너뛰어요 (실제 deploy 가 없어요). (업데이트 알림은 Step 1a 에서 맨 앞에 처리하니 여기선 다시 안 해요.)
+
+**대표 verify 실패/진행 중 복구.** `verify` 가 exit 6 을 주면 진행 중으로만 말하고 성공을 선언하지 않아요. exit 7 이면 실패로 말하되 앱이 망가졌다고 단정하지 말고, 같은 deployment id 로 확인한 증거와 다음 행동(`배포 상태 확인해줘`, `로그 보여줘`, `다시 배포해줘`)만 제안해요. 두 경우 모두 raw verify 출력·exit jargon·latest 재탐색은 사용자에게 노출하지 않아요.
 
 6. **On any non-zero exit**, route via `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` (canonical router; 두 공간 다 처리: CLI-native 4/5/6 와 helper-output 65/67/68 을 classify-exit 가 65→4 / 67→5 / 68→6 으로 정규화해요 — normalize_helper_exit 계약 불변) 또는 `references/error-empathy-catalog.md` by exit code:
    - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 앱은 안전해요. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.
@@ -589,8 +596,10 @@ After cancellation, run a read-only status check and summarize the terminal stat
 - NEVER call `axhub deploy cancel` without explicit confirmation.
 - NEVER infer `app_id` from `pwd` or git remote alone in the mutation path; always live resolve through deploy-prep.
 - NEVER bypass the AskUserQuestion preview card on slash invocation; slash is explicit confirmation for the SKILL invocation, not for the destructive operation.
+- NEVER insert the old approved-run helper bridge between preview approval and the canonical deploy workflow; approval must flow into `deploy-prep` / bootstrap / public `axhub deploy create --execute --json` / verify.
 
 ## Additional Resources
 
 For Korean trigger lexicon (informal, honorific, demo-context variants): `references/nl-lexicon.md`.
 For exit-code → 4-part Korean error template (emotion + cause + action + button): `references/error-empathy-catalog.md`.
+For same-conversation 조회·온보딩 맥락 carry-over·confabulation 가드·마찰 억제 단일 계약: `references/session-carryover.md`.
