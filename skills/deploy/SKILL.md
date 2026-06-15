@@ -30,8 +30,9 @@ When the user says a human deployment phrase such as `배포해줘`, `올려줘`
 - If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, render the local initialization choices (`React/Vite로 초기화`, `다른 템플릿 선택`, `취소`) and stop. Do not ask for deploy approval or call `deploy-approved-run` from this state.
 - Immediately run one Bash/tool call with title `배포 준비 확인`: `axhub plugin-support deploy-preview-summary --user-utterance "<latest user sentence>"`.
 - Copy that Korean stdout as the preview card and ask for explicit approval.
-- After the user explicitly approves, run one Bash/tool call with title `배포 실행`: `axhub plugin-support deploy-approved-run --user-utterance "<latest user sentence>"`.
-- Copy that Korean stdout as the deploy result, then confirm success with `axhub deploy verify <deployment-id>` (Step 5). Do not call this skill again after approval.
+- After the user explicitly approves, run one Bash/tool call with title `배포 실행`: `axhub plugin-support deploy-approved-run --user-utterance "<latest user sentence>"`. Treat stdout as progress text only until a deployment id is bound.
+- Bind `deployment_id` / `id` from the approved-run structured output into `DEPLOY_ID`. If no deployment id is present, do **not** declare success; say "배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. '배포 상태 확인해줘'라고 말하면 이어서 볼게요." and stop.
+- Confirm success only with `axhub deploy verify "$DEPLOY_ID"` (Step 5). Copy verify-derived Korean success/recovery text, not raw approved-run stdout, as the final deploy result. Do not call this skill again after approval.
 - Do not echo the user's phrase as a route conversion, such as `"배포해줘" → ...`.
 - If a Bash/tool call is needed, use Korean titles only: `배포 준비 확인`, `배포 실행`, or `배포 상태 확인`.
 - Before any destructive deploy, show only the Korean preview card (앱 / 환경 / 브랜치 / 커밋 / 예상 시간) and ask for explicit approval.
@@ -497,9 +498,13 @@ To deploy:
        echo "다른 배포가 진행 중이에요. 잠시 뒤에 다시 시도해요." >&2
        rm -f "$AXHUB_STDERR_TMP" "$AXHUB_STDOUT_TMP"; exit 0
      fi
-   elif [ $AXHUB_EXIT -eq 0 ]; then
-     DEPLOY_ID=$(jq -r '.id // .deployment_id // empty' "$AXHUB_STDOUT_TMP")
-     cat "$AXHUB_STDOUT_TMP"
+  elif [ $AXHUB_EXIT -eq 0 ]; then
+    DEPLOY_ID=$(jq -r '.id // .deployment_id // empty' "$AXHUB_STDOUT_TMP")
+    if [ -z "$DEPLOY_ID" ]; then
+      echo "배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. '배포 상태 확인해줘'라고 말하면 이어서 볼게요." >&2
+      rm -f "$AXHUB_STDERR_TMP" "$AXHUB_STDOUT_TMP"; exit 0
+    fi
+    echo "배포 결과를 확인하고 있어요." >&2
    else
      cat "$AXHUB_STDERR_TMP" >&2; cat "$AXHUB_STDOUT_TMP"
    fi
@@ -527,6 +532,8 @@ To deploy:
    - exit 4 (auth 만료, CLI-native) → Step 6 의 auth recovery (exit 4 / 65) 로 라우팅해요 ("axhub 로그인이 만료됐어요. 다시 로그인할까요?").
 
    `--dry-run` 경로에서는 verify 를 건너뛰어요 (실제 deploy 가 없어요). (업데이트 알림은 Step 1a 에서 맨 앞에 처리하니 여기선 다시 안 해요.)
+
+**대표 verify 실패/진행 중 복구.** `verify` 가 exit 6 을 주면 진행 중으로만 말하고 성공을 선언하지 않아요. exit 7 이면 실패로 말하되 앱이 망가졌다고 단정하지 말고, 같은 deployment id 로 확인한 증거와 다음 행동(`배포 상태 확인해줘`, `로그 보여줘`, `다시 배포해줘`)만 제안해요. 두 경우 모두 raw verify 출력·exit jargon·latest 재탐색은 사용자에게 노출하지 않아요.
 
 6. **On any non-zero exit**, route via `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` (canonical router; 두 공간 다 처리: CLI-native 4/5/6 와 helper-output 65/67/68 을 classify-exit 가 65→4 / 67→5 / 68→6 으로 정규화해요 — normalize_helper_exit 계약 불변) 또는 `references/error-empathy-catalog.md` by exit code:
    - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 앱은 안전해요. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.

@@ -6,6 +6,7 @@ auth status
 deploy create
 deploy list
 deploy logs
+deploy verify
 deploy rollback
 deploy status
 logs build

@@ -52,6 +52,8 @@ model: sonnet
 
 **이 SKILL 이 앱 생성 전체를 담당해요.** "앱 만들어줘" 류 발화에 generic 한 스택/데이터-fetch 질문을 즉석에서 만들지 말고, 반드시 아래 template flow 를 따라요. 스택 선택은 Step 3 (backend template registry), 데이터 접근은 Step 8 의 `@ax-hub/sdk` 안내로 처리해요.
 
+**대표 여정에서의 역할.** onboarding 이 `VIBE_READY` 또는 `READY_WITH_USER_ACTION` 으로 첫 셋업 상태를 정리한 뒤, 사용자가 "첫 앱 만들어줘" 류로 넘어오면 이 SKILL 이 앱 생성·repo 준비·첫 배포 결과 안내까지 이어요. 실패해도 raw JSON/stderr 를 보여주지 말고, 재개 phrase(`다시 만들어줘`, `다시 로그인해줘`, `설치했어`)로 같은 saga 를 이어갈 수 있게 남겨요.
+
 0. **TodoWrite 진행 체크리스트 (있을 때만).**
 
    TodoWrite 도구가 현재 host 에 노출돼 있을 때만 호출해요. 없으면 호출하지 말고 조용히 진행해요.

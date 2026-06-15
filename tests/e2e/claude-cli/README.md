@@ -2,7 +2,7 @@
 
 vibe coder 가 Claude Code 안에서 axhub 자연어를 입력했을 때의 끝-끝 흐름 (SKILL routing → preflight injection → AskUserQuestion preview gate → exit-code 한국어 분류) 을 subprocess `claude -p` 로 직접 driving 해서 회귀를 catch 해요.
 
-diet 후 matrix 는 핵심 deploy 경로 회귀 **단일 케이스(case 19, 한국어 NL deploy)** 만 유지해요. 실제 `claude -p` 호출이라 claude API 비용이 들어, CI 에서는 nightly + 수동 dispatch 로만 돌려요 (PR-blocking 아님).
+diet 후 matrix 는 대표 safety guard 회귀 **단일 케이스(case 19, 한국어 NL deploy)** 를 유지해요. 실제 `claude -p` 호출이라 claude API 비용이 들어, CI 에서는 nightly + 수동 dispatch 로만 돌려요 (PR-blocking 아님).
 
 ## 디렉토리
 
@@ -45,6 +45,12 @@ bash tests/e2e/claude-cli/run-matrix.sh --tier nightly
 2. **격리 sandbox** — `env -i` + 격리 `HOME`/`XDG_CONFIG_HOME` + `fixtures/bin/axhub` shim PATH 1순위 + `/usr/local/bin` 제거. 시스템 axhub binary 호출 0건 (sentinel touch 검증).
 3. **CLI wrapper fixtures** — backend/auth/read path 는 직접 HTTP 를 열지 않고 `fixtures/bin/axhub` shim 을 통해 현재 CLI surface 를 검증해요.
 4. **TTL 강제** — per-case `timeout`. matrix total 상한.
+
+## 대표 smoothness 증거
+
+이 하네스의 자동화 범위는 작게 유지해요. `bun test` 에서 skill/metadata/fixture 계약을 빠르게 확인하고, 실제 `claude -p` e2e 는 case 19 하나로 deploy 실패 복구·raw 내부명 노출 금지·headless safe default 를 대표 검증해요.
+
+대표 여정은 문서/계약 기준으로 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. e2e case 19 는 그중 배포 안전 실패 샘플을 담당하고, onboarding detect-first 및 deploy verify failed/in-progress 는 fixture contract test 가 담당해요.
 
 ## 새 case 추가
 

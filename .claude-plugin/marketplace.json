@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "axhub",
-      "description": "Korean-first axhub Claude Code plugin wrapping ax-hub-cli v0.20.0+ surfaces with 4 NL skills (onboarding/init/deploy/cli) and preview-first destructive workflows",
+      "description": "Korean-first axhub Claude Code plugin wrapping ax-hub-cli v0.20.0+ surfaces with 4 NL skills (onboarding/init/deploy/clarity) and preview-first destructive workflows",
       "version": "1.0.2",
       "author": {
         "name": "Jocoding AX Partners",
