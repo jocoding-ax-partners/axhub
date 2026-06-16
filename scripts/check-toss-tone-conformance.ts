@@ -85,7 +85,7 @@ const scan = async (includePatterns: string[] = []): Promise<Violation[]> => {
     const content = readFileSync(file, "utf8");
     const lines = content.split("\n");
     // For SKILL.md files, skip YAML frontmatter (between first two `---`
-    // lines). description: contains nl-lexicon activation phrases — do NOT
+    // lines). description: contains trigger activation phrases — do NOT
     // lint frontmatter prose.
     let frontmatterEnd = 0;
     if (file.endsWith("/SKILL.md") && lines[0] === "---") {

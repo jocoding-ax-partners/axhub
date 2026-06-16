@@ -22,7 +22,7 @@ model: sonnet
 
 # Onboarding (first-run vibe coding orchestrator)
 
-Frontmatter `description` 은 nl-lexicon trigger baseline 때문에 보수적으로 유지해요. 실제 온보딩 범위와
+Frontmatter `description` 은 trigger 어구 baseline 때문에 보수적으로 유지해요. 실제 온보딩 범위와
 안전 계약은 이 본문을 authoritative source 로 봐요.
 
 처음 axhub 를 쓰는 사람을 위한 **온보딩 단일 진입점**이에요. 사용자는 `온보딩`, `처음인데 뭐부터`,
@@ -490,6 +490,5 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
 ## Additional Resources
 
-- `../deploy/references/nl-lexicon.md` — 활성화 trigger 어구 추가 시 참조.
 - `../deploy/references/error-empathy-catalog.md` — 4-part Korean exit-code template.
 - `../init/SKILL.md` — bootstrap saga + 첫 deploy 포함 계약 source (참고용 — onboarding 은 더 이상 위임하지 않아요).

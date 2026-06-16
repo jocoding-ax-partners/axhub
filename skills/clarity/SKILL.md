@@ -17,6 +17,18 @@ description: 'This skill is the catch-all for ANY axhub feature that is NOT owne
 
 **대표 정직성 계약.** `clarity` 는 hidden `plugin-support` 를 탐색하지 않아요. 공개 `--json-schema` / `--help` 트리에서 맞는 leaf 를 찾지 못하면 존재하지 않는 명령을 만들지 말고, "axhub 에 그 기능은 없어요" + 가장 가까운 공개 명령만 말해요. 상태 확인·로그·환경변수처럼 대표 여정 뒤 작업은 이 경로로 이어가요.
 
+## Anti-Patterns (하지 말 것)
+
+원칙 위반이 실전에서 드러나는 구체 형태예요:
+
+- ❌ `--json-schema` (270KB) 를 통째로 읽기 — 반드시 `jq` (추후 CLI `--field`) 로 필요 부분만 슬라이스해요. 통째 로드는 context 낭비.
+- ❌ `--help` 를 안 읽고 인자를 추측 조립 — leaf 명령 `--help` 1회 선숙지(--help gate) 후에만 실행. 추측 인자는 exit 64.
+- ❌ 1단계 탐색에서 못 찾자 포기 — 두 단계 깊이까지 탐색한 뒤에만 "기능 없음" 을 선언해요.
+- ❌ 탐색 출력(schema/help 본문)·raw stdout/stderr·secret·내부 id 를 chat 에 echo — 사용자에겐 한국어 요약만.
+- ❌ 못 찾은 기능을 비슷한 명령으로 조용히 대체 실행 — 정직하게 부재를 알리고 가장 가까운 명령을 "제안"만 해요 (무단 실행 금지).
+- ❌ `plugin-support` hidden 표면을 탐색·실행 (공개 표면만 원칙 위반).
+- ❌ deploy/init/onboarding 담당 의도를 가로채기 (아래 경계표 위반 — 해당 의도는 양보).
+
 ## Workflow
 
 1. **CLI 가드.** `command -v axhub` 가 실패하면 멈추고 안내해요: "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요" → onboarding 스킬로 넘겨요. raw 에러는 chat 에 노출하지 않아요.

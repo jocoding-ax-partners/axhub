@@ -600,6 +600,5 @@ After cancellation, run a read-only status check and summarize the terminal stat
 
 ## Additional Resources
 
-For Korean trigger lexicon (informal, honorific, demo-context variants): `references/nl-lexicon.md`.
 For exit-code → 4-part Korean error template (emotion + cause + action + button): `references/error-empathy-catalog.md`.
 For same-conversation 조회·온보딩 맥락 carry-over·confabulation 가드·마찰 억제 단일 계약: `references/session-carryover.md`.

@@ -547,7 +547,6 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
 ## Additional Resources
 
-- `../deploy/references/nl-lexicon.md` — 활성화 trigger 어구 추가 시 참조.
 - `../deploy/references/error-empathy-catalog.md` — 4-part Korean exit-code template (Step 8 에서 사용).
 - `../deploy/references/session-carryover.md` — 같은 대화 조회·온보딩 맥락 carry-over·confabulation 가드·마찰 억제 단일 계약.
 - `../onboarding/SKILL.md` — 빈 폴더 외 gap 처리·CLI 부재 라우팅 source.
