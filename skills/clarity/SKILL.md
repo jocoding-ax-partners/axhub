@@ -21,7 +21,7 @@ description: 'This skill is the catch-all for ANY axhub feature that is NOT owne
 
 원칙 위반이 실전에서 드러나는 구체 형태예요:
 
-- ❌ `--json-schema` (270KB) 를 통째로 읽기 — 반드시 `jq` (추후 CLI `--field`) 로 필요 부분만 슬라이스해요. 통째 로드는 context 낭비.
+- ❌ `--json-schema` (270KB) 를 통째로 읽기 — 반드시 `--field-expr` 로 필요 부분만 슬라이스해요. 통째 로드는 context 낭비.
 - ❌ `--help` 를 안 읽고 인자를 추측 조립 — leaf 명령 `--help` 1회 선숙지(--help gate) 후에만 실행. 추측 인자는 exit 64.
 - ❌ 1단계 탐색에서 못 찾자 포기 — 두 단계 깊이까지 탐색한 뒤에만 "기능 없음" 을 선언해요.
 - ❌ 탐색 출력(schema/help 본문)·raw stdout/stderr·secret·내부 id 를 chat 에 echo — 사용자에겐 한국어 요약만.
@@ -50,16 +50,16 @@ description: 'This skill is the catch-all for ANY axhub feature that is NOT owne
 
 2. **의도 좁히기 (clarify).** 발화가 모호하면 먼저 핵심 동사·명사를 잡아요. 그래도 후보 동작이 여럿이면 한 번만 짧게 되물어요 — 단, 되묻기는 마지막 수단이고 대개는 다음 탐색으로 스스로 판별해요.
 
-3. **탐색 (discover).** axhub 는 **에이전트용 기계가독 표면** `--json-schema` 를 제공해요 — `--help` prose 를 긁는 것보다 안정적이니 이걸 우선 써요. 단 전체 schema 는 ~270KB 라 **반드시 `jq` 로 필요한 부분만 슬라이스**하고 통째로 읽지 않아요.
+3. **탐색 (discover).** axhub 는 **에이전트용 기계가독 표면** `--json-schema` 를 제공해요 — `--help` prose 를 긁는 것보다 안정적이니 이걸 우선 써요. 단 전체 schema 는 ~270KB 라 **반드시 `--field-expr` 로 필요한 부분만 슬라이스**하고 통째로 읽지 않아요.
 
    ```bash
    # 1단계: 최상위 명령 목록만 (작아요)
-   axhub --json-schema | jq -r '.commands | keys[]'
+   axhub --json-schema --field-expr '.commands | keys[]'
    # 2단계: 후보 명령의 구조 (서브커맨드·플래그·alias) — 그 명령만 슬라이스
-   axhub --json-schema | jq '.commands["<후보>"]'
+   axhub --json-schema --field-expr '.commands["<후보>"]'
    ```
 
-   - 예: "환경변수 설정해줘" → keys 에서 `env` 발견 → `jq '.commands.env'` 로 set/list/get/delete 와 플래그 확인 → 인자 조립.
+   - 예: "환경변수 설정해줘" → keys 에서 `env` 발견 → `--field-expr '.commands.env'` 로 set/list/get/delete 와 플래그 확인 → 인자 조립.
    - `--json-schema` 가 없거나 비면(구 CLI) `--help` 트리로 폴백해요: `axhub --help` → `axhub <후보> --help` → 필요하면 더 깊이.
    - 후보가 여럿이면 description 으로 판별하고, 탐색 출력(schema/help 본문)은 chat 에 붙이지 않아요 — 판단 재료로만 써요.
 
@@ -71,7 +71,7 @@ description: 'This skill is the catch-all for ANY axhub feature that is NOT owne
    ```
 
    - 여기서 확인한 인자·플래그만 Step 4 에서 써요. help 에 없는 플래그·인자는 지어내지 않아요.
-   - `--help` 가 비거나 없으면(구 CLI) `axhub --json-schema | jq '.commands["<명령>"]'` 의 해당 서브커맨드 노드로 같은 정보(인자·플래그)를 확정해요.
+   - `--help` 가 비거나 없으면(구 CLI) `axhub --json-schema --field-expr '.commands["<명령>"]'` 의 해당 서브커맨드 노드로 같은 정보(인자·플래그)를 확정해요.
    - help 본문은 chat 에 echo 하지 않아요 — 읽고 사용법만 내재화해요.
 
 4. **실행 (execute).** Step 3b 사용법 확정을 통과한 명령만 조립해 바로 실행해요 (사용법 미확인 명령 실행 금지).

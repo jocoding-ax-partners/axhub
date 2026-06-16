@@ -143,15 +143,17 @@ TENANT_CACHE=".axhub/state/tenant.json"
 NEEDS_PICK="false"
 CANDIDATES_JSON="[]"
 if [ -z "${AXHUB_TENANT:-}" ]; then
-  TENANT_JSON=$(axhub plugin-support tenant-resolve --json 2>/dev/null)
-  [ -n "$TENANT_JSON" ] || TENANT_JSON='{}'
-  AXHUB_TENANT=$(printf '%s' "$TENANT_JSON" | jq -r '.tenant // empty' 2>/dev/null || true)
-  _NEEDS_PICK_RAW=$(printf '%s' "$TENANT_JSON" | jq -r '.needs_pick // false' 2>/dev/null || echo false)
+  # 한 번 호출 → CLI 가 자기 JSON 에서 필드 추출(eval-safe @sh, Git Bash portable — 외부 파서 의존 없음).
+  # AXHUB_TENANT/_NEEDS_PICK_RAW/CANDIDATES_JSON 와 비-TTY fallback 용 첫 후보(_FIRST_CANDIDATE)를 한 번에 받아요.
+  eval "$(axhub plugin-support tenant-resolve --field-expr '"AXHUB_TENANT=" + (.tenant // "" | @sh), "_NEEDS_PICK_RAW=" + (.needs_pick // false | tostring | @sh), "CANDIDATES_JSON=" + ((.candidates // []) | tojson | @sh), "_FIRST_CANDIDATE=" + ((.candidates // [])[0].id // (.candidates // [])[0].slug // "" | @sh)' 2>/dev/null)"
+  : "${AXHUB_TENANT:=}"
+  : "${_NEEDS_PICK_RAW:=false}"
+  : "${CANDIDATES_JSON:=[]}"
+  : "${_FIRST_CANDIDATE:=}"
   if [ "$_NEEDS_PICK_RAW" = "true" ]; then
-    CANDIDATES_JSON=$(printf '%s' "$TENANT_JSON" | jq -c '.candidates // []' 2>/dev/null || echo '[]')
     if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]; then
-      # non-TTY: active fallback + 경고 (R4 fail-wrong guard)
-      AXHUB_TENANT=$(printf '%s' "$CANDIDATES_JSON" | jq -r '.[0].id // .[0].slug // empty' 2>/dev/null || true)
+      # non-TTY: active fallback + 경고 (R4 fail-wrong guard) — 미리 추출한 첫 후보 사용
+      AXHUB_TENANT="$_FIRST_CANDIDATE"
       echo "여러 tenant 에 속해 있는데 picker 를 건너뛰고 기본 tenant($AXHUB_TENANT)로 진행해요"
     else
       NEEDS_PICK="true"
@@ -195,8 +197,8 @@ if (NEEDS_PICK === "true") {
 2. **Backend template registry 를 읽어요.**
 
    ```bash
-   # tenant fence re-read — fence 간 env 휘발, .axhub/state/tenant.json 재읽기 (L1 이 영속화한 값)
-   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
+   # tenant fence re-read — fence 간 env 휘발, tenant-resolve 가 cache-first 로 L1 영속값(.axhub/state/tenant.json)을 재취득
+   AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
    axhub apps templates list --tenant "$AXHUB_TENANT" --json
    ```
 
@@ -347,7 +349,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 5. **Bootstrap dry-run 으로 미리보기를 만들어요.**
 
    ```bash
-   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
+   AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
    axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --dry-run --json
    ```
 
@@ -369,7 +371,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    확인 받으면 saga 를 실행해요. 실행 직전 `.axhub/init-resume.json` 에 template/app_name/slug/subdomain/idempotency_key 를 먼저 저장해요:
 
    ```bash
-   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
+   AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
    axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --json
    axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
    ```
@@ -377,8 +379,9 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    **에이전트도 terminal 까지 폴링해요.** `--watch-timeout` (또는 `--watch-interval`) 을 붙이면 explicit streaming override 라 CLI 가 비-TTY 에서도 terminal(saga 완료 / 실패) 까지 직접 폴링해요. 이 bash 는 Bash tool `timeout: 570000` (9.5분) 으로 호출하고, 9분 초과 시 CLI Timeout + resume hint 를 받으면 "아직 만드는 중이에요, 계속 확인할게요" 후 아래 bootstrap-status 를 한 번 더 호출해요:
 
    ```bash
-   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
-   BOOTSTRAP_ID=$(echo "$ACCEPTED_JSON" | jq -r '.data.bootstrap_id')
+   AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
+   # idempotency-key 는 axhub 의 agent-safe mutation retry 계약(--help 명시) — 같은 key 라 execute 재호출은 backend 가 dedup 해서 같은 bootstrap_id 를 반환해요(새 saga side-effect 없음). 위 --watch 호출이 device flow + saga 진행을 처리하고, 이 호출은 bootstrap_id 한 줄만 추출해요.
+   BOOTSTRAP_ID=$(axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY" --field-expr '.data.bootstrap_id // empty' 2>/dev/null || true)
    axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --json
    axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --watch --watch-timeout 9m --json
    ```
@@ -404,14 +407,14 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    **대화형 TTY** 면 saga 가 polling 으로 install 완료를 기다리니 SKILL 은 다음 stage event 까지 narrate 만 계속해요. **에이전트 / 비-TTY** 면 CLI 가 emit 직후 fast-exit 하므로, challenge 를 보여준 뒤 브라우저 승인을 기다려요. 사용자가 승인 신호("승인했어" / "연결했어" / "됐어")를 주면 에이전트가 캐시된 device flow 를 `--resume-last` 로 직접 이어받아요:
 
    ```bash
-   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
+   AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
    axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
    ```
 
    **outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 말아요 — 새 code 를 발급해 이미 승인한 code 를 버려요.** resume 응답이 아직 `device_code_pending` 이면 "브라우저 승인이 아직 안 끝난 것 같아요. 승인 후 다시 알려주세요" 후 승인 신호를 받으면 한 번 더 resume 해요. resume 응답이 `no pending github device flow` 이면 `axhub github accounts list --json` 로 선택한 owner 설치가 확인될 때만 같은 idempotency key 로 아래 복구 명령을 한 번 실행해요:
 
    ```bash
-   AXHUB_TENANT="${AXHUB_TENANT:-$(jq -r '.tenant // empty' .axhub/state/tenant.json 2>/dev/null || true)}"
+   AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
    axhub github accounts list --json
    axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --github-owner "$GITHUB_OWNER" --repo-name "$APP_SLUG" --repo-private --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
    ```
@@ -421,7 +424,8 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 7. **응답에서 `repo_full_name` 을 꺼내 CWD 로 받아요.**
 
    ```bash
-   REPO=$(echo "$FINAL_JSON" | jq -r '.data.status.repo_full_name // empty')
+   # 완료된 saga 의 bootstrap-status 는 read-only — repo_full_name 한 줄만 CLI 가 추출
+   REPO=$(axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --field-expr '.data.status.repo_full_name // empty' 2>/dev/null || true)
    if [ -z "$REPO" ]; then
      echo '{"systemMessage":"GitHub repo 정보가 응답에 없어요. 설치 상태 진단해줘라고 말하면 이어서 점검할 수 있어요."}'
      exit 65
@@ -482,7 +486,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    saga 응답의 `app_id` / `deployment_id` / `repo_full_name` 을 humanize 해서 한국어 한 줄씩 보여줘요. **배포 공개 URL** 은 배포 성공 후 `axhub apps get` 으로 앱의 `access_url` 을 읽어서 hero 첫 줄로 보여줘요. URL 은 절대 합성하지 않아요.
 
    ```bash
-   PUBLIC_URL="$(axhub apps get "$APP_ID" --json --no-input 2>/dev/null | jq -r '.access_url // .data.access_url // empty')"
+   PUBLIC_URL="$(axhub apps get "$APP_ID" --no-input --field-expr '.access_url // .data.access_url // empty' 2>/dev/null || true)"
    ```
 
    dry-run 의 subdomain 은 내부 힌트라 인터넷 주소처럼 조합하지 않아요. `access_url` 을 못 읽으면 아래 낮춤 문장으로 안내해요.
