@@ -4,6 +4,17 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.2.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.2.0...v1.2.1) (2026-06-17)
+
+실사용에서 나온 development·deploy 안정화 픽스예요. development 가 코드를 짤 때 앱 스캐폴드 헬퍼를 베끼지 않고 MCP(sdk_search)를 SDK 사용법의 1차 근거로 삼게 하고, 템플릿은 MCP 미연결·미커버 때만 fallback 으로 써요. 또 클론된 axhub.yaml 이 템플릿 기본 슬러그를 그대로 갖고 있어 배포가 다른 앱을 가리키던 위험을 — init 이 생성한 앱 슬러그로 정합하고, development 가 폴더 바인딩 밖 앱 코딩을 거부하고, deploy 가 타깃을 재확인하는 3중으로 막았어요. 더해서 development 추가로 5 skill 이 됐는데 메타데이터·문서가 4 skill 로 남아 있던 걸 바로잡았어요.
+
+
+### Fixed
+
+* development 데이터-레이어 코드는 MCP(sdk_search) 1차, 템플릿은 fallback ([fa78d8d](https://github.com/jocoding-ax-partners/axhub/commit/fa78d8d8ea067cfe2294d3355a57e40824263c1d))
+* stale axhub.yaml 슬러그로 잘못된 앱 배포 방지 (bind 정합 + reconcile) ([ec19776](https://github.com/jocoding-ax-partners/axhub/commit/ec19776c9e3f4ea17061ac39955292c0728f0919))
+* 플러그인 메타데이터·문서의 skill 수 4→5 정정 ([f25df9f](https://github.com/jocoding-ax-partners/axhub/commit/f25df9f1975a73ab9b07bcd307f3b1418a707632))
+
 ## [1.2.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.1.0...v1.2.0) (2026-06-17)
 
 기존 axhub 앱에 실데이터(connector·table) 기반 기능을 코딩하는 다섯 번째 `development` 스킬을 추가했어요 — connector/table 을 실제로 조회해 진짜 스키마에 맞는 코드를 read·write 로 생성하고, 배포 전 필요한 테이블·환경변수까지 점검해요. CLI·플러그인 새 버전을 세션 시작 때 알려주는 자동 업데이트 hook 과, 각 스킬이 지금 어디까지 진행했는지 한 줄로 알려주는 진행 상황 알림도 들어왔어요. 더해서 스킬들의 jq 의존을 `axhub --field-expr` 로 바꿔 Windows·Git Bash 에서도 끊김 없이 돌고, 길어서 잘리던 스킬 description 을 1024자 밑으로 줄여 라우팅 신호가 온전히 전달되도록 다듬었어요.

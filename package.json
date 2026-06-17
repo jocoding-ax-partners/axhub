@@ -1,6 +1,6 @@
 {
   "name": "@jocoding-ax-partners/axhub-plugin-cc",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders. 5 skills (onboarding/init/deploy/development/clarity) calling ax-hub-cli v0.20.0+ directly; Bun for repo tooling.",
   "type": "module",
   "private": true,
