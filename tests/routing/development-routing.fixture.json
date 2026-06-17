@@ -1,0 +1,21 @@
+{
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). 이 fixture 는 '대표 여정 회귀'와 같은 방식의 계약이에요: skill frontmatter description/examples 를 편집할 때 아래 발화의 정답 skill 이 유지되는지 dry-run 으로 확인해요. 핵심 경계: clarity=axhub 명령 실행(코드 안 짬), development=앱 코드(페이지/화면/대시보드/엔드포인트) 생성.",
+  "boundary": {
+    "development": "기존 앱에 실데이터 기반 read 기능(페이지·화면·대시보드·조회 엔드포인트) 코드 생성",
+    "clarity": "axhub CLI 운영 명령(테이블/컬럼 생성·env·로그·connector 연결·데이터 조회) — 코드 안 짬",
+    "init": "새 앱 생성",
+    "deploy": "배포 실행·검증"
+  },
+  "cases": [
+    { "utterance": "내 connector 데이터로 대시보드 만들어줘", "expected": "development", "why": "실데이터로 화면 코드 생성" },
+    { "utterance": "유저 목록 페이지 만들어줘", "expected": "development", "why": "페이지 코드 생성" },
+    { "utterance": "결제 데이터 보여주는 화면 만들어", "expected": "development", "why": "데이터 기반 화면 코드" },
+    { "utterance": "이 테이블로 통계 페이지 추가해줘", "expected": "development", "why": "테이블 데이터로 페이지 코드 (테이블 '생성'이 아니라 페이지 코드)" },
+    { "utterance": "조회 가능한 리소스 조회해줘", "expected": "clarity", "why": "순수 조회(connector_list), 코드 안 짬" },
+    { "utterance": "테이블 만들어줘", "expected": "clarity", "why": "axhub table_create 운영 명령 (앱 코드 아님)" },
+    { "utterance": "환경변수 설정해줘", "expected": "clarity", "why": "axhub env 운영 명령" },
+    { "utterance": "로그 보여줘", "expected": "clarity", "why": "axhub 로그 조회" },
+    { "utterance": "새 앱 만들어줘", "expected": "init", "why": "새 앱 생성 (앱 없음)" },
+    { "utterance": "배포해줘", "expected": "deploy", "why": "배포 실행" }
+  ]
+}
