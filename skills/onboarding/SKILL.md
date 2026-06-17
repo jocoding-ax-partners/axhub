@@ -1,6 +1,6 @@
 ---
 name: onboarding
-description: 'This skill should be used when the user is new to axhub, asks what to do first, requests setup/onboarding/getting started, or says a short first-run phrase. 이 스킬은 axhub 를 처음 쓰는 사람이 셋업/온보딩 전체 과정을 한 번에 진행하고 싶어할 때 사용해요. 다음 표현에서 활성화: "셋업해줘", "셋업 해줘", "처음인데", "처음 사용", "처음 써", "처음 쓰는데", "처음 쓰는데 뭐부터", "뭐부터 하면 돼", "뭐부터 하면 되나요", "어떻게 시작하면 돼", "어떻게 시작해", "온보딩", "온보딩해줘", "시작하기", "axhub 시작", "axhub 처음", "초기 셋업", "setup", "set up", "onboard", "onboarding", "getting started", "get started", "first time", 또는 첫 사용자 셋업 의도. axhub CLI 설치(install-cli)·로그인(auth)·node 환경 감지를 순서대로 안내하고, node 가 없으면 명시 확인 후 설치해요. 빈 폴더에서도 첫 앱 만들기(init)로 자동 연결하지 않고, Ready card 에서 ‘첫 앱 만들어줘’ 같은 다음 단계만 안내해요. 환경 진단(doctor)이나 새 앱 초기화(init)와 달리 처음 사용자의 순차 온보딩을 담당해요.'
+description: 'This skill should be used when the user is new to axhub, asks what to do first, or requests setup/onboarding/getting started. 이 스킬은 axhub 를 처음 쓰는 사람이 셋업·온보딩 전체 과정을 한 번에 진행하고 싶어할 때 사용해요. 활성화 예: "셋업해줘", "처음인데", "처음 쓰는데 뭐부터", "뭐부터 하면 돼", "어떻게 시작해", "온보딩", "온보딩해줘", "시작하기", "axhub 시작", "초기 셋업", "setup", "onboard", "getting started", "first time", 또는 첫 사용자 셋업 의도. axhub CLI 설치(install-cli)·로그인(auth)·node 환경 감지를 순서대로 안내하고, node 가 없으면 명시 확인 후 설치해요. 빈 폴더에서도 첫 앱 만들기(init)로 자동 연결하지 않고 Ready card 에서 다음 단계만 안내해요. 환경 진단(doctor)이나 새 앱 초기화(init)와 달리 처음 사용자의 순차 온보딩을 담당해요.'
 examples:
   - utterance: "셋업해줘"
     intent: "onboard axhub first-time onboarding"

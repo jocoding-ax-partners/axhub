@@ -1,6 +1,6 @@
 ---
 name: init
-description: '이 스킬은 Claude Desktop에서 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 말할 때 axhub 템플릿 앱 생성을 담당해요. 사용자에게는 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작해요. 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고, axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 다음 표현에서 활성화: "새 앱 만들어줘", "새 앱 만들어", "앱 만들어줘", "결제 앱 만들어", "결제 앱 만들어줘", "빈 디렉토리", "프로젝트 만들어", "프로젝트 만들어줘", "프로젝트 초기화", "프로젝트 초기화 해줘", "프로젝트 초기화해줘", "초기화 해줘", "초기화해줘", "apphub.yaml 만들어", "apphub.yaml 만들어줘", "axhub.yaml 만들어", "axhub.yaml 만들어줘", "fastapi 앱", "FastAPI 앱 만들어줘", "next.js 앱", "Next.js 앱 만들어줘", "nextjs 앱", "init", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. `axhub apps bootstrap` saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 `repo_full_name` 으로 현재 dir 에 git clone 해요.'
+description: '이 스킬은 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 빈 디렉토리에서 새 axhub 앱을 만들고 싶을 때 axhub 템플릿 앱 생성을 담당해요. 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작하고, 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고 axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 활성화 예: "새 앱 만들어줘", "앱 만들어줘", "결제 앱 만들어", "프로젝트 만들어", "프로젝트 초기화해줘", "초기화해줘", "apphub.yaml 만들어", "axhub.yaml 만들어", "fastapi 앱", "Next.js 앱 만들어줘", "init", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. axhub apps bootstrap saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 repo_full_name 으로 현재 dir 에 git clone 해요.'
 examples:
   - utterance: "새 앱 만들어줘"
     intent: "scaffold new axhub app"
