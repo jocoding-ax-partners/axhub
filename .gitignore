@@ -78,3 +78,5 @@ fuzz/
 .omc/notepads/
 .omc/specs/
 .omc/ultragoal/
+.gjc/
+.understand-anything/

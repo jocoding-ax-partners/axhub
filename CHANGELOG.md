@@ -4,6 +4,30 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.2.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.1.0...v1.2.0) (2026-06-17)
+
+기존 axhub 앱에 실데이터(connector·table) 기반 기능을 코딩하는 다섯 번째 `development` 스킬을 추가했어요 — connector/table 을 실제로 조회해 진짜 스키마에 맞는 코드를 read·write 로 생성하고, 배포 전 필요한 테이블·환경변수까지 점검해요. CLI·플러그인 새 버전을 세션 시작 때 알려주는 자동 업데이트 hook 과, 각 스킬이 지금 어디까지 진행했는지 한 줄로 알려주는 진행 상황 알림도 들어왔어요. 더해서 스킬들의 jq 의존을 `axhub --field-expr` 로 바꿔 Windows·Git Bash 에서도 끊김 없이 돌고, 길어서 잘리던 스킬 description 을 1024자 밑으로 줄여 라우팅 신호가 온전히 전달되도록 다듬었어요.
+
+
+### Added
+
+* axhub CLI/플러그인 자동 업데이트 hook 추가 ([798c6ce](https://github.com/jocoding-ax-partners/axhub/commit/798c6ce9020e915b1fbad465f7dbd6309705af66))
+* development skill v1.1 write 경로 (런타임 CRUD + 게이트된 스키마) ([0c030a3](https://github.com/jocoding-ax-partners/axhub/commit/0c030a37ec9c2315b7df60cc2c9966a1e30dfc36))
+* development skill 추가 (실데이터 grounded 기능 코딩, read-only v1) ([3ec300c](https://github.com/jocoding-ax-partners/axhub/commit/3ec300c535e79dfd7b85b421a4293417d737c395))
+* development 배포 준비 점검(infer-tables-env) 추가 ([fd4bbda](https://github.com/jocoding-ax-partners/axhub/commit/fd4bbda4f6697b85d9d85cec56d00de4b3b0f68c))
+* 각 skill 에 진행 상황 알림(Progress Reporting) 추가 ([9355f1c](https://github.com/jocoding-ax-partners/axhub/commit/9355f1cd2945b982b10deedd560357713ced9c37))
+
+
+### Fixed
+
+* skill description 1024자 이하로 트림 (라우팅 truncation 해소) ([8457ffc](https://github.com/jocoding-ax-partners/axhub/commit/8457ffca1062f4a38db7d17d229973c76c73bd47))
+
+
+### Changed
+
+* nl-lexicon corpus 제거 및 clarity anti-patterns 추가 ([8653acb](https://github.com/jocoding-ax-partners/axhub/commit/8653acbcccd12fd9bf985d33a4a182e2ff21a159))
+* skill 들의 jq 의존을 axhub --field-expr 로 교체 ([72a45e8](https://github.com/jocoding-ax-partners/axhub/commit/72a45e83df0b5fe035a3b7cdf89efdd90c0e623b)), closes [#325](https://github.com/jocoding-ax-partners/axhub/issues/325)
+
 ## [1.1.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.0.2...v1.1.0) (2026-06-15)
 
 온보딩이나 리소스 조회를 한 뒤 "이걸로 앱 만들어줘" 처럼 이어 말하면, 같은 대화에서 본 맥락을 init·deploy 가 그대로 이어받아요 — 별도 저장 없이 SKILL 지시로만 처리하고, 실제로 조회한 근거가 있을 때만 반영해 없는 리소스를 지어내지 않아요. 온보딩 직후의 중복 안내(설치 링크 재안내 등)는 줄이되 로그인·GitHub 설치 같은 안전 확인은 그대로 거쳐요. 더해서 deploy 라우팅의 죽은 분기와 approved-run 브리지, init 의 불필요한 MCP 설치 단계를 걷어내 동작을 더 매끄럽게 다듬었어요.
