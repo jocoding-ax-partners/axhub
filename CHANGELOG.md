@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.2.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.2.1...v1.2.2) (2026-06-17)
+
+새 E2E 샌드박스(mock CLI·격리 환경)로 배포 스킬을 반복 실행했더니, 본문이 길어 모델이 헤드리스·노출 규칙을 가끔 흘리는 게 잡혔어요 — 비대화형인데 확인 카드를 띄우거나, 최종 메시지에 내부 id·에러 코드 같은 개발자용 표현이 새는 식이었어요. 두 규칙을 본문 맨 위 '절대 규칙' 블록으로 끌어올려 모델이 매 응답 먼저 지키게 하고, 확인 카드 필수 규칙이 헤드리스와 충돌하던 지점을 '대화형 실행에만 적용'으로 풀었어요. 보조 명령 문서는 references 로 분리해 본문을 줄였어요. 같은 샌드박스 케이스가 수정 전 2/2 실패에서 수정 후 3/3 통과로 바뀌었어요.
+
+
+### Fixed
+
+* deploy headless·visibility 절대규칙 hoist (adherence 회귀 수정) ([d97df6a](https://github.com/jocoding-ax-partners/axhub/commit/d97df6adfb0bd6646ad83b443d82292cf16a5cb9))
+
 ## [1.2.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.2.0...v1.2.1) (2026-06-17)
 
 실사용에서 나온 development·deploy 안정화 픽스예요. development 가 코드를 짤 때 앱 스캐폴드 헬퍼를 베끼지 않고 MCP(sdk_search)를 SDK 사용법의 1차 근거로 삼게 하고, 템플릿은 MCP 미연결·미커버 때만 fallback 으로 써요. 또 클론된 axhub.yaml 이 템플릿 기본 슬러그를 그대로 갖고 있어 배포가 다른 앱을 가리키던 위험을 — init 이 생성한 앱 슬러그로 정합하고, development 가 폴더 바인딩 밖 앱 코딩을 거부하고, deploy 가 타깃을 재확인하는 3중으로 막았어요. 더해서 development 추가로 5 skill 이 됐는데 메타데이터·문서가 4 skill 로 남아 있던 걸 바로잡았어요.
