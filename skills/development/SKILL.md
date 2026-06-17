@@ -84,7 +84,7 @@ model: sonnet
 
 1a. **버전 체크 (best-effort · 비차단 · 10분 TTL).** preflight 정상이면 본 작업 전에 새 버전이 있는지 한 번 가볍게 확인하고(`axhub update check`), 실패·구 CLI 면 조용히 건너뛰어요 — 작업을 막지 않아요.
 
-2. **앱 게이트.** 현재 폴더가 axhub 앱인지 확인해요 (`axhub.yaml`/clone 된 repo). **앱이 없으면 코딩하지 않고** "먼저 앱이 필요해요 — `앱 만들어줘` 라고 하면 만들어 드려요" 한 줄 안내 후 멈춰요 (init 소관, 자동 위임 안 함).
+2. **앱 게이트 + 앱 바인딩 확정.** 현재 폴더가 axhub 앱인지 확인해요 (`axhub.yaml`/clone 된 repo). **앱이 없으면 코딩하지 않고** "먼저 앱이 필요해요 — `앱 만들어줘` 라고 하면 만들어 드려요" 한 줄 안내 후 멈춰요 (init 소관, 자동 위임 안 함). **타깃 앱 = 이 폴더의 `axhub.yaml` 바인딩(앱 슬러그)이에요** — development 는 이 폴더가 묶인 앱에만 코드를 만들어요. 사용자가 폴더 바인딩과 **다른 앱**을 가리키면(예: "dsjcjd1 에 만들어줘" 인데 폴더 axhub.yaml 은 `nextjs-axhub`), 코드를 생성하지 말고 "이 폴더는 `<바인딩 앱>` 이에요. `<요청 앱>` 에 만들려면 그 앱 폴더로 가거나 클론해서 거기서 해주세요" 로 멈춰요 — 잘못된 앱 폴더에 코드를 만들지 않아요.
 
 3. **stack 감지 (에이전트 판단).** 고정 표 대신 신호로 framework 를 판단해요 — `package.json`(next/vite/react), `pyproject.toml`/`requirements.txt`(fastapi/flask), `axhub.yaml` 힌트, 파일 구조. 이걸로 뒤의 규약 학습·verify 명령을 분기해요. **판단이 안 서는 미지원 stack 이면** "이 앱 스택은 아직 자동 코딩을 지원 안 해요" 로 degrade 하고 멈춰요.
 

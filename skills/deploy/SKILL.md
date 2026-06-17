@@ -262,6 +262,12 @@ To deploy:
 
    Never use cached `app_id` for mutation. resolve 가 `app_id` 를 주면 기존 앱 배포라 `bootstrap apps_create` 를 돌리지 않고 git readiness → preview → approval-deploy 로 가요. resolve 가 ambiguity 면 사용자에게 disambiguate (slug list + numeric id) 를 물어요. resolve 가 등록된 앱을 못 찾고 `axhub.yaml`/`apphub.yaml` 이 있으면 Step 1.1b first-run bridge 로 가요. deploy MUST NOT continue to the preview card while `branch` or `commit_sha` is empty.
 
+1.1c. **타깃 앱 reconcile (stale manifest 슬러그 방지 — deploy-safety).** resolve 는 로컬 `axhub.yaml` 슬러그를 source 로 쓰는데, 그 슬러그가 **의도한 앱과 다를** 수 있어요 (예: 템플릿 기본 슬러그가 안 고쳐진 폴더, 같은 대화에서 다른 앱을 방금 만든 경우). resolve 가 `app_id` 를 준 기존-앱 경로에서 mutation 전에 타깃을 확정해요:
+   - **의도 충돌 신호**가 있으면 — 같은 대화에서 사용자가 **다른 앱**을 만들었거나(carry-over `references/session-carryover.md`), 발화가 **다른 앱 이름**을 가리키거나, manifest 슬러그가 stale 의심이면 — resolve 결과를 그대로 신뢰하지 말고 "배포 대상이 `<app_slug>` (id=`<app_id>`) 맞아요? 아니면 올바른 앱을 알려줘요" 로 한 번 확인해요.
+   - 사용자가 **다른 앱**을 지정하면 그 앱 슬러그로 `axhub.yaml` 을 고친 뒤 **Step 1.1 deploy-prep 을 재실행**해 새 manifest 로 다시 resolve 해요 (axhub.yaml 수정 = deploy 영향 변경이라 Step 1.5 git 저장에 담겨요).
+   - **headless/비대화형**(확인 불가)에서 의도 충돌 신호가 있으면 **dry-run 으로 강등**해요 — 불확실한 라이브 배포로 잘못된 앱을 건드리지 않아요.
+   - 충돌 신호가 없으면 manifest resolve 가 정상 경로예요 (preview 카드 `① 앱` 이 최종 안전망).
+
 1.1b. **First-run bootstrap plan/record bridge.** Step 1.1 이 기존 `app_id` 를 resolve 못 했을 때만 써요. first-run remote mutation 전에 Rust FSM 에 다음 안전 step 을 물어요:
 
    ```bash

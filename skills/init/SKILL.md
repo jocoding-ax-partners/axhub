@@ -462,7 +462,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
 8.5. **clone 직후 자동 연결을 준비해요 (post-scaffold auto-connect).**
 
-   clone 이 성공하면 먼저 resume state 에 `clone_done=true` 를 기록하고 clear 해요. 그 다음 로컬 실행 가능 여부를 scaffold-detect 로 감지해요.
+   clone 이 성공하면 **먼저 axhub.yaml 슬러그를 방금 만든 앱으로 맞춰요 (바인딩 정합 — deploy resolve 안전).** 템플릿 repo 의 `axhub.yaml` 은 템플릿 기본 슬러그(예: `nextjs-axhub`)를 그대로 가질 수 있어요. 그대로 두면 나중에 deploy 의 resolve 가 그 슬러그로 **다른 앱**을 가리켜 잘못 배포할 위험이 있어요. `axhub manifest --json` 으로 clone 된 매니페스트의 앱 슬러그를 읽어 `$APP_SLUG` 와 비교하고, 다르면 `axhub.yaml` 의 슬러그 필드를 `$APP_SLUG` 로 고친 뒤 `axhub manifest validate --file axhub.yaml --json` 으로 검증해요 (manifest 가 source of truth 라 이 한 줄이 잘못된 타깃을 원천 차단해요). 그다음 resume state 에 `clone_done=true` 를 기록하고 clear 해요. 그리고 로컬 실행 가능 여부를 scaffold-detect 로 감지해요.
 
    ```bash
    axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --repo-full-name "$REPO" --clone-done true --json
