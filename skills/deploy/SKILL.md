@@ -20,6 +20,13 @@ model: sonnet
 
 Deploy a vibe coder's app to axhub with safety primitives. `axhub plugin-support` 명령들 (preview, recovery planning) 과 공개 `axhub deploy` 명령으로 진행해요. preview-confirm flow 없이 `axhub deploy create` 를 직접 호출하지 않아요.
 
+## 절대 규칙 — 길어도 매 응답·최종 메시지에 먼저 적용해요
+
+이 SKILL 은 길어요. 그래도 아래 둘은 **어떤 단계·어떤 모델에서도 우선**해요 (헤드리스 회귀의 핵심):
+
+1. **헤드리스 = AskUserQuestion 0회.** `claude -p`·CI·`$CLAUDE_NON_INTERACTIVE`·TTY 없음이면 헤드리스예요. 헤드리스에선 preview 카드를 포함해 **어떤 AskUserQuestion 도 호출하지 않고** `--dry-run` safe default 로 바로 진행해요. (아래 "AUQ preview 카드 필수/우회 금지" 류 NEVER 규칙은 **대화형 `--execute` 에만** 적용돼요 — 헤드리스는 `--execute` 자체를 안 하니 AUQ 도 안 불러요.)
+2. **최종 사용자 메시지 = 한국어 한 줄 요약 + 다음 행동.** 마지막 텍스트에 raw id(`app-123`)·exit 숫자(`exit 65`)·내부 이름(`plugin-support`·`deploy-prep`·`preflight`·`quality gate`·`in-flight`)·dry-run 내부 덤프를 **절대 넣지 않아요**. 디버그 요약 대신 감정+원인+다음 행동만 보여줘요 (상세 template: 아래 Vibe Coder Visibility Rules).
+
 ## Claude Desktop Natural-Language Path
 
 When the user says a human deployment phrase such as `배포해줘`, `올려줘`, or `프로덕션에 띄워줘`, keep the visible conversation human:
@@ -582,28 +589,6 @@ To deploy:
 
 7. **Dry-run NL trigger** — if the user said "한번 해보기만", "리허설", "테스트로", "진짜 안 올리고", add `--dry-run` to Step 4 and skip Step 5 verify.
 
-## v0.2.0 command coverage polish
-
-### deploy list
-
-Read-only deployment browsing:
-
-```bash
-axhub deploy list --app "$APP_ID" --json
-```
-
-pagination 이 보이면 첫 페이지만 보여주고 follow-up 을 제안해요 (긴 목록 dump 금지).
-
-### deploy cancel
-
-Cancel is a mutation. Preview the in-progress deployment first (app id/slug, deployment id, branch/commit, current status, expected effect), confirm approval, then run:
-
-```bash
-axhub deploy cancel "$DEPLOYMENT_ID" --app "$APP_ID" --execute --json
-```
-
-After cancellation, run a read-only status check and summarize the terminal state.
-
 ## NEVER
 
 - NEVER treat `axhub plugin-support bootstrap --auto-chain --json` as approval; it is only a plan/record FSM.
@@ -626,3 +611,4 @@ After cancellation, run a read-only status check and summarize the terminal stat
 
 For exit-code → 4-part Korean error template (emotion + cause + action + button): `references/error-empathy-catalog.md`.
 For same-conversation 조회·온보딩 맥락 carry-over·confabulation 가드·마찰 억제 단일 계약: `references/session-carryover.md`.
+Deploy 보조 명령(list/cancel) 커버리지: `references/command-coverage.md`.
