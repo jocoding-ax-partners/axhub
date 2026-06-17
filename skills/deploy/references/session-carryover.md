@@ -1,6 +1,6 @@
 # 세션 맥락 핸드오프 계약 (session carry-over)
 
-`init` 과 `deploy` 가 **같은 대화** 안의 조회·온보딩 맥락을 이어받을 때 따르는 공유 계약이에요. 두 스킬이 같은 규칙을 쓰도록 여기 한 곳에만 적어요. 별도 state 파일·CLI 호출·마커 없이, LLM 이 자기 대화 컨텍스트만 봐요.
+`init`·`deploy`·`development` 이 **같은 대화** 안의 조회·온보딩·점검 맥락을 이어받을 때 따르는 공유 계약이에요. 세 스킬이 같은 규칙을 쓰도록 여기 한 곳에만 적어요. 별도 state 파일·CLI 호출·마커 없이, LLM 이 자기 대화 컨텍스트만 봐요.
 
 ## 감지 휴리스틱 — "이 대화에서 했나"
 
@@ -8,6 +8,7 @@
 
 - **리소스 조회:** `connector_query` / `connector_resources` / `row_list` / `table_list` 같은 도구의 실제 결과가 이 대화에 있음.
 - **온보딩 완료:** 이 대화에 온보딩 Ready card(`VIBE_READY`) 출력이 있음.
+- **배포 준비 점검 완료 (development→deploy):** 이 대화에 development 의 `[8/9] 배포 준비 점검` 결과(생성코드가 쓰는 테이블·env 확인)가 보임 → deploy 는 "배포 직전 선택 점검(infer-tables-env)" AskUserQuestion 을 건너뛰고 safe default 로 바로 배포를 이어가요.
 
 근거가 안 보이면 "안 했다" 로 보고 콜드(평소) 동작으로 가요. 짐작으로 판정하지 않아요.
 
