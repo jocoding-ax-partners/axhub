@@ -1,6 +1,6 @@
 ---
 name: onboarding
-description: 'This skill should be used when the user is new to axhub, asks what to do first, requests setup/onboarding/getting started, or says a short first-run phrase. 이 스킬은 axhub 를 처음 쓰는 사람이 셋업/온보딩 전체 과정을 한 번에 진행하고 싶어할 때 사용해요. 다음 표현에서 활성화: "셋업해줘", "셋업 해줘", "처음인데", "처음 사용", "처음 써", "처음 쓰는데", "처음 쓰는데 뭐부터", "뭐부터 하면 돼", "뭐부터 하면 되나요", "어떻게 시작하면 돼", "어떻게 시작해", "온보딩", "온보딩해줘", "시작하기", "axhub 시작", "axhub 처음", "초기 셋업", "setup", "set up", "onboard", "onboarding", "getting started", "get started", "first time", 또는 첫 사용자 셋업 의도. axhub CLI 설치(install-cli)·로그인(auth)·node 환경 감지를 순서대로 안내하고, node 가 없으면 명시 확인 후 설치해요. 빈 폴더에서도 첫 앱 만들기(init)로 자동 연결하지 않고, Ready card 에서 ‘첫 앱 만들어줘’ 같은 다음 단계만 안내해요. 환경 진단(doctor)이나 새 앱 초기화(init)와 달리 처음 사용자의 순차 온보딩을 담당해요.'
+description: 'This skill should be used when the user is new to axhub, asks what to do first, or requests setup/onboarding/getting started. 이 스킬은 axhub 를 처음 쓰는 사람이 셋업·온보딩 전체 과정을 한 번에 진행하고 싶어할 때 사용해요. 활성화 예: "셋업해줘", "처음인데", "처음 쓰는데 뭐부터", "뭐부터 하면 돼", "어떻게 시작해", "온보딩", "온보딩해줘", "시작하기", "axhub 시작", "초기 셋업", "setup", "onboard", "getting started", "first time", 또는 첫 사용자 셋업 의도. axhub CLI 설치(install-cli)·로그인(auth)·node 환경 감지를 순서대로 안내하고, node 가 없으면 명시 확인 후 설치해요. 빈 폴더에서도 첫 앱 만들기(init)로 자동 연결하지 않고 Ready card 에서 다음 단계만 안내해요. 환경 진단(doctor)이나 새 앱 초기화(init)와 달리 처음 사용자의 순차 온보딩을 담당해요.'
 examples:
   - utterance: "셋업해줘"
     intent: "onboard axhub first-time onboarding"
@@ -38,6 +38,19 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 한 번이 모든 gap 의 single detection source 예요 — 개별 gap 마다 preflight 를 다시 부르지 않아요. SKILL 은
 한국어 안내 카드·AskUserQuestion 결정점·사용자 행동 재개 phrase(device 승인, installer 동의, 새 터미널 reload)만
 렌더해요. detect JSON 의 `first_gap` 이 순서의 source of truth 예요.
+
+## 진행 상황 알림 (Progress Reporting)
+
+각 단계를 시작할 때 친근한 한국어 한 줄로 지금 뭐 하는 중인지 알려줘요 — vibe coder 가 멈춘 게 아니라 진행 중인 걸 알 수 있게 해요. 형식은 `○○ 하는 중이에요…`, 끝나면 `○○ 됐어요` 처럼 한 줄로 확인해요.
+
+- 사람이 알아들을 요약만 알려요 — secret·내부 id·raw 출력·schema 본문은 chat 에 넣지 않아요 (Visibility 규칙 그대로).
+- TodoWrite 가 있으면 체크리스트로도 같이 보여주고, 없는 host 에서도 이 한 줄 알림은 늘 해요.
+- onboarding 은 첫 gap 하나씩 처리하고 재감지하는 분기 흐름이라 `[N/전체]` 숫자는 안 붙이고, 지금 처리 중인 단계 이름만 알려요.
+
+단계 이름 (announce 용 한국어):
+- `환경 점검하는 중이에요` (CLI·로그인·GitHub·실행환경을 한 번에 감지)
+- 발견된 gap 에 따라 한 줄씩: `axhub CLI 설치하는 중이에요` · `로그인 진행하는 중이에요` · `실행환경(node·git) 점검하는 중이에요` · `GitHub App 설치 확인하는 중이에요` · `필요한 패키지 설치하는 중이에요` · `axhub 도구 연결하는 중이에요`
+- `준비 다 됐어요` (Ready card)
 
 ## Workflow
 

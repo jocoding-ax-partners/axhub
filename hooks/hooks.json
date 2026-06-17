@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "[ -n \"$AXHUB_NO_AUTO_UPDATE\" ] && exit 0; command -v axhub >/dev/null 2>&1 || exit 0; CACHE=\"$HOME/.axhub/cache/.plugin-update-check\"; [ -f \"$CACHE\" ] && [ -n \"$(find \"$CACHE\" -mmin -1440 2>/dev/null)\" ] && exit 0; echo \"[axhub] axhub CLI/plugin 업데이트를 확인할 시점이에요(24h throttle). ${CLAUDE_PLUGIN_ROOT}/hooks/auto-update-prompt.md 를 읽고 그 지침대로 버전을 확인·적용하세요. best-effort·비차단 — 실패하면 조용히 건너뛰고 사용자의 작업을 절대 막지 마세요.\""
+          }
+        ]
+      }
+    ]
+  }
+}

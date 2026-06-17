@@ -1,6 +1,6 @@
 ---
 name: clarity
-description: 'This skill is the catch-all for ANY axhub feature that is NOT owned by the onboarding, init, or deploy skills — it discovers the right axhub CLI command (via `--json-schema`, falling back to `--help`) and runs it, so the entire axhub CLI surface stays reachable. Route here for every other axhub capability and for vague/ambiguous axhub requests. 이 스킬은 온보딩(첫 셋업·로그인)·새 앱 만들기(init)·배포(deploy) 세 스킬이 담당하지 않는 axhub 의 나머지 모든 기능을 처리하는 만능 라우팅 대상이에요. axhub CLI 공개 명령을 라이브로 찾아 무확인 실행해서, 플러그인에 따로 스킬이 없는 기능도 전부 쓸 수 있게 해요. 다음 같은 거의 모든 axhub 작업에서 활성화돼요 — 환경변수·시크릿·설정: "환경변수 설정해줘", "환경변수 조회/삭제", "env 추가해줘", "시크릿 넣어줘", "설정 바꿔줘"; 로그·상태: "로그 보여줘", "빌드 로그 봐줘", "배포 상태 확인해줘", "앱 상태 보여줘"; 앱 관리(생성 제외): "앱 목록 보여줘", "앱 지워줘", "앱 삭제해줘", "앱 멈춰줘/재개해줘", "앱 복제해줘", "앱 이름 바꿔줘", "앱 정보 보여줘"; 롤백: "롤백해줘", "이전 버전으로 되돌려줘"; 데이터·테이블·커넥터·API: "테이블 만들어줘", "컬럼 추가해줘", "DB 연결해줘", "postgres 붙여줘", "데이터 카탈로그 검색", "쓸 수 있는 API 보여줘", "리소스 정리해줘"; 워크스페이스·테넌트·팀·권한: "테넌트 바꿔줘", "워크스페이스 보여줘", "팀 전환해줘", "팀원 초대해줘", "멤버 관리", "권한 줘", "접근 권한 관리"; 비용: "비용 보여줘", "요금 얼마 나왔어"; 프로필·엔드포인트: "프로필 바꿔줘", "회사 서버 주소 바꿔줘"; CLI 업데이트: "업데이트 확인해줘", "최신 버전이야?"; 공개·리뷰·피드백: "마켓에 공개해줘", "퍼블리시해줘", "리뷰해줘", "피드백 보내줘"; 게이트웨이·카테고리·감사·열기·새 기능: "앱 열어줘", "게이트웨이 설정", "감사 로그 보여줘", "새 기능 뭐 있어"; 그리고 "axhub로 ~해줘", "axhub로 뭔가 해줘", "이거 axhub에서 어떻게 해?" 처럼 axhub 관련이지만 무엇을 원하는지 명확하지 않은 모든 발화. 경계: 첫 셋업·로그인은 onboarding, 새 앱 생성은 init, 배포 실행·검증은 deploy 가 담당하니 그 의도가 분명할 때만 그쪽으로 보내고, 그 외 axhub 가 할 수 있는 모든 작업은 전부 이 스킬이 받아요.'
+description: 'axhub 의 onboarding(첫 셋업·로그인)·init(새 앱)·deploy(배포)·development(앱 코드 생성)이 담당하지 않는 나머지 모든 axhub CLI 작업을 처리하는 만능(catch-all) 라우팅 대상이에요. 공개 명령을 라이브로 찾아(--json-schema→--help) 무확인 실행해서 별도 스킬이 없는 기능도 다 쓸 수 있게 해요. 활성화 예: 환경변수·시크릿("환경변수 설정해줘", "env 추가", "시크릿 넣어줘"), 로그·상태("로그 보여줘", "배포 상태 확인"), 앱 관리·생성 제외("앱 목록", "앱 삭제/멈춰/복제/이름 바꿔"), 롤백("롤백해줘", "이전 버전으로"), 데이터·테이블·커넥터("테이블 만들어줘", "컬럼 추가", "DB 연결", "데이터 조회"), 테넌트·팀·권한("테넌트 바꿔줘", "팀 전환", "권한 줘"), 비용·프로필·업데이트·공개("비용 보여줘", "프로필 바꿔줘", "업데이트 확인", "마켓에 공개"), 그리고 "axhub로 ~해줘"처럼 axhub 관련이나 의도가 불명확한 모든 발화. 경계: 첫 셋업=onboarding, 새 앱=init, 배포=deploy, 기존 앱에 화면·페이지·대시보드 코드 생성=development 라 그 의도가 분명할 때만 양보하고 그 외 axhub CLI 운영은 다 받아요. 앱 코드는 안 짜고 axhub 명령만 실행해요.'
 ---
 
 # axhub clarity 브리지
@@ -21,13 +21,26 @@ description: 'This skill is the catch-all for ANY axhub feature that is NOT owne
 
 원칙 위반이 실전에서 드러나는 구체 형태예요:
 
-- ❌ `--json-schema` (270KB) 를 통째로 읽기 — 반드시 `jq` (추후 CLI `--field`) 로 필요 부분만 슬라이스해요. 통째 로드는 context 낭비.
+- ❌ `--json-schema` (270KB) 를 통째로 읽기 — 반드시 `--field-expr` 로 필요 부분만 슬라이스해요. 통째 로드는 context 낭비.
 - ❌ `--help` 를 안 읽고 인자를 추측 조립 — leaf 명령 `--help` 1회 선숙지(--help gate) 후에만 실행. 추측 인자는 exit 64.
 - ❌ 1단계 탐색에서 못 찾자 포기 — 두 단계 깊이까지 탐색한 뒤에만 "기능 없음" 을 선언해요.
 - ❌ 탐색 출력(schema/help 본문)·raw stdout/stderr·secret·내부 id 를 chat 에 echo — 사용자에겐 한국어 요약만.
 - ❌ 못 찾은 기능을 비슷한 명령으로 조용히 대체 실행 — 정직하게 부재를 알리고 가장 가까운 명령을 "제안"만 해요 (무단 실행 금지).
 - ❌ `plugin-support` hidden 표면을 탐색·실행 (공개 표면만 원칙 위반).
-- ❌ deploy/init/onboarding 담당 의도를 가로채기 (아래 경계표 위반 — 해당 의도는 양보).
+- ❌ deploy/init/onboarding/development 담당 의도를 가로채기 (아래 경계표 위반 — 해당 의도는 양보). 특히 앱 코드(페이지·화면·대시보드·엔드포인트) 생성은 development 양보 — clarity 는 axhub 명령 실행만 해요.
+
+## 진행 상황 알림 (Progress Reporting)
+
+각 단계를 시작할 때 친근한 한국어 한 줄로 지금 뭐 하는 중인지 알려줘요 — vibe coder 가 멈춘 게 아니라 진행 중인 걸 알 수 있게 해요. 형식은 `[현재/전체] ○○ 하는 중이에요…`, 끝나면 `○○ 됐어요` 처럼 한 줄로 확인해요.
+
+- 사람이 알아들을 요약만 알려요 — secret·내부 id·raw 출력·schema 본문은 chat 에 넣지 않아요 (위 원칙 그대로).
+- 한 번에 끝나는 단순 조회(예: 목록 한 번 보기)는 굳이 단계별로 안 알리고 결과만 줘도 돼요 — 탐색이 여러 단계로 길어질 때 알려요.
+
+단계 이름 (announce 용 한국어):
+- `[1/4] 무엇을 찾는지 파악하는 중이에요`
+- `[2/4] 기능 찾아보는 중이에요`
+- `[3/4] 실행하는 중이에요`
+- `[4/4] 결과 정리하는 중이에요`
 
 ## Workflow
 
@@ -50,16 +63,16 @@ description: 'This skill is the catch-all for ANY axhub feature that is NOT owne
 
 2. **의도 좁히기 (clarify).** 발화가 모호하면 먼저 핵심 동사·명사를 잡아요. 그래도 후보 동작이 여럿이면 한 번만 짧게 되물어요 — 단, 되묻기는 마지막 수단이고 대개는 다음 탐색으로 스스로 판별해요.
 
-3. **탐색 (discover).** axhub 는 **에이전트용 기계가독 표면** `--json-schema` 를 제공해요 — `--help` prose 를 긁는 것보다 안정적이니 이걸 우선 써요. 단 전체 schema 는 ~270KB 라 **반드시 `jq` 로 필요한 부분만 슬라이스**하고 통째로 읽지 않아요.
+3. **탐색 (discover).** axhub 는 **에이전트용 기계가독 표면** `--json-schema` 를 제공해요 — `--help` prose 를 긁는 것보다 안정적이니 이걸 우선 써요. 단 전체 schema 는 ~270KB 라 **반드시 `--field-expr` 로 필요한 부분만 슬라이스**하고 통째로 읽지 않아요.
 
    ```bash
    # 1단계: 최상위 명령 목록만 (작아요)
-   axhub --json-schema | jq -r '.commands | keys[]'
+   axhub --json-schema --field-expr '.commands | keys[]'
    # 2단계: 후보 명령의 구조 (서브커맨드·플래그·alias) — 그 명령만 슬라이스
-   axhub --json-schema | jq '.commands["<후보>"]'
+   axhub --json-schema --field-expr '.commands["<후보>"]'
    ```
 
-   - 예: "환경변수 설정해줘" → keys 에서 `env` 발견 → `jq '.commands.env'` 로 set/list/get/delete 와 플래그 확인 → 인자 조립.
+   - 예: "환경변수 설정해줘" → keys 에서 `env` 발견 → `--field-expr '.commands.env'` 로 set/list/get/delete 와 플래그 확인 → 인자 조립.
    - `--json-schema` 가 없거나 비면(구 CLI) `--help` 트리로 폴백해요: `axhub --help` → `axhub <후보> --help` → 필요하면 더 깊이.
    - 후보가 여럿이면 description 으로 판별하고, 탐색 출력(schema/help 본문)은 chat 에 붙이지 않아요 — 판단 재료로만 써요.
 
@@ -71,7 +84,7 @@ description: 'This skill is the catch-all for ANY axhub feature that is NOT owne
    ```
 
    - 여기서 확인한 인자·플래그만 Step 4 에서 써요. help 에 없는 플래그·인자는 지어내지 않아요.
-   - `--help` 가 비거나 없으면(구 CLI) `axhub --json-schema | jq '.commands["<명령>"]'` 의 해당 서브커맨드 노드로 같은 정보(인자·플래그)를 확정해요.
+   - `--help` 가 비거나 없으면(구 CLI) `axhub --json-schema --field-expr '.commands["<명령>"]'` 의 해당 서브커맨드 노드로 같은 정보(인자·플래그)를 확정해요.
    - help 본문은 chat 에 echo 하지 않아요 — 읽고 사용법만 내재화해요.
 
 4. **실행 (execute).** Step 3b 사용법 확정을 통과한 명령만 조립해 바로 실행해요 (사용법 미확인 명령 실행 금지).
