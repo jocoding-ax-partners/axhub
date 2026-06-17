@@ -39,6 +39,19 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 한국어 안내 카드·AskUserQuestion 결정점·사용자 행동 재개 phrase(device 승인, installer 동의, 새 터미널 reload)만
 렌더해요. detect JSON 의 `first_gap` 이 순서의 source of truth 예요.
 
+## 진행 상황 알림 (Progress Reporting)
+
+각 단계를 시작할 때 친근한 한국어 한 줄로 지금 뭐 하는 중인지 알려줘요 — vibe coder 가 멈춘 게 아니라 진행 중인 걸 알 수 있게 해요. 형식은 `○○ 하는 중이에요…`, 끝나면 `○○ 됐어요` 처럼 한 줄로 확인해요.
+
+- 사람이 알아들을 요약만 알려요 — secret·내부 id·raw 출력·schema 본문은 chat 에 넣지 않아요 (Visibility 규칙 그대로).
+- TodoWrite 가 있으면 체크리스트로도 같이 보여주고, 없는 host 에서도 이 한 줄 알림은 늘 해요.
+- onboarding 은 첫 gap 하나씩 처리하고 재감지하는 분기 흐름이라 `[N/전체]` 숫자는 안 붙이고, 지금 처리 중인 단계 이름만 알려요.
+
+단계 이름 (announce 용 한국어):
+- `환경 점검하는 중이에요` (CLI·로그인·GitHub·실행환경을 한 번에 감지)
+- 발견된 gap 에 따라 한 줄씩: `axhub CLI 설치하는 중이에요` · `로그인 진행하는 중이에요` · `실행환경(node·git) 점검하는 중이에요` · `GitHub App 설치 확인하는 중이에요` · `필요한 패키지 설치하는 중이에요` · `axhub 도구 연결하는 중이에요`
+- `준비 다 됐어요` (Ready card)
+
 ## Workflow
 
 **한눈에 — 실행 흐름.** read-only 감지 → 첫 gap 하나 처리 → 재감지, gap 0 될 때까지 반복 → Ready card. 순서:

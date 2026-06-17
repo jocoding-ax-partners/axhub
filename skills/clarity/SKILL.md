@@ -29,6 +29,19 @@ description: 'This skill is the catch-all for ANY axhub feature that is NOT owne
 - ❌ `plugin-support` hidden 표면을 탐색·실행 (공개 표면만 원칙 위반).
 - ❌ deploy/init/onboarding 담당 의도를 가로채기 (아래 경계표 위반 — 해당 의도는 양보).
 
+## 진행 상황 알림 (Progress Reporting)
+
+각 단계를 시작할 때 친근한 한국어 한 줄로 지금 뭐 하는 중인지 알려줘요 — vibe coder 가 멈춘 게 아니라 진행 중인 걸 알 수 있게 해요. 형식은 `[현재/전체] ○○ 하는 중이에요…`, 끝나면 `○○ 됐어요` 처럼 한 줄로 확인해요.
+
+- 사람이 알아들을 요약만 알려요 — secret·내부 id·raw 출력·schema 본문은 chat 에 넣지 않아요 (위 원칙 그대로).
+- 한 번에 끝나는 단순 조회(예: 목록 한 번 보기)는 굳이 단계별로 안 알리고 결과만 줘도 돼요 — 탐색이 여러 단계로 길어질 때 알려요.
+
+단계 이름 (announce 용 한국어):
+- `[1/4] 무엇을 찾는지 파악하는 중이에요`
+- `[2/4] 기능 찾아보는 중이에요`
+- `[3/4] 실행하는 중이에요`
+- `[4/4] 결과 정리하는 중이에요`
+
 ## Workflow
 
 1. **CLI 가드.** `command -v axhub` 가 실패하면 멈추고 안내해요: "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요" → onboarding 스킬로 넘겨요. raw 에러는 chat 에 노출하지 않아요.

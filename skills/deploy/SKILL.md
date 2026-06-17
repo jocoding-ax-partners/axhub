@@ -62,6 +62,20 @@ When the user says a human deployment phrase such as `배포해줘`, `올려줘`
 
 raw JSON 이 디버깅에 필요한 환경은 `AXHUB_DEPLOY_VERBOSE=1` 이 켜진 경우에만 echo 해요.
 
+## 진행 상황 알림 (Progress Reporting)
+
+각 단계를 시작할 때 친근한 한국어 한 줄로 지금 뭐 하는 중인지 알려줘요 — vibe coder 가 멈춘 게 아니라 진행 중인 걸 알 수 있게 해요. 형식은 `[현재/전체] ○○ 하는 중이에요…`, 끝나면 `○○ 됐어요` 처럼 한 줄로 확인해요.
+
+- 사람이 알아들을 요약만 알려요 — secret·내부 id·raw 출력·schema 본문은 chat 에 넣지 않아요 (위 Visibility Rules 그대로).
+- TodoWrite 가 있으면 체크리스트로도 같이 보여주고, 없는 host 에서도 이 한 줄 알림은 늘 해요.
+
+단계 이름 (announce 용 한국어):
+- `[1/5] axhub 점검하는 중이에요`
+- `[2/5] 배포 대상 확인하는 중이에요` (routing·작업공간·deploy-prep)
+- `[3/5] 미리보기 보여줄게요`
+- `[4/5] 배포하는 중이에요`
+- `[5/5] 배포 결과 확인하는 중이에요` (verify)
+
 ## Workflow
 
 **한눈에 — 실행 순서.** step 라벨은 히스토리상 순서가 섞여 있으니, 실제 실행은 이 순서로 읽어요:
