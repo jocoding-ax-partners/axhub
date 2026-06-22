@@ -4,6 +4,17 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.3.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.2.2...v1.3.0) (2026-06-22)
+
+세션 중에 axhub CLI·플러그인을 직접 최신으로 올리는 여섯 번째 `update` 스킬을 추가했어요 — auto-update 훅과 달리 24h throttle 없이 바로 확인하고, 보안 검증 실패(변조 신호)는 하드 스톱으로 막고, `AXHUB_NO_AUTO_UPDATE` kill switch 도 그대로 존중해요. 더해서 진행 상황을 '태스크 하나 끝날 때마다' 동적으로 갱신하는 TodoWrite 를 update·clarity 스킬에 넣어, 멀티-태스크 작업에서도 어디까지 됐는지 한눈에 보이게 했어요.
+
+
+### Added
+
+* clarity 에 동적 진행 체크리스트(TodoWrite) 추가 ([09616de](https://github.com/jocoding-ax-partners/axhub/commit/09616de1099e2ea3d979d4c25ab78a0dba9d5f04))
+* update 스킬 추가 (CLI·플러그인 수동 업데이트) ([2c026a7](https://github.com/jocoding-ax-partners/axhub/commit/2c026a75823dff2bff913d15087cf939e896997a))
+* update 스킬에 동적 진행 체크리스트(TodoWrite) 추가 ([0a30420](https://github.com/jocoding-ax-partners/axhub/commit/0a30420954684af558f9cdc63b8a4a4b48b228bd))
+
 ## [1.2.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.2.1...v1.2.2) (2026-06-17)
 
 새 E2E 샌드박스(mock CLI·격리 환경)로 배포 스킬을 반복 실행했더니, 본문이 길어 모델이 헤드리스·노출 규칙을 가끔 흘리는 게 잡혔어요 — 비대화형인데 확인 카드를 띄우거나, 최종 메시지에 내부 id·에러 코드 같은 개발자용 표현이 새는 식이었어요. 두 규칙을 본문 맨 위 '절대 규칙' 블록으로 끌어올려 모델이 매 응답 먼저 지키게 하고, 확인 카드 필수 규칙이 헤드리스와 충돌하던 지점을 '대화형 실행에만 적용'으로 풀었어요. 보조 명령 문서는 references 로 분리해 본문을 줄였어요. 같은 샌드박스 케이스가 수정 전 2/2 실패에서 수정 후 3/3 통과로 바뀌었어요.
