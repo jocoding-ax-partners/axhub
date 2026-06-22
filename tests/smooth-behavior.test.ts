@@ -29,7 +29,7 @@ const runShim = (args: string[], env: Record<string, string> = {}) => {
 };
 
 describe("smooth behavior contracts", () => {
-  test("public metadata advertises the five surviving skills", () => {
+  test("public metadata advertises the six surviving skills", () => {
     const packageJson = readJson<PackageLike>("package.json");
     const pluginJson = readJson<PackageLike>(".claude-plugin/plugin.json");
     const marketplace = readJson<MarketplaceLike>(".claude-plugin/marketplace.json");
@@ -40,7 +40,7 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("onboarding/init/deploy/cli");
       expect(description).not.toContain("3개 스킬");
     }
-    expect(descriptions.join("\n")).toContain("onboarding/init/deploy/development/clarity");
+    expect(descriptions.join("\n")).toContain("onboarding/init/deploy/development/clarity/update");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {

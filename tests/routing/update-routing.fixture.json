@@ -1,0 +1,21 @@
+{
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). development fixture 와 같은 방식의 계약이에요: skill frontmatter description/examples 를 편집할 때 아래 발화의 정답 skill 이 유지되는지 dry-run 으로 확인해요. 핵심 경계: update=CLI·플러그인 버전 업데이트(axhub update apply + claude plugin update, 수동 on-demand), clarity=그 외 axhub 운영 명령(버전 업데이트는 update 양보), onboarding=첫 셋업. clarity 가 한때 '업데이트 확인'을 소유했던 confusable 경계라 이 guard 를 둬요.",
+  "boundary": {
+    "update": "axhub CLI·플러그인을 지금 최신으로 (axhub update apply + claude plugin update). 수동 on-demand 버전 업데이트.",
+    "clarity": "그 외 axhub CLI 운영 명령(env·로그·상태·롤백·테이블·connector) — 버전 업데이트는 update 양보",
+    "onboarding": "첫 셋업·CLI 설치·로그인",
+    "deploy": "배포 실행·검증"
+  },
+  "cases": [
+    { "utterance": "업데이트해줘", "expected": "update", "why": "CLI·플러그인 최신화 (수동 on-demand)" },
+    { "utterance": "axhub 최신 버전으로 맞춰줘", "expected": "update", "why": "버전 업데이트" },
+    { "utterance": "플러그인 업데이트해줘", "expected": "update", "why": "claude plugin update — clarity 는 axhub 명령만이라 plugin 반쪽도 못 함" },
+    { "utterance": "지금 최신 버전 받아줘", "expected": "update", "why": "수동 on-demand 업데이트" },
+    { "utterance": "update axhub", "expected": "update", "why": "영어 업데이트 발화" },
+    { "utterance": "환경변수 설정해줘", "expected": "clarity", "why": "axhub env 운영 명령 (버전 업데이트 아님)" },
+    { "utterance": "로그 보여줘", "expected": "clarity", "why": "axhub 로그 조회" },
+    { "utterance": "이전 버전으로 롤백해줘", "expected": "clarity", "why": "배포 롤백 — 최신화(update)와 구분되는 운영 명령" },
+    { "utterance": "처음인데 셋업해줘", "expected": "onboarding", "why": "첫 셋업 (CLI 설치 포함, 업데이트 아님)" },
+    { "utterance": "배포해줘", "expected": "deploy", "why": "배포 실행" }
+  ]
+}
