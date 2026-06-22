@@ -42,6 +42,21 @@ description: 'axhub 의 onboarding(첫 셋업·로그인)·init(새 앱)·deploy
 - `[3/4] 실행하는 중이에요`
 - `[4/4] 결과 정리하는 중이에요`
 
+### TodoWrite 체크리스트 (2+ 태스크일 때만 · 있을 때만)
+
+요청이 **2개 이상의 axhub 작업으로 쪼개질 때만** TodoWrite 로 태스크를 보여줘요 (예: "테이블 만들고 env 추가하고 로그 봐줘"). 한 번에 끝나는 단순 조회·단일 명령은 TodoWrite 없이 위 한 줄 알림만 해요 — 1줄짜리 체크리스트는 만들지 않아요. TodoWrite 도구가 host 에 노출됐을 때만 호출하고, 없으면 조용히 진행해요 (도구 가용성은 언급 안 해요).
+
+clarity 는 카탈로그가 없어서 todos 도 **고정 목록이 아니라 요청을 쪼갠 실제 태스크에서 도출**해요 — 사용자 발화를 axhub 작업 단위로 나눠 한 항목씩 만들어요. 참고 shape ("테이블 만들고 env 추가해줘"):
+
+```typescript
+TodoWrite({ todos: [
+  { content: "테이블 생성",   status: "in_progress", activeForm: "테이블 만드는 중" },
+  { content: "환경변수 추가", status: "pending",     activeForm: "env 추가하는 중" }
+]})
+```
+
+**태스크 하나가 끝날 때마다**(그 태스크의 탐색→실행→결과까지 끝나면) 전체 todos 배열로 다시 호출해 끝난 항목은 `completed`, 다음 항목은 `in_progress` 로 갱신해요 — 끝에 한꺼번에 말고 매 태스크 직후에요. 이전 스킬 todo 가 남아 있으면 patch 하지 말고 위 배열 전체로 교체해요. 종료 시 미완료 todo 0 개.
+
 ## Workflow
 
 1. **CLI 가드.** `command -v axhub` 가 실패하면 멈추고 안내해요: "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요" → onboarding 스킬로 넘겨요. raw 에러는 chat 에 노출하지 않아요.
