@@ -29,6 +29,23 @@ model: sonnet
 
 ---
 
+## 진행 체크리스트 (TodoWrite — 있을 때만)
+
+TodoWrite 도구가 host 에 노출됐을 때만 호출해요 (Claude Desktop 처럼 없으면 조용히 진행하고, 도구 가용성·생략은 언급하지 않아요). 고정 목록을 붙여넣지 말고 **이번 실행의 실제 일에서 도출**해요 — 버전 확인 뒤 CLI·플러그인 중 이미 최신인 쪽은 바로 `completed` 로 시작하고, `disabled`·`AXHUB_NO_AUTO_UPDATE` 로 안내-only 인 항목은 적용 대신 "안내" 로 닫아요. 참고 shape:
+
+```typescript
+TodoWrite({ todos: [
+  { content: "버전 확인 (axhub update check)", status: "in_progress", activeForm: "버전 확인하는 중" },
+  { content: "CLI 업데이트",                  status: "pending",     activeForm: "CLI 업데이트하는 중" },
+  { content: "플러그인 업데이트",              status: "pending",     activeForm: "플러그인 업데이트하는 중" },
+  { content: "결과 보고",                     status: "pending",     activeForm: "결과 정리하는 중" }
+]})
+```
+
+**태스크 하나가 끝날 때마다** 전체 todos 배열로 다시 호출해 끝난 항목은 `completed`, 다음 항목은 `in_progress` 로 갱신해요 — 끝에 한꺼번에 말고 매 태스크 직후에요. 이전 스킬 todo 가 남아 있으면 patch 하지 말고 위 배열 전체로 교체해요. 종료 시 미완료 todo 0 개.
+
+---
+
 ## 0. 사전 점검 (네트워크 0)
 
 1. `command -v axhub` 가 실패하면 멈춰요 — CLI 가 아직 없는 건 설치 소관이에요. 한 줄: `axhub CLI 가 아직 없어요. "온보딩" 이라고 말하면 설치부터 도와드려요.` (재설치를 여기서 시도하지 않아요.)
