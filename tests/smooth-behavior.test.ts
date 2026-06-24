@@ -29,7 +29,7 @@ const runShim = (args: string[], env: Record<string, string> = {}) => {
 };
 
 describe("smooth behavior contracts", () => {
-  test("public metadata advertises the six surviving skills", () => {
+  test("public metadata advertises the seven official skills", () => {
     const packageJson = readJson<PackageLike>("package.json");
     const pluginJson = readJson<PackageLike>(".claude-plugin/plugin.json");
     const marketplace = readJson<MarketplaceLike>(".claude-plugin/marketplace.json");
@@ -40,7 +40,7 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("onboarding/init/deploy/cli");
       expect(description).not.toContain("3개 스킬");
     }
-    expect(descriptions.join("\n")).toContain("onboarding/init/deploy/development/clarity/update");
+    expect(descriptions.join("\n")).toContain("onboarding/init/deploy/development/diagnosis/clarity/update");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {
@@ -74,6 +74,7 @@ describe("smooth behavior contracts", () => {
     const init = readRepo("skills/init/SKILL.md");
     const deploy = readRepo("skills/deploy/SKILL.md");
     const clarity = readRepo("skills/clarity/SKILL.md");
+    const diagnosis = readRepo("skills/diagnosis/SKILL.md");
 
     expect(onboarding).toContain("axhub plugin-support onboarding-detect --json");
     expect(onboarding).toContain("cli_missing");
@@ -90,11 +91,23 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("성공을 선언하지 않아요");
     expect(deploy).not.toContain("deploy-approved-run");
     expect(deploy).toContain("canonical workflow");
+    expect(deploy).toContain("diagnosis");
 
     expect(clarity).toContain("공개 표면만");
     expect(clarity).toContain("plugin-support");
     expect(clarity).toContain("탐색·실행 대상이 아니에요");
     expect(clarity).toContain("axhub 에 그 기능은 없어요");
+    expect(clarity).toContain("diagnosis");
+    expect(clarity).toContain("배포 실패 원인 진단");
+    expect(diagnosis).toContain("axhub deploy diagnose");
+    expect(diagnosis).toContain("deployment_diagnosis");
+    expect(diagnosis).toContain("정상이에요");
+    expect(diagnosis).toContain("해결 후보가 있어요");
+    expect(diagnosis).toContain("대상을 못 찾았어요");
+    expect(diagnosis).toContain("로그인/권한이 필요해요");
+    expect(diagnosis).toContain("진단을 못 했어요");
+    expect(diagnosis).toContain("재배포·롤백");
+    expect(diagnosis).toContain("직접 실행하지 않아요");
     const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
   });

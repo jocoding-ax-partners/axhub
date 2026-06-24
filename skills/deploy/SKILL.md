@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: '이 스킬은 사용자가 현재 브랜치를 axhub 라이브로 배포하고 싶어할 때 사용해요. 다음 표현에서 활성화: "공개해", "내보내자", "띄워", "배포", "배포해", "배포해줘", "쏘자", "올려", "올리자", "터트려", "푸시한 거 띄워", "프로덕션", "프로덕션에 박아", "demo가 필요", "demo가 필요해", "deploy", "launch", "release", "rollout", "ship", 또는 현재 브랜치를 axhub 라이브로 올리고 싶다는 모든 의도. 안전한 배포 준비 확인, 라이브 profile/app 해석, AskUserQuestion preview card 를 통한 AskUserQuestion preview-confirm gate, exit-code 기반 복구 라우팅을 담당해요.'
+description: '이 스킬은 사용자가 현재 브랜치를 axhub 라이브로 배포하고 싶어할 때 사용해요. 다음 표현에서 활성화: "공개해", "내보내자", "띄워", "배포", "배포해", "배포해줘", "쏘자", "올려", "올리자", "터트려", "푸시한 거 띄워", "프로덕션", "프로덕션에 박아", "demo가 필요", "demo가 필요해", "deploy", "launch", "release", "rollout", "ship", 또는 현재 브랜치를 axhub 라이브로 올리고 싶다는 모든 의도. 안전한 배포 준비 확인, 라이브 profile/app 해석, AskUserQuestion preview card 를 통한 AskUserQuestion preview-confirm gate, exit-code 기반 복구 라우팅을 담당해요. 경계: 사용자가 배포 실패 원인 진단을 명시하면 diagnosis 가 맡고, 이 스킬은 새 배포·재배포·검증만 맡아요.'
 examples:
   - utterance: "paydrop 배포해"
     intent: "deploy current branch to axhub live"
@@ -19,6 +19,7 @@ model: sonnet
 # Deploy via axhub
 
 Deploy a vibe coder's app to axhub with safety primitives. `axhub plugin-support` 명령들 (preview, recovery planning) 과 공개 `axhub deploy` 명령으로 진행해요. preview-confirm flow 없이 `axhub deploy create` 를 직접 호출하지 않아요.
+명시적인 배포 실패 원인 진단 요청(예: "배포 실패 원인 진단해줘", "왜 배포가 죽었어")은 `diagnosis` 에 양보해요. 이 스킬은 원인 분석만 하려고 deploy/verify 를 다시 실행하지 않아요.
 
 ## 절대 규칙 — 길어도 매 응답·최종 메시지에 먼저 적용해요
 
