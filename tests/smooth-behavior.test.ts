@@ -102,6 +102,7 @@ describe("smooth behavior contracts", () => {
     expect(diagnosis).toContain("axhub deploy diagnose");
     expect(diagnosis).toContain("deployment_diagnosis");
     expect(diagnosis).toContain("정상이에요");
+    expect(diagnosis).toContain("진단 대상이 아니에요");
     expect(diagnosis).toContain("해결 후보가 있어요");
     expect(diagnosis).toContain("대상을 못 찾았어요");
     expect(diagnosis).toContain("로그인/권한이 필요해요");
