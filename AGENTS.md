@@ -129,5 +129,5 @@ frontmatter validity check 와 e2e flow 1개도 살아남은 quality gate 예요
 - NEVER helper 바이너리 (`crates/axhub-helpers`) 나 hook / NL routing / scaffold 인프라 재추가 — diet 결정 위반.
 - NEVER 명시적 결정 없이 skill 추가 — 6 skill 체제 유지 (`clarity` 는 deep-interview spec, `development` 은 office-hours→리뷰 체인, `update` 는 수동 on-demand 업데이트 요청의 명시 결정으로 신설됐어요).
 - NEVER 최소 CLI 기능 게이트를 우회하지 말아요.
-- NEVER deploy 성공 선언을 `axhub deploy verify <deployment-id>` 1회 실행 없이 — deployment id 필수, latest 재탐색 금지.
+- NEVER deploy 성공 선언(docker/compose deployment-record lane)을 `axhub deploy verify <deployment-id>` 1회 실행 없이 — deployment id 필수, latest 재탐색 금지. static 앱(deploy_method=static)은 별도 lane 이라 `deploy verify` 가 404 라서 `active_release_id`(activate 성공)로 선언해요.
 - NEVER release 를 manual `vim package.json` + `git tag` 로 — `bun run release` → narrative amend → `bun run release:tag` 2단계 flow (단순화된 postbump) 만 써요.
