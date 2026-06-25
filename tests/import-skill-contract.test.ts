@@ -75,7 +75,10 @@ const validateImportEnvelope = (value: unknown): { ok: boolean; reason?: string 
   const evidence = value.result.evidence;
   if (value.mode === "preview" && evidence !== null) return { ok: false, reason: "preview evidence" };
   if (evidence !== null && value.error !== null) return { ok: false, reason: "evidence with error" };
-  if (evidence === null) return { ok: true };
+  if (evidence === null) {
+    if (value.mode === "execute" && value.error === null) return { ok: false, reason: "execute without evidence" };
+    return { ok: true };
+  }
   if (!isRecord(evidence)) return { ok: false, reason: "bad evidence" };
   if (evidence.kind === "deployment") {
     if (value.deploy_method === "static") return { ok: false, reason: "evidence method mismatch" };
@@ -130,6 +133,13 @@ describe("import skill contract", () => {
     expect(validateImportEnvelope(parseStdout(result.stdout))).toMatchObject({ ok: true });
     const argvLog = readFileSync(join(caseDir, "axhub-argv.log"), "utf8").trim().split("\n");
     expect(argvLog.filter((line) => line.includes("plugin-support import"))).toHaveLength(1);
+  });
+
+  test("execute envelope with null evidence and no error is rejected", () => {
+    const { result } = runShim(["plugin-support", "import", "--mode", "execute", "--approved", "--json"], { AXHUB_FIXTURE_IMPORT: "execute_success" });
+    const envelope = parseStdout(result.stdout) as Record<string, unknown>;
+    const stripped = { ...envelope, error: null, result: { ...(envelope.result as Record<string, unknown>), evidence: null } };
+    expect(validateImportEnvelope(stripped)).toMatchObject({ ok: false, reason: "execute without evidence" });
   });
 
   test("execute without approval returns a non-mutating approval failure", () => {

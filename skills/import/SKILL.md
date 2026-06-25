@@ -10,8 +10,6 @@ examples:
     intent: "import existing local app into axhub"
   - utterance: "import existing app"
     intent: "import existing local app into axhub"
-  - utterance: "앱 만들어줘"
-    intent: "route to import only when current directory is non-empty existing app"
 allows-dependency-execution: false
 model: sonnet
 ---
