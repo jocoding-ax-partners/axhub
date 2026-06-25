@@ -29,7 +29,7 @@ const runShim = (args: string[], env: Record<string, string> = {}) => {
 };
 
 describe("smooth behavior contracts", () => {
-  test("public metadata advertises the six surviving skills", () => {
+  test("public metadata advertises the seven surviving skills", () => {
     const packageJson = readJson<PackageLike>("package.json");
     const pluginJson = readJson<PackageLike>(".claude-plugin/plugin.json");
     const marketplace = readJson<MarketplaceLike>(".claude-plugin/marketplace.json");
@@ -40,7 +40,7 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("onboarding/init/deploy/cli");
       expect(description).not.toContain("3개 스킬");
     }
-    expect(descriptions.join("\n")).toContain("onboarding/init/deploy/development/clarity/update");
+    expect(descriptions.join("\n")).toContain("onboarding/init/deploy/import/development/clarity/update");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {
@@ -74,6 +74,7 @@ describe("smooth behavior contracts", () => {
     const init = readRepo("skills/init/SKILL.md");
     const deploy = readRepo("skills/deploy/SKILL.md");
     const clarity = readRepo("skills/clarity/SKILL.md");
+    const importSkill = readRepo("skills/import/SKILL.md");
 
     expect(onboarding).toContain("axhub plugin-support onboarding-detect --json");
     expect(onboarding).toContain("cli_missing");
@@ -83,6 +84,8 @@ describe("smooth behavior contracts", () => {
     expect(init).toContain("axhub apps bootstrap");
     expect(init).toContain("대표 여정에서의 역할");
     expect(init).toContain("raw JSON/stderr");
+    expect(init).toContain("기존 앱 가져오기와 분리");
+    expect(init).toContain("`import` 스킬로 보내요");
 
     expect(deploy).toContain("axhub deploy verify <deployment-id>");
     expect(deploy).toContain("exit 6");
@@ -91,6 +94,13 @@ describe("smooth behavior contracts", () => {
     expect(deploy).not.toContain("deploy-approved-run");
     expect(deploy).toContain("canonical workflow");
 
+    expect(importSkill).toContain("axhub plugin-support import --mode preview --json");
+    expect(importSkill).toContain("axhub plugin-support import --mode execute --approved --json");
+    expect(importSkill).toContain("capabilities.import.schemas");
+    expect(importSkill).toContain("Static 성공은");
+    expect(importSkill).toContain("정적 사이트 확인 증거가 부족해요");
+    expect(importSkill).toContain("raw JSON body");
+    expect(importSkill).toContain("low-level 명령을 조합해서 우회하지 않아요");
     expect(clarity).toContain("공개 표면만");
     expect(clarity).toContain("plugin-support");
     expect(clarity).toContain("탐색·실행 대상이 아니에요");
@@ -162,7 +172,7 @@ describe("smooth behavior contracts", () => {
 
     // clarity: pure-prose continuation, stays out of plugin-support.
     expect(clarity).toContain("## 다음 단계 이어주기");
-    expect(clarity).toContain("이걸로 앱 만들어줘");
+    expect(clarity).toContain("이걸로 대시보드 만들어줘");
     const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
   });

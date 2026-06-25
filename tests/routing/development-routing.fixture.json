@@ -3,8 +3,9 @@
   "boundary": {
     "development": "기존 앱에 실데이터 기반 기능 코드 생성 — read 화면·대시보드·조회 엔드포인트 + write CRUD 화면. 기능이 새 테이블을 필요로 하면 게이트로 스키마 옵트인(단독 '테이블 만들기'는 clarity)",
     "clarity": "axhub CLI 운영 명령(테이블/컬럼 생성·env·로그·connector 연결·데이터 조회) — 코드 안 짬",
-    "init": "새 앱 생성",
-    "deploy": "배포 실행·검증"
+    "init": "빈 디렉토리 새 앱 생성",
+    "import": "비어 있지 않은 기존 로컬 앱을 axhub에 첫 연결·첫 배포로 가져오기",
+    "deploy": "이미 연결된 앱의 ordinary redeploy"
   },
   "cases": [
     { "utterance": "내 connector 데이터로 대시보드 만들어줘", "expected": "development", "why": "실데이터로 화면 코드 생성" },
@@ -16,6 +17,7 @@
     { "utterance": "환경변수 설정해줘", "expected": "clarity", "why": "axhub env 운영 명령" },
     { "utterance": "로그 보여줘", "expected": "clarity", "why": "axhub 로그 조회" },
     { "utterance": "새 앱 만들어줘", "expected": "init", "why": "새 앱 생성 (앱 없음)" },
+    { "utterance": "기존 앱 올려", "expected": "import", "why": "기존 로컬 앱 첫 연결" },
     { "utterance": "배포해줘", "expected": "deploy", "why": "배포 실행" },
     { "utterance": "결제 입력 폼 만들어줘", "expected": "development", "why": "write 기능(CRUD 코드) 생성 — 앱 코드" },
     { "utterance": "재고 등록 화면 만들어줘", "expected": "development", "why": "write 입력 화면 코드 (테이블 '만들기'가 아니라 입력 UI)" }
