@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **axhub** (271 symbols, 280 relationships, 1 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **axhub** (294 symbols, 302 relationships, 1 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -102,14 +102,14 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 # axhub plugin (diet 체제)
 
-이 repo 는 axhub Claude Code plugin 이에요. 45 skill 체제에서 **4 skill** 로 다이어트한 뒤 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill 과 CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill 을 더해 현재 **6 skill** (`onboarding` / `init` / `deploy` / `development` / `clarity` / `update`) 이에요. plugin 은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli (`axhub` 바이너리) 를 호출해요. `clarity` skill 은 나머지 skill 들에 명확히 안 맞거나 의도가 불분명한 axhub 발화를 라이브 `--help` 트리 탐색으로 명령을 찾아 무확인 실행하는 브리지예요 (카탈로그 내장 금지).
+이 repo 는 axhub Claude Code plugin 이에요. 45 skill 체제에서 **4 skill** 로 다이어트한 뒤 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis` skill, CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill 을 더해 현재 **7 skill** (`onboarding` / `init` / `deploy` / `development` / `diagnosis` / `clarity` / `update`) 이에요. plugin 은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli (`axhub` 바이너리) 를 호출해요. `clarity` skill 은 나머지 skill 들에 명확히 안 맞거나 의도가 불분명한 axhub 발화를 라이브 `--help` 트리 탐색으로 명령을 찾아 무확인 실행하는 브리지예요 (카탈로그 내장 금지). `diagnosis` skill 은 명시적인 배포 실패 원인 진단만 담당하고 재배포·롤백은 실행하지 않아요.
 
 제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 모든 hook, NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인.
 
 ## skill 이 CLI 를 부르는 법
 
 - 흡수된 helper 표면은 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 — 예: `onboarding-detect`, `preflight`, `deploy-prep`.
-- 공개 검증 표면은 `axhub deploy verify <deployment-id>` 하나예요.
+- 공개 검증·진단 표면은 `axhub deploy verify <deployment-id>` 와 `axhub deploy diagnose` 예요.
 - init·deploy skill 은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면(v0.20.0+) 을 가드해요. 미달이면 멈추고 안내해요 — 우회 금지.
 
 ## 변경 검증
@@ -127,7 +127,7 @@ frontmatter validity check 와 e2e flow 1개도 살아남은 quality gate 예요
 ## Never Do
 
 - NEVER helper 바이너리 (`crates/axhub-helpers`) 나 hook / NL routing / scaffold 인프라 재추가 — diet 결정 위반.
-- NEVER 명시적 결정 없이 skill 추가 — 6 skill 체제 유지 (`clarity` 는 deep-interview spec, `development` 은 office-hours→리뷰 체인, `update` 는 수동 on-demand 업데이트 요청의 명시 결정으로 신설됐어요).
+- NEVER 명시적 결정 없이 skill 추가 — 현재 7 skill 체제 유지 (`clarity` 는 deep-interview spec, `development` 은 office-hours→리뷰 체인, `update` 는 수동 on-demand 업데이트 요청, `diagnosis` 는 deep-interview→ralplan 승인으로 신설됐어요).
 - NEVER 최소 CLI 기능 게이트를 우회하지 말아요.
 - NEVER deploy 성공 선언(docker/compose deployment-record lane)을 `axhub deploy verify <deployment-id>` 1회 실행 없이 — deployment id 필수, latest 재탐색 금지. static 앱(deploy_method=static)은 별도 lane 이라 `deploy verify` 가 404 라서 `active_release_id`(activate 성공)로 선언해요.
 - NEVER release 를 manual `vim package.json` + `git tag` 로 — `bun run release` → narrative amend → `bun run release:tag` 2단계 flow (단순화된 postbump) 만 써요.
