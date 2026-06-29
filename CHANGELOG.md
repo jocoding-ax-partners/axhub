@@ -6,7 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 ## [1.4.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.3.0...v1.4.0) (2026-06-29)
 
-기존 6 skill 에 세 가지를 더해 8 skill 이 됐어요. 비어 있지 않은 로컬 앱을 처음 axhub 에 연결·첫 배포까지 가져오는 `import`, 배포 실패 원인을 재배포 없이 읽기 전용으로 요약하는 `diagnosis`, 그리고 deploy 가 `deploy_method` 를 auto-detect 해 static 호스팅 앱을 dry-run→`--execute`→`active_release_id` 독립 lane 으로 올리는 길을 추가했어요. 세 PR(#240·#241·#242)을 합치면서 메타데이터·문서·라우팅 경계를 8 skill 기준으로 정합했어요.
+import·diagnosis 두 skill 을 더하고 deploy 에 static lane 을 보태 기존 6 skill 이 8 skill 이 됐어요. 비어 있지 않은 로컬 앱을 처음 axhub 에 연결·첫 배포까지 가져오는 `import`, 배포 실패 원인을 재배포 없이 읽기 전용으로 요약하는 `diagnosis`, 그리고 deploy 가 `deploy_method` 를 auto-detect 해 static 호스팅 앱을 dry-run→`--execute`→`active_release_id` 독립 lane 으로 올리는 길을 추가했어요. 세 PR(#240·#241·#242)을 합치면서 메타데이터·문서·라우팅 경계를 8 skill 기준으로 정합했어요.
 
 
 ### Added
