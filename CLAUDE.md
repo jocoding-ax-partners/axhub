@@ -150,6 +150,7 @@ bun run release:tag
 ## deploy 성공 선언 규칙
 
 - deploy 성공 선언은 `axhub deploy verify <deployment-id>` **1회 실행으로만** 해요. deployment id 인자는 필수이고 latest 재탐색 경로는 금지예요 — verify exit 0 + 접근 가능 URL 확인 전까지 "배포 성공" 이라고 말하지 않아요.
+- **static 앱(deploy_method=static) 배포는 별도 lane** 이에요: 성공 선언을 `apps static deploy --execute` 의 `active_release_id`(activate 성공)로 해요 — static 은 deployment-record 가 아니라 release 라 `deploy verify` 가 404 예요. 위 verify 규칙은 deployment-record 배포(docker/compose)에만 적용돼요. deploy skill 이 resolve 직후 `apps get` 의 `deploy_method` 로 auto-detect 해 이 lane 으로 갈라요.
 
 ## Skill routing
 
@@ -158,7 +159,7 @@ bun run release:tag
 Key routing rules:
 - 처음 셋업·CLI 설치·로그인·환경 점검 → `onboarding`
 - 새 앱 생성·템플릿·bootstrap saga → `init`
-- 배포 실행·preview-confirm·verify 기반 성공 선언 → `deploy`
+- 배포 실행·preview-confirm·verify 기반 성공 선언 → `deploy` (static 앱은 deploy_method auto-detect 로 독립 static lane: dry-run→`--execute`→`active_release_id` 성공 선언)
 - 기존 앱에 실데이터 기반 기능(페이지·화면·대시보드·조회 엔드포인트) 코드 생성 → `development` (read 전용 v1)
 - axhub CLI·플러그인을 지금 최신 버전으로 업데이트(수동 on-demand) → `update`
 - axhub CLI 운영 명령(테이블/컬럼 생성·환경변수·로그·connector 연결·데이터 조회·롤백·상태)·모호한 axhub 발화 → `clarity` (axhub 명령 실행만, 버전 업데이트는 update·앱 코드 생성은 development 양보)
