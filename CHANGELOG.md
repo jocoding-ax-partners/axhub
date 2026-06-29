@@ -4,6 +4,21 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.5.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.4.0...v1.5.0) (2026-06-29)
+
+import skill 이 첫 배포용 axhub.yaml 을 더 정확하고 풍부하게 만들어요. `manifest_create` 일 때 CLI 의 결정론적 힌트와 실제 프로젝트 파일을 근거로 포트·빌드·시작 명령을 채우고 `axhub manifest validate` 로 deploy-parity 검증하는 보강 단계를 더했고, 원하면 그 manifest 를 커밋·push 해서 첫 배포부터 반영하는 opt-in 동의 lane(CLI `--commit-manifest`, capability 게이트)을 보탰어요. env 값은 절대 안 쓰고, 검증이 실패하면 최소 manifest 로 안전하게 fallback 해요.
+
+
+### Added
+
+* import skill manifest 보강 단계 추가 ([e342868](https://github.com/jocoding-ax-partners/axhub/commit/e342868f96f71eecc13b8c0c78d31b00aa5d33e8))
+* import skill 에 commit+push 동의 lane 추가 ([93e6218](https://github.com/jocoding-ax-partners/axhub/commit/93e6218f47d4768a9ea8b2bc5feadb047b0a5e69))
+
+
+### Docs
+
+* CHANGELOG 1.4.0 narrative skill 수 정정 (import·diagnosis 2 skill + deploy static lane) ([dad0f24](https://github.com/jocoding-ax-partners/axhub/commit/dad0f24f62a4e10e53cc03074f1fbdeae6a393bd))
+
 ## [1.4.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.3.0...v1.4.0) (2026-06-29)
 
 import·diagnosis 두 skill 을 더하고 deploy 에 static lane 을 보태 기존 6 skill 이 8 skill 이 됐어요. 비어 있지 않은 로컬 앱을 처음 axhub 에 연결·첫 배포까지 가져오는 `import`, 배포 실패 원인을 재배포 없이 읽기 전용으로 요약하는 `diagnosis`, 그리고 deploy 가 `deploy_method` 를 auto-detect 해 static 호스팅 앱을 dry-run→`--execute`→`active_release_id` 독립 lane 으로 올리는 길을 추가했어요. 세 PR(#240·#241·#242)을 합치면서 메타데이터·문서·라우팅 경계를 8 skill 기준으로 정합했어요.
