@@ -16,7 +16,7 @@ model: sonnet
 
 # Import Existing App
 
-비어 있지 않은 로컬 앱을 axhub 앱으로 가져와 manifest, GitHub 연결, 첫 배포 증거까지 한 번에 정리해요. 이 스킬은 판단·실행 로직을 직접 갖지 않아요. `axhub plugin-support import` 가 내보내는 `import/v1` envelope 를 검증하고, 사람이 이해할 수 있는 preview 와 복구 문구만 렌더링해요.
+비어 있지 않은 로컬 앱을 axhub 앱으로 가져와 manifest, GitHub 연결, 첫 배포 증거까지 한 번에 정리해요. 이 스킬은 판단·실행 로직을 거의 직접 갖지 않아요. `axhub plugin-support import` 가 내보내는 `import/v1` envelope 를 검증하고, 사람이 이해할 수 있는 preview 와 복구 문구를 렌더링해요. 딱 하나 예외로, `manifest_create` 일 때 프로젝트 파일 근거로 axhub.yaml 을 풍부하게 작성하고 `axhub manifest validate` 로 검증하는 보강 단계만 직접 맡아요 — 그 외 모든 mutation 판정·실행은 CLI 가 해요.
 
 ## 라우팅 경계
 
@@ -106,6 +106,30 @@ Static 성공은 `active_release_id`, `verified === true`, `public_url`, `error 
 - `--mode execute` 를 호출하지 않아요.
 - preview 결과를 한국어 요약으로 보여주고, 실제 가져오기는 대화형에서 다시 실행하라고 안내해요.
 
+## Manifest 보강
+
+`required_mutations` 에 `manifest_create` 가 있고 대화형일 때만, execute 전에 axhub.yaml 을 프로젝트 파일 근거로 풍부하게 작성해요. 이게 이 스킬이 직접 authoring 하는 유일한 단계예요 — minimal manifest 대신 포트·빌드·시작 명령 같은 실제 값을 채워 manifest 의 정확도와 정보량을 함께 높여요.
+
+- **언제:** `가져오기 시작` 승인 직후, execute 호출 직전에만 해요. `manifest_create` 가 없으면(=axhub.yaml 이 이미 있으면) 절대 건드리지 않아요. headless 에서는 실행하지 않아요.
+- **근거(grounding):** preview envelope 의 `detected_state.manifest_hints`(포트·health·build·start 와 그 출처)와 실제 프로젝트 파일만 봐요 — Dockerfile, docker-compose·compose, package.json(name·scripts·deps), requirements.txt·pyproject.toml·go.mod, 프레임워크 설정(next.config.\*, vite.config.\* 등), .env.example. 직접 근거가 있는 값만 적고, 불확실하면 비워요. 작고 정확한 manifest 가 크고 틀린 manifest 보다 나아요 — 비운 필드는 backend 가 자동 감지해요.
+- **채우는 필드(axhub.yaml 정규 스키마):**
+  - `version: axhub/v1` (필수)
+  - `name`: 표시 이름(package.json name 또는 폴더 이름)
+  - `runtime`: `port`, `health_path` (EXPOSE·HEALTHCHECK·compose·hints 근거)
+  - `build`: `framework`, `install`, `build`, `start`, `dockerfile`, `compose_file`, `static_output_dir`, `deploy_method` (deploy_method 는 detect 가 정한 값을 그대로 써요)
+  - `env`: `required`/`optional` 아래 `- name:`(+ 필요하면 `scope:`) — **키 이름만**
+  - `database`: `engine` (분명히 감지될 때만)
+- **보안(엄수):** env 값은 절대 적지 않아요. .env.example 키나 compose `environment:` 키처럼 값 없는 출처에서 key 이름만 가져오고, 비밀처럼 보이는 값은 건너뛰어요. axhub.yaml 에 secret·토큰·비밀번호를 쓰지 않아요.
+- **검증 게이트:** 작성한 뒤 반드시 deploy 와 같은 파서로 검증해요.
+
+  ```bash
+  axhub manifest validate
+  ```
+
+  exit 0 이면 그대로 진행해요. 실패하면 typed error 가 가리키는 필드만 고쳐 최대 2회까지 다시 검증하고, 그래도 실패하면 작성한 axhub.yaml 을 지워 CLI 가 execute 때 최소 manifest 를 쓰게 두고, 최소 설정으로 진행한다고 한 줄로 알려요. validate 의 raw JSON 은 chat 에 붙이지 않아요.
+- **이후:** execute 는 axhub.yaml 이 있으면 최소 manifest 를 새로 쓰지 않고 이 보강본을 그대로 둬요. 첫 배포는 현재 git HEAD 를 빌드하므로 이 보강본은 커밋해서 HEAD 에 들어간 뒤(또는 이후 `deploy`)부터 빌드에 반영돼요 — 그래서 정확하고 풍부한 manifest 를 프로젝트에 남기는 게 이 단계의 목적이에요. 아래 commit+push 옵션을 고르지 않으면 첫 배포 자체는 기존 HEAD 와 앱의 deploy_method 로 진행돼요.
+- **첫 배포까지 반영 (옵션, commit+push):** `axhub plugin-support preflight` 의 `capabilities.import.commit_manifest` 가 true 이고 git remote 가 있을 때만, 검증 통과 직후 한 번 더 물어요 — 보강본을 커밋하고 배포 브랜치에 push 해서 첫 배포부터 반영할지. 동의하면 execute 를 `--commit-manifest` 로 호출해요(아래 Workflow 7). capability 가 없거나(구 CLI) 거절하면 이 옵션을 빼고 기본 경로(커밋 없이, 이후 deploy 부터 반영)로 가요. commit+push 는 외부·되돌리기 어려운 동작이라 반드시 이 별도 동의를 받고, 강제 push 는 절대 안 하고, headless 에서는 제공하지 않아요.
+
 ## Workflow
 
 1. CLI 가드와 capability 확인
@@ -142,35 +166,55 @@ axhub plugin-support import --mode preview --headless --json
 - 배포 방식
 - 안전 메모
 
+`manifest_create` 가 있으면, axhub.yaml 을 프로젝트 파일 근거로 자세히 작성할 예정이라고 한 줄로 같이 알려요.
+
 5. 대화형 승인 1회
 
-AskUserQuestion 은 preview 직후 한 번만 써요. 옵션은 다음 네 가지예요.
+AskUserQuestion 은 preview 직후 한 번 써요. 옵션은 다음 네 가지예요.
 
 - 가져오기 시작
 - 먼저 수정할게요
 - 취소
 - 자세한 요약 보기
 
-`가져오기 시작` 외에는 execute 를 호출하지 않아요.
+`가져오기 시작` 외에는 execute 를 호출하지 않아요. commit+push lane 이 적용될 때(아래 6)만 보강·검증 성공 후 커밋 동의 1회를 더 쓰고, 그 외에는 추가 질문을 쓰지 않아요.
 
-6. Execute 호출
+6. axhub.yaml 보강 (manifest_create 일 때만)
 
-대화형 승인 직후 한 번만 호출해요.
+`가져오기 시작` 승인 직후, execute 전에 진행해요. `required_mutations` 에 `manifest_create` 가 있을 때만 위 `## Manifest 보강` 규칙대로 프로젝트 파일 근거로 axhub.yaml 을 작성하고 `axhub manifest validate` 로 검증해요. `manifest_create` 가 없거나 headless 면 이 단계를 건너뛰어요.
+
+검증 통과 후, `capabilities.import.commit_manifest` 가 true 이고 git remote 가 있으면 커밋 동의 1회를 더 써요. 옵션은 세 가지예요.
+
+- 커밋·push 하고 진행 (첫 배포부터 반영)
+- 커밋 없이 진행 (이후 deploy 부터 반영)
+- 취소
+
+capability 가 없거나 remote 가 없으면 이 질문을 건너뛰고 `커밋 없이 진행` 으로 가요.
+
+7. Execute 호출
+
+대화형 승인 직후 한 번만 호출해요. `커밋 없이 진행` 이거나 commit+push 질문을 건너뛴 경우:
 
 ```bash
 axhub plugin-support import --mode execute --approved --json
 ```
 
-동일 승인으로 두 번 호출하지 않아요. execute 결과도 `import/v1` 로 다시 검증해요.
+`커밋·push 하고 진행` 을 골랐으면 `--commit-manifest` 를 더해요. CLI 가 backend mutation 전에 axhub.yaml 을 커밋·push 해서 첫 배포에 반영해요.
 
-7. 성공 안내
+```bash
+axhub plugin-support import --mode execute --approved --commit-manifest --json
+```
+
+동일 승인으로 두 번 호출하지 않아요. execute 결과도 `import/v1` 로 다시 검증해요. push 실패는 `typed_failure: git` 으로 와요(아래 9의 git 행으로 안내).
+
+8. 성공 안내
 
 - docker/compose 성공: public URL 을 보여주고, 배포 확인이 끝났다고 말해요.
 - static 성공: public URL 을 보여주고, 정적 사이트 활성 릴리스 확인이 끝났다고 말해요.
 
 내부 id 는 필요할 때만 상태 이어보기에 쓰고 chat 에 raw 값으로 노출하지 않아요.
 
-8. 실패 안내
+9. 실패 안내
 
 `error.message_ko` 를 우선 쓰되, raw field 를 그대로 복사하지 않아요. `recovery_action` 은 한국어 행동 문장으로 바꿔요.
 
@@ -193,5 +237,7 @@ axhub plugin-support import --mode execute --approved --json
 - deploy 는 ordinary redeploy 만 맡아요.
 - import 는 non-empty existing app first-connect flow 만 맡아요.
 - plugin 은 low-level CLI primitive 를 조합하지 않아요.
+- manifest 보강은 plugin 이 직접 authoring 하는 유일한 단계예요 — `manifest_create` 일 때만, 증거 있는 필드만, env 값 없이 작성하고 `axhub manifest validate` 통과를 강제해요. 실패하면 최소 manifest 로 fallback 해요.
+- commit+push 는 opt-in 이에요 — `capabilities.import.commit_manifest` true + git remote + 별도 동의가 모두 있을 때만 `--commit-manifest` 로 호출하고, 그 git 커밋·push 는 CLI 가(force 없이) 맡아요. capability 가 없으면 옵션을 제공하지 않아요. headless 에서는 없어요.
 - malformed envelope, unknown schema, unknown enum, missing static URL, `verified !== true`, headless execute, approval bypass 는 모두 중단해요.
 - 성공을 말하기 전 항상 execute envelope 의 method-specific evidence 를 확인해요.
