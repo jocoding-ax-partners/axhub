@@ -4,6 +4,24 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.4.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.3.0...v1.4.0) (2026-06-29)
+
+기존 6 skill 에 세 가지를 더해 8 skill 이 됐어요. 비어 있지 않은 로컬 앱을 처음 axhub 에 연결·첫 배포까지 가져오는 `import`, 배포 실패 원인을 재배포 없이 읽기 전용으로 요약하는 `diagnosis`, 그리고 deploy 가 `deploy_method` 를 auto-detect 해 static 호스팅 앱을 dry-run→`--execute`→`active_release_id` 독립 lane 으로 올리는 길을 추가했어요. 세 PR(#240·#241·#242)을 합치면서 메타데이터·문서·라우팅 경계를 8 skill 기준으로 정합했어요.
+
+
+### Added
+
+* add diagnosis skill ([1c3bce5](https://github.com/jocoding-ax-partners/axhub/commit/1c3bce5c872771cb04ad6b4fb756f1020cd6a950))
+* add existing app import skill ([186db90](https://github.com/jocoding-ax-partners/axhub/commit/186db903900e53488a3bd1fe429400513185e6c8))
+* deploy 스킬에 static 앱 auto-detect lane 추가 ([421b12a](https://github.com/jocoding-ax-partners/axhub/commit/421b12a2ac76a74f33db3f939359a0c1b77103db))
+
+
+### Fixed
+
+* AGENTS.md verify-once 규칙을 static lane 으로 scope ([3a6332d](https://github.com/jocoding-ax-partners/axhub/commit/3a6332dd21615d51c381187d2561119b99356d46))
+* diagnosis 스킬을 실제 진단 표면에 정합·MCP 우선 ([4230db5](https://github.com/jocoding-ax-partners/axhub/commit/4230db54bac9a30c2d8d317912fb59cb1a84564a))
+* import 스킬 CE 리뷰 finding 반영 (라우팅 충돌·envelope 검증) ([653a46d](https://github.com/jocoding-ax-partners/axhub/commit/653a46d836f8d38c5f2d8c85f54044fcf4303d69))
+
 ## [1.3.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.2.2...v1.3.0) (2026-06-22)
 
 세션 중에 axhub CLI·플러그인을 직접 최신으로 올리는 여섯 번째 `update` 스킬을 추가했어요 — auto-update 훅과 달리 24h throttle 없이 바로 확인하고, 보안 검증 실패(변조 신호)는 하드 스톱으로 막고, `AXHUB_NO_AUTO_UPDATE` kill switch 도 그대로 존중해요. 더해서 진행 상황을 '태스크 하나 끝날 때마다' 동적으로 갱신하는 TodoWrite 를 update·clarity 스킬에 넣어, 멀티-태스크 작업에서도 어디까지 됐는지 한눈에 보이게 했어요.
