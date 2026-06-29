@@ -29,7 +29,7 @@ Every entry uses these four parts, in this order:
 
 **감정:** 축하해요! 배포 성공이에요.
 
-**원인:** `<APP_SLUG>` (id=`<APP_ID>`) 가 `<PROFILE>` 환경에 정상 반영됐어요. 빌드 `<DEPLOY_ID>` 가 `<ELAPSED>` 만에 끝났습니다.
+**원인:** `<APP_SLUG>` 가 `<PROFILE>` 환경에 정상 반영됐어요. 빌드가 `<ELAPSED>` 만에 끝났어요.
 
 **해결:** 라이브 URL을 한 번 확인해보시겠어요? 다음에 또 배포하실 때는 "방금 거 상태" 또는 "방금 거 로그" 라고 말씀하시면 바로 보여드려요.
 
@@ -53,7 +53,7 @@ Every entry uses these four parts, in this order:
 
 **감정:** 정상이에요. 배포가 아직 진행 중일 뿐이에요.
 
-**원인:** `<DEPLOY_ID>` 가 현재 `<STATUS_PHASE>` 단계예요. 평균 `<ETA>` 정도 걸리는데, 지금까지 `<ELAPSED>` 경과했어요.
+**원인:** 현재 배포가 `<STATUS_PHASE>` 단계예요. 평균 `<ETA>` 정도 걸리는데, 지금까지 `<ELAPSED>` 경과했어요.
 
 **해결:** "계속 지켜봐줘" 라고 말씀하시면 끝날 때까지 자동으로 알려드려요. 다른 일 하시다가 끝나면 알림 드릴게요.
 
@@ -123,9 +123,9 @@ hand-written UX guide covers every emitted key.
 
 **원인:** 현재 디렉토리에 `apphub.yaml` 또는 `axhub.yaml` 이 없고 최근 배포 cache 도 비어 있어요.
 
-**해결:** 먼저 init 으로 앱 파일을 만들거나 apps 목록에서 열 앱을 골라요.
+**해결:** 비어 있지 않은 기존 앱이면 "기존 앱 가져와줘" 라고 말씀해 import 로 이어가요. 빈 디렉토리에서 새 템플릿을 시작하려면 "새 앱 만들어줘" 라고 말씀해주세요.
 
-**버튼:** ["init 시작", "앱 목록 보기", "닫기"]
+**버튼:** ["기존 앱 가져오기", "새 앱 만들기", "앱 목록 보기"]
 
 ---
 
@@ -145,7 +145,7 @@ hand-written UX guide covers every emitted key.
 
 **감정:** 앱은 안전해요. 다른 배포가 먼저 진행 중이에요.
 
-**원인:** `<APP_SLUG>` 의 다른 배포 (`<IN_FLIGHT_DEPLOY_ID>`) 가 아직 끝나지 않았어요. 같은 앱은 한 번에 한 배포만 진행됩니다 (서로 덮어쓰지 못하게 막아주는 안전장치예요).
+**원인:** `<APP_SLUG>` 의 다른 배포가 아직 끝나지 않았어요. 같은 앱은 한 번에 한 배포만 진행됩니다 (서로 덮어쓰지 못하게 막아주는 안전장치예요).
 
 **해결:** 새로 배포하지 마시고 진행 중인 그 배포를 함께 지켜볼까요? "그거 끝날 때까지 지켜봐줘" 라고 말씀해주시면 됩니다. **절대 다시 시도하지 않습니다 — 끝나면 자연스럽게 다음 배포가 가능해요.**
 
@@ -159,9 +159,9 @@ hand-written UX guide covers every emitted key.
 
 **원인:** `<INPUT_SLUG>` 라는 이름의 앱이 여러 개 있어요. 어떤 거 말씀하신 건지 골라주세요.
 
-**해결:** 아래 후보 중 하나를 골라주세요. 다음부터는 정확한 ID로 기억해둘게요.
+**해결:** 아래 후보 중 하나를 골라주세요. 다음부터는 앱 이름으로 기억해둘게요.
 
-**버튼:** [동적 — 후보 앱 슬러그 + ID 최대 3개, 예: "paydrop (id=42)", "paydrop-staging (id=43)", "더 많은 후보 보기"]
+**버튼:** [동적 — 후보 앱 슬러그 최대 3개, 예: "paydrop", "paydrop-staging", "더 많은 후보 보기"]
 
 ---
 
@@ -171,9 +171,9 @@ hand-written UX guide covers every emitted key.
 
 **원인:** 앱이 100개를 넘어서 목록이 잘렸어요. 이름만으로는 정확히 어떤 앱인지 못 찾아요.
 
-**해결:** 앱의 ID 숫자를 직접 알려주실 수 있나요? 예: "id 42 배포해" 또는 "app-3 배포해" 처럼요. ID는 `apps list` 결과에 표시돼요.
+**해결:** 앱 이름 일부를 더 알려주시거나 검색을 다시 실행해 정확한 앱을 고르게 해요. 사용자-facing 카드에는 내부 숫자 ID를 노출하지 않아요.
 
-**버튼:** ["앱 검색하기", "앱 ID 직접 입력", "도와주세요"]
+**버튼:** ["앱 검색하기", "이름 다시 입력", "도와주세요"]
 
 ---
 
@@ -181,7 +181,7 @@ hand-written UX guide covers every emitted key.
 
 **감정:** 잠깐만요. push 전에 설정 불일치를 발견했어요. 앱은 안전해요.
 
-**원인:** preflight / resolve 결과에서 일관성 문제가 있어요. cli_version 누락, bootstrap plan 충돌, exit code mismatch, 프로필 불일치 같은 사유로 잘못된 배포가 될 수 있어요.
+**원인:** preflight / resolve 결과에서 일관성 문제가 있어요. cli_version 누락, import/init 경계 충돌, exit code mismatch, 프로필 불일치 같은 사유로 잘못된 배포가 될 수 있어요.
 
 **해결:** 구체적 violation 을 같이 보여줄게요. 의도된 거면 "강제로 진행해" 라고 말해주세요. 비대화형 환경에서는 자동으로 차단됐어요.
 
@@ -283,13 +283,13 @@ hand-written UX guide covers every emitted key.
 
 # Deploy-Preview Card Template
 
-This is the AskUserQuestion card rendered by `skills/deploy/SKILL.md` step 3 BEFORE any destructive `axhub deploy create` call. It echoes the five identity fields verbatim in Korean (E4 fix from PLAN — never trust cached app_id for mutations).
+This is the AskUserQuestion card rendered by `skills/deploy/SKILL.md` step 3 before any destructive `axhub deploy create` is run.
 
 ## Card body (Korean, NFKC-normalized)
 
 ```
 다음을 실행할게요:
-  ① 앱:    <APP_SLUG> (id=<APP_ID>)
+  ① 앱:    <APP_SLUG>
   ② 환경:  <PROFILE> (<ENDPOINT>)
   ③ 브랜치: <BRANCH>
   ④ 커밋:  <COMMIT_SHA_SHORT> — "<COMMIT_MESSAGE_FIRST_LINE>"
@@ -327,14 +327,14 @@ This is the AskUserQuestion card rendered by `skills/deploy/SKILL.md` step 3 BEF
 ## Rendering rules
 
 - **NFKC normalize** every displayed string before showing. If NFKC altered the slug (Cyrillic lookalike attack, ZWJ injection), surface a warning row above the card: `⚠️ 앱 이름에 비정상 문자가 감지됐어요. 확인해주세요: 원본=<RAW_SLUG>, 정규화=<NFKC_SLUG>`. (Reference: PLAN §16.11 Unicode + F14 Korean Unicode 공격.)
-- **Verbatim echo** — never substitute `app_id` from local cache. The five fields MUST come from the latest live `axhub auth status --json` + `axhub apps list --json --slug-prefix <slug>` resolution (E4 fix).
+- **Verbatim echo** — never substitute a mutation target from local cache. Resolve the internal app target from the latest live `axhub auth status --json` + `axhub apps list --json --slug-prefix <slug>` result, but render only the app slug in the user-facing card (E4 fix).
 - **Profile mismatch** — if `--profile` arg differs from `$AXHUB_PROFILE`, prepend a yellow warning row: `⚠️ 현재 환경(<ENV_PROFILE>) 과 다른 환경(<ARG_PROFILE>) 으로 배포하려 해요. 의도한 게 맞나요?`
 - **Slash invocation does NOT skip this card.** `/axhub:deploy paydrop` still renders the card. Slash is confirmation for invoking the skill, not for the destructive op (E2 fix).
 - **Legacy note** — older builds used a confirmation token here. Current builds rely on the preview card plus explicit approval before `axhub deploy create`.
 
 ## Special: ETA calculation
 
-If `eta_sec` from helper resolution is null (first deploy on this app), render: `⑤ 예상:  처음 배포라서 시간 예측 어려워요 (보통 2~5분)`. Do NOT fabricate a number.
+If `eta_sec` from helper resolution is null (no reliable duration history for this app), render: `⑤ 예상:  시간 예측 어려워요 (보통 2~5분)`. Do NOT fabricate a number.
 
 ## Special: dry-run preview output
 
@@ -419,9 +419,9 @@ When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <I
 
 **원인:** 현재 디렉토리에 axhub.yaml 또는 legacy apphub.yaml 이 없고 최근 배포 cache 도 비어 있어요.
 
-**해결:** 먼저 init 으로 앱 파일을 만들거나 apps 목록에서 열 앱을 골라요.
+**해결:** 비어 있지 않은 기존 앱이면 "기존 앱 가져와줘" 라고 말씀해 import 로 이어가요. 빈 디렉토리에서 새 템플릿을 시작하려면 "새 앱 만들어줘" 라고 말씀해주세요.
 
-**버튼:** ["init 시작", "앱 목록 보기", "닫기"]
+**버튼:** ["기존 앱 가져오기", "새 앱 만들기", "앱 목록 보기"]
 
 ---
 

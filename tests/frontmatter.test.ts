@@ -15,7 +15,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
-const SKILLS = ["onboarding", "init", "deploy", "development", "diagnosis", "clarity", "update"] as const;
+const SKILLS = ["onboarding", "init", "deploy", "import", "development", "diagnosis", "clarity", "update"] as const;
 
 // Dead-contract keys retired by ADR-0013. Their presence means a stale
 // scaffold leaked back in. (`model:` is excluded — it is a live key.)

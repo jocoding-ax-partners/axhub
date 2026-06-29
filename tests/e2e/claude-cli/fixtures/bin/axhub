@@ -17,6 +17,7 @@
 #   plugin-support deploy-preview-summary    한국어 preview text (해요체).
 #   plugin-support token-gate                 deploy_expired → exit 65, else exit 0 (stdout 없음).
 #   plugin-support onboarding-detect [--json]  detect-first onboarding envelope; env can force cli_missing/cli_old.
+#   plugin-support import --mode preview|execute  import/v1 envelope fixture.
 
 set -euo pipefail
 
@@ -61,7 +62,7 @@ case "${1:-}" in
       preflight)
         # preflight: token 은 아직 fine (deploy_expired 도 auth_ok=true).
         # raw stderr/exit-jargon 미노출 — JSON contract 만.
-        echo '{"cli_present":true,"cli_state":"ok","in_range":true,"cli_too_old":false,"cli_too_new":false,"auth_ok":true,"auth_error_code":null,"profile":"paydrop"}'
+        echo '{"cli_present":true,"cli_state":"ok","in_range":true,"cli_too_old":false,"cli_too_new":false,"auth_ok":true,"auth_error_code":null,"profile":"paydrop","capabilities":{"import":{"supported":true,"schemas":["import/v1"]}}}'
         exit 0
         ;;
       route-decision)
@@ -81,6 +82,85 @@ case "${1:-}" in
       deploy-preview-summary)
         # 5필드 한국어 preview card (해요체). raw 값 미노출.
         echo "다음을 올릴게요: 앱 paydrop / 환경 production / 브랜치 main / 커밋 abc1234 / 예상 약 1분 걸려요."
+        exit 0
+        ;;
+      import)
+        MODE="preview"
+        HEADLESS="false"
+        APPROVED="false"
+        shift 2
+        while [ "$#" -gt 0 ]; do
+          case "${1:-}" in
+            --mode)
+              MODE="${2:-preview}"
+              shift 2
+              ;;
+            --headless)
+              HEADLESS="true"
+              shift
+              ;;
+            --approved)
+              APPROVED="true"
+              shift
+              ;;
+            --json)
+              shift
+              ;;
+            *)
+              shift
+              ;;
+          esac
+        done
+        if [ "$HEADLESS" = "true" ]; then
+          MODE="preview"
+          APPROVED="false"
+        fi
+        case "${AXHUB_FIXTURE_IMPORT:-preview_success}" in
+          malformed)
+            echo '{"schema_version":"import/v1","mode":"preview"'
+            exit 0
+            ;;
+          unknown_schema)
+            SCHEMA="import/v2"
+            ;;
+          *)
+            SCHEMA="import/v1"
+            ;;
+        esac
+        if [ "${AXHUB_FIXTURE_IMPORT:-}" = "unknown_enum" ]; then
+          DEPLOY_METHOD="spaceship"
+        else
+          DEPLOY_METHOD="${AXHUB_FIXTURE_IMPORT_DEPLOY_METHOD:-static}"
+        fi
+        if [ "${AXHUB_FIXTURE_IMPORT:-}" = "static_with_deployment_evidence" ]; then
+          DEPLOY_METHOD="static"
+        elif [ "${AXHUB_FIXTURE_IMPORT:-}" = "docker_with_static_evidence" ]; then
+          DEPLOY_METHOD="docker"
+        fi
+        ERROR_JSON="null"
+        EVIDENCE_JSON="null"
+        if [ "${AXHUB_FIXTURE_IMPORT:-}" = "static_missing_url" ]; then
+          ERROR_JSON='{"typed_failure":"static","owner":"backend","retryable":true,"phase":"static","mutation_performed":true,"recovery_action":"static public_url and active release evidence required","message_ko":"정적 사이트 확인 증거가 부족해요. 공개 URL과 활성 릴리스 확인 뒤 다시 시도해요.","details":"missing public_url"}'
+        elif [ "${AXHUB_FIXTURE_IMPORT:-}" = "preview_with_evidence" ]; then
+          EVIDENCE_JSON='{"kind":"static_release","active_release_id":"rel-fixture","verified":true,"public_url":"https://paydrop.axhub.dev"}'
+        elif [ "${AXHUB_FIXTURE_IMPORT:-}" = "static_unverified" ]; then
+          EVIDENCE_JSON='{"kind":"static_release","active_release_id":"rel-fixture","verified":false,"public_url":"https://paydrop.axhub.dev"}'
+        elif [ "${AXHUB_FIXTURE_IMPORT:-}" = "static_with_deployment_evidence" ]; then
+          EVIDENCE_JSON='{"kind":"deployment","deployment_id":"dep-fixture","verification_status":"success","public_url":"https://paydrop.axhub.dev"}'
+        elif [ "${AXHUB_FIXTURE_IMPORT:-}" = "docker_with_static_evidence" ]; then
+          EVIDENCE_JSON='{"kind":"static_release","active_release_id":"rel-fixture","verified":true,"public_url":"https://paydrop.axhub.dev"}'
+        elif [ "$MODE" = "execute" ] && [ "$APPROVED" != "true" ]; then
+          ERROR_JSON='{"typed_failure":"app","owner":"plugin","retryable":false,"phase":"approval","mutation_performed":false,"recovery_action":"approve preview before execute","message_ko":"가져오기 전에 미리보기 승인이 필요해요.","details":null}'
+        elif [ "$MODE" = "execute" ]; then
+          if [ "$DEPLOY_METHOD" = "static" ]; then
+            EVIDENCE_JSON='{"kind":"static_release","active_release_id":"rel-fixture","verified":true,"public_url":"https://paydrop.axhub.dev"}'
+          else
+            EVIDENCE_JSON='{"kind":"deployment","deployment_id":"dep-fixture","verification_status":"success","public_url":"https://paydrop.axhub.dev"}'
+          fi
+        fi
+        cat <<JSON
+{"schema_version":"$SCHEMA","mode":"$MODE","headless":$HEADLESS,"correlation_id":"fixture-correlation","detected_state":{"starting_state":"local_github_no_axhub_app","local_project":{"cwd_has_project_marker":true,"manifest_present":false,"manifest_app":null},"git":{"is_repo":true,"has_commit":true,"branch":"main","commit_sha":"abc1234","remote_repo":"jocoding/paydrop"},"axhub_app":{"app_id":null,"app_slug":null,"matched":false},"manifest":{"status":"missing","path":null}},"deploy_method":"$DEPLOY_METHOD","required_mutations":["manifest_create","app_create","github_connect","first_deploy"],"preview":{"title":"기존 앱 가져오기","summary":["현재 폴더를 axhub 앱으로 연결해요."],"mutations":["manifest_create","app_create","github_connect","first_deploy"],"safety_notes":["승인 전에는 변경하지 않아요."]},"approval":{"required":true,"approved":$APPROVED,"interactive_only":true},"result":{"evidence":$EVIDENCE_JSON},"error":$ERROR_JSON}
+JSON
         exit 0
         ;;
       token-gate)

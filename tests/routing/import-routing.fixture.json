@@ -1,0 +1,20 @@
+{
+  "_doc": "라우팅 회귀 계약 — import 는 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 첫 연결/첫 배포 스킬이에요. init 은 빈 디렉토리 template bootstrap, deploy 는 이미 연결된 앱의 ordinary redeploy 를 맡아요.",
+  "boundary": {
+    "import": "non-empty existing local app → axhub app create/select + manifest/GitHub connect + first deploy via import/v1 envelope",
+    "init": "empty directory new-template bootstrap",
+    "deploy": "already-connected app ordinary redeploy",
+    "development": "existing app feature code generation",
+    "clarity": "other axhub operations or ambiguous command discovery"
+  },
+  "cases": [
+    { "utterance": "기존 앱 올려", "context": "현재 폴더가 비어 있지 않은 로컬 앱", "expected": "import", "why": "기존 소스를 axhub에 처음 가져오는 요청" },
+    { "utterance": "이 폴더 axhub에 올려", "context": "package.json 또는 소스 파일이 있는 로컬 앱", "expected": "import", "why": "non-empty existing app first-connect flow" },
+    { "utterance": "앱 만들어줘", "context": "현재 폴더가 비어 있지 않은 기존 앱", "expected": "import", "why": "generic 앱 만들기라도 non-empty repo 에서는 template bootstrap 이 아니라 import" },
+    { "utterance": "앱 만들어줘", "context": "빈 디렉토리", "expected": "init", "why": "empty directory new-template bootstrap" },
+    { "utterance": "새 앱 만들어줘", "context": "빈 디렉토리", "expected": "init", "why": "명시적 새 템플릿 앱" },
+    { "utterance": "배포해줘", "context": "axhub manifest 와 app 연결이 이미 있음", "expected": "deploy", "why": "ordinary redeploy" },
+    { "utterance": "유저 목록 페이지 만들어줘", "context": "기존 앱 코드 수정", "expected": "development", "why": "기능 코드 생성" },
+    { "utterance": "로그 보여줘", "context": "운영 명령", "expected": "clarity", "why": "import/init/deploy/development/update 경계 밖" }
+  ]
+}

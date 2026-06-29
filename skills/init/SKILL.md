@@ -1,6 +1,6 @@
 ---
 name: init
-description: '이 스킬은 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 빈 디렉토리에서 새 axhub 앱을 만들고 싶을 때 axhub 템플릿 앱 생성을 담당해요. 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작하고, 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고 axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 활성화 예: "새 앱 만들어줘", "앱 만들어줘", "결제 앱 만들어", "프로젝트 만들어", "프로젝트 초기화해줘", "초기화해줘", "apphub.yaml 만들어", "axhub.yaml 만들어", "fastapi 앱", "Next.js 앱 만들어줘", "init", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. axhub apps bootstrap saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 repo_full_name 으로 현재 dir 에 git clone 해요.'
+description: '이 스킬은 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 싶을 때 axhub 템플릿 앱 생성을 담당해요. 비어 있지 않은 기존 로컬 앱을 axhub에 가져오거나 첫 연결·첫 배포까지 올리려는 요청은 import 스킬이 담당해요. 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작하고, 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고 axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 활성화 예: "새 앱 만들어줘", "앱 만들어줘", "결제 앱 만들어", "프로젝트 만들어", "프로젝트 초기화해줘", "초기화해줘", "fastapi 앱", "Next.js 앱 만들어줘", "init", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. axhub apps bootstrap saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 repo_full_name 으로 현재 dir 에 git clone 해요.'
 examples:
   - utterance: "새 앱 만들어줘"
     intent: "scaffold new axhub app"
@@ -67,6 +67,7 @@ model: sonnet
 **Visible response contract:** when no pending resume state exists, the first visible chat sentence must be exactly "새 앱을 만들 수 있는 템플릿을 확인할게요." Step 0.5 에서 pending resume state 가 있으면 first visible chat sentence 는 이어서 할지 묻는 문장으로 시작해요.
 
 **이 SKILL 이 앱 생성 전체를 담당해요.** "앱 만들어줘" 류 발화에 generic 한 스택/데이터-fetch 질문을 즉석에서 만들지 말고, 반드시 아래 template flow 를 따라요. 스택 선택은 Step 3 (backend template registry), 데이터 접근은 Step 8 의 `@ax-hub/sdk` 안내로 처리해요.
+**기존 앱 가져오기와 분리.** 현재 폴더가 비어 있지 않은 기존 앱이고 사용자가 "이 앱 올려", "이 폴더 axhub에 올려", "기존 앱 가져와"처럼 첫 axhub 연결을 원하면 이 스킬이 아니라 `import` 스킬로 보내요. `init` 은 빈 디렉토리에서 template registry 를 고르는 bootstrap 전용이에요.
 
 **같은 대화 맥락 이어받기 (carry-over).** 단, **이 대화에 구체 근거**(직전 `connector_query`/`connector_resources`/`row_list`/`table_list` 등 조회 도구의 실제 결과, 또는 이 대화의 온보딩 Ready card)가 보이면 그 맥락을 반영해도 돼요 — generic 즉석 질문을 새로 만드는 게 아니라 **이미 본 것만** 이어받는 거예요. 근거가 없으면 콜드(평소)로 가고, 리소스를 지어내지 않아요. 감지 휴리스틱·confabulation 가드·마찰 억제 범위·D1 가드는 `../deploy/references/session-carryover.md` 를 단일 계약으로 따라요. 조건부 ack("방금 본 `<리소스>` 데이터 반영할게요.")는 조회 근거가 있을 때만, 대화형(D1)에서만 보여줘요.
 
@@ -200,7 +201,7 @@ if (NEEDS_PICK === "true") {
       multiSelect: false,
       options: candidates.map((t: { id?: string; slug?: string; name?: string }) => ({
         label: t.name ?? t.slug ?? t.id ?? "unknown",
-        description: `ID: ${t.id ?? t.slug}`,
+        description: t.slug ? `tenant: ${t.slug}` : "이 tenant 로 진행",
       })),
     }],
   });
@@ -499,7 +500,7 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
 8. **결과와 다음 액션을 안내해요.**
 
-   saga 응답의 `app_id` / `deployment_id` / `repo_full_name` 을 humanize 해서 한국어 한 줄씩 보여줘요. **배포 공개 URL** 은 배포 성공 후 `axhub apps get` 으로 앱의 `access_url` 을 읽어서 hero 첫 줄로 보여줘요. URL 은 절대 합성하지 않아요.
+   saga 응답은 내부 primitive 로만 검증하고, 사용자에게는 생성된 repo 이름과 다음 행동을 한국어 한 줄씩 보여줘요. **배포 공개 URL** 은 배포 성공 후 `axhub apps get` 으로 앱의 `access_url` 을 읽어서 hero 첫 줄로 보여줘요. URL 은 절대 합성하지 않아요.
 
    ```bash
    PUBLIC_URL="$(axhub apps get "$APP_ID" --no-input --field-expr '.access_url // .data.access_url // empty' 2>/dev/null || true)"
