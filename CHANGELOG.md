@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.5.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.0...v1.5.1) (2026-06-30)
+
+deploy 실패를 만났을 때 사용자가 막다른 골목에 남지 않도록 deploy skill 이 diagnosis skill 로 자연스럽게 이어지는 안내를 갖췄어요. import skill 도 CLI 0.22.1 의 넓어진 stack detection 과 맞춰 Next.js 밖의 백엔드·프론트엔드 앱까지 기존 프로젝트를 가져와 실제 배포로 이어가는 목표를 더 분명히 설명해요.
+
+
+### Fixed
+
+* route deploy failures into diagnosis and broaden import guidance ([83eaf3a](https://github.com/jocoding-ax-partners/axhub/commit/83eaf3a334f176cbb723e38f9d8ead073d99077a))
+
 ## [1.5.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.4.0...v1.5.0) (2026-06-29)
 
 import skill 이 첫 배포용 axhub.yaml 을 더 정확하고 풍부하게 만들어요. `manifest_create` 일 때 CLI 의 결정론적 힌트와 실제 프로젝트 파일을 근거로 포트·빌드·시작 명령을 채우고 `axhub manifest validate` 로 deploy-parity 검증하는 보강 단계를 더했고, 원하면 그 manifest 를 커밋·push 해서 첫 배포부터 반영하는 opt-in 동의 lane(CLI `--commit-manifest`, capability 게이트)을 보탰어요. env 값은 절대 안 쓰고, 검증이 실패하면 최소 manifest 로 안전하게 fallback 해요.
