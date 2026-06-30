@@ -28,6 +28,17 @@ model: sonnet
 
 `import` 는 `deploy` 를 감싸지 않아요. 첫 연결·첫 배포 준비는 import, 이후 반복 배포는 deploy 가 맡아요.
 
+## 개발자 스택 지원 범위
+
+이 스킬은 Next.js 전용이 아니에요. CLI 의 `import/v1` 감지와 execute 증거를 기준으로 기존 개발자 앱을 가져오며, 대표적인 프론트·백엔드 스택을 지원해요.
+
+- 정적 프론트: Vite, Astro, React Scripts, Angular, Vue CLI, Parcel, Gatsby, Svelte 등 build-only 앱은 static 후보로 다뤄요.
+- Compose 기반 앱: `compose.yml`, `compose.yaml`, `docker-compose.yml`, `docker-compose.yaml` 이 있으면 compose 배포 후보로 다뤄요.
+- Dockerfile 보유 앱: 기존 Dockerfile 을 존중하고 새 Dockerfile 을 만들지 않아요.
+- Dockerfile 없는 백엔드 앱: CLI 가 근거 파일을 보고 Node, Python(FastAPI/Flask/Django), Go, Rust, Java(Maven/Gradle), PHP, Ruby(Rails/Rack), Deno, .NET 용 기본 Dockerfile 을 생성할 수 있어요.
+
+스킬은 이 스택 판정을 직접 재구현하지 않아요. preview 의 `deploy_method`, `manifest_hints`, `required_mutations`, `safety_notes` 를 검증해서 보여주고, execute 는 CLI 가 한 번만 수행해요.
+
 ## 첫 문장
 
 대화형에서 이 스킬이 시작되면 첫 visible chat sentence 는 정확히 이렇게 시작해요.
