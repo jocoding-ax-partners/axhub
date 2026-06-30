@@ -95,6 +95,9 @@ describe("smooth behavior contracts", () => {
     expect(deploy).not.toContain("deploy-approved-run");
     expect(deploy).toContain("canonical workflow");
     expect(deploy).toContain("diagnosis");
+    expect(deploy).toContain("Deploy failure → diagnosis handoff");
+    expect(deploy).toContain("재배포나 롤백은 하지 않아요");
+    expect(deploy).toContain("axhub --json deploy diagnose <앱>");
 
     expect(importSkill).toContain("axhub plugin-support import --mode preview --json");
     expect(importSkill).toContain("axhub plugin-support import --mode execute --approved --json");

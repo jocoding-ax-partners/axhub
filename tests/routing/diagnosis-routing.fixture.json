@@ -2,7 +2,7 @@
   "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). diagnosis 는 명시적인 배포 실패 원인 진단만 맡고, 실행·상태·로그·롤백은 deploy/clarity 에 남겨요.",
   "boundary": {
     "diagnosis": "배포 실패 원인을 읽기 전용으로 진단하고 6가지 결과 카테고리로 요약. 재배포·롤백 직접 실행 금지.",
-    "deploy": "새 배포·재배포·배포 검증 실행",
+    "deploy": "새 배포·재배포·배포 검증 실행. 배포 검증이 terminal failure 로 끝나면 diagnosis 로 읽기 전용 handoff",
     "clarity": "일반 상태 확인·로그 조회·롤백·운영 명령 실행",
     "update": "CLI·플러그인 버전 업데이트"
   },
@@ -15,6 +15,7 @@
     { "utterance": "왜 실패했는지 보고 다시 배포해줘", "expected": "diagnosis", "why": "원인 진단을 먼저 명시 — diagnosis 가 원인만 요약하고 재배포는 deploy 로 handoff" },
     { "utterance": "배포해줘", "expected": "deploy", "why": "새 배포 실행" },
     { "utterance": "다시 배포해줘", "expected": "deploy", "why": "재배포 실행, diagnosis 가 직접 실행하지 않음" },
+    { "utterance": "배포해줘", "context": "deploy verify 가 terminal failure 를 반환", "expected": "deploy → diagnosis", "why": "초기 라우팅은 deploy 이지만 실패 확인 뒤 diagnosis 가 읽기 전용 원인 진단을 이어감" },
     { "utterance": "배포 상태 확인해줘", "expected": "clarity", "why": "일반 상태 조회" },
     { "utterance": "로그 보여줘", "expected": "clarity", "why": "로그 조회" },
     { "utterance": "이전 버전으로 롤백해줘", "expected": "clarity", "why": "롤백 운영 명령" },

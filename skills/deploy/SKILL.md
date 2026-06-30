@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: '이 스킬은 사용자가 이미 axhub에 연결된 현재 브랜치를 axhub 라이브로 다시 배포하고 싶어할 때 사용해요. 비어 있지 않은 기존 로컬 앱을 처음 axhub에 등록·연결·첫 배포까지 가져오는 요청은 import 스킬이 담당해요. 다음 표현에서 활성화: "공개해", "내보내자", "띄워", "배포", "배포해", "배포해줘", "쏘자", "올려", "올리자", "터트려", "푸시한 거 띄워", "프로덕션", "프로덕션에 박아", "demo가 필요", "demo가 필요해", "deploy", "launch", "release", "rollout", "ship", 또는 이미 연결된 axhub 앱의 현재 브랜치를 라이브로 올리고 싶다는 의도. 안전한 배포 준비 확인, 라이브 profile/app 해석, AskUserQuestion preview card 를 통한 AskUserQuestion preview-confirm gate, exit-code 기반 복구 라우팅을 담당해요. 경계: 사용자가 배포 실패 원인 진단을 명시하면 diagnosis 가 맡고, 기존 로컬 앱의 첫 연결·첫 배포는 import 가 맡고, 이 스킬은 연결된 앱의 새 배포·재배포·검증만 맡아요.'
+description: '이 스킬은 사용자가 이미 axhub에 연결된 현재 브랜치를 axhub 라이브로 다시 배포하고 싶어할 때 사용해요. 비어 있지 않은 기존 로컬 앱을 처음 axhub에 등록·연결·첫 배포까지 가져오는 요청은 import 스킬이 담당해요. 다음 표현에서 활성화: "공개해", "내보내자", "띄워", "배포", "배포해", "배포해줘", "쏘자", "올려", "올리자", "터트려", "푸시한 거 띄워", "프로덕션", "프로덕션에 박아", "demo가 필요", "demo가 필요해", "deploy", "launch", "release", "rollout", "ship", 또는 이미 연결된 axhub 앱의 현재 브랜치를 라이브로 올리고 싶다는 의도. 안전한 배포 준비 확인, 라이브 profile/app 해석, AskUserQuestion preview card 를 통한 AskUserQuestion preview-confirm gate, exit-code 기반 복구 라우팅을 담당하고, 배포 검증이 terminal failure 로 끝나면 diagnosis 스킬로 읽기 전용 원인 진단을 이어요. 경계: 사용자가 배포 실패 원인 진단을 명시하면 diagnosis 가 맡고, 기존 로컬 앱의 첫 연결·첫 배포는 import 가 맡고, 이 스킬은 연결된 앱의 새 배포·재배포·검증만 맡아요.'
 examples:
   - utterance: "paydrop 배포해"
     intent: "deploy current branch to axhub live"
@@ -20,6 +20,7 @@ model: sonnet
 
 Deploy a vibe coder's app to axhub with safety primitives. `axhub plugin-support` 명령들 (preview, recovery planning) 과 공개 `axhub deploy` 명령으로 진행해요. preview-confirm flow 없이 `axhub deploy create` 를 직접 호출하지 않아요.
 명시적인 배포 실패 원인 진단 요청(예: "배포 실패 원인 진단해줘", "왜 배포가 죽었어")은 `diagnosis` 에 양보해요. 이 스킬은 원인 분석만 하려고 deploy/verify 를 다시 실행하지 않아요.
+단, 이 스킬이 실제 배포를 시작한 뒤 `axhub deploy verify` 에서 terminal failure 를 확인하면, 같은 앱 식별자와 배포 실패 근거를 유지한 채 `diagnosis` 스킬로 읽기 전용 진단을 이어요. 이 handoff 는 재배포·롤백·새 deploy create 를 절대 실행하지 않아요.
 
 `import` 스킬과 경계를 나눠요. `import` 는 기존 로컬 앱의 첫 axhub 연결과 첫 배포 성공 증거를 담당하고, 이 스킬은 연결된 앱의 ordinary redeploy 를 담당해요. import 의 static terminal success(`active_release_id` + `verified` + `public_url`)는 import envelope 에서 검증하고, deploy 는 deployment-record 경로의 `axhub deploy verify <deployment-id>` 계약과 static redeploy 경로의 `active_release_id` + 공개 URL 확인 계약을 각각 지켜요.
 
@@ -598,13 +599,21 @@ To deploy:
 
    - exit 0 (terminal success) → 단일 한국어 완료 요약을 보여줘요 (live URL 포함).
    - exit 6 (non-terminal — 아직 진행 중) → "빌드가 아직 진행 중이에요. '배포 상태 확인해줘'라고 말하면 이어서 볼 수 있어요." 로 안내하고 멈춰요.
-   - exit 7 (terminal failure — 배포 실패) → "배포가 실패했어요." 후 Step 6 의 4-part 에러 카드로 라우팅해요.
+   - exit 7 (terminal failure — 배포 실패) → "배포가 실패했어요. 지금부터 원인 진단만 읽기 전용으로 확인할게요. 재배포나 롤백은 하지 않아요." 라고 말한 뒤 아래 **Deploy failure → diagnosis handoff** 로 이어가요. Step 6 의 일반 에러 카드로 끝내지 않아요.
    - exit 5 (unknown deployment id) → "그 배포를 못 찾았어요." 안내 후 멈춰요 (latest 재탐색 금지).
    - exit 4 (auth 만료, CLI-native) → Step 6 의 auth recovery (exit 4 / 65) 로 라우팅해요 ("axhub 로그인이 만료됐어요. 다시 로그인할까요?").
 
    `--dry-run` 경로에서는 verify 를 건너뛰어요 (실제 deploy 가 없어요). (업데이트 알림은 Step 1a 에서 맨 앞에 처리하니 여기선 다시 안 해요.)
 
-**대표 verify 실패/진행 중 복구.** `verify` 가 exit 6 을 주면 진행 중으로만 말하고 성공을 선언하지 않아요. exit 7 이면 실패로 말하되 앱이 망가졌다고 단정하지 말고, 같은 deployment id 로 확인한 증거와 다음 행동(`배포 상태 확인해줘`, `로그 보여줘`, `다시 배포해줘`)만 제안해요. 두 경우 모두 raw verify 출력·exit jargon·latest 재탐색은 사용자에게 노출하지 않아요.
+**대표 verify 실패/진행 중 복구.** `verify` 가 exit 6 을 주면 진행 중으로만 말하고 성공을 선언하지 않아요. exit 7 이면 실패로 말하되 앱이 망가졌다고 단정하지 말고, 같은 deployment id 로 확인한 실패 근거를 내부에 보존한 뒤 diagnosis 로 읽기 전용 handoff 해요. 두 경우 모두 raw verify 출력·exit jargon·latest 재탐색은 사용자에게 노출하지 않아요.
+
+**Deploy failure → diagnosis handoff.** exit 7 에서만 적용해요.
+
+- 보존할 내부 근거: `DEPLOY_ID`, Step 1.1/1.2 에서 해석한 앱 slug/id/name, `VERIFY_OUT` 의 분류 가능한 상태. raw stdout/stderr 는 사용자 chat 에 노출하지 않아요.
+- 사용자에게 먼저 말할 문장은 한 줄이에요: "배포가 실패했어요. 지금부터 원인 진단만 읽기 전용으로 확인할게요. 재배포나 롤백은 하지 않아요."
+- callable 한 `Skill` 도구가 있으면 `diagnosis` 스킬을 호출해요. prompt 에는 앱 식별자와 "방금 배포 verify 가 실패했다" 는 문맥만 넘겨요. deployment-id 는 진단 대상이 아니라 근거예요 — diagnosis 의 CLI 표면은 앱 단위 현재 롤아웃 진단이에요.
+- 현재 실행 표면에서 Skill 도구를 호출할 수 없으면 diagnosis 스킬의 표면 선택 규칙을 이 자리에서 그대로 수행해요: MCP `deployment_diagnosis` 가 callable 이면 먼저 쓰고, 아니면 `axhub --json deploy diagnose <앱>` 만 실행해요. 둘 다 읽기 전용이에요.
+- 진단 결과는 diagnosis 스킬의 6가지 사용자 카테고리 문구로 요약해요. 마지막 문장은 수정 후보 또는 다음 행동만 말하고, `다시 배포` 는 사용자가 새로 요청할 때만 deploy 흐름으로 돌아와요.
 
 6. **On any non-zero exit**, route via `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` (canonical router; 두 공간 다 처리: CLI-native 4/5/6 와 helper-output 65/67/68 을 classify-exit 가 65→4 / 67→5 / 68→6 으로 정규화해요 — normalize_helper_exit 계약 불변) 또는 `references/error-empathy-catalog.md` by exit code:
    - exit 64 + `validation.deployment_in_progress` → 4-part Korean copy: "다른 배포가 진행 중이에요. 앱은 안전해요. 5분만 기다리면 자동으로 다음 배포가 가능해요." Never retry. Offer to watch the in-flight deploy instead.
