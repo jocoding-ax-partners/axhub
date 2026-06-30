@@ -23,6 +23,7 @@ Thumbs.db
 # Test artifacts
 tests/.coverage/
 tests/.last-run/
+dist/
 
 # OMC / orchestration state (per-session, transient — not for commit)
 .omc/state/
