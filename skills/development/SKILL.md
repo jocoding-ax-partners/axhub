@@ -1,6 +1,6 @@
 ---
 name: development
-description: '이미 만들어진 axhub 앱에 사용자의 실제 데이터(connector·table)를 기반으로 기능(페이지·화면·대시보드·조회 엔드포인트) 코드를 만들고 싶을 때 사용해요. 핵심은 추측이 아니라 실데이터 grounding — connector/table 을 실제로 조회해 진짜 스키마에 맞는 @ax-hub/sdk 코드를 짜요. read 기능이 중심이고 데이터 입력·수정(CRUD) 화면과 옵트인·게이트 하의 테이블 생성도 만들어요. 활성화 예: "대시보드 만들어줘", "내 connector 데이터로 대시보드 만들어", "유저 목록 페이지 만들어줘", "결제 데이터 보여주는 화면 만들어", "이 테이블로 조회 페이지 만들어줘", "통계 페이지 추가해줘", "관리자 화면 만들어줘", "결제 입력 폼 만들어줘", "build a dashboard from my data", 또는 기존 앱에 실데이터 기반 기능을 코딩하려는 의도. 경계: 빈 디렉토리 새 앱 생성은 init, 비어 있지 않은 기존 로컬 앱을 axhub로 처음 가져오는 요청은 import, 배포는 deploy, axhub 운영 명령(테이블/컬럼 생성·환경변수·로그·connector 연결·데이터 조회 같은 CLI 작업)은 clarity 가 담당해요 — development 는 그 데이터를 쓰는 앱 코드를 생성할 때만 받아요. "테이블 만들어줘" 단독은 clarity, development 는 기능을 만들다 필요할 때만 게이트로 스키마를 옵트인 생성해요.'
+description: 'development: 이미 만들어진 axhub 앱에 실제 데이터(connector·table) 기반 기능 코드를 추가할 때 사용해요. "내 connector 데이터로 대시보드 만들어", "유저 목록 페이지", "결제 데이터 화면", "build a dashboard from my data"처럼 실데이터 스키마를 조회해 @ax-hub/sdk 페이지·화면·대시보드·엔드포인트·CRUD 를 생성하는 요청이에요. 빈 디렉토리 새 앱=init, 기존 앱 첫 연결=import, 배포=deploy, axhub CLI 운영/테이블 생성 단독 요청=clarity 로 양보해요.'
 examples:
   - utterance: "내 connector 데이터로 대시보드 만들어줘"
     intent: "build a data-grounded feature page in an existing axhub app"
@@ -8,13 +8,7 @@ examples:
     intent: "build a data-grounded feature page in an existing axhub app"
   - utterance: "결제 데이터 보여주는 화면 만들어"
     intent: "build a data-grounded feature page in an existing axhub app"
-  - utterance: "이 테이블로 조회 페이지 만들어줘"
-    intent: "build a data-grounded feature page in an existing axhub app"
-  - utterance: "통계 페이지 추가해줘"
-    intent: "build a data-grounded feature page in an existing axhub app"
   - utterance: "build a dashboard from my connector data"
-    intent: "build a data-grounded feature page in an existing axhub app"
-  - utterance: "관리자 조회 화면 짜줘"
     intent: "build a data-grounded feature page in an existing axhub app"
   - utterance: "결제 입력 폼 만들어줘"
     intent: "build a data-grounded feature with write (CRUD) in an existing axhub app"

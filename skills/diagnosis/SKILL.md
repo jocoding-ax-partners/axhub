@@ -1,15 +1,11 @@
 ---
 name: diagnosis
-description: '이 스킬은 사용자가 axhub 배포 실패 원인을 명시적으로 진단해 달라고 할 때만 사용해요. 활성화 예: "배포 실패 원인 진단해줘", "왜 배포가 죽었어", "이 앱 배포 실패 진단해줘", "방금 배포 왜 실패했어", "배포 에러 원인만 알려줘", "diagnose deployment failure", "why did deploy fail", 또는 배포 실패의 원인·해결 후보를 읽기 전용으로 보고 싶다는 의도. 경계: 배포 실행·재배포·검증은 deploy, 일반 상태·로그·롤백·운영 명령은 clarity, CLI·플러그인 최신화는 update, 앱 코드 생성은 development, 설치 상태·환경 진단(doctor)은 onboarding 이 맡아요. 이 스킬은 진단 결과를 6가지 사용자 카테고리로 요약하고 재배포·롤백을 직접 실행하지 않아요.'
+description: 'diagnosis: "배포 실패 원인 진단해줘", "왜 배포가 죽었어", "diagnose deployment failure"처럼 axhub 배포 실패 원인과 해결 후보를 읽기 전용으로 알고 싶을 때만 사용해요. 결과는 사용자 카테고리로 요약하고 재배포·롤백은 직접 실행하지 않아요. 배포 실행/검증=deploy, 상태·로그·롤백·운영 명령=clarity, 업데이트=update, 앱 코드 생성=development 로 양보해요.'
 examples:
   - utterance: "배포 실패 원인 진단해줘"
     intent: "diagnose deployment failure cause"
-  - utterance: "왜 배포가 죽었어"
-    intent: "diagnose deployment failure cause"
   - utterance: "이 앱 배포 실패 진단해줘"
     intent: "diagnose app deployment failure cause"
-  - utterance: "방금 배포 왜 실패했어?"
-    intent: "diagnose latest deployment failure cause"
   - utterance: "diagnose deployment failure"
     intent: "diagnose deployment failure cause"
 allows-dependency-execution: false

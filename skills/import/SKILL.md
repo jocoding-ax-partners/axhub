@@ -1,10 +1,8 @@
 ---
 name: import
-description: '이 스킬은 사용자가 비어 있지 않은 기존 로컬 앱을 axhub로 가져와 앱 생성/선택, manifest 정리, GitHub 연결, 첫 배포까지 진행하고 싶을 때 사용해요. 활성화 예: "기존 앱 올려", "이 폴더 axhub에 올려", "이미 만든 앱 배포 준비해", "내 로컬 프로젝트를 axhub 앱으로 가져와", "import existing app", "upload existing app", "이 앱 axhub로 연결해", 또는 non-empty repo 에서 "앱 만들어줘"처럼 템플릿 bootstrap 이 아니라 기존 소스를 axhub에 등록하려는 의도. 빈 디렉토리에서 새 템플릿 앱을 시작하는 요청은 init 으로 보내고, 이미 axhub에 연결된 앱의 ordinary redeploy 는 deploy 로 보내요.'
+description: '비어 있지 않은 기존 로컬 앱을 axhub 앱으로 연결하고 manifest/GitHub/첫 배포 준비까지 가져오는 import 스킬. "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app"처럼 템플릿 bootstrap 이 아니라 기존 소스를 등록하려는 요청에 사용해요. Next.js뿐 아니라 프론트·백엔드·Dockerfile 앱 등 broad stack 을 CLI 감지에 맡겨요. 빈 디렉토리 새 앱은 init, 이미 연결된 앱의 재배포는 deploy 로 양보해요.'
 examples:
   - utterance: "기존 앱 올려"
-    intent: "import existing local app into axhub"
-  - utterance: "이 폴더 axhub에 올려"
     intent: "import existing local app into axhub"
   - utterance: "이미 만든 앱 axhub로 연결해"
     intent: "import existing local app into axhub"
