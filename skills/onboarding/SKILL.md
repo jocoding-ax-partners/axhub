@@ -104,7 +104,7 @@ DETECT 직후 `github.install_url` 이 있으면 항상 한 줄로 보여줘요.
 | `existing_repo_gap` | Existing repo app connection via `axhub apps git`; load gap-state reference and GitHub reference. |
 | `no_manifest_empty` | No init. Show advisory and go to Ready card with `첫 앱 만들어줘`. |
 | `deps_missing` | Lockfile-only install with `--ignore-scripts`; load [`references/dependency-install.md`](references/dependency-install.md). |
-| `deploy_unverified` | Verify only known deployment id with `axhub deploy verify "$DEPLOYMENT_ID"`. |
+| `deploy_unverified` | Verify only known deployment id and app scope with `axhub deploy verify "$DEPLOYMENT_ID" --app "$APP_ID_OR_SLUG"`. |
 | `doctor_gap` | Final read-only `axhub plugin-support preflight --json` and recovery phrase. |
 | `no_gap` | Ready card. |
 
@@ -139,7 +139,7 @@ Finish with one honest card:
 - NEVER omit `--ignore-scripts` from dependency install.
 - NEVER subprocess(`claude -p`/CI/headless)에서 install/update/auth/init/deps mutation 이나 git/node system install/version switch 를 자동 실행하지 말아요.
 - NEVER mark unchecked items green in `VIBE_READY`.
-- NEVER run deploy verify without the concrete deployment id from the deploy output; no latest re-search.
+- NEVER run deploy verify without the concrete deployment id and app scope from the deploy output; no latest re-search.
 - NEVER claim axhub MCP is connected after add only; require `claude mcp get axhub` connected status.
 
 ## Additional Resources

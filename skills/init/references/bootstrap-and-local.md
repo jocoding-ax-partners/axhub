@@ -88,7 +88,7 @@ If resume says `no pending github device flow`, follow `resume-and-tenant.md` re
 After saga reaches terminal success, read repo from status and fill current directory. Do not create a subdirectory:
 
 ```bash
-REPO=$(axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --field-expr '.data.status.repo_full_name // empty' 2>/dev/null || true)
+REPO=$(axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --field-expr '.data.repo_full_name // .data.status.repo_full_name // empty' 2>/dev/null || true)
 if [ -z "$REPO" ]; then
   echo '{"systemMessage":"GitHub repo 정보가 응답에 없어요. 설치 상태 진단해줘라고 말하면 이어서 점검할 수 있어요."}'
   exit 65
@@ -112,13 +112,21 @@ If `.git` already exists, skip automatic clone and show manual remote commands. 
 After clone, make sure `axhub.yaml` points to the newly created app slug, not the template default:
 
 ```bash
-axhub manifest --json
-axhub manifest validate --file axhub.yaml --json
+if [ -f axhub.yaml ]; then
+  if grep -Eq '^name:[[:space:]]*' axhub.yaml; then
+    APP_SLUG="$APP_SLUG" perl -0pi -e 's/(^name:[[:space:]]*).*$/${1}$ENV{APP_SLUG}/m' axhub.yaml
+  else
+    TMP_MANIFEST="$(mktemp)"
+    { printf 'name: %s\n' "$APP_SLUG"; cat axhub.yaml; } > "$TMP_MANIFEST"
+    mv "$TMP_MANIFEST" axhub.yaml
+  fi
+  axhub deploy --explain --json >/dev/null
+fi
 axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --repo-full-name "$REPO" --clone-done true --json
 axhub plugin-support init-resume clear --json
 ```
 
-If manifest slug differs, edit only the slug field to `$APP_SLUG`, then validate. This protects later deploy resolve from targeting the template app.
+If manifest `name:` differs, edit only that top-level binding to `$APP_SLUG`, then run `deploy --explain` as the parser check. This protects later deploy resolve from targeting the template app.
 
 ## Scaffold And Dependency Preview
 
