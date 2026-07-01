@@ -94,12 +94,18 @@ describe("smooth behavior contracts", () => {
     expect(init).toContain("raw JSON/stderr");
     expect(init).toContain("기존 앱 가져오기와 분리");
     expect(init).toContain("`import` 스킬로 보내요");
+    expect(init).toContain("순수 UUID v4 idempotency key");
+    expect(init).toContain("APP_SLUG=\"$APP_SLUG\" perl -0pi");
+    expect(init).toContain("url_checked=false");
+    expect(init).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
 
     expect(deploy).toContain("axhub deploy verify <deployment-id>");
+    expect(deploy).toContain("axhub deploy verify \"$DEPLOY_ID\"");
     expect(deploy).toContain("exit 6");
     expect(deploy).toContain("exit 7");
     expect(deploy).toContain("성공을 선언하지 않아요");
     expect(deploy).not.toContain("deploy-approved-run");
+    expect(deploy).toContain(".data.id // .data.deployment_id // .id // .deployment_id // empty");
     expect(deploy).toContain("canonical workflow");
     expect(deploy).toContain("diagnosis");
     expect(deploy).toContain("Deploy failure → diagnosis handoff");
@@ -107,12 +113,18 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("axhub --json deploy diagnose <앱>");
 
     expect(importSkill).toContain("axhub plugin-support import --mode preview --json");
+    expect(importSkill).toContain('axhub plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT" --json');
+    expect(importSkill).toContain("static lane 에서는 사용자가 명시적으로");
     expect(importSkill).toContain("axhub plugin-support import --mode execute --approved --json");
+    expect(importSkill).toContain('axhub plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT" --json');
+    expect(importSkill).toContain("Docker/compose `local_only` 에서 새 repo 를 만들려면 `--repo owner/name` 없이 execute 하지 않아요");
     expect(importSkill).toContain("capabilities.import.schemas");
     expect(importSkill).toContain("Static 성공은");
     expect(importSkill).toContain("정적 사이트 확인 증거가 부족해요");
     expect(importSkill).toContain("raw JSON body");
     expect(importSkill).toContain("low-level 명령을 조합해서 우회하지 않아요");
+    expect(importSkill).toContain("axhub deploy --explain --json");
+    expect(importSkill).not.toContain("axhub manifest validate");
     expect(clarity).toContain("공개 표면만");
     expect(clarity).toContain("plugin-support");
     expect(clarity).toContain("탐색·실행 대상이 아니에요");
@@ -215,6 +227,9 @@ describe("smooth behavior contracts", () => {
     // M2: gate relaxation suppresses re-narration only, never the gate.
     expect(init).toContain("install-link 를 보여줬으면 재안내는 생략");
     expect(init).toContain("0-install gate 는 맥락과 무관하게 그대로 실행해요");
+
+    const bootstrapAndLocal = readRepo("skills/init/references/bootstrap-and-local.md");
+    expect(bootstrapAndLocal).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
 
     // deploy: carry-over applies only AFTER the route gate (no vercel hijack).
     expect(deploy).toContain("route gate 통과 후에만 적용해서 다른 타깃");

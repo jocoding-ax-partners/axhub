@@ -83,7 +83,7 @@ TodoWrite({ todos: [
    ```bash
    # 1단계: 최상위 명령 목록만 (작아요)
    axhub --json-schema --field-expr '.commands | keys[]'
-   # 2단계: 후보 명령의 구조 (서브커맨드·플래그·alias) — 그 명령만 슬라이스
+   # 2단계: 후보 명령의 구조 (직접 하위 leaf·플래그·alias) — 그 명령만 슬라이스
    axhub --json-schema --field-expr '.commands["<후보>"]'
    ```
 
