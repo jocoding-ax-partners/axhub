@@ -8,6 +8,8 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint:tone": "bun scripts/check-toss-tone-conformance.ts --strict",
+    "plugin:bundle": "bun scripts/build-plugin-bundle.ts",
+    "plugin:validate": "bun run plugin:bundle && claude plugin validate dist/axhub-plugin",
     "release": "commit-and-tag-version",
     "release:tag": "bun scripts/release-tag.ts"
   },

@@ -201,6 +201,14 @@ bun test                     # SKILL frontmatter + smoothness contract + e2e fix
 bun run typecheck            # tsc --noEmit
 ```
 
+로컬 개발 설치·검증은 repo 루트가 아니라 clean bundle 을 써요. repo 루트에는 `.claude`, `.omx`, `node_modules`, 인덱스 DB 같은 큰 개발 산출물이 생길 수 있어서 Claude Code local plugin cache 를 비대하게 만들 수 있어요.
+
+```bash
+bun run plugin:bundle
+claude plugin validate dist/axhub-plugin
+claude --plugin-dir dist/axhub-plugin
+```
+
 릴리즈는 `commit-and-tag-version` 2단계 flow 예요.
 
 ```bash
