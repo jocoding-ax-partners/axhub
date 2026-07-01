@@ -4,6 +4,16 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.5.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.2...v1.5.3) (2026-07-01)
+
+development skill 이 최신 axhub SDK 방향과 맞지 않는 동적 data-table 예시를 더 이상 안내하지 않도록 정리했어요. 배포 계열 skill 은 CLI envelope 를 단일 진실로 삼아 MCP deploy mutation, advisor, subagent helper 로 새지 않게 고정했고, headless 환경에서는 가능한 CLI dry-run 계약으로 진행하도록 해서 로컬 플러그인과 CLI만으로 더 매끄럽게 QA할 수 있어요.
+
+
+### Fixed
+
+* development skill 을 retired SDK dynamic data-plane 대신 현재 raw DB/SDK 경계에 맞춰 정리
+* deploy/import 실행 경로를 axhub CLI envelope 중심으로 고정하고 headless fallback 문구 보강
+
 ## [1.5.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.1...v1.5.2) (2026-07-01)
 
 Claude Code 가 axhub skill 을 부르기 전에 1M context usage-credit 오류로 막히던 문제를 플러그인 쪽에서 줄였어요. 로컬 설치는 clean bundle 만 잡도록 하고, always-on skill 본문은 compact contract 로 줄이고 긴 절차는 필요할 때만 읽는 references 로 옮겼어요. 새 `plugin:budget` 검증은 source byte budget 과 Claude plugin details token budget 을 fail-closed 로 확인해서, 다시 큰 컨텍스트가 섞이면 릴리즈 전에 잡아요. 온보딩도 이미 `~/.axhub/bin` 에 CLI 가 있는데 PATH 만 못 읽는 경우를 재설치가 아니라 PATH 복구로 안내해요.
