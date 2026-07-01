@@ -133,6 +133,32 @@ describe("smooth behavior contracts", () => {
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
   });
 
+  test("development skill follows the current SDK raw-db surface", () => {
+    const development = readRepo("skills/development/SKILL.md");
+    const connectorSafety = readRepo("skills/development/references/connector-safety.md");
+    const writeGate = readRepo("skills/development/references/write-gate.md");
+
+    expect(development).toContain("legacy `/data` 데이터플레인");
+    expect(development).toContain("sdk.apps.rawDb.tables(appId)");
+    expect(development).toContain("sdk.apps.rawDb.tableRows(appId, table");
+    expect(development).toContain("제거된 SDK data-plane API");
+    expect(connectorSafety).toContain("legacy data-plane DSL 은 제거");
+    expect(writeGate).toContain("legacy data-plane write DSL 은 새로 만들지 않아요");
+
+    const retiredExamples = [
+      "sdk_search (MANDATORY",
+      "MCP 가 authority",
+      'import { AxHubClient, defineSchema, where }',
+      'sdk.tenant("test").app("uqa152-node-fix").data.table',
+      "data.table(Products)",
+      "`where(...).isNotNull()`",
+      "`data.table(\"<name>\", schema)`",
+    ];
+    for (const retiredExample of retiredExamples) {
+      expect(development).not.toContain(retiredExample);
+    }
+  });
+
   test("fixture exposes onboarding detect-first contracts", () => {
     const missing = runShim(["plugin-support", "onboarding-detect", "--json"], { AXHUB_FIXTURE_ONBOARDING: "cli_missing" });
     expect(missing.exitCode).toBe(0);
