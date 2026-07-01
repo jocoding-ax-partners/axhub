@@ -1,16 +1,12 @@
 ---
 name: update
-description: '이 스킬은 사용자가 axhub CLI 와 Claude Code 플러그인을 지금 최신 버전으로 업데이트하고 싶어할 때 사용해요. 세션 중 직접 부르는 on-demand 업데이트라, SessionStart auto-update 훅의 24h throttle 과 무관하게 바로 버전을 확인하고 적용해요. 활성화 예: "업데이트해줘", "최신으로 맞춰줘", "axhub 업데이트", "axhub 최신 버전으로", "플러그인 업데이트해줘", "최신 버전 받아줘", "지금 업데이트", "update", "update axhub", "update the plugin", "get latest version", 또는 axhub CLI·플러그인을 최신으로 올리고 싶다는 모든 의도. axhub CLI(axhub update apply)와 플러그인(claude plugin update) 두 버전을 함께 봐요. 경계: 첫 셋업·설치=onboarding, 새 앱=init, 배포=deploy, 그 외 axhub 운영 명령=clarity 라 버전 업데이트 의도일 때만 받아요.'
+description: 'update: 사용자가 지금 axhub CLI 와 Claude Code 플러그인을 최신으로 올리려는 수동 on-demand 업데이트 요청에 사용해요. "업데이트해줘", "axhub 최신 버전으로", "플러그인 업데이트", "update axhub"처럼 버전 확인/적용 의도가 분명한 경우예요. 첫 셋업·설치=onboarding, 새 앱=init, 배포=deploy, 그 외 axhub 운영 명령=clarity 로 양보해요.'
 examples:
   - utterance: "업데이트해줘"
     intent: "update axhub cli and plugin to latest"
   - utterance: "axhub 최신 버전으로 맞춰줘"
     intent: "update axhub cli and plugin to latest"
-  - utterance: "플러그인 업데이트 있어?"
-    intent: "check and apply axhub plugin update"
   - utterance: "update axhub"
-    intent: "update axhub cli and plugin to latest"
-  - utterance: "지금 최신 버전 받아줘"
     intent: "update axhub cli and plugin to latest"
 allows-dependency-execution: false
 model: sonnet
@@ -18,10 +14,10 @@ model: sonnet
 
 # axhub update (수동 on-demand 버전 업데이트)
 
-사용자가 직접 불러 **axhub CLI 와 Claude Code 플러그인을 지금 최신으로** 올리는 스킬이에요. 로직은 `hooks/auto-update-prompt.md` (SessionStart auto-update 훅) 와 같되, 사용자가 명시적으로 부른 거라 두 가지가 달라요:
+사용자가 직접 불러 **axhub CLI 와 Claude Code 플러그인을 지금 최신으로** 올리는 스킬이에요. 제거된 자동 훅에 의존하지 않고, 사용자가 명시적으로 부른 순간에만 버전 확인과 적용을 진행해요:
 
-- **24h throttle 없음** — 훅과 달리 항상 바로 버전을 확인해요.
-- **최신이어도 결과 보고** — 훅은 최신이면 조용히 지나가지만, 여기선 "이미 최신이에요 (CLI vX, plugin vY)" 처럼 결과를 한 줄로 알려요. 사용자가 물었으니 답을 줘요.
+- **항상 즉시 확인** — 사용자가 부른 수동 실행이라 바로 버전을 확인해요.
+- **최신이어도 결과 보고** — "이미 최신이에요 (CLI vX, plugin vY)" 처럼 결과를 한 줄로 알려요. 사용자가 물었으니 답을 줘요.
 
 전 과정 best-effort·비차단이에요. 실패·구 CLI·네트워크 오류면 raw 에러를 숨기고 한 줄만 안내한 뒤 멈춰요.
 
@@ -53,7 +49,7 @@ TodoWrite({ todos: [
 
 **`disabled` 와 `AXHUB_NO_AUTO_UPDATE` — 둘 다 존중해요 (자동 적용 안 함, 안내만).**
 - `disabled`(패키지 매니저가 관리하는 설치) → CLI 가 자기를 교체할 수 없어요. 패키지 매니저 업그레이드를 **안내만** 해요.
-- `AXHUB_NO_AUTO_UPDATE` → CLAUDE.md 가 문서화한 update kill switch 예요. auto-update 훅과 똑같이 **존중**해서, 새 버전이 있어도 적용하지 않고 **안내만** 해요 (사용자가 직접 불러도요 — 잠긴·CI 환경에서 의도치 않은 binary swap 을 막아요). 받으려면 플래그를 끄거나 안내된 명령을 직접 실행하면 돼요.
+- `AXHUB_NO_AUTO_UPDATE` → CLAUDE.md 가 문서화한 update kill switch 예요. 새 버전이 있어도 적용하지 않고 **안내만** 해요 (사용자가 직접 불러도요 — 잠긴·CI 환경에서 의도치 않은 binary swap 을 막아요). 받으려면 플래그를 끄거나 안내된 명령을 직접 실행하면 돼요.
 
 ---
 
@@ -64,7 +60,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 ```
 
 - `--plugin-version` 은 CLI v0.21.0+ 에서 플러그인 최신 여부도 함께 판정해요. 구 CLI 가 이 플래그를 거부하면 (exit 64) `axhub update check --json` 으로 한 번 더 호출해 CLI-only 로 떨어져요.
-- 결과와 무관하게 재확인 주기 캐시를 갱신해요 (auto-update 훅의 24h throttle 기준점도 같이 리셋 — 방금 봤으니 훅이 중복 확인 안 하게):
+- 결과와 무관하게 수동 확인 시각 캐시를 갱신해요:
 
   ```bash
   mkdir -p "$HOME/.axhub/cache" && : > "$HOME/.axhub/cache/.plugin-update-check"
@@ -135,7 +131,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 
 - NEVER `command -v axhub` 실패 상태에서 재설치를 시도하지 말아요 — 설치는 onboarding 소관이라 안내만 하고 멈춰요.
 - NEVER `disabled == true` 인데 `axhub update apply` 를 실행하지 말아요 — 패키지 매니저 관리 설치는 자기 교체가 안 돼요.
-- NEVER `AXHUB_NO_AUTO_UPDATE` 가 설정됐는데 자동 적용하지 말아요 — 문서화된 update kill switch 라, 사용자가 직접 불러도 안내만 해요 (auto-update 훅과 동일).
+- NEVER `AXHUB_NO_AUTO_UPDATE` 가 설정됐는데 자동 적용하지 말아요 — 문서화된 update kill switch 라, 사용자가 직접 불러도 안내만 해요.
 - NEVER exit 14/66 (보안 검증 실패) 을 무시하고 강제 진행하지 말아요. 하드 스톱이에요.
 - NEVER raw JSON·stderr·내부 device/installation id 를 chat 에 출력하지 말아요.
 - NEVER 플러그인 업데이트를 받고도 재시작 안내를 빼먹지 말아요 — 재시작 전엔 새 버전이 안 떠요.
