@@ -95,6 +95,18 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
      AXHUB_BIN="$(command -v axhub)"; export AXHUB_BIN
      DETECT_JSON=$(axhub plugin-support onboarding-detect --json 2>/dev/null)
      [ -n "$DETECT_JSON" ] || DETECT_JSON='{"cli_present":true,"first_gap":"doctor_gap","github":{"state":"unavailable","install_url":null}}'
+   elif [ -f "$HOME/.axhub/bin/axhub" ] || [ -f "$HOME/.axhub/bin/axhub.exe" ]; then
+     # axhub 는 ~/.axhub/bin 에 이미 설치돼 있는데 이 셸 PATH 가 그걸 못 읽어요.
+     # install 은 PATH 를 shell rc(.zshrc/.bashrc)나 Windows 레지스트리에만 넣어서,
+     # 이미 열린 터미널·실행 중 세션은 그걸 다시 안 읽어 command -v 가 실패해요.
+     # command -v 실패 + 디스크 존재 = 정의상 on_disk_not_on_path 라, 재설치
+     # (cli_missing)가 아니라 PATH 복구(cli_path_missing)로 보내요. 여기서 detect 를
+     # 부르거나 AXHUB_BIN 을 export 하면 detect 가 cli_on_path:true 로 오보해 이 gap
+     # 이 사라지니 부르지 않아요. canonical install dir(~/.axhub/bin)만 봐요 — 비표준
+     # 설치는 기존대로 else 의 cli_missing 으로 떨어져서 회귀는 없어요.
+     # Windows(Git Bash): $HOME=%USERPROFILE%, install.ps1 기본도 ~/.axhub/bin\axhub.exe
+     # 라 같은 경로예요. -x 는 MSYS 의 .exe 권한 에뮬레이션이 흔들려서 존재 검사 -f 를 써요.
+     DETECT_JSON='{"cli_present":true,"cli_on_path":false,"cli_state":"on_disk_not_on_path","first_gap":"cli_path_missing","github":{"state":"unavailable","install_url":null}}'
    else
      DETECT_JSON='{"cli_present":false,"first_gap":"cli_missing","github":{"state":"unavailable","install_url":null}}'
    fi
@@ -102,6 +114,8 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    ```
 
    `first_gap=helper_outdated` 분기는 없어요 — detect 는 `axhub` CLI 안에 들어 있어서 "CLI 는 되는데 detect 가 빈 출력" 케이스가 구조적으로 사라졌어요. 위 fallback 처럼 빈 출력은 `doctor_gap` 으로 낮춰서 끝단 점검(Step 9)으로 보내요.
+
+   **CLI 는 설치됐는데 PATH 에만 안 잡히는 경우** 를 위 `elif` 가 잡아요. install 은 PATH 를 shell rc 에만 넣어서 이미 열린 터미널·실행 중 세션은 그걸 못 읽어요 — 그래서 `command -v axhub` 실패를 재설치로 오해하지 않게, 디스크의 `~/.axhub/bin/axhub` 를 확인해 `cli_path_missing`(Step 4b PATH 복구 + 새 터미널)으로 보내요. 이게 "새 세션마다 CLI 를 또 설치" 하던 증상의 근원이에요.
 
 **대표 안전 실패 흐름.** `cli_missing` 이면 preflight/doctor 를 먼저 부르지 말고 설치 안내와 재개 phrase 만 남겨요. `cli_old` 이면 "axhub CLI 가 오래됐어요. 업데이트한 뒤 다시 시도해 주세요" 처럼 원인·행동을 짧게 말하고, raw stderr 나 내부 subcommand 덤프는 보여주지 않아요. 두 경우 모두 detect-first 근거(`first_gap`)를 따른 뒤 멈추거나 재감지해요.
 
@@ -202,13 +216,19 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    - macOS / Linux: `curl -fsSL https://cli.axhub.ai/install.sh | sh`
    - Windows: `irm https://cli.axhub.ai/install.ps1 | iex`
 
-   **4b. `cli_path_missing`.** CLI 는 디스크에 있는데 PATH 에 안 잡혀요 (`cli_state=on_disk_not_on_path`). CLI 가 자기 PATH 를 고쳐요 — shell rc 수정 + backup 은 `repair-path` 가 소유해요.
+   **4b. `cli_path_missing`.** CLI 는 디스크에 있는데 이 셸 PATH 에 안 잡혀요 (`cli_state=on_disk_not_on_path`). CLI 가 자기 PATH 를 고쳐요 — Unix 는 shell rc(.zshrc/.bashrc) 수정 + backup, Windows 는 PowerShell 로 레지스트리 `HKCU\Environment` PATH 수정을 `repair-path` 가 소유해요. 이 gap 은 `axhub` 가 PATH 에 없을 수 있으니 절대경로로 불러요 (Windows Git Bash 는 bare `axhub` 가 안 잡히면 `.exe` 로 폴백).
 
    ```bash
-   axhub plugin-support repair-path --json
+   AXHUB_BIN="$(command -v axhub 2>/dev/null)"
+   [ -n "$AXHUB_BIN" ] || { AXHUB_BIN="$HOME/.axhub/bin/axhub"; [ -f "$AXHUB_BIN" ] || AXHUB_BIN="$HOME/.axhub/bin/axhub.exe"; }
+   "$AXHUB_BIN" plugin-support repair-path --json
    ```
 
-   JSON: `{repaired, already_present, disabled, shell_rc, backup_path}` (spec §2.5). `repaired:true` 면 "PATH 를 고쳐뒀어요. **새 터미널을 한 번 열고** '온보딩 계속' 이라고 말해 주세요" 로 안내해요 (새 터미널 reload 는 사용자 행동 필수). `already_present:true` 면 바로 재감지하고, `disabled:true` (`AXHUB_DISABLE_PATH_REPAIR`) 면 수동 PATH 추가 안내 한 줄을 보여줘요. shell rc 변경 동의가 차단점이라, 자동 수정 전에 한 줄로 알려요.
+   JSON: `{repaired, already_present, disabled, shell_rc, backup_path}` (spec §2.5). `disabled:true` (`AXHUB_DISABLE_PATH_REPAIR`) 면 수동 PATH 추가 안내 한 줄을 보여줘요. rc·레지스트리 변경 동의가 차단점이라, 자동 수정 전에 한 줄로 알려요.
+
+   **재감지 vs 새 터미널 (무한 루프 방지).** repair 뒤 어떻게 이어갈지는 지금 이 셸에서 `command -v axhub` 가 되는지로 갈라요:
+   - `command -v axhub` **성공** (구 CLI self-probe 오탐으로 path gap 이 뜬 케이스): `repaired:true`/`already_present:true` 면 바로 재감지해요 — CLI 가 실제로 PATH 에 있어서 재감지가 gap 을 지워요.
+   - `command -v axhub` **실패** (Step 2 on-disk `elif` 로 들어온 케이스): rc 는 `repaired`(새로 추가)든 `already_present`(이미 있음)든 이제 맞지만 **이 셸·실행 중 세션은 rc 를 다시 읽지 않아요**. 여기서 재감지하면 같은 `cli_path_missing` 이 또 나와 무한 루프예요. 그러니 재감지하지 말고 `READY_WITH_USER_ACTION` 으로 "PATH 준비됐어요. **새 터미널을 한 번 열고** 거기서 claude 를 실행해 온보딩을 다시 불러 주세요" 라고 안내하고 멈춰요. **지금 이 터미널에서 claude 만 다시 켜면 stale 환경 그대로라 똑같이 안 잡혀요** — 반드시 새 터미널(셸이 rc 를 새로 읽는)이 필요해요. 새 터미널에서 온보딩을 다시 부르면 깨끗한 재감지가 돌아요.
 
    **4c. `cli_old`.** `cli_too_old=true` 또는 `has_update=true` 면 업데이트를 물어요. 이 plugin 의 스킬들은 ax-hub-cli **v0.20.0 이상**(plugin-support 표면 포함)이 필요해요. update-summary 헬퍼는 폐기됐어요 — 공개 `axhub update` 를 직접 부르고 한국어 메시지는 이 SKILL 이 렌더해요.
 
@@ -488,6 +508,9 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 
 - NEVER preflight 를 CLI 확인 이전에 호출 — CLI 부재 상태로 fire 되면 무한 루프 위험이에요. detect 는 fail-open 이라 먼저 써요.
 - NEVER `command -v axhub` 가 성공하는데 `cli_missing` 으로 재설치를 안내하지 말아요 — 그건 구 CLI 의 detect self-probe 오탐이에요. Step 2 의 `AXHUB_BIN` 절대경로 핀으로 재감지하면 present 로 잡히고, 그래도 false 면 CLI 를 present 로 간주하고 `auth_missing` 부터 이어가요.
+- NEVER `command -v axhub` 가 실패해도 `~/.axhub/bin/axhub` 가 디스크에 있으면 `cli_missing`(재설치)로 가지 말아요 — install 이 PATH 를 rc 에만 넣어 이 셸이 아직 못 읽는 상태라, `cli_path_missing`(PATH 복구 + 새 터미널)으로 라우팅해요. 이게 "새 세션마다 CLI 재설치" 버그의 근원이에요.
+- NEVER Step 2 on-disk `elif` 분기에서 detect 를 부르거나 AXHUB_BIN 을 export 하지 말아요 — detect 가 `cli_on_path:true` 로 오보해 path gap 이 사라지고 다시 재설치로 되돌아가요.
+- NEVER `command -v axhub` 가 실패하는 세션에서 repair-path 뒤 재감지 루프를 돌지 말아요 — rc 가 맞아도 이 셸이 재소싱을 못 해 같은 `cli_path_missing` 이 반복돼요. **새 터미널을 열어 거기서 다시 시작** 하라는 안내(`READY_WITH_USER_ACTION`)로 끝내요 — 같은 터미널에서 claude 만 재실행하면 stale 환경이라 그대로예요.
 - NEVER 사용자가 sibling skill 이름이나 slash command 를 알아야만 끝나는 안내를 만들지 말아요.
 - NEVER 한 번에 여러 mutate gap 을 추측 실행하지 말아요. 항상 detect-first → 첫 gap 처리 → 재감지 루프예요.
 - NEVER gap 마다 preflight/detect 를 중복 호출하지 말아요. `onboarding-detect` 한 번이 단일 판정원이에요.

@@ -81,6 +81,13 @@ describe("smooth behavior contracts", () => {
     expect(onboarding).toContain("cli_missing");
     expect(onboarding).toContain("cli_old");
     expect(onboarding).toContain("detect-first");
+    // Regression: CLI installed on disk but not on PATH (new session, rc not re-sourced)
+    // must route to PATH repair, not reinstall. See Step 2 on-disk elif + Step 4b loop-breaker.
+    // -f (existence) not -x so Git Bash .exe (MSYS perm emulation) probes reliably on Windows.
+    expect(onboarding).toContain('[ -f "$HOME/.axhub/bin/axhub" ]');
+    expect(onboarding).toContain('[ -f "$HOME/.axhub/bin/axhub.exe" ]');
+    expect(onboarding).toContain('"first_gap":"cli_path_missing"');
+    expect(onboarding).toContain("무한 루프 방지");
 
     expect(init).toContain("axhub apps bootstrap");
     expect(init).toContain("대표 여정에서의 역할");
