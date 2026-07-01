@@ -47,6 +47,15 @@ Headless means `claude -p`, CI, `$CLAUDE_NON_INTERACTIVE`, no TTY, or unavailabl
 
 Keep chat human and Korean. Do not echo raw ids, raw JSON, schema names, exit numbers, internal command names, or stderr unless `AXHUB_DEPLOY_VERBOSE=1`.
 
+## Tool Authority
+
+This skill is **CLI-only**. All deploy preview/create/verify/status/diagnosis routing must go through `axhub` CLI commands described below. Ignore MCP deployment mutation tools even when they are visible in the session.
+
+- Do not call MCP tools such as `deployment_trigger` for deploy create.
+- Do not route deploy execution through advisor/server advisor/subagent helpers.
+- Do not escalate to another model/context to decide deployment. The CLI envelopes are the source of truth.
+- If MCP deployment tools are present but denied, that is not a blocker for this skill; continue with the CLI path or the headless dry-run contract.
+
 Progress lines:
 
 - `[1/5] axhub 점검하는 중이에요`
@@ -213,3 +222,5 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 - NEVER infer mutation target from pwd, git remote, cached app id, or old manifest alone; live resolve through `deploy-prep`.
 - NEVER bypass the AskUserQuestion preview card on slash invocation. Slash confirms skill invocation, not the destructive operation.
 - NEVER insert the old approved-run helper bridge between preview approval and the canonical workflow; approval flows into `deploy-prep`, public `axhub deploy create --execute`, and verify.
+- NEVER call MCP deployment mutation tools such as `deployment_trigger`; deploy is CLI-only.
+- NEVER use advisor/server advisor/subagent/model escalation to choose or execute deploy; use CLI envelopes only.
