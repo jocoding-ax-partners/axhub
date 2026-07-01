@@ -71,13 +71,15 @@ if command -v axhub >/dev/null 2>&1; then
   AXHUB_BIN="$(command -v axhub)"; export AXHUB_BIN
   DETECT_JSON=$(axhub plugin-support onboarding-detect --json 2>/dev/null)
   [ -n "$DETECT_JSON" ] || DETECT_JSON='{"cli_present":true,"first_gap":"doctor_gap","github":{"state":"unavailable","install_url":null}}'
+elif [ -f "$HOME/.axhub/bin/axhub" ] || [ -f "$HOME/.axhub/bin/axhub.exe" ]; then
+  DETECT_JSON='{"cli_present":true,"cli_on_path":false,"cli_state":"on_disk_not_on_path","first_gap":"cli_path_missing","github":{"state":"unavailable","install_url":null}}'
 else
   DETECT_JSON='{"cli_present":false,"first_gap":"cli_missing","github":{"state":"unavailable","install_url":null}}'
 fi
 echo "$DETECT_JSON"
 ```
 
-`AXHUB_BIN` 은 PATH/HOME 차이 때문에 detect self-probe 가 현재 shell 의 axhub 를 못 찾는 오탐을 줄이기 위한 pin 이에요. detect output 은 fail-open 이며 CLI 부재도 `cli_present:false` 로 표현돼요.
+`AXHUB_BIN` 은 PATH/HOME 차이 때문에 detect self-probe 가 현재 shell 의 axhub 를 못 찾는 오탐을 줄이기 위한 pin 이에요. `command -v axhub` 는 실패했지만 canonical install dir(`~/.axhub/bin/axhub` 또는 `.exe`)에 파일이 있으면 재설치가 아니라 `cli_path_missing` 이에요. 이 branch 에서는 detect 를 부르거나 `AXHUB_BIN` 을 export 하지 않아요. 열린 세션이 PATH 를 못 읽는 상태라 detect 가 `cli_on_path:true` 로 오보하거나 같은 gap 을 반복할 수 있기 때문이에요.
 
 주요 필드는 `first_gap`, `gaps`, `cli_present`, `cli_version`, `cli_state`, `cli_on_path`, `cli_too_old`, `has_update`, `latest_version`, `auth_ok`, `auth_error_code`, `git_present`, `git_repo`, `git_commit`, `node_present`, `node_version`, `node_required`, `node_mismatch`, `manifest_present`, `lockfile_present`, `deps_missing`, `dir_empty`, `github`, `deploy_checked`, `deploy_verified` 예요.
 
@@ -108,6 +110,8 @@ DETECT 직후 `github.install_url` 이 있으면 항상 한 줄로 보여줘요.
 
 If a handler needs a prompt but D1 safe-stop mode is active, do not execute the mutation. Return `SAFE_STOP_NONINTERACTIVE` with the exact manual command or natural phrase.
 
+`cli_path_missing` 은 CLI 가 디스크에 있는데 현재 셸 PATH 에 없는 상태예요. repair-path 뒤에도 `command -v axhub` 가 실패하면 무한 루프 방지를 위해 재감지를 반복하지 말고, `READY_WITH_USER_ACTION` 으로 "PATH 준비됐어요. 새 터미널을 열고 거기서 Claude 를 실행해 온보딩을 다시 불러 주세요" 라고 안내해요. 같은 터미널에서 Claude 만 재실행하면 stale 환경이라 같은 gap 이 반복될 수 있어요.
+
 ### 4. MCP and Ready card
 
 After gaps are green, optionally register axhub MCP in user scope and verify authentication status. Load [`references/mcp-ready-card.md`](references/mcp-ready-card.md) before doing this step. Never claim MCP connected until `claude mcp get axhub` says `Status: Connected`.
@@ -123,6 +127,9 @@ Finish with one honest card:
 
 - NEVER call preflight before CLI detection; `onboarding-detect --json` is the fail-open first step.
 - NEVER treat `command -v axhub` success as `cli_missing`; pin `AXHUB_BIN` and continue from the real detect state.
+- NEVER treat `command -v axhub` failure as `cli_missing` when `~/.axhub/bin/axhub` or `~/.axhub/bin/axhub.exe` exists; route to `cli_path_missing` instead.
+- NEVER call detect or export `AXHUB_BIN` in the on-disk-not-on-PATH branch; it can hide the PATH gap.
+- NEVER loop re-detect in the same session after repair-path if `command -v axhub` still fails; tell the user to open a new terminal.
 - NEVER require the user to know sibling skill names or slash commands to finish onboarding.
 - NEVER run multiple mutate gaps from one detect result. Always detect-first -> first_gap -> re-detect.
 - NEVER run plugin update during onboarding; mention `/plugin update` as advisory only.
