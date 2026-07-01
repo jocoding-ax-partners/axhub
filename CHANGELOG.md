@@ -4,6 +4,22 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.5.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.1...v1.5.2) (2026-07-01)
+
+Claude Code 가 axhub skill 을 부르기 전에 1M context usage-credit 오류로 막히던 문제를 플러그인 쪽에서 줄였어요. 로컬 설치는 clean bundle 만 잡도록 하고, always-on skill 본문은 compact contract 로 줄이고 긴 절차는 필요할 때만 읽는 references 로 옮겼어요. 새 `plugin:budget` 검증은 source byte budget 과 Claude plugin details token budget 을 fail-closed 로 확인해서, 다시 큰 컨텍스트가 섞이면 릴리즈 전에 잡아요. 온보딩도 이미 `~/.axhub/bin` 에 CLI 가 있는데 PATH 만 못 읽는 경우를 재설치가 아니라 PATH 복구로 안내해요.
+
+
+### Added
+
+* plugin context budget guard 추가
+* deploy/init/onboarding 긴 절차를 on-demand references 로 분리
+
+
+### Fixed
+
+* Claude Code 1M context usage-credit 오류를 유발하던 plugin always-on context 축소
+* onboarding이 PATH 미등재 CLI를 재설치하지 않도록 수정 74dc858
+
 ## [1.5.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.0...v1.5.1) (2026-06-30)
 
 deploy 실패를 만났을 때 사용자가 막다른 골목에 남지 않도록 deploy skill 이 diagnosis skill 로 자연스럽게 이어지는 안내를 갖췄어요. import skill 도 CLI 0.22.1 의 넓어진 stack detection 과 맞춰 Next.js 밖의 백엔드·프론트엔드 앱까지 기존 프로젝트를 가져와 실제 배포로 이어가는 목표를 더 분명히 설명해요.
