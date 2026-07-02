@@ -109,7 +109,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 ## skill 이 CLI 를 부르는 법
 
 - 흡수된 helper 표면은 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 — 예: `onboarding-detect`, `preflight`, `deploy-prep`.
-- 공개 검증·진단 표면은 `axhub deploy verify <deployment-id>` 와 `axhub deploy diagnose` 예요.
+- 공개 검증·진단 표면은 `axhub deploy verify <deployment-id> --app <app>` 와 `axhub deploy diagnose` 예요.
 - init·deploy skill 은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면(v0.20.0+) 을 가드해요. 미달이면 멈추고 안내해요 — 우회 금지.
 
 ## 변경 검증
@@ -129,5 +129,5 @@ frontmatter validity check 와 e2e flow 1개도 살아남은 quality gate 예요
 - NEVER helper 바이너리 (`crates/axhub-helpers`) 나 hook / NL routing / scaffold 인프라 재추가 — diet 결정 위반.
 - NEVER 명시적 결정 없이 skill 추가 — 현재 8 skill 체제 유지 (`clarity` 는 deep-interview spec, `development` 은 office-hours→리뷰 체인, `update` 는 수동 on-demand 업데이트 요청, `import` 는 기존 앱 가져오기, `diagnosis` 는 배포 실패 원인 진단 deep-interview→ralplan 승인으로 신설됐어요).
 - NEVER 최소 CLI 기능 게이트를 우회하지 말아요.
-- NEVER deploy 성공 선언(docker/compose deployment-record lane)을 `axhub deploy verify <deployment-id>` 1회 실행 없이 — deployment id 필수, latest 재탐색 금지. static 앱(deploy_method=static)은 별도 lane 이라 `deploy verify` 가 404 라서 `active_release_id`(activate 성공)로 선언해요.
+- NEVER deploy 성공 선언(docker/compose deployment-record lane)을 `axhub deploy verify <deployment-id> --app <app>` 1회 실행 없이 — deployment id 와 app scope 필수, latest 재탐색 금지. static 앱(deploy_method=static)은 별도 lane 이라 `deploy verify` 가 404 라서 `active_release_id`(activate 성공)로 선언해요.
 - NEVER release 를 manual `vim package.json` + `git tag` 로 — `bun run release` → narrative amend → `bun run release:tag` 2단계 flow (단순화된 postbump) 만 써요.

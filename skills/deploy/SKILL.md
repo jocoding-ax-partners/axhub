@@ -22,7 +22,7 @@ Deploy a vibe coder's app to axhub with safety primitives. `axhub plugin-support
 명시적인 배포 실패 원인 진단 요청(예: "배포 실패 원인 진단해줘", "왜 배포가 죽었어")은 `diagnosis` 에 양보해요. 이 스킬은 원인 분석만 하려고 deploy/verify 를 다시 실행하지 않아요.
 단, 이 스킬이 실제 배포를 시작한 뒤 `axhub deploy verify` 에서 terminal failure 를 확인하면, 같은 앱 식별자와 배포 실패 근거를 유지한 채 `diagnosis` 스킬로 읽기 전용 진단을 이어요. 이 handoff 는 재배포·롤백·새 deploy create 를 절대 실행하지 않아요.
 
-`import` 스킬과 경계를 나눠요. `import` 는 기존 로컬 앱의 첫 axhub 연결과 첫 배포 성공 증거를 담당하고, 이 스킬은 연결된 앱의 ordinary redeploy 를 담당해요. import 의 static terminal success(`active_release_id` + `verified` + `public_url`)는 import envelope 에서 검증하고, deploy 는 deployment-record 경로의 `axhub deploy verify <deployment-id>` 계약과 static redeploy 경로의 `active_release_id` + 공개 URL 확인 계약을 각각 지켜요.
+`import` 스킬과 경계를 나눠요. `import` 는 기존 로컬 앱의 첫 axhub 연결과 첫 배포 성공 증거를 담당하고, 이 스킬은 연결된 앱의 ordinary redeploy 를 담당해요. import 의 static terminal success(`active_release_id` + `verified` + `public_url`)는 import envelope 에서 검증하고, deploy 는 deployment-record 경로의 `axhub deploy verify <deployment-id> --app <app>` 계약과 static redeploy 경로의 `active_release_id` + 공개 URL 확인 계약을 각각 지켜요.
 
 ## 절대 규칙 — 길어도 매 응답·최종 메시지에 먼저 적용해요
 
@@ -43,7 +43,7 @@ When the user says a human deployment phrase such as `배포해줘`, `올려줘`
 - Copy that Korean stdout as the preview card and ask for explicit approval.
 - After the user explicitly approves, continue into the canonical workflow below starting at Step 1.1 with the approval decision already captured. Use `deploy-prep`, git readiness/status-first checks, token gate, public `axhub deploy create --execute --json` when redeploy creation is actually required, and Step 5 verify. Do not insert a separate approved-run helper bridge between preview approval and the canonical workflow.
 - Bind `DEPLOY_ID` only from an in-flight deployment id or public `axhub deploy create --execute --json` output. If no deployment id is present, do **not** declare success; say "배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. '배포 상태 확인해줘'라고 말하면 이어서 볼게요." and stop.
-- Confirm success only with `axhub deploy verify "$DEPLOY_ID"` (Step 5). Copy verify-derived Korean success/recovery text, not raw deploy-create stdout, as the final deploy result. Do not call this skill again after approval.
+- Confirm success only with `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` (or the resolved app slug/id from Step 1.1; Step 5). Copy verify-derived Korean success/recovery text, not raw deploy-create stdout, as the final deploy result. Do not call this skill again after approval.
 - Do not echo the user's phrase as a route conversion, such as `"배포해줘" → ...`.
 - If a Bash/tool call is needed, use Korean titles only: `배포 준비 확인`, `배포 실행`, or `배포 상태 확인`.
 - Before any destructive deploy, show only the Korean preview card (앱 / 환경 / 브랜치 / 커밋 / 예상 시간) and ask for explicit approval.
@@ -585,17 +585,17 @@ To deploy:
 
    `DEPLOY_ID` 는 deploy create stdout JSON 의 `.id` (또는 in-flight race 시 재조회한 in-flight id) 예요. Step 5 verify 가 이 id 를 써요.
 
-5. **Success declaration — verify once (배포 성공 선언은 verify 로만).** 배포가 끝났는지 / 성공인지 선언은 **오직 `axhub deploy verify <deployment-id>` 한 번**으로 해요. deployment id 는 Step 4 의 `DEPLOY_ID` (또는 Step 1.6/1.7 의 `$IN_FLIGHT_ID`) 예요. prose polling 절차나 `deploy status --watch` 기반 성공 주장은 하지 않아요.
+5. **Success declaration — verify once (배포 성공 선언은 verify 로만).** 배포가 끝났는지 / 성공인지 선언은 **오직 `axhub deploy verify <deployment-id> --app <app>` 한 번**으로 해요. deployment id 는 Step 4 의 `DEPLOY_ID` (또는 Step 1.6/1.7 의 `$IN_FLIGHT_ID`) 예요. app 은 Step 1.1 에서 live resolve 한 `$APP_ID` 또는 `$APP_SLUG` 예요. deployment id 와 app 을 둘 다 넘겨도 latest 재탐색은 아니며, v0.22.2 CLI 검증 표면에 필요한 app scope 예요. prose polling 절차나 `deploy status --watch` 기반 성공 주장은 하지 않아요.
 
    ```bash
    echo "배포 결과를 확인하고 있어요." >&2
    VERIFY_OUT=$(mktemp)
-   axhub deploy verify "$DEPLOY_ID" > "$VERIFY_OUT" 2>&1
+   axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" > "$VERIFY_OUT" 2>&1
    VERIFY_EXIT=$?
    # raw 출력은 chat 에 cat 하지 않아요 — 에이전트가 $VERIFY_OUT 을 읽고 아래 분기의 한국어 문장만 보여줘요.
    ```
 
-   `axhub deploy verify` 는 공개 명령이에요. terminal success state + 접근 가능 URL 을 확인해요 (spec §2.3, correlation 계약: **deployment id 인자 필수, latest 재탐색 금지**). 비-0 exit 는 절대 성공으로 선언하지 않아요. exit code 로 갈라요:
+   `axhub deploy verify` 는 공개 명령이에요. terminal success state 를 확인해요 (spec §2.3, correlation 계약: **deployment id 인자 필수, latest 재탐색 금지**). v0.22.2 는 app scope 도 요구하므로 `--app "$APP_ID"` 를 빠뜨리지 않아요. verify 응답이 `url_checked=false` 면 접근 가능 URL 은 별도 `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` + HTTPS HEAD retry 로 확인하고, 그 전에는 "바로 열 수 있어요"라고 말하지 않아요. 비-0 exit 는 절대 성공으로 선언하지 않아요. exit code 로 갈라요:
 
    - exit 0 (terminal success) → 단일 한국어 완료 요약을 보여줘요 (live URL 포함).
    - exit 6 (non-terminal — 아직 진행 중) → "빌드가 아직 진행 중이에요. '배포 상태 확인해줘'라고 말하면 이어서 볼 수 있어요." 로 안내하고 멈춰요.
@@ -632,8 +632,8 @@ To deploy:
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop `--json` (parsing relies on it).
 - NEVER call `axhub deploy create --execute` without the AskUserQuestion preview decision.
-- NEVER declare deploy success from `deploy status --watch` output or a prose polling loop. Success declaration is `axhub deploy verify <deployment-id>` run once.
-- NEVER call `axhub deploy verify` without a deployment id (latest 재탐색 금지 — correlation 계약).
+- NEVER declare deploy success from `deploy status --watch` output or a prose polling loop. Success declaration is `axhub deploy verify <deployment-id> --app <app>` run once.
+- NEVER call `axhub deploy verify` without a deployment id or without the resolved app id/slug (latest 재탐색 금지 — correlation 계약; app scope is required by v0.22.2 CLI).
 - NEVER static lane(deploy_method=static)에서 `axhub deploy verify` 를 호출하지 않아요 — static 은 deployment-record 가 아니라 release 라 verify 가 404 예요. static 성공은 `apps static deploy --execute` 의 `active_release_id`(activate)로 선언해요.
 - NEVER 비-static 앱(deploy_method ≠ static)을 static lane 으로 보내지 않아요 — deploy_method 가 빈 값/미지원이면 일반 deployment-record 파이프라인으로 가요.
 - NEVER static lane 에서 `apps static deploy --execute` 를 dry-run 미리보기 + AskUserQuestion 승인 없이 호출하지 않아요 (헤드리스 제외 — 헤드리스는 dry-run 만).

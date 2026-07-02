@@ -385,10 +385,15 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
    }
    ```
 
-   확인 받으면 saga 를 실행해요. 실행 직전 `.axhub/init-resume.json` 에 template/app_name/slug/subdomain/idempotency_key 를 먼저 저장해요:
+   확인 받으면 saga 를 실행해요. 실행 직전 **순수 UUID v4 idempotency key** 를 만들고 검증해요. 앱 slug, prefix, 사람이 읽기 쉬운 문자열을 절대 섞지 말아요. UUID 원문은 사용자 chat 에 echo 하지 않고 `.axhub/init-resume.json` 에만 저장해요:
 
    ```bash
    AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
+   IDEMPOTENCY_KEY="${IDEMPOTENCY_KEY:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
+   if ! printf '%s\n' "$IDEMPOTENCY_KEY" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'; then
+     echo '{"systemMessage":"재시도 키 생성이 올바르지 않아서 앱 생성을 시작하지 않았어요. 다시 시도할게요."}'
+     exit 65
+   fi
    axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --json
    axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
    ```
@@ -463,9 +468,19 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
 8.5. **clone 직후 자동 연결을 준비해요 (post-scaffold auto-connect).**
 
-   clone 이 성공하면 **먼저 axhub.yaml 슬러그를 방금 만든 앱으로 맞춰요 (바인딩 정합 — deploy resolve 안전).** 템플릿 repo 의 `axhub.yaml` 은 템플릿 기본 슬러그(예: `nextjs-axhub`)를 그대로 가질 수 있어요. 그대로 두면 나중에 deploy 의 resolve 가 그 슬러그로 **다른 앱**을 가리켜 잘못 배포할 위험이 있어요. `axhub manifest --json` 으로 clone 된 매니페스트의 앱 슬러그를 읽어 `$APP_SLUG` 와 비교하고, 다르면 `axhub.yaml` 의 슬러그 필드를 `$APP_SLUG` 로 고친 뒤 `axhub manifest validate --file axhub.yaml --json` 으로 검증해요 (manifest 가 source of truth 라 이 한 줄이 잘못된 타깃을 원천 차단해요). 그다음 resume state 에 `clone_done=true` 를 기록하고 clear 해요. 그리고 로컬 실행 가능 여부를 scaffold-detect 로 감지해요.
+   clone 이 성공하면 **먼저 axhub.yaml 의 앱 바인딩을 방금 만든 앱으로 맞춰요 (바인딩 정합 — deploy resolve 안전).** 현재 manifest 에서는 최상위 `name:` 이 app slug 로 resolve 돼요. 템플릿 repo 의 `axhub.yaml` 은 `name: vite-react-axhub` 같은 템플릿 기본값을 그대로 가질 수 있어요. 그대로 두면 나중에 deploy 의 resolve 가 그 이름으로 **다른 앱**을 찾거나 app 을 못 찾아 잘못된 UX 로 빠져요. 따라서 clone 직후 반드시 `name:` 을 `$APP_SLUG` 로 고치고 `axhub deploy --explain --json` 으로 manifest parse 가 되는지 확인해요. 이 보정은 방금 clone 된 템플릿 파일에 대한 로컬 변경이며, 사용자 파일을 덮어쓰는 게 아니에요. 그다음 resume state 에 `clone_done=true` 를 기록하고 clear 해요. 그리고 로컬 실행 가능 여부를 scaffold-detect 로 감지해요.
 
    ```bash
+   if [ -f axhub.yaml ]; then
+     if grep -Eq '^name:[[:space:]]*' axhub.yaml; then
+       APP_SLUG="$APP_SLUG" perl -0pi -e 's/(^name:[[:space:]]*).*$/${1}$ENV{APP_SLUG}/m' axhub.yaml
+     else
+       TMP_MANIFEST="$(mktemp)"
+       { printf 'name: %s\n' "$APP_SLUG"; cat axhub.yaml; } > "$TMP_MANIFEST"
+       mv "$TMP_MANIFEST" axhub.yaml
+     fi
+     axhub deploy --explain --json >/dev/null
+   fi
    axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --repo-full-name "$REPO" --clone-done true --json
    axhub plugin-support init-resume clear --json
    axhub plugin-support scaffold-detect --json
@@ -500,10 +515,16 @@ backend 가 반환한 template 전체 목록은 먼저 텍스트로 보여줘요
 
 8. **결과와 다음 액션을 안내해요.**
 
-   saga 응답은 내부 primitive 로만 검증하고, 사용자에게는 생성된 repo 이름과 다음 행동을 한국어 한 줄씩 보여줘요. **배포 공개 URL** 은 배포 성공 후 `axhub apps get` 으로 앱의 `access_url` 을 읽어서 hero 첫 줄로 보여줘요. URL 은 절대 합성하지 않아요.
+   saga 응답은 내부 primitive 로만 검증하고, 사용자에게는 생성된 repo 이름과 다음 행동을 한국어 한 줄씩 보여줘요. **배포 공개 URL** 은 배포 성공 후 `axhub apps get` 으로 앱의 `access_url` 을 읽어서 hero 첫 줄로 보여줘요. URL 은 절대 합성하지 않아요. `deploy verify` 가 `success=true` 여도 `url_checked=false` 일 수 있으니, 공개 URL 은 반드시 별도 `access_url` HTTPS 확인으로 증거를 보강해요. 배포 직후 TLS 인증서 발급이 수십 초 지연될 수 있어요. 첫 HTTPS 확인이 인증서 오류/HTTP 000 이면 곧장 실패로 단정하지 말고 10초 간격으로 최대 6회 재시도한 뒤 결과를 낮춰 말해요.
 
    ```bash
    PUBLIC_URL="$(axhub apps get "$APP_ID" --no-input --field-expr '.access_url // .data.access_url // empty' 2>/dev/null || true)"
+   if [ -n "$PUBLIC_URL" ]; then
+     for _ in 1 2 3 4 5 6; do
+       curl -fsSI --max-time 15 "$PUBLIC_URL" >/dev/null && break
+       sleep 10
+     done
+   fi
    ```
 
    dry-run 의 subdomain 은 내부 힌트라 인터넷 주소처럼 조합하지 않아요. `access_url` 을 못 읽으면 아래 낮춤 문장으로 안내해요.

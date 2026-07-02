@@ -94,8 +94,12 @@ describe("smooth behavior contracts", () => {
     expect(init).toContain("raw JSON/stderr");
     expect(init).toContain("기존 앱 가져오기와 분리");
     expect(init).toContain("`import` 스킬로 보내요");
+    expect(init).toContain("순수 UUID v4 idempotency key");
+    expect(init).toContain("APP_SLUG=\"$APP_SLUG\" perl -0pi");
+    expect(init).toContain("url_checked=false");
 
-    expect(deploy).toContain("axhub deploy verify <deployment-id>");
+    expect(deploy).toContain("axhub deploy verify <deployment-id> --app <app>");
+    expect(deploy).toContain("axhub deploy verify \"$DEPLOY_ID\" --app \"$APP_ID\"");
     expect(deploy).toContain("exit 6");
     expect(deploy).toContain("exit 7");
     expect(deploy).toContain("성공을 선언하지 않아요");
@@ -113,6 +117,8 @@ describe("smooth behavior contracts", () => {
     expect(importSkill).toContain("정적 사이트 확인 증거가 부족해요");
     expect(importSkill).toContain("raw JSON body");
     expect(importSkill).toContain("low-level 명령을 조합해서 우회하지 않아요");
+    expect(importSkill).toContain("axhub deploy --explain --json");
+    expect(importSkill).not.toContain("axhub manifest validate");
     expect(clarity).toContain("공개 표면만");
     expect(clarity).toContain("plugin-support");
     expect(clarity).toContain("탐색·실행 대상이 아니에요");

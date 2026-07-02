@@ -173,7 +173,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
      ├─ existing_repo_gap   → Step 7a axhub apps git status/connect → DETECT_ALL
      ├─ no_manifest_empty   → Step 7b 첫 앱 안내(advisory) → VIBE_READY_CARD
      ├─ deps_missing        → Step 8 install_deps(승인+ignore-scripts) → DETECT_ALL
-     ├─ deploy_unverified   → Step 9 axhub deploy verify → DETECT_ALL
+     ├─ deploy_unverified   → Step 9 axhub deploy verify --app → DETECT_ALL
      ├─ doctor_gap          → Step 9 preflight 안내 → DETECT_ALL
      └─ no_gap              → VIBE_READY_CARD
    ```
@@ -441,10 +441,10 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
    axhub plugin-support preflight --json
    ```
 
-   `auth_ok`/`cli_on_path` 등이 green 이면 진단 카드를 한국어로 보여주고, 막힌 항목이 있으면 next-phrase (`다시 로그인해줘` / 새 터미널 reload) 를 안내해요 (doctor_gap 은 차단점 없음). 이전 배포의 deployment id 가 있으면 공개 `axhub deploy verify` 로 성공을 확인해요 (deployment id 는 배포 출력에서 받아요).
+   `auth_ok`/`cli_on_path` 등이 green 이면 진단 카드를 한국어로 보여주고, 막힌 항목이 있으면 next-phrase (`다시 로그인해줘` / 새 터미널 reload) 를 안내해요 (doctor_gap 은 차단점 없음). 이전 배포의 deployment id 가 있으면 공개 `axhub deploy verify` 로 성공을 확인해요. v0.22.2 CLI 는 app scope 도 필요하므로 deployment id 와 app slug/id 를 함께 보관한 경우에만 verify 를 실행하고, app 이 없으면 latest 를 재탐색하지 말고 "배포 id 와 앱을 같이 알려주면 확인할게요"로 낮춰 말해요.
 
    ```bash
-   axhub deploy verify "$DEPLOYMENT_ID"
+   axhub deploy verify "$DEPLOYMENT_ID" --app "$APP_ID_OR_SLUG"
    ```
 
    exit 0 이면 terminal success + 접근 가능 URL 이 확인된 거라 live evidence 로 써요. 비-0 이면 아직 진행 중이거나 실패라, URL surface 만 있고 live evidence 가 없으면 `READY_WITH_USER_ACTION` 으로 낮춰요. **latest 재탐색 없이 받은 deployment id 만 verify 해요** (correlation 계약, spec §2.3).
@@ -521,7 +521,7 @@ onboarding 의 제품 계약은 `detect-first → 첫 gap 처리 → 재감지` 
 - NEVER dependency install 에서 `--ignore-scripts` 를 빼지 말아요. postinstall 자동 실행 금지예요.
 - NEVER subprocess(`claude -p`/CI/headless)에서 install/update/auth/init/deps mutation 이나 git/node system install/version switch 를 자동 실행하지 말아요.
 - NEVER `VIBE_READY` 카드에 확인하지 않은 항목을 green 으로 표시하지 말아요.
-- NEVER deploy verify 에 deployment id 없이 latest 를 재탐색하지 말아요 (correlation 계약).
+- NEVER deploy verify 에 deployment id 또는 app scope 없이 latest 를 재탐색하지 말아요 (correlation 계약).
 - NEVER axhub MCP 를 add(등록)만 하고 연동 완료로 선언하지 말아요. `claude mcp get axhub` 의 `Status: Connected` 확인 전까지는 미연동이라 `/mcp` OAuth 안내를 남겨요.
 
 ## Additional Resources
