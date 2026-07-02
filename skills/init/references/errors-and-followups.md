@@ -89,7 +89,7 @@ When stopping for user action, leave a phrase that resumes the correct lane:
 
 - CLI/auth: `다시 로그인해줘`
 - GitHub App install: `설치했어` or `다시 만들어줘`
-- Device approval: `승인했어`
+- Device-flow fallback after browser-open failure or expiry: `다시 만들어줘`
 - In-progress deploy: `방금 배포 어디까지 됐어?`
 - Diagnostics: `설치 상태 진단해줘`
 

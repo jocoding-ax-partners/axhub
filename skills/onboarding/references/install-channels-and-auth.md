@@ -123,10 +123,17 @@ Login prompt:
 Start device flow:
 
 ```bash
-axhub auth login --no-browser --json
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub auth login --json
 ```
 
-Humanize only `verification_uri_complete` or `verification_uri` plus `user_code`. Never echo internal `device_code`. The browser approval is a blocking user action; after `승인했어`, re-detect.
+The CLI should open the browser automatically, keep polling, and return the login result in the same command. Do not ask the user to open the URL manually or say an approval phrase while the command is running. Humanize only `verification_uri_complete` or `verification_uri` plus `user_code` if the command returns `browser_opened:false`, `device_flow_required_user_action`, `device_flow_pending`, or `device_code_expired`. Never echo internal `device_code`.
+
+Fallback handling:
+
+- `device_code_issued` with `auto_poll:true` and final success: re-detect immediately.
+- `device_code_issued` with `browser_opened:false`: show the safe URL/code once and stop with `READY_WITH_USER_ACTION`.
+- `device_flow_pending`: wait the emitted `retry_after_secs` and retry the emitted `resume_command` until success or expiry; do not ask for a manual approval phrase.
+- `device_code_expired`: start a fresh login once if the user still wants to continue.
 
 ## Git Missing
 

@@ -76,6 +76,8 @@ describe("smooth behavior contracts", () => {
     const clarity = readRepo("skills/clarity/SKILL.md");
     const diagnosis = readRepo("skills/diagnosis/SKILL.md");
     const importSkill = readRepo("skills/import/SKILL.md");
+    const onboardingAuth = readRepo("skills/onboarding/references/install-channels-and-auth.md");
+    const bootstrapAndLocal = readRepo("skills/init/references/bootstrap-and-local.md");
 
     expect(onboarding).toContain("axhub plugin-support onboarding-detect --json");
     expect(onboarding).toContain("cli_missing");
@@ -88,6 +90,10 @@ describe("smooth behavior contracts", () => {
     expect(onboarding).toContain('[ -f "$HOME/.axhub/bin/axhub.exe" ]');
     expect(onboarding).toContain('"first_gap":"cli_path_missing"');
     expect(onboarding).toContain("무한 루프 방지");
+    expect(onboardingAuth).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub auth login --json");
+    expect(onboardingAuth).not.toContain("axhub auth login --no-browser --json");
+    expect(onboardingAuth).not.toContain("after `승인했어`");
+    expect(onboardingAuth).not.toContain("승인했어`, re-detect");
 
     expect(init).toContain("axhub apps bootstrap");
     expect(init).toContain("대표 여정에서의 역할");
@@ -98,6 +104,9 @@ describe("smooth behavior contracts", () => {
     expect(init).toContain("APP_SLUG=\"$APP_SLUG\" perl -0pi");
     expect(init).toContain("url_checked=false");
     expect(init).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
+    expect(bootstrapAndLocal).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap");
+    expect(bootstrapAndLocal).toContain("auto_poll");
+    expect(bootstrapAndLocal).not.toContain("브라우저에서 승인한 다음 \"승인했어\"");
 
     expect(deploy).toContain("axhub deploy verify <deployment-id>");
     expect(deploy).toContain("axhub deploy verify \"$DEPLOY_ID\"");
