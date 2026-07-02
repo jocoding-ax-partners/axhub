@@ -111,7 +111,7 @@ Static 성공은 `active_release_id`, `verified === true`, `public_url`, `error 
 `claude -p`, CI, `$CLAUDE_NON_INTERACTIVE`, TTY 없음, AskUserQuestion 사용 불가 상태는 headless 예요.
 
 - AskUserQuestion 0회.
-- `axhub plugin-support import --mode preview --headless --json` 만 호출해요.
+- `axhub --json plugin-support import --mode preview --headless` 만 호출해요.
 - `--mode execute` 를 호출하지 않아요.
 - preview 결과를 한국어 요약으로 보여주고, 실제 가져오기는 대화형에서 다시 실행하라고 안내해요.
 
@@ -155,25 +155,25 @@ axhub plugin-support preflight --json
 
 단, static 앱은 CLI 가 GitHub repo 없이 `app_create/app_select → local build → static_release` 로 배포할 수 있어요. static lane 에서는 사용자가 명시적으로 "GitHub 저장소도 만들고 연결해줘" 라고 말하지 않는 한 `--repo` 를 붙이지 않아요. Docker/compose 같은 GitHub 기반 첫 배포에서만 `local_only` 새 repo 생성 전에 `--repo owner/name` 이 확정돼 있어야 해요.
 
-Docker/compose `local_only` 에서 새 GitHub repo 를 만들 때 owner 는 먼저 로컬 GitHub 계정과 맞춰요. `gh api user --jq .login` 으로 현재 `gh` 로그인 이름을 확인할 수 있으면 그 login 을 기본 owner 로 쓰고, org owner 는 이미 그 org repo 를 직접 만들고 push 가능한 `origin` 이 있거나 사용자가 명시적으로 그 owner 를 지정했을 때만 써요. CLI 는 새 repo 생성 전에 owner mismatch 를 `typed_failure: git` 으로 막을 수 있어요. 이때는 같은 로컬 login owner 로 다시 preview/execute 하거나, org repo 를 직접 만들고 push 가능한 origin 에서 다시 실행해요.
+Docker/compose `local_only` 에서 새 GitHub repo 를 만들 때 owner 는 먼저 로컬 GitHub 계정과 맞춰요. `gh api user --jq .login` 으로 현재 `gh` 로그인 이름을 확인할 수 있으면 CLI 가 그 login 과 app slug 로 기본 repo 를 정해요. org owner 는 이미 그 org repo 를 직접 만들고 push 가능한 `origin` 이 있거나 사용자가 명시적으로 그 owner 를 지정했을 때만 써요. CLI 는 새 repo 생성 전에 owner mismatch 를 `typed_failure: git` 으로 막을 수 있어요. 이때는 같은 로컬 login owner 로 다시 preview/execute 하거나, org repo 를 직접 만들고 push 가능한 origin 에서 다시 실행해요.
 
 ```bash
-axhub plugin-support import --mode preview --json
+axhub --json plugin-support import --mode preview
 ```
 
 예시:
 
 ```bash
-axhub plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT" --json
+axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT"
 
 # Docker/compose local_only 처럼 GitHub repo 가 필요한 경우에만:
-axhub plugin-support import --mode preview --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --tenant "$TENANT" --json
+axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --tenant "$TENANT"
 ```
 
 headless 에서는 이렇게 호출해요.
 
 ```bash
-axhub plugin-support import --mode preview --headless --json
+axhub --json plugin-support import --mode preview --headless
 ```
 
 3. Envelope 검증
@@ -221,22 +221,22 @@ capability 가 없거나 remote 가 없으면 이 질문을 건너뛰고 `커밋
 대화형 승인 직후 한 번만 호출해요. `커밋 없이 진행` 이거나 commit+push 질문을 건너뛴 경우:
 
 ```bash
-axhub plugin-support import --mode execute --approved --json
+axhub --json plugin-support import --mode execute --approved
 ```
 
-preview 에 `--slug`, `--repo`, `--tenant`, `--name`, `--deploy-method`, `--from-dir`, `--branch` 같은 import 옵션을 넘겼다면 execute 에도 같은 값을 그대로 반복해요. static lane preview 에 `--repo` 를 넣지 않았다면 execute 에도 넣지 않아요. Docker/compose `local_only` 에서 새 repo 를 만들려면 `--repo owner/name` 없이 execute 하지 않아요.
+preview 에 `--slug`, `--repo`, `--tenant`, `--name`, `--deploy-method`, `--from-dir`, `--branch` 같은 import 옵션을 넘겼다면 execute 에도 같은 값을 그대로 반복해요. static lane preview 에 `--repo` 를 넣지 않았다면 execute 에도 넣지 않아요. Docker/compose `local_only` 에서 `--repo owner/name` 이 없으면 CLI 가 현재 `gh` 로그인과 app slug 로 repo 를 정하고, owner 를 확인할 수 없으면 repo failure 로 멈춰요.
 
 ```bash
-axhub plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT" --json
+axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"
 
 # Docker/compose local_only 처럼 GitHub repo 가 필요한 경우에만:
-axhub plugin-support import --mode execute --approved --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --tenant "$TENANT" --json
+axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --tenant "$TENANT"
 ```
 
 `커밋·push 하고 진행` 을 골랐으면 `--commit-manifest` 를 더해요. CLI 가 backend mutation 전에 axhub.yaml 을 커밋·push 해서 첫 배포에 반영해요.
 
 ```bash
-axhub plugin-support import --mode execute --approved --commit-manifest --json
+axhub --json plugin-support import --mode execute --approved --commit-manifest
 ```
 
 동일 승인으로 두 번 호출하지 않아요. execute 결과도 `import/v1` 로 다시 검증해요. push 실패는 `typed_failure: git` 으로 와요(아래 9의 git 행으로 안내).

@@ -121,12 +121,12 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("재배포나 롤백은 하지 않아요");
     expect(deploy).toContain("axhub --json deploy diagnose <앱>");
 
-    expect(importSkill).toContain("axhub plugin-support import --mode preview --json");
-    expect(importSkill).toContain('axhub plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT" --json');
+    expect(importSkill).toContain("axhub --json plugin-support import --mode preview");
+    expect(importSkill).toContain('axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT"');
     expect(importSkill).toContain("static lane 에서는 사용자가 명시적으로");
-    expect(importSkill).toContain("axhub plugin-support import --mode execute --approved --json");
-    expect(importSkill).toContain('axhub plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT" --json');
-    expect(importSkill).toContain("Docker/compose `local_only` 에서 새 repo 를 만들려면 `--repo owner/name` 없이 execute 하지 않아요");
+    expect(importSkill).toContain("axhub --json plugin-support import --mode execute --approved");
+    expect(importSkill).toContain('axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"');
+    expect(importSkill).toContain("CLI 가 현재 `gh` 로그인과 app slug 로 repo 를 정하고");
     expect(importSkill).toContain("capabilities.import.schemas");
     expect(importSkill).toContain("Static 성공은");
     expect(importSkill).toContain("정적 사이트 확인 증거가 부족해요");
