@@ -4,6 +4,43 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.5.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.3...v1.5.4) (2026-07-02)
+
+Claude Code marketplace 로 설치한 바이브코더가 axhub skill 을 바로 불러도 1M context usage-credit 오류에 덜 걸리도록 standard context 친화적인 안내를 유지했어요. import/deploy skill 은 CLI 0.22.4 의 exact deployment-id 흐름과 맞춰 최신 배포 근거를 잃지 않고 verify·diagnosis 로 이어지게 했고, Claude Desktop 에서 보이는 진행 문구와 SDK 안내도 현재 계약에 맞게 정리했어요.
+
+
+### Fixed
+
+* marketplace 설치 사용자가 standard context 에서 skill 을 시작할 수 있도록 guidance budget 과 install expectation 보강
+* import/deploy skill 을 CLI exact rollout evidence 와 배포 실패 diagnosis routing 에 정합
+* development skill 의 SDK 안내와 Claude Desktop 친화적인 진행 문구 정리
+
+## [1.5.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.2...v1.5.3) (2026-07-01)
+
+development skill 이 최신 axhub SDK 방향과 맞지 않는 동적 data-table 예시를 더 이상 안내하지 않도록 정리했어요. 배포 계열 skill 은 CLI envelope 를 단일 진실로 삼아 MCP deploy mutation, advisor, subagent helper 로 새지 않게 고정했고, headless 환경에서는 가능한 CLI dry-run 계약으로 진행하도록 해서 로컬 플러그인과 CLI만으로 더 매끄럽게 QA할 수 있어요.
+
+
+### Fixed
+
+* development skill 을 retired SDK dynamic data-plane 대신 현재 raw DB/SDK 경계에 맞춰 정리
+* deploy/import 실행 경로를 axhub CLI envelope 중심으로 고정하고 headless fallback 문구 보강
+
+## [1.5.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.1...v1.5.2) (2026-07-01)
+
+Claude Code 가 axhub skill 을 부르기 전에 1M context usage-credit 오류로 막히던 문제를 플러그인 쪽에서 줄였어요. 로컬 설치는 clean bundle 만 잡도록 하고, always-on skill 본문은 compact contract 로 줄이고 긴 절차는 필요할 때만 읽는 references 로 옮겼어요. 새 `plugin:budget` 검증은 source byte budget 과 Claude plugin details token budget 을 fail-closed 로 확인해서, 다시 큰 컨텍스트가 섞이면 릴리즈 전에 잡아요. 온보딩도 이미 `~/.axhub/bin` 에 CLI 가 있는데 PATH 만 못 읽는 경우를 재설치가 아니라 PATH 복구로 안내해요.
+
+
+### Added
+
+* plugin context budget guard 추가
+* deploy/init/onboarding 긴 절차를 on-demand references 로 분리
+
+
+### Fixed
+
+* Claude Code 1M context usage-credit 오류를 유발하던 plugin always-on context 축소
+* onboarding이 PATH 미등재 CLI를 재설치하지 않도록 수정 74dc858
+
 ## [1.5.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.0...v1.5.1) (2026-06-30)
 
 deploy 실패를 만났을 때 사용자가 막다른 골목에 남지 않도록 deploy skill 이 diagnosis skill 로 자연스럽게 이어지는 안내를 갖췄어요. import skill 도 CLI 0.22.1 의 넓어진 stack detection 과 맞춰 Next.js 밖의 백엔드·프론트엔드 앱까지 기존 프로젝트를 가져와 실제 배포로 이어가는 목표를 더 분명히 설명해요.

@@ -52,15 +52,15 @@ Retest prod mutation:
 - Evidence now includes `access_note="이 정적 사이트는 비공개라 axhub 로그인이 필요해요."`
 - `apps static site get` confirms `visibility=private`.
 
-### 2. `plugin:bundle` script was documented but missing
+### 2. `plugin:bundle` script was missing before main reconciliation
 
-`AGENTS.md` said to run `bun run plugin:bundle`, but `package.json` had no such script. This blocks clean local-plugin QA.
+The QA branch initially had `AGENTS.md` guidance for `bun run plugin:bundle`, but `package.json` did not define that script. This blocks clean local-plugin QA.
 
-Fix applied:
+Main reconciliation result:
 
-- Added `scripts/bundle-plugin.cjs`.
-- Added `plugin:bundle` npm script.
-- Verified it regenerates `dist/axhub-plugin` with `skills/`, `hooks/`, `README.md`, and `LICENSE`.
+- Latest `origin/main` already provides `plugin:bundle` via `scripts/build-plugin-bundle.ts`.
+- The temporary `scripts/bundle-plugin.cjs` fallback from the QA branch was removed during conflict resolution.
+- `plugin:bundle` remains verified as the clean local bundle path.
 
 ## Passing Evidence
 
@@ -106,5 +106,5 @@ Change-impact evidence:
 
 ## Remaining Concerns
 
-- Version metadata mismatch remains: plugin repo says `1.5.1`, local CLI workspace says `0.22.2`, while the installed CLI reports `0.22.4`. QA used local build intentionally, but release/version bookkeeping should be aligned before publishing another release.
+- Version metadata mismatch remains only on the CLI side after main reconciliation: plugin repo now reports `1.5.4`, local CLI workspace says `0.22.2`, while the installed PATH CLI reports `0.22.4`. QA used local build intentionally, but CLI release/version bookkeeping should be aligned before publishing another release.
 - Direct unauthenticated curl to private static site still returns the auth shell. This is expected for `visibility=private`; the fix is that the plugin/CLI now tells the user that login is required.

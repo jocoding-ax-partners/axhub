@@ -118,6 +118,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 bun test               # skill / e2e 회귀
 bun run lint:tone --strict   # 해요체 0 err
 bunx tsc --noEmit      # 타입 clean
+bun run plugin:bundle  # clean local plugin bundle 생성
 ```
 
 frontmatter validity check 와 e2e flow 1개도 살아남은 quality gate 예요.
@@ -129,5 +130,6 @@ frontmatter validity check 와 e2e flow 1개도 살아남은 quality gate 예요
 - NEVER helper 바이너리 (`crates/axhub-helpers`) 나 hook / NL routing / scaffold 인프라 재추가 — diet 결정 위반.
 - NEVER 명시적 결정 없이 skill 추가 — 현재 8 skill 체제 유지 (`clarity` 는 deep-interview spec, `development` 은 office-hours→리뷰 체인, `update` 는 수동 on-demand 업데이트 요청, `import` 는 기존 앱 가져오기, `diagnosis` 는 배포 실패 원인 진단 deep-interview→ralplan 승인으로 신설됐어요).
 - NEVER 최소 CLI 기능 게이트를 우회하지 말아요.
+- NEVER Claude Code local plugin 을 repo 루트에서 직접 설치/검증하지 말아요 — `bun run plugin:bundle` 후 `dist/axhub-plugin` clean bundle 을 써요.
 - NEVER deploy 성공 선언(docker/compose deployment-record lane)을 `axhub deploy verify <deployment-id> --app <app>` 1회 실행 없이 — deployment id 와 app scope 필수, latest 재탐색 금지. static 앱(deploy_method=static)은 별도 lane 이라 `deploy verify` 가 404 라서 `active_release_id`(activate 성공)로 선언해요.
 - NEVER release 를 manual `vim package.json` + `git tag` 로 — `bun run release` → narrative amend → `bun run release:tag` 2단계 flow (단순화된 postbump) 만 써요.

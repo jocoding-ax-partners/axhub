@@ -1,10 +1,8 @@
 ---
 name: import
-description: '이 스킬은 사용자가 비어 있지 않은 기존 로컬 앱을 axhub로 가져와 앱 생성/선택, manifest 정리, GitHub 연결, 첫 배포까지 진행하고 싶을 때 사용해요. 활성화 예: "기존 앱 올려", "이 폴더 axhub에 올려", "이미 만든 앱 배포 준비해", "내 로컬 프로젝트를 axhub 앱으로 가져와", "import existing app", "upload existing app", "이 앱 axhub로 연결해", 또는 non-empty repo 에서 "앱 만들어줘"처럼 템플릿 bootstrap 이 아니라 기존 소스를 axhub에 등록하려는 의도. 빈 디렉토리에서 새 템플릿 앱을 시작하는 요청은 init 으로 보내고, 이미 axhub에 연결된 앱의 ordinary redeploy 는 deploy 로 보내요.'
+description: '비어 있지 않은 기존 로컬 앱을 axhub 앱으로 연결하고 manifest/GitHub/첫 배포 준비까지 가져오는 import 스킬. "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app"처럼 템플릿 bootstrap 이 아니라 기존 소스를 등록하려는 요청에 사용해요. Next.js뿐 아니라 프론트·백엔드·Dockerfile 앱 등 broad stack 을 CLI 감지에 맡겨요. 빈 디렉토리 새 앱은 init, 이미 연결된 앱의 재배포는 deploy 로 양보해요.'
 examples:
   - utterance: "기존 앱 올려"
-    intent: "import existing local app into axhub"
-  - utterance: "이 폴더 axhub에 올려"
     intent: "import existing local app into axhub"
   - utterance: "이미 만든 앱 axhub로 연결해"
     intent: "import existing local app into axhub"
@@ -153,8 +151,21 @@ axhub plugin-support preflight --json
 
 2. Preview envelope 요청
 
+사용자나 현재 컨텍스트에서 app slug, GitHub owner/repo, tenant 가 이미 정해졌으면 preview 부터 그대로 넘겨요. `--slug` 는 axhub 앱 slug, `--name` 은 표시 이름, `--repo` 는 GitHub 저장소예요. repo owner 를 별도 flag 로 만들지 말고 `--repo "$OWNER/$REPO"` 형태로 넘겨요.
+
+단, static 앱은 CLI 가 GitHub repo 없이 `app_create/app_select → local build → static_release` 로 배포할 수 있어요. static lane 에서는 사용자가 명시적으로 "GitHub 저장소도 만들고 연결해줘" 라고 말하지 않는 한 `--repo` 를 붙이지 않아요. Docker/compose 같은 GitHub 기반 첫 배포에서만 `local_only` 새 repo 생성 전에 `--repo owner/name` 이 확정돼 있어야 해요.
+
 ```bash
 axhub plugin-support import --mode preview --json
+```
+
+예시:
+
+```bash
+axhub plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT" --json
+
+# Docker/compose local_only 처럼 GitHub repo 가 필요한 경우에만:
+axhub plugin-support import --mode preview --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --tenant "$TENANT" --json
 ```
 
 headless 에서는 이렇게 호출해요.
@@ -208,6 +219,15 @@ capability 가 없거나 remote 가 없으면 이 질문을 건너뛰고 `커밋
 
 ```bash
 axhub plugin-support import --mode execute --approved --json
+```
+
+preview 에 `--slug`, `--repo`, `--tenant`, `--name`, `--deploy-method`, `--from-dir`, `--branch` 같은 import 옵션을 넘겼다면 execute 에도 같은 값을 그대로 반복해요. static lane preview 에 `--repo` 를 넣지 않았다면 execute 에도 넣지 않아요. Docker/compose `local_only` 에서 새 repo 를 만들려면 `--repo owner/name` 없이 execute 하지 않아요.
+
+```bash
+axhub plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT" --json
+
+# Docker/compose local_only 처럼 GitHub repo 가 필요한 경우에만:
+axhub plugin-support import --mode execute --approved --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --tenant "$TENANT" --json
 ```
 
 `커밋·push 하고 진행` 을 골랐으면 `--commit-manifest` 를 더해요. CLI 가 backend mutation 전에 axhub.yaml 을 커밋·push 해서 첫 배포에 반영해요.

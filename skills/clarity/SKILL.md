@@ -1,6 +1,6 @@
 ---
 name: clarity
-description: 'axhub 의 onboarding(첫 셋업·로그인)·init(빈 디렉토리 새 앱)·import(기존 앱 가져오기)·deploy(배포)·development(앱 코드 생성)·diagnosis(배포 실패 원인 진단)·update(CLI/플러그인 업데이트)가 담당하지 않는 나머지 모든 axhub CLI 작업을 처리하는 만능(catch-all) 라우팅 대상이에요. 공개 명령을 라이브로 찾아(--json-schema→--help) 무확인 실행해서 별도 스킬이 없는 기능도 다 쓸 수 있게 해요. 활성화 예: 환경변수·시크릿("환경변수 설정해줘", "env 추가", "시크릿 넣어줘"), 로그·상태("로그 보여줘", "배포 상태 확인"), 앱 관리·생성 제외("앱 목록", "앱 삭제/멈춰/복제/이름 바꿔"), 롤백("롤백해줘", "이전 버전으로"), 데이터·테이블·커넥터("테이블 만들어줘", "컬럼 추가", "DB 연결", "데이터 조회"), 테넌트·팀·권한("테넌트 바꿔줘", "팀 전환", "권한 줘"), 비용·프로필·공개("비용 보여줘", "프로필 바꿔줘", "마켓에 공개"), 그리고 "axhub로 ~해줘"처럼 axhub 관련이나 의도가 불명확한 모든 발화. 경계: 첫 셋업=onboarding, 빈 디렉토리 새 앱=init, 기존 로컬 앱 가져오기=import, 배포=deploy, 기존 앱에 화면·페이지·대시보드 코드 생성=development, 배포 실패 원인 진단=diagnosis, CLI·플러그인 버전 업데이트=update 라 그 의도가 분명할 때만 양보하고 그 외 axhub CLI 운영은 다 받아요. 앱 코드는 안 짜고 axhub 명령만 실행해요.'
+description: 'clarity: onboarding/init/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요.'
 ---
 
 # axhub clarity 브리지
@@ -83,7 +83,7 @@ TodoWrite({ todos: [
    ```bash
    # 1단계: 최상위 명령 목록만 (작아요)
    axhub --json-schema --field-expr '.commands | keys[]'
-   # 2단계: 후보 명령의 구조 (서브커맨드·플래그·alias) — 그 명령만 슬라이스
+   # 2단계: 후보 명령의 구조 (직접 하위 leaf·플래그·alias) — 그 명령만 슬라이스
    axhub --json-schema --field-expr '.commands["<후보>"]'
    ```
 

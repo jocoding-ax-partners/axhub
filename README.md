@@ -71,6 +71,14 @@ Claude Code 프롬프트에 아래를 순서대로 입력해요.
 
 > axhub CLI 가 없거나 너무 낮은 버전이면 onboarding·init·deploy 스킬이 멈추고 설치/업그레이드를 안내해요 — 최소 요구 버전은 **v0.20.0** 이에요.
 
+### `Usage credits required for 1M context` 오류가 보이면
+
+이 오류는 Claude Code 에서 선택된 모델이나 1M context 모드가 내는 메시지예요. axhub 로그인, axhub backend, 배포 권한, 플러그인 설치 실패가 아니고, axhub 를 쓰기 위해 usage credits 가 필요한 것도 아니에요.
+
+일반 사용자는 Claude Code 에서 `/model` 을 열고 1M 이 붙지 않은 표준 모델/context 를 고르면 바로 이어서 쓸 수 있어요. 계속 1M 이 선택된다면 Claude Code 를 실행할 때 `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` 을 설정해 1M context 선택지를 끄세요.
+
+1M context 를 일부러 쓰려는 사용자만 Claude Code 의 `/usage-credits` 에서 사용 가능 여부를 확인하면 돼요.
+
 ---
 
 ## 📋 준비물
@@ -199,6 +207,14 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요.
 bun run lint:tone --strict   # 모든 한글 텍스트 해요체 0 err
 bun test                     # SKILL frontmatter + smoothness contract + e2e fixture
 bun run typecheck            # tsc --noEmit
+```
+
+로컬 개발 설치·검증은 repo 루트가 아니라 clean bundle 을 써요. repo 루트에는 `.claude`, `.omx`, `node_modules`, 인덱스 DB 같은 큰 개발 산출물이 생길 수 있어서 Claude Code local plugin cache 를 비대하게 만들 수 있어요.
+
+```bash
+bun run plugin:bundle
+claude plugin validate dist/axhub-plugin
+claude --plugin-dir dist/axhub-plugin
 ```
 
 릴리즈는 `commit-and-tag-version` 2단계 flow 예요.

@@ -1,6 +1,6 @@
 {
   "name": "@jocoding-ax-partners/axhub-plugin-cc",
-  "version": "1.5.1",
+  "version": "1.5.4",
   "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders. 8 skills (onboarding/init/deploy/import/development/diagnosis/clarity/update) calling ax-hub-cli v0.20.0+ directly; Bun for repo tooling.",
   "type": "module",
   "private": true,
@@ -8,7 +8,9 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint:tone": "bun scripts/check-toss-tone-conformance.ts --strict",
-    "plugin:bundle": "node scripts/bundle-plugin.cjs",
+    "plugin:budget": "bun scripts/check-plugin-context-budget.ts",
+    "plugin:bundle": "bun scripts/build-plugin-bundle.ts",
+    "plugin:validate": "bun run plugin:bundle && claude plugin validate dist/axhub-plugin",
     "release": "commit-and-tag-version",
     "release:tag": "bun scripts/release-tag.ts"
   },
