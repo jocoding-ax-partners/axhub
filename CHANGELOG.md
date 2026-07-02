@@ -4,6 +4,16 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.5.8](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.7...v1.5.8) (2026-07-03)
+
+Claude Desktop QA에서 확인한 import skill의 CLI 호출 모양을 바로잡았어요. `--json` 같은 전역 플래그가 `plugin-support import` 뒤에 붙으면 hidden import parser가 잘못 해석할 수 있어서, 이제 skill 안내는 `axhub --json plugin-support import ...` 형태를 기준으로 설명해요. CLI 0.22.8의 local-only repo 자동 선택 흐름도 함께 반영해서 기존 백엔드·Docker 앱을 가져올 때 불필요한 `--repo` 추측 없이 더 매끄럽게 이어갈 수 있어요.
+
+
+### Fixed
+
+* import skill 예시에서 `--json` 전역 플래그를 `plugin-support` 앞에 두도록 수정
+* local-only Docker/compose import 안내를 CLI의 현재 GitHub 로그인 기반 repo 기본값과 맞춤
+
 ## [1.5.7](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.6...v1.5.7) (2026-07-02)
 
 Claude Desktop 에서 axhub skill 이 device flow 인증을 시작할 때 사용자가 직접 링크를 열고 “승인했어”라고 다시 말해야 하던 마찰을 줄였어요. onboarding 과 init skill 은 CLI 0.22.7 의 auto-open/auto-poll 계약을 우선 사용하고, 브라우저 열기나 polling 이 실제로 불가능한 경우에만 수동 안내로 돌아가서 바이브코더가 플러그인 안에서 흐름을 자연스럽게 끝낼 수 있게 했어요.
