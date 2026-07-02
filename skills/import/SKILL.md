@@ -155,6 +155,8 @@ axhub plugin-support preflight --json
 
 단, static 앱은 CLI 가 GitHub repo 없이 `app_create/app_select → local build → static_release` 로 배포할 수 있어요. static lane 에서는 사용자가 명시적으로 "GitHub 저장소도 만들고 연결해줘" 라고 말하지 않는 한 `--repo` 를 붙이지 않아요. Docker/compose 같은 GitHub 기반 첫 배포에서만 `local_only` 새 repo 생성 전에 `--repo owner/name` 이 확정돼 있어야 해요.
 
+Docker/compose `local_only` 에서 새 GitHub repo 를 만들 때 owner 는 먼저 로컬 GitHub 계정과 맞춰요. `gh api user --jq .login` 으로 현재 `gh` 로그인 이름을 확인할 수 있으면 그 login 을 기본 owner 로 쓰고, org owner 는 이미 그 org repo 를 직접 만들고 push 가능한 `origin` 이 있거나 사용자가 명시적으로 그 owner 를 지정했을 때만 써요. CLI 는 새 repo 생성 전에 owner mismatch 를 `typed_failure: git` 으로 막을 수 있어요. 이때는 같은 로컬 login owner 로 다시 preview/execute 하거나, org repo 를 직접 만들고 push 가능한 origin 에서 다시 실행해요.
+
 ```bash
 axhub plugin-support import --mode preview --json
 ```
@@ -189,6 +191,7 @@ axhub plugin-support import --mode preview --headless --json
 - 안전 메모
 
 `manifest_create` 가 있으면, axhub.yaml 을 프로젝트 파일 근거로 자세히 작성할 예정이라고 한 줄로 같이 알려요.
+`manifest_repair` 가 있으면, 기존 axhub.yaml 문법이 깨져 있어서 CLI 가 execute 중 백업 파일을 남기고 안전한 최소 manifest 로 복구한다고 한 줄로 같이 알려요. 이 경우 plugin 이 직접 덮어쓰지 않아요.
 
 5. 대화형 승인 1회
 
@@ -254,7 +257,7 @@ axhub plugin-support import --mode execute --approved --commit-manifest --json
 | `auth` | 로그인이 필요해요. 다시 로그인한 뒤 이어갈게요. |
 | `version` | axhub CLI가 import 기능을 아직 지원하지 않아요. 업데이트한 뒤 다시 시도해요. |
 | `manifest` | 앱 설정 파일을 정리해야 해요. CLI가 제안한 안전한 수정만 진행해요. |
-| `git` | Git 저장 지점이 준비되지 않았어요. 커밋이나 원격 연결을 먼저 확인해요. |
+| `git` | Git 저장 지점이 준비되지 않았어요. 커밋, 원격 연결, 또는 로컬 GitHub 계정과 repo owner 가 맞는지 먼저 확인해요. |
 | `repo` | GitHub 저장소 연결을 확인해야 해요. 권한이나 원격 저장소를 다시 볼게요. |
 | `app` | axhub 앱 생성 또는 선택에서 막혔어요. 앱 이름과 소유 권한을 확인해요. |
 | `static` | 정적 사이트 확인 증거가 부족해요. 공개 URL과 활성 릴리스 확인 뒤 다시 시도해요. |
@@ -269,6 +272,7 @@ axhub plugin-support import --mode execute --approved --commit-manifest --json
 - import 는 non-empty existing app first-connect flow 만 맡아요.
 - plugin 은 low-level CLI primitive 를 조합하지 않아요.
 - manifest 보강은 plugin 이 직접 authoring 하는 유일한 단계예요 — `manifest_create` 일 때만, 증거 있는 필드만, env 값 없이 작성하고 `axhub deploy --explain --json` 통과를 강제해요. 실패하면 최소 manifest 로 fallback 해요.
+- `manifest_repair` 는 CLI execute 가 처리해요. plugin 은 preview 에서 사용자에게 알리고, 직접 파일을 덮어쓰지 않아요.
 - commit+push 는 opt-in 이에요 — `capabilities.import.commit_manifest` true + git remote + 별도 동의가 모두 있을 때만 `--commit-manifest` 로 호출하고, 그 git 커밋·push 는 CLI 가(force 없이) 맡아요. capability 가 없으면 옵션을 제공하지 않아요. headless 에서는 없어요.
 - malformed envelope, unknown schema, unknown enum, missing static URL, `verified !== true`, headless execute, approval bypass 는 모두 중단해요.
 - 성공을 말하기 전 항상 execute envelope 의 method-specific evidence 를 확인해요.
