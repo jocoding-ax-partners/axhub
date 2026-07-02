@@ -4,6 +4,17 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.5.6](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.5...v1.5.6) (2026-07-02)
+
+import skill 이 CLI 0.22.6 의 더 부드러운 기존 앱 가져오기 흐름을 자연어 안내로 제대로 전달하도록 맞췄어요. local-only GitHub 권한 문제, 깨진 기존 manifest 복구, 느린 Docker 첫 배포 검증처럼 바이브코더가 중간에 막히기 쉬운 구간을 먼저 설명하고, 실패하면 바로 diagnosis 로 이어지게 해서 플러그인과 CLI만으로도 다음 행동이 분명하게 보이도록 정리했어요.
+
+
+### Fixed
+
+* import skill 이 local-only GitHub push 권한 문제를 repo 생성 전에 멈추는 CLI 흐름과 맞도록 안내 보강
+* 깨진 기존 `axhub.yaml`/`apphub.yaml` repair 경로와 preview 결과 설명을 최신 CLI envelope 에 정합
+* 느린 Docker 첫 배포 검증이 실패처럼 보일 때 diagnosis 로 자연스럽게 이어지도록 배포 후 안내 정리
+
 ## [1.5.5](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.4...v1.5.5) (2026-07-02)
 
 Claude Desktop QA에서 확인한 stale skill 계약을 최신 CLI 흐름에 맞춰 다시 정리했어요. update skill 은 실제 적용 명령을 안내하고, deploy/onboarding 은 app-scoped verify 로 배포 근거를 놓치지 않게 했으며, init/import/development 는 현재 CLI envelope 와 static access note 계약에 맞춰 바이브코더가 막히지 않도록 보강했어요.
