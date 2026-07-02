@@ -1,6 +1,6 @@
 {
   "name": "axhub",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "description": "Korean-first Claude Code plugin for axhub. onboarding/init/deploy/import/development/diagnosis/clarity/update 8개 스킬이 ax-hub-cli v0.20.0+ 표면(hidden plugin-support 그룹 + 공개 deploy verify·diagnose·update)을 직접 호출해요. import 는 기존 로컬 앱 가져오기를, diagnosis 는 배포 실패 원인 요약을 담당하고, preview-confirm 배포와 verify 기반 성공 선언을 제공해요.",
   "author": {
     "name": "Jocoding AX Partners",
