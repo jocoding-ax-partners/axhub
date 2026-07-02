@@ -33,8 +33,8 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 ## Core Contract
 
 1. **Single source of truth.** 모든 gap 판정은 `axhub plugin-support onboarding-detect --json` 한 번에서 온 JSON 이 source of truth 예요. `first_gap` 이 처리 순서를 결정해요. gap 마다 preflight 를 다시 돌려 순서를 추측하지 않아요.
-2. **Detect-first loop.** `detect -> first_gap 하나 처리 -> 재감지` 를 반복해요. 한 번에 여러 mutate gap 을 실행하지 않아요. 사용자가 해야 하는 브라우저 승인, OS installer GUI, PATH reload, OAuth 는 `READY_WITH_USER_ACTION` 으로 멈추고 `승인했어`, `온보딩 계속`, `다시 온보딩해줘` 같은 자연어 재개 phrase 를 남겨요.
-3. **Headless safety.** subprocess/headless/CI 에서는 AskUserQuestion 을 생략하고 safe defaults 로 멈춰요. install/update/auth/init/deps mutation, git/node system install, node version switch, browser open, MCP OAuth 를 자동 실행하지 않아요. 최종 상태는 `SAFE_STOP_NONINTERACTIVE` 예요.
+2. **Detect-first loop.** `detect -> first_gap 하나 처리 -> 재감지` 를 반복해요. 한 번에 여러 mutate gap 을 실행하지 않아요. Claude Desktop 의 OAuth device flow 는 CLI 자동 브라우저 오픈/자동 polling 경로를 쓰고, 브라우저 실행 실패·만료·권한 거부 같은 fallback 에서만 `READY_WITH_USER_ACTION` 으로 멈춰요. OS installer GUI, PATH reload, GitHub App install, MCP OAuth 는 여전히 사용자 action gate 예요.
+3. **Headless safety.** 순수 subprocess/headless/CI 에서는 AskUserQuestion 을 생략하고 safe defaults 로 멈춰요. install/update/auth/init/deps mutation, git/node system install, node version switch, browser open, MCP OAuth 를 자동 실행하지 않아요. 최종 상태는 `SAFE_STOP_NONINTERACTIVE` 예요.
 4. **No automatic init.** 빈 폴더나 manifest 없는 폴더를 발견해도 init skill 로 위임하거나 앱을 자동 생성하지 않아요. `no_manifest_empty` 는 안내 후 Ready card 로 가고, 다음 말은 `첫 앱 만들어줘` 예요.
 5. **GitHub App visibility.** detect JSON 의 `github.install_url` 이 null 이 아니면 설치 여부·계정 수·`first_gap` 과 무관하게 한 번은 보여줘요. `github.state` 가 `uninstalled`/`empty` 면 설치 확인 전 Step 7 repo/app 연결로 넘어가지 않아요.
 6. **Dependency safety.** 의존성 설치는 manifest 와 lockfile 이 있을 때만, 명시 확인 뒤, 해당 lockfile 의 package manager 로만 실행해요. 모든 install command 는 반드시 `--ignore-scripts` 를 붙여요. lockfile 이 없으면 설치하지 않아요.

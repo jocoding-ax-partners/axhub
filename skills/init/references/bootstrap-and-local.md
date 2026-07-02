@@ -33,7 +33,7 @@ Before execute, write resume state with the same idempotency key that execute wi
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
 axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --json
-axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
 ```
 
 Run the tool with a timeout longer than 9 minutes, for example 570000ms. Narrate about every 30s with short Korean progress lines like "앱 만들고 있어요", "GitHub repo 만들고 있어요", "첫 배포 중이에요. 거의 다 왔어요".
@@ -52,7 +52,7 @@ axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --watch --w
 If stdout contains:
 
 ```json
-{"event":"device_code_issued","data":{"verification_uri":"https://github.com/login/device","verification_uri_complete":null,"user_code":"XXXX-XXXX","expires_in":899}}
+{"event":"device_code_issued","data":{"verification_uri":"https://github.com/login/device","verification_uri_complete":null,"user_code":"XXXX-XXXX","auto_poll":true,"browser_opened":true,"expires_in":899}}
 ```
 
 write pending state:
@@ -61,7 +61,9 @@ write pending state:
 axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --pending-device-flow true --json
 ```
 
-Immediately show:
+When `auto_poll:true` and `browser_opened:true`, the CLI already opened the browser and is still polling. Keep the command running, narrate briefly, and wait for the next JSON stage or terminal result. Do not ask the user to say an approval phrase.
+
+If `browser_opened:false` or the command exits with `device_flow_required_user_action`, show exactly one fallback prompt:
 
 ```text
 GitHub 연결이 필요해요. 다음 단계로 진행해 주세요:
@@ -69,17 +71,17 @@ GitHub 연결이 필요해요. 다음 단계로 진행해 주세요:
 2. 코드 입력: <user_code>
 3. axhub GitHub App 설치 승인
 
-브라우저에서 승인한 다음 "승인했어" 라고 알려주세요. 제가 이어서 마무리할게요.
+브라우저 승인까지 끝나면 제가 자동 재시도로 이어갈 수 있어요.
 ```
 
-In interactive TTY, CLI may keep polling; narrate until the next stage event. In agent/non-TTY, CLI fast-exits after emitting the challenge. On user approval signal, resume the cached flow:
+In fallback mode, resume the cached flow yourself after `retry_after_secs` or a short bounded delay; do not wait for a manual approval phrase:
 
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
 ```
 
-While an outstanding code exists, never run fresh `bootstrap --execute` without `--resume-last`; it can issue a new code and invalidate the user's approved one. If response remains `device_code_pending`, ask the user to finish approval and resume again. If code expired, start Step 7 execute again to issue a fresh challenge.
+While an outstanding code exists, never run fresh `bootstrap --execute` without `--resume-last`; it can issue a new code and invalidate the user's approved one. If response remains `device_code_pending`, respect `retry_after_secs` and retry `--resume-last` until success or expiry. If code expired, start Step 7 execute again to issue a fresh challenge.
 
 If resume says `no pending github device flow`, follow `resume-and-tenant.md` recovery: re-check `axhub github accounts list --json`, confirm owner installation, then run one same-idempotency recovery execute without `--resume-last`.
 
