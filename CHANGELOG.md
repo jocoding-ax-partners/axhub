@@ -4,6 +4,17 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.5.5](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.4...v1.5.5) (2026-07-02)
+
+Claude Desktop QA에서 확인한 stale skill 계약을 최신 CLI 흐름에 맞춰 다시 정리했어요. update skill 은 실제 적용 명령을 안내하고, deploy/onboarding 은 app-scoped verify 로 배포 근거를 놓치지 않게 했으며, init/import/development 는 현재 CLI envelope 와 static access note 계약에 맞춰 바이브코더가 막히지 않도록 보강했어요.
+
+
+### Fixed
+
+* update skill 이 dry-run 안내에 머물지 않고 실제 `axhub update apply --execute --yes` 흐름을 안내하도록 정리
+* deploy/onboarding skill 의 배포 검증을 app-scoped `axhub deploy verify <deployment-id> --app <app>` 계약에 정합
+* import/development skill 을 최신 CLI manifest, static access note, SDK surface 안내와 맞춰 보강
+
 ## [1.5.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.3...v1.5.4) (2026-07-02)
 
 Claude Code marketplace 로 설치한 바이브코더가 axhub skill 을 바로 불러도 1M context usage-credit 오류에 덜 걸리도록 standard context 친화적인 안내를 유지했어요. import/deploy skill 은 CLI 0.22.4 의 exact deployment-id 흐름과 맞춰 최신 배포 근거를 잃지 않고 verify·diagnosis 로 이어지게 했고, Claude Desktop 에서 보이는 진행 문구와 SDK 안내도 현재 계약에 맞게 정리했어요.
