@@ -8,6 +8,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint:tone": "bun scripts/check-toss-tone-conformance.ts --strict",
+    "plugin:bundle": "node scripts/bundle-plugin.cjs",
     "release": "commit-and-tag-version",
     "release:tag": "bun scripts/release-tag.ts"
   },
