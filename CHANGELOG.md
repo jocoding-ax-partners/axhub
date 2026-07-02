@@ -4,6 +4,16 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.5.7](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.6...v1.5.7) (2026-07-02)
+
+Claude Desktop 에서 axhub skill 이 device flow 인증을 시작할 때 사용자가 직접 링크를 열고 “승인했어”라고 다시 말해야 하던 마찰을 줄였어요. onboarding 과 init skill 은 CLI 0.22.7 의 auto-open/auto-poll 계약을 우선 사용하고, 브라우저 열기나 polling 이 실제로 불가능한 경우에만 수동 안내로 돌아가서 바이브코더가 플러그인 안에서 흐름을 자연스럽게 끝낼 수 있게 했어요.
+
+
+### Fixed
+
+* onboarding auth 를 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub auth login --json` 흐름에 맞춰 자동 브라우저 열기와 polling 을 기다리도록 수정
+* init bootstrap execute/resume 안내가 CLI device-flow auto-poll event 를 먼저 처리하고, 실패·만료 때만 수동 승인 안내로 fallback 하도록 보강
+
 ## [1.5.6](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.5...v1.5.6) (2026-07-02)
 
 import skill 이 CLI 0.22.6 의 더 부드러운 기존 앱 가져오기 흐름을 자연어 안내로 제대로 전달하도록 맞췄어요. local-only GitHub 권한 문제, 깨진 기존 manifest 복구, 느린 Docker 첫 배포 검증처럼 바이브코더가 중간에 막히기 쉬운 구간을 먼저 설명하고, 실패하면 바로 diagnosis 로 이어지게 해서 플러그인과 CLI만으로도 다음 행동이 분명하게 보이도록 정리했어요.
