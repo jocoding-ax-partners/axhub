@@ -102,7 +102,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 # axhub plugin (diet 체제)
 
-axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어요: `onboarding` / `init` / `deploy` + 그 셋에 명확히 안 맞거나 의도가 불분명한 axhub 발화를 라이브 `--help` 탐색으로 처리하는 `clarity` 브리지예요. 이후 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import` skill, CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis` skill 을 더해 현재 8 skill 이에요. 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli (`axhub` 바이너리) 를 직접 호출해요. Rust helper 바이너리 (`crates/axhub-helpers`), 모든 hook(이후 auto-update SessionStart 훅 1개만 `hooks/` 로 재도입 — 아래 "자동 업데이트 hook" 참고), NL routing corpus, scaffold/skill-doctor/lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인은 전부 제거됐어요.
+axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어요: `onboarding` / `init` / `deploy` + 그 셋에 명확히 안 맞거나 의도가 불분명한 axhub 발화를 라이브 `--help` 탐색으로 처리하는 `clarity` 브리지예요. 이후 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import` skill, CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis` skill 을 더해 현재 8 skill 이에요. 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli (`axhub` 바이너리) 를 직접 호출해요. Rust helper 바이너리 (`crates/axhub-helpers`), 모든 hook(이후 SessionStart 훅 2개 — auto-update + 온보딩 MCP 재시작 resume — 만 `hooks/` 로 재도입, 아래 "자동 업데이트 hook"·"온보딩 MCP 재시작 resume hook" 참고), NL routing corpus, scaffold/skill-doctor/lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인은 전부 제거됐어요.
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
 
@@ -117,6 +117,14 @@ diet 가 제거한 hook 중 **auto-update SessionStart 훅 1개**만 `hooks/` �
 - **Windows:** hook 은 `"shell": "bash"` 로 고정했어요 — Windows 에선 Git Bash 로 돌고(없으면 silent PowerShell fallback 대신 깨끗이 skip), `bash`·`find`·`command -v`·`$HOME` 등 Git for Windows 번들 도구만 써요 (jq 같은 외부 의존 없음). prompt 의 `axhub update`/`claude plugin update` 는 에이전트 Bash 도구(= skill 들과 같은 Git Bash 경로)로 실행돼요. 즉 hook 은 skill bash 와 동일한 Git Bash 전제를 따르고, 새 의존(node 등)은 더하지 않아요.
 - best-effort·비차단 — 실패·구 CLI·네트워크 오류면 조용히 건너뛰고 사용자의 작업을 막지 않아요. skill 들의 기존 `1a 버전 체크`(10분 TTL, 안내만)와 보완 관계예요.
 - **수동 on-demand counterpart:** 같은 update 로직을 사용자가 직접 부르는 진입점은 `update` skill (`skills/update/SKILL.md`) 이에요 — 훅과 달리 24h throttle 없이 바로 확인하고, 최신이어도 결과를 한 줄로 알려요. 둘은 같은 `axhub update` + `claude plugin update` 표면을 공유해요.
+
+## 온보딩 MCP 재시작 resume hook
+
+auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks.json` 두 번째 entry). 새로 등록한 MCP 서버는 Claude Code 를 재시작해야 세션에 로드되기 때문에, onboarding 은 `claude mcp add` 직후 marker(`~/.axhub/cache/.onboarding-mcp-restart`)를 쓰고 Restart Handoff Card 로 종료해요. 재시작 후 이 훅이 marker(7일 TTL, mtime 만 사용)를 감지하면 새 세션이 온보딩 마무리(`claude mcp get axhub` 확인 → 필요시 `/mcp` OAuth → 최종 카드 → marker 삭제)를 먼저 제안해요.
+
+- hook 은 파일 존재 + mtime 만 봐요 — `axhub` 바이너리도 네트워크도 안 건드리고, marker 삭제도 skill 몫이에요 (`VIBE_READY` 시 `rm -f`).
+- **끄기:** `AXHUB_NO_ONBOARDING_RESUME=1`. Windows 전제는 auto-update 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
+- 세부 절차는 `skills/onboarding/references/mcp-ready-card.md` 의 Restart Marker / Resume After Restart 섹션이 소유해요.
 
 ## CLI 호출 표면
 

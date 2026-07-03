@@ -250,4 +250,62 @@ describe("smooth behavior contracts", () => {
     const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
   });
+
+  test("onboarding MCP restart resume hook is wired", () => {
+    interface HookEntry {
+      type: string;
+      shell?: string;
+      command: string;
+    }
+    interface HooksFile {
+      hooks: { SessionStart: Array<{ hooks: HookEntry[] }> };
+    }
+    const hooksFile = readJson<HooksFile>("hooks/hooks.json");
+    const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
+    expect(entries).toHaveLength(2);
+
+    const resume = entries[1];
+    expect(resume.type).toBe("command");
+    expect(resume.shell).toBe("bash");
+    expect(resume.command).toContain("AXHUB_NO_ONBOARDING_RESUME");
+    expect(resume.command).toContain(".onboarding-mcp-restart");
+    expect(resume.command).toContain("-mmin -10080");
+    expect(resume.command).toContain("claude mcp get axhub");
+    expect(resume.command).toContain("Resume After Restart");
+    // hook is read-only: never deletes the marker, never spawns the axhub binary
+    expect(resume.command).not.toContain("rm -f");
+    expect(resume.command).not.toContain("axhub plugin-support");
+  });
+
+  test("mcp-ready-card encodes restart handoff and resume contracts", () => {
+    const card = readRepo("skills/onboarding/references/mcp-ready-card.md");
+
+    // marker lifecycle: write on fresh add, delete on final card
+    expect(card).toContain('date > "$HOME/.axhub/cache/.onboarding-mcp-restart"');
+    expect(card).toContain('rm -f "$HOME/.axhub/cache/.onboarding-mcp-restart"');
+
+    // restart handoff card replaces same-session /mcp guidance after a fresh add
+    expect(card).toContain("## Restart Handoff Card");
+    expect(card).toContain("도구 활성화에는 Claude Code 재시작이 필요해요. [READY_WITH_USER_ACTION]");
+    expect(card).toContain("이 세션에서 `/mcp` OAuth 를 안내하지 않아요");
+
+    // resume procedure owned by this reference, pointed at by the SessionStart hook
+    expect(card).toContain("## Resume After Restart");
+    expect(card).toContain("SAFE_STOP_NONINTERACTIVE");
+
+    // the old impossible instruction must be gone
+    expect(card).not.toContain("It may require a new session before tools appear");
+  });
+
+  test("onboarding SKILL encodes MCP restart handoff invariants", () => {
+    const onboarding = readRepo("skills/onboarding/SKILL.md");
+
+    expect(onboarding).toContain(".onboarding-mcp-restart");
+    expect(onboarding).toContain("Restart Handoff Card");
+    expect(onboarding).toContain("Resume After Restart");
+    expect(onboarding).toContain(
+      "NEVER `claude mcp add` 를 실행한 그 세션에서 `/mcp` OAuth 완료나 `mcp__axhub__*` 도구 활성화를 안내하지 말아요",
+    );
+    expect(onboarding).toContain("NEVER `VIBE_READY` 출력 후 marker");
+  });
 });

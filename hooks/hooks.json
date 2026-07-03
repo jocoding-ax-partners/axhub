@@ -7,6 +7,11 @@
             "type": "command",
             "shell": "bash",
             "command": "[ -n \"$AXHUB_NO_AUTO_UPDATE\" ] && exit 0; command -v axhub >/dev/null 2>&1 || exit 0; CACHE=\"$HOME/.axhub/cache/.plugin-update-check\"; [ -f \"$CACHE\" ] && [ -n \"$(find \"$CACHE\" -mmin -1440 2>/dev/null)\" ] && exit 0; echo \"[axhub] axhub CLI/plugin 업데이트를 확인할 시점이에요(24h throttle). ${CLAUDE_PLUGIN_ROOT}/hooks/auto-update-prompt.md 를 읽고 그 지침대로 버전을 확인·적용하세요. best-effort·비차단 — 실패하면 조용히 건너뛰고 사용자의 작업을 절대 막지 마세요.\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "[ -n \"$AXHUB_NO_ONBOARDING_RESUME\" ] && exit 0; M=\"$HOME/.axhub/cache/.onboarding-mcp-restart\"; [ -f \"$M\" ] || exit 0; [ -n \"$(find \"$M\" -mmin -10080 2>/dev/null)\" ] || exit 0; echo \"[axhub] 온보딩 MCP 마무리가 남았어요(재시작 후 이어가기). 사용자에게 이어서 확인할지 물어보고, 동의하면 ${CLAUDE_PLUGIN_ROOT}/skills/onboarding/references/mcp-ready-card.md 의 Resume After Restart 절차대로 claude mcp get axhub 상태 확인 → 필요시 /mcp OAuth 안내 → 최종 카드 출력 → marker 삭제를 진행하세요. best-effort·비차단 — 실패하면 조용히 건너뛰고 사용자의 작업을 절대 막지 마세요.\""
           }
         ]
       }
