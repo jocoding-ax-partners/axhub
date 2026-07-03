@@ -51,7 +51,11 @@ const FORBIDDEN: ForbiddenToken[] = [
 ];
 
 const PHASE_13_FILES = async (includePatterns: string[] = []): Promise<string[]> => {
-  const explicit: string[] = [];
+  const explicit: string[] = [
+    "POLICY.md",
+    "docs/policy/agent-policy.md",
+    "docs/policy/dev-policy.md",
+  ];
   // diet 후 commands/ 디렉토리는 제거됨 — skills/*/SKILL.md 만 검사해요.
   const skillFiles: string[] = [];
   for await (const f of glob("skills/*/SKILL.md", { cwd: REPO_ROOT })) {
