@@ -4,6 +4,20 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.6.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.6.0...v1.6.1) (2026-07-03)
+
+커넥터를 "내가 조회 가능한 것"으로 물었을 때 tenant-admin 전체 카탈로그가 섞여 보이던 혼란을 줄였어요. 이제 clarity 는 본인 접근 범위 질문을 grant 기준의 `axhub connectors mine` 으로만 확인하고, `connectors list --enabled-only` 같은 관리자 전체 목록을 개인 연결 목록처럼 요약하지 않아요. README 도 MCP 재시작 후 이어가기 흐름에 맞춰 최신 상태로 정리돼 있어요.
+
+
+### Fixed
+
+* scope connector visibility to grant-accessible list ([f6079a2](https://github.com/jocoding-ax-partners/axhub/commit/f6079a2fb85d418f6783d67ed3aae4e3f9f7da3b))
+
+
+### Docs
+
+* README 를 SessionStart 훅 2개 체제와 온보딩 MCP 재시작 흐름에 맞춰 최신화 ([#260](https://github.com/jocoding-ax-partners/axhub/issues/260)) ([912b1da](https://github.com/jocoding-ax-partners/axhub/commit/912b1da3fdfa099b38c165ee9668c9aa3a03f7b0))
+
 ## [1.6.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.8...v1.6.0) (2026-07-03)
 
 온보딩에서 axhub MCP 를 새로 등록한 뒤 같은 세션에서 `/mcp` OAuth 를 안내하던 실행 불가능한 흐름을 고쳤어요 — 새로 등록한 MCP 서버는 Claude Code 를 재시작해야 세션에 로드되기 때문이에요. 이제 등록 직후에는 재시작 안내 카드로 마무리하고, 재시작한 새 세션이 SessionStart hook 으로 marker 를 감지해 온보딩 마무리(연결 확인 → OAuth → 최종 카드)를 먼저 제안해요. 자동 제안이 필요 없으면 `AXHUB_NO_ONBOARDING_RESUME=1` 로 끌 수 있어요.
