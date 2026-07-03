@@ -166,9 +166,9 @@ axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --commit "$COMMIT_SHA" 
 
 Bind `DEPLOY_ID` only from an in-flight deployment id or public `axhub deploy create --execute --json` / field-expr output. If no deployment id is present, do not declare success; say "배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. '배포 상태 확인해줘'라고 말하면 이어서 볼게요." and stop.
 
-### Verify once
+### Verify loop
 
-Deployment-record success is declared only by one verify call with the bound id:
+Deployment-record success is declared only by `axhub deploy verify` with the bound id:
 
 ```bash
 echo "배포 결과를 확인하고 있어요." >&2
@@ -177,7 +177,7 @@ axhub deploy verify "$DEPLOY_ID" > "$VERIFY_OUT" 2>&1
 VERIFY_EXIT=$?
 ```
 
-Do not use latest lookup. Current CLI resolves the exact deployment id to its app scope when needed, so the happy path is `axhub deploy verify "$DEPLOY_ID"` without `--app`. Do not claim success from `deploy status --watch`, deploy-create stdout, or prose polling; verify 전에는 성공을 선언하지 않아요. If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
+Do not use latest lookup. Current CLI resolves the exact deployment id to its app scope when needed, so the happy path is `axhub deploy verify "$DEPLOY_ID"` without `--app`. Do not call `axhub deploy watch` or `axhub deploy status --watch` from this skill; Desktop/non-TTY watch paths can degrade or require extra flags. If verify exits `6`, sleep briefly and retry the same verify command until terminal success/failure or a bounded timeout. Do not claim success from deploy-create stdout, status snapshots, watch output, or prose polling; verify 전에는 성공을 선언하지 않아요. If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
 
 Verify exits:
 
@@ -189,13 +189,13 @@ Verify exits:
 
 ### Deploy failure → diagnosis handoff
 
-For verify exit 7 only, preserve internal `DEPLOY_ID`, app slug/id/name, and classified verify state. Do not expose raw output. If a Skill tool exists, invoke `diagnosis` with app identity and "방금 배포 verify 가 실패했다" context. Otherwise follow diagnosis read-only surfaces: MCP `deployment_diagnosis` if callable, else `axhub --json deploy diagnose <앱>`.
+For verify exit 7 only, preserve internal `DEPLOY_ID`, app slug/id/name, and classified verify state. Do not expose raw output. If a Skill tool exists, invoke `diagnosis` with app identity and "방금 배포 verify 가 실패했다" context. Otherwise follow diagnosis read-only CLI surfaces: `axhub deploy status <deployment-id> --json`, `axhub deploy logs <deployment-id> --app <앱> --json --limit 100`, then `axhub --json deploy diagnose <앱>`. Do not call MCP deployment diagnosis tools.
 
 ## Recovery Summary
 
 Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-empathy-catalog.md`.
 
-- exit 64 + `validation.deployment_in_progress`: never retry `axhub deploy create`; offer to watch the in-flight deploy.
+- exit 64 + `validation.deployment_in_progress`: never retry `axhub deploy create`; offer to monitor the in-flight deploy with the verify loop.
 - subdomain precondition: `axhub apps update <slug> --subdomain <subdomain> --json` is a separate destructive mutation and needs its own preview/approval before one retry.
 - GitHub connection required: do not create repo, first push, or `apps git connect` from deploy; hand off to `import`.
 - auth expired: ask before login flow in interactive mode.
@@ -210,14 +210,15 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop JSON/field-expr parsing contracts where a command result is parsed.
 - NEVER call `axhub deploy create --execute` without the interactive AskUserQuestion preview decision. Headless is exempt only because it must stay dry-run and must not use `--execute`.
-- NEVER declare deploy success from `deploy status --watch`, deploy-create stdout, or prose polling. Deployment-record success declaration is `axhub deploy verify <deployment-id>` run once.
+- NEVER call `axhub deploy watch` or `axhub deploy status --watch` from this skill. In-flight and webhook-triggered deployments use the bounded `axhub deploy verify "$DEPLOY_ID"` loop.
+- NEVER declare deploy success from deploy-create stdout, status snapshots, watch output, or prose polling. Deployment-record success declaration is terminal `axhub deploy verify <deployment-id>`.
 - NEVER call `axhub deploy verify` without a deployment id. Latest 재탐색 금지.
 - NEVER call `axhub deploy verify` in static lane (`deploy_method=static`). Static is release-based, not deployment-record-based, and success is `apps static deploy --execute` activate with `active_release_id`.
 - NEVER send non-static apps to static lane. Empty or unsupported `deploy_method` uses the normal deployment-record pipeline.
 - NEVER call `apps static deploy --execute` without static dry-run preview plus interactive approval. Headless static lane is dry-run only.
-- NEVER change command semantics after approval by omitting `--execute`, changing the resolved deploy target, changing `--commit`, or changing the resolved tenant/profile. Surface the typed reason in one jargon-free line and stop, or use status-first watch when appropriate.
+- NEVER change command semantics after approval by omitting `--execute`, changing the resolved deploy target, changing `--commit`, or changing the resolved tenant/profile. Surface the typed reason in one jargon-free line and stop, or use status-first verify-loop monitoring when appropriate.
 - NEVER instruct the user to run `axhub deploy create`, `axhub deploy verify`, `apps static deploy --execute`, or any deploy CLI command themselves. The agent runs deploy and verify in this skill flow.
-- NEVER run `deploy create` when status-first already found an in-flight deploy for this app; route to verify/watch instead.
+- NEVER run `deploy create` when status-first already found an in-flight deploy for this app; route to the bounded verify loop instead.
 - NEVER call `axhub deploy cancel` without explicit confirmation.
 - NEVER infer mutation target from pwd, git remote, cached app id, or old manifest alone; live resolve through `deploy-prep`.
 - NEVER bypass the AskUserQuestion preview card on slash invocation. Slash confirms skill invocation, not the destructive operation.

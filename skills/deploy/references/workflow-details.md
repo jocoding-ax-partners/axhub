@@ -97,9 +97,9 @@ If `IN_FLIGHT_ID` exists, compare `IN_FLIGHT_COMMIT` and `RESOLVE_COMMIT`:
 - different non-empty commit: possible other user or tenant; be conservative.
 - either empty: uncertain; be conservative.
 
-Interactive choices are monitor, force new, or cancel. Headless safe default is abort. `monitor` sends `DEPLOY_ID="$IN_FLIGHT_ID"` to verify and never creates a new deployment. `force_new` may proceed to preview, but exit 64 deployment-in-progress is not retried.
+Interactive choices are monitor, force new, or cancel. Headless safe default is abort. `monitor` sends `DEPLOY_ID="$IN_FLIGHT_ID"` to the bounded verify loop and never creates a new deployment. `force_new` may proceed to preview, but exit 64 deployment-in-progress is not retried.
 
-For GitHub-connected apps, use status-first before fallback create. If no in-flight deployment is visible yet, interactive mode may wait briefly and refresh with `deploy-prep --refresh-in-flight`; headless does not wait. If a status-first id appears, reuse the same in-flight branch rules and skip `deploy create`.
+For GitHub-connected apps, use status-first before fallback create. If no in-flight deployment is visible yet, interactive mode may wait briefly and refresh with `deploy-prep --refresh-in-flight`; headless does not wait. If a status-first id appears, reuse the same in-flight branch rules and skip `deploy create`. Do not call `axhub deploy watch` or `axhub deploy status --watch`; Desktop/non-TTY watch can degrade or fail on required app flags. Use the bounded verify loop below.
 
 ## Preview and token gate
 
@@ -150,9 +150,9 @@ AXHUB_EXIT=$?
 
 On exit 64 with `validation.deployment_in_progress`, do not retry. Refresh in-flight once and verify that id if available; otherwise tell the user another deploy is in progress and stop. On exit 0, bind `DEPLOY_ID` from stdout. If no id exists, do not claim success; tell the user the start was seen but no result id was received.
 
-## Verify and diagnosis
+## Verify loop and diagnosis
 
-Deployment-record success is declared only by:
+Deployment-record success is declared only by `axhub deploy verify`. Poll this command for in-flight/webhook deployments:
 
 ```bash
 echo "배포 결과를 확인하고 있어요." >&2
@@ -160,6 +160,8 @@ VERIFY_OUT=$(mktemp)
 axhub deploy verify "$DEPLOY_ID" > "$VERIFY_OUT" 2>&1
 VERIFY_EXIT=$?
 ```
+
+If `VERIFY_EXIT=6`, the deployment is still running. Sleep briefly and retry the same verify command until exit 0 or 7, or until a bounded timeout. Do not substitute `axhub deploy watch` or `axhub deploy status --watch`.
 
 Exit handling:
 
@@ -169,7 +171,7 @@ Exit handling:
 - 5: unknown deployment id; stop without latest lookup.
 - 4: auth expired; use auth recovery.
 
-For the failure handoff, preserve `DEPLOY_ID`, app slug/id/name, and classified verify state internally. Do not expose raw output. If a Skill tool exists, invoke `diagnosis` with the app identity and "방금 배포 verify 가 실패했다" context. Otherwise follow diagnosis' read-only surface: MCP `deployment_diagnosis` if callable, else `axhub --json deploy diagnose <앱>`.
+For the failure handoff, preserve `DEPLOY_ID`, app slug/id/name, and classified verify state internally. Do not expose raw output. If a Skill tool exists, invoke `diagnosis` with the app identity and "방금 배포 verify 가 실패했다" context. Otherwise follow diagnosis' read-only CLI surfaces: `axhub deploy status <deployment-id> --json`, `axhub deploy logs <deployment-id> --app <앱> --json --limit 100`, then `axhub --json deploy diagnose <앱>`. Do not call MCP deployment diagnosis tools.
 
 ## Error routing
 
@@ -181,7 +183,7 @@ axhub plugin-support classify-exit "$EXIT" "$STDOUT"
 
 or use `references/error-empathy-catalog.md`.
 
-- exit 64 + `validation.deployment_in_progress`: explain another deployment is running, never retry create, offer to watch.
+- exit 64 + `validation.deployment_in_progress`: explain another deployment is running, never retry create, offer to monitor it with the verify loop.
 - exit 9 + `subdomain_not_configured`: subdomain update is a separate destructive mutation. Preview the proposed 2..32 character subdomain and require approval before `axhub apps update`.
 - exit 9/64/67 + GitHub connection required: do not create repo, first push, or `apps git connect` from deploy. Hand off to import.
 - exit 4/65: auth expired; ask before login flow in interactive mode.

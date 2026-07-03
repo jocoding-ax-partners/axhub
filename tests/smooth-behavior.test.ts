@@ -78,6 +78,7 @@ describe("smooth behavior contracts", () => {
     const importSkill = readRepo("skills/import/SKILL.md");
     const onboardingAuth = readRepo("skills/onboarding/references/install-channels-and-auth.md");
     const bootstrapAndLocal = readRepo("skills/init/references/bootstrap-and-local.md");
+    const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
 
     expect(onboarding).toContain("axhub plugin-support onboarding-detect --json");
     expect(onboarding).toContain("cli_missing");
@@ -110,6 +111,8 @@ describe("smooth behavior contracts", () => {
 
     expect(deploy).toContain("axhub deploy verify <deployment-id>");
     expect(deploy).toContain("axhub deploy verify \"$DEPLOY_ID\"");
+    expect(deploy).toContain("NEVER call `axhub deploy watch`");
+    expect(deploy).toContain("bounded `axhub deploy verify \"$DEPLOY_ID\"` loop");
     expect(deploy).toContain("exit 6");
     expect(deploy).toContain("exit 7");
     expect(deploy).toContain("성공을 선언하지 않아요");
@@ -119,13 +122,21 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("diagnosis");
     expect(deploy).toContain("Deploy failure → diagnosis handoff");
     expect(deploy).toContain("재배포나 롤백은 하지 않아요");
+    expect(deploy).toContain("axhub deploy logs <deployment-id>");
     expect(deploy).toContain("axhub --json deploy diagnose <앱>");
+    expect(deploy).not.toContain("deployment_diagnosis if callable");
+    expect(workflowDetails).toContain("Do not call `axhub deploy watch`");
+    expect(workflowDetails).toContain("Do not substitute `axhub deploy watch`");
+    expect(workflowDetails).toContain("axhub deploy logs <deployment-id>");
 
     expect(importSkill).toContain("axhub --json plugin-support import --mode preview");
     expect(importSkill).toContain('axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT"');
     expect(importSkill).toContain("static lane 에서는 사용자가 명시적으로");
     expect(importSkill).toContain("axhub --json plugin-support import --mode execute --approved");
     expect(importSkill).toContain('axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"');
+    expect(importSkill).toContain("foreground 로 실행하고 완료 출력을 받을 때까지");
+    expect(importSkill).toContain("background output");
+    expect(importSkill).toContain("existing_axhub_app_repair");
     expect(importSkill).toContain("CLI 가 현재 `gh` 로그인과 app slug 로 repo 를 정하고");
     expect(importSkill).toContain("capabilities.import.schemas");
     expect(importSkill).toContain("Static 성공은");
@@ -145,7 +156,18 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("tenant-admin 전체 카탈로그");
     expect(clarity).toContain('`connectors list` / `--enabled-only` tenant-admin 전체 목록을 "내가 조회 가능한 커넥터" 로 표현');
     expect(diagnosis).toContain("axhub deploy diagnose");
-    expect(diagnosis).toContain("deployment_diagnosis");
+    expect(diagnosis).toContain("axhub deploy status <deployment-id>");
+    expect(diagnosis).toContain("axhub deploy logs <deployment-id>");
+    expect(diagnosis).toContain("CLI 전용");
+    expect(diagnosis).toContain("MCP `deployment_diagnosis` 같은 deployment MCP 도구가 보여도 호출하지 않아요");
+    expect(diagnosis).toContain("사용자에게 보이는 진행 문구와 Bash/tool call 제목은 한국어로만");
+    expect(diagnosis).toContain("axhub CLI 확인");
+    expect(diagnosis).toContain("실패 배포 상태 확인");
+    expect(diagnosis).toContain("실패 배포 로그 확인");
+    expect(diagnosis).toContain("실패 배포 상태·로그 확인");
+    expect(diagnosis).toContain("현재 라이브 상태 확인");
+    expect(diagnosis).toContain("사용자에게 보이는 문장에서는 영어 진행 문장을 쓰지 않아요");
+    expect(diagnosis).toContain("명령 이름(`axhub deploy status`, `status/logs/diagnose`)은 필요할 때만 짧게 허용");
     expect(diagnosis).toContain("정상이에요");
     expect(diagnosis).toContain("진단 대상이 아니에요");
     expect(diagnosis).toContain("해결 후보가 있어요");
@@ -154,6 +176,10 @@ describe("smooth behavior contracts", () => {
     expect(diagnosis).toContain("진단을 못 했어요");
     expect(diagnosis).toContain("재배포·롤백");
     expect(diagnosis).toContain("직접 실행하지 않아요");
+    expect(diagnosis).not.toContain("MCP `deployment_diagnosis` 를 1순위");
+    expect(diagnosis).not.toContain("CLI-only diagnosis");
+    expect(diagnosis).not.toContain("Check CLI surface first");
+    expect(diagnosis).not.toContain("Checking axhub CLI availability");
     const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
   });
@@ -167,6 +193,8 @@ describe("smooth behavior contracts", () => {
     expect(development).toContain("sdk.apps.rawDb.tables(appId)");
     expect(development).toContain("sdk.apps.rawDb.tableRows(appId, table");
     expect(development).toContain("제거된 SDK data-plane API");
+    expect(development).toContain("사용자에게 보이는 설명·툴 제목·중간 메모는 한국어로만");
+    expect(development).toContain("optional 파일·설정 확인은 없어도 정상인 경우 실패처럼 보이면 안 돼요");
     expect(connectorSafety).toContain("legacy data-plane DSL 은 제거");
     expect(writeGate).toContain("legacy data-plane write DSL 은 새로 만들지 않아요");
 
@@ -178,6 +206,7 @@ describe("smooth behavior contracts", () => {
       "data.table(Products)",
       "`where(...).isNotNull()`",
       "`data.table(\"<name>\", schema)`",
+      "Now the file's read",
     ];
     for (const retiredExample of retiredExamples) {
       expect(development).not.toContain(retiredExample);
