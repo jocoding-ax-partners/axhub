@@ -250,4 +250,30 @@ describe("smooth behavior contracts", () => {
     const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
   });
+
+  test("onboarding MCP restart resume hook is wired", () => {
+    interface HookEntry {
+      type: string;
+      shell?: string;
+      command: string;
+    }
+    interface HooksFile {
+      hooks: { SessionStart: Array<{ hooks: HookEntry[] }> };
+    }
+    const hooksFile = readJson<HooksFile>("hooks/hooks.json");
+    const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
+    expect(entries).toHaveLength(2);
+
+    const resume = entries[1];
+    expect(resume.type).toBe("command");
+    expect(resume.shell).toBe("bash");
+    expect(resume.command).toContain("AXHUB_NO_ONBOARDING_RESUME");
+    expect(resume.command).toContain(".onboarding-mcp-restart");
+    expect(resume.command).toContain("-mmin -10080");
+    expect(resume.command).toContain("claude mcp get axhub");
+    expect(resume.command).toContain("Resume After Restart");
+    // hook is read-only: never deletes the marker, never spawns the axhub binary
+    expect(resume.command).not.toContain("rm -f");
+    expect(resume.command).not.toContain("axhub plugin-support");
+  });
 });
