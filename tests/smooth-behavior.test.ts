@@ -140,6 +140,10 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("axhub 에 그 기능은 없어요");
     expect(clarity).toContain("diagnosis");
     expect(clarity).toContain("배포 실패 원인 진단");
+    expect(clarity).toContain("본인 범위");
+    expect(clarity).toContain("axhub connectors mine");
+    expect(clarity).toContain("tenant-admin 전체 카탈로그");
+    expect(clarity).toContain('`connectors list` / `--enabled-only` tenant-admin 전체 목록을 "내가 조회 가능한 커넥터" 로 표현');
     expect(diagnosis).toContain("axhub deploy diagnose");
     expect(diagnosis).toContain("deployment_diagnosis");
     expect(diagnosis).toContain("정상이에요");

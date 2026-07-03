@@ -13,6 +13,7 @@ description: 'clarity: onboarding/init/import/deploy/development/diagnosis/updat
 - **사용법 선숙지 강제 (--help gate).** 명령을 찾았다고 바로 실행하지 않아요. 실행 전 그 정확한 leaf 명령(서브커맨드 포함)의 `--help` 를 반드시 1회 읽어 사용법(positional 인자 순서·필수/선택 플래그·파괴적 실행 플래그)을 확정하고, 거기 나온 인자·플래그만 써요. 사용법을 안 읽은 명령은 실행 금지예요.
 - **조회는 바로 실행, 파괴적 변경은 승인.** 목록·상태·로그처럼 읽기 전용 명령은 확인 없이 실행해요. 삭제·롤백·force/yes/execute 같은 파괴적 플래그가 있으면 대화형 승인 1회를 받고, headless 에서는 preview/summary 로 멈춰요.
 - **공개 표면만.** `axhub plugin-support ...` (hidden 그룹) 는 plugin 내부 프로토콜이라 이 스킬의 탐색·실행 대상이 아니에요.
+- **내 접근 가능 범위는 grant 기준.** 사용자가 "내가 조회 가능한", "내가 접근 가능한", "connected 된", "연결된 connector"처럼 **본인 범위**를 물으면 반드시 공개 명령 `axhub connectors mine` 으로 확인해요. tenant-admin 전체 카탈로그인 `axhub connectors list` / `--enabled-only` 결과를 "내가 조회 가능한 connector" 로 요약하지 말아요.
 - **지어내지 않기.** 탐색으로 못 찾은 기능은 "axhub 에 그 기능은 없어요" 라고 정직하게 말하고, 가장 가까운 명령을 제안해요.
 
 **대표 정직성 계약.** `clarity` 는 hidden `plugin-support` 를 탐색하지 않아요. 공개 `--json-schema` / `--help` 트리에서 맞는 leaf 를 찾지 못하면 존재하지 않는 명령을 만들지 말고, "axhub 에 그 기능은 없어요" + 가장 가까운 공개 명령만 말해요. 상태 확인·로그·환경변수처럼 대표 여정 뒤 작업은 이 경로로 이어가요.
@@ -25,6 +26,7 @@ description: 'clarity: onboarding/init/import/deploy/development/diagnosis/updat
 - ❌ `--help` 를 안 읽고 인자를 추측 조립 — leaf 명령 `--help` 1회 선숙지(--help gate) 후에만 실행. 추측 인자는 exit 64.
 - ❌ 1단계 탐색에서 못 찾자 포기 — 두 단계 깊이까지 탐색한 뒤에만 "기능 없음" 을 선언해요.
 - ❌ 탐색 출력(schema/help 본문)·raw stdout/stderr·secret·내부 id 를 chat 에 echo — 사용자에겐 한국어 요약만.
+- ❌ `connectors list` / `--enabled-only` tenant-admin 전체 목록을 "내가 조회 가능한 커넥터" 로 표현 — 본인 접근 범위는 `connectors mine` 만 authority.
 - ❌ 못 찾은 기능을 비슷한 명령으로 조용히 대체 실행 — 정직하게 부재를 알리고 가장 가까운 명령을 "제안"만 해요 (무단 실행 금지).
 - ❌ `plugin-support` hidden 표면을 탐색·실행 (공개 표면만 원칙 위반).
 - ❌ deploy/init/import/onboarding/development/diagnosis/update 담당 의도를 가로채기 (아래 경계표 위반 — 해당 의도는 양보). 특히 기존 앱 첫 연결은 import, 앱 코드(페이지·화면·대시보드·엔드포인트) 생성은 development, 배포 실패 원인 진단은 diagnosis 양보 — clarity 는 axhub 명령 실행만 해요.
