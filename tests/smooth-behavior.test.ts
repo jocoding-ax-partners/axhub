@@ -296,4 +296,16 @@ describe("smooth behavior contracts", () => {
     // the old impossible instruction must be gone
     expect(card).not.toContain("It may require a new session before tools appear");
   });
+
+  test("onboarding SKILL encodes MCP restart handoff invariants", () => {
+    const onboarding = readRepo("skills/onboarding/SKILL.md");
+
+    expect(onboarding).toContain(".onboarding-mcp-restart");
+    expect(onboarding).toContain("Restart Handoff Card");
+    expect(onboarding).toContain("Resume After Restart");
+    expect(onboarding).toContain(
+      "NEVER `claude mcp add` 를 실행한 그 세션에서 `/mcp` OAuth 완료나 `mcp__axhub__*` 도구 활성화를 안내하지 말아요",
+    );
+    expect(onboarding).toContain("NEVER `VIBE_READY` 출력 후 marker");
+  });
 });

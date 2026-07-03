@@ -38,7 +38,7 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 4. **No automatic init.** 빈 폴더나 manifest 없는 폴더를 발견해도 init skill 로 위임하거나 앱을 자동 생성하지 않아요. `no_manifest_empty` 는 안내 후 Ready card 로 가고, 다음 말은 `첫 앱 만들어줘` 예요.
 5. **GitHub App visibility.** detect JSON 의 `github.install_url` 이 null 이 아니면 설치 여부·계정 수·`first_gap` 과 무관하게 한 번은 보여줘요. `github.state` 가 `uninstalled`/`empty` 면 설치 확인 전 Step 7 repo/app 연결로 넘어가지 않아요.
 6. **Dependency safety.** 의존성 설치는 manifest 와 lockfile 이 있을 때만, 명시 확인 뒤, 해당 lockfile 의 package manager 로만 실행해요. 모든 install command 는 반드시 `--ignore-scripts` 를 붙여요. lockfile 이 없으면 설치하지 않아요.
-7. **MCP truth.** `claude mcp add` 는 등록일 뿐이에요. `claude mcp get axhub` 가 `Status: Connected` 를 보여주기 전까지 `mcp__axhub__*` 가 연결됐다고 말하지 말고 `/mcp` OAuth 안내로 남겨요.
+7. **MCP truth.** `claude mcp add` 는 등록일 뿐이에요. `claude mcp get axhub` 가 `Status: Connected` 를 보여주기 전까지 `mcp__axhub__*` 가 연결됐다고 말하지 않아요. 새로 add 한 세션에서는 `/mcp` OAuth 를 안내하지 말고 재시작 handoff 로 넘겨요 — `/mcp` OAuth 안내는 이전 세션에서 등록된 경우(resume 포함)에만 해요.
 8. **Ready card honesty.** 확인하지 않은 항목은 green check 로 표시하지 않아요. 가능한 종료 상태는 `VIBE_READY`, `READY_WITH_USER_ACTION`, `SAFE_STOP_NONINTERACTIVE`, `BLOCKED_UNSUPPORTED` 예요.
 
 ## Progress
@@ -116,6 +116,8 @@ If a handler needs a prompt but D1 safe-stop mode is active, do not execute the 
 
 After gaps are green, optionally register axhub MCP in user scope and verify authentication status. Load [`references/mcp-ready-card.md`](references/mcp-ready-card.md) before doing this step. Never claim MCP connected until `claude mcp get axhub` says `Status: Connected`.
 
+새로 `claude mcp add` 를 실행한 세션에는 서버가 로드되지 않아요 — marker(`~/.axhub/cache/.onboarding-mcp-restart`)를 쓰고 Restart Handoff Card(`READY_WITH_USER_ACTION`)로 종료해요. 재시작 후에는 SessionStart hook 이 marker 를 감지해 새 세션이 마무리를 먼저 제안하고, `VIBE_READY` 를 출력할 때 marker 를 삭제해요. 세부 분기는 reference 의 Claude Code Path / Resume After Restart 섹션이 소유해요.
+
 Finish with one honest card:
 
 - `VIBE_READY`: verified green enough to start coding.
@@ -141,6 +143,8 @@ Finish with one honest card:
 - NEVER mark unchecked items green in `VIBE_READY`.
 - NEVER run deploy verify without the concrete deployment id and app scope from the deploy output; no latest re-search.
 - NEVER claim axhub MCP is connected after add only; require `claude mcp get axhub` connected status.
+- NEVER `claude mcp add` 를 실행한 그 세션에서 `/mcp` OAuth 완료나 `mcp__axhub__*` 도구 활성화를 안내하지 말아요 — marker 를 쓰고 Restart Handoff Card 로 종료해요.
+- NEVER `VIBE_READY` 출력 후 marker(`~/.axhub/cache/.onboarding-mcp-restart`)를 남기지 말아요.
 
 ## Additional Resources
 
