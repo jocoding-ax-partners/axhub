@@ -219,7 +219,7 @@ claude plugin validate dist/axhub-plugin
 claude --plugin-dir dist/axhub-plugin
 ```
 
-릴리즈는 `commit-and-tag-version` 2단계 flow 예요.
+릴리즈는 `commit-and-tag-version` 3단계 flow 예요.
 
 ```bash
 bun run release                    # bump + commit (tag 미생성)

@@ -56,7 +56,7 @@ const PHASE_13_FILES = async (includePatterns: string[] = []): Promise<string[]>
     "docs/policy/agent-policy.md",
     "docs/policy/dev-policy.md",
   ];
-  // diet 후 commands/ 디렉토리는 제거됨 — skills/*/SKILL.md 만 검사해요.
+  // diet 후 commands/ 디렉토리는 제거됨 — skills/*/SKILL.md 와 explicit 정책 문서를 검사해요.
   const skillFiles: string[] = [];
   for await (const f of glob("skills/*/SKILL.md", { cwd: REPO_ROOT })) {
     skillFiles.push(f);

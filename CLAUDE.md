@@ -147,7 +147,7 @@ auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks
 
 ## Release flow (commit-and-tag-version, 단순화)
 
-plugin 릴리즈는 `commit-and-tag-version` 기반 2단계 flow 를 유지하되 postbump 이 단순해졌어요 (codegen:version·release:check·5-binary build·bin/ add 전부 제거).
+plugin 릴리즈는 `commit-and-tag-version` 기반 3단계 flow 를 유지하되 postbump 이 단순해졌어요 (codegen:version·release:check·5-binary build·bin/ add 전부 제거).
 
 ```bash
 # step 1 — bump + commit (tag 미생성)
