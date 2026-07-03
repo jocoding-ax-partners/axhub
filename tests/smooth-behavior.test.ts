@@ -276,4 +276,24 @@ describe("smooth behavior contracts", () => {
     expect(resume.command).not.toContain("rm -f");
     expect(resume.command).not.toContain("axhub plugin-support");
   });
+
+  test("mcp-ready-card encodes restart handoff and resume contracts", () => {
+    const card = readRepo("skills/onboarding/references/mcp-ready-card.md");
+
+    // marker lifecycle: write on fresh add, delete on final card
+    expect(card).toContain('date > "$HOME/.axhub/cache/.onboarding-mcp-restart"');
+    expect(card).toContain('rm -f "$HOME/.axhub/cache/.onboarding-mcp-restart"');
+
+    // restart handoff card replaces same-session /mcp guidance after a fresh add
+    expect(card).toContain("## Restart Handoff Card");
+    expect(card).toContain("도구 활성화에는 Claude Code 재시작이 필요해요. [READY_WITH_USER_ACTION]");
+    expect(card).toContain("이 세션에서 `/mcp` OAuth 를 안내하지 않아요");
+
+    // resume procedure owned by this reference, pointed at by the SessionStart hook
+    expect(card).toContain("## Resume After Restart");
+    expect(card).toContain("SAFE_STOP_NONINTERACTIVE");
+
+    // the old impossible instruction must be gone
+    expect(card).not.toContain("It may require a new session before tools appear");
+  });
 });
