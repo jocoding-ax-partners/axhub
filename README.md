@@ -191,6 +191,8 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요.
 - **CLI 경계 신뢰** — 플러그인은 자체 HTTP/TLS 스택이 없어요. TLS·프록시·인증서 검증·토큰 저장은 모두 캐노니컬 `axhub` CLI 가 담당해요.
 - **최소 버전/기능 게이트** — `init`·`deploy` 스킬은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 v0.20.0+ 표면이 없으면 멈추고 설치/업그레이드를 안내해요 — 우회하지 않아요.
 
+플러그인이 네트워크·로컬 파일·자동 업데이트에서 무엇을 하는지는 [POLICY.md](./POLICY.md) 에 공개돼 있어요.
+
 ---
 
 ## 🛠️ 개발과 기여
@@ -226,6 +228,8 @@ bun run release:tag                # tag 생성 + push
 ```
 
 > 판정·실행 로직은 플러그인이 아니라 `ax-hub-cli` 에 있어요 — helper 기능 변경, schema parity, CLI 릴리즈는 그쪽 레포(`ax-hub-cli`) follow-up 으로 처리해요.
+
+개발·운영 규칙의 원천은 [docs/policy/dev-policy.md](./docs/policy/dev-policy.md), 에이전트 행동 규칙의 원천은 [docs/policy/agent-policy.md](./docs/policy/agent-policy.md) 예요.
 
 ---
 
