@@ -4,6 +4,28 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.6.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.8...v1.6.0) (2026-07-03)
+
+온보딩에서 axhub MCP 를 새로 등록한 뒤 같은 세션에서 `/mcp` OAuth 를 안내하던 실행 불가능한 흐름을 고쳤어요 — 새로 등록한 MCP 서버는 Claude Code 를 재시작해야 세션에 로드되기 때문이에요. 이제 등록 직후에는 재시작 안내 카드로 마무리하고, 재시작한 새 세션이 SessionStart hook 으로 marker 를 감지해 온보딩 마무리(연결 확인 → OAuth → 최종 카드)를 먼저 제안해요. 자동 제안이 필요 없으면 `AXHUB_NO_ONBOARDING_RESUME=1` 로 끌 수 있어요.
+
+
+### Added
+
+* 온보딩 MCP 재시작 resume SessionStart hook 추가 ([936cb9c](https://github.com/jocoding-ax-partners/axhub/commit/936cb9cc6e66af3ed81856cb45ebf0abd180a5e8))
+* 온보딩 SKILL 에 MCP 재시작 handoff invariant 추가 ([b091944](https://github.com/jocoding-ax-partners/axhub/commit/b091944ca2d9d4b3a388fe42f1befd2e41b5fe0c))
+
+
+### Fixed
+
+* MCP fresh add 를 재시작 handoff 카드로 종료하고 resume 절차 추가 ([7ddce66](https://github.com/jocoding-ax-partners/axhub/commit/7ddce66168eaa891490032fa92105e11b4c26752))
+
+
+### Docs
+
+* 온보딩 MCP 재시작 resume hook 문서 동기화 ([2ff38fc](https://github.com/jocoding-ax-partners/axhub/commit/2ff38fca086be1b94f87a00b3ed997f124ae191e))
+* 온보딩 MCP 재시작 resume 구현 계획 추가 ([06d69e6](https://github.com/jocoding-ax-partners/axhub/commit/06d69e6fd7b16eaa027044afb4439d5c6ea6a117))
+* 온보딩 MCP 재시작 안내·세션 이어가기 설계 spec 추가 ([9d08021](https://github.com/jocoding-ax-partners/axhub/commit/9d0802172c3ec8f5c183a490f5fbaa010dcda6b1))
+
 ## [1.5.8](https://github.com/jocoding-ax-partners/axhub/compare/v1.5.7...v1.5.8) (2026-07-03)
 
 Claude Desktop QA에서 확인한 import skill의 CLI 호출 모양을 바로잡았어요. `--json` 같은 전역 플래그가 `plugin-support import` 뒤에 붙으면 hidden import parser가 잘못 해석할 수 있어서, 이제 skill 안내는 `axhub --json plugin-support import ...` 형태를 기준으로 설명해요. CLI 0.22.8의 local-only repo 자동 선택 흐름도 함께 반영해서 기존 백엔드·Docker 앱을 가져올 때 불필요한 `--repo` 추측 없이 더 매끄럽게 이어갈 수 있어요.
