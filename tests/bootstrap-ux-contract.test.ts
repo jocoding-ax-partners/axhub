@@ -9,12 +9,12 @@ describe("bootstrap desktop UX contract", () => {
   test("advertises English empty-folder web app deployment prompts as bootstrap triggers", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
 
-    expect(bootstrap).toContain("English empty-folder prompts");
+    expect(bootstrap).toContain("English examples for the same 새 앱 생성+배포 intent");
     expect(bootstrap).toContain("Create a small bakery preorder web app and deploy it to the internet");
     expect(bootstrap).toContain("Build a cafe booking website and put it online");
     expect(bootstrap).toContain("Make a flower shop reservation app");
-    expect(bootstrap).toContain("also route here even when the user does not say axhub");
-    expect(bootstrap).toContain("사용자가 `axhub` 를 말하지 않아도 빈 디렉토리에서는 이 스킬이에요");
+    expect(bootstrap).toContain("사용자가 axhub 를 말하지 않아도 조용히 이 흐름을 시작해요");
+    expect(bootstrap).toContain("사용자가 `axhub` 를 말하지 않아도 빈 디렉토리에서는 이 흐름으로 처리해요");
     expect(bootstrap).toContain("Claude 기본 앱 제작 경로로 들어가서 임의 shell 점검이나 일반 프로젝트 생성을 시작하지 않아요");
   });
 
@@ -42,6 +42,12 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`실행 중 명령`");
     expect(bootstrap).toContain("가능한 제목은 이 목록에서 골라요");
     expect(bootstrap).toContain("`앱 이름 확인`");
+    expect(bootstrap).toContain("왜 이 스킬이 맞는지");
+    expect(bootstrap).toContain("라우팅 사유");
+    expect(bootstrap).toContain("첫 visible 응답은 반드시");
+    expect(bootstrap).toContain("첫 visible 응답은 절대 스킬 매칭 설명으로 시작하지 않아요");
+    expect(bootstrap).toContain("영어/한국어 판정 요약");
+    expect(bootstrap).toContain("첫 문장에 영어 라우팅 판정 요약을 붙이지 않아요");
   });
 
   test("keeps bootstrap checks portable without rtk or shell-wrapper preflight", () => {
