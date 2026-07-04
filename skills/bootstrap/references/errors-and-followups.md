@@ -4,7 +4,7 @@ Load this reference for long error routing, final result wording, optional MCP/s
 
 ## Result Card
 
-Use saga response only for verification. User-facing result should be short Korean lines. URL and public state must be read from the app record and never synthesized from dry-run subdomain:
+Use saga response only for verification. User-facing result should be short Korean lines. URL and public state must be read from the app record through `axhub apps get` CLI only and never synthesized from dry-run subdomain. Do not use `App get (axhub)`, `App list`, deployment MCP, or app connector tools even if Claude Desktop shows them as available:
 
 ```bash
 PUBLIC_URL="$(axhub apps get "$APP_SLUG" --no-input --field-expr '.access_url // .data.access_url // empty' 2>/dev/null || true)"

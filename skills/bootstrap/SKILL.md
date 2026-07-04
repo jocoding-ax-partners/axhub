@@ -1,32 +1,15 @@
 ---
 name: bootstrap
-description: 'Use this skill in an empty folder when the user wants a new axhub template app created and put online. Do not explain the skill match, do not mention axhub:bootstrap in chat, and start the visible response with a Korean progress sentence before the first CLI check. Korean triggers include "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘", "초기화해줘", "결제 앱 만들어", "Next.js 앱 만들어줘", "bootstrap", and "scaffold". English triggers include "Please make my first app. I want a small gym class booking website and put it online", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", and "Make a flower shop reservation app". Run the backend template picker, confirm the app name, check GitHub owner, preview, then create/deploy with axhub apps bootstrap. Use import instead for a non-empty existing local app.'
-examples:
-  - utterance: "새 앱 만들어줘"
-    intent: "scaffold new axhub app"
-  - utterance: "앱 만들어줘"
-    intent: "scaffold new axhub app"
-  - utterance: "bootstrap"
-    intent: "scaffold new axhub app"
-  - utterance: "Please make my first app. I want a small gym class booking website and put it online."
-    intent: "scaffold new axhub app"
-  - utterance: "Create a small bakery preorder web app and deploy it to the internet."
-    intent: "scaffold new axhub app"
-  - utterance: "Build a cafe booking website and put it online"
-    intent: "scaffold new axhub app"
-  - utterance: "Make a flower shop reservation app"
-    intent: "scaffold new axhub app"
+description: 'Use this skill in an empty folder. Do not explain the skill match, do not mention axhub:bootstrap in chat, and start the visible response with a Korean progress sentence. Triggers: "새 앱 만들어줘", "앱 만들어줘", "초기화해줘", "Next.js 앱 만들어줘", "Please make my first app. I want a small gym class booking website and put it online", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", "Make a flower shop reservation app". Run the backend template picker, confirm the app name, check GitHub owner, preview, then create/deploy with axhub apps bootstrap. Use import instead for a non-empty existing local app.'
 allows-dependency-execution: true
 model: sonnet
 ---
 
 # Bootstrap
 
-새 앱을 만들 수 있는 템플릿을 확인할게요.
-
 ## Fast Start
 
-첫 visible 응답은 반드시 한국어 진행 문장으로 시작해요: `새 앱을 만들 수 있는지 확인할게요.` 또는 `[1/7] CLI 준비 확인하는 중이에요.`처럼요. 스킬 선택 이유, 빈 디렉토리 판단, route label, `axhub:bootstrap 스킬 호출한다` 같은 내부 라벨은 말하지 않아요. Claude Desktop 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요. native badge 가 skill 사용 고지를 대신하므로 chat 에서 "스킬을 사용하겠습니다"라고 말할 필요가 없어요. 특히 `Using axhub:bootstrap skill`, `matches new app`, `matches new app + deploy request`, `skill —`, `axhub의 새 앱 생성 스킬`, `스킬을 사용하겠습니다` 같은 라우팅 문장은 절대 쓰지 않아요.
+첫 visible 응답은 반드시 한국어 진행 문장으로 시작해요: `새 앱을 만들 수 있는지 확인할게요.` 또는 `[1/7] CLI 준비 확인하는 중이에요.`처럼요. 스킬 선택 이유, 빈 디렉토리 판단, route label, `axhub:bootstrap 스킬 호출한다` 같은 내부 라벨은 말하지 않아요. Claude Desktop 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요. 특히 `Using axhub:bootstrap skill`, `matches new app`, `matches new app + deploy request`, `skill —`, `axhub의 새 앱 생성 스킬`, `스킬을 사용하겠습니다` 같은 라우팅 문장은 절대 쓰지 않아요.
 
 사용자가 "앱 만들어줘", "first app", "put it online", "deploy"처럼 새 앱 생성과 배포 목표를 말하면 이미 목표 승인은 받은 상태예요. 하지만 execute 승인은 아직 아니므로, 아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행하고, `진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요.
 
@@ -46,12 +29,12 @@ creation path 는 하나뿐이에요: backend `axhub apps bootstrap` saga. `axhu
 
 ## Load These References
 
-정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, GitHub gate, dry-run preview 까지 진행해요. plugin cache reference 읽기는 Desktop 에서 workspace 밖 파일 권한 프롬프트를 만들 수 있으니 edge case 에서만 열어요.
+정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, GitHub gate, dry-run preview, execute/status/verify/result 까지 진행해요. plugin cache reference 읽기는 Desktop 에서 workspace 밖 파일 권한 프롬프트를 만들 수 있으니 edge case 에서만 열어요.
 
-- `references/resume-and-tenant.md`: route 가 `watch_status`/`resume_last` 이거나 pending GitHub device-flow recovery 가 필요할 때만 읽어요.
-- `references/templates-and-github.md`: backend template 응답이 예상과 다르거나 GitHub App installation/account gate, multi-owner picker, non-interactive defaults 의 edge case 가 필요할 때만 읽어요.
-- `references/bootstrap-and-local.md`: dry-run/execute/watch, GitHub device-code event 처리, clone/current-dir safety, manifest slug correction, local preview 가 필요할 때 읽어요.
-- `references/errors-and-followups.md`: long error routing, result card, optional MCP/setup/follow-up guidance, carry-over wording 이 필요할 때 읽어요.
+- `references/resume-and-tenant.md`: `watch_status`/`resume_last` 또는 pending GitHub device-flow recovery edge case.
+- `references/templates-and-github.md`: backend template 응답, GitHub account gate, multi-owner, non-interactive edge case.
+- `references/bootstrap-and-local.md`: clone/current-dir, manifest 보정, local preview edge case.
+- `references/errors-and-followups.md`: long error routing, result card, optional MCP/setup/follow-up.
 - `../deploy/references/error-empathy-catalog.md`: exit-code 안내를 사람 말투로 바꿀 때 읽어요.
 
 Claude Desktop 에서 reference 읽기 권한 프롬프트가 workspace 밖 plugin cache 경로로 뜨면 읽지 말고 이 본문 절차만으로 진행해요.
@@ -60,14 +43,15 @@ Claude Desktop 에서 reference 읽기 권한 프롬프트가 workspace 밖 plug
 
 사용자는 대부분 개발 지식이 없어요. CLI JSON 의 raw primitive 는 변수로만 다루고 chat 에 echo 하지 않아요.
 
-- 내부 라벨 노출 금지. `Folder near empty`, `Invoke axhub:bootstrap skill`, `Tenanting`, `Bootstraping`, `Idempotencying key`, `saga 실행`, `Saga 완료`, `GitHubed repo`, `DB 선언된 템플릿`, `development 단계` 같은 내부 상태·영어 동사화·스킬명은 chat, thinking summary, tool/Bash 제목, progress text, 질문 카드에 쓰지 않아요.
-- Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `raw`, `route`, `tenant`, `실행 중 명령`, `명령 실행` 같은 내부 단어는 쓰지 않아요.
+- 내부 라벨 노출 금지. `Folder near empty`, `Invoke axhub:bootstrap skill`, `Tenanting`, `Bootstraping`, `Idempotencying key`, `saga 실행`, `Saga 완료`, `GitHubed repo`, `DB 선언된 템플릿`, `development 단계` 는 chat/tool/progress/question 에 쓰지 않아요.
+- Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `raw`, `route`, `tenant`, `실행 중 명령`, `명령 실행` 은 쓰지 않아요.
 - 가능한 제목: `작업공간 확인`, `CLI 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `저장소 계정 확인`, `앱 이름 확인`, `만들기 전 확인`, `앱 생성 진행`, `첫 배포 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`, `인증 대기`.
 - `rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요. `pwd`, `ls`, `find`, `cat`, `curl` 같은 generic shell probe 로 작업공간이나 실패 상태를 추측하지 말고 `axhub` CLI 표면만 써요.
 - Desktop-visible command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수, `export`, command substitution, semicolon chain 으로 조립하지 말고 literal flag 로 넣어요. device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요.
 - Echo 금지: `schema_version`, template `id`, `folder_name`, `resource_tier`, `bootstrap_id`, `status_url`, `stage`, `app_id`, `deployment_id`, `error_code`, `error_message`, `request_id`, `idempotency_key`, `installation_id`, `device_code`.
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.
 - 공개 URL Markdown link 는 label 과 target 모두 확인된 `https://...` 절대 URL 을 그대로 써요. `[$PUBLIC_URL]($PUBLIC_URL)` 형태를 지켜요.
+- 이 스킬은 CLI-only 흐름이에요. Claude Desktop 에 `App get (axhub)`, `App list`, deployment MCP, app connector 도구가 보여도 호출하지 않아요. 배포 상태·검증은 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --json`, 앱 상세·URL 확인은 `axhub apps get <app-slug> --tenant <tenant> --json` 또는 `--field-expr` CLI 로만 해요. `Finding tools` 로 이동해서 MCP/App 도구를 찾지 않아요.
 
 각 단계는 한 줄로만 진행 상황을 알려요: `[1/7] CLI 준비 확인하는 중이에요`, `[2/7] 작업공간 확인하는 중이에요`, `[3/7] 템플릿 고르는 중이에요`, `[4/7] 앱 이름 정하는 중이에요`, `[5/7] 미리보기 만드는 중이에요`, `[6/7] 앱 만드는 중이에요`, `[7/7] 코드 받아서 정리하는 중이에요`.
 
@@ -130,9 +114,13 @@ Claude Desktop 에서 backend template 결과로 native Question/AskUserQuestion
 
 `웹앱`, `쇼핑몰`, `사이트`, `앱`, `서비스`, `예약`, `주문`, `preorder`, `booking`, `shop`, `store`, `dashboard`, `admin` 같은 일반 장르·기능 단어는 exact template 선택이 아니에요. 추천 순서를 정하는 근거일 뿐 선택 확정이 아니며, `--template ... --dry-run` 은 템플릿 질문 답변을 받은 뒤에만 실행해요.
 
+사용자가 `추천해줘`, `알아서`, `best option`, `recommend the best option` 처럼 말해도 그 말은 추천을 원한다는 뜻이지 선택 확정이 아니에요. 가장 알맞은 템플릿을 1번 추천으로 올리되 반드시 `어떤 템플릿으로 시작할까요?` 질문을 보여주고 답을 기다려요. 질문 뒤 사용자가 `추천대로`, `1번`, template 이름처럼 답하면 그때 확정해요.
+
 ### 5. App Name
 
 앱 이름 질문 문구는 반드시 `앱 이름을 무엇으로 할까요?` 로 써요. `앵 이름` 같은 오타나 줄임말을 쓰지 않아요. 표시 제목은 `앱 이름 확인` 으로 써요. 앱 이름 확인도 native Question/AskUserQuestion card 를 쓰지 말고 일반 채팅 텍스트로 물어요. 사용자가 고르거나 직접 입력한 뒤에만 `--name`/`--slug` 를 확정해요.
+
+`추천 이름으로 해줘`, `알아서 이름 지어줘`, `use the recommended name` 은 앱 이름 질문이 먼저 보인 뒤의 답변일 때만 확정으로 봐요. 앱 이름 질문을 아직 보여주지 않았다면 추천 이름을 제안하고 `앱 이름을 무엇으로 할까요?` 로 한 번 확인해요.
 
 repo name 과 subdomain 은 명시 입력이 없으면 app slug 로 맞춰요. dry-run 과 execute 모두 `--repo-name <app-slug>` 및 `--subdomain <app-slug>` 를 붙여요.
 
@@ -187,33 +175,26 @@ Claude Desktop 에서 `앱 생성 진행` 또는 `앱 생성 재시도` tool 이
 
 완료된 saga 에서 repo 를 읽고 현재 dir 을 채워요. 서브디렉토리를 만들지 않아요. `repo_full_name` 이 비어 있으면 임의 URL 을 만들지 않아요.
 
-Clone 이 성공하면 `axhub.yaml` 의 app binding 을 새 app slug 로 보정하고 `axhub deploy --explain --json` 으로 parser check 를 해요. 자세한 command 는 `references/bootstrap-and-local.md` 를 읽어요.
+Clone 이 성공하면 `axhub.yaml` 의 app binding 을 새 app slug 로 보정하고 `axhub deploy --explain --json` 으로 parser check 를 해요. 정상 fresh path 에서 workspace 밖 reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고, 이미 확보한 repo/app/deployment 값과 CLI 명령으로만 마무리해요. 자세한 command 는 clone 실패, 이미 `.git` 이 있는 디렉토리, manifest 보정 실패 같은 edge case 에서만 `references/bootstrap-and-local.md` 를 읽어요.
 
 ### 10. Result
 
-공개 URL 은 절대 합성하지 않아요. 배포 성공 후 앱의 `access_url`, `visibility`, `review_status` 를 읽어서 확인된 값만 보여줘요. `url_checked=false` 인 경우 URL 확인 증거를 보강해요. `visibility=private` 또는 `review_status=pending` 이면 친구에게 바로 공개됐다고 말하지 않아요.
+공개 URL 은 절대 합성하지 않아요. 배포 성공 후 `axhub apps get <app-slug> --tenant <tenant> --json` 또는 `--field-expr` CLI 로 앱의 `access_url`, `visibility`, `review_status` 를 읽어서 확인된 값만 보여줘요. `App get (axhub)` 같은 Desktop/App/MCP 도구는 쓰지 않아요. `url_checked=false` 인 경우 URL 확인 증거를 보강해요. `visibility=private` 또는 `review_status=pending` 이면 친구에게 바로 공개됐다고 말하지 않아요.
 
 사용자가 공개·누구나·친구에게 보여주기까지 원했으면 `axhub publish --app "$APP_SLUG" --visibility public --json` 으로 공개 신청을 넣고 `review_status=pending` 또는 review request id 를 알려줘요. 승인 전 공개 확대를 `axhub apps update --visibility public` 로 시도하지 않아요.
 
 ## Non-Interactive Defaults
 
-Subprocess, CI, `CLAUDE_NON_INTERACTIVE`, no TTY 에서는 사람 선택을 임의로 대신하지 않아요.
-
-- Resume offer: `새로 시작`
-- GitHub owner: `AXHUB_GITHUB_OWNER` 가 있으면 사용, 없으면 `취소`
-- Template 선택: `abort`
-- App name: `abort`
-- Bootstrap execute 확인: `취소`
-- Local preview: `아니요`
+Subprocess/CI/no TTY 에서는 사람 선택을 대신하지 않아요. Defaults: resume `새로 시작`; GitHub owner 는 `AXHUB_GITHUB_OWNER` 없으면 `취소`; template/app name 은 `abort`; execute 는 `취소`; local preview 는 `아니요`.
 
 ## NEVER
 
-- NEVER GitHub App 이 아무 계정에도 설치 안 된 상태에서 bootstrap dry-run/execute 를 호출하지 않아요.
-- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회하지 않아요.
-- NEVER remote `templates.json` 또는 폐기된 fetch-template 을 source 로 쓰지 않아요.
-- NEVER subprocess/headless 에서 template 또는 앱 이름을 임의로 고르지 않아요.
-- NEVER `--execute` 를 `--dry-run` 미리보기와 사용자 확인 없이 호출하지 않아요.
-- NEVER auth 만료를 template 조회 실패로 오해하지 않아요.
+- NEVER GitHub App 미설치 상태에서 bootstrap dry-run/execute.
+- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회.
+- NEVER remote `templates.json` / 폐기된 fetch-template 사용.
+- NEVER subprocess/headless 에서 template/app name 임의 선택.
+- NEVER `--execute` 를 `--dry-run` 미리보기와 사용자 확인 없이 호출.
+- NEVER auth 만료를 template 조회 실패로 오해.
 - NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채 사용자를 빈 GitHub code 입력 화면에 남겨두지 않아요.
-- NEVER `repo_full_name` 이 비어 있는데 임의 URL 을 만들어 clone 시도하지 않아요.
+- NEVER `repo_full_name` 없이 임의 URL clone.
 - NEVER shell 에서 CLI 버전 숫자를 직접 파싱·비교하지 않아요.
