@@ -6,6 +6,8 @@ Load this reference when dry-run/execute/watch, GitHub device-code handling, clo
 
 Run only after template, app name, tenant, and GitHub owner gate are settled:
 
+Claude Desktop-visible tool titles and progress text must stay user-facing. Use titles like `만들기 전 확인` or `미리보기 확인`; do not write `dry-run`, `Bootstrapped dry-run`, `Bootstraping dry-run`, `saga`, or other internal execution labels in chat or tool descriptions.
+
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
 REPO_NAME="${REPO_NAME:-$APP_SLUG}"
@@ -33,6 +35,8 @@ Subprocess/no TTY safe default is `취소`.
 ## Execute And Watch
 
 Before execute, write resume state with the same idempotency key that execute will use:
+
+Use a user-facing tool title such as `앱 생성 진행` or `첫 배포 진행`. Never expose idempotency, saga, route, or skill names in the title or surrounding prose; those are implementation details.
 
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
