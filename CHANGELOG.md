@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.12](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.11...v1.7.12) (2026-07-04)
+
+Claude Code Desktop 에서 "Please make my first app..."처럼 axhub 를 모르는 사용자가 첫 앱과 배포를 자연어로 요청했을 때 bootstrap 이 더 안정적으로 잡히도록 했어요. GitHub App 설치 확인은 템플릿과 앱 이름을 고른 뒤 dry-run 직전에만 보게 했고, fresh path 에서는 plugin cache reference 읽기나 tenant 저장용 shell glue 가 뜨지 않도록 정리해서 첫 앱 생성 흐름이 더 매끄럽게 이어져요.
+
 ## [1.7.11](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.10...v1.7.11) (2026-07-04)
 
 Claude Code Desktop 에서 영어 자연어로 새 앱과 배포를 요청했을 때 bootstrap 은 계속 조용히 잡되, 첫 응답에 "이 스킬이 맞다"는 식의 라우팅 판정 설명이 먼저 보이는 문제를 막았어요. 이제 사용자는 내부 skill-match 이유 대신 바로 "새 앱을 만들 수 있는지 확인할게요" 같은 진행 문장과 템플릿/앱 이름 질문을 보게 돼요.
