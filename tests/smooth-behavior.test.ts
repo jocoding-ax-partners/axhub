@@ -305,6 +305,9 @@ describe("smooth behavior contracts", () => {
 
     const update = readRepo("skills/update/SKILL.md");
     expect(update).toContain("`axhubing`, `axhubed`, `updating` 처럼 제품명을 영어 동사처럼");
+    expect(update).toContain("`Plugin version 1.6.1. 버전 확인 돌린다.`, `CLI 최신. 플러그인 업데이트 있음 — scope 확인 후 적용.`, `Scope: user.`, `받았다.` 같은 섞인 문장은 금지");
+    expect(update).toContain("`현재 플러그인 버전을 확인했어요.`, `CLI는 이미 최신이에요. 플러그인 새 버전을 받을게요.`, `플러그인 설치 위치를 확인했어요.`, `플러그인 새 버전을 받았어요.`");
+    expect(update).toContain("`Plugin version`, `Scope`, `CLI latest`, `plugin.has_update`, `has_update`, `disabled`, `current`, `latest` 같은 내부 필드명이나 영어 라벨");
   });
 
   test("development skill follows the current SDK raw-db surface", () => {

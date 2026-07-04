@@ -99,7 +99,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - **`command -v claude` 실패** (Claude Code CLI 없음) → 한 줄 안내만: `axhub 플러그인 새 버전(v<plugin.latest>)이 있어요. Claude Code 에서 /plugin update 로 받아 주세요.`
 - **`AXHUB_NO_AUTO_UPDATE` 설정** → 적용하지 않고 한 줄 안내만: `axhub 플러그인 새 버전(v<plugin.latest>)이 있어요. AXHUB_NO_AUTO_UPDATE 설정이라 자동 적용은 안 해요 — claude plugin update axhub@axhub 로 직접 받거나 플래그를 끄면 돼요.`
 - **`plugin.has_update == true` 이고 적용 가능** → 적용해요:
-  1. 설치 scope 를 먼저 확인해요 — `claude plugin list` 출력에서 `axhub@axhub` 항목의 `Scope:` 값(user/project/local/managed)을 읽어 `<SCOPE>` 로 둬요. 못 찾으면 `user` 로 둬요.
+  1. 설치 위치를 먼저 확인해요 — `claude plugin list` 출력에서 `axhub@axhub` 항목의 `Scope:` 값(user/project/local/managed)을 읽어 내부 변수 `<SCOPE>` 로만 둬요. 사용자에게는 `플러그인 설치 위치를 확인할게요.` 라고 말하고 `Scope:` 원문은 보여주지 않아요. 못 찾으면 `user` 로 둬요.
   2. 한 줄: `axhub 플러그인 새 버전(v<plugin.current> → v<plugin.latest>)이 나왔어요. 지금 받을게요…`
   3. 실행: `claude plugin update axhub@axhub --scope <SCOPE>`
   4. **재시작 안내(필수 — 플러그인 업데이트는 재시작해야 적용돼요):** `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.`
@@ -125,6 +125,9 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 
 - raw JSON·명령 출력·내부 값은 chat 에 echo 하지 않고, 위의 한국어 한 줄들만 보여줘요.
 - 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `axhubing`, `axhubed`, `updating` 처럼 제품명을 영어 동사처럼 보이게 만드는 제목을 쓰지 않아요. 예: `버전 확인`, `CLI 업데이트 적용`, `업데이트 후 버전 확인`.
+- 진행 문구도 한국어 사용자 문장만 써요. `Plugin version 1.6.1. 버전 확인 돌린다.`, `CLI 최신. 플러그인 업데이트 있음 — scope 확인 후 적용.`, `Scope: user.`, `받았다.` 같은 섞인 문장은 금지예요.
+- 대신 `현재 플러그인 버전을 확인했어요.`, `CLI는 이미 최신이에요. 플러그인 새 버전을 받을게요.`, `플러그인 설치 위치를 확인했어요.`, `플러그인 새 버전을 받았어요.` 라고 말해요.
+- 최종 카드 밖에서 `Plugin version`, `Scope`, `CLI latest`, `plugin.has_update`, `has_update`, `disabled`, `current`, `latest` 같은 내부 필드명이나 영어 라벨을 보여주지 않아요.
 - 사용자가 직접 부른 거라 적용 전 "적용할까요?" 를 다시 묻지 않아요 (간단한 1-shot 업데이트). 단 exit 14/66 보안 실패는 무조건 하드 스톱이에요.
 - 전 과정 비차단 — 한 단계가 막혀도 raw 에러를 숨기고 다음으로 넘어가거나 한 줄 안내 후 멈춰요.
 
