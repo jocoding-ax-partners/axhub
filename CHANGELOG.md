@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.16](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.15...v1.7.16) (2026-07-04)
+
+Claude Code Desktop 실제 QA에서 bootstrap 이 호출된 뒤에도 첫 응답이 무겁거나 라우팅 설명으로 새서 템플릿·앱 이름 단계까지 못 내려가는 문제가 남아 있었어요. 이제 bootstrap entrypoint 는 첫 턴에 CLI 준비 확인, 작업공간 선택, 템플릿 목록, 앱 이름 확인까지 바로 진행하도록 더 작고 action-first 로 정리했고, runtime dot directory 가 context budget 검사에 섞이지 않도록 해서 로컬 QA 중 생기는 `.omc` 같은 폴더도 실패 원인이 되지 않아요.
+
 ## [1.7.15](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.14...v1.7.15) (2026-07-04)
 
 Claude Code Desktop 실제 QA에서 bootstrap 의 템플릿 선택과 앱 이름 확인은 정상으로 호출되는 것을 확인했지만, 앱 생성 tool 이 실패처럼 보인 뒤 복구 흐름이 plugin cache reference 읽기 권한 프롬프트와 generic shell probe 로 새는 문제가 남아 있었어요. 이제 실패 복구는 `axhub` 상태·검증 명령으로만 이어지고, 사용자에게 보이는 GitHub 계정 확인 제목도 영어 동사화 없이 한국어 문구로 고정돼요.
