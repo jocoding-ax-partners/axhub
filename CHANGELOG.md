@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.0...v1.7.1) (2026-07-04)
+
+업데이트 스킬이 새 플러그인을 받을 때 보이던 영어 섞인 진행 문구를 줄였어요. 이제 설치 위치나 플러그인 버전 확인 같은 내부 단계도 한국어 사용자 문장으로 정리하고, 최종 결과 카드 밖에서는 `Scope` 같은 내부 라벨을 숨겨요.
+
+
+### Fixed
+
+* update skill progress Korean wording ([5b988eb](https://github.com/jocoding-ax-partners/axhub/commit/5b988ebba38354cded51e73881d7ef15f1e3b225))
+
 ## [1.7.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.6.1...v1.7.0) (2026-07-04)
 
 Claude Desktop QA에서 확인한 긴 대화형 사용 마찰을 줄였어요. 배포는 원격에 올라간 커밋만 대상으로 삼고, diagnosis/import/clarity/deploy 화면은 내부 CLI 필드 대신 한국어 진행 문구를 쓰며, 비공개 앱의 로그인 화면을 `/healthz` 성공으로 착각하지 않도록 정리했어요.
