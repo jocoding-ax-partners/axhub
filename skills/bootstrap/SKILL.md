@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: '이 스킬은 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 싶을 때 axhub 템플릿 앱 생성을 담당해요. English empty-folder prompts like "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", or "Make a flower shop reservation app" also route here even when the user does not say axhub. 비어 있지 않은 기존 로컬 앱을 axhub에 가져오거나 첫 연결·첫 배포까지 올리려는 요청은 import 스킬이 담당해요. 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작하고, 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고 axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 활성화 예: "새 앱 만들어줘", "앱 만들어줘", "결제 앱 만들어", "프로젝트 만들어", "프로젝트 초기화해줘", "초기화해줘", "fastapi 앱", "Next.js 앱 만들어줘", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", "Make a flower shop reservation app", "bootstrap", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. axhub apps bootstrap saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 repo_full_name 으로 현재 dir 에 git clone 해요.'
+description: '이 스킬은 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 싶을 때 axhub 템플릿 앱 생성을 담당해요. English examples for the same 새 앱 생성+배포 intent include "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", and "Make a flower shop reservation app"; 사용자가 axhub 를 말하지 않아도 조용히 이 흐름을 시작해요. 사용자에게 왜 이 스킬이 맞는지, 라우팅 사유, 빈 디렉토리 같은 내부 판단을 설명하지 말고 첫 visible 응답은 반드시 "새 앱을 만들 수 있는지 확인할게요." 또는 "[1/7] CLI 준비 확인하는 중이에요." 같은 한국어 진행 문장으로 시작해요. 비어 있지 않은 기존 로컬 앱을 axhub에 가져오거나 첫 연결·첫 배포까지 올리려는 요청은 import 스킬이 담당해요. 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작하고, 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고 axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 활성화 예: "새 앱 만들어줘", "앱 만들어줘", "결제 앱 만들어", "프로젝트 만들어", "프로젝트 초기화해줘", "초기화해줘", "fastapi 앱", "Next.js 앱 만들어줘", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", "Make a flower shop reservation app", "bootstrap", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. axhub apps bootstrap saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 repo_full_name 으로 현재 dir 에 git clone 해요.'
 examples:
   - utterance: "새 앱 만들어줘"
     intent: "scaffold new axhub app"
@@ -36,9 +36,11 @@ model: sonnet
 
 새 앱을 만들 수 있는 템플릿을 확인할게요.
 
+첫 visible 응답은 절대 스킬 매칭 설명으로 시작하지 않아요. 스킬 선택 이유나 빈 디렉토리 판단을 영어/한국어 판정 요약으로 말하지 말고 한국어 진행 문장으로 바로 시작해요.
+
 빈 디렉토리에서 새 axhub 템플릿 앱을 만드는 스킬이에요. 비어 있지 않은 기존 앱을 axhub에 가져오거나 이미 있는 로컬 앱을 첫 연결·첫 배포까지 올리려는 요청은 `import` 스킬로 보내요.
 
-영어로 `create`, `build`, `make` + `web app`, `website`, `app`, `site` + `deploy`, `internet`, `online` 의도가 함께 오면, 사용자가 `axhub` 를 말하지 않아도 빈 디렉토리에서는 이 스킬이에요. Claude 기본 앱 제작 경로로 들어가서 임의 shell 점검이나 일반 프로젝트 생성을 시작하지 않아요.
+영어로 `create`, `build`, `make` + `web app`, `website`, `app`, `site` + `deploy`, `internet`, `online` 의도가 함께 오면, 사용자가 `axhub` 를 말하지 않아도 빈 디렉토리에서는 이 흐름으로 처리해요. 이 판단 이유를 사용자에게 설명하지 않고, Claude 기본 앱 제작 경로로 들어가서 임의 shell 점검이나 일반 프로젝트 생성을 시작하지 않아요.
 
 이 스킬의 creation path 는 하나뿐이에요: backend `axhub apps bootstrap` saga. saga 가 backend app, GitHub repo, 첫 deploy 를 server-side 에서 처리하고, 성공 후 `repo_full_name` 으로 현재 디렉토리에 코드를 받아요. `axhub init`, `axhub apps create`, `axhub deploy create` 로 우회하지 않아요.
 
@@ -69,7 +71,7 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 
 사용자는 대부분 개발 지식이 없어요. CLI JSON 의 raw primitive 는 변수로만 다루고 chat 에 echo 하지 않아요.
 
-- **내부 라벨 노출 금지.** 사용자에게 `axhub:bootstrap 스킬 호출한다`, `import 스킬 영역`, `route label`, `skill 호출`, `saga`, `dry-run` 같은 내부 판단 문장을 말하지 않아요. 같은 상황은 "새 앱으로 만들 수 있는지 확인할게요", "작업공간을 먼저 볼게요", "만들기 전에 미리보기로 확인할게요"처럼 사용자 목적 언어로만 말해요.
+- **내부 라벨 노출 금지.** 사용자에게 `axhub:bootstrap 스킬 호출한다`, `import 스킬 영역`, `route label`, `skill 호출`, `saga`, `dry-run` 같은 내부 판단 문장을 말하지 않아요. 같은 상황은 "새 앱으로 만들 수 있는지 확인할게요", "작업공간을 먼저 볼게요", "만들기 전에 미리보기로 확인할게요"처럼 사용자 목적 언어로만 말해요. 첫 문장에 영어 라우팅 판정 요약을 붙이지 않아요.
 - 이 금지는 chat 본문뿐 아니라 Claude Desktop 에 보이는 모든 표면에 적용돼요: tool/Bash 제목, thinking summary, progress text, AskUserQuestion header/body/option description, preview card, final card. `Folder near empty`, `Invoke axhub:bootstrap skill`, `Fresh start, no resume`, `route 확인`, `Tenanting`, `Bootstraping`, `Bootstrapped dry-run`, `Idempotencying key`, `saga 실행`, `Saga 완료`, `GitHubed repo`, `DB 선언된 템플릿`, `development 단계` 처럼 내부 상태·영어 동사화·스킬명을 섞은 작업명은 절대 쓰지 않아요.
 - Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `원본 응답`, `실행 중 명령`, `명령 실행`, raw/route/tenant 같은 내부 단어가 들어간 제목은 금지예요. `axhub CLI 존재/버전 확인`처럼 영어 제품명으로 시작하면 Claude Desktop 이 `axhubing`/`axhubed` 처럼 보이게 만들 수 있으니 쓰지 않아요. 가능한 제목은 이 목록에서 골라요: `작업공간 확인`, `CLI 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `GitHub 계정 확인`, `앱 이름 확인`, `만들기 전 확인`, `앱 생성 진행`, `첫 배포 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`, `GitHub 인증 대기`.
 - Claude Desktop 에 보이는 Bash/tool command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수(`$TEMPLATE`, `$APP_NAME`, `$APP_SLUG`, `$AXHUB_TENANT`)나 `export`, value-assembly `VAR=...`, command substitution, semicolon chain 으로 조립하지 말고 실제 선택된 literal 값으로 flag 에 넣어요. 예: `axhub apps templates list --tenant test --json`, `axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json`. device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요.
