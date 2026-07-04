@@ -67,6 +67,8 @@ Claude Desktop 같은 긴 QA 대화에서 이전 답변에 금지 문구가 보�
 
 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `importing`, `imported`, `manifested`, `gitted`, `pushed`, `raw JSON`, `token-gate`, `manifest_create`, `verification_status`, `deployment`, `execute`, `git remote`, `curl`, `Envelope`, `preview` 같은 내부/영어 동사형·필드형 라벨을 제목이나 진행 문장에 쓰지 않아요. 예: `가져오기 준비 확인`, `미리보기 확인`, `앱 설정 작성`, `첫 배포 확인`, `정적 사이트 확인`.
 
+Claude Desktop 이 Bash 내용에서 자동 제목을 만들 때도 같은 규칙을 적용해요. tool 제목·summary·progress title 에 `static vite import preview`, `Express import execute`, `FastAPI import execute` 처럼 스택명+내부 phase 를 섞은 영어 제목이 보이면, 같은 명령이라도 반드시 `정적 앱 준비 확인`, `서버 앱 가져오기 실행`, `파이썬 앱 가져오기 실행` 같은 한국어 제목으로 다시 호출해요. 스택 이름은 본문 설명에서만 써도 충분해요.
+
 진행 문구도 사용자 언어로 번역해요. `앱 slug 미확정` 대신 `앱 이름이 아직 정해지지 않아 package.json 이름으로 확인할게요`, `manifest_create 있으니` 대신 `앱 설정 파일이 필요해서 프로젝트 파일 근거로 작성할게요`, `git remote 아직 없음` 대신 `원격 저장소가 아직 없어 새 저장소 생성 경로로 진행해요`, `execute 호출한다` 대신 `가져오기를 실행할게요`, `import 지원 확인됐다` 대신 `가져오기 기능을 사용할 수 있어요`, `preview 진행` 대신 `미리보기를 확인할게요`, `Envelope 정상` 대신 `응답 형식 확인이 끝났어요`, `deployment verification: success` 대신 `첫 배포 검증 성공`, `raw endpoint`/`raw 엔드포인트` 대신 `원문 응답`, `public으로` 대신 `공개 접근으로` 라고 말해요.
 
 최종 성공 요약은 아래 형태를 벗어나지 않아요. 괄호 안에 raw status 를 붙이지 않아요.

@@ -148,9 +148,10 @@ TodoWrite({ todos: [
 4. **실행 (execute).** Step 3b 사용법 확정을 통과한 명령만 조립해 실행해요 (사용법 미확인 명령 실행 금지).
 
    - 기계 파싱이 필요하면 `--json` (global flag) 을 붙여요.
-   - help 가 `--execute` / `--yes` / `--force` 같은 명시 실행 플래그를 요구하는 파괴적 명령이면 대화형에서 한 번 승인받은 뒤 붙여요. headless 에서는 붙이지 않고 preview/summary 로 멈춰요.
-   - 인자가 부족하면(앱 이름 등) 먼저 조회 명령으로 채울 수 있는지 시도하고, 정말 사용자만 아는 값일 때만 물어요.
-   - help 의 어떤 플래그가 **플러그인 자신의 설치 버전**을 요구하면(예: `update check` 의 `--plugin-version`), `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 의 `version` 을 읽어 채워요 — 그러면 업데이트 확인에서 CLI·플러그인 최신 여부를 한 번에 알려줘요 (`plugin.has_update` 면 `/plugin update` 안내).
+- help 가 `--execute` / `--yes` / `--force` 같은 명시 실행 플래그를 요구하는 파괴적 명령이면 대화형에서 한 번 승인받은 뒤 붙여요. headless 에서는 붙이지 않고 preview/summary 로 멈춰요.
+- 인자가 부족하면(앱 이름 등) 먼저 조회 명령으로 채울 수 있는지 시도하고, 정말 사용자만 아는 값일 때만 물어요.
+- 앱을 가리키는 인자는 사용자가 아는 slug/name 을 우선 써요. 앞 단계 조회 결과에서 얻은 raw app id 를 다음 mutation 명령의 `--app` 값으로 넘기지 않아요. CLI 가 내부 id 를 반환해도 chat/tool 출력에 그대로 보이지 않도록, 실행 결과는 임시 파일로 받고 사용자에게는 "앱 이름 기준으로 실행했어요"처럼 요약해요.
+- help 의 어떤 플래그가 **플러그인 자신의 설치 버전**을 요구하면(예: `update check` 의 `--plugin-version`), `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 의 `version` 을 읽어 채워요 — 그러면 업데이트 확인에서 CLI·플러그인 최신 여부를 한 번에 알려줘요 (`plugin.has_update` 면 `/plugin update` 안내).
 
    ```bash
    OUT=$(mktemp)
