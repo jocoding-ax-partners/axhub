@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.6.1...v1.7.0) (2026-07-04)
+
+Claude Desktop QA에서 확인한 긴 대화형 사용 마찰을 줄였어요. 배포는 원격에 올라간 커밋만 대상으로 삼고, diagnosis/import/clarity/deploy 화면은 내부 CLI 필드 대신 한국어 진행 문구를 쓰며, 비공개 앱의 로그인 화면을 `/healthz` 성공으로 착각하지 않도록 정리했어요.
+
+
+### Added
+
+* plugin policy docs and QA recovery hardening ([d943553](https://github.com/jocoding-ax-partners/axhub/commit/d943553b5c12d49af0b3734ea0bfa6aaf00cbbb3))
+
 ## [1.6.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.6.0...v1.6.1) (2026-07-03)
 
 커넥터를 "내가 조회 가능한 것"으로 물었을 때 tenant-admin 전체 카탈로그가 섞여 보이던 혼란을 줄였어요. 이제 clarity 는 본인 접근 범위 질문을 grant 기준의 `axhub connectors mine` 으로만 확인하고, `connectors list --enabled-only` 같은 관리자 전체 목록을 개인 연결 목록처럼 요약하지 않아요. README 도 MCP 재시작 후 이어가기 흐름에 맞춰 최신 상태로 정리돼 있어요.
