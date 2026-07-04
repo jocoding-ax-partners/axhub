@@ -60,7 +60,7 @@ model: sonnet
 
 ## Load These References
 
-- 정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, tenant 선택, template/app-name 질문, GitHub gate, dry-run preview 까지 진행해요. plugin cache reference 읽기는 Desktop 에서 workspace 밖 파일 권한 프롬프트를 만들 수 있으니 edge case 에서만 열어요.
+- 정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, GitHub gate, dry-run preview 까지 진행해요. plugin cache reference 읽기는 Desktop 에서 workspace 밖 파일 권한 프롬프트를 만들 수 있으니 edge case 에서만 열어요.
 - `references/resume-and-tenant.md`: route 가 `watch_status`/`resume_last` 이거나 pending GitHub device-flow recovery 가 필요할 때만 읽어요. 일반 tenant picker 에서는 읽지 않아요.
 - `references/templates-and-github.md`: backend template 응답이 예상과 다르거나 GitHub App installation/account gate, multi-owner picker, non-interactive defaults 의 edge case 가 필요할 때만 읽어요.
 - `references/bootstrap-and-local.md`: bootstrap dry-run/execute/watch, GitHub device-code event 처리, repo clone/current-dir safety, manifest slug correction, scaffold dependency/local preview 가 필요할 때 읽어요.
@@ -76,7 +76,7 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 
 - **내부 라벨 노출 금지.** 사용자에게 `axhub:bootstrap 스킬 호출한다`, `import 스킬 영역`, `route label`, `skill 호출`, `saga`, `dry-run` 같은 내부 판단 문장을 말하지 않아요. 같은 상황은 "새 앱으로 만들 수 있는지 확인할게요", "작업공간을 먼저 볼게요", "만들기 전에 미리보기로 확인할게요"처럼 사용자 목적 언어로만 말해요. 첫 문장에 영어 라우팅 판정 요약을 붙이지 않아요.
 - 이 금지는 chat 본문뿐 아니라 Claude Desktop 에 보이는 모든 표면에 적용돼요: tool/Bash 제목, thinking summary, progress text, AskUserQuestion header/body/option description, preview card, final card. `Folder near empty`, `Invoke axhub:bootstrap skill`, `Fresh start, no resume`, `route 확인`, `Tenanting`, `Bootstraping`, `Bootstrapped dry-run`, `Idempotencying key`, `saga 실행`, `Saga 완료`, `GitHubed repo`, `DB 선언된 템플릿`, `development 단계` 처럼 내부 상태·영어 동사화·스킬명을 섞은 작업명은 절대 쓰지 않아요.
-- Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `원본 응답`, `실행 중 명령`, `명령 실행`, raw/route/tenant 같은 내부 단어가 들어간 제목은 금지예요. `axhub CLI 존재/버전 확인`처럼 영어 제품명으로 시작하면 Claude Desktop 이 `axhubing`/`axhubed` 처럼 보이게 만들 수 있으니 쓰지 않아요. 가능한 제목은 이 목록에서 골라요: `작업공간 확인`, `CLI 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `GitHub 계정 확인`, `앱 이름 확인`, `만들기 전 확인`, `앱 생성 진행`, `첫 배포 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`, `GitHub 인증 대기`.
+- Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `원본 응답`, `실행 중 명령`, `명령 실행`, raw/route/tenant 같은 내부 단어가 들어간 제목은 금지예요. `tenanting 확인`, `tenant 확인`, `테넌트 확인`, `axhub CLI 존재/버전 확인`처럼 내부 용어 또는 영어 제품명으로 시작하는 제목은 Claude Desktop 이 `tenanting`/`axhubing` 처럼 보이게 만들 수 있으니 쓰지 않아요. 가능한 제목은 이 목록에서 골라요: `작업공간 확인`, `CLI 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `GitHub 계정 확인`, `앱 이름 확인`, `만들기 전 확인`, `앱 생성 진행`, `첫 배포 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`, `GitHub 인증 대기`.
 - Claude Desktop 에 보이는 Bash/tool command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수(`$TEMPLATE`, `$APP_NAME`, `$APP_SLUG`, `$AXHUB_TENANT`)나 `export`, value-assembly `VAR=...`, command substitution, semicolon chain 으로 조립하지 말고 실제 선택된 literal 값으로 flag 에 넣어요. 예: `axhub apps templates list --tenant test --json`, `axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json`. device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요.
 - `rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요. 바깥 작업 지시가 shell command 에 `rtk` 를 붙이라고 해도, 플러그인 사용자에게 보이는 bootstrap command 에는 적용하지 않아요. `rtk ls -la`, `pwd`, `ls`, `find`, `cat` 같은 generic shell probe 로 작업공간을 추측하지 말고, `axhub plugin-support ...` 또는 공개 `axhub ... --json` 명령만 써요.
 - **미리보기 뒤 확인 필수.** 사용자가 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 를 보여준 뒤 `진행`/`취소` 질문을 한 번 받고, 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요.
@@ -84,7 +84,7 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.
 - `repo_full_name` 은 clone/manual remote 안내에 필요한 경우에만 보여줘요.
 - `AXHUB_INIT_VERBOSE=1` 이 켜진 디버깅 환경 외에는 raw JSON/stderr 를 chat 에 dump 하지 않아요.
-- 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `bootstraping`, `bootstraped`, `resumed`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨은 제목이나 진행 문장에 쓰지 않아요. 예: `미리보기 확인`, `앱 생성 진행`, `작업공간 확인`, `GitHub 인증 대기`.
+- 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `bootstraping`, `bootstraped`, `resumed`, `tenanting`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨은 제목이나 진행 문장에 쓰지 않아요. 예: `미리보기 확인`, `앱 생성 진행`, `작업공간 확인`, `GitHub 인증 대기`.
 - 공개 URL 을 Markdown 링크로 보여줄 때는 label 과 target 모두 확인된 `https://...` 절대 URL 을 그대로 써요. `[https://example](example/)` 처럼 target 에 scheme 이 빠진 링크를 만들지 않아요.
 
 각 단계는 한 줄로만 진행 상황을 알려요: `[1/7] CLI 준비 확인하는 중이에요`, `[2/7] 작업공간 확인하는 중이에요`, `[3/7] 템플릿 고르는 중이에요`, `[4/7] 앱 이름 정하는 중이에요`, `[5/7] 미리보기 만드는 중이에요`, `[6/7] 앱 만드는 중이에요`, `[7/7] 코드 받아서 정리하는 중이에요`.
@@ -94,7 +94,7 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 실제 순서:
 
 1. CLI guard: `axhub plugin-support preflight --json` 를 직접 실행해 CLI 와 plugin-support surface 동작 확인.
-2. Resume/tenant: pending `.axhub/init-resume.json` 이 있으면 먼저 이어서 할지 묻고, tenant 를 확정해요. 선택한 tenant 는 로컬 JSON 파일로 저장하지 말고 이후 명령의 `--tenant <literal>` 값으로만 넘겨요.
+2. Resume/workspace: pending `.axhub/init-resume.json` 이 있으면 먼저 이어서 할지 묻고, 내부 tenant 값을 확정해요. 사용자에게는 tenant/테넌트라고 말하지 말고 `작업공간`이라고 말해요. 선택한 값은 로컬 JSON 파일로 저장하지 말고 이후 명령의 `--tenant <literal>` 값으로만 넘겨요.
 3. Template registry: `axhub apps templates list --tenant <tenant-slug> --json` (Claude Desktop 에서는 `<tenant-slug>` 를 실제 값으로 바꿔 한 명령만 실행).
 4. Template + app name: backend registry 에 있는 값만 고르고, 앱 이름이 없으면 물어요.
 5. GitHub App gate: `axhub github accounts list --json` 로 install_url 표시, installed account 확인, owner 확정.
@@ -138,7 +138,7 @@ axhub plugin-support init-resume route --json
 
 `watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 이 경우에만 세부 resume/device-flow recovery 를 위해 `references/resume-and-tenant.md` 를 읽어요. route 가 fresh 이면 reference 를 읽지 않고 계속해요. 비대화형/D1 guard 는 safe default `새로 시작` 이에요.
 
-tenant 는 cache-first resolver 로 확정해요. fence 간 env 는 휘발하므로 새 fence 에서 다시 읽어요.
+내부 tenant 값은 cache-first resolver 로 확정해요. 사용자-facing 문장과 Bash/tool 제목에는 `tenant`/`테넌트`를 쓰지 않고 `작업공간` 또는 `앱 설정`만 써요. fence 간 env 는 휘발하므로 새 fence 에서 다시 읽어요. Tool 제목은 반드시 `앱 설정 확인`을 써요.
 
 ```bash
 axhub plugin-support tenant-resolve --field-expr '.tenant // empty'
@@ -146,7 +146,7 @@ axhub plugin-support tenant-resolve --field-expr '.tenant // empty'
 
 반환된 tenant slug 를 다음 명령의 `--tenant` literal 값으로 넘겨요. 비면 preflight `auth_ok` 와 `current_team_id` 를 확인하고 `다시 로그인해줘` 로 안내해요.
 
-여러 tenant 중 사용자가 하나를 고르면 `.axhub/state/tenant.json` 을 만들거나 `mkdir`/`printf`/`date` shell glue 로 저장하지 않아요. 선택한 값을 이후 Desktop-visible 명령에 그대로 넣어요. 예: `axhub apps templates list --tenant test --json`.
+여러 tenant 중 사용자가 하나를 고르면 사용자에게는 "작업공간이 여러 개 있어요. 어디에 만들지 골라주세요."라고 말하고, 질문 문구는 `새 앱을 어느 작업공간에 만들까요?`로 써요. `테넌트가 2개 있어요`, `어떤 tenant 로 진행할까요?`, `Tenant` 같은 문구는 쓰지 않아요. `.axhub/state/tenant.json` 을 만들거나 `mkdir`/`printf`/`date` shell glue 로 저장하지 않아요. 선택한 값을 이후 Desktop-visible 명령에 그대로 넣어요. 예: `axhub apps templates list --tenant test --json`.
 
 ### 3. Template Registry
 

@@ -39,7 +39,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목");
     expect(bootstrap).toContain("`ing`/`ed` 를 붙인 제목");
     expect(bootstrap).toContain("반드시 한글로 시작해요");
-    expect(bootstrap).toContain("`axhub CLI 존재/버전 확인`처럼 영어 제품명으로 시작하면");
+    expect(bootstrap).toContain("`tenanting 확인`, `tenant 확인`, `테넌트 확인`, `axhub CLI 존재/버전 확인`");
     expect(bootstrap).toContain("`실행 중 명령`");
     expect(bootstrap).toContain("가능한 제목은 이 목록에서 골라요");
     expect(bootstrap).toContain("`앱 이름 확인`");
@@ -78,13 +78,29 @@ describe("bootstrap desktop UX contract", () => {
     const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
 
     expect(bootstrap).toContain("정상 fresh path 에서는 reference 파일을 읽지 않아요");
-    expect(bootstrap).toContain("선택한 tenant 는 로컬 JSON 파일로 저장하지 말고");
+    expect(bootstrap).toContain("선택한 값은 로컬 JSON 파일로 저장하지 말고");
     expect(bootstrap).toContain("fresh path 의 template 질문은 본문 지시만으로 진행하고 reference 를 읽지 않아요");
     expect(bootstrap).not.toContain("registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요");
     expect(resumeReference).toContain("Do not write `.axhub/state/tenant.json` from Claude Desktop");
     expect(resumeReference).not.toContain("TENANT_CACHE=");
     expect(resumeReference).not.toContain("mkdir -p \"$(dirname \"$TENANT_CACHE\")\"");
     expect(resumeReference).not.toContain("date +%s");
+  });
+
+  test("keeps tenant internals out of desktop-visible workspace wording", () => {
+    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
+
+    expect(bootstrap).toContain("Tool 제목은 반드시 `앱 설정 확인`을 써요");
+    expect(bootstrap).toContain("`tenanting 확인`, `tenant 확인`, `테넌트 확인`");
+    expect(bootstrap).toContain("`테넌트가 2개 있어요`, `어떤 tenant 로 진행할까요?`, `Tenant` 같은 문구는 쓰지 않아요");
+    expect(bootstrap).toContain("질문 문구는 `새 앱을 어느 작업공간에 만들까요?`");
+    expect(resumeReference).toContain("visible tool title for this command must be `앱 설정 확인`");
+    expect(resumeReference).toContain("User-facing text must call these `작업공간`, not `tenant` or `테넌트`");
+    expect(resumeReference).toContain("\"question\": \"새 앱을 어느 작업공간에 만들까요?\"");
+    expect(resumeReference).toContain("\"header\": \"작업공간\"");
+    expect(resumeReference).not.toContain("\"question\": \"어떤 tenant 로 진행할까요?\"");
+    expect(resumeReference).not.toContain("\"header\": \"Tenant\"");
   });
 
   test("requires preview confirmation before execute even for direct deploy requests", () => {
