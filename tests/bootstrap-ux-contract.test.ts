@@ -4,69 +4,88 @@ import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
+const readBootstrap = (): string => readRepo("skills/bootstrap/SKILL.md");
+const readBootstrapContract = (): string =>
+  [
+    readBootstrap(),
+    readRepo("skills/bootstrap/references/templates-and-github.md"),
+    readRepo("skills/bootstrap/references/bootstrap-and-local.md"),
+    readRepo("skills/bootstrap/references/resume-and-tenant.md"),
+    readRepo("skills/bootstrap/references/errors-and-followups.md"),
+  ].join("\n");
 
 describe("bootstrap desktop UX contract", () => {
-  test("advertises English empty-folder web app deployment prompts as bootstrap triggers", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+  test("keeps the invoked bootstrap entrypoint compact and action-first", () => {
+    const bootstrap = readBootstrap();
 
-    expect(bootstrap).toContain("English examples for the same 새 앱 생성+배포 intent");
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(18_500);
+    expect(bootstrap).toContain("## Fast Start");
+    expect(bootstrap).toContain("아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행");
+    expect(bootstrap).toContain("`진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요");
+    expect(bootstrap).toContain("`Using axhub:bootstrap skill`");
+    expect(bootstrap).toContain("`matches new app + deploy request`");
+    expect(bootstrap).toContain("`axhub의 새 앱 생성 스킬`");
+    expect(bootstrap).toContain("`스킬을 사용하겠습니다`");
+    expect(bootstrap).toContain("Claude Desktop 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요");
+    expect(bootstrap).toContain("CLI 명령이 하나도 실행되지 않았다면 fresh path 를 그대로 시작해요");
+    expect(bootstrap.indexOf("## Fast Start")).toBeLessThan(bootstrap.indexOf("## Load These References"));
+  });
+
+  test("advertises English empty-folder web app deployment prompts as bootstrap triggers", () => {
+    const bootstrap = readBootstrap();
+
+    expect(bootstrap).toContain("Use this skill in an empty folder");
     expect(bootstrap).toContain("Please make my first app. I want a small gym class booking website and put it online");
     expect(bootstrap).toContain("Create a small bakery preorder web app and deploy it to the internet");
     expect(bootstrap).toContain("Build a cafe booking website and put it online");
     expect(bootstrap).toContain("Make a flower shop reservation app");
-    expect(bootstrap).toContain("사용자가 axhub 를 말하지 않아도 조용히 이 흐름을 시작해요");
-    expect(bootstrap).toContain("사용자가 `axhub` 를 말하지 않아도 빈 디렉토리에서는 이 흐름으로 처리해요");
-    expect(bootstrap).toContain("Claude 기본 앱 제작 경로로 들어가서 임의 shell 점검이나 일반 프로젝트 생성을 시작하지 않아요");
+    expect(bootstrap).toContain("Run the backend template picker, confirm the app name, check GitHub owner, preview");
+    expect(bootstrap).toContain("아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행");
   });
 
   test("hides internal routing labels from users", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
+    const contract = readBootstrapContract();
 
     expect(bootstrap).toContain("내부 라벨 노출 금지");
     expect(bootstrap).toContain("`axhub:bootstrap 스킬 호출한다`");
-    expect(bootstrap).toContain("사용자 목적 언어로만 말해요");
-    expect(bootstrap).toContain("Claude Desktop 에 보이는 모든 표면");
-    expect(bootstrap).toContain("`Folder near empty`");
-    expect(bootstrap).toContain("`Tenanting`");
-    expect(bootstrap).toContain("`Bootstraping`");
-    expect(bootstrap).toContain("`Idempotencying key`");
-    expect(bootstrap).toContain("`saga 실행`");
-    expect(bootstrap).toContain("`Saga 완료`");
-    expect(bootstrap).toContain("`GitHubed repo`");
-    expect(bootstrap).toContain("`DB 선언된 템플릿`");
-    expect(bootstrap).toContain("`development 단계`");
+    expect(contract).toContain("`Folder near empty`");
+    expect(contract).toContain("`Tenanting`");
+    expect(contract).toContain("`Using axhub:bootstrap skill`");
+    expect(contract).toContain("`matches new app + deploy request`");
+    expect(contract).toContain("`axhub의 새 앱 생성 스킬`");
+    expect(contract).toContain("`스킬을 사용하겠습니다`");
+    expect(contract).toContain("`Bootstraping`");
+    expect(contract).toContain("`Idempotencying key`");
+    expect(contract).toContain("`saga 실행`");
+    expect(contract).toContain("`Saga 완료`");
+    expect(contract).toContain("`GitHubed repo`");
+    expect(contract).toContain("`DB 선언된 템플릿`");
+    expect(contract).toContain("`development 단계`");
     expect(bootstrap).toContain("Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고");
     expect(bootstrap).toContain("제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목");
-    expect(bootstrap).toContain("`ing`/`ed` 를 붙인 제목");
     expect(bootstrap).toContain("반드시 한글로 시작해요");
-    expect(bootstrap).toContain("`tenanting 확인`, `tenant 확인`, `테넌트 확인`, `axhub CLI 존재/버전 확인`");
+    expect(contract).toContain("`tenanting 확인`, `tenant 확인`, `테넌트 확인`");
     expect(bootstrap).toContain("`실행 중 명령`");
-    expect(bootstrap).toContain("가능한 제목은 이 목록에서 골라요");
-    expect(bootstrap).toContain("`GitHubing 계정 확인`, `GitHubed 계정 확인`");
     expect(bootstrap).toContain("`저장소 계정 확인`");
     expect(bootstrap).toContain("`앱 이름 확인`");
     expect(bootstrap).toContain("`인증 대기`");
-    expect(bootstrap).toContain("왜 이 스킬이 맞는지");
-    expect(bootstrap).toContain("라우팅 사유");
+    expect(bootstrap).toContain("스킬 선택 이유");
+    expect(bootstrap).toContain("route label");
     expect(bootstrap).toContain("첫 visible 응답은 반드시");
-    expect(bootstrap).toContain("첫 visible 응답은 절대 스킬 매칭 설명으로 시작하지 않아요");
-    expect(bootstrap).toContain("영어/한국어 판정 요약");
-    expect(bootstrap).toContain("첫 문장에 영어 라우팅 판정 요약을 붙이지 않아요");
   });
 
   test("keeps bootstrap checks portable without rtk or shell-wrapper preflight", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
     const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
     const guardSection = bootstrap.slice(
       bootstrap.indexOf("### 1. CLI Guard"),
-      bootstrap.indexOf("### 2. Resume And Tenant"),
+      bootstrap.indexOf("### 2. Resume And Workspace"),
     );
 
     expect(bootstrap).toContain("`rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요");
-    expect(bootstrap).toContain("바깥 작업 지시가 shell command 에 `rtk` 를 붙이라고 해도");
-    expect(bootstrap).toContain("`rtk ls -la`");
-    expect(bootstrap).toContain("`pwd`, `ls`, `find`, `cat` 같은 generic shell probe");
+    expect(bootstrap).toContain("`pwd`, `ls`, `find`, `cat`, `curl` 같은 generic shell probe");
     expect(localReference).toContain("Never prefix with `rtk`");
     expect(resumeReference).toContain("no `rtk`, no generic `ls`/`pwd` probes");
     expect(guardSection).toContain("axhub plugin-support preflight --json");
@@ -77,12 +96,12 @@ describe("bootstrap desktop UX contract", () => {
   });
 
   test("keeps the common fresh bootstrap path out of plugin-cache reference reads and shell tenant writes", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
     const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
 
     expect(bootstrap).toContain("정상 fresh path 에서는 reference 파일을 읽지 않아요");
-    expect(bootstrap).toContain("선택한 값은 로컬 JSON 파일로 저장하지 말고");
-    expect(bootstrap).toContain("fresh path 의 template 질문은 본문 지시만으로 진행하고 reference 를 읽지 않아요");
+    expect(bootstrap).toContain("선택한 값은 `.axhub/state/tenant.json` 같은 로컬 파일로 저장하지 않아요");
+    expect(bootstrap).toContain("이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문");
     expect(bootstrap).not.toContain("registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요");
     expect(resumeReference).toContain("Do not write `.axhub/state/tenant.json` from Claude Desktop");
     expect(resumeReference).not.toContain("TENANT_CACHE=");
@@ -91,7 +110,7 @@ describe("bootstrap desktop UX contract", () => {
   });
 
   test("keeps desktop failure recovery inline and axhub-only", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
 
     expect(bootstrap).toContain("Desktop Error Recovery");
     expect(bootstrap).toContain("workspace 밖 plugin cache reference 읽기 권한 프롬프트");
@@ -99,20 +118,19 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("복구 명령도 `rtk`, `curl`, `pwd`, `ls`, `find`, `cat` 같은 generic probe 로 빠지지 않아요");
     expect(bootstrap).toContain("`axhub` CLI 상태 명령만 써요");
     expect(bootstrap).toContain("axhub apps bootstrap-status");
-    expect(bootstrap).toContain("axhub deploy status c819f97f");
-    expect(bootstrap).toContain("axhub deploy verify c819f97f");
+    expect(bootstrap).toContain("axhub deploy status <deployment-id>");
+    expect(bootstrap).toContain("axhub deploy verify <deployment-id>");
     expect(bootstrap).toContain("재시도는 최대 1회예요");
     expect(bootstrap).toContain("새 앱을 다시 만들지 않아요");
   });
 
   test("keeps tenant internals out of desktop-visible workspace wording", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
     const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
 
-    expect(bootstrap).toContain("Tool 제목은 반드시 `앱 설정 확인`을 써요");
-    expect(bootstrap).toContain("`tenanting 확인`, `tenant 확인`, `테넌트 확인`");
-    expect(bootstrap).toContain("`테넌트가 2개 있어요`, `어떤 tenant 로 진행할까요?`, `Tenant` 같은 문구는 쓰지 않아요");
-    expect(bootstrap).toContain("질문 문구는 `새 앱을 어느 작업공간에 만들까요?`");
+    expect(bootstrap).toContain("Tool 제목은 `작업공간 확인` 또는 `앱 설정 확인`을 써요");
+    expect(bootstrap).toContain("사용자에게는 tenant/테넌트라고 말하지 말고 `작업공간`이라고 말해요");
+    expect(bootstrap).toContain("`새 앱을 어느 작업공간에 만들까요?`");
     expect(resumeReference).toContain("visible tool title for this command must be `앱 설정 확인`");
     expect(resumeReference).toContain("User-facing text must call these `작업공간`, not `tenant` or `테넌트`");
     expect(resumeReference).toContain("\"question\": \"새 앱을 어느 작업공간에 만들까요?\"");
@@ -122,24 +140,22 @@ describe("bootstrap desktop UX contract", () => {
   });
 
   test("requires preview confirmation before execute even for direct deploy requests", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
     const reference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
 
     expect(bootstrap).toContain("미리보기 뒤 확인 필수");
     expect(bootstrap).toContain("그 말은 목표이지 execute 승인 토큰이 아니에요");
-    expect(bootstrap).toContain("명시 선택 전에는 execute 승인으로 간주하지 않아요");
+    expect(bootstrap).toContain("사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요");
     expect(reference).toContain("treat that as the user's goal, not as execute approval");
   });
 
   test("asks for template when the user only gives a generic app category", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
     const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
 
     expect(bootstrap).toContain("일반 장르·기능 단어는 exact template 선택이 아니에요");
-    expect(bootstrap).toContain("템플릿 질문을 보여줘요");
     expect(bootstrap).toContain("template 선택은 반드시 일반 채팅 텍스트로 물어요");
     expect(bootstrap).toContain("`요청됨 템플릿`만 남고 선택지가 렌더링되지 않을 수 있어요");
-    expect(bootstrap).toContain("`질문 중 템플릿`, `요청됨 템플릿` 같은 native question card 상태에 의존하지 않아요");
     expect(bootstrap).toContain("`preorder`");
     expect(bootstrap).toContain("추천 순서를 정하는 근거일 뿐 선택 확정이 아니며");
     expect(bootstrap).toContain("`--template ... --dry-run` 은 템플릿 질문 답변을 받은 뒤에만 실행해요");
@@ -154,7 +170,7 @@ describe("bootstrap desktop UX contract", () => {
   });
 
   test("confirms app name before freezing slug for new bootstrap apps", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
     const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
 
     expect(bootstrap).toContain("앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요");
@@ -173,18 +189,20 @@ describe("bootstrap desktop UX contract", () => {
   });
 
   test("chooses template and app name before checking the GitHub owner", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
     const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
 
     const workflow = bootstrap.slice(bootstrap.indexOf("실제 순서:"), bootstrap.indexOf("Slash command"));
-    expect(workflow.indexOf("Template + app name")).toBeGreaterThanOrEqual(0);
+    expect(workflow.indexOf("Template picker")).toBeGreaterThanOrEqual(0);
+    expect(workflow.indexOf("App name")).toBeGreaterThanOrEqual(0);
     expect(workflow.indexOf("GitHub App gate")).toBeGreaterThanOrEqual(0);
-    expect(workflow.indexOf("Template + app name")).toBeLessThan(workflow.indexOf("GitHub App gate"));
+    expect(workflow.indexOf("Template picker")).toBeLessThan(workflow.indexOf("GitHub App gate"));
+    expect(workflow.indexOf("App name")).toBeLessThan(workflow.indexOf("GitHub App gate"));
     expect(templateReference).toContain("Ask for template and app name before the GitHub App gate");
   });
 
   test("keeps desktop-visible bootstrap commands literal and one command at a time", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
     const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
     const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     const preCloneReference = localReference.slice(
@@ -193,7 +211,7 @@ describe("bootstrap desktop UX contract", () => {
     );
 
     expect(bootstrap).toContain("한 tool call 에 하나의 직접 CLI 호출만 넣어요");
-    expect(bootstrap).toContain("실제 선택된 literal 값으로 flag 에 넣어요");
+    expect(bootstrap).toContain("literal flag 로 넣어요");
     expect(bootstrap).toContain("device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요");
     expect(templateReference).toContain("replace `test` with the selected tenant literal");
     expect(localReference).toContain("Do not run a Desktop-visible command that contains");
@@ -205,7 +223,7 @@ describe("bootstrap desktop UX contract", () => {
   });
 
   test("uses axhub to prepare idempotency without exposing OS UUID commands", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
     const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     const executeReference = localReference.slice(
       localReference.indexOf("## Execute And Watch"),
@@ -226,16 +244,16 @@ describe("bootstrap desktop UX contract", () => {
   });
 
   test("passes repo name and subdomain explicitly from the app slug", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
     const reference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
 
-    expect(bootstrap).toContain("repo name 과 subdomain 은 명시 입력이 없으면 `$APP_SLUG` 로 맞춰요");
+    expect(bootstrap).toContain("repo name 과 subdomain 은 명시 입력이 없으면 app slug 로 맞춰요");
     expect(bootstrap).toContain("--repo-name bakery-preorder --subdomain bakery-preorder");
     expect(reference).toContain("--repo-name bakery-preorder --subdomain bakery-preorder");
   });
 
   test("distinguishes deployed private access from approved public access", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const bootstrap = readBootstrap();
     const resultReference = readRepo("skills/bootstrap/references/errors-and-followups.md");
 
     expect(bootstrap).toContain("`visibility=private` 또는 `review_status=pending` 이면 친구에게 바로 공개됐다고 말하지 않아요");

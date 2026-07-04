@@ -30,6 +30,13 @@ const REAL_CLAUDE_PLUGIN_DETAILS_OUTPUT = [
   "  On-invoke cost is paid each time a skill or agent fires.\n  Token counts are estimates and may differ from actual usage.\n[exit:0]\n",
 ].join("\n");
 
+const CURRENT_LOCAL_CLAUDE_PLUGIN_DETAILS_OUTPUT = [
+  "axhub 1.7.15",
+  "Projected token cost",
+  "  Always-on:   ~2,123 tok   added to every session\n",
+  "Per-component (rounded)\n  component    always-on  on-invoke\n  bootstrap         ~460      ~7.5k\n  update            ~170      ~4.4k\n  development       ~210      ~7.8k\n  deploy            ~240     ~12.1k\n  clarity           ~330      ~7.9k\n  import            ~190       ~11k\n  onboarding        ~240      ~7.3k\n  diagnosis         ~280      ~6.4k\n",
+].join("\n");
+
 const SHORT_SKILLS = {
   deploy: "short deploy skill",
   bootstrap: "short bootstrap skill",
@@ -72,6 +79,25 @@ describe("plugin context budget checker", () => {
       expect(result.overBudgetSkills).toEqual([]);
       expect(result.skills.map((skill) => skill.slug)).toEqual(["bootstrap", "deploy", "onboarding"]);
       expect(formatBudgetReport(result)).toContain("Plugin context budget: PASS");
+    } finally {
+      cleanup(root);
+    }
+  });
+
+  test("ignores runtime dot directories under skills", () => {
+    const root = createFixture(SHORT_SKILLS);
+    mkdirSync(join(root, "skills", ".omc", "state"), { recursive: true });
+
+    try {
+      const result = checkPluginContextBudget({
+        root,
+        maxSkillBytes: 128,
+        maxTotalBytes: 512,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.errors).toEqual([]);
+      expect(result.skills.map((skill) => skill.slug)).toEqual(["bootstrap", "deploy", "onboarding"]);
     } finally {
       cleanup(root);
     }
@@ -191,6 +217,33 @@ describe("plugin context budget checker", () => {
       { component: "onboarding", alwaysOnTokens: 280, onInvokeTokens: 5_800 },
       { component: "diagnosis", alwaysOnTokens: 200, onInvokeTokens: 4_000 },
     ]);
+  });
+
+  test("accepts the current local bundle token budget profile", () => {
+    const root = createFixture({
+      bootstrap: "short bootstrap skill",
+      clarity: "short clarity skill",
+      deploy: "short deploy skill",
+      development: "short development skill",
+      diagnosis: "short diagnosis skill",
+      import: "short import skill",
+      onboarding: "short onboarding skill",
+      update: "short update skill",
+    });
+
+    try {
+      const result = checkPluginContextBudget({
+        root,
+        maxSkillBytes: 128,
+        maxTotalBytes: 1024,
+        pluginDetailsText: CURRENT_LOCAL_CLAUDE_PLUGIN_DETAILS_OUTPUT,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.tokenBudget.overBudgetComponents).toEqual([]);
+    } finally {
+      cleanup(root);
+    }
   });
 
   test("rejects Claude plugin-details output with always-on tokens but no component rows", () => {

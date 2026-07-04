@@ -99,19 +99,21 @@ describe("smooth behavior contracts", () => {
     expect(onboardingAuth).not.toContain("승인했어`, re-detect");
 
     expect(bootstrap).toContain("axhub apps bootstrap");
-    expect(bootstrap).toContain("대표 여정에서의 역할");
+    expect(bootstrap).toContain("## Fast Start");
+    expect(bootstrap).toContain("CLI 확인과 템플릿 질문까지 바로 진행");
     expect(bootstrap).toContain("raw JSON/stderr");
-    expect(bootstrap).toContain("기존 앱 가져오기와 분리");
-    expect(bootstrap).toContain("`import` 스킬로 보내요");
+    expect(bootstrap).toContain("비어 있지 않은 기존 로컬 앱");
+    expect(bootstrap).toContain("`import` 스킬로 넘겨요");
     expect(bootstrap).toContain("idempotency key 는 OS별 UUID 생성 명령으로 만들지 말고");
     expect(bootstrap).toContain("`axhub plugin-support init-resume put` 에 생성을 맡겨요");
-    expect(bootstrap).toContain("APP_SLUG=\"$APP_SLUG\" perl -0pi");
+    expect(bootstrapAndLocal).toContain("APP_SLUG=\"$APP_SLUG\" perl -0pi");
     expect(bootstrap).toContain("url_checked=false");
-    expect(bootstrap).toContain("`bootstraping`, `bootstraped`, `resumed`, `tenanting`, `GitHubing`, `GitHubed`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨");
+    expect(bootstrap).toContain("내부 라벨 노출 금지");
+    expect(bootstrap).toContain("제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목");
     expect(bootstrap).toContain("label 과 target 모두 확인된 `https://...` 절대 URL");
     expect(bootstrap).toContain("`[$PUBLIC_URL]($PUBLIC_URL)` 형태");
     expect(bootstrap).toContain("NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채");
-    expect(bootstrap).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
+    expect(bootstrapAndLocal).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
     expect(bootstrapAndLocal).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap");
     expect(bootstrapAndLocal).toContain("auto_poll");
     expect(bootstrapAndLocal).toContain("Never leave the user staring at an empty GitHub code-entry screen with no code");
