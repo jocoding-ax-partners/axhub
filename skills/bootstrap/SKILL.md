@@ -62,6 +62,8 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 사용자는 대부분 개발 지식이 없어요. CLI JSON 의 raw primitive 는 변수로만 다루고 chat 에 echo 하지 않아요.
 
 - **내부 라벨 노출 금지.** 사용자에게 `axhub:bootstrap 스킬 호출한다`, `import 스킬 영역`, `route label`, `skill 호출`, `saga`, `dry-run` 같은 내부 판단 문장을 말하지 않아요. 같은 상황은 "새 앱으로 만들 수 있는지 확인할게요", "작업공간을 먼저 볼게요", "만들기 전에 미리보기로 확인할게요"처럼 사용자 목적 언어로만 말해요.
+- 이 금지는 chat 본문뿐 아니라 Claude Desktop 에 보이는 모든 표면에 적용돼요: tool/Bash 제목, thinking summary, progress text, AskUserQuestion header/body/option description, preview card, final card. `Folder near empty`, `Invoke axhub:bootstrap skill`, `Fresh start, no resume`, `route 확인`, `Tenanting`, `Bootstraping`, `Bootstrapped dry-run`, `Idempotencying key`, `saga 실행`, `Saga 완료`, `GitHubed repo`, `DB 선언된 템플릿`, `development 단계` 처럼 내부 상태·영어 동사화·스킬명을 섞은 작업명은 절대 쓰지 않아요.
+- Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 써요. 예: `작업공간 확인`, `axhub 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `GitHub 계정 확인`, `만들기 전 확인`, `앱 생성 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`.
 - **미리보기 뒤 확인 필수.** 사용자가 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 를 보여준 뒤 `진행`/`취소` 질문을 한 번 받고, 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요.
 - Echo 금지: `schema_version`, template `id`, `folder_name`, `resource_tier`, `bootstrap_id`, `status_url`, `stage`, `app_id`, `deployment_id`, `error_code`, `error_message`, `request_id`, `idempotency_key`, `installation_id`, `device_code`.
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.

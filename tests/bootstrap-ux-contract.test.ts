@@ -12,6 +12,17 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("내부 라벨 노출 금지");
     expect(bootstrap).toContain("`axhub:bootstrap 스킬 호출한다`");
     expect(bootstrap).toContain("사용자 목적 언어로만 말해요");
+    expect(bootstrap).toContain("Claude Desktop 에 보이는 모든 표면");
+    expect(bootstrap).toContain("`Folder near empty`");
+    expect(bootstrap).toContain("`Tenanting`");
+    expect(bootstrap).toContain("`Bootstraping`");
+    expect(bootstrap).toContain("`Idempotencying key`");
+    expect(bootstrap).toContain("`saga 실행`");
+    expect(bootstrap).toContain("`Saga 완료`");
+    expect(bootstrap).toContain("`GitHubed repo`");
+    expect(bootstrap).toContain("`DB 선언된 템플릿`");
+    expect(bootstrap).toContain("`development 단계`");
+    expect(bootstrap).toContain("Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 써요");
   });
 
   test("requires preview confirmation before execute even for direct deploy requests", () => {
