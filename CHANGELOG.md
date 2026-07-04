@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.14](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.13...v1.7.14) (2026-07-04)
+
+Claude Code Desktop 실제 QA에서 bootstrap 이 작업공간 선택과 템플릿 목록 조회까지는 통과했지만, 동적 템플릿 질문이 `요청됨 템플릿` 상태로 멈춰 선택지가 보이지 않는 문제가 남아 있었어요. 이제 backend 템플릿과 앱 이름 확인은 native question card 대신 일반 채팅의 번호 선택으로 물어, 사용자가 바로 답할 수 있는 화면을 보게 했어요.
+
 ## [1.7.13](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.12...v1.7.13) (2026-07-04)
 
 Claude Code Desktop 실제 QA에서 bootstrap 은 자연어 첫 앱 요청을 제대로 잡았지만, 작업공간을 고르는 중 `tenanting 확인` 같은 tool 제목과 `테넌트가 2개 있어요` 같은 개발자 용어가 아직 보였어요. 이제 tenant 는 CLI 내부 플래그로만 남기고, 사용자가 보는 진행 문구와 질문 카드에는 `작업공간`·`앱 설정 확인`만 쓰도록 계약과 회귀 테스트를 보강했어요.
