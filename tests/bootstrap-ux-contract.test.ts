@@ -20,6 +20,9 @@ describe("bootstrap desktop UX contract", () => {
 
     expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(18_500);
     expect(bootstrap).toContain("## Fast Start");
+    expect(bootstrap).toContain("Do not explain the skill match");
+    expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");
+    expect(bootstrap).toContain("start the visible response with a Korean progress sentence");
     expect(bootstrap).toContain("아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행");
     expect(bootstrap).toContain("`진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요");
     expect(bootstrap).toContain("`Using axhub:bootstrap skill`");

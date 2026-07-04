@@ -1,14 +1,10 @@
 ---
 name: bootstrap
-description: 'Use this skill in an empty folder when the user wants a new axhub template app created and put online. Korean triggers include "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘", "초기화해줘", "결제 앱 만들어", "Next.js 앱 만들어줘", "bootstrap", and "scaffold". English triggers include "Please make my first app. I want a small gym class booking website and put it online", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", and "Make a flower shop reservation app". Run the backend template picker, confirm the app name, check GitHub owner, preview, then create/deploy with axhub apps bootstrap. Use import instead for a non-empty existing local app.'
+description: 'Use this skill in an empty folder when the user wants a new axhub template app created and put online. Do not explain the skill match, do not mention axhub:bootstrap in chat, and start the visible response with a Korean progress sentence before the first CLI check. Korean triggers include "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘", "초기화해줘", "결제 앱 만들어", "Next.js 앱 만들어줘", "bootstrap", and "scaffold". English triggers include "Please make my first app. I want a small gym class booking website and put it online", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", and "Make a flower shop reservation app". Run the backend template picker, confirm the app name, check GitHub owner, preview, then create/deploy with axhub apps bootstrap. Use import instead for a non-empty existing local app.'
 examples:
   - utterance: "새 앱 만들어줘"
     intent: "scaffold new axhub app"
   - utterance: "앱 만들어줘"
-    intent: "scaffold new axhub app"
-  - utterance: "프로젝트 초기화해줘"
-    intent: "scaffold new axhub app"
-  - utterance: "결제 앱 만들어"
     intent: "scaffold new axhub app"
   - utterance: "bootstrap"
     intent: "scaffold new axhub app"
