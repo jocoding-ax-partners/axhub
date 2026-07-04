@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.8](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.7...v1.7.8) (2026-07-04)
+
+Claude Code Desktop 에서 영어로 "Create a small bakery preorder web app and deploy it to the internet"처럼 말했을 때 axhub 를 직접 언급하지 않아도 bootstrap 스킬이 먼저 잡히도록 했어요. 빈 디렉토리에서 create/build/make + web app/website/app + deploy/online 의도가 함께 오면 일반 Claude 앱 제작 경로로 빠져 임의 shell 점검을 시작하지 않고, 바로 axhub 템플릿 선택 흐름으로 들어가요.
+
 ## [1.7.7](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.6...v1.7.7) (2026-07-04)
 
 Claude Code Desktop 에서 "빵집 예약 앱 만들어줘"처럼 기능만 말했을 때 bootstrap 이 Next.js 템플릿을 확정한 것으로 오해하고 미리보기까지 먼저 가던 흐름을 막았어요. 이제 preorder, booking, shop 같은 말은 추천 근거일 뿐 템플릿 선택이 아니며, 앱 이름도 한 번 확인한 뒤 slug 를 확정해요. Desktop 에 보이는 명령도 `$TEMPLATE` 같은 shell 변수 조립 대신 실제 선택된 값으로 된 한 줄 CLI 형태를 쓰도록 정리해서 권한 확인 화면이 더 읽기 쉬워졌어요.
