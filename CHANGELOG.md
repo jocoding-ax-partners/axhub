@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.19](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.18...v1.7.19) (2026-07-04)
+
+Claude Code Desktop 실제 QA에서 bootstrap 의 템플릿·앱 이름 선택 단계가 일반 채팅 입력 상태나 plugin cache reference 권한 요청에 묶여 자연스럽게 호출되지 않는 문제가 남아 있었어요. 이제 fresh path 에서는 참조 파일 읽기 권한 프롬프트를 피하고, 템플릿과 앱 이름은 native question card 를 먼저 띄운 뒤에만 확정하도록 해서 명령어를 모르는 사용자도 첫 앱 생성 흐름을 화면 선택만으로 이어갈 수 있어요.
+
 ## [1.7.18](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.17...v1.7.18) (2026-07-04)
 
 Claude Code Desktop 실제 QA에서 bootstrap 의 템플릿·앱 이름 단계가 남아 있어도 `추천해줘`나 `use the recommended name` 같은 문구를 선택 확정으로 오해할 여지가 있었고, 배포 성공 뒤에는 `App get (axhub)` 도구 탐색으로 새는 흐름이 보였어요. 이제 추천은 질문을 띄운 뒤의 답변일 때만 확정으로 보고, 결과 확인도 `axhub apps get`·`axhub deploy verify` CLI 경로에 고정해 첫 앱 생성 흐름이 더 예측 가능해졌어요.
