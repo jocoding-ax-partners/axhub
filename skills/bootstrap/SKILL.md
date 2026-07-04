@@ -63,7 +63,8 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 
 - **내부 라벨 노출 금지.** 사용자에게 `axhub:bootstrap 스킬 호출한다`, `import 스킬 영역`, `route label`, `skill 호출`, `saga`, `dry-run` 같은 내부 판단 문장을 말하지 않아요. 같은 상황은 "새 앱으로 만들 수 있는지 확인할게요", "작업공간을 먼저 볼게요", "만들기 전에 미리보기로 확인할게요"처럼 사용자 목적 언어로만 말해요.
 - 이 금지는 chat 본문뿐 아니라 Claude Desktop 에 보이는 모든 표면에 적용돼요: tool/Bash 제목, thinking summary, progress text, AskUserQuestion header/body/option description, preview card, final card. `Folder near empty`, `Invoke axhub:bootstrap skill`, `Fresh start, no resume`, `route 확인`, `Tenanting`, `Bootstraping`, `Bootstrapped dry-run`, `Idempotencying key`, `saga 실행`, `Saga 완료`, `GitHubed repo`, `DB 선언된 템플릿`, `development 단계` 처럼 내부 상태·영어 동사화·스킬명을 섞은 작업명은 절대 쓰지 않아요.
-- Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 써요. 예: `작업공간 확인`, `axhub 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `GitHub 계정 확인`, `만들기 전 확인`, `앱 생성 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`.
+- Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 써요. 제품명·명령어·영어 단어에 `ing` 를 붙인 제목, `원본 응답`, `실행 중 명령`, `명령 실행`, raw/route/tenant 같은 내부 단어가 들어간 제목은 금지예요. 가능한 제목은 이 목록에서 골라요: `작업공간 확인`, `axhub 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `GitHub 계정 확인`, `앱 이름 확인`, `만들기 전 확인`, `앱 생성 진행`, `첫 배포 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`, `GitHub 인증 대기`.
+- Claude Desktop 에 보이는 Bash/tool command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수(`$TEMPLATE`, `$APP_NAME`, `$APP_SLUG`, `$AXHUB_TENANT`)나 `export`, value-assembly `VAR=...`, command substitution, semicolon chain 으로 조립하지 말고 실제 선택된 literal 값으로 flag 에 넣어요. 예: `axhub apps templates list --tenant test --json`, `axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json`. device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요.
 - **미리보기 뒤 확인 필수.** 사용자가 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 를 보여준 뒤 `진행`/`취소` 질문을 한 번 받고, 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요.
 - Echo 금지: `schema_version`, template `id`, `folder_name`, `resource_tier`, `bootstrap_id`, `status_url`, `stage`, `app_id`, `deployment_id`, `error_code`, `error_message`, `request_id`, `idempotency_key`, `installation_id`, `device_code`.
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.
@@ -80,7 +81,7 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 
 1. CLI guard: `axhub` 존재와 `axhub plugin-support preflight --json` 동작 확인.
 2. Resume/tenant: pending `.axhub/init-resume.json` 이 있으면 먼저 이어서 할지 묻고, tenant 를 확정해요.
-3. Template registry: `axhub apps templates list --tenant "$AXHUB_TENANT" --json`.
+3. Template registry: `axhub apps templates list --tenant <tenant-slug> --json` (Claude Desktop 에서는 `<tenant-slug>` 를 실제 값으로 바꿔 한 명령만 실행).
 4. GitHub App gate: `axhub github accounts list --json` 로 install_url 표시, installed account 확인, owner 확정.
 5. Template + app name: backend registry 에 있는 값만 고르고, 앱 이름이 없으면 물어요.
 6. Dry-run preview: `axhub apps bootstrap ... --dry-run --json`.
@@ -145,22 +146,20 @@ axhub plugin-support init-resume route --json
 tenant 는 cache-first resolver 로 확정해요. fence 간 env 는 휘발하므로 새 fence 에서 다시 읽어요.
 
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-export AXHUB_TENANT
+axhub plugin-support tenant-resolve --field-expr '.tenant // empty'
 ```
 
-`AXHUB_TENANT` 가 끝까지 비면 preflight `auth_ok` 와 `current_team_id` 를 확인하고 `다시 로그인해줘` 로 안내해요.
+반환된 tenant slug 를 다음 명령의 `--tenant` literal 값으로 넘겨요. 비면 preflight `auth_ok` 와 `current_team_id` 를 확인하고 `다시 로그인해줘` 로 안내해요.
 
 ### 3. Template Registry
 
 Backend registry 가 source of truth 예요.
 
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-axhub apps templates list --tenant "$AXHUB_TENANT" --json
+axhub apps templates list --tenant test --json
 ```
 
-사용자에게는 backend 가 반환한 template 전체 목록을 사람이 읽을 수 있게 보여줘요. 선택 값은 반드시 반환된 `id`, `folder_name`, 또는 built-in alias (`react`, `nextjs`, `astro`) 중 하나예요. registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요.
+위 `test` 는 예시예요. Claude Desktop 에서는 확정된 tenant literal 로 바꿔 한 명령만 실행해요. 사용자에게는 backend 가 반환한 template 전체 목록을 사람이 읽을 수 있게 보여줘요. 선택 값은 반드시 반환된 `id`, `folder_name`, 또는 built-in alias (`react`, `nextjs`, `astro`) 중 하나예요. registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요.
 
 ### 4. GitHub App Gate
 
@@ -177,51 +176,45 @@ axhub github accounts list --json
 ### 5. Template And App Name
 
 이미 발화에 exact alias/folder/name 이 있고 registry 와 맞으면 질문 없이 써요. 맞지 않으면 registry 목록을 다시 보여주고 다시 물어요.
-`웹앱`, `쇼핑몰`, `사이트`, `앱`, `서비스` 같은 일반 장르 단어는 exact template 선택이 아니에요. 사용자가 `Next.js`, `React`, `Astro` 또는 backend registry 의 정확한 `name`/`folder_name`/alias 를 말하지 않았으면 템플릿 질문을 보여줘요.
+`웹앱`, `쇼핑몰`, `사이트`, `앱`, `서비스`, `예약`, `주문`, `preorder`, `booking`, `shop`, `store`, `dashboard`, `admin` 같은 일반 장르·기능 단어는 exact template 선택이 아니에요. 사용자가 `Next.js`, `React`, `Astro` 또는 backend registry 의 정확한 `name`/`folder_name`/alias 를 말하지 않았으면 템플릿 질문을 보여줘요. 이런 기능 단어는 추천 순서를 정하는 근거일 뿐 선택 확정이 아니며, `--template ... --dry-run` 은 템플릿 질문 답변을 받은 뒤에만 실행해요.
 
 비대화형/D1 guard 에서는 template 과 앱 이름을 임의로 고르지 않아요. safe default 는 `abort` 또는 `취소` 예요.
 
-앱 이름이 발화에서 유추되면 그대로 쓰고, 없으면 한 번 물어요. `--slug` 는 이름을 기반으로 자동 유도하되 backend 정책 충돌은 saga error 를 보고 한 번 더 받아요.
+앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요. 추천 이름을 첫 번째 옵션으로 두되, 사용자가 고르거나 직접 입력한 뒤에만 `--name`/`--slug` 를 확정해요. `--slug` 는 이름을 기반으로 자동 유도하되 backend 정책 충돌은 saga error 를 보고 한 번 더 받아요.
 repo name 과 subdomain 은 명시 입력이 없으면 `$APP_SLUG` 로 맞춰요. 기본값에 맡기면 backend saga 가 repo/subdomain 을 다르게 추론해 한 번 실패할 수 있으니 dry-run 과 execute 모두 `--repo-name "$APP_SLUG"` 및 `--subdomain "$APP_SLUG"` 를 붙여요.
 
 ### 6. Dry-Run Preview
 
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-REPO_NAME="${REPO_NAME:-$APP_SLUG}"
-SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
-axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --dry-run --json
+axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json
 ```
 
-Dry-run envelope 에서 template, slug, subdomain, repo name, private/public 같은 preview 만 한국어로 보여줘요. raw JSON dump 금지. 확인을 받기 전에는 execute 를 호출하지 않아요. 최초 사용자 문장에 "바로", "배포까지", "올려줘"가 있어도 preview 이후의 명시 선택 전에는 execute 승인으로 간주하지 않아요.
+위 값들은 예시예요. 실제 실행 전에는 템플릿, 앱 이름, slug, GitHub owner, tenant 를 사용자 확인 또는 CLI 응답으로 확정한 literal 값으로 바꿔요. Dry-run envelope 에서 template, slug, subdomain, repo name, private/public 같은 preview 만 한국어로 보여줘요. raw JSON dump 금지. 확인을 받기 전에는 execute 를 호출하지 않아요. 최초 사용자 문장에 "바로", "배포까지", "올려줘"가 있어도 preview 이후의 명시 선택 전에는 execute 승인으로 간주하지 않아요.
 
 ### 7. Execute Bootstrap Saga
 
 사용자가 진행을 확인하면 순수 UUID v4 idempotency key 를 만들고 검증한 뒤 resume state 를 먼저 저장하고 saga 를 실행해요. 앱 slug, prefix, 사람이 읽기 쉬운 문자열을 절대 섞지 말아요. UUID 원문은 사용자 chat 에 echo 하지 않고 `.axhub/init-resume.json` 에만 저장해요.
 
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-IDEMPOTENCY_KEY="${IDEMPOTENCY_KEY:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
-REPO_NAME="${REPO_NAME:-$APP_SLUG}"
-SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
-if ! printf '%s\n' "$IDEMPOTENCY_KEY" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'; then
-  echo '{"systemMessage":"재시도 키 생성이 올바르지 않아서 앱 생성을 시작하지 않았어요. 다시 시도할게요."}'
-  exit 65
-fi
-axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --json
-AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+uuidgen
 ```
 
+```bash
+axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key 00000000-0000-4000-8000-000000000000 --json
+```
+
+```bash
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --watch --watch-timeout 9m --idempotency-key 00000000-0000-4000-8000-000000000000 --json
+```
+
+`uuidgen` 결과는 lowercase UUID v4 여야 해요. 실제 실행에서는 예시 UUID 를 방금 만든 literal UUID 로 바꿔요.
 Bash/tool timeout 은 9.5분 이상으로 잡아요. CLI timeout 뒤 resume hint 가 있으면 terminal status 를 한 번 더 확인해요.
 
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-REPO_NAME="${REPO_NAME:-$APP_SLUG}"
-SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
-BOOTSTRAP_ID=$(AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY" --field-expr '.data.bootstrap_id // empty' 2>/dev/null || true)
-axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --json
-axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --watch --watch-timeout 9m --json
+axhub apps bootstrap-status 11111111-1111-4111-8111-111111111111 --tenant test --watch --watch-timeout 9m --json
 ```
+
+위 bootstrap id 와 tenant 는 예시예요. 실제 JSON/status 출력에서 읽은 literal 값으로 바꿔요.
 
 `device_code_issued` event 가 나오면 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 사용자에게 보여줘요. Claude Desktop 에서는 긴 `--watch` tool 이 끝날 때까지 stdout 이 chat 에 안 보일 수 있으므로, device flow 를 숨긴 채 9분 watch 에 들어가지 않아요. 실행 tool 이 아직 진행 중이면 task output/log 에서 `user_code` 를 읽어 "GitHub 창이 열렸어요. 화면에 이 코드를 입력해 승인하면 여기서 자동으로 이어갈게요: XXXX-XXXX" 라고 바로 말해요. `auto_poll:true` 인 동안에는 사용자가 "승인했어"라고 다시 말하게 하지 않아요. `승인하시면 알려주세요`, `승인 후 말해 주세요`, `완료되면 알려주세요` 같은 문장은 금지예요. 승인 뒤에는 CLI watch/resume 이 자동으로 이어지는지 스스로 확인해요. `auto_poll:false` 면 URL/code 를 한 번만 보여주고, outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 않아요. 자세한 device-flow handling 은 `references/bootstrap-and-local.md` 를 읽어요.
 

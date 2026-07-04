@@ -7,9 +7,10 @@ Load this reference when template registry display, template/app-name choice, Gi
 Read templates from backend only:
 
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-axhub apps templates list --tenant "$AXHUB_TENANT" --json
+axhub apps templates list --tenant test --json
 ```
+
+The command above is a Desktop-visible shape: replace `test` with the selected tenant literal. Do not use `export`, `$AXHUB_TENANT`, command substitution, or multi-command shell glue in Claude Desktop-visible tool calls.
 
 The response envelope contains `data.items[]` with fields like `id`, `folder_name`, `name`, and `resource_tier`. `schema_version` and raw IDs are internal primitives; do not dump them to chat. The selected `--template` may be a returned `id` or a built-in alias (`react`, `nextjs`, `astro`) that corresponds to a returned item.
 
@@ -47,11 +48,11 @@ Example shape, only when those templates exist in backend output:
 }
 ```
 
-If the user's utterance already contains an exact alias/folder/name, use it without asking. Generic category words such as "웹앱", "쇼핑몰", "사이트", "앱", or "서비스" are not exact template choices; show the picker unless the user named `Next.js`, `React`, `Astro`, or an exact backend template. In subprocess/no TTY, do not auto-pick a template; safe default is `abort`.
+If the user's utterance already contains an exact alias/folder/name, use it without asking. Generic category or feature words such as "웹앱", "쇼핑몰", "사이트", "앱", "서비스", "예약", "주문", "preorder", "booking", "shop", "store", "dashboard", or "admin" are not exact template choices; show the picker unless the user named `Next.js`, `React`, `Astro`, or an exact backend template. Those words can make Next.js the recommended first option, but they never finalize `--template`. In subprocess/no TTY, do not auto-pick a template; safe default is `abort`.
 
 ## App Name
 
-`--name` is required. If the utterance implies a name, use it, for example "결제 앱 만들어줘" -> "결제 앱". Otherwise ask once:
+`--name` is required. If the utterance implies a name, propose it as the first option, for example "결제 앱 만들어줘" -> "결제 앱". Do not finalize the name before one user-facing confirmation in Claude Desktop. If the utterance does not imply a name, ask once:
 
 ```json
 {
