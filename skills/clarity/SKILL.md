@@ -18,6 +18,16 @@ Claude Desktop 에서는 slash 명령이 채팅에서 인식되지 않을 수 �
 
 이런 요청을 받으면 직전 답변을 재사용해서 끝내지 말고, 필요한 공개 CLI 조회를 새로 실행해 현재 상태를 확인해요. slash 명령이 실패한 직후라도 자연어 요청은 독립된 새 요청으로 취급해요.
 
+## Device Flow 코드 표시
+
+GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 사용자 행동의 핵심이에요. `axhub github link`, 로그인·연결 명령, 또는 실행 출력에 `github.com/login/device`, `verification_uri`, `verification_uri_complete`, `user_code`, `Enter code`, `XXXX-XXXX` 형태의 입력 코드가 보이면 예외적으로 URL과 입력 코드는 사용자 가치 정보로 취급해요.
+
+- device flow 를 시작하는 명령이 승인 대기 때문에 오래 폴링할 수 있으면 foreground 로 오래 붙잡지 말고 stdout/stderr 를 임시 로그로 받는 background 실행으로 시작해요.
+- 로그를 짧게 폴링해서 URL과 입력 코드를 찾고, 발견 즉시 일반 채팅 본문에 URL과 입력 코드를 다시 써요. 예: `GitHub 인증 창이 열렸어요. 브라우저에서 https://github.com/login/device 를 열고 입력 코드 ABCD-1234 를 넣으면 여기서 자동으로 이어갈게요.`
+- 코드를 명령 출력이나 로그 읽기 결과 안에만 남기지 않아요. Claude Desktop 에서는 tool 출력이 접혀 보일 수 있으므로, 최종 요약이나 다음 안내 문장에도 사용자가 입력할 코드를 한 번 더 써요.
+- 자동 브라우저 열기와 자동 폴링이 가능하더라도 사용자가 "승인했어"라고 다시 말하게 하지 않아요. 승인 뒤 CLI 가 이어갈 수 있으면 계속 폴링하고, 사용자가 QA처럼 코드 표시만 요청했으면 코드를 확인한 뒤 대기 프로세스를 정리하고 멈춰요.
+- device_code 같은 내부 교환용 값은 절대 쓰지 않아요. 사용자에게 필요한 건 verification URL 과 `user_code` 뿐이에요.
+
 ## 상태 확인 UX 계약
 
 사용자가 "현재 앱 상태", "production 이 healthy 한지", "status only", "Read-only only"처럼 단순 상태 확인을 요청하면 **상태 확인 범위에서 멈춰요**. 명시 요청이 없으면 최근 배포 이력 전체, 로그, 실패 커밋 분석까지 확장하지 않아요. `last_deployment_status` 가 실패여도 현재 운영 배포 상태를 확인해 "최근 배포 시도는 실패했지만 현재 운영은 정상이에요"처럼 요약하고, 더 자세한 실패 원인은 diagnosis 로 넘겨요.
@@ -26,6 +36,7 @@ Claude Desktop 에서는 slash 명령이 채팅에서 인식되지 않을 수 �
 
 - 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구만 써요: `명령 표면 확인`, `명령 사용법 확인`, `앱 상태 조회`, `운영 상태 확인`, `결과 정리`.
 - Bash/명령 tool 을 호출할 때 description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요. 도구가 자동으로 제목을 만들도록 비워두면 `axhub: App get 사용 중` 같은 이름이 보이므로 금지예요.
+- CLI 존재 여부를 확인할 때 tool 제목은 반드시 `CLI 설치 확인` 으로 직접 채워요. `axhubed CLI 설치 확인`, `axhubing CLI 설치 확인` 같은 자동 제목이 보이면 같은 확인이라도 `CLI 설치 확인` 으로 제목을 고쳐서 다시 호출해요.
 - 앱 상세를 조회할 때 tool 제목은 정확히 `앱 상태 조회`, 운영 배포 상태를 조회할 때는 정확히 `운영 상태 확인`, CLI 표면이나 help 를 볼 때는 각각 `명령 표면 확인` / `명령 사용법 확인` 으로 써요.
 - `axhubing`, `axhubed`, `productioning`, `productioned`, `checking`, `executing`, `Usage 확인`, `app get`, `deploy status`, `deploy list` 같은 영어 동사화·명령 나열 제목을 쓰지 않아요.
 - `axhub: App get 사용 중`, `productioning 배포 상태`, `productioned 배포 상태`, `Usage 확인 끝` 같은 제목이나 중간 문장이 보이면 같은 명령이라도 다시 고정 한국어 제목으로 호출해요.
