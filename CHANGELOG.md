@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.10](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.9...v1.7.10) (2026-07-04)
+
+Claude Code Desktop 에서 bootstrap 이 템플릿과 앱 이름을 정상으로 물은 뒤, 실행 직전에 `uuidgen` 같은 OS 명령 권한 카드가 따로 뜨던 남은 마찰을 없앴어요. idempotency key 는 이제 `axhub plugin-support init-resume put` 이 생성한 값을 내부적으로 이어 쓰게 해서, 사용자는 끝까지 axhub CLI 명령 중심의 앱 생성 흐름만 보게 돼요.
+
 ## [1.7.9](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.8...v1.7.9) (2026-07-04)
 
 Claude Code Desktop 실제 QA에서 bootstrap 은 잡혔지만 첫 점검 단계가 `command -v` shell wrapper, `axhubed` 같은 자동 영어 동사화 라벨, `rtk ls -la` 같은 개발자 전용 명령으로 새는 문제를 줄였어요. 이제 bootstrap 은 처음부터 `axhub plugin-support preflight --json` 같은 직접 CLI 호출을 쓰고, tool 제목도 한글로 시작하는 사용자 문구만 쓰도록 계약과 회귀 테스트를 보강했어요.
