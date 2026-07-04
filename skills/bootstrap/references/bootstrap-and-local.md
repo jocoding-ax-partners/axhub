@@ -8,10 +8,14 @@ Run only after template, app name, tenant, and GitHub owner gate are settled:
 
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --dry-run --json
+REPO_NAME="${REPO_NAME:-$APP_SLUG}"
+SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
+axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --dry-run --json
 ```
 
 Show preview fields in Korean: template, slug, subdomain, repo name, visibility. Do not show raw JSON. Do not execute before the user confirms:
+
+Even if the initial natural-language request says "바로 인터넷에 올려줘" or "배포까지 해줘", treat that as the user's goal, not as execute approval. The preview-confirm card below is still required before any `--execute` call.
 
 ```json
 {
@@ -32,8 +36,10 @@ Before execute, write resume state with the same idempotency key that execute wi
 
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
+REPO_NAME="${REPO_NAME:-$APP_SLUG}"
+SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
 axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --json
-AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
 ```
 
 Run the tool with a timeout longer than 9 minutes, for example 570000ms. Narrate about every 30s with short Korean progress lines like "앱 만들고 있어요", "GitHub repo 만들고 있어요", "첫 배포 중이에요. 거의 다 왔어요".
@@ -42,7 +48,9 @@ If the watch times out with a resume hint, fetch bootstrap id with the same idem
 
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-BOOTSTRAP_ID=$(axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY" --field-expr '.data.bootstrap_id // empty' 2>/dev/null || true)
+REPO_NAME="${REPO_NAME:-$APP_SLUG}"
+SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
+BOOTSTRAP_ID=$(axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY" --field-expr '.data.bootstrap_id // empty' 2>/dev/null || true)
 axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --json
 axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --watch --watch-timeout 9m --json
 ```
@@ -78,7 +86,9 @@ In fallback mode, resume the cached flow yourself after `retry_after_secs` or a 
 
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+REPO_NAME="${REPO_NAME:-$APP_SLUG}"
+SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" --tenant "$AXHUB_TENANT" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
 ```
 
 While an outstanding code exists, never run fresh `bootstrap --execute` without `--resume-last`; it can issue a new code and invalidate the user's approved one. If response remains `device_code_pending`, respect `retry_after_secs` and retry `--resume-last` until success or expiry. If code expired, start Step 7 execute again to issue a fresh challenge.

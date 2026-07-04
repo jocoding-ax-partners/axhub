@@ -47,7 +47,7 @@ Example shape, only when those templates exist in backend output:
 }
 ```
 
-If the user's utterance already contains an exact alias/folder/name, use it without asking. In subprocess/no TTY, do not auto-pick a template; safe default is `abort`.
+If the user's utterance already contains an exact alias/folder/name, use it without asking. Generic category words such as "웹앱", "쇼핑몰", "사이트", "앱", or "서비스" are not exact template choices; show the picker unless the user named `Next.js`, `React`, `Astro`, or an exact backend template. In subprocess/no TTY, do not auto-pick a template; safe default is `abort`.
 
 ## App Name
 
