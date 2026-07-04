@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: '이 스킬은 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 싶을 때 axhub 템플릿 앱 생성을 담당해요. English examples for the same 새 앱 생성+배포 intent include "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", and "Make a flower shop reservation app"; 사용자가 axhub 를 말하지 않아도 조용히 이 흐름을 시작해요. 사용자에게 왜 이 스킬이 맞는지, 라우팅 사유, 빈 디렉토리 같은 내부 판단을 설명하지 말고 첫 visible 응답은 반드시 "새 앱을 만들 수 있는지 확인할게요." 또는 "[1/7] CLI 준비 확인하는 중이에요." 같은 한국어 진행 문장으로 시작해요. 비어 있지 않은 기존 로컬 앱을 axhub에 가져오거나 첫 연결·첫 배포까지 올리려는 요청은 import 스킬이 담당해요. 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작하고, 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고 axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 활성화 예: "새 앱 만들어줘", "앱 만들어줘", "결제 앱 만들어", "프로젝트 만들어", "프로젝트 초기화해줘", "초기화해줘", "fastapi 앱", "Next.js 앱 만들어줘", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", "Make a flower shop reservation app", "bootstrap", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. axhub apps bootstrap saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 repo_full_name 으로 현재 dir 에 git clone 해요.'
+description: 'Use this skill in an empty folder when the user says "Please make my first app. I want a small gym class booking website and put it online", asks to make/build/create a website, web app, app, site, or first app and put it online/deploy it. 이 스킬은 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 싶을 때 axhub 템플릿 앱 생성을 담당해요. English examples for the same 새 앱 생성+배포 intent include "Please make my first app. I want a small gym class booking website and put it online", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", and "Make a flower shop reservation app"; 사용자가 axhub 를 말하지 않아도 조용히 이 흐름을 시작해요. 사용자에게 왜 이 스킬이 맞는지, 라우팅 사유, 빈 디렉토리 같은 내부 판단을 설명하지 말고 첫 visible 응답은 반드시 "새 앱을 만들 수 있는지 확인할게요." 또는 "[1/7] CLI 준비 확인하는 중이에요." 같은 한국어 진행 문장으로 시작해요. 비어 있지 않은 기존 로컬 앱을 axhub에 가져오거나 첫 연결·첫 배포까지 올리려는 요청은 import 스킬이 담당해요. 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작하고, 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고 axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 활성화 예: "새 앱 만들어줘", "앱 만들어줘", "결제 앱 만들어", "프로젝트 만들어", "프로젝트 초기화해줘", "초기화해줘", "fastapi 앱", "Next.js 앱 만들어줘", "Please make my first app. I want a small gym class booking website and put it online", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", "Make a flower shop reservation app", "bootstrap", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. axhub apps bootstrap saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 repo_full_name 으로 현재 dir 에 git clone 해요.'
 examples:
   - utterance: "새 앱 만들어줘"
     intent: "scaffold new axhub app"
@@ -21,6 +21,8 @@ examples:
   - utterance: "이제 앱 만들어줘"
     intent: "scaffold new axhub app"
   - utterance: "그거로 앱 만들어줘"
+    intent: "scaffold new axhub app"
+  - utterance: "Please make my first app. I want a small gym class booking website and put it online."
     intent: "scaffold new axhub app"
   - utterance: "Create a small bakery preorder web app and deploy it to the internet."
     intent: "scaffold new axhub app"
@@ -58,8 +60,9 @@ model: sonnet
 
 ## Load These References
 
-- `references/resume-and-tenant.md`: Step 0.5 resume state, device-flow resume recovery, tenant resolve/picker, fence 간 cache 재조회가 필요할 때 읽어요.
-- `references/templates-and-github.md`: template registry 표시, template/app-name 선택, GitHub App installation/account gate, multi-owner picker, non-interactive defaults 가 필요할 때 읽어요.
+- 정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, tenant 선택, template/app-name 질문, GitHub gate, dry-run preview 까지 진행해요. plugin cache reference 읽기는 Desktop 에서 workspace 밖 파일 권한 프롬프트를 만들 수 있으니 edge case 에서만 열어요.
+- `references/resume-and-tenant.md`: route 가 `watch_status`/`resume_last` 이거나 pending GitHub device-flow recovery 가 필요할 때만 읽어요. 일반 tenant picker 에서는 읽지 않아요.
+- `references/templates-and-github.md`: backend template 응답이 예상과 다르거나 GitHub App installation/account gate, multi-owner picker, non-interactive defaults 의 edge case 가 필요할 때만 읽어요.
 - `references/bootstrap-and-local.md`: bootstrap dry-run/execute/watch, GitHub device-code event 처리, repo clone/current-dir safety, manifest slug correction, scaffold dependency/local preview 가 필요할 때 읽어요.
 - `references/errors-and-followups.md`: long error routing, result card, optional MCP/setup/follow-up guidance, carry-over wording 이 필요할 때 읽어요.
 - `../deploy/references/session-carryover.md`: 같은 대화의 조회·온보딩 근거를 이어받을 때만 읽어요. 근거가 없으면 리소스·테이블·앱 요구사항을 지어내지 않아요.
@@ -91,10 +94,10 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 실제 순서:
 
 1. CLI guard: `axhub plugin-support preflight --json` 를 직접 실행해 CLI 와 plugin-support surface 동작 확인.
-2. Resume/tenant: pending `.axhub/init-resume.json` 이 있으면 먼저 이어서 할지 묻고, tenant 를 확정해요.
+2. Resume/tenant: pending `.axhub/init-resume.json` 이 있으면 먼저 이어서 할지 묻고, tenant 를 확정해요. 선택한 tenant 는 로컬 JSON 파일로 저장하지 말고 이후 명령의 `--tenant <literal>` 값으로만 넘겨요.
 3. Template registry: `axhub apps templates list --tenant <tenant-slug> --json` (Claude Desktop 에서는 `<tenant-slug>` 를 실제 값으로 바꿔 한 명령만 실행).
-4. GitHub App gate: `axhub github accounts list --json` 로 install_url 표시, installed account 확인, owner 확정.
-5. Template + app name: backend registry 에 있는 값만 고르고, 앱 이름이 없으면 물어요.
+4. Template + app name: backend registry 에 있는 값만 고르고, 앱 이름이 없으면 물어요.
+5. GitHub App gate: `axhub github accounts list --json` 로 install_url 표시, installed account 확인, owner 확정.
 6. Dry-run preview: `axhub apps bootstrap ... --dry-run --json`.
 7. Execute saga: 사용자 확인 후 `axhub apps bootstrap ... --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json`.
 8. Clone/current dir: completed saga 에서 `repo_full_name` 을 읽고 현재 dir 에 remote fetch/reset 해요.
@@ -133,7 +136,7 @@ CLI guard 통과 뒤에는 템플릿 목록보다 먼저 resume route 를 확인
 axhub plugin-support init-resume route --json
 ```
 
-`watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 비대화형/D1 guard 는 safe default `새로 시작` 이에요. 세부 resume/device-flow recovery 와 tenant picker 는 `references/resume-and-tenant.md` 를 읽어요.
+`watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 이 경우에만 세부 resume/device-flow recovery 를 위해 `references/resume-and-tenant.md` 를 읽어요. route 가 fresh 이면 reference 를 읽지 않고 계속해요. 비대화형/D1 guard 는 safe default `새로 시작` 이에요.
 
 tenant 는 cache-first resolver 로 확정해요. fence 간 env 는 휘발하므로 새 fence 에서 다시 읽어요.
 
@@ -143,6 +146,8 @@ axhub plugin-support tenant-resolve --field-expr '.tenant // empty'
 
 반환된 tenant slug 를 다음 명령의 `--tenant` literal 값으로 넘겨요. 비면 preflight `auth_ok` 와 `current_team_id` 를 확인하고 `다시 로그인해줘` 로 안내해요.
 
+여러 tenant 중 사용자가 하나를 고르면 `.axhub/state/tenant.json` 을 만들거나 `mkdir`/`printf`/`date` shell glue 로 저장하지 않아요. 선택한 값을 이후 Desktop-visible 명령에 그대로 넣어요. 예: `axhub apps templates list --tenant test --json`.
+
 ### 3. Template Registry
 
 Backend registry 가 source of truth 예요.
@@ -151,29 +156,29 @@ Backend registry 가 source of truth 예요.
 axhub apps templates list --tenant test --json
 ```
 
-위 `test` 는 예시예요. Claude Desktop 에서는 확정된 tenant literal 로 바꿔 한 명령만 실행해요. 사용자에게는 backend 가 반환한 template 전체 목록을 사람이 읽을 수 있게 보여줘요. 선택 값은 반드시 반환된 `id`, `folder_name`, 또는 built-in alias (`react`, `nextjs`, `astro`) 중 하나예요. registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요.
+위 `test` 는 예시예요. Claude Desktop 에서는 확정된 tenant literal 로 바꿔 한 명령만 실행해요. 사용자에게는 backend 가 반환한 template 전체 목록을 사람이 읽을 수 있게 보여줘요. 선택 값은 반드시 반환된 `id`, `folder_name`, 또는 built-in alias (`react`, `nextjs`, `astro`) 중 하나예요. fresh path 의 template 질문은 본문 지시만으로 진행하고 reference 를 읽지 않아요.
 
-### 4. GitHub App Gate
-
-Template 목록이 정상으로 오면 GitHub App 계정 상태를 확인해요.
-
-```bash
-axhub github accounts list --json
-```
-
-`install_url` 이 있으면 설치 여부와 무관하게 한 줄로 보여줘요. 설치된 계정이 0개로 확인되면 설치가 확인될 때까지 Step 5 이후로 진행하지 않아요. 설치된 계정이 1개면 자동 owner 로 쓰고, 2개 이상이면 owner 를 고르게 해요. subprocess/no TTY 에서는 `AXHUB_GITHUB_OWNER` 가 있을 때만 진행하고, 없으면 safe default `취소` 로 bootstrap 을 시작하지 않아요.
-
-확인할 수 없는 상태(빈 출력, JSON parse 불가)는 막지 않고 진행해요. auth 에러는 `다시 로그인해줘` 로 안내해요. 자세한 gate loop 는 `references/templates-and-github.md` 를 읽어요.
-
-### 5. Template And App Name
+### 4. Template And App Name
 
 이미 발화에 exact alias/folder/name 이 있고 registry 와 맞으면 질문 없이 써요. 맞지 않으면 registry 목록을 다시 보여주고 다시 물어요.
 `웹앱`, `쇼핑몰`, `사이트`, `앱`, `서비스`, `예약`, `주문`, `preorder`, `booking`, `shop`, `store`, `dashboard`, `admin` 같은 일반 장르·기능 단어는 exact template 선택이 아니에요. 사용자가 `Next.js`, `React`, `Astro` 또는 backend registry 의 정확한 `name`/`folder_name`/alias 를 말하지 않았으면 템플릿 질문을 보여줘요. 이런 기능 단어는 추천 순서를 정하는 근거일 뿐 선택 확정이 아니며, `--template ... --dry-run` 은 템플릿 질문 답변을 받은 뒤에만 실행해요.
 
 비대화형/D1 guard 에서는 template 과 앱 이름을 임의로 고르지 않아요. safe default 는 `abort` 또는 `취소` 예요.
 
-앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요. 추천 이름을 첫 번째 옵션으로 두되, 사용자가 고르거나 직접 입력한 뒤에만 `--name`/`--slug` 를 확정해요. `--slug` 는 이름을 기반으로 자동 유도하되 backend 정책 충돌은 saga error 를 보고 한 번 더 받아요.
+앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요. 앱 이름 질문 문구는 반드시 `앱 이름을 무엇으로 할까요?` 로 써요. `앵 이름` 같은 오타나 줄임말을 쓰지 않아요. 질문 제목은 `앱 이름 확인` 으로 써요. 추천 이름을 첫 번째 옵션으로 두되, 사용자가 고르거나 직접 입력한 뒤에만 `--name`/`--slug` 를 확정해요. `--slug` 는 이름을 기반으로 자동 유도하되 backend 정책 충돌은 saga error 를 보고 한 번 더 받아요.
 repo name 과 subdomain 은 명시 입력이 없으면 `$APP_SLUG` 로 맞춰요. 기본값에 맡기면 backend saga 가 repo/subdomain 을 다르게 추론해 한 번 실패할 수 있으니 dry-run 과 execute 모두 `--repo-name "$APP_SLUG"` 및 `--subdomain "$APP_SLUG"` 를 붙여요.
+
+### 5. GitHub App Gate
+
+Template 과 앱 이름이 사용자에게 확정되면 dry-run 직전에 GitHub App 계정 상태를 확인해요. 이 gate 는 저장소를 만들 owner 를 확정하기 위한 단계예요. 템플릿/앱 이름 질문보다 먼저 실행하지 않아요.
+
+```bash
+axhub github accounts list --json
+```
+
+`install_url` 이 있으면 설치 여부와 무관하게 한 줄로 보여줘요. 설치된 계정이 0개로 확인되면 설치가 확인될 때까지 dry-run/execute 로 진행하지 않아요. 설치된 계정이 1개면 자동 owner 로 쓰고, 2개 이상이면 owner 를 고르게 해요. subprocess/no TTY 에서는 `AXHUB_GITHUB_OWNER` 가 있을 때만 진행하고, 없으면 safe default `취소` 로 bootstrap 을 시작하지 않아요.
+
+확인할 수 없는 상태(빈 출력, JSON parse 불가)는 막지 않고 진행해요. auth 에러는 `다시 로그인해줘` 로 안내해요. 자세한 gate loop 는 `references/templates-and-github.md` 를 읽어요.
 
 ### 6. Dry-Run Preview
 
@@ -293,7 +298,7 @@ Subprocess, CI, `CLAUDE_NON_INTERACTIVE`, no TTY 에서는 사람 선택을 임�
 
 ## NEVER
 
-- NEVER GitHub App 이 아무 계정에도 설치 안 된 상태에서 Step 5 이후로 진행하거나 bootstrap dry-run/execute 를 호출하지 않아요.
+- NEVER GitHub App 이 아무 계정에도 설치 안 된 상태에서 bootstrap dry-run/execute 를 호출하지 않아요.
 - NEVER `axhub init` 또는 `axhub init --from-template` 을 호출하지 않아요. 이 SKILL 은 `axhub apps bootstrap` saga 만 써요.
 - NEVER `axhub apps create` 를 직접 호출하지 않아요. bootstrap saga 가 server-side 에서 app 생성을 처리해요.
 - NEVER `axhub deploy create` 를 직접 호출하지 않아요. bootstrap saga 가 첫 deploy 까지 포함해요.

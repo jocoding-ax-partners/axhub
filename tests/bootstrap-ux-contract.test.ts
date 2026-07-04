@@ -10,6 +10,7 @@ describe("bootstrap desktop UX contract", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
 
     expect(bootstrap).toContain("English examples for the same 새 앱 생성+배포 intent");
+    expect(bootstrap).toContain("Please make my first app. I want a small gym class booking website and put it online");
     expect(bootstrap).toContain("Create a small bakery preorder web app and deploy it to the internet");
     expect(bootstrap).toContain("Build a cafe booking website and put it online");
     expect(bootstrap).toContain("Make a flower shop reservation app");
@@ -72,6 +73,20 @@ describe("bootstrap desktop UX contract", () => {
     expect(guardSection).not.toContain("find \"$STAMP\"");
   });
 
+  test("keeps the common fresh bootstrap path out of plugin-cache reference reads and shell tenant writes", () => {
+    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
+
+    expect(bootstrap).toContain("정상 fresh path 에서는 reference 파일을 읽지 않아요");
+    expect(bootstrap).toContain("선택한 tenant 는 로컬 JSON 파일로 저장하지 말고");
+    expect(bootstrap).toContain("fresh path 의 template 질문은 본문 지시만으로 진행하고 reference 를 읽지 않아요");
+    expect(bootstrap).not.toContain("registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요");
+    expect(resumeReference).toContain("Do not write `.axhub/state/tenant.json` from Claude Desktop");
+    expect(resumeReference).not.toContain("TENANT_CACHE=");
+    expect(resumeReference).not.toContain("mkdir -p \"$(dirname \"$TENANT_CACHE\")\"");
+    expect(resumeReference).not.toContain("date +%s");
+  });
+
   test("requires preview confirmation before execute even for direct deploy requests", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
     const reference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
@@ -102,8 +117,25 @@ describe("bootstrap desktop UX contract", () => {
     const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
 
     expect(bootstrap).toContain("앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요");
+    expect(bootstrap).toContain("앱 이름 질문 문구는 반드시 `앱 이름을 무엇으로 할까요?`");
+    expect(bootstrap).toContain("`앵 이름` 같은 오타나 줄임말을 쓰지 않아요");
+    expect(bootstrap).toContain("질문 제목은 `앱 이름 확인`");
     expect(bootstrap).toContain("사용자가 고르거나 직접 입력한 뒤에만 `--name`/`--slug` 를 확정해요");
     expect(templateReference).toContain("Do not finalize the name before one user-facing confirmation in Claude Desktop");
+    expect(templateReference).toContain("\"question\": \"앱 이름을 무엇으로 할까요?\"");
+    expect(templateReference).toContain("\"header\": \"앱 이름 확인\"");
+    expect(templateReference).not.toContain("\"앱 이름 뭘로 할래요?\"");
+  });
+
+  test("chooses template and app name before checking the GitHub owner", () => {
+    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
+
+    const workflow = bootstrap.slice(bootstrap.indexOf("실제 순서:"), bootstrap.indexOf("Slash command"));
+    expect(workflow.indexOf("Template + app name")).toBeGreaterThanOrEqual(0);
+    expect(workflow.indexOf("GitHub App gate")).toBeGreaterThanOrEqual(0);
+    expect(workflow.indexOf("Template + app name")).toBeLessThan(workflow.indexOf("GitHub App gate"));
+    expect(templateReference).toContain("Ask for template and app name before the GitHub App gate");
   });
 
   test("keeps desktop-visible bootstrap commands literal and one command at a time", () => {

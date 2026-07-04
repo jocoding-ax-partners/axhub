@@ -52,12 +52,12 @@ If the user's utterance already contains an exact alias/folder/name, use it with
 
 ## App Name
 
-`--name` is required. If the utterance implies a name, propose it as the first option, for example "결제 앱 만들어줘" -> "결제 앱". Do not finalize the name before one user-facing confirmation in Claude Desktop. If the utterance does not imply a name, ask once:
+`--name` is required. If the utterance implies a name, propose it as the first option, for example "결제 앱 만들어줘" -> "결제 앱". Do not finalize the name before one user-facing confirmation in Claude Desktop. Use the exact question text `앱 이름을 무엇으로 할까요?`; never write `앵 이름` or a shortened variant. If the utterance does not imply a name, ask once:
 
 ```json
 {
-  "question": "앱 이름 뭘로 할래요?",
-  "header": "앱 이름",
+  "question": "앱 이름을 무엇으로 할까요?",
+  "header": "앱 이름 확인",
   "options": [
     {"label": "지금 발화 기준 자동", "value": "auto_from_utterance", "description": "발화에서 유추한 이름을 그대로 써요"},
     {"label": "직접 입력", "value": "manual_name", "description": "원하는 이름을 한 번만 말해요"},
@@ -70,7 +70,9 @@ Derive `--slug` by lowercasing, replacing spaces with hyphens, and removing spec
 
 ## GitHub App Gate
 
-After templates are readable, check GitHub App installation/account state:
+Ask for template and app name before the GitHub App gate. This gate exists to confirm the repository owner for dry-run/execute, so do not run it before the user has seen the template picker and app-name confirmation.
+
+After templates are readable and template/app name are confirmed, check GitHub App installation/account state:
 
 ```bash
 axhub github accounts list --json
@@ -109,7 +111,7 @@ In subprocess/no TTY, use `AXHUB_GITHUB_OWNER` if present; otherwise safe defaul
 
 ## Zero Installed Accounts
 
-If normal response confirms zero installed accounts, block before template choice/dry-run/execute. Show install_url if available, otherwise point to the dashboard GitHub connection menu:
+If normal response confirms zero installed accounts, block before dry-run/execute. Show install_url if available, otherwise point to the dashboard GitHub connection menu:
 
 ```text
 GitHub App 이 아직 어떤 GitHub 계정에도 설치 안 됐어요. repo 를 만들려면 먼저 설치가 필요해요.
