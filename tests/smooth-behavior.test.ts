@@ -307,20 +307,27 @@ describe("smooth behavior contracts", () => {
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
 
     const update = readRepo("skills/update/SKILL.md");
+    expect(update).toContain("description: '현재 버전을 확인할게요.");
     expect(update).toContain("**CRITICAL desktop first line.**");
-    expect(update).toContain('첫 assistant 본문은 반드시 정확히 "현재 버전을 확인할게요."');
-    expect(update).toContain('"전용 스킬"');
+    expect(update).toContain('First visible assistant text must start exactly with "현재 버전을 확인할게요."');
+    expect(update).toContain("Start directly; do not explain why this path was chosen.");
     expect(update).toContain("사용자에게 보이는 첫 문장은 반드시 정확히 `현재 버전을 확인할게요.`");
+    expect(update).toContain("그 앞에 어떤 설명도 붙이지 않아요");
     expect(update).toContain("assistant 본문에는 같은 말을 반복하지 않아요");
     expect(update).toContain("`axhubing`, `axhubed`, `updating` 처럼 제품명을 영어 동사처럼");
-    expect(update).toContain("`axhub:update 스킬`, `/axhub:update`, `update skill`, `전용 스킬을 사용`, `이 스킬을 사용` 같은 내부 라우팅 문장");
-    expect(update).toContain("그 앞뒤로 `axhub:update 스킬`, `/axhub:update`, `스킬 실행`, `전용 스킬`, `이 스킬`, `라우팅`, `사용하겠습니다` 같은 내부 설명을 절대 붙이지 않아요");
+    expect(update).toContain("선택 이유를 설명하지 않아요");
+    for (const leakedPhrase of ["전용 스킬", "스킬을 사용", "사용하겠습니다", "라우팅", "axhub:update 스킬", "/axhub:update", "update skill"]) {
+      expect(update).not.toContain(leakedPhrase);
+    }
     expect(update).toContain("라벨 안에 `axhub` 를 넣지 않아요");
     expect(update).toContain("| CLI 존재 확인 (`command -v axhub`) | `CLI 설치 확인` |");
     expect(update).toContain("| 버전 확인 (`axhub update check ...`) | `버전 확인` |");
-    expect(update).toContain("| 버전 확인 시각 캐시 갱신 | `버전 확인` |");
-    expect(update).toContain("별도 권한 카드가 필요할 정도로 분리해야 한다면 캐시 갱신은 생략해요");
-    expect(update).toContain("`캐시`, `시각`, `갱신`, `캐시만 갱신할게요` 같은 내부 작업명을 chat 에 쓰지 않아요");
+    expect(update).toContain("수동 확인 기록은 Claude Desktop 경로에서 갱신하지 않아요");
+    expect(update).toContain("별도 `mkdir`/touch/marker command 를 실행하지 말아요");
+    expect(update).toContain("별도 로컬 기록 작업명은 chat 에 쓰지 않아요");
+    expect(update).not.toContain("plugin-update-check");
+    expect(update).not.toContain('mkdir -p "$HOME/.axhub/cache"');
+    expect(update).not.toContain("캐시만 갱신할게요");
     expect(update).toContain("| 플러그인 업데이트 적용 | `플러그인 업데이트 받기` |");
     expect(update).toContain("`Plugin version 1.6.1. 버전 확인 돌린다.`, `CLI 최신. 플러그인 업데이트 있음 — scope 확인 후 적용.`, `Scope: user.`, `받았다.` 같은 섞인 문장은 금지");
     expect(update).toContain("`현재 플러그인 버전을 확인했어요.`, `CLI는 이미 최신이에요. 플러그인 새 버전을 받을게요.`, `플러그인 설치 위치를 확인했어요.`, `플러그인 새 버전을 받았어요.`");

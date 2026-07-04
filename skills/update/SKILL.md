@@ -1,6 +1,6 @@
 ---
 name: update
-description: '사용자가 지금 axhub CLI 와 Claude Code 플러그인을 최신으로 올리려는 수동 on-demand 업데이트 요청에 사용해요. 이 업데이트 경로가 선택되면 사용자에게 보이는 첫 assistant 본문은 반드시 정확히 "현재 버전을 확인할게요." 로 시작해요. "스킬", "전용 스킬", "skill", "라우팅", "사용하겠습니다" 같은 내부 실행 설명은 사용자에게 말하지 않아요. "업데이트해줘", "axhub 최신 버전으로", "플러그인 업데이트", "update axhub"처럼 버전 확인/적용 의도가 분명한 경우예요. 첫 셋업·설치=onboarding, 새 앱=bootstrap, 배포=deploy, 그 외 axhub 운영 명령=clarity 로 양보해요.'
+description: '현재 버전을 확인할게요. For explicit axhub CLI and Claude Code plugin version check/update requests: "업데이트해줘", "axhub 최신 버전으로", "플러그인 업데이트", "update axhub", "Check whether axhub is up to date and update it if needed." First visible assistant text must start exactly with "현재 버전을 확인할게요." Start directly; do not explain why this path was chosen. First setup=onboarding, new app=bootstrap, deploy=deploy, other axhub operations=clarity.'
 examples:
   - utterance: "업데이트해줘"
     intent: "update axhub cli and plugin to latest"
@@ -16,18 +16,18 @@ model: sonnet
 
 # 버전 업데이트 (수동 on-demand)
 
-**CRITICAL desktop first line.** Claude Desktop 에서 이 스킬이 호출되면 사용자에게 보이는 첫 문장은 반드시 정확히 `현재 버전을 확인할게요.` 여야 해요. 그 앞뒤로 `axhub:update 스킬`, `/axhub:update`, `스킬 실행`, `전용 스킬`, `이 스킬`, `라우팅`, `사용하겠습니다` 같은 내부 설명을 절대 붙이지 않아요. native UI 가 자동으로 붙이는 `스킬 실행됨 /axhub:update` 배지는 제어할 수 없지만, assistant 본문에는 같은 말을 반복하지 않아요.
+**CRITICAL desktop first line.** Claude Desktop 에서 이 경로가 선택되면 사용자에게 보이는 첫 문장은 반드시 정확히 `현재 버전을 확인할게요.` 여야 해요. 그 앞에 어떤 설명도 붙이지 않아요. native UI 가 자동으로 붙이는 배지는 제어할 수 없지만, assistant 본문에는 같은 말을 반복하지 않아요.
 
-사용자가 직접 불러 **axhub CLI 와 Claude Code 플러그인을 지금 최신으로** 올리는 스킬이에요. 제거된 자동 훅에 의존하지 않고, 사용자가 명시적으로 부른 순간에만 버전 확인과 적용을 진행해요:
+사용자가 직접 **axhub CLI 와 Claude Code 플러그인을 지금 최신으로** 맞추려는 요청이에요. 제거된 자동 훅에 의존하지 않고, 사용자가 명시적으로 요청한 순간에만 버전 확인과 적용을 진행해요:
 
 - **항상 즉시 확인** — 사용자가 부른 수동 실행이라 바로 버전을 확인해요.
 - **최신이어도 결과 보고** — "이미 최신이에요 (CLI vX, plugin vY)" 처럼 결과를 한 줄로 알려요. 사용자가 물었으니 답을 줘요.
 
 전 과정 best-effort·비차단이에요. 실패·구 CLI·네트워크 오류면 raw 에러를 숨기고 한 줄만 안내한 뒤 멈춰요.
 
-**책임 경계.** 이 스킬은 버전 업데이트만 해요. 첫 셋업·CLI 설치는 `onboarding`, 그 외 axhub 운영 명령은 `clarity` 가 맡아요.
+**책임 경계.** 이 경로는 버전 업데이트만 해요. 첫 셋업·CLI 설치는 `onboarding`, 그 외 axhub 운영 명령은 `clarity` 로 양보해요.
 
-**첫 응답 계약.** 이 스킬로 들어온 사실을 설명하지 않아요. `axhub:update 스킬`, `/axhub:update`, `update skill`, `전용 스킬을 사용`, `이 스킬을 사용` 같은 내부 라우팅 문장을 사용자에게 쓰지 말아요. 빈 폴더여도 "axhub 프로젝트가 아니다" 라고 추론하지 말고 바로 버전 확인을 진행해요.
+**첫 응답 계약.** 선택 이유를 설명하지 않아요. 빈 폴더여도 "axhub 프로젝트가 아니다" 라고 추론하지 말고 바로 버전 확인을 진행해요.
 
 **보이는 tool 제목 계약.** Bash/명령 도구를 부를 때 description/title/summary 는 아래 고정 한국어 라벨 중 하나만 써요. 라벨 안에 `axhub` 를 넣지 않아요. `axhubing CLI 설치 여부 확인` 처럼 제품명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요.
 
@@ -35,7 +35,6 @@ model: sonnet
 | --- | --- |
 | CLI 존재 확인 (`command -v axhub`) | `CLI 설치 확인` |
 | 버전 확인 (`axhub update check ...`) | `버전 확인` |
-| 버전 확인 시각 캐시 갱신 | `버전 확인` |
 | CLI 업데이트 적용 | `CLI 업데이트 적용` |
 | 업데이트 후 버전 재확인 | `업데이트 후 버전 확인` |
 | 플러그인 설치 위치 확인 | `플러그인 설치 위치 확인` |
@@ -78,11 +77,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 ```
 
 - `--plugin-version` 은 CLI v0.21.0+ 에서 플러그인 최신 여부도 함께 판정해요. 구 CLI 가 이 플래그를 거부하면 (exit 64) `axhub update check --json` 으로 한 번 더 호출해 CLI-only 로 떨어져요.
-- 결과와 무관하게 수동 확인 시각 캐시는 best-effort 로 갱신해요. 가능하면 `axhub update check ...` 와 같은 `버전 확인` tool call 안에서 끝내요. 별도 권한 카드가 필요할 정도로 분리해야 한다면 캐시 갱신은 생략해요. 사용자에게 `캐시`, `시각`, `갱신`, `캐시만 갱신할게요` 같은 내부 작업명을 chat 에 쓰지 않아요:
-
-  ```bash
-  mkdir -p "$HOME/.axhub/cache" && : > "$HOME/.axhub/cache/.plugin-update-check"
-  ```
+- 수동 확인 기록은 Claude Desktop 경로에서 갱신하지 않아요. `axhub update check ...` 뒤에 별도 `mkdir`/touch/marker command 를 실행하지 말아요. 별도 로컬 기록 작업명은 chat 에 쓰지 않아요.
 
 - 출력 JSON 을 읽어요:
   - CLI: `{ current, latest, has_update, disabled }`
