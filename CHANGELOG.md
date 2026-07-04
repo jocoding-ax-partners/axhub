@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.3...v1.7.4) (2026-07-04)
+
+Claude Code 기본 `init` skill 과 이름이 겹치지 않도록 axhub 의 새 앱 생성 skill 을 `bootstrap` 으로 바꿨어요. 내부 CLI 호환 이름인 `init-resume`, `axhub init` 금지 안내, `git init` 같은 명령 이름은 그대로 두어서 기존 복구 상태와 문맥은 유지하면서, 사용자가 skill 을 호출할 때는 `bootstrap` 하나로 명확하게 찾을 수 있어요.
+
+
+### Fixed
+
+* avoid Claude init skill collision ([0f5fbd9](https://github.com/jocoding-ax-partners/axhub/commit/0f5fbd96885f388f872d8c2bfc658735e7e92c2b))
+
 ## [1.7.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.2...v1.7.3) (2026-07-04)
 
 Claude Desktop 실제 QA에서 보인 남은 마찰을 줄였어요. init 은 CLI auto-poll 이 켜진 device flow 에서 더 이상 "승인하면 알려주세요"라고 멈추지 않고, import/clarity 는 자동 tool 제목과 파괴적 명령 preview 에 내부 영어 라벨이나 raw app id 가 드러나지 않게 안내를 조정했어요. diagnosis 도 실패 원인 확인과 복구 배포를 한 루프에 섞어 끝없이 재진단하지 않도록, 원인 요약 뒤 deploy/status 흐름으로 자연스럽게 넘깁니다.
