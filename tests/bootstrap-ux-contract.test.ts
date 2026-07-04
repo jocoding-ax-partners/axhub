@@ -121,6 +121,27 @@ describe("bootstrap desktop UX contract", () => {
     expect(preCloneReference).not.toContain("export ");
   });
 
+  test("uses axhub to prepare idempotency without exposing OS UUID commands", () => {
+    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
+    const executeReference = localReference.slice(
+      localReference.indexOf("## Execute And Watch"),
+      localReference.indexOf("## Device-Code Event"),
+    );
+    const preCloneReference = localReference.slice(
+      localReference.indexOf("## Execute And Watch"),
+      localReference.indexOf("## Clone Current Directory"),
+    );
+
+    expect(bootstrap).not.toContain("uuidgen");
+    expect(localReference).not.toContain("uuidgen");
+    expect(bootstrap).toContain("`axhub plugin-support init-resume put` 에 생성을 맡겨요");
+    expect(localReference).toContain("let `axhub plugin-support init-resume put` generate the idempotency key");
+    expect(executeReference).toContain("axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json");
+    expect(executeReference).not.toContain("init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key");
+    expect(preCloneReference).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap");
+  });
+
   test("passes repo name and subdomain explicitly from the app slug", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
     const reference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");

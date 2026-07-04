@@ -103,7 +103,8 @@ describe("smooth behavior contracts", () => {
     expect(bootstrap).toContain("raw JSON/stderr");
     expect(bootstrap).toContain("기존 앱 가져오기와 분리");
     expect(bootstrap).toContain("`import` 스킬로 보내요");
-    expect(bootstrap).toContain("순수 UUID v4 idempotency key");
+    expect(bootstrap).toContain("idempotency key 는 OS별 UUID 생성 명령으로 만들지 말고");
+    expect(bootstrap).toContain("`axhub plugin-support init-resume put` 에 생성을 맡겨요");
     expect(bootstrap).toContain("APP_SLUG=\"$APP_SLUG\" perl -0pi");
     expect(bootstrap).toContain("url_checked=false");
     expect(bootstrap).toContain("`bootstraping`, `bootstraped`, `resumed`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨");
