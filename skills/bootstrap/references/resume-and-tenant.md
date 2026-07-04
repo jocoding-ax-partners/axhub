@@ -52,26 +52,26 @@ If `device_code_pending` remains, respect `retry_after_secs` and retry the emitt
 
 ## Tenant Resolve L1
 
-`axhub plugin-support tenant-resolve` owns risky tenant logic. The skill is a thin resolver and cache reader. Explicit `AXHUB_TENANT` wins. Otherwise call once and use the resolved tenant as a literal value in later commands:
+`axhub plugin-support tenant-resolve` owns risky tenant logic. The skill is a thin resolver and cache reader. Explicit `AXHUB_TENANT` wins. Otherwise call once and use the resolved tenant as a literal value in later commands. In Claude Desktop, the visible tool title for this command must be `앱 설정 확인`; never use `tenanting 확인`, `tenant 확인`, `테넌트 확인`, or `tenant-resolve`.
 
 ```bash
 axhub plugin-support tenant-resolve --field-expr '.tenant // empty'
 ```
 
-If the command returns one tenant value, carry it as a literal `--tenant <slug>` value. If the resolver output says multiple tenants need a pick, ask the picker from the resolver/preflight candidates and carry the chosen value as the same literal `--tenant <slug>` value. If no tenant can be resolved, check preflight `auth_ok` and `current_team_id`, then guide with `다시 로그인해줘`.
+If the command returns one tenant value, carry it as a literal `--tenant <slug>` value. If the resolver output says multiple tenants need a pick, ask the picker from the resolver/preflight candidates and carry the chosen value as the same literal `--tenant <slug>` value. User-facing text must call these `작업공간`, not `tenant` or `테넌트`. If no tenant can be resolved, check preflight `auth_ok` and `current_team_id`, then guide with `다시 로그인해줘`.
 
 ## Tenant Picker L2
 
-Only when the resolver/preflight output says multiple tenants need a pick and the host is interactive TTY, ask once:
+Only when the resolver/preflight output says multiple tenants need a pick and the host is interactive TTY, ask once. The surrounding chat sentence should be "작업공간이 여러 개 있어요. 어디에 만들지 골라주세요." Do not say "테넌트가 2개 있어요." or "어떤 tenant 로 진행할까요?"
 
 ```json
 {
   "questions": [{
-    "question": "어떤 tenant 로 진행할까요?",
-    "header": "Tenant",
+    "question": "새 앱을 어느 작업공간에 만들까요?",
+    "header": "작업공간",
     "multiSelect": false,
     "options": [
-      {"label": "<tenant name/slug/id>", "description": "이 tenant 로 진행"}
+      {"label": "<workspace name/slug/id>", "description": "이 작업공간에 앱을 만들어요"}
     ]
   }]
 }
