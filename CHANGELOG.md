@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.5](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.4...v1.7.5) (2026-07-04)
+
+Claude Code Desktop 에서 새 앱을 자연어로 만들 때 보이던 bootstrap 마찰을 줄였어요. "웹앱", "쇼핑몰"처럼 장르만 말한 경우에는 Next.js 로 자동 확정하지 않고 템플릿 선택을 먼저 보여주며, "바로 올려줘"라는 목표 문장도 미리보기 이후의 실행 승인으로 오해하지 않아요. GitHub repo name 과 subdomain 은 앱 slug 로 명시해서 첫 생성이 `app` 기본값 충돌로 실패하지 않게 했고, 배포는 성공했지만 앱이 private 이거나 공개 심사 대기 중이면 친구에게 바로 공개됐다고 말하지 않도록 결과 문구를 나눴어요.
+
 ## [1.7.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.3...v1.7.4) (2026-07-04)
 
 Claude Code 기본 `init` skill 과 이름이 겹치지 않도록 axhub 의 새 앱 생성 skill 을 `bootstrap` 으로 바꿨어요. 내부 CLI 호환 이름인 `init-resume`, `axhub init` 금지 안내, `git init` 같은 명령 이름은 그대로 두어서 기존 복구 상태와 문맥은 유지하면서, 사용자가 skill 을 호출할 때는 `bootstrap` 하나로 명확하게 찾을 수 있어요.
