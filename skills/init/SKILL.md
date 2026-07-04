@@ -65,6 +65,8 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.
 - `repo_full_name` 은 clone/manual remote 안내에 필요한 경우에만 보여줘요.
 - `AXHUB_INIT_VERBOSE=1` 이 켜진 디버깅 환경 외에는 raw JSON/stderr 를 chat 에 dump 하지 않아요.
+- 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `bootstraping`, `bootstraped`, `resumed`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨은 제목이나 진행 문장에 쓰지 않아요. 예: `미리보기 확인`, `앱 생성 진행`, `작업공간 확인`, `GitHub 인증 대기`.
+- 공개 URL 을 Markdown 링크로 보여줄 때는 label 과 target 모두 확인된 `https://...` 절대 URL 을 그대로 써요. `[https://example](example/)` 처럼 target 에 scheme 이 빠진 링크를 만들지 않아요.
 
 각 단계는 한 줄로만 진행 상황을 알려요: `[1/7] axhub 점검하는 중이에요`, `[2/7] 작업공간 확인하는 중이에요`, `[3/7] 템플릿 고르는 중이에요`, `[4/7] 앱 이름 정하는 중이에요`, `[5/7] 미리보기 만드는 중이에요`, `[6/7] 앱 만드는 중이에요`, `[7/7] 코드 받아서 정리하는 중이에요`.
 
@@ -209,7 +211,7 @@ axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAM
 axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --watch --watch-timeout 9m --json
 ```
 
-`device_code_issued` event 가 나오면 `auto_poll:true` + `browser_opened:true` 인지 먼저 봐요. 둘 다 true 면 CLI 가 이미 브라우저를 열고 polling 중이므로 command 를 유지하고 다음 stage 를 기다려요. false 면 URL/code 를 한 번만 보여주고, outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 않아요. 자세한 device-flow handling 은 `references/bootstrap-and-local.md` 를 읽어요.
+`device_code_issued` event 가 나오면 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 사용자에게 보여줘요. Claude Desktop 에서는 긴 `--watch` tool 이 끝날 때까지 stdout 이 chat 에 안 보일 수 있으므로, device flow 를 숨긴 채 9분 watch 에 들어가지 않아요. 실행 tool 이 아직 진행 중이면 task output/log 에서 `user_code` 를 읽어 "GitHub 창이 열렸어요. 화면에 이 코드를 입력해 승인하면 여기서 자동으로 이어갈게요: XXXX-XXXX" 라고 바로 말해요. false 면 URL/code 를 한 번만 보여주고, outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 않아요. 자세한 device-flow handling 은 `references/bootstrap-and-local.md` 를 읽어요.
 
 ### 8. Clone Into Current Directory
 
@@ -267,6 +269,8 @@ Subprocess/no TTY 의 local preview safe default 는 `아니요` 예요. 자세�
 
 공개 URL 은 절대 합성하지 않아요. 배포 성공 후 앱의 `access_url` 을 읽어서 확인된 값만 보여줘요. `deploy verify` 가 `success=true` 여도 `url_checked=false` 일 수 있으니, 공개 URL 은 반드시 별도 `access_url` HTTPS 확인으로 증거를 보강해요. 배포 직후 TLS 인증서 발급이 수십 초 지연될 수 있어요. 첫 HTTPS 확인이 인증서 오류/HTTP 000 이면 곧장 실패로 단정하지 말고 10초 간격으로 최대 6회 재시도한 뒤 결과를 낮춰 말해요.
 
+공개 URL 을 링크로 출력할 때는 `[$PUBLIC_URL]($PUBLIC_URL)` 형태로 같은 절대 URL 을 label/target 에 모두 넣어요. Claude Desktop 에서 target scheme 이 빠지면 사용자가 클릭했을 때 상대 링크처럼 열릴 수 있어요.
+
 ```bash
 PUBLIC_URL="$(axhub apps get "$APP_ID" --no-input --field-expr '.access_url // .data.access_url // empty' 2>/dev/null || true)"
 if [ -n "$PUBLIC_URL" ]; then
@@ -303,5 +307,6 @@ Subprocess, CI, `CLAUDE_NON_INTERACTIVE`, no TTY 에서는 사람 선택을 임�
 - NEVER `--execute` 를 `--dry-run` 미리보기와 사용자 확인 없이 호출하지 않아요.
 - NEVER auth 만료를 template 조회 실패로 오해하지 않아요. CLI auth 실패(exit 4 또는 `auth`)는 `다시 로그인해줘` 로 안내해요.
 - NEVER `device_code_issued` event 의 `auto_poll:true` + `browser_opened:true` 를 무시하고 사용자에게 수동 승인 phrase 를 요구하지 않아요. 단, 자동 브라우저 오픈이 실패하면 `verification_uri` + `user_code` 를 보여줘요.
+- NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채 사용자를 빈 GitHub code 입력 화면에 남겨두지 않아요. 브라우저가 자동으로 열렸어도 `user_code` 는 즉시 보여줘요.
 - NEVER `repo_full_name` 이 비어 있는데 임의 URL 을 만들어 clone 시도하지 않아요.
 - NEVER shell 에서 CLI 버전 숫자를 직접 파싱·비교하지 않아요. gate 는 `axhub plugin-support preflight --json` 동작 여부예요.

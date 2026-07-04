@@ -61,7 +61,7 @@ write pending state:
 axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --pending-device-flow true --json
 ```
 
-When `auto_poll:true` and `browser_opened:true`, the CLI already opened the browser and is still polling. Keep the command running, narrate briefly, and wait for the next JSON stage or terminal result. Do not ask the user to say an approval phrase.
+When `auto_poll:true` and `browser_opened:true`, the CLI already opened the browser and is still polling. Still surface the `user_code` immediately in chat, because Claude Desktop may hide stdout until the long watch tool exits. Never leave the user staring at an empty GitHub code-entry screen with no code. Keep the command running, narrate briefly, and wait for the next JSON stage or terminal result. Do not ask the user to say an approval phrase.
 
 If `browser_opened:false` or the command exits with `device_flow_required_user_action`, show exactly one fallback prompt:
 

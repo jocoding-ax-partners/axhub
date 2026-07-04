@@ -102,6 +102,8 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 # axhub plugin (diet 체제)
 
+> **정책 원천:** 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 개발·운영 규칙은 `docs/policy/dev-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 canonical 원천이에요. 이 파일의 요약과 충돌하면 정책 문서가 이겨요. drift 가드: `tests/policy-parity.test.ts`.
+
 axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어요: `onboarding` / `init` / `deploy` + 그 셋에 명확히 안 맞거나 의도가 불분명한 axhub 발화를 라이브 `--help` 탐색으로 처리하는 `clarity` 브리지예요. 이후 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import` skill, CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis` skill 을 더해 현재 8 skill 이에요. 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli (`axhub` 바이너리) 를 직접 호출해요. Rust helper 바이너리 (`crates/axhub-helpers`), 모든 hook(이후 SessionStart 훅 2개 — auto-update + 온보딩 MCP 재시작 resume — 만 `hooks/` 로 재도입, 아래 "자동 업데이트 hook"·"온보딩 MCP 재시작 resume hook" 참고), NL routing corpus, scaffold/skill-doctor/lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인은 전부 제거됐어요.
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
@@ -145,7 +147,7 @@ auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks
 
 ## Release flow (commit-and-tag-version, 단순화)
 
-plugin 릴리즈는 `commit-and-tag-version` 기반 2단계 flow 를 유지하되 postbump 이 단순해졌어요 (codegen:version·release:check·5-binary build·bin/ add 전부 제거).
+plugin 릴리즈는 `commit-and-tag-version` 기반 3단계 flow 를 유지하되 postbump 이 단순해졌어요 (codegen:version·release:check·5-binary build·bin/ add 전부 제거).
 
 ```bash
 # step 1 — bump + commit (tag 미생성)

@@ -1,11 +1,41 @@
 ---
 name: clarity
-description: 'clarity: onboarding/init/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요.'
+description: 'clarity: onboarding/init/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "Use the axhub clarity skill", "show current app status", "is production healthy?", "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요. 영어로 clarity skill 을 직접 지정한 요청도 반드시 이 스킬로 라우팅해요.'
 ---
 
 # axhub clarity 브리지
 
 8개 스킬(onboarding·init·import·deploy·development·diagnosis·clarity·update) 중 다른 스킬에 명확히 안 맞거나 **의도가 불분명한** axhub 요청을 여기서 해소해요. 작업→명령 카탈로그는 없어요 — **매번 라이브 CLI 의 `--help` 트리를 탐색**해 맞는 명령을 찾고, 조회 명령은 바로 실행하되 파괴적 변경은 승인 뒤 실행해요.
+
+## 자연어 라우팅 계약
+
+Claude Desktop 에서는 slash 명령이 채팅에서 인식되지 않을 수 있으므로, 사용자가 아래처럼 영어로 직접 clarity 를 지목해도 이 스킬을 실행해요:
+
+- `Use the axhub clarity skill. Show the current app status for <app>.`
+- `Use axhub clarity to check whether production is healthy.`
+- `Show current app status for <app>. Read-only only.`
+- `Check app status and production health without deploying.`
+
+이런 요청을 받으면 직전 답변을 재사용해서 끝내지 말고, 필요한 공개 CLI 조회를 새로 실행해 현재 상태를 확인해요. slash 명령이 실패한 직후라도 자연어 요청은 독립된 새 요청으로 취급해요.
+
+## 상태 확인 UX 계약
+
+사용자가 "현재 앱 상태", "production 이 healthy 한지", "status only", "Read-only only"처럼 단순 상태 확인을 요청하면 **상태 확인 범위에서 멈춰요**. 명시 요청이 없으면 최근 배포 이력 전체, 로그, 실패 커밋 분석까지 확장하지 않아요. `last_deployment_status` 가 실패여도 현재 운영 배포 상태를 확인해 "최근 배포 시도는 실패했지만 현재 운영은 정상이에요"처럼 요약하고, 더 자세한 실패 원인은 diagnosis 로 넘겨요.
+
+단순 상태 확인은 대표 여정의 마지막 조회 단계라 **빠른 경로**예요. 전체 `--json-schema` 탐색으로 돌아가지 말고, 먼저 `앱 상태 조회` 제목으로 앱 상세 조회 help gate 를 통과한 뒤 앱 상태를 조회해요. 운영 배포 확인이 추가로 필요할 때만 `운영 상태 확인` 제목으로 운영 배포 상태 help gate 를 통과하고 조회해요. 이 빠른 경로도 공개 CLI 표면만 쓰며 hidden `plugin-support` 는 호출하지 않아요.
+
+- 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구만 써요: `명령 표면 확인`, `명령 사용법 확인`, `앱 상태 조회`, `운영 상태 확인`, `결과 정리`.
+- Bash/명령 tool 을 호출할 때 description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요. 도구가 자동으로 제목을 만들도록 비워두면 `axhub: App get 사용 중` 같은 이름이 보이므로 금지예요.
+- 앱 상세를 조회할 때 tool 제목은 정확히 `앱 상태 조회`, 운영 배포 상태를 조회할 때는 정확히 `운영 상태 확인`, CLI 표면이나 help 를 볼 때는 각각 `명령 표면 확인` / `명령 사용법 확인` 으로 써요.
+- `axhubing`, `axhubed`, `productioning`, `productioned`, `checking`, `executing`, `Usage 확인`, `app get`, `deploy status`, `deploy list` 같은 영어 동사화·명령 나열 제목을 쓰지 않아요.
+- `axhub: App get 사용 중`, `productioning 배포 상태`, `productioned 배포 상태`, `Usage 확인 끝` 같은 제목이나 중간 문장이 보이면 같은 명령이라도 다시 고정 한국어 제목으로 호출해요.
+- tool 제목에는 제품명 `axhub` 자체를 넣지 않아요. 필요하면 본문에서만 "CLI" 또는 "명령"이라고 말해요.
+- 중간 문구에도 `Usage`, `app get`, `deploy status`, `apps get` 같은 명령·영어 단어를 쓰지 말고 `사용법 확인 끝. 앱 상태와 운영 상태만 확인할게요.`처럼 말해요.
+- 중간 진행 문구와 최종 메시지에 raw 필드명·불리언·상태 enum 을 그대로 쓰지 않아요: `status: deployed`, `operating_status`, `last_deployment_status`, `production_deployment_id`, `resource: XS`, `succeeded`, `failed`, `commit_not_found`, `resolve`, `healthy: true` 대신 한국어로 풀어요.
+- `operating_status` 값이 `dev` 라고 해서 "운영 배포 승격 전" 또는 "production 이 아니다" 라고 해석하지 않아요. 앱 URL 이 살아 있고 현재 운영 배포가 서빙 중이면 "현재 운영 서비스는 정상이에요"라고만 말해요.
+- 사용자가 이력이나 실패 원인을 묻지 않았으면 deployment id, commit SHA, deployment 목록을 보여주지 않아요. 필요하면 "최근 배포 시도 하나는 실패했어요" 정도로만 말하고, 상세 분석은 diagnosis 로 안내해요.
+- 단순 상태 확인에서는 "최근 배포 시도 하나는 실패했어요"까지만 말해요. `커밋 못 찾음`, "설정 문제", `remote push`, `commit`, 브랜치·SHA 같은 실패 분석은 diagnosis 의 책임이므로 여기서 말하지 않아요.
+- 최종 답변에는 이모지나 raw 화살표 목록을 쓰지 말고, 한국어 요약 2-4줄로 끝내요.
 
 ## 원칙
 

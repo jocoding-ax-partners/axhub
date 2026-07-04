@@ -44,6 +44,7 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 ## Progress
 
 각 단계 시작에는 사용자가 멈춘 것으로 오해하지 않게 한국어 한 줄만 말해요. raw JSON, secret, internal id, full stderr 는 chat 에 넣지 않아요.
+사용자에게 보이는 문장과 Bash/tool call 제목은 한국어로만 써요. `first_gap`, `gaps`, `cli_state`, `auth_error_code` 같은 detect 필드명이나 enum 값은 내부 라우팅용으로만 읽고, chat 에 그대로 출력하지 않아요. "빈 폴더라 자동으로 만들지 않았어요"처럼 사람 말로 바꿔요.
 
 - `환경 점검하는 중이에요`
 - `axhub CLI 설치하는 중이에요`
@@ -81,7 +82,7 @@ echo "$DETECT_JSON"
 
 `AXHUB_BIN` 은 PATH/HOME 차이 때문에 detect self-probe 가 현재 shell 의 axhub 를 못 찾는 오탐을 줄이기 위한 pin 이에요. `command -v axhub` 는 실패했지만 canonical install dir(`~/.axhub/bin/axhub` 또는 `.exe`)에 파일이 있으면 재설치가 아니라 `cli_path_missing` 이에요. 이 branch 에서는 detect 를 부르거나 `AXHUB_BIN` 을 export 하지 않아요. 열린 세션이 PATH 를 못 읽는 상태라 detect 가 `cli_on_path:true` 로 오보하거나 같은 gap 을 반복할 수 있기 때문이에요.
 
-주요 필드는 `first_gap`, `gaps`, `cli_present`, `cli_version`, `cli_state`, `cli_on_path`, `cli_too_old`, `has_update`, `latest_version`, `auth_ok`, `auth_error_code`, `git_present`, `git_repo`, `git_commit`, `node_present`, `node_version`, `node_required`, `node_mismatch`, `manifest_present`, `lockfile_present`, `deps_missing`, `dir_empty`, `github`, `deploy_checked`, `deploy_verified` 예요.
+주요 필드는 `first_gap`, `gaps`, `cli_present`, `cli_version`, `cli_state`, `cli_on_path`, `cli_too_old`, `has_update`, `latest_version`, `auth_ok`, `auth_error_code`, `git_present`, `git_repo`, `git_commit`, `node_present`, `node_version`, `node_required`, `node_mismatch`, `manifest_present`, `lockfile_present`, `deps_missing`, `dir_empty`, `github`, `deploy_checked`, `deploy_verified` 예요. 이 이름들은 parsing 전용이고 사용자-facing 문장·표·도구 제목에는 노출하지 않아요.
 
 ### 2. GitHub App surface
 
@@ -130,6 +131,7 @@ Finish with one honest card:
 - NEVER call preflight before CLI detection; `onboarding-detect --json` is the fail-open first step.
 - NEVER treat `command -v axhub` success as `cli_missing`; pin `AXHUB_BIN` and continue from the real detect state.
 - NEVER treat `command -v axhub` failure as `cli_missing` when `~/.axhub/bin/axhub` or `~/.axhub/bin/axhub.exe` exists; route to `cli_path_missing` instead.
+- NEVER `first_gap`, `gaps`, `cli_state`, `auth_error_code` 같은 detect 필드명·enum 값을 사용자에게 그대로 말하지 말아요.
 - NEVER call detect or export `AXHUB_BIN` in the on-disk-not-on-PATH branch; it can hide the PATH gap.
 - NEVER loop re-detect in the same session after repair-path if `command -v axhub` still fails; tell the user to open a new terminal.
 - NEVER require the user to know sibling skill names or slash commands to finish onboarding.
