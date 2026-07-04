@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.20](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.19...v1.7.20) (2026-07-04)
+
+Claude Code Desktop 실제 QA에서 update 요청이 skill 본문을 읽기 전 frontmatter 단계에서 `전용 스킬을 사용하겠습니다` 같은 내부 라우팅 설명을 먼저 보여주는 문제가 남아 있었어요. 이제 update 경로는 첫 본문을 `현재 버전을 확인할게요.` 로 시작하도록 frontmatter 와 본문 계약을 같이 고정하고, CLI 설치·버전 확인·플러그인 업데이트 tool 제목도 한국어 라벨로 제한해서 빈 폴더에서 최신 여부를 물어도 개발자용 설명이 앞에 새지 않아요.
+
 ## [1.7.19](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.18...v1.7.19) (2026-07-04)
 
 Claude Code Desktop 실제 QA에서 bootstrap 의 템플릿·앱 이름 선택 단계가 일반 채팅 입력 상태나 plugin cache reference 권한 요청에 묶여 자연스럽게 호출되지 않는 문제가 남아 있었어요. 이제 fresh path 에서는 참조 파일 읽기 권한 프롬프트를 피하고, 템플릿과 앱 이름은 native question card 를 먼저 띄운 뒤에만 확정하도록 해서 명령어를 모르는 사용자도 첫 앱 생성 흐름을 화면 선택만으로 이어갈 수 있어요.
