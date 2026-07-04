@@ -29,7 +29,7 @@ eval "$(axhub plugin-support deploy-prep --intent deploy --user-utterance "$ARGS
 
 The same logical envelope must drive in-flight, status-first, and create. Reuse the first JSON when practical; if field extraction is repeated, do not let the values diverge semantically.
 
-Quality gate failure stops by default. Interactive mode may ask whether to force current values; headless safe default is cancel. If `bootstrap_plan` is non-null, or `app_id` cannot be resolved, stop at the first-run boundary and hand off to `import` for a non-empty existing app or `init` for an empty new app. Do not continue to preview while `branch` or `commit_sha` is empty.
+Quality gate failure stops by default. Interactive mode may ask whether to force current values; headless safe default is cancel. If `bootstrap_plan` is non-null, or `app_id` cannot be resolved, stop at the first-run boundary and hand off to `import` for a non-empty existing app or `bootstrap` for an empty new app. Do not continue to preview while `branch` or `commit_sha` is empty.
 
 ## Target reconciliation
 

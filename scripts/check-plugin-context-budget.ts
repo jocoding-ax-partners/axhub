@@ -5,7 +5,7 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 export const DEFAULT_MAX_TOTAL_BYTES = 180_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
-export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = { deploy: 12_000, init: 12_000, onboarding: 10_000 };
+export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = { deploy: 12_000, bootstrap: 12_000, onboarding: 10_000 };
 
 export interface BudgetOptions {
   root?: string; skillsDir?: string; maxSkillBytes?: number; maxTotalBytes?: number;

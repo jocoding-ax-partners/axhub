@@ -13,7 +13,7 @@ Context budget
 Always-on tokens: 3,963
 
 Component      Always-on tokens  On-invoke tokens
-init           0                 21.8k
+bootstrap      0                 21.8k
 deploy         0                 28.2k
 onboarding     0                 18.5k
 clarity        0                 8.1k
@@ -22,17 +22,17 @@ clarity        0                 8.1k
 const REAL_CLAUDE_PLUGIN_DETAILS_OUTPUT = [
   "$ claude --plugin-dir dist/axhub-plugin plugin details axhub",
   "axhub 1.5.1",
-  "  Korean-first Claude Code plugin for axhub. onboarding/init/deploy/import/development/diagnosis/clarity/update 8개 스킬이 ax-hub-cli v0.20.0+ 표면(hidden plugin-support 그룹 + 공개 deploy verify·diagnose·update)을 직접 호출해요. import 는 기존 로컬 앱 가져오기를, diagnosis 는 배포 실패 원인 요약을 담당하고, preview-confirm 배포와 verify 기반 성공 선언을 제공해요.",
+  "  Korean-first Claude Code plugin for axhub. onboarding/bootstrap/deploy/import/development/diagnosis/clarity/update 8개 스킬이 ax-hub-cli v0.20.0+ 표면(hidden plugin-support 그룹 + 공개 deploy verify·diagnose·update)을 직접 호출해요. import 는 기존 로컬 앱 가져오기를, diagnosis 는 배포 실패 원인 요약을 담당하고, preview-confirm 배포와 verify 기반 성공 선언을 제공해요.",
   "  Source: axhub@inline\n",
-  "Component inventory\n  Skills (8)  clarity, deploy, development, diagnosis, import, init, onboarding, update\n  Agents (0)\n  Hooks (0)\n  MCP servers (0)\n  LSP servers (0)\n",
+  "Component inventory\n  Skills (8)  bootstrap, clarity, deploy, development, diagnosis, import, onboarding, update\n  Agents (0)\n  Hooks (0)\n  MCP servers (0)\n  LSP servers (0)\n",
   "Projected token cost\n  Always-on:   ~2,166 tok   added to every session\n",
-  "Per-component (rounded)\n  component    always-on  on-invoke\n  init              ~430      ~8.7k\n  update            ~190      ~4.1k\n  development       ~260      ~6.2k\n  deploy            ~290      ~7.6k\n  clarity           ~290        ~5k\n  import            ~230      ~7.1k\n  onboarding        ~280      ~5.8k\n  diagnosis         ~200        ~4k\n",
+  "Per-component (rounded)\n  component    always-on  on-invoke\n  bootstrap         ~430      ~8.7k\n  update            ~190      ~4.1k\n  development       ~260      ~6.2k\n  deploy            ~290      ~7.6k\n  clarity           ~290        ~5k\n  import            ~230      ~7.1k\n  onboarding        ~280      ~5.8k\n  diagnosis         ~200        ~4k\n",
   "  On-invoke cost is paid each time a skill or agent fires.\n  Token counts are estimates and may differ from actual usage.\n[exit:0]\n",
 ].join("\n");
 
 const SHORT_SKILLS = {
   deploy: "short deploy skill",
-  init: "short init skill",
+  bootstrap: "short bootstrap skill",
   onboarding: "short onboarding skill",
 } as const;
 
@@ -70,7 +70,7 @@ describe("plugin context budget checker", () => {
       expect(result.ok).toBe(true);
       expect(result.errors).toEqual([]);
       expect(result.overBudgetSkills).toEqual([]);
-      expect(result.skills.map((skill) => skill.slug)).toEqual(["deploy", "init", "onboarding"]);
+      expect(result.skills.map((skill) => skill.slug)).toEqual(["bootstrap", "deploy", "onboarding"]);
       expect(formatBudgetReport(result)).toContain("Plugin context budget: PASS");
     } finally {
       cleanup(root);
@@ -80,7 +80,7 @@ describe("plugin context budget checker", () => {
   test("fails fixtures that exceed per-skill and total budgets", () => {
     const root = createFixture({
       deploy: "x".repeat(32),
-      init: "short",
+      bootstrap: "short",
       onboarding: "also short",
     });
 
@@ -104,7 +104,7 @@ describe("plugin context budget checker", () => {
   });
 
   test("CLI exits non-zero and names the over-budget fixture skill", () => {
-    const root = createFixture({ deploy: "x".repeat(32), init: "short" });
+    const root = createFixture({ deploy: "x".repeat(32), bootstrap: "short" });
 
     try {
       const result = runBudgetCli(root, "--max-skill-bytes", "16", "--max-total-bytes", "256");
@@ -170,7 +170,7 @@ describe("plugin context budget checker", () => {
 
     expect(details.alwaysOnTokens).toBe(3_963);
     expect(details.components).toEqual([
-      { component: "init", alwaysOnTokens: 0, onInvokeTokens: 21_800 },
+      { component: "bootstrap", alwaysOnTokens: 0, onInvokeTokens: 21_800 },
       { component: "deploy", alwaysOnTokens: 0, onInvokeTokens: 28_200 },
       { component: "onboarding", alwaysOnTokens: 0, onInvokeTokens: 18_500 },
       { component: "clarity", alwaysOnTokens: 0, onInvokeTokens: 8_100 },
@@ -182,7 +182,7 @@ describe("plugin context budget checker", () => {
 
     expect(details.alwaysOnTokens).toBe(2_166);
     expect(details.components).toEqual([
-      { component: "init", alwaysOnTokens: 430, onInvokeTokens: 8_700 },
+      { component: "bootstrap", alwaysOnTokens: 430, onInvokeTokens: 8_700 },
       { component: "update", alwaysOnTokens: 190, onInvokeTokens: 4_100 },
       { component: "development", alwaysOnTokens: 260, onInvokeTokens: 6_200 },
       { component: "deploy", alwaysOnTokens: 290, onInvokeTokens: 7_600 },
@@ -196,7 +196,7 @@ describe("plugin context budget checker", () => {
   test("rejects Claude plugin-details output with always-on tokens but no component rows", () => {
     const root = createFixture({
       deploy: "short deploy skill",
-      init: "short init skill",
+      bootstrap: "short bootstrap skill",
     });
 
     try {
@@ -229,7 +229,7 @@ describe("plugin context budget checker", () => {
     const root = createFixture({
       clarity: "short clarity skill",
       deploy: "short deploy skill",
-      init: "short init skill",
+      bootstrap: "short bootstrap skill",
       onboarding: "short onboarding skill",
     });
 
@@ -243,7 +243,7 @@ describe("plugin context budget checker", () => {
         maxOtherOnInvokeTokens: 8_000,
         maxOnInvokeTokensByComponent: {
           deploy: 12_000,
-          init: 12_000,
+          bootstrap: 12_000,
           onboarding: 10_000,
         },
       });
@@ -266,12 +266,12 @@ describe("plugin context budget checker", () => {
       );
 
       expect(componentBudgets).toMatchObject({
-        init: { maxOnInvokeTokens: 12_000, onInvokeTokens: 21_800, overBy: 9_800 },
+        bootstrap: { maxOnInvokeTokens: 12_000, onInvokeTokens: 21_800, overBy: 9_800 },
         deploy: { maxOnInvokeTokens: 12_000, onInvokeTokens: 28_200, overBy: 16_200 },
         onboarding: { maxOnInvokeTokens: 10_000, onInvokeTokens: 18_500, overBy: 8_500 },
         clarity: { maxOnInvokeTokens: 8_000, onInvokeTokens: 8_100, overBy: 100 },
       });
-      expect(result.tokenBudget.overBudgetComponents.map((component) => component.component).sort()).toEqual(["clarity", "deploy", "init", "onboarding"]);
+      expect(result.tokenBudget.overBudgetComponents.map((component) => component.component).sort()).toEqual(["bootstrap", "clarity", "deploy", "onboarding"]);
     } finally {
       cleanup(root);
     }

@@ -1,6 +1,6 @@
 ---
-name: init
-description: '이 스킬은 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 싶을 때 axhub 템플릿 앱 생성을 담당해요. 비어 있지 않은 기존 로컬 앱을 axhub에 가져오거나 첫 연결·첫 배포까지 올리려는 요청은 import 스킬이 담당해요. 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작하고, 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고 axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 활성화 예: "새 앱 만들어줘", "앱 만들어줘", "결제 앱 만들어", "프로젝트 만들어", "프로젝트 초기화해줘", "초기화해줘", "fastapi 앱", "Next.js 앱 만들어줘", "init", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. axhub apps bootstrap saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 repo_full_name 으로 현재 dir 에 git clone 해요.'
+name: bootstrap
+description: '이 스킬은 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 싶을 때 axhub 템플릿 앱 생성을 담당해요. 비어 있지 않은 기존 로컬 앱을 axhub에 가져오거나 첫 연결·첫 배포까지 올리려는 요청은 import 스킬이 담당해요. 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작하고, 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고 axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 활성화 예: "새 앱 만들어줘", "앱 만들어줘", "결제 앱 만들어", "프로젝트 만들어", "프로젝트 초기화해줘", "초기화해줘", "fastapi 앱", "Next.js 앱 만들어줘", "bootstrap", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. axhub apps bootstrap saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 repo_full_name 으로 현재 dir 에 git clone 해요.'
 examples:
   - utterance: "새 앱 만들어줘"
     intent: "scaffold new axhub app"
@@ -10,7 +10,7 @@ examples:
     intent: "scaffold new axhub app"
   - utterance: "프로젝트 초기화해줘"
     intent: "scaffold new axhub app"
-  - utterance: "init"
+  - utterance: "bootstrap"
     intent: "scaffold new axhub app"
   - utterance: "scaffold"
     intent: "scaffold new axhub app"
@@ -26,7 +26,7 @@ allows-dependency-execution: true
 model: sonnet
 ---
 
-# Init
+# Bootstrap
 
 새 앱을 만들 수 있는 템플릿을 확인할게요.
 
@@ -36,11 +36,11 @@ model: sonnet
 
 ## 대표 여정에서의 역할
 
-온보딩이 준비 상태가 된 뒤, `init` 은 새 앱 생성, GitHub repo 준비, 첫 배포 결과 안내를 맡아요.
+온보딩이 준비 상태가 된 뒤, `bootstrap` 은 새 앱 생성, GitHub repo 준비, 첫 배포 결과 안내를 맡아요.
 
 ## 기존 앱 가져오기와 분리
 
-`init` 은 빈 디렉토리 새 앱 생성만 담당해요. 비어 있지 않은 폴더, 이미 만든 로컬 앱, "이 앱 올려" 요청은 `import` 스킬로 보내요.
+`bootstrap` 은 빈 디렉토리 새 앱 생성만 담당해요. 비어 있지 않은 폴더, 이미 만든 로컬 앱, "이 앱 올려" 요청은 `import` 스킬로 보내요.
 
 ## 같은 대화 맥락 이어받기
 
@@ -89,7 +89,7 @@ Slash command, skill name, route label 은 사용자에게 말하지 않아요. 
 
 ## Scope Boundary
 
-`init` 은 빈 디렉토리에서 새 app 을 만드는 bootstrap 전용이에요.
+`bootstrap` 은 빈 디렉토리에서 새 app 을 만드는 새 앱 생성 전용이에요.
 
 - 현재 폴더가 비어 있지 않고 사용자가 "이 앱 올려", "이 폴더 axhub에 올려", "기존 앱 가져와"처럼 말하면 `import` 스킬로 넘겨요.
 - 일반 앱 아이디어를 새로 브레인스토밍하지 않아요. template 은 backend registry 에서 고르고, 데이터 접근은 생성된 template 의 `@ax-hub/sdk` 안내나 실제 조회 근거가 있을 때만 이어받아요.

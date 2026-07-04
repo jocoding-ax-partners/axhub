@@ -40,7 +40,7 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("onboarding/init/deploy/cli");
       expect(description).not.toContain("3개 스킬");
     }
-    expect(descriptions.join("\n")).toContain("onboarding/init/deploy/import/development/diagnosis/clarity/update");
+    expect(descriptions.join("\n")).toContain("onboarding/bootstrap/deploy/import/development/diagnosis/clarity/update");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {
@@ -53,7 +53,7 @@ describe("smooth behavior contracts", () => {
     expect(claude).toContain("첫 셋업 → 앱 생성 → 배포 → 상태 확인");
     const flowRows = [
       "| 첫 셋업 | `onboarding` |",
-      "| 앱 생성 | `init` |",
+      "| 앱 생성 | `bootstrap` |",
       "| 배포 | `deploy` |",
       "| 상태 확인 | `clarity` |",
     ];
@@ -71,13 +71,13 @@ describe("smooth behavior contracts", () => {
 
   test("skills encode the required guard boundaries", () => {
     const onboarding = readRepo("skills/onboarding/SKILL.md");
-    const init = readRepo("skills/init/SKILL.md");
+    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
     const deploy = readRepo("skills/deploy/SKILL.md");
     const clarity = readRepo("skills/clarity/SKILL.md");
     const diagnosis = readRepo("skills/diagnosis/SKILL.md");
     const importSkill = readRepo("skills/import/SKILL.md");
     const onboardingAuth = readRepo("skills/onboarding/references/install-channels-and-auth.md");
-    const bootstrapAndLocal = readRepo("skills/init/references/bootstrap-and-local.md");
+    const bootstrapAndLocal = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
 
     expect(onboarding).toContain("axhub plugin-support onboarding-detect --json");
@@ -98,19 +98,19 @@ describe("smooth behavior contracts", () => {
     expect(onboardingAuth).not.toContain("after `승인했어`");
     expect(onboardingAuth).not.toContain("승인했어`, re-detect");
 
-    expect(init).toContain("axhub apps bootstrap");
-    expect(init).toContain("대표 여정에서의 역할");
-    expect(init).toContain("raw JSON/stderr");
-    expect(init).toContain("기존 앱 가져오기와 분리");
-    expect(init).toContain("`import` 스킬로 보내요");
-    expect(init).toContain("순수 UUID v4 idempotency key");
-    expect(init).toContain("APP_SLUG=\"$APP_SLUG\" perl -0pi");
-    expect(init).toContain("url_checked=false");
-    expect(init).toContain("`bootstraping`, `bootstraped`, `resumed`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨");
-    expect(init).toContain("label 과 target 모두 확인된 `https://...` 절대 URL");
-    expect(init).toContain("`[$PUBLIC_URL]($PUBLIC_URL)` 형태");
-    expect(init).toContain("NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채");
-    expect(init).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
+    expect(bootstrap).toContain("axhub apps bootstrap");
+    expect(bootstrap).toContain("대표 여정에서의 역할");
+    expect(bootstrap).toContain("raw JSON/stderr");
+    expect(bootstrap).toContain("기존 앱 가져오기와 분리");
+    expect(bootstrap).toContain("`import` 스킬로 보내요");
+    expect(bootstrap).toContain("순수 UUID v4 idempotency key");
+    expect(bootstrap).toContain("APP_SLUG=\"$APP_SLUG\" perl -0pi");
+    expect(bootstrap).toContain("url_checked=false");
+    expect(bootstrap).toContain("`bootstraping`, `bootstraped`, `resumed`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨");
+    expect(bootstrap).toContain("label 과 target 모두 확인된 `https://...` 절대 URL");
+    expect(bootstrap).toContain("`[$PUBLIC_URL]($PUBLIC_URL)` 형태");
+    expect(bootstrap).toContain("NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채");
+    expect(bootstrap).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
     expect(bootstrapAndLocal).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap");
     expect(bootstrapAndLocal).toContain("auto_poll");
     expect(bootstrapAndLocal).toContain("Never leave the user staring at an empty GitHub code-entry screen with no code");
@@ -366,7 +366,7 @@ describe("smooth behavior contracts", () => {
 
   test("session carry-over handoff contract is wired (Phase 1, instruction-first)", () => {
     const carryover = readRepo("skills/deploy/references/session-carryover.md");
-    const init = readRepo("skills/init/SKILL.md");
+    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
     const deploy = readRepo("skills/deploy/SKILL.md");
     const clarity = readRepo("skills/clarity/SKILL.md");
 
@@ -382,21 +382,21 @@ describe("smooth behavior contracts", () => {
     expect(carryover).toContain("owner-pick");
     expect(carryover).toContain("0-install gate");
 
-    // init: evidence-gated carry-over + shared-contract include.
-    expect(init).toContain("같은 대화 맥락 이어받기");
-    expect(init).toContain("이미 본 것만");
-    expect(init).toContain("../deploy/references/session-carryover.md");
+    // bootstrap: evidence-gated carry-over + shared-contract include.
+    expect(bootstrap).toContain("같은 대화 맥락 이어받기");
+    expect(bootstrap).toContain("이미 본 것만");
+    expect(bootstrap).toContain("../deploy/references/session-carryover.md");
     // E4: infer-tables-env also weighs actually-queried resources.
-    expect(init).toContain("infer-tables-env 분석은 scaffold 코드뿐 아니라");
+    expect(bootstrap).toContain("infer-tables-env 분석은 scaffold 코드뿐 아니라");
     // Confabulation negative guard (PR-gating proxy for the nightly behavioral case):
-    // with no evidence, init must go cold and never invent a resource.
-    expect(init).toContain("리소스를 지어내지 않아요");
-    expect(init).toContain("carry-over 를 주장하지 않아요");
+    // with no evidence, bootstrap must go cold and never invent a resource.
+    expect(bootstrap).toContain("리소스를 지어내지 않아요");
+    expect(bootstrap).toContain("carry-over 를 주장하지 않아요");
     // M2: gate relaxation suppresses re-narration only, never the gate.
-    expect(init).toContain("install-link 를 보여줬으면 재안내는 생략");
-    expect(init).toContain("0-install gate 는 맥락과 무관하게 그대로 실행해요");
+    expect(bootstrap).toContain("install-link 를 보여줬으면 재안내는 생략");
+    expect(bootstrap).toContain("0-install gate 는 맥락과 무관하게 그대로 실행해요");
 
-    const bootstrapAndLocal = readRepo("skills/init/references/bootstrap-and-local.md");
+    const bootstrapAndLocal = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     expect(bootstrapAndLocal).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
 
     // deploy: carry-over applies only AFTER the route gate (no vercel hijack).

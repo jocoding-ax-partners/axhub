@@ -9,7 +9,7 @@ Onboarding may install project dependencies because frontmatter allows dependenc
 - user explicitly confirms in an interactive session;
 - selected package manager is derived from the lockfile, not guessed from preference;
 - every install command includes `--ignore-scripts`;
-- no install/update/auth/init/deps mutation runs in subprocess/headless mode.
+- no install/update/auth/bootstrap/deps mutation runs in subprocess/headless mode.
 
 ## Prompt
 

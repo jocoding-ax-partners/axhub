@@ -70,7 +70,7 @@ MCP setup is optional follow-up, not part of the creation gate. Offer it only af
 
 - If required CLI/plugin setup is missing, route to onboarding/update guidance instead of mutating silently.
 - Do not install or modify external MCP config in subprocess/headless mode.
-- Do not block success on MCP setup. The bootstrap saga and clone are the init completion criteria.
+- Do not block success on MCP setup. The bootstrap saga and clone are the bootstrap completion criteria.
 - Keep wording natural: "데이터 연결까지 이어서 볼까요?" rather than naming internal skill labels.
 
 ## Carry-Over Contract

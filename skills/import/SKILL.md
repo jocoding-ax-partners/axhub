@@ -1,6 +1,6 @@
 ---
 name: import
-description: '비어 있지 않은 기존 로컬 앱을 axhub 앱으로 연결하고 manifest/GitHub/첫 배포 준비까지 가져오는 import 스킬. "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app"처럼 템플릿 bootstrap 이 아니라 기존 소스를 등록하려는 요청에 사용해요. Next.js뿐 아니라 프론트·백엔드·Dockerfile 앱 등 broad stack 을 CLI 감지에 맡겨요. 빈 디렉토리 새 앱은 init, 이미 연결된 앱의 재배포는 deploy 로 양보해요.'
+description: '비어 있지 않은 기존 로컬 앱을 axhub 앱으로 연결하고 manifest/GitHub/첫 배포 준비까지 가져오는 import 스킬. "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app"처럼 템플릿 bootstrap 이 아니라 기존 소스를 등록하려는 요청에 사용해요. Next.js뿐 아니라 프론트·백엔드·Dockerfile 앱 등 broad stack 을 CLI 감지에 맡겨요. 빈 디렉토리 새 앱은 bootstrap, 이미 연결된 앱의 재배포는 deploy 로 양보해요.'
 examples:
   - utterance: "기존 앱 올려"
     intent: "import existing local app into axhub"
@@ -19,7 +19,7 @@ model: sonnet
 ## 라우팅 경계
 
 - `import`: 현재 폴더가 비어 있지 않고 기존 앱 소스가 있는 상태에서 axhub 앱으로 처음 가져오는 요청.
-- `init`: 빈 디렉토리에서 axhub 템플릿 앱을 새로 만드는 요청.
+- `bootstrap`: 빈 디렉토리에서 axhub 템플릿 앱을 새로 만드는 요청.
 - `deploy`: 이미 axhub 앱과 manifest 가 연결된 앱을 다시 배포하는 요청.
 - `development`: 기존 앱 안에 화면, 대시보드, CRUD 같은 기능 코드를 새로 쓰는 요청.
 - `clarity`: 위 경계 밖 운영 명령이나 의도가 모호한 axhub 요청.
@@ -295,7 +295,7 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 
 ## Regression guard
 
-- init 은 빈 디렉토리 template bootstrap 만 맡아요.
+- bootstrap 은 빈 디렉토리 template bootstrap 만 맡아요.
 - deploy 는 ordinary redeploy 만 맡아요.
 - import 는 non-empty existing app first-connect flow 만 맡아요.
 - plugin 은 low-level CLI primitive 를 조합하지 않아요.
