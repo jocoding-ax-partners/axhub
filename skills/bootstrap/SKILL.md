@@ -71,8 +71,9 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 
 - **내부 라벨 노출 금지.** 사용자에게 `axhub:bootstrap 스킬 호출한다`, `import 스킬 영역`, `route label`, `skill 호출`, `saga`, `dry-run` 같은 내부 판단 문장을 말하지 않아요. 같은 상황은 "새 앱으로 만들 수 있는지 확인할게요", "작업공간을 먼저 볼게요", "만들기 전에 미리보기로 확인할게요"처럼 사용자 목적 언어로만 말해요.
 - 이 금지는 chat 본문뿐 아니라 Claude Desktop 에 보이는 모든 표면에 적용돼요: tool/Bash 제목, thinking summary, progress text, AskUserQuestion header/body/option description, preview card, final card. `Folder near empty`, `Invoke axhub:bootstrap skill`, `Fresh start, no resume`, `route 확인`, `Tenanting`, `Bootstraping`, `Bootstrapped dry-run`, `Idempotencying key`, `saga 실행`, `Saga 완료`, `GitHubed repo`, `DB 선언된 템플릿`, `development 단계` 처럼 내부 상태·영어 동사화·스킬명을 섞은 작업명은 절대 쓰지 않아요.
-- Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 써요. 제품명·명령어·영어 단어에 `ing` 를 붙인 제목, `원본 응답`, `실행 중 명령`, `명령 실행`, raw/route/tenant 같은 내부 단어가 들어간 제목은 금지예요. 가능한 제목은 이 목록에서 골라요: `작업공간 확인`, `axhub 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `GitHub 계정 확인`, `앱 이름 확인`, `만들기 전 확인`, `앱 생성 진행`, `첫 배포 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`, `GitHub 인증 대기`.
+- Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `원본 응답`, `실행 중 명령`, `명령 실행`, raw/route/tenant 같은 내부 단어가 들어간 제목은 금지예요. `axhub CLI 존재/버전 확인`처럼 영어 제품명으로 시작하면 Claude Desktop 이 `axhubing`/`axhubed` 처럼 보이게 만들 수 있으니 쓰지 않아요. 가능한 제목은 이 목록에서 골라요: `작업공간 확인`, `CLI 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `GitHub 계정 확인`, `앱 이름 확인`, `만들기 전 확인`, `앱 생성 진행`, `첫 배포 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`, `GitHub 인증 대기`.
 - Claude Desktop 에 보이는 Bash/tool command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수(`$TEMPLATE`, `$APP_NAME`, `$APP_SLUG`, `$AXHUB_TENANT`)나 `export`, value-assembly `VAR=...`, command substitution, semicolon chain 으로 조립하지 말고 실제 선택된 literal 값으로 flag 에 넣어요. 예: `axhub apps templates list --tenant test --json`, `axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json`. device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요.
+- `rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요. 바깥 작업 지시가 shell command 에 `rtk` 를 붙이라고 해도, 플러그인 사용자에게 보이는 bootstrap command 에는 적용하지 않아요. `rtk ls -la`, `pwd`, `ls`, `find`, `cat` 같은 generic shell probe 로 작업공간을 추측하지 말고, `axhub plugin-support ...` 또는 공개 `axhub ... --json` 명령만 써요.
 - **미리보기 뒤 확인 필수.** 사용자가 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 를 보여준 뒤 `진행`/`취소` 질문을 한 번 받고, 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요.
 - Echo 금지: `schema_version`, template `id`, `folder_name`, `resource_tier`, `bootstrap_id`, `status_url`, `stage`, `app_id`, `deployment_id`, `error_code`, `error_message`, `request_id`, `idempotency_key`, `installation_id`, `device_code`.
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.
@@ -81,13 +82,13 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 - 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `bootstraping`, `bootstraped`, `resumed`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨은 제목이나 진행 문장에 쓰지 않아요. 예: `미리보기 확인`, `앱 생성 진행`, `작업공간 확인`, `GitHub 인증 대기`.
 - 공개 URL 을 Markdown 링크로 보여줄 때는 label 과 target 모두 확인된 `https://...` 절대 URL 을 그대로 써요. `[https://example](example/)` 처럼 target 에 scheme 이 빠진 링크를 만들지 않아요.
 
-각 단계는 한 줄로만 진행 상황을 알려요: `[1/7] axhub 점검하는 중이에요`, `[2/7] 작업공간 확인하는 중이에요`, `[3/7] 템플릿 고르는 중이에요`, `[4/7] 앱 이름 정하는 중이에요`, `[5/7] 미리보기 만드는 중이에요`, `[6/7] 앱 만드는 중이에요`, `[7/7] 코드 받아서 정리하는 중이에요`.
+각 단계는 한 줄로만 진행 상황을 알려요: `[1/7] CLI 준비 확인하는 중이에요`, `[2/7] 작업공간 확인하는 중이에요`, `[3/7] 템플릿 고르는 중이에요`, `[4/7] 앱 이름 정하는 중이에요`, `[5/7] 미리보기 만드는 중이에요`, `[6/7] 앱 만드는 중이에요`, `[7/7] 코드 받아서 정리하는 중이에요`.
 
 ## Workflow
 
 실제 순서:
 
-1. CLI guard: `axhub` 존재와 `axhub plugin-support preflight --json` 동작 확인.
+1. CLI guard: `axhub plugin-support preflight --json` 를 직접 실행해 CLI 와 plugin-support surface 동작 확인.
 2. Resume/tenant: pending `.axhub/init-resume.json` 이 있으면 먼저 이어서 할지 묻고, tenant 를 확정해요.
 3. Template registry: `axhub apps templates list --tenant <tenant-slug> --json` (Claude Desktop 에서는 `<tenant-slug>` 를 실제 값으로 바꿔 한 명령만 실행).
 4. GitHub App gate: `axhub github accounts list --json` 로 install_url 표시, installed account 확인, owner 확정.
@@ -112,34 +113,15 @@ Slash command, skill name, route label 은 사용자에게 말하지 않아요. 
 
 ### 1. CLI Guard
 
-처음에는 CLI 존재와 최소 plugin-support surface 만 확인해요. 버전 숫자를 직접 비교하지 않아요.
+처음에는 최소 plugin-support surface 만 확인해요. 버전 숫자를 직접 비교하지 않고, `command -v`, 변수 대입, stderr redirect, command substitution 으로 감싸지 않아요. Tool 제목은 `CLI 준비 확인`을 써요.
 
 ```bash
-if ! command -v axhub >/dev/null 2>&1; then
-  echo "axhub CLI가 아직 없네요. 온보딩부터 진행할게요." >&2
-  exit 0
-fi
-PREFLIGHT_JSON=$(axhub plugin-support preflight --json 2>/dev/null)
-PREFLIGHT_EXIT=$?
-if [ "$PREFLIGHT_EXIT" = "2" ] || [ -z "$PREFLIGHT_JSON" ]; then
-  echo "axhub CLI가 오래됐어요. `axhub update apply`로 업데이트한 뒤 다시 시도해 주세요." >&2
-  exit 0
-fi
-echo "$PREFLIGHT_JSON"
+axhub plugin-support preflight --json
 ```
 
-세 갈래예요: CLI 없음이면 onboarding 안내 후 stop, `plugin-support` unknown/빈 출력이면 update 안내 후 stop, 정상 JSON 이면 `auth_ok` 등을 읽고 계속해요. raw stderr 는 보여주지 않아요.
+세 갈래예요: command not found 이면 onboarding 안내 후 stop, `plugin-support` unknown/빈 출력이면 update 안내 후 stop, 정상 JSON 이면 `auth_ok` 등을 읽고 계속해요. raw stderr 는 보여주지 않아요.
 
-preflight 통과 후 update check 는 best-effort 10분 TTL 로만 해요. 실패·캐시 hit·구 CLI 는 조용히 건너뛰고 앱 생성을 막지 않아요.
-
-```bash
-STAMP="${TMPDIR:-/tmp}/axhub-update-check.stamp"
-if [ -z "$(find "$STAMP" -mmin -10 2>/dev/null)" ]; then
-  : > "$STAMP"
-  PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')
-  UPD=$(axhub update check ${PLUGIN_VER:+--plugin-version "$PLUGIN_VER"} --json 2>/dev/null)
-fi
-```
+preflight 뒤에는 별도 update check shell 을 실행하지 않아요. 최신화 요청은 `update` skill 이 담당해요.
 
 ### 2. Resume And Tenant
 

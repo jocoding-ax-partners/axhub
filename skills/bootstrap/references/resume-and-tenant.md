@@ -2,6 +2,8 @@
 
 Load this reference when Step 0.5 resume state, pending GitHub device-flow recovery, or tenant selection needs more detail than the top-level skill.
 
+Desktop-visible commands here must stay direct and portable: no `rtk`, no generic `ls`/`pwd` probes, and no shell wrapper unless the command is explicitly documented as an execute/resume recovery command. Prefer the CLI-emitted command string only when resuming a prior flow; for fresh flow checks, run the literal `axhub plugin-support ... --json` command shown in each section.
+
 ## Resume Route
 
 After `axhub plugin-support preflight --json` succeeds, check repo-local state before listing templates:
