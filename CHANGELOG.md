@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.6](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.5...v1.7.6) (2026-07-04)
+
+Claude Code Desktop 에서 bootstrap 진행 중 보이던 내부 작업 라벨을 더 강하게 숨겼어요. live QA 에서 확인된 `dry-run`, `saga`, `Idempotencying key`, `GitHubed repo` 같은 개발자용 표현이 chat 본문뿐 아니라 tool 제목, 진행 문구, 질문 카드, preview/final card 에도 나타나지 않도록 스킬 계약과 회귀 테스트를 보강했어요.
+
 ## [1.7.5](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.4...v1.7.5) (2026-07-04)
 
 Claude Code Desktop 에서 새 앱을 자연어로 만들 때 보이던 bootstrap 마찰을 줄였어요. "웹앱", "쇼핑몰"처럼 장르만 말한 경우에는 Next.js 로 자동 확정하지 않고 템플릿 선택을 먼저 보여주며, "바로 올려줘"라는 목표 문장도 미리보기 이후의 실행 승인으로 오해하지 않아요. GitHub repo name 과 subdomain 은 앱 slug 로 명시해서 첫 생성이 `app` 기본값 충돌로 실패하지 않게 했고, 배포는 성공했지만 앱이 private 이거나 공개 심사 대기 중이면 친구에게 바로 공개됐다고 말하지 않도록 결과 문구를 나눴어요.
