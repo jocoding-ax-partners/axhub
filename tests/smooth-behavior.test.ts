@@ -185,12 +185,18 @@ describe("smooth behavior contracts", () => {
     expect(importSkill).toContain("`git remote 아직 없음` 대신 `원격 저장소가 아직 없어 새 저장소 생성 경로로 진행해요`");
     expect(importSkill).toContain("`execute 호출한다` 대신 `가져오기를 실행할게요`");
     expect(importSkill).toContain("`Envelope`, `preview`, `import 지원`, `deployment verification`, `success`, `raw endpoint`, `raw 엔드포인트`, `public`, `HTML, 200`");
+    expect(importSkill).toContain("이미 발견된 버그 예시");
+    expect(importSkill).toContain("같은 대화 안에서 재시도하거나 이어서 import 할 때도 이전 표현을 재사용하지 말고");
+    expect(importSkill).toContain("`Port 8080, /healthz 확인. preview 진행.`, `git remote 없음`, `execute 실행한다`, `deployment verification: success`, `HTML, 200`");
     expect(importSkill).toContain("`import 지원 확인됐다` 대신 `가져오기 기능을 사용할 수 있어요`");
     expect(importSkill).toContain("`preview 진행` 대신 `미리보기를 확인할게요`");
     expect(importSkill).toContain("`Envelope 정상` 대신 `응답 형식 확인이 끝났어요`");
     expect(importSkill).toContain("`deployment verification: success` 대신 `첫 배포 검증 성공`");
     expect(importSkill).toContain("`raw endpoint`/`raw 엔드포인트` 대신 `원문 응답`");
     expect(importSkill).toContain("`public으로` 대신 `공개 접근으로`");
+    expect(importSkill).toContain("최종 성공 요약은 아래 형태를 벗어나지 않아요");
+    expect(importSkill).toContain("`첫 배포 검증이 끝났어요. 운영 URL: [https://...](https://...)`");
+    expect(importSkill).toContain("비공개 접근 제어 때문에 로그인 없는 요청으로는 앱 본문을 직접 확인하지 못했어요");
     expect(importSkill).toContain("비공개 앱에서 로그인 없는 HTTP 요청이 axhub 로그인 화면 HTML 을 200 으로 돌려주면");
     expect(importSkill).toContain("그건 앱의 `/healthz` 또는 루트 응답 검증이 아니에요");
     expect(importSkill).toContain("`/healthz HTTP 200 확인`이라고 쓰지 않아요");
