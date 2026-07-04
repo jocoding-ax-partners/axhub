@@ -1,6 +1,6 @@
 # Init Resume And Tenant Reference
 
-Load this reference when Step 0.5 resume state, pending GitHub device-flow recovery, or tenant selection needs more detail than the top-level skill.
+Load this reference only when Step 0.5 resume state, pending GitHub device-flow recovery, or tenant selection needs more detail than the top-level skill. The normal fresh bootstrap path should not read this file; the top-level skill already covers tenant selection without plugin-cache reference reads.
 
 Desktop-visible commands here must stay direct and portable: no `rtk`, no generic `ls`/`pwd` probes, and no shell wrapper unless the command is explicitly documented as an execute/resume recovery command. Prefer the CLI-emitted command string only when resuming a prior flow; for fresh flow checks, run the literal `axhub plugin-support ... --json` command shown in each section.
 
@@ -52,41 +52,17 @@ If `device_code_pending` remains, respect `retry_after_secs` and retry the emitt
 
 ## Tenant Resolve L1
 
-`axhub plugin-support tenant-resolve` owns risky tenant logic. The skill is a thin resolver and cache reader. Explicit `AXHUB_TENANT` wins. Otherwise call once and persist only a resolved tenant:
+`axhub plugin-support tenant-resolve` owns risky tenant logic. The skill is a thin resolver and cache reader. Explicit `AXHUB_TENANT` wins. Otherwise call once and use the resolved tenant as a literal value in later commands:
 
 ```bash
-TENANT_CACHE=".axhub/state/tenant.json"
-NEEDS_PICK="false"
-CANDIDATES_JSON="[]"
-if [ -z "${AXHUB_TENANT:-}" ]; then
-  eval "$(axhub plugin-support tenant-resolve --field-expr '"AXHUB_TENANT=" + (.tenant // "" | @sh), "_NEEDS_PICK_RAW=" + (.needs_pick // false | tostring | @sh), "CANDIDATES_JSON=" + ((.candidates // []) | tojson | @sh), "_FIRST_CANDIDATE=" + ((.candidates // [])[0].id // (.candidates // [])[0].slug // "" | @sh)' 2>/dev/null)"
-  : "${AXHUB_TENANT:=}"
-  : "${_NEEDS_PICK_RAW:=false}"
-  : "${CANDIDATES_JSON:=[]}"
-  : "${_FIRST_CANDIDATE:=}"
-  if [ "$_NEEDS_PICK_RAW" = "true" ]; then
-    if ! [ -t 1 ] || [ -n "$CI" ] || [ -n "$CLAUDE_NON_INTERACTIVE" ]; then
-      AXHUB_TENANT="$_FIRST_CANDIDATE"
-      echo "여러 tenant 에 속해 있는데 picker 를 건너뛰고 기본 tenant($AXHUB_TENANT)로 진행해요"
-    else
-      NEEDS_PICK="true"
-    fi
-  fi
-fi
-if [ -n "${AXHUB_TENANT:-}" ] && [ "$NEEDS_PICK" = "false" ]; then
-  mkdir -p "$(dirname "$TENANT_CACHE")"
-  printf '{"tenant":"%s","source":"resolved","ts":%s}\n' "$AXHUB_TENANT" "$(date +%s 2>/dev/null || echo '0')" > "$TENANT_CACHE"
-fi
-export AXHUB_TENANT
-export NEEDS_PICK
-export CANDIDATES_JSON
+axhub plugin-support tenant-resolve --field-expr '.tenant // empty'
 ```
 
-If `AXHUB_TENANT` is still empty, check preflight `auth_ok` and `current_team_id`, then guide with `다시 로그인해줘`.
+If the command returns one tenant value, carry it as a literal `--tenant <slug>` value. If the resolver output says multiple tenants need a pick, ask the picker from the resolver/preflight candidates and carry the chosen value as the same literal `--tenant <slug>` value. If no tenant can be resolved, check preflight `auth_ok` and `current_team_id`, then guide with `다시 로그인해줘`.
 
 ## Tenant Picker L2
 
-Only when `NEEDS_PICK=true` and the host is interactive TTY, ask once:
+Only when the resolver/preflight output says multiple tenants need a pick and the host is interactive TTY, ask once:
 
 ```json
 {
@@ -101,12 +77,12 @@ Only when `NEEDS_PICK=true` and the host is interactive TTY, ask once:
 }
 ```
 
-Write the chosen tenant to `.axhub/state/tenant.json` as `{tenant, source:"picker", ts}`. In non-interactive/D1, skip L2 because L1 already used first-candidate fallback or left tenant empty for login guidance.
+Do not write `.axhub/state/tenant.json` from Claude Desktop. Do not use `mkdir`, `printf`, redirection, timestamp commands, or shell glue to persist the choice. In non-interactive/D1, use the CLI resolver's first-candidate fallback when it is explicitly returned; otherwise leave tenant empty for login guidance.
 
 ## Fence Re-Read
 
-Every later command fence should re-read tenant because env may not survive:
+Every later command fence should use the literal tenant already selected in the current conversation. If the value is genuinely missing, re-run the direct resolver command:
 
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
+axhub plugin-support tenant-resolve --field-expr '.tenant // empty'
 ```
