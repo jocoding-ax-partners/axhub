@@ -25,19 +25,11 @@ creation path 는 하나뿐이에요: backend `axhub apps bootstrap` saga. `axhu
 
 같은 대화 맥락 이어받기는 이미 본 것만 써요. infer-tables-env 분석은 scaffold 코드뿐 아니라 같은 대화에서 실제로 조회한 리소스 근거까지 함께 봐요. 근거가 없으면 리소스를 지어내지 않아요, carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략할 수 있지만 0-install gate 는 맥락과 무관하게 그대로 실행해요.
 
-필요하면 `../deploy/references/session-carryover.md` 를 읽어요.
+## Reference Loading Policy
 
-## Load These References
+정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, GitHub gate, dry-run preview, execute/status/verify/result 까지 진행해요. Claude Desktop 에서 workspace 밖 plugin cache reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고 읽지 않아요.
 
-정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, GitHub gate, dry-run preview, execute/status/verify/result 까지 진행해요. plugin cache reference 읽기는 Desktop 에서 workspace 밖 파일 권한 프롬프트를 만들 수 있으니 edge case 에서만 열어요.
-
-- `references/resume-and-tenant.md`: `watch_status`/`resume_last` 또는 pending GitHub device-flow recovery edge case.
-- `references/templates-and-github.md`: backend template 응답, GitHub account gate, multi-owner, non-interactive edge case.
-- `references/bootstrap-and-local.md`: clone/current-dir, manifest 보정, local preview edge case.
-- `references/errors-and-followups.md`: long error routing, result card, optional MCP/setup/follow-up.
-- `../deploy/references/error-empathy-catalog.md`: exit-code 안내를 사람 말투로 바꿀 때 읽어요.
-
-Claude Desktop 에서 reference 읽기 권한 프롬프트가 workspace 밖 plugin cache 경로로 뜨면 읽지 말고 이 본문 절차만으로 진행해요.
+Edge case 에서도 먼저 이 본문과 `axhub` CLI 상태 명령만 써요. 긴 오류 설명도 chat 에 보이는 오류 코드와 `axhub` status/diagnose 출력으로 요약하고, plugin cache 파일 읽기를 복구 조건으로 삼지 않아요.
 
 ## Visibility
 
@@ -62,13 +54,13 @@ Claude Desktop 에서 reference 읽기 권한 프롬프트가 workspace 밖 plug
 1. CLI guard: `axhub plugin-support preflight --json`.
 2. Resume/workspace: `axhub plugin-support init-resume route --json`, then `axhub plugin-support tenant-resolve --field-expr '.tenant // empty'`.
 3. Template registry: `axhub apps templates list --tenant <tenant-slug> --json`.
-4. Template picker: backend registry 에 있는 값만 고르고, 일반 채팅 텍스트로 물어요.
+4. Template picker: backend registry 에 있는 값만 고르고, native 질문 card 로 먼저 물어요.
 5. App name: 앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요.
 6. GitHub App gate: `axhub github accounts list --json`.
 7. Dry-run preview: `axhub apps bootstrap ... --dry-run --json`.
 8. Preview confirmation: 사용자가 `진행`을 고른 뒤에만 execute 해요.
 9. Execute saga: `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap ... --execute --watch --watch-timeout 9m --idempotency-key <literal> --json`.
-10. Clone/current dir, manifest slug correction, result/follow-up.
+10. Clone/current dir, manifest check, result/follow-up.
 
 Slash command, skill name, route label 은 사용자에게 말하지 않아요.
 
@@ -110,7 +102,7 @@ axhub apps templates list --tenant test --json
 
 ### 4. Template Picker
 
-Claude Desktop 에서 backend template 결과로 native Question/AskUserQuestion card 를 만들면 `요청됨 템플릿`만 남고 선택지가 렌더링되지 않을 수 있어요. 그래서 template 선택은 반드시 일반 채팅 텍스트로 물어요. `어떤 템플릿으로 시작할까요?` 라고 말한 뒤 backend 가 반환한 실제 template 만 번호 목록으로 보여주고, `번호나 템플릿 이름으로 답해 주세요.` 라고 멈춰요.
+Claude Desktop 에서는 template 선택을 native Question/AskUserQuestion card 로 먼저 물어요. 제목은 `템플릿 선택`, 질문은 `어떤 템플릿으로 시작할까요?` 로 쓰고, backend 실제 template 만 선택지로 보여줘요. 3개 초과면 추천 3개만 card 에 올려요. card 가 렌더링되지 않거나 선택지가 보이지 않는 경우에만 일반 채팅 텍스트로 fallback 해요.
 
 `웹앱`, `쇼핑몰`, `사이트`, `앱`, `서비스`, `예약`, `주문`, `preorder`, `booking`, `shop`, `store`, `dashboard`, `admin` 같은 일반 장르·기능 단어는 exact template 선택이 아니에요. 추천 순서를 정하는 근거일 뿐 선택 확정이 아니며, `--template ... --dry-run` 은 템플릿 질문 답변을 받은 뒤에만 실행해요.
 
@@ -118,7 +110,7 @@ Claude Desktop 에서 backend template 결과로 native Question/AskUserQuestion
 
 ### 5. App Name
 
-앱 이름 질문 문구는 반드시 `앱 이름을 무엇으로 할까요?` 로 써요. `앵 이름` 같은 오타나 줄임말을 쓰지 않아요. 표시 제목은 `앱 이름 확인` 으로 써요. 앱 이름 확인도 native Question/AskUserQuestion card 를 쓰지 말고 일반 채팅 텍스트로 물어요. 사용자가 고르거나 직접 입력한 뒤에만 `--name`/`--slug` 를 확정해요.
+앱 이름 질문 문구는 반드시 `앱 이름을 무엇으로 할까요?` 로 써요. `앵 이름` 같은 오타나 줄임말을 쓰지 않아요. 표시 제목은 `앱 이름 확인` 으로 써요. 앱 이름 확인도 native Question/AskUserQuestion card 로 먼저 물어요. 답변 입력이 막힐 때만 일반 채팅 텍스트로 fallback 해요. 사용자가 답한 뒤에만 `--name`/`--slug` 를 확정해요.
 
 `추천 이름으로 해줘`, `알아서 이름 지어줘`, `use the recommended name` 은 앱 이름 질문이 먼저 보인 뒤의 답변일 때만 확정으로 봐요. 앱 이름 질문을 아직 보여주지 않았다면 추천 이름을 제안하고 `앱 이름을 무엇으로 할까요?` 로 한 번 확인해요.
 
@@ -173,9 +165,19 @@ Claude Desktop 에서 `앱 생성 진행` 또는 `앱 생성 재시도` tool 이
 
 ### 9. Clone And Manifest
 
-완료된 saga 에서 repo 를 읽고 현재 dir 을 채워요. 서브디렉토리를 만들지 않아요. `repo_full_name` 이 비어 있으면 임의 URL 을 만들지 않아요.
+완료된 saga 의 `repo_full_name` 으로 사용자가 요청한 현재 폴더를 채워요. 서브디렉토리 없이, 값이 비면 임의 URL 을 만들지 않아요.
 
-Clone 이 성공하면 `axhub.yaml` 의 app binding 을 새 app slug 로 보정하고 `axhub deploy --explain --json` 으로 parser check 를 해요. 정상 fresh path 에서 workspace 밖 reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고, 이미 확보한 repo/app/deployment 값과 CLI 명령으로만 마무리해요. 자세한 command 는 clone 실패, 이미 `.git` 이 있는 디렉토리, manifest 보정 실패 같은 edge case 에서만 `references/bootstrap-and-local.md` 를 읽어요.
+상단 폴더 표시가 사용자가 지정한 새 폴더와 다르면, 메시지의 absolute path 를 target 으로 써요. `pwd`, `ls`, `find`, `cat`, `rtk ls -la` probe 로 권한 프롬프트를 늘리지 않아요.
+
+새 폴더에 `.omc/` 같은 Desktop 메타데이터가 있을 수 있으므로 `git clone ... .` 는 쓰지 않아요. `git init` 후 원격 `main` 을 받아 `.omc/` 를 보존해요.
+
+```bash
+git -C <target> init -q -b main && (git -C <target> remote add origin https://github.com/<repo>.git 2>/dev/null || git -C <target> remote set-url origin https://github.com/<repo>.git) && git -C <target> fetch origin main --quiet --depth=1 && git -C <target> reset --hard FETCH_HEAD
+```
+
+실행 때 `<target>` 과 `<repo>` 은 확인된 literal 로 바꿔요. target 채운 뒤 추가 `rtk ls`, `ls`, `find`, `cat` 확인은 하지 않아요.
+
+성공하면 추가 파일 읽기 없이 `axhub deploy --explain --json` 으로 check 해요. 정상 fresh path 에서 밖 reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고, 이미 확보한 repo/app/deployment 값과 CLI 명령으로만 마무리해요.
 
 ### 10. Result
 

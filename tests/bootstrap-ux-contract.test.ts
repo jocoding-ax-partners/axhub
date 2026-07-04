@@ -31,7 +31,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`스킬을 사용하겠습니다`");
     expect(bootstrap).toContain("Claude Desktop 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요");
     expect(bootstrap).toContain("CLI 명령이 하나도 실행되지 않았다면 fresh path 를 그대로 시작해요");
-    expect(bootstrap.indexOf("## Fast Start")).toBeLessThan(bootstrap.indexOf("## Load These References"));
+    expect(bootstrap.indexOf("## Fast Start")).toBeLessThan(bootstrap.indexOf("## Reference Loading Policy"));
   });
 
   test("advertises English empty-folder web app deployment prompts as bootstrap triggers", () => {
@@ -98,6 +98,27 @@ describe("bootstrap desktop UX contract", () => {
     expect(guardSection).not.toContain("find \"$STAMP\"");
   });
 
+  test("hydrates Claude Desktop metadata-only folders without clone probes", () => {
+    const bootstrap = readBootstrap();
+    const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
+    const cloneSection = bootstrap.slice(
+      bootstrap.indexOf("### 9. Clone And Manifest"),
+      bootstrap.indexOf("### 10. Result"),
+    );
+
+    expect(cloneSection).toContain("`.omc/` 같은 Desktop 메타데이터");
+    expect(cloneSection).toContain("`git clone ... .` 는 쓰지 않아요");
+    expect(cloneSection).toContain("git -C <target> init -q -b main");
+    expect(cloneSection).toContain("remote set-url origin https://github.com/<repo>.git");
+    expect(cloneSection).toContain("fetch origin main --quiet --depth=1");
+    expect(cloneSection).toContain("reset --hard FETCH_HEAD");
+    expect(cloneSection).toContain("target 채운 뒤 추가 `rtk ls`, `ls`, `find`, `cat`");
+    expect(cloneSection).not.toContain("cd /absolute/target && git clone");
+    expect(localReference).toContain("Claude Desktop may create `.omc/`");
+    expect(localReference).toContain("Do not run `git clone ... .`");
+    expect(localReference).toContain("leads to extra `rtk ls -la` probes");
+  });
+
   test("keeps the common fresh bootstrap path out of plugin-cache reference reads and shell tenant writes", () => {
     const bootstrap = readBootstrap();
     const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
@@ -107,6 +128,8 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문");
     expect(bootstrap).toContain("execute/status/verify/result 까지 진행");
     expect(bootstrap).not.toContain("registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요");
+    expect(bootstrap).not.toContain("references/bootstrap-and-local.md");
+    expect(bootstrap).not.toContain("../deploy/references/session-carryover.md");
     expect(resumeReference).toContain("Do not write `.axhub/state/tenant.json` from Claude Desktop");
     expect(resumeReference).not.toContain("TENANT_CACHE=");
     expect(resumeReference).not.toContain("mkdir -p \"$(dirname \"$TENANT_CACHE\")\"");
@@ -119,6 +142,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("Desktop Error Recovery");
     expect(bootstrap).toContain("workspace 밖 plugin cache reference 읽기 권한 프롬프트");
     expect(bootstrap).toContain("읽지 않아요");
+    expect(bootstrap).toContain("plugin cache 파일 읽기를 복구 조건으로 삼지 않아요");
     expect(bootstrap).toContain("복구 명령도 `rtk`, `curl`, `pwd`, `ls`, `find`, `cat` 같은 generic probe 로 빠지지 않아요");
     expect(bootstrap).toContain("`axhub` CLI 상태 명령만 써요");
     expect(bootstrap).toContain("axhub apps bootstrap-status");
@@ -158,13 +182,13 @@ describe("bootstrap desktop UX contract", () => {
     const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
 
     expect(bootstrap).toContain("일반 장르·기능 단어는 exact template 선택이 아니에요");
-    expect(bootstrap).toContain("template 선택은 반드시 일반 채팅 텍스트로 물어요");
-    expect(bootstrap).toContain("`요청됨 템플릿`만 남고 선택지가 렌더링되지 않을 수 있어요");
+    expect(bootstrap).toContain("template 선택을 native Question/AskUserQuestion card 로 먼저 물어요");
+    expect(bootstrap).toContain("card 가 렌더링되지 않거나 선택지가 보이지 않는 경우에만");
     expect(bootstrap).toContain("`preorder`");
     expect(bootstrap).toContain("추천 순서를 정하는 근거일 뿐 선택 확정이 아니며");
     expect(bootstrap).toContain("`--template ... --dry-run` 은 템플릿 질문 답변을 받은 뒤에만 실행해요");
-    expect(templateReference).toContain("do not use native Question/AskUserQuestion cards for backend template selection");
-    expect(templateReference).toContain("Ask in normal chat text instead");
+    expect(templateReference).toContain("use a native Question/AskUserQuestion card first for backend template selection");
+    expect(templateReference).toContain("text fallback only when the card does not render choices");
     expect(templateReference).toContain("번호나 템플릿 이름으로 답해 주세요.");
     expect(templateReference).toContain("Generic category or feature words");
     expect(templateReference).toContain("are not exact template choices");
@@ -174,7 +198,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("반드시 `어떤 템플릿으로 시작할까요?` 질문을 보여주고 답을 기다려요");
     expect(templateReference).toContain("Recommendation wording such as");
     expect(templateReference).toContain("is not template approval");
-    expect(templateReference).not.toContain("Structured AskUserQuestion can show at most 3 choices");
+    expect(templateReference).not.toContain("Ask in normal chat text instead");
   });
 
   test("confirms app name before freezing slug for new bootstrap apps", () => {
@@ -185,17 +209,17 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("앱 이름 질문 문구는 반드시 `앱 이름을 무엇으로 할까요?`");
     expect(bootstrap).toContain("`앵 이름` 같은 오타나 줄임말을 쓰지 않아요");
     expect(bootstrap).toContain("표시 제목은 `앱 이름 확인`");
-    expect(bootstrap).toContain("앱 이름 확인도 native Question/AskUserQuestion card 를 쓰지 말고 일반 채팅 텍스트로 물어요");
-    expect(bootstrap).toContain("사용자가 고르거나 직접 입력한 뒤에만 `--name`/`--slug` 를 확정해요");
+    expect(bootstrap).toContain("앱 이름 확인도 native Question/AskUserQuestion card 로 먼저 물어요");
+    expect(bootstrap).toContain("답변 입력이 막힐 때만 일반 채팅 텍스트로 fallback");
+    expect(bootstrap).toContain("사용자가 답한 뒤에만 `--name`/`--slug` 를 확정해요");
     expect(bootstrap).toContain("`use the recommended name` 은 앱 이름 질문이 먼저 보인 뒤의 답변일 때만 확정");
     expect(templateReference).toContain("Do not finalize the name before one user-facing confirmation in Claude Desktop");
     expect(templateReference).toContain("Recommendation wording like");
     expect(templateReference).toContain("is approval only after the app-name prompt is visible");
-    expect(templateReference).toContain("Ask in normal chat text, not a native Question/AskUserQuestion card");
+    expect(templateReference).toContain("Ask with a native Question/AskUserQuestion card first");
+    expect(templateReference).toContain("Fall back to normal chat text only when the card does not render or the answer UI is unavailable");
     expect(templateReference).toContain("앱 이름을 무엇으로 할까요?");
     expect(templateReference).toContain("번호나 원하는 앱 이름으로 답해 주세요.");
-    expect(templateReference).not.toContain("\"question\": \"앱 이름을 무엇으로 할까요?\"");
-    expect(templateReference).not.toContain("\"header\": \"앱 이름 확인\"");
     expect(templateReference).not.toContain("\"앱 이름 뭘로 할래요?\"");
   });
 

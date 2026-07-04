@@ -98,7 +98,9 @@ If resume says `no pending github device flow`, follow `resume-and-tenant.md` re
 
 ## Clone Current Directory
 
-After saga reaches terminal success, read repo from status and fill current directory. Do not create a subdirectory:
+After saga reaches terminal success, read repo from status and fill current directory. Do not create a subdirectory.
+
+Claude Desktop may create `.omc/` in a newly added folder before the app code is cloned. Treat that as Desktop metadata, not as a user app. Do not run `git clone ... .`, because it fails in metadata-only folders and leads to extra `rtk ls -la` probes. Fill the current folder with `git init` + `fetch` + `reset --hard` so `.omc/` stays in place:
 
 ```bash
 REPO=$(axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --field-expr '.data.repo_full_name // .data.status.repo_full_name // empty' 2>/dev/null || true)
