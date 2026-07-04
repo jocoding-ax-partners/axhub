@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.17](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.16...v1.7.17) (2026-07-04)
+
+Claude Code Desktop 실제 QA에서 bootstrap 은 작업공간 선택 뒤 템플릿 목록까지 정상으로 내려갔지만, 첫 문장에 `axhub:bootstrap` 스킬 선택 설명이 아직 보였어요. 이제 스킬 본문뿐 아니라 frontmatter 단계에도 스킬명 노출 금지를 올려, 자연어 첫 앱 요청에서도 내부 라우팅 설명 대신 바로 CLI 준비와 작업공간·템플릿·앱 이름 확인 흐름으로 들어가도록 보강했어요.
+
 ## [1.7.16](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.15...v1.7.16) (2026-07-04)
 
 Claude Code Desktop 실제 QA에서 bootstrap 이 호출된 뒤에도 첫 응답이 무겁거나 라우팅 설명으로 새서 템플릿·앱 이름 단계까지 못 내려가는 문제가 남아 있었어요. 이제 bootstrap entrypoint 는 첫 턴에 CLI 준비 확인, 작업공간 선택, 템플릿 목록, 앱 이름 확인까지 바로 진행하도록 더 작고 action-first 로 정리했고, runtime dot directory 가 context budget 검사에 섞이지 않도록 해서 로컬 QA 중 생기는 `.omc` 같은 폴더도 실패 원인이 되지 않아요.
