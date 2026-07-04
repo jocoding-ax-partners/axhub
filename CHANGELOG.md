@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.18](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.17...v1.7.18) (2026-07-04)
+
+Claude Code Desktop 실제 QA에서 bootstrap 의 템플릿·앱 이름 단계가 남아 있어도 `추천해줘`나 `use the recommended name` 같은 문구를 선택 확정으로 오해할 여지가 있었고, 배포 성공 뒤에는 `App get (axhub)` 도구 탐색으로 새는 흐름이 보였어요. 이제 추천은 질문을 띄운 뒤의 답변일 때만 확정으로 보고, 결과 확인도 `axhub apps get`·`axhub deploy verify` CLI 경로에 고정해 첫 앱 생성 흐름이 더 예측 가능해졌어요.
+
 ## [1.7.17](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.16...v1.7.17) (2026-07-04)
 
 Claude Code Desktop 실제 QA에서 bootstrap 은 작업공간 선택 뒤 템플릿 목록까지 정상으로 내려갔지만, 첫 문장에 `axhub:bootstrap` 스킬 선택 설명이 아직 보였어요. 이제 스킬 본문뿐 아니라 frontmatter 단계에도 스킬명 노출 금지를 올려, 자연어 첫 앱 요청에서도 내부 라우팅 설명 대신 바로 CLI 준비와 작업공간·템플릿·앱 이름 확인 흐름으로 들어가도록 보강했어요.
