@@ -1,11 +1,11 @@
 ---
 name: clarity
-description: 'clarity: onboarding/init/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "Use the axhub clarity skill", "show current app status", "is production healthy?", "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요. 영어로 clarity skill 을 직접 지정한 요청도 반드시 이 스킬로 라우팅해요.'
+description: 'clarity: onboarding/bootstrap/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "Use the axhub clarity skill", "show current app status", "is production healthy?", "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요. 영어로 clarity skill 을 직접 지정한 요청도 반드시 이 스킬로 라우팅해요.'
 ---
 
 # axhub clarity 브리지
 
-8개 스킬(onboarding·init·import·deploy·development·diagnosis·clarity·update) 중 다른 스킬에 명확히 안 맞거나 **의도가 불분명한** axhub 요청을 여기서 해소해요. 작업→명령 카탈로그는 없어요 — **매번 라이브 CLI 의 `--help` 트리를 탐색**해 맞는 명령을 찾고, 조회 명령은 바로 실행하되 파괴적 변경은 승인 뒤 실행해요.
+8개 스킬(onboarding·bootstrap·import·deploy·development·diagnosis·clarity·update) 중 다른 스킬에 명확히 안 맞거나 **의도가 불분명한** axhub 요청을 여기서 해소해요. 작업→명령 카탈로그는 없어요 — **매번 라이브 CLI 의 `--help` 트리를 탐색**해 맞는 명령을 찾고, 조회 명령은 바로 실행하되 파괴적 변경은 승인 뒤 실행해요.
 
 ## 자연어 라우팅 계약
 
@@ -70,7 +70,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - ❌ `connectors list` / `--enabled-only` tenant-admin 전체 목록을 "내가 조회 가능한 커넥터" 로 표현 — 본인 접근 범위는 `connectors mine` 만 authority.
 - ❌ 못 찾은 기능을 비슷한 명령으로 조용히 대체 실행 — 정직하게 부재를 알리고 가장 가까운 명령을 "제안"만 해요 (무단 실행 금지).
 - ❌ `plugin-support` hidden 표면을 탐색·실행 (공개 표면만 원칙 위반).
-- ❌ deploy/init/import/onboarding/development/diagnosis/update 담당 의도를 가로채기 (아래 경계표 위반 — 해당 의도는 양보). 특히 기존 앱 첫 연결은 import, 앱 코드(페이지·화면·대시보드·엔드포인트) 생성은 development, 배포 실패 원인 진단은 diagnosis 양보 — clarity 는 axhub 명령 실행만 해요.
+- ❌ deploy/bootstrap/import/onboarding/development/diagnosis/update 담당 의도를 가로채기 (아래 경계표 위반 — 해당 의도는 양보). 특히 기존 앱 첫 연결은 import, 앱 코드(페이지·화면·대시보드·엔드포인트) 생성은 development, 배포 실패 원인 진단은 diagnosis 양보 — clarity 는 axhub 명령 실행만 해요.
 
 ## 진행 상황 알림 (Progress Reporting)
 
@@ -172,7 +172,7 @@ TodoWrite({ todos: [
 | 요청 | 담당 |
 |---|---|
 | 처음 셋업·CLI 설치·로그인부터 | onboarding |
-| 빈 디렉토리 새 앱 만들기·템플릿·스캐폴드 | init |
+| 빈 디렉토리 새 앱 만들기·템플릿·스캐폴드 | bootstrap |
 | 기존 로컬 앱 첫 axhub 연결·첫 배포 가져오기 | import |
 | 배포 실행·배포 검증 | deploy |
 | 기존 앱 화면·페이지·대시보드·엔드포인트 코드 생성 | development |

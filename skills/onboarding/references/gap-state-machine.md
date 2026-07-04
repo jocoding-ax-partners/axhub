@@ -44,7 +44,7 @@ Do not process the second item in `gaps` from the same JSON. Handle one `first_g
 
 ## Existing Repo Gap
 
-Existing repo onboarding is not init. If the directory has a commit and no axhub manifest, avoid clone/scaffold collision and use the app/repo Git surface.
+Existing repo onboarding is not bootstrap. If the directory has a commit and no axhub manifest, avoid clone/scaffold collision and use the app/repo Git surface.
 
 1. If `$APP_ID` is unknown, stop with `READY_WITH_USER_ACTION`: tell the user to say `첫 앱 만들어줘` first. Onboarding must not auto-create the app.
 2. Run status for the known app:
@@ -70,7 +70,7 @@ OAuth or GitHub installation approval is a user-action gate. In headless mode, s
 
 ## Empty Directory Gap
 
-For `no_manifest_empty`, do not ask an init question and do not call init. Say: "이 폴더는 비어 있어요. 첫 앱을 만들려면 `첫 앱 만들어줘` 라고 말해 주세요." Then continue to the Ready card as `READY_WITH_USER_ACTION` or a Ready card with that next phrase. This avoids an infinite detect loop on an intentionally empty directory.
+For `no_manifest_empty`, do not ask a bootstrap question and do not call bootstrap. Say: "이 폴더는 비어 있어요. 첫 앱을 만들려면 `첫 앱 만들어줘` 라고 말해 주세요." Then continue to the Ready card as `READY_WITH_USER_ACTION` or a Ready card with that next phrase. This avoids an infinite detect loop on an intentionally empty directory.
 
 ## Doctor And Deploy Evidence
 

@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: '이미 axhub에 연결된 앱의 현재 브랜치/커밋을 다시 배포하거나 배포 상태를 이어서 확인할 때 사용해요. 트리거: "배포", "배포해", "배포해줘", "올려", "공개해", "띄워", "프로덕션", "deploy", "ship", "release", "rollout". 첫 연결/첫 배포는 import, 빈 폴더 새 앱 생성은 init, 명시적인 실패 원인 진단은 diagnosis 가 담당해요. 이 스킬은 preview-confirm gate, headless dry-run, deployment-record verify, static deploy 예외, terminal failure diagnosis handoff 를 맡아요.'
+description: '이미 axhub에 연결된 앱의 현재 브랜치/커밋을 다시 배포하거나 배포 상태를 이어서 확인할 때 사용해요. 트리거: "배포", "배포해", "배포해줘", "올려", "공개해", "띄워", "프로덕션", "deploy", "ship", "release", "rollout". 첫 연결/첫 배포는 import, 빈 폴더 새 앱 생성은 bootstrap, 명시적인 실패 원인 진단은 diagnosis 가 담당해요. 이 스킬은 preview-confirm gate, headless dry-run, deployment-record verify, static deploy 예외, terminal failure diagnosis handoff 를 맡아요.'
 examples:
   - utterance: "paydrop 배포해"
     intent: "deploy current branch to axhub live"
@@ -14,7 +14,7 @@ model: sonnet
 
 # Deploy via axhub
 
-Deploy an already-connected axhub app with preview, approval, and verification safety. First-connect/import and new-app/init flows do not run here.
+Deploy an already-connected axhub app with preview, approval, and verification safety. First-connect/import and new-app/bootstrap flows do not run here.
 
 명시적인 배포 실패 원인 진단 요청(예: "배포 실패 원인 진단해줘", "왜 배포가 죽었어")은 `diagnosis` 에 양보해요. 이 스킬이 실제 배포를 시작한 뒤 `axhub deploy verify` 에서 terminal failure 를 확인한 경우에만 같은 앱 식별자와 실패 근거를 유지해 `diagnosis` 로 읽기 전용 handoff 해요. 이 handoff 는 재배포, 롤백, 새 deploy create 를 실행하지 않아요.
 
@@ -30,7 +30,7 @@ Then run one Bash/tool call with Korean title `배포 준비 확인` from the us
 axhub plugin-support deploy-preview-summary --user-utterance "<latest user sentence>"
 ```
 
-Copy the Korean stdout as the preview card and ask for explicit approval. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `init`.
+Copy the Korean stdout as the preview card and ask for explicit approval. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`.
 
 For the initial Desktop preview, stop reading after this section unless approval is received. After approval, continue with the canonical workflow below and load `references/workflow-details.md` for branch detail.
 
@@ -133,7 +133,7 @@ The `deploy-prep` envelope is authoritative for `profile`, `endpoint`, `app_id`,
 
 If this skill was invoked as a handoff from another axhub skill after code changes, do **not** reuse the original feature prompt as `--user-utterance`; it may contain display text such as "QA banner" that looks like an app candidate. Use a short deploy utterance like `현재 앱 배포해` and rely on the current folder's axhub.yaml binding. If the current folder has a valid axhub.yaml and the latest deploy phrase does not explicitly name another app, the bound app slug wins over arbitrary words in prior chat.
 
-If `bootstrap_plan` is present, `app_id` is missing, or branch/commit is empty, stop before preview. Existing non-empty app first-connect belongs to `import`; empty new app creation belongs to `init`.
+If `bootstrap_plan` is present, `app_id` is missing, or branch/commit is empty, stop before preview. Existing non-empty app first-connect belongs to `import`; empty new app creation belongs to `bootstrap`.
 
 ### Static branch
 
@@ -221,7 +221,7 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 
 ## NEVER
 
-- NEVER let deploy create or initialize first-run app/import state. Missing app/manifest first-connect belongs to `import` or `init`.
+- NEVER let deploy create or initialize first-run app/import state. Missing app/manifest first-connect belongs to `import` or `bootstrap`.
 - NEVER run `axhub init`, `axhub apps create`, first GitHub repo creation, first push, or `apps git connect` from deploy. Pushing normal ahead commits to an already connected `origin` branch is allowed and required before deployment-record create.
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop JSON/field-expr parsing contracts where a command result is parsed.

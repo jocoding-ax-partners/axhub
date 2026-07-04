@@ -1,6 +1,6 @@
 ---
 name: update
-description: 'update: 사용자가 지금 axhub CLI 와 Claude Code 플러그인을 최신으로 올리려는 수동 on-demand 업데이트 요청에 사용해요. "업데이트해줘", "axhub 최신 버전으로", "플러그인 업데이트", "update axhub"처럼 버전 확인/적용 의도가 분명한 경우예요. 첫 셋업·설치=onboarding, 새 앱=init, 배포=deploy, 그 외 axhub 운영 명령=clarity 로 양보해요.'
+description: 'update: 사용자가 지금 axhub CLI 와 Claude Code 플러그인을 최신으로 올리려는 수동 on-demand 업데이트 요청에 사용해요. "업데이트해줘", "axhub 최신 버전으로", "플러그인 업데이트", "update axhub"처럼 버전 확인/적용 의도가 분명한 경우예요. 첫 셋업·설치=onboarding, 새 앱=bootstrap, 배포=deploy, 그 외 axhub 운영 명령=clarity 로 양보해요.'
 examples:
   - utterance: "업데이트해줘"
     intent: "update axhub cli and plugin to latest"

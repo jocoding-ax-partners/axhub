@@ -32,8 +32,8 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙의 canonical 원천이�
 - invariant: "read 기본, write 게이트"
 
 ## AP-6 CLI preflight 게이트
-- 규칙: init·deploy 는 시작 시 `axhub` 존재와 plugin-support preflight 동작을 확인해요. CLI 가 없거나 preflight 가 안 되면 멈추고 설치/업그레이드를 안내하며, 절대 우회하지 않아요. 버전 숫자를 직접 비교하지 않아요.
-- 적용: skills/init/SKILL.md, skills/deploy/SKILL.md
+- 규칙: bootstrap·deploy 는 시작 시 `axhub` 존재와 plugin-support preflight 동작을 확인해요. CLI 가 없거나 preflight 가 안 되면 멈추고 설치/업그레이드를 안내하며, 절대 우회하지 않아요. 버전 숫자를 직접 비교하지 않아요.
+- 적용: skills/bootstrap/SKILL.md, skills/deploy/SKILL.md
 - invariant: "plugin-support preflight"
 
 ## AP-7 skill 양보 라우팅
@@ -41,10 +41,10 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙의 canonical 원천이�
 - 적용: skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/import/SKILL.md, skills/update/SKILL.md
 - invariant: "양보"
 
-## AP-8 onboarding 자동 init 금지
-- 규칙: onboarding 은 빈 폴더나 manifest 없는 폴더를 발견해도 init 을 자동 실행하거나 앱을 자동 생성하지 않아요. Ready card 로 끝내요.
+## AP-8 onboarding 자동 bootstrap 금지
+- 규칙: onboarding 은 빈 폴더나 manifest 없는 폴더를 발견해도 bootstrap 을 자동 실행하거나 앱을 자동 생성하지 않아요. Ready card 로 끝내요.
 - 적용: skills/onboarding/SKILL.md
-- invariant: "No automatic init"
+- invariant: "No automatic bootstrap"
 
 ## AP-9 clarity 공개 표면만
 - 규칙: clarity 는 hidden `axhub plugin-support` 그룹을 탐색·실행하지 않아요. 공개 `--json-schema`/`--help` 표면만 사용해요.

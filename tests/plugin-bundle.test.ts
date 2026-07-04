@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
-const SKILLS = ["onboarding", "init", "deploy", "import", "development", "diagnosis", "clarity", "update"] as const;
+const SKILLS = ["onboarding", "bootstrap", "deploy", "import", "development", "diagnosis", "clarity", "update"] as const;
 const FORBIDDEN_PARTS = new Set([
   ".DS_Store",
   ".axhub-state",

@@ -3,7 +3,7 @@
 repo 기여자를 위한 개발·운영 규칙의 canonical 원천이에요. README·CLAUDE.md 의 서술과 충돌하면 이 문서가 이겨요. 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 각각 원천이에요.
 
 ## DP-1 diet 체제 — skill 추가 기준
-- 공개 skill 은 8개(onboarding/init/import/deploy/development/diagnosis/clarity/update)를 유지해요.
+- 공개 skill 은 8개(onboarding/bootstrap/import/deploy/development/diagnosis/clarity/update)를 유지해요.
 - 새 skill 은 기존 8개의 경계·양보 규칙으로 라우팅할 수 없는 사용자 의도가 반복 관측될 때만 추가해요.
 - 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli 에 둬요. 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
 
