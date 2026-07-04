@@ -35,14 +35,14 @@ Subprocess/no TTY safe default is `취소`.
 
 ## Execute And Watch
 
-Before execute, write resume state with the same idempotency key that execute will use:
+Before execute, write resume state and let `axhub plugin-support init-resume put` generate the idempotency key:
 
 Use a user-facing tool title such as `앱 생성 진행` or `첫 배포 진행`. Never expose idempotency, saga, route, or skill names in the title or surrounding prose; those are implementation details.
 
-Generate the UUID in a separate small tool call if needed, then pass the literal UUID to both commands. Keep each Desktop-visible tool call to one direct command.
+Do not run an OS UUID generator as a separate Desktop-visible command. Run one direct `axhub plugin-support init-resume put ... --json` command, read `.state.idempotency_key` from its output internally, then pass that literal UUID to execute/resume commands. Keep each Desktop-visible tool call to one direct command.
 
 ```bash
-axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key 00000000-0000-4000-8000-000000000000 --json
+axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json
 ```
 
 ```bash

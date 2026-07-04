@@ -183,21 +183,17 @@ axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug baker
 
 ### 7. Execute Bootstrap Saga
 
-사용자가 진행을 확인하면 순수 UUID v4 idempotency key 를 만들고 검증한 뒤 resume state 를 먼저 저장하고 saga 를 실행해요. 앱 slug, prefix, 사람이 읽기 쉬운 문자열을 절대 섞지 말아요. UUID 원문은 사용자 chat 에 echo 하지 않고 `.axhub/init-resume.json` 에만 저장해요.
+사용자가 진행을 확인하면 resume state 를 먼저 저장하고 saga 를 실행해요. idempotency key 는 OS별 UUID 생성 명령으로 만들지 말고 `axhub plugin-support init-resume put` 에 생성을 맡겨요. `put` 결과의 `.state.idempotency_key` 를 내부적으로 읽어 execute/retry 에 같은 literal 값으로 넘기되, UUID 원문은 사용자 chat 에 echo 하지 않아요.
 
 ```bash
-uuidgen
-```
-
-```bash
-axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key 00000000-0000-4000-8000-000000000000 --json
+axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json
 ```
 
 ```bash
 AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --watch --watch-timeout 9m --idempotency-key 00000000-0000-4000-8000-000000000000 --json
 ```
 
-`uuidgen` 결과는 lowercase UUID v4 여야 해요. 실제 실행에서는 예시 UUID 를 방금 만든 literal UUID 로 바꿔요.
+실제 실행에서는 예시 UUID 를 `init-resume put` 이 반환한 literal UUID 로 바꿔요.
 Bash/tool timeout 은 9.5분 이상으로 잡아요. CLI timeout 뒤 resume hint 가 있으면 terminal status 를 한 번 더 확인해요.
 
 ```bash
