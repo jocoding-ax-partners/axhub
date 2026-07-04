@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.9](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.8...v1.7.9) (2026-07-04)
+
+Claude Code Desktop 실제 QA에서 bootstrap 은 잡혔지만 첫 점검 단계가 `command -v` shell wrapper, `axhubed` 같은 자동 영어 동사화 라벨, `rtk ls -la` 같은 개발자 전용 명령으로 새는 문제를 줄였어요. 이제 bootstrap 은 처음부터 `axhub plugin-support preflight --json` 같은 직접 CLI 호출을 쓰고, tool 제목도 한글로 시작하는 사용자 문구만 쓰도록 계약과 회귀 테스트를 보강했어요.
+
 ## [1.7.8](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.7...v1.7.8) (2026-07-04)
 
 Claude Code Desktop 에서 영어로 "Create a small bakery preorder web app and deploy it to the internet"처럼 말했을 때 axhub 를 직접 언급하지 않아도 bootstrap 스킬이 먼저 잡히도록 했어요. 빈 디렉토리에서 create/build/make + web app/website/app + deploy/online 의도가 함께 오면 일반 Claude 앱 제작 경로로 빠져 임의 shell 점검을 시작하지 않고, 바로 axhub 템플릿 선택 흐름으로 들어가요.
