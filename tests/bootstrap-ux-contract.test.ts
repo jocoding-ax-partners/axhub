@@ -105,6 +105,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("정상 fresh path 에서는 reference 파일을 읽지 않아요");
     expect(bootstrap).toContain("선택한 값은 `.axhub/state/tenant.json` 같은 로컬 파일로 저장하지 않아요");
     expect(bootstrap).toContain("이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문");
+    expect(bootstrap).toContain("execute/status/verify/result 까지 진행");
     expect(bootstrap).not.toContain("registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요");
     expect(resumeReference).toContain("Do not write `.axhub/state/tenant.json` from Claude Desktop");
     expect(resumeReference).not.toContain("TENANT_CACHE=");
@@ -169,6 +170,10 @@ describe("bootstrap desktop UX contract", () => {
     expect(templateReference).toContain("are not exact template choices");
     expect(templateReference).toContain("Those words can make Next.js the recommended first option");
     expect(templateReference).toContain("they never finalize `--template`");
+    expect(bootstrap).toContain("`recommend the best option` 처럼 말해도 그 말은 추천을 원한다는 뜻");
+    expect(bootstrap).toContain("반드시 `어떤 템플릿으로 시작할까요?` 질문을 보여주고 답을 기다려요");
+    expect(templateReference).toContain("Recommendation wording such as");
+    expect(templateReference).toContain("is not template approval");
     expect(templateReference).not.toContain("Structured AskUserQuestion can show at most 3 choices");
   });
 
@@ -182,7 +187,10 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("표시 제목은 `앱 이름 확인`");
     expect(bootstrap).toContain("앱 이름 확인도 native Question/AskUserQuestion card 를 쓰지 말고 일반 채팅 텍스트로 물어요");
     expect(bootstrap).toContain("사용자가 고르거나 직접 입력한 뒤에만 `--name`/`--slug` 를 확정해요");
+    expect(bootstrap).toContain("`use the recommended name` 은 앱 이름 질문이 먼저 보인 뒤의 답변일 때만 확정");
     expect(templateReference).toContain("Do not finalize the name before one user-facing confirmation in Claude Desktop");
+    expect(templateReference).toContain("Recommendation wording like");
+    expect(templateReference).toContain("is approval only after the app-name prompt is visible");
     expect(templateReference).toContain("Ask in normal chat text, not a native Question/AskUserQuestion card");
     expect(templateReference).toContain("앱 이름을 무엇으로 할까요?");
     expect(templateReference).toContain("번호나 원하는 앱 이름으로 답해 주세요.");
@@ -265,5 +273,18 @@ describe("bootstrap desktop UX contract", () => {
     expect(resultReference).toContain("If `PUBLIC_URL` exists and `VISIBILITY=public` and `REVIEW_STATUS=approved`");
     expect(resultReference).toContain("do not call it public");
     expect(resultReference).toContain('Never try `axhub apps update "$APP_SLUG" --visibility public` before approval');
+  });
+
+  test("keeps bootstrap result lookup on CLI even when Desktop app tools are visible", () => {
+    const bootstrap = readBootstrap();
+    const resultReference = readRepo("skills/bootstrap/references/errors-and-followups.md");
+
+    expect(bootstrap).toContain("이 스킬은 CLI-only 흐름이에요");
+    expect(bootstrap).toContain("`App get (axhub)`");
+    expect(bootstrap).toContain("`Finding tools` 로 이동해서 MCP/App 도구를 찾지 않아요");
+    expect(bootstrap).toContain("axhub apps get <app-slug> --tenant <tenant> --json");
+    expect(bootstrap).toContain("axhub deploy verify <deployment-id> --json");
+    expect(resultReference).toContain("through `axhub apps get` CLI only");
+    expect(resultReference).toContain("Do not use `App get (axhub)`");
   });
 });

@@ -46,11 +46,11 @@ Example visible chat shape, only when those templates exist in backend output:
 번호나 템플릿 이름으로 답해 주세요.
 ```
 
-If the user's utterance already contains an exact alias/folder/name, use it without asking. Generic category or feature words such as "웹앱", "쇼핑몰", "사이트", "앱", "서비스", "예약", "주문", "preorder", "booking", "shop", "store", "dashboard", or "admin" are not exact template choices; show the picker unless the user named `Next.js`, `React`, `Astro`, or an exact backend template. Those words can make Next.js the recommended first option, but they never finalize `--template`. In subprocess/no TTY, do not auto-pick a template; safe default is `abort`.
+If the user's utterance already contains an exact alias/folder/name, use it without asking. Generic category or feature words such as "웹앱", "쇼핑몰", "사이트", "앱", "서비스", "예약", "주문", "preorder", "booking", "shop", "store", "dashboard", or "admin" are not exact template choices; show the picker unless the user named `Next.js`, `React`, `Astro`, or an exact backend template. Those words can make Next.js the recommended first option, but they never finalize `--template`. Recommendation wording such as "추천해줘", "알아서", "best option", or "recommend the best option" is not template approval; it only means place the best recommendation first, ask the picker, and wait for a reply. After the picker is visible, a reply like "추천대로" or "1번" can confirm the first recommendation. In subprocess/no TTY, do not auto-pick a template; safe default is `abort`.
 
 ## App Name
 
-`--name` is required. If the utterance implies a name, propose it as the first option, for example "결제 앱 만들어줘" -> "결제 앱". Do not finalize the name before one user-facing confirmation in Claude Desktop. Use the exact question text `앱 이름을 무엇으로 할까요?`; never write `앵 이름` or a shortened variant. Ask in normal chat text, not a native Question/AskUserQuestion card. If the utterance does not imply a name, ask once:
+`--name` is required. If the utterance implies a name, propose it as the first option, for example "결제 앱 만들어줘" -> "결제 앱". Do not finalize the name before one user-facing confirmation in Claude Desktop. Recommendation wording like "알아서 이름 지어줘" or "use the recommended name" is approval only after the app-name prompt is visible; before that, propose the recommendation and ask. Use the exact question text `앱 이름을 무엇으로 할까요?`; never write `앵 이름` or a shortened variant. Ask in normal chat text, not a native Question/AskUserQuestion card. If the utterance does not imply a name, ask once:
 
 ```text
 앱 이름 확인
