@@ -8,11 +8,10 @@ Run only after template, app name, tenant, and GitHub owner gate are settled:
 
 Claude Desktop-visible tool titles and progress text must stay user-facing. Use titles like `만들기 전 확인` or `미리보기 확인`; do not write `dry-run`, `Bootstrapped dry-run`, `Bootstraping dry-run`, `saga`, or other internal execution labels in chat or tool descriptions.
 
+Use the command shape below by replacing the sample literals with the values already confirmed in the conversation. Do not run a Desktop-visible command that contains `export`, value-assembly `TEMPLATE=...`/`APP_NAME=...`, `$TEMPLATE`, `$APP_SLUG`, `$AXHUB_TENANT`, command substitution, or semicolon-chained shell glue. The only allowed env prefix is `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` on execute/resume commands.
+
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-REPO_NAME="${REPO_NAME:-$APP_SLUG}"
-SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
-axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --dry-run --json
+axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json
 ```
 
 Show preview fields in Korean: template, slug, subdomain, repo name, visibility. Do not show raw JSON. Do not execute before the user confirms:
@@ -38,12 +37,14 @@ Before execute, write resume state with the same idempotency key that execute wi
 
 Use a user-facing tool title such as `앱 생성 진행` or `첫 배포 진행`. Never expose idempotency, saga, route, or skill names in the title or surrounding prose; those are implementation details.
 
+Generate the UUID in a separate small tool call if needed, then pass the literal UUID to both commands. Keep each Desktop-visible tool call to one direct command.
+
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-REPO_NAME="${REPO_NAME:-$APP_SLUG}"
-SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
-axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --json
-AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key 00000000-0000-4000-8000-000000000000 --json
+```
+
+```bash
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --watch --watch-timeout 9m --idempotency-key 00000000-0000-4000-8000-000000000000 --json
 ```
 
 Run the tool with a timeout longer than 9 minutes, for example 570000ms. Narrate about every 30s with short Korean progress lines like "앱 만들고 있어요", "GitHub repo 만들고 있어요", "첫 배포 중이에요. 거의 다 왔어요".
@@ -51,13 +52,10 @@ Run the tool with a timeout longer than 9 minutes, for example 570000ms. Narrate
 If the watch times out with a resume hint, fetch bootstrap id with the same idempotency key and then watch status:
 
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-REPO_NAME="${REPO_NAME:-$APP_SLUG}"
-SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
-BOOTSTRAP_ID=$(axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY" --field-expr '.data.bootstrap_id // empty' 2>/dev/null || true)
-axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --json
-axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --watch --watch-timeout 9m --json
+axhub apps bootstrap-status 11111111-1111-4111-8111-111111111111 --tenant test --watch --watch-timeout 9m --json
 ```
+
+Use the real `bootstrap_id` from the previous JSON/status output instead of the sample UUID.
 
 ## Device-Code Event
 
@@ -70,7 +68,7 @@ If stdout contains:
 write pending state:
 
 ```bash
-axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --pending-device-flow true --json
+axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key 00000000-0000-4000-8000-000000000000 --pending-device-flow true --json
 ```
 
 When `auto_poll:true` and `browser_opened:true`, the CLI already opened the browser and is still polling. Still surface the `user_code` immediately in chat, because Claude Desktop may hide stdout until the long watch tool exits. Never leave the user staring at an empty GitHub code-entry screen with no code. Keep the command running, narrate briefly, and wait for the next JSON stage or terminal result. Do not ask the user to say an approval phrase.
@@ -89,10 +87,7 @@ GitHub 연결이 필요해요. 다음 단계로 진행해 주세요:
 In fallback mode, resume the cached flow yourself after `retry_after_secs` or a short bounded delay; do not wait for a manual approval phrase:
 
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-REPO_NAME="${REPO_NAME:-$APP_SLUG}"
-SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
-AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" --tenant "$AXHUB_TENANT" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --resume-last --watch --watch-timeout 9m --idempotency-key 00000000-0000-4000-8000-000000000000 --json
 ```
 
 While an outstanding code exists, never run fresh `bootstrap --execute` without `--resume-last`; it can issue a new code and invalidate the user's approved one. If response remains `device_code_pending`, respect `retry_after_secs` and retry `--resume-last` until success or expiry. If code expired, start Step 7 execute again to issue a fresh challenge.
