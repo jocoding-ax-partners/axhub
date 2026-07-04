@@ -32,7 +32,7 @@ This is not a second registry. Attach descriptions only to items returned by bac
 
 Unknown backend templates are not hidden. Show backend `name` and `folder_name`, then give neutral guidance like "이름을 보고 고르면 돼요. 잘 모르겠으면 먼저 Next.js 추천을 봐요."
 
-In Claude Desktop, do not use native Question/AskUserQuestion cards for backend template selection. Desktop QA showed dynamic template cards can remain stuck as `요청됨 템플릿` without rendering choices. Ask in normal chat text instead, and wait for the user's reply before starting saga. Every numbered choice must map to a real backend template. Do not add generic `Other`, `직접 고르기`, or `취소` choices to the template picker. If there are more than 3 templates, show the full text list first and put the best 3 actual recommendations at the top; free-text must match exact alias/folder/name before starting saga.
+In Claude Desktop, use a native Question/AskUserQuestion card first for backend template selection. Earlier dynamic cards sometimes rendered poorly, but current Desktop QA showed normal chat fallback can leave the prompt box disabled after the question; the smoother path is native card first, text fallback only when the card does not render choices. Every choice must map to a real backend template. Do not add generic `Other`, `직접 고르기`, or `취소` choices to the template picker. If there are more than 3 templates, put the best 3 actual recommendations in the card and show the full text list nearby; free-text fallback must match exact alias/folder/name before starting saga.
 
 Example visible chat shape, only when those templates exist in backend output:
 
@@ -50,7 +50,7 @@ If the user's utterance already contains an exact alias/folder/name, use it with
 
 ## App Name
 
-`--name` is required. If the utterance implies a name, propose it as the first option, for example "결제 앱 만들어줘" -> "결제 앱". Do not finalize the name before one user-facing confirmation in Claude Desktop. Recommendation wording like "알아서 이름 지어줘" or "use the recommended name" is approval only after the app-name prompt is visible; before that, propose the recommendation and ask. Use the exact question text `앱 이름을 무엇으로 할까요?`; never write `앵 이름` or a shortened variant. Ask in normal chat text, not a native Question/AskUserQuestion card. If the utterance does not imply a name, ask once:
+`--name` is required. If the utterance implies a name, propose it as the first option, for example "결제 앱 만들어줘" -> "결제 앱". Do not finalize the name before one user-facing confirmation in Claude Desktop. Recommendation wording like "알아서 이름 지어줘" or "use the recommended name" is approval only after the app-name prompt is visible; before that, propose the recommendation and ask. Use the exact question text `앱 이름을 무엇으로 할까요?`; never write `앵 이름` or a shortened variant. Ask with a native Question/AskUserQuestion card first. Fall back to normal chat text only when the card does not render or the answer UI is unavailable. If the utterance does not imply a name, ask once:
 
 ```text
 앱 이름 확인

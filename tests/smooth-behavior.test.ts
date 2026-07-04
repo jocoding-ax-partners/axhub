@@ -388,7 +388,9 @@ describe("smooth behavior contracts", () => {
     // bootstrap: evidence-gated carry-over + shared-contract include.
     expect(bootstrap).toContain("같은 대화 맥락 이어받기");
     expect(bootstrap).toContain("이미 본 것만");
-    expect(bootstrap).toContain("../deploy/references/session-carryover.md");
+    expect(bootstrap).toContain("## Reference Loading Policy");
+    expect(bootstrap).not.toContain("../deploy/references/session-carryover.md");
+    expect(bootstrap).not.toContain("references/bootstrap-and-local.md");
     // E4: infer-tables-env also weighs actually-queried resources.
     expect(bootstrap).toContain("infer-tables-env 분석은 scaffold 코드뿐 아니라");
     // Confabulation negative guard (PR-gating proxy for the nightly behavioral case):
