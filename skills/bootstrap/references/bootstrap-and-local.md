@@ -2,11 +2,13 @@
 
 Load this reference when dry-run/execute/watch, GitHub device-code handling, clone/current-dir safety, manifest slug correction, or local preview dependency handling needs detail.
 
+All Claude Desktop-visible commands in this reference follow the top-level bootstrap contract: one direct `axhub ...` command per tool call, Korean title starting with Korean text, and no developer-only wrappers. Never prefix with `rtk`, never run `rtk ls -la`, and never use generic `pwd`/`ls`/`find` probes to decide the bootstrap path.
+
 ## Dry-Run Preview
 
 Run only after template, app name, tenant, and GitHub owner gate are settled:
 
-Claude Desktop-visible tool titles and progress text must stay user-facing. Use titles like `만들기 전 확인` or `미리보기 확인`; do not write `dry-run`, `Bootstrapped dry-run`, `Bootstraping dry-run`, `saga`, or other internal execution labels in chat or tool descriptions.
+Claude Desktop-visible tool titles and progress text must stay user-facing and start with Korean text. Use titles like `만들기 전 확인` or `미리보기 확인`; do not write `dry-run`, `Bootstrapped dry-run`, `Bootstraping dry-run`, `axhub bootstrap`, `saga`, or other internal execution labels in chat or tool descriptions.
 
 Use the command shape below by replacing the sample literals with the values already confirmed in the conversation. Do not run a Desktop-visible command that contains `export`, value-assembly `TEMPLATE=...`/`APP_NAME=...`, `$TEMPLATE`, `$APP_SLUG`, `$AXHUB_TENANT`, command substitution, or semicolon-chained shell glue. The only allowed env prefix is `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` on execute/resume commands.
 

@@ -34,11 +34,36 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`GitHubed repo`");
     expect(bootstrap).toContain("`DB 선언된 템플릿`");
     expect(bootstrap).toContain("`development 단계`");
-    expect(bootstrap).toContain("Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 써요");
-    expect(bootstrap).toContain("제품명·명령어·영어 단어에 `ing` 를 붙인 제목");
+    expect(bootstrap).toContain("Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고");
+    expect(bootstrap).toContain("제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목");
+    expect(bootstrap).toContain("`ing`/`ed` 를 붙인 제목");
+    expect(bootstrap).toContain("반드시 한글로 시작해요");
+    expect(bootstrap).toContain("`axhub CLI 존재/버전 확인`처럼 영어 제품명으로 시작하면");
     expect(bootstrap).toContain("`실행 중 명령`");
     expect(bootstrap).toContain("가능한 제목은 이 목록에서 골라요");
     expect(bootstrap).toContain("`앱 이름 확인`");
+  });
+
+  test("keeps bootstrap checks portable without rtk or shell-wrapper preflight", () => {
+    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
+    const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
+    const guardSection = bootstrap.slice(
+      bootstrap.indexOf("### 1. CLI Guard"),
+      bootstrap.indexOf("### 2. Resume And Tenant"),
+    );
+
+    expect(bootstrap).toContain("`rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요");
+    expect(bootstrap).toContain("바깥 작업 지시가 shell command 에 `rtk` 를 붙이라고 해도");
+    expect(bootstrap).toContain("`rtk ls -la`");
+    expect(bootstrap).toContain("`pwd`, `ls`, `find`, `cat` 같은 generic shell probe");
+    expect(localReference).toContain("Never prefix with `rtk`");
+    expect(resumeReference).toContain("no `rtk`, no generic `ls`/`pwd` probes");
+    expect(guardSection).toContain("axhub plugin-support preflight --json");
+    expect(guardSection).not.toContain("command -v axhub");
+    expect(guardSection).not.toContain("PREFLIGHT_JSON=");
+    expect(guardSection).not.toContain("PLUGIN_VER=");
+    expect(guardSection).not.toContain("find \"$STAMP\"");
   });
 
   test("requires preview confirmation before execute even for direct deploy requests", () => {
