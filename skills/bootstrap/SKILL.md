@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: '이 스킬은 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 싶을 때 axhub 템플릿 앱 생성을 담당해요. 비어 있지 않은 기존 로컬 앱을 axhub에 가져오거나 첫 연결·첫 배포까지 올리려는 요청은 import 스킬이 담당해요. 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작하고, 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고 axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 활성화 예: "새 앱 만들어줘", "앱 만들어줘", "결제 앱 만들어", "프로젝트 만들어", "프로젝트 초기화해줘", "초기화해줘", "fastapi 앱", "Next.js 앱 만들어줘", "bootstrap", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. axhub apps bootstrap saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 repo_full_name 으로 현재 dir 에 git clone 해요.'
+description: '이 스킬은 사용자가 "새 앱 만들어줘", "앱 만들어줘", "프로젝트 만들어줘"처럼 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 싶을 때 axhub 템플릿 앱 생성을 담당해요. English empty-folder prompts like "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", or "Make a flower shop reservation app" also route here even when the user does not say axhub. 비어 있지 않은 기존 로컬 앱을 axhub에 가져오거나 첫 연결·첫 배포까지 올리려는 요청은 import 스킬이 담당해요. 내부 작동 라벨을 말하지 말고 바로 템플릿 확인으로 시작하고, 일반 앱 브레인스토밍이나 임의 스택 질문으로 우회하지 말고 axhub template 선택 → 앱 이름 → 실행 승인 순서로 진행해요. 활성화 예: "새 앱 만들어줘", "앱 만들어줘", "결제 앱 만들어", "프로젝트 만들어", "프로젝트 초기화해줘", "초기화해줘", "fastapi 앱", "Next.js 앱 만들어줘", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", "Make a flower shop reservation app", "bootstrap", "scaffold", 또는 빈 디렉토리에서 새 앱 시작 의도. axhub apps bootstrap saga 로 backend app + GitHub repo + 첫 deploy 를 한 번에 진행하고 repo_full_name 으로 현재 dir 에 git clone 해요.'
 examples:
   - utterance: "새 앱 만들어줘"
     intent: "scaffold new axhub app"
@@ -22,6 +22,12 @@ examples:
     intent: "scaffold new axhub app"
   - utterance: "그거로 앱 만들어줘"
     intent: "scaffold new axhub app"
+  - utterance: "Create a small bakery preorder web app and deploy it to the internet."
+    intent: "scaffold new axhub app"
+  - utterance: "Build a cafe booking website and put it online"
+    intent: "scaffold new axhub app"
+  - utterance: "Make a flower shop reservation app"
+    intent: "scaffold new axhub app"
 allows-dependency-execution: true
 model: sonnet
 ---
@@ -31,6 +37,8 @@ model: sonnet
 새 앱을 만들 수 있는 템플릿을 확인할게요.
 
 빈 디렉토리에서 새 axhub 템플릿 앱을 만드는 스킬이에요. 비어 있지 않은 기존 앱을 axhub에 가져오거나 이미 있는 로컬 앱을 첫 연결·첫 배포까지 올리려는 요청은 `import` 스킬로 보내요.
+
+영어로 `create`, `build`, `make` + `web app`, `website`, `app`, `site` + `deploy`, `internet`, `online` 의도가 함께 오면, 사용자가 `axhub` 를 말하지 않아도 빈 디렉토리에서는 이 스킬이에요. Claude 기본 앱 제작 경로로 들어가서 임의 shell 점검이나 일반 프로젝트 생성을 시작하지 않아요.
 
 이 스킬의 creation path 는 하나뿐이에요: backend `axhub apps bootstrap` saga. saga 가 backend app, GitHub repo, 첫 deploy 를 server-side 에서 처리하고, 성공 후 `repo_full_name` 으로 현재 디렉토리에 코드를 받아요. `axhub init`, `axhub apps create`, `axhub deploy create` 로 우회하지 않아요.
 

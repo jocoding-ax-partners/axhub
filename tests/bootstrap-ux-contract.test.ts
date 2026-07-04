@@ -6,6 +6,18 @@ const REPO_ROOT = join(import.meta.dir, "..");
 const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
 
 describe("bootstrap desktop UX contract", () => {
+  test("advertises English empty-folder web app deployment prompts as bootstrap triggers", () => {
+    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+
+    expect(bootstrap).toContain("English empty-folder prompts");
+    expect(bootstrap).toContain("Create a small bakery preorder web app and deploy it to the internet");
+    expect(bootstrap).toContain("Build a cafe booking website and put it online");
+    expect(bootstrap).toContain("Make a flower shop reservation app");
+    expect(bootstrap).toContain("also route here even when the user does not say axhub");
+    expect(bootstrap).toContain("사용자가 `axhub` 를 말하지 않아도 빈 디렉토리에서는 이 스킬이에요");
+    expect(bootstrap).toContain("Claude 기본 앱 제작 경로로 들어가서 임의 shell 점검이나 일반 프로젝트 생성을 시작하지 않아요");
+  });
+
   test("hides internal routing labels from users", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
 
