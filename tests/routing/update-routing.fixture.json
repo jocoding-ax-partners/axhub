@@ -10,6 +10,7 @@
   "cases": [
     { "utterance": "업데이트해줘", "expected": "update", "why": "CLI·플러그인 최신화 (수동 on-demand)" },
     { "utterance": "axhub 최신 버전으로 맞춰줘", "expected": "update", "why": "버전 업데이트" },
+    { "utterance": "axhub가 최신인지 확인하고, 아니면 최신으로 업데이트해줘", "expected": "update", "why": "빈 폴더라도 프로젝트 상태 조회가 아니라 CLI·플러그인 최신화" },
     { "utterance": "플러그인 업데이트해줘", "expected": "update", "why": "claude plugin update — clarity 는 axhub 명령만이라 plugin 반쪽도 못 함" },
     { "utterance": "지금 최신 버전 받아줘", "expected": "update", "why": "수동 on-demand 업데이트" },
     { "utterance": "update axhub", "expected": "update", "why": "영어 업데이트 발화" },
