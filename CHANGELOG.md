@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.11](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.10...v1.7.11) (2026-07-04)
+
+Claude Code Desktop 에서 영어 자연어로 새 앱과 배포를 요청했을 때 bootstrap 은 계속 조용히 잡되, 첫 응답에 "이 스킬이 맞다"는 식의 라우팅 판정 설명이 먼저 보이는 문제를 막았어요. 이제 사용자는 내부 skill-match 이유 대신 바로 "새 앱을 만들 수 있는지 확인할게요" 같은 진행 문장과 템플릿/앱 이름 질문을 보게 돼요.
+
 ## [1.7.10](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.9...v1.7.10) (2026-07-04)
 
 Claude Code Desktop 에서 bootstrap 이 템플릿과 앱 이름을 정상으로 물은 뒤, 실행 직전에 `uuidgen` 같은 OS 명령 권한 카드가 따로 뜨던 남은 마찰을 없앴어요. idempotency key 는 이제 `axhub plugin-support init-resume put` 이 생성한 값을 내부적으로 이어 쓰게 해서, 사용자는 끝까지 axhub CLI 명령 중심의 앱 생성 흐름만 보게 돼요.
