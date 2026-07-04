@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.13](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.12...v1.7.13) (2026-07-04)
+
+Claude Code Desktop 실제 QA에서 bootstrap 은 자연어 첫 앱 요청을 제대로 잡았지만, 작업공간을 고르는 중 `tenanting 확인` 같은 tool 제목과 `테넌트가 2개 있어요` 같은 개발자 용어가 아직 보였어요. 이제 tenant 는 CLI 내부 플래그로만 남기고, 사용자가 보는 진행 문구와 질문 카드에는 `작업공간`·`앱 설정 확인`만 쓰도록 계약과 회귀 테스트를 보강했어요.
+
 ## [1.7.12](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.11...v1.7.12) (2026-07-04)
 
 Claude Code Desktop 에서 "Please make my first app..."처럼 axhub 를 모르는 사용자가 첫 앱과 배포를 자연어로 요청했을 때 bootstrap 이 더 안정적으로 잡히도록 했어요. GitHub App 설치 확인은 템플릿과 앱 이름을 고른 뒤 dry-run 직전에만 보게 했고, fresh path 에서는 plugin cache reference 읽기나 tenant 저장용 shell glue 가 뜨지 않도록 정리해서 첫 앱 생성 흐름이 더 매끄럽게 이어져요.
