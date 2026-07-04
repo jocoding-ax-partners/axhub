@@ -14,7 +14,7 @@ model: sonnet
 
 # Import Existing App
 
-비어 있지 않은 로컬 앱을 axhub 앱으로 가져와 manifest, GitHub 연결, 첫 배포 증거까지 한 번에 정리해요. 이 스킬은 판단·실행 로직을 거의 직접 갖지 않아요. `axhub plugin-support import` 가 내보내는 `import/v1` envelope 를 검증하고, 사람이 이해할 수 있는 preview 와 복구 문구를 렌더링해요. 딱 하나 예외로, `manifest_create` 일 때 프로젝트 파일 근거로 axhub.yaml 을 풍부하게 작성하고 `axhub deploy --explain --json` 으로 같은 파서가 읽는지 검증하는 보강 단계만 직접 맡아요 — 그 외 모든 mutation 판정·실행은 CLI 가 해요.
+비어 있지 않은 로컬 앱을 axhub 앱으로 가져와 앱 설정, GitHub 연결, 첫 배포 증거까지 한 번에 정리해요. 이 스킬은 판단·실행 로직을 거의 직접 갖지 않아요. `axhub plugin-support import` 가 내보내는 `import/v1` envelope 를 검증하고, 사람이 이해할 수 있는 미리보기와 복구 문구를 렌더링해요. 딱 하나 예외로, 새 앱 설정 파일이 필요한 경우 프로젝트 파일 근거로 axhub.yaml 을 풍부하게 작성하고 `axhub deploy --explain --json` 으로 같은 파서가 읽는지 검증하는 보강 단계만 직접 맡아요. 그 외 모든 변경 판정·실행은 CLI 가 해요.
 
 ## 라우팅 경계
 
@@ -47,6 +47,8 @@ model: sonnet
 
 ## Vibe Coder Visibility Rules
 
+이 섹션은 workflow 보다 우선해요. 아래 금지어가 떠오르면 말하기 전에 반드시 한국어 사용자 문구로 바꿔요. 특히 Claude Desktop 에서 모델이 중간 생각을 chat 에 노출하기 쉬우므로, 검증용 field name 이나 영어 진행어를 "짧게라도" 쓰지 않아요.
+
 다음 값은 internal verification primitives 예요. 스킬 안에서는 검증에만 쓰고 사용자 chat 에 raw 값으로 보여주지 않아요.
 
 - `schema_version`, `mode`, `headless`, `correlation_id`
@@ -54,9 +56,20 @@ model: sonnet
 - `deployment_id`, `active_release_id`, `verification_status`, `public_url`, optional `access_note` evidence field
 - `typed_failure`, `owner`, `phase`, `mutation_performed`, `retryable`
 - `request_id`, `stdout`, `stderr`, `command_argv`, raw JSON body
+- `manifest_create`, `manifest_migrate`, `manifest_repair`, `deployment`, `static_release`
+- `status: deployed`, `production_deployment_id`, `Confirmed`, `bearer auth`, `private visibility`, `curl`, `execute`, `git remote`, `app slug`
+- `Envelope`, `preview`, `import 지원`, `deployment verification`, `success`, `raw endpoint`, `raw 엔드포인트`, `public`, `HTML, 200`
 
 대신 사용자가 이해할 문장으로 바꿔요. 예: "정적 사이트 공개 URL 확인이 아직 안 됐어요. CLI를 업데이트하거나 다시 시도해요."
-검증된 `public_url` 값은 사용자에게 열어볼 주소로 보여줘도 돼요. 단 field name, envelope 구조, raw evidence object 는 숨겨요. `access_note` 가 있으면 URL 바로 아래에 자연어로 덧붙여요.
+검증된 `public_url` 값은 사용자에게 열어볼 주소로 보여줘도 돼요. 단 field name, envelope 구조, raw evidence object 는 숨겨요. URL 을 markdown 으로 보여줄 때는 label 과 target 모두 `https://...` 절대 URL이어야 해요. `[$PUBLIC_URL]($PUBLIC_URL)` 형태로 쓰고, target 에 scheme 이 빠진 `[...](uqa.../)` 링크는 금지해요. `access_note` 가 있으면 URL 바로 아래에 자연어로 덧붙여요.
+
+사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `importing`, `imported`, `manifested`, `gitted`, `pushed`, `raw JSON`, `token-gate`, `manifest_create`, `verification_status`, `deployment`, `execute`, `git remote`, `curl`, `Envelope`, `preview` 같은 내부/영어 동사형·필드형 라벨을 제목이나 진행 문장에 쓰지 않아요. 예: `가져오기 준비 확인`, `미리보기 확인`, `앱 설정 작성`, `첫 배포 확인`, `정적 사이트 확인`.
+
+진행 문구도 사용자 언어로 번역해요. `앱 slug 미확정` 대신 `앱 이름이 아직 정해지지 않아 package.json 이름으로 확인할게요`, `manifest_create 있으니` 대신 `앱 설정 파일이 필요해서 프로젝트 파일 근거로 작성할게요`, `git remote 아직 없음` 대신 `원격 저장소가 아직 없어 새 저장소 생성 경로로 진행해요`, `execute 호출한다` 대신 `가져오기를 실행할게요`, `import 지원 확인됐다` 대신 `가져오기 기능을 사용할 수 있어요`, `preview 진행` 대신 `미리보기를 확인할게요`, `Envelope 정상` 대신 `응답 형식 확인이 끝났어요`, `deployment verification: success` 대신 `첫 배포 검증 성공`, `raw endpoint`/`raw 엔드포인트` 대신 `원문 응답`, `public으로` 대신 `공개 접근으로` 라고 말해요.
+
+라이브 URL 확인은 조심해요. 비공개 앱에서 로그인 없는 HTTP 요청이 axhub 로그인 화면 HTML 을 200 으로 돌려주면, 그건 앱의 `/healthz` 또는 루트 응답 검증이 아니에요. 이런 경우 `배포 검증은 완료됐지만, 비공개 접근 제어 때문에 로그인 없는 요청으로는 앱 본문을 직접 확인하지 못했어요` 라고 말하고, `/healthz HTTP 200 확인`이라고 쓰지 않아요. 사용자가 raw endpoint 확인을 명시하면 로그인된 브라우저, 세션 쿠키, 또는 별도 접근 정책 변경이 필요하다고 설명해요. 200 응답이라도 body 가 axhub 로그인 포털이면 실패한 본문 검증으로 취급해요.
+
+로컬 QA/에이전트 상태 폴더는 앱 변경으로 취급하지 않아요. Git 상태를 판단하거나 commit+push 여부를 설명할 때 `.omc/`, `.claude/`, `.codex/`, `.serena/` 같은 런타임 상태는 제외하고, import 스킬이 이 경로들을 자동 커밋하거나 `.gitignore`에 추가하지 않아요. 필요한 경우 성공 뒤 정리 메모로만 알려요.
 
 ## import/v1 envelope 계약
 
@@ -190,8 +203,8 @@ axhub --json plugin-support import --mode preview --headless
 - 배포 방식
 - 안전 메모
 
-`manifest_create` 가 있으면, axhub.yaml 을 프로젝트 파일 근거로 자세히 작성할 예정이라고 한 줄로 같이 알려요.
-`manifest_repair` 가 있으면, 기존 axhub.yaml 문법이 깨져 있어서 CLI 가 execute 중 백업 파일을 남기고 안전한 최소 manifest 로 복구한다고 한 줄로 같이 알려요. 이 경우 plugin 이 직접 덮어쓰지 않아요.
+새 앱 설정 파일이 필요하면, axhub.yaml 을 프로젝트 파일 근거로 자세히 작성할 예정이라고 한 줄로 같이 알려요.
+기존 axhub.yaml 복구가 필요하면, 문법이 깨져 있어서 CLI 가 가져오기 중 백업 파일을 남기고 안전한 최소 설정으로 복구한다고 한 줄로 같이 알려요. 이 경우 plugin 이 직접 덮어쓰지 않아요.
 
 5. 대화형 승인 1회
 
@@ -247,8 +260,8 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 
 8. 성공 안내
 
-- docker/compose 성공: public URL 을 보여주고, 배포 확인이 끝났다고 말해요.
-- static 성공: public URL 을 보여주고, 정적 사이트 활성 릴리스 확인이 끝났다고 말해요. `access_note` 가 있으면 같은 성공 블록에서 "참고: ..." 형태로 함께 말해요.
+- docker/compose 성공: 공개 URL 을 절대 링크로 보여주고, 배포 확인이 끝났다고 말해요. 앱이 비공개라 로그인 없는 URL 요청이 로그인 화면으로 돌아오면, 배포 검증과 앱 본문 확인을 분리해 설명해요.
+- static 성공: 공개 URL 을 절대 링크로 보여주고, 정적 사이트 활성 릴리스 확인이 끝났다고 말해요. `access_note` 가 있으면 같은 성공 블록에서 "참고: ..." 형태로 함께 말해요.
 
 내부 id 는 필요할 때만 상태 이어보기에 쓰고 chat 에 raw 값으로 노출하지 않아요.
 

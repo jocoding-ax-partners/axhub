@@ -73,7 +73,7 @@ Only `DEPLOY_METHOD=static` enters this lane. All other values use the deploymen
 
 ## Git readiness
 
-Do not preview an old commit while deploy-affecting local changes are uncommitted. If `deploy-prep` reports `git_init_needed`, no commit, missing branch/commit, or uncommitted deploy-affecting changes, pause before preview.
+Do not preview an old commit while deploy-affecting local changes are uncommitted. If `deploy-prep` reports `git_init_needed`, no commit, missing branch/commit, or uncommitted deploy-affecting changes, pause before preview. Ignore local agent/runtime state such as `.omc/`, `.claude/`, `.codex/`, `.serena/`; those paths are not deploy-affecting app changes and must not be committed, pushed, or added to `.gitignore` during deploy cleanup.
 
 Interactive mode may ask to create a local save point, then run quiet git commands and rerun `deploy-prep`:
 
@@ -81,13 +81,23 @@ Interactive mode may ask to create a local save point, then run quiet git comman
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git init >/dev/null 2>&1
 fi
-git add -A >/dev/null 2>&1
+git add -A -- . ':(exclude).omc' ':(exclude).claude' ':(exclude).codex' ':(exclude).serena' >/dev/null 2>&1
 git commit -m "init: axhub deploy baseline" >/dev/null 2>&1 || true
 git branch -M main >/dev/null 2>&1
 axhub plugin-support deploy-prep --intent deploy --user-utterance "$ARGS" --json
 ```
 
-Raw git output stays out of chat. Headless safe default is cancel; never run `git init` automatically in subprocess mode.
+Before preview/create, normalize the resolved commit to a full local SHA, push normal ahead commits to an already connected `origin` branch, and confirm the commit is reachable from the remote. This is required for both savepoint commits and existing local commits from a previous skill such as development:
+
+```bash
+COMMIT_SHA=$(git rev-parse "${COMMIT_SHA:-HEAD}^{commit}")
+git push -u origin "HEAD:$BRANCH" >/dev/null 2>"$AXHUB_STDERR_TMP"
+PUSH_EXIT=$?
+git fetch origin "$BRANCH" >/dev/null 2>&1
+git merge-base --is-ancestor "$COMMIT_SHA" "origin/$BRANCH"
+```
+
+If push or containment fails, stop before mutation. Judge push success by `PUSH_EXIT`, not by stderr text; harmless hook warnings or "no config" messages do not make a zero-exit push fail. Raw git output stays out of chat. Headless safe default is cancel; never run `git init` automatically in subprocess mode. Never run `axhub deploy create --execute` for a local-only commit because the backend resolves commits from the connected GitHub repo.
 
 ## In-flight and status-first
 
@@ -115,15 +125,18 @@ if [ "$AXHUB_HEADLESS" = "1" ]; then
 fi
 ```
 
-Interactive preview shows exactly app, environment, branch, commit, and ETA. Normalize displayed slug with NFKC and warn if normalization changes it. Ask approve, dry-run, or abort. Dry-run natural language such as "리허설", "테스트로", or "진짜 안 올리고" also sets `DEPLOY_DECISION=dry_run`.
+Interactive preview shows exactly app, environment, branch, commit, and ETA. Normalize displayed slug with NFKC and warn if normalization changes it. The visible environment label is `운영`; do not show `prod`, `production`, or raw profile names in the card unless the user explicitly asks for CLI-level evidence. Ask approve, dry-run, or abort. Dry-run natural language such as "리허설", "테스트로", or "진짜 안 올리고" also sets `DEPLOY_DECISION=dry_run`.
+
+User-visible prose and tool titles must translate workflow internals: `진행 중 배포` for in-flight work, `미리보기` for dry-run, `인증 상태 확인` for token-gate, `배포 실행` for execute, and `검증 성공` for terminal success. Do not show `deploy-prep`, `in-flight`, `dry-run`, `token-gate`, `execute`, `production`, `terminal success`, `gitignore`, `gitting`, `checking`, `Build passed`, `Working tree clean`, `Not ignored`, `User explicitly authorized`, `Proceeding`, or `Push 성공` in chat/tool titles/final tables unless the user asked for low-level debugging evidence.
 
 Before execute, run:
 
 ```bash
-axhub plugin-support token-gate
+AXHUB_GATE_POLL_ITERATIONS=0 axhub plugin-support token-gate
 ```
 
 Exit 0 continues. Exit 65 routes to auth recovery. `AXHUB_AUTH_BG_REFRESH=0` disables the gate.
+Do not pipe token-gate through `grep`, `head`, or a combined dry-run pipeline. It is an exit-code gate with no user-facing stdout. In Claude Desktop use the fast inline check above so the UI does not sit in a silent 30 second polling window.
 
 ## Deployment-record create
 

@@ -47,6 +47,16 @@ Headless means `claude -p`, CI, `$CLAUDE_NON_INTERACTIVE`, no TTY, or unavailabl
 
 Keep chat human and Korean. Do not echo raw ids, raw JSON, schema names, exit numbers, internal command names, or stderr unless `AXHUB_DEPLOY_VERBOSE=1`.
 
+User-visible Bash/tool call titles must be Korean noun phrases only. Do not expose helper-shaped or English labels such as `manifesting`, `manifested`, `gitted`, `pushed`, `Push`, `resumed`, `bootstraped`, `deploy-prep`, `in-flight`, `dry-run`, `token-gate`, `execute`, `production`, `terminal success`, `grep pipe`, `gitignore`, `gitignoring`, `gitting`, `checking`, `Build passed`, `Working tree clean`, or `Not ignored`. Good examples: `배포 준비 확인`, `변경사항 확인`, `커밋 동기화 확인`, `원격 반영 확인`, `진행 중 배포 확인`, `배포 미리보기 확인`, `인증 상태 확인`, `배포 실행`, `배포 결과 확인`.
+
+The same rule applies to chat prose, preview cards, and final tables. Use `운영` for the user-facing environment, `진행 중 배포` for in-flight work, `미리보기` for dry-run, `인증 상태 확인` for token gate, `배포 실행` for execute, and `검증 성공` for terminal success. Command names may appear only when the user explicitly asks for technical evidence or when an error needs exact copy-paste recovery.
+
+When a technical check fails or needs recovery, translate it before showing it. Say `원격 반영이 필요해요`, not `commit_not_found`; `재생성되는 빌드 파일은 정리했어요`, not `Not ignored` or `Working tree clean`; `원격 저장소 확인`, not `gitting` or `gitignore 확인`. Do not create English status snippets during build/lint/git cleanup.
+
+Do not narrate approval state in English. Never write `User explicitly authorized`, `Proceeding`, `Push 성공`, or `Push failed`. Use `사용자가 배포와 원격 반영을 요청했으니 계속 진행해요`, `원격 반영 성공`, or `원격 반영 실패` instead.
+
+When shell output is noisy, capture it in temp files or summarize after the command. Do not pipe important axhub commands through `grep`, `head`, or similar filters in a way that can change the command exit code or hide a long-running helper. If cosmetic filtering is truly needed, preserve and inspect the original command exit code first.
+
 ## Tool Authority
 
 This skill is **CLI-only**. All deploy preview/create/verify/status/diagnosis routing must go through `axhub` CLI commands described below. Ignore MCP deployment mutation tools even when they are visible in the session.
@@ -121,6 +131,8 @@ DEPLOY_PREP_JSON=$(axhub plugin-support deploy-prep --intent deploy --user-utter
 
 The `deploy-prep` envelope is authoritative for `profile`, `endpoint`, `app_id`, `app_slug`, `branch`, `commit_sha`, `commit_message`, `eta_sec`, preflight, `bootstrap_plan`, in-flight deploy, GitHub connection, and quality gate. Never infer `app_id` from pwd or git remote alone in the mutation path.
 
+If this skill was invoked as a handoff from another axhub skill after code changes, do **not** reuse the original feature prompt as `--user-utterance`; it may contain display text such as "QA banner" that looks like an app candidate. Use a short deploy utterance like `현재 앱 배포해` and rely on the current folder's axhub.yaml binding. If the current folder has a valid axhub.yaml and the latest deploy phrase does not explicitly name another app, the bound app slug wins over arbitrary words in prior chat.
+
 If `bootstrap_plan` is present, `app_id` is missing, or branch/commit is empty, stop before preview. Existing non-empty app first-connect belongs to `import`; empty new app creation belongs to `init`.
 
 ### Static branch
@@ -144,13 +156,17 @@ Static success is `active_release_id` from activate plus public URL when availab
 
 Deployment-record apps continue through git readiness, in-flight/status-first handling, preview, token gate, fallback create, and verify. Load `references/workflow-details.md` for the branch mechanics.
 
-Preview card is interactive only and must show app, environment, branch, commit, and ETA. Use `references/error-empathy-catalog.md` for the deploy-preview card and NFKC warning. Slash invocation does not skip this card.
+Preview card is interactive only and must show app, environment, branch, commit, and ETA. Display the environment as `운영`, not `prod`, `production`, or raw profile values, unless the user explicitly asked for exact CLI fields. Use `references/error-empathy-catalog.md` for the deploy-preview card and NFKC warning. Slash invocation does not skip this card.
+
+Before showing the preview, make sure the commit is actually reachable from the remote branch that axhub will build. Normalize any short commit to the full local SHA (`git rev-parse "$COMMIT_SHA^{commit}"` or `git rev-parse HEAD`) and use the full SHA for remote containment and `axhub deploy create`. If the branch has an existing `origin` remote/upstream and local commits are ahead, push with `git push -u origin "HEAD:$BRANCH"` first, refresh `origin/<branch>`, and confirm `git merge-base --is-ancestor "$COMMIT_SHA" "origin/$BRANCH"` (or an equivalent remote containment check) before preview/create. Judge push success by exit code, not by stderr text such as harmless hook warnings. Never deploy a local-only commit SHA; if push or remote containment fails, stop before mutation and say the remote commit is not ready yet.
 
 Before execute, run:
 
 ```bash
-axhub plugin-support token-gate
+AXHUB_GATE_POLL_ITERATIONS=0 axhub plugin-support token-gate
 ```
+
+Claude Desktop often hides stdout/stderr for long-running tool calls until completion. The deploy skill therefore uses the fast inline token check above for Desktop smoothness and never wraps token-gate in `grep`, `head`, or a multi-command pipe. Present this step as `인증 상태 확인`, not as token-gate. Exit 0 continues. Exit 65 routes to auth recovery. `AXHUB_AUTH_BG_REFRESH=0` disables the gate.
 
 On approval, run fallback create only when status-first found no in-flight deployment:
 
@@ -197,7 +213,7 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 
 - exit 64 + `validation.deployment_in_progress`: never retry `axhub deploy create`; offer to monitor the in-flight deploy with the verify loop.
 - subdomain precondition: `axhub apps update <slug> --subdomain <subdomain> --json` is a separate destructive mutation and needs its own preview/approval before one retry.
-- GitHub connection required: do not create repo, first push, or `apps git connect` from deploy; hand off to `import`.
+- GitHub connection required: do not create repo, first push, or `apps git connect` from deploy; hand off to `import`. This does not prohibit pushing normal ahead commits to an already connected `origin` branch before deploy.
 - auth expired: ask before login flow in interactive mode.
 - not found/ambiguous: show slug candidates only, no numeric ids.
 - rate limit: respect Retry-After.
@@ -206,7 +222,7 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 ## NEVER
 
 - NEVER let deploy create or initialize first-run app/import state. Missing app/manifest first-connect belongs to `import` or `init`.
-- NEVER run `axhub init`, `axhub apps create`, first GitHub repo creation, first push, or `apps git connect` from deploy.
+- NEVER run `axhub init`, `axhub apps create`, first GitHub repo creation, first push, or `apps git connect` from deploy. Pushing normal ahead commits to an already connected `origin` branch is allowed and required before deployment-record create.
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop JSON/field-expr parsing contracts where a command result is parsed.
 - NEVER call `axhub deploy create --execute` without the interactive AskUserQuestion preview decision. Headless is exempt only because it must stay dry-run and must not use `--execute`.
@@ -225,3 +241,6 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 - NEVER insert the old approved-run helper bridge between preview approval and the canonical workflow; approval flows into `deploy-prep`, public `axhub deploy create --execute`, and verify.
 - NEVER call MCP deployment mutation tools such as `deployment_trigger`; deploy is CLI-only.
 - NEVER use advisor/server advisor/subagent/model escalation to choose or execute deploy; use CLI envelopes only.
+- NEVER commit, push, or add `.omc/`, `.claude/`, `.codex/`, `.serena/`, or other local agent/runtime state as part of deploy cleanup. Ignore those paths when deciding whether app code is clean enough to deploy; if they are the only dirty entries, proceed with the tracked app commit and mention local cleanup only after deployment.
+- NEVER call `axhub deploy create --execute` for a commit that is only local. AxHub resolves commits from the connected GitHub repo; local-only commits fail in prod with commit-not-found.
+- NEVER pipe `axhub plugin-support token-gate`, `axhub deploy create`, or `axhub deploy verify` through `grep`, `head`, or filters that can make a successful command look failed or make a waiting command look hung.

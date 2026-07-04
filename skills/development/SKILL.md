@@ -38,7 +38,7 @@ model: sonnet
 각 단계를 시작할 때 친근한 한국어 한 줄로 지금 뭐 하는 중인지 알려줘요 — vibe coder 가 멈춘 게 아니라 진행 중인 걸 알 수 있게 해요. 형식은 `[현재/전체] ○○ 하는 중이에요…`, 끝나면 `○○ 됐어요` 처럼 한 줄로 확인해요.
 
 - 사람이 알아들을 요약만 알려요 — secret·내부 id·raw 출력·schema 본문은 chat 에 넣지 않아요 (위 Visibility Rules 그대로).
-- 사용자에게 보이는 설명·툴 제목·중간 메모는 한국어로만 써요. 파일을 읽었다거나 다음 편집을 설명하는 내부 영어 사고 과정을 chat 에 남기지 않아요.
+- 사용자에게 보이는 설명·툴 제목·중간 메모는 한국어로만 써요. 파일을 읽었다거나 다음 편집을 설명하는 내부 영어 사고 과정을 chat 에 남기지 않아요. `Build passed`, `Lint check too`, `Only App.tsx changed`, `Working tree clean`, `Not ignored` 같은 영어 상태 문구는 쓰지 말고 `빌드와 린트 확인이 끝났어요`, `앱 코드 변경만 커밋했어요`, `재생성되는 빌드 파일은 정리했어요`처럼 말해요.
 - optional 파일·설정 확인은 없어도 정상인 경우 실패처럼 보이면 안 돼요. 예를 들어 `.env.local` 확인은 `test -f .env.local && ... || true` 처럼 exit 0 로 끝나게 하거나 "선택 설정 없음" 요약으로 처리해요.
 - TodoWrite 가 있으면 체크리스트로도 같이 보여주고, 없는 host 에서도 이 한 줄 알림은 늘 해요.
 
@@ -125,7 +125,7 @@ model: sonnet
     - **headless/비대화형** (AUQ 불가): 기본은 스캔 결과만 보고하고 **아무것도 바꾸지 않아요** (스키마·env 무변경 safe default, deploy headless 계약과 동일). 단, 사용자가 같은 요청에서 `production mutation 허용`, `테이블 생성까지 진행`, `전부 실행`처럼 명시 권한을 줬고 필요한 테이블/컬럼이 구체적으로 결정됐으면, preview JSON 을 먼저 보고한 뒤 CLI `--execute` 로 생성할 수 있어요. 이 경우 idempotency key 를 쓰고, create 후 rows/list 로 검증해요.
     - 점검을 마치면 deploy 핸드오프 맥락에 **"배포 준비 점검 완료"** 를 남겨, deploy 의 사전 점검 질문이 **중복되지 않게** 해요 (`../deploy/references/session-carryover.md`).
 
-12. **deploy 핸드오프.** 배포는 development 가 직접 안 하고 **deploy skill 을 호출**해요 (중복 배포 로직 금지). "이제 배포할까요?" 로 같은 대화 맥락을 이어줘요 (carry-over: `../deploy/references/session-carryover.md`).
+12. **deploy 핸드오프.** 배포는 development 가 직접 안 하고 **deploy skill 을 호출**해요 (중복 배포 로직 금지). 사용자가 같은 요청에서 배포까지 명시했다면 `현재 앱 배포해`처럼 짧은 handoff utterance 로 deploy 를 호출해요. 원래 기능 요청 문장 전체(예: "QA banner 추가")를 deploy 의 `--user-utterance` 로 넘기지 않아요. 기능 문구가 앱 후보로 잘못 매칭될 수 있기 때문이에요. 사용자가 배포를 명시하지 않았다면 "이제 배포할까요?" 로 같은 대화 맥락을 이어줘요 (carry-over: `../deploy/references/session-carryover.md`).
 
 ## NEVER
 
