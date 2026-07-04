@@ -107,7 +107,7 @@ describe("smooth behavior contracts", () => {
     expect(bootstrap).toContain("`axhub plugin-support init-resume put` 에 생성을 맡겨요");
     expect(bootstrap).toContain("APP_SLUG=\"$APP_SLUG\" perl -0pi");
     expect(bootstrap).toContain("url_checked=false");
-    expect(bootstrap).toContain("`bootstraping`, `bootstraped`, `resumed`, `tenanting`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨");
+    expect(bootstrap).toContain("`bootstraping`, `bootstraped`, `resumed`, `tenanting`, `GitHubing`, `GitHubed`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨");
     expect(bootstrap).toContain("label 과 target 모두 확인된 `https://...` 절대 URL");
     expect(bootstrap).toContain("`[$PUBLIC_URL]($PUBLIC_URL)` 형태");
     expect(bootstrap).toContain("NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채");

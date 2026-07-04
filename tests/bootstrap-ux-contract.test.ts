@@ -42,7 +42,10 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`tenanting 확인`, `tenant 확인`, `테넌트 확인`, `axhub CLI 존재/버전 확인`");
     expect(bootstrap).toContain("`실행 중 명령`");
     expect(bootstrap).toContain("가능한 제목은 이 목록에서 골라요");
+    expect(bootstrap).toContain("`GitHubing 계정 확인`, `GitHubed 계정 확인`");
+    expect(bootstrap).toContain("`저장소 계정 확인`");
     expect(bootstrap).toContain("`앱 이름 확인`");
+    expect(bootstrap).toContain("`인증 대기`");
     expect(bootstrap).toContain("왜 이 스킬이 맞는지");
     expect(bootstrap).toContain("라우팅 사유");
     expect(bootstrap).toContain("첫 visible 응답은 반드시");
@@ -85,6 +88,21 @@ describe("bootstrap desktop UX contract", () => {
     expect(resumeReference).not.toContain("TENANT_CACHE=");
     expect(resumeReference).not.toContain("mkdir -p \"$(dirname \"$TENANT_CACHE\")\"");
     expect(resumeReference).not.toContain("date +%s");
+  });
+
+  test("keeps desktop failure recovery inline and axhub-only", () => {
+    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+
+    expect(bootstrap).toContain("Desktop Error Recovery");
+    expect(bootstrap).toContain("workspace 밖 plugin cache reference 읽기 권한 프롬프트");
+    expect(bootstrap).toContain("읽지 않아요");
+    expect(bootstrap).toContain("복구 명령도 `rtk`, `curl`, `pwd`, `ls`, `find`, `cat` 같은 generic probe 로 빠지지 않아요");
+    expect(bootstrap).toContain("`axhub` CLI 상태 명령만 써요");
+    expect(bootstrap).toContain("axhub apps bootstrap-status");
+    expect(bootstrap).toContain("axhub deploy status c819f97f");
+    expect(bootstrap).toContain("axhub deploy verify c819f97f");
+    expect(bootstrap).toContain("재시도는 최대 1회예요");
+    expect(bootstrap).toContain("새 앱을 다시 만들지 않아요");
   });
 
   test("keeps tenant internals out of desktop-visible workspace wording", () => {

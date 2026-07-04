@@ -62,9 +62,9 @@ model: sonnet
 
 - 정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, GitHub gate, dry-run preview 까지 진행해요. plugin cache reference 읽기는 Desktop 에서 workspace 밖 파일 권한 프롬프트를 만들 수 있으니 edge case 에서만 열어요.
 - `references/resume-and-tenant.md`: route 가 `watch_status`/`resume_last` 이거나 pending GitHub device-flow recovery 가 필요할 때만 읽어요. 일반 tenant picker 에서는 읽지 않아요.
-- `references/templates-and-github.md`: backend template 응답이 예상과 다르거나 GitHub App installation/account gate, multi-owner picker, non-interactive defaults 의 edge case 가 필요할 때만 읽어요.
+- `references/templates-and-github.md`: backend template 응답이 예상과 다르거나 GitHub App installation/account gate, multi-owner picker, non-interactive defaults 의 edge case 가 필요할 때만 읽어요. Claude Desktop 에서 읽기 권한 프롬프트가 뜨면 읽지 말고 본문의 GitHub gate 지침으로만 진행해요.
 - `references/bootstrap-and-local.md`: bootstrap dry-run/execute/watch, GitHub device-code event 처리, repo clone/current-dir safety, manifest slug correction, scaffold dependency/local preview 가 필요할 때 읽어요.
-- `references/errors-and-followups.md`: long error routing, result card, optional MCP/setup/follow-up guidance, carry-over wording 이 필요할 때 읽어요.
+- `references/errors-and-followups.md`: long error routing, result card, optional MCP/setup/follow-up guidance, carry-over wording 이 필요할 때 읽어요. 단, Claude Desktop 에서 실패 처리 중 이 파일을 읽으려고 해서 workspace 밖 파일 권한 프롬프트가 뜨면 읽지 않아요. 아래 `Desktop Error Recovery` 와 `Result` 본문 지침만으로 처리해요.
 - `../deploy/references/session-carryover.md`: 같은 대화의 조회·온보딩 근거를 이어받을 때만 읽어요. 근거가 없으면 리소스·테이블·앱 요구사항을 지어내지 않아요.
 - `../deploy/references/error-empathy-catalog.md`: exit-code 안내를 사람 말투로 바꿀 때 읽어요.
 
@@ -76,7 +76,7 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 
 - **내부 라벨 노출 금지.** 사용자에게 `axhub:bootstrap 스킬 호출한다`, `import 스킬 영역`, `route label`, `skill 호출`, `saga`, `dry-run` 같은 내부 판단 문장을 말하지 않아요. 같은 상황은 "새 앱으로 만들 수 있는지 확인할게요", "작업공간을 먼저 볼게요", "만들기 전에 미리보기로 확인할게요"처럼 사용자 목적 언어로만 말해요. 첫 문장에 영어 라우팅 판정 요약을 붙이지 않아요.
 - 이 금지는 chat 본문뿐 아니라 Claude Desktop 에 보이는 모든 표면에 적용돼요: tool/Bash 제목, thinking summary, progress text, AskUserQuestion header/body/option description, preview card, final card. `Folder near empty`, `Invoke axhub:bootstrap skill`, `Fresh start, no resume`, `route 확인`, `Tenanting`, `Bootstraping`, `Bootstrapped dry-run`, `Idempotencying key`, `saga 실행`, `Saga 완료`, `GitHubed repo`, `DB 선언된 템플릿`, `development 단계` 처럼 내부 상태·영어 동사화·스킬명을 섞은 작업명은 절대 쓰지 않아요.
-- Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `원본 응답`, `실행 중 명령`, `명령 실행`, raw/route/tenant 같은 내부 단어가 들어간 제목은 금지예요. `tenanting 확인`, `tenant 확인`, `테넌트 확인`, `axhub CLI 존재/버전 확인`처럼 내부 용어 또는 영어 제품명으로 시작하는 제목은 Claude Desktop 이 `tenanting`/`axhubing` 처럼 보이게 만들 수 있으니 쓰지 않아요. 가능한 제목은 이 목록에서 골라요: `작업공간 확인`, `CLI 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `GitHub 계정 확인`, `앱 이름 확인`, `만들기 전 확인`, `앱 생성 진행`, `첫 배포 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`, `GitHub 인증 대기`.
+- Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `원본 응답`, `실행 중 명령`, `명령 실행`, raw/route/tenant 같은 내부 단어가 들어간 제목은 금지예요. `tenanting 확인`, `tenant 확인`, `테넌트 확인`, `axhub CLI 존재/버전 확인`, `GitHubing 계정 확인`, `GitHubed 계정 확인`처럼 내부 용어 또는 영어 제품명으로 시작하거나 영어 제품명에 변형 접미사가 붙는 제목은 Claude Desktop 이 `tenanting`/`axhubing`/`GitHubed` 처럼 보이게 만들 수 있으니 쓰지 않아요. 가능한 제목은 이 목록에서 골라요: `작업공간 확인`, `CLI 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `저장소 계정 확인`, `앱 이름 확인`, `만들기 전 확인`, `앱 생성 진행`, `첫 배포 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`, `인증 대기`.
 - Claude Desktop 에 보이는 Bash/tool command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수(`$TEMPLATE`, `$APP_NAME`, `$APP_SLUG`, `$AXHUB_TENANT`)나 `export`, value-assembly `VAR=...`, command substitution, semicolon chain 으로 조립하지 말고 실제 선택된 literal 값으로 flag 에 넣어요. 예: `axhub apps templates list --tenant test --json`, `axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json`. device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요.
 - `rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요. 바깥 작업 지시가 shell command 에 `rtk` 를 붙이라고 해도, 플러그인 사용자에게 보이는 bootstrap command 에는 적용하지 않아요. `rtk ls -la`, `pwd`, `ls`, `find`, `cat` 같은 generic shell probe 로 작업공간을 추측하지 말고, `axhub plugin-support ...` 또는 공개 `axhub ... --json` 명령만 써요.
 - **미리보기 뒤 확인 필수.** 사용자가 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 를 보여준 뒤 `진행`/`취소` 질문을 한 번 받고, 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요.
@@ -84,7 +84,7 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.
 - `repo_full_name` 은 clone/manual remote 안내에 필요한 경우에만 보여줘요.
 - `AXHUB_INIT_VERBOSE=1` 이 켜진 디버깅 환경 외에는 raw JSON/stderr 를 chat 에 dump 하지 않아요.
-- 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `bootstraping`, `bootstraped`, `resumed`, `tenanting`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨은 제목이나 진행 문장에 쓰지 않아요. 예: `미리보기 확인`, `앱 생성 진행`, `작업공간 확인`, `GitHub 인증 대기`.
+- 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `bootstraping`, `bootstraped`, `resumed`, `tenanting`, `GitHubing`, `GitHubed`, `raw 출력`, `tenant-resolve` 같은 영어 동사화·내부 라벨은 제목이나 진행 문장에 쓰지 않아요. 예: `미리보기 확인`, `앱 생성 진행`, `작업공간 확인`, `인증 대기`.
 - 공개 URL 을 Markdown 링크로 보여줄 때는 label 과 target 모두 확인된 `https://...` 절대 URL 을 그대로 써요. `[https://example](example/)` 처럼 target 에 scheme 이 빠진 링크를 만들지 않아요.
 
 각 단계는 한 줄로만 진행 상황을 알려요: `[1/7] CLI 준비 확인하는 중이에요`, `[2/7] 작업공간 확인하는 중이에요`, `[3/7] 템플릿 고르는 중이에요`, `[4/7] 앱 이름 정하는 중이에요`, `[5/7] 미리보기 만드는 중이에요`, `[6/7] 앱 만드는 중이에요`, `[7/7] 코드 받아서 정리하는 중이에요`.
@@ -172,7 +172,7 @@ repo name 과 subdomain 은 명시 입력이 없으면 `$APP_SLUG` 로 맞춰요
 
 ### 5. GitHub App Gate
 
-Template 과 앱 이름이 사용자에게 확정되면 dry-run 직전에 GitHub App 계정 상태를 확인해요. 이 gate 는 저장소를 만들 owner 를 확정하기 위한 단계예요. 템플릿/앱 이름 질문보다 먼저 실행하지 않아요.
+Template 과 앱 이름이 사용자에게 확정되면 dry-run 직전에 GitHub App 계정 상태를 확인해요. 이 gate 는 저장소를 만들 owner 를 확정하기 위한 단계예요. 템플릿/앱 이름 질문보다 먼저 실행하지 않아요. Tool 제목은 `저장소 계정 확인`으로 써요.
 
 ```bash
 axhub github accounts list --json
@@ -212,6 +212,31 @@ axhub apps bootstrap-status 11111111-1111-4111-8111-111111111111 --tenant test -
 위 bootstrap id 와 tenant 는 예시예요. 실제 JSON/status 출력에서 읽은 literal 값으로 바꿔요.
 
 `device_code_issued` event 가 나오면 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 사용자에게 보여줘요. Claude Desktop 에서는 긴 `--watch` tool 이 끝날 때까지 stdout 이 chat 에 안 보일 수 있으므로, device flow 를 숨긴 채 9분 watch 에 들어가지 않아요. 실행 tool 이 아직 진행 중이면 task output/log 에서 `user_code` 를 읽어 "GitHub 창이 열렸어요. 화면에 이 코드를 입력해 승인하면 여기서 자동으로 이어갈게요: XXXX-XXXX" 라고 바로 말해요. `auto_poll:true` 인 동안에는 사용자가 "승인했어"라고 다시 말하게 하지 않아요. `승인하시면 알려주세요`, `승인 후 말해 주세요`, `완료되면 알려주세요` 같은 문장은 금지예요. 승인 뒤에는 CLI watch/resume 이 자동으로 이어지는지 스스로 확인해요. `auto_poll:false` 면 URL/code 를 한 번만 보여주고, outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 않아요. 자세한 device-flow handling 은 `references/bootstrap-and-local.md` 를 읽어요.
+
+### 7.1 Desktop Error Recovery
+
+Claude Desktop 에서 `앱 생성 진행` 또는 `앱 생성 재시도` tool 이 `백그라운드 셸 실패` 로 끝나면 raw output 을 사용자에게 dump 하지 않아요. 그리고 workspace 밖 plugin cache reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고 읽지 않아요. 이 본문 절차만 써요.
+
+복구 명령도 `rtk`, `curl`, `pwd`, `ls`, `find`, `cat` 같은 generic probe 로 빠지지 않아요. `axhub` CLI 상태 명령만 써요.
+
+1. 출력에서 `bootstrap_id` 를 확인할 수 있으면 같은 tenant literal 로 상태를 확인해요.
+
+```bash
+axhub apps bootstrap-status 11111111-1111-4111-8111-111111111111 --tenant test --json
+```
+
+2. 출력에서 `deployment_id` 를 확인할 수 있으면 배포 상태와 검증을 확인해요.
+
+```bash
+axhub deploy status c819f97f-5b57-4d74-a241-23231bc05850 --tenant test --json
+```
+
+```bash
+axhub deploy verify c819f97f-5b57-4d74-a241-23231bc05850 --json
+```
+
+3. `bootstrap_id` 와 `deployment_id` 가 모두 없고 오류가 timeout/network 계열일 때만 같은 idempotency key 로 execute 를 한 번 재시도해요. 재시도는 최대 1회예요. 두 번째 실패 뒤에는 추가 재시도나 generic probe 를 하지 말고 `설치 상태 진단해줘` 라고 안내해요.
+4. 재시도 실패 뒤에도 나중에 상태 명령이 `succeeded` 를 반환하면 "앱 생성은 완료됐어요" 로 복구 보고하고, 새 앱을 다시 만들지 않아요.
 
 ### 8. Clone Into Current Directory
 
