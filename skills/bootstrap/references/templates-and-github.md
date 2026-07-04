@@ -32,38 +32,36 @@ This is not a second registry. Attach descriptions only to items returned by bac
 
 Unknown backend templates are not hidden. Show backend `name` and `folder_name`, then give neutral guidance like "이름을 보고 고르면 돼요. 잘 모르겠으면 먼저 Next.js 추천을 봐요."
 
-Structured AskUserQuestion can show at most 3 choices, and every choice must map to a real backend template. Do not add generic `Other`, `직접 고르기`, or `취소` choices to the template picker. If there are more than 3 templates, show the full text list and make the buttons the 3 best actual recommendations; free-text must match exact alias/folder/name before starting saga.
+In Claude Desktop, do not use native Question/AskUserQuestion cards for backend template selection. Desktop QA showed dynamic template cards can remain stuck as `요청됨 템플릿` without rendering choices. Ask in normal chat text instead, and wait for the user's reply before starting saga. Every numbered choice must map to a real backend template. Do not add generic `Other`, `직접 고르기`, or `취소` choices to the template picker. If there are more than 3 templates, show the full text list first and put the best 3 actual recommendations at the top; free-text must match exact alias/folder/name before starting saga.
 
-Example shape, only when those templates exist in backend output:
+Example visible chat shape, only when those templates exist in backend output:
 
-```json
-{
-  "question": "어떤 템플릿으로 시작할까요?",
-  "header": "템플릿",
-  "options": [
-    {"label": "Next.js 추천", "description": "쇼핑몰·예약·결제·로그인·관리자 화면"},
-    {"label": "Vite + React", "description": "로그인 뒤 쓰는 설정·입력·관리 화면"},
-    {"label": "Astro", "description": "회사 소개·랜딩 페이지·블로그·문서"}
-  ]
-}
+```text
+어떤 템플릿으로 시작할까요?
+
+1. Next.js 추천 - 쇼핑몰·예약·결제·로그인·관리자 화면
+2. Vite + React - 로그인 뒤 쓰는 설정·입력·관리 화면
+3. Astro - 회사 소개·랜딩 페이지·블로그·문서
+
+번호나 템플릿 이름으로 답해 주세요.
 ```
 
 If the user's utterance already contains an exact alias/folder/name, use it without asking. Generic category or feature words such as "웹앱", "쇼핑몰", "사이트", "앱", "서비스", "예약", "주문", "preorder", "booking", "shop", "store", "dashboard", or "admin" are not exact template choices; show the picker unless the user named `Next.js`, `React`, `Astro`, or an exact backend template. Those words can make Next.js the recommended first option, but they never finalize `--template`. In subprocess/no TTY, do not auto-pick a template; safe default is `abort`.
 
 ## App Name
 
-`--name` is required. If the utterance implies a name, propose it as the first option, for example "결제 앱 만들어줘" -> "결제 앱". Do not finalize the name before one user-facing confirmation in Claude Desktop. Use the exact question text `앱 이름을 무엇으로 할까요?`; never write `앵 이름` or a shortened variant. If the utterance does not imply a name, ask once:
+`--name` is required. If the utterance implies a name, propose it as the first option, for example "결제 앱 만들어줘" -> "결제 앱". Do not finalize the name before one user-facing confirmation in Claude Desktop. Use the exact question text `앱 이름을 무엇으로 할까요?`; never write `앵 이름` or a shortened variant. Ask in normal chat text, not a native Question/AskUserQuestion card. If the utterance does not imply a name, ask once:
 
-```json
-{
-  "question": "앱 이름을 무엇으로 할까요?",
-  "header": "앱 이름 확인",
-  "options": [
-    {"label": "지금 발화 기준 자동", "value": "auto_from_utterance", "description": "발화에서 유추한 이름을 그대로 써요"},
-    {"label": "직접 입력", "value": "manual_name", "description": "원하는 이름을 한 번만 말해요"},
-    {"label": "취소", "value": "abort", "description": "프로젝트를 만들지 않아요"}
-  ]
-}
+```text
+앱 이름 확인
+
+앱 이름을 무엇으로 할까요?
+
+1. <발화에서 유추한 이름>
+2. 직접 입력
+3. 취소
+
+번호나 원하는 앱 이름으로 답해 주세요.
 ```
 
 Derive `--slug` by lowercasing, replacing spaces with hyphens, and removing special characters. If backend reports slug policy/collision, ask once for a new name/slug and retry the same flow.

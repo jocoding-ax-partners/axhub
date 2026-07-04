@@ -158,6 +158,8 @@ axhub apps templates list --tenant test --json
 
 위 `test` 는 예시예요. Claude Desktop 에서는 확정된 tenant literal 로 바꿔 한 명령만 실행해요. 사용자에게는 backend 가 반환한 template 전체 목록을 사람이 읽을 수 있게 보여줘요. 선택 값은 반드시 반환된 `id`, `folder_name`, 또는 built-in alias (`react`, `nextjs`, `astro`) 중 하나예요. fresh path 의 template 질문은 본문 지시만으로 진행하고 reference 를 읽지 않아요.
 
+Claude Desktop 에서 backend template 결과로 native Question/AskUserQuestion card 를 만들면 `요청됨 템플릿`만 남고 선택지가 렌더링되지 않을 수 있어요. 그래서 template 선택은 반드시 일반 채팅 텍스트로 물어요. `어떤 템플릿으로 시작할까요?` 라고 말한 뒤 backend 가 반환한 실제 template 만 번호 목록으로 보여주고, `번호나 템플릿 이름으로 답해 주세요.` 라고 멈춰요. template 선택 전에는 다음 CLI 명령을 실행하지 않아요. `질문 중 템플릿`, `요청됨 템플릿` 같은 native question card 상태에 의존하지 않아요.
+
 ### 4. Template And App Name
 
 이미 발화에 exact alias/folder/name 이 있고 registry 와 맞으면 질문 없이 써요. 맞지 않으면 registry 목록을 다시 보여주고 다시 물어요.
@@ -165,7 +167,7 @@ axhub apps templates list --tenant test --json
 
 비대화형/D1 guard 에서는 template 과 앱 이름을 임의로 고르지 않아요. safe default 는 `abort` 또는 `취소` 예요.
 
-앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요. 앱 이름 질문 문구는 반드시 `앱 이름을 무엇으로 할까요?` 로 써요. `앵 이름` 같은 오타나 줄임말을 쓰지 않아요. 질문 제목은 `앱 이름 확인` 으로 써요. 추천 이름을 첫 번째 옵션으로 두되, 사용자가 고르거나 직접 입력한 뒤에만 `--name`/`--slug` 를 확정해요. `--slug` 는 이름을 기반으로 자동 유도하되 backend 정책 충돌은 saga error 를 보고 한 번 더 받아요.
+앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요. 앱 이름 질문 문구는 반드시 `앱 이름을 무엇으로 할까요?` 로 써요. `앵 이름` 같은 오타나 줄임말을 쓰지 않아요. 표시 제목은 `앱 이름 확인` 으로 써요. 앱 이름 확인도 native Question/AskUserQuestion card 를 쓰지 말고 일반 채팅 텍스트로 물어요. 추천 이름을 첫 번째 번호로 두되, 사용자가 고르거나 직접 입력한 뒤에만 `--name`/`--slug` 를 확정해요. `--slug` 는 이름을 기반으로 자동 유도하되 backend 정책 충돌은 saga error 를 보고 한 번 더 받아요.
 repo name 과 subdomain 은 명시 입력이 없으면 `$APP_SLUG` 로 맞춰요. 기본값에 맡기면 backend saga 가 repo/subdomain 을 다르게 추론해 한 번 실패할 수 있으니 dry-run 과 execute 모두 `--repo-name "$APP_SLUG"` 및 `--subdomain "$APP_SLUG"` 를 붙여요.
 
 ### 5. GitHub App Gate
