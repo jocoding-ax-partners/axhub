@@ -4,18 +4,36 @@ Load this reference for long error routing, final result wording, optional MCP/s
 
 ## Result Card
 
-Use saga response only for verification. User-facing result should be short Korean lines. Public URL must be read from the app record and never synthesized from dry-run subdomain:
+Use saga response only for verification. User-facing result should be short Korean lines. URL and public state must be read from the app record and never synthesized from dry-run subdomain:
 
 ```bash
-PUBLIC_URL="$(axhub apps get "$APP_ID" --no-input --field-expr '.access_url // .data.access_url // empty' 2>/dev/null || true)"
+PUBLIC_URL="$(axhub apps get "$APP_SLUG" --no-input --field-expr '.access_url // .data.access_url // empty' 2>/dev/null || true)"
+VISIBILITY="$(axhub apps get "$APP_SLUG" --no-input --field-expr '.visibility // .data.visibility // empty' 2>/dev/null || true)"
+REVIEW_STATUS="$(axhub apps get "$APP_SLUG" --no-input --field-expr '.review_status // .data.review_status // empty' 2>/dev/null || true)"
 ```
 
-If `PUBLIC_URL` exists:
+If `PUBLIC_URL` exists and `VISIBILITY=public` and `REVIEW_STATUS=approved`:
 
 ```text
 인터넷에 올라갔어요: <confirmed-public-url>
 친구한테 바로 보여줄 수 있어요.
 ```
+
+If `PUBLIC_URL` exists but `VISIBILITY=private` or `REVIEW_STATUS!=approved`, do not call it public:
+
+```text
+배포는 끝났어요: <confirmed-access-url>
+지금은 로그인 후 볼 수 있는 private 앱이에요.
+```
+
+If the user asked for a public app or to share with anyone, submit the publication request with the top-level publish command, not an app metadata update:
+
+```bash
+axhub publish --app "$APP_SLUG" --visibility public --json
+axhub review history --app "$APP_SLUG" --json
+```
+
+Report the result as "공개 신청은 들어갔고 승인 대기 중이에요" when the request is pending. Never try `axhub apps update "$APP_SLUG" --visibility public` before approval; the backend rejects visibility widening until the review is approved.
 
 If local preview is alive, add "로컬 미리보기도 떠 있어요: `<localhost-url>`". If no confirmed URL exists, lower the claim:
 

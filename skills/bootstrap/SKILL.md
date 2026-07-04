@@ -61,6 +61,8 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 
 사용자는 대부분 개발 지식이 없어요. CLI JSON 의 raw primitive 는 변수로만 다루고 chat 에 echo 하지 않아요.
 
+- **내부 라벨 노출 금지.** 사용자에게 `axhub:bootstrap 스킬 호출한다`, `import 스킬 영역`, `route label`, `skill 호출`, `saga`, `dry-run` 같은 내부 판단 문장을 말하지 않아요. 같은 상황은 "새 앱으로 만들 수 있는지 확인할게요", "작업공간을 먼저 볼게요", "만들기 전에 미리보기로 확인할게요"처럼 사용자 목적 언어로만 말해요.
+- **미리보기 뒤 확인 필수.** 사용자가 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 를 보여준 뒤 `진행`/`취소` 질문을 한 번 받고, 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요.
 - Echo 금지: `schema_version`, template `id`, `folder_name`, `resource_tier`, `bootstrap_id`, `status_url`, `stage`, `app_id`, `deployment_id`, `error_code`, `error_message`, `request_id`, `idempotency_key`, `installation_id`, `device_code`.
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.
 - `repo_full_name` 은 clone/manual remote 안내에 필요한 경우에만 보여줘요.
@@ -83,7 +85,7 @@ Top-level 은 실행 순서와 안전 anchor 만 유지해요. 위 reference 는
 7. Execute saga: 사용자 확인 후 `axhub apps bootstrap ... --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json`.
 8. Clone/current dir: completed saga 에서 `repo_full_name` 을 읽고 현재 dir 에 remote fetch/reset 해요.
 9. Manifest/local: `axhub.yaml` slug 를 새 앱 slug 로 보정·검증하고, 선택 시 로컬 미리보기를 준비해요.
-10. Result/follow-up: 확인된 `access_url` 이 있으면 보여주고, 없으면 배포 진행 중으로 낮춰 말해요.
+10. Result/follow-up: 확인된 `access_url` 이 있으면 앱 공개 상태와 함께 보여주고, 없으면 배포 진행 중으로 낮춰 말해요. `visibility=private` 또는 `review_status=pending` 이면 친구에게 바로 공개됐다고 말하지 않아요.
 
 Slash command, skill name, route label 은 사용자에게 말하지 않아요. Desktop 사용자에게는 `다시 로그인해줘`, `설치했어`, `다시 만들어줘`, `방금 배포 어디까지 됐어?` 같은 자연어를 안내해요.
 
@@ -173,19 +175,23 @@ axhub github accounts list --json
 ### 5. Template And App Name
 
 이미 발화에 exact alias/folder/name 이 있고 registry 와 맞으면 질문 없이 써요. 맞지 않으면 registry 목록을 다시 보여주고 다시 물어요.
+`웹앱`, `쇼핑몰`, `사이트`, `앱`, `서비스` 같은 일반 장르 단어는 exact template 선택이 아니에요. 사용자가 `Next.js`, `React`, `Astro` 또는 backend registry 의 정확한 `name`/`folder_name`/alias 를 말하지 않았으면 템플릿 질문을 보여줘요.
 
 비대화형/D1 guard 에서는 template 과 앱 이름을 임의로 고르지 않아요. safe default 는 `abort` 또는 `취소` 예요.
 
 앱 이름이 발화에서 유추되면 그대로 쓰고, 없으면 한 번 물어요. `--slug` 는 이름을 기반으로 자동 유도하되 backend 정책 충돌은 saga error 를 보고 한 번 더 받아요.
+repo name 과 subdomain 은 명시 입력이 없으면 `$APP_SLUG` 로 맞춰요. 기본값에 맡기면 backend saga 가 repo/subdomain 을 다르게 추론해 한 번 실패할 수 있으니 dry-run 과 execute 모두 `--repo-name "$APP_SLUG"` 및 `--subdomain "$APP_SLUG"` 를 붙여요.
 
 ### 6. Dry-Run Preview
 
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --dry-run --json
+REPO_NAME="${REPO_NAME:-$APP_SLUG}"
+SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
+axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --dry-run --json
 ```
 
-Dry-run envelope 에서 template, slug, subdomain, repo name, private/public 같은 preview 만 한국어로 보여줘요. raw JSON dump 금지. 확인을 받기 전에는 execute 를 호출하지 않아요.
+Dry-run envelope 에서 template, slug, subdomain, repo name, private/public 같은 preview 만 한국어로 보여줘요. raw JSON dump 금지. 확인을 받기 전에는 execute 를 호출하지 않아요. 최초 사용자 문장에 "바로", "배포까지", "올려줘"가 있어도 preview 이후의 명시 선택 전에는 execute 승인으로 간주하지 않아요.
 
 ### 7. Execute Bootstrap Saga
 
@@ -194,19 +200,23 @@ Dry-run envelope 에서 template, slug, subdomain, repo name, private/public 같
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
 IDEMPOTENCY_KEY="${IDEMPOTENCY_KEY:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
+REPO_NAME="${REPO_NAME:-$APP_SLUG}"
+SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
 if ! printf '%s\n' "$IDEMPOTENCY_KEY" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'; then
   echo '{"systemMessage":"재시도 키 생성이 올바르지 않아서 앱 생성을 시작하지 않았어요. 다시 시도할게요."}'
   exit 65
 fi
 axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --json
-AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
 ```
 
 Bash/tool timeout 은 9.5분 이상으로 잡아요. CLI timeout 뒤 resume hint 가 있으면 terminal status 를 한 번 더 확인해요.
 
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-BOOTSTRAP_ID=$(AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY" --field-expr '.data.bootstrap_id // empty' 2>/dev/null || true)
+REPO_NAME="${REPO_NAME:-$APP_SLUG}"
+SUBDOMAIN="${SUBDOMAIN:-$APP_SLUG}"
+BOOTSTRAP_ID=$(AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --repo-name "$REPO_NAME" --subdomain "$SUBDOMAIN" ${GITHUB_OWNER:+--github-owner "$GITHUB_OWNER"} --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY" --field-expr '.data.bootstrap_id // empty' 2>/dev/null || true)
 axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --json
 axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --watch --watch-timeout 9m --json
 ```
@@ -267,12 +277,14 @@ Subprocess/no TTY 의 local preview safe default 는 `아니요` 예요. 자세�
 
 ### 10. Result
 
-공개 URL 은 절대 합성하지 않아요. 배포 성공 후 앱의 `access_url` 을 읽어서 확인된 값만 보여줘요. `deploy verify` 가 `success=true` 여도 `url_checked=false` 일 수 있으니, 공개 URL 은 반드시 별도 `access_url` HTTPS 확인으로 증거를 보강해요. 배포 직후 TLS 인증서 발급이 수십 초 지연될 수 있어요. 첫 HTTPS 확인이 인증서 오류/HTTP 000 이면 곧장 실패로 단정하지 말고 10초 간격으로 최대 6회 재시도한 뒤 결과를 낮춰 말해요.
+공개 URL 은 절대 합성하지 않아요. 배포 성공 후 앱의 `access_url`, `visibility`, `review_status` 를 읽어서 확인된 값만 보여줘요. `deploy verify` 가 `success=true` 여도 `url_checked=false` 일 수 있으니, URL 은 반드시 별도 `access_url` HTTPS 확인으로 증거를 보강해요. 배포 직후 TLS 인증서 발급이 수십 초 지연될 수 있어요. 첫 HTTPS 확인이 인증서 오류/HTTP 000 이면 곧장 실패로 단정하지 말고 10초 간격으로 최대 6회 재시도한 뒤 결과를 낮춰 말해요.
 
 공개 URL 을 링크로 출력할 때는 `[$PUBLIC_URL]($PUBLIC_URL)` 형태로 같은 절대 URL 을 label/target 에 모두 넣어요. Claude Desktop 에서 target scheme 이 빠지면 사용자가 클릭했을 때 상대 링크처럼 열릴 수 있어요.
 
 ```bash
-PUBLIC_URL="$(axhub apps get "$APP_ID" --no-input --field-expr '.access_url // .data.access_url // empty' 2>/dev/null || true)"
+PUBLIC_URL="$(axhub apps get "$APP_SLUG" --no-input --field-expr '.access_url // .data.access_url // empty' 2>/dev/null || true)"
+VISIBILITY="$(axhub apps get "$APP_SLUG" --no-input --field-expr '.visibility // .data.visibility // empty' 2>/dev/null || true)"
+REVIEW_STATUS="$(axhub apps get "$APP_SLUG" --no-input --field-expr '.review_status // .data.review_status // empty' 2>/dev/null || true)"
 if [ -n "$PUBLIC_URL" ]; then
   for _ in 1 2 3 4 5 6; do
     curl -fsSI --max-time 15 "$PUBLIC_URL" >/dev/null && break
@@ -281,7 +293,7 @@ if [ -n "$PUBLIC_URL" ]; then
 fi
 ```
 
-URL 이 있으면 첫 줄에 보여줘요. 없으면 "인터넷 배포가 시작됐어요. '방금 배포 어디까지 됐어?' 라고 물으면 이어서 확인할게요." 로 낮춰 말해요. 자세한 result card, optional MCP/setup, infer-tables-env follow-up 은 `references/errors-and-followups.md` 를 읽어요.
+URL 이 있으면 첫 줄에 보여줘요. 단, `visibility=private` 또는 `review_status!=approved` 면 "로그인 후 볼 수 있는 배포 URL" 로 말하고, "누구나 볼 수 있어요", "친구한테 바로 보여줄 수 있어요" 같은 문장은 쓰지 않아요. 사용자가 공개·누구나·친구에게 보여주기까지 원했으면 `axhub publish --app "$APP_SLUG" --visibility public --json` 으로 공개 신청을 넣고 `review_status=pending` 또는 review request id 를 알려줘요. 승인 전 공개 확대를 `axhub apps update --visibility public` 로 시도하지 않아요. 없으면 "인터넷 배포가 시작됐어요. '방금 배포 어디까지 됐어?' 라고 물으면 이어서 확인할게요." 로 낮춰 말해요. 자세한 result card, optional MCP/setup, infer-tables-env follow-up 은 `references/errors-and-followups.md` 를 읽어요.
 
 ## Non-Interactive Defaults
 
