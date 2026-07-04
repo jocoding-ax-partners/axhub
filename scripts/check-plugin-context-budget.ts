@@ -5,7 +5,12 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 export const DEFAULT_MAX_TOTAL_BYTES = 180_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
-export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = { deploy: 12_000, bootstrap: 12_000, onboarding: 10_000 };
+export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {
+  bootstrap: 10_000,
+  deploy: 13_000,
+  import: 12_000,
+  onboarding: 10_000,
+};
 
 export interface BudgetOptions {
   root?: string; skillsDir?: string; maxSkillBytes?: number; maxTotalBytes?: number;
@@ -149,7 +154,10 @@ const scanSkills = (root: string, skillsDir: string, maxSkillBytes: number): Pic
   if (!statSync(skillsDir).isDirectory()) return { skills: [], errors: [`skills path is not a directory: ${displayPath(root, skillsDir)}`] };
 
   const errors: string[] = [];
-  const skills = readdirSync(skillsDir).sort().flatMap((slug): SkillBudget[] => {
+  const skills = readdirSync(skillsDir)
+    .sort()
+    .filter((slug) => !slug.startsWith("."))
+    .flatMap((slug): SkillBudget[] => {
     const skillDir = join(skillsDir, slug);
     if (!statSync(skillDir).isDirectory()) return [];
 
