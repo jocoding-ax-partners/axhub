@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.2...v1.7.3) (2026-07-04)
+
+Claude Desktop 실제 QA에서 보인 남은 마찰을 줄였어요. init 은 CLI auto-poll 이 켜진 device flow 에서 더 이상 "승인하면 알려주세요"라고 멈추지 않고, import/clarity 는 자동 tool 제목과 파괴적 명령 preview 에 내부 영어 라벨이나 raw app id 가 드러나지 않게 안내를 조정했어요. diagnosis 도 실패 원인 확인과 복구 배포를 한 루프에 섞어 끝없이 재진단하지 않도록, 원인 요약 뒤 deploy/status 흐름으로 자연스럽게 넘깁니다.
+
 ## [1.7.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.1...v1.7.2) (2026-07-04)
 
 Claude Desktop 에서 GitHub device flow 를 시작할 때 입력 코드가 접힌 tool 출력 안에만 남아 바이브코더가 놓치던 문제를 줄였어요. clarity skill 은 이제 인증 URL 과 사용자 입력 코드를 일반 채팅 본문에 다시 쓰고, 사용자가 "승인했어"라고 말하지 않아도 CLI polling 흐름을 계속 이어가도록 안내해요. CLI 설치 확인 tool 제목도 `CLI 설치 확인`으로 고정해서 자동 영어 동사화 제목이 섞이지 않게 했어요.
