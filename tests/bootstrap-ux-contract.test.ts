@@ -119,13 +119,20 @@ describe("bootstrap desktop UX contract", () => {
 
     expect(bootstrap).toContain("일반 장르·기능 단어는 exact template 선택이 아니에요");
     expect(bootstrap).toContain("템플릿 질문을 보여줘요");
+    expect(bootstrap).toContain("template 선택은 반드시 일반 채팅 텍스트로 물어요");
+    expect(bootstrap).toContain("`요청됨 템플릿`만 남고 선택지가 렌더링되지 않을 수 있어요");
+    expect(bootstrap).toContain("`질문 중 템플릿`, `요청됨 템플릿` 같은 native question card 상태에 의존하지 않아요");
     expect(bootstrap).toContain("`preorder`");
     expect(bootstrap).toContain("추천 순서를 정하는 근거일 뿐 선택 확정이 아니며");
     expect(bootstrap).toContain("`--template ... --dry-run` 은 템플릿 질문 답변을 받은 뒤에만 실행해요");
+    expect(templateReference).toContain("do not use native Question/AskUserQuestion cards for backend template selection");
+    expect(templateReference).toContain("Ask in normal chat text instead");
+    expect(templateReference).toContain("번호나 템플릿 이름으로 답해 주세요.");
     expect(templateReference).toContain("Generic category or feature words");
     expect(templateReference).toContain("are not exact template choices");
     expect(templateReference).toContain("Those words can make Next.js the recommended first option");
     expect(templateReference).toContain("they never finalize `--template`");
+    expect(templateReference).not.toContain("Structured AskUserQuestion can show at most 3 choices");
   });
 
   test("confirms app name before freezing slug for new bootstrap apps", () => {
@@ -135,11 +142,15 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요");
     expect(bootstrap).toContain("앱 이름 질문 문구는 반드시 `앱 이름을 무엇으로 할까요?`");
     expect(bootstrap).toContain("`앵 이름` 같은 오타나 줄임말을 쓰지 않아요");
-    expect(bootstrap).toContain("질문 제목은 `앱 이름 확인`");
+    expect(bootstrap).toContain("표시 제목은 `앱 이름 확인`");
+    expect(bootstrap).toContain("앱 이름 확인도 native Question/AskUserQuestion card 를 쓰지 말고 일반 채팅 텍스트로 물어요");
     expect(bootstrap).toContain("사용자가 고르거나 직접 입력한 뒤에만 `--name`/`--slug` 를 확정해요");
     expect(templateReference).toContain("Do not finalize the name before one user-facing confirmation in Claude Desktop");
-    expect(templateReference).toContain("\"question\": \"앱 이름을 무엇으로 할까요?\"");
-    expect(templateReference).toContain("\"header\": \"앱 이름 확인\"");
+    expect(templateReference).toContain("Ask in normal chat text, not a native Question/AskUserQuestion card");
+    expect(templateReference).toContain("앱 이름을 무엇으로 할까요?");
+    expect(templateReference).toContain("번호나 원하는 앱 이름으로 답해 주세요.");
+    expect(templateReference).not.toContain("\"question\": \"앱 이름을 무엇으로 할까요?\"");
+    expect(templateReference).not.toContain("\"header\": \"앱 이름 확인\"");
     expect(templateReference).not.toContain("\"앱 이름 뭘로 할래요?\"");
   });
 
