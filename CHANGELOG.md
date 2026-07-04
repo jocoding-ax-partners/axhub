@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.1...v1.7.2) (2026-07-04)
+
+Claude Desktop 에서 GitHub device flow 를 시작할 때 입력 코드가 접힌 tool 출력 안에만 남아 바이브코더가 놓치던 문제를 줄였어요. clarity skill 은 이제 인증 URL 과 사용자 입력 코드를 일반 채팅 본문에 다시 쓰고, 사용자가 "승인했어"라고 말하지 않아도 CLI polling 흐름을 계속 이어가도록 안내해요. CLI 설치 확인 tool 제목도 `CLI 설치 확인`으로 고정해서 자동 영어 동사화 제목이 섞이지 않게 했어요.
+
 ## [1.7.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.0...v1.7.1) (2026-07-04)
 
 업데이트 스킬이 새 플러그인을 받을 때 보이던 영어 섞인 진행 문구를 줄였어요. 이제 설치 위치나 플러그인 버전 확인 같은 내부 단계도 한국어 사용자 문장으로 정리하고, 최종 결과 카드 밖에서는 `Scope` 같은 내부 라벨을 숨겨요.
