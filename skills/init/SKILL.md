@@ -211,7 +211,7 @@ axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAM
 axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --watch --watch-timeout 9m --json
 ```
 
-`device_code_issued` event 가 나오면 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 사용자에게 보여줘요. Claude Desktop 에서는 긴 `--watch` tool 이 끝날 때까지 stdout 이 chat 에 안 보일 수 있으므로, device flow 를 숨긴 채 9분 watch 에 들어가지 않아요. 실행 tool 이 아직 진행 중이면 task output/log 에서 `user_code` 를 읽어 "GitHub 창이 열렸어요. 화면에 이 코드를 입력해 승인하면 여기서 자동으로 이어갈게요: XXXX-XXXX" 라고 바로 말해요. false 면 URL/code 를 한 번만 보여주고, outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 않아요. 자세한 device-flow handling 은 `references/bootstrap-and-local.md` 를 읽어요.
+`device_code_issued` event 가 나오면 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 사용자에게 보여줘요. Claude Desktop 에서는 긴 `--watch` tool 이 끝날 때까지 stdout 이 chat 에 안 보일 수 있으므로, device flow 를 숨긴 채 9분 watch 에 들어가지 않아요. 실행 tool 이 아직 진행 중이면 task output/log 에서 `user_code` 를 읽어 "GitHub 창이 열렸어요. 화면에 이 코드를 입력해 승인하면 여기서 자동으로 이어갈게요: XXXX-XXXX" 라고 바로 말해요. `auto_poll:true` 인 동안에는 사용자가 "승인했어"라고 다시 말하게 하지 않아요. `승인하시면 알려주세요`, `승인 후 말해 주세요`, `완료되면 알려주세요` 같은 문장은 금지예요. 승인 뒤에는 CLI watch/resume 이 자동으로 이어지는지 스스로 확인해요. `auto_poll:false` 면 URL/code 를 한 번만 보여주고, outstanding code 가 있는 동안 `--resume-last` 없이 fresh `bootstrap --execute` 를 다시 호출하지 않아요. 자세한 device-flow handling 은 `references/bootstrap-and-local.md` 를 읽어요.
 
 ### 8. Clone Into Current Directory
 
