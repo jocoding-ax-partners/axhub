@@ -95,17 +95,21 @@ axhub apps templates list --tenant test --json
 
 ### 4. Template Picker
 
-Claude Desktop 에서는 template 선택을 native Question/AskUserQuestion card 로 먼저 물어요. 제목은 `템플릿 선택`, 질문은 `어떤 템플릿으로 시작할까요?`; backend 실제 template 만 보여줘요. 3개 초과면 추천 3개만 card 에 올리고, card 가 렌더링되지 않거나 선택지가 보이지 않는 경우에만 일반 채팅 텍스트로 fallback 해요.
+Claude Desktop 에서는 template 선택을 native Question/AskUserQuestion card 로 먼저 물어요. 제목은 `템플릿 선택`, 질문은 `어떤 템플릿으로 시작할까요?`; backend 실제 template 만 보여줘요. 3개 초과면 추천 3개만 올리고, card 가 렌더링되지 않거나 선택지가 보이지 않는 경우에만 일반 채팅 텍스트로 fallback 해요.
 
-`웹앱`, `쇼핑몰`, `사이트`, `앱`, `서비스`, `예약`, `주문`, `preorder`, `booking`, `shop`, `store`, `dashboard`, `admin` 같은 일반 장르·기능 단어는 exact template 선택이 아니에요. 추천 순서를 정하는 근거일 뿐 선택 확정이 아니며, `--template ... --dry-run` 은 템플릿 질문 답변을 받은 뒤에만 실행해요.
+섞인 요청에서 update/clarity 가 먼저 처리됐어도 template 은 여기서만 확정해요. 이전 콘셉트·slug·이름 질문 답은 추천 힌트일 뿐이에요.
 
-사용자가 `추천해줘`, `알아서`, `best option`, `recommend the best option` 처럼 말해도 그 말은 추천을 원한다는 뜻이지 선택 확정이 아니에요. 가장 알맞은 템플릿을 1번 추천으로 올리되 반드시 `어떤 템플릿으로 시작할까요?` 질문을 보여주고 답을 기다려요. 질문 뒤 사용자가 `추천대로`, `1번`, template 이름처럼 답하면 그때 확정해요.
+`웹앱`, `쇼핑몰`, `예약`, `preorder`, `booking`, `shop`, `dashboard`, `admin` 같은 일반 장르·기능 단어는 exact template 선택이 아니에요. 추천 순서를 정하는 근거일 뿐 선택 확정이 아니며, `--template ... --dry-run` 은 템플릿 질문 답변을 받은 뒤에만 실행해요.
+
+사용자가 `추천해줘`, `알아서`, `best option`, `recommend the best option` 처럼 말해도 그 말은 추천을 원한다는 뜻이지 선택 확정이 아니에요. 1번 추천은 가능하지만 반드시 `어떤 템플릿으로 시작할까요?` 질문을 보여주고 답을 기다려요. 질문 뒤 `추천대로`, `1번`, template 이름 답변이면 확정해요.
 
 ### 5. App Name
 
-앱 이름 질문 문구는 반드시 `앱 이름을 무엇으로 할까요?` 로 써요. `앵 이름` 같은 오타나 줄임말을 쓰지 않아요. 표시 제목은 `앱 이름 확인`; 앱 이름 확인도 native Question/AskUserQuestion card 로 먼저 물어요. 답변 입력이 막힐 때만 일반 채팅 텍스트로 fallback 해요. 사용자가 답한 뒤에만 `--name`/`--slug` 를 확정해요.
+앱 이름 질문 문구는 반드시 `앱 이름을 무엇으로 할까요?`; `앵 이름` 같은 오타나 줄임말을 쓰지 않아요. 표시 제목은 `앱 이름 확인`; 앱 이름 확인도 native Question/AskUserQuestion card 로 먼저 물어요. 답변 입력이 막힐 때만 일반 채팅 텍스트로 fallback. 사용자가 답한 뒤에만 `--name`/`--slug` 를 확정해요.
 
-`추천 이름으로 해줘`, `알아서 이름 지어줘`, `use the recommended name` 은 앱 이름 질문이 먼저 보인 뒤의 답변일 때만 확정으로 봐요. 앱 이름 질문을 아직 보여주지 않았다면 추천 이름을 제안하고 `앱 이름을 무엇으로 할까요?` 로 한 번 확인해요.
+`추천 이름으로 해줘`, `알아서 이름 지어줘`, `use the recommended name` 은 앱 이름 질문이 먼저 보인 뒤의 답변일 때만 확정으로 봐요. 아직이면 추천 이름을 제안하고 `앱 이름을 무엇으로 할까요?` 로 확인해요.
+
+다른 스킬/일반 채팅의 이름·slug 답은 추천 후보로만 쓰고, `앱 이름 확인` card 를 다시 보여줘요. 앱 이름 라벨은 오타·반말 없이 써요. 선택지 설명은 짧고 검수된 한국어만 써요: `기존 앱들과 겹치지 않는 새 콘셉트`, `예약 폼과 시간 선택에 적합`, `정적 페이지 중심이면 가까운 구조`.
 
 repo name 과 subdomain 은 명시 입력이 없으면 app slug 로 맞춰요. dry-run 과 execute 모두 `--repo-name <app-slug>` 및 `--subdomain <app-slug>` 를 붙여요.
 

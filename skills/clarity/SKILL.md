@@ -1,6 +1,6 @@
 ---
 name: clarity
-description: 'clarity: onboarding/bootstrap/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "Use the axhub clarity skill", "show current app status", "is production healthy?", "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요. 영어로 clarity skill 을 직접 지정한 요청도 반드시 이 스킬로 라우팅해요.'
+description: 'clarity: onboarding/bootstrap/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "Use the axhub clarity skill", "show current app status", "is production healthy?", "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 빈 디렉토리 새 앱 만들기·템플릿·앱 이름 선택=bootstrap, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요. 앱 상태 조회와 새 앱 생성이 한 요청에 섞이면 clarity 는 상태만 조회하고 concept/name/slug/template 질문 없이 bootstrap 으로 넘겨요. 영어로 clarity skill 을 직접 지정한 요청도 반드시 이 스킬로 라우팅해요.'
 ---
 
 # axhub clarity 브리지
@@ -92,6 +92,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - ❌ Claude Desktop 에 노출된 `axhub` App/MCP 도구 호출 — `App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)`, `Deployment status (axhub)` 는 read-only 라도 쓰지 않아요. clarity 는 항상 CLI help gate 뒤 `axhub` 명령으로 실행해요.
 - ❌ 읽기 전용 leaf CLI 를 `> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution 같은 shell wrapper 로 감싸기 — Claude Desktop 사용자에게 불필요한 권한 팝업과 임시 파일 흔적이 생겨요. 단일 `axhub ... --json` 호출을 실행하고 tool 결과를 assistant 내부에서 해석해요.
 - ❌ `읽는 중 <랜덤>.txt`, `Read /tmp/...`, `파일 읽기` 같은 임시 출력 파일 재읽기 — 사용자는 앱 상태 조회 하나를 기대하므로, 파일 읽기 팝업/단계가 보이면 실패예요. 더 좁은 CLI 조회로 다시 실행해요.
+- ❌ 앱 상태 조회 뒤 새 앱 생성을 clarity 가 직접 질문 — `예약 사이트 컨셉`, `새로 만들 예약 웹사이트, 어떤 컨셉으로 할까요?`, `네일샵 예약`, `사진관 예약`, `애견미용 예약`, `피아노 레슨 예약` 같은 concept/name/slug/template 추천 질문을 만들지 않아요. 추천 후보와 선택 카드는 bootstrap 책임이에요.
 
 ## 진행 상황 알림 (Progress Reporting)
 
@@ -193,6 +194,16 @@ TodoWrite({ todos: [
 | **그 외 전부 + 의도가 불분명한 axhub 발화** | **clarity (이 스킬)** |
 
 경계가 섞여 오면(예: "배포하고 로그 봐줘") 배포는 deploy 에 양보하고 로그 부분만 이 스킬이 이어받아요.
+
+버전 확인·앱 상태 조회·새 앱 생성이 한 요청에 섞이면 update 는 버전만, clarity 는 앱 상태 조회만 처리하고, 새 앱 생성은 bootstrap 으로 넘겨요. clarity 안에서 콘셉트, 앱 이름, slug, 템플릿을 대신 묻거나 확정하지 않아요. 상태 조회 뒤 새 앱 생성이 남아 있으면 native Question/AskUserQuestion 을 절대 열지 말고 `새 앱 생성은 이어서 진행할게요.` 라고만 말한 뒤 bootstrap 으로 handoff 해요. bootstrap 이 `어떤 템플릿으로 시작할까요?` 와 `앱 이름을 무엇으로 할까요?` 카드를 묻게 해요.
+
+특히 Claude Desktop 에서 다음처럼 보이면 clarity 실패예요:
+
+- question 제목 `예약 사이트 컨셉`
+- 질문 `새로 만들 예약 웹사이트, 어떤 컨셉으로 할까요?`
+- 선택지 `네일샵 예약`, `사진관 예약`, `애견미용 예약`, `피아노 레슨 예약`
+
+이 실패 형태가 떠오르면 해당 질문을 띄우지 말고 즉시 `새 앱 생성은 이어서 진행할게요.` 한 줄로 마무리한 뒤 bootstrap 을 호출해요. 추천 후보는 bootstrap 이 묻고 clarity 는 만들지 않아요.
 
 ## 다음 단계 이어주기
 

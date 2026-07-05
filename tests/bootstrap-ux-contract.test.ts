@@ -215,6 +215,11 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("답변 입력이 막힐 때만 일반 채팅 텍스트로 fallback");
     expect(bootstrap).toContain("사용자가 답한 뒤에만 `--name`/`--slug` 를 확정해요");
     expect(bootstrap).toContain("`use the recommended name` 은 앱 이름 질문이 먼저 보인 뒤의 답변일 때만 확정");
+    expect(bootstrap).toContain("선택지 설명은 짧고 검수된 한국어만 써요");
+    expect(bootstrap).toContain("기존 앱들과 겹치지 않는 새 콘셉트");
+    expect(bootstrap).toContain("예약 폼과 시간 선택에 적합");
+    expect(templateReference).toContain("Keep choice descriptions short and proofread");
+    expect(templateReference).toContain("정적 페이지 중심이면 가까운 구조");
     expect(templateReference).toContain("Do not finalize the name before one user-facing confirmation in Claude Desktop");
     expect(templateReference).toContain("Recommendation wording like");
     expect(templateReference).toContain("is approval only after the app-name prompt is visible");
@@ -223,6 +228,43 @@ describe("bootstrap desktop UX contract", () => {
     expect(templateReference).toContain("앱 이름을 무엇으로 할까요?");
     expect(templateReference).toContain("번호나 원하는 앱 이름으로 답해 주세요.");
     expect(templateReference).not.toContain("\"앱 이름 뭘로 할래요?\"");
+  });
+
+  test("does not accept pre-bootstrap concept or slug prompts as bootstrap confirmation", () => {
+    const bootstrap = readBootstrap();
+    const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
+    const clarity = readRepo("skills/clarity/SKILL.md");
+
+    expect(bootstrap).toContain("섞인 요청에서 update/clarity 가 먼저 처리됐어도 template 은 여기서만 확정");
+    expect(bootstrap).toContain("콘셉트·slug·이름 질문 답은 추천 힌트일 뿐");
+    expect(bootstrap).toContain("추천 후보로만 쓰고");
+    expect(templateReference).toContain("Pre-bootstrap answers to concept or slug questions are not confirmation");
+    expect(templateReference).toContain("bootstrap must still show `앱 이름 확인`");
+    expect(clarity).toContain("clarity 안에서 콘셉트, 앱 이름, slug, 템플릿을 대신 묻거나 확정하지 않아요");
+    expect(clarity).toContain("native Question/AskUserQuestion 을 절대 열지 말고");
+    expect(clarity).toContain("새 앱 생성은 이어서 진행할게요");
+    expect(clarity).toContain("question 제목 `예약 사이트 컨셉`");
+    expect(clarity).toContain("질문 `새로 만들 예약 웹사이트, 어떤 컨셉으로 할까요?`");
+    expect(clarity).toContain("선택지 `네일샵 예약`, `사진관 예약`, `애견미용 예약`, `피아노 레슨 예약`");
+    expect(clarity).toContain("추천 후보는 bootstrap 이 묻고 clarity 는 만들지 않아요");
+    expect(clarity).toContain("bootstrap 이 `어떤 템플릿으로 시작할까요?` 와 `앱 이름을 무엇으로 할까요?` 카드를 묻게 해요");
+  });
+
+  test("blocks typoed Korean prompt copy observed in desktop bootstrap QA", () => {
+    const contract = readBootstrapContract() + "\n" + readRepo("skills/clarity/SKILL.md");
+
+    expect(contract).toContain("`어느 템플릿` 대신 반드시 `어떤 템플릿으로 시작할까요?`");
+    expect(contract).toContain("`작업공간`이라고 말해요");
+    expect(contract).toContain("`가장 빠른 시작`");
+    expect(contract).not.toContain("앱 이륨");
+    expect(contract).not.toContain("앱 이맄");
+    expect(contract).not.toContain("뱰른");
+    expect(contract).not.toContain("작업구역");
+    expect(contract).not.toContain("지어버릴게요");
+    expect(contract).not.toContain("곹치지");
+    expect(contract).not.toContain("컴셈");
+    expect(contract).not.toContain("컴셉");
+    expect(contract).not.toContain("가깜운");
   });
 
   test("chooses template and app name before checking the GitHub owner", () => {

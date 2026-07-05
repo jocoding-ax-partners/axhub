@@ -34,6 +34,8 @@ Unknown backend templates are not hidden. Show backend `name` and `folder_name`,
 
 In Claude Desktop, use a native Question/AskUserQuestion card first for backend template selection. Earlier dynamic cards sometimes rendered poorly, but current Desktop QA showed normal chat fallback can leave the prompt box disabled after the question; the smoother path is native card first, text fallback only when the card does not render choices. Every choice must map to a real backend template. Do not add generic `Other`, `직접 고르기`, or `취소` choices to the template picker. If there are more than 3 templates, put the best 3 actual recommendations in the card and show the full text list nearby; free-text fallback must match exact alias/folder/name before starting saga.
 
+If update/clarity or ordinary chat ran earlier in the same mixed request, ignore any ad-hoc concept/name/slug question that was not issued by bootstrap itself. Treat those answers only as recommendation hints. The first authoritative template confirmation must still be the bootstrap card with the exact Korean question `어떤 템플릿으로 시작할까요?`. `어느 템플릿` 대신 반드시 `어떤 템플릿으로 시작할까요?` 를 쓰고, descriptions should use natural Korean such as `가장 빠른 시작`; do not use typoed or over-casual phrasing.
+
 Example visible chat shape, only when those templates exist in backend output:
 
 ```text
@@ -51,6 +53,8 @@ If the user's utterance already contains an exact alias/folder/name, use it with
 ## App Name
 
 `--name` is required. If the utterance implies a name, propose it as the first option, for example "결제 앱 만들어줘" -> "결제 앱". Do not finalize the name before one user-facing confirmation in Claude Desktop. Recommendation wording like "알아서 이름 지어줘" or "use the recommended name" is approval only after the app-name prompt is visible; before that, propose the recommendation and ask. Use the exact question text `앱 이름을 무엇으로 할까요?`; never write `앵 이름` or a shortened variant. Ask with a native Question/AskUserQuestion card first. Fall back to normal chat text only when the card does not render or the answer UI is unavailable. If the utterance does not imply a name, ask once:
+
+Pre-bootstrap answers to concept or slug questions are not confirmation. They may seed the first recommendation, but bootstrap must still show `앱 이름 확인` and ask `앱 이름을 무엇으로 할까요?` before setting `--name`, `--slug`, `--repo-name`, or `--subdomain`. Never display typoed labels or malformed choice descriptions. Keep choice descriptions short and proofread: prefer natural Korean like `기존 앱들과 겹치지 않는 새 콘셉트`, `예약 폼과 시간 선택에 적합`, or `정적 페이지 중심이면 가까운 구조`.
 
 ```text
 앱 이름 확인
