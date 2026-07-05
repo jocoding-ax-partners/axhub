@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.26](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.25...v1.7.26) (2026-07-05)
+
+Claude Code Desktop 실제 QA에서 "axhub 최신인지 확인해줘" 뒤 update 가 플러그인 캐시의 `plugin.json` 읽기 권한을 요구하고, 이어진 "내 앱들이 지금 어떤 상태인지 모르겠어" 요청은 clarity 가 schema 탐색과 디렉토리 확인으로 오래 머무는 문제가 보였어요. 이제 update 는 캐시 파일을 직접 읽지 않고 `claude plugin list` 로만 플러그인 버전을 내부 확인하며, clarity 는 계정 전체 앱 상태 요청을 빠른 경로로 처리해 빈 프로젝트 폴더를 스캔하지 않고 짧은 조회 결과로 바로 요약해요.
+
 ## [1.7.25](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.24...v1.7.25) (2026-07-05)
 
 Claude Code Desktop 실제 QA에서 bootstrap 은 작업공간·템플릿·앱 이름·GitHub owner 질문을 모두 정상으로 호출했지만, GitHub device flow 뒤 첫 resume 명령이 긴 watch 모드로 들어가면 코드와 다음 상태가 늦게 보여 사용자가 멈춘 것처럼 느낄 수 있었어요. 이제 첫 execute 와 device-flow 직후 첫 resume 은 `--no-input` 기반 짧은 명령으로 끝내고, 이후 빌드·배포 상태만 별도 status 명령으로 확인하도록 해서 GitHub 코드가 바로 보이는 흐름을 유지해요.
