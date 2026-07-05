@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.21](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.20...v1.7.21) (2026-07-05)
+
+Claude Code Desktop 실제 QA에서 update 요청이 첫 본문은 좋아졌지만, 최신 확인 뒤 별도 cache marker 권한 카드가 뜨고 release skill 설명이 다시 내부 경로 설명으로 샐 수 있는 여지가 남아 있었어요. 이제 update 경로는 바로 `현재 버전을 확인할게요.` 로 시작하고, 버전 확인 뒤에는 CLI·plugin 결과만 보여주며 별도 로컬 캐시 쓰기 권한을 요청하지 않아요.
+
 ## [1.7.20](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.19...v1.7.20) (2026-07-04)
 
 Claude Code Desktop 실제 QA에서 update 요청이 skill 본문을 읽기 전 frontmatter 단계에서 `전용 스킬을 사용하겠습니다` 같은 내부 라우팅 설명을 먼저 보여주는 문제가 남아 있었어요. 이제 update 경로는 첫 본문을 `현재 버전을 확인할게요.` 로 시작하도록 frontmatter 와 본문 계약을 같이 고정하고, CLI 설치·버전 확인·플러그인 업데이트 tool 제목도 한국어 라벨로 제한해서 빈 폴더에서 최신 여부를 물어도 개발자용 설명이 앞에 새지 않아요.
