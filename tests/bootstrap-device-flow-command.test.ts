@@ -17,10 +17,19 @@ describe("bootstrap device-flow command contract", () => {
 
     expect(bootstrap).toContain("첫 execute/resume 에 `--watch`/`--watch-timeout` 을 붙이지 않아요");
     expect(localReference).toContain("Do not attach `--watch` or `--watch-timeout` to the first execute");
-    expect(localReference).toContain("strip `--watch --watch-timeout <value>` from the first Desktop resume");
-    expect(resumeReference).toContain("strip `--watch --watch-timeout <value>` from the first Desktop resume");
+    expect(localReference).toContain("background task output file");
+    expect(localReference).toContain("do not run the emitted `resume_command`");
+    expect(localReference).toContain("never verbatim");
+    expect(localReference).toContain("strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume");
+    expect(bootstrap).toContain("output file 을 알려주면 그 파일을 즉시 읽어");
+    expect(bootstrap).toContain("원래 execute background task 가 `auto_poll:true` 로 아직 돌고 있으면 중복 resume 을 실행하지 말고");
+    expect(resumeReference).toContain("strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume");
+    expect(resumeReference).toContain("never run it verbatim");
+    expect(resumeReference).toContain("original execute is still running as an `auto_poll:true` background task");
     expect(preCloneReference).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap");
     expect(preCloneReference).not.toContain("--execute --watch");
     expect(preCloneReference).not.toContain("--resume-last --watch");
+    expect(preCloneReference).not.toMatch(/AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap[^\n]*--execute[^\n]*--json/);
+    expect(resumeReference).not.toMatch(/AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap[^\n]*--execute[^\n]*--json/);
   });
 });
