@@ -7,6 +7,10 @@ description: 'clarity: onboarding/bootstrap/import/deploy/development/diagnosis/
 
 8개 스킬(onboarding·bootstrap·import·deploy·development·diagnosis·clarity·update) 중 다른 스킬에 명확히 안 맞거나 **의도가 불분명한** axhub 요청을 여기서 해소해요. 작업→명령 카탈로그는 없어요 — **매번 라이브 CLI 의 `--help` 트리를 탐색**해 맞는 명령을 찾고, 조회 명령은 바로 실행하되 파괴적 변경은 승인 뒤 실행해요.
 
+**CLI-only.** 이 스킬의 조회·상태 확인·운영 브리지는 Claude Desktop 에 보이는 `axhub` App/MCP 도구가 아니라 Bash/명령 도구로 실행하는 `axhub` CLI 만 사용해요. `App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)`, `Deployment status (axhub)` 같은 도구가 보여도 호출하지 않아요. read-only 조회라도 MCP/App tool 로 빠지면 CLI help gate·제목 계약·권한 UX 를 검증할 수 없어서 이 스킬의 실패예요.
+
+**Desktop-visible command allowlist.** Claude Desktop 에 보이는 모든 `clarity` 명령은 `axhub ...` 단일 명령이어야 해요. 탐색(`--json-schema`), 사용법 확인(`--help`), 실행(`--json`) 모두 공통으로 `bash -lc`, `sh -c`, `| head`, `| grep`, `| sed`, `| awk`, shell pipe, `>`, `<`, `2>`, `&>`, `;`, `&&`, `||`, `echo`, `cat`, `wc`, `tee`, `xargs`, `jq`, `python`, `node`, `perl`, `mktemp`, command substitution, 임시 파일, Read/Write/file tool 을 쓰지 않아요. `--field-expr` 문자열 내부의 `|` 는 허용되지만 shell pipe 로 출력 후처리하면 실패예요. 출력이 크면 `head -c` 로 자르지 말고 더 좁은 `--field-expr` 경로를 다시 고른 단일 `axhub --json-schema --field-expr '...'` 명령을 실행해요.
+
 ## 자연어 라우팅 계약
 
 Claude Desktop 에서는 slash 명령이 채팅에서 인식되지 않을 수 있으므로, 사용자가 아래처럼 영어로 직접 clarity 를 지목해도 이 스킬을 실행해요:
@@ -38,9 +42,11 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 
 - 계정 전체 앱 상태에서는 최상위 `keys[]` 탐색을 건너뛰고 `명령 표면 확인` 제목으로 앱 명령 표면만 한 번 확인해요.
 - 앱 목록·상태를 보여주는 leaf 를 고른 뒤 `명령 사용법 확인` 제목으로 그 leaf 의 help gate 를 한 번만 통과해요.
-- 그 다음 `앱 상태 조회` 제목으로 읽기 전용 조회를 실행하고, 결과를 2-4줄 한국어로 바로 요약해요.
+- 그 다음 `앱 상태 조회` 제목으로 읽기 전용 조회를 실행하고, 결과를 2-4줄 한국어로 바로 요약해요. 이때 Claude Desktop 에 보이는 실행 명령은 `axhub apps ... --json` 같은 단일 leaf CLI 호출이어야 해요. `> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution, 임시 파일 저장/재읽기, shell wrapper 로 감싸지 않아요. tool 출력은 assistant 내부에서 읽고 요약하며, 출력이 크면 CLI 의 공개 필터/필드 옵션을 help gate 로 확인해 사용해요.
+- `앱 상태 조회` 실행 뒤에는 Read/파일 읽기 도구로 `*.txt`, `/tmp/*`, command output snapshot, 임시 결과 파일을 열지 않아요. Claude Desktop 이 command output 을 파일로 접어 보여줘도 그 파일을 읽지 말고, 필요한 범위를 더 좁힌 `axhub ... --json` 또는 `axhub --json-schema --field-expr ...` 단일 CLI 호출을 다시 실행해요.
 - 이 빠른 경로에서 tool call 이 4개를 넘기면 멈추고 지금까지 확인한 결과만 요약해요. 더 깊은 로그·실패 원인 분석은 diagnosis 로 넘겨요.
 - 계정 전체 상태 조회 중에는 `디렉토리 구조 확인`, `파일 목록 확인`, `프로젝트 확인` 같은 tool 제목이나 `ls`, `find`, `pwd` 류 명령을 쓰지 않아요.
+- 계정 전체 상태 조회 중에는 `App list (axhub)` 또는 `Tenant recent deployments (axhub)` 같은 Claude Desktop axhub App/MCP 도구를 쓰지 않아요. 같은 정보를 조회해야 해도 반드시 `axhub --json-schema --field-expr ...`, leaf `--help`, leaf `--json` CLI 순서로 확인해요.
 
 - 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구만 써요: `명령 표면 확인`, `명령 사용법 확인`, `앱 상태 조회`, `운영 상태 확인`, `결과 정리`.
 - Bash/명령 tool 을 호출할 때 description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요. 도구가 자동으로 제목을 만들도록 비워두면 `axhub: App get 사용 중` 같은 이름이 보이므로 금지예요.
@@ -50,6 +56,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - `axhub: App get 사용 중`, `productioning 배포 상태`, `productioned 배포 상태`, `Usage 확인 끝` 같은 제목이나 중간 문장이 보이면 같은 명령이라도 다시 고정 한국어 제목으로 호출해요.
 - tool 제목에는 제품명 `axhub` 자체를 넣지 않아요. 필요하면 본문에서만 "CLI" 또는 "명령"이라고 말해요.
 - 중간 문구에도 `Usage`, `app get`, `deploy status`, `apps get` 같은 명령·영어 단어를 쓰지 말고 `사용법 확인 끝. 앱 상태와 운영 상태만 확인할게요.`처럼 말해요.
+- 중간 진행 문구는 정확한 한국어만 써요. `Ap 상태`, `App 상태`, `앱 status`, `status 조회`처럼 영어가 섞이거나 단어가 잘린 표현을 쓰지 말고 `앱 상태 조회할게요.` 또는 `앱 상태를 확인할게요.`라고 써요.
 - 중간 진행 문구와 최종 메시지에 raw 필드명·불리언·상태 enum 을 그대로 쓰지 않아요: `status: deployed`, `operating_status`, `last_deployment_status`, `production_deployment_id`, `resource: XS`, `succeeded`, `failed`, `commit_not_found`, `resolve`, `healthy: true` 대신 한국어로 풀어요.
 - `operating_status` 값이 `dev` 라고 해서 "운영 배포 승격 전" 또는 "production 이 아니다" 라고 해석하지 않아요. 앱 URL 이 살아 있고 현재 운영 배포가 서빙 중이면 "현재 운영 서비스는 정상이에요"라고만 말해요.
 - 사용자가 이력이나 실패 원인을 묻지 않았으면 deployment id, commit SHA, deployment 목록을 보여주지 않아요. 필요하면 "최근 배포 시도 하나는 실패했어요" 정도로만 말하고, 상세 분석은 diagnosis 로 안내해요.
@@ -72,6 +79,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 원칙 위반이 실전에서 드러나는 구체 형태예요:
 
 - ❌ `--json-schema` (270KB) 를 통째로 읽기 — 반드시 `--field-expr` 로 필요 부분만 슬라이스해요. 통째 로드는 context 낭비.
+- ❌ schema/help/실행 명령에 `2>/dev/null | head -c 2000`, `| grep`, `| jq`, `bash -lc` 같은 shell 후처리 붙이기 — 모든 Desktop-visible clarity 명령은 단일 `axhub ...` 명령이어야 해요. 출력 축소는 더 좁은 `--field-expr` 로만 해요.
 - ❌ `--help` 를 안 읽고 인자를 추측 조립 — leaf 명령 `--help` 1회 선숙지(--help gate) 후에만 실행. 추측 인자는 exit 64.
 - ❌ 1단계 탐색에서 못 찾자 포기 — 두 단계 깊이까지 탐색한 뒤에만 "기능 없음" 을 선언해요.
 - ❌ 탐색 출력(schema/help 본문)·raw stdout/stderr·secret·내부 id 를 chat 에 echo — 사용자에겐 한국어 요약만.
@@ -79,6 +87,9 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - ❌ 못 찾은 기능을 비슷한 명령으로 조용히 대체 실행 — 정직하게 부재를 알리고 가장 가까운 명령을 "제안"만 해요 (무단 실행 금지).
 - ❌ `plugin-support` hidden 표면을 탐색·실행 (공개 표면만 원칙 위반).
 - ❌ deploy/bootstrap/import/onboarding/development/diagnosis/update 담당 의도를 가로채기 (아래 경계표 위반 — 해당 의도는 양보). 특히 기존 앱 첫 연결은 import, 앱 코드(페이지·화면·대시보드·엔드포인트) 생성은 development, 배포 실패 원인 진단은 diagnosis 양보 — clarity 는 axhub 명령 실행만 해요.
+- ❌ Claude Desktop 에 노출된 `axhub` App/MCP 도구 호출 — `App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)`, `Deployment status (axhub)` 는 read-only 라도 쓰지 않아요. clarity 는 항상 CLI help gate 뒤 `axhub` 명령으로 실행해요.
+- ❌ 읽기 전용 leaf CLI 를 `> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution 같은 shell wrapper 로 감싸기 — Claude Desktop 사용자에게 불필요한 권한 팝업과 임시 파일 흔적이 생겨요. 단일 `axhub ... --json` 호출을 실행하고 tool 결과를 assistant 내부에서 해석해요.
+- ❌ `읽는 중 <랜덤>.txt`, `Read /tmp/...`, `파일 읽기` 같은 임시 출력 파일 재읽기 — 사용자는 앱 상태 조회 하나를 기대하므로, 파일 읽기 팝업/단계가 보이면 실패예요. 더 좁은 CLI 조회로 다시 실행해요.
 
 ## 진행 상황 알림 (Progress Reporting)
 
@@ -112,17 +123,9 @@ TodoWrite({ todos: [
 
 1. **CLI 가드.** `command -v axhub` 가 실패하면 멈추고 안내해요: "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요" → onboarding 스킬로 넘겨요. raw 에러는 chat 에 노출하지 않아요.
 
-1a. **버전 체크 (맨 처음, best-effort · 비차단 · 10분 TTL).** CLI 가 있으면 본 작업 전에 axhub CLI·플러그인 새 버전이 있는지 한 번 가볍게 확인해요. 매 호출 네트워크를 피하려 10분 캐시하고, 실패·구 CLI 면 조용히 건너뛰어요 — 작업을 막지 않아요.
+1a. **버전 체크 (맨 처음, best-effort · 비차단).** CLI 가 있으면 본 작업 전에 axhub CLI·플러그인 새 버전이 있는지 가볍게 확인할 수 있어요. Claude Desktop 에서는 캐시 파일·stamp 파일·shell wrapper 없이 `버전 확인` 제목으로 단일 명령 `axhub update check --json` 만 실행해요. 실패·구 CLI 면 조용히 건너뛰고, 작업을 막지 않아요.
 
-   ```bash
-   STAMP="${TMPDIR:-/tmp}/axhub-update-check.stamp"
-   if [ -z "$(find "$STAMP" -mmin -10 2>/dev/null)" ]; then
-     : > "$STAMP"
-     UPD=$(axhub update check --json 2>/dev/null)
-   fi
-   ```
-
-   `UPD` 의 `has_update`(CLI) / `plugin.has_update`(플러그인) 중 하나라도 true 면 한 줄만 안내한 뒤 이어가요. 둘 다 false 거나 `UPD` 가 비면(캐시 hit·네트워크 실패·구 CLI) 아무것도 안 보여줘요.
+   `axhub update check --json` 결과의 `has_update`(CLI) / `plugin.has_update`(플러그인) 중 하나라도 true 면 한 줄만 안내한 뒤 이어가요. 둘 다 false 거나 결과를 못 읽으면 아무것도 안 보여줘요.
    - CLI 새 버전: "axhub CLI 새 버전(`latest`)이 나왔어요 — '업데이트 해줘'라고 하면 적용할게요."
    - 플러그인 새 버전: "axhub 플러그인 새 버전(`plugin.latest`)이 있어요 — `/plugin update` 로 받을 수 있어요."
 

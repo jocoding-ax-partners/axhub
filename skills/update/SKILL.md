@@ -29,9 +29,11 @@ model: sonnet
 
 **첫 응답 계약.** 선택 이유를 설명하지 않아요. 빈 폴더여도 "axhub 프로젝트가 아니다" 라고 추론하지 말고 바로 버전 확인을 진행해요.
 
+**섞인 요청 처리.** 사용자가 "최신인지 확인하고 내 앱 상태도 봐줘"처럼 버전 확인과 다른 axhub 운영 요청을 함께 말해도, 이 스킬은 **버전 확인/업데이트 결과까지만** 처리해요. 앱 목록·앱 상태·배포 상태·로그·환경변수·데이터 조회는 여기서 직접 실행하지 말고 `clarity` 로 넘겨요. 특히 Claude Desktop 에 노출되는 `App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)` 같은 axhub App/MCP 도구는 read 라도 이 스킬에서 호출하지 않아요.
+
 **보이는 tool 제목 계약.** Bash/명령 도구를 부를 때 description/title/summary 는 아래 고정 한국어 라벨 중 하나만 써요. 라벨 안에 `axhub` 를 넣지 않아요. `axhubing CLI 설치 여부 확인` 처럼 제품명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요.
 
-**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `command -v claude`, `claude plugin list`, `claude plugin update axhub@axhub --scope <SCOPE>`. Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요. 캐시 경로가 작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요. 플러그인 현재 버전은 가능하면 `claude plugin list` 의 `axhub@axhub` 항목에서 내부 변수로만 읽고, `claude` CLI 가 없거나 파싱할 수 없으면 플러그인 버전 비교는 생략해요. 플러그인 manifest 확인 때문에 shell wrapper, file test, pipe, text filter, 파일 읽기 도구를 쓰지 않아요.
+**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `command -v claude`, `claude plugin list`, `claude plugin update axhub@axhub --scope <SCOPE>`. Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요. 캐시 경로가 작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요. 플러그인 현재 버전은 가능하면 **정확히 `claude plugin list` 만 실행한 출력**의 `axhub@axhub` 항목에서 내부 변수로만 읽고, `claude` CLI 가 없거나 파싱할 수 없으면 플러그인 버전 비교는 생략해요. `claude plugin list 2>&1 | grep ...`, `sed`, `awk`, `head`, `tail`, command substitution, shell wrapper, file test, pipe, text filter, 파일 읽기 도구를 쓰지 않아요. 출력이 길어도 전체 `claude plugin list` 결과를 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요.
 
 | 단계 | tool description/title/summary |
 | --- | --- |
@@ -134,6 +136,8 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 
 플러그인을 새로 받았으면 마지막에 **재시작 안내**를 한 번 더 또렷이 남겨요.
 
+원래 요청에 앱 상태 조회 같은 다른 axhub 작업이 함께 있었으면, 결과 카드 뒤에 한 줄만 덧붙이고 멈춰요: `앱 상태는 이어서 확인할게요.` 그 다음 작업은 `clarity` 스킬이 CLI 로 처리해야 해요. update 스킬 안에서 앱 목록·배포 상태 도구를 이어서 호출하지 않아요.
+
 ---
 
 ## 가시성·안전 규칙
@@ -155,3 +159,4 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - NEVER raw JSON·stderr·내부 device/installation id 를 chat 에 출력하지 말아요.
 - NEVER 플러그인 업데이트를 받고도 재시작 안내를 빼먹지 말아요 — 재시작 전엔 새 버전이 안 떠요.
 - NEVER 확인하지 않은 버전을 "업데이트됨" 으로 보고하지 말아요 — `axhub --version` 재확인 뒤에만 새 버전을 말해요.
+- NEVER 이 스킬에서 앱 목록·앱 상태·최근 배포 상태를 직접 조회하지 말아요. `App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)` 같은 Claude Desktop axhub App/MCP 도구도 호출하지 말아요 — read 작업이어도 `clarity` 소관이에요.
