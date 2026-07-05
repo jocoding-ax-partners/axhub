@@ -265,6 +265,11 @@ describe("bootstrap desktop UX contract", () => {
     expect(contract).not.toContain("컴셈");
     expect(contract).not.toContain("컴셉");
     expect(contract).not.toContain("가깜운");
+    expect(contract).not.toContain("가벼고");
+    expect(contract).not.toContain("안 격침");
+    expect(contract).not.toContain("멈췤요");
+    expect(contract).toContain("가볍고 빠른 시작");
+    expect(contract).toContain("진행하지 않고 멈춰요");
   });
 
   test("chooses template and app name before checking the GitHub owner", () => {
@@ -309,8 +314,10 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`for`, `while`, `sleep`, `grep`, `cut`, `awk`, `jq`");
     expect(bootstrap).toContain("상태를 다시 볼 때마다 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행");
     expect(bootstrap).toContain("성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요");
+    expect(bootstrap).toContain("실제 tool/예약 없이 `90초 후 자동 확인` 같은 말을 쓰지 않아요");
     expect(localReference).toContain("Never poll deployment status with a shell loop");
     expect(localReference).toContain("Run one direct `axhub deploy status <deployment-id> --tenant <tenant> --json` command per check");
+    expect(localReference).toContain("Do not claim \"I'll automatically check again in 90 seconds\"");
     expect(localReference).toContain("Do not parse JSON with `grep`, `cut`, `awk`, `sed`, or `jq` in Desktop-visible commands");
     expect(localReference).not.toContain("for i in $(seq");
     expect(localReference).not.toContain("grep -o '\"status\"");
@@ -361,6 +368,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`visibility=private` 또는 `review_status=pending` 이면 친구에게 바로 공개됐다고 말하지 않아요");
     expect(bootstrap).toContain('axhub publish --app "$APP_SLUG" --visibility public --json');
     expect(bootstrap).toContain("승인 전 공개 확대를 `axhub apps update --visibility public` 로 시도하지 않아요");
+    expect(bootstrap).toContain("도메인-only target 금지");
     expect(resultReference).toContain("If `PUBLIC_URL` exists and `VISIBILITY=public` and `REVIEW_STATUS=approved`");
     expect(resultReference).toContain("do not call it public");
     expect(resultReference).toContain('Never try `axhub apps update "$APP_SLUG" --visibility public` before approval');

@@ -110,8 +110,8 @@ describe("smooth behavior contracts", () => {
     expect(bootstrap).toContain("url_checked=false");
     expect(bootstrap).toContain("내부 라벨 노출 금지");
     expect(bootstrap).toContain("제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목");
-    expect(bootstrap).toContain("label 과 target 모두 확인된 `https://...` 절대 URL");
-    expect(bootstrap).toContain("`[$PUBLIC_URL]($PUBLIC_URL)` 형태");
+    expect(bootstrap).toContain("label/target 모두 같은 `https://...` 절대 URL");
+    expect(bootstrap).toContain("도메인-only target 금지");
     expect(bootstrap).toContain("NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채");
     expect(bootstrap).toContain("승인 완료를 채팅으로 알려 달라고 쓰지 않고");
     expect(bootstrapAndLocal).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
@@ -265,6 +265,13 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("`명령 표면 확인`, `명령 사용법 확인`, `앱 상태 조회`, `운영 상태 확인`, `결과 정리`");
     expect(clarity).toContain("description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요");
     expect(clarity).toContain("도구가 자동으로 제목을 만들도록 비워두면 `axhub: App get 사용 중` 같은 이름이 보이므로 금지");
+    expect(clarity).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>");
+    expect(clarity).toContain("device flow fast path 에서는 Step 1a 의 optional `axhub update check --json` 버전 확인을 건너뛰어요");
+    expect(clarity).toContain("device flow 를 시작하는 Bash/tool call 제목은 정확히 `계정 인증 시작`");
+    expect(clarity).toContain("device-flow URL 은 markdown 링크로 만들지 말고 평문 `https://...` 절대 URL");
+    expect(clarity).toContain("[https://github.com/login/device](github.com/login/device)` 처럼 target 에 scheme 이 빠질 수 있는 링크 문법은 금지");
+    expect(clarity).toContain("승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출");
+    expect(clarity).toContain("`인증 확인` 제목으로 `axhub github accounts list --tenant <tenant> --json`");
     expect(clarity).toContain("앱 상세를 조회할 때 tool 제목은 정확히 `앱 상태 조회`");
     expect(clarity).toContain("운영 배포 상태를 조회할 때는 정확히 `운영 상태 확인`");
     expect(clarity).toContain("CLI 표면이나 help 를 볼 때는 각각 `명령 표면 확인` / `명령 사용법 확인`");
