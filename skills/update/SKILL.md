@@ -31,7 +31,7 @@ model: sonnet
 
 **보이는 tool 제목 계약.** Bash/명령 도구를 부를 때 description/title/summary 는 아래 고정 한국어 라벨 중 하나만 써요. 라벨 안에 `axhub` 를 넣지 않아요. `axhubing CLI 설치 여부 확인` 처럼 제품명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요.
 
-**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `command -v claude`, `claude plugin list`, `claude plugin update axhub@axhub --scope <SCOPE>`. `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 은 Bash/명령 도구로 읽지 않아요. 파일 읽기 도구로만 읽고, 파일 읽기 도구가 없거나 거부되면 플러그인 버전 비교는 생략해요. 플러그인 manifest 확인 때문에 shell wrapper, file test, pipe, text filter 를 쓰지 않아요.
+**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `command -v claude`, `claude plugin list`, `claude plugin update axhub@axhub --scope <SCOPE>`. Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요. 캐시 경로가 작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요. 플러그인 현재 버전은 가능하면 `claude plugin list` 의 `axhub@axhub` 항목에서 내부 변수로만 읽고, `claude` CLI 가 없거나 파싱할 수 없으면 플러그인 버전 비교는 생략해요. 플러그인 manifest 확인 때문에 shell wrapper, file test, pipe, text filter, 파일 읽기 도구를 쓰지 않아요.
 
 | 단계 | tool description/title/summary |
 | --- | --- |
@@ -64,7 +64,7 @@ TodoWrite({ todos: [
 ## 0. 사전 점검 (네트워크 0)
 
 1. `command -v axhub` 가 실패하면 멈춰요 — CLI 가 아직 없는 건 설치 소관이에요. 한 줄: `axhub CLI 가 아직 없어요. "온보딩" 이라고 말하면 설치부터 도와드려요.` (재설치를 여기서 시도하지 않아요.)
-2. `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 의 `version` 을 파일 읽기 도구로 읽어 `<PLUGIN_VERSION>` 으로 둬요. Bash/명령 도구로 이 파일을 읽지 않아요. 파일 읽기 도구가 없거나 거부되면 플러그인 확인은 생략하고 CLI 만 봐요. 파일을 읽은 직후 영어 라벨과 정확한 숫자를 중간 문장으로 말하지 말고, 필요한 경우 `현재 플러그인 버전을 확인했어요.` 만 말해요.
+2. Claude Desktop 에서는 플러그인 캐시의 `plugin.json` 을 읽지 않아요. 먼저 `command -v claude` 를 확인하고, 가능하면 `claude plugin list` 에서 `axhub@axhub` 의 현재 버전을 내부 변수 `<PLUGIN_VERSION>` 으로만 둬요. `claude` CLI 가 없거나 목록에서 못 찾으면 `<PLUGIN_VERSION>` 없이 CLI 업데이트 확인만 진행해요. 이 단계에서 설치 경로, Scope, manifest 경로, raw 목록은 사용자에게 말하지 않아요. 필요한 경우 `현재 플러그인 버전을 확인했어요.` 만 말해요.
 
 **`disabled` 와 `AXHUB_NO_AUTO_UPDATE` — 둘 다 존중해요 (자동 적용 안 함, 안내만).**
 - `disabled`(패키지 매니저가 관리하는 설치) → CLI 가 자기를 교체할 수 없어요. 패키지 매니저 업그레이드를 **안내만** 해요.

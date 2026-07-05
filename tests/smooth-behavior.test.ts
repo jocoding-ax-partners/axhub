@@ -221,6 +221,11 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("최근 배포 이력 전체, 로그, 실패 커밋 분석까지 확장하지 않아요");
     expect(clarity).toContain("최근 배포 시도는 실패했지만 현재 운영은 정상이에요");
     expect(clarity).toContain("단순 상태 확인은 대표 여정의 마지막 조회 단계라 **빠른 경로**");
+    expect(clarity).toContain("계정 전체 상태 요청도 빠른 경로예요");
+    expect(clarity).toContain("프로젝트 폴더를 스캔하지 말아요");
+    expect(clarity).toContain("디렉토리 구조 확인");
+    expect(clarity).toContain("`ls`, `find`, `pwd` 류 명령을 쓰지 않아요");
+    expect(clarity).toContain("tool call 이 4개를 넘기면 멈추고");
     expect(clarity).toContain("전체 `--json-schema` 탐색으로 돌아가지 말고");
     expect(clarity).toContain("먼저 `앱 상태 조회` 제목으로 앱 상세 조회 help gate 를 통과");
     expect(clarity).toContain("운영 배포 확인이 추가로 필요할 때만 `운영 상태 확인` 제목");
@@ -325,9 +330,10 @@ describe("smooth behavior contracts", () => {
     expect(update).toContain("라벨 안에 `axhub` 를 넣지 않아요");
     expect(update).toContain("**Desktop-visible command allowlist.**");
     expect(update).toContain("Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요");
-    expect(update).toContain("파일 읽기 도구로만 읽고");
-    expect(update).toContain("파일 읽기 도구가 없거나 거부되면 플러그인 버전 비교는 생략해요");
-    expect(update).toContain("shell wrapper, file test, pipe, text filter 를 쓰지 않아요");
+    expect(update).toContain("플러그인 캐시 파일을 읽지 않아요");
+    expect(update).toContain("`claude plugin list` 의 `axhub@axhub` 항목에서 내부 변수로만 읽고");
+    expect(update).toContain("파일 읽기 도구를 쓰지 않아요");
+    expect(update).toContain("shell wrapper, file test, pipe, text filter, 파일 읽기 도구를 쓰지 않아요");
     expect(update).toContain("| CLI 존재 확인 (`command -v axhub`) | `CLI 설치 확인` |");
     expect(update).toContain("| 버전 확인 (`axhub update check ...`) | `버전 확인` |");
     expect(update).toContain("수동 확인 기록은 Claude Desktop 경로에서 갱신하지 않아요");
@@ -339,7 +345,7 @@ describe("smooth behavior contracts", () => {
     for (const commandLeak of ["rtk read", "grep version", "test -f", "cat ", "sed -n"]) {
       expect(update).not.toContain(commandLeak);
     }
-    expect(update).toContain("영어 라벨과 정확한 숫자를 중간 문장으로 말하지 말고");
+    expect(update).toContain("설치 경로, Scope, manifest 경로, raw 목록은 사용자에게 말하지 않아요");
     expect(update).toContain("| 플러그인 업데이트 적용 | `플러그인 업데이트 받기` |");
     expect(update).toContain("`현재 플러그인 버전을 확인했어요.`, `CLI는 이미 최신이에요. 플러그인 새 버전을 받을게요.`, `플러그인 설치 위치를 확인했어요.`, `플러그인 새 버전을 받았어요.`");
     expect(update).toContain("영어 라벨, 내부 필드명, 설치 위치 원문, raw 상태값, 반말형 짧은 메모가 섞인 문장");
