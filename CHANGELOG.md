@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.31](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.30...v1.7.31) (2026-07-05)
+
+Claude Code Desktop 실제 QA에서 GitHub device flow 승인 뒤 `Monitor 사용` 권한 카드가 한 번 더 뜨고, 자연어 GitHub 재연결 요청이 clarity 스킬 대신 App/MCP 도구로 빠질 수 있는 문제가 보였어요. 이제 device-flow 확인은 단일 CLI 조회만 쓰도록 고정하고, 영어 재연결·device code 요청도 clarity 로 잡아 사용자가 "승인했어"라고 다시 말하거나 추가 watcher 권한을 누르지 않아도 계정 연결 확인까지 이어지게 했어요.
+
 ## [1.7.30](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.29...v1.7.30) (2026-07-05)
 
 Claude Code Desktop 실제 QA에서 "최신인지 확인하고, 앱 상태도 보고, 새 예약 앱도 만들어줘"처럼 여러 요청이 섞이면 update 뒤 clarity 가 새 앱 컨셉·이름 질문을 대신 띄워 bootstrap 의 템플릿·앱 이름 카드가 호출되지 않는 문제가 보였어요. 이제 clarity 는 앱 상태까지만 처리하고 새 앱 생성은 bootstrap 으로 넘기며, bootstrap 이 이전 답변을 힌트로만 쓰고 `어떤 템플릿으로 시작할까요?`와 `앱 이름을 무엇으로 할까요?` 카드를 다시 보여줘요.
