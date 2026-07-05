@@ -278,6 +278,7 @@ describe("bootstrap desktop UX contract", () => {
   test("uses axhub to prepare idempotency without exposing OS UUID commands", () => {
     const bootstrap = readBootstrap();
     const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
+    const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
     const executeReference = localReference.slice(
       localReference.indexOf("## Execute And Watch"),
       localReference.indexOf("## Device-Code Event"),
@@ -291,6 +292,12 @@ describe("bootstrap desktop UX contract", () => {
     expect(localReference).not.toContain("uuidgen");
     expect(bootstrap).toContain("`axhub plugin-support init-resume put` 에 생성을 맡겨요");
     expect(localReference).toContain("let `axhub plugin-support init-resume put` generate the idempotency key");
+    expect(bootstrap).toContain("명령이 `device_flow_required_user_action` 으로 끝나도 거기서 멈추지 않아요");
+    expect(bootstrap).toContain("사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않고");
+    expect(localReference).toContain("따로 `승인했어`라고 말하지 않아도 돼요");
+    expect(localReference).toContain("Prefer the emitted `resume_command` literally");
+    expect(localReference).toContain("do not end the response asking the user to report approval");
+    expect(resumeReference).toContain("Do not ask the user to say an approval phrase in chat");
     expect(executeReference).toContain("axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json");
     expect(executeReference).not.toContain("init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key");
     expect(preCloneReference).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap");
