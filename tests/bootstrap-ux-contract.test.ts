@@ -113,6 +113,8 @@ describe("bootstrap desktop UX contract", () => {
     expect(cloneSection).toContain("fetch origin main --quiet --depth=1");
     expect(cloneSection).toContain("reset --hard FETCH_HEAD");
     expect(cloneSection).toContain("target 채운 뒤 추가 `rtk ls`, `ls`, `find`, `cat`");
+    expect(cloneSection).toContain("clone/hydrate 명령 안에서는 raw `git`만 써요");
+    expect(cloneSection).toContain("`rtk git`, `grep`, `cut`, `awk`, `sed`");
     expect(cloneSection).not.toContain("cd /absolute/target && git clone");
     expect(localReference).toContain("Claude Desktop may create `.omc/`");
     expect(localReference).toContain("Do not run `git clone ... .`");
@@ -255,6 +257,22 @@ describe("bootstrap desktop UX contract", () => {
     expect(preCloneReference).not.toContain('axhub apps bootstrap --template "$TEMPLATE"');
     expect(preCloneReference).not.toContain('AXHUB_TENANT="${AXHUB_TENANT');
     expect(preCloneReference).not.toContain("export ");
+  });
+
+  test("uses direct deploy status calls instead of shell polling or JSON text parsing", () => {
+    const bootstrap = readBootstrap();
+    const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
+
+    expect(bootstrap).toContain("배포 상태 대기/확인도 예외가 아니에요");
+    expect(bootstrap).toContain("`for`, `while`, `sleep`, `grep`, `cut`, `awk`, `jq`");
+    expect(bootstrap).toContain("상태를 다시 볼 때마다 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행");
+    expect(bootstrap).toContain("성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요");
+    expect(localReference).toContain("Never poll deployment status with a shell loop");
+    expect(localReference).toContain("Run one direct `axhub deploy status <deployment-id> --tenant <tenant> --json` command per check");
+    expect(localReference).toContain("Do not parse JSON with `grep`, `cut`, `awk`, `sed`, or `jq` in Desktop-visible commands");
+    expect(localReference).not.toContain("for i in $(seq");
+    expect(localReference).not.toContain("grep -o '\"status\"");
+    expect(localReference).not.toContain("cut -d");
   });
 
   test("uses axhub to prepare idempotency without exposing OS UUID commands", () => {
