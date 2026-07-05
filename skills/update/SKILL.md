@@ -31,6 +31,8 @@ model: sonnet
 
 **보이는 tool 제목 계약.** Bash/명령 도구를 부를 때 description/title/summary 는 아래 고정 한국어 라벨 중 하나만 써요. 라벨 안에 `axhub` 를 넣지 않아요. `axhubing CLI 설치 여부 확인` 처럼 제품명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요.
 
+**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `command -v claude`, `claude plugin list`, `claude plugin update axhub@axhub --scope <SCOPE>`. `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 은 Bash/명령 도구로 읽지 않아요. 파일 읽기 도구로만 읽고, 파일 읽기 도구가 없거나 거부되면 플러그인 버전 비교는 생략해요. 플러그인 manifest 확인 때문에 shell wrapper, file test, pipe, text filter 를 쓰지 않아요.
+
 | 단계 | tool description/title/summary |
 | --- | --- |
 | CLI 존재 확인 (`command -v axhub`) | `CLI 설치 확인` |
@@ -62,7 +64,7 @@ TodoWrite({ todos: [
 ## 0. 사전 점검 (네트워크 0)
 
 1. `command -v axhub` 가 실패하면 멈춰요 — CLI 가 아직 없는 건 설치 소관이에요. 한 줄: `axhub CLI 가 아직 없어요. "온보딩" 이라고 말하면 설치부터 도와드려요.` (재설치를 여기서 시도하지 않아요.)
-2. `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 의 `version` 을 읽어 `<PLUGIN_VERSION>` 으로 둬요 (못 읽으면 플러그인 확인은 생략하고 CLI 만 봐요).
+2. `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 의 `version` 을 파일 읽기 도구로 읽어 `<PLUGIN_VERSION>` 으로 둬요. Bash/명령 도구로 이 파일을 읽지 않아요. 파일 읽기 도구가 없거나 거부되면 플러그인 확인은 생략하고 CLI 만 봐요. 파일을 읽은 직후 영어 라벨과 정확한 숫자를 중간 문장으로 말하지 말고, 필요한 경우 `현재 플러그인 버전을 확인했어요.` 만 말해요.
 
 **`disabled` 와 `AXHUB_NO_AUTO_UPDATE` — 둘 다 존중해요 (자동 적용 안 함, 안내만).**
 - `disabled`(패키지 매니저가 관리하는 설치) → CLI 가 자기를 교체할 수 없어요. 패키지 매니저 업그레이드를 **안내만** 해요.
@@ -138,9 +140,9 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 
 - raw JSON·명령 출력·내부 값은 chat 에 echo 하지 않고, 위의 한국어 한 줄들만 보여줘요.
 - 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `axhubing`, `axhubed`, `updating` 처럼 제품명을 영어 동사처럼 보이게 만드는 제목을 쓰지 않아요. 예: `버전 확인`, `CLI 업데이트 적용`, `업데이트 후 버전 확인`.
-- 진행 문구도 한국어 사용자 문장만 써요. `Plugin version 1.6.1. 버전 확인 돌린다.`, `CLI 최신. 플러그인 업데이트 있음 — scope 확인 후 적용.`, `Scope: user.`, `받았다.` 같은 섞인 문장은 금지예요.
+- 진행 문구도 한국어 사용자 문장만 써요. 영어 라벨, 내부 필드명, 설치 위치 원문, raw 상태값, 반말형 짧은 메모가 섞인 문장은 쓰지 않아요.
 - 대신 `현재 플러그인 버전을 확인했어요.`, `CLI는 이미 최신이에요. 플러그인 새 버전을 받을게요.`, `플러그인 설치 위치를 확인했어요.`, `플러그인 새 버전을 받았어요.` 라고 말해요.
-- 최종 카드 밖에서 `Plugin version`, `Scope`, `CLI latest`, `plugin.has_update`, `has_update`, `disabled`, `current`, `latest` 같은 내부 필드명이나 영어 라벨을 보여주지 않아요.
+- 최종 카드 밖에서 내부 필드명이나 영어 라벨을 보여주지 않아요. 버전 숫자는 결과 카드나 업데이트 안내처럼 사용자에게 필요한 문장에서만 보여줘요.
 - 사용자가 직접 부른 거라 적용 전 "적용할까요?" 를 다시 묻지 않아요 (간단한 1-shot 업데이트). 단 exit 14/66 보안 실패는 무조건 하드 스톱이에요.
 - 전 과정 비차단 — 한 단계가 막혀도 raw 에러를 숨기고 다음으로 넘어가거나 한 줄 안내 후 멈춰요.
 
