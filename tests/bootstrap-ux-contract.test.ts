@@ -253,7 +253,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(templateReference).toContain("replace `test` with the selected tenant literal");
     expect(localReference).toContain("Do not run a Desktop-visible command that contains");
     expect(localReference).toContain("The only allowed env prefix is `AXHUB_DEVICE_FLOW_AUTO_OPEN=1`");
-    expect(preCloneReference).toContain("axhub apps bootstrap --template nextjs-axhub --name bakery-preorder");
+    expect(preCloneReference).toContain("axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder");
     expect(preCloneReference).not.toContain('axhub apps bootstrap --template "$TEMPLATE"');
     expect(preCloneReference).not.toContain('AXHUB_TENANT="${AXHUB_TENANT');
     expect(preCloneReference).not.toContain("export ");
@@ -300,7 +300,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(resumeReference).toContain("Do not ask the user to say an approval phrase in chat");
     expect(executeReference).toContain("axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json");
     expect(executeReference).not.toContain("init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key");
-    expect(preCloneReference).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap");
+    expect(preCloneReference).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap");
   });
 
   test("passes repo name and subdomain explicitly from the app slug", () => {
