@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.27](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.26...v1.7.27) (2026-07-05)
+
+Claude Code Desktop 실제 QA에서 "최신인지 확인하고 앱 상태도 봐줘" 같은 섞인 요청이 update 뒤에 앱 MCP 도구나 shell wrapper 로 새고, `app status` 같은 애매한 요청도 임시 파일 읽기와 깨진 `Ap 상태` 진행 문구를 만들 수 있었어요. 이제 update 는 버전 확인까지만 맡고 앱 상태는 clarity 로 넘기며, clarity 의 Desktop-visible 조회는 `axhub ...` 단일 CLI 호출만 쓰도록 고정해서 App/MCP read 도구, `head`/`jq`/임시 파일, 파일 읽기 팝업 없이 바로 한국어 상태 요약으로 끝나요.
+
 ## [1.7.26](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.25...v1.7.26) (2026-07-05)
 
 Claude Code Desktop 실제 QA에서 "axhub 최신인지 확인해줘" 뒤 update 가 플러그인 캐시의 `plugin.json` 읽기 권한을 요구하고, 이어진 "내 앱들이 지금 어떤 상태인지 모르겠어" 요청은 clarity 가 schema 탐색과 디렉토리 확인으로 오래 머무는 문제가 보였어요. 이제 update 는 캐시 파일을 직접 읽지 않고 `claude plugin list` 로만 플러그인 버전을 내부 확인하며, clarity 는 계정 전체 앱 상태 요청을 빠른 경로로 처리해 빈 프로젝트 폴더를 스캔하지 않고 짧은 조회 결과로 바로 요약해요.
