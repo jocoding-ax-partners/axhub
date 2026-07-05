@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.29](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.28...v1.7.29) (2026-07-05)
+
+Claude Code Desktop 실제 QA에서 bootstrap 의 템플릿·앱 이름 질문은 사라진 게 아니라 이전 QA 폴더의 resume 상태가 먼저 감지되어 뒤로 밀린 것이 확인됐어요. 이제 새 폴더/`새로 시작` 흐름은 이전 상태를 넘고 바로 템플릿·앱 이름 질문으로 이어가며, GitHub device flow 가 백그라운드 task output 에 숨을 때도 output file 을 즉시 읽어 코드를 보여주고 auto-poll 중복 resume 을 피해서 승인 뒤 흐름이 더 조용하게 이어져요.
+
 ## [1.7.28](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.27...v1.7.28) (2026-07-05)
 
 Claude Code Desktop 실제 QA에서 `app status` 같은 짧고 애매한 요청이 clarity 로 잡히긴 했지만, 앱 상태를 바로 보여주지 않고 schema/help 탐색 권한 카드가 반복되는 문제가 남아 있었어요. 이제 계정 전체 앱 상태 요청은 일반 탐색과 업데이트 확인을 건너뛰고 `axhub apps list --page-size 5 --json` 단일 조회로 바로 요약해서, 명령어를 모르는 사용자도 "내 앱 상태 봐줘" 흐름을 짧게 끝낼 수 있어요.
