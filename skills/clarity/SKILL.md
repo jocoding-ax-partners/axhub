@@ -34,6 +34,14 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 
 단순 상태 확인은 대표 여정의 마지막 조회 단계라 **빠른 경로**예요. 전체 `--json-schema` 탐색으로 돌아가지 말고, 먼저 `앱 상태 조회` 제목으로 앱 상세 조회 help gate 를 통과한 뒤 앱 상태를 조회해요. 운영 배포 확인이 추가로 필요할 때만 `운영 상태 확인` 제목으로 운영 배포 상태 help gate 를 통과하고 조회해요. 이 빠른 경로도 공개 CLI 표면만 쓰며 hidden `plugin-support` 는 호출하지 않아요.
 
+계정 전체 상태 요청도 빠른 경로예요. 사용자가 "내 앱들", "앱들이 지금 어떤 상태인지", "전체 앱 상태", "뭐가 배포됐는지 모르겠어"처럼 특정 앱을 말하지 않고 앱 목록·상태를 묻는다면 프로젝트 폴더를 스캔하지 말아요. 새 디렉토리가 비어 있어도 그건 오류가 아니라 계정/작업공간 조회 요청이에요. `작업은 <경로> 안에서만` 같은 말은 실행 cwd 제한일 뿐, 디렉토리 구조를 먼저 확인하라는 뜻이 아니에요.
+
+- 계정 전체 앱 상태에서는 최상위 `keys[]` 탐색을 건너뛰고 `명령 표면 확인` 제목으로 앱 명령 표면만 한 번 확인해요.
+- 앱 목록·상태를 보여주는 leaf 를 고른 뒤 `명령 사용법 확인` 제목으로 그 leaf 의 help gate 를 한 번만 통과해요.
+- 그 다음 `앱 상태 조회` 제목으로 읽기 전용 조회를 실행하고, 결과를 2-4줄 한국어로 바로 요약해요.
+- 이 빠른 경로에서 tool call 이 4개를 넘기면 멈추고 지금까지 확인한 결과만 요약해요. 더 깊은 로그·실패 원인 분석은 diagnosis 로 넘겨요.
+- 계정 전체 상태 조회 중에는 `디렉토리 구조 확인`, `파일 목록 확인`, `프로젝트 확인` 같은 tool 제목이나 `ls`, `find`, `pwd` 류 명령을 쓰지 않아요.
+
 - 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구만 써요: `명령 표면 확인`, `명령 사용법 확인`, `앱 상태 조회`, `운영 상태 확인`, `결과 정리`.
 - Bash/명령 tool 을 호출할 때 description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요. 도구가 자동으로 제목을 만들도록 비워두면 `axhub: App get 사용 중` 같은 이름이 보이므로 금지예요.
 - CLI 존재 여부를 확인할 때 tool 제목은 반드시 `CLI 설치 확인` 으로 직접 채워요. `axhubed CLI 설치 확인`, `axhubing CLI 설치 확인` 같은 자동 제목이 보이면 같은 확인이라도 `CLI 설치 확인` 으로 제목을 고쳐서 다시 호출해요.
@@ -110,8 +118,7 @@ TodoWrite({ todos: [
    STAMP="${TMPDIR:-/tmp}/axhub-update-check.stamp"
    if [ -z "$(find "$STAMP" -mmin -10 2>/dev/null)" ]; then
      : > "$STAMP"
-     PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')
-     UPD=$(axhub update check ${PLUGIN_VER:+--plugin-version "$PLUGIN_VER"} --json 2>/dev/null)
+     UPD=$(axhub update check --json 2>/dev/null)
    fi
    ```
 
@@ -151,7 +158,7 @@ TodoWrite({ todos: [
 - help 가 `--execute` / `--yes` / `--force` 같은 명시 실행 플래그를 요구하는 파괴적 명령이면 대화형에서 한 번 승인받은 뒤 붙여요. headless 에서는 붙이지 않고 preview/summary 로 멈춰요.
 - 인자가 부족하면(앱 이름 등) 먼저 조회 명령으로 채울 수 있는지 시도하고, 정말 사용자만 아는 값일 때만 물어요.
 - 앱을 가리키는 인자는 사용자가 아는 slug/name 을 우선 써요. 앞 단계 조회 결과에서 얻은 raw app id 를 다음 mutation 명령의 `--app` 값으로 넘기지 않아요. CLI 가 내부 id 를 반환해도 chat/tool 출력에 그대로 보이지 않도록, 실행 결과는 임시 파일로 받고 사용자에게는 "앱 이름 기준으로 실행했어요"처럼 요약해요.
-- help 의 어떤 플래그가 **플러그인 자신의 설치 버전**을 요구하면(예: `update check` 의 `--plugin-version`), `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 의 `version` 을 읽어 채워요 — 그러면 업데이트 확인에서 CLI·플러그인 최신 여부를 한 번에 알려줘요 (`plugin.has_update` 면 `/plugin update` 안내).
+- help 의 어떤 플래그가 **플러그인 자신의 설치 버전**을 요구하면(예: `update check` 의 `--plugin-version`), clarity 에서는 플러그인 캐시 파일을 읽어 채우지 않아요. 캐시 경로가 작업 디렉토리 밖이면 Claude Desktop 권한 팝업이 떠서 운영 브리지 흐름이 거칠어져요. 플러그인 최신 여부까지 필요한 요청은 update 스킬로 넘기고, clarity 는 CLI 조회만 계속해요.
 
    ```bash
    OUT=$(mktemp)
