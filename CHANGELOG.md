@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.24](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.23...v1.7.24) (2026-07-05)
+
+Claude Code Desktop 실제 QA에서 bootstrap 은 작업공간·템플릿·앱 이름·GitHub owner 확인까지 자연스럽게 이어졌지만, GitHub device flow 가 뜨면 브라우저는 열려도 입력 코드가 늦게 보이고 승인 뒤 사용자가 다시 알려줘야 하는 흐름으로 멈출 수 있었어요. 이제 device-code 단계는 링크와 코드를 chat 에 즉시 보여주고, `device_flow_required_user_action` 뒤에도 `resume_command` 또는 `--resume-last` 로 같은 turn 에서 계속 확인하도록 고정했어요.
+
 ## [1.7.23](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.22...v1.7.23) (2026-07-05)
 
 Claude Code Desktop 실제 QA에서 bootstrap 의 작업공간·템플릿·앱 이름·GitHub owner 질문은 정상 호출됐지만, 첫 배포 상태 확인이 `for`/`sleep`/`grep`/`cut` shell loop 로 새면서 실제 배포 성공 뒤에도 자연스럽게 성공 보고로 끝나지 않는 문제가 남아 있었어요. 이제 bootstrap 은 상태를 다시 볼 때마다 `axhub deploy status <deployment-id> --tenant <tenant> --json` 단일 CLI 호출만 쓰고, clone/hydrate 단계도 raw `git`만 쓰도록 고정해서 사용자가 개발자용 shell parsing 권한 카드를 보지 않게 했어요.
