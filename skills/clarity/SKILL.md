@@ -1,6 +1,6 @@
 ---
 name: clarity
-description: 'clarity: onboarding/bootstrap/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "Use the axhub clarity skill", "show current app status", "is production healthy?", "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 빈 디렉토리 새 앱 만들기·템플릿·앱 이름 선택=bootstrap, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요. 앱 상태 조회와 새 앱 생성이 한 요청에 섞이면 clarity 는 상태만 조회하고 concept/name/slug/template 질문 없이 bootstrap 으로 넘겨요. 영어로 clarity skill 을 직접 지정한 요청도 반드시 이 스킬로 라우팅해요.'
+description: 'clarity: onboarding/bootstrap/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "Use the axhub clarity skill", "show current app status", "is production healthy?", "reconnect my GitHub account with axhub", "GitHub device code", "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 빈 디렉토리 새 앱 만들기·템플릿·앱 이름 선택=bootstrap, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요. 앱 상태 조회와 새 앱 생성이 한 요청에 섞이면 clarity 는 상태만 조회하고 concept/name/slug/template 질문 없이 bootstrap 으로 넘겨요. 영어로 clarity skill 이나 GitHub 계정 재연결을 직접 지정한 요청도 반드시 이 스킬로 라우팅해요.'
 ---
 
 # axhub clarity 브리지

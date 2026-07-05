@@ -224,7 +224,9 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("Use the axhub clarity skill");
     expect(clarity).toContain("show current app status");
     expect(clarity).toContain("is production healthy?");
-    expect(clarity).toContain("영어로 clarity skill 을 직접 지정한 요청도 반드시 이 스킬로 라우팅");
+    expect(clarity).toContain("reconnect my GitHub account with axhub");
+    expect(clarity).toContain("GitHub device code");
+    expect(clarity).toContain("영어로 clarity skill 이나 GitHub 계정 재연결을 직접 지정한 요청도 반드시 이 스킬로 라우팅");
     expect(clarity).toContain("직전 답변을 재사용해서 끝내지 말고");
     expect(clarity).toContain("slash 명령이 실패한 직후라도 자연어 요청은 독립된 새 요청으로 취급");
     expect(clarity).toContain("상태 확인 범위에서 멈춰요");
