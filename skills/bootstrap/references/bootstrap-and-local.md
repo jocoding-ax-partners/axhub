@@ -51,6 +51,8 @@ AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template nextjs-axhub --nam
 
 Run the tool with a timeout longer than 9 minutes, for example 570000ms. Narrate about every 30s with short Korean progress lines like "앱 만들고 있어요", "GitHub repo 만들고 있어요", "첫 배포 중이에요. 거의 다 왔어요".
 
+If execute returns before deployment reaches a terminal state: Never poll deployment status with a shell loop. Run one direct `axhub deploy status <deployment-id> --tenant <tenant> --json` command per check, with a user-facing title like `배포 상태 확인`. If it is still running, say it is still building and issue another separate direct status command only when needed. Do not parse JSON with `grep`, `cut`, `awk`, `sed`, or `jq` in Desktop-visible commands; read the tool output JSON directly.
+
 If the watch times out with a resume hint, fetch bootstrap id with the same idempotency key and then watch status:
 
 ```bash
@@ -101,6 +103,8 @@ If resume says `no pending github device flow`, follow `resume-and-tenant.md` re
 After saga reaches terminal success, read repo from status and fill current directory. Do not create a subdirectory.
 
 Claude Desktop may create `.omc/` in a newly added folder before the app code is cloned. Treat that as Desktop metadata, not as a user app. Do not run `git clone ... .`, because it fails in metadata-only folders and leads to extra `rtk ls -la` probes. Fill the current folder with `git init` + `fetch` + `reset --hard` so `.omc/` stays in place:
+
+Keep the clone/hydrate command raw-git only. Never prefix any segment with rtk and do not add grep/cut/awk/sed probes to the same Desktop-visible command.
 
 ```bash
 REPO=$(axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --field-expr '.data.repo_full_name // .data.status.repo_full_name // empty' 2>/dev/null || true)

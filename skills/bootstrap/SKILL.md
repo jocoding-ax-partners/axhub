@@ -9,7 +9,7 @@ model: sonnet
 
 ## Fast Start
 
-첫 visible 응답은 반드시 한국어 진행 문장으로 시작해요: `새 앱을 만들 수 있는지 확인할게요.` 또는 `[1/7] CLI 준비 확인하는 중이에요.`처럼요. 스킬 선택 이유, 빈 디렉토리 판단, route label, `axhub:bootstrap 스킬 호출한다` 같은 내부 라벨은 말하지 않아요. Claude Desktop 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요. 특히 `Using axhub:bootstrap skill`, `matches new app`, `matches new app + deploy request`, `skill —`, `axhub의 새 앱 생성 스킬`, `스킬을 사용하겠습니다` 같은 라우팅 문장은 절대 쓰지 않아요.
+첫 visible 응답은 반드시 한국어 진행 문장으로 시작해요: `새 앱을 만들 수 있는지 확인할게요.`처럼요. 스킬 선택 이유, 빈 디렉토리 판단, route label, `axhub:bootstrap 스킬 호출한다` 같은 내부 라벨은 말하지 않아요. Claude Desktop 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요. 특히 `Using axhub:bootstrap skill`, `matches new app + deploy request`, `axhub의 새 앱 생성 스킬`, `스킬을 사용하겠습니다` 같은 라우팅 문장은 절대 쓰지 않아요.
 
 사용자가 "앱 만들어줘", "first app", "put it online", "deploy"처럼 새 앱 생성과 배포 목표를 말하면 이미 목표 승인은 받은 상태예요. 하지만 execute 승인은 아직 아니므로, 아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행하고, `진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요.
 
@@ -23,11 +23,11 @@ creation path 는 하나뿐이에요: backend `axhub apps bootstrap` saga. `axhu
 
 ## Common Context
 
-같은 대화 맥락 이어받기는 이미 본 것만 써요. infer-tables-env 분석은 scaffold 코드뿐 아니라 같은 대화에서 실제로 조회한 리소스 근거까지 함께 봐요. 근거가 없으면 리소스를 지어내지 않아요, carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략할 수 있지만 0-install gate 는 맥락과 무관하게 그대로 실행해요.
+같은 대화 맥락 이어받기는 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 근거 없으면 리소스를 지어내지 않아요, carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 맥락과 무관하게 그대로 실행해요.
 
 ## Reference Loading Policy
 
-정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, GitHub gate, dry-run preview, execute/status/verify/result 까지 진행해요. Claude Desktop 에서 workspace 밖 plugin cache reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고 읽지 않아요.
+정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, GitHub gate, dry-run preview, execute/status/verify/result 까지 진행해요. Claude Desktop 에서 workspace 밖 plugin cache reference 읽기 권한 프롬프트가 뜨면 허용 요구 없이 읽지 않아요.
 
 Edge case 에서도 먼저 이 본문과 `axhub` CLI 상태 명령만 써요. 긴 오류 설명도 chat 에 보이는 오류 코드와 `axhub` status/diagnose 출력으로 요약하고, plugin cache 파일 읽기를 복구 조건으로 삼지 않아요.
 
@@ -40,12 +40,11 @@ Edge case 에서도 먼저 이 본문과 `axhub` CLI 상태 명령만 써요. �
 - 가능한 제목: `작업공간 확인`, `CLI 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `저장소 계정 확인`, `앱 이름 확인`, `만들기 전 확인`, `앱 생성 진행`, `첫 배포 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`, `인증 대기`.
 - `rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요. `pwd`, `ls`, `find`, `cat`, `curl` 같은 generic shell probe 로 작업공간이나 실패 상태를 추측하지 말고 `axhub` CLI 표면만 써요.
 - Desktop-visible command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수, `export`, command substitution, semicolon chain 으로 조립하지 말고 literal flag 로 넣어요. device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요.
+- 배포 상태 대기/확인도 예외가 아니에요. `for`, `while`, `sleep`, `grep`, `cut`, `awk`, `jq` 로 JSON 을 polling/파싱하지 않아요. 상태를 다시 볼 때마다 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행해요. 성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요.
 - Echo 금지: `schema_version`, template `id`, `folder_name`, `resource_tier`, `bootstrap_id`, `status_url`, `stage`, `app_id`, `deployment_id`, `error_code`, `error_message`, `request_id`, `idempotency_key`, `installation_id`, `device_code`.
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.
 - 공개 URL Markdown link 는 label 과 target 모두 확인된 `https://...` 절대 URL 을 그대로 써요. `[$PUBLIC_URL]($PUBLIC_URL)` 형태를 지켜요.
 - 이 스킬은 CLI-only 흐름이에요. Claude Desktop 에 `App get (axhub)`, `App list`, deployment MCP, app connector 도구가 보여도 호출하지 않아요. 배포 상태·검증은 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --json`, 앱 상세·URL 확인은 `axhub apps get <app-slug> --tenant <tenant> --json` 또는 `--field-expr` CLI 로만 해요. `Finding tools` 로 이동해서 MCP/App 도구를 찾지 않아요.
-
-각 단계는 한 줄로만 진행 상황을 알려요: `[1/7] CLI 준비 확인하는 중이에요`, `[2/7] 작업공간 확인하는 중이에요`, `[3/7] 템플릿 고르는 중이에요`, `[4/7] 앱 이름 정하는 중이에요`, `[5/7] 미리보기 만드는 중이에요`, `[6/7] 앱 만드는 중이에요`, `[7/7] 코드 받아서 정리하는 중이에요`.
 
 ## Fresh Workflow
 
@@ -170,6 +169,8 @@ Claude Desktop 에서 `앱 생성 진행` 또는 `앱 생성 재시도` tool 이
 상단 폴더 표시가 사용자가 지정한 새 폴더와 다르면, 메시지의 absolute path 를 target 으로 써요. `pwd`, `ls`, `find`, `cat`, `rtk ls -la` probe 로 권한 프롬프트를 늘리지 않아요.
 
 새 폴더에 `.omc/` 같은 Desktop 메타데이터가 있을 수 있으므로 `git clone ... .` 는 쓰지 않아요. `git init` 후 원격 `main` 을 받아 `.omc/` 를 보존해요.
+
+clone/hydrate 명령 안에서는 raw `git`만 써요. `rtk git`, `grep`, `cut`, `awk`, `sed` 금지.
 
 ```bash
 git -C <target> init -q -b main && (git -C <target> remote add origin https://github.com/<repo>.git 2>/dev/null || git -C <target> remote set-url origin https://github.com/<repo>.git) && git -C <target> fetch origin main --quiet --depth=1 && git -C <target> reset --hard FETCH_HEAD
