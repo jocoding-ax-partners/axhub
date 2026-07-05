@@ -38,15 +38,17 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 
 단순 상태 확인은 대표 여정의 마지막 조회 단계라 **빠른 경로**예요. 전체 `--json-schema` 탐색으로 돌아가지 말고, 먼저 `앱 상태 조회` 제목으로 앱 상세 조회 help gate 를 통과한 뒤 앱 상태를 조회해요. 운영 배포 확인이 추가로 필요할 때만 `운영 상태 확인` 제목으로 운영 배포 상태 help gate 를 통과하고 조회해요. 이 빠른 경로도 공개 CLI 표면만 쓰며 hidden `plugin-support` 는 호출하지 않아요.
 
-계정 전체 상태 요청도 빠른 경로예요. 사용자가 "내 앱들", "앱들이 지금 어떤 상태인지", "전체 앱 상태", "뭐가 배포됐는지 모르겠어"처럼 특정 앱을 말하지 않고 앱 목록·상태를 묻는다면 프로젝트 폴더를 스캔하지 말아요. 새 디렉토리가 비어 있어도 그건 오류가 아니라 계정/작업공간 조회 요청이에요. `작업은 <경로> 안에서만` 같은 말은 실행 cwd 제한일 뿐, 디렉토리 구조를 먼저 확인하라는 뜻이 아니에요.
+계정 전체 상태 요청도 빠른 경로예요. 사용자가 "내 앱들", "앱들이 지금 어떤 상태인지", "전체 앱 상태", "뭐가 배포됐는지 모르겠어", 또는 영어로 `app status` 처럼 특정 앱을 말하지 않고 앱 목록·상태를 묻는다면 프로젝트 폴더를 스캔하지 말아요. 새 디렉토리가 비어 있어도 그건 오류가 아니라 계정/작업공간 조회 요청이에요. `작업은 <경로> 안에서만` 같은 말은 실행 cwd 제한일 뿐, 디렉토리 구조를 먼저 확인하라는 뜻이 아니에요.
 
-- 계정 전체 앱 상태에서는 최상위 `keys[]` 탐색을 건너뛰고 `명령 표면 확인` 제목으로 앱 명령 표면만 한 번 확인해요.
-- 앱 목록·상태를 보여주는 leaf 를 고른 뒤 `명령 사용법 확인` 제목으로 그 leaf 의 help gate 를 한 번만 통과해요.
-- 그 다음 `앱 상태 조회` 제목으로 읽기 전용 조회를 실행하고, 결과를 2-4줄 한국어로 바로 요약해요. 이때 Claude Desktop 에 보이는 실행 명령은 `axhub apps ... --json` 같은 단일 leaf CLI 호출이어야 해요. `> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution, 임시 파일 저장/재읽기, shell wrapper 로 감싸지 않아요. tool 출력은 assistant 내부에서 읽고 요약하며, 출력이 크면 CLI 의 공개 필터/필드 옵션을 help gate 로 확인해 사용해요.
+- 계정 전체 앱 상태에서는 일반 clarity 탐색을 시작하지 않아요. `axhub --json-schema`, `--help`, `keys[]`, `.commands.apps.workspace`, `.commands.apps.get`, `.commands.apps.status` 같은 schema/help 탐색을 모두 건너뛰어요.
+- 이 fast path 에서는 optional `axhub update check --json` 도 건너뛰어요. 사용자는 앱 상태 하나를 기대하므로 업데이트 새 버전 안내보다 빠른 상태 요약이 우선이에요.
+- CLI 존재 확인이 필요하면 `CLI 설치 확인` 제목으로 `command -v axhub` 또는 기존 host 의 CLI presence check 한 번만 실행해요. 그 다음 바로 `앱 상태 조회` 제목으로 `axhub apps list --page-size 5 --json` 을 실행해요. 앱이 많아도 첫 5개와 총 개수만 요약하고, 더 보려면 "더 보여줘"라고 할 수 있다고 말해요.
+- 계정 전체 앱 상태 fast path 의 정상 tool call 은 최대 2개예요: `CLI 설치 확인` 1개와 `앱 상태 조회` 1개. 이미 CLI 가 있다고 이전 단계에서 확정했으면 `앱 상태 조회` 1개만 실행해요. 3개 이상 `명령 표면 확인` 카드가 보이면 실패예요.
+- `앱 상태 조회` 결과를 2-4줄 한국어로 바로 요약해요. 이때 Claude Desktop 에 보이는 실행 명령은 `axhub apps list --page-size 5 --json` 단일 leaf CLI 호출이어야 해요. `--all` 로 전체 50개 이상을 길게 뽑지 말고, `--field-expr` 가 null/0 으로 오해될 수 있으니 이 fast path 에서는 쓰지 않아요. `> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution, 임시 파일 저장/재읽기, shell wrapper 로 감싸지 않아요. tool 출력은 assistant 내부에서 읽고 요약해요.
 - `앱 상태 조회` 실행 뒤에는 Read/파일 읽기 도구로 `*.txt`, `/tmp/*`, command output snapshot, 임시 결과 파일을 열지 않아요. Claude Desktop 이 command output 을 파일로 접어 보여줘도 그 파일을 읽지 말고, 필요한 범위를 더 좁힌 `axhub ... --json` 또는 `axhub --json-schema --field-expr ...` 단일 CLI 호출을 다시 실행해요.
 - 이 빠른 경로에서 tool call 이 4개를 넘기면 멈추고 지금까지 확인한 결과만 요약해요. 더 깊은 로그·실패 원인 분석은 diagnosis 로 넘겨요.
 - 계정 전체 상태 조회 중에는 `디렉토리 구조 확인`, `파일 목록 확인`, `프로젝트 확인` 같은 tool 제목이나 `ls`, `find`, `pwd` 류 명령을 쓰지 않아요.
-- 계정 전체 상태 조회 중에는 `App list (axhub)` 또는 `Tenant recent deployments (axhub)` 같은 Claude Desktop axhub App/MCP 도구를 쓰지 않아요. 같은 정보를 조회해야 해도 반드시 `axhub --json-schema --field-expr ...`, leaf `--help`, leaf `--json` CLI 순서로 확인해요.
+- 계정 전체 상태 조회 중에는 `App list (axhub)` 또는 `Tenant recent deployments (axhub)` 같은 Claude Desktop axhub App/MCP 도구를 쓰지 않아요. 같은 정보를 조회해야 해도 반드시 `axhub apps list --page-size 5 --json` CLI 로 확인해요.
 
 - 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구만 써요: `명령 표면 확인`, `명령 사용법 확인`, `앱 상태 조회`, `운영 상태 확인`, `결과 정리`.
 - Bash/명령 tool 을 호출할 때 description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요. 도구가 자동으로 제목을 만들도록 비워두면 `axhub: App get 사용 중` 같은 이름이 보이므로 금지예요.
