@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.23](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.22...v1.7.23) (2026-07-05)
+
+Claude Code Desktop 실제 QA에서 bootstrap 의 작업공간·템플릿·앱 이름·GitHub owner 질문은 정상 호출됐지만, 첫 배포 상태 확인이 `for`/`sleep`/`grep`/`cut` shell loop 로 새면서 실제 배포 성공 뒤에도 자연스럽게 성공 보고로 끝나지 않는 문제가 남아 있었어요. 이제 bootstrap 은 상태를 다시 볼 때마다 `axhub deploy status <deployment-id> --tenant <tenant> --json` 단일 CLI 호출만 쓰고, clone/hydrate 단계도 raw `git`만 쓰도록 고정해서 사용자가 개발자용 shell parsing 권한 카드를 보지 않게 했어요.
+
 ## [1.7.22](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.21...v1.7.22) (2026-07-05)
 
 Claude Code Desktop 실제 QA에서 update 요청이 cache marker 권한은 사라졌지만, 설치된 plugin 버전을 확인할 때 `rtk read`, `grep`, `test -f` 같은 개발자용 shell probe 로 `plugin.json` 을 읽으려는 권한 카드가 아직 보였어요. 이제 update skill 은 사용자에게 보이는 명령을 `axhub`/`claude` 업데이트 경로로 제한하고, plugin manifest 는 Claude 파일 읽기 도구로만 확인하며, 중간 진행 문장에서도 `Plugin version` 같은 raw 라벨이 새지 않도록 고정했어요.
