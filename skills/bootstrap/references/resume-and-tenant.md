@@ -30,7 +30,7 @@ Non-interactive/D1 safe default is `새로 시작`. Do not echo raw `bootstrap_i
 If the user chooses resume, use the route enum and `args.*_command` returned by the CLI. Do not reconstruct raw IDs in the skill.
 
 - `watch_status`: run `args.status_command`. Current shape is `axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json`.
-- `resume_last`: run `args.resume_command` as the base argv. Append `--tenant "$AXHUB_TENANT"` only when `$AXHUB_TENANT` is set and the base command lacks tenant context. Current shape is `axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json`.
+- `resume_last`: run `args.resume_command` as the base argv. Append `--tenant "$AXHUB_TENANT"` only when `$AXHUB_TENANT` is set and the base command lacks tenant context. For Desktop device-flow recovery, strip `--watch --watch-timeout <value>` from the first Desktop resume so stdout is visible. Current shape may include `axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --idempotency-key "$IDEMPOTENCY_KEY" --json`.
 - stale/broken/fresh: say "이전 기록을 찾지 못해서 새로 시작할게요." and continue to template registry.
 
 ## Resume Device-Flow Recovery
@@ -45,7 +45,7 @@ Only when the selected GitHub owner is confirmed installed (`installed=true` or 
 
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --github-owner "$GITHUB_OWNER" --repo-name "$APP_SLUG" --repo-private --tenant "$AXHUB_TENANT" --execute --watch --watch-timeout 9m --idempotency-key "$IDEMPOTENCY_KEY" --json
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --github-owner "$GITHUB_OWNER" --repo-name "$APP_SLUG" --repo-private --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY" --json
 ```
 
 If `device_code_pending` remains, respect `retry_after_secs` and retry the emitted `resume_command` until success or expiry. Do not ask the user to say an approval phrase in chat; the CLI resume result is the only completion signal. If owner installation is not confirmed, do not run fresh execute; show the install URL once and stop with the GitHub App install resume phrase.

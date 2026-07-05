@@ -58,7 +58,7 @@ Edge case 에서도 먼저 이 본문과 `axhub` CLI 상태 명령만 써요. �
 6. GitHub App gate: `axhub github accounts list --json`.
 7. Dry-run preview: `axhub apps bootstrap ... --dry-run --json`.
 8. Preview confirmation: 사용자가 `진행`을 고른 뒤에만 execute 해요.
-9. Execute saga: `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap ... --execute --watch --watch-timeout 9m --idempotency-key <literal> --json`.
+9. Execute saga: `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap ... --execute --idempotency-key <literal> --json`.
 10. Clone/current dir, manifest check, result/follow-up.
 
 Slash command, skill name, route label 은 사용자에게 말하지 않아요.
@@ -144,12 +144,12 @@ axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-p
 ```
 
 ```bash
-AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --watch --watch-timeout 9m --idempotency-key 00000000-0000-4000-8000-000000000000 --json
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000 --json
 ```
 
-실제 실행에서는 예시 UUID 를 `init-resume put` 이 반환한 literal UUID 로 바꿔요.
+실행 때 예시 UUID 는 `init-resume put` 반환 literal UUID 로 바꿔요.
 
-`device_code_issued` event 가 나오면 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 보여줘요. Desktop에선 긴 `--watch` tool 이 끝날 때까지 stdout 이 chat 에 안 보일 수 있으므로, device flow 를 숨긴 채 9분 watch 에 들어가지 않아요. 사용자가 "승인했어"라고 다시 말하게 하지 않아요.
+`device_code_issued` event 가 나오면 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 보여줘요. Desktop에선 긴 `--watch` tool 이 끝날 때까지 stdout 이 chat 에 안 보일 수 있으므로, 첫 execute/resume 에 `--watch`/`--watch-timeout` 을 붙이지 않아요. 사용자가 "승인했어"라고 다시 말하게 하지 않아요.
 
 명령이 `device_flow_required_user_action` 으로 끝나도 거기서 멈추지 않아요. 링크/코드를 보여주고, 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않고 같은 turn 에서 `resume_command` 또는 `--resume-last` 로 이어가요.
 

@@ -115,7 +115,7 @@ describe("smooth behavior contracts", () => {
     expect(bootstrap).toContain("NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채");
     expect(bootstrap).toContain("승인 완료를 채팅으로 알려 달라고 쓰지 않고");
     expect(bootstrapAndLocal).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
-    expect(bootstrapAndLocal).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap");
+    expect(bootstrapAndLocal).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap");
     expect(bootstrapAndLocal).toContain("auto_poll");
     expect(bootstrapAndLocal).toContain("Never leave the user staring at an empty GitHub code-entry screen with no code");
     expect(bootstrapAndLocal).toContain("따로 `승인했어`라고 말하지 않아도 돼요");
