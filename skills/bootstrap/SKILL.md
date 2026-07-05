@@ -29,16 +29,16 @@ creation path 는 backend `axhub apps bootstrap` saga 하나예요. `axhub init`
 
 ## Visibility
 
-- 내부 라벨 노출 금지. `Folder near empty`, `Invoke axhub:bootstrap skill`, `Tenanting`, `Bootstraping`, `Idempotencying key`, `saga 실행`, `Saga 완료`, `GitHubed repo`, `DB 선언된 템플릿`, `development 단계` 는 chat/tool/progress/question 에 쓰지 않아요.
+- 내부 라벨 노출 금지. `Folder near empty`, `Invoke axhub:bootstrap skill`, `Tenanting`, `Bootstraping`, `Idempotencying key`, `saga 실행`, `Saga 완료`, `GitHubed repo`, `DB 선언된 템플릿`, `axhub:bootstrap 스킬 호출한다`, `development 단계` 는 chat/tool/progress/question 에 쓰지 않아요.
 - Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `raw`, `route`, `tenant`, `실행 중 명령`, `명령 실행` 은 쓰지 않아요.
-- 가능한 제목: `작업공간 확인`, `CLI 준비 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `저장소 계정 확인`, `앱 이름 확인`, `만들기 전 확인`, `앱 생성 진행`, `첫 배포 진행`, `배포 상태 확인`, `코드 가져오기`, `마무리 확인`, `인증 대기`.
+- 가능한 제목: `CLI 준비 확인`, `저장소 계정 확인`, `앱 이름 확인`, `인증 대기`.
 - `rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요. `pwd`, `ls`, `find`, `cat`, `curl` 같은 generic shell probe 로 작업공간이나 실패 상태를 추측하지 말고 `axhub` CLI 표면만 써요.
-- Desktop-visible command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수, `export`, command substitution, semicolon chain 으로 조립하지 말고 literal flag 로 넣어요. device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요.
-- 배포 상태 대기/확인도 예외가 아니에요. `for`, `while`, `sleep`, `grep`, `cut`, `awk`, `jq` 로 polling/파싱하지 않아요. 상태를 다시 볼 때마다 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행해요. 성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요.
+- Desktop-visible command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수, `export`, command substitution, semicolon chain 으로 조립하지 말고 literal flag 로 넣어요. device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요. device flow 가능 execute/resume Bash tool call 은 `timeout` 을 12000~15000ms 로 짧게 지정해 코드 출력 파일을 즉시 읽어요.
+- 배포 상태 대기/확인도 예외가 아니에요. `for`, `while`, `sleep`, `grep`, `cut`, `awk`, `jq` 로 polling/파싱하지 않아요. 상태를 다시 볼 때마다 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행해요. 성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요. 실제 tool/예약 없이 `90초 후 자동 확인` 같은 말을 쓰지 않아요.
 - Echo 금지: `schema_version`, template `id`, `folder_name`, `resource_tier`, `bootstrap_id`, `status_url`, `stage`, `app_id`, `deployment_id`, `error_code`, `error_message`, `request_id`, `idempotency_key`, `installation_id`, `device_code`.
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.
-- 공개 URL Markdown link 는 label 과 target 모두 확인된 `https://...` 절대 URL 을 그대로 써요. `[$PUBLIC_URL]($PUBLIC_URL)` 형태를 지켜요.
-- 이 스킬은 CLI-only 흐름이에요. Claude Desktop 에 `App get (axhub)`, `App list`, deployment MCP, app connector 도구가 보여도 호출하지 않아요. 배포 상태·검증은 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --json`, 앱 상세·URL 확인은 `axhub apps get <app-slug> --tenant <tenant> --json` 또는 `--field-expr` CLI 로만 해요. `Finding tools` 로 이동해서 MCP/App 도구를 찾지 않아요.
+- 공개 URL Markdown link 는 label/target 모두 같은 `https://...` 절대 URL 만 써요. `[https://x](https://x)`만 허용하고 `(x)` 같은 도메인-only target 금지.
+- 이 스킬은 CLI-only 흐름이에요. `App get (axhub)`, `App list`, deployment MCP 가 보여도 호출하지 않아요. 배포 상태·검증은 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --json`, 앱 상세·URL 확인은 `axhub apps get <app-slug> --tenant <tenant> --json` 또는 `--field-expr` CLI 만 써요. `Finding tools` 로 이동해서 MCP/App 도구를 찾지 않아요.
 
 ## Fresh Workflow
 
@@ -75,13 +75,13 @@ Tool 제목은 `작업공간 확인` 또는 `앱 설정 확인`을 써요.
 axhub plugin-support init-resume route --json
 ```
 
-`watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 새 폴더/새 앱 요청이거나 `새로 시작`을 고르면 이전 상태는 무시하고 template registry, template picker, app-name 질문으로 이어가요. route 가 fresh 이면 reference 를 읽지 않아요.
+`watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 새 폴더/새 앱 요청이거나 `새로 시작`이면 이전 상태를 무시하고 template 질문으로 이어가요. fresh 이면 reference 를 읽지 않아요.
 
 ```bash
 axhub plugin-support tenant-resolve --field-expr '.tenant // empty'
 ```
 
-반환된 tenant slug 를 `--tenant <literal>` 로 넘겨요. 사용자에게는 tenant/테넌트라고 말하지 말고 `작업공간`이라고 말해요. 여러 작업공간이면 `새 앱을 어느 작업공간에 만들까요?`라고 물어요. 선택한 값은 `.axhub/state/tenant.json` 같은 로컬 파일로 저장하지 않아요.
+반환된 tenant slug 는 `--tenant <literal>` 로 넘겨요. 사용자에게는 tenant/테넌트라고 말하지 말고 `작업공간`이라고 말해요. 여러 작업공간이면 `새 앱을 어느 작업공간에 만들까요?`라고 물어요. 선택한 값은 `.axhub/state/tenant.json` 같은 로컬 파일로 저장하지 않아요.
 
 ### 3. Template Registry
 
@@ -95,7 +95,7 @@ axhub apps templates list --tenant test --json
 
 ### 4. Template Picker
 
-Claude Desktop 에서는 template 선택을 native Question/AskUserQuestion card 로 먼저 물어요. 제목은 `템플릿 선택`, 질문은 `어떤 템플릿으로 시작할까요?`; backend 실제 template 만 보여줘요. 3개 초과면 추천 3개만 올리고, card 가 렌더링되지 않거나 선택지가 보이지 않는 경우에만 일반 채팅 텍스트로 fallback 해요.
+Claude Desktop 에서는 template 선택을 native Question/AskUserQuestion card 로 먼저 물어요. 제목은 `템플릿 선택`, 질문은 `어떤 템플릿으로 시작할까요?`; backend 실제 template 만 보여줘요. 3개 초과면 추천 3개만 올리고, card 가 렌더링되지 않거나 선택지가 보이지 않는 경우에만 chat fallback.
 
 섞인 요청에서 update/clarity 가 먼저 처리됐어도 template 은 여기서만 확정해요. 이전 콘셉트·slug·이름 질문 답은 추천 힌트일 뿐이에요.
 
@@ -109,7 +109,7 @@ Claude Desktop 에서는 template 선택을 native Question/AskUserQuestion card
 
 `추천 이름으로 해줘`, `알아서 이름 지어줘`, `use the recommended name` 은 앱 이름 질문이 먼저 보인 뒤의 답변일 때만 확정으로 봐요. 아직이면 추천 이름을 제안하고 `앱 이름을 무엇으로 할까요?` 로 확인해요.
 
-다른 스킬/일반 채팅의 이름·slug 답은 추천 후보로만 쓰고, `앱 이름 확인` card 를 다시 보여줘요. 앱 이름 라벨은 오타·반말 없이 써요. 선택지 설명은 짧고 검수된 한국어만 써요: `기존 앱들과 겹치지 않는 새 콘셉트`, `예약 폼과 시간 선택에 적합`, `정적 페이지 중심이면 가까운 구조`.
+다른 스킬/일반 채팅의 이름·slug 답은 추천 후보로만 쓰고, `앱 이름 확인` card 를 다시 보여줘요. 앱 이름 라벨은 오타·반말 없이 써요. 선택지 설명은 짧고 검수된 한국어만 써요: `기존 앱들과 겹치지 않는 새 콘셉트`, `예약 폼과 시간 선택에 적합`, `정적 페이지 중심이면 가까운 구조`, `가볍고 빠른 시작`, `진행하지 않고 멈춰요`. 오타·비문 금지.
 
 repo name 과 subdomain 은 명시 입력이 없으면 app slug 로 맞춰요. dry-run 과 execute 모두 `--repo-name <app-slug>` 및 `--subdomain <app-slug>` 를 붙여요.
 
@@ -121,7 +121,7 @@ Template 과 앱 이름이 사용자에게 확정되면 dry-run 직전에 저장
 axhub github accounts list --json
 ```
 
-설치된 계정이 0개로 확인되면 설치가 확인될 때까지 dry-run/execute 로 진행하지 않아요. 설치된 계정이 1개면 자동 owner 로 쓰고, 2개 이상이면 owner 를 고르게 해요. 확인할 수 없는 상태는 막지 않고 진행해요. auth 에러는 `다시 로그인해줘` 로 안내해요.
+설치 계정 0개면 설치 확인 전 dry-run/execute 금지. 1개면 자동 owner, 2개 이상이면 owner 를 고르게 해요. 확인 불가 상태는 막지 않고, auth 에러는 `다시 로그인해줘` 로 안내해요.
 
 ### 7. Dry-Run Preview
 
@@ -129,7 +129,7 @@ axhub github accounts list --json
 axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json
 ```
 
-위 값들은 예시예요. 실제 실행 전에는 템플릿, 앱 이름, slug, GitHub owner, tenant 를 확정한 literal 값으로 바꿔요. Dry-run envelope 에서 template, slug, subdomain, repo name, private/public preview 만 한국어로 보여줘요. raw JSON/stderr 를 dump 하지 않아요.
+위 값들은 예시예요. 실제 실행 전에는 확정 literal 값으로 바꿔요. Dry-run envelope 에서 template, slug, subdomain, repo name, private/public preview 만 한국어로 보여줘요. raw JSON/stderr 를 dump 하지 않아요.
 
 미리보기 뒤 확인 필수. 사용자가 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 를 보여준 뒤 `진행`/`취소` 질문을 한 번 받고, 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요.
 
@@ -149,9 +149,9 @@ AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap --template nextjs-
 
 Execute/resume 명령에는 `--json` 금지.
 
-`device_code_issued` event 는 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 보여줘요. Claude Desktop 이 output file 을 알려주면 그 파일을 즉시 읽어 `verification_uri` 와 `user_code` 를 보여줘요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 을 붙이지 않아요. 사용자가 "승인했어"라고 다시 말하게 하지 않아요.
+`device_code_issued` event 는 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 보여줘요. 첫 execute/resume Bash tool call 은 `timeout` 을 12000~15000ms 로 짧게 지정하고, output file 을 알려주면 그 파일을 즉시 읽어 `verification_uri` 와 `user_code` 를 보여줘요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 을 붙이지 않아요.
 
-명령이 `device_flow_required_user_action` 으로 끝나도 거기서 멈추지 않아요. 링크/코드를 보여주고, 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않고 같은 turn 에서 resume 해요. 원래 execute background task 가 `auto_poll:true` 로 아직 돌고 있으면 중복 resume 을 실행하지 말고 같은 output/status 를 읽어 완료를 확인해요. `resume_command` 는 verbatim 실행 금지, `--json`/watch flag 제거.
+명령이 `device_flow_required_user_action` 으로 끝나도 거기서 멈추지 않아요. 링크/코드를 보여주고, 승인되면 이 화면에서 자동으로 계속 확인한다고만 말해요. 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않고 같은 turn 에서 resume 해요. 대기 중 안내도 "승인되면 자동으로 이어서 확인할게요" 형태만 써요. 원래 execute background task 가 `auto_poll:true` 로 아직 돌고 있으면 중복 resume 을 실행하지 말고 같은 output/status 를 읽어 완료를 확인해요. `resume_command` 는 verbatim 실행 금지, `--json`/watch flag 제거.
 
 ### 8.1 Desktop Error Recovery
 
@@ -168,7 +168,7 @@ Claude Desktop 에서 `앱 생성 진행` 또는 `앱 생성 재시도` tool 이
 
 완료된 saga 의 `repo_full_name` 으로 사용자가 요청한 현재 폴더를 채워요. 값이 비면 임의 URL 을 만들지 않아요.
 
-상단 폴더 표시가 사용자가 지정한 새 폴더와 다르면, 메시지의 absolute path 를 target 으로 써요. `pwd`, `ls`, `find`, `cat`, `rtk ls -la` probe 로 권한 프롬프트를 늘리지 않아요.
+상단 폴더와 사용자가 지정한 새 폴더가 다르면 메시지의 absolute path 를 target 으로 써요. `pwd`, `ls`, `find`, `cat`, `rtk ls -la` probe 로 권한 프롬프트를 늘리지 않아요.
 
 새 폴더에 `.omc/` 같은 Desktop 메타데이터가 있을 수 있으므로 `git clone ... .` 는 쓰지 않아요. `git init` 후 원격 `main` 을 받아 `.omc/` 를 보존해요.
 
@@ -180,7 +180,7 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 
 실행 때 `<target>` 과 `<repo>` 은 확인된 literal 로 바꿔요. target 채운 뒤 추가 `rtk ls`, `ls`, `find`, `cat` 확인은 하지 않아요.
 
-성공하면 추가 파일 읽기 없이 `axhub deploy --explain --json` 으로 check 해요. 정상 fresh path 에서 밖 reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고, 이미 확보한 repo/app/deployment 값과 CLI 명령으로만 마무리해요.
+성공하면 추가 파일 읽기 없이 `axhub deploy --explain --json` 으로 check 해요. 밖 reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고, 확보한 repo/app/deployment 값과 CLI 명령으로만 마무리해요.
 
 ### 10. Result
 

@@ -1,6 +1,6 @@
 ---
 name: clarity
-description: 'clarity: onboarding/bootstrap/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "Use the axhub clarity skill", "show current app status", "is production healthy?", "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 빈 디렉토리 새 앱 만들기·템플릿·앱 이름 선택=bootstrap, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요. 앱 상태 조회와 새 앱 생성이 한 요청에 섞이면 clarity 는 상태만 조회하고 concept/name/slug/template 질문 없이 bootstrap 으로 넘겨요. 영어로 clarity skill 을 직접 지정한 요청도 반드시 이 스킬로 라우팅해요.'
+description: 'clarity: onboarding/bootstrap/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "Use the axhub clarity skill", "show current app status", "is production healthy?", "reconnect my GitHub account with axhub", "GitHub device code", "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 빈 디렉토리 새 앱 만들기·템플릿·앱 이름 선택=bootstrap, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요. 앱 상태 조회와 새 앱 생성이 한 요청에 섞이면 clarity 는 상태만 조회하고 concept/name/slug/template 질문 없이 bootstrap 으로 넘겨요. 영어로 clarity skill 이나 GitHub 계정 재연결을 직접 지정한 요청도 반드시 이 스킬로 라우팅해요.'
 ---
 
 # axhub clarity 브리지
@@ -26,10 +26,15 @@ Claude Desktop 에서는 slash 명령이 채팅에서 인식되지 않을 수 �
 
 GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 사용자 행동의 핵심이에요. `axhub github link`, 로그인·연결 명령, 또는 실행 출력에 `github.com/login/device`, `verification_uri`, `verification_uri_complete`, `user_code`, `Enter code`, `XXXX-XXXX` 형태의 입력 코드가 보이면 예외적으로 URL과 입력 코드는 사용자 가치 정보로 취급해요.
 
-- device flow 를 시작하는 명령이 승인 대기 때문에 오래 폴링할 수 있으면 foreground 로 오래 붙잡지 말고 stdout/stderr 를 임시 로그로 받는 background 실행으로 시작해요.
-- 로그를 짧게 폴링해서 URL과 입력 코드를 찾고, 발견 즉시 일반 채팅 본문에 URL과 입력 코드를 다시 써요. 예: `GitHub 인증 창이 열렸어요. 브라우저에서 https://github.com/login/device 를 열고 입력 코드 ABCD-1234 를 넣으면 여기서 자동으로 이어갈게요.`
+- device flow fast path 에서는 shell loop, background watcher, persistent monitor 를 쓰지 않아요. `while true`, `sleep`, `grep`, command substitution, 임시 로그 파일 저장/재읽기, `Monitor 사용` 권한 카드가 뜨는 명령은 실패예요. device flow 시작은 `계정 인증 시작` 단일 CLI 호출 하나로 처리하고, CLI stdout/stderr 에서 URL과 코드를 바로 읽어요.
+- device flow fast path 에서는 Step 1a 의 optional `axhub update check --json` 버전 확인을 건너뛰어요. 사용자가 지금 필요한 건 코드와 브라우저 승인이라서, 업데이트 권한 팝업이나 버전 안내로 앞단을 늦추지 않아요.
+- Claude Desktop 에서 `axhub github link` 를 실행할 때는 자동 브라우저 열기와 agent-safe 흐름을 위해 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>` 형태로 실행해요.
+- device flow 를 시작하는 Bash/tool call 제목은 정확히 `계정 인증 시작` 으로 직접 채워요. 자동 제목에 제품명이나 영어 단어가 붙어 동사처럼 보이면 같은 명령이라도 이 제목으로 고쳐 다시 호출해요.
+- 로그를 짧게 폴링해서 URL과 입력 코드를 찾고, 발견 즉시 일반 채팅 본문에 URL과 입력 코드를 다시 써요. device-flow URL 은 markdown 링크로 만들지 말고 평문 `https://...` 절대 URL 로만 써요. `[https://github.com/login/device](github.com/login/device)` 처럼 target 에 scheme 이 빠질 수 있는 링크 문법은 금지예요. 예: `GitHub 인증 창이 열렸어요. 브라우저에서 https://github.com/login/device 를 열고 입력 코드 ABCD-1234 를 넣으면 여기서 자동으로 이어갈게요.`
+- 입력 코드를 찾았으면 승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출해요. `실행됨 명령 N개`, `TaskOutput 사용함`, tool 카드, 접힌 로그만 남기고 응답을 끝내면 실패예요.
 - 코드를 명령 출력이나 로그 읽기 결과 안에만 남기지 않아요. Claude Desktop 에서는 tool 출력이 접혀 보일 수 있으므로, 최종 요약이나 다음 안내 문장에도 사용자가 입력할 코드를 한 번 더 써요.
-- 자동 브라우저 열기와 자동 폴링이 가능하더라도 사용자가 "승인했어"라고 다시 말하게 하지 않아요. 승인 뒤 CLI 가 이어갈 수 있으면 계속 폴링하고, 사용자가 QA처럼 코드 표시만 요청했으면 코드를 확인한 뒤 대기 프로세스를 정리하고 멈춰요.
+- 자동 브라우저 열기와 자동 폴링이 가능하더라도 사용자가 "승인했어"라고 다시 말하게 하지 않아요. CLI 가 짧은 agent-safe 승인 대기 뒤 pending 으로 끝나면, shell loop 로 감시하지 말고 `인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 조회를 실행해 연결 반영 여부를 확인해요.
+- 브라우저가 성공 화면인데 계정 연결이 아직 반영되지 않았으면 같은 leaf 명령을 한 번만 더 실행할 수 있어요. 그래도 pending 이면 지금 상태와 다음에 확인할 명령을 짧게 안내하고 멈춰요. 승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요.
 - device_code 같은 내부 교환용 값은 절대 쓰지 않아요. 사용자에게 필요한 건 verification URL 과 `user_code` 뿐이에요.
 
 ## 상태 확인 UX 계약
