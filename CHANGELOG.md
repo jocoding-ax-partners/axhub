@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.30](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.29...v1.7.30) (2026-07-05)
+
+Claude Code Desktop 실제 QA에서 "최신인지 확인하고, 앱 상태도 보고, 새 예약 앱도 만들어줘"처럼 여러 요청이 섞이면 update 뒤 clarity 가 새 앱 컨셉·이름 질문을 대신 띄워 bootstrap 의 템플릿·앱 이름 카드가 호출되지 않는 문제가 보였어요. 이제 clarity 는 앱 상태까지만 처리하고 새 앱 생성은 bootstrap 으로 넘기며, bootstrap 이 이전 답변을 힌트로만 쓰고 `어떤 템플릿으로 시작할까요?`와 `앱 이름을 무엇으로 할까요?` 카드를 다시 보여줘요.
+
 ## [1.7.29](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.28...v1.7.29) (2026-07-05)
 
 Claude Code Desktop 실제 QA에서 bootstrap 의 템플릿·앱 이름 질문은 사라진 게 아니라 이전 QA 폴더의 resume 상태가 먼저 감지되어 뒤로 밀린 것이 확인됐어요. 이제 새 폴더/`새로 시작` 흐름은 이전 상태를 넘고 바로 템플릿·앱 이름 질문으로 이어가며, GitHub device flow 가 백그라운드 task output 에 숨을 때도 output file 을 즉시 읽어 코드를 보여주고 auto-poll 중복 resume 을 피해서 승인 뒤 흐름이 더 조용하게 이어져요.
