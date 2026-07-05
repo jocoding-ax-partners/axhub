@@ -320,6 +320,11 @@ describe("smooth behavior contracts", () => {
       expect(update).not.toContain(leakedPhrase);
     }
     expect(update).toContain("라벨 안에 `axhub` 를 넣지 않아요");
+    expect(update).toContain("**Desktop-visible command allowlist.**");
+    expect(update).toContain("Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요");
+    expect(update).toContain("파일 읽기 도구로만 읽고");
+    expect(update).toContain("파일 읽기 도구가 없거나 거부되면 플러그인 버전 비교는 생략해요");
+    expect(update).toContain("shell wrapper, file test, pipe, text filter 를 쓰지 않아요");
     expect(update).toContain("| CLI 존재 확인 (`command -v axhub`) | `CLI 설치 확인` |");
     expect(update).toContain("| 버전 확인 (`axhub update check ...`) | `버전 확인` |");
     expect(update).toContain("수동 확인 기록은 Claude Desktop 경로에서 갱신하지 않아요");
@@ -328,10 +333,14 @@ describe("smooth behavior contracts", () => {
     expect(update).not.toContain("plugin-update-check");
     expect(update).not.toContain('mkdir -p "$HOME/.axhub/cache"');
     expect(update).not.toContain("캐시만 갱신할게요");
+    for (const commandLeak of ["rtk read", "grep version", "test -f", "cat ", "sed -n"]) {
+      expect(update).not.toContain(commandLeak);
+    }
+    expect(update).toContain("영어 라벨과 정확한 숫자를 중간 문장으로 말하지 말고");
     expect(update).toContain("| 플러그인 업데이트 적용 | `플러그인 업데이트 받기` |");
-    expect(update).toContain("`Plugin version 1.6.1. 버전 확인 돌린다.`, `CLI 최신. 플러그인 업데이트 있음 — scope 확인 후 적용.`, `Scope: user.`, `받았다.` 같은 섞인 문장은 금지");
     expect(update).toContain("`현재 플러그인 버전을 확인했어요.`, `CLI는 이미 최신이에요. 플러그인 새 버전을 받을게요.`, `플러그인 설치 위치를 확인했어요.`, `플러그인 새 버전을 받았어요.`");
-    expect(update).toContain("`Plugin version`, `Scope`, `CLI latest`, `plugin.has_update`, `has_update`, `disabled`, `current`, `latest` 같은 내부 필드명이나 영어 라벨");
+    expect(update).toContain("영어 라벨, 내부 필드명, 설치 위치 원문, raw 상태값, 반말형 짧은 메모가 섞인 문장");
+    expect(update).not.toContain("Plugin version");
   });
 
   test("development skill follows the current SDK raw-db surface", () => {
