@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.25](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.24...v1.7.25) (2026-07-05)
+
+Claude Code Desktop 실제 QA에서 bootstrap 은 작업공간·템플릿·앱 이름·GitHub owner 질문을 모두 정상으로 호출했지만, GitHub device flow 뒤 첫 resume 명령이 긴 watch 모드로 들어가면 코드와 다음 상태가 늦게 보여 사용자가 멈춘 것처럼 느낄 수 있었어요. 이제 첫 execute 와 device-flow 직후 첫 resume 은 `--no-input` 기반 짧은 명령으로 끝내고, 이후 빌드·배포 상태만 별도 status 명령으로 확인하도록 해서 GitHub 코드가 바로 보이는 흐름을 유지해요.
+
 ## [1.7.24](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.23...v1.7.24) (2026-07-05)
 
 Claude Code Desktop 실제 QA에서 bootstrap 은 작업공간·템플릿·앱 이름·GitHub owner 확인까지 자연스럽게 이어졌지만, GitHub device flow 가 뜨면 브라우저는 열려도 입력 코드가 늦게 보이고 승인 뒤 사용자가 다시 알려줘야 하는 흐름으로 멈출 수 있었어요. 이제 device-code 단계는 링크와 코드를 chat 에 즉시 보여주고, `device_flow_required_user_action` 뒤에도 `resume_command` 또는 `--resume-last` 로 같은 turn 에서 계속 확인하도록 고정했어요.
