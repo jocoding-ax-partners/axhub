@@ -266,12 +266,15 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요");
     expect(clarity).toContain("도구가 자동으로 제목을 만들도록 비워두면 `axhub: App get 사용 중` 같은 이름이 보이므로 금지");
     expect(clarity).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>");
+    expect(clarity).toContain("shell loop, background watcher, persistent monitor 를 쓰지 않아요");
+    expect(clarity).toContain("`Monitor 사용` 권한 카드가 뜨는 명령은 실패");
     expect(clarity).toContain("device flow fast path 에서는 Step 1a 의 optional `axhub update check --json` 버전 확인을 건너뛰어요");
     expect(clarity).toContain("device flow 를 시작하는 Bash/tool call 제목은 정확히 `계정 인증 시작`");
     expect(clarity).toContain("device-flow URL 은 markdown 링크로 만들지 말고 평문 `https://...` 절대 URL");
     expect(clarity).toContain("[https://github.com/login/device](github.com/login/device)` 처럼 target 에 scheme 이 빠질 수 있는 링크 문법은 금지");
     expect(clarity).toContain("승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출");
-    expect(clarity).toContain("`인증 확인` 제목으로 `axhub github accounts list --tenant <tenant> --json`");
+    expect(clarity).toContain("`인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 조회");
+    expect(clarity).toContain("승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요");
     expect(clarity).toContain("앱 상세를 조회할 때 tool 제목은 정확히 `앱 상태 조회`");
     expect(clarity).toContain("운영 배포 상태를 조회할 때는 정확히 `운영 상태 확인`");
     expect(clarity).toContain("CLI 표면이나 help 를 볼 때는 각각 `명령 표면 확인` / `명령 사용법 확인`");
