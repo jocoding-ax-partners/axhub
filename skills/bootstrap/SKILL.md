@@ -27,9 +27,9 @@ creation path 는 하나뿐이에요: backend `axhub apps bootstrap` saga. `axhu
 
 ## Reference Loading Policy
 
-정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, GitHub gate, dry-run preview, execute/status/verify/result 까지 진행해요. Claude Desktop 에서 workspace 밖 plugin cache reference 읽기 권한 프롬프트가 뜨면 허용 요구 없이 읽지 않아요.
+정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, GitHub gate, dry-run preview, execute/status/verify/result 까지 진행해요. workspace 밖 plugin cache 권한 프롬프트가 뜨면 허용 요구 없이 읽지 않아요.
 
-Edge case 에서도 먼저 이 본문과 `axhub` CLI 상태 명령만 써요. 긴 오류 설명도 chat 에 보이는 오류 코드와 `axhub` status/diagnose 출력으로 요약하고, plugin cache 파일 읽기를 복구 조건으로 삼지 않아요.
+Edge case 에서도 먼저 이 본문과 `axhub` CLI 상태 명령만 써요. 오류는 chat 의 코드와 `axhub` status/diagnose 로 요약하고, plugin cache 파일 읽기를 복구 조건으로 삼지 않아요.
 
 ## Visibility
 
@@ -97,7 +97,7 @@ Tool 제목은 `템플릿 목록 확인`을 써요.
 axhub apps templates list --tenant test --json
 ```
 
-위 `test` 는 예시예요. 실제 Desktop-visible command 에서는 확정된 tenant literal 로 바꿔 한 명령만 실행해요.
+실제 Desktop-visible command 에서는 확정된 tenant literal 로 바꿔요.
 
 ### 4. Template Picker
 
@@ -147,9 +147,11 @@ axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-p
 AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --watch --watch-timeout 9m --idempotency-key 00000000-0000-4000-8000-000000000000 --json
 ```
 
-실제 실행에서는 예시 UUID 를 `init-resume put` 이 반환한 literal UUID 로 바꿔요. Bash/tool timeout 은 9.5분 이상으로 잡아요.
+실제 실행에서는 예시 UUID 를 `init-resume put` 이 반환한 literal UUID 로 바꿔요.
 
-`device_code_issued` event 가 나오면 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 사용자에게 보여줘요. Claude Desktop 에서는 긴 `--watch` tool 이 끝날 때까지 stdout 이 chat 에 안 보일 수 있으므로, device flow 를 숨긴 채 9분 watch 에 들어가지 않아요. 사용자가 "승인했어"라고 다시 말하게 하지 않아요.
+`device_code_issued` event 가 나오면 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 보여줘요. Desktop에선 긴 `--watch` tool 이 끝날 때까지 stdout 이 chat 에 안 보일 수 있으므로, device flow 를 숨긴 채 9분 watch 에 들어가지 않아요. 사용자가 "승인했어"라고 다시 말하게 하지 않아요.
+
+명령이 `device_flow_required_user_action` 으로 끝나도 거기서 멈추지 않아요. 링크/코드를 보여주고, 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않고 같은 turn 에서 `resume_command` 또는 `--resume-last` 로 이어가요.
 
 ### 8.1 Desktop Error Recovery
 

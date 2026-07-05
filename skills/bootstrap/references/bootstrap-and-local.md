@@ -85,10 +85,10 @@ GitHub 연결이 필요해요. 다음 단계로 진행해 주세요:
 2. 코드 입력: <user_code>
 3. axhub GitHub App 설치 승인
 
-브라우저 승인까지 끝나면 제가 자동 재시도로 이어갈 수 있어요.
+브라우저에서 승인하면 제가 이 화면에서 자동으로 계속 확인할게요. 따로 `승인했어`라고 말하지 않아도 돼요.
 ```
 
-In fallback mode, resume the cached flow yourself after `retry_after_secs` or a short bounded delay; do not wait for a manual approval phrase:
+In fallback mode, resume the cached flow yourself after `retry_after_secs` or a short bounded delay; do not wait for a manual approval phrase and do not end the response asking the user to report approval. Prefer the emitted `resume_command` literally when the CLI returns one; otherwise use:
 
 ```bash
 AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --resume-last --watch --watch-timeout 9m --idempotency-key 00000000-0000-4000-8000-000000000000 --json
