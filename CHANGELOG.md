@@ -4,6 +4,16 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.7.32](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.31...v1.7.32) (2026-07-06)
+
+Claude Code Desktop 실제 QA에서 "최신인지 확인하고 앱 상태도 봐줘"처럼 섞인 요청을 보내면 update 결과 뒤 같은 응답에서 앱 상태 조회로 이어질 수 있었어요. 이제 update 는 버전 확인과 업데이트 결과에서 정확히 멈추고, 플러그인 scope 같은 내부 설치 위치값도 chat 에 노출하지 않으며, 남은 앱 상태 확인은 별도 흐름에서 다시 시작하도록 안내해요.
+
+
+### Docs
+
+* hidden 표면 설명을 더 쉬운 말로 다듬기 ([e60dffa](https://github.com/jocoding-ax-partners/axhub/commit/e60dffa9f5be470acabcf1a1f5d0d7c3c7637661))
+* 정책 문서 용어를 쉬운 말로 풀어쓰기 ([69d8c7b](https://github.com/jocoding-ax-partners/axhub/commit/69d8c7b01dd2e9f62ed193f01865c7d1e2f4cf5b))
+
 ## [1.7.31](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.30...v1.7.31) (2026-07-05)
 
 Claude Code Desktop 실제 QA에서 GitHub device flow 승인 뒤 `Monitor 사용` 권한 카드가 한 번 더 뜨고, 자연어 GitHub 재연결 요청이 clarity 스킬 대신 App/MCP 도구로 빠질 수 있는 문제가 보였어요. 이제 device-flow 확인은 단일 CLI 조회만 쓰도록 고정하고, 영어 재연결·device code 요청도 clarity 로 잡아 사용자가 "승인했어"라고 다시 말하거나 추가 watcher 권한을 누르지 않아도 계정 연결 확인까지 이어지게 했어요.
