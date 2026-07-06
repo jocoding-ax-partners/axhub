@@ -55,3 +55,8 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 규칙: clarity 스킬은 숨김 내부 명령 그룹(`axhub plugin-support` — plugin 전용 통로라 예고 없이 바뀔 수 있는 명령들)을 탐색하거나 실행하지 않아요. 누구나 `--help` 로 볼 수 있는 공개 명령 표면(`--json-schema`/`--help`)만 사용해요.
 - 적용: skills/clarity/SKILL.md
 - invariant: "공개 표면만"
+
+## AP-10 telemetry 옵트인
+- 규칙: AI 활용 기록(`axhub axrouter` — 내 Claude Code 프롬프트·응답·툴콜을 팀 워크스페이스로 보내는 수집 기능)은 onboarding 이 무엇이 수집되는지 설명하고 물어본 뒤, 사용자가 켜기를 고를 때만 켜요 — 동의 없이 켜지 않아요. 거절하면 같은 온보딩에서 다시 묻지 않고 나중에 켜는 방법만 알려줘요. headless(사람이 답할 수 없는 자동 실행 환경)에서는 묻지도 켜지도 않아요.
+- 적용: skills/onboarding/SKILL.md
+- invariant: "AI 활용 기록", "동의 없이 켜지 않아요"

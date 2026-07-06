@@ -1,6 +1,20 @@
 # MCP And Ready Cards
 
-Load this after core gaps are resolved, before optional MCP setup and the final card.
+Load this after core gaps are resolved. 처리 순서는 AI 활용 기록 옵트인 → optional MCP setup → final card 예요.
+
+## AI 활용 기록 옵트인 (MCP 등록 전, 선택)
+
+AI 활용 기록은 내 Claude Code 프롬프트·응답·툴콜 내용을 팀 워크스페이스로 보내는 수집 기능이에요 (`axhub axrouter`). 켜는 것은 항상 사용자 선택이에요 — 동의 없이 켜지 않아요. headless 면 이 섹션을 통째로 건너뛰어요 (묻지도 실행하지도 않아요).
+
+1. `axhub axrouter status --json` 을 실행해요 (read-only). 명령 실패(구 CLI 포함)거나 `data.workspaces[]` 에 `available: true` 인 워크스페이스가 없으면 조용히 건너뛰어요. `data.local_monitoring` 이 이미 true 면 묻지 않고 최종 카드에 상태만 반영해요.
+2. AskUserQuestion 한 번으로 물어요. 질문에는 무엇이 수집되는지(이 컴퓨터의 Claude Code 프롬프트·응답·툴콜 내용), 어디로 가는지(<slug> 워크스페이스), 선택 사항이라는 점을 담아요. 옵션은 "켜기" / "이번엔 건너뛰기". available 워크스페이스가 여러 개면 어느 워크스페이스로 보낼지도 같은 질문에서 골라요.
+3. 건너뛰기 → "나중에 켜고 싶으면 'AI 활용 기록 켜줘' 라고 말하면 돼요." 한 줄만 남기고 같은 온보딩에서 다시 묻지 않아요.
+4. 켜기 → `axhub axrouter monitor --tenant <slug> --json`.
+   - 성공 → 적용은 Claude Code 재시작 후예요. 이어지는 fresh MCP add 로 Restart Handoff Card 가 나가면 "AI 활용 기록도 같은 재시작으로 적용돼요" 한 줄을 카드에 덧붙이고, MCP 재시작이 없으면 최종 카드의 해당 줄에 "재시작 후 적용" 을 붙여요.
+   - `error.subcode` 가 `consent_required` → 워크스페이스 콘솔의 1회 동의가 아직이에요. `error.doc_url` 의 동의 페이지 주소를 보여주고, 사용자가 동의를 마쳤다고 하면 monitor 를 1회만 재시도해요. 여전히 미동의면 "콘솔 동의 후 'AI 활용 기록 켜줘' 라고 말해 주세요" 안내로 남기고 green check 는 달지 않아요.
+5. 끄기·해제는 온보딩 범위 밖이에요 — 물으면 `axhub axrouter monitor --off`(이 컴퓨터만 끔) / `axhub axrouter revoke`(등록 해제)를 알려줘요.
+
+수집 전용 토큰은 CLI 가 settings.json 에만 기록해요 — 토큰 값이나 raw JSON 을 chat 에 출력하지 않아요.
 
 ## MCP Add/Auth Distinction
 
@@ -64,6 +78,7 @@ axhub MCP 등록했어요. 도구 활성화에는 Claude Code 재시작이 필�
 2. 위 Claude Code Path 분기를 그대로 따라요 — 보통 `Needs authentication` 이고 이 대화에 add 흔적이 없는 상태라 `/mcp` OAuth 안내로 이어져요.
 3. 절차는 read-only 확인(`claude mcp get`)과 사용자 action 안내뿐이라 안전해요. headless 면 질문 없이 수동 명령만 남기고 `SAFE_STOP_NONINTERACTIVE` 로 끝내요.
 4. 온보딩 도중 환경이 바뀌었을 수 있으면 detect 를 다시 돌려도 돼요 (read-only). `first_gap` 이 순서를 다시 잡아줘요.
+5. AI 활용 기록 옵트인은 resume 에서 다시 묻지 않아요 — `axhub axrouter status --json` 으로 켜짐이 확인되면 최종 카드에 반영만 해요.
 
 ## Claude Desktop Or Other Host
 
@@ -86,6 +101,7 @@ axhub 온보딩 완료예요. [VIBE_READY]
   ✓ 첫 배포 live: <deployment-url>
   ✓ 점검 통과
   ✓ axhub MCP 연동됨 — `claude mcp get axhub` 가 Connected 일 때만
+  ✓ AI 활용 기록 켜짐 — <workspace-slug> (Claude Code 재시작 후 적용) — 켰거나 status 로 확인될 때만, 건너뛰었으면 줄 생략
 
 이제 바로 코딩하면 돼요.
 다음에 말할 수 있는 것: "첫 앱 만들어줘", "배포해", "로그 봐줘", "환경변수 추가해줘", "테이블 추천해줘"
