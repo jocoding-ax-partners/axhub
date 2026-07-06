@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.8.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.32...v1.8.0) (2026-07-06)
+
+팀 워크스페이스가 AI 활용 기록(axrouter)을 지원해도 온보딩이 수집을 켤 기회를 안내하지 않아 사용자가 명령을 직접 알아야 했어요. 이제 온보딩이 gap 정리 후 MCP 등록 전에 무엇이 수집되는지(프롬프트·응답·툴콜) 설명하고 켤지 한 번만 물어봐요 — 동의 없이 켜지 않고, 거절하면 다시 묻지 않으며, headless·미지원 워크스페이스에서는 조용히 건너뛰어요. 켠 경우 적용은 Claude Code 재시작 후이고, 기록 위치와 끄는 법은 POLICY.md 에 공개했어요.
+
+
+### Added
+
+* 온보딩에 AI 활용 기록(axrouter) 옵트인 단계 추가 ([119d009](https://github.com/jocoding-ax-partners/axhub/commit/119d0095327ff4bb8bf50dd2353dd313f877157f))
+
 ## [1.7.32](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.31...v1.7.32) (2026-07-06)
 
 Claude Code Desktop 실제 QA에서 "최신인지 확인하고 앱 상태도 봐줘"처럼 섞인 요청을 보내면 update 결과 뒤 같은 응답에서 앱 상태 조회로 이어질 수 있었어요. 이제 update 는 버전 확인과 업데이트 결과에서 정확히 멈추고, 플러그인 scope 같은 내부 설치 위치값도 chat 에 노출하지 않으며, 남은 앱 상태 확인은 별도 흐름에서 다시 시작하도록 안내해요.
