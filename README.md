@@ -229,7 +229,7 @@ bun run release:tag                # tag 생성 + push
 
 > 판정·실행 로직은 플러그인이 아니라 `ax-hub-cli` 에 있어요 — helper 기능 변경, schema parity, CLI 릴리즈는 그쪽 레포(`ax-hub-cli`) follow-up 으로 처리해요.
 
-개발·운영 규칙의 원천은 [docs/policy/dev-policy.md](./docs/policy/dev-policy.md), 에이전트 행동 규칙의 원천은 [docs/policy/agent-policy.md](./docs/policy/agent-policy.md) 예요.
+개발·운영 규칙은 [docs/policy/dev-policy.md](./docs/policy/dev-policy.md), 에이전트 행동 규칙은 [docs/policy/agent-policy.md](./docs/policy/agent-policy.md) 가 기준 문서예요.
 
 ---
 
