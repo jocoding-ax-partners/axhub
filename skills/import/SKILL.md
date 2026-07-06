@@ -47,6 +47,8 @@ model: sonnet
 기존 앱을 axhub에 가져올 준비를 확인할게요.
 ```
 
+import preview 정상이면 axhub 가져오기 대상 확정이에요. Interactive 는 preview card 전에 AskUserQuestion 으로 axhub 진입 확인을 먼저 해요: `이 앱을 axhub에 가져올까요?` (`axhub에 가져오기`/`아니요`). `가져오기` 면 preview card 와 기존 승인을 이어가요. `아니요` 면 종료. (headless 는 이 AUQ 생략)
+
 ## Vibe Coder Visibility Rules
 
 이 섹션은 workflow 보다 우선해요. 아래 금지어가 떠오르면 말하기 전에 반드시 한국어 사용자 문구로 바꿔요. 특히 Claude Desktop 에서 모델이 중간 생각을 chat 에 노출하기 쉬우므로, 검증용 field name 이나 영어 진행어를 "짧게라도" 쓰지 않아요.
