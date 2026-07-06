@@ -4,6 +4,20 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.9.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.8.4...v1.9.0) (2026-07-06)
+
+axhub 와 무관한 프로젝트에서 "배포해"·"업데이트해줘" 같은 일반 발화가 axhub 스킬로 잘못 라우팅되던 오탐을 막았어요(AP-11). 반대로 axhub 프로젝트가 맞을 때도 배포·생성·가져오기를 실행하기 전에 "axhub로 진행할까요?"를 interactive 로 한 번 더 확인하는 진입 AUQ 를 더해(AP-12), 원치 않는 실행과 원치 않는 axhub 사용을 양쪽에서 막아요.
+
+
+### Added
+
+* axhub 진입 확인 AUQ 추가 (AP-12) ([1aa9c56](https://github.com/jocoding-ax-partners/axhub/commit/1aa9c560d3d71a5c63d8aed4f42c64e85b136648))
+
+
+### Fixed
+
+* 비-axhub 맥락 발화 라우팅 오탐 가드 추가 (AP-11) ([04d7c1f](https://github.com/jocoding-ax-partners/axhub/commit/04d7c1f23af5e4490b8c633045474165480fd1a9))
+
 ## [1.8.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.8.3...v1.8.4) (2026-07-06)
 
 Claude Code Desktop 배포 흐름에서 빌드가 아직 진행 중이면 사용자에게 "배포 상태 확인해줘"라고 다시 말해 달라고 안내해 멈춘 것처럼 보일 수 있었어요. 이제 deploy skill 은 deployment id 를 알고 있는 진행 중 배포를 같은 응답 흐름에서 계속 확인하거나 실제 follow-up 으로 이어가며, 사용자가 상태 확인 문구를 알 필요 없이 끝날 때까지 자연스럽게 지켜봐요.
