@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.8.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.8.0...v1.8.1) (2026-07-06)
+
+실기기 QA 에서 다른 도구가 `CLAUDE_CODE_ENABLE_TELEMETRY=1` 을 설정해 둔 컴퓨터면 온보딩이 AI 활용 기록을 "이미 켜짐"으로 오판해 옵트인 질문과 동의 페이지를 건너뛰는 문제가 보였어요. 이제 실제 수집 중인지는 활성 워크스페이스 기준으로만 판단해서, 외부 텔레메트리 설정이 있어도 정상적으로 물어보고 켜면 axhub 설정으로 교체된다는 안내까지 함께 해요.
+
+
+### Fixed
+
+* AI 활용 기록 수집 중 판정을 active_workspace 기준으로 교정 ([484f70c](https://github.com/jocoding-ax-partners/axhub/commit/484f70c412c20f705af7700b400ada9001ff4f4b))
+
 ## [1.8.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.7.32...v1.8.0) (2026-07-06)
 
 팀 워크스페이스가 AI 활용 기록(axrouter)을 지원해도 온보딩이 수집을 켤 기회를 안내하지 않아 사용자가 명령을 직접 알아야 했어요. 이제 온보딩이 gap 정리 후 MCP 등록 전에 무엇이 수집되는지(프롬프트·응답·툴콜) 설명하고 켤지 한 번만 물어봐요 — 동의 없이 켜지 않고, 거절하면 다시 묻지 않으며, headless·미지원 워크스페이스에서는 조용히 건너뛰어요. 켠 경우 적용은 Claude Code 재시작 후이고, 기록 위치와 끄는 법은 POLICY.md 에 공개했어요.
