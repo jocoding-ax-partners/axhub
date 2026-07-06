@@ -39,6 +39,19 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("scope 원문, 영어 진행 로그는 사용자에게 말하지 않아요");
   });
 
+  test("uses the newest enabled plugin entry when Claude lists duplicates", () => {
+    const update = readRepo("skills/update/SKILL.md");
+
+    expect(update).toContain("`claude plugin list` 에 `axhub@axhub` 가 여러 번 나오면");
+    expect(update).toContain("enabled 항목 중 **가장 높은 semver** 를 `<PLUGIN_VERSION>` 으로 삼아요");
+    expect(update).toContain("`local` → `project` → `user`");
+    expect(update).toContain("낮은 버전이 함께 남아 있어도 사용자에게 중복 설치·scope 원문을 설명하지 않고");
+    expect(update).toContain("성공하면 `claude plugin list` 를 한 번 더 실행해");
+    expect(update).toContain("이 값이 `plugin.latest` 보다 높으면 `<PLUGIN_UPDATED_VERSION>` 을 최종 카드에 써요");
+    expect(update).toContain("낡은 중복 항목을 나열하지 않아요");
+    expect(update).toContain("NEVER `claude plugin list` 에서 처음 발견한 낡은 `axhub@axhub` 항목만 보고 업데이트 여부를 판단하지 말아요");
+  });
+
   test("does not continue mixed app-status requests inside update", () => {
     const update = readRepo("skills/update/SKILL.md");
 

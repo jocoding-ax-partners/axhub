@@ -75,6 +75,7 @@ TodoWrite({ todos: [
 
 1. `command -v axhub` 가 실패하면 멈춰요 — CLI 가 아직 없는 건 설치 소관이에요. 한 줄: `axhub CLI 가 아직 없어요. "온보딩" 이라고 말하면 설치부터 도와드려요.` (재설치를 여기서 시도하지 않아요.)
 2. Claude Desktop 에서는 플러그인 캐시의 `plugin.json` 을 읽지 않아요. 먼저 `command -v claude` 를 확인하고, 가능하면 `claude plugin list` 에서 `axhub@axhub` 의 현재 버전을 내부 변수 `<PLUGIN_VERSION>` 으로만 둬요. `claude` CLI 가 없거나 목록에서 못 찾으면 `<PLUGIN_VERSION>` 없이 CLI 업데이트 확인만 진행해요. 이 단계에서 설치 경로, Scope, manifest 경로, raw 목록, `user scope`/`local scope` 같은 scope 원문, 영어 진행 로그는 사용자에게 말하지 않아요. 필요한 경우 `현재 플러그인 버전을 확인했어요.` 만 말해요. 설치 위치값은 업데이트 명령의 `--scope` 인자에만 쓰고 chat 에는 쓰지 않아요.
+3. `claude plugin list` 에 `axhub@axhub` 가 여러 번 나오면, enabled 항목 중 **가장 높은 semver** 를 `<PLUGIN_VERSION>` 으로 삼아요. 같은 버전이 여러 scope 에 있으면 업데이트 대상 `<SCOPE>` 는 현재 작업공간에 가장 가까운 항목(`local` → `project` → `user`)을 고르고, 이 선택 근거는 chat 에 쓰지 않아요. 낮은 버전이 함께 남아 있어도 사용자에게 중복 설치·scope 원문을 설명하지 않고, 최종 카드에는 선택된 최고 버전만 써요.
 
 **`disabled` 와 `AXHUB_NO_AUTO_UPDATE` — 둘 다 존중해요 (자동 적용 안 함, 안내만).**
 - `disabled`(패키지 매니저가 관리하는 설치) → CLI 가 자기를 교체할 수 없어요. 패키지 매니저 업그레이드를 **안내만** 해요.
@@ -124,11 +125,12 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - **`command -v claude` 실패** (Claude Code CLI 없음) → 한 줄 안내만: `axhub 플러그인 새 버전(v<plugin.latest>)이 있어요. Claude Code 에서 /plugin update 로 받아 주세요.`
 - **`AXHUB_NO_AUTO_UPDATE` 설정** → 적용하지 않고 한 줄 안내만: `axhub 플러그인 새 버전(v<plugin.latest>)이 있어요. AXHUB_NO_AUTO_UPDATE 설정이라 자동 적용은 안 해요 — claude plugin update axhub@axhub 로 직접 받거나 플래그를 끄면 돼요.`
 - **`plugin.has_update == true` 이고 적용 가능** → 적용해요:
-  1. 설치 위치를 먼저 확인해요 — `claude plugin list` 출력에서 `axhub@axhub` 항목의 `Scope:` 값(user/project/local/managed)을 읽어 내부 변수 `<SCOPE>` 로만 둬요. 사용자에게는 `플러그인 설치 위치를 확인할게요.` 라고 말하고 `Scope:` 원문은 보여주지 않아요. 못 찾으면 `user` 로 둬요.
+  1. 설치 위치를 먼저 확인해요 — `claude plugin list` 출력에서 `axhub@axhub` 항목의 `Scope:` 값(user/project/local/managed)을 읽어 내부 변수 `<SCOPE>` 로만 둬요. 같은 이름이 여러 번 나오면 enabled 항목 중 가장 높은 semver 를 현재 버전으로 보고, 같은 버전끼리는 `local` → `project` → `user` 순서로 `<SCOPE>` 를 골라요. 사용자에게는 `플러그인 설치 위치를 확인할게요.` 라고 말하고 `Scope:` 원문은 보여주지 않아요. 못 찾으면 `user` 로 둬요.
   2. 한 줄: `axhub 플러그인 새 버전(v<plugin.current> → v<plugin.latest>)이 나왔어요. 지금 받을게요…`
   3. 실행: `claude plugin update axhub@axhub --scope <SCOPE>`
-  4. **재시작 안내(필수 — 플러그인 업데이트는 재시작해야 적용돼요):** `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.`
-  5. 실패하면 raw 에러는 숨기고 한 줄: `플러그인 자동 업데이트가 안 됐어요. claude plugin update axhub@axhub --scope <SCOPE> 를 직접 실행해 주세요.`
+  4. 성공하면 `claude plugin list` 를 한 번 더 실행해 `axhub@axhub` enabled 항목 중 가장 높은 semver 를 내부 변수 `<PLUGIN_UPDATED_VERSION>` 으로 둬요. 이 값이 `plugin.latest` 보다 높으면 `<PLUGIN_UPDATED_VERSION>` 을 최종 카드에 써요. 확인이 안 되면 `plugin.latest` 를 써요.
+  5. **재시작 안내(필수 — 플러그인 업데이트는 재시작해야 적용돼요):** `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.`
+  6. 실패하면 raw 에러는 숨기고 한 줄: `플러그인 자동 업데이트가 안 됐어요. claude plugin update axhub@axhub --scope <SCOPE> 를 직접 실행해 주세요.`
 
 ---
 
@@ -156,6 +158,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - 플러그인 확인 직후에는 `현재 플러그인 버전을 확인했어요.` 만 보여줘요. 현재 버전 숫자와 설치 위치값을 묶어 설명하는 문장을 만들지 않아요.
 - 대신 `현재 플러그인 버전을 확인했어요.`, `CLI는 이미 최신이에요. 플러그인 새 버전을 받을게요.`, `플러그인 설치 위치를 확인했어요.`, `플러그인 새 버전을 받았어요.` 라고 말해요.
 - 최종 카드 밖에서 내부 필드명이나 영어 라벨을 보여주지 않아요. 버전 숫자는 결과 카드나 업데이트 안내처럼 사용자에게 필요한 문장에서만 보여줘요.
+- `claude plugin list` 에 같은 플러그인의 낡은 항목과 새 항목이 같이 남아 있어도, chat 에는 낡은 중복 항목을 나열하지 않아요. 사용자가 알아야 할 건 "받은 최신 버전" 과 "재시작 필요" 예요.
 - mixed request 의 남은 작업을 말할 때는 `업데이트 확인은 끝났어요. 앱 상태 확인은 별도 상태 확인 흐름에서 처리해요.` 만 써요. `앱 상태는 이어서 확인할게요`, `이제 이어서 앱 상태를 확인할게요`, `현재 앱 상태를 정리해드릴게요`, `백그라운드에서 조회하고 있어요`, `결과 나오는 대로 알려드릴게요` 같은 후속 작업 문장이나 상태 요약 문장은 쓰지 않아요.
 - 사용자가 직접 부른 거라 적용 전 "적용할까요?" 를 다시 묻지 않아요 (간단한 1-shot 업데이트). 단 exit 14/66 보안 실패는 무조건 하드 스톱이에요.
 - 전 과정 비차단 — 한 단계가 막혀도 raw 에러를 숨기고 다음으로 넘어가거나 한 줄 안내 후 멈춰요.
@@ -169,5 +172,6 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - NEVER raw JSON·stderr·내부 device/installation id 를 chat 에 출력하지 말아요.
 - NEVER 플러그인 업데이트를 받고도 재시작 안내를 빼먹지 말아요 — 재시작 전엔 새 버전이 안 떠요.
 - NEVER 확인하지 않은 버전을 "업데이트됨" 으로 보고하지 말아요 — `axhub --version` 재확인 뒤에만 새 버전을 말해요.
+- NEVER `claude plugin list` 에서 처음 발견한 낡은 `axhub@axhub` 항목만 보고 업데이트 여부를 판단하지 말아요 — enabled 항목 전체를 읽고 최고 semver 로 판단해요.
 - NEVER 이 스킬에서 앱 목록·앱 상태·최근 배포 상태를 직접 조회하지 말아요. `App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)` 같은 Claude Desktop axhub App/MCP 도구도 호출하지 말아요 — read 작업이어도 이 스킬에서는 금지예요.
 - NEVER Task/Subagent/Agent/백그라운드 작업으로 mixed request 의 남은 앱 상태 확인을 우회하지 말아요.
