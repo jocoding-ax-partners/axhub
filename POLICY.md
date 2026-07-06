@@ -1,25 +1,29 @@
 # axhub plugin 정책
 
-axhub Claude Code plugin 이 사용자 환경에서 무엇을 하고 무엇을 하지 않는지 공개하는 문서예요.
+axhub Claude Code plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 하지 않는지 공개하는 문서예요. 어려운 용어는 처음 나올 때 괄호로 풀어 썼어요.
 
-## 네트워크 접근
-- 스킬과 훅은 `axhub` CLI 와 axhub MCP 서버를 통해서만 네트워크에 접근해요.
-- SessionStart auto-update 훅은 24시간에 1회만 `axhub update check` 로 새 버전을 확인해요. 네트워크 호출은 훅 스크립트가 아니라 CLI 가 수행해요.
+## 네트워크 접근 — 인터넷에 언제 연결하나요
+- 스킬(플러그인이 상황별로 꺼내 쓰는 기능 단위)과 훅(세션이 시작될 때 자동으로 도는 점검)은 `axhub` CLI(터미널에서 쓰는 axhub 명령 도구)와 axhub MCP 서버(Claude 가 axhub 데이터를 읽을 때 쓰는 연결 통로)를 통해서만 인터넷에 접근해요. 플러그인이 그 밖의 곳에 몰래 접속하지 않아요.
+- 세션 시작 때 도는 auto-update 훅은 24시간에 1회만 `axhub update check` 명령으로 새 버전이 있는지 확인해요. 실제 인터넷 연결은 훅 스크립트가 아니라 axhub CLI 가 해요.
 
-## 로컬에 기록하는 파일
-- `~/.axhub/cache/.plugin-update-check` — 업데이트 확인 throttle 마커예요.
-- `~/.axhub/cache/.onboarding-mcp-restart` — 온보딩 MCP 재시작 resume 마커예요 (7일 TTL).
+## 로컬에 기록하는 파일 — 내 컴퓨터에 무엇을 남기나요
+- `~/.axhub/cache/.plugin-update-check` — 업데이트를 너무 자주 확인하지 않도록 마지막 확인 시각을 남겨두는 표시 파일이에요.
+- `~/.axhub/cache/.onboarding-mcp-restart` — 첫 설정 중 Claude Code 재시작이 필요할 때 "재시작 후 이어서 하자"라고 남겨두는 표시 파일이에요. 7일이 지나면 무시돼요.
+- 두 파일 다 시각을 표시하는 용도의 작은 파일이고, 개인 정보나 코드 내용은 담지 않아요.
 
 ## 자동 업데이트와 끄는 법
-- CLI 업데이트는 확인 후 자동 적용될 수 있어요. 플러그인 업데이트는 적용해도 Claude Code 재시작 후에 반영돼요.
-- `AXHUB_NO_AUTO_UPDATE=1` — 자동 적용 없이 안내만 해요.
-- `AXHUB_NO_ONBOARDING_RESUME=1` — 온보딩 재시작 resume 안내를 꺼요.
+- axhub CLI 는 새 버전이 확인되면 자동으로 설치될 수 있어요. 플러그인 자체의 업데이트는 설치돼도 Claude Code 를 껐다 켜야 반영돼요.
+- 자동 설치를 원하지 않으면 환경변수(터미널에 설정해 두는 켜기/끄기 값)로 꺼요:
+  - `AXHUB_NO_AUTO_UPDATE=1` — 자동 설치 없이 새 버전이 있다고 알려주기만 해요.
+  - `AXHUB_NO_ONBOARDING_RESUME=1` — 재시작 후 "이어서 하기" 안내를 꺼요.
 
-## 파괴적 작업 승인
-- 삭제·롤백·force/execute 급 변경은 항상 사용자 확인 뒤에만 실행해요. headless 환경에서는 실행하지 않고 preview 로 멈춰요.
+## 파괴적 작업 승인 — 되돌리기 어려운 일은 먼저 물어봐요
+- 삭제, 롤백(이전 버전으로 되돌리기), `--force`/`--execute` 같은 강제 실행 옵션이 붙는 변경은 항상 사용자에게 먼저 보여주고 확인을 받은 뒤에만 실행해요.
+- 사람이 대답할 수 없는 자동 실행 환경(headless — 예: 예약 실행, 백그라운드 작업)에서는 실행하지 않고 "이렇게 하려고 했어요" 미리보기(preview)만 남기고 멈춰요.
 
-## 데이터 범위
-- axhub MCP 도구는 OAuth 로 검증된 tenant 범위 안에서만 동작하고, 기본 도구는 read-only 예요.
-- 스킬은 credential 을 파일이나 로그에 남기지 않아요.
+## 데이터 범위 — 어디까지 볼 수 있나요
+- axhub MCP 도구는 로그인 인증(OAuth)으로 확인된 내 계정 범위(tenant) 안의 데이터만 다뤄요. 다른 사람이나 다른 조직의 데이터는 보이지 않아요.
+- 기본 제공 도구는 읽기 전용(read-only, 조회만 하고 바꾸지 않음)이에요.
+- 비밀번호·토큰 같은 인증 정보(credential)는 파일이나 로그에 남기지 않아요.
 
-에이전트 행동 규칙의 원천은 repo 의 `docs/policy/agent-policy.md` 예요.
+에이전트 행동 규칙(Claude 가 axhub 작업에서 지키는 규칙)은 repo 의 `docs/policy/agent-policy.md` 에 정리돼 있어요.

@@ -1,52 +1,57 @@
 # axhub plugin 에이전트 행동 정책
 
-axhub plugin 스킬들이 지켜야 하는 행동 규칙의 canonical 원천이에요. SKILL.md·README·CLAUDE.md 의 서술과 충돌하면 이 문서가 이겨요. 규칙 블록의 `적용:`/`invariant:` 형식은 `tests/policy-parity.test.ts` 가 파싱해 검증해요.
+axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기준 문서예요. 여러 문서에 같은 규칙이 다르게 적혀 있으면 이 문서가 기준이에요 — SKILL.md·README·CLAUDE.md 의 서술과 다르면 이 문서를 따라요. 규칙 블록의 `적용:`/`invariant:` 형식은 `tests/policy-parity.test.ts` 가 자동으로 읽어 검증해요.
+
+블록 형식과 용어를 먼저 풀어둘게요:
 
 - `적용:` — 규칙 복사본을 반드시 담아야 하는 파일 경로예요. 복수면 쉼표로 구분해요.
-- `invariant:` — 각 적용 파일에 문자 그대로 존재해야 하는 핵심 문구예요. 쌍따옴표로 감싸고 쉼표로 구분해요.
+- `invariant:` — 각 적용 파일에 문자 그대로 존재해야 하는 핵심 문구예요. 쌍따옴표로 감싸고 쉼표로 구분해요. 자동 검사(parity 테스트)가 이 문구가 실제로 있는지 확인해서, 정책과 스킬 문서가 어긋나면 테스트가 실패해요.
 - 규칙을 바꿀 때는 이 문서를 먼저 고치고, 적용 파일을 따라 고쳐요. parity 테스트가 어긋남을 잡아요.
+- **스킬(skill)** — 플러그인이 상황별로 꺼내 쓰는 작업 설명서예요. `skills/*/SKILL.md` 파일 하나가 스킬 하나예요.
+- **headless** — 사람이 대화로 답할 수 없는 자동 실행 환경이에요 (예: 예약 실행, 백그라운드 작업). 이 환경에서는 확인이 필요한 일을 실행하지 않고 멈춰요.
+- **preview / dry-run** — 실제로 실행하기 전에 "이렇게 될 거예요"를 미리 보여주는 단계예요.
 
 ## AP-1 deploy 성공 선언
-- 규칙: deployment-record 배포의 성공은 bound deployment id 에 대한 `axhub deploy verify` 가 terminal success 를 반환할 때만 선언해요. deploy-create stdout·status snapshot·watch 출력·latest 재탐색으로는 선언하지 않아요. static 앱(deploy_method=static)은 별도 lane — activate 의 `active_release_id` 로 성공을 선언하고 verify 를 호출하지 않아요.
+- 규칙: 일반 배포(deployment-record 방식 — 배포 한 건마다 기록 id 가 생기는 방식)의 성공은 그 id 에 대해 `axhub deploy verify` (배포가 정말 끝나서 접속 가능한지 확인하는 명령)가 최종 성공을 돌려줄 때만 선언해요. 배포 시작 명령의 화면 출력, 중간 상태 조회, watch 화면, "가장 최근 배포" 재검색 같은 간접 근거로는 성공이라고 말하지 않아요. 정적 파일 앱(deploy_method=static — 서버 없이 파일만 올리는 방식)은 확인 경로가 달라서, activate 결과의 `active_release_id` (새 버전이 실제로 켜졌다는 표시)로 성공을 선언하고 verify 는 부르지 않아요.
 - 적용: skills/deploy/SKILL.md
 - invariant: "axhub deploy verify", "active_release_id"
 
 ## AP-2 deploy preview-confirm gate
-- 규칙: 실제 배포 실행 전에 preview 를 보여주고 사용자 확인을 받아요. headless 에서는 dry-run/preview 로 멈춰요.
+- 규칙: 실제 배포를 실행하기 전에 무엇이 어떻게 배포되는지 미리보기(preview)를 보여주고 사용자 확인을 받아요. headless 에서는 실행하지 않고 dry-run/preview 로 멈춰요.
 - 적용: skills/deploy/SKILL.md
 - invariant: "preview-confirm"
 
 ## AP-3 파괴적 변경 승인
-- 규칙: 삭제·롤백·force/yes/execute 급 파괴적 명령은 대화형 승인 1회 뒤에만 실행해요. 조회(목록·상태·로그)는 확인 없이 실행해요. headless 에서는 파괴적 명령을 실행하지 않고 preview/summary 로 멈춰요.
+- 규칙: 삭제, 롤백(이전 버전으로 되돌리기), `--force`/`--yes`/`--execute` 같은 강제 실행 옵션이 붙는 명령(파괴적 명령 — 실행하면 되돌리기 어려운 변경)은 대화로 승인을 1회 받은 뒤에만 실행해요. 목록·상태·로그 같은 단순 조회는 확인 없이 바로 실행해요. headless 에서는 파괴적 명령을 실행하지 않고 preview/summary 로 멈춰요.
 - 적용: skills/clarity/SKILL.md
 - invariant: "파괴적 변경은 승인"
 
 ## AP-4 diagnosis 읽기 전용
-- 규칙: diagnosis 는 배포 실패 원인을 읽기 전용으로만 진단해요. 재배포·롤백·새 deploy create 를 직접 실행하지 않고, 실행이 필요한 다음 행동은 담당 스킬로 자연어 handoff 만 남겨요.
+- 규칙: diagnosis 스킬은 배포가 왜 실패했는지 읽기 전용(조회만 하고 아무것도 바꾸지 않음)으로 진단해요. 재배포·롤백·새 배포 생성을 직접 실행하지 않고, 실행이 필요한 다음 행동은 담당 스킬이 이어받도록 자연어 안내(handoff)만 남겨요.
 - 적용: skills/diagnosis/SKILL.md
 - invariant: "읽기 전용", "절대 직접 실행하지 않아요"
 
 ## AP-5 development write 게이트
-- 규칙: development 의 코드 생성은 read 를 기본으로 하고, 스키마 변경 같은 write 는 preview-confirm 승인과 존재 확인 뒤에만 실행해요. headless 에서는 아무것도 바꾸지 않아요.
+- 규칙: development 스킬의 코드 생성은 데이터 읽기(read)를 기본으로 해요. 테이블 구조 변경(스키마 변경) 같은 쓰기(write — 데이터나 구조를 바꾸는 일)는 미리보기 승인과 대상 존재 확인을 거친 뒤에만 실행해요. headless 에서는 아무것도 바꾸지 않아요.
 - 적용: skills/development/SKILL.md
 - invariant: "read 기본, write 게이트"
 
 ## AP-6 CLI preflight 게이트
-- 규칙: bootstrap·deploy 는 시작 시 `axhub` 존재와 plugin-support preflight 동작을 확인해요. CLI 가 없거나 preflight 가 안 되면 멈추고 설치/업그레이드를 안내하며, 절대 우회하지 않아요. 버전 숫자를 직접 비교하지 않아요.
+- 규칙: bootstrap·deploy 스킬은 시작할 때 `axhub` CLI 가 설치돼 있는지, 사전 점검 명령(plugin-support preflight — 비행 전 점검처럼 필요한 기능이 도는지 미리 확인)이 동작하는지 확인해요. CLI 가 없거나 점검이 실패하면 멈추고 설치/업그레이드 방법을 안내하며, 이 확인을 절대 건너뛰지 않아요. 버전 숫자를 직접 비교하지 않고 "필요한 기능이 있는지"로 판단해요.
 - 적용: skills/bootstrap/SKILL.md, skills/deploy/SKILL.md
 - invariant: "plugin-support preflight"
 
 ## AP-7 skill 양보 라우팅
-- 규칙: 각 스킬은 자기 경계 밖 요청을 담당 스킬로 양보해요. 경계가 섞이면 자기 몫만 끝내고 나머지는 담당 스킬로 넘겨요.
+- 규칙: 각 스킬은 자기 담당 밖의 요청을 그 일을 맡은 스킬로 넘겨요(양보). 요청이 섞여 있으면 자기 몫만 끝내고 나머지는 담당 스킬로 넘겨요. 예를 들어 진단 중에 재배포가 필요해지면 진단은 여기서 끝내고 배포는 deploy 스킬이 이어받아요.
 - 적용: skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/import/SKILL.md, skills/update/SKILL.md
 - invariant: "양보"
 
 ## AP-8 onboarding 자동 bootstrap 금지
-- 규칙: onboarding 은 빈 폴더나 manifest 없는 폴더를 발견해도 bootstrap 을 자동 실행하거나 앱을 자동 생성하지 않아요. Ready card 로 끝내요.
+- 규칙: onboarding(첫 설정 안내) 스킬은 빈 폴더나 앱 설정 파일(manifest)이 없는 폴더를 발견해도 새 앱 생성(bootstrap)을 자동으로 실행하지 않아요. 지금 환경이 얼마나 준비됐는지 정리한 Ready card 로 끝내고, 다음 행동은 사용자가 정해요.
 - 적용: skills/onboarding/SKILL.md
 - invariant: "No automatic bootstrap"
 
 ## AP-9 clarity 공개 표면만
-- 규칙: clarity 는 hidden `axhub plugin-support` 그룹을 탐색·실행하지 않아요. 공개 `--json-schema`/`--help` 표면만 사용해요.
+- 규칙: clarity 스킬은 숨김 내부 명령 그룹(`axhub plugin-support` — plugin 전용 통로라 예고 없이 바뀔 수 있는 명령들)을 탐색하거나 실행하지 않아요. 누구나 `--help` 로 볼 수 있는 공개 명령 표면(`--json-schema`/`--help`)만 사용해요.
 - 적용: skills/clarity/SKILL.md
 - invariant: "공개 표면만"
