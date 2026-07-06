@@ -28,7 +28,8 @@ repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 
 - 대표 여정 회귀 — 첫 셋업 → 앱 생성 → 배포 → 상태 확인 경로를 문서·skill 본문·fixture(테스트용 고정 예시 데이터) 계약으로 같은 방향에 맞춰요.
 
 ## DP-6 hidden 표면 계약
-- skill 이 쓰는 `axhub plugin-support <cmd>` hidden 그룹은 외부 무보증이에요 — 바깥에 쓰라고 약속한 적 없는 내부 통로라 예고 없이 바뀔 수 있다는 뜻이에요. 계약 parity 테스트(계약이 어긋나면 실패하는 자동 검사) + preflight 게이트(agent-policy AP-6)로 CLI 와 동기화해요.
+- `axhub plugin-support <cmd>` 는 이 plugin 의 skill 들만 쓰라고 만든 숨김 명령이에요. 일반 사용자용 명령이 아니라서 도움말에도 안 나오고, 예고 없이 바뀌거나 사라질 수 있어요. 그래서 skill 밖에서는 쓰지 않아요.
+- 어긋남을 막는 안전장치는 두 개예요. 하나는 plugin 과 CLI 가 서로 기대하는 형식이 달라지면 바로 실패하는 자동 테스트(계약 parity 테스트)이고, 다른 하나는 skill 이 시작할 때 이 명령이 실제로 동작하는지 먼저 확인하는 사전 점검(preflight 게이트, agent-policy AP-6)이에요.
 - clarity 는 hidden 표면을 쓰지 않아요 (agent-policy AP-9).
 
 ## DP-7 bundle 규칙
