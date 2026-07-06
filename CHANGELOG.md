@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.8.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.8.3...v1.8.4) (2026-07-06)
+
+Claude Code Desktop 배포 흐름에서 빌드가 아직 진행 중이면 사용자에게 "배포 상태 확인해줘"라고 다시 말해 달라고 안내해 멈춘 것처럼 보일 수 있었어요. 이제 deploy skill 은 deployment id 를 알고 있는 진행 중 배포를 같은 응답 흐름에서 계속 확인하거나 실제 follow-up 으로 이어가며, 사용자가 상태 확인 문구를 알 필요 없이 끝날 때까지 자연스럽게 지켜봐요.
+
 ## [1.8.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.8.2...v1.8.3) (2026-07-06)
 
 Claude Code Desktop 실제 QA에서 local scope 는 이미 최신 `v1.8.2` 인데 user scope 에 낡은 `v1.8.0` 이 같이 남아 있으면 update skill 이 낮은 중복 항목을 현재 버전처럼 보고 `v1.8.0 → v1.8.2` 업데이트와 재시작 안내를 다시 보여줄 수 있었어요. 이제 update skill 은 enabled 항목 전체의 최고 semver 가 이미 최신이면 낮은 중복 scope 를 정리하려 들지 않고, 사용자에게는 `이미 최신` 결과만 보여줘요.
