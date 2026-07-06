@@ -174,12 +174,12 @@ axhub deploy verify "$DEPLOY_ID" > "$VERIFY_OUT" 2>&1
 VERIFY_EXIT=$?
 ```
 
-If `VERIFY_EXIT=6`, the deployment is still running. Sleep briefly and retry the same verify command until exit 0 or 7, or until a bounded timeout. Do not substitute `axhub deploy watch` or `axhub deploy status --watch`.
+If `VERIFY_EXIT=6`, the deployment is still running. Tell the user `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same verify command until exit 0 or 7, or until a bounded timeout. Prefer separate short tool calls or a real ScheduleWakeup when available. Do not substitute `axhub deploy watch` or `axhub deploy status --watch`. Do not end by asking the user to say `배포 상태 확인해줘`; the skill owns the follow-up while a known `DEPLOY_ID` is still running.
 
 Exit handling:
 
 - 0: terminal success; summarize in Korean with the verified live URL if available.
-- 6: non-terminal; say the build is still running and invite "배포 상태 확인해줘".
+- 6: non-terminal; keep the same `DEPLOY_ID` and continue the bounded verify loop automatically. Do not ask the user to request another status check.
 - 7: terminal failure; say "배포가 실패했어요. 지금부터 원인 진단만 읽기 전용으로 확인할게요. 재배포나 롤백은 하지 않아요." Then hand off to `diagnosis`.
 - 5: unknown deployment id; stop without latest lookup.
 - 4: auth expired; use auth recovery.
@@ -196,7 +196,7 @@ axhub plugin-support classify-exit "$EXIT" "$STDOUT"
 
 or use `references/error-empathy-catalog.md`.
 
-- exit 64 + `validation.deployment_in_progress`: explain another deployment is running, never retry create, offer to monitor it with the verify loop.
+- exit 64 + `validation.deployment_in_progress`: explain another deployment is running, never retry create, and monitor it with the verify loop when an id is available.
 - exit 9 + `subdomain_not_configured`: subdomain update is a separate destructive mutation. Preview the proposed 2..32 character subdomain and require approval before `axhub apps update`.
 - exit 9/64/67 + GitHub connection required: do not create repo, first push, or `apps git connect` from deploy. Hand off to import.
 - exit 4/65: auth expired; ask before login flow in interactive mode.

@@ -65,8 +65,10 @@ describe("smooth behavior contracts", () => {
     }
 
 
-    const sampleLabels = readme.match(/Action-first success|Evidence-balanced failure|Debug-friendly repeated failure/g) ?? [];
+    const sampleLabels = readme.match(/Action-first success|Evidence-balanced progress|Debug-friendly repeated failure/g) ?? [];
     expect(sampleLabels).toHaveLength(3);
+    expect(readme).toContain("같은 deployment id 로 계속 확인할게요");
+    expect(readme).not.toContain("'배포 상태 확인해줘'라고 말하면 이어서 볼게요");
   });
 
   test("skills encode the required guard boundaries", () => {
@@ -79,6 +81,7 @@ describe("smooth behavior contracts", () => {
     const onboardingAuth = readRepo("skills/onboarding/references/install-channels-and-auth.md");
     const bootstrapAndLocal = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
+    const deployErrors = readRepo("skills/deploy/references/error-empathy-catalog.md");
 
     expect(onboarding).toContain("axhub plugin-support onboarding-detect --json");
     expect(onboarding).toContain("cli_missing");
@@ -128,6 +131,11 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("bounded `axhub deploy verify \"$DEPLOY_ID\"` loop");
     expect(deploy).toContain("exit 6");
     expect(deploy).toContain("exit 7");
+    expect(deploy).toContain("계속 확인할게요");
+    expect(deploy).toContain("do not end the response by asking the user to say `배포 상태 확인해줘`");
+    expect(deploy).toContain("ScheduleWakeup");
+    expect(deploy).not.toContain("suggest `배포 상태 확인해줘`");
+    expect(deploy).not.toContain("'배포 상태 확인해줘'라고 말하면 이어서 볼게요");
     expect(deploy).toContain("성공을 선언하지 않아요");
     expect(deploy).not.toContain("deploy-approved-run");
     expect(deploy).toContain(".data.id // .data.deployment_id // .id // .deployment_id // empty");
@@ -164,7 +172,13 @@ describe("smooth behavior contracts", () => {
     expect(workflowDetails).toContain("Never run `axhub deploy create --execute` for a local-only commit");
     expect(workflowDetails).toContain("Do not call `axhub deploy watch`");
     expect(workflowDetails).toContain("Do not substitute `axhub deploy watch`");
+    expect(workflowDetails).toContain("Do not end by asking the user to say `배포 상태 확인해줘`");
+    expect(workflowDetails).toContain("continue the bounded verify loop automatically");
+    expect(workflowDetails).not.toContain("invite \"배포 상태 확인해줘\"");
     expect(workflowDetails).toContain("axhub deploy logs <deployment-id>");
+    expect(deployErrors).toContain("제가 같은 배포를 계속 확인할게요");
+    expect(deployErrors).toContain("진행 중인 그 배포를 제가 계속 확인할게요");
+    expect(deployErrors).not.toContain("말씀하시면 끝날 때까지");
 
     expect(importSkill).toContain("axhub --json plugin-support import --mode preview");
     expect(importSkill).toContain('axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT"');

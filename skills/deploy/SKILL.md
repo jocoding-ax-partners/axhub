@@ -74,7 +74,7 @@ Progress lines:
 - `[4/5] 배포하는 중이에요`
 - `[5/5] 배포 결과 확인하는 중이에요`
 
-Final user message is a Korean one-line summary plus next action. Prefer natural phrases such as `다시 로그인해줘`, `기존 앱 올려`, `새 앱 만들어줘`, or `배포 상태 확인해줘`; do not tell a Desktop user to run deploy CLI commands.
+Final user message is a Korean one-line summary plus next action. Prefer natural phrases such as `다시 로그인해줘`, `기존 앱 올려`, or `새 앱 만들어줘`; do not tell a Desktop user to run deploy CLI commands. If a deployment is already running and a `DEPLOY_ID` is known, do not ask the user to request another status check; keep watching automatically with the verify loop or an actual scheduled follow-up.
 
 ## Reference Loading
 
@@ -180,7 +180,7 @@ Dry-run path uses the same target fields with `--dry-run` and skips verify:
 axhub deploy create --app "$APP_ID" "${PROFILE_FLAG[@]}" --commit "$COMMIT_SHA" --tenant "$AXHUB_TENANT" --dry-run --field-expr '.data.id // .data.deployment_id // .id // .deployment_id // empty'
 ```
 
-Bind `DEPLOY_ID` only from an in-flight deployment id or public `axhub deploy create --execute --json` / field-expr output. If no deployment id is present, do not declare success; say "배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. '배포 상태 확인해줘'라고 말하면 이어서 볼게요." and stop.
+Bind `DEPLOY_ID` only from an in-flight deployment id or public `axhub deploy create --execute --json` / field-expr output. If no deployment id is present, do not declare success; say "배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. 자동으로 지켜볼 id 가 없어 여기서 멈출게요." and stop.
 
 ### Verify loop
 
@@ -193,12 +193,12 @@ axhub deploy verify "$DEPLOY_ID" > "$VERIFY_OUT" 2>&1
 VERIFY_EXIT=$?
 ```
 
-Do not use latest lookup. Current CLI resolves the exact deployment id to its app scope when needed, so the happy path is `axhub deploy verify "$DEPLOY_ID"` without `--app`. Do not call `axhub deploy watch` or `axhub deploy status --watch` from this skill; Desktop/non-TTY watch paths can degrade or require extra flags. If verify exits `6`, sleep briefly and retry the same verify command until terminal success/failure or a bounded timeout. Do not claim success from deploy-create stdout, status snapshots, watch output, or prose polling; verify 전에는 성공을 선언하지 않아요. If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
+Do not use latest lookup. Current CLI resolves the exact deployment id to its app scope when needed, so the happy path is `axhub deploy verify "$DEPLOY_ID"` without `--app`. Do not call `axhub deploy watch` or `axhub deploy status --watch` from this skill; Desktop/non-TTY watch paths can degrade or require extra flags. If verify exits `6`, say `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same verify command until terminal success/failure or a bounded timeout. Prefer separate short tool calls or a real ScheduleWakeup when available; do not end the response by asking the user to say `배포 상태 확인해줘`. If the bounded timeout is reached while the deploy is still running, schedule a follow-up check when the host supports it; otherwise say `아직 진행 중이에요. 여기서 실패로 보지 않고, 제가 확인 가능한 범위까지는 같은 배포를 지켜봤어요.` and keep the `DEPLOY_ID` visible enough for a future status request. Do not claim success from deploy-create stdout, status snapshots, watch output, or prose polling; verify 전에는 성공을 선언하지 않아요. If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
 
 Verify exits:
 
 - `0`: terminal success. Summarize in Korean with verified URL if available.
-- `6`: still running. Say build is still in progress and suggest `배포 상태 확인해줘`.
+- `6`: still running. Keep the same `DEPLOY_ID` and continue the bounded verify loop automatically; do not ask the user to request another status check.
 - `7`: terminal failure. Say "배포가 실패했어요. 지금부터 원인 진단만 읽기 전용으로 확인할게요. 재배포나 롤백은 하지 않아요." Then hand off to `diagnosis`.
 - `5`: unknown deployment id. Stop; do not search latest.
 - `4`: auth expired. Use auth recovery copy.
@@ -211,7 +211,7 @@ For verify exit 7 only, preserve internal `DEPLOY_ID`, app slug/id/name, and cla
 
 Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-empathy-catalog.md`.
 
-- exit 64 + `validation.deployment_in_progress`: never retry `axhub deploy create`; offer to monitor the in-flight deploy with the verify loop.
+- exit 64 + `validation.deployment_in_progress`: never retry `axhub deploy create`; monitor the in-flight deploy with the verify loop when an id is available.
 - subdomain precondition: `axhub apps update <slug> --subdomain <subdomain> --json` is a separate destructive mutation and needs its own preview/approval before one retry.
 - GitHub connection required: do not create repo, first push, or `apps git connect` from deploy; hand off to `import`. This does not prohibit pushing normal ahead commits to an already connected `origin` branch before deploy.
 - auth expired: ask before login flow in interactive mode.
