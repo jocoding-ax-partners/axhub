@@ -1,6 +1,6 @@
 ---
 name: onboarding
-description: 'Use when the user is new to axhub or asks for first setup/onboarding/getting started. 이 스킬은 "셋업해줘", "처음인데", "처음 쓰는데 뭐부터", "온보딩", "시작하기", "axhub 시작", "초기 셋업", "setup", "onboard", "getting started", "first time" 같은 첫 사용자 셋업 의도를 담당해요. axhub CLI 설치, 로그인, git/node, GitHub App, 앱 연결, 의존성, 최종 Ready card 를 detect-first 로 안내하되 빈 폴더에서 bootstrap 을 자동 실행하지 않아요.'
+description: 'Use when the user is new to axhub or asks for first setup/onboarding/getting started. 이 스킬은 "셋업해줘", "처음인데", "처음 쓰는데 뭐부터", "온보딩", "시작하기", "axhub 시작", "초기 셋업", "setup", "onboard", "getting started", "first time" 같은 첫 사용자 셋업 의도를 담당해요. axhub CLI 설치, 로그인, git/node, GitHub App, 앱 연결, 의존성, 최종 Ready card 를 detect-first 로 안내하되 빈 폴더에서 bootstrap 을 자동 실행하지 않아요. 이 트리거들은 axhub 맥락(발화의 axhub 언급·대화의 직전 axhub 작업)이 있을 때만 유효해요. 일반 프로젝트 셋업이나 다른 도구 온보딩 발화에는 이 스킬을 쓰지 않아요.'
 examples:
   - utterance: "셋업해줘"
     intent: "onboard axhub first-time setup"
@@ -41,6 +41,7 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 7. **MCP truth.** `claude mcp add` 는 등록일 뿐이에요. `claude mcp get axhub` 가 `Status: Connected` 를 보여주기 전까지 `mcp__axhub__*` 가 연결됐다고 말하지 않아요. 새로 add 한 세션에서는 `/mcp` OAuth 를 안내하지 말고 재시작 handoff 로 넘겨요 — `/mcp` OAuth 안내는 이전 세션에서 등록된 경우(resume 포함)에만 해요.
 8. **Ready card honesty.** 확인하지 않은 항목은 green check 로 표시하지 않아요. 가능한 종료 상태는 `VIBE_READY`, `READY_WITH_USER_ACTION`, `SAFE_STOP_NONINTERACTIVE`, `BLOCKED_UNSUPPORTED` 예요.
 9. **Telemetry opt-in.** AI 활용 기록(`axhub axrouter` — 내 Claude Code 프롬프트·응답·툴콜을 팀 워크스페이스로 보내는 수집 기능)은 무엇이 수집되는지 설명하고 물어본 뒤 사용자가 켜기를 고를 때만 켜요 — 동의 없이 켜지 않아요. 거절하면 같은 온보딩에서 다시 묻지 않고, headless 에서는 묻지도 켜지도 않아요. 미지원 워크스페이스·구 CLI 면 조용히 건너뛰어요.
+10. **axhub 맥락 게이트.** 발화에 axhub 언급이 없고 대화에도 axhub 맥락(직전 axhub 작업)이 없으면, detect 를 시작하기 전에 "axhub 셋업을 말하는 거예요?" 를 한 번만 물어요. 아니라는 답이면 이 스킬을 종료하고 다른 axhub skill 로 넘기지 않아요. headless 에서는 묻지 않고 멈춰요.
 
 ## Progress
 

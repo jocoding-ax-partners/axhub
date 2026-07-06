@@ -1,6 +1,6 @@
 ---
 name: development
-description: 'development: 이미 만들어진 axhub 앱에 실제 데이터(connector·table) 기반 기능 코드를 추가할 때 사용해요. "내 connector 데이터로 대시보드 만들어", "유저 목록 페이지", "결제 데이터 화면", "build a dashboard from my data"처럼 실데이터 스키마를 조회해 페이지·화면·대시보드·엔드포인트·폼을 생성하는 요청이에요. 빈 디렉토리 새 앱=bootstrap, 기존 앱 첫 연결=import, 배포=deploy, axhub CLI 운영/테이블 생성 단독 요청=clarity 로 양보해요.'
+description: 'development: 이미 만들어진 axhub 앱에 실제 데이터(connector·table) 기반 기능 코드를 추가할 때 사용해요. "내 connector 데이터로 대시보드 만들어", "유저 목록 페이지", "결제 데이터 화면", "build a dashboard from my data"처럼 실데이터 스키마를 조회해 페이지·화면·대시보드·엔드포인트·폼을 생성하는 요청이에요. 빈 디렉토리 새 앱=bootstrap, 기존 앱 첫 연결=import, 배포=deploy, axhub CLI 운영/테이블 생성 단독 요청=clarity 로 양보해요. 이 트리거들은 axhub 맥락(현재 폴더의 axhub 연결·대화의 axhub 언급·직전 axhub 작업)이 있을 때만 유효해요. axhub 앱이 아닌 일반 프로젝트의 페이지·화면 작업에는 이 스킬을 쓰지 않아요.'
 examples:
   - utterance: "내 connector 데이터로 대시보드 만들어줘"
     intent: "build a data-grounded feature page in an existing axhub app"
@@ -26,6 +26,7 @@ model: sonnet
 - **clarity = axhub CLI 운영 명령** (테이블/컬럼 생성·환경변수·로그·connector 연결·데이터 조회 같은 라이브 CLI 작업). 코드를 안 짜요.
 - **bootstrap = 빈 디렉토리 새 앱 생성**, **import = 기존 로컬 앱 첫 연결**, **deploy = 배포**. 그 의도가 분명하면 양보해요.
 - 헷갈리면: "axhub 가 무언가를 **하게**"(테이블 생성·env 설정·조회) → clarity. "앱에 **화면/페이지/기능 코드**를 만들어" → development.
+- axhub 맥락이 없으면 진입하지 않아요: 현재 폴더에 axhub 연결(axhub.yaml/clone)이 없고 발화에 axhub 언급도 없으면 이 스킬을 종료하고 일반 코딩 흐름에 맡겨요. 다른 axhub skill 로 넘기지도 않아요.
 
 ## Vibe Coder Visibility Rules
 

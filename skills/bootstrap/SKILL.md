@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: 'Use this skill in an empty folder. Do not explain the skill match, do not mention axhub:bootstrap in chat, and start the visible response with a Korean progress sentence. Triggers: "새 앱 만들어줘", "앱 만들어줘", "초기화해줘", "Next.js 앱 만들어줘", "Please make my first app. I want a small gym class booking website and put it online", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", "Make a flower shop reservation app". Run the backend template picker, confirm the app name, check GitHub owner, preview, then create/deploy with axhub apps bootstrap. Use import instead for a non-empty existing local app.'
+description: 'Use this skill in an empty folder. Do not explain the skill match, do not mention axhub:bootstrap in chat, and start the visible response with a Korean progress sentence. Triggers: "새 앱 만들어줘", "앱 만들어줘", "초기화해줘", "Next.js 앱 만들어줘", "Please make my first app. I want a small gym class booking website and put it online", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", "Make a flower shop reservation app". Run the backend template picker, confirm the app name, check GitHub owner, preview, then create/deploy with axhub apps bootstrap. Use import instead for a non-empty existing local app. axhub 맥락 없는 일반 로컬 앱 요청엔 쓰지 않아요.'
 allows-dependency-execution: true
 model: sonnet
 ---
@@ -17,9 +17,9 @@ model: sonnet
 
 ## Scope
 
-이 스킬은 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 첫 배포까지 진행하는 전용 흐름이에요. 비어 있지 않은 기존 로컬 앱, 이미 만든 앱 가져오기, "이 폴더 올려줘" 요청은 `import` 스킬로 넘겨요.
+빈 디렉토리 새 axhub 템플릿 앱 생성 + 첫 배포 전용이에요. 비어 있지 않은 기존 로컬 앱·가져오기·"이 폴더 올려줘" 요청은 `import` 스킬로 넘겨요.
 
-creation path 는 backend `axhub apps bootstrap` saga 하나예요. `axhub init`, `axhub apps create`, `axhub deploy create` 로 우회하지 않아요.
+creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지.
 
 같은 대화 맥락 이어받기는 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요, carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 맥락과 무관하게 그대로 실행해요.
 
@@ -131,7 +131,7 @@ axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug baker
 
 위 값들은 예시예요. 실제 실행 전에는 확정 literal 값으로 바꿔요. Dry-run envelope 에서 template, slug, subdomain, repo name, private/public preview 만 한국어로 보여줘요. raw JSON/stderr 를 dump 하지 않아요.
 
-미리보기 뒤 확인 필수. 사용자가 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 를 보여준 뒤 `진행`/`취소` 질문을 한 번 받고, 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요.
+미리보기 뒤 확인 필수. 사용자가 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 뒤 axhub 진입 확인(`axhub 앱을 만들까요?` `진행`/`취소`)을 받고, 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요.
 
 ### 8. Execute Bootstrap Saga
 

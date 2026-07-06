@@ -19,6 +19,7 @@
     { "utterance": "배포 상태 확인해줘", "expected": "clarity", "why": "일반 상태 조회" },
     { "utterance": "로그 보여줘", "expected": "clarity", "why": "로그 조회" },
     { "utterance": "이전 버전으로 롤백해줘", "expected": "clarity", "why": "롤백 운영 명령" },
-    { "utterance": "업데이트해줘", "expected": "update", "why": "버전 업데이트" }
+    { "utterance": "업데이트해줘", "expected": "update", "why": "버전 업데이트" },
+    { "utterance": "왜 배포가 죽었어", "context": "axhub 무관, 다른 플랫폼 배포", "expected": "none", "why": "AP-11 — 다른 플랫폼 배포 실패면 어느 플랫폼인지 한 번 묻고 axhub 아니면 종료" }
   ]
 }

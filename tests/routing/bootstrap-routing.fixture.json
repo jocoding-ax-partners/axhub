@@ -1,0 +1,15 @@
+{
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). bootstrap 은 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 첫 배포까지 진행해요. AP-11 은 bootstrap 에 frontmatter 게이트로만 적용해요(본문 질문은 생략) — 이미 preview-confirm 승인이 backstop 이라서요. axhub 맥락이나 배포·온라인 공개 의도가 있을 때만 진입하고, 그런 맥락 없이 일반 로컬 앱만 만들어 달라는 발화에는 진입하지 않아요.",
+  "boundary": {
+    "bootstrap": "빈 디렉토리 새 axhub 템플릿 앱 생성 + 첫 배포. axhub 맥락 또는 배포·공개 의도 필요.",
+    "import": "비어 있지 않은 기존 로컬 앱 첫 연결",
+    "none": "AP-11 — axhub 맥락도 배포 의도도 없는 일반 로컬 앱 요청은 진입하지 않고 일반 코딩에 맡김"
+  },
+  "cases": [
+    { "utterance": "새 앱 만들어줘", "context": "빈 디렉토리", "expected": "bootstrap", "why": "빈 폴더 새 템플릿 앱" },
+    { "utterance": "Create a small bakery preorder web app and deploy it to the internet", "context": "빈 디렉토리", "expected": "bootstrap", "why": "배포·공개 의도 명시 — bootstrap" },
+    { "utterance": "예약 사이트 만들어서 배포까지 해줘", "context": "빈 디렉토리", "expected": "bootstrap", "why": "새 앱 + 배포 의도" },
+    { "utterance": "간단한 스크립트 하나 만들어줘", "context": "빈 디렉토리, axhub 무언급·배포 의도 없음", "expected": "none", "why": "AP-11 — 배포·axhub 맥락 없는 일반 로컬 코딩. frontmatter 게이트에서 'axhub로 만들어 올릴까요, 일반 로컬 앱으로 만들까요?' 한 번 묻거나 일반 코딩에 맡김" },
+    { "utterance": "앱 만들어줘", "context": "비어 있지 않은 기존 앱", "expected": "import", "why": "non-empty repo 는 bootstrap 아니라 import" }
+  ]
+}

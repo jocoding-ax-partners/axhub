@@ -1,6 +1,6 @@
 ---
 name: import
-description: '비어 있지 않은 기존 로컬 앱을 axhub 앱으로 연결하고 manifest/GitHub/첫 배포 준비까지 가져오는 import 스킬. "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app"처럼 템플릿 bootstrap 이 아니라 기존 소스를 등록하려는 요청에 사용해요. Next.js뿐 아니라 프론트·백엔드·Dockerfile 앱 등 broad stack 을 CLI 감지에 맡겨요. 빈 디렉토리 새 앱은 bootstrap, 이미 연결된 앱의 재배포는 deploy 로 양보해요.'
+description: '비어 있지 않은 기존 로컬 앱을 axhub 앱으로 연결하고 manifest/GitHub/첫 배포 준비까지 가져오는 import 스킬. "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app"처럼 템플릿 bootstrap 이 아니라 기존 소스를 등록하려는 요청에 사용해요. Next.js뿐 아니라 프론트·백엔드·Dockerfile 앱 등 broad stack 을 CLI 감지에 맡겨요. 빈 디렉토리 새 앱은 bootstrap, 이미 연결된 앱의 재배포는 deploy 로 양보해요. 이 트리거들은 axhub 맥락(발화의 axhub 언급·대화의 직전 axhub 작업)이 있을 때만 유효해요. GitHub push 나 다른 플랫폼 업로드를 뜻하는 "올려" 발화에는 이 스킬을 쓰지 않아요.'
 examples:
   - utterance: "기존 앱 올려"
     intent: "import existing local app into axhub"
@@ -26,6 +26,8 @@ model: sonnet
 
 `import` 는 `deploy` 를 감싸지 않아요. 첫 연결·첫 배포 준비는 import, 이후 반복 배포는 deploy 가 맡아요.
 
+발화에 axhub 언급이 없고 대화에도 axhub 맥락(직전 axhub 작업)이 없으면 — 예를 들어 "이 폴더 올려" 를 GitHub push 로 뜻할 수 있으면 — manifest 를 만들기 전에 "axhub에 연결하려는 거예요?" 를 한 번만 묻고, 아니라는 답이면 종료해요. headless 에서는 묻지 않고 멈춰요.
+
 ## 개발자 스택 지원 범위
 
 이 스킬은 Next.js 전용이 아니에요. CLI 의 `import/v1` 감지와 execute 증거를 기준으로 기존 개발자 앱을 가져오며, 대표적인 프론트·백엔드 스택을 지원해요.
@@ -44,6 +46,8 @@ model: sonnet
 ```text
 기존 앱을 axhub에 가져올 준비를 확인할게요.
 ```
+
+import preview 정상이면 axhub 가져오기 대상 확정이에요. Interactive 는 preview card 전에 AskUserQuestion 으로 axhub 진입 확인을 먼저 해요: `이 앱을 axhub에 가져올까요?` (`axhub에 가져오기`/`아니요`). `가져오기` 면 preview card 와 기존 승인을 이어가요. `아니요` 면 종료. (headless 는 이 AUQ 생략)
 
 ## Vibe Coder Visibility Rules
 

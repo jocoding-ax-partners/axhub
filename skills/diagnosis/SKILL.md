@@ -1,6 +1,6 @@
 ---
 name: diagnosis
-description: 'diagnosis: "배포 실패 원인 진단해줘", "왜 배포가 죽었어", "diagnose deployment failure", "diagnose failed deployment <id> for app <slug>", "failed deployment diagnosis", "why did my deploy fail"처럼 axhub 배포 실패 원인과 해결 후보를 읽기 전용으로 알고 싶을 때만 사용해요. 영어 실패 배포 진단 요청도 반드시 이 스킬로 라우팅하고, MCP app/list/read 도구만으로 답하지 않아요. 결과는 사용자 카테고리로 요약하고 재배포·롤백은 직접 실행하지 않아요. 배포 실행/검증=deploy, 상태·로그·롤백·운영 명령=clarity, 업데이트=update, 앱 코드 생성=development 로 양보해요.'
+description: 'diagnosis: "배포 실패 원인 진단해줘", "왜 배포가 죽었어", "diagnose deployment failure", "diagnose failed deployment <id> for app <slug>", "failed deployment diagnosis", "why did my deploy fail"처럼 axhub 배포 실패 원인과 해결 후보를 읽기 전용으로 알고 싶을 때만 사용해요. 영어 실패 배포 진단 요청도 반드시 이 스킬로 라우팅하고, MCP app/list/read 도구만으로 답하지 않아요. 결과는 사용자 카테고리로 요약하고 재배포·롤백은 직접 실행하지 않아요. 배포 실행/검증=deploy, 상태·로그·롤백·운영 명령=clarity, 업데이트=update, 앱 코드 생성=development 로 양보해요. 이 트리거들은 axhub 맥락(현재 폴더의 axhub 연결·발화의 axhub 언급·대화의 직전 axhub 작업)이 있을 때만 유효해요. 다른 플랫폼 배포 실패 발화에는 이 스킬을 쓰지 않아요.'
 examples:
   - utterance: "배포 실패 원인 진단해줘"
     intent: "diagnose deployment failure cause"
@@ -19,6 +19,8 @@ model: sonnet
 # axhub diagnosis (배포 실패 원인 진단)
 
 배포 실패 원인을 읽기 전용으로 진단하는 스킬이에요. 사용자가 실패 원인이나 해결 후보를 명시적으로 물을 때만 들어오고, 배포 실행·재배포·롤백은 절대 직접 실행하지 않아요.
+
+발화에 axhub 언급이 없고 대화에 axhub 맥락(현재 폴더의 axhub 연결·직전 axhub 작업)도 없으면 — 배포 실패가 다른 플랫폼일 수 있으면 — 진단을 시작하기 전에 어느 플랫폼 배포인지 한 번만 확인하고, axhub 가 아니면 종료해요. headless 에서는 묻지 않고 멈춰요.
 
 진단 결과는 두 층으로 나눠요. `deploy` 에서 방금 실패한 배포 id 를 넘긴 경우에는 그 **실패한 배포 한 건**의 status/logs 를 먼저 읽고, 그 다음 현재 라이브 롤아웃 상태를 별도로 확인해요. 사용자가 앱만 주고 실패 배포 id 가 없으면 앱의 **현재 라이브 롤아웃 상태**를 진단해요. 그래서 "현재 라이브는 정상"이어도 방금 배포가 실패했을 수 있다는 한계를 사용자에게 정직하게 전달해요.
 

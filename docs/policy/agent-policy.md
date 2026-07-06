@@ -60,3 +60,13 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 규칙: AI 활용 기록(`axhub axrouter` — 내 Claude Code 프롬프트·응답·툴콜을 팀 워크스페이스로 보내는 수집 기능)은 onboarding 이 무엇이 수집되는지 설명하고 물어본 뒤, 사용자가 켜기를 고를 때만 켜요 — 동의 없이 켜지 않아요. 거절하면 같은 온보딩에서 다시 묻지 않고 나중에 켜는 방법만 알려줘요. headless(사람이 답할 수 없는 자동 실행 환경)에서는 묻지도 켜지도 않아요.
 - 적용: skills/onboarding/SKILL.md
 - invariant: "AI 활용 기록", "동의 없이 켜지 않아요"
+
+## AP-11 비-axhub 맥락 라우팅 가드
+- 규칙: axhub 를 명시하지 않은 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘" 같은 generic 동사)는 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결 manifest·직전 axhub 작업)이 있을 때만 스킬이 진행해요. 맥락이 없으면 실행·안내로 밀어붙이지 않고 axhub 사용 의사를 한 번 묻거나 종료해요 — 다른 axhub 스킬로 넘기지도 않아요. 이미 preview-confirm 승인이 backstop 인 bootstrap 은 frontmatter 게이트로만 적용하고 본문 질문은 생략해요. headless 에서는 묻지 않고 멈춰요.
+- 적용: skills/onboarding/SKILL.md, skills/bootstrap/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/clarity/SKILL.md, skills/update/SKILL.md
+- invariant: "axhub 맥락"
+
+## AP-12 axhub 진입 확인 AUQ
+- 규칙: axhub 프로젝트가 확정된 상태에서 배포·생성·가져오기를 실행하기 전에, interactive 에서는 "axhub로 진행할지"를 AskUserQuestion 으로 한 번 더 확인해요 — "무엇을·어떻게"를 묻는 기존 preview 승인과 별개인 진입 게이트예요. deploy·import 는 preview card 앞에 별도 AUQ 를 두고, byte 예산이 포화한 bootstrap 은 기존 preview 승인 문구에 axhub 확인을 통합해요(별도 AUQ 대신 1회 승인). headless 에서는 이 AUQ 를 생략해요 — AUQ 0회 계약을 그대로 지켜요.
+- 적용: skills/deploy/SKILL.md, skills/bootstrap/SKILL.md, skills/import/SKILL.md
+- invariant: "axhub 진입 확인"

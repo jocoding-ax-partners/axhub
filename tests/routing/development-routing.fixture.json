@@ -20,6 +20,7 @@
     { "utterance": "기존 앱 올려", "expected": "import", "why": "기존 로컬 앱 첫 연결" },
     { "utterance": "배포해줘", "expected": "deploy", "why": "배포 실행" },
     { "utterance": "결제 입력 폼 만들어줘", "expected": "development", "why": "write 기능(CRUD 코드) 생성 — 앱 코드" },
-    { "utterance": "재고 등록 화면 만들어줘", "expected": "development", "why": "write 입력 화면 코드 (테이블 '만들기'가 아니라 입력 UI)" }
+    { "utterance": "재고 등록 화면 만들어줘", "expected": "development", "why": "write 입력 화면 코드 (테이블 '만들기'가 아니라 입력 UI)" },
+    { "utterance": "유저 목록 페이지 만들어줘", "context": "axhub 무관 일반 웹 프로젝트(axhub.yaml/clone 없음)", "expected": "none", "why": "AP-11 — axhub 앱이 아니면 일반 코딩에 맡기고 종료 (다른 axhub 스킬로도 안 넘김)" }
   ]
 }
