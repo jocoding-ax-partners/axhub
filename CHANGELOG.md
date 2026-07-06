@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.8.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.8.1...v1.8.2) (2026-07-06)
+
+Claude Code Desktop 실제 QA에서 플러그인을 업데이트한 뒤 `claude plugin list` 에 local/user scope 의 여러 `axhub@axhub` 버전이 같이 남을 수 있었어요. 이제 update skill 은 처음 보이는 낡은 항목을 현재 버전으로 착각하지 않고 enabled 항목 전체에서 가장 높은 semver 를 기준으로 판단하며, 업데이트 후 목록을 다시 읽어 실제 받은 최신 버전만 결과 카드에 보여줘요. 낮은 중복 버전이나 scope 원문은 사용자에게 노출하지 않고, 필요한 안내는 재시작 필요 여부로만 정리해요.
+
 ## [1.8.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.8.0...v1.8.1) (2026-07-06)
 
 실기기 QA 에서 다른 도구가 `CLAUDE_CODE_ENABLE_TELEMETRY=1` 을 설정해 둔 컴퓨터면 온보딩이 AI 활용 기록을 "이미 켜짐"으로 오판해 옵트인 질문과 동의 페이지를 건너뛰는 문제가 보였어요. 이제 실제 수집 중인지는 활성 워크스페이스 기준으로만 판단해서, 외부 텔레메트리 설정이 있어도 정상적으로 물어보고 켜면 axhub 설정으로 교체된다는 안내까지 함께 해요.
