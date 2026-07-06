@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.8.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.8.2...v1.8.3) (2026-07-06)
+
+Claude Code Desktop 실제 QA에서 local scope 는 이미 최신 `v1.8.2` 인데 user scope 에 낡은 `v1.8.0` 이 같이 남아 있으면 update skill 이 낮은 중복 항목을 현재 버전처럼 보고 `v1.8.0 → v1.8.2` 업데이트와 재시작 안내를 다시 보여줄 수 있었어요. 이제 update skill 은 enabled 항목 전체의 최고 semver 가 이미 최신이면 낮은 중복 scope 를 정리하려 들지 않고, 사용자에게는 `이미 최신` 결과만 보여줘요.
+
 ## [1.8.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.8.1...v1.8.2) (2026-07-06)
 
 Claude Code Desktop 실제 QA에서 플러그인을 업데이트한 뒤 `claude plugin list` 에 local/user scope 의 여러 `axhub@axhub` 버전이 같이 남을 수 있었어요. 이제 update skill 은 처음 보이는 낡은 항목을 현재 버전으로 착각하지 않고 enabled 항목 전체에서 가장 높은 semver 를 기준으로 판단하며, 업데이트 후 목록을 다시 읽어 실제 받은 최신 버전만 결과 카드에 보여줘요. 낮은 중복 버전이나 scope 원문은 사용자에게 노출하지 않고, 필요한 안내는 재시작 필요 여부로만 정리해요.
