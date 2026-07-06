@@ -131,7 +131,7 @@ auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks
 ## CLI 호출 표면
 
 - skill 들은 흡수된 helper 표면을 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 (`clarity` skill 은 예외 — 공개 표면만 탐색·실행, `diagnosis` skill 은 MCP `deployment_diagnosis` 우선, 없으면 공개 `axhub deploy diagnose`) — 예: `axhub plugin-support onboarding-detect`, `axhub plugin-support preflight`, `axhub plugin-support deploy-prep`. hidden 명령은 외부 무보증이지만 계약 parity 테스트 + 최소 CLI 버전 게이트로 plugin 과 동기화돼요.
-- 사용자 가치가 있는 공개 표면은 `axhub deploy verify <deployment-id> --app <app>` 와 `axhub deploy diagnose` 예요.
+- 사용자 가치가 있는 공개 표면은 `axhub deploy verify <deployment-id> --app <app>` 와 `axhub deploy diagnose`, 그리고 onboarding 의 AI 활용 기록 옵트인이 쓰는 `axhub axrouter` (status/monitor — 실패 시 조용히 건너뛰는 fail-open) 예요.
 
 ## 최소 CLI 버전 게이트
 
