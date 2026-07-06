@@ -122,7 +122,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 한국어 UX 샘플은 정확히 세 가지 상황만 대표로 고정해요.
 
 1. **Action-first success** — "배포가 끝났어요. 바로 열어볼 수 있어요: <url>"
-2. **Evidence-balanced failure** — "배포가 아직 완료되지 않았어요. 같은 deployment id 로 확인했고, 실패로 단정하지 않을게요. '배포 상태 확인해줘'라고 말하면 이어서 볼게요."
+2. **Evidence-balanced progress** — "배포가 아직 완료되지 않았어요. 같은 deployment id 로 계속 확인할게요. 실패로 단정하지 않고 끝날 때까지 지켜볼게요."
 3. **Debug-friendly repeated failure** — "같은 단계에서 두 번 막혔어요. 원인은 인증 만료로 보여요. raw 로그 대신 해결 순서만 정리할게요: 다시 로그인 → 같은 명령 재시도 → 그래도 막히면 설치 상태 진단."
 
 ---
