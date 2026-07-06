@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: 'Use this skill in an empty folder. Do not explain the skill match, do not mention axhub:bootstrap in chat, and start the visible response with a Korean progress sentence. Triggers: "새 앱 만들어줘", "앱 만들어줘", "초기화해줘", "Next.js 앱 만들어줘", "Please make my first app. I want a small gym class booking website and put it online", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", "Make a flower shop reservation app". Run the backend template picker, confirm the app name, check GitHub owner, preview, then create/deploy with axhub apps bootstrap. Use import instead for a non-empty existing local app.'
+description: 'Use this skill in an empty folder. Do not explain the skill match, do not mention axhub:bootstrap in chat, and start the visible response with a Korean progress sentence. Triggers: "새 앱 만들어줘", "앱 만들어줘", "초기화해줘", "Next.js 앱 만들어줘", "Please make my first app. I want a small gym class booking website and put it online", "Create a small bakery preorder web app and deploy it to the internet", "Build a cafe booking website and put it online", "Make a flower shop reservation app". Run the backend template picker, confirm the app name, check GitHub owner, preview, then create/deploy with axhub apps bootstrap. Use import instead for a non-empty existing local app. axhub 맥락 없는 일반 로컬 앱 요청엔 쓰지 않아요.'
 allows-dependency-execution: true
 model: sonnet
 ---
@@ -17,7 +17,7 @@ model: sonnet
 
 ## Scope
 
-이 스킬은 빈 디렉토리에서 새 axhub 템플릿 앱을 만들고 첫 배포까지 진행하는 전용 흐름이에요. 비어 있지 않은 기존 로컬 앱, 이미 만든 앱 가져오기, "이 폴더 올려줘" 요청은 `import` 스킬로 넘겨요.
+빈 디렉토리 새 axhub 템플릿 앱 생성 + 첫 배포 전용이에요. 비어 있지 않은 기존 로컬 앱·가져오기·"이 폴더 올려줘" 요청은 `import` 스킬로 넘겨요.
 
 creation path 는 backend `axhub apps bootstrap` saga 하나예요. `axhub init`, `axhub apps create`, `axhub deploy create` 로 우회하지 않아요.
 

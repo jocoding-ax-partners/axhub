@@ -1,0 +1,19 @@
+{
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). deploy 는 이미 axhub 에 연결된 앱의 재배포·상태 확인을 맡되, AP-11 로 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 진입해요. 맥락 없는 generic '배포해' 나 다른 배포 대상 발화는 진입하지 않고 한 번 묻거나 종료해요.",
+  "boundary": {
+    "deploy": "이미 연결된 axhub 앱의 재배포·배포 상태 확인 (preview-confirm gate). axhub 맥락 필요.",
+    "import": "비어 있지 않은 기존 로컬 앱 첫 연결·첫 배포",
+    "bootstrap": "빈 디렉토리 새 앱 생성",
+    "diagnosis": "배포 실패 원인 읽기 전용 진단",
+    "none": "AP-11 — axhub 맥락이 없으면 어느 스킬도 진입하지 않고 한 번 묻거나 종료 (다른 axhub 스킬로 넘기지 않음)"
+  },
+  "cases": [
+    { "utterance": "배포해", "context": "axhub.yaml 연결된 앱 폴더", "expected": "deploy", "why": "axhub 맥락 있는 ordinary 재배포" },
+    { "utterance": "paydrop 배포해", "expected": "deploy", "why": "앱 이름 명시 배포" },
+    { "utterance": "프로덕션에 올려줘", "context": "axhub.yaml 연결된 앱 폴더", "expected": "deploy", "why": "human 배포 발화 + axhub 맥락" },
+    { "utterance": "배포해", "context": "axhub 맥락 없는 일반 프로젝트(axhub.yaml 없음, axhub 무언급)", "expected": "none", "why": "AP-11 — 맥락 없으면 진입 안 하고 'axhub로 배포하려는 거예요?' 한 번 묻거나 종료" },
+    { "utterance": "vercel에 배포해", "expected": "none", "why": "다른 배포 대상 명시 — axhub deploy 아님" },
+    { "utterance": "AWS에 올려줘", "expected": "none", "why": "다른 플랫폼 명시" },
+    { "utterance": "첫 배포 준비해줘", "context": "비어 있지 않은 기존 로컬 앱, axhub 첫 연결", "expected": "import", "why": "첫 연결은 deploy 아님" }
+  ]
+}

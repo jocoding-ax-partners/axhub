@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: '이미 axhub에 연결된 앱의 현재 브랜치/커밋을 다시 배포하거나 배포 상태를 이어서 확인할 때 사용해요. 트리거: "배포", "배포해", "배포해줘", "올려", "공개해", "띄워", "프로덕션", "deploy", "ship", "release", "rollout". 첫 연결/첫 배포는 import, 빈 폴더 새 앱 생성은 bootstrap, 명시적인 실패 원인 진단은 diagnosis 가 담당해요. 이 스킬은 preview-confirm gate, headless dry-run, deployment-record verify, static deploy 예외, terminal failure diagnosis handoff 를 맡아요.'
+description: '이미 axhub에 연결된 앱의 현재 브랜치/커밋을 다시 배포하거나 배포 상태를 이어서 확인할 때 사용해요. 트리거: "배포", "배포해", "배포해줘", "올려", "공개해", "띄워", "프로덕션", "deploy", "ship", "release", "rollout". 첫 연결/첫 배포는 import, 빈 폴더 새 앱 생성은 bootstrap, 명시적인 실패 원인 진단은 diagnosis 가 담당해요. 이 스킬은 preview-confirm gate, headless dry-run, deployment-record verify, static deploy 예외, terminal failure diagnosis handoff 를 맡아요. 이 트리거들은 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요. axhub 맥락 없는 일반 "배포해" 발화나 Vercel·AWS 같은 다른 배포 대상을 명시한 요청에는 이 스킬을 쓰지 않아요.'
 examples:
   - utterance: "paydrop 배포해"
     intent: "deploy current branch to axhub live"
@@ -30,7 +30,7 @@ Then run one Bash/tool call with Korean title `배포 준비 확인` from the us
 axhub plugin-support deploy-preview-summary --user-utterance "<latest user sentence>"
 ```
 
-Copy the Korean stdout as the preview card and ask for explicit approval. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`.
+Copy the Korean stdout as the preview card and ask for explicit approval. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here. axhub 맥락(사용자의 axhub 언급·직전 axhub 작업)이 있으면 기존대로 안내해요: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`. axhub 맥락이 없으면 import/bootstrap 으로 넘기지 말고 "이 폴더는 axhub에 연결돼 있지 않아요. axhub로 배포하려는 거예요?" 를 한 번만 묻고, 아니라는 답이면 이 스킬을 종료해요. headless 에서는 묻지 않고 조용히 멈춰요.
 
 For the initial Desktop preview, stop reading after this section unless approval is received. After approval, continue with the canonical workflow below and load `references/workflow-details.md` for branch detail.
 
