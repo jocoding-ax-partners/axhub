@@ -39,7 +39,7 @@ Do not process the second item in `gaps` from the same JSON. Handle one `first_g
 | `existing_repo_gap` | repo has git+commit but no manifest | app/repo connection succeeds, or onboarding stops with user action needed. |
 | `no_manifest_empty` | empty dir and no manifest | advisory only; no re-detect loop for this gap. |
 | `deps_missing` | lockfile+manifest present and deps missing | lockfile install exits 0; native build issues downgrade to user action. |
-| `deploy_unverified` | deployment known but not verified | `axhub deploy verify "$DEPLOYMENT_ID"` exits 0 for that id. |
+| `deploy_unverified` | deployment known but not verified | `axhub deploy verify "$DEPLOYMENT_ID" --app "$APP_ID_OR_SLUG"` exits 0 for that id and app. |
 | `doctor_gap` | final core check is not green | preflight gives recovery phrase; no destructive action. |
 
 ## Existing Repo Gap
@@ -85,7 +85,7 @@ Use it to produce recovery phrases such as `다시 로그인해줘` or `새 터�
 For deployment evidence, verify only the deployment id already returned by a deploy flow:
 
 ```bash
-axhub deploy verify "$DEPLOYMENT_ID"
+axhub deploy verify "$DEPLOYMENT_ID" --app "$APP_ID_OR_SLUG"
 ```
 
 Never search for latest deployment during onboarding. If the id cannot be proven live, report `READY_WITH_USER_ACTION` instead of green success.

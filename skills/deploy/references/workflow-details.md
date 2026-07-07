@@ -73,7 +73,7 @@ Only `DEPLOY_METHOD=static` enters this lane. All other values use the deploymen
 
 ## Git readiness
 
-Do not preview an old commit while deploy-affecting local changes are uncommitted. If `deploy-prep` reports `git_init_needed`, no commit, missing branch/commit, or uncommitted deploy-affecting changes, pause before preview. Ignore local agent/runtime state such as `.omc/`, `.claude/`, `.codex/`, `.serena/`; those paths are not deploy-affecting app changes and must not be committed, pushed, or added to `.gitignore` during deploy cleanup.
+Do not preview an old commit while deploy-affecting local changes are uncommitted. If `deploy-prep` reports `git_init_needed`, no commit, missing branch/commit, or uncommitted deploy-affecting changes, pause before preview. Ignore local agent/runtime state such as `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/`; those paths are not deploy-affecting app changes and must not be committed, pushed, or added to `.gitignore` during deploy cleanup. If deploy-prep or another target check still reports only those runtime paths, treat the app commit as clean enough for deploy and do not mutate `.gitignore`; if the CLI blocks anyway, stop with a CLI-gap note instead of creating a cleanup commit.
 
 Interactive mode may ask to create a local save point, then run quiet git commands and rerun `deploy-prep`:
 
@@ -81,7 +81,7 @@ Interactive mode may ask to create a local save point, then run quiet git comman
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git init >/dev/null 2>&1
 fi
-git add -A -- . ':(exclude).omc' ':(exclude).claude' ':(exclude).codex' ':(exclude).serena' >/dev/null 2>&1
+git add -A -- . ':(exclude).omc' ':(exclude).claude' ':(exclude).codex' ':(exclude).serena' ':(exclude).omx' ':(exclude).omo' >/dev/null 2>&1
 git commit -m "init: axhub deploy baseline" >/dev/null 2>&1 || true
 git branch -M main >/dev/null 2>&1
 axhub plugin-support deploy-prep --intent deploy --user-utterance "$ARGS" --json
@@ -170,11 +170,11 @@ Deployment-record success is declared only by `axhub deploy verify`. Poll this c
 ```bash
 echo "배포 결과를 확인하고 있어요." >&2
 VERIFY_OUT=$(mktemp)
-axhub deploy verify "$DEPLOY_ID" > "$VERIFY_OUT" 2>&1
+axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" > "$VERIFY_OUT" 2>&1
 VERIFY_EXIT=$?
 ```
 
-If `VERIFY_EXIT=6`, the deployment is still running. Tell the user `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same verify command until exit 0 or 7, or until a bounded timeout. Prefer separate short tool calls or a real ScheduleWakeup when available. Do not substitute `axhub deploy watch` or `axhub deploy status --watch`. Do not end by asking the user to say `배포 상태 확인해줘`; the skill owns the follow-up while a known `DEPLOY_ID` is still running.
+If `VERIFY_EXIT=6`, the deployment is still running. Tell the user `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same scoped verify command until exit 0 or 7, or until a bounded timeout. Prefer separate short tool calls or a real ScheduleWakeup when available. Do not combine polling into one long `while`/`for` shell loop with `MAX_ATTEMPTS`, command substitution, or shell expansion. Do not substitute `axhub deploy watch` or `axhub deploy status --watch`. Do not end by asking the user to say `배포 상태 확인해줘`; the skill owns the follow-up while a known `DEPLOY_ID` is still running.
 
 Exit handling:
 
