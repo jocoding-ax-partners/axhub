@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.1...v1.10.2) (2026-07-07)
+
+Claude Code Desktop Code 모드 재QA에서 clarity 스킬은 이제 App/MCP 권한 카드 대신 제대로 호출됐지만, 응답 첫머리에 "스킬 가이드가 반환됐네요" 같은 내부 설명이 보이고 앱 상태 빠른 조회가 `명령 3개` 그룹 카드로 묶이는 어색함이 남아 있었어요. 이제 clarity 는 스킬 문서나 slash 실패 같은 메타 설명을 사용자에게 말하지 않고, 계정 전체 앱 상태 fast path 는 CLI 설치 확인과 앱 목록 조회 두 단계만 보이도록 계약을 더 강하게 잠갔어요.
+
 ## [1.10.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.0...v1.10.1) (2026-07-07)
 
 Claude Code Desktop Code 모드에서 "내 앱들이 지금 어떤 상태인지 모르겠어" 같은 애매한 상태 확인 요청이 플러그인 clarity 스킬 대신 axhub App/MCP 권한 카드로 빠질 수 있었어요. 이제 플러그인 메타데이터와 clarity 계약은 이런 요청을 CLI-only 스킬 흐름으로 먼저 잡도록 더 분명히 말하고, bootstrap/deploy/import/development/diagnosis/update 도 내부 라우팅 문구나 shell-wrapper 티가 사용자에게 새지 않게 다듬었어요. 정적 앱 상태 표현, device flow 코드 노출, 업데이트 결과 카드도 실제 Code 모드 QA에서 보인 어색한 부분을 회귀 테스트로 잠갔어요.
