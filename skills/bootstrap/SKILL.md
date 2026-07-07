@@ -15,6 +15,8 @@ model: sonnet
 
 중단 뒤 이어질 때도 CLI 명령이 하나도 실행되지 않았다면 fresh path 를 그대로 시작해요. 다시 시작 문구를 요구하지 않아요.
 
+`If you need an app name or template, choose a reasonable one yourself`, `choose whatever is reasonable`, `pick the best template/name`, `deploy it for real`, `put it online`, `do it for real` 는 목표·추천 허용일 뿐이에요. 템플릿 선택 카드, 앱 이름 확인 카드, dry-run 뒤 `진행` 확인은 절대 생략하지 않아요.
+
 ## Scope
 
 빈 디렉토리 새 axhub 템플릿 앱 생성 + 첫 배포 전용이에요. axhub 맥락 없는 일반 앱 작업은 맡지 않아요. 비어 있지 않은 기존 로컬 앱·가져오기·"이 폴더 올려줘" 요청은 `import` 스킬로 넘겨요.
@@ -33,13 +35,14 @@ creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps c
 
 - 내부 라벨 노출 금지. `Folder near empty`, `Invoke axhub:bootstrap skill`, `Tenanting`, `Bootstraping`, `Idempotencying key`, `saga 실행`, `Saga 완료`, `GitHubed repo`, `DB 선언된 템플릿`, `axhub:bootstrap 스킬 호출한다`, `development 단계` 는 chat/tool/progress/question 금지.
 - Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `raw`, `route`, `tenant`, `실행 중 명령`, `명령 실행` 금지.
-- 제목: `CLI 준비 확인`, `저장소 계정 확인`, `앱 이름 확인`, `앱 주소 확인`, `인증 대기`.
+- 제목: `CLI 준비 확인`, `작업공간 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `저장소 계정 확인`, `앱 이름 확인`, `앱 주소 확인`, `앱 생성 미리보기`, `계정 인증 시작`, `인증 확인`, `앱 생성 상태 확인`, `배포 상태 확인`, `검증 확인`.
 - `rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요. `pwd`, `ls`, `find`, `cat`, `curl` 같은 generic shell probe 대신 `axhub` CLI 표면만 써요.
 - Desktop-visible command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수, `export`, command substitution, semicolon chain 없이 literal flag 로 넣어요. device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요.
 - 배포 상태 대기/확인도 예외가 아니에요: `for`, `while`, `sleep`, `grep`, `cut`, `awk`, `jq` polling/파싱 금지. 상태를 다시 볼 때마다 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행. 성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요. 실제 tool/예약 없이 `90초 후 자동 확인` 같은 말을 쓰지 않아요.
 - Echo 금지: `schema_version`, `bootstrap_id`, `deployment_id`, `request_id`, `idempotency_key`, `installation_id`, `device_code`.
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.
 - 사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL; Markdown URL 링크 문법은 전부 금지; 도메인-only target 금지: `[https://x](https://x)`, `[열기](https://x)`, `<https://x>`.
+- GitHub device flow 는 평문 URL+코드를 본문에 다시 써요: `https://github.com/login/device`, `ABCD-1234`. Markdown 링크(`[https://...](github.com/...)` 포함), `Monitor`, `ScheduleWakeup`, `TaskOutput`, `읽는 중 <output>`, 임시 출력 파일 읽기 카드로 코드 노출 금지. 승인 확인은 별도 `axhub` leaf 명령으로 이어가요.
 - 이 스킬은 CLI-only 흐름이에요. `App get (axhub)`, `App list`, deployment MCP 호출 금지. 배포 상태·검증은 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --app <app> --json`, 앱 상세·URL 확인은 `axhub apps get <app-slug> --tenant <tenant> --json` 또는 `--field-expr`. `Finding tools` 로 이동해서 MCP/App 도구를 찾지 않아요.
 - 다른 플러그인/워크플로 상태를 정리하지 않아요. `oh-my-claudecode`, `autopilot`, `cancel`, `.omc` state tools 로 call/cleanup 금지. chat/tool/progress 금지: `Task done, now marking autopilot inactive.`, `Finding tools`, `plugin oh-my-claudecode ...`.
 
@@ -163,9 +166,7 @@ AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap --template nextjs-
 
 Execute/resume 명령에는 `--json` 금지.
 
-`device_code_issued` event 는 `auto_poll:true` + `browser_opened:true` 여도 user code 를 즉시 보여줘요. 첫 execute/resume Bash tool call 은 `timeout` 을 12000~15000ms 로 짧게 지정하고, output file 을 알려주면 그 파일을 즉시 읽어 `verification_uri` 와 `user_code` 를 보여줘요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 을 붙이지 않아요.
-
-명령이 `device_flow_required_user_action` 으로 끝나도 거기서 멈추지 않아요. 링크/코드를 보여주고 승인되면 이 화면에서 자동으로 계속 확인한다고만 말해요. 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않고 같은 turn 에서 resume 해요. 원래 execute background task 가 `auto_poll:true` 로 아직 돌고 있으면 중복 resume 을 실행하지 말고 같은 output/status 를 읽어요. `resume_command` 는 verbatim 실행 금지, `--json`/watch flag 제거.
+`device_code_issued` 는 `auto_poll:true`/`browser_opened:true` 여도 user code 를 즉시 보여줘요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 금지, 짧은 timeout 으로 background 처리 금지. CLI 가 pending 으로 끝나면 URL·코드를 본문에 쓰고, `인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 또는 watch flag 를 제거한 단일 resume 명령으로 승인 반영을 확인해요. `device_flow_required_user_action` 에서 멈추거나 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요.
 
 ### 9.1 Desktop Error Recovery
 

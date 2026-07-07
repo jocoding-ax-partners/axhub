@@ -18,7 +18,7 @@ describe("bootstrap desktop UX contract", () => {
   test("keeps the invoked bootstrap entrypoint compact and action-first", () => {
     const bootstrap = readBootstrap();
 
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(18_500);
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(19_500);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");
@@ -44,6 +44,9 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("Make a flower shop reservation app");
     expect(bootstrap).toContain("Run the backend template picker, confirm the app name, check GitHub owner, preview");
     expect(bootstrap).toContain("아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행");
+    expect(bootstrap).toContain("If you need an app name or template, choose a reasonable one yourself");
+    expect(bootstrap).toContain("deploy it for real");
+    expect(bootstrap).toContain("템플릿 선택 카드, 앱 이름 확인 카드, dry-run 뒤 `진행` 확인은 절대 생략하지 않아요");
   });
 
   test("hides internal routing labels from users", () => {
@@ -72,7 +75,8 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`실행 중 명령`");
     expect(bootstrap).toContain("`저장소 계정 확인`");
     expect(bootstrap).toContain("`앱 이름 확인`");
-    expect(bootstrap).toContain("`인증 대기`");
+    expect(bootstrap).toContain("`계정 인증 시작`");
+    expect(bootstrap).toContain("`인증 확인`");
     expect(bootstrap).toContain("스킬 선택 이유");
     expect(bootstrap).toContain("route label");
     expect(bootstrap).toContain("첫 visible 응답은 반드시");
@@ -175,6 +179,8 @@ describe("bootstrap desktop UX contract", () => {
 
     expect(bootstrap).toContain("미리보기 뒤 확인 필수");
     expect(bootstrap).toContain("그 말은 목표이지 execute 승인 토큰이 아니에요");
+    expect(bootstrap).toContain("`deploy it for real`");
+    expect(bootstrap).toContain("추천 허용일 뿐이에요");
     expect(bootstrap).toContain("사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요");
     expect(reference).toContain("treat that as the user's goal, not as execute approval");
   });
@@ -197,6 +203,8 @@ describe("bootstrap desktop UX contract", () => {
     expect(templateReference).toContain("Those words can make Next.js the recommended first option");
     expect(templateReference).toContain("they never finalize `--template`");
     expect(bootstrap).toContain("`recommend the best option` 처럼 말해도 그 말은 추천을 원한다는 뜻");
+    expect(bootstrap).toContain("`choose whatever is reasonable`");
+    expect(bootstrap).toContain("`pick the best template/name`");
     expect(bootstrap).toContain("반드시 `어떤 템플릿으로 시작할까요?` 질문을 보여주고 답을 기다려요");
     expect(templateReference).toContain("Recommendation wording such as");
     expect(templateReference).toContain("is not template approval");
@@ -215,6 +223,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("답변 입력이 막힐 때만 일반 채팅 텍스트로 fallback");
     expect(bootstrap).toContain("사용자가 답한 뒤에만 `--name`/`--slug` 를 확정해요");
     expect(bootstrap).toContain("`use the recommended name` 은 앱 이름 질문이 먼저 보인 뒤의 답변일 때만 확정");
+    expect(bootstrap).toContain("`choose whatever is reasonable`");
     expect(bootstrap).toContain("선택지 설명은 짧고 검수된 한국어만 써요");
     expect(bootstrap).toContain("기존 앱들과 겹치지 않는 새 콘셉트");
     expect(bootstrap).toContain("예약 폼과 시간 선택에 적합");
@@ -358,8 +367,8 @@ describe("bootstrap desktop UX contract", () => {
     expect(localReference).not.toContain("uuidgen");
     expect(bootstrap).toContain("`axhub plugin-support init-resume put` 에 생성을 맡겨요");
     expect(localReference).toContain("let `axhub plugin-support init-resume put` generate the idempotency key");
-    expect(bootstrap).toContain("명령이 `device_flow_required_user_action` 으로 끝나도 거기서 멈추지 않아요");
-    expect(bootstrap).toContain("사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않고");
+    expect(bootstrap).toContain("`device_flow_required_user_action` 에서 멈추거나");
+    expect(bootstrap).toContain("사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요");
     expect(localReference).toContain("따로 `승인했어`라고 말하지 않아도 돼요");
     expect(localReference).toContain("Prefer the emitted `resume_command` literally");
     expect(localReference).toContain("do not end the response asking the user to report approval");
