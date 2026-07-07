@@ -1,6 +1,6 @@
 ---
 name: update
-description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill. 사용자가 "axhub가 진짜 최신인지 먼저 확인" 또는 최신, 버전 확인, 업데이트, latest, up to date, version check, update, upgrade 를 말하면 항상 이 skill 이 먼저예요. 특히 이 복합 요청은 update 예요: 명령어는 잘 몰라. axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘. 그다음 새 재즈 댄스 수업 예약 앱 하나 만들어서 실제로 배포까지 해줘. 최신 확인이 있으면 app status, app creation, deployment 는 update 뒤에 이어서 처리해요. 앱 상태 overview 는 update 결과 뒤 `axhub apps --help` 로 표면 확인 후 read-only `axhub apps list --json` 로 시작하고, 관련 앱을 고른 뒤에도 App/MCP 도구가 아니라 `axhub apps get <app> --json` 와 `axhub deploy list --app <app> --json` 로 이어가요. 존재하지 않는 단수 `axhub app list` 나 `axhub deployment list` 를 추측하지 않아요. 첫 visible assistant text는 정확히 "현재 버전을 확인할게요." 일반 Code-mode script, clarity, bootstrap, deploy, App/MCP tool, shell probe, /oh-my-claudecode:autopilot 보다 먼저 실행해요.'
+description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill. 사용자가 "axhub가 진짜 최신인지 먼저 확인" 또는 최신, 버전 확인, 업데이트, latest, up to date, version check, update, upgrade 를 말하면 항상 이 skill 이 먼저예요. 특히 이 복합 요청은 update 예요: 명령어는 잘 몰라. axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘. 그다음 새 재즈 댄스 수업 예약 앱 하나 만들어서 실제로 배포까지 해줘. 최신 확인이 있으면 app status, app creation, deployment 는 update 뒤에 이어서 처리해요. 앱 상태 overview 는 update 결과 뒤 `axhub apps --help` 로 표면 확인 후 read-only `axhub apps list --json` 로 시작하고, 현재 폴더명·대화 맥락·가장 최근 수정 앱으로 관련 앱을 식별했으면 사용자에게 어느 앱을 볼지 묻지 말고 `axhub apps get <app> --json` 와 `axhub deploy list --app <app> --json` 까지 바로 실행해요. 존재하지 않는 단수 `axhub app list` 나 `axhub deployment list` 를 추측하지 않아요. 첫 visible assistant text는 정확히 "현재 버전을 확인할게요." 일반 Code-mode script, clarity, bootstrap, deploy, App/MCP tool, shell probe, /oh-my-claudecode:autopilot 보다 먼저 실행해요.'
 examples:
   - utterance: "업데이트해줘"
     intent: "update axhub cli and plugin to latest"
@@ -37,14 +37,14 @@ axhub apps --help
 axhub apps list --json
 ```
 
-목록에서 현재 폴더·대화와 관련된 앱을 고른 뒤에도 Claude Desktop axhub App/MCP 도구를 찾지 않아요. 상세와 최근 배포 이력은 계속 Desktop-visible Bash command 로만 이어가요:
+목록에서 현재 폴더명·대화 맥락·가장 최근 수정 앱 중 하나로 관련 앱을 식별했으면 멈춰서 "어느 앱을 더 볼까요?"라고 묻지 않아요. 그 앱의 상세와 최근 배포 이력까지 같은 흐름에서 바로 확인해요. Claude Desktop axhub App/MCP 도구를 찾지 않고, 계속 Desktop-visible Bash command 로만 이어가요:
 
 ```bash
 axhub apps get <app> --json
 axhub deploy list --app <app> --json
 ```
 
-여기서 `<app>` 은 사용자에게 보이는 앱 slug/name 을 우선 써요. CLI 가 app id 를 반환해도 다음 명령의 `--app` 값으로 raw id 를 드러내지 않고, slug/name 으로 조회할 수 없을 때만 내부적으로 좁혀요. 존재하지 않는 단수 명령 `axhub app list` 또는 `axhub app get`, 존재하지 않는 `axhub deployment list`, 또는 `Deployment list (axhub)`, `App get (axhub)`, `Tenant recent deployments (axhub)` 같은 MCP/App permission card 로 빠지면 실패예요. `axhub apps list --json 2>/dev/null | head -100`, `axhub --help | head`, `grep`, `sed`, `awk`, `head`, `tail`, pipe, redirect, `2>/dev/null`, `bash -lc`, `sh -c` 가 붙은 순간 실패예요. 그런 명령이 떠오르면 실행하지 말고 정확히 `axhub apps --help` → `axhub apps list --json` → `axhub apps get <app> --json` → `axhub deploy list --app <app> --json` 로 바꿔요. 출력이 길어도 shell 로 자르지 말고 tool 결과를 내부에서 필요한 만큼만 읽어요. 앱 overview 를 읽은 다음 같은 원문에 새 앱 생성·배포가 남아 있으면, 직접 low-level 명령을 추측하지 말고 bootstrap/deploy 흐름으로 이어가요.
+여기서 `<app>` 은 사용자에게 보이는 앱 slug/name 을 우선 써요. CLI 가 app id 를 반환해도 다음 명령의 `--app` 값으로 raw id 를 드러내지 않고, slug/name 으로 조회할 수 없을 때만 내부적으로 좁혀요. 관련 앱을 하나로 좁혔는데 `이 중 어느 앱의 배포 상태나 로그를 더 자세히 확인하고 싶으신가요?`, `어느 앱을 볼까요?`, `더 자세히 확인하고 싶은 앱을 말해 주세요` 같은 질문으로 끝나면 실패예요. 존재하지 않는 단수 명령 `axhub app list` 또는 `axhub app get`, 존재하지 않는 `axhub deployment list`, 또는 `Deployment list (axhub)`, `App get (axhub)`, `Tenant recent deployments (axhub)` 같은 MCP/App permission card 로 빠지면 실패예요. `axhub apps list --json 2>/dev/null | head -100`, `axhub --help | head`, `grep`, `sed`, `awk`, `head`, `tail`, pipe, redirect, `2>/dev/null`, `bash -lc`, `sh -c` 가 붙은 순간 실패예요. 그런 명령이 떠오르면 실행하지 말고 정확히 `axhub apps --help` → `axhub apps list --json` → `axhub apps get <app> --json` → `axhub deploy list --app <app> --json` 로 바꿔요. 출력이 길어도 shell 로 자르지 말고 tool 결과를 내부에서 필요한 만큼만 읽어요. 앱 overview 를 읽은 다음 같은 원문에 새 앱 생성·배포가 남아 있으면, 직접 low-level 명령을 추측하지 말고 bootstrap/deploy 흐름으로 이어가요.
 
 **CRITICAL no background detour.** mixed request 의 남은 일을 Task/Subagent/Agent/백그라운드 작업으로 우회하지 않아요. 업데이트 결과 뒤 같은 assistant 흐름에서 직접 이어가요. `axhubed 앱 상태 조회`, `앱 상태 백그라운드 조회` 같은 작업·카드·제목을 만들지 않아요.
 
