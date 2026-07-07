@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 ## [1.10.6](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.5...v1.10.6) (2026-07-07)
 
+Claude Code Desktop Code 모드 재QA에서 "진행 중이던 앱 만들기/배포 상태를 이어서 확인해줘" 같은 애매한 요청이 generic shell 확인으로 빠질 수 있었어요. 이제 상태 이어가기 요청은 bootstrap/deploy 스킬과 짧은 axhub CLI 상태 확인으로 먼저 라우팅되고, 배포 완료 여부도 사용자가 다시 말하지 않아도 같은 흐름에서 확인해요.
+
 ## [1.10.5](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.4...v1.10.5) (2026-07-07)
 
 Claude Code Desktop Code 모드 재QA에서 "앱 이름이나 템플릿은 알아서 골라줘"와 "실제로 배포해줘"가 섞인 요청을 bootstrap 이 실행 승인처럼 해석해 템플릿 선택, 앱 이름 확인, dry-run 진행 확인을 건너뛰는 문제가 보였어요. 이제 추천은 추천으로만 다루고, 실제 생성과 GitHub 연결은 초보 사용자도 볼 수 있는 확인 카드와 plain URL/code device flow 로 진행하도록 계약을 잠갔어요.
