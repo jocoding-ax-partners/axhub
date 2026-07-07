@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.16](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.15...v1.10.16) (2026-07-07)
+
+Claude Code Desktop Code 모드 공개 설치 QA에서 marketplace source 가 repo 루트라서 플러그인 runtime 뿐 아니라 개발 파일과 node_modules 까지 cache 로 들어가는 문제가 보였어요. 이제 marketplace 는 커밋된 clean runtime bundle 인 `plugins/axhub` 만 설치하고, 테스트가 그 폴더를 새로 생성한 bundle 과 byte-for-byte 로 비교해서 hook·skill 은 유지하되 설치 크기와 컨텍스트 노출은 작게 잠가요.
+
 ## [1.10.15](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.6...v1.10.15) (2026-07-07)
 
 Claude Code Desktop Code 모드 재QA에서 같은 버전의 오래된 설치 cache 가 남아 있으면 공개 태그에는 최신 hook 과 manifest 가 있어도 활성 플러그인 cache 는 예전 내용으로 남아 update/status 라우터가 작동하지 않을 수 있었어요. 이번 릴리즈는 새 cache 경로로 배포해 Code 모드가 최신 라우팅 계약과 hooks 를 실제 설치본에서 읽도록 만들고, 이후 같은 자연어 QA 를 공개 설치본으로 다시 확인할 수 있게 해요.
