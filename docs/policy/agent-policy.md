@@ -70,3 +70,8 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 규칙: axhub 프로젝트가 확정된 상태에서 배포·생성·가져오기를 실행하기 전에, interactive 에서는 "axhub로 진행할지"를 AskUserQuestion 으로 한 번 더 확인해요 — "무엇을·어떻게"를 묻는 기존 preview 승인과 별개인 진입 게이트예요. deploy·import 는 preview card 앞에 별도 AUQ 를 두고, byte 예산이 포화한 bootstrap 은 기존 preview 승인 문구에 axhub 확인을 통합해요(별도 AUQ 대신 1회 승인). headless 에서는 이 AUQ 를 생략해요 — AUQ 0회 계약을 그대로 지켜요.
 - 적용: skills/deploy/SKILL.md, skills/bootstrap/SKILL.md, skills/import/SKILL.md
 - invariant: "axhub 진입 확인"
+
+## AP-13 Windows 실행 계약 (Git Bash 전용)
+- 규칙: Windows 에선 모든 axhub CLI 명령을 Git Bash 전용으로 실행해요 — PowerShell 로 실행하지 않아요. PowerShell 에는 `$HOME` 과 repair 된 PATH 가 없어서 credential·auth 조회가 false-negative 나요. PATH 가 없으면 `SetEnvironmentVariable` 이나 `$env:PATH` prepend 로 수동 등록하지 않고 `axhub plugin-support repair-path` 로 고친 뒤 새 터미널을 열어요. `auth status` 는 `auth login` 을 실행한 그 셸에서 검증해요 — HOME 없는 셸이 "미로그인" 이라고 해도 로그인 실패로 보지 않아요. 로그인은 단일 self-polling `axhub auth login --json` 1 회로 하고 background 로 재실행하지 않아요 (device code 소진). 이 계약은 Windows(`$OS`=Windows_NT) 세션에서 SessionStart hook (`hooks/hooks.json`) 이 매 세션 always-on 으로 emit 해요 — skill 본문 로드 여부와 무관하게 free-form 실행 경로까지 덮어요. non-Windows 세션에서는 조용히 건너뛰어요.
+- 적용: hooks/hooks.json, CLAUDE.md
+- invariant: "Git Bash 전용"

@@ -12,6 +12,11 @@
             "type": "command",
             "shell": "bash",
             "command": "[ -n \"$AXHUB_NO_ONBOARDING_RESUME\" ] && exit 0; M=\"$HOME/.axhub/cache/.onboarding-mcp-restart\"; [ -f \"$M\" ] || exit 0; [ -n \"$(find \"$M\" -mmin -10080 2>/dev/null)\" ] || exit 0; echo \"[axhub] 온보딩 MCP 마무리가 남았어요(재시작 후 이어가기). 사용자에게 이어서 확인할지 물어보고, 동의하면 ${CLAUDE_PLUGIN_ROOT}/skills/onboarding/references/mcp-ready-card.md 의 Resume After Restart 절차대로 claude mcp get axhub 상태 확인 → 필요시 /mcp OAuth 안내 → 최종 카드 출력 → marker 삭제를 진행하세요. best-effort·비차단 — 실패하면 조용히 건너뛰고 사용자의 작업을 절대 막지 마세요.\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "[ -n \"$AXHUB_NO_WINDOWS_CONTRACT\" ] && exit 0; [ \"$OS\" = \"Windows_NT\" ] || exit 0; echo \"[axhub] Windows(Git Bash) 세션이에요. axhub 명령은 전부 Git Bash 전용으로 실행하세요 — PowerShell 금지. axhub 가 PATH 에 없으면 axhub plugin-support repair-path 로 고치고 새 터미널을 여세요(수동 PATH 등록 금지). 로그인은 단일 폴링 axhub auth login --json 1회로 하고, auth status 는 로그인한 그 셸에서 확인하세요 — HOME 없는 PowerShell 의 미로그인 표시는 실패가 아니에요.\""
           }
         ]
       }
