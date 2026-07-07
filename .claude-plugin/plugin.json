@@ -1,6 +1,6 @@
 {
   "name": "axhub",
-  "version": "1.10.1",
+  "version": "1.10.2",
   "description": "Korean-first Claude Code plugin for axhub. Before finding or calling tools for vague app-status prompts like `내 앱들이 지금 어떤 상태인지 모르겠어`, `내 앱들 알아서 봐줘`, or `전체 앱 상태 봐줘`, route to the clarity skill; 이런 axhub 상태 요청은 clarity 스킬로 라우팅하고 Claude Desktop axhub App/MCP 도구(`Tenant recent deployments`, `App list`, `App get`)를 쓰지 않아요. onboarding/bootstrap/deploy/import/development/diagnosis/clarity/update 8개 스킬이 ax-hub-cli v0.20.0+ 표면(hidden plugin-support 그룹 + 공개 deploy verify·diagnose·update)을 직접 호출해요. import 요청은 사용자에게 보이는 첫 문장에서 라우트/스킬 라벨 없이 `기존 앱을 axhub에 가져올 준비를 확인할게요.`로 시작해요. update 는 사전 안내 문장 없이 `현재 버전을 확인할게요.` 로 바로 시작해요. import 는 기존 로컬 앱 가져오기를, diagnosis 는 배포 실패 원인 요약을 담당하고, preview-confirm 배포와 verify 기반 성공 선언을 제공해요.",
   "author": {
     "name": "Jocoding AX Partners",
