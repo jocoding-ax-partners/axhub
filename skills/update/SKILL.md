@@ -1,6 +1,6 @@
 ---
 name: update
-description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill. 사용자가 "axhub가 진짜 최신인지 먼저 확인" 또는 최신, 버전 확인, 업데이트, latest, up to date, version check, update, upgrade 를 말하면 항상 이 skill 이 먼저예요. 특히 이 복합 요청은 update 예요: 명령어는 잘 몰라. axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘. 그다음 새 재즈 댄스 수업 예약 앱 하나 만들어서 실제로 배포까지 해줘. 최신 확인이 있으면 app status, app creation, deployment 는 update 뒤에 이어서 처리해요. 앱 상태 overview 는 update 결과 뒤 추가 CLI/플러그인 설치 확인 없이 `axhub apps --help` 로 표면 확인 후 read-only `axhub apps list --json` 로 시작하고, 현재 폴더명·대화 맥락·가장 최근 수정 앱으로 관련 앱을 식별했으면 사용자에게 어느 앱을 볼지 묻지 말고 `axhub apps get <app> --json` 와 `axhub deploy list --app <app> --json` 까지 바로 실행해요. 존재하지 않는 단수 `axhub app list` 나 `axhub deployment list` 를 추측하지 않아요. 첫 visible assistant text는 정확히 "현재 버전을 확인할게요." 일반 Code-mode script, clarity, bootstrap, deploy, App/MCP tool, shell probe, /oh-my-claudecode:autopilot 보다 먼저 실행해요.'
+description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill. 사용자가 "axhub가 진짜 최신인지 먼저 확인" 또는 최신, 버전 확인, 업데이트, latest, up to date, version check, update, upgrade 를 명시하면 항상 이 skill 이 먼저예요. 일반 UX 역할 문구나 "알아서 진행"만으로는 update 가 아니며, freshness/update 단어가 없는 기존 앱 import·배포 요청은 import/deploy 로 양보해요. 특히 이 복합 요청은 update 예요: axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘. 그다음 새 재즈 댄스 수업 예약 앱 하나 만들어서 실제로 배포까지 해줘. 최신 확인이 있으면 app status, app creation, deployment 는 update 뒤에 이어서 처리해요. 앱 상태 overview 는 update 결과 뒤 추가 CLI/플러그인 설치 확인 없이 `axhub apps --help` 로 표면 확인 후 read-only `axhub apps list --json` 로 시작하고, 현재 폴더명·대화 맥락·가장 최근 수정 앱으로 관련 앱을 식별했으면 사용자에게 어느 앱을 볼지 묻지 말고 `axhub apps get <app> --json` 와 `axhub deploy list --app <app> --json` 까지 바로 실행해요. 존재하지 않는 단수 `axhub app list` 나 `axhub deployment list` 를 추측하지 않아요. 첫 visible assistant text는 정확히 "현재 버전을 확인할게요." 일반 Code-mode script, clarity, bootstrap, deploy, App/MCP tool, shell probe, /oh-my-claudecode:autopilot 보다 먼저 실행해요.'
 examples:
   - utterance: "업데이트해줘"
     intent: "update axhub cli and plugin to latest"
@@ -10,7 +10,7 @@ examples:
     intent: "check and update axhub cli and plugin even in an empty workspace"
   - utterance: "axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘"
     intent: "check/update axhub first before any app-status tool, then continue app status"
-  - utterance: "명령어는 잘 몰라. axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘. 그다음 새 재즈 댄스 수업 예약 앱 하나 만들어서 실제로 배포까지 해줘."
+  - utterance: "axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘. 그다음 새 재즈 댄스 수업 예약 앱 하나 만들어서 실제로 배포까지 해줘."
     intent: "check/update axhub first; do not select clarity or non-axhub workflows before update; continue app overview and bootstrap/deploy afterward"
   - utterance: "check whether axhub is up to date and then tell me my app status"
     intent: "check/update axhub first, then continue app status handling without asking for another user prompt"
