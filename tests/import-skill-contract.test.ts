@@ -118,10 +118,13 @@ describe("import skill contract", () => {
   test("manifest authoring removes direct axhub.yaml ignore rule", () => {
     const skill = readImportSkill();
     expect(skill).toContain("## Manifest 보강");
-    expect(skill).toContain("`.gitignore` 또는 exclude 규칙이 `axhub.yaml` 을 무시하면");
-    expect(skill).toContain("검증 통과 직후, commit manifest 확인 질문을 띄우기 전에 반드시 먼저 정리");
-    expect(skill).toContain("`axhub.yaml` 을 직접 무시하는 줄은 제거");
+    expect(skill).toContain("무시 중이면 `.gitignore` 또는 `.git/info/exclude`");
+    expect(skill).toContain("axhub.yaml 을 쓰기 전에 반드시 먼저");
+    expect(skill).toContain('cd "<absolute APP_DIR>" && git check-ignore -q axhub.yaml');
+    expect(skill).toContain("`axhub.yaml` 을 직접 무시하는 줄을 제거");
     expect(skill).toContain("`git check-ignore -q axhub.yaml` 이 실패");
+    expect(skill).toContain("아직 무시되면 axhub.yaml 을 쓰거나");
+    expect(skill).toContain("검증 통과 직후, commit manifest 확인 질문을 띄우기 전에도");
     expect(skill).toContain("아직 무시되면 execute 를 호출하지 말고");
     expect(skill).toContain("`.gitignore` 변경도 같은 커밋에 들어가야");
     expect(skill).toContain("실패한 execute 뒤에 뒤늦게 고치는 복구 흐름으로 두지 않아요");
@@ -143,11 +146,23 @@ describe("import skill contract", () => {
     expect(skill).toContain('cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode execute --approved --commit-manifest');
   });
 
+  test("repo owner without repo name keeps the repo name equal to app slug", () => {
+    const skill = readImportSkill();
+    expect(skill).toContain("GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 반드시 `$APP_SLUG` 와 정확히 같게 둬요");
+    expect(skill).toContain('`--repo "realitsyourman/uqa-exp-public-11021-0708"`');
+    expect(skill).toContain('`--repo "realitsyourman/uqa-exp-public-11021"` 처럼 줄인 명령은 실행하지 말고');
+  });
+
   test("desktop tool titles and final URLs avoid generated product verbs", () => {
     const skill = readImportSkill();
     expect(skill).toContain("도구 제목에는 제품명 `axhub` 자체도 넣지 않아요");
     expect(skill).toContain("`axhubing`, `axhubed`, `axhub import 기능 지원 확인`, `axhub 가져오기 기능 지원 확인`");
     expect(skill).toContain("`axhubed import 기능 지원 확인`");
+    expect(skill).toContain("`Expressing 앱 파일 확인`");
+    expect(skill).toContain("`Expressing ...`, `Expressed ...`, `FastAPIing ...`, `axhubed ...`");
+    expect(skill).toContain("스택 이름을 영어 동사처럼 만든 제목");
+    expect(skill).toContain("Claude Desktop 자동 제목에 맡기지 않아요");
+    expect(skill).toContain("`서버 앱 준비 확인`");
     expect(skill).toContain("`가져오기 기능 확인`");
     expect(skill).toContain("최종 성공 요약에서도 URL 은 반드시 평문 절대 URL 로만 보여줘요");
     expect(skill).toContain("`배포 URL: [https://...](...)`, `[열기](https://...)` 같은 Markdown 링크 문법을 쓰지 않아요");
