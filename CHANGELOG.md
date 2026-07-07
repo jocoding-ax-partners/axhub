@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.0...v1.10.1) (2026-07-07)
+
+Claude Code Desktop Code 모드에서 "내 앱들이 지금 어떤 상태인지 모르겠어" 같은 애매한 상태 확인 요청이 플러그인 clarity 스킬 대신 axhub App/MCP 권한 카드로 빠질 수 있었어요. 이제 플러그인 메타데이터와 clarity 계약은 이런 요청을 CLI-only 스킬 흐름으로 먼저 잡도록 더 분명히 말하고, bootstrap/deploy/import/development/diagnosis/update 도 내부 라우팅 문구나 shell-wrapper 티가 사용자에게 새지 않게 다듬었어요. 정적 앱 상태 표현, device flow 코드 노출, 업데이트 결과 카드도 실제 Code 모드 QA에서 보인 어색한 부분을 회귀 테스트로 잠갔어요.
+
 ## [1.10.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.9.0...v1.10.0) (2026-07-07)
 
 Windows(Git Bash) 세션마다 axhub 실행 계약을 always-on 으로 emit 하는 SessionStart hook 을 더했어요(AP-13). PowerShell 로 axhub 를 실행하면 `$HOME`·PATH 부재로 로그인 검증이 false-negative 나서 device code 를 태우던 Windows 온보딩 실패를 완화해요. credential 이 셸에 따라 갈리는 최심부 원인은 ax-hub-cli 로 핸드오프했어요.
