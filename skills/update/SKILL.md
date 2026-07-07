@@ -1,6 +1,6 @@
 ---
 name: update
-description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill. 사용자가 "axhub가 진짜 최신인지 먼저 확인" 또는 최신, 버전 확인, 업데이트, latest, up to date, version check, update, upgrade 를 말하면 항상 이 skill 이 먼저예요. 특히 이 복합 요청은 update 예요: 명령어는 잘 몰라. axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘. 그다음 새 재즈 댄스 수업 예약 앱 하나 만들어서 실제로 배포까지 해줘. 최신 확인이 있으면 app status, app creation, deployment 는 update 뒤에 이어서 처리해요. 앱 상태 overview 는 update 결과 뒤 `axhub apps --help` 로 표면 확인 후 read-only `axhub apps list --json` 로 시작하고, 현재 폴더명·대화 맥락·가장 최근 수정 앱으로 관련 앱을 식별했으면 사용자에게 어느 앱을 볼지 묻지 말고 `axhub apps get <app> --json` 와 `axhub deploy list --app <app> --json` 까지 바로 실행해요. 존재하지 않는 단수 `axhub app list` 나 `axhub deployment list` 를 추측하지 않아요. 첫 visible assistant text는 정확히 "현재 버전을 확인할게요." 일반 Code-mode script, clarity, bootstrap, deploy, App/MCP tool, shell probe, /oh-my-claudecode:autopilot 보다 먼저 실행해요.'
+description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill. 사용자가 "axhub가 진짜 최신인지 먼저 확인" 또는 최신, 버전 확인, 업데이트, latest, up to date, version check, update, upgrade 를 말하면 항상 이 skill 이 먼저예요. 특히 이 복합 요청은 update 예요: 명령어는 잘 몰라. axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘. 그다음 새 재즈 댄스 수업 예약 앱 하나 만들어서 실제로 배포까지 해줘. 최신 확인이 있으면 app status, app creation, deployment 는 update 뒤에 이어서 처리해요. 앱 상태 overview 는 update 결과 뒤 추가 CLI/플러그인 설치 확인 없이 `axhub apps --help` 로 표면 확인 후 read-only `axhub apps list --json` 로 시작하고, 현재 폴더명·대화 맥락·가장 최근 수정 앱으로 관련 앱을 식별했으면 사용자에게 어느 앱을 볼지 묻지 말고 `axhub apps get <app> --json` 와 `axhub deploy list --app <app> --json` 까지 바로 실행해요. 존재하지 않는 단수 `axhub app list` 나 `axhub deployment list` 를 추측하지 않아요. 첫 visible assistant text는 정확히 "현재 버전을 확인할게요." 일반 Code-mode script, clarity, bootstrap, deploy, App/MCP tool, shell probe, /oh-my-claudecode:autopilot 보다 먼저 실행해요.'
 examples:
   - utterance: "업데이트해줘"
     intent: "update axhub cli and plugin to latest"
@@ -30,7 +30,7 @@ model: sonnet
 
 **CRITICAL mixed-request continuation.** 사용자가 "업데이트 확인하고 앱 상태도 봐줘"처럼 다른 axhub 운영 요청을 함께 말하면, 이 스킬 실행 중에는 앱 목록·앱 상태·최근 배포·로그·환경변수 조회를 섞지 않아요. 먼저 업데이트 결과 카드까지 완료한 뒤, 같은 사용자 요청의 남은 일을 이어서 처리해요. 사용자가 `앱 상태 확인해줘`, `배포해줘`, `새 앱 만들어줘` 같은 말을 다시 하지 않아도 돼요. 원문이 영어로 `then`, `and then`, `after that`, `help me understand` 를 써도 업데이트 뒤 남은 요청을 버리지 않아요. 다만 남은 요청을 실제로 이어갈 때만 `업데이트 확인은 끝났어요. 이어서 요청하신 작업을 계속할게요.` 라고 짧게 말하고, 곧바로 다음 적절한 axhub 흐름을 시작해요.
 
-**CRITICAL post-update app overview.** 업데이트 결과 뒤 남은 요청이 "내 앱들이 지금 어떤 상태인지", "내 앱 상태를 알아서 봐줘", "app status overview" 같은 읽기 전용 앱 현황이면 명령을 추측하지 않아요. 첫 overview 의 Desktop-visible Bash command 는 아래 두 개만 허용해요. 먼저 정확히 `axhub apps --help` 를 1회 실행하고, 그 다음 정확히 `axhub apps list --json` 로 접근 가능한 앱 목록부터 읽어요. 명령 문자열 뒤에 공백 외 어떤 문자도 붙이지 않아요.
+**CRITICAL post-update app overview.** 업데이트 결과 뒤 남은 요청이 "내 앱들이 지금 어떤 상태인지", "내 앱 상태를 알아서 봐줘", "app status overview" 같은 읽기 전용 앱 현황이면 명령을 추측하지 않아요. `업데이트 확인은 끝났어요. 이어서 요청하신 앱 상태 확인을 계속할게요.` 를 말한 뒤에는 설치 확인·버전 확인·플러그인 확인을 다시 하지 않아요. 즉 `command -v axhub`, `axhub --version`, `command -v claude`, `claude plugin list` 를 다시 실행하지 않아요. 첫 overview 의 Desktop-visible Bash command 는 아래 두 개만 허용해요. 먼저 정확히 `axhub apps --help` 를 1회 실행하고, 그 다음 정확히 `axhub apps list --json` 로 접근 가능한 앱 목록부터 읽어요. 명령 문자열 뒤에 공백 외 어떤 문자도 붙이지 않아요.
 
 ```bash
 axhub apps --help
@@ -44,7 +44,7 @@ axhub apps get <app> --json
 axhub deploy list --app <app> --json
 ```
 
-여기서 `<app>` 은 사용자에게 보이는 앱 slug/name 을 우선 써요. CLI 가 app id 를 반환해도 다음 명령의 `--app` 값으로 raw id 를 드러내지 않고, slug/name 으로 조회할 수 없을 때만 내부적으로 좁혀요. 관련 앱을 하나로 좁혔는데 `이 중 어느 앱의 배포 상태나 로그를 더 자세히 확인하고 싶으신가요?`, `어느 앱을 볼까요?`, `더 자세히 확인하고 싶은 앱을 말해 주세요` 같은 질문으로 끝나면 실패예요. 존재하지 않는 단수 명령 `axhub app list` 또는 `axhub app get`, 존재하지 않는 `axhub deployment list`, 또는 `Deployment list (axhub)`, `App get (axhub)`, `Tenant recent deployments (axhub)` 같은 MCP/App permission card 로 빠지면 실패예요. `axhub apps list --json 2>/dev/null | head -100`, `axhub --help | head`, `grep`, `sed`, `awk`, `head`, `tail`, pipe, redirect, `2>/dev/null`, `bash -lc`, `sh -c` 가 붙은 순간 실패예요. 그런 명령이 떠오르면 실행하지 말고 정확히 `axhub apps --help` → `axhub apps list --json` → `axhub apps get <app> --json` → `axhub deploy list --app <app> --json` 로 바꿔요. 출력이 길어도 shell 로 자르지 말고 tool 결과를 내부에서 필요한 만큼만 읽어요. 앱 overview 를 읽은 다음 같은 원문에 새 앱 생성·배포가 남아 있으면, 직접 low-level 명령을 추측하지 말고 bootstrap/deploy 흐름으로 이어가요.
+여기서 `<app>` 은 사용자에게 보이는 앱 slug/name 을 우선 써요. CLI 가 app id 를 반환해도 다음 명령의 `--app` 값으로 raw id 를 드러내지 않고, slug/name 으로 조회할 수 없을 때만 내부적으로 좁혀요. 관련 앱을 하나로 좁혔는데 `이 중 어느 앱의 배포 상태나 로그를 더 자세히 확인하고 싶으신가요?`, `어느 앱을 볼까요?`, `더 자세히 확인하고 싶은 앱을 말해 주세요` 같은 질문으로 끝나면 실패예요. 존재하지 않는 단수 명령 `axhub app list` 또는 `axhub app get`, 존재하지 않는 `axhub deployment list`, 또는 `Deployment list (axhub)`, `App get (axhub)`, `Tenant recent deployments (axhub)` 같은 MCP/App permission card 로 빠지면 실패예요. `command -v axhub && axhub --version`, `command -v claude && claude plugin list`, `claude plugin list 2>&1 | grep`, `axhub apps list --json 2>/dev/null | head -100`, `axhub --help | head`, `grep`, `sed`, `awk`, `head`, `tail`, pipe, redirect, `&&`, `2>/dev/null`, `bash -lc`, `sh -c` 가 붙은 순간 실패예요. 그런 명령이 떠오르면 실행하지 말고 정확히 `axhub apps --help` → `axhub apps list --json` → `axhub apps get <app> --json` → `axhub deploy list --app <app> --json` 로 바꿔요. 출력이 길어도 shell 로 자르지 말고 tool 결과를 내부에서 필요한 만큼만 읽어요. 앱 overview 를 읽은 다음 같은 원문에 새 앱 생성·배포가 남아 있으면, 직접 low-level 명령을 추측하지 말고 bootstrap/deploy 흐름으로 이어가요.
 
 **CRITICAL no background detour.** mixed request 의 남은 일을 Task/Subagent/Agent/백그라운드 작업으로 우회하지 않아요. 업데이트 결과 뒤 같은 assistant 흐름에서 직접 이어가요. `axhubed 앱 상태 조회`, `앱 상태 백그라운드 조회` 같은 작업·카드·제목을 만들지 않아요.
 
@@ -65,7 +65,7 @@ axhub deploy list --app <app> --json
 
 **보이는 tool 제목 계약.** Bash/명령 도구를 부를 때 description/title/summary 는 아래 고정 한국어 라벨 중 하나만 써요. 라벨 안에 `axhub` 를 넣지 않아요. `axhubing CLI 설치 여부 확인` 처럼 제품명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요.
 
-**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `command -v claude`, `claude plugin list`, `claude plugin update axhub@axhub --scope <SCOPE>`. Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요. 캐시 경로가 작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요. 플러그인 현재 버전은 가능하면 **정확히 `claude plugin list` 만 실행한 출력**의 `axhub@axhub` 항목에서 내부 변수로만 읽고, `claude` CLI 가 없거나 파싱할 수 없으면 플러그인 버전 비교는 생략해요. 이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요. `claude plugin list 2>&1`, `claude plugin list 2>&1 | grep ...`, `sed`, `awk`, `head`, `tail`, command substitution, shell wrapper, file test, pipe, redirect, text filter, 파일 읽기 도구를 쓰지 않아요. 실행하려는 command 가 `claude plugin list 2>&1` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.** 출력이 길어도 전체 `claude plugin list` 결과를 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요. 플러그인 버전, 설치 scope, 다음 CLI 확인을 영어 내부 로그처럼 chat 에 쓰지 말고, 필요한 경우 `현재 플러그인 버전을 확인했어요.` 라고만 말해요. 버전과 설치 위치를 같은 문장에 섞지 않아요.
+**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `claude plugin list`, `claude plugin update axhub@axhub --scope <SCOPE>`. 각 command 는 단독으로 실행해요. `&&`, pipe, redirect, `grep`, `head`, `tail`, `sed`, `awk`, `bash -lc`, `sh -c` 로 묶거나 자르지 않아요. `command -v claude` 는 Desktop-visible command 로 쓰지 않아요. Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요. 캐시 경로가 작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요. 플러그인 현재 버전은 가능하면 **정확히 `claude plugin list` 만 실행한 출력**의 `axhub@axhub` 항목에서 내부 변수로만 읽고, 실패하면 플러그인 버전 비교는 생략해요. 이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요. `command -v claude && claude plugin list`, `claude plugin list 2>&1`, `claude plugin list 2>&1 | grep ...`, `sed`, `awk`, `head`, `tail`, command substitution, shell wrapper, file test, pipe, redirect, text filter, 파일 읽기 도구를 쓰지 않아요. 실행하려는 command 가 `claude plugin list 2>&1` 또는 `command -v claude && claude plugin list` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.** 출력이 길어도 전체 `claude plugin list` 결과를 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요. 플러그인 버전, 설치 scope, 다음 CLI 확인을 영어 내부 로그처럼 chat 에 쓰지 말고, 필요한 경우 `현재 플러그인 버전을 확인했어요.` 라고만 말해요. 버전과 설치 위치를 같은 문장에 섞지 않아요.
 
 | 단계 | tool description/title/summary |
 | --- | --- |
@@ -73,7 +73,7 @@ axhub deploy list --app <app> --json
 | 버전 확인 (`axhub update check ...`) | `버전 확인` |
 | CLI 업데이트 적용 | `CLI 업데이트 적용` |
 | 업데이트 후 버전 재확인 | `업데이트 후 버전 확인` |
-| 플러그인 설치 위치 확인 (`command -v claude` 뒤 정확히 `claude plugin list`) | `플러그인 설치 위치 확인` |
+| 플러그인 설치 위치 확인 (정확히 `claude plugin list`) | `플러그인 설치 위치 확인` |
 | 플러그인 업데이트 적용 | `플러그인 업데이트 받기` |
 
 ---
@@ -98,7 +98,7 @@ TodoWrite({ todos: [
 ## 0. 사전 점검 (네트워크 0)
 
 1. `command -v axhub` 가 실패하면 멈춰요 — CLI 가 아직 없는 건 설치 소관이에요. 한 줄: `axhub CLI 가 아직 없어요. "온보딩" 이라고 말하면 설치부터 도와드려요.` (재설치를 여기서 시도하지 않아요.)
-2. Claude Desktop 에서는 플러그인 캐시의 `plugin.json` 을 읽지 않아요. 먼저 `command -v claude` 를 확인하고, 가능하면 `claude plugin list` 에서 `axhub@axhub` 의 현재 버전을 내부 변수 `<PLUGIN_VERSION>` 으로만 둬요. `claude` CLI 가 없거나 목록에서 못 찾으면 `<PLUGIN_VERSION>` 없이 CLI 업데이트 확인만 진행해요. 이 단계에서 설치 경로, Scope, manifest 경로, raw 목록, `user scope`/`local scope` 같은 scope 원문, 영어 진행 로그는 사용자에게 말하지 않아요. 필요한 경우 `현재 플러그인 버전을 확인했어요.` 만 말해요. 설치 위치값은 업데이트 명령의 `--scope` 인자에만 쓰고 chat 에는 쓰지 않아요.
+2. Claude Desktop 에서는 플러그인 캐시의 `plugin.json` 을 읽지 않아요. 가능하면 정확히 `claude plugin list` 한 번으로 `axhub@axhub` 의 현재 버전을 내부 변수 `<PLUGIN_VERSION>` 으로만 둬요. `claude plugin list` 가 실패하거나 목록에서 못 찾으면 `<PLUGIN_VERSION>` 없이 CLI 업데이트 확인만 진행해요. 이 단계에서 설치 경로, Scope, manifest 경로, raw 목록, `user scope`/`local scope` 같은 scope 원문, 영어 진행 로그는 사용자에게 말하지 않아요. 필요한 경우 `현재 플러그인 버전을 확인했어요.` 만 말해요. 설치 위치값은 업데이트 명령의 `--scope` 인자에만 쓰고 chat 에는 쓰지 않아요.
 3. `claude plugin list` 에 `axhub@axhub` 가 여러 번 나오면, enabled 항목 중 **가장 높은 semver** 를 `<PLUGIN_VERSION>` 으로 삼아요. 같은 버전이 여러 scope 에 있으면 업데이트 대상 `<SCOPE>` 는 현재 작업공간에 가장 가까운 항목(`local` → `project` → `user`)을 고르고, 이 선택 근거는 chat 에 쓰지 않아요. 낮은 버전이 함께 남아 있어도 사용자에게 중복 설치·scope 원문을 설명하지 않고, 최종 카드에는 선택된 최고 버전만 써요.
 
 **중복 설치 판정 알고리즘.** `claude plugin list` 결과를 읽을 때는 먼저 모든 `axhub@axhub` block 을 끝까지 훑고, `Status: ✔ enabled` 인 block 만 모아 `version`, `scope` 를 내부 표로 만들어요. 그 다음 정렬해서 최고 semver 를 `<PLUGIN_VERSION>` 으로 확정한 뒤에만 `axhub update check --plugin-version <PLUGIN_VERSION> --json` 을 실행해요. 낮은 버전 block 이 남아 있어도 그것은 cleanup 대상이 아니며, 최신성 판정과 업데이트 대상 선택에서 무시해요. 현재 확인한 최고 enabled 버전이 CLI 응답의 플러그인 최신 버전 이상이면 업데이트 필요처럼 보여도 플러그인 업데이트를 실행하지 말고 `axhub 플러그인은 이미 최신이에요 (v<PLUGIN_VERSION>).` 로 닫아요. 즉, `local 1.8.2` 와 `user 1.8.0` 이 함께 있으면 현재 버전은 `1.8.2` 이고, `user 1.8.0 → 1.8.2` 같은 정리성 업데이트나 결과 카드를 만들지 않아요.
@@ -148,7 +148,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 ## 3. 플러그인 업데이트 (`claude plugin update` — 재시작 후 반영)
 
 - `plugin` 블록이 없거나 플러그인 업데이트가 필요 없거나 현재 확인한 최고 enabled 버전이 CLI 응답의 플러그인 최신 버전 이상이면 → `axhub 플러그인은 이미 최신이에요 (v<확인된 플러그인 버전>).` 한 줄 (plugin 블록이 없으면 = 구 CLI 라 이 줄을 생략해요). 이때 낮은 중복 scope 가 있어도 `claude plugin update` 를 실행하지 않아요.
-- **`command -v claude` 실패** (Claude Code CLI 없음) → 한 줄 안내만: `axhub 플러그인 새 버전(v<최신 플러그인 버전>)이 있어요. Claude Code 에서 /plugin update 로 받아 주세요.`
+- **`claude plugin list` 실행 실패** (Claude Code CLI 없음 또는 목록 확인 불가) → 한 줄 안내만: `axhub 플러그인 새 버전(v<최신 플러그인 버전>)이 있어요. Claude Code 에서 /plugin update 로 받아 주세요.`
 - **`AXHUB_NO_AUTO_UPDATE` 설정** → 적용하지 않고 한 줄 안내만: `axhub 플러그인 새 버전(v<최신 플러그인 버전>)이 있어요. AXHUB_NO_AUTO_UPDATE 설정이라 자동 적용은 안 해요 — claude plugin update axhub@axhub 로 직접 받거나 플래그를 끄면 돼요.`
 - **플러그인 업데이트가 필요하고 적용 가능하며 현재 확인한 버전이 CLI 응답의 플러그인 최신 버전보다 낮으면** → 적용해요:
   1. 설치 위치를 먼저 확인해요 — `claude plugin list` 출력에서 `axhub@axhub` 항목의 `Scope:` 값(user/project/local/managed)을 읽어 내부 변수 `<SCOPE>` 로만 둬요. 같은 이름이 여러 번 나오면 enabled 항목 중 가장 높은 semver 를 현재 버전으로 보고, **그 최고 버전을 가진 block 들 안에서만** `local` → `project` → `user` 순서로 `<SCOPE>` 를 골라요. 낮은 버전 block 의 scope 는 업데이트 대상이 아니며, 사용자에게는 `플러그인 설치 위치를 확인할게요.` 라고 말하고 `Scope:` 원문은 보여주지 않아요. 못 찾으면 `user` 로 둬요.
@@ -205,3 +205,4 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - NEVER 최고 enabled semver 가 이미 최신인데도 낮은 중복 scope 를 기준으로 `v낮은버전 → v최신버전 받음` 결과를 만들지 말아요.
 - NEVER update 단계 안에서 앱 목록·앱 상태·최근 배포 상태를 직접 조회하지 말아요. `App list (axhub)`, `Deployment list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)` 같은 Claude Desktop axhub App/MCP 도구도 이 단계와 후속 앱 상태 흐름에서는 호출하지 말아요 — read 작업이어도 CLI 계약을 우선해요.
 - NEVER Task/Subagent/Agent/백그라운드 작업으로 mixed request 의 남은 앱 상태 확인을 우회하지 말아요. update 결과 뒤 같은 assistant 흐름에서 직접 이어가요.
+- NEVER update 결과 뒤 앱 상태 흐름에서 `command -v axhub && axhub --version`, `command -v claude && claude plugin list`, `claude plugin list 2>&1 | grep`, `head`, pipe, redirect, `&&` 가 들어간 command 를 실행하지 말아요. 그 시점의 앱 상태 흐름은 `axhub apps --help` → `axhub apps list --json` → `axhub apps get <app> --json` → `axhub deploy list --app <app> --json` 네 명령만 써요.
