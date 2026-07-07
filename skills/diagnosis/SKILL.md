@@ -1,6 +1,6 @@
 ---
 name: diagnosis
-description: 'diagnosis: "배포 실패 원인 진단해줘", "왜 배포가 죽었어", "diagnose deployment failure", "diagnose failed deployment <id> for app <slug>", "failed deployment diagnosis", "why did my deploy fail"처럼 axhub 배포 실패 원인과 해결 후보를 읽기 전용으로 알고 싶을 때만 사용해요. 영어 실패 배포 진단 요청도 반드시 이 스킬로 라우팅하고, MCP app/list/read 도구만으로 답하지 않아요. 결과는 사용자 카테고리로 요약하고 재배포·롤백은 직접 실행하지 않아요. 배포 실행/검증=deploy, 상태·로그·롤백·운영 명령=clarity, 업데이트=update, 앱 코드 생성=development 로 양보해요. 이 트리거들은 axhub 맥락(현재 폴더의 axhub 연결·발화의 axhub 언급·대화의 직전 axhub 작업)이 있을 때만 유효해요. 다른 플랫폼 배포 실패 발화에는 이 스킬을 쓰지 않아요.'
+description: 'diagnosis: "배포 실패 원인 진단해줘", "왜 배포가 죽었어", "방금 배포된 앱 혹시 실패 원인 같은 거 있으면 진단해줘", "재배포는 하지 말고 원인만 봐줘", "diagnose deployment failure", "diagnose failed deployment <id> for app <slug>", "failed deployment diagnosis", "why did my deploy fail"처럼 axhub 배포 실패 원인과 해결 후보를 읽기 전용으로 알고 싶을 때만 사용해요. 영어 실패 배포 진단 요청도 반드시 이 스킬로 라우팅하고, MCP app/list/read 도구만으로 답하지 않아요. 결과는 사용자 카테고리로 요약하고 재배포·롤백은 직접 실행하지 않아요. 배포 실행/검증=deploy, 상태·로그·롤백·운영 명령=clarity, 업데이트=update, 앱 코드 생성=development 로 양보해요. 이 트리거들은 axhub 맥락(현재 폴더의 axhub 연결·발화의 axhub 언급·대화의 직전 axhub 작업)이 있을 때만 유효해요. 다른 플랫폼 배포 실패 발화에는 이 스킬을 쓰지 않아요.'
 examples:
   - utterance: "배포 실패 원인 진단해줘"
     intent: "diagnose deployment failure cause"
@@ -12,13 +12,17 @@ examples:
     intent: "diagnose deployment failure cause"
   - utterance: "why did my deploy fail?"
     intent: "diagnose deployment failure cause"
+  - utterance: "방금 배포된 앱 혹시 실패 원인 같은 거 있으면 진단해줘. 재배포는 하지 말고 원인만 봐줘."
+    intent: "diagnose deployment failure cause"
 allows-dependency-execution: false
 model: sonnet
 ---
 
 # axhub diagnosis (배포 실패 원인 진단)
 
-배포 실패 원인을 읽기 전용으로 진단하는 스킬이에요. 사용자가 실패 원인이나 해결 후보를 명시적으로 물을 때만 들어오고, 배포 실행·재배포·롤백은 절대 직접 실행하지 않아요.
+> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
+
+배포 실패 원인을 읽기 전용으로 진단하는 스킬이에요. 사용자가 실패 원인이나 해결 후보를 명시적으로 물을 때만 들어오고, 배포 실행·재배포·롤백은 절대 직접 실행하지 않아요. `혹시 실패 원인 같은 거 있으면`, `원인만 봐줘`, `재배포는 하지 말고` 같은 조건부·소극적 표현도 실패 원인 진단 의도예요.
 
 발화에 axhub 언급이 없고 대화에 axhub 맥락(현재 폴더의 axhub 연결·직전 axhub 작업)도 없으면 — 배포 실패가 다른 플랫폼일 수 있으면 — 진단을 시작하기 전에 어느 플랫폼 배포인지 한 번만 확인하고, axhub 가 아니면 종료해요. headless 에서는 묻지 않고 멈춰요.
 
@@ -71,7 +75,7 @@ Claude Desktop QA처럼 사용자가 한 문장 안에 "진단하고 복구까�
 | `로그인/권한이 필요해요` | 인증·권한 문제로 진단을 끝내지 못했어요. | 로그인·권한 전환은 onboarding/clarity 로 넘겨요. |
 | `진단을 못 했어요` | CLI 진단 표면을 사용할 수 없어요. | CLI 업데이트나 나중 재시도를 안내해요. |
 
-`정상이에요` 인데 사용자가 "방금 실패"를 물었으면, 현재 라이브가 정상이라는 걸 말한 뒤 "방금 배포 자체 결과를 보려면 '배포 상태 확인해줘'·'로그 보여줘'라고 말하면 돼요" 로 이어요 — 라이브 진단만으로 과거 배포 실패를 단정하지 않아요.
+`정상이에요` 인데 사용자가 "방금 실패"를 물었으면, 현재 라이브가 정상이라는 걸 말한 뒤 "방금 배포 자체 결과를 보려면 '배포 상태 확인해줘'·'로그 보여줘'라고 말하면 돼요" 로 이어요 — 라이브 진단만으로 과거 배포 실패를 단정하지 않아요. 실패 배포 id 없이 "혹시 실패 원인 있으면"처럼 물었고 현재 라이브가 정상이면 `정상이에요` 로 끝내고, 재배포나 추가 로그 조회를 실행하지 않아요.
 
 ## Visibility 규칙
 

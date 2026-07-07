@@ -41,6 +41,14 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("3개 스킬");
     }
     expect(descriptions.join("\n")).toContain("onboarding/bootstrap/deploy/import/development/diagnosis/clarity/update");
+    expect(pluginJson.description).toContain("`내 앱들이 지금 어떤 상태인지 모르겠어`");
+    expect(pluginJson.description).toContain("Before finding or calling tools for vague app-status prompts");
+    expect(pluginJson.description).toContain("clarity 스킬로 라우팅");
+    expect(pluginJson.description).toContain("Claude Desktop axhub App/MCP 도구");
+    expect(pluginJson.description).toContain("`Tenant recent deployments`, `App list`, `App get`");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("Vague app-status requests");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("Before finding or calling tools for vague app-status requests");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("must not use Claude Desktop axhub App/MCP tools");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {
@@ -51,6 +59,8 @@ describe("smooth behavior contracts", () => {
     expect(readme).toContain("첫 셋업 → 앱 생성 → 배포 → 상태 확인");
     expect(agents).toContain("첫 셋업 → 앱 생성 → 배포 → 상태 확인");
     expect(claude).toContain("첫 셋업 → 앱 생성 → 배포 → 상태 확인");
+    expect(readme).toContain("Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only");
+    expect(readme).toContain("`Tenant recent deployments`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않아요");
     const flowRows = [
       "| 첫 셋업 | `onboarding` |",
       "| 앱 생성 | `bootstrap` |",
@@ -111,10 +121,22 @@ describe("smooth behavior contracts", () => {
     expect(bootstrap).toContain("`axhub plugin-support init-resume put` 에 생성을 맡겨요");
     expect(bootstrapAndLocal).toContain("APP_SLUG=\"$APP_SLUG\" perl -0pi");
     expect(bootstrap).toContain("url_checked=false");
+    expect(bootstrap).toContain("axhub apps check-availability --tenant <tenant> --slug <app-slug> --subdomain <app-slug> --json");
+    expect(bootstrap).toContain("Tool 제목은 `앱 주소 확인`");
+    expect(bootstrap).toContain("dry-run preview 전 pre-preview guard");
+    expect(bootstrap).toContain("slug 또는 subdomain 중 하나라도 unavailable 이면 bootstrap dry-run/execute 금지");
     expect(bootstrap).toContain("내부 라벨 노출 금지");
     expect(bootstrap).toContain("제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목");
-    expect(bootstrap).toContain("label/target 모두 같은 `https://...` 절대 URL");
-    expect(bootstrap).toContain("도메인-only target 금지");
+    expect(bootstrap).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
+    expect(bootstrap).toContain("Markdown URL 링크 문법은 전부 금지");
+    expect(bootstrap).toContain("[https://x](https://x)`, `[열기](https://x)`, `<https://x>`");
+    expect(bootstrap).toContain("다른 플러그인/워크플로 상태를 정리하지 않아요");
+    expect(bootstrap).toContain("`oh-my-claudecode`, `autopilot`, `cancel`, `.omc` state tools");
+    expect(bootstrap).toContain("`Task done, now marking autopilot inactive.`");
+    expect(bootstrap).toContain("`plugin oh-my-claudecode ...`");
+    expect(bootstrap).toContain('axhub publish --app "$APP_SLUG" --visibility public --execute --json');
+    expect(bootstrap).toContain("publish dry-run 을 먼저 호출하지 않고");
+    expect(bootstrap).toContain("`Dry-run 기본값` 같은 내부 CLI dry-run semantics");
     expect(bootstrap).toContain("NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채");
     expect(bootstrap).toContain("승인 완료를 채팅으로 알려 달라고 쓰지 않고");
     expect(bootstrapAndLocal).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
@@ -151,6 +173,8 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("Use `운영` for the user-facing environment");
     expect(deploy).toContain("Never write `User explicitly authorized`, `Proceeding`, `Push 성공`, or `Push failed`");
     expect(deploy).toContain("Display the environment as `운영`, not `prod`, `production`, or raw profile values");
+    expect(deploy).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
+    expect(deploy).toContain("Markdown URL 링크 문법은 전부 금지");
     expect(deploy).toContain("AXHUB_GATE_POLL_ITERATIONS=0 axhub plugin-support token-gate");
     expect(deploy).toContain("never wraps token-gate in `grep`, `head`, or a multi-command pipe");
     expect(deploy).toContain("Present this step as `인증 상태 확인`, not as token-gate");
@@ -198,8 +222,13 @@ describe("smooth behavior contracts", () => {
     expect(importSkill).toContain("사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만");
     expect(importSkill).toContain("`importing`, `imported`, `manifested`, `gitted`, `pushed`, `raw JSON`, `token-gate`, `manifest_create`, `verification_status`, `deployment`, `execute`, `git remote`, `curl`");
     expect(importSkill).toContain("`.omc/`, `.claude/`, `.codex/`, `.serena/` 같은 런타임 상태는 제외");
-    expect(importSkill).toContain("label 과 target 모두 `https://...` 절대 URL");
-    expect(importSkill).toContain("target 에 scheme 이 빠진 `[...](uqa.../)` 링크는 금지");
+    expect(importSkill).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
+    expect(importSkill).toContain("Markdown URL 링크 문법은 전부 금지");
+    expect(importSkill).toContain("[https://...](https://...)`, `[열기](https://...)`, `<https://...>`");
+    expect(importSkill).toContain("첫 visible chat sentence 는 반드시 정확히 `기존 앱을 axhub에 가져올 준비를 확인할게요.` 로 시작");
+    expect(importSkill).toContain("그 앞에는 공백·설명·스킬 선택 이유를 포함해 어떤 문장도 쓰지 않아요");
+    expect(importSkill).toContain("스킬 선택 이유, route label, slash command label 을 절대 설명하지 않아요");
+    expect(importSkill).toContain("`/axhub:import`, `axhub:import`, `import 스킬`, `스킬을 사용할게요`, `스킬 호출`");
     expect(importSkill).toContain("`앱 slug 미확정` 대신 `앱 이름이 아직 정해지지 않아 package.json 이름으로 확인할게요`");
     expect(importSkill).toContain("`manifest_create 있으니` 대신 `앱 설정 파일이 필요해서 프로젝트 파일 근거로 작성할게요`");
     expect(importSkill).toContain("`git remote 아직 없음` 대신 `원격 저장소가 아직 없어 새 저장소 생성 경로로 진행해요`");
@@ -215,7 +244,7 @@ describe("smooth behavior contracts", () => {
     expect(importSkill).toContain("`raw endpoint`/`raw 엔드포인트` 대신 `원문 응답`");
     expect(importSkill).toContain("`public으로` 대신 `공개 접근으로`");
     expect(importSkill).toContain("최종 성공 요약은 아래 형태를 벗어나지 않아요");
-    expect(importSkill).toContain("`첫 배포 검증이 끝났어요. 운영 URL: [https://...](https://...)`");
+    expect(importSkill).toContain("`첫 배포 검증이 끝났어요. 운영 URL: https://...`");
     expect(importSkill).toContain("비공개 접근 제어 때문에 로그인 없는 요청으로는 앱 본문을 직접 확인하지 못했어요");
     expect(importSkill).toContain("비공개 앱에서 로그인 없는 HTTP 요청이 axhub 로그인 화면 HTML 을 200 으로 돌려주면");
     expect(importSkill).toContain("그건 앱의 `/healthz` 또는 루트 응답 검증이 아니에요");
@@ -225,6 +254,7 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("공개 표면만");
     expect(clarity).toContain("plugin-support");
     expect(clarity).toContain("탐색·실행 대상이 아니에요");
+    expect(clarity).toContain("invoke this skill before finding or calling any tools");
     expect(clarity).toContain("**CLI-only.**");
     expect(clarity).toContain("Bash/명령 도구로 실행하는 `axhub` CLI 만 사용");
     expect(clarity).toContain("`App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)`, `Deployment status (axhub)`");
@@ -264,10 +294,17 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("3개 이상 `명령 표면 확인` 카드가 보이면 실패예요");
     expect(clarity).toContain("`--all` 로 전체 50개 이상을 길게 뽑지 말고");
     expect(clarity).toContain("`--field-expr` 가 null/0 으로 오해될 수 있으니 이 fast path 에서는 쓰지 않아요");
+    expect(clarity).toContain("정적 사이트로 정상 서빙 중");
+    expect(clarity).toContain("정적 배포 방식이라 별도 빌드 이력 없음");
+    expect(clarity).toContain("`배포 완료했지만 아직 첫 배포 전`처럼 서로 모순되는 표현을 쓰지 않아요");
     expect(clarity).toContain("디렉토리 구조 확인");
     expect(clarity).toContain("`ls`, `find`, `pwd` 류 명령을 쓰지 않아요");
     expect(clarity).toContain("계정 전체 상태 조회 중에는 `App list (axhub)` 또는 `Tenant recent deployments (axhub)`");
     expect(clarity).toContain("반드시 `axhub apps list --page-size 5 --json` CLI 로 확인해요");
+    expect(clarity).toContain("현재 요청 결과만 요약해요");
+    expect(clarity).toContain("이전 Task/Subagent/Agent/백그라운드 작업");
+    expect(clarity).toContain("백그라운드 검색 작업");
+    expect(clarity).toContain("TaskOutput 결과를 언급하지 않아요");
     expect(clarity).toContain("단일 leaf CLI 호출");
     expect(clarity).toContain("`> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution");
     expect(clarity).toContain("tool 출력은 assistant 내부에서 읽고 요약");
@@ -277,6 +314,10 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("전체 `--json-schema` 탐색으로 돌아가지 말고");
     expect(clarity).toContain("먼저 `앱 상태 조회` 제목으로 앱 상세 조회 help gate 를 통과");
     expect(clarity).toContain("운영 배포 확인이 추가로 필요할 때만 `운영 상태 확인` 제목");
+    expect(clarity).toContain("현재 폴더/현재 앱 예외");
+    expect(clarity).toContain("현재 Code workspace 의 `axhub.yaml` 또는 이미 확인한 앱 바인딩을 먼저 읽고");
+    expect(clarity).toContain("manifest 를 달라고 되묻지 않아요");
+    expect(clarity).toContain("아래 계정 전체 앱 상태 fast path 로 degrade");
     expect(clarity).toContain("사용자에게 보이는 Bash/tool call 제목은 한국어 명사구만");
     expect(clarity).toContain("`명령 표면 확인`, `명령 사용법 확인`, `앱 상태 조회`, `운영 상태 확인`, `결과 정리`");
     expect(clarity).toContain("description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요");
@@ -286,8 +327,10 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("`Monitor 사용` 권한 카드가 뜨는 명령은 실패");
     expect(clarity).toContain("device flow fast path 에서는 Step 1a 의 optional `axhub update check --json` 버전 확인을 건너뛰어요");
     expect(clarity).toContain("device flow 를 시작하는 Bash/tool call 제목은 정확히 `계정 인증 시작`");
-    expect(clarity).toContain("device-flow URL 은 markdown 링크로 만들지 말고 평문 `https://...` 절대 URL");
-    expect(clarity).toContain("[https://github.com/login/device](github.com/login/device)` 처럼 target 에 scheme 이 빠질 수 있는 링크 문법은 금지");
+    expect(clarity).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
+    expect(clarity).toContain("Markdown URL 링크 문법은 전부 금지");
+    expect(clarity).toContain("device-flow URL 은 Markdown 링크로 만들지 말고 평문 `https://...` 절대 URL");
+    expect(clarity).toContain("[https://github.com/login/device](https://github.com/login/device)`, `[GitHub 열기](https://github.com/login/device)`, `<https://github.com/login/device>` 같은 링크 문법은 모두 금지");
     expect(clarity).toContain("승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출");
     expect(clarity).toContain("`인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 조회");
     expect(clarity).toContain("승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요");
@@ -331,6 +374,10 @@ describe("smooth behavior contracts", () => {
     expect(diagnosis).toContain("diagnose failed deployment <id> for app <slug>");
     expect(diagnosis).toContain("Diagnose failed deployment 96728617 for app my-app");
     expect(diagnosis).toContain("why did my deploy fail?");
+    expect(diagnosis).toContain("방금 배포된 앱 혹시 실패 원인 같은 거 있으면 진단해줘");
+    expect(diagnosis).toContain("재배포는 하지 말고 원인만 봐줘");
+    expect(diagnosis).toContain("`혹시 실패 원인 같은 거 있으면`, `원인만 봐줘`, `재배포는 하지 말고` 같은 조건부·소극적 표현도 실패 원인 진단 의도");
+    expect(diagnosis).toContain("실패 배포 id 없이 \"혹시 실패 원인 있으면\"처럼 물었고 현재 라이브가 정상이면 `정상이에요` 로 끝내고");
     expect(diagnosis).toContain("영어 실패 배포 진단 요청도 반드시 이 스킬로 라우팅");
     expect(diagnosis).toContain("axhub deploy status <deployment-id>");
     expect(diagnosis).toContain("axhub deploy logs <deployment-id>");
@@ -448,7 +495,12 @@ describe("smooth behavior contracts", () => {
     expect(update).toContain("| 플러그인 업데이트 적용 | `플러그인 업데이트 받기` |");
     expect(update).toContain("`현재 플러그인 버전을 확인했어요.`, `CLI는 이미 최신이에요. 플러그인 새 버전을 받을게요.`, `플러그인 설치 위치를 확인했어요.`, `플러그인 새 버전을 받았어요.`");
     expect(update).toContain("영어 라벨, 내부 필드명, 설치 위치 원문, raw 상태값, 반말형 짧은 메모가 섞인 문장");
+    expect(update).toContain("플러그인: vX -> vY 받음 (재시작 필요)");
+    expect(update).toContain("확인·비교 결과를 설명하는 영어 디버그 문장이나 raw 확인 줄은 쓰지 않아요");
     expect(update).not.toContain("Plugin version");
+    for (const leakedUpdatePhrase of ["PLUGIN_UPDATED_VERSION", "matching plugin.latest", "Confirmed:", "Confirmed", "plugin.latest"]) {
+      expect(update).not.toContain(leakedUpdatePhrase);
+    }
   });
 
   test("development skill follows the current SDK raw-db surface", () => {
@@ -460,8 +512,19 @@ describe("smooth behavior contracts", () => {
     expect(development).toContain("sdk.apps.rawDb.tables(appId)");
     expect(development).toContain("sdk.apps.rawDb.tableRows(appId, table");
     expect(development).toContain("제거된 SDK data-plane API");
+    expect(development).toContain("기능 코드 추가·수정");
+    expect(development).toContain("todo priority/filter/search, tabs, forms, CRUD, UI/page/API route 개선");
+    expect(development).toContain("기능이 connector/table/DB 데이터를 쓰면");
+    expect(development).toContain("순수 UI 정리, todo priority/filter/search, tabs, forms, API route 리팩터");
     expect(development).toContain("사용자에게 보이는 설명·툴 제목·중간 메모는 한국어로만");
     expect(development).toContain("optional 파일·설정 확인은 없어도 정상인 경우 실패처럼 보이면 안 돼요");
+    expect(development).toContain("Desktop preview/issue check guard");
+    expect(development).toContain("Claude Desktop Code 모드");
+    expect(development).toContain("preview 확인은 `lint`/`build` 통과 뒤 한 번만");
+    expect(development).toContain("Next `1 Issue` 배지·overlay 가 보이면 최대 1회만");
+    expect(development).toContain("preview/issue 확인에 90초 이상 쓰지 않아요");
+    expect(development).toContain("`ScheduleWakeup`, 내부 task 이름, 브라우저/preview 도구 이름을 chat 에 쓰지 않아요");
+    expect(development).toContain("장시간 overlay 탐색으로 사용자를 기다리게 하지 않아요");
     expect(connectorSafety).toContain("legacy data-plane DSL 은 제거");
     expect(writeGate).toContain("legacy data-plane write DSL 은 새로 만들지 않아요");
 
@@ -537,7 +600,7 @@ describe("smooth behavior contracts", () => {
     expect(bootstrap).toContain("carry-over 를 주장하지 않아요");
     // M2: gate relaxation suppresses re-narration only, never the gate.
     expect(bootstrap).toContain("install-link 를 보여줬으면 재안내는 생략");
-    expect(bootstrap).toContain("0-install gate 는 맥락과 무관하게 그대로 실행해요");
+    expect(bootstrap).toContain("0-install gate 는 항상 실행해요");
 
     const bootstrapAndLocal = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     expect(bootstrapAndLocal).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
@@ -634,5 +697,20 @@ describe("smooth behavior contracts", () => {
       "NEVER `claude mcp add` 를 실행한 그 세션에서 `/mcp` OAuth 완료나 `mcp__axhub__*` 도구 활성화를 안내하지 말아요",
     );
     expect(onboarding).toContain("NEVER `VIBE_READY` 출력 후 marker");
+  });
+
+  test("import frontmatter starts directly and avoids preamble leaks", () => {
+    const importSkill = readRepo("skills/import/SKILL.md");
+    const importFrontmatter = importSkill.match(/^---\n([\s\S]*?)\n---/)?.[1];
+    expect(importFrontmatter, "import SKILL frontmatter not found").not.toBeNull();
+    const importDescription = importFrontmatter?.match(/^description:\s*'([^']*)'/m)?.[1];
+    expect(importDescription, "import description not found in frontmatter").toBeDefined();
+    expect(importDescription?.split(".")[0]).toBe("기존 앱을 axhub에 가져올 준비를 확인할게요");
+    expect(importDescription).toContain("스킬 실행 전 사용자 문장 0개");
+    expect(importDescription).toContain("do not explain why this path was chosen");
+    expect(importDescription).toContain("route/skill label");
+    expect(importDescription).not.toContain("스킬을 사용");
+    expect(importDescription).not.toContain("사용하겠습니다");
+    expect(importDescription).not.toContain("axhub:import 스킬");
   });
 });

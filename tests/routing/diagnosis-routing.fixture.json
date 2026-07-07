@@ -11,6 +11,7 @@
     { "utterance": "왜 배포가 죽었어", "expected": "diagnosis", "why": "배포 실패 원인을 묻는 표현" },
     { "utterance": "이 앱 배포 실패 진단해줘", "expected": "diagnosis", "why": "앱 배포 실패 원인 진단 요청" },
     { "utterance": "방금 배포 왜 실패했어?", "expected": "diagnosis", "why": "최근 배포 실패 원인 질문" },
+    { "utterance": "방금 배포된 앱 혹시 실패 원인 같은 거 있으면 진단해줘. 재배포는 하지 말고 원인만 봐줘.", "expected": "diagnosis", "why": "조건부 표현이어도 실패 원인 진단과 mutation 금지를 명시" },
     { "utterance": "diagnose deployment failure", "expected": "diagnosis", "why": "영어 배포 실패 진단 발화" },
     { "utterance": "왜 실패했는지 보고 다시 배포해줘", "expected": "diagnosis", "why": "원인 진단을 먼저 명시 — diagnosis 가 원인만 요약하고 재배포는 deploy 로 handoff" },
     { "utterance": "배포해줘", "expected": "deploy", "why": "새 배포 실행" },

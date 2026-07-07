@@ -1,6 +1,6 @@
 ---
 name: import
-description: '비어 있지 않은 기존 로컬 앱을 axhub 앱으로 연결하고 manifest/GitHub/첫 배포 준비까지 가져오는 import 스킬. "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app"처럼 템플릿 bootstrap 이 아니라 기존 소스를 등록하려는 요청에 사용해요. Next.js뿐 아니라 프론트·백엔드·Dockerfile 앱 등 broad stack 을 CLI 감지에 맡겨요. 빈 디렉토리 새 앱은 bootstrap, 이미 연결된 앱의 재배포는 deploy 로 양보해요. 이 트리거들은 axhub 맥락(발화의 axhub 언급·대화의 직전 axhub 작업)이 있을 때만 유효해요. GitHub push 나 다른 플랫폼 업로드를 뜻하는 "올려" 발화에는 이 스킬을 쓰지 않아요.'
+description: '기존 앱을 axhub에 가져올 준비를 확인할게요. Start directly; do not explain why this path was chosen or name any route/skill label. 스킬 실행 전 사용자 문장 0개. 비어 있지 않은 기존 로컬 앱을 axhub 앱으로 연결하고 manifest/GitHub/첫 배포 준비까지 가져오는 import 흐름. "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app"처럼 템플릿 bootstrap 이 아니라 기존 소스를 등록하려는 요청에 사용해요. Next.js뿐 아니라 프론트·백엔드·Dockerfile 앱 등 broad stack 을 CLI 감지에 맡겨요. 빈 디렉토리 새 앱은 bootstrap, 이미 연결된 앱의 재배포는 deploy 로 양보해요. 이 트리거들은 axhub 맥락(발화의 axhub 언급·대화의 직전 axhub 작업)이 있을 때만 유효해요. GitHub push 나 다른 플랫폼 업로드를 뜻하는 "올려" 발화에는 이 스킬을 쓰지 않아요.'
 examples:
   - utterance: "기존 앱 올려"
     intent: "import existing local app into axhub"
@@ -13,6 +13,8 @@ model: sonnet
 ---
 
 # Import Existing App
+
+> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
 비어 있지 않은 로컬 앱을 axhub 앱으로 가져와 앱 설정, GitHub 연결, 첫 배포 증거까지 한 번에 정리해요. 이 스킬은 판단·실행 로직을 거의 직접 갖지 않아요. `axhub plugin-support import` 가 내보내는 `import/v1` envelope 를 검증하고, 사람이 이해할 수 있는 미리보기와 복구 문구를 렌더링해요. 딱 하나 예외로, 새 앱 설정 파일이 필요한 경우 프로젝트 파일 근거로 axhub.yaml 을 풍부하게 작성하고 `axhub deploy --explain --json` 으로 같은 파서가 읽는지 검증하는 보강 단계만 직접 맡아요. 그 외 모든 변경 판정·실행은 CLI 가 해요.
 
@@ -47,11 +49,15 @@ model: sonnet
 기존 앱을 axhub에 가져올 준비를 확인할게요.
 ```
 
+첫 visible chat sentence 는 반드시 정확히 `기존 앱을 axhub에 가져올 준비를 확인할게요.` 로 시작하고, 그 앞에는 공백·설명·스킬 선택 이유를 포함해 어떤 문장도 쓰지 않아요.
+
 import preview 정상이면 axhub 가져오기 대상 확정이에요. Interactive 는 preview card 전에 AskUserQuestion 으로 axhub 진입 확인을 먼저 해요: `이 앱을 axhub에 가져올까요?` (`axhub에 가져오기`/`아니요`). `가져오기` 면 preview card 와 기존 승인을 이어가요. `아니요` 면 종료. (headless 는 이 AUQ 생략)
 
 ## Vibe Coder Visibility Rules
 
 이 섹션은 workflow 보다 우선해요. 아래 금지어가 떠오르면 말하기 전에 반드시 한국어 사용자 문구로 바꿔요. 특히 Claude Desktop 에서 모델이 중간 생각을 chat 에 노출하기 쉬우므로, 검증용 field name 이나 영어 진행어를 "짧게라도" 쓰지 않아요.
+
+사용자에게 보이는 chat 에서는 스킬 선택 이유, route label, slash command label 을 절대 설명하지 않아요. `/axhub:import`, `axhub:import`, `import 스킬`, `스킬을 사용할게요`, `스킬 호출` 또는 유사한 내부 라벨은 첫 문장 전/후 어디에도 쓰지 않아요.
 
 Claude Desktop 같은 긴 QA 대화에서 이전 답변에 금지 문구가 보이더라도, 그 문구는 참고할 스타일 예시가 아니라 **이미 발견된 버그 예시**예요. 같은 대화 안에서 재시도하거나 이어서 import 할 때도 이전 표현을 재사용하지 말고 이 섹션의 안전 문구로 다시 써요. 특히 `Port 8080, /healthz 확인. preview 진행.`, `git remote 없음`, `execute 실행한다`, `deployment verification: success`, `HTML, 200` 같은 문장을 보았으면 그대로 따라 쓰지 않아요.
 
@@ -67,7 +73,7 @@ Claude Desktop 같은 긴 QA 대화에서 이전 답변에 금지 문구가 보�
 - `Envelope`, `preview`, `import 지원`, `deployment verification`, `success`, `raw endpoint`, `raw 엔드포인트`, `public`, `HTML, 200`
 
 대신 사용자가 이해할 문장으로 바꿔요. 예: "정적 사이트 공개 URL 확인이 아직 안 됐어요. CLI를 업데이트하거나 다시 시도해요."
-검증된 `public_url` 값은 사용자에게 열어볼 주소로 보여줘도 돼요. 단 field name, envelope 구조, raw evidence object 는 숨겨요. URL 을 markdown 으로 보여줄 때는 label 과 target 모두 `https://...` 절대 URL이어야 해요. `[$PUBLIC_URL]($PUBLIC_URL)` 형태로 쓰고, target 에 scheme 이 빠진 `[...](uqa.../)` 링크는 금지해요. `access_note` 가 있으면 URL 바로 아래에 자연어로 덧붙여요.
+검증된 `public_url` 값은 사용자에게 열어볼 주소로 보여줘도 돼요. 단 field name, envelope 구조, raw evidence object 는 숨겨요. 사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL 로만 써요. Markdown URL 링크 문법은 전부 금지예요. `[https://...](https://...)`, `[열기](https://...)`, `<https://...>` 처럼 URL 을 괄호나 label 로 감싸지 말고 `https://...` 그대로 보여줘요. `access_note` 가 있으면 URL 바로 아래에 자연어로 덧붙여요.
 
 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `importing`, `imported`, `manifested`, `gitted`, `pushed`, `raw JSON`, `token-gate`, `manifest_create`, `verification_status`, `deployment`, `execute`, `git remote`, `curl`, `Envelope`, `preview` 같은 내부/영어 동사형·필드형 라벨을 제목이나 진행 문장에 쓰지 않아요. 예: `가져오기 준비 확인`, `미리보기 확인`, `앱 설정 작성`, `첫 배포 확인`, `정적 사이트 확인`.
 
@@ -79,7 +85,7 @@ Claude Desktop 이 Bash 내용에서 자동 제목을 만들 때도 같은 규�
 
 - `<스택> 앱 <앱 이름>을 axhub 앱으로 가져왔어요.`
 - `GitHub 저장소를 생성하고 연결했어요.`
-- `첫 배포 검증이 끝났어요. 운영 URL: [https://...](https://...)`
+- `첫 배포 검증이 끝났어요. 운영 URL: https://...`
 - 비공개 앱이면 `배포 검증은 끝났지만, 비공개 접근 제어 때문에 로그인 없는 요청으로는 앱 본문을 직접 확인하지 못했어요.`
 
 라이브 URL 확인은 조심해요. 비공개 앱에서 로그인 없는 HTTP 요청이 axhub 로그인 화면 HTML 을 200 으로 돌려주면, 그건 앱의 `/healthz` 또는 루트 응답 검증이 아니에요. 이런 경우 `배포 검증은 완료됐지만, 비공개 접근 제어 때문에 로그인 없는 요청으로는 앱 본문을 직접 확인하지 못했어요` 라고 말하고, `/healthz HTTP 200 확인`이라고 쓰지 않아요. 사용자가 raw endpoint 확인을 명시하면 로그인된 브라우저, 세션 쿠키, 또는 별도 접근 정책 변경이 필요하다고 설명해요. 200 응답이라도 body 가 axhub 로그인 포털이면 실패한 본문 검증으로 취급해요.
@@ -275,8 +281,8 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 
 8. 성공 안내
 
-- docker/compose 성공: 공개 URL 을 절대 링크로 보여주고, 배포 확인이 끝났다고 말해요. 앱이 비공개라 로그인 없는 URL 요청이 로그인 화면으로 돌아오면, 배포 검증과 앱 본문 확인을 분리해 설명해요.
-- static 성공: 공개 URL 을 절대 링크로 보여주고, 정적 사이트 활성 릴리스 확인이 끝났다고 말해요. `access_note` 가 있으면 같은 성공 블록에서 "참고: ..." 형태로 함께 말해요.
+- docker/compose 성공: 공개 URL 을 평문 절대 URL 로 보여주고, 배포 확인이 끝났다고 말해요. 앱이 비공개라 로그인 없는 URL 요청이 로그인 화면으로 돌아오면, 배포 검증과 앱 본문 확인을 분리해 설명해요.
+- static 성공: 공개 URL 을 평문 절대 URL 로 보여주고, 정적 사이트 활성 릴리스 확인이 끝났다고 말해요. `access_note` 가 있으면 같은 성공 블록에서 "참고: ..." 형태로 함께 말해요.
 
 내부 id 는 필요할 때만 상태 이어보기에 쓰고 chat 에 raw 값으로 노출하지 않아요.
 

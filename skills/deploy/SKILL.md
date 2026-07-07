@@ -14,6 +14,8 @@ model: sonnet
 
 # Deploy via axhub
 
+> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
+
 Deploy an already-connected axhub app with preview, approval, and verification safety. First-connect/import and new-app/bootstrap flows do not run here.
 
 명시적인 배포 실패 원인 진단 요청(예: "배포 실패 원인 진단해줘", "왜 배포가 죽었어")은 `diagnosis` 에 양보해요. 이 스킬이 실제 배포를 시작한 뒤 `axhub deploy verify` 에서 terminal failure 를 확인한 경우에만 같은 앱 식별자와 실패 근거를 유지해 `diagnosis` 로 읽기 전용 handoff 해요. 이 handoff 는 재배포, 롤백, 새 deploy create 를 실행하지 않아요.
@@ -50,6 +52,8 @@ Keep chat human and Korean. Do not echo raw ids, raw JSON, schema names, exit nu
 User-visible Bash/tool call titles must be Korean noun phrases only. Do not expose helper-shaped or English labels such as `manifesting`, `manifested`, `gitted`, `pushed`, `Push`, `resumed`, `bootstraped`, `deploy-prep`, `in-flight`, `dry-run`, `token-gate`, `execute`, `production`, `terminal success`, `grep pipe`, `gitignore`, `gitignoring`, `gitting`, `checking`, `Build passed`, `Working tree clean`, or `Not ignored`. Good examples: `배포 준비 확인`, `변경사항 확인`, `커밋 동기화 확인`, `원격 반영 확인`, `진행 중 배포 확인`, `배포 미리보기 확인`, `인증 상태 확인`, `배포 실행`, `배포 결과 확인`.
 
 The same rule applies to chat prose, preview cards, and final tables. Use `운영` for the user-facing environment, `진행 중 배포` for in-flight work, `미리보기` for dry-run, `인증 상태 확인` for token gate, `배포 실행` for execute, and `검증 성공` for terminal success. Command names may appear only when the user explicitly asks for technical evidence or when an error needs exact copy-paste recovery.
+
+사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL 로만 써요. Markdown URL 링크 문법은 전부 금지예요. `[https://...](https://...)`, `[열기](https://...)`, `<https://...>` 처럼 URL 을 괄호나 label 로 감싸지 말고 `https://...` 그대로 보여줘요.
 
 When a technical check fails or needs recovery, translate it before showing it. Say `원격 반영이 필요해요`, not `commit_not_found`; `재생성되는 빌드 파일은 정리했어요`, not `Not ignored` or `Working tree clean`; `원격 저장소 확인`, not `gitting` or `gitignore 확인`. Do not create English status snippets during build/lint/git cleanup.
 

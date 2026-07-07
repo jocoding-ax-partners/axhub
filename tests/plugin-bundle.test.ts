@@ -63,6 +63,7 @@ describe("clean plugin bundle", () => {
       expect(existsSync(join(outDir, "README.md"))).toBe(true);
       expect(existsSync(join(outDir, "LICENSE"))).toBe(true);
       expect(existsSync(join(outDir, "POLICY.md"))).toBe(true);
+      expect(readFileSync(join(outDir, "POLICY.md"), "utf8")).toContain("플러그인 스킬 흐름은 그 도구를 우선 사용하지 않아요");
 
       const rootManifest = JSON.parse(readFileSync(join(REPO_ROOT, ".claude-plugin", "plugin.json"), "utf8")) as { version: string };
       const bundledManifest = JSON.parse(readFileSync(join(outDir, ".claude-plugin", "plugin.json"), "utf8")) as { version: string };
