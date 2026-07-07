@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.18](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.17...v1.10.18) (2026-07-07)
+
+Claude Code Desktop Code 모드 공개 설치 QA에서 update skill 이 시작은 잘 했지만 플러그인 버전 확인 권한 카드에 `claude plugin list 2>&1` 처럼 redirect 를 붙이는 문제가 다시 보였어요. 이제 hook 과 skill 본문, marketplace 설명에서 플러그인 조회 command 를 정확히 `claude plugin list` 로 더 앞쪽에 못 박고, redirect 가 붙은 변형은 회귀 테스트가 바로 잡도록 했어요.
+
 ## [1.10.17](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.16...v1.10.17) (2026-07-07)
 
 Claude Code Desktop Code 모드 재QA에서 update skill 뒤 앱 상태를 이어 확인할 때 `axhub deployment list` 같은 존재하지 않는 명령이나 `Deployment list (axhub)` MCP 권한 카드로 빠질 수 있었어요. 이제 앱 목록에서 관련 앱을 고른 뒤에도 `axhub apps get <app> --json` 과 `axhub deploy list --app <app> --json` CLI 흐름만 쓰도록 계약과 테스트를 잠그고, 실제 Code 모드 로컬 설치본으로 최신 확인부터 배포 이력 요약까지 다시 확인했어요.
