@@ -451,6 +451,7 @@ describe("smooth behavior contracts", () => {
     expect(update).toContain("Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요");
     expect(update).toContain("플러그인 캐시 파일을 읽지 않아요");
     expect(update).toContain("정확히 `claude plugin list` 만 실행한 출력");
+    expect(update).toContain("이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요");
     expect(update).toContain("`claude plugin list 2>&1`");
     expect(update).toContain("`claude plugin list 2>&1 | grep ...`");
     expect(update).toContain("pipe, redirect, text filter");
@@ -477,6 +478,7 @@ describe("smooth behavior contracts", () => {
     expect(update).not.toContain("다음 동작은 `clarity`");
     expect(update).not.toContain("그 다음 작업은 `clarity`");
     expect(update).toContain("| CLI 존재 확인 (`command -v axhub`) | `CLI 설치 확인` |");
+    expect(update).toContain("| 플러그인 설치 위치 확인 (`command -v claude` 뒤 정확히 `claude plugin list`) | `플러그인 설치 위치 확인` |");
     expect(update).toContain("| 버전 확인 (`axhub update check ...`) | `버전 확인` |");
     expect(update).toContain("수동 확인 기록은 Claude Desktop 경로에서 갱신하지 않아요");
     expect(update).toContain("별도 `mkdir`/touch/marker command 를 실행하지 말아요");
