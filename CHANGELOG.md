@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.17](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.16...v1.10.17) (2026-07-07)
+
+Claude Code Desktop Code 모드 재QA에서 update skill 뒤 앱 상태를 이어 확인할 때 `axhub deployment list` 같은 존재하지 않는 명령이나 `Deployment list (axhub)` MCP 권한 카드로 빠질 수 있었어요. 이제 앱 목록에서 관련 앱을 고른 뒤에도 `axhub apps get <app> --json` 과 `axhub deploy list --app <app> --json` CLI 흐름만 쓰도록 계약과 테스트를 잠그고, 실제 Code 모드 로컬 설치본으로 최신 확인부터 배포 이력 요약까지 다시 확인했어요.
+
 ## [1.10.16](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.15...v1.10.16) (2026-07-07)
 
 Claude Code Desktop Code 모드 공개 설치 QA에서 marketplace source 가 repo 루트라서 플러그인 runtime 뿐 아니라 개발 파일과 node_modules 까지 cache 로 들어가는 문제가 보였어요. 이제 marketplace 는 커밋된 clean runtime bundle 인 `plugins/axhub` 만 설치하고, 테스트가 그 폴더를 새로 생성한 bundle 과 byte-for-byte 로 비교해서 hook·skill 은 유지하되 설치 크기와 컨텍스트 노출은 작게 잠가요.
