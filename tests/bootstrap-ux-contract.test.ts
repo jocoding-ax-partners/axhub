@@ -34,20 +34,35 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap.indexOf("## Fast Start")).toBeLessThan(bootstrap.indexOf("## Reference Loading Policy"));
   });
 
-  test("advertises English empty-folder web app deployment prompts as bootstrap triggers", () => {
+  test("keeps bootstrap discovery focused on empty-folder creation", () => {
     const bootstrap = readBootstrap();
+    const frontmatter = bootstrap.slice(0, bootstrap.indexOf("---", 4));
 
-    expect(bootstrap).toContain("Use this skill in an empty folder");
-    expect(bootstrap).toContain("Please make my first app. I want a small gym class booking website and put it online");
-    expect(bootstrap).toContain("Create a small bakery preorder web app and deploy it to the internet");
-    expect(bootstrap).toContain("Build a cafe booking website and put it online");
-    expect(bootstrap).toContain("Make a flower shop reservation app");
-    expect(bootstrap).toContain("진행 중이던 axhub 앱 만들기/배포 상태 이어서 확인");
-    expect(bootstrap).toContain("Run the backend template picker, confirm the app name, check GitHub owner, preview");
+    expect(bootstrap).toContain("Use this skill only in an empty folder");
+    expect(frontmatter).toContain("Use this skill only in an empty folder to create a brand-new axhub template app");
+    expect(frontmatter).toContain("Positive triggers only when the user asks to create/start/init a new app");
+    expect(frontmatter).toContain("새 앱 만들어줘");
+    expect(frontmatter).toContain("처음부터 앱 만들어줘");
+    expect(frontmatter).toContain("진행 중이던 axhub 앱 만들기/배포 상태 이어서 확인");
+    expect(frontmatter).not.toContain("Please make my first app");
+    expect(frontmatter).not.toContain("deploy it to the internet");
+    expect(frontmatter).not.toContain("put it online");
     expect(bootstrap).toContain("아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행");
     expect(bootstrap).toContain("If you need an app name or template, choose a reasonable one yourself");
     expect(bootstrap).toContain("deploy it for real");
     expect(bootstrap).toContain("템플릿 선택 카드, 앱 이름 확인 카드, dry-run 뒤 `진행` 확인은 절대 생략하지 않아요");
+  });
+
+  test("refuses existing backend app imports before bootstrap preflight", () => {
+    const bootstrap = readBootstrap();
+    const scopeSection = bootstrap.slice(bootstrap.indexOf("## Scope"), bootstrap.indexOf("## Reference Loading Policy"));
+
+    expect(bootstrap).toContain("never use for \"기존 앱\", \"기존 Express 서버 앱\", \"이미 만든 앱\", \"작업 폴더는 /path\"");
+    expect(scopeSection).toContain("사용자 발화에 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`");
+    expect(scopeSection).toContain("`Express`, `Fastify`, `Nest`, `FastAPI`, `Flask`, `Django`, `Rails`, `Go 서버`, `Dockerfile`");
+    expect(scopeSection).toContain("기존 소스가 있음을 뜻하는 단서");
+    expect(scopeSection).toContain("CLI guard, preflight, 템플릿 목록 확인을 실행하기 전에 즉시 import 경계로 양보");
+    expect(scopeSection).toContain("chat 본문에서 `/axhub:bootstrap` 또는 bootstrap 선택 이유를 설명하지 않아요");
   });
 
   test("hides internal routing labels from users", () => {

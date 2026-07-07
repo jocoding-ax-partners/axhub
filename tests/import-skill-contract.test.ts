@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
+const readImportSkill = (): string => readFileSync(join(REPO_ROOT, "skills", "import", "SKILL.md"), "utf8");
 
 type JsonObject = Record<string, unknown>;
 
@@ -96,6 +97,75 @@ const validateImportEnvelope = (value: unknown): { ok: boolean; reason?: string 
 };
 
 describe("import skill contract", () => {
+  test("commit manifest question uses short JSON-safe desktop copy", () => {
+    const skill = readImportSkill();
+    expect(skill).toContain("## AskUserQuestion JSON 안전 규칙");
+    expect(skill).toContain("question: `axhub.yaml을 커밋하고 푸시할까요?`");
+    expect(skill).toContain("option 1 label: `커밋하고 진행`");
+    expect(skill).toContain("option 2 label: `커밋 없이 진행`");
+    expect(skill).toContain("option 3 label: `취소`");
+    expect(skill).not.toContain("커밋·push 하고 진행 (첫 배포부터 반영)");
+  });
+
+  test("local-only GitHub import still asks for commit manifest", () => {
+    const skill = readImportSkill();
+    expect(skill).toContain("local_only 앱은 아직 git remote 가 없을 수 있지만");
+    expect(skill).toContain("remote 없음만으로 이 질문을 건너뛰지 않아요");
+    expect(skill).not.toContain("git remote 가 있으면 커밋 동의");
+    expect(skill).toContain("capability 가 없거나 repo 없는 static lane");
+  });
+
+  test("manifest authoring removes direct axhub.yaml ignore rule", () => {
+    const skill = readImportSkill();
+    expect(skill).toContain("## Manifest 보강");
+    expect(skill).toContain("`.gitignore` 또는 exclude 규칙이 `axhub.yaml` 을 무시하면");
+    expect(skill).toContain("검증 통과 직후, commit manifest 확인 질문을 띄우기 전에 반드시 먼저 정리");
+    expect(skill).toContain("`axhub.yaml` 을 직접 무시하는 줄은 제거");
+    expect(skill).toContain("`git check-ignore -q axhub.yaml` 이 실패");
+    expect(skill).toContain("아직 무시되면 execute 를 호출하지 말고");
+    expect(skill).toContain("`.gitignore` 변경도 같은 커밋에 들어가야");
+    expect(skill).toContain("실패한 execute 뒤에 뒤늦게 고치는 복구 흐름으로 두지 않아요");
+  });
+
+  test("provided app directory pins all import commands to APP_DIR", () => {
+    const skill = readImportSkill();
+    expect(skill).toContain("## 작업 폴더 실행 계약");
+    expect(skill).toContain("그 절대 경로를 `APP_DIR` 로 고정해요");
+    expect(skill).toContain("모든 import 관련 `axhub`, `git`, `npm`, build, manifest 검증 명령은 반드시 `APP_DIR` 안에서 실행");
+    expect(skill).toContain('명령 앞에 실제 절대 경로를 넣은 `cd "<absolute APP_DIR>" &&` 를 붙여요');
+    expect(skill).toContain("권한 카드에는 `$APP_DIR` 변수를 그대로 쓰지 말고 사용자가 준 실제 경로를 따옴표로 넣어요");
+    expect(skill).toContain("workspace root 에서 `axhub --json plugin-support import`");
+    expect(skill).toContain("권한 카드 명령이 bare `axhub ...`, bare `git ...`, bare `npm ...` 로 시작하거나");
+    expect(skill).toContain('실제 절대 경로가 들어간 `cd "<absolute APP_DIR>" &&`');
+    expect(skill).toContain('cd "<absolute APP_DIR>" && axhub plugin-support preflight --json');
+    expect(skill).toContain('cd "<absolute APP_DIR>" && axhub deploy --explain --json');
+    expect(skill).toContain('cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT"');
+    expect(skill).toContain('cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode execute --approved --commit-manifest');
+  });
+
+  test("desktop tool titles and final URLs avoid generated product verbs", () => {
+    const skill = readImportSkill();
+    expect(skill).toContain("도구 제목에는 제품명 `axhub` 자체도 넣지 않아요");
+    expect(skill).toContain("`axhubing`, `axhubed`, `axhub import 기능 지원 확인`, `axhub 가져오기 기능 지원 확인`");
+    expect(skill).toContain("`axhubed import 기능 지원 확인`");
+    expect(skill).toContain("`가져오기 기능 확인`");
+    expect(skill).toContain("최종 성공 요약에서도 URL 은 반드시 평문 절대 URL 로만 보여줘요");
+    expect(skill).toContain("`배포 URL: [https://...](...)`, `[열기](https://...)` 같은 Markdown 링크 문법을 쓰지 않아요");
+  });
+
+  test("backend existing app utterances route directly to import", () => {
+    const skill = readImportSkill();
+    const frontmatter = skill.slice(0, skill.indexOf("---", 4));
+    expect(frontmatter).toContain("Use this before bootstrap for any existing/local-folder app import or first deploy");
+    expect(skill).toContain("기존 Express 서버 앱을 axhub에 올려서 실제 배포");
+    expect(skill).toContain("이미 만든 앱");
+    expect(skill).toContain("이 앱을 axhub에 올려");
+    expect(skill).toContain("작업 폴더는 /path");
+    expect(skill).toContain("Express/Fastify/Nest/FastAPI/Flask/Django/Rails/Go/Rust/Java/PHP/.NET");
+    expect(skill).toContain("기존 Express 서버 앱을 axhub에 올려서 실제 배포까지 해줘");
+    expect(skill).toContain("작업 폴더는 /path/to/app 이야. axhub에 올려줘");
+  });
+
   test("preflight fixture advertises import/v1 capability", () => {
     const { result } = runShim(["plugin-support", "preflight", "--json"]);
     expect(result.exitCode).toBe(0);

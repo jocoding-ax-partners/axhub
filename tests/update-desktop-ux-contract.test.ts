@@ -8,10 +8,20 @@ const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "
 describe("update Desktop UX contract", () => {
   test("plugin manifest preserves update no-preamble routing contract", () => {
     const manifest = JSON.parse(readRepo(".claude-plugin/plugin.json")) as { description: string };
+    const marketplace = JSON.parse(readRepo(".claude-plugin/marketplace.json")) as { plugins: Array<{ description: string }> };
+    const descriptions = [manifest.description, marketplace.plugins[0]?.description ?? ""];
 
     expect(manifest.description).toContain("Natural-language axhub requests should route to one of onboarding/bootstrap/deploy/import/development/diagnosis/update");
     expect(manifest.description).toContain("clarity is manual/explicit-only");
+    for (const description of descriptions) {
+      expect(description).toContain("Import priority is strict");
+      expect(description).toContain("existing app/local folder");
+      expect(description).toContain("작업 폴더는");
+      expect(description).toContain("invoke the axhub import skill before generic Code-mode folder inspection");
+      expect(description).toContain("The first visible import text should start exactly `기존 앱을 axhub에 가져올 준비를 확인할게요.`");
+    }
     expect(manifest.description).toContain("axhub가 진짜 최신인지 먼저 확인해주고");
+    expect(manifest.description).toContain("General helper-role phrasing without freshness words must not invoke update");
     expect(manifest.description).toContain("Routing priority is strict");
     expect(manifest.description).toContain("invoke the axhub update skill first");
     expect(manifest.description).toContain("first visible assistant text is exactly `현재 버전을 확인할게요.`");
@@ -43,8 +53,10 @@ describe("update Desktop UX contract", () => {
 
     expect(update).toContain("description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill");
     expect(update).toContain("axhub가 진짜 최신인지 먼저 확인");
-    expect(update).toContain("명령어는 잘 몰라");
-    expect(update).toContain("명령어는 잘 몰라. axhub가 진짜 최신인지 먼저 확인해주고");
+    expect(update).toContain('일반 UX 역할 문구나 "알아서 진행"만으로는 update 가 아니며');
+    expect(update).toContain("freshness/update 단어가 없는 기존 앱 import·배포 요청은 import/deploy 로 양보해요");
+    expect(update).not.toContain("명령어는 잘 몰라");
+    expect(update).not.toContain("명령어를 잘 모르는");
     expect(update).toContain("일반 Code-mode script");
     expect(update).toContain("/oh-my-claudecode:autopilot");
     expect(update).toContain('첫 visible assistant text는 정확히 "현재 버전을 확인할게요."');
@@ -52,7 +64,7 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("app status, app creation, deployment 는 update 뒤에 이어서 처리해요");
     expect(update).toContain("내 앱들이 지금 어떤 상태인지도 알아서 봐줘");
     expect(update).toContain("새 재즈 댄스 수업 예약 앱 하나 만들어서 실제로 배포까지");
-    expect(update).toContain("명령어는 잘 몰라. axhub가 진짜 최신인지 먼저 확인해주고");
+    expect(update).toContain("axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘");
     expect(update).toContain("Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요");
     expect(update).toContain("스킬 호출 전 사전 안내 문장도 쓰지 않아요");
     expect(update).toContain("작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요");

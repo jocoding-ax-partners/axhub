@@ -430,7 +430,8 @@ describe("smooth behavior contracts", () => {
     const update = readRepo("skills/update/SKILL.md");
     const updateBody = update.replace(/^---\n[\s\S]*?\n---\n?/, "");
     expect(update).toContain("description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill");
-    expect(update).toContain("명령어는 잘 몰라");
+    expect(update).toContain('일반 UX 역할 문구나 "알아서 진행"만으로는 update 가 아니며');
+    expect(update).not.toContain("명령어는 잘 몰라");
     expect(update).toContain("일반 Code-mode script");
     expect(update).toContain("app status, app creation, deployment 는 update 뒤에 이어서 처리해요");
     expect(update).toContain("**CRITICAL desktop first line.**");
@@ -654,7 +655,7 @@ describe("smooth behavior contracts", () => {
     }
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.UserPromptSubmit.flatMap((group) => group.hooks);
-    expect(entries).toHaveLength(2);
+    expect(entries).toHaveLength(3);
 
     const router = entries[0];
     expect(router.type).toBe("command");
@@ -678,7 +679,27 @@ describe("smooth behavior contracts", () => {
     expect(router.command).not.toContain("axhub update check");
     expect(router.command).not.toContain("claude plugin update");
 
-    const statusRouter = entries[1];
+    const importRouter = entries[1];
+    expect(importRouter.type).toBe("command");
+    expect(importRouter.shell).toBe("bash");
+    expect(importRouter.command).toContain("import-router.sh");
+
+    const importRouterScript = readRepo("hooks/import-router.sh");
+    expect(importRouterScript).toContain("AXHUB_NO_IMPORT_ROUTER");
+    expect(importRouterScript).toContain("bring or first-deploy an existing local app to axhub");
+    expect(importRouterScript).toContain("invoke the axhub import skill");
+    expect(importRouterScript).toContain("기존 앱을 axhub에 가져올 준비를 확인할게요");
+    expect(importRouterScript).toContain("treat that absolute path as APP_DIR");
+    expect(importRouterScript).toContain('cd \\"<the actual absolute APP_DIR from the user prompt>\\" &&');
+    expect(importRouterScript).toContain("not bare axhub/git/npm and not literal $APP_DIR");
+    expect(importRouterScript).toContain("Do not use the selected Code workspace root as a substitute");
+    expect(importRouterScript).toContain("Do not read package.json, list files, or say bootstrap before invoking import");
+    expect(importRouterScript).toContain("Never run axhub apps bootstrap for existing/local-folder apps");
+    expect(importRouterScript).toContain("*최신*|*버전*|*업데이트*|*latest*");
+    expect(importRouterScript).not.toContain("python3");
+    expect(importRouterScript).not.toContain("node ");
+
+    const statusRouter = entries[2];
     expect(statusRouter.type).toBe("command");
     expect(statusRouter.shell).toBe("bash");
     expect(statusRouter.command).toContain("status-resume-router.sh");
