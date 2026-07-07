@@ -1,8 +1,8 @@
 {
-  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). development fixture 와 같은 방식의 계약이에요: skill frontmatter description/examples 를 편집할 때 아래 발화의 정답 skill 이 유지되는지 dry-run 으로 확인해요. 핵심 경계: update=CLI·플러그인 버전 업데이트(axhub update apply + claude plugin update, 수동 on-demand), clarity=그 외 axhub 운영 명령(버전 업데이트는 update 양보), onboarding=첫 셋업. clarity 가 한때 '업데이트 확인'을 소유했던 confusable 경계라 이 guard 를 둬요.",
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). development fixture 와 같은 방식의 계약이에요: skill frontmatter description/examples 를 편집할 때 아래 발화의 정답 skill 이 유지되는지 dry-run 으로 확인해요. 핵심 경계: update=CLI·플러그인 버전 업데이트(axhub update apply + claude plugin update, 수동 on-demand), clarity=로그·환경변수·롤백·테이블·connector grant·GitHub 재연결 운영 명령(버전 업데이트는 update 양보), onboarding=첫 셋업. clarity 가 한때 '업데이트 확인'을 소유했던 confusable 경계라 이 guard 를 둬요.",
   "boundary": {
     "update": "axhub CLI·플러그인을 지금 최신으로 (axhub update apply + claude plugin update). 수동 on-demand 버전 업데이트.",
-    "clarity": "그 외 axhub CLI 운영 명령(env·로그·상태·롤백·테이블·connector) — 버전 업데이트는 update 양보",
+    "clarity": "axhub CLI 운영 명령(env·로그·롤백·테이블·connector grant·GitHub 재연결) — 버전 업데이트는 update 양보",
     "onboarding": "첫 셋업·CLI 설치·로그인",
     "deploy": "이미 연결된 앱의 ordinary redeploy",
     "import": "비어 있지 않은 기존 로컬 앱을 axhub에 첫 연결·첫 배포로 가져오기"
@@ -11,6 +11,7 @@
     { "utterance": "업데이트해줘", "context": "axhub 맥락(현재 폴더 axhub 연결·대화의 axhub 언급·직전 axhub 작업)", "expected": "update", "why": "axhub 맥락 있는 CLI·플러그인 최신화 (수동 on-demand)" },
     { "utterance": "axhub 최신 버전으로 맞춰줘", "expected": "update", "why": "버전 업데이트" },
     { "utterance": "axhub가 최신인지 확인하고, 아니면 최신으로 업데이트해줘", "expected": "update", "why": "빈 폴더라도 프로젝트 상태 조회가 아니라 CLI·플러그인 최신화" },
+    { "utterance": "axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘. 그다음 새 앱 하나 만들어서 실제로 배포까지 해줘.", "expected": "update", "why": "명시적 최신 확인이 섞인 바이브코더 요청은 update 먼저, 이후 적절한 조회/bootstrap continuation" },
     { "utterance": "플러그인 업데이트해줘", "expected": "update", "why": "claude plugin update — clarity 는 axhub 명령만이라 plugin 반쪽도 못 함" },
     { "utterance": "지금 최신 버전 받아줘", "expected": "update", "why": "수동 on-demand 업데이트" },
     { "utterance": "update axhub", "expected": "update", "why": "영어 업데이트 발화" },

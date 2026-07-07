@@ -4,7 +4,10 @@ axhub Claude Code plugin 이 사용자의 컴퓨터에서 무엇을 하고 무�
 
 ## 네트워크 접근 — 인터넷에 언제 연결하나요
 - 스킬(플러그인이 상황별로 꺼내 쓰는 기능 단위)과 훅(세션이 시작될 때 자동으로 도는 점검)은 기본적으로 `axhub` CLI(터미널에서 쓰는 axhub 명령 도구)를 통해 인터넷에 접근해요. 플러그인이 그 밖의 곳에 몰래 접속하지 않아요.
-- Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 그 도구를 우선 사용하지 않아요. "내 앱들이 지금 어떤 상태인지 모르겠어", "내 앱들 알아서 봐줘", "전체 앱 상태 봐줘" 같은 상태 요청은 `clarity` 스킬이 `axhub` CLI 로 처리하고, `Tenant recent deployments`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않아요.
+- "axhub가 최신인지", "axhub가 진짜 최신인지 먼저 확인", "up to date"처럼 버전 확인이 들어간 요청은 가장 먼저 `update` 스킬로 처리해요. 이때 `axhub --version`, `npm list`, `grep`/pipe 같은 일반 shell 확인, 앱 상태 조회, `/axhub:clarity`, `/oh-my-claudecode:autopilot` 를 먼저 실행하지 않아요. 사용자에게 보이는 첫 문장은 `현재 버전을 확인할게요.` 예요.
+- 업데이트 뒤 같은 요청 안에 앱 현황 확인이 남아 있으면 존재하지 않는 `axhub app list` 를 추측하지 않고, plural `axhub apps` 표면을 help 로 확인한 뒤 정확히 `axhub apps list --json` 같은 읽기 전용 명령으로 이어가요. 이때 `| head`, `2>/dev/null`, `grep` 같은 shell 후처리는 붙이지 않아요.
+- Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 그 도구를 우선 사용하지 않아요. 버전·최신 확인이 같은 요청에 있으면 언제나 위의 `update` 스킬이 먼저 끝나요. 로그·환경변수·롤백·GitHub 재연결 같은 후속 운영 작업도 `Tenant recent deployments`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요.
+- 그래서 최신 확인 요청에는 아주 좁은 Code-mode update router guard 가 라우팅 문맥만 추가해요. 이 guard 는 SessionStart fallback 과 UserPromptSubmit match 로 동작하고, 명령을 실행하거나 앱 목록을 조회하지 않으며, `AXHUB_NO_UPDATE_ROUTER=1` 로 끌 수 있어요.
 - 세션 시작 때 도는 auto-update 훅은 24시간에 1회만 `axhub update check` 명령으로 새 버전이 있는지 확인해요. 실제 인터넷 연결은 훅 스크립트가 아니라 axhub CLI 가 해요.
 
 ## 로컬에 기록하는 파일 — 내 컴퓨터에 무엇을 남기나요

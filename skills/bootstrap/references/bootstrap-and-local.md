@@ -25,11 +25,13 @@ Even if the initial natural-language request says "바로 인터넷에 올려줘
   "question": "지금 만들고 배포까지 진행할까요?",
   "header": "앱 만들기",
   "options": [
-    {"label": "진행", "value": "execute", "description": "backend app + GitHub repo + 첫 deploy 를 자동으로 진행해요"},
-    {"label": "취소", "value": "취소", "description": "지금은 만들지 않아요"}
+    {"label": "진행", "value": "execute", "description": "앱 생성, 저장소 생성, 첫 배포를 진행해요"},
+    {"label": "취소", "value": "cancel", "description": "지금은 만들지 않아요"}
   ]
 }
 ```
+
+Use exactly this question, labels, values, and descriptions. Do not paraphrase the question or invent new Korean option labels/descriptions.
 
 Subprocess/no TTY safe default is `취소`.
 
@@ -55,12 +57,14 @@ Do not attach `--watch` or `--watch-timeout` to the first execute. If execute re
 
 Use `axhub --no-input apps bootstrap` for execute and resume. Claude Desktop may run shell tools through a PTY, so stdout can look interactive to the CLI; `--no-input` forces the agent device-flow branch that prints the code envelope and exits instead of waiting invisibly.
 
-If execute returns before deployment reaches a terminal state: Never poll deployment status with a shell loop. Run one direct `axhub deploy status <deployment-id> --tenant <tenant> --json` command per check, with a user-facing title like `배포 상태 확인`. If it is still running, say it is still building and issue another separate direct status command only when needed. Do not claim "I'll automatically check again in 90 seconds" unless you actually schedule or run a follow-up tool call in this same Desktop session. Do not parse JSON with `grep`, `cut`, `awk`, `sed`, or `jq` in Desktop-visible commands; read the tool output JSON directly.
+If execute returns before deployment reaches a terminal state, the known `deployment_id` becomes an owned watch. Never poll deployment status with a shell loop, Claude Desktop Monitor, ScheduleWakeup, or any background watcher. Run one direct `axhub deploy status <deployment-id> --tenant <tenant> --json` command per check, with a user-facing title like `배포 상태 확인`. If it is still running, say it is still building and issue another separate direct status command in the same Desktop response when the UI can run another tool call; do not express the wait as `sleep`, `until`, `while`, a pipe, or a compound shell block. A Desktop permission request containing `until axhub deploy status`, `while`, `sleep`, `grep`, `head`, or a pipe is a failed watch UX and must be replaced with standalone status calls. Do not end the response by telling the user to check later. Do not claim "I'll automatically check again in 90 seconds" unless you actually run a follow-up tool call in this same Desktop session. Do not parse JSON with `grep`, `head`, `tail`, `cut`, `awk`, `sed`, or `jq` in Desktop-visible commands; read the tool output JSON directly.
 
-If the watch times out with a resume hint, fetch bootstrap id with the same idempotency key and then watch status:
+Do not report final success while the deployment status is building/running/pending. Phrases such as `완벽해요`, `앱이 생성되었습니다`, `배포 완료`, or URL-later handoffs are final-result language and are only allowed after terminal deploy success plus verify success. Once status is terminal success, run one direct `axhub deploy verify <deployment-id> --app <app-slug> --json` command. If verify says still building, continue the same watch. If terminal failure or verify failure is returned, summarize briefly and route to diagnosis; do not call the app complete.
+
+If the watch cannot finish in the current Desktop response, fetch bootstrap id with the same idempotency key and then use one direct status command. Do not use CLI watch flags from Claude Desktop:
 
 ```bash
-axhub apps bootstrap-status 11111111-1111-4111-8111-111111111111 --tenant test --watch --watch-timeout 9m --json
+axhub apps bootstrap-status 11111111-1111-4111-8111-111111111111 --tenant test --json
 ```
 
 Use the real `bootstrap_id` from the previous JSON/status output instead of the sample UUID.

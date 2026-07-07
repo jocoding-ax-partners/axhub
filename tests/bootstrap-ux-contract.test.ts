@@ -42,6 +42,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("Create a small bakery preorder web app and deploy it to the internet");
     expect(bootstrap).toContain("Build a cafe booking website and put it online");
     expect(bootstrap).toContain("Make a flower shop reservation app");
+    expect(bootstrap).toContain("진행 중이던 axhub 앱 만들기/배포 상태 이어서 확인");
     expect(bootstrap).toContain("Run the backend template picker, confirm the app name, check GitHub owner, preview");
     expect(bootstrap).toContain("아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행");
     expect(bootstrap).toContain("If you need an app name or template, choose a reasonable one yourself");
@@ -68,7 +69,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(contract).toContain("`GitHubed repo`");
     expect(contract).toContain("`DB 선언된 템플릿`");
     expect(contract).toContain("`development 단계`");
-    expect(bootstrap).toContain("Tool/Bash 제목은 사용자가 이해하는 한국어 명사구로만 쓰고");
+    expect(bootstrap).toContain("Tool/Bash 제목은 한국어 명사구로 쓰고");
     expect(bootstrap).toContain("제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목");
     expect(bootstrap).toContain("반드시 한글로 시작해요");
     expect(contract).toContain("`tenanting 확인`, `tenant 확인`, `테넌트 확인`");
@@ -181,8 +182,15 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("그 말은 목표이지 execute 승인 토큰이 아니에요");
     expect(bootstrap).toContain("`deploy it for real`");
     expect(bootstrap).toContain("추천 허용일 뿐이에요");
+    expect(bootstrap).toContain("정확히 `지금 만들고 배포까지 진행할까요?` 질문과 `진행`/`취소` 선택지");
+    expect(bootstrap).toContain("질문·선택지·설명은 의역하거나 새로 만들지 않아요");
     expect(bootstrap).toContain("사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요");
     expect(reference).toContain("treat that as the user's goal, not as execute approval");
+    expect(reference).toContain('"question": "지금 만들고 배포까지 진행할까요?"');
+    expect(reference).toContain('"label": "진행", "value": "execute"');
+    expect(reference).toContain('"label": "취소", "value": "cancel"');
+    expect(reference).toContain("Use exactly this question, labels, values, and descriptions");
+    expect(reference).toContain("Do not paraphrase the question or invent new Korean option labels/descriptions");
   });
 
   test("asks for template when the user only gives a generic app category", () => {
@@ -249,8 +257,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("추천 후보로만 쓰고");
     expect(templateReference).toContain("Pre-bootstrap answers to concept or slug questions are not confirmation");
     expect(templateReference).toContain("bootstrap must still show `앱 이름 확인`");
-    expect(clarity).toContain("clarity 안에서 콘셉트, 앱 이름, slug, 템플릿을 대신 묻거나 확정하지 않아요");
-    expect(clarity).toContain("native Question/AskUserQuestion 을 절대 열지 말고");
+    expect(clarity).toContain("clarity 가 앱 콘셉트, 이름, slug, 템플릿을 대신 묻거나 확정하지 않아요");
     expect(clarity).toContain("새 앱 생성은 이어서 진행할게요");
     expect(clarity).toContain("question 제목 `예약 사이트 컨셉`");
     expect(clarity).toContain("질문 `새로 만들 예약 웹사이트, 어떤 컨셉으로 할까요?`");
@@ -277,6 +284,8 @@ describe("bootstrap desktop UX contract", () => {
     expect(contract).not.toContain("가벼고");
     expect(contract).not.toContain("안 격침");
     expect(contract).not.toContain("멈췤요");
+    expect(contract).not.toContain("앨 젼");
+    expect(contract).not.toContain("낹니다");
     expect(contract).toContain("가볍고 빠른 시작");
     expect(contract).toContain("진행하지 않고 멈춰요");
   });
@@ -337,14 +346,28 @@ describe("bootstrap desktop UX contract", () => {
     const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
 
     expect(bootstrap).toContain("배포 상태 대기/확인도 예외가 아니에요");
-    expect(bootstrap).toContain("`for`, `while`, `sleep`, `grep`, `cut`, `awk`, `jq`");
+    expect(bootstrap).toContain("`for`, `while`, `until`, `sleep`, `grep`, `head`, `tail`, `cut`, `awk`, `sed`, `jq`");
+    expect(bootstrap).toContain("`Monitor`, `ScheduleWakeup`, background watch");
     expect(bootstrap).toContain("상태를 다시 볼 때마다 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행");
+    expect(bootstrap).toContain("`until axhub ... | grep ...`, `axhub ... | head ...` 같은 권한 요청창이 뜨는 긴 shell watch 는 UX 실패예요");
     expect(bootstrap).toContain("성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요");
-    expect(bootstrap).toContain("실제 tool/예약 없이 `90초 후 자동 확인` 같은 말을 쓰지 않아요");
+    expect(bootstrap).toContain("deployment id 를 알면 terminal/verify 완료 전 응답을 끝내지 않아요");
     expect(localReference).toContain("Never poll deployment status with a shell loop");
+    expect(localReference).toContain("Claude Desktop Monitor, ScheduleWakeup, or any background watcher");
     expect(localReference).toContain("Run one direct `axhub deploy status <deployment-id> --tenant <tenant> --json` command per check");
+    expect(localReference).toContain("do not express the wait as `sleep`, `until`, `while`, a pipe, or a compound shell block");
+    expect(localReference).toContain("A Desktop permission request containing `until axhub deploy status`");
+    expect(bootstrap).toContain("terminal까지 봐요");
+    expect(bootstrap).toContain("verify 성공 전 최종 성공 문구 금지");
+    expect(bootstrap).toContain("`잠시 후 확인해보세요` 로 끝내기 금지");
+    expect(localReference).toContain("the known `deployment_id` becomes an owned watch");
+    expect(localReference).toContain("Do not end the response by telling the user to check later");
+    expect(localReference).toContain("Do not report final success while the deployment status is building/running/pending");
+    expect(localReference).toContain("run one direct `axhub deploy verify <deployment-id> --app <app-slug> --json` command");
     expect(localReference).toContain("Do not claim \"I'll automatically check again in 90 seconds\"");
-    expect(localReference).toContain("Do not parse JSON with `grep`, `cut`, `awk`, `sed`, or `jq` in Desktop-visible commands");
+    expect(localReference).toContain("Do not parse JSON with `grep`, `head`, `tail`, `cut`, `awk`, `sed`, or `jq` in Desktop-visible commands");
+    expect(localReference).not.toContain("--watch --watch-timeout 9m");
+    expect(localReference).not.toContain("you can check the URL later");
     expect(localReference).not.toContain("for i in $(seq");
     expect(localReference).not.toContain("grep -o '\"status\"");
     expect(localReference).not.toContain("cut -d");
@@ -413,9 +436,10 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`App get (axhub)`");
     expect(bootstrap).toContain("`Finding tools` 로 이동해서 MCP/App 도구를 찾지 않아요");
     expect(bootstrap).toContain("다른 플러그인/워크플로 상태를 정리하지 않아요");
-    expect(bootstrap).toContain("`oh-my-claudecode`, `autopilot`, `cancel`, `.omc` state tools");
-    expect(bootstrap).toContain("`Task done, now marking autopilot inactive.`");
-    expect(bootstrap).toContain("`plugin oh-my-claudecode ...`");
+    expect(bootstrap).toContain("외부 자동화·취소·state 정리 도구를 부르지 않고");
+    expect(bootstrap).toContain("chat/tool/progress 에 다른 플러그인 이름, 자동화 정리 문구");
+    expect(bootstrap).not.toContain("autopilot");
+    expect(bootstrap).not.toContain("oh-my-claudecode");
     expect(bootstrap).toContain("axhub apps get <app-slug> --tenant <tenant> --json");
     expect(bootstrap).toContain("axhub deploy verify <deployment-id> --app <app> --json");
     expect(resultReference).toContain("through `axhub apps get` CLI only");
