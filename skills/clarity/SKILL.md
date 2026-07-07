@@ -11,6 +11,8 @@ description: 'clarity: for vague axhub app-status prompts, invoke this skill bef
 
 현재 폴더에 axhub 연결(manifest)이 없고 발화에 axhub 언급도, 대화에 axhub 맥락도 없으면 — 예를 들어 일반 프로젝트에서 "로그 보여줘" — axhub CLI 탐색을 시작하지 않고 일반 작업으로 양보하며 조용히 종료해요.
 
+스킬이 호출되면 곧바로 이 지침을 실행해요. `스킬 가이드가 반환됐네요`, `스킬 가이드가 나왔네요`, `slash 명령이 실패했네요`, `이제 스킬 문서를 보고` 같은 메타 설명을 사용자에게 말하지 않아요. 첫 visible 문장은 사용자가 요청한 일을 바로 하는 말이어야 해요. 예: `앱 상태를 확인할게요. 먼저 CLI 설치 여부와 앱 목록만 빠르게 볼게요.`
+
 **CLI-only.** 이 스킬의 조회·상태 확인·운영 브리지는 Claude Desktop 에 보이는 `axhub` App/MCP 도구가 아니라 Bash/명령 도구로 실행하는 `axhub` CLI 만 사용해요. `App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)`, `Deployment status (axhub)` 같은 도구가 보여도 호출하지 않아요. read-only 조회라도 MCP/App tool 로 빠지면 CLI help gate·제목 계약·권한 UX 를 검증할 수 없어서 이 스킬의 실패예요.
 
 사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL 로만 써요. Markdown URL 링크 문법은 전부 금지예요. `[https://...](https://...)`, `[열기](https://...)`, `<https://...>` 처럼 URL 을 괄호나 label 로 감싸지 말고 `https://...` 그대로 보여줘요.
@@ -58,7 +60,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - 계정 전체 앱 상태에서는 일반 clarity 탐색을 시작하지 않아요. `axhub --json-schema`, `--help`, `keys[]`, `.commands.apps.workspace`, `.commands.apps.get`, `.commands.apps.status` 같은 schema/help 탐색을 모두 건너뛰어요.
 - 이 fast path 에서는 optional `axhub update check --json` 도 건너뛰어요. 사용자는 앱 상태 하나를 기대하므로 업데이트 새 버전 안내보다 빠른 상태 요약이 우선이에요.
 - CLI 존재 확인이 필요하면 `CLI 설치 확인` 제목으로 `command -v axhub` 또는 기존 host 의 CLI presence check 한 번만 실행해요. 그 다음 바로 `앱 상태 조회` 제목으로 `axhub apps list --page-size 5 --json` 을 실행해요. 앱이 많아도 첫 5개와 총 개수만 요약하고, 더 보려면 "더 보여줘"라고 할 수 있다고 말해요.
-- 계정 전체 앱 상태 fast path 의 정상 tool call 은 최대 2개예요: `CLI 설치 확인` 1개와 `앱 상태 조회` 1개. 이미 CLI 가 있다고 이전 단계에서 확정했으면 `앱 상태 조회` 1개만 실행해요. 3개 이상 `명령 표면 확인` 카드가 보이면 실패예요.
+- 계정 전체 앱 상태 fast path 의 정상 tool call 은 최대 2개예요: `CLI 설치 확인` 1개와 `앱 상태 조회` 1개. 이미 CLI 가 있다고 이전 단계에서 확정했으면 `앱 상태 조회` 1개만 실행해요. 정상 Desktop UI 는 `실행됨 CLI 설치 확인` 1개와 `실행됨 앱 상태 조회` 1개여야 해요. `실행됨 명령 3개`, `명령 3개`, `명령 N개`, 3개 이상 `명령 표면 확인` 카드가 보이면 실패예요.
 - `앱 상태 조회` 결과를 2-4줄 한국어로 바로 요약해요. 이때 Claude Desktop 에 보이는 실행 명령은 `axhub apps list --page-size 5 --json` 단일 leaf CLI 호출이어야 해요. `--all` 로 전체 50개 이상을 길게 뽑지 말고, `--field-expr` 가 null/0 으로 오해될 수 있으니 이 fast path 에서는 쓰지 않아요. `> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution, 임시 파일 저장/재읽기, shell wrapper 로 감싸지 않아요. tool 출력은 assistant 내부에서 읽고 요약해요.
 - 정적 앱처럼 별도 빌드 배포 이력이 없지만 URL 이 서빙 중인 항목은 `정적 사이트로 정상 서빙 중` 또는 `정적 배포 방식이라 별도 빌드 이력 없음`처럼 말해요. `배포 완료했지만 아직 첫 배포 전`처럼 서로 모순되는 표현을 쓰지 않아요.
 - `앱 상태 조회` 실행 뒤에는 Read/파일 읽기 도구로 `*.txt`, `/tmp/*`, command output snapshot, 임시 결과 파일을 열지 않아요. Claude Desktop 이 command output 을 파일로 접어 보여줘도 그 파일을 읽지 말고, 필요한 범위를 더 좁힌 `axhub ... --json` 또는 `axhub --json-schema --field-expr ...` 단일 CLI 호출을 다시 실행해요.
