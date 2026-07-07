@@ -22,6 +22,7 @@ describe("update Desktop UX contract", () => {
     expect(manifest.description).toContain("unrelated plugin mode");
     expect(manifest.description).toContain("/oh-my-claudecode:autopilot");
     expect(manifest.description).toContain("exact `axhub apps --help` then `axhub apps list --json`");
+    expect(manifest.description).toContain("plugin lookup uses exact `claude plugin list`, never `claude plugin list 2>&1`");
     expect(manifest.description).toContain("`axhub apps get <app> --json`");
     expect(manifest.description).toContain("`axhub deploy list --app <app> --json`");
     expect(manifest.description).toContain("nonexistent `axhub app list`");
@@ -49,6 +50,7 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("스킬 호출 전 사전 안내 문장도 쓰지 않아요");
     expect(update).toContain("작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요");
     expect(update).toContain("정확히 `claude plugin list` 만 실행한 출력");
+    expect(update).toContain("이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요");
     expect(update).toContain("`claude plugin list 2>&1`");
     expect(update).toContain("`claude plugin list 2>&1 | grep ...`");
     expect(update).toContain("redirect");
@@ -115,6 +117,7 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("`axhub apps --help`");
     expect(update).toContain("`axhub apps list --json`");
     expect(update).toContain("첫 overview 의 Desktop-visible Bash command 는 아래 두 개만 허용해요");
+    expect(hooks).toContain("For plugin version lookup, the visible command is exactly claude plugin list; never claude plugin list 2>&1");
     expect(update).toContain("목록에서 현재 폴더·대화와 관련된 앱을 고른 뒤에도");
     expect(update).toContain("`axhub apps get <app> --json`");
     expect(update).toContain("`axhub deploy list --app <app> --json`");
