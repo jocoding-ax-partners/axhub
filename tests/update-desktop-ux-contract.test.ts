@@ -18,8 +18,8 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("Invoke this skill before writing any explanatory assistant sentence.");
     expect(update).toContain("스킬 실행 전 사용자 문장 0개");
     expect(update).toContain("Start directly; do not explain why this path was chosen or name the chosen skill.");
-    expect(update).toContain("Mixed app-status/log/deploy requests after update still stop after version check/update");
-    expect(update).toContain('write exactly "업데이트 확인은 끝났어요. 앱 상태 확인은 별도 상태 확인 흐름에서 처리해요." and end the assistant turn');
+    expect(update).toContain("Mixed app-status/log/deploy/new-app requests after update continue after the version check/update");
+    expect(update).toContain('do not ask the user to repeat "앱 상태 확인해줘" or "배포해줘"');
     expect(update).toContain("Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요");
     expect(update).toContain("스킬 호출 전 사전 안내 문장도 쓰지 않아요");
     expect(update).toContain("작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요");
@@ -72,23 +72,23 @@ describe("update Desktop UX contract", () => {
     }
   });
 
-  test("does not continue mixed app-status requests inside update", () => {
+  test("continues mixed app-status requests after the update boundary", () => {
     const update = readRepo("skills/update/SKILL.md");
 
-    expect(update).toContain("버전 확인과 다른 axhub 운영 요청을 함께 말해도");
-    expect(update).toContain("버전 확인/업데이트 결과까지만");
-    expect(update).toContain("업데이트 확인은 끝났어요. 앱 상태 확인은 별도 상태 확인 흐름에서 처리해요.");
+    expect(update).toContain("버전 확인과 다른 axhub 운영 요청을 함께 말하면");
+    expect(update).toContain("버전 확인/업데이트 결과를 먼저");
+    expect(update).toContain("업데이트 확인은 끝났어요. 이어서 요청하신 작업을 계속할게요.");
     expect(update).toContain("`App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)`");
-    expect(update).toContain("read 작업이어도 이 스킬에서는 금지예요");
+    expect(update).toContain("read 작업이어도 update 단계에서는 금지예요");
     expect(update).toContain("원문이 영어로 `then`, `and then`, `after that`, `help me understand` 를 써도");
-    expect(update).toContain("현재 assistant turn 을 즉시 끝내요");
-    expect(update).toContain("update 실행 뒤 같은 assistant 응답 안에서 앱 목록·배포 상태 도구, 추가 Bash/MCP/App 도구");
+    expect(update).toContain("업데이트 뒤 남은 요청을 버리지 않아요");
+    expect(update).toContain("사용자의 추가 프롬프트를 기다리지 말고 다음 적절한 axhub 흐름을 시작해요");
     expect(update).toContain("`앱 상태 조회`, `배포 상태 조회`, `최근 배포 조회` 같은 tool 제목이 떠올랐다면");
-    expect(update).toContain("Task/Subagent/Agent/백그라운드 작업을 절대 만들지 않아요");
+    expect(update).toContain("Task/Subagent/Agent/백그라운드 작업으로 우회하지 않아요");
     expect(update).toContain("NEVER Task/Subagent/Agent/백그라운드 작업으로 mixed request 의 남은 앱 상태 확인을 우회하지 말아요");
-    expect(update).toContain("후속 작업을 약속하거나 실제 상태를 요약하는 문장은 쓰지 않아요");
-    expect(update).toContain("이제 이어서 앱 상태를 확인할게요");
-    expect(update).toContain("현재 앱 상태를 정리해드릴게요");
+    expect(update).toContain("update 결과 뒤 같은 assistant 흐름에서 직접 이어가요");
+    expect(update).toContain("사용자가 `앱 상태 확인해줘`, `배포해줘`, `새 앱 만들어줘` 같은 말을 다시 하지 않아도 돼요");
+    expect(update).toContain("바로 다음 axhub 흐름으로 이어가요");
     expect(update).not.toContain("다음 동작은 `clarity`");
     expect(update).not.toContain("그 다음 작업은 `clarity`");
   });
