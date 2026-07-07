@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.19](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.18...v1.10.19) (2026-07-07)
+
+Claude Code Desktop Code 모드 로컬 설치 QA에서 update skill 이 최신 확인과 앱 목록 조회까지는 잘 이어갔지만, 현재 폴더명과 일치하는 앱을 찾은 뒤에도 "어느 앱의 배포 상태를 볼까요?"라고 다시 물어보는 문제가 보였어요. 이제 폴더명·대화 맥락·최근 앱 목록으로 관련 앱이 하나로 좁혀지면 `axhub apps get <app> --json` 과 `axhub deploy list --app <app> --json` 까지 바로 실행하고, 사용자에게 앱 선택을 다시 맡기지 않도록 계약과 회귀 테스트를 잠갔어요.
+
 ## [1.10.18](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.17...v1.10.18) (2026-07-07)
 
 Claude Code Desktop Code 모드 공개 설치 QA에서 update skill 이 시작은 잘 했지만 플러그인 버전 확인 권한 카드에 `claude plugin list 2>&1` 처럼 redirect 를 붙이는 문제가 다시 보였어요. 이제 hook 과 skill 본문, marketplace 설명에서 플러그인 조회 command 를 정확히 `claude plugin list` 로 더 앞쪽에 못 박고, redirect 가 붙은 변형은 회귀 테스트가 바로 잡도록 했어요.
