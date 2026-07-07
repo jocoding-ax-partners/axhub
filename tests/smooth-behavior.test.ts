@@ -147,14 +147,17 @@ describe("smooth behavior contracts", () => {
     expect(bootstrapAndLocal).toContain("do not end the response asking the user to report approval");
     expect(bootstrapAndLocal).not.toContain("브라우저에서 승인한 다음 \"승인했어\"");
 
-    expect(deploy).toContain("axhub deploy verify <deployment-id>");
-    expect(deploy).toContain("axhub deploy verify \"$DEPLOY_ID\"");
+    expect(deploy).toContain("axhub deploy verify <deployment-id> --app <app>");
+    expect(deploy).toContain("axhub deploy verify \"$DEPLOY_ID\" --app \"$APP_ID\"");
     expect(deploy).toContain("NEVER call `axhub deploy watch`");
-    expect(deploy).toContain("bounded `axhub deploy verify \"$DEPLOY_ID\"` loop");
+    expect(deploy).toContain("bounded `axhub deploy verify \"$DEPLOY_ID\" --app \"$APP_ID\"` loop");
     expect(deploy).toContain("exit 6");
     expect(deploy).toContain("exit 7");
     expect(deploy).toContain("계속 확인할게요");
-    expect(deploy).toContain("do not end the response by asking the user to say `배포 상태 확인해줘`");
+    expect(deploy).toContain("Do not add those paths to `.gitignore`");
+    expect(deploy).toContain("If a CLI check still blocks solely because of these runtime paths");
+    expect(deploy).toContain("do not collapse polling into one long `while`/`for` shell loop");
+    expect(deploy).toContain("Do not end the response by asking the user to say `배포 상태 확인해줘`");
     expect(deploy).toContain("ScheduleWakeup");
     expect(deploy).not.toContain("suggest `배포 상태 확인해줘`");
     expect(deploy).not.toContain("'배포 상태 확인해줘'라고 말하면 이어서 볼게요");
@@ -178,7 +181,7 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("AXHUB_GATE_POLL_ITERATIONS=0 axhub plugin-support token-gate");
     expect(deploy).toContain("never wraps token-gate in `grep`, `head`, or a multi-command pipe");
     expect(deploy).toContain("Present this step as `인증 상태 확인`, not as token-gate");
-    expect(deploy).toContain("NEVER commit, push, or add `.omc/`, `.claude/`, `.codex/`, `.serena/`");
+    expect(deploy).toContain("NEVER commit, push, or add `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/`");
     expect(deploy).toContain("Never deploy a local-only commit SHA");
     expect(deploy).toContain("git push -u origin \"HEAD:$BRANCH\"");
     expect(deploy).toContain("Judge push success by exit code");
@@ -189,6 +192,10 @@ describe("smooth behavior contracts", () => {
     expect(workflowDetails).toContain("The visible environment label is `운영`");
     expect(workflowDetails).toContain("Do not show `deploy-prep`, `in-flight`, `dry-run`, `token-gate`, `execute`, `production`, `terminal success`, `gitignore`, `gitting`, `checking`, `Build passed`, `Working tree clean`, `Not ignored`, `User explicitly authorized`, `Proceeding`, or `Push 성공`");
     expect(workflowDetails).toContain("':(exclude).serena'");
+    expect(workflowDetails).toContain("':(exclude).omx'");
+    expect(workflowDetails).toContain("':(exclude).omo'");
+    expect(workflowDetails).toContain("If deploy-prep or another target check still reports only those runtime paths");
+    expect(workflowDetails).toContain("Do not combine polling into one long `while`/`for` shell loop");
     expect(workflowDetails).toContain("COMMIT_SHA=$(git rev-parse \"${COMMIT_SHA:-HEAD}^{commit}\")");
     expect(workflowDetails).toContain("git push -u origin \"HEAD:$BRANCH\"");
     expect(workflowDetails).toContain("Judge push success by `PUSH_EXIT`, not by stderr text");

@@ -252,7 +252,7 @@ capability 가 없거나 remote 가 없으면 이 질문을 건너뛰고 `커밋
 
 7. Execute 호출
 
-대화형 승인 직후 한 번만 호출해요. execute 는 가능하면 foreground 로 실행하고 완료 출력을 받을 때까지 기다려요. Claude Code Desktop 에서 tool 이 긴 실행을 background job 으로 전환하더라도, 그 background output 을 다시 읽어 `import/v1` execute envelope 를 검증하기 전에는 "완료"라고 말하지 않아요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못하면, 같은 명령을 반복 실행하지 말고 `axhub deploy verify <deployment-id>` 또는 `axhub apps git status <앱>` 같은 읽기 전용 증거로 상태를 재확인해요.
+대화형 승인 직후 한 번만 호출해요. execute 는 가능하면 foreground 로 실행하고 완료 출력을 받을 때까지 기다려요. Claude Code Desktop 에서 tool 이 긴 실행을 background job 으로 전환하더라도, 그 background output 을 다시 읽어 `import/v1` execute envelope 를 검증하기 전에는 "완료"라고 말하지 않아요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못하면, 같은 명령을 반복 실행하지 말고 `axhub deploy verify <deployment-id> --app <app>` 또는 `axhub apps git status <앱>` 같은 읽기 전용 증거로 상태를 재확인해요.
 
 `커밋 없이 진행` 이거나 commit+push 질문을 건너뛴 경우:
 
@@ -277,7 +277,7 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 
 동일 승인으로 두 번 호출하지 않아요. execute 결과도 `import/v1` 로 다시 검증해요. push 실패는 `typed_failure: git` 으로 와요(아래 9의 git 행으로 안내).
 
-권한 복구 뒤 같은 import 를 재개할 때는 preview 가 `existing_axhub_app_repair` 를 줄 수 있어요. 이 경우에도 execute 는 CLI envelope 한 번으로 처리해요. 이미 성공 deployment evidence 가 있거나 방금 execute 가 `deployment_id` 를 반환했으면, 그 id 로 `axhub deploy verify <deployment-id>` 를 한 번 더 읽어 최종 증거를 확인하고 끝내요.
+권한 복구 뒤 같은 import 를 재개할 때는 preview 가 `existing_axhub_app_repair` 를 줄 수 있어요. 이 경우에도 execute 는 CLI envelope 한 번으로 처리해요. 이미 성공 deployment evidence 가 있거나 방금 execute 가 `deployment_id` 를 반환했으면, 그 id 와 앱 scope 로 `axhub deploy verify <deployment-id> --app <app>` 를 한 번 더 읽어 최종 증거를 확인하고 끝내요.
 
 8. 성공 안내
 

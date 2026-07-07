@@ -149,7 +149,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`axhub` CLI 상태 명령만 써요");
     expect(bootstrap).toContain("axhub apps bootstrap-status");
     expect(bootstrap).toContain("axhub deploy status <deployment-id>");
-    expect(bootstrap).toContain("axhub deploy verify <deployment-id>");
+    expect(bootstrap).toContain("axhub deploy verify <deployment-id> --app <app>");
     expect(bootstrap).toContain("재시도는 최대 1회예요");
     expect(bootstrap).toContain("새 앱을 다시 만들지 않아요");
   });
@@ -408,7 +408,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`Task done, now marking autopilot inactive.`");
     expect(bootstrap).toContain("`plugin oh-my-claudecode ...`");
     expect(bootstrap).toContain("axhub apps get <app-slug> --tenant <tenant> --json");
-    expect(bootstrap).toContain("axhub deploy verify <deployment-id> --json");
+    expect(bootstrap).toContain("axhub deploy verify <deployment-id> --app <app> --json");
     expect(resultReference).toContain("through `axhub apps get` CLI only");
     expect(resultReference).toContain("Do not use `App get (axhub)`");
   });

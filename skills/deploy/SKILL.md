@@ -164,6 +164,8 @@ Preview card is interactive only and must show app, environment, branch, commit,
 
 Before showing the preview, make sure the commit is actually reachable from the remote branch that axhub will build. Normalize any short commit to the full local SHA (`git rev-parse "$COMMIT_SHA^{commit}"` or `git rev-parse HEAD`) and use the full SHA for remote containment and `axhub deploy create`. If the branch has an existing `origin` remote/upstream and local commits are ahead, push with `git push -u origin "HEAD:$BRANCH"` first, refresh `origin/<branch>`, and confirm `git merge-base --is-ancestor "$COMMIT_SHA" "origin/$BRANCH"` (or an equivalent remote containment check) before preview/create. Judge push success by exit code, not by stderr text such as harmless hook warnings. Never deploy a local-only commit SHA; if push or remote containment fails, stop before mutation and say the remote commit is not ready yet.
 
+Runtime-only dirty entries are a hard exception. `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/` and similar local agent state are not app code and are not deploy-affecting. If `git status`, `deploy-prep`, or a target check reports only those paths, treat the app commit as clean enough for deploy. Do not add those paths to `.gitignore`, do not create a cleanup commit for them, and do not ask the user to approve that cleanup. If a CLI check still blocks solely because of these runtime paths, stop with a concise CLI-gap note instead of mutating the user's repository.
+
 Before execute, run:
 
 ```bash
@@ -193,11 +195,11 @@ Deployment-record success is declared only by `axhub deploy verify` with the bou
 ```bash
 echo "배포 결과를 확인하고 있어요." >&2
 VERIFY_OUT=$(mktemp)
-axhub deploy verify "$DEPLOY_ID" > "$VERIFY_OUT" 2>&1
+axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" > "$VERIFY_OUT" 2>&1
 VERIFY_EXIT=$?
 ```
 
-Do not use latest lookup. Current CLI resolves the exact deployment id to its app scope when needed, so the happy path is `axhub deploy verify "$DEPLOY_ID"` without `--app`. Do not call `axhub deploy watch` or `axhub deploy status --watch` from this skill; Desktop/non-TTY watch paths can degrade or require extra flags. If verify exits `6`, say `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same verify command until terminal success/failure or a bounded timeout. Prefer separate short tool calls or a real ScheduleWakeup when available; do not end the response by asking the user to say `배포 상태 확인해줘`. If the bounded timeout is reached while the deploy is still running, schedule a follow-up check when the host supports it; otherwise say `아직 진행 중이에요. 여기서 실패로 보지 않고, 제가 확인 가능한 범위까지는 같은 배포를 지켜봤어요.` and keep the `DEPLOY_ID` visible enough for a future status request. Do not claim success from deploy-create stdout, status snapshots, watch output, or prose polling; verify 전에는 성공을 선언하지 않아요. If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
+Do not use latest lookup. Always pass the app scope from the same resolved target: `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"`. If app scope is missing, stop instead of running a bare verify. Do not call `axhub deploy watch` or `axhub deploy status --watch` from this skill; Desktop/non-TTY watch paths can degrade or require extra flags. If verify exits `6`, say `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same scoped verify command until terminal success/failure or a bounded timeout. Prefer separate short tool calls or a real ScheduleWakeup when available; do not collapse polling into one long `while`/`for` shell loop with `MAX_ATTEMPTS`, command substitution, or shell expansion. Do not end the response by asking the user to say `배포 상태 확인해줘`. If the bounded timeout is reached while the deploy is still running, schedule a follow-up check when the host supports it; otherwise say `아직 진행 중이에요. 여기서 실패로 보지 않고, 제가 확인 가능한 범위까지는 같은 배포를 지켜봤어요.` and keep the `DEPLOY_ID` visible enough for a future status request. Do not claim success from deploy-create stdout, status snapshots, watch output, or prose polling; verify 전에는 성공을 선언하지 않아요. If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
 
 Verify exits:
 
@@ -230,9 +232,9 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop JSON/field-expr parsing contracts where a command result is parsed.
 - NEVER call `axhub deploy create --execute` without the interactive AskUserQuestion preview decision. Headless is exempt only because it must stay dry-run and must not use `--execute`.
-- NEVER call `axhub deploy watch` or `axhub deploy status --watch` from this skill. In-flight and webhook-triggered deployments use the bounded `axhub deploy verify "$DEPLOY_ID"` loop.
-- NEVER declare deploy success from deploy-create stdout, status snapshots, watch output, or prose polling. Deployment-record success declaration is terminal `axhub deploy verify <deployment-id>`.
-- NEVER call `axhub deploy verify` without a deployment id. Latest 재탐색 금지.
+- NEVER call `axhub deploy watch` or `axhub deploy status --watch` from this skill. In-flight and webhook-triggered deployments use the bounded `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` loop.
+- NEVER declare deploy success from deploy-create stdout, status snapshots, watch output, or prose polling. Deployment-record success declaration is terminal `axhub deploy verify <deployment-id> --app <app>`.
+- NEVER call `axhub deploy verify` without both a deployment id and the resolved app scope. Latest 재탐색 금지.
 - NEVER call `axhub deploy verify` in static lane (`deploy_method=static`). Static is release-based, not deployment-record-based, and success is `apps static deploy --execute` activate with `active_release_id`.
 - NEVER send non-static apps to static lane. Empty or unsupported `deploy_method` uses the normal deployment-record pipeline.
 - NEVER call `apps static deploy --execute` without static dry-run preview plus interactive approval. Headless static lane is dry-run only.
@@ -245,6 +247,7 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 - NEVER insert the old approved-run helper bridge between preview approval and the canonical workflow; approval flows into `deploy-prep`, public `axhub deploy create --execute`, and verify.
 - NEVER call MCP deployment mutation tools such as `deployment_trigger`; deploy is CLI-only.
 - NEVER use advisor/server advisor/subagent/model escalation to choose or execute deploy; use CLI envelopes only.
-- NEVER commit, push, or add `.omc/`, `.claude/`, `.codex/`, `.serena/`, or other local agent/runtime state as part of deploy cleanup. Ignore those paths when deciding whether app code is clean enough to deploy; if they are the only dirty entries, proceed with the tracked app commit and mention local cleanup only after deployment.
+- NEVER commit, push, or add `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/`, or other local agent/runtime state as part of deploy cleanup. Ignore those paths when deciding whether app code is clean enough to deploy; if they are the only dirty entries, proceed with the tracked app commit and mention local cleanup only after deployment.
 - NEVER call `axhub deploy create --execute` for a commit that is only local. AxHub resolves commits from the connected GitHub repo; local-only commits fail in prod with commit-not-found.
 - NEVER pipe `axhub plugin-support token-gate`, `axhub deploy create`, or `axhub deploy verify` through `grep`, `head`, or filters that can make a successful command look failed or make a waiting command look hung.
+- NEVER combine deploy polling into one long shell loop that asks Claude Desktop for a broad `run` permission card. Use one scoped verify command per check or a real host wakeup.

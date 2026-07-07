@@ -40,7 +40,7 @@ creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps c
 - Echo 금지: `schema_version`, `bootstrap_id`, `deployment_id`, `request_id`, `idempotency_key`, `installation_id`, `device_code`.
 - 예외: GitHub device-flow event 가 나오면 `verification_uri` 또는 `verification_uri_complete`, `user_code`, 대략적인 만료 시간은 즉시 humanize 해서 보여줘요.
 - 사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL; Markdown URL 링크 문법은 전부 금지; 도메인-only target 금지: `[https://x](https://x)`, `[열기](https://x)`, `<https://x>`.
-- 이 스킬은 CLI-only 흐름이에요. `App get (axhub)`, `App list`, deployment MCP 호출 금지. 배포 상태·검증은 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --json`, 앱 상세·URL 확인은 `axhub apps get <app-slug> --tenant <tenant> --json` 또는 `--field-expr`. `Finding tools` 로 이동해서 MCP/App 도구를 찾지 않아요.
+- 이 스킬은 CLI-only 흐름이에요. `App get (axhub)`, `App list`, deployment MCP 호출 금지. 배포 상태·검증은 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --app <app> --json`, 앱 상세·URL 확인은 `axhub apps get <app-slug> --tenant <tenant> --json` 또는 `--field-expr`. `Finding tools` 로 이동해서 MCP/App 도구를 찾지 않아요.
 - 다른 플러그인/워크플로 상태를 정리하지 않아요. `oh-my-claudecode`, `autopilot`, `cancel`, `.omc` state tools 로 call/cleanup 금지. chat/tool/progress 금지: `Task done, now marking autopilot inactive.`, `Finding tools`, `plugin oh-my-claudecode ...`.
 
 ## Fresh Workflow
@@ -174,7 +174,7 @@ Claude Desktop 에서 `앱 생성 진행`/`앱 생성 재시도` tool 이 `백�
 복구 명령도 `rtk`, `curl`, `pwd`, `ls`, `find`, `cat` 같은 generic probe 로 빠지지 않아요. `axhub` CLI 상태 명령만 써요.
 
 1. 출력에서 `bootstrap_id` 를 확인할 수 있으면 `axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json`.
-2. 출력에서 `deployment_id` 를 확인할 수 있으면 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --json`.
+2. 출력에서 `deployment_id` 를 확인할 수 있으면 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --app <app> --json`.
 3. 둘 다 없고 오류가 timeout/network 계열일 때만 같은 idempotency key 로 execute 를 한 번 재시도해요. 재시도는 최대 1회예요.
 4. 나중에 상태 명령이 `succeeded` 를 반환하면 "앱 생성은 완료됐어요" 로 복구 보고하고, 새 앱을 다시 만들지 않아요.
 
