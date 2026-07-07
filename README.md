@@ -93,7 +93,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 ## 🧩 8개 스킬
 
-플러그인은 8개 스킬을 담아요. `onboarding`·`bootstrap`·`deploy` 세 핵심 플로우, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import`, 기존 앱에 실데이터(connector·table) 기반 기능 코드를 만드는 `development`, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis`, CLI·플러그인을 지금 최신으로 올리는 `update`, 그리고 나머지 스킬에 명확히 안 맞거나 의도가 불분명한 axhub 요청을 라이브로 찾아 처리하는 `clarity` 브리지예요.
+플러그인은 8개 스킬을 담아요. `onboarding`·`bootstrap`·`deploy` 세 핵심 플로우, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import`, 기존 앱에 실데이터(connector·table) 기반 기능 코드를 만드는 `development`, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis`, CLI·플러그인을 지금 최신으로 올리는 `update`, 그리고 로그·환경변수·롤백·테이블·connector grant·GitHub 재연결 같은 명시적 운영 명령을 라이브로 찾아 처리하는 `clarity` 브리지예요.
 
 | 스킬 | 언제 | 자연어 예시 |
 |------|------|-------------|
@@ -103,23 +103,23 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 | `import` | 기존 로컬 앱 가져오기 | "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app" |
 | `development` | 기존 앱에 실데이터 기능 코딩 | "내 connector 데이터로 대시보드 만들어줘", "유저 목록 페이지 만들어줘", "결제 입력 폼 만들어줘" |
 | `diagnosis` | 배포 실패 원인 진단 | "배포 실패 원인 진단해줘", "왜 배포가 죽었어", "이 앱 배포 실패 진단해줘" |
-| `clarity` | 그 외 전부 + 모호한 axhub 발화 | "환경변수 설정해줘", "로그 보여줘", "롤백해줘", "axhub로 뭔가 해줘" |
+| `clarity` | 공개 CLI 운영 브리지 | "환경변수 설정해줘", "로그 보여줘", "롤백해줘", "GitHub 계정 다시 연결해줘" |
 | `update` | CLI·플러그인 최신화 | "업데이트해줘", "axhub 최신 버전으로", "플러그인 업데이트해줘" |
 
 `clarity` 브리지는 정해진 명령 목록을 들고 있지 않아요. `axhub --help` 트리를 라이브로 탐색해 맞는 명령을 찾고 바로 실행해요 — CLI 가 새 명령을 추가해도 플러그인 수정 없이 따라가요. 단, 배포 실패 원인을 명시적으로 묻는 요청은 `diagnosis` 가 맡고 raw 로그 대신 여섯 가지 결과로 요약해요.
 
-Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 특히 "내 앱들이 지금 어떤 상태인지 모르겠어", "내 앱들 알아서 봐줘", "전체 앱 상태 봐줘" 같은 상태 요청은 `clarity` 가 `axhub` CLI 로 처리하고, `Tenant recent deployments`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않아요.
+Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 버전·최신 확인이 들어간 요청은 언제나 `update` 가 먼저 끝나요. 업데이트 뒤 같은 요청에 앱 현황 확인이 남아 있으면 존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 이어가요. `| head`, `2>/dev/null`, `grep` 같은 shell 후처리를 붙이지 않아요. 로그·환경변수·롤백·GitHub 재연결 같은 후속 운영 작업도 `Tenant recent deployments`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요.
 
 ## ✅ 대표 여정과 UX 샘플
 
-대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. 각 단계는 `onboarding` 이 CLI·로그인·환경을 detect-first 로 확인하고, `bootstrap` 이 앱 생성과 첫 배포를 이어가며, `deploy` 가 preview-confirm 뒤 `axhub deploy verify <deployment-id> --app <app>` 로 성공을 확정하고, 이후 상태·로그·환경변수 같은 나머지 작업은 `clarity` 가 공개 CLI 표면에서 찾아 처리해요.
+대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. 각 단계는 `onboarding` 이 CLI·로그인·환경을 detect-first 로 확인하고, `bootstrap` 이 앱 생성과 첫 배포를 이어가며, `deploy` 가 preview-confirm 뒤 `axhub deploy verify <deployment-id> --app <app>` 로 성공을 확정하고, 이후 로그·환경변수·롤백 같은 나머지 운영 작업은 `clarity` 가 공개 CLI 표면에서 찾아 처리해요.
 
 | 대표 단계 | 담당 스킬 | 확인 계약 |
 |---|---|---|
 | 첫 셋업 | `onboarding` | `onboarding-detect` 로 detect-first 확인 후 CLI missing/old 를 복구해요. axhub MCP 를 새로 등록하면 재시작 안내로 마무리하고, 재시작한 새 세션이 온보딩 마무리를 먼저 제안해요. |
 | 앱 생성 | `bootstrap` | `apps bootstrap` saga 로 앱·repo·첫 배포를 이어가고 raw JSON/stderr 를 숨겨요. |
 | 배포 | `deploy` | preview-confirm 뒤 실행하고 `axhub deploy verify <deployment-id> --app <app>` exit 0 전에는 성공을 말하지 않아요. |
-| 상태 확인 | `clarity` | 공개 `--json-schema` / `--help` 표면에서 상태·로그 명령을 찾아요. |
+| 상태 확인 | `deploy` | 배포 id 기준 verify/watch 흐름으로 완료까지 확인해요. |
 
 한국어 UX 샘플은 정확히 세 가지 상황만 대표로 고정해요.
 
@@ -131,7 +131,7 @@ Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 
 
 ## 💬 자연어로 할 수 있는 일
 
-명령어를 외울 필요 없어요. 평소 말투로 말하면 8개 스킬 중 맞는 곳으로 연결되고, 나머지 스킬 범위 밖이거나 의도가 모호하면 `clarity` 브리지가 axhub 명령을 직접 찾아 실행해요.
+명령어를 외울 필요 없어요. 평소 말투로 말하면 8개 스킬 중 맞는 곳으로 연결돼요. CLI·플러그인 최신 확인은 `update` 가 먼저 맡고, 로그·환경변수·롤백·테이블·GitHub 재연결처럼 명시된 운영 명령은 `clarity` 브리지가 axhub 명령을 직접 찾아 실행해요.
 
 - **배포하고 운영하기** — "내 앱 배포해", "방금 배포 어떻게 됐어?", "빌드 로그 보여줘", "이전 버전으로 되돌려줘"
 - **배포 실패 진단** — "배포 실패 원인 진단해줘", "왜 배포가 죽었어?", "이 앱 배포 실패 진단해줘"
@@ -158,7 +158,7 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요.
 - 자체 인증·배포 로직을 재구현하지 않아요. CLI 를 **invoke** 하고 결과를 **분류·복구 안내**할 뿐이에요.
 - CLI 가 새 기능을 내면 자연어 트리거만 더하면 돼요 — `clarity` 브리지는 그것조차 자동이에요.
 
-이전에는 플러그인이 Rust helper 바이너리·hook·NL 라우팅 코퍼스를 동봉했지만, v1 다이어트에서 전부 제거하고 `ax-hub-cli` 직접 호출로 전환했어요. 흡수된 helper 표면은 CLI 의 hidden `axhub plugin-support <cmd>` 그룹으로 옮겼어요. 이후 cheap bash SessionStart 훅 2개만 다시 들어왔어요 — 세션 시작 때 CLI·플러그인 업데이트를 확인하는 auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1`)과, MCP 등록 후 재시작한 새 세션이 온보딩 마무리를 먼저 제안하는 onboarding resume 훅(끄기: `AXHUB_NO_ONBOARDING_RESUME=1`)이에요.
+이전에는 플러그인이 Rust helper 바이너리·hook·NL 라우팅 코퍼스를 동봉했지만, v1 다이어트에서 전부 제거하고 `ax-hub-cli` 직접 호출로 전환했어요. 흡수된 helper 표면은 CLI 의 hidden `axhub plugin-support <cmd>` 그룹으로 옮겼어요. 이후 cheap bash 훅만 아주 좁게 다시 들어왔어요 — 세션 시작 때 CLI·플러그인 업데이트를 확인하는 auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1`), MCP 등록 후 재시작한 새 세션이 온보딩 마무리를 먼저 제안하는 onboarding resume 훅(끄기: `AXHUB_NO_ONBOARDING_RESUME=1`), Windows Git Bash 실행 계약 훅(끄기: `AXHUB_NO_WINDOWS_CONTRACT=1`), 그리고 최신·버전·업데이트 요청이 axhub App/MCP 도구보다 `update` 스킬을 먼저 타게 하는 Code-mode update router guard(끄기: `AXHUB_NO_UPDATE_ROUTER=1`)예요. 이 guard 는 SessionStart fallback 과 UserPromptSubmit match 로 라우팅 문맥만 추가하고, 명령을 실행하거나 앱 목록을 조회하지 않아요. 이 경로에서 사용자에게 보이는 첫 문장은 `현재 버전을 확인할게요.` 예요.
 
 ---
 

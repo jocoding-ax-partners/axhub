@@ -13,7 +13,7 @@ describe("clarity device flow UX contract", () => {
     expect(clarity).toContain("일반 채팅 본문에 URL과 입력 코드를 다시 써요");
     expect(clarity).toContain("shell loop, background watcher, persistent monitor 를 쓰지 않아요");
     expect(clarity).toContain("`Monitor 사용` 권한 카드가 뜨는 명령은 실패");
-    expect(clarity).toContain("device flow fast path 에서는 Step 1a 의 optional `axhub update check --json` 버전 확인을 건너뛰어요");
+    expect(clarity).toContain("device flow fast path 에서는 다른 사전 점검을 건너뛰어요");
     expect(clarity).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>");
     expect(clarity).toContain("device flow 를 시작하는 Bash/tool call 제목은 정확히 `계정 인증 시작`");
     expect(clarity).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
@@ -27,7 +27,6 @@ describe("clarity device flow UX contract", () => {
     expect(clarity).toContain("승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요");
     expect(clarity).toContain("device_code 같은 내부 교환용 값은 절대 쓰지 않아요");
     expect(clarity).toContain("axhub github link");
-    expect(clarity).toContain("CLI 설치 확인");
-    expect(clarity).toContain("`axhubed CLI 설치 확인`, `axhubing CLI 설치 확인` 같은 자동 제목이 보이면");
+    expect(clarity).not.toContain("operational-lookups.md");
   });
 });

@@ -41,14 +41,37 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("3개 스킬");
     }
     expect(descriptions.join("\n")).toContain("onboarding/bootstrap/deploy/import/development/diagnosis/clarity/update");
-    expect(pluginJson.description).toContain("`내 앱들이 지금 어떤 상태인지 모르겠어`");
-    expect(pluginJson.description).toContain("Before finding or calling tools for vague app-status prompts");
-    expect(pluginJson.description).toContain("clarity 스킬로 라우팅");
-    expect(pluginJson.description).toContain("Claude Desktop axhub App/MCP 도구");
-    expect(pluginJson.description).toContain("`Tenant recent deployments`, `App list`, `App get`");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("Vague app-status requests");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("Before finding or calling tools for vague app-status requests");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("must not use Claude Desktop axhub App/MCP tools");
+    expect(pluginJson.description).toContain("Natural-language axhub requests should route to one of onboarding/bootstrap/deploy/import/development/diagnosis/update");
+    expect(pluginJson.description).toContain("clarity is manual/explicit-only");
+    expect(pluginJson.description).toContain("Routing priority is strict");
+    expect(pluginJson.description).toContain("ordinary Code-mode shell work");
+    expect(pluginJson.description).toContain("invoke the axhub update skill first");
+    expect(pluginJson.description).toContain("first visible assistant text is exactly `현재 버전을 확인할게요.`");
+    expect(pluginJson.description).toContain("Never start freshness prompts with `Using /axhub:clarity`");
+    expect(pluginJson.description).toContain("run scripts, shell/version probes, app-status tools");
+    expect(pluginJson.description).toContain("Claude Desktop axhub App/MCP tools");
+    expect(pluginJson.description).toContain("unrelated plugin mode");
+    expect(pluginJson.description).toContain("/oh-my-claudecode:autopilot");
+    expect(pluginJson.description).toContain("exact `axhub apps --help` then `axhub apps list --json`");
+    expect(pluginJson.description).toContain("nonexistent `axhub app list`");
+    expect(pluginJson.description).toContain("never pipes or redirects");
+    expect(pluginJson.description).not.toContain("`내 앱들이 지금 어떤 상태인지 모르겠어`");
+    expect(pluginJson.description).not.toContain("Before finding or calling tools for vague app-status prompts");
+    expect(pluginJson.description).not.toContain("clarity 스킬로 라우팅");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("Natural-language axhub requests should route to one of onboarding/bootstrap/deploy/import/development/diagnosis/update");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("clarity is manual/explicit-only");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("Routing priority is strict");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("ordinary Code-mode shell work");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("invoke the update skill first");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("first visible assistant text is exactly `현재 버전을 확인할게요.`");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("Never start freshness prompts with `Using /axhub:clarity`");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("Claude Desktop axhub App/MCP tools");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("/oh-my-claudecode:autopilot");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("exact `axhub apps --help` then `axhub apps list --json`");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("nonexistent `axhub app list`");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("never pipes or redirects");
+    expect(marketplace.plugins[0]?.description ?? "").not.toContain("Vague app-status requests");
+    expect(marketplace.plugins[0]?.description ?? "").not.toContain("Before finding or calling tools for vague app-status requests");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {
@@ -60,12 +83,17 @@ describe("smooth behavior contracts", () => {
     expect(agents).toContain("첫 셋업 → 앱 생성 → 배포 → 상태 확인");
     expect(claude).toContain("첫 셋업 → 앱 생성 → 배포 → 상태 확인");
     expect(readme).toContain("Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only");
-    expect(readme).toContain("`Tenant recent deployments`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않아요");
+    expect(readme).toContain("버전·최신 확인이 들어간 요청은 언제나 `update` 가 먼저 끝나요");
+    expect(readme).toContain("존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help`");
+    expect(readme).toContain("정확히 `axhub apps list --json` 읽기 전용 명령으로 이어가요");
+    expect(readme).toContain("`| head`, `2>/dev/null`, `grep` 같은 shell 후처리를 붙이지 않아요");
+    expect(readme).not.toContain("내 앱들이 지금 어떤 상태인지 모르겠어");
+    expect(readme).toContain("`Tenant recent deployments`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요");
     const flowRows = [
       "| 첫 셋업 | `onboarding` |",
       "| 앱 생성 | `bootstrap` |",
       "| 배포 | `deploy` |",
-      "| 상태 확인 | `clarity` |",
+      "| 상태 확인 | `deploy` |",
     ];
     let previousIndex = -1;
     for (const row of flowRows) {
@@ -86,6 +114,7 @@ describe("smooth behavior contracts", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
     const deploy = readRepo("skills/deploy/SKILL.md");
     const clarity = readRepo("skills/clarity/SKILL.md");
+    const clarityFrontmatter = clarity.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
     const diagnosis = readRepo("skills/diagnosis/SKILL.md");
     const importSkill = readRepo("skills/import/SKILL.md");
     const onboardingAuth = readRepo("skills/onboarding/references/install-channels-and-auth.md");
@@ -131,9 +160,10 @@ describe("smooth behavior contracts", () => {
     expect(bootstrap).toContain("Markdown URL 링크 문법은 전부 금지");
     expect(bootstrap).toContain("[https://x](https://x)`, `[열기](https://x)`, `<https://x>`");
     expect(bootstrap).toContain("다른 플러그인/워크플로 상태를 정리하지 않아요");
-    expect(bootstrap).toContain("`oh-my-claudecode`, `autopilot`, `cancel`, `.omc` state tools");
-    expect(bootstrap).toContain("`Task done, now marking autopilot inactive.`");
-    expect(bootstrap).toContain("`plugin oh-my-claudecode ...`");
+    expect(bootstrap).toContain("외부 자동화·취소·state 정리 도구를 부르지 않고");
+    expect(bootstrap).toContain("chat/tool/progress 에 다른 플러그인 이름, 자동화 정리 문구");
+    expect(bootstrap).not.toContain("autopilot");
+    expect(bootstrap).not.toContain("oh-my-claudecode");
     expect(bootstrap).toContain('axhub publish --app "$APP_SLUG" --visibility public --execute --json');
     expect(bootstrap).toContain("publish dry-run 을 먼저 호출하지 않고");
     expect(bootstrap).toContain("`Dry-run 기본값` 같은 내부 CLI dry-run semantics");
@@ -156,7 +186,7 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("계속 확인할게요");
     expect(deploy).toContain("Do not add those paths to `.gitignore`");
     expect(deploy).toContain("If a CLI check still blocks solely because of these runtime paths");
-    expect(deploy).toContain("do not collapse polling into one long `while`/`for` shell loop");
+    expect(deploy).toContain("do not collapse polling into one long `while`/`for`/`until` shell loop");
     expect(deploy).toContain("Do not end the response by asking the user to say `배포 상태 확인해줘`");
     expect(deploy).toContain("ScheduleWakeup");
     expect(deploy).not.toContain("suggest `배포 상태 확인해줘`");
@@ -196,6 +226,8 @@ describe("smooth behavior contracts", () => {
     expect(workflowDetails).toContain("':(exclude).omo'");
     expect(workflowDetails).toContain("If deploy-prep or another target check still reports only those runtime paths");
     expect(workflowDetails).toContain("Do not combine polling into one long `while`/`for` shell loop");
+    expect(workflowDetails).toContain("do not collapse polling into one long `while`/`for`/`until` shell loop");
+    expect(workflowDetails).toContain("A Claude Desktop permission request for a long polling shell block is a failed watch UX");
     expect(workflowDetails).toContain("COMMIT_SHA=$(git rev-parse \"${COMMIT_SHA:-HEAD}^{commit}\")");
     expect(workflowDetails).toContain("git push -u origin \"HEAD:$BRANCH\"");
     expect(workflowDetails).toContain("Judge push success by `PUSH_EXIT`, not by stderr text");
@@ -261,10 +293,9 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("공개 표면만");
     expect(clarity).toContain("plugin-support");
     expect(clarity).toContain("탐색·실행 대상이 아니에요");
-    expect(clarity).toContain("invoke this skill before finding or calling any tools");
+    expect(clarity).toContain("로그, 환경변수, 롤백, 테이블/컬럼/데이터, connector grant, GitHub 재연결");
     expect(clarity).toContain("**CLI-only.**");
     expect(clarity).toContain("Bash/명령 도구로 실행하는 `axhub` CLI 만 사용");
-    expect(clarity).toContain("`App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)`, `Deployment status (axhub)`");
     expect(clarity).toContain("read-only 조회라도 MCP/App tool 로 빠지면");
     expect(clarity).toContain("**Desktop-visible command allowlist.**");
     expect(clarity).toContain("탐색(`--json-schema`), 사용법 확인(`--help`), 실행(`--json`) 모두 공통");
@@ -273,71 +304,30 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("`--field-expr` 문자열 내부의 `|` 는 허용되지만 shell pipe 로 출력 후처리하면 실패");
     expect(clarity).toContain("출력이 크면 `head -c` 로 자르지 말고 더 좁은 `--field-expr` 경로");
     expect(clarity).toContain("Use the axhub clarity skill");
-    expect(clarity).toContain("show current app status");
-    expect(clarity).toContain("is production healthy?");
+    expect(clarity).toContain("Show logs for <app>");
+    expect(clarity).toContain("set an environment variable");
     expect(clarity).toContain("reconnect my GitHub account with axhub");
     expect(clarity).toContain("GitHub device code");
-    expect(clarity).toContain("영어로 clarity skill 이나 GitHub 계정 재연결을 직접 지정한 요청도 반드시 이 스킬로 라우팅");
+    expect(clarity).toContain("사용자가 아래처럼 영어로 직접 clarity 를 지목해도 이 스킬을 실행");
     expect(clarity).toContain("직전 답변을 재사용해서 끝내지 말고");
+    expect(clarityFrontmatter).toContain("disable-model-invocation: true");
+    expect(clarity).toContain("사용자 수동 slash 또는 명시적 지목 때만 실행해요");
     expect(clarity).toContain("slash 명령이 실패한 직후라도 자연어 요청은 독립된 새 요청으로 취급");
     expect(clarity).toContain("`스킬 가이드가 반환됐네요`");
     expect(clarity).toContain("메타 설명을 사용자에게 말하지 않아요");
     expect(clarity).toContain("첫 visible 문장은 사용자가 요청한 일을 바로 하는 말");
-    expect(clarity).toContain("상태 확인 범위에서 멈춰요");
-    expect(clarity).toContain("최근 배포 이력 전체, 로그, 실패 커밋 분석까지 확장하지 않아요");
-    expect(clarity).toContain("최근 배포 시도는 실패했지만 현재 운영은 정상이에요");
-    expect(clarity).toContain("앱 상태 조회와 새 앱 생성이 한 요청에 섞이면 clarity 는 상태만 조회하고");
-    expect(clarity).toContain("concept/name/slug/template 질문 없이 bootstrap 으로 넘겨요");
-    expect(clarity).toContain("native Question/AskUserQuestion 을 절대 열지 말고");
+    expect(clarity).toContain("새 앱 생성을 clarity 가 직접 질문");
+    expect(clarity).toContain("concept/name/slug/template 추천 질문을 만들지 않아요");
     expect(clarity).toContain("question 제목 `예약 사이트 컨셉`");
     expect(clarity).toContain("질문 `새로 만들 예약 웹사이트, 어떤 컨셉으로 할까요?`");
     expect(clarity).toContain("추천 후보는 bootstrap 이 묻고 clarity 는 만들지 않아요");
-    expect(clarity).toContain("단순 상태 확인은 대표 여정의 마지막 조회 단계라 **빠른 경로**");
-    expect(clarity).toContain("계정 전체 상태 요청도 빠른 경로예요");
-    expect(clarity).toContain("프로젝트 폴더를 스캔하지 말아요");
-    expect(clarity).toContain("영어로 `app status` 처럼 특정 앱을 말하지 않고 앱 목록·상태를 묻는다면");
-    expect(clarity).toContain("일반 clarity 탐색을 시작하지 않아요");
-    expect(clarity).toContain("`axhub --json-schema`, `--help`, `keys[]`, `.commands.apps.workspace`, `.commands.apps.get`, `.commands.apps.status` 같은 schema/help 탐색을 모두 건너뛰어요");
-    expect(clarity).toContain("optional `axhub update check --json` 도 건너뛰어요");
-    expect(clarity).toContain("바로 `앱 상태 조회` 제목으로 `axhub apps list --page-size 5 --json`");
-    expect(clarity).toContain("계정 전체 앱 상태 fast path 의 정상 tool call 은 최대 2개예요");
-    expect(clarity).toContain("정상 Desktop UI 는 `실행됨 CLI 설치 확인` 1개와 `실행됨 앱 상태 조회` 1개");
-    expect(clarity).toContain("`실행됨 명령 3개`, `명령 3개`, `명령 N개`");
-    expect(clarity).toContain("3개 이상 `명령 표면 확인` 카드가 보이면 실패예요");
-    expect(clarity).toContain("`--all` 로 전체 50개 이상을 길게 뽑지 말고");
-    expect(clarity).toContain("`--field-expr` 가 null/0 으로 오해될 수 있으니 이 fast path 에서는 쓰지 않아요");
-    expect(clarity).toContain("정적 사이트로 정상 서빙 중");
-    expect(clarity).toContain("정적 배포 방식이라 별도 빌드 이력 없음");
-    expect(clarity).toContain("`배포 완료했지만 아직 첫 배포 전`처럼 서로 모순되는 표현을 쓰지 않아요");
-    expect(clarity).toContain("디렉토리 구조 확인");
-    expect(clarity).toContain("`ls`, `find`, `pwd` 류 명령을 쓰지 않아요");
-    expect(clarity).toContain("계정 전체 상태 조회 중에는 `App list (axhub)` 또는 `Tenant recent deployments (axhub)`");
-    expect(clarity).toContain("반드시 `axhub apps list --page-size 5 --json` CLI 로 확인해요");
-    expect(clarity).toContain("현재 요청 결과만 요약해요");
-    expect(clarity).toContain("이전 Task/Subagent/Agent/백그라운드 작업");
-    expect(clarity).toContain("백그라운드 검색 작업");
-    expect(clarity).toContain("TaskOutput 결과를 언급하지 않아요");
-    expect(clarity).toContain("단일 leaf CLI 호출");
-    expect(clarity).toContain("`> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution");
-    expect(clarity).toContain("tool 출력은 assistant 내부에서 읽고 요약");
-    expect(clarity).toContain("Read/파일 읽기 도구로 `*.txt`, `/tmp/*`, command output snapshot, 임시 결과 파일을 열지 않아요");
-    expect(clarity).toContain("Claude Desktop 이 command output 을 파일로 접어 보여줘도 그 파일을 읽지 말고");
-    expect(clarity).toContain("tool call 이 4개를 넘기면 멈추고");
-    expect(clarity).toContain("전체 `--json-schema` 탐색으로 돌아가지 말고");
-    expect(clarity).toContain("먼저 `앱 상태 조회` 제목으로 앱 상세 조회 help gate 를 통과");
-    expect(clarity).toContain("운영 배포 확인이 추가로 필요할 때만 `운영 상태 확인` 제목");
-    expect(clarity).toContain("현재 폴더/현재 앱 예외");
-    expect(clarity).toContain("현재 Code workspace 의 `axhub.yaml` 또는 이미 확인한 앱 바인딩을 먼저 읽고");
-    expect(clarity).toContain("manifest 를 달라고 되묻지 않아요");
-    expect(clarity).toContain("아래 계정 전체 앱 상태 fast path 로 degrade");
-    expect(clarity).toContain("사용자에게 보이는 Bash/tool call 제목은 한국어 명사구만");
-    expect(clarity).toContain("`명령 표면 확인`, `명령 사용법 확인`, `앱 상태 조회`, `운영 상태 확인`, `결과 정리`");
-    expect(clarity).toContain("description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요");
-    expect(clarity).toContain("도구가 자동으로 제목을 만들도록 비워두면 `axhub: App get 사용 중` 같은 이름이 보이므로 금지");
+    expect(clarity).not.toContain("operational-lookups.md");
+    expect(clarity).not.toContain("show a read-only axhub overview");
+    expect(clarity).not.toContain("is production healthy?");
     expect(clarity).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>");
     expect(clarity).toContain("shell loop, background watcher, persistent monitor 를 쓰지 않아요");
     expect(clarity).toContain("`Monitor 사용` 권한 카드가 뜨는 명령은 실패");
-    expect(clarity).toContain("device flow fast path 에서는 Step 1a 의 optional `axhub update check --json` 버전 확인을 건너뛰어요");
+    expect(clarity).toContain("device flow fast path 에서는 다른 사전 점검을 건너뛰어요");
     expect(clarity).toContain("device flow 를 시작하는 Bash/tool call 제목은 정확히 `계정 인증 시작`");
     expect(clarity).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
     expect(clarity).toContain("Markdown URL 링크 문법은 전부 금지");
@@ -346,23 +336,6 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출");
     expect(clarity).toContain("`인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 조회");
     expect(clarity).toContain("승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요");
-    expect(clarity).toContain("앱 상세를 조회할 때 tool 제목은 정확히 `앱 상태 조회`");
-    expect(clarity).toContain("운영 배포 상태를 조회할 때는 정확히 `운영 상태 확인`");
-    expect(clarity).toContain("CLI 표면이나 help 를 볼 때는 각각 `명령 표면 확인` / `명령 사용법 확인`");
-    expect(clarity).toContain("`axhubing`, `axhubed`, `productioning`, `productioned`, `checking`, `executing`, `Usage 확인`, `app get`, `deploy status`, `deploy list`");
-    expect(clarity).toContain("`axhub: App get 사용 중`, `productioning 배포 상태`, `productioned 배포 상태`, `Usage 확인 끝`");
-    expect(clarity).toContain("tool 제목에는 제품명 `axhub` 자체를 넣지 않아요");
-    expect(clarity).toContain("중간 문구에도 `Usage`, `app get`, `deploy status`, `apps get` 같은 명령·영어 단어를 쓰지 말고");
-    expect(clarity).toContain("사용법 확인 끝. 앱 상태와 운영 상태만 확인할게요.");
-    expect(clarity).toContain("`Ap 상태`, `App 상태`, `앱 status`, `status 조회`");
-    expect(clarity).toContain("`앱 상태 조회할게요.` 또는 `앱 상태를 확인할게요.`");
-    expect(clarity).toContain("raw 필드명·불리언·상태 enum");
-    expect(clarity).toContain("`status: deployed`, `operating_status`, `last_deployment_status`, `production_deployment_id`, `resource: XS`, `succeeded`, `failed`, `commit_not_found`, `resolve`, `healthy: true`");
-    expect(clarity).toContain("`operating_status` 값이 `dev` 라고 해서 \"운영 배포 승격 전\" 또는 \"production 이 아니다\" 라고 해석하지 않아요");
-    expect(clarity).toContain("현재 운영 서비스는 정상이에요");
-    expect(clarity).toContain("deployment id, commit SHA, deployment 목록을 보여주지 않아요");
-    expect(clarity).toContain("`커밋 못 찾음`, \"설정 문제\", `remote push`, `commit`, 브랜치·SHA 같은 실패 분석은 diagnosis 의 책임");
-    expect(clarity).toContain("이모지나 raw 화살표 목록을 쓰지 말고");
     expect(clarity).toContain("axhub 에 그 기능은 없어요");
     expect(clarity).toContain("schema/help/실행 명령에 `2>/dev/null | head -c 2000`, `| grep`, `| jq`, `bash -lc` 같은 shell 후처리 붙이기");
     expect(clarity).toContain("출력 축소는 더 좁은 `--field-expr` 로만");
@@ -378,7 +351,6 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("단일 `axhub ... --json` 호출을 실행하고 tool 결과를 assistant 내부에서 해석");
     expect(clarity).toContain("`읽는 중 <랜덤>.txt`, `Read /tmp/...`, `파일 읽기` 같은 임시 출력 파일 재읽기");
     expect(clarity).toContain("파일 읽기 팝업/단계가 보이면 실패");
-    expect(clarity).toContain("Claude Desktop 에서는 캐시 파일·stamp 파일·shell wrapper 없이 `버전 확인` 제목으로 단일 명령 `axhub update check --json`");
     const clarityCodeBlocksForShell = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
     expect(clarityCodeBlocksForShell.join("\n")).not.toContain("2>/dev/null");
     expect(clarityCodeBlocksForShell.join("\n")).not.toContain("head -c");
@@ -446,13 +418,15 @@ describe("smooth behavior contracts", () => {
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
 
     const update = readRepo("skills/update/SKILL.md");
-    expect(update).toContain("description: '현재 버전을 확인할게요.");
-    expect(update).toContain("스킬 실행 전 사용자 문장 0개");
-    expect(update).toContain("Mixed app-status/log/deploy/new-app requests after update continue after the version check/update");
-    expect(update).toContain('do not ask the user to repeat "앱 상태 확인해줘" or "배포해줘"');
+    const updateBody = update.replace(/^---\n[\s\S]*?\n---\n?/, "");
+    expect(update).toContain("description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill");
+    expect(update).toContain("명령어는 잘 몰라");
+    expect(update).toContain("일반 Code-mode script");
+    expect(update).toContain("app status, app creation, deployment 는 update 뒤에 이어서 처리해요");
     expect(update).toContain("**CRITICAL desktop first line.**");
-    expect(update).toContain('First visible assistant text must start exactly with "현재 버전을 확인할게요."');
-    expect(update).toContain("Start directly; do not explain why this path was chosen or name the chosen skill.");
+    expect(update).toContain("사용자에게 보이는 첫 문장은 반드시 정확히 `현재 버전을 확인할게요.`");
+    expect(update).toContain("선택 이유를 설명하지 않아요");
+    expect(update).toContain("선택한 스킬 이름이나 선택 이유도 말하지 않아요");
     expect(update).toContain("사용자에게 보이는 첫 문장은 반드시 정확히 `현재 버전을 확인할게요.`");
     expect(update).toContain("그 앞에 어떤 설명도 붙이지 않아요");
     expect(update).toContain("선택한 스킬 이름이나 선택 이유도 말하지 않아요");
@@ -460,7 +434,7 @@ describe("smooth behavior contracts", () => {
     expect(update).toContain("`axhubing`, `axhubed`, `updating` 처럼 제품명을 영어 동사처럼");
     expect(update).toContain("선택 이유를 설명하지 않아요");
     for (const leakedPhrase of ["전용 스킬", "스킬을 사용", "사용하겠습니다", "라우팅", "axhub:update 스킬", "/axhub:update", "update skill"]) {
-      expect(update).not.toContain(leakedPhrase);
+      expect(updateBody).not.toContain(leakedPhrase);
     }
     expect(update).toContain("라벨 안에 `axhub` 를 넣지 않아요");
     expect(update).toContain("**Desktop-visible command allowlist.**");
@@ -639,7 +613,7 @@ describe("smooth behavior contracts", () => {
     }
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-    expect(entries).toHaveLength(3);
+    expect(entries).toHaveLength(4);
 
     const resume = entries[1];
     expect(resume.type).toBe("command");
@@ -652,6 +626,73 @@ describe("smooth behavior contracts", () => {
     // hook is read-only: never deletes the marker, never spawns the axhub binary
     expect(resume.command).not.toContain("rm -f");
     expect(resume.command).not.toContain("axhub plugin-support");
+  });
+
+  test("update freshness prompt router hook is wired", () => {
+    interface HookEntry {
+      type: string;
+      shell?: string;
+      command: string;
+    }
+    interface HooksFile {
+      hooks: {
+        SessionStart: Array<{ hooks: HookEntry[] }>;
+        UserPromptSubmit: Array<{ hooks: HookEntry[] }>;
+      };
+    }
+    const hooksFile = readJson<HooksFile>("hooks/hooks.json");
+    const entries = hooksFile.hooks.UserPromptSubmit.flatMap((group) => group.hooks);
+    expect(entries).toHaveLength(2);
+
+    const router = entries[0];
+    expect(router.type).toBe("command");
+    expect(router.shell).toBe("bash");
+    expect(router.command).toContain("hookSpecificOutput");
+    expect(router.command).toContain("hookEventName");
+    expect(router.command).toContain("additionalContext");
+    expect(router.command).toContain("AXHUB_NO_UPDATE_ROUTER");
+    expect(router.command).toContain("axhub freshness/update");
+    expect(router.command).toContain("Finding tools");
+    expect(router.command).toContain("invoke the axhub update skill");
+    expect(router.command).toContain("현재 버전을 확인할게요");
+    expect(router.command).toContain("App/MCP tool");
+    expect(router.command).toContain("app list/status tool");
+    expect(router.command).toContain("Finish update first");
+    expect(router.command).not.toContain("python3");
+    expect(router.command).not.toContain("node ");
+    expect(router.command).not.toContain("axhub update check");
+    expect(router.command).not.toContain("claude plugin update");
+
+    const statusRouter = entries[1];
+    expect(statusRouter.type).toBe("command");
+    expect(statusRouter.shell).toBe("bash");
+    expect(statusRouter.command).toContain("status-resume-router.sh");
+
+    const statusRouterScript = readRepo("hooks/status-resume-router.sh");
+    expect(statusRouterScript).toContain("AXHUB_NO_STATUS_ROUTER");
+    expect(statusRouterScript).toContain("axhub app creation/deployment/status flow");
+    expect(statusRouterScript).toContain("invoke the axhub bootstrap skill");
+    expect(statusRouterScript).toContain("generic Code-mode shell probes");
+    expect(statusRouterScript).toContain("command -v axhub");
+    expect(statusRouterScript).toContain("axhub plugin-support init-resume route --json");
+    expect(statusRouterScript).toContain("axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json");
+    expect(statusRouterScript).toContain("axhub deploy status <deployment-id> --tenant <tenant> --json");
+    expect(statusRouterScript).toContain("axhub deploy verify <deployment-id> --app <app> --json");
+    expect(statusRouterScript).not.toContain("python3");
+    expect(statusRouterScript).not.toContain("node ");
+
+    const sessionEntries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
+    const sessionRouter = sessionEntries[3];
+    expect(sessionRouter.type).toBe("command");
+    expect(sessionRouter.shell).toBe("bash");
+    expect(sessionRouter.command).toContain("AXHUB_NO_UPDATE_ROUTER");
+    expect(sessionRouter.command).toContain("update-first routing guard is active for Code mode");
+    expect(sessionRouter.command).toContain("Finding tools");
+    expect(sessionRouter.command).toContain("현재 버전을 확인할게요");
+    expect(sessionRouter.command).toContain("App/MCP tools");
+    expect(sessionRouter.command).toContain("generic Code-mode handling");
+    expect(sessionRouter.command).not.toContain("axhub update check");
+    expect(sessionRouter.command).not.toContain("claude plugin update");
   });
 
   test("AP-13 Windows execution contract hook is wired", () => {

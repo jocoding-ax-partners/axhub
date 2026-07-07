@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **axhub** (531 symbols, 647 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **axhub** (610 symbols, 723 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -104,7 +104,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 > **정책 기준 문서:** 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 개발·운영 규칙은 `docs/policy/dev-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 기준이에요. 이 파일의 요약과 다르면 정책 문서를 따라요. 어긋남은 `tests/policy-parity.test.ts` 가 잡아요.
 
-axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어요: `onboarding` / `bootstrap` / `deploy` + 그 셋에 명확히 안 맞거나 의도가 불분명한 axhub 발화를 라이브 `--help` 탐색으로 처리하는 `clarity` 브리지예요. 이후 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import` skill, CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis` skill 을 더해 현재 8 skill 이에요. 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli (`axhub` 바이너리) 를 직접 호출해요. Rust helper 바이너리 (`crates/axhub-helpers`), 모든 hook(이후 SessionStart 훅 3개 — auto-update + 온보딩 MCP 재시작 resume + Windows 실행 계약(AP-13) — 만 `hooks/` 로 재도입, 아래 "자동 업데이트 hook"·"온보딩 MCP 재시작 resume hook"·"Windows 실행 계약 hook" 참고), NL routing corpus, scaffold/skill-doctor/lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인은 전부 제거됐어요.
+axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어요: `onboarding` / `bootstrap` / `deploy` + 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 같은 명시적 axhub 운영 명령을 라이브 `--help` 탐색으로 처리하는 `clarity` 브리지예요. 이후 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import` skill, CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis` skill 을 더해 현재 8 skill 이에요. 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli (`axhub` 바이너리) 를 직접 호출해요. Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold/skill-doctor/lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인은 전부 제거됐어요. 이후 훅은 cheap bash guard 로만 제한해서 재도입했어요: SessionStart 훅 4개(auto-update + 온보딩 MCP 재시작 resume + Windows 실행 계약 AP-13 + Code-mode update router fallback AP-14)와, 최신·버전·업데이트 요청이 전역 axhub App/MCP 도구보다 `update` 스킬을 먼저 타게 하는 좁은 UserPromptSubmit match(AP-14)뿐이에요.
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
 
@@ -135,6 +135,15 @@ auto-update·resume 와 나란히 SessionStart 훅이 하나 더 있어요 (`hoo
 - hook 은 `$OS` 만 봐요 — 네트워크·`axhub` 바이너리·marker 안 건드리고, non-Windows 는 즉시 exit 0.
 - **끄기:** `AXHUB_NO_WINDOWS_CONTRACT=1`. Windows 전제는 다른 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
 - 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-13 이 소유해요 (parity 적용: `hooks/hooks.json`, `CLAUDE.md`).
+
+## update-first Code-mode router hook (AP-14)
+
+SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이트 요청에만 라우팅 문맥을 추가해요. Claude Desktop Code 모드에서 `Finding tools`, 전역 `App list (axhub)` 같은 App/MCP 도구, 일반 shell probe 가 먼저 잡히는 것을 막기 위한 guard 예요.
+
+- SessionStart fallback 은 새 Code 세션에 update-first 규칙을 먼저 깔아요. UserPromptSubmit match 는 사용자 프롬프트 JSON 에 `axhub` 와 최신성 키워드(`최신`, `버전`, `업데이트`, `latest`, `up to date`, `version check`, `update`, `upgrade`)가 함께 있을 때 `hookSpecificOutput.additionalContext` 와 `systemMessage` 를 emit 해요.
+- 명령 실행·네트워크·앱 목록 조회를 하지 않아요. `update` 스킬 우선, 첫 visible assistant text `현재 버전을 확인할게요.`, App/MCP 도구 선행 금지만 주입해요.
+- update 뒤 같은 원문에 앱 현황 확인이 남으면 존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 시작해요. `| head`, `2>/dev/null`, `grep`, `sed`, `awk` 같은 shell 후처리는 붙이지 않아요.
+- **끄기:** `AXHUB_NO_UPDATE_ROUTER=1`.
 
 ## CLI 호출 표면
 

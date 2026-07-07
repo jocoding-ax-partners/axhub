@@ -1,6 +1,6 @@
 ---
 name: update
-description: '현재 버전을 확인할게요. 스킬 실행 전 사용자 문장 0개: 먼저 아무 말 없이 이 스킬을 실행해요. For explicit axhub CLI and Claude Code plugin version check/update requests: "업데이트해줘", "axhub 최신 버전으로", "플러그인 업데이트", "update axhub", "Check whether axhub is up to date and update it if needed." Invoke this skill before writing any explanatory assistant sentence. First visible assistant text must start exactly with "현재 버전을 확인할게요." Start directly; do not explain why this path was chosen or name the chosen skill. Mixed app-status/log/deploy/new-app requests after update continue after the version check/update: finish the update result first, then continue the remaining user request in the same conversation with the appropriate next axhub flow; do not ask the user to repeat "앱 상태 확인해줘" or "배포해줘". Standalone first setup=onboarding, new app=bootstrap, deploy=deploy. axhub CLI·플러그인 버전 전용이라, 발화의 axhub 언급이나 대화의 axhub 맥락(직전 axhub 작업)이 있을 때만 이 스킬을 써요 — 맥락 없는 일반 "업데이트해줘" 나 npm·다른 도구 업데이트 발화에는 쓰지 않아요.'
+description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill. 사용자가 "axhub가 진짜 최신인지 먼저 확인" 또는 최신, 버전 확인, 업데이트, latest, up to date, version check, update, upgrade 를 말하면 항상 이 skill 이 먼저예요. 특히 이 복합 요청은 update 예요: 명령어는 잘 몰라. axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘. 그다음 새 재즈 댄스 수업 예약 앱 하나 만들어서 실제로 배포까지 해줘. 최신 확인이 있으면 app status, app creation, deployment 는 update 뒤에 이어서 처리해요. 앱 상태 overview 는 update 결과 뒤 `axhub apps --help` 로 표면 확인 후 read-only `axhub apps list --json` 로 시작하고, 존재하지 않는 단수 `axhub app list` 를 추측하지 않아요. 첫 visible assistant text는 정확히 "현재 버전을 확인할게요." 일반 Code-mode script, clarity, bootstrap, deploy, App/MCP tool, shell probe, /oh-my-claudecode:autopilot 보다 먼저 실행해요.'
 examples:
   - utterance: "업데이트해줘"
     intent: "update axhub cli and plugin to latest"
@@ -8,11 +8,15 @@ examples:
     intent: "update axhub cli and plugin to latest"
   - utterance: "axhub가 최신인지 확인하고, 아니면 최신으로 업데이트해줘"
     intent: "check and update axhub cli and plugin even in an empty workspace"
+  - utterance: "axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘"
+    intent: "check/update axhub first before any app-status tool, then continue app status"
+  - utterance: "명령어는 잘 몰라. axhub가 진짜 최신인지 먼저 확인해주고, 내 앱들이 지금 어떤 상태인지도 알아서 봐줘. 그다음 새 재즈 댄스 수업 예약 앱 하나 만들어서 실제로 배포까지 해줘."
+    intent: "check/update axhub first; do not select clarity or non-axhub workflows before update; continue app overview and bootstrap/deploy afterward"
   - utterance: "check whether axhub is up to date and then tell me my app status"
     intent: "check/update axhub first, then continue app status handling without asking for another user prompt"
   - utterance: "update axhub"
     intent: "update axhub cli and plugin to latest"
-allows-dependency-execution: false
+allows-dependency-execution: true
 model: sonnet
 ---
 
@@ -26,6 +30,15 @@ model: sonnet
 
 **CRITICAL mixed-request continuation.** 사용자가 "업데이트 확인하고 앱 상태도 봐줘"처럼 다른 axhub 운영 요청을 함께 말하면, 이 스킬 실행 중에는 앱 목록·앱 상태·최근 배포·로그·환경변수 조회를 섞지 않아요. 먼저 업데이트 결과 카드까지 완료한 뒤, 같은 사용자 요청의 남은 일을 이어서 처리해요. 사용자가 `앱 상태 확인해줘`, `배포해줘`, `새 앱 만들어줘` 같은 말을 다시 하지 않아도 돼요. 원문이 영어로 `then`, `and then`, `after that`, `help me understand` 를 써도 업데이트 뒤 남은 요청을 버리지 않아요. 다만 남은 요청을 실제로 이어갈 때만 `업데이트 확인은 끝났어요. 이어서 요청하신 작업을 계속할게요.` 라고 짧게 말하고, 곧바로 다음 적절한 axhub 흐름을 시작해요.
 
+**CRITICAL post-update app overview.** 업데이트 결과 뒤 남은 요청이 "내 앱들이 지금 어떤 상태인지", "내 앱 상태를 알아서 봐줘", "app status overview" 같은 읽기 전용 앱 현황이면 명령을 추측하지 않아요. 첫 overview 의 Desktop-visible Bash command 는 아래 두 개만 허용해요. 먼저 정확히 `axhub apps --help` 를 1회 실행하고, 그 다음 정확히 `axhub apps list --json` 로 접근 가능한 앱 목록부터 읽어요. 명령 문자열 뒤에 공백 외 어떤 문자도 붙이지 않아요.
+
+```bash
+axhub apps --help
+axhub apps list --json
+```
+
+존재하지 않는 단수 명령 `axhub app list` 또는 `axhub app get` 을 실행하지 않아요. `axhub apps list --json 2>/dev/null | head -100`, `axhub --help | head`, `grep`, `sed`, `awk`, `head`, `tail`, pipe, redirect, `2>/dev/null`, `bash -lc`, `sh -c` 가 붙은 순간 실패예요. 그런 명령이 떠오르면 실행하지 말고 정확히 `axhub apps --help` → `axhub apps list --json` 로 바꿔요. 출력이 길어도 shell 로 자르지 말고 tool 결과를 내부에서 필요한 만큼만 읽어요. 앱 overview 를 읽은 다음 같은 원문에 새 앱 생성·배포가 남아 있으면, 직접 low-level 명령을 추측하지 말고 bootstrap/deploy 흐름으로 이어가요.
+
 **CRITICAL no background detour.** mixed request 의 남은 일을 Task/Subagent/Agent/백그라운드 작업으로 우회하지 않아요. 업데이트 결과 뒤 같은 assistant 흐름에서 직접 이어가요. `axhubed 앱 상태 조회`, `앱 상태 백그라운드 조회` 같은 작업·카드·제목을 만들지 않아요.
 
 사용자가 직접 **axhub CLI 와 Claude Code 플러그인을 지금 최신으로** 맞추려는 요청이에요. 제거된 자동 훅에 의존하지 않고, 사용자가 명시적으로 요청한 순간에만 버전 확인과 적용을 진행해요:
@@ -36,6 +49,8 @@ model: sonnet
 전 과정 best-effort·비차단이에요. 실패·구 CLI·네트워크 오류면 raw 에러를 숨기고 한 줄만 안내한 뒤 멈춰요.
 
 **책임 경계.** 이 경로는 버전 업데이트만 해요. 첫 셋업·CLI 설치는 `onboarding` 소관이고, 그 외 axhub 운영 명령은 업데이트 결과를 끝낸 뒤 다음 적절한 axhub 흐름으로 양보·계속 처리해요.
+
+**비-axhub 맥락 가드.** 사용자가 `axhub` 를 말하지 않고 "업데이트해줘"처럼 일반 업데이트만 말한 경우에는 대화의 axhub 언급·현재 폴더의 axhub 연결 manifest·직전 axhub 작업 같은 **axhub 맥락**이 있을 때만 진행해요. 맥락이 없으면 axhub 업데이트로 밀어붙이지 말고 axhub 사용 의사를 한 번 확인하거나 조용히 멈춰요.
 
 **첫 응답 계약.** 선택 이유를 설명하지 않아요. 빈 폴더여도 "axhub 프로젝트가 아니다" 라고 추론하지 말고 바로 버전 확인을 진행해요.
 

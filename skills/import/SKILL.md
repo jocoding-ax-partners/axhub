@@ -24,7 +24,7 @@ model: sonnet
 - `bootstrap`: 빈 디렉토리에서 axhub 템플릿 앱을 새로 만드는 요청.
 - `deploy`: 이미 axhub 앱과 manifest 가 연결된 앱을 다시 배포하는 요청.
 - `development`: 기존 앱 안에 화면, 대시보드, CRUD 같은 기능 코드를 새로 쓰는 요청.
-- `clarity`: 위 경계 밖 운영 명령이나 의도가 모호한 axhub 요청.
+- `clarity`: 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 같은 명시된 axhub 운영 명령.
 
 `import` 는 `deploy` 를 감싸지 않아요. 첫 연결·첫 배포 준비는 import, 이후 반복 배포는 deploy 가 맡아요.
 

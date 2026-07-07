@@ -4,7 +4,7 @@ import { dirname, join, relative, resolve } from "node:path";
 const REPO_ROOT = resolve(join(import.meta.dir, ".."));
 const DEFAULT_OUT_DIR = join(REPO_ROOT, "dist", "axhub-plugin");
 const ROOT_FILES = ["README.md", "LICENSE", "POLICY.md"] as const;
-const ROOT_DIRS = [".claude-plugin", "skills"] as const;
+const ROOT_DIRS = [".claude-plugin", "skills", "hooks"] as const;
 const DENY_NAMES = new Set([
   ".DS_Store",
   ".axhub",

@@ -174,7 +174,7 @@ axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" > "$VERIFY_OUT" 2>&1
 VERIFY_EXIT=$?
 ```
 
-If `VERIFY_EXIT=6`, the deployment is still running. Tell the user `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same scoped verify command until exit 0 or 7, or until a bounded timeout. Prefer separate short tool calls or a real ScheduleWakeup when available. Do not combine polling into one long `while`/`for` shell loop with `MAX_ATTEMPTS`, command substitution, or shell expansion. Do not substitute `axhub deploy watch` or `axhub deploy status --watch`. Do not end by asking the user to say `배포 상태 확인해줘`; the skill owns the follow-up while a known `DEPLOY_ID` is still running.
+If `VERIFY_EXIT=6`, the deployment is still running. Tell the user `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same scoped verify command until exit 0 or 7, or until a bounded timeout. Prefer separate short tool calls or a real ScheduleWakeup when available. Do not combine polling into one long `while`/`for` shell loop with `MAX_ATTEMPTS`, command substitution, or shell expansion. Also do not collapse polling into one long `while`/`for`/`until` shell loop with `sleep`, `grep`, `head`, pipes, or shell expansion. A Claude Desktop permission request for a long polling shell block is a failed watch UX. Do not substitute `axhub deploy watch` or `axhub deploy status --watch`. Do not end by asking the user to say `배포 상태 확인해줘`; the skill owns the follow-up while a known `DEPLOY_ID` is still running.
 
 Exit handling:
 

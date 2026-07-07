@@ -5,7 +5,7 @@
     "bootstrap": "empty directory new-template bootstrap",
     "deploy": "already-connected app ordinary redeploy",
     "development": "existing app feature code generation",
-    "clarity": "other axhub operations or ambiguous command discovery"
+    "clarity": "explicit axhub CLI operations such as env/logs/rollback/table/connector/GitHub reconnect"
   },
   "cases": [
     { "utterance": "기존 앱 올려", "context": "현재 폴더가 비어 있지 않은 로컬 앱", "expected": "import", "why": "기존 소스를 axhub에 처음 가져오는 요청" },
