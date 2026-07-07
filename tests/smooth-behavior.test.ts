@@ -53,7 +53,11 @@ describe("smooth behavior contracts", () => {
     expect(pluginJson.description).toContain("unrelated plugin mode");
     expect(pluginJson.description).toContain("/oh-my-claudecode:autopilot");
     expect(pluginJson.description).toContain("exact `axhub apps --help` then `axhub apps list --json`");
+    expect(pluginJson.description).toContain("`axhub apps get <app> --json`");
+    expect(pluginJson.description).toContain("`axhub deploy list --app <app> --json`");
     expect(pluginJson.description).toContain("nonexistent `axhub app list`");
+    expect(pluginJson.description).toContain("never `axhub deployment list`");
+    expect(pluginJson.description).toContain("never Claude Desktop axhub App/MCP permission popups");
     expect(pluginJson.description).toContain("never pipes or redirects");
     expect(pluginJson.description).not.toContain("`내 앱들이 지금 어떤 상태인지 모르겠어`");
     expect(pluginJson.description).not.toContain("Before finding or calling tools for vague app-status prompts");
@@ -68,7 +72,11 @@ describe("smooth behavior contracts", () => {
     expect(marketplace.plugins[0]?.description ?? "").toContain("Claude Desktop axhub App/MCP tools");
     expect(marketplace.plugins[0]?.description ?? "").toContain("/oh-my-claudecode:autopilot");
     expect(marketplace.plugins[0]?.description ?? "").toContain("exact `axhub apps --help` then `axhub apps list --json`");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("`axhub apps get <app> --json`");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("`axhub deploy list --app <app> --json`");
     expect(marketplace.plugins[0]?.description ?? "").toContain("nonexistent `axhub app list`");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("never `axhub deployment list`");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("never Claude Desktop axhub App/MCP permission popups");
     expect(marketplace.plugins[0]?.description ?? "").toContain("never pipes or redirects");
     expect(marketplace.plugins[0]?.description ?? "").not.toContain("Vague app-status requests");
     expect(marketplace.plugins[0]?.description ?? "").not.toContain("Before finding or calling tools for vague app-status requests");
@@ -86,9 +94,11 @@ describe("smooth behavior contracts", () => {
     expect(readme).toContain("버전·최신 확인이 들어간 요청은 언제나 `update` 가 먼저 끝나요");
     expect(readme).toContain("존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help`");
     expect(readme).toContain("정확히 `axhub apps list --json` 읽기 전용 명령으로 이어가요");
+    expect(readme).toContain("`axhub apps get <app> --json`, `axhub deploy list --app <app> --json`");
+    expect(readme).toContain("존재하지 않는 `axhub deployment list`");
     expect(readme).toContain("`| head`, `2>/dev/null`, `grep` 같은 shell 후처리를 붙이지 않아요");
     expect(readme).not.toContain("내 앱들이 지금 어떤 상태인지 모르겠어");
-    expect(readme).toContain("`Tenant recent deployments`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요");
+    expect(readme).toContain("`Tenant recent deployments`, `Deployment list`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요");
     const flowRows = [
       "| 첫 셋업 | `onboarding` |",
       "| 앱 생성 | `bootstrap` |",
@@ -453,7 +463,7 @@ describe("smooth behavior contracts", () => {
     expect(update).toContain("파일 읽기 도구를 쓰지 않아요");
     expect(update).toContain("command substitution, shell wrapper, file test, pipe, redirect, text filter, 파일 읽기 도구를 쓰지 않아요");
     expect(update).toContain("이 스킬은 **버전 확인/업데이트 결과를 먼저** 처리해요");
-    expect(update).toContain("read 작업이어도 update 단계에서는 금지예요");
+    expect(update).toContain("read 작업이어도 CLI 계약을 우선해요");
     expect(update).toContain("원문이 영어로 `then`, `and then`, `after that`, `help me understand` 를 써도");
     expect(update).toContain("업데이트 뒤 남은 요청을 버리지 않아요");
     expect(update).toContain("사용자의 추가 프롬프트를 기다리지 말고 다음 적절한 axhub 흐름을 시작해요");
@@ -658,6 +668,9 @@ describe("smooth behavior contracts", () => {
     expect(router.command).toContain("App/MCP tool");
     expect(router.command).toContain("app list/status tool");
     expect(router.command).toContain("Finish update first");
+    expect(router.command).toContain("CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json");
+    expect(router.command).toContain("Deployment list (axhub)");
+    expect(router.command).toContain("axhub deployment list");
     expect(router.command).not.toContain("python3");
     expect(router.command).not.toContain("node ");
     expect(router.command).not.toContain("axhub update check");
@@ -676,8 +689,12 @@ describe("smooth behavior contracts", () => {
     expect(statusRouterScript).toContain("command -v axhub");
     expect(statusRouterScript).toContain("axhub plugin-support init-resume route --json");
     expect(statusRouterScript).toContain("axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json");
+    expect(statusRouterScript).toContain("axhub apps get <app> --json");
+    expect(statusRouterScript).toContain("axhub deploy list --app <app> --json");
     expect(statusRouterScript).toContain("axhub deploy status <deployment-id> --tenant <tenant> --json");
     expect(statusRouterScript).toContain("axhub deploy verify <deployment-id> --app <app> --json");
+    expect(statusRouterScript).toContain("Deployment list (axhub)");
+    expect(statusRouterScript).toContain("axhub deployment list");
     expect(statusRouterScript).not.toContain("python3");
     expect(statusRouterScript).not.toContain("node ");
 
@@ -691,6 +708,9 @@ describe("smooth behavior contracts", () => {
     expect(sessionRouter.command).toContain("현재 버전을 확인할게요");
     expect(sessionRouter.command).toContain("App/MCP tools");
     expect(sessionRouter.command).toContain("generic Code-mode handling");
+    expect(sessionRouter.command).toContain("CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json");
+    expect(sessionRouter.command).toContain("Deployment list (axhub)");
+    expect(sessionRouter.command).toContain("axhub deployment list");
     expect(sessionRouter.command).not.toContain("axhub update check");
     expect(sessionRouter.command).not.toContain("claude plugin update");
   });
