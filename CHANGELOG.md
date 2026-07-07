@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.2...v1.10.3) (2026-07-07)
+
+Claude Code Desktop Code 모드 배포 QA에서 로컬 런타임 상태인 `.omc/` 를 앱 코드 변경으로 오인해 `.gitignore` 수정 커밋을 만들고, 배포 확인은 `--app` 없이 긴 shell loop 로 요청하는 흐름이 보였어요. 이제 deploy skill 은 `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/` 같은 에이전트 런타임 폴더를 배포 대상 변경으로 다루지 않고, 배포 성공 확인은 항상 앱 범위가 붙은 짧은 `axhub deploy verify <deployment-id> --app <app>` 호출로만 이어가도록 계약을 잠갔어요.
+
 ## [1.10.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.1...v1.10.2) (2026-07-07)
 
 Claude Code Desktop Code 모드 재QA에서 clarity 스킬은 이제 App/MCP 권한 카드 대신 제대로 호출됐지만, 응답 첫머리에 "스킬 가이드가 반환됐네요" 같은 내부 설명이 보이고 앱 상태 빠른 조회가 `명령 3개` 그룹 카드로 묶이는 어색함이 남아 있었어요. 이제 clarity 는 스킬 문서나 slash 실패 같은 메타 설명을 사용자에게 말하지 않고, 계정 전체 앱 상태 fast path 는 CLI 설치 확인과 앱 목록 조회 두 단계만 보이도록 계약을 더 강하게 잠갔어요.
