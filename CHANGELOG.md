@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.22](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.21...v1.10.22) (2026-07-07)
+
+Claude Code Desktop Code 모드 import QA에서 기존 Express 앱을 첫 배포까지 진행하는 동안 도구 제목, `axhub.yaml` ignore 정리, GitHub repo 이름 추론이 바이브코더에게 어색하게 보일 수 있는 지점을 확인했어요. 이제 import skill 은 도구 제목을 한국어 명사구로 고정하고, manifest 작성 전에 ignore 규칙을 먼저 정리하며, GitHub owner 만 주어진 경우 앱 slug 그대로 repo 이름을 유지해 첫 배포 흐름이 더 매끄럽게 이어져요.
+
 ## [1.10.21](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.20...v1.10.21) (2026-07-07)
 
 Claude Code Desktop Code 모드 재QA에서 기존 Express 앱을 axhub에 올려 달라는 자연어 요청이 import 대신 일반 폴더 검사와 bootstrap 쪽으로 새는 문제가 보였어요. 이제 기존 앱·작업 폴더·백엔드 스택 단서가 있으면 import 라우터가 먼저 잡고, 권한 카드에도 실제 앱 디렉토리 `cd "..." &&` 접두사를 보여줘요. `.gitignore`가 `axhub.yaml`을 무시하던 케이스까지 Code 모드에서 실제 첫 배포로 확인했고, 도구 제목과 최종 URL도 바이브코더에게 어색한 내부 표현이 새지 않도록 잠갔어요.
