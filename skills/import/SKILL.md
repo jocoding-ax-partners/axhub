@@ -42,6 +42,10 @@ model: sonnet
 
 사용자가 앱 경로를 말하지 않았고 현재 workspace 가 실제 앱 폴더인지 확실하지 않으면, preview 전에 앱 폴더를 먼저 확인해요. 잘못된 폴더에서 import preview 를 돌려서 bootstrap/import 라우팅을 다시 설명하는 흐름으로 가지 않아요.
 
+## Desktop 도구 제목 hard rule
+
+모든 Bash/tool call 제목·progress title 은 한국어 명사구로 직접 정해요. Claude Desktop 자동 제목에 맡기지 않아요. 특히 `Expressing ...`, `Expressed ...`, `FastAPIing ...`, `axhubed ...` 처럼 제품명·스택명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요. 파일 확인은 `서버 설정 확인`, `작업 폴더 파일 확인`, `package.json 확인`, 설정 파일 검증은 `앱 설정 파일 검증`, 가져오기 실행은 `가져오기 실행` 처럼 써요. 스택 이름은 본문 설명에만 써요.
+
 ## 개발자 스택 지원 범위
 
 이 스킬은 Next.js 전용이 아니에요. CLI 의 `import/v1` 감지와 execute 증거를 기준으로 기존 개발자 앱을 가져오며, 대표적인 프론트·백엔드 스택을 지원해요.
@@ -105,7 +109,7 @@ Claude Desktop 같은 긴 QA 대화에서 이전 답변에 금지 문구가 보�
 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `importing`, `imported`, `manifested`, `gitted`, `pushed`, `raw JSON`, `token-gate`, `manifest_create`, `verification_status`, `deployment`, `execute`, `git remote`, `curl`, `Envelope`, `preview` 같은 내부/영어 동사형·필드형 라벨을 제목이나 진행 문장에 쓰지 않아요. 예: `가져오기 준비 확인`, `미리보기 확인`, `앱 설정 작성`, `첫 배포 확인`, `정적 사이트 확인`.
 도구 제목에는 제품명 `axhub` 자체도 넣지 않아요. `axhubing`, `axhubed`, `axhub import 기능 지원 확인`, `axhub 가져오기 기능 지원 확인` 같은 자동 생성 제목이 보이면, 같은 명령이라도 `가져오기 기능 확인` 또는 `가져오기 준비 확인` 으로 제목을 고쳐서 다시 호출해요.
 
-Claude Desktop 이 Bash 내용에서 자동 제목을 만들 때도 같은 규칙을 적용해요. tool 제목·summary·progress title 에 `static vite import preview`, `Express import execute`, `FastAPI import execute`, `axhubed import 기능 지원 확인` 처럼 제품명·스택명+내부 phase 를 섞은 제목이 보이면, 같은 명령이라도 반드시 `정적 앱 준비 확인`, `서버 앱 가져오기 실행`, `파이썬 앱 가져오기 실행`, `가져오기 기능 확인` 같은 한국어 제목으로 다시 호출해요. 스택 이름은 본문 설명에서만 써도 충분해요.
+Claude Desktop 이 Bash 내용에서 자동 제목을 만들 때도 같은 규칙을 적용해요. tool 제목·summary·progress title 에 `static vite import preview`, `Express import execute`, `FastAPI import execute`, `Expressing 앱 파일 확인`, `axhubed import 기능 지원 확인` 처럼 제품명·스택명+내부 phase 를 섞거나 스택 이름을 영어 동사처럼 만든 제목이 보이면, 같은 명령이라도 반드시 `정적 앱 준비 확인`, `서버 앱 준비 확인`, `파이썬 앱 가져오기 실행`, `가져오기 기능 확인` 같은 한국어 제목으로 다시 호출해요. 스택 이름은 본문 설명에서만 써도 충분해요.
 
 진행 문구도 사용자 언어로 번역해요. `앱 slug 미확정` 대신 `앱 이름이 아직 정해지지 않아 package.json 이름으로 확인할게요`, `manifest_create 있으니` 대신 `앱 설정 파일이 필요해서 프로젝트 파일 근거로 작성할게요`, `git remote 아직 없음` 대신 `원격 저장소가 아직 없어 새 저장소 생성 경로로 진행해요`, `execute 호출한다` 대신 `가져오기를 실행할게요`, `import 지원 확인됐다` 대신 `가져오기 기능을 사용할 수 있어요`, `preview 진행` 대신 `미리보기를 확인할게요`, `Envelope 정상` 대신 `응답 형식 확인이 끝났어요`, `deployment verification: success` 대신 `첫 배포 검증 성공`, `raw endpoint`/`raw 엔드포인트` 대신 `원문 응답`, `public으로` 대신 `공개 접근으로` 라고 말해요.
 
@@ -184,6 +188,7 @@ Static 성공은 `active_release_id`, `verified === true`, `public_url`, `error 
 `required_mutations` 에 `manifest_create` 가 있고 대화형일 때만, execute 전에 axhub.yaml 을 프로젝트 파일 근거로 풍부하게 작성해요. 이게 이 스킬이 직접 authoring 하는 유일한 단계예요 — minimal manifest 대신 포트·빌드·시작 명령 같은 실제 값을 채워 manifest 의 정확도와 정보량을 함께 높여요.
 
 - **언제:** `가져오기 시작` 승인 직후, execute 호출 직전에만 해요. `manifest_create` 가 없으면(=axhub.yaml 이 이미 있으면) 절대 건드리지 않아요. headless 에서는 실행하지 않아요.
+- **무시 파일 선행 정리:** axhub.yaml 을 쓰기 전에 반드시 먼저 `cd "<absolute APP_DIR>" && git check-ignore -q axhub.yaml` 로 ignore 여부를 확인해요. 무시 중이면 `.gitignore` 또는 `.git/info/exclude` 에서 `axhub.yaml` 을 직접 무시하는 줄을 제거하고, 다시 `git check-ignore -q axhub.yaml` 이 실패하는지 확인해요. 아직 무시되면 axhub.yaml 을 쓰거나 `axhub deploy --explain --json` 검증을 진행하지 말고 남은 ignore 출처를 정리해요. 이 변경은 앱 설정을 첫 배포에 반영하기 위한 manifest 보강의 일부이므로, `--commit-manifest` 경로를 선택했다면 `.gitignore` 변경도 같은 커밋에 들어가야 해요.
 - **근거(grounding):** preview envelope 의 `detected_state.manifest_hints`(포트·health·build·start 와 그 출처)와 실제 프로젝트 파일만 봐요 — Dockerfile, docker-compose·compose, package.json(name·scripts·deps), requirements.txt·pyproject.toml·go.mod, 프레임워크 설정(next.config.\*, vite.config.\* 등), .env.example. 직접 근거가 있는 값만 적고, 불확실하면 비워요. 작고 정확한 manifest 가 크고 틀린 manifest 보다 나아요 — 비운 필드는 backend 가 자동 감지해요.
 - **채우는 필드(axhub.yaml 정규 스키마):**
   - `version: axhub/v1` (필수)
@@ -201,7 +206,7 @@ Static 성공은 `active_release_id`, `verified === true`, `public_url`, `error 
 
   exit 0 이고 `status` 가 `ok` 이면 그대로 진행해요. 실패하면 typed error 가 가리키는 필드만 고쳐 최대 2회까지 다시 검증하고, 그래도 실패하면 작성한 axhub.yaml 을 지워 CLI 가 execute 때 최소 manifest 를 쓰게 두고, 최소 설정으로 진행한다고 한 줄로 알려요. `deploy --explain` 의 raw JSON 은 chat 에 붙이지 않아요.
 - **이후:** execute 는 axhub.yaml 이 있으면 최소 manifest 를 새로 쓰지 않고 이 보강본을 그대로 둬요. 첫 배포는 현재 git HEAD 를 빌드하므로 이 보강본은 커밋해서 HEAD 에 들어간 뒤(또는 이후 `deploy`)부터 빌드에 반영돼요 — 그래서 정확하고 풍부한 manifest 를 프로젝트에 남기는 게 이 단계의 목적이에요. 아래 commit+push 옵션을 고르지 않으면 첫 배포 자체는 기존 HEAD 와 앱의 deploy_method 로 진행돼요.
-- **무시 파일 정리:** `.gitignore` 또는 exclude 규칙이 `axhub.yaml` 을 무시하면, 보강본을 커밋할 수 없어요. **검증 통과 직후, commit manifest 확인 질문을 띄우기 전에 반드시 먼저 정리해요.** `.gitignore` 또는 `.git/info/exclude` 에서 `axhub.yaml` 을 직접 무시하는 줄은 제거하고, `git check-ignore -q axhub.yaml` 이 실패하는지 확인해요. 아직 무시되면 execute 를 호출하지 말고 남은 ignore 출처를 정리해요. 이 변경은 앱 설정을 첫 배포에 반영하기 위한 manifest 보강의 일부이므로, `--commit-manifest` 경로를 선택했다면 `.gitignore` 변경도 같은 커밋에 들어가야 해요. 실패한 execute 뒤에 뒤늦게 고치는 복구 흐름으로 두지 않아요.
+- **무시 파일 사후 확인:** 검증 통과 직후, commit manifest 확인 질문을 띄우기 전에도 `git check-ignore -q axhub.yaml` 이 실패하는지 다시 확인해요. 아직 무시되면 execute 를 호출하지 말고 남은 ignore 출처를 정리해요. 실패한 execute 뒤에 뒤늦게 고치는 복구 흐름으로 두지 않아요.
 - **첫 배포까지 반영 (옵션, commit+push):** `axhub plugin-support preflight` 의 `capabilities.import.commit_manifest` 가 true 이고 GitHub 기반 첫 배포(docker/compose, 또는 preview 가 `github_repo_create`/`github_connect`/`first_deploy` 를 요구하는 경우)라면, 검증 통과 직후 한 번 더 물어요 — 보강본을 커밋하고 배포 브랜치에 push 해서 첫 배포부터 반영할지. **local_only 앱은 아직 git remote 가 없을 수 있지만, execute 중 CLI 가 repo/remote 를 만들 수 있으므로 remote 없음만으로 이 질문을 건너뛰지 않아요.** 동의하면 execute 를 `--commit-manifest` 로 호출해요(아래 Workflow 7). capability 가 없거나(구 CLI), static lane 이 repo 없이 진행되거나, 사용자가 거절하면 이 옵션을 빼고 기본 경로(커밋 없이, 이후 deploy 부터 반영)로 가요. commit+push 는 외부·되돌리기 어려운 동작이라 반드시 이 별도 동의를 받고, 강제 push 는 절대 안 하고, headless 에서는 제공하지 않아요.
 
 ## Workflow
@@ -217,6 +222,8 @@ cd "<absolute APP_DIR>" && axhub plugin-support preflight --json
 2. Preview envelope 요청
 
 사용자나 현재 컨텍스트에서 app slug, GitHub owner/repo, tenant 가 이미 정해졌으면 preview 부터 그대로 넘겨요. `--slug` 는 axhub 앱 slug, `--name` 은 표시 이름, `--repo` 는 GitHub 저장소예요. repo owner 를 별도 flag 로 만들지 말고 `--repo "$OWNER/$REPO"` 형태로 넘겨요.
+
+GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 반드시 `$APP_SLUG` 와 정확히 같게 둬요. 날짜·숫자·QA suffix 를 추론으로 자르거나 정리하지 않아요. 예를 들어 app slug 가 `uqa-exp-public-11021-0708` 이고 owner 가 `realitsyourman` 이면 `--repo "realitsyourman/uqa-exp-public-11021-0708"` 이어야 하며 `--repo "realitsyourman/uqa-exp-public-11021"` 처럼 줄인 명령은 실행하지 말고 고쳐서 다시 호출해요.
 
 단, static 앱은 CLI 가 GitHub repo 없이 `app_create/app_select → local build → static_release` 로 배포할 수 있어요. static lane 에서는 사용자가 명시적으로 "GitHub 저장소도 만들고 연결해줘" 라고 말하지 않는 한 `--repo` 를 붙이지 않아요. Docker/compose 같은 GitHub 기반 첫 배포에서만 `local_only` 새 repo 생성 전에 `--repo owner/name` 이 확정돼 있어야 해요.
 
