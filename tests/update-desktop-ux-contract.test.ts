@@ -23,6 +23,9 @@ describe("update Desktop UX contract", () => {
     expect(manifest.description).toContain("/oh-my-claudecode:autopilot");
     expect(manifest.description).toContain("exact `axhub apps --help` then `axhub apps list --json`");
     expect(manifest.description).toContain("plugin lookup uses exact `claude plugin list`, never `claude plugin list 2>&1`");
+    expect(manifest.description).toContain("when folder/current conversation/latest list clearly identifies a related app");
+    expect(manifest.description).toContain("do not ask which app");
+    expect(manifest.description).toContain("before any summary");
     expect(manifest.description).toContain("`axhub apps get <app> --json`");
     expect(manifest.description).toContain("`axhub deploy list --app <app> --json`");
     expect(manifest.description).toContain("nonexistent `axhub app list`");
@@ -118,7 +121,12 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("`axhub apps list --json`");
     expect(update).toContain("첫 overview 의 Desktop-visible Bash command 는 아래 두 개만 허용해요");
     expect(hooks).toContain("For plugin version lookup, the visible command is exactly claude plugin list; never claude plugin list 2>&1");
-    expect(update).toContain("목록에서 현재 폴더·대화와 관련된 앱을 고른 뒤에도");
+    expect(update).toContain("현재 폴더명·대화 맥락·가장 최근 수정 앱 중 하나로 관련 앱을 식별했으면");
+    expect(update).toContain("멈춰서 \"어느 앱을 더 볼까요?\"라고 묻지 않아요");
+    expect(update).toContain("상세와 최근 배포 이력까지 같은 흐름에서 바로 확인해요");
+    expect(update).toContain("관련 앱을 하나로 좁혔는데 `이 중 어느 앱의 배포 상태나 로그를 더 자세히 확인하고 싶으신가요?`");
+    expect(update).toContain("`어느 앱을 볼까요?`");
+    expect(update).toContain("`더 자세히 확인하고 싶은 앱을 말해 주세요` 같은 질문으로 끝나면 실패예요");
     expect(update).toContain("`axhub apps get <app> --json`");
     expect(update).toContain("`axhub deploy list --app <app> --json`");
     expect(update).toContain("`Deployment list (axhub)`, `App get (axhub)`, `Tenant recent deployments (axhub)`");
@@ -170,7 +178,8 @@ describe("update Desktop UX contract", () => {
     expect(hooks).toContain("invoke the axhub update skill");
     expect(hooks).toContain("현재 버전을 확인할게요");
     expect(hooks).toContain("allowed visible commands are exactly axhub apps --help then axhub apps list --json");
-    expect(hooks).toContain("After choosing a related app, continue with CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json");
+    expect(hooks).toContain("If folder/current conversation/latest list clearly identifies a related app, do not ask which app");
+    expect(hooks).toContain("continue with CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json before any summary");
     expect(hooks).toContain("Never call Claude Desktop axhub App/MCP tools such as Deployment list (axhub), App get (axhub), or Tenant recent deployments (axhub)");
     expect(hooks).toContain("Never run nonexistent singular axhub app list");
     expect(hooks).toContain("axhub deployment list");
@@ -187,6 +196,8 @@ describe("update Desktop UX contract", () => {
     expect(policy).toContain("UserPromptSubmit match");
     expect(policy).toContain("존재하지 않는 `axhub app list`");
     expect(policy).toContain("plural `axhub apps` 표면");
+    expect(policy).toContain("현재 폴더명·대화 맥락·가장 최근 목록으로 관련 앱이 하나로 좁혀지면");
+    expect(policy).toContain("사용자에게 어느 앱을 볼지 묻지 말고");
     expect(policy).toContain("`axhub apps get <app> --json`, `axhub deploy list --app <app> --json`");
     expect(policy).toContain("존재하지 않는 `axhub deployment list`");
     expect(policy).toContain("`Tenant recent deployments`, `Deployment list`, `App list`, `App get`");
