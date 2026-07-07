@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.15](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.6...v1.10.15) (2026-07-07)
+
+Claude Code Desktop Code 모드 재QA에서 같은 버전의 오래된 설치 cache 가 남아 있으면 공개 태그에는 최신 hook 과 manifest 가 있어도 활성 플러그인 cache 는 예전 내용으로 남아 update/status 라우터가 작동하지 않을 수 있었어요. 이번 릴리즈는 새 cache 경로로 배포해 Code 모드가 최신 라우팅 계약과 hooks 를 실제 설치본에서 읽도록 만들고, 이후 같은 자연어 QA 를 공개 설치본으로 다시 확인할 수 있게 해요.
+
 ## [1.10.6](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.5...v1.10.6) (2026-07-07)
 
 Claude Code Desktop Code 모드 재QA에서 "진행 중이던 앱 만들기/배포 상태를 이어서 확인해줘" 같은 애매한 요청이 generic shell 확인으로 빠질 수 있었어요. 이제 상태 이어가기 요청은 bootstrap/deploy 스킬과 짧은 axhub CLI 상태 확인으로 먼저 라우팅되고, 배포 완료 여부도 사용자가 다시 말하지 않아도 같은 흐름에서 확인해요.
