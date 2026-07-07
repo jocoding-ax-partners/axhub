@@ -564,7 +564,7 @@ describe("smooth behavior contracts", () => {
     }
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-    expect(entries).toHaveLength(2);
+    expect(entries).toHaveLength(3);
 
     const resume = entries[1];
     expect(resume.type).toBe("command");
@@ -577,6 +577,31 @@ describe("smooth behavior contracts", () => {
     // hook is read-only: never deletes the marker, never spawns the axhub binary
     expect(resume.command).not.toContain("rm -f");
     expect(resume.command).not.toContain("axhub plugin-support");
+  });
+
+  test("AP-13 Windows execution contract hook is wired", () => {
+    interface HookEntry {
+      type: string;
+      shell?: string;
+      command: string;
+    }
+    interface HooksFile {
+      hooks: { SessionStart: Array<{ hooks: HookEntry[] }> };
+    }
+    const hooksFile = readJson<HooksFile>("hooks/hooks.json");
+    const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
+
+    const windows = entries[2];
+    expect(windows.type).toBe("command");
+    expect(windows.shell).toBe("bash");
+    // Windows-only guard + killswitch
+    expect(windows.command).toContain("AXHUB_NO_WINDOWS_CONTRACT");
+    expect(windows.command).toContain("Windows_NT");
+    // emits the Git Bash execution contract (invariant with agent-policy AP-13)
+    expect(windows.command).toContain("Git Bash 전용");
+    expect(windows.command).toContain("PowerShell");
+    // read-only / non-blocking: only echoes, never deletes markers
+    expect(windows.command).not.toContain("rm -f");
   });
 
   test("mcp-ready-card encodes restart handoff and resume contracts", () => {

@@ -104,7 +104,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 > **정책 기준 문서:** 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 개발·운영 규칙은 `docs/policy/dev-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 기준이에요. 이 파일의 요약과 다르면 정책 문서를 따라요. 어긋남은 `tests/policy-parity.test.ts` 가 잡아요.
 
-axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어요: `onboarding` / `bootstrap` / `deploy` + 그 셋에 명확히 안 맞거나 의도가 불분명한 axhub 발화를 라이브 `--help` 탐색으로 처리하는 `clarity` 브리지예요. 이후 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import` skill, CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis` skill 을 더해 현재 8 skill 이에요. 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli (`axhub` 바이너리) 를 직접 호출해요. Rust helper 바이너리 (`crates/axhub-helpers`), 모든 hook(이후 SessionStart 훅 2개 — auto-update + 온보딩 MCP 재시작 resume — 만 `hooks/` 로 재도입, 아래 "자동 업데이트 hook"·"온보딩 MCP 재시작 resume hook" 참고), NL routing corpus, scaffold/skill-doctor/lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인은 전부 제거됐어요.
+axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어요: `onboarding` / `bootstrap` / `deploy` + 그 셋에 명확히 안 맞거나 의도가 불분명한 axhub 발화를 라이브 `--help` 탐색으로 처리하는 `clarity` 브리지예요. 이후 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import` skill, CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis` skill 을 더해 현재 8 skill 이에요. 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli (`axhub` 바이너리) 를 직접 호출해요. Rust helper 바이너리 (`crates/axhub-helpers`), 모든 hook(이후 SessionStart 훅 3개 — auto-update + 온보딩 MCP 재시작 resume + Windows 실행 계약(AP-13) — 만 `hooks/` 로 재도입, 아래 "자동 업데이트 hook"·"온보딩 MCP 재시작 resume hook"·"Windows 실행 계약 hook" 참고), NL routing corpus, scaffold/skill-doctor/lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인은 전부 제거됐어요.
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
 
@@ -127,6 +127,14 @@ auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks
 - hook 은 파일 존재 + mtime 만 봐요 — `axhub` 바이너리도 네트워크도 안 건드리고, marker 삭제도 skill 몫이에요 (`VIBE_READY` 시 `rm -f`).
 - **끄기:** `AXHUB_NO_ONBOARDING_RESUME=1`. Windows 전제는 auto-update 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
 - 세부 절차는 `skills/onboarding/references/mcp-ready-card.md` 의 Restart Marker / Resume After Restart 섹션이 소유해요.
+
+## Windows 실행 계약 hook (AP-13)
+
+auto-update·resume 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks.json` 세 번째 entry). Windows(`$OS`=Windows_NT) 세션에서만 Git Bash 실행 계약을 always-on 으로 emit 해요 — axhub 명령은 Git Bash 전용(PowerShell 금지), PATH 는 `axhub plugin-support repair-path` 후 새 터미널, `auth status` 는 로그인한 그 셸에서 검증, 로그인은 단일 폴링 1회. skill 본문이 아니라 hook 에 둔 이유는, 사고처럼 에이전트가 skill 을 안 따르고 free-form 으로 PowerShell 을 쓰는 경로까지 덮기 위해서예요 (skill byte 예산도 안 먹어요).
+
+- hook 은 `$OS` 만 봐요 — 네트워크·`axhub` 바이너리·marker 안 건드리고, non-Windows 는 즉시 exit 0.
+- **끄기:** `AXHUB_NO_WINDOWS_CONTRACT=1`. Windows 전제는 다른 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
+- 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-13 이 소유해요 (parity 적용: `hooks/hooks.json`, `CLAUDE.md`).
 
 ## CLI 호출 표면
 
@@ -180,3 +188,5 @@ Key routing rules:
 **모든 트리거 전제 (AP-11):** 위 규칙은 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요. 맥락 없는 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘")는 실행·안내로 밀어붙이지 않고 한 번 묻거나 종료하며 다른 axhub 스킬로 넘기지 않아요. bootstrap 은 preview-confirm 승인이 backstop 이라 frontmatter 게이트로만 적용해요.
 
 **진입 확인 AUQ (AP-12):** axhub 프로젝트가 확정돼도 배포·생성·가져오기(deploy·bootstrap·import) 실행 전에 interactive 에서는 "axhub로 진행할까요?"를 AskUserQuestion 으로 한 번 더 확인해요("무엇을·어떻게"를 묻는 기존 preview 승인과 별개인 진입 게이트). deploy·import 는 preview 앞 별도 AUQ, bootstrap 은 기존 preview 승인에 통합(byte 예산 포화). headless 는 생략해요.
+
+**Windows 실행 계약 (AP-13):** Windows 에선 axhub 명령을 Git Bash 전용으로 실행해요 (PowerShell 금지). PATH 는 수동 등록 대신 `axhub plugin-support repair-path` 후 새 터미널, `auth status` 는 `auth login` 한 그 셸에서 검증해요 — HOME 없는 PowerShell 의 "미로그인" 은 실패가 아니에요. 로그인은 단일 폴링 `axhub auth login --json` 1 회로 하고 background 재실행은 안 해요.
