@@ -29,7 +29,7 @@ If `PUBLIC_URL` exists but `VISIBILITY=private` or `REVIEW_STATUS!=approved`, do
 If the user asked for a public app or to share with anyone, submit the publication request with the top-level publish command, not an app metadata update:
 
 ```bash
-axhub publish --app "$APP_SLUG" --visibility public --json
+axhub publish --app "$APP_SLUG" --visibility public --execute --json
 axhub review history --app "$APP_SLUG" --json
 ```
 

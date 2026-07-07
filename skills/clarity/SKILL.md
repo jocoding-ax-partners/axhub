@@ -1,15 +1,19 @@
 ---
 name: clarity
-description: 'clarity: onboarding/bootstrap/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "Use the axhub clarity skill", "show current app status", "is production healthy?", "reconnect my GitHub account with axhub", "GitHub device code", "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 빈 디렉토리 새 앱 만들기·템플릿·앱 이름 선택=bootstrap, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요. 앱 상태 조회와 새 앱 생성이 한 요청에 섞이면 clarity 는 상태만 조회하고 concept/name/slug/template 질문 없이 bootstrap 으로 넘겨요. 영어로 clarity skill 이나 GitHub 계정 재연결을 직접 지정한 요청도 반드시 이 스킬로 라우팅해요. 이 트리거들은 axhub 맥락(현재 폴더의 axhub 연결·대화의 axhub 언급·직전 axhub 작업)이 있을 때만 유효해요. 일반 프로젝트의 .env·로그·DB 작업 발화에는 이 스킬을 쓰지 않아요.'
+description: 'clarity: for vague axhub app-status prompts, invoke this skill before finding or calling any tools; do not use Claude Desktop axhub App/MCP tools such as Tenant recent deployments, App list, or App get. onboarding/bootstrap/import/deploy/development/diagnosis/update 에 명확히 안 맞는 axhub CLI 운영 브리지. "Use the axhub clarity skill", "show current app status", "is production healthy?", "내 앱들이 지금 어떤 상태인지 모르겠어", "내 앱들 알아서 봐줘", "전체 앱 상태 봐줘", "reconnect my GitHub account with axhub", "GitHub device code", "axhub로 ~해줘", "환경변수 설정", "로그 보여줘", "롤백", "테이블/컬럼", "데이터 조회"처럼 의도가 모호하거나 별도 스킬 밖인 요청에서 공개 --json-schema/--help 를 라이브 탐색해 실행해요. 삭제·롤백·force/execute 같은 파괴적 변경은 승인 필요. 기존 앱 첫 연결=import, 빈 디렉토리 새 앱 만들기·템플릿·앱 이름 선택=bootstrap, 앱 코드 생성=development, 배포 실패 읽기 전용 진단=diagnosis, 버전 업데이트=update 로 양보하고 앱 코드는 쓰지 않아요. 앱 상태 조회와 새 앱 생성이 한 요청에 섞이면 clarity 는 상태만 조회하고 concept/name/slug/template 질문 없이 bootstrap 으로 넘겨요. 영어로 clarity skill 이나 GitHub 계정 재연결을 직접 지정한 요청도 반드시 이 스킬로 라우팅해요. 이 트리거들은 axhub 맥락(현재 폴더의 axhub 연결·대화의 axhub 언급·직전 axhub 작업)이 있을 때만 유효해요. 일반 프로젝트의 .env·로그·DB 작업 발화에는 이 스킬을 쓰지 않아요.'
 ---
 
 # axhub clarity 브리지
+
+> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
 8개 스킬(onboarding·bootstrap·import·deploy·development·diagnosis·clarity·update) 중 다른 스킬에 명확히 안 맞거나 **의도가 불분명한** axhub 요청을 여기서 해소해요. 작업→명령 카탈로그는 없어요 — **매번 라이브 CLI 의 `--help` 트리를 탐색**해 맞는 명령을 찾고, 조회 명령은 바로 실행하되 파괴적 변경은 승인 뒤 실행해요.
 
 현재 폴더에 axhub 연결(manifest)이 없고 발화에 axhub 언급도, 대화에 axhub 맥락도 없으면 — 예를 들어 일반 프로젝트에서 "로그 보여줘" — axhub CLI 탐색을 시작하지 않고 일반 작업으로 양보하며 조용히 종료해요.
 
 **CLI-only.** 이 스킬의 조회·상태 확인·운영 브리지는 Claude Desktop 에 보이는 `axhub` App/MCP 도구가 아니라 Bash/명령 도구로 실행하는 `axhub` CLI 만 사용해요. `App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)`, `Deployment status (axhub)` 같은 도구가 보여도 호출하지 않아요. read-only 조회라도 MCP/App tool 로 빠지면 CLI help gate·제목 계약·권한 UX 를 검증할 수 없어서 이 스킬의 실패예요.
+
+사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL 로만 써요. Markdown URL 링크 문법은 전부 금지예요. `[https://...](https://...)`, `[열기](https://...)`, `<https://...>` 처럼 URL 을 괄호나 label 로 감싸지 말고 `https://...` 그대로 보여줘요.
 
 **Desktop-visible command allowlist.** Claude Desktop 에 보이는 모든 `clarity` 명령은 `axhub ...` 단일 명령이어야 해요. 탐색(`--json-schema`), 사용법 확인(`--help`), 실행(`--json`) 모두 공통으로 `bash -lc`, `sh -c`, `| head`, `| grep`, `| sed`, `| awk`, shell pipe, `>`, `<`, `2>`, `&>`, `;`, `&&`, `||`, `echo`, `cat`, `wc`, `tee`, `xargs`, `jq`, `python`, `node`, `perl`, `mktemp`, command substitution, 임시 파일, Read/Write/file tool 을 쓰지 않아요. `--field-expr` 문자열 내부의 `|` 는 허용되지만 shell pipe 로 출력 후처리하면 실패예요. 출력이 크면 `head -c` 로 자르지 말고 더 좁은 `--field-expr` 경로를 다시 고른 단일 `axhub --json-schema --field-expr '...'` 명령을 실행해요.
 
@@ -21,6 +25,8 @@ Claude Desktop 에서는 slash 명령이 채팅에서 인식되지 않을 수 �
 - `Use axhub clarity to check whether production is healthy.`
 - `Show current app status for <app>. Read-only only.`
 - `Check app status and production health without deploying.`
+- `내 앱들이 지금 어떤 상태인지 모르겠어. 알아서 봐줘.`
+- `내 앱들 전체 상태만 쉽게 알려줘.`
 
 이런 요청을 받으면 직전 답변을 재사용해서 끝내지 말고, 필요한 공개 CLI 조회를 새로 실행해 현재 상태를 확인해요. slash 명령이 실패한 직후라도 자연어 요청은 독립된 새 요청으로 취급해요.
 
@@ -32,7 +38,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - device flow fast path 에서는 Step 1a 의 optional `axhub update check --json` 버전 확인을 건너뛰어요. 사용자가 지금 필요한 건 코드와 브라우저 승인이라서, 업데이트 권한 팝업이나 버전 안내로 앞단을 늦추지 않아요.
 - Claude Desktop 에서 `axhub github link` 를 실행할 때는 자동 브라우저 열기와 agent-safe 흐름을 위해 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>` 형태로 실행해요.
 - device flow 를 시작하는 Bash/tool call 제목은 정확히 `계정 인증 시작` 으로 직접 채워요. 자동 제목에 제품명이나 영어 단어가 붙어 동사처럼 보이면 같은 명령이라도 이 제목으로 고쳐 다시 호출해요.
-- 로그를 짧게 폴링해서 URL과 입력 코드를 찾고, 발견 즉시 일반 채팅 본문에 URL과 입력 코드를 다시 써요. device-flow URL 은 markdown 링크로 만들지 말고 평문 `https://...` 절대 URL 로만 써요. `[https://github.com/login/device](github.com/login/device)` 처럼 target 에 scheme 이 빠질 수 있는 링크 문법은 금지예요. 예: `GitHub 인증 창이 열렸어요. 브라우저에서 https://github.com/login/device 를 열고 입력 코드 ABCD-1234 를 넣으면 여기서 자동으로 이어갈게요.`
+- 로그를 짧게 폴링해서 URL과 입력 코드를 찾고, 발견 즉시 일반 채팅 본문에 URL과 입력 코드를 다시 써요. device-flow URL 은 Markdown 링크로 만들지 말고 평문 `https://...` 절대 URL 로만 써요. `[https://github.com/login/device](https://github.com/login/device)`, `[GitHub 열기](https://github.com/login/device)`, `<https://github.com/login/device>` 같은 링크 문법은 모두 금지예요. 예: `GitHub 인증 창이 열렸어요. 브라우저에서 https://github.com/login/device 를 열고 입력 코드 ABCD-1234 를 넣으면 여기서 자동으로 이어갈게요.`
 - 입력 코드를 찾았으면 승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출해요. `실행됨 명령 N개`, `TaskOutput 사용함`, tool 카드, 접힌 로그만 남기고 응답을 끝내면 실패예요.
 - 코드를 명령 출력이나 로그 읽기 결과 안에만 남기지 않아요. Claude Desktop 에서는 tool 출력이 접혀 보일 수 있으므로, 최종 요약이나 다음 안내 문장에도 사용자가 입력할 코드를 한 번 더 써요.
 - 자동 브라우저 열기와 자동 폴링이 가능하더라도 사용자가 "승인했어"라고 다시 말하게 하지 않아요. CLI 가 짧은 agent-safe 승인 대기 뒤 pending 으로 끝나면, shell loop 로 감시하지 말고 `인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 조회를 실행해 연결 반영 여부를 확인해요.
@@ -45,6 +51,8 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 
 단순 상태 확인은 대표 여정의 마지막 조회 단계라 **빠른 경로**예요. 전체 `--json-schema` 탐색으로 돌아가지 말고, 먼저 `앱 상태 조회` 제목으로 앱 상세 조회 help gate 를 통과한 뒤 앱 상태를 조회해요. 운영 배포 확인이 추가로 필요할 때만 `운영 상태 확인` 제목으로 운영 배포 상태 help gate 를 통과하고 조회해요. 이 빠른 경로도 공개 CLI 표면만 쓰며 hidden `plugin-support` 는 호출하지 않아요.
 
+현재 폴더/현재 앱 예외: 사용자가 "이 폴더", "현재 폴더", "여기 앱", "current folder", "current app" 의 상태를 묻는다면 현재 Code workspace 의 `axhub.yaml` 또는 이미 확인한 앱 바인딩을 먼저 읽고 그 앱으로 상태를 조회해요. 이 경우 manifest 를 달라고 되묻지 않아요. 현재 workspace 에 `axhub.yaml` 과 알려진 바인딩이 모두 없으면 오류로 멈추지 말고 아래 계정 전체 앱 상태 fast path 로 degrade 해서 `axhub apps list --page-size 5 --json` 을 조회해요.
+
 계정 전체 상태 요청도 빠른 경로예요. 사용자가 "내 앱들", "앱들이 지금 어떤 상태인지", "전체 앱 상태", "뭐가 배포됐는지 모르겠어", 또는 영어로 `app status` 처럼 특정 앱을 말하지 않고 앱 목록·상태를 묻는다면 프로젝트 폴더를 스캔하지 말아요. 새 디렉토리가 비어 있어도 그건 오류가 아니라 계정/작업공간 조회 요청이에요. `작업은 <경로> 안에서만` 같은 말은 실행 cwd 제한일 뿐, 디렉토리 구조를 먼저 확인하라는 뜻이 아니에요.
 
 - 계정 전체 앱 상태에서는 일반 clarity 탐색을 시작하지 않아요. `axhub --json-schema`, `--help`, `keys[]`, `.commands.apps.workspace`, `.commands.apps.get`, `.commands.apps.status` 같은 schema/help 탐색을 모두 건너뛰어요.
@@ -52,10 +60,12 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - CLI 존재 확인이 필요하면 `CLI 설치 확인` 제목으로 `command -v axhub` 또는 기존 host 의 CLI presence check 한 번만 실행해요. 그 다음 바로 `앱 상태 조회` 제목으로 `axhub apps list --page-size 5 --json` 을 실행해요. 앱이 많아도 첫 5개와 총 개수만 요약하고, 더 보려면 "더 보여줘"라고 할 수 있다고 말해요.
 - 계정 전체 앱 상태 fast path 의 정상 tool call 은 최대 2개예요: `CLI 설치 확인` 1개와 `앱 상태 조회` 1개. 이미 CLI 가 있다고 이전 단계에서 확정했으면 `앱 상태 조회` 1개만 실행해요. 3개 이상 `명령 표면 확인` 카드가 보이면 실패예요.
 - `앱 상태 조회` 결과를 2-4줄 한국어로 바로 요약해요. 이때 Claude Desktop 에 보이는 실행 명령은 `axhub apps list --page-size 5 --json` 단일 leaf CLI 호출이어야 해요. `--all` 로 전체 50개 이상을 길게 뽑지 말고, `--field-expr` 가 null/0 으로 오해될 수 있으니 이 fast path 에서는 쓰지 않아요. `> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution, 임시 파일 저장/재읽기, shell wrapper 로 감싸지 않아요. tool 출력은 assistant 내부에서 읽고 요약해요.
+- 정적 앱처럼 별도 빌드 배포 이력이 없지만 URL 이 서빙 중인 항목은 `정적 사이트로 정상 서빙 중` 또는 `정적 배포 방식이라 별도 빌드 이력 없음`처럼 말해요. `배포 완료했지만 아직 첫 배포 전`처럼 서로 모순되는 표현을 쓰지 않아요.
 - `앱 상태 조회` 실행 뒤에는 Read/파일 읽기 도구로 `*.txt`, `/tmp/*`, command output snapshot, 임시 결과 파일을 열지 않아요. Claude Desktop 이 command output 을 파일로 접어 보여줘도 그 파일을 읽지 말고, 필요한 범위를 더 좁힌 `axhub ... --json` 또는 `axhub --json-schema --field-expr ...` 단일 CLI 호출을 다시 실행해요.
 - 이 빠른 경로에서 tool call 이 4개를 넘기면 멈추고 지금까지 확인한 결과만 요약해요. 더 깊은 로그·실패 원인 분석은 diagnosis 로 넘겨요.
 - 계정 전체 상태 조회 중에는 `디렉토리 구조 확인`, `파일 목록 확인`, `프로젝트 확인` 같은 tool 제목이나 `ls`, `find`, `pwd` 류 명령을 쓰지 않아요.
 - 계정 전체 상태 조회 중에는 `App list (axhub)` 또는 `Tenant recent deployments (axhub)` 같은 Claude Desktop axhub App/MCP 도구를 쓰지 않아요. 같은 정보를 조회해야 해도 반드시 `axhub apps list --page-size 5 --json` CLI 로 확인해요.
+- 현재 요청 결과만 요약해요. 이전 Task/Subagent/Agent/백그라운드 작업, 백그라운드 검색 작업, TaskOutput 결과를 언급하지 않아요. `이건 아까 확인차 돌려봤던 백그라운드 검색 작업 결과인데` 같은 별도 작업 설명을 붙이지 않아요.
 
 - 사용자에게 보이는 Bash/tool call 제목은 한국어 명사구만 써요: `명령 표면 확인`, `명령 사용법 확인`, `앱 상태 조회`, `운영 상태 확인`, `결과 정리`.
 - Bash/명령 tool 을 호출할 때 description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요. 도구가 자동으로 제목을 만들도록 비워두면 `axhub: App get 사용 중` 같은 이름이 보이므로 금지예요.

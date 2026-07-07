@@ -108,6 +108,8 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 `clarity` 브리지는 정해진 명령 목록을 들고 있지 않아요. `axhub --help` 트리를 라이브로 탐색해 맞는 명령을 찾고 바로 실행해요 — CLI 가 새 명령을 추가해도 플러그인 수정 없이 따라가요. 단, 배포 실패 원인을 명시적으로 묻는 요청은 `diagnosis` 가 맡고 raw 로그 대신 여섯 가지 결과로 요약해요.
 
+Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 특히 "내 앱들이 지금 어떤 상태인지 모르겠어", "내 앱들 알아서 봐줘", "전체 앱 상태 봐줘" 같은 상태 요청은 `clarity` 가 `axhub` CLI 로 처리하고, `Tenant recent deployments`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않아요.
+
 ## ✅ 대표 여정과 UX 샘플
 
 대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. 각 단계는 `onboarding` 이 CLI·로그인·환경을 detect-first 로 확인하고, `bootstrap` 이 앱 생성과 첫 배포를 이어가며, `deploy` 가 preview-confirm 뒤 `axhub deploy verify <deployment-id> --app <app>` 로 성공을 확정하고, 이후 상태·로그·환경변수 같은 나머지 작업은 `clarity` 가 공개 CLI 표면에서 찾아 처리해요.

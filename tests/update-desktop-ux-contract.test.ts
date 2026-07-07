@@ -47,11 +47,11 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("`local` → `project` → `user`");
     expect(update).toContain("낮은 버전이 함께 남아 있어도 사용자에게 중복 설치·scope 원문을 설명하지 않고");
     expect(update).toContain("성공하면 `claude plugin list` 를 한 번 더 실행해");
-    expect(update).toContain("이 값이 `plugin.latest` 보다 높으면 `<PLUGIN_UPDATED_VERSION>` 을 최종 카드에 써요");
+    expect(update).toContain("확인된 받은 버전이 CLI 응답의 플러그인 최신 버전보다 높아도 최종 카드에는 확인된 받은 버전만 한국어 결과 줄로 써요");
     expect(update).toContain("낡은 중복 항목을 나열하지 않아요");
     expect(update).toContain("중복 설치 판정 알고리즘");
     expect(update).toContain("낮은 버전 block 이 남아 있어도 그것은 cleanup 대상이 아니며");
-    expect(update).toContain("`<PLUGIN_VERSION>` 이 `plugin.latest` 이상이면 `plugin.has_update` 가 true 처럼 보여도");
+    expect(update).toContain("현재 확인한 최고 enabled 버전이 CLI 응답의 플러그인 최신 버전 이상이면 업데이트 필요처럼 보여도");
     expect(update).toContain("`local 1.8.2` 와 `user 1.8.0` 이 함께 있으면 현재 버전은 `1.8.2`");
     expect(update).toContain("`user 1.8.0 → 1.8.2` 같은 정리성 업데이트나 결과 카드를 만들지 않아요");
     expect(update).toContain("이때 낮은 중복 scope 가 있어도 `claude plugin update` 를 실행하지 않아요");
@@ -59,6 +59,17 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("최고 enabled 버전이 이미 최신이면, 낮은 중복 항목을 최신화하기 위한 `claude plugin update` 를 실행하지 않아요");
     expect(update).toContain("NEVER `claude plugin list` 에서 처음 발견한 낡은 `axhub@axhub` 항목만 보고 업데이트 여부를 판단하지 말아요");
     expect(update).toContain("NEVER 최고 enabled semver 가 이미 최신인데도 낮은 중복 scope 를 기준으로");
+  });
+
+  test("keeps plugin update confirmation text human-facing", () => {
+    const update = readRepo("skills/update/SKILL.md");
+
+    expect(update).toContain("플러그인: vX -> vY 받음 (재시작 필요)");
+    expect(update).toContain("Claude Code 를 재시작하면 새 버전이 적용돼요.");
+    expect(update).toContain("확인·비교 결과를 설명하는 영어 디버그 문장이나 raw 확인 줄은 쓰지 않아요");
+    for (const leakedPhrase of ["PLUGIN_UPDATED_VERSION", "matching plugin.latest", "Confirmed:", "Confirmed", "plugin.latest"]) {
+      expect(update).not.toContain(leakedPhrase);
+    }
   });
 
   test("does not continue mixed app-status requests inside update", () => {

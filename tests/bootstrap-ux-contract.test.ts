@@ -102,8 +102,8 @@ describe("bootstrap desktop UX contract", () => {
     const bootstrap = readBootstrap();
     const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     const cloneSection = bootstrap.slice(
-      bootstrap.indexOf("### 9. Clone And Manifest"),
-      bootstrap.indexOf("### 10. Result"),
+      bootstrap.indexOf("### 10. Clone And Manifest"),
+      bootstrap.indexOf("### 11. Result"),
     );
 
     expect(cloneSection).toContain("`.omc/` 같은 Desktop 메타데이터");
@@ -285,6 +285,23 @@ describe("bootstrap desktop UX contract", () => {
     expect(templateReference).toContain("Ask for template and app name before the GitHub App gate");
   });
 
+  test("checks app address availability before bootstrap dry-run preview", () => {
+    const bootstrap = readBootstrap();
+
+    const workflow = bootstrap.slice(bootstrap.indexOf("실제 순서:"), bootstrap.indexOf("Slash command"));
+    expect(workflow.indexOf("GitHub App gate")).toBeGreaterThanOrEqual(0);
+    expect(workflow.indexOf("Availability check")).toBeGreaterThanOrEqual(0);
+    expect(workflow.indexOf("Dry-run preview")).toBeGreaterThanOrEqual(0);
+    expect(workflow.indexOf("GitHub App gate")).toBeLessThan(workflow.indexOf("Availability check"));
+    expect(workflow.indexOf("Availability check")).toBeLessThan(workflow.indexOf("Dry-run preview"));
+    expect(bootstrap).toContain("Tool 제목은 `앱 주소 확인`");
+    expect(bootstrap).toContain("axhub apps check-availability --tenant <tenant> --slug <app-slug> --subdomain <app-slug> --json");
+    expect(bootstrap).toContain("dry-run preview 전 pre-preview guard");
+    expect(bootstrap).toContain("slug 또는 subdomain 중 하나라도 unavailable 이면 bootstrap dry-run/execute 금지");
+    expect(bootstrap).toContain("availability check 부터 다시 실행해요");
+    expect(bootstrap).toContain("execute 실패 뒤 복구로 처리하지 않아요");
+  });
+
   test("keeps desktop-visible bootstrap commands literal and one command at a time", () => {
     const bootstrap = readBootstrap();
     const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
@@ -366,11 +383,16 @@ describe("bootstrap desktop UX contract", () => {
     const resultReference = readRepo("skills/bootstrap/references/errors-and-followups.md");
 
     expect(bootstrap).toContain("`visibility=private` 또는 `review_status=pending` 이면 친구에게 바로 공개됐다고 말하지 않아요");
-    expect(bootstrap).toContain('axhub publish --app "$APP_SLUG" --visibility public --json');
+    expect(bootstrap).toContain('axhub publish --app "$APP_SLUG" --visibility public --execute --json');
+    expect(bootstrap).not.toContain('axhub publish --app "$APP_SLUG" --visibility public --dry-run');
+    expect(bootstrap).toContain("publish dry-run 을 먼저 호출하지 않고");
+    expect(bootstrap).toContain("`Dry-run 기본값` 같은 내부 CLI dry-run semantics");
     expect(bootstrap).toContain("승인 전 공개 확대를 `axhub apps update --visibility public` 로 시도하지 않아요");
     expect(bootstrap).toContain("도메인-only target 금지");
     expect(resultReference).toContain("If `PUBLIC_URL` exists and `VISIBILITY=public` and `REVIEW_STATUS=approved`");
     expect(resultReference).toContain("do not call it public");
+    expect(resultReference).toContain('axhub publish --app "$APP_SLUG" --visibility public --execute --json');
+    expect(resultReference).not.toContain('axhub publish --app "$APP_SLUG" --visibility public --dry-run');
     expect(resultReference).toContain('Never try `axhub apps update "$APP_SLUG" --visibility public` before approval');
   });
 
@@ -381,6 +403,10 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("이 스킬은 CLI-only 흐름이에요");
     expect(bootstrap).toContain("`App get (axhub)`");
     expect(bootstrap).toContain("`Finding tools` 로 이동해서 MCP/App 도구를 찾지 않아요");
+    expect(bootstrap).toContain("다른 플러그인/워크플로 상태를 정리하지 않아요");
+    expect(bootstrap).toContain("`oh-my-claudecode`, `autopilot`, `cancel`, `.omc` state tools");
+    expect(bootstrap).toContain("`Task done, now marking autopilot inactive.`");
+    expect(bootstrap).toContain("`plugin oh-my-claudecode ...`");
     expect(bootstrap).toContain("axhub apps get <app-slug> --tenant <tenant> --json");
     expect(bootstrap).toContain("axhub deploy verify <deployment-id> --json");
     expect(resultReference).toContain("through `axhub apps get` CLI only");

@@ -16,6 +16,8 @@ model: sonnet
 
 # Onboarding (first-run setup router)
 
+> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
+
 처음 axhub 를 쓰는 사람을 위한 단일 진입점이에요. 사용자는 `온보딩`, `처음인데 뭐부터`, `getting started` 처럼 말하면 되고, 이 스킬은 CLI/auth/runtime/GitHub/repo/deps/MCP 준비를 한 gap 씩 닫아요. 환경 진단만 원하면 doctor/diagnosis 가 맞고, 새 앱 생성을 명시하면 bootstrap 이 맞아요. onboarding 은 빈 폴더에서도 자동 bootstrap 을 시작하지 않고 Ready card 에서 `첫 앱 만들어줘` 를 다음 말로 안내해요.
 
 ## Reference Loading
@@ -47,6 +49,8 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 
 각 단계 시작에는 사용자가 멈춘 것으로 오해하지 않게 한국어 한 줄만 말해요. raw JSON, secret, internal id, full stderr 는 chat 에 넣지 않아요.
 사용자에게 보이는 문장과 Bash/tool call 제목은 한국어로만 써요. `first_gap`, `gaps`, `cli_state`, `auth_error_code` 같은 detect 필드명이나 enum 값은 내부 라우팅용으로만 읽고, chat 에 그대로 출력하지 않아요. "빈 폴더라 자동으로 만들지 않았어요"처럼 사람 말로 바꿔요.
+
+사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL 로만 써요. GitHub App 설치 URL, OAuth/device-flow URL, 앱 URL 모두 Markdown URL 링크 문법 없이 그대로 보여줘요. `[https://...](https://...)`, `[열기](https://...)`, `<https://...>` 처럼 URL 을 괄호나 label 로 감싸면 실패예요.
 
 - `환경 점검하는 중이에요`
 - `axhub CLI 설치하는 중이에요`

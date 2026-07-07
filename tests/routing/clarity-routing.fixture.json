@@ -10,6 +10,7 @@
     { "utterance": "환경변수 설정해줘", "context": "axhub 연결된 앱 폴더", "expected": "clarity", "why": "axhub env 운영 명령 + axhub 맥락" },
     { "utterance": "로그 보여줘", "context": "axhub 연결된 앱 폴더", "expected": "clarity", "why": "axhub 로그 조회" },
     { "utterance": "현재 앱 상태 확인해줘", "context": "axhub 맥락", "expected": "clarity", "why": "모호한 axhub 운영 발화" },
+    { "utterance": "내 앱들이 지금 어떤 상태인지 모르겠어. 알아서 봐줘.", "context": "axhub 연결된 Code workspace", "expected": "clarity", "why": "바이브코더식 계정 전체 앱 상태 요청" },
     { "utterance": "로그 보여줘", "context": "axhub 무관 일반 프로젝트(axhub 연결·언급 없음)", "expected": "none", "why": "AP-11 — 일반 프로젝트 로그 요청, axhub CLI 탐색 시작 안 하고 일반 작업으로 양보·종료" },
     { "utterance": "환경변수 좀 정리해줘", "context": "axhub 무관 일반 프로젝트", "expected": "none", "why": "AP-11 — 일반 .env 작업" },
     { "utterance": "테이블 만들어줘", "context": "axhub 연결된 앱 폴더", "expected": "clarity", "why": "axhub table 운영 명령 (앱 코드 아님)" },
