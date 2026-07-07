@@ -22,7 +22,11 @@ describe("update Desktop UX contract", () => {
     expect(manifest.description).toContain("unrelated plugin mode");
     expect(manifest.description).toContain("/oh-my-claudecode:autopilot");
     expect(manifest.description).toContain("exact `axhub apps --help` then `axhub apps list --json`");
+    expect(manifest.description).toContain("`axhub apps get <app> --json`");
+    expect(manifest.description).toContain("`axhub deploy list --app <app> --json`");
     expect(manifest.description).toContain("nonexistent `axhub app list`");
+    expect(manifest.description).toContain("never `axhub deployment list`");
+    expect(manifest.description).toContain("never Claude Desktop axhub App/MCP permission popups");
     expect(manifest.description).toContain("never pipes or redirects");
   });
 
@@ -103,14 +107,20 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("버전 확인과 다른 axhub 운영 요청을 함께 말하면");
     expect(update).toContain("버전 확인/업데이트 결과를 먼저");
     expect(update).toContain("업데이트 확인은 끝났어요. 이어서 요청하신 작업을 계속할게요.");
-    expect(update).toContain("`App list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)`");
-    expect(update).toContain("read 작업이어도 update 단계에서는 금지예요");
+    expect(update).toContain("`App list (axhub)`, `Deployment list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)`");
+    expect(update).toContain("read 작업이어도 CLI 계약을 우선해요");
     expect(update).toContain("원문이 영어로 `then`, `and then`, `after that`, `help me understand` 를 써도");
     expect(update).toContain("업데이트 뒤 남은 요청을 버리지 않아요");
     expect(update).toContain("CRITICAL post-update app overview");
     expect(update).toContain("`axhub apps --help`");
     expect(update).toContain("`axhub apps list --json`");
     expect(update).toContain("첫 overview 의 Desktop-visible Bash command 는 아래 두 개만 허용해요");
+    expect(update).toContain("목록에서 현재 폴더·대화와 관련된 앱을 고른 뒤에도");
+    expect(update).toContain("`axhub apps get <app> --json`");
+    expect(update).toContain("`axhub deploy list --app <app> --json`");
+    expect(update).toContain("`Deployment list (axhub)`, `App get (axhub)`, `Tenant recent deployments (axhub)`");
+    expect(update).toContain("존재하지 않는 `axhub deployment list`");
+    expect(update).toContain("업데이트 결과 카드 뒤에는 남은 요청을 이어서 처리하되, 이때도 앱 상태/배포 이력은 MCP/App 도구가 아니라 위의 CLI overview 흐름으로 실행해요");
     expect(update).toContain("명령 문자열 뒤에 공백 외 어떤 문자도 붙이지 않아요");
     expect(update).toContain("존재하지 않는 단수 명령 `axhub app list`");
     expect(update).toContain("`axhub apps list --json 2>/dev/null | head -100`");
@@ -157,7 +167,10 @@ describe("update Desktop UX contract", () => {
     expect(hooks).toContain("invoke the axhub update skill");
     expect(hooks).toContain("현재 버전을 확인할게요");
     expect(hooks).toContain("allowed visible commands are exactly axhub apps --help then axhub apps list --json");
+    expect(hooks).toContain("After choosing a related app, continue with CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json");
+    expect(hooks).toContain("Never call Claude Desktop axhub App/MCP tools such as Deployment list (axhub), App get (axhub), or Tenant recent deployments (axhub)");
     expect(hooks).toContain("Never run nonexistent singular axhub app list");
+    expect(hooks).toContain("axhub deployment list");
     expect(hooks).toContain("axhub apps --help");
     expect(hooks).toContain("axhub apps list --json");
     expect(hooks).toContain("Never add pipes, redirects, head, tail, grep, sed, awk, bash -lc, sh -c, or 2>/dev/null");
@@ -171,6 +184,9 @@ describe("update Desktop UX contract", () => {
     expect(policy).toContain("UserPromptSubmit match");
     expect(policy).toContain("존재하지 않는 `axhub app list`");
     expect(policy).toContain("plural `axhub apps` 표면");
+    expect(policy).toContain("`axhub apps get <app> --json`, `axhub deploy list --app <app> --json`");
+    expect(policy).toContain("존재하지 않는 `axhub deployment list`");
+    expect(policy).toContain("`Tenant recent deployments`, `Deployment list`, `App list`, `App get`");
     expect(policy).toContain("`| head`, `2>/dev/null`, `grep` 같은 shell 후처리는 붙이지 않아요");
   });
 });
