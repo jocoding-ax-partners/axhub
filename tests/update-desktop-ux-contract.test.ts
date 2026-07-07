@@ -23,6 +23,10 @@ describe("update Desktop UX contract", () => {
     expect(manifest.description).toContain("/oh-my-claudecode:autopilot");
     expect(manifest.description).toContain("exact `axhub apps --help` then `axhub apps list --json`");
     expect(manifest.description).toContain("plugin lookup uses exact `claude plugin list`, never `claude plugin list 2>&1`");
+    expect(manifest.description).toContain("once the remaining app-status flow begins, do not rerun command-v");
+    expect(manifest.description).toContain("never `command -v axhub && axhub --version`");
+    expect(manifest.description).toContain("never `command -v claude && claude plugin list`");
+    expect(manifest.description).toContain("never `claude plugin list 2>&1 | grep`");
     expect(manifest.description).toContain("when folder/current conversation/latest list clearly identifies a related app");
     expect(manifest.description).toContain("do not ask which app");
     expect(manifest.description).toContain("before any summary");
@@ -31,7 +35,7 @@ describe("update Desktop UX contract", () => {
     expect(manifest.description).toContain("nonexistent `axhub app list`");
     expect(manifest.description).toContain("never `axhub deployment list`");
     expect(manifest.description).toContain("never Claude Desktop axhub App/MCP permission popups");
-    expect(manifest.description).toContain("never pipes or redirects");
+    expect(manifest.description).toContain("never &&, pipes, redirects, grep, or head");
   });
 
   test("does not read plugin cache manifests in Claude Desktop", () => {
@@ -54,10 +58,11 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요");
     expect(update).toContain("정확히 `claude plugin list` 만 실행한 출력");
     expect(update).toContain("이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요");
+    expect(update).toContain("`command -v claude && claude plugin list`");
     expect(update).toContain("`claude plugin list 2>&1`");
     expect(update).toContain("`claude plugin list 2>&1 | grep ...`");
     expect(update).toContain("redirect");
-    expect(update).toContain("실행하려는 command 가 `claude plugin list 2>&1` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.**");
+    expect(update).toContain("실행하려는 command 가 `claude plugin list 2>&1` 또는 `command -v claude && claude plugin list` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.**");
     expect(update).toContain("플러그인 버전, 설치 scope, 다음 CLI 확인을 영어 내부 로그처럼 chat 에 쓰지 말고");
     expect(update).toContain("필요한 경우 `현재 플러그인 버전을 확인했어요.` 라고만 말해요");
     expect(update).toContain("버전과 설치 위치를 같은 문장에 섞지 않아요");
@@ -65,7 +70,8 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("플러그인 확인 직후에는 `현재 플러그인 버전을 확인했어요.` 만 보여줘요");
     expect(update).toContain("출력이 길어도 전체 `claude plugin list` 결과를 도구 응답에서 내부적으로 읽고");
     expect(update).toContain("파일 읽기 도구를 쓰지 않아요");
-    expect(update).toContain("`claude` CLI 가 없거나 목록에서 못 찾으면 `<PLUGIN_VERSION>` 없이 CLI 업데이트 확인만 진행해요");
+    expect(update).toContain("정확히 `claude plugin list` 한 번으로 `axhub@axhub` 의 현재 버전을 내부 변수 `<PLUGIN_VERSION>` 으로만 둬요");
+    expect(update).toContain("`claude plugin list` 가 실패하거나 목록에서 못 찾으면 `<PLUGIN_VERSION>` 없이 CLI 업데이트 확인만 진행해요");
     expect(update).toContain("scope 원문, 영어 진행 로그는 사용자에게 말하지 않아요");
   });
 
@@ -117,6 +123,8 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("원문이 영어로 `then`, `and then`, `after that`, `help me understand` 를 써도");
     expect(update).toContain("업데이트 뒤 남은 요청을 버리지 않아요");
     expect(update).toContain("CRITICAL post-update app overview");
+    expect(update).toContain("`업데이트 확인은 끝났어요. 이어서 요청하신 앱 상태 확인을 계속할게요.` 를 말한 뒤에는 설치 확인·버전 확인·플러그인 확인을 다시 하지 않아요");
+    expect(update).toContain("`command -v axhub`, `axhub --version`, `command -v claude`, `claude plugin list` 를 다시 실행하지 않아요");
     expect(update).toContain("`axhub apps --help`");
     expect(update).toContain("`axhub apps list --json`");
     expect(update).toContain("첫 overview 의 Desktop-visible Bash command 는 아래 두 개만 허용해요");
@@ -134,8 +142,12 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("업데이트 결과 카드 뒤에는 남은 요청을 이어서 처리하되, 이때도 앱 상태/배포 이력은 MCP/App 도구가 아니라 위의 CLI overview 흐름으로 실행해요");
     expect(update).toContain("명령 문자열 뒤에 공백 외 어떤 문자도 붙이지 않아요");
     expect(update).toContain("존재하지 않는 단수 명령 `axhub app list`");
+    expect(update).toContain("`command -v axhub && axhub --version`");
+    expect(update).toContain("`command -v claude && claude plugin list`");
+    expect(update).toContain("`claude plugin list 2>&1 | grep`");
     expect(update).toContain("`axhub apps list --json 2>/dev/null | head -100`");
     expect(update).toContain("`axhub --help | head`");
+    expect(update).toContain("`&&`");
     expect(update).toContain("`2>/dev/null`");
     expect(update).toContain("`bash -lc`");
     expect(update).toContain("사용자의 추가 프롬프트를 기다리지 말고 다음 적절한 axhub 흐름을 시작해요");
@@ -178,14 +190,20 @@ describe("update Desktop UX contract", () => {
     expect(hooks).toContain("invoke the axhub update skill");
     expect(hooks).toContain("현재 버전을 확인할게요");
     expect(hooks).toContain("allowed visible commands are exactly axhub apps --help then axhub apps list --json");
+    expect(hooks).toContain("Once the assistant says 업데이트 확인은 끝났어요");
+    expect(hooks).toContain("must not run command-v, axhub --version, claude plugin list, plugin-location checks, or version probes again");
     expect(hooks).toContain("If folder/current conversation/latest list clearly identifies a related app, do not ask which app");
     expect(hooks).toContain("continue with CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json before any summary");
     expect(hooks).toContain("Never call Claude Desktop axhub App/MCP tools such as Deployment list (axhub), App get (axhub), or Tenant recent deployments (axhub)");
     expect(hooks).toContain("Never run nonexistent singular axhub app list");
+    expect(hooks).toContain("Never run command -v axhub && axhub --version");
+    expect(hooks).toContain("command -v claude && claude plugin list");
+    expect(hooks).toContain("claude plugin list 2>&1 | grep");
     expect(hooks).toContain("axhub deployment list");
     expect(hooks).toContain("axhub apps --help");
     expect(hooks).toContain("axhub apps list --json");
-    expect(hooks).toContain("Never add pipes, redirects, head, tail, grep, sed, awk, bash -lc, sh -c, or 2>/dev/null");
+    expect(hooks).toContain("Never add &&, pipes, redirects");
+    expect(hooks).toContain("Never add &&, pipes, redirects, head, tail, grep, sed, awk, bash -lc, sh -c, or 2>/dev/null");
     expect(hooks).toContain("update-first routing guard is active for Code mode");
     expect(hooks).not.toContain("axhub update check --plugin-version");
     expect(policy).toContain('"axhub가 진짜 최신인지 먼저 확인"');
@@ -196,11 +214,12 @@ describe("update Desktop UX contract", () => {
     expect(policy).toContain("UserPromptSubmit match");
     expect(policy).toContain("존재하지 않는 `axhub app list`");
     expect(policy).toContain("plural `axhub apps` 표면");
+    expect(policy).toContain("이 앱 상태 흐름에 들어간 뒤에는 `command -v axhub && axhub --version`, `command -v claude && claude plugin list`, `claude plugin list 2>&1 | grep` 같은 설치·버전·플러그인 probe 를 다시 실행하지 않아요");
     expect(policy).toContain("현재 폴더명·대화 맥락·가장 최근 목록으로 관련 앱이 하나로 좁혀지면");
     expect(policy).toContain("사용자에게 어느 앱을 볼지 묻지 말고");
     expect(policy).toContain("`axhub apps get <app> --json`, `axhub deploy list --app <app> --json`");
     expect(policy).toContain("존재하지 않는 `axhub deployment list`");
     expect(policy).toContain("`Tenant recent deployments`, `Deployment list`, `App list`, `App get`");
-    expect(policy).toContain("`| head`, `2>/dev/null`, `grep` 같은 shell 후처리는 붙이지 않아요");
+    expect(policy).toContain("`| head`, `2>/dev/null`, `grep`, `&&` 같은 shell 후처리는 붙이지 않아요");
   });
 });

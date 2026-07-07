@@ -58,7 +58,7 @@ describe("smooth behavior contracts", () => {
     expect(pluginJson.description).toContain("nonexistent `axhub app list`");
     expect(pluginJson.description).toContain("never `axhub deployment list`");
     expect(pluginJson.description).toContain("never Claude Desktop axhub App/MCP permission popups");
-    expect(pluginJson.description).toContain("never pipes or redirects");
+    expect(pluginJson.description).toContain("never &&, pipes, redirects, grep, or head");
     expect(pluginJson.description).not.toContain("`내 앱들이 지금 어떤 상태인지 모르겠어`");
     expect(pluginJson.description).not.toContain("Before finding or calling tools for vague app-status prompts");
     expect(pluginJson.description).not.toContain("clarity 스킬로 라우팅");
@@ -77,7 +77,7 @@ describe("smooth behavior contracts", () => {
     expect(marketplace.plugins[0]?.description ?? "").toContain("nonexistent `axhub app list`");
     expect(marketplace.plugins[0]?.description ?? "").toContain("never `axhub deployment list`");
     expect(marketplace.plugins[0]?.description ?? "").toContain("never Claude Desktop axhub App/MCP permission popups");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("never pipes or redirects");
+    expect(marketplace.plugins[0]?.description ?? "").toContain("never &&, pipes, redirects, grep, or head");
     expect(marketplace.plugins[0]?.description ?? "").not.toContain("Vague app-status requests");
     expect(marketplace.plugins[0]?.description ?? "").not.toContain("Before finding or calling tools for vague app-status requests");
   });
@@ -455,7 +455,7 @@ describe("smooth behavior contracts", () => {
     expect(update).toContain("`claude plugin list 2>&1`");
     expect(update).toContain("`claude plugin list 2>&1 | grep ...`");
     expect(update).toContain("pipe, redirect, text filter");
-    expect(update).toContain("실행하려는 command 가 `claude plugin list 2>&1` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.**");
+    expect(update).toContain("실행하려는 command 가 `claude plugin list 2>&1` 또는 `command -v claude && claude plugin list` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.**");
     expect(update).toContain("플러그인 버전, 설치 scope, 다음 CLI 확인을 영어 내부 로그처럼 chat 에 쓰지 말고");
     expect(update).toContain("scope 원문, 영어 진행 로그는 사용자에게 말하지 않아요");
     expect(update).toContain("버전과 설치 위치를 같은 문장에 섞지 않아요");
@@ -478,7 +478,7 @@ describe("smooth behavior contracts", () => {
     expect(update).not.toContain("다음 동작은 `clarity`");
     expect(update).not.toContain("그 다음 작업은 `clarity`");
     expect(update).toContain("| CLI 존재 확인 (`command -v axhub`) | `CLI 설치 확인` |");
-    expect(update).toContain("| 플러그인 설치 위치 확인 (`command -v claude` 뒤 정확히 `claude plugin list`) | `플러그인 설치 위치 확인` |");
+    expect(update).toContain("| 플러그인 설치 위치 확인 (정확히 `claude plugin list`) | `플러그인 설치 위치 확인` |");
     expect(update).toContain("| 버전 확인 (`axhub update check ...`) | `버전 확인` |");
     expect(update).toContain("수동 확인 기록은 Claude Desktop 경로에서 갱신하지 않아요");
     expect(update).toContain("별도 `mkdir`/touch/marker command 를 실행하지 말아요");
