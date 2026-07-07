@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.9.0...v1.10.0) (2026-07-07)
+
+Windows(Git Bash) 세션마다 axhub 실행 계약을 always-on 으로 emit 하는 SessionStart hook 을 더했어요(AP-13). PowerShell 로 axhub 를 실행하면 `$HOME`·PATH 부재로 로그인 검증이 false-negative 나서 device code 를 태우던 Windows 온보딩 실패를 완화해요. credential 이 셸에 따라 갈리는 최심부 원인은 ax-hub-cli 로 핸드오프했어요.
+
+
+### Added
+
+* Windows 실행 계약 SessionStart hook 추가 (AP-13) ([e40b7e1](https://github.com/jocoding-ax-partners/axhub/commit/e40b7e194cb44f4e8beff828dd2e3afe7a0b3eff))
+
 ## [1.9.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.8.4...v1.9.0) (2026-07-06)
 
 axhub 와 무관한 프로젝트에서 "배포해"·"업데이트해줘" 같은 일반 발화가 axhub 스킬로 잘못 라우팅되던 오탐을 막았어요(AP-11). 반대로 axhub 프로젝트가 맞을 때도 배포·생성·가져오기를 실행하기 전에 "axhub로 진행할까요?"를 interactive 로 한 번 더 확인하는 진입 AUQ 를 더해(AP-12), 원치 않는 실행과 원치 않는 axhub 사용을 양쪽에서 막아요.
