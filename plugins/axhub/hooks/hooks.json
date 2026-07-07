@@ -1,0 +1,47 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "[ -n \"$AXHUB_NO_UPDATE_ROUTER\" ] && exit 0; input=$(cat); if [[ \"$input\" == *axhub* ]] && { [[ \"$input\" == *최신* ]] || [[ \"$input\" == *버전* ]] || [[ \"$input\" == *업데이트* ]] || [[ \"$input\" == *latest* ]] || [[ \"$input\" == *'up to date'* ]] || [[ \"$input\" == *'version check'* ]] || [[ \"$input\" == *update* ]] || [[ \"$input\" == *upgrade* ]]; }; then printf '%s\\n' '{\"continue\":true,\"suppressOutput\":true,\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"[axhub update router] The current user prompt asks about axhub freshness/update. Before Finding tools, any axhub App/MCP tool, app list/status tool, shell version probe, clarity, bootstrap, deploy, /oh-my-claudecode:autopilot, unrelated plugin mode, or generic Code-mode handling, invoke the axhub update skill. The first visible assistant body must be exactly: 현재 버전을 확인할게요. Finish update first, then continue any remaining app status/create/deploy request in the same conversation. For app status overview after update, allowed visible commands are exactly axhub apps --help then axhub apps list --json. Never run nonexistent singular axhub app list. Never add pipes, redirects, head, tail, grep, sed, awk, bash -lc, sh -c, or 2>/dev/null.\"},\"systemMessage\":\"[axhub update router] The current user prompt asks about axhub freshness/update. Before Finding tools, any axhub App/MCP tool, app list/status tool, shell version probe, clarity, bootstrap, deploy, /oh-my-claudecode:autopilot, unrelated plugin mode, or generic Code-mode handling, invoke the axhub update skill. The first visible assistant body must be exactly: 현재 버전을 확인할게요. Finish update first, then continue any remaining app status/create/deploy request in the same conversation. For app status overview after update, allowed visible commands are exactly axhub apps --help then axhub apps list --json. Never run nonexistent singular axhub app list. Never add pipes, redirects, head, tail, grep, sed, awk, bash -lc, sh -c, or 2>/dev/null.\"}'; fi"
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/status-resume-router.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "[ -n \"$AXHUB_NO_AUTO_UPDATE\" ] && exit 0; command -v axhub >/dev/null 2>&1 || exit 0; CACHE=\"$HOME/.axhub/cache/.plugin-update-check\"; [ -f \"$CACHE\" ] && [ -n \"$(find \"$CACHE\" -mmin -1440 2>/dev/null)\" ] && exit 0; echo \"[axhub] axhub CLI/plugin 업데이트를 확인할 시점이에요(24h throttle). ${CLAUDE_PLUGIN_ROOT}/hooks/auto-update-prompt.md 를 읽고 그 지침대로 버전을 확인·적용하세요. best-effort·비차단 — 실패하면 조용히 건너뛰고 사용자의 작업을 절대 막지 마세요.\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "[ -n \"$AXHUB_NO_ONBOARDING_RESUME\" ] && exit 0; M=\"$HOME/.axhub/cache/.onboarding-mcp-restart\"; [ -f \"$M\" ] || exit 0; [ -n \"$(find \"$M\" -mmin -10080 2>/dev/null)\" ] || exit 0; echo \"[axhub] 온보딩 MCP 마무리가 남았어요(재시작 후 이어가기). 사용자에게 이어서 확인할지 물어보고, 동의하면 ${CLAUDE_PLUGIN_ROOT}/skills/onboarding/references/mcp-ready-card.md 의 Resume After Restart 절차대로 claude mcp get axhub 상태 확인 → 필요시 /mcp OAuth 안내 → 최종 카드 출력 → marker 삭제를 진행하세요. best-effort·비차단 — 실패하면 조용히 건너뛰고 사용자의 작업을 절대 막지 마세요.\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "[ -n \"$AXHUB_NO_WINDOWS_CONTRACT\" ] && exit 0; [ \"$OS\" = \"Windows_NT\" ] || exit 0; echo \"[axhub] Windows(Git Bash) 세션이에요. axhub 명령은 전부 Git Bash 전용으로 실행하세요 — PowerShell 금지. axhub 가 PATH 에 없으면 axhub plugin-support repair-path 로 고치고 새 터미널을 여세요(수동 PATH 등록 금지). 로그인은 단일 폴링 axhub auth login --json 1회로 하고, auth status 는 로그인한 그 셸에서 확인하세요 — HOME 없는 PowerShell 의 미로그인 표시는 실패가 아니에요.\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "[ -n \"$AXHUB_NO_UPDATE_ROUTER\" ] && exit 0; echo \"[axhub] update-first routing guard is active for Code mode. If the user's current prompt mentions axhub with 최신/버전/업데이트/latest/up to date/version check/update/upgrade, the first visible assistant text must be exactly: 현재 버전을 확인할게요. Invoke the axhub update skill before Finding tools, App/MCP tools, project probes, shell version probes, clarity, bootstrap, deploy, /oh-my-claudecode:autopilot, unrelated plugin modes, or generic Code-mode handling. After update, continue remaining app status/create/deploy requests in the same conversation. For app status overview, allowed visible commands are exactly axhub apps --help then axhub apps list --json; never run nonexistent singular axhub app list and never add pipes, redirects, head, tail, grep, sed, awk, bash -lc, sh -c, or 2>/dev/null.\""
+          }
+        ]
+      }
+    ]
+  }
+}

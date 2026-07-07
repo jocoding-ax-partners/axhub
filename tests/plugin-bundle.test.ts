@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
+const MARKETPLACE_BUNDLE_DIR = join(REPO_ROOT, "plugins", "axhub");
 const SKILLS = ["onboarding", "bootstrap", "deploy", "import", "development", "diagnosis", "clarity", "update"] as const;
 const FORBIDDEN_PARTS = new Set([
   ".DS_Store",
@@ -80,6 +81,43 @@ describe("clean plugin bundle", () => {
         const parts = file.split("/");
         expect(parts.some((part) => FORBIDDEN_PARTS.has(part)), `forbidden bundle file: ${file}`).toBe(false);
         expect(FORBIDDEN_PARTS.has(basename(file)), `forbidden bundle file: ${file}`).toBe(false);
+      }
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("marketplace points at the committed clean runtime bundle", () => {
+    const marketplace = JSON.parse(readFileSync(join(REPO_ROOT, ".claude-plugin", "marketplace.json"), "utf8")) as {
+      plugins: Array<{ source?: string }>;
+    };
+    expect(marketplace.plugins[0]?.source).toBe("./plugins/axhub");
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "hooks.json"))).toBe(true);
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "node_modules"))).toBe(false);
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, ".git"))).toBe(false);
+  });
+
+  test("committed marketplace runtime matches a freshly generated bundle", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "axhub-marketplace-bundle-"));
+    const outDir = join(tempRoot, "bundle");
+    try {
+      const result = Bun.spawnSync({
+        cmd: ["bun", "scripts/build-plugin-bundle.ts", "--out", outDir, "--json"],
+        cwd: REPO_ROOT,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+
+      expect(result.exitCode, result.stderr.toString()).toBe(0);
+
+      const generated = walk(outDir).map((file) => relative(outDir, file)).sort();
+      const committed = walk(MARKETPLACE_BUNDLE_DIR).map((file) => relative(MARKETPLACE_BUNDLE_DIR, file)).sort();
+      expect(committed).toEqual(generated);
+
+      for (const file of generated) {
+        const expected = readFileSync(join(outDir, file), "utf8");
+        const actual = readFileSync(join(MARKETPLACE_BUNDLE_DIR, file), "utf8");
+        expect(actual, `bundle drift in ${file}`).toBe(expected);
       }
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
