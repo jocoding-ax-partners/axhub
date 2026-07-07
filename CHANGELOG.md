@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.5](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.4...v1.10.5) (2026-07-07)
+
+Claude Code Desktop Code 모드 재QA에서 "앱 이름이나 템플릿은 알아서 골라줘"와 "실제로 배포해줘"가 섞인 요청을 bootstrap 이 실행 승인처럼 해석해 템플릿 선택, 앱 이름 확인, dry-run 진행 확인을 건너뛰는 문제가 보였어요. 이제 추천은 추천으로만 다루고, 실제 생성과 GitHub 연결은 초보 사용자도 볼 수 있는 확인 카드와 plain URL/code device flow 로 진행하도록 계약을 잠갔어요.
+
 ## [1.10.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.3...v1.10.4) (2026-07-07)
 
 Claude Code Desktop Code 모드 재QA에서 "최신인지 확인하고 내 앱 상태도 봐줘. 그 다음 앱을 만들어 배포해줘"처럼 한 번에 말한 요청이 update 결과 뒤에 멈췄어요. 이제 update skill 은 버전 확인 단계 안에서는 앱 조회·배포 도구를 섞지 않되, 결과 카드를 보여준 직후 같은 assistant 흐름에서 남은 앱 상태·생성·배포 요청을 담당 axhub 흐름으로 이어가요. 사용자가 "앱 상태 확인해줘"나 "배포해줘"를 다시 말하지 않아도 되는 Code 모드 UX를 계약으로 잠갔어요.
