@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.3...v1.10.4) (2026-07-07)
+
+Claude Code Desktop Code 모드 재QA에서 "최신인지 확인하고 내 앱 상태도 봐줘. 그 다음 앱을 만들어 배포해줘"처럼 한 번에 말한 요청이 update 결과 뒤에 멈췄어요. 이제 update skill 은 버전 확인 단계 안에서는 앱 조회·배포 도구를 섞지 않되, 결과 카드를 보여준 직후 같은 assistant 흐름에서 남은 앱 상태·생성·배포 요청을 담당 axhub 흐름으로 이어가요. 사용자가 "앱 상태 확인해줘"나 "배포해줘"를 다시 말하지 않아도 되는 Code 모드 UX를 계약으로 잠갔어요.
+
 ## [1.10.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.2...v1.10.3) (2026-07-07)
 
 Claude Code Desktop Code 모드 배포 QA에서 로컬 런타임 상태인 `.omc/` 를 앱 코드 변경으로 오인해 `.gitignore` 수정 커밋을 만들고, 배포 확인은 `--app` 없이 긴 shell loop 로 요청하는 흐름이 보였어요. 이제 deploy skill 은 `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/` 같은 에이전트 런타임 폴더를 배포 대상 변경으로 다루지 않고, 배포 성공 확인은 항상 앱 범위가 붙은 짧은 `axhub deploy verify <deployment-id> --app <app>` 호출로만 이어가도록 계약을 잠갔어요.
