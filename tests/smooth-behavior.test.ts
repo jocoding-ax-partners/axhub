@@ -273,6 +273,9 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("영어로 clarity skill 이나 GitHub 계정 재연결을 직접 지정한 요청도 반드시 이 스킬로 라우팅");
     expect(clarity).toContain("직전 답변을 재사용해서 끝내지 말고");
     expect(clarity).toContain("slash 명령이 실패한 직후라도 자연어 요청은 독립된 새 요청으로 취급");
+    expect(clarity).toContain("`스킬 가이드가 반환됐네요`");
+    expect(clarity).toContain("메타 설명을 사용자에게 말하지 않아요");
+    expect(clarity).toContain("첫 visible 문장은 사용자가 요청한 일을 바로 하는 말");
     expect(clarity).toContain("상태 확인 범위에서 멈춰요");
     expect(clarity).toContain("최근 배포 이력 전체, 로그, 실패 커밋 분석까지 확장하지 않아요");
     expect(clarity).toContain("최근 배포 시도는 실패했지만 현재 운영은 정상이에요");
@@ -291,6 +294,8 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("optional `axhub update check --json` 도 건너뛰어요");
     expect(clarity).toContain("바로 `앱 상태 조회` 제목으로 `axhub apps list --page-size 5 --json`");
     expect(clarity).toContain("계정 전체 앱 상태 fast path 의 정상 tool call 은 최대 2개예요");
+    expect(clarity).toContain("정상 Desktop UI 는 `실행됨 CLI 설치 확인` 1개와 `실행됨 앱 상태 조회` 1개");
+    expect(clarity).toContain("`실행됨 명령 3개`, `명령 3개`, `명령 N개`");
     expect(clarity).toContain("3개 이상 `명령 표면 확인` 카드가 보이면 실패예요");
     expect(clarity).toContain("`--all` 로 전체 50개 이상을 길게 뽑지 말고");
     expect(clarity).toContain("`--field-expr` 가 null/0 으로 오해될 수 있으니 이 fast path 에서는 쓰지 않아요");
