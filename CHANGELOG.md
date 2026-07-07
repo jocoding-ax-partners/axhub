@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.20](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.19...v1.10.20) (2026-07-07)
+
+Claude Code Desktop Code 모드 로컬 설치 QA에서 update skill 이 앱 상태 확인으로 이어진 뒤에도 `command -v axhub && axhub --version` 이나 shell-filtered `claude plugin list` 같은 추가 환경 probe 를 요청하는 문제가 보였어요. 이제 최신 확인이 끝난 뒤의 앱 상태 이어보기는 `axhub apps --help`, `axhub apps list --json`, `axhub apps get <app> --json`, `axhub deploy list --app <app> --json` 만 쓰도록 잠그고, 같은 자연어 요청을 Code 모드에서 다시 실행해 사용자에게 앱 선택을 되묻지 않고 두 관련 앱 상태까지 요약하는 것을 확인했어요.
+
 ## [1.10.19](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.18...v1.10.19) (2026-07-07)
 
 Claude Code Desktop Code 모드 로컬 설치 QA에서 update skill 이 최신 확인과 앱 목록 조회까지는 잘 이어갔지만, 현재 폴더명과 일치하는 앱을 찾은 뒤에도 "어느 앱의 배포 상태를 볼까요?"라고 다시 물어보는 문제가 보였어요. 이제 폴더명·대화 맥락·최근 앱 목록으로 관련 앱이 하나로 좁혀지면 `axhub apps get <app> --json` 과 `axhub deploy list --app <app> --json` 까지 바로 실행하고, 사용자에게 앱 선택을 다시 맡기지 않도록 계약과 회귀 테스트를 잠갔어요.
