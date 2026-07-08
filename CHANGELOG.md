@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.24](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.23...v1.10.24) (2026-07-08)
+
+Claude Code Desktop Code 모드에서 GitHub 계정 연결을 다시 시작할 때, 장시간 device-flow 명령 출력 뒤에 입력 코드가 묻히거나 URL 이 링크처럼 처리되어 바이브코더가 어디에 어떤 코드를 넣어야 하는지 놓칠 수 있었어요. 이제 애매한 GitHub 연결 요청도 clarity 로 바로 라우팅하고, 권한 카드는 `계정 인증 시작` / `인증 확인` 두 단계로 고정하며, 본문에는 `인증 URL` 과 `입력 코드` 를 독립 줄로 먼저 보여줘요. 실제 Code 모드에서 Zen 브라우저 자동 오픈, 코드 노출, GitHub 승인, 승인 후 별도 "승인했어" 없이 연결 상태 자동 확인까지 다시 검증했어요.
+
 ## [1.10.23](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.22...v1.10.23) (2026-07-08)
 
 Claude Code Desktop Code 모드 update QA에서 플러그인 업데이트는 정상 완료됐지만, 재시작 안내가 모델에 의해 어색하게 변형될 수 있는 문제가 보였어요. 이제 update skill 은 플러그인 업데이트 성공 후 재시작 문장을 정확한 한 문장으로 고정하고, 앱 재시작이나 알 수 없는 로마자 표현으로 바뀌지 않도록 회귀 테스트로 잠갔어요.
