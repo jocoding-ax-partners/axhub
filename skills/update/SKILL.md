@@ -14,6 +14,8 @@ examples:
     intent: "check/update axhub first; do not select clarity or non-axhub workflows before update; continue app overview and bootstrap/deploy afterward"
   - utterance: "check whether axhub is up to date and then tell me my app status"
     intent: "check/update axhub first, then continue app status handling without asking for another user prompt"
+  - utterance: "axhub가 최신인지 확인하고 GitHub 계정을 다시 연결하는 device flow도 시작해줘"
+    intent: "check/update axhub first, then continue GitHub reconnect/device-code handling without asking for another user prompt"
   - utterance: "update axhub"
     intent: "update axhub cli and plugin to latest"
 allows-dependency-execution: true
@@ -46,6 +48,29 @@ axhub deploy list --app <app> --json
 
 여기서 `<app>` 은 사용자에게 보이는 앱 slug/name 을 우선 써요. CLI 가 app id 를 반환해도 다음 명령의 `--app` 값으로 raw id 를 드러내지 않고, slug/name 으로 조회할 수 없을 때만 내부적으로 좁혀요. 관련 앱을 하나로 좁혔는데 `이 중 어느 앱의 배포 상태나 로그를 더 자세히 확인하고 싶으신가요?`, `어느 앱을 볼까요?`, `더 자세히 확인하고 싶은 앱을 말해 주세요` 같은 질문으로 끝나면 실패예요. 존재하지 않는 단수 명령 `axhub app list` 또는 `axhub app get`, 존재하지 않는 `axhub deployment list`, 또는 `Deployment list (axhub)`, `App get (axhub)`, `Tenant recent deployments (axhub)` 같은 MCP/App permission card 로 빠지면 실패예요. `command -v axhub && axhub --version`, `command -v claude && claude plugin list`, `claude plugin list 2>&1 | grep`, `axhub apps list --json 2>/dev/null | head -100`, `axhub --help | head`, `grep`, `sed`, `awk`, `head`, `tail`, pipe, redirect, `&&`, `2>/dev/null`, `bash -lc`, `sh -c` 가 붙은 순간 실패예요. 그런 명령이 떠오르면 실행하지 말고 정확히 `axhub apps --help` → `axhub apps list --json` → `axhub apps get <app> --json` → `axhub deploy list --app <app> --json` 로 바꿔요. 출력이 길어도 shell 로 자르지 말고 tool 결과를 내부에서 필요한 만큼만 읽어요. 앱 overview 를 읽은 다음 같은 원문에 새 앱 생성·배포가 남아 있으면, 직접 low-level 명령을 추측하지 말고 bootstrap/deploy 흐름으로 이어가요.
 
+**CRITICAL post-update GitHub reconnect/device-code.** 업데이트 결과 뒤 남은 요청이 GitHub 계정 재연결, GitHub account link, device code, 브라우저 자동 열기, 입력 코드 노출, 승인 뒤 자동 확인 같은 인증 흐름이면 앱 상태 overview 로 오해하지 않아요. `업데이트 확인은 끝났어요. 이어서 GitHub 계정 연결을 확인할게요.` 를 말한 뒤에는 설치 확인·버전 확인·플러그인 확인을 다시 하지 않고, axhub clarity GitHub device-flow 계약을 inline 으로 적용해요. 이 자연어 후속 흐름에서는 `/axhub:clarity` slash command 를 새로 호출하지 않아요. failing skill badge 가 보이면 실패예요. 사전 탐색용 `axhub --help | grep`, `axhub github status`, `axhub git_connection_status`, `axhub github link --help | grep`, `command -v axhub && axhub --version`, shell pipe, redirect, `bash -lc`, `sh -c` 를 실행하지 않아요. device flow 시작 command 는 정확히 아래 계열만 써요. tenant 가 이미 명확할 때만 `--tenant <tenant>` 를 붙이고, 모르면 tenant 옵션 없이 시작해요.
+
+```bash
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>
+```
+
+이 command 의 Desktop-visible title/description 은 모두 정확히 `계정 인증 시작` 이에요. `axhub GitHub device flow 인증 시작`, `GitHub device flow 인증 시작 (브라우저 자동 열기)` 같은 긴 제목이나 description 을 쓰지 않아요. 실행 결과에서 `https://github.com/login/device` 와 코드를 읽으면, 승인 확인 명령을 실행하기 전에 먼저 assistant 본문에 아래처럼 두 줄로 URL 과 코드를 노출해요. URL 은 Claude Desktop 이 자동 링크로 바꾸지 못하도록 inline code span 으로 써요. Markdown 링크 문법을 쓰지 않아요. `[https://github.com/login/device](github.com/login/device)`, `<https://github.com/login/device>`, bare `https://github.com/login/device` 처럼 링크/자동링크 형태로 꾸미면 실패예요.
+
+```text
+인증 URL: `https://github.com/login/device`
+입력 코드: <USER_CODE>
+```
+
+사용자가 `승인했어` 라고 다시 말하기를 기다리지 말고, 코드 노출 뒤 응답을 끝내지도 말아요. CLI 가 `After approving in the browser, run axhub github accounts list --json to confirm` 같은 pending 문구를 출력해도 그 문구를 사용자에게 다음 요청처럼 떠넘기지 말고, 같은 assistant turn 에서 단일 확인 명령까지 이어가요. tenant 가 이미 명확할 때만 `--tenant <tenant>` 를 붙이고, 모르면 tenant 옵션 없이 확인해요.
+
+```bash
+axhub github accounts list --json
+axhub github accounts list --tenant <tenant> --json
+```
+
+이 확인 command 의 Desktop-visible title/description 은 모두 정확히 `인증 확인` 이에요. `계정 인증 시작` command 뒤에 이 `인증 확인` command 가 보이지 않고 assistant 응답이 끝나면 실패예요. `while true`, `sleep`, background watcher, persistent monitor, shell loop 로 자동 watch 를 만들지 않아요. `sleep 3 && axhub github accounts list --json`, `axhub git_connection_status`, `axhub github status`, `axhub --help | grep`, `axhub github accounts list --json | jq`, `2>/dev/null`, `head`, `grep`, `sed`, `awk`, `&&`, pipe, redirect 가 붙은 command 가 떠오르면 실패예요. 이 경우 반드시 위의 단일 device-flow command 와 단일 accounts-list command 로 바꿔요.
+
 **CRITICAL no background detour.** mixed request 의 남은 일을 Task/Subagent/Agent/백그라운드 작업으로 우회하지 않아요. 업데이트 결과 뒤 같은 assistant 흐름에서 직접 이어가요. `axhubed 앱 상태 조회`, `앱 상태 백그라운드 조회` 같은 작업·카드·제목을 만들지 않아요.
 
 사용자가 직접 **axhub CLI 와 Claude Code 플러그인을 지금 최신으로** 맞추려는 요청이에요. 제거된 자동 훅에 의존하지 않고, 사용자가 명시적으로 요청한 순간에만 버전 확인과 적용을 진행해요:
@@ -61,7 +86,7 @@ axhub deploy list --app <app> --json
 
 **첫 응답 계약.** 선택 이유를 설명하지 않아요. 빈 폴더여도 "axhub 프로젝트가 아니다" 라고 추론하지 말고 바로 버전 확인을 진행해요.
 
-**섞인 요청 처리.** 사용자가 "최신인지 확인하고 내 앱 상태도 봐줘"처럼 버전 확인과 다른 axhub 운영 요청을 함께 말하면, 이 스킬은 **버전 확인/업데이트 결과를 먼저** 처리해요. 앱 목록·앱 상태·배포 상태·로그·환경변수·데이터 조회는 업데이트 단계 안에서 직접 실행하지 않아요. 특히 Claude Desktop 에 노출되는 `App list (axhub)`, `Deployment list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)` 같은 axhub App/MCP 도구는 read 라도 호출하지 않아요. 업데이트 결과 카드 뒤에는 남은 요청을 이어서 처리하되, 이때도 앱 상태/배포 이력은 MCP/App 도구가 아니라 위의 CLI overview 흐름으로 실행해요. `앱 상태 조회`, `배포 상태 조회`, `최근 배포 조회` 같은 tool 제목이 떠올랐다면 업데이트 결과 뒤 다음 axhub CLI 흐름에서 실행해요. Task/Subagent/Agent 로 우회하지 않아요.
+**섞인 요청 처리.** 사용자가 "최신인지 확인하고 내 앱 상태도 봐줘"처럼 버전 확인과 다른 axhub 운영 요청을 함께 말하면, 이 스킬은 **버전 확인/업데이트 결과를 먼저** 처리해요. 앱 목록·앱 상태·배포 상태·로그·환경변수·데이터 조회는 업데이트 단계 안에서 직접 실행하지 않아요. 특히 Claude Desktop 에 노출되는 `App list (axhub)`, `Deployment list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)` 같은 axhub App/MCP 도구는 read 라도 호출하지 않아요. 업데이트 결과 카드 뒤에는 남은 요청을 이어서 처리하되, 이때도 앱 상태/배포 이력은 MCP/App 도구가 아니라 위의 CLI overview 흐름으로 실행해요. GitHub 계정 재연결/device code 남은 요청은 위의 GitHub device-flow fast path 를 inline 으로 이어가요. `앱 상태 조회`, `배포 상태 조회`, `최근 배포 조회`, `GitHub 연결 상태 확인` 같은 tool 제목이 떠올랐다면 업데이트 결과 뒤 다음 axhub CLI 흐름에서 실행해요. Task/Subagent/Agent 로 우회하지 않아요.
 
 **보이는 tool 제목 계약.** Bash/명령 도구를 부를 때 description/title/summary 는 아래 고정 한국어 라벨 중 하나만 써요. 라벨 안에 `axhub` 를 넣지 않아요. `axhubing CLI 설치 여부 확인` 처럼 제품명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요.
 
@@ -174,7 +199,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 
 플러그인을 새로 받았으면 마지막에 **재시작 안내**를 한 번 더 또렷이 남겨요. 이 마지막 문장은 정확히 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 예요. `지금 다시 열거나`, `앱을 재시작`, 영어 단어, 알 수 없는 단어, 다른 프로그램 이름을 섞지 않아요.
 
-원래 요청에 앱 상태 조회·새 앱 생성·배포 같은 다른 axhub 작업이 함께 있었으면, 결과 카드 뒤에 한 줄만 덧붙이고 남은 작업을 계속해요: `업데이트 확인은 끝났어요. 이어서 요청하신 작업을 계속할게요.` 이 문장 뒤에는 사용자의 추가 프롬프트를 기다리지 말고 다음 적절한 axhub 흐름을 시작해요. update 단계 안에서는 앱 목록·배포 상태 도구, 추가 Bash/MCP/App 도구를 쓰지 않지만, update 결과 뒤 남은 요청을 처리하기 위한 다음 흐름에서는 필요한 조회·변경 도구를 정상적으로 써요.
+원래 요청에 앱 상태 조회·새 앱 생성·배포·GitHub 계정 재연결/device code 같은 다른 axhub 작업이 함께 있었으면, 결과 카드 뒤에 한 줄만 덧붙이고 남은 작업을 계속해요: `업데이트 확인은 끝났어요. 이어서 요청하신 작업을 계속할게요.` 남은 요청이 GitHub 계정 재연결/device code 라면 더 구체적으로 `업데이트 확인은 끝났어요. 이어서 GitHub 계정 연결을 확인할게요.` 를 써요. 이 문장 뒤에는 사용자의 추가 프롬프트를 기다리지 말고 다음 적절한 axhub 흐름을 시작해요. update 단계 안에서는 앱 목록·배포 상태 도구, 추가 Bash/MCP/App 도구를 쓰지 않지만, update 결과 뒤 남은 요청을 처리하기 위한 다음 흐름에서는 필요한 조회·변경 도구를 정상적으로 써요.
 
 ---
 
@@ -189,7 +214,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - 플러그인 업데이트 성공 뒤 재시작 안내는 정확히 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 만 써요. `앱을 재시작해 주세요`, `reopen`, `restart app` 같은 변형 문장이나 알 수 없는 로마자 단어를 만들지 않아요.
 - `claude plugin list` 에 같은 플러그인의 낡은 항목과 새 항목이 같이 남아 있어도, chat 에는 낡은 중복 항목을 나열하지 않아요. 사용자가 알아야 할 건 "받은 최신 버전" 과 "재시작 필요" 예요.
 - 최고 enabled 버전이 이미 최신이면, 낮은 중복 항목을 최신화하기 위한 `claude plugin update` 를 실행하지 않아요. 이 경우 사용자가 알아야 할 건 "이미 최신" 이에요.
-- mixed request 의 남은 작업을 말할 때는 `업데이트 확인은 끝났어요. 이어서 요청하신 작업을 계속할게요.` 를 쓰고 바로 다음 axhub 흐름으로 이어가요. 실제 조회·생성·배포를 시작하지 않을 거라면 이 문장을 쓰지 않아요. `백그라운드에서 조회하고 있어요`, `결과 나오는 대로 알려드릴게요` 처럼 사용자가 기다려야 하는 문장만 남기고 멈추지 않아요.
+- mixed request 의 남은 작업을 말할 때는 `업데이트 확인은 끝났어요. 이어서 요청하신 작업을 계속할게요.` 를 쓰고 바로 다음 axhub 흐름으로 이어가요. GitHub 계정 재연결/device code 라면 `업데이트 확인은 끝났어요. 이어서 GitHub 계정 연결을 확인할게요.` 를 쓰고 device-flow fast path 를 inline 으로 이어가요. 실제 조회·생성·배포·인증 시작을 하지 않을 거라면 이 문장을 쓰지 않아요. `백그라운드에서 조회하고 있어요`, `결과 나오는 대로 알려드릴게요` 처럼 사용자가 기다려야 하는 문장만 남기고 멈추지 않아요.
 - 사용자가 직접 부른 거라 적용 전 "적용할까요?" 를 다시 묻지 않아요 (간단한 1-shot 업데이트). 단 exit 14/66 보안 실패는 무조건 하드 스톱이에요.
 - 전 과정 비차단 — 한 단계가 막혀도 raw 에러를 숨기고 다음으로 넘어가거나 한 줄 안내 후 멈춰요.
 
@@ -208,3 +233,4 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - NEVER update 단계 안에서 앱 목록·앱 상태·최근 배포 상태를 직접 조회하지 말아요. `App list (axhub)`, `Deployment list (axhub)`, `Tenant recent deployments (axhub)`, `App get (axhub)` 같은 Claude Desktop axhub App/MCP 도구도 이 단계와 후속 앱 상태 흐름에서는 호출하지 말아요 — read 작업이어도 CLI 계약을 우선해요.
 - NEVER Task/Subagent/Agent/백그라운드 작업으로 mixed request 의 남은 앱 상태 확인을 우회하지 말아요. update 결과 뒤 같은 assistant 흐름에서 직접 이어가요.
 - NEVER update 결과 뒤 앱 상태 흐름에서 `command -v axhub && axhub --version`, `command -v claude && claude plugin list`, `claude plugin list 2>&1 | grep`, `head`, pipe, redirect, `&&` 가 들어간 command 를 실행하지 말아요. 그 시점의 앱 상태 흐름은 `axhub apps --help` → `axhub apps list --json` → `axhub apps get <app> --json` → `axhub deploy list --app <app> --json` 네 명령만 써요.
+- NEVER update 결과 뒤 GitHub 계정 재연결/device code 흐름에서 `axhub git_connection_status`, `axhub github status`, `axhub --help | grep`, `axhub github link --help | grep`, `head`, `jq`, pipe, redirect, `&&`, `bash -lc`, `sh -c` 가 들어간 command 를 실행하지 말아요. 그 시점의 인증 흐름은 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link` 계열 1회와 `axhub github accounts list --json` 계열 1회만 써요.
