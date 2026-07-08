@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.23](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.22...v1.10.23) (2026-07-08)
+
+Claude Code Desktop Code 모드 update QA에서 플러그인 업데이트는 정상 완료됐지만, 재시작 안내가 모델에 의해 어색하게 변형될 수 있는 문제가 보였어요. 이제 update skill 은 플러그인 업데이트 성공 후 재시작 문장을 정확한 한 문장으로 고정하고, 앱 재시작이나 알 수 없는 로마자 표현으로 바뀌지 않도록 회귀 테스트로 잠갔어요.
+
 ## [1.10.22](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.21...v1.10.22) (2026-07-07)
 
 Claude Code Desktop Code 모드 import QA에서 기존 Express 앱을 첫 배포까지 진행하는 동안 도구 제목, `axhub.yaml` ignore 정리, GitHub repo 이름 추론이 바이브코더에게 어색하게 보일 수 있는 지점을 확인했어요. 이제 import skill 은 도구 제목을 한국어 명사구로 고정하고, manifest 작성 전에 ignore 규칙을 먼저 정리하며, GitHub owner 만 주어진 경우 앱 slug 그대로 repo 이름을 유지해 첫 배포 흐름이 더 매끄럽게 이어져요.
