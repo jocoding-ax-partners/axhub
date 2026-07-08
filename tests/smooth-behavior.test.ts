@@ -339,13 +339,16 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("shell loop, background watcher, persistent monitor 를 쓰지 않아요");
     expect(clarity).toContain("`Monitor 사용` 권한 카드가 뜨는 명령은 실패");
     expect(clarity).toContain("device flow fast path 에서는 다른 사전 점검을 건너뛰어요");
-    expect(clarity).toContain("device flow 를 시작하는 Bash/tool call 제목은 정확히 `계정 인증 시작`");
+    expect(clarity).toContain("device flow 를 시작하는 Bash/tool call 제목과 description 은 모두 정확히 `계정 인증 시작`");
     expect(clarity).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
     expect(clarity).toContain("Markdown URL 링크 문법은 전부 금지");
-    expect(clarity).toContain("device-flow URL 은 Markdown 링크로 만들지 말고 평문 `https://...` 절대 URL");
-    expect(clarity).toContain("[https://github.com/login/device](https://github.com/login/device)`, `[GitHub 열기](https://github.com/login/device)`, `<https://github.com/login/device>` 같은 링크 문법은 모두 금지");
+    expect(clarity).toContain("device-flow URL 은 Claude Desktop 이 자동 링크로 바꾸지 못하도록 URL 부분만 inline code span 으로 써요");
+    expect(clarity).toContain("[https://github.com/login/device](https://github.com/login/device)`, `[https://github.com/login/device](github.com/login/device)`, `[GitHub 열기](https://github.com/login/device)`, `<https://github.com/login/device>`, bare `https://github.com/login/device` 같은 링크/자동링크 형태는 모두 금지");
+    expect(clarity).toContain("bare `https://github.com/login/device` 같은 링크/자동링크 형태는 모두 금지");
+    expect(clarity).toContain("인증 URL: \\`https://github.com/login/device\\`");
+    expect(clarity).toContain("입력 코드: <USER_CODE>");
     expect(clarity).toContain("승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출");
-    expect(clarity).toContain("`인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 조회");
+    expect(clarity).toContain("title 과 description 이 모두 정확히 `인증 확인` 인 단일 `axhub github accounts list --json` 조회");
     expect(clarity).toContain("승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요");
     expect(clarity).toContain("axhub 에 그 기능은 없어요");
     expect(clarity).toContain("schema/help/실행 명령에 `2>/dev/null | head -c 2000`, `| grep`, `| jq`, `bash -lc` 같은 shell 후처리 붙이기");
@@ -470,7 +473,12 @@ describe("smooth behavior contracts", () => {
     expect(update).toContain("원문이 영어로 `then`, `and then`, `after that`, `help me understand` 를 써도");
     expect(update).toContain("업데이트 뒤 남은 요청을 버리지 않아요");
     expect(update).toContain("사용자의 추가 프롬프트를 기다리지 말고 다음 적절한 axhub 흐름을 시작해요");
-    expect(update).toContain("`앱 상태 조회`, `배포 상태 조회`, `최근 배포 조회` 같은 tool 제목이 떠올랐다면");
+    expect(update).toContain("`앱 상태 조회`, `배포 상태 조회`, `최근 배포 조회`, `GitHub 연결 상태 확인` 같은 tool 제목이 떠올랐다면");
+    expect(update).toContain("업데이트 확인은 끝났어요. 이어서 GitHub 계정 연결을 확인할게요.");
+    expect(update).toContain("GitHub device-flow fast path");
+    expect(update).toContain("`axhub git_connection_status`");
+    expect(update).toContain("`AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link`");
+    expect(update).toContain("`axhub github accounts list --json`");
     expect(update).toContain("업데이트 확인은 끝났어요. 이어서 요청하신 작업을 계속할게요.");
     expect(update).toContain("Task/Subagent/Agent/백그라운드 작업으로 우회하지 않아요");
     expect(update).toContain("NEVER Task/Subagent/Agent/백그라운드 작업으로 mixed request 의 남은 앱 상태 확인을 우회하지 말아요");
@@ -659,7 +667,7 @@ describe("smooth behavior contracts", () => {
     }
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.UserPromptSubmit.flatMap((group) => group.hooks);
-    expect(entries).toHaveLength(3);
+    expect(entries).toHaveLength(4);
 
     const router = entries[0];
     expect(router.type).toBe("command");
@@ -675,6 +683,21 @@ describe("smooth behavior contracts", () => {
     expect(router.command).toContain("App/MCP tool");
     expect(router.command).toContain("app list/status tool");
     expect(router.command).toContain("Finish update first");
+    expect(router.command).toContain("GitHub reconnect-device-code");
+    expect(router.command).toContain("axhub clarity device-flow contract inline");
+    expect(router.command).toContain("do not invoke /axhub:clarity");
+    expect(router.command).toContain("failing skill badge");
+    expect(router.command).toContain("axhub git_connection_status");
+    expect(router.command).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link");
+    expect(router.command).toContain("axhub github accounts list --json");
+    expect(router.command).toContain("계정 인증 시작");
+    expect(router.command).toContain("인증 확인");
+    expect(router.command).toContain("The assistant body must print exactly two normal chat lines with the URL in inline code");
+    expect(router.command).toContain("never print the URL as a bare auto-link or Markdown link such as [https://github.com/login/device](github.com/login/device)");
+    expect(router.command).toContain("Do not finish after showing the code");
+    expect(router.command).toContain("continue to 인증 확인 in the same assistant turn");
+    expect(router.command).toContain("배포 상태 확인해줘");
+    expect(router.command).toContain("승인했어");
     expect(router.command).toContain("CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json");
     expect(router.command).toContain("Deployment list (axhub)");
     expect(router.command).toContain("axhub deployment list");
@@ -683,7 +706,35 @@ describe("smooth behavior contracts", () => {
     expect(router.command).not.toContain("axhub update check");
     expect(router.command).not.toContain("claude plugin update");
 
-    const importRouter = entries[1];
+    const clarityRouter = entries[1];
+    expect(clarityRouter.type).toBe("command");
+    expect(clarityRouter.shell).toBe("bash");
+    expect(clarityRouter.command).toContain("clarity-router.sh");
+
+    const clarityRouterScript = readRepo("hooks/clarity-router.sh");
+    expect(clarityRouterScript).toContain("AXHUB_NO_CLARITY_ROUTER");
+    expect(clarityRouterScript).toContain("exact axhub GitHub reconnect/device-code operation");
+    expect(clarityRouterScript).toContain("Apply the axhub clarity GitHub device-flow contract inline");
+    expect(clarityRouterScript).toContain("Do not invoke the /axhub:clarity slash command");
+    expect(clarityRouterScript).toContain("failing skill badge");
+    expect(clarityRouterScript).toContain("axhub --help | grep");
+    expect(clarityRouterScript).toContain("shell pipes, redirects, grep, head, sed, awk, bash -lc, sh -c");
+    expect(clarityRouterScript).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link");
+    expect(clarityRouterScript).toContain("계정 인증 시작");
+    expect(clarityRouterScript).toContain("never use axhub GitHub device flow 인증 시작");
+    expect(clarityRouterScript).toContain("https://github.com/login/device");
+    expect(clarityRouterScript).toContain("인증 URL: `https://github.com/login/device`");
+    expect(clarityRouterScript).toContain("입력 코드: <USER_CODE>");
+    expect(clarityRouterScript).toContain("[https://github.com/login/device](github.com/login/device)");
+    expect(clarityRouterScript).toContain("Do not finish after code display or pending text");
+    expect(clarityRouterScript).toContain("승인했어");
+    expect(clarityRouterScript).toContain("인증 확인");
+    expect(clarityRouterScript).toContain("axhub github accounts list --json");
+    expect(clarityRouterScript).toContain("*최신*|*버전*|*업데이트*|*latest*");
+    expect(clarityRouterScript).not.toContain("python3");
+    expect(clarityRouterScript).not.toContain("node ");
+
+    const importRouter = entries[2];
     expect(importRouter.type).toBe("command");
     expect(importRouter.shell).toBe("bash");
     expect(importRouter.command).toContain("import-router.sh");
@@ -703,7 +754,7 @@ describe("smooth behavior contracts", () => {
     expect(importRouterScript).not.toContain("python3");
     expect(importRouterScript).not.toContain("node ");
 
-    const statusRouter = entries[2];
+    const statusRouter = entries[3];
     expect(statusRouter.type).toBe("command");
     expect(statusRouter.shell).toBe("bash");
     expect(statusRouter.command).toContain("status-resume-router.sh");
