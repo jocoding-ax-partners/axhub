@@ -114,6 +114,10 @@ describe("update Desktop UX contract", () => {
 
     expect(update).toContain("플러그인: vX -> vY 받음 (재시작 필요)");
     expect(update).toContain("Claude Code 를 재시작하면 새 버전이 적용돼요.");
+    expect(update).toContain("정확히 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 라고 말해요");
+    expect(update).toContain("이 마지막 문장은 정확히 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 예요");
+    expect(update).toContain("`앱을 재시작해 주세요`");
+    expect(update).toContain("알 수 없는 로마자 단어를 만들지 않아요");
     expect(update).toContain("확인·비교 결과를 설명하는 영어 디버그 문장이나 raw 확인 줄은 쓰지 않아요");
     for (const leakedPhrase of ["PLUGIN_UPDATED_VERSION", "matching plugin.latest", "Confirmed:", "Confirmed", "plugin.latest"]) {
       expect(update).not.toContain(leakedPhrase);
