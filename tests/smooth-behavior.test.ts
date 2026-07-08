@@ -496,6 +496,9 @@ describe("smooth behavior contracts", () => {
     expect(update).toContain("`현재 플러그인 버전을 확인했어요.`, `CLI는 이미 최신이에요. 플러그인 새 버전을 받을게요.`, `플러그인 설치 위치를 확인했어요.`, `플러그인 새 버전을 받았어요.`");
     expect(update).toContain("영어 라벨, 내부 필드명, 설치 위치 원문, raw 상태값, 반말형 짧은 메모가 섞인 문장");
     expect(update).toContain("플러그인: vX -> vY 받음 (재시작 필요)");
+    expect(update).toContain("정확히 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 라고 말해요");
+    expect(update).toContain("알 수 없는 로마자 단어를 만들지 않아요");
+    expect(update).toContain("NEVER 플러그인 업데이트 성공 뒤 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 가 아닌 재시작 안내 문장을 만들지 말아요");
     expect(update).toContain("확인·비교 결과를 설명하는 영어 디버그 문장이나 raw 확인 줄은 쓰지 않아요");
     expect(update).not.toContain("Plugin version");
     for (const leakedUpdatePhrase of ["PLUGIN_UPDATED_VERSION", "matching plugin.latest", "Confirmed:", "Confirmed", "plugin.latest"]) {
