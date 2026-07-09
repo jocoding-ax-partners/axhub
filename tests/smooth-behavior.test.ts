@@ -647,6 +647,11 @@ describe("smooth behavior contracts", () => {
       expect(entry.command).toContain("additionalContext");
       expect(entry.command).not.toContain("systemMessage");
       expect(entry.command).not.toContain('echo "');
+      // Windows: backslash plugin-root paths must be slash-normalized before
+      // JSON interpolation, or C:\... produces invalid JSON escapes
+      if (entry.command.includes("CLAUDE_PLUGIN_ROOT")) {
+        expect(entry.command).toContain("${CLAUDE_PLUGIN_ROOT//");
+      }
     }
 
     const resume = entries[1];
