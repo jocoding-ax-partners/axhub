@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.25](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.24...v1.10.25) (2026-07-09)
+
+Claude Desktop Code 모드 QA에서 UserPromptSubmit·SessionStart 훅의 내부 라우팅 안내문이 `UserPromptSubmit says: ...` 배너로 사용자에게 그대로 노출되는 문제가 보였어요([#376](https://github.com/jocoding-ax-partners/axhub/pull/376)). 이제 모든 훅 출력은 systemMessage 와 plain stdout 없이 suppressOutput JSON 의 additionalContext 로만 주입돼 화면에 나타나지 않고, 라우팅 지침은 모델에게만 전달돼요. Windows 백슬래시 경로가 훅 JSON 을 깨뜨리지 않도록 슬래시 정규화와 `.sh` LF 고정(.gitattributes)도 함께 잠갔어요.
+
 ## [1.10.24](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.23...v1.10.24) (2026-07-08)
 
 Claude Code Desktop Code 모드에서 GitHub 계정 연결을 다시 시작할 때, 장시간 device-flow 명령 출력 뒤에 입력 코드가 묻히거나 URL 이 링크처럼 처리되어 바이브코더가 어디에 어떤 코드를 넣어야 하는지 놓칠 수 있었어요. 이제 애매한 GitHub 연결 요청도 clarity 로 바로 라우팅하고, 권한 카드는 `계정 인증 시작` / `인증 확인` 두 단계로 고정하며, 본문에는 `인증 URL` 과 `입력 코드` 를 독립 줄로 먼저 보여줘요. 실제 Code 모드에서 Zen 브라우저 자동 오픈, 코드 노출, GitHub 승인, 승인 후 별도 "승인했어" 없이 연결 상태 자동 확인까지 다시 검증했어요.
