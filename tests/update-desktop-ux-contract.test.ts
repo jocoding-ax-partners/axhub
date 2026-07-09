@@ -228,6 +228,9 @@ describe("update Desktop UX contract", () => {
     expect(hooks).toContain("axhub freshness/update");
     expect(hooks).toContain("hookSpecificOutput");
     expect(hooks).toContain("additionalContext");
+    expect(hooks).toContain("suppressOutput");
+    // hook output stays invisible to the user: context injection only, no banner
+    expect(hooks).not.toContain("systemMessage");
     expect(hooks).toContain("Before Finding tools");
     expect(hooks).toContain("invoke the axhub update skill");
     expect(hooks).toContain("현재 버전을 확인할게요");

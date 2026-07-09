@@ -640,6 +640,15 @@ describe("smooth behavior contracts", () => {
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
     expect(entries).toHaveLength(4);
 
+    // every SessionStart hook injects context invisibly: suppressed JSON only,
+    // never plain echo stdout and never a user-facing systemMessage banner
+    for (const entry of entries) {
+      expect(entry.command).toContain("suppressOutput");
+      expect(entry.command).toContain("additionalContext");
+      expect(entry.command).not.toContain("systemMessage");
+      expect(entry.command).not.toContain('echo "');
+    }
+
     const resume = entries[1];
     expect(resume.type).toBe("command");
     expect(resume.shell).toBe("bash");
@@ -675,6 +684,8 @@ describe("smooth behavior contracts", () => {
     expect(router.command).toContain("hookSpecificOutput");
     expect(router.command).toContain("hookEventName");
     expect(router.command).toContain("additionalContext");
+    expect(router.command).toContain("suppressOutput");
+    expect(router.command).not.toContain("systemMessage");
     expect(router.command).toContain("AXHUB_NO_UPDATE_ROUTER");
     expect(router.command).toContain("axhub freshness/update");
     expect(router.command).toContain("Finding tools");
@@ -726,13 +737,14 @@ describe("smooth behavior contracts", () => {
     expect(clarityRouterScript).toContain("인증 URL: `https://github.com/login/device`");
     expect(clarityRouterScript).toContain("입력 코드: <USER_CODE>");
     expect(clarityRouterScript).toContain("[https://github.com/login/device](github.com/login/device)");
-    expect(clarityRouterScript).toContain("Do not finish after code display or pending text");
+    expect(clarityRouterScript).toContain("Do not end the turn after showing the code or after any pending/waiting CLI text");
     expect(clarityRouterScript).toContain("승인했어");
     expect(clarityRouterScript).toContain("인증 확인");
     expect(clarityRouterScript).toContain("axhub github accounts list --json");
     expect(clarityRouterScript).toContain("*최신*|*버전*|*업데이트*|*latest*");
     expect(clarityRouterScript).not.toContain("python3");
     expect(clarityRouterScript).not.toContain("node ");
+    expect(clarityRouterScript).not.toContain("systemMessage");
 
     const importRouter = entries[2];
     expect(importRouter.type).toBe("command");
@@ -753,6 +765,7 @@ describe("smooth behavior contracts", () => {
     expect(importRouterScript).toContain("*최신*|*버전*|*업데이트*|*latest*");
     expect(importRouterScript).not.toContain("python3");
     expect(importRouterScript).not.toContain("node ");
+    expect(importRouterScript).not.toContain("systemMessage");
 
     const statusRouter = entries[3];
     expect(statusRouter.type).toBe("command");
@@ -763,7 +776,7 @@ describe("smooth behavior contracts", () => {
     expect(statusRouterScript).toContain("AXHUB_NO_STATUS_ROUTER");
     expect(statusRouterScript).toContain("axhub app creation/deployment/status flow");
     expect(statusRouterScript).toContain("invoke the axhub bootstrap skill");
-    expect(statusRouterScript).toContain("generic Code-mode shell probes");
+    expect(statusRouterScript).toContain("generic Code-mode handling, shell probes");
     expect(statusRouterScript).toContain("command -v axhub");
     expect(statusRouterScript).toContain("axhub plugin-support init-resume route --json");
     expect(statusRouterScript).toContain("axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json");
@@ -775,6 +788,7 @@ describe("smooth behavior contracts", () => {
     expect(statusRouterScript).toContain("axhub deployment list");
     expect(statusRouterScript).not.toContain("python3");
     expect(statusRouterScript).not.toContain("node ");
+    expect(statusRouterScript).not.toContain("systemMessage");
 
     const sessionEntries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
     const sessionRouter = sessionEntries[3];
