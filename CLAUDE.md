@@ -140,7 +140,7 @@ auto-update·resume 와 나란히 SessionStart 훅이 하나 더 있어요 (`hoo
 
 SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이트 요청에만 라우팅 문맥을 추가해요. Claude Desktop Code 모드에서 `Finding tools`, 전역 `App list (axhub)` 같은 App/MCP 도구, 일반 shell probe 가 먼저 잡히는 것을 막기 위한 guard 예요.
 
-- SessionStart fallback 은 새 Code 세션에 update-first 규칙을 먼저 깔아요. UserPromptSubmit match 는 사용자 프롬프트 JSON 에 `axhub` 와 최신성 키워드(`최신`, `버전`, `업데이트`, `latest`, `up to date`, `version check`, `update`, `upgrade`)가 함께 있을 때 `hookSpecificOutput.additionalContext` 와 `systemMessage` 를 emit 해요.
+- SessionStart fallback 은 새 Code 세션에 update-first 규칙을 먼저 깔아요. UserPromptSubmit match 는 사용자 프롬프트 JSON 에 `axhub` 와 최신성 키워드(`최신`, `버전`, `업데이트`, `latest`, `up to date`, `version check`, `update`, `upgrade`)가 함께 있을 때 `hookSpecificOutput.additionalContext` 만 emit 해요. 모든 훅 출력은 `suppressOutput: true` JSON 이라 사용자 화면에 노출되지 않아요 — `systemMessage` 와 plain stdout 은 쓰지 않아요.
 - 명령 실행·네트워크·앱 목록 조회를 하지 않아요. `update` 스킬 우선, 첫 visible assistant text `현재 버전을 확인할게요.`, App/MCP 도구 선행 금지만 주입해요.
 - update 뒤 같은 원문에 앱 현황 확인이 남으면 존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 시작해요. `| head`, `2>/dev/null`, `grep`, `sed`, `awk` 같은 shell 후처리는 붙이지 않아요.
 - **끄기:** `AXHUB_NO_UPDATE_ROUTER=1`.
