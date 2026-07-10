@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **axhub** (940 symbols, 1059 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **axhub** (980 symbols, 1099 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -199,3 +199,9 @@ Key routing rules:
 **진입 확인 AUQ (AP-12):** axhub 프로젝트가 확정돼도 배포·생성·가져오기(deploy·bootstrap·import) 실행 전에 interactive 에서는 "axhub로 진행할까요?"를 AskUserQuestion 으로 한 번 더 확인해요("무엇을·어떻게"를 묻는 기존 preview 승인과 별개인 진입 게이트). deploy·import 는 preview 앞 별도 AUQ, bootstrap 은 기존 preview 승인에 통합(byte 예산 포화). headless 는 생략해요.
 
 **Windows 실행 계약 (AP-13):** Windows 에선 axhub 명령을 Git Bash 전용으로 실행해요 (PowerShell 금지). PATH 는 수동 등록 대신 `axhub plugin-support repair-path` 후 새 터미널, `auth status` 는 `auth login` 한 그 셸에서 검증해요 — HOME 없는 PowerShell 의 "미로그인" 은 실패가 아니에요. 로그인은 단일 폴링 `axhub auth login --json` 1 회로 하고 background 재실행은 안 해요.
+
+<!-- SPECKIT START -->
+## 진행 중 피처 (spec-kit)
+
+- `specs/001-npx-one-command-onboarding/` — npx 원커맨드 온보딩. 구현 플랜: [specs/001-npx-one-command-onboarding/plan.md](specs/001-npx-one-command-onboarding/plan.md)
+<!-- SPECKIT END -->
