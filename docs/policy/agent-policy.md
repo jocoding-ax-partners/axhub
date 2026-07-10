@@ -72,7 +72,7 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "axhub 진입 확인"
 
 ## AP-13 Windows 실행 계약 (Git Bash 전용)
-- 규칙: Windows 에선 모든 axhub CLI 명령을 Git Bash 전용으로 실행해요 — PowerShell 로 실행하지 않아요. PowerShell 에는 `$HOME` 과 repair 된 PATH 가 없어서 credential·auth 조회가 false-negative 나요. PATH 가 없으면 `SetEnvironmentVariable` 이나 `$env:PATH` prepend 로 수동 등록하지 않고 `axhub plugin-support repair-path` 로 고친 뒤 새 터미널을 열어요. `auth status` 는 `auth login` 을 실행한 그 셸에서 검증해요 — HOME 없는 셸이 "미로그인" 이라고 해도 로그인 실패로 보지 않아요. 로그인은 단일 self-polling `axhub auth login --json` 1 회로 하고 background 로 재실행하지 않아요 (device code 소진). 이 계약은 Windows(`$OS`=Windows_NT) 세션에서 SessionStart hook (`hooks/hooks.json`) 이 매 세션 always-on 으로 emit 해요 — skill 본문 로드 여부와 무관하게 free-form 실행 경로까지 덮어요. non-Windows 세션에서는 조용히 건너뛰어요.
+- 규칙: Windows 에선 모든 axhub CLI 명령을 Git Bash 전용으로 실행해요 — PowerShell 로 실행하지 않아요. PowerShell 에는 `$HOME` 과 repair 된 PATH 가 없어서 credential·auth 조회가 false-negative 나요. PATH 가 없으면 `SetEnvironmentVariable` 이나 `$env:PATH` prepend 로 수동 등록하지 않고 `axhub plugin-support repair-path` 로 고친 뒤 새 터미널을 열어요. `auth status` 는 `auth login` 을 실행한 그 셸에서 검증해요 — HOME 없는 셸이 "미로그인" 이라고 해도 로그인 실패로 보지 않아요. 로그인은 단일 self-polling `axhub auth login --json` 1 회로 하고 background 로 재실행하지 않아요 (device code 소진). 이 계약은 Windows(`$OS`=Windows_NT) 세션에서 SessionStart hook (`hooks/hooks.json`) 이 매 세션 always-on 으로 emit 해요 — skill 본문 로드 여부와 무관하게 free-form 실행 경로까지 덮어요. non-Windows 세션에서는 조용히 건너뛰어요. **예외(명문):** 이 계약이 막는 것은 auth·credential·repair 된 PATH 에 의존하는 명령이에요. npx 기반 셋업(`npx axhub@latest setup` → `axhub setup claude`)은 auth 무접촉이고 npx 가 바이너리를 직접 해석해 PATH 에 의존하지 않아서, 사용자가 PowerShell 에서 실행해도 계약 위반이 아니에요. 단 setup 이후의 로그인·`auth status` 검증 등 auth·PATH 의존 명령부터는 그대로 Git Bash 계약을 따라요.
 - 적용: hooks/hooks.json, CLAUDE.md
 - invariant: "Git Bash 전용"
 

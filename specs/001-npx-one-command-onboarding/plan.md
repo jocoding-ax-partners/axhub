@@ -36,7 +36,7 @@
 | AP-6 preflight 게이트 | PASS | bootstrap·deploy 게이트 불변. setup 은 새 CLI 버전 기능이라 구 CLI 에는 명령 자체가 없어요 |
 | AP-8 자동 bootstrap 금지 | PASS | 핸드오프는 "처음인데 셋업해줘" 안내만 — 앱 생성을 실행하지 않아요 |
 | AP-10 telemetry 옵트인 | PASS | setup 무수집(R-9). axrouter 옵트인 흐름 불변 |
-| AP-13 Windows Git Bash | PASS | setup 은 auth 무접촉(로그인은 onboarding 이 계약대로). npm 런처는 바이너리 직접 spawn — PowerShell 프로파일 경로와 무관 |
+| AP-13 Windows Git Bash | PASS | AP-13 개정(2026-07-10)으로 npx setup 예외가 명문화됐어요 — setup 은 auth 무접촉·PATH 비의존, setup 이후 로그인·auth 검증부터 Git Bash 계약. 해석이 아니라 정책 문언으로 충족해요 |
 | AP-14 README invariant | PASS(조건) | WS-B README 수정 시 invariant 문구(`AXHUB_NO_UPDATE_ROUTER` 등) 보존 — parity 테스트가 감시해요 |
 
 **초기 평가**: 위반 0 → Phase 0 진행. **Post-design 재평가**: Phase 1 산출물(contracts·data-model)이 위 판정을 바꾸지 않아요 — 위반 0 유지.

@@ -99,7 +99,7 @@ setup 이 만든 상태를 사후 검증하는 공개 진단 명령이에요 —
 | 리스크 | 완화 |
 |---|---|
 | Node 없는 사내 Windows PC (npx 의 구조적 약점) | 웹사이트 설치 페이지에 Node 18+ 전제 명시 + OS 감지 fallback 안내. B2B 는 추후 admin provisioning(Claude Code managed settings)으로 별도 해결 — 이번 범위 밖, 기록만 해둬요 |
-| AP-13 (Windows Git Bash 계약) | `setup claude` 는 auth 무관 작업만 해요. npx 의 바이너리 spawn 은 PowerShell 프로파일 이슈와 무관해요 |
+| AP-13 (Windows Git Bash 계약) | AP-13 에 npx setup 예외가 명문화됐어요(2026-07-10 개정) — setup 은 auth 무접촉·PATH 비의존이라 PowerShell 실행도 계약 위반이 아니고, 이후 로그인·auth 검증부터 Git Bash 계약을 따라요 |
 | npm 배포 인프라 신설 | plugin repo 가 다이어트로 제거한 건 plugin 쪽 파이프라인이에요 — npm publish 는 CLI repo release CI 에 붙어 바이너리와 버전이 동기화돼요 |
 | 사용자가 Claude Code 세션을 켜둔 채 실행 | 핸드오프 카드가 "이미 켜져 있으면 재시작"을 항상 안내해요 (플러그인 로드는 재시작 필요) |
 | AI 에이전트가 setup 을 대신 실행(입력 불가) | 비대화형 계약(입력 대기 금지·브라우저 열기 금지)을 스펙 FR 로 고정해요 — create-next-app 의 AI-도구 hang 선례가 근거예요 |
