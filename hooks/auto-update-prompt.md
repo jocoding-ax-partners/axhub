@@ -22,6 +22,12 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
    axhub update check --plugin-version <PLUGIN_VERSION> --json
    ```
 
+   구 CLI (v0.21.0 미만) 가 `--plugin-version` 을 거부하면 (exit 64 usage error) 여기서 조용히 멈추지 않아요 — 업데이트가 가장 필요한 구 CLI 일수록 이 fallback 이 있어야 hook 이 최신으로 끌어올릴 수 있어요. update 스킬과 같은 계약으로 플래그 없이 한 번 더 호출해 CLI-only 로 떨어져요 (플러그인 비교만 생략돼요):
+
+   ```bash
+   axhub update check --json
+   ```
+
 2. 결과와 무관하게 재확인 주기 캐시를 바로 갱신해요 (24h throttle 의 기준점):
 
    ```bash
@@ -31,7 +37,7 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
 3. 출력 JSON 을 읽어요:
    - CLI: `{ current, latest, has_update, disabled }`
    - (있으면) 플러그인: `plugin: { current, latest, has_update }`
-4. 호출이 실패하거나 JSON 이 비면 (구 CLI·네트워크 실패) 조용히 멈춰요 — 작업을 막지 않아요.
+4. fallback 까지 실패하거나 JSON 이 비면 (네트워크 실패 등) 조용히 멈춰요 — 작업을 막지 않아요.
 
 ---
 
@@ -48,6 +54,8 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
   3. 끝나면 `axhub --version` 으로 재확인하고 한 줄: `axhub <새 버전> 으로 업데이트됐어요.`
   4. 적용이 실패하면 (권한·네트워크 등) raw 에러는 숨기고 한 줄만 안내한 뒤 비차단으로 계속해요:
      > `자동 업데이트가 안 됐어요. axhub update apply 를 직접 한 번 실행해 주세요.`
+  5. 단, 보안 검증 실패 (exit 14 digest mismatch / exit 66 cosign_enforce_failed) 는 재실행을 권하지 않아요 — update 스킬과 같은 하드 스톱으로 안내하고 멈춰요:
+     > `보안 검증에 실패했어요. 강제로 진행하지 말고 회사 IT·보안팀에 알려주세요. 지금 버전은 그대로 써도 돼요.`
 
 ---
 
