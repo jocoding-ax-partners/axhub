@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.27](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.26...v1.10.27) (2026-07-13)
+
+죽은 링크 전수 감사에서 plugin.json·marketplace.json 의 homepage(`https://axhub.jocodingax.ai`)가 TLS 연결 실패로 접속되지 않는 것을 확인해, 살아있는 `https://axhub.ai` 로 교체했어요([#381](https://github.com/jocoding-ax-partners/axhub/pull/381)). marketplace UI 에서 homepage 링크를 눌러도 더 이상 빈 화면으로 떨어지지 않아요. 같은 감사에서 나온 CLI 쪽 미발행 문서 링크 제거는 ax-hub-cli 0.24.2 로 함께 릴리즈돼요.
+
+
+### Fixed
+
+* 플러그인 homepage를 접속 불가 도메인에서 axhub.ai로 교체 ([#381](https://github.com/jocoding-ax-partners/axhub/issues/381)) ([c6670c1](https://github.com/jocoding-ax-partners/axhub/commit/c6670c116643bf0169e59b00b19afa085c951fe8))
+
 ## [1.10.26](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.25...v1.10.26) (2026-07-13)
 
 QA에서 앱 생성 계정과 로그인 계정이 다르자 에이전트가 정책에 없는 "소유자 확인" 게이트를 즉흥으로 만들고 구두 승인만으로 배포를 진행한 사례가 보고됐어요([#378](https://github.com/jocoding-ax-partners/axhub/pull/378)). 이제 AP-15로 소유자·계정 불일치는 스킬이 스스로 판정하지 않고 인가는 CLI/백엔드(exit 8 `axhub_app_forbidden`)가 판정하며, 구두 승인은 권한 근거로 쓰지 않도록 deploy skill과 공감 카탈로그에 잠갔어요. 함께 auto-update 훅이 구 CLI(<0.21)에서 업데이트 제안을 영영 못 받던 dead-end에 CLI-only fallback을 더하고, cosign 보안 검증 실패는 직접 재실행 권유 대신 하드 스톱 문구로 안내해요.
