@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.26](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.25...v1.10.26) (2026-07-13)
+
+QA에서 앱 생성 계정과 로그인 계정이 다르자 에이전트가 정책에 없는 "소유자 확인" 게이트를 즉흥으로 만들고 구두 승인만으로 배포를 진행한 사례가 보고됐어요([#378](https://github.com/jocoding-ax-partners/axhub/pull/378)). 이제 AP-15로 소유자·계정 불일치는 스킬이 스스로 판정하지 않고 인가는 CLI/백엔드(exit 8 `axhub_app_forbidden`)가 판정하며, 구두 승인은 권한 근거로 쓰지 않도록 deploy skill과 공감 카탈로그에 잠갔어요. 함께 auto-update 훅이 구 CLI(<0.21)에서 업데이트 제안을 영영 못 받던 dead-end에 CLI-only fallback을 더하고, cosign 보안 검증 실패는 직접 재실행 권유 대신 하드 스톱 문구로 안내해요.
+
+
+### Fixed
+
+* 앱 소유자 불일치 비판정 규칙 AP-15 추가 ([#378](https://github.com/jocoding-ax-partners/axhub/issues/378)) ([8f37acb](https://github.com/jocoding-ax-partners/axhub/commit/8f37acb83f3cb78b81aa81650f942c667708946a))
+
 ## [1.10.25](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.24...v1.10.25) (2026-07-09)
 
 Claude Desktop Code 모드 QA에서 UserPromptSubmit·SessionStart 훅의 내부 라우팅 안내문이 `UserPromptSubmit says: ...` 배너로 사용자에게 그대로 노출되는 문제가 보였어요([#376](https://github.com/jocoding-ax-partners/axhub/pull/376)). 이제 모든 훅 출력은 systemMessage 와 plain stdout 없이 suppressOutput JSON 의 additionalContext 로만 주입돼 화면에 나타나지 않고, 라우팅 지침은 모델에게만 전달돼요. Windows 백슬래시 경로가 훅 JSON 을 깨뜨리지 않도록 슬래시 정규화와 `.sh` LF 고정(.gitattributes)도 함께 잠갔어요.
