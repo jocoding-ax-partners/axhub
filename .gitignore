@@ -81,3 +81,5 @@ fuzz/
 .omc/ultragoal/
 .gjc/
 .understand-anything/
+specs/
+docs/superpowers/
