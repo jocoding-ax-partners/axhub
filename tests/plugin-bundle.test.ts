@@ -96,6 +96,8 @@ describe("clean plugin bundle", () => {
     expect(marketplace.plugins[0]?.source).toBe("./plugins/axhub");
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "hooks.json"))).toBe(true);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "import-router.sh"))).toBe(true);
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "update-router.sh"))).toBe(true);
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "plugin-restart-confirm-prompt.md"))).toBe(true);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "node_modules"))).toBe(false);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, ".git"))).toBe(false);
   });

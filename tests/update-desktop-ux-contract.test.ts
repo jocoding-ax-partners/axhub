@@ -127,7 +127,9 @@ describe("update Desktop UX contract", () => {
   test("continues mixed app-status requests after the update boundary", () => {
     const update = readRepo("skills/update/SKILL.md");
     const clarity = readRepo("skills/clarity/SKILL.md");
-    const hooks = readRepo("hooks/hooks.json");
+    // update 라우터 본문은 hooks/update-router.sh 로 추출됐어요 — 계약 검증
+    // 표면은 hooks.json(가드·SessionStart 폴백) + 라우터 스크립트의 합집합이에요.
+    const hooks = readRepo("hooks/hooks.json") + "\n" + readRepo("hooks/update-router.sh");
     const policy = readRepo("POLICY.md");
     const clarityFrontmatter = clarity.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
 

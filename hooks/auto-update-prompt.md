@@ -11,6 +11,7 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
 1. `command -v axhub` 가 실패하면 즉시 멈춰요 — CLI 가 없는 건 onboarding 소관이에요.
 2. `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 의 `version` 을 읽어 `<PLUGIN_VERSION>` 으로 둬요 (못 읽으면 plugin 확인은 생략하고 CLI 만 봐요).
 3. 환경변수 `AXHUB_NO_AUTO_UPDATE` 가 설정돼 있으면 **안내만** 모드예요 — 아래 자동 적용(2단계 apply)을 건너뛰고, 새 버전이 있을 때 한 줄 안내만 해요.
+   - 이 분기가 필요한 이유(env-divergence): 훅 bash 는 Claude Code 프로세스 env 만 봐요 — shell profile 을 소싱하지 않아요. profile 에만 `export AXHUB_NO_AUTO_UPDATE=1` 을 둔 사용자가 GUI 로 실행하면 훅은 변수를 못 보고 발동하지만, 이 지침을 실행하는 에이전트의 Bash 는 profile 을 소싱하므로 여기서 잡아요. 이 분기는 그 경우의 유일한 kill switch 예요.
 
 ---
 
@@ -35,8 +36,9 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
    ```
 
 3. 출력 JSON 을 읽어요:
-   - CLI: `{ current, latest, has_update, disabled }`
+   - CLI: `{ current, latest, has_update, disabled, is_downgrade }`
    - (있으면) 플러그인: `plugin: { current, latest, has_update }`
+   - `is_downgrade` 는 optional 필드예요 — **부재(구 CLI 응답)는 false 로 취급**해요. `is_downgrade == true` 면 서버가 낮은 버전을 latest 로 내려보내는 롤백 상황이라 자동 적용하지 않고 안내만 해요 (변조 방어는 이 필드가 아니라 apply 의 cosign 검증이 담당해요).
 4. fallback 까지 실패하거나 JSON 이 비면 (네트워크 실패 등) 조용히 멈춰요 — 작업을 막지 않아요.
 
 ---
@@ -45,7 +47,7 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
 
 분기로 처리해요:
 
-- **`disabled == true`** (패키지 매니저가 관리하는 설치) **또는 `AXHUB_NO_AUTO_UPDATE` 설정** → 자동 적용하지 않아요. `has_update` 면 한 줄만 안내해요:
+- **`disabled == true`** (패키지 매니저가 관리하는 설치) **또는 `AXHUB_NO_AUTO_UPDATE` 설정** **또는 `is_downgrade == true`** (서버 롤백 배포 — 부재는 false) → 자동 적용하지 않아요. `has_update` 면 한 줄만 안내해요:
   > `axhub 새 버전(<latest>)이 있어요. axhub update apply 로 받을 수 있어요.`
 - **`has_update == false`** → 아무것도 보여주지 않고 조용히 통과해요.
 - **`has_update == true` 이고 적용 가능** → 사용자에게 해요체로 알리고 바로 적용해요 (auto):
@@ -68,8 +70,14 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
   1. 설치 scope 를 먼저 확인해요 — `claude plugin list` 출력에서 `axhub@axhub` 항목의 `Scope:` 값(user/project/local/managed)을 읽어 `<SCOPE>` 로 둬요. 못 찾으면 `user` 로 둬요.
   2. 안내 한 줄: `axhub 플러그인 새 버전(<plugin.current> → <plugin.latest>)이 나왔어요. 지금 받을게요…`
   3. 실행: `claude plugin update axhub@axhub --scope <SCOPE>`
-  4. **재시작 안내(필수 — plugin 업데이트는 재시작해야 적용돼요):** `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.`
-  5. 실패하면 raw 에러는 숨기고 한 줄만 안내한 뒤 비차단으로 계속해요: `플러그인 자동 업데이트가 안 됐어요. claude plugin update axhub@axhub --scope <SCOPE> 를 직접 실행해 주세요.`
+  4. 성공하면 재시작 확인 marker 를 기록해요 — 다음 세션의 restart-confirm 훅이 실제 적용을 확인하고 닫아요 (절차는 `plugin-restart-confirm-prompt.md` 소유):
+
+     ```bash
+     mkdir -p "$HOME/.axhub/cache" && printf '%s' '<plugin.latest>' > "$HOME/.axhub/cache/.plugin-update-restart"
+     ```
+
+  5. **재시작 안내(필수 — plugin 업데이트는 재시작해야 적용돼요):** `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.`
+  6. 실패하면 raw 에러는 숨기고 한 줄만 안내한 뒤 비차단으로 계속해요 (marker 는 기록하지 않아요): `플러그인 자동 업데이트가 안 됐어요. claude plugin update axhub@axhub --scope <SCOPE> 를 직접 실행해 주세요.`
 
 ---
 
