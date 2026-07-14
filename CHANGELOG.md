@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.11.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.28...v1.11.0) (2026-07-14)
+
+Windows 에서 axhub 가 PATH 에 없을 때(`cli_path_missing`) 온보딩이 "새 터미널을 여세요" 로 세션을 끊던 흐름을 없앴어요 — 이미 열린 셸의 PATH 는 OS 설계상 밖에서 못 고치기 때문에, 이제 repair-path 로 영속 등록만 고치고 그 세션은 `bin_path` 절대경로로 남은 온보딩을 그대로 이어가요([#386](https://github.com/jocoding-ax-partners/axhub/pull/386)). lane 진입도 `command -v axhub` 가 실패한 상태라 canonical 경로(`~/.axhub/bin/axhub`)로 부르도록 명시했고, ax-hub-cli 0.24.7 의 `bin_path`·`cli_resolved_path` 계약과 정합시켰어요. 모든 SessionStart·UserPromptSubmit 훅 kill switch 는 `~/.axhub/config/no-*` marker 파일로도 꺼지게 해서, shell profile export 가 닿지 않는 Windows GUI 세션에서도 확실히 제어돼요. npx 셋업 lane 은 지원하지 않기로 확정해 AP-13 의 npx 예외 조항을 전부 삭제했어요.
+
+### Added
+
+* Windows 환경변수 강화 — 절대경로 lane·marker kill switch·npx 미지원 확정 ([#386](https://github.com/jocoding-ax-partners/axhub/pull/386)) 111f3c0
+
 ## [1.10.28](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.27...v1.10.28) (2026-07-14)
 
 exit 4 를 일괄 "다시 로그인" 으로 안내하던 스킬들이 `github_relogin_required` subcode 를 구분해 GitHub 재연동(device flow)으로 이어가요 — axhub 재로그인으로는 풀리지 않아 로그인과 게이트 사이를 맴돌던 흐름이 사라져요([#384](https://github.com/jocoding-ax-partners/axhub/pull/384)). update·import·diagnosis 문구를 ax-hub-cli 0.24.5 의 pending 재개·재시도 계약과 정합시키고, 재개를 지원하지 않는 구 CLI 를 위한 업데이트 폴백 안내와 마켓플레이스 번들 미러 재생성도 함께 담았어요.
