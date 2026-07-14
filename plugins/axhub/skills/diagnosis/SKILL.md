@@ -88,7 +88,7 @@ Claude Desktop QA처럼 사용자가 한 문장 안에 "진단하고 복구까�
 - pod name, signal name, container reason, stack trace, log line 원문
 - MCP transport 오류 세부정보, tool schema, 내부 분기 판정
 
-CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 원본은 reason·signal text·로그 line 을 그대로 찍을 수 있으니 스킬이 직접 가려요. 어느 경로든 사용자에게는 원인군과 다음 행동만 말해요. 예: "환경 설정 쪽이 가장 의심돼요. 먼저 설정값을 확인하고, 맞으면 같은 배포를 다시 시도하면 돼요."
+CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 원본은 reason·signal text·로그 line 을 그대로 찍을 수 있으니 스킬이 직접 가려요. 어느 경로든 사용자에게는 원인군과 다음 행동만 말해요. 예: "환경 설정 쪽이 가장 의심돼요. 먼저 설정값을 확인하고, 맞으면 다시 배포하면 돼요." 코드가 원인이면 수정 커밋을 만든 뒤 다시 배포하라고 안내해요 — import 첫 배포는 같은 커밋을 같은 배포로 재사용해서 커밋 없이는 결과가 안 바뀌어요.
 
 ## 헤드리스 판정
 
@@ -188,7 +188,7 @@ CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 원본�
 
 - `정상이에요. 지금 라이브 롤아웃은 건강해요. 방금 배포 결과가 궁금하면 "배포 상태 확인해줘"라고 말하면 돼요.`
 - `진단 대상이 아니에요. 지금 진단할 라이브 롤아웃이 없어요(아직 배포 전이거나 정적 앱). 첫 배포는 "배포해줘"라고 말하면 돼요.`
-- `해결 후보가 있어요. 인프라·배포 환경 쪽이 가장 의심돼요. 먼저 설정을 확인하고, 맞으면 다시 배포하면 돼요.`
+- `해결 후보가 있어요. 인프라·배포 환경 쪽이 가장 의심돼요. 먼저 설정을 확인하고, 맞으면 다시 배포하면 돼요. 코드가 원인이면 수정 커밋을 만든 뒤에요.`
 - `대상을 못 찾았어요. 어떤 앱이나 배포를 봐야 하는지 단서가 한 가지 더 필요해요.`
 - `로그인/권한이 필요해요. axhub 권한을 확인한 뒤 다시 진단하면 돼요.`
 - `진단을 못 했어요. 지금은 연결된 진단 도구도, CLI 진단 표면도 없어요.`

@@ -77,6 +77,8 @@ hand-written UX guide covers every emitted key.
 
 **해결:** "다시 로그인해줘" 라고 하면 브라우저로 안내해요. 브라우저가 안 열리는 환경이면 헤드리스 토큰 안내로 이어가요.
 
+**예외:** subcode 가 `github_relogin_required` 면 axhub 로그인이 아니라 GitHub 계정 연동이 풀린 상태예요. 재로그인 대신 GitHub 재연동(device flow)으로 안내해요 — `axhub github link` 를 승인하고 같은 확인 명령을 다시 실행하면 저장된 연동이 이어져요.
+
 **버튼:** ["다시 로그인", "토큰 파일로 로그인", "도와주세요"]
 
 ---

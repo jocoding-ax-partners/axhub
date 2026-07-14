@@ -16,7 +16,7 @@ The response envelope contains `data.items[]` with fields like `id`, `folder_nam
 
 Exit routing:
 
-- exit 4/auth: say `다시 로그인해줘`.
+- exit 4/auth: if the envelope subcode is `github_relogin_required`, axhub re-login does not fix it — run the device-flow fast path (`AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link`, then `axhub github accounts list --json`) and re-run this gate. Otherwise say `다시 로그인해줘`.
 - exit 8/tenant unresolved: use `axhub profile current --json` guidance and ask for login/profile fix.
 - other abnormal exit: say `설치 상태 진단해줘` can inspect.
 
@@ -83,7 +83,7 @@ axhub github accounts list --json
 Rules:
 
 - If output is empty or not parseable, state is unavailable; do not block.
-- If auth envelope says auth expired, say `다시 로그인해줘`, then re-run this gate after login.
+- If the auth envelope subcode is `github_relogin_required`, re-login does not fix it: run the device-flow fast path (`AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link`, then `axhub github accounts list --json`) and re-run this gate. For other auth-expired envelopes, say `다시 로그인해줘`, then re-run this gate after login.
 - If `install_url` exists, always show it once as "GitHub App 설치·계정 추가 링크: `<install_url>`", regardless of installed status.
 - If onboarding already showed the same install link in this conversation, repeated display can be skipped, but account check, owner pick, and zero-install gate still run.
 
