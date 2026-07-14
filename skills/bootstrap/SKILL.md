@@ -125,7 +125,7 @@ Template 과 앱 이름이 사용자에게 확정되면 앱 주소 확인 직전
 axhub github accounts list --json
 ```
 
-설치 계정 0개면 설치 확인 전 dry-run/execute 금지. 1개면 자동 owner, 2개 이상이면 고르게 해요. auth 에러는 `다시 로그인해줘`.
+설치 계정 0개면 설치 확인 전 dry-run/execute 금지. 1개면 자동 owner, 2개 이상이면 고르게 해요. auth 에러 중 subcode 가 `github_relogin_required` 면 axhub 재로그인으로는 안 풀려요 — device-flow fast path(`AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link` → `axhub github accounts list --json`)로 GitHub 계정을 다시 연동한 뒤 이 gate 를 재실행해요. 그 외 auth 에러는 `다시 로그인해줘`.
 
 ### 7. Availability Check
 

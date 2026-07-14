@@ -55,7 +55,7 @@ Never show raw JSON/stderr unless `AXHUB_INIT_VERBOSE=1`. Map failures:
 - `github.installation_missing` / `github.repo_create_failed`: say `GitHub 연결 다시 해줘` and preserve resume phrase.
 - `validation.template_not_found`: go back to backend template list.
 - `validation.slug_collision`: go back to app name/slug once.
-- `auth` / CLI exit 4: say `다시 로그인해줘`.
+- `auth` / CLI exit 4: subcode `github_relogin_required` 면 GitHub 계정 연동 문제라 device-flow fast path(`axhub github link` 승인 → `axhub github accounts list --json`)로 이어가요 — axhub 재로그인으로는 안 풀려요. 그 외에는 `다시 로그인해줘`.
 - `forbidden` / `tenant_scope` / CLI exit 12 or 8: explain permission/workspace admin issue.
 - missing `repo_full_name`: do not clone; say `설치 상태 진단해줘` can inspect.
 - anything else: say `설치 상태 진단해줘`.

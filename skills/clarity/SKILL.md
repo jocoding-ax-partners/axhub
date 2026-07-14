@@ -56,7 +56,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - 입력 코드를 찾았으면 승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출해요. `실행됨 명령 N개`, `TaskOutput 사용함`, tool 카드, 접힌 로그만 남기고 응답을 끝내면 실패예요.
 - 코드를 명령 출력이나 로그 읽기 결과 안에만 남기지 않아요. Claude Desktop 에서는 tool 출력이 접혀 보일 수 있으므로, 최종 요약이나 다음 안내 문장에도 사용자가 입력할 코드를 한 번 더 써요.
 - 자동 브라우저 열기는 입력 코드가 포함된 직접 URL을 우선 열 수 있어요. 사용자가 "승인했어"라고 다시 말하게 하지 않아요. 코드 표시 뒤 assistant 응답을 끝내지 말고, `계정 인증 시작` command 뒤 같은 assistant turn 에서 title 과 description 이 모두 정확히 `인증 확인` 인 단일 `axhub github accounts list --json` 조회까지 이어가요. tenant 가 이미 명확할 때만 `axhub github accounts list --tenant <tenant> --json` 를 써요. CLI 가 pending 으로 끝나도 `sleep`, `&&`, shell loop, watcher 로 감시하지 말고 같은 단일 확인 조회로 연결 반영 여부를 확인해요.
-- 브라우저가 성공 화면인데 계정 연결이 아직 반영되지 않았으면 같은 leaf 명령을 한 번만 더 실행할 수 있어요. 그래도 pending 이면 현재 결과와 다음에 확인할 명령을 짧게 안내하고 멈춰요. 승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요.
+- 브라우저가 성공 화면인데 계정 연결이 아직 반영되지 않았으면 같은 leaf 명령을 한 번만 더 실행할 수 있어요. 그래도 pending 이면 현재 결과와 다음에 확인할 명령을 짧게 안내하고 멈춰요. 승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요. 승인했는데도 `not authenticated` 가 계속 반복되면 CLI 가 pending 연동 재개를 지원하지 않는 구버전일 수 있어요 — update 스킬로 CLI 를 먼저 올린 뒤 다시 시도하도록 안내해요.
 - device_code 같은 내부 교환용 값은 절대 쓰지 않아요. 사용자에게 필요한 건 verification URL 과 `user_code` 뿐이에요.
 
 ## 원칙
