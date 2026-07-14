@@ -265,7 +265,7 @@ describe("smooth behavior contracts", () => {
     expect(importSkill).toContain("CLI 가 현재 `gh` 로그인과 app slug 로 repo 를 정하고");
     expect(importSkill).toContain("capabilities.import.schemas");
     expect(importSkill).toContain("Static 성공은");
-    expect(importSkill).toContain("정적 사이트 확인 증거가 부족해요");
+    expect(importSkill).toContain("고친 뒤에만 다시 시도해요");
     expect(importSkill).toContain("raw JSON body");
     expect(importSkill).toContain("low-level 명령을 조합해서 우회하지 않아요");
     expect(importSkill).toContain("axhub deploy --explain --json");
