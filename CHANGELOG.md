@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.10.28](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.27...v1.10.28) (2026-07-14)
+
+exit 4 를 일괄 "다시 로그인" 으로 안내하던 스킬들이 `github_relogin_required` subcode 를 구분해 GitHub 재연동(device flow)으로 이어가요 — axhub 재로그인으로는 풀리지 않아 로그인과 게이트 사이를 맴돌던 흐름이 사라져요([#384](https://github.com/jocoding-ax-partners/axhub/pull/384)). update·import·diagnosis 문구를 ax-hub-cli 0.24.5 의 pending 재개·재시도 계약과 정합시키고, 재개를 지원하지 않는 구 CLI 를 위한 업데이트 폴백 안내와 마켓플레이스 번들 미러 재생성도 함께 담았어요.
+
+### Fixed
+
+* CLI 이음새 정합 — github_relogin_required 분기·pending 재개 문구·재시도 안내 갱신 ([#384](https://github.com/jocoding-ax-partners/axhub/pull/384)) c955874
+* 릴리즈 게이트 회귀 정리 — 번들 미러 재생성·bootstrap 바이트 예산·static 문구 pin 갱신 7b552e9
+
 ## [1.10.27](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.26...v1.10.27) (2026-07-13)
 
 죽은 링크 전수 감사에서 plugin.json·marketplace.json 의 homepage(`https://axhub.jocodingax.ai`)가 TLS 연결 실패로 접속되지 않는 것을 확인해, 살아있는 `https://axhub.ai` 로 교체했어요([#381](https://github.com/jocoding-ax-partners/axhub/pull/381)). marketplace UI 에서 homepage 링크를 눌러도 더 이상 빈 화면으로 떨어지지 않아요. 같은 감사에서 나온 CLI 쪽 미발행 문서 링크 제거는 ax-hub-cli 0.24.2 로 함께 릴리즈돼요.
