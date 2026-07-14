@@ -4,6 +4,7 @@ set -euo pipefail
 if [ -n "${AXHUB_NO_IMPORT_ROUTER:-}" ]; then
   exit 0
 fi
+[ -f "$HOME/.axhub/config/no-import-router" ] && exit 0
 
 input="$(cat)"
 

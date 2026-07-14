@@ -2,6 +2,7 @@
 set -euo pipefail
 
 [ -n "${AXHUB_NO_STATUS_ROUTER:-}" ] && exit 0
+[ -f "$HOME/.axhub/config/no-status-router" ] && exit 0
 
 input="$(cat)"
 

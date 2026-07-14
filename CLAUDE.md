@@ -115,7 +115,7 @@ diet 가 제거한 hook 중 **auto-update SessionStart 훅 1개**만 `hooks/` �
 - **트리거·throttle:** SessionStart 마다 cheap bash 가 `axhub` 존재 + `~/.axhub/cache/.plugin-update-check` mtime(24h)만 보고, due 면 `auto-update-prompt.md` 를 읽으라는 지시를 emit 해요. 네트워크 호출은 hook 이 아니라 prompt(에이전트)가 해요.
 - **CLI 업데이트:** `axhub update check --plugin-version <plugin.json version> --json` 으로 확인 → `has_update && !disabled` 면 `axhub update apply --execute --yes` 자동 적용(즉시 반영).
 - **플러그인 업데이트:** 같은 응답의 `plugin` 블록이 `has_update` 면 `claude plugin list` 로 scope 감지 후 `claude plugin update axhub@axhub --scope <scope>` 자동 적용 — **재시작해야 반영**돼요.
-- **끄기:** `AXHUB_NO_AUTO_UPDATE=1` 이면 자동 적용 없이 안내만 하고 throttle 도 즉시 skip 해요.
+- **끄기:** `AXHUB_NO_AUTO_UPDATE=1` 또는 marker 파일 `~/.axhub/config/no-auto-update`(모든 훅 kill switch 는 env 에서 `AXHUB_` 를 뗀 소문자-하이픈 marker counterpart 를 가져요 — profile export 가 안 닿는 GUI 세션용 채널)이면 자동 적용 없이 안내만 하고 throttle 도 즉시 skip 해요.
 - **Windows:** hook 은 `"shell": "bash"` 로 고정했어요 — Windows 에선 Git Bash 로 돌고(없으면 silent PowerShell fallback 대신 깨끗이 skip), `bash`·`find`·`command -v`·`$HOME` 등 Git for Windows 번들 도구만 써요 (jq 같은 외부 의존 없음). prompt 의 `axhub update`/`claude plugin update` 는 에이전트 Bash 도구(= skill 들과 같은 Git Bash 경로)로 실행돼요. 즉 hook 은 skill bash 와 동일한 Git Bash 전제를 따르고, 새 의존(node 등)은 더하지 않아요.
 - best-effort·비차단 — 실패·구 CLI·네트워크 오류면 조용히 건너뛰고 사용자의 작업을 막지 않아요. skill 들의 기존 `1a 버전 체크`(10분 TTL, 안내만)와 보완 관계예요.
 - **수동 on-demand counterpart:** 같은 update 로직을 사용자가 직접 부르는 진입점은 `update` skill (`skills/update/SKILL.md`) 이에요 — 훅과 달리 24h throttle 없이 바로 확인하고, 최신이어도 결과를 한 줄로 알려요. 둘은 같은 `axhub update` + `claude plugin update` 표면을 공유해요.
@@ -125,15 +125,15 @@ diet 가 제거한 hook 중 **auto-update SessionStart 훅 1개**만 `hooks/` �
 auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks.json` 두 번째 entry). 새로 등록한 MCP 서버는 Claude Code 를 재시작해야 세션에 로드되기 때문에, onboarding 은 `claude mcp add` 직후 marker(`~/.axhub/cache/.onboarding-mcp-restart`)를 쓰고 Restart Handoff Card 로 종료해요. 재시작 후 이 훅이 marker(7일 TTL, mtime 만 사용)를 감지하면 새 세션이 온보딩 마무리(`claude mcp get axhub` 확인 → 필요시 `/mcp` OAuth → 최종 카드 → marker 삭제)를 먼저 제안해요.
 
 - hook 은 파일 존재 + mtime 만 봐요 — `axhub` 바이너리도 네트워크도 안 건드리고, marker 삭제도 skill 몫이에요 (`VIBE_READY` 시 `rm -f`).
-- **끄기:** `AXHUB_NO_ONBOARDING_RESUME=1`. Windows 전제는 auto-update 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
+- **끄기:** `AXHUB_NO_ONBOARDING_RESUME=1` 또는 `~/.axhub/config/no-onboarding-resume`. Windows 전제는 auto-update 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
 - 세부 절차는 `skills/onboarding/references/mcp-ready-card.md` 의 Restart Marker / Resume After Restart 섹션이 소유해요.
 
 ## Windows 실행 계약 hook (AP-13)
 
-auto-update·resume 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks.json` 세 번째 entry). Windows(`$OS`=Windows_NT) 세션에서만 Git Bash 실행 계약을 always-on 으로 emit 해요 — axhub 명령은 Git Bash 전용(PowerShell 금지), PATH 는 `axhub plugin-support repair-path` 후 새 터미널, `auth status` 는 로그인한 그 셸에서 검증, 로그인은 단일 폴링 1회. skill 본문이 아니라 hook 에 둔 이유는, 사고처럼 에이전트가 skill 을 안 따르고 free-form 으로 PowerShell 을 쓰는 경로까지 덮기 위해서예요 (skill byte 예산도 안 먹어요).
+auto-update·resume 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks.json` 세 번째 entry). Windows(`$OS`=Windows_NT) 세션에서만 Git Bash 실행 계약을 always-on 으로 emit 해요 — axhub 명령은 Git Bash 전용(PowerShell 금지), PATH 는 `axhub plugin-support repair-path` 로 영속 등록 + 같은 세션은 bin_path 절대경로로 계속(새 터미널은 다음 세션용), `auth status` 는 로그인한 그 셸에서 검증, 로그인은 단일 폴링 1회. skill 본문이 아니라 hook 에 둔 이유는, 사고처럼 에이전트가 skill 을 안 따르고 free-form 으로 PowerShell 을 쓰는 경로까지 덮기 위해서예요 (skill byte 예산도 안 먹어요).
 
 - hook 은 `$OS` 만 봐요 — 네트워크·`axhub` 바이너리·marker 안 건드리고, non-Windows 는 즉시 exit 0.
-- **끄기:** `AXHUB_NO_WINDOWS_CONTRACT=1`. Windows 전제는 다른 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
+- **끄기:** `AXHUB_NO_WINDOWS_CONTRACT=1` 또는 `~/.axhub/config/no-windows-contract`. Windows 전제는 다른 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
 - 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-13 이 소유해요 (parity 적용: `hooks/hooks.json`, `CLAUDE.md`).
 
 ## update-first Code-mode router hook (AP-14)
@@ -143,7 +143,7 @@ SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이�
 - SessionStart fallback 은 새 Code 세션에 update-first 규칙을 먼저 깔아요. UserPromptSubmit match 는 사용자 프롬프트 JSON 에 `axhub` 와 최신성 키워드(`최신`, `버전`, `업데이트`, `latest`, `up to date`, `version check`, `update`, `upgrade`)가 함께 있을 때 `hookSpecificOutput.additionalContext` 만 emit 해요. 모든 훅 출력은 `suppressOutput: true` JSON 이라 사용자 화면에 노출되지 않아요 — `systemMessage` 와 plain stdout 은 쓰지 않아요.
 - 명령 실행·네트워크·앱 목록 조회를 하지 않아요. `update` 스킬 우선, 첫 visible assistant text `현재 버전을 확인할게요.`, App/MCP 도구 선행 금지만 주입해요.
 - update 뒤 같은 원문에 앱 현황 확인이 남으면 존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 시작해요. `| head`, `2>/dev/null`, `grep`, `sed`, `awk` 같은 shell 후처리는 붙이지 않아요.
-- **끄기:** `AXHUB_NO_UPDATE_ROUTER=1`.
+- **끄기:** `AXHUB_NO_UPDATE_ROUTER=1` 또는 `~/.axhub/config/no-update-router`.
 
 ## CLI 호출 표면
 
@@ -198,4 +198,4 @@ Key routing rules:
 
 **진입 확인 AUQ (AP-12):** axhub 프로젝트가 확정돼도 배포·생성·가져오기(deploy·bootstrap·import) 실행 전에 interactive 에서는 "axhub로 진행할까요?"를 AskUserQuestion 으로 한 번 더 확인해요("무엇을·어떻게"를 묻는 기존 preview 승인과 별개인 진입 게이트). deploy·import 는 preview 앞 별도 AUQ, bootstrap 은 기존 preview 승인에 통합(byte 예산 포화). headless 는 생략해요.
 
-**Windows 실행 계약 (AP-13):** Windows 에선 axhub 명령을 Git Bash 전용으로 실행해요 (PowerShell 금지). PATH 는 수동 등록 대신 `axhub plugin-support repair-path` 후 새 터미널, `auth status` 는 `auth login` 한 그 셸에서 검증해요 — HOME 없는 PowerShell 의 "미로그인" 은 실패가 아니에요. 로그인은 단일 폴링 `axhub auth login --json` 1 회로 하고 background 재실행은 안 해요. 예외(명문): npx 기반 셋업(`npx axhub@latest setup`)은 auth 무접촉·PATH 비의존이라 PowerShell 에서 실행돼도 계약 위반이 아니고, setup 이후 로그인·auth 검증부터 Git Bash 계약을 따라요.
+**Windows 실행 계약 (AP-13):** Windows 에선 axhub 명령을 Git Bash 전용으로 실행해요 (PowerShell 금지). PATH 는 수동 등록 대신 canonical 경로(`~/.axhub/bin/axhub`(.exe))로 `plugin-support repair-path` 를 실행해 영속 등록하고 같은 세션은 repair-path 의 bin_path 절대경로로 계속 진행해요(구 CLI 로 bin_path 가 없으면 새 터미널 안내, 새 터미널은 다음 세션용), `auth status` 는 `auth login` 한 그 셸에서 검증해요 — HOME 없는 PowerShell 의 "미로그인" 은 실패가 아니에요. 로그인은 단일 폴링 `axhub auth login --json` 1 회로 하고 background 재실행은 안 해요. 이 계약에 예외는 없어요 — 공식 설치 채널은 install.sh / install.ps1 뿐이에요.

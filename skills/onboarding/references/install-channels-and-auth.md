@@ -27,21 +27,26 @@ Official channels:
 
 Installer GUI, shell profile changes, and permissions are user action gates. Do not expose raw installer stderr in chat.
 
+install.sh / install.ps1 은 PATH 영속 등록까지 스스로 해요 (`AXHUB_INSTALL_NO_PATH=1` 옵트아웃, 사용자가 PowerShell 에서 직접 실행하면 그 창은 즉시 사용 가능). 다만 에이전트 세션 안에서 설치하면 이 세션은 여전히 예전 PATH 라, 설치 직후 재감지가 `cli_path_missing` 을 주면 아래 절대경로 lane 으로 그대로 이어가요.
+
 ## CLI Path Missing
 
-If detect says the CLI exists but is not on PATH, let the CLI repair its own shell config:
+If detect says the CLI exists but is not on PATH (`cli_state: on_disk_not_on_path`), let the CLI repair its own persistence, then keep going in THIS session via the absolute path:
 
 ```bash
-axhub plugin-support repair-path --json
+"$HOME/.axhub/bin/axhub" plugin-support repair-path --json
 ```
 
-Interpret `{repaired, already_present, disabled, shell_rc, backup_path}`:
+bare `axhub` 는 이 상태(현재 셸 PATH 미포함)에선 127 로 실패해요 — detect 가 확인한 canonical on-disk 경로로 호출해요 (Windows Git Bash 는 `"$HOME/.axhub/bin/axhub.exe"`). detect 가 PATH 위 CLI 로 `on_disk_not_on_path` 를 보고한 드문 sub-case 에선 bare 호출도 돼요.
 
-- `repaired:true`: "PATH 를 고쳐뒀어요. 새 터미널을 열고 `온보딩 계속` 이라고 말해 주세요."
-- `already_present:true`: re-detect immediately.
+Interpret `{repaired, already_present, disabled, shell_rc, backup_path, bin_path, current_session_stale, session_hint}`:
+
+- `repaired:true` 또는 `already_present:true` + `current_session_stale:true`: 영속 등록은 끝났지만 이 세션은 못 봐요 — 이미 열린 셸의 PATH 는 밖에서 못 고쳐요(OS 설계). **남은 온보딩 명령을 `bin_path` 절대경로로 그대로 이어가요** (예: `"<bin_path>" auth status --json`). 안내는 한 번만 붙여요: "새 터미널부터는 `axhub` 로 짧게 쓸 수 있어요 (VS Code 통합터미널은 앱 재시작)." 사용자가 이 터미널을 직접 고치고 싶어 하면 `session_hint` 에서 셸에 맞는 한 줄만 보여줘요.
+- `already_present:true` + `current_session_stale:false`: re-detect immediately.
 - `disabled:true`: show one manual PATH instruction and stop with user action.
+- 구 CLI(새 필드 없음): repair 후 "PATH 를 고쳐뒀어요. 새 터미널을 열고 `온보딩 계속` 이라고 말해 주세요." 로 멈춰요. 재감지 루프 금지는 동일해요.
 
-Do not invent another PATH search. The CLI owns candidate paths, shell rc backup, and mutation.
+Do not invent another PATH search. The CLI owns candidate paths, shell rc backup, and mutation. detect 의 `cli_resolved_path` 도 같은 절대경로 escape hatch 예요.
 
 ## CLI Old Or Update Available
 
