@@ -62,7 +62,7 @@ AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>
 입력 코드: <USER_CODE>
 ```
 
-사용자가 `승인했어` 라고 다시 말하기를 기다리지 말고, 코드 노출 뒤 응답을 끝내지도 말아요. CLI 가 `After approving in the browser, run axhub github accounts list --json to confirm` 같은 pending 문구를 출력해도 그 문구를 사용자에게 다음 요청처럼 떠넘기지 말고, 같은 assistant turn 에서 단일 확인 명령까지 이어가요. tenant 가 이미 명확할 때만 `--tenant <tenant>` 를 붙이고, 모르면 tenant 옵션 없이 확인해요.
+사용자가 `승인했어` 라고 다시 말하기를 기다리지 말고, 코드 노출 뒤 응답을 끝내지도 말아요. CLI 가 `After approving in the browser, rerun axhub github link (or axhub github accounts list --json)` 같은 pending 문구를 출력해도 그 문구를 사용자에게 다음 요청처럼 떠넘기지 말고, 같은 assistant turn 에서 단일 확인 명령까지 이어가요. 확인이 pending 으로 끝났다면 승인 뒤 같은 확인 명령을 다시 실행하면 저장된 pending link 가 이어져요(새 코드 발급 없음). tenant 가 이미 명확할 때만 `--tenant <tenant>` 를 붙이고, 모르면 tenant 옵션 없이 확인해요.
 
 ```bash
 axhub github accounts list --json

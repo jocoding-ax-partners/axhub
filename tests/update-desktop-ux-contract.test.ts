@@ -155,7 +155,8 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("[https://github.com/login/device](github.com/login/device)");
     expect(update).toContain("링크/자동링크 형태로 꾸미면 실패예요");
     expect(update).toContain("코드 노출 뒤 응답을 끝내지도 말아요");
-    expect(update).toContain("After approving in the browser, run axhub github accounts list --json to confirm");
+    expect(update).toContain("After approving in the browser, rerun axhub github link (or axhub github accounts list --json)");
+    expect(update).toContain("저장된 pending link 가 이어져요");
     expect(update).toContain("사용자에게 다음 요청처럼 떠넘기지 말고");
     expect(update).toContain("`계정 인증 시작` command 뒤에 이 `인증 확인` command 가 보이지 않고 assistant 응답이 끝나면 실패예요");
     expect(hooks).toContain("The assistant body must print exactly two normal chat lines with the URL in inline code");
