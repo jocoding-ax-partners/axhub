@@ -34,8 +34,10 @@ install.sh / install.ps1 은 PATH 영속 등록까지 스스로 해요 (`AXHUB_I
 If detect says the CLI exists but is not on PATH (`cli_state: on_disk_not_on_path`), let the CLI repair its own persistence, then keep going in THIS session via the absolute path:
 
 ```bash
-axhub plugin-support repair-path --json
+"$HOME/.axhub/bin/axhub" plugin-support repair-path --json
 ```
+
+bare `axhub` 는 이 상태(현재 셸 PATH 미포함)에선 127 로 실패해요 — detect 가 확인한 canonical on-disk 경로로 호출해요 (Windows Git Bash 는 `"$HOME/.axhub/bin/axhub.exe"`). detect 가 PATH 위 CLI 로 `on_disk_not_on_path` 를 보고한 드문 sub-case 에선 bare 호출도 돼요.
 
 Interpret `{repaired, already_present, disabled, shell_rc, backup_path, bin_path, current_session_stale, session_hint}`:
 

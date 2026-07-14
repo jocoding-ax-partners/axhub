@@ -7,7 +7,7 @@ Load this after `axhub plugin-support onboarding-detect --json` when `first_gap`
 ```text
 DETECT_ALL(read-only)  <- axhub plugin-support onboarding-detect --json
   cli_missing          -> installer approval -> DETECT_ALL
-  cli_path_missing     -> repair-path -> user reload or DETECT_ALL
+  cli_path_missing     -> repair-path(canonical path) -> bin_path lane -> DETECT_ALL via bin_path
   cli_old              -> update check/apply approval -> DETECT_ALL
   auth_missing         -> auth status/refresh/login -> DETECT_ALL
   git_missing          -> git install approval -> DETECT_ALL
@@ -29,7 +29,7 @@ Do not process the second item in `gaps` from the same JSON. Handle one `first_g
 | gap id | Detection cue | Completion rule |
 | --- | --- | --- |
 | `cli_missing` | `cli_present=false` | User installs official CLI, then detect reports `cli_present=true`. |
-| `cli_path_missing` | `cli_state=on_disk_not_on_path` or `cli_on_path=false` | `repair-path` reports repaired/already present, or user opens a new terminal and re-runs onboarding. |
+| `cli_path_missing` | `cli_state=on_disk_not_on_path` or `cli_on_path=false` | canonical 경로로 부른 `repair-path` 가 repaired/already present 를 보고하면 같은 세션은 `bin_path` 절대경로로 이어가고 재감지도 `bin_path` 로 해요; 구 CLI(bin_path 없음)는 새 터미널 재실행으로 완료해요. |
 | `cli_old` | `cli_too_old=true` or `has_update=true` | update apply succeeds, or user stops with `READY_WITH_USER_ACTION`. |
 | `auth_missing` | `auth_ok=false` | refresh/login succeeds and re-detect is green. |
 | `git_missing` | `git_present=false` | git becomes present after user-approved install. |
