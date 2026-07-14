@@ -158,7 +158,7 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요.
 - 자체 인증·배포 로직을 재구현하지 않아요. CLI 를 **invoke** 하고 결과를 **분류·복구 안내**할 뿐이에요.
 - CLI 가 새 기능을 내면 자연어 트리거만 더하면 돼요 — `clarity` 브리지는 그것조차 자동이에요.
 
-이전에는 플러그인이 Rust helper 바이너리·hook·NL 라우팅 코퍼스를 동봉했지만, v1 다이어트에서 전부 제거하고 `ax-hub-cli` 직접 호출로 전환했어요. 흡수된 helper 표면은 CLI 의 hidden `axhub plugin-support <cmd>` 그룹으로 옮겼어요. 이후 cheap bash 훅만 아주 좁게 다시 들어왔어요 — 세션 시작 때 CLI·플러그인 업데이트를 확인하는 auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1`), MCP 등록 후 재시작한 새 세션이 온보딩 마무리를 먼저 제안하는 onboarding resume 훅(끄기: `AXHUB_NO_ONBOARDING_RESUME=1`), Windows Git Bash 실행 계약 훅(끄기: `AXHUB_NO_WINDOWS_CONTRACT=1`), 그리고 최신·버전·업데이트 요청이 axhub App/MCP 도구보다 `update` 스킬을 먼저 타게 하는 Code-mode update router guard(끄기: `AXHUB_NO_UPDATE_ROUTER=1`)예요. 이 guard 는 SessionStart fallback 과 UserPromptSubmit match 로 라우팅 문맥만 추가하고, 명령을 실행하거나 앱 목록을 조회하지 않아요. 이 경로에서 사용자에게 보이는 첫 문장은 `현재 버전을 확인할게요.` 예요.
+이전에는 플러그인이 Rust helper 바이너리·hook·NL 라우팅 코퍼스를 동봉했지만, v1 다이어트에서 전부 제거하고 `ax-hub-cli` 직접 호출로 전환했어요. 흡수된 helper 표면은 CLI 의 hidden `axhub plugin-support <cmd>` 그룹으로 옮겼어요. 이후 cheap bash 훅만 아주 좁게 다시 들어왔어요 — 세션 시작 때 CLI·플러그인 업데이트를 확인하는 auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update`), MCP 등록 후 재시작한 새 세션이 온보딩 마무리를 먼저 제안하는 onboarding resume 훅(끄기: `AXHUB_NO_ONBOARDING_RESUME=1` 또는 `~/.axhub/config/no-onboarding-resume`), Windows Git Bash 실행 계약 훅(끄기: `AXHUB_NO_WINDOWS_CONTRACT=1` 또는 `~/.axhub/config/no-windows-contract`), 그리고 최신·버전·업데이트 요청이 axhub App/MCP 도구보다 `update` 스킬을 먼저 타게 하는 Code-mode update router guard(끄기: `AXHUB_NO_UPDATE_ROUTER=1` 또는 `~/.axhub/config/no-update-router`)예요. 이 guard 는 SessionStart fallback 과 UserPromptSubmit match 로 라우팅 문맥만 추가하고, 명령을 실행하거나 앱 목록을 조회하지 않아요. 이 경로에서 사용자에게 보이는 첫 문장은 `현재 버전을 확인할게요.` 예요.
 
 ---
 
