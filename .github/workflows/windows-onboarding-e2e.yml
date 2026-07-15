@@ -98,7 +98,7 @@ jobs:
         run: |
           python - <<'PY' > "$RUNNER_TEMP/hooks.env"
           import json
-          hooks = json.load(open("hooks/hooks.json"))["hooks"]["SessionStart"][0]["hooks"]
+          hooks = json.load(open("hooks/hooks.json", encoding="utf-8"))["hooks"]["SessionStart"][0]["hooks"]
           def pick(marker):
               for h in hooks:
                   if marker in h["command"]:
