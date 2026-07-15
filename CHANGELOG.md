@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.12.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.11.0...v1.12.0) (2026-07-15)
+
+세션을 새로 열 때마다 CLI 를 못 찾고 재설치를 권하던 오판을 없앴어요 — 새 세션은 부모 앱(VS Code·데스크톱 앱)의 예전 PATH 를 물려받아 `command -v axhub` 가 계속 실패하는데, 기존 픽스처는 canonical `~/.axhub/bin` 한 곳만 봐서 커스텀 설치 위치를 "미설치"로 읽었어요([#388](https://github.com/jocoding-ax-partners/axhub/pull/388)). 이제 ax-hub-cli 0.24.8+ 가 기록하는 location 파일(`~/.axhub/bin-path`)을 1순위로 읽어 어떤 설치 위치든 PATH 문제로 정확히 판별하고, 그 절대경로로 온보딩을 그대로 이어가요. 반복되는 이유(부모 앱의 stale PATH)와 앱 재시작 후 정상화 안내도 함께 담았어요.
+
+### Added
+
+* 세션 재진입 인식 — DETECT 픽스처가 location 파일(bin-path)을 1순위로 읽어 재설치 오판 제거 ([#388](https://github.com/jocoding-ax-partners/axhub/pull/388)) 2b0ba54
+
 ## [1.11.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.10.28...v1.11.0) (2026-07-14)
 
 Windows 에서 axhub 가 PATH 에 없을 때(`cli_path_missing`) 온보딩이 "새 터미널을 여세요" 로 세션을 끊던 흐름을 없앴어요 — 이미 열린 셸의 PATH 는 OS 설계상 밖에서 못 고치기 때문에, 이제 repair-path 로 영속 등록만 고치고 그 세션은 `bin_path` 절대경로로 남은 온보딩을 그대로 이어가요([#386](https://github.com/jocoding-ax-partners/axhub/pull/386)). lane 진입도 `command -v axhub` 가 실패한 상태라 canonical 경로(`~/.axhub/bin/axhub`)로 부르도록 명시했고, ax-hub-cli 0.24.7 의 `bin_path`·`cli_resolved_path` 계약과 정합시켰어요. 모든 SessionStart·UserPromptSubmit 훅 kill switch 는 `~/.axhub/config/no-*` marker 파일로도 꺼지게 해서, shell profile export 가 닿지 않는 Windows GUI 세션에서도 확실히 제어돼요. npx 셋업 lane 은 지원하지 않기로 확정해 AP-13 의 npx 예외 조항을 전부 삭제했어요.
