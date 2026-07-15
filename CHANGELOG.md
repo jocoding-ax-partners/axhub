@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.14.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.13.0...v1.14.0) (2026-07-15)
+
+온보딩 마무리 개정(1.13.0)의 후속 폴리시 패스예요([#392](https://github.com/jocoding-ax-partners/axhub/pull/392)). AI 활용 기록 옵트인 질문을 표준 JSON 으로 고정해(기본 선택지 "이번엔 건너뛰기", 나중에 켜는 방법 포함) 세션마다 문구가 흔들리지 않게 했어요. github-app reference 의 `auth_error` 안내를 `github_relogin_required` → `axhub github link` 재연동 분기로 교정하고, 브라우저 App 설치 완료 신호를 device-flow 금지 어휘와 충돌하지 않는 `설치 끝났어` 로 바꿨어요. dependency reference 의 존재하지 않는 detect 계약 참조를 제거했고, SKILL·gap-state-machine 사이 gap 집합 드리프트를 잡는 대표 여정 parity 테스트 6종을 새로 추가했어요.
+
+### Added
+
+* 온보딩 폴리시 패스 — 옵트인 표준 질문·reference 정합 4건·대표 여정 parity 테스트 ([#392](https://github.com/jocoding-ax-partners/axhub/pull/392))
+
 ## [1.13.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.12.0...v1.13.0) (2026-07-15)
 
 온보딩 후반(AI 활용 기록 옵트인 → MCP 연동 → 카드)이 뚝뚝 끊긴다는 실사용 피드백을 반영했어요([#390](https://github.com/jocoding-ax-partners/axhub/pull/390)). 마무리 진입 시 "재시작 한 번으로 끝나요" 예고를 먼저 하고, 재시작 최대 1회·카드 1장·질문은 옵트인 1개 원칙을 명문화했어요. Restart Handoff Card 는 green 요약 체크가 담긴 "완료 직전" 카드로 확장됐고, 재시작 후 새 세션은 이어서 할지 다시 묻지 않고 바로 read-only 확인으로 이어가요(무관한 첫 요청이면 그 요청 우선). resume 에서의 detect 재실행은 명시 요청 시로 제한했어요.
