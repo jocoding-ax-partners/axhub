@@ -9,7 +9,23 @@ Load this after core gaps are resolved. 처리 순서는 AI 활용 기록 옵트
 AI 활용 기록은 내 Claude Code 프롬프트·응답·툴콜 내용을 팀 워크스페이스로 보내는 수집 기능이에요 (`axhub axrouter`). 켜는 것은 항상 사용자 선택이에요 — 동의 없이 켜지 않아요. headless 면 이 섹션을 통째로 건너뛰어요 (묻지도 실행하지도 않아요).
 
 1. `axhub axrouter status --json` 을 실행해요 (read-only). 명령 실패(구 CLI 포함)거나 `data.workspaces[]` 에 `available: true` 인 워크스페이스가 없으면 조용히 건너뛰어요. 이미 수집 중인지는 `data.active_workspace` 로만 판단해요 — 값이 있으면 묻지 않고 최종 카드에 상태만 반영해요. `data.local_monitoring` 이 true 라도 `active_workspace` 가 null 이면 axhub 수집이 아니라 다른 도구의 텔레메트리 설정일 수 있으니 건너뛰지 말고 정상적으로 물어봐요.
-2. AskUserQuestion 한 번으로 물어요. 질문에는 무엇이 수집되는지(이 컴퓨터의 Claude Code 프롬프트·응답·툴콜 내용), 어디로 가는지(<slug> 워크스페이스), 선택 사항이라는 점을 담아요. 옵션은 "켜기" / "이번엔 건너뛰기". available 워크스페이스가 여러 개면 어느 워크스페이스로 보낼지도 같은 질문에서 골라요. `local_monitoring` 이 true 인데 `active_workspace` 가 null 이면 다른 텔레메트리 설정이 이미 있는 상태라, "켜면 기존 수집 설정이 axhub 설정으로 교체돼요" 를 질문에 함께 담아요 (CLI 가 켤 때 외부 OTEL 키를 제거하고 제거 목록을 알려줘요).
+2. AskUserQuestion 한 번으로 물어요. 표준 질문은 아래 모양이에요 — 무엇이 수집되는지·어디로 가는지·선택 사항이라는 점·나중에 켜는 방법이 전부 질문 안에 담겨야 하고, 기본 선택지는 "이번엔 건너뛰기"(첫 번째 옵션)예요.
+
+```json
+{
+  "questions": [{
+    "question": "AI 활용 기록을 켤까요? 이 컴퓨터의 Claude Code 프롬프트·응답·툴콜 내용이 <workspace-slug> 워크스페이스로 전송돼요. 선택 사항이에요 — 지금 건너뛰어도 나중에 'AI 활용 기록 켜줘' 한마디로 켤 수 있어요.",
+    "header": "AI 활용 기록",
+    "multiSelect": false,
+    "options": [
+      {"label": "이번엔 건너뛰기", "description": "수집 없이 온보딩을 마무리해요. 나중에 'AI 활용 기록 켜줘' 라고 말하면 켜져요"},
+      {"label": "켜기", "description": "<workspace-slug> 워크스페이스로 수집을 시작해요 (Claude Code 재시작 후 적용)"}
+    ]
+  }]
+}
+```
+
+   available 워크스페이스가 여러 개면 같은 질문에서 대상 워크스페이스도 골라요 — 옵션을 워크스페이스별로 나누되 질문은 여전히 1개예요. `local_monitoring` 이 true 인데 `active_workspace` 가 null 이면 다른 텔레메트리 설정이 이미 있는 상태라, "켜면 기존 수집 설정이 axhub 설정으로 교체돼요" 한 문장을 question 에 덧붙여요 (CLI 가 켤 때 외부 OTEL 키를 제거하고 제거 목록을 알려줘요).
 3. 건너뛰기 → "나중에 켜고 싶으면 'AI 활용 기록 켜줘' 라고 말하면 돼요." 한 줄만 남기고 같은 온보딩에서 다시 묻지 않아요.
 4. 켜기 → `axhub axrouter monitor --tenant <slug> --json`.
    - 성공 → 적용은 Claude Code 재시작 후예요. 별도 카드나 안내 문단을 만들지 않아요 — 이어지는 카드(Restart Handoff 또는 최종 카드) 한 곳에 "AI 활용 기록 켜짐 — 재시작 후 적용" 한 줄로만 반영해요.

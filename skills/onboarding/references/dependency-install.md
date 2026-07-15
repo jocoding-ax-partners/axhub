@@ -38,7 +38,7 @@ Use the project lockfile to pick one command:
 - `package-lock.json` or `npm-shrinkwrap.json`: `npm install --ignore-scripts`
 - `yarn.lock`: `yarn install --ignore-scripts`
 
-If more than one lockfile exists, prefer the package manager already recorded by detect if present; otherwise ask the user to choose. If no lockfile exists, do not ask which package manager to use. Say lockfile is required and leave a user-action card.
+If more than one lockfile exists, ask the user which one to use — detect JSON 은 package manager 를 내려주지 않으니 추측하지 않아요. If no lockfile exists, do not ask which package manager to use. Say lockfile is required and leave a user-action card.
 
 ## Result Handling
 
