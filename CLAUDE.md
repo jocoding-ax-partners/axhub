@@ -122,7 +122,7 @@ diet 가 제거한 hook 중 **auto-update SessionStart 훅 1개**만 `hooks/` �
 
 ## 온보딩 MCP 재시작 resume hook
 
-auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks.json` 두 번째 entry). 새로 등록한 MCP 서버는 Claude Code 를 재시작해야 세션에 로드되기 때문에, onboarding 은 `claude mcp add` 직후 marker(`~/.axhub/cache/.onboarding-mcp-restart`)를 쓰고 Restart Handoff Card 로 종료해요. 재시작 후 이 훅이 marker(7일 TTL, mtime 만 사용)를 감지하면 새 세션이 온보딩 마무리(`claude mcp get axhub` 확인 → 필요시 `/mcp` OAuth → 최종 카드 → marker 삭제)를 먼저 제안해요.
+auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks.json` 두 번째 entry). 새로 등록한 MCP 서버는 Claude Code 를 재시작해야 세션에 로드되기 때문에, onboarding 은 `claude mcp add` 직후 marker(`~/.axhub/cache/.onboarding-mcp-restart`)를 쓰고 Restart Handoff Card 로 종료해요. 재시작 후 이 훅이 marker(7일 TTL, mtime 만 사용)를 감지하면 새 세션이 온보딩 마무리(`claude mcp get axhub` 확인 → 필요시 `/mcp` OAuth → 최종 카드 → marker 삭제)를 다시 묻지 않고 바로 이어가요 — 사용자의 첫 요청이 다른 주제면 한 줄 제안만 남기고 그 요청을 우선해요.
 
 - hook 은 파일 존재 + mtime 만 봐요 — `axhub` 바이너리도 네트워크도 안 건드리고, marker 삭제도 skill 몫이에요 (`VIBE_READY` 시 `rm -f`).
 - **끄기:** `AXHUB_NO_ONBOARDING_RESUME=1` 또는 `~/.axhub/config/no-onboarding-resume`. Windows 전제는 auto-update 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
