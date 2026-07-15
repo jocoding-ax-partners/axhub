@@ -13,7 +13,7 @@ GitHub App 설치·계정 추가 링크: <github.install_url>
 
 If `github.installed_logins` is non-empty, add `이미 연결된 계정: <login...>`. Show login names and the URL only. Do not show `installation_id` or internal API details. Do not automatically open the link unless the user chooses an install action.
 
-If `github.install_url` is null because `github.state=auth_error`, tell the user to login again. If `unavailable`, leave it as best-effort unavailable and continue only when the current gap does not require GitHub installation.
+If `github.install_url` is null because `github.state=auth_error`, error subcode 를 따라요 — `github_relogin_required` 계열이면 axhub 재로그인으로는 풀리지 않으니 `axhub github link` 재연동(브라우저 승인 후 재감지)으로 안내하고, 그 외에는 `다시 로그인해줘` 로 안내해요. If `unavailable`, leave it as best-effort unavailable and continue only when the current gap does not require GitHub installation.
 
 ## Already Installed Or Mixed
 
@@ -53,9 +53,9 @@ For `github.state=uninstalled` or `empty`, installation is a gate. Do not advanc
 }
 ```
 
-If the user chooses install, show/open `github.install_url`. After they say `승인했어` or `온보딩 계속`, re-run detect exactly once and follow the new `first_gap`.
+If the user chooses install, show/open `github.install_url`. After they say `설치 끝났어` or `온보딩 계속`, re-run detect exactly once and follow the new `first_gap`. 브라우저의 App 설치 완료는 CLI 가 폴링할 수 없어 사용자 신호가 필요해요 — device flow 의 "승인 문구를 기다리지 않는다" 규칙과는 다른 표면이에요.
 
-If the user chooses later, leave the install URL, the phrases `승인했어` / `온보딩 계속`, and `READY_WITH_USER_ACTION`. Do not call `axhub apps git connect`.
+If the user chooses later, leave the install URL, the phrases `설치 끝났어` / `온보딩 계속`, and `READY_WITH_USER_ACTION`. Do not call `axhub apps git connect`.
 
 ## Existing Repo Connection Notes
 
