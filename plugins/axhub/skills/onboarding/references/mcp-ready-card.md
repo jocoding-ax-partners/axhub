@@ -2,6 +2,8 @@
 
 Load this after core gaps are resolved. 처리 순서는 AI 활용 기록 옵트인 → optional MCP setup → final card 예요.
 
+마무리 진입 시 사용자에게 먼저 한 줄로 예고해요: "마지막 단계예요 — AI 활용 기록(선택)과 axhub 도구 연동을 정리하고, 필요하면 재시작 한 번으로 끝나요." 이 단계의 원칙은 **재시작 최대 1회 · 카드 1장 · 질문은 옵트인 1개**예요 — 기록 활성화와 MCP 로드가 같은 재시작을 공유하도록 옵트인을 add 보다 먼저 처리해요.
+
 ## AI 활용 기록 옵트인 (MCP 등록 전, 선택)
 
 AI 활용 기록은 내 Claude Code 프롬프트·응답·툴콜 내용을 팀 워크스페이스로 보내는 수집 기능이에요 (`axhub axrouter`). 켜는 것은 항상 사용자 선택이에요 — 동의 없이 켜지 않아요. headless 면 이 섹션을 통째로 건너뛰어요 (묻지도 실행하지도 않아요).
@@ -10,7 +12,7 @@ AI 활용 기록은 내 Claude Code 프롬프트·응답·툴콜 내용을 팀 �
 2. AskUserQuestion 한 번으로 물어요. 질문에는 무엇이 수집되는지(이 컴퓨터의 Claude Code 프롬프트·응답·툴콜 내용), 어디로 가는지(<slug> 워크스페이스), 선택 사항이라는 점을 담아요. 옵션은 "켜기" / "이번엔 건너뛰기". available 워크스페이스가 여러 개면 어느 워크스페이스로 보낼지도 같은 질문에서 골라요. `local_monitoring` 이 true 인데 `active_workspace` 가 null 이면 다른 텔레메트리 설정이 이미 있는 상태라, "켜면 기존 수집 설정이 axhub 설정으로 교체돼요" 를 질문에 함께 담아요 (CLI 가 켤 때 외부 OTEL 키를 제거하고 제거 목록을 알려줘요).
 3. 건너뛰기 → "나중에 켜고 싶으면 'AI 활용 기록 켜줘' 라고 말하면 돼요." 한 줄만 남기고 같은 온보딩에서 다시 묻지 않아요.
 4. 켜기 → `axhub axrouter monitor --tenant <slug> --json`.
-   - 성공 → 적용은 Claude Code 재시작 후예요. 이어지는 fresh MCP add 로 Restart Handoff Card 가 나가면 "AI 활용 기록도 같은 재시작으로 적용돼요" 한 줄을 카드에 덧붙이고, MCP 재시작이 없으면 최종 카드의 해당 줄에 "재시작 후 적용" 을 붙여요.
+   - 성공 → 적용은 Claude Code 재시작 후예요. 별도 카드나 안내 문단을 만들지 않아요 — 이어지는 카드(Restart Handoff 또는 최종 카드) 한 곳에 "AI 활용 기록 켜짐 — 재시작 후 적용" 한 줄로만 반영해요.
    - `error.subcode` 가 `consent_required` → 워크스페이스 콘솔의 1회 동의가 아직이에요. `error.doc_url` 의 동의 페이지 주소를 보여주고, 사용자가 동의를 마쳤다고 하면 monitor 를 1회만 재시도해요. 여전히 미동의면 "콘솔 동의 후 'AI 활용 기록 켜줘' 라고 말해 주세요" 안내로 남기고 green check 는 달지 않아요.
 5. 끄기·해제는 온보딩 범위 밖이에요 — 물으면 `axhub axrouter monitor --off`(이 컴퓨터만 끔) / `axhub axrouter revoke`(등록 해제)를 알려줘요.
 
@@ -62,23 +64,26 @@ In subprocess/headless mode, do not add or authenticate, and do not write the ma
 
 ## Restart Handoff Card
 
-fresh add 직후에는 이 카드로 종료해요:
+fresh add 직후에는 이 카드 **한 장**으로 종료해요 — "중단"이 아니라 "완료 직전" 프레임이에요. 지금까지 실제로 green 인 항목을 요약 체크로 함께 보여줘요 (VIBE_READY 와 같은 정직성 규칙 — 검증된 것만 ✓).
 
 ```text
-axhub MCP 등록했어요. 도구 활성화에는 Claude Code 재시작이 필요해요. [READY_WITH_USER_ACTION]
-  1. 이 세션 종료 후 claude 다시 실행해 주세요
-  2. 새 세션이 온보딩 마무리를 먼저 제안해요 — 안 뜨면 "온보딩"이라고 말해 주세요
+거의 다 됐어요 — 재시작 한 번이면 끝나요. 도구 활성화에는 Claude Code 재시작이 필요해요. [READY_WITH_USER_ACTION]
+  ✓ CLI v<CLI_VERSION> · 로그인 <masked-email> · git/node 준비됨
+  ✓ axhub MCP 등록됨 (도구 로드는 재시작 후)
+  ✓ AI 활용 기록 켜짐 — 같은 재시작으로 적용   ← 이번에 켰을 때만, 아니면 줄 생략
+  남은 1단계: 이 세션을 종료하고 claude 를 다시 실행해 주세요.
+  재시작하면 새 세션이 자동으로 마무리를 이어가요 — 브라우저 로그인 1번(/mcp)이면 끝나요. 안 뜨면 "온보딩"이라고 말해 주세요.
 ```
 
 ## Resume After Restart
 
 새 세션에서 SessionStart hook nudge 를 받았거나, marker 가 있는 상태로 사용자가 "온보딩"이라고 하면:
 
-1. hook 경로면 사용자에게 이어서 확인할지 먼저 물어요. 사용자가 직접 "온보딩"이라고 했으면 바로 진행해요.
-2. 위 Claude Code Path 분기를 그대로 따라요 — 보통 `Needs authentication` 이고 이 대화에 add 흔적이 없는 상태라 `/mcp` OAuth 안내로 이어져요.
-3. 절차는 read-only 확인(`claude mcp get`)과 사용자 action 안내뿐이라 안전해요. headless 면 질문 없이 수동 명령만 남기고 `SAFE_STOP_NONINTERACTIVE` 로 끝내요.
-4. 온보딩 도중 환경이 바뀌었을 수 있으면 detect 를 다시 돌려도 돼요 (read-only). `first_gap` 이 순서를 다시 잡아줘요.
-5. AI 활용 기록 옵트인은 resume 에서 다시 묻지 않아요 — status 의 `active_workspace` 가 확인되면 최종 카드에 반영만 해요.
+1. **다시 묻지 않아요.** 절차 전체가 read-only 확인(`claude mcp get`)과 사용자 action 안내뿐이라 승인 질문이 필요 없어요 — 첫 응답에서 "온보딩 마무리 이어서 할게요 — 확인 한 번이면 끝나요." 한 줄 뒤 바로 상태를 확인해요. 단 사용자의 첫 메시지가 온보딩과 무관한 요청이면 그 요청을 먼저 처리하고, 마무리는 한 줄 제안으로만 남겨요.
+2. 위 Claude Code Path 분기를 그대로 따라요 — 보통 `Needs authentication` 이고 이 대화에 add 흔적이 없는 상태라 `/mcp` 에서 `axhub` 선택 → 브라우저 로그인 1번 안내로 이어져요. Connected 면 곧장 `VIBE_READY` + marker 삭제예요.
+3. headless 면 질문 없이 수동 명령만 남기고 `SAFE_STOP_NONINTERACTIVE` 로 끝내요.
+4. detect 는 기본적으로 다시 돌리지 않아요 — resume 의 남은 일은 MCP 마무리 하나예요. 사용자가 온보딩 전체 재점검을 명시할 때만 detect 부터 다시 시작해요.
+5. AI 활용 기록 옵트인은 resume 에서 다시 묻지 않아요 — `axhub axrouter status --json` 의 `active_workspace` 가 확인되면 최종 카드에 반영만 해요.
 
 ## Claude Desktop Or Other Host
 

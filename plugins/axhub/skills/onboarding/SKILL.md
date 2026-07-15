@@ -124,7 +124,7 @@ If a handler needs a prompt but D1 safe-stop mode is active, do not execute the 
 
 ### 4. Telemetry opt-in, MCP and Ready card
 
-After gaps are green, load [`references/mcp-ready-card.md`](references/mcp-ready-card.md) and finish in order: AI 활용 기록 옵트인 질문 → optional MCP registration in user scope → 최종 카드. Never claim MCP connected until `claude mcp get axhub` says `Status: Connected`.
+After gaps are green, load [`references/mcp-ready-card.md`](references/mcp-ready-card.md) and finish in order: AI 활용 기록 옵트인 질문 → optional MCP registration in user scope → 최종 카드. 마무리 진입 시 "마지막 단계예요 — AI 활용 기록(선택)과 axhub 도구 연동을 정리하고, 필요하면 재시작 한 번으로 끝나요." 예고 한 줄을 먼저 말해요. 원칙은 재시작 최대 1회 · 카드 1장 · 질문은 옵트인 1개예요. Never claim MCP connected until `claude mcp get axhub` says `Status: Connected`.
 
 새로 `claude mcp add` 를 실행한 세션에는 서버가 로드되지 않아요 — marker(`~/.axhub/cache/.onboarding-mcp-restart`)를 쓰고 Restart Handoff Card(`READY_WITH_USER_ACTION`)로 종료해요. 재시작 후에는 SessionStart hook 이 marker 를 감지해 새 세션이 마무리를 먼저 제안하고, `VIBE_READY` 를 출력할 때 marker 를 삭제해요. 세부 분기는 reference 의 Claude Code Path / Resume After Restart 섹션이 소유해요.
 
