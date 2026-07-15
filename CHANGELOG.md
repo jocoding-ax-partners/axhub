@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.13.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.12.0...v1.13.0) (2026-07-15)
+
+온보딩 후반(AI 활용 기록 옵트인 → MCP 연동 → 카드)이 뚝뚝 끊긴다는 실사용 피드백을 반영했어요([#390](https://github.com/jocoding-ax-partners/axhub/pull/390)). 마무리 진입 시 "재시작 한 번으로 끝나요" 예고를 먼저 하고, 재시작 최대 1회·카드 1장·질문은 옵트인 1개 원칙을 명문화했어요. Restart Handoff Card 는 green 요약 체크가 담긴 "완료 직전" 카드로 확장됐고, 재시작 후 새 세션은 이어서 할지 다시 묻지 않고 바로 read-only 확인으로 이어가요(무관한 첫 요청이면 그 요청 우선). resume 에서의 detect 재실행은 명시 요청 시로 제한했어요.
+
+### Added
+
+* 온보딩 마무리 플로우 다듬기 — 예고 한 줄·재시작 1회 원칙·핸드오프 카드 확장·resume 재질문 제거 ([#390](https://github.com/jocoding-ax-partners/axhub/pull/390))
+
 ## [1.12.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.11.0...v1.12.0) (2026-07-15)
 
 세션을 새로 열 때마다 CLI 를 못 찾고 재설치를 권하던 오판을 없앴어요 — 새 세션은 부모 앱(VS Code·데스크톱 앱)의 예전 PATH 를 물려받아 `command -v axhub` 가 계속 실패하는데, 기존 픽스처는 canonical `~/.axhub/bin` 한 곳만 봐서 커스텀 설치 위치를 "미설치"로 읽었어요([#388](https://github.com/jocoding-ax-partners/axhub/pull/388)). 이제 ax-hub-cli 0.24.8+ 가 기록하는 location 파일(`~/.axhub/bin-path`)을 1순위로 읽어 어떤 설치 위치든 PATH 문제로 정확히 판별하고, 그 절대경로로 온보딩을 그대로 이어가요. 반복되는 이유(부모 앱의 stale PATH)와 앱 재시작 후 정상화 안내도 함께 담았어요.
