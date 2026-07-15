@@ -96,7 +96,7 @@ jobs:
 
       - name: 7. 훅 marker kill-switch 실동작 (windows-contract·onboarding-resume)
         run: |
-          python - <<'PY' > "$RUNNER_TEMP/hooks.env"
+          PYTHONIOENCODING=utf-8 python - <<'PY' > "$RUNNER_TEMP/hooks.env"
           import json
           hooks = json.load(open("hooks/hooks.json", encoding="utf-8"))["hooks"]["SessionStart"][0]["hooks"]
           def pick(marker):
