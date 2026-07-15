@@ -4,6 +4,11 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.14.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.14.0...v1.14.1) (2026-07-15)
+
+온보딩 스킬의 실행 계약을 실제 Windows(windows-latest + Git Bash)에서 상시 검증하는 E2E 워크플로를 편입했어요([#394](https://github.com/jocoding-ax-partners/axhub/pull/394)). SKILL.md 원문에서 DETECT_ALL 픽스처를 런타임 추출해 4분기(미설치→canonical→bin-path 1순위→rc 이중화 후 bare detect)를 실행하고, cli_path_missing lane 의 sanctioned 재감지와 SessionStart 훅 marker kill-switch 실동작까지 확인해요 — `gh workflow run windows-onboarding-e2e.yml --ref main` 으로 언제든 재실행할 수 있어요. 1.12.0~1.14.0 의 온보딩 변경분이 이 워크플로로 전 스텝 green 검증을 마쳤어요.
+
+
 ## [1.14.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.13.0...v1.14.0) (2026-07-15)
 
 온보딩 마무리 개정(1.13.0)의 후속 폴리시 패스예요([#392](https://github.com/jocoding-ax-partners/axhub/pull/392)). AI 활용 기록 옵트인 질문을 표준 JSON 으로 고정해(기본 선택지 "이번엔 건너뛰기", 나중에 켜는 방법 포함) 세션마다 문구가 흔들리지 않게 했어요. github-app reference 의 `auth_error` 안내를 `github_relogin_required` → `axhub github link` 재연동 분기로 교정하고, 브라우저 App 설치 완료 신호를 device-flow 금지 어휘와 충돌하지 않는 `설치 끝났어` 로 바꿨어요. dependency reference 의 존재하지 않는 detect 계약 참조를 제거했고, SKILL·gap-state-machine 사이 gap 집합 드리프트를 잡는 대표 여정 parity 테스트 6종을 새로 추가했어요.
