@@ -79,6 +79,8 @@ if command -v axhub >/dev/null 2>&1; then
   AXHUB_BIN="$(command -v axhub)"; export AXHUB_BIN
   DETECT_JSON=$(axhub plugin-support onboarding-detect --json 2>/dev/null)
   [ -n "$DETECT_JSON" ] || DETECT_JSON='{"cli_present":true,"first_gap":"doctor_gap","github":{"state":"unavailable","install_url":null}}'
+elif AXHUB_BIN_LOC="$(cat "$HOME/.axhub/bin-path" 2>/dev/null)" && [ -n "$AXHUB_BIN_LOC" ] && [ -f "$AXHUB_BIN_LOC" ]; then
+  DETECT_JSON="{\"cli_present\":true,\"cli_on_path\":false,\"cli_state\":\"on_disk_not_on_path\",\"cli_resolved_path\":\"$AXHUB_BIN_LOC\",\"first_gap\":\"cli_path_missing\",\"github\":{\"state\":\"unavailable\",\"install_url\":null}}"
 elif [ -f "$HOME/.axhub/bin/axhub" ] || [ -f "$HOME/.axhub/bin/axhub.exe" ]; then
   DETECT_JSON='{"cli_present":true,"cli_on_path":false,"cli_state":"on_disk_not_on_path","first_gap":"cli_path_missing","github":{"state":"unavailable","install_url":null}}'
 else
@@ -87,7 +89,7 @@ fi
 echo "$DETECT_JSON"
 ```
 
-`AXHUB_BIN` 은 PATH/HOME 차이 때문에 detect self-probe 가 현재 shell 의 axhub 를 못 찾는 오탐을 줄이기 위한 pin 이에요. `command -v axhub` 는 실패했지만 canonical install dir(`~/.axhub/bin/axhub` 또는 `.exe`)에 파일이 있으면 재설치가 아니라 `cli_path_missing` 이에요. 이 branch 에서는 detect 를 부르거나 `AXHUB_BIN` 을 export 하지 않아요. 열린 세션이 PATH 를 못 읽는 상태라 detect 가 `cli_on_path:true` 로 오보하거나 같은 gap 을 반복할 수 있기 때문이에요.
+`AXHUB_BIN` 은 PATH/HOME 차이 때문에 detect self-probe 가 현재 shell 의 axhub 를 못 찾는 오탐을 줄이기 위한 pin 이에요. `command -v axhub` 는 실패했지만 location 파일(`~/.axhub/bin-path` — CLI 0.24.8+ 가 자기 설치 위치를 기록)이 가리키는 파일이나 canonical install dir(`~/.axhub/bin/axhub` 또는 `.exe`)에 파일이 있으면 재설치가 아니라 `cli_path_missing` 이에요 — 새 세션이 부모 앱의 stale PATH 를 물려받아 `command -v` 가 계속 실패해도 절대 재설치를 권하지 않아요. location 파일 덕에 CARGO_HOME 등 커스텀 설치 위치도 인식돼요. 이 branch 에서는 detect 를 부르거나 `AXHUB_BIN` 을 export 하지 않아요. 열린 세션이 PATH 를 못 읽는 상태라 detect 가 `cli_on_path:true` 로 오보하거나 같은 gap 을 반복할 수 있기 때문이에요.
 
 주요 필드는 `first_gap`, `gaps`, `cli_present`, `cli_version`, `cli_state`, `cli_on_path`, `cli_too_old`, `has_update`, `latest_version`, `auth_ok`, `auth_error_code`, `git_present`, `git_repo`, `git_commit`, `node_present`, `node_version`, `node_required`, `node_mismatch`, `manifest_present`, `lockfile_present`, `deps_missing`, `dir_empty`, `github`, `deploy_checked`, `deploy_verified` 예요. 이 이름들은 parsing 전용이고 사용자-facing 문장·표·도구 제목에는 노출하지 않아요.
 
@@ -102,7 +104,7 @@ DETECT 직후 `github.install_url` 이 있으면 항상 한 줄로 보여줘요.
 | `first_gap` | Handler |
 | --- | --- |
 | `cli_missing` | CLI install approval. Load [`references/install-channels-and-auth.md`](references/install-channels-and-auth.md). |
-| `cli_path_missing` | `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` (canonical 경로 — bare `axhub` 는 이 상태에서 127, Windows 는 `.exe`); continue THIS session via the JSON `bin_path` absolute command; new terminal is next-session advice. |
+| `cli_path_missing` | detect 가 준 `cli_resolved_path`(없으면 canonical `"$HOME/.axhub/bin/axhub"`, Windows 는 `.exe`)로 `plugin-support repair-path --json` 실행 (bare `axhub` 는 이 상태에서 127); continue THIS session via the JSON `bin_path` absolute command; new terminal is next-session advice. |
 | `cli_old` | `axhub update check` / `axhub update apply --execute --yes --json`; load install reference. |
 | `auth_missing` | `axhub auth status`, refresh, or device login; load install reference. |
 | `git_missing` | git install approval; load install reference. |

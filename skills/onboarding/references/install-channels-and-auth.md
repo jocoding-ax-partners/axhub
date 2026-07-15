@@ -37,7 +37,7 @@ If detect says the CLI exists but is not on PATH (`cli_state: on_disk_not_on_pat
 "$HOME/.axhub/bin/axhub" plugin-support repair-path --json
 ```
 
-bare `axhub` 는 이 상태(현재 셸 PATH 미포함)에선 127 로 실패해요 — detect 가 확인한 canonical on-disk 경로로 호출해요 (Windows Git Bash 는 `"$HOME/.axhub/bin/axhub.exe"`). detect 가 PATH 위 CLI 로 `on_disk_not_on_path` 를 보고한 드문 sub-case 에선 bare 호출도 돼요.
+bare `axhub` 는 이 상태(현재 셸 PATH 미포함)에선 127 로 실패해요 — detect 픽스처가 준 `cli_resolved_path`(location 파일 `~/.axhub/bin-path` 유래)를 그대로 쓰고, 없으면 canonical on-disk 경로로 호출해요 (Windows Git Bash 는 `"$HOME/.axhub/bin/axhub.exe"`). detect 가 PATH 위 CLI 로 `on_disk_not_on_path` 를 보고한 드문 sub-case 에선 bare 호출도 돼요. 세션을 새로 열 때마다 이 상태가 반복되는 건 부모 앱(VS Code·데스크톱 앱)이 예전 PATH 를 들고 있어서예요 — 재설치 대상이 아니라 이 lane 으로 매번 그대로 이어가면 되고, 부모 앱을 재시작하면 그때부터 bare `axhub` 로 잡혀요.
 
 Interpret `{repaired, already_present, disabled, shell_rc, backup_path, bin_path, current_session_stale, session_hint}`:
 
