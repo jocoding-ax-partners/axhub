@@ -1,0 +1,135 @@
+# Windows 온보딩 실기 E2E — 온보딩 스킬의 "실행 가능한 계약"을 실제
+# windows-latest + Git Bash(스킬이 실제로 도는 셸)에서 검증해요.
+#
+# 검증 대상 (1.12.0~1.14.0 변경분):
+# - DETECT_ALL 픽스처를 SKILL.md 원문에서 그대로 추출해 4분기 실행:
+#   미설치(cli_missing) → canonical(on-disk) → bin-path 1순위(cli_resolved_path)
+#   → rc 이중화 후 PATH 정상(bare detect)
+# - cli_path_missing lane: 절대경로 repair-path → bin_path → sanctioned 재감지
+#   → 다음 gap(auth_missing)으로 여정 전진
+# - SessionStart 훅의 marker kill-switch(~/.axhub/config/no-*) 실동작
+#
+# 에이전트 행위(AUQ·카드 출력)는 러너에서 실행 불가 — 그 계약은 bun 테스트
+# (tests/onboarding-journey.test.ts 등)가 소유해요.
+name: Windows onboarding E2E
+
+on:
+  push:
+    branches: ["ci/windows-onboarding-e2e"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  onboarding:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 0. 픽스처 추출 (SKILL.md 원문 그대로)
+        run: |
+          awk '/^### 1\. DETECT_ALL/{f=1} f&&/^```bash$/{c=1;next} c&&/^```$/{exit} c' \
+            skills/onboarding/SKILL.md > "$RUNNER_TEMP/detect_fixture.sh"
+          echo "--- shipped fixture ---"
+          cat "$RUNNER_TEMP/detect_fixture.sh"
+          test -s "$RUNNER_TEMP/detect_fixture.sh"
+
+      - name: 1. 분기 A — 미설치 상태는 cli_missing
+        run: |
+          if command -v axhub >/dev/null 2>&1; then echo "runner has axhub?"; exit 1; fi
+          [ ! -e "$HOME/.axhub" ] || { echo "leftover ~/.axhub"; exit 1; }
+          OUT="$(bash "$RUNNER_TEMP/detect_fixture.sh")"
+          echo "$OUT"
+          echo "$OUT" | grep -q '"first_gap":"cli_missing"'
+
+      - name: 2. 분기 B — NO_PATH 설치 후 canonical on-disk 는 cli_path_missing (재설치 아님)
+        run: |
+          curl -fsSL https://cli.axhub.ai/install.sh | AXHUB_INSTALL_NO_PATH=1 bash
+          command -v axhub >/dev/null 2>&1 && { echo "PATH unexpectedly has axhub"; exit 1; }
+          [ ! -f "$HOME/.axhub/bin-path" ] || { echo "bin-path should not exist yet"; exit 1; }
+          OUT="$(bash "$RUNNER_TEMP/detect_fixture.sh")"
+          echo "$OUT"
+          echo "$OUT" | grep -q '"first_gap":"cli_path_missing"'
+          echo "$OUT" | grep -q 'cli_resolved_path' && { echo "resolved_path must come from bin-path branch only"; exit 1; } || true
+
+      - name: 3. lane — canonical 경로 repair-path 가 세션 계약과 bin-path 를 만든다
+        run: |
+          OUT="$("$HOME/.axhub/bin/axhub.exe" plugin-support repair-path --json)"
+          echo "$OUT"
+          echo "$OUT" | grep -q '"current_session_stale":true'
+          echo "$OUT" | grep -q '"bin_path"'
+          echo "$OUT" | grep -q '"session_hint"'
+          echo "$OUT" | grep -Eq '"shell_rc":"[^"]*\.bashrc"'
+          test -f "$HOME/.axhub/bin-path"
+          echo "bin-path -> $(cat "$HOME/.axhub/bin-path")"
+
+      - name: 4. 분기 C — 픽스처가 bin-path 를 1순위로 읽어 cli_resolved_path 를 내려준다
+        run: |
+          command -v axhub >/dev/null 2>&1 && { echo "step shell must stay stale"; exit 1; }
+          OUT="$(bash "$RUNNER_TEMP/detect_fixture.sh")"
+          echo "$OUT"
+          echo "$OUT" | grep -q '"first_gap":"cli_path_missing"'
+          echo "$OUT" | grep -q '"cli_resolved_path":"'
+
+      - name: 5. sanctioned 재감지 — bin_path 로 detect, 재보고는 간주-처리, 여정은 다음 gap 으로
+        run: |
+          BIN="$(cat "$HOME/.axhub/bin-path")"
+          OUT="$("$BIN" plugin-support onboarding-detect --json)"
+          echo "$OUT"
+          echo "$OUT" | grep -q '"cli_state":"on_disk_not_on_path"'
+          echo "$OUT" | grep -q '"cli_resolved_path":'
+          echo "$OUT" | grep -q '"first_gap":"cli_path_missing"'
+          echo "$OUT" | grep -q '"auth_missing"'
+          echo "journey continues: cli_path_missing re-report is treated as handled; next gap auth_missing is queued"
+
+      - name: 6. 분기 D — rc 이중화 덕에 새 bash 세션은 bare detect 로 cli_path_missing 을 벗어난다
+        run: |
+          OUT="$('/c/Program Files/Git/bin/bash.exe' -ic 'axhub plugin-support onboarding-detect --json' 2>/dev/null)"
+          echo "$OUT"
+          echo "$OUT" | grep -q '"cli_on_path":true'
+          echo "$OUT" | grep -q '"first_gap":"auth_missing"'
+
+      - name: 7. 훅 marker kill-switch 실동작 (windows-contract·onboarding-resume)
+        run: |
+          PYTHONIOENCODING=utf-8 python - <<'PY' > "$RUNNER_TEMP/hooks.env"
+          import json
+          hooks = json.load(open("hooks/hooks.json", encoding="utf-8"))["hooks"]["SessionStart"][0]["hooks"]
+          def pick(marker):
+              for h in hooks:
+                  if marker in h["command"]:
+                      return h["command"]
+              raise SystemExit(f"hook not found: {marker}")
+          import shlex
+          print("WIN_CMD=" + shlex.quote(pick("AXHUB_NO_WINDOWS_CONTRACT")))
+          print("RESUME_CMD=" + shlex.quote(pick("AXHUB_NO_ONBOARDING_RESUME")))
+          PY
+          source "$RUNNER_TEMP/hooks.env"
+          export CLAUDE_PLUGIN_ROOT="$PWD" OS=Windows_NT
+          unset AXHUB_NO_WINDOWS_CONTRACT AXHUB_NO_ONBOARDING_RESUME
+
+          echo "--- [7a] windows-contract: marker 없으면 AP-13 context 를 emit ---"
+          OUT="$(bash -c "$WIN_CMD")"
+          echo "$OUT" | grep -q "Git Bash"
+
+          echo "--- [7b] windows-contract: marker 가 있으면 침묵 ---"
+          mkdir -p "$HOME/.axhub/config" && : > "$HOME/.axhub/config/no-windows-contract"
+          OUT="$(bash -c "$WIN_CMD")"
+          [ -z "$OUT" ] || { echo "expected silence, got: $OUT"; exit 1; }
+          rm -f "$HOME/.axhub/config/no-windows-contract"
+
+          echo "--- [7c] onboarding-resume: restart marker 가 있으면 resume context 를 emit ---"
+          mkdir -p "$HOME/.axhub/cache" && date > "$HOME/.axhub/cache/.onboarding-mcp-restart"
+          OUT="$(bash -c "$RESUME_CMD")"
+          echo "$OUT" | grep -q "mcp-ready-card.md"
+
+          echo "--- [7d] onboarding-resume: kill-switch marker 가 이겨서 침묵 ---"
+          : > "$HOME/.axhub/config/no-onboarding-resume"
+          OUT="$(bash -c "$RESUME_CMD")"
+          [ -z "$OUT" ] || { echo "expected silence, got: $OUT"; exit 1; }
+          rm -f "$HOME/.axhub/config/no-onboarding-resume" "$HOME/.axhub/cache/.onboarding-mcp-restart"
+          echo "hook kill-switch contracts verified"
