@@ -6,46 +6,24 @@ const REPO_ROOT = join(import.meta.dir, "..");
 const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
 
 describe("update Desktop UX contract", () => {
-  test("plugin manifest preserves update no-preamble routing contract", () => {
+  test("plugin manifests stay concise — routing contracts live in skills and hooks", () => {
     const manifest = JSON.parse(readRepo(".claude-plugin/plugin.json")) as { description: string };
     const marketplace = JSON.parse(readRepo(".claude-plugin/marketplace.json")) as { plugins: Array<{ description: string }> };
     const descriptions = [manifest.description, marketplace.plugins[0]?.description ?? ""];
 
-    expect(manifest.description).toContain("Natural-language axhub requests should route to one of onboarding/bootstrap/deploy/import/development/diagnosis/update");
-    expect(manifest.description).toContain("clarity is manual/explicit-only");
     for (const description of descriptions) {
-      expect(description).toContain("Import priority is strict");
-      expect(description).toContain("existing app/local folder");
-      expect(description).toContain("작업 폴더는");
-      expect(description).toContain("invoke the axhub import skill before generic Code-mode folder inspection");
-      expect(description).toContain("The first visible import text should start exactly `기존 앱을 axhub에 가져올 준비를 확인할게요.`");
+      // Discover/Installed UI 에 그대로 노출되는 필드라 간결하게 유지해요.
+      // update/import 라우팅 계약 본문은 skills/*/SKILL.md 와 hooks/ 가
+      // 소유해요 — 아래 다른 테스트들이 그 표면을 잠가요.
+      expect(description.length).toBeLessThanOrEqual(320);
+      expect(description).toContain("ax-hub-cli");
+      expect(description).toContain("onboarding/bootstrap/deploy/import/development/diagnosis/clarity/update");
+      expect(description).not.toContain("Import priority is strict");
+      expect(description).not.toContain("Routing priority is strict");
+      expect(description).not.toContain("현재 버전을 확인할게요");
+      expect(description).not.toContain("기존 앱을 axhub에 가져올 준비를 확인할게요");
+      expect(description).not.toContain("claude plugin list");
     }
-    expect(manifest.description).toContain("axhub가 진짜 최신인지 먼저 확인해주고");
-    expect(manifest.description).toContain("General helper-role phrasing without freshness words must not invoke update");
-    expect(manifest.description).toContain("Routing priority is strict");
-    expect(manifest.description).toContain("invoke the axhub update skill first");
-    expect(manifest.description).toContain("first visible assistant text is exactly `현재 버전을 확인할게요.`");
-    expect(manifest.description).toContain("ordinary Code-mode shell work");
-    expect(manifest.description).toContain("Never start freshness prompts with `Using /axhub:clarity`");
-    expect(manifest.description).toContain("run scripts, shell/version probes, app-status tools");
-    expect(manifest.description).toContain("Claude Desktop axhub App/MCP tools");
-    expect(manifest.description).toContain("unrelated plugin mode");
-    expect(manifest.description).toContain("/oh-my-claudecode:autopilot");
-    expect(manifest.description).toContain("exact `axhub apps --help` then `axhub apps list --json`");
-    expect(manifest.description).toContain("plugin lookup uses exact `claude plugin list`, never `claude plugin list 2>&1`");
-    expect(manifest.description).toContain("once the remaining app-status flow begins, do not rerun command-v");
-    expect(manifest.description).toContain("never `command -v axhub && axhub --version`");
-    expect(manifest.description).toContain("never `command -v claude && claude plugin list`");
-    expect(manifest.description).toContain("never `claude plugin list 2>&1 | grep`");
-    expect(manifest.description).toContain("when folder/current conversation/latest list clearly identifies a related app");
-    expect(manifest.description).toContain("do not ask which app");
-    expect(manifest.description).toContain("before any summary");
-    expect(manifest.description).toContain("`axhub apps get <app> --json`");
-    expect(manifest.description).toContain("`axhub deploy list --app <app> --json`");
-    expect(manifest.description).toContain("nonexistent `axhub app list`");
-    expect(manifest.description).toContain("never `axhub deployment list`");
-    expect(manifest.description).toContain("never Claude Desktop axhub App/MCP permission popups");
-    expect(manifest.description).toContain("never &&, pipes, redirects, grep, or head");
   });
 
   test("does not read plugin cache manifests in Claude Desktop", () => {
