@@ -638,7 +638,7 @@ describe("smooth behavior contracts", () => {
     }
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-    expect(entries).toHaveLength(4);
+    expect(entries).toHaveLength(5);
 
     // every SessionStart hook injects context invisibly: suppressed JSON only,
     // never plain echo stdout and never a user-facing systemMessage banner
@@ -665,6 +665,22 @@ describe("smooth behavior contracts", () => {
     // hook is read-only: never deletes the marker, never spawns the axhub binary
     expect(resume.command).not.toContain("rm -f");
     expect(resume.command).not.toContain("axhub plugin-support");
+
+    // 5번째 entry: 플러그인 업데이트 재시작 확인 (restart-confirm)
+    const restartConfirm = entries[4];
+    expect(restartConfirm.type).toBe("command");
+    expect(restartConfirm.shell).toBe("bash");
+    expect(restartConfirm.command).toContain("AXHUB_NO_AUTO_UPDATE");
+    expect(restartConfirm.command).toContain("no-auto-update");
+    expect(restartConfirm.command).toContain(".plugin-update-restart");
+    expect(restartConfirm.command).toContain("-mmin -10080");
+    expect(restartConfirm.command).toContain("plugin-restart-confirm-prompt.md");
+    // dev 가드는 이 entry 에 적용하지 않아요 — marker 는 머신 전역이라
+    // 어느 세션의 확인도 유효해요 (eng review #1)
+    expect(restartConfirm.command).not.toContain("../../.git");
+    // hook 은 읽기 전용: marker 삭제는 confirm prompt 몫, 바이너리 무접촉
+    expect(restartConfirm.command).not.toContain("rm -f");
+    expect(restartConfirm.command).not.toContain("command -v axhub");
   });
 
   test("update freshness prompt router hook is wired", () => {
@@ -683,44 +699,55 @@ describe("smooth behavior contracts", () => {
     const entries = hooksFile.hooks.UserPromptSubmit.flatMap((group) => group.hooks);
     expect(entries).toHaveLength(4);
 
+    // update 라우터는 hooks/update-router.sh 로 추출됐어요 — hooks.json 은
+    // 형제 라우터와 같은 bare 위임만 갖고, kill switch(env·marker)와 계약
+    // 본문은 스크립트가 소유해요.
     const router = entries[0];
     expect(router.type).toBe("command");
     expect(router.shell).toBe("bash");
-    expect(router.command).toContain("hookSpecificOutput");
-    expect(router.command).toContain("hookEventName");
-    expect(router.command).toContain("additionalContext");
-    expect(router.command).toContain("suppressOutput");
-    expect(router.command).not.toContain("systemMessage");
-    expect(router.command).toContain("AXHUB_NO_UPDATE_ROUTER");
-    expect(router.command).toContain("axhub freshness/update");
-    expect(router.command).toContain("Finding tools");
-    expect(router.command).toContain("invoke the axhub update skill");
-    expect(router.command).toContain("현재 버전을 확인할게요");
-    expect(router.command).toContain("App/MCP tool");
-    expect(router.command).toContain("app list/status tool");
-    expect(router.command).toContain("Finish update first");
-    expect(router.command).toContain("GitHub reconnect-device-code");
-    expect(router.command).toContain("axhub clarity device-flow contract inline");
-    expect(router.command).toContain("do not invoke /axhub:clarity");
-    expect(router.command).toContain("failing skill badge");
-    expect(router.command).toContain("axhub git_connection_status");
-    expect(router.command).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link");
-    expect(router.command).toContain("axhub github accounts list --json");
-    expect(router.command).toContain("계정 인증 시작");
-    expect(router.command).toContain("인증 확인");
-    expect(router.command).toContain("The assistant body must print exactly two normal chat lines with the URL in inline code");
-    expect(router.command).toContain("never print the URL as a bare auto-link or Markdown link such as [https://github.com/login/device](github.com/login/device)");
-    expect(router.command).toContain("Do not finish after showing the code");
-    expect(router.command).toContain("continue to 인증 확인 in the same assistant turn");
-    expect(router.command).toContain("배포 상태 확인해줘");
-    expect(router.command).toContain("승인했어");
-    expect(router.command).toContain("CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json");
-    expect(router.command).toContain("Deployment list (axhub)");
-    expect(router.command).toContain("axhub deployment list");
-    expect(router.command).not.toContain("python3");
-    expect(router.command).not.toContain("node ");
-    expect(router.command).not.toContain("axhub update check");
-    expect(router.command).not.toContain("claude plugin update");
+    expect(router.command).toBe('bash "${CLAUDE_PLUGIN_ROOT}/hooks/update-router.sh"');
+
+    const routerScript = readRepo("hooks/update-router.sh");
+    // prompt-field 매칭 계약: "prompt": 키 이후 구간만 보고, 키 부재 시 fail-closed
+    expect(routerScript).toContain('prompt_part=${input#*\\"prompt\\":}');
+    expect(routerScript).toContain("fail-closed");
+    expect(routerScript).toContain("*axhub*|*Axhub*|*AxHub*|*AXHUB*");
+    expect(routerScript).toContain("AXHUB_NO_UPDATE_ROUTER");
+    expect(routerScript).toContain("no-update-router");
+    expect(routerScript).toContain("hookSpecificOutput");
+    expect(routerScript).toContain("hookEventName");
+    expect(routerScript).toContain("additionalContext");
+    expect(routerScript).toContain("suppressOutput");
+    expect(routerScript).not.toContain("systemMessage");
+    expect(routerScript).toContain("axhub freshness/update");
+    expect(routerScript).toContain("Finding tools");
+    expect(routerScript).toContain("invoke the axhub update skill");
+    expect(routerScript).toContain("현재 버전을 확인할게요");
+    expect(routerScript).toContain("App/MCP tool");
+    expect(routerScript).toContain("app list/status tool");
+    expect(routerScript).toContain("Finish update first");
+    expect(routerScript).toContain("GitHub reconnect-device-code");
+    expect(routerScript).toContain("axhub clarity device-flow contract inline");
+    expect(routerScript).toContain("do not invoke /axhub:clarity");
+    expect(routerScript).toContain("failing skill badge");
+    expect(routerScript).toContain("axhub git_connection_status");
+    expect(routerScript).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link");
+    expect(routerScript).toContain("axhub github accounts list --json");
+    expect(routerScript).toContain("계정 인증 시작");
+    expect(routerScript).toContain("인증 확인");
+    expect(routerScript).toContain("The assistant body must print exactly two normal chat lines with the URL in inline code");
+    expect(routerScript).toContain("never print the URL as a bare auto-link or Markdown link such as [https://github.com/login/device](github.com/login/device)");
+    expect(routerScript).toContain("Do not finish after showing the code");
+    expect(routerScript).toContain("continue to 인증 확인 in the same assistant turn");
+    expect(routerScript).toContain("배포 상태 확인해줘");
+    expect(routerScript).toContain("승인했어");
+    expect(routerScript).toContain("CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json");
+    expect(routerScript).toContain("Deployment list (axhub)");
+    expect(routerScript).toContain("axhub deployment list");
+    expect(routerScript).not.toContain("python3");
+    expect(routerScript).not.toContain("node ");
+    expect(routerScript).not.toContain("axhub update check");
+    expect(routerScript).not.toContain("claude plugin update");
 
     const clarityRouter = entries[1];
     expect(clarityRouter.type).toBe("command");

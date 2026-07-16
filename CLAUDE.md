@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **axhub** (1066 symbols, 1197 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **axhub** (942 symbols, 1062 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -104,7 +104,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 > **정책 기준 문서:** 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 개발·운영 규칙은 `docs/policy/dev-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 기준이에요. 이 파일의 요약과 다르면 정책 문서를 따라요. 어긋남은 `tests/policy-parity.test.ts` 가 잡아요.
 
-axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어요: `onboarding` / `bootstrap` / `deploy` + 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 같은 명시적 axhub 운영 명령을 라이브 `--help` 탐색으로 처리하는 `clarity` 브리지예요. 이후 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import` skill, CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis` skill 을 더해 현재 8 skill 이에요. 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli (`axhub` 바이너리) 를 직접 호출해요. Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold/skill-doctor/lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인은 전부 제거됐어요. 이후 훅은 cheap bash guard 로만 제한해서 재도입했어요: SessionStart 훅 4개(auto-update + 온보딩 MCP 재시작 resume + Windows 실행 계약 AP-13 + Code-mode update router fallback AP-14)와, 최신·버전·업데이트 요청이 전역 axhub App/MCP 도구보다 `update` 스킬을 먼저 타게 하는 좁은 UserPromptSubmit match(AP-14)뿐이에요.
+axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어요: `onboarding` / `bootstrap` / `deploy` + 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 같은 명시적 axhub 운영 명령을 라이브 `--help` 탐색으로 처리하는 `clarity` 브리지예요. 이후 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import` skill, CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis` skill 을 더해 현재 8 skill 이에요. 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli (`axhub` 바이너리) 를 직접 호출해요. Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold/skill-doctor/lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인은 전부 제거됐어요. 이후 훅은 cheap bash guard 로만 제한해서 재도입했어요: SessionStart 훅 5개(auto-update + 온보딩 MCP 재시작 resume + Windows 실행 계약 AP-13 + Code-mode update router fallback AP-14 + 플러그인 업데이트 재시작 확인)와, 최신·버전·업데이트 요청이 전역 axhub App/MCP 도구보다 `update` 스킬을 먼저 타게 하는 좁은 UserPromptSubmit match(AP-14 — `hooks/update-router.sh`, 매칭은 훅 입력 JSON 전체가 아니라 prompt 필드만)뿐이에요. UserPromptSubmit 라우터 4개(update/clarity/import/status-resume)는 전부 `"prompt":` 키 이후 구간만 매칭하고 키 부재 시 fail-closed 로 침묵해요 — cwd·transcript_path 경로에 axhub 가 든 프로젝트의 오탐을 구조적으로 차단해요.
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
 
@@ -112,10 +112,12 @@ axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어�
 
 diet 가 제거한 hook 중 **auto-update SessionStart 훅 1개**만 `hooks/` 로 재도입했어요 (`hooks/hooks.json` + `hooks/auto-update-prompt.md`). Claude Code 가 `hooks/hooks.json` 을 자동 발견해요 — plugin.json 선언은 불필요해요.
 
-- **트리거·throttle:** SessionStart 마다 cheap bash 가 `axhub` 존재 + `~/.axhub/cache/.plugin-update-check` mtime(24h)만 보고, due 면 `auto-update-prompt.md` 를 읽으라는 지시를 emit 해요. 네트워크 호출은 hook 이 아니라 prompt(에이전트)가 해요.
-- **CLI 업데이트:** `axhub update check --plugin-version <plugin.json version> --json` 으로 확인 → `has_update && !disabled` 면 `axhub update apply --execute --yes` 자동 적용(즉시 반영).
-- **플러그인 업데이트:** 같은 응답의 `plugin` 블록이 `has_update` 면 `claude plugin list` 로 scope 감지 후 `claude plugin update axhub@axhub --scope <scope>` 자동 적용 — **재시작해야 반영**돼요.
-- **끄기:** `AXHUB_NO_AUTO_UPDATE=1` 또는 marker 파일 `~/.axhub/config/no-auto-update`(모든 훅 kill switch 는 env 에서 `AXHUB_` 를 뗀 소문자-하이픈 marker counterpart 를 가져요 — profile export 가 안 닿는 GUI 세션용 채널)이면 자동 적용 없이 안내만 하고 throttle 도 즉시 skip 해요.
+- **트리거·throttle:** SessionStart 마다 cheap bash 가 `axhub` 존재 + `~/.axhub/cache/.plugin-update-check` mtime(24h)만 보고, due 면 **캐시를 훅이 직접 touch 한 뒤** `auto-update-prompt.md` 를 읽으라는 지시를 emit 해요 — throttle 기준점이 훅 발동 시점이라 에이전트가 지침을 못 따라도 재발동 스팸이 없어요 (offline 실패 시 다음 시도는 24h 뒤 — best-effort 수용). prompt 의 touch 는 이중 안전으로 유지돼요. 네트워크 호출은 hook 이 아니라 prompt(에이전트)가 해요.
+- **dev 가드:** `${CLAUDE_PLUGIN_ROOT}/../../.git` 또는 `${CLAUDE_PLUGIN_ROOT}/.git` 이 있으면(레포 체크아웃 in-place 로딩·레포 루트 직접 로딩·dist 검증) auto-update 를 조용히 skip 해요 — 메인테이너 세션 노이즈 방지. end user 는 `~/.claude/plugins/cache/...` 경로라 무영향이에요.
+- **CLI 업데이트:** `axhub update check --plugin-version <plugin.json version> --json` 으로 확인 → `has_update && !disabled && !is_downgrade` 면 `axhub update apply --execute --yes` 자동 적용(즉시 반영). `is_downgrade` 는 optional 필드로 부재(구 CLI)=false 취급, true(서버 롤백 배포)면 안내만 해요.
+- **플러그인 업데이트:** 같은 응답의 `plugin` 블록이 `has_update` 면 `claude plugin list` 로 scope 감지 후 `claude plugin update axhub@axhub --scope <scope>` 자동 적용 — **재시작해야 반영**돼요. 적용 성공 시 marker(`~/.axhub/cache/.plugin-update-restart`, 내용=받은 버전)를 기록해요.
+- **재시작 확인 훅 (5번째 entry):** 재시작 후 SessionStart 가 marker(7일 TTL, mtime)를 감지하면 `plugin-restart-confirm-prompt.md` 지침으로 `claude plugin list` 의 enabled 최고 semver ≥ marker 버전을 확인해 한 줄로 닫고 marker 를 삭제해요. 세션당 한 줄 + 명령 1회 상한, 미반영이면 재시작 안내 유지. dev 가드는 이 entry 에 적용하지 않아요 — marker 는 머신 전역이라 어느 세션의 확인도 유효해요.
+- **끄기:** `AXHUB_NO_AUTO_UPDATE=1` 또는 marker 파일 `~/.axhub/config/no-auto-update`(모든 훅 kill switch 는 env 에서 `AXHUB_` 를 뗀 소문자-하이픈 marker counterpart 를 가져요) — 둘 중 하나면 훅은 context 를 주입하지 않고 완전히 건너뛰어요(안내 없음). 훅 bash 는 shell profile 을 소싱하지 않아 profile 에만 export 한 GUI 세션에선 env 를 못 볼 수 있어요 — 훅 레벨에선 marker 파일이 그 경우에도 닿는 채널이고, 에이전트 레벨에선 prompt/skill 의 env 분기(에이전트 shell 은 profile 소싱)가 apply 직전 방어선이에요. kill switch 는 이 2-계층이 계약이에요.
 - **Windows:** hook 은 `"shell": "bash"` 로 고정했어요 — Windows 에선 Git Bash 로 돌고(없으면 silent PowerShell fallback 대신 깨끗이 skip), `bash`·`find`·`command -v`·`$HOME` 등 Git for Windows 번들 도구만 써요 (jq 같은 외부 의존 없음). prompt 의 `axhub update`/`claude plugin update` 는 에이전트 Bash 도구(= skill 들과 같은 Git Bash 경로)로 실행돼요. 즉 hook 은 skill bash 와 동일한 Git Bash 전제를 따르고, 새 의존(node 등)은 더하지 않아요.
 - best-effort·비차단 — 실패·구 CLI·네트워크 오류면 조용히 건너뛰고 사용자의 작업을 막지 않아요. skill 들의 기존 `1a 버전 체크`(10분 TTL, 안내만)와 보완 관계예요.
 - **수동 on-demand counterpart:** 같은 update 로직을 사용자가 직접 부르는 진입점은 `update` skill (`skills/update/SKILL.md`) 이에요 — 훅과 달리 24h throttle 없이 바로 확인하고, 최신이어도 결과를 한 줄로 알려요. 둘은 같은 `axhub update` + `claude plugin update` 표면을 공유해요.
@@ -140,7 +142,7 @@ auto-update·resume 와 나란히 SessionStart 훅이 하나 더 있어요 (`hoo
 
 SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이트 요청에만 라우팅 문맥을 추가해요. Claude Desktop Code 모드에서 `Finding tools`, 전역 `App list (axhub)` 같은 App/MCP 도구, 일반 shell probe 가 먼저 잡히는 것을 막기 위한 guard 예요.
 
-- SessionStart fallback 은 새 Code 세션에 update-first 규칙을 먼저 깔아요. UserPromptSubmit match 는 사용자 프롬프트 JSON 에 `axhub` 와 최신성 키워드(`최신`, `버전`, `업데이트`, `latest`, `up to date`, `version check`, `update`, `upgrade`)가 함께 있을 때 `hookSpecificOutput.additionalContext` 만 emit 해요. 모든 훅 출력은 `suppressOutput: true` JSON 이라 사용자 화면에 노출되지 않아요 — `systemMessage` 와 plain stdout 은 쓰지 않아요.
+- SessionStart fallback 은 새 Code 세션에 update-first 규칙을 먼저 깔아요. UserPromptSubmit match(`hooks/update-router.sh`)는 훅 입력 JSON 전체가 아니라 **사용자 프롬프트(`"prompt":` 필드 이후 구간)에** `axhub`(대소문자 4-변형)와 최신성 키워드(`최신`, `버전`, `업데이트`, `latest`, `up to date`, `version check`, `update`, `upgrade`)가 함께 있을 때만 `hookSpecificOutput.additionalContext` 를 emit 하고, `"prompt":` 키 부재 시 fail-closed 로 침묵해요. 모든 훅 출력은 `suppressOutput: true` JSON 이라 사용자 화면에 노출되지 않아요 — `systemMessage` 와 plain stdout 은 쓰지 않아요.
 - 명령 실행·네트워크·앱 목록 조회를 하지 않아요. `update` 스킬 우선, 첫 visible assistant text `현재 버전을 확인할게요.`, App/MCP 도구 선행 금지만 주입해요.
 - update 뒤 같은 원문에 앱 현황 확인이 남으면 존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 시작해요. `| head`, `2>/dev/null`, `grep`, `sed`, `awk` 같은 shell 후처리는 붙이지 않아요.
 - **끄기:** `AXHUB_NO_UPDATE_ROUTER=1` 또는 `~/.axhub/config/no-update-router`.

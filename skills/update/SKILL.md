@@ -144,15 +144,16 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - 수동 확인 기록은 Claude Desktop 경로에서 갱신하지 않아요. `axhub update check ...` 뒤에 별도 `mkdir`/touch/marker command 를 실행하지 말아요. 별도 로컬 기록 작업명은 chat 에 쓰지 않아요.
 
 - 출력 JSON 을 읽어요:
-  - CLI: `{ current, latest, has_update, disabled }`
+  - CLI: `{ current, latest, has_update, disabled, is_downgrade }`
   - (있으면) 플러그인: `plugin: { current, latest, has_update }`
+  - `is_downgrade` 는 optional 필드 — 부재(구 CLI 응답)는 false 로 취급해요.
 - 호출이 실패하거나 JSON 이 비면 (구 CLI·네트워크 실패) 한 줄 안내 후 멈춰요: `버전 확인을 못 했어요. 잠시 뒤 다시 시도해 주세요.`
 
 ---
 
 ## 2. CLI 업데이트
 
-먼저 **안내-only 조건**을 봐요: `disabled == true` (패키지 매니저 관리 설치) 또는 `AXHUB_NO_AUTO_UPDATE` 설정. 둘 중 하나면 적용하지 않고 안내만 해요.
+먼저 **안내-only 조건**을 봐요: `disabled == true` (패키지 매니저 관리 설치) 또는 `AXHUB_NO_AUTO_UPDATE` 설정 또는 `is_downgrade == true` (서버 롤백 배포 — 자동 다운그레이드는 하지 않아요). 하나라도 참이면 적용하지 않고 안내만 해요.
 
 - **안내-only + `has_update == true`** → 한 줄 안내:
   - `disabled` → `axhub 는 패키지 매니저가 관리하는 설치예요. 패키지 매니저로 업그레이드해 주세요 (예: brew upgrade axhub).`

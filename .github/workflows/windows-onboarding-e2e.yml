@@ -9,8 +9,15 @@
 #   → 다음 gap(auth_missing)으로 여정 전진
 # - SessionStart 훅의 marker kill-switch(~/.axhub/config/no-*) 실동작
 #
+# 검증 대상 (auto-update 라우터 hardening 변경분 — step 8·9):
+# - UserPromptSubmit 라우터 4개의 prompt-field 매칭: cwd/transcript_path
+#   경로 오탐(F1) 차단 · "prompt": 키 부재 fail-closed · marker kill-switch
+#   · Windows 네이티브(backslash) CLAUDE_PLUGIN_ROOT 위임
+# - auto-update 훅의 touch-in-hook throttle · dev 가드 · restart-confirm
+#   훅의 7일 TTL과 marker kill-switch
+#
 # 에이전트 행위(AUQ·카드 출력)는 러너에서 실행 불가 — 그 계약은 bun 테스트
-# (tests/onboarding-journey.test.ts 등)가 소유해요.
+# (tests/onboarding-journey.test.ts, tests/hook-execution.test.ts 등)가 소유해요.
 name: Windows onboarding E2E
 
 on:
@@ -133,3 +140,115 @@ jobs:
           [ -z "$OUT" ] || { echo "expected silence, got: $OUT"; exit 1; }
           rm -f "$HOME/.axhub/config/no-onboarding-resume" "$HOME/.axhub/cache/.onboarding-mcp-restart"
           echo "hook kill-switch contracts verified"
+
+      - name: 8. 라우터 prompt-field 실동작 — F1 오탐 차단·fail-closed·marker·backslash 위임
+        run: |
+          PYTHONIOENCODING=utf-8 python - <<'PY' > "$RUNNER_TEMP/routers.env"
+          import json, os, shlex
+          hooks = json.load(open("hooks/hooks.json", encoding="utf-8"))["hooks"]["UserPromptSubmit"][0]["hooks"]
+          for name, h in zip(["UPDATE_CMD", "CLARITY_CMD", "IMPORT_CMD", "STATUS_CMD"], hooks):
+              print(name + "=" + shlex.quote(h["command"]))
+          base = {"session_id": "abc", "transcript_path": "C:\\Users\\dev\\work\\axhub\\t.jsonl",
+                  "cwd": "C:\\Users\\dev\\work\\axhub", "permission_mode": "default",
+                  "hook_event_name": "UserPromptSubmit"}
+          payloads = {
+              "f1": {**base, "prompt": "npm 업데이트 해줘"},
+              "nokey": {k: v for k, v in base.items() if k != "prompt"},
+              "update": {**base, "cwd": "C:\\Users\\dev\\demo", "prompt": "axhub 업데이트해줘"},
+              "clarity": {**base, "cwd": "C:\\Users\\dev\\demo", "prompt": "axhub GitHub 계정 다시 연결해줘"},
+              "import": {**base, "cwd": "C:\\Users\\dev\\demo", "prompt": "이 기존 Express 앱을 axhub에 올려줘"},
+              "status": {**base, "cwd": "C:\\Users\\dev\\demo", "prompt": "axhub 배포 상태 확인해줘"},
+          }
+          for k, v in payloads.items():
+              with open(os.path.join(os.environ["RUNNER_TEMP"], "payload_" + k + ".json"), "w", encoding="utf-8") as f:
+                  json.dump(v, f, ensure_ascii=False)
+          PY
+          source "$RUNNER_TEMP/routers.env"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+
+          echo "--- [8a] F1 재현 payload (axhub 는 cwd/transcript_path 에만) -> 4개 전부 침묵 ---"
+          for CMD in "$UPDATE_CMD" "$CLARITY_CMD" "$IMPORT_CMD" "$STATUS_CMD"; do
+            OUT="$(bash -c "$CMD" < "$RUNNER_TEMP/payload_f1.json")"
+            [ -z "$OUT" ] || { echo "expected F1 silence, got: $OUT"; exit 1; }
+          done
+
+          echo "--- [8b] prompt 필드의 진짜 발화 -> 각 라우터 발동 ---"
+          bash -c "$UPDATE_CMD" < "$RUNNER_TEMP/payload_update.json" | grep -q "axhub update router"
+          bash -c "$CLARITY_CMD" < "$RUNNER_TEMP/payload_clarity.json" | grep -q "axhub clarity router"
+          bash -c "$IMPORT_CMD" < "$RUNNER_TEMP/payload_import.json" | grep -q "axhub import router"
+          bash -c "$STATUS_CMD" < "$RUNNER_TEMP/payload_status.json" | grep -q "axhub status/resume router"
+
+          echo "--- [8c] \"prompt\": 키 부재 payload -> fail-closed 로 4개 전부 침묵 ---"
+          for CMD in "$UPDATE_CMD" "$CLARITY_CMD" "$IMPORT_CMD" "$STATUS_CMD"; do
+            OUT="$(bash -c "$CMD" < "$RUNNER_TEMP/payload_nokey.json")"
+            [ -z "$OUT" ] || { echo "expected fail-closed silence, got: $OUT"; exit 1; }
+          done
+
+          echo "--- [8d] marker kill-switch 4종 -> 발화 payload 에도 침묵 ---"
+          mkdir -p "$HOME/.axhub/config"
+          for M in update-router clarity-router import-router status-router; do : > "$HOME/.axhub/config/no-$M"; done
+          OUT="$(bash -c "$UPDATE_CMD" < "$RUNNER_TEMP/payload_update.json")"
+          [ -z "$OUT" ] || { echo "expected marker silence for update, got: $OUT"; exit 1; }
+          OUT="$(bash -c "$CLARITY_CMD" < "$RUNNER_TEMP/payload_clarity.json")"
+          [ -z "$OUT" ] || { echo "expected marker silence for clarity, got: $OUT"; exit 1; }
+          OUT="$(bash -c "$IMPORT_CMD" < "$RUNNER_TEMP/payload_import.json")"
+          [ -z "$OUT" ] || { echo "expected marker silence for import, got: $OUT"; exit 1; }
+          OUT="$(bash -c "$STATUS_CMD" < "$RUNNER_TEMP/payload_status.json")"
+          [ -z "$OUT" ] || { echo "expected marker silence for status, got: $OUT"; exit 1; }
+          for M in update-router clarity-router import-router status-router; do rm -f "$HOME/.axhub/config/no-$M"; done
+
+          echo "--- [8e] Windows 네이티브(backslash) CLAUDE_PLUGIN_ROOT 로도 위임이 동작 ---"
+          CLAUDE_PLUGIN_ROOT="$(cygpath -w "$PWD")" bash -c "$UPDATE_CMD" < "$RUNNER_TEMP/payload_update.json" | grep -q "axhub update router"
+          echo "router prompt-field contracts verified on windows"
+
+      - name: 9. auto-update·restart-confirm 훅 실동작 — touch-in-hook·dev 가드·TTL·marker
+        run: |
+          PYTHONIOENCODING=utf-8 python - <<'PY' > "$RUNNER_TEMP/ss.env"
+          import json, shlex
+          hooks = json.load(open("hooks/hooks.json", encoding="utf-8"))["hooks"]["SessionStart"][0]["hooks"]
+          def pick(tok):
+              for h in hooks:
+                  if tok in h["command"]:
+                      return h["command"]
+              raise SystemExit("hook not found: " + tok)
+          print("AUTOUPDATE_CMD=" + shlex.quote(pick(".plugin-update-check")))
+          print("RESTART_CMD=" + shlex.quote(pick(".plugin-update-restart")))
+          PY
+          source "$RUNNER_TEMP/ss.env"
+          BIN_DIR="$HOME/.axhub/bin"   # step 2 가 설치한 실제 axhub.exe
+          NOGIT_ROOT="$(mktemp -d)"    # dev 가드에 안 걸리는 plugin root
+
+          echo "--- [9a] due 상태 -> 발행 + 캐시를 훅이 직접 touch ---"
+          H1="$(mktemp -d)"
+          OUT="$(HOME="$H1" PATH="$BIN_DIR:$PATH" CLAUDE_PLUGIN_ROOT="$NOGIT_ROOT" bash -c "$AUTOUPDATE_CMD")"
+          echo "$OUT" | grep -q "auto-update-prompt.md"
+          [ -f "$H1/.axhub/cache/.plugin-update-check" ] || { echo "cache not touched by hook"; exit 1; }
+
+          echo "--- [9b] 직후 재실행 -> throttle 침묵 (재발동 스팸 제거 증명) ---"
+          OUT="$(HOME="$H1" PATH="$BIN_DIR:$PATH" CLAUDE_PLUGIN_ROOT="$NOGIT_ROOT" bash -c "$AUTOUPDATE_CMD")"
+          [ -z "$OUT" ] || { echo "expected throttle silence, got: $OUT"; exit 1; }
+
+          echo "--- [9c] dev 가드 — .git 이 있는 repo 체크아웃 plugin root -> 침묵 + 캐시 무접촉 ---"
+          H2="$(mktemp -d)"
+          OUT="$(HOME="$H2" PATH="$BIN_DIR:$PATH" CLAUDE_PLUGIN_ROOT="$PWD" bash -c "$AUTOUPDATE_CMD")"
+          [ -z "$OUT" ] || { echo "expected dev-guard silence, got: $OUT"; exit 1; }
+          [ ! -e "$H2/.axhub/cache/.plugin-update-check" ] || { echo "dev guard must not touch cache"; exit 1; }
+
+          echo "--- [9d] marker kill switch no-auto-update -> 침묵 ---"
+          H3="$(mktemp -d)"; mkdir -p "$H3/.axhub/config" && : > "$H3/.axhub/config/no-auto-update"
+          OUT="$(HOME="$H3" PATH="$BIN_DIR:$PATH" CLAUDE_PLUGIN_ROOT="$NOGIT_ROOT" bash -c "$AUTOUPDATE_CMD")"
+          [ -z "$OUT" ] || { echo "expected marker silence, got: $OUT"; exit 1; }
+
+          echo "--- [9e] restart-confirm: fresh marker -> 발행 / 8일 경과 -> TTL 침묵 / kill-switch marker -> 침묵 ---"
+          H4="$(mktemp -d)"; mkdir -p "$H4/.axhub/cache"
+          printf '%s' "1.99.0" > "$H4/.axhub/cache/.plugin-update-restart"
+          OUT="$(HOME="$H4" CLAUDE_PLUGIN_ROOT="$NOGIT_ROOT" bash -c "$RESTART_CMD")"
+          echo "$OUT" | grep -q "plugin-restart-confirm-prompt.md"
+          touch -d "8 days ago" "$H4/.axhub/cache/.plugin-update-restart"
+          OUT="$(HOME="$H4" CLAUDE_PLUGIN_ROOT="$NOGIT_ROOT" bash -c "$RESTART_CMD")"
+          [ -z "$OUT" ] || { echo "expected TTL silence, got: $OUT"; exit 1; }
+          touch "$H4/.axhub/cache/.plugin-update-restart"
+          mkdir -p "$H4/.axhub/config" && : > "$H4/.axhub/config/no-auto-update"
+          OUT="$(HOME="$H4" CLAUDE_PLUGIN_ROOT="$NOGIT_ROOT" bash -c "$RESTART_CMD")"
+          [ -z "$OUT" ] || { echo "expected kill-switch silence, got: $OUT"; exit 1; }
+          echo "auto-update hook contracts verified on windows"
