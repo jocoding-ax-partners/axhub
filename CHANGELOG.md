@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.14.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.14.1...v1.14.2) (2026-07-16)
+
+UserPromptSubmit 라우터 4개(update/clarity/import/status-resume)가 훅 입력 JSON 전체를 매칭해 cwd·transcript_path 경로에 axhub 가 든 프로젝트에서 무관한 프롬프트에 오탐하던 버그를 고쳤어요([#383](https://github.com/jocoding-ax-partners/axhub/pull/383)) — 이제 `"prompt":` 필드 이후 구간만 보고, 키 부재 시 fail-closed 로 침묵해요. auto-update 훅은 throttle 캐시를 훅이 직접 touch 해 재발동 스팸을 없앴고, dev 체크아웃 가드·`is_downgrade` 안내 분기·플러그인 재시작 확인 5번째 SessionStart 훅(marker 7일 TTL)을 더했어요. update 라우터는 `hooks/update-router.sh` 로 추출해 형제 라우터와 같은 위임 패턴과 env+marker kill-switch 2채널을 따라요. 훅 bash 를 실제 실행하는 hook-execution 테스트 60케이스와 Windows 실기 E2E lane(step 8·9 — F1 오탐 차단·fail-closed·backslash 위임·touch-in-hook throttle·TTL)으로 전 계약을 검증했어요.
+
+
+### Fixed
+
+* UserPromptSubmit 라우터 prompt-field 매칭 + auto-update 훅 보강 ([#383](https://github.com/jocoding-ax-partners/axhub/pull/383))
+
 ## [1.14.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.14.0...v1.14.1) (2026-07-15)
 
 온보딩 스킬의 실행 계약을 실제 Windows(windows-latest + Git Bash)에서 상시 검증하는 E2E 워크플로를 편입했어요([#394](https://github.com/jocoding-ax-partners/axhub/pull/394)). SKILL.md 원문에서 DETECT_ALL 픽스처를 런타임 추출해 4분기(미설치→canonical→bin-path 1순위→rc 이중화 후 bare detect)를 실행하고, cli_path_missing lane 의 sanctioned 재감지와 SessionStart 훅 marker kill-switch 실동작까지 확인해요 — `gh workflow run windows-onboarding-e2e.yml --ref main` 으로 언제든 재실행할 수 있어요. 1.12.0~1.14.0 의 온보딩 변경분이 이 워크플로로 전 스텝 green 검증을 마쳤어요.
