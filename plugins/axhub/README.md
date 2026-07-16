@@ -7,7 +7,7 @@
 코드를 직접 짜는 대신, "내 앱 배포해" 한마디로 앱 lifecycle 전체를 안전하게 굴려요.
 
 [![version](https://img.shields.io/github/v/release/jocoding-ax-partners/axhub?color=blue)](https://github.com/jocoding-ax-partners/axhub/releases)
-[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![license](https://img.shields.io/badge/license-Apache_2.0-green)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
@@ -28,7 +28,6 @@
 - [🧭 핵심 철학](#-핵심-철학)
 - [🔄 동작 방식](#-동작-방식)
 - [🔒 안전과 신뢰](#-안전과-신뢰)
-- [🛠️ 개발과 기여](#-개발과-기여)
 - [📄 라이선스](#-라이선스)
 
 ---
@@ -197,44 +196,6 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요.
 
 ---
 
-## 🛠️ 개발과 기여
-
-이 플러그인을 직접 개발·확장하려면 작업 규칙 문서를 봐요.
-
-| 문서 | 용도 |
-|------|------|
-| [CLAUDE.md](CLAUDE.md) · [AGENTS.md](AGENTS.md) | AI 에이전트 작업 규칙 — 8 skill 체제 · CLI 호출 표면 · release 계약 |
-
-살아남은 quality gate 는 셋이에요.
-
-```bash
-bun run lint:tone --strict   # 모든 한글 텍스트 해요체 0 err
-bun test                     # SKILL frontmatter + smoothness contract + e2e fixture
-bun run typecheck            # tsc --noEmit
-```
-
-로컬 개발 설치·검증은 repo 루트가 아니라 clean bundle 을 써요. repo 루트에는 `.claude`, `.omx`, `node_modules`, 인덱스 DB 같은 큰 개발 산출물이 생길 수 있어서 Claude Code local plugin cache 를 비대하게 만들 수 있어요.
-
-```bash
-bun run plugin:bundle
-claude plugin validate dist/axhub-plugin
-claude --plugin-dir dist/axhub-plugin
-```
-
-릴리즈는 `commit-and-tag-version` 3단계 flow 예요.
-
-```bash
-bun run release                    # bump + commit (tag 미생성)
-git commit --amend --no-edit -a    # CHANGELOG narrative(해요체) 보완
-bun run release:tag                # tag 생성 + push
-```
-
-> 판정·실행 로직은 플러그인이 아니라 `ax-hub-cli` 에 있어요 — helper 기능 변경, schema parity, CLI 릴리즈는 그쪽 레포(`ax-hub-cli`) follow-up 으로 처리해요.
-
-개발·운영 규칙은 [docs/policy/dev-policy.md](./docs/policy/dev-policy.md), 에이전트 행동 규칙은 [docs/policy/agent-policy.md](./docs/policy/agent-policy.md) 가 기준 문서예요.
-
----
-
 ## 📄 라이선스
 
-MIT — [LICENSE](LICENSE).
+Apache License 2.0 — [LICENSE](LICENSE).
