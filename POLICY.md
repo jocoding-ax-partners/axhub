@@ -25,7 +25,7 @@ axhub Claude Code plugin 이 사용자의 컴퓨터에서 무엇을 하고 무�
 ## AI 활용 기록 (선택 수집) — 프롬프트 수집은 물어보고 켜요
 - 팀 워크스페이스가 AI 활용 기록(내 Claude Code 프롬프트·응답·툴콜 내용을 워크스페이스로 보내는 수집 기능)을 지원하면, 첫 설정(온보딩) 중에 켤지 한 번 물어봐요. 사용자가 켜기를 고르고 워크스페이스 콘솔에서 1회 동의한 경우에만 켜져요 — 동의 없이 켜지지 않아요.
 - 켜면 axhub CLI 가 `~/.claude/settings.json` 에 수집 설정(Claude Code 의 기본 텔레메트리 기능을 켜는 환경변수)을 기록하고, 전송은 plugin 이 아니라 Claude Code 가 워크스페이스 수집 주소로 직접 해요.
-- 끄기: `axhub axrouter monitor --off` (이 컴퓨터에서만 끔) / `axhub axrouter revoke` (등록까지 해제). 켠 적이 없으면 아무것도 기록되지 않아요.
+- 끄기: `axhub axrouter monitor --off` (이 컴퓨터에서만 끔) / `axhub axrouter revoke` (등록까지 해제) / `axhub axrouter revoke-consent --execute` (본문 수집 동의 철회). 켠 적이 없으면 아무것도 기록되지 않아요.
 
 ## 파괴적 작업 승인 — 되돌리기 어려운 일은 먼저 물어봐요
 - 삭제, 롤백(이전 버전으로 되돌리기), `--force`/`--execute` 같은 강제 실행 옵션이 붙는 변경은 항상 사용자에게 먼저 보여주고 확인을 받은 뒤에만 실행해요.

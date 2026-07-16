@@ -87,6 +87,23 @@ describe("onboarding representative journey", () => {
     }
   });
 
+  test("telemetry opt-in keeps the axrouter CLI contract in the card", () => {
+    // status 파싱 계약 — CLI JSON 필드명이 바뀌면 여기서 잡아요
+    expect(CARD).toContain("axhub axrouter status --json");
+    expect(CARD).toContain("`data.workspaces[]`");
+    expect(CARD).toContain("`available: true`");
+    expect(CARD).toContain("`data.active_workspace`");
+    expect(CARD).toContain("`data.local_monitoring`");
+    // 켜기·동의·철회 lane — CLI-native consent 먼저, 실패 시 콘솔 fallback
+    expect(CARD).toContain("axhub axrouter monitor --tenant <slug> --json");
+    expect(CARD).toContain("consent_required");
+    expect(CARD).toContain("axhub axrouter consent --agree --execute --tenant <slug> --json");
+    expect(CARD).toContain("error.doc_url");
+    expect(CARD).toContain("axhub axrouter revoke-consent --execute");
+    // headless 는 묻지도 실행하지도 않아요 (AP-10)
+    expect(CARD).toContain("headless 면 이 섹션을 통째로 건너뛰어요");
+  });
+
   test("github-app reference stays aligned with device-flow and relogin contracts", () => {
     expect(GITHUB).toContain("github_relogin_required");
     expect(GITHUB).toContain("axhub github link");

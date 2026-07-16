@@ -29,8 +29,9 @@ AI 활용 기록은 내 Claude Code 프롬프트·응답·툴콜 내용을 팀 �
 3. 건너뛰기 → "나중에 켜고 싶으면 'AI 활용 기록 켜줘' 라고 말하면 돼요." 한 줄만 남기고 같은 온보딩에서 다시 묻지 않아요.
 4. 켜기 → `axhub axrouter monitor --tenant <slug> --json`.
    - 성공 → 적용은 Claude Code 재시작 후예요. 별도 카드나 안내 문단을 만들지 않아요 — 이어지는 카드(Restart Handoff 또는 최종 카드) 한 곳에 "AI 활용 기록 켜짐 — 재시작 후 적용" 한 줄로만 반영해요.
-   - `error.subcode` 가 `consent_required` → 워크스페이스 콘솔의 1회 동의가 아직이에요. `error.doc_url` 의 동의 페이지 주소를 보여주고, 사용자가 동의를 마쳤다고 하면 monitor 를 1회만 재시도해요. 여전히 미동의면 "콘솔 동의 후 'AI 활용 기록 켜줘' 라고 말해 주세요" 안내로 남기고 green check 는 달지 않아요.
-5. 끄기·해제는 온보딩 범위 밖이에요 — 물으면 `axhub axrouter monitor --off`(이 컴퓨터만 끔) / `axhub axrouter revoke`(등록 해제)를 알려줘요.
+   - `error.subcode` 가 `consent_required` → 본문 수집 동의 기록이 아직이에요. 위 옵트인 질문에 수집 내용 고지가 이미 담겨 있고 사용자가 "켜기" 를 골랐으므로, `axhub axrouter consent --agree --execute --tenant <slug> --json` 으로 동의를 기록한 뒤 monitor 를 1회만 재시도해요 (consent·재시도 각 1회 상한). 이 lane 이 성립하려면 옵트인 질문에 프롬프트·응답·툴콜 내용 고지가 반드시 남아 있어야 해요.
+   - consent 명령까지 실패하면(구 CLI·권한 등) 콘솔 fallback 이에요 — `error.doc_url` 의 동의 페이지 주소를 보여주고 "콘솔 동의 후 'AI 활용 기록 켜줘' 라고 말해 주세요" 로 남겨요. green check 는 달지 않아요.
+5. 끄기·해제는 온보딩 범위 밖이에요 — 물으면 `axhub axrouter monitor --off`(이 컴퓨터만 끔) / `axhub axrouter revoke`(등록 해제) / `axhub axrouter revoke-consent --execute`(본문 수집 동의 철회 — 활성 등록도 함께 해제돼요)를 알려줘요.
 
 수집 전용 토큰은 CLI 가 settings.json 에만 기록해요 — 토큰 값이나 raw JSON 을 chat 에 출력하지 않아요.
 
