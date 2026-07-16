@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.14.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.14.3...v1.14.4) (2026-07-16)
+
+온보딩 AI 활용 기록 옵트인을 CLI 실표면과 대조해 보강했어요([#399](https://github.com/jocoding-ax-partners/axhub/pull/399)). `monitor` 가 `consent_required` 를 내려주면 콘솔 페이지 대신 옵트인 질문의 수집 고지를 근거로 `axhub axrouter consent --agree --execute` 로 동의를 기록하고 1회 재시도해요 — consent 실패 시 기존 콘솔 fallback 은 유지돼요. 끄기·해제 안내에 `revoke-consent`(본문 수집 동의 철회)를 더해 철회 경로를 완성했고, status JSON 필드명·명령 문자열·headless 스킵을 잠그는 axrouter 계약 테스트를 신설했어요.
+
+
+### Fixed
+
+* 텔레메트리 옵트인에 CLI-native consent lane과 revoke-consent 안내 반영 ([#399](https://github.com/jocoding-ax-partners/axhub/pull/399))
+
 ## [1.14.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.14.2...v1.14.3) (2026-07-16)
 
 Claude Code plugin Discover 화면에 2.7KB 영어 라우팅 계약 전문이 그대로 노출되던 description 을 간결한 한국어 2문장으로 교체했어요([#397](https://github.com/jocoding-ax-partners/axhub/pull/397)). 같은 계약은 스킬 frontmatter·SessionStart 폴백·UserPromptSubmit 라우터가 이미 소유하고 있어서 사용자-facing metadata 에 재수록하지 않아요 — 길이 상한(320자)과 계약 문구 재수록 금지를 테스트로 잠갔어요.
