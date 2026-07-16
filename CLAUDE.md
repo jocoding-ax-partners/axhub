@@ -150,7 +150,7 @@ SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이�
 ## CLI 호출 표면
 
 - skill 들은 흡수된 helper 표면을 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 (`clarity` skill 은 예외 — 공개 표면만 탐색·실행, `diagnosis` skill 은 CLI 전용 — MCP `deployment_diagnosis` 가 보여도 호출하지 않고 공개 `axhub deploy status`/`deploy logs`/`deploy diagnose` 만 써요) — 예: `axhub plugin-support onboarding-detect`, `axhub plugin-support preflight`, `axhub plugin-support deploy-prep`. hidden 명령은 외부 무보증이지만 계약 parity 테스트 + 최소 CLI 버전 게이트로 plugin 과 동기화돼요.
-- 사용자 가치가 있는 공개 표면은 `axhub deploy verify <deployment-id> --app <app>` 와 `axhub deploy diagnose`, 그리고 onboarding 의 AI 활용 기록 옵트인이 쓰는 `axhub axrouter` (status/monitor — 실패 시 조용히 건너뛰는 fail-open) 예요.
+- 사용자 가치가 있는 공개 표면은 `axhub deploy verify <deployment-id> --app <app>` 와 `axhub deploy diagnose`, 그리고 onboarding 의 AI 활용 기록 옵트인이 쓰는 `axhub axrouter` (status/monitor/consent — 실패 시 조용히 건너뛰는 fail-open) 예요.
 
 ## 최소 CLI 버전 게이트
 
