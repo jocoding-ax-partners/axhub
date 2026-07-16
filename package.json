@@ -4,6 +4,7 @@
   "description": "axhub Claude Code plugin — Korean-first NL deploy/manage for vibe coders. 8 skills (onboarding/bootstrap/deploy/import/development/diagnosis/clarity/update) calling ax-hub-cli v0.20.0+ directly; Bun for repo tooling.",
   "type": "module",
   "private": true,
+  "license": "Apache-2.0",
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
