@@ -39,47 +39,16 @@ describe("smooth behavior contracts", () => {
       expect(description).toContain("ax-hub-cli");
       expect(description).not.toContain("onboarding/init/deploy/cli");
       expect(description).not.toContain("3개 스킬");
+      // description 은 Discover/Installed UI 에 그대로 노출되는 사용자-facing
+      // 필드예요 — 라우팅 계약 본문은 스킬 frontmatter·훅이 소유하고, 여기엔
+      // 재수록하지 않아요 (간결 유지).
+      expect(description.length).toBeLessThanOrEqual(320);
+      expect(description).not.toContain("should route to");
+      expect(description).not.toContain("Routing priority is strict");
+      expect(description).not.toContain("Import priority is strict");
+      expect(description).not.toContain("현재 버전을 확인할게요");
     }
     expect(descriptions.join("\n")).toContain("onboarding/bootstrap/deploy/import/development/diagnosis/clarity/update");
-    expect(pluginJson.description).toContain("Natural-language axhub requests should route to one of onboarding/bootstrap/deploy/import/development/diagnosis/update");
-    expect(pluginJson.description).toContain("clarity is manual/explicit-only");
-    expect(pluginJson.description).toContain("Routing priority is strict");
-    expect(pluginJson.description).toContain("ordinary Code-mode shell work");
-    expect(pluginJson.description).toContain("invoke the axhub update skill first");
-    expect(pluginJson.description).toContain("first visible assistant text is exactly `현재 버전을 확인할게요.`");
-    expect(pluginJson.description).toContain("Never start freshness prompts with `Using /axhub:clarity`");
-    expect(pluginJson.description).toContain("run scripts, shell/version probes, app-status tools");
-    expect(pluginJson.description).toContain("Claude Desktop axhub App/MCP tools");
-    expect(pluginJson.description).toContain("unrelated plugin mode");
-    expect(pluginJson.description).toContain("/oh-my-claudecode:autopilot");
-    expect(pluginJson.description).toContain("exact `axhub apps --help` then `axhub apps list --json`");
-    expect(pluginJson.description).toContain("`axhub apps get <app> --json`");
-    expect(pluginJson.description).toContain("`axhub deploy list --app <app> --json`");
-    expect(pluginJson.description).toContain("nonexistent `axhub app list`");
-    expect(pluginJson.description).toContain("never `axhub deployment list`");
-    expect(pluginJson.description).toContain("never Claude Desktop axhub App/MCP permission popups");
-    expect(pluginJson.description).toContain("never &&, pipes, redirects, grep, or head");
-    expect(pluginJson.description).not.toContain("`내 앱들이 지금 어떤 상태인지 모르겠어`");
-    expect(pluginJson.description).not.toContain("Before finding or calling tools for vague app-status prompts");
-    expect(pluginJson.description).not.toContain("clarity 스킬로 라우팅");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("Natural-language axhub requests should route to one of onboarding/bootstrap/deploy/import/development/diagnosis/update");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("clarity is manual/explicit-only");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("Routing priority is strict");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("ordinary Code-mode shell work");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("invoke the update skill first");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("first visible assistant text is exactly `현재 버전을 확인할게요.`");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("Never start freshness prompts with `Using /axhub:clarity`");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("Claude Desktop axhub App/MCP tools");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("/oh-my-claudecode:autopilot");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("exact `axhub apps --help` then `axhub apps list --json`");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("`axhub apps get <app> --json`");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("`axhub deploy list --app <app> --json`");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("nonexistent `axhub app list`");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("never `axhub deployment list`");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("never Claude Desktop axhub App/MCP permission popups");
-    expect(marketplace.plugins[0]?.description ?? "").toContain("never &&, pipes, redirects, grep, or head");
-    expect(marketplace.plugins[0]?.description ?? "").not.toContain("Vague app-status requests");
-    expect(marketplace.plugins[0]?.description ?? "").not.toContain("Before finding or calling tools for vague app-status requests");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {
