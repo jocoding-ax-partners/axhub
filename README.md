@@ -7,7 +7,7 @@
 코드를 직접 짜는 대신, "내 앱 배포해" 한마디로 앱 lifecycle 전체를 안전하게 굴려요.
 
 [![version](https://img.shields.io/github/v/release/jocoding-ax-partners/axhub?color=blue)](https://github.com/jocoding-ax-partners/axhub/releases)
-[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![license](https://img.shields.io/badge/license-Apache_2.0-green)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
