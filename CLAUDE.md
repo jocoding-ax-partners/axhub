@@ -132,7 +132,7 @@ auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks
 
 ## Windows 실행 계약 hook (AP-13)
 
-auto-update·resume 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks.json` 세 번째 entry). Windows(`$OS`=Windows_NT) 세션에서만 Git Bash 실행 계약을 always-on 으로 emit 해요 — axhub 명령은 Git Bash 전용(PowerShell 금지), PATH 는 `axhub plugin-support repair-path` 로 영속 등록 + 같은 세션은 bin_path 절대경로로 계속(새 터미널은 다음 세션용), `auth status` 는 로그인한 그 셸에서 검증, 로그인은 단일 폴링 1회. skill 본문이 아니라 hook 에 둔 이유는, 사고처럼 에이전트가 skill 을 안 따르고 free-form 으로 PowerShell 을 쓰는 경로까지 덮기 위해서예요 (skill byte 예산도 안 먹어요).
+auto-update·resume 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks.json` 세 번째 entry). Windows(`$OS`=Windows_NT) 세션에서만 Git Bash 실행 계약을 always-on 으로 emit 해요 — axhub 명령은 Git Bash 전용(PowerShell 금지), PATH 는 `axhub plugin-support repair-path` 로 영속 등록 + 같은 세션은 bin_path 절대경로로 계속(새 터미널은 다음 세션용), `auth status` 는 로그인한 그 셸에서 검증, 로그인은 단일 폴링 1회, 설치·업데이트 안내는 install.ps1·`axhub update` 만(npm/npx 의 axhub 패키지는 이름 예약 스텁 — 금지). skill 본문이 아니라 hook 에 둔 이유는, 사고처럼 에이전트가 skill 을 안 따르고 free-form 으로 PowerShell 을 쓰는 경로까지 덮기 위해서예요 (skill byte 예산도 안 먹어요).
 
 - hook 은 `$OS` 만 봐요 — 네트워크·`axhub` 바이너리·marker 안 건드리고, non-Windows 는 즉시 exit 0.
 - **끄기:** `AXHUB_NO_WINDOWS_CONTRACT=1` 또는 `~/.axhub/config/no-windows-contract`. Windows 전제는 다른 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
@@ -200,4 +200,4 @@ Key routing rules:
 
 **진입 확인 AUQ (AP-12):** axhub 프로젝트가 확정돼도 배포·생성·가져오기(deploy·bootstrap·import) 실행 전에 interactive 에서는 "axhub로 진행할까요?"를 AskUserQuestion 으로 한 번 더 확인해요("무엇을·어떻게"를 묻는 기존 preview 승인과 별개인 진입 게이트). deploy·import 는 preview 앞 별도 AUQ, bootstrap 은 기존 preview 승인에 통합(byte 예산 포화). headless 는 생략해요.
 
-**Windows 실행 계약 (AP-13):** Windows 에선 axhub 명령을 Git Bash 전용으로 실행해요 (PowerShell 금지). PATH 는 수동 등록 대신 canonical 경로(`~/.axhub/bin/axhub`(.exe))로 `plugin-support repair-path` 를 실행해 영속 등록하고 같은 세션은 repair-path 의 bin_path 절대경로로 계속 진행해요(구 CLI 로 bin_path 가 없으면 새 터미널 안내, 새 터미널은 다음 세션용), `auth status` 는 `auth login` 한 그 셸에서 검증해요 — HOME 없는 PowerShell 의 "미로그인" 은 실패가 아니에요. 로그인은 단일 폴링 `axhub auth login --json` 1 회로 하고 background 재실행은 안 해요. 이 계약에 예외는 없어요 — 공식 설치 채널은 install.sh / install.ps1 뿐이에요.
+**Windows 실행 계약 (AP-13):** Windows 에선 axhub 명령을 Git Bash 전용으로 실행해요 (PowerShell 금지). PATH 는 수동 등록 대신 canonical 경로(`~/.axhub/bin/axhub`(.exe))로 `plugin-support repair-path` 를 실행해 영속 등록하고 같은 세션은 repair-path 의 bin_path 절대경로로 계속 진행해요(구 CLI 로 bin_path 가 없으면 새 터미널 안내, 새 터미널은 다음 세션용), `auth status` 는 `auth login` 한 그 셸에서 검증해요 — HOME 없는 PowerShell 의 "미로그인" 은 실패가 아니에요. 로그인은 단일 폴링 `axhub auth login --json` 1 회로 하고 background 재실행은 안 해요. 이 계약에 예외는 없어요 — 공식 설치 채널은 install.sh / install.ps1 뿐이고, npm/npx 의 `axhub`·`axhub-cli` 패키지는 이름 예약 스텁이라 설치·실행·안내에 쓰지 않아요.
