@@ -25,6 +25,8 @@ Official channels:
 - macOS/Linux: `curl -fsSL https://cli.axhub.ai/install.sh | sh`
 - Windows: `irm https://cli.axhub.ai/install.ps1 | iex`
 
+위 두 스크립트가 유일한 설치 채널이에요. npm/npx 로는 절대 설치·실행하지 않아요 — npm 의 `axhub`/`axhub-cli` 패키지는 이름 예약용 스텁이라 실행하면 실패해요.
+
 Installer GUI, shell profile changes, and permissions are user action gates. Do not expose raw installer stderr in chat.
 
 install.sh / install.ps1 은 PATH 영속 등록까지 스스로 해요 (`AXHUB_INSTALL_NO_PATH=1` 옵트아웃, 사용자가 PowerShell 에서 직접 실행하면 그 창은 즉시 사용 가능). 다만 에이전트 세션 안에서 설치하면 이 세션은 여전히 예전 PATH 라, 설치 직후 재감지가 `cli_path_missing` 을 주면 아래 절대경로 lane 으로 그대로 이어가요.
