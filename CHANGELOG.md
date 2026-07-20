@@ -4,6 +4,22 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.14.5](https://github.com/jocoding-ax-partners/axhub/compare/v1.14.4...v1.14.5) (2026-07-20)
+
+Windows 세션에서 에이전트가 free-form 으로 npm/npx 설치를 추측해 npm 이름 예약 스텁(0.0.1)의 placeholder reservation 오류에 부딪히던 경로를 막았어요([#403](https://github.com/jocoding-ax-partners/axhub/pull/403)). always-on AP-13 Windows 계약 hook 문안에 `axhub update`·install.ps1 만 안내하고 npm/npx 의 axhub·axhub-cli 패키지는 설치·실행·안내 전부 금지한다는 문장을 추가했고, 온보딩 install-channels 문서에도 두 설치 스크립트가 유일한 채널임을 명시했어요. agent-policy AP-13·CLAUDE.md parity 와 마켓플레이스 번들 미러도 함께 갱신했어요.
+
+
+### Fixed
+
+* AP-13 Windows hook에 npm/npx 설치 금지 명시 ([#403](https://github.com/jocoding-ax-partners/axhub/issues/403)) ([1b18538](https://github.com/jocoding-ax-partners/axhub/commit/1b18538f757ef7544c334a93847d7e442e8ed096))
+
+
+### Docs
+
+* README 개발과 기여 섹션 제거 (외부 기여 비대상) ([a4e92ec](https://github.com/jocoding-ax-partners/axhub/commit/a4e92ec2270b0da94ebb81ae1c9f110b4d470bc7))
+* README 라이선스 Apache 2.0 반영 + 개발과 기여 섹션 제거 ([#402](https://github.com/jocoding-ax-partners/axhub/issues/402)) ([2c48e72](https://github.com/jocoding-ax-partners/axhub/commit/2c48e72c9be464fe7422a51bb3bc1475df9c1c57))
+* 라이센스 배지·문구 MIT → Apache 2.0 + 마켓플레이스 번들 동기화 ([0f1ffed](https://github.com/jocoding-ax-partners/axhub/commit/0f1ffed4b3b6e2e836bd5264b788ade77e23eac6))
+
 ## [1.14.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.14.3...v1.14.4) (2026-07-16)
 
 온보딩 AI 활용 기록 옵트인을 CLI 실표면과 대조해 보강했어요([#399](https://github.com/jocoding-ax-partners/axhub/pull/399)). `monitor` 가 `consent_required` 를 내려주면 콘솔 페이지 대신 옵트인 질문의 수집 고지를 근거로 `axhub axrouter consent --agree --execute` 로 동의를 기록하고 1회 재시도해요 — consent 실패 시 기존 콘솔 fallback 은 유지돼요. 끄기·해제 안내에 `revoke-consent`(본문 수집 동의 철회)를 더해 철회 경로를 완성했고, status JSON 필드명·명령 문자열·headless 스킵을 잠그는 axrouter 계약 테스트를 신설했어요.
