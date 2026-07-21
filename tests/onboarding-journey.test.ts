@@ -104,6 +104,15 @@ describe("onboarding representative journey", () => {
     }
   });
 
+  test("Desktop Code mode has a non-deadlocking MCP authentication path", () => {
+    expect(CARD).toContain("**Claude Desktop Code mode**");
+    expect(CARD).toContain("채팅 입력창에 `/mcp` 를 치라고 안내하지 않아요");
+    expect(CARD).toContain("Cmd+J");
+    expect(CARD).toContain("env -u CLAUDECODE claude");
+    expect(CARD).toContain("Authentication successful");
+    expect(CARD).toContain("복사·붙여넣기와 화살표·Enter 만으로 끝나야 해요");
+  });
+
   test("telemetry opt-in keeps the axrouter CLI contract in the card", () => {
     // status 파싱 계약 — CLI JSON 필드명이 바뀌면 여기서 잡아요
     expect(CARD).toContain("axhub axrouter status --json");
