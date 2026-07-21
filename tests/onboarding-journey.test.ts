@@ -70,9 +70,17 @@ describe("onboarding representative journey", () => {
     }
   });
 
-  test("session re-entry lane: bin-path fixture in SKILL, absolute-path lane in reference", () => {
+  test("session re-entry lane uses standalone Desktop-safe probes and absolute paths", () => {
+    expect(SKILL).toContain("각각 별도 Bash tool call의 한 명령만");
+    expect(SKILL).toContain("정확히 `command -v axhub`");
     expect(SKILL).toContain('cat "$HOME/.axhub/bin-path"');
-    expect(SKILL).toContain('"cli_resolved_path\\":\\"$AXHUB_BIN_LOC\\"');
+    expect(SKILL).toContain('test -f "<반환된 절대경로>"');
+    expect(SKILL).toContain('test -f "$HOME/.axhub/bin/axhub"');
+    expect(SKILL).toContain("Contains shell syntax ... cannot be statically analyzed");
+    expect(SKILL).not.toContain("if command -v axhub");
+    expect(SKILL).not.toContain("DETECT_JSON=$(");
+    expect(SKILL).not.toContain("AXHUB_BIN_LOC=");
+    expect(SKILL).not.toContain('echo "$DETECT_JSON"');
     expect(INSTALL).toContain("cli_resolved_path");
     expect(INSTALL).toContain("current_session_stale");
   });

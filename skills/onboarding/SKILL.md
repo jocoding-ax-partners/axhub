@@ -72,24 +72,15 @@ TodoWrite 가 host 에 있으면 checklist 를 갱신해요. 없으면 언급하
 
 ### 1. DETECT_ALL(read-only)
 
-항상 먼저 한 번 감지해요. 이 block 은 Bash tool 로 실행만 하고 명령 본문을 사용자에게 출력하지 않아요.
+항상 먼저 한 번 감지해요. Claude Code Desktop 이 첫 읽기 전용 점검을 위험한 복합 셸처럼 보이지 않게, 아래 probe 는 **각각 별도 Bash tool call의 한 명령만** 실행해요. 명령 본문과 경로는 사용자 chat 에 출력하지 않아요.
 
-```bash
-if command -v axhub >/dev/null 2>&1; then
-  AXHUB_BIN="$(command -v axhub)"; export AXHUB_BIN
-  DETECT_JSON=$(axhub plugin-support onboarding-detect --json 2>/dev/null)
-  [ -n "$DETECT_JSON" ] || DETECT_JSON='{"cli_present":true,"first_gap":"doctor_gap","github":{"state":"unavailable","install_url":null}}'
-elif AXHUB_BIN_LOC="$(cat "$HOME/.axhub/bin-path" 2>/dev/null)" && [ -n "$AXHUB_BIN_LOC" ] && [ -f "$AXHUB_BIN_LOC" ]; then
-  DETECT_JSON="{\"cli_present\":true,\"cli_on_path\":false,\"cli_state\":\"on_disk_not_on_path\",\"cli_resolved_path\":\"$AXHUB_BIN_LOC\",\"first_gap\":\"cli_path_missing\",\"github\":{\"state\":\"unavailable\",\"install_url\":null}}"
-elif [ -f "$HOME/.axhub/bin/axhub" ] || [ -f "$HOME/.axhub/bin/axhub.exe" ]; then
-  DETECT_JSON='{"cli_present":true,"cli_on_path":false,"cli_state":"on_disk_not_on_path","first_gap":"cli_path_missing","github":{"state":"unavailable","install_url":null}}'
-else
-  DETECT_JSON='{"cli_present":false,"first_gap":"cli_missing","github":{"state":"unavailable","install_url":null}}'
-fi
-echo "$DETECT_JSON"
-```
+1. 정확히 `command -v axhub` 를 실행해요.
+2. 성공하면 반환된 한 줄이 절대경로인지 확인하고, 그 값을 그대로 인용한 `"<axhub 절대경로>" plugin-support onboarding-detect --json` 을 별도 call 로 실행해요. 반환된 경로를 변수에 넣거나 bare `axhub` 로 다시 찾지 않아요.
+3. `command -v axhub` 가 실패하면 정확히 `cat "$HOME/.axhub/bin-path"` 를 별도 call 로 실행해요. 한 줄 경로가 있으면 `test -f "<반환된 절대경로>"` 를 별도 call 로 확인해요.
+4. location 파일도 없거나 가리킨 파일이 없으면 `test -f "$HOME/.axhub/bin/axhub"` 와 `test -f "$HOME/.axhub/bin/axhub.exe"` 를 각각 필요할 때만 별도 call 로 확인해요.
+5. PATH 에서 찾은 바이너리의 detect 출력이 비었으면 내부적으로 `doctor_gap` fallback 으로 처리해요. PATH 밖 파일만 확인됐으면 내부적으로 `cli_path_missing`, 어디에도 없으면 `cli_missing` 으로 처리해요. fallback JSON 을 만들기 위한 `echo` 명령은 실행하지 않아요.
 
-`AXHUB_BIN` 은 PATH/HOME 차이 때문에 detect self-probe 가 현재 shell 의 axhub 를 못 찾는 오탐을 줄이기 위한 pin 이에요. `command -v axhub` 는 실패했지만 location 파일(`~/.axhub/bin-path` — CLI 0.24.8+ 가 자기 설치 위치를 기록)이 가리키는 파일이나 canonical install dir(`~/.axhub/bin/axhub` 또는 `.exe`)에 파일이 있으면 재설치가 아니라 `cli_path_missing` 이에요 — 새 세션이 부모 앱의 stale PATH 를 물려받아 `command -v` 가 계속 실패해도 절대 재설치를 권하지 않아요. location 파일 덕에 CARGO_HOME 등 커스텀 설치 위치도 인식돼요. 이 branch 에서는 detect 를 부르거나 `AXHUB_BIN` 을 export 하지 않아요. 열린 세션이 PATH 를 못 읽는 상태라 detect 가 `cli_on_path:true` 로 오보하거나 같은 gap 을 반복할 수 있기 때문이에요.
+이 단계의 command string 에 `if`/`elif`, `$()`, `&&`/`||`, `;`, pipe, redirect, 변수 대입을 넣지 않아요. Desktop 에 `Contains shell syntax ... cannot be statically analyzed` 권한 카드가 뜨는 명령은 실패예요. 반환된 절대경로를 직접 실행하는 방식이 기존 `AXHUB_BIN` pin 역할을 대신해 PATH/HOME 차이의 오탐을 막아요. `command -v axhub` 는 실패했지만 location 파일(`~/.axhub/bin-path` — CLI 0.24.8+ 가 자기 설치 위치를 기록)이 가리키는 파일이나 canonical install dir(`~/.axhub/bin/axhub` 또는 `.exe`)에 파일이 있으면 재설치가 아니라 `cli_path_missing` 이에요 — 새 세션이 부모 앱의 stale PATH 를 물려받아도 재설치를 권하지 않아요. location 파일 덕에 CARGO_HOME 등 커스텀 설치 위치도 인식돼요. 이 branch 에서는 detect 를 부르지 않아요. 열린 세션이 PATH 를 못 읽는 상태라 같은 gap 을 반복할 수 있기 때문이에요.
 
 주요 필드는 `first_gap`, `gaps`, `cli_present`, `cli_version`, `cli_state`, `cli_on_path`, `cli_too_old`, `has_update`, `latest_version`, `auth_ok`, `auth_error_code`, `git_present`, `git_repo`, `git_commit`, `node_present`, `node_version`, `node_required`, `node_mismatch`, `manifest_present`, `lockfile_present`, `deps_missing`, `dir_empty`, `github`, `deploy_checked`, `deploy_verified` 예요. 이 이름들은 parsing 전용이고 사용자-facing 문장·표·도구 제목에는 노출하지 않아요.
 
