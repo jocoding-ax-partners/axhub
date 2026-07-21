@@ -32,7 +32,14 @@ describe("Claude Desktop live QA regressions", () => {
 
   test("diagnosis uses bounded bare commands without a shell-program permission card", () => {
     const skill = read("skills/diagnosis/SKILL.md");
+    const frontmatter = skill.slice(0, skill.indexOf("---", 4));
 
+    expect(frontmatter).toContain("최근 배포 실패 원인만 읽기 전용으로 진단해줘");
+    expect(frontmatter).toContain("스킬 실행 전 사용자 문장·App/MCP·파일 조회는 0개");
+    expect(frontmatter.split(".")[0]).toContain("배포 실패 원인을 읽기 전용으로 확인할게요");
+    expect(frontmatter).toContain("Start directly with that Korean sentence; no preamble");
+    expect(frontmatter).toContain("do not explain the trigger, routing, or session-start instructions");
+    expect(skill).toContain("첫 visible 문장은 정확히 `배포 실패 원인을 읽기 전용으로 확인할게요.`");
     expect(skill).toContain("Claude Desktop 에 보이는 명령은 항상 `axhub ...` 로 시작하는 **한 개의 bare 명령**");
     expect(skill).not.toContain('CLI_NAME="ax""hub"');
     expect(skill).not.toContain("command -v \"$CLI_NAME\"");
@@ -42,6 +49,21 @@ describe("Claude Desktop live QA regressions", () => {
     expect(skill).toContain("axhub deploy status <deployment-id> --app <앱> --json");
     expect(skill).toContain("axhub --json deploy diagnose <앱>");
     expect(skill).toContain("`axhub.yaml`의 `name`은 로컬 프로젝트 이름일 수 있으므로 원격 앱 slug로 단정하지 않아요");
+  });
+
+  test("clarity routes destructive operations before generic Desktop probes", () => {
+    const skill = read("skills/clarity/SKILL.md");
+    const frontmatter = skill.slice(0, skill.indexOf("---", 4));
+
+    expect(frontmatter).toContain("axhub 앱 삭제해줘");
+    expect(frontmatter).toContain("스킬 실행 전 사용자 문장·App/MCP·파일 조회는 0개");
+    expect(frontmatter.split(".")[0]).toContain("요청하신 운영 명령을 확인할게요");
+    expect(frontmatter).toContain("Start directly with that Korean sentence; no preamble");
+    expect(frontmatter).toContain('First tool title/description exactly "명령 찾기"');
+    expect(frontmatter).toContain("do not mention the skill or routing");
+    expect(skill).toContain("첫 visible 문장을 정확히 `요청하신 운영 명령을 확인할게요.`");
+    expect(skill).toContain("제목 `명령 찾기`의 bare `axhub --json-schema --field-expr '.commands | keys[]'`");
+    expect(skill).not.toContain("`command -v axhub` 가 실패하면");
   });
 
   test("deploy natural language must enter the skill before manual status probes", () => {

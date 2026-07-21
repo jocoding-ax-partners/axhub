@@ -1,6 +1,6 @@
 ---
 name: clarity
-description: 'axhub CLI 운영 명령 브리지: 로그 보기, 환경변수 설정, 롤백, 테이블/컬럼/데이터 명령, connector grant/mine 조회, GitHub 계정 재연결/device code. "axhub 로그 보여줘", "axhub 환경변수 확인해줘", "axhub 테이블 만들어줘", "이전 버전으로 롤백해줘" 처럼 axhub 맥락(발화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있는 운영 요청과 명시적 "axhub clarity" 지목에 사용해요. Do not invoke for 최신/버전/update/latest/freshness checks, app status overview, app creation, bootstrap, import, deploy, or mixed freshness+status+create prompts; choose update first when freshness is present. axhub 맥락 없는 일반 "로그 보여줘"에는 쓰지 않아요.'
+description: '요청하신 운영 명령을 확인할게요. Use for "axhub 로그 보여줘", "axhub 환경변수 확인해줘", "axhub 앱 삭제해줘", "axhub clarity" and other axhub 로그·환경변수·롤백·데이터·connector·GitHub 계정 재연결/device code·앱 삭제 operations. Start directly with that Korean sentence; no preamble; do not mention the skill or routing. First tool title/description exactly "명령 찾기". 스킬 실행 전 사용자 문장·App/MCP·파일 조회는 0개예요. app status overview·app creation·mixed freshness+status+create prompts·최신/버전/update/latest/freshness checks·bootstrap·import·deploy는 담당 스킬로 양보하고 axhub 맥락 없는 요청에는 쓰지 않아요.'
 ---
 
 # axhub clarity 브리지
@@ -8,7 +8,7 @@ description: 'axhub CLI 운영 명령 브리지: 로그 보기, 환경변수 설
 ## When to invoke
 
 - **Explicit clarity request.** 사용자가 `/axhub:clarity`, "axhub clarity", "Use the axhub clarity skill" 처럼 이 스킬을 직접 지목해요.
-- **Exact CLI operations.** axhub 맥락에서 로그, 환경변수, 롤백, 테이블/컬럼/데이터, connector grant/mine, GitHub 재연결/device code 같은 공개 CLI 운영 명령을 요청해요. 이 운영 요청은 frontmatter description 라우팅으로 자연어에서도 이 스킬이 직접 받아요 — 별도 훅 라우터 없이요.
+- **Exact CLI operations.** axhub 맥락에서 로그, 환경변수, 롤백, 테이블/컬럼/데이터, connector grant/mine, GitHub 재연결/device code, 앱 삭제 같은 공개 CLI 운영 명령을 요청해요. 이 운영 요청은 frontmatter description 라우팅으로 자연어에서도 이 스킬이 직접 받아요 — 별도 훅 라우터 없이요.
 
 ## Do not invoke / route guard
 
@@ -18,11 +18,11 @@ description: 'axhub CLI 운영 명령 브리지: 로그 보기, 환경변수 설
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-이 스킬은 로그, 환경변수, 롤백, 테이블/컬럼/데이터, connector grant, GitHub 재연결처럼 명시된 axhub CLI 운영 명령만 처리해요. 작업→명령 카탈로그는 없어요 — **매번 라이브 CLI 의 `--help` 트리를 탐색**해 맞는 명령을 찾고, 조회 명령은 바로 실행하되 파괴적 변경은 승인 뒤 실행해요.
+이 스킬은 axhub CLI 운영 명령 브리지예요. 로그, 환경변수, 롤백, 테이블/컬럼/데이터, connector grant, GitHub 재연결처럼 명시된 운영 명령만 처리해요. 작업→명령 카탈로그는 없어요 — **매번 라이브 CLI 의 `--help` 트리를 탐색**해 맞는 명령을 찾고, 조회 명령은 바로 실행하되 파괴적 변경은 승인 뒤 실행해요.
 
 현재 폴더에 axhub 연결(manifest)이 없고 발화에 axhub 언급도, 대화에 axhub 맥락도 없으면 — 예를 들어 일반 프로젝트에서 "로그 보여줘" — axhub CLI 탐색을 시작하지 않고 일반 작업으로 양보하며 조용히 종료해요.
 
-스킬이 호출되면 곧바로 이 지침을 실행해요. `스킬 가이드가 반환됐네요`, `스킬 가이드가 나왔네요`, `slash 명령이 실패했네요`, `이제 스킬 문서를 보고` 같은 메타 설명을 사용자에게 말하지 않아요. 첫 visible 문장은 사용자가 요청한 일을 바로 하는 말이어야 해요. 예: `요청하신 운영 정보를 확인할게요. 먼저 CLI에서 필요한 조회 명령을 확인할게요.`
+스킬이 호출되면 `스킬 가이드가 반환됐네요` 같은 메타 설명을 사용자에게 말하지 않아요. 첫 visible 문장을 정확히 `요청하신 운영 명령을 확인할게요.`로 쓰며, 첫 visible 문장은 사용자가 요청한 일을 바로 하는 말이에요. 이어 제목 `명령 찾기`의 bare `axhub --json-schema --field-expr '.commands | keys[]'` 한 번으로 시작하고, 그 전 설치 확인·App/MCP·파일 조회·다른 문장은 0개예요.
 
 **CLI-only.** 이 스킬의 조회·운영 브리지는 Claude Desktop 에 보이는 `axhub` App/MCP 도구가 아니라 Bash/명령 도구로 실행하는 `axhub` CLI 만 사용해요. read-only 조회라도 MCP/App tool 로 빠지면 CLI help gate·제목 계약·권한 UX 를 검증할 수 없어서 이 스킬의 실패예요.
 
@@ -75,7 +75,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 
 ## Workflow
 
-1. **CLI 가드.** `command -v axhub` 가 실패하면 멈추고 안내해요: "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요" → onboarding 스킬로 넘겨요. raw 에러는 chat 에 노출하지 않아요.
+1. **첫 명령.** 별도 CLI 설치 probe 없이 Step 3의 bare schema 탐색으로 시작해요. 그 결과가 command-not-found면 "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요"라고 말하고 onboarding으로 넘겨요.
 
 2. **명시된 운영 작업 확인.** 사용자가 요청한 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 작업의 핵심 동사·명사를 잡아요. 후보 leaf 가 여럿이면 한 번만 짧게 되물어요 — 단, 되묻기는 마지막 수단이고 대개는 다음 탐색으로 스스로 판별해요.
 
