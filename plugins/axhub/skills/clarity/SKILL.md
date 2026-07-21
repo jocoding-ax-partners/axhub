@@ -22,7 +22,7 @@ description: '요청하신 운영 명령을 확인할게요. Use for "axhub 로�
 
 현재 폴더에 axhub 연결(manifest)이 없고 발화에 axhub 언급도, 대화에 axhub 맥락도 없으면 — 예를 들어 일반 프로젝트에서 "로그 보여줘" — axhub CLI 탐색을 시작하지 않고 일반 작업으로 양보하며 조용히 종료해요.
 
-스킬이 호출되면 `스킬 가이드가 반환됐네요` 같은 메타 설명을 사용자에게 말하지 않아요. 첫 visible 문장을 정확히 `요청하신 운영 명령을 확인할게요.`로 쓰며, 첫 visible 문장은 사용자가 요청한 일을 바로 하는 말이에요. 이어 제목 `명령 찾기`의 bare `axhub --json-schema --field-expr '.commands | keys[]'` 한 번으로 시작하고, 그 전 설치 확인·App/MCP·파일 조회·다른 문장은 0개예요.
+스킬이 호출되면 `스킬 가이드가 반환됐네요` 같은 메타 설명을 사용자에게 말하지 않아요. 첫 visible 문장을 정확히 `요청하신 운영 명령을 확인할게요.`로 쓰며, 첫 visible 문장은 사용자가 요청한 일을 바로 하는 말이에요. 이어 제목 `명령 찾기`의 bare `axhub --json-schema --field-expr '<가장 좁은 후보>'` 한 번으로 시작하고, 그 전 설치 확인·App/MCP·파일 조회·다른 문장은 0개예요. 명사·동사 후보가 하나면 leaf 부터, 불명확하면 root 부터 검증해요.
 
 **CLI-only.** 이 스킬의 조회·운영 브리지는 Claude Desktop 에 보이는 `axhub` App/MCP 도구가 아니라 Bash/명령 도구로 실행하는 `axhub` CLI 만 사용해요. read-only 조회라도 MCP/App tool 로 빠지면 CLI help gate·제목 계약·권한 UX 를 검증할 수 없어서 이 스킬의 실패예요.
 
@@ -75,20 +75,22 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 
 ## Workflow
 
-1. **첫 명령.** 별도 CLI 설치 probe 없이 Step 3의 bare schema 탐색으로 시작해요. 그 결과가 command-not-found면 "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요"라고 말하고 onboarding으로 넘겨요.
+1. **첫 명령.** 제목·description 이 정확히 `명령 찾기`인 Step 3의 bare schema 탐색으로 시작해요. 그 결과가 command-not-found면 "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요"라고 말하고 onboarding으로 넘겨요.
 
 2. **명시된 운영 작업 확인.** 사용자가 요청한 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 작업의 핵심 동사·명사를 잡아요. 후보 leaf 가 여럿이면 한 번만 짧게 되물어요 — 단, 되묻기는 마지막 수단이고 대개는 다음 탐색으로 스스로 판별해요.
 
 3. **탐색 (discover).** axhub 는 **에이전트용 기계가독 표면** `--json-schema` 를 제공해요 — `--help` prose 를 긁는 것보다 안정적이니 이걸 우선 써요. 단 전체 schema 는 ~270KB 라 **반드시 `--field-expr` 로 필요한 부분만 슬라이스**하고 통째로 읽지 않아요.
 
    ```bash
-   # 1단계: 최상위 명령 목록만 (작아요)
+   # 하나로 좁혀진 후보는 leaf 부터
+   axhub --json-schema --field-expr '.commands["<명사 후보>"]["<동사 후보>"]'
+   # 실패하거나 불명확할 때만 parent → root
+   axhub --json-schema --field-expr '.commands["<명사 후보>"]'
    axhub --json-schema --field-expr '.commands | keys[]'
-   # 2단계: 후보 명령의 구조 (직접 하위 leaf·플래그·alias) — 그 명령만 슬라이스
-   axhub --json-schema --field-expr '.commands["<후보>"]'
    ```
 
-   - 예: "환경변수 설정해줘" → keys 에서 `env` 발견 → `--field-expr '.commands.env'` 로 set/list/get/delete 와 플래그 확인 → 인자 조립.
+   - **leaf-first 권한 UX.** leaf 결과에 `description`/`request`/`agent` 등 명령 정보가 있으면 parent/root 를 더 조회하지 않아요. null/empty/error 일 때만 한 단계씩 넓히며 같은 leaf 를 재조회하지 않아요.
+   - 후보는 라이브 검증 전까지 추측일 뿐이에요. 작업→명령 매핑을 문서에 새기지 않아요.
    - `--json-schema` 가 없거나 비면(구 CLI) `--help` 트리로 폴백해요: `axhub --help` → `axhub <후보> --help` → 필요하면 더 깊이.
    - 후보가 여럿이면 description 으로 판별하고, 탐색 출력(schema/help 본문)은 chat 에 붙이지 않아요 — 판단 재료로만 써요.
 
