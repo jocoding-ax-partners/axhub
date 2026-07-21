@@ -75,7 +75,16 @@ claude mcp add --transport http --scope user axhub https://mcp.axhub.ai/mcp \
 
 add 가 재시도 후에도 실패하면 manual Claude Code command 를 보여주고 user action 으로 남겨요.
 
-3. **`Needs authentication` (또는 status 줄 없음)** — 이 대화에서 방금 add 를 실행했으면 아직 재시작 전이니 Restart Handoff Card 를 다시 보여줘요 (marker 쓰기 명령을 다시 실행해 mtime 을 갱신해요). 이 대화에 add 흔적이 없으면(이전 세션에서 등록됨 — 재시작 후 resume 경로 포함) `/mcp` 에서 `axhub` 를 선택해 브라우저 OAuth 를 안내하고, 완료 신호를 받으면 status 를 재확인해요. Connected 면 `VIBE_READY` + marker 삭제, 여전히 실패면 `READY_WITH_USER_ACTION` 으로 남기고 marker 는 유지해요 (다음 세션이 다시 제안해요).
+3. **`Needs authentication` (또는 status 줄 없음)** — 이 대화에서 방금 add 를 실행했으면 아직 재시작 전이니 Restart Handoff Card 를 다시 보여줘요 (marker 쓰기 명령을 다시 실행해 mtime 을 갱신해요). 이 대화에 add 흔적이 없으면(이전 세션에서 등록됨 — 재시작 후 resume 경로 포함) 아래 host-aware OAuth 절차를 안내하고, 완료 신호를 받으면 status 를 재확인해요. Connected 면 `VIBE_READY` + marker 삭제, 여전히 실패면 `READY_WITH_USER_ACTION` 으로 남기고 marker 는 유지해요 (다음 세션이 다시 제안해요).
+
+   - **일반 Claude Code 터미널**: `/mcp` → `axhub` → `Authenticate` → 브라우저에서 팀 선택 순서로 안내해요.
+   - **Claude Desktop Code mode**: 채팅 입력창에 `/mcp` 를 치라고 안내하지 않아요. Desktop 채팅은 slash command 를 실행하지 않고 일반 메시지로 보내서 사용자가 막혀요. 다음 클릭·입력 순서를 그대로 보여줘요.
+     1. `Cmd+J`(Windows 는 `Ctrl+J`)로 오른쪽 내장 터미널을 열어요.
+     2. macOS/Linux/Git Bash 는 `env -u CLAUDECODE claude`, Windows PowerShell 은 `Remove-Item Env:CLAUDECODE -ErrorAction SilentlyContinue; claude` 를 입력해 대화형 Claude Code 를 열어요.
+     3. 그 터미널 안에서 `/mcp` → `axhub` → `Authenticate` 를 고르고, 열린 브라우저에서 팀을 선택해요.
+     4. `Authentication successful` 과 `Connected to axhub.` 를 확인한 뒤 이 채팅으로 돌아와 `인증했어` 라고 말해 달라고 해요.
+
+   Desktop 에서 위 절차를 한꺼번에 긴 설명으로 던지지 말고, 첫 두 단계만 먼저 안내한 뒤 사용자가 터미널을 열면 다음 선택을 이어서 안내해요. 사용자가 개발 경험이 없어도 복사·붙여넣기와 화살표·Enter 만으로 끝나야 해요.
 
 In subprocess/headless mode, do not add or authenticate, and do not write the marker. Show the manual command and end with `SAFE_STOP_NONINTERACTIVE`.
 
@@ -89,7 +98,7 @@ fresh add 직후에는 이 카드 **한 장**으로 종료해요 — "중단"이
   ✓ axhub MCP 등록됨 (도구 로드는 재시작 후)
   ✓ AI 활용 기록 켜짐 — 같은 재시작으로 적용   ← 이번에 켰을 때만, 아니면 줄 생략
   남은 1단계: 이 세션을 종료하고 claude 를 다시 실행해 주세요.
-  재시작하면 새 세션이 자동으로 마무리를 이어가요 — 브라우저 로그인 1번(/mcp)이면 끝나요. 안 뜨면 "온보딩"이라고 말해 주세요.
+  재시작하면 새 세션이 자동으로 마무리를 이어가요 — 브라우저 로그인 1번이면 끝나요. 일반 Claude Code 는 /mcp, Claude Desktop Code mode 는 안내에 따라 내장 터미널을 열면 돼요. 안 뜨면 "온보딩"이라고 말해 주세요.
 ```
 
 ## Resume After Restart
@@ -97,7 +106,7 @@ fresh add 직후에는 이 카드 **한 장**으로 종료해요 — "중단"이
 새 세션에서 SessionStart hook nudge 를 받았거나, marker 가 있는 상태로 사용자가 "온보딩"이라고 하면:
 
 1. **다시 묻지 않아요.** 절차 전체가 read-only 확인(`claude mcp get`)과 사용자 action 안내뿐이라 승인 질문이 필요 없어요 — 첫 응답에서 "온보딩 마무리 이어서 할게요 — 확인 한 번이면 끝나요." 한 줄 뒤 바로 상태를 확인해요. 단 사용자의 첫 메시지가 온보딩과 무관한 요청이면 그 요청을 먼저 처리하고, 마무리는 한 줄 제안으로만 남겨요.
-2. 위 Claude Code Path 분기를 그대로 따라요 — 보통 `Needs authentication` 이고 이 대화에 add 흔적이 없는 상태라 `/mcp` 에서 `axhub` 선택 → 브라우저 로그인 1번 안내로 이어져요. Connected 면 곧장 `VIBE_READY` + marker 삭제예요.
+2. 위 Claude Code Path 분기를 그대로 따라요 — 보통 `Needs authentication` 이고 이 대화에 add 흔적이 없는 상태라 host-aware OAuth 절차(일반 터미널은 `/mcp`, Claude Desktop Code mode 는 내장 터미널) → `axhub` 선택 → 브라우저 로그인 1번 안내로 이어져요. Connected 면 곧장 `VIBE_READY` + marker 삭제예요.
 3. headless 면 질문 없이 수동 명령만 남기고 `SAFE_STOP_NONINTERACTIVE` 로 끝내요.
 4. detect 는 기본적으로 다시 돌리지 않아요 — resume 의 남은 일은 MCP 마무리 하나예요. 사용자가 온보딩 전체 재점검을 명시할 때만 detect 부터 다시 시작해요.
 5. AI 활용 기록 옵트인은 resume 에서 다시 묻지 않아요 — `axhub axrouter status --json` 의 `active_workspace` 가 확인되면 최종 카드에 반영만 해요.

@@ -786,6 +786,13 @@ describe("smooth behavior contracts", () => {
     expect(card).not.toContain("필요해요. [READY_WITH_USER_ACTION]");
     expect(card).toContain("이 세션에서 `/mcp` OAuth 를 안내하지 않아요");
 
+    // Claude Desktop Code mode does not execute slash commands in its chat composer.
+    expect(card).toContain("채팅 입력창에 `/mcp` 를 치라고 안내하지 않아요");
+    expect(card).toContain("`Cmd+J`(Windows 는 `Ctrl+J`)");
+    expect(card).toContain("`env -u CLAUDECODE claude`");
+    expect(card).toContain("`Remove-Item Env:CLAUDECODE -ErrorAction SilentlyContinue; claude`");
+    expect(card).toContain("`Authentication successful` 과 `Connected to axhub.`");
+
     // resume procedure owned by this reference, pointed at by the SessionStart hook
     expect(card).toContain("## Resume After Restart");
     expect(card).toContain("SAFE_STOP_NONINTERACTIVE");
@@ -803,6 +810,7 @@ describe("smooth behavior contracts", () => {
     expect(onboarding).toContain(
       "NEVER `claude mcp add` 를 실행한 그 세션에서 `/mcp` OAuth 완료나 `mcp__axhub__*` 도구 활성화를 안내하지 말아요",
     );
+    expect(onboarding).toContain("Claude Desktop Code mode 의 채팅 입력창은 `/mcp` 를 실행하지 않고 일반 메시지로 보내므로");
     expect(onboarding).toContain("NEVER `VIBE_READY` 출력 후 marker");
   });
 
