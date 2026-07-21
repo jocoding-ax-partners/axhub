@@ -111,11 +111,11 @@ describe("smooth behavior contracts", () => {
     expect(onboarding).toContain("`first_gap`, `gaps`, `cli_state`, `auth_error_code` 같은 detect 필드명이나 enum 값은 내부 라우팅용으로만");
     expect(onboarding).toContain("NEVER `first_gap`, `gaps`, `cli_state`, `auth_error_code` 같은 detect 필드명");
     // Regression: CLI installed on disk but not on PATH (new session, rc not re-sourced)
-    // must route to PATH repair, not reinstall. See Step 2 on-disk elif + Step 4b loop-breaker.
-    // -f (existence) not -x so Git Bash .exe (MSYS perm emulation) probes reliably on Windows.
-    expect(onboarding).toContain('[ -f "$HOME/.axhub/bin/axhub" ]');
-    expect(onboarding).toContain('[ -f "$HOME/.axhub/bin/axhub.exe" ]');
-    expect(onboarding).toContain('"first_gap":"cli_path_missing"');
+    // must route to PATH repair, not reinstall. Each -f check stays a standalone
+    // Desktop-safe command and remains portable to Git Bash .exe handling.
+    expect(onboarding).toContain('test -f "$HOME/.axhub/bin/axhub"');
+    expect(onboarding).toContain('test -f "$HOME/.axhub/bin/axhub.exe"');
+    expect(onboarding).toContain("내부적으로 `cli_path_missing`");
     expect(onboarding).toContain("무한 루프 방지");
     expect(onboardingAuth).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub auth login --json");
     expect(onboardingAuth).not.toContain("axhub auth login --no-browser --json");
