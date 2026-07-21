@@ -38,11 +38,11 @@ model: sonnet
 - CLI 표면이 없으면 `진단을 못 했어요` 로 끝내요.
 - 사용자에게는 raw id, exit code, JSON, stderr, pod signal, log line 을 그대로 보여주지 않고 여섯 가지 결과 중 하나로 요약해요.
 - 해결 행동이 필요하면 `deploy` 또는 `clarity` 로 이어질 자연어 다음 행동만 안내해요. 재배포·롤백·로그 원문 조회를 이 스킬 안에서 실행하지 않아요.
-- 사용자에게 보이는 진행 문구와 Bash/tool call 제목은 한국어로만 써요. 실제 호출 제목은 `CLI 표면 확인`, `실패 배포 상태 확인`, `실패 배포 로그 확인`, `현재 라이브 상태 확인` 처럼 짧은 한국어 명사구로 고정해요.
-- 여러 CLI 확인을 한 tool 에 묶으면 제목은 `CLI 표면 확인` 으로 써요. 실패 배포 status+logs 를 한 tool 에 묶으면 제목은 `실패 배포 상태·로그 확인` 으로 써요. 중간 요약도 `CLI 확인 완료`, `실패 배포 확인 완료`, `현재 라이브 상태 확인` 처럼 한국어로만 남겨요.
+- 사용자에게 보이는 진행 문구와 Bash/tool call 제목은 한국어로만 써요. shell/run tool도 같은 규칙을 따르고, 실제 호출 제목은 `실패 배포 상태 확인`, `실패 배포 로그 확인`, `현재 라이브 상태 확인` 처럼 짧은 한국어 명사구로 고정해요.
+- 각 CLI 확인은 별도 tool 로 실행해요. status+logs, 설치 확인+help 같은 여러 명령을 한 카드에 묶지 않아요. 중간 요약도 `실패 배포 확인 완료`, `현재 라이브 상태 확인` 처럼 한국어로만 남겨요.
 - Bash/명령 tool 을 호출할 때 description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요. 도구가 자동으로 제목을 만들도록 비워두지 말고, 실행 전에 `axhubing CLI 확인` 같은 자동 생성 제목이 보이면 같은 명령이라도 `CLI 표면 확인` 으로 제목을 고쳐서 호출해요.
-- `axhubing`, `axhubed`, `diagnosing`, `checking` 처럼 제품명이나 영어 동사를 붙인 도구 제목을 쓰지 않아요. 예를 들어 `axhubed CLI 확인` 대신 항상 `CLI 표면 확인` 을 써요. 도구 제목에는 제품명 `axhub` 자체도 넣지 않아요.
-- Claude Code UI 가 Bash 본문의 `axhub` 문자열을 보고 `axhubing` 같은 자동 제목을 만들 수 있어요. 진단용 Bash 본문에서는 바이너리 이름도 나눠서 만들어요: `CLI_NAME="ax""hub"`, `CLI_BIN="$(command -v "$CLI_NAME" || true)"`, `"$CLI_BIN" deploy ...`. Bash 본문 안에는 소문자 `axhub` 연속 문자열, `AXHUB_BIN` 같은 변수명, command line 첫 단어의 bare `axhub` 를 쓰지 않아요.
+- `axhubing`, `axhubed`, `diagnosing`, `checking` 처럼 제품명이나 영어 동사를 붙인 도구 제목을 쓰지 않아요. 예를 들어 `axhubed CLI 확인` 대신 `현재 라이브 상태 확인` 을 써요. 도구 제목에는 제품명 `axhub` 자체도 넣지 않아요.
+- Claude Desktop 에 보이는 명령은 항상 `axhub ...` 로 시작하는 **한 개의 bare 명령**이에요. `CLI_NAME`, `CLI_BIN`, 변수 대입, `command -v`, `if`, command substitution, `bash -lc`, `sh -c`, `;`, `&&`, `||`, pipe, redirect, `echo`, `grep`, `head`, `tail`, `2>/dev/null`, `$?`를 절대 쓰지 않아요. 명령 실패와 exit code 는 tool 결과에서 직접 읽어요.
 - 사용자에게 보이는 문장에서는 영어 진행 문장을 쓰지 않아요. `Read-only` 도 쓰지 말고 `읽기 전용` 이라고 써요. 명령 이름(`axhub deploy status`, `status/logs/diagnose`)은 필요할 때만 짧게 허용해요.
 - 중간 요약과 최종 메시지에서 raw category/stage/code 이름을 그대로 쓰지 않아요. `configuration`, `auth`, `build`, `infrastructure`, `timeout`, `resolve`, `backend_unimplemented`, `commit_not_found` 같은 값은 사용자에게 숨기고, "설정 쪽", "권한 쪽", "빌드 단계", "배포 환경", "시간 초과", "배포할 버전 찾기" 같은 말로 바꿔요. 단, `reason.message` 가 한국어 안내 문구면(빌드 실패 코드들은 백엔드가 사용자용 문구로 내려줘요) 그 문구는 그대로 전달해도 돼요.
 - 사용자가 배포 id 를 직접 줬어도 최종 메시지에서 id 전체나 앞부분을 다시 쓰지 않아요. `실패 배포(96728617)` 처럼 일부만 보여주는 것도 금지예요. 항상 "방금 실패한 배포" 또는 "이 실패한 배포" 라고 말해요.
@@ -88,51 +88,33 @@ Claude Desktop QA처럼 사용자가 한 문장 안에 "진단하고 복구까�
 
 ## Workflow
 
-1. **대상 추론.** 다음 단서만 써서 앱을 좁혀요.
-   - 현재 디렉터리의 `axhub.yaml`
-   - 같은 대화에서 방금 언급된 앱 이름이나 배포 문맥
-   - 공개 표면으로 안전하게 조회 가능한 최근 앱·배포 목록
+1. **대상 추론.** 다음 우선순위로 앱을 좁혀요.
+   - `deploy` handoff가 준 검증된 app id/slug와 deployment id
+   - 같은 대화에서 성공 응답으로 검증된 app id/slug
+   - 현재 폴더의 `.axhub/import-resume.json` 또는 bootstrap resume에 저장된 `app_id`
+   - origin 저장소 이름 또는 `axhub.yaml`의 `name` 후보
 
-   하나로 좁혀지면 계속 진행해요. 대화형에서만 앱 이름을 한 번 물을 수 있어요. 헤드리스에선 묻지 않아요.
+   `axhub.yaml`의 `name`은 로컬 프로젝트 이름일 수 있으므로 원격 앱 slug로 단정하지 않아요. app id가 있으면 bare `axhub apps get <app-id> --json` 한 번으로 검증해요. manifest/origin 후보만 있으면 bare `axhub apps get <candidate> --json`을 한 번만 호출하고, not-found면 `apps list`, `--help`, pipe 탐색으로 복구하지 말고 대화형에서 앱을 한 번 물어요. 헤드리스에선 `대상을 못 찾았어요`로 끝내요.
 
-2. **표면 선택 — CLI 전용.**
+2. **표면 실행 — CLI 전용·탐색 없음.**
    - 이 세션에 `deployment_diagnosis` 같은 MCP 도구가 callable 이어도 사용하지 않아요.
-   - CLI 표면을 확인해요:
-
-     ```bash
-     CLI_NAME="ax""hub"
-     CLI_BIN="$(command -v "$CLI_NAME" || true)"
-     if [ -z "$CLI_BIN" ]; then
-       echo "진단을 못 했어요"   # 설치 안내는 onboarding 소관
-       exit 0
-     fi
-     "$CLI_BIN" deploy status --help
-     "$CLI_BIN" deploy logs --help
-     "$CLI_BIN" deploy diagnose --help   # 표면 존재 확인
-     ```
-
-     이 확인을 tool 로 실행할 때 제목은 `CLI 표면 확인` 으로 써요. help 확인까지 같은 tool 에 묶어도 제목은 그대로예요.
-     Bash/명령 tool description/title/summary 도 정확히 `CLI 표면 확인` 으로 설정해요. 비워두거나 `axhubing CLI 확인`, `axhubed CLI 확인`, `Checking CLI` 로 자동 생성되게 두지 않아요.
-     Bash 본문도 위 예시처럼 `CLI_NAME`/`CLI_BIN` 을 써요. bare `axhub deploy ...` 로 help 를 호출하지 않고, 변수명에도 `axhub` 를 넣지 않아요.
-
-     help 가 있으면 그 help 인자만 써서 실행해요. help 에 없는 플래그·positional 은 만들지 않아요.
+   - 공개 표면은 이미 고정돼 있어 `command -v`나 세 개의 `--help`를 먼저 돌리지 않아요. 아래 필요한 bare 명령만 실행해요. command-not-found/unknown-command면 `진단을 못 했어요`로 끝내고, 다른 철자나 help tree를 탐색하지 않아요.
 
      방금 실패한 배포 id 가 있으면 먼저 status 를 읽고, status 의 시작·종료 시각으로 로그 시간창을 계산해요. `--app` 은 앱 slug/id/name 을 알고 있을 때만 붙여요.
 
      ```bash
-     "$CLI_BIN" deploy status <deployment-id> --app <앱> --json
-     "$CLI_BIN" deploy logs --app <앱> --since <시작> --until <종료> --json --limit 100
+     axhub deploy status <deployment-id> --app <앱> --json
+     axhub deploy logs --app <앱> --since <시작> --until <종료> --json --limit 100
      ```
 
      `deploy logs` 는 앱 단위 로그예요 — 시간창으로 좁혀도 요약은 "그 배포 시간대의 앱 로그"로 정직하게 말해요.
 
-     각 tool 제목은 `실패 배포 상태 확인`, `실패 배포 로그 확인` 으로 써요. 두 명령을 같은 tool 에 묶으면 제목은 `실패 배포 상태·로그 확인` 으로 써요.
-     Bash/명령 tool description/title/summary 도 같은 고정 문구로 설정해요.
+     각 tool 제목은 `실패 배포 상태 확인`, `실패 배포 로그 확인` 으로 쓰고 반드시 별도 카드로 실행해요.
 
      그 다음 앱 단위 현재 라이브 롤아웃 진단을 읽어요. 이 명령은 **positional 앱 인자 하나**를 받고, `--json` 은 전역 플래그예요. deployment-id 타깃은 없어요.
 
      ```bash
-     "$CLI_BIN" --json deploy diagnose <앱>
+     axhub --json deploy diagnose <앱>
      ```
 
      이 tool 제목은 `현재 라이브 상태 확인` 으로 써요.
