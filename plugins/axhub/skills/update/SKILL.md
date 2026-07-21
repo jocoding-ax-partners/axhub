@@ -34,7 +34,7 @@ model: sonnet
 
 **CRITICAL desktop-visible probe narration.** `claude plugin list` 는 내부 판정을 위한 도구예요. 이 도구 뒤에 사용자에게 보이는 중간 문장은 반드시 `현재 플러그인 버전을 확인했어요.` 또는 생략 둘 중 하나예요. 플러그인 버전값과 설치 위치값을 같은 문장에 섞지 않아요. `scope`, `user`, `project`, `local`, `managed`, `Scope:` 같은 설치 위치 원문은 chat 에 쓰지 않아요. 버전 숫자는 최종 결과 카드나 업데이트 안내처럼 사용자에게 필요한 자리에서만 보여줘요.
 
-**CRITICAL Desktop plugin update is executable.** `claude plugin update axhub@axhub --scope <SCOPE>` 는 slash command 나 대화형 패널이 아니라 Desktop Bash tool 에서 직접 실행하는 비대화형 CLI 명령이에요. `claude plugin list` 가 성공해 enabled `axhub@axhub` 와 scope 를 읽었고 사용자가 플러그인 업데이트를 요청했다면, 업데이트 필요 시 반드시 이 명령을 직접 실행해요. `"/plugin update 는 대화형이라 제가 실행할 수 없어요"`, `"인터랙티브 터미널에서 직접 실행해 주세요"`, 사용자가 `/plugin update` 를 실행하라는 안내로 끝나면 실패예요. `claude plugin list` 성공 뒤에는 수동 slash-command 폴백으로 내려가지 않아요.
+**CRITICAL Desktop plugin update is executable.** `claude plugin marketplace update axhub` 와 `claude plugin update axhub@axhub --scope <SCOPE>` 는 slash command 나 대화형 패널이 아니라 Desktop Bash tool 에서 직접 실행하는 비대화형 CLI 명령이에요. `claude plugin list` 가 성공해 enabled `axhub@axhub` 와 scope 를 읽었고 사용자가 플러그인 업데이트를 요청했다면, 업데이트 필요 시 marketplace 를 먼저 새로고침한 뒤 plugin update 를 반드시 직접 실행해요. marketplace 새로고침이 실패해도 기존 cache 로 plugin update 를 계속 시도해 dead-end 를 만들지 않아요. `"/plugin update 는 대화형이라 제가 실행할 수 없어요"`, `"인터랙티브 터미널에서 직접 실행해 주세요"`, 사용자가 `/plugin update` 를 실행하라는 안내로 끝나면 실패예요. `claude plugin list` 성공 뒤에는 수동 slash-command 폴백으로 내려가지 않아요.
 
 **CRITICAL mixed-request continuation.** 사용자가 업데이트와 함께 앱 상태·새 앱 생성·배포·GitHub 재연결/device code 같은 다른 axhub 요청을 말했으면, 업데이트 결과 카드까지 먼저 끝낸 뒤 같은 assistant 흐름에서 남은 요청을 직접 이어가요 — 추가 프롬프트를 기다리지 않고, Task/Subagent/백그라운드로 우회하지 않아요. 후속 앱 상태 overview 와 GitHub device-flow 의 정확한 명령·제목·금지 목록은 [references/post-update-continuation.md](references/post-update-continuation.md) 를 읽고 그대로 따라요.
 
@@ -45,7 +45,7 @@ model: sonnet
 
 전 과정 best-effort·비차단이에요. 실패·구 CLI·네트워크 오류면 raw 에러를 숨기고 한 줄만 안내한 뒤 멈춰요.
 
-**책임 경계.** 이 경로는 버전 업데이트만 해요. 첫 셋업·CLI 설치는 `onboarding` 소관이고, 그 외 axhub 운영 명령은 업데이트 결과를 끝낸 뒤 다음 적절한 axhub 흐름으로 양보·계속 처리해요. 사용자가 `플러그인만` 또는 `CLI만`처럼 한 구성요소만 명시하면 최신 판정을 위한 read-only check 는 하되 제외한 구성요소의 apply 명령은 실행하지 않아요. `플러그인만` 요청은 `claude plugin list` → `axhub update check --plugin-version <PLUGIN_VERSION> --json` → 필요 시 `claude plugin update axhub@axhub --scope <SCOPE>` 로 끝까지 처리해요.
+**책임 경계.** 이 경로는 버전 업데이트만 해요. 첫 셋업·CLI 설치는 `onboarding` 소관이고, 그 외 axhub 운영 명령은 업데이트 결과를 끝낸 뒤 다음 적절한 axhub 흐름으로 양보·계속 처리해요. 사용자가 `플러그인만` 또는 `CLI만`처럼 한 구성요소만 명시하면 최신 판정을 위한 read-only check 는 하되 제외한 구성요소의 apply 명령은 실행하지 않아요. `플러그인만` 요청은 `claude plugin list` → `axhub update check --plugin-version <PLUGIN_VERSION> --json` → 필요 시 `claude plugin marketplace update axhub` → `claude plugin update axhub@axhub --scope <SCOPE>` 로 끝까지 처리해요.
 
 **비-axhub 맥락 가드.** 사용자가 `axhub` 를 말하지 않고 "업데이트해줘"처럼 일반 업데이트만 말한 경우에는 대화의 axhub 언급·현재 폴더의 axhub 연결 manifest·직전 axhub 작업 같은 **axhub 맥락**이 있을 때만 진행해요. 맥락이 없으면 axhub 업데이트로 밀어붙이지 말고 axhub 사용 의사를 한 번 확인하거나 조용히 멈춰요.
 
@@ -55,7 +55,7 @@ model: sonnet
 
 **보이는 tool 제목 계약.** Bash/명령 도구를 부를 때 description/title/summary 는 아래 고정 한국어 라벨 중 하나만 써요. 라벨 안에 `axhub` 를 넣지 않아요. `axhubing CLI 설치 여부 확인` 처럼 제품명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요.
 
-**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `claude plugin list`, `claude plugin update axhub@axhub --scope <SCOPE>`. 각 command 는 단독으로 실행해요. `&&`, pipe, redirect, `grep`, `head`, `tail`, `sed`, `awk`, `bash -lc`, `sh -c` 로 묶거나 자르지 않아요. `command -v claude` 는 Desktop-visible command 로 쓰지 않아요. Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요. 캐시 경로가 작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요. 플러그인 현재 버전은 가능하면 **정확히 `claude plugin list` 만 실행한 출력**의 `axhub@axhub` 항목에서 내부 변수로만 읽고, 실패하면 플러그인 버전 비교는 생략해요. 이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요. `command -v claude && claude plugin list`, `claude plugin list 2>&1`, `claude plugin list 2>&1 | grep ...`, `sed`, `awk`, `head`, `tail`, command substitution, shell wrapper, file test, pipe, redirect, text filter, 파일 읽기 도구를 쓰지 않아요. 실행하려는 command 가 `claude plugin list 2>&1` 또는 `command -v claude && claude plugin list` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.** 출력이 길어도 전체 `claude plugin list` 결과를 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요. 플러그인 버전, 설치 scope, 다음 CLI 확인을 영어 내부 로그처럼 chat 에 쓰지 말고, 필요한 경우 `현재 플러그인 버전을 확인했어요.` 라고만 말해요. 버전과 설치 위치를 같은 문장에 섞지 않아요.
+**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `claude plugin list`, `claude plugin marketplace update axhub`, `claude plugin update axhub@axhub --scope <SCOPE>`. 각 command 는 단독으로 실행해요. `&&`, pipe, redirect, `grep`, `head`, `tail`, `sed`, `awk`, `bash -lc`, `sh -c` 로 묶거나 자르지 않아요. `command -v claude` 는 Desktop-visible command 로 쓰지 않아요. Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요. 캐시 경로가 작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요. 플러그인 현재 버전은 가능하면 **정확히 `claude plugin list` 만 실행한 출력**의 `axhub@axhub` 항목에서 내부 변수로만 읽고, 실패하면 플러그인 버전 비교는 생략해요. 이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요. `command -v claude && claude plugin list`, `claude plugin list 2>&1`, `claude plugin list 2>&1 | grep ...`, `sed`, `awk`, `head`, `tail`, command substitution, shell wrapper, file test, pipe, redirect, text filter, 파일 읽기 도구를 쓰지 않아요. 실행하려는 command 가 `claude plugin list 2>&1` 또는 `command -v claude && claude plugin list` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.** 출력이 길어도 전체 `claude plugin list` 결과를 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요. 플러그인 버전, 설치 scope, 다음 CLI 확인을 영어 내부 로그처럼 chat 에 쓰지 말고, 필요한 경우 `현재 플러그인 버전을 확인했어요.` 라고만 말해요. 버전과 설치 위치를 같은 문장에 섞지 않아요.
 
 | 단계 | tool description/title/summary |
 | --- | --- |
@@ -64,6 +64,7 @@ model: sonnet
 | CLI 업데이트 적용 | `CLI 업데이트 적용` |
 | 업데이트 후 버전 재확인 | `업데이트 후 버전 확인` |
 | 플러그인 설치 위치 확인 (정확히 `claude plugin list`) | `플러그인 설치 위치 확인` |
+| 플러그인 마켓플레이스 새로고침 | `플러그인 카탈로그 새로고침` |
 | 플러그인 업데이트 적용 | `플러그인 업데이트 받기` |
 
 ---
@@ -184,6 +185,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - NEVER raw JSON·stderr·내부 device/installation id 를 chat 에 출력하지 말아요.
 - NEVER 플러그인 업데이트를 받고도 재시작 안내를 빼먹지 말아요 — 재시작 전엔 새 버전이 안 떠요.
 - NEVER `claude plugin list` 가 성공했는데 `/plugin update` 가 대화형이라 실행할 수 없다고 말하거나 사용자가 인터랙티브 터미널에서 직접 하도록 떠넘기지 말아요. 업데이트가 필요하면 Desktop Bash tool 로 `claude plugin update axhub@axhub --scope <SCOPE>` 를 직접 실행해요.
+- NEVER 실제 플러그인 업데이트가 필요한데 `claude plugin marketplace update axhub` 없이 오래된 marketplace cache 만 기준으로 `claude plugin update` 를 실행하지 말아요. 새로고침 실패 자체는 dead-end 로 만들지 않고 기존 cache 업데이트를 계속 시도해요.
 - NEVER 플러그인 업데이트 성공 뒤 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 가 아닌 재시작 안내 문장을 만들지 말아요.
 - NEVER 확인하지 않은 버전을 "업데이트됨" 으로 보고하지 말아요 — `axhub --version` 재확인 뒤에만 새 버전을 말해요.
 - NEVER `claude plugin list` 에서 처음 발견한 낡은 `axhub@axhub` 항목만 보고 업데이트 여부를 판단하지 말아요 — enabled 항목 전체를 읽고 최고 semver 로 판단해요.

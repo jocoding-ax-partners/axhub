@@ -464,6 +464,7 @@ describe("smooth behavior contracts", () => {
     expect(update).not.toContain("그 다음 작업은 `clarity`");
     expect(update).toContain("| CLI 존재 확인 (`command -v axhub`) | `CLI 설치 확인` |");
     expect(update).toContain("| 플러그인 설치 위치 확인 (정확히 `claude plugin list`) | `플러그인 설치 위치 확인` |");
+    expect(update).toContain("| 플러그인 마켓플레이스 새로고침 | `플러그인 카탈로그 새로고침` |");
     expect(update).toContain("| 버전 확인 (`axhub update check ...`) | `버전 확인` |");
     expect(update).toContain("수동 확인 기록은 Claude Desktop 경로에서 갱신하지 않아요");
     expect(update).toContain("별도 `mkdir`/touch/marker command 를 실행하지 말아요");

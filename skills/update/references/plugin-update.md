@@ -17,9 +17,10 @@
 
 1. 사용자에게 `플러그인 설치 위치를 확인할게요.`라고 말하되 `Scope:` 원문은 보여주지 않아요. scope 를 못 찾으면 `user`로 둬요.
 2. `axhub 플러그인 새 버전(v<current> → v<latest>)이 나왔어요. 지금 받을게요…`라고 말해요.
-3. Desktop Bash tool 로 정확히 `claude plugin update axhub@axhub --scope <SCOPE>` 를 직접 실행해요. slash command 나 대화형 패널이 아니에요.
-4. 성공하면 `claude plugin list` 를 한 번 더 실행해 enabled 최고 semver 를 확정해요. 확인된 받은 버전이 CLI 응답의 플러그인 최신 버전보다 높아도 최종 카드에는 확인된 받은 버전만 한국어 결과 줄로 써요. 확인이 안 되면 CLI 응답의 latest 를 써요.
-5. 정확히 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 라고 말해요.
-6. 실패하면 raw 에러를 숨기고 `플러그인 자동 업데이트가 안 됐어요. claude plugin update axhub@axhub --scope <SCOPE> 를 직접 실행해 주세요.`라고 안내해요.
+3. Desktop Bash tool 로 정확히 `claude plugin marketplace update axhub` 를 먼저 실행해 marketplace cache 를 최신으로 만들어요. slash command 나 대화형 패널이 아니에요. 실패하면 raw 에러를 숨기고 다음 plugin update 를 그대로 계속 시도해요.
+4. Desktop Bash tool 로 정확히 `claude plugin update axhub@axhub --scope <SCOPE>` 를 직접 실행해요. slash command 나 대화형 패널이 아니에요.
+5. 성공하면 `claude plugin list` 를 한 번 더 실행해 enabled 최고 semver 를 확정해요. 확인된 받은 버전이 CLI 응답의 플러그인 최신 버전보다 높아도 최종 카드에는 확인된 받은 버전만 한국어 결과 줄로 써요. 확인이 안 되면 CLI 응답의 latest 를 써요.
+6. 정확히 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 라고 말해요.
+7. 실패하면 raw 에러를 숨기고 `플러그인 자동 업데이트가 안 됐어요. claude plugin update axhub@axhub --scope <SCOPE> 를 직접 실행해 주세요.`라고 안내해요.
 
 `claude plugin list` 성공 뒤 `대화형 패널이라 직접 실행할 수 없다`고 답하거나 사용자를 `/plugin update`로 보내는 것은 명령 실행 전 dead-end 이므로 실패예요. `성공하면 claude plugin list 를 한 번 더 실행해` 받은 버전을 확인하고, 낮은 중복 항목을 나열하지 않아요.
