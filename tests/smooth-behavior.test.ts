@@ -777,7 +777,9 @@ describe("smooth behavior contracts", () => {
 
     // restart handoff card replaces same-session /mcp guidance after a fresh add
     expect(card).toContain("## Restart Handoff Card");
-    expect(card).toContain("도구 활성화에는 Claude Code 재시작이 필요해요. [READY_WITH_USER_ACTION]");
+    expect(card).toContain("도구 활성화에는 Claude Code 재시작이 필요해요.");
+    expect(card).toContain("사용자에게는 enum 이름이나 대괄호 표식을 출력하지 말고");
+    expect(card).not.toContain("필요해요. [READY_WITH_USER_ACTION]");
     expect(card).toContain("이 세션에서 `/mcp` OAuth 를 안내하지 않아요");
 
     // resume procedure owned by this reference, pointed at by the SessionStart hook

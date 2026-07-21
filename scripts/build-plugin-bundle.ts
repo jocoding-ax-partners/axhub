@@ -1,4 +1,13 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 const REPO_ROOT = resolve(join(import.meta.dir, ".."));
@@ -132,6 +141,19 @@ const buildBundle = ({ outDir }: Options): BundleStats => {
   const pluginJson = join(outDir, ".claude-plugin", "plugin.json");
   if (!existsSync(pluginJson)) {
     throw new Error(`bundle is missing ${relative(outDir, pluginJson)}`);
+  }
+
+  const marketplaceJson = join(outDir, ".claude-plugin", "marketplace.json");
+  if (existsSync(marketplaceJson)) {
+    const marketplace = JSON.parse(readFileSync(marketplaceJson, "utf8")) as {
+      plugins?: Array<{ source?: string }>;
+    };
+    const bundledPlugin = marketplace.plugins?.[0];
+    if (!bundledPlugin) {
+      throw new Error(`bundle marketplace is missing plugins[0]: ${relative(outDir, marketplaceJson)}`);
+    }
+    bundledPlugin.source = ".";
+    writeFileSync(marketplaceJson, `${JSON.stringify(marketplace, null, 2)}\n`);
   }
 
   const stats = collectStats(outDir);

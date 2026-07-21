@@ -77,6 +77,10 @@ describe("clean plugin bundle", () => {
       const rootManifest = JSON.parse(readFileSync(join(REPO_ROOT, ".claude-plugin", "plugin.json"), "utf8")) as { version: string };
       const bundledManifest = JSON.parse(readFileSync(join(outDir, ".claude-plugin", "plugin.json"), "utf8")) as { version: string };
       expect(bundledManifest.version).toBe(rootManifest.version);
+      const bundledMarketplace = JSON.parse(
+        readFileSync(join(outDir, ".claude-plugin", "marketplace.json"), "utf8"),
+      ) as { plugins: Array<{ source?: string }> };
+      expect(bundledMarketplace.plugins[0]?.source).toBe(".");
 
       for (const skill of SKILLS) {
         expect(existsSync(join(outDir, "skills", skill, "SKILL.md")), `missing bundled skill: ${skill}`).toBe(true);
