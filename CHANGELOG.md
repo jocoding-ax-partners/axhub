@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.15.8](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.7...v1.15.8) (2026-07-21)
+
+Claude Code Desktop의 기존 앱 가져오기 QA에서 비공개 저장소 옵션을 추측해 첫 명령이 실패하고, manifest 반영을 두 번 묻고, 배포 확인 권한을 반복 요청하던 흐름을 한 번의 승인과 한 번의 제한된 검증으로 정리했어요. 정확한 `--repo-private` 계약과 선택된 작업 폴더의 단일 명령을 사용하고 CLI 0.25.4의 bounded verify를 capability로 확인해, 초보 사용자도 첫 게시부터 실제 배포 성공까지 막힘 없이 이어갈 수 있어요.
+
+
+### Fixed
+
+* **import:** make Desktop flow single-pass ([#420](https://github.com/jocoding-ax-partners/axhub/issues/420)) ([da606cc](https://github.com/jocoding-ax-partners/axhub/commit/da606cc17f0c4378934fe917d21c18fd68d18e8f))
+
 ## [1.15.7](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.6...v1.15.7) (2026-07-21)
 
 Claude Code Desktop 실사용 QA에서 MCP 인증이 필요할 때 대화창에 `/mcp`를 입력하라고 안내해, 명령이 일반 메시지로 전송되고 사용자가 더 진행할 수 없던 deadlock을 고쳤어요. 이제 실행 중인 호스트를 구분해 Desktop에서는 내장 터미널에서 Claude 대화형 화면을 열고 인증을 마친 뒤 원래 대화로 돌아오는 짧은 순서만 안내하며, macOS·Linux·Git Bash·PowerShell 환경별 명령도 안전하게 나눠 개발 경험이 없는 사용자도 온보딩을 끝까지 완료할 수 있어요.
