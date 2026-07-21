@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.15.9](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.8...v1.15.9) (2026-07-21)
+
+Claude Code Desktop 실사용 QA에서 완료된 가져오기를 새 앱으로 다시 시작하거나 로컬 폴더 이름을 원격 앱으로 추측하고, deploy·development·diagnosis 자연어 요청이 스킬을 벗어나 복합 셸과 오래된 상태를 사용하는 흐름을 고쳤어요. 이제 import는 저장된 app·deployment 식별자로 한 번만 검증해 성공이면 즉시 끝내고, 나머지 스킬도 정확한 앱 범위와 분석 가능한 단일 CLI 명령으로 시작해 초보 사용자가 권한 경고나 잘못된 복구 경로에 막히지 않아요.
+
+
+### Fixed
+
+* **plugin:** harden Desktop skill recovery flows ([3af5e92](https://github.com/jocoding-ax-partners/axhub/commit/3af5e921e4da735b5c792cda0a35ad2a649153b0))
+
 ## [1.15.8](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.7...v1.15.8) (2026-07-21)
 
 Claude Code Desktop의 기존 앱 가져오기 QA에서 비공개 저장소 옵션을 추측해 첫 명령이 실패하고, manifest 반영을 두 번 묻고, 배포 확인 권한을 반복 요청하던 흐름을 한 번의 승인과 한 번의 제한된 검증으로 정리했어요. 정확한 `--repo-private` 계약과 선택된 작업 폴더의 단일 명령을 사용하고 CLI 0.25.4의 bounded verify를 capability로 확인해, 초보 사용자도 첫 게시부터 실제 배포 성공까지 막힘 없이 이어갈 수 있어요.
