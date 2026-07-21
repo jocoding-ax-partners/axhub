@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.15.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.0...v1.15.1) (2026-07-21)
+
+플러그인-CLI 교차 검증에서 확정된 계약 문제들을 한 번에 정리했어요([#407](https://github.com/jocoding-ax-partners/axhub/pull/407)). onboarding 이 실제 CLI 의 `first_gap: null` 완료 상태를 그대로 수용하고, 오라우팅을 만들던 clarity/import/status-resume 훅 라우터는 diet 정책대로 제거해 운영 요청을 clarity frontmatter 라우팅이 직접 받아요. 배포·생성 상태 확인에는 AP-16 폴링 예산(최대 30회 또는 10분)이 생겨 무한 반복 없이 재개 가능한 요약으로 끝나고, import 는 axhub-cli 의 early-return lane(`--verify-wait none`, jocoding-ax-partners/axhub-cli#506)과 결합해 긴 동기 블로킹이 사라지며, diagnosis 는 실패 배포 status 시간창으로 좁힌 앱 로그를 정직하게 표기해요. 컨텍스트 예산도 reference 추출로 180k 안(176,627B)으로 복구했고 `plugin:budget` 포함 전 게이트가 새 ci.yml PR gate 로 상시 검증돼요.
+
+### Fixed
+
+* 교차 저장소 계약 정합 — 차단 4건 포함 15건 해소, MCP 게이트 표기 정정 ([#407](https://github.com/jocoding-ax-partners/axhub/issues/407)) ([298a626](https://github.com/jocoding-ax-partners/axhub/commit/298a6262f96e74653ebbb8f9b15ba7ff3dbe3018))
+
 ## [1.15.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.14.5...v1.15.0) (2026-07-21)
 
 백엔드가 빌드 실패 배포에 secret 마스킹·절단을 끝낸 빌드 로그 tail(`build_log_tail`)을 내려주기 시작해서, diagnosis 스킬이 이 값을 원인 판단 근거로 쓰고 사용자에게 로그 발췌를 코드블록으로 보여줄 수 있게 Visibility 예외를 열었어요([#405](https://github.com/jocoding-ax-partners/axhub/pull/405)). 런타임 로그 원문과 signal text 는 기존대로 가리고, 필드가 없는 구 CLI·기능 이전 배포에서는 기존 원인군 요약으로 폴백해요. CLI 쪽 `--json` passthrough 는 axhub-cli 0.25.0 (jocoding-ax-partners/axhub-cli#504) 이 맡아요.
