@@ -38,6 +38,8 @@ model: sonnet
 
 사용자가 `작업 폴더`, `폴더`, `경로`, `디렉토리` 로 앱 경로를 지정하면 그 절대 경로를 `APP_DIR` 로 고정해요. 현재 Claude Code workspace 가 상위 폴더이거나 다른 폴더여도, 모든 import 관련 `axhub`, `git`, `npm`, build, manifest 검증 명령은 반드시 `APP_DIR` 안에서 실행해요. tool 이 cwd 를 지정할 수 없거나 권한 카드에 cwd 가 따로 보이지 않으면 명령 앞에 실제 절대 경로를 넣은 `cd "<absolute APP_DIR>" &&` 를 붙여요. 권한 카드에는 `$APP_DIR` 변수를 그대로 쓰지 말고 사용자가 준 실제 경로를 따옴표로 넣어요.
 
+Claude Desktop 에서 현재 선택된 프로젝트가 이미 정확히 `APP_DIR` 이면 `cd ... &&` 를 붙이지 않고 **한 카드에 한 개의 bare 명령만** 실행해요. 먼저 tool 의 cwd 지정 기능을 쓰고, 현재 프로젝트도 다르고 cwd 지정도 불가능할 때만 `cd "<absolute APP_DIR>" && <single command>` 를 마지막 수단으로 써요. 같은 폴더를 매번 `cd` 하는 compound shell 은 명령마다 새 권한 카드를 만들 수 있으므로 Desktop 매끄러움 실패예요.
+
 `APP_DIR` 이 정해진 뒤에는 workspace root 에서 `axhub --json plugin-support import`, `axhub deploy --explain --json`, `git check-ignore`, `git status`, `npm run build` 를 실행하지 않아요. preview 가 통과했더라도 권한 카드 명령이 bare `axhub ...`, bare `git ...`, bare `npm ...` 로 시작하거나 실제 절대 경로가 들어간 `cd "<absolute APP_DIR>" &&` 또는 동등한 cwd 지정이 보이지 않으면 실행하지 말고 같은 명령을 `APP_DIR` 기준으로 다시 호출해요.
 
 사용자가 앱 경로를 말하지 않았고 현재 workspace 가 실제 앱 폴더인지 확실하지 않으면, preview 전에 앱 폴더를 먼저 확인해요. 잘못된 폴더에서 import preview 를 돌려서 bootstrap/import 라우팅을 다시 설명하는 흐름으로 가지 않아요.
@@ -67,7 +69,7 @@ model: sonnet
 
 첫 visible chat sentence 는 반드시 정확히 `기존 앱을 axhub에 가져올 준비를 확인할게요.` 로 시작하고, 그 앞에는 공백·설명·스킬 선택 이유를 포함해 어떤 문장도 쓰지 않아요.
 
-import preview 정상이면 axhub 가져오기 대상 확정이에요. Interactive 는 별도 진입 질문 없이 아래 5의 preview 승인 AskUserQuestion **하나가 axhub 진입 확인을 겸해요** — 질문 문구에 axhub 대상임을 명시해요 (AP-12 통합 게이트). (headless 는 이 AUQ 생략)
+import preview 정상이면 axhub 가져오기 대상 확정이에요. Interactive 는 별도 진입 질문 없이 아래 6의 preview 승인 AskUserQuestion **하나가 axhub 진입 확인을 겸해요** — 질문 문구에 axhub 대상임을 명시해요 (AP-12 통합 게이트). (headless 는 이 AUQ 생략)
 
 ## AskUserQuestion JSON 안전 규칙
 
@@ -148,7 +150,19 @@ cd "<absolute APP_DIR>" && axhub plugin-support preflight --json
 
 `capabilities.import.supported` 가 true 이고 `capabilities.import.schemas` 에 `import/v1` 이 있어야 해요. 아니면 업데이트 안내 후 멈춰요.
 
-2. Preview envelope 요청
+2. 작업공간 확정
+
+preview 와 첫 승인보다 먼저 아래 읽기 전용 resolver 를 정확히 한 번 실행해요.
+
+```bash
+cd "<absolute APP_DIR>" && axhub plugin-support tenant-resolve --json
+```
+
+현재 Desktop 프로젝트가 `APP_DIR` 이면 위 명령에서 `cd ... &&` 를 빼고 `axhub plugin-support tenant-resolve --json` 만 실행해요. 반환된 `tenant` 가 비어 있지 않으면 그 값을 이후 preview 와 execute 모두에 literal `--tenant <slug>` 로 넘겨요. `needs_pick: true` 면 후보를 사용자에게 `작업공간`이라고만 부르고, `앱을 어느 작업공간에 만들까요?`를 승인 전에 한 번 물은 뒤 선택한 slug 를 같은 literal 로 유지해요. 사용자-facing 문구에 `tenant` 또는 `테넌트`를 쓰지 않아요.
+
+여러 작업공간이 있는 상태에서 `--tenant` 없는 execute 를 먼저 호출해 오류를 낸 뒤 `axhub tenants list`, `axhub tenant list`, `--help | grep`로 복구하지 않아요. 작업공간 선택 전에는 preview 승인이나 execute mutation을 시작하지 않아요. 이 순서가 깨지면 동일 가져오기 승인을 다시 받게 되어 Desktop deadlock UX예요.
+
+3. Preview envelope 요청
 
 사용자나 현재 컨텍스트에서 app slug, GitHub owner/repo, tenant 가 이미 정해졌으면 preview 부터 그대로 넘겨요. `--slug` 는 axhub 앱 slug, `--name` 은 표시 이름, `--repo` 는 GitHub 저장소예요. repo owner 를 별도 flag 로 만들지 말고 `--repo "$OWNER/$REPO"` 형태로 넘겨요.
 
@@ -177,11 +191,11 @@ headless 에서는 이렇게 호출해요.
 cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode preview --headless
 ```
 
-3. Envelope 검증
+4. Envelope 검증
 
 `import/v1` schema, closed enum, `error`, `approval`, success evidence shape 를 fail-closed 로 확인해요. raw JSON 은 chat 에 붙이지 않아요.
 
-4. Preview 카드 렌더링
+5. Preview 카드 렌더링
 
 사용자에게는 아래 항목만 보여줘요.
 
@@ -194,7 +208,7 @@ cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode preview --h
 새 앱 설정 파일이 필요하면, axhub.yaml 을 프로젝트 파일 근거로 자세히 작성할 예정이라고 한 줄로 같이 알려요.
 기존 axhub.yaml 복구가 필요하면, 문법이 깨져 있어서 CLI 가 가져오기 중 백업 파일을 남기고 안전한 최소 설정으로 복구한다고 한 줄로 같이 알려요. 이 경우 plugin 이 직접 덮어쓰지 않아요.
 
-5. 대화형 승인 1회
+6. 대화형 승인 1회
 
 AskUserQuestion 은 preview 직후 한 번 써요. 질문은 `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?` 처럼 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인을 겸해요. 옵션은 다음 네 가지예요.
 
@@ -203,9 +217,9 @@ AskUserQuestion 은 preview 직후 한 번 써요. 질문은 `이 앱을 axhub�
 - 취소
 - 자세한 요약 보기
 
-`가져오기 시작` 외에는 execute 를 호출하지 않아요. commit+push lane 이 적용될 때(아래 6)만 보강·검증 성공 후 커밋 동의 1회를 더 쓰고, 그 외에는 추가 질문을 쓰지 않아요.
+`가져오기 시작` 외에는 execute 를 호출하지 않아요. commit+push lane 이 적용될 때(아래 7)만 보강·검증 성공 후 커밋 동의 1회를 더 쓰고, 그 외에는 추가 질문을 쓰지 않아요.
 
-6. axhub.yaml 보강 (manifest_create 일 때만)
+7. axhub.yaml 보강 (manifest_create 일 때만)
 
 `가져오기 시작` 승인 직후, execute 전에 진행해요. `required_mutations` 에 `manifest_create` 가 있을 때만 위 `## Manifest 보강` 규칙대로 프로젝트 파일 근거로 axhub.yaml 을 작성하고 `axhub deploy --explain --json` 로 검증해요. `manifest_create` 가 없거나 headless 면 이 단계를 건너뛰어요.
 
@@ -217,9 +231,9 @@ AskUserQuestion 은 preview 직후 한 번 써요. 질문은 `이 앱을 axhub�
 
 capability 가 없거나 repo 없는 static lane 이면 이 질문을 건너뛰고 `커밋 없이 진행` 으로 가요.
 
-7. Execute 호출
+8. Execute 호출
 
-대화형 승인 직후 한 번만 호출해요. preflight `capabilities.import.early_return` 이 true 면 execute 에 `--verify-wait none` 을 붙여요 — execute 는 첫 배포 생성과 deployment id 확보까지만 하고 `verification_status: "pending"` 으로 바로 반환해요(`.axhub/import-resume.json` breadcrumb 포함). 첫 배포 검증은 이 스킬이 `axhub deploy verify <deployment-id> --app <app>` 를 별도 tool call 로 반복해 확인하고, 폴링 예산 최대 30회 또는 10분(AP-16)을 지켜요(닿으면 재개 요약). capability 없는 구 CLI 는 execute 가 검증까지 동기라 foreground 로 실행하고 완료 출력을 기다려요. Claude Code Desktop 에서 tool 이 긴 실행을 background job 으로 전환하더라도, 그 background output 을 다시 읽어 `import/v1` execute envelope 를 검증하기 전에는 "완료"라고 말하지 않아요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못하면, 같은 명령을 반복 실행하지 말고 읽기 전용 증거로 상태를 재확인해요 — deployment id 를 알면 `axhub deploy verify <deployment-id> --app <app>`, 모르면 `axhub apps git status <앱>` → `axhub deploy list --app <앱> --json` 순서로 최신 deployment id 를 복원한 뒤 같은 verify 로 판정해요. 이 재확인 반복에도 같은 폴링 예산이 적용돼요.
+대화형 승인 직후 한 번만 호출해요. preflight `capabilities.import.early_return` 이 true 면 execute 에 `--verify-wait none` 을 붙여요 — execute 는 첫 배포 생성과 deployment id 확보까지만 하고 `verification_status: "pending"` 으로 바로 반환해요(`.axhub/import-resume.json` breadcrumb 포함). 첫 배포 검증은 이 스킬이 `axhub deploy verify <deployment-id> --app <app> --json` 를 **한 카드당 한 번의 별도 tool call** 로 반복해 확인하고, 폴링 예산 최대 30회 또는 10분(AP-16)을 지켜요(닿으면 재개 요약). Claude Desktop 에서는 Monitor, background task, ScheduleWakeup, output 파일 읽기, `for`/`while`/`until`, `sleep`, command substitution, pipe, `grep`, `head`, `status=` 같은 shell 변수로 폴링하지 않아요. 특히 zsh 예약어와 충돌할 수 있는 `status` 변수를 포함한 긴 shell block 권한 카드가 뜨면 실행하지 말고, 즉시 standalone `axhub deploy verify <deployment-id> --app <app> --json` 로 바꿔요. 같은 verify 명령에 이미 `항상 허용`이 적용되면 이후 확인은 추가 권한 카드 없이 이어질 수 있어요. capability 없는 구 CLI 는 execute 가 검증까지 동기라 foreground 로 실행하고 완료 출력을 기다려요. Claude Code Desktop 에서 tool 이 긴 실행을 background job 으로 전환하더라도, 그 background output 을 다시 읽어 `import/v1` execute envelope 를 검증하기 전에는 "완료"라고 말하지 않아요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못하면, 같은 명령을 반복 실행하지 말고 읽기 전용 증거로 상태를 재확인해요 — deployment id 를 알면 `axhub deploy verify <deployment-id> --app <app> --json`, 모르면 `axhub apps git status <앱>` → `axhub deploy list --app <앱> --json` 순서로 최신 deployment id 를 복원한 뒤 같은 verify 로 판정해요. 이 재확인 반복에도 같은 폴링 예산이 적용돼요.
 
 `커밋 없이 진행` 이거나 commit+push 질문을 건너뛴 경우:
 
@@ -242,18 +256,18 @@ cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode execute --a
 cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode execute --approved --commit-manifest
 ```
 
-동일 승인으로 두 번 호출하지 않아요. execute 결과도 `import/v1` 로 다시 검증해요. push 실패는 `typed_failure: git` 으로 와요(아래 9의 git 행으로 안내).
+동일 승인으로 두 번 호출하지 않아요. execute 결과도 `import/v1` 로 다시 검증해요. push 실패는 `typed_failure: git` 으로 와요(아래 10의 git 행으로 안내).
 
 권한 복구 뒤 같은 import 를 재개할 때는 preview 가 `existing_axhub_app_repair` 를 줄 수 있어요. 이 경우에도 execute 는 CLI envelope 한 번으로 처리해요. 이미 성공 deployment evidence 가 있거나 방금 execute 가 `deployment_id` 를 반환했으면, 그 id 와 앱 scope 로 `axhub deploy verify <deployment-id> --app <app>` 를 한 번 더 읽어 최종 증거를 확인하고 끝내요.
 
-8. 성공 안내
+9. 성공 안내
 
 - docker/compose 성공: 공개 URL 을 평문 절대 URL 로 보여주고, 배포 확인이 끝났다고 말해요. 앱이 비공개라 로그인 없는 URL 요청이 로그인 화면으로 돌아오면, 배포 검증과 앱 본문 확인을 분리해 설명해요.
 - static 성공: 공개 URL 을 평문 절대 URL 로 보여주고, 정적 사이트 활성 릴리스 확인이 끝났다고 말해요. `access_note` 가 있으면 같은 성공 블록에서 "참고: ..." 형태로 함께 말해요.
 
 내부 id 는 필요할 때만 상태 이어보기에 쓰고 chat 에 raw 값으로 노출하지 않아요.
 
-9. 실패 안내
+10. 실패 안내
 
 `error.message_ko` 를 우선 쓰되, raw field 를 그대로 복사하지 않아요. `recovery_action` 은 한국어 행동 문장으로 바꿔요.
 

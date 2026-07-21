@@ -63,6 +63,8 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("정확히 `claude plugin list` 한 번으로 `axhub@axhub` 의 현재 버전을 내부 변수 `<PLUGIN_VERSION>` 으로만 둬요");
     expect(update).toContain("`claude plugin list` 가 실패하거나 목록에서 못 찾으면 `<PLUGIN_VERSION>` 없이 CLI 업데이트 확인만 진행해요");
     expect(update).toContain("scope 원문, 영어 진행 로그는 사용자에게 말하지 않아요");
+    expect(update).toContain("`現재 버전을 확인할게요.`, `現在 버전을 확인할게요.`");
+    expect(update).toContain("한글 `현재`를 한자나 일본어 문자로 바꾸는 출력은 실패예요");
   });
 
   test("uses the newest enabled plugin entry when Claude lists duplicates", () => {
