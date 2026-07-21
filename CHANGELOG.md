@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.15.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.3...v1.15.4) (2026-07-21)
+
+Claude Code Desktop의 실제 첫 온보딩 QA에서 읽기 전용 감지조차 복합 셸로 묶여 `Contains shell syntax ... cannot be statically analyzed` 권한 경고를 띄우던 문제를 고쳤어요. 이제 CLI 위치 확인, 디스크 설치 확인, 온보딩 감지를 각각 하나의 독립된 명령으로 실행하고 확인된 절대경로를 직접 사용해, 개발 경험이 없는 사용자도 위험해 보이는 명령을 승인하지 않고 자연스럽게 첫 설정을 이어갈 수 있어요.
+
+
+### Fixed
+
+* make onboarding probes Desktop-safe ([#412](https://github.com/jocoding-ax-partners/axhub/issues/412)) ([b8f923a](https://github.com/jocoding-ax-partners/axhub/commit/b8f923a8f8833ad1ded04c895138e039e5cdacd3))
+
 ## [1.15.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.2...v1.15.3) (2026-07-21)
 
 Claude Code Desktop에서 기존 앱을 자연어로 가져오는 실사용 QA를 진행해, 작업공간이 빠진 첫 실행 뒤 임의 명령으로 복구하던 흐름과 zsh 예약 변수 때문에 실패하던 Monitor 반복문을 없앴어요. 미리 작업공간을 확인해 승인 화면과 단 한 번의 실행 명령에 그대로 전달하고, 배포 확인은 독립된 `deploy verify` 호출로만 이어져 초보자도 중간에 막히지 않아요. 프로젝트 폴더를 직접 실행해 불필요한 권한 카드를 줄였고 업데이트 안내의 혼합 문자 오타도 회귀 테스트로 잠갔어요.
