@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.15.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.2...v1.15.3) (2026-07-21)
+
+Claude Code Desktop에서 기존 앱을 자연어로 가져오는 실사용 QA를 진행해, 작업공간이 빠진 첫 실행 뒤 임의 명령으로 복구하던 흐름과 zsh 예약 변수 때문에 실패하던 Monitor 반복문을 없앴어요. 미리 작업공간을 확인해 승인 화면과 단 한 번의 실행 명령에 그대로 전달하고, 배포 확인은 독립된 `deploy verify` 호출로만 이어져 초보자도 중간에 막히지 않아요. 프로젝트 폴더를 직접 실행해 불필요한 권한 카드를 줄였고 업데이트 안내의 혼합 문자 오타도 회귀 테스트로 잠갔어요.
+
+
+### Fixed
+
+* **import:** eliminate desktop dead-end recovery ([#410](https://github.com/jocoding-ax-partners/axhub/issues/410)) ([5314ba5](https://github.com/jocoding-ax-partners/axhub/commit/5314ba5930be69a2455759b283e325deb9d05f3d))
+
 ## [1.15.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.1...v1.15.2) (2026-07-21)
 
 Claude Code Desktop 실사용 QA에서 clean bundle의 marketplace source가 repo 전용 경로를 그대로 가리켜 wrapper 없이는 직접 설치되지 않던 문제를 고쳤어요. bundle 안에서는 source를 `.`로 재작성하고, onboarding 마무리 카드의 내부 상태 enum은 사용자에게 숨겨 초보자에게 자연스러운 다음 행동만 보이도록 했으며, 166개 테스트와 clean bundle 직접 등록·재설치·활성화 검증을 통과했어요.
