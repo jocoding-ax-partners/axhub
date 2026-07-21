@@ -99,7 +99,7 @@ DETECT 직후 `github.install_url` 이 있으면 항상 한 줄로 보여줘요.
 
 ### 3. first_gap router
 
-`first_gap` 만 처리하고 재감지해요. 아래 table 은 owner map 이고, 순서는 detect JSON 이 정해요.
+`first_gap` 만 처리하고 재감지해요. 아래 table 은 owner map 이고, 순서는 detect JSON 이 정해요. CLI 는 gap 이 없으면 `first_gap` 을 `null` 로(그리고 `gaps` 를 빈 배열로) 반환해요 — **`first_gap` 이 null/부재이고 `gaps` 가 비어 있으면 `no_gap` 과 동일한 완료**로 처리하고 Ready card 로 가요. `doctor_gap` 은 CLI 가 만들지 않는 플러그인 합성 값이에요 — detect 출력이 비었을 때 1의 fallback JSON 이 넣어요.
 
 | `first_gap` | Handler |
 | --- | --- |
@@ -116,7 +116,7 @@ DETECT 직후 `github.install_url` 이 있으면 항상 한 줄로 보여줘요.
 | `deps_missing` | Lockfile-only install with `--ignore-scripts`; load [`references/dependency-install.md`](references/dependency-install.md). |
 | `deploy_unverified` | Verify only known deployment id and app scope with `axhub deploy verify "$DEPLOYMENT_ID" --app "$APP_ID_OR_SLUG"`. |
 | `doctor_gap` | Final read-only `axhub plugin-support preflight --json` and recovery phrase. |
-| `no_gap` | Ready card. |
+| `no_gap` | Ready card. `first_gap` null/부재 + 빈 `gaps` 도 이 행으로 처리해요. |
 
 If a handler needs a prompt but D1 safe-stop mode is active, do not execute the mutation. Return `SAFE_STOP_NONINTERACTIVE` with the exact manual command or natural phrase.
 
@@ -124,7 +124,7 @@ If a handler needs a prompt but D1 safe-stop mode is active, do not execute the 
 
 ### 4. Telemetry opt-in, MCP and Ready card
 
-After gaps are green, load [`references/mcp-ready-card.md`](references/mcp-ready-card.md) and finish in order: AI 활용 기록 옵트인 질문 → optional MCP registration in user scope → 최종 카드. 마무리 진입 시 "마지막 단계예요 — AI 활용 기록(선택)과 axhub 도구 연동을 정리하고, 필요하면 재시작 한 번으로 끝나요." 예고 한 줄을 먼저 말해요. 원칙은 재시작 최대 1회 · 카드 1장 · 질문은 옵트인 1개예요. Never claim MCP connected until `claude mcp get axhub` says `Status: Connected`.
+After gaps are green, load [`references/mcp-ready-card.md`](references/mcp-ready-card.md) and finish in order: AI 활용 기록 옵트인 질문 → MCP 등록(온보딩 기본 단계, user scope — 'optional' 이 아니라 재시작 1회로 활성화하는 마무리 게이트예요) → 최종 카드. 마무리 진입 시 "마지막 단계예요 — AI 활용 기록(선택)과 axhub 도구 연동을 정리하고, 필요하면 재시작 한 번으로 끝나요." 예고 한 줄을 먼저 말해요. 원칙은 재시작 최대 1회 · 카드 1장 · 질문은 옵트인 1개예요. Never claim MCP connected until `claude mcp get axhub` says `Status: Connected`.
 
 새로 `claude mcp add` 를 실행한 세션에는 서버가 로드되지 않아요 — marker(`~/.axhub/cache/.onboarding-mcp-restart`)를 쓰고 Restart Handoff Card(`READY_WITH_USER_ACTION`)로 종료해요. 재시작 후에는 SessionStart hook 이 marker 를 감지해 새 세션이 마무리를 먼저 제안하고, `VIBE_READY` 를 출력할 때 marker 를 삭제해요. 세부 분기는 reference 의 Claude Code Path / Resume After Restart 섹션이 소유해요.
 

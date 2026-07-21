@@ -65,10 +65,14 @@ describe("clean plugin bundle", () => {
       expect(existsSync(join(outDir, "LICENSE"))).toBe(true);
       expect(existsSync(join(outDir, "POLICY.md"))).toBe(true);
       expect(existsSync(join(outDir, "hooks", "hooks.json"))).toBe(true);
-      expect(existsSync(join(outDir, "hooks", "import-router.sh"))).toBe(true);
+      expect(existsSync(join(outDir, "hooks", "update-router.sh"))).toBe(true);
+      expect(existsSync(join(outDir, "hooks", "import-router.sh"))).toBe(false);
+      expect(existsSync(join(outDir, "hooks", "clarity-router.sh"))).toBe(false);
+      expect(existsSync(join(outDir, "hooks", "status-resume-router.sh"))).toBe(false);
       expect(readFileSync(join(outDir, "POLICY.md"), "utf8")).toContain("플러그인 스킬 흐름은 그 도구를 우선 사용하지 않아요");
       expect(readFileSync(join(outDir, "hooks", "hooks.json"), "utf8")).toContain("AXHUB_NO_UPDATE_ROUTER");
-      expect(readFileSync(join(outDir, "hooks", "hooks.json"), "utf8")).toContain("import-router.sh");
+      expect(readFileSync(join(outDir, "hooks", "hooks.json"), "utf8")).toContain("update-router.sh");
+      expect(readFileSync(join(outDir, "hooks", "hooks.json"), "utf8")).not.toContain("import-router.sh");
 
       const rootManifest = JSON.parse(readFileSync(join(REPO_ROOT, ".claude-plugin", "plugin.json"), "utf8")) as { version: string };
       const bundledManifest = JSON.parse(readFileSync(join(outDir, ".claude-plugin", "plugin.json"), "utf8")) as { version: string };
@@ -95,7 +99,7 @@ describe("clean plugin bundle", () => {
     };
     expect(marketplace.plugins[0]?.source).toBe("./plugins/axhub");
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "hooks.json"))).toBe(true);
-    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "import-router.sh"))).toBe(true);
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "import-router.sh"))).toBe(false);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "update-router.sh"))).toBe(true);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "plugin-restart-confirm-prompt.md"))).toBe(true);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "node_modules"))).toBe(false);

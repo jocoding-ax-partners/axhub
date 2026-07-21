@@ -184,7 +184,7 @@ Exit handling:
 - 5: unknown deployment id; stop without latest lookup.
 - 4: auth expired; use auth recovery.
 
-For the failure handoff, preserve `DEPLOY_ID`, app slug/id/name, and classified verify state internally. Do not expose raw output. If a Skill tool exists, invoke `diagnosis` with the app identity and "방금 배포 verify 가 실패했다" context. Otherwise follow diagnosis' read-only CLI surfaces: `axhub deploy status <deployment-id> --json`, `axhub deploy logs <deployment-id> --app <앱> --json --limit 100`, then `axhub --json deploy diagnose <앱>`. Do not call MCP deployment diagnosis tools.
+For the failure handoff, preserve `DEPLOY_ID`, app slug/id/name, and classified verify state internally. Do not expose raw output. If a Skill tool exists, invoke `diagnosis` with the app identity and "방금 배포 verify 가 실패했다" context. Otherwise follow diagnosis' read-only CLI surfaces: `axhub deploy status <deployment-id> --json`, 그 status 시간창으로 좁힌 `axhub deploy logs --app <앱> --since <시작> --until <종료> --json --limit 100`(앱 단위 로그), then `axhub --json deploy diagnose <앱>`. Do not call MCP deployment diagnosis tools.
 
 ## Error routing
 

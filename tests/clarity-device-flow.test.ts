@@ -7,7 +7,7 @@ const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "
 
 describe("clarity device flow UX contract", () => {
   test("surfaces the verification URL and user code in normal chat text", () => {
-    const clarity = readRepo("skills/clarity/SKILL.md");
+    const clarity = readRepo("skills/clarity/SKILL.md") + readRepo("skills/clarity/references/execution-guardrails.md");
 
     expect(clarity).toContain("## Device Flow 코드 표시");
     expect(clarity).toContain("일반 채팅 본문에 URL과 입력 코드를 다시 써요");

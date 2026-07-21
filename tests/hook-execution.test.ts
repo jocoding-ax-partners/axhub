@@ -67,10 +67,6 @@ function runBash(argv: string[], stdin: string, env: Record<string, string>): Ru
   return { stdout: result.stdout.toString(), exitCode: result.exitCode ?? -1 };
 }
 
-function runRouterScript(script: string, stdin: string, env: Record<string, string> = {}): RunResult {
-  return runBash(["bash", join(REPO_ROOT, "hooks", script)], stdin, baseEnv(env));
-}
-
 function runInline(command: string, stdin: string, env: Record<string, string> = {}): RunResult {
   return runBash(["bash", "-c", command], stdin, baseEnv(env));
 }
@@ -170,183 +166,30 @@ describe("update-router (UserPromptSubmit entry 1 → hooks/update-router.sh)", 
   });
 });
 
-describe("clarity-router", () => {
-  test("axhub GitHub 재연결 발화에 발동해요", () => {
-    expectEmit(
-      runRouterScript("clarity-router.sh", promptPayload("axhub GitHub 계정 다시 연결해줘")),
-      "UserPromptSubmit",
-      "[axhub clarity router]",
-    );
+describe("UserPromptSubmit 라우터 diet (update 단독)", () => {
+  test("운영 발화(로그·테이블·환경변수)엔 어떤 라우터도 발동하지 않아요 — clarity frontmatter 라우팅 소관", () => {
+    for (const prompt of ["axhub 로그 보여줘", "axhub 테이블 만들어줘", "axhub 환경변수 확인해줘"]) {
+      expectSilent(runUpdateRouter(promptPayload(prompt)));
+    }
   });
 
-  test("게이트-순서 계약: freshness yield 가 github 게이트보다 먼저라 axhub GitHub 연결 업데이트 발화엔 침묵해요", () => {
-    expectSilent(runRouterScript("clarity-router.sh", promptPayload("axhub GitHub 계정 연결 업데이트해줘")));
+  test("UserPromptSubmit 표면은 update 라우터 1개뿐이에요 (AGENTS diet 허용 목록)", () => {
+    expect(upsCommands).toHaveLength(1);
+    expect(upsCommands[0]).toContain("update-router.sh");
   });
 
-  test("cwd 에만 axhub 가 있으면 침묵해요 (F1)", () => {
-    expectSilent(runRouterScript("clarity-router.sh", promptPayload("GitHub 계정 다시 연결해줘", DEV_CWD)));
+  test("제거된 라우터 스크립트는 hooks/ 에 존재하지 않아요", () => {
+    for (const script of ["clarity-router.sh", "import-router.sh", "status-resume-router.sh"]) {
+      expect(existsSync(join(REPO_ROOT, "hooks", script))).toBe(false);
+    }
   });
 
-  test("자기-트리거 음성: github 언급 없는 axhub 발화엔 침묵해요", () => {
-    expectSilent(runRouterScript("clarity-router.sh", promptPayload("axhub 로그 좀 보여줘")));
+  test("freshness 발화 → update 라우터가 발동해요", () => {
+    expectEmit(runUpdateRouter(promptPayload("axhub 최신 버전으로 업데이트해줘")), "UserPromptSubmit", "[axhub update router]");
   });
 
-  test('"prompt": 키 부재 → fail-closed 침묵', () => {
-    expectSilent(runRouterScript("clarity-router.sh", noPromptKeyPayload()));
-  });
-
-  test("kill switch AXHUB_NO_CLARITY_ROUTER → 침묵", () => {
-    expectSilent(
-      runRouterScript("clarity-router.sh", promptPayload("axhub GitHub 계정 다시 연결해줘"), {
-        AXHUB_NO_CLARITY_ROUTER: "1",
-      }),
-    );
-  });
-
-  test("marker kill switch no-clarity-router → 침묵", () => {
-    expectSilent(
-      runRouterScript("clarity-router.sh", promptPayload("axhub GitHub 계정 다시 연결해줘"), {
-        HOME: makeHomeWithMarker("clarity-router"),
-      }),
-    );
-  });
-});
-
-describe("import-router", () => {
-  test("기존 앱 발화에 발동해요", () => {
-    expectEmit(
-      runRouterScript("import-router.sh", promptPayload("이 기존 Express 앱을 axhub에 올려줘")),
-      "UserPromptSubmit",
-      "[axhub import router]",
-    );
-  });
-
-  test("대소문자 변형 AxHub 에 발동해요 (E4)", () => {
-    expectEmit(
-      runRouterScript("import-router.sh", promptPayload("이 기존 앱을 AxHub에 올려줘")),
-      "UserPromptSubmit",
-      "기존 앱을 axhub에 가져올 준비를 확인할게요",
-    );
-  });
-
-  test("freshness yield: 기존 앱 + 업데이트 발화엔 침묵해요", () => {
-    expectSilent(runRouterScript("import-router.sh", promptPayload("기존 axhub 앱을 최신으로 업데이트해줘")));
-  });
-
-  test("cwd 에만 axhub 가 있으면 침묵해요 (F1)", () => {
-    expectSilent(runRouterScript("import-router.sh", promptPayload("이 기존 Express 앱 정리해줘", DEV_CWD)));
-  });
-
-  test("자기-트리거 음성: import 키워드 없는 axhub 발화엔 침묵해요", () => {
-    expectSilent(runRouterScript("import-router.sh", promptPayload("axhub 로그 좀 보여줘")));
-  });
-
-  test('"prompt": 키 부재 → fail-closed 침묵', () => {
-    expectSilent(runRouterScript("import-router.sh", noPromptKeyPayload()));
-  });
-
-  test("kill switch AXHUB_NO_IMPORT_ROUTER → 침묵", () => {
-    expectSilent(
-      runRouterScript("import-router.sh", promptPayload("이 기존 Express 앱을 axhub에 올려줘"), {
-        AXHUB_NO_IMPORT_ROUTER: "1",
-      }),
-    );
-  });
-
-  test("marker kill switch no-import-router → 침묵", () => {
-    expectSilent(
-      runRouterScript("import-router.sh", promptPayload("이 기존 Express 앱을 axhub에 올려줘"), {
-        HOME: makeHomeWithMarker("import-router"),
-      }),
-    );
-  });
-});
-
-describe("status-resume-router", () => {
-  test("배포 상태 발화에 발동해요", () => {
-    expectEmit(
-      runRouterScript("status-resume-router.sh", promptPayload("axhub 배포 상태 확인해줘")),
-      "UserPromptSubmit",
-      "[axhub status/resume router]",
-    );
-  });
-
-  test("대소문자 변형 AXHUB 에 발동해요 (E4)", () => {
-    expectEmit(
-      runRouterScript("status-resume-router.sh", promptPayload("AXHUB 배포 상태 확인해줘")),
-      "UserPromptSubmit",
-      "[axhub status/resume router]",
-    );
-  });
-
-  test("freshness yield: 상태 + 업데이트 발화엔 침묵해요", () => {
-    expectSilent(runRouterScript("status-resume-router.sh", promptPayload("axhub 업데이트 상태 확인해줘")));
-  });
-
-  test("cwd 에만 axhub 가 있으면 침묵해요 (F1)", () => {
-    expectSilent(runRouterScript("status-resume-router.sh", promptPayload("배포 상태 확인해줘", DEV_CWD)));
-  });
-
-  test("자기-트리거 음성: status 키워드 없는 axhub 발화엔 침묵해요", () => {
-    expectSilent(runRouterScript("status-resume-router.sh", promptPayload("axhub 로그 좀 줘")));
-  });
-
-  test('"prompt": 키 부재 → fail-closed 침묵', () => {
-    expectSilent(runRouterScript("status-resume-router.sh", noPromptKeyPayload()));
-  });
-
-  test("kill switch AXHUB_NO_STATUS_ROUTER → 침묵", () => {
-    expectSilent(
-      runRouterScript("status-resume-router.sh", promptPayload("axhub 배포 상태 확인해줘"), {
-        AXHUB_NO_STATUS_ROUTER: "1",
-      }),
-    );
-  });
-
-  test("marker kill switch no-status-router → 침묵", () => {
-    expectSilent(
-      runRouterScript("status-resume-router.sh", promptPayload("axhub 배포 상태 확인해줘"), {
-        HOME: makeHomeWithMarker("status-router"),
-      }),
-    );
-  });
-});
-
-describe("UserPromptSubmit 체인 (4 라우터 동시 투입 — collision 계약)", () => {
-  function runChain(stdin: string): { update: boolean; clarity: boolean; import: boolean; status: boolean } {
-    return {
-      update: runUpdateRouter(stdin).stdout.trim().length > 0,
-      clarity: runRouterScript("clarity-router.sh", stdin).stdout.trim().length > 0,
-      import: runRouterScript("import-router.sh", stdin).stdout.trim().length > 0,
-      status: runRouterScript("status-resume-router.sh", stdin).stdout.trim().length > 0,
-    };
-  }
-
-  test("collision: axhub 기존 앱 배포 상태 확인 → import+status 둘 다 발동 (현재 행동의 계약화)", () => {
-    expect(runChain(promptPayload("axhub 기존 앱 배포 상태 확인"))).toEqual({
-      update: false,
-      clarity: false,
-      import: true,
-      status: true,
-    });
-  });
-
-  test("freshness 발화 → update 만 발동, 나머지는 yield 로 침묵", () => {
-    expect(runChain(promptPayload("axhub 최신 버전으로 업데이트해줘"))).toEqual({
-      update: true,
-      clarity: false,
-      import: false,
-      status: false,
-    });
-  });
-
-  test("F1 재현 payload (axhub 는 경로에만) → 4개 전부 침묵", () => {
-    expect(runChain(promptPayload("이 프로젝트 상태 확인하고 기존 코드 업데이트해줘", DEV_CWD))).toEqual({
-      update: false,
-      clarity: false,
-      import: false,
-      status: false,
-    });
+  test("F1 재현 payload (axhub 는 경로에만) → 침묵해요", () => {
+    expectSilent(runUpdateRouter(promptPayload("이 프로젝트 상태 확인하고 기존 코드 업데이트해줘", DEV_CWD)));
   });
 });
 

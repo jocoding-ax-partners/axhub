@@ -24,12 +24,13 @@ repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 
 머지 전에 반드시 통과해야 하는 자동·수동 검사 목록이에요:
 - `bun run lint:tone --strict` — 한글 tone 0 error
 - `bun test` — frontmatter·bundle·routing·policy parity 포함 전부 PASS
+- `bun run plugin:budget` — 컨텍스트 byte 예산 PASS (SKILL.md 8개 합산 180k · per-skill 35k). 넘치면 본문을 reference 로 추출해요.
 - `bun run plugin:bundle` — clean bundle(개발 산출물이 섞이지 않은 배포용 플러그인 꾸러미) 생성. 로컬 Claude Code 검증은 repo 루트가 아니라 `dist/axhub-plugin` 을 써요.
 - 대표 여정 회귀 — 첫 셋업 → 앱 생성 → 배포 → 상태 확인 경로를 문서·skill 본문·fixture(테스트용 고정 예시 데이터) 계약으로 같은 방향에 맞춰요.
 
 ## DP-6 hidden 표면 계약
 - `axhub plugin-support <cmd>` 는 이 plugin 의 skill 들만 쓰라고 만든 숨김 명령이에요. 일반 사용자용 명령이 아니라서 도움말에도 안 나오고, 예고 없이 바뀌거나 사라질 수 있어요. 그래서 skill 밖에서는 쓰지 않아요.
-- 어긋남을 막는 안전장치는 두 개예요. 하나는 plugin 과 CLI 가 서로 기대하는 형식이 달라지면 바로 실패하는 자동 테스트(계약 parity 테스트)이고, 다른 하나는 skill 이 시작할 때 이 명령이 실제로 동작하는지 먼저 확인하는 사전 점검(preflight 게이트, agent-policy AP-6)이에요.
+- 어긋남을 막는 안전장치는 세 겹이에요. ① repo 안 fixture(shim) 계약 테스트 — plugin 이 기대하는 형식을 고정하지만 **실제 CLI 를 실행하진 않아요**. ② nightly 실 CLI 계약 스냅샷(`.github/workflows/cli-contract-nightly.yml` + `tests/cli-contract.test.ts`) — 최신 배포 CLI 를 설치해 onboarding-detect 스키마(`first_gap` null 완료 포함)·preflight exit 계약·deploy logs/verify/diagnose 표면을 검증해 cross-repo drift 를 잡아요. ③ skill 이 시작할 때 이 명령이 실제로 동작하는지 먼저 확인하는 사전 점검(preflight 게이트, agent-policy AP-6)이에요.
 - clarity 는 hidden 표면을 쓰지 않아요 (agent-policy AP-9).
 
 ## DP-7 bundle 규칙

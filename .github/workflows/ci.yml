@@ -1,0 +1,29 @@
+name: ci
+
+# PR-blocking quality gates (DP-5): bun test · lint:tone · plugin:budget · tsc.
+# 예전에는 로컬 수동 실행에만 의존했어요 — budget 초과가 조용히 쌓이는 걸 막기 위해
+# DP-5 목록 전체를 CI 로 올렸어요.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Tests (frontmatter · bundle · routing · policy parity · hooks)
+        run: bun test
+      - name: Korean tone gate
+        run: bun run lint:tone --strict
+      - name: Plugin context budget gate
+        run: bun run plugin:budget
+      - name: Typecheck
+        run: bunx tsc --noEmit

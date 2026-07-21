@@ -47,6 +47,15 @@ describe("onboarding representative journey", () => {
     expect([...completionGaps].sort()).toEqual(loopMinusNoGap);
   });
 
+  test("CLI null first_gap is accepted as no_gap completion (schema parity with real CLI)", () => {
+    // CLI 는 gap 이 없으면 first_gap 을 null 로 반환해요 — "no_gap" 문자열은 CLI 가 만들지 않아요.
+    expect(SKILL).toContain("null/부재이고 `gaps` 가 비어 있으면 `no_gap` 과 동일한 완료");
+    expect(GAPS).toContain("null/부재 + 빈 `gaps` 는 `no_gap` 과 같은 완료");
+    const shim = read("tests/e2e/claude-cli/fixtures/bin/axhub");
+    expect(shim).toContain('"first_gap":null');
+    expect(shim).not.toContain('"first_gap":"no_gap"');
+  });
+
   test("journey stages appear in order: guard -> detect -> router -> finish", () => {
     const stages = [
       "### 0. Non-interactive guard",

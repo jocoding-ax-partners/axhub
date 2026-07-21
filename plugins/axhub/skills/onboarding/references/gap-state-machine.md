@@ -1,6 +1,6 @@
 # Onboarding Gap State Machine
 
-Load this after `axhub plugin-support onboarding-detect --json` when `first_gap` is not `no_gap`, or when you need the exact completion rule for a gap. The detector owns order. This reference only maps the detected first gap to the next safe action.
+Load this after `axhub plugin-support onboarding-detect --json` when `first_gap` is not `no_gap`, or when you need the exact completion rule for a gap. CLI 는 gap 이 없으면 `first_gap: null` + 빈 `gaps` 를 반환해요 — null/부재 + 빈 `gaps` 는 `no_gap` 과 같은 완료라서 이 reference 를 열 필요 없이 Ready card 로 가요. The detector owns order. This reference only maps the detected first gap to the next safe action.
 
 ## Loop
 
@@ -19,7 +19,7 @@ DETECT_ALL(read-only)  <- axhub plugin-support onboarding-detect --json
   deps_missing         -> lockfile install approval -> DETECT_ALL
   deploy_unverified    -> deploy verify on known id -> DETECT_ALL
   doctor_gap           -> preflight recovery phrase -> DETECT_ALL
-  no_gap               -> Ready card
+  no_gap               -> Ready card (first_gap null/부재 + 빈 gaps 도 동일)
 ```
 
 Do not process the second item in `gaps` from the same JSON. Handle one `first_gap`, then re-run detect.

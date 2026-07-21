@@ -26,14 +26,14 @@ model: sonnet
 
 발화에 axhub 언급이 없고 대화에 axhub 맥락(현재 폴더의 axhub 연결·직전 axhub 작업)도 없으면 — 배포 실패가 다른 플랫폼일 수 있으면 — 진단을 시작하기 전에 어느 플랫폼 배포인지 한 번만 확인하고, axhub 가 아니면 종료해요. headless 에서는 묻지 않고 멈춰요.
 
-진단 결과는 두 층으로 나눠요. `deploy` 에서 방금 실패한 배포 id 를 넘긴 경우에는 그 **실패한 배포 한 건**의 status/logs 를 먼저 읽고, 그 다음 현재 라이브 롤아웃 상태를 별도로 확인해요. 사용자가 앱만 주고 실패 배포 id 가 없으면 앱의 **현재 라이브 롤아웃 상태**를 진단해요. 그래서 "현재 라이브는 정상"이어도 방금 배포가 실패했을 수 있다는 한계를 사용자에게 정직하게 전달해요.
+진단 결과는 두 층으로 나눠요. `deploy` 에서 방금 실패한 배포 id 를 넘긴 경우에는 그 **실패한 배포 한 건의 status** 를 먼저 읽고, status 의 시작·종료 시각으로 좁힌 **그 시간대 앱 로그**를 함께 본 뒤(`deploy logs` 는 CLI 계약상 배포 한 건이 아니라 앱 단위 로그예요), 현재 라이브 롤아웃 상태를 별도로 확인해요. 사용자가 앱만 주고 실패 배포 id 가 없으면 앱의 **현재 라이브 롤아웃 상태**를 진단해요. 그래서 "현재 라이브는 정상"이어도 방금 배포가 실패했을 수 있다는 한계를 사용자에게 정직하게 전달해요.
 
 ## 핵심 책임
 
 - **CLI 전용이에요.** MCP `deployment_diagnosis` 같은 deployment MCP 도구가 보여도 호출하지 않아요. 진단 표면은 `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 만 써요.
 - 영어로 "Diagnose failed deployment ..."처럼 물어도 이 스킬이에요. MCP `App list`, `App get`, `deployment_diagnosis` 같은 도구만으로 진단을 대신하지 않아요.
-- 방금 실패한 배포 id 가 있으면 `axhub deploy status <deployment-id> --json` 으로 terminal failure 를 확인하고, 앱 식별자가 있으면 `axhub deploy logs <deployment-id> --app <앱> --json --limit 100` 으로 런타임 로그 신호를 읽어요. raw 로그는 사용자에게 그대로 붙이지 않고 원인군만 요약해요.
-- 빌드 실패에는 `deploy status --json` 최상위와 `deploy diagnose` 응답 service 에 `build_log_tail`(백엔드가 secret 마스킹·절단을 끝낸 빌드 로그 끝부분)이 실릴 수 있어요. 이 필드는 아래 Visibility 예외를 따라 사용자에게 보여주고, 원인 요약의 근거로 써요. 필드가 없으면(구 CLI·기능 이전 배포·비-빌드 실패) 기존처럼 원인군 요약만 해요.
+- 방금 실패한 배포 id 가 있으면 `axhub deploy status <deployment-id> --json` 으로 terminal failure 와 시작·종료 시각을 확인하고, 앱 식별자가 있으면 그 시각으로 계산한 시간창을 붙여 `axhub deploy logs --app <앱> --since <시작> --until <종료> --json --limit 100` 으로 그 시간대 앱 로그를 읽어요. deployment id 를 positional 로 넘겨도 CLI 는 앱 단위 로그를 돌려주므로, 시간창 없이 읽은 로그를 그 배포의 로그라고 말하지 않아요. raw 로그는 사용자에게 그대로 붙이지 않고 원인군만 요약해요.
+- 빌드 실패에는 `deploy status --json` 최상위와 `deploy diagnose` 응답 service 에 `build_log_tail`(백엔드가 secret 마스킹·절단을 끝낸 빌드 로그 끝부분)이 실릴 수 있어요. 이 필드는 Visibility 예외를 따라 사용자에게 보여주고, 원인 요약의 근거로 써요. 필드가 없으면(구 CLI·기능 이전 배포·비-빌드 실패) 기존처럼 원인군 요약만 해요.
 - 앱 단위 현재 상태는 공개 CLI `axhub deploy diagnose` 로 받아요. CLI 원본 출력은 redact 가 안 돼 있어서 스킬이 직접 가려요.
 - CLI 표면이 없으면 `진단을 못 했어요` 로 끝내요.
 - 사용자에게는 raw id, exit code, JSON, stderr, pod signal, log line 을 그대로 보여주지 않고 여섯 가지 결과 중 하나로 요약해요.
@@ -80,18 +80,7 @@ Claude Desktop QA처럼 사용자가 한 문장 안에 "진단하고 복구까�
 
 ## Visibility 규칙
 
-사용자 chat 에 절대 그대로 노출하지 않는 값:
-
-- raw app id, deployment id, release id, trace id
-- exit code, 내부 에러 코드·subcode, raw JSON, raw stderr
-- raw 필드명·불리언(`healthy: true`, `healthy=false`, `applicable=false`, `services[]`, `reason.category` 등)
-- raw category/stage/code 값(`configuration`, `resolve`, `commit_not_found` 등)
-- pod name, signal name, container reason, stack trace, log line 원문
-- MCP transport 오류 세부정보, tool schema, 내부 분기 판정
-
-**예외 — `build_log_tail`:** 백엔드가 secret 마스킹과 절단을 끝낸 빌드 실패 로그 tail 은 사용자에게 보여줘도 돼요. 원인 요약 아래 코드블록으로 붙이되, 기본은 에러 신호가 모인 끝부분 20~30줄만 발췌하고 사용자가 전체를 원하면 tail 전체를 보여줘요. 이 예외는 `build_log_tail` 필드에만 적용돼요 — `deploy logs` 런타임 로그 원문과 `signals[].text` 는 계속 가려요.
-
-CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 원본은 reason·signal text·로그 line 을 그대로 찍을 수 있으니 스킬이 직접 가려요. 어느 경로든 사용자에게는 원인군과 다음 행동만 말해요. 예: "환경 설정 쪽이 가장 의심돼요. 먼저 설정값을 확인하고, 맞으면 다시 배포하면 돼요." 코드가 원인이면 수정 커밋을 만든 뒤 다시 배포하라고 안내해요 — import 첫 배포는 같은 커밋을 같은 배포로 재사용해서 커밋 없이는 결과가 안 바뀌어요.
+사용자에게 보여주기 전에 [references/output-contract.md](references/output-contract.md) 의 Visibility 규칙을 그대로 따라요 — raw 값은 숨기고 원인군과 다음 행동만 전달해요. 유일한 예외는 같은 문서의 `build_log_tail` 규칙이에요.
 
 ## 헤드리스 판정
 
@@ -128,12 +117,14 @@ CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 원본�
 
      help 가 있으면 그 help 인자만 써서 실행해요. help 에 없는 플래그·positional 은 만들지 않아요.
 
-     방금 실패한 배포 id 가 있으면 먼저 이 두 명령을 읽어요. `--app` 은 앱 slug/id/name 을 알고 있을 때만 붙여요.
+     방금 실패한 배포 id 가 있으면 먼저 status 를 읽고, status 의 시작·종료 시각으로 로그 시간창을 계산해요. `--app` 은 앱 slug/id/name 을 알고 있을 때만 붙여요.
 
      ```bash
      "$CLI_BIN" deploy status <deployment-id> --app <앱> --json
-     "$CLI_BIN" deploy logs <deployment-id> --app <앱> --json --limit 100
+     "$CLI_BIN" deploy logs --app <앱> --since <시작> --until <종료> --json --limit 100
      ```
+
+     `deploy logs` 는 앱 단위 로그예요 — 시간창으로 좁혀도 요약은 "그 배포 시간대의 앱 로그"로 정직하게 말해요.
 
      각 tool 제목은 `실패 배포 상태 확인`, `실패 배포 로그 확인` 으로 써요. 두 명령을 같은 tool 에 묶으면 제목은 `실패 배포 상태·로그 확인` 으로 써요.
      Bash/명령 tool description/title/summary 도 같은 고정 문구로 설정해요.
@@ -187,22 +178,6 @@ CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 원본�
    - 롤백 후보: "되돌리려면 '이전 버전으로 롤백해줘' 라고 말하면 돼요."
    - 로그·상태 후보: "상세 로그나 상태가 필요하면 '로그 보여줘'·'배포 상태 확인해줘' 라고 말하면 돼요."
 
-## 최종 메시지 템플릿
+## 최종 메시지 · 금지
 
-- `정상이에요. 지금 라이브 롤아웃은 건강해요. 방금 배포 결과가 궁금하면 "배포 상태 확인해줘"라고 말하면 돼요.`
-- `진단 대상이 아니에요. 지금 진단할 라이브 롤아웃이 없어요(아직 배포 전이거나 정적 앱). 첫 배포는 "배포해줘"라고 말하면 돼요.`
-- `해결 후보가 있어요. 인프라·배포 환경 쪽이 가장 의심돼요. 먼저 설정을 확인하고, 맞으면 다시 배포하면 돼요. 코드가 원인이면 수정 커밋을 만든 뒤에요.`
-- `대상을 못 찾았어요. 어떤 앱이나 배포를 봐야 하는지 단서가 한 가지 더 필요해요.`
-- `로그인/권한이 필요해요. axhub 권한을 확인한 뒤 다시 진단하면 돼요.`
-- `진단을 못 했어요. 지금은 연결된 진단 도구도, CLI 진단 표면도 없어요.`
-
-빌드 실패로 `build_log_tail` 이 있으면 `해결 후보가 있어요` 메시지 아래에 로그 발췌 코드블록을 이어 붙여요.
-
-## 금지
-
-- 재배포, 롤백, 앱 삭제, 환경변수 변경 같은 mutation 을 실행하지 않아요.
-- 실패 후보를 확정 원인처럼 말하지 않아요. evidence 가 약하면 "가장 의심돼요" 처럼 후보로 표현해요.
-- 라이브 진단이 정상이라고 과거 배포가 성공했다고 단정하지 않아요. 현재 롤아웃 상태와 배포 한 건의 결과는 다를 수 있어요.
-- raw 출력이나 내부 id·exit code 를 사용자에게 보여주지 않아요. 빌드 실패 로그 tail 만 Visibility 예외를 따라요.
-- MCP 를 호출하거나 설치·설정하라고 내부 절차를 만들지 않아요.
-- `clarity` 처럼 전체 `--json-schema` 트리를 탐색해 임의 명령을 찾아 실행하지 않아요. 이 스킬의 표면은 CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 뿐이에요.
+최종 메시지는 [references/output-contract.md](references/output-contract.md) 의 여섯 가지 템플릿 중 하나로 시작하고(빌드 실패면 같은 문서의 `build_log_tail` 발췌 규칙 적용), 같은 문서의 금지 목록(재배포·롤백·mutation 실행 금지, 원인 단정 금지, raw 출력 노출 금지, `--json-schema` 임의 탐색 금지 — 표면은 `axhub deploy status`/`deploy logs`/`deploy diagnose` 뿐)을 그대로 지켜요.

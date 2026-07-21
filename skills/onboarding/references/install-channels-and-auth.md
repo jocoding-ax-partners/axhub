@@ -52,7 +52,7 @@ Do not invent another PATH search. The CLI owns candidate paths, shell rc backup
 
 ## CLI Old Or Update Available
 
-This plugin needs ax-hub-cli v0.20.0+ because `plugin-support` is inside the CLI. Use public update commands, not retired helper summaries.
+This plugin needs ax-hub-cli v0.20.0+ because `plugin-support` is inside the CLI (`plugin-support import`·`deploy diagnose` 표면까지 쓰는 import·diagnosis 는 v0.21.3+ 예요). Use public update commands, not retired helper summaries.
 
 ```bash
 PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')

@@ -27,7 +27,7 @@ describe("update Desktop UX contract", () => {
   });
 
   test("does not read plugin cache manifests in Claude Desktop", () => {
-    const update = readRepo("skills/update/SKILL.md");
+    const update = readRepo("skills/update/SKILL.md") + readRepo("skills/update/references/post-update-continuation.md");
 
     expect(update).toContain("description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill");
     expect(update).toContain("axhub가 진짜 최신인지 먼저 확인");
@@ -66,7 +66,7 @@ describe("update Desktop UX contract", () => {
   });
 
   test("uses the newest enabled plugin entry when Claude lists duplicates", () => {
-    const update = readRepo("skills/update/SKILL.md");
+    const update = readRepo("skills/update/SKILL.md") + readRepo("skills/update/references/post-update-continuation.md");
 
     expect(update).toContain("`claude plugin list` 에 `axhub@axhub` 가 여러 번 나오면");
     expect(update).toContain("enabled 항목 중 **가장 높은 semver** 를 `<PLUGIN_VERSION>` 으로 삼아요");
@@ -88,7 +88,7 @@ describe("update Desktop UX contract", () => {
   });
 
   test("keeps plugin update confirmation text human-facing", () => {
-    const update = readRepo("skills/update/SKILL.md");
+    const update = readRepo("skills/update/SKILL.md") + readRepo("skills/update/references/post-update-continuation.md");
 
     expect(update).toContain("플러그인: vX -> vY 받음 (재시작 필요)");
     expect(update).toContain("Claude Code 를 재시작하면 새 버전이 적용돼요.");
@@ -103,8 +103,8 @@ describe("update Desktop UX contract", () => {
   });
 
   test("continues mixed app-status requests after the update boundary", () => {
-    const update = readRepo("skills/update/SKILL.md");
-    const clarity = readRepo("skills/clarity/SKILL.md");
+    const update = readRepo("skills/update/SKILL.md") + readRepo("skills/update/references/post-update-continuation.md");
+    const clarity = readRepo("skills/clarity/SKILL.md") + readRepo("skills/clarity/references/execution-guardrails.md");
     // update 라우터 본문은 hooks/update-router.sh 로 추출됐어요 — 계약 검증
     // 표면은 hooks.json(가드·SessionStart 폴백) + 라우터 스크립트의 합집합이에요.
     const hooks = readRepo("hooks/hooks.json") + "\n" + readRepo("hooks/update-router.sh");
@@ -182,9 +182,9 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("바로 다음 axhub 흐름으로 이어가요");
     expect(update).not.toContain("다음 동작은 `clarity`");
     expect(update).not.toContain("그 다음 작업은 `clarity`");
-    expect(clarity).toContain('Use this skill only for explicit "axhub clarity" requests');
-    expect(clarityFrontmatter).toContain("disable-model-invocation: true");
-    expect(clarity).toContain("사용자 수동 slash 또는 명시적 지목 때만 실행해요");
+    expect(clarity).toContain("axhub CLI 운영 명령 브리지");
+    expect(clarityFrontmatter).not.toContain("disable-model-invocation");
+    expect(clarity).toContain("frontmatter description 라우팅으로 자연어에서도 이 스킬이 직접 받아요");
     expect(clarity).toContain("## Do not invoke / route guard");
     expect(clarity).toContain("첫 visible assistant text 를 정확히 `현재 버전을 확인할게요.`");
     expect(clarity).toContain("이미 `/axhub:clarity` 배지가 뜬 뒤 이 문서를 읽었다면");

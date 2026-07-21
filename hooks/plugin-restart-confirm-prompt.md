@@ -4,7 +4,7 @@ SessionStart 훅이 `~/.axhub/cache/.plugin-update-restart` marker(7일 TTL)를 
 
 ```
 marker 상태머신:
-  없음 ──plugin 적용(auto-update §3)──▶ 활성(내용 = 받은 버전)
+  없음 ──plugin 적용(auto-update §3)──▶ 활성(내용 = 받은 버전|scope — 구 marker 는 버전만)
   활성 ──재시작 후 확인 성공──▶ 삭제
   활성 ──7일 경과(재시작 안 함)──▶ 휴면(훅 발동 중지, 파일 잔존)
   휴면 ──다음 플러그인 적용──▶ 활성(덮어씀)
@@ -16,12 +16,12 @@ marker 상태머신:
 
 ## 확인 절차
 
-1. marker 내용을 읽어 기대 버전 `<EXPECTED>` 로 둬요 (예: `1.10.28`). 읽기 실패면 조용히 멈춰요.
+1. marker 내용을 `버전|scope` 로 읽어 기대 버전 `<EXPECTED>` 와 대상 scope `<EXPECTED_SCOPE>` 로 둬요 (예: `1.10.28|user`). `|` 가 없는 구 marker 는 버전만 있는 것으로 보고 scope 미상으로 진행해요. 읽기 실패면 조용히 멈춰요.
 2. `command -v claude` 가 실패하면 조용히 멈춰요 — marker 는 그대로 두면 TTL 로 휴면해요.
-3. `claude plugin list` 를 1회 실행해 `axhub@axhub` 의 **enabled 항목 중 가장 높은 semver** 를 읽어요 (update SKILL 의 중복 설치 판정 알고리즘과 동일). 파싱이 안 되면 조용히 멈춰요.
-   - 참고: 이 확인은 설치-기준이에요 — 멀티 scope 중복 설치에서 다른 scope 의 버전을 볼 수 있고, 현재 세션이 그 버전을 로드했는지까지 증명하진 않아요. 기존 update SKILL 확인과 동일한 한계예요.
+3. `claude plugin list` 를 1회 실행해요. `<EXPECTED_SCOPE>` 가 있으면 **그 scope 의 `axhub@axhub` enabled 항목 버전**을 읽어요 — 해당 scope 항목이 없으면 판정 불가로 조용히 멈춰요. scope 미상(구 marker)이면 기존대로 **enabled 항목 중 가장 높은 semver** 를 읽어요 (update SKILL 의 중복 설치 판정 알고리즘과 동일). 파싱이 안 되면 조용히 멈춰요.
+   - 참고: scope 를 고정하면 다른 scope 의 높은 버전을 적용 확인으로 오인하는 문제는 막아요. 다만 이 확인도 설치-기준이라, 현재 세션이 그 버전을 로드했는지까지 증명하진 않아요.
 4. 판정:
-   - **최고 enabled semver ≥ `<EXPECTED>`** → 한 줄 안내 후 marker 삭제:
+   - **대상 scope(미상이면 최고) enabled semver ≥ `<EXPECTED>`** → 한 줄 안내 후 marker 삭제:
      > `플러그인 v<확인된 버전> 적용을 확인했어요.`
      ```bash
      rm -f "$HOME/.axhub/cache/.plugin-update-restart"

@@ -91,11 +91,14 @@ describe("smooth behavior contracts", () => {
   test("skills encode the required guard boundaries", () => {
     const onboarding = readRepo("skills/onboarding/SKILL.md");
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
-    const deploy = readRepo("skills/deploy/SKILL.md");
-    const clarity = readRepo("skills/clarity/SKILL.md");
+    const deploy = readRepo("skills/deploy/SKILL.md") + readRepo("skills/deploy/references/user-facing-language.md");
+    const clarity = readRepo("skills/clarity/SKILL.md") + readRepo("skills/clarity/references/execution-guardrails.md");
     const clarityFrontmatter = clarity.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
-    const diagnosis = readRepo("skills/diagnosis/SKILL.md");
-    const importSkill = readRepo("skills/import/SKILL.md");
+    const diagnosis = readRepo("skills/diagnosis/SKILL.md") + readRepo("skills/diagnosis/references/output-contract.md");
+    const importSkill =
+      readRepo("skills/import/SKILL.md") +
+      readRepo("skills/import/references/visibility-rules.md") +
+      readRepo("skills/import/references/manifest-authoring.md");
     const onboardingAuth = readRepo("skills/onboarding/references/install-channels-and-auth.md");
     const bootstrapAndLocal = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
@@ -177,7 +180,7 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("diagnosis");
     expect(deploy).toContain("Deploy failure → diagnosis handoff");
     expect(deploy).toContain("재배포나 롤백은 하지 않아요");
-    expect(deploy).toContain("axhub deploy logs <deployment-id>");
+    expect(deploy).toContain("axhub deploy logs --app");
     expect(deploy).toContain("axhub --json deploy diagnose <앱>");
     expect(deploy).not.toContain("deployment_diagnosis if callable");
     expect(deploy).toContain("User-visible Bash/tool call titles must be Korean noun phrases only");
@@ -217,7 +220,7 @@ describe("smooth behavior contracts", () => {
     expect(workflowDetails).toContain("Do not end by asking the user to say `배포 상태 확인해줘`");
     expect(workflowDetails).toContain("continue the bounded verify loop automatically");
     expect(workflowDetails).not.toContain("invite \"배포 상태 확인해줘\"");
-    expect(workflowDetails).toContain("axhub deploy logs <deployment-id>");
+    expect(workflowDetails).toContain("axhub deploy logs --app");
     expect(deployErrors).toContain("제가 같은 배포를 계속 확인할게요");
     expect(deployErrors).toContain("진행 중인 그 배포를 제가 계속 확인할게요");
     expect(deployErrors).not.toContain("말씀하시면 끝날 때까지");
@@ -227,7 +230,7 @@ describe("smooth behavior contracts", () => {
     expect(importSkill).toContain("static lane 에서는 사용자가 명시적으로");
     expect(importSkill).toContain("axhub --json plugin-support import --mode execute --approved");
     expect(importSkill).toContain('axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"');
-    expect(importSkill).toContain("foreground 로 실행하고 완료 출력을 받을 때까지");
+    expect(importSkill).toContain("foreground 로 실행하고 완료 출력을 기다려요");
     expect(importSkill).toContain("GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 반드시 `$APP_SLUG` 와 정확히 같게 둬요");
     expect(importSkill).toContain("background output");
     expect(importSkill).toContain("existing_axhub_app_repair");
@@ -290,8 +293,8 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("GitHub device code");
     expect(clarity).toContain("사용자가 아래처럼 영어로 직접 clarity 를 지목해도 이 스킬을 실행");
     expect(clarity).toContain("직전 답변을 재사용해서 끝내지 말고");
-    expect(clarityFrontmatter).toContain("disable-model-invocation: true");
-    expect(clarity).toContain("사용자 수동 slash 또는 명시적 지목 때만 실행해요");
+    expect(clarityFrontmatter).not.toContain("disable-model-invocation");
+    expect(clarity).toContain("frontmatter description 라우팅으로 자연어에서도 이 스킬이 직접 받아요");
     expect(clarity).toContain("slash 명령이 실패한 직후라도 자연어 요청은 독립된 새 요청으로 취급");
     expect(clarity).toContain("`스킬 가이드가 반환됐네요`");
     expect(clarity).toContain("메타 설명을 사용자에게 말하지 않아요");
@@ -347,7 +350,7 @@ describe("smooth behavior contracts", () => {
     expect(diagnosis).toContain("실패 배포 id 없이 \"혹시 실패 원인 있으면\"처럼 물었고 현재 라이브가 정상이면 `정상이에요` 로 끝내고");
     expect(diagnosis).toContain("영어 실패 배포 진단 요청도 반드시 이 스킬로 라우팅");
     expect(diagnosis).toContain("axhub deploy status <deployment-id>");
-    expect(diagnosis).toContain("axhub deploy logs <deployment-id>");
+    expect(diagnosis).toContain("axhub deploy logs --app");
     expect(diagnosis).toContain("CLI 전용");
     expect(diagnosis).toContain("MCP `deployment_diagnosis` 같은 deployment MCP 도구가 보여도 호출하지 않아요");
     expect(diagnosis).toContain("MCP `App list`, `App get`, `deployment_diagnosis` 같은 도구만으로 진단을 대신하지 않아요");
@@ -400,7 +403,7 @@ describe("smooth behavior contracts", () => {
     const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
 
-    const update = readRepo("skills/update/SKILL.md");
+    const update = readRepo("skills/update/SKILL.md") + readRepo("skills/update/references/post-update-continuation.md");
     const updateBody = update.replace(/^---\n[\s\S]*?\n---\n?/, "");
     expect(update).toContain("description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill");
     expect(update).toContain('일반 UX 역할 문구나 "알아서 진행"만으로는 update 가 아니며');
@@ -484,7 +487,7 @@ describe("smooth behavior contracts", () => {
   });
 
   test("development skill follows the current SDK raw-db surface", () => {
-    const development = readRepo("skills/development/SKILL.md");
+    const development = readRepo("skills/development/SKILL.md") + readRepo("skills/development/references/sdk-db-surface.md");
     const connectorSafety = readRepo("skills/development/references/connector-safety.md");
     const writeGate = readRepo("skills/development/references/write-gate.md");
 
@@ -551,8 +554,8 @@ describe("smooth behavior contracts", () => {
   test("session carry-over handoff contract is wired (Phase 1, instruction-first)", () => {
     const carryover = readRepo("skills/deploy/references/session-carryover.md");
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
-    const deploy = readRepo("skills/deploy/SKILL.md");
-    const clarity = readRepo("skills/clarity/SKILL.md");
+    const deploy = readRepo("skills/deploy/SKILL.md") + readRepo("skills/deploy/references/user-facing-language.md");
+    const clarity = readRepo("skills/clarity/SKILL.md") + readRepo("skills/clarity/references/execution-guardrails.md");
 
     // Shared single-source contract carries all four elements (DRY).
     expect(carryover).toContain("감지 휴리스틱");
@@ -666,7 +669,7 @@ describe("smooth behavior contracts", () => {
     }
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.UserPromptSubmit.flatMap((group) => group.hooks);
-    expect(entries).toHaveLength(4);
+    expect(entries).toHaveLength(1);
 
     // update 라우터는 hooks/update-router.sh 로 추출됐어요 — hooks.json 은
     // 형제 라우터와 같은 bare 위임만 갖고, kill switch(env·marker)와 계약
@@ -718,78 +721,10 @@ describe("smooth behavior contracts", () => {
     expect(routerScript).not.toContain("axhub update check");
     expect(routerScript).not.toContain("claude plugin update");
 
-    const clarityRouter = entries[1];
-    expect(clarityRouter.type).toBe("command");
-    expect(clarityRouter.shell).toBe("bash");
-    expect(clarityRouter.command).toContain("clarity-router.sh");
-
-    const clarityRouterScript = readRepo("hooks/clarity-router.sh");
-    expect(clarityRouterScript).toContain("AXHUB_NO_CLARITY_ROUTER");
-    expect(clarityRouterScript).toContain("exact axhub GitHub reconnect/device-code operation");
-    expect(clarityRouterScript).toContain("Apply the axhub clarity GitHub device-flow contract inline");
-    expect(clarityRouterScript).toContain("Do not invoke the /axhub:clarity slash command");
-    expect(clarityRouterScript).toContain("failing skill badge");
-    expect(clarityRouterScript).toContain("axhub --help | grep");
-    expect(clarityRouterScript).toContain("shell pipes, redirects, grep, head, sed, awk, bash -lc, sh -c");
-    expect(clarityRouterScript).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link");
-    expect(clarityRouterScript).toContain("계정 인증 시작");
-    expect(clarityRouterScript).toContain("never use axhub GitHub device flow 인증 시작");
-    expect(clarityRouterScript).toContain("https://github.com/login/device");
-    expect(clarityRouterScript).toContain("인증 URL: `https://github.com/login/device`");
-    expect(clarityRouterScript).toContain("입력 코드: <USER_CODE>");
-    expect(clarityRouterScript).toContain("[https://github.com/login/device](github.com/login/device)");
-    expect(clarityRouterScript).toContain("Do not end the turn after showing the code or after any pending/waiting CLI text");
-    expect(clarityRouterScript).toContain("승인했어");
-    expect(clarityRouterScript).toContain("인증 확인");
-    expect(clarityRouterScript).toContain("axhub github accounts list --json");
-    expect(clarityRouterScript).toContain("*최신*|*버전*|*업데이트*|*latest*");
-    expect(clarityRouterScript).not.toContain("python3");
-    expect(clarityRouterScript).not.toContain("node ");
-    expect(clarityRouterScript).not.toContain("systemMessage");
-
-    const importRouter = entries[2];
-    expect(importRouter.type).toBe("command");
-    expect(importRouter.shell).toBe("bash");
-    expect(importRouter.command).toContain("import-router.sh");
-
-    const importRouterScript = readRepo("hooks/import-router.sh");
-    expect(importRouterScript).toContain("AXHUB_NO_IMPORT_ROUTER");
-    expect(importRouterScript).toContain("bring or first-deploy an existing local app to axhub");
-    expect(importRouterScript).toContain("invoke the axhub import skill");
-    expect(importRouterScript).toContain("기존 앱을 axhub에 가져올 준비를 확인할게요");
-    expect(importRouterScript).toContain("treat that absolute path as APP_DIR");
-    expect(importRouterScript).toContain('cd \\"<the actual absolute APP_DIR from the user prompt>\\" &&');
-    expect(importRouterScript).toContain("not bare axhub/git/npm and not literal $APP_DIR");
-    expect(importRouterScript).toContain("Do not use the selected Code workspace root as a substitute");
-    expect(importRouterScript).toContain("Do not read package.json, list files, or say bootstrap before invoking import");
-    expect(importRouterScript).toContain("Never run axhub apps bootstrap for existing/local-folder apps");
-    expect(importRouterScript).toContain("*최신*|*버전*|*업데이트*|*latest*");
-    expect(importRouterScript).not.toContain("python3");
-    expect(importRouterScript).not.toContain("node ");
-    expect(importRouterScript).not.toContain("systemMessage");
-
-    const statusRouter = entries[3];
-    expect(statusRouter.type).toBe("command");
-    expect(statusRouter.shell).toBe("bash");
-    expect(statusRouter.command).toContain("status-resume-router.sh");
-
-    const statusRouterScript = readRepo("hooks/status-resume-router.sh");
-    expect(statusRouterScript).toContain("AXHUB_NO_STATUS_ROUTER");
-    expect(statusRouterScript).toContain("axhub app creation/deployment/status flow");
-    expect(statusRouterScript).toContain("invoke the axhub bootstrap skill");
-    expect(statusRouterScript).toContain("generic Code-mode handling, shell probes");
-    expect(statusRouterScript).toContain("command -v axhub");
-    expect(statusRouterScript).toContain("axhub plugin-support init-resume route --json");
-    expect(statusRouterScript).toContain("axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json");
-    expect(statusRouterScript).toContain("axhub apps get <app> --json");
-    expect(statusRouterScript).toContain("axhub deploy list --app <app> --json");
-    expect(statusRouterScript).toContain("axhub deploy status <deployment-id> --tenant <tenant> --json");
-    expect(statusRouterScript).toContain("axhub deploy verify <deployment-id> --app <app> --json");
-    expect(statusRouterScript).toContain("Deployment list (axhub)");
-    expect(statusRouterScript).toContain("axhub deployment list");
-    expect(statusRouterScript).not.toContain("python3");
-    expect(statusRouterScript).not.toContain("node ");
-    expect(statusRouterScript).not.toContain("systemMessage");
+    // diet 계약: update 외 UserPromptSubmit 라우터는 wiring 도 스크립트도 없어요
+    for (const removed of ["clarity-router.sh", "import-router.sh", "status-resume-router.sh"]) {
+      expect(entries.some((entry) => entry.command.includes(removed))).toBe(false);
+    }
 
     const sessionEntries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
     const sessionRouter = sessionEntries[3];
@@ -866,7 +801,10 @@ describe("smooth behavior contracts", () => {
   });
 
   test("import frontmatter starts directly and avoids preamble leaks", () => {
-    const importSkill = readRepo("skills/import/SKILL.md");
+    const importSkill =
+      readRepo("skills/import/SKILL.md") +
+      readRepo("skills/import/references/visibility-rules.md") +
+      readRepo("skills/import/references/manifest-authoring.md");
     const importFrontmatter = importSkill.match(/^---\n([\s\S]*?)\n---/)?.[1];
     expect(importFrontmatter, "import SKILL frontmatter not found").not.toBeNull();
     const importDescription = importFrontmatter?.match(/^description:\s*'([^']*)'/m)?.[1];
