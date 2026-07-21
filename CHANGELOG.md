@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.15.5](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.4...v1.15.5) (2026-07-21)
+
+Claude Code Desktop 실사용 QA에서 플러그인 새 버전을 찾고도 `/plugin update`가 대화형이라 실행할 수 없다며 사용자에게 터미널 작업을 떠넘기던 dead-end를 고쳤어요. 이제 플러그인만 업데이트해 달라는 자연어도 현재 버전과 설치 위치를 확인한 뒤 비대화형 `claude plugin update`를 직접 실행하고, 제외된 CLI는 변경하지 않으며, 받은 버전과 재시작 필요 여부까지 확인해 알려줘요. 중복 설치 판정은 필요할 때만 읽는 reference로 분리해 8스킬 컨텍스트 예산도 180KB 안에 유지했어요.
+
+
+### Fixed
+
+* **update:** execute plugin upgrades in Desktop ([#414](https://github.com/jocoding-ax-partners/axhub/issues/414)) ([8b53396](https://github.com/jocoding-ax-partners/axhub/commit/8b53396502d5843dd1535a4b8481edd0debdc1b4))
+
 ## [1.15.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.3...v1.15.4) (2026-07-21)
 
 Claude Code Desktop의 실제 첫 온보딩 QA에서 읽기 전용 감지조차 복합 셸로 묶여 `Contains shell syntax ... cannot be statically analyzed` 권한 경고를 띄우던 문제를 고쳤어요. 이제 CLI 위치 확인, 디스크 설치 확인, 온보딩 감지를 각각 하나의 독립된 명령으로 실행하고 확인된 절대경로를 직접 사용해, 개발 경험이 없는 사용자도 위험해 보이는 명령을 승인하지 않고 자연스럽게 첫 설정을 이어갈 수 있어요.
