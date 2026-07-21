@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.15.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.14.5...v1.15.0) (2026-07-21)
+
+백엔드가 빌드 실패 배포에 secret 마스킹·절단을 끝낸 빌드 로그 tail(`build_log_tail`)을 내려주기 시작해서, diagnosis 스킬이 이 값을 원인 판단 근거로 쓰고 사용자에게 로그 발췌를 코드블록으로 보여줄 수 있게 Visibility 예외를 열었어요([#405](https://github.com/jocoding-ax-partners/axhub/pull/405)). 런타임 로그 원문과 signal text 는 기존대로 가리고, 필드가 없는 구 CLI·기능 이전 배포에서는 기존 원인군 요약으로 폴백해요. CLI 쪽 `--json` passthrough 는 axhub-cli 0.25.0 (jocoding-ax-partners/axhub-cli#504) 이 맡아요.
+
+### Added
+
+* diagnosis 스킬에 빌드 실패 로그 tail 노출 규칙 추가 ([#405](https://github.com/jocoding-ax-partners/axhub/pull/405)) 8adfdca
+
 ## [1.14.5](https://github.com/jocoding-ax-partners/axhub/compare/v1.14.4...v1.14.5) (2026-07-20)
 
 Windows 세션에서 에이전트가 free-form 으로 npm/npx 설치를 추측해 npm 이름 예약 스텁(0.0.1)의 placeholder reservation 오류에 부딪히던 경로를 막았어요([#403](https://github.com/jocoding-ax-partners/axhub/pull/403)). always-on AP-13 Windows 계약 hook 문안에 `axhub update`·install.ps1 만 안내하고 npm/npx 의 axhub·axhub-cli 패키지는 설치·실행·안내 전부 금지한다는 문장을 추가했고, 온보딩 install-channels 문서에도 두 설치 스크립트가 유일한 채널임을 명시했어요. agent-policy AP-13·CLAUDE.md parity 와 마켓플레이스 번들 미러도 함께 갱신했어요.
