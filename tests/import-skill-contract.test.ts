@@ -110,31 +110,47 @@ describe("import skill contract", () => {
     expect(skill).toContain("작업공간 선택 전에는 preview 승인이나 execute mutation을 시작하지 않아요");
   });
 
-  test("uses standalone Desktop commands and standalone verify polling", () => {
+  test("uses standalone Desktop commands and one bounded verify invocation", () => {
     const skill = readImportSkill();
     expect(skill).toContain("현재 선택된 프로젝트가 이미 정확히 `APP_DIR` 이면 `cd ... &&` 를 붙이지 않고");
     expect(skill).toContain("한 카드에 한 개의 bare 명령만");
     expect(skill).toContain("Monitor, background task, ScheduleWakeup, output 파일 읽기");
     expect(skill).toContain("`for`/`while`/`until`, `sleep`, command substitution, pipe, `grep`, `head`, `status=`");
-    expect(skill).toContain("standalone `axhub deploy verify <deployment-id> --app <app> --json`");
+    expect(skill).toContain("`capabilities.import.early_return` 과 `capabilities.import.verify_wait` 가 모두 true");
+    expect(skill).toContain("axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 10m --json");
+    expect(skill).toContain("내부 폴링 예산은 최대 30회 또는 10분(AP-16)");
+    expect(skill).toContain("정확히 한 번 호출");
+    expect(skill).toContain("같은 verify 를 반복 호출하거나 `axhub apps get`, `deploy list`, `deploy status` 같은 사후 확인을 덧붙이지 않아요");
   });
 
-  test("commit manifest question uses short JSON-safe desktop copy", () => {
+  test("preview approval carries the commit choice without a second question", () => {
     const skill = readImportSkill();
     expect(skill).toContain("## AskUserQuestion JSON 안전 규칙");
-    expect(skill).toContain("question: `axhub.yaml을 커밋하고 푸시할까요?`");
-    expect(skill).toContain("option 1 label: `커밋하고 진행`");
-    expect(skill).toContain("option 2 label: `커밋 없이 진행`");
-    expect(skill).toContain("option 3 label: `취소`");
+    expect(skill).toContain("question: `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?`");
+    expect(skill).toContain("option 1 label: `설정도 반영하고 시작`");
+    expect(skill).toContain("option 2 label: `커밋 없이 시작`");
+    expect(skill).toContain("option 3 label: `먼저 수정할게요`");
+    expect(skill).toContain("option 4 label: `취소`");
+    expect(skill).toContain("manifest 검증 뒤에는 다시 묻지 않아요");
+    expect(skill).not.toContain("axhub.yaml을 커밋하고 푸시할까요?");
     expect(skill).not.toContain("커밋·push 하고 진행 (첫 배포부터 반영)");
   });
 
-  test("local-only GitHub import still asks for commit manifest", () => {
+  test("local-only GitHub import includes commit choice in the single approval", () => {
     const skill = readImportSkill();
     expect(skill).toContain("local_only 앱은 아직 git remote 가 없을 수 있지만");
-    expect(skill).toContain("remote 없음만으로 이 질문을 건너뛰지 않아요");
+    expect(skill).toContain("remote 없음만으로 이 선택지를 빼지 않아요");
     expect(skill).not.toContain("git remote 가 있으면 커밋 동의");
-    expect(skill).toContain("capability 가 없거나 repo 없는 static lane");
+    expect(skill).toContain("`설정도 반영하고 시작` 을 골랐으면 검증 뒤 다시 묻지 않고");
+  });
+
+  test("uses the exact import option contract and never invents private", () => {
+    const skill = readImportSkill();
+    expect(skill).toContain("`--mode`, `--headless`, `--approved`, `--commit-manifest`, `--verify-wait`");
+    expect(skill).toContain("정확히 `--repo-private` 를 쓰고");
+    expect(skill).toContain("존재하지 않는 `--private` 를 절대 붙이지 않아요");
+    expect(skill).toContain("`plugin-support import --help` 호출로 이어가지 말고 멈춰요");
+    expect(skill).toContain('--repo "$GITHUB_OWNER/$REPO_NAME" --repo-private --tenant "$TENANT"');
   });
 
   test("manifest authoring removes direct axhub.yaml ignore rule", () => {
@@ -142,11 +158,12 @@ describe("import skill contract", () => {
     expect(skill).toContain("## Manifest 보강");
     expect(skill).toContain("무시 중이면 `.gitignore` 또는 `.git/info/exclude`");
     expect(skill).toContain("axhub.yaml 을 쓰기 전에 반드시 먼저");
-    expect(skill).toContain('cd "<absolute APP_DIR>" && git check-ignore -q axhub.yaml');
+    expect(skill).toContain("bare `git check-ignore -q axhub.yaml`");
+    expect(skill).toContain("현재 Desktop 프로젝트가 `APP_DIR` 이면 `cd`, `&&`, `;`, `echo $?`를 붙이지 않아요");
     expect(skill).toContain("`axhub.yaml` 을 직접 무시하는 줄을 제거");
     expect(skill).toContain("`git check-ignore -q axhub.yaml` 이 실패");
     expect(skill).toContain("아직 무시되면 axhub.yaml 을 쓰거나");
-    expect(skill).toContain("검증 통과 직후, commit manifest 확인 질문을 띄우기 전에도");
+    expect(skill).toContain("검증 통과 직후, execute 전에");
     expect(skill).toContain("아직 무시되면 execute 를 호출하지 말고");
     expect(skill).toContain("`.gitignore` 변경도 같은 커밋에 들어가야");
     expect(skill).toContain("실패한 execute 뒤에 뒤늦게 고치는 복구 흐름으로 두지 않아요");
@@ -162,10 +179,13 @@ describe("import skill contract", () => {
     expect(skill).toContain("workspace root 에서 `axhub --json plugin-support import`");
     expect(skill).toContain("권한 카드 명령이 bare `axhub ...`, bare `git ...`, bare `npm ...` 로 시작하거나");
     expect(skill).toContain('실제 절대 경로가 들어간 `cd "<absolute APP_DIR>" &&`');
-    expect(skill).toContain('cd "<absolute APP_DIR>" && axhub plugin-support preflight --json');
-    expect(skill).toContain('cd "<absolute APP_DIR>" && axhub deploy --explain --json');
-    expect(skill).toContain('cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT"');
-    expect(skill).toContain('cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode execute --approved --commit-manifest');
+    expect(skill).toContain("아래 Workflow 명령 예시는 모두 tool cwd 가 `APP_DIR` 로 지정된 bare 명령이에요");
+    expect(skill).toContain("axhub plugin-support preflight --json");
+    expect(skill).toContain("axhub deploy --explain --json");
+    expect(skill).toContain('axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT"');
+    expect(skill).toContain("axhub --json plugin-support import --mode execute --approved --commit-manifest");
+    expect(skill).not.toContain('cd "<absolute APP_DIR>" && axhub plugin-support preflight --json');
+    expect(skill).not.toContain('cd "<absolute APP_DIR>" && axhub deploy --explain --json');
   });
 
   test("repo owner without repo name keeps the repo name equal to app slug", () => {
@@ -206,7 +226,17 @@ describe("import skill contract", () => {
   test("preflight fixture advertises import/v1 capability", () => {
     const { result } = runShim(["plugin-support", "preflight", "--json"]);
     expect(result.exitCode).toBe(0);
-    expect(parseStdout(result.stdout)).toMatchObject({ capabilities: { import: { supported: true, schemas: ["import/v1"] } } });
+    expect(parseStdout(result.stdout)).toMatchObject({
+      capabilities: {
+        import: {
+          supported: true,
+          schemas: ["import/v1"],
+          commit_manifest: true,
+          early_return: true,
+          verify_wait: true,
+        },
+      },
+    });
   });
 
   test("preview envelope is valid and uses one CLI import invocation", () => {

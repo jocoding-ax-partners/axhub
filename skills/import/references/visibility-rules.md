@@ -46,13 +46,15 @@ Claude Desktop 이 Bash 내용에서 자동 제목을 만들 때도 같은 규�
 
 Claude Desktop 에서는 AskUserQuestion 을 raw JSON 문자열이나 수동 `\uXXXX` escape 로 만들지 않아요. native Question/AskUserQuestion tool 입력에는 평문 UTF-8 문자열만 넣고, question/header/label/description 은 짧게 써요. 한글 escape 가 깨지면 `InputValidationError` 가 사용자 화면에 그대로 보이므로, 질문을 길게 풀어 쓰거나 괄호가 긴 선택지를 만들지 않아요.
 
-commit manifest 확인 질문은 아래 exact copy 만 써요.
+GitHub 기반 첫 배포에서 commit manifest capability 가 있으면 preview 통합 승인에 아래 exact copy 만 써요. manifest 검증 뒤에는 다시 묻지 않아요.
 
-- header: `커밋 확인`
-- question: `axhub.yaml을 커밋하고 푸시할까요?`
-- option 1 label: `커밋하고 진행`
+- header: `가져오기 확인`
+- question: `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?`
+- option 1 label: `설정도 반영하고 시작`
 - option 1 description: `첫 배포에 설정을 반영해요.`
-- option 2 label: `커밋 없이 진행`
+- option 2 label: `커밋 없이 시작`
 - option 2 description: `다음 배포부터 반영해요.`
-- option 3 label: `취소`
-- option 3 description: `가져오기를 중단해요.`
+- option 3 label: `먼저 수정할게요`
+- option 3 description: `실행하지 않고 대화로 돌아가요.`
+- option 4 label: `취소`
+- option 4 description: `가져오기를 중단해요.`

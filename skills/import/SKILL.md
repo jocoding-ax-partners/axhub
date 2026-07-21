@@ -73,7 +73,7 @@ import preview 정상이면 axhub 가져오기 대상 확정이에요. Interacti
 
 ## AskUserQuestion JSON 안전 규칙
 
-AskUserQuestion 입력은 평문 UTF-8 만 쓰고 raw JSON/수동 escape 를 만들지 않아요. 커밋 확인 질문의 exact copy 는 [references/visibility-rules.md](references/visibility-rules.md) 의 AskUserQuestion 절을 그대로 써요.
+AskUserQuestion 입력은 평문 UTF-8 만 쓰고 raw JSON/수동 escape 를 만들지 않아요. preview 승인과 commit 선택을 합친 exact copy 는 [references/visibility-rules.md](references/visibility-rules.md) 의 AskUserQuestion 절을 그대로 써요.
 
 ## Vibe Coder Visibility Rules
 
@@ -138,14 +138,16 @@ Static 성공은 `active_release_id`, `verified === true`, `public_url`, `error 
 
 ## Manifest 보강
 
-`required_mutations` 에 `manifest_create` 가 있고 대화형일 때만, execute 전에 axhub.yaml 을 프로젝트 파일 근거로 풍부하게 작성해요 — 이 스킬이 직접 authoring 하는 유일한 단계예요. 실행 시점이 오면 [references/manifest-authoring.md](references/manifest-authoring.md) 를 읽고 그 규칙대로 진행해요: 무시 파일 선행/사후 정리(`git check-ignore`), manifest_hints·실파일 근거 grounding, 정규 스키마 필드만 작성, env 값 절대 금지(키 이름만), `axhub deploy --explain --json` 검증 게이트(최대 2회, 실패 시 최소 manifest 로 degrade), commit+push 는 `capabilities.import.commit_manifest` + 별도 동의가 있을 때만이에요. headless 에서는 실행하지 않아요.
+`required_mutations` 에 `manifest_create` 가 있고 대화형일 때만, execute 전에 axhub.yaml 을 프로젝트 파일 근거로 풍부하게 작성해요 — 이 스킬이 직접 authoring 하는 유일한 단계예요. 실행 시점이 오면 [references/manifest-authoring.md](references/manifest-authoring.md) 를 읽고 그 규칙대로 진행해요: 무시 파일 선행/사후 정리(`git check-ignore`), manifest_hints·실파일 근거 grounding, 정규 스키마 필드만 작성, env 값 절대 금지(키 이름만), `axhub deploy --explain --json` 검증 게이트(최대 2회, 실패 시 최소 manifest 로 degrade), commit+push 는 `capabilities.import.commit_manifest` + preview 승인에서 고른 명시적 동의가 있을 때만이에요. headless 에서는 실행하지 않아요.
 
 ## Workflow
 
 1. CLI 가드와 capability 확인
 
+아래 Workflow 명령 예시는 모두 tool cwd 가 `APP_DIR` 로 지정된 bare 명령이에요. 현재 Desktop 프로젝트가 `APP_DIR` 이면 보이는 명령 앞에 `cd`, `&&`, `;`, `echo $?`를 절대 붙이지 않아요.
+
 ```bash
-cd "<absolute APP_DIR>" && axhub plugin-support preflight --json
+axhub plugin-support preflight --json
 ```
 
 `capabilities.import.supported` 가 true 이고 `capabilities.import.schemas` 에 `import/v1` 이 있어야 해요. 아니면 업데이트 안내 후 멈춰요.
@@ -155,16 +157,18 @@ cd "<absolute APP_DIR>" && axhub plugin-support preflight --json
 preview 와 첫 승인보다 먼저 아래 읽기 전용 resolver 를 정확히 한 번 실행해요.
 
 ```bash
-cd "<absolute APP_DIR>" && axhub plugin-support tenant-resolve --json
+axhub plugin-support tenant-resolve --json
 ```
 
-현재 Desktop 프로젝트가 `APP_DIR` 이면 위 명령에서 `cd ... &&` 를 빼고 `axhub plugin-support tenant-resolve --json` 만 실행해요. 반환된 `tenant` 가 비어 있지 않으면 그 값을 이후 preview 와 execute 모두에 literal `--tenant <slug>` 로 넘겨요. `needs_pick: true` 면 후보를 사용자에게 `작업공간`이라고만 부르고, `앱을 어느 작업공간에 만들까요?`를 승인 전에 한 번 물은 뒤 선택한 slug 를 같은 literal 로 유지해요. 사용자-facing 문구에 `tenant` 또는 `테넌트`를 쓰지 않아요.
+반환된 `tenant` 가 비어 있지 않으면 그 값을 이후 preview 와 execute 모두에 literal `--tenant <slug>` 로 넘겨요. `needs_pick: true` 면 후보를 사용자에게 `작업공간`이라고만 부르고, `앱을 어느 작업공간에 만들까요?`를 승인 전에 한 번 물은 뒤 선택한 slug 를 같은 literal 로 유지해요. 사용자-facing 문구에 `tenant` 또는 `테넌트`를 쓰지 않아요.
 
 여러 작업공간이 있는 상태에서 `--tenant` 없는 execute 를 먼저 호출해 오류를 낸 뒤 `axhub tenants list`, `axhub tenant list`, `--help | grep`로 복구하지 않아요. 작업공간 선택 전에는 preview 승인이나 execute mutation을 시작하지 않아요. 이 순서가 깨지면 동일 가져오기 승인을 다시 받게 되어 Desktop deadlock UX예요.
 
 3. Preview envelope 요청
 
 사용자나 현재 컨텍스트에서 app slug, GitHub owner/repo, tenant 가 이미 정해졌으면 preview 부터 그대로 넘겨요. `--slug` 는 axhub 앱 slug, `--name` 은 표시 이름, `--repo` 는 GitHub 저장소예요. repo owner 를 별도 flag 로 만들지 말고 `--repo "$OWNER/$REPO"` 형태로 넘겨요.
+
+import helper 에 넘길 수 있는 옵션은 `--mode`, `--headless`, `--approved`, `--commit-manifest`, `--verify-wait`, `--app`, `--name`, `--slug`, `--repo`, `--repo-private`, `--repo-public`, `--branch`, `--from-dir`, `--installation-id`, `--tenant`, `--deploy-method`, `--json` 뿐이에요. 이 목록에 없는 옵션은 추론하거나 `--help`로 복구하지 않아요. 특히 사용자가 비공개 저장소를 원하면 정확히 `--repo-private` 를 쓰고, 존재하지 않는 `--private` 를 절대 붙이지 않아요. 실수로 unknown option 이 나오면 임의 옵션을 뺀 재시도나 `plugin-support import --help` 호출로 이어가지 말고 멈춰요. preview 와 execute 는 검증된 동일 옵션 집합을 유지해요.
 
 GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 반드시 `$APP_SLUG` 와 정확히 같게 둬요. 날짜·숫자·QA suffix 를 추론으로 자르거나 정리하지 않아요. 예를 들어 app slug 가 `uqa-exp-public-11021-0708` 이고 owner 가 `realitsyourman` 이면 `--repo "realitsyourman/uqa-exp-public-11021-0708"` 이어야 하며 `--repo "realitsyourman/uqa-exp-public-11021"` 처럼 줄인 명령은 실행하지 말고 고쳐서 다시 호출해요.
 
@@ -173,22 +177,22 @@ GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 �
 Docker/compose `local_only` 에서 새 GitHub repo 를 만들 때 owner 는 먼저 로컬 GitHub 계정과 맞춰요. `gh api user --jq .login` 으로 현재 `gh` 로그인 이름을 확인할 수 있으면 CLI 가 그 login 과 app slug 로 기본 repo 를 정해요. org owner 는 이미 그 org repo 를 직접 만들고 push 가능한 `origin` 이 있거나 사용자가 명시적으로 그 owner 를 지정했을 때만 써요. CLI 는 새 repo 생성 전에 owner mismatch 를 `typed_failure: git` 으로 막을 수 있어요. 이때는 같은 로컬 login owner 로 다시 preview/execute 하거나, org repo 를 직접 만들고 push 가능한 origin 에서 다시 실행해요.
 
 ```bash
-cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode preview
+axhub --json plugin-support import --mode preview
 ```
 
 예시:
 
 ```bash
-cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT"
+axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT"
 
 # Docker/compose local_only 처럼 GitHub repo 가 필요한 경우에만:
-cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --tenant "$TENANT"
+axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --repo-private --tenant "$TENANT"
 ```
 
 headless 에서는 이렇게 호출해요.
 
 ```bash
-cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode preview --headless
+axhub --json plugin-support import --mode preview --headless
 ```
 
 4. Envelope 검증
@@ -208,57 +212,49 @@ cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode preview --h
 새 앱 설정 파일이 필요하면, axhub.yaml 을 프로젝트 파일 근거로 자세히 작성할 예정이라고 한 줄로 같이 알려요.
 기존 axhub.yaml 복구가 필요하면, 문법이 깨져 있어서 CLI 가 가져오기 중 백업 파일을 남기고 안전한 최소 설정으로 복구한다고 한 줄로 같이 알려요. 이 경우 plugin 이 직접 덮어쓰지 않아요.
 
-6. 대화형 승인 1회
+6. 대화형 통합 승인 1회
 
-AskUserQuestion 은 preview 직후 한 번 써요. 질문은 `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?` 처럼 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인을 겸해요. 옵션은 다음 네 가지예요.
+AskUserQuestion 은 preview 직후 딱 한 번 써요. 질문은 `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?` 처럼 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인과 manifest commit 동의를 모두 겸해요.
 
-- 가져오기 시작
-- 먼저 수정할게요
-- 취소
-- 자세한 요약 보기
+- `capabilities.import.commit_manifest` 가 true 이고 GitHub 기반 첫 배포면 `설정도 반영하고 시작`, `커밋 없이 시작`, `먼저 수정할게요`, `취소` 네 옵션을 써요. 첫 옵션은 `--commit-manifest`, 둘째 옵션은 옵션 없는 execute 로 고정해요.
+- 그 외에는 `가져오기 시작`, `먼저 수정할게요`, `취소` 세 옵션만 써요.
 
-`가져오기 시작` 외에는 execute 를 호출하지 않아요. commit+push lane 이 적용될 때(아래 7)만 보강·검증 성공 후 커밋 동의 1회를 더 쓰고, 그 외에는 추가 질문을 쓰지 않아요.
+승인 선택 뒤에는 manifest 작성·검증 결과가 예상과 달라도 커밋 질문이나 같은 가져오기 질문을 다시 띄우지 않아요. 실행 가능한 첫째/둘째 옵션 외에는 execute 를 호출하지 않아요.
 
 7. axhub.yaml 보강 (manifest_create 일 때만)
 
-`가져오기 시작` 승인 직후, execute 전에 진행해요. `required_mutations` 에 `manifest_create` 가 있을 때만 위 `## Manifest 보강` 규칙대로 프로젝트 파일 근거로 axhub.yaml 을 작성하고 `axhub deploy --explain --json` 로 검증해요. `manifest_create` 가 없거나 headless 면 이 단계를 건너뛰어요.
-
-검증 통과 후, `capabilities.import.commit_manifest` 가 true 이고 GitHub 기반 첫 배포(docker/compose 또는 preview 에 `github_repo_create`/`github_connect`/`first_deploy` 가 있는 경우)면 커밋 동의 1회를 더 써요. local_only 라서 아직 git remote 가 없어도 이 질문을 건너뛰지 않아요. CLI 가 `--commit-manifest` execute 중 repo/remote 를 만들고 manifest 를 커밋·push 할 수 있어요. 옵션은 세 가지예요.
-
-- 커밋하고 진행
-- 커밋 없이 진행 (이후 deploy 부터 반영)
-- 취소
-
-capability 가 없거나 repo 없는 static lane 이면 이 질문을 건너뛰고 `커밋 없이 진행` 으로 가요.
+통합 승인 직후, execute 전에 진행해요. `required_mutations` 에 `manifest_create` 가 있을 때만 위 `## Manifest 보강` 규칙대로 프로젝트 파일 근거로 axhub.yaml 을 작성하고 `axhub deploy --explain --json` 로 검증해요. `manifest_create` 가 없거나 headless 면 이 단계를 건너뛰어요. `설정도 반영하고 시작` 을 골랐다면 검증 통과 뒤 질문 없이 `--commit-manifest` 를 쓰고, `커밋 없이 시작` 이면 질문 없이 그 옵션을 빼요. local_only 라서 아직 git remote 가 없어도 통합 승인에서 선택한 값을 그대로 유지해요.
 
 8. Execute 호출
 
-대화형 승인 직후 한 번만 호출해요. preflight `capabilities.import.early_return` 이 true 면 execute 에 `--verify-wait none` 을 붙여요 — execute 는 첫 배포 생성과 deployment id 확보까지만 하고 `verification_status: "pending"` 으로 바로 반환해요(`.axhub/import-resume.json` breadcrumb 포함). 첫 배포 검증은 이 스킬이 `axhub deploy verify <deployment-id> --app <app> --json` 를 **한 카드당 한 번의 별도 tool call** 로 반복해 확인하고, 폴링 예산 최대 30회 또는 10분(AP-16)을 지켜요(닿으면 재개 요약). Claude Desktop 에서는 Monitor, background task, ScheduleWakeup, output 파일 읽기, `for`/`while`/`until`, `sleep`, command substitution, pipe, `grep`, `head`, `status=` 같은 shell 변수로 폴링하지 않아요. 특히 zsh 예약어와 충돌할 수 있는 `status` 변수를 포함한 긴 shell block 권한 카드가 뜨면 실행하지 말고, 즉시 standalone `axhub deploy verify <deployment-id> --app <app> --json` 로 바꿔요. 같은 verify 명령에 이미 `항상 허용`이 적용되면 이후 확인은 추가 권한 카드 없이 이어질 수 있어요. capability 없는 구 CLI 는 execute 가 검증까지 동기라 foreground 로 실행하고 완료 출력을 기다려요. Claude Code Desktop 에서 tool 이 긴 실행을 background job 으로 전환하더라도, 그 background output 을 다시 읽어 `import/v1` execute envelope 를 검증하기 전에는 "완료"라고 말하지 않아요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못하면, 같은 명령을 반복 실행하지 말고 읽기 전용 증거로 상태를 재확인해요 — deployment id 를 알면 `axhub deploy verify <deployment-id> --app <app> --json`, 모르면 `axhub apps git status <앱>` → `axhub deploy list --app <앱> --json` 순서로 최신 deployment id 를 복원한 뒤 같은 verify 로 판정해요. 이 재확인 반복에도 같은 폴링 예산이 적용돼요.
+대화형 승인 직후 한 번만 호출해요. preflight 의 `capabilities.import.early_return` 과 `capabilities.import.verify_wait` 가 모두 true 일 때만 execute 에 `--verify-wait none` 을 붙여요 — execute 는 첫 배포 생성과 deployment id 확보까지만 반환하고, 이어서 **권한 카드 한 번으로 끝나는** `axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 10m --json` 를 정확히 한 번 호출해요. 이 한 호출의 내부 폴링 예산은 최대 30회 또는 10분(AP-16)이고, `--wait` 가 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `axhub apps get`, `deploy list`, `deploy status` 같은 사후 확인을 덧붙이지 않아요. 둘 중 capability 하나라도 없으면 `--verify-wait none` 을 빼서 execute 가 동기 검증을 끝내게 하고, 반환된 정확한 deployment id 로 일반 `axhub deploy verify <deployment-id> --app <app> --json` 를 최종 증거용으로 정확히 한 번만 호출해요.
 
-`커밋 없이 진행` 이거나 commit+push 질문을 건너뛴 경우:
+Claude Desktop 에서는 Monitor, background task, ScheduleWakeup, output 파일 읽기, `for`/`while`/`until`, `sleep`, command substitution, pipe, `grep`, `head`, `status=` 같은 shell 폴링을 쓰지 않아요. 첫 verify 가 exit 6 또는 timeout 이면 성공이라고 말하지 않고, 같은 명령을 자동 재실행하거나 새 승인 카드를 띄우지 않은 채 현재 진행 중이며 나중에 같은 ID로 이어볼 수 있다고 요약해요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못해도 execute 를 다시 실행하지 않아요.
+
+`커밋 없이 시작` 이거나 commit+push capability 가 없는 경우:
 
 ```bash
-cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode execute --approved
+axhub --json plugin-support import --mode execute --approved
 ```
 
 preview 에 `--slug`, `--repo`, `--tenant`, `--name`, `--deploy-method`, `--from-dir`, `--branch` 같은 import 옵션을 넘겼다면 execute 에도 같은 값을 그대로 반복해요. static lane preview 에 `--repo` 를 넣지 않았다면 execute 에도 넣지 않아요. Docker/compose `local_only` 에서 `--repo owner/name` 이 없으면 CLI 가 현재 `gh` 로그인과 app slug 로 repo 를 정하고, owner 를 확인할 수 없으면 repo failure 로 멈춰요.
 
 ```bash
-cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"
+axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"
 
 # Docker/compose local_only 처럼 GitHub repo 가 필요한 경우에만:
-cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --tenant "$TENANT"
+axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --repo-private --tenant "$TENANT"
 ```
 
-`커밋하고 진행` 을 골랐으면 `--commit-manifest` 를 더해요. CLI 가 backend mutation 전에 axhub.yaml 을 커밋·push 해서 첫 배포에 반영해요.
+`설정도 반영하고 시작` 을 골랐으면 `--commit-manifest` 를 더해요. CLI 가 backend mutation 전에 axhub.yaml 을 커밋·push 해서 첫 배포에 반영해요.
 
 ```bash
-cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode execute --approved --commit-manifest
+axhub --json plugin-support import --mode execute --approved --commit-manifest
 ```
 
 동일 승인으로 두 번 호출하지 않아요. execute 결과도 `import/v1` 로 다시 검증해요. push 실패는 `typed_failure: git` 으로 와요(아래 10의 git 행으로 안내).
 
-권한 복구 뒤 같은 import 를 재개할 때는 preview 가 `existing_axhub_app_repair` 를 줄 수 있어요. 이 경우에도 execute 는 CLI envelope 한 번으로 처리해요. 이미 성공 deployment evidence 가 있거나 방금 execute 가 `deployment_id` 를 반환했으면, 그 id 와 앱 scope 로 `axhub deploy verify <deployment-id> --app <app>` 를 한 번 더 읽어 최종 증거를 확인하고 끝내요.
+권한 복구 뒤 같은 import 를 재개할 때는 preview 가 `existing_axhub_app_repair` 를 줄 수 있어요. 이 경우에도 execute 는 CLI envelope 한 번으로 처리하고, 위 capability 규칙에 맞는 verify 한 번만 실행해요.
 
 9. 성공 안내
 
@@ -292,6 +288,6 @@ cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode execute --a
 - plugin 은 low-level CLI primitive 를 조합하지 않아요.
 - manifest 보강은 plugin 이 직접 authoring 하는 유일한 단계예요 — `manifest_create` 일 때만, 증거 있는 필드만, env 값 없이 작성하고 `axhub deploy --explain --json` 통과를 강제해요. 실패하면 최소 manifest 로 fallback 해요.
 - `manifest_repair` 는 CLI execute 가 처리해요. plugin 은 preview 에서 사용자에게 알리고, 직접 파일을 덮어쓰지 않아요.
-- commit+push 는 opt-in 이에요 — `capabilities.import.commit_manifest` true + GitHub 기반 첫 배포 + 별도 동의가 모두 있을 때만 `--commit-manifest` 로 호출하고, 그 git 커밋·push 는 CLI 가(force 없이) 맡아요. local_only 는 remote 없음만으로 제외하지 않아요. capability 가 없으면 옵션을 제공하지 않아요. headless 에서는 없어요.
+- commit+push 는 opt-in 이에요 — `capabilities.import.commit_manifest` true + GitHub 기반 첫 배포 + preview 통합 승인에서 `설정도 반영하고 시작` 선택이 모두 있을 때만 `--commit-manifest` 로 호출하고, 그 git 커밋·push 는 CLI 가(force 없이) 맡아요. local_only 는 remote 없음만으로 제외하지 않아요. capability 가 없으면 옵션을 제공하지 않아요. headless 에서는 없어요.
 - malformed envelope, unknown schema, unknown enum, missing static URL, `verified !== true`, headless execute, approval bypass 는 모두 중단해요.
 - 성공을 말하기 전 항상 execute envelope 의 method-specific evidence 를 확인해요.
