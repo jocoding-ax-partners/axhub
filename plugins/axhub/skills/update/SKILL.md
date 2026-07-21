@@ -18,6 +18,8 @@ examples:
     intent: "check/update axhub first, then continue GitHub reconnect/device-code handling without asking for another user prompt"
   - utterance: "update axhub"
     intent: "update axhub cli and plugin to latest"
+  - utterance: "axhub 플러그인만 최신 버전으로 업데이트해줘. CLI는 건드리지 마"
+    intent: "update only the axhub plugin with the non-interactive claude plugin update command; do not apply a CLI update"
 allows-dependency-execution: true
 model: sonnet
 ---
@@ -32,6 +34,8 @@ model: sonnet
 
 **CRITICAL desktop-visible probe narration.** `claude plugin list` 는 내부 판정을 위한 도구예요. 이 도구 뒤에 사용자에게 보이는 중간 문장은 반드시 `현재 플러그인 버전을 확인했어요.` 또는 생략 둘 중 하나예요. 플러그인 버전값과 설치 위치값을 같은 문장에 섞지 않아요. `scope`, `user`, `project`, `local`, `managed`, `Scope:` 같은 설치 위치 원문은 chat 에 쓰지 않아요. 버전 숫자는 최종 결과 카드나 업데이트 안내처럼 사용자에게 필요한 자리에서만 보여줘요.
 
+**CRITICAL Desktop plugin update is executable.** `claude plugin update axhub@axhub --scope <SCOPE>` 는 slash command 나 대화형 패널이 아니라 Desktop Bash tool 에서 직접 실행하는 비대화형 CLI 명령이에요. `claude plugin list` 가 성공해 enabled `axhub@axhub` 와 scope 를 읽었고 사용자가 플러그인 업데이트를 요청했다면, 업데이트 필요 시 반드시 이 명령을 직접 실행해요. `"/plugin update 는 대화형이라 제가 실행할 수 없어요"`, `"인터랙티브 터미널에서 직접 실행해 주세요"`, 사용자가 `/plugin update` 를 실행하라는 안내로 끝나면 실패예요. `claude plugin list` 성공 뒤에는 수동 slash-command 폴백으로 내려가지 않아요.
+
 **CRITICAL mixed-request continuation.** 사용자가 업데이트와 함께 앱 상태·새 앱 생성·배포·GitHub 재연결/device code 같은 다른 axhub 요청을 말했으면, 업데이트 결과 카드까지 먼저 끝낸 뒤 같은 assistant 흐름에서 남은 요청을 직접 이어가요 — 추가 프롬프트를 기다리지 않고, Task/Subagent/백그라운드로 우회하지 않아요. 후속 앱 상태 overview 와 GitHub device-flow 의 정확한 명령·제목·금지 목록은 [references/post-update-continuation.md](references/post-update-continuation.md) 를 읽고 그대로 따라요.
 
 사용자가 직접 **axhub CLI 와 Claude Code 플러그인을 지금 최신으로** 맞추려는 요청이에요. 제거된 자동 훅에 의존하지 않고, 사용자가 명시적으로 요청한 순간에만 버전 확인과 적용을 진행해요:
@@ -41,7 +45,7 @@ model: sonnet
 
 전 과정 best-effort·비차단이에요. 실패·구 CLI·네트워크 오류면 raw 에러를 숨기고 한 줄만 안내한 뒤 멈춰요.
 
-**책임 경계.** 이 경로는 버전 업데이트만 해요. 첫 셋업·CLI 설치는 `onboarding` 소관이고, 그 외 axhub 운영 명령은 업데이트 결과를 끝낸 뒤 다음 적절한 axhub 흐름으로 양보·계속 처리해요.
+**책임 경계.** 이 경로는 버전 업데이트만 해요. 첫 셋업·CLI 설치는 `onboarding` 소관이고, 그 외 axhub 운영 명령은 업데이트 결과를 끝낸 뒤 다음 적절한 axhub 흐름으로 양보·계속 처리해요. 사용자가 `플러그인만` 또는 `CLI만`처럼 한 구성요소만 명시하면 최신 판정을 위한 read-only check 는 하되 제외한 구성요소의 apply 명령은 실행하지 않아요. `플러그인만` 요청은 `claude plugin list` → `axhub update check --plugin-version <PLUGIN_VERSION> --json` → 필요 시 `claude plugin update axhub@axhub --scope <SCOPE>` 로 끝까지 처리해요.
 
 **비-axhub 맥락 가드.** 사용자가 `axhub` 를 말하지 않고 "업데이트해줘"처럼 일반 업데이트만 말한 경우에는 대화의 axhub 언급·현재 폴더의 axhub 연결 manifest·직전 axhub 작업 같은 **axhub 맥락**이 있을 때만 진행해요. 맥락이 없으면 axhub 업데이트로 밀어붙이지 말고 axhub 사용 의사를 한 번 확인하거나 조용히 멈춰요.
 
@@ -85,9 +89,7 @@ TodoWrite({ todos: [
 
 1. `command -v axhub` 가 실패하면 멈춰요 — CLI 가 아직 없는 건 설치 소관이에요. 한 줄: `axhub CLI 가 아직 없어요. "온보딩" 이라고 말하면 설치부터 도와드려요.` (재설치를 여기서 시도하지 않아요.)
 2. Claude Desktop 에서는 플러그인 캐시의 `plugin.json` 을 읽지 않아요. 가능하면 정확히 `claude plugin list` 한 번으로 `axhub@axhub` 의 현재 버전을 내부 변수 `<PLUGIN_VERSION>` 으로만 둬요. `claude plugin list` 가 실패하거나 목록에서 못 찾으면 `<PLUGIN_VERSION>` 없이 CLI 업데이트 확인만 진행해요. 이 단계에서 설치 경로, Scope, manifest 경로, raw 목록, `user scope`/`local scope` 같은 scope 원문, 영어 진행 로그는 사용자에게 말하지 않아요. 필요한 경우 `현재 플러그인 버전을 확인했어요.` 만 말해요. 설치 위치값은 업데이트 명령의 `--scope` 인자에만 쓰고 chat 에는 쓰지 않아요.
-3. `claude plugin list` 에 `axhub@axhub` 가 여러 번 나오면, enabled 항목 중 **가장 높은 semver** 를 `<PLUGIN_VERSION>` 으로 삼아요. 같은 버전이 여러 scope 에 있으면 업데이트 대상 `<SCOPE>` 는 현재 작업공간에 가장 가까운 항목(`local` → `project` → `user`)을 고르고, 이 선택 근거는 chat 에 쓰지 않아요. 낮은 버전이 함께 남아 있어도 사용자에게 중복 설치·scope 원문을 설명하지 않고, 최종 카드에는 선택된 최고 버전만 써요.
-
-**중복 설치 판정 알고리즘.** `claude plugin list` 결과를 읽을 때는 먼저 모든 `axhub@axhub` block 을 끝까지 훑고, `Status: ✔ enabled` 인 block 만 모아 `version`, `scope` 를 내부 표로 만들어요. 그 다음 정렬해서 최고 semver 를 `<PLUGIN_VERSION>` 으로 확정한 뒤에만 `axhub update check --plugin-version <PLUGIN_VERSION> --json` 을 실행해요. 낮은 버전 block 이 남아 있어도 그것은 cleanup 대상이 아니며, 최신성 판정과 업데이트 대상 선택에서 무시해요. 현재 확인한 최고 enabled 버전이 CLI 응답의 플러그인 최신 버전 이상이면 업데이트 필요처럼 보여도 플러그인 업데이트를 실행하지 말고 `axhub 플러그인은 이미 최신이에요 (v<PLUGIN_VERSION>).` 로 닫아요. 즉, `local 1.8.2` 와 `user 1.8.0` 이 함께 있으면 현재 버전은 `1.8.2` 이고, `user 1.8.0 → 1.8.2` 같은 정리성 업데이트나 결과 카드를 만들지 않아요.
+3. `claude plugin list` 가 성공하면 [`references/plugin-update.md`](references/plugin-update.md)를 읽어요. 이 reference 가 중복 설치 최고 semver·scope 선택과 Desktop 직접 업데이트를 소유해요.
 
 **`disabled` 와 `AXHUB_NO_AUTO_UPDATE` — 둘 다 존중해요 (자동 적용 안 함, 안내만).**
 - `disabled`(패키지 매니저가 관리하는 설치) → CLI 가 자기를 교체할 수 없어요. 패키지 매니저 업그레이드를 **안내만** 해요.
@@ -116,6 +118,8 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 
 먼저 **안내-only 조건**을 봐요: `disabled == true` (패키지 매니저 관리 설치) 또는 `AXHUB_NO_AUTO_UPDATE` 설정 또는 `is_downgrade == true` (서버 롤백 배포 — 자동 다운그레이드는 하지 않아요). 하나라도 참이면 적용하지 않고 안내만 해요.
 
+사용자가 명시적으로 `플러그인만` 업데이트하고 CLI 는 건드리지 말라고 했으면 `has_update` 여부와 무관하게 `axhub update apply` 를 실행하지 않아요. read-only check 결과만 내부에 보존하고 플러그인 단계로 바로 이어가요. 이 제외 요청을 이유로 플러그인 업데이트까지 멈추면 실패예요.
+
 - **안내-only + `has_update == true`** → 한 줄 안내:
   - `disabled` → `axhub 는 패키지 매니저가 관리하는 설치예요. 패키지 매니저로 업그레이드해 주세요 (예: brew upgrade axhub).`
   - `AXHUB_NO_AUTO_UPDATE` → `axhub 새 버전(v<latest>)이 있어요. AXHUB_NO_AUTO_UPDATE 설정이라 자동 적용은 안 해요 — axhub update apply 로 직접 받거나 플래그를 끄면 돼요.`
@@ -134,16 +138,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 
 ## 3. 플러그인 업데이트 (`claude plugin update` — 재시작 후 반영)
 
-- `plugin` 블록이 없거나 플러그인 업데이트가 필요 없거나 현재 확인한 최고 enabled 버전이 CLI 응답의 플러그인 최신 버전 이상이면 → `axhub 플러그인은 이미 최신이에요 (v<확인된 플러그인 버전>).` 한 줄 (plugin 블록이 없으면 = 구 CLI 라 이 줄을 생략해요). 이때 낮은 중복 scope 가 있어도 `claude plugin update` 를 실행하지 않아요.
-- **`claude plugin list` 실행 실패** (Claude Code CLI 없음 또는 목록 확인 불가) → 한 줄 안내만: `axhub 플러그인 새 버전(v<최신 플러그인 버전>)이 있어요. Claude Code 에서 /plugin update 로 받아 주세요.`
-- **`AXHUB_NO_AUTO_UPDATE` 설정** → 적용하지 않고 한 줄 안내만: `axhub 플러그인 새 버전(v<최신 플러그인 버전>)이 있어요. AXHUB_NO_AUTO_UPDATE 설정이라 자동 적용은 안 해요 — claude plugin update axhub@axhub 로 직접 받거나 플래그를 끄면 돼요.`
-- **플러그인 업데이트가 필요하고 적용 가능하며 현재 확인한 버전이 CLI 응답의 플러그인 최신 버전보다 낮으면** → 적용해요:
-  1. 설치 위치를 먼저 확인해요 — `claude plugin list` 출력에서 `axhub@axhub` 항목의 `Scope:` 값(user/project/local/managed)을 읽어 내부 변수 `<SCOPE>` 로만 둬요. 같은 이름이 여러 번 나오면 enabled 항목 중 가장 높은 semver 를 현재 버전으로 보고, **그 최고 버전을 가진 block 들 안에서만** `local` → `project` → `user` 순서로 `<SCOPE>` 를 골라요. 낮은 버전 block 의 scope 는 업데이트 대상이 아니며, 사용자에게는 `플러그인 설치 위치를 확인할게요.` 라고 말하고 `Scope:` 원문은 보여주지 않아요. 못 찾으면 `user` 로 둬요.
-  2. 한 줄: `axhub 플러그인 새 버전(v<현재 플러그인 버전> → v<최신 플러그인 버전>)이 나왔어요. 지금 받을게요…`
-  3. 실행: `claude plugin update axhub@axhub --scope <SCOPE>`
-  4. 성공하면 `claude plugin list` 를 한 번 더 실행해 `axhub@axhub` enabled 항목 중 가장 높은 semver 를 받은 버전으로 내부 확정해요. 확인된 받은 버전이 CLI 응답의 플러그인 최신 버전보다 높아도 최종 카드에는 확인된 받은 버전만 한국어 결과 줄로 써요. 확인이 안 되면 CLI 응답의 플러그인 최신 버전을 써요.
-  5. **재시작 안내(필수 — 플러그인 업데이트는 재시작해야 적용돼요):** 정확히 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 라고 말해요. 이 문장은 바꾸거나 덧붙이지 않아요.
-  6. 실패하면 raw 에러는 숨기고 한 줄: `플러그인 자동 업데이트가 안 됐어요. claude plugin update axhub@axhub --scope <SCOPE> 를 직접 실행해 주세요.`
+`claude plugin list` 가 성공했으면 이미 읽은 [`references/plugin-update.md`](references/plugin-update.md)의 direct-update lane 을 끝까지 실행해요. plugin block 부재, 최신, kill switch, 직접 업데이트, 재확인, 실패 문구는 모두 reference 가 소유해요. 목록 조회가 성공했는데 `/plugin update` 패널로 떠넘기면 실패예요.
 
 ---
 
@@ -188,6 +183,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - NEVER exit 14/66 (보안 검증 실패) 을 무시하고 강제 진행하지 말아요. 하드 스톱이에요.
 - NEVER raw JSON·stderr·내부 device/installation id 를 chat 에 출력하지 말아요.
 - NEVER 플러그인 업데이트를 받고도 재시작 안내를 빼먹지 말아요 — 재시작 전엔 새 버전이 안 떠요.
+- NEVER `claude plugin list` 가 성공했는데 `/plugin update` 가 대화형이라 실행할 수 없다고 말하거나 사용자가 인터랙티브 터미널에서 직접 하도록 떠넘기지 말아요. 업데이트가 필요하면 Desktop Bash tool 로 `claude plugin update axhub@axhub --scope <SCOPE>` 를 직접 실행해요.
 - NEVER 플러그인 업데이트 성공 뒤 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 가 아닌 재시작 안내 문장을 만들지 말아요.
 - NEVER 확인하지 않은 버전을 "업데이트됨" 으로 보고하지 말아요 — `axhub --version` 재확인 뒤에만 새 버전을 말해요.
 - NEVER `claude plugin list` 에서 처음 발견한 낡은 `axhub@axhub` 항목만 보고 업데이트 여부를 판단하지 말아요 — enabled 항목 전체를 읽고 최고 semver 로 판단해요.

@@ -403,7 +403,10 @@ describe("smooth behavior contracts", () => {
     const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
 
-    const update = readRepo("skills/update/SKILL.md") + readRepo("skills/update/references/post-update-continuation.md");
+    const update =
+      readRepo("skills/update/SKILL.md") +
+      readRepo("skills/update/references/plugin-update.md") +
+      readRepo("skills/update/references/post-update-continuation.md");
     const updateBody = update.replace(/^---\n[\s\S]*?\n---\n?/, "");
     expect(update).toContain("description: 'axhub 최신 확인, 버전 확인, 업데이트 전용 skill");
     expect(update).toContain('일반 UX 역할 문구나 "알아서 진행"만으로는 update 가 아니며');
