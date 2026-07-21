@@ -41,7 +41,7 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 5. **GitHub App visibility.** detect JSON 의 `github.install_url` 이 null 이 아니면 설치 여부·계정 수·`first_gap` 과 무관하게 한 번은 보여줘요. `github.state` 가 `uninstalled`/`empty` 면 설치 확인 전 Step 7 repo/app 연결로 넘어가지 않아요.
 6. **Dependency safety.** 의존성 설치는 manifest 와 lockfile 이 있을 때만, 명시 확인 뒤, 해당 lockfile 의 package manager 로만 실행해요. 모든 install command 는 반드시 `--ignore-scripts` 를 붙여요. lockfile 이 없으면 설치하지 않아요.
 7. **MCP truth.** `claude mcp add` 는 등록일 뿐이에요. `claude mcp get axhub` 가 `Status: Connected` 를 보여주기 전까지 `mcp__axhub__*` 가 연결됐다고 말하지 않아요. 새로 add 한 세션에서는 `/mcp` OAuth 를 안내하지 말고 재시작 handoff 로 넘겨요 — `/mcp` OAuth 안내는 이전 세션에서 등록된 경우(resume 포함)에만 해요.
-8. **Ready card honesty.** 확인하지 않은 항목은 green check 로 표시하지 않아요. 가능한 종료 상태는 `VIBE_READY`, `READY_WITH_USER_ACTION`, `SAFE_STOP_NONINTERACTIVE`, `BLOCKED_UNSUPPORTED` 예요.
+8. **Ready card honesty.** 확인하지 않은 항목은 green check 로 표시하지 않아요. 내부 종료 상태는 `VIBE_READY`, `READY_WITH_USER_ACTION`, `SAFE_STOP_NONINTERACTIVE`, `BLOCKED_UNSUPPORTED` 중 하나로 판정하되, 이 enum 이름과 대괄호 표기는 사용자 문장에 출력하지 말아요.
 9. **Telemetry opt-in.** AI 활용 기록(`axhub axrouter` — 내 Claude Code 프롬프트·응답·툴콜을 팀 워크스페이스로 보내는 수집 기능)은 무엇이 수집되는지 설명하고 물어본 뒤 사용자가 켜기를 고를 때만 켜요 — 동의 없이 켜지 않아요. 거절하면 같은 온보딩에서 다시 묻지 않고, headless 에서는 묻지도 켜지도 않아요. 미지원 워크스페이스·구 CLI 면 조용히 건너뛰어요.
 10. **axhub 맥락 게이트.** 발화에 axhub 언급이 없고 대화에도 axhub 맥락(직전 axhub 작업)이 없으면, detect 를 시작하기 전에 "axhub 셋업을 말하는 거예요?" 를 한 번만 물어요. 아니라는 답이면 이 스킬을 종료하고 다른 axhub skill 로 넘기지 않아요. headless 에서는 묻지 않고 멈춰요.
 
@@ -134,6 +134,8 @@ Finish with one honest card:
 - `READY_WITH_USER_ACTION`: only external user action remains.
 - `SAFE_STOP_NONINTERACTIVE`: headless/subprocess mode avoided mutation.
 - `BLOCKED_UNSUPPORTED`: no safe OS/package-manager/permission path exists.
+
+위 상태 이름은 내부 판정용이에요. 최종 카드에는 enum 자체나 `[READY_WITH_USER_ACTION]` 같은 표식을 쓰지 말고, 현재 상태와 사용자가 할 다음 행동만 자연스러운 한국어로 보여줘요.
 
 ## NEVER
 

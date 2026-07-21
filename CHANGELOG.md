@@ -4,6 +4,10 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.15.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.1...v1.15.2) (2026-07-21)
+
+Claude Code Desktop 실사용 QA에서 clean bundle의 marketplace source가 repo 전용 경로를 그대로 가리켜 wrapper 없이는 직접 설치되지 않던 문제를 고쳤어요. bundle 안에서는 source를 `.`로 재작성하고, onboarding 마무리 카드의 내부 상태 enum은 사용자에게 숨겨 초보자에게 자연스러운 다음 행동만 보이도록 했으며, 166개 테스트와 clean bundle 직접 등록·재설치·활성화 검증을 통과했어요.
+
 ## [1.15.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.0...v1.15.1) (2026-07-21)
 
 플러그인-CLI 교차 검증에서 확정된 계약 문제들을 한 번에 정리했어요([#407](https://github.com/jocoding-ax-partners/axhub/pull/407)). onboarding 이 실제 CLI 의 `first_gap: null` 완료 상태를 그대로 수용하고, 오라우팅을 만들던 clarity/import/status-resume 훅 라우터는 diet 정책대로 제거해 운영 요청을 clarity frontmatter 라우팅이 직접 받아요. 배포·생성 상태 확인에는 AP-16 폴링 예산(최대 30회 또는 10분)이 생겨 무한 반복 없이 재개 가능한 요약으로 끝나고, import 는 axhub-cli 의 early-return lane(`--verify-wait none`, jocoding-ax-partners/axhub-cli#506)과 결합해 긴 동기 블로킹이 사라지며, diagnosis 는 실패 배포 status 시간창으로 좁힌 앱 로그를 정직하게 표기해요. 컨텍스트 예산도 reference 추출로 180k 안(176,627B)으로 복구했고 `plugin:budget` 포함 전 게이트가 새 ci.yml PR gate 로 상시 검증돼요.

@@ -84,7 +84,7 @@ In subprocess/headless mode, do not add or authenticate, and do not write the ma
 fresh add 직후에는 이 카드 **한 장**으로 종료해요 — "중단"이 아니라 "완료 직전" 프레임이에요. 지금까지 실제로 green 인 항목을 요약 체크로 함께 보여줘요 (VIBE_READY 와 같은 정직성 규칙 — 검증된 것만 ✓).
 
 ```text
-거의 다 됐어요 — 재시작 한 번이면 끝나요. 도구 활성화에는 Claude Code 재시작이 필요해요. [READY_WITH_USER_ACTION]
+거의 다 됐어요 — 재시작 한 번이면 끝나요. 도구 활성화에는 Claude Code 재시작이 필요해요.
   ✓ CLI v<CLI_VERSION> · 로그인 <masked-email> · git/node 준비됨
   ✓ axhub MCP 등록됨 (도구 로드는 재시작 후)
   ✓ AI 활용 기록 켜짐 — 같은 재시작으로 적용   ← 이번에 켰을 때만, 아니면 줄 생략
@@ -134,6 +134,8 @@ The GitHub App line should include `github.install_url` whenever detect provided
 `VIBE_READY` 를 출력한 직후에는 marker 를 정리해요: `rm -f "$HOME/.axhub/cache/.onboarding-mcp-restart"`
 
 ## Degraded Cards
+
+아래 상태 이름은 내부 분기용이에요. 사용자에게는 enum 이름이나 대괄호 표식을 출력하지 말고, 현재 상태·남은 행동·다시 말할 문장만 자연스러운 한국어로 보여줘요.
 
 `READY_WITH_USER_ACTION`: external approval or local user action remains. Examples: browser device approval, GitHub App install, OS installer GUI, PATH reload, native build/manual dependency repair, MCP OAuth, MCP restart handoff. Include exactly what to do and what to say next.
 
