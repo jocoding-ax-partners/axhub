@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
-const readImportSkill = (): string => readFileSync(join(REPO_ROOT, "skills", "import", "SKILL.md"), "utf8");
+const readImportSkill = (): string =>
+  readFileSync(join(REPO_ROOT, "skills", "import", "SKILL.md"), "utf8") +
+  readFileSync(join(REPO_ROOT, "skills", "import", "references", "visibility-rules.md"), "utf8") +
+  readFileSync(join(REPO_ROOT, "skills", "import", "references", "manifest-authoring.md"), "utf8");
 
 type JsonObject = Record<string, unknown>;
 

@@ -11,7 +11,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
-**상태**: 8 SKILL (onboarding · bootstrap · deploy · import · development · diagnosis · clarity · update) · ax-hub-cli v0.20.0+ 직접 호출
+**상태**: 8 SKILL (onboarding · bootstrap · deploy · import · development · diagnosis · clarity · update) · ax-hub-cli 직접 호출 (코어 v0.20.0+ · 8스킬 전체 v0.21.3+)
 
 </div>
 
@@ -68,7 +68,7 @@ Claude Code 프롬프트에 아래를 순서대로 입력해요.
 내 paydrop 앱 배포해
 ```
 
-> axhub CLI 가 없거나 너무 낮은 버전이면 onboarding·bootstrap·deploy 스킬이 멈추고 설치/업그레이드를 안내해요 — 최소 요구 버전은 **v0.20.0** 이에요.
+> axhub CLI 가 없거나 너무 낮은 버전이면 onboarding·bootstrap·deploy 스킬이 멈추고 설치/업그레이드를 안내해요 — 최소 요구 버전은 코어 **v0.20.0**, `import`·`diagnosis` 까지 8스킬 전체는 **v0.21.3** 이에요.
 
 ### `Usage credits required for 1M context` 오류가 보이면
 
@@ -83,7 +83,7 @@ Claude Code 프롬프트에 아래를 순서대로 입력해요.
 ## 📋 준비물
 
 - **Claude Code** 최신 버전
-- **axhub CLI v0.20.0 이상** — `bootstrap`·`deploy` 스킬이 시작 시 `plugin-support` 기능(preflight)을 확인해요. 미설치 시 `onboarding` 스킬이 설치를 안내해요.
+- **axhub CLI v0.20.0 이상 (8스킬 전체는 v0.21.3 이상)** — `bootstrap`·`deploy` 스킬이 시작 시 `plugin-support` 기능(preflight)을 확인해요. `import`·`diagnosis` 표면은 v0.21.3+ 예요. 미설치 시 `onboarding` 스킬이 설치를 안내해요.
 - **axhub SaaS 계정** + scope (회사 admin 이 발급)
 
 headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인증·TLS·토큰 저장은 모두 CLI 가 담당하고, 플러그인은 별도 바이너리를 동봉하지 않아요.

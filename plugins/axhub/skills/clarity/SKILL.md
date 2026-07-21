@@ -1,15 +1,14 @@
 ---
 name: clarity
-description: 'Use this skill only for explicit "axhub clarity" requests or exact axhub 운영 명령: 로그 보기, 환경변수 설정, 롤백, 테이블/컬럼/데이터 명령, connector grant/mine 조회, GitHub 계정 재연결/device code. Do not invoke for 최신/버전/update/latest/freshness checks, app status overview, app creation, bootstrap, import, deploy, or mixed freshness+status+create prompts; choose update first when freshness is present.'
-disable-model-invocation: true
+description: 'axhub CLI 운영 명령 브리지: 로그 보기, 환경변수 설정, 롤백, 테이블/컬럼/데이터 명령, connector grant/mine 조회, GitHub 계정 재연결/device code. "axhub 로그 보여줘", "axhub 환경변수 확인해줘", "axhub 테이블 만들어줘", "이전 버전으로 롤백해줘" 처럼 axhub 맥락(발화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있는 운영 요청과 명시적 "axhub clarity" 지목에 사용해요. Do not invoke for 최신/버전/update/latest/freshness checks, app status overview, app creation, bootstrap, import, deploy, or mixed freshness+status+create prompts; choose update first when freshness is present. axhub 맥락 없는 일반 "로그 보여줘"에는 쓰지 않아요.'
 ---
 
 # axhub clarity 브리지
 
 ## When to invoke
 
-- **Explicit clarity request.** 사용자가 `/axhub:clarity`, "axhub clarity", "Use the axhub clarity skill" 처럼 이 스킬을 직접 지목해요. 이 스킬은 `disable-model-invocation: true` 라서 Claude 가 자연어만 보고 자동 호출하면 안 되고, 사용자 수동 slash 또는 명시적 지목 때만 실행해요.
-- **Exact CLI operations.** axhub 맥락에서 로그, 환경변수, 롤백, 테이블/컬럼/데이터, connector grant/mine, GitHub 재연결/device code 같은 공개 CLI 운영 명령을 요청해요.
+- **Explicit clarity request.** 사용자가 `/axhub:clarity`, "axhub clarity", "Use the axhub clarity skill" 처럼 이 스킬을 직접 지목해요.
+- **Exact CLI operations.** axhub 맥락에서 로그, 환경변수, 롤백, 테이블/컬럼/데이터, connector grant/mine, GitHub 재연결/device code 같은 공개 CLI 운영 명령을 요청해요. 이 운영 요청은 frontmatter description 라우팅으로 자연어에서도 이 스킬이 직접 받아요 — 별도 훅 라우터 없이요.
 
 ## Do not invoke / route guard
 
@@ -70,51 +69,9 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 
 **대표 정직성 계약.** `clarity` 는 hidden `plugin-support` 를 탐색하지 않아요. 공개 `--json-schema` / `--help` 트리에서 맞는 leaf 를 찾지 못하면 존재하지 않는 명령을 만들지 말고, "axhub 에 그 기능은 없어요" + 가장 가까운 공개 명령만 말해요. 로그·환경변수·롤백·테이블·connector grant 처럼 대표 여정 뒤 작업은 이 경로로 이어가요.
 
-## Anti-Patterns (하지 말 것)
+## Anti-Patterns · 진행 알림 · TodoWrite
 
-원칙 위반이 실전에서 드러나는 구체 형태예요:
-
-- ❌ `--json-schema` (270KB) 를 통째로 읽기 — 반드시 `--field-expr` 로 필요 부분만 슬라이스해요. 통째 로드는 context 낭비.
-- ❌ schema/help/실행 명령에 `2>/dev/null | head -c 2000`, `| grep`, `| jq`, `bash -lc` 같은 shell 후처리 붙이기 — 모든 Desktop-visible clarity 명령은 단일 `axhub ...` 명령이어야 해요. 출력 축소는 더 좁은 `--field-expr` 로만 해요.
-- ❌ `--help` 를 안 읽고 인자를 추측 조립 — leaf 명령 `--help` 1회 선숙지(--help gate) 후에만 실행. 추측 인자는 exit 64.
-- ❌ 1단계 탐색에서 못 찾자 포기 — 두 단계 깊이까지 탐색한 뒤에만 "기능 없음" 을 선언해요.
-- ❌ 탐색 출력(schema/help 본문)·raw stdout/stderr·secret·내부 id 를 chat 에 echo — 사용자에겐 한국어 요약만.
-- ❌ `connectors list` / `--enabled-only` tenant-admin 전체 목록을 "내가 조회 가능한 커넥터" 로 표현 — 본인 접근 범위는 `connectors mine` 만 authority.
-- ❌ 못 찾은 기능을 비슷한 명령으로 조용히 대체 실행 — 정직하게 부재를 알리고 가장 가까운 명령을 "제안"만 해요 (무단 실행 금지).
-- ❌ `plugin-support` hidden 표면을 탐색·실행 (공개 표면만 원칙 위반).
-- ❌ deploy/bootstrap/import/onboarding/development/diagnosis/update 담당 의도를 가로채기 (아래 경계표 위반 — 해당 의도는 양보). 특히 기존 앱 첫 연결은 import, 앱 코드(페이지·화면·대시보드·엔드포인트) 생성은 development, 배포 실패 원인 진단은 diagnosis 양보 — clarity 는 axhub 명령 실행만 해요.
-- ❌ Claude Desktop 에 노출된 `axhub` App/MCP 도구 호출 — read-only 라도 쓰지 않아요. clarity 는 항상 CLI help gate 뒤 `axhub` 명령으로 실행해요.
-- ❌ 읽기 전용 leaf CLI 를 `> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution 같은 shell wrapper 로 감싸기 — Claude Desktop 사용자에게 불필요한 권한 팝업과 임시 파일 흔적이 생겨요. 단일 `axhub ... --json` 호출을 실행하고 tool 결과를 assistant 내부에서 해석해요.
-- ❌ `읽는 중 <랜덤>.txt`, `Read /tmp/...`, `파일 읽기` 같은 임시 출력 파일 재읽기 — 사용자는 단일 조회를 기대하므로, 파일 읽기 팝업/단계가 보이면 실패예요. 더 좁은 CLI 조회로 다시 실행해요.
-- ❌ 새 앱 생성을 clarity 가 직접 질문 — concept/name/slug/template 추천 질문을 만들지 않아요. 추천 후보와 선택 카드는 bootstrap 책임이에요.
-
-## 진행 상황 알림 (Progress Reporting)
-
-각 단계를 시작할 때 친근한 한국어 한 줄로 지금 뭐 하는 중인지 알려줘요 — vibe coder 가 멈춘 게 아니라 진행 중인 걸 알 수 있게 해요. 형식은 `[현재/전체] ○○ 하는 중이에요…`, 끝나면 `○○ 됐어요` 처럼 한 줄로 확인해요.
-
-- 사람이 알아들을 요약만 알려요 — secret·내부 id·raw 출력·schema 본문은 chat 에 넣지 않아요 (위 원칙 그대로).
-- 한 번에 끝나는 단순 조회(예: 목록 한 번 보기)는 굳이 단계별로 안 알리고 결과만 줘도 돼요 — 탐색이 여러 단계로 길어질 때 알려요.
-
-단계 이름 (announce 용 한국어):
-- `[1/4] 무엇을 찾는지 파악하는 중이에요`
-- `[2/4] 기능 찾아보는 중이에요`
-- `[3/4] 실행하는 중이에요`
-- `[4/4] 결과 정리하는 중이에요`
-
-### TodoWrite 체크리스트 (2+ 태스크일 때만 · 있을 때만)
-
-요청이 **2개 이상의 axhub 작업으로 쪼개질 때만** TodoWrite 로 태스크를 보여줘요 (예: "테이블 만들고 env 추가하고 로그 봐줘"). 한 번에 끝나는 단순 조회·단일 명령은 TodoWrite 없이 위 한 줄 알림만 해요 — 1줄짜리 체크리스트는 만들지 않아요. TodoWrite 도구가 host 에 노출됐을 때만 호출하고, 없으면 조용히 진행해요 (도구 가용성은 언급 안 해요).
-
-clarity 는 카탈로그가 없어서 todos 도 **고정 목록이 아니라 요청을 쪼갠 실제 태스크에서 도출**해요 — 사용자 발화를 axhub 작업 단위로 나눠 한 항목씩 만들어요. 참고 shape ("테이블 만들고 env 추가해줘"):
-
-```typescript
-TodoWrite({ todos: [
-  { content: "테이블 생성",   status: "in_progress", activeForm: "테이블 만드는 중" },
-  { content: "환경변수 추가", status: "pending",     activeForm: "env 추가하는 중" }
-]})
-```
-
-**태스크 하나가 끝날 때마다**(그 태스크의 탐색→실행→결과까지 끝나면) 전체 todos 배열로 다시 호출해 끝난 항목은 `completed`, 다음 항목은 `in_progress` 로 갱신해요 — 끝에 한꺼번에 말고 매 태스크 직후에요. 이전 스킬 todo 가 남아 있으면 patch 하지 말고 위 배열 전체로 교체해요. 종료 시 미완료 todo 0 개.
+탐색·실행 단계에 들어가기 전에 [references/execution-guardrails.md](references/execution-guardrails.md) 를 읽고 anti-pattern 목록·진행 알림 형식·TodoWrite 규칙을 그대로 따라요. 핵심: Desktop-visible 명령은 단일 `axhub` 명령만(후처리·임시 파일 금지), 전체 schema 통째 읽기 금지, 담당 스킬 의도 가로채기 금지예요.
 
 ## Workflow
 
@@ -151,15 +108,14 @@ TodoWrite({ todos: [
    - 기계 파싱이 필요하면 `--json` (global flag) 을 붙여요.
 - help 가 `--execute` / `--yes` / `--force` 같은 명시 실행 플래그를 요구하는 파괴적 명령이면 대화형에서 한 번 승인받은 뒤 붙여요. headless 에서는 붙이지 않고 preview/summary 로 멈춰요.
 - 인자가 부족하면(앱 이름 등) 먼저 조회 명령으로 채울 수 있는지 시도하고, 정말 사용자만 아는 값일 때만 물어요.
-- 앱을 가리키는 인자는 사용자가 아는 slug/name 을 우선 써요. 앞 단계 조회 결과에서 얻은 raw app id 를 다음 mutation 명령의 `--app` 값으로 넘기지 않아요. CLI 가 내부 id 를 반환해도 chat/tool 출력에 그대로 보이지 않도록, 실행 결과는 임시 파일로 받고 사용자에게는 "앱 이름 기준으로 실행했어요"처럼 요약해요.
+- 앱을 가리키는 인자는 사용자가 아는 slug/name 을 우선 써요. 앞 단계 조회 결과에서 얻은 raw app id 를 다음 mutation 명령의 `--app` 값으로 넘기지 않아요. CLI 가 내부 id 를 반환해도 chat 에 raw 로 옮겨 적지 말고, 사용자에게는 "앱 이름 기준으로 실행했어요"처럼 요약해요.
 - help 의 어떤 플래그가 **플러그인 자신의 설치 정보**를 요구하면, clarity 에서는 플러그인 캐시 파일을 읽어 채우지 않아요. 캐시 경로가 작업 디렉토리 밖이면 Claude Desktop 권한 팝업이 떠서 운영 브리지 흐름이 거칠어져요.
 
    ```bash
-   OUT=$(mktemp)
-   axhub <명령> <인자...> > "$OUT" 2>&1
-   EXIT=$?
-   # raw 출력은 chat 에 cat 하지 않아요 — 읽고 아래 규칙대로 요약해요.
+   axhub <명령> <인자...> --json
    ```
+
+   실행도 allowlist 그대로 단일 `axhub` 명령이에요 — `mktemp`·redirect·임시 파일 없이 tool 결과(stdout/stderr)를 assistant 내부에서 읽고 아래 규칙대로 요약해요.
 
 5. **결과 제시.** exit 0 이면 무엇이 어떻게 됐는지 한국어 한두 문장으로 요약해요 (URL·이름 같은 사용자 가치 정보만, 내부 id·raw JSON 생략). 비-0 이면:
    - 인증 계열(exit 4 등) → "axhub 로그인이 만료됐어요. 다시 로그인할까요?"

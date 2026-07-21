@@ -108,12 +108,7 @@ model: sonnet
    - **미로그인**(`auth_ok=false`): "로그인이 필요해요 — `axhub auth login` 하거나 '온보딩'이라고 해주세요" 안내 후 완료되면 재확인.
    - **MCP 미등록**(`mcp__axhub__*` 도구 부재): `claude mcp add` + OAuth 로 등록을 인라인 안내해요 (`references/mcp-setup.md`). ⚠️ 새 MCP 서버는 **재시작해야 도구가 살아나요** — 그래서 이번 세션은 아래 6단계의 **CLI fallback** 으로 진행하고, "등록·로그인했어요. Claude Code 를 재시작하면 다음부터 더 정확해져요" 한 줄만 남겨요.
 
-5. **SDK/DB 표면 확인 (현재 SDK 우선).** 데이터 접근 코드를 짜기 전에 현재 앱이 실제로 쓰는 DB/connector 경로와 설치된 SDK 버전을 확인해요. `@ax-hub/sdk` 3.x 는 legacy `/data` 데이터플레인을 제거했어요. 따라서 `sdk.data`, `sdk.tenant(...).app(...).data`, `defineSchema`, `where`, `discover()`, `data.table(...)` 같은 예전 typed data DSL 을 생성하지 않아요.
-
-   - 앱 런타임 기능 코드는 우선 **기존 앱의 데이터 접근 방식**(예: 서버 라우트, DB client, connector helper, ORM, fetch wrapper)을 따라요. SDK가 아니라 앱 코드의 실제 패턴이 런타임 authority 예요.
-   - `@ax-hub/sdk` 로 DB를 확인해야 하는 경우는 control-plane 성격의 raw DB introspection 으로 제한해요: `sdk.apps.rawDb.tables(appId)` 와 `sdk.apps.rawDb.tableRows(appId, table, { page, perPage, environment })`. 이 표면은 app id + owner/admin 권한이 필요하고, 앱 런타임 CRUD DSL 이 아니에요.
-   - SDK 문서나 MCP 검색 결과가 `defineSchema`/`where`/`tenant().app().data` 를 제안하면 stale 정보로 취급하고, 설치된 SDK README/CHANGELOG 또는 현재 package export 로 다시 확인해요.
-   - 외부 connector 접근처럼 SDK로 풀 문제가 아니면 `connector_list`/`connector_resources`(MCP) 또는 CLI fallback 으로 실제 리소스와 샘플만 확인하고, 생성 코드는 앱의 기존 connector/DB 패턴에 맞춰요.
+5. **SDK/DB 표면 확인 (현재 SDK 우선).** 데이터 접근 코드를 짜기 전에 [references/sdk-db-surface.md](references/sdk-db-surface.md) 의 5단계 절을 읽고 현재 앱의 실제 DB/connector 패턴과 설치된 SDK 표면을 확인해요 — legacy `/data` typed DSL(`sdk.data`, `defineSchema`, `where`, `discover()` 등)은 생성하지 않고, 기존 앱 코드의 데이터 접근 패턴이 런타임 authority 예요.
 
 6. **데이터 discover (fallback 체인).** 기능이 connector/table/DB 데이터를 쓰면 사용자가 쓰겠다는 리소스를 실제로 봐요. 순수 UI 정리, todo priority/filter/search, tabs, forms, API route 리팩터처럼 새 데이터 리소스가 필요 없는 기존 앱 기능 개선은 현재 코드의 데이터 패턴을 읽고 진행하되, 없는 테이블·컬럼을 지어내지 않아요.
    - **MCP 있음** → `connector_list`/`connector_resources`/`connector_query` 또는 `table_list`/`table_get`/`row_list` 로 실스키마·샘플. `connector_query` 는 **SELECT-only + LIMIT** 만, 임의 SQL passthrough 금지 (`references/connector-safety.md`).
@@ -132,11 +127,7 @@ model: sonnet
 
 11. **verify 게이트.** stack(3단계)에 맞는 검증을 돌리고 출력을 읽어요 — typecheck/lint/build/route smoke/data-query smoke + empty·error·loading 확인. 로컬 실행이 불가하면 dry-run 으로 낮춰요. 실패면 고친 뒤 다시 돌려요. Desktop preview/issue 확인은 위 guard 대로 유한하게 한 번만 수행하고, 장시간 overlay 탐색으로 사용자를 기다리게 하지 않아요.
 
-11.5. **배포 준비 점검 (infer-tables-env 연계).** verify 통과 후, deploy 핸드오프 전에 **방금 생성한 코드가 실제로 참조하는 테이블·환경변수**를 스캔해 빠진 게 있는지 확인해요 — 코드 분석이지 전용 CLI 명령이 아니에요(deploy 의 infer-tables-env 와 같은 성격). 비차단이고, 빠진 걸 찾으면 development 가 가진 게이트로 **그 자리에서** 메워 배포 왕복을 없애요. 이건 (b) write-gate 의 탐지 프론트엔드예요 — 사용자가 "테이블 만들어줘" 라고 명시 안 해도, 생성코드가 없는 테이블을 참조하면 능동 감지해 게이트로 연결해요.
-    - **빠진 테이블** (코드가 참조하는데 `table_list`/CLI 에 없음) → `references/write-gate.md` 의 (b) 게이트로 연결해요 ("이 기능엔 `X` 테이블이 필요해요 — 만들까요?" → preview-confirm). deploy 는 테이블을 못 만들지만 development 는 (b) 게이트로 만들 수 있어요.
-    - **빠진 환경변수** (코드가 읽는데 `env_var_list`/CLI 에 없음) → "이 기능엔 `Y` env 가 필요해요" 한 줄 안내 후 clarity/deploy 에서 설정하도록 이어줘요. `env_var_set` 은 operator-gated 라 development 가 **자동 설정하지 않아요**.
-    - **headless/비대화형** (AUQ 불가): 기본은 스캔 결과만 보고하고 **아무것도 바꾸지 않아요** (스키마·env 무변경 safe default, deploy headless 계약과 동일). 단, 사용자가 같은 요청에서 `production mutation 허용`, `테이블 생성까지 진행`, `전부 실행`처럼 명시 권한을 줬고 필요한 테이블/컬럼이 구체적으로 결정됐으면, preview JSON 을 먼저 보고한 뒤 CLI `--execute` 로 생성할 수 있어요. 이 경우 idempotency key 를 쓰고, create 후 rows/list 로 검증해요.
-    - 점검을 마치면 deploy 핸드오프 맥락에 **"배포 준비 점검 완료"** 를 남겨, deploy 의 사전 점검 질문이 **중복되지 않게** 해요 (`../deploy/references/session-carryover.md`).
+11.5. **배포 준비 점검 (infer-tables-env 연계).** verify 통과 후 deploy 핸드오프 전에 방금 생성한 코드가 참조하는 테이블·환경변수를 스캔해 빠진 게 있는지 확인해요 (비차단 코드 분석). 상세 분기 — 빠진 테이블 → `references/write-gate.md` (b) 게이트, 빠진 env → clarity 안내(자동 설정 금지), headless 무변경 기본, "배포 준비 점검 완료" carry-over — 는 [references/sdk-db-surface.md](references/sdk-db-surface.md) 의 11.5 절을 그대로 따라요.
 
 12. **deploy 핸드오프.** 배포는 development 가 직접 안 하고 **deploy skill 을 호출**해요 (중복 배포 로직 금지). 사용자가 같은 요청에서 배포까지 명시했다면 `현재 앱 배포해`처럼 짧은 handoff utterance 로 deploy 를 호출해요. 원래 기능 요청 문장 전체(예: "QA banner 추가")를 deploy 의 `--user-utterance` 로 넘기지 않아요. 기능 문구가 앱 후보로 잘못 매칭될 수 있기 때문이에요. 사용자가 배포를 명시하지 않았다면 "이제 배포할까요?" 로 같은 대화 맥락을 이어줘요 (carry-over: `../deploy/references/session-carryover.md`).
 

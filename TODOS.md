@@ -18,5 +18,5 @@
 - **Why:** 훅은 suppressOutput 이라 사용자 오탐 제보("엉뚱한 말에 update 가 떠요")를 재현 없이 진단할 수단이 없어요. 스위치가 있으면 제보자에게 env 하나 켜고 재현해 달라는 질문 한 번으로 끝나요.
 - **현재 대안:** `tests/hook-execution.test.ts` 의 합성 payload 재현 + 배포 전 tee 캡처 절차 (플랜 T8) — 실제 제보가 발생하기 전까지는 이걸로 충분하다고 판단했어요 (2026-07-13 eng review D8).
 - **Cons:** 버그픽스 PR 범위 밖 기능 추가 + stderr 출력 규약(훅 출력 비노출 원칙)과의 정합 검토 필요.
-- **연관 파일:** `hooks/update-router.sh`, `hooks/clarity-router.sh`, `hooks/import-router.sh`, `hooks/status-resume-router.sh`
+- **연관 파일:** `hooks/update-router.sh` (clarity/import/status-resume 라우터는 diet 복귀로 제거됨 — frontmatter 라우팅이 담당)
 - **Depends on:** 실제 오탐 제보 발생 (그 전에는 착수하지 않아요)

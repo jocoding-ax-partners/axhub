@@ -66,8 +66,8 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 적용: skills/onboarding/SKILL.md, skills/bootstrap/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/clarity/SKILL.md, skills/update/SKILL.md
 - invariant: "axhub 맥락"
 
-## AP-12 axhub 진입 확인 AUQ
-- 규칙: axhub 프로젝트가 확정된 상태에서 배포·생성·가져오기를 실행하기 전에, interactive 에서는 "axhub로 진행할지"를 AskUserQuestion 으로 한 번 더 확인해요 — "무엇을·어떻게"를 묻는 기존 preview 승인과 별개인 진입 게이트예요. deploy·import 는 preview card 앞에 별도 AUQ 를 두고, byte 예산이 포화한 bootstrap 은 기존 preview 승인 문구에 axhub 확인을 통합해요(별도 AUQ 대신 1회 승인). headless 에서는 이 AUQ 를 생략해요 — AUQ 0회 계약을 그대로 지켜요.
+## AP-12 axhub 진입 확인 (preview 통합 게이트)
+- 규칙: axhub 프로젝트가 확정된 상태에서 배포·생성·가져오기를 실행하기 전에, interactive 에서는 preview 승인 카드 **하나**가 axhub 진입 확인을 겸해요 — 질문 문구에 axhub 대상임을 명시하고, 같은 작업에 진입 AUQ 와 preview 승인을 이중으로 묻지 않아요. bootstrap 이 먼저 쓰던 통합 방식(`지금 만들고 배포까지 진행할까요?`)을 deploy·import 에도 동일하게 적용해요. 파괴적 실행 승인(AP-2·AP-3)과 조건부 커밋 동의는 별개로 유지해요. headless 에서는 AUQ 를 생략해요 — AUQ 0회 계약을 그대로 지켜요.
 - 적용: skills/deploy/SKILL.md, skills/bootstrap/SKILL.md, skills/import/SKILL.md
 - invariant: "axhub 진입 확인"
 
@@ -80,6 +80,11 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 규칙: Claude Desktop Code 모드에서 사용자가 `axhub` 와 최신성 키워드(최신·버전·업데이트·latest·up to date·version check·update·upgrade)를 함께 말하면, 전역 axhub App/MCP 도구보다 `update` 스킬을 먼저 타야 해요. Code-mode update router guard 는 SessionStart fallback 과 UserPromptSubmit match 로 라우팅 문맥만 추가하고 명령 실행·네트워크·앱 목록 조회는 하지 않아요. UserPromptSubmit match 는 훅 입력 JSON 전체가 아니라 사용자 프롬프트(`"prompt":` 필드 이후 구간)만 봐요 — cwd·transcript_path 경로 유래 오탐을 막고, 키 부재 시 fail-closed 로 침묵해요. 사용자에게 보이는 첫 문장은 `현재 버전을 확인할게요.` 예요. 이 guard 는 `AXHUB_NO_UPDATE_ROUTER=1` 또는 marker 파일 `~/.axhub/config/no-update-router` 로 끌 수 있어요 — 모든 훅 kill switch 는 env 에서 `AXHUB_` 를 뗀 소문자-하이픈 이름의 marker 파일 counterpart 를 가져요 (profile export 가 닿지 않는 Windows GUI 세션에서도 확실한 채널). 업데이트 뒤 같은 요청의 앱 현황 확인을 이어갈 때는 존재하지 않는 `axhub app list` 단수 명령을 추측하지 말고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 시작해요. `| head`, `2>/dev/null`, `grep`, `sed`, `awk` 같은 shell 후처리는 붙이지 않아요.
 - 적용: hooks/hooks.json, CLAUDE.md, POLICY.md, README.md
 - invariant: "AXHUB_NO_UPDATE_ROUTER", "현재 버전을 확인할게요"
+
+## AP-16 상태 폴링 예산
+- 규칙: 배포·생성 상태를 반복 확인하는 tool call(`deploy status`·`deploy verify`·`apps bootstrap-status` 재호출)은 한 요청당 폴링 예산 **최대 30회 또는 10분** 중 먼저 닿는 쪽까지만 반복해요. 예산에 닿으면 실패로 선언하지 않고 "아직 진행 중이에요" 와 이어서 확인할 명령을 안내하는 재개 요약으로 응답을 끝내며, deployment id/bootstrap id 는 그 안내에 보존해요. 이 예산 종료는 "terminal 전 응답 종료 금지" 규칙의 유일한 예외예요. CLI 자체의 `--watch` 상한과 별개로, 스킬 레벨 반복에는 항상 이 예산이 적용돼요.
+- 적용: skills/bootstrap/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md
+- invariant: "폴링 예산", "최대 30회 또는 10분"
 
 ## AP-15 앱 소유자·계정 불일치 비판정
 - 규칙: 앱을 만든 계정과 지금 로그인한 계정이 달라 보여도(앱 정보의 owner 표시, 멤버 목록, git 커밋 이메일 등), 스킬은 그 불일치를 스스로 판정해 막거나 "앱 소유자에게 물어보세요" 같은 확인 절차를 만들어내지 않아요. 배포 권한(인가 — 이 계정이 이 앱을 배포할 수 있는지)의 판정은 CLI/백엔드 몫이에요. 사용자의 구두 승인을 권한 근거로 쓰지 않아요 — "소유자가 배포해도 된대요" 같은 말로는 권한이 생기지 않아요. CLI 가 권한 부족(exit 8, `axhub_app_forbidden` — 앱 owner/admin 권한 검사 실패)으로 막을 때만 앱 소유자/관리자에게 멤버 권한 부여를 요청하도록 안내하고 멈추며, 권한이 실제로 생겼는지는 말이 아니라 같은 명령의 재시도 성공으로만 확인해요.

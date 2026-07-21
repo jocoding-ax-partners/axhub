@@ -73,8 +73,10 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
   4. 성공하면 재시작 확인 marker 를 기록해요 — 다음 세션의 restart-confirm 훅이 실제 적용을 확인하고 닫아요 (절차는 `plugin-restart-confirm-prompt.md` 소유):
 
      ```bash
-     mkdir -p "$HOME/.axhub/cache" && printf '%s' '<plugin.latest>' > "$HOME/.axhub/cache/.plugin-update-restart"
+     mkdir -p "$HOME/.axhub/cache" && printf '%s' '<plugin.latest>|<SCOPE>' > "$HOME/.axhub/cache/.plugin-update-restart"
      ```
+
+     marker 내용은 `받은 버전|scope` 형식이에요 — restart-confirm 이 그 scope 의 설치 항목을 직접 확인해, 다른 scope 의 높은 버전을 적용 확인으로 오인하지 않게 해요.
 
   5. **재시작 안내(필수 — plugin 업데이트는 재시작해야 적용돼요):** `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.`
   6. 실패하면 raw 에러는 숨기고 한 줄만 안내한 뒤 비차단으로 계속해요 (marker 는 기록하지 않아요): `플러그인 자동 업데이트가 안 됐어요. claude plugin update axhub@axhub --scope <SCOPE> 를 직접 실행해 주세요.`

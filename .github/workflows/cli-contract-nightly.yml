@@ -1,0 +1,27 @@
+name: cli-contract-nightly
+
+# 실제 ax-hub-cli 바이너리를 설치해 plugin↔CLI 계약 표면을 스냅샷 검증해요 (DP-6 ②).
+# fixture shim 기반 로컬 테스트가 못 잡는 cross-repo drift — 예: onboarding-detect 의
+# first_gap null vs "no_gap" — 를 잡는 게 목적이에요. 인증이 필요 없는 읽기 전용
+# 표면(스키마 모양·exit 계약·플래그 존재)만 검증해요.
+
+on:
+  schedule:
+    - cron: "30 17 * * *" # 02:30 KST nightly (claude-cli-e2e 뒤)
+  workflow_dispatch:
+
+jobs:
+  contract-snapshot:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Install latest axhub CLI
+        run: |
+          curl -fsSL https://cli.axhub.ai/install.sh | bash
+          echo "$HOME/.axhub/bin" >> $GITHUB_PATH
+      - name: Real-CLI contract snapshot
+        run: AXHUB_REAL_CLI=1 bun test tests/cli-contract.test.ts

@@ -67,64 +67,15 @@ model: sonnet
 
 첫 visible chat sentence 는 반드시 정확히 `기존 앱을 axhub에 가져올 준비를 확인할게요.` 로 시작하고, 그 앞에는 공백·설명·스킬 선택 이유를 포함해 어떤 문장도 쓰지 않아요.
 
-import preview 정상이면 axhub 가져오기 대상 확정이에요. Interactive 는 preview card 전에 AskUserQuestion 으로 axhub 진입 확인을 먼저 해요: `이 앱을 axhub에 가져올까요?` (`axhub에 가져오기`/`아니요`). `가져오기` 면 preview card 와 기존 승인을 이어가요. `아니요` 면 종료. (headless 는 이 AUQ 생략)
+import preview 정상이면 axhub 가져오기 대상 확정이에요. Interactive 는 별도 진입 질문 없이 아래 5의 preview 승인 AskUserQuestion **하나가 axhub 진입 확인을 겸해요** — 질문 문구에 axhub 대상임을 명시해요 (AP-12 통합 게이트). (headless 는 이 AUQ 생략)
 
 ## AskUserQuestion JSON 안전 규칙
 
-Claude Desktop 에서는 AskUserQuestion 을 raw JSON 문자열이나 수동 `\uXXXX` escape 로 만들지 않아요. native Question/AskUserQuestion tool 입력에는 평문 UTF-8 문자열만 넣고, question/header/label/description 은 짧게 써요. 한글 escape 가 깨지면 `InputValidationError` 가 사용자 화면에 그대로 보이므로, 질문을 길게 풀어 쓰거나 괄호가 긴 선택지를 만들지 않아요.
-
-commit manifest 확인 질문은 아래 exact copy 만 써요.
-
-- header: `커밋 확인`
-- question: `axhub.yaml을 커밋하고 푸시할까요?`
-- option 1 label: `커밋하고 진행`
-- option 1 description: `첫 배포에 설정을 반영해요.`
-- option 2 label: `커밋 없이 진행`
-- option 2 description: `다음 배포부터 반영해요.`
-- option 3 label: `취소`
-- option 3 description: `가져오기를 중단해요.`
+AskUserQuestion 입력은 평문 UTF-8 만 쓰고 raw JSON/수동 escape 를 만들지 않아요. 커밋 확인 질문의 exact copy 는 [references/visibility-rules.md](references/visibility-rules.md) 의 AskUserQuestion 절을 그대로 써요.
 
 ## Vibe Coder Visibility Rules
 
-이 섹션은 workflow 보다 우선해요. 아래 금지어가 떠오르면 말하기 전에 반드시 한국어 사용자 문구로 바꿔요. 특히 Claude Desktop 에서 모델이 중간 생각을 chat 에 노출하기 쉬우므로, 검증용 field name 이나 영어 진행어를 "짧게라도" 쓰지 않아요.
-
-사용자에게 보이는 chat 에서는 스킬 선택 이유, route label, slash command label 을 절대 설명하지 않아요. `/axhub:import`, `axhub:import`, `import 스킬`, `스킬을 사용할게요`, `스킬 호출` 또는 유사한 내부 라벨은 첫 문장 전/후 어디에도 쓰지 않아요.
-
-Claude Desktop 같은 긴 QA 대화에서 이전 답변에 금지 문구가 보이더라도, 그 문구는 참고할 스타일 예시가 아니라 **이미 발견된 버그 예시**예요. 같은 대화 안에서 재시도하거나 이어서 import 할 때도 이전 표현을 재사용하지 말고 이 섹션의 안전 문구로 다시 써요. 특히 `Port 8080, /healthz 확인. preview 진행.`, `git remote 없음`, `execute 실행한다`, `deployment verification: success`, `HTML, 200` 같은 문장을 보았으면 그대로 따라 쓰지 않아요.
-
-다음 값은 internal verification primitives 예요. 스킬 안에서는 검증에만 쓰고 사용자 chat 에 raw 값으로 보여주지 않아요.
-
-- `schema_version`, `mode`, `headless`, `correlation_id`
-- `detected_state`, `starting_state`, `required_mutations`, `approval`
-- `deployment_id`, `active_release_id`, `verification_status`, `public_url`, optional `access_note` evidence field
-- `typed_failure`, `owner`, `phase`, `mutation_performed`, `retryable`
-- `request_id`, `stdout`, `stderr`, `command_argv`, raw JSON body
-- `manifest_create`, `manifest_migrate`, `manifest_repair`, `deployment`, `static_release`
-- `status: deployed`, `production_deployment_id`, `Confirmed`, `bearer auth`, `private visibility`, `curl`, `execute`, `git remote`, `app slug`
-- `Envelope`, `preview`, `import 지원`, `deployment verification`, `success`, `raw endpoint`, `raw 엔드포인트`, `public`, `HTML, 200`
-
-대신 사용자가 이해할 문장으로 바꿔요. 예: "정적 사이트 공개 URL 확인이 아직 안 됐어요. CLI를 업데이트하거나 다시 시도해요."
-검증된 `public_url` 값은 사용자에게 열어볼 주소로 보여줘도 돼요. 단 field name, envelope 구조, raw evidence object 는 숨겨요. 사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL 로만 써요. Markdown URL 링크 문법은 전부 금지예요. `[https://...](https://...)`, `[열기](https://...)`, `<https://...>` 처럼 URL 을 괄호나 label 로 감싸지 말고 `https://...` 그대로 보여줘요. `access_note` 가 있으면 URL 바로 아래에 자연어로 덧붙여요.
-
-사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만 써요. `importing`, `imported`, `manifested`, `gitted`, `pushed`, `raw JSON`, `token-gate`, `manifest_create`, `verification_status`, `deployment`, `execute`, `git remote`, `curl`, `Envelope`, `preview` 같은 내부/영어 동사형·필드형 라벨을 제목이나 진행 문장에 쓰지 않아요. 예: `가져오기 준비 확인`, `미리보기 확인`, `앱 설정 작성`, `첫 배포 확인`, `정적 사이트 확인`.
-도구 제목에는 제품명 `axhub` 자체도 넣지 않아요. `axhubing`, `axhubed`, `axhub import 기능 지원 확인`, `axhub 가져오기 기능 지원 확인` 같은 자동 생성 제목이 보이면, 같은 명령이라도 `가져오기 기능 확인` 또는 `가져오기 준비 확인` 으로 제목을 고쳐서 다시 호출해요.
-
-Claude Desktop 이 Bash 내용에서 자동 제목을 만들 때도 같은 규칙을 적용해요. tool 제목·summary·progress title 에 `static vite import preview`, `Express import execute`, `FastAPI import execute`, `Expressing 앱 파일 확인`, `axhubed import 기능 지원 확인` 처럼 제품명·스택명+내부 phase 를 섞거나 스택 이름을 영어 동사처럼 만든 제목이 보이면, 같은 명령이라도 반드시 `정적 앱 준비 확인`, `서버 앱 준비 확인`, `파이썬 앱 가져오기 실행`, `가져오기 기능 확인` 같은 한국어 제목으로 다시 호출해요. 스택 이름은 본문 설명에서만 써도 충분해요.
-
-진행 문구도 사용자 언어로 번역해요. `앱 slug 미확정` 대신 `앱 이름이 아직 정해지지 않아 package.json 이름으로 확인할게요`, `manifest_create 있으니` 대신 `앱 설정 파일이 필요해서 프로젝트 파일 근거로 작성할게요`, `git remote 아직 없음` 대신 `원격 저장소가 아직 없어 새 저장소 생성 경로로 진행해요`, `execute 호출한다` 대신 `가져오기를 실행할게요`, `import 지원 확인됐다` 대신 `가져오기 기능을 사용할 수 있어요`, `preview 진행` 대신 `미리보기를 확인할게요`, `Envelope 정상` 대신 `응답 형식 확인이 끝났어요`, `deployment verification: success` 대신 `첫 배포 검증 성공`, `raw endpoint`/`raw 엔드포인트` 대신 `원문 응답`, `public으로` 대신 `공개 접근으로` 라고 말해요.
-
-최종 성공 요약은 아래 형태를 벗어나지 않아요. 괄호 안에 raw status 를 붙이지 않아요.
-
-- `<스택> 앱 <앱 이름>을 axhub 앱으로 가져왔어요.`
-- `GitHub 저장소를 생성하고 연결했어요.`
-- `첫 배포 검증이 끝났어요. 운영 URL: https://...`
-- 비공개 앱이면 `배포 검증은 끝났지만, 비공개 접근 제어 때문에 로그인 없는 요청으로는 앱 본문을 직접 확인하지 못했어요.`
-
-최종 성공 요약에서도 URL 은 반드시 평문 절대 URL 로만 보여줘요. `배포 URL: [https://...](...)`, `[열기](https://...)` 같은 Markdown 링크 문법을 쓰지 않아요.
-
-라이브 URL 확인은 조심해요. 비공개 앱에서 로그인 없는 HTTP 요청이 axhub 로그인 화면 HTML 을 200 으로 돌려주면, 그건 앱의 `/healthz` 또는 루트 응답 검증이 아니에요. 이런 경우 `배포 검증은 완료됐지만, 비공개 접근 제어 때문에 로그인 없는 요청으로는 앱 본문을 직접 확인하지 못했어요` 라고 말하고, `/healthz HTTP 200 확인`이라고 쓰지 않아요. 사용자가 raw endpoint 확인을 명시하면 로그인된 브라우저, 세션 쿠키, 또는 별도 접근 정책 변경이 필요하다고 설명해요. 200 응답이라도 body 가 axhub 로그인 포털이면 실패한 본문 검증으로 취급해요.
-
-로컬 QA/에이전트 상태 폴더는 앱 변경으로 취급하지 않아요. Git 상태를 판단하거나 commit+push 여부를 설명할 때 `.omc/`, `.claude/`, `.codex/`, `.serena/` 같은 런타임 상태는 제외하고, import 스킬이 이 경로들을 자동 커밋하거나 `.gitignore`에 추가하지 않아요. 필요한 경우 성공 뒤 정리 메모로만 알려요.
+이 섹션은 workflow 보다 우선해요. 사용자-facing 문구·tool 제목을 쓰기 전(진행 안내·preview 카드·성공/실패 요약 직전)에 [references/visibility-rules.md](references/visibility-rules.md) 를 읽고 그 금지어·치환·제목 규칙을 그대로 따라요. 핵심만 요약하면: 내부 field name·영어 진행어·스킬/route 라벨 금지, tool 제목은 한국어 명사구만, URL 은 평문 절대 URL 만, 비공개 앱의 로그인 화면 200 응답을 본문 검증으로 치지 않기예요.
 
 ## import/v1 envelope 계약
 
@@ -185,29 +136,7 @@ Static 성공은 `active_release_id`, `verified === true`, `public_url`, `error 
 
 ## Manifest 보강
 
-`required_mutations` 에 `manifest_create` 가 있고 대화형일 때만, execute 전에 axhub.yaml 을 프로젝트 파일 근거로 풍부하게 작성해요. 이게 이 스킬이 직접 authoring 하는 유일한 단계예요 — minimal manifest 대신 포트·빌드·시작 명령 같은 실제 값을 채워 manifest 의 정확도와 정보량을 함께 높여요.
-
-- **언제:** `가져오기 시작` 승인 직후, execute 호출 직전에만 해요. `manifest_create` 가 없으면(=axhub.yaml 이 이미 있으면) 절대 건드리지 않아요. headless 에서는 실행하지 않아요.
-- **무시 파일 선행 정리:** axhub.yaml 을 쓰기 전에 반드시 먼저 `cd "<absolute APP_DIR>" && git check-ignore -q axhub.yaml` 로 ignore 여부를 확인해요. 무시 중이면 `.gitignore` 또는 `.git/info/exclude` 에서 `axhub.yaml` 을 직접 무시하는 줄을 제거하고, 다시 `git check-ignore -q axhub.yaml` 이 실패하는지 확인해요. 아직 무시되면 axhub.yaml 을 쓰거나 `axhub deploy --explain --json` 검증을 진행하지 말고 남은 ignore 출처를 정리해요. 이 변경은 앱 설정을 첫 배포에 반영하기 위한 manifest 보강의 일부이므로, `--commit-manifest` 경로를 선택했다면 `.gitignore` 변경도 같은 커밋에 들어가야 해요.
-- **근거(grounding):** preview envelope 의 `detected_state.manifest_hints`(포트·health·build·start 와 그 출처)와 실제 프로젝트 파일만 봐요 — Dockerfile, docker-compose·compose, package.json(name·scripts·deps), requirements.txt·pyproject.toml·go.mod, 프레임워크 설정(next.config.\*, vite.config.\* 등), .env.example. 직접 근거가 있는 값만 적고, 불확실하면 비워요. 작고 정확한 manifest 가 크고 틀린 manifest 보다 나아요 — 비운 필드는 backend 가 자동 감지해요.
-- **채우는 필드(axhub.yaml 정규 스키마):**
-  - `version: axhub/v1` (필수)
-  - `name`: 표시 이름(package.json name 또는 폴더 이름)
-  - `runtime`: `port`, `health_path` (EXPOSE·HEALTHCHECK·compose·hints 근거)
-  - `build`: `framework`, `install`, `build`, `start`, `dockerfile`, `compose_file`, `static_output_dir`, `deploy_method` (deploy_method 는 detect 가 정한 값을 그대로 써요)
-  - `env`: `required`/`optional` 아래 `- name:`(+ 필요하면 `scope:`) — **키 이름만**
-  - `database`: `engine` (분명히 감지될 때만)
-- **보안(엄수):** env 값은 절대 적지 않아요. .env.example 키나 compose `environment:` 키처럼 값 없는 출처에서 key 이름만 가져오고, 비밀처럼 보이는 값은 건너뛰어요. axhub.yaml 에 secret·토큰·비밀번호를 쓰지 않아요.
-- **검증 게이트:** 작성한 뒤 반드시 deploy 와 같은 파서로 검증해요.
-
-  ```bash
-  cd "<absolute APP_DIR>" && axhub deploy --explain --json
-  ```
-
-  exit 0 이고 `status` 가 `ok` 이면 그대로 진행해요. 실패하면 typed error 가 가리키는 필드만 고쳐 최대 2회까지 다시 검증하고, 그래도 실패하면 작성한 axhub.yaml 을 지워 CLI 가 execute 때 최소 manifest 를 쓰게 두고, 최소 설정으로 진행한다고 한 줄로 알려요. `deploy --explain` 의 raw JSON 은 chat 에 붙이지 않아요.
-- **이후:** execute 는 axhub.yaml 이 있으면 최소 manifest 를 새로 쓰지 않고 이 보강본을 그대로 둬요. 첫 배포는 현재 git HEAD 를 빌드하므로 이 보강본은 커밋해서 HEAD 에 들어간 뒤(또는 이후 `deploy`)부터 빌드에 반영돼요 — 그래서 정확하고 풍부한 manifest 를 프로젝트에 남기는 게 이 단계의 목적이에요. 아래 commit+push 옵션을 고르지 않으면 첫 배포 자체는 기존 HEAD 와 앱의 deploy_method 로 진행돼요.
-- **무시 파일 사후 확인:** 검증 통과 직후, commit manifest 확인 질문을 띄우기 전에도 `git check-ignore -q axhub.yaml` 이 실패하는지 다시 확인해요. 아직 무시되면 execute 를 호출하지 말고 남은 ignore 출처를 정리해요. 실패한 execute 뒤에 뒤늦게 고치는 복구 흐름으로 두지 않아요.
-- **첫 배포까지 반영 (옵션, commit+push):** `axhub plugin-support preflight` 의 `capabilities.import.commit_manifest` 가 true 이고 GitHub 기반 첫 배포(docker/compose, 또는 preview 가 `github_repo_create`/`github_connect`/`first_deploy` 를 요구하는 경우)라면, 검증 통과 직후 한 번 더 물어요 — 보강본을 커밋하고 배포 브랜치에 push 해서 첫 배포부터 반영할지. **local_only 앱은 아직 git remote 가 없을 수 있지만, execute 중 CLI 가 repo/remote 를 만들 수 있으므로 remote 없음만으로 이 질문을 건너뛰지 않아요.** 동의하면 execute 를 `--commit-manifest` 로 호출해요(아래 Workflow 7). capability 가 없거나(구 CLI), static lane 이 repo 없이 진행되거나, 사용자가 거절하면 이 옵션을 빼고 기본 경로(커밋 없이, 이후 deploy 부터 반영)로 가요. commit+push 는 외부·되돌리기 어려운 동작이라 반드시 이 별도 동의를 받고, 강제 push 는 절대 안 하고, headless 에서는 제공하지 않아요.
+`required_mutations` 에 `manifest_create` 가 있고 대화형일 때만, execute 전에 axhub.yaml 을 프로젝트 파일 근거로 풍부하게 작성해요 — 이 스킬이 직접 authoring 하는 유일한 단계예요. 실행 시점이 오면 [references/manifest-authoring.md](references/manifest-authoring.md) 를 읽고 그 규칙대로 진행해요: 무시 파일 선행/사후 정리(`git check-ignore`), manifest_hints·실파일 근거 grounding, 정규 스키마 필드만 작성, env 값 절대 금지(키 이름만), `axhub deploy --explain --json` 검증 게이트(최대 2회, 실패 시 최소 manifest 로 degrade), commit+push 는 `capabilities.import.commit_manifest` + 별도 동의가 있을 때만이에요. headless 에서는 실행하지 않아요.
 
 ## Workflow
 
@@ -267,7 +196,7 @@ cd "<absolute APP_DIR>" && axhub --json plugin-support import --mode preview --h
 
 5. 대화형 승인 1회
 
-AskUserQuestion 은 preview 직후 한 번 써요. 옵션은 다음 네 가지예요.
+AskUserQuestion 은 preview 직후 한 번 써요. 질문은 `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?` 처럼 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인을 겸해요. 옵션은 다음 네 가지예요.
 
 - 가져오기 시작
 - 먼저 수정할게요
@@ -290,7 +219,7 @@ capability 가 없거나 repo 없는 static lane 이면 이 질문을 건너뛰�
 
 7. Execute 호출
 
-대화형 승인 직후 한 번만 호출해요. execute 는 가능하면 foreground 로 실행하고 완료 출력을 받을 때까지 기다려요. Claude Code Desktop 에서 tool 이 긴 실행을 background job 으로 전환하더라도, 그 background output 을 다시 읽어 `import/v1` execute envelope 를 검증하기 전에는 "완료"라고 말하지 않아요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못하면, 같은 명령을 반복 실행하지 말고 `axhub deploy verify <deployment-id> --app <app>` 또는 `axhub apps git status <앱>` 같은 읽기 전용 증거로 상태를 재확인해요.
+대화형 승인 직후 한 번만 호출해요. preflight `capabilities.import.early_return` 이 true 면 execute 에 `--verify-wait none` 을 붙여요 — execute 는 첫 배포 생성과 deployment id 확보까지만 하고 `verification_status: "pending"` 으로 바로 반환해요(`.axhub/import-resume.json` breadcrumb 포함). 첫 배포 검증은 이 스킬이 `axhub deploy verify <deployment-id> --app <app>` 를 별도 tool call 로 반복해 확인하고, 폴링 예산 최대 30회 또는 10분(AP-16)을 지켜요(닿으면 재개 요약). capability 없는 구 CLI 는 execute 가 검증까지 동기라 foreground 로 실행하고 완료 출력을 기다려요. Claude Code Desktop 에서 tool 이 긴 실행을 background job 으로 전환하더라도, 그 background output 을 다시 읽어 `import/v1` execute envelope 를 검증하기 전에는 "완료"라고 말하지 않아요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못하면, 같은 명령을 반복 실행하지 말고 읽기 전용 증거로 상태를 재확인해요 — deployment id 를 알면 `axhub deploy verify <deployment-id> --app <app>`, 모르면 `axhub apps git status <앱>` → `axhub deploy list --app <앱> --json` 순서로 최신 deployment id 를 복원한 뒤 같은 verify 로 판정해요. 이 재확인 반복에도 같은 폴링 예산이 적용돼요.
 
 `커밋 없이 진행` 이거나 commit+push 질문을 건너뛴 경우:
 

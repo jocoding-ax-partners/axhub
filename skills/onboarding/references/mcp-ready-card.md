@@ -1,6 +1,6 @@
 # MCP And Ready Cards
 
-Load this after core gaps are resolved. 처리 순서는 AI 활용 기록 옵트인 → optional MCP setup → final card 예요.
+Load this after core gaps are resolved. 처리 순서는 AI 활용 기록 옵트인 → MCP 연동(온보딩 기본 단계) → final card 예요.
 
 마무리 진입 시 사용자에게 먼저 한 줄로 예고해요: "마지막 단계예요 — AI 활용 기록(선택)과 axhub 도구 연동을 정리하고, 필요하면 재시작 한 번으로 끝나요." 이 단계의 원칙은 **재시작 최대 1회 · 카드 1장 · 질문은 옵트인 1개**예요 — 기록 활성화와 MCP 로드가 같은 재시작을 공유하도록 옵트인을 add 보다 먼저 처리해요.
 
@@ -66,7 +66,7 @@ claude mcp get axhub 2>&1 | grep -i status
 
 1. **`Status: Connected`** — MCP ready. `VIBE_READY` 로 가고 marker 를 삭제해요.
 
-2. **미등록 (get 실패)** — 등록하고 marker 를 쓴 뒤 Restart Handoff Card 로 종료해요. 이 세션에서 `/mcp` OAuth 를 안내하지 않아요 — 서버가 아직 세션에 로드되지 않아 목록에 없어요.
+2. **미등록 (get 실패)** — 등록하고 marker 를 쓴 뒤 Restart Handoff Card 로 종료해요. MCP 연동은 온보딩의 **기본 단계**라 별도 질문 없이 진행해요('optional' 아님 — 재시작 1회로 활성화하는 마무리 게이트이고, 재시작 안내는 Restart Handoff Card 몫이에요). 이 세션에서 `/mcp` OAuth 를 안내하지 않아요 — 서버가 아직 세션에 로드되지 않아 목록에 없어요.
 
 ```bash
 claude mcp add --transport http --scope user axhub https://mcp.axhub.ai/mcp \

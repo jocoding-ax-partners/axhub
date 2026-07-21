@@ -18,7 +18,8 @@ describe("bootstrap desktop UX contract", () => {
   test("keeps the invoked bootstrap entrypoint compact and action-first", () => {
     const bootstrap = readBootstrap();
 
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(19_500);
+    // AP-16 폴링 예산 문구 추가로 19_500 → 20_000 상향 (plugin:budget 의 per-skill 35k 는 별도 gate)
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(20_000);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");
