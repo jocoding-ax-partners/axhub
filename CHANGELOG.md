@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.15.6](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.5...v1.15.6) (2026-07-21)
+
+Claude Code Desktop 실사용 QA에서 최신 릴리스가 v1.15.5인데도 오래된 마켓플레이스 정보 때문에 v1.15.4까지만 받아지는 업데이트 정체를 고쳤어요. 이제 수동 업데이트와 세션 시작 자동 업데이트 모두 axhub 마켓플레이스를 먼저 새로고침한 뒤 플러그인을 받고, 새로고침이 일시적으로 실패해도 기존 정보로 업데이트를 계속 시도해 사용자를 막힌 상태에 두지 않아요.
+
+
+### Fixed
+
+* **update:** refresh marketplace before plugin upgrade ([#416](https://github.com/jocoding-ax-partners/axhub/issues/416)) ([d951bda](https://github.com/jocoding-ax-partners/axhub/commit/d951bda4d2c2c58fb67b9b9a1c3f70d51a93ad0e))
+
 ## [1.15.5](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.4...v1.15.5) (2026-07-21)
 
 Claude Code Desktop 실사용 QA에서 플러그인 새 버전을 찾고도 `/plugin update`가 대화형이라 실행할 수 없다며 사용자에게 터미널 작업을 떠넘기던 dead-end를 고쳤어요. 이제 플러그인만 업데이트해 달라는 자연어도 현재 버전과 설치 위치를 확인한 뒤 비대화형 `claude plugin update`를 직접 실행하고, 제외된 CLI는 변경하지 않으며, 받은 버전과 재시작 필요 여부까지 확인해 알려줘요. 중복 설치 판정은 필요할 때만 읽는 reference로 분리해 8스킬 컨텍스트 예산도 180KB 안에 유지했어요.
