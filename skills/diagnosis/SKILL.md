@@ -33,6 +33,7 @@ model: sonnet
 - **CLI 전용이에요.** MCP `deployment_diagnosis` 같은 deployment MCP 도구가 보여도 호출하지 않아요. 진단 표면은 `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 만 써요.
 - 영어로 "Diagnose failed deployment ..."처럼 물어도 이 스킬이에요. MCP `App list`, `App get`, `deployment_diagnosis` 같은 도구만으로 진단을 대신하지 않아요.
 - 방금 실패한 배포 id 가 있으면 `axhub deploy status <deployment-id> --json` 으로 terminal failure 를 확인하고, 앱 식별자가 있으면 `axhub deploy logs <deployment-id> --app <앱> --json --limit 100` 으로 런타임 로그 신호를 읽어요. raw 로그는 사용자에게 그대로 붙이지 않고 원인군만 요약해요.
+- 빌드 실패에는 `deploy status --json` 최상위와 `deploy diagnose` 응답 service 에 `build_log_tail`(백엔드가 secret 마스킹·절단을 끝낸 빌드 로그 끝부분)이 실릴 수 있어요. 이 필드는 아래 Visibility 예외를 따라 사용자에게 보여주고, 원인 요약의 근거로 써요. 필드가 없으면(구 CLI·기능 이전 배포·비-빌드 실패) 기존처럼 원인군 요약만 해요.
 - 앱 단위 현재 상태는 공개 CLI `axhub deploy diagnose` 로 받아요. CLI 원본 출력은 redact 가 안 돼 있어서 스킬이 직접 가려요.
 - CLI 표면이 없으면 `진단을 못 했어요` 로 끝내요.
 - 사용자에게는 raw id, exit code, JSON, stderr, pod signal, log line 을 그대로 보여주지 않고 여섯 가지 결과 중 하나로 요약해요.
@@ -43,7 +44,7 @@ model: sonnet
 - `axhubing`, `axhubed`, `diagnosing`, `checking` 처럼 제품명이나 영어 동사를 붙인 도구 제목을 쓰지 않아요. 예를 들어 `axhubed CLI 확인` 대신 항상 `CLI 표면 확인` 을 써요. 도구 제목에는 제품명 `axhub` 자체도 넣지 않아요.
 - Claude Code UI 가 Bash 본문의 `axhub` 문자열을 보고 `axhubing` 같은 자동 제목을 만들 수 있어요. 진단용 Bash 본문에서는 바이너리 이름도 나눠서 만들어요: `CLI_NAME="ax""hub"`, `CLI_BIN="$(command -v "$CLI_NAME" || true)"`, `"$CLI_BIN" deploy ...`. Bash 본문 안에는 소문자 `axhub` 연속 문자열, `AXHUB_BIN` 같은 변수명, command line 첫 단어의 bare `axhub` 를 쓰지 않아요.
 - 사용자에게 보이는 문장에서는 영어 진행 문장을 쓰지 않아요. `Read-only` 도 쓰지 말고 `읽기 전용` 이라고 써요. 명령 이름(`axhub deploy status`, `status/logs/diagnose`)은 필요할 때만 짧게 허용해요.
-- 중간 요약과 최종 메시지에서 raw category/stage/code 이름을 그대로 쓰지 않아요. `configuration`, `auth`, `build`, `infrastructure`, `timeout`, `resolve`, `backend_unimplemented`, `commit_not_found` 같은 값은 사용자에게 숨기고, "설정 쪽", "권한 쪽", "빌드 단계", "배포 환경", "시간 초과", "배포할 버전 찾기" 같은 말로 바꿔요.
+- 중간 요약과 최종 메시지에서 raw category/stage/code 이름을 그대로 쓰지 않아요. `configuration`, `auth`, `build`, `infrastructure`, `timeout`, `resolve`, `backend_unimplemented`, `commit_not_found` 같은 값은 사용자에게 숨기고, "설정 쪽", "권한 쪽", "빌드 단계", "배포 환경", "시간 초과", "배포할 버전 찾기" 같은 말로 바꿔요. 단, `reason.message` 가 한국어 안내 문구면(빌드 실패 코드들은 백엔드가 사용자용 문구로 내려줘요) 그 문구는 그대로 전달해도 돼요.
 - 사용자가 배포 id 를 직접 줬어도 최종 메시지에서 id 전체나 앞부분을 다시 쓰지 않아요. `실패 배포(96728617)` 처럼 일부만 보여주는 것도 금지예요. 항상 "방금 실패한 배포" 또는 "이 실패한 배포" 라고 말해요.
 - `healthy: true`, `healthy=false`, `applicable=false`, `services[]`, `reason.category` 같은 raw 필드명·불리언 표현을 사용자에게 쓰지 않아요. "현재 라이브 롤아웃은 정상이에요", "진단 대상이 아니에요" 처럼 사람 말로 바꿔요.
 
@@ -87,6 +88,8 @@ Claude Desktop QA처럼 사용자가 한 문장 안에 "진단하고 복구까�
 - raw category/stage/code 값(`configuration`, `resolve`, `commit_not_found` 등)
 - pod name, signal name, container reason, stack trace, log line 원문
 - MCP transport 오류 세부정보, tool schema, 내부 분기 판정
+
+**예외 — `build_log_tail`:** 백엔드가 secret 마스킹과 절단을 끝낸 빌드 실패 로그 tail 은 사용자에게 보여줘도 돼요. 원인 요약 아래 코드블록으로 붙이되, 기본은 에러 신호가 모인 끝부분 20~30줄만 발췌하고 사용자가 전체를 원하면 tail 전체를 보여줘요. 이 예외는 `build_log_tail` 필드에만 적용돼요 — `deploy logs` 런타임 로그 원문과 `signals[].text` 는 계속 가려요.
 
 CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 원본은 reason·signal text·로그 line 을 그대로 찍을 수 있으니 스킬이 직접 가려요. 어느 경로든 사용자에게는 원인군과 다음 행동만 말해요. 예: "환경 설정 쪽이 가장 의심돼요. 먼저 설정값을 확인하고, 맞으면 다시 배포하면 돼요." 코드가 원인이면 수정 커밋을 만든 뒤 다시 배포하라고 안내해요 — import 첫 배포는 같은 커밋을 같은 배포로 재사용해서 커밋 없이는 결과가 안 바뀌어요.
 
@@ -146,7 +149,7 @@ CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 원본�
 
    - CLI 표면이 없으면 `진단을 못 했어요` 로 끝내요.
 
-3. **결과 분류.** 실패 배포가 있으면 deployment status/logs 를 먼저 원인군으로 접고, 앱 진단은 현재 라이브 상태로 따로 접어요. 앱 진단 필드는 `applicable`, `healthy`, `services[].healthy`, `services[].reason{stage,code,category,message}`, `signals[]` 를 봐요.
+3. **결과 분류.** 실패 배포가 있으면 deployment status/logs 를 먼저 원인군으로 접고, 앱 진단은 현재 라이브 상태로 따로 접어요. 앱 진단 필드는 `applicable`, `healthy`, `services[].healthy`, `services[].reason{stage,code,category,message}`, `services[].build_log_tail`(있으면), `signals[]` 를 봐요. 실패 배포 status 응답에서는 최상위 `build_log_tail` 도 봐요.
 
    CLI 경로의 exit code 계약 (검증된 두 값을 우선으로 봐요):
 
@@ -174,7 +177,7 @@ CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 원본�
    `해결 후보가 있어요` 의 원인군은 service `reason.category` 를 사람 말로 옮겨요 (확정이 아니라 "의심"으로). 실제 category 값은 다섯 가지예요:
    - `auth` → "인증·권한 쪽 문제로 보여요 (레지스트리·git 접근)"
    - `configuration` → "설정 쪽이 의심돼요 (이미지 이름·환경변수·컨테이너 설정)"
-   - `build` → "빌드 단계가 의심돼요"
+   - `build` → "빌드 단계가 의심돼요" — `build_log_tail` 이나 한국어 `reason.message` 가 있으면 "네이티브 모듈 빌드 도구가 이미지에 없어요"처럼 구체적 원인으로 좁혀 말하고, tail 발췌를 코드블록으로 이어 붙여요
    - `infrastructure` → "인프라·배포 환경 쪽이 의심돼요"
    - `timeout` → "제한 시간 안에 안정화되지 않았어요 (시작 시간·readiness 확인)"
    - category 는 열린 문자열이라 모르는 값이 올 수 있어요. 그러면 그 값을 그대로 노출하지 말고 "원인을 좁히는 중이에요" 로만 안내해요.
@@ -193,11 +196,13 @@ CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 원본�
 - `로그인/권한이 필요해요. axhub 권한을 확인한 뒤 다시 진단하면 돼요.`
 - `진단을 못 했어요. 지금은 연결된 진단 도구도, CLI 진단 표면도 없어요.`
 
+빌드 실패로 `build_log_tail` 이 있으면 `해결 후보가 있어요` 메시지 아래에 로그 발췌 코드블록을 이어 붙여요.
+
 ## 금지
 
 - 재배포, 롤백, 앱 삭제, 환경변수 변경 같은 mutation 을 실행하지 않아요.
 - 실패 후보를 확정 원인처럼 말하지 않아요. evidence 가 약하면 "가장 의심돼요" 처럼 후보로 표현해요.
 - 라이브 진단이 정상이라고 과거 배포가 성공했다고 단정하지 않아요. 현재 롤아웃 상태와 배포 한 건의 결과는 다를 수 있어요.
-- raw 출력이나 내부 id·exit code 를 사용자에게 보여주지 않아요.
+- raw 출력이나 내부 id·exit code 를 사용자에게 보여주지 않아요. 빌드 실패 로그 tail 만 Visibility 예외를 따라요.
 - MCP 를 호출하거나 설치·설정하라고 내부 절차를 만들지 않아요.
 - `clarity` 처럼 전체 `--json-schema` 트리를 탐색해 임의 명령을 찾아 실행하지 않아요. 이 스킬의 표면은 CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 뿐이에요.
