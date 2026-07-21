@@ -113,6 +113,9 @@ describe("update Desktop UX contract", () => {
     expect(update).toContain("`플러그인만` 요청은 `claude plugin list` → `axhub update check --plugin-version <PLUGIN_VERSION> --json`");
     expect(update).toContain("사용자가 명시적으로 `플러그인만` 업데이트하고 CLI 는 건드리지 말라고 했으면");
     expect(update).toContain("이 제외 요청을 이유로 플러그인 업데이트까지 멈추면 실패예요");
+    expect(update).toContain("`claude plugin marketplace update axhub`");
+    expect(update).toContain("marketplace 새로고침이 실패해도 기존 cache 로 plugin update 를 계속 시도해 dead-end 를 만들지 않아요");
+    expect(update).toContain("Desktop Bash tool 로 정확히 `claude plugin marketplace update axhub` 를 먼저 실행해 marketplace cache 를 최신으로 만들어요");
     expect(update).toContain("Desktop Bash tool 로 `claude plugin update axhub@axhub --scope <SCOPE>` 를 직접 실행해요");
     expect(update).toContain("대화형 패널이라 직접 실행할 수 없다");
     expect(update).toContain("인터랙티브 터미널에서 직접 하도록 떠넘기지 말아요");

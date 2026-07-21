@@ -69,8 +69,9 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
 - **`plugin.has_update == true` 이고 적용 가능** → 자동 적용해요:
   1. 설치 scope 를 먼저 확인해요 — `claude plugin list` 출력에서 `axhub@axhub` 항목의 `Scope:` 값(user/project/local/managed)을 읽어 `<SCOPE>` 로 둬요. 못 찾으면 `user` 로 둬요.
   2. 안내 한 줄: `axhub 플러그인 새 버전(<plugin.current> → <plugin.latest>)이 나왔어요. 지금 받을게요…`
-  3. 실행: `claude plugin update axhub@axhub --scope <SCOPE>`
-  4. 성공하면 재시작 확인 marker 를 기록해요 — 다음 세션의 restart-confirm 훅이 실제 적용을 확인하고 닫아요 (절차는 `plugin-restart-confirm-prompt.md` 소유):
+  3. marketplace cache 를 먼저 최신화해요: `claude plugin marketplace update axhub`. 실패해도 raw 에러를 숨기고 다음 plugin update 를 계속 시도해요.
+  4. 실행: `claude plugin update axhub@axhub --scope <SCOPE>`
+  5. 성공하면 재시작 확인 marker 를 기록해요 — 다음 세션의 restart-confirm 훅이 실제 적용을 확인하고 닫아요 (절차는 `plugin-restart-confirm-prompt.md` 소유):
 
      ```bash
      mkdir -p "$HOME/.axhub/cache" && printf '%s' '<plugin.latest>|<SCOPE>' > "$HOME/.axhub/cache/.plugin-update-restart"
@@ -78,8 +79,8 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
 
      marker 내용은 `받은 버전|scope` 형식이에요 — restart-confirm 이 그 scope 의 설치 항목을 직접 확인해, 다른 scope 의 높은 버전을 적용 확인으로 오인하지 않게 해요.
 
-  5. **재시작 안내(필수 — plugin 업데이트는 재시작해야 적용돼요):** `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.`
-  6. 실패하면 raw 에러는 숨기고 한 줄만 안내한 뒤 비차단으로 계속해요 (marker 는 기록하지 않아요): `플러그인 자동 업데이트가 안 됐어요. claude plugin update axhub@axhub --scope <SCOPE> 를 직접 실행해 주세요.`
+  6. **재시작 안내(필수 — plugin 업데이트는 재시작해야 적용돼요):** `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.`
+  7. 실패하면 raw 에러는 숨기고 한 줄만 안내한 뒤 비차단으로 계속해요 (marker 는 기록하지 않아요): `플러그인 자동 업데이트가 안 됐어요. claude plugin update axhub@axhub --scope <SCOPE> 를 직접 실행해 주세요.`
 
 ---
 
