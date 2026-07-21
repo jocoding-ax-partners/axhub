@@ -62,7 +62,10 @@ describe("Claude Desktop live QA regressions", () => {
     expect(frontmatter).toContain('First tool title/description exactly "명령 찾기"');
     expect(frontmatter).toContain("do not mention the skill or routing");
     expect(skill).toContain("첫 visible 문장을 정확히 `요청하신 운영 명령을 확인할게요.`");
-    expect(skill).toContain("제목 `명령 찾기`의 bare `axhub --json-schema --field-expr '.commands | keys[]'`");
+    expect(skill).toContain("제목 `명령 찾기`의 bare `axhub --json-schema --field-expr '<가장 좁은 후보>'`");
+    expect(skill).toContain("명사·동사 후보가 하나면 leaf 부터");
+    expect(skill).toContain("parent/root 를 더 조회하지 않아요");
+    expect(skill).toContain("null/empty/error 일 때만 한 단계씩 넓히며");
     expect(skill).not.toContain("`command -v axhub` 가 실패하면");
   });
 
