@@ -100,6 +100,25 @@ const validateImportEnvelope = (value: unknown): { ok: boolean; reason?: string 
 };
 
 describe("import skill contract", () => {
+  test("resolves the workspace before preview and never retries an unscoped mutation", () => {
+    const skill = readImportSkill();
+    expect(skill).toContain("2. 작업공간 확정");
+    expect(skill).toContain("axhub plugin-support tenant-resolve --json");
+    expect(skill).toContain("앱을 어느 작업공간에 만들까요?");
+    expect(skill).toContain("사용자-facing 문구에 `tenant` 또는 `테넌트`를 쓰지 않아요");
+    expect(skill).toContain("`--tenant` 없는 execute 를 먼저 호출해 오류를 낸 뒤");
+    expect(skill).toContain("작업공간 선택 전에는 preview 승인이나 execute mutation을 시작하지 않아요");
+  });
+
+  test("uses standalone Desktop commands and standalone verify polling", () => {
+    const skill = readImportSkill();
+    expect(skill).toContain("현재 선택된 프로젝트가 이미 정확히 `APP_DIR` 이면 `cd ... &&` 를 붙이지 않고");
+    expect(skill).toContain("한 카드에 한 개의 bare 명령만");
+    expect(skill).toContain("Monitor, background task, ScheduleWakeup, output 파일 읽기");
+    expect(skill).toContain("`for`/`while`/`until`, `sleep`, command substitution, pipe, `grep`, `head`, `status=`");
+    expect(skill).toContain("standalone `axhub deploy verify <deployment-id> --app <app> --json`");
+  });
+
   test("commit manifest question uses short JSON-safe desktop copy", () => {
     const skill = readImportSkill();
     expect(skill).toContain("## AskUserQuestion JSON 안전 규칙");

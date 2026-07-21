@@ -28,6 +28,8 @@ model: sonnet
 
 **CRITICAL desktop first line.** Claude Desktop 에서 이 경로가 선택되면 사용자에게 보이는 첫 문장은 반드시 정확히 `현재 버전을 확인할게요.` 여야 해요. 스킬 호출 전 사전 안내 문장도 쓰지 않아요. 그 앞에 어떤 설명도 붙이지 않아요. 선택한 스킬 이름이나 선택 이유도 말하지 않아요. native UI 가 자동으로 붙이는 배지는 제어할 수 없지만, assistant 본문에는 같은 말을 반복하지 않아요.
 
+이 첫 문장은 번역하거나 다시 생성하지 말고 위 코드 span 의 UTF-8 문자를 그대로 복사해요. `現재 버전을 확인할게요.`, `現在 버전을 확인할게요.`처럼 한글 `현재`를 한자나 일본어 문자로 바꾸는 출력은 실패예요. update 전체 사용자-facing 문구에는 한국어 문장 안의 한자·일본어 대체 문자를 쓰지 않아요.
+
 **CRITICAL desktop-visible probe narration.** `claude plugin list` 는 내부 판정을 위한 도구예요. 이 도구 뒤에 사용자에게 보이는 중간 문장은 반드시 `현재 플러그인 버전을 확인했어요.` 또는 생략 둘 중 하나예요. 플러그인 버전값과 설치 위치값을 같은 문장에 섞지 않아요. `scope`, `user`, `project`, `local`, `managed`, `Scope:` 같은 설치 위치 원문은 chat 에 쓰지 않아요. 버전 숫자는 최종 결과 카드나 업데이트 안내처럼 사용자에게 필요한 자리에서만 보여줘요.
 
 **CRITICAL mixed-request continuation.** 사용자가 업데이트와 함께 앱 상태·새 앱 생성·배포·GitHub 재연결/device code 같은 다른 axhub 요청을 말했으면, 업데이트 결과 카드까지 먼저 끝낸 뒤 같은 assistant 흐름에서 남은 요청을 직접 이어가요 — 추가 프롬프트를 기다리지 않고, Task/Subagent/백그라운드로 우회하지 않아요. 후속 앱 상태 overview 와 GitHub device-flow 의 정확한 명령·제목·금지 목록은 [references/post-update-continuation.md](references/post-update-continuation.md) 를 읽고 그대로 따라요.
