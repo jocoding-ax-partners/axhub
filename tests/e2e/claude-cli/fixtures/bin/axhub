@@ -62,7 +62,7 @@ case "${1:-}" in
       preflight)
         # preflight: token 은 아직 fine (deploy_expired 도 auth_ok=true).
         # raw stderr/exit-jargon 미노출 — JSON contract 만.
-        echo '{"cli_present":true,"cli_state":"ok","in_range":true,"cli_too_old":false,"cli_too_new":false,"auth_ok":true,"auth_error_code":null,"profile":"paydrop","capabilities":{"import":{"supported":true,"schemas":["import/v1"]}}}'
+        echo '{"cli_present":true,"cli_state":"ok","in_range":true,"cli_too_old":false,"cli_too_new":false,"auth_ok":true,"auth_error_code":null,"profile":"paydrop","capabilities":{"import":{"supported":true,"schemas":["import/v1"],"commit_manifest":true,"early_return":true,"verify_wait":true}}}'
         exit 0
         ;;
       route-decision)

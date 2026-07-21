@@ -230,9 +230,10 @@ describe("smooth behavior contracts", () => {
     expect(importSkill).toContain("static lane 에서는 사용자가 명시적으로");
     expect(importSkill).toContain("axhub --json plugin-support import --mode execute --approved");
     expect(importSkill).toContain('axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"');
-    expect(importSkill).toContain("foreground 로 실행하고 완료 출력을 기다려요");
+    expect(importSkill).toContain("권한 카드 한 번으로 끝나는");
+    expect(importSkill).toContain("--wait --wait-interval 20s --wait-timeout 10m --json");
     expect(importSkill).toContain("GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 반드시 `$APP_SLUG` 와 정확히 같게 둬요");
-    expect(importSkill).toContain("background output");
+    expect(importSkill).toContain("같은 verify 를 반복 호출하거나");
     expect(importSkill).toContain("existing_axhub_app_repair");
     expect(importSkill).toContain("CLI 가 현재 `gh` 로그인과 app slug 로 repo 를 정하고");
     expect(importSkill).toContain("capabilities.import.schemas");
