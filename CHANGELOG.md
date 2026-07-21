@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.15.7](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.6...v1.15.7) (2026-07-21)
+
+Claude Code Desktop 실사용 QA에서 MCP 인증이 필요할 때 대화창에 `/mcp`를 입력하라고 안내해, 명령이 일반 메시지로 전송되고 사용자가 더 진행할 수 없던 deadlock을 고쳤어요. 이제 실행 중인 호스트를 구분해 Desktop에서는 내장 터미널에서 Claude 대화형 화면을 열고 인증을 마친 뒤 원래 대화로 돌아오는 짧은 순서만 안내하며, macOS·Linux·Git Bash·PowerShell 환경별 명령도 안전하게 나눠 개발 경험이 없는 사용자도 온보딩을 끝까지 완료할 수 있어요.
+
+
+### Fixed
+
+* **onboarding:** unblock Desktop MCP authentication ([dc11af3](https://github.com/jocoding-ax-partners/axhub/commit/dc11af3dce66d761e4cc15d710980711c516028d))
+
 ## [1.15.6](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.5...v1.15.6) (2026-07-21)
 
 Claude Code Desktop 실사용 QA에서 최신 릴리스가 v1.15.5인데도 오래된 마켓플레이스 정보 때문에 v1.15.4까지만 받아지는 업데이트 정체를 고쳤어요. 이제 수동 업데이트와 세션 시작 자동 업데이트 모두 axhub 마켓플레이스를 먼저 새로고침한 뒤 플러그인을 받고, 새로고침이 일시적으로 실패해도 기존 정보로 업데이트를 계속 시도해 사용자를 막힌 상태에 두지 않아요.
