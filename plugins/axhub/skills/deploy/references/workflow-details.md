@@ -2,6 +2,8 @@
 
 Load this only after the top-level `deploy` skill has passed the activation boundary and the user approved the initial preview, or when a specific branch below is needed.
 
+Claude Desktop 에서는 이 문서의 여러 줄 shell 블록을 실행하지 않아요. 블록은 논리·headless 설명용이에요. 모든 Desktop 권한 카드는 구체적인 값을 넣은 bare 명령 하나만 실행하고, 변수 대입·`eval`·`mktemp`·분기·pipe·redirect·`;`·`&&`·`||`·`echo`·`$?`를 금지해요. 앞선 JSON/tool 결과를 모델이 직접 읽어 다음 단일 명령의 literal 인자로 옮겨요.
+
 ## Routing and context
 
 - Named target wins. If the user explicitly says another target such as Vercel, Netlify, Fly, Cloudflare Pages, Render, Railway, Heroku, AWS, GCP, Azure, VPS, or GitHub Pages, stop axhub deploy before `deploy-prep` and say that the other target seems intended.
@@ -168,10 +170,7 @@ On exit 64 with `validation.deployment_in_progress`, do not retry. Refresh in-fl
 Deployment-record success is declared only by `axhub deploy verify`. Poll this command for in-flight/webhook deployments:
 
 ```bash
-echo "배포 결과를 확인하고 있어요." >&2
-VERIFY_OUT=$(mktemp)
-axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" > "$VERIFY_OUT" 2>&1
-VERIFY_EXIT=$?
+axhub deploy verify <deployment-id> --app <app-id>
 ```
 
 If `VERIFY_EXIT=6`, the deployment is still running. Tell the user `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same scoped verify command until exit 0 or 7, or until a bounded timeout. Prefer separate short tool calls or a real ScheduleWakeup when available. Do not combine polling into one long `while`/`for` shell loop with `MAX_ATTEMPTS`, command substitution, or shell expansion. Also do not collapse polling into one long `while`/`for`/`until` shell loop with `sleep`, `grep`, `head`, pipes, or shell expansion. A Claude Desktop permission request for a long polling shell block is a failed watch UX. Do not substitute `axhub deploy watch` or `axhub deploy status --watch`. Do not end by asking the user to say `배포 상태 확인해줘`; the skill owns the follow-up while a known `DEPLOY_ID` is still running.

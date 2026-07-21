@@ -1,6 +1,6 @@
 ---
 name: import
-description: '기존 앱을 axhub에 가져올 준비를 확인할게요. Use this before bootstrap for any existing/local-folder app import or first deploy: "기존 앱", "기존 Express 서버 앱", "이미 만든 앱", "작업 폴더는 /path", "이 폴더 axhub에 올려", "이 앱을 axhub에 올려", "기존 Express 서버 앱을 axhub에 올려서 실제 배포", "import existing app". Start directly; do not explain why this path was chosen or name any route/skill label. 스킬 실행 전 사용자 문장 0개. 비어 있지 않은 기존 로컬 앱을 axhub 앱으로 연결하고 manifest/GitHub/첫 배포 준비까지 가져오는 import 흐름. 템플릿 bootstrap 이 아니라 기존 소스를 등록하려는 요청에 사용해요. Next.js뿐 아니라 Express/Fastify/Nest/FastAPI/Flask/Django/Rails/Go/Rust/Java/PHP/.NET 같은 백엔드와 프론트·Dockerfile 앱 등 broad stack 을 CLI 감지에 맡겨요. 빈 디렉토리 새 앱은 bootstrap, 이미 연결된 앱의 재배포는 deploy 로 양보해요. 이 트리거들은 axhub 맥락(발화의 axhub 언급·대화의 직전 axhub 작업)이 있을 때만 유효해요. GitHub push 나 다른 플랫폼 업로드를 뜻하는 "올려" 발화에는 이 스킬을 쓰지 않아요.'
+description: '기존 앱을 axhub에 가져올 준비를 확인할게요. Use this before bootstrap for any existing/local-folder app import or first deploy: "기존 앱", "기존 Express 서버 앱", "이미 만든 앱", "작업 폴더는 /path", "이 폴더 axhub에 올려", "이 앱을 axhub에 올려", "가져오기가 잘 끝났는지 확인", "중단된 가져오기 이어서 마무리", "import existing app". Start directly with that Korean sentence; no preamble; do not explain why this path was chosen or expose a route/skill label. 스킬 실행 전 사용자 문장 0개. 기존 앱의 첫 연결·첫 배포와 resume 완료 확인을 맡겨요. Broad stack: Express/Fastify/Nest/FastAPI/Flask/Django/Rails/Go/Rust/Java/PHP/.NET. 빈 폴더는 bootstrap, 재배포는 deploy로 양보해요.'
 examples:
   - utterance: "기존 앱 올려"
     intent: "import existing local app into axhub"
@@ -140,17 +140,31 @@ Static 성공은 `active_release_id`, `verified === true`, `public_url`, `error 
 
 `required_mutations` 에 `manifest_create` 가 있고 대화형일 때만, execute 전에 axhub.yaml 을 프로젝트 파일 근거로 풍부하게 작성해요 — 이 스킬이 직접 authoring 하는 유일한 단계예요. 실행 시점이 오면 [references/manifest-authoring.md](references/manifest-authoring.md) 를 읽고 그 규칙대로 진행해요: 무시 파일 선행/사후 정리(`git check-ignore`), manifest_hints·실파일 근거 grounding, 정규 스키마 필드만 작성, env 값 절대 금지(키 이름만), `axhub deploy --explain --json` 검증 게이트(최대 2회, 실패 시 최소 manifest 로 degrade), commit+push 는 `capabilities.import.commit_manifest` + preview 승인에서 고른 명시적 동의가 있을 때만이에요. headless 에서는 실행하지 않아요.
 
+Desktop ignore 확인은 bare `git check-ignore -q axhub.yaml` 1회예요. exit 0/1을 tool 결과로 읽고 `$?`, `echo`, 변수, shell 연산자를 붙이지 않아요. ignore 규칙을 바꾼 때만 사후 1회 재검증해요.
+
 ## Workflow
 
 1. CLI 가드와 capability 확인
 
-아래 Workflow 명령 예시는 모두 tool cwd 가 `APP_DIR` 로 지정된 bare 명령이에요. 현재 Desktop 프로젝트가 `APP_DIR` 이면 보이는 명령 앞에 `cd`, `&&`, `;`, `echo $?`를 절대 붙이지 않아요.
+아래 Workflow 명령 예시는 모두 tool cwd 가 `APP_DIR` 로 지정된 bare 명령이에요. Desktop 카드에는 shell 연산·출력 가공을 붙이지 않아요.
+
+완료/재개 시 폴더명·manifest `name`·preflight `current_app`을 원격 slug로 추론하거나 `apps get/list`, `deploy list/status`로 우회하지 않아요. 아래 resume 식별자를 써요.
 
 ```bash
 axhub plugin-support preflight --json
 ```
 
 `capabilities.import.supported` 가 true 이고 `capabilities.import.schemas` 에 `import/v1` 이 있어야 해요. 아니면 업데이트 안내 후 멈춰요.
+
+1.5. 완료 확인 short-circuit
+
+완료 확인 요청이면 작업공간/preview 전에 `.axhub/import-resume.json`을 1회 읽어요. 유효한 `app_id`와 `deployment_id`가 있으면 다음 bare 명령을 1회 실행해요.
+
+```bash
+axhub deploy verify <deployment-id> --app <app-id> --json
+```
+
+성공이면 완료를 안내하고 preview/승인/execute/추가 조회 없이 끝내요. `not_found` 또는 식별자 없음만 일반 흐름으로 가고, 다른 실패는 성공이라 하지 않고 멈춰요. 새 가져오기에는 적용하지 않아요.
 
 2. 작업공간 확정
 
@@ -165,6 +179,8 @@ axhub plugin-support tenant-resolve --json
 여러 작업공간이 있는 상태에서 `--tenant` 없는 execute 를 먼저 호출해 오류를 낸 뒤 `axhub tenants list`, `axhub tenant list`, `--help | grep`로 복구하지 않아요. 작업공간 선택 전에는 preview 승인이나 execute mutation을 시작하지 않아요. 이 순서가 깨지면 동일 가져오기 승인을 다시 받게 되어 Desktop deadlock UX예요.
 
 3. Preview envelope 요청
+
+아직 안 읽었다면 resume을 1회 읽어요. 유효한 `app_id`는 preview의 literal `--app <app_id>`로 넘기고, 없을 때만 옵션 없이 호출해요. resume ID는 폴더·manifest·preflight 이름보다 우선해요.
 
 사용자나 현재 컨텍스트에서 app slug, GitHub owner/repo, tenant 가 이미 정해졌으면 preview 부터 그대로 넘겨요. `--slug` 는 axhub 앱 slug, `--name` 은 표시 이름, `--repo` 는 GitHub 저장소예요. repo owner 를 별도 flag 로 만들지 말고 `--repo "$OWNER/$REPO"` 형태로 넘겨요.
 

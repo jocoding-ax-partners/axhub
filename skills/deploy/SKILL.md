@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: '이미 axhub에 연결된 앱의 현재 브랜치/커밋을 다시 배포하거나 배포 상태를 이어서 확인할 때 사용해요. 트리거: "배포", "배포해", "배포해줘", "올려", "공개해", "띄워", "프로덕션", "deploy", "ship", "release", "rollout". 첫 연결/첫 배포는 import, 빈 폴더 새 앱 생성은 bootstrap, 명시적인 실패 원인 진단은 diagnosis 가 담당해요. 이 스킬은 preview-confirm gate, headless dry-run, deployment-record verify, static deploy 예외, terminal failure diagnosis handoff 를 맡아요. 이 트리거들은 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요. axhub 맥락 없는 일반 "배포해" 발화나 Vercel·AWS 같은 다른 배포 대상을 명시한 요청에는 이 스킬을 쓰지 않아요.'
+description: '연결된 앱의 현재 코드를 실제 AxHub에 배포하고 성공 여부까지 확인할 때 반드시 사용해요. 트리거: "배포해", "실제 AxHub에 배포", "성공 여부까지 확인", "같은 코드로 강제 재배포", "deploy". preview-confirm과 exact deployment verify를 맡고 apps status/curl로 대신하지 않아요. 첫 연결은 import, 빈 폴더는 bootstrap, 실패 원인 진단은 diagnosis예요. axhub 맥락 없거나 다른 배포 대상이면 쓰지 않아요.'
 examples:
   - utterance: "paydrop 배포해"
     intent: "deploy current branch to axhub live"
@@ -32,6 +32,8 @@ Then run one Bash/tool call with Korean title `배포 준비 확인` from the us
 axhub plugin-support deploy-preview-summary --user-utterance "<latest user sentence>"
 ```
 
+이 첫 명령 전에는 설치·플러그인·앱·git·curl probe를 하지 않아요. 명시적 최신성 요청만 update 뒤 이 스킬로 돌아와요.
+
 정상 preview 면 axhub 프로젝트 확정이에요. Interactive 는 별도 진입 질문 없이 **preview card 하나가 axhub 진입 확인을 겸해요** (AP-12 통합 게이트): Korean stdout 을 preview card 로 보여주고 `axhub로 지금 배포를 진행할까요?` 질문과 기존 `진행`/`취소` 승인을 한 번만 받아요. `취소` 면 종료. (headless 는 AUQ 생략, dry-run) If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here. axhub 맥락(사용자의 axhub 언급·직전 axhub 작업)이 있으면 기존대로 안내해요: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`. axhub 맥락이 없으면 import/bootstrap 으로 넘기지 말고 "이 폴더는 axhub에 연결돼 있지 않아요. axhub로 배포하려는 거예요?" 를 한 번만 묻고, 아니라는 답이면 이 스킬을 종료해요. headless 에서는 묻지 않고 조용히 멈춰요.
 
 For the initial Desktop preview, stop reading after this section unless approval is received. After approval, continue with the canonical workflow below and load `references/workflow-details.md` for branch detail.
@@ -57,6 +59,8 @@ This skill is **CLI-only**. All deploy preview/create/verify/status/diagnosis ro
 - Do not route deploy execution through advisor/server advisor/subagent helpers.
 - Do not escalate to another model/context to decide deployment. The CLI envelopes are the source of truth.
 - If MCP deployment tools are present but denied, that is not a blocker for this skill; continue with the CLI path or the headless dry-run contract.
+
+**Claude Desktop 단일 명령 계약.** 카드마다 한 bare 명령만 써요. 변수·분기·subshell·shell 연산·pipe·redirect·출력 가공 없이 이전 결과의 ID를 literal 인자로 넘겨요.
 
 Progress lines:
 
@@ -88,29 +92,17 @@ Actual execution order:
 Use CLI capability, not version string comparison:
 
 ```bash
-if ! command -v axhub >/dev/null 2>&1; then
-  echo "axhub CLI가 아직 없네요. 온보딩부터 진행할게요." >&2
-  exit 0
-fi
-PREFLIGHT_JSON=$(axhub plugin-support preflight --json 2>/dev/null)
-PREFLIGHT_EXIT=$?
-if [ "$PREFLIGHT_EXIT" = "2" ] || [ -z "$PREFLIGHT_JSON" ]; then
-  echo "axhub CLI가 오래됐어요. `axhub update apply`로 업데이트한 뒤 다시 시도해 주세요." >&2
-  exit 0
-fi
-echo "$PREFLIGHT_JSON"
+axhub plugin-support preflight --json
 ```
 
-If auth is missing/expired, explain in Korean and ask before starting login flow in interactive mode.
+이 명령의 tool 결과에서 command-not-found, exit, JSON을 직접 읽어요. 별도 설치 probe나 shell 분기를 만들지 않아요. If auth is missing/expired, explain in Korean and ask before starting login flow in interactive mode.
 
 ### Routing and resolve
 
 If the user explicitly names another deployment target, stop axhub deploy before `deploy-prep`. Otherwise route with the CLI context gate:
 
 ```bash
-EXPLICIT_FLAG=""
-[ "${EXPLICIT:-0}" = "1" ] && EXPLICIT_FLAG="--explicit"
-ROUTE_DECISION=$(axhub plugin-support route-decision --user-utterance "$ARGS" $EXPLICIT_FLAG --field-expr '.decision // "axhub"' 2>/dev/null || echo axhub)
+axhub plugin-support route-decision --user-utterance "<latest user sentence>" --field-expr '.decision // "axhub"'
 ```
 
 Only `axhub` continues to `deploy-prep`. Session carry-over evidence is route gate 통과 후에만 적용해서 다른 타깃으로 배포 의도를 훔치지 않아요. For `ignore`, interactive mode asks whether to deploy to axhub; headless stops safely.
@@ -118,7 +110,7 @@ Only `axhub` continues to `deploy-prep`. Session carry-over evidence is route ga
 Resolve live deployment inputs with:
 
 ```bash
-DEPLOY_PREP_JSON=$(axhub plugin-support deploy-prep --intent deploy --user-utterance "$ARGS" --json)
+axhub plugin-support deploy-prep --intent deploy --user-utterance "<latest user sentence>" --json
 ```
 
 The `deploy-prep` envelope is authoritative for `profile`, `endpoint`, `app_id`, `app_slug`, `branch`, `commit_sha`, `commit_message`, `eta_sec`, preflight, `bootstrap_plan`, in-flight deploy, GitHub connection, and quality gate. Never infer `app_id` from pwd or git remote alone in the mutation path.
@@ -181,10 +173,7 @@ Bind `DEPLOY_ID` only from an in-flight deployment id or public `axhub deploy cr
 Deployment-record success is declared only by `axhub deploy verify` with the bound id:
 
 ```bash
-echo "배포 결과를 확인하고 있어요." >&2
-VERIFY_OUT=$(mktemp)
-axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" > "$VERIFY_OUT" 2>&1
-VERIFY_EXIT=$?
+axhub deploy verify <deployment-id> --app <app-id>
 ```
 
 Do not use latest lookup. Always pass the app scope from the same resolved target: `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"`. If app scope is missing, stop instead of running a bare verify. Do not call `axhub deploy watch` or `axhub deploy status --watch` from this skill; Desktop/non-TTY watch paths can degrade or require extra flags. If verify exits `6`, say `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same scoped verify command until terminal success/failure or the bounded budget — 이 verify 반복의 폴링 예산은 최대 30회 또는 10분(AP-16)이에요. Prefer separate short tool calls or an actual ScheduleWakeup; do not collapse polling into one long `while`/`for`/`until` shell loop with `sleep`, `grep`, `head`, `MAX_ATTEMPTS`, command substitution, pipes, or shell expansion. A Claude Desktop permission request for a long polling shell block is a failed watch UX; replace it with standalone `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` calls. Do not end the response by asking the user to say `배포 상태 확인해줘`. If the bounded timeout is reached while the deploy is still running, schedule a follow-up check when the host supports it; otherwise say `아직 진행 중이에요. 여기서 실패로 보지 않고, 제가 확인 가능한 범위까지는 같은 배포를 지켜봤어요.` and keep the `DEPLOY_ID` visible enough for a future status request. Do not claim success from deploy-create stdout, status snapshots, watch output, or prose polling; verify 전에는 성공을 선언하지 않아요. If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
