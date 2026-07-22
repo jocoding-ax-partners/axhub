@@ -4,6 +4,16 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.15.10](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.9...v1.15.10) (2026-07-22)
+
+Claude Code Desktop에서 자연어 운영 요청이 스킬 안내 전에 불필요한 탐색으로 새거나, 명령 스키마를 루트부터 넓게 읽어 같은 권한 확인이 반복되던 마지막 마찰을 없앴어요. 이제 요청한 동작의 정확한 leaf 명령부터 확인하고 유효하지 않은 대상은 실행 승인 전에 거절하므로, 앱 삭제 같은 파괴적 작업도 초보 사용자가 예측 가능한 한 번의 흐름으로 안전하게 끝낼 수 있어요.
+
+
+### Fixed
+
+* **clarity:** discover exact leaf commands first ([#425](https://github.com/jocoding-ax-partners/axhub/issues/425)) ([e323af2](https://github.com/jocoding-ax-partners/axhub/commit/e323af2c821a27ecc6614e22c350da43df72ff14))
+* smooth Desktop skill routing ([5bdadc6](https://github.com/jocoding-ax-partners/axhub/commit/5bdadc6559a0b2a822b1b02ceada1731ee14d71e))
+
 ## [1.15.9](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.8...v1.15.9) (2026-07-21)
 
 Claude Code Desktop 실사용 QA에서 완료된 가져오기를 새 앱으로 다시 시작하거나 로컬 폴더 이름을 원격 앱으로 추측하고, deploy·development·diagnosis 자연어 요청이 스킬을 벗어나 복합 셸과 오래된 상태를 사용하는 흐름을 고쳤어요. 이제 import는 저장된 app·deployment 식별자로 한 번만 검증해 성공이면 즉시 끝내고, 나머지 스킬도 정확한 앱 범위와 분석 가능한 단일 CLI 명령으로 시작해 초보 사용자가 권한 경고나 잘못된 복구 경로에 막히지 않아요.
