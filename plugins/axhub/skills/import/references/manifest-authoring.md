@@ -12,6 +12,7 @@ import SKILL 의 Manifest 보강 단계가 로드하는 내부 reference 예요.
   - `build`: `framework`, `install`, `build`, `start`, `dockerfile`, `compose_file`, `static_output_dir`, `deploy_method` (deploy_method 는 detect 가 정한 값을 그대로 써요)
   - `env`: `required`/`optional` 아래 `- name:`(+ 필요하면 `scope:`) — **키 이름만**
   - `database`: `engine` (분명히 감지될 때만)
+  - `storage`: `enabled` (파일 스토리지가 분명히 필요할 때만 — S3 SDK·파일 업로드 의존성 등 직접 근거가 있을 때만 `enabled: true`, 아니면 비워요)
 - **보안(엄수):** env 값은 절대 적지 않아요. .env.example 키나 compose `environment:` 키처럼 값 없는 출처에서 key 이름만 가져오고, 비밀처럼 보이는 값은 건너뛰어요. axhub.yaml 에 secret·토큰·비밀번호를 쓰지 않아요.
 - **검증 게이트:** 작성한 뒤 반드시 deploy 와 같은 파서로 검증해요.
 
