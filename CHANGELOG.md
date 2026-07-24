@@ -4,12 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
-## [1.16.0](///compare/v1.15.10...v1.16.0) (2026-07-24)
+## [1.16.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.10...v1.16.0) (2026-07-24)
+
+기존 앱을 axhub로 가져올 때 파일 스토리지가 분명히 필요하면 `import` 스킬이 `axhub.yaml` 에 `storage.enabled` 를 선언하도록 매니페스트 authoring 정규 스키마에 문서화했어요. 근거가 있을 때만 켜는 opt-in 이고, ax-hub-cli 0.25.7 의 storage 파서 지원과 짝을 이뤄요.
 
 
 ### Added
 
-* import 매니페스트 스키마에 storage.enabled 문서화 (spec 138-140) ([#427](undefined/undefined/undefined/issues/427)) 4b5b2d0
+* import 매니페스트 스키마에 storage.enabled 문서화 (spec 138-140) ([#427](https://github.com/jocoding-ax-partners/axhub/issues/427)) 4b5b2d0
 
 ## [1.15.10](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.9...v1.15.10) (2026-07-22)
 
