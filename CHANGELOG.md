@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.16.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.10...v1.16.0) (2026-07-24)
+
+기존 앱을 axhub로 가져올 때 파일 스토리지가 분명히 필요하면 `import` 스킬이 `axhub.yaml` 에 `storage.enabled` 를 선언하도록 매니페스트 authoring 정규 스키마에 문서화했어요. 근거가 있을 때만 켜는 opt-in 이고, ax-hub-cli 0.25.7 의 storage 파서 지원과 짝을 이뤄요.
+
+
+### Added
+
+* import 매니페스트 스키마에 storage.enabled 문서화 (spec 138-140) ([#427](https://github.com/jocoding-ax-partners/axhub/issues/427)) 4b5b2d0
+
 ## [1.15.10](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.9...v1.15.10) (2026-07-22)
 
 Claude Code Desktop에서 자연어 운영 요청이 스킬 안내 전에 불필요한 탐색으로 새거나, 명령 스키마를 루트부터 넓게 읽어 같은 권한 확인이 반복되던 마지막 마찰을 없앴어요. 이제 요청한 동작의 정확한 leaf 명령부터 확인하고 유효하지 않은 대상은 실행 승인 전에 거절하므로, 앱 삭제 같은 파괴적 작업도 초보 사용자가 예측 가능한 한 번의 흐름으로 안전하게 끝낼 수 있어요.
