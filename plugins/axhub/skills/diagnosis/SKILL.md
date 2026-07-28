@@ -22,6 +22,8 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+
 첫 visible 문장은 정확히 `배포 실패 원인을 읽기 전용으로 확인할게요.`예요. 그 전에 연결 확인·App/MCP·파일 조회·다른 사용자 문장은 0개예요. `혹시 실패 원인 같은 거 있으면`, `원인만 봐줘`, `재배포는 하지 말고` 같은 조건부·소극적 표현도 실패 원인 진단 의도예요. 영어 실패 배포 진단 요청도 반드시 이 스킬로 라우팅하며 재배포·롤백은 절대 직접 실행하지 않아요.
 
 발화에 axhub 언급이 없고 대화에 axhub 맥락(현재 폴더의 axhub 연결·직전 axhub 작업)도 없으면 — 배포 실패가 다른 플랫폼일 수 있으면 — 진단을 시작하기 전에 어느 플랫폼 배포인지 한 번만 확인하고, axhub 가 아니면 종료해요. headless 에서는 묻지 않고 멈춰요.

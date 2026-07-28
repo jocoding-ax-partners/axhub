@@ -18,8 +18,11 @@ describe("bootstrap desktop UX contract", () => {
   test("keeps the invoked bootstrap entrypoint compact and action-first", () => {
     const bootstrap = readBootstrap();
 
-    // AP-16 폴링 예산 문구 추가로 19_500 → 20_000 상향 (plugin:budget 의 per-skill 35k 는 별도 gate)
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(20_000);
+    // AP-16 폴링 예산 문구 추가로 19_500 → 20_000 상향.
+    // AP-17 CLI 경로 계약 + AP-18 device flow 코드 선노출로 20_000 → 22_400 상향 —
+    // 둘 다 fresh path 에서 reference 를 읽지 않기 때문에 본문에 있어야 도달해요.
+    // (plugin:budget 의 per-skill 35k 는 별도 gate)
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(22_400);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");
@@ -347,10 +350,10 @@ describe("bootstrap desktop UX contract", () => {
 
     expect(bootstrap).toContain("한 tool call 에 하나의 직접 CLI 호출만 넣어요");
     expect(bootstrap).toContain("literal flag 로 넣어요");
-    expect(bootstrap).toContain("device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요");
+    expect(bootstrap).toContain("execute/resume 명령에는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` 을 붙이지 않아요");
     expect(templateReference).toContain("replace `test` with the selected tenant literal");
     expect(localReference).toContain("Do not run a Desktop-visible command that contains");
-    expect(localReference).toContain("The only allowed env prefix is `AXHUB_DEVICE_FLOW_AUTO_OPEN=1`");
+    expect(localReference).toContain("Execute and resume commands carry no env prefix");
     expect(preCloneReference).toContain("axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder");
     expect(preCloneReference).not.toContain('axhub apps bootstrap --template "$TEMPLATE"');
     expect(preCloneReference).not.toContain('AXHUB_TENANT="${AXHUB_TENANT');
@@ -414,7 +417,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(resumeReference).toContain("Do not ask the user to say an approval phrase in chat");
     expect(executeReference).toContain("axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json");
     expect(executeReference).not.toContain("init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key");
-    expect(preCloneReference).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap");
+    expect(preCloneReference).toContain("axhub --no-input apps bootstrap");
   });
 
   test("passes repo name and subdomain explicitly from the app slug", () => {

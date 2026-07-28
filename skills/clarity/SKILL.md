@@ -18,6 +18,8 @@ description: '요청하신 운영 명령을 확인할게요. Use for "axhub 로�
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+
 이 스킬은 axhub CLI 운영 명령 브리지예요. 로그, 환경변수, 롤백, 테이블/컬럼/데이터, connector grant, GitHub 재연결처럼 명시된 운영 명령만 처리해요. 작업→명령 카탈로그는 없어요 — **매번 라이브 CLI 의 `--help` 트리를 탐색**해 맞는 명령을 찾고, 조회 명령은 바로 실행하되 파괴적 변경은 승인 뒤 실행해요.
 
 현재 폴더에 axhub 연결(manifest)이 없고 발화에 axhub 언급도, 대화에 axhub 맥락도 없으면 — 예를 들어 일반 프로젝트에서 "로그 보여줘" — axhub CLI 탐색을 시작하지 않고 일반 작업으로 양보하며 조용히 종료해요.
@@ -75,7 +77,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 
 ## Workflow
 
-1. **첫 명령.** 제목·description 이 정확히 `명령 찾기`인 Step 3의 bare schema 탐색으로 시작해요. 그 결과가 command-not-found면 "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요"라고 말하고 onboarding으로 넘겨요.
+1. **첫 명령.** 제목·description 이 정확히 `명령 찾기`인 Step 3의 bare schema 탐색으로 시작해요. 그 결과가 command-not-found면 바로 넘기지 않고 AP-17 경로 계약대로 `"$HOME/.axhub/bin/axhub"` 로 `plugin-support repair-path --json` 을 한 번 실행해 그 절대경로로 이어가요. 디스크에도 없을 때만 "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요"라고 말하고 onboarding으로 넘겨요.
 
 2. **명시된 운영 작업 확인.** 사용자가 요청한 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 작업의 핵심 동사·명사를 잡아요. 후보 leaf 가 여럿이면 한 번만 짧게 되물어요 — 단, 되묻기는 마지막 수단이고 대개는 다음 탐색으로 스스로 판별해요.
 

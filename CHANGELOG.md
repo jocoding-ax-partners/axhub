@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.16.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.16.0...v1.16.1) (2026-07-28)
+
+앱 만들기가 멈추던 두 지점을 고쳤어요. 첫째, CLI 가 설치돼 있는데도 "설치 안 됨" 으로 판정하고 온보딩으로 돌려보내던 문제예요 — 부모 앱이 물려준 낡은 PATH 때문에 `axhub` 를 못 찾는 상태가 macOS 에서도 흔한데 Windows 전용 AP-13 만 있어서 못 덮었어요. 이제 AP-17 로 모든 스킬이 `~/.axhub/bin-path` 와 canonical 경로까지 확인하고 `plugin-support repair-path` 로 이어가요. 둘째, GitHub 인증 코드가 화면에 안 나오고 명령이 계속 대기하던 문제예요 — `apps bootstrap --execute` 에 붙이던 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` 이 CLI 를 블로킹 폴링 분기로 보내서 코드가 프로세스 안에 갇힌 채 tool call 이 끝나지 않았어요. 이 prefix 를 execute/resume 에서 빼 CLI 가 코드를 즉시 돌려주게 했고, 코드가 안 보인 채 끝난 execute 는 재실행(코드 무효화) 대신 `github link` fast path 로 코드를 먼저 보여주고 `--resume-last` 로 이어가요(AP-18).
+
+### Fixed
+
+* CLI PATH 오판과 GitHub device flow 코드 미노출 해결 ([58a33d8](https://github.com/jocoding-ax-partners/axhub/commit/58a33d818d34d065fb04452c1692b26a71dea966))
+
 ## [1.16.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.15.10...v1.16.0) (2026-07-24)
 
 기존 앱을 axhub로 가져올 때 파일 스토리지가 분명히 필요하면 `import` 스킬이 `axhub.yaml` 에 `storage.enabled` 를 선언하도록 매니페스트 authoring 정규 스키마에 문서화했어요. 근거가 있을 때만 켜는 opt-in 이고, ax-hub-cli 0.25.7 의 storage 파서 지원과 짝을 이뤄요.

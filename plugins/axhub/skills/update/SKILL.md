@@ -28,6 +28,8 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+
 **CRITICAL desktop first line.** Claude Desktop 에서 이 경로가 선택되면 사용자에게 보이는 첫 문장은 반드시 정확히 `현재 버전을 확인할게요.` 여야 해요. 스킬 호출 전 사전 안내 문장도 쓰지 않아요. 그 앞에 어떤 설명도 붙이지 않아요. 선택한 스킬 이름이나 선택 이유도 말하지 않아요. native UI 가 자동으로 붙이는 배지는 제어할 수 없지만, assistant 본문에는 같은 말을 반복하지 않아요.
 
 이 첫 문장은 번역하거나 다시 생성하지 말고 위 코드 span 의 UTF-8 문자를 그대로 복사해요. `現재 버전을 확인할게요.`, `現在 버전을 확인할게요.`처럼 한글 `현재`를 한자나 일본어 문자로 바꾸는 출력은 실패예요. update 전체 사용자-facing 문구에는 한국어 문장 안의 한자·일본어 대체 문자를 쓰지 않아요.
@@ -55,7 +57,7 @@ model: sonnet
 
 **보이는 tool 제목 계약.** Bash/명령 도구를 부를 때 description/title/summary 는 아래 고정 한국어 라벨 중 하나만 써요. 라벨 안에 `axhub` 를 넣지 않아요. `axhubing CLI 설치 여부 확인` 처럼 제품명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요.
 
-**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `claude plugin list`, `claude plugin marketplace update axhub`, `claude plugin update axhub@axhub --scope <SCOPE>`. 각 command 는 단독으로 실행해요. `&&`, pipe, redirect, `grep`, `head`, `tail`, `sed`, `awk`, `bash -lc`, `sh -c` 로 묶거나 자르지 않아요. `command -v claude` 는 Desktop-visible command 로 쓰지 않아요. Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요. 캐시 경로가 작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요. 플러그인 현재 버전은 가능하면 **정확히 `claude plugin list` 만 실행한 출력**의 `axhub@axhub` 항목에서 내부 변수로만 읽고, 실패하면 플러그인 버전 비교는 생략해요. 이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요. `command -v claude && claude plugin list`, `claude plugin list 2>&1`, `claude plugin list 2>&1 | grep ...`, `sed`, `awk`, `head`, `tail`, command substitution, shell wrapper, file test, pipe, redirect, text filter, 파일 읽기 도구를 쓰지 않아요. 실행하려는 command 가 `claude plugin list 2>&1` 또는 `command -v claude && claude plugin list` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.** 출력이 길어도 전체 `claude plugin list` 결과를 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요. 플러그인 버전, 설치 scope, 다음 CLI 확인을 영어 내부 로그처럼 chat 에 쓰지 말고, 필요한 경우 `현재 플러그인 버전을 확인했어요.` 라고만 말해요. 버전과 설치 위치를 같은 문장에 섞지 않아요.
+**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` (AP-17 경로 복구일 때만), `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `claude plugin list`, `claude plugin marketplace update axhub`, `claude plugin update axhub@axhub --scope <SCOPE>`. 각 command 는 단독으로 실행해요. `&&`, pipe, redirect, `grep`, `head`, `tail`, `sed`, `awk`, `bash -lc`, `sh -c` 로 묶거나 자르지 않아요. `command -v claude` 는 Desktop-visible command 로 쓰지 않아요. Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요. 캐시 경로가 작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요. 플러그인 현재 버전은 가능하면 **정확히 `claude plugin list` 만 실행한 출력**의 `axhub@axhub` 항목에서 내부 변수로만 읽고, 실패하면 플러그인 버전 비교는 생략해요. 이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요. `command -v claude && claude plugin list`, `claude plugin list 2>&1`, `claude plugin list 2>&1 | grep ...`, `sed`, `awk`, `head`, `tail`, command substitution, shell wrapper, file test, pipe, redirect, text filter, 파일 읽기 도구를 쓰지 않아요. 실행하려는 command 가 `claude plugin list 2>&1` 또는 `command -v claude && claude plugin list` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.** 출력이 길어도 전체 `claude plugin list` 결과를 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요. 플러그인 버전, 설치 scope, 다음 CLI 확인을 영어 내부 로그처럼 chat 에 쓰지 말고, 필요한 경우 `현재 플러그인 버전을 확인했어요.` 라고만 말해요. 버전과 설치 위치를 같은 문장에 섞지 않아요.
 
 | 단계 | tool description/title/summary |
 | --- | --- |
@@ -88,7 +90,7 @@ TodoWrite({ todos: [
 
 ## 0. 사전 점검 (네트워크 0)
 
-1. `command -v axhub` 가 실패하면 멈춰요 — CLI 가 아직 없는 건 설치 소관이에요. 한 줄: `axhub CLI 가 아직 없어요. "온보딩" 이라고 말하면 설치부터 도와드려요.` (재설치를 여기서 시도하지 않아요.)
+1. `command -v axhub` 가 실패하면 AP-17 경로 계약을 먼저 밟아요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 같은 절대경로로 update 를 이어가요 (재설치가 아니라 PATH 복구예요). 세 경로 어디에도 없을 때만 멈춰요 — CLI 가 아직 없는 건 설치 소관이에요. 한 줄: `axhub CLI 가 아직 없어요. "온보딩" 이라고 말하면 설치부터 도와드려요.` (재설치를 여기서 시도하지 않아요.)
 2. Claude Desktop 에서는 플러그인 캐시의 `plugin.json` 을 읽지 않아요. 가능하면 정확히 `claude plugin list` 한 번으로 `axhub@axhub` 의 현재 버전을 내부 변수 `<PLUGIN_VERSION>` 으로만 둬요. `claude plugin list` 가 실패하거나 목록에서 못 찾으면 `<PLUGIN_VERSION>` 없이 CLI 업데이트 확인만 진행해요. 이 단계에서 설치 경로, Scope, manifest 경로, raw 목록, `user scope`/`local scope` 같은 scope 원문, 영어 진행 로그는 사용자에게 말하지 않아요. 필요한 경우 `현재 플러그인 버전을 확인했어요.` 만 말해요. 설치 위치값은 업데이트 명령의 `--scope` 인자에만 쓰고 chat 에는 쓰지 않아요.
 3. `claude plugin list` 가 성공하면 [`references/plugin-update.md`](references/plugin-update.md)를 읽어요. 이 reference 가 중복 설치 최고 semver·scope 선택과 Desktop 직접 업데이트를 소유해요.
 

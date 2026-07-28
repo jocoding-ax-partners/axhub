@@ -24,6 +24,8 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+
 이미 만들어진 axhub 앱에 **기능 코드 추가·수정**을 해요. 실데이터(connector·table)를 기반으로 한 페이지·엔드포인트뿐 아니라 todo priority/filter/search, tabs, forms, CRUD, UI/page/API route 개선처럼 기존 앱의 동작과 화면을 바꾸는 요청도 포함해요. 데이터가 필요한 기능은 추측하지 않고 진짜 스키마에 맞춰 grounding 하고, 데이터 입력·수정(CRUD) 화면과 (옵트인·게이트 하의) 테이블 생성도 만들어요 (`references/write-gate.md`).
 
 ## 책임 경계 (단일 판정원)
@@ -89,7 +91,7 @@ model: sonnet
    ```bash
    axhub plugin-support preflight --json
    ```
-   Claude Desktop tool 제목은 정확히 `axhub·앱 점검`으로 지정하고 영어 자동 제목을 쓰지 않아요. 이 명령을 정확히 한 번만 호출해요. command-not-found 면 온보딩 안내 후 멈추고, exit 2·빈 출력·capability 부족이면 업데이트 안내 후 멈춰요. 정상 JSON 의 `auth_ok` 등을 tool 결과에서 직접 읽어요. development 요청에서 별도 `axhub update check`, `command -v`, `axhub --version`을 실행하지 않아요. 최신성 요청은 update 스킬 소관이에요.
+   Claude Desktop tool 제목은 정확히 `axhub·앱 점검`으로 지정하고 영어 자동 제목을 쓰지 않아요. 이 명령을 정확히 한 번만 호출해요. command-not-found 면 AP-17 경로 계약대로 `"$HOME/.axhub/bin/axhub"` 로 `plugin-support repair-path --json` 을 실행해 그 절대경로로 이어가고, 디스크에도 없을 때만 온보딩 안내 후 멈추고, exit 2·빈 출력·capability 부족이면 업데이트 안내 후 멈춰요. 정상 JSON 의 `auth_ok` 등을 tool 결과에서 직접 읽어요. development 요청에서 별도 `axhub update check`, `command -v`, `axhub --version`을 실행하지 않아요. 최신성 요청은 update 스킬 소관이에요.
 
 2. **앱 게이트 + 앱 바인딩 확정.** 현재 폴더가 axhub 앱인지 확인해요 (`axhub.yaml`/clone 된 repo). **앱이 없으면 코딩하지 않고** "먼저 앱이 필요해요 — `앱 만들어줘` 라고 하면 만들어 드려요" 한 줄 안내 후 멈춰요 (bootstrap 소관, 자동 위임 안 함). `axhub.yaml` 의 `name` 은 로컬 프로젝트 이름일 수 있으므로 원격 앱 slug 로 단정하지 않아요. 타깃은 같은 대화에서 검증된 app id/slug → `.axhub/import-resume.json` 또는 bootstrap resume 의 `app_id` → origin 저장소 이름 순으로 좁히고, id 가 있으면 bare `axhub apps get <app-id> --json` 한 번으로 검증해요. 이 근거가 없으면 manifest name 을 후보로 한 번 검증하고, 실패하면 `apps list`, `--help`, pipe 탐색으로 복구하지 말고 앱을 한 번 물어요. **검증된 타깃 앱 = 이 폴더의 바인딩**이며 development 는 이 폴더가 묶인 앱에만 코드를 만들어요. 사용자가 다른 앱을 가리키면 코드를 생성하지 말고 올바른 앱 폴더로 이동하도록 안내해요.
 
