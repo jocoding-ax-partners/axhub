@@ -16,6 +16,8 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+
 Deploy an already-connected axhub app with preview, approval, and verification safety. First-connect/import and new-app/bootstrap flows do not run here.
 
 명시적인 배포 실패 원인 진단 요청(예: "배포 실패 원인 진단해줘", "왜 배포가 죽었어")은 `diagnosis` 에 양보해요. 이 스킬이 실제 배포를 시작한 뒤 `axhub deploy verify` 에서 terminal failure 를 확인한 경우에만 같은 앱 식별자와 실패 근거를 유지해 `diagnosis` 로 읽기 전용 handoff 해요. 이 handoff 는 재배포, 롤백, 새 deploy create 를 실행하지 않아요.
@@ -95,7 +97,7 @@ Use CLI capability, not version string comparison:
 axhub plugin-support preflight --json
 ```
 
-이 명령의 tool 결과에서 command-not-found, exit, JSON을 직접 읽어요. 별도 설치 probe나 shell 분기를 만들지 않아요. If auth is missing/expired, explain in Korean and ask before starting login flow in interactive mode.
+이 명령의 tool 결과에서 command-not-found, exit, JSON을 직접 읽어요. command-not-found 는 미설치가 아니에요 — AP-17 대로 `"$HOME/.axhub/bin/axhub"` 로 `plugin-support repair-path --json` 을 실행해 그 절대경로로 이어가고, 디스크에도 없을 때만 온보딩을 안내해요. 별도 설치 probe나 shell 분기를 만들지 않아요. If auth is missing/expired, explain in Korean and ask before starting login flow in interactive mode.
 
 ### Routing and resolve
 

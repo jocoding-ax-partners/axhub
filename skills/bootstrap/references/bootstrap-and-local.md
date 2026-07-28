@@ -10,7 +10,7 @@ Run only after template, app name, tenant, and GitHub owner gate are settled:
 
 Claude Desktop-visible tool titles and progress text must stay user-facing and start with Korean text. Use titles like `만들기 전 확인` or `미리보기 확인`; do not write `dry-run`, `Bootstrapped dry-run`, `Bootstraping dry-run`, `axhub bootstrap`, `saga`, or other internal execution labels in chat or tool descriptions.
 
-Use the command shape below by replacing the sample literals with the values already confirmed in the conversation. Do not run a Desktop-visible command that contains `export`, value-assembly `TEMPLATE=...`/`APP_NAME=...`, `$TEMPLATE`, `$APP_SLUG`, `$AXHUB_TENANT`, command substitution, or semicolon-chained shell glue. The only allowed env prefix is `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` on execute/resume commands.
+Use the command shape below by replacing the sample literals with the values already confirmed in the conversation. Do not run a Desktop-visible command that contains `export`, value-assembly `TEMPLATE=...`/`APP_NAME=...`, `$TEMPLATE`, `$APP_SLUG`, `$AXHUB_TENANT`, command substitution, or semicolon-chained shell glue. Execute and resume commands carry no env prefix — `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` there makes the CLI block-poll instead of returning the device code, so the tool call never ends and the code stays invisible. That prefix belongs only on the short `github link` fast path.
 
 ```bash
 axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json
@@ -48,7 +48,7 @@ axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-p
 ```
 
 ```bash
-AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
+axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
 ```
 
 Do not add `--json` to Desktop-visible execute or device-flow resume commands. Do not set an intentionally short tool timeout to force Claude Desktop backgrounding. Device-flow code display must come from the visible `axhub ...` command output, not from `Monitor`, `ScheduleWakeup`, `TaskOutput`, or reading a generated output file. When GitHub device flow starts, surface the `verification_uri` plus `user_code` in normal chat text before any confirmation/status command.
@@ -99,7 +99,7 @@ GitHub 연결이 필요해요. 다음 단계로 진행해 주세요:
 In fallback mode, resume the cached flow yourself after `retry_after_secs` or a short bounded delay; do not wait for a manual approval phrase and do not end the response asking the user to report approval. Pending messages must say that approval will be detected automatically, not that the user should tell the agent after approving. Do not follow old wording like "Prefer the emitted `resume_command` literally"; use it only as a base argv, never verbatim: strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume after a device code so the result surfaces. Otherwise use:
 
 ```bash
-AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --resume-last --idempotency-key 00000000-0000-4000-8000-000000000000
+axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --resume-last --idempotency-key 00000000-0000-4000-8000-000000000000
 ```
 
 While an outstanding code exists, never run fresh `bootstrap --execute` without `--resume-last`; it can issue a new code and invalidate the user's approved one. If response remains `device_code_pending`, respect `retry_after_secs` and retry `--resume-last` until success or expiry. If code expired, start Step 7 execute again to issue a fresh challenge.

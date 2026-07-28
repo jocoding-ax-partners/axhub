@@ -8,7 +8,7 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
 
 ## 0. 사전 점검 (네트워크 0)
 
-1. `command -v axhub` 가 실패하면 즉시 멈춰요 — CLI 가 없는 건 onboarding 소관이에요.
+1. `command -v axhub` 가 실패하면 AP-17 경로 계약을 한 번 밟아요 — bare `axhub` 실패는 미설치가 아니에요. `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 이후 명령을 그 절대경로로 이어가요. 세 경로 어디에도 없으면 즉시 멈춰요 — CLI 가 없는 건 onboarding 소관이에요.
 2. `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 의 `version` 을 읽어 `<PLUGIN_VERSION>` 으로 둬요 (못 읽으면 plugin 확인은 생략하고 CLI 만 봐요).
 3. 환경변수 `AXHUB_NO_AUTO_UPDATE` 가 설정돼 있으면 **안내만** 모드예요 — 아래 자동 적용(2단계 apply)을 건너뛰고, 새 버전이 있을 때 한 줄 안내만 해요.
    - 이 분기가 필요한 이유(env-divergence): 훅 bash 는 Claude Code 프로세스 env 만 봐요 — shell profile 을 소싱하지 않아요. profile 에만 `export AXHUB_NO_AUTO_UPDATE=1` 을 둔 사용자가 GUI 로 실행하면 훅은 변수를 못 보고 발동하지만, 이 지침을 실행하는 에이전트의 Bash 는 profile 을 소싱하므로 여기서 잡아요. 이 분기는 그 경우의 유일한 kill switch 예요.

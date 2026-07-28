@@ -35,7 +35,7 @@ creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps c
 - Tool/Bash 제목은 한국어 명사구로 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `실행 중 명령`, `명령 실행` 금지.
 - 제목: `CLI 준비 확인`, `작업공간 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `저장소 계정 확인`, `앱 이름 확인`, `앱 주소 확인`, `앱 생성 미리보기`, `계정 인증 시작`, `인증 확인`, `앱 생성 상태 확인`, `배포 상태 확인`, `검증 확인`.
 - `rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요. `pwd`, `ls`, `find`, `cat`, `curl` 같은 generic shell probe 대신 `axhub` CLI 표면만 써요.
-- Desktop-visible command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수, `export`, command substitution, semicolon chain 없이 literal flag 로 넣어요. device flow 자동 브라우저 열기용 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` prefix 만 execute/resume 명령에서 허용해요.
+- Desktop-visible command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수, `export`, command substitution, semicolon chain 없이 literal flag 로 넣어요. execute/resume 명령에는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` 을 붙이지 않아요 — 이 prefix 가 붙으면 CLI 가 코드를 돌려주는 대신 블로킹 폴링으로 들어가서 tool call 이 끝나지 않고, 사용자는 빈 GitHub 코드 화면만 봐요. 이 prefix 는 즉시 끝나는 `github link` fast path 에서만 써요.
 - 배포 상태 대기/확인도 예외가 아니에요: `Monitor`, `ScheduleWakeup`, background watch 와 `for`, `while`, `until`, `sleep`, `grep`, `head`, `tail`, `cut`, `awk`, `sed`, `jq` polling/파싱 금지. 상태를 다시 볼 때마다 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행. `until axhub ... | grep ...`, `axhub ... | head ...` 같은 권한 요청창이 뜨는 긴 shell watch 는 UX 실패예요. 성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요. deployment id 를 알면 terminal/verify 완료 전 응답을 끝내지 않아요. 단, 상태 확인 tool call 의 폴링 예산은 최대 30회 또는 10분(AP-16)이에요 — 예산에 먼저 닿으면 실패 선언 없이 `아직 진행 중이에요` 와 재개 명령(`axhub deploy status <deployment-id> --tenant <tenant> --json`)을 남기는 재개 요약으로 응답을 끝내고 deployment id 를 보존해요. 이 예산 종료가 앞 규칙의 유일한 예외예요.
 - Echo 금지: `bootstrap_id`, `deployment_id`, `idempotency_key`, `device_code`.
 - 사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL; Markdown URL 링크 문법은 전부 금지; 도메인-only target 금지: `[https://x](https://x)`, `[열기](https://x)`, `<https://x>`.
@@ -56,7 +56,7 @@ creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps c
 7. Availability check: `axhub apps check-availability --tenant <tenant> --slug <app-slug> --subdomain <app-slug> --json`.
 8. Dry-run preview: `axhub apps bootstrap ... --dry-run --json`.
 9. Preview confirmation: 사용자가 `진행`을 고른 뒤에만 execute 해요.
-10. Execute saga: `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap ... --execute --idempotency-key <literal>`.
+10. Execute saga: `axhub --no-input apps bootstrap ... --execute --idempotency-key <literal>`.
 11. Clone/current dir, result.
 
 Slash command, skill name, route label 은 사용자에게 말하지 않아요.
@@ -69,7 +69,9 @@ Tool 제목은 `CLI 준비 확인`을 써요.
 axhub plugin-support preflight --json
 ```
 
-command not found 이면 onboarding 안내 후 stop, `plugin-support` unknown/빈 출력이면 update 안내 후 stop, 정상 JSON 이면 계속해요. raw stderr 는 보여주지 않아요. shell 에서 CLI 버전 숫자를 직접 파싱·비교하지 않아요.
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+
+command not found 여도 곧바로 onboarding 으로 돌리지 않아요 — 낡은 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS 에서도 흔해요. 같은 제목으로 `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` 을 한 번 더 실행하고, 나온 `bin_path`(없으면 그 canonical 경로)로 preflight 부터 다시 실행해요. 그 명령까지 파일 없음이면 onboarding 안내 후 stop. `plugin-support` unknown/빈 출력이면 update 안내 후 stop, 정상 JSON 이면 계속해요. raw stderr 는 보여주지 않아요. shell 에서 CLI 버전 숫자를 직접 파싱·비교하지 않아요.
 
 ### 2. Resume And Workspace
 
@@ -156,12 +158,19 @@ axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-p
 ```
 
 ```bash
-AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
+axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
 ```
 
 실행 때 예시 UUID 는 `init-resume put` 반환 literal UUID 로 바꾸고, Execute/resume 명령에는 `--json` 금지.
 
 `device_code_issued` 는 `auto_poll:true`/`browser_opened:true` 여도 user code 를 즉시 보여줘요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 금지, 짧은 timeout 으로 background 처리 금지. CLI 가 pending 으로 끝나면 URL·코드를 본문에 쓰고, `인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 또는 watch flag 를 제거한 단일 resume 명령으로 승인 반영을 확인해요. `device_flow_required_user_action` 에서 멈추거나 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요.
+
+본문 두 줄 형식(URL 부분만 inline code span):
+
+인증 URL: `https://github.com/login/device`
+입력 코드: <USER_CODE>
+
+**코드가 안 보인 채 execute 가 끝났을 때 (AP-18).** 출력 없이 실패·거부·중단됐는데 브라우저 device 화면이 열렸으면 같은 `--execute` 를 절대 다시 실행하지 않아요 — 새 device code 를 발급해 사용자가 보고 있는 코드를 무효로 만들어요. 즉시 끝나는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link`(제목 `계정 인증 시작`)로 코드를 받아 위 두 줄을 본문에 먼저 쓰고, 같은 turn 에 `인증 확인` 단일 `axhub github accounts list --json` 뒤 `--resume-last` 로 이어가요. 코드를 보여주기 전에 `인증 확인` 을 먼저 실행하거나, 코드만 보여주고 응답을 끝내면 실패예요.
 
 execute/status 가 `deployment_id` 와 빌드/실행중 상태를 주면 `배포 상태 확인` tool call 을 폴링 예산(최대 30회 또는 10분, AP-16) 안에서 반복해 terminal까지 봐요. 예산에 닿으면 재개 요약으로 끝내요. 성공 뒤에는 `axhub deploy verify <deployment-id> --app <app> --json` 를 실행해요. verify 성공 전 최종 성공 문구 금지, `잠시 후 확인해보세요` 로 끝내기 금지.
 
@@ -171,7 +180,7 @@ Claude Desktop 에서 `앱 생성 진행`/`앱 생성 재시도` tool 이 `백�
 
 1. 출력에서 `bootstrap_id` 를 확인할 수 있으면 `axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json`.
 2. 출력에서 `deployment_id` 를 확인할 수 있으면 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --app <app> --json`.
-3. 둘 다 없고 오류가 timeout/network 계열일 때만 같은 idempotency key 로 execute 를 한 번 재시도해요. 재시도는 최대 1회예요.
+3. 둘 다 없고 오류가 timeout/network 계열일 때만 같은 idempotency key 로 execute 를 한 번 재시도해요. 재시도는 최대 1회예요. 단 device flow 가 시작된 흔적(브라우저 device 화면, `device_code_issued`, 사용자가 코드 입력 화면을 봤다는 말)이 있으면 이 재시도를 쓰지 않아요 — AP-18 대로 `github link` fast path 로 코드를 먼저 보여주고 `--resume-last` 로만 이어가요.
 4. 나중에 상태 명령이 `succeeded` 를 반환하면 "앱 생성은 완료됐어요" 로 복구 보고하고, 새 앱을 다시 만들지 않아요.
 
 ### 10. Clone And Manifest
@@ -203,5 +212,6 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 - NEVER `--execute` 를 `--dry-run` 미리보기와 사용자 확인 없이 호출.
 - NEVER auth 만료를 template 조회 실패로 오해.
 - NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채 사용자를 빈 GitHub code 입력 화면에 남겨두지 않아요.
+- NEVER 코드가 안 보인 채 끝난 execute 를 같은 `--execute` 로 재실행하지 않아요 — 새 코드가 발급돼 사용자가 보고 있는 코드가 무효가 돼요.
 - NEVER `repo_full_name` 없이 임의 URL clone.
 - NEVER shell 에서 CLI 버전 숫자를 직접 파싱·비교하지 않아요.

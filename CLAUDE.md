@@ -155,6 +155,7 @@ SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이�
 ## 최소 CLI 버전 게이트
 
 - bootstrap·deploy skill 은 **시작 시 `axhub` 존재와 `plugin-support` 기능(preflight) 가드** 로 최소 표면 (흡수 릴리즈 = **0.20.0+**, import·diagnosis 표면은 **0.21.3+** — 8스킬 전체 최소는 v0.21.3) 을 확인해요. CLI 가 없거나 너무 낮으면 skill 은 멈추고 설치/업그레이드를 안내해요 — 절대 우회하지 않아요.
+- **CLI 경로 해석 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 낡은 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요 (AP-13 은 Windows 전용이라 이 상태를 덮지 못해요). 모든 skill 의 CLI 가드는 `command -v axhub` → 위치 파일 `~/.axhub/bin-path` → canonical `~/.axhub/bin/axhub`(.exe) 순으로 찾고, 디스크에 있으면 재설치·온보딩으로 돌리지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤 같은 세션은 반환된 `bin_path` 절대경로로 이어가요. 세 경로 모두에서 못 찾을 때만 onboarding 을 안내해요.
 
 ## 살아남은 quality gate
 

@@ -34,10 +34,24 @@ describe("bootstrap device-flow command contract", () => {
     expect(bootstrap).not.toContain("승인 완료 후 알려주세요");
     expect(resumeReference).toContain("strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume");
     expect(resumeReference).toContain("never run it verbatim");
-    expect(preCloneReference).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap");
+    expect(preCloneReference).toContain("axhub --no-input apps bootstrap");
     expect(preCloneReference).not.toContain("--execute --watch");
     expect(preCloneReference).not.toContain("--resume-last --watch");
-    expect(preCloneReference).not.toMatch(/AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap[^\n]*--execute[^\n]*--json/);
-    expect(resumeReference).not.toMatch(/AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input apps bootstrap[^\n]*--execute[^\n]*--json/);
+    expect(preCloneReference).not.toMatch(/axhub --no-input apps bootstrap[^\n]*--execute[^\n]*--json/);
+    expect(resumeReference).not.toMatch(/axhub --no-input apps bootstrap[^\n]*--execute[^\n]*--json/);
+  });
+
+  test("surfaces the code via the short github link fast path instead of re-running a silent execute", () => {
+    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+
+    expect(bootstrap).toContain("인증 URL: `https://github.com/login/device`");
+    expect(bootstrap).toContain("입력 코드: <USER_CODE>");
+    expect(bootstrap).toContain("URL 부분만 inline code span");
+    expect(bootstrap).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link");
+    expect(bootstrap).toContain("같은 `--execute` 를 절대 다시 실행하지 않아요");
+    expect(bootstrap).toContain("새 device code 를 발급해 사용자가 보고 있는 코드를 무효로 만들어요");
+    expect(bootstrap).toContain("코드를 보여주기 전에 `인증 확인` 을 먼저 실행하거나, 코드만 보여주고 응답을 끝내면 실패예요");
+    expect(bootstrap).toContain("`github link` fast path 로 코드를 먼저 보여주고 `--resume-last` 로만 이어가요");
+    expect(bootstrap).toContain("NEVER 코드가 안 보인 채 끝난 execute 를 같은 `--execute` 로 재실행하지 않아요");
   });
 });
