@@ -178,12 +178,24 @@ Deployment-record success is declared only by `axhub deploy verify` with the bou
 axhub deploy verify <deployment-id> --app <app-id>
 ```
 
-Do not use latest lookup. Always pass the app scope from the same resolved target: `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"`. If app scope is missing, stop instead of running a bare verify. Do not call `axhub deploy watch` or `axhub deploy status --watch` from this skill; Desktop/non-TTY watch paths can degrade or require extra flags. If verify exits `6`, say `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same scoped verify command until terminal success/failure or the bounded budget — 이 verify 반복의 폴링 예산은 최대 30회 또는 10분(AP-16)이에요. Prefer separate short tool calls or an actual ScheduleWakeup; do not collapse polling into one long `while`/`for`/`until` shell loop with `sleep`, `grep`, `head`, `MAX_ATTEMPTS`, command substitution, pipes, or shell expansion. A Claude Desktop permission request for a long polling shell block is a failed watch UX; replace it with standalone `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` calls. Do not end the response by asking the user to say `배포 상태 확인해줘`. If the bounded timeout is reached while the deploy is still running, schedule a follow-up check when the host supports it; otherwise say `아직 진행 중이에요. 여기서 실패로 보지 않고, 제가 확인 가능한 범위까지는 같은 배포를 지켜봤어요.` and keep the `DEPLOY_ID` visible enough for a future status request. Do not claim success from deploy-create stdout, status snapshots, watch output, or prose polling; verify 전에는 성공을 선언하지 않아요. If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
+Do not use latest lookup. Always pass the app scope from the same resolved target: `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"`. If app scope is missing, stop instead of running a bare verify. Do not call `axhub deploy watch` or `axhub deploy status --watch` from this skill; Desktop/non-TTY watch paths can degrade or require extra flags.
+
+preflight 의 `capabilities.import.verify_wait` 가 true 면 **권한 카드 한 번으로 끝나는** 단일 대기 호출을 정확히 한 번만 실행해요:
+
+```bash
+axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" --wait --wait-interval 20s --wait-timeout 10m --json
+```
+
+호출 직전에 `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` 한 줄만 남겨요. 이 한 호출의 내부 폴링 예산은 최대 30회 또는 10분(AP-16)이고, `--wait` 가 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `axhub apps get`, `deploy list`, `deploy status` 같은 사후 확인을 덧붙이지 않아요. 대기 수단 없이 같은 verify 를 연달아 호출해 같은 exit 6 을 화면에 쌓는 연타 폴링은 UX 실패예요 — 사용자에게는 실패한 명령이 반복되는 것처럼 보여요.
+
+`verify_wait` capability 가 없는 구 CLI 에서만 `--wait` 없는 `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` 를 폴링 예산(최대 30회 또는 10분, AP-16) 안에서 반복해요. Prefer separate short tool calls or an actual ScheduleWakeup. 이 fallback 에서도 do not collapse polling into one long `while`/`for`/`until` shell loop with `sleep`, `grep`, `head`, `MAX_ATTEMPTS`, command substitution, pipes, or shell expansion. A Claude Desktop permission request for a long polling shell block is a failed watch UX; replace it with standalone `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` calls.
+
+Do not end the response by asking the user to say `배포 상태 확인해줘`. If the bounded budget is reached while the deploy is still running, schedule a follow-up check when the host supports it; otherwise say `아직 진행 중이에요. 여기서 실패로 보지 않고, 제가 확인 가능한 범위까지는 같은 배포를 지켜봤어요.` and keep the `DEPLOY_ID` visible enough for a future status request. Do not claim success from deploy-create stdout, status snapshots, watch output, or prose polling; verify 전에는 성공을 선언하지 않아요. If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
 
 Verify exits:
 
 - `0`: terminal success. Summarize in Korean with verified URL if available.
-- `6`: still running. Keep the same `DEPLOY_ID` and continue the bounded verify loop automatically; do not ask the user to request another status check.
+- `6`: still running. `--wait` 경로에서는 10분 예산을 다 쓰고도 끝나지 않았다는 뜻이에요 — 같은 verify 를 자동 재실행하거나 새 승인 카드를 띄우지 않고, 실패 선언 없이 재개 요약으로 응답을 끝내며 `DEPLOY_ID` 를 보존해요. fallback 경로에서는 같은 `DEPLOY_ID` 로 폴링 예산 안에서 계속 확인하고, 사용자에게 다시 상태 확인을 요청하지 않아요.
 - `7`: terminal failure. Say "배포가 실패했어요. 지금부터 원인 진단만 읽기 전용으로 확인할게요. 재배포나 롤백은 하지 않아요." Then hand off to `diagnosis`.
 - `5`: unknown deployment id. Stop; do not search latest.
 - `4`: auth expired. Use auth recovery copy.
@@ -212,7 +224,8 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 - NEVER retry `axhub deploy create` on exit 64.
 - NEVER drop JSON/field-expr parsing contracts where a command result is parsed.
 - NEVER call `axhub deploy create --execute` without the interactive AskUserQuestion preview decision. Headless is exempt only because it must stay dry-run and must not use `--execute`.
-- NEVER call `axhub deploy watch` or `axhub deploy status --watch` from this skill. In-flight and webhook-triggered deployments use the bounded `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` loop.
+- NEVER call `axhub deploy watch` or `axhub deploy status --watch` from this skill. In-flight and webhook-triggered deployments use the single `--wait` verify call, and only a CLI without `capabilities.import.verify_wait` falls back to the bounded `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` loop.
+- NEVER 대기 수단 없이 같은 `axhub deploy verify` 를 연달아 호출하지 말아요. `verify_wait` capability 가 있으면 `--wait --wait-interval 20s --wait-timeout 10m --json` 단일 호출이 유일한 경로예요. 같은 exit 6 을 화면에 반복해서 쌓으면 사용자에게는 실패한 명령이 도배되는 것처럼 보여요.
 - NEVER declare deploy success from deploy-create stdout, status snapshots, watch output, or prose polling. Deployment-record success declaration is terminal `axhub deploy verify <deployment-id> --app <app>`.
 - NEVER call `axhub deploy verify` without both a deployment id and the resolved app scope. Latest 재탐색 금지.
 - NEVER call `axhub deploy verify` in static lane (`deploy_method=static`). Static is release-based, not deployment-record-based, and success is `apps static deploy --execute` activate with `active_release_id`.

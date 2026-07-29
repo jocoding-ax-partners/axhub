@@ -21,8 +21,10 @@ describe("bootstrap desktop UX contract", () => {
     // AP-16 폴링 예산 문구 추가로 19_500 → 20_000 상향.
     // AP-17 CLI 경로 계약 + AP-18 device flow 코드 선노출로 20_000 → 22_400 상향 —
     // 둘 다 fresh path 에서 reference 를 읽지 않기 때문에 본문에 있어야 도달해요.
+    // AP-16 대기 수단 우선(`deploy verify --wait` 단일 호출)로 22_400 → 23_000 상향 —
+    // 연타 폴링 UX 실패를 막는 계약이라 fresh path 본문에 있어야 해요.
     // (plugin:budget 의 per-skill 35k 는 별도 gate)
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(22_400);
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(23_000);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");
@@ -173,6 +175,9 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`axhub` CLI 상태 명령만 써요");
     expect(bootstrap).toContain("axhub apps bootstrap-status");
     expect(bootstrap).toContain("axhub deploy status <deployment-id>");
+    // AP-16 대기 수단 우선: status 연타 폴링 대신 CLI 내부 대기 단일 호출.
+    expect(bootstrap).toContain("--wait --wait-interval 20s --wait-timeout 10m --json");
+    expect(bootstrap).toContain("연타 폴링은 UX 실패예요");
     expect(bootstrap).toContain("axhub deploy verify <deployment-id> --app <app>");
     expect(bootstrap).toContain("재시도는 최대 1회예요");
     expect(bootstrap).toContain("새 앱을 다시 만들지 않아요");
@@ -367,7 +372,8 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("배포 상태 대기/확인도 예외가 아니에요");
     expect(bootstrap).toContain("`for`, `while`, `until`, `sleep`, `grep`, `head`, `tail`, `cut`, `awk`, `sed`, `jq`");
     expect(bootstrap).toContain("`Monitor`, `ScheduleWakeup`, background watch");
-    expect(bootstrap).toContain("상태를 다시 볼 때마다 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행");
+    expect(bootstrap).toContain("CLI 내부 대기인 `deploy verify --wait` 는 이 금지에 걸리지 않고 오히려 우선이에요");
+    expect(bootstrap).toContain("fallback 으로 상태를 다시 볼 때는 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행");
     expect(bootstrap).toContain("`until axhub ... | grep ...`, `axhub ... | head ...` 같은 권한 요청창이 뜨는 긴 shell watch 는 UX 실패예요");
     expect(bootstrap).toContain("성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요");
     expect(bootstrap).toContain("deployment id 를 알면 terminal/verify 완료 전 응답을 끝내지 않아요");
@@ -376,7 +382,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(localReference).toContain("Run one direct `axhub deploy status <deployment-id> --tenant <tenant> --json` command per check");
     expect(localReference).toContain("do not express the wait as `sleep`, `until`, `while`, a pipe, or a compound shell block");
     expect(localReference).toContain("A Desktop permission request containing `until axhub deploy status`");
-    expect(bootstrap).toContain("terminal까지 봐요");
+    expect(bootstrap).toContain("terminal 까지 봐요");
     expect(bootstrap).toContain("verify 성공 전 최종 성공 문구 금지");
     expect(bootstrap).toContain("`잠시 후 확인해보세요` 로 끝내기 금지");
     expect(localReference).toContain("the known `deployment_id` becomes an owned watch");

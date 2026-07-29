@@ -163,6 +163,11 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("axhub deploy verify \"$DEPLOY_ID\" --app \"$APP_ID\"");
     expect(deploy).toContain("NEVER call `axhub deploy watch`");
     expect(deploy).toContain("bounded `axhub deploy verify \"$DEPLOY_ID\" --app \"$APP_ID\"` loop");
+    // AP-16 대기 수단 우선: verify 연타 폴링 대신 CLI 내부 대기 단일 호출.
+    expect(deploy).toContain("--wait --wait-interval 20s --wait-timeout 10m --json");
+    expect(deploy).toContain("권한 카드 한 번으로 끝나는");
+    expect(deploy).toContain("연타 폴링은 UX 실패예요");
+    expect(deploy).toContain("capabilities.import.verify_wait");
     expect(deploy).toContain("exit 6");
     expect(deploy).toContain("exit 7");
     expect(deploy).toContain("계속 확인할게요");

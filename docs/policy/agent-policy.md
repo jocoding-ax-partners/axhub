@@ -83,8 +83,9 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-16 상태 폴링 예산
 - 규칙: 배포·생성 상태를 반복 확인하는 tool call(`deploy status`·`deploy verify`·`apps bootstrap-status` 재호출)은 한 요청당 폴링 예산 **최대 30회 또는 10분** 중 먼저 닿는 쪽까지만 반복해요. 예산에 닿으면 실패로 선언하지 않고 "아직 진행 중이에요" 와 이어서 확인할 명령을 안내하는 재개 요약으로 응답을 끝내며, deployment id/bootstrap id 는 그 안내에 보존해요. 이 예산 종료는 "terminal 전 응답 종료 금지" 규칙의 유일한 예외예요. CLI 자체의 `--watch` 상한과 별개로, 스킬 레벨 반복에는 항상 이 예산이 적용돼요.
+- 대기 수단 우선: preflight 가 `capabilities.import.verify_wait` 를 true 로 보고하면 스킬 레벨 반복 대신 `deploy verify --wait --wait-interval 20s --wait-timeout 10m` 단일 호출로 이 예산을 CLI 안에서 소화해요. 스킬은 `sleep`·shell loop 를 쓸 수 없으므로 대기 수단 없이 같은 명령을 연달아 호출하면 30회 예산이 몇 초 만에 소진되고, 사용자 화면에는 같은 exit 6 이 실패한 명령처럼 도배돼요. 반복 호출은 그 capability 가 없는 구 CLI 의 fallback 이에요.
 - 적용: skills/bootstrap/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md
-- invariant: "폴링 예산", "최대 30회 또는 10분"
+- invariant: "폴링 예산", "최대 30회 또는 10분", "--wait --wait-interval 20s --wait-timeout 10m"
 
 ## AP-17 CLI 경로 해석 (설치 여부 오판 금지)
 - 규칙: bare `axhub` 호출 실패(command not found·exit 127)는 미설치 판정 근거가 아니에요. 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 오래된 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요 — AP-13 은 Windows 전용이라 이 상태를 덮지 못해요. 모든 스킬의 CLI 가드는 (1) `command -v axhub`, (2) 위치 파일 `~/.axhub/bin-path`(CLI 0.24.8+ 가 자기 설치 위치를 기록), (3) canonical 경로 `~/.axhub/bin/axhub`(Windows Git Bash 는 `.exe`) 순서로 실행 파일을 찾아요. 디스크에서 찾으면 재설치·온보딩으로 돌려보내지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤, 같은 세션의 남은 명령은 반환된 `bin_path` 절대경로로 이어가요 (이미 열린 셸의 PATH 는 OS 설계상 밖에서 못 고쳐요). 구 CLI 라 `bin_path` 가 없으면 찾은 절대경로를 그대로 써요. 세 경로 모두에서 실행 파일을 못 찾을 때만 미설치로 보고 onboarding 을 안내해요.
@@ -92,7 +93,7 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "bare `axhub` 실패는 미설치가 아니에요", "repair-path"
 
 ## AP-18 device flow 코드 선노출
-- 규칙: GitHub device flow 가 필요한 순간에는 코드 노출이 사용자 행동의 전부예요. 코드를 몇 분씩 도는 saga 명령(`apps bootstrap --execute` 등) 안에만 두지 않아요 — 그 tool call 이 실패·거부·중단되면 stdout 이 사라져 사용자는 브라우저의 빈 코드 입력 화면만 보게 돼요. 코드가 안 보인 채 saga 가 끝나면 같은 `--execute` 를 다시 실행하지 않아요 — 새 device code 가 발급돼 이미 받은 코드가 무효가 돼요. 대신 즉시 끝나는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link` 로 코드를 받아 본문에 `인증 URL:` 과 `입력 코드:` 두 줄로 먼저 노출하고, 승인 확인 뒤 `--resume-last` 로 이어가요.
+- 규칙: GitHub device flow 가 필요한 순간에는 코드 노출이 사용자 행동의 전부예요. 코드를 몇 분씩 도는 saga 명령(`apps bootstrap --execute` 등) 안에만 두지 않아요 — 그 tool call 이 실패·거부·중단되면 stdout 이 사라져 사용자는 브라우저의 빈 코드 입력 화면만 보게 돼요. 코드가 안 보인 채 saga 가 끝나면 같은 `--execute` 를 다시 실행하지 않아요 — 새 device code 가 발급돼 이미 받은 코드가 무효가 돼요. 대신 즉시 끝나는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link` 로 코드를 받아 본문에 `인증 URL:` 과 `입력 코드:` 두 줄로 먼저 노출하고, 승인 확인 뒤 `--resume-last` 로 이어가요. 재시도 구간도 같아요 — `--resume-last` 의 `device_code_pending` 응답은 `user_code`·`verification_uri`·`expires_at` 을 실어 주므로 재시도마다 그 두 줄을 다시 써요. 승인만이 이 루프를 끝내니, 코드 없이 `아직 대기 중` 만 반복하는 재시도는 사용자가 할 수 있는 일이 없어요. 이 필드가 없는 구 CLI 에서는 재노출을 건너뛰고 재시도만 이어가요.
 - 적용: skills/bootstrap/SKILL.md, skills/clarity/SKILL.md
 - invariant: "입력 코드:", "github link"
 

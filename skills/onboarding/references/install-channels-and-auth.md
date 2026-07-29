@@ -139,7 +139,7 @@ Fallback handling:
 
 - `device_code_issued` with `auto_poll:true` and final success: re-detect immediately.
 - `device_code_issued` with `browser_opened:false`: show the safe URL/code once and stop with `READY_WITH_USER_ACTION`.
-- `device_flow_pending`: wait the emitted `retry_after_secs` and retry the emitted `resume_command` until success or expiry; do not ask for a manual approval phrase.
+- `device_flow_pending`: wait the emitted `retry_after_secs` and retry the emitted `resume_command` until success or expiry; do not ask for a manual approval phrase. When the pending payload carries `user_code` (every cached `--resume-last`), re-show that code plus `verification_uri` on each retry — approval is what ends the loop, so a retry without the code is unactionable.
 - `device_code_expired`: start a fresh login once if the user still wants to continue.
 
 ## Git Missing

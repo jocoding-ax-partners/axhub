@@ -173,12 +173,20 @@ Deployment-record success is declared only by `axhub deploy verify`. Poll this c
 axhub deploy verify <deployment-id> --app <app-id>
 ```
 
-If `VERIFY_EXIT=6`, the deployment is still running. Tell the user `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` and retry the same scoped verify command until exit 0 or 7, or until a bounded timeout. Prefer separate short tool calls or a real ScheduleWakeup when available. Do not combine polling into one long `while`/`for` shell loop with `MAX_ATTEMPTS`, command substitution, or shell expansion. Also do not collapse polling into one long `while`/`for`/`until` shell loop with `sleep`, `grep`, `head`, pipes, or shell expansion. A Claude Desktop permission request for a long polling shell block is a failed watch UX. Do not substitute `axhub deploy watch` or `axhub deploy status --watch`. Do not end by asking the user to say `배포 상태 확인해줘`; the skill owns the follow-up while a known `DEPLOY_ID` is still running.
+preflight 의 `capabilities.import.verify_wait` 가 true 면 위 명령 대신 **권한 카드 한 번으로 끝나는** 단일 대기 호출을 정확히 한 번만 실행해요:
+
+```bash
+axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" --wait --wait-interval 20s --wait-timeout 10m --json
+```
+
+호출 직전에 `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` 한 줄만 남겨요. `--wait` 가 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `axhub apps get`, `deploy list`, `deploy status` 같은 사후 확인을 덧붙이지 않아요. 대기 수단 없이 같은 verify 를 연달아 호출해 같은 exit 6 을 화면에 쌓는 연타 폴링은 UX 실패예요.
+
+`verify_wait` capability 가 없는 구 CLI 에서만 `--wait` 없는 verify 를 폴링 예산(최대 30회 또는 10분, AP-16) 안에서 반복해요. Do not combine polling into one long `while`/`for` shell loop with `MAX_ATTEMPTS`, command substitution, or shell expansion. Also do not collapse polling into one long `while`/`for`/`until` shell loop with `sleep`, `grep`, `head`, pipes, or shell expansion. A Claude Desktop permission request for a long polling shell block is a failed watch UX. Do not substitute `axhub deploy watch` or `axhub deploy status --watch`. Do not end by asking the user to say `배포 상태 확인해줘`; the skill owns the follow-up while a known `DEPLOY_ID` is still running.
 
 Exit handling:
 
 - 0: terminal success; summarize in Korean with the verified live URL if available.
-- 6: non-terminal; keep the same `DEPLOY_ID` and continue the bounded verify loop automatically. Do not ask the user to request another status check.
+- 6: non-terminal. `--wait` 경로에서는 예산을 다 쓰고도 끝나지 않은 상태라 같은 verify 를 자동 재실행하지 않고 재개 요약으로 끝내며 `DEPLOY_ID` 를 보존해요. fallback 경로에서만 keep the same `DEPLOY_ID` and continue the bounded verify loop automatically. 어느 쪽도 사용자에게 다시 상태 확인을 요청하지 않아요.
 - 7: terminal failure; say "배포가 실패했어요. 지금부터 원인 진단만 읽기 전용으로 확인할게요. 재배포나 롤백은 하지 않아요." Then hand off to `diagnosis`.
 - 5: unknown deployment id; stop without latest lookup.
 - 4: auth expired; use auth recovery.
