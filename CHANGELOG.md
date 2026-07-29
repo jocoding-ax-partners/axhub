@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.16.2](///compare/v1.16.1...v1.16.2) (2026-07-29)
+
+배포가 아직 빌드 중일 때 화면에 같은 오류가 도배되던 문제를 고쳤어요. `deploy verify` 가 "아직 진행 중" 을 뜻하는 exit 6 을 돌려주면 스킬이 대기 수단 없이 같은 명령을 최대 30회 연달아 호출했고, `sleep` 도 shell loop 도 쓸 수 없어서 그 예산이 몇 초 만에 소진되며 사용자에게는 실패한 명령이 15줄씩 쌓이는 것처럼 보였어요. 이제 CLI 가 `verify_wait` 를 지원하면 `deploy verify --wait --wait-interval 20s --wait-timeout 10m` 단일 호출로 CLI 안에서 기다려요 — 권한 카드도 화면도 한 번이면 끝나고, `import` 스킬이 쓰던 방식과 같아졌어요(AP-16). GitHub device flow 재시도에서 승인할 코드가 사라지던 것도 함께 고쳐, pending 응답마다 `user_code` 와 인증 URL 을 다시 보여줘요.
+
+
+### Fixed
+
+* device flow 재시도 코드 재노출과 배포 대기 수단 우선 규칙 917d79a, closes #519
+
 ## [1.16.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.16.0...v1.16.1) (2026-07-28)
 
 앱 만들기가 멈추던 두 지점을 고쳤어요. 첫째, CLI 가 설치돼 있는데도 "설치 안 됨" 으로 판정하고 온보딩으로 돌려보내던 문제예요 — 부모 앱이 물려준 낡은 PATH 때문에 `axhub` 를 못 찾는 상태가 macOS 에서도 흔한데 Windows 전용 AP-13 만 있어서 못 덮었어요. 이제 AP-17 로 모든 스킬이 `~/.axhub/bin-path` 와 canonical 경로까지 확인하고 `plugin-support repair-path` 로 이어가요. 둘째, GitHub 인증 코드가 화면에 안 나오고 명령이 계속 대기하던 문제예요 — `apps bootstrap --execute` 에 붙이던 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` 이 CLI 를 블로킹 폴링 분기로 보내서 코드가 프로세스 안에 갇힌 채 tool call 이 끝나지 않았어요. 이 prefix 를 execute/resume 에서 빼 CLI 가 코드를 즉시 돌려주게 했고, 코드가 안 보인 채 끝난 execute 는 재실행(코드 무효화) 대신 `github link` fast path 로 코드를 먼저 보여주고 `--resume-last` 로 이어가요(AP-18).
