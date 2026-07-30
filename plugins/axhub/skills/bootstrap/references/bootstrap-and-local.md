@@ -104,7 +104,14 @@ axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder -
 
 While an outstanding code exists, never run fresh `bootstrap --execute` without `--resume-last`; it can issue a new code and invalidate the user's approved one. If response remains `device_code_pending`, respect `retry_after_secs` and retry `--resume-last` until success or expiry. If code expired, start Step 7 execute again to issue a fresh challenge.
 
-A `device_code_pending` payload carries `user_code`, `verification_uri`, and `expires_at` whenever the resume came from the local cache. Re-show the two body lines (`인증 URL:` / `입력 코드:`) from those fields on every pending retry, not only on the first `device_code_issued`. The user approving is the only thing that ends this loop, so a retry that reports "still pending" without the code leaves them nothing to act on. Older CLIs omit those fields; then keep retrying without re-showing.
+A `device_code_pending` payload carries `user_code`, `verification_uri`, and `expires_at` whenever the resume came from the local cache. Use them so a lost `device_code_issued` is recoverable — but do not reprint the block on every retry. Older CLIs omit those fields; then retry without re-showing.
+
+**Retry budget (never spam the pending block).** Approval is a human action, and this skill cannot `sleep`, so back-to-back resumes just paper the screen with the same code while the user is still typing it. Bound it:
+
+- The emitted `resume_command` already carries `--wait-approval 90s` when `capabilities.device_flow.resume_wait` is true. Run it as-is: that one call waits inside the CLI for the whole approval window. Do not strip the flag, and do not wrap it in a shell loop.
+- Show the `인증 URL:` / `입력 코드:` block **once** when the code first appears, and again **only** if the budget below is exhausted. Repeating it between retries is a UX failure.
+- Cap skill-level retries at **3 resumes or 5 minutes**, whichever comes first (with `--wait-approval` one resume already covers 90s). On exhaustion do not declare failure: end the response with a resume summary that keeps the code, the URL, and `expires_at`, and say the approval will be picked up automatically when it lands.
+- Older CLI without `resume_wait`: same 3-resume cap, and never add `sleep`, `until`, or a pipe to fake the interval.
 
 If resume says `no pending github device flow`, follow `resume-and-tenant.md` recovery: re-check `axhub github accounts list --json`, confirm owner installation, then run one same-idempotency recovery execute without `--resume-last`.
 

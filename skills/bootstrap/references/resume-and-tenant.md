@@ -48,7 +48,7 @@ AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr
 axhub --no-input apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --github-owner "$GITHUB_OWNER" --repo-name "$APP_SLUG" --repo-private --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY"
 ```
 
-If `device_code_pending` remains, respect `retry_after_secs` and retry the emitted `resume_command` until success or expiry. Every pending payload from a cached resume carries `user_code` + `verification_uri`; re-show them in the body on each retry so the user always has something to approve. Do not ask the user to say an approval phrase in chat; the CLI resume result is the only completion signal. If owner installation is not confirmed, do not run fresh execute; show the install URL once and stop with the GitHub App install resume phrase.
+If `device_code_pending` remains, run the emitted `resume_command` as-is — it already carries `--wait-approval 90s`, so that single call waits out the approval window inside the CLI instead of returning instantly. Cap this at 3 resumes or 5 minutes; on exhaustion end with a resume summary that keeps the code, URL, and `expires_at` rather than declaring failure. Show the `인증 URL:` / `입력 코드:` block once when the code first appears and once more only if the budget runs out — reprinting it between retries is the spam this budget exists to prevent. Do not ask the user to say an approval phrase in chat; the CLI resume result is the only completion signal. If owner installation is not confirmed, do not run fresh execute; show the install URL once and stop with the GitHub App install resume phrase.
 
 ## Tenant Resolve L1
 
