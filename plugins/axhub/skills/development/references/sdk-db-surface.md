@@ -13,6 +13,14 @@ development SKILL 의 5단계(SDK/DB 표면 확인)와 11.5단계(배포 준비 
 - SDK 문서나 MCP 검색 결과가 `defineSchema`/`where`/`tenant().app().data` 를 제안하면 stale 정보로 취급하고, 설치된 SDK README/CHANGELOG 또는 현재 package export 로 다시 확인해요.
 - 외부 connector 접근처럼 SDK로 풀 문제가 아니면 `connector_list`/`connector_resources`(MCP) 또는 CLI fallback 으로 실제 리소스와 샘플만 확인하고, 생성 코드는 앱의 기존 connector/DB 패턴에 맞춰요.
 
+## 5b. 인바운드 웹훅 받기 (relay) — 라우팅
+
+"웹훅 받게 해줘", "외부 시스템이 우리 앱 호출", "inbound webhook" 류는 **DB/CRUD 가 아니라 relay 표면**이라 `get_recipe(dynamic-db-crud)`로 가지 않아요. 두 갈래 (계약 상세는 CLI 출력·MCP 레시피 authority):
+
+- **창구 = CLI `axhub relay create --app <app> --name <이름> --verify-mode <hmac|key|none>`**. 받는 주소·열쇠·수신 계약은 **이 출력이 authority**. 조회/폐쇄/재발급은 `axhub relay list|delete|rotate-key`.
+- **받는 코드 = 앱의 프레임워크 네이티브 라우트 핸들러** (SDK 아님). MCP 있으면 `get_recipe(recipe_id="inbound-relay-webhook", framework=…)` 로 템플릿을, 없으면 CLI 출력 계약대로 써요.
+- ⚠ **relay 서명 헤더(`X-AxHub-Signature`)는 없어요** — 흔한 오해. 발신자 검증은 창구 `verify_mode` 가, 앱엔 `X-AxHub-Delivery`(멱등 키)로 전달돼요.
+
 ## 11.5. 배포 준비 점검 (infer-tables-env 연계) 상세
 
 verify 통과 후, deploy 핸드오프 전에 **방금 생성한 코드가 실제로 참조하는 테이블·환경변수**를 스캔해 빠진 게 있는지 확인해요 — 코드 분석이지 전용 CLI 명령이 아니에요(deploy 의 infer-tables-env 와 같은 성격). 비차단이고, 빠진 걸 찾으면 development 가 가진 게이트로 **그 자리에서** 메워 배포 왕복을 없애요. 이건 (b) write-gate 의 탐지 프론트엔드예요 — 사용자가 "테이블 만들어줘" 라고 명시 안 해도, 생성코드가 없는 테이블을 참조하면 능동 감지해 게이트로 연결해요.
