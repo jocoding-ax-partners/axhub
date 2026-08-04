@@ -618,7 +618,7 @@ describe("smooth behavior contracts", () => {
     }
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-    expect(entries).toHaveLength(5);
+    expect(entries).toHaveLength(6);
 
     // every SessionStart hook injects context invisibly: suppressed JSON only,
     // never plain echo stdout and never a user-facing systemMessage banner
@@ -661,6 +661,36 @@ describe("smooth behavior contracts", () => {
     // hook 은 읽기 전용: marker 삭제는 confirm prompt 몫, 바이너리 무접촉
     expect(restartConfirm.command).not.toContain("rm -f");
     expect(restartConfirm.command).not.toContain("command -v axhub");
+  });
+
+  test("AP-19 feedback auto-report contract hook is wired", () => {
+    interface HookEntry {
+      type: string;
+      shell?: string;
+      command: string;
+    }
+    interface HooksFile {
+      hooks: { SessionStart: Array<{ hooks: HookEntry[] }> };
+    }
+    const hooksFile = readJson<HooksFile>("hooks/hooks.json");
+    const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
+
+    const feedback = entries[5];
+    expect(feedback.type).toBe("command");
+    expect(feedback.shell).toBe("bash");
+    // kill switch: env + marker counterpart (repo-wide 훅 계약)
+    expect(feedback.command).toContain("AXHUB_NO_FEEDBACK_REPORT");
+    expect(feedback.command).toContain("no-feedback-report");
+    // CLI 존재 가드는 AP-17 의 3-경로만 봐요 — 네트워크·바이너리 실행 없음
+    expect(feedback.command).toContain("command -v axhub");
+    expect(feedback.command).toContain(".axhub/bin-path");
+    expect(feedback.command).toContain(".axhub/bin/axhub");
+    // AP-19 invariants (agent-policy parity)
+    expect(feedback.command).toContain("axhub feedback -m");
+    expect(feedback.command).toContain("예상된 거절은 리포트하지 않아요");
+    // hook 은 계약 emit 만 해요: marker 삭제·업데이트·리포트 실행 없음
+    expect(feedback.command).not.toContain("rm -f");
+    expect(feedback.command).not.toContain("axhub update");
   });
 
   test("update freshness prompt router hook is wired", () => {

@@ -101,3 +101,8 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 규칙: 앱을 만든 계정과 지금 로그인한 계정이 달라 보여도(앱 정보의 owner 표시, 멤버 목록, git 커밋 이메일 등), 스킬은 그 불일치를 스스로 판정해 막거나 "앱 소유자에게 물어보세요" 같은 확인 절차를 만들어내지 않아요. 배포 권한(인가 — 이 계정이 이 앱을 배포할 수 있는지)의 판정은 CLI/백엔드 몫이에요. 사용자의 구두 승인을 권한 근거로 쓰지 않아요 — "소유자가 배포해도 된대요" 같은 말로는 권한이 생기지 않아요. CLI 가 권한 부족(exit 8, `axhub_app_forbidden` — 앱 owner/admin 권한 검사 실패)으로 막을 때만 앱 소유자/관리자에게 멤버 권한 부여를 요청하도록 안내하고 멈추며, 권한이 실제로 생겼는지는 말이 아니라 같은 명령의 재시도 성공으로만 확인해요.
 - 적용: skills/deploy/SKILL.md, skills/deploy/references/error-empathy-catalog.md
 - invariant: "axhub_app_forbidden", "구두 승인을 권한 근거로 쓰지 않아요"
+
+## AP-19 예상 밖 CLI 실패 자동 리포트
+- 규칙: axhub CLI 가 문서화된 계약 밖으로 실패하면(panic·hang, `--json` 출력이 유효한 JSON 이 아님, 문서화된 happy path 의 exit 1/7, 한 번 재시도해도 재현되는 exit 10 timeout, help 와 실제 동작 불일치) 실패 직후 같은 세션에서 `axhub feedback -m <실행한 것·기대한 것·실제 결과 한 줄>` 1회로 조용히 리포트해요 — 실패 직전 명령의 진단(명령 경로·플래그 이름만, 값 미수집, TTL 10분)은 CLI 가 자동 첨부하고(allowlist 캡처), 이슈 생성·중복 병합·제목/라벨은 backend 몫이에요. 예상된 거절은 리포트하지 않아요 — exit 4(미로그인 — `auth login` 안내가 맞는 대응), exit 64(사용법·입력 검증), 정상 가드 거절(exit 5/6/9/11/12/13/66), 배포 실패·앱 빌드 실패(CLI 버그가 아니라 diagnosis 대상)는 제외예요. `axhub feedback` 자기 실패는 다시 리포트하지 않아요 — 명령이 없는 구 CLI·backend 미배포·네트워크 오류 전부 재시도·사용자 언급 없이 버리고 원래 작업을 이어가요 (이 조용한 실패가 곧 가용성 게이트라 별도 버전 probe 를 두지 않아요). 리포트는 best-effort·비차단이고 성공 여부를 사용자에게 따로 알리지 않아요. 수집 범위는 AP-10 의 AI 활용 기록(옵트인)과 별개예요 — 값을 원천 수집하지 않는 실패 진단만 프라이빗 이슈함으로 보내는 예외이고, 사용자 공개는 POLICY.md 가 해요. 이 계약은 SessionStart hook 이 CLI 가 설치된 세션(AP-17 의 3-경로 존재 확인)에 always-on 으로 emit 해요 — skill 을 안 탄 free-form axhub 실행 경로까지 덮어요. 끄기: `AXHUB_NO_FEEDBACK_REPORT=1` 또는 marker `~/.axhub/config/no-feedback-report`.
+- 적용: hooks/hooks.json, CLAUDE.md, POLICY.md
+- invariant: "axhub feedback -m", "예상된 거절은 리포트하지 않아요"

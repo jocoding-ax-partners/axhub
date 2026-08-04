@@ -27,6 +27,7 @@ const onboardingResumeCmd = ssCommands[1]!;
 const windowsContractCmd = ssCommands[2]!;
 const ap14FallbackCmd = ssCommands[3]!;
 const restartConfirmCmd = ssCommands[4]!;
+const feedbackContractCmd = ssCommands[5]!;
 
 const DEV_CWD = "/Users/dev/work/jocoding/axhub"; // 경로에 axhub 포함 (F1 재현용)
 
@@ -367,6 +368,40 @@ describe("AP-13 Windows 계약 훅 (SessionStart entry 3)", () => {
 
   test("marker kill switch no-windows-contract → 침묵해요", () => {
     expectSilent(runInline(windowsContractCmd, "", { OS: "Windows_NT", HOME: makeHomeWithMarker("windows-contract") }));
+  });
+});
+
+describe("AP-19 feedback 리포트 계약 훅 (SessionStart entry 6)", () => {
+  test("PATH 에 axhub 존재 → 계약을 발행해요", () => {
+    const result = runInline(feedbackContractCmd, "", { HOME: makeHome(), PATH: SAFE_PATH });
+    expectEmit(result, "SessionStart", "axhub feedback -m");
+    expect(result.stdout).toContain("예상된 거절은 리포트하지 않아요");
+  });
+
+  test("PATH 에 없어도 위치 파일 ~/.axhub/bin-path 가 있으면 발행해요 (AP-17 3-경로)", () => {
+    const home = makeHome();
+    mkdirSync(join(home, ".axhub"), { recursive: true });
+    writeFileSync(join(home, ".axhub", "bin-path"), "/opt/axhub/bin/axhub");
+    expectEmit(runInline(feedbackContractCmd, "", { HOME: home, PATH: NO_AXHUB_PATH }), "SessionStart", "axhub feedback -m");
+  });
+
+  test("canonical ~/.axhub/bin/axhub 만 있어도 발행해요 (AP-17 3-경로)", () => {
+    const home = makeHome();
+    mkdirSync(join(home, ".axhub", "bin"), { recursive: true });
+    writeFileSync(join(home, ".axhub", "bin", "axhub"), "");
+    expectEmit(runInline(feedbackContractCmd, "", { HOME: home, PATH: NO_AXHUB_PATH }), "SessionStart", "axhub feedback -m");
+  });
+
+  test("CLI 가 3-경로 어디에도 없으면 침묵해요", () => {
+    expectSilent(runInline(feedbackContractCmd, "", { HOME: makeHome(), PATH: NO_AXHUB_PATH }));
+  });
+
+  test("kill switch AXHUB_NO_FEEDBACK_REPORT → 침묵해요", () => {
+    expectSilent(runInline(feedbackContractCmd, "", { HOME: makeHome(), PATH: SAFE_PATH, AXHUB_NO_FEEDBACK_REPORT: "1" }));
+  });
+
+  test("marker kill switch no-feedback-report → 침묵해요", () => {
+    expectSilent(runInline(feedbackContractCmd, "", { HOME: makeHomeWithMarker("feedback-report"), PATH: SAFE_PATH }));
   });
 });
 
