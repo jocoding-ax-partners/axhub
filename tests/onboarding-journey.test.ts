@@ -62,7 +62,9 @@ describe("onboarding representative journey", () => {
     // 합성 gap 이라 detect 가 만들지 않아요 — 신호는 accounts 명령의 relogin subcode 예요.
     expect(SKILL).toContain("github_relogin_required");
     expect(SKILL).toContain("axhub github accounts list --json");
-    expect(SKILL).toContain("`github_link_missing` 도 같은 합성 값이라 detect 결과에는 없어요");
+    expect(SKILL).toContain("`github_link_missing` 도 합성 값이라 2의 연동 확인에서만 생기고");
+    // 진행 알림도 연동 단계를 별도로 알려요 (설치 확인과 다른 줄).
+    expect(SKILL).toContain("`GitHub 계정 연동 확인하는 중이에요`");
   });
 
   test("github link is documented as a pre-auth step without promising permanence", () => {

@@ -17,8 +17,8 @@ describe("bootstrap device-flow command contract", () => {
     const errorsReference = readRepo("skills/bootstrap/references/errors-and-followups.md");
 
     // Step 6: 정상 응답 = 연동됨 = 인증 단계 없음.
-    expect(bootstrap).toContain("이 조회가 정상 응답하면 GitHub 계정이 이미 연동된 상태라 **인증 단계가 없어요**");
-    expect(bootstrap).toContain("device flow 를 미리 시작하거나 인증이 필요하다고 말하지 않아요");
+    expect(bootstrap).toContain("이 조회가 정상 응답하면 계정이 이미 연동된 상태라 **인증 단계가 없어요**");
+    expect(bootstrap).toContain("device flow 를 미리 시작하지 않아요");
     expect(bootstrap).toContain("9단계 device flow 안무는 이 fallback 전용이에요");
     // Step 9: 안무 진입 자체가 fallback.
     expect(bootstrap).toContain("연동된 계정이면 execute 는 device flow 없이 끝나요");

@@ -56,6 +56,7 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 - `axhub CLI 설치하는 중이에요`
 - `로그인 진행하는 중이에요`
 - `실행환경(node·git) 점검하는 중이에요`
+- `GitHub 계정 연동 확인하는 중이에요`
 - `GitHub App 설치 확인하는 중이에요`
 - `필요한 패키지 설치하는 중이에요`
 - `AI 활용 기록 설정 확인하는 중이에요`
@@ -88,13 +89,11 @@ TodoWrite 가 host 에 있으면 checklist 를 갱신해요. 없으면 언급하
 
 DETECT 직후 `github.install_url` 이 있으면 항상 한 줄로 보여줘요. 이미 설치되어 있어도 다른 org/계정을 더 연결할 수 있다는 말을 붙여요. `installed_logins` 는 login 만 보여주고 `installation_id` 같은 internal 값은 보여주지 않아요. 자세한 질문과 gate 는 [`references/github-app.md`](references/github-app.md)를 읽어요.
 
-GitHub 표면은 **계정 연동**과 **App 설치** 두 단계예요. detect 의 GitHub 상태 값은 전부 App 설치 상태라 연동 여부를 담지 않으니, 설치 gate 로 넘어가기 전에 읽기 전용 `axhub github accounts list --json` 을 한 번 실행해 연동 상태를 확인해요. exit 4 이고 봉투 subcode 가 `github_relogin_required` 면 연동이 없거나 만료된 상태라 설치 상태 자체를 알 수 없어요 — 내부적으로 `github_link_missing` 으로 처리해 연동을 먼저 끝내요. 그 외 실패는 best-effort 로 두고 진행해요.
-
-GitHub 표면은 **계정 연동**과 **App 설치** 두 단계예요. detect 의 GitHub 상태 값은 전부 App 설치 상태라 연동 여부를 담지 않으니, 설치 gate 로 넘어가기 전에 읽기 전용 `axhub github accounts list --json` 을 한 번 실행해 연동 상태를 확인해요. exit 4 이고 봉투 subcode 가 `github_relogin_required` 면 연동이 없거나 만료된 상태라 설치 상태 자체를 알 수 없어요 — 내부적으로 `github_link_missing` 으로 처리해 연동을 먼저 끝내요. 그 외 실패는 best-effort 로 두고 진행해요.
+GitHub 표면은 **계정 연동**과 **App 설치** 두 단계예요. detect 값은 전부 설치 상태라 연동 여부를 담지 않으니, 설치 gate 앞에 읽기 전용 `axhub github accounts list --json` 을 한 번 돌려요. exit 4 + subcode `github_relogin_required` 면 `github_link_missing` 으로 처리하고, 그 외 실패는 best-effort 로 두고 진행해요.
 
 ### 3. first_gap router
 
-`first_gap` 만 처리하고 재감지해요. 아래 table 은 owner map 이고, 순서는 detect JSON 이 정해요. CLI 는 gap 이 없으면 `first_gap` 을 `null` 로(그리고 `gaps` 를 빈 배열로) 반환해요 — **`first_gap` 이 null/부재이고 `gaps` 가 비어 있으면 `no_gap` 과 동일한 완료**로 처리하고 Ready card 로 가요. `doctor_gap` 은 CLI 가 만들지 않는 플러그인 합성 값이에요 — detect 출력이 비었을 때 1의 fallback JSON 이 넣어요. `github_link_missing` 도 같은 합성 값이라 detect 결과에는 없어요 — 2의 계정 연동 확인이 `github_relogin_required` 를 돌려줄 때만 생기고, 연동이 없으면 App 설치 상태를 읽을 수 없으니 항상 `github_app_missing` 보다 먼저 처리해요.
+`first_gap` 만 처리하고 재감지해요. 아래 table 은 owner map 이고, 순서는 detect JSON 이 정해요. CLI 는 gap 이 없으면 `first_gap` 을 `null` 로(그리고 `gaps` 를 빈 배열로) 반환해요 — **`first_gap` 이 null/부재이고 `gaps` 가 비어 있으면 `no_gap` 과 동일한 완료**로 처리하고 Ready card 로 가요. `doctor_gap` 은 CLI 가 만들지 않는 플러그인 합성 값이에요 — detect 출력이 비었을 때 1의 fallback JSON 이 넣어요. `github_link_missing` 도 합성 값이라 2의 연동 확인에서만 생기고, 항상 `github_app_missing` 보다 먼저 처리해요.
 
 | `first_gap` | Handler |
 | --- | --- |
@@ -105,7 +104,7 @@ GitHub 표면은 **계정 연동**과 **App 설치** 두 단계예요. detect �
 | `git_missing` | git install approval; load install reference. |
 | `node_missing` | node install approval; load install reference. |
 | `node_mismatch` | nvm/package-manager version correction approval; load install reference. |
-| `github_link_missing` | GitHub 계정 연동 gate — `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link` fast path; load [`references/github-app.md`](references/github-app.md). |
+| `github_link_missing` | GitHub 계정 연동 gate; load [`references/github-app.md`](references/github-app.md). |
 | `github_app_missing` | GitHub App install gate; load [`references/github-app.md`](references/github-app.md). |
 | `existing_repo_gap` | Existing repo app connection via `axhub apps git`; load gap-state reference and GitHub reference. |
 | `no_manifest_empty` | No bootstrap. Show advisory and go to Ready card with `첫 앱 만들어줘`. |
@@ -145,8 +144,7 @@ Finish with one honest card:
 - NEVER run multiple mutate gaps from one detect result. Always detect-first -> first_gap -> re-detect.
 - NEVER run plugin update during onboarding; mention `/plugin update` as advisory only.
 - NEVER move GitHub OAuth device-flow into the install_url stage; install_url is account-level App installation. 계정 연동(`github link`)과 App 설치(install_url)는 끝까지 별개 단계예요.
-- NEVER 계정 연동이 영구적이라고 말하지 말아요 — 연동은 시간이 지나면 만료돼서 다시 연동하는 게 정상 흐름이에요. `다시 묻지 않아요` 같은 단정 표현을 쓰지 말아요.
-- NEVER 계정 연동 승인을 사용자가 채팅으로 알려 달라고 요구하지 말아요 — 승인 반영은 `axhub github accounts list --json` 재실행으로 확인해요.
+- NEVER 계정 연동을 영구적이라고 말하거나(`다시 묻지 않아요` 류) 승인 완료를 채팅으로 알려 달라고 요구하지 말아요.
 - NEVER 빈 폴더에서 bootstrap 스킬로 위임하거나 앱을 자동 생성하지 말아요.
 - NEVER dependency install without a lockfile.
 - NEVER omit `--ignore-scripts` from dependency install.
