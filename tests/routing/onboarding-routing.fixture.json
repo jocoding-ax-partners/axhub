@@ -1,7 +1,7 @@
 {
-  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). onboarding 은 첫 axhub 셋업(CLI 설치·로그인·git/node·GitHub App·앱 연결)을 detect-first 로 안내해요. AP-11 로 발화에 axhub 언급이 없고 대화에도 axhub 맥락이 없으면 detect 전에 'axhub 셋업을 말하는 거예요?' 를 한 번 묻고, 아니면 종료해요. 일반 프로젝트 셋업이나 다른 도구 온보딩으로 오인하지 않아요.",
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). onboarding 은 첫 axhub 셋업(CLI 설치·로그인·git/node·GitHub 계정 연동·GitHub App·앱 연결)을 detect-first 로 안내해요. AP-11 로 발화에 axhub 언급이 없고 대화에도 axhub 맥락이 없으면 detect 전에 'axhub 셋업을 말하는 거예요?' 를 한 번 묻고, 아니면 종료해요. 일반 프로젝트 셋업이나 다른 도구 온보딩으로 오인하지 않아요.",
   "boundary": {
-    "onboarding": "첫 axhub 셋업·CLI 설치·로그인·환경 점검. axhub 맥락 필요.",
+    "onboarding": "첫 axhub 셋업·CLI 설치·로그인·GitHub 계정 연동·환경 점검. axhub 맥락 필요.",
     "bootstrap": "빈 디렉토리 새 앱 생성 (onboarding 은 자동 bootstrap 안 함)",
     "update": "CLI·플러그인 버전 업데이트",
     "none": "AP-11 — axhub 맥락 없는 일반 셋업 발화는 한 번 묻거나 종료"
