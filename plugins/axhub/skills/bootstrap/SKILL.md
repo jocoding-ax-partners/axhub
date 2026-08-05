@@ -127,7 +127,7 @@ Template 과 앱 이름이 사용자에게 확정되면 앱 주소 확인 직전
 axhub github accounts list --json
 ```
 
-설치 계정 0개면 설치 확인 전 dry-run/execute 금지. 1개면 자동 owner, 2개 이상이면 고르게 해요. auth 에러는 `다시 로그인해줘`. 단 `github_relogin_required` 는 `axhub github link` 재연동으로만 풀려요(승인 후 gate 재실행).
+이 조회가 정상 응답하면 GitHub 계정이 이미 연동된 상태라 **인증 단계가 없어요** — 어느 계정·설치로 만들지는 CLI 가 정하니 device flow 를 미리 시작하거나 인증이 필요하다고 말하지 않아요. 설치 계정 0개면 설치 확인 전 dry-run/execute 금지. 1개면 자동 owner, 2개 이상이면 고르게 해요. auth 에러는 `다시 로그인해줘`. 단 `github_relogin_required` 는 연동이 없거나 만료된 상태라 `axhub github link` 재연동으로만 풀려요(승인 후 gate 재실행) — 9단계 device flow 안무는 이 fallback 전용이에요.
 
 ### 7. Availability Check
 
@@ -163,7 +163,7 @@ axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder -
 
 실행 때 예시 UUID 는 `init-resume put` 반환 literal UUID 로 바꾸고, Execute/resume 명령에는 `--json` 금지.
 
-`device_code_issued` 는 `auto_poll:true`/`browser_opened:true` 여도 user code 를 즉시 보여줘요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 금지, 짧은 timeout 으로 background 처리 금지. CLI 가 pending 으로 끝나면 URL·코드를 본문에 쓰고, `인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 또는 watch flag 를 제거한 단일 resume 명령으로 승인 반영을 확인해요. `device_flow_required_user_action` 에서 멈추거나 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요.
+연동된 계정이면 execute 는 device flow 없이 끝나요 — 아래는 6단계가 미연동·만료를 확인했을 때만 타는 fallback 안무예요. `device_code_issued` 는 `auto_poll:true`/`browser_opened:true` 여도 user code 를 즉시 보여줘요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 금지, 짧은 timeout 으로 background 처리 금지. CLI 가 pending 으로 끝나면 URL·코드를 본문에 쓰고, `인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 또는 watch flag 를 제거한 단일 resume 명령으로 승인 반영을 확인해요. `device_flow_required_user_action` 에서 멈추거나 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요.
 
 본문 두 줄 형식(URL 부분만 inline code span):
 

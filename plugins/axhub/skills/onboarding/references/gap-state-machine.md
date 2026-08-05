@@ -13,6 +13,7 @@ DETECT_ALL(read-only)  <- axhub plugin-support onboarding-detect --json
   git_missing          -> git install approval -> DETECT_ALL
   node_missing         -> node install approval -> DETECT_ALL
   node_mismatch        -> node version correction approval -> DETECT_ALL
+  github_link_missing  -> github link fast path -> accounts 재확인 -> DETECT_ALL
   github_app_missing   -> install_url gate -> DETECT_ALL
   existing_repo_gap    -> apps git status/connect -> DETECT_ALL
   no_manifest_empty    -> advisory only -> Ready card
@@ -35,6 +36,7 @@ Do not process the second item in `gaps` from the same JSON. Handle one `first_g
 | `git_missing` | `git_present=false` | git becomes present after user-approved install. |
 | `node_missing` | `node_present=false` | node becomes present after user-approved install. |
 | `node_mismatch` | `node_mismatch=true` | required version is active, or continue is degraded. |
+| `github_link_missing` | `axhub github accounts list --json` 이 exit 4 + subcode `github_relogin_required` | 연동 승인 뒤 같은 조회가 정상 응답하면 완료, 또는 사용자가 미루면 `READY_WITH_USER_ACTION`. |
 | `github_app_missing` | `github.state=uninstalled` or `empty` | re-detect shows `installed`/`mixed`, or user explicitly defers with `READY_WITH_USER_ACTION`. |
 | `existing_repo_gap` | repo has git+commit but no manifest | app/repo connection succeeds, or onboarding stops with user action needed. |
 | `no_manifest_empty` | empty dir and no manifest | advisory only; no re-detect loop for this gap. |
