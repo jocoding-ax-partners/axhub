@@ -35,6 +35,8 @@ If the user chooses resume, use the route enum and `args.*_command` returned by 
 
 ## Resume Device-Flow Recovery
 
+This whole section is fallback-only: a linked GitHub account never reaches a pending device flow, so it applies when the link was missing or expired at the GitHub App gate.
+
 If resume fails with `no pending github device flow`, do not declare hard failure immediately. First re-check the read-only account surface:
 
 ```bash
