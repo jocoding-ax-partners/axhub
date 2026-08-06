@@ -4,6 +4,21 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.17.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.16.2...v1.17.0) (2026-08-06)
+
+온보딩이 GitHub 계정 연동(`axhub github link`)을 1급 사전 단계로 안내해요 — 셋업에서 계정을 미리 연결해 두면 앱 만들기에서 device flow 인증 단계가 통째로 사라지고, bootstrap 의 device flow 안무는 미연동 사용자를 위한 fallback 으로만 남아요 (CLI v0.27.0 의 linked-first 동작과 짝이에요). 그리고 axhub CLI 가 문서화된 계약 밖으로 실패하면(panic·비정상 `--json` 출력·재현되는 timeout 등) 에이전트가 실패 직후 `axhub feedback` 1회로 조용히 자동 리포트하는 AP-19 계약을 추가했어요 — 예상된 거절(미로그인·사용법·정상 가드 거절)은 리포트하지 않고, 리포트 자체가 실패하면 재시도나 언급 없이 버려요. development 스킬에는 인바운드 웹훅 받기(relay) 라우팅 안내가 얇게 더해졌어요.
+
+
+### Added
+
+* 예상 밖 CLI 실패 자동 리포트 AP-19 계약 추가 ([#433](https://github.com/jocoding-ax-partners/axhub/issues/433)) ([0a69243](https://github.com/jocoding-ax-partners/axhub/commit/0a69243868473a1f174e951b259364eb6ad44f58))
+* 온보딩 GitHub 계정 연동 gap 추가, bootstrap device flow 는 fallback 전용 ([#434](https://github.com/jocoding-ax-partners/axhub/issues/434)) ([7657d30](https://github.com/jocoding-ax-partners/axhub/commit/7657d302648557d0973db7bba125386eafa69ea4))
+
+
+### Docs
+
+* **development:** 인바운드 웹훅 받기(relay) 라우팅 (얇게) ([#432](https://github.com/jocoding-ax-partners/axhub/issues/432)) ([5e29c23](https://github.com/jocoding-ax-partners/axhub/commit/5e29c238a3be0b13e48dd1a98b4130a259b71dee))
+
 ## [1.16.2](///compare/v1.16.1...v1.16.2) (2026-07-29)
 
 배포가 아직 빌드 중일 때 화면에 같은 오류가 도배되던 문제를 고쳤어요. `deploy verify` 가 "아직 진행 중" 을 뜻하는 exit 6 을 돌려주면 스킬이 대기 수단 없이 같은 명령을 최대 30회 연달아 호출했고, `sleep` 도 shell loop 도 쓸 수 없어서 그 예산이 몇 초 만에 소진되며 사용자에게는 실패한 명령이 15줄씩 쌓이는 것처럼 보였어요. 이제 CLI 가 `verify_wait` 를 지원하면 `deploy verify --wait --wait-interval 20s --wait-timeout 10m` 단일 호출로 CLI 안에서 기다려요 — 권한 카드도 화면도 한 번이면 끝나고, `import` 스킬이 쓰던 방식과 같아졌어요(AP-16). GitHub device flow 재시도에서 승인할 코드가 사라지던 것도 함께 고쳐, pending 응답마다 `user_code` 와 인증 URL 을 다시 보여줘요.
