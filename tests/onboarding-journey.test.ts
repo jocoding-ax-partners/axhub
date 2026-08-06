@@ -40,11 +40,46 @@ const completionGaps = new Set(
 
 describe("onboarding representative journey", () => {
   test("gap id sets stay in parity across SKILL router, loop diagram, completion rules", () => {
-    expect(routerGaps.size).toBeGreaterThanOrEqual(13);
+    expect(routerGaps.size).toBeGreaterThanOrEqual(14);
     expect([...loopGaps].sort()).toEqual([...routerGaps].sort());
     // no_gap ends the loop at the Ready card and has no completion rule row.
     const loopMinusNoGap = [...loopGaps].filter((id) => id !== "no_gap").sort();
     expect([...completionGaps].sort()).toEqual(loopMinusNoGap);
+  });
+
+  test("GitHub 계정 연동 is a first-class gap ordered before the App install gate", () => {
+    // 링크가 없으면 accounts 조회가 relogin 으로 끝나 App 설치 상태를 읽을 수 없어요 —
+    // 그래서 연동이 먼저고 설치가 나중인 순서만 성립해요.
+    for (const set of [routerGaps, loopGaps, completionGaps]) {
+      expect(set.has("github_link_missing")).toBe(true);
+    }
+    const routerSection = section(SKILL, "### 3. first_gap router");
+    const loopSection = section(GAPS, "## Loop");
+    for (const doc of [routerSection, loopSection]) {
+      expect(doc.indexOf("github_link_missing")).toBeGreaterThan(-1);
+      expect(doc.indexOf("github_link_missing")).toBeLessThan(doc.indexOf("github_app_missing"));
+    }
+    // 합성 gap 이라 detect 가 만들지 않아요 — 신호는 accounts 명령의 relogin subcode 예요.
+    expect(SKILL).toContain("github_relogin_required");
+    expect(SKILL).toContain("axhub github accounts list --json");
+    expect(SKILL).toContain("`github_link_missing` 도 합성 값이라 2의 연동 확인에서만 생기고");
+    // 진행 알림도 연동 단계를 별도로 알려요 (설치 확인과 다른 줄).
+    expect(SKILL).toContain("`GitHub 계정 연동 확인하는 중이에요`");
+  });
+
+  test("github link is documented as a pre-auth step without promising permanence", () => {
+    expect(GITHUB).toContain("## GitHub 계정 연동 (설치보다 먼저)");
+    expect(GITHUB).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link");
+    // onboarding URL 규칙 — 평문 절대 URL 만, inline code/Markdown 링크 금지.
+    expect(GITHUB).toContain("인증 URL: https://github.com/login/device");
+    expect(GITHUB).not.toContain("인증 URL: `https://github.com/login/device`");
+    expect(GITHUB).not.toContain("[https://github.com/login/device]");
+    // 연동은 만료돼요 — 재연동이 정상이라 영속을 약속하지 않아요.
+    expect(GITHUB).toContain("재연동은 고장이 아니라 정상 흐름이에요");
+    expect(GITHUB).not.toContain("연동은 한 번만 하면 끝나요");
+    // 설치 단계와 끝까지 분리 (SKILL.md NEVER 와 짝).
+    expect(GITHUB).toContain("install URL 표시와 절대 한 단계로 합치지 않아요");
+    expect(SKILL).toContain("계정 연동(`github link`)과 App 설치(install_url)는 끝까지 별개 단계예요");
   });
 
   test("CLI null first_gap is accepted as no_gap completion (schema parity with real CLI)", () => {

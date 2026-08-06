@@ -71,6 +71,8 @@ Use the real `bootstrap_id` from the previous JSON/status output instead of the 
 
 ## Device-Code Event
 
+A linked GitHub account makes execute finish with no device flow at all, so nothing in this section runs on that path. Everything below is the fallback for the not-linked or expired-link case that the GitHub App gate already surfaced.
+
 If stdout contains:
 
 ```json

@@ -23,8 +23,11 @@ describe("bootstrap desktop UX contract", () => {
     // 둘 다 fresh path 에서 reference 를 읽지 않기 때문에 본문에 있어야 도달해요.
     // AP-16 대기 수단 우선(`deploy verify --wait` 단일 호출)로 22_400 → 23_000 상향 —
     // 연타 폴링 UX 실패를 막는 계약이라 fresh path 본문에 있어야 해요.
+    // linked-account-first 서사(6단계 "인증 단계 없음" + 9단계 device flow fallback 전용)로
+    // 23_000 → 23_500 상향 — 연동을 마친 사용자에겐 이게 fresh path 의 기본 서사이고,
+    // reference 로 빼면 "정상 fresh path 에서는 reference 파일을 읽지 않아요" 규칙 때문에 도달하지 않아요.
     // (plugin:budget 의 per-skill 35k 는 별도 gate)
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(23_000);
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(23_500);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");

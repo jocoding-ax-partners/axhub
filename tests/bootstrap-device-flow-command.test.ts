@@ -6,6 +6,34 @@ const REPO_ROOT = join(import.meta.dir, "..");
 const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
 
 describe("bootstrap device-flow command contract", () => {
+  // 백엔드에 연동된 GitHub 계정이 있으면 bootstrap 은 device flow 를 아예 타지 않아요.
+  // 아래 안무 계약은 전부 "미연동·만료" fallback 에만 적용돼요 — 그 프레이밍이
+  // 스킬 본문과 reference 에서 같이 유지되는지 먼저 고정해요.
+  test("frames the whole device-flow choreography as the not-linked fallback", () => {
+    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
+    const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
+    const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
+    const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
+    const errorsReference = readRepo("skills/bootstrap/references/errors-and-followups.md");
+
+    // Step 6: 정상 응답 = 연동됨 = 인증 단계 없음.
+    expect(bootstrap).toContain("이 조회가 정상 응답하면 계정이 이미 연동된 상태라 **인증 단계가 없어요**");
+    expect(bootstrap).toContain("device flow 를 미리 시작하지 않아요");
+    expect(bootstrap).toContain("9단계 device flow 안무는 이 fallback 전용이에요");
+    // Step 9: 안무 진입 자체가 fallback.
+    expect(bootstrap).toContain("연동된 계정이면 execute 는 device flow 없이 끝나요");
+    // relogin 은 axhub 재로그인이 아니라 연동 없음/만료 신호예요.
+    expect(bootstrap).toContain("`github_relogin_required` 는 연동이 없거나 만료된 상태라");
+    expect(errorsReference).toContain("연동이 살아 있으면 이 경로 자체가 안 나와요");
+    expect(templateReference).toContain("bootstrap continues with **no authentication step at all**");
+    expect(templateReference).toContain("Device flow is the fallback for this case only");
+    expect(localReference).toContain("A linked GitHub account makes execute finish with no device flow at all");
+    expect(resumeReference).toContain("a linked GitHub account never reaches a pending device flow");
+    // 영속을 약속하지 않아요 — refresh token 만료 뒤 재연동은 정상 경로예요.
+    expect(bootstrap).not.toContain("다시 묻지 않아요");
+    expect(templateReference).not.toContain("only once and never again");
+  });
+
   test("keeps the first desktop execute and resume out of watch and monitor mode", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
     const localReference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");

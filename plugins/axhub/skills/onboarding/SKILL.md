@@ -1,6 +1,6 @@
 ---
 name: onboarding
-description: 'Use when the user is new to axhub or asks for first setup/onboarding/getting started. 이 스킬은 "셋업해줘", "처음인데", "처음 쓰는데 뭐부터", "온보딩", "시작하기", "axhub 시작", "초기 셋업", "setup", "onboard", "getting started", "first time" 같은 첫 사용자 셋업 의도를 담당해요. axhub CLI 설치, 로그인, git/node, GitHub App, 앱 연결, 의존성, 최종 Ready card 를 detect-first 로 안내하되 빈 폴더에서 bootstrap 을 자동 실행하지 않아요. 이 트리거들은 axhub 맥락(발화의 axhub 언급·대화의 직전 axhub 작업)이 있을 때만 유효해요. 일반 프로젝트 셋업이나 다른 도구 온보딩 발화에는 이 스킬을 쓰지 않아요.'
+description: 'Use when the user is new to axhub or asks for first setup/onboarding/getting started. 이 스킬은 "셋업해줘", "처음인데", "처음 쓰는데 뭐부터", "온보딩", "시작하기", "axhub 시작", "초기 셋업", "setup", "onboard", "getting started", "first time" 같은 첫 사용자 셋업 의도를 담당해요. axhub CLI 설치, 로그인, git/node, GitHub 계정 연동, GitHub App, 앱 연결, 의존성, 최종 Ready card 를 detect-first 로 안내하되 빈 폴더에서 bootstrap 을 자동 실행하지 않아요. 이 트리거들은 axhub 맥락(발화의 axhub 언급·대화의 직전 axhub 작업)이 있을 때만 유효해요. 일반 프로젝트 셋업이나 다른 도구 온보딩 발화에는 이 스킬을 쓰지 않아요.'
 examples:
   - utterance: "셋업해줘"
     intent: "onboard axhub first-time setup"
@@ -18,7 +18,7 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-처음 axhub 를 쓰는 사람을 위한 단일 진입점이에요. 사용자는 `온보딩`, `처음인데 뭐부터`, `getting started` 처럼 말하면 되고, 이 스킬은 CLI/auth/runtime/GitHub/repo/deps/MCP 준비를 한 gap 씩 닫아요. 환경 진단만 원하면 doctor/diagnosis 가 맞고, 새 앱 생성을 명시하면 bootstrap 이 맞아요. onboarding 은 빈 폴더에서도 자동 bootstrap 을 시작하지 않고 Ready card 에서 `첫 앱 만들어줘` 를 다음 말로 안내해요.
+처음 axhub 를 쓰는 사람을 위한 단일 진입점이에요. 사용자는 `온보딩`, `처음인데 뭐부터`, `getting started` 처럼 말하면 되고, 이 스킬은 CLI/auth/runtime/GitHub 계정 연동/GitHub App/repo/deps/MCP 준비를 한 gap 씩 닫아요. 환경 진단만 원하면 doctor/diagnosis 가 맞고, 새 앱 생성을 명시하면 bootstrap 이 맞아요. onboarding 은 빈 폴더에서도 자동 bootstrap 을 시작하지 않고 Ready card 에서 `첫 앱 만들어줘` 를 다음 말로 안내해요.
 
 ## Reference Loading
 
@@ -56,6 +56,7 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 - `axhub CLI 설치하는 중이에요`
 - `로그인 진행하는 중이에요`
 - `실행환경(node·git) 점검하는 중이에요`
+- `GitHub 계정 연동 확인하는 중이에요`
 - `GitHub App 설치 확인하는 중이에요`
 - `필요한 패키지 설치하는 중이에요`
 - `AI 활용 기록 설정 확인하는 중이에요`
@@ -88,9 +89,11 @@ TodoWrite 가 host 에 있으면 checklist 를 갱신해요. 없으면 언급하
 
 DETECT 직후 `github.install_url` 이 있으면 항상 한 줄로 보여줘요. 이미 설치되어 있어도 다른 org/계정을 더 연결할 수 있다는 말을 붙여요. `installed_logins` 는 login 만 보여주고 `installation_id` 같은 internal 값은 보여주지 않아요. 자세한 질문과 gate 는 [`references/github-app.md`](references/github-app.md)를 읽어요.
 
+GitHub 표면은 **계정 연동**과 **App 설치** 두 단계예요. detect 값은 전부 설치 상태라 연동 여부를 담지 않으니, 설치 gate 앞에 읽기 전용 `axhub github accounts list --json` 을 한 번 돌려요. exit 4 + subcode `github_relogin_required` 면 `github_link_missing` 으로 처리하고, 그 외 실패는 best-effort 로 두고 진행해요.
+
 ### 3. first_gap router
 
-`first_gap` 만 처리하고 재감지해요. 아래 table 은 owner map 이고, 순서는 detect JSON 이 정해요. CLI 는 gap 이 없으면 `first_gap` 을 `null` 로(그리고 `gaps` 를 빈 배열로) 반환해요 — **`first_gap` 이 null/부재이고 `gaps` 가 비어 있으면 `no_gap` 과 동일한 완료**로 처리하고 Ready card 로 가요. `doctor_gap` 은 CLI 가 만들지 않는 플러그인 합성 값이에요 — detect 출력이 비었을 때 1의 fallback JSON 이 넣어요.
+`first_gap` 만 처리하고 재감지해요. 아래 table 은 owner map 이고, 순서는 detect JSON 이 정해요. CLI 는 gap 이 없으면 `first_gap` 을 `null` 로(그리고 `gaps` 를 빈 배열로) 반환해요 — **`first_gap` 이 null/부재이고 `gaps` 가 비어 있으면 `no_gap` 과 동일한 완료**로 처리하고 Ready card 로 가요. `doctor_gap` 은 CLI 가 만들지 않는 플러그인 합성 값이에요 — detect 출력이 비었을 때 1의 fallback JSON 이 넣어요. `github_link_missing` 도 합성 값이라 2의 연동 확인에서만 생기고, 항상 `github_app_missing` 보다 먼저 처리해요.
 
 | `first_gap` | Handler |
 | --- | --- |
@@ -101,6 +104,7 @@ DETECT 직후 `github.install_url` 이 있으면 항상 한 줄로 보여줘요.
 | `git_missing` | git install approval; load install reference. |
 | `node_missing` | node install approval; load install reference. |
 | `node_mismatch` | nvm/package-manager version correction approval; load install reference. |
+| `github_link_missing` | GitHub 계정 연동 gate; load [`references/github-app.md`](references/github-app.md). |
 | `github_app_missing` | GitHub App install gate; load [`references/github-app.md`](references/github-app.md). |
 | `existing_repo_gap` | Existing repo app connection via `axhub apps git`; load gap-state reference and GitHub reference. |
 | `no_manifest_empty` | No bootstrap. Show advisory and go to Ready card with `첫 앱 만들어줘`. |
@@ -139,7 +143,8 @@ Finish with one honest card:
 - NEVER require the user to know sibling skill names or slash commands to finish onboarding.
 - NEVER run multiple mutate gaps from one detect result. Always detect-first -> first_gap -> re-detect.
 - NEVER run plugin update during onboarding; mention `/plugin update` as advisory only.
-- NEVER move GitHub OAuth device-flow into the install_url stage; install_url is account-level App installation.
+- NEVER move GitHub OAuth device-flow into the install_url stage; install_url is account-level App installation. 계정 연동(`github link`)과 App 설치(install_url)는 끝까지 별개 단계예요.
+- NEVER 계정 연동을 영구적이라고 말하거나(`다시 묻지 않아요` 류) 승인 완료를 채팅으로 알려 달라고 요구하지 말아요.
 - NEVER 빈 폴더에서 bootstrap 스킬로 위임하거나 앱을 자동 생성하지 말아요.
 - NEVER dependency install without a lockfile.
 - NEVER omit `--ignore-scripts` from dependency install.
