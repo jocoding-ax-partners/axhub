@@ -106,8 +106,8 @@ GitHub 표면은 **계정 연동**과 **App 설치** 두 단계예요. detect �
 | `git_missing` | git install approval; load install reference. |
 | `node_missing` | node install approval; load install reference. |
 | `node_mismatch` | nvm/package-manager version correction approval; load install reference. |
-| `github_link_missing` | GitHub 계정 연동 gate; load [`references/github-app.md`](references/github-app.md). **GitHub 없이 갈 길도 같이 알려줘요** — 아래 §GitHub 없이 배포하기. |
-| `github_app_missing` | GitHub App install gate; load [`references/github-app.md`](references/github-app.md). **GitHub 없이 갈 길도 같이 알려줘요** — 아래 §GitHub 없이 배포하기. |
+| `github_link_missing` | GitHub 계정 연동 gate; load [`references/github-app.md`](references/github-app.md). |
+| `github_app_missing` | GitHub App install gate; load [`references/github-app.md`](references/github-app.md). |
 | `existing_repo_gap` | Existing repo app connection via `axhub apps git`; load gap-state reference and GitHub reference. |
 | `no_manifest_empty` | No bootstrap. Show advisory and go to Ready card with `첫 앱 만들어줘`. **핸드오프 모드면 예외** — advisory 대신 아래 3h 의 repo 확보 분기를 수행해요. |
 | `deps_missing` | Lockfile-only install with `--ignore-scripts`; load [`references/dependency-install.md`](references/dependency-install.md). |
@@ -119,25 +119,6 @@ If a handler needs a prompt but D1 safe-stop mode is active, do not execute the 
 
 `cli_path_missing` 은 CLI 가 디스크에 있는데 현재 셸 PATH 에 없는 상태예요. 이미 열린 세션의 PATH 는 밖에서 못 고치므로(OS 설계), repair-path 뒤에 `command -v axhub` 재감지를 반복하지 말고(무한 루프 방지) **repair-path JSON 의 `bin_path` 절대경로로 남은 온보딩 명령을 그대로 이어가요** (예: `"<bin_path>" auth status --json`). detect 의 `cli_resolved_path` 도 같은 절대경로예요. 남은 gap 재감지가 필요하면 `"<bin_path>" plugin-support onboarding-detect --json` 으로 실행하고, 결과에 `cli_path_missing`/`cli_on_path:false` 가 다시 보여도 이미 처리된 것으로 간주하고 다음 gap 으로 넘어가요. `bin_path` 가 없는 구 CLI 면 기존대로 `READY_WITH_USER_ACTION` 으로 "PATH 준비됐어요. 새 터미널을 열고 거기서 Claude 를 실행해 온보딩을 다시 불러 주세요" 라고 안내해요. 새 터미널·VS Code 앱 재시작 안내는 마무리 카드에 보조 문구로 한 번만 붙여요.
 
-### 3g. GitHub 없이 배포하기 (백엔드 spec 184)
-
-GitHub 연동은 **선택**이에요. 계정 연동이나 App 설치 gate 에서 사용자가
-망설이거나 거절하면, 막다른 길로 만들지 말고 다른 길을 한 줄로 같이 알려줘요:
-
-> GitHub 없이도 배포할 수 있어요 — 코드가 있는 폴더에서 "이 폴더 배포해줘" 라고 말하면 그 폴더를 그대로 올려서 배포해요.
-
-규칙:
-
-- **먼저 권하지는 않아요.** GitHub 연동은 push 자동 배포·이력·협업이 따라오니
-  기본 안내는 그대로예요. 이 문장은 gate 에서 멈출 때 붙이는 **대안**이에요.
-- 실행은 `"<axhub 절대경로>" up --app "<slug>" --execute` 예요 (기본은 무엇이
-  올라갈지 보여주는 미리보기라 `--execute` 가 있어야 실제로 올라가요).
-  `axhub up` 은 CLI 0.29.0 이상에 있어요 — 없으면 `axhub update apply` 를
-  먼저 안내해요.
-- D1 safe-stop 모드에서는 실행하지 않고 수동 명령만 보여줘요 (mutation 이에요).
-- 올라가는 것은 `.gitignore` 를 존중한 현재 폴더예요. `.git/`·`node_modules/`·
-  `.env` 는 자동으로 빠져요 (`.env.example` 류는 남아요).
-
 ### 3h. Handoff context (콘솔 "Claude Code로 옮기기" — 백엔드 spec 174 계약)
 
 붙여넣은 프롬프트가 `axhub 앱 "{slug}" 의 로컬 개발환경 셋업` + `axhub onboarding 스킬로 진행` + `앱 slug = {slug}` 모양이면 핸드오프 모드예요 (계약 원문: 백엔드 레포 `specs/174-claude-code-handoff/contracts/prompt.md`). 핸드오프 모드는 기존 detect-first 루프를 그대로 돌아요 — CLI 설치·로그인·git/node·GitHub 연동 gap 은 기존 handler 가 먼저 닫고, **repo 단계에 도달했을 때만** 아래 분기가 기존 `no_manifest_empty` advisory 를 대체해요. 핸드오프 컨텍스트가 없는 일반 온보딩은 이 섹션을 전혀 타지 않아요.
@@ -146,7 +127,6 @@ repo 확보 분기 (한 call 에 한 명령 규약 유지):
 
 1. **조회.** `"<axhub 절대경로>" apps get "<slug>" --json` 으로 앱을 조회해 저장소 주소를 읽어요. slug 는 프롬프트가 준 값 그대로만 써요(다른 앱 추측·목록 재검색 금지).
    - 4xx(앱 없음·권한 없음)면 정확히 이렇게 안내하고 중단해요: `이 프롬프트가 가리키는 앱을 찾을 수 없어요 — 콘솔에서 다시 복사하세요`. 재시도·다른 slug 추측을 하지 않아요.
-   - **저장소가 없으면**(git 연동 없이 만들어졌거나 로컬 소스로만 배포해 온 앱) clone 할 것이 없어요. 이건 오류가 아니라 정상 상태예요 — 이렇게 안내하고 repo 확보 분기를 끝내요: `이 앱은 GitHub 없이 로컬 소스로 배포하고 있어요. 코드를 둘 폴더에서 "이 폴더 배포해줘" 라고 말하면 돼요`. 빈 폴더를 만들거나 bootstrap 을 시작하지 않아요.
 2. **경로 판정.** 현재 디렉터리 기준:
    - 비었거나 새 폴더면 → clone 해요 (D1 safe-stop 모드면 clone 도 mutation — 실행하지 않고 수동 명령 안내로 멈춰요).
    - 같은 저장소(origin 이 조회된 주소와 일치)가 이미 있으면 → clone 하지 않고 현재 상태(브랜치·변경 유무)를 한 줄로 보고한 뒤 다음 gap 으로 넘어가요. 재붙여넣기는 이 갈래로 수렴해 무해해요.
