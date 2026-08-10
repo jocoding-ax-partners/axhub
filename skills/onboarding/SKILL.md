@@ -10,6 +10,8 @@ examples:
     intent: "onboard axhub first-time setup"
   - utterance: "getting started"
     intent: "onboard axhub first-time setup"
+  - utterance: "axhub 앱 \"my-app\" 의 로컬 개발환경 셋업을 진행해 주세요. 이 작업은 axhub onboarding 스킬로 진행해요."
+    intent: "handoff local setup for an existing axhub app (console copy-paste)"
 allows-dependency-execution: true
 model: sonnet
 ---
@@ -18,7 +20,7 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-처음 axhub 를 쓰는 사람을 위한 단일 진입점이에요. 사용자는 `온보딩`, `처음인데 뭐부터`, `getting started` 처럼 말하면 되고, 이 스킬은 CLI/auth/runtime/GitHub 계정 연동/GitHub App/repo/deps/MCP 준비를 한 gap 씩 닫아요. 환경 진단만 원하면 doctor/diagnosis 가 맞고, 새 앱 생성을 명시하면 bootstrap 이 맞아요. onboarding 은 빈 폴더에서도 자동 bootstrap 을 시작하지 않고 Ready card 에서 `첫 앱 만들어줘` 를 다음 말로 안내해요.
+처음 axhub 를 쓰는 사람을 위한 단일 진입점이에요. 사용자는 `온보딩`, `처음인데 뭐부터`, `getting started` 처럼 말하면 되고, 이 스킬은 CLI/auth/runtime/GitHub 계정 연동/GitHub App/repo/deps/MCP 준비를 한 gap 씩 닫아요. 환경 진단만 원하면 doctor/diagnosis 가 맞고, 새 앱 생성을 명시하면 bootstrap 이 맞아요. onboarding 은 빈 폴더에서도 자동 bootstrap 을 시작하지 않고 Ready card 에서 `첫 앱 만들어줘` 를 다음 말로 안내해요. 콘솔의 "Claude Code로 옮기기" 버튼이 만든 프롬프트(앱 slug 동봉)를 붙여넣은 경우는 **핸드오프 모드**예요 — 아래 Handoff context 섹션이 repo 확보(조회·clone)까지 담당해요.
 
 ## Reference Loading
 
@@ -107,7 +109,7 @@ GitHub 표면은 **계정 연동**과 **App 설치** 두 단계예요. detect �
 | `github_link_missing` | GitHub 계정 연동 gate; load [`references/github-app.md`](references/github-app.md). |
 | `github_app_missing` | GitHub App install gate; load [`references/github-app.md`](references/github-app.md). |
 | `existing_repo_gap` | Existing repo app connection via `axhub apps git`; load gap-state reference and GitHub reference. |
-| `no_manifest_empty` | No bootstrap. Show advisory and go to Ready card with `첫 앱 만들어줘`. |
+| `no_manifest_empty` | No bootstrap. Show advisory and go to Ready card with `첫 앱 만들어줘`. **핸드오프 모드면 예외** — advisory 대신 아래 3h 의 repo 확보 분기를 수행해요. |
 | `deps_missing` | Lockfile-only install with `--ignore-scripts`; load [`references/dependency-install.md`](references/dependency-install.md). |
 | `deploy_unverified` | Verify only known deployment id and app scope with `axhub deploy verify "$DEPLOYMENT_ID" --app "$APP_ID_OR_SLUG"`. |
 | `doctor_gap` | Final read-only `axhub plugin-support preflight --json` and recovery phrase. |
@@ -116,6 +118,22 @@ GitHub 표면은 **계정 연동**과 **App 설치** 두 단계예요. detect �
 If a handler needs a prompt but D1 safe-stop mode is active, do not execute the mutation. Return `SAFE_STOP_NONINTERACTIVE` with the exact manual command or natural phrase.
 
 `cli_path_missing` 은 CLI 가 디스크에 있는데 현재 셸 PATH 에 없는 상태예요. 이미 열린 세션의 PATH 는 밖에서 못 고치므로(OS 설계), repair-path 뒤에 `command -v axhub` 재감지를 반복하지 말고(무한 루프 방지) **repair-path JSON 의 `bin_path` 절대경로로 남은 온보딩 명령을 그대로 이어가요** (예: `"<bin_path>" auth status --json`). detect 의 `cli_resolved_path` 도 같은 절대경로예요. 남은 gap 재감지가 필요하면 `"<bin_path>" plugin-support onboarding-detect --json` 으로 실행하고, 결과에 `cli_path_missing`/`cli_on_path:false` 가 다시 보여도 이미 처리된 것으로 간주하고 다음 gap 으로 넘어가요. `bin_path` 가 없는 구 CLI 면 기존대로 `READY_WITH_USER_ACTION` 으로 "PATH 준비됐어요. 새 터미널을 열고 거기서 Claude 를 실행해 온보딩을 다시 불러 주세요" 라고 안내해요. 새 터미널·VS Code 앱 재시작 안내는 마무리 카드에 보조 문구로 한 번만 붙여요.
+
+### 3h. Handoff context (콘솔 "Claude Code로 옮기기" — 백엔드 spec 174 계약)
+
+붙여넣은 프롬프트가 `axhub 앱 "{slug}" 의 로컬 개발환경 셋업` + `axhub onboarding 스킬로 진행` + `앱 slug = {slug}` 모양이면 핸드오프 모드예요 (계약 원문: 백엔드 레포 `specs/174-claude-code-handoff/contracts/prompt.md`). 핸드오프 모드는 기존 detect-first 루프를 그대로 돌아요 — CLI 설치·로그인·git/node·GitHub 연동 gap 은 기존 handler 가 먼저 닫고, **repo 단계에 도달했을 때만** 아래 분기가 기존 `no_manifest_empty` advisory 를 대체해요. 핸드오프 컨텍스트가 없는 일반 온보딩은 이 섹션을 전혀 타지 않아요.
+
+repo 확보 분기 (한 call 에 한 명령 규약 유지):
+
+1. **조회.** `"<axhub 절대경로>" apps get "<slug>" --json` 으로 앱을 조회해 저장소 주소를 읽어요. slug 는 프롬프트가 준 값 그대로만 써요(다른 앱 추측·목록 재검색 금지).
+   - 4xx(앱 없음·권한 없음)면 정확히 이렇게 안내하고 중단해요: `이 프롬프트가 가리키는 앱을 찾을 수 없어요 — 콘솔에서 다시 복사하세요`. 재시도·다른 slug 추측을 하지 않아요.
+2. **경로 판정.** 현재 디렉터리 기준:
+   - 비었거나 새 폴더면 → clone 해요 (D1 safe-stop 모드면 clone 도 mutation — 실행하지 않고 수동 명령 안내로 멈춰요).
+   - 같은 저장소(origin 이 조회된 주소와 일치)가 이미 있으면 → clone 하지 않고 현재 상태(브랜치·변경 유무)를 한 줄로 보고한 뒤 다음 gap 으로 넘어가요. 재붙여넣기는 이 갈래로 수렴해 무해해요.
+   - 다른 remote 의 repo 이거나 무관한 파일이 있으면 → 아무것도 만들지 않고 중단한 뒤 `./<slug>` 같은 다른 경로에서 다시 시도하라고 제안해요.
+3. **clone 후** 재감지하면 detect 가 manifest·deps 를 새로 보고, 나머지는 기존 루프 그대로예요(의존성 설치는 기존 Dependency safety 규칙 6 그대로 — lockfile-only·`--ignore-scripts`).
+
+이 분기는 기존 앱의 저장소를 받아오는 것이라 Core Contract 4(No automatic bootstrap — 앱 신규 생성 금지)와 충돌하지 않아요. 어떤 갈래에서도 기존 파일을 삭제·덮어쓰기·`reset`·`stash` 하지 않아요.
 
 ### 4. Telemetry opt-in, MCP and Ready card
 
@@ -155,6 +173,8 @@ Finish with one honest card:
 - NEVER claim axhub MCP is connected after add only; require `claude mcp get axhub` connected status.
 - NEVER `claude mcp add` 를 실행한 그 세션에서 `/mcp` OAuth 완료나 `mcp__axhub__*` 도구 활성화를 안내하지 말아요 — marker 를 쓰고 Restart Handoff Card 로 종료해요.
 - NEVER `VIBE_READY` 출력 후 marker(`~/.axhub/cache/.onboarding-mcp-restart`)를 남기지 말아요.
+- NEVER 핸드오프 repo 확보에서 기존 파일을 삭제·덮어쓰기·`reset`·`stash` 하지 말아요; 같은 origin 이면 상태 보고, 무관한 내용이면 중단+다른 경로 제안이 전부예요.
+- NEVER 핸드오프 컨텍스트(프롬프트의 slug) 없이 repo 확보 분기(3h)를 실행하지 말아요 — 일반 온보딩의 `no_manifest_empty` 는 기존 advisory 그대로예요.
 
 ## Additional Resources
 
