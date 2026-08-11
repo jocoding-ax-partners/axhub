@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.19.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.19.2...v1.19.3) (2026-08-11)
+
+GitHub 차단 폴백이 공개 템플릿을 받아 배포할 때 자리표시자(`{{API_BASE}}` 등 6개)를 실값으로 바꾸지 않아, 화면은 뜨는데 로그인·데이터 연동만 조용히 안 되는 앱이 나올 수 있었어요. 정상 앱 생성은 서버가 저장소에 올리기 전에 바꿔 주지만 이 갈래는 그 단계가 없었거든요. 이제 폴백 절차에 치환 단계가 들어가서 받은 템플릿 그대로가 아니라 내 앱 값으로 채워진 코드가 올라가요.
+
+
+### Fixed
+
+* **bootstrap:** 폴백 템플릿의 placeholder 를 치환하고 배포 ([#445](https://github.com/jocoding-ax-partners/axhub/issues/445)) ([88dfac8](https://github.com/jocoding-ax-partners/axhub/commit/88dfac8e18f02ea64639ce939b8f2d01039ece0d))
+
 ## [1.19.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.19.1...v1.19.2) (2026-08-11)
 
 GitHub 이 막혔을 때 로컬 소스로 배포하는 갈래가 실사용에서 안 걸렸어요. 두 가지가 겹쳤는데 둘 다 안내를 참고 문서로 뺀 탓이에요 — 실패한 그 자리에서 읽는 문장들은 여전히 GitHub 을 고치라고만 말했고(그래서 조직 소유자를 바꾸거나 개인 계정으로 만들고 나중에 옮기라는 제안이 나와요), 정작 절차가 담긴 참고 문서는 작업 폴더 밖이라 읽을 때 권한 창이 떠서 조용히 건너뛰어졌어요. 이제 막히는 지점마다 로컬 소스 배포로 가라고 적혀 있고, 절차도 참고 문서 없이 그 자리에서 끝나요. 배포 스킬의 업로드 경로도 같은 이유로 본문으로 옮겼어요.
