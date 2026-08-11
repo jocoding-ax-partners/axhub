@@ -99,7 +99,7 @@ git fetch origin "$BRANCH" >/dev/null 2>&1
 git merge-base --is-ancestor "$COMMIT_SHA" "origin/$BRANCH"
 ```
 
-If push or containment fails, stop before mutation. Judge push success by `PUSH_EXIT`, not by stderr text; harmless hook warnings or "no config" messages do not make a zero-exit push fail. Raw git output stays out of chat. Headless safe default is cancel; never run `git init` automatically in subprocess mode. Never run `axhub deploy create --execute` for a local-only commit because the backend resolves commits from the connected GitHub repo.
+If push or containment fails, stop before mutation — unless GitHub itself is what failed, which routes to "GitHub blocked" below instead of ending here. Judge push success by `PUSH_EXIT`, not by stderr text; harmless hook warnings or "no config" messages do not make a zero-exit push fail. Raw git output stays out of chat. Headless safe default is cancel; never run `git init` automatically in subprocess mode. Never run `axhub deploy create --execute` for a local-only commit because the backend resolves commits from the connected GitHub repo.
 
 ## In-flight and status-first
 
@@ -164,6 +164,27 @@ AXHUB_EXIT=$?
 ```
 
 On exit 64 with `validation.deployment_in_progress`, do not retry. Refresh in-flight once and verify that id if available; otherwise tell the user another deploy is in progress and stop. On exit 0, bind `DEPLOY_ID` from stdout. If no id exists, do not claim success; tell the user the start was seen but no result id was received.
+
+## GitHub blocked — local source upload
+
+Reached only from Git readiness, when the push or containment check failed because of GitHub itself: no connected repo, permission denied, 404 on a private repo, org policy, expired or refused device flow. The source becomes the local folder instead of a repo commit (backend spec 184). Everything after create is unchanged — `axhub up` prints the same create result, so `DEPLOY_ID` binding, the verify loop, and the diagnosis handoff stay identical.
+
+Two guards before taking this path:
+
+- The cause must be GitHub. Network, timeout, and 5xx get one retry of the same step first. Falling through on a transient error silently drops the repo and push auto-deploy the user already had.
+- The app must already exist and be resolved (`APP_ID` from `deploy-prep`). This path never creates apps or repos — that stays `bootstrap` and `import`.
+
+Say one line and continue, not a question: `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요.` The preview card and interactive approval are still required — same destructive mutation, different source. What the preview shows is the packed file count, size, and version hash.
+
+```bash
+axhub up --app "$APP_ID" --tenant "$AXHUB_TENANT" "${PROFILE_FLAG[@]}" --execute --field-expr '.id // .deployment_id // empty' >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
+```
+
+Drop `--execute` for the dry-run decision; `axhub up` previews by default. Always pass `--app` explicitly. `axhub up` needs CLI 0.29.0+ — on unknown-command exit, route to `update` and stop rather than falling back to `deploy create`.
+
+What goes up is the current folder with `.gitignore` honored, so `.git/`, `node_modules/`, and `.env` stay out. No commit is sent, which is why a local-only commit is fine here and only here. A connected repo is not touched or disconnected: the source is chosen per deployment, not per app.
+
+Tell the user after the result, never before: this deployment did not come from the repo, so push auto-deploy and the version history do not cover it, and the next normal deploy goes back to the repo path once GitHub works.
 
 ## Verify loop and diagnosis
 

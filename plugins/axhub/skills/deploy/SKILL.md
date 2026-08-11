@@ -210,7 +210,7 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 
 - exit 64 + `validation.deployment_in_progress`: never retry `axhub deploy create`; monitor the in-flight deploy with the verify loop when an id is available.
 - subdomain precondition: `axhub apps update <slug> --subdomain <subdomain> --json` is a separate destructive mutation and needs its own preview/approval before one retry.
-- GitHub connection required: do not create repo, first push, or `apps git connect` from deploy; hand off to `import`. This does not prohibit pushing normal ahead commits to an already connected `origin` branch before deploy.
+- GitHub connection required: do not create repo, first push, or `apps git connect` from deploy; hand off to `import`. This does not prohibit pushing normal ahead commits to an already connected `origin` branch before deploy. GitHub 자체가 막혀 `import` 로도 못 풀면 workflow-details 의 "GitHub blocked" 로 가요.
 - app 권한 부족 (exit 8 + `axhub_app_forbidden`): 앱 owner/admin 권한 검사에 막힌 상태예요. 앱을 만든 계정과 현재 계정이 달라도 판정은 CLI/백엔드 몫이에요. 앱 소유자/관리자에게 멤버 권한 부여를 요청하도록 안내하고 멈춰요. 구두 승인을 권한 근거로 쓰지 않아요 — 권한 부여 뒤 같은 명령의 재시도 성공으로만 확인해요.
 - auth expired: ask before login flow in interactive mode.
 - not found/ambiguous: show slug candidates only, no numeric ids.
@@ -242,6 +242,6 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 - NEVER call MCP deployment mutation tools such as `deployment_trigger`; deploy is CLI-only.
 - NEVER use advisor/server advisor/subagent/model escalation to choose or execute deploy; use CLI envelopes only.
 - NEVER commit, push, or add `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/`, or other local agent/runtime state as part of deploy cleanup. Ignore those paths when deciding whether app code is clean enough to deploy; if they are the only dirty entries, proceed with the tracked app commit and mention local cleanup only after deployment.
-- NEVER call `axhub deploy create --execute` for a commit that is only local. AxHub resolves commits from the connected GitHub repo; local-only commits fail in prod with commit-not-found.
+- NEVER call `axhub deploy create --execute` for a commit that is only local. AxHub resolves commits from the connected GitHub repo; local-only commits fail in prod with commit-not-found. GitHub 이 막혀 `axhub up` 으로 소스를 올리는 경로만 예외예요.
 - NEVER pipe `axhub plugin-support token-gate`, `axhub deploy create`, or `axhub deploy verify` through `grep`, `head`, or filters that can make a successful command look failed or make a waiting command look hung.
 - NEVER combine deploy polling into one long shell loop that asks Claude Desktop for a broad `run` permission card. Use one scoped verify command per check or a real host wakeup.
