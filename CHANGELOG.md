@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.19.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.18.0...v1.19.0) (2026-08-11)
+
+1.18.0 은 앱을 **만드는** 순간만 덮었어요 — 이미 있는 앱을 배포할 때는 deploy 가 정반대를 계약으로 갖고 있어서, 저장소가 없거나 권한이 막힌 앱은 "배포해줘" 에서 저장소 연결로 넘겨지고 GitHub 이 여전히 막혀 있으면 거기서 끝났어요. 이제 GitHub 이 원인일 때만 지금 폴더의 소스를 그대로 올려서 배포해요 (`axhub up`). 배포가 시작된 뒤의 확인·실패 진단은 하나도 달라지지 않고, 연결된 저장소도 건드리지 않아요 — 소스는 배포마다 정해지지 앱에 붙는 속성이 아니에요. 일시적인 네트워크 오류를 GitHub 차단으로 오해하지 않도록 한 번 재시도를 앞에 뒀어요.
+
+
+### Added
+
+* **deploy:** GitHub 이 막히면 로컬 소스로 배포 (백엔드 spec 184) ([#439](https://github.com/jocoding-ax-partners/axhub/issues/439)) ([7b5ef99](https://github.com/jocoding-ax-partners/axhub/commit/7b5ef99ccc23b793350de476ec3b1207a8516307))
+
 ## [1.18.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.17.0...v1.18.0) (2026-08-11)
 
 앱을 만들다 GitHub 에서 막혀도 빈손으로 끝나지 않아요 — 계정이 연동되지 않든, 조직 권한에 저장소 생성이 거부되든, 만들어진 저장소를 받아올 권한이 없든, bootstrap 이 묻지 않고 로컬 소스를 그대로 올려서 배포해요 (`axhub up`, CLI 0.29.0+ · 백엔드 spec 184). 올릴 코드가 없으면 공개 템플릿 저장소에서 같은 템플릿을 받아 쓰고, 앱이 이미 만들어졌는지 먼저 확인해 중복 생성을 막아요. 저장소와 push 자동 배포가 빠진다는 점은 배포가 끝난 뒤에 알려줘요.
