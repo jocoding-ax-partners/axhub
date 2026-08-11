@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.20.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.19.3...v1.20.0) (2026-08-11)
+
+9번째 스킬 scaffold 가 생겼어요 — 템플릿으로 시작하되 **저장소는 사용자 계정/조직 소유**로 만들어요. 기존 앱 생성(bootstrap)은 axhub 이 저장소를 만들어 줘서 조직에서는 주인 권한이 자동으로 안 붙는 경우가 있었는데, 이 스킬은 연동한 본인 계정으로 만들어 생성자가 곧 주인이에요. 흐름은 템플릿 내려받기 → 자리표시자 치환 → 저장소 생성+push(`axhub github repo create`, CLI 0.30.0+) → 앱 연결·첫 배포 인계까지이고, 저장소가 있으니 push 자동 배포도 그대로 살아나요. 릴리스 전 실제 환경에서 전 구간(템플릿→생성→push→배포→push 자동 배포)을 완주해 확인했어요.
+
+
+### Added
+
+* **scaffold:** 신규 스킬 — 템플릿으로 시작, 저장소는 사용자 소유 ([#447](https://github.com/jocoding-ax-partners/axhub/issues/447)) ([46bc991](https://github.com/jocoding-ax-partners/axhub/commit/46bc991b7821669c3bde049bda55daa2acac9d4b))
+
 ## [1.19.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.19.2...v1.19.3) (2026-08-11)
 
 GitHub 차단 폴백이 공개 템플릿을 받아 배포할 때 자리표시자(`{{API_BASE}}` 등 6개)를 실값으로 바꾸지 않아, 화면은 뜨는데 로그인·데이터 연동만 조용히 안 되는 앱이 나올 수 있었어요. 정상 앱 생성은 서버가 저장소에 올리기 전에 바꿔 주지만 이 갈래는 그 단계가 없었거든요. 이제 폴백 절차에 치환 단계가 들어가서 받은 템플릿 그대로가 아니라 내 앱 값으로 채워진 코드가 올라가요.
