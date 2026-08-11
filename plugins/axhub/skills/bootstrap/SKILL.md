@@ -23,7 +23,7 @@ model: sonnet
 
 사용자 발화에 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`, `Express`, `Fastify`, `Nest`, `FastAPI`, `Flask`, `Django`, `Rails`, `Go 서버`, `Dockerfile` 처럼 기존 소스가 있음을 뜻하는 단서와 axhub 배포 의도가 함께 있으면 bootstrap 을 시작하지 않아요. CLI guard, preflight, 템플릿 목록 확인을 실행하기 전에 즉시 import 경계로 양보하고, chat 본문에서 `/axhub:bootstrap` 또는 bootstrap 선택 이유를 설명하지 않아요.
 
-creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 항상 실행해요.
+creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지. **예외는 12단계 하나** (GitHub 차단 시 로컬 소스 배포). 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 항상 실행해요.
 
 ## Reference Loading Policy
 
@@ -195,6 +195,9 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 
 실행 때 `<target>`/`<repo>` 은 확인된 literal. target 채운 뒤 추가 `rtk ls`, `ls`, `find`, `cat` 확인은 하지 않아요.
 
+`fetch` 가 권한으로 실패하면(404 / permission denied) 저장소는 있는데 이 계정이
+못 받는 상태예요 — 앱을 새로 만들지 말고 12단계로 가요.
+
 성공하면 추가 파일 읽기 없이 `axhub deploy --explain --json` check. 밖 reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고, 확보한 repo/app/deployment 값과 CLI 명령으로만 마무리해요.
 
 ### 11. Result
@@ -203,10 +206,18 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 
 공개·누구나·친구에게 보여주기까지 원했으면 `axhub publish --app "$APP_SLUG" --visibility public --execute --json` 으로 공개 신청하고 `review_status=pending` 또는 review request id 를 알려줘요. publish dry-run 을 먼저 호출하지 않고, chat 에 `Dry-run 기본값` 같은 내부 CLI dry-run semantics 를 설명하지 않아요. 승인 전 공개 확대를 `axhub apps update --visibility public` 로 시도하지 않아요.
 
+### 12. GitHub 이 막혔을 때 — 로컬 소스로 배포
+
+bootstrap 어느 지점이든 GitHub 때문에(계정·App·저장소·권한) 더 못 나가면 빈손으로
+돌려보내지 않아요. 일시적 실패는 한 번만 재시도하고, 그래도 막히면
+[`references/github-blocked-local-deploy.md`](references/github-blocked-local-deploy.md)
+를 읽고 그대로 따라요 — 묻지 않고 코드를 확보해 배포까지 이어가요.
+
 ## NEVER
 
 - NEVER GitHub App 미설치 상태에서 bootstrap dry-run/execute.
-- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회.
+- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회. **단 12단계(GitHub 차단)의 세 조건을 전부 충족한 경우만 예외**예요 — 그때도 `apps create` + `axhub up` 두 명령만 쓰고 `deploy create` 는 쓰지 않아요.
+- NEVER 12단계에서 "GitHub 을 고칠까요?" 를 묻지 않아요 — 막힌 시점의 그 질문이 사용자를 멈춰 세우는 병목이에요. 알리고 진행해요.
 - NEVER remote `templates.json` / 폐기된 fetch-template 사용.
 - NEVER subprocess/headless 에서 template/app name 임의 선택.
 - NEVER `--execute` 를 `--dry-run` 미리보기와 사용자 확인 없이 호출.

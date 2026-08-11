@@ -26,8 +26,12 @@ describe("bootstrap desktop UX contract", () => {
     // linked-account-first 서사(6단계 "인증 단계 없음" + 9단계 device flow fallback 전용)로
     // 23_000 → 23_500 상향 — 연동을 마친 사용자에겐 이게 fresh path 의 기본 서사이고,
     // reference 로 빼면 "정상 fresh path 에서는 reference 파일을 읽지 않아요" 규칙 때문에 도달하지 않아요.
+    // GitHub 차단 시 로컬 소스 배포(12단계) 트리거로 23_500 → 24_500 상향 —
+    // 절차·명령·NEVER 는 전부 references/github-blocked-local-deploy.md 로 뺐고
+    // 본문에는 "언제 그 파일을 여는가" 만 남겼어요. 이 트리거까지 reference 로
+    // 빼면 분기 자체가 도달하지 않아요.
     // (plugin:budget 의 per-skill 35k 는 별도 gate)
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(23_500);
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(24_500);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");

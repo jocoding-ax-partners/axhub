@@ -104,8 +104,8 @@ GitHub 표면은 **계정 연동**과 **App 설치** 두 단계예요. detect �
 | `git_missing` | git install approval; load install reference. |
 | `node_missing` | node install approval; load install reference. |
 | `node_mismatch` | nvm/package-manager version correction approval; load install reference. |
-| `github_link_missing` | GitHub 계정 연동 gate; load [`references/github-app.md`](references/github-app.md). |
-| `github_app_missing` | GitHub App install gate; load [`references/github-app.md`](references/github-app.md). |
+| `github_link_missing` | GitHub 계정 연동 gate; load [`references/github-app.md`](references/github-app.md). 사용자가 지금은 안 하겠다고 하면 아래 §GitHub 없이 배포하기 를 한 줄로 같이 알려줘요. |
+| `github_app_missing` | GitHub App install gate; load [`references/github-app.md`](references/github-app.md). 사용자가 지금은 안 하겠다고 하면 아래 §GitHub 없이 배포하기 를 한 줄로 같이 알려줘요. |
 | `existing_repo_gap` | Existing repo app connection via `axhub apps git`; load gap-state reference and GitHub reference. |
 | `no_manifest_empty` | No bootstrap. Show advisory and go to Ready card with `첫 앱 만들어줘`. |
 | `deps_missing` | Lockfile-only install with `--ignore-scripts`; load [`references/dependency-install.md`](references/dependency-install.md). |
@@ -116,6 +116,22 @@ GitHub 표면은 **계정 연동**과 **App 설치** 두 단계예요. detect �
 If a handler needs a prompt but D1 safe-stop mode is active, do not execute the mutation. Return `SAFE_STOP_NONINTERACTIVE` with the exact manual command or natural phrase.
 
 `cli_path_missing` 은 CLI 가 디스크에 있는데 현재 셸 PATH 에 없는 상태예요. 이미 열린 세션의 PATH 는 밖에서 못 고치므로(OS 설계), repair-path 뒤에 `command -v axhub` 재감지를 반복하지 말고(무한 루프 방지) **repair-path JSON 의 `bin_path` 절대경로로 남은 온보딩 명령을 그대로 이어가요** (예: `"<bin_path>" auth status --json`). detect 의 `cli_resolved_path` 도 같은 절대경로예요. 남은 gap 재감지가 필요하면 `"<bin_path>" plugin-support onboarding-detect --json` 으로 실행하고, 결과에 `cli_path_missing`/`cli_on_path:false` 가 다시 보여도 이미 처리된 것으로 간주하고 다음 gap 으로 넘어가요. `bin_path` 가 없는 구 CLI 면 기존대로 `READY_WITH_USER_ACTION` 으로 "PATH 준비됐어요. 새 터미널을 열고 거기서 Claude 를 실행해 온보딩을 다시 불러 주세요" 라고 안내해요. 새 터미널·VS Code 앱 재시작 안내는 마무리 카드에 보조 문구로 한 번만 붙여요.
+
+### 3g. GitHub 없이 배포하기 (백엔드 spec 184)
+
+GitHub 연동은 **선택**이에요. 계정 연동이나 App 설치 gate 에서 사용자가
+망설이거나 지금은 안 하겠다고 하면, 막다른 길로 만들지 말고 다른 길을 한 줄로
+같이 알려줘요:
+
+> GitHub 없이도 배포할 수 있어요 — 코드가 있는 폴더에서 "이 폴더 배포해줘" 라고 말하면 그 폴더를 그대로 올려서 배포해요.
+
+규칙:
+
+- **기본 안내는 GitHub 연동이에요** — push 자동 배포·저장소·이력·협업이 따라오니까요. 이 문장은 gate 에서 **멈출 때** 붙이는 대안이지, 연동 대신 먼저 권하는 길이 아니에요.
+- 실제 실행은 앱을 만드는 일이라 bootstrap 스킬의 12단계가 담당해요 — onboarding 은 길이 있다는 것만 알려주고 넘겨요. 거기서는 사용자에게 되묻지 않고 바로 배포로 진행해요.
+- 이미 앱이 있으면 폴더에서 `"<axhub 절대경로>" up --app "<slug>" --execute` 예요 (기본은 미리보기라 `--execute` 가 있어야 실제로 올라가요). `axhub up` 은 CLI 0.29.0+ 에 있어요.
+- D1 safe-stop 모드에서는 실행하지 않고 수동 명령만 보여줘요 (mutation 이에요).
+- 올라가는 것은 `.gitignore` 를 존중한 현재 폴더예요. `.git/`·`node_modules/`·`.env` 는 자동으로 빠져요 (`.env.example` 류는 남아요).
 
 ### 4. Telemetry opt-in, MCP and Ready card
 
