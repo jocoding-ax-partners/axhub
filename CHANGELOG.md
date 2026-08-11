@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.19.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.19.1...v1.19.2) (2026-08-11)
+
+GitHub 이 막혔을 때 로컬 소스로 배포하는 갈래가 실사용에서 안 걸렸어요. 두 가지가 겹쳤는데 둘 다 안내를 참고 문서로 뺀 탓이에요 — 실패한 그 자리에서 읽는 문장들은 여전히 GitHub 을 고치라고만 말했고(그래서 조직 소유자를 바꾸거나 개인 계정으로 만들고 나중에 옮기라는 제안이 나와요), 정작 절차가 담긴 참고 문서는 작업 폴더 밖이라 읽을 때 권한 창이 떠서 조용히 건너뛰어졌어요. 이제 막히는 지점마다 로컬 소스 배포로 가라고 적혀 있고, 절차도 참고 문서 없이 그 자리에서 끝나요. 배포 스킬의 업로드 경로도 같은 이유로 본문으로 옮겼어요.
+
+
+### Fixed
+
+* **bootstrap,deploy:** GitHub 차단 폴백이 실제로 도달하게 ([#443](https://github.com/jocoding-ax-partners/axhub/issues/443)) ([35c37c9](https://github.com/jocoding-ax-partners/axhub/commit/35c37c9f7564f9b64ee4150d20decad89f870523))
+
 ## [1.19.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.19.0...v1.19.1) (2026-08-11)
 
 1.19.0 은 로컬 소스 배포를 푸시 실패 뒤에 달아 뒀는데, 저장소가 아예 없는 앱한테는 틀린 자리였어요 — 그건 실패가 아니라 정상 상태고, 저장소가 있는 앱은 푸시하면 웹훅이 알아서 배포하지만 저장소가 없는 앱은 받을 웹훅이 없어서 직접 배포하는 게 유일한 길이거든요. 이제 그런 앱은 푸시를 시도하지도 않고 처음부터 업로드로 배포하고, 저장소가 있는데 GitHub 이 막힌 경우에만 복구로 넘어가요. 그리고 GitHub 이 막혔다고 알리는 그 줄에서 다시 연결할 수 있다는 것도 같이 말해요 — 배포가 끝난 뒤에야 알려주면 그때까지는 저장소를 영영 못 쓰는 줄 알거든요.
