@@ -67,6 +67,8 @@ tests/.tmp-*/
 .serena/
 
 # 로컬 dev 도구 산출물 (플러그인 배포물 아님 — diet 후 추적 제외)
+bin/
+target/
 .graphify_python
 .specify/
 .agents/
