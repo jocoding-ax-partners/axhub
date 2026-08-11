@@ -1,6 +1,6 @@
 ---
 name: scaffold
-description: '템플릿으로 시작하되 저장소는 사용자 소유로 만들어요. Use when the user wants the repository under THEIR account/org — even if the sentence also says "새 앱 만들어줘/시작해줘", repository ownership words win over bootstrap: "내 계정에 레포 만들어서 시작", "내 계정에 레포 만들어서 새 앱", "회사 조직에 저장소 파고 새 앱", "템플릿 받아서 내 깃허브에 올려줘", "레포는 우리 org 소유로", "start from template in my org". Start directly with a Korean progress sentence; no preamble; no route/skill label. 저장소 소유 언급이 전혀 없으면 bootstrap 으로, 이미 코드가 있는 폴더는 import 로 양보해요. 흐름: 템플릿 내려받기 → placeholder 치환 → 사용자 계정/조직에 저장소 생성+push(axhub github repo create) → 여기서 멈추고 확인 → 동의하면 import 인계. push 뒤 앱 생성·배포로 자동으로 이어가지 않아요.'
+description: '템플릿으로 시작하되 저장소는 사용자 소유로 만들어요. Use when the user wants the repository under THEIR account/org — even if the sentence also says "새 앱 만들어줘/시작해줘", repository ownership words win over bootstrap: "내 계정에 레포 만들어서 시작", "내 계정에 레포 만들어서 새 앱", "회사 조직에 저장소 파고 새 앱", "템플릿 받아서 내 깃허브에 올려줘", "레포는 우리 org 소유로", "start from template in my org". Start directly with a Korean progress sentence; no preamble; no route/skill label. 저장소 소유 언급이 전혀 없으면 bootstrap 으로, 이미 코드가 있는 폴더는 import 로 양보해요. 흐름: 템플릿 내려받기 → placeholder 치환 → 사용자 계정/조직에 저장소 생성+push(axhub github repo create) → origin 등록 → 여기서 멈추고 확인 → 동의하면 import 인계. push 뒤 앱 생성·배포로 자동으로 이어가지 않아요.'
 examples:
   - utterance: "내 계정에 레포 만들어서 새 앱 시작해줘"
     intent: "scaffold a template app with a user-owned repository"
@@ -88,6 +88,16 @@ axhub github repo create --owner <owner> --name <slug> --push <target> --execute
 
 기본 private 이에요(공개를 원하면 `--public`). 토큰은 CLI 가 env 로만 다뤄서 채팅·히스토리에 안 남아요. device flow pending 으로 끝나면 URL·코드 두 줄을 보여주고 `--resume-last` 로 이어가요. `name already exists` 는 다른 이름을 물어요 — 기존 저장소에 덮어 push 하지 않아요.
 
+### 7.5. origin 등록 (push 성공 직후 필수)
+
+CLI 는 토큰이 `.git/config` 에 박히지 않게 원격 URL 을 인자로 직접 넘겨 push 해요 — 그래서 push 는 되지만 로컬에 named remote 가 남지 않아요. 이 등록을 빼먹으면 사용자의 **다음 `git push` 가 곧바로 `'origin' does not appear to be a git repository` 로 실패**하고, 저장소 연결 뒤 살아나는 push 자동 배포도 쓸 수 없어요.
+
+```bash
+git -C <target> remote add origin https://github.com/<owner>/<slug>.git
+```
+
+이 폴더는 6단계에서 방금 `git init` 한 상태라 `origin` 이 이미 있을 수 없어요 — 존재 확인 분기를 만들지 않아요. upstream 은 여기서 붙이지 않고, 사용자의 첫 push 때 `git push -u origin main` 으로 붙이면 돼요. 8단계 안내에 그 문장을 포함해요.
+
 ### 8. 여기서 한 번 멈춰요 (import 인계 확인)
 
 7단계까지가 이 스킬의 기본 완료선이에요. push 가 끝나면 **묻지 않고 이어가지 않아요** — 저장소 주소를 평문 절대 URL 로 보여주고 AskUserQuestion 한 번으로 확인해요. 사용자가 처음에 "배포까지 해줘" 라고 말했더라도 여기서 한 번은 물어요. 저장소 생성과 앱 배포는 되돌리는 비용이 달라서, 한 번의 승인으로 묶지 않아요.
@@ -106,7 +116,7 @@ axhub github repo create --owner <owner> --name <slug> --push <target> --execute
 }
 ```
 
-멈추기를 고르면 저장소 URL·로컬 폴더 경로·재개 문장(`이 폴더 axhub에 올려`)만 남기고 끝내요. headless 에서는 묻지 않고 같은 자리에서 멈춰요.
+멈추기를 고르면 저장소 URL·로컬 폴더 경로·재개 문장(`이 폴더 axhub에 올려`)만 남기고 끝내요. 이때 다음 코드 변경을 올릴 때 쓸 `git push -u origin main` 한 줄도 같이 알려줘요 (7.5 에서 등록한 origin 에 upstream 을 붙이는 첫 push 예요). headless 에서는 묻지 않고 같은 자리에서 멈춰요.
 
 이어가기를 고른 경우에만 `import` 스킬을 호출해 앱 생성·GitHub 연결·첫 배포를 맡겨요. 3단계에서 정한 slug·subdomain·tenant 를 그대로 넘겨요. 연결이 끝나면 push 자동 배포도 그대로 살아나요 — 이 흐름은 저장소가 있으므로 `axhub up` 을 쓰지 않아요.
 
@@ -118,4 +128,5 @@ axhub github repo create --owner <owner> --name <slug> --push <target> --execute
 - NEVER 토큰·인증 URL 을 제외한 device flow 진행 상황을 사용자에게 승인 완료 보고로 요구하지 않아요 — `--resume-last` 재개 계약을 따라요.
 - NEVER `--execute` 를 미리보기·승인 없이 붙이지 않아요.
 - NEVER push 직후 확인 없이 `import` 로 넘어가지 않아요 — 첫 발화에 "배포까지" 가 있어도 8단계 질문은 생략하지 않아요.
+- NEVER push 성공 뒤 `origin` 등록(7.5)을 건너뛰지 않아요 — CLI 가 URL 직접 push 라 remote 를 안 남겨서, 빼먹으면 사용자의 다음 `git push` 가 실패해요.
 - NEVER 연동 계정 목록에 없는 owner 로 진행하지 않아요 — App 미설치 조직은 생성이 되더라도 이후 연결(`VerifyInstallation`)이 404 로 죽어요.
