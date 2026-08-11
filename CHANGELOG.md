@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.18.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.17.0...v1.18.0) (2026-08-11)
+
+앱을 만들다 GitHub 에서 막혀도 빈손으로 끝나지 않아요 — 계정이 연동되지 않든, 조직 권한에 저장소 생성이 거부되든, 만들어진 저장소를 받아올 권한이 없든, bootstrap 이 묻지 않고 로컬 소스를 그대로 올려서 배포해요 (`axhub up`, CLI 0.29.0+ · 백엔드 spec 184). 올릴 코드가 없으면 공개 템플릿 저장소에서 같은 템플릿을 받아 쓰고, 앱이 이미 만들어졌는지 먼저 확인해 중복 생성을 막아요. 저장소와 push 자동 배포가 빠진다는 점은 배포가 끝난 뒤에 알려줘요.
+
+
+### Added
+
+* **bootstrap:** GitHub 이 막히면 로컬 소스로 배포 (백엔드 spec 184) ([#437](https://github.com/jocoding-ax-partners/axhub/issues/437)) ([4b18de7](https://github.com/jocoding-ax-partners/axhub/commit/4b18de7dc12f4e9598c576a7417e4d4a6906a8a8))
+
 ## [1.17.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.16.2...v1.17.0) (2026-08-06)
 
 온보딩이 GitHub 계정 연동(`axhub github link`)을 1급 사전 단계로 안내해요 — 셋업에서 계정을 미리 연결해 두면 앱 만들기에서 device flow 인증 단계가 통째로 사라지고, bootstrap 의 device flow 안무는 미연동 사용자를 위한 fallback 으로만 남아요 (CLI v0.27.0 의 linked-first 동작과 짝이에요). 그리고 axhub CLI 가 문서화된 계약 밖으로 실패하면(panic·비정상 `--json` 출력·재현되는 timeout 등) 에이전트가 실패 직후 `axhub feedback` 1회로 조용히 자동 리포트하는 AP-19 계약을 추가했어요 — 예상된 거절(미로그인·사용법·정상 가드 거절)은 리포트하지 않고, 리포트 자체가 실패하면 재시도나 언급 없이 버려요. development 스킬에는 인바운드 웹훅 받기(relay) 라우팅 안내가 얇게 더해졌어요.
