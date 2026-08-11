@@ -215,8 +215,9 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 2. 앱이 이미 있는지 확인해요 — saga 가 조금이라도 돌았으면 앱만 만들어졌을 수 있어요. `axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json` 또는 `axhub apps get <app-slug> --tenant <tenant> --json`. 있으면 3 을 건너뛰고 slug 는 확인된 값을 써요.
 3. 앱이 없으면 주소 확인(7단계) 후 만들어요 — `axhub apps create --tenant <tenant> --name <이름> --slug <slug> --subdomain <slug> --deploy-method docker --resource-tier XS`
 4. 코드가 폴더에 없으면 공개 템플릿에서 받아요(인증 불필요) — `git clone --depth 1 --branch main https://github.com/jocoding-ax-partners/axhub-template.git <target>/.axhub-template` → `cp -R <target>/.axhub-template/<template-id>/. <target>/` → `rm -rf <target>/.axhub-template`. 지우는 경로는 정확히 그 임시 폴더 하나뿐이에요.
-5. 소스 폴더 안에서 배포 — `axhub up --app <slug> --execute` (CLI 0.29.0+, `--execute` 없으면 미리보기만)
-6. 결과 확인은 11단계 그대로. clone 단계는 건너뛴 상태예요.
+5. **placeholder 치환 (템플릿을 받았을 때 필수).** 정상 bootstrap 은 서버가 push 전에 치환하지만 이 갈래는 그 단계가 없어요. 건너뛰면 앱이 `'{{API_BASE}}'` 라는 글자 그대로 API 를 불러 **로그인·데이터 연동만 조용히 죽어요**(화면은 떠요). `grep -rl '{{' <target>` 로 찾은 파일들의 6개 토큰을 전부 바꿔요 — `{{APP_SLUG}}`→slug · `{{APP_SUBDOMAIN}}`→subdomain · `{{APP_NAME}}`→앱 이름 · `{{TENANT}}`→테넌트 slug · `{{API_BASE}}`→CLI 가 쓰는 API 주소(prod `https://axhub.ai`) · `{{APP_ORIGIN}}`→`apps get` 의 `access_url`. `axhub.yaml` 의 `name:` 도 앱 slug 로 바꿔요.
+6. 소스 폴더 안에서 배포 — `axhub up --app <slug> --execute` (CLI 0.29.0+, `--execute` 없으면 미리보기만)
+7. 결과 확인은 11단계 그대로. clone 단계는 건너뛴 상태예요.
 
 상세·주의점은 [`references/github-blocked-local-deploy.md`](references/github-blocked-local-deploy.md)
 에 있어요(compose 는 루트 `Dockerfile` 이 같이 있으면 docker 로 해석되는 함정 포함).
