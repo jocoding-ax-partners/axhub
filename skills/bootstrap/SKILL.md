@@ -259,9 +259,6 @@ rm -rf <target>/.axhub-template
    복사한 코드에는 템플릿 저장소의 git 이력이 따라오지 않아요(하위 폴더만
    복사하므로) — 사용자의 코드로 새로 시작하는 게 맞아요.
 
-   실측(2026-08-11): 이 세 명령으로 `vite-react-axhub` 를 받아 `axhub up` 으로
-   prod 배포까지 완주했어요. clone 에 GitHub 인증이 전혀 필요 없었어요.
-
 3. **앱 종류 판정.** 템플릿의 `axhub.yaml` 의 `build.deploy_method` 를 그대로 써요 — 현재 세 템플릿은 모두 `docker` 예요. 사용자 자기 코드면 루트에 compose 파일만 있으면 `compose`, `Dockerfile` 이 있으면 `docker` 예요. **둘 다 루트에 있으면 `docker` 로 해석돼요** — compose 로 배포하려면 루트 `Dockerfile` 을 서비스 폴더(`web/Dockerfile` 등)로 옮기고 compose 의 `build:` 가 그 폴더를 가리켜야 해요. 이걸 어기면 배포가 build 단계에서 `compose 파일 파싱 실패` 로 죽어요.
 4. **앱 확보.**
    - **(B) 는 앱이 이미 있어요** — 4~5 를 건너뛰고 6(배포)으로 가요. slug 는 saga 결과의 값을 그대로 써요.
