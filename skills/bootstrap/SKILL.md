@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: 'Use this skill only in an empty folder to create a brand-new axhub template app. Strongly exclude existing/local-folder apps: never use for "기존 앱", "기존 Express 서버 앱", "이미 만든 앱", "작업 폴더는 /path", "이 폴더 axhub에 올려", "이 앱을 axhub에 올려", or any non-empty app source; use import instead. Positive triggers only when the user asks to create/start/init a new app: "새 앱 만들어줘", "앱 만들어줘", "초기화해줘", "Next.js 앱 만들어줘", "처음부터 앱 만들어줘", "진행 중이던 axhub 앱 만들기/배포 상태 이어서 확인". Do not explain the skill match, do not mention axhub:bootstrap in chat, and start the visible response with a Korean progress sentence.'
+description: 'Use this skill only in an empty folder to create a brand-new axhub template app. Strongly exclude existing/local-folder apps: never use for "기존 앱", "기존 Express 서버 앱", "이미 만든 앱", "작업 폴더는 /path", "이 폴더 axhub에 올려", "이 앱을 axhub에 올려", or any non-empty app source; use import instead. Also yield to scaffold whenever the user wants the repository under THEIR OWN account/org — "내 계정에 레포", "내 깃허브에", "우리/회사 조직(org)에 저장소" 처럼 저장소 소유를 지목하면 bootstrap 이 아니라 scaffold 예요 (bootstrap 은 axhub 이 저장소를 만들어 줘요). Positive triggers only when the user asks to create/start/init a new app: "새 앱 만들어줘", "앱 만들어줘", "초기화해줘", "Next.js 앱 만들어줘", "처음부터 앱 만들어줘", "진행 중이던 axhub 앱 만들기/배포 상태 이어서 확인". Do not explain the skill match, do not mention axhub:bootstrap in chat, and start the visible response with a Korean progress sentence.'
 allows-dependency-execution: true
 model: sonnet
 ---
@@ -23,7 +23,7 @@ model: sonnet
 
 사용자 발화에 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`, `Express`, `Fastify`, `Nest`, `FastAPI`, `Flask`, `Django`, `Rails`, `Go 서버`, `Dockerfile` 처럼 기존 소스가 있음을 뜻하는 단서와 axhub 배포 의도가 함께 있으면 bootstrap 을 시작하지 않아요. CLI guard, preflight, 템플릿 목록 확인을 실행하기 전에 즉시 import 경계로 양보하고, chat 본문에서 `/axhub:bootstrap` 또는 bootstrap 선택 이유를 설명하지 않아요.
 
-creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지. **예외는 12단계 하나** (GitHub 차단 시 로컬 소스 배포). 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 항상 실행해요.
+creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지. **예외는 12단계 하나** (GitHub 차단 시 로컬 소스 배포). 저장소를 **사용자 계정/조직 소유**로 원하는 요청은 이 스킬 소관이 아니에요 — scaffold 로 양보해요. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 항상 실행해요.
 
 ## Reference Loading Policy
 

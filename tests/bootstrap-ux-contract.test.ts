@@ -39,8 +39,13 @@ describe("bootstrap desktop UX contract", () => {
     // push 전에 치환하지만 폴백은 clone 그대로라, 빠뜨리면 앱이 '{{API_BASE}}'
     // 리터럴로 API 를 불러 로그인·데이터 연동만 조용히 죽어요. 실행 필수
     // 지시라 본문에 둬요.
-    // (plugin:budget 의 per-skill 35k · 총합 200k 는 별도 gate)
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(27_000);
+    // 27_000 → 27_500: scaffold 양보 라우팅 추가 — Desktop 실측에서 "내 계정에
+    // 레포 만들어서 새 앱" 이 bootstrap 으로 라우팅됐어요. bootstrap 의 배타
+    // 클레임("creation path 는 saga 하나뿐")이 소유 지목 문장까지 삼켜서,
+    // frontmatter 와 Scope 에 scaffold 양보를 명시해요. 라우팅은 본문에 있어야
+    // 작동해요.
+    // (plugin:budget 의 per-skill 35k · 총합 210k 는 별도 gate)
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(27_500);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");
