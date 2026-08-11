@@ -119,7 +119,7 @@ The `deploy-prep` envelope is authoritative for `profile`, `endpoint`, `app_id`,
 
 If this skill was invoked as a handoff from another axhub skill after code changes, do **not** reuse the original feature prompt as `--user-utterance`; it may contain display text such as "QA banner" that looks like an app candidate. Use a short deploy utterance like `현재 앱 배포해` and rely on the current folder's axhub.yaml binding. If the current folder has a valid axhub.yaml and the latest deploy phrase does not explicitly name another app, the bound app slug wins over arbitrary words in prior chat.
 
-If `bootstrap_plan` is present, `app_id` is missing, or branch/commit is empty, stop before preview. Existing non-empty app first-connect belongs to `import`; empty new app creation belongs to `bootstrap`.
+If `bootstrap_plan` is present, `app_id` is missing, or branch/commit is empty, stop before preview. Existing non-empty app first-connect belongs to `import`; empty new app creation belongs to `bootstrap`. 단 `github_connected` 가 false 면 저장소 없는 앱의 정상 상태라 이 정지가 안 걸려요 — workflow-details 의 업로드 레인으로 가요.
 
 ### Static branch
 
@@ -210,7 +210,7 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 
 - exit 64 + `validation.deployment_in_progress`: never retry `axhub deploy create`; monitor the in-flight deploy with the verify loop when an id is available.
 - subdomain precondition: `axhub apps update <slug> --subdomain <subdomain> --json` is a separate destructive mutation and needs its own preview/approval before one retry.
-- GitHub connection required: do not create repo, first push, or `apps git connect` from deploy; hand off to `import`. This does not prohibit pushing normal ahead commits to an already connected `origin` branch before deploy. GitHub 자체가 막혀 `import` 로도 못 풀면 workflow-details 의 "GitHub blocked" 로 가요.
+- GitHub connection required: do not create repo, first push, or `apps git connect` from deploy; hand off to `import`. GitHub 자체가 막혀 `import` 로도 못 풀면 workflow-details 의 업로드 레인으로 가요.
 - app 권한 부족 (exit 8 + `axhub_app_forbidden`): 앱 owner/admin 권한 검사에 막힌 상태예요. 앱을 만든 계정과 현재 계정이 달라도 판정은 CLI/백엔드 몫이에요. 앱 소유자/관리자에게 멤버 권한 부여를 요청하도록 안내하고 멈춰요. 구두 승인을 권한 근거로 쓰지 않아요 — 권한 부여 뒤 같은 명령의 재시도 성공으로만 확인해요.
 - auth expired: ask before login flow in interactive mode.
 - not found/ambiguous: show slug candidates only, no numeric ids.
