@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.20.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.20.0...v1.20.1) (2026-08-11)
+
+"내 계정에 레포 만들어서 새 앱 시작해줘" 처럼 저장소 소유를 지목한 요청이 scaffold 가 아니라 bootstrap 으로 흘러가는 걸 실사용에서 잡았어요. 앱 생성 요청을 bootstrap 이 전부 가져가는 문구 때문이라, 양쪽에 양보 규칙을 명시했어요 — 저장소를 내 계정/조직 소유로 원하면 scaffold, 소유 언급이 없으면 지금처럼 bootstrap 이에요.
+
+
+### Fixed
+
+* **scaffold,bootstrap:** 저장소 소유 지목 문장은 scaffold 로 라우팅 ([#449](https://github.com/jocoding-ax-partners/axhub/issues/449)) ([f8843cb](https://github.com/jocoding-ax-partners/axhub/commit/f8843cbc88004d53d19b80c0d99da21530483e02))
+
 ## [1.20.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.19.3...v1.20.0) (2026-08-11)
 
 9번째 스킬 scaffold 가 생겼어요 — 템플릿으로 시작하되 **저장소는 사용자 계정/조직 소유**로 만들어요. 기존 앱 생성(bootstrap)은 axhub 이 저장소를 만들어 줘서 조직에서는 주인 권한이 자동으로 안 붙는 경우가 있었는데, 이 스킬은 연동한 본인 계정으로 만들어 생성자가 곧 주인이에요. 흐름은 템플릿 내려받기 → 자리표시자 치환 → 저장소 생성+push(`axhub github repo create`, CLI 0.30.0+) → 앱 연결·첫 배포 인계까지이고, 저장소가 있으니 push 자동 배포도 그대로 살아나요. 릴리스 전 실제 환경에서 전 구간(템플릿→생성→push→배포→push 자동 배포)을 완주해 확인했어요.
