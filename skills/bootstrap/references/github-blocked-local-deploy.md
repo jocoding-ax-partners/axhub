@@ -12,7 +12,7 @@ bootstrap 은 저장소를 만드는 흐름이라 GitHub 이 필수예요(`--git
 생길 때 빈틈이 생겨요. 자주 보는 모양(이게 전부는 아니에요):
 
 - 6단계 gate: 설치 계정 0개, `github_relogin_required`, device flow 거부·만료·중단
-- 10단계 execute: 저장소 생성이 org 권한·정책으로 거부, 계정 미연결로 saga 미시작
+- 9단계 execute: 저장소 생성이 org 권한·정책으로 거부, 계정 미연결로 saga 미시작
 - 10단계 clone: `git fetch` 가 권한으로 실패(404 / permission denied). org 저장소는 우리 봇이 만들어 **주인에게 권한이 자동으로 안 붙는 경우**가 있어요
 
 ## 판정할 것은 둘뿐
