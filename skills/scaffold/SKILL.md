@@ -1,6 +1,6 @@
 ---
 name: scaffold
-description: '템플릿으로 시작하되 저장소는 사용자 소유로 만들어요. Use when the user wants the repository under THEIR account/org: "내 계정에 레포 만들어서 시작", "회사 조직에 저장소 파고 새 앱", "템플릿 받아서 내 깃허브에 올려줘", "레포는 우리 org 소유로", "start from template in my org". Start directly with a Korean progress sentence; no preamble; no route/skill label. 저장소를 axhub 이 만들어 주길 원하면(소유 언급 없음) bootstrap 으로, 이미 코드가 있는 폴더는 import 로 양보해요. 흐름: 템플릿 내려받기 → placeholder 치환 → 사용자 계정/조직에 저장소 생성+push(axhub github repo create) → import 인계.'
+description: '템플릿으로 시작하되 저장소는 사용자 소유로 만들어요. Use when the user wants the repository under THEIR account/org — even if the sentence also says "새 앱 만들어줘/시작해줘", repository ownership words win over bootstrap: "내 계정에 레포 만들어서 시작", "내 계정에 레포 만들어서 새 앱", "회사 조직에 저장소 파고 새 앱", "템플릿 받아서 내 깃허브에 올려줘", "레포는 우리 org 소유로", "start from template in my org". Start directly with a Korean progress sentence; no preamble; no route/skill label. 저장소 소유 언급이 전혀 없으면 bootstrap 으로, 이미 코드가 있는 폴더는 import 로 양보해요. 흐름: 템플릿 내려받기 → placeholder 치환 → 사용자 계정/조직에 저장소 생성+push(axhub github repo create) → import 인계.'
 examples:
   - utterance: "내 계정에 레포 만들어서 새 앱 시작해줘"
     intent: "scaffold a template app with a user-owned repository"
