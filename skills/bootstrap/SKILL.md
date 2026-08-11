@@ -23,7 +23,7 @@ model: sonnet
 
 사용자 발화에 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`, `Express`, `Fastify`, `Nest`, `FastAPI`, `Flask`, `Django`, `Rails`, `Go 서버`, `Dockerfile` 처럼 기존 소스가 있음을 뜻하는 단서와 axhub 배포 의도가 함께 있으면 bootstrap 을 시작하지 않아요. CLI guard, preflight, 템플릿 목록 확인을 실행하기 전에 즉시 import 경계로 양보하고, chat 본문에서 `/axhub:bootstrap` 또는 bootstrap 선택 이유를 설명하지 않아요.
 
-creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 항상 실행해요.
+creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지. **예외는 12단계 하나**: GitHub 이 막혀 saga 를 시작할 수 없고, 폴더에 배포할 코드가 이미 있고, 사용자가 그 갈래를 고른 경우에만 `apps create` + `axhub up` 으로 배포해요. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 항상 실행해요.
 
 ## Reference Loading Policy
 
@@ -203,10 +203,54 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 
 공개·누구나·친구에게 보여주기까지 원했으면 `axhub publish --app "$APP_SLUG" --visibility public --execute --json` 으로 공개 신청하고 `review_status=pending` 또는 review request id 를 알려줘요. publish dry-run 을 먼저 호출하지 않고, chat 에 `Dry-run 기본값` 같은 내부 CLI dry-run semantics 를 설명하지 않아요. 승인 전 공개 확대를 `axhub apps update --visibility public` 로 시도하지 않아요.
 
+### 12. GitHub 이 막혔을 때 — 로컬 소스로 배포 (백엔드 spec 184)
+
+bootstrap 은 저장소를 만드는 흐름이라 GitHub 이 필수예요(`--github-owner`).
+그런데 GitHub 쪽이 막혀 더 나아갈 수 없을 때, 사용자를 빈손으로 돌려보내는
+대신 **이미 손에 있는 코드를 그대로 배포하는** 갈래가 있어요.
+
+**진입 조건 — 넷 다 충족해야 해요.** 하나라도 아니면 이 갈래로 가지 않아요.
+
+1. GitHub 때문에 실제로 막혔어요: 6단계 gate 의 설치 계정 0개(설치를 안 하거나 못 함), `github_relogin_required` 재연동 실패·거부, device flow 만료·거부·중단 중 하나예요.
+2. GitHub 복구를 **먼저 제안했고** 사용자가 지금은 안 하겠다고 했어요.
+3. **현재 폴더에 배포할 코드가 이미 있어요** — 루트에 `Dockerfile` 이나 compose 파일이 있어요.
+4. D1 safe-stop 모드가 아니에요 (앱 생성·배포는 mutation 이에요).
+
+**빈 폴더면 이 갈래로 가지 않아요.** template 은 GitHub 저장소에서 오기 때문에
+GitHub 없이는 받을 수 없어요 — 그 경우는 GitHub 복구로 돌아가요.
+
+절차:
+
+1. **무엇을 포기하는지 먼저 말해요.** push 자동 배포·저장소·변경 이력·협업이 없어요. 대신 나중에 `axhub apps git connect` 로 저장소를 붙일 수 있고, 그때 앱을 다시 만들 필요는 없어요.
+2. **앱 종류 판정.** 루트에 compose 파일(`compose.yml`·`compose.yaml`·`docker-compose.yml`·`docker-compose.yaml`)이 있으면 `compose`, 루트에 `Dockerfile` 이 있으면 `docker` 예요. **둘 다 루트에 있으면 `docker` 로 해석돼요** — compose 로 배포하려면 루트 `Dockerfile` 을 서비스 폴더(`web/Dockerfile` 등)로 옮기고 compose 의 `build:` 가 그 폴더를 가리켜야 해요. 이걸 어기면 배포가 build 단계에서 `compose 파일 파싱 실패` 로 죽어요.
+3. **앱 주소 확인** — 7단계의 availability check 를 그대로 해요.
+4. **앱 생성** (tool 제목 `앱 만들기`):
+
+```bash
+axhub apps create --tenant test --name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --deploy-method docker --resource-tier XS
+```
+
+5. **배포** (tool 제목 `소스 올려서 배포`). 소스 폴더 안에서 실행해요:
+
+```bash
+axhub up --app bakery-preorder --execute
+```
+
+`--execute` 없이 실행하면 무엇이 올라갈지 미리보기만 나와요. 올라가는 것은
+`.gitignore` 를 존중한 현재 폴더이고 `.git/`·`node_modules/`·`.env` 는 자동으로
+빠져요(`.env.example` 류는 남아요). `axhub up` 은 CLI 0.29.0+ 에 있어요 — 없으면
+`axhub update apply --execute --yes --json` 을 먼저 안내해요.
+
+6. **결과 확인** — 11단계를 그대로 써요. clone 단계(10)는 저장소가 없으니 건너뛰어요.
+
+위 값들은 확정 literal 로 바꿔요. 이 갈래에서는 `apps bootstrap` 을 부르지 않아요.
+
 ## NEVER
 
 - NEVER GitHub App 미설치 상태에서 bootstrap dry-run/execute.
-- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회.
+- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회. **단 12단계(GitHub 차단)의 네 조건을 전부 충족하고 사용자가 그 갈래를 고른 경우만 예외**예요 — 그때도 `apps create` + `axhub up` 두 명령만 쓰고 `deploy create` 는 쓰지 않아요.
+- NEVER GitHub 이 정상인데 12단계 갈래로 빠지지 않아요 — 저장소·push 자동 배포를 조용히 포기시키는 셈이에요.
+- NEVER 빈 폴더에서 12단계 갈래 진입 — template 을 못 받아 배포할 것이 없어요.
 - NEVER remote `templates.json` / 폐기된 fetch-template 사용.
 - NEVER subprocess/headless 에서 template/app name 임의 선택.
 - NEVER `--execute` 를 `--dry-run` 미리보기와 사용자 확인 없이 호출.
