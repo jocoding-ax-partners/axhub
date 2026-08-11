@@ -127,7 +127,7 @@ Template 과 앱 이름이 사용자에게 확정되면 앱 주소 확인 직전
 axhub github accounts list --json
 ```
 
-이 조회가 정상 응답하면 계정이 이미 연동된 상태라 **인증 단계가 없어요** — 계정·설치는 CLI 가 정하니 device flow 를 미리 시작하지 않아요. 설치 계정 0개면 설치 확인 전 dry-run/execute 금지. 1개면 자동 owner, 2개 이상이면 고르게 해요. auth 에러는 `다시 로그인해줘`. 단 `github_relogin_required` 는 연동이 없거나 만료된 상태라 `axhub github link` 재연동으로만 풀려요(승인 후 gate 재실행) — 9단계 device flow 안무는 이 fallback 전용이에요.
+이 조회가 정상 응답하면 계정이 이미 연동된 상태라 **인증 단계가 없어요** — 계정·설치는 CLI 가 정하니 device flow 를 미리 시작하지 않아요. 설치 계정 0개면 설치 확인 전 dry-run/execute 금지. 1개면 자동 owner, 2개 이상이면 고르게 해요. auth 에러는 `다시 로그인해줘`. 단 `github_relogin_required` 는 연동이 없거나 만료된 상태라 `axhub github link` 재연동으로 풀려요(승인 후 gate 재실행) — 9단계 device flow 안무는 이 fallback 전용이에요. 재연동까지 막히거나 설치 계정이 계속 0개면 GitHub 복구를 더 제안하지 말고 **12단계**로 가요.
 
 ### 7. Availability Check
 
@@ -182,6 +182,7 @@ Claude Desktop 에서 `앱 생성 진행`/`앱 생성 재시도` tool 이 `백�
 2. 출력에서 `deployment_id` 를 확인할 수 있으면 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --app <app> --json`.
 3. 둘 다 없고 오류가 timeout/network 계열일 때만 같은 idempotency key 로 execute 를 한 번 재시도해요. 재시도는 최대 1회예요. 단 device flow 가 시작된 흔적(브라우저 device 화면, `device_code_issued`, 사용자가 코드 입력 화면을 봤다는 말)이 있으면 이 재시도를 쓰지 않아요 — AP-18 대로 `github link` fast path 로 코드를 먼저 보여주고 `--resume-last` 로만 이어가요.
 4. 나중에 상태 명령이 `succeeded` 를 반환하면 "앱 생성은 완료됐어요" 로 복구 보고하고, 새 앱을 다시 만들지 않아요.
+5. 실패 원인이 GitHub(권한·정책·미연동·device flow) 이면 여기서 멈추지 말고 **12단계**로 가요. org owner 를 바꾸거나 개인 계정으로 만들고 나중에 transfer 하라는 제안은 하지 않아요.
 
 ### 10. Clone And Manifest
 
@@ -193,7 +194,7 @@ Claude Desktop 에서 `앱 생성 진행`/`앱 생성 재시도` tool 이 `백�
 git -C <target> init -q -b main && (git -C <target> remote add origin https://github.com/<repo>.git 2>/dev/null || git -C <target> remote set-url origin https://github.com/<repo>.git) && git -C <target> fetch origin main --quiet --depth=1 && git -C <target> reset --hard FETCH_HEAD
 ```
 
-실행 때 `<target>`/`<repo>` 은 확인된 literal. target 채운 뒤 추가 `rtk ls`, `ls`, `find`, `cat` 확인은 하지 않아요.
+실행 때 `<target>`/`<repo>` 은 확인된 literal. target 채운 뒤 추가 `rtk ls`, `ls`, `find`, `cat` 확인은 하지 않아요. `fetch` 가 권한으로 실패하면(404 / permission denied) 앱은 이미 만들어진 상태이니 **12단계**로 가요 — 권한 실패를 "저장소가 없다" 로 보고하지 않아요.
 
 성공하면 추가 파일 읽기 없이 `axhub deploy --explain --json` check. 밖 reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고, 확보한 repo/app/deployment 값과 CLI 명령으로만 마무리해요.
 
@@ -205,10 +206,20 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 
 ### 12. GitHub 이 막혔을 때 — 로컬 소스로 배포
 
-어느 지점이든 GitHub 때문에 못 나가면 빈손으로 돌려보내지 않아요. 일시적 실패는
-한 번 재시도하고, 그래도 막히면
-[`references/github-blocked-local-deploy.md`](references/github-blocked-local-deploy.md)
-를 읽고 따라요.
+어느 지점이든 GitHub 때문에 못 나가면 빈손으로 돌려보내지 않아요. 일시적 실패
+(네트워크·타임아웃·5xx)는 그 단계를 한 번만 재시도하고, 그래도 막히면 **묻지 않고**
+아래를 그대로 해요. 이 절차는 본문만으로 완결돼요 — reference 는 plugin cache 라
+읽기 권한 프롬프트가 뜨므로, 읽히면 좋고 못 읽어도 여기서 끝냅니다.
+
+1. 한 줄 알리고 바로 진행: `GitHub 연결에 실패해서 우선 로컬 소스로 배포할게요. GitHub 는 이후 다시 연결할 수 있어요` (저장소는 있는데 권한만 없으면 `권한이 풀리면 평소대로 push 배포를 쓸 수 있어요`)
+2. 앱이 이미 있는지 확인해요 — saga 가 조금이라도 돌았으면 앱만 만들어졌을 수 있어요. `axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json` 또는 `axhub apps get <app-slug> --tenant <tenant> --json`. 있으면 3 을 건너뛰고 slug 는 확인된 값을 써요.
+3. 앱이 없으면 주소 확인(7단계) 후 만들어요 — `axhub apps create --tenant <tenant> --name <이름> --slug <slug> --subdomain <slug> --deploy-method docker --resource-tier XS`
+4. 코드가 폴더에 없으면 공개 템플릿에서 받아요(인증 불필요) — `git clone --depth 1 --branch main https://github.com/jocoding-ax-partners/axhub-template.git <target>/.axhub-template` → `cp -R <target>/.axhub-template/<template-id>/. <target>/` → `rm -rf <target>/.axhub-template`. 지우는 경로는 정확히 그 임시 폴더 하나뿐이에요.
+5. 소스 폴더 안에서 배포 — `axhub up --app <slug> --execute` (CLI 0.29.0+, `--execute` 없으면 미리보기만)
+6. 결과 확인은 11단계 그대로. clone 단계는 건너뛴 상태예요.
+
+상세·주의점은 [`references/github-blocked-local-deploy.md`](references/github-blocked-local-deploy.md)
+에 있어요(compose 는 루트 `Dockerfile` 이 같이 있으면 docker 로 해석되는 함정 포함).
 
 ## NEVER
 

@@ -119,7 +119,7 @@ The `deploy-prep` envelope is authoritative for `profile`, `endpoint`, `app_id`,
 
 If this skill was invoked as a handoff from another axhub skill after code changes, do **not** reuse the original feature prompt as `--user-utterance`; it may contain display text such as "QA banner" that looks like an app candidate. Use a short deploy utterance like `현재 앱 배포해` and rely on the current folder's axhub.yaml binding. If the current folder has a valid axhub.yaml and the latest deploy phrase does not explicitly name another app, the bound app slug wins over arbitrary words in prior chat.
 
-If `bootstrap_plan` is present, `app_id` is missing, or branch/commit is empty, stop before preview. Existing non-empty app first-connect belongs to `import`; empty new app creation belongs to `bootstrap`. 단 `github_connected` 가 false 면 저장소 없는 앱의 정상 상태라 이 정지가 안 걸려요 — workflow-details 의 업로드 레인으로 가요.
+If `bootstrap_plan` is present, `app_id` is missing, or branch/commit is empty, stop before preview. Existing non-empty app first-connect belongs to `import`; empty new app creation belongs to `bootstrap`. 단 `github_connected` 가 false 면 저장소 없는 앱의 정상 상태라 이 정지가 안 걸려요 — 아래 Upload lane 으로 가요.
 
 ### Static branch
 
@@ -141,6 +141,20 @@ Static success is `active_release_id` from activate plus public URL when availab
 ### Deployment-record branch
 
 Deployment-record apps continue through git readiness, in-flight/status-first handling, preview, token gate, fallback create, and verify. Load `references/workflow-details.md` for the branch mechanics.
+
+### Upload lane
+
+`github_connected` 가 false 면 저장소가 없는 앱이에요 — 실패가 아니라 정상 상태이고, 받을 push 웹훅이 없어서 명시적 배포가 유일한 출고 경로예요. Git readiness·push·containment·빈 커밋 정지를 건너뛰고 여기로 와요. 저장소가 있는데 GitHub 때문에 push 나 containment 가 막힌 경우도 같은 명령을 쓰되(네트워크·타임아웃·5xx 는 한 번 재시도 먼저) 그때만 복구로 알려요. 이 절차는 본문만으로 완결돼요.
+
+preview 카드와 승인은 그대로예요 — 소스만 다른 같은 mutation 이에요. 승인 뒤:
+
+```bash
+axhub up --app "$APP_ID" --tenant "$AXHUB_TENANT" "${PROFILE_FLAG[@]}" --execute --field-expr '.id // .deployment_id // empty' >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
+```
+
+`--execute` 를 빼면 미리보기예요. 결과 모양이 `deploy create` 와 같아서 `DEPLOY_ID` 바인딩·verify 루프·diagnosis 인계는 전부 그대로예요. CLI 0.29.0+ 필요 — unknown command 로 끝나면 `update` 로 보내고 멈춰요(`deploy create` 로 대체 금지). 올라가는 건 `.gitignore` 를 존중한 현재 폴더이고 커밋은 안 보내요. 연결된 저장소는 건드리거나 끊지 않아요.
+
+안내 문구는 갈라요 — 저장소 없음: `이 앱은 저장소 없이 소스를 올려서 배포해요` / GitHub 차단: `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요. GitHub 는 이후 다시 연결할 수 있어요`.
 
 Preview card is interactive only and must show app, environment, branch, commit, and ETA. Display the environment as `운영`, not `prod`, `production`, or raw profile values, unless the user explicitly asked for exact CLI fields. Use `references/error-empathy-catalog.md` for the deploy-preview card and NFKC warning. Slash invocation does not skip this card.
 
@@ -210,7 +224,7 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 
 - exit 64 + `validation.deployment_in_progress`: never retry `axhub deploy create`; monitor the in-flight deploy with the verify loop when an id is available.
 - subdomain precondition: `axhub apps update <slug> --subdomain <subdomain> --json` is a separate destructive mutation and needs its own preview/approval before one retry.
-- GitHub connection required: do not create repo, first push, or `apps git connect` from deploy; hand off to `import`. GitHub 자체가 막혀 `import` 로도 못 풀면 workflow-details 의 업로드 레인으로 가요.
+- GitHub connection required: do not create repo, first push, or `apps git connect` from deploy; hand off to `import`. GitHub 자체가 막혀 `import` 로도 못 풀면 Upload lane 으로 가요.
 - app 권한 부족 (exit 8 + `axhub_app_forbidden`): 앱 owner/admin 권한 검사에 막힌 상태예요. 앱을 만든 계정과 현재 계정이 달라도 판정은 CLI/백엔드 몫이에요. 앱 소유자/관리자에게 멤버 권한 부여를 요청하도록 안내하고 멈춰요. 구두 승인을 권한 근거로 쓰지 않아요 — 권한 부여 뒤 같은 명령의 재시도 성공으로만 확인해요.
 - auth expired: ask before login flow in interactive mode.
 - not found/ambiguous: show slug candidates only, no numeric ids.

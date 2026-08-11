@@ -30,8 +30,13 @@ describe("bootstrap desktop UX contract", () => {
     // 절차·명령·NEVER 는 전부 references/github-blocked-local-deploy.md 로 뺐고
     // 본문에는 "언제 그 파일을 여는가" 만 남겼어요. 이 트리거까지 reference 로
     // 빼면 분기 자체가 도달하지 않아요.
-    // (plugin:budget 의 per-skill 35k · 총합 190k 는 별도 gate)
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(24_000);
+    // 24_000 → 26_500: 그 절차 분리가 실제로 실패했어요. reference 는 plugin cache
+    // 라 workspace 밖이고, Desktop 은 읽을 때 권한 프롬프트를 띄우는데 9.1 규칙은
+    // 그 프롬프트를 생략하라고 해요 — 즉 트리거에 닿아도 절차를 못 읽어요. 실패
+    // 지점(6·9.1·10)에 12단계 포인터를 넣고, 절차는 reference 없이도 완결되도록
+    // 본문으로 되돌렸어요. 실행에 필요한 지시는 reference 로 빼지 않아요.
+    // (plugin:budget 의 per-skill 35k · 총합 200k 는 별도 gate)
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(26_500);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");

@@ -3,8 +3,13 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 
 export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 // 8 skill 체제 현실 반영으로 180_000 → 190_000 상향.
+// 190_000 → 200_000: 예산이 꽉 차면 본문을 reference 로 미는 것이 유일한 탈출구가
+// 되는데, reference 는 plugin cache 에 있어 workspace 밖이다. Desktop 은 그걸 읽을
+// 때 권한 프롬프트를 띄우고, 우리 규칙은 그 프롬프트를 생략하라고 한다
+// (bootstrap 9.1). 즉 실행 경로에 필요한 지시를 reference 로 빼면 조용히 안 읽힌다
+// — 실제로 GitHub 차단 폴백이 그렇게 죽었다. 실행에 필요한 최소본은 본문에 둔다.
 // per-skill 35_000 게이트는 그대로 유지해요 — 개별 skill 비대화는 계속 막아요.
-export const DEFAULT_MAX_TOTAL_BYTES = 190_000;
+export const DEFAULT_MAX_TOTAL_BYTES = 200_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
 export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {

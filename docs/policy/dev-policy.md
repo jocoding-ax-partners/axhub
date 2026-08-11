@@ -24,7 +24,7 @@ repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 
 머지 전에 반드시 통과해야 하는 자동·수동 검사 목록이에요:
 - `bun run lint:tone --strict` — 한글 tone 0 error
 - `bun test` — frontmatter·bundle·routing·policy parity 포함 전부 PASS
-- `bun run plugin:budget` — 컨텍스트 byte 예산 PASS (SKILL.md 8개 합산 180k · per-skill 35k). 넘치면 본문을 reference 로 추출해요.
+- `bun run plugin:budget` — 컨텍스트 byte 예산 PASS (SKILL.md 8개 합산 200k · per-skill 35k). 넘치면 본문을 reference 로 추출하되, **실행 경로에 필요한 지시는 빼지 않아요** — reference 는 plugin cache 라 workspace 밖이고 Desktop 은 읽을 때 권한 프롬프트를 띄우는데 우리 규칙(bootstrap 9.1)은 그 프롬프트를 생략하라고 해서 조용히 안 읽혀요. 참고용 상세만 reference 로 가요.
 - `bun run plugin:bundle` — clean bundle(개발 산출물이 섞이지 않은 배포용 플러그인 꾸러미) 생성. 로컬 Claude Code 검증은 repo 루트가 아니라 `dist/axhub-plugin` 을 써요.
 - 대표 여정 회귀 — 첫 셋업 → 앱 생성 → 배포 → 상태 확인 경로를 문서·skill 본문·fixture(테스트용 고정 예시 데이터) 계약으로 같은 방향에 맞춰요.
 
