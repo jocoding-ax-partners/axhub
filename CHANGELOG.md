@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.20.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.20.2...v1.20.3) (2026-08-11)
+
+scaffold 로 저장소를 만든 뒤 코드를 고쳐서 올리려 하면 `git push` 가 곧바로 실패하던 걸 고쳤어요. 저장소 생성 명령이 토큰을 남기지 않으려고 주소를 직접 넘겨 push 하는데, 그 방식이라 로컬에 `origin` 이 등록되지 않았거든요. 이제 push 가 끝나면 `origin` 을 붙여두고, 다음 push 에 쓸 명령도 함께 안내해요. 실사용에서 두 번 연속 재현한 문제예요.
+
+
+### Fixed
+
+* **scaffold:** push 뒤 origin 등록 단계 추가 ([3721446](https://github.com/jocoding-ax-partners/axhub/commit/3721446cdf5500cb8d76fabcf99fe88df2f3e1b3))
+
 ## [1.20.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.20.1...v1.20.2) (2026-08-11)
 
 scaffold 가 저장소를 push 한 뒤 곧바로 앱 생성·첫 배포까지 이어가던 흐름을 끊었어요. 저장소만 만들려던 사람도 배포까지 흘러갔는데, 저장소 생성 승인 하나에 앱 배포까지 묶여 있던 게 원인이었어요. 이제 push 가 끝나면 저장소 주소를 보여주고 이어갈지 한 번 물어봐요 — 기본은 여기서 멈추기이고, 나중에 "이 폴더 axhub에 올려" 라고 말하면 이어서 진행해요.
