@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.20.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.20.1...v1.20.2) (2026-08-11)
+
+scaffold 가 저장소를 push 한 뒤 곧바로 앱 생성·첫 배포까지 이어가던 흐름을 끊었어요. 저장소만 만들려던 사람도 배포까지 흘러갔는데, 저장소 생성 승인 하나에 앱 배포까지 묶여 있던 게 원인이었어요. 이제 push 가 끝나면 저장소 주소를 보여주고 이어갈지 한 번 물어봐요 — 기본은 여기서 멈추기이고, 나중에 "이 폴더 axhub에 올려" 라고 말하면 이어서 진행해요.
+
+
+### Fixed
+
+* **scaffold:** push 뒤 import 인계 전에 확인 게이트 추가 ([a2472ae](https://github.com/jocoding-ax-partners/axhub/commit/a2472ae12746589fdc828e5c49c0fe0df90b3dbf))
+
 ## [1.20.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.20.0...v1.20.1) (2026-08-11)
 
 "내 계정에 레포 만들어서 새 앱 시작해줘" 처럼 저장소 소유를 지목한 요청이 scaffold 가 아니라 bootstrap 으로 흘러가는 걸 실사용에서 잡았어요. 앱 생성 요청을 bootstrap 이 전부 가져가는 문구 때문이라, 양쪽에 양보 규칙을 명시했어요 — 저장소를 내 계정/조직 소유로 원하면 scaffold, 소유 언급이 없으면 지금처럼 bootstrap 이에요.
