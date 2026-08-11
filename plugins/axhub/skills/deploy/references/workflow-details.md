@@ -33,6 +33,8 @@ The same logical envelope must drive in-flight, status-first, and create. Reuse 
 
 Quality gate failure stops by default. Interactive mode may ask whether to force current values; headless safe default is cancel. If `bootstrap_plan` is non-null, or `app_id` cannot be resolved, stop at the first-run boundary and hand off to `import` for a non-empty existing app or `bootstrap` for an empty new app. Do not continue to preview while `branch` or `commit_sha` is empty.
 
+`GITHUB_CONNECTED` decides the lane and must actually be read, not just extracted. False on a resolved app means the app has no repository, so Git readiness, push, containment, and the empty branch/commit stop are all skipped — route to the upload lane. True keeps the normal repo path, where the upload lane is only a recovery escape.
+
 ## Target reconciliation
 
 Before mutation, reconcile stale manifest risk. If the conversation points at a different app, the utterance names a different app, or the manifest slug looks stale, confirm the target interactively. If the user chooses another app, update `axhub.yaml`, rerun `deploy-prep`, and include that manifest change in the git-readiness step. In headless mode, any target conflict downgrades to dry-run.
@@ -99,7 +101,7 @@ git fetch origin "$BRANCH" >/dev/null 2>&1
 git merge-base --is-ancestor "$COMMIT_SHA" "origin/$BRANCH"
 ```
 
-If push or containment fails, stop before mutation — unless GitHub itself is what failed, which routes to "GitHub blocked" below instead of ending here. Judge push success by `PUSH_EXIT`, not by stderr text; harmless hook warnings or "no config" messages do not make a zero-exit push fail. Raw git output stays out of chat. Headless safe default is cancel; never run `git init` automatically in subprocess mode. Never run `axhub deploy create --execute` for a local-only commit because the backend resolves commits from the connected GitHub repo.
+Skip this whole section when `GITHUB_CONNECTED` is false; that app has no repo to push to and belongs to the upload lane. If push or containment fails, stop before mutation — unless GitHub itself is what failed, which routes to the upload lane below instead of ending here. Judge push success by `PUSH_EXIT`, not by stderr text; harmless hook warnings or "no config" messages do not make a zero-exit push fail. Raw git output stays out of chat. Headless safe default is cancel; never run `git init` automatically in subprocess mode. Never run `axhub deploy create --execute` for a local-only commit because the backend resolves commits from the connected GitHub repo.
 
 ## In-flight and status-first
 
@@ -165,16 +167,21 @@ AXHUB_EXIT=$?
 
 On exit 64 with `validation.deployment_in_progress`, do not retry. Refresh in-flight once and verify that id if available; otherwise tell the user another deploy is in progress and stop. On exit 0, bind `DEPLOY_ID` from stdout. If no id exists, do not claim success; tell the user the start was seen but no result id was received.
 
-## GitHub blocked — local source upload
+## Upload lane — deploy the local folder
 
-Reached only from Git readiness, when the push or containment check failed because of GitHub itself: no connected repo, permission denied, 404 on a private repo, org policy, expired or refused device flow. The source becomes the local folder instead of a repo commit (backend spec 184). Everything after create is unchanged — `axhub up` prints the same create result, so `DEPLOY_ID` binding, the verify loop, and the diagnosis handoff stay identical.
+The source is the local folder instead of a repo commit (backend spec 184). Everything after create is unchanged — `axhub up` prints the same create result, so `DEPLOY_ID` binding, the verify loop, and the diagnosis handoff stay identical.
 
-Two guards before taking this path:
+Two entries, and they are not the same thing:
+
+- **No repo (steady state).** `github_connected` is false in the `deploy-prep` envelope. The app has no repository — normal for an app first deployed from local source. For repo apps a push fires the webhook and deploys without this skill; an app with no repo receives no push webhook, so an explicit deploy through this lane is the only way it ever ships a change. This is not a failure: do not attempt push, do not report recovery, and do not apply the empty branch/commit stop, since no commit is sent. Skip Git readiness entirely and come straight here.
+- **Repo blocked (recovery).** `github_connected` is true but the push or containment check failed because of GitHub itself: permission denied, 404 on a private repo, org policy, expired or refused device flow. Only this entry gets the recovery framing.
+
+Two guards, recovery entry only:
 
 - The cause must be GitHub. Network, timeout, and 5xx get one retry of the same step first. Falling through on a transient error silently drops the repo and push auto-deploy the user already had.
-- The app must already exist and be resolved (`APP_ID` from `deploy-prep`). This path never creates apps or repos — that stays `bootstrap` and `import`.
+- The app must already exist and be resolved (`APP_ID` from `deploy-prep`). This lane never creates apps or repos — that stays `bootstrap` and `import`.
 
-Say one line and continue, not a question: `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요.` The preview card and interactive approval are still required — same destructive mutation, different source. What the preview shows is the packed file count, size, and version hash.
+Say one line and continue, not a question. No repo: `이 앱은 저장소 없이 소스를 올려서 배포해요.` Repo blocked: `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요.` The preview card and interactive approval are still required in both — same destructive mutation, different source. What the preview shows is the packed file count, size, and version hash.
 
 ```bash
 axhub up --app "$APP_ID" --tenant "$AXHUB_TENANT" "${PROFILE_FLAG[@]}" --execute --field-expr '.id // .deployment_id // empty' >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
@@ -184,7 +191,7 @@ Drop `--execute` for the dry-run decision; `axhub up` previews by default. Alway
 
 What goes up is the current folder with `.gitignore` honored, so `.git/`, `node_modules/`, and `.env` stay out. No commit is sent, which is why a local-only commit is fine here and only here. A connected repo is not touched or disconnected: the source is chosen per deployment, not per app.
 
-Tell the user after the result, never before: this deployment did not come from the repo, so push auto-deploy and the version history do not cover it, and the next normal deploy goes back to the repo path once GitHub works.
+Tell the user after the result, never before, and only what applies. No repo: this app deploys by uploading the folder, so there is no push auto-deploy, and `axhub apps git connect` adds one later without recreating the app. Repo blocked: this one deployment did not come from the repo, so push auto-deploy and the version history do not cover it, and the next deploy goes back to the repo path once GitHub works.
 
 ## Verify loop and diagnosis
 
