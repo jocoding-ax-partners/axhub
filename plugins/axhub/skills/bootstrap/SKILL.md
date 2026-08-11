@@ -195,9 +195,6 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 
 실행 때 `<target>`/`<repo>` 은 확인된 literal. target 채운 뒤 추가 `rtk ls`, `ls`, `find`, `cat` 확인은 하지 않아요.
 
-`fetch` 가 권한으로 실패하면(404 / permission denied) 저장소는 있는데 이 계정이
-못 받는 상태예요 — 앱을 새로 만들지 말고 12단계로 가요.
-
 성공하면 추가 파일 읽기 없이 `axhub deploy --explain --json` check. 밖 reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고, 확보한 repo/app/deployment 값과 CLI 명령으로만 마무리해요.
 
 ### 11. Result
@@ -208,16 +205,15 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 
 ### 12. GitHub 이 막혔을 때 — 로컬 소스로 배포
 
-bootstrap 어느 지점이든 GitHub 때문에(계정·App·저장소·권한) 더 못 나가면 빈손으로
-돌려보내지 않아요. 일시적 실패는 한 번만 재시도하고, 그래도 막히면
+어느 지점이든 GitHub 때문에 못 나가면 빈손으로 돌려보내지 않아요. 일시적 실패는
+한 번 재시도하고, 그래도 막히면
 [`references/github-blocked-local-deploy.md`](references/github-blocked-local-deploy.md)
-를 읽고 그대로 따라요 — 묻지 않고 코드를 확보해 배포까지 이어가요.
+를 읽고 따라요.
 
 ## NEVER
 
 - NEVER GitHub App 미설치 상태에서 bootstrap dry-run/execute.
 - NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회. **단 12단계(GitHub 차단)의 세 조건을 전부 충족한 경우만 예외**예요 — 그때도 `apps create` + `axhub up` 두 명령만 쓰고 `deploy create` 는 쓰지 않아요.
-- NEVER 12단계에서 "GitHub 을 고칠까요?" 를 묻지 않아요 — 막힌 시점의 그 질문이 사용자를 멈춰 세우는 병목이에요. 알리고 진행해요.
 - NEVER remote `templates.json` / 폐기된 fetch-template 사용.
 - NEVER subprocess/headless 에서 template/app name 임의 선택.
 - NEVER `--execute` 를 `--dry-run` 미리보기와 사용자 확인 없이 호출.
