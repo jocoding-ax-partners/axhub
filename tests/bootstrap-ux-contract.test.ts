@@ -35,8 +35,12 @@ describe("bootstrap desktop UX contract", () => {
     // 그 프롬프트를 생략하라고 해요 — 즉 트리거에 닿아도 절차를 못 읽어요. 실패
     // 지점(6·9.1·10)에 12단계 포인터를 넣고, 절차는 reference 없이도 완결되도록
     // 본문으로 되돌렸어요. 실행에 필요한 지시는 reference 로 빼지 않아요.
+    // 26_500 → 27_000: 폴백의 placeholder 치환 단계 추가. 서버 bootstrap 은
+    // push 전에 치환하지만 폴백은 clone 그대로라, 빠뜨리면 앱이 '{{API_BASE}}'
+    // 리터럴로 API 를 불러 로그인·데이터 연동만 조용히 죽어요. 실행 필수
+    // 지시라 본문에 둬요.
     // (plugin:budget 의 per-skill 35k · 총합 200k 는 별도 gate)
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(26_500);
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(27_000);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");

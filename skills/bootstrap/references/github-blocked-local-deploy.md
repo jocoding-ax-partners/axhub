@@ -55,6 +55,27 @@ rm -rf <target>/.axhub-template
 `<target>/.axhub-template` 하나만 지워요. 하위 폴더만 복사하므로 템플릿 저장소의
 git 이력은 따라오지 않아요.
 
+**2.5. placeholder 치환 — 템플릿을 받았으면 필수.** 정상 bootstrap 은 서버가
+push 전에 6개 토큰을 텍스트 치환하고 `axhub.yaml` 의 `name:` 을 slug 로
+재작성해요. 이 갈래는 그 단계가 없으니 직접 해요. 건너뛰면 템플릿 코드의
+`process.env.APPHUB_API_URL || '{{API_BASE}}'` 같은 fallback 이 그대로 살아
+앱이 `'{{API_BASE}}'` 라는 리터럴로 API 를 불러요 — 빌드도 첫 화면도 멀쩡하고
+**로그인·gateway·DB SDK 만 조용히 죽는** 모양이라 배포 성공으로 오판하기 쉬워요
+(`APPHUB_*` env 는 플랫폼이 주입하지 않아요 — 자동 주입은 `DATABASE_URL` 계열뿐).
+
+| 토큰 | 값 |
+|---|---|
+| `{{APP_SLUG}}` | 앱 slug |
+| `{{APP_SUBDOMAIN}}` | subdomain |
+| `{{APP_NAME}}` | 앱 이름 |
+| `{{TENANT}}` | 테넌트 slug |
+| `{{API_BASE}}` | CLI 가 쓰는 API 주소 (prod `https://axhub.ai`) |
+| `{{APP_ORIGIN}}` | `axhub apps get <slug> --tenant <tenant> --json` 의 `access_url` |
+
+`grep -rl '{{' <target>` 로 대상 파일을 찾아(README 포함 전부) 편집 도구로
+치환해요 — `sed -i` 는 macOS/GNU 문법이 갈려서 안 써요. 마지막으로
+`axhub.yaml` 의 `name:` 을 앱 slug 로 바꿔요.
+
 **3. 앱 종류 판정.** 템플릿은 그 `axhub.yaml` 의 `build.deploy_method` 를 그대로
 써요(현재 세 템플릿 모두 `docker`). 사용자 자기 코드면 루트에 compose 파일만
 있으면 `compose`, `Dockerfile` 이 있으면 `docker`. **둘 다 루트에 있으면 `docker`
