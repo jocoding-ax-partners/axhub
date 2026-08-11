@@ -23,7 +23,7 @@ model: sonnet
 
 사용자 발화에 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`, `Express`, `Fastify`, `Nest`, `FastAPI`, `Flask`, `Django`, `Rails`, `Go 서버`, `Dockerfile` 처럼 기존 소스가 있음을 뜻하는 단서와 axhub 배포 의도가 함께 있으면 bootstrap 을 시작하지 않아요. CLI guard, preflight, 템플릿 목록 확인을 실행하기 전에 즉시 import 경계로 양보하고, chat 본문에서 `/axhub:bootstrap` 또는 bootstrap 선택 이유를 설명하지 않아요.
 
-creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 항상 실행해요.
+creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지. **예외는 12단계 하나** (GitHub 차단 시 로컬 소스 배포). 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 항상 실행해요.
 
 ## Reference Loading Policy
 
@@ -203,10 +203,17 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 
 공개·누구나·친구에게 보여주기까지 원했으면 `axhub publish --app "$APP_SLUG" --visibility public --execute --json` 으로 공개 신청하고 `review_status=pending` 또는 review request id 를 알려줘요. publish dry-run 을 먼저 호출하지 않고, chat 에 `Dry-run 기본값` 같은 내부 CLI dry-run semantics 를 설명하지 않아요. 승인 전 공개 확대를 `axhub apps update --visibility public` 로 시도하지 않아요.
 
+### 12. GitHub 이 막혔을 때 — 로컬 소스로 배포
+
+어느 지점이든 GitHub 때문에 못 나가면 빈손으로 돌려보내지 않아요. 일시적 실패는
+한 번 재시도하고, 그래도 막히면
+[`references/github-blocked-local-deploy.md`](references/github-blocked-local-deploy.md)
+를 읽고 따라요.
+
 ## NEVER
 
 - NEVER GitHub App 미설치 상태에서 bootstrap dry-run/execute.
-- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회.
+- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회. **단 12단계(GitHub 차단)의 세 조건을 전부 충족한 경우만 예외**예요 — 그때도 `apps create` + `axhub up` 두 명령만 쓰고 `deploy create` 는 쓰지 않아요.
 - NEVER remote `templates.json` / 폐기된 fetch-template 사용.
 - NEVER subprocess/headless 에서 template/app name 임의 선택.
 - NEVER `--execute` 를 `--dry-run` 미리보기와 사용자 확인 없이 호출.
