@@ -23,7 +23,7 @@ model: sonnet
 
 사용자 발화에 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`, `Express`, `Fastify`, `Nest`, `FastAPI`, `Flask`, `Django`, `Rails`, `Go 서버`, `Dockerfile` 처럼 기존 소스가 있음을 뜻하는 단서와 axhub 배포 의도가 함께 있으면 bootstrap 을 시작하지 않아요. CLI guard, preflight, 템플릿 목록 확인을 실행하기 전에 즉시 import 경계로 양보하고, chat 본문에서 `/axhub:bootstrap` 또는 bootstrap 선택 이유를 설명하지 않아요.
 
-creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지. **예외는 12단계 하나**: GitHub 이 막혀 saga 를 시작할 수 없고, 폴더에 배포할 코드가 이미 있고, 사용자가 그 갈래를 고른 경우에만 `apps create` + `axhub up` 으로 배포해요. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 항상 실행해요.
+creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지. **예외는 12단계 하나**: GitHub 이 상태 문제로 막혀 saga 를 시작할 수 없고 폴더에 배포할 코드가 이미 있으면, 묻지 않고 `apps create` + `axhub up` 으로 배포해요. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 항상 실행해요.
 
 ## Reference Loading Policy
 
@@ -209,19 +209,27 @@ bootstrap 은 저장소를 만드는 흐름이라 GitHub 이 필수예요(`--git
 그런데 GitHub 쪽이 막혀 더 나아갈 수 없을 때, 사용자를 빈손으로 돌려보내는
 대신 **이미 손에 있는 코드를 그대로 배포하는** 갈래가 있어요.
 
-**진입 조건 — 넷 다 충족해야 해요.** 하나라도 아니면 이 갈래로 가지 않아요.
+**묻지 않고 바로 넘어가요.** GitHub 이 막힌 시점에 "고칠래요?" 를 묻는 건
+없애려던 그 병목이에요. 조건이 맞으면 확인 질문 없이 이 갈래로 진행하고,
+무엇이 달라지는지는 **하고 나서 알려줘요**.
 
-1. GitHub 때문에 실제로 막혔어요: 6단계 gate 의 설치 계정 0개(설치를 안 하거나 못 함), `github_relogin_required` 재연동 실패·거부, device flow 만료·거부·중단 중 하나예요.
-2. GitHub 복구를 **먼저 제안했고** 사용자가 지금은 안 하겠다고 했어요.
-3. **현재 폴더에 배포할 코드가 이미 있어요** — 루트에 `Dockerfile` 이나 compose 파일이 있어요.
-4. D1 safe-stop 모드가 아니에요 (앱 생성·배포는 mutation 이에요).
+**진입 조건 — 셋 다 충족해야 해요.** 하나라도 아니면 이 갈래로 가지 않아요.
+
+1. GitHub 이 **상태 문제로** 막혔어요: 6단계 gate 의 설치 계정 0개, `github_relogin_required`, device flow 거부·만료·중단 중 하나예요.
+2. **현재 폴더에 배포할 코드가 이미 있어요** — 루트에 `Dockerfile` 이나 compose 파일이 있어요.
+3. D1 safe-stop 모드가 아니에요 (앱 생성·배포는 mutation 이에요).
+
+**일시적 오류는 폴백 대상이 아니에요.** 네트워크·타임아웃·5xx 처럼 다시 하면
+될 것 같은 실패는 gate 를 **한 번만** 재시도하고, 그래도 안 되면 그때 이
+갈래로 와요. 여기서 성급히 폴백하면 저장소를 원했던 사람이 저장소 없는 앱을
+갖게 돼요.
 
 **빈 폴더면 이 갈래로 가지 않아요.** template 은 GitHub 저장소에서 오기 때문에
-GitHub 없이는 받을 수 없어요 — 그 경우는 GitHub 복구로 돌아가요.
+GitHub 없이는 받을 수 없어요 — 그 경우는 GitHub 복구 안내로 돌아가요.
 
 절차:
 
-1. **무엇을 포기하는지 먼저 말해요.** push 자동 배포·저장소·변경 이력·협업이 없어요. 대신 나중에 `axhub apps git connect` 로 저장소를 붙일 수 있고, 그때 앱을 다시 만들 필요는 없어요.
+1. **한 줄로 알리고 바로 진행해요** (질문 아니에요): `GitHub 연결이 안 돼 있어서, 이 폴더를 그대로 올려서 배포할게요`. 배포가 끝난 뒤 결과 카드에 무엇이 다른지 덧붙여요 — push 자동 배포·저장소·변경 이력이 없고, 원하면 나중에 `axhub apps git connect` 로 저장소를 붙일 수 있으며 그때 앱을 다시 만들 필요는 없어요.
 2. **앱 종류 판정.** 루트에 compose 파일(`compose.yml`·`compose.yaml`·`docker-compose.yml`·`docker-compose.yaml`)이 있으면 `compose`, 루트에 `Dockerfile` 이 있으면 `docker` 예요. **둘 다 루트에 있으면 `docker` 로 해석돼요** — compose 로 배포하려면 루트 `Dockerfile` 을 서비스 폴더(`web/Dockerfile` 등)로 옮기고 compose 의 `build:` 가 그 폴더를 가리켜야 해요. 이걸 어기면 배포가 build 단계에서 `compose 파일 파싱 실패` 로 죽어요.
 3. **앱 주소 확인** — 7단계의 availability check 를 그대로 해요.
 4. **앱 생성** (tool 제목 `앱 만들기`):
@@ -248,9 +256,11 @@ axhub up --app bakery-preorder --execute
 ## NEVER
 
 - NEVER GitHub App 미설치 상태에서 bootstrap dry-run/execute.
-- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회. **단 12단계(GitHub 차단)의 네 조건을 전부 충족하고 사용자가 그 갈래를 고른 경우만 예외**예요 — 그때도 `apps create` + `axhub up` 두 명령만 쓰고 `deploy create` 는 쓰지 않아요.
+- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회. **단 12단계(GitHub 차단)의 세 조건을 전부 충족한 경우만 예외**예요 — 그때도 `apps create` + `axhub up` 두 명령만 쓰고 `deploy create` 는 쓰지 않아요.
 - NEVER GitHub 이 정상인데 12단계 갈래로 빠지지 않아요 — 저장소·push 자동 배포를 조용히 포기시키는 셈이에요.
+- NEVER 네트워크·타임아웃·5xx 같은 일시적 실패를 GitHub 차단으로 보고 곧바로 12단계로 넘어가지 않아요 — gate 를 한 번 재시도한 뒤에 판단해요.
 - NEVER 빈 폴더에서 12단계 갈래 진입 — template 을 못 받아 배포할 것이 없어요.
+- NEVER 12단계에서 "GitHub 을 고칠까요?" 를 묻지 않아요 — 막힌 시점의 그 질문이 사용자를 멈춰 세우는 병목이에요. 알리고 진행해요.
 - NEVER remote `templates.json` / 폐기된 fetch-template 사용.
 - NEVER subprocess/headless 에서 template/app name 임의 선택.
 - NEVER `--execute` 를 `--dry-run` 미리보기와 사용자 확인 없이 호출.
