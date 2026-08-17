@@ -1,6 +1,6 @@
 # Init Errors And Follow-Ups Reference
 
-Load this reference for long error routing, final result wording, optional MCP/setup follow-ups, and carry-over-safe next actions.
+Load this reference for long error routing, final result wording, and carry-over-safe next actions.
 
 ## Result Card
 
@@ -81,15 +81,6 @@ After successful creation, ask once whether to recommend tables/env needed by th
 ```
 
 If the user chooses analysis, infer from cloned scaffold code. Include same-conversation connector/table results only when actual results are visible in context. Do not claim carry-over from memory or intent alone; follow `../../deploy/references/session-carryover.md`.
-
-## Optional MCP Setup
-
-MCP setup is optional follow-up, not part of the creation gate. Offer it only after app creation/clone result is clear or when the user explicitly asks to connect tools/data sources.
-
-- If required CLI/plugin setup is missing, route to onboarding/update guidance instead of mutating silently.
-- Do not install or modify external MCP config in subprocess/headless mode.
-- Do not block success on MCP setup. The bootstrap saga and clone are the bootstrap completion criteria.
-- Keep wording natural: "데이터 연결까지 이어서 볼까요?" rather than naming internal skill labels.
 
 ## Carry-Over Contract
 

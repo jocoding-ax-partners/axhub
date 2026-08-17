@@ -23,11 +23,10 @@ const upsCommands = hooksFile.hooks.UserPromptSubmit.flatMap((group) => group.ho
 const ssCommands = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks).map((h) => h.command);
 const updateRouterCmd = upsCommands[0]!;
 const autoUpdateCmd = ssCommands[0]!;
-const onboardingResumeCmd = ssCommands[1]!;
-const windowsContractCmd = ssCommands[2]!;
-const ap14FallbackCmd = ssCommands[3]!;
-const restartConfirmCmd = ssCommands[4]!;
-const feedbackContractCmd = ssCommands[5]!;
+const windowsContractCmd = ssCommands[1]!;
+const ap14FallbackCmd = ssCommands[2]!;
+const restartConfirmCmd = ssCommands[3]!;
+const feedbackContractCmd = ssCommands[4]!;
 
 const DEV_CWD = "/Users/dev/work/jocoding/axhub"; // 경로에 axhub 포함 (F1 재현용)
 
@@ -279,7 +278,7 @@ describe("auto-update 훅 (SessionStart entry 1)", () => {
   });
 });
 
-describe("restart-confirm 훅 (SessionStart entry 5)", () => {
+describe("restart-confirm 훅 (SessionStart entry 4)", () => {
   test("fresh marker → confirm prompt 지시를 발행해요", () => {
     const home = makeHome();
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
@@ -315,45 +314,7 @@ describe("restart-confirm 훅 (SessionStart entry 5)", () => {
   });
 });
 
-describe("onboarding resume 훅 (SessionStart entry 2)", () => {
-  const RESUME_REL = join(".axhub", "cache", ".onboarding-mcp-restart");
-
-  test("fresh marker → resume 지시를 발행해요", () => {
-    const home = makeHome();
-    mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
-    writeFileSync(join(home, RESUME_REL), "");
-    expectEmit(runInline(onboardingResumeCmd, "", { HOME: home }), "SessionStart", "mcp-ready-card.md");
-  });
-
-  test("marker 없음 → 침묵해요", () => {
-    expectSilent(runInline(onboardingResumeCmd, "", { HOME: makeHome() }));
-  });
-
-  test("TTL(7일) 초과 → 침묵해요", () => {
-    const home = makeHome();
-    mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
-    const marker = join(home, RESUME_REL);
-    writeFileSync(marker, "");
-    utimesSync(marker, daysAgo(8), daysAgo(8));
-    expectSilent(runInline(onboardingResumeCmd, "", { HOME: home }));
-  });
-
-  test("kill switch AXHUB_NO_ONBOARDING_RESUME → 침묵해요", () => {
-    const home = makeHome();
-    mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
-    writeFileSync(join(home, RESUME_REL), "");
-    expectSilent(runInline(onboardingResumeCmd, "", { HOME: home, AXHUB_NO_ONBOARDING_RESUME: "1" }));
-  });
-
-  test("marker kill switch no-onboarding-resume → 침묵해요", () => {
-    const home = makeHomeWithMarker("onboarding-resume");
-    mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
-    writeFileSync(join(home, RESUME_REL), "");
-    expectSilent(runInline(onboardingResumeCmd, "", { HOME: home }));
-  });
-});
-
-describe("AP-13 Windows 계약 훅 (SessionStart entry 3)", () => {
+describe("AP-13 Windows 계약 훅 (SessionStart entry 2)", () => {
   test("OS=Windows_NT → 계약을 발행해요", () => {
     expectEmit(runInline(windowsContractCmd, "", { OS: "Windows_NT" }), "SessionStart", "Git Bash");
   });
@@ -371,7 +332,7 @@ describe("AP-13 Windows 계약 훅 (SessionStart entry 3)", () => {
   });
 });
 
-describe("AP-19 feedback 리포트 계약 훅 (SessionStart entry 6)", () => {
+describe("AP-19 feedback 리포트 계약 훅 (SessionStart entry 5)", () => {
   test("PATH 에 axhub 존재 → 계약을 발행해요", () => {
     const result = runInline(feedbackContractCmd, "", { HOME: makeHome(), PATH: SAFE_PATH });
     expectEmit(result, "SessionStart", "axhub feedback -m");
@@ -405,7 +366,7 @@ describe("AP-19 feedback 리포트 계약 훅 (SessionStart entry 6)", () => {
   });
 });
 
-describe("AP-14 폴백 훅 (SessionStart entry 4)", () => {
+describe("AP-14 폴백 훅 (SessionStart entry 3)", () => {
   test("기본 상태에서 update-first 가드를 발행해요", () => {
     expectEmit(runInline(ap14FallbackCmd, ""), "SessionStart", "update-first routing guard is active for Code mode");
   });

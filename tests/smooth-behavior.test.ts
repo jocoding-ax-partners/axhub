@@ -607,7 +607,7 @@ describe("smooth behavior contracts", () => {
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
   });
 
-  test("onboarding MCP restart resume hook is wired", () => {
+  test("SessionStart hooks are wired", () => {
     interface HookEntry {
       type: string;
       shell?: string;
@@ -618,7 +618,7 @@ describe("smooth behavior contracts", () => {
     }
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-    expect(entries).toHaveLength(6);
+    expect(entries).toHaveLength(5);
 
     // every SessionStart hook injects context invisibly: suppressed JSON only,
     // never plain echo stdout and never a user-facing systemMessage banner
@@ -634,20 +634,8 @@ describe("smooth behavior contracts", () => {
       }
     }
 
-    const resume = entries[1];
-    expect(resume.type).toBe("command");
-    expect(resume.shell).toBe("bash");
-    expect(resume.command).toContain("AXHUB_NO_ONBOARDING_RESUME");
-    expect(resume.command).toContain(".onboarding-mcp-restart");
-    expect(resume.command).toContain("-mmin -10080");
-    expect(resume.command).toContain("claude mcp get axhub");
-    expect(resume.command).toContain("Resume After Restart");
-    // hook is read-only: never deletes the marker, never spawns the axhub binary
-    expect(resume.command).not.toContain("rm -f");
-    expect(resume.command).not.toContain("axhub plugin-support");
-
-    // 5번째 entry: 플러그인 업데이트 재시작 확인 (restart-confirm)
-    const restartConfirm = entries[4];
+    // 4번째 entry: 플러그인 업데이트 재시작 확인 (restart-confirm)
+    const restartConfirm = entries[3];
     expect(restartConfirm.type).toBe("command");
     expect(restartConfirm.shell).toBe("bash");
     expect(restartConfirm.command).toContain("AXHUB_NO_AUTO_UPDATE");
@@ -675,7 +663,7 @@ describe("smooth behavior contracts", () => {
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
 
-    const feedback = entries[5];
+    const feedback = entries[4];
     expect(feedback.type).toBe("command");
     expect(feedback.shell).toBe("bash");
     // kill switch: env + marker counterpart (repo-wide 훅 계약)
@@ -765,7 +753,7 @@ describe("smooth behavior contracts", () => {
     }
 
     const sessionEntries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-    const sessionRouter = sessionEntries[3];
+    const sessionRouter = sessionEntries[2];
     expect(sessionRouter.type).toBe("command");
     expect(sessionRouter.shell).toBe("bash");
     expect(sessionRouter.command).toContain("AXHUB_NO_UPDATE_ROUTER");
@@ -793,7 +781,7 @@ describe("smooth behavior contracts", () => {
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
 
-    const windows = entries[2];
+    const windows = entries[1];
     expect(windows.type).toBe("command");
     expect(windows.shell).toBe("bash");
     // Windows-only guard + killswitch
@@ -806,46 +794,24 @@ describe("smooth behavior contracts", () => {
     expect(windows.command).not.toContain("rm -f");
   });
 
-  test("mcp-ready-card encodes restart handoff and resume contracts", () => {
-    const card = readRepo("skills/onboarding/references/mcp-ready-card.md");
-
-    // marker lifecycle: write on fresh add, delete on final card
-    expect(card).toContain('date > "$HOME/.axhub/cache/.onboarding-mcp-restart"');
-    expect(card).toContain('rm -f "$HOME/.axhub/cache/.onboarding-mcp-restart"');
-
-    // restart handoff card replaces same-session /mcp guidance after a fresh add
-    expect(card).toContain("## Restart Handoff Card");
-    expect(card).toContain("도구 활성화에는 Claude Code 재시작이 필요해요.");
-    expect(card).toContain("사용자에게는 enum 이름이나 대괄호 표식을 출력하지 말고");
-    expect(card).not.toContain("필요해요. [READY_WITH_USER_ACTION]");
-    expect(card).toContain("이 세션에서 `/mcp` OAuth 를 안내하지 않아요");
-
-    // Claude Desktop Code mode does not execute slash commands in its chat composer.
-    expect(card).toContain("채팅 입력창에 `/mcp` 를 치라고 안내하지 않아요");
-    expect(card).toContain("`Cmd+J`(Windows 는 `Ctrl+J`)");
-    expect(card).toContain("`env -u CLAUDECODE claude`");
-    expect(card).toContain("`Remove-Item Env:CLAUDECODE -ErrorAction SilentlyContinue; claude`");
-    expect(card).toContain("`Authentication successful` 과 `Connected to axhub.`");
-
-    // resume procedure owned by this reference, pointed at by the SessionStart hook
-    expect(card).toContain("## Resume After Restart");
-    expect(card).toContain("SAFE_STOP_NONINTERACTIVE");
-
-    // the old impossible instruction must be gone
-    expect(card).not.toContain("It may require a new session before tools appear");
-  });
-
-  test("onboarding SKILL encodes MCP restart handoff invariants", () => {
+  test("onboarding and ready-card stay MCP-free", () => {
     const onboarding = readRepo("skills/onboarding/SKILL.md");
+    const card = readRepo("skills/onboarding/references/ready-card.md");
 
-    expect(onboarding).toContain(".onboarding-mcp-restart");
-    expect(onboarding).toContain("Restart Handoff Card");
-    expect(onboarding).toContain("Resume After Restart");
+    // 온보딩은 MCP 등록·OAuth 를 안내하지 않아요 — CLI 준비까지만 담당해요.
     expect(onboarding).toContain(
-      "NEVER `claude mcp add` 를 실행한 그 세션에서 `/mcp` OAuth 완료나 `mcp__axhub__*` 도구 활성화를 안내하지 말아요",
+      "NEVER MCP 서버 등록(`claude mcp add`)이나 MCP OAuth 인증을 안내·실행하지 말아요",
     );
-    expect(onboarding).toContain("Claude Desktop Code mode 의 채팅 입력창은 `/mcp` 를 실행하지 않고 일반 메시지로 보내므로");
-    expect(onboarding).toContain("NEVER `VIBE_READY` 출력 후 marker");
+    expect(onboarding).toContain("references/ready-card.md");
+    expect(onboarding).not.toContain(".onboarding-mcp-restart");
+    expect(onboarding).not.toContain("Restart Handoff Card");
+
+    // ready card 는 옵트인 → 최종 카드만 담당해요. MCP 절차·marker 는 없어요.
+    expect(card).toContain("AI 활용 기록 옵트인");
+    expect(card).toContain("VIBE_READY");
+    expect(card).not.toContain("claude mcp");
+    expect(card).not.toContain(".onboarding-mcp-restart");
+    expect(card).toContain("사용자에게는 enum 이름이나 대괄호 표식을 출력하지 말고");
   });
 
   test("import frontmatter starts directly and avoids preamble leaks", () => {

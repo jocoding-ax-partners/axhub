@@ -11,7 +11,7 @@ const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
 const SKILL = read("skills/onboarding/SKILL.md");
 const GAPS = read("skills/onboarding/references/gap-state-machine.md");
-const CARD = read("skills/onboarding/references/mcp-ready-card.md");
+const CARD = read("skills/onboarding/references/ready-card.md");
 const INSTALL = read("skills/onboarding/references/install-channels-and-auth.md");
 const GITHUB = read("skills/onboarding/references/github-app.md");
 const DEPS = read("skills/onboarding/references/dependency-install.md");
@@ -96,7 +96,7 @@ describe("onboarding representative journey", () => {
       "### 0. Non-interactive guard",
       "### 1. DETECT_ALL(read-only)",
       "### 3. first_gap router",
-      "### 4. Telemetry opt-in, MCP and Ready card",
+      "### 4. Telemetry opt-in and Ready card",
     ];
     const positions = stages.map((s) => SKILL.indexOf(s));
     for (const [i, pos] of positions.entries()) {
@@ -120,15 +120,12 @@ describe("onboarding representative journey", () => {
     expect(INSTALL).toContain("current_session_stale");
   });
 
-  test("finish stage keeps the one-restart contract chain", () => {
-    expect(SKILL).toContain("재시작 최대 1회 · 카드 1장 · 질문은 옵트인 1개");
+  test("finish stage keeps the single-card opt-in contract", () => {
+    expect(SKILL).toContain("카드 1장 · 질문은 옵트인 1개");
     expect(CARD).toContain("마지막 단계예요");
     // opt-in question shape: skip-first default + later-enable phrase
     expect(CARD).toContain('"이번엔 건너뛰기"(첫 번째 옵션)');
     expect(CARD).toContain("AI 활용 기록 켜줘");
-    // resume without re-asking, and marker cleanup after the final card
-    expect(CARD).toContain("다시 묻지 않아요");
-    expect(CARD).toContain('rm -f "$HOME/.axhub/cache/.onboarding-mcp-restart"');
     for (const exit of [
       "VIBE_READY",
       "READY_WITH_USER_ACTION",
@@ -137,15 +134,6 @@ describe("onboarding representative journey", () => {
     ]) {
       expect(CARD).toContain(exit);
     }
-  });
-
-  test("Desktop Code mode has a non-deadlocking MCP authentication path", () => {
-    expect(CARD).toContain("**Claude Desktop Code mode**");
-    expect(CARD).toContain("채팅 입력창에 `/mcp` 를 치라고 안내하지 않아요");
-    expect(CARD).toContain("Cmd+J");
-    expect(CARD).toContain("env -u CLAUDECODE claude");
-    expect(CARD).toContain("Authentication successful");
-    expect(CARD).toContain("복사·붙여넣기와 화살표·Enter 만으로 끝나야 해요");
   });
 
   test("telemetry opt-in keeps the axrouter CLI contract in the card", () => {
