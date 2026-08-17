@@ -65,7 +65,7 @@ model: sonnet
 ## Workflow
 
 **한눈에 — 실행 순서.**
-`1` CLI 가드 → `2` 앱 게이트(없으면 bootstrap 안내) → `3` stack 감지 → `4` auth/MCP 전제 인라인 안내 → `5` SDK/DB 표면 확인 → `6` 데이터 discover(MCP|CLI fallback|질문) → `7` 앱 규약 학습 → `8` 기능 계획 + 미리보기 + 확인 → `9` 코드 생성 → `10` UI 상태 보강 → `11` verify 게이트 → `11.5` 배포 준비 점검(infer-tables-env: 생성코드가 쓰는 테이블·env 확인 → 빠진 테이블 (b) 게이트, 빠진 env clarity, carry-over 로 deploy 중복 방지) → `12` deploy 핸드오프. (`0` TodoWrite 는 가용 시 전 구간 갱신.)
+`1` CLI 가드 → `2` 앱 게이트(없으면 bootstrap 안내) → `3` stack 감지 → `4` auth 전제 인라인 안내 → `5` SDK/DB 표면 확인 → `6` 데이터 discover(MCP|CLI fallback|질문) → `7` 앱 규약 학습 → `8` 기능 계획 + 미리보기 + 확인 → `9` 코드 생성 → `10` UI 상태 보강 → `11` verify 게이트 → `11.5` 배포 준비 점검(infer-tables-env: 생성코드가 쓰는 테이블·env 확인 → 빠진 테이블 (b) 게이트, 빠진 env clarity, carry-over 로 deploy 중복 방지) → `12` deploy 핸드오프. (`0` TodoWrite 는 가용 시 전 구간 갱신.)
 
 **User-facing handoff language:** slash command·skill 이름은 내부 라벨이에요. Claude Desktop 사용자에겐 `다시 로그인해줘`, `배포해줘`, `앱부터 만들어줘` 같은 자연어만 안내하고, `/axhub:*` 를 시키지 않아요 (사용자가 명시 요청할 때 제외).
 
@@ -97,9 +97,9 @@ model: sonnet
 
 3. **stack 감지 (에이전트 판단).** 고정 표 대신 신호로 framework 를 판단해요 — `package.json`(next/vite/react), `pyproject.toml`/`requirements.txt`(fastapi/flask), `axhub.yaml` 힌트, 파일 구조. 이걸로 뒤의 규약 학습·verify 명령을 분기해요. **판단이 안 서는 미지원 stack 이면** "이 앱 스택은 아직 자동 코딩을 지원 안 해요" 로 degrade 하고 멈춰요.
 
-4. **auth/MCP 전제 인라인 안내.** discover 는 auth + MCP 에 의존해요. gap 이면 인라인으로 안내해요 (onboarding 위임 X).
+4. **auth 전제 인라인 안내.** discover 는 auth 에 의존해요. gap 이면 인라인으로 안내해요 (onboarding 위임 X).
    - **미로그인**(`auth_ok=false`): "로그인이 필요해요 — `axhub auth login` 하거나 '온보딩'이라고 해주세요" 안내 후 완료되면 재확인.
-   - **MCP 미등록**(`mcp__axhub__*` 도구 부재): `claude mcp add` + OAuth 로 등록을 인라인 안내해요 (`references/mcp-setup.md`). ⚠️ 새 MCP 서버는 **재시작해야 도구가 살아나요** — 그래서 이번 세션은 아래 6단계의 **CLI fallback** 으로 진행하고, "등록·로그인했어요. Claude Code 를 재시작하면 다음부터 더 정확해져요" 한 줄만 남겨요.
+   - MCP 서버 등록은 안내하지 않아요 — `mcp__axhub__*` 도구가 없으면 아래 6단계의 **CLI fallback** 으로 그대로 진행해요.
 
 5. **SDK/DB 표면 확인 (현재 SDK 우선).** 데이터 접근 코드를 짜기 전에 [references/sdk-db-surface.md](references/sdk-db-surface.md) 의 5단계 절을 읽고 현재 앱의 실제 DB/connector 패턴과 설치된 SDK 표면을 확인해요 — legacy `/data` typed DSL(`defineSchema`, `where` 등)은 생성하지 않고, 기존 앱 코드의 데이터 접근 패턴이 런타임 authority 예요. CRUD/DB 기능이면 `get_recipe`를 최대 한 번 호출하고 인자는 정확히 `app_id`, `recipe_id`, 선택 `framework`, `preferred_table`만 써요. 기본 recipe id 는 정확히 `dynamic-db-crud`예요. `recipe`, `tenant`, `schema` 키를 만들거나 실패 뒤 키 모양을 바꿔 반복하지 않아요. 웹훅 받기는 relay 표면이라 `get_recipe` 아니라 **5b 절**.
 
@@ -145,6 +145,5 @@ model: sonnet
 
 - `references/injection-guard.md` — 실데이터 injection 가드 상세 (데이터-only·샘플 cap·sanitize·escape·파라미터화)
 - `references/connector-safety.md` — connector_query 안전 (SELECT-only·LIMIT·timeout)
-- `references/mcp-setup.md` — auth/MCP 전제 인라인 안내 명령 (onboarding 재사용)
 - `references/ui-states.md` — empty/error/loading + 스타일 정합 템플릿
 - `references/write-gate.md` — write 경로 ((a) 런타임 CRUD 코드 · (b) 빌드타임 스키마 게이트 옵트인)

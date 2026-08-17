@@ -18,7 +18,7 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-처음 axhub 를 쓰는 사람을 위한 단일 진입점이에요. 사용자는 `온보딩`, `처음인데 뭐부터`, `getting started` 처럼 말하면 되고, 이 스킬은 CLI/auth/runtime/GitHub 계정 연동/GitHub App/repo/deps/MCP 준비를 한 gap 씩 닫아요. 환경 진단만 원하면 doctor/diagnosis 가 맞고, 새 앱 생성을 명시하면 bootstrap 이 맞아요. onboarding 은 빈 폴더에서도 자동 bootstrap 을 시작하지 않고 Ready card 에서 `첫 앱 만들어줘` 를 다음 말로 안내해요.
+처음 axhub 를 쓰는 사람을 위한 단일 진입점이에요. 사용자는 `온보딩`, `처음인데 뭐부터`, `getting started` 처럼 말하면 되고, 이 스킬은 CLI/auth/runtime/GitHub 계정 연동/GitHub App/repo/deps 준비를 한 gap 씩 닫아요. 환경 진단만 원하면 doctor/diagnosis 가 맞고, 새 앱 생성을 명시하면 bootstrap 이 맞아요. onboarding 은 빈 폴더에서도 자동 bootstrap 을 시작하지 않고 Ready card 에서 `첫 앱 만들어줘` 를 다음 말로 안내해요.
 
 ## Reference Loading
 
@@ -28,22 +28,21 @@ model: sonnet
 - [`references/install-channels-and-auth.md`](references/install-channels-and-auth.md): CLI 설치·PATH repair·update·auth, git/node 설치와 version 교정.
 - [`references/github-app.md`](references/github-app.md): GitHub App install URL visibility, 다른 계정 추가 질문, 미설치 gate.
 - [`references/dependency-install.md`](references/dependency-install.md): lockfile-only dependency install, `--ignore-scripts`, native build downgrade.
-- [`references/mcp-ready-card.md`](references/mcp-ready-card.md): AI 활용 기록 옵트인, MCP add/auth distinction, `VIBE_READY`, `READY_WITH_USER_ACTION`, `SAFE_STOP_NONINTERACTIVE` card variants.
+- [`references/ready-card.md`](references/ready-card.md): AI 활용 기록 옵트인, `VIBE_READY`, `READY_WITH_USER_ACTION`, `SAFE_STOP_NONINTERACTIVE` card variants.
 
 References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, top-level invariant 와 reference detail 이 충돌하면 top-level safety invariant 를 우선해요.
 
 ## Core Contract
 
 1. **Single source of truth.** 모든 gap 판정은 `axhub plugin-support onboarding-detect --json` 한 번에서 온 JSON 이 source of truth 예요. `first_gap` 이 처리 순서를 결정해요. gap 마다 preflight 를 다시 돌려 순서를 추측하지 않아요.
-2. **Detect-first loop.** `detect -> first_gap 하나 처리 -> 재감지` 를 반복해요. 한 번에 여러 mutate gap 을 실행하지 않아요. Claude Desktop 의 OAuth device flow 는 CLI 자동 브라우저 오픈/자동 polling 경로를 쓰고, 브라우저 실행 실패·만료·권한 거부 같은 fallback 에서만 `READY_WITH_USER_ACTION` 으로 멈춰요. OS installer GUI, PATH reload, GitHub App install, MCP OAuth 는 여전히 사용자 action gate 예요.
-3. **Headless safety.** 순수 subprocess/headless/CI 에서는 AskUserQuestion 을 생략하고 safe defaults 로 멈춰요. install/update/auth/bootstrap/deps mutation, git/node system install, node version switch, browser open, MCP OAuth 를 자동 실행하지 않아요. 최종 상태는 `SAFE_STOP_NONINTERACTIVE` 예요.
+2. **Detect-first loop.** `detect -> first_gap 하나 처리 -> 재감지` 를 반복해요. 한 번에 여러 mutate gap 을 실행하지 않아요. Claude Desktop 의 OAuth device flow 는 CLI 자동 브라우저 오픈/자동 polling 경로를 쓰고, 브라우저 실행 실패·만료·권한 거부 같은 fallback 에서만 `READY_WITH_USER_ACTION` 으로 멈춰요. OS installer GUI, PATH reload, GitHub App install 은 여전히 사용자 action gate 예요.
+3. **Headless safety.** 순수 subprocess/headless/CI 에서는 AskUserQuestion 을 생략하고 safe defaults 로 멈춰요. install/update/auth/bootstrap/deps mutation, git/node system install, node version switch, browser open 을 자동 실행하지 않아요. 최종 상태는 `SAFE_STOP_NONINTERACTIVE` 예요.
 4. **No automatic bootstrap.** 빈 폴더나 manifest 없는 폴더를 발견해도 bootstrap skill 로 위임하거나 앱을 자동 생성하지 않아요. `no_manifest_empty` 는 안내 후 Ready card 로 가고, 다음 말은 `첫 앱 만들어줘` 예요.
 5. **GitHub App visibility.** detect JSON 의 `github.install_url` 이 null 이 아니면 설치 여부·계정 수·`first_gap` 과 무관하게 한 번은 보여줘요. `github.state` 가 `uninstalled`/`empty` 면 설치 확인 전 Step 7 repo/app 연결로 넘어가지 않아요.
 6. **Dependency safety.** 의존성 설치는 manifest 와 lockfile 이 있을 때만, 명시 확인 뒤, 해당 lockfile 의 package manager 로만 실행해요. 모든 install command 는 반드시 `--ignore-scripts` 를 붙여요. lockfile 이 없으면 설치하지 않아요.
-7. **MCP truth.** `claude mcp add` 는 등록일 뿐이에요. `claude mcp get axhub` 가 `Status: Connected` 를 보여주기 전까지 `mcp__axhub__*` 가 연결됐다고 말하지 않아요. 새로 add 한 세션에서는 `/mcp` OAuth 를 안내하지 말고 재시작 handoff 로 넘겨요 — `/mcp` OAuth 안내는 이전 세션에서 등록된 경우(resume 포함)에만 해요. Claude Desktop Code mode 의 채팅 입력창은 `/mcp` 를 실행하지 않고 일반 메시지로 보내므로, 그 입력창에 `/mcp` 를 치라고 안내하지 않아요. Desktop 에서는 내장 터미널을 여는 방법부터 정확히 안내하는 reference 의 host-aware 인증 절차를 따라요.
-8. **Ready card honesty.** 확인하지 않은 항목은 green check 로 표시하지 않아요. 내부 종료 상태는 `VIBE_READY`, `READY_WITH_USER_ACTION`, `SAFE_STOP_NONINTERACTIVE`, `BLOCKED_UNSUPPORTED` 중 하나로 판정하되, 이 enum 이름과 대괄호 표기는 사용자 문장에 출력하지 말아요.
-9. **Telemetry opt-in.** AI 활용 기록(`axhub axrouter` — 내 Claude Code 프롬프트·응답·툴콜을 팀 워크스페이스로 보내는 수집 기능)은 무엇이 수집되는지 설명하고 물어본 뒤 사용자가 켜기를 고를 때만 켜요 — 동의 없이 켜지 않아요. 거절하면 같은 온보딩에서 다시 묻지 않고, headless 에서는 묻지도 켜지도 않아요. 미지원 워크스페이스·구 CLI 면 조용히 건너뛰어요.
-10. **axhub 맥락 게이트.** 발화에 axhub 언급이 없고 대화에도 axhub 맥락(직전 axhub 작업)이 없으면, detect 를 시작하기 전에 "axhub 셋업을 말하는 거예요?" 를 한 번만 물어요. 아니라는 답이면 이 스킬을 종료하고 다른 axhub skill 로 넘기지 않아요. headless 에서는 묻지 않고 멈춰요.
+7. **Ready card honesty.** 확인하지 않은 항목은 green check 로 표시하지 않아요. 내부 종료 상태는 `VIBE_READY`, `READY_WITH_USER_ACTION`, `SAFE_STOP_NONINTERACTIVE`, `BLOCKED_UNSUPPORTED` 중 하나로 판정하되, 이 enum 이름과 대괄호 표기는 사용자 문장에 출력하지 말아요.
+8. **Telemetry opt-in.** AI 활용 기록(`axhub axrouter` — 내 Claude Code 프롬프트·응답·툴콜을 팀 워크스페이스로 보내는 수집 기능)은 무엇이 수집되는지 설명하고 물어본 뒤 사용자가 켜기를 고를 때만 켜요 — 동의 없이 켜지 않아요. 거절하면 같은 온보딩에서 다시 묻지 않고, headless 에서는 묻지도 켜지도 않아요. 미지원 워크스페이스·구 CLI 면 조용히 건너뛰어요.
+9. **axhub 맥락 게이트.** 발화에 axhub 언급이 없고 대화에도 axhub 맥락(직전 axhub 작업)이 없으면, detect 를 시작하기 전에 "axhub 셋업을 말하는 거예요?" 를 한 번만 물어요. 아니라는 답이면 이 스킬을 종료하고 다른 axhub skill 로 넘기지 않아요. headless 에서는 묻지 않고 멈춰요.
 
 ## Progress
 
@@ -60,7 +59,6 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 - `GitHub App 설치 확인하는 중이에요`
 - `필요한 패키지 설치하는 중이에요`
 - `AI 활용 기록 설정 확인하는 중이에요`
-- `axhub 도구 연결하는 중이에요`
 - `준비 다 됐어요`
 
 TodoWrite 가 host 에 있으면 checklist 를 갱신해요. 없으면 언급하지 말고 자연어 진행 알림만 사용해요.
@@ -117,11 +115,9 @@ If a handler needs a prompt but D1 safe-stop mode is active, do not execute the 
 
 `cli_path_missing` 은 CLI 가 디스크에 있는데 현재 셸 PATH 에 없는 상태예요. 이미 열린 세션의 PATH 는 밖에서 못 고치므로(OS 설계), repair-path 뒤에 `command -v axhub` 재감지를 반복하지 말고(무한 루프 방지) **repair-path JSON 의 `bin_path` 절대경로로 남은 온보딩 명령을 그대로 이어가요** (예: `"<bin_path>" auth status --json`). detect 의 `cli_resolved_path` 도 같은 절대경로예요. 남은 gap 재감지가 필요하면 `"<bin_path>" plugin-support onboarding-detect --json` 으로 실행하고, 결과에 `cli_path_missing`/`cli_on_path:false` 가 다시 보여도 이미 처리된 것으로 간주하고 다음 gap 으로 넘어가요. `bin_path` 가 없는 구 CLI 면 기존대로 `READY_WITH_USER_ACTION` 으로 "PATH 준비됐어요. 새 터미널을 열고 거기서 Claude 를 실행해 온보딩을 다시 불러 주세요" 라고 안내해요. 새 터미널·VS Code 앱 재시작 안내는 마무리 카드에 보조 문구로 한 번만 붙여요.
 
-### 4. Telemetry opt-in, MCP and Ready card
+### 4. Telemetry opt-in and Ready card
 
-After gaps are green, load [`references/mcp-ready-card.md`](references/mcp-ready-card.md) and finish in order: AI 활용 기록 옵트인 질문 → MCP 등록(온보딩 기본 단계, user scope — 'optional' 이 아니라 재시작 1회로 활성화하는 마무리 게이트예요) → 최종 카드. 마무리 진입 시 "마지막 단계예요 — AI 활용 기록(선택)과 axhub 도구 연동을 정리하고, 필요하면 재시작 한 번으로 끝나요." 예고 한 줄을 먼저 말해요. 원칙은 재시작 최대 1회 · 카드 1장 · 질문은 옵트인 1개예요. Never claim MCP connected until `claude mcp get axhub` says `Status: Connected`.
-
-새로 `claude mcp add` 를 실행한 세션에는 서버가 로드되지 않아요 — marker(`~/.axhub/cache/.onboarding-mcp-restart`)를 쓰고 Restart Handoff Card(`READY_WITH_USER_ACTION`)로 종료해요. 재시작 후에는 SessionStart hook 이 marker 를 감지해 새 세션이 마무리를 먼저 제안하고, `VIBE_READY` 를 출력할 때 marker 를 삭제해요. 세부 분기는 reference 의 Claude Code Path / Resume After Restart 섹션이 소유해요.
+After gaps are green, load [`references/ready-card.md`](references/ready-card.md) and finish in order: AI 활용 기록 옵트인 질문 → 최종 카드. 마무리 진입 시 "마지막 단계예요 — AI 활용 기록(선택)만 정하면 끝나요." 예고 한 줄을 먼저 말해요. 원칙은 카드 1장 · 질문은 옵트인 1개예요. AI 활용 기록을 이번에 켰으면 적용은 Claude Code 재시작 후라는 점을 카드 한 줄로만 반영해요 — 별도 재시작 handoff 는 없어요.
 
 Finish with one honest card:
 
@@ -152,9 +148,7 @@ Finish with one honest card:
 - NEVER subprocess(`claude -p`/CI/headless)에서 install/update/auth/bootstrap/deps mutation 이나 git/node system install/version switch 를 자동 실행하지 말아요.
 - NEVER mark unchecked items green in `VIBE_READY`.
 - NEVER run deploy verify without the concrete deployment id and app scope from the deploy output; no latest re-search.
-- NEVER claim axhub MCP is connected after add only; require `claude mcp get axhub` connected status.
-- NEVER `claude mcp add` 를 실행한 그 세션에서 `/mcp` OAuth 완료나 `mcp__axhub__*` 도구 활성화를 안내하지 말아요 — marker 를 쓰고 Restart Handoff Card 로 종료해요.
-- NEVER `VIBE_READY` 출력 후 marker(`~/.axhub/cache/.onboarding-mcp-restart`)를 남기지 말아요.
+- NEVER MCP 서버 등록(`claude mcp add`)이나 MCP OAuth 인증을 안내·실행하지 말아요 — 온보딩은 CLI 준비까지만 담당해요.
 
 ## Additional Resources
 
