@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.20.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.20.3...v1.20.4) (2026-08-17)
+
+플러그인에서 axhub MCP 등록·안내 표면을 걷어냈어요 — MCP 서버가 등록만 되고 인증이 안 된 상태면 세션마다 인증 팝업이 떠서 불편했고, MCP 없이도 스킬 기능에는 문제가 없거든요. 온보딩은 이제 MCP 등록·재시작 없이 옵트인 질문과 최종 카드 한 장으로 끝나고, 관련 SessionStart resume 훅도 제거됐어요. "App/MCP 도구 대신 CLI-only" 방어 가드는 그대로 유지돼요.
+
+
+### Changed
+
+* **plugin:** MCP 등록·resume 표면 제거 ([d6a3280](https://github.com/jocoding-ax-partners/axhub/commit/d6a3280b7277c797cac3b248e1e0023e6f3005d1))
+
 ## [1.20.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.20.2...v1.20.3) (2026-08-11)
 
 scaffold 로 저장소를 만든 뒤 코드를 고쳐서 올리려 하면 `git push` 가 곧바로 실패하던 걸 고쳤어요. 저장소 생성 명령이 토큰을 남기지 않으려고 주소를 직접 넘겨 push 하는데, 그 방식이라 로컬에 `origin` 이 등록되지 않았거든요. 이제 push 가 끝나면 `origin` 을 붙여두고, 다음 push 에 쓸 명령도 함께 안내해요. 실사용에서 두 번 연속 재현한 문제예요.
