@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.21.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.21.1...v1.21.2) (2026-08-19)
+
+Codex 데스크탑 앱에서 9개 스킬을 처음부터 끝까지 실사용해 보며 나온 두 가지를 고쳤어요. `codex plugin list --json` 은 내가 쓰지도 않는 다른 마켓플레이스 하나만 깨져 있어도 목록 전체를 실패시키는데, 그동안 "최신인지 확인해줘" 는 여기서 플러그인 쪽을 통째로 포기하고 손쓸 방법 없는 안내로 닫혔어요. 이제 설치된 플러그인에서 현재 버전을 직접 읽어 비교하고 필요하면 새 버전까지 받아요. 저장소를 내 계정에 만드는 흐름은 승인 문구가 매번 달라지고 별표가 그대로 보이던 문제를 다른 스킬과 같은 `진행`/`취소` 로 맞췄어요.
+
+### Fixed
+
+* **plugin:** codex update 목록 실패 fallback 과 scaffold 승인 문구 고정 ([b58a833](https://github.com/jocoding-ax-partners/axhub/commit/b58a833322a0f49c4b8c550932a049b93ecbeb85))
+
 ## [1.21.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.21.0...v1.21.1) (2026-08-19)
 
 Codex 에서 마켓플레이스를 추가하면 axhub(Claude 용)와 axhub-codex 가 함께 떠 혼란스럽다는 피드백을 반영했어요. 이제 Codex 카탈로그에는 `axhub-codex` 하나만 보여요 — Claude Code 는 `.agents` 목록을 읽지 않아 Claude 사용자에게는 아무 변화가 없어요. 이미 마켓플레이스를 등록해 둔 Codex 사용자는 `codex plugin marketplace upgrade axhub` 를 실행하면 목록이 정리돼요.

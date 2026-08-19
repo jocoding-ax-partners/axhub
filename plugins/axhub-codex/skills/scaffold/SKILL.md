@@ -73,7 +73,7 @@ git -C <target> init -q -b main && git -C <target> add -A && git -C <target> com
 
 ### 7. 저장소 생성 + push (tool 제목 `저장소 만들기`)
 
-미리보기 먼저(기본이 dry-run), 사용자 승인 후 `--execute`:
+미리보기 먼저(기본이 dry-run), 사용자 승인 후 `--execute`. 승인 문구는 다른 스킬과 같은 `진행`/`취소` 로 고정해요 — 미리보기 끝에 `지금 저장소를 만들고 코드를 올릴까요? 진행 또는 취소 로 답해 주세요.` 를 그대로 쓰고 매번 새 문구를 지어내지 않아요. 승인 문구를 굵게 강조하지 않아요 — `** 진행 **` 처럼 별표 안쪽에 공백이 들어가면 별표가 그대로 노출돼요.
 
 ```bash
 axhub github repo create --owner <owner> --name <slug> --push <target> --execute
