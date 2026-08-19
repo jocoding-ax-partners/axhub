@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync, chmodSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { HOST_EXPECTATIONS, SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
 
 // 훅 bash 를 실제로 실행하는 하네스예요 — 문자열 계약 테스트가 못 잡는 의미
 // 회귀(F1: whole-JSON 매칭 오탐)를 잠가요. 합성 payload 는 공식 문서 예시
@@ -25,15 +27,9 @@ const upsCommands = hooksFile.hooks.UserPromptSubmit.flatMap((group) => group.ho
 const ssCommands = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks).map((h) => h.command);
 const updateRouterCmd = upsCommands[0]!;
 
-// hooks.json 의 SessionStart entry 순서와 1:1 인 wrapper 파일들이에요.
-const SESSION_WRAPPERS = [
-  "session-auto-update.sh",
-  "session-windows-contract.sh",
-  "session-update-router-guard.sh",
-  "session-restart-confirm.sh",
-  "session-feedback-contract.sh",
-] as const;
-const wrapperPath = (name: (typeof SESSION_WRAPPERS)[number]): string => join(REPO_ROOT, "hooks", name);
+// hooks.json 의 SessionStart entry 순서와 1:1 인 wrapper 파일 목록은
+// fixtures/host-expectations.ts 의 SESSION_WRAPPER_SCRIPTS 가 단일 소유해요.
+const wrapperPath = (name: (typeof SESSION_WRAPPER_SCRIPTS)[number]): string => join(REPO_ROOT, "hooks", name);
 const autoUpdateSh = wrapperPath("session-auto-update.sh");
 const windowsContractSh = wrapperPath("session-windows-contract.sh");
 const ap14FallbackSh = wrapperPath("session-update-router-guard.sh");
@@ -217,8 +213,8 @@ describe("UserPromptSubmit 라우터 diet (update 단독)", () => {
 
 describe("SessionStart wrapper 위임 (KTD6: 인라인 command → hooks/session-*.sh)", () => {
   test("5개 entry 가 순서대로 각 wrapper 파일로 bare 위임해요 — 실행 대상과 hooks.json 이 일치해요", () => {
-    expect(ssCommands).toEqual(SESSION_WRAPPERS.map((name) => `bash "\${CLAUDE_PLUGIN_ROOT}/hooks/${name}"`));
-    for (const name of SESSION_WRAPPERS) {
+    expect(ssCommands).toEqual(SESSION_WRAPPER_SCRIPTS.map((name) => HOST_EXPECTATIONS.claude.surface.hookWrapperCommand(name)));
+    for (const name of SESSION_WRAPPER_SCRIPTS) {
       expect(existsSync(wrapperPath(name))).toBe(true);
     }
   });
@@ -406,5 +402,63 @@ describe("AP-14 폴백 훅 (SessionStart entry 3)", () => {
 
   test("marker kill switch no-update-router → 침묵해요 (UserPromptSubmit 라우터와 공용)", () => {
     expectSilent(runScript(ap14FallbackSh, "", { HOME: makeHomeWithMarker("update-router") }));
+  });
+});
+
+// ── hooks.json 합성 command e2e (plugin-root env 치환 경계) ──────────────
+
+// hooks.json 의 SessionStart command 문자열 자체를 `bash -c` 로 실행해요 —
+// wrapper 파일 직접 실행(runScript)이 못 보는 `${CLAUDE_PLUGIN_ROOT}` 치환
+// 경계를 잠가요. repo 루트를 그대로 쓰면 .git 때문에 entry 1 dev 가드가
+// 끼어드니, .git 없는 스테이징 번들 루트(운영 플러그인 캐시 배치와 동형)로
+// 각 entry 의 기대 emit/침묵을 그대로 재현해요.
+const STAGED_PLUGIN_ROOT = mkdtempSync(join(tmpdir(), "axhub-staged-plugin-"));
+cpSync(join(REPO_ROOT, "hooks"), join(STAGED_PLUGIN_ROOT, "hooks"), { recursive: true });
+
+const runSsCommand = (index: number, env: Record<string, string> = {}): RunResult =>
+  runInline(ssCommands[index]!, "", { CLAUDE_PLUGIN_ROOT: STAGED_PLUGIN_ROOT, ...env });
+
+describe("SessionStart 합성 command e2e (hooks.json command 문자열 실행)", () => {
+  test("entry 1 auto-update: 스테이징 루트 + 캐시 없음 → 운영 emit 이 재현돼요", () => {
+    const home = makeHome();
+    expectEmit(runSsCommand(0, { HOME: home, PATH: SAFE_PATH }), "SessionStart", "auto-update-prompt.md");
+    expect(existsSync(join(home, CACHE_REL))).toBe(true);
+  });
+
+  test("entry 1 auto-update: kill switch 침묵도 합성 command 경로에서 재현돼요", () => {
+    const home = makeHome();
+    expectSilent(runSsCommand(0, { HOME: home, PATH: SAFE_PATH, AXHUB_NO_AUTO_UPDATE: "1" }));
+    expect(existsSync(join(home, CACHE_REL))).toBe(false);
+  });
+
+  test("entry 2 windows-contract: OS=Windows_NT → 발행, 미설정(non-Windows skip) → 침묵해요", () => {
+    expectEmit(runSsCommand(1, { OS: "Windows_NT" }), "SessionStart", "Git Bash");
+    expectSilent(runSsCommand(1));
+  });
+
+  test("entry 3 update-router-guard: 기본 상태 → update-first 가드를 발행해요", () => {
+    expectEmit(runSsCommand(2), "SessionStart", "update-first routing guard is active for Code mode");
+  });
+
+  test("entry 4 restart-confirm: fresh marker → confirm prompt 지시를 발행해요", () => {
+    const home = makeHome();
+    mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
+    writeFileSync(join(home, MARKER_REL), "1.10.28");
+    expectEmit(runSsCommand(3, { HOME: home }), "SessionStart", "plugin-restart-confirm-prompt.md");
+  });
+
+  test("entry 5 feedback-contract: PATH 의 axhub 로 계약을 발행해요", () => {
+    expectEmit(runSsCommand(4, { HOME: makeHome(), PATH: SAFE_PATH }), "SessionStart", "axhub feedback -m");
+  });
+});
+
+describe("CLAUDE_PLUGIN_ROOT 미설정 경계 (omitted-root)", () => {
+  test("env 미설정이면 5개 entry 모두 exit 127 + stdout 무JSON 으로 소실돼요 (현행 거동 문서화)", () => {
+    // 조용한 소실이 현행 계약이에요 — Claude·Codex 둘 다 env 주입 실측 확인, U1-(p) 재확인 예정.
+    for (const command of ssCommands) {
+      const result = runInline(command, "");
+      expect(result.exitCode).toBe(127);
+      expect(result.stdout.trim()).toBe("");
+    }
   });
 });

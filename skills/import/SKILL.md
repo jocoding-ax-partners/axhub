@@ -131,7 +131,7 @@ Static 성공은 `active_release_id`, `verified === true`, `public_url`, `error 
 
 ## Headless rule
 
-`claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, TTY 없음, AskUserQuestion 사용 불가 상태는 headless 예요.
+`claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, TTY 없음, 네이티브 선택 UI 와 명시 텍스트 승인이 둘 다 불가한 상태(사용자 확인 채널 자체가 없음)는 headless 예요.
 
 - AskUserQuestion 0회.
 - `axhub --json plugin-support import --mode preview --headless` 만 호출해요.

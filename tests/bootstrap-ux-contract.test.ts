@@ -235,6 +235,8 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("정확히 `지금 만들고 배포까지 진행할까요?` 질문과 `진행`/`취소` 선택지");
     expect(bootstrap).toContain("질문·선택지·설명은 의역하거나 새로 만들지 않아요");
     expect(bootstrap).toContain("사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요");
+    // AP-12 승인 fallback 사다리 — bootstrap 사본 문장 전문을 fixture 로 잠가요.
+    expect(bootstrap).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
     expect(reference).toContain("treat that as the user's goal, not as execute approval");
     expect(reference).toContain('"question": "지금 만들고 배포까지 진행할까요?"');
     expect(reference).toContain('"label": "진행", "value": "execute"');

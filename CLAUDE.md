@@ -128,7 +128,7 @@ auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks
 
 - hook 은 `$OS` 만 봐요 — 네트워크·`axhub` 바이너리·marker 안 건드리고, non-Windows 는 즉시 exit 0.
 - **끄기:** `AXHUB_NO_WINDOWS_CONTRACT=1` 또는 `~/.axhub/config/no-windows-contract`. Windows 전제는 다른 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
-- 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-13 이 소유해요 (parity 적용: `hooks/hooks.json`, `CLAUDE.md`).
+- 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-13 이 소유해요 (parity 적용: `hooks/session-windows-contract.sh`, `CLAUDE.md`).
 
 ## update-first Code-mode router hook (AP-14)
 
@@ -145,7 +145,7 @@ SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이�
 
 - hook 은 CLI 존재만 봐요 (AP-17 의 3-경로: `command -v axhub` → `~/.axhub/bin-path` → canonical `~/.axhub/bin/axhub`(.exe)) — 네트워크·바이너리 실행·marker 접촉 없음, 못 찾으면 즉시 exit 0.
 - **끄기:** `AXHUB_NO_FEEDBACK_REPORT=1` 또는 `~/.axhub/config/no-feedback-report`.
-- 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-19 가 소유해요 (parity 적용: `hooks/hooks.json`, `CLAUDE.md`, `POLICY.md`). 사용자 공개는 `POLICY.md` 의 "실패 자동 리포트" 섹션이 담당해요.
+- 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-19 가 소유해요 (parity 적용: `hooks/session-feedback-contract.sh`, `CLAUDE.md`, `POLICY.md`). 사용자 공개는 `POLICY.md` 의 "실패 자동 리포트" 섹션이 담당해요.
 
 ## CLI 호출 표면
 

@@ -3,6 +3,8 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } 
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 
+import { SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
+
 const REPO_ROOT = join(import.meta.dir, "..");
 const MARKETPLACE_BUNDLE_DIR = join(REPO_ROOT, "plugins", "axhub");
 const SKILLS = ["onboarding", "bootstrap", "deploy", "import", "development", "diagnosis", "clarity", "update"] as const;
@@ -67,13 +69,7 @@ describe("clean plugin bundle", () => {
       expect(existsSync(join(outDir, "hooks", "hooks.json"))).toBe(true);
       expect(existsSync(join(outDir, "hooks", "update-router.sh"))).toBe(true);
       // KTD6: SessionStart 인라인 command 를 추출한 wrapper 5개도 번들에 실려요
-      for (const wrapper of [
-        "session-auto-update.sh",
-        "session-windows-contract.sh",
-        "session-update-router-guard.sh",
-        "session-restart-confirm.sh",
-        "session-feedback-contract.sh",
-      ]) {
+      for (const wrapper of SESSION_WRAPPER_SCRIPTS) {
         expect(existsSync(join(outDir, "hooks", wrapper)), `missing bundled wrapper: ${wrapper}`).toBe(true);
       }
       expect(existsSync(join(outDir, "hooks", "import-router.sh"))).toBe(false);
@@ -116,11 +112,9 @@ describe("clean plugin bundle", () => {
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "hooks.json"))).toBe(true);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "import-router.sh"))).toBe(false);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "update-router.sh"))).toBe(true);
-    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "session-auto-update.sh"))).toBe(true);
-    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "session-windows-contract.sh"))).toBe(true);
-    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "session-update-router-guard.sh"))).toBe(true);
-    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "session-restart-confirm.sh"))).toBe(true);
-    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "session-feedback-contract.sh"))).toBe(true);
+    for (const wrapper of SESSION_WRAPPER_SCRIPTS) {
+      expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", wrapper)), `missing marketplace wrapper: ${wrapper}`).toBe(true);
+    }
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "plugin-restart-confirm-prompt.md"))).toBe(true);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "node_modules"))).toBe(false);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, ".git"))).toBe(false);

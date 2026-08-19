@@ -42,7 +42,7 @@ For the initial Desktop preview, stop reading after this section unless approval
 
 ## Headless Contract
 
-Headless means `claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, no TTY, or unavailable/denied AskUserQuestion.
+Headless means `claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, no TTY, or no user-confirmation channel at all — neither native choice UI nor explicit text approval is available.
 
 - Headless = AskUserQuestion 0회. Do not call AskUserQuestion and do not render numbered choices then stop.
 - Headless safe default is dry-run for deploy preview/create paths. Force `DEPLOY_DECISION=dry_run` and never run `--execute`.

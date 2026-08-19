@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { HOST_EXPECTATIONS } from "./fixtures/host-expectations";
+import { HOST_EXPECTATIONS, SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
@@ -104,6 +104,7 @@ describe("smooth behavior contracts", () => {
       readRepo("skills/import/SKILL.md") +
       readRepo("skills/import/references/visibility-rules.md") +
       readRepo("skills/import/references/manifest-authoring.md");
+    const scaffold = readRepo("skills/scaffold/SKILL.md");
     const onboardingAuth = readRepo("skills/onboarding/references/install-channels-and-auth.md");
     const bootstrapAndLocal = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
@@ -498,6 +499,18 @@ describe("smooth behavior contracts", () => {
     for (const leakedUpdatePhrase of ["PLUGIN_UPDATED_VERSION", "matching plugin.latest", "Confirmed:", "Confirmed", "plugin.latest"]) {
       expect(update).not.toContain(leakedUpdatePhrase);
     }
+
+    // AP-12 승인 fallback 사다리 — 4사본 공통 문장 전문을 fixture 로 잠가요
+    // (bootstrap 사본은 bootstrap-ux-contract.test.ts 가 잠가요).
+    expect(deploy).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    expect(importSkill).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    expect(scaffold).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    // headless 정의는 3-lane 사다리 정합 재작성본으로 잠가요 — 정의 문장이
+    // `claude -p`·`codex exec` 병기 토큰을 포함해요. onboarding 은 D1 가드와
+    // NEVER 목록 두 곳 모두에 병기 토큰이 남아야 해요.
+    expect(deploy).toContain(CLAUDE.approvalGate.headlessDefinitionDeploy);
+    expect(importSkill).toContain(CLAUDE.approvalGate.headlessDefinitionImport);
+    expect(onboarding.split(CLAUDE.approvalGate.headlessCodexExecMention).length - 1).toBeGreaterThanOrEqual(2);
   });
 
   test("development skill follows the current SDK raw-db surface", () => {
@@ -629,22 +642,16 @@ describe("smooth behavior contracts", () => {
     // KTD6: 인라인 command 는 hooks/session-*.sh wrapper 로 추출됐어요 —
     // hooks.json 은 update-router 와 같은 bare 위임만 갖고, 계약 본문은
     // wrapper 스크립트가 소유해요 (codex 훅 trust hash 재신뢰 스팸 방지 구조).
-    const wrappers = [
-      "session-auto-update.sh",
-      "session-windows-contract.sh",
-      "session-update-router-guard.sh",
-      "session-restart-confirm.sh",
-      "session-feedback-contract.sh",
-    ];
+    // wrapper 파일명 목록은 fixture 의 SESSION_WRAPPER_SCRIPTS 가 단일 소유해요.
     entries.forEach((entry, index) => {
       expect(entry.type).toBe("command");
       expect(entry.shell).toBe("bash");
-      expect(entry.command).toBe(CLAUDE.surface.hookWrapperCommand(wrappers[index]));
+      expect(entry.command).toBe(CLAUDE.surface.hookWrapperCommand(SESSION_WRAPPER_SCRIPTS[index]));
     });
 
     // every SessionStart hook injects context invisibly: suppressed JSON only,
     // never plain echo stdout and never a user-facing systemMessage banner
-    for (const wrapper of wrappers) {
+    for (const wrapper of SESSION_WRAPPER_SCRIPTS) {
       const script = readRepo(`hooks/${wrapper}`);
       expect(script).toContain("suppressOutput");
       expect(script).toContain("additionalContext");
