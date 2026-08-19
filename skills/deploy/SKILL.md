@@ -36,13 +36,13 @@ axhub plugin-support deploy-preview-summary --user-utterance "<latest user sente
 
 이 첫 명령 전에는 설치·플러그인·앱·git·curl probe를 하지 않아요. 명시적 최신성 요청만 update 뒤 이 스킬로 돌아와요.
 
-정상 preview 면 axhub 프로젝트 확정이에요. Interactive 는 별도 진입 질문 없이 **preview card 하나가 axhub 진입 확인을 겸해요** (AP-12 통합 게이트): Korean stdout 을 preview card 로 보여주고 `axhub로 지금 배포를 진행할까요?` 질문과 기존 `진행`/`취소` 승인을 한 번만 받아요. `취소` 면 종료. (headless 는 AUQ 생략, dry-run) If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here. axhub 맥락(사용자의 axhub 언급·직전 axhub 작업)이 있으면 기존대로 안내해요: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`. axhub 맥락이 없으면 import/bootstrap 으로 넘기지 말고 "이 폴더는 axhub에 연결돼 있지 않아요. axhub로 배포하려는 거예요?" 를 한 번만 묻고, 아니라는 답이면 이 스킬을 종료해요. headless 에서는 묻지 않고 조용히 멈춰요.
+정상 preview 면 axhub 프로젝트 확정이에요. Interactive 는 별도 진입 질문 없이 **preview card 하나가 axhub 진입 확인을 겸해요** (AP-12 통합 게이트): Korean stdout 을 preview card 로 보여주고 `axhub로 지금 배포를 진행할까요?` 질문과 기존 `진행`/`취소` 승인을 한 번만 받아요. `취소` 면 종료. (headless 는 AUQ 생략, dry-run) 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here. axhub 맥락(사용자의 axhub 언급·직전 axhub 작업)이 있으면 기존대로 안내해요: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`. axhub 맥락이 없으면 import/bootstrap 으로 넘기지 말고 "이 폴더는 axhub에 연결돼 있지 않아요. axhub로 배포하려는 거예요?" 를 한 번만 묻고, 아니라는 답이면 이 스킬을 종료해요. headless 에서는 묻지 않고 조용히 멈춰요.
 
 For the initial Desktop preview, stop reading after this section unless approval is received. After approval, continue with the canonical workflow below and load `references/workflow-details.md` for branch detail.
 
 ## Headless Contract
 
-Headless means `claude -p`, CI, `$CLAUDE_NON_INTERACTIVE`, no TTY, or unavailable/denied AskUserQuestion.
+Headless means `claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, no TTY, or unavailable/denied AskUserQuestion.
 
 - Headless = AskUserQuestion 0회. Do not call AskUserQuestion and do not render numbered choices then stop.
 - Headless safe default is dry-run for deploy preview/create paths. Force `DEPLOY_DECISION=dry_run` and never run `--execute`.

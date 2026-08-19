@@ -67,7 +67,7 @@ TodoWrite 가 host 에 있으면 checklist 를 갱신해요. 없으면 언급하
 
 ### 0. Non-interactive guard
 
-첫 AskUserQuestion 또는 mutation 전에 대화형 여부를 판단해요. 다음 중 하나면 D1 safe-stop mode 예요: stdout 이 TTY 가 아님, `CI` 가 있음, `CLAUDE_NON_INTERACTIVE` 가 있음, `claude -p` 같은 subprocess/headless 호출임. 이 모드에서는 사용자 확인이 필요한 action 을 실행하지 않고 manual next phrase 와 `SAFE_STOP_NONINTERACTIVE` card 로 끝내요.
+첫 AskUserQuestion 또는 mutation 전에 대화형 여부를 판단해요. 다음 중 하나면 D1 safe-stop mode 예요: stdout 이 TTY 가 아님, `CI` 가 있음, `CLAUDE_NON_INTERACTIVE` 가 있음, `claude -p`·`codex exec` 같은 subprocess/headless 호출임. 이 모드에서는 사용자 확인이 필요한 action 을 실행하지 않고 manual next phrase 와 `SAFE_STOP_NONINTERACTIVE` card 로 끝내요.
 
 ### 1. DETECT_ALL(read-only)
 
@@ -145,7 +145,7 @@ Finish with one honest card:
 - NEVER dependency install without a lockfile.
 - NEVER omit `--ignore-scripts` from dependency install.
 - NEVER 묻지 않고 또는 headless 에서 AI 활용 기록 수집(`axhub axrouter monitor`)을 켜지 말아요; 거절한 사용자에게 같은 온보딩에서 다시 묻지 말아요.
-- NEVER subprocess(`claude -p`/CI/headless)에서 install/update/auth/bootstrap/deps mutation 이나 git/node system install/version switch 를 자동 실행하지 말아요.
+- NEVER subprocess(`claude -p`·`codex exec`/CI/headless)에서 install/update/auth/bootstrap/deps mutation 이나 git/node system install/version switch 를 자동 실행하지 말아요.
 - NEVER mark unchecked items green in `VIBE_READY`.
 - NEVER run deploy verify without the concrete deployment id and app scope from the deploy output; no latest re-search.
 - NEVER MCP 서버 등록(`claude mcp add`)이나 MCP OAuth 인증을 안내·실행하지 말아요 — 온보딩은 CLI 준비까지만 담당해요.

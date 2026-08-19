@@ -134,7 +134,7 @@ describe("bootstrap desktop UX contract", () => {
       bootstrap.indexOf("### 2. Resume And Workspace"),
     );
 
-    expect(bootstrap).toContain("`rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요");
+    expect(bootstrap).toContain("`rtk` 같은 개발자 전용 CLI 래퍼는 이 skill 에서 절대 쓰지 않아요");
     expect(bootstrap).toContain("`pwd`, `ls`, `find`, `cat`, `curl` 같은 generic shell probe");
     expect(localReference).toContain("Never prefix with `rtk`");
     expect(resumeReference).toContain("no `rtk`, no generic `ls`/`pwd` probes");
