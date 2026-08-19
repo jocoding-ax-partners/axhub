@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.21.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.21.2...v1.21.3) (2026-08-19)
+
+
+1.21.2 에서 넣은 "플러그인 목록이 안 열려도 버전은 확인해요" 경로가 실제로는 잘못된 위치를 보고 있었어요. Codex 데스크탑 앱에서 다시 돌려 보니 스킬이 쓰는 셸에는 플러그인 위치를 알려 주는 환경변수가 비어 있었고, 그 바람에 버전을 경로 이름에서 눈대중으로 집어 오는 상태였어요. 이제 읽고 있는 스킬 파일의 실제 위치에서 설치 폴더를 찾아 버전을 읽고, 경로에 적힌 숫자를 버전으로 추측하는 길은 막았어요.
+
+### Fixed
+
+* **plugin:** codex update fallback 을 설치 경로 기준으로 고정 ([f585dfe](https://github.com/jocoding-ax-partners/axhub/commit/f585dfe07192fd662aabc98504afb7f2f4754492))
+
 ## [1.21.2](https://github.com/jocoding-ax-partners/axhub/compare/v1.21.1...v1.21.2) (2026-08-19)
 
 Codex 데스크탑 앱에서 9개 스킬을 처음부터 끝까지 실사용해 보며 나온 두 가지를 고쳤어요. `codex plugin list --json` 은 내가 쓰지도 않는 다른 마켓플레이스 하나만 깨져 있어도 목록 전체를 실패시키는데, 그동안 "최신인지 확인해줘" 는 여기서 플러그인 쪽을 통째로 포기하고 손쓸 방법 없는 안내로 닫혔어요. 이제 설치된 플러그인에서 현재 버전을 직접 읽어 비교하고 필요하면 새 버전까지 받아요. 저장소를 내 계정에 만드는 흐름은 승인 문구가 매번 달라지고 별표가 그대로 보이던 문제를 다른 스킬과 같은 `진행`/`취소` 로 맞췄어요.
