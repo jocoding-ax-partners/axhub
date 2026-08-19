@@ -39,4 +39,10 @@ axhub Claude Code plugin 이 사용자의 컴퓨터에서 무엇을 하고 무�
 - axhub MCP 도구는 읽기 전용(read-only, 조회만 하고 바꾸지 않음)이지만, 플러그인 스킬의 상태 조회·배포·진단 흐름에서는 CLI 계약을 우선해요.
 - 비밀번호·토큰 같은 인증 정보(credential)는 파일이나 로그에 남기지 않아요.
 
+## Codex 지원 — 같은 정책이 적용돼요
+- axhub 는 OpenAI Codex CLI(≥ 0.147.0, 최종 검증 0.148.0)용 파생 번들(`axhub-codex`)도 제공해요. 이 문서의 정책(네트워크 접근·파괴적 작업 승인·실패 자동 리포트·kill switch)은 Codex 판에도 동일하게 적용되고, Codex 판 번들에는 이 문서의 Codex 판이 함께 실려요.
+- Codex 는 플러그인 훅을 사용자가 신뢰하기 전에는 실행하지 않아요 — 신뢰 전에는 자동 업데이트 확인이 돌지 않고, 업데이트는 `update` 스킬을 직접 부르면 돼요. Codex 가 신뢰하는 대상은 훅 command(스크립트 경로)이고, wrapper 스크립트 내용은 플러그인 업데이트로 재신뢰 확인 없이 갱신돼요 — wrapper 동작 변경은 CHANGELOG 에 명시해요.
+- Codex 판의 로컬 표시 파일은 `-codex` 붙은 별도 파일(`~/.axhub/cache/.plugin-update-check-codex` 등)을 써서 Claude 판과 확인 주기를 나눠요. 모든 kill switch(`AXHUB_NO_AUTO_UPDATE` 등)는 동일하게 동작해요.
+- AI 활용 기록(선택 수집) 옵트인은 Claude 판 전용이에요 — Codex 판 플러그인은 이 수집 설정을 만들거나 바꾸지 않아요.
+
 에이전트 행동 규칙(Claude 가 axhub 작업에서 지키는 규칙)은 repo 의 `docs/policy/agent-policy.md` 에 정리돼 있어요.
