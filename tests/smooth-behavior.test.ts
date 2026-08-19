@@ -620,35 +620,50 @@ describe("smooth behavior contracts", () => {
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
     expect(entries).toHaveLength(5);
 
+    // KTD6: 인라인 command 는 hooks/session-*.sh wrapper 로 추출됐어요 —
+    // hooks.json 은 update-router 와 같은 bare 위임만 갖고, 계약 본문은
+    // wrapper 스크립트가 소유해요 (codex 훅 trust hash 재신뢰 스팸 방지 구조).
+    const wrappers = [
+      "session-auto-update.sh",
+      "session-windows-contract.sh",
+      "session-update-router-guard.sh",
+      "session-restart-confirm.sh",
+      "session-feedback-contract.sh",
+    ];
+    entries.forEach((entry, index) => {
+      expect(entry.type).toBe("command");
+      expect(entry.shell).toBe("bash");
+      expect(entry.command).toBe(`bash "\${CLAUDE_PLUGIN_ROOT}/hooks/${wrappers[index]}"`);
+    });
+
     // every SessionStart hook injects context invisibly: suppressed JSON only,
     // never plain echo stdout and never a user-facing systemMessage banner
-    for (const entry of entries) {
-      expect(entry.command).toContain("suppressOutput");
-      expect(entry.command).toContain("additionalContext");
-      expect(entry.command).not.toContain("systemMessage");
-      expect(entry.command).not.toContain('echo "');
+    for (const wrapper of wrappers) {
+      const script = readRepo(`hooks/${wrapper}`);
+      expect(script).toContain("suppressOutput");
+      expect(script).toContain("additionalContext");
+      expect(script).not.toContain("systemMessage");
+      expect(script).not.toContain('echo "');
       // Windows: backslash plugin-root paths must be slash-normalized before
       // JSON interpolation, or C:\... produces invalid JSON escapes
-      if (entry.command.includes("CLAUDE_PLUGIN_ROOT")) {
-        expect(entry.command).toContain("${CLAUDE_PLUGIN_ROOT//");
+      if (script.includes("CLAUDE_PLUGIN_ROOT")) {
+        expect(script).toContain("${CLAUDE_PLUGIN_ROOT//");
       }
     }
 
     // 4번째 entry: 플러그인 업데이트 재시작 확인 (restart-confirm)
-    const restartConfirm = entries[3];
-    expect(restartConfirm.type).toBe("command");
-    expect(restartConfirm.shell).toBe("bash");
-    expect(restartConfirm.command).toContain("AXHUB_NO_AUTO_UPDATE");
-    expect(restartConfirm.command).toContain("no-auto-update");
-    expect(restartConfirm.command).toContain(".plugin-update-restart");
-    expect(restartConfirm.command).toContain("-mmin -10080");
-    expect(restartConfirm.command).toContain("plugin-restart-confirm-prompt.md");
+    const restartConfirm = readRepo("hooks/session-restart-confirm.sh");
+    expect(restartConfirm).toContain("AXHUB_NO_AUTO_UPDATE");
+    expect(restartConfirm).toContain("no-auto-update");
+    expect(restartConfirm).toContain(".plugin-update-restart");
+    expect(restartConfirm).toContain("-mmin -10080");
+    expect(restartConfirm).toContain("plugin-restart-confirm-prompt.md");
     // dev 가드는 이 entry 에 적용하지 않아요 — marker 는 머신 전역이라
     // 어느 세션의 확인도 유효해요 (eng review #1)
-    expect(restartConfirm.command).not.toContain("../../.git");
+    expect(restartConfirm).not.toContain("../../.git");
     // hook 은 읽기 전용: marker 삭제는 confirm prompt 몫, 바이너리 무접촉
-    expect(restartConfirm.command).not.toContain("rm -f");
-    expect(restartConfirm.command).not.toContain("command -v axhub");
+    expect(restartConfirm).not.toContain("rm -f");
+    expect(restartConfirm).not.toContain("command -v axhub");
   });
 
   test("AP-19 feedback auto-report contract hook is wired", () => {
@@ -663,22 +678,26 @@ describe("smooth behavior contracts", () => {
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
 
-    const feedback = entries[4];
-    expect(feedback.type).toBe("command");
-    expect(feedback.shell).toBe("bash");
+    const feedbackEntry = entries[4];
+    expect(feedbackEntry.type).toBe("command");
+    expect(feedbackEntry.shell).toBe("bash");
+    expect(feedbackEntry.command).toBe('bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-feedback-contract.sh"');
+
+    // 계약 본문은 wrapper 스크립트가 소유해요 (KTD6 추출)
+    const feedback = readRepo("hooks/session-feedback-contract.sh");
     // kill switch: env + marker counterpart (repo-wide 훅 계약)
-    expect(feedback.command).toContain("AXHUB_NO_FEEDBACK_REPORT");
-    expect(feedback.command).toContain("no-feedback-report");
+    expect(feedback).toContain("AXHUB_NO_FEEDBACK_REPORT");
+    expect(feedback).toContain("no-feedback-report");
     // CLI 존재 가드는 AP-17 의 3-경로만 봐요 — 네트워크·바이너리 실행 없음
-    expect(feedback.command).toContain("command -v axhub");
-    expect(feedback.command).toContain(".axhub/bin-path");
-    expect(feedback.command).toContain(".axhub/bin/axhub");
+    expect(feedback).toContain("command -v axhub");
+    expect(feedback).toContain(".axhub/bin-path");
+    expect(feedback).toContain(".axhub/bin/axhub");
     // AP-19 invariants (agent-policy parity)
-    expect(feedback.command).toContain("axhub feedback -m");
-    expect(feedback.command).toContain("예상된 거절은 리포트하지 않아요");
+    expect(feedback).toContain("axhub feedback -m");
+    expect(feedback).toContain("예상된 거절은 리포트하지 않아요");
     // hook 은 계약 emit 만 해요: marker 삭제·업데이트·리포트 실행 없음
-    expect(feedback.command).not.toContain("rm -f");
-    expect(feedback.command).not.toContain("axhub update");
+    expect(feedback).not.toContain("rm -f");
+    expect(feedback).not.toContain("axhub update");
   });
 
   test("update freshness prompt router hook is wired", () => {
@@ -753,20 +772,24 @@ describe("smooth behavior contracts", () => {
     }
 
     const sessionEntries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-    const sessionRouter = sessionEntries[2];
-    expect(sessionRouter.type).toBe("command");
-    expect(sessionRouter.shell).toBe("bash");
-    expect(sessionRouter.command).toContain("AXHUB_NO_UPDATE_ROUTER");
-    expect(sessionRouter.command).toContain("update-first routing guard is active for Code mode");
-    expect(sessionRouter.command).toContain("Finding tools");
-    expect(sessionRouter.command).toContain("현재 버전을 확인할게요");
-    expect(sessionRouter.command).toContain("App/MCP tools");
-    expect(sessionRouter.command).toContain("generic Code-mode handling");
-    expect(sessionRouter.command).toContain("CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json");
-    expect(sessionRouter.command).toContain("Deployment list (axhub)");
-    expect(sessionRouter.command).toContain("axhub deployment list");
-    expect(sessionRouter.command).not.toContain("axhub update check");
-    expect(sessionRouter.command).not.toContain("claude plugin update");
+    const sessionRouterEntry = sessionEntries[2];
+    expect(sessionRouterEntry.type).toBe("command");
+    expect(sessionRouterEntry.shell).toBe("bash");
+    expect(sessionRouterEntry.command).toBe('bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-update-router-guard.sh"');
+
+    // AP-14 폴백 본문도 wrapper 스크립트가 소유해요 (KTD6 추출)
+    const sessionRouter = readRepo("hooks/session-update-router-guard.sh");
+    expect(sessionRouter).toContain("AXHUB_NO_UPDATE_ROUTER");
+    expect(sessionRouter).toContain("update-first routing guard is active for Code mode");
+    expect(sessionRouter).toContain("Finding tools");
+    expect(sessionRouter).toContain("현재 버전을 확인할게요");
+    expect(sessionRouter).toContain("App/MCP tools");
+    expect(sessionRouter).toContain("generic Code-mode handling");
+    expect(sessionRouter).toContain("CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json");
+    expect(sessionRouter).toContain("Deployment list (axhub)");
+    expect(sessionRouter).toContain("axhub deployment list");
+    expect(sessionRouter).not.toContain("axhub update check");
+    expect(sessionRouter).not.toContain("claude plugin update");
   });
 
   test("AP-13 Windows execution contract hook is wired", () => {
@@ -781,17 +804,21 @@ describe("smooth behavior contracts", () => {
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
 
-    const windows = entries[1];
-    expect(windows.type).toBe("command");
-    expect(windows.shell).toBe("bash");
+    const windowsEntry = entries[1];
+    expect(windowsEntry.type).toBe("command");
+    expect(windowsEntry.shell).toBe("bash");
+    expect(windowsEntry.command).toBe('bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-windows-contract.sh"');
+
+    // AP-13 계약 본문은 wrapper 스크립트가 소유해요 (KTD6 추출)
+    const windows = readRepo("hooks/session-windows-contract.sh");
     // Windows-only guard + killswitch
-    expect(windows.command).toContain("AXHUB_NO_WINDOWS_CONTRACT");
-    expect(windows.command).toContain("Windows_NT");
+    expect(windows).toContain("AXHUB_NO_WINDOWS_CONTRACT");
+    expect(windows).toContain("Windows_NT");
     // emits the Git Bash execution contract (invariant with agent-policy AP-13)
-    expect(windows.command).toContain("Git Bash 전용");
-    expect(windows.command).toContain("PowerShell");
+    expect(windows).toContain("Git Bash 전용");
+    expect(windows).toContain("PowerShell");
     // read-only / non-blocking: only echoes, never deletes markers
-    expect(windows.command).not.toContain("rm -f");
+    expect(windows).not.toContain("rm -f");
   });
 
   test("onboarding and ready-card stay MCP-free", () => {

@@ -66,11 +66,22 @@ describe("clean plugin bundle", () => {
       expect(existsSync(join(outDir, "POLICY.md"))).toBe(true);
       expect(existsSync(join(outDir, "hooks", "hooks.json"))).toBe(true);
       expect(existsSync(join(outDir, "hooks", "update-router.sh"))).toBe(true);
+      // KTD6: SessionStart 인라인 command 를 추출한 wrapper 5개도 번들에 실려요
+      for (const wrapper of [
+        "session-auto-update.sh",
+        "session-windows-contract.sh",
+        "session-update-router-guard.sh",
+        "session-restart-confirm.sh",
+        "session-feedback-contract.sh",
+      ]) {
+        expect(existsSync(join(outDir, "hooks", wrapper)), `missing bundled wrapper: ${wrapper}`).toBe(true);
+      }
       expect(existsSync(join(outDir, "hooks", "import-router.sh"))).toBe(false);
       expect(existsSync(join(outDir, "hooks", "clarity-router.sh"))).toBe(false);
       expect(existsSync(join(outDir, "hooks", "status-resume-router.sh"))).toBe(false);
       expect(readFileSync(join(outDir, "POLICY.md"), "utf8")).toContain("플러그인 스킬 흐름은 그 도구를 우선 사용하지 않아요");
-      expect(readFileSync(join(outDir, "hooks", "hooks.json"), "utf8")).toContain("AXHUB_NO_UPDATE_ROUTER");
+      // kill switch 본문은 스크립트로 추출됐어요 — hooks.json 은 위임만 가져요
+      expect(readFileSync(join(outDir, "hooks", "update-router.sh"), "utf8")).toContain("AXHUB_NO_UPDATE_ROUTER");
       expect(readFileSync(join(outDir, "hooks", "hooks.json"), "utf8")).toContain("update-router.sh");
       expect(readFileSync(join(outDir, "hooks", "hooks.json"), "utf8")).not.toContain("import-router.sh");
 
@@ -105,6 +116,11 @@ describe("clean plugin bundle", () => {
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "hooks.json"))).toBe(true);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "import-router.sh"))).toBe(false);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "update-router.sh"))).toBe(true);
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "session-auto-update.sh"))).toBe(true);
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "session-windows-contract.sh"))).toBe(true);
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "session-update-router-guard.sh"))).toBe(true);
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "session-restart-confirm.sh"))).toBe(true);
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "session-feedback-contract.sh"))).toBe(true);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "plugin-restart-confirm-prompt.md"))).toBe(true);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "node_modules"))).toBe(false);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, ".git"))).toBe(false);

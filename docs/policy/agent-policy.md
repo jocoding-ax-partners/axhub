@@ -73,12 +73,12 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-13 Windows 실행 계약 (Git Bash 전용)
 - 규칙: Windows 에선 모든 axhub CLI 명령을 Git Bash 전용으로 실행해요 — PowerShell 로 실행하지 않아요. PowerShell 에는 `$HOME` 과 repair 된 PATH 가 없어서 credential·auth 조회가 false-negative 나요. PATH 가 없으면 `SetEnvironmentVariable` 이나 `$env:PATH` prepend 로 수동 등록하지 않고, canonical on-disk 경로(`~/.axhub/bin/axhub`(.exe))로 `plugin-support repair-path` 를 실행해 영속 등록을 고쳐요 — 그 상태에선 bare `axhub` 가 127 이에요. 같은 세션은 repair-path JSON 의 `bin_path` 절대경로로 이어가고, bin_path 가 없는 구 CLI 면 새 터미널 안내로 대체해요 — 이미 열린 셸은 OS 설계상 밖에서 PATH 를 못 고치므로 새 터미널은 다음 세션용 보조 안내예요 (VS Code 통합터미널은 앱 재시작 후에야 새 PATH 를 봐요). `auth status` 는 `auth login` 을 실행한 그 셸에서 검증해요 — HOME 없는 셸이 "미로그인" 이라고 해도 로그인 실패로 보지 않아요. 로그인은 단일 self-polling `axhub auth login --json` 1 회로 하고 background 로 재실행하지 않아요 (device code 소진). 이 계약은 Windows(`$OS`=Windows_NT) 세션에서 SessionStart hook (`hooks/hooks.json`) 이 매 세션 always-on 으로 emit 해요 — skill 본문 로드 여부와 무관하게 free-form 실행 경로까지 덮어요. non-Windows 세션에서는 조용히 건너뛰어요. 이 계약에 예외는 없어요 — 공식 설치 채널은 install.sh / install.ps1 뿐이고, npm/npx 의 `axhub`·`axhub-cli` 패키지는 이름 예약 스텁이라 설치·실행·안내에 절대 쓰지 않아요. 이 npm/npx 금지는 hook 문안에도 포함돼 skill 을 안 탄 free-form npm 추측 경로까지 덮어요.
-- 적용: hooks/hooks.json, CLAUDE.md
+- 적용: hooks/session-windows-contract.sh, CLAUDE.md
 - invariant: "Git Bash 전용"
 
 ## AP-14 update-first Code-mode router
 - 규칙: Claude Desktop Code 모드에서 사용자가 `axhub` 와 최신성 키워드(최신·버전·업데이트·latest·up to date·version check·update·upgrade)를 함께 말하면, 전역 axhub App/MCP 도구보다 `update` 스킬을 먼저 타야 해요. Code-mode update router guard 는 SessionStart fallback 과 UserPromptSubmit match 로 라우팅 문맥만 추가하고 명령 실행·네트워크·앱 목록 조회는 하지 않아요. UserPromptSubmit match 는 훅 입력 JSON 전체가 아니라 사용자 프롬프트(`"prompt":` 필드 이후 구간)만 봐요 — cwd·transcript_path 경로 유래 오탐을 막고, 키 부재 시 fail-closed 로 침묵해요. 사용자에게 보이는 첫 문장은 `현재 버전을 확인할게요.` 예요. 이 guard 는 `AXHUB_NO_UPDATE_ROUTER=1` 또는 marker 파일 `~/.axhub/config/no-update-router` 로 끌 수 있어요 — 모든 훅 kill switch 는 env 에서 `AXHUB_` 를 뗀 소문자-하이픈 이름의 marker 파일 counterpart 를 가져요 (profile export 가 닿지 않는 Windows GUI 세션에서도 확실한 채널). 업데이트 뒤 같은 요청의 앱 현황 확인을 이어갈 때는 존재하지 않는 `axhub app list` 단수 명령을 추측하지 말고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 시작해요. `| head`, `2>/dev/null`, `grep`, `sed`, `awk` 같은 shell 후처리는 붙이지 않아요.
-- 적용: hooks/hooks.json, CLAUDE.md, POLICY.md, README.md
+- 적용: hooks/session-update-router-guard.sh, CLAUDE.md, POLICY.md, README.md
 - invariant: "AXHUB_NO_UPDATE_ROUTER", "현재 버전을 확인할게요"
 
 ## AP-16 상태 폴링 예산
@@ -104,5 +104,5 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-19 예상 밖 CLI 실패 자동 리포트
 - 규칙: axhub CLI 가 문서화된 계약 밖으로 실패하면(panic·hang, `--json` 출력이 유효한 JSON 이 아님, 문서화된 happy path 의 exit 1/7, 한 번 재시도해도 재현되는 exit 10 timeout, help 와 실제 동작 불일치) 실패 직후 같은 세션에서 `axhub feedback -m <실행한 것·기대한 것·실제 결과 한 줄>` 1회로 조용히 리포트해요 — 실패 직전 명령의 진단(명령 경로·플래그 이름만, 값 미수집, TTL 10분)은 CLI 가 자동 첨부하고(allowlist 캡처), 이슈 생성·중복 병합·제목/라벨은 backend 몫이에요. 예상된 거절은 리포트하지 않아요 — exit 4(미로그인 — `auth login` 안내가 맞는 대응), exit 64(사용법·입력 검증), 정상 가드 거절(exit 5/6/9/11/12/13/66), 배포 실패·앱 빌드 실패(CLI 버그가 아니라 diagnosis 대상)는 제외예요. `axhub feedback` 자기 실패는 다시 리포트하지 않아요 — 명령이 없는 구 CLI·backend 미배포·네트워크 오류 전부 재시도·사용자 언급 없이 버리고 원래 작업을 이어가요 (이 조용한 실패가 곧 가용성 게이트라 별도 버전 probe 를 두지 않아요). 리포트는 best-effort·비차단이고 성공 여부를 사용자에게 따로 알리지 않아요. 수집 범위는 AP-10 의 AI 활용 기록(옵트인)과 별개예요 — 값을 원천 수집하지 않는 실패 진단만 프라이빗 이슈함으로 보내는 예외이고, 사용자 공개는 POLICY.md 가 해요. 이 계약은 SessionStart hook 이 CLI 가 설치된 세션(AP-17 의 3-경로 존재 확인)에 always-on 으로 emit 해요 — skill 을 안 탄 free-form axhub 실행 경로까지 덮어요. 끄기: `AXHUB_NO_FEEDBACK_REPORT=1` 또는 marker `~/.axhub/config/no-feedback-report`.
-- 적용: hooks/hooks.json, CLAUDE.md, POLICY.md
+- 적용: hooks/session-feedback-contract.sh, CLAUDE.md, POLICY.md
 - invariant: "axhub feedback -m", "예상된 거절은 리포트하지 않아요"
