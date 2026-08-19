@@ -60,6 +60,27 @@ if (status) {
   process.exit(1);
 }
 
+// U8 가드 — 릴리즈 amend 가 미검토 재생성물을 흡수하는 표면 차단이에요.
+// 태그 직전 HEAD diff(첫 부모 기준)는 bump 대상(.versionrc.json bumpFiles 전체)과
+// CHANGELOG.md 밖 파일을 포함하면 안 돼요.
+const versionrc = JSON.parse(readFileSync(join(REPO_ROOT, ".versionrc.json"), "utf8")) as {
+  bumpFiles: Array<{ filename: string }>;
+};
+const allowedReleaseFiles = new Set([
+  ...versionrc.bumpFiles.map((entry) => entry.filename),
+  "CHANGELOG.md",
+]);
+const headDiffFiles = sh("git diff --name-only HEAD^1 HEAD")
+  .split("\n")
+  .filter((line) => line.length > 0);
+const outsideBumpScope = headDiffFiles.filter((file) => !allowedReleaseFiles.has(file));
+if (outsideBumpScope.length > 0) {
+  console.error("[release:tag] release commit 에 bump 대상 밖 파일이 섞여 있어요:");
+  for (const file of outsideBumpScope) console.error(`  - ${file}`);
+  console.error("bump 대상(.versionrc.json bumpFiles)과 CHANGELOG.md 만 release commit 에 담고 재실행해주세요.");
+  process.exit(1);
+}
+
 const headSha = sh("git rev-parse HEAD");
 console.log(`[release:tag] ${tag} → ${headSha.slice(0, 12)} 에 tag 생성해요.`);
 sh(`git tag -a ${tag} -m "chore(release): ${version}"`);
