@@ -319,7 +319,9 @@ describe("codex marketplace and version wiring (U7)", () => {
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
       plugins: Array<{ name: string; source: string; version?: string }>;
     };
-    expect(manifest.plugins.map((entry) => entry.name)).toEqual(["axhub", "axhub-codex"]);
+    // Codex 카탈로그엔 codex 번들 하나만 노출해요 — Claude Code 는 `.agents` 를 읽지
+    // 않아 무영향(U1-(g) 실측)이고, 타 host 가 `.agents` 를 채택하면 그때 재병기해요.
+    expect(manifest.plugins.map((entry) => entry.name)).toEqual(["axhub-codex"]);
     for (const entry of manifest.plugins) {
       // KTD3: 버전은 플러그인 매니페스트가 소유 — .agents 엔트리는 version 생략.
       expect("version" in entry, `${entry.name} entry must omit version`).toBe(false);
