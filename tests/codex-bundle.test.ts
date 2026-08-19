@@ -258,3 +258,71 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     }
   });
 });
+
+describe("codex marketplace and version wiring (U7)", () => {
+  const CODEX_BUNDLE_DIR = join(REPO_ROOT, "plugins", "axhub-codex");
+
+  test("committed codex bundle matches a freshly generated bundle", () => {
+    const generated = walk(outDir).map((file) => relative(outDir, file)).sort();
+    const committed = walk(CODEX_BUNDLE_DIR).map((file) => relative(CODEX_BUNDLE_DIR, file)).sort();
+    expect(committed).toEqual(generated);
+    for (const file of generated) {
+      const expected = readFileSync(join(outDir, file), "utf8");
+      const actual = readFileSync(join(CODEX_BUNDLE_DIR, file), "utf8");
+      expect(actual, `codex bundle drift in ${file}`).toBe(expected);
+    }
+  });
+
+  test(".agents manifest is git-tracked with version-less entries matching bundle names (KTD3)", () => {
+    const manifestPath = join(REPO_ROOT, ".agents", "plugins", "marketplace.json");
+    const tracked = Bun.spawnSync({
+      cmd: ["git", "ls-files", "--error-unmatch", ".agents/plugins/marketplace.json"],
+      cwd: REPO_ROOT,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(tracked.exitCode, "gitignore 캐스케이드가 .agents manifest 를 제외하면 안 돼요").toBe(0);
+
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+      plugins: Array<{ name: string; source: string; version?: string }>;
+    };
+    expect(manifest.plugins.map((entry) => entry.name)).toEqual(["axhub", "axhub-codex"]);
+    for (const entry of manifest.plugins) {
+      // KTD3: 버전은 플러그인 매니페스트가 소유 — .agents 엔트리는 version 생략.
+      expect("version" in entry, `${entry.name} entry must omit version`).toBe(false);
+      // U1-(l): 엔트리 name ≠ plugin.json name 은 설치 거부 hard error.
+      const pluginJson = JSON.parse(
+        readFileSync(join(REPO_ROOT, entry.source, ".claude-plugin", "plugin.json"), "utf8"),
+      ) as { name: string };
+      expect(pluginJson.name).toBe(entry.name);
+    }
+  });
+
+  test("versionrc bumps all three codex manifests to the package version", () => {
+    const packageVersion = (
+      JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as { version: string }
+    ).version;
+    const versionrc = JSON.parse(readFileSync(join(REPO_ROOT, ".versionrc.json"), "utf8")) as {
+      bumpFiles: Array<{ filename: string; type?: string; updater?: string }>;
+    };
+    const codexBumpFiles = versionrc.bumpFiles.filter((entry) =>
+      entry.filename.startsWith("plugins/axhub-codex/"),
+    );
+    expect(codexBumpFiles.map((entry) => entry.filename).sort()).toEqual([
+      "plugins/axhub-codex/.claude-plugin/marketplace.json",
+      "plugins/axhub-codex/.claude-plugin/plugin.json",
+      "plugins/axhub-codex/.codex-plugin/plugin.json",
+    ]);
+    for (const entry of codexBumpFiles) {
+      const raw = readFileSync(join(REPO_ROOT, entry.filename), "utf8");
+      if (entry.updater) {
+        const updater = require(join(REPO_ROOT, entry.updater)) as {
+          readVersion: (contents: string) => string;
+        };
+        expect(updater.readVersion(raw)).toBe(packageVersion);
+      } else {
+        expect((JSON.parse(raw) as { version: string }).version).toBe(packageVersion);
+      }
+    }
+  });
+});
