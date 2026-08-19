@@ -18,8 +18,8 @@ const SKILLS = [
   "update",
 ] as const;
 
-// R8 축소판 — U6 가 update lane·README·POLICY override 를 저작하기 전까지의
-// 골격 게이트예요. update lane 계열이 override 로 대체되면 EXCLUDED 를 비워요.
+// R8 — codex 번들 전 텍스트 파일에서 Claude-호스트 문자열 0건이 계약이에요
+// (U6 override 저작 완료로 배제 목록 없음).
 const FORBIDDEN_STRINGS = [
   "AskUserQuestion",
   "claude plugin",
@@ -30,13 +30,7 @@ const FORBIDDEN_STRINGS = [
   "Claude Code",
   "oh-my-claudecode",
 ] as const;
-const U6_PENDING_EXCLUDED_PREFIXES = [
-  "skills/update/",
-  "README.md",
-  "POLICY.md",
-  "hooks/auto-update-prompt.md",
-  "hooks/plugin-restart-confirm-prompt.md",
-] as const;
+const U6_PENDING_EXCLUDED_PREFIXES = [] as const;
 
 const walk = (dir: string): string[] => {
   const files: string[] = [];
@@ -209,6 +203,46 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       expect(frontmatter).toContain("description:");
       expect(frontmatter).not.toContain("examples:");
       expect(body.startsWith("> 이 본문이 중간에 끊겨 보이면")).toBe(true);
+    }
+  });
+
+  test("update lane override owns the codex apply flow (R4)", () => {
+    const skill = readFileSync(join(outDir, "skills", "update", "SKILL.md"), "utf8");
+    expect(skill).toContain("axhub update check --plugin-version");
+    expect(skill).toContain("codex plugin list --json");
+    expect(skill).toContain("현재 버전을 확인할게요.");
+    expect(skill).toContain("받았어요. Codex 를 재시작하면 새 버전이 적용돼요.");
+    expect(skill).not.toContain("--scope");
+
+    const reference = readFileSync(
+      join(outDir, "skills", "update", "references", "plugin-update.md"),
+      "utf8",
+    );
+    expect(reference).toContain("codex plugin marketplace upgrade axhub");
+    expect(reference).toContain("codex plugin add axhub-codex@axhub");
+    expect(reference).toContain("marketplaceSource.sourceType");
+
+    const autoUpdatePrompt = readFileSync(join(outDir, "hooks", "auto-update-prompt.md"), "utf8");
+    expect(autoUpdatePrompt).toContain(".plugin-update-check-codex");
+    expect(autoUpdatePrompt).toContain(".plugin-update-restart-codex");
+    const restartPrompt = readFileSync(
+      join(outDir, "hooks", "plugin-restart-confirm-prompt.md"),
+      "utf8",
+    );
+    expect(restartPrompt).toContain(".plugin-update-restart-codex");
+    expect(/\.plugin-update-restart(?!-codex)/.test(restartPrompt)).toBe(false);
+  });
+
+  test("SOURCE_HASHES pins match the current sources (KTD9)", async () => {
+    const pins = JSON.parse(
+      readFileSync(join(REPO_ROOT, "codex-overrides", "SOURCE_HASHES.json"), "utf8"),
+    ) as Record<string, string>;
+    expect(Object.keys(pins).length).toBeGreaterThan(0);
+    for (const [source, pinned] of Object.entries(pins)) {
+      const bytes = readFileSync(join(REPO_ROOT, source));
+      const hasher = new Bun.CryptoHasher("sha256");
+      hasher.update(bytes);
+      expect(hasher.digest("hex"), `stale pin for ${source}`).toBe(pinned);
     }
   });
 
