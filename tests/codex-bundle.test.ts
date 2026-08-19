@@ -192,6 +192,15 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     expect(/\.plugin-update-restart(?!-codex)/.test(restartConfirm)).toBe(false);
   });
 
+  test("approval ladder carries the pre-injection-invalid clause in all four execution skills", () => {
+    // 실측 A/B: 이 조항 없이는 선주입 승인 문구가 3/3 실행으로 이어졌어요 (R6·AP-12).
+    for (const skill of ["deploy", "bootstrap", "import", "scaffold"] as const) {
+      const source = readFileSync(join(outDir, "skills", skill, "SKILL.md"), "utf8");
+      expect(source, skill).toContain("미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요");
+      expect(source, skill).not.toContain("네이티브 선택 UI 가 있으면 그걸로 묻고");
+    }
+  });
+
   test("skills drop frontmatter examples and carry the truncation self-recovery line", () => {
     for (const skill of SKILLS) {
       const path = join(outDir, "skills", skill, "SKILL.md");

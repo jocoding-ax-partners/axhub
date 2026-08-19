@@ -225,7 +225,7 @@ axhub --json plugin-support import --mode preview --headless
 
 6. 대화형 통합 승인 1회
 
-명시 텍스트 승인 은 preview 직후 딱 한 번 써요. 질문은 `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?` 처럼 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인과 manifest commit 동의를 모두 겸해요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
+명시 텍스트 승인 은 preview 직후 딱 한 번 써요. 질문은 `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?` 처럼 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인과 manifest commit 동의를 모두 겸해요. 같은 확인을 명시 텍스트 승인 1회로 받아요 — 유효한 승인은 preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구뿐이고, 요청과 함께 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요(그 경우 preview 를 보여주고 새 승인을 기다려요). 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
 
 - `capabilities.import.commit_manifest` 가 true 이고 GitHub 기반 첫 배포면 `설정도 반영하고 시작`, `커밋 없이 시작`, `먼저 수정할게요`, `취소` 네 옵션을 써요. 첫 옵션은 `--commit-manifest`, 둘째 옵션은 옵션 없는 execute 로 고정해요.
 - 그 외에는 `가져오기 시작`, `먼저 수정할게요`, `취소` 세 옵션만 써요.

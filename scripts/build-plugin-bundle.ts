@@ -70,6 +70,12 @@ interface BundleStats {
 // 치환은 longest-first 가 계약이에요 — 병기 구문 전체를 먼저 소비해 이중 적용을
 // 막아요 (tests/codex-bundle.test.ts 가 정렬을 assert 해요).
 export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: string]> = [
+  // 승인 사다리: codex 레인은 네이티브 UI 가 없어 명시 텍스트 승인 단일 lane 이에요.
+  // 선주입 무효 조항은 실측 A/B(조항 없이 3/3 실행, 있으면 3/3 정지)로 필수 확인됐어요.
+  [
+    "네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.",
+    "같은 확인을 명시 텍스트 승인 1회로 받아요 — 유효한 승인은 preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구뿐이고, 요청과 함께 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요(그 경우 preview 를 보여주고 새 승인을 기다려요). 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.",
+  ],
   ["`claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, ", "`codex exec`, CI, "],
   ["(`claude -p` / CI / `$CLAUDE_NON_INTERACTIVE` / no TTY)", "(`codex exec` / CI / no TTY)"],
   ["`claude -p`·CI·`$CLAUDE_NON_INTERACTIVE`·TTY 없음", "`codex exec`·CI·TTY 없음"],
