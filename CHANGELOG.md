@@ -4,6 +4,39 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.21.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.20.4...v1.21.0) (2026-08-19)
+
+이번 릴리즈부터 OpenAI Codex CLI(≥ 0.147.0, 최종 검증 0.148.0)를 공식 지원해요 — `codex plugin marketplace add` 후 `codex plugin add axhub-codex@axhub` 로 Codex 전용 파생 번들을 설치할 수 있어요. 배포·생성 승인 게이트에는 preview 전에 미리 넣어 둔 승인 문구를 무효로 보는 조항이 추가돼 선주입 우회를 막아요. SessionStart 훅 5개는 동작 불변으로 wrapper 스크립트(`hooks/session-*.sh`)로 추출됐고, Codex 판은 AP-14·AP-19 훅을 합본 wrapper 하나로 발행해요 — Codex 가 신뢰하는 대상은 훅 command(스크립트 경로)라 wrapper 내용 갱신은 재신뢰 확인 없이 반영돼요.
+
+### Added
+
+* build transform --host codex 추가 — 치환·훅 변환·매니페스트 파생 (U5) ([cbee98d](https://github.com/jocoding-ax-partners/axhub/commit/cbee98d8c8f46a20579738f98d347aeb7cd3c508))
+* codex overrides 저작 — update lane·훅 프롬프트·README/POLICY codex 판 (U6 비코어) ([e0f8379](https://github.com/jocoding-ax-partners/axhub/commit/e0f837964e45fb0605f6be7f51b4a7d04d1be25c))
+* codex 게이트 배선 — parity invariant(codex) 문법·release-tag bump 가드·CI budget:codex (U8) ([f6f5a28](https://github.com/jocoding-ax-partners/axhub/commit/f6f5a28eccf4de74cc1863a88622700962e89fb3))
+* codex 마켓플레이스·버전 배선 — .agents 병기·bumpFiles·번들 최초 커밋 (U7) ([b6cd226](https://github.com/jocoding-ax-partners/axhub/commit/b6cd226bfc893ca31ab38ce77d8c0826d526f1a7))
+* codex 지원 선언 활성화 — README 설치 섹션·POLICY 공개 문안 (U10) ([522c8d5](https://github.com/jocoding-ax-partners/axhub/commit/522c8d5c06387ad579cf0f72b90d4b557fa8c4f9))
+
+
+### Fixed
+
+* 리뷰 발견 5건 반영 — headless 정의 정합·AP-12 사다리 명문화·훅 위임 e2e ([bf111ea](https://github.com/jocoding-ax-partners/axhub/commit/bf111eac3508838b30312ad165480b130c01ef16))
+* 승인 게이트에 선주입 무효 조항 배선 — 파괴 QA A/B 실측 반영 (R6) ([591ce38](https://github.com/jocoding-ax-partners/axhub/commit/591ce38daa30ae0e9473e18bb187e26639f40116))
+
+
+### Changed
+
+* SessionStart 인라인 훅 5개를 wrapper 스크립트로 추출 ([82a59bf](https://github.com/jocoding-ax-partners/axhub/commit/82a59bfe8a5e78428f94e33f461a37e289c78c23))
+* 계약 테스트 기대값을 host 별 fixture 로 전환 ([2ef0cd1](https://github.com/jocoding-ax-partners/axhub/commit/2ef0cd1807ae2197d4fa355dadac2a1d9d0d21b2))
+* 승인 문안 host-중립화와 headless 예시 codex exec 병기 ([cb6a6ea](https://github.com/jocoding-ax-partners/axhub/commit/cb6a6eac08e8e98ddffa043dc7f025c08fe8cbbe))
+
+
+### Docs
+
+* codex 플러그인 호환 연구·플랜 문서 추가 ([a98a92e](https://github.com/jocoding-ax-partners/axhub/commit/a98a92e0c2a24be8c200f3d7becfceff304a1e3d))
+* 정책에 codex 파생 반영 — AP-20 신설·host-scoped parity·DP-8 compat matrix (U9) ([fbf9e8d](https://github.com/jocoding-ax-partners/axhub/commit/fbf9e8da869a1c143605e193c230fbc9b7b627b7))
+* 플랜에 TUI 실측 16/16 완주 반영 — 코어 불요·KTD6 pass·QA 매트릭스 ([31eeb06](https://github.com/jocoding-ax-partners/axhub/commit/31eeb0632b82bab99f9bcf4c8f1c16b48768f151))
+* 플랜에 U1 실측 반영 — KTD 게이트 조정·Open Questions 해소 ([1dfe70e](https://github.com/jocoding-ax-partners/axhub/commit/1dfe70e375acd28b8b959215a334c2af77fc4a3f))
+
 ## [1.20.4](https://github.com/jocoding-ax-partners/axhub/compare/v1.20.3...v1.20.4) (2026-08-17)
 
 플러그인에서 axhub MCP 등록·안내 표면을 걷어냈어요 — MCP 서버가 등록만 되고 인증이 안 된 상태면 세션마다 인증 팝업이 떠서 불편했고, MCP 없이도 스킬 기능에는 문제가 없거든요. 온보딩은 이제 MCP 등록·재시작 없이 옵트인 질문과 최종 카드 한 장으로 끝나고, 관련 SessionStart resume 훅도 제거됐어요. "App/MCP 도구 대신 CLI-only" 방어 가드는 그대로 유지돼요.
