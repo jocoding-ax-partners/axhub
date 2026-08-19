@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **axhub** (1081 symbols, 1232 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **axhub** (1688 symbols, 1902 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -108,6 +108,8 @@ axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어�
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
 
+**codex 파생 번들 (AP-20):** 소스는 claude-first 단일 트리 하나이고, OpenAI Codex CLI 용 번들 `plugins/axhub-codex` 는 `scripts/build-plugin-bundle.ts --host codex` 가 파생 생성해요 — 치환 테이블(`CODEX_SUBSTITUTIONS`, longest-first) + `codex-overrides/` 스왑(update lane·훅 프롬프트·README/POLICY codex 판) + 훅 변환(`shell` 키 제거·`commandWindows` 추가·AP-14+AP-19 합본 wrapper·상태 marker `-codex` suffix) + 매니페스트 name 재작성(axhub-codex) + description 재합성으로요. 파생 번들은 직접 수정하지 않고 소스·override 를 고쳐 재생성하며(`bun run plugin:bundle:all`), drift·FORBIDDEN·hash-pin 게이트는 `tests/codex-bundle.test.ts` 가 강제해요. codex 노출 경로는 host-중립 `.agents/plugins/marketplace.json`(axhub·axhub-codex 병기, version 생략) 이에요 — codex 는 `.agents` 를 읽으면 legacy `.claude-plugin` 을 완전히 가리고, Claude Code 는 `.agents` 를 읽지 않아요.
+
 ## 자동 업데이트 hook
 
 diet 가 제거한 hook 중 **auto-update SessionStart 훅 1개**만 `hooks/` 로 재도입했어요 (`hooks/hooks.json` + `hooks/auto-update-prompt.md`). Claude Code 가 `hooks/hooks.json` 을 자동 발견해요 — plugin.json 선언은 불필요해요.
@@ -128,7 +130,7 @@ auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks
 
 - hook 은 `$OS` 만 봐요 — 네트워크·`axhub` 바이너리·marker 안 건드리고, non-Windows 는 즉시 exit 0.
 - **끄기:** `AXHUB_NO_WINDOWS_CONTRACT=1` 또는 `~/.axhub/config/no-windows-contract`. Windows 전제는 다른 훅과 동일해요 (`"shell": "bash"`, Git Bash 번들 도구만).
-- 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-13 이 소유해요 (parity 적용: `hooks/hooks.json`, `CLAUDE.md`).
+- 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-13 이 소유해요 (parity 적용: `hooks/session-windows-contract.sh`, `CLAUDE.md`).
 
 ## update-first Code-mode router hook (AP-14)
 
@@ -145,7 +147,7 @@ SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이�
 
 - hook 은 CLI 존재만 봐요 (AP-17 의 3-경로: `command -v axhub` → `~/.axhub/bin-path` → canonical `~/.axhub/bin/axhub`(.exe)) — 네트워크·바이너리 실행·marker 접촉 없음, 못 찾으면 즉시 exit 0.
 - **끄기:** `AXHUB_NO_FEEDBACK_REPORT=1` 또는 `~/.axhub/config/no-feedback-report`.
-- 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-19 가 소유해요 (parity 적용: `hooks/hooks.json`, `CLAUDE.md`, `POLICY.md`). 사용자 공개는 `POLICY.md` 의 "실패 자동 리포트" 섹션이 담당해요.
+- 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-19 가 소유해요 (parity 적용: `hooks/session-feedback-contract.sh`, `CLAUDE.md`, `POLICY.md`). 사용자 공개는 `POLICY.md` 의 "실패 자동 리포트" 섹션이 담당해요.
 
 ## CLI 호출 표면
 

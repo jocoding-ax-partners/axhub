@@ -1,0 +1,41 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/update-router.sh\"",
+            "commandWindows": "where bash >nul 2>nul && bash \"${CLAUDE_PLUGIN_ROOT}/hooks/update-router.sh\" || cd ."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-auto-update.sh\"",
+            "commandWindows": "where bash >nul 2>nul && bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-auto-update.sh\" || cd ."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-windows-contract.sh\"",
+            "commandWindows": "where bash >nul 2>nul && bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-windows-contract.sh\" || cd ."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-always-on-codex.sh\"",
+            "commandWindows": "where bash >nul 2>nul && bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-always-on-codex.sh\" || cd ."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-restart-confirm.sh\"",
+            "commandWindows": "where bash >nul 2>nul && bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-restart-confirm.sh\" || cd ."
+          }
+        ]
+      }
+    ]
+  }
+}

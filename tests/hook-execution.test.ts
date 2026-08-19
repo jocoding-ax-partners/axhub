@@ -1,14 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync, chmodSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { HOST_EXPECTATIONS, SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
 
 // 훅 bash 를 실제로 실행하는 하네스예요 — 문자열 계약 테스트가 못 잡는 의미
 // 회귀(F1: whole-JSON 매칭 오탐)를 잠가요. 합성 payload 는 공식 문서 예시
 // 스키마를 미러링해요 (code.claude.com/docs/en/hooks — session_id →
 // transcript_path → cwd → permission_mode → hook_event_name → prompt).
-// 인라인 command 는 운영과 동일하게 plain `bash -c` 로 실행해요 (set -u 주입
-// 금지). spawn timeout 은 성능 assert 가 아니라 deadlock 가드예요.
+// SessionStart 5개 entry 는 hooks/session-*.sh wrapper 로 추출됐어요 (KTD6) —
+// wrapper 는 운영과 동일하게 `bash "<path>"` 로 실행하고, wrapper 본문은 인라인
+// 시절과 같은 plain bash 의미를 유지해요 (set -u 주입 금지). spawn timeout 은
+// 성능 assert 가 아니라 deadlock 가드예요.
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const SPAWN_TIMEOUT_MS = 10_000;
@@ -22,11 +26,15 @@ const hooksFile = JSON.parse(readFileSync(join(REPO_ROOT, "hooks", "hooks.json")
 const upsCommands = hooksFile.hooks.UserPromptSubmit.flatMap((group) => group.hooks).map((h) => h.command);
 const ssCommands = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks).map((h) => h.command);
 const updateRouterCmd = upsCommands[0]!;
-const autoUpdateCmd = ssCommands[0]!;
-const windowsContractCmd = ssCommands[1]!;
-const ap14FallbackCmd = ssCommands[2]!;
-const restartConfirmCmd = ssCommands[3]!;
-const feedbackContractCmd = ssCommands[4]!;
+
+// hooks.json 의 SessionStart entry 순서와 1:1 인 wrapper 파일 목록은
+// fixtures/host-expectations.ts 의 SESSION_WRAPPER_SCRIPTS 가 단일 소유해요.
+const wrapperPath = (name: (typeof SESSION_WRAPPER_SCRIPTS)[number]): string => join(REPO_ROOT, "hooks", name);
+const autoUpdateSh = wrapperPath("session-auto-update.sh");
+const windowsContractSh = wrapperPath("session-windows-contract.sh");
+const ap14FallbackSh = wrapperPath("session-update-router-guard.sh");
+const restartConfirmSh = wrapperPath("session-restart-confirm.sh");
+const feedbackContractSh = wrapperPath("session-feedback-contract.sh");
 
 const DEV_CWD = "/Users/dev/work/jocoding/axhub"; // 경로에 axhub 포함 (F1 재현용)
 
@@ -69,6 +77,14 @@ function runBash(argv: string[], stdin: string, env: Record<string, string>): Ru
 
 function runInline(command: string, stdin: string, env: Record<string, string> = {}): RunResult {
   return runBash(["bash", "-c", command], stdin, baseEnv(env));
+}
+
+// SessionStart wrapper 는 운영 위임 형태 그대로 `bash "<path>"` 로 실행해요.
+// CLAUDE_PLUGIN_ROOT 는 인라인 시절과 동일하게 기본 미설정이에요 — repo
+// checkout 의 .git 이 dev 가드를 오발동시키지 않게 하고, dev 가드 양성
+// 케이스는 각 테스트가 명시적으로 env 를 줘요.
+function runScript(scriptPath: string, stdin: string, env: Record<string, string> = {}): RunResult {
+  return runBash(["bash", scriptPath], stdin, baseEnv(env));
 }
 
 function promptPayload(prompt: string, cwd = "/Users/dev/projects/demo"): string {
@@ -195,6 +211,15 @@ describe("UserPromptSubmit 라우터 diet (update 단독)", () => {
 
 // ── SessionStart 훅 ──────────────────────────────────────────────────────
 
+describe("SessionStart wrapper 위임 (KTD6: 인라인 command → hooks/session-*.sh)", () => {
+  test("5개 entry 가 순서대로 각 wrapper 파일로 bare 위임해요 — 실행 대상과 hooks.json 이 일치해요", () => {
+    expect(ssCommands).toEqual(SESSION_WRAPPER_SCRIPTS.map((name) => HOST_EXPECTATIONS.claude.surface.hookWrapperCommand(name)));
+    for (const name of SESSION_WRAPPER_SCRIPTS) {
+      expect(existsSync(wrapperPath(name))).toBe(true);
+    }
+  });
+});
+
 function makeHome(): string {
   return mkdtempSync(join(tmpdir(), "axhub-hook-home-"));
 }
@@ -220,7 +245,7 @@ function daysAgo(days: number): Date {
 describe("auto-update 훅 (SessionStart entry 1)", () => {
   test("캐시 없음 → context 발행 + 캐시 파일을 훅이 직접 생성해요 (touch-in-hook)", () => {
     const home = makeHome();
-    const result = runInline(autoUpdateCmd, "", { HOME: home, PATH: SAFE_PATH });
+    const result = runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH });
     expectEmit(result, "SessionStart", "auto-update-prompt.md");
     expect(existsSync(join(home, CACHE_REL))).toBe(true);
   });
@@ -229,7 +254,7 @@ describe("auto-update 훅 (SessionStart entry 1)", () => {
     const home = makeHome();
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
     writeFileSync(join(home, CACHE_REL), "");
-    expectSilent(runInline(autoUpdateCmd, "", { HOME: home, PATH: SAFE_PATH }));
+    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH }));
   });
 
   test("stale 캐시(24h 초과) → 발행하고 캐시를 갱신해요", () => {
@@ -238,24 +263,24 @@ describe("auto-update 훅 (SessionStart entry 1)", () => {
     const cache = join(home, CACHE_REL);
     writeFileSync(cache, "");
     utimesSync(cache, daysAgo(2), daysAgo(2));
-    expectEmit(runInline(autoUpdateCmd, "", { HOME: home, PATH: SAFE_PATH }), "SessionStart", "auto-update-prompt.md");
+    expectEmit(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH }), "SessionStart", "auto-update-prompt.md");
   });
 
   test("kill switch AXHUB_NO_AUTO_UPDATE → 침묵 + 캐시도 만들지 않아요", () => {
     const home = makeHome();
-    expectSilent(runInline(autoUpdateCmd, "", { HOME: home, PATH: SAFE_PATH, AXHUB_NO_AUTO_UPDATE: "1" }));
+    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH, AXHUB_NO_AUTO_UPDATE: "1" }));
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
   });
 
   test("marker kill switch no-auto-update → 침묵 + 캐시도 만들지 않아요", () => {
     const home = makeHomeWithMarker("auto-update");
-    expectSilent(runInline(autoUpdateCmd, "", { HOME: home, PATH: SAFE_PATH }));
+    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH }));
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
   });
 
   test("axhub 바이너리 부재 → 침묵해요", () => {
     const home = makeHome();
-    expectSilent(runInline(autoUpdateCmd, "", { HOME: home, PATH: NO_AXHUB_PATH }));
+    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: NO_AXHUB_PATH }));
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
   });
 
@@ -265,7 +290,7 @@ describe("auto-update 훅 (SessionStart entry 1)", () => {
     mkdirSync(join(repo, ".git"), { recursive: true });
     const pluginRoot = join(repo, "plugins", "axhub");
     mkdirSync(pluginRoot, { recursive: true });
-    expectSilent(runInline(autoUpdateCmd, "", { HOME: home, PATH: SAFE_PATH, CLAUDE_PLUGIN_ROOT: pluginRoot }));
+    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH, CLAUDE_PLUGIN_ROOT: pluginRoot }));
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
   });
 
@@ -273,7 +298,7 @@ describe("auto-update 훅 (SessionStart entry 1)", () => {
     const home = makeHome();
     const repo = mkdtempSync(join(tmpdir(), "axhub-dev-root-"));
     mkdirSync(join(repo, ".git"), { recursive: true });
-    expectSilent(runInline(autoUpdateCmd, "", { HOME: home, PATH: SAFE_PATH, CLAUDE_PLUGIN_ROOT: repo }));
+    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH, CLAUDE_PLUGIN_ROOT: repo }));
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
   });
 });
@@ -283,11 +308,11 @@ describe("restart-confirm 훅 (SessionStart entry 4)", () => {
     const home = makeHome();
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
     writeFileSync(join(home, MARKER_REL), "1.10.28");
-    expectEmit(runInline(restartConfirmCmd, "", { HOME: home }), "SessionStart", "plugin-restart-confirm-prompt.md");
+    expectEmit(runScript(restartConfirmSh, "", { HOME: home }), "SessionStart", "plugin-restart-confirm-prompt.md");
   });
 
   test("marker 없음 → 침묵해요", () => {
-    expectSilent(runInline(restartConfirmCmd, "", { HOME: makeHome() }));
+    expectSilent(runScript(restartConfirmSh, "", { HOME: makeHome() }));
   });
 
   test("TTL(7일) 초과 marker → 침묵해요 (휴면)", () => {
@@ -296,45 +321,45 @@ describe("restart-confirm 훅 (SessionStart entry 4)", () => {
     const marker = join(home, MARKER_REL);
     writeFileSync(marker, "1.10.28");
     utimesSync(marker, daysAgo(8), daysAgo(8));
-    expectSilent(runInline(restartConfirmCmd, "", { HOME: home }));
+    expectSilent(runScript(restartConfirmSh, "", { HOME: home }));
   });
 
   test("kill switch AXHUB_NO_AUTO_UPDATE → 침묵해요", () => {
     const home = makeHome();
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
     writeFileSync(join(home, MARKER_REL), "1.10.28");
-    expectSilent(runInline(restartConfirmCmd, "", { HOME: home, AXHUB_NO_AUTO_UPDATE: "1" }));
+    expectSilent(runScript(restartConfirmSh, "", { HOME: home, AXHUB_NO_AUTO_UPDATE: "1" }));
   });
 
   test("marker kill switch no-auto-update → 침묵해요 (auto-update 계열 공용)", () => {
     const home = makeHomeWithMarker("auto-update");
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
     writeFileSync(join(home, MARKER_REL), "1.10.28");
-    expectSilent(runInline(restartConfirmCmd, "", { HOME: home }));
+    expectSilent(runScript(restartConfirmSh, "", { HOME: home }));
   });
 });
 
 describe("AP-13 Windows 계약 훅 (SessionStart entry 2)", () => {
   test("OS=Windows_NT → 계약을 발행해요", () => {
-    expectEmit(runInline(windowsContractCmd, "", { OS: "Windows_NT" }), "SessionStart", "Git Bash");
+    expectEmit(runScript(windowsContractSh, "", { OS: "Windows_NT" }), "SessionStart", "Git Bash");
   });
 
   test("non-Windows(OS 미설정) → 침묵해요", () => {
-    expectSilent(runInline(windowsContractCmd, ""));
+    expectSilent(runScript(windowsContractSh, ""));
   });
 
   test("kill switch AXHUB_NO_WINDOWS_CONTRACT → 침묵해요", () => {
-    expectSilent(runInline(windowsContractCmd, "", { OS: "Windows_NT", AXHUB_NO_WINDOWS_CONTRACT: "1" }));
+    expectSilent(runScript(windowsContractSh, "", { OS: "Windows_NT", AXHUB_NO_WINDOWS_CONTRACT: "1" }));
   });
 
   test("marker kill switch no-windows-contract → 침묵해요", () => {
-    expectSilent(runInline(windowsContractCmd, "", { OS: "Windows_NT", HOME: makeHomeWithMarker("windows-contract") }));
+    expectSilent(runScript(windowsContractSh, "", { OS: "Windows_NT", HOME: makeHomeWithMarker("windows-contract") }));
   });
 });
 
 describe("AP-19 feedback 리포트 계약 훅 (SessionStart entry 5)", () => {
   test("PATH 에 axhub 존재 → 계약을 발행해요", () => {
-    const result = runInline(feedbackContractCmd, "", { HOME: makeHome(), PATH: SAFE_PATH });
+    const result = runScript(feedbackContractSh, "", { HOME: makeHome(), PATH: SAFE_PATH });
     expectEmit(result, "SessionStart", "axhub feedback -m");
     expect(result.stdout).toContain("예상된 거절은 리포트하지 않아요");
   });
@@ -343,39 +368,97 @@ describe("AP-19 feedback 리포트 계약 훅 (SessionStart entry 5)", () => {
     const home = makeHome();
     mkdirSync(join(home, ".axhub"), { recursive: true });
     writeFileSync(join(home, ".axhub", "bin-path"), "/opt/axhub/bin/axhub");
-    expectEmit(runInline(feedbackContractCmd, "", { HOME: home, PATH: NO_AXHUB_PATH }), "SessionStart", "axhub feedback -m");
+    expectEmit(runScript(feedbackContractSh, "", { HOME: home, PATH: NO_AXHUB_PATH }), "SessionStart", "axhub feedback -m");
   });
 
   test("canonical ~/.axhub/bin/axhub 만 있어도 발행해요 (AP-17 3-경로)", () => {
     const home = makeHome();
     mkdirSync(join(home, ".axhub", "bin"), { recursive: true });
     writeFileSync(join(home, ".axhub", "bin", "axhub"), "");
-    expectEmit(runInline(feedbackContractCmd, "", { HOME: home, PATH: NO_AXHUB_PATH }), "SessionStart", "axhub feedback -m");
+    expectEmit(runScript(feedbackContractSh, "", { HOME: home, PATH: NO_AXHUB_PATH }), "SessionStart", "axhub feedback -m");
   });
 
   test("CLI 가 3-경로 어디에도 없으면 침묵해요", () => {
-    expectSilent(runInline(feedbackContractCmd, "", { HOME: makeHome(), PATH: NO_AXHUB_PATH }));
+    expectSilent(runScript(feedbackContractSh, "", { HOME: makeHome(), PATH: NO_AXHUB_PATH }));
   });
 
   test("kill switch AXHUB_NO_FEEDBACK_REPORT → 침묵해요", () => {
-    expectSilent(runInline(feedbackContractCmd, "", { HOME: makeHome(), PATH: SAFE_PATH, AXHUB_NO_FEEDBACK_REPORT: "1" }));
+    expectSilent(runScript(feedbackContractSh, "", { HOME: makeHome(), PATH: SAFE_PATH, AXHUB_NO_FEEDBACK_REPORT: "1" }));
   });
 
   test("marker kill switch no-feedback-report → 침묵해요", () => {
-    expectSilent(runInline(feedbackContractCmd, "", { HOME: makeHomeWithMarker("feedback-report"), PATH: SAFE_PATH }));
+    expectSilent(runScript(feedbackContractSh, "", { HOME: makeHomeWithMarker("feedback-report"), PATH: SAFE_PATH }));
   });
 });
 
 describe("AP-14 폴백 훅 (SessionStart entry 3)", () => {
   test("기본 상태에서 update-first 가드를 발행해요", () => {
-    expectEmit(runInline(ap14FallbackCmd, ""), "SessionStart", "update-first routing guard is active for Code mode");
+    expectEmit(runScript(ap14FallbackSh, ""), "SessionStart", "update-first routing guard is active for Code mode");
   });
 
   test("kill switch AXHUB_NO_UPDATE_ROUTER → 침묵해요", () => {
-    expectSilent(runInline(ap14FallbackCmd, "", { AXHUB_NO_UPDATE_ROUTER: "1" }));
+    expectSilent(runScript(ap14FallbackSh, "", { AXHUB_NO_UPDATE_ROUTER: "1" }));
   });
 
   test("marker kill switch no-update-router → 침묵해요 (UserPromptSubmit 라우터와 공용)", () => {
-    expectSilent(runInline(ap14FallbackCmd, "", { HOME: makeHomeWithMarker("update-router") }));
+    expectSilent(runScript(ap14FallbackSh, "", { HOME: makeHomeWithMarker("update-router") }));
+  });
+});
+
+// ── hooks.json 합성 command e2e (plugin-root env 치환 경계) ──────────────
+
+// hooks.json 의 SessionStart command 문자열 자체를 `bash -c` 로 실행해요 —
+// wrapper 파일 직접 실행(runScript)이 못 보는 `${CLAUDE_PLUGIN_ROOT}` 치환
+// 경계를 잠가요. repo 루트를 그대로 쓰면 .git 때문에 entry 1 dev 가드가
+// 끼어드니, .git 없는 스테이징 번들 루트(운영 플러그인 캐시 배치와 동형)로
+// 각 entry 의 기대 emit/침묵을 그대로 재현해요.
+const STAGED_PLUGIN_ROOT = mkdtempSync(join(tmpdir(), "axhub-staged-plugin-"));
+cpSync(join(REPO_ROOT, "hooks"), join(STAGED_PLUGIN_ROOT, "hooks"), { recursive: true });
+
+const runSsCommand = (index: number, env: Record<string, string> = {}): RunResult =>
+  runInline(ssCommands[index]!, "", { CLAUDE_PLUGIN_ROOT: STAGED_PLUGIN_ROOT, ...env });
+
+describe("SessionStart 합성 command e2e (hooks.json command 문자열 실행)", () => {
+  test("entry 1 auto-update: 스테이징 루트 + 캐시 없음 → 운영 emit 이 재현돼요", () => {
+    const home = makeHome();
+    expectEmit(runSsCommand(0, { HOME: home, PATH: SAFE_PATH }), "SessionStart", "auto-update-prompt.md");
+    expect(existsSync(join(home, CACHE_REL))).toBe(true);
+  });
+
+  test("entry 1 auto-update: kill switch 침묵도 합성 command 경로에서 재현돼요", () => {
+    const home = makeHome();
+    expectSilent(runSsCommand(0, { HOME: home, PATH: SAFE_PATH, AXHUB_NO_AUTO_UPDATE: "1" }));
+    expect(existsSync(join(home, CACHE_REL))).toBe(false);
+  });
+
+  test("entry 2 windows-contract: OS=Windows_NT → 발행, 미설정(non-Windows skip) → 침묵해요", () => {
+    expectEmit(runSsCommand(1, { OS: "Windows_NT" }), "SessionStart", "Git Bash");
+    expectSilent(runSsCommand(1));
+  });
+
+  test("entry 3 update-router-guard: 기본 상태 → update-first 가드를 발행해요", () => {
+    expectEmit(runSsCommand(2), "SessionStart", "update-first routing guard is active for Code mode");
+  });
+
+  test("entry 4 restart-confirm: fresh marker → confirm prompt 지시를 발행해요", () => {
+    const home = makeHome();
+    mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
+    writeFileSync(join(home, MARKER_REL), "1.10.28");
+    expectEmit(runSsCommand(3, { HOME: home }), "SessionStart", "plugin-restart-confirm-prompt.md");
+  });
+
+  test("entry 5 feedback-contract: PATH 의 axhub 로 계약을 발행해요", () => {
+    expectEmit(runSsCommand(4, { HOME: makeHome(), PATH: SAFE_PATH }), "SessionStart", "axhub feedback -m");
+  });
+});
+
+describe("CLAUDE_PLUGIN_ROOT 미설정 경계 (omitted-root)", () => {
+  test("env 미설정이면 5개 entry 모두 exit 127 + stdout 무JSON 으로 소실돼요 (현행 거동 문서화)", () => {
+    // 조용한 소실이 현행 계약이에요 — Claude·Codex 둘 다 env 주입 실측 확인, U1-(p) 재확인 예정.
+    for (const command of ssCommands) {
+      const result = runInline(command, "");
+      expect(result.exitCode).toBe(127);
+      expect(result.stdout.trim()).toBe("");
+    }
   });
 });

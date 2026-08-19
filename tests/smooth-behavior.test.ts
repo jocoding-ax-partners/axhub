@@ -3,9 +3,14 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { HOST_EXPECTATIONS, SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
+
 const REPO_ROOT = join(import.meta.dir, "..");
 const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
 const readJson = <T>(path: string): T => JSON.parse(readRepo(path)) as T;
+// host 결합 기대값은 Claude lane fixture 를 참조해요 — codex 열은 후속 유닛이
+// tests/fixtures/host-expectations.ts 에 추가해요.
+const CLAUDE = HOST_EXPECTATIONS.claude;
 
 interface PackageLike {
   description: string;
@@ -59,7 +64,7 @@ describe("smooth behavior contracts", () => {
     expect(readme).toContain("첫 셋업 → 앱 생성 → 배포 → 상태 확인");
     expect(agents).toContain("첫 셋업 → 앱 생성 → 배포 → 상태 확인");
     expect(claude).toContain("첫 셋업 → 앱 생성 → 배포 → 상태 확인");
-    expect(readme).toContain("Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only");
+    expect(readme).toContain(CLAUDE.readme.desktopCliOnly);
     expect(readme).toContain("버전·최신 확인이 들어간 요청은 언제나 `update` 가 먼저 끝나요");
     expect(readme).toContain("존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help`");
     expect(readme).toContain("정확히 `axhub apps list --json` 읽기 전용 명령으로 이어가요");
@@ -99,6 +104,7 @@ describe("smooth behavior contracts", () => {
       readRepo("skills/import/SKILL.md") +
       readRepo("skills/import/references/visibility-rules.md") +
       readRepo("skills/import/references/manifest-authoring.md");
+    const scaffold = readRepo("skills/scaffold/SKILL.md");
     const onboardingAuth = readRepo("skills/onboarding/references/install-channels-and-auth.md");
     const bootstrapAndLocal = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
@@ -144,8 +150,9 @@ describe("smooth behavior contracts", () => {
     expect(bootstrap).toContain("다른 플러그인/워크플로 상태를 정리하지 않아요");
     expect(bootstrap).toContain("외부 자동화·취소·state 정리 도구를 부르지 않고");
     expect(bootstrap).toContain("chat/tool/progress 에 다른 플러그인 이름, 자동화 정리 문구");
-    expect(bootstrap).not.toContain("autopilot");
-    expect(bootstrap).not.toContain("oh-my-claudecode");
+    // 역방향 계열 — fixture 값이어도 not.toContain 은 여기 명시적으로 남겨요.
+    expect(bootstrap).not.toContain(CLAUDE.forbidden.externalAutomationSkill);
+    expect(bootstrap).not.toContain(CLAUDE.forbidden.externalAutomationPlugin);
     expect(bootstrap).toContain('axhub publish --app "$APP_SLUG" --visibility public --execute --json');
     expect(bootstrap).toContain("publish dry-run 을 먼저 호출하지 않고");
     expect(bootstrap).toContain("`Dry-run 기본값` 같은 내부 CLI dry-run semantics");
@@ -214,7 +221,7 @@ describe("smooth behavior contracts", () => {
     expect(workflowDetails).toContain("If deploy-prep or another target check still reports only those runtime paths");
     expect(workflowDetails).toContain("Do not combine polling into one long `while`/`for` shell loop");
     expect(workflowDetails).toContain("do not collapse polling into one long `while`/`for`/`until` shell loop");
-    expect(workflowDetails).toContain("A Claude Desktop permission request for a long polling shell block is a failed watch UX");
+    expect(workflowDetails).toContain(CLAUDE.deploySkill.desktopPermissionWatchFail);
     expect(workflowDetails).toContain("COMMIT_SHA=$(git rev-parse \"${COMMIT_SHA:-HEAD}^{commit}\")");
     expect(workflowDetails).toContain("git push -u origin \"HEAD:$BRANCH\"");
     expect(workflowDetails).toContain("Judge push success by `PUSH_EXIT`, not by stderr text");
@@ -320,7 +327,7 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("device flow 를 시작하는 Bash/tool call 제목과 description 은 모두 정확히 `계정 인증 시작`");
     expect(clarity).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
     expect(clarity).toContain("Markdown URL 링크 문법은 전부 금지");
-    expect(clarity).toContain("device-flow URL 은 Claude Desktop 이 자동 링크로 바꾸지 못하도록 URL 부분만 inline code span 으로 써요");
+    expect(clarity).toContain(CLAUDE.claritySkill.desktopAutolinkGuard);
     expect(clarity).toContain("[https://github.com/login/device](https://github.com/login/device)`, `[https://github.com/login/device](github.com/login/device)`, `[GitHub 열기](https://github.com/login/device)`, `<https://github.com/login/device>`, bare `https://github.com/login/device` 같은 링크/자동링크 형태는 모두 금지");
     expect(clarity).toContain("bare `https://github.com/login/device` 같은 링크/자동링크 형태는 모두 금지");
     expect(clarity).toContain("인증 URL: \\`https://github.com/login/device\\`");
@@ -337,7 +344,7 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("axhub connectors mine");
     expect(clarity).toContain("tenant-admin 전체 카탈로그");
     expect(clarity).toContain('`connectors list` / `--enabled-only` tenant-admin 전체 목록을 "내가 조회 가능한 커넥터" 로 표현');
-    expect(clarity).toContain("Claude Desktop 에 노출된 `axhub` App/MCP 도구 호출");
+    expect(clarity).toContain(CLAUDE.claritySkill.desktopAppToolExposure);
     expect(clarity).toContain("clarity 는 항상 CLI help gate 뒤 `axhub` 명령으로 실행해요");
     expect(clarity).toContain("읽기 전용 leaf CLI 를 `> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution 같은 shell wrapper 로 감싸기");
     expect(clarity).toContain("단일 `axhub ... --json` 호출을 실행하고 tool 결과를 assistant 내부에서 해석");
@@ -434,12 +441,12 @@ describe("smooth behavior contracts", () => {
     expect(update).toContain("**Desktop-visible command allowlist.**");
     expect(update).toContain("Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요");
     expect(update).toContain("플러그인 캐시 파일을 읽지 않아요");
-    expect(update).toContain("정확히 `claude plugin list` 만 실행한 출력");
-    expect(update).toContain("이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요");
-    expect(update).toContain("`claude plugin list 2>&1`");
-    expect(update).toContain("`claude plugin list 2>&1 | grep ...`");
+    expect(update).toContain(CLAUDE.updateSkill.exactListOnlyOutput);
+    expect(update).toContain(CLAUDE.updateSkill.permissionCardExactList);
+    expect(update).toContain(CLAUDE.updateSkill.listRedirectInlineCode);
+    expect(update).toContain(CLAUDE.updateSkill.listRedirectGrepInlineCode);
     expect(update).toContain("pipe, redirect, text filter");
-    expect(update).toContain("실행하려는 command 가 `claude plugin list 2>&1` 또는 `command -v claude && claude plugin list` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.**");
+    expect(update).toContain(CLAUDE.updateSkill.rewriteToBareListRule);
     expect(update).toContain("플러그인 버전, 설치 scope, 다음 CLI 확인을 영어 내부 로그처럼 chat 에 쓰지 말고");
     expect(update).toContain("scope 원문, 영어 진행 로그는 사용자에게 말하지 않아요");
     expect(update).toContain("버전과 설치 위치를 같은 문장에 섞지 않아요");
@@ -467,10 +474,10 @@ describe("smooth behavior contracts", () => {
     expect(update).not.toContain("다음 동작은 `clarity`");
     expect(update).not.toContain("그 다음 작업은 `clarity`");
     expect(update).toContain("| CLI 존재 확인 (`command -v axhub`) | `CLI 설치 확인` |");
-    expect(update).toContain("| 플러그인 설치 위치 확인 (정확히 `claude plugin list`) | `플러그인 설치 위치 확인` |");
+    expect(update).toContain(CLAUDE.updateSkill.locationCheckTableRow);
     expect(update).toContain("| 플러그인 마켓플레이스 새로고침 | `플러그인 카탈로그 새로고침` |");
     expect(update).toContain("| 버전 확인 (`axhub update check ...`) | `버전 확인` |");
-    expect(update).toContain("수동 확인 기록은 Claude Desktop 경로에서 갱신하지 않아요");
+    expect(update).toContain(CLAUDE.updateSkill.noManualCheckStamp);
     expect(update).toContain("별도 `mkdir`/touch/marker command 를 실행하지 말아요");
     expect(update).toContain("별도 로컬 기록 작업명은 chat 에 쓰지 않아요");
     expect(update).not.toContain("plugin-update-check");
@@ -484,14 +491,26 @@ describe("smooth behavior contracts", () => {
     expect(update).toContain("`현재 플러그인 버전을 확인했어요.`, `CLI는 이미 최신이에요. 플러그인 새 버전을 받을게요.`, `플러그인 설치 위치를 확인했어요.`, `플러그인 새 버전을 받았어요.`");
     expect(update).toContain("영어 라벨, 내부 필드명, 설치 위치 원문, raw 상태값, 반말형 짧은 메모가 섞인 문장");
     expect(update).toContain("플러그인: vX -> vY 받음 (재시작 필요)");
-    expect(update).toContain("정확히 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 라고 말해요");
+    expect(update).toContain(CLAUDE.restartNotice.exactSayRule);
     expect(update).toContain("알 수 없는 로마자 단어를 만들지 않아요");
-    expect(update).toContain("NEVER 플러그인 업데이트 성공 뒤 `받았어요. Claude Code 를 재시작하면 새 버전이 적용돼요.` 가 아닌 재시작 안내 문장을 만들지 말아요");
+    expect(update).toContain(CLAUDE.restartNotice.neverOtherNoticeRule);
     expect(update).toContain("확인·비교 결과를 설명하는 영어 디버그 문장이나 raw 확인 줄은 쓰지 않아요");
     expect(update).not.toContain("Plugin version");
     for (const leakedUpdatePhrase of ["PLUGIN_UPDATED_VERSION", "matching plugin.latest", "Confirmed:", "Confirmed", "plugin.latest"]) {
       expect(update).not.toContain(leakedUpdatePhrase);
     }
+
+    // AP-12 승인 fallback 사다리 — 4사본 공통 문장 전문을 fixture 로 잠가요
+    // (bootstrap 사본은 bootstrap-ux-contract.test.ts 가 잠가요).
+    expect(deploy).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    expect(importSkill).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    expect(scaffold).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    // headless 정의는 3-lane 사다리 정합 재작성본으로 잠가요 — 정의 문장이
+    // `claude -p`·`codex exec` 병기 토큰을 포함해요. onboarding 은 D1 가드와
+    // NEVER 목록 두 곳 모두에 병기 토큰이 남아야 해요.
+    expect(deploy).toContain(CLAUDE.approvalGate.headlessDefinitionDeploy);
+    expect(importSkill).toContain(CLAUDE.approvalGate.headlessDefinitionImport);
+    expect(onboarding.split(CLAUDE.approvalGate.headlessCodexExecMention).length - 1).toBeGreaterThanOrEqual(2);
   });
 
   test("development skill follows the current SDK raw-db surface", () => {
@@ -510,7 +529,7 @@ describe("smooth behavior contracts", () => {
     expect(development).toContain("사용자에게 보이는 설명·툴 제목·중간 메모는 한국어로만");
     expect(development).toContain("optional 파일·설정 확인은 없어도 정상인 경우 실패처럼 보이면 안 돼요");
     expect(development).toContain("Desktop preview/issue check guard");
-    expect(development).toContain("Claude Desktop Code 모드");
+    expect(development).toContain(CLAUDE.developmentSkill.desktopCodeMode);
     expect(development).toContain("preview 확인은 `lint`/`build` 통과 뒤 한 번만");
     expect(development).toContain("Next `1 Issue` 배지·overlay 가 보이면 최대 1회만");
     expect(development).toContain("preview/issue 확인에 90초 이상 쓰지 않아요");
@@ -620,35 +639,45 @@ describe("smooth behavior contracts", () => {
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
     expect(entries).toHaveLength(5);
 
+    // KTD6: 인라인 command 는 hooks/session-*.sh wrapper 로 추출됐어요 —
+    // hooks.json 은 update-router 와 같은 bare 위임만 갖고, 계약 본문은
+    // wrapper 스크립트가 소유해요 (codex 훅 trust hash 재신뢰 스팸 방지 구조).
+    // wrapper 파일명 목록은 fixture 의 SESSION_WRAPPER_SCRIPTS 가 단일 소유해요.
+    entries.forEach((entry, index) => {
+      expect(entry.type).toBe("command");
+      expect(entry.shell).toBe("bash");
+      expect(entry.command).toBe(CLAUDE.surface.hookWrapperCommand(SESSION_WRAPPER_SCRIPTS[index]));
+    });
+
     // every SessionStart hook injects context invisibly: suppressed JSON only,
     // never plain echo stdout and never a user-facing systemMessage banner
-    for (const entry of entries) {
-      expect(entry.command).toContain("suppressOutput");
-      expect(entry.command).toContain("additionalContext");
-      expect(entry.command).not.toContain("systemMessage");
-      expect(entry.command).not.toContain('echo "');
+    for (const wrapper of SESSION_WRAPPER_SCRIPTS) {
+      const script = readRepo(`hooks/${wrapper}`);
+      expect(script).toContain("suppressOutput");
+      expect(script).toContain("additionalContext");
+      // 역방향 계열 — fixture 값이어도 not.toContain 은 여기 명시적으로 남겨요.
+      expect(script).not.toContain(CLAUDE.forbidden.hookBannerField);
+      expect(script).not.toContain('echo "');
       // Windows: backslash plugin-root paths must be slash-normalized before
       // JSON interpolation, or C:\... produces invalid JSON escapes
-      if (entry.command.includes("CLAUDE_PLUGIN_ROOT")) {
-        expect(entry.command).toContain("${CLAUDE_PLUGIN_ROOT//");
+      if (script.includes(CLAUDE.surface.hookPluginRootEnv)) {
+        expect(script).toContain(CLAUDE.surface.hookSlashNormalizeMarker);
       }
     }
 
     // 4번째 entry: 플러그인 업데이트 재시작 확인 (restart-confirm)
-    const restartConfirm = entries[3];
-    expect(restartConfirm.type).toBe("command");
-    expect(restartConfirm.shell).toBe("bash");
-    expect(restartConfirm.command).toContain("AXHUB_NO_AUTO_UPDATE");
-    expect(restartConfirm.command).toContain("no-auto-update");
-    expect(restartConfirm.command).toContain(".plugin-update-restart");
-    expect(restartConfirm.command).toContain("-mmin -10080");
-    expect(restartConfirm.command).toContain("plugin-restart-confirm-prompt.md");
+    const restartConfirm = readRepo("hooks/session-restart-confirm.sh");
+    expect(restartConfirm).toContain("AXHUB_NO_AUTO_UPDATE");
+    expect(restartConfirm).toContain("no-auto-update");
+    expect(restartConfirm).toContain(".plugin-update-restart");
+    expect(restartConfirm).toContain("-mmin -10080");
+    expect(restartConfirm).toContain("plugin-restart-confirm-prompt.md");
     // dev 가드는 이 entry 에 적용하지 않아요 — marker 는 머신 전역이라
     // 어느 세션의 확인도 유효해요 (eng review #1)
-    expect(restartConfirm.command).not.toContain("../../.git");
+    expect(restartConfirm).not.toContain("../../.git");
     // hook 은 읽기 전용: marker 삭제는 confirm prompt 몫, 바이너리 무접촉
-    expect(restartConfirm.command).not.toContain("rm -f");
-    expect(restartConfirm.command).not.toContain("command -v axhub");
+    expect(restartConfirm).not.toContain("rm -f");
+    expect(restartConfirm).not.toContain("command -v axhub");
   });
 
   test("AP-19 feedback auto-report contract hook is wired", () => {
@@ -663,22 +692,26 @@ describe("smooth behavior contracts", () => {
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
 
-    const feedback = entries[4];
-    expect(feedback.type).toBe("command");
-    expect(feedback.shell).toBe("bash");
+    const feedbackEntry = entries[4];
+    expect(feedbackEntry.type).toBe("command");
+    expect(feedbackEntry.shell).toBe("bash");
+    expect(feedbackEntry.command).toBe(CLAUDE.surface.hookWrapperCommand("session-feedback-contract.sh"));
+
+    // 계약 본문은 wrapper 스크립트가 소유해요 (KTD6 추출)
+    const feedback = readRepo("hooks/session-feedback-contract.sh");
     // kill switch: env + marker counterpart (repo-wide 훅 계약)
-    expect(feedback.command).toContain("AXHUB_NO_FEEDBACK_REPORT");
-    expect(feedback.command).toContain("no-feedback-report");
+    expect(feedback).toContain("AXHUB_NO_FEEDBACK_REPORT");
+    expect(feedback).toContain("no-feedback-report");
     // CLI 존재 가드는 AP-17 의 3-경로만 봐요 — 네트워크·바이너리 실행 없음
-    expect(feedback.command).toContain("command -v axhub");
-    expect(feedback.command).toContain(".axhub/bin-path");
-    expect(feedback.command).toContain(".axhub/bin/axhub");
+    expect(feedback).toContain("command -v axhub");
+    expect(feedback).toContain(".axhub/bin-path");
+    expect(feedback).toContain(".axhub/bin/axhub");
     // AP-19 invariants (agent-policy parity)
-    expect(feedback.command).toContain("axhub feedback -m");
-    expect(feedback.command).toContain("예상된 거절은 리포트하지 않아요");
+    expect(feedback).toContain("axhub feedback -m");
+    expect(feedback).toContain("예상된 거절은 리포트하지 않아요");
     // hook 은 계약 emit 만 해요: marker 삭제·업데이트·리포트 실행 없음
-    expect(feedback.command).not.toContain("rm -f");
-    expect(feedback.command).not.toContain("axhub update");
+    expect(feedback).not.toContain("rm -f");
+    expect(feedback).not.toContain("axhub update");
   });
 
   test("update freshness prompt router hook is wired", () => {
@@ -703,7 +736,7 @@ describe("smooth behavior contracts", () => {
     const router = entries[0];
     expect(router.type).toBe("command");
     expect(router.shell).toBe("bash");
-    expect(router.command).toBe('bash "${CLAUDE_PLUGIN_ROOT}/hooks/update-router.sh"');
+    expect(router.command).toBe(CLAUDE.surface.hookWrapperCommand("update-router.sh"));
 
     const routerScript = readRepo("hooks/update-router.sh");
     // prompt-field 매칭 계약: "prompt": 키 이후 구간만 보고, 키 부재 시 fail-closed
@@ -716,7 +749,8 @@ describe("smooth behavior contracts", () => {
     expect(routerScript).toContain("hookEventName");
     expect(routerScript).toContain("additionalContext");
     expect(routerScript).toContain("suppressOutput");
-    expect(routerScript).not.toContain("systemMessage");
+    // 역방향 계열 — fixture 값이어도 not.toContain 은 여기 명시적으로 남겨요.
+    expect(routerScript).not.toContain(CLAUDE.forbidden.hookBannerField);
     expect(routerScript).toContain("axhub freshness/update");
     expect(routerScript).toContain("Finding tools");
     expect(routerScript).toContain("invoke the axhub update skill");
@@ -745,7 +779,8 @@ describe("smooth behavior contracts", () => {
     expect(routerScript).not.toContain("python3");
     expect(routerScript).not.toContain("node ");
     expect(routerScript).not.toContain("axhub update check");
-    expect(routerScript).not.toContain("claude plugin update");
+    // 역방향 계열 — fixture 값이어도 not.toContain 은 여기 명시적으로 남겨요.
+    expect(routerScript).not.toContain(CLAUDE.forbidden.pluginUpdateCommand);
 
     // diet 계약: update 외 UserPromptSubmit 라우터는 wiring 도 스크립트도 없어요
     for (const removed of ["clarity-router.sh", "import-router.sh", "status-resume-router.sh"]) {
@@ -753,20 +788,25 @@ describe("smooth behavior contracts", () => {
     }
 
     const sessionEntries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-    const sessionRouter = sessionEntries[2];
-    expect(sessionRouter.type).toBe("command");
-    expect(sessionRouter.shell).toBe("bash");
-    expect(sessionRouter.command).toContain("AXHUB_NO_UPDATE_ROUTER");
-    expect(sessionRouter.command).toContain("update-first routing guard is active for Code mode");
-    expect(sessionRouter.command).toContain("Finding tools");
-    expect(sessionRouter.command).toContain("현재 버전을 확인할게요");
-    expect(sessionRouter.command).toContain("App/MCP tools");
-    expect(sessionRouter.command).toContain("generic Code-mode handling");
-    expect(sessionRouter.command).toContain("CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json");
-    expect(sessionRouter.command).toContain("Deployment list (axhub)");
-    expect(sessionRouter.command).toContain("axhub deployment list");
-    expect(sessionRouter.command).not.toContain("axhub update check");
-    expect(sessionRouter.command).not.toContain("claude plugin update");
+    const sessionRouterEntry = sessionEntries[2];
+    expect(sessionRouterEntry.type).toBe("command");
+    expect(sessionRouterEntry.shell).toBe("bash");
+    expect(sessionRouterEntry.command).toBe(CLAUDE.surface.hookWrapperCommand("session-update-router-guard.sh"));
+
+    // AP-14 폴백 본문도 wrapper 스크립트가 소유해요 (KTD6 추출)
+    const sessionRouter = readRepo("hooks/session-update-router-guard.sh");
+    expect(sessionRouter).toContain("AXHUB_NO_UPDATE_ROUTER");
+    expect(sessionRouter).toContain("update-first routing guard is active for Code mode");
+    expect(sessionRouter).toContain("Finding tools");
+    expect(sessionRouter).toContain("현재 버전을 확인할게요");
+    expect(sessionRouter).toContain("App/MCP tools");
+    expect(sessionRouter).toContain("generic Code-mode handling");
+    expect(sessionRouter).toContain("CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json");
+    expect(sessionRouter).toContain("Deployment list (axhub)");
+    expect(sessionRouter).toContain("axhub deployment list");
+    expect(sessionRouter).not.toContain("axhub update check");
+    // 역방향 계열 — fixture 값이어도 not.toContain 은 여기 명시적으로 남겨요.
+    expect(sessionRouter).not.toContain(CLAUDE.forbidden.pluginUpdateCommand);
   });
 
   test("AP-13 Windows execution contract hook is wired", () => {
@@ -781,17 +821,21 @@ describe("smooth behavior contracts", () => {
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
 
-    const windows = entries[1];
-    expect(windows.type).toBe("command");
-    expect(windows.shell).toBe("bash");
+    const windowsEntry = entries[1];
+    expect(windowsEntry.type).toBe("command");
+    expect(windowsEntry.shell).toBe("bash");
+    expect(windowsEntry.command).toBe(CLAUDE.surface.hookWrapperCommand("session-windows-contract.sh"));
+
+    // AP-13 계약 본문은 wrapper 스크립트가 소유해요 (KTD6 추출)
+    const windows = readRepo("hooks/session-windows-contract.sh");
     // Windows-only guard + killswitch
-    expect(windows.command).toContain("AXHUB_NO_WINDOWS_CONTRACT");
-    expect(windows.command).toContain("Windows_NT");
+    expect(windows).toContain("AXHUB_NO_WINDOWS_CONTRACT");
+    expect(windows).toContain("Windows_NT");
     // emits the Git Bash execution contract (invariant with agent-policy AP-13)
-    expect(windows.command).toContain("Git Bash 전용");
-    expect(windows.command).toContain("PowerShell");
+    expect(windows).toContain("Git Bash 전용");
+    expect(windows).toContain("PowerShell");
     // read-only / non-blocking: only echoes, never deletes markers
-    expect(windows.command).not.toContain("rm -f");
+    expect(windows).not.toContain("rm -f");
   });
 
   test("onboarding and ready-card stay MCP-free", () => {
@@ -799,9 +843,7 @@ describe("smooth behavior contracts", () => {
     const card = readRepo("skills/onboarding/references/ready-card.md");
 
     // 온보딩은 MCP 등록·OAuth 를 안내하지 않아요 — CLI 준비까지만 담당해요.
-    expect(onboarding).toContain(
-      "NEVER MCP 서버 등록(`claude mcp add`)이나 MCP OAuth 인증을 안내·실행하지 말아요",
-    );
+    expect(onboarding).toContain(CLAUDE.onboardingSkill.neverMcpRegister);
     expect(onboarding).toContain("references/ready-card.md");
     expect(onboarding).not.toContain(".onboarding-mcp-restart");
     expect(onboarding).not.toContain("Restart Handoff Card");
@@ -809,7 +851,7 @@ describe("smooth behavior contracts", () => {
     // ready card 는 옵트인 → 최종 카드만 담당해요. MCP 절차·marker 는 없어요.
     expect(card).toContain("AI 활용 기록 옵트인");
     expect(card).toContain("VIBE_READY");
-    expect(card).not.toContain("claude mcp");
+    expect(card).not.toContain(CLAUDE.forbidden.mcpRegisterCommand);
     expect(card).not.toContain(".onboarding-mcp-restart");
     expect(card).toContain("사용자에게는 enum 이름이나 대괄호 표식을 출력하지 말고");
   });

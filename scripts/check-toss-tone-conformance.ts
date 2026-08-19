@@ -57,8 +57,15 @@ const PHASE_13_FILES = async (includePatterns: string[] = []): Promise<string[]>
     "docs/policy/dev-policy.md",
   ];
   // diet 후 commands/ 디렉토리는 제거됨 — skills/*/SKILL.md 와 explicit 정책 문서를 검사해요.
+  // codex 파생 표면(overrides 소스·커밋 번들)도 같은 tone 게이트를 통과해요 (U8).
   const skillFiles: string[] = [];
   for await (const f of glob("skills/*/SKILL.md", { cwd: REPO_ROOT })) {
+    skillFiles.push(f);
+  }
+  for await (const f of glob("codex-overrides/**/*.md", { cwd: REPO_ROOT })) {
+    skillFiles.push(f);
+  }
+  for await (const f of glob("plugins/axhub-codex/skills/*/SKILL.md", { cwd: REPO_ROOT })) {
     skillFiles.push(f);
   }
   const includeFiles: string[] = [];

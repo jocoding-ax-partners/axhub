@@ -25,5 +25,7 @@ jobs:
         run: bun run lint:tone --strict
       - name: Plugin context budget gate
         run: bun run plugin:budget
+      - name: Plugin context budget gate (codex)
+        run: bun run plugin:budget:codex
       - name: Typecheck
         run: bunx tsc --noEmit

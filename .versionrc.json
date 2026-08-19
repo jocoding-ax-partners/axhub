@@ -32,6 +32,18 @@
     {
       "filename": "plugins/axhub/.claude-plugin/marketplace.json",
       "updater": "scripts/version-updater-marketplace.cjs"
+    },
+    {
+      "filename": "plugins/axhub-codex/.claude-plugin/plugin.json",
+      "type": "json"
+    },
+    {
+      "filename": "plugins/axhub-codex/.claude-plugin/marketplace.json",
+      "updater": "scripts/version-updater-marketplace.cjs"
+    },
+    {
+      "filename": "plugins/axhub-codex/.codex-plugin/plugin.json",
+      "type": "json"
     }
   ],
   "scripts": {

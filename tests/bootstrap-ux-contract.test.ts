@@ -2,8 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { HOST_EXPECTATIONS } from "./fixtures/host-expectations";
+
 const REPO_ROOT = join(import.meta.dir, "..");
 const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
+// host 결합 기대값은 Claude lane fixture 를 참조해요 — codex 열은 후속 유닛이
+// tests/fixtures/host-expectations.ts 에 추가해요.
+const CLAUDE = HOST_EXPECTATIONS.claude;
 const readBootstrap = (): string => readRepo("skills/bootstrap/SKILL.md");
 const readBootstrapContract = (): string =>
   [
@@ -56,7 +61,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("`matches new app + deploy request`");
     expect(bootstrap).toContain("`axhub의 새 앱 생성 스킬`");
     expect(bootstrap).toContain("`스킬을 사용하겠습니다`");
-    expect(bootstrap).toContain("Claude Desktop 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요");
+    expect(bootstrap).toContain(CLAUDE.bootstrapSkill.nativeBadgeNoRepeat);
     expect(bootstrap).toContain("CLI 명령이 하나도 실행되지 않았다면 fresh path 를 그대로 시작해요");
     expect(bootstrap.indexOf("## Fast Start")).toBeLessThan(bootstrap.indexOf("## Reference Loading Policy"));
   });
@@ -134,7 +139,7 @@ describe("bootstrap desktop UX contract", () => {
       bootstrap.indexOf("### 2. Resume And Workspace"),
     );
 
-    expect(bootstrap).toContain("`rtk` 같은 Codex/개발자 전용 래퍼는 이 Claude Desktop skill 에서 절대 쓰지 않아요");
+    expect(bootstrap).toContain("`rtk` 같은 개발자 전용 CLI 래퍼는 이 skill 에서 절대 쓰지 않아요");
     expect(bootstrap).toContain("`pwd`, `ls`, `find`, `cat`, `curl` 같은 generic shell probe");
     expect(localReference).toContain("Never prefix with `rtk`");
     expect(resumeReference).toContain("no `rtk`, no generic `ls`/`pwd` probes");
@@ -163,7 +168,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(cloneSection).toContain("clone/hydrate 명령 안에서는 raw `git`만 써요");
     expect(cloneSection).toContain("`rtk git`, `grep`, `cut`, `awk`, `sed`");
     expect(cloneSection).not.toContain("cd /absolute/target && git clone");
-    expect(localReference).toContain("Claude Desktop may create `.omc/`");
+    expect(localReference).toContain(CLAUDE.bootstrapSkill.desktopMetadataFolders);
     expect(localReference).toContain("Do not run `git clone ... .`");
     expect(localReference).toContain("leads to extra `rtk ls -la` probes");
   });
@@ -179,7 +184,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).not.toContain("registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요");
     expect(bootstrap).not.toContain("references/bootstrap-and-local.md");
     expect(bootstrap).not.toContain("../deploy/references/session-carryover.md");
-    expect(resumeReference).toContain("Do not write `.axhub/state/tenant.json` from Claude Desktop");
+    expect(resumeReference).toContain(CLAUDE.bootstrapSkill.noTenantFileWrite);
     expect(resumeReference).not.toContain("TENANT_CACHE=");
     expect(resumeReference).not.toContain("mkdir -p \"$(dirname \"$TENANT_CACHE\")\"");
     expect(resumeReference).not.toContain("date +%s");
@@ -230,6 +235,8 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("정확히 `지금 만들고 배포까지 진행할까요?` 질문과 `진행`/`취소` 선택지");
     expect(bootstrap).toContain("질문·선택지·설명은 의역하거나 새로 만들지 않아요");
     expect(bootstrap).toContain("사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요");
+    // AP-12 승인 fallback 사다리 — bootstrap 사본 문장 전문을 fixture 로 잠가요.
+    expect(bootstrap).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
     expect(reference).toContain("treat that as the user's goal, not as execute approval");
     expect(reference).toContain('"question": "지금 만들고 배포까지 진행할까요?"');
     expect(reference).toContain('"label": "진행", "value": "execute"');
@@ -282,7 +289,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("예약 폼과 시간 선택에 적합");
     expect(templateReference).toContain("Keep choice descriptions short and proofread");
     expect(templateReference).toContain("정적 페이지 중심이면 가까운 구조");
-    expect(templateReference).toContain("Do not finalize the name before one user-facing confirmation in Claude Desktop");
+    expect(templateReference).toContain(CLAUDE.bootstrapSkill.nameConfirmBeforeFinalize);
     expect(templateReference).toContain("Recommendation wording like");
     expect(templateReference).toContain("is approval only after the app-name prompt is visible");
     expect(templateReference).toContain("Ask with a native Question/AskUserQuestion card first");
@@ -399,7 +406,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요");
     expect(bootstrap).toContain("deployment id 를 알면 terminal/verify 완료 전 응답을 끝내지 않아요");
     expect(localReference).toContain("Never poll deployment status with a shell loop");
-    expect(localReference).toContain("Claude Desktop Monitor, ScheduleWakeup, or any background watcher");
+    expect(localReference).toContain(CLAUDE.bootstrapSkill.desktopWatcherBan);
     expect(localReference).toContain("Run one direct `axhub deploy status <deployment-id> --tenant <tenant> --json` command per check");
     expect(localReference).toContain("do not express the wait as `sleep`, `until`, `while`, a pipe, or a compound shell block");
     expect(localReference).toContain("A Desktop permission request containing `until axhub deploy status`");
@@ -484,8 +491,9 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("다른 플러그인/워크플로 상태를 정리하지 않아요");
     expect(bootstrap).toContain("외부 자동화·취소·state 정리 도구를 부르지 않고");
     expect(bootstrap).toContain("chat/tool/progress 에 다른 플러그인 이름, 자동화 정리 문구");
-    expect(bootstrap).not.toContain("autopilot");
-    expect(bootstrap).not.toContain("oh-my-claudecode");
+    // 역방향 계열 — fixture 값이어도 not.toContain 은 여기 명시적으로 남겨요.
+    expect(bootstrap).not.toContain(CLAUDE.forbidden.externalAutomationSkill);
+    expect(bootstrap).not.toContain(CLAUDE.forbidden.externalAutomationPlugin);
     expect(bootstrap).toContain("axhub apps get <app-slug> --tenant <tenant> --json");
     expect(bootstrap).toContain("axhub deploy verify <deployment-id> --app <app> --json");
     expect(resultReference).toContain("through `axhub apps get` CLI only");
