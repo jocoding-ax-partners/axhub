@@ -70,6 +70,22 @@ Claude Code 프롬프트에 아래를 순서대로 입력해요.
 
 > axhub CLI 가 없거나 너무 낮은 버전이면 onboarding·bootstrap·deploy 스킬이 멈추고 설치/업그레이드를 안내해요 — 최소 요구 버전은 코어 **v0.20.0**, `import`·`diagnosis` 까지 8스킬 전체는 **v0.21.3** 이에요.
 
+### OpenAI Codex 에서 쓰기
+
+axhub 는 **Codex CLI ≥ 0.147.0 (최종 검증: 0.148.0)** 도 공식 지원해요. Codex 전용 파생 번들(`axhub-codex`)을 설치해요:
+
+```bash
+codex plugin marketplace add https://github.com/jocoding-ax-partners/axhub
+codex plugin add axhub-codex@axhub
+```
+
+- **훅 신뢰를 한 번 확인해요** — 설치 후 첫 대화형 세션에서 Codex 가 플러그인 훅(세션 시작 4개 + 프롬프트 1개)의 신뢰 여부를 물어요. 신뢰하지 않으면 자동 업데이트 확인·update-first 라우팅 가드·재시작 확인·Windows 계약 안내 4개 표면이 조용히 꺼져요 — 스킬 자체는 훅 없이도 완결되고, 업데이트는 "업데이트해줘" 한마디로 `update` 스킬이 끝까지 처리해요.
+- Codex 가 신뢰하는 대상은 **훅 command(스크립트 경로)** 예요. wrapper 스크립트 내용은 플러그인 업데이트로 재신뢰 프롬프트 없이 갱신돼요 — wrapper 로직 변경은 CHANGELOG 에 명시해요.
+- 플러그인 업데이트는 설치돼도 **Codex 를 재시작해야 반영**돼요.
+- `codex exec` 자동화의 `--dangerously-bypass-hook-trust` 는 세션 전체 플러그인의 훅 신뢰 검토를 우회하는 전역 플래그라 권장하지 않아요 — axhub 의 headless 사용은 훅 없이 완결되고 파괴 작업은 preview 까지만 진행돼요.
+- 예전에 Claude 용 번들(`axhub@axhub`)을 Codex 에 설치했다면 `codex plugin remove axhub@axhub` 후 `axhub-codex@axhub` 로 재설치해요.
+- 카탈로그에 스킬이 안 보이면(다른 플러그인이 많아 컨텍스트 예산 초과 시 설명이 축약·생략될 수 있어요) `$axhub-codex:deploy` 처럼 명시 멘션으로 부르면 돼요. 등록된 다른 marketplace 경로가 깨져 있으면 목록 자체가 실패할 수 있으니 `codex plugin marketplace list` 로 정리해요.
+
 ### `Usage credits required for 1M context` 오류가 보이면
 
 이 오류는 Claude Code 에서 선택된 모델이나 1M context 모드가 내는 메시지예요. axhub 로그인, axhub backend, 배포 권한, 플러그인 설치 실패가 아니고, axhub 를 쓰기 위해 usage credits 가 필요한 것도 아니에요.

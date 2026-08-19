@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **axhub** (1081 symbols, 1232 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **axhub** (1688 symbols, 1902 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -107,6 +107,8 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 axhub plugin 은 45 skill 체제에서 **4 skill 체제**로 다이어트했어요: `onboarding` / `bootstrap` / `deploy` + 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 같은 명시적 axhub 운영 명령을 라이브 `--help` 탐색으로 처리하는 `clarity` 브리지예요. 이후 기존 앱에 실데이터 기반 기능 코드를 생성하는 `development` skill, 비어 있지 않은 기존 로컬 앱을 axhub로 가져오는 `import` skill, CLI·플러그인을 지금 최신으로 올리는 수동 on-demand `update` skill, 배포 실패 원인을 읽기 전용으로 요약하는 `diagnosis` skill 을 더해 현재 8 skill 이에요. 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli (`axhub` 바이너리) 를 직접 호출해요. Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold/skill-doctor/lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인은 전부 제거됐어요. 이후 훅은 cheap bash guard 로만 제한해서 재도입했어요: SessionStart 훅 5개(auto-update + Windows 실행 계약 AP-13 + Code-mode update router fallback AP-14 + 플러그인 업데이트 재시작 확인 + 예상 밖 CLI 실패 자동 리포트 AP-19)와, 최신·버전·업데이트 요청이 전역 axhub App/MCP 도구보다 `update` 스킬을 먼저 타게 하는 좁은 UserPromptSubmit match(AP-14 — `hooks/update-router.sh`, 매칭은 훅 입력 JSON 전체가 아니라 prompt 필드만)뿐이에요. UserPromptSubmit 라우터는 이 update 라우터 하나만이에요 — 한때 있던 clarity/import/status-resume 라우터 3개는 diet 정책(AGENTS 허용 목록) 위반이자 오라우팅 원인이라 제거했고, 운영 명령 자연어 라우팅은 clarity frontmatter description 이 담당해요. update 라우터는 `"prompt":` 키 이후 구간만 매칭하고 키 부재 시 fail-closed 로 침묵해요 — cwd·transcript_path 경로에 axhub 가 든 프로젝트의 오탐을 구조적으로 차단해요.
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
+
+**codex 파생 번들 (AP-20):** 소스는 claude-first 단일 트리 하나이고, OpenAI Codex CLI 용 번들 `plugins/axhub-codex` 는 `scripts/build-plugin-bundle.ts --host codex` 가 파생 생성해요 — 치환 테이블(`CODEX_SUBSTITUTIONS`, longest-first) + `codex-overrides/` 스왑(update lane·훅 프롬프트·README/POLICY codex 판) + 훅 변환(`shell` 키 제거·`commandWindows` 추가·AP-14+AP-19 합본 wrapper·상태 marker `-codex` suffix) + 매니페스트 name 재작성(axhub-codex) + description 재합성으로요. 파생 번들은 직접 수정하지 않고 소스·override 를 고쳐 재생성하며(`bun run plugin:bundle:all`), drift·FORBIDDEN·hash-pin 게이트는 `tests/codex-bundle.test.ts` 가 강제해요. codex 노출 경로는 host-중립 `.agents/plugins/marketplace.json`(axhub·axhub-codex 병기, version 생략) 이에요 — codex 는 `.agents` 를 읽으면 legacy `.claude-plugin` 을 완전히 가리고, Claude Code 는 `.agents` 를 읽지 않아요.
 
 ## 자동 업데이트 hook
 

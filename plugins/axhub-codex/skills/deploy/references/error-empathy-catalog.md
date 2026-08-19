@@ -1,0 +1,635 @@
+# Error Empathy Catalog (4-Part Korean Templates)
+
+This catalog implements the DX-2 fix from PLAN Phase 3.5: every axhub exit code maps to a Korean message with **emotion + cause + action + button**, not a clinical exit-code dictionary.
+
+The **vibe coder is anxious** (P3 persona, 11pm demo scenario in PLAN §1000). Clinical messages like "토큰이 만료됐습니다. /axhub:login을 실행하세요." trigger the give-up cascade. Empathy + plain Korean + a next phrase the user can literally say keeps them in the loop.
+
+---
+
+## Template Structure (4 parts, MANDATORY order)
+
+Every entry uses these four parts, in this order:
+
+1. **감정 (Emotion)** — 1 sentence reassurance. Pick from:
+   - "이건 흔한 일이에요." (this happens often)
+   - "앱은 안전해요." (your app is safe)
+   - "잠깐만요." (one moment)
+   - "축하해요!" (success only)
+   - "전혀 문제없어요." (no problem at all)
+
+2. **원인 (Cause)** — what + why in plain Korean. **No CLI jargon. No slash references on first-time users.** Avoid words like exit code, JSON, NDJSON, payload, transport.
+
+3. **해결 (Action)** — 1–2 lines, written as **the next natural-language phrase the user can literally say**. Not "/axhub:login" but "'다시 로그인해줘' 라고 말씀해주세요."
+
+4. **버튼 (Buttons)** — 명시 텍스트 승인 options array, max 3 short Korean labels.
+
+---
+
+## exit 0 — success (celebration template)
+
+**감정:** 축하해요! 배포 성공이에요.
+
+**원인:** `<APP_SLUG>` 가 `<PROFILE>` 환경에 정상 반영됐어요. 빌드가 `<ELAPSED>` 만에 끝났어요.
+
+**해결:** 라이브 URL을 한 번 확인해보시겠어요? 다음에 또 배포하실 때는 "방금 거 상태" 또는 "방금 거 로그" 라고 말씀하시면 바로 보여드려요.
+
+**버튼:** ["라이브 확인", "로그 보기", "닫기"]
+
+---
+
+## exit 1 — transport / unclassified
+
+**감정:** 잠깐만요. 일시적인 통신 문제예요. 앱은 안전해요.
+
+**원인:** axhub 서버까지 연결이 잠깐 끊겼어요. 네트워크가 느리거나 서버가 잠시 응답을 못한 경우예요. 배포 자체는 시작도 안 됐으니 걱정하지 마세요.
+
+**해결:** 한 번 더 시도해보시겠어요? "다시 시도해줘" 라고 말씀하시면 한 번만 자동 재시도해요. 배포 명령은 자동 재시도하지 않아요 (중복 배포 방지).
+
+**버튼:** ["다시 시도", "잠시 후 다시", "도와주세요"]
+
+---
+
+## exit 2 — deploy status in-progress
+
+**감정:** 정상이에요. 배포가 아직 진행 중일 뿐이에요.
+
+**원인:** 현재 배포가 `<STATUS_PHASE>` 단계예요. 평균 `<ETA>` 정도 걸리는데, 지금까지 `<ELAPSED>` 경과했어요.
+
+**해결:** 제가 같은 배포를 계속 확인할게요. 다른 일 하시다가 끝나면 알림 드릴게요.
+
+**버튼:** ["계속 지켜보기", "지금 그만 보기", "로그도 같이 보기"]
+
+---
+
+## Runtime compatibility aliases — generated catalog parity
+
+The runtime catalog also carries compact exit-code aliases used by
+`classify-exit` when it has no rich deploy context. Keep these headings in
+sync with ax-hub-cli `axhub/src/commands/plugin_support/data/catalog.json` and
+`error-empathy-catalog.generated.md` so catalog drift tests can prove the
+hand-written UX guide covers every emitted key.
+
+## exit 4 — auth required / token expired runtime alias
+
+**감정:** 잠깐만요. 로그인이 만료됐을 뿐이에요. 앱은 그대로예요.
+
+**원인:** axhub 로그인 토큰이 만료됐어요. 보안을 위해 일정 시간이 지나면 다시 로그인해야 해요.
+
+**해결:** "다시 로그인해줘" 라고 하면 브라우저로 안내해요. 브라우저가 안 열리는 환경이면 헤드리스 토큰 안내로 이어가요.
+
+**예외:** subcode 가 `github_relogin_required` 면 axhub 로그인이 아니라 GitHub 계정 연동이 풀린 상태예요. 재로그인 대신 GitHub 재연동(device flow)으로 안내해요 — `axhub github link` 를 승인하고 같은 확인 명령을 다시 실행하면 저장된 연동이 이어져요.
+
+**버튼:** ["다시 로그인", "토큰 파일로 로그인", "도와주세요"]
+
+---
+
+## exit 5 — resource not found runtime alias
+
+**감정:** 잠깐만요. 그런 이름은 못 찾았어요.
+
+**원인:** 그 이름의 앱/배포/API 가 회사 axhub 에 등록 안 돼 있어요. 오타이거나 다른 회사 계정의 앱일 수 있어요.
+
+**해결:** 가장 비슷한 후보를 보여줘요. 후보 중 하나를 고르거나 이름을 다시 입력하게 안내해요.
+
+**버튼:** ["가장 유사한 거로", "앱 목록 보기", "다시 입력"]
+
+---
+
+### exit 5:catalog.not_found
+
+**감정:** 찾는 데이터 리소스를 못 찾았어요.
+
+**원인:** connector/path 가 catalog 에 없거나 현재 인증 주체가 볼 수 없는 리소스예요.
+
+**해결:** path 를 추측하지 말고 `axhub catalog search --json --limit 200` 으로 후보를 다시 찾은 뒤 정확한 connector/path 만 사용해요.
+
+**버튼:** ["catalog search 실행", "path 다시 입력", "닫기"]
+
+---
+
+### exit 5:github.install_not_found
+
+**감정:** GitHub App 설치를 찾지 못했어요.
+
+**원인:** 선택한 account 에 axhub GitHub App 이 설치되어 있지 않거나 repo 권한이 없어요.
+
+**해결:** CLI 출력의 `install_url` 을 GitHub 연결 링크로 바로 보여줘요. 권한 부여는 자동으로 진행하지 않아요.
+
+**버튼:** ["GitHub 연결 링크", "repo 다시 고르기", "닫기"]
+
+---
+
+### exit 5:open.no_app_manifest
+
+**감정:** 열 수 있는 axhub 앱 정보를 찾지 못했어요.
+
+**원인:** 현재 디렉토리에 `apphub.yaml` 또는 `axhub.yaml` 이 없고 최근 배포 cache 도 비어 있어요.
+
+**해결:** 비어 있지 않은 기존 앱이면 "기존 앱 가져와줘" 라고 말씀해 import 로 이어가요. 빈 디렉토리에서 새 템플릿을 시작하려면 "새 앱 만들어줘" 라고 말씀해주세요.
+
+**버튼:** ["기존 앱 가져오기", "새 앱 만들기", "앱 목록 보기"]
+
+---
+
+## exit 8 — app permission forbidden (`axhub_app_forbidden`)
+
+**감정:** 잠깐만요. 권한 문제예요. 앱은 안전해요.
+
+**원인:** 이 앱의 owner/admin 권한 검사에 막혔어요. 앱을 만든 계정과 지금 로그인한 계정이 다를 때 생길 수 있어요. 권한 판정은 axhub 서버가 해요 — 계정이 달라 보인다는 이유만으로 에이전트가 미리 막지도, 통과시키지도 않아요.
+
+**해결:** 앱 소유자/관리자에게 이 앱의 멤버 권한 부여를 요청해주세요. 구두 승인을 권한 근거로 쓰지 않아요 — 권한이 부여된 뒤 같은 배포를 다시 시도해 성공하는 것으로만 확인해요. 다른 테넌트/계정으로 작업하려던 거면 그 계정으로 다시 로그인해요.
+
+**버튼:** ["소유자에게 권한 요청", "다른 계정으로 로그인", "취소"]
+
+---
+
+## exit 64 (base) — validation / usage error
+
+**감정:** 잠깐만요. 배포는 시작 안 됐어요. 앱은 안전해요.
+
+**원인:** 입력값에 문제가 있어서 배포 요청이 막혔어요. axhub가 받기 전에 검증에서 멈췄다는 뜻이에요.
+
+**해결:** 무엇을 배포하려 하셨는지 다시 한 번 풀어서 말씀해주세요. 예: "paydrop 메인 브랜치 최신 커밋 배포해" 처럼 구체적으로요.
+
+**버튼:** ["다시 풀어 말하기", "도와주세요", "취소"]
+
+---
+
+### exit 64 + `validation.deployment_in_progress`
+
+**감정:** 앱은 안전해요. 다른 배포가 먼저 진행 중이에요.
+
+**원인:** `<APP_SLUG>` 의 다른 배포가 아직 끝나지 않았어요. 같은 앱은 한 번에 한 배포만 진행됩니다 (서로 덮어쓰지 못하게 막아주는 안전장치예요).
+
+**해결:** 새로 배포하지 않고 진행 중인 그 배포를 제가 계속 확인할게요. **절대 다시 시도하지 않습니다 — 끝나면 자연스럽게 다음 배포가 가능해요.**
+
+**버튼:** ["진행 중인 거 지켜보기", "5분 후 다시 알려줘", "지금 취소"]
+
+---
+
+### exit 64 + `validation.app_ambiguous`
+
+**감정:** 잠깐만요. 같은 이름이 두 개라서 헷갈렸어요.
+
+**원인:** `<INPUT_SLUG>` 라는 이름의 앱이 여러 개 있어요. 어떤 거 말씀하신 건지 골라주세요.
+
+**해결:** 아래 후보 중 하나를 골라주세요. 다음부터는 앱 이름으로 기억해둘게요.
+
+**버튼:** [동적 — 후보 앱 슬러그 최대 3개, 예: "paydrop", "paydrop-staging", "더 많은 후보 보기"]
+
+---
+
+### exit 64 + `validation.app_list_truncated`
+
+**감정:** 잠깐만요. 회사에 앱이 너무 많아서 다 못 가져왔어요.
+
+**원인:** 앱이 100개를 넘어서 목록이 잘렸어요. 이름만으로는 정확히 어떤 앱인지 못 찾아요.
+
+**해결:** 앱 이름 일부를 더 알려주시거나 검색을 다시 실행해 정확한 앱을 고르게 해요. 사용자-facing 카드에는 내부 숫자 ID를 노출하지 않아요.
+
+**버튼:** ["앱 검색하기", "이름 다시 입력", "도와주세요"]
+
+---
+
+### exit 64 + `validation.quality_gate_failed`
+
+**감정:** 잠깐만요. push 전에 설정 불일치를 발견했어요. 앱은 안전해요.
+
+**원인:** preflight / resolve 결과에서 일관성 문제가 있어요. cli_version 누락, import/bootstrap 경계 충돌, exit code mismatch, 프로필 불일치 같은 사유로 잘못된 배포가 될 수 있어요.
+
+**해결:** 구체적 violation 을 같이 보여줄게요. 의도된 거면 "강제로 진행해" 라고 말해주세요. 비대화형 환경에서는 자동으로 차단됐어요.
+
+**버튼:** ["violation 자세히 보기", "강제로 진행 (위험)", "취소"]
+
+---
+
+## exit 65 — auth required / token expired
+
+**감정:** 잠깐만요. 로그인이 만료됐을 뿐이에요. 앱은 그대로예요.
+
+**원인:** axhub 로그인 토큰이 만료됐어요. 보안을 위해 일정 시간이 지나면 다시 로그인해야 해요. 평소 회사 메일·은행 사이트랑 똑같아요.
+
+**해결:** "다시 로그인해줘" 라고 말씀하시면 브라우저로 안내드릴게요. (브라우저가 안 열리는 환경 — 예: GitHub Codespaces — 이시면 별도 안내드려요.)
+
+**버튼:** ["다시 로그인", "토큰 파일로 로그인 (헤드리스)", "도와주세요"]
+
+---
+
+## exit 66 (base) — scope insufficient
+
+**감정:** 잠깐만요. 권한 문제예요. 앱은 안전해요.
+
+**원인:** 지금 토큰의 권한 범위로는 이 작업을 할 수 없어요. 회사 정책상 사람 (보통 토큰 발급해주신 분 — IT 담당자나 PM) 이 권한을 더 부여해야 해요.
+
+**해결:** 토큰을 발급해준 분께 이 메시지 그대로 보내주세요: "axhub 토큰에 `<REQUIRED_SCOPE>` scope 추가가 필요해요." 그 분이 처리해주면 다시 로그인하면 돼요.
+
+**버튼:** ["담당자에게 메시지 복사", "현재 권한 확인", "도와주세요"]
+
+---
+
+### exit 66 + `scope.downgrade_blocked`
+
+**감정:** 잠깐만요. 안전장치가 작동했어요.
+
+**원인:** 더 낮은 환경으로의 다운그레이드 시도가 감지됐어요. 예를 들어 production에 있는 앱을 staging 빌드로 덮으려 했을 때 안전을 위해 막아드려요.
+
+**해결:** 정말로 다운그레이드가 필요하시면 명시적으로 "강제로 다운그레이드해" 라고 말씀해주세요. 그게 아니라면 의도하신 환경 (보통 production) 의 빌드를 다시 확인해주세요.
+
+**버튼:** ["환경 다시 확인", "강제 다운그레이드 (위험)", "취소"]
+
+---
+
+### exit 66 + `update.downgrade_blocked`
+
+**감정:** 잠깐만요. 더 낮은 버전으로 되돌리려는 걸 감지했어요.
+
+**원인:** 지금 설치된 axhub 보다 낮은 버전으로 업데이트하려고 해서 안전을 위해 막았어요. 보통 실수로 옛 버전을 가리킬 때 생겨요.
+
+**해결:** 정말 다운그레이드가 필요하면 "강제로 업데이트해" 라고 말해주세요. --force 는 다운그레이드 게이트만 우회하고 cosign 서명 검증은 그대로 지켜요. 그게 아니면 최신 버전으로 두는 게 안전해요.
+
+**버튼:** ["최신 유지", "강제 다운그레이드 (위험)", "취소"]
+
+---
+
+### exit 66 + `update.cosign_enforce_failed`
+
+**감정:** 잠깐만요. 보안 검증에 실패했어요. 절대 진행하지 않아요.
+
+**원인:** 다운로드받은 axhub 업데이트 파일이 정품인지 검증하는 cosign 절차에서 실패했어요. 파일이 변조됐거나 네트워크 중간에 누군가 끼어든 가능성이 있어요. 보안상 업데이트를 차단했습니다.
+
+**해결:** 절대 강제로 진행하지 마세요. 회사 IT 보안 담당자에게 즉시 알려주세요. 그동안 axhub는 현재 버전으로 계속 사용하실 수 있어요.
+
+**버튼:** ["IT 보안팀에 알리기", "업데이트 취소", "현재 버전 유지"]
+
+---
+
+## exit 67 — resource not found (with did-you-mean)
+
+**감정:** 잠깐만요. 그런 이름은 못 찾았어요.
+
+**원인:** `<INPUT_NAME>` 이라는 이름의 `<RESOURCE_TYPE>` (앱/배포/API) 이 회사 axhub에 등록되어 있지 않아요. 오타이거나, 다른 회사 계정의 앱일 수도 있어요.
+
+**해결:** 혹시 이 중 하나를 말씀하셨나요? 가장 비슷한 후보를 보여드릴게요. (Levenshtein 거리 ≤2 또는 prefix match)
+
+```
+혹시 이걸 말씀하셨나요?
+  ① paydrop (가장 유사)
+  ② paydrop-v2
+  ③ paydrop-staging
+  ④ 위에 없어요 — 앱 목록 보기
+```
+
+**버튼:** ["가장 유사한 거로", "앱 목록 보기", "다시 입력"]
+
+---
+
+## exit 68 — rate limit (with auto-backoff)
+
+**감정:** 잠깐만요. 너무 많이 요청해서 서버가 잠시 쉬자고 해요. 앱은 안전해요.
+
+**원인:** 짧은 시간 안에 axhub 호출이 많이 누적돼서 잠깐 멈춰야 해요. 보통 다른 사람이랑 같은 토큰을 공유하거나, 자동화 스크립트가 너무 빨리 돌 때 생겨요. 서버에서 `Retry-After: <SECONDS>` 초 후 다시 시도하라고 알려줬어요.
+
+**해결:** `<SECONDS>` 초 (보통 30초~2분) 만 기다려주세요. 자동으로 다시 시도할게요. 그동안 커피 한 잔 어떠세요?
+
+**버튼:** ["자동으로 기다리기", "지금 취소", "도와주세요"]
+
+---
+
+# Deploy-Preview Card Template
+
+This is the 명시 텍스트 승인 card rendered by `skills/deploy/SKILL.md` step 3 before any destructive `axhub deploy create` is run.
+
+## Card body (Korean, NFKC-normalized)
+
+```
+다음을 실행할게요:
+  ① 앱:    <APP_SLUG>
+  ② 환경:  <PROFILE> (<ENDPOINT>)
+  ③ 브랜치: <BRANCH>
+  ④ 커밋:  <COMMIT_SHA_SHORT> — "<COMMIT_MESSAGE_FIRST_LINE>"
+           (<RELATIVE_TIME> 푸시, <COMMIT_AUTHOR>)
+  ⑤ 예상:  약 <ETA_MIN>분 소요
+
+진행할까요?
+```
+
+## 명시 텍스트 승인 options (mandatory three)
+
+```json
+{
+  "question": "위 내용으로 배포 진행할까요?",
+  "options": [
+    {
+      "label": "네, 진행",
+      "value": "confirm",
+      "description": "위 5가지 내용 그대로 axhub deploy create 실행"
+    },
+    {
+      "label": "아니요, 취소",
+      "value": "reject",
+      "description": "배포를 시작하지 않습니다. 안전해요."
+    },
+    {
+      "label": "미리보기만 (--dry-run)",
+      "value": "dry_run",
+      "description": "실제 배포 없이 어떻게 진행될지만 시뮬레이션"
+    }
+  ]
+}
+```
+
+## Rendering rules
+
+- **NFKC normalize** every displayed string before showing. If NFKC altered the slug (Cyrillic lookalike attack, ZWJ injection), surface a warning row above the card: `⚠️ 앱 이름에 비정상 문자가 감지됐어요. 확인해주세요: 원본=<RAW_SLUG>, 정규화=<NFKC_SLUG>`. (Reference: PLAN §16.11 Unicode + F14 Korean Unicode 공격.)
+- **Verbatim echo** — never substitute a mutation target from local cache. Resolve the internal app target from the latest live `axhub auth status --json` + `axhub apps list --json --slug-prefix <slug>` result, but render only the app slug in the user-facing card (E4 fix).
+- **Profile mismatch** — if `--profile` arg differs from `$AXHUB_PROFILE`, prepend a yellow warning row: `⚠️ 현재 환경(<ENV_PROFILE>) 과 다른 환경(<ARG_PROFILE>) 으로 배포하려 해요. 의도한 게 맞나요?`
+- **Slash invocation does NOT skip this card.** `/axhub:deploy paydrop` still renders the card. Slash is confirmation for invoking the skill, not for the destructive op (E2 fix).
+- **Legacy note** — older builds used a confirmation token here. Current builds rely on the preview card plus explicit approval before `axhub deploy create`.
+
+## Special: ETA calculation
+
+If `eta_sec` from helper resolution is null (no reliable duration history for this app), render: `⑤ 예상:  시간 예측 어려워요 (보통 2~5분)`. Do NOT fabricate a number.
+
+## Special: dry-run preview output
+
+When user picks "미리보기만 (--dry-run)", run `axhub deploy create --app <ID> --commit <SHA> --dry-run --json` and render the response as:
+
+```
+미리보기 결과 (실제로는 아무것도 안 올렸어요):
+  · 새 컨테이너 이미지 빌드: 예상 ~2분
+  · DB 마이그레이션: <N>개 변경 감지
+  · 환경변수 변경: <N>개 (이전 배포 대비)
+  · 헬스체크 주소: <URL>
+  · 라이브 전환 방식: <STRATEGY>
+
+이대로 진짜 배포하시려면 "이대로 진행해" 라고 말씀해주세요.
+```
+
+---
+
+### exit 64 + `env.prod_force_required`
+
+**감정:** 잠깐만요. production 환경변수는 더 조심해야 해요.
+
+**원인:** production 값은 즉시 라이브 앱에 영향을 줄 수 있어서 일반 env 변경보다 위험해요.
+
+**해결:** key 와 app slug 를 다시 확인하고 exact confirm 후 진행해요. 값은 화면에 노출하지 않아요.
+
+**버튼:** ["key 다시 확인", "취소", "도와주세요"]
+
+---
+
+### exit 64 + `env.prod_confirm_mismatch`
+
+**감정:** 잠깐만요. 확인 문구가 일치하지 않아요.
+
+**원인:** 입력한 key 또는 app 확인값이 실제 변경 대상과 달라요.
+
+**해결:** 대상 key 와 app slug 를 다시 보고 정확히 일치할 때만 다시 시도해요.
+
+**버튼:** ["다시 확인", "취소", "도와주세요"]
+
+---
+
+### exit 67 + `github.install_not_found`
+
+**감정:** GitHub App 설치를 찾지 못했어요.
+
+**원인:** 선택한 account 에 axhub GitHub App 이 설치되어 있지 않거나 repo 권한이 없어요.
+
+**해결:** CLI 출력의 install_url 을 GitHub 연결 링크로 바로 보여줘요. 권한 부여는 자동으로 진행하지 않아요.
+
+**버튼:** ["GitHub 연결 링크", "repo 다시 고르기", "닫기"]
+
+---
+
+### exit 64 + `github.git_connection_already_exists`
+
+**감정:** 이미 GitHub repo 가 연결되어 있어요.
+
+**원인:** 이 앱에는 기존 GitHub 연결이 있어서 중복 연결을 만들 수 없어요.
+
+**해결:** 현재 연결을 확인한 뒤 바꾸려면 disconnect preview 와 exact confirm 을 먼저 진행해요.
+
+**버튼:** ["현재 연결 보기", "연결 해제 검토", "닫기"]
+
+---
+
+### exit 64 + `github.confirm_slug_mismatch`
+
+**감정:** 확인한 앱 slug 가 달라요.
+
+**원인:** GitHub 연결 해제 대상과 확인 문구가 일치하지 않아 안전하게 중단했어요.
+
+**해결:** 앱 slug 를 다시 확인하고 정말 해제할 때만 정확히 입력해요.
+
+**버튼:** ["slug 다시 확인", "취소", "도와주세요"]
+
+---
+
+### exit 67 + `open.no_app_manifest`
+
+**감정:** 열 수 있는 axhub 앱 정보를 찾지 못했어요.
+
+**원인:** 현재 디렉토리에 axhub.yaml 또는 legacy apphub.yaml 이 없고 최근 배포 cache 도 비어 있어요.
+
+**해결:** 비어 있지 않은 기존 앱이면 "기존 앱 가져와줘" 라고 말씀해 import 로 이어가요. 빈 디렉토리에서 새 템플릿을 시작하려면 "새 앱 만들어줘" 라고 말씀해주세요.
+
+**버튼:** ["기존 앱 가져오기", "새 앱 만들기", "앱 목록 보기"]
+
+---
+
+### exit 66 + `profile.endpoint_not_in_allowlist`
+
+**감정:** 이 서버 주소가 허용 목록 밖이에요.
+
+**원인:** 사내 서버 주소거나 임시 서버 주소일 수 있지만, 토큰과 요청이 다른 서버로 갈 수 있어서 조심해야 해요.
+
+**해결:** 회사에서 승인한 서버 주소인지 한 번 더 확인한 뒤에만 프로필에 추가해요.
+
+**버튼:** ["서버 주소 확인", "취소", "도와주세요"]
+
+---
+
+### exit 65 + `apis.call_consent_required` (backend approval-required code)
+
+**감정:** API 호출에는 사전 승인이 필요해요.
+
+**원인:** 이 API 호출은 서버 상태를 바꿀 수 있어요. 단순 조회처럼 자동으로 실행할 수 없어요.
+
+**해결:** 어떤 요청인지 (요청 방식 / 주소 / 보낼 내용) 미리 보고 확인한 뒤, 명시 승인을 받아 다시 실행해요.
+
+**버튼:** ["미리보기", "취소", "도와주세요"]
+
+---
+
+## npm 권한 오류 (npm_eacces_cache)
+
+> 오류 패턴: `EACCES` + `_cacache`
+
+**감정:** 이건 흔한 일이에요. npm 캐시 폴더 권한이 달라졌을 뿐이에요.
+
+**원인:** npm 캐시 폴더를 다른 사용자 (보통 root 또는 관리자) 권한으로 쓴 적이 있어서 지금 계정으로는 읽거나 쓸 수 없어요. 패키지 설치 자체의 문제가 아니에요. 캐시 위치는 macOS/Linux 는 `~/.npm/_cacache`, Windows 는 `%LOCALAPPDATA%\npm-cache\_cacache` 예요.
+
+**해결:** "npm 캐시 권한 고쳐줘" 라고 말씀하시면 OS 별로 아래 명령을 안내드려요.
+
+macOS / Linux:
+```
+sudo chown -R $(whoami) ~/.npm
+```
+Windows (PowerShell, 관리자 권한):
+```
+icacls "$env:LOCALAPPDATA\npm-cache" /grant "$($env:USERNAME):F" /T
+```
+또는 캐시를 비우고 다시 시도하세요 (양쪽 OS 공통):
+```
+npm cache clean --force && npm install
+```
+
+**버튼:** ["캐시 권한 고치기", "캐시 비우고 재시도", "도와주세요"]
+
+---
+
+## npm 권한 오류 (npm_eexist_cache)
+
+> 오류 패턴: `EEXIST` + `rename` + `tmp`
+
+**감정:** 이건 흔한 일이에요. npm 캐시 임시 파일 충돌이에요.
+
+**원인:** npm 이 패키지를 캐시에 저장하다가 임시 파일이 이미 존재해서 충돌했어요. 이전 설치가 중간에 끊기거나 여러 npm 프로세스가 동시에 돌 때 생겨요. 앱 코드는 전혀 건드리지 않았어요.
+
+**해결:** "npm 캐시 지우고 다시 설치해줘" 라고 말씀하시면 됩니다 (양쪽 OS 공통):
+```
+npm cache clean --force
+npm install
+```
+계속 반복된다면 캐시 폴더를 완전히 지워도 안전해요 (캐시만 지우는 거예요). macOS/Linux 는 `~/.npm/_cacache`, Windows 는 `%LOCALAPPDATA%\npm-cache\_cacache` 예요.
+
+**버튼:** ["캐시 지우고 재시도", "캐시 폴더 삭제 안내", "도와주세요"]
+
+---
+
+## npm 권한 오류 (npm_eperm)
+
+> 오류 패턴: `EPERM` + `operation not permitted`
+
+**감정:** 이건 흔한 일이에요. 파일 시스템 권한 문제예요.
+
+**원인:** npm 이 파일을 만들거나 지우려는데 운영체제에서 막고 있어요. 보통 node_modules 폴더나 패키지 파일이 다른 사용자 소유이거나, Windows 에서 Antivirus 가 파일을 잠근 경우예요.
+
+**해결:** 프로젝트 폴더 소유권을 현재 계정으로 바꿔주세요.
+
+macOS / Linux:
+```
+sudo chown -R $(whoami) ./node_modules
+sudo chown -R $(whoami) .
+```
+Windows (PowerShell, 관리자 권한):
+```
+icacls .\node_modules /grant "$($env:USERNAME):F" /T
+icacls . /grant "$($env:USERNAME):F" /T
+```
+Windows 라면 Antivirus 를 잠시 끄거나 터미널을 관리자 권한으로 실행해보세요. `sudo npm install` 은 사용하지 마세요 — 더 큰 권한 문제가 생길 수 있어요.
+
+**버튼:** ["소유권 변경 안내", "node_modules 삭제 후 재설치", "도와주세요"]
+
+---
+
+## npm 권한 오류 (npm_enospc)
+
+> 오류 패턴: `ENOSPC` + `no space left`
+
+**감정:** 잠깐만요. 디스크 공간이 부족해요. 코드는 안전해요.
+
+**원인:** 디스크에 여유 공간이 없어서 npm 이 패키지 파일을 저장하지 못했어요. node_modules 나 npm 캐시가 커지면서 디스크를 다 쓴 경우가 많아요.
+
+**해결:** 먼저 여유 공간을 확보해보세요.
+
+macOS / Linux:
+```
+df -h                     # 디스크 사용량 확인
+npm cache clean --force   # npm 캐시 정리
+```
+Windows (PowerShell):
+```
+Get-PSDrive -PSProvider FileSystem   # 드라이브 사용량 확인
+npm cache clean --force              # npm 캐시 정리
+```
+Docker 나 CI 환경이라면 볼륨 크기를 늘리거나 불필요한 이미지를 정리해주세요 (양쪽 OS 공통):
+```
+docker system prune
+```
+
+**버튼:** ["디스크 사용량 확인", "캐시 정리 후 재시도", "도와주세요"]
+
+---
+
+## npm 권한 오류 (npm_enotempty)
+
+> 오류 패턴: `ENOTEMPTY` + `directory not empty`
+
+**감정:** 이건 흔한 일이에요. 폴더가 비어있지 않아서 생긴 충돌이에요.
+
+**원인:** npm 이 패키지 폴더를 교체하거나 지우려는데 안에 파일이 남아있어서 실패했어요. 이전 설치가 중간에 끊겼거나 다른 프로세스가 폴더를 사용 중일 때 생겨요.
+
+**해결:** node_modules 를 완전히 지우고 다시 설치해보세요.
+
+macOS / Linux:
+```
+rm -rf node_modules
+npm install
+```
+Windows (PowerShell):
+```
+Remove-Item -Recurse -Force node_modules
+npm install
+```
+잠금 파일도 함께 지우고 싶다면 — macOS / Linux:
+```
+rm -rf node_modules package-lock.json
+npm install
+```
+Windows (PowerShell):
+```
+Remove-Item -Recurse -Force node_modules, package-lock.json
+npm install
+```
+`npm install --force` 는 사용하지 마세요 — 의존성 불일치를 숨길 수 있어요.
+
+**버튼:** ["node_modules 삭제 후 재설치", "잠금 파일도 같이 삭제", "도와주세요"]
+
+---
+
+### exit 70 + `catalog.internal_error`
+
+**감정:** 잠깐만요. 데이터 조회를 안전하게 멈췄어요.
+
+**원인:** catalog 서버가 내부 오류를 돌려줬어요. `allowed_columns` 와 masked 정책을 확정하지 못한 상태라 결과를 추측하면 안 돼요.
+
+**해결:** 같은 live read 를 자동 재시도하지 않아요. 먼저 `axhub catalog get` 으로 `allowed_columns` 를 다시 확인하고, `deny_reason` 이 있으면 그대로 보여줘요.
+
+**버튼:** ["catalog get 확인", "관리자에게 전달", "닫기"]
+
+---
+
+### exit 67 + `catalog.not_found`
+
+**감정:** 찾는 데이터 리소스를 못 찾았어요.
+
+**원인:** connector/path 가 catalog 에 없거나 현재 인증 주체가 볼 수 없는 리소스예요.
+
+**해결:** path 를 추측하지 말고 `axhub catalog search --json --limit 200` 으로 후보를 다시 찾은 뒤 정확한 connector/path 만 사용해요.
+
+**버튼:** ["catalog search 실행", "path 다시 입력", "닫기"]
+
+---
+
+### exit 64 + `catalog.sql_format`
+
+**감정:** SQL 모양을 다시 확인해야 해요.
+
+**원인:** SQL 문이 read 전용 형식이 아니거나 catalog 가 허용하는 SELECT 형식을 벗어났어요.
+
+**해결:** row limit 과 `allowed_columns` 를 유지한 채 SELECT 쿼리만 다시 작성해요. write/update/delete 로 바꾸지 않아요.
+
+**버튼:** ["SQL 다시 작성", "schema 보기", "닫기"]

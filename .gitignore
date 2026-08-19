@@ -71,7 +71,10 @@ bin/
 target/
 .graphify_python
 .specify/
-.agents/
+.agents/*
+!.agents/plugins/
+.agents/plugins/*
+!.agents/plugins/marketplace.json
 fuzz/
 .cargo/
 .omc/
