@@ -37,7 +37,7 @@ allows-dependency-execution: true
 
 **보이는 tool 제목 계약.** 셸/명령 도구를 부를 때 description/title/summary 는 아래 고정 한국어 라벨 중 하나만 써요. 라벨 안에 `axhub` 를 넣지 않아요. `axhubing CLI 설치 여부 확인` 처럼 제품명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요.
 
-**사용자에게 보이는 command allowlist.** 셸 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` (AP-17 경로 복구일 때만), `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `codex plugin list --json`, `codex plugin marketplace upgrade axhub`, `codex plugin add axhub-codex@axhub`, `cat "$CLAUDE_PLUGIN_ROOT/.codex-plugin/plugin.json"` (0단계 4번 fallback 일 때만). 각 command 는 단독으로 실행하고 stdin 이 열려 있지 않게 해요. `&&`, pipe, redirect, `grep`, `head`, `tail`, `sed`, `awk`, `bash -lc`, `sh -c` 로 묶거나 자르지 않아요. `codex plugin list --json` 이 성공한 경로에서는 플러그인 캐시의 `plugin.json` 파일을 직접 읽지 않아요 — 그때 플러그인 현재 버전은 정확히 `codex plugin list --json` 1회의 `installed` 배열에서 `axhub-codex@axhub` 항목으로만 내부 판독해요 (`available` 배열은 신뢰하지 않아요 — 빈 배열로 나와요). 출력이 길어도 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요.
+**사용자에게 보이는 command allowlist.** 셸 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` (AP-17 경로 복구일 때만), `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `codex plugin list --json`, `codex plugin marketplace upgrade axhub`, `codex plugin add axhub-codex@axhub`, `cat "<설치 루트>/.codex-plugin/plugin.json"` (0단계 4번 fallback 일 때만, 리터럴 절대경로). 각 command 는 단독으로 실행하고 stdin 이 열려 있지 않게 해요. `&&`, pipe, redirect, `grep`, `head`, `tail`, `sed`, `awk`, `bash -lc`, `sh -c` 로 묶거나 자르지 않아요. `codex plugin list --json` 이 성공한 경로에서는 플러그인 캐시의 `plugin.json` 파일을 직접 읽지 않아요 — 그때 플러그인 현재 버전은 정확히 `codex plugin list --json` 1회의 `installed` 배열에서 `axhub-codex@axhub` 항목으로만 내부 판독해요 (`available` 배열은 신뢰하지 않아요 — 빈 배열로 나와요). 출력이 길어도 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요.
 
 | 단계 | tool description/title/summary |
 | --- | --- |
@@ -56,7 +56,7 @@ allows-dependency-execution: true
 2. 가능하면 정확히 `codex plugin list --json` 한 번으로 `installed` 배열의 `axhub-codex@axhub` 항목에서 현재 버전을 내부 변수 `<PLUGIN_VERSION>` 으로, 설치 소스 `marketplaceSource.sourceType`(`git`/`local`)을 `<SOURCE_TYPE>` 으로 둬요. 항목이 없으면 `<PLUGIN_VERSION>` 없이 CLI 업데이트 확인만 진행해요. 이 단계에서 설치 경로·raw JSON·영어 진행 로그는 사용자에게 말하지 않아요. 필요한 경우 `현재 플러그인 버전을 확인했어요.` 만 말해요.
 3. `codex plugin list --json` 이 성공하면 [`references/plugin-update.md`](references/plugin-update.md)를 읽어요. 이 reference 가 설치 소스 분기와 직접 업데이트를 소유해요.
 4. **`codex plugin list --json` 이 실패하면 (exit 비-0) 여기서 멈추지 않아요.** 무관한 다른 marketplace 하나가 깨져 있어도 codex 는 목록 전체를 실패시켜요 — 흔한 상태이고 플러그인 업데이트 자체는 그대로 동작해요. 이때만 fallback lane 을 타요:
-   - 현재 버전은 정확히 `cat "$CLAUDE_PLUGIN_ROOT/.codex-plugin/plugin.json"` 한 번으로 읽어 `version` 을 `<PLUGIN_VERSION>` 으로 둬요 (`$CLAUDE_PLUGIN_ROOT` 가 비어 있으면 `$PLUGIN_ROOT` 로 한 번 더 시도하고, 둘 다 없으면 `<PLUGIN_VERSION>` 없이 CLI 만 확인해요). 이 fallback 은 plugin.json 직접 읽기 금지의 유일한 예외예요.
+   - 현재 버전은 **지금 읽고 있는 이 SKILL.md 의 절대경로**에서 뒤쪽 `/skills/update/SKILL.md` 를 떼어낸 설치 루트를 `<ROOT>` 로 두고, `cat "<ROOT>/.codex-plugin/plugin.json"` 한 번으로 읽어 `version` 을 `<PLUGIN_VERSION>` 으로 둬요. `<ROOT>` 는 리터럴 절대경로로 바꿔 실행해요. `$CLAUDE_PLUGIN_ROOT`·`$PLUGIN_ROOT` 환경변수는 이 셸에 비어 있어서 못 써요 (실측). 읽기에 실패하면 `<PLUGIN_VERSION>` 없이 CLI 만 확인해요 — 경로 문자열에 든 숫자를 버전으로 추측하지 않아요. 이 fallback 은 plugin.json 직접 읽기 금지의 유일한 예외예요.
    - `<SOURCE_TYPE>` 은 알 수 없으니 판정에 쓰지 않아요. 적용이 필요하면 `codex plugin marketplace upgrade axhub` 를 한 번 시도하고(로컬 설치면 거부되는데 정상이라 그대로 넘어가요) 이어서 `codex plugin add axhub-codex@axhub` 를 실행해요 — 이 재실행이 git·local 양쪽에서 통하는 in-place 갱신이에요.
    - 이 lane 에서도 reference 는 읽지 않아요. 결과 카드와 재시작 안내는 §3·§4 와 똑같이 써요.
    - 사용자에게 목록 실패를 설명하지 않아요. `확인 불가`, `설정 오류`, `설정 복구 후 다시 확인` 같은 문장은 이 lane 에서 쓰지 않아요 — 버전을 읽었으면 평소처럼 결과만 알려줘요.
@@ -155,6 +155,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - NEVER 플러그인 업데이트를 받고도 재시작 안내를 빼먹지 말아요 — 재시작 전엔 새 버전이 안 떠요.
 - NEVER 플러그인 업데이트 성공 뒤 `받았어요. Codex 를 재시작하면 새 버전이 적용돼요.` 가 아닌 재시작 안내 문장을 만들지 말아요.
 - NEVER 확인하지 않은 버전을 "업데이트됨" 으로 보고하지 말아요 — `axhub --version` 재확인 뒤에만 새 버전을 말해요.
+- NEVER 설치 경로 문자열에 들어 있는 숫자를 플러그인 버전으로 추측해 `--plugin-version` 에 넣지 말아요 — `codex plugin list --json` 의 `installed` 항목이나 0단계 4번의 `plugin.json` 읽기로 확인한 값만 써요.
 - NEVER `codex plugin list --json` 의 `available` 배열로 설치·최신 여부를 판단하지 말아요 — `installed` 배열만 신뢰해요.
 - NEVER `<SOURCE_TYPE>` 이 로컬로 확인된 설치에 `codex plugin marketplace upgrade` 를 실행하지 말아요 — upgrade 는 Git marketplace 전용이라 거부돼요. 로컬 설치 갱신은 `codex plugin add axhub-codex@axhub` 재실행이에요. (0단계 4번 fallback 은 `<SOURCE_TYPE>` 을 모르는 상태라 upgrade 1회 시도 후 거부돼도 그대로 add 로 넘어가요 — 이 경로는 예외예요.)
 - NEVER `codex plugin list --json` 이 실패했다고 플러그인 단계를 통째로 포기하지 말아요 — 0단계 4번 fallback lane 으로 버전 판정과 적용을 끝까지 해요.
