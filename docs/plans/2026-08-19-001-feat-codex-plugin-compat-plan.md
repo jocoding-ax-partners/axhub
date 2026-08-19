@@ -88,9 +88,9 @@ axhub 플러그인은 Claude Code 전용으로 설계됐지만, Codex CLI 0.147.
 - KTD1. **빌드 파생 이중 번들** (session-settled: user-approved — 단일 번들 문안 병기(A)·훅 제외 skills-only(C)·무변경 스파이크(D) 대신: byte 예산 잔여 7,063B 로 병기가 산술적으로 불가하고, 훅 동봉 dual-host 선례 4개가 실물로 확정됐고, 8KB·1,024자 등 codex 전용 조정은 파생 번들에서만 가능해요). 소스는 claude-first 단일 트리, codex 표면은 build transform 이 소유하고 `plugins/axhub-codex` 로 커밋해요. Governs R7, R9.
 - KTD2. **codex 승인 프리미티브 = 명시 텍스트 승인 1회** (session-settled: user-approved — headless 강제 유지 대신: codex interactive 에서 deploy `--execute` UX 를 보존해요. codex 의 `request_user_input` 은 Plan 모드 전용이라 대체 프리미티브가 아니에요). Governs R6. codex 판에서 "텍스트 번호 선택지 렌더 후 정지 금지" 계약은 역방향 재작성 대상이라 치환이 아니라 override 로 다뤄요. **U1-(i)(j) 실측:** codex exec 컨텍스트엔 headless 신호가 없고 오히려 대화형을 암시해요 — 안전은 승인 기아(승인 불가 환경에선 canonical 문구가 도달하지 않아 실행 불발)로 성립하고, 파일럿에서 승인 전 실행 0 을 확인했어요. QA 판정은 "승인 전 `--execute` 실행 0" 행동 기준이에요.
 - KTD3. **host-중립 `.agents` 병기** (session-settled: user-approved — codex 전용 단일 axhub 엔트리 + tripwire 대신: `.agents` 는 다중 host 표준 경로고 완전-가림(shadowing) 특성이 있어 타 host 채택 시 시한폭탄이 돼요). Governs R12. codex 설치 id 는 `axhub-codex@axhub` 이고, transform 이 codex 번들 매니페스트 3종의 name 을 axhub-codex 로 재작성해 엔트리명과 정합시켜요. `.agents` 엔트리는 version 을 생략해 플러그인 매니페스트가 버전을 소유하게 해요(bump 표면 최소화).
-- KTD4. **실행 4스킬의 codex 코어 ≤ 8,000B 를 transform 선행조건으로** — 적대 검증 CRITICAL: 안전 게이트가 절단선 밖(@8,058~@11,365)이라 prepend 재독 지시만으로는 안전 계약이 모델 재량으로 강등돼요. byte-offset 테스트로 강제하고, prepend 는 보조 수단으로만 둬요. Governs R3. **U1-(k) 실측(0.148):** exec 레인은 본문 미주입·절단 부존재 — 모델이 스킬 파일을 직접 읽어요. 8KB 코어 필요성은 TUI 주입 실측((b)·(k-TUI)) 판정에 게이트하고, 판정 전에는 U6 코어 물량·U8 byte-offset assert 를 착수하지 않아요(보류 lane).
+- KTD4. **실행 4스킬의 codex 코어 ≤ 8,000B 를 transform 선행조건으로** — 적대 검증 CRITICAL: 안전 게이트가 절단선 밖(@8,058~@11,365)이라 prepend 재독 지시만으로는 안전 계약이 모델 재량으로 강등돼요. byte-offset 테스트로 강제하고, prepend 는 보조 수단으로만 둬요. Governs R3. **U1-(k) 실측(0.148):** exec 레인은 본문 미주입·절단 부존재 — 모델이 스킬 파일을 직접 읽어요. **(k-TUI) 실측 완료: TUI 레인도 본문 미주입(NOMARKER)·절단 부존재 → 8KB 코어 불필요 확정.** U6 코어 물량·U8 byte-offset assert 는 해소(불요)로 닫고, "스킬 본문 절단" 은 compat matrix(KTD12) 분기 재검증 항목으로만 유지해요.
 - KTD5. **상태 파일 host-suffix** — 적대 검증 CRITICAL: `~/.axhub/cache/` 의 throttle·restart marker 를 공유하면 듀얼 host 사용자의 codex 자동 업데이트가 굶고 Claude 쪽에 오안내가 역류해요. codex 판은 `-codex` suffix 경로 + marker host 판별자를 써요. Governs R10.
-- KTD6. **훅 wrapper 화 (소스 공통)** — codex trust hash 가 훅 command 원문 기반이라, 인라인 SessionStart command 5개를 `hooks/*.sh` 로 추출하면 릴리즈마다 재신뢰 스팸을 구조적으로 피해요. 단 이 편익은 upstream 이 닫을 수 있는 거동이라 정책 문서에 확정 서술하지 않고 compat matrix(KTD12)로 관리해요. 사용자 공개를 계약으로 둬요 — README·POLICY 에 신뢰 대상이 훅 command(스크립트 경로)이고 wrapper 스크립트 내용은 플러그인 업데이트로 재신뢰 프롬프트 없이 갱신됨을 1문단 공개하고, wrapper 로직 변경은 CHANGELOG 명시 의무(AP-20)로 다뤄요. 실거동은 U1-(n) 의 본문-수정 재설치 probe 로 확인하고, 공개 문구 활성화는 그 pass 에 게이트해요. 대안이던 "스크립트 내용 digest 를 신뢰 identity 에 포함"은 이 결정의 편익 자체를 소거해 기각했어요.
+- KTD6. **훅 wrapper 화 (소스 공통)** — codex trust hash 가 훅 command 원문 기반이라, 인라인 SessionStart command 5개를 `hooks/*.sh` 로 추출하면 릴리즈마다 재신뢰 스팸을 구조적으로 피해요. 단 이 편익은 upstream 이 닫을 수 있는 거동이라 정책 문서에 확정 서술하지 않고 compat matrix(KTD12)로 관리해요. 사용자 공개를 계약으로 둬요 — README·POLICY 에 신뢰 대상이 훅 command(스크립트 경로)이고 wrapper 스크립트 내용은 플러그인 업데이트로 재신뢰 프롬프트 없이 갱신됨을 1문단 공개하고, wrapper 로직 변경은 CHANGELOG 명시 의무(AP-20)로 다뤄요. 실거동은 U1-(n) 의 본문-수정 재설치 probe 로 확인하고, 공개 문구 활성화는 그 pass 에 게이트해요. **2026-08-19 실측 pass:** TUI 신뢰 후 trust 기록은 `[hooks.state."<pluginId>:<hooks.json 경로>:<이벤트>:<entry>:<hook>"]` + `trusted_hash="sha256:<hex>"` 이고, wrapper 본문 수정+재설치 시 hash 불변·재신뢰 없이 실행·새 문안 반영을 확인했어요(command 문자열 변경 시엔 그 훅만 조용히 미실행). 공개 문구 활성화 게이트 충족. 대안이던 "스크립트 내용 digest 를 신뢰 identity 에 포함"은 이 결정의 편익 자체를 소거해 기각했어요.
 - KTD7. **codex description 재합성** — codex 는 frontmatter `examples` 를 무시해서 7/9 스킬의 라우팅 자산이 증발해요. transform 이 description 핵심 + examples 대표 트리거를 병합하고(≤ 1,024자), 트리거·양보 규칙을 앞 200자에 배치해요. 재합성 문안은 transform 하드코딩이 아니라 `codex-overrides/` 의 문안 파일이 소유하고 hash-pin(KTD9) 대상이에요. Governs R2.
 - KTD8. **훅 6개 전체 다이어트 이식** — 축소 4개 대신: auto-update·AP-13/14/19 의 free-form 가드를 유지해요. 대신 codex 는 미신뢰 훅을 조용히 제외하므로 커버리지 서술을 "훅은 보강재, 스킬 본문·수동 update 가 1차"로 재정의하고, update 스킬 codex 판은 훅 발동 여부와 무관하게 완결되는 계약을 명시해요. Governs R5.
 - KTD9. **codex-overrides hash-pin** — override 대상인 update lane 은 repo 최다 churn 표면이라, `codex-overrides/SOURCE_HASHES.json` 에 대응 소스 sha256 을 pin 하고 소스 변경 시 pin 미갱신이면 테스트가 fail 해요. Governs R9.
@@ -335,7 +335,7 @@ Unit index:
 - **Approach:**
   1. `bun run plugin:bundle:all` 로 양 번들을 재생성해 갱신분을 커밋해요 (codex 번들 최초 생성·커밋은 U7 배선·U8 게이트와 같은 landing 소유).
   2. 태그·병합 전에 격리 `CODEX_HOME` QA 를 릴리즈 후보(릴리즈 브랜치 체크아웃)에서 선행해요 — R1 두 설치 분기 중 git marketplace 분기도 main 대신 릴리즈 브랜치 체크아웃을 local marketplace 로 등록해 실측하므로 공개 노출이 0 이에요. 범위: 설치, 9스킬 로드, 훅 trust 흐름, update lane(감지→upgrade→재시작 확인 한 줄 마감), 라우팅 매트릭스(스킬당 자연어 트리거 1건 + 인접 스킬 오라우팅 후보 1건), Windows codex 실측(bash 부재에서 6훅 조용한 skip / Git Bash 존재에서 wrapper 실행·`-codex` marker 기록·additionalContext 노출). QA 는 최소 버전(0.147.0)과 검증 시점 최신 버전 두 지점에서 수행하고(KTD12), 실모델 세션은 U1 과 같은 preflight·기록 위생(비프로덕션 확인·marker 선설정·secret 마스킹·크리덴셜 revoke)으로 진행하며, 결과에 각 codex 버전을 필수 기록해요. 자동화 exec 호출은 전부 `</dev/null` 로 실행해요 (U1 실측: stdin 개방 시 무기한 대기).
-  3. 파괴 경로 QA(R11)를 격리 tenant 실모델 세션으로 실측해요 — 순방향 3항목과 우회 방향(승인 문구 선주입 시 정지하는지, 오답·무응답·거절 시 미실행인지, headless 에서 정지하는지)을 방향별 3회 반복, 전 회 pass 기준이에요.
+  3. 파괴 경로 QA(R11)를 격리 tenant 실모델 세션으로 실측해요 — 순방향 3항목과 우회 방향(승인 문구 선주입 시 정지하는지, 오답·무응답·거절 시 미실행인지, headless 에서 정지하는지)을 방향별 3회 반복, 전 회 pass 기준이에요. **2026-08-19 선행 실측:** 승인 계약의 모델 행동 매트릭스는 프로브 스킬로 방향별 3회 완주했어요 — 순방향 3/3·오답 3/3·headless 3/3 pass, 선주입은 무효 조항 유무 A/B 로 3/3 FAIL→3/3 pass (조항 배선 완료). 릴리즈 게이트에 남는 것은 이 매트릭스를 실번들·비프로덕션 tenant 로 재확인하는 1회예요.
   4. QA 전항 통과 후에만 기존 3단계 릴리즈 플로우로 릴리즈해요 (R13 — codex 번들 변화는 manifest version 뿐이라 clean-tree 게이트를 통과해요). axhub-codex marketplace 엔트리 병합(U7 스테이징 해제)과 README·POLICY 지원 선언 활성화를 이 릴리즈와 같은 landing 으로 반영해요.
   5. QA 실패 시 태그·엔트리 병합·선언 없이 Claude-only 릴리즈만 진행하고 원인을 후속 유닛으로 등록해요 — 이미 병합된 노출이 발견되는 예외에만 revert 를 백스톱으로 써요.
 - **Test scenarios:**
@@ -388,11 +388,12 @@ Claude lane 회귀 판정: U5 이후 `plugins/axhub` 재생성 diff 는 U2·U4 �
 - 훅 실행: 신뢰(bypass) 시 정상 실행 확정 — `plugin_hooks: removed` flag 의 의미만 TUI 보류로 이월해요.
 - Claude Code 는 `.agents` 를 읽지 않아요 (KTD3 split-brain 확정).
 
-**잔여 게이트 — TUI 세션 3항목** (U6 코어 물량·U8 byte-offset 활성·U10 지원 선언에만 게이트예요. U5·U7·U8 골격·U6 비코어 물량은 비게이트):
+**잔여 게이트 해소 — 2026-08-19 TUI pty 실측으로 16/16 완주** (0.148.0):
 
-- (a) trust 팝업 UX + `hooks.state` key 파생 확정 — trust 스키마 필드(`enabled`·`trusted_hash`)는 실측 완료, KTD6 공개 문구 활성화의 잔여 확인이에요 (구조 반쪽은 pass: wrapper 본문 수정→재설치→재신뢰 없이 실행).
-- (b) TUI 의 additionalContext preview 렌더 + 스킬 본문 주입·절단 여부 — U6 8KB 코어 필요성의 최종 판정 입력 (exec 레인은 절단 부존재 확정).
-- (j-forward) interactive 승인 파일럿 (exec 방향은 승인 기아 정지 확인 완료).
+- (a) 확정: 훅 신뢰 팝업은 3택(`Review hooks / Trust all and continue / Continue without trusting`) — 디렉토리 신뢰(2택, `[projects] trust_level` 영속)와 별개 게이트.
+- (n) 확정: trust key = `<pluginId>:<hooks.json 경로>:<이벤트>:<entry>:<hook>`, 값 = `trusted_hash="sha256:<hex>"`. 본문 수정→재설치→재신뢰 없음(KTD6 pass), command 변경→해당 훅만 조용한 미실행(KTD8 실측).
+- (b) 확정: `hook context:` 첫 2줄 + `… +N lines` 접힘 렌더, 2.8KB entry 도 절단 없이 접힘. **스킬 본문은 TUI 에도 미주입 → U6 8KB 코어 불필요 확정.**
+- (j) 확정: 순방향 3/3(승인 후에만 실행)·오답 3/3 정지·headless 3/3 정지. **선주입은 무효 조항 A/B 로 필수 확인**(조항 없이 3/3 오인 실행 → 조항 추가 후 3/3 정지) — 조항을 `CODEX_SUBSTITUTIONS` 승인 사다리와 AP-12 invariant(codex) 로 기계 잠금했어요.
 
 ---
 
