@@ -8,10 +8,12 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve } from "node:path";
 
 const REPO_ROOT = resolve(join(import.meta.dir, ".."));
 const DEFAULT_OUT_DIR = join(REPO_ROOT, "dist", "axhub-plugin");
+const DEFAULT_CODEX_OUT_DIR = join(REPO_ROOT, "dist", "axhub-plugin-codex");
+const CODEX_OVERRIDES_DIR = join(REPO_ROOT, "codex-overrides");
 const ROOT_FILES = ["README.md", "LICENSE", "POLICY.md"] as const;
 const ROOT_DIRS = [".claude-plugin", "skills", "hooks"] as const;
 const DENY_NAMES = new Set([
@@ -49,20 +51,62 @@ const DENY_NAMES = new Set([
   "test-results.json",
 ]);
 
+type Host = "claude" | "codex";
+
 interface Options {
   outDir: string;
   json: boolean;
+  host: Host;
 }
 
 interface BundleStats {
   outDir: string;
   files: number;
   bytes: number;
+  host: Host;
 }
 
+// ── codex 파생 상수 (KTD1·KTD5·KTD7·KTD11, U5) ──────────────────────────────
+// 치환은 longest-first 가 계약이에요 — 병기 구문 전체를 먼저 소비해 이중 적용을
+// 막아요 (tests/codex-bundle.test.ts 가 정렬을 assert 해요).
+export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: string]> = [
+  ["`claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, ", "`codex exec`, CI, "],
+  ["(`claude -p` / CI / `$CLAUDE_NON_INTERACTIVE` / no TTY)", "(`codex exec` / CI / no TTY)"],
+  ["`claude -p`·CI·`$CLAUDE_NON_INTERACTIVE`·TTY 없음", "`codex exec`·CI·TTY 없음"],
+  ["claude plugin marketplace update", "codex plugin marketplace upgrade"],
+  ["`claude -p`·`codex exec`", "`codex exec`"],
+  ["Claude Desktop Code 모드", "Codex"],
+  [".plugin-update-restart", ".plugin-update-restart-codex"],
+  ["claude plugin update", "codex plugin marketplace upgrade"],
+  [".plugin-update-check", ".plugin-update-check-codex"],
+  ["claude plugin list", "codex plugin list"],
+  ["command -v claude", "command -v codex"],
+  ["AskUserQuestion", "명시 텍스트 승인"],
+  ["claude mcp add", "codex mcp add"],
+  ["Claude Desktop", "Codex"],
+  ["Claude Code", "Codex"],
+  ["claude -p", "codex exec"],
+  ["Claude", "Codex"],
+];
+
+const CODEX_TEXT_EXTENSIONS = new Set([".md", ".sh", ".json"]);
+// AP-14 fallback + AP-19 는 합본 wrapper 하나로 대체돼요 (trust 표면 축소).
+const CODEX_SUPERSEDED_WRAPPERS = new Set([
+  "session-update-router-guard.sh",
+  "session-feedback-contract.sh",
+]);
+const CODEX_MERGED_WRAPPER = "session-always-on-codex.sh";
+// codex-overrides 에서 번들 경로로 mirror-copy 하지 않는 예약 자산이에요.
+const CODEX_OVERRIDE_RESERVED = new Set(["routing", "SOURCE_HASHES.json"]);
+const CODEX_OVERRIDE_RESERVED_HOOK_DIRS = new Set(["context"]);
+const CODEX_PLUGIN_NAME = "axhub-codex";
+const CODEX_RECOVERY_LINE =
+  "> 이 본문이 중간에 끊겨 보이면 설치 경로의 이 SKILL.md 원문을 열어 전체 절차를 확인한 뒤 진행해요.";
+
 const parseArgs = (): Options => {
-  let outDir = DEFAULT_OUT_DIR;
+  let outDir: string | undefined;
   let json = false;
+  let host: Host = "claude";
   const args = Bun.argv.slice(2);
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -73,11 +117,16 @@ const parseArgs = (): Options => {
       if (!value) throw new Error("--out requires a path");
       outDir = resolve(value);
       i += 1;
+    } else if (arg === "--host") {
+      const value = args[i + 1];
+      if (value !== "claude" && value !== "codex") throw new Error("--host requires claude|codex");
+      host = value;
+      i += 1;
     } else {
       throw new Error(`unknown argument: ${arg}`);
     }
   }
-  return { outDir, json };
+  return { outDir: outDir ?? (host === "codex" ? DEFAULT_CODEX_OUT_DIR : DEFAULT_OUT_DIR), json, host };
 };
 
 const assertSafeOutDir = (outDir: string): void => {
@@ -125,7 +174,277 @@ const collectStats = (dir: string): { files: number; bytes: number } => {
   return { files, bytes };
 };
 
-const buildBundle = ({ outDir }: Options): BundleStats => {
+const walkFiles = (dir: string): string[] => {
+  const files: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const path = join(dir, entry);
+    const stat = statSync(path);
+    if (stat.isDirectory()) files.push(...walkFiles(path));
+    else if (stat.isFile()) files.push(path);
+  }
+  return files;
+};
+
+// ── codex 파생 단계들 ────────────────────────────────────────────────────────
+
+// codex-overrides 의 mirror 경로 파일을 번들 위에 스왑해요 (routing/·hooks/context/
+// ·SOURCE_HASHES.json 은 transform 입력 자산이라 mirror 대상이 아니에요).
+const applyCodexOverrides = (outDir: string): void => {
+  if (!existsSync(CODEX_OVERRIDES_DIR)) return;
+  for (const entry of readdirSync(CODEX_OVERRIDES_DIR)) {
+    if (CODEX_OVERRIDE_RESERVED.has(entry)) continue;
+    const src = join(CODEX_OVERRIDES_DIR, entry);
+    if (entry === "hooks" && statSync(src).isDirectory()) {
+      for (const hookEntry of readdirSync(src)) {
+        if (CODEX_OVERRIDE_RESERVED_HOOK_DIRS.has(hookEntry)) continue;
+        copyTree(join(src, hookEntry), join(outDir, "hooks", hookEntry));
+      }
+      continue;
+    }
+    copyTree(src, join(outDir, entry));
+  }
+};
+
+const applyCodexSubstitutions = (outDir: string): void => {
+  for (const file of walkFiles(outDir)) {
+    if (!CODEX_TEXT_EXTENSIONS.has(extname(file))) continue;
+    const original = readFileSync(file, "utf8");
+    let next = original;
+    for (const [from, to] of CODEX_SUBSTITUTIONS) {
+      next = next.replaceAll(from, to);
+    }
+    if (next !== original) writeFileSync(file, next);
+  }
+};
+
+const shellQuote = (value: string): string => `'${value.replaceAll("'", `'\\''`)}'`;
+
+const suppressedSessionStartJson = (additionalContext: string): string =>
+  JSON.stringify({
+    continue: true,
+    suppressOutput: true,
+    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext },
+  });
+
+const readOverrideContext = (name: string): string => {
+  const path = join(CODEX_OVERRIDES_DIR, "hooks", "context", name);
+  const text = readFileSync(path, "utf8").trim();
+  if (!text) throw new Error(`empty codex override context: ${relative(REPO_ROOT, path)}`);
+  return text;
+};
+
+// 소스 wrapper 의 printf JSON 에서 additionalContext 원문을 추출해요 — 문안의
+// 소유자는 소스 스크립트라 transform 이 하드코딩하지 않아요.
+const extractAdditionalContext = (scriptSource: string, scriptName: string): string => {
+  const match = scriptSource.match(/\{"continue":true[\s\S]*?\}\}/);
+  if (!match) throw new Error(`cannot find hook JSON in ${scriptName}`);
+  const parsed = JSON.parse(match[0]) as {
+    hookSpecificOutput?: { additionalContext?: string };
+  };
+  const context = parsed.hookSpecificOutput?.additionalContext;
+  if (!context) throw new Error(`missing additionalContext in ${scriptName}`);
+  return context;
+};
+
+interface CodexHookEntry {
+  type: string;
+  command: string;
+  commandWindows?: string;
+  [key: string]: unknown;
+}
+
+interface HooksJson {
+  hooks: Record<string, Array<{ matcher?: string; hooks: CodexHookEntry[] }>>;
+}
+
+const codexCommandWindows = (scriptName: string): string =>
+  `where bash >nul 2>nul && bash "\${CLAUDE_PLUGIN_ROOT}/hooks/${scriptName}" || cd .`;
+
+const wrapperScriptName = (command: string): string => {
+  const match = command.match(/hooks\/([A-Za-z0-9._-]+\.sh)/);
+  if (!match) throw new Error(`cannot derive wrapper script from command: ${command}`);
+  return match[1];
+};
+
+const transformCodexHooks = (outDir: string): void => {
+  const hooksDir = join(outDir, "hooks");
+
+  // 1) 합본 wrapper 생성 — AP-14 fallback 문안은 override 가, AP-19 문안은 소스
+  //    wrapper 가 소유해요. kill switch 2계층(env·marker)과 AP-17 CLI 존재 게이트를
+  //    분기별로 보존하고 JSON 은 한 번만 emit 해요.
+  const feedbackSource = readFileSync(join(hooksDir, "session-feedback-contract.sh"), "utf8");
+  const feedbackContext = extractAdditionalContext(feedbackSource, "session-feedback-contract.sh");
+  const routerContext = readOverrideContext("update-first.md");
+  const bothJson = suppressedSessionStartJson(`${routerContext}\n\n${feedbackContext}`);
+  const routerJson = suppressedSessionStartJson(routerContext);
+  const feedbackJson = suppressedSessionStartJson(feedbackContext);
+  const mergedScript = [
+    "#!/usr/bin/env bash",
+    "# codex SessionStart 합본 훅이에요 — AP-14 update-first fallback + AP-19 실패 리포트.",
+    "# transform 이 생성해요. 문안은 codex-overrides/hooks/context/ 와 소스 wrapper 가 소유해요.",
+    "R=1; F=1",
+    '[ -n "$AXHUB_NO_UPDATE_ROUTER" ] && R=0; [ -f "$HOME/.axhub/config/no-update-router" ] && R=0',
+    '[ -n "$AXHUB_NO_FEEDBACK_REPORT" ] && F=0; [ -f "$HOME/.axhub/config/no-feedback-report" ] && F=0',
+    'if [ "$F" = 1 ]; then command -v axhub >/dev/null 2>&1 || [ -f "$HOME/.axhub/bin-path" ] || [ -f "$HOME/.axhub/bin/axhub" ] || [ -f "$HOME/.axhub/bin/axhub.exe" ] || F=0; fi',
+    `if [ "$R" = 1 ] && [ "$F" = 1 ]; then printf '%s\\n' ${shellQuote(bothJson)}`,
+    `elif [ "$R" = 1 ]; then printf '%s\\n' ${shellQuote(routerJson)}`,
+    `elif [ "$F" = 1 ]; then printf '%s\\n' ${shellQuote(feedbackJson)}`,
+    "fi",
+    "",
+  ].join("\n");
+  writeFileSync(join(hooksDir, CODEX_MERGED_WRAPPER), mergedScript);
+
+  // 2) 대체된 wrapper 2개 제거.
+  for (const name of CODEX_SUPERSEDED_WRAPPERS) {
+    rmSync(join(hooksDir, name), { force: true });
+  }
+
+  // 3) update-router.sh(UserPromptSubmit) 의 컨텍스트를 codex 문안으로 재작성해요 —
+  //    게이트 파이프라인(kill switch → prompt 키 → axhub 토큰 → 키워드)은 그대로예요.
+  const routerPath = join(hooksDir, "update-router.sh");
+  const routerSource = readFileSync(routerPath, "utf8");
+  const routerJsonMatch = routerSource.match(/^\{"continue":true.*\}\}$/m);
+  if (!routerJsonMatch) throw new Error("cannot find update-router.sh hook JSON line");
+  const routerOverride = readOverrideContext("update-router.md");
+  const rewrittenRouter = routerSource.replace(
+    routerJsonMatch[0],
+    JSON.stringify({
+      continue: true,
+      suppressOutput: true,
+      hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: routerOverride },
+    }),
+  );
+  writeFileSync(routerPath, rewrittenRouter);
+
+  // 4) hooks.json 재작성 — shell 키 제거(U1-(c): 런타임 무시), commandWindows 추가,
+  //    대체된 entry 를 합본 entry 로 교체해요.
+  const hooksJsonPath = join(hooksDir, "hooks.json");
+  const hooksJson = JSON.parse(readFileSync(hooksJsonPath, "utf8")) as HooksJson;
+  for (const eventEntries of Object.values(hooksJson.hooks)) {
+    for (const entry of eventEntries) {
+      const nextHooks: CodexHookEntry[] = [];
+      for (const hook of entry.hooks) {
+        const scriptName = wrapperScriptName(hook.command);
+        if (CODEX_SUPERSEDED_WRAPPERS.has(scriptName)) {
+          if (scriptName === "session-update-router-guard.sh") {
+            nextHooks.push({
+              type: "command",
+              command: `bash "\${CLAUDE_PLUGIN_ROOT}/hooks/${CODEX_MERGED_WRAPPER}"`,
+              commandWindows: codexCommandWindows(CODEX_MERGED_WRAPPER),
+            });
+          }
+          continue;
+        }
+        const { shell: _shell, ...rest } = hook as CodexHookEntry & { shell?: string };
+        nextHooks.push({ ...rest, commandWindows: codexCommandWindows(scriptName) });
+      }
+      entry.hooks = nextHooks;
+    }
+  }
+  writeFileSync(hooksJsonPath, `${JSON.stringify(hooksJson, null, 2)}\n`);
+};
+
+const transformCodexManifests = (outDir: string, version: string): void => {
+  const pluginJsonPath = join(outDir, ".claude-plugin", "plugin.json");
+  const plugin = JSON.parse(readFileSync(pluginJsonPath, "utf8")) as Record<string, unknown> & {
+    keywords?: string[];
+  };
+  plugin.name = CODEX_PLUGIN_NAME;
+  if (Array.isArray(plugin.keywords)) {
+    plugin.keywords = plugin.keywords.map((keyword) =>
+      keyword === "claude-code-plugin" ? "codex-plugin" : keyword,
+    );
+  }
+  writeFileSync(pluginJsonPath, `${JSON.stringify(plugin, null, 2)}\n`);
+
+  const marketplacePath = join(outDir, ".claude-plugin", "marketplace.json");
+  if (existsSync(marketplacePath)) {
+    const marketplace = JSON.parse(readFileSync(marketplacePath, "utf8")) as {
+      plugins?: Array<{ name?: string; source?: string }>;
+    };
+    const bundledPlugin = marketplace.plugins?.[0];
+    if (bundledPlugin) bundledPlugin.name = CODEX_PLUGIN_NAME;
+    writeFileSync(marketplacePath, `${JSON.stringify(marketplace, null, 2)}\n`);
+  }
+
+  // KTD11: 미동봉 시 codex 가 자동 생성해 표시 메타 통제권을 잃어요. hooks 필드는
+  // 넣지 않아요 (codex 스캐폴드 지침).
+  const codexPluginDir = join(outDir, ".codex-plugin");
+  mkdirSync(codexPluginDir, { recursive: true });
+  const codexPlugin: Record<string, unknown> = { ...plugin, name: CODEX_PLUGIN_NAME, version };
+  delete codexPlugin.hooks;
+  writeFileSync(join(codexPluginDir, "plugin.json"), `${JSON.stringify(codexPlugin, null, 2)}\n`);
+};
+
+interface FrontmatterSplit {
+  frontmatterLines: string[];
+  body: string;
+}
+
+const splitFrontmatter = (source: string, file: string): FrontmatterSplit => {
+  if (!source.startsWith("---\n")) throw new Error(`missing frontmatter in ${file}`);
+  const end = source.indexOf("\n---\n", 4);
+  if (end === -1) throw new Error(`unterminated frontmatter in ${file}`);
+  return {
+    frontmatterLines: source.slice(4, end).split("\n"),
+    body: source.slice(end + "\n---\n".length),
+  };
+};
+
+const isTopLevelKeyLine = (line: string): boolean => /^[A-Za-z_-]+:/.test(line);
+
+// KTD7: codex 는 frontmatter examples 를 무시해요 — 재합성 description 은
+// codex-overrides/routing/descriptions.json 이 소유하고, examples 블록은 카탈로그
+// 예산을 위해 제거해요. KTD4 보조 수단인 절단 자기-복구 1줄도 여기서 prepend 해요.
+const resynthesizeCodexDescriptions = (outDir: string): void => {
+  const descriptionsPath = join(CODEX_OVERRIDES_DIR, "routing", "descriptions.json");
+  const descriptions = existsSync(descriptionsPath)
+    ? (JSON.parse(readFileSync(descriptionsPath, "utf8")) as Record<string, string>)
+    : {};
+  const skillsDir = join(outDir, "skills");
+  if (!existsSync(skillsDir)) return;
+  for (const skill of readdirSync(skillsDir)) {
+    const skillPath = join(skillsDir, skill, "SKILL.md");
+    if (!existsSync(skillPath)) continue;
+    const source = readFileSync(skillPath, "utf8");
+    const { frontmatterLines, body } = splitFrontmatter(source, skillPath);
+    const nextLines: string[] = [];
+    let index = 0;
+    while (index < frontmatterLines.length) {
+      const line = frontmatterLines[index];
+      if (line.startsWith("description:")) {
+        const override = descriptions[skill];
+        const kept: string[] = [line];
+        index += 1;
+        while (index < frontmatterLines.length && !isTopLevelKeyLine(frontmatterLines[index])) {
+          kept.push(frontmatterLines[index]);
+          index += 1;
+        }
+        if (override) {
+          nextLines.push(`description: ${JSON.stringify(override)}`);
+        } else {
+          nextLines.push(...kept);
+        }
+        continue;
+      }
+      if (line.startsWith("examples:")) {
+        index += 1;
+        while (index < frontmatterLines.length && !isTopLevelKeyLine(frontmatterLines[index])) {
+          index += 1;
+        }
+        continue;
+      }
+      nextLines.push(line);
+      index += 1;
+    }
+    const nextBody = body.startsWith(`${CODEX_RECOVERY_LINE}\n`)
+      ? body
+      : `${CODEX_RECOVERY_LINE}\n\n${body}`;
+    writeFileSync(skillPath, `---\n${nextLines.join("\n")}\n---\n${nextBody}`);
+  }
+};
+
+const buildBundle = ({ outDir, host }: Options): BundleStats => {
   assertSafeOutDir(outDir);
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
@@ -136,6 +455,19 @@ const buildBundle = ({ outDir }: Options): BundleStats => {
 
   for (const dir of ROOT_DIRS) {
     copyTree(join(REPO_ROOT, dir), join(outDir, dir));
+  }
+
+  if (host === "codex") {
+    applyCodexOverrides(outDir);
+    applyCodexSubstitutions(outDir);
+    transformCodexHooks(outDir);
+    const version = (
+      JSON.parse(readFileSync(join(REPO_ROOT, ".claude-plugin", "plugin.json"), "utf8")) as {
+        version: string;
+      }
+    ).version;
+    transformCodexManifests(outDir, version);
+    resynthesizeCodexDescriptions(outDir);
   }
 
   const pluginJson = join(outDir, ".claude-plugin", "plugin.json");
@@ -157,7 +489,7 @@ const buildBundle = ({ outDir }: Options): BundleStats => {
   }
 
   const stats = collectStats(outDir);
-  return { outDir, ...stats };
+  return { outDir, host, ...stats };
 };
 
 const main = (): void => {
@@ -166,8 +498,12 @@ const main = (): void => {
   if (options.json) {
     console.log(JSON.stringify(stats));
   } else {
-    console.log(`Built axhub plugin bundle at ${stats.outDir} (${stats.files} files, ${stats.bytes} bytes)`);
+    console.log(
+      `Built ${stats.host === "codex" ? "axhub-codex" : "axhub"} plugin bundle at ${stats.outDir} (${stats.files} files, ${stats.bytes} bytes)`,
+    );
   }
 };
 
-main();
+if (import.meta.main) {
+  main();
+}
