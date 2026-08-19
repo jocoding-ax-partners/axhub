@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.21.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.21.0...v1.21.1) (2026-08-19)
+
+Codex 에서 마켓플레이스를 추가하면 axhub(Claude 용)와 axhub-codex 가 함께 떠 혼란스럽다는 피드백을 반영했어요. 이제 Codex 카탈로그에는 `axhub-codex` 하나만 보여요 — Claude Code 는 `.agents` 목록을 읽지 않아 Claude 사용자에게는 아무 변화가 없어요. 이미 마켓플레이스를 등록해 둔 Codex 사용자는 `codex plugin marketplace upgrade axhub` 를 실행하면 목록이 정리돼요.
+
+### Fixed
+
+* Codex 카탈로그를 axhub-codex 단일 엔트리로 — Claude 는 .claude-plugin 만 읽어 무영향 ([8057b41](https://github.com/jocoding-ax-partners/axhub/commit/8057b41233ac5b4948eba25cd7d1c4fddfb12831))
+
 ## [1.21.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.20.4...v1.21.0) (2026-08-19)
 
 이번 릴리즈부터 OpenAI Codex CLI(≥ 0.147.0, 최종 검증 0.148.0)를 공식 지원해요 — `codex plugin marketplace add` 후 `codex plugin add axhub-codex@axhub` 로 Codex 전용 파생 번들을 설치할 수 있어요. 배포·생성 승인 게이트에는 preview 전에 미리 넣어 둔 승인 문구를 무효로 보는 조항이 추가돼 선주입 우회를 막아요. SessionStart 훅 5개는 동작 불변으로 wrapper 스크립트(`hooks/session-*.sh`)로 추출됐고, Codex 판은 AP-14·AP-19 훅을 합본 wrapper 하나로 발행해요 — Codex 가 신뢰하는 대상은 훅 command(스크립트 경로)라 wrapper 내용 갱신은 재신뢰 확인 없이 반영돼요.
