@@ -255,6 +255,30 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     }
   });
 
+  test("codex skill descriptions stay within the 1,024-char catalog budget (KTD7)", () => {
+    for (const skill of SKILLS) {
+      const source = readFileSync(join(outDir, "skills", skill, "SKILL.md"), "utf8");
+      const frontmatter = source.slice(0, source.indexOf("\n---\n", 4));
+      const description = frontmatter.match(/^description: ([\s\S]*?)(?=\n[A-Za-z-]+:|$)/m);
+      expect(description, skill).toBeTruthy();
+      expect([...description![1].trim()].length, `${skill} description over 1,024 chars`).toBeLessThanOrEqual(1024);
+    }
+  });
+
+  test("hook additionalContext payloads stay within the exposure budget", () => {
+    // 노출 다이어트 회귀 방지 — 훅이 emit 하는 컨텍스트가 무한정 자라지 않게 상한을 둬요.
+    const hooksDir = join(outDir, "hooks");
+    let checked = 0;
+    for (const script of readdirSync(hooksDir).filter((file) => file.endsWith(".sh"))) {
+      const source = readFileSync(join(hooksDir, script), "utf8");
+      for (const match of source.matchAll(/"additionalContext":\s*"((?:[^"\\]|\\.)*)"/g)) {
+        checked += 1;
+        expect(match[1].length, `${script} context over budget`).toBeLessThanOrEqual(4096);
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
   test("codex bundle has no forbidden host strings outside U6-pending overrides", () => {
     const files = walk(outDir).map((file) => relative(outDir, file));
     for (const file of files) {
