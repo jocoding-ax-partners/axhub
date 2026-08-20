@@ -4,6 +4,21 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.22.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.21.3...v1.22.0) (2026-08-20)
+
+codex 번들에서 승인 게이트가 사라질 수 있던 구멍을 막았어요. codex 는 스킬 본문을 앞에서부터 8,000B 만 읽는데 bootstrap 의 승인 게이트 4종과 import 의 승인 계약이 전부 그 밖에 있어서, 모델이 게이트를 아예 못 보는 세션이 가능했어요 — 이제 실행 5스킬의 게이트가 모두 절단선 안에 있고 밖으로 나가면 CI 가 잡아요. 선택을 물을 때는 번호 메뉴 대신 한 문장 확인형으로 묻고 답을 기다리며, 네이티브 선택 카드가 빈 답변으로 자동 해제되면 승인하지 않은 것으로 처리해요. 이 규칙은 훅·정책·스킬 본문 세 곳이 겹쳐 들고 있어요 — 훅은 미신뢰 세션에서 조용히 꺼지고 본문은 잘리니 실패하는 방식이 서로 달라서예요. 실제 codex 세션에서 카드 렌더·60초 자동 해제·Esc 취소·텍스트 질문 대기까지 확인했고, 승인 게이트가 사용자 응답 없이 통과한 경로는 0건이었어요.
+
+
+### Added
+
+* codex 대화형 UX parity — 승인 게이트 절단 이탈 차단과 질문 프로토콜 ([d4c3d39](https://github.com/jocoding-ax-partners/axhub/commit/d4c3d3934675969679184be8abdef752f9a922bf))
+
+
+### Docs
+
+* QA 절차의 config 흔적 정정 — 신뢰 항목이 config.toml 에 남아요 ([0f35e05](https://github.com/jocoding-ax-partners/axhub/commit/0f35e05c2fbfa0c8549be9e8aa971c0bee4d4ff9))
+* U1 라이브 QA 실측 기록 — 승인 게이트 무응답 통과 0건 ([247ca56](https://github.com/jocoding-ax-partners/axhub/commit/247ca564f34625d7115dca58c89585c31d3a3fda))
+
 ## [1.21.3](https://github.com/jocoding-ax-partners/axhub/compare/v1.21.2...v1.21.3) (2026-08-19)
 
 

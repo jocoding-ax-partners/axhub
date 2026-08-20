@@ -1,6 +1,6 @@
 {
   "name": "axhub-codex",
-  "version": "1.21.3",
+  "version": "1.22.0",
   "description": "axhub 앱을 만들고 배포하는 Codex plugin이에요. 9개 스킬(onboarding/bootstrap/scaffold/deploy/import/development/diagnosis/clarity/update)이 ax-hub-cli(코어 v0.20.0+, 8스킬 전체 v0.21.3+)를 직접 호출해 preview-confirm 배포와 verify 기반 성공 선언을 따라요.",
   "author": {
     "name": "Jocoding AX Partners",
