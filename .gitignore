@@ -88,3 +88,10 @@ fuzz/
 .understand-anything/
 specs/
 docs/superpowers/
+
+# 루트 연구·조사 문서는 로컬 전용이에요 (추적하지 않아요).
+/codex-UX-프리미티브-parity.md
+/codex-선택UX-연구.md
+/codex-플러그인-호환-연구.md
+/*-연구.md
+/*-parity.md
