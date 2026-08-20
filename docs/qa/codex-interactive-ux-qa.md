@@ -35,7 +35,9 @@ codex debug prompt-input            # 스킬 카탈로그 주입 확인
 
 ### 라이브 TUI 관측 `[confirmed]` — 2026-08-20 실측
 
-격리 프로파일은 인증이 없어 **401 Unauthorized** 로 모델 턴이 시작되지 않아요 (`codex exec` 실행으로 확인). 그래서 이 항목만 사용자 승인을 받아 **인증 프로파일에서 호출 단위 override** 로 관측했어요 — `-c approval_policy=on-request -c sandbox_mode=read-only`, config 파일 무수정, 임시 git 디렉토리에서 실행. TUI 는 pty 로 구동해 렌더 프레임을 캡처했어요.
+격리 프로파일은 인증이 없어 **401 Unauthorized** 로 모델 턴이 시작되지 않아요 (`codex exec` 실행으로 확인). 그래서 이 항목만 사용자 승인을 받아 **인증 프로파일에서 호출 단위 override** 로 관측했어요 — `-c approval_policy=on-request -c sandbox_mode=read-only`, 임시 git 디렉토리에서 실행. `approval_policy`·`sandbox_mode` 는 호출 단위 override 라 파일에 쓰이지 않아요.
+
+> **주의 — 이 절차는 config 에 흔적을 남겨요.** codex TUI 는 처음 보는 디렉토리에서 신뢰를 묻고, `Yes, continue` 를 고르면 `~/.codex/config.toml` 에 `[projects."<경로>"] trust_level = "trusted"` 를 영속 기록해요. 임시 QA 디렉토리 항목이 남으니 QA 후 그 항목을 지워요. 이번 실측에서도 남아서 제거했어요. TUI 는 pty 로 구동해 렌더 프레임을 캡처했어요.
 
 | # | 관측 | 실측 결과 |
 |---|---|---|
