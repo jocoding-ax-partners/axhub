@@ -292,7 +292,7 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 | `auth` | 로그인이 필요해요. 다시 로그인한 뒤 이어갈게요. |
 | `version` | axhub CLI가 import 기능을 아직 지원하지 않아요. 업데이트한 뒤 다시 시도해요. |
 | `manifest` | 앱 설정 파일을 정리해야 해요. CLI가 제안한 안전한 수정만 진행해요. |
-| `git` | Git/GitHub 연결이 준비되지 않았어요. recovery_action 을 따라요 — GitHub 인증 승인이 필요하다는 안내면 `axhub github link` 연동(승인 후 재실행하면 이어져요)이 먼저고, 그 외에는 커밋·원격 연결·repo owner 를 확인해요. |
+| `git` | Git/GitHub 연결이 준비되지 않았어요. recovery_action 을 따라요 — GitHub 인증 승인이 필요하다는 안내면 `axhub github link` 연동(승인 후 재실행하면 이어져요, 코드를 놓쳤거나 만료됐으면 `--fresh`)이 먼저고, 그 외에는 커밋·원격 연결·repo owner 를 확인해요. |
 | `repo` | GitHub 저장소 연결을 확인해야 해요. 권한이나 원격 저장소를 다시 볼게요. |
 | `app` | axhub 앱 생성 또는 선택에서 막혔어요. 앱 이름과 소유 권한을 확인해요. |
 | `static` | 정적 앱 처리에서 막혔어요. retryable=false 면 빌드 스크립트나 산출물 경로를 고친 뒤에만 다시 시도해요 — 재시도만으로는 결과가 안 바뀌어요. 그 외에는 공개 URL과 활성 릴리스를 확인해요. |

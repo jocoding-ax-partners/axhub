@@ -35,7 +35,7 @@ Tool 제목 `저장소 계정 확인`:
 axhub github accounts list --json
 ```
 
-정상 응답이면 연동돼 있는 거예요. `github_relogin_required` 면 `axhub github link` 로 연동해요(코드 두 줄 형식·재개는 bootstrap 9단계 계약 그대로). 응답의 계정 목록이 3단계 owner 후보예요 — **GitHub App 이 설치된 계정/조직만** 후보로 보여줘요. 원하는 조직이 목록에 없으면 그 조직에 App 설치가 먼저예요(설치 링크 안내 후 재확인).
+정상 응답이면 연동돼 있는 거예요. `github_relogin_required` 면 `axhub github link` 로 연동해요(코드 두 줄 형식·재개·코드 유실 시 `--fresh` 재발급은 bootstrap 9단계 계약 그대로). 응답의 계정 목록이 3단계 owner 후보예요 — **GitHub App 이 설치된 계정/조직만** 후보로 보여줘요. 원하는 조직이 목록에 없으면 그 조직에 App 설치가 먼저예요(설치 링크 안내 후 재확인).
 
 ### 3. 질문 한 번에: 템플릿·이름·소유자
 

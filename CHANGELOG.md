@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.22.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.22.0...v1.22.1) (2026-08-20)
+
+GitHub 인증 코드를 한 번 놓치면 다시 연동할 방법이 없던 문제를 고쳤어요. `github link` 는 저장된 pending device link 를 그대로 이어 줘서, 코드가 화면에서 사라지거나 만료된 뒤 같은 명령을 다시 실행하면 이미 죽은 코드가 그대로 돌아왔어요 — 사용자가 몇 번을 승인해도 연동이 풀리지 않는 막다른 길이었어요. CLI 가 `--fresh` 로 이미 풀어 둔 경로를 플러그인 계약에도 반영해서, 코드 유실·만료 신호가 있거나 같은 코드로 확인이 계속 pending 이면 새 코드를 발급해 다시 보여줘요. 반대로 사용자가 보고 있는 코드가 아직 유효하면 붙이지 않아요 — 그 플래그가 멀쩡한 코드를 무효로 만들거든요.
+
+
+### Fixed
+
+* GitHub device code 유실·만료 시 --fresh 재발급 경로 반영 ([4b26996](https://github.com/jocoding-ax-partners/axhub/commit/4b269968048914716a6725e3a64eed15d2335b5e))
+
 ## [1.22.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.21.3...v1.22.0) (2026-08-20)
 
 codex 번들에서 승인 게이트가 사라질 수 있던 구멍을 막았어요. codex 는 스킬 본문을 앞에서부터 8,000B 만 읽는데 bootstrap 의 승인 게이트 4종과 import 의 승인 계약이 전부 그 밖에 있어서, 모델이 게이트를 아예 못 보는 세션이 가능했어요 — 이제 실행 5스킬의 게이트가 모두 절단선 안에 있고 밖으로 나가면 CI 가 잡아요. 선택을 물을 때는 번호 메뉴 대신 한 문장 확인형으로 묻고 답을 기다리며, 네이티브 선택 카드가 빈 답변으로 자동 해제되면 승인하지 않은 것으로 처리해요. 이 규칙은 훅·정책·스킬 본문 세 곳이 겹쳐 들고 있어요 — 훅은 미신뢰 세션에서 조용히 꺼지고 본문은 잘리니 실패하는 방식이 서로 달라서예요. 실제 codex 세션에서 카드 렌더·60초 자동 해제·Esc 취소·텍스트 질문 대기까지 확인했고, 승인 게이트가 사용자 응답 없이 통과한 경로는 0건이었어요.
