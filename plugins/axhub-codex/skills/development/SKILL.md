@@ -36,7 +36,7 @@ model: sonnet
 - 사람이 알아들을 요약만 알려요 — secret·내부 id·raw 출력·schema 본문은 chat 에 넣지 않아요 (위 Visibility Rules 그대로).
 - 사용자에게 보이는 설명·툴 제목·중간 메모는 한국어로만 써요. 파일을 읽었다거나 다음 편집을 설명하는 내부 영어 사고 과정을 chat 에 남기지 않아요. `Build passed`, `Lint check too`, `Only App.tsx changed`, `Working tree clean`, `Not ignored` 같은 영어 상태 문구는 쓰지 말고 `빌드와 린트 확인이 끝났어요`, `앱 코드 변경만 커밋했어요`, `재생성되는 빌드 파일은 정리했어요`처럼 말해요.
 - optional 파일·설정 확인은 없어도 정상인 경우 실패처럼 보이면 안 돼요. 예를 들어 `.env.local` 확인은 `test -f .env.local && ... || true` 처럼 exit 0 로 끝나게 하거나 "선택 설정 없음" 요약으로 처리해요.
-- TodoWrite 가 있으면 체크리스트로도 같이 보여주고, 없는 host 에서도 이 한 줄 알림은 늘 해요.
+- update_plan 가 있으면 체크리스트로도 같이 보여주고, 없는 host 에서도 이 한 줄 알림은 늘 해요.
 
 단계 이름 (announce 용 한국어):
 - `[1/9] axhub·앱 점검하는 중이에요`
@@ -52,7 +52,7 @@ model: sonnet
 ## Workflow
 
 **한눈에 — 실행 순서.**
-`1` CLI 가드 → `2` 앱 게이트(없으면 bootstrap 안내) → `3` stack 감지 → `4` auth 전제 인라인 안내 → `5` SDK/DB 표면 확인 → `6` 데이터 discover(MCP|CLI fallback|질문) → `7` 앱 규약 학습 → `8` 기능 계획 + 미리보기 + 확인 → `9` 코드 생성 → `10` UI 상태 보강 → `11` verify 게이트 → `11.5` 배포 준비 점검(infer-tables-env: 생성코드가 쓰는 테이블·env 확인 → 빠진 테이블 (b) 게이트, 빠진 env clarity, carry-over 로 deploy 중복 방지) → `12` deploy 핸드오프. (`0` TodoWrite 는 가용 시 전 구간 갱신.)
+`1` CLI 가드 → `2` 앱 게이트(없으면 bootstrap 안내) → `3` stack 감지 → `4` auth 전제 인라인 안내 → `5` SDK/DB 표면 확인 → `6` 데이터 discover(MCP|CLI fallback|질문) → `7` 앱 규약 학습 → `8` 기능 계획 + 미리보기 + 확인 → `9` 코드 생성 → `10` UI 상태 보강 → `11` verify 게이트 → `11.5` 배포 준비 점검(infer-tables-env: 생성코드가 쓰는 테이블·env 확인 → 빠진 테이블 (b) 게이트, 빠진 env clarity, carry-over 로 deploy 중복 방지) → `12` deploy 핸드오프. (`0` update_plan 는 가용 시 전 구간 갱신.)
 
 **User-facing handoff language:** slash command·skill 이름은 내부 라벨이에요. Codex 사용자에겐 `다시 로그인해줘`, `배포해줘`, `앱부터 만들어줘` 같은 자연어만 안내하고, `/axhub:*` 를 시키지 않아요 (사용자가 명시 요청할 때 제외).
 
@@ -69,9 +69,9 @@ model: sonnet
 - preview 확인은 `lint`/`build` 통과 뒤 한 번만 열고, 핵심 화면 렌더링과 요청된 happy path 하나를 확인해요.
 - Next `1 Issue` 배지·overlay 가 보이면 최대 1회만 클릭해서 내용을 읽고, 실제 오류가 아니거나 이미 lint/build 가 통과한 경우에는 그 사실을 한국어로 짧게 말하고 넘어가요.
 - preview/issue 확인에 90초 이상 쓰지 않아요. 90초가 지나면 `lint/build 는 통과했고 미리보기 확인은 오래 걸려서 핵심 검증 결과로 진행할게요` 라고 요약하고, 코드 수정·DB smoke·deploy handoff 로 진행해요.
-- `ScheduleWakeup`, 내부 task 이름, 브라우저/preview 도구 이름을 chat 에 쓰지 않아요. "잠시 후 자동으로 이어서 확인할게요"처럼 사용자 행동을 요구하지 않는 한국어만 써요.
+- 내부 task 이름, 브라우저/preview 도구 이름을 chat 에 쓰지 않아요. "잠시 후 자동으로 이어서 확인할게요"처럼 사용자 행동을 요구하지 않는 한국어만 써요.
 
-0. **TodoWrite 진행 체크리스트 (있을 때만).** TodoWrite 가 host 에 있을 때만 호출하고, 없으면 조용히 진행해요. 도구 가용성·생략을 사용자에게 언급하지 않아요.
+0. **update_plan 진행 체크리스트 (있을 때만).** update_plan 가 host 에 있을 때만 호출하고, 없으면 조용히 진행해요. 도구 가용성·생략을 사용자에게 언급하지 않아요.
 
 1. **CLI 가드 — axhub 존재 + preflight 동작 확인.**
 
@@ -101,7 +101,7 @@ model: sonnet
 
 8. **기능 계획 + 미리보기 + 확인.** 요청된 페이지·화면·API route·검색·필터·탭·폼·CRUD·UI 개선을 기존 앱 규약에 맞춰 설계하고, 데이터 기반 기능이면 **E1 실데이터 미리보기**(샘플 cap + **PII 마스킹**)와 함께 한국어로 보여준 뒤 확인받아요. PII·secret·규제 데이터로 보이면 마스킹하고, raw 샘플은 생성 코드/테스트/로그에 절대 안 써요.
 
-9. **코드 생성 (기능 — 기존 패턴 우선, read 기본, write 게이트).** 데이터-레이어 코드는 5단계에서 확인한 현재 표면과 7단계 앱 규약에 맞춰요. 검색·필터·탭·폼·CRUD·UI/page/API route 개선은 기존 컴포넌트·라우팅·상태관리 패턴을 우선 재사용해요. 앱 런타임 CRUD는 기존 앱의 DB/connector/서버 라우트 패턴을 사용하고, 제거된 SDK data-plane DSL 을 새로 만들지 않아요. 데이터 read 는 쿼리 파라미터화·식별자 sanitize·표시값 escape. **write 면 `references/write-gate.md`** 를 따라요 — (a) 런타임 CRUD 코드(form/mutation: validation·파라미터화 write·중복제출 방지·실패 롤백·write 상태 UI)는 기본이고, (b) 기능이 새 테이블/컬럼을 필요로 하면 **게이트 옵트인**(가용성 확인 → 존재 우선 check-then-create → preview-confirm AUQ → headless 무변경 → partial-failure 복구)으로만 스키마를 생성해요. **의존성**: 가능하면 기존 앱 의존성만 써요. 신규 라이브러리(chart/form 등)가 꼭 필요하면 기존 앱 manifest+lockfile 이 있을 때만, 명시 확인 후 `--ignore-scripts` 로 설치해요 (onboarding 의존성 계약 재사용).
+9. **코드 생성 (기능 — 기존 패턴 우선, read 기본, write 게이트).** 데이터-레이어 코드는 5단계에서 확인한 현재 표면과 7단계 앱 규약에 맞춰요. 검색·필터·탭·폼·CRUD·UI/page/API route 개선은 기존 컴포넌트·라우팅·상태관리 패턴을 우선 재사용해요. 앱 런타임 CRUD는 기존 앱의 DB/connector/서버 라우트 패턴을 사용하고, 제거된 SDK data-plane DSL 을 새로 만들지 않아요. 데이터 read 는 쿼리 파라미터화·식별자 sanitize·표시값 escape. **write 면 `references/write-gate.md`** 를 따라요 — (a) 런타임 CRUD 코드(form/mutation: validation·파라미터화 write·중복제출 방지·실패 롤백·write 상태 UI)는 기본이고, (b) 기능이 새 테이블/컬럼을 필요로 하면 **게이트 옵트인**(가용성 확인 → 존재 우선 check-then-create → preview-confirm 명시 텍스트 승인 → headless 무변경 → partial-failure 복구)으로만 스키마를 생성해요. **의존성**: 가능하면 기존 앱 의존성만 써요. 신규 라이브러리(chart/form 등)가 꼭 필요하면 기존 앱 manifest+lockfile 이 있을 때만, 명시 확인 후 `--ignore-scripts` 로 설치해요 (onboarding 의존성 계약 재사용).
 
 10. **UI 상태 보강 (E2).** read 화면이면 **empty/error/loading** 3상태를 항상 만들고, 기존 앱 컴포넌트·디자인 토큰에 맞춰 스타일을 정합해요. 큰 결과는 페이지네이션을 넣어요.
 
@@ -113,7 +113,7 @@ model: sonnet
 
 ## NEVER
 
-- NEVER 스키마 변경(table_create/column_add)을 preview-confirm AUQ·존재 확인 없이 실행하지 말아요. MCP write 도구는 무확인 단발이라 게이트는 skill 이 강제해요. headless/비대화형 기본값은 no-mutation 이고, 같은 요청에서 production mutation 이 명시 허용된 경우에만 위 11.5 예외를 따라요.
+- NEVER 스키마 변경(table_create/column_add)을 preview-confirm 명시 텍스트 승인·존재 확인 없이 실행하지 말아요. MCP write 도구는 무확인 단발이라 게이트는 skill 이 강제해요. headless/비대화형 기본값은 no-mutation 이고, 같은 요청에서 production mutation 이 명시 허용된 경우에만 위 11.5 예외를 따라요.
 - NEVER app-scoped MCP 권한 오류 뒤 같은 MCP 호출을 반복하지 말아요 — 즉시 CLI fallback 으로 가요.
 - NEVER advisor/server advisor 도구를 호출하지 말아요 — 이 스킬은 live CLI/MCP/file evidence 로만 판단해요.
 - NEVER "테이블 만들어줘" 단독 요청을 development 가 받지 말아요 — clarity 양보. development 는 기능을 만들다 필요할 때만 게이트로 스키마를 옵트인 생성해요.

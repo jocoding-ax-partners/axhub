@@ -17,6 +17,14 @@ Deploy an already-connected axhub app with preview, approval, and verification s
 
 명시적인 배포 실패 원인 진단 요청(예: "배포 실패 원인 진단해줘", "왜 배포가 죽었어")은 `diagnosis` 에 양보해요. 이 스킬이 실제 배포를 시작한 뒤 `axhub deploy verify` 에서 terminal failure 를 확인한 경우에만 같은 앱 식별자와 실패 근거를 유지해 `diagnosis` 로 읽기 전용 handoff 해요. 이 handoff 는 재배포, 롤백, 새 deploy create 를 실행하지 않아요.
 
+**질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요(예: `진행` 이면 시작하고 `취소` 면 여기서 멈춰요). 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요. 비파괴 선택은 숫자·서수·라벨·앞글자 어느 쪽으로 답해도 알아듣고, 파괴 게이트만 canonical 문구를 그대로 받아요.
+
+**장기 대기.** codex 는 긴 명령을 최대 30초에 yield 하고 백그라운드 터미널로 넘겨요 — yield 는 실패도 완료도 아니에요. `deploy verify --wait` 가 yield 되면 같은 명령을 다시 실행하지 말고 같은 터미널을 빈 입력으로 폴링해 완주를 기다려요. 성공 선언 규칙은 그대로예요.
+
+## 승인 게이트 계약 (요약)
+
+codex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 승인 방식은 명시 텍스트 승인 1회예요 — preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구만 유효하고, 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요. 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. 선택 카드로 물은 경우 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.
+
 ## First Visible Sentence
 
 When the user says a human deployment phrase such as `배포해줘`, `올려줘`, or `프로덕션에 띄워줘`, the first visible chat sentence must be exactly:
@@ -31,7 +39,7 @@ axhub plugin-support deploy-preview-summary --user-utterance "<latest user sente
 
 이 첫 명령 전에는 설치·플러그인·앱·git·curl probe를 하지 않아요. 명시적 최신성 요청만 update 뒤 이 스킬로 돌아와요.
 
-정상 preview 면 axhub 프로젝트 확정이에요. Interactive 는 별도 진입 질문 없이 **preview card 하나가 axhub 진입 확인을 겸해요** (AP-12 통합 게이트): Korean stdout 을 preview card 로 보여주고 `axhub로 지금 배포를 진행할까요?` 질문과 기존 `진행`/`취소` 승인을 한 번만 받아요. `취소` 면 종료. (headless 는 AUQ 생략, dry-run) 같은 확인을 명시 텍스트 승인 1회로 받아요 — 유효한 승인은 preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구뿐이고, 요청과 함께 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요(그 경우 preview 를 보여주고 새 승인을 기다려요). 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here. axhub 맥락(사용자의 axhub 언급·직전 axhub 작업)이 있으면 기존대로 안내해요: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`. axhub 맥락이 없으면 import/bootstrap 으로 넘기지 말고 "이 폴더는 axhub에 연결돼 있지 않아요. axhub로 배포하려는 거예요?" 를 한 번만 묻고, 아니라는 답이면 이 스킬을 종료해요. headless 에서는 묻지 않고 조용히 멈춰요.
+정상 preview 면 axhub 프로젝트 확정이에요. Interactive 는 별도 진입 질문 없이 **preview card 하나가 axhub 진입 확인을 겸해요** (AP-12 통합 게이트): Korean stdout 을 preview card 로 보여주고 `axhub로 지금 배포를 진행할까요?` 질문과 기존 `진행`/`취소` 승인을 한 번만 받아요. `취소` 면 종료. (headless 는 명시 텍스트 승인 생략, dry-run) 같은 확인을 명시 텍스트 승인 1회로 받아요 — 유효한 승인은 preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구뿐이고, 요청과 함께 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요(그 경우 preview 를 보여주고 새 승인을 기다려요). 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here. axhub 맥락(사용자의 axhub 언급·직전 axhub 작업)이 있으면 기존대로 안내해요: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`. axhub 맥락이 없으면 import/bootstrap 으로 넘기지 말고 "이 폴더는 axhub에 연결돼 있지 않아요. axhub로 배포하려는 거예요?" 를 한 번만 묻고, 아니라는 답이면 이 스킬을 종료해요. headless 에서는 묻지 않고 조용히 멈춰요.
 
 For the initial Desktop preview, stop reading after this section unless approval is received. After approval, continue with the canonical workflow below and load `references/workflow-details.md` for branch detail.
 
@@ -197,7 +205,7 @@ axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" --wait --wait-interval 20s --wa
 
 호출 직전에 `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` 한 줄만 남겨요. 이 한 호출의 내부 폴링 예산은 최대 30회 또는 10분(AP-16)이고, `--wait` 가 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `axhub apps get`, `deploy list`, `deploy status` 같은 사후 확인을 덧붙이지 않아요. 대기 수단 없이 같은 verify 를 연달아 호출해 같은 exit 6 을 화면에 쌓는 연타 폴링은 UX 실패예요 — 사용자에게는 실패한 명령이 반복되는 것처럼 보여요.
 
-`verify_wait` capability 가 없는 구 CLI 에서만 `--wait` 없는 `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` 를 폴링 예산(최대 30회 또는 10분, AP-16) 안에서 반복해요. Prefer separate short tool calls or an actual ScheduleWakeup. 이 fallback 에서도 do not collapse polling into one long `while`/`for`/`until` shell loop with `sleep`, `grep`, `head`, `MAX_ATTEMPTS`, command substitution, pipes, or shell expansion. A Codex permission request for a long polling shell block is a failed watch UX; replace it with standalone `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` calls.
+`verify_wait` capability 가 없는 구 CLI 에서만 `--wait` 없는 `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` 를 폴링 예산(최대 30회 또는 10분, AP-16) 안에서 반복해요. Prefer separate short tool calls. 이 fallback 에서도 do not collapse polling into one long `while`/`for`/`until` shell loop with `sleep`, `grep`, `head`, `MAX_ATTEMPTS`, command substitution, pipes, or shell expansion. A Codex permission request for a long polling shell block is a failed watch UX; replace it with standalone `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` calls.
 
 Do not end the response by asking the user to say `배포 상태 확인해줘`. If the bounded budget is reached while the deploy is still running, schedule a follow-up check when the host supports it; otherwise say `아직 진행 중이에요. 여기서 실패로 보지 않고, 제가 확인 가능한 범위까지는 같은 배포를 지켜봤어요.` and keep the `DEPLOY_ID` visible enough for a future status request. Do not claim success from deploy-create stdout, status snapshots, watch output, or prose polling; verify 전에는 성공을 선언하지 않아요. If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
 

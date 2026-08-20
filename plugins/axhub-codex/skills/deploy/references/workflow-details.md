@@ -121,7 +121,7 @@ Headless detection:
 
 ```bash
 AXHUB_HEADLESS=0
-if ! [ -t 1 ] || [ -n "${CI:-}" ] || [ -n "${CLAUDE_NON_INTERACTIVE:-}" ]; then
+if ! [ -t 1 ] || [ -n "${CI:-}" ] || [ -n "${CODEX_NON_INTERACTIVE:-}" ]; then
   AXHUB_HEADLESS=1
 fi
 if [ "$AXHUB_HEADLESS" = "1" ]; then

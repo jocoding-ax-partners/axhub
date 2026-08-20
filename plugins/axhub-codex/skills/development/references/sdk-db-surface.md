@@ -27,5 +27,5 @@ verify 통과 후, deploy 핸드오프 전에 **방금 생성한 코드가 실�
 
 - **빠진 테이블** (코드가 참조하는데 `table_list`/CLI 에 없음) → `references/write-gate.md` 의 (b) 게이트로 연결해요 ("이 기능엔 `X` 테이블이 필요해요 — 만들까요?" → preview-confirm). 승인 뒤 live 스키마 작업은 clarity 의 공개 CLI 경로로 한 번 handoff 하고, 성공한 뒤 같은 development 흐름으로 돌아와 코드를 만들어요.
 - **빠진 환경변수** (코드가 읽는데 `env_var_list`/CLI 에 없음) → "이 기능엔 `Y` env 가 필요해요" 한 줄 안내 후 clarity/deploy 에서 설정하도록 이어줘요. `env_var_set` 은 operator-gated 라 development 가 **자동 설정하지 않아요**.
-- **headless/비대화형** (AUQ 불가): 기본은 스캔 결과만 보고하고 **아무것도 바꾸지 않아요** (스키마·env 무변경 safe default, deploy headless 계약과 동일). 단, 사용자가 같은 요청에서 `production mutation 허용`, `테이블 생성까지 진행`, `전부 실행`처럼 명시 권한을 줬고 필요한 테이블/컬럼이 구체적으로 결정됐으면, preview JSON 을 먼저 보고한 뒤 CLI `--execute` 로 생성할 수 있어요. 이 경우 idempotency key 를 쓰고, create 후 rows/list 로 검증해요.
+- **headless/비대화형** (명시 텍스트 승인 불가): 기본은 스캔 결과만 보고하고 **아무것도 바꾸지 않아요** (스키마·env 무변경 safe default, deploy headless 계약과 동일). 단, 사용자가 같은 요청에서 `production mutation 허용`, `테이블 생성까지 진행`, `전부 실행`처럼 명시 권한을 줬고 필요한 테이블/컬럼이 구체적으로 결정됐으면, preview JSON 을 먼저 보고한 뒤 CLI `--execute` 로 생성할 수 있어요. 이 경우 idempotency key 를 쓰고, create 후 rows/list 로 검증해요.
 - 점검을 마치면 deploy 핸드오프 맥락에 **"배포 준비 점검 완료"** 를 남겨, deploy 의 사전 점검 질문이 **중복되지 않게** 해요 (`../deploy/references/session-carryover.md`).

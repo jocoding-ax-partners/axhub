@@ -51,12 +51,12 @@ Codex 에서는 slash 명령이 채팅에서 인식되지 않을 수 있으므�
 
 GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 사용자 행동의 핵심이에요. `axhub github link`, 로그인·연결 명령, 또는 실행 출력에 `github.com/login/device`, `verification_uri`, `verification_uri_complete`, `user_code`, `Enter code`, `XXXX-XXXX` 형태의 입력 코드가 보이면 예외적으로 URL과 입력 코드는 사용자 가치 정보로 취급해요.
 
-- device flow fast path 에서는 shell loop, background watcher, persistent monitor 를 쓰지 않아요. `while true`, `sleep`, `grep`, command substitution, 임시 로그 파일 저장/재읽기, `Monitor 사용` 권한 카드가 뜨는 명령은 실패예요. device flow 시작은 `계정 인증 시작` 단일 CLI 호출 하나로 처리하고, CLI stdout/stderr 에서 URL과 코드를 바로 읽어요.
+- device flow fast path 에서는 shell loop, background watcher, persistent monitor 를 쓰지 않아요. `while true`, `sleep`, `grep`, command substitution, 임시 로그 파일 저장/재읽기, 백그라운드 감시 권한 카드가 뜨는 명령은 실패예요. device flow 시작은 `계정 인증 시작` 단일 CLI 호출 하나로 처리하고, CLI stdout/stderr 에서 URL과 코드를 바로 읽어요.
 - device flow fast path 에서는 다른 사전 점검을 건너뛰어요. 사용자가 지금 필요한 건 코드와 브라우저 승인이라서, 권한 팝업이나 사전 안내로 앞단을 늦추지 않아요.
 - Codex 에서 `axhub github link` 를 실행할 때는 자동 브라우저 열기와 agent-safe 흐름을 위해 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>` 형태로 실행해요.
 - device flow 를 시작하는 Bash/tool call 제목과 description 은 모두 정확히 `계정 인증 시작` 으로 직접 채워요. 자동 제목이나 description 에 제품명, `axhub GitHub device flow 인증 시작`, `GitHub 인증 시작`, 영어 단어, 설명 문장이 붙어 보이면 같은 명령이라도 이 제목과 description 으로 고쳐 다시 호출해요.
 - 로그를 짧게 폴링해서 URL과 입력 코드를 찾고, 발견 즉시 일반 채팅 본문에 URL과 입력 코드를 다시 써요. device-flow URL 은 Codex 이 자동 링크로 바꾸지 못하도록 URL 부분만 inline code span 으로 써요. `[https://github.com/login/device](https://github.com/login/device)`, `[https://github.com/login/device](github.com/login/device)`, `[GitHub 열기](https://github.com/login/device)`, `<https://github.com/login/device>`, bare `https://github.com/login/device` 같은 링크/자동링크 형태는 모두 금지예요. 반드시 `인증 URL: \`https://github.com/login/device\`` 와 `입력 코드: <USER_CODE>` 두 줄을 일반 채팅 본문에 그대로 보여줘요.
-- 입력 코드를 찾았으면 승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출해요. `실행됨 명령 N개`, `TaskOutput 사용함`, tool 카드, 접힌 로그만 남기고 응답을 끝내면 실패예요.
+- 입력 코드를 찾았으면 승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출해요. `실행됨 명령 N개`, tool 카드, 접힌 로그만 남기고 응답을 끝내면 실패예요.
 - 코드를 명령 출력이나 로그 읽기 결과 안에만 남기지 않아요. Codex 에서는 tool 출력이 접혀 보일 수 있으므로, 최종 요약이나 다음 안내 문장에도 사용자가 입력할 코드를 한 번 더 써요.
 - 자동 브라우저 열기는 입력 코드가 포함된 직접 URL을 우선 열 수 있어요. 사용자가 "승인했어"라고 다시 말하게 하지 않아요. 코드 표시 뒤 assistant 응답을 끝내지 말고, `계정 인증 시작` command 뒤 같은 assistant turn 에서 title 과 description 이 모두 정확히 `인증 확인` 인 단일 `axhub github accounts list --json` 조회까지 이어가요. tenant 가 이미 명확할 때만 `axhub github accounts list --tenant <tenant> --json` 를 써요. CLI 가 pending 으로 끝나도 `sleep`, `&&`, shell loop, watcher 로 감시하지 말고 같은 단일 확인 조회로 연결 반영 여부를 확인해요.
 - 브라우저가 성공 화면인데 계정 연결이 아직 반영되지 않았으면 같은 leaf 명령을 한 번만 더 실행할 수 있어요. 그래도 pending 이면 현재 결과와 다음에 확인할 명령을 짧게 안내하고 멈춰요. 승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요. 승인했는데도 `not authenticated` 가 계속 반복되면 CLI 가 pending 연동 재개를 지원하지 않는 구버전일 수 있어요 — update 스킬로 CLI 를 먼저 올린 뒤 다시 시도하도록 안내해요.
@@ -73,9 +73,9 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 
 **대표 정직성 계약.** `clarity` 는 hidden `plugin-support` 를 탐색하지 않아요. 공개 `--json-schema` / `--help` 트리에서 맞는 leaf 를 찾지 못하면 존재하지 않는 명령을 만들지 말고, "axhub 에 그 기능은 없어요" + 가장 가까운 공개 명령만 말해요. 로그·환경변수·롤백·테이블·connector grant 처럼 대표 여정 뒤 작업은 이 경로로 이어가요.
 
-## Anti-Patterns · 진행 알림 · TodoWrite
+## Anti-Patterns · 진행 알림 · update_plan
 
-탐색·실행 단계에 들어가기 전에 [references/execution-guardrails.md](references/execution-guardrails.md) 를 읽고 anti-pattern 목록·진행 알림 형식·TodoWrite 규칙을 그대로 따라요. 핵심: Desktop-visible 명령은 단일 `axhub` 명령만(후처리·임시 파일 금지), 전체 schema 통째 읽기 금지, 담당 스킬 의도 가로채기 금지예요.
+탐색·실행 단계에 들어가기 전에 [references/execution-guardrails.md](references/execution-guardrails.md) 를 읽고 anti-pattern 목록·진행 알림 형식·update_plan 규칙을 그대로 따라요. 핵심: Desktop-visible 명령은 단일 `axhub` 명령만(후처리·임시 파일 금지), 전체 schema 통째 읽기 금지, 담당 스킬 의도 가로채기 금지예요.
 
 ## Workflow
 

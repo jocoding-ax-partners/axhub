@@ -22,6 +22,13 @@ const SKILLS = [
 // (U6 override 저작 완료로 배제 목록 없음).
 const FORBIDDEN_STRINGS = [
   "AskUserQuestion",
+  // U2 (KTD5): 치환이 제거하고 FORBIDDEN 이 재유입을 막아요. bare "Monitor" 는
+  // 일반 영단어와 충돌해 넣지 않고, 명확한 도구 이름 둘만 잠가요.
+  "AUQ",
+  "TodoWrite",
+  "CLAUDE_NON_INTERACTIVE",
+  "ScheduleWakeup",
+  "TaskOutput",
   "claude plugin",
   "claude -p",
   "command -v claude",
@@ -127,7 +134,7 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     expect(existsSync(join(outDir, "hooks", "session-feedback-contract.sh"))).toBe(false);
   });
 
-  test("merged always-on wrapper preserves both kill-switch branches and emits one JSON", () => {
+  test("merged always-on wrapper preserves every kill-switch branch and emits one JSON", () => {
     const script = join(outDir, "hooks", "session-always-on-codex.sh");
     const syntax = Bun.spawnSync({ cmd: ["bash", "-n", script], stdout: "pipe", stderr: "pipe" });
     expect(syntax.exitCode, syntax.stderr.toString()).toBe(0);
@@ -135,14 +142,19 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     const env = { ...process.env, HOME: tempRoot };
     const bothKilled = Bun.spawnSync({
       cmd: ["bash", script],
-      env: { ...env, AXHUB_NO_UPDATE_ROUTER: "1", AXHUB_NO_FEEDBACK_REPORT: "1" },
+      env: {
+        ...env,
+        AXHUB_NO_UPDATE_ROUTER: "1",
+        AXHUB_NO_QUESTION_PROTOCOL: "1",
+        AXHUB_NO_FEEDBACK_REPORT: "1",
+      },
       stdout: "pipe",
     });
     expect(bothKilled.stdout.toString()).toBe("");
 
     const routerOnly = Bun.spawnSync({
       cmd: ["bash", script],
-      env: { ...env, AXHUB_NO_FEEDBACK_REPORT: "1" },
+      env: { ...env, AXHUB_NO_QUESTION_PROTOCOL: "1", AXHUB_NO_FEEDBACK_REPORT: "1" },
       stdout: "pipe",
     });
     const routerPayload = JSON.parse(routerOnly.stdout.toString()) as {
@@ -155,6 +167,23 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     expect(routerPayload.hookSpecificOutput.hookEventName).toBe("SessionStart");
     expect(routerPayload.hookSpecificOutput.additionalContext).toContain("update-first routing guard");
     expect(routerPayload.hookSpecificOutput.additionalContext).toContain("codex plugin list");
+
+    // U5/KTD6: 질문 프로토콜은 기본 on 이고, 훅이 꺼진 세션에서도 skill 본문·정책이
+    // 같은 fail-closed 규칙을 들고 있어요 (3채널 중복 소유).
+    const questionOnly = Bun.spawnSync({
+      cmd: ["bash", script],
+      env: { ...env, AXHUB_NO_UPDATE_ROUTER: "1", AXHUB_NO_FEEDBACK_REPORT: "1" },
+      stdout: "pipe",
+    });
+    const questionPayload = JSON.parse(questionOnly.stdout.toString()) as {
+      hookSpecificOutput: { additionalContext: string };
+    };
+    expect(questionPayload.hookSpecificOutput.additionalContext).toContain(
+      "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
+    );
+    expect(questionPayload.hookSpecificOutput.additionalContext).not.toContain(
+      "update-first routing guard",
+    );
   });
 
   test("update-router.sh keeps the gate pipeline and emits the codex context", () => {
@@ -277,6 +306,41 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       }
     }
     expect(checked).toBeGreaterThan(0);
+  });
+
+  // U3 (R2·KTD2): codex 는 SKILL.md 를 **파일 선두 기준** 8,000B 에서 절단해요
+  // (rust-v0.148.0 ext/skills/src/render.rs — frontmatter 포함 파일 전체가 대상).
+  // 승인 게이트가 절단선 밖으로 나가면 모델이 게이트를 아예 못 봐요. recovery-line
+  // 존재 assert 로는 이걸 못 잡아서, 게이트 문자열의 byte offset 을 직접 계약으로 고정해요.
+  const CODEX_SKILL_PROMPT_LIMIT = 8_000;
+  const GATE_STRINGS: Record<string, readonly string[]> = {
+    bootstrap: [
+      "어떤 템플릿으로 시작할까요?",
+      "앱 이름을 무엇으로 할까요?",
+      "지금 만들고 배포까지 진행할까요?",
+      "--execute",
+      "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
+    ],
+    deploy: ["axhub로 지금 배포를 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
+    import: ["미리보기대로 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
+    scaffold: ["명시 텍스트 승인 1회", "미리 넣어 둔 문구", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
+    update: ["update apply --execute"],
+  };
+
+  test("approval gates sit inside the codex 8,000B truncation window (R2)", () => {
+    const failures: string[] = [];
+    for (const [skill, gates] of Object.entries(GATE_STRINGS)) {
+      const buf = readFileSync(join(outDir, "skills", skill, "SKILL.md"));
+      for (const gate of gates) {
+        const offset = buf.indexOf(Buffer.from(gate, "utf8"));
+        if (offset < 0) {
+          failures.push(`${skill}: gate string absent — "${gate}"`);
+        } else if (offset >= CODEX_SKILL_PROMPT_LIMIT) {
+          failures.push(`${skill}: "${gate}" @${offset}B (limit ${CODEX_SKILL_PROMPT_LIMIT})`);
+        }
+      }
+    }
+    expect(failures).toEqual([]);
   });
 
   test("codex bundle has no forbidden host strings outside U6-pending overrides", () => {

@@ -13,6 +13,12 @@ model: sonnet
 
 처음 axhub 를 쓰는 사람을 위한 단일 진입점이에요. 사용자는 `온보딩`, `처음인데 뭐부터`, `getting started` 처럼 말하면 되고, 이 스킬은 CLI/auth/runtime/GitHub 계정 연동/GitHub App/repo/deps 준비를 한 gap 씩 닫아요. 환경 진단만 원하면 doctor/diagnosis 가 맞고, 새 앱 생성을 명시하면 bootstrap 이 맞아요. onboarding 은 빈 폴더에서도 자동 bootstrap 을 시작하지 않고 Ready card 에서 `첫 앱 만들어줘` 를 다음 말로 안내해요.
 
+## Codex 첫 세션 안내
+
+- 첫 axhub 명령에서 네트워크 접근 승인을 한 번 물어요 — 허용해야 axhub 백엔드에 닿아요.
+- 시작 시 훅 신뢰를 묻는데, 신뢰하지 않으면 자동 업데이트·라우팅 가드가 조용히 꺼져요. `/hooks` 에서 언제든 다시 켤 수 있어요.
+- 선택 카드로 답하고 싶으면 `~/.codex/config.toml` 의 `[features]` 에 `default_mode_request_user_input = true` 한 줄을 더하면 돼요. 켠 경우 빈 답변은 미승인으로 처리돼요. 설정을 대신 바꾸지는 않아요.
+
 ## Reference Loading
 
 이 top-level 파일은 routing, safety, exact command anchors 를 보존하는 compact contract 예요. 세부 UX 는 detect 결과가 해당 branch 를 요구할 때만 아래 reference 를 읽어요.
@@ -54,13 +60,13 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 - `AI 활용 기록 설정 확인하는 중이에요`
 - `준비 다 됐어요`
 
-TodoWrite 가 host 에 있으면 checklist 를 갱신해요. 없으면 언급하지 말고 자연어 진행 알림만 사용해요.
+update_plan 가 host 에 있으면 checklist 를 갱신해요. 없으면 언급하지 말고 자연어 진행 알림만 사용해요.
 
 ## Workflow
 
 ### 0. Non-interactive guard
 
-첫 명시 텍스트 승인 또는 mutation 전에 대화형 여부를 판단해요. 다음 중 하나면 D1 safe-stop mode 예요: stdout 이 TTY 가 아님, `CI` 가 있음, `CLAUDE_NON_INTERACTIVE` 가 있음, `codex exec` 같은 subprocess/headless 호출임. 이 모드에서는 사용자 확인이 필요한 action 을 실행하지 않고 manual next phrase 와 `SAFE_STOP_NONINTERACTIVE` card 로 끝내요.
+첫 명시 텍스트 승인 또는 mutation 전에 대화형 여부를 판단해요. 다음 중 하나면 D1 safe-stop mode 예요: stdout 이 TTY 가 아님, `CI` 가 있음, `CODEX_NON_INTERACTIVE` 가 있음, `codex exec` 같은 subprocess/headless 호출임. 이 모드에서는 사용자 확인이 필요한 action 을 실행하지 않고 manual next phrase 와 `SAFE_STOP_NONINTERACTIVE` card 로 끝내요.
 
 ### 1. DETECT_ALL(read-only)
 

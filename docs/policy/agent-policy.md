@@ -72,7 +72,8 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 적용: skills/deploy/SKILL.md, skills/bootstrap/SKILL.md, skills/import/SKILL.md, skills/scaffold/SKILL.md
 - invariant: "axhub 진입 확인", "승인을 조용히 건너뛰지 않아요"
 - 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/scaffold/SKILL.md
-- invariant(codex): "미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요"
+- 빈 답변 fail-closed (codex): 네이티브 선택 카드가 켜진 세션에서 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 이 규칙은 훅·정책·skill 본문 세 채널이 겹쳐 소유해요 — 훅은 미신뢰 세션에서 조용히 꺼지고 본문은 8,000B 에서 절단되니 실패 모드가 서로 달라요.
+- invariant(codex): "미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"
 
 ## AP-13 Windows 실행 계약 (Git Bash 전용)
 - 규칙: Windows 에선 모든 axhub CLI 명령을 Git Bash 전용으로 실행해요 — PowerShell 로 실행하지 않아요. PowerShell 에는 `$HOME` 과 repair 된 PATH 가 없어서 credential·auth 조회가 false-negative 나요. PATH 가 없으면 `SetEnvironmentVariable` 이나 `$env:PATH` prepend 로 수동 등록하지 않고, canonical on-disk 경로(`~/.axhub/bin/axhub`(.exe))로 `plugin-support repair-path` 를 실행해 영속 등록을 고쳐요 — 그 상태에선 bare `axhub` 가 127 이에요. 같은 세션은 repair-path JSON 의 `bin_path` 절대경로로 이어가고, bin_path 가 없는 구 CLI 면 새 터미널 안내로 대체해요 — 이미 열린 셸은 OS 설계상 밖에서 PATH 를 못 고치므로 새 터미널은 다음 세션용 보조 안내예요 (VS Code 통합터미널은 앱 재시작 후에야 새 PATH 를 봐요). `auth status` 는 `auth login` 을 실행한 그 셸에서 검증해요 — HOME 없는 셸이 "미로그인" 이라고 해도 로그인 실패로 보지 않아요. 로그인은 단일 self-polling `axhub auth login --json` 1 회로 하고 background 로 재실행하지 않아요 (device code 소진). 이 계약은 Windows(`$OS`=Windows_NT) 세션에서 SessionStart hook (`hooks/hooks.json`) 이 매 세션 always-on 으로 emit 해요 — skill 본문 로드 여부와 무관하게 free-form 실행 경로까지 덮어요. non-Windows 세션에서는 조용히 건너뛰어요. 이 계약에 예외는 없어요 — 공식 설치 채널은 install.sh / install.ps1 뿐이고, npm/npx 의 `axhub`·`axhub-cli` 패키지는 이름 예약 스텁이라 설치·실행·안내에 절대 쓰지 않아요. 이 npm/npx 금지는 hook 문안에도 포함돼 skill 을 안 탄 free-form npm 추측 경로까지 덮어요.
