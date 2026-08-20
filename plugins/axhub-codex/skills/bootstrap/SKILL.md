@@ -184,7 +184,7 @@ axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder -
 인증 URL: `https://github.com/login/device`
 입력 코드: <USER_CODE>
 
-**코드가 안 보인 채 execute 가 끝났을 때 (AP-18).** 출력 없이 실패·거부·중단됐는데 브라우저 device 화면이 열렸으면 같은 `--execute` 를 절대 다시 실행하지 않아요 — 새 device code 를 발급해 사용자가 보고 있는 코드를 무효로 만들어요. 즉시 끝나는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link`(제목 `계정 인증 시작`)로 코드를 받아 위 두 줄을 본문에 먼저 쓰고, 같은 turn 에 `인증 확인` 단일 `axhub github accounts list --json` 뒤 `--resume-last` 로 이어가요. 코드를 보여주기 전에 `인증 확인` 을 먼저 실행하거나, 코드만 보여주고 응답을 끝내면 실패예요.
+**코드가 안 보인 채 execute 가 끝났을 때 (AP-18).** 출력 없이 실패·거부·중단됐는데 브라우저 device 화면이 열렸으면 같은 `--execute` 를 절대 다시 실행하지 않아요 — 새 device code 를 발급해 사용자가 보고 있는 코드를 무효로 만들어요. 즉시 끝나는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link`(제목 `계정 인증 시작`)로 코드를 받아 위 두 줄을 본문에 먼저 쓰고, 같은 turn 에 `인증 확인` 단일 `axhub github accounts list --json` 뒤 `--resume-last` 로 이어가요. 코드를 보여주기 전에 `인증 확인` 을 먼저 실행하거나, 코드만 보여주고 응답을 끝내면 실패예요. 단 그 코드를 놓쳤거나 만료됐으면 fast path 를 반복하지 않고 `github link --fresh` 로 새 코드를 받아 두 줄을 다시 써요 — 저장된 pending link 는 죽은 코드를 그대로 돌려줘요. 유효한 코드가 화면에 있으면 붙이지 않아요(무효가 돼요).
 
 execute/status 가 `deployment_id` 와 빌드/실행중 상태를 주면, preflight 의 `capabilities.import.verify_wait` 가 true 일 때 **권한 카드 한 번으로 끝나는** `axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 10m --json` 를 정확히 한 번 호출해 terminal 까지 봐요. `--wait` 가 성공·실패·예산 제한(최대 30회 또는 10분, AP-16)까지 책임지므로 같은 verify 나 `배포 상태 확인` 을 연달아 호출하지 않아요 — 대기 수단 없이 같은 exit 6 을 화면에 쌓는 연타 폴링은 UX 실패예요. capability 가 없는 구 CLI 에서만 `배포 상태 확인` tool call 을 폴링 예산 안에서 반복하고 성공 뒤 `axhub deploy verify <deployment-id> --app <app> --json` 를 실행해요. 예산에 닿으면 재개 요약으로 끝내요. verify 성공 전 최종 성공 문구 금지, `잠시 후 확인해보세요` 로 끝내기 금지.
 

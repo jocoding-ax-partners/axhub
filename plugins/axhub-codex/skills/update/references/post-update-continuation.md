@@ -25,6 +25,7 @@ axhub deploy list --app <app> --json
 ```bash
 AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link
 AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>
+AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --fresh
 ```
 
 이 command 의 사용자에게 보이는 title/description 은 모두 정확히 `계정 인증 시작` 이에요. `axhub GitHub device flow 인증 시작`, `GitHub device flow 인증 시작 (브라우저 자동 열기)` 같은 긴 제목이나 description 을 쓰지 않아요. 실행 결과에서 `https://github.com/login/device` 와 코드를 읽으면, 승인 확인 명령을 실행하기 전에 먼저 assistant 본문에 아래처럼 두 줄로 URL 과 코드를 노출해요. URL 은 자동 링크로 바뀌지 않도록 inline code span 으로 써요. Markdown 링크 문법을 쓰지 않아요. `[https://github.com/login/device](github.com/login/device)`, `<https://github.com/login/device>`, bare `https://github.com/login/device` 처럼 링크/자동링크 형태로 꾸미면 실패예요.
@@ -34,7 +35,7 @@ AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>
 입력 코드: <USER_CODE>
 ```
 
-사용자가 `승인했어` 라고 다시 말하기를 기다리지 말고, 코드 노출 뒤 응답을 끝내지도 말아요. CLI 가 `After approving in the browser, rerun axhub github link (or axhub github accounts list --json)` 같은 pending 문구를 출력해도 그 문구를 사용자에게 다음 요청처럼 떠넘기지 말고, 같은 assistant turn 에서 단일 확인 명령까지 이어가요. 확인이 pending 으로 끝났다면 승인 뒤 같은 확인 명령을 다시 실행하면 저장된 pending link 가 이어져요(새 코드 발급 없음). tenant 가 이미 명확할 때만 `--tenant <tenant>` 를 붙이고, 모르면 tenant 옵션 없이 확인해요.
+사용자가 `승인했어` 라고 다시 말하기를 기다리지 말고, 코드 노출 뒤 응답을 끝내지도 말아요. CLI 가 `After approving in the browser, rerun axhub github link (or axhub github accounts list --json)` 같은 pending 문구를 출력해도 그 문구를 사용자에게 다음 요청처럼 떠넘기지 말고, 같은 assistant turn 에서 단일 확인 명령까지 이어가요. 확인이 pending 으로 끝났다면 승인 뒤 같은 확인 명령을 다시 실행하면 저장된 pending link 가 이어져요(새 코드 발급 없음). 단 사용자가 코드를 놓쳤거나 코드가 만료돼서 승인 자체를 못 했으면 그 저장된 pending link 가 죽은 코드를 그대로 돌려줘요 — 그때만 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --fresh` 로 새 코드를 발급해 두 줄을 다시 노출해요. 보고 있는 코드가 아직 유효하면 `--fresh` 를 붙이지 않아요(그 코드가 무효가 돼요). `--fresh` 가 exit 64 로 거부되는 구 CLI 면 플래그 없이 한 번만 다시 실행해요. tenant 가 이미 명확할 때만 `--tenant <tenant>` 를 붙이고, 모르면 tenant 옵션 없이 확인해요.
 
 ```bash
 axhub github accounts list --json

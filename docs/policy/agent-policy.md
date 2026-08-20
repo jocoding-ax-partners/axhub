@@ -104,8 +104,9 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-18 device flow 코드 선노출
 - 규칙: GitHub device flow 가 필요한 순간에는 코드 노출이 사용자 행동의 전부예요. 코드를 몇 분씩 도는 saga 명령(`apps bootstrap --execute` 등) 안에만 두지 않아요 — 그 tool call 이 실패·거부·중단되면 stdout 이 사라져 사용자는 브라우저의 빈 코드 입력 화면만 보게 돼요. 코드가 안 보인 채 saga 가 끝나면 같은 `--execute` 를 다시 실행하지 않아요 — 새 device code 가 발급돼 이미 받은 코드가 무효가 돼요. 대신 즉시 끝나는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link` 로 코드를 받아 본문에 `인증 URL:` 과 `입력 코드:` 두 줄로 먼저 노출하고, 승인 확인 뒤 `--resume-last` 로 이어가요. 재시도 구간도 같아요 — `--resume-last` 의 `device_code_pending` 응답은 `user_code`·`verification_uri`·`expires_at` 을 실어 주므로 재시도마다 그 두 줄을 다시 써요. 승인만이 이 루프를 끝내니, 코드 없이 `아직 대기 중` 만 반복하는 재시도는 사용자가 할 수 있는 일이 없어요. 이 필드가 없는 구 CLI 에서는 재노출을 건너뛰고 재시도만 이어가요.
-- 적용: skills/bootstrap/SKILL.md, skills/clarity/SKILL.md
-- invariant: "입력 코드:", "github link"
+- 코드 유실·만료 재발급: `github link` 는 저장된 pending device link 를 그대로 이어 줘요 — 사용자가 코드를 놓쳤거나 코드가 만료된 뒤 같은 명령을 다시 실행하면 이미 죽은 코드가 그대로 돌아와서, 아무리 승인해도 연동이 영영 안 풀려요. 코드를 못 봤다·사라졌다·만료됐다는 신호가 있거나 같은 코드로 승인 확인이 계속 pending 이면 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --fresh` 로 새 코드를 발급해 두 줄을 다시 써요. 반대로 사용자가 지금 보고 있는 코드가 아직 유효하면 `--fresh` 를 붙이지 않아요 — 그 플래그가 그 코드를 무효로 만들어요. `--fresh` 를 모르는 구 CLI 는 exit 64(사용법)로 거부하니 플래그 없이 한 번만 다시 실행하고 update 스킬로 CLI 업그레이드를 안내해요 (AP-19 대상 아님 — 예상된 사용법 거절이에요).
+- 적용: skills/bootstrap/SKILL.md, skills/clarity/SKILL.md, skills/update/references/post-update-continuation.md
+- invariant: "입력 코드:", "github link", "github link --fresh"
 
 ## AP-15 앱 소유자·계정 불일치 비판정
 - 규칙: 앱을 만든 계정과 지금 로그인한 계정이 달라 보여도(앱 정보의 owner 표시, 멤버 목록, git 커밋 이메일 등), 스킬은 그 불일치를 스스로 판정해 막거나 "앱 소유자에게 물어보세요" 같은 확인 절차를 만들어내지 않아요. 배포 권한(인가 — 이 계정이 이 앱을 배포할 수 있는지)의 판정은 CLI/백엔드 몫이에요. 사용자의 구두 승인을 권한 근거로 쓰지 않아요 — "소유자가 배포해도 된대요" 같은 말로는 권한이 생기지 않아요. CLI 가 권한 부족(exit 8, `axhub_app_forbidden` — 앱 owner/admin 권한 검사 실패)으로 막을 때만 앱 소유자/관리자에게 멤버 권한 부여를 요청하도록 안내하고 멈추며, 권한이 실제로 생겼는지는 말이 아니라 같은 명령의 재시도 성공으로만 확인해요.

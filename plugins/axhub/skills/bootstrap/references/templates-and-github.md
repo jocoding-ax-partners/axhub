@@ -16,7 +16,7 @@ The response envelope contains `data.items[]` with fields like `id`, `folder_nam
 
 Exit routing:
 
-- exit 4/auth: if the envelope subcode is `github_relogin_required`, the backend GitHub link is missing or expired and axhub re-login does not fix it — run the device-flow fast path (`AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link`, then `axhub github accounts list --json`) and re-run this gate. That fast path is the fallback that restores the link, not the normal path. Otherwise say `다시 로그인해줘`.
+- exit 4/auth: if the envelope subcode is `github_relogin_required`, the backend GitHub link is missing or expired and axhub re-login does not fix it — run the device-flow fast path (`AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link`, then `axhub github accounts list --json`) and re-run this gate. That fast path is the fallback that restores the link, not the normal path. 코드를 놓쳤거나 만료됐으면 같은 명령을 반복하지 말고 `axhub github link --fresh` 로 새 코드를 받아요. Otherwise say `다시 로그인해줘`.
 - exit 8/tenant unresolved: use `axhub profile current --json` guidance and ask for login/profile fix.
 - other abnormal exit: say `설치 상태 진단해줘` can inspect.
 
@@ -84,7 +84,7 @@ Rules:
 
 - A normal (non-error) response means the backend already holds a linked GitHub account, so bootstrap continues with **no authentication step at all**. The CLI resolves owner and installation from this response, so do not pre-start a device flow and do not tell the user that authentication is required.
 - If output is empty or not parseable, state is unavailable; do not block.
-- If the auth envelope subcode is `github_relogin_required`, the link is missing or expired and re-login does not fix it: run the device-flow fast path (`AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link`, then `axhub github accounts list --json`) and re-run this gate. Device flow is the fallback for this case only. For other auth-expired envelopes, say `다시 로그인해줘`, then re-run this gate after login.
+- If the auth envelope subcode is `github_relogin_required`, the link is missing or expired and re-login does not fix it: run the device-flow fast path (`AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link`, then `axhub github accounts list --json`) and re-run this gate. Device flow is the fallback for this case only. 코드를 놓쳤거나 만료됐으면 같은 명령을 반복하지 말고 `axhub github link --fresh` 로 새 코드를 받아요. For other auth-expired envelopes, say `다시 로그인해줘`, then re-run this gate after login.
 - If `install_url` exists, always show it once as "GitHub App 설치·계정 추가 링크: `<install_url>`", regardless of installed status.
 - If onboarding already showed the same install link in this conversation, repeated display can be skipped, but account check, owner pick, and zero-install gate still run.
 

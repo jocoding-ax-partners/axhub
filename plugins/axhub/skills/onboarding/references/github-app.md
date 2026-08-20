@@ -25,7 +25,7 @@ AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link
 입력 코드: <USER_CODE>
 ```
 
-브라우저 승인 반영은 위 `axhub github accounts list --json` 를 한 번 다시 실행해서 확인해요 — 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요. 정상 응답이 오면 그때 설치 단계(install_url)로 넘어가요.
+코드를 놓쳤거나 만료돼서 승인을 못 했으면 같은 명령을 반복하지 말고 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --fresh` 로 새 코드를 받아요 — 저장된 pending link 는 죽은 코드를 그대로 돌려줘요. 브라우저 승인 반영은 위 `axhub github accounts list --json` 를 한 번 다시 실행해서 확인해요 — 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요. 정상 응답이 오면 그때 설치 단계(install_url)로 넘어가요.
 
 연동을 한 번 해두면 앱 만들기·저장소 연결이 그 연동을 그대로 써서 인증 단계 없이 진행돼요. 다만 연동은 시간이 지나면 만료돼서 같은 안내가 다시 필요할 수 있어요 — 재연동은 고장이 아니라 정상 흐름이에요. `다시 묻지 않아요` 처럼 영구적이라고 단정하지 말아요.
 
