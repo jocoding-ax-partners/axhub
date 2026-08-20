@@ -30,7 +30,7 @@ Non-interactive/D1 safe default is `새로 시작`. Do not echo raw `bootstrap_i
 If the user chooses resume, use the route enum and `args.*_command` returned by the CLI. Do not reconstruct raw IDs in the skill.
 
 - `watch_status`: run `args.status_command`. Current shape is `axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json`.
-- `resume_last`: use `args.resume_command` as the base argv, but never run it verbatim. Append `--tenant "$AXHUB_TENANT"` only when `$AXHUB_TENANT` is set and the base command lacks tenant context. For Desktop device-flow recovery, strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume so stdout is visible. Do not use Monitor, ScheduleWakeup, TaskOutput, or background output file reads as the resume control plane. Current shape should be `axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --idempotency-key "$IDEMPOTENCY_KEY"`.
+- `resume_last`: use `args.resume_command` as the base argv, but never run it verbatim. Append `--tenant "$AXHUB_TENANT"` only when `$AXHUB_TENANT` is set and the base command lacks tenant context. For Desktop device-flow recovery, strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume so stdout is visible. Do not use background watchers or output-file reads as the resume control plane. Current shape should be `axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --idempotency-key "$IDEMPOTENCY_KEY"`.
 - stale/broken/fresh: say "이전 기록을 찾지 못해서 새로 시작할게요." and continue to template registry.
 
 ## Resume Device-Flow Recovery

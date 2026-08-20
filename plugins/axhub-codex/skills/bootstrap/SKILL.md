@@ -19,6 +19,18 @@ model: sonnet
 
 `If you need an app name or template, choose a reasonable one yourself`, `choose whatever is reasonable`, `pick the best template/name`, `deploy it for real`, `put it online`, `do it for real` 는 목표·추천 허용일 뿐이에요. 템플릿 선택 카드, 앱 이름 확인 카드, dry-run 뒤 `진행` 확인은 절대 생략하지 않아요.
 
+## 승인 게이트 계약 (요약)
+
+codex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 아래 네 게이트는 뒤쪽 절차 설명이 잘려도 그대로 지켜요.
+
+1. 템플릿 선택 — `어떤 템플릿으로 시작할까요?` 로 묻고, backend 가 실제로 가진 template 만 보여줘요.
+2. 앱 이름 확인 — `앱 이름을 무엇으로 할까요?` 로 묻고, 답을 받은 뒤에만 `--name`/`--slug` 를 확정해요.
+3. 생성·배포 승인 — dry-run preview 를 보여준 뒤 `지금 만들고 배포까지 진행할까요?` 로 묻고, 승인을 받은 뒤에만 `--execute` 를 실행해요.
+4. 승인 방식 — 같은 확인을 명시 텍스트 승인 1회로 받아요. preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구만 유효하고, 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요. 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
+5. 빈 답변 = 미승인 — 선택 카드로 물은 경우 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.
+
+**질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요(예: `진행` 이면 시작하고 `취소` 면 여기서 멈춰요). 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요. 비파괴 선택은 숫자·서수·라벨·앞글자 어느 쪽으로 답해도 알아듣고, 파괴 게이트만 canonical 문구를 그대로 받아요.
+
 ## Scope
 
 빈 디렉토리 axhub 템플릿 앱 + 첫 배포 전용이에요. axhub 맥락 없는 일반 앱 작업은 맡지 않아요. 비어 있지 않은 기존 로컬 앱·가져오기·"이 폴더 올려줘" 요청은 `import` 스킬로 넘겨요.
@@ -38,10 +50,10 @@ creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps c
 - 제목: `CLI 준비 확인`, `작업공간 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `저장소 계정 확인`, `앱 이름 확인`, `앱 주소 확인`, `앱 생성 미리보기`, `계정 인증 시작`, `인증 확인`, `앱 생성 상태 확인`, `배포 상태 확인`, `검증 확인`.
 - `rtk` 같은 개발자 전용 CLI 래퍼는 이 skill 에서 절대 쓰지 않아요. `pwd`, `ls`, `find`, `cat`, `curl` 같은 generic shell probe 대신 `axhub` CLI 표면만 써요.
 - Desktop-visible command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수, `export`, command substitution, semicolon chain 없이 literal flag 로 넣어요. execute/resume 명령에는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` 을 붙이지 않아요 — 이 prefix 가 붙으면 CLI 가 코드를 돌려주는 대신 블로킹 폴링으로 들어가서 tool call 이 끝나지 않고, 사용자는 빈 GitHub 코드 화면만 봐요. 이 prefix 는 즉시 끝나는 `github link` fast path 에서만 써요.
-- 배포 상태 대기/확인도 예외가 아니에요: `Monitor`, `ScheduleWakeup`, background watch 와 `for`, `while`, `until`, `sleep`, `grep`, `head`, `tail`, `cut`, `awk`, `sed`, `jq` polling/파싱 금지. CLI 내부 대기인 `deploy verify --wait` 는 이 금지에 걸리지 않고 오히려 우선이에요. fallback 으로 상태를 다시 볼 때는 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행. `until axhub ... | grep ...`, `axhub ... | head ...` 같은 권한 요청창이 뜨는 긴 shell watch 는 UX 실패예요. 성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요. deployment id 를 알면 terminal/verify 완료 전 응답을 끝내지 않아요. 단, 상태 확인 tool call 의 폴링 예산은 최대 30회 또는 10분(AP-16)이에요 — 예산에 먼저 닿으면 실패 선언 없이 `아직 진행 중이에요` 와 재개 명령(`axhub deploy status <deployment-id> --tenant <tenant> --json`)을 남기는 재개 요약으로 응답을 끝내고 deployment id 를 보존해요. 이 예산 종료가 앞 규칙의 유일한 예외예요.
+- 배포 상태 대기/확인도 예외가 아니에요: 백그라운드 감시와 `for`, `while`, `until`, `sleep`, `grep`, `head`, `tail`, `cut`, `awk`, `sed`, `jq` polling/파싱 금지. CLI 내부 대기인 `deploy verify --wait` 는 이 금지에 걸리지 않고 오히려 우선이에요. fallback 으로 상태를 다시 볼 때는 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행. `until axhub ... | grep ...`, `axhub ... | head ...` 같은 권한 요청창이 뜨는 긴 shell watch 는 UX 실패예요. 성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요. deployment id 를 알면 terminal/verify 완료 전 응답을 끝내지 않아요. 단, 상태 확인 tool call 의 폴링 예산은 최대 30회 또는 10분(AP-16)이에요 — 예산에 먼저 닿으면 실패 선언 없이 `아직 진행 중이에요` 와 재개 명령(`axhub deploy status <deployment-id> --tenant <tenant> --json`)을 남기는 재개 요약으로 응답을 끝내고 deployment id 를 보존해요. 이 예산 종료가 앞 규칙의 유일한 예외예요.
 - Echo 금지: `bootstrap_id`, `deployment_id`, `idempotency_key`, `device_code`.
 - 사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL; Markdown URL 링크 문법은 전부 금지; 도메인-only target 금지: `[https://x](https://x)`, `[열기](https://x)`, `<https://x>`.
-- GitHub device flow 는 평문 URL+코드를 본문에 다시 써요: `https://github.com/login/device`, `ABCD-1234`. Markdown 링크(`[https://...](github.com/...)` 포함), `Monitor`, `ScheduleWakeup`, `TaskOutput`, `읽는 중 <output>`, 임시 출력 파일 읽기 카드로 코드 노출 금지. 승인 확인은 별도 `axhub` leaf 명령으로 이어가요.
+- GitHub device flow 는 평문 URL+코드를 본문에 다시 써요: `https://github.com/login/device`, `ABCD-1234`. Markdown 링크(`[https://...](github.com/...)` 포함), 백그라운드 감시, `읽는 중 <output>`, 임시 출력 파일 읽기 카드로 코드 노출 금지. 승인 확인은 별도 `axhub` leaf 명령으로 이어가요.
 - 이 스킬은 CLI-only 흐름이에요. `App get (axhub)`, `App list`, deployment MCP 호출 금지. 상태·검증은 CLI 명령만, 앱 상세·URL 확인은 `axhub apps get <app-slug> --tenant <tenant> --json` 또는 `--field-expr`. `Finding tools` 로 이동해서 MCP/App 도구를 찾지 않아요.
 - 다른 플러그인/워크플로 상태를 정리하지 않아요. 외부 자동화·취소·state 정리 도구를 부르지 않고, chat/tool/progress 에 다른 플러그인 이름, 자동화 정리 문구, `Finding tools` 를 쓰지 않아요.
 
