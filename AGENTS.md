@@ -110,7 +110,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 - 흡수된 helper 표면은 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 — 예: `onboarding-detect`, `preflight`, `deploy-prep`.
 - 공개 검증·진단 표면은 `axhub deploy verify <deployment-id> --app <app>` 와 `axhub deploy diagnose` 예요.
-- bootstrap·deploy skill 은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면(코어 v0.20.0+) 을 가드해요. import·diagnosis 가 쓰는 `plugin-support import`·`deploy diagnose` 표면은 v0.21.3+ 라, 8스킬 전체의 실제 최소 버전은 v0.21.3 이에요. 미달이면 멈추고 안내해요 — 우회 금지.
+- bootstrap·deploy skill 은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면(코어 v0.20.0+) 을 가드해요. 기존 8스킬이 쓰는 표면은 v0.21.3+, scaffold의 GitHub 저장소 생성 표면은 v0.30.0+예요. 미달이면 멈추고 안내해요 — 우회 금지.
 
 ## 변경 검증
 

@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.23.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.22.1...v1.23.0) (2026-08-24)
+
+사용자 계정·조직에 템플릿 저장소를 만드는 `scaffold`를 아홉 번째 스킬로 정식 노출했어요. 이 경로가 요구하는 CLI v0.30.0을 Claude·Codex metadata와 안내에 같은 기준으로 고정했고, 공백·symlink가 섞인 target 경로는 canonical 경계 밖으로 나가지 못하게 막았어요. Codex 번들 marker 변환은 몇 번 생성해도 `-codex`가 중복되지 않으며, 실제 배포물의 license도 Apache-2.0 하나로 맞췄어요.
+
+
+### Added
+
+* scaffold 스킬과 안전한 Codex 번들 계약 추가 ([77ebdae](https://github.com/jocoding-ax-partners/axhub/commit/77ebdae1d06f10d6b6e5f45184074b3b07a98b54))
+
 ## [1.22.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.22.0...v1.22.1) (2026-08-20)
 
 GitHub 인증 코드를 한 번 놓치면 다시 연동할 방법이 없던 문제를 고쳤어요. `github link` 는 저장된 pending device link 를 그대로 이어 줘서, 코드가 화면에서 사라지거나 만료된 뒤 같은 명령을 다시 실행하면 이미 죽은 코드가 그대로 돌아왔어요 — 사용자가 몇 번을 승인해도 연동이 풀리지 않는 막다른 길이었어요. CLI 가 `--fresh` 로 이미 풀어 둔 경로를 플러그인 계약에도 반영해서, 코드 유실·만료 신호가 있거나 같은 코드로 확인이 계속 pending 이면 새 코드를 발급해 다시 보여줘요. 반대로 사용자가 보고 있는 코드가 아직 유효하면 붙이지 않아요 — 그 플래그가 멀쩡한 코드를 무효로 만들거든요.

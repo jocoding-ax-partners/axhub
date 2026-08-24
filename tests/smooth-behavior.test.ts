@@ -34,7 +34,7 @@ const runShim = (args: string[], env: Record<string, string> = {}) => {
 };
 
 describe("smooth behavior contracts", () => {
-  test("public metadata advertises the eight official skills", () => {
+  test("public metadata advertises the nine official skills", () => {
     const packageJson = readJson<PackageLike>("package.json");
     const pluginJson = readJson<PackageLike>(".claude-plugin/plugin.json");
     const marketplace = readJson<MarketplaceLike>(".claude-plugin/marketplace.json");
@@ -53,7 +53,7 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("Import priority is strict");
       expect(description).not.toContain("현재 버전을 확인할게요");
     }
-    expect(descriptions.join("\n")).toContain("onboarding/bootstrap/deploy/import/development/diagnosis/clarity/update");
+    expect(descriptions.join("\n")).toContain("onboarding/bootstrap/scaffold/deploy/import/development/diagnosis/clarity/update");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {

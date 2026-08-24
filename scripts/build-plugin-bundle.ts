@@ -540,8 +540,8 @@ const buildBundle = ({ outDir, host }: Options): BundleStats => {
   }
 
   if (host === "codex") {
-    applyCodexOverrides(outDir);
     applyCodexSubstitutions(outDir);
+    applyCodexOverrides(outDir);
     transformCodexHooks(outDir);
     const version = (
       JSON.parse(readFileSync(join(REPO_ROOT, ".claude-plugin", "plugin.json"), "utf8")) as {
