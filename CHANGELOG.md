@@ -4,16 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
-## [Unreleased]
+## [1.23.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.22.1...v1.23.0) (2026-08-24)
 
-### Fixed
+사용자 계정·조직에 템플릿 저장소를 만드는 `scaffold`를 아홉 번째 스킬로 정식 노출했어요. 이 경로가 요구하는 CLI v0.30.0을 Claude·Codex metadata와 안내에 같은 기준으로 고정했고, 공백·symlink가 섞인 target 경로는 canonical 경계 밖으로 나가지 못하게 막았어요. Codex 번들 marker 변환은 몇 번 생성해도 `-codex`가 중복되지 않으며, 실제 배포물의 license도 Apache-2.0 하나로 맞췄어요.
 
-* Codex bundle marker 변환을 idempotent하게 바꿔 `-codex-codex` 경로 때문에 재시작 확인이 영원히 누락되던 문제를 막았어요.
-* `scaffold`의 target 경로를 모두 인용하고 canonical·symlink 경계를 검사해 공백 경로 실패와 shell path injection을 막았어요.
 
-### Changed
+### Added
 
-* Claude/Codex manifest license를 실제 번들의 Apache-2.0과 맞추고, 9개 skill 및 scaffold CLI v0.30.0+ 요구사항을 모든 metadata·README·검증 목록에 반영했어요.
+* scaffold 스킬과 안전한 Codex 번들 계약 추가 ([77ebdae](https://github.com/jocoding-ax-partners/axhub/commit/77ebdae1d06f10d6b6e5f45184074b3b07a98b54))
 
 ## [1.22.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.22.0...v1.22.1) (2026-08-20)
 
