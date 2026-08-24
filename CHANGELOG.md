@@ -4,6 +4,17 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [Unreleased]
+
+### Fixed
+
+* Codex bundle marker 변환을 idempotent하게 바꿔 `-codex-codex` 경로 때문에 재시작 확인이 영원히 누락되던 문제를 막았어요.
+* `scaffold`의 target 경로를 모두 인용하고 canonical·symlink 경계를 검사해 공백 경로 실패와 shell path injection을 막았어요.
+
+### Changed
+
+* Claude/Codex manifest license를 실제 번들의 Apache-2.0과 맞추고, 9개 skill 및 scaffold CLI v0.30.0+ 요구사항을 모든 metadata·README·검증 목록에 반영했어요.
+
 ## [1.22.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.22.0...v1.22.1) (2026-08-20)
 
 GitHub 인증 코드를 한 번 놓치면 다시 연동할 방법이 없던 문제를 고쳤어요. `github link` 는 저장된 pending device link 를 그대로 이어 줘서, 코드가 화면에서 사라지거나 만료된 뒤 같은 명령을 다시 실행하면 이미 죽은 코드가 그대로 돌아왔어요 — 사용자가 몇 번을 승인해도 연동이 풀리지 않는 막다른 길이었어요. CLI 가 `--fresh` 로 이미 풀어 둔 경로를 플러그인 계약에도 반영해서, 코드 유실·만료 신호가 있거나 같은 코드로 확인이 계속 pending 이면 새 코드를 발급해 다시 보여줘요. 반대로 사용자가 보고 있는 코드가 아직 유효하면 붙이지 않아요 — 그 플래그가 멀쩡한 코드를 무효로 만들거든요.

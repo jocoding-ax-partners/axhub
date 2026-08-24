@@ -1,6 +1,6 @@
 # axhub 플러그인 재시작 확인 (내부 — 훅 트리거, codex)
 
-SessionStart 훅이 `~/.axhub/cache/.plugin-update-restart-codex-codex` marker(7일 TTL)를 감지하면 이 지침을 불러요. auto-update 가 플러그인 새 버전을 받은 뒤 재시작으로 실제 적용됐는지 확인하는 마무리 단계예요. 사용자가 직접 부르는 skill 이 아니에요.
+SessionStart 훅이 `~/.axhub/cache/.plugin-update-restart-codex` marker(7일 TTL)를 감지하면 이 지침을 불러요. auto-update 가 플러그인 새 버전을 받은 뒤 재시작으로 실제 적용됐는지 확인하는 마무리 단계예요. 사용자가 직접 부르는 skill 이 아니에요.
 
 ```
 marker 상태머신:
@@ -24,7 +24,7 @@ marker 상태머신:
    - **installed 버전 ≥ `<EXPECTED>`** → 한 줄 안내 후 marker 삭제:
      > `플러그인 v<확인된 버전> 적용을 확인했어요.`
      ```bash
-     rm -f "$HOME/.axhub/cache/.plugin-update-restart-codex-codex"
+     rm -f "$HOME/.axhub/cache/.plugin-update-restart-codex"
      ```
    - **아직 낮음** (재시작 미반영) → marker 는 유지하고 한 줄만:
      > `플러그인 새 버전이 아직 반영 전이에요. Codex 를 재시작하면 적용돼요.`

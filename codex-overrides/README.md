@@ -6,7 +6,7 @@
 
 코드를 직접 짜는 대신, "내 앱 배포해" 한마디로 앱 lifecycle 전체를 안전하게 굴려요.
 
-**상태**: 9 SKILL (onboarding · bootstrap · scaffold · deploy · import · development · diagnosis · clarity · update) · ax-hub-cli 직접 호출 (코어 v0.20.0+ · 전체 v0.21.3+) · Codex CLI ≥ 0.147.0 (최종 검증: 0.148.0)
+**상태**: 9 SKILL (onboarding · bootstrap · scaffold · deploy · import · development · diagnosis · clarity · update) · ax-hub-cli 직접 호출 (코어 v0.20.0+ · 기존 8스킬 v0.21.3+ · scaffold v0.30.0+) · Codex CLI ≥ 0.147.0 (최종 검증: 0.149.0)
 
 </div>
 
@@ -48,7 +48,7 @@ codex plugin add axhub-codex@axhub
 내 paydrop 앱 배포해
 ```
 
-> axhub CLI 가 없거나 너무 낮은 버전이면 onboarding·bootstrap·deploy 스킬이 멈추고 설치/업그레이드를 안내해요 — 최소 요구 버전은 코어 **v0.20.0**, 전체 스킬은 **v0.21.3** 이에요.
+> axhub CLI 가 없거나 너무 낮은 버전이면 onboarding·bootstrap·deploy·scaffold 스킬이 멈추고 설치/업그레이드를 안내해요 — 최소 요구 버전은 코어 **v0.20.0**, 기존 8스킬 전체는 **v0.21.3**, `scaffold`는 **v0.30.0** 이에요.
 >
 > 예전에 Claude 용 번들(`axhub@axhub`)을 codex 에 설치해 본 적이 있다면 `codex plugin remove axhub@axhub` 로 제거한 뒤 `axhub-codex@axhub` 를 설치해요 — Codex 표면에 맞게 파생된 번들이 이쪽이에요.
 
@@ -76,8 +76,8 @@ codex plugin add axhub-codex@axhub
 
 ## 📋 준비물
 
-- **Codex CLI ≥ 0.147.0** (최종 검증: 0.148.0)
-- **axhub CLI v0.20.0 이상 (전체 스킬은 v0.21.3 이상)** — `bootstrap`·`deploy` 스킬이 시작 시 `plugin-support` 기능(preflight)을 확인해요. 미설치 시 `onboarding` 스킬이 설치를 안내해요.
+- **Codex CLI ≥ 0.147.0** (최종 검증: 0.149.0)
+- **axhub CLI v0.20.0 이상 (기존 8스킬은 v0.21.3 이상, scaffold는 v0.30.0 이상)** — `bootstrap`·`deploy`·`scaffold` 스킬이 시작 시 필요한 CLI 표면을 확인해요. 미설치·미달이면 `onboarding` 스킬이 설치·업그레이드를 안내해요.
 - **axhub SaaS 계정** + scope (회사 admin 이 발급)
 
 headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인증·TLS·토큰 저장은 모두 CLI 가 담당하고, 플러그인은 별도 바이너리를 동봉하지 않아요.

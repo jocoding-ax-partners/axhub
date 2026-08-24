@@ -156,13 +156,13 @@ SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이�
 
 ## 최소 CLI 버전 게이트
 
-- bootstrap·deploy skill 은 **시작 시 `axhub` 존재와 `plugin-support` 기능(preflight) 가드** 로 최소 표면 (흡수 릴리즈 = **0.20.0+**, import·diagnosis 표면은 **0.21.3+** — 8스킬 전체 최소는 v0.21.3) 을 확인해요. CLI 가 없거나 너무 낮으면 skill 은 멈추고 설치/업그레이드를 안내해요 — 절대 우회하지 않아요.
+- bootstrap·deploy skill 은 **시작 시 `axhub` 존재와 `plugin-support` 기능(preflight) 가드** 로 최소 표면을 확인해요. 코어는 **0.20.0+**, 기존 8스킬의 import·diagnosis 포함 표면은 **0.21.3+**, scaffold의 GitHub 저장소 생성 표면은 **0.30.0+**예요. CLI 가 없거나 너무 낮으면 skill 은 멈추고 설치/업그레이드를 안내해요 — 절대 우회하지 않아요.
 - **CLI 경로 해석 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 낡은 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요 (AP-13 은 Windows 전용이라 이 상태를 덮지 못해요). 모든 skill 의 CLI 가드는 `command -v axhub` → 위치 파일 `~/.axhub/bin-path` → canonical `~/.axhub/bin/axhub`(.exe) 순으로 찾고, 디스크에 있으면 재설치·온보딩으로 돌리지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤 같은 세션은 반환된 `bin_path` 절대경로로 이어가요. 세 경로 모두에서 못 찾을 때만 onboarding 을 안내해요.
 
 ## 살아남은 quality gate
 
 - `bun run lint:tone --strict` — 모든 한글 텍스트 해요체 0 err (금지: 합니다 / 입니다 / 드립니다 / 당신).
-- frontmatter validity check — 8 skill 의 SKILL.md frontmatter 유효성.
+- frontmatter validity check — 9 skill 의 SKILL.md frontmatter 유효성.
 - 대표 여정 회귀 — 첫 셋업 → 앱 생성 → 배포 → 상태 확인 경로를 문서·skill 본문·fixture 계약으로 같은 방향에 맞춰요.
 - `bun run plugin:bundle` — `.claude`, `.omx`, `node_modules`, 인덱스 DB 같은 개발 산출물이 빠진 clean local plugin bundle 을 만들어요. 로컬 Claude Code 검증은 repo 루트가 아니라 `dist/axhub-plugin` 을 써요.
 - 실제 ax-hub-cli 구현/schema parity/release 는 이 plugin repo 범위 밖 follow-up 으로 남겨요.

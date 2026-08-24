@@ -263,11 +263,13 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     const autoUpdatePrompt = readFileSync(join(outDir, "hooks", "auto-update-prompt.md"), "utf8");
     expect(autoUpdatePrompt).toContain(".plugin-update-check-codex");
     expect(autoUpdatePrompt).toContain(".plugin-update-restart-codex");
+    expect(autoUpdatePrompt).not.toContain("-codex-codex");
     const restartPrompt = readFileSync(
       join(outDir, "hooks", "plugin-restart-confirm-prompt.md"),
       "utf8",
     );
     expect(restartPrompt).toContain(".plugin-update-restart-codex");
+    expect(restartPrompt).not.toContain("-codex-codex");
     expect(/\.plugin-update-restart(?!-codex)/.test(restartPrompt)).toBe(false);
   });
 

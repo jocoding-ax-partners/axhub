@@ -32,7 +32,7 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
 2. 결과와 무관하게 재확인 주기 캐시를 바로 갱신해요 (24h throttle 의 기준점):
 
    ```bash
-   mkdir -p "$HOME/.axhub/cache" && : > "$HOME/.axhub/cache/.plugin-update-check-codex-codex"
+   mkdir -p "$HOME/.axhub/cache" && : > "$HOME/.axhub/cache/.plugin-update-check-codex"
    ```
 
 3. 출력 JSON 을 읽어요:
@@ -74,7 +74,7 @@ SessionStart 훅이 24시간에 한 번 이 지침을 부르면, axhub CLI 와 �
   3. 성공하면 재시작 확인 marker 를 기록해요 — 다음 세션의 restart-confirm 훅이 실제 적용을 확인하고 닫아요 (절차는 `plugin-restart-confirm-prompt.md` 소유):
 
      ```bash
-     mkdir -p "$HOME/.axhub/cache" && printf '%s' '<plugin.latest>' > "$HOME/.axhub/cache/.plugin-update-restart-codex-codex"
+     mkdir -p "$HOME/.axhub/cache" && printf '%s' '<plugin.latest>' > "$HOME/.axhub/cache/.plugin-update-restart-codex"
      ```
 
      marker 내용은 `받은 버전` 이에요 — restart-confirm 이 설치 항목을 직접 확인해요.

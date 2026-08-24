@@ -44,25 +44,25 @@ AskUserQuestion 하나로 물어요 — 템플릿(`nextjs-axhub`·`vite-react-ax
 
 ### 4. 템플릿 내려받기 (인증 불필요)
 
-빈 폴더(또는 새 폴더) `<target>` 에서:
+빈 폴더(또는 새 폴더) `<target>` 에서 진행해요. 먼저 `<target>` 을 canonical absolute path로 고정하고, 경로 자체가 symlink이거나 비어 있지 않으면 중단해요. clone 뒤에도 template 안 symlink가 하나라도 있으면 복사·치환하지 않고 중단하며, placeholder 편집은 canonical target 내부의 regular file만 대상으로 해요.
 
 ```bash
-git clone --depth 1 --branch main https://github.com/jocoding-ax-partners/axhub-template.git <target>/.axhub-template
+git clone --depth 1 --branch main -- https://github.com/jocoding-ax-partners/axhub-template.git "<target>/.axhub-template"
 ```
 
 ```bash
-cp -R <target>/.axhub-template/<template-id>/. <target>/
+cp -R "<target>/.axhub-template/<template-id>/." "<target>/"
 ```
 
 ```bash
-rm -rf <target>/.axhub-template
+rm -rf -- "<target>/.axhub-template"
 ```
 
-지우는 경로는 정확히 그 임시 폴더 하나뿐이에요.
+지우는 경로는 canonical target 바로 아래의 정확한 임시 폴더 하나뿐이에요.
 
 ### 5. placeholder 치환 (필수)
 
-서버 bootstrap 은 push 전에 치환하지만 이 흐름엔 서버가 없어요. 건너뛰면 앱이 `'{{API_BASE}}'` 라는 글자 그대로 API 를 불러 **로그인·데이터 연동만 조용히 죽어요**(화면은 떠요). `grep -rl '{{' <target>` 로 찾은 파일 전부(README 포함)에서 6개 토큰을 편집 도구로 바꿔요 — `sed -i` 는 macOS/GNU 문법이 갈려서 안 써요.
+서버 bootstrap 은 push 전에 치환하지만 이 흐름엔 서버가 없어요. 건너뛰면 앱이 `'{{API_BASE}}'` 라는 글자 그대로 API 를 불러 **로그인·데이터 연동만 조용히 죽어요**(화면은 떠요). `grep -rl -- '{{' "<target>"` 로 찾은 canonical target 내부 regular file 전부(README 포함)에서 6개 토큰을 편집 도구로 바꿔요 — symlink는 따라가지 않고, `sed -i` 는 macOS/GNU 문법이 갈려서 안 써요.
 
 | 토큰 | 값 |
 |---|---|
@@ -75,7 +75,7 @@ rm -rf <target>/.axhub-template
 ### 6. 커밋
 
 ```bash
-git -C <target> init -q -b main && git -C <target> add -A && git -C <target> commit -q -m "Initial commit from axhub template"
+git -C "<target>" init -q -b main && git -C "<target>" add -A && git -C "<target>" commit -q -m "Initial commit from axhub template"
 ```
 
 ### 7. 저장소 생성 + push (tool 제목 `저장소 만들기`)
@@ -83,7 +83,7 @@ git -C <target> init -q -b main && git -C <target> add -A && git -C <target> com
 미리보기 먼저(기본이 dry-run), 사용자 승인 후 `--execute`. 승인 문구는 다른 스킬과 같은 `진행`/`취소` 로 고정해요 — 미리보기 끝에 `지금 저장소를 만들고 코드를 올릴까요? 진행 또는 취소 로 답해 주세요.` 를 그대로 쓰고 매번 새 문구를 지어내지 않아요. 승인 문구를 굵게 강조하지 않아요 — `** 진행 **` 처럼 별표 안쪽에 공백이 들어가면 별표가 그대로 노출돼요.
 
 ```bash
-axhub github repo create --owner <owner> --name <slug> --push <target> --execute
+axhub github repo create --owner "<owner>" --name "<slug>" --push "<target>" --execute
 ```
 
 기본 private 이에요(공개를 원하면 `--public`). 토큰은 CLI 가 env 로만 다뤄서 채팅·히스토리에 안 남아요. device flow pending 으로 끝나면 URL·코드 두 줄을 보여주고 `--resume-last` 로 이어가요. `name already exists` 는 다른 이름을 물어요 — 기존 저장소에 덮어 push 하지 않아요.
@@ -93,7 +93,7 @@ axhub github repo create --owner <owner> --name <slug> --push <target> --execute
 CLI 는 토큰이 `.git/config` 에 박히지 않게 원격 URL 을 인자로 직접 넘겨 push 해요 — 그래서 push 는 되지만 로컬에 named remote 가 남지 않아요. 이 등록을 빼먹으면 사용자의 **다음 `git push` 가 곧바로 `'origin' does not appear to be a git repository` 로 실패**하고, 저장소 연결 뒤 살아나는 push 자동 배포도 쓸 수 없어요.
 
 ```bash
-git -C <target> remote add origin https://github.com/<owner>/<slug>.git
+git -C "<target>" remote add origin "https://github.com/<owner>/<slug>.git"
 ```
 
 이 폴더는 6단계에서 방금 `git init` 한 상태라 `origin` 이 이미 있을 수 없어요 — 존재 확인 분기를 만들지 않아요. upstream 은 여기서 붙이지 않고, 사용자의 첫 push 때 `git push -u origin main` 으로 붙이면 돼요. 8단계 안내에 그 문장을 포함해요.
