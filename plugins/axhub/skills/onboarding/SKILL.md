@@ -36,13 +36,14 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 
 1. **Single source of truth.** 모든 gap 판정은 `axhub plugin-support onboarding-detect --json` 한 번에서 온 JSON 이 source of truth 예요. `first_gap` 이 처리 순서를 결정해요. gap 마다 preflight 를 다시 돌려 순서를 추측하지 않아요.
 2. **Detect-first loop.** `detect -> first_gap 하나 처리 -> 재감지` 를 반복해요. 한 번에 여러 mutate gap 을 실행하지 않아요. Claude Desktop 의 OAuth device flow 는 CLI 자동 브라우저 오픈/자동 polling 경로를 쓰고, 브라우저 실행 실패·만료·권한 거부 같은 fallback 에서만 `READY_WITH_USER_ACTION` 으로 멈춰요. OS installer GUI, PATH reload, GitHub App install 은 여전히 사용자 action gate 예요.
-3. **Headless safety.** 순수 subprocess/headless/CI 에서는 AskUserQuestion 을 생략하고 safe defaults 로 멈춰요. install/update/auth/bootstrap/deps mutation, git/node system install, node version switch, browser open 을 자동 실행하지 않아요. 최종 상태는 `SAFE_STOP_NONINTERACTIVE` 예요.
-4. **No automatic bootstrap.** 빈 폴더나 manifest 없는 폴더를 발견해도 bootstrap skill 로 위임하거나 앱을 자동 생성하지 않아요. `no_manifest_empty` 는 안내 후 Ready card 로 가고, 다음 말은 `첫 앱 만들어줘` 예요.
-5. **GitHub App visibility.** detect JSON 의 `github.install_url` 이 null 이 아니면 설치 여부·계정 수·`first_gap` 과 무관하게 한 번은 보여줘요. `github.state` 가 `uninstalled`/`empty` 면 설치 확인 전 Step 7 repo/app 연결로 넘어가지 않아요.
-6. **Dependency safety.** 의존성 설치는 manifest 와 lockfile 이 있을 때만, 명시 확인 뒤, 해당 lockfile 의 package manager 로만 실행해요. 모든 install command 는 반드시 `--ignore-scripts` 를 붙여요. lockfile 이 없으면 설치하지 않아요.
-7. **Ready card honesty.** 확인하지 않은 항목은 green check 로 표시하지 않아요. 내부 종료 상태는 `VIBE_READY`, `READY_WITH_USER_ACTION`, `SAFE_STOP_NONINTERACTIVE`, `BLOCKED_UNSUPPORTED` 중 하나로 판정하되, 이 enum 이름과 대괄호 표기는 사용자 문장에 출력하지 말아요.
-8. **Telemetry opt-in.** AI 활용 기록(`axhub axrouter` — 내 Claude Code 프롬프트·응답·툴콜을 팀 워크스페이스로 보내는 수집 기능)은 무엇이 수집되는지 설명하고 물어본 뒤 사용자가 켜기를 고를 때만 켜요 — 동의 없이 켜지 않아요. 거절하면 같은 온보딩에서 다시 묻지 않고, headless 에서는 묻지도 켜지도 않아요. 미지원 워크스페이스·구 CLI 면 조용히 건너뛰어요.
-9. **axhub 맥락 게이트.** 발화에 axhub 언급이 없고 대화에도 axhub 맥락(직전 axhub 작업)이 없으면, detect 를 시작하기 전에 "axhub 셋업을 말하는 거예요?" 를 한 번만 물어요. 아니라는 답이면 이 스킬을 종료하고 다른 axhub skill 로 넘기지 않아요. headless 에서는 묻지 않고 멈춰요.
+3. **GUI 실행 중이면 mutation 금지.** Windows 설치 도우미(`ax-setup-tauri.exe`)가 떠 있는 동안에는 install/update/auth/deps 를 실행하지 않고 read-only 상태 조회만 해요. 같은 mutation 을 두 경로가 동시에 하면 CLI 업데이트가 GUI 가 붙잡고 있는 binary 를 교체해요. 감지되면 GUI 쪽에서 마저 진행하도록 안내하고 `READY_WITH_USER_ACTION` 으로 멈춰요.
+4. **Headless safety.** 순수 subprocess/headless/CI 에서는 AskUserQuestion 을 생략하고 safe defaults 로 멈춰요. install/update/auth/bootstrap/deps mutation, git/node system install, node version switch, browser open 을 자동 실행하지 않아요. 최종 상태는 `SAFE_STOP_NONINTERACTIVE` 예요.
+5. **No automatic bootstrap.** 빈 폴더나 manifest 없는 폴더를 발견해도 bootstrap skill 로 위임하거나 앱을 자동 생성하지 않아요. `no_manifest_empty` 는 안내 후 Ready card 로 가고, 다음 말은 `첫 앱 만들어줘` 예요.
+6. **GitHub App visibility.** detect JSON 의 `github.install_url` 이 null 이 아니면 설치 여부·계정 수·`first_gap` 과 무관하게 한 번은 보여줘요. `github.state` 가 `uninstalled`/`empty` 면 설치 확인 전 Step 7 repo/app 연결로 넘어가지 않아요.
+7. **Dependency safety.** 의존성 설치는 manifest 와 lockfile 이 있을 때만, 명시 확인 뒤, 해당 lockfile 의 package manager 로만 실행해요. 모든 install command 는 반드시 `--ignore-scripts` 를 붙여요. lockfile 이 없으면 설치하지 않아요.
+8. **Ready card honesty.** 확인하지 않은 항목은 green check 로 표시하지 않아요. 내부 종료 상태는 `VIBE_READY`, `READY_WITH_USER_ACTION`, `SAFE_STOP_NONINTERACTIVE`, `BLOCKED_UNSUPPORTED` 중 하나로 판정하되, 이 enum 이름과 대괄호 표기는 사용자 문장에 출력하지 말아요.
+9. **Telemetry opt-in.** AI 활용 기록(`axhub axrouter` — 내 Claude Code 프롬프트·응답·툴콜을 팀 워크스페이스로 보내는 수집 기능)은 무엇이 수집되는지 설명하고 물어본 뒤 사용자가 켜기를 고를 때만 켜요 — 동의 없이 켜지 않아요. 거절하면 같은 온보딩에서 다시 묻지 않고, headless 에서는 묻지도 켜지도 않아요. 미지원 워크스페이스·구 CLI 면 조용히 건너뛰어요.
+10. **axhub 맥락 게이트.** 발화에 axhub 언급이 없고 대화에도 axhub 맥락(직전 axhub 작업)이 없으면, detect 를 시작하기 전에 "axhub 셋업을 말하는 거예요?" 를 한 번만 물어요. 아니라는 답이면 이 스킬을 종료하고 다른 axhub skill 로 넘기지 않아요. headless 에서는 묻지 않고 멈춰요.
 
 ## Progress
 
