@@ -102,7 +102,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 # axhub plugin (diet 체제)
 
-이 repo는 axhub plugin이에요. 현재 공개 surface는 **10 skill** (`onboarding` / `bootstrap` / `scaffold` / `publishing` / `deploy` / `import` / `development` / `diagnosis` / `clarity` / `update`)이에요. `scaffold`는 사용자 소유 GitHub 저장소에서 앱을 시작하고, `publishing`은 단일 `SKILL.md` 또는 여러 skill을 담은 plugin directory를 tenant marketplace에 preview-confirm으로 게시해요. plugin은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli(`axhub` 바이너리)를 호출해요.
+이 repo는 axhub plugin이에요. 현재 공개 surface는 **10 skill** (`onboarding` / `bootstrap` / `scaffold` / `plugins` / `deploy` / `import` / `development` / `diagnosis` / `clarity` / `update`)이에요. `plugins`는 category=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 맡고, 게시자 관리는 App Console, 승인은 Console Review로 연결해요. plugin은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli(`axhub` 바이너리)를 호출해요.
 
 제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인. 훅은 cheap bash guard 로 제한해요: auto-update, onboarding resume, Windows 실행 계약, update-first Code-mode router guard 만 허용돼요.
 
@@ -110,7 +110,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 - 흡수된 helper 표면은 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 — 예: `onboarding-detect`, `preflight`, `deploy-prep`.
 - 공개 검증·진단 표면은 `axhub deploy verify <deployment-id> --app <app>` 와 `axhub deploy diagnose` 예요.
-- bootstrap·deploy skill은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면(코어 v0.20.0+)을 가드해요. 기존 8스킬이 쓰는 표면은 v0.21.3+, scaffold의 GitHub 저장소 생성 표면은 v0.30.0+예요. publishing은 version 추측 대신 `axhub plugin publish --help` 성공을 가드해요. 기능이 없으면 멈추고 `update`로 보내며 우회하지 않아요.
+- bootstrap·deploy skill은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면을 가드해요. 기존 8스킬은 v0.21.3+, scaffold는 v0.30.0+예요. plugins는 version 추측 대신 필요한 `axhub plugin list|download|publish --help` 성공을 가드하고, 기능이 없으면 `update`로 보내며 우회하지 않아요.
 
 ## 변경 검증
 
@@ -128,7 +128,7 @@ bun run plugin:bundle  # clean local plugin bundle 생성
 ## Never Do
 
 - NEVER helper 바이너리 (`crates/axhub-helpers`) 나 hook / NL routing / scaffold 인프라 재추가 — diet 결정 위반.
-- NEVER 명시적 결정 없이 skill을 추가하지 않아요 — `scaffold`와 `publishing`은 사용자 명시 결정으로 추가됐고 현재 10 skill 체제를 유지해요.
+- NEVER 명시적 결정 없이 skill을 추가하지 않아요 — `scaffold`와 `plugins`는 사용자 명시 결정으로 추가됐고 현재 10 skill 체제를 유지해요.
 - NEVER 최소 CLI 기능 게이트를 우회하지 말아요.
 - NEVER Claude Code local plugin 을 repo 루트에서 직접 설치/검증하지 말아요 — `bun run plugin:bundle` 후 `dist/axhub-plugin` clean bundle 을 써요.
 - NEVER deploy 성공 선언(docker/compose deployment-record lane)을 `axhub deploy verify <deployment-id> --app <app>` 1회 실행 없이 — deployment id 와 app scope 필수, latest 재탐색 금지. static 앱(deploy_method=static)은 별도 lane 이라 `deploy verify` 가 404 라서 `active_release_id`(activate 성공)로 선언해요.

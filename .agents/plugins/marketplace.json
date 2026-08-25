@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "axhub-codex",
-      "description": "axhub 앱을 만들고 배포하고 marketplace plugin을 게시해요. 10개 스킬이 ax-hub-cli를 직접 호출해 preview와 명시 승인, verify·gate terminal 기반 성공 선언을 따라요.",
+      "description": "axhub 앱을 운영하고 marketplace plugin을 게시·탐색·다운로드해요. 10개 스킬이 ax-hub-cli를 직접 호출해 preview와 명시 승인, terminal truth를 따라요.",
       "source": "./plugins/axhub-codex",
       "category": "code",
       "homepage": "https://axhub.ai",

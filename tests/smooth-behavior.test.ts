@@ -53,7 +53,7 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("Import priority is strict");
       expect(description).not.toContain("현재 버전을 확인할게요");
     }
-    expect(descriptions.join("\n")).toContain("onboarding/bootstrap/scaffold/publishing/deploy/import/development/diagnosis/clarity/update");
+    expect(descriptions.join("\n")).toContain("onboarding/bootstrap/scaffold/plugins/deploy/import/development/diagnosis/clarity/update");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {

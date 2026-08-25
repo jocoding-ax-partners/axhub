@@ -6,11 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 ## [1.24.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.23.0...v1.24.0) (2026-08-25)
 
-단일 `SKILL.md`와 여러 skill을 담은 plugin directory를 tenant marketplace에 게시하는 `publishing` skill을 열 번째로 추가했어요. Offline preview에서 artifact·위험 inventory를 확인한 뒤 배포 권리와 실행을 한 번의 명시 승인으로 묶고, 전용 scoped PAT·고정 Idempotency-Key·gate terminal 결과로만 완료를 판정해요. Claude·Codex 번들은 같은 계약을 공유하며 Codex 본문 전체가 8,000B 안에 남도록 잠갔어요.
+category=plugin인 일반 App을 Discovery에서 찾고 exact version을 다운로드하며, 단일 `SKILL.md`나 multi-skill directory를 게시하는 `plugins` skill을 열 번째로 추가했어요. 목록은 App의 `plugin.current_servable_version` summary를 보여주고, exact download는 app_id·app_slug·install_name·version·output·size_bytes·sha256만 반환해 version_id를 노출하지 않아요. 목록·다운로드는 OAuth 또는 broad PAT를 쓰고, Publish execute는 `plugins:read` + `plugins:write` scoped PAT·rights·Idempotency-Key를 요구해 gate 통과 뒤 `review_ready`·installable=false로 끝나요. 이후 owner는 App Console, reviewer는 Console Review를 사용하며 Claude·Codex 번들은 같은 계약을 공유해요.
 
 ### Added
 
-* **publishing:** plugin marketplace 게시 skill 추가 188f856
+* **plugins:** app-backed plugin marketplace 게시·목록·exact download skill 추가 188f856
 
 ## [1.23.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.22.1...v1.23.0) (2026-08-24)
 

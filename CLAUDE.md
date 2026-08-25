@@ -104,7 +104,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 > **정책 기준 문서:** 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 개발·운영 규칙은 `docs/policy/dev-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 기준이에요. 이 파일의 요약과 다르면 정책 문서를 따라요. 어긋남은 `tests/policy-parity.test.ts` 가 잡아요.
 
-axhub plugin은 45 skill 체제에서 instruction-only diet를 거쳐 현재 **10 skill** (`onboarding` / `bootstrap` / `scaffold` / `publishing` / `deploy` / `import` / `development` / `diagnosis` / `clarity` / `update`)을 제공해요. `publishing`은 사용자 명시 결정으로 추가됐고 단일 `SKILL.md`와 multi-skill plugin directory를 tenant marketplace에 preview-confirm으로 게시해요. 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli(`axhub` 바이너리)를 직접 호출해요. 제거된 helper·범용 routing corpus·skill-doctor·cosign pipeline은 재도입하지 않고, 훅은 아래 cheap bash guard만 유지해요.
+axhub plugin은 instruction-only diet 뒤 현재 **10 skill** (`onboarding` / `bootstrap` / `scaffold` / `plugins` / `deploy` / `import` / `development` / `diagnosis` / `clarity` / `update`)을 제공해요. `plugins`는 사용자 명시 결정으로 추가됐고 category=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 담당해요. 게시자 관리는 App Console, 승인은 Console Review로 연결하고 판정·실행은 ax-hub-cli(`axhub`)에 둬요.
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
 
@@ -156,7 +156,7 @@ SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이�
 
 ## 최소 CLI 버전 게이트
 
-- bootstrap·deploy skill은 **시작 시 `axhub` 존재와 `plugin-support` 기능(preflight) 가드**로 최소 표면을 확인해요. 코어는 **0.20.0+**, 기존 8스킬의 import·diagnosis 포함 표면은 **0.21.3+**, scaffold의 GitHub 저장소 생성 표면은 **0.30.0+**예요. publishing은 version을 추측하지 않고 `axhub plugin publish --help` 성공으로 기능을 가드해요. CLI가 없거나 기능이 없으면 멈추고 설치/업그레이드를 안내하며 우회하지 않아요.
+- bootstrap·deploy skill은 `plugin-support` 기능(preflight)으로 최소 표면을 확인해요. 기존 8스킬은 **0.21.3+**, scaffold는 **0.30.0+**예요. plugins는 version을 추측하지 않고 필요한 `axhub plugin list|download|publish --help` 성공을 가드해요. CLI가 없거나 기능이 없으면 멈추고 update로 보내며 우회하지 않아요.
 - **CLI 경로 해석 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 낡은 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요 (AP-13 은 Windows 전용이라 이 상태를 덮지 못해요). 모든 skill 의 CLI 가드는 `command -v axhub` → 위치 파일 `~/.axhub/bin-path` → canonical `~/.axhub/bin/axhub`(.exe) 순으로 찾고, 디스크에 있으면 재설치·온보딩으로 돌리지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤 같은 세션은 반환된 `bin_path` 절대경로로 이어가요. 세 경로 모두에서 못 찾을 때만 onboarding 을 안내해요.
 
 ## 살아남은 quality gate
@@ -187,13 +187,13 @@ bun run release:tag
 
 ## Skill routing
 
-이 repo의 공개 plugin surface는 `onboarding` / `bootstrap` / `scaffold` / `publishing` / `deploy` / `import` / `development` / `diagnosis` / `clarity` / `update` 열 스킬이에요.
+이 repo의 공개 plugin surface는 `onboarding` / `bootstrap` / `scaffold` / `plugins` / `deploy` / `import` / `development` / `diagnosis` / `clarity` / `update` 열 스킬이에요.
 
 Key routing rules:
 - 처음 셋업·CLI 설치·로그인·환경 점검 → `onboarding`
 - 빈 디렉토리 새 앱 생성·템플릿·bootstrap saga → `bootstrap`
 - 사용자 소유 GitHub 저장소에서 새 앱 시작 → `scaffold`
-- 단일 skill 또는 multi-skill plugin을 tenant marketplace에 게시 → `publishing` (offline preview→명시 승인→`--execute`→gate terminal 판정)
+- category=plugin App 게시·목록·정확한 version 다운로드 → `plugins` (Discovery/App Console/Console Review canonical surface)
 - 비어 있지 않은 기존 로컬 앱의 첫 axhub 연결·첫 배포 가져오기 → `import`
 - 배포 실행·preview-confirm·verify 기반 성공 선언 → `deploy` (static 앱은 deploy_method auto-detect 로 독립 static lane: dry-run→`--execute`→`active_release_id` 성공 선언)
 - 기존 앱에 실데이터 기반 기능(페이지·화면·대시보드·조회 엔드포인트·CRUD 화면) 코드 생성 → `development` (read 전용 v1)

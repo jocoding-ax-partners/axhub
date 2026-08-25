@@ -1,7 +1,7 @@
 {
   "name": "@jocoding-ax-partners/axhub-plugin-cc",
   "version": "1.24.0",
-  "description": "axhub plugin — Korean-first deploy/manage/publishing. 10 skills (onboarding/bootstrap/scaffold/publishing/deploy/import/development/diagnosis/clarity/update) call ax-hub-cli directly with preview-confirm and terminal verification.",
+  "description": "axhub plugin — Korean-first app operations and plugin marketplace. 10 skills (onboarding/bootstrap/scaffold/plugins/deploy/import/development/diagnosis/clarity/update) call ax-hub-cli directly with preview-confirm and terminal verification.",
   "type": "module",
   "private": true,
   "license": "Apache-2.0",
