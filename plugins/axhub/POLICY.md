@@ -10,11 +10,13 @@ axhub Claude Code plugin 이 사용자의 컴퓨터에서 무엇을 하고 무�
 - 그래서 최신 확인 요청에는 아주 좁은 Code-mode update router guard 가 라우팅 문맥만 추가해요. 이 guard 는 SessionStart fallback 과 UserPromptSubmit match 로 동작하고, 명령을 실행하거나 앱 목록을 조회하지 않으며, `AXHUB_NO_UPDATE_ROUTER=1` 또는 `~/.axhub/config/no-update-router` 파일로 끌 수 있어요.
 - 세션 시작 때 도는 auto-update 훅은 24시간에 1회만 `axhub update check` 명령으로 새 버전이 있는지 확인해요. 실제 인터넷 연결은 훅 스크립트가 아니라 axhub CLI 가 해요.
 - `plugin list`와 exact `plugin download`는 현재 로그인 OAuth 또는 active broad PAT로 App-backed marketplace를 읽어요. Download는 요청한 새 ZIP만 만들고 기존 파일을 덮어쓰거나 받은 code를 실행하지 않아요.
+- `plugin install`은 offline preview 뒤 사용자가 host·exact version을 보고 승인한 `--execute --yes`에서만 동작해요. CLI가 ZIP 경로·symlink·크기·manifest identity를 검증한 뒤 `~/.axhub/plugins/` 아래 private local marketplace를 만들고 Claude Code 또는 Codex의 공식 plugin CLI로 user scope 설치해요. AxHub token·API key는 host process에 전달하지 않아요.
 - `plugin publish`는 `--execute`가 없으면 network·auth가 없는 offline preview예요. Execute는 OAuth나 broad PAT 대신 `plugins:read` + `plugins:write` scoped PAT file·권리 확인·명시 승인을 모두 요구하고, gate 통과 성공도 `review_ready`·installable=false로 끝나요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
 
 ## 로컬에 기록하는 파일 — 내 컴퓨터에 무엇을 남기나요
 - `~/.axhub/cache/.plugin-update-check` — 업데이트를 너무 자주 확인하지 않도록 마지막 확인 시각을 남겨두는 표시 파일이에요.
-- 이 파일은 시각을 표시하는 용도의 작은 파일이고, 개인 정보나 코드 내용은 담지 않아요.
+- `~/.axhub/plugins/<app-id>/<host>/marketplace/` — 사용자가 명시적으로 설치한 exact plugin package와 host별 local marketplace manifest를 보관해요. 같은 App을 다시 설치하면 검증된 새 version으로 교체하고 실패 시 이전 package로 rollback해요.
+- update-check 파일은 시각만 담고, plugin marketplace 경로는 설치한 plugin code·manifest와 AxHub install metadata만 담아요.
 - `~/.claude/settings.json` — AI 활용 기록을 켜기로 선택한 경우에만 axhub CLI 가 이 파일에 수집 설정을 추가해요. 자세한 내용은 아래 "AI 활용 기록" 항목을 봐요.
 
 ## 자동 업데이트와 끄는 법

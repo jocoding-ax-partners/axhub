@@ -101,6 +101,12 @@ describe("app-centric plugins skill contract", () => {
       expect(document).not.toContain("/settings/integrations/plugin");
       expect(document).not.toContain("plugin admin");
     }
+    for (const document of [readme, codexReadme, policy, codexPolicy, agentPolicy]) {
+      expect(document).toContain("plugin install");
+    }
+    expect(policy).toContain("~/.axhub/plugins/");
+    expect(codexPolicy).toContain("~/.axhub/plugins/");
+    expect(agentPolicy).toContain("download 요청과 install 요청을 구분");
     expect(agentPolicy).toContain("AP-21 app-backed plugin marketplace");
   });
 
