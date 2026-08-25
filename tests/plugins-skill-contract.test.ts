@@ -14,8 +14,13 @@ const codexPolicy = readFileSync(join(ROOT, "codex-overrides", "POLICY.md"), "ut
 const agentPolicy = readFileSync(join(ROOT, "docs", "policy", "agent-policy.md"), "utf8");
 
 describe("app-centric plugins skill contract", () => {
-  test("owns list, exact download, and publish while yielding app deployment", () => {
-    for (const trigger of ["플러그인 목록 보여줘", "플러그인 1.2.0 내려 받아", "플러그인으로 올려"]) {
+  test("owns list, exact download, host install, and publish while yielding app deployment", () => {
+    for (const trigger of [
+      "플러그인 목록 보여줘",
+      "플러그인 1.2.0 내려 받아",
+      "Claude에 설치해줘",
+      "플러그인으로 올려",
+    ]) {
       expect(source, trigger).toContain(trigger);
     }
     expect(source).toContain("앱 배포는 deploy");
@@ -48,6 +53,17 @@ describe("app-centric plugins skill contract", () => {
     expect(source).toContain("받은 code를 자동 실행하거나 unzip하지 않고");
   });
 
+  test("installs one exact version through the official Claude or Codex plugin CLI", () => {
+    expect(source).toContain('axhub plugin install \\\n  --app "<slug-or-UUID>" \\\n  --version "<exact-semver>" \\\n  --host "<claude|codex>"');
+    expect(source).toContain("--execute --yes");
+    expect(source).toContain("traversal·symlink·duplicate path·archive bomb");
+    expect(source).toContain("AxHub 관리 local marketplace");
+    expect(source).toContain("host 공식 plugin CLI");
+    expect(source).toContain("status=installed");
+    expect(source).toContain("restart_required=true");
+    expect(source).toContain("download 요청과 install 요청을 구분");
+  });
+
   test("publishes an App-backed release into the existing app review flow", () => {
     expect(source).toContain('axhub plugin publish "<path>" --app "<slug-or-UUID>" --release-version "<new-semver>" --json');
     expect(source).toContain("canonical `--app <slug|UUID>`");
@@ -69,7 +85,7 @@ describe("app-centric plugins skill contract", () => {
   });
 
   test("requires released public CLI commands and AP-17 continuation", () => {
-    for (const command of ["plugin list", "plugin download", "plugin publish"]) {
+    for (const command of ["plugin list", "plugin download", "plugin install", "plugin publish"]) {
       expect(source, command).toContain(`axhub ${command} --help`);
     }
     expect(source).toContain("이후 명령은 반환된 `bin_path`");
@@ -92,7 +108,14 @@ describe("app-centric plugins skill contract", () => {
     expect(claudeBundle).toBe(source);
     expect(Buffer.byteLength(codexBundle, "utf8")).toBeLessThan(8_000);
     expect(codexBundle).not.toContain("네이티브 선택 UI");
-    for (const sentinel of ["plugin list", "plugin download", "review_ready", "submit_plugin_version_for_review", "--idempotency-key"]) {
+    for (const sentinel of [
+      "plugin list",
+      "plugin download",
+      "plugin install",
+      "review_ready",
+      "submit_plugin_version_for_review",
+      "--idempotency-key",
+    ]) {
       expect(codexBundle, sentinel).toContain(sentinel);
     }
   });
