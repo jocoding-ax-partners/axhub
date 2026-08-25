@@ -63,15 +63,15 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-11 비-axhub 맥락 라우팅 가드
 - 규칙: axhub 를 명시하지 않은 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘" 같은 generic 동사)는 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결 manifest·직전 axhub 작업)이 있을 때만 스킬이 진행해요. 맥락이 없으면 실행·안내로 밀어붙이지 않고 axhub 사용 의사를 한 번 묻거나 종료해요 — 다른 axhub 스킬로 넘기지도 않아요. 이미 preview-confirm 승인이 backstop 인 bootstrap 은 frontmatter 게이트로만 적용하고 본문 질문은 생략해요. headless 에서는 묻지 않고 멈춰요.
-- 적용: skills/onboarding/SKILL.md, skills/bootstrap/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/clarity/SKILL.md, skills/update/SKILL.md
+- 적용: skills/onboarding/SKILL.md, skills/bootstrap/SKILL.md, skills/plugins/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/clarity/SKILL.md, skills/update/SKILL.md
 - invariant: "axhub 맥락"
 
 ## AP-12 axhub 진입 확인 (preview 통합 게이트)
-- 규칙: axhub 프로젝트가 확정된 상태에서 배포·생성·가져오기를 실행하기 전에, interactive 에서는 preview 승인 카드 **하나**가 axhub 진입 확인을 겸해요 — 질문 문구에 axhub 대상임을 명시하고, 같은 작업에 진입 AUQ 와 preview 승인을 이중으로 묻지 않아요. bootstrap 이 먼저 쓰던 통합 방식(`지금 만들고 배포까지 진행할까요?`)을 deploy·import 에도 동일하게 적용해요. 파괴적 실행 승인(AP-2·AP-3)과 조건부 커밋 동의는 별개로 유지해요. headless 에서는 AUQ 를 생략해요 — AUQ 0회 계약을 그대로 지켜요. 이 승인은 fallback 사다리를 따라요 — 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless(사용자 확인 채널 자체가 없음)에서는 실행 없이 멈춰요. 어떤 lane 에서도 승인을 조용히 건너뛰지 않아요.
+- 규칙: axhub 프로젝트가 확정된 상태에서 배포·생성·가져오기·plugin App 게시를 실행하기 전에 interactive preview 승인 하나가 axhub 진입 확인을 겸해요. `plugins`의 목록·다운로드는 read-only/no-clobber라 별도 실행 승인을 요구하지 않고, publish만 rights attestation과 execute를 결합해요. headless publish는 preview에서 멈추고 어떤 lane에서도 승인을 조용히 건너뛰지 않아요.
 - host 별 승인 프리미티브: 네이티브 선택 UI 는 Claude 판의 프리미티브이고, Codex 판의 프리미티브는 명시 텍스트 승인 1회예요 — 유효 승인은 preview 를 본 뒤 사용자가 안내된 canonical 승인 문구를 byte-exact 로 입력한 경우만이에요. preview 전에 미리 넣어 둔 문구, 유사 표현, 무응답은 승인이 아니에요. 이 선주입 무효 조항은 실측 A/B(조항 없는 게이트는 선주입 문구를 3/3 승인으로 오인, 조항 있으면 3/3 정지)로 필수 확인됐고, codex 파생 번들의 승인 문안에 기계 잠금돼요.
-- 적용: skills/deploy/SKILL.md, skills/bootstrap/SKILL.md, skills/import/SKILL.md, skills/scaffold/SKILL.md
+- 적용: skills/deploy/SKILL.md, skills/bootstrap/SKILL.md, skills/import/SKILL.md, skills/scaffold/SKILL.md, skills/plugins/SKILL.md
 - invariant: "axhub 진입 확인", "승인을 조용히 건너뛰지 않아요"
-- 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/scaffold/SKILL.md
+- 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/scaffold/SKILL.md, plugins/axhub-codex/skills/plugins/SKILL.md
 - 빈 답변 fail-closed (codex): 네이티브 선택 카드가 켜진 세션에서 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 이 규칙은 훅·정책·skill 본문 세 채널이 겹쳐 소유해요 — 훅은 미신뢰 세션에서 조용히 꺼지고 본문은 8,000B 에서 절단되니 실패 모드가 서로 달라요.
 - invariant(codex): "미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"
 
@@ -99,7 +99,7 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-17 CLI 경로 해석 (설치 여부 오판 금지)
 - 규칙: bare `axhub` 호출 실패(command not found·exit 127)는 미설치 판정 근거가 아니에요. 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 오래된 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요 — AP-13 은 Windows 전용이라 이 상태를 덮지 못해요. 모든 스킬의 CLI 가드는 (1) `command -v axhub`, (2) 위치 파일 `~/.axhub/bin-path`(CLI 0.24.8+ 가 자기 설치 위치를 기록), (3) canonical 경로 `~/.axhub/bin/axhub`(Windows Git Bash 는 `.exe`) 순서로 실행 파일을 찾아요. 디스크에서 찾으면 재설치·온보딩으로 돌려보내지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤, 같은 세션의 남은 명령은 반환된 `bin_path` 절대경로로 이어가요 (이미 열린 셸의 PATH 는 OS 설계상 밖에서 못 고쳐요). 구 CLI 라 `bin_path` 가 없으면 찾은 절대경로를 그대로 써요. 세 경로 모두에서 실행 파일을 못 찾을 때만 미설치로 보고 onboarding 을 안내해요.
-- 적용: skills/bootstrap/SKILL.md, skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/import/SKILL.md, skills/update/SKILL.md, hooks/auto-update-prompt.md, CLAUDE.md
+- 적용: skills/bootstrap/SKILL.md, skills/scaffold/SKILL.md, skills/plugins/SKILL.md, skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/import/SKILL.md, skills/update/SKILL.md, hooks/auto-update-prompt.md, CLAUDE.md
 - invariant: "bare `axhub` 실패는 미설치가 아니에요", "repair-path"
 
 ## AP-18 device flow 코드 선노출
@@ -125,3 +125,8 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 규칙: 스킬·훅·정책 문안의 source of truth 는 claude-first 단일 트리(`skills/`·`hooks/`·루트 문서)예요. codex 표면은 `scripts/build-plugin-bundle.ts` 의 `--host codex` transform(치환 테이블 `CODEX_SUBSTITUTIONS` + `codex-overrides/` 스왑)이 소유하고, 파생 번들(`plugins/axhub-codex/`)은 생성물이라 직접 수정하지 않아요 — 고칠 것은 소스나 override 를 고치고 재생성해요. 소스에 host-종속 문안(제품명·host 명령·host UI 언급)을 새로 추가할 때는 같은 변경에서 치환 테이블 또는 override 를 갱신할 의무가 있어요 — codex 번들 FORBIDDEN 게이트(`tests/codex-bundle.test.ts`)가 누락을 잡아요. wrapper 훅 스크립트의 로직 변경은 CHANGELOG 에 명시해요 — codex 의 훅 신뢰 대상이 command(스크립트 경로)라 wrapper 본문 갱신은 재신뢰 프롬프트 없이 배포되기 때문이에요 (KTD6).
 - 적용: CLAUDE.md, package.json
 - invariant: "plugins/axhub-codex"
+
+## AP-21 app-backed plugin marketplace
+- 규칙: `plugins` 스킬은 category=plugin인 일반 App의 canonical AppID·slug만 사용해 목록·exact download·publish를 처리해요. 목록은 App의 nested `plugin.current_servable_version` summary를 그대로 읽고, exact download 결과에는 version_id를 만들지 않아요. 목록·다운로드는 현재 OAuth 또는 active broad PAT를 허용하지만 publish execute는 `plugins:read` + `plugins:write` scoped PAT file·rights attestation·명시 승인만 허용해요. Gate 통과 성공은 `review_ready`·installable=false이며 owner의 App Console 제출과 Console Review 승인이 끝나기 전 release 완료로 부르지 않아요. Discovery·App Console·Console Review만 canonical UI로 사용해요.
+- 적용: skills/plugins/SKILL.md
+- invariant: "plugin.current_servable_version", "`version_id`를 만들거나 보고하지 않아요", "Publish execute에는 OAuth나 broad PAT 대신", "submit_plugin_version_for_review"

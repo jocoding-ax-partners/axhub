@@ -10,6 +10,8 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 - 최신 확인 요청에는 아주 좁은 update-first 라우팅 가드가 라우팅 문맥만 추가해요. 이 가드는 SessionStart 합본 훅과 UserPromptSubmit match 로 동작하고, 명령을 실행하거나 앱 목록을 조회하지 않으며, `AXHUB_NO_UPDATE_ROUTER=1` 또는 `~/.axhub/config/no-update-router` 파일로 끌 수 있어요.
 - 세션 시작 때 도는 auto-update 훅은 24시간에 1회만 `axhub update check` 명령으로 새 버전이 있는지 확인해요. 실제 인터넷 연결은 훅 스크립트가 아니라 axhub CLI 가 해요.
 - Codex 는 플러그인 훅을 사용자가 신뢰하기 전에는 실행하지 않아요. 신뢰하지 않으면 위 훅 표면(자동 업데이트 확인·라우팅 가드·재시작 확인·Windows 계약 안내)은 조용히 꺼지고, 스킬은 훅 없이도 완결돼요 — 업데이트는 `update` 스킬을 직접 부르면 돼요.
+- `plugin list`와 exact `plugin download`는 현재 로그인 OAuth 또는 active broad PAT로 App-backed marketplace를 읽어요. Download는 요청한 새 ZIP만 만들고 기존 파일을 덮어쓰거나 받은 code를 실행하지 않아요.
+- `plugin publish`는 `--execute`가 없으면 network·auth가 없는 offline preview예요. Execute는 OAuth나 broad PAT 대신 `plugins:read` + `plugins:write` scoped PAT file·권리 확인·명시 승인을 모두 요구하고, gate 통과 성공도 `review_ready`·installable=false로 끝나요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
 
 ## 로컬에 기록하는 파일 — 내 컴퓨터에 무엇을 남기나요
 - `~/.axhub/cache/.plugin-update-check-codex` — 업데이트를 너무 자주 확인하지 않도록 마지막 확인 시각을 남겨두는 표시 파일이에요.

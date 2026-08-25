@@ -11,7 +11,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
-**상태**: 9 SKILL (onboarding · bootstrap · scaffold · deploy · import · development · diagnosis · clarity · update) · ax-hub-cli 직접 호출 (코어 v0.20.0+ · 기존 8스킬 v0.21.3+ · scaffold v0.30.0+)
+**상태**: 10 SKILL (onboarding · bootstrap · scaffold · plugins · deploy · import · development · diagnosis · clarity · update) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download)
 
 </div>
 
@@ -22,7 +22,7 @@
 - [🤔 axhub 가 뭔가요?](#-axhub-가-뭔가요)
 - [⚡ 빠른 시작](#-빠른-시작)
 - [📋 준비물](#-준비물)
-- [🧩 9개 스킬](#-9개-스킬)
+- [🧩 10개 스킬](#-10개-스킬)
 - [✅ 대표 여정과 UX 샘플](#-대표-여정과-ux-샘플)
 - [💬 자연어로 할 수 있는 일](#-자연어로-할-수-있는-일)
 - [🧭 핵심 철학](#-핵심-철학)
@@ -68,7 +68,7 @@ Claude Code 프롬프트에 아래를 순서대로 입력해요.
 내 paydrop 앱 배포해
 ```
 
-> axhub CLI 가 없거나 너무 낮은 버전이면 onboarding·bootstrap·deploy·scaffold 스킬이 멈추고 설치/업그레이드를 안내해요 — 최소 요구 버전은 코어 **v0.20.0**, 기존 8스킬 전체는 **v0.21.3**, `scaffold`는 **v0.30.0** 이에요.
+> axhub CLI가 없거나 필요한 기능이 없으면 관련 스킬이 멈추고 update를 안내해요. `plugins`는 `axhub plugin list|download|publish --help`를 mode별 기능 게이트로 확인해요.
 
 ### OpenAI Codex 에서 쓰기
 
@@ -99,22 +99,23 @@ codex plugin add axhub-codex@axhub
 ## 📋 준비물
 
 - **Claude Code** 최신 버전
-- **axhub CLI v0.20.0 이상 (기존 8스킬은 v0.21.3 이상, scaffold는 v0.30.0 이상)** — `bootstrap`·`deploy`·`scaffold` 스킬이 시작 시 필요한 CLI 표면을 확인해요. 미설치·미달이면 `onboarding` 스킬이 설치·업그레이드를 안내해요.
+- **axhub CLI** — `plugins`는 version 추측 대신 필요한 `axhub plugin list|download|publish --help`가 성공할 때만 진행해요. 기능이 없으면 `update`로 보내고 source build·직접 API로 우회하지 않아요.
 - **axhub SaaS 계정** + scope (회사 admin 이 발급)
 
 headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인증·TLS·토큰 저장은 모두 CLI 가 담당하고, 플러그인은 별도 바이너리를 동봉하지 않아요.
 
 ---
 
-## 🧩 9개 스킬
+## 🧩 10개 스킬
 
-플러그인은 9개 스킬을 담아요. `onboarding`·`bootstrap`·`scaffold`·`deploy` 네 핵심 플로우, 기존 로컬 앱을 가져오는 `import`, 실데이터 기능을 만드는 `development`, 배포 실패를 읽기 전용으로 진단하는 `diagnosis`, CLI·플러그인을 최신화하는 `update`, 그리고 명시적 운영 명령을 라이브로 찾는 `clarity` 브리지예요.
+플러그인은 10개 스킬을 담아요. `plugins`는 category=plugin인 일반 App을 Discovery에서 찾고, App 안의 `plugin.current_servable_version` summary를 읽어 exact version을 받아요. 목록·다운로드는 현재 OAuth 또는 broad PAT를 쓰고, download 결과는 app_id·app_slug·install_name·version·output·size_bytes·sha256만 반환해 version_id를 노출하지 않아요. Publish execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 요구하며, 성공은 `review_ready`·installable=false예요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
 
 | 스킬 | 언제 | 자연어 예시 |
 |------|------|-------------|
 | `onboarding` | 처음 셋업 | "처음인데 셋업해줘", "온보딩", "뭐부터 하면 돼" |
 | `bootstrap` | 새 앱 생성 | "결제 앱 만들어줘", "프로젝트 초기화해줘", "Next.js 앱 만들어줘" |
 | `scaffold` | 사용자 GitHub 저장소에서 새 앱 시작 | "내 계정에 레포 만들어서 시작", "회사 org에 저장소 파고 새 앱 만들어줘" |
+| `plugins` | plugin App 게시·목록·다운로드 | "플러그인 목록 보여줘", "1.2.0 내려 받아", "여러 스킬을 하나로 올려줘" |
 | `deploy` | 현재 브랜치 배포 | "배포해", "ship 해줘", "프로덕션에 올려" |
 | `import` | 기존 로컬 앱 가져오기 | "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app" |
 | `development` | 기존 앱에 실데이터 기능 코딩 | "내 connector 데이터로 대시보드 만들어줘", "유저 목록 페이지 만들어줘", "결제 입력 폼 만들어줘" |
@@ -147,13 +148,14 @@ Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 
 
 ## 💬 자연어로 할 수 있는 일
 
-명령어를 외울 필요 없어요. 평소 말투로 말하면 9개 스킬 중 맞는 곳으로 연결돼요. CLI·플러그인 최신 확인은 `update` 가 먼저 맡고, 로그·환경변수·롤백·테이블·GitHub 재연결처럼 명시된 운영 명령은 `clarity` 브리지가 axhub 명령을 직접 찾아 실행해요.
+명령어를 외울 필요 없어요. plugin App 게시·목록·다운로드는 `plugins`, CLI·플러그인 최신 확인은 `update`, 앱 운영 명령은 `clarity`가 맡아요.
 
 - **배포하고 운영하기** — "내 앱 배포해", "방금 배포 어떻게 됐어?", "빌드 로그 보여줘", "이전 버전으로 되돌려줘"
 - **배포 실패 진단** — "배포 실패 원인 진단해줘", "왜 배포가 죽었어?", "이 앱 배포 실패 진단해줘"
 - **앱 만들기** — "결제 앱 만들어줘", "프로젝트 초기화해줘", "FastAPI 앱 만들어줘"
 - **기존 앱 가져오기** — "기존 앱 올려", "이 폴더 axhub에 올려", "이미 만든 앱 axhub로 연결해"
 - **기능 만들기 (기존 앱)** — "내 connector 데이터로 대시보드 만들어줘", "유저 목록 페이지 만들어줘", "결제 입력 폼 만들어줘"
+- **Plugin 찾기·받기·게시하기** — "플러그인 목록 보여줘", "scaffold 1.23.0 내려 받아", "여러 스킬을 하나의 plugin으로 올려줘"
 - **데이터·환경 다루기** — "환경변수 설정해줘", "테이블 만들어줘", "쓸 수 있는 API 보여줘"
 - **워크스페이스와 팀** — "내 워크스페이스 보여줘", "팀원 초대해줘"
 - **셋업하고 점검하기** — "처음인데 셋업해줘", "axhub 로그인해줘", "axhub 잘 설치됐어?"
@@ -198,7 +200,7 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요.
 [verify]      axhub deploy verify <deployment-id> --app <app>  →  exit 0 일 때만 "배포 성공" 선언
 ```
 
-4개 레이어로 보면: **① 사용자(한국어)** → **② Claude Code (9 skills)** → **③ ax-hub-cli (axhub 바이너리 — plugin-support 그룹 + 공개 표면)** → **④ axhub-api backend**.
+4개 레이어로 보면: **① 사용자(한국어)** → **② Claude Code (10 skills)** → **③ ax-hub-cli (axhub 바이너리 — plugin-support 그룹 + 공개 표면)** → **④ axhub-api backend**.
 
 ---
 

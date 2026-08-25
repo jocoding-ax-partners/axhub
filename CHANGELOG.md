@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.24.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.23.0...v1.24.0) (2026-08-25)
+
+category=plugin인 일반 App을 Discovery에서 찾고 exact version을 다운로드하며, 단일 `SKILL.md`나 multi-skill directory를 게시하는 `plugins` skill을 열 번째로 추가했어요. 목록은 App의 `plugin.current_servable_version` summary를 보여주고, exact download는 app_id·app_slug·install_name·version·output·size_bytes·sha256만 반환해 version_id를 노출하지 않아요. 목록·다운로드는 OAuth 또는 broad PAT를 쓰고, Publish execute는 `plugins:read` + `plugins:write` scoped PAT·rights·Idempotency-Key를 요구해 gate 통과 뒤 `review_ready`·installable=false로 끝나요. 이후 owner는 App Console, reviewer는 Console Review를 사용하며 Claude·Codex 번들은 같은 계약을 공유해요.
+
+### Added
+
+* **plugins:** app-backed plugin marketplace 게시·목록·exact download skill 추가 188f856
+
 ## [1.23.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.22.1...v1.23.0) (2026-08-24)
 
 사용자 계정·조직에 템플릿 저장소를 만드는 `scaffold`를 아홉 번째 스킬로 정식 노출했어요. 이 경로가 요구하는 CLI v0.30.0을 Claude·Codex metadata와 안내에 같은 기준으로 고정했고, 공백·symlink가 섞인 target 경로는 canonical 경계 밖으로 나가지 못하게 막았어요. Codex 번들 marker 변환은 몇 번 생성해도 `-codex`가 중복되지 않으며, 실제 배포물의 license도 Apache-2.0 하나로 맞췄어요.
