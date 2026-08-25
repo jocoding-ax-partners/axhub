@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **add-plugin-publishing-skill** (1631 symbols, 1854 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **axhub** (1688 symbols, 1902 relationships, 10 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -17,7 +17,7 @@ This project is indexed by GitNexus as **add-plugin-publishing-skill** (1631 sym
 
 1. `gitnexus_query({query: "<error or symptom>"})` — find execution flows related to the issue
 2. `gitnexus_context({name: "<suspect function>"})` — see all callers, callees, and process participation
-3. `READ gitnexus://repo/add-plugin-publishing-skill/process/{processName}` — trace the full execution flow step by step
+3. `READ gitnexus://repo/axhub/process/{processName}` — trace the full execution flow step by step
 4. For regressions: `gitnexus_detect_changes({scope: "compare", base_ref: "main"})` — see what your branch changed
 
 ## When Refactoring
@@ -56,10 +56,10 @@ This project is indexed by GitNexus as **add-plugin-publishing-skill** (1631 sym
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/add-plugin-publishing-skill/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/add-plugin-publishing-skill/clusters` | All functional areas |
-| `gitnexus://repo/add-plugin-publishing-skill/processes` | All execution flows |
-| `gitnexus://repo/add-plugin-publishing-skill/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/axhub/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/axhub/clusters` | All functional areas |
+| `gitnexus://repo/axhub/processes` | All execution flows |
+| `gitnexus://repo/axhub/process/{name}` | Step-by-step execution trace |
 
 ## Self-Check Before Finishing
 

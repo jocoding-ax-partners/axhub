@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.24.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.23.0...v1.24.0) (2026-08-25)
+
+단일 `SKILL.md`와 여러 skill을 담은 plugin directory를 tenant marketplace에 게시하는 `publishing` skill을 열 번째로 추가했어요. Offline preview에서 artifact·위험 inventory를 확인한 뒤 배포 권리와 실행을 한 번의 명시 승인으로 묶고, 전용 scoped PAT·고정 Idempotency-Key·gate terminal 결과로만 완료를 판정해요. Claude·Codex 번들은 같은 계약을 공유하며 Codex 본문 전체가 8,000B 안에 남도록 잠갔어요.
+
+### Added
+
+* **publishing:** plugin marketplace 게시 skill 추가 188f856
+
 ## [1.23.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.22.1...v1.23.0) (2026-08-24)
 
 사용자 계정·조직에 템플릿 저장소를 만드는 `scaffold`를 아홉 번째 스킬로 정식 노출했어요. 이 경로가 요구하는 CLI v0.30.0을 Claude·Codex metadata와 안내에 같은 기준으로 고정했고, 공백·symlink가 섞인 target 경로는 canonical 경계 밖으로 나가지 못하게 막았어요. Codex 번들 marker 변환은 몇 번 생성해도 `-codex`가 중복되지 않으며, 실제 배포물의 license도 Apache-2.0 하나로 맞췄어요.
