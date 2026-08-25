@@ -9,8 +9,9 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 // (bootstrap 9.1). 즉 실행 경로에 필요한 지시를 reference 로 빼면 조용히 안 읽힌다
 // — 실제로 GitHub 차단 폴백이 그렇게 죽었다. 실행에 필요한 최소본은 본문에 둔다.
 // 200_000 → 210_000: 9번째 skill(scaffold — 사용자 소유 저장소로 템플릿 시작) 추가.
+// 210_000 → 220_000: 10번째 skill(publishing — tenant marketplace 게시) 추가.
 // per-skill 35_000 게이트는 그대로 유지해요 — 개별 skill 비대화는 계속 막아요.
-export const DEFAULT_MAX_TOTAL_BYTES = 210_000;
+export const DEFAULT_MAX_TOTAL_BYTES = 220_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
 export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {
