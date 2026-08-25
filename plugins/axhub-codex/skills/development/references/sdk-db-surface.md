@@ -19,7 +19,7 @@ development SKILL 의 5단계(SDK/DB 표면 확인)와 11.5단계(배포 준비 
 
 - **창구 = CLI `axhub relay create --app <app> --name <이름> --verify-mode <hmac|key|none>`**. 받는 주소·열쇠·수신 계약은 **이 출력이 authority**. 조회/폐쇄/재발급은 `axhub relay list|delete|rotate-key`.
 - **받는 코드 = 앱의 프레임워크 네이티브 라우트 핸들러** (SDK 아님). MCP 있으면 `get_recipe(recipe_id="inbound-relay-webhook", framework=…)` 로 템플릿을, 없으면 CLI 출력 계약대로 써요.
-- ⚠ **relay 서명 헤더(`X-AxHub-Signature`)는 없어요** — 흔한 오해. 발신자 검증은 창구 `verify_mode` 가, 앱엔 `X-AxHub-Delivery`(멱등 키)로 전달돼요.
+- relay 는 배달마다 **`X-AxHub-Signature`**(`sha256=<hex>`, 바디의 HMAC-SHA256)를 동봉해요 — 앱은 배포 시 주입되는 `AXHUB_RELAY_SIGNING_SECRET` 으로 검증할 수 있어요(spec 159). 발신자 검증은 창구 `verify_mode` 가 하고, 앱엔 `X-AxHub-Delivery`(멱등 키)도 함께 와요.
 
 ## 11.5. 배포 준비 점검 (infer-tables-env 연계) 상세
 
