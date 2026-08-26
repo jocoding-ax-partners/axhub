@@ -130,6 +130,7 @@ describe("app-centric plugins skill contract", () => {
         "<host>/.install.lock",
         ".marketplace-transaction.json",
         ".marketplace-host-mutating.json",
+        ".marketplace-rollback-pending.json",
         ".marketplace-host-installed.json",
         ".marketplace-staging-",
         ".marketplace-backup-",
