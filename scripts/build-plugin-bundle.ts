@@ -92,7 +92,7 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
   ],
   [
     "네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.",
-    "같은 확인을 명시 텍스트 승인 1회로 받아요 — 유효한 승인은 preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구뿐이고, 요청과 함께 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요(그 경우 preview 를 보여주고 새 승인을 기다려요). 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.",
+    "명시 텍스트 승인 1회만 받아요. 승인 채널 없는 headless 에서는 execute하지 않아요 — 승인을 조용히 건너뛰지 않아요.",
   ],
   [
     "`CI` 가 있음, `CLAUDE_NON_INTERACTIVE` 가 있음, `claude -p`·`codex exec` 같은 subprocess/headless 호출임",
@@ -273,13 +273,19 @@ const applyCodexOverrides = (outDir: string): void => {
 };
 
 const applyCodexSubstitutions = (outDir: string): void => {
+  const claudeHostTrigger = "Claude에 설치해줘";
+  const preservedTrigger = "__AXHUB_PRESERVED_CLAUDE_HOST_TRIGGER__";
   for (const file of walkFiles(outDir)) {
     if (!CODEX_TEXT_EXTENSIONS.has(extname(file))) continue;
     const original = readFileSync(file, "utf8");
-    let next = original;
+    const isPluginsSkill = file.endsWith(join("skills", "plugins", "SKILL.md"));
+    let next = isPluginsSkill
+      ? original.replaceAll(claudeHostTrigger, preservedTrigger)
+      : original;
     for (const [from, to] of CODEX_SUBSTITUTIONS) {
       next = next.replaceAll(from, to);
     }
+    if (isPluginsSkill) next = next.replaceAll(preservedTrigger, claudeHostTrigger);
     if (next !== original) writeFileSync(file, next);
   }
 };

@@ -48,7 +48,7 @@ codex plugin add axhub-codex@axhub
 내 paydrop 앱 배포해
 ```
 
-> axhub CLI가 없거나 필요한 기능이 없으면 관련 스킬이 멈추고 update를 안내해요. `plugins`는 `axhub plugin list|download|publish --help`를 mode별 기능 게이트로 확인해요.
+> axhub CLI가 없거나 필요한 기능이 없으면 관련 스킬이 멈추고 update를 안내해요. `plugins`는 `axhub plugin list|download|install|publish --help`를 mode별 기능 게이트로 확인해요.
 >
 > 예전에 Claude 용 번들(`axhub@axhub`)을 codex 에 설치해 본 적이 있다면 `codex plugin remove axhub@axhub` 로 제거한 뒤 `axhub-codex@axhub` 를 설치해요 — Codex 표면에 맞게 파생된 번들이 이쪽이에요.
 
@@ -77,7 +77,7 @@ codex plugin add axhub-codex@axhub
 ## 📋 준비물
 
 - **Codex CLI ≥ 0.147.0** (최종 검증: 0.149.0)
-- **axhub CLI** — `plugins`는 version 추측 대신 필요한 `axhub plugin list|download|publish --help`가 성공할 때만 진행해요. 기능이 없으면 `update`로 보내고 우회하지 않아요.
+- **axhub CLI** — `plugins`는 version 추측 대신 필요한 `axhub plugin list|download|install|publish --help`가 성공할 때만 진행해요. 기능이 없으면 `update`로 보내고 우회하지 않아요.
 - **axhub SaaS 계정** + scope (회사 admin 이 발급)
 
 headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인증·TLS·토큰 저장은 모두 CLI 가 담당하고, 플러그인은 별도 바이너리를 동봉하지 않아요.
@@ -86,14 +86,14 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 ## 🧩 10개 스킬
 
-`plugins`는 category=plugin인 일반 App을 Discovery에서 찾고, App 안의 `plugin.current_servable_version` summary를 읽어 exact version을 받아요. 목록·다운로드는 현재 OAuth 또는 broad PAT를 쓰고, download 결과는 app_id·app_slug·install_name·version·output·size_bytes·sha256만 반환해 version_id를 노출하지 않아요. Publish execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 요구하며, 성공은 `review_ready`·installable=false예요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
+`plugins`는 category=plugin인 일반 App의 exact version을 다운로드하거나 Codex에 설치해요. `download`는 검증된 ZIP만 저장하고, `axhub plugin install --host codex`는 offline preview 뒤 `--execute --yes`일 때만 archive 공격과 manifest identity를 검사하고 AxHub 관리 local marketplace를 Codex 공식 plugin CLI로 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 사용하며 성공은 `review_ready`·installable=false예요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
 
 | 스킬 | 언제 | 자연어 예시 |
 |------|------|-------------|
 | `onboarding` | 처음 셋업 | "처음인데 셋업해줘", "온보딩", "뭐부터 하면 돼" |
 | `bootstrap` | 새 앱 생성 | "결제 앱 만들어줘", "프로젝트 초기화해줘", "Next.js 앱 만들어줘" |
 | `scaffold` | 템플릿 + 내 계정 저장소 | "내 계정에 레포 만들어서 새 앱 시작해줘" |
-| `plugins` | plugin App 게시·목록·다운로드 | "플러그인 목록 보여줘", "1.2.0 내려 받아", "여러 스킬을 하나로 올려줘" |
+| `plugins` | plugin App 게시·목록·다운로드·Codex 설치 | "플러그인 목록 보여줘", "1.2.0 내려 받아", "Codex에 설치해줘", "여러 스킬을 하나로 올려줘" |
 | `deploy` | 현재 브랜치 배포 | "배포해", "ship 해줘", "프로덕션에 올려" |
 | `import` | 기존 로컬 앱 가져오기 | "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app" |
 | `development` | 기존 앱에 실데이터 기능 코딩 | "내 connector 데이터로 대시보드 만들어줘", "유저 목록 페이지 만들어줘" |
