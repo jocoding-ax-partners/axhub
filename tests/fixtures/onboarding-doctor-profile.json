@@ -1,0 +1,66 @@
+{
+  "schema_version": "onboarding-doctor/v1",
+  "profile": "axhub",
+  "outcome": "prerequisite_blocked",
+  "no_gap": false,
+  "first_gap": null,
+  "completed": 5,
+  "total": 7,
+  "code_agent": {
+    "kind": null,
+    "label": null,
+    "version": null,
+    "plugin_installed": false
+  },
+  "cards": [
+    {
+      "id": "cli",
+      "state": "completed",
+      "label": "AXHub CLI",
+      "action_id": null,
+      "safety": "none"
+    },
+    {
+      "id": "tools",
+      "state": "completed",
+      "label": "기본 도구",
+      "action_id": null,
+      "safety": "none"
+    },
+    {
+      "id": "agent",
+      "state": "blocked",
+      "label": "AI 코딩 도구",
+      "action_id": null,
+      "safety": "none"
+    },
+    {
+      "id": "plugin",
+      "state": "blocked",
+      "label": "AXHub plugin",
+      "action_id": null,
+      "safety": "none"
+    },
+    {
+      "id": "auth",
+      "state": "completed",
+      "label": "AXHub 로그인",
+      "action_id": null,
+      "safety": "none"
+    },
+    {
+      "id": "github_link",
+      "state": "completed",
+      "label": "GitHub 연결",
+      "action_id": null,
+      "safety": "none"
+    },
+    {
+      "id": "github_app",
+      "state": "completed",
+      "label": "GitHub App",
+      "action_id": null,
+      "safety": "none"
+    }
+  ]
+}
