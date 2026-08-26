@@ -4,6 +4,18 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.25.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.24.0...v1.25.0) (2026-08-26)
+
+App-backed plugin을 exact version으로 내려받는 데서 끝나지 않고 Claude Code와 Codex의 공식 local marketplace에 안전하게 설치하는 workflow를 추가했어요. 설치 명령은 현재 tenant UUID와 semver를 고정하고 preview에서는 network·keyring·host를 건드리지 않으며, execute는 사용자 승인을 받은 뒤에만 진행해요. 설치 중 중단되면 `.install.lock`과 transaction journal을 기준으로 rollback·replay하고, Codex bundle도 같은 trigger와 정책을 유지해요.
+
+### Added
+
+* Claude Codex plugin host 설치 workflow 추가 ([#472](https://github.com/jocoding-ax-partners/axhub/pull/472)) c7fd401
+
+### Docs
+
+* **skills:** relay 서명 헤더 오정보 수정 — X-AxHub-Signature 는 실재 ([#471](https://github.com/jocoding-ax-partners/axhub/pull/471)) 268ec1b
+
 ## [1.24.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.23.0...v1.24.0) (2026-08-25)
 
 category=plugin인 일반 App을 Discovery에서 찾고 exact version을 다운로드하며, 단일 `SKILL.md`나 multi-skill directory를 게시하는 `plugins` skill을 열 번째로 추가했어요. 목록은 App의 `plugin.current_servable_version` summary를 보여주고, exact download는 app_id·app_slug·install_name·version·output·size_bytes·sha256만 반환해 version_id를 노출하지 않아요. 목록·다운로드는 OAuth 또는 broad PAT를 쓰고, Publish execute는 `plugins:read` + `plugins:write` scoped PAT·rights·Idempotency-Key를 요구해 gate 통과 뒤 `review_ready`·installable=false로 끝나요. 이후 owner는 App Console, reviewer는 Console Review를 사용하며 Claude·Codex 번들은 같은 계약을 공유해요.
