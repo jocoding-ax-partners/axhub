@@ -1,15 +1,17 @@
 ---
 name: plugins
-description: 'axhub plugin marketplace 게시·목록·exact download·host install skill. "플러그인 올려줘", "plugin publish", "플러그인 목록 보여줘", "플러그인 1.2.0 내려 받아", "Codex에 설치해줘", "Codex에 설치해줘", "여러 스킬을 하나의 플러그인으로 올려"에 사용해요. Plugin은 category=plugin인 일반 App이고 App Console·Console Review를 써요. 앱 배포는 deploy, 앱 연결은 import, 업데이트는 update로 양보해요.'
+description: 'axhub plugin marketplace 게시·목록·exact download·host install skill. "플러그인 올려줘", "plugin publish", "플러그인 목록 보여줘", "플러그인 1.2.0 내려 받아", "Claude에 설치해줘", "Codex에 설치해줘", "여러 스킬을 하나의 플러그인으로 올려"에 사용해요. Plugin은 category=plugin인 일반 App이고 App Console·Console Review를 써요. 앱 배포는 deploy, 앱 연결은 import, 업데이트는 update로 양보해요.'
 allows-dependency-execution: false
 model: sonnet
 ---
 > 이 본문이 중간에 끊겨 보이면 설치 경로의 이 SKILL.md 원문을 열어 전체 절차를 확인한 뒤 진행해요.
 
 
-axhub 맥락이 없으면 tenant marketplace 대상인지 확인하고 headless면 멈춰요.
+axhub 맥락 확인과 axhub 진입 확인 후 tenant marketplace 대상인지 판정해요. headless에서도 목록·exact download는 실행해요. install·publish execute만 preview에서 멈춰요.
 
-> **CLI 경로(AP-17):** `command -v` → `~/.axhub/bin-path` → `~/.axhub/bin/axhub`(.exe) 순으로 찾고 `repair-path --json`을 실행해요. 이후 명령은 반환된 `bin_path`를 써요. 없으면 onboarding으로 양보해요. `cargo run`, `target/debug/axhub`, curl·직접 API 우회는 금지예요.
+> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
+
+> **CLI 경로(AP-17):** bare `axhub` 실패는 미설치가 아니에요. `command -v` → `~/.axhub/bin-path` → `~/.axhub/bin/axhub`(.exe) 순으로 찾고 발견한 절대경로로 `plugin-support repair-path --json`을 실행해요. 이후 명령은 반환된 `bin_path`를 쓰고, `bin_path`가 없으면 앞에서 발견한 절대경로로 이어가요. 세 경로 모두 없을 때만 onboarding으로 양보해요. `cargo run`, `target/debug/axhub`, curl·직접 API 우회는 금지예요.
 
 요청 mode의 public help(`axhub plugin list --help`·`axhub plugin download --help`·`axhub plugin install --help`·`axhub plugin publish --help`)가 없으면 update로 양보해요.
 
@@ -51,7 +53,7 @@ axhub plugin install \
   --json
 ```
 
-`mode=preview`, `network=false`, `auth=false`를 보여준 뒤 `검증된 <name> <version>을 <host> user scope에 설치할까요? 진행 또는 취소로 답해 주세요.`로 새 승인을 기다려요. 새 `진행` 뒤에만 `--execute --yes`를 붙여요. CLI가 traversal·symlink·duplicate path·archive bomb·manifest mismatch를 차단하고 AxHub 관리 local marketplace와 host 공식 plugin CLI로 설치해요.
+`mode=preview`, `network=false`, `auth=false`를 보여줘요. 명시 텍스트 승인 1회만 받아요. 승인 채널 없는 headless 에서는 execute하지 않아요 — 승인을 조용히 건너뛰지 않아요. 질문은 `검증된 <name> <version>을 <host> user scope에 설치할까요? 진행 또는 취소로 답해 주세요.`예요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요. 새 `진행` 뒤에만 `--execute --yes`를 붙여요. CLI가 traversal·symlink·duplicate path·archive bomb·manifest mismatch를 차단하고 AxHub 관리 local marketplace와 host 공식 plugin CLI로 설치해요.
 
 `status=installed`, identity·host·scope=user·SHA·marketplace_root·`restart_required=true`를 확인해 host 재시작을 안내해요. host 실패면 성공이라 하지 않아요.
 
@@ -78,9 +80,9 @@ axhub plugin publish "<path>" --app "<slug-or-UUID>" --release-version "<new-sem
 
 Publish execute에는 OAuth나 broad PAT 대신 정확히 `plugins:read` + `plugins:write`인 repo 밖 PAT file만 쓰며 token을 출력하지 않아요. 신규 publish의 `--tenant`는 tenant UUID예요.
 
-목록·다운로드는 read-only예요. Install은 §3, publish는 preview 뒤 각각 새 승인을 받고 승인 채널 없는 headless는 실행하지 않아요.
+목록·다운로드는 read-only예요. Install은 §3, publish는 preview 뒤 각각 새 승인을 받고 승인 채널 없는 headless는 실행하지 않으며 승인을 조용히 건너뛰지 않아요.
 
-Publish 승인 문구는 `이 artifact를 배포할 권리가 있음을 확인하고, 미리보기대로 plugin App version을 업로드해 review-ready 상태로 만들까요? 진행 또는 취소 로 답해 주세요.`예요. 새 `진행`만 승인이고 선주입 문구·유사 표현·무응답은 승인이 아니에요.
+Publish 승인 문구는 `이 artifact를 배포할 권리가 있음을 확인하고, 미리보기대로 plugin App version을 업로드해 review-ready 상태로 만들까요? 진행 또는 취소 로 답해 주세요.`예요. 명시 텍스트 승인 1회만 받아요. 승인 채널 없는 headless 에서는 execute하지 않아요 — 승인을 조용히 건너뛰지 않아요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 새 `진행`만 승인이고 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요.
 
 ## 7. Execute and review truth
 

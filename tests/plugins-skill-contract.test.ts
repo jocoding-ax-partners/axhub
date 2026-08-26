@@ -44,6 +44,12 @@ describe("app-centric plugins skill contract", () => {
     expect(source).toContain("한 번에 전량 fetch하지 않아요");
   });
 
+  test("keeps headless read-only list and exact download available", () => {
+    expect(source).toContain("headless에서도 목록·exact download는 실행해요");
+    expect(source).toContain("install·publish execute만 preview에서 멈춰요");
+    expect(source).not.toContain("tenant marketplace 대상인지 판정하고 headless면 멈춰요");
+  });
+
   test("downloads one immutable semver with verified no-clobber output", () => {
     expect(source).toContain('axhub plugin download \\\n  --app "<slug-or-UUID>" \\\n  --version "<exact-semver>"');
     expect(source).toContain("`latest`·생략 version·mutable name-only download는 금지예요");
@@ -62,6 +68,8 @@ describe("app-centric plugins skill contract", () => {
     expect(source).toContain("status=installed");
     expect(source).toContain("restart_required=true");
     expect(source).toContain("download 요청과 install 요청을 구분");
+    expect(source).toContain("네이티브 선택 UI 가 있으면 그걸로 묻고");
+    expect(source).toContain("없으면 같은 확인을 명시 텍스트 승인 1회로 받고");
   });
 
   test("publishes an App-backed release into the existing app review flow", () => {
@@ -80,8 +88,9 @@ describe("app-centric plugins skill contract", () => {
     expect(source).toContain("plugins:read` + `plugins:write");
     expect(source).toContain('--idempotency-key "<UUID-v4>"');
     expect(source).toContain("artifact를 배포할 권리가 있음을 확인하고");
-    expect(source).toContain("선주입 문구·유사 표현·무응답은 승인이 아니에요");
+    expect(source).toContain("미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요");
     expect(source).toContain("`.env`, `*.pem`, `*.key`, `id_rsa*`");
+    expect(source.match(/네이티브 선택 UI 가 있으면 그걸로 묻고/g)?.length).toBe(2);
   });
 
   test("requires released public CLI commands and AP-17 continuation", () => {
@@ -90,6 +99,11 @@ describe("app-centric plugins skill contract", () => {
     }
     expect(source).toContain("이후 명령은 반환된 `bin_path`");
     expect(source).toContain("`cargo run`, `target/debug/axhub`");
+    expect(source).toContain("`bin_path`가 없으면 앞에서 발견한 절대경로");
+    expect(source).toContain("세 경로 모두 없을 때만 onboarding");
+    expect(source).toContain("plugin-support repair-path --json");
+    expect(source).toContain("Windows 실행 계약 (AP-13)");
+    expect(source).toContain("axhub 명령은 Git Bash 전용으로 실행해요");
   });
 
   test("keeps public and policy sources on the final auth and review contract", () => {
@@ -110,10 +124,28 @@ describe("app-centric plugins skill contract", () => {
     expect(agentPolicy).toContain("AP-21 app-backed plugin marketplace");
   });
 
+  test("discloses every persistent and recoverable install-state path", () => {
+    for (const document of [policy, codexPolicy]) {
+      for (const path of [
+        "<host>/.install.lock",
+        ".marketplace-transaction.json",
+        ".marketplace-host-mutating.json",
+        ".marketplace-host-installed.json",
+        ".marketplace-staging-",
+        ".marketplace-backup-",
+        "AXHUB_PLUGIN_HOME",
+      ]) {
+        expect(document, path).toContain(path);
+      }
+    }
+  });
+
   test("generated bundles stay synced and complete under Codex 8KB", () => {
     expect(claudeBundle).toBe(source);
     expect(Buffer.byteLength(codexBundle, "utf8")).toBeLessThan(8_000);
     expect(codexBundle).not.toContain("네이티브 선택 UI");
+    expect(codexBundle).toContain("Claude에 설치해줘");
+    expect(codexBundle).toContain("Codex에 설치해줘");
     for (const sentinel of [
       "plugin list",
       "plugin download",

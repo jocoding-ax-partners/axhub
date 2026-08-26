@@ -10,15 +10,15 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 - 최신 확인 요청에는 아주 좁은 update-first 라우팅 가드가 라우팅 문맥만 추가해요. 이 가드는 SessionStart 합본 훅과 UserPromptSubmit match 로 동작하고, 명령을 실행하거나 앱 목록을 조회하지 않으며, `AXHUB_NO_UPDATE_ROUTER=1` 또는 `~/.axhub/config/no-update-router` 파일로 끌 수 있어요.
 - 세션 시작 때 도는 auto-update 훅은 24시간에 1회만 `axhub update check` 명령으로 새 버전이 있는지 확인해요. 실제 인터넷 연결은 훅 스크립트가 아니라 axhub CLI 가 해요.
 - Codex 는 플러그인 훅을 사용자가 신뢰하기 전에는 실행하지 않아요. 신뢰하지 않으면 위 훅 표면(자동 업데이트 확인·라우팅 가드·재시작 확인·Windows 계약 안내)은 조용히 꺼지고, 스킬은 훅 없이도 완결돼요 — 업데이트는 `update` 스킬을 직접 부르면 돼요.
-- `plugin list`와 exact `plugin download`는 현재 로그인 OAuth 또는 active broad PAT로 App-backed marketplace를 읽어요. Download는 요청한 새 ZIP만 만들고 기존 파일을 덮어쓰거나 받은 code를 실행하지 않아요.
-- `plugin install --host codex`는 offline preview 뒤 명시한 `--execute --yes`에서만 exact ZIP을 검증·안전 해제하고 `~/.axhub/plugins/` 아래 private local marketplace를 Codex 공식 plugin CLI로 user scope 설치해요. AxHub token·API key는 Codex process에 전달하지 않아요.
-- `plugin publish`는 `--execute`가 없으면 network·auth가 없는 offline preview예요. Execute는 OAuth나 broad PAT 대신 `plugins:read` + `plugins:write` scoped PAT file·권리 확인·명시 승인을 모두 요구하고, gate 통과 성공도 `review_ready`·installable=false로 끝나요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
+- `plugin list`와 exact `plugin download`는 현재 로그인 OAuth 또는 active broad PAT로 App-backed marketplace를 읽어요. 목록은 `plugin.current_servable_version` summary를 페이지 단위로 읽고 download 결과에서 `version_id`를 만들거나 보고하지 않아요. Download는 요청한 새 ZIP만 만들고 기존 파일을 덮어쓰거나 받은 code를 실행하지 않아요.
+- download 요청과 install 요청을 구분해요. `plugin install --host codex`는 offline preview 뒤 명시한 `--execute --yes`에서만 bounded ZIP metadata·실제 압축 해제 크기·identity를 검증하고 App/host lock과 crash recovery를 적용한 뒤 `~/.axhub/plugins/` 아래 private local marketplace를 Codex 공식 plugin CLI로 user scope 설치해요. 모든 `AXHUB_*` 환경은 Codex process에 전달하지 않아요.
+- `plugin publish`는 `--execute`가 없으면 network·auth가 없는 offline preview예요. Publish execute에는 OAuth나 broad PAT 대신 `plugins:read` + `plugins:write` scoped PAT file·권리 확인·명시 승인을 모두 요구하고, gate 통과 성공도 `review_ready`·installable=false와 `submit_plugin_version_for_review` 다음 동작으로 끝나요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
 
 ## 로컬에 기록하는 파일 — 내 컴퓨터에 무엇을 남기나요
 - `~/.axhub/cache/.plugin-update-check-codex` — 업데이트를 너무 자주 확인하지 않도록 마지막 확인 시각을 남겨두는 표시 파일이에요.
-- `~/.axhub/plugins/<app-id>/codex/marketplace/` — 명시적으로 설치한 exact plugin code·manifest와 AxHub install metadata를 보관하며 실패 시 이전 package로 rollback해요.
-- `~/.axhub/cache/.plugin-update-restart-codex` — 플러그인 새 버전을 받은 뒤 재시작으로 적용됐는지 확인하기 위한 표시 파일이에요.
-- update marker들은 시각·버전만 담고, plugin marketplace 경로는 설치한 code·manifest와 install metadata를 담아요. Claude/Codex host별 경로를 나눠 서로 덮어쓰지 않아요.
+- 기본 install root는 `~/.axhub/plugins/`이고, `AXHUB_PLUGIN_HOME`을 설정하면 그 absolute directory로 전체 tree가 이동해요. `<root>/<app-id>/<host>/marketplace/`에는 exact plugin code·manifest·install metadata를 보관하고, `<host>/.install.lock`은 같은 App/host의 동시 설치를 막아요.
+- Crash recovery 동안 `<host>/.marketplace-transaction.json`, `.marketplace-host-mutating.json`, `.marketplace-host-installed.json`과 `.marketplace-staging-*`·`.marketplace-backup-*` directory가 남을 수 있어요. 다음 locked install이 journal에 따라 완료 또는 rollback한 뒤 이 임시 상태를 지워요.
+- `~/.axhub/cache/.plugin-update-restart-codex` — 플러그인 새 버전을 받은 뒤 재시작으로 적용됐는지 확인하기 위한 표시 파일이에요. update marker들은 시각·버전만 담고 Claude/Codex host별로 나눠 서로 덮어쓰지 않아요.
 
 ## 자동 업데이트와 끄는 법
 - axhub CLI 는 새 버전이 확인되면 자동으로 설치될 수 있어요. 플러그인 자체의 업데이트는 설치돼도 Codex 를 껐다 켜야 반영돼요.

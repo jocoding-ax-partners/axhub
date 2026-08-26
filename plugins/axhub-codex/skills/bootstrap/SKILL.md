@@ -161,7 +161,7 @@ axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug baker
 
 위 값들은 확정 literal 로 바꿔요. Dry-run envelope 에서 template, slug, subdomain, repo name, private/public preview 만 한국어로 보여주고 raw JSON/stderr 를 dump 하지 않아요.
 
-미리보기 뒤 확인 필수. 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 뒤 axhub 진입 확인: 정확히 `지금 만들고 배포까지 진행할까요?` 질문과 `진행`/`취소` 선택지를 보여줘요. 질문·선택지·설명은 의역하거나 새로 만들지 않아요. 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요. 같은 확인을 명시 텍스트 승인 1회로 받아요 — 유효한 승인은 preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구뿐이고, 요청과 함께 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요(그 경우 preview 를 보여주고 새 승인을 기다려요). 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
+미리보기 뒤 확인 필수. 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 뒤 axhub 진입 확인: 정확히 `지금 만들고 배포까지 진행할까요?` 질문과 `진행`/`취소` 선택지를 보여줘요. 질문·선택지·설명은 의역하거나 새로 만들지 않아요. 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요. 명시 텍스트 승인 1회만 받아요. 승인 채널 없는 headless 에서는 execute하지 않아요 — 승인을 조용히 건너뛰지 않아요.
 
 ### 9. Execute Bootstrap Saga
 
