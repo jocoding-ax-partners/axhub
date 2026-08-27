@@ -136,7 +136,7 @@ describe("onboarding doctor external JSON contract", () => {
     expect(validateDoctorProfile(profile)).toEqual({ ok: true });
     expect(Object.keys(profile).sort()).toEqual([...TOP_LEVEL_FIELDS].sort());
     expect(profile.code_agent).toEqual({ kind: null, label: null, version: null, plugin_installed: false });
-    expect((profile.cards as JsonObject[]).map((card) => card.id)).toEqual(CARD_IDS);
+    expect((profile.cards as JsonObject[]).map((card) => card.id)).toEqual([...CARD_IDS]);
     for (const card of profile.cards as JsonObject[]) expect(Object.keys(card).sort()).toEqual([...CARD_FIELDS].sort());
     expect((profile.cards as JsonObject[]).find((card) => card.id === "agent")).toEqual({
       id: "agent",
