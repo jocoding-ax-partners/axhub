@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.26.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.25.0...v1.26.0) (2026-08-28)
+
+GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려 배포하는 `up` 스킬을 추가했어요. 커밋 상태를 게이트로 쓰지 않아서 커밋하지 않은 변경이 있어도 그대로 올라가고, 무엇이 올라가는지(파일 수·크기·소스 버전)를 먼저 보여준 뒤 승인을 받아야 실행돼요. `deploy`·`bootstrap` 안에 묻혀 있던 업로드 경로는 이 스킬로 넘기고, 성공 선언 규칙(AP-1)은 배포 기록 lane 과 정적 앱 lane 으로 나눠 각 스킬이 자기 lane 것만 지키게 했어요.
+
+### Added
+
+* GitHub 없이 로컬 폴더를 배포하는 up 스킬 추가 ([#475](https://github.com/jocoding-ax-partners/axhub/issues/475)) ([5969f3e](https://github.com/jocoding-ax-partners/axhub/commit/5969f3e8e4b6cb50dd19c5e9b3a658896596849b))
+
 ## [1.25.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.24.0...v1.25.0) (2026-08-26)
 
 App-backed plugin을 exact version으로 내려받는 데서 끝나지 않고 Claude Code와 Codex의 공식 local marketplace에 안전하게 설치하는 workflow를 추가했어요. 설치 명령은 현재 tenant UUID와 semver를 고정하고 preview에서는 network·keyring·host를 건드리지 않으며, execute는 사용자 승인을 받은 뒤에만 진행해요. 설치 중 중단되면 `.install.lock`과 transaction journal을 기준으로 rollback·replay하고, Codex bundle도 같은 trigger와 정책을 유지해요.
