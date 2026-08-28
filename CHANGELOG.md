@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 ## [1.26.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.25.0...v1.26.0) (2026-08-28)
 
+GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려 배포하는 `up` 스킬을 추가했어요. 커밋 상태를 게이트로 쓰지 않아서 커밋하지 않은 변경이 있어도 그대로 올라가고, 무엇이 올라가는지(파일 수·크기·소스 버전)를 먼저 보여준 뒤 승인을 받아야 실행돼요. `deploy`·`bootstrap` 안에 묻혀 있던 업로드 경로는 이 스킬로 넘기고, 성공 선언 규칙(AP-1)은 배포 기록 lane 과 정적 앱 lane 으로 나눠 각 스킬이 자기 lane 것만 지키게 했어요.
 
 ### Added
 
