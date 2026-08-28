@@ -1,6 +1,6 @@
 # connector_query 안전
 
-development 가 외부 connector 데이터를 읽을 때(MCP `connector_query` 또는 CLI fallback) 지키는 안전 규칙이에요. connector 는 읽기 전용 추상화지만, 생성·실행하는 쿼리를 좁게 유지해요.
+development 가 외부 connector 데이터를 읽을 때(MCP `connector_query` 또는 CLI fallback) 지키는 안전 규칙이에요. development 가 쓰는 조회 도구는 읽기 전용이지만, connector 자체가 늘 읽기 전용인 건 아니에요 — 파일 업로드처럼 쓰기 액션을 선언한 connector 도 있어요. 그래서 생성·실행하는 쿼리를 좁게 유지해요.
 
 ## 규칙
 
