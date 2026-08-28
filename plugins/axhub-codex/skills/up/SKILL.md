@@ -101,7 +101,8 @@ axhub plugin-support deploy-prep --intent deploy --json
 |---|---|
 | `auth_ok` false | `axhub 로그인이 필요해요.` 한 줄 뒤 auth 복구로 안내하고 멈춰요. |
 | `cli_too_old` true | `update` 로 보내고 멈춰요. |
-| `bootstrap_plan` 존재, 또는 `resolve.app_id` 없음 | 앱이 아직 없다는 뜻이에요. 비어 있지 않은 폴더는 `import`, 빈 폴더는 `bootstrap` 으로 양보해요. |
+| `resolve.error` 가 `app_ambiguous` | 앱 이름이 여러 개에 걸린다는 뜻이에요 — 앱이 없는 게 아니에요. 후보를 보여주고 어느 앱인지 한 번 물은 뒤 `--app` 에 그 값을 넣어 1단계를 다시 해요. `import`·`bootstrap` 으로 보내지 않아요. |
+| `bootstrap_plan` 존재, 또는 `resolve.app_id` 없음 (모호함이 아닐 때) | 앱이 아직 없다는 뜻이에요. 비어 있지 않은 폴더는 `import`, 빈 폴더는 `bootstrap` 으로 양보해요. |
 | `in_flight_deploy` 존재 | `이미 진행 중인 배포가 있어요. 그 배포를 계속 확인할게요.` 한 줄 뒤 `in_flight_deploy.id` 를 `DEPLOY_ID` 로 바인딩하고 5단계로 바로 가요. 새 배포를 시작하지 않아요 — `deploy-prep` 은 이 상태를 exit code 로 알리지 않으니 여기서 직접 막아요. |
 | exit 64 (`validation.quality_gate_failed`) | 품질 확인에서 막힌 항목이 있다는 뜻이에요. 실행하지 않고 사유를 한국어로 알린 뒤 멈춰요. |
 | 현재 폴더에 `axhub.yaml`·`apphub.yaml` 이 둘 다 없음 | `이 폴더에 axhub 매니페스트가 없어서 어떤 앱의 소스인지 확인할 수 없어요.` 로 멈추고 `import` 로 양보해요. `axhub up` 은 패킹 전에 매니페스트를 보지 않으니 이 확인은 여기서 해요. |
@@ -142,8 +143,9 @@ interactive 에서는 preview 카드 하나가 **axhub 진입 확인**을 겸해
 
 안내 문구는 상황에 따라 갈라요:
 
-- 저장소 없음: `이 앱은 저장소 없이 소스를 올려서 배포해요.`
-- GitHub 차단: `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요. GitHub 는 이후 다시 연결할 수 있어요.`
+- 저장소 없음(`github_connected` false): `이 앱은 저장소 없이 소스를 올려서 배포해요.`
+- GitHub 차단(연결은 있는데 push·containment 가 GitHub 때문에 막힘): `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요. GitHub 는 이후 다시 연결할 수 있어요.`
+- 사용자가 명시(저장소는 정상): `저장소 대신 지금 폴더의 소스를 그대로 올려서 배포할게요. 연결된 저장소는 그대로 두고, 다음 배포는 평소대로 push 로 하면 돼요.` 일어나지 않은 GitHub 장애를 사실처럼 말하지 않아요.
 
 ## 4단계 — 실행
 
@@ -200,6 +202,7 @@ verify exit:
 결과가 나온 **뒤에** 상황에 맞는 것만 알려줘요.
 
 - 저장소 없음: 이 앱은 폴더를 올려서 배포하니 push 자동 배포가 없고, 나중에 `axhub apps git connect` 로 저장소를 붙여도 앱을 다시 만들 필요는 없어요.
+- 사용자가 명시(저장소 정상): 이번 배포만 폴더에서 올라갔고 저장소와 push 자동 배포는 그대로예요.
 - GitHub 차단: 이번 배포만 저장소에서 오지 않았으니 push 자동 배포와 버전 이력이 이 건을 덮지 않고, GitHub 이 풀리면 다음 배포는 저장소 경로로 돌아가요.
 
 ## 금지
