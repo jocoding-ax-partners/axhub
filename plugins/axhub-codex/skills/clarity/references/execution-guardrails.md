@@ -12,6 +12,7 @@ clarity SKILL 이 로드하는 내부 reference 예요. 탐색·실행 단계에
 - ❌ 1단계 탐색에서 못 찾자 포기 — 두 단계 깊이까지 탐색한 뒤에만 "기능 없음" 을 선언해요.
 - ❌ 탐색 출력(schema/help 본문)·raw stdout/stderr·secret·내부 id 를 chat 에 echo — 사용자에겐 한국어 요약만.
 - ❌ `connectors list` / `--enabled-only` tenant-admin 전체 목록을 "내가 조회 가능한 커넥터" 로 표현 — 본인 접근 범위는 `connectors mine` 만 authority.
+- ❌ 커넥터 목록에 있다는 이유로 "올릴 수 있다/쓸 수 있다" 로 답하기 — 읽기와 쓰기는 다른 축이에요. 쓰기 여부는 `authz grants mine` 의 `scope_levels`(대상별 `read` | `write`) 로만 판단해요.
 - ❌ 못 찾은 기능을 비슷한 명령으로 조용히 대체 실행 — 정직하게 부재를 알리고 가장 가까운 명령을 "제안"만 해요 (무단 실행 금지).
 - ❌ `plugin-support` hidden 표면을 탐색·실행 (공개 표면만 원칙 위반).
 - ❌ deploy/bootstrap/import/onboarding/development/diagnosis/update 담당 의도를 가로채기 (경계표 위반 — 해당 의도는 양보). 특히 기존 앱 첫 연결은 import, 앱 코드(페이지·화면·대시보드·엔드포인트) 생성은 development, 배포 실패 원인 진단은 diagnosis 양보 — clarity 는 axhub 명령 실행만 해요.
