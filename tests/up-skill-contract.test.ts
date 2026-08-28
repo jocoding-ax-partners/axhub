@@ -53,6 +53,24 @@ describe("up skill contract", () => {
     expect(body).toContain("--wait --wait-interval 20s --wait-timeout 10m");
   });
 
+  // Silent-pass 차단 — 2단계 명령의 --dry-run 을 --execute 로 뒤집으면 승인 전
+  // 실배포가 되는데, 문자열 존재 assert 만으로는 그 변조가 통과해요.
+  test("미리보기는 --dry-run, 실행은 --execute 로 분리돼 있어요", () => {
+    const preview = "axhub up --app \"$APP_ID\" --path . --dry-run --json";
+    const execute = "axhub up --app \"$APP_ID\" --path . --execute";
+    expect(body).toContain(preview);
+    expect(body).toContain(execute);
+    // 승인 절이 실행 명령보다 앞에 와야 해요.
+    const approvalAt = body.indexOf("## 3단계 — 승인");
+    const executeAt = body.indexOf(execute);
+    expect(approvalAt).toBeGreaterThan(-1);
+    expect(executeAt).toBeGreaterThan(approvalAt);
+    // 승인 절 앞에는 --execute 를 쓰는 명령이 없어야 해요. 산문에서 --execute 를
+    // 언급하는 것(재패킹 경고)은 허용하고, 실행 명령만 금지해요.
+    const beforeApproval = body.slice(0, approvalAt);
+    expect(beforeApproval.match(/axhub up [^\n]*--execute/)).toBeNull();
+  });
+
   // dry-run 패킹 실패는 preview 를 만들지 않고 멈춰요.
   test("dry-run 패킹 실패는 preview 없이 멈춰요", () => {
     expect(body).toContain("dry-run 이 실패하면 preview 카드를 만들지 않아요");
