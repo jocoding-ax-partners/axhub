@@ -71,7 +71,7 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - host 별 승인 프리미티브: 네이티브 선택 UI 는 Claude 판의 프리미티브이고, Codex 판의 프리미티브는 명시 텍스트 승인 1회예요 — 유효 승인은 preview 를 본 뒤 사용자가 안내된 canonical 승인 문구를 byte-exact 로 입력한 경우만이에요. preview 전에 미리 넣어 둔 문구, 유사 표현, 무응답은 승인이 아니에요. 이 선주입 무효 조항은 실측 A/B(조항 없는 게이트는 선주입 문구를 3/3 승인으로 오인, 조항 있으면 3/3 정지)로 필수 확인됐고, codex 파생 번들의 승인 문안에 기계 잠금돼요.
 - 적용: skills/deploy/SKILL.md, skills/bootstrap/SKILL.md, skills/import/SKILL.md, skills/scaffold/SKILL.md, skills/plugins/SKILL.md, skills/up/SKILL.md
 - invariant: "axhub 진입 확인", "승인을 조용히 건너뛰지 않아요"
-- 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/scaffold/SKILL.md, plugins/axhub-codex/skills/plugins/SKILL.md
+- 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/scaffold/SKILL.md, plugins/axhub-codex/skills/plugins/SKILL.md, plugins/axhub-codex/skills/up/SKILL.md
 - 빈 답변 fail-closed (codex): 네이티브 선택 카드가 켜진 세션에서 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 이 규칙은 훅·정책·skill 본문 세 채널이 겹쳐 소유해요 — 훅은 미신뢰 세션에서 조용히 꺼지고 본문은 8,000B 에서 절단되니 실패 모드가 서로 달라요.
 - invariant(codex): "미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"
 
