@@ -1,6 +1,8 @@
 # Init Errors And Follow-Ups Reference
 
 Load this reference for long error routing, final result wording, and carry-over-safe next actions.
+Branch before provider errors: resolved apps use `axhub apps get <app> --json`, fresh apps use `axhub apps git-backend --tenant <tenant> --json`. When `git_backend.backend=selfhosted`, ignore GitHub/device/installation recovery rows and never surface their copy; use only backend-neutral app/deploy failures.
+
 
 ## Result Card
 

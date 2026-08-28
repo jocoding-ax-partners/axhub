@@ -156,7 +156,7 @@ SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이�
 
 ## 최소 CLI 버전 게이트
 
-- bootstrap·deploy skill은 `plugin-support` 기능(preflight)으로 최소 표면을 확인해요. 기존 8스킬은 **0.21.3+**, scaffold는 **0.30.0+**예요. plugins는 version을 추측하지 않고 필요한 `axhub plugin list|download|publish --help` 성공을 가드해요. CLI가 없거나 기능이 없으면 멈추고 update로 보내며 우회하지 않아요.
+- bootstrap·deploy skill은 `plugin-support` 기능(preflight)으로 최소 표면 **0.21.3+**를 확인하고, scaffold는 **0.30.0+**를 확인해요. plugins는 version을 추측하지 않고 필요한 `axhub plugin list|download|publish --help` 성공을 가드해요. CLI가 없거나 기능이 없으면 멈추고 update로 보내며 우회하지 않아요.
 - **CLI 경로 해석 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 낡은 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요 (AP-13 은 Windows 전용이라 이 상태를 덮지 못해요). 모든 skill 의 CLI 가드는 `command -v axhub` → 위치 파일 `~/.axhub/bin-path` → canonical `~/.axhub/bin/axhub`(.exe) 순으로 찾고, 디스크에 있으면 재설치·온보딩으로 돌리지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤 같은 세션은 반환된 `bin_path` 절대경로로 이어가요. 세 경로 모두에서 못 찾을 때만 onboarding 을 안내해요.
 
 ## 살아남은 quality gate
@@ -202,6 +202,8 @@ Key routing rules:
 - axhub CLI 운영 명령(테이블/컬럼 생성·환경변수·로그·connector 연결·데이터 조회·롤백·상태)·모호한 axhub 발화 → `clarity` (axhub 명령 실행만, 버전 업데이트는 update·앱 코드 생성은 development·기존 앱 가져오기는 import·배포 실패 원인 진단은 diagnosis 양보)
 
 **모든 트리거 전제 (AP-11):** 위 규칙은 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요. 맥락 없는 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘")는 실행·안내로 밀어붙이지 않고 한 번 묻거나 종료하며 다른 axhub 스킬로 넘기지 않아요. bootstrap 은 preview-confirm 승인이 backstop 이라 frontmatter 게이트로만 적용해요.
+
+**앱 git backend 선판정 (AP-22):** resume/existing은 public `axhub apps get <app> --json`, fresh bootstrap/onboarding은 read-only `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 판정 입력으로 써요. selfhosted는 device flow·GitHub App 설치 대사를 노출하지 않고, non-static deploy는 `axhub repo clone` 뒤 일반 `git push`의 webhook deployment를 기다려요. static은 기존 release lane, GitHub·`legacy_github`는 기존 gate/upload/create 경로를 유지하며 C1/Gitea API를 직접 호출하지 않아요.
 
 **codex 질문 프로토콜·fail-closed (AP-12 codex 판):** codex 판은 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형 + 추천안 `(추천)` + 답→행동 매핑을 쓰고, 질문한 턴은 도구 호출 없이 끝내요. 네이티브 선택 카드(`[features] default_mode_request_user_input`)가 켜진 세션에서 **빈 답변은 미승인**이고 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 이 규칙은 세 채널이 겹쳐 소유해요 — always-on 합본 훅(kill switch `AXHUB_NO_QUESTION_PROTOCOL` / `~/.axhub/config/no-question-protocol`), AP-12 정책, 그리고 실행 6스킬 본문의 첫 8,000B. 훅은 미신뢰 세션에서 조용히 꺼지고 본문은 8,000B에서 절단되니 실패 모드가 서로 달라요.
 

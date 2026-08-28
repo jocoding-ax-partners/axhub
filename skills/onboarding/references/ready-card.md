@@ -45,7 +45,7 @@ axhub 온보딩 완료예요. [VIBE_READY]
   ✓ 로그인 <masked-email>
   ✓ git v<GIT_VERSION>
   ✓ node v<NODE_VERSION> (pm: <bun|pnpm|npm|yarn>)
-  ✓ GitHub App 설치됨 — 다른 org/계정 추가: <install_url>
+  ✓ <저장소 준비 상태 — backend별 한 줄만>
   ✓ 앱 <app-slug> 연결됨
   ✓ 첫 배포 live: <deployment-url>
   ✓ 점검 통과
@@ -55,13 +55,13 @@ axhub 온보딩 완료예요. [VIBE_READY]
 다음에 말할 수 있는 것: "첫 앱 만들어줘", "배포해", "로그 봐줘", "환경변수 추가해줘", "테이블 추천해줘"
 ```
 
-The GitHub App line should include `github.install_url` whenever detect provided it, even if the app is already installed. If the URL is null because auth failed, leave a login recovery phrase instead.
+Choose exactly one repository line after `axhub apps get <app> --json` or fresh `axhub apps git-backend --tenant <tenant> --json`. For selfhosted, render only `✓ axhub 저장소 준비됨` and never include provider login/install copy or `github.install_url`. For GitHub, preserve the existing App line and include the install URL when detect provided it.
 
 ## Degraded Cards
 
 아래 상태 이름은 내부 분기용이에요. 사용자에게는 enum 이름이나 대괄호 표식을 출력하지 말고, 현재 상태·남은 행동·다시 말할 문장만 자연스러운 한국어로 보여줘요.
 
-`READY_WITH_USER_ACTION`: external approval or local user action remains. Examples: browser device approval, GitHub App install, OS installer GUI, PATH reload, native build/manual dependency repair. Include exactly what to do and what to say next.
+`READY_WITH_USER_ACTION`: an applicable external approval or local user action remains. Provider login/App install examples are GitHub-only; selfhosted cards never list them. Include exactly what to do and what to say next.
 
 `SAFE_STOP_NONINTERACTIVE`: CI/headless/subprocess mode avoided mutation. Include manual commands or natural next phrase; do not suggest that the agent already completed setup.
 

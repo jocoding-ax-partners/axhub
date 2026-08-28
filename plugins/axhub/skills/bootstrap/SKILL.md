@@ -12,6 +12,8 @@ model: sonnet
 첫 visible 응답은 반드시 한국어 진행 문장. 스킬 선택 이유, route label, `axhub:bootstrap 스킬 호출한다` 금지. Claude Desktop 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요. 금지문: `Using axhub:bootstrap skill`, `matches new app + deploy request`, `axhub의 새 앱 생성 스킬`, `스킬을 사용하겠습니다`.
 
 새 앱 생성과 배포 목표는 받은 상태예요. execute 승인은 별도라서 아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행하고, `진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요.
+저장소 인증보다 backend 판정이 먼저예요. resume/existing app은 `axhub apps get <app> --json`, fresh app은 `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 써요. `git_backend.backend=selfhosted`면 device flow·GitHub App 설치·owner 질문을 모두 건너뛰고 owner flag 없이 bootstrap해요. GitHub·`legacy_github`만 기존 gate를 유지해요.
+
 
 중단 뒤 이어질 때도 CLI 명령이 하나도 실행되지 않았다면 fresh path 를 그대로 시작해요. 다시 시작 문구를 요구하지 않아요.
 
@@ -23,11 +25,11 @@ model: sonnet
 
 사용자 발화에 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`, `Express`, `Fastify`, `Nest`, `FastAPI`, `Flask`, `Django`, `Rails`, `Go 서버`, `Dockerfile` 처럼 기존 소스가 있음을 뜻하는 단서와 axhub 배포 의도가 함께 있으면 bootstrap 을 시작하지 않아요. CLI guard, preflight, 템플릿 목록 확인을 실행하기 전에 즉시 import 경계로 양보하고, chat 본문에서 `/axhub:bootstrap` 또는 bootstrap 선택 이유를 설명하지 않아요.
 
-creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps create`/`deploy create` 우회 금지. **예외는 12단계 하나** (GitHub 차단 시 로컬 소스 배포). 저장소를 **사용자 계정/조직 소유**로 원하는 요청은 이 스킬 소관이 아니에요 — scaffold 로 양보해요. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. install-link 를 보여줬으면 재안내는 생략, 0-install gate 는 항상 실행해요.
+creation path는 `axhub apps bootstrap` saga 하나뿐이에요. GitHub 차단 시 로컬 소스 배포만 예외예요. 사용자 계정/조직 소유 저장소 요청은 scaffold로 양보해요. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. GitHub branch에서 install-link 를 보여줬으면 재안내는 생략하지만 0-install gate 는 항상 실행해요.
 
 ## Reference Loading Policy
 
-정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, GitHub gate, dry-run preview, execute/status/verify/result 까지 진행해요. plugin cache 파일 읽기를 복구 조건으로 삼지 않아요.
+정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, backend gate, backend별 preview와 execute/status/verify/result 까지 진행해요. plugin cache 파일 읽기를 복구 조건으로 삼지 않아요.
 
 ## Visibility
 
@@ -52,11 +54,11 @@ creation path 는 `axhub apps bootstrap` saga 하나뿐 — `axhub init`/`apps c
 3. Template registry: `axhub apps templates list --tenant <tenant-slug> --json`.
 4. Template picker: backend registry 에 있는 값만 고르고, native 질문 card 로 먼저 물어요.
 5. App name: 앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요.
-6. GitHub App gate: `axhub github accounts list --json`.
+6. Git backend 판정 뒤 GitHub App gate: 기존/resume 앱은 `axhub apps get <app> --json`, fresh 앱은 `axhub apps git-backend --tenant <tenant> --json`으로 먼저 판정해요. selfhosted는 GitHub App gate를 건너뛰고, GitHub만 `axhub github accounts list --json`로 기존 경로를 이어가요.
 7. Availability check: `axhub apps check-availability --tenant <tenant> --slug <app-slug> --subdomain <app-slug> --json`.
-8. Dry-run preview: `axhub apps bootstrap ... --dry-run --json`.
+8. Dry-run preview: backend에 맞는 `axhub apps bootstrap ... --dry-run --json`.
 9. Preview confirmation: 사용자가 `진행`을 고른 뒤에만 execute 해요.
-10. Execute saga: `axhub --no-input apps bootstrap ... --execute --idempotency-key <literal>`.
+10. Execute saga: backend에 맞는 `axhub --no-input apps bootstrap ... --execute --idempotency-key <literal>`.
 11. Clone/current dir, result.
 
 Slash command, skill name, route label 은 사용자에게 말하지 않아요.
@@ -69,6 +71,8 @@ Tool 제목은 `CLI 준비 확인`을 써요.
 axhub plugin-support preflight --json
 ```
 
+preflight의 `capabilities.self_hosted_git.apps_git_backend`와 `capabilities.self_hosted_git.app_git_backend`가 모두 `true`여야 backend 판정을 시작해요. 누락·malformed/false면 GitHub 질문과 mutation 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
+
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
 
 command not found 여도 곧바로 onboarding 으로 돌리지 않아요 — 낡은 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS 에서도 흔해요. 같은 제목으로 `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` 을 한 번 더 실행하고, 나온 `bin_path`(없으면 그 canonical 경로)로 preflight 부터 다시 실행해요. 그 명령까지 파일 없음이면 onboarding 안내 후 stop. `plugin-support` unknown/빈 출력이면 update 안내 후 stop, 정상 JSON 이면 계속해요. raw stderr 는 보여주지 않아요. shell 에서 CLI 버전 숫자를 직접 파싱·비교하지 않아요.
@@ -80,6 +84,8 @@ Tool 제목은 `작업공간 확인` 또는 `앱 설정 확인`을 써요.
 ```bash
 axhub plugin-support init-resume route --json
 ```
+`watch_status`/`resume_last`이면 emitted command 전에 `axhub apps get <app> --json`을 실행해요. missing/malformed면 멈추고, selfhosted면 provider-auth resume을 버려 ownerless status/resume으로 이어가요. GitHub/`legacy_github`만 emitted provider-auth command를 써요.
+
 
 `watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 새 폴더/새 앱 요청이거나 `새로 시작`이면 이전 상태를 무시하고 template 질문으로 이어가요. fresh 이면 reference 를 읽지 않아요.
 
@@ -119,15 +125,26 @@ Claude Desktop 에서는 template 선택을 native Question/AskUserQuestion card
 
 repo name 과 subdomain 은 명시 입력이 없으면 app slug 로 맞춰요. dry-run 과 execute 모두 `--repo-name <app-slug>` 및 `--subdomain <app-slug>` 를 붙여요.
 
-### 6. GitHub App Gate
+### 6. Git Backend Gate
 
-Template 과 앱 이름이 사용자에게 확정되면 앱 주소 확인 직전에 저장소 계정 상태를 확인해요. 템플릿/앱 이름 질문보다 먼저 실행하지 않아요. Tool 제목은 `저장소 계정 확인`으로 써요.
+provider 대사 전에 backend를 확정해요. resume/기존 app은 첫 명령, app row 없는 fresh path는 둘째 read-only 명령을 써요. app row를 먼저 만들지 않아요.
+
+```bash
+axhub apps get <app> --json
+axhub apps git-backend --tenant <tenant> --json
+```
+
+top-level `git_backend.backend`와 `git_backend.source`만 읽어요. app source는 `tenant_default|app_override|legacy_github`, tenant 응답 source는 `tenant|platform_default`예요. Gitea/C1/remote는 보지 않고 read 실패·malformed면 provider 질문·mutation 전에 멈춰요.
+
+`git_backend.backend=selfhosted`이면 두 source 모두 인증 branch를 건너뛰어요. `references/templates-and-github.md` 전체를 읽지 않아요. selfhosted 사용자-facing 대사는 `저장소는 axhub에서 준비할게요.`만 허용하며 계정 인증·저장소 App 설치 질문을 0회로 유지해요.
+
+`git_backend.backend=github` 또는 `git_backend.source=legacy_github`이면 기존 GitHub App gate를 실행해요. `references/templates-and-github.md`의 owner picker와 `GitHub App 설치를 끝냈을까요?`를 유지해요.
 
 ```bash
 axhub github accounts list --json
 ```
 
-이 조회가 정상 응답하면 계정이 이미 연동된 상태라 **인증 단계가 없어요** — 계정·설치는 CLI 가 정하니 device flow 를 미리 시작하지 않아요. 설치 계정 0개면 설치 확인 전 dry-run/execute 금지. 1개면 자동 owner, 2개 이상이면 고르게 해요. auth 에러는 `다시 로그인해줘`. 단 `github_relogin_required` 는 연동이 없거나 만료된 상태라 `axhub github link` 재연동으로 풀려요(승인 후 gate 재실행) — 9단계 device flow 안무는 이 fallback 전용이에요. 재연동까지 막히거나 설치 계정이 계속 0개면 GitHub 복구를 더 제안하지 말고 **12단계**로 가요.
+이 조회가 정상 응답하면 계정이 이미 연동된 상태라 **인증 단계가 없어요**. 계정·설치는 CLI가 정하니 device flow 를 미리 시작하지 않아요. 설치 계정 0개면 설치 확인 전 dry-run/execute 금지. 1개면 자동 owner, 2개 이상이면 고르게 해요. `github_relogin_required` 는 연동이 없거나 만료된 상태라 재연동으로 풀고, 9단계 device flow 안무는 이 fallback 전용이에요. 재연동까지 막히면 **12단계**로 가요.
 
 ### 7. Availability Check
 
@@ -141,13 +158,16 @@ axhub apps check-availability --tenant <tenant> --slug <app-slug> --subdomain <a
 
 ### 8. Dry-Run Preview
 
+selfhosted는 owner flag 없이 실행하고, GitHub만 확인된 owner를 붙여요.
+
 ```bash
+axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --dry-run --json
 axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json
 ```
 
-위 값들은 확정 literal 로 바꿔요. Dry-run envelope 에서 template, slug, subdomain, repo name, private/public preview 만 한국어로 보여주고 raw JSON/stderr 를 dump 하지 않아요.
+첫 명령은 selfhosted, 둘째는 GitHub예요. 확정 literal로 바꾸고 preview의 template·slug·subdomain·repo·visibility만 한국어로 보여주며 raw JSON/stderr는 숨겨요.
 
-미리보기 뒤 확인 필수. 처음부터 "바로 올려줘", "배포까지 해줘"라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. `--dry-run` preview 뒤 axhub 진입 확인: 정확히 `지금 만들고 배포까지 진행할까요?` 질문과 `진행`/`취소` 선택지를 보여줘요. 질문·선택지·설명은 의역하거나 새로 만들지 않아요. 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
+미리보기 뒤 확인 필수. 처음부터 "바로 올려줘", "배포까지 해줘", `deploy it for real`이라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. 추천 허용일 뿐이에요. `--dry-run` preview 뒤 axhub 진입 확인: 정확히 `지금 만들고 배포까지 진행할까요?` 질문과 `진행`/`취소` 선택지를 보여줘요. 질문·선택지·설명은 의역하거나 새로 만들지 않아요. 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
 
 ### 9. Execute Bootstrap Saga
 
@@ -158,12 +178,13 @@ axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-p
 ```
 
 ```bash
+axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
 axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
 ```
 
-실행 때 예시 UUID 는 `init-resume put` 반환 literal UUID 로 바꾸고, Execute/resume 명령에는 `--json` 금지.
+첫 명령은 selfhosted, 둘째는 GitHub 예시예요. 실행 때 예시 UUID는 `init-resume put` 반환 literal UUID로 바꾸고 Execute/resume 명령에는 `--json`을 붙이지 않아요.
 
-연동된 계정이면 execute 는 device flow 없이 끝나요 — 아래는 미연동·만료 fallback 전용이에요. `device_code_issued` 는 `auto_poll:true`/`browser_opened:true` 여도 user code 를 즉시 보여줘요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 금지, 짧은 timeout 으로 background 처리 금지. CLI 가 pending 으로 끝나면 URL·코드를 본문에 쓰고, `인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 또는 watch flag 를 제거한 단일 resume 명령으로 승인 반영을 확인해요. `device_flow_required_user_action` 에서 멈추거나 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요.
+아래 계정 연동/device 처리는 GitHub branch 전용이에요. selfhosted에서는 시작하지 않아요. 연동된 계정이면 execute 는 device flow 없이 끝나요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 금지예요. CLI 가 pending 으로 끝나면 URL·코드를 본문에 쓰고, `device_flow_required_user_action` 에서 멈추거나 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요. `인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 또는 watch flag를 제거한 resume 명령으로 승인 반영을 확인해요.
 
 본문 두 줄 형식(URL 부분만 inline code span):
 
@@ -186,17 +207,24 @@ Claude Desktop 에서 `앱 생성 진행`/`앱 생성 재시도` tool 이 `백�
 
 ### 10. Clone And Manifest
 
-완료 saga 의 `repo_full_name` 으로 현재 폴더를 채워요. 값이 비면 임의 URL 을 만들지 않아요.
+selfhosted는 Gitea API·remote URL을 추측하지 않고 선택한 literal tenant를 두 명령에 그대로 써요.
 
-상단 폴더와 새 폴더가 다르면 메시지의 absolute path 를 target 으로 써요. `pwd`, `ls`, `find`, `cat`, `rtk ls -la` probe 금지. 새 폴더에 `.omc/` 같은 Desktop 메타데이터가 있을 수 있으므로 `git clone ... .` 는 쓰지 않아요. `git init` 후 원격 `main` 을 받아 보존해요. clone/hydrate 명령 안에서는 raw `git`만 써요. `rtk git`, `grep`, `cut`, `awk`, `sed` 금지.
+```bash
+axhub --tenant <tenant> git setup --json
+axhub --tenant <tenant> repo clone <app-slug> --json
+```
+
+`data.destination`을 모든 repository-local 후속 tool call의 `cwd`로 고정해요. 원래 CWD를 쓰거나 값 누락을 추측하면 실패예요.
+
+GitHub는 `repo_full_name` hydrate를 유지해요. 새 폴더의 `.omc/` 같은 Desktop 메타데이터 때문에 `git clone ... .` 는 쓰지 않아요. clone/hydrate 명령 안에서는 raw `git`만 써요. `rtk git`, `grep`, `cut`, `awk`, `sed` 금지.
 
 ```bash
 git -C <target> init -q -b main && (git -C <target> remote add origin https://github.com/<repo>.git 2>/dev/null || git -C <target> remote set-url origin https://github.com/<repo>.git) && git -C <target> fetch origin main --quiet --depth=1 && git -C <target> reset --hard FETCH_HEAD
 ```
 
-실행 때 `<target>`/`<repo>` 은 확인된 literal. target 채운 뒤 추가 `rtk ls`, `ls`, `find`, `cat` 확인은 하지 않아요. `fetch` 가 권한으로 실패하면(404 / permission denied) 앱은 이미 만들어진 상태이니 **12단계**로 가요 — 권한 실패를 "저장소가 없다" 로 보고하지 않아요.
+`<target>`/`<repo>`은 literal이에요. target 채운 뒤 추가 `rtk ls`, `ls`, `find`, `cat` probe 금지. GitHub fetch 권한 실패는 **12단계**로 가요.
 
-성공하면 추가 파일 읽기 없이 `axhub deploy --explain --json` check. 밖 reference 읽기 권한 프롬프트가 뜨면 허용을 요구하지 말고, 확보한 repo/app/deployment 값과 CLI 명령으로만 마무리해요.
+성공하면 확정한 repository `cwd`에서 `axhub deploy --explain --json`을 실행해요. 외부 reference 권한은 요구하지 말고 확보한 값·CLI로 마무리해요.
 
 ### 11. Result
 

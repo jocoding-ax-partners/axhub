@@ -130,3 +130,10 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 규칙: `plugins` 스킬은 category=plugin인 일반 App의 canonical AppID·slug만 사용해 목록·exact download·host install·publish를 처리해요. 목록은 `plugin.current_servable_version` summary를 페이지 단위로 읽고 download 결과에는 version_id를 만들지 않아요. `axhub plugin install`은 download 요청과 구분해 exact version·`claude|codex` host를 고른 offline preview 뒤 새 승인에서만 `--execute --yes`를 붙여요. CLI는 traversal·symlink·duplicate path·archive bomb·manifest identity를 검사하고 AxHub secret을 host process에서 제거한 뒤 `~/.axhub/plugins/` local marketplace와 host 공식 plugin CLI로 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish execute는 `plugins:read` + `plugins:write` scoped PAT file·rights attestation·명시 승인만 허용해요. Gate 성공은 `review_ready`·installable=false이며 App Console 제출과 Console Review 승인 전에는 release 완료가 아니에요.
 - 적용: skills/plugins/SKILL.md, POLICY.md
 - invariant: "plugin.current_servable_version", "`version_id`를 만들거나 보고하지 않아요", "download 요청과 install 요청을 구분", "--execute --yes", "Publish execute에는 OAuth나 broad PAT 대신", "submit_plugin_version_for_review"
+
+## AP-22 app git backend 선판정
+- 규칙: 저장소 provider 대사나 mutation보다 먼저 public CLI JSON으로 effective backend를 확인해요. resume/existing은 `axhub apps get <app> --json`, fresh bootstrap/onboarding은 read-only `axhub apps git-backend --tenant <tenant> --json`을 쓰고 app row를 먼저 만들지 않아요. 판정 입력은 top-level `git_backend.backend`·`git_backend.source`뿐이며 Gitea API·C1 HTTP·remote URL을 보지 않아요. selfhosted는 계정 연동·device flow·GitHub App 설치 대사를 노출하지 않고, non-static deploy는 `axhub repo clone` 뒤 일반 `git push`의 webhook deployment id를 exact verify해요. static은 기존 release lane, GitHub와 `legacy_github`는 기존 gate/upload/create 경로를 유지해요.
+- 적용: skills/bootstrap/SKILL.md, skills/deploy/SKILL.md, skills/onboarding/SKILL.md
+- invariant: "axhub apps get <app> --json", "git_backend.backend=selfhosted"
+- 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/onboarding/SKILL.md
+- invariant(codex): "axhub apps get <app> --json", "git_backend.backend=selfhosted"

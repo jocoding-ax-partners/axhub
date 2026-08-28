@@ -1,6 +1,8 @@
 # Onboarding Gap State Machine
 
 Load this after `axhub plugin-support onboarding-detect --json` when `first_gap` is not `no_gap`, or when you need the exact completion rule for a gap. CLI 는 gap 이 없으면 `first_gap: null` + 빈 `gaps` 를 반환해요 — null/부재 + 빈 `gaps` 는 `no_gap` 과 같은 완료라서 이 reference 를 열 필요 없이 Ready card 로 가요. The detector owns order. This reference only maps the detected first gap to the next safe action.
+Before mapping provider gaps, use `axhub apps get <app> --json` for a known app or `axhub apps git-backend --tenant <tenant> --json` for fresh onboarding. When `git_backend.backend=selfhosted`, remove `github_link_missing`, `github_app_missing`, and GitHub-shaped `existing_repo_gap` from this pass and continue with the next non-provider gap. Do not load the GitHub reference or show its user-action copy.
+
 
 ## Loop
 
@@ -46,7 +48,7 @@ Do not process the second item in `gaps` from the same JSON. Handle one `first_g
 
 ## Existing Repo Gap
 
-Existing repo onboarding is not bootstrap. If the directory has a commit and no axhub manifest, avoid clone/scaffold collision and use the app/repo Git surface.
+Existing repo onboarding is not bootstrap. This handler is GitHub-only after the backend gate. A selfhosted app never enters it; if cloning is the remaining user goal, show `axhub repo clone <app>` as the next action without account-link or App-install steps.
 
 1. If `$APP_ID` is unknown, stop with `READY_WITH_USER_ACTION`: tell the user to say `첫 앱 만들어줘` first. Onboarding must not auto-create the app.
 2. Run status for the known app:

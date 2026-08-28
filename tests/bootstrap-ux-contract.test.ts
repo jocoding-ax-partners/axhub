@@ -49,11 +49,11 @@ describe("bootstrap desktop UX contract", () => {
     // 클레임("creation path 는 saga 하나뿐")이 소유 지목 문장까지 삼켜서,
     // frontmatter 와 Scope 에 scaffold 양보를 명시해요. 라우팅은 본문에 있어야
     // 작동해요.
-    // (plugin:budget 의 per-skill 35k · 총합 210k 는 별도 gate)
-    // 27_500 → 27_850: AP-18 의 `--fresh` 재발급 한 문장. 코드를 놓친 사용자가
-    // 죽은 코드로 영영 못 빠져나오는 경로라 본문에 있어야 해요 (구 CLI fallback
-    // 같은 나머지 서술은 references/errors-and-followups.md 로 밀었어요).
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(27_850);
+    // (plugin:budget 의 per-skill 35k · 10 skill 총합 220k 는 별도 gate)
+    // 27_850 → 30_500: spec 236 T144 backend 선판정 + selfhosted no-owner
+    // preview/execute/clone 경로를 본문에 둬요. 이 분기가 첫 8KB 밖 reference 에만
+    // 있으면 Codex 절단과 Desktop reference 권한 양쪽에서 다시 GitHub gate로 빠져요.
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(30_500);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");

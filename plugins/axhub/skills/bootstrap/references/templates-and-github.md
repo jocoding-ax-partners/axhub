@@ -1,6 +1,6 @@
-# Init Templates And GitHub Gate Reference
+# Init Templates And Repository Provider Gate Reference
 
-Load this reference when template registry display, template/app-name choice, GitHub App installation/account gating, or multi-owner behavior needs detail.
+Load this reference only for template registry detail or after the top-level bootstrap backend gate selected GitHub. A confirmed selfhosted app must not load the provider-specific sections below.
 
 ## Template Registry
 
@@ -69,6 +69,14 @@ Pre-bootstrap answers to concept or slug questions are not confirmation. They ma
 ```
 
 Derive `--slug` by lowercasing, replacing spaces with hyphens, and removing special characters. If backend reports slug policy/collision, ask once for a new name/slug and retry the same flow.
+
+## Backend Gate
+
+The top-level skill owns backend resolution. Read top-level `git_backend.backend` and `git_backend.source` from `axhub apps get <app> --json` for resume/existing apps or `axhub apps git-backend --tenant <tenant> --json` for fresh apps. The latter is read-only and returns source `tenant|platform_default`; never pre-create an app row or call C1/Gitea directly.
+
+When `git_backend.backend=selfhosted`, stop reading this file here. Do not run the account check, do not start a device flow, do not show an install URL, and do not render any owner or installation question. Continue to the backend-neutral availability and bootstrap preview with no `--github-owner`.
+
+When `git_backend.backend=github` or `git_backend.source=legacy_github`, preserve every gate and question below.
 
 ## GitHub App Gate
 

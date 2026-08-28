@@ -25,7 +25,7 @@ const section = (doc: string, heading: string): string => {
 };
 
 const routerGaps = new Set(
-  [...section(SKILL, "### 3. first_gap router").matchAll(/^\| `([a-z_]+)` \|/gm)]
+  [...section(SKILL, "### 4. first_gap router").matchAll(/^\| `([a-z_]+)` \|/gm)]
     .map((m) => m[1]!)
     .filter((id) => id !== "first_gap"),
 );
@@ -53,7 +53,7 @@ describe("onboarding representative journey", () => {
     for (const set of [routerGaps, loopGaps, completionGaps]) {
       expect(set.has("github_link_missing")).toBe(true);
     }
-    const routerSection = section(SKILL, "### 3. first_gap router");
+    const routerSection = section(SKILL, "### 4. first_gap router");
     const loopSection = section(GAPS, "## Loop");
     for (const doc of [routerSection, loopSection]) {
       expect(doc.indexOf("github_link_missing")).toBeGreaterThan(-1);
@@ -62,7 +62,7 @@ describe("onboarding representative journey", () => {
     // 합성 gap 이라 detect 가 만들지 않아요 — 신호는 accounts 명령의 relogin subcode 예요.
     expect(SKILL).toContain("github_relogin_required");
     expect(SKILL).toContain("axhub github accounts list --json");
-    expect(SKILL).toContain("`github_link_missing` 도 합성 값이라 2의 연동 확인에서만 생기고");
+    expect(SKILL).toContain("`github_link_missing`도 합성 값이라 GitHub branch의 3단계 연동 확인에서만 생기고");
     // 진행 알림도 연동 단계를 별도로 알려요 (설치 확인과 다른 줄).
     expect(SKILL).toContain("`GitHub 계정 연동 확인하는 중이에요`");
   });
@@ -84,19 +84,21 @@ describe("onboarding representative journey", () => {
 
   test("CLI null first_gap is accepted as no_gap completion (schema parity with real CLI)", () => {
     // CLI 는 gap 이 없으면 first_gap 을 null 로 반환해요 — "no_gap" 문자열은 CLI 가 만들지 않아요.
-    expect(SKILL).toContain("null/부재이고 `gaps` 가 비어 있으면 `no_gap` 과 동일한 완료");
+    expect(SKILL).toContain("`first_gap:null`과 빈 `gaps`를 반환하며 이는 `no_gap`과 같은 완료");
     expect(GAPS).toContain("null/부재 + 빈 `gaps` 는 `no_gap` 과 같은 완료");
     const shim = read("tests/e2e/claude-cli/fixtures/bin/axhub");
     expect(shim).toContain('"first_gap":null');
     expect(shim).not.toContain('"first_gap":"no_gap"');
   });
 
-  test("journey stages appear in order: guard -> detect -> router -> finish", () => {
+  test("journey stages appear in order: guard -> detect -> backend -> provider -> router -> finish", () => {
     const stages = [
       "### 0. Non-interactive guard",
       "### 1. DETECT_ALL(read-only)",
-      "### 3. first_gap router",
-      "### 4. Telemetry opt-in and Ready card",
+      "### 2. Git backend gate",
+      "### 3. Repository provider surface",
+      "### 4. first_gap router",
+      "### 5. Telemetry opt-in and Ready card",
     ];
     const positions = stages.map((s) => SKILL.indexOf(s));
     for (const [i, pos] of positions.entries()) {

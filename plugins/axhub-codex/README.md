@@ -17,7 +17,7 @@
 axhub 는 [axhub SaaS](https://axhub.ai) 를 도입한 회사의 **바이브코더**가 Codex 안에서 한국어 자연어만으로 앱을 만들고·배포하고·관리하게 해주는 플러그인이에요.
 
 ```
-"결제 앱 만들어줘"  →  "GitHub 연결해"  →  "배포해"  →  "결과 봐"
+"결제 앱 만들어줘"  →  "저장소 준비해"  →  "배포해"  →  "결과 봐"
 ```
 
 이 한 줄들이 실제 배포 파이프라인을 끝까지 굴려요. 플러그인은 얇은 라우팅 레이어라서, 판정·실행 로직은 전부 `ax-hub-cli`(axhub 바이너리)에 두고 플러그인은 자연어 의도를 적절한 axhub 명령으로 연결하고 안전 가드만 챙겨요.
@@ -105,13 +105,15 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 버전·최신 확인이 들어간 요청은 언제나 `update` 가 먼저 끝나요. 업데이트 뒤 같은 요청에 앱 현황 확인이 남아 있으면 존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 이어가요.
 
+앱 생성·배포·온보딩은 저장소 단계보다 먼저 public CLI의 top-level `git_backend`를 확인해요. resume/existing은 `axhub apps get <app> --json`, fresh bootstrap/onboarding은 read-only `axhub apps git-backend --tenant <tenant> --json`을 써요. non-static selfhosted면 계정 연동·device flow·GitHub App 설치 대사를 건너뛰고 `axhub repo clone` 뒤 일반 `git push`의 webhook 배포를 기다려요. static은 기존 release lane, GitHub·`legacy_github`는 기존 `axhub up`·repo gate 경로를 유지해요.
+
 카탈로그에 스킬이 안 보일 때(다른 플러그인·스킬이 많아 컨텍스트 예산이 넘치면 Codex 가 설명을 줄이거나 생략할 수 있어요)는 스킬 이름을 명시해 부르면 돼요 — 예: `$axhub-codex:deploy` 처럼 명시 멘션으로요. 또 등록해 둔 다른 marketplace 경로가 깨져 있으면 플러그인 목록 자체가 실패할 수 있어요 — `codex plugin marketplace list` 로 등록 상태를 정리해요.
 
 ---
 
 ## ✅ 대표 여정
 
-대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. `onboarding` 이 CLI·로그인·환경을 detect-first 로 확인하고, `bootstrap` 이 앱 생성과 첫 배포를 이어가며, `deploy` 가 preview 와 명시 텍스트 승인 뒤 `axhub deploy verify <deployment-id> --app <app>` 로 성공을 확정하고, 이후 로그·환경변수·롤백 같은 운영 작업은 `clarity` 가 공개 CLI 표면에서 찾아 처리해요.
+대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. `onboarding`과 `bootstrap`은 app backend를 먼저 확인해 필요한 저장소 준비만 노출하고, `deploy`는 selfhosted push 또는 기존 GitHub/upload 경로를 실행한 뒤 exact deployment id를 verify해요. 이후 운영 작업은 `clarity`가 공개 CLI 표면에서 처리해요.
 
 ---
 

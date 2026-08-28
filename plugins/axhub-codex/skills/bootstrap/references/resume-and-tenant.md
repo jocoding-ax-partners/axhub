@@ -12,7 +12,25 @@ After `axhub plugin-support preflight --json` succeeds, check repo-local state b
 axhub plugin-support init-resume route --json
 ```
 
-Expected shape is `{route(fresh|watch_status|resume_last), reason, state_stale, requires_status_authority, args{status_command, resume_command}}`. If route is `watch_status` or `resume_last` and `clone_done=false`, ask:
+Expected shape is `{route(fresh|watch_status|resume_last), reason, state_stale, requires_status_authority, args{status_command, resume_command}}`.
+
+Before showing the resume question or running either `args.status_command` or `args.resume_command`, choose the backend read from persisted route authority:
+
+- route가 `watch_status`이거나 state에 `bootstrap_id`가 있으면 persisted app id/slug로 app-level choice를 읽어요.
+
+  ```bash
+  axhub apps get <app> --json
+  ```
+
+- route가 `resume_last`이고 `bootstrap_id`가 없으면 app row가 아직 없어요. 먼저 아래 Tenant Resolve L1로 literal tenant를 확정하고 tenant default를 읽어요.
+
+  ```bash
+  axhub apps git-backend --tenant <tenant> --json
+  ```
+
+Missing/malformed `git_backend` or the selected read's failure stops fail-closed before any emitted command. If `git_backend.backend=selfhosted`, discard a stale provider-auth `resume_last` route and never execute its emitted command. If a bootstrap id exists, continue through the backend-neutral status path; otherwise rebuild the ownerless selfhosted resume from stored template/name/slug/tenant/idempotency values. Do not surface GitHub/device/install copy. Only confirmed `github` or `legacy_github` may execute a provider-auth resume command.
+
+After this check, if route is `watch_status` or `resume_last` and `clone_done=false`, ask:
 
 ```json
 {
@@ -27,7 +45,7 @@ Expected shape is `{route(fresh|watch_status|resume_last), reason, state_stale, 
 
 Non-interactive/D1 safe default is `새로 시작`. Do not echo raw `bootstrap_id`, `idempotency_key`, repo, or slug. Humanize only a short app alias if needed.
 
-If the user chooses resume, use the route enum and `args.*_command` returned by the CLI. Do not reconstruct raw IDs in the skill.
+If the user chooses resume, use the route enum only after the backend check above. Do not reconstruct raw IDs except for the ownerless selfhosted resume described above.
 
 - `watch_status`: run `args.status_command`. Current shape is `axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json`.
 - `resume_last`: use `args.resume_command` as the base argv, but never run it verbatim. Append `--tenant "$AXHUB_TENANT"` only when `$AXHUB_TENANT` is set and the base command lacks tenant context. For Desktop device-flow recovery, strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume so stdout is visible. Do not use background watchers or output-file reads as the resume control plane. Current shape should be `axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --idempotency-key "$IDEMPOTENCY_KEY"`.
@@ -35,7 +53,7 @@ If the user chooses resume, use the route enum and `args.*_command` returned by 
 
 ## Resume Device-Flow Recovery
 
-This whole section is fallback-only: a linked GitHub account never reaches a pending device flow, so it applies when the link was missing or expired at the GitHub App gate.
+This whole section is GitHub-only fallback and may be entered only after the Resume Route check confirmed `git_backend.backend=github` or `git_backend.source=legacy_github`; a linked GitHub account never reaches a pending device flow, so the remainder applies only to a missing or expired link.
 
 If resume fails with `no pending github device flow`, do not declare hard failure immediately. First re-check the read-only account surface:
 

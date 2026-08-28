@@ -110,7 +110,8 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 - 흡수된 helper 표면은 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 — 예: `onboarding-detect`, `preflight`, `deploy-prep`.
 - 공개 검증·진단 표면은 `axhub deploy verify <deployment-id> --app <app>` 와 `axhub deploy diagnose` 예요.
-- bootstrap·deploy skill은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면을 가드해요. 기존 8스킬은 v0.21.3+, scaffold는 v0.30.0+예요. plugins는 version 추측 대신 필요한 `axhub plugin list|download|publish --help` 성공을 가드하고, 기능이 없으면 `update`로 보내며 우회하지 않아요.
+- bootstrap·deploy skill은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면 v0.21.3+를 가드하고, scaffold는 v0.30.0+를 가드해요. plugins는 version 추측 대신 필요한 `axhub plugin list|download|publish --help` 성공을 가드하고, 기능이 없으면 `update`로 보내며 우회하지 않아요.
+- 저장소 provider 판정은 resume/existing에서 public `axhub apps get <app> --json`, fresh bootstrap/onboarding에서 read-only `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 써요. selfhosted는 GitHub 인증/App 설치 대사를 건너뛰고, non-static deploy는 `axhub repo clone` 뒤 일반 `git push` webhook 경로를 써요. static은 기존 release lane을 유지하며 Gitea API를 직접 호출하지 않아요.
 
 ## 변경 검증
 

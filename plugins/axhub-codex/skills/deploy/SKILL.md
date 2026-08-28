@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: "연결된 앱의 현재 코드를 실제 AxHub에 배포하고 성공 여부까지 확인할 때 반드시 사용해요. 트리거: \"배포해\", \"<앱이름> 배포해\", \"ship <앱이름>\", \"실제 AxHub에 배포\", \"성공 여부까지 확인\", \"같은 코드로 강제 재배포\", \"deploy\". preview-confirm과 exact deployment verify를 맡고 apps status/curl로 대신하지 않아요. 첫 연결은 import, 빈 폴더는 bootstrap, 실패 원인 진단은 diagnosis예요. axhub 맥락 없거나 다른 배포 대상이면 쓰지 않아요."
+description: "연결된 앱의 현재 코드를 실제 AxHub에 배포하고 성공 여부까지 확인할 때 반드시 사용해요. 트리거: \"배포해\", \"<앱이름> 배포해\", \"ship <앱이름>\", \"실제 AxHub에 배포\", \"성공 여부까지 확인\", \"같은 코드로 강제 재배포\", \"deploy\". apps get의 git_backend로 selfhosted push와 기존 GitHub/upload 경로를 먼저 나누고 preview-confirm·exact deployment verify를 맡으며 apps status/curl로 대신하지 않아요. 첫 연결은 import, 빈 폴더는 bootstrap, 실패 원인 진단은 diagnosis예요. axhub 맥락 없거나 다른 배포 대상이면 쓰지 않아요."
 allows-dependency-execution: false
 model: sonnet
 ---
@@ -16,6 +16,8 @@ model: sonnet
 Deploy an already-connected axhub app with preview, approval, and verification safety. First-connect/import and new-app/bootstrap flows do not run here.
 
 명시적인 배포 실패 원인 진단 요청(예: "배포 실패 원인 진단해줘", "왜 배포가 죽었어")은 `diagnosis` 에 양보해요. 이 스킬이 실제 배포를 시작한 뒤 `axhub deploy verify` 에서 terminal failure 를 확인한 경우에만 같은 앱 식별자와 실패 근거를 유지해 `diagnosis` 로 읽기 전용 handoff 해요. 이 handoff 는 재배포, 롤백, 새 deploy create 를 실행하지 않아요.
+승인 뒤 mutation 전에 `axhub apps get <app> --json`의 top-level `deploy_method`와 `git_backend`를 읽어요. static은 기존 release lane을 먼저 쓰고, non-static `git_backend.backend=selfhosted`면 미클론 폴더에서 `axhub repo clone <app>`을 먼저 실행한 뒤 일반 `git push`의 webhook deployment id를 기다려 verify해요. GitHub·`legacy_github`는 기존 `axhub up`/create 경로를 유지해요. Gitea API나 C1 HTTP를 직접 호출하지 않아요.
+
 
 **질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요(예: `진행` 이면 시작하고 `취소` 면 여기서 멈춰요). 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요. 비파괴 선택은 숫자·서수·라벨·앞글자 어느 쪽으로 답해도 알아듣고, 파괴 게이트만 canonical 문구를 그대로 받아요.
 
@@ -90,7 +92,7 @@ Load only what the current branch needs:
 
 Actual execution order:
 
-`CLI guard` -> `version check` -> `route-decision` -> `tenant resolve` -> `deploy-prep` -> `static branch or deployment-record branch` -> `first-run boundary` -> `git readiness` -> `in-flight/status-first` -> `headless decision` -> `preview card` -> `token-gate` -> `deploy create` -> `verify` -> `diagnosis/error recovery`.
+`CLI guard` -> `version check` -> `route-decision` -> `tenant resolve` -> `deploy-prep` -> `apps get` backend 판정 -> `static branch`, `selfhosted push branch`, 또는 기존 GitHub/upload branch -> `verify` -> `diagnosis/error recovery`.
 
 ### CLI guard
 
@@ -100,7 +102,9 @@ Use CLI capability, not version string comparison:
 axhub plugin-support preflight --json
 ```
 
-이 명령의 tool 결과에서 command-not-found, exit, JSON을 직접 읽어요. command-not-found 는 미설치가 아니에요 — AP-17 대로 `"$HOME/.axhub/bin/axhub"` 로 `plugin-support repair-path --json` 을 실행해 그 절대경로로 이어가고, 디스크에도 없을 때만 온보딩을 안내해요. 별도 설치 probe나 shell 분기를 만들지 않아요. If auth is missing/expired, explain in Korean and ask before starting login flow in interactive mode.
+`capabilities.self_hosted_git.app_git_backend`, `capabilities.self_hosted_git.git_setup`, `capabilities.self_hosted_git.repo_clone`이 모두 `true`여야 해요. 누락·malformed/false면 fallback 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
+
+command-not-found는 미설치가 아니에요. AP-17대로 `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json`의 `bin_path`로 이어가고 디스크에도 없을 때만 onboarding을 안내해요. auth missing/expired면 interactive login 전에 물어요.
 
 ### Routing and resolve
 
@@ -118,21 +122,21 @@ Resolve live deployment inputs with:
 axhub plugin-support deploy-prep --intent deploy --user-utterance "<latest user sentence>" --json
 ```
 
-The `deploy-prep` envelope is authoritative for `profile`, `endpoint`, `app_id`, `app_slug`, `branch`, `commit_sha`, `commit_message`, `eta_sec`, preflight, `bootstrap_plan`, in-flight deploy, GitHub connection, and quality gate. Never infer `app_id` from pwd or git remote alone in the mutation path.
+The `deploy-prep` envelope is authoritative for `profile`, `endpoint`, `app_id`, `app_slug`, `branch`, `commit_sha`, `commit_message`, `eta_sec`, preflight, `bootstrap_plan`, in-flight deploy, repository connection, and quality gate. Never infer `app_id` from pwd or git remote alone in the mutation path.
 
 If this skill was invoked as a handoff from another axhub skill after code changes, do **not** reuse the original feature prompt as `--user-utterance`; it may contain display text such as "QA banner" that looks like an app candidate. Use a short deploy utterance like `현재 앱 배포해` and rely on the current folder's axhub.yaml binding. If the current folder has a valid axhub.yaml and the latest deploy phrase does not explicitly name another app, the bound app slug wins over arbitrary words in prior chat.
 
-If `bootstrap_plan` is present, `app_id` is missing, or branch/commit is empty, stop before preview. Existing non-empty app first-connect belongs to `import`; empty new app creation belongs to `bootstrap`. 단 `github_connected` 가 false 면 저장소 없는 앱의 정상 상태라 이 정지가 안 걸려요 — 아래 Upload lane 으로 가요.
+If `bootstrap_plan` is present or `app_id` is missing, stop before preview: non-empty first-connect belongs to import and empty new app creation to bootstrap. Defer empty branch/commit until after `apps get`: selfhosted may be an un-cloned app and must enter `repo clone`; GitHub with no repository enters upload; only a GitHub repo path with missing readiness stops for import.
 
 ### Static branch
 
-After resolving an existing app, detect static hosting:
+After resolving an existing app, read the public app JSON exactly once:
 
 ```bash
-DEPLOY_METHOD=$(axhub apps get "$APP_ID" --no-input --field-expr '.deploy_method // empty' 2>/dev/null || true)
+axhub apps get "$APP_ID" --no-input --json
 ```
 
-Only `DEPLOY_METHOD=static` enters static lane. Static lane uses `apps static deploy --execute` after its own dry-run preview and approval:
+Use top-level `deploy_method`, `git_backend.backend`, and `git_backend.source` only. The backend values are `github|selfhosted`; source is `tenant_default|app_override|legacy_github`. Do not call C1 or Gitea directly and do not infer a backend from a remote URL. Only `deploy_method=static` enters static lane. Static lane uses `apps static deploy --execute` after its own dry-run preview and approval:
 
 ```bash
 axhub apps static deploy --app "$APP_ID" --from-dir "$STATIC_DIR" --tenant "$AXHUB_TENANT" --dry-run
@@ -143,9 +147,36 @@ Static success is `active_release_id` from activate plus public URL when availab
 
 ### Deployment-record branch
 
-Deployment-record apps continue through git readiness, in-flight/status-first handling, preview, token gate, fallback create, and verify. Load `references/workflow-details.md` for the branch mechanics.
+Deployment-record apps branch on the already-read `git_backend.backend` before repository auth, push, upload, or create logic. Load `references/workflow-details.md` for the matching branch mechanics.
 
-### Upload lane
+### Self-hosted repository lane
+
+This lane starts only when the preceding `axhub apps get <app> --json` reports `git_backend.backend=selfhosted`. `tenant_default` and `app_override` use the same behavior. Never enter the upload/create fallback, call a GitHub command, or call Gitea API from this lane.
+
+If the current folder is not yet the resolved app's clone, prepare the endpoint-matched credential helper and run the public resolver instead of guessing the opaque repository address:
+
+```bash
+axhub git setup
+axhub repo clone <app> --json
+```
+
+clone 응답의 absolute `data.destination`을 사용해 이후 모든 local git command의 tool `cwd`를 고정해요. retry도 same returned `data.destination` cwd에서 실행하며 원래 폴더나 추측 경로를 쓰지 않아요.
+
+After the usual local savepoint/branch readiness and the already-shown preview approval, push ordinary Git from that returned working directory. The webhook owns deployment creation:
+
+```bash
+git push -u origin "HEAD:$BRANCH"
+```
+
+After push exit 0, say only `변경 내용을 보냈어요. 자동 배포가 시작되는지 확인할게요.` webhook 자동 배포를 AP-16(30회/10분) 안에서 `deploy-prep --refresh-in-flight`로 확인하고 받은 exact deployment id를 verify해요. 예산 종료는 pending으로 보고하며 create/upload하지 않아요.
+
+credential missing/expired일 때만 `axhub git setup` 후 같은 push를 한 번 retry해요. hook/permission/capacity/5xx에는 쓰지 않고 credential output을 출력하지 않아요.
+
+### GitHub and upload lanes
+
+The existing GitHub behavior stays unchanged. `github_connected=false` and GitHub-blocked recovery keep the upload lane below; connected GitHub repository commits keep the existing readiness, containment, status-first, create, and verify path.
+
+#### Upload lane
 
 `github_connected` 가 false 면 저장소가 없는 앱이에요 — 실패가 아니라 정상 상태이고, 받을 push 웹훅이 없어서 명시적 배포가 유일한 출고 경로예요. Git readiness·push·containment·빈 커밋 정지를 건너뛰고 여기로 와요. 저장소가 있는데 GitHub 때문에 push 나 containment 가 막힌 경우도 같은 명령을 쓰되(네트워크·타임아웃·5xx 는 한 번 재시도 먼저) 그때만 복구로 알려요. 이 절차는 본문만으로 완결돼요.
 

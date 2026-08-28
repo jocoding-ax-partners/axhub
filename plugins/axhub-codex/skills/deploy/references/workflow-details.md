@@ -22,7 +22,7 @@ If the resolver reports multiple candidates, interactive mode may ask the user t
 
 ## Deploy-prep envelope
 
-Resolve the authoritative app, profile, branch, commit, preflight, bootstrap boundary, in-flight deployment, GitHub connection, and quality gate through `deploy-prep`:
+Resolve the authoritative app, profile, branch, commit, preflight, bootstrap boundary, in-flight deployment, repository connection, and quality gate through `deploy-prep`:
 
 ```bash
 DEPLOY_PREP_JSON=$(axhub plugin-support deploy-prep --intent deploy --user-utterance "$ARGS" --json)
@@ -31,23 +31,23 @@ eval "$(axhub plugin-support deploy-prep --intent deploy --user-utterance "$ARGS
 
 The same logical envelope must drive in-flight, status-first, and create. Reuse the first JSON when practical; if field extraction is repeated, do not let the values diverge semantically.
 
-Quality gate failure stops by default. Interactive mode may ask whether to force current values; headless safe default is cancel. If `bootstrap_plan` is non-null, or `app_id` cannot be resolved, stop at the first-run boundary and hand off to `import` for a non-empty existing app or `bootstrap` for an empty new app. Do not continue to preview while `branch` or `commit_sha` is empty.
+Quality gate failure stops by default. If `bootstrap_plan` is non-null or `app_id` cannot be resolved, stop at the first-run boundary and hand off to import/bootstrap. Do not reject empty branch/commit until `apps get` selects the lane: selfhosted clones first, GitHub without a repo uploads, and only an unready GitHub repo path stops.
 
-`GITHUB_CONNECTED` decides the lane and must actually be read, not just extracted. False on a resolved app means the app has no repository, so Git readiness, push, containment, and the empty branch/commit stop are all skipped — route to the upload lane. True keeps the normal repo path, where the upload lane is only a recovery escape.
+Read `GITHUB_CONNECTED` only after `git_backend.backend=github` is known. In that branch, false on a resolved app means the app has no repository and routes to the upload lane; true keeps the existing GitHub repo path. It is not a backend detector and must never send a selfhosted app to upload.
 
 ## Target reconciliation
 
 Before mutation, reconcile stale manifest risk. If the conversation points at a different app, the utterance names a different app, or the manifest slug looks stale, confirm the target interactively. If the user chooses another app, update `axhub.yaml`, rerun `deploy-prep`, and include that manifest change in the git-readiness step. In headless mode, any target conflict downgrades to dry-run.
 
-## Static lane
+## App backend and static lane
 
-Static apps do not use deployment-record verify. After `deploy-prep` resolves an existing `APP_ID`, probe the app:
+After `deploy-prep` resolves an existing `APP_ID`, read the public app JSON once:
 
 ```bash
-DEPLOY_METHOD=$(axhub apps get "$APP_ID" --no-input --field-expr '.deploy_method // empty' 2>/dev/null || true)
+axhub apps get "$APP_ID" --no-input --json
 ```
 
-Only `DEPLOY_METHOD=static` enters this lane. All other values use the deployment-record lane.
+Use top-level `deploy_method`, `git_backend.backend`, and `git_backend.source`. Only `deploy_method=static` enters the static lane. Non-static `selfhosted` enters the push branch below; non-static `github` and `legacy_github` preserve the existing GitHub/upload path. Never call C1 or Gitea directly and never infer backend from a remote URL.
 
 1. Capability probe:
 
@@ -75,6 +75,16 @@ Only `DEPLOY_METHOD=static` enters this lane. All other values use the deploymen
 
    Static success is `active_release_id` from activation plus, when available, `axhub apps get "$APP_ID" --no-input --field-expr '.access_url // empty'`. Never call `axhub deploy verify` in this lane.
 
+## Self-hosted push branch
+
+For `git_backend.backend=selfhosted`, do not inspect `github_connected`. If the current folder is not the resolved app's clone, run `axhub repo clone <app> --json` first and require a successful envelope with a non-empty absolute `data.destination`. Use the CLI-resolved HTTPS remote and never synthesize the repository path or destination.
+
+Treat that exact `data.destination` as the working directory for every subsequent repository-local command in this branch. Set the tool `cwd` to it for status/savepoint, `git rev-parse`, branch/commit work, push, fetch, and containment checks; do not run those commands in the original un-cloned folder. An explicit clone destination, when supplied, is authoritative because the CLI returns the same absolute path.
+
+After the common local savepoint and preview approval, `git push -u origin "HEAD:$BRANCH"` from that working directory is the deployment mutation. A successful push starts the webhook deployment, so do not run `deploy create` or the upload lane. Refresh `deploy-prep --refresh-in-flight` within AP-16's 30-check/10-minute budget until the exact deployment id appears, then use the common verify loop. A budget expiry is pending, not failure.
+
+The rest of this reference's containment/create/upload instructions are the GitHub branch unless they explicitly say common.
+
 ## Git readiness
 
 Do not preview an old commit while deploy-affecting local changes are uncommitted. If `deploy-prep` reports `git_init_needed`, no commit, missing branch/commit, or uncommitted deploy-affecting changes, pause before preview. Ignore local agent/runtime state such as `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/`; those paths are not deploy-affecting app changes and must not be committed, pushed, or added to `.gitignore` during deploy cleanup. If deploy-prep or another target check still reports only those runtime paths, treat the app commit as clean enough for deploy and do not mutate `.gitignore`; if the CLI blocks anyway, stop with a CLI-gap note instead of creating a cleanup commit.
@@ -91,7 +101,7 @@ git branch -M main >/dev/null 2>&1
 axhub plugin-support deploy-prep --intent deploy --user-utterance "$ARGS" --json
 ```
 
-Before preview/create, normalize the resolved commit to a full local SHA, push normal ahead commits to an already connected `origin` branch, and confirm the commit is reachable from the remote. This is required for both savepoint commits and existing local commits from a previous skill such as development:
+Before push, normalize the resolved commit to a full local SHA. GitHub additionally confirms remote containment before create; selfhosted uses push success plus the webhook deployment id:
 
 ```bash
 COMMIT_SHA=$(git rev-parse "${COMMIT_SHA:-HEAD}^{commit}")
@@ -101,7 +111,7 @@ git fetch origin "$BRANCH" >/dev/null 2>&1
 git merge-base --is-ancestor "$COMMIT_SHA" "origin/$BRANCH"
 ```
 
-Skip this whole section when `GITHUB_CONNECTED` is false; that app has no repo to push to and belongs to the upload lane. If push or containment fails, stop before mutation — unless GitHub itself is what failed, which routes to the upload lane below instead of ending here. Judge push success by `PUSH_EXIT`, not by stderr text; harmless hook warnings or "no config" messages do not make a zero-exit push fail. Raw git output stays out of chat. Headless safe default is cancel; never run `git init` automatically in subprocess mode. Never run `axhub deploy create --execute` for a local-only commit because the backend resolves commits from the connected GitHub repo.
+For selfhosted, this section applies even when `GITHUB_CONNECTED` is false; push success routes to the webhook wait. For GitHub, false routes to upload and push/containment failure stops unless GitHub itself is the cause. Judge push success by `PUSH_EXIT`, not by stderr text. Raw git output stays out of chat. Headless never runs `git init` automatically. Never run `axhub deploy create --execute` for a local-only commit.
 
 ## In-flight and status-first
 
@@ -167,9 +177,9 @@ AXHUB_EXIT=$?
 
 On exit 64 with `validation.deployment_in_progress`, do not retry. Refresh in-flight once and verify that id if available; otherwise tell the user another deploy is in progress and stop. On exit 0, bind `DEPLOY_ID` from stdout. If no id exists, do not claim success; tell the user the start was seen but no result id was received.
 
-## Upload lane — deploy the local folder
+## GitHub upload lane — deploy the local folder
 
-The source is the local folder instead of a repo commit (backend spec 184). Everything after create is unchanged — `axhub up` prints the same create result, so `DEPLOY_ID` binding, the verify loop, and the diagnosis handoff stay identical.
+This lane is for `git_backend.backend=github` only. The source is the local folder instead of a repo commit (backend spec 184). Everything after create is unchanged — `axhub up` prints the same create result, so `DEPLOY_ID` binding, the verify loop, and the diagnosis handoff stay identical.
 
 Two entries, and they are not the same thing:
 
