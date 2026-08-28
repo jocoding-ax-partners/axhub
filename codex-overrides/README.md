@@ -6,7 +6,7 @@
 
 코드를 직접 짜는 대신, "내 앱 배포해" 한마디로 앱 lifecycle 전체를 안전하게 굴려요.
 
-**상태**: 10 SKILL (onboarding · bootstrap · scaffold · plugins · deploy · import · development · diagnosis · clarity · update) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download) · Codex CLI ≥ 0.147.0
+**상태**: 11 SKILL (onboarding · bootstrap · scaffold · plugins · deploy · up · import · development · diagnosis · clarity · update) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download) · Codex CLI ≥ 0.147.0
 
 </div>
 
@@ -84,7 +84,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 ---
 
-## 🧩 10개 스킬
+## 🧩 11개 스킬
 
 `plugins`는 category=plugin인 일반 App의 exact version을 다운로드하거나 Codex에 설치해요. `download`는 검증된 ZIP만 저장하고, `axhub plugin install --host codex`는 offline preview 뒤 `--execute --yes`일 때만 archive 공격과 manifest identity를 검사하고 AxHub 관리 local marketplace를 Codex 공식 plugin CLI로 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 사용하며 성공은 `review_ready`·installable=false예요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
 
@@ -95,6 +95,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 | `scaffold` | 템플릿 + 내 계정 저장소 | "내 계정에 레포 만들어서 새 앱 시작해줘" |
 | `plugins` | plugin App 게시·목록·다운로드·Codex 설치 | "플러그인 목록 보여줘", "1.2.0 내려 받아", "Codex에 설치해줘", "여러 스킬을 하나로 올려줘" |
 | `deploy` | 현재 브랜치 배포 | "배포해", "ship 해줘", "프로덕션에 올려" |
+| `up` | GitHub 없이 로컬 폴더 배포 | "GitHub 없이 배포해", "이 폴더 그대로 올려줘", "소스 올려서 배포" |
 | `import` | 기존 로컬 앱 가져오기 | "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app" |
 | `development` | 기존 앱에 실데이터 기능 코딩 | "내 connector 데이터로 대시보드 만들어줘", "유저 목록 페이지 만들어줘" |
 | `diagnosis` | 배포 실패 원인 진단 | "배포 실패 원인 진단해줘", "왜 배포가 죽었어" |

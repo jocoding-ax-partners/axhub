@@ -181,17 +181,11 @@ Two guards, recovery entry only:
 - The cause must be GitHub. Network, timeout, and 5xx get one retry of the same step first. Falling through on a transient error silently drops the repo and push auto-deploy the user already had.
 - The app must already exist and be resolved (`APP_ID` from `deploy-prep`). This lane never creates apps or repos — that stays `bootstrap` and `import`.
 
-Say one line and continue, not a question. No repo: `이 앱은 저장소 없이 소스를 올려서 배포해요.` Repo blocked: `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요.` The preview card and interactive approval are still required in both — same destructive mutation, different source. What the preview shows is the packed file count, size, and version hash.
+Say one line and continue, not a question. No repo: `이 앱은 저장소 없이 소스를 올려서 배포해요.` Repo blocked: `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요.` Then hand the lane to the `up` skill.
 
-```bash
-axhub up --app "$APP_ID" --tenant "$AXHUB_TENANT" "${PROFILE_FLAG[@]}" --execute --field-expr '.id // .deployment_id // empty' >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
-```
+The handoff happens **before** the preview card and approval, so nothing has mutated yet. Invoke `up` through the host's skill-invocation tool when one exists, carrying `APP_ID` and the reason (no repo / repo blocked). When no such tool exists, follow `skills/up/SKILL.md` from its step 2 in place — preview, approval, execute, and `axhub deploy verify`. Either way the deploy finishes inside this request; ending the response on the yield sentence alone leaves the user with nothing deployed. Do not restate the upload command here and do not treat this skill's preview card as the approval for it.
 
-Drop `--execute` for the dry-run decision; `axhub up` previews by default. Always pass `--app` explicitly. `axhub up` needs CLI 0.29.0+ — on unknown-command exit, route to `update` and stop rather than falling back to `deploy create`.
-
-What goes up is the current folder with `.gitignore` honored, so `.git/`, `node_modules/`, and `.env` stay out. No commit is sent, which is why a local-only commit is fine here and only here. A connected repo is not touched or disconnected: the source is chosen per deployment, not per app.
-
-Tell the user after the result, never before, and only what applies. No repo: this app deploys by uploading the folder, so there is no push auto-deploy, and `axhub apps git connect` adds one later without recreating the app. Repo blocked: this one deployment did not come from the repo, so push auto-deploy and the version history do not cover it, and the next deploy goes back to the repo path once GitHub works.
+A dirty working tree never reaches this point — `deploy-preview-summary` stops the run at the first command. That path opens only when the user calls `up` directly.
 
 ## Verify loop and diagnosis
 

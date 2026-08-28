@@ -14,6 +14,7 @@ const GUARD_FILES = [
   "skills/development/SKILL.md",
   "skills/diagnosis/SKILL.md",
   "skills/import/SKILL.md",
+  "skills/up/SKILL.md",
   "skills/update/SKILL.md",
   "hooks/auto-update-prompt.md",
 ];

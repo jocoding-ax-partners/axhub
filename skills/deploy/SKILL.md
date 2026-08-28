@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: '연결된 앱의 현재 코드를 실제 AxHub에 배포하고 성공 여부까지 확인할 때 반드시 사용해요. 트리거: "배포해", "실제 AxHub에 배포", "성공 여부까지 확인", "같은 코드로 강제 재배포", "deploy". preview-confirm과 exact deployment verify를 맡고 apps status/curl로 대신하지 않아요. 첫 연결은 import, 빈 폴더는 bootstrap, 실패 원인 진단은 diagnosis예요. axhub 맥락 없거나 다른 배포 대상이면 쓰지 않아요.'
+description: '연결된 앱의 현재 코드를 실제 AxHub에 배포하고 성공 여부까지 확인할 때 반드시 사용해요. 트리거: "배포해", "실제 AxHub에 배포", "성공 여부까지 확인", "같은 코드로 강제 재배포", "deploy". preview-confirm과 exact deployment verify를 맡고 apps status/curl로 대신하지 않아요. 첫 연결은 import, 빈 폴더는 bootstrap, 실패 원인 진단은 diagnosis예요. GitHub 없이 지금 폴더의 소스를 그대로 올리는 배포("GitHub 없이 배포해", "이 폴더 그대로 올려줘", "소스 올려서 배포")는 up 으로 양보해요. axhub 맥락 없거나 다른 배포 대상이면 쓰지 않아요.'
 examples:
   - utterance: "paydrop 배포해"
     intent: "deploy current branch to axhub live"
@@ -146,15 +146,9 @@ Deployment-record apps continue through git readiness, in-flight/status-first ha
 
 `github_connected` 가 false 면 저장소가 없는 앱이에요 — 실패가 아니라 정상 상태이고, 받을 push 웹훅이 없어서 명시적 배포가 유일한 출고 경로예요. Git readiness·push·containment·빈 커밋 정지를 건너뛰고 여기로 와요. 저장소가 있는데 GitHub 때문에 push 나 containment 가 막힌 경우도 같은 명령을 쓰되(네트워크·타임아웃·5xx 는 한 번 재시도 먼저) 그때만 복구로 알려요. 이 절차는 본문만으로 완결돼요.
 
-preview 카드와 승인은 그대로예요 — 소스만 다른 같은 mutation 이에요. 승인 뒤:
+이 lane 의 절차는 `up` 스킬이 소유해요. `deploy-prep` 에서 이 lane 임이 드러나는 시점에는 아직 아무것도 바뀌지 않아서 인계가 안전해요. 첫 카드에서 받은 승인은 **저장소 배포 기준이라 이 lane 의 승인이 아니에요** — 올라갈 내용(파일 수·크기·소스 버전)이 그 카드에 없었으니, `up` 이 실제 업로드 내용으로 카드를 한 번 더 보여주고 승인을 받아요. 사용자에게는 배포 방식이 바뀐 이유를 한 줄로 알려요. Skill 호출 도구가 있으면 `up` 을 호출하고 `APP_ID` 와 사유를 넘겨요. 그런 도구가 없으면 `skills/up/SKILL.md` 의 2단계부터 그대로 수행해요 — 미리보기, 승인, 실행, `axhub deploy verify` 성공 확인까지요. 어느 쪽이든 **배포는 반드시 이 요청 안에서 끝나요.** 양보한다는 문장만 남기고 응답을 끝내면 사용자는 아무것도 배포되지 않은 채로 남아요. 이 스킬의 preview 카드를 승인으로 승계시키지 않고, 업로드 명령을 이 본문에 다시 적지도 않아요 — 절차 원본은 `up` 한 곳이에요.
 
-```bash
-axhub up --app "$APP_ID" --tenant "$AXHUB_TENANT" "${PROFILE_FLAG[@]}" --execute --field-expr '.id // .deployment_id // empty' >"$AXHUB_STDOUT_TMP" 2>"$AXHUB_STDERR_TMP"
-```
-
-`--execute` 를 빼면 미리보기예요. 결과 모양이 `deploy create` 와 같아서 `DEPLOY_ID` 바인딩·verify 루프·diagnosis 인계는 전부 그대로예요. CLI 0.29.0+ 필요 — unknown command 로 끝나면 `update` 로 보내고 멈춰요(`deploy create` 로 대체 금지). 올라가는 건 `.gitignore` 를 존중한 현재 폴더이고 커밋은 안 보내요. 연결된 저장소는 건드리거나 끊지 않아요.
-
-안내 문구는 갈라요 — 저장소 없음: `이 앱은 저장소 없이 소스를 올려서 배포해요` / GitHub 차단: `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요. GitHub 는 이후 다시 연결할 수 있어요`.
+작업 트리가 dirty 하면 이 스킬은 첫 명령(`deploy-preview-summary`)에서 이미 멈춰 여기까지 오지 못해요. 그 경로는 사용자가 `up` 을 직접 부르는 것으로만 열려요.
 
 Preview card is interactive only and must show app, environment, branch, commit, and ETA. Display the environment as `운영`, not `prod`, `production`, or raw profile values, unless the user explicitly asked for exact CLI fields. Use `references/error-empathy-catalog.md` for the deploy-preview card and NFKC warning. Slash invocation does not skip this card.
 
@@ -256,6 +250,6 @@ Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-
 - NEVER call MCP deployment mutation tools such as `deployment_trigger`; deploy is CLI-only.
 - NEVER use advisor/server advisor/subagent/model escalation to choose or execute deploy; use CLI envelopes only.
 - NEVER commit, push, or add `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/`, or other local agent/runtime state as part of deploy cleanup. Ignore those paths when deciding whether app code is clean enough to deploy; if they are the only dirty entries, proceed with the tracked app commit and mention local cleanup only after deployment.
-- NEVER call `axhub deploy create --execute` for a commit that is only local. AxHub resolves commits from the connected GitHub repo; local-only commits fail in prod with commit-not-found. GitHub 이 막혀 `axhub up` 으로 소스를 올리는 경로만 예외예요.
+- NEVER call `axhub deploy create --execute` for a commit that is only local. AxHub resolves commits from the connected GitHub repo; local-only commits fail in prod with commit-not-found. GitHub 이 막혀 로컬 소스를 올려야 하는 경로는 예외이고, 그 경로는 `up` 스킬로 양보해요.
 - NEVER pipe `axhub plugin-support token-gate`, `axhub deploy create`, or `axhub deploy verify` through `grep`, `head`, or filters that can make a successful command look failed or make a waiting command look hung.
 - NEVER combine deploy polling into one long shell loop that asks Claude Desktop for a broad `run` permission card. Use one scoped verify command per check or a real host wakeup.

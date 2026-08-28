@@ -92,24 +92,22 @@ compose 의 `build:` 가 그 폴더를 가리켜야 해요. 어기면 build 단�
 axhub apps create --tenant test --name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --deploy-method docker --resource-tier XS
 ```
 
-**6. 배포** (tool 제목 `소스 올려서 배포`). 소스 폴더 안에서:
+**6. 배포**. 절차는 `up` 스킬이 소유해요. Skill 호출 도구가 있으면 앱 slug 와
+사유(GitHub 차단)를 넘겨 호출하고, 그런 도구가 없으면 `skills/up/SKILL.md` 의
+2단계부터 그대로 수행해요 — 미리보기, 승인, 실행, 성공 확인까지요. 이 시점에는
+앱·템플릿·치환이 이미 끝나 있어서, 배포를 넘기고 응답을 끝내면 만들어진 앱만
+남고 배포는 영영 일어나지 않아요.
 
-```bash
-axhub up --app bakery-preorder --execute
-```
-
-`--execute` 없이는 미리보기만 나와요. 올라가는 건 `.gitignore` 를 존중한 현재
-폴더이고 `.git/`·`node_modules/`·`.env` 는 빠져요(`.env.example` 류는 남아요).
-`axhub up` 은 CLI 0.29.0+ — 없으면 `axhub update apply --execute --yes --json`
-먼저. 앱에 저장소가 연결돼 있어도 그대로 동작해요(배포 소스는 배포마다 정해지고
-연결된 저장소는 건드리지 않아요).
+`up` 이 올리는 건 `.gitignore` 를 존중한 현재 폴더이고 `.git/`·`node_modules/`·
+`.env` 는 빠져요(`.env.example` 류는 남아요). 앱에 저장소가 연결돼 있어도 그대로
+동작해요 — 배포 소스는 배포마다 정해지고 연결된 저장소는 건드리지 않아요.
 
 **7. 결과 확인** — 11단계 그대로. clone 단계는 이미 끝났거나 건너뛴 상태예요.
 
 **8. 사후 고지** — 결과 카드에 덧붙여요.
 
 - 저장소가 아예 없으면: push 자동 배포·변경 이력이 없어요. 나중에 `axhub apps git connect` 로 붙일 수 있고 그때 앱을 다시 만들 필요는 없어요.
-- 저장소는 있는데 권한이 없으면: 조직 관리자가 권한을 주면 평소대로 push 배포를 쓸 수 있고, 그전까지는 `axhub up` 으로 배포하면 돼요. 저장소 주소는 saga 결과 값 그대로 알려주고 임의로 만들지 않아요.
+- 저장소는 있는데 권한이 없으면: 조직 관리자가 권한을 주면 평소대로 push 배포를 쓸 수 있고, 그전까지는 `up` 스킬로 폴더를 올려서 배포하면 돼요. 저장소 주소는 saga 결과 값 그대로 알려주고 임의로 만들지 않아요.
 
 위 값들은 확정 literal 로 바꿔요. 이 갈래에서는 `apps bootstrap` 을 부르지 않아요.
 

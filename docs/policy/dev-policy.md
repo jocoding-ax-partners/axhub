@@ -3,8 +3,8 @@
 repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 개발·운영 규칙을 한곳에 모은 기준 문서예요. README·CLAUDE.md 에 다르게 적혀 있으면 이 문서를 따라요. 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 각각 기준 문서예요.
 
 ## DP-1 diet 체제 — skill 추가 기준
-- diet 체제는 스킬 수를 최소로 유지하는 방침이에요. 공개 skill 은 9개(onboarding/bootstrap/scaffold/import/deploy/development/diagnosis/clarity/update)를 유지해요.
-- 새 skill 은 기존 9개의 경계·양보 규칙으로 연결(라우팅)할 수 없는 사용자 의도가 반복해서 관측될 때만 추가해요.
+- diet 체제는 스킬 수를 최소로 유지하는 방침이에요. 공개 skill 은 11개(onboarding/bootstrap/scaffold/plugins/deploy/up/import/development/diagnosis/clarity/update)를 유지해요.
+- 새 skill 은 기존 skill 의 경계·양보 규칙으로 연결(라우팅)할 수 없는 사용자 의도가 반복해서 관측될 때만 추가해요. `up` 이 그 기준으로 추가된 이유는, GitHub 없이 지금 폴더를 올려 배포하려는 의도가 `deploy` 의 커밋 게이트에 먼저 막혀 기존 양보 규칙으로는 그 lane 에 닿을 수 없었기 때문이에요.
 - 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli 에 둬요. 라우팅 품질은 외부 corpus(라우팅 학습용 예문 모음)가 아니라 frontmatter(SKILL.md 맨 위의 메타데이터 블록)의 `description`·`examples` 에 투자해요.
 
 ## DP-2 tone — 해요체
@@ -12,7 +12,7 @@ repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 
 - gate(통과하지 못하면 머지할 수 없는 자동 검사): `bun run lint:tone --strict` 0 error. 스캔 대상은 `skills/*/SKILL.md` + `explicit` 목록(정책 문서 3개) + codex 파생 표면(`codex-overrides/**/*.md`, `plugins/axhub-codex/skills/*/SKILL.md`)이에요.
 
 ## DP-3 frontmatter 유효성
-- 8개 SKILL.md 의 frontmatter 는 `tests/frontmatter.test.ts` 로 검증해요. `name`·`description` 은 Claude 가 어떤 스킬을 쓸지 고르는 기준(라우팅 표면)이라 깨지면 스킬이 아예 선택되지 않을 수 있어요.
+- 11개 SKILL.md 의 frontmatter 는 `tests/frontmatter.test.ts` 로 검증해요. `name`·`description` 은 Claude 가 어떤 스킬을 쓸지 고르는 기준(라우팅 표면)이라 깨지면 스킬이 아예 선택되지 않을 수 있어요.
 
 ## DP-4 release flow
 - `commit-and-tag-version` 도구 기반 3단계로 릴리즈해요:
@@ -24,7 +24,7 @@ repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 
 머지 전에 반드시 통과해야 하는 자동·수동 검사 목록이에요:
 - `bun run lint:tone --strict` — 한글 tone 0 error
 - `bun test` — frontmatter·bundle·routing·policy parity 포함 전부 PASS
-- `bun run plugin:budget` — 컨텍스트 byte 예산 PASS (SKILL.md 9개 합산 210k · per-skill 35k). codex 번들은 `bun run plugin:budget:codex` 로 같은 예산을 별도 검사해요. 넘치면 본문을 reference 로 추출하되, **실행 경로에 필요한 지시는 빼지 않아요** — reference 는 plugin cache 라 workspace 밖이고 Desktop 은 읽을 때 권한 프롬프트를 띄우는데 우리 규칙(bootstrap 9.1)은 그 프롬프트를 생략하라고 해서 조용히 안 읽혀요. 참고용 상세만 reference 로 가요.
+- `bun run plugin:budget` — 컨텍스트 byte 예산 PASS (SKILL.md 11개 합산 236,000B · per-skill 35,000B). codex 번들은 `bun run plugin:budget:codex` 로 같은 예산을 별도 검사해요. 넘치면 본문을 reference 로 추출하되, **실행 경로에 필요한 지시는 빼지 않아요** — reference 는 plugin cache 라 workspace 밖이고 Desktop 은 읽을 때 권한 프롬프트를 띄우는데 우리 규칙(bootstrap 9.1)은 그 프롬프트를 생략하라고 해서 조용히 안 읽혀요. 참고용 상세만 reference 로 가요.
 - `bun run plugin:bundle` — clean bundle(개발 산출물이 섞이지 않은 배포용 플러그인 꾸러미) 생성. 로컬 Claude Code 검증은 repo 루트가 아니라 `dist/axhub-plugin` 을 써요.
 - 대표 여정 회귀 — 첫 셋업 → 앱 생성 → 배포 → 상태 확인 경로를 문서·skill 본문·fixture(테스트용 고정 예시 데이터) 계약으로 같은 방향에 맞춰요.
 
