@@ -20,8 +20,10 @@ describe("up skill contract", () => {
   // 금지와 커밋 게이트 부재를 함께 잠가요.
   test("AE1: 커밋 상태를 게이트로 쓰지 않고 커밋 게이트 명령을 금지해요", () => {
     expect(body).toContain("커밋 상태를 게이트로 쓰지 않아요");
-    expect(body).toContain("deploy-preview-summary");
-    expect(body).toContain("deploy-approved-run");
+    // 방향성 있는 금지문 — 이름 존재만 보면 "deploy-preview-summary 로 시작해요"
+    // 로 뒤집혀도 통과해요.
+    expect(body).toContain("`axhub plugin-support deploy-preview-summary` / `deploy-approved-run` 호출 금지");
+    expect(body).toContain("`axhub plugin-support deploy-preview-summary` 와 `deploy-approved-run` 은 **쓰지 않아요.**");
     expect(body).toContain("plugin-support deploy-prep --intent deploy --json");
     // 커밋을 만들거나 push 하지 않는다는 계약.
     expect(body).toContain("커밋을 만들거나 push 하지 않");
@@ -67,6 +69,21 @@ describe("up skill contract", () => {
   test("static 앱은 deploy 의 static lane 으로 양보해요", () => {
     expect(body).toContain("deploy_method");
     expect(body).toContain("static lane");
+  });
+
+  // 양보 계약 — deploy·bootstrap 이 업로드 명령을 직접 실행하지 않아야 해요.
+  // 이 삭제를 잠그지 않으면 두 스킬이 같은 배포를 각자 승인·실행할 수 있어요.
+  test("deploy·bootstrap 은 업로드 명령을 직접 실행하지 않아요", () => {
+    for (const path of [
+      "skills/deploy/SKILL.md",
+      "skills/deploy/references/workflow-details.md",
+      "skills/bootstrap/SKILL.md",
+      "skills/bootstrap/references/github-blocked-local-deploy.md",
+    ]) {
+      const text = readRepo(path);
+      expect(text, path).not.toMatch(/axhub up [^\n]*--execute/);
+      expect(text, path).not.toMatch(/axhub up [^\n]*--dry-run/);
+    }
   });
 
   // reference 는 참고용이고 실행 지시를 본문 밖으로 빼지 않아요 (KTD5).

@@ -18,7 +18,7 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-2 deploy preview-confirm gate
 - 규칙: 실제 배포를 실행하기 전에 무엇이 어떻게 배포되는지 미리보기(preview)를 보여주고 사용자 확인을 받아요. headless 에서는 실행하지 않고 dry-run/preview 로 멈춰요.
-- 적용: skills/deploy/SKILL.md
+- 적용: skills/deploy/SKILL.md, skills/up/SKILL.md
 - invariant: "preview-confirm"
 
 ## AP-3 파괴적 변경 승인

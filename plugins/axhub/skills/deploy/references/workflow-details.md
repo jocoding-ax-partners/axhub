@@ -181,9 +181,9 @@ Two guards, recovery entry only:
 - The cause must be GitHub. Network, timeout, and 5xx get one retry of the same step first. Falling through on a transient error silently drops the repo and push auto-deploy the user already had.
 - The app must already exist and be resolved (`APP_ID` from `deploy-prep`). This lane never creates apps or repos — that stays `bootstrap` and `import`.
 
-Say one line and continue, not a question. No repo: `이 앱은 저장소 없이 소스를 올려서 배포해요.` Repo blocked: `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요.` Then hand the lane to the `up` skill and end this skill here.
+Say one line and continue, not a question. No repo: `이 앱은 저장소 없이 소스를 올려서 배포해요.` Repo blocked: `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요.` Then hand the lane to the `up` skill.
 
-The handoff happens **before** the preview card and approval, so nothing has mutated yet. Carry `APP_ID` and the reason (no repo / repo blocked) across; `up` runs its own preview, approval, execute, and verify from the start. Do not run the upload command here and do not treat this skill's preview card as the approval for it.
+The handoff happens **before** the preview card and approval, so nothing has mutated yet. Invoke `up` through the host's skill-invocation tool when one exists, carrying `APP_ID` and the reason (no repo / repo blocked). When no such tool exists, follow `skills/up/SKILL.md` from its step 2 in place — preview, approval, execute, and `axhub deploy verify`. Either way the deploy finishes inside this request; ending the response on the yield sentence alone leaves the user with nothing deployed. Do not restate the upload command here and do not treat this skill's preview card as the approval for it.
 
 A dirty working tree never reaches this point — `deploy-preview-summary` stops the run at the first command. That path opens only when the user calls `up` directly.
 

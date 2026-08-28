@@ -149,7 +149,7 @@ Deployment-record apps continue through git readiness, in-flight/status-first ha
 
 `github_connected` 가 false 면 저장소가 없는 앱이에요 — 실패가 아니라 정상 상태이고, 받을 push 웹훅이 없어서 명시적 배포가 유일한 출고 경로예요. Git readiness·push·containment·빈 커밋 정지를 건너뛰고 여기로 와요. 저장소가 있는데 GitHub 때문에 push 나 containment 가 막힌 경우도 같은 명령을 쓰되(네트워크·타임아웃·5xx 는 한 번 재시도 먼저) 그때만 복구로 알려요. 이 절차는 본문만으로 완결돼요.
 
-이 lane 은 `up` 스킬이 소유해요. **preview·승인 전에** `up` 으로 양보하고 이 스킬은 여기서 끝내요 — 그 시점에는 아직 아무것도 바뀌지 않아서 인계가 안전해요. 넘길 때 `APP_ID` 와 사유(저장소 없음 / GitHub 차단)를 그대로 이어주고, preview 카드·승인·실행·verify 는 `up` 이 처음부터 해요. 여기서 `axhub up` 을 직접 실행하지 않고, 이 스킬의 preview 카드를 승인으로 승계시키지도 않아요.
+이 lane 의 절차는 `up` 스킬이 소유해요. **preview·승인 전에** 넘겨요 — 그 시점에는 아직 아무것도 바뀌지 않아서 인계가 안전해요. Skill 호출 도구가 있으면 `up` 을 호출하고 `APP_ID` 와 사유를 넘겨요. 그런 도구가 없으면 `skills/up/SKILL.md` 의 2단계부터 그대로 수행해요 — 미리보기, 승인, 실행, `axhub deploy verify` 성공 확인까지요. 어느 쪽이든 **배포는 반드시 이 요청 안에서 끝나요.** 양보한다는 문장만 남기고 응답을 끝내면 사용자는 아무것도 배포되지 않은 채로 남아요. 이 스킬의 preview 카드를 승인으로 승계시키지 않고, 업로드 명령을 이 본문에 다시 적지도 않아요 — 절차 원본은 `up` 한 곳이에요.
 
 작업 트리가 dirty 하면 이 스킬은 첫 명령(`deploy-preview-summary`)에서 이미 멈춰 여기까지 오지 못해요. 그 경로는 사용자가 `up` 을 직접 부르는 것으로만 열려요.
 

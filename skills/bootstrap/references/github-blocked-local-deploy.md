@@ -92,9 +92,11 @@ compose 의 `build:` 가 그 폴더를 가리켜야 해요. 어기면 build 단�
 axhub apps create --tenant test --name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --deploy-method docker --resource-tier XS
 ```
 
-**6. 배포**. 이 단계는 `up` 스킬이 소유해요 — 여기서 배포 명령을 직접 실행하지
-않고 앱 slug 와 사유(GitHub 차단)를 넘겨 양보해요. preview 카드·승인·실행·성공
-확인은 `up` 이 처음부터 하고, 이 갈래는 앱을 만드는 데까지만 책임져요.
+**6. 배포**. 절차는 `up` 스킬이 소유해요. Skill 호출 도구가 있으면 앱 slug 와
+사유(GitHub 차단)를 넘겨 호출하고, 그런 도구가 없으면 `skills/up/SKILL.md` 의
+2단계부터 그대로 수행해요 — 미리보기, 승인, 실행, 성공 확인까지요. 이 시점에는
+앱·템플릿·치환이 이미 끝나 있어서, 배포를 넘기고 응답을 끝내면 만들어진 앱만
+남고 배포는 영영 일어나지 않아요.
 
 `up` 이 올리는 건 `.gitignore` 를 존중한 현재 폴더이고 `.git/`·`node_modules/`·
 `.env` 는 빠져요(`.env.example` 류는 남아요). 앱에 저장소가 연결돼 있어도 그대로

@@ -1,6 +1,6 @@
 ---
 name: up
-description: 'GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려서 배포해요. 커밋을 만들지 않고 작업 트리를 그대로 업로드하는 lane 이라, 커밋하지 않은 변경이 있어도 그대로 진행해요. 트리거: "GitHub 없이 배포해", "저장소 없이 배포해줘", "이 폴더 그대로 올려줘", "소스 올려서 배포", "레포 안 만들고 배포", "deploy without github", "upload this folder and deploy". 저장소가 연결돼 있고 push 배포가 정상인 평시 "배포해" 는 deploy 로, 빈 폴더 새 앱은 bootstrap 으로, 기존 앱 첫 연결은 import 로, 정적 파일 앱(deploy_method=static)은 deploy 의 static lane 으로 양보해요. 이 트리거는 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요.'
+description: 'GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려서 배포해요. 커밋을 만들지 않고 작업 트리를 그대로 업로드하는 lane 이라, 커밋하지 않은 변경이 있어도 그대로 진행해요. 트리거: "GitHub 없이 배포해", "저장소 없이 배포해줘", "이 폴더 그대로 올려줘", "소스 올려서 배포", "레포 안 만들고 배포", "GitHub push 가 막혀서 배포가 안 돼", "레포 권한이 없어서 배포 못 해", "deploy without github", "upload this folder and deploy". 저장소가 연결돼 있고 push 배포가 정상인 평시 "배포해" 는 deploy 로, 빈 폴더 새 앱은 bootstrap 으로, 기존 앱 첫 연결은 import 로, 정적 파일 앱(deploy_method=static)은 deploy 의 static lane 으로 양보해요. 이 트리거는 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요.'
 examples:
   - utterance: "GitHub 없이 이 폴더 그대로 올려줘"
     intent: "deploy the local working tree without a git repository"
@@ -24,6 +24,15 @@ model: sonnet
 
 **커밋 상태를 게이트로 쓰지 않아요.** 커밋하지 않은 변경이 있는 작업 트리는 이 lane 의 정상 입력이에요 — 커밋을 만들거나 push 하지 않고 지금 파일을 그대로 올려요.
 
+## 승인 게이트 계약 (요약)
+
+절단이 있는 host 는 이 본문을 앞에서부터 일부만 읽어요. 아래 게이트는 뒤쪽 절차 설명이 잘려도 그대로 지켜요.
+
+1. 실행 승인 — preview 카드를 보여준 뒤 `axhub 로 지금 이 폴더를 올려서 배포할까요?` 로 한 번만 묻고, 이 승인 하나가 axhub 진입 확인을 겸해요. 승인 전에는 `--execute` 를 실행하지 않아요.
+2. 승인 방식 — 네이티브 선택 UI 가 없으면 같은 확인을 명시 텍스트 승인 1회로 받아요. preview 를 본 뒤 사용자가 새로 입력한 승인 문구만 유효하고, 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요.
+3. 빈 답변 = 미승인 — 선택 카드로 물은 경우 빈 답변이 돌아오면 미승인이에요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.
+4. 승인 채널이 없는 headless 에서는 dry-run 에서 멈춰요 — 승인을 조용히 건너뛰지 않아요.
+
 ## First Visible Sentence
 
 사용자가 로컬 소스 배포를 말하면(`GitHub 없이 배포해`, `이 폴더 그대로 올려줘`, `소스 올려서 배포`) 첫 visible chat 문장은 정확히 이거예요:
@@ -33,6 +42,8 @@ model: sonnet
 `deploy` 의 첫 문장(`배포 준비를 확인할게요.`)과 다르게 둬서, 사용자가 어느 lane 에 있는지 첫 줄에서 알 수 있게 해요.
 
 그다음 한국어 제목 `소스 배포 준비 확인` 으로 tool call 하나를 실행해요. 이 첫 명령 전에는 설치·플러그인·앱·git·curl probe 를 하지 않아요.
+
+`deploy`·`bootstrap` 에서 넘어온 경우에는 이 첫 문장과 probe 0 규칙을 적용하지 않아요 — 이미 진행 중인 흐름이라 넘겨받은 `APP_ID` 로 2단계(미리보기)부터 시작하고 1단계는 건너뛰어요.
 
 ## Tool Authority
 
@@ -90,10 +101,11 @@ axhub plugin-support deploy-prep --intent deploy --json
 | `auth_ok` false | `axhub 로그인이 필요해요.` 한 줄 뒤 auth 복구로 안내하고 멈춰요. |
 | `cli_too_old` true | `update` 로 보내고 멈춰요. |
 | `bootstrap_plan` 존재, 또는 `resolve.app_id` 없음 | 앱이 아직 없다는 뜻이에요. 비어 있지 않은 폴더는 `import`, 빈 폴더는 `bootstrap` 으로 양보해요. |
-| `in_flight_deploy` 존재 | `이미 진행 중인 배포가 있어요.` 를 알리고, 그 배포를 계속 볼지 새 배포를 시작할지 **한 번 묻고 멈춰요.** `deploy-prep` 은 이 상태를 exit code 로 알리지 않으니 여기서 직접 막아요. headless 는 묻지 않고 진행 중 배포를 지켜보는 쪽으로 멈춰요. |
+| `in_flight_deploy` 존재 | `이미 진행 중인 배포가 있어요. 그 배포를 계속 확인할게요.` 한 줄 뒤 `in_flight_deploy.id` 를 `DEPLOY_ID` 로 바인딩하고 5단계로 바로 가요. 새 배포를 시작하지 않아요 — `deploy-prep` 은 이 상태를 exit code 로 알리지 않으니 여기서 직접 막아요. |
 | exit 64 (`validation.quality_gate_failed`) | 품질 확인에서 막힌 항목이 있다는 뜻이에요. 실행하지 않고 사유를 한국어로 알린 뒤 멈춰요. |
+| 현재 폴더에 `axhub.yaml`·`apphub.yaml` 이 둘 다 없음 | `이 폴더에 axhub 매니페스트가 없어서 어떤 앱의 소스인지 확인할 수 없어요.` 로 멈추고 `import` 로 양보해요. `axhub up` 은 패킹 전에 매니페스트를 보지 않으니 이 확인은 여기서 해요. |
 
-`APP_ID` 는 `resolve.app_id` 로 바인딩해요.
+`APP_ID` 는 `resolve.app_id` 로 바인딩해요. tenant 와 profile 은 플래그로 넘기지 않아요 — CLI 가 `AXHUB_TENANT`·`AXHUB_PROFILE` 환경변수를 직접 읽어요. 셸 변수로만 잡아 둔 값은 넘어가지 않으니, 명시 스코프가 필요하면 그 환경변수를 설정해요.
 
 ### static 앱 확인
 
@@ -108,7 +120,7 @@ axhub apps get "$APP_ID" --no-input --field-expr '.deploy_method // empty'
 ## 2단계 — 올릴 내용 미리보기
 
 ```bash
-axhub up --app "$APP_ID" --path . --tenant "$AXHUB_TENANT" --dry-run --json
+axhub up --app "$APP_ID" --path . --dry-run --json
 ```
 
 dry-run 은 앱 resolve·인증·네트워크 이전에 패킹만 하고 끝나요. 반환된 `target` 문자열에서 파일 수·압축 크기·source 버전을 읽어 preview 카드를 만들어요. 이 값은 **승인 시점의 스냅샷**이에요 — `--execute` 는 폴더를 다시 패킹하므로, 승인 뒤 파일을 고치면 카드와 다른 소스가 올라가요.
@@ -142,13 +154,17 @@ AXHUB_GATE_POLL_ITERATIONS=0 axhub plugin-support token-gate
 
 exit 0 이면 계속하고, exit 65 면 auth 복구로 가요. `AXHUB_AUTH_BG_REFRESH=0` 이면 이 게이트를 건너뛰어요.
 
+승인과 실행 사이에 폴더가 바뀌었을 수 있으니 2단계 dry-run 을 한 번 더 돌려 source 버전을 카드 값과 대조해요. 다르면 실행하지 않고 `승인하신 뒤 폴더 내용이 바뀌었어요. 지금 올라갈 소스가 보여드린 것과 달라서 다시 확인할게요.` 로 2단계 preview 부터 다시 해요.
+
 그다음 실행해요:
 
 ```bash
-axhub up --app "$APP_ID" --path . --tenant "$AXHUB_TENANT" --execute --field-expr '.id // .deployment_id // empty'
+axhub up --app "$APP_ID" --path . --execute --field-expr '.id // .deployment_id // empty'
 ```
 
-결과 모양이 `deploy create` 와 같아서 이후 단계는 저장소 배포와 동일해요. `DEPLOY_ID` 는 이 출력에서만 바인딩해요. id 를 못 받으면 성공을 선언하지 않고 `배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. 자동으로 지켜볼 id 가 없어 여기서 멈출게요.` 라고 말한 뒤 멈춰요.
+**이 명령은 실패로 보여도 다시 실행하지 않아요.** 폴더가 크면 업로드가 도구 타임아웃보다 오래 걸려, 배포는 이미 시작됐는데 출력만 잘려 돌아올 수 있어요. 그때 재실행하면 같은 소스로 프로덕션 배포가 하나 더 생겨요. 출력이 잘리거나 타임아웃이면 `deploy list --app "$APP_ID"` 로 방금 만들어진 배포가 있는지 먼저 확인하고, 있으면 그 id 를 `DEPLOY_ID` 로 써요. exit 64 에 `deployment_in_progress` 가 있으면 실패가 아니라 진행 중이라는 뜻이라 5단계로 가요.
+
+결과 모양이 `deploy create` 와 같아서 이후 단계는 저장소 배포와 동일해요. `DEPLOY_ID` 는 이 출력 또는 1단계의 `in_flight_deploy.id` 에서만 바인딩해요. id 를 못 받으면 성공을 선언하지 않고 `배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. 자동으로 지켜볼 id 가 없어 여기서 멈출게요.` 라고 말한 뒤 멈춰요.
 
 ## 5단계 — 성공 확인
 
@@ -162,7 +178,7 @@ axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" --wait --wait-interval 20s --wa
 
 호출 직전에 `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` 한 줄만 남겨요. 이 한 호출이 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `apps get`·`deploy list`·`deploy status` 같은 사후 확인을 덧붙이지 않아요.
 
-`verify_wait` capability 가 없는 구 CLI 에서만 `--wait` 없는 개별 호출을 반복해요. 이때도 스킬 레벨 **폴링 예산**이 적용돼요 — **최대 30회 또는 10분** 중 먼저 닿는 쪽까지만이에요. `sleep`·shell loop·pipe·command substitution 으로 묶지 않고 독립 tool call 로 실행해요.
+`verify_wait` capability 가 없는 구 CLI 에서만 `--wait` 없는 개별 호출을 반복해요. 이때도 스킬 레벨 **폴링 예산**이 적용돼요 — **최대 30회 또는 10분** 중 먼저 닿는 쪽까지만이에요. `sleep`·shell loop·pipe·command substitution 으로 묶지 않고 독립 tool call 로 실행해요. 짧은 독립 호출 사이에는 host 가 지원하면 실제 대기 수단(예약 재확인)을 써요. 대기 수단이 없으면 30회를 연달아 쓰지 말고 확인 가능한 횟수까지만 하고 재개 요약으로 끝내요.
 
 예산에 닿으면 실패로 선언하지 않아요. `아직 진행 중이에요. 여기서 실패로 보지 않고, 제가 확인 가능한 범위까지는 같은 배포를 지켜봤어요.` 로 재개 요약을 남기고 `DEPLOY_ID` 를 보존해요. 사용자에게 다시 상태 확인을 요청하지 않아요.
 
@@ -190,6 +206,7 @@ verify exit:
 - `axhub plugin-support deploy-preview-summary` / `deploy-approved-run` 호출 금지 — 커밋 게이트가 이 lane 을 잘못 막아요.
 - 커밋 생성·`git add`·`git push`·`.gitignore` 수정 금지. 사용자의 저장소를 대신 정리하지 않아요.
 - `axhub deploy create` 로 대체 금지. 로컬 커밋은 저장소에서 찾을 수 없어요.
+- `axhub up --execute` 재실행 금지 — 같은 소스라도 새 프로덕션 배포가 하나 더 생겨요.
 - `axhub deploy watch` / `deploy status --watch` 호출 금지 — Desktop·non-TTY 에서 저하돼요.
 - MCP 배포 mutation 도구 호출 금지.
 - verify 전 성공 선언 금지.

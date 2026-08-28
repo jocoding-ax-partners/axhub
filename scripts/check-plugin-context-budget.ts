@@ -10,12 +10,12 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 // — 실제로 GitHub 차단 폴백이 그렇게 죽었다. 실행에 필요한 최소본은 본문에 둔다.
 // 200_000 → 210_000: 9번째 skill(scaffold — 사용자 소유 저장소로 템플릿 시작) 추가.
 // 210_000 → 220_000: 10번째 skill(plugins — app-backed marketplace 게시·목록·다운로드) 추가.
-// 220_000 → 245_000: 11번째 skill(up — GitHub 없이 로컬 폴더 배포) 추가. 이번 증분은
-// 선례 추종이 아니라 실행 lane skill 크기에서 역산했어요 — 같은 preview→승인→실행→verify
-// 구조인 deploy 26,206B·import 29,297B·bootstrap 27,803B 가 기준이고, 9·10번째의
-// +10,000B 는 이 저장소에서 가장 작은 두 skill 의 증분이라 이 lane 에 맞지 않아요.
+// 220_000 → 236_000: 11번째 skill(up — GitHub 없이 로컬 폴더 배포) 추가. 상한은 선례
+// 추종도 동급 skill 크기 역산도 아니고 실측에서 잡았어요 — 11개 합산 230,606B 에
+// 9·10번째가 유지하던 수준의 여유(약 5,000B)를 더한 값이에요. 게이트 감도를 종전과
+// 같게 두는 것이 목적이라, up 이 나중에 deploy 급으로 자라면 그때 다시 올려요.
 // per-skill 35_000 게이트는 그대로 유지해요 — 개별 skill 비대화는 계속 막아요.
-export const DEFAULT_MAX_TOTAL_BYTES = 245_000;
+export const DEFAULT_MAX_TOTAL_BYTES = 236_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
 export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {
