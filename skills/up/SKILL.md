@@ -123,7 +123,7 @@ CLI 0.29.0 미만이면 이 명령이 unknown command 로 끝나요. 그때는 `
 
 interactive 에서는 preview 카드 하나가 **axhub 진입 확인**을 겸해요. 카드에 앱, 환경, 파일 수, 압축 크기, source 버전, 예상 소요를 보여주고 `axhub 로 지금 이 폴더를 올려서 배포할까요?` 를 한 번만 물어요. 환경은 `운영` 으로 표시하고 `prod`·`production` 같은 raw 값을 쓰지 않아요.
 
-네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받아요. 둘 다 불가한 headless 에서는 실행 없이 dry-run 에서 멈춰요 — **승인을 조용히 건너뛰지 않아요.** slash 호출도 이 카드를 건너뛰지 못해요. 이 preview-confirm 은 `deploy` 와 같은 mutation 에 대한 같은 게이트이고, 소스만 달라요.
+네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. headless 는 dry-run preview 까지만 하고 `--execute` 로 넘어가지 않아요. slash 호출도 이 카드를 건너뛰지 못해요. 이 preview-confirm 은 `deploy` 와 같은 mutation 에 대한 같은 게이트이고, 소스만 달라요.
 
 `취소` 면 종료해요.
 

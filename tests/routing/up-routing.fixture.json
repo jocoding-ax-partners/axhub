@@ -1,0 +1,72 @@
+{
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). up 은 GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려서 배포하는 lane 을 맡되, AP-11 로 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 진입해요. 커밋 상태는 게이트가 아니에요 — 커밋하지 않은 변경이 있는 작업 트리가 이 lane 의 정상 입력이에요.",
+  "boundary": {
+    "up": "이미 연결된 axhub 앱을 GitHub 없이 로컬 폴더 소스로 배포 (preview-confirm gate). axhub 맥락 필요.",
+    "deploy": "저장소가 연결돼 있고 push 배포가 정상인 평시 재배포·배포 상태 확인. static 앱 lane 도 여기.",
+    "import": "비어 있지 않은 기존 로컬 앱 첫 연결·첫 배포",
+    "bootstrap": "빈 디렉토리 새 앱 생성",
+    "none": "AP-11 — axhub 맥락이 없으면 어느 스킬도 진입하지 않고 한 번 묻거나 종료 (다른 axhub 스킬로 넘기지 않음)"
+  },
+  "cases": [
+    {
+      "utterance": "GitHub 없이 배포해줘",
+      "context": "axhub.yaml 연결된 앱 폴더, github_connected=false",
+      "expected": "up",
+      "why": "로컬 소스 배포를 명시한 발화"
+    },
+    {
+      "utterance": "이 폴더 그대로 올려줘",
+      "context": "axhub.yaml 연결된 앱 폴더",
+      "expected": "up",
+      "why": "폴더 업로드 배포를 명시 — KD2 가 넓힌 트리거 계열"
+    },
+    {
+      "utterance": "소스 올려서 배포해줘",
+      "context": "axhub.yaml 연결된 앱 폴더, 커밋하지 않은 변경 있음",
+      "expected": "up",
+      "why": "커밋 상태는 게이트가 아니에요 — dirty 작업 트리가 이 lane 의 정상 입력"
+    },
+    {
+      "utterance": "저장소 없이 배포해줘",
+      "context": "axhub.yaml 연결된 앱 폴더, 로컬 git 저장소는 있으나 GitHub 미연결",
+      "expected": "up",
+      "why": "deploy 의 커밋 게이트가 막던 바로 그 조합"
+    },
+    {
+      "utterance": "GitHub 없이 이 폴더 올려서 배포해줘",
+      "context": "axhub.yaml 연결된 앱 폴더, github_connected=true",
+      "expected": "up",
+      "why": "로컬 소스 배포를 명시하면 github_connected 가 true 여도 up 이 이겨요"
+    },
+    {
+      "utterance": "배포해",
+      "context": "axhub.yaml 연결된 앱 폴더, 저장소 연결 정상",
+      "expected": "deploy",
+      "why": "소스 업로드를 명시하지 않은 평시 배포는 deploy"
+    },
+    {
+      "utterance": "이 폴더 그대로 올려줘",
+      "context": "axhub.yaml 연결된 앱 폴더, deploy_method=static",
+      "expected": "deploy",
+      "why": "static 앱은 release 기반이라 성공 선언 경로가 달라 deploy 의 static lane 이 맡아요"
+    },
+    {
+      "utterance": "이 앱을 axhub에 올려줘",
+      "context": "코드는 있으나 axhub.yaml 없음 (앱 미연결)",
+      "expected": "import",
+      "why": "앱 첫 연결은 import — up 은 이미 연결된 앱만 맡아요"
+    },
+    {
+      "utterance": "새 앱 만들어줘",
+      "context": "빈 디렉토리",
+      "expected": "bootstrap",
+      "why": "빈 폴더 새 앱 생성"
+    },
+    {
+      "utterance": "이 폴더 올려줘",
+      "context": "axhub 맥락 없는 일반 프로젝트 (axhub.yaml 없음, axhub 무언급, 직전 axhub 작업 없음)",
+      "expected": "none",
+      "why": "AP-11 — 한 번 묻거나 종료하고 다른 axhub 스킬로 넘기지 않아요"
+    }
+  ]
+}
