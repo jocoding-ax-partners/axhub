@@ -319,13 +319,17 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
   const CODEX_SKILL_PROMPT_LIMIT = 8_000;
   const GATE_STRINGS: Record<string, readonly string[]> = {
     bootstrap: [
+      "axhub apps get <app> --json",
+      "axhub apps git-backend --tenant <tenant> --json",
+      "git_backend.backend=selfhosted",
       "어떤 템플릿으로 시작할까요?",
       "앱 이름을 무엇으로 할까요?",
       "지금 만들고 배포까지 진행할까요?",
       "--execute",
       "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
     ],
-    deploy: ["axhub로 지금 배포를 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
+    deploy: ["axhub apps get <app> --json", "git_backend.backend=selfhosted", "axhub repo clone <app>", "axhub로 지금 배포를 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
+    onboarding: ["axhub apps get <app> --json", "axhub apps git-backend --tenant <tenant> --json", "git_backend.backend=selfhosted"],
     import: ["미리보기대로 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
     scaffold: ["명시 텍스트 승인 1회", "미리 넣어 둔 문구", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
     plugins: ["artifact를 배포할 권리가 있음을 확인하고", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "--idempotency-key", "--execute"],
@@ -333,7 +337,7 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     update: ["update apply --execute"],
   };
 
-  test("approval gates sit inside the codex 8,000B truncation window (R2)", () => {
+  test("approval and backend gates sit inside the codex 8,000B truncation window (R2)", () => {
     const failures: string[] = [];
     for (const [skill, gates] of Object.entries(GATE_STRINGS)) {
       const buf = readFileSync(join(outDir, "skills", skill, "SKILL.md"));

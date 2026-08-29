@@ -1,9 +1,8 @@
 # GitHub 이 막혔을 때 — 로컬 소스로 배포 (백엔드 spec 184)
 
-bootstrap 12단계 본문이에요. GitHub 때문에 더 못 나갈 때만 읽어요.
+bootstrap 12단계의 GitHub-only 복구 본문이에요. `axhub apps get <app> --json` 또는 fresh의 `axhub apps git-backend --tenant <tenant> --json`에서 `git_backend.backend=selfhosted`가 확인되면 이 파일을 읽거나 이 fallback으로 오지 않아요.
 
-bootstrap 은 저장소를 만드는 흐름이라 GitHub 이 필수예요(`--github-owner`).
-막히면 빈손으로 돌려보내는 대신 코드를 확보해 그대로 올려서 배포해요.
+GitHub backend의 bootstrap은 `--github-owner` 저장소 흐름을 유지해요. 그 경로가 막히면 빈손으로 돌려보내는 대신 코드를 확보해 그대로 올려서 배포해요.
 **묻지 않고 진행하고**, 무엇이 달라지는지는 하고 나서 알려줘요.
 
 ## 언제 오나 — 단계가 아니라 원인으로

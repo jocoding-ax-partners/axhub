@@ -26,7 +26,7 @@
 같은 대화에서 온보딩이 이미 끝났으면 중복 안내를 줄여요. 단 줄이는 건 **재설명·재안내뿐**이에요:
 
 - ✅ 줄여도 됨: 이 대화에서 이미 보여준 install-link 재안내, 셋업 다시 설명.
-- ❌ 절대 우회 금지: auth 판정(`preflight`), GitHub 설치 판정(`accounts list`), owner-pick(2+ 설치 시 어느 계정에 repo 만들지), 0-install gate. 이건 맥락과 무관하게 항상 그대로 실행해요.
+- ❌ 절대 우회 금지: auth 판정(`preflight`)과 backend 판정. GitHub branch의 설치 판정(`accounts list`)·owner-pick·0-install gate는 그대로 실행하고, selfhosted에서는 노출하지 않아요.
 
 마커는 마찰만 줄여요. correctness gate 를 대신 통과시키지 않아요.
 

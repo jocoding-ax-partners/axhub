@@ -1,6 +1,6 @@
 # GitHub App Onboarding
 
-Load this whenever detect includes `github.install_url`, when the gap is `github_link_missing` or `github_app_missing`, or when an existing repo needs `axhub apps git`.
+Load this only after `axhub apps get <app> --json` or fresh `axhub apps git-backend --tenant <tenant> --json` selected `git_backend.backend=github` (or app source `legacy_github`). A selfhosted or malformed backend must not load this file, show `github.install_url`, call account linking, or render any question below.
 
 ## GitHub 계정 연동 (설치보다 먼저)
 

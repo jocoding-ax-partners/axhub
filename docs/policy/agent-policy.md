@@ -136,3 +136,10 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 규칙: 정적 파일 앱(deploy_method=static — 서버 없이 파일만 올리는 방식)의 배포 성공은 activate 결과의 `active_release_id` (새 버전이 실제로 켜졌다는 표시)로 선언하고 `deploy verify` 는 부르지 않아요 — static 은 deployment-record 가 아니라 release 라 verify 가 404 예요. 이 규칙은 static lane 을 실제로 소유한 skill 에만 적용해요. AP-1 에서 떼어낸 이유는, 두 lane 의 성공 선언을 한 규칙에 묶어 두면 static lane 이 없는 skill 을 그 규칙에 넣을 수 없기 때문이에요.
 - 적용: skills/deploy/SKILL.md
 - invariant: "active_release_id"
+
+## AP-23 app git backend 선판정
+- 규칙: 저장소 provider 대사나 mutation보다 먼저 public CLI JSON으로 effective backend를 확인해요. resume/existing은 `axhub apps get <app> --json`, fresh bootstrap/onboarding은 read-only `axhub apps git-backend --tenant <tenant> --json`을 쓰고 app row를 먼저 만들지 않아요. 판정 입력은 top-level `git_backend.backend`·`git_backend.source`뿐이며 Gitea API·C1 HTTP·remote URL을 보지 않아요. selfhosted는 계정 연동·device flow·GitHub App 설치 대사를 노출하지 않고, non-static deploy는 `axhub repo clone` 뒤 일반 `git push`의 webhook deployment id를 exact verify해요. static은 기존 release lane, GitHub와 `legacy_github`는 기존 gate/upload/create 경로를 유지해요.
+- 적용: skills/bootstrap/SKILL.md, skills/deploy/SKILL.md, skills/onboarding/SKILL.md
+- invariant: "axhub apps get <app> --json", "git_backend.backend=selfhosted"
+- 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/onboarding/SKILL.md
+- invariant(codex): "axhub apps get <app> --json", "git_backend.backend=selfhosted"

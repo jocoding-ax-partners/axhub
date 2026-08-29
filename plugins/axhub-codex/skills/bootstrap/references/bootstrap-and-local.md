@@ -6,15 +6,18 @@ All Codex-visible commands in this reference follow the top-level bootstrap cont
 
 ## Dry-Run Preview
 
-Run only after template, app name, tenant, and GitHub owner gate are settled:
+Run only after template, app name, tenant, and the top-level `git_backend` gate are settled. selfhosted has no repository-owner gate; GitHub must also finish the existing owner gate.
 
 Codex-visible tool titles and progress text must stay user-facing and start with Korean text. Use titles like `만들기 전 확인` or `미리보기 확인`; do not write `dry-run`, `Bootstrapped dry-run`, `Bootstraping dry-run`, `axhub bootstrap`, `saga`, or other internal execution labels in chat or tool descriptions.
 
 Use the command shape below by replacing the sample literals with the values already confirmed in the conversation. Do not run a Desktop-visible command that contains `export`, value-assembly `TEMPLATE=...`/`APP_NAME=...`, `$TEMPLATE`, `$APP_SLUG`, `$AXHUB_TENANT`, command substitution, or semicolon-chained shell glue. Execute and resume commands carry no env prefix — `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` there makes the CLI block-poll instead of returning the device code, so the tool call never ends and the code stays invisible. That prefix belongs only on the short `github link` fast path.
 
 ```bash
+axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --dry-run --json
 axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json
 ```
+
+The first command is the selfhosted shape; the second is the unchanged GitHub shape. Never add `--github-owner` to selfhosted.
 
 Show preview fields in Korean: template, slug, subdomain, repo name, visibility. Do not show raw JSON. Do not execute before the user confirms:
 
@@ -48,8 +51,11 @@ axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-p
 ```
 
 ```bash
+axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
 axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
 ```
+
+The first command is selfhosted; the second preserves GitHub behavior.
 
 Do not add `--json` to Desktop-visible execute or device-flow resume commands. Do not set an intentionally short tool timeout to force Codex backgrounding. Device-flow code display must come from the visible `axhub ...` command output, not from a background watcher or a generated output file. When GitHub device flow starts, surface the `verification_uri` plus `user_code` in normal chat text before any confirmation/status command.
 
@@ -71,7 +77,7 @@ Use the real `bootstrap_id` from the previous JSON/status output instead of the 
 
 ## Device-Code Event
 
-A linked GitHub account makes execute finish with no device flow at all, so nothing in this section runs on that path. Everything below is the fallback for the not-linked or expired-link case that the GitHub App gate already surfaced.
+This entire section is GitHub-only. When `git_backend.backend=selfhosted`, do not inspect these events, do not start or resume device flow, and do not render any authentication or installation copy. A linked GitHub account makes execute finish with no device flow at all, so everything below is the fallback for the not-linked or expired-link case that the GitHub App gate already surfaced.
 
 If stdout contains:
 
@@ -112,11 +118,20 @@ If resume says `no pending github device flow`, follow `resume-and-tenant.md` re
 
 ## Clone Current Directory
 
-After saga reaches terminal success, read repo from status and fill current directory. Do not create a subdirectory.
+After saga reaches terminal success, branch on the already-resolved backend. For selfhosted, carry the literal tenant selected by the flow through credential setup and app resolution:
 
-Codex may create `.omc/` in a newly added folder before the app code is cloned. Treat that as Desktop metadata, not as a user app. Do not run `git clone ... .`, because it fails in metadata-only folders and leads to extra `rtk ls -la` probes. Fill the current folder with `git init` + `fetch` + `reset --hard` so `.omc/` stays in place:
+```bash
+axhub --tenant <tenant> git setup --json
+axhub --tenant <tenant> repo clone <app-slug> --json
+```
 
-Keep the clone/hydrate command raw-git only. Never prefix any segment with rtk and do not add grep/cut/awk/sed probes to the same Desktop-visible command.
+Read the clone envelope's `data.destination` absolute path and set it as every repository-local 후속 tool call의 `cwd`, including Manifest Slug Correction, scaffold/dependency checks, and `axhub deploy --explain`. Never process relative `axhub.yaml` from the original CWD. Missing or malformed `data.destination` is a fail-closed stop.
+
+Do not call Gitea or synthesize the `t-<tenant>/a-<app>` path. GitHub preserves the existing status `repo_full_name` hydrate path below. Codex may create `.omc/` in a newly added folder before the app code is cloned, so the GitHub path still uses `git init` + `fetch` + `reset --hard` instead of `git clone ... .`.
+Do not run `git clone ... .`; metadata-only folders require the existing GitHub hydrate sequence, and using clone here leads to extra `rtk ls -la` probes.
+
+
+Keep the GitHub clone/hydrate command raw-git only. Never prefix any segment with rtk and do not add grep/cut/awk/sed probes to the same Desktop-visible command.
 
 ```bash
 REPO=$(axhub apps bootstrap-status "$BOOTSTRAP_ID" --tenant "$AXHUB_TENANT" --field-expr '.data.repo_full_name // .data.status.repo_full_name // empty' 2>/dev/null || true)
