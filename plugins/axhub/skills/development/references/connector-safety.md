@@ -9,6 +9,7 @@ development 가 외부 connector 데이터를 읽을 때(MCP `connector_query` �
 - **timeout.** 느린 쿼리는 짧은 timeout 으로 끊고, 실패하면 degrade(스키마만/사용자에 질문)해요.
 - **임의 SQL passthrough 금지.** 사용자 발화를 그대로 SQL 로 흘리지 않아요. 필요한 컬럼·필터만 구조적으로 구성해요.
 - **무관 리소스 금지.** 사용자가 지목한 connector/리소스만 조회하고, grant 안 받은 리소스는 건드리지 않아요.
+- **쓰기는 양보.** connector 가 파일 업로드 같은 쓰기 액션을 지원해도 development 는 읽기만 해요. 실제로 쓸 수 있는지는 프리셋에 그 액션이 있는지 + grant 의 `scope_levels`(대상별 `read` | `write`)가 함께 정하고, 그 확인·부여는 clarity 의 공개 CLI 계약으로 handoff 해요.
 - **join 보수적.** 명시 확인 전에는 단일 리소스 조회를 기본으로 해요.
 
 생성하는 앱 코드의 런타임 쿼리도 같은 원칙을 따라요 — 기존 앱의 DB/connector 경로를 파라미터화해서 쓰고, LIMIT/페이지네이션을 넣어요. `@ax-hub/sdk` 의 legacy data-plane DSL 은 제거됐으므로 새 런타임 read 경로로 만들지 않아요.
