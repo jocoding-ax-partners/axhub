@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
@@ -36,6 +36,46 @@ const parseRules = (markdown: string): PolicyRule[] => {
     return { id, files, invariants, codexFiles, codexInvariants };
   });
 };
+
+// KD4 — dev-policy 의 skill 개수 표기 드리프트를 기계로 잠가요. policy-parity 가
+// 원래 읽는 것은 agent-policy.md 뿐이라, DP-1·DP-3·DP-5 의 개수는 지금까지
+// 어떤 게이트도 보지 않았고 실제로 9·8·9 로 어긋나 있었어요.
+const COUNT_DOC_PATHS = [
+  join(REPO_ROOT, "docs", "policy", "dev-policy.md"),
+  join(REPO_ROOT, "README.md"),
+  join(REPO_ROOT, "AGENTS.md"),
+  join(REPO_ROOT, "CLAUDE.md"),
+  join(REPO_ROOT, "codex-overrides", "README.md"),
+];
+const SKILLS_DIR = join(REPO_ROOT, "skills");
+
+const skillCount = (): number =>
+  readdirSync(SKILLS_DIR, { withFileTypes: true }).filter((entry) => entry.isDirectory()).length;
+
+// "11개 SKILL.md" / "11개 skill" 그리고 "skill 은 11개" / "SKILL.md 11개" 양쪽 어순.
+const COUNT_PATTERNS = [
+  /(\d+)\s*개\s*(?:SKILL\.md|skill|스킬)/g,
+  /(?:SKILL\.md|skill|스킬)\s*(?:은\s*)?(\d+)\s*개/g,
+  /(\d+)\s+(?:SKILL|skills?)\b/g,
+];
+
+describe("dev policy skill counts (KD4)", () => {
+  test("문서의 모든 skill 개수 표기가 실제 skill 수와 같아요", () => {
+    const expected = skillCount();
+    let total = 0;
+    for (const path of COUNT_DOC_PATHS) {
+      expect(existsSync(path), `missing ${path}`).toBe(true);
+      const markdown = readFileSync(path, "utf8");
+      for (const pattern of COUNT_PATTERNS) {
+        for (const match of markdown.matchAll(pattern)) {
+          total += 1;
+          expect(Number(match[1]), `${path}: 개수 표기 ${match[0]} != 실제 skill 수 ${expected}`).toBe(expected);
+        }
+      }
+    }
+    expect(total, "검사 대상 문서에 skill 개수 표기가 하나도 없어요").toBeGreaterThan(0);
+  });
+});
 
 describe("agent policy parity", () => {
   test("policy document exists", () => {

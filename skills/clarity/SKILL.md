@@ -1,6 +1,6 @@
 ---
 name: clarity
-description: '요청하신 운영 명령을 확인할게요. Use for "axhub 로그 보여줘", "axhub 환경변수 확인해줘", "axhub 앱 삭제해줘", "axhub clarity" and other axhub 로그·환경변수·롤백·데이터·connector·GitHub 계정 재연결/device code·앱 삭제 operations. Start directly with that Korean sentence; no preamble; do not mention the skill or routing. First tool title/description exactly "명령 찾기". 스킬 실행 전 사용자 문장·App/MCP·파일 조회는 0개예요. app status overview·app creation·mixed freshness+status+create prompts·최신/버전/update/latest/freshness checks·bootstrap·import·deploy는 담당 스킬로 양보하고 axhub 맥락 없는 요청에는 쓰지 않아요.'
+description: '요청하신 운영 명령을 확인할게요. Use for "axhub 로그 보여줘", "axhub 환경변수 확인해줘", "axhub 앱 삭제해줘", "axhub clarity" and other axhub 로그·환경변수·롤백·데이터·connector 권한(read|write) 부여·GitHub 계정 재연결/device code·앱 삭제 operations. Start directly with that Korean sentence; no preamble; do not mention the skill or routing. First tool title/description exactly "명령 찾기". 스킬 실행 전 사용자 문장·App/MCP·파일 조회는 0개예요. app status overview·app creation·mixed freshness+status+create prompts·최신/버전/update/latest/freshness checks·bootstrap·import·deploy는 담당 스킬로 양보하고 axhub 맥락 없는 요청에는 쓰지 않아요.'
 ---
 
 # axhub clarity 브리지
@@ -68,6 +68,8 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - **조회는 바로 실행, 파괴적 변경은 승인.** 목록·로그처럼 읽기 전용 명령은 확인 없이 실행해요. 삭제·롤백·force/yes/execute 같은 파괴적 플래그가 있으면 대화형 승인 1회를 받고, headless 에서는 preview/summary 로 멈춰요.
 - **공개 표면만.** `axhub plugin-support ...` (hidden 그룹) 는 plugin 내부 프로토콜이라 이 스킬의 탐색·실행 대상이 아니에요.
 - **내 접근 가능 범위는 grant 기준.** 사용자가 "내가 조회 가능한", "내가 접근 가능한", "connected 된", "연결된 connector"처럼 **본인 범위**를 물으면 반드시 공개 명령 `axhub connectors mine` 으로 확인해요. tenant-admin 전체 카탈로그인 `axhub connectors list` / `--enabled-only` 결과를 "내가 조회 가능한 connector" 로 요약하지 말아요.
+- **읽기와 쓰기는 다른 질문이에요.** "내가 올릴 수 있어?", "쓰기 권한 있어?", "여기 파일 넣을 수 있어?" 처럼 **바꾸는 쪽**을 물으면 `axhub authz grants mine` 으로 확인해요. 응답의 `scope_resource_paths` 가 닿는 대상이고 `scope_levels` 가 대상별로 어디까지인지(`read` | `write`) 예요. 커넥터 목록만 보고 "접근 가능하니 올릴 수도 있다" 고 답하지 말아요 — 목록에 있어도 그 대상이 `read` 면 못 올려요. 반대로 `scope_levels` 가 비어 있으면 대상을 안 나눈 권한이라 프리셋이 정해요.
+- **권한 부여도 여기예요.** "OO 에게 업로드 권한 줘" 처럼 남에게 권한을 새로 주는 요청은 `authz grants` 계열 leaf 의 라이브 `--help` 로 대상·레벨 플래그(`--scope`, `--level <대상>=read|write`)를 확정한 뒤, 접근을 넓히는 변경이라 승인 1회 받고 실행해요.
 - **지어내지 않기.** 탐색으로 못 찾은 기능은 "axhub 에 그 기능은 없어요" 라고 정직하게 말하고, 가장 가까운 명령을 제안해요.
 
 **대표 정직성 계약.** `clarity` 는 hidden `plugin-support` 를 탐색하지 않아요. 공개 `--json-schema` / `--help` 트리에서 맞는 leaf 를 찾지 못하면 존재하지 않는 명령을 만들지 말고, "axhub 에 그 기능은 없어요" + 가장 가까운 공개 명령만 말해요. 로그·환경변수·롤백·테이블·connector grant 처럼 대표 여정 뒤 작업은 이 경로로 이어가요.

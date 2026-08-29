@@ -10,8 +10,12 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 // — 실제로 GitHub 차단 폴백이 그렇게 죽었다. 실행에 필요한 최소본은 본문에 둔다.
 // 200_000 → 210_000: 9번째 skill(scaffold — 사용자 소유 저장소로 템플릿 시작) 추가.
 // 210_000 → 220_000: 10번째 skill(plugins — app-backed marketplace 게시·목록·다운로드) 추가.
-// per-skill 35_000 게이트는 그대로 유지해요 — 개별 skill 비대화는 계속 막아요.
-export const DEFAULT_MAX_TOTAL_BYTES = 220_000;
+// 220_000 → 236_000: 11번째 skill(up — GitHub 없이 로컬 폴더 배포) 추가.
+// 236_000 → 246_000: spec 236의 backend 선판정·selfhosted clone/push/resume
+// 실행 계약이 bootstrap/deploy/onboarding 세 본문에 들어간다. 이 지시는 reference로
+// 빼면 Desktop 권한 경계에서 조용히 유실되므로 본문에 유지하고, 실측 240,500B에
+// 기존과 같은 약 5,000B 여유를 둔다. per-skill 35,000B 게이트는 그대로 유지한다.
+export const DEFAULT_MAX_TOTAL_BYTES = 246_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
 export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {

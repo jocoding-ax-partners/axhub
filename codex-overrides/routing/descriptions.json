@@ -1,3 +1,3 @@
 {
-  "deploy": "연결된 앱의 현재 코드를 실제 AxHub에 배포하고 성공 여부까지 확인할 때 반드시 사용해요. 트리거: \"배포해\", \"<앱이름> 배포해\", \"ship <앱이름>\", \"실제 AxHub에 배포\", \"성공 여부까지 확인\", \"같은 코드로 강제 재배포\", \"deploy\". apps get의 git_backend로 selfhosted push와 기존 GitHub/upload 경로를 먼저 나누고 preview-confirm·exact deployment verify를 맡으며 apps status/curl로 대신하지 않아요. 첫 연결은 import, 빈 폴더는 bootstrap, 실패 원인 진단은 diagnosis예요. axhub 맥락 없거나 다른 배포 대상이면 쓰지 않아요."
+  "deploy": "연결된 앱의 현재 코드를 실제 AxHub에 배포하고 성공 여부까지 확인할 때 반드시 사용해요. 트리거: \"배포해\", \"<앱이름> 배포해\", \"ship <앱이름>\", \"실제 AxHub에 배포\", \"성공 여부까지 확인\", \"같은 코드로 강제 재배포\", \"deploy\". apps get의 git_backend로 selfhosted push와 기존 GitHub/upload 경로를 먼저 나누고 preview-confirm·exact deployment verify를 맡으며 apps status/curl로 대신하지 않아요. GitHub 없이 현재 폴더 소스를 그대로 올리는 요청은 up 으로 양보해요. 첫 연결은 import, 빈 폴더는 bootstrap, 실패 원인 진단은 diagnosis예요. axhub 맥락 없거나 다른 배포 대상이면 쓰지 않아요."
 }

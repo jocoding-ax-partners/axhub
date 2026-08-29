@@ -102,7 +102,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 # axhub plugin (diet 체제)
 
-이 repo는 axhub plugin이에요. 현재 공개 surface는 **10 skill** (`onboarding` / `bootstrap` / `scaffold` / `plugins` / `deploy` / `import` / `development` / `diagnosis` / `clarity` / `update`)이에요. `plugins`는 category=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 맡고, 게시자 관리는 App Console, 승인은 Console Review로 연결해요. plugin은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli(`axhub` 바이너리)를 호출해요.
+이 repo는 axhub plugin이에요. 현재 공개 surface는 **11 skill** (`onboarding` / `bootstrap` / `scaffold` / `plugins` / `deploy` / `up` / `import` / `development` / `diagnosis` / `clarity` / `update`)이에요. `plugins`는 category=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 맡고, 게시자 관리는 App Console, 승인은 Console Review로 연결해요. plugin은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli(`axhub` 바이너리)를 호출해요.
 
 제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인. 훅은 cheap bash guard 로 제한해요: auto-update, onboarding resume, Windows 실행 계약, update-first Code-mode router guard 만 허용돼요.
 
@@ -122,14 +122,14 @@ bunx tsc --noEmit      # 타입 clean
 bun run plugin:bundle  # clean local plugin bundle 생성
 ```
 
-10개 skill의 frontmatter validity check와 대표 e2e flow도 살아남은 quality gate예요.
+11개 skill의 frontmatter validity check와 대표 e2e flow도 살아남은 quality gate예요.
 
 대표 여정 회귀는 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**을 문서·skill 본문·fixture 계약으로 같은 방향에 맞추는 방식이에요. 실제 ax-hub-cli 구현/schema parity/release 는 이 repo 범위 밖 follow-up 으로 남겨요.
 
 ## Never Do
 
 - NEVER helper 바이너리 (`crates/axhub-helpers`) 나 hook / NL routing / scaffold 인프라 재추가 — diet 결정 위반.
-- NEVER 명시적 결정 없이 skill을 추가하지 않아요 — `scaffold`와 `plugins`는 사용자 명시 결정으로 추가됐고 현재 10 skill 체제를 유지해요.
+- NEVER 명시적 결정 없이 skill을 추가하지 않아요 — `scaffold`·`plugins`·`up`은 사용자 명시 결정으로 추가됐고 현재 11 skill 체제를 유지해요.
 - NEVER 최소 CLI 기능 게이트를 우회하지 말아요.
 - NEVER Claude Code local plugin 을 repo 루트에서 직접 설치/검증하지 말아요 — `bun run plugin:bundle` 후 `dist/axhub-plugin` clean bundle 을 써요.
 - NEVER deploy 성공 선언(docker/compose deployment-record lane)을 `axhub deploy verify <deployment-id> --app <app>` 1회 실행 없이 — deployment id 와 app scope 필수, latest 재탐색 금지. static 앱(deploy_method=static)은 별도 lane 이라 `deploy verify` 가 404 라서 `active_release_id`(activate 성공)로 선언해요.

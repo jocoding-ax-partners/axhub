@@ -4,6 +4,24 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.26.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.26.0...v1.26.1) (2026-08-29)
+
+커넥터가 더는 읽기 전용이 아니에요. NAS 커넥터에 파일 업로드가 생기면서, 스킬이 "조회 가능한" 축만 알고 있으면 "내가 여기 올릴 수 있어?" 에 잘못 답하게 돼요. 목록에 보인다고 올릴 수 있는 게 아니고, 폴더마다 읽기까지인지 쓰기까지인지가 따로 있거든요.
+
+그래서 clarity 가 읽기와 쓰기를 다른 질문으로 다뤄요. 확인은 `authz grants mine` 의 대상별 레벨로 답하고, 부여 요청은 라이브 `--help` 로 대상·레벨 플래그를 확정한 뒤 승인 1회를 받고 실행해요. 남의 접근 범위를 넓히는 변경도 파괴적 작업과 같은 승인 게이트를 지나요. development 는 여전히 읽기만 하고, 확인·부여는 clarity 로 넘겨요.
+
+### Docs
+
+* **skills:** 쓰기 권한을 읽기와 구분해서 답하도록 ([#478](https://github.com/jocoding-ax-partners/axhub/issues/478)) ([ba5990f](https://github.com/jocoding-ax-partners/axhub/commit/ba5990f888780e070496b0ffa76f9cd80ececc04))
+* **skills:** 커넥터 쓰기 권한 부여까지 라우팅해요 ([#479](https://github.com/jocoding-ax-partners/axhub/issues/479)) ([e2c77e7](https://github.com/jocoding-ax-partners/axhub/commit/e2c77e7e7bdf1341167c23a75c112430783716be))
+## [1.26.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.25.0...v1.26.0) (2026-08-28)
+
+GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려 배포하는 `up` 스킬을 추가했어요. 커밋 상태를 게이트로 쓰지 않아서 커밋하지 않은 변경이 있어도 그대로 올라가고, 무엇이 올라가는지(파일 수·크기·소스 버전)를 먼저 보여준 뒤 승인을 받아야 실행돼요. `deploy`·`bootstrap` 안에 묻혀 있던 업로드 경로는 이 스킬로 넘기고, 성공 선언 규칙(AP-1)은 배포 기록 lane 과 정적 앱 lane 으로 나눠 각 스킬이 자기 lane 것만 지키게 했어요.
+
+### Added
+
+* GitHub 없이 로컬 폴더를 배포하는 up 스킬 추가 ([#475](https://github.com/jocoding-ax-partners/axhub/issues/475)) ([5969f3e](https://github.com/jocoding-ax-partners/axhub/commit/5969f3e8e4b6cb50dd19c5e9b3a658896596849b))
+
 ## [1.25.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.24.0...v1.25.0) (2026-08-26)
 
 App-backed plugin을 exact version으로 내려받는 데서 끝나지 않고 Claude Code와 Codex의 공식 local marketplace에 안전하게 설치하는 workflow를 추가했어요. 설치 명령은 현재 tenant UUID와 semver를 고정하고 preview에서는 network·keyring·host를 건드리지 않으며, execute는 사용자 승인을 받은 뒤에만 진행해요. 설치 중 중단되면 `.install.lock`과 transaction journal을 기준으로 rollback·replay하고, Codex bundle도 같은 trigger와 정책을 유지해요.

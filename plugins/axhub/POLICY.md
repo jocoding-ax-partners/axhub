@@ -12,6 +12,7 @@ axhub Claude Code plugin 이 사용자의 컴퓨터에서 무엇을 하고 무�
 - 세션 시작 때 도는 auto-update 훅은 24시간에 1회만 `axhub update check` 명령으로 새 버전이 있는지 확인해요. 실제 인터넷 연결은 훅 스크립트가 아니라 axhub CLI 가 해요.
 - `plugin list`와 exact `plugin download`는 현재 로그인 OAuth 또는 active broad PAT로 App-backed marketplace를 읽어요. 목록은 `plugin.current_servable_version` summary를 페이지 단위로 읽고, download 결과에서 `version_id`를 만들거나 보고하지 않아요. Download는 요청한 새 ZIP만 만들고 기존 파일을 덮어쓰거나 받은 code를 실행하지 않아요.
 - download 요청과 install 요청을 구분해요. `plugin install`은 offline preview 뒤 사용자가 host·exact version을 보고 승인한 `--execute --yes`에서만 동작해요. CLI가 bounded ZIP metadata·실제 압축 해제 크기·경로·symlink·manifest identity를 검증하고 App/host lock과 crash recovery를 적용한 뒤 `~/.axhub/plugins/` 아래 private local marketplace를 Claude Code 또는 Codex의 공식 plugin CLI로 user scope 설치해요. 모든 `AXHUB_*` 환경은 host process에 전달하지 않아요.
+- GitHub 저장소 없이 배포하는 `up` 스킬은 지금 폴더의 파일을 그대로 올려요. 커밋을 만들거나 push 하지 않고, 연결된 저장소가 있어도 건드리거나 끊지 않아요. 올라가는 목록은 `.gitignore` 를 존중하고 `.git/`·`node_modules/`·`.env` 계열은 항상 빠져요. 무엇이 올라가는지(파일 수·크기·소스 버전)를 먼저 보여주고 승인을 받은 뒤에만 실제로 올려요.
 - `plugin publish`는 `--execute`가 없으면 network·auth가 없는 offline preview예요. Publish execute에는 OAuth나 broad PAT 대신 `plugins:read` + `plugins:write` scoped PAT file·권리 확인·명시 승인을 모두 요구하고, gate 통과 성공도 `review_ready`·installable=false와 `submit_plugin_version_for_review` 다음 동작으로 끝나요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
 
 ## 로컬에 기록하는 파일 — 내 컴퓨터에 무엇을 남기나요

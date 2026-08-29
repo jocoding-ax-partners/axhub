@@ -34,7 +34,7 @@ const runShim = (args: string[], env: Record<string, string> = {}) => {
 };
 
 describe("smooth behavior contracts", () => {
-  test("public metadata advertises the ten official skills", () => {
+  test("public metadata advertises the eleven official skills", () => {
     const packageJson = readJson<PackageLike>("package.json");
     const pluginJson = readJson<PackageLike>(".claude-plugin/plugin.json");
     const marketplace = readJson<MarketplaceLike>(".claude-plugin/marketplace.json");
@@ -53,7 +53,7 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("Import priority is strict");
       expect(description).not.toContain("현재 버전을 확인할게요");
     }
-    expect(descriptions.join("\n")).toContain("onboarding/bootstrap/scaffold/plugins/deploy/import/development/diagnosis/clarity/update");
+    expect(descriptions.join("\n")).toContain("onboarding/bootstrap/scaffold/plugins/deploy/up/import/development/diagnosis/clarity/update");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {
@@ -105,6 +105,7 @@ describe("smooth behavior contracts", () => {
       readRepo("skills/import/references/visibility-rules.md") +
       readRepo("skills/import/references/manifest-authoring.md");
     const scaffold = readRepo("skills/scaffold/SKILL.md");
+    const up = readRepo("skills/up/SKILL.md");
     const onboardingAuth = readRepo("skills/onboarding/references/install-channels-and-auth.md");
     const bootstrapAndLocal = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
@@ -505,6 +506,7 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
     expect(importSkill).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
     expect(scaffold).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    expect(up).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
     // headless 정의는 3-lane 사다리 정합 재작성본으로 잠가요 — 정의 문장이
     // `claude -p`·`codex exec` 병기 토큰을 포함해요. onboarding 은 D1 가드와
     // NEVER 목록 두 곳 모두에 병기 토큰이 남아야 해요.

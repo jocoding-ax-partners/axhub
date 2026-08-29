@@ -10,6 +10,7 @@ const DIET = [
   "scaffold",
   "plugins",
   "deploy",
+  "up",
   "import",
   "development",
   "diagnosis",
@@ -119,15 +120,16 @@ describe("spec 236 self-hosted git skill contracts", () => {
     }
   });
 
-  test("T145 negative: GitHub and repository-less deploys retain axhub up", () => {
+  test("T145 negative: GitHub deploy remains intact and repository-less deploy delegates to up", () => {
     for (const root of SKILL_ROOTS) {
       const deploy = readSkill(root, "deploy");
       const github = sliceSection(deploy, "### GitHub and upload lanes", "### Verify loop");
-      expect(github, root).toContain("axhub up --app \"$APP_ID\"");
+      expect(github, root).toContain("axhub deploy create");
+      expect(github, root).toContain("이 lane 의 절차는 `up` 스킬이 소유해요");
+      expect(github, root).toContain("skills/up/SKILL.md");
       expect(github, root).toContain("github_connected");
     }
   });
-
   test("T146 positive: onboarding suppresses provider auth for tenant-default selfhosted apps", () => {
     for (const root of SKILL_ROOTS) {
       const onboarding = readSkill(root, "onboarding");
@@ -171,17 +173,17 @@ describe("spec 236 self-hosted git skill contracts", () => {
     }
   });
 
-  test("policy pins CLI-only backend selection and the 10-skill diet", () => {
+  test("policy pins CLI-only backend selection and the 11-skill diet", () => {
     const agentPolicy = readFileSync(join(ROOT, "docs", "policy", "agent-policy.md"), "utf8");
     const devPolicy = readFileSync(join(ROOT, "docs", "policy", "dev-policy.md"), "utf8");
-    expect(agentPolicy).toContain("## AP-22 app git backend 선판정");
+    expect(agentPolicy).toContain("## AP-23 app git backend 선판정");
     expect(agentPolicy).toContain("top-level `git_backend.backend`·`git_backend.source`");
     expect(agentPolicy).toContain("Gitea API·C1 HTTP·remote URL");
-    expect(devPolicy).toContain("공개 skill은 10개");
-    expect(devPolicy).toContain("SKILL.md 10개 합산 220k");
+    expect(devPolicy).toContain("공개 skill 은 11개");
+    expect(devPolicy).toContain("SKILL.md 11개 합산 246,000B");
   });
 
-  test("source and both generated surfaces keep the 10-skill diet", () => {
+  test("source and both generated surfaces keep the 11-skill diet", () => {
     const expected = [...DIET].sort();
     for (const root of SKILL_ROOTS) {
       const actual = readdirSync(join(ROOT, root), { withFileTypes: true })

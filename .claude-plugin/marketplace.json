@@ -9,8 +9,8 @@
   "plugins": [
     {
       "name": "axhub",
-      "description": "axhub 앱을 운영하고 marketplace plugin을 게시·탐색·다운로드해요. 10개 스킬(onboarding/bootstrap/scaffold/plugins/deploy/import/development/diagnosis/clarity/update)이 ax-hub-cli를 직접 호출해 preview-confirm과 terminal truth를 따라요.",
-      "version": "1.25.0",
+      "description": "axhub 앱을 운영하고 marketplace plugin을 게시·탐색·다운로드해요. 11개 스킬(onboarding/bootstrap/scaffold/plugins/deploy/up/import/development/diagnosis/clarity/update)이 ax-hub-cli를 직접 호출해 preview-confirm과 terminal truth를 따라요.",
+      "version": "1.26.1",
       "author": {
         "name": "Jocoding AX Partners",
         "url": "https://jocodingax.ai"

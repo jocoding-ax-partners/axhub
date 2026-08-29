@@ -11,7 +11,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
-**상태**: 10 SKILL (onboarding · bootstrap · scaffold · plugins · deploy · import · development · diagnosis · clarity · update) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download)
+**상태**: 11 SKILL (onboarding · bootstrap · scaffold · plugins · deploy · up · import · development · diagnosis · clarity · update) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download)
 
 </div>
 
@@ -22,7 +22,7 @@
 - [🤔 axhub 가 뭔가요?](#-axhub-가-뭔가요)
 - [⚡ 빠른 시작](#-빠른-시작)
 - [📋 준비물](#-준비물)
-- [🧩 10개 스킬](#-10개-스킬)
+- [🧩 11개 스킬](#-11개-스킬)
 - [✅ 대표 여정과 UX 샘플](#-대표-여정과-ux-샘플)
 - [💬 자연어로 할 수 있는 일](#-자연어로-할-수-있는-일)
 - [🧭 핵심 철학](#-핵심-철학)
@@ -106,9 +106,9 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 ---
 
-## 🧩 10개 스킬
+## 🧩 11개 스킬
 
-플러그인은 10개 스킬을 담아요. `plugins`는 category=plugin인 일반 App을 찾고 exact version을 다운로드하거나 Claude Code·Codex에 설치해요. `download`는 검증된 새 ZIP만 저장하고, `install`은 offline preview 뒤 `--execute --yes`를 명시한 경우에만 archive 공격과 manifest identity를 검사하고 AxHub 관리 local marketplace와 host 공식 plugin CLI로 user scope에 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 사용하며 성공은 `review_ready`·installable=false예요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
+플러그인은 11개 스킬을 담아요. `plugins`는 category=plugin인 일반 App을 찾고 exact version을 다운로드하거나 Claude Code·Codex에 설치해요. `download`는 검증된 새 ZIP만 저장하고, `install`은 offline preview 뒤 `--execute --yes`를 명시한 경우에만 archive 공격과 manifest identity를 검사하고 AxHub 관리 local marketplace와 host 공식 plugin CLI로 user scope에 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 사용하며 성공은 `review_ready`·installable=false예요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
 
 | 스킬 | 언제 | 자연어 예시 |
 |------|------|-------------|
@@ -117,6 +117,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 | `scaffold` | 사용자 GitHub 저장소에서 새 앱 시작 | "내 계정에 레포 만들어서 시작", "회사 org에 저장소 파고 새 앱 만들어줘" |
 | `plugins` | plugin App 게시·목록·다운로드·host 설치 | "플러그인 목록 보여줘", "1.2.0 내려 받아", "Claude에 설치해줘", "여러 스킬을 하나로 올려줘" |
 | `deploy` | 현재 브랜치 배포 | "배포해", "ship 해줘", "프로덕션에 올려" |
+| `up` | GitHub 없이 로컬 폴더 배포 | "GitHub 없이 배포해", "이 폴더 그대로 올려줘", "소스 올려서 배포" |
 | `import` | 기존 로컬 앱 가져오기 | "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app" |
 | `development` | 기존 앱에 실데이터 기능 코딩 | "내 connector 데이터로 대시보드 만들어줘", "유저 목록 페이지 만들어줘", "결제 입력 폼 만들어줘" |
 | `diagnosis` | 배포 실패 원인 진단 | "배포 실패 원인 진단해줘", "왜 배포가 죽었어", "이 앱 배포 실패 진단해줘" |
@@ -202,7 +203,7 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요.
 [verify]      axhub deploy verify <deployment-id> --app <app>  →  exit 0 일 때만 "배포 성공" 선언
 ```
 
-4개 레이어로 보면: **① 사용자(한국어)** → **② Claude Code (10 skills)** → **③ ax-hub-cli (axhub 바이너리 — plugin-support 그룹 + 공개 표면)** → **④ axhub-api backend**.
+4개 레이어로 보면: **① 사용자(한국어)** → **② Claude Code (11 skills)** → **③ ax-hub-cli (axhub 바이너리 — plugin-support 그룹 + 공개 표면)** → **④ axhub-api backend**.
 
 ---
 

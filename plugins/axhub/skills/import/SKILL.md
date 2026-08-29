@@ -1,6 +1,6 @@
 ---
 name: import
-description: '기존 앱을 axhub에 가져올 준비를 확인할게요. Use this before bootstrap for any existing/local-folder app import or first deploy: "기존 앱", "기존 Express 서버 앱", "이미 만든 앱", "작업 폴더는 /path", "이 폴더 axhub에 올려", "이 앱을 axhub에 올려", "가져오기가 잘 끝났는지 확인", "중단된 가져오기 이어서 마무리", "import existing app". Start directly with that Korean sentence; no preamble; do not explain why this path was chosen or expose a route/skill label. 스킬 실행 전 사용자 문장 0개. 기존 앱의 첫 연결·첫 배포와 resume 완료 확인을 맡겨요. Broad stack: Express/Fastify/Nest/FastAPI/Flask/Django/Rails/Go/Rust/Java/PHP/.NET. 빈 폴더는 bootstrap, 재배포는 deploy로 양보해요.'
+description: '기존 앱을 axhub에 가져올 준비를 확인할게요. Use this before bootstrap for any existing/local-folder app import or first deploy: "기존 앱", "기존 Express 서버 앱", "이미 만든 앱", "작업 폴더는 /path", "이 폴더 axhub에 올려", "이 앱을 axhub에 올려", "가져오기가 잘 끝났는지 확인", "중단된 가져오기 이어서 마무리", "import existing app". Start directly with that Korean sentence; no preamble; do not explain why this path was chosen or expose a route/skill label. 스킬 실행 전 사용자 문장 0개. 기존 앱의 첫 연결·첫 배포와 resume 완료 확인을 맡겨요. Broad stack: Express/Fastify/Nest/FastAPI/Flask/Django/Rails/Go/Rust/Java/PHP/.NET. 빈 폴더는 bootstrap, 재배포는 deploy로 양보해요. 이미 연결된 앱을 GitHub 없이 지금 폴더 소스로 올려 배포("이 폴더 그대로 올려줘", "GitHub 없이 배포해")하는 건 up으로 양보해요.'
 examples:
   - utterance: "기존 앱 올려"
     intent: "import existing local app into axhub"
