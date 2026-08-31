@@ -21,6 +21,7 @@ development SKILL 의 5단계(SDK/DB 표면 확인)와 11.5단계(배포 준비 
 - **받는 코드 = 앱의 프레임워크 네이티브 라우트 핸들러** (SDK 아님). MCP 있으면 `get_recipe(recipe_id="inbound-relay-webhook", framework=…)` 로 템플릿을, 없으면 CLI 출력 계약대로 써요.
 - relay 는 배달마다 **`X-AxHub-Signature`**(`sha256=<hex>`, 바디의 HMAC-SHA256)를 동봉해요 — 앱은 배포 시 주입되는 `AXHUB_RELAY_SIGNING_SECRET` 으로 검증할 수 있어요(spec 159). 발신자 검증은 창구 `verify_mode` 가 하고, 앱엔 `X-AxHub-Delivery`(멱등 키)도 함께 와요.
 - **sync 창구**는 앱 응답을 발신자에게 중계해요 — status·바디에 더해 `Content-Type`·`Mcp-Session-Id` 같은 허용 헤더까지 가고(`Set-Cookie` 는 안 가요), 앱이 응답한 요청은 재시도하지 않아요(미도달만 재시도). durable 은 2xx 를 받아야 완료되고 실패하면 재시도해요.
+- 여러 서비스로 된 앱(compose)은 **진입 서비스**(바깥 주소가 연결된 그 서비스)가 웹훅을 받아요 — 바꾸려면 `axhub.yaml` 의 `runtime.entry_service`. 포트를 연 서비스가 없으면 창구를 만들 수 없어요(409).
 
 ## 11.5. 배포 준비 점검 (infer-tables-env 연계) 상세
 
