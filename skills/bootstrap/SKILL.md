@@ -12,7 +12,7 @@ model: sonnet
 첫 visible 응답은 반드시 한국어 진행 문장. 스킬 선택 이유, route label, `axhub:bootstrap 스킬 호출한다` 금지. Claude Desktop 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요. 금지문: `Using axhub:bootstrap skill`, `matches new app + deploy request`, `axhub의 새 앱 생성 스킬`, `스킬을 사용하겠습니다`.
 
 새 앱 생성과 배포 목표는 받은 상태예요. execute 승인은 별도라서 아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행하고, `진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요.
-저장소 인증보다 backend 판정이 먼저예요. resume/existing app은 `axhub apps get <app> --json`, fresh app은 `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 써요. `git_backend.backend=selfhosted`면 device flow·GitHub App 설치·owner 질문을 모두 건너뛰고 owner flag 없이 bootstrap해요. GitHub·`legacy_github`만 기존 gate를 유지해요.
+인증 전 backend 판정: resume/existing은 `axhub apps get <app> --json`, fresh는 `axhub apps git-backend --tenant <tenant> --json` 추천값에서 고르게 해요. `git_backend.backend=selfhosted`이면 device flow·GitHub App·owner 질문을 건너뛰어요.
 
 
 중단 뒤 이어질 때도 CLI 명령이 하나도 실행되지 않았다면 fresh path 를 그대로 시작해요. 다시 시작 문구를 요구하지 않아요.
@@ -54,7 +54,7 @@ creation path는 `axhub apps bootstrap` saga 하나뿐이에요. GitHub 차단 �
 3. Template registry: `axhub apps templates list --tenant <tenant-slug> --json`.
 4. Template picker: backend registry 에 있는 값만 고르고, native 질문 card 로 먼저 물어요.
 5. App name: 앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요.
-6. Git backend 판정 뒤 GitHub App gate: 기존/resume 앱은 `axhub apps get <app> --json`, fresh 앱은 `axhub apps git-backend --tenant <tenant> --json`으로 먼저 판정해요. selfhosted는 GitHub App gate를 건너뛰고, GitHub만 `axhub github accounts list --json`로 기존 경로를 이어가요.
+6. Git backend: persisted 선택을 재사용하거나 tenant 추천값에서 확정해요. selfhosted는 GitHub App gate를 건너뛰고, GitHub만 `axhub github accounts list --json`를 실행해요.
 7. Availability check: `axhub apps check-availability --tenant <tenant> --slug <app-slug> --subdomain <app-slug> --json`.
 8. Dry-run preview: backend에 맞는 `axhub apps bootstrap ... --dry-run --json`.
 9. Preview confirmation: 사용자가 `진행`을 고른 뒤에만 execute 해요.
@@ -84,7 +84,7 @@ Tool 제목은 `작업공간 확인` 또는 `앱 설정 확인`을 써요.
 ```bash
 axhub plugin-support init-resume route --json
 ```
-`watch_status`/`resume_last`이면 emitted command 전에 `axhub apps get <app> --json`을 실행해요. missing/malformed면 멈추고, selfhosted면 provider-auth resume을 버려 ownerless status/resume으로 이어가요. GitHub/`legacy_github`만 emitted provider-auth command를 써요.
+`watch_status`/`resume_last`이면 emitted command 전에 `axhub apps get <app> --json`으로 persisted backend를 재사용해요. missing/malformed면 멈추고, selfhosted면 provider-auth resume을 버려 ownerless status/resume으로, GitHub/`legacy_github`만 emitted command로 이어가요.
 
 
 `watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 새 폴더/새 앱 요청이거나 `새로 시작`이면 이전 상태를 무시하고 template 질문으로 이어가요. fresh 이면 reference 를 읽지 않아요.
@@ -127,7 +127,7 @@ repo name 과 subdomain 은 명시 입력이 없으면 app slug 로 맞춰요. d
 
 ### 6. Git Backend Gate
 
-provider 대사 전에 backend를 확정해요. resume/기존 app은 첫 명령, app row 없는 fresh path는 둘째 read-only 명령을 써요. app row를 먼저 만들지 않아요.
+provider 대사 전에 backend를 확정해요. resume/기존은 persisted app choice를 재사용하고, fresh는 app row 생성 없이 tenant default를 읽어요.
 
 ```bash
 axhub apps get <app> --json
@@ -136,9 +136,13 @@ axhub apps git-backend --tenant <tenant> --json
 
 top-level `git_backend.backend`와 `git_backend.source`만 읽어요. app source는 `tenant_default|app_override|legacy_github`, tenant 응답 source는 `tenant|platform_default`예요. Gitea/C1/remote는 보지 않고 read 실패·malformed면 provider 질문·mutation 전에 멈춰요.
 
-`git_backend.backend=selfhosted`이면 두 source 모두 인증 branch를 건너뛰어요. `references/templates-and-github.md` 전체를 읽지 않아요. selfhosted 사용자-facing 대사는 `저장소는 axhub에서 준비할게요.`만 허용하며 계정 인증·저장소 App 설치 질문을 0회로 유지해요.
+fresh tenant backend는 추천값이에요. 사용자가 발화에서 backend를 명시했다면 그 값을 써요. 아니면 native Question/AskUserQuestion card로 정확히 `이 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. 추천 반대 옵션도 허용하고, card가 안 보일 때만 같은 선택을 chat text로 물어요.
 
-`git_backend.backend=github` 또는 `git_backend.source=legacy_github`이면 기존 GitHub App gate를 실행해요. `references/templates-and-github.md`의 owner picker와 `GitHub App 설치를 끝냈을까요?`를 유지해요.
+확정값은 dry-run, `init-resume put`, execute에 `--git-backend github|selfhosted`로 항상 명시해요.
+
+`git_backend.backend=selfhosted` 선택은 `references/templates-and-github.md` 전체를 읽지 않아요. selfhosted 사용자-facing 대사는 `저장소는 axhub에서 준비할게요.`만 허용하고 계정 인증·저장소 App 설치 질문을 0회로 유지해요.
+
+`github` 또는 `legacy_github`이면 GitHub App gate, owner picker, `GitHub App 설치를 끝냈을까요?`를 유지해요.
 
 ```bash
 axhub github accounts list --json
@@ -161,11 +165,11 @@ axhub apps check-availability --tenant <tenant> --slug <app-slug> --subdomain <a
 selfhosted는 owner flag 없이 실행하고, GitHub만 확인된 owner를 붙여요.
 
 ```bash
-axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --dry-run --json
-axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json
+axhub apps bootstrap --git-backend selfhosted --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --dry-run --json
+axhub apps bootstrap --git-backend github --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json
 ```
 
-첫 명령은 selfhosted, 둘째는 GitHub예요. 확정 literal로 바꾸고 preview의 template·slug·subdomain·repo·visibility만 한국어로 보여주며 raw JSON/stderr는 숨겨요.
+첫 명령은 selfhosted, 둘째는 GitHub예요. backend와 나머지 값을 literal로 바꾸고 preview의 template·slug·subdomain·repo·visibility만 한국어로 보여줘요. raw JSON/stderr는 숨겨요.
 
 미리보기 뒤 확인 필수. 처음부터 "바로 올려줘", "배포까지 해줘", `deploy it for real`이라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. 추천 허용일 뿐이에요. `--dry-run` preview 뒤 axhub 진입 확인: 정확히 `지금 만들고 배포까지 진행할까요?` 질문과 `진행`/`취소` 선택지를 보여줘요. 질문·선택지·설명은 의역하거나 새로 만들지 않아요. 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
 
@@ -174,12 +178,13 @@ axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug baker
 idempotency key 는 OS별 UUID 생성 명령으로 만들지 말고 `axhub plugin-support init-resume put` 에 생성을 맡겨요.
 
 ```bash
-axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json
+axhub plugin-support init-resume put --git-backend selfhosted --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json
 ```
+GitHub 선택이면 `--git-backend github`로 바꾸고, 실제 tool call에는 확정 literal만 넣어요.
 
 ```bash
-axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
-axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
+axhub --no-input apps bootstrap --git-backend selfhosted --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
+axhub --no-input apps bootstrap --git-backend github --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
 ```
 
 첫 명령은 selfhosted, 둘째는 GitHub 예시예요. 실행 때 예시 UUID는 `init-resume put` 반환 literal UUID로 바꾸고 Execute/resume 명령에는 `--json`을 붙이지 않아요.

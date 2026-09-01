@@ -12,23 +12,24 @@ After `axhub plugin-support preflight --json` succeeds, check repo-local state b
 axhub plugin-support init-resume route --json
 ```
 
-Expected shape is `{route(fresh|watch_status|resume_last), reason, state_stale, requires_status_authority, args{status_command, resume_command}}`.
+Expected shape is `{route(fresh|watch_status|resume_last), reason, state_stale, requires_status_authority, args{status_command, resume_command, git_backend}, state{git_backend, ...}}`.
 
-Before showing the resume question or running either `args.status_command` or `args.resume_command`, choose the backend read from persisted route authority:
+Before showing the resume question or running either `args.status_command` or `args.resume_command`, choose the backend from persisted route authority:
 
-- route가 `watch_status`이거나 state에 `bootstrap_id`가 있으면 persisted app id/slug로 app-level choice를 읽어요.
+- `state.git_backend`이 있으면 이것이 persisted `git_backend.backend` 선택이에요. `github|selfhosted`만 허용하고 그대로 사용하며 코드 저장 위치를 다시 선택하지 않아요.
+- legacy state에 `git_backend`이 없고 route가 `watch_status`이거나 state에 `bootstrap_id`가 있으면 persisted app id/slug로 app-level choice를 읽어요.
 
   ```bash
   axhub apps get <app> --json
   ```
 
-- route가 `resume_last`이고 `bootstrap_id`가 없으면 app row가 아직 없어요. 먼저 아래 Tenant Resolve L1로 literal tenant를 확정하고 tenant default를 읽어요.
+- legacy state에 `git_backend`이 없고 route가 `resume_last`이고 `bootstrap_id`가 없으면 app row가 아직 없어요. 먼저 아래 Tenant Resolve L1로 literal tenant를 확정하고 tenant default를 읽어요.
 
   ```bash
   axhub apps git-backend --tenant <tenant> --json
   ```
 
-Missing/malformed `git_backend` or the selected read's failure stops fail-closed before any emitted command. If `git_backend.backend=selfhosted`, discard a stale provider-auth `resume_last` route and never execute its emitted command. If a bootstrap id exists, continue through the backend-neutral status path; otherwise rebuild the ownerless selfhosted resume from stored template/name/slug/tenant/idempotency values. Do not surface GitHub/device/install copy. Only confirmed `github` or `legacy_github` may execute a provider-auth resume command.
+Missing/malformed `git_backend` or the selected legacy read's failure stops fail-closed before any emitted command. If `git_backend.backend=selfhosted`, discard a stale provider-auth `resume_last` route and never execute its emitted command. If a bootstrap id exists, continue through the backend-neutral status path; otherwise rebuild the ownerless selfhosted resume from stored template/name/slug/tenant/idempotency values and the resolved backend. Do not surface GitHub/device/install copy. Only confirmed `github` or `legacy_github` may execute a provider-auth resume command.
 
 After this check, if route is `watch_status` or `resume_last` and `clone_done=false`, ask:
 
@@ -48,7 +49,7 @@ Non-interactive/D1 safe default is `새로 시작`. Do not echo raw `bootstrap_i
 If the user chooses resume, use the route enum only after the backend check above. Do not reconstruct raw IDs except for the ownerless selfhosted resume described above.
 
 - `watch_status`: run `args.status_command`. Current shape is `axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json`.
-- `resume_last`: use `args.resume_command` as the base argv, but never run it verbatim. Append `--tenant "$AXHUB_TENANT"` only when `$AXHUB_TENANT` is set and the base command lacks tenant context. For Desktop device-flow recovery, strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume so stdout is visible. Do not use background watchers or output-file reads as the resume control plane. Current shape should be `axhub apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --idempotency-key "$IDEMPOTENCY_KEY"`.
+- `resume_last`: use `args.resume_command` as the base argv, but never run it verbatim. Its `--git-backend` value must match persisted authority; current state already emits it, while legacy state must append the resolved `--git-backend <github|selfhosted>` without asking again. Append `--tenant "$AXHUB_TENANT"` only when `$AXHUB_TENANT` is set and the base command lacks tenant context. For Desktop device-flow recovery, strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume so stdout is visible. Do not use background watchers or output-file reads as the resume control plane. Current shape should be `axhub apps bootstrap --git-backend "$GIT_BACKEND" --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --idempotency-key "$IDEMPOTENCY_KEY"`.
 - stale/broken/fresh: say "이전 기록을 찾지 못해서 새로 시작할게요." and continue to template registry.
 
 ## Resume Device-Flow Recovery
@@ -65,7 +66,7 @@ Only when the selected GitHub owner is confirmed installed (`installed=true` or 
 
 ```bash
 AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-axhub --no-input apps bootstrap --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --github-owner "$GITHUB_OWNER" --repo-name "$APP_SLUG" --repo-private --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY"
+axhub --no-input apps bootstrap --git-backend github --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --github-owner "$GITHUB_OWNER" --repo-name "$APP_SLUG" --repo-private --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY"
 ```
 
 If `device_code_pending` remains, respect `retry_after_secs` and retry the emitted `resume_command` until success or expiry. Every pending payload from a cached resume carries `user_code` + `verification_uri`; re-show them in the body on each retry so the user always has something to approve. Do not ask the user to say an approval phrase in chat; the CLI resume result is the only completion signal. If owner installation is not confirmed, do not run fresh execute; show the install URL once and stop with the GitHub App install resume phrase.

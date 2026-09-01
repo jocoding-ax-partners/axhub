@@ -29,6 +29,34 @@ const sliceSection = (source: string, start: string, end: string): string => {
   return source.slice(from, to);
 };
 
+describe("per-app git backend bootstrap contracts", () => {
+  test("fresh bootstrap lets the user choose a backend and passes it explicitly", () => {
+    for (const root of SKILL_ROOTS) {
+      const bootstrap = readSkill(root, "bootstrap");
+      const backendGate = sliceSection(bootstrap, "### 6. Git Backend Gate", "### 7. Availability Check");
+      const dryRun = sliceSection(bootstrap, "### 8. Dry-Run Preview", "### 9. Execute Bootstrap Saga");
+      const execute = sliceSection(bootstrap, "### 9. Execute Bootstrap Saga", "### 9.1 Desktop Error Recovery");
+      const resume = readFileSync(join(ROOT, root, "bootstrap", "references", "resume-and-tenant.md"), "utf8");
+
+      expect(backendGate, root).toContain("tenant backend는 추천값");
+      expect(backendGate, root).toContain("이 앱의 코드 저장 위치를 선택해 주세요.");
+      expect(backendGate, root).toContain(
+        root === "plugins/axhub-codex/skills"
+          ? "native Question/명시 텍스트 승인 card"
+          : "native Question/AskUserQuestion card",
+      );
+      expect(backendGate, root).toContain("`GitHub`와 `Axhub self-hosted`");
+      expect(backendGate, root).toContain("사용자가 발화에서 backend를 명시했다면 그 값을 써요");
+      expect(dryRun, root).toContain("--git-backend selfhosted");
+      expect(dryRun, root).toContain("--git-backend github");
+      expect(execute, root).toContain("--git-backend selfhosted");
+      expect(execute, root).toContain("--git-backend github");
+      expect(resume, root).toContain("persisted `git_backend.backend`");
+      expect(resume, root).toContain("코드 저장 위치를 다시 선택하지 않아요");
+    }
+  });
+});
+
 describe("spec 236 self-hosted git skill contracts", () => {
   test("T144 positive: bootstrap resolves selfhosted before every repository-provider prompt", () => {
     for (const root of SKILL_ROOTS) {
