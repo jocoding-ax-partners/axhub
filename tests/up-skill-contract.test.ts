@@ -89,6 +89,14 @@ describe("up skill contract", () => {
     expect(body).toContain("static lane");
   });
 
+  test("selfhosted app uses repository deploy unless the user explicitly requests repositoryless upload", () => {
+    expect(body).toContain('axhub apps get "$APP_ID" --json');
+    expect(body).toContain("top-level `git_backend.backend`");
+    expect(body).toContain("`selfhosted`면 `deploy`의 self-hosted repository lane");
+    expect(body).toContain("`GitHub 없이`만으로 repositoryless upload를 확정하지 않아요");
+    expect(body).toContain("`저장소 없이`·`레포 없이`·`지금 폴더 그대로 업로드`");
+  });
+
   // 양보 계약 — deploy·bootstrap 이 업로드 명령을 직접 실행하지 않아야 해요.
   // 이 삭제를 잠그지 않으면 두 스킬이 같은 배포를 각자 승인·실행할 수 있어요.
   test("deploy·bootstrap 은 업로드 명령을 직접 실행하지 않아요", () => {

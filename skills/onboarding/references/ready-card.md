@@ -55,7 +55,7 @@ axhub 온보딩 완료예요. [VIBE_READY]
 다음에 말할 수 있는 것: "첫 앱 만들어줘", "배포해", "로그 봐줘", "환경변수 추가해줘", "테이블 추천해줘"
 ```
 
-Choose exactly one repository line after `axhub apps get <app> --json` or fresh `axhub apps git-backend --tenant <tenant> --json`. For selfhosted, render only `✓ axhub 저장소 준비됨` and never include provider login/install copy or `github.install_url`. For GitHub, preserve the existing App line and include the install URL when detect provided it.
+Choose exactly one repository line from the persisted app backend or the fresh session's `SELECTED_GIT_BACKEND`. For selfhosted, render only `✓ axhub 저장소 준비됨` and never include provider login/install copy or `github.install_url`. For GitHub, preserve the existing App line and include the install URL when detect provided it. When the next phrase is `첫 앱 만들어줘`, carry the same choice to bootstrap as literal `--git-backend github|selfhosted`; do not claim the fresh choice was persisted before an app exists.
 
 ## Degraded Cards
 

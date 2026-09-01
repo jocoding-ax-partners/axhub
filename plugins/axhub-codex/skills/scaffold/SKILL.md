@@ -1,6 +1,6 @@
 ---
 name: scaffold
-description: '템플릿으로 시작하되 저장소는 사용자 소유로 만들어요. Use when the user wants the repository under THEIR account/org — even if the sentence also says "새 앱 만들어줘/시작해줘", repository ownership words win over bootstrap: "내 계정에 레포 만들어서 시작", "내 계정에 레포 만들어서 새 앱", "회사 조직에 저장소 파고 새 앱", "템플릿 받아서 내 깃허브에 올려줘", "레포는 우리 org 소유로", "start from template in my org". Start directly with a Korean progress sentence; no preamble; no route/skill label. 저장소 소유 언급이 전혀 없으면 bootstrap 으로, 이미 코드가 있는 폴더는 import 로 양보해요. 흐름: 템플릿 내려받기 → placeholder 치환 → 사용자 계정/조직에 저장소 생성+push(axhub github repo create) → origin 등록 → 여기서 멈추고 확인 → 동의하면 import 인계. push 뒤 앱 생성·배포로 자동으로 이어가지 않아요.'
+description: '템플릿으로 시작하되 저장소는 사용자 GitHub 계정/조직 소유로 만들어요. 사용자 소유 GitHub 저장소를 명시하면 bootstrap보다 우선해요. 단 같은 요청에 Axhub self-hosted도 있으면 두 요구는 동시에 충족할 수 없으므로 코드 저장 위치를 먼저 선택하게 하고, self-hosted를 고르면 bootstrap으로 양보해요. Start directly with a Korean progress sentence; no preamble; no route/skill label. 저장소 소유 언급이 없으면 bootstrap으로, 이미 코드가 있는 폴더는 import로 양보해요. 흐름: 템플릿 내려받기 → placeholder 치환 → 사용자 GitHub 저장소 생성+push → origin 등록 → 확인 → 동의하면 import 인계. push 뒤 앱 생성·배포로 자동으로 이어가지 않아요.'
 allows-dependency-execution: false
 model: sonnet
 ---
@@ -14,6 +14,8 @@ model: sonnet
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
 
 bootstrap 과의 차이 하나뿐이에요: bootstrap 은 axhub 이 저장소를 만들어 주고(봇 소유 생성 — org 에서 주인 권한이 자동으로 안 붙을 수 있어요), 이 스킬은 **사용자 연동 계정으로 사용자의 계정/조직에** 저장소를 만들어요. 생성자가 곧 주인이라 그 권한 문제가 구조적으로 없어요. 저장소 생성만 CLI(`axhub github repo create`, v0.30.0+)가 하고 clone·커밋은 git 이에요. 앱 생성·연결·배포는 `import` 가 해요 — 이 스킬은 GitHub 쪽 준비까지만 소유하고, push 가 끝나면 이어갈지 한 번 물어본 뒤에만 넘겨요.
+
+명시적인 `Axhub self-hosted`와 `내 GitHub 계정/조직 소유 저장소`가 같은 요청에 있으면 두 요구는 동시에 충족할 수 없어요. 어떤 CLI도 실행하기 전에 `코드 저장 위치를 먼저 선택해 주세요.`라고 묻고 `Axhub self-hosted`와 `내 GitHub 계정/조직` 두 옵션을 보여줘요. selfhosted를 고르면 이 스킬을 시작하지 않고 선택값을 그대로 `bootstrap`에 넘겨요. GitHub 소유를 고른 경우에만 아래 순서를 진행해요.
 
 **질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요(예: `진행` 이면 시작하고 `취소` 면 여기서 멈춰요). 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요. 비파괴 선택은 숫자·서수·라벨·앞글자 어느 쪽으로 답해도 알아듣고, 파괴 게이트만 canonical 문구를 그대로 받아요.
 

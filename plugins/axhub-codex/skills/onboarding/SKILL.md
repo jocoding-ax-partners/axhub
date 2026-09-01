@@ -1,6 +1,6 @@
 ---
 name: onboarding
-description: 'Use when the user is new to axhub or asks for first setup/onboarding/getting started. 이 스킬은 "셋업해줘", "처음인데", "처음 쓰는데 뭐부터", "온보딩", "시작하기", "axhub 시작", "초기 셋업", "setup", "onboard", "getting started", "first time" 같은 첫 사용자 셋업 의도를 담당해요. axhub CLI 설치, 로그인, git/node, 앱 backend에 필요한 저장소 계정 준비, 의존성, 최종 Ready card를 detect-first로 안내하되 빈 폴더에서 bootstrap을 자동 실행하지 않아요. 현재 앱이 tenant-default selfhosted면 GitHub 로그인/App 설치 단계를 노출하지 않아요. 이 트리거들은 axhub 맥락이 있을 때만 유효해요.'
+description: 'Use when the user is new to axhub or asks for first setup/onboarding/getting started. 이 스킬은 "셋업해줘", "처음인데", "처음 쓰는데 뭐부터", "온보딩", "시작하기", "axhub 시작", "초기 셋업", "setup", "onboard", "getting started", "first time" 같은 첫 사용자 셋업 의도를 담당해요. axhub CLI 설치, 로그인, git/node, 첫 앱의 GitHub 또는 Axhub self-hosted 코드 저장 위치 선택, 의존성, 최종 Ready card를 detect-first로 안내하되 빈 폴더에서 bootstrap을 자동 실행하지 않아요. 기존 앱은 persisted backend를 재사용하고, fresh 사용자는 tenant 추천값을 본 뒤 직접 선택해요. 이 트리거들은 axhub 맥락이 있을 때만 유효해요.'
 allows-dependency-execution: true
 model: sonnet
 ---
@@ -11,7 +11,7 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-처음 axhub를 쓰는 사람을 위한 단일 진입점이에요. CLI/auth/runtime/repo/deps 준비를 한 gap씩 닫되, 저장소 provider 단계는 현재 앱의 `git_backend`를 먼저 확인해요. 환경 진단만 원하면 diagnosis, 새 앱 생성을 명시하면 bootstrap이 맞아요. onboarding은 빈 폴더에서도 자동 bootstrap을 시작하지 않고 Ready card에서 `첫 앱 만들어줘`를 다음 말로 안내해요.
+처음 axhub를 쓰는 사람을 위한 단일 진입점이에요. CLI/auth/runtime/repo/deps 준비를 한 gap씩 닫고, fresh 사용자는 첫 앱의 저장소 provider를 직접 선택해요. 환경 진단만 원하면 diagnosis, 새 앱 생성을 명시하면 bootstrap이 맞아요. onboarding은 빈 폴더에서도 자동 bootstrap을 시작하지 않고 Ready card에서 `첫 앱 만들어줘`를 다음 말로 안내해요.
 
 ## Codex 첫 세션 안내
 
@@ -33,11 +33,11 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 
 ## Core Contract
 
-1. **Single source of truth.** gap 순서는 `axhub plugin-support onboarding-detect --json`을 써요. backend는 app target이 있으면 `axhub apps get <app> --json`, 없으면 `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 써요. Gitea API·C1 HTTP·remote URL은 보지 않아요.
-2. **Detect-first loop.** `detect -> backend 판정 -> first_gap 하나 처리 -> 재감지`를 반복해요. selfhosted app/tenant에서는 provider 전용 gaps만 non-applicable로 건너뛰고 다음 non-provider gap을 처리해요.
-3. **Headless safety.** 순수 subprocess/headless/CI에서는 명시 텍스트 승인을 생략하고 safe defaults로 멈춰요. install/update/auth/bootstrap/deps mutation, git/node system install, node version switch, browser open을 자동 실행하지 않아요.
+1. **Single source of truth.** gap 순서는 `axhub plugin-support onboarding-detect --json`을 써요. app target이 있으면 `axhub apps get <app> --json`의 persisted backend를 그대로 쓰고 다시 묻지 않아요. fresh tenant는 `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`를 추천값으로만 읽고 사용자가 확정한 `SELECTED_GIT_BACKEND`를 써요. 선택이 없으면 정확히 `첫 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`·`Axhub self-hosted`를 보여줘요. Gitea API·C1 HTTP·remote URL은 보지 않아요.
+2. **Detect-first loop.** `detect -> backend 선택/판정 -> EFFECTIVE_FIRST_GAP 하나 처리 -> 재감지`를 반복해요. 선택된 selfhosted에서는 provider 전용 gaps를 action 없이 필터링하고 첫 applicable gap 하나만 처리해요.
+3. **Headless safety.** 순수 subprocess/headless/CI에서는 명시 텍스트 승인을 생략해요. provider 선택이 명시되지 않았으면 provider mutation 전에 `SAFE_STOP_NONINTERACTIVE`로 멈추고, install/update/auth/bootstrap/deps mutation, git/node system install, node version switch, browser open을 자동 실행하지 않아요.
 4. **No automatic bootstrap.** 빈 폴더나 manifest 없는 폴더를 발견해도 bootstrap을 자동 실행하지 않아요. `no_manifest_empty`는 안내 후 Ready card로 가요.
-5. **Repository provider visibility.** `git_backend.backend=selfhosted`면 detect JSON의 provider install URL·설치 상태를 보여주지 않고 계정 연동/App 설치 질문을 만들지 않아요. `git_backend.backend=github` 또는 `git_backend.source=legacy_github`만 기존 visibility와 gate를 유지해요.
+5. **Repository provider visibility.** persisted `git_backend.backend=selfhosted` 또는 fresh `SELECTED_GIT_BACKEND=selfhosted`면 provider install URL·설치 상태를 보여주지 않고 계정 연동/App 설치 질문을 만들지 않아요. persisted `legacy_github` 또는 선택된 GitHub만 기존 visibility와 gate를 유지해요.
 6. **Dependency safety.** 의존성 설치는 manifest와 lockfile이 있을 때만, 명시 확인 뒤, 해당 lockfile의 package manager로만 실행해요. 모든 install command는 `--ignore-scripts`를 붙여요.
 7. **Ready card honesty.** 확인하지 않은 항목은 green check로 표시하지 않아요. 내부 종료 상태 enum은 사용자 문장에 출력하지 말아요.
 8. **Telemetry opt-in.** AI 활용 기록은 무엇이 수집되는지 설명하고 물어본 뒤 사용자가 켜기를 고를 때만 켜요 — 동의 없이 켜지 않아요. 거절하면 같은 온보딩에서 다시 묻지 않고, headless에서는 묻지도 켜지도 않아요.
@@ -94,19 +94,24 @@ axhub apps get <app> --json
 axhub apps git-backend --tenant <tenant> --json
 ```
 
-top-level `git_backend.backend`·`git_backend.source`만 읽어요. `git_backend.backend=selfhosted`면 `github.install_url`을 숨기고 `github_link_missing`·`github_app_missing`을 처리하지 않아요. `references/github-app.md`를 건너뛰며 계정 로그인·App 설치 대사를 0회로 유지해요. tenant source는 `tenant|platform_default`예요.
+top-level `git_backend.backend`·`git_backend.source`만 읽어요. app target이 있으면 `git_backend.backend=selfhosted`를 포함한 persisted app backend를 `SELECTED_GIT_BACKEND`로 고정하고 코드 저장 위치를 다시 묻지 않아요. `git_backend.source=legacy_github`는 GitHub로 고정해요.
+
+fresh tenant 응답은 추천값이에요. 사용자가 최초 발화나 현재 대화에서 GitHub/selfhosted를 이미 명시했다면 그 값을 `SELECTED_GIT_BACKEND`로 써요. 아니면 native Question/명시 텍스트 승인 card로 정확히 `첫 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. tenant 추천값은 추천 옵션으로 표시하되 반대 선택도 허용해요. card가 안 보일 때만 같은 질문을 chat text로 물어요.
+
+선택값은 이 대화가 끝날 때까지 유지해요. 같은 대화의 bootstrap이 이어지면 다시 묻지 않고 `--git-backend <SELECTED_GIT_BACKEND>`로 전달해요. 아직 app이 없으므로 새 세션의 persisted 설정이라고 주장하지 않아요. headless에서 provider 선택이 명시되지 않았으면 provider mutation 전에 `SAFE_STOP_NONINTERACTIVE`로 멈추고 두 선택지와 재개 문장만 보여줘요.
 
 read command 실패나 missing/malformed `git_backend`만 provider 단계 전에 중단 사유예요. app row를 먼저 만들거나 GitHub를 platform default로 추측하거나 tenant C1/Gitea를 직접 호출하지 않아요.
 
 ### 3. Repository provider surface
 
-두 command 중 하나가 `git_backend.backend=github` 또는 app `git_backend.source=legacy_github`를 반환한 경우에만 기존 GitHub surface를 사용해요. DETECT의 `github.install_url`을 한 줄로 보여주고 설치 gate 앞에 `axhub github accounts list --json`을 한 번 돌려요. exit 4 + `github_relogin_required`면 `github_link_missing`으로 처리해요.
+persisted app 또는 fresh `SELECTED_GIT_BACKEND`가 GitHub인 경우에만 기존 GitHub surface를 사용해요. app `git_backend.source=legacy_github`도 이 branch예요. DETECT의 `github.install_url`을 한 줄로 보여주고 설치 gate 앞에 `axhub github accounts list --json`을 한 번 돌려요. exit 4 + `github_relogin_required`면 `github_link_missing`으로 처리해요.
+`github_link_missing`도 합성 값이라 GitHub branch의 3단계 연동 확인에서만 생기고 `github_app_missing`보다 먼저 처리해요.
 
-selfhosted이고 CLI/auth gap이 닫혔으면 session당 한 번 `axhub git setup --json`으로 account·endpoint별 helper·30일 PAT를 준비해요. marker로 재실행을 막고 GitHub 질문은 0회로 유지해요.
+persisted `git_backend.backend=selfhosted` 또는 fresh `SELECTED_GIT_BACKEND=selfhosted`이고 CLI/auth gap이 닫혔으면 session당 한 번 `axhub git setup --json`으로 account·endpoint별 helper·30일 PAT를 준비해요. marker로 재실행을 막고 `github.install_url`을 숨기며 `github_link_missing`·`github_app_missing`을 처리하지 않아요. `references/github-app.md`를 건너뛰고 계정 로그인·App 설치 대사를 0회로 유지해요. tenant source는 `tenant|platform_default`예요.
 
 ### 4. first_gap router
 
-`first_gap`만 처리하고 재감지해요. CLI는 gap이 없으면 `first_gap:null`과 빈 `gaps`를 반환하며 이는 `no_gap`과 같은 완료예요. `doctor_gap`은 detect 출력이 비었을 때만 쓰는 플러그인 합성 값이에요. `github_link_missing`도 합성 값이라 GitHub branch의 3단계 연동 확인에서만 생기고 `github_app_missing`보다 먼저 처리해요. selfhosted branch는 둘 다 non-applicable이에요.
+provider branch를 확정한 뒤 `EFFECTIVE_FIRST_GAP` 하나만 처리하고 재감지해요. GitHub는 raw `first_gap`을 그대로 쓰고, selfhosted는 ordered gap 후보에서 `github_link_missing`·`github_app_missing`·GitHub-shaped `existing_repo_gap`을 action 없이 제거한 뒤 첫 applicable gap을 써요. 필터 결과가 없으면 `no_gap`이에요. CLI는 gap이 없으면 `first_gap:null`과 빈 `gaps`를 반환하며 이는 `no_gap`과 같은 완료예요. `doctor_gap`은 detect 출력이 비었을 때만 쓰는 플러그인 합성 값이에요.
 
 | `first_gap` | Handler |
 | --- | --- |
@@ -126,7 +131,7 @@ selfhosted이고 CLI/auth gap이 닫혔으면 session당 한 번 `axhub git setu
 | `doctor_gap` | Final read-only `axhub plugin-support preflight --json` and recovery phrase. |
 | `no_gap` | Ready card. `first_gap` null/부재 + 빈 `gaps` 도 이 행으로 처리해요. |
 
-If a handler needs a prompt but D1 safe-stop mode is active, do not execute the mutation. Return `SAFE_STOP_NONINTERACTIVE` with the exact manual command or natural phrase.
+If the selected handler needs a prompt but D1 safe-stop mode is active, do not execute the mutation. Return `SAFE_STOP_NONINTERACTIVE` with the exact manual command or natural phrase. Filtering provider-only gaps is selection, not a second action; never execute two gap handlers from one detect result.
 
 `cli_path_missing` 은 CLI 가 디스크에 있는데 현재 셸 PATH 에 없는 상태예요. 이미 열린 세션의 PATH 는 밖에서 못 고치므로(OS 설계), repair-path 뒤에 `command -v axhub` 재감지를 반복하지 말고(무한 루프 방지) **repair-path JSON 의 `bin_path` 절대경로로 남은 온보딩 명령을 그대로 이어가요** (예: `"<bin_path>" auth status --json`). detect 의 `cli_resolved_path` 도 같은 절대경로예요. 남은 gap 재감지가 필요하면 `"<bin_path>" plugin-support onboarding-detect --json` 으로 실행하고, 결과에 `cli_path_missing`/`cli_on_path:false` 가 다시 보여도 이미 처리된 것으로 간주하고 다음 gap 으로 넘어가요. `bin_path` 가 없는 구 CLI 면 기존대로 `READY_WITH_USER_ACTION` 으로 "PATH 준비됐어요. 새 터미널을 열고 거기서 Codex 를 실행해 온보딩을 다시 불러 주세요" 라고 안내해요. 새 터미널·VS Code 앱 재시작 안내는 마무리 카드에 보조 문구로 한 번만 붙여요.
 
@@ -152,6 +157,7 @@ Finish with one honest card:
 - NEVER call detect via bare `axhub` or export `AXHUB_BIN` in the on-disk-not-on-PATH branch before repair-path; it can hide the PATH gap. After the repair-path pivot, re-detect via the `bin_path` absolute command and treat a repeated `cli_path_missing` as already handled.
 - NEVER loop re-detect in the same session after repair-path if `command -v axhub` still fails; continue via the repair-path `bin_path` absolute command (new terminal is next-session advice; old CLI without `bin_path` falls back to the new-terminal stop).
 - NEVER require the user to know sibling skill names or slash commands to finish onboarding.
+- NEVER fresh onboarding에서 tenant 추천값을 사용자 선택으로 가장하거나, 선택 없는 headless에서 provider setup을 실행하지 말아요.
 - NEVER run multiple mutate gaps from one detect result. Always detect-first -> first_gap -> re-detect.
 - NEVER run plugin update during onboarding; mention `/plugin update` as advisory only.
 - NEVER move GitHub OAuth device-flow into the install_url stage; install_url is account-level App installation. 계정 연동(`github link`)과 App 설치(install_url)는 끝까지 별개 단계예요.

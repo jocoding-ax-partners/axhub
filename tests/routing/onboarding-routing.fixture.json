@@ -1,7 +1,7 @@
 {
-  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). onboarding 은 첫 axhub 셋업(CLI 설치·로그인·git/node·GitHub 계정 연동·GitHub App·앱 연결)을 detect-first 로 안내해요. AP-11 로 발화에 axhub 언급이 없고 대화에도 axhub 맥락이 없으면 detect 전에 'axhub 셋업을 말하는 거예요?' 를 한 번 묻고, 아니면 종료해요. 일반 프로젝트 셋업이나 다른 도구 온보딩으로 오인하지 않아요.",
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). onboarding 은 첫 axhub 셋업(CLI 설치·로그인·git/node·저장소 provider 선택·앱 연결)을 detect-first 로 안내해요. fresh 사용자는 GitHub 또는 Axhub self-hosted를 고르고, 기존 app은 persisted backend를 재사용해요. AP-11 로 발화에 axhub 언급이 없고 대화에도 axhub 맥락이 없으면 detect 전에 'axhub 셋업을 말하는 거예요?' 를 한 번 묻고, 아니면 종료해요. 일반 프로젝트 셋업이나 다른 도구 온보딩으로 오인하지 않아요.",
   "boundary": {
-    "onboarding": "첫 axhub 셋업·CLI 설치·로그인·GitHub 계정 연동·환경 점검. axhub 맥락 필요.",
+    "onboarding": "첫 axhub 셋업·CLI 설치·로그인·GitHub/Axhub self-hosted 선택·환경 점검. axhub 맥락 필요.",
     "bootstrap": "빈 디렉토리 새 앱 생성 (onboarding 은 자동 bootstrap 안 함)",
     "update": "CLI·플러그인 버전 업데이트",
     "none": "AP-11 — axhub 맥락 없는 일반 셋업 발화는 한 번 묻거나 종료"
@@ -10,6 +10,8 @@
     { "utterance": "axhub 처음인데 셋업해줘", "expected": "onboarding", "why": "axhub 명시 첫 셋업" },
     { "utterance": "온보딩", "context": "axhub 맥락(axhub CLI 설치 흔적·대화 언급)", "expected": "onboarding", "why": "첫 셋업 의도 + axhub 맥락" },
     { "utterance": "getting started", "context": "axhub 맥락", "expected": "onboarding", "why": "영어 첫 셋업 발화" },
+    { "utterance": "axhub 처음인데 self-hosted 저장소로 셋업해줘", "expected": "onboarding", "why": "첫 셋업과 Axhub self-hosted provider 선택을 함께 명시" },
+    { "utterance": "axhub 온보딩하고 코드는 GitHub에 둘게", "expected": "onboarding", "why": "첫 셋업과 GitHub provider 선택을 함께 명시" },
     { "utterance": "셋업해줘", "context": "axhub 무관 일반 프로젝트(axhub 언급·흔적 없음)", "expected": "none", "why": "AP-11 — 'axhub 셋업을 말하는 거예요?' 한 번 묻고, 아니면 종료 (일반 프로젝트 셋업으로 오인 금지)" },
     { "utterance": "개발 환경 세팅 도와줘", "context": "axhub 무관 일반 프로젝트", "expected": "none", "why": "AP-11 — 다른 도구·일반 환경 셋업" },
     { "utterance": "새 앱 만들어줘", "context": "빈 디렉토리", "expected": "bootstrap", "why": "새 앱 생성은 bootstrap (onboarding 자동 bootstrap 금지)" }

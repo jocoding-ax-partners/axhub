@@ -13,8 +13,8 @@ Codex-visible tool titles and progress text must stay user-facing and start with
 Use the command shape below by replacing the sample literals with the values already confirmed in the conversation. Do not run a Desktop-visible command that contains `export`, value-assembly `TEMPLATE=...`/`APP_NAME=...`, `$TEMPLATE`, `$APP_SLUG`, `$AXHUB_TENANT`, command substitution, or semicolon-chained shell glue. Execute and resume commands carry no env prefix — `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` there makes the CLI block-poll instead of returning the device code, so the tool call never ends and the code stays invisible. That prefix belongs only on the short `github link` fast path.
 
 ```bash
-axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --dry-run --json
-axhub apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json
+axhub apps bootstrap --git-backend selfhosted --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --dry-run --json
+axhub apps bootstrap --git-backend github --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json
 ```
 
 The first command is the selfhosted shape; the second is the unchanged GitHub shape. Never add `--github-owner` to selfhosted.
@@ -47,12 +47,14 @@ Use a user-facing tool title such as `앱 생성 진행` or `첫 배포 진행`.
 Do not run an OS UUID generator as a separate Desktop-visible command. Run one direct `axhub plugin-support init-resume put ... --json` command, read `.state.idempotency_key` from its output internally, then pass that literal UUID to execute/resume commands. Keep each Desktop-visible tool call to one direct command.
 
 ```bash
-axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json
+axhub plugin-support init-resume put --git-backend selfhosted --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json
+axhub plugin-support init-resume put --git-backend github --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json
 ```
+Run exactly one state command for the selected backend; never run both examples.
 
 ```bash
-axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
-axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
+axhub --no-input apps bootstrap --git-backend selfhosted --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
+axhub --no-input apps bootstrap --git-backend github --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
 ```
 
 The first command is selfhosted; the second preserves GitHub behavior.
@@ -88,7 +90,7 @@ If stdout contains:
 write pending state:
 
 ```bash
-axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key 00000000-0000-4000-8000-000000000000 --pending-device-flow true --json
+axhub plugin-support init-resume put --git-backend github --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key 00000000-0000-4000-8000-000000000000 --pending-device-flow true --json
 ```
 
 When `auto_poll:true` and `browser_opened:true`, still surface the `user_code` immediately in chat. Never leave the user staring at an empty GitHub code-entry screen with no code. Do not use background-task output as the device-flow control plane. After the code is visible, use one direct `axhub github accounts list --tenant <tenant> --json` check or a watch-flag-free resume command to observe approval. Do not ask the user to say an approval phrase, and do not write wording that asks them to report back after approval. Say only that this screen will keep checking automatically.
@@ -107,7 +109,7 @@ GitHub 연결이 필요해요. 다음 단계로 진행해 주세요:
 In fallback mode, resume the cached flow yourself after `retry_after_secs` or a short bounded delay; do not wait for a manual approval phrase and do not end the response asking the user to report approval. Pending messages must say that approval will be detected automatically, not that the user should tell the agent after approving. Do not follow old wording like "Prefer the emitted `resume_command` literally"; use it only as a base argv, never verbatim: strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume after a device code so the result surfaces. Otherwise use:
 
 ```bash
-axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --resume-last --idempotency-key 00000000-0000-4000-8000-000000000000
+axhub --no-input apps bootstrap --git-backend github --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --resume-last --idempotency-key 00000000-0000-4000-8000-000000000000
 ```
 
 While an outstanding code exists, never run fresh `bootstrap --execute` without `--resume-last`; it can issue a new code and invalidate the user's approved one. If response remains `device_code_pending`, respect `retry_after_secs` and retry `--resume-last` until success or expiry. If code expired, start Step 7 execute again to issue a fresh challenge.
@@ -168,7 +170,10 @@ if [ -f axhub.yaml ]; then
   fi
   axhub deploy --explain --json >/dev/null
 fi
-axhub plugin-support init-resume put --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --repo-full-name "$REPO" --clone-done true --json
+# Selfhosted:
+axhub plugin-support init-resume put --git-backend selfhosted --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --clone-done true --json
+# GitHub:
+axhub plugin-support init-resume put --git-backend github --template "$TEMPLATE" --app-name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --idempotency-key "$IDEMPOTENCY_KEY" --bootstrap-id "$BOOTSTRAP_ID" --repo-full-name "$REPO" --clone-done true --json
 axhub plugin-support init-resume clear --json
 ```
 

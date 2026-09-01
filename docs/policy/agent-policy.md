@@ -143,3 +143,10 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "axhub apps get <app> --json", "git_backend.backend=selfhosted"
 - 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/onboarding/SKILL.md
 - invariant(codex): "axhub apps get <app> --json", "git_backend.backend=selfhosted"
+
+## AP-24 fresh git backend 명시 선택
+- 규칙: fresh onboarding/bootstrap의 tenant `git_backend`는 추천값일 뿐이에요. 사용자가 현재 대화에서 GitHub 또는 Axhub self-hosted를 명시하면 그대로 쓰고, 아니면 interactive 선택 card로 코드 저장 위치를 한 번 물어요. 선택은 `SELECTED_GIT_BACKEND`로 같은 대화의 onboarding→bootstrap에 전달하되 app 생성 전 persisted 값이라고 말하지 않아요. existing/resume app은 persisted backend를 재사용하고 다시 묻지 않아요. provider 선택이 명시되지 않은 headless는 provider mutation 전에 safe-stop해요. bootstrap의 preview·execute·resume와 모든 `init-resume put`에는 literal `--git-backend github|selfhosted`를 넣어요.
+- 적용: skills/bootstrap/SKILL.md, skills/onboarding/SKILL.md
+- invariant: "SELECTED_GIT_BACKEND", "코드 저장 위치", "provider 선택이 명시되지"
+- 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/onboarding/SKILL.md
+- invariant(codex): "SELECTED_GIT_BACKEND", "코드 저장 위치", "provider 선택이 명시되지"
