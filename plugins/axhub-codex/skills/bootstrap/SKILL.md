@@ -14,7 +14,7 @@ model: sonnet
 첫 visible 응답은 반드시 한국어 진행 문장. 스킬 선택 이유, route label, `axhub:bootstrap 스킬 호출한다` 금지. Codex 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요. 금지문: `Using axhub:bootstrap skill`, `matches new app + deploy request`, `axhub의 새 앱 생성 스킬`, `스킬을 사용하겠습니다`.
 
 새 앱 생성과 배포 목표는 받은 상태예요. execute 승인은 별도라서 아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행하고, `진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요.
-인증 전 backend 판정: resume/existing은 `axhub apps get <app> --json`, fresh는 `axhub apps git-backend --tenant <tenant> --json` 추천값에서 고르게 해요. `git_backend.backend=selfhosted`이면 device flow·GitHub App·owner 질문을 건너뛰어요.
+인증 전: 기존=`axhub apps get <app> --json`; resume=`state.git_backend` 우선(없을 때만 app lookup); fresh=`axhub apps git-backend --tenant <tenant> --json` 추천 뒤 `GitHub`/`Axhub self-hosted` 선택. dry-run·state·execute=`--git-backend github|selfhosted`. `git_backend.backend=selfhosted`는 GitHub 계정·device flow·App·owner 질문 0회.
 
 
 중단 뒤 이어질 때도 CLI 명령이 하나도 실행되지 않았다면 fresh path 를 그대로 시작해요. 다시 시작 문구를 요구하지 않아요.
@@ -98,7 +98,7 @@ Tool 제목은 `작업공간 확인` 또는 `앱 설정 확인`을 써요.
 ```bash
 axhub plugin-support init-resume route --json
 ```
-`watch_status`/`resume_last`이면 emitted command 전에 `axhub apps get <app> --json`으로 persisted backend를 재사용해요. missing/malformed면 멈추고, selfhosted면 provider-auth resume을 버려 ownerless status/resume으로, GitHub/`legacy_github`만 emitted command로 이어가요.
+`watch_status`/`resume_last`: `state.git_backend` 우선; 없을 때만 `axhub apps get <app> --json`, 실패면 중단. selfhosted는 ownerless status/resume, GitHub/`legacy_github`만 emitted command.
 
 
 `watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 새 폴더/새 앱 요청이거나 `새로 시작`이면 이전 상태를 무시하고 template 질문으로 이어가요. fresh 이면 reference 를 읽지 않아요.
