@@ -4,6 +4,27 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.27.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.26.1...v1.27.0) (2026-09-01)
+
+새 앱을 시작할 때 GitHub와 Axhub self-hosted 저장소 중 어디에 코드를 둘지 먼저 선택해요. 선택한 backend는 bootstrap의 preview·state·execute·resume 전 구간에 고정되고, self-hosted 경로에서는 불필요한 GitHub 인증을 건너뛰어요. headless 환경에서는 선택값이 없으면 provider mutation 전에 멈추고 기존 앱은 저장된 backend를 그대로 쓰며, relay sync와 compose webhook의 책임 경계도 명확히 했어요.
+
+
+### Added
+
+* self-hosted Git skill 흐름 지원 ([#477](https://github.com/jocoding-ax-partners/axhub/issues/477)) f3b6b4e
+* 온보딩과 bootstrap에 Git 저장소 선택 흐름을 적용해요 ([#484](https://github.com/jocoding-ax-partners/axhub/issues/484)) c6fb380
+
+
+### Fixed
+
+* **skills:** 앱별 Git backend 선택을 유지해요 ([#483](https://github.com/jocoding-ax-partners/axhub/issues/483)) dc6d7d0
+
+
+### Docs
+
+* **skills:** compose 앱 웹훅은 진입 서비스가 받는다 (spec 246) ([#482](https://github.com/jocoding-ax-partners/axhub/issues/482)) 5fe4a89
+* **skills:** relay sync 창구의 응답 중계·재시도 경계 (spec 245) ([#481](https://github.com/jocoding-ax-partners/axhub/issues/481)) 3f65d5e
+
 ## [1.26.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.26.0...v1.26.1) (2026-08-29)
 
 커넥터가 더는 읽기 전용이 아니에요. NAS 커넥터에 파일 업로드가 생기면서, 스킬이 "조회 가능한" 축만 알고 있으면 "내가 여기 올릴 수 있어?" 에 잘못 답하게 돼요. 목록에 보인다고 올릴 수 있는 게 아니고, 폴더마다 읽기까지인지 쓰기까지인지가 따로 있거든요.
