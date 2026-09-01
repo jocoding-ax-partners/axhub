@@ -248,6 +248,30 @@ describe("bootstrap desktop UX contract", () => {
     expect(reference).toContain("Do not paraphrase the question or invent new Korean option labels/descriptions");
   });
 
+  test("pins the selected backend on every bootstrap preview, state, execute, and resume command", () => {
+    const bootstrap = readBootstrap();
+    const reference = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
+    const bootstrapCommands = reference
+      .split("\n")
+      .filter((line) => line.startsWith("axhub ") && line.includes(" apps bootstrap "));
+    const resumeStateCommands = reference
+      .split("\n")
+      .filter((line) => line.startsWith("axhub plugin-support init-resume put "));
+
+    expect(bootstrap).toContain("provider 선택이 명시되지 않은 headless");
+    expect(bootstrap).toContain("같은 대화의 onboarding 선택을 재사용");
+    expect(bootstrapCommands.length).toBeGreaterThanOrEqual(5);
+    for (const command of bootstrapCommands) {
+      expect(command).toMatch(/--git-backend (github|selfhosted)/);
+    }
+    expect(resumeStateCommands.length).toBeGreaterThan(0);
+    for (const command of resumeStateCommands) {
+      expect(command).toMatch(/--git-backend (github|selfhosted)/);
+    }
+    expect(resumeStateCommands.some((command) => command.includes("--git-backend selfhosted"))).toBe(true);
+    expect(resumeStateCommands.some((command) => command.includes("--git-backend github"))).toBe(true);
+  });
+
   test("asks for template when the user only gives a generic app category", () => {
     const bootstrap = readBootstrap();
     const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
@@ -390,7 +414,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(templateReference).toContain("replace `test` with the selected tenant literal");
     expect(localReference).toContain("Do not run a Desktop-visible command that contains");
     expect(localReference).toContain("Execute and resume commands carry no env prefix");
-    expect(preCloneReference).toContain("axhub --no-input apps bootstrap --template nextjs-axhub --name bakery-preorder");
+    expect(preCloneReference).toContain("axhub --no-input apps bootstrap --git-backend selfhosted --template nextjs-axhub --name bakery-preorder");
     expect(preCloneReference).not.toContain('axhub apps bootstrap --template "$TEMPLATE"');
     expect(preCloneReference).not.toContain('AXHUB_TENANT="${AXHUB_TENANT');
     expect(preCloneReference).not.toContain("export ");
@@ -452,7 +476,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(localReference).toContain("Prefer the emitted `resume_command` literally");
     expect(localReference).toContain("do not end the response asking the user to report approval");
     expect(resumeReference).toContain("Do not ask the user to say an approval phrase in chat");
-    expect(executeReference).toContain("axhub plugin-support init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json");
+    expect(executeReference).toContain("axhub plugin-support init-resume put --git-backend selfhosted --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --json");
     expect(executeReference).not.toContain("init-resume put --template nextjs-axhub --app-name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --idempotency-key");
     expect(preCloneReference).toContain("axhub --no-input apps bootstrap");
   });

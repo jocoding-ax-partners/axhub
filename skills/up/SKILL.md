@@ -1,6 +1,6 @@
 ---
 name: up
-description: 'GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려서 배포해요. 커밋을 만들지 않고 작업 트리를 그대로 업로드하는 lane 이라, 커밋하지 않은 변경이 있어도 그대로 진행해요. 트리거: "GitHub 없이 배포해", "저장소 없이 배포해줘", "이 폴더 그대로 올려줘", "소스 올려서 배포", "레포 안 만들고 배포", "GitHub push 가 막혀서 배포가 안 돼", "레포 권한이 없어서 배포 못 해", "deploy without github", "upload this folder and deploy". 저장소가 연결돼 있고 push 배포가 정상인 평시 "배포해" 는 deploy 로, 빈 폴더 새 앱은 bootstrap 으로, 기존 앱 첫 연결은 import 로, 정적 파일 앱(deploy_method=static)은 deploy 의 static lane 으로 양보해요. 이 트리거는 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요.'
+description: '저장소를 쓰지 않고 지금 폴더의 소스를 그대로 올려서 배포해요. 커밋을 만들지 않고 작업 트리를 그대로 업로드하는 lane이에요. 트리거: "저장소 없이 배포해줘", "레포 안 만들고 배포", "이 폴더 그대로 업로드", "GitHub push가 막혀서 현재 소스로 배포", "upload this folder and deploy". "GitHub 없이"만 말하면 app의 top-level git_backend를 먼저 확인하고, selfhosted app은 deploy의 저장소 push lane으로 양보해요. 저장소가 연결돼 있고 push 배포가 정상인 평시 "배포해"는 deploy로, 빈 폴더 새 앱은 bootstrap으로, 기존 앱 첫 연결은 import로, 정적 파일 앱은 deploy의 static lane으로 양보해요. axhub 맥락이 있을 때만 유효해요.'
 examples:
   - utterance: "GitHub 없이 이 폴더 그대로 올려줘"
     intent: "deploy the local working tree without a git repository"
@@ -20,9 +20,9 @@ model: sonnet
 
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
 
-이 스킬은 이미 axhub 에 연결된 앱의 **로컬 소스 배포**를 맡아요. 소스는 GitHub 커밋이 아니라 지금 폴더를 tar.gz 로 묶은 아카이브이고, 그 뒤 단계(빌드·스캔·기동·verify)는 저장소 배포와 완전히 같은 파이프라인이에요.
+이 스킬은 이미 axhub에 연결된 앱의 **명시적인 repositoryless local-source 배포**를 맡아요. 소스는 Git 커밋이 아니라 지금 폴더를 tar.gz로 묶은 아카이브이고, 그 뒤 단계(빌드·스캔·기동·verify)는 저장소 배포와 같은 파이프라인이에요. selfhosted app의 정상 배포는 이 lane이 아니라 `deploy`의 clone→push lane이에요.
 
-**커밋 상태를 게이트로 쓰지 않아요.** 커밋하지 않은 변경이 있는 작업 트리는 이 lane 의 정상 입력이에요 — 커밋을 만들거나 push 하지 않고 지금 파일을 그대로 올려요.
+**커밋 상태를 게이트로 쓰지 않아요.** 커밋하지 않은 변경이 있는 작업 트리는 이 lane의 정상 입력이에요 — 커밋을 만들거나 push 하지 않고 지금 파일을 그대로 올려요. 다만 `GitHub 없이`만으로 repositoryless upload를 확정하지 않아요. 사용자가 `저장소 없이`·`레포 없이`·`지금 폴더 그대로 업로드`처럼 저장소 우회를 명시해야 selfhosted app에서도 이 lane을 써요.
 
 ## 실행 게이트 계약 (요약)
 
@@ -80,13 +80,13 @@ Headless 는 `claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, TTY 없�
 |---|---|
 | 빈 폴더에서 새 앱 만들기 | `bootstrap` |
 | 앱이 아직 없거나 첫 연결·첫 배포 | `import` |
-| 저장소가 연결돼 있고 push 배포가 정상인 평시 배포 | `deploy` |
+| 저장소가 연결돼 있고 push 배포가 정상인 평시 배포, 또는 non-static selfhosted app의 저장소 배포 | `deploy` |
 | `deploy_method=static` 정적 파일 앱 | `deploy` 의 static lane |
 | CLI·플러그인 버전 업데이트 | `update` |
 | 배포 실패 원인 진단 | `diagnosis` |
 | 로그·환경변수·롤백·GitHub 재연결 | `clarity` |
 
-사용자가 로컬 소스 배포를 **명시**하면 `github_connected` 가 true 여도 이 스킬이 이겨요. `deploy` 로 되돌리는 역방향 양보는 소스 업로드를 명시하지 않은 평시 배포 발화에만 적용해요.
+사용자가 repositoryless local-source 배포를 **명시**하면 저장소 연결 여부와 무관하게 이 스킬이 이겨요. 단 `GitHub 없이`만으로는 명시가 아니에요. app이 selfhosted면 `deploy`의 self-hosted repository lane을 쓰고, `저장소 없이`·`레포 없이`·`지금 폴더 그대로 업로드`가 함께 있을 때만 이 스킬을 유지해요.
 
 ## 1단계 — preflight
 
@@ -94,7 +94,7 @@ Headless 는 `claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, TTY 없�
 axhub plugin-support deploy-prep --intent deploy --json
 ```
 
-이 명령은 `deploy-preview-summary` 와 같은 envelope 를 커밋 게이트 없이 줘요. 결과에서 읽는 값은 `preflight.auth_ok`, `preflight.cli_too_old`, `preflight.capabilities`, `resolve.app_id`, `github_connected`, `in_flight_deploy`, `bootstrap_plan` 이에요.
+이 명령은 `deploy-preview-summary`와 같은 envelope를 커밋 게이트 없이 줘요. 결과에서 읽는 값은 `preflight.auth_ok`, `preflight.cli_too_old`, `preflight.capabilities`, `resolve.app_id`, `github_connected`, `in_flight_deploy`, `bootstrap_plan`이에요. `resolve.app_id`를 얻은 뒤 provider 판정은 별도 `apps get`의 top-level `git_backend`만 써요.
 
 분기:
 
@@ -110,15 +110,15 @@ axhub plugin-support deploy-prep --intent deploy --json
 
 `APP_ID` 는 `resolve.app_id` 로 바인딩해요. tenant 와 profile 은 플래그로 넘기지 않아요 — CLI 가 `AXHUB_TENANT`·`AXHUB_PROFILE` 환경변수를 직접 읽어요. 셸 변수로만 잡아 둔 값은 넘어가지 않으니, 명시 스코프가 필요하면 그 환경변수를 설정해요.
 
-### static 앱 확인
+### deploy method와 Git backend 확인
 
-`APP_ID` 를 잡은 직후 배포 방식을 확인해요:
+`APP_ID`를 잡은 직후 한 번만 실행해요:
 
 ```bash
-axhub apps get "$APP_ID" --no-input --field-expr '.deploy_method // empty'
+axhub apps get "$APP_ID" --json
 ```
 
-`static` 이면 이 스킬을 멈추고 `deploy` 의 static lane 으로 양보해요 — 정적 파일 앱은 release 기반이라 `axhub deploy verify` 가 404 를 주고, 성공 선언 경로 자체가 달라요. `up` 은 deployment-record 를 만드는 lane 만 소유해요.
+top-level `git_backend.backend`와 `git_backend.source`, `deploy_method`만 읽어요. missing/malformed면 upload 전에 멈춰요. `deploy_method=static`이면 `deploy`의 static lane으로 양보해요. `git_backend.backend`가 `selfhosted`면 `deploy`의 self-hosted repository lane으로 양보하되, 사용자가 repositoryless upload를 명시한 경우만 아래 archive preview로 이어가요. `legacy_github` 또는 GitHub app도 아래로 이어가요.
 
 ## 2단계 — 올릴 내용 미리보기
 

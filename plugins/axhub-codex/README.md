@@ -95,7 +95,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 | `scaffold` | 템플릿 + 내 계정 저장소 | "내 계정에 레포 만들어서 새 앱 시작해줘" |
 | `plugins` | plugin App 게시·목록·다운로드·Codex 설치 | "플러그인 목록 보여줘", "1.2.0 내려 받아", "Codex에 설치해줘", "여러 스킬을 하나로 올려줘" |
 | `deploy` | 현재 브랜치 배포 | "배포해", "ship 해줘", "프로덕션에 올려" |
-| `up` | GitHub 없이 로컬 폴더 배포 | "GitHub 없이 배포해", "이 폴더 그대로 올려줘", "소스 올려서 배포" |
+| `up` | 명시적인 repositoryless 로컬 폴더 배포 | "저장소 없이 배포해", "이 폴더 그대로 올려줘", "소스 올려서 배포" |
 | `import` | 기존 로컬 앱 가져오기 | "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app" |
 | `development` | 기존 앱에 실데이터 기능 코딩 | "내 connector 데이터로 대시보드 만들어줘", "유저 목록 페이지 만들어줘" |
 | `diagnosis` | 배포 실패 원인 진단 | "배포 실패 원인 진단해줘", "왜 배포가 죽었어" |
@@ -106,7 +106,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 버전·최신 확인이 들어간 요청은 언제나 `update` 가 먼저 끝나요. 업데이트 뒤 같은 요청에 앱 현황 확인이 남아 있으면 존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 이어가요.
 
-앱 생성·배포·온보딩은 저장소 단계보다 먼저 public CLI의 top-level `git_backend`를 확인해요. resume/existing은 `axhub apps get <app> --json`, fresh bootstrap/onboarding은 read-only `axhub apps git-backend --tenant <tenant> --json`을 써요. non-static selfhosted면 계정 연동·device flow·GitHub App 설치 대사를 건너뛰고 `axhub repo clone` 뒤 일반 `git push`의 webhook 배포를 기다려요. static은 기존 release lane, GitHub·`legacy_github`는 기존 `axhub up`·repo gate 경로를 유지해요.
+앱 생성·배포·온보딩은 저장소 단계보다 먼저 public CLI의 top-level `git_backend`를 확인해요. resume/existing은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh bootstrap/onboarding은 read-only `axhub apps git-backend --tenant <tenant> --json`을 추천값으로 읽은 뒤 GitHub/Axhub self-hosted를 직접 선택해요. 같은 대화의 선택은 bootstrap의 모든 preview·state·execute에 `--git-backend`로 전달해요. non-static selfhosted면 계정 연동·device flow·GitHub App 설치를 건너뛰고 clone→`git push` webhook 배포를 기다려요. `GitHub 없이`만 말해도 selfhosted 정상 배포를 쓰며, `up`은 repositoryless upload를 명시한 경우만 맡아요.
 
 카탈로그에 스킬이 안 보일 때(다른 플러그인·스킬이 많아 컨텍스트 예산이 넘치면 Codex 가 설명을 줄이거나 생략할 수 있어요)는 스킬 이름을 명시해 부르면 돼요 — 예: `$axhub-codex:deploy` 처럼 명시 멘션으로요. 또 등록해 둔 다른 marketplace 경로가 깨져 있으면 플러그인 목록 자체가 실패할 수 있어요 — `codex plugin marketplace list` 로 등록 상태를 정리해요.
 
@@ -114,7 +114,7 @@ axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 
 
 ## ✅ 대표 여정
 
-대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. `onboarding`과 `bootstrap`은 app backend를 먼저 확인해 필요한 저장소 준비만 노출하고, `deploy`는 selfhosted push 또는 기존 GitHub/upload 경로를 실행한 뒤 exact deployment id를 verify해요. 이후 운영 작업은 `clarity`가 공개 CLI 표면에서 처리해요.
+대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. `onboarding`에서 고른 GitHub/Axhub self-hosted 값을 같은 대화의 `bootstrap`이 재사용하고, `deploy`는 persisted backend에 맞는 lane을 실행한 뒤 exact deployment id를 verify해요. 이후 운영 작업은 `clarity`가 공개 CLI 표면에서 처리해요.
 
 ---
 

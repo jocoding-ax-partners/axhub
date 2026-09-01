@@ -333,11 +333,11 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
     ],
     deploy: ["axhub apps get <app> --json", "git_backend.backend=selfhosted", "axhub repo clone <app>", "axhub로 지금 배포를 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
-    onboarding: ["axhub apps get <app> --json", "axhub apps git-backend --tenant <tenant> --json", "git_backend.backend=selfhosted"],
+    onboarding: ["axhub apps get <app> --json", "axhub apps git-backend --tenant <tenant> --json", "git_backend.backend=selfhosted", "첫 앱의 코드 저장 위치를 선택해 주세요.", "SELECTED_GIT_BACKEND", "provider 선택이 명시되지 않았으면"],
     import: ["미리보기대로 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
-    scaffold: ["명시 텍스트 승인 1회", "미리 넣어 둔 문구", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
+    scaffold: ["명시 텍스트 승인 1회", "미리 넣어 둔 문구", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "두 요구는 동시에 충족할 수 없어요", "코드 저장 위치를 먼저 선택"],
     plugins: ["artifact를 배포할 권리가 있음을 확인하고", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "--idempotency-key", "--execute"],
-    up: ["axhub 로 지금 이 폴더를 올려서 배포할까요?", "명시 텍스트 승인 1회", "미리 넣어 둔 문구", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "--execute", "axhub deploy verify"],
+    up: ["axhub 로 지금 이 폴더를 올려서 배포할까요?", "명시 텍스트 승인 1회", "미리 넣어 둔 문구", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "`GitHub 없이`만으로 repositoryless upload를 확정하지 않아요", "selfhosted app의 정상 배포는", "--execute", "axhub deploy verify"],
     update: ["update apply --execute"],
   };
 

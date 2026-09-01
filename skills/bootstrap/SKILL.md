@@ -127,18 +127,18 @@ repo name 과 subdomain 은 명시 입력이 없으면 app slug 로 맞춰요. d
 
 ### 6. Git Backend Gate
 
-provider 대사 전에 backend를 확정해요. resume/기존은 persisted app choice를 재사용하고, fresh는 app row 생성 없이 tenant default를 읽어요.
+provider 대사 전 resume/기존은 persisted app choice, fresh tenant backend는 추천값이며 app row를 만들지 않아요. 같은 대화의 onboarding 선택을 재사용하고 backend 질문을 반복하지 않아요.
 
 ```bash
 axhub apps get <app> --json
 axhub apps git-backend --tenant <tenant> --json
 ```
 
-top-level `git_backend.backend`와 `git_backend.source`만 읽어요. app source는 `tenant_default|app_override|legacy_github`, tenant 응답 source는 `tenant|platform_default`예요. Gitea/C1/remote는 보지 않고 read 실패·malformed면 provider 질문·mutation 전에 멈춰요.
+top-level `git_backend.backend`·`git_backend.source`만 읽어요. app source는 `tenant_default|app_override|legacy_github`, tenant 응답 source는 `tenant|platform_default`예요. Gitea/C1/remote는 보지 않고 실패·malformed면 멈춰요.
 
-fresh tenant backend는 추천값이에요. 사용자가 발화에서 backend를 명시했다면 그 값을 써요. 아니면 native Question/AskUserQuestion card로 정확히 `이 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. 추천 반대 옵션도 허용하고, card가 안 보일 때만 같은 선택을 chat text로 물어요.
+발화나 같은 대화에 backend가 있으면 쓰고, 없으면 native Question/AskUserQuestion card로 `이 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. 추천과 다른 선택도 허용해요. provider 선택이 명시되지 않은 headless는 mutation 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
 
-확정값은 dry-run, `init-resume put`, execute에 `--git-backend github|selfhosted`로 항상 명시해요.
+`SELECTED_GIT_BACKEND`를 dry-run, `init-resume put`, execute에 `--git-backend github|selfhosted`로 넣어요.
 
 `git_backend.backend=selfhosted` 선택은 `references/templates-and-github.md` 전체를 읽지 않아요. selfhosted 사용자-facing 대사는 `저장소는 axhub에서 준비할게요.`만 허용하고 계정 인증·저장소 App 설치 질문을 0회로 유지해요.
 

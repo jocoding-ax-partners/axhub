@@ -4,7 +4,7 @@ repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 
 
 ## DP-1 diet 체제 — skill 추가 기준
 - diet 체제는 스킬 수를 최소로 유지하는 방침이에요. 공개 skill 은 11개(onboarding/bootstrap/scaffold/plugins/deploy/up/import/development/diagnosis/clarity/update)를 유지해요.
-- 새 skill 은 기존 skill 의 경계·양보 규칙으로 연결(라우팅)할 수 없는 사용자 의도가 반복해서 관측될 때만 추가해요. `up` 이 그 기준으로 추가된 이유는, GitHub 없이 지금 폴더를 올려 배포하려는 의도가 `deploy` 의 커밋 게이트에 먼저 막혀 기존 양보 규칙으로는 그 lane 에 닿을 수 없었기 때문이에요.
+- 새 skill은 기존 skill의 경계·양보 규칙으로 연결할 수 없는 사용자 의도가 반복될 때만 추가해요. `up`은 사용자가 `저장소 없이`·`레포 없이`·`지금 폴더 그대로 업로드`를 명시한 repositoryless 배포 lane이에요. `GitHub 없이`만 말한 selfhosted app의 정상 배포는 `deploy`가 맡아요.
 - 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli 에 둬요. 라우팅 품질은 외부 corpus(라우팅 학습용 예문 모음)가 아니라 frontmatter(SKILL.md 맨 위의 메타데이터 블록)의 `description`·`examples` 에 투자해요.
 
 ## DP-2 tone — 해요체
@@ -26,7 +26,7 @@ repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 
 - `bun test` — frontmatter·bundle·routing·policy parity 포함 전부 PASS
 - `bun run plugin:budget` — 컨텍스트 byte 예산 PASS (SKILL.md 11개 합산 246,000B · per-skill 35,000B). codex 번들은 `bun run plugin:budget:codex` 로 같은 예산을 별도 검사해요. 236,000→246,000B 증가는 spec 236의 backend 선판정·selfhosted 실행 계약을 bootstrap/deploy/onboarding 본문에 유지하면서 실측 합계에 약 5,000B 여유를 보존하기 위한 것이에요. 넘치면 본문을 reference 로 추출하되, **실행 경로에 필요한 지시는 빼지 않아요** — reference 는 plugin cache 라 workspace 밖이고 Desktop 은 읽을 때 권한 프롬프트를 띄우는데 우리 규칙(bootstrap 9.1)은 그 프롬프트를 생략하라고 해서 조용히 안 읽혀요. 참고용 상세만 reference 로 가요.
 - `bun run plugin:bundle` — clean bundle(개발 산출물이 섞이지 않은 배포용 플러그인 꾸러미) 생성. 로컬 Claude Code 검증은 repo 루트가 아니라 `dist/axhub-plugin` 을 써요.
-- 대표 여정 회귀 — 첫 셋업 → 앱 생성 → 배포 → 상태 확인 경로를 문서·skill 본문·fixture(테스트용 고정 예시 데이터) 계약으로 같은 방향에 맞춰요.
+- 대표 여정 회귀 — 첫 셋업의 GitHub/Axhub self-hosted 명시 선택 → 같은 선택의 앱 생성 → backend별 배포 → 상태 확인 경로를 문서·skill 본문·fixture 계약으로 같은 방향에 맞춰요.
 
 ## DP-6 hidden 표면 계약
 - `axhub plugin-support <cmd>` 는 이 plugin 의 skill 들만 쓰라고 만든 숨김 명령이에요. 일반 사용자용 명령이 아니라서 도움말에도 안 나오고, 예고 없이 바뀌거나 사라질 수 있어요. 그래서 skill 밖에서는 쓰지 않아요.

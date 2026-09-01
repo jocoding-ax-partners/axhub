@@ -46,7 +46,7 @@ describe("per-app git backend bootstrap contracts", () => {
           : "native Question/AskUserQuestion card",
       );
       expect(backendGate, root).toContain("`GitHub`와 `Axhub self-hosted`");
-      expect(backendGate, root).toContain("사용자가 발화에서 backend를 명시했다면 그 값을 써요");
+      expect(backendGate, root).toContain("발화나 같은 대화에 backend가 있으면 쓰고");
       expect(dryRun, root).toContain("--git-backend selfhosted");
       expect(dryRun, root).toContain("--git-backend github");
       expect(execute, root).toContain("--git-backend selfhosted");
@@ -158,10 +158,10 @@ describe("spec 236 self-hosted git skill contracts", () => {
       expect(github, root).toContain("github_connected");
     }
   });
-  test("T146 positive: onboarding suppresses provider auth for tenant-default selfhosted apps", () => {
+  test("T146 positive: fresh onboarding asks once and selected selfhosted suppresses provider auth", () => {
     for (const root of SKILL_ROOTS) {
       const onboarding = readSkill(root, "onboarding");
-      const backendGate = sliceSection(onboarding, "### 2. Git backend gate", "### 3. Repository provider surface");
+      const backendGate = sliceSection(onboarding, "### 2. Git backend gate", "### 4. first_gap router");
 
       const cliReadiness = backendGate.indexOf("`cli_missing`·`cli_path_missing`·`cli_old`·`auth_missing`");
       expect(cliReadiness, root).toBeGreaterThanOrEqual(0);
@@ -169,6 +169,15 @@ describe("spec 236 self-hosted git skill contracts", () => {
       expect(backendGate, root).toContain("CLI·auth gap을 닫기 전에는 preflight와 backend read를 절대 실행하지 않아요");
       expect(backendGate, root).toContain("axhub apps get <app> --json");
       expect(backendGate, root).toContain("axhub apps git-backend --tenant <tenant> --json");
+      expect(backendGate, root).toContain("fresh tenant 응답은 추천값");
+      expect(backendGate, root).toContain("첫 앱의 코드 저장 위치를 선택해 주세요.");
+      expect(backendGate, root).toContain(
+        root === "plugins/axhub-codex/skills"
+          ? "native Question/명시 텍스트 승인 card"
+          : "native Question/AskUserQuestion card",
+      );
+      expect(backendGate, root).toContain("`GitHub`와 `Axhub self-hosted`");
+      expect(backendGate, root).toContain("SELECTED_GIT_BACKEND");
       expect(backendGate, root).toContain("`git_backend.backend=selfhosted`");
       expect(backendGate, root).toContain("tenant source는 `tenant|platform_default`");
       expect(backendGate, root).toContain("`github_link_missing`·`github_app_missing`을 처리하지 않아요");
@@ -176,12 +185,25 @@ describe("spec 236 self-hosted git skill contracts", () => {
     }
   });
 
-  test("T146 negative: GitHub onboarding keeps account linking and App installation", () => {
+  test("T146 negative: selected GitHub onboarding keeps account linking and App installation", () => {
     for (const root of SKILL_ROOTS) {
       const onboarding = readSkill(root, "onboarding");
+      expect(onboarding, root).toContain("SELECTED_GIT_BACKEND");
       expect(onboarding, root).toContain("axhub github accounts list --json");
       expect(onboarding, root).toContain("github_link_missing");
       expect(onboarding, root).toContain("github_app_missing");
+    }
+  });
+
+  test("related routes do not confuse selfhosted Git with repositoryless upload or GitHub scaffold", () => {
+    for (const root of SKILL_ROOTS) {
+      const up = readSkill(root, "up");
+      const scaffold = readSkill(root, "scaffold");
+      expect(up, root).toContain("`GitHub 없이`만으로 repositoryless upload를 확정하지 않아요");
+      expect(up, root).toContain("`selfhosted`면 `deploy`의 self-hosted repository lane");
+      expect(scaffold, root).toContain("Axhub self-hosted");
+      expect(scaffold, root).toContain("두 요구는 동시에 충족할 수 없어요");
+      expect(scaffold, root).toContain("코드 저장 위치를 먼저 선택");
     }
   });
 

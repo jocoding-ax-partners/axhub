@@ -107,6 +107,28 @@ describe("onboarding representative journey", () => {
     }
   });
 
+  test("fresh onboarding asks for a Git backend and carries the selected value into bootstrap", () => {
+    const backendGate = section(SKILL, "### 2. Git backend gate");
+
+    expect(backendGate).toContain("fresh tenant 응답은 추천값");
+    expect(backendGate).toContain("첫 앱의 코드 저장 위치를 선택해 주세요.");
+    expect(backendGate).toContain("native Question/AskUserQuestion card");
+    expect(backendGate).toContain("`GitHub`와 `Axhub self-hosted`");
+    expect(backendGate).toContain("SELECTED_GIT_BACKEND");
+    expect(backendGate).toContain("같은 대화의 bootstrap");
+    expect(backendGate).toContain("`--git-backend <SELECTED_GIT_BACKEND>`");
+    expect(backendGate).toContain("persisted app backend를 `SELECTED_GIT_BACKEND`로 고정");
+    expect(backendGate).toContain("코드 저장 위치를 다시 묻지 않아요");
+  });
+
+  test("provider choice fails closed headlessly and selfhosted filters to one applicable gap", () => {
+    expect(SKILL).toContain("provider 선택이 명시되지 않았으면");
+    expect(SKILL).toContain("provider mutation 전에 `SAFE_STOP_NONINTERACTIVE`");
+    expect(GAPS).toContain("EFFECTIVE_FIRST_GAP");
+    expect(GAPS).toContain("필터 뒤 첫 applicable gap 하나만");
+    expect(GAPS).toContain("Execute that one action, then re-detect");
+  });
+
   test("session re-entry lane uses standalone Desktop-safe probes and absolute paths", () => {
     expect(SKILL).toContain("각각 별도 Bash tool call의 한 명령만");
     expect(SKILL).toContain("정확히 `command -v axhub`");
