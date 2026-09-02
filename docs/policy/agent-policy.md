@@ -100,7 +100,7 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-17 CLI 경로 해석 (설치 여부 오판 금지)
 - 규칙: bare `axhub` 호출 실패(command not found·exit 127)는 미설치 판정 근거가 아니에요. 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 오래된 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요 — AP-13 은 Windows 전용이라 이 상태를 덮지 못해요. 모든 스킬의 CLI 가드는 (1) `command -v axhub`, (2) 위치 파일 `~/.axhub/bin-path`(CLI 0.24.8+ 가 자기 설치 위치를 기록), (3) canonical 경로 `~/.axhub/bin/axhub`(Windows Git Bash 는 `.exe`) 순서로 실행 파일을 찾아요. 디스크에서 찾으면 재설치·온보딩으로 돌려보내지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤, 같은 세션의 남은 명령은 반환된 `bin_path` 절대경로로 이어가요 (이미 열린 셸의 PATH 는 OS 설계상 밖에서 못 고쳐요). 구 CLI 라 `bin_path` 가 없으면 찾은 절대경로를 그대로 써요. 세 경로 모두에서 실행 파일을 못 찾을 때만 미설치로 보고 onboarding 을 안내해요.
-- 적용: skills/bootstrap/SKILL.md, skills/scaffold/SKILL.md, skills/plugins/SKILL.md, skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/import/SKILL.md, skills/up/SKILL.md, skills/update/SKILL.md, hooks/auto-update-prompt.md, CLAUDE.md
+- 적용: skills/bootstrap/SKILL.md, skills/scaffold/SKILL.md, skills/plugins/SKILL.md, skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/import/SKILL.md, skills/up/SKILL.md, skills/update/SKILL.md, hooks/session-auto-update.sh, CLAUDE.md
 - invariant: "bare `axhub` 실패는 미설치가 아니에요", "repair-path"
 
 ## AP-18 device flow 코드 선노출
@@ -157,3 +157,10 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "staging_enabled", "스테이징", "axhub publish --app"
 - 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/up/SKILL.md
 - invariant(codex): "staging_enabled", "스테이징", "axhub publish --app"
+
+## AP-26 조용한 백그라운드 자동 업데이트 (묻지 않음)
+- 규칙: auto-update 훅은 사용자에게 묻지 않고 `"async": true` 백그라운드 worker(`hooks/session-auto-update.sh`)로 axhub CLI 와 플러그인을 적용해요. 훅 계열 중 유일하게 네트워크·바이너리 교체를 하는 예외이고, 다른 전경 훅은 여전히 네트워크 0 이에요. worker 는 kill switch(`AXHUB_NO_AUTO_UPDATE` / `~/.axhub/config/no-auto-update`) → dev 가드 → AP-17 3-경로 → 24h throttle → `mkdir` lock 순으로 gate 를 밟고, `axhub update check --field-expr` 1회로 판정해 `has_update && !disabled && !is_downgrade` 면 `axhub update apply --execute --yes --json`, `plugin.has_update` 면 host 의 plugin update 를 실행해요. 알림은 실제로 바뀐 게 있을 때만 세션당 최대 한 줄이고 질문이 없어요 — 에이전트는 다음 응답 앞머리에 그 한 줄만 말하고 버전 확인 명령을 실행하지 않아요. 보안 검증 실패(exit 14/66)는 반드시 1회 안내하고 같은 버전은 재시도하지 않아요. 침묵을 최신으로 읽지 않아요 — 실패는 `~/.axhub/cache/auto-update.log` 에 남겨요. 플러그인 적용 확인은 restart-confirm 훅이 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 의 로드 버전을 marker 와 비교해 에이전트 명령 없이 닫아요. 이 훅 경로에서 에이전트가 실행하는 명령은 0개예요.
+- 적용: hooks/session-auto-update.sh, hooks/session-restart-confirm.sh, CLAUDE.md, POLICY.md
+- invariant: "묻지 않", "no-auto-update", "AXHUB_NO_AUTO_UPDATE"
+- 적용(codex): plugins/axhub-codex/hooks/session-auto-update.sh, plugins/axhub-codex/hooks/session-restart-confirm.sh, plugins/axhub-codex/POLICY.md
+- invariant(codex): "묻지 않", "no-auto-update", "AXHUB_NO_AUTO_UPDATE"

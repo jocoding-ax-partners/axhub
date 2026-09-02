@@ -70,6 +70,14 @@ interface BundleStats {
 // 치환은 longest-first 가 계약이에요 — 병기 구문 전체를 먼저 소비해 이중 적용을
 // 막아요 (tests/codex-bundle.test.ts 가 정렬을 assert 해요).
 export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: string]> = [
+  // AP-26: auto-update worker 의 플러그인 갱신 블록 — Claude 는 scope 를 읽어
+  // `claude plugin update`, codex 는 git marketplace `upgrade` 뒤 로컬 marketplace
+  // fallback 인 재 `plugin add` 예요. 블록 통째 치환이라 아래 짧은 명령 치환이
+  // 이 블록을 반쯤 바꾸는 사고가 없어요 (FORBIDDEN 이 재유입을 막아요).
+  [
+    "  if ! command -v claude >/dev/null 2>&1; then\n    PLUGIN_RESULT=\"PLUGIN_SKIPPED reason=host_cli_missing latest=$PLAT\"\n  else\n    SCOPE=$(claude plugin list 2>/dev/null | awk '/axhub@axhub/{f=1} f&&/Scope:/{print $2; exit}')\n    [ -n \"$SCOPE\" ] || SCOPE=user\n    claude plugin marketplace update axhub >/dev/null 2>&1\n    if claude plugin update axhub@axhub --scope \"$SCOPE\" >/dev/null 2>&1; then\n      printf '%s|%s' \"$PLAT\" \"$SCOPE\" > \"$RESTART_MARKER\" 2>/dev/null\n      PLUGIN_RESULT=\"PLUGIN_UPDATED plugin=$PV->$PLAT scope=$SCOPE\"\n    else\n      PLUGIN_RESULT=\"PLUGIN_FAILED plugin=$PV latest=$PLAT scope=$SCOPE\"\n    fi\n  fi",
+    "  if ! command -v codex >/dev/null 2>&1; then\n    PLUGIN_RESULT=\"PLUGIN_SKIPPED reason=host_cli_missing latest=$PLAT\"\n  else\n    if codex plugin marketplace upgrade axhub >/dev/null 2>&1 || codex plugin add axhub-codex@axhub >/dev/null 2>&1; then\n      printf '%s' \"$PLAT\" > \"$RESTART_MARKER\" 2>/dev/null\n      PLUGIN_RESULT=\"PLUGIN_UPDATED plugin=$PV->$PLAT\"\n    else\n      PLUGIN_RESULT=\"PLUGIN_FAILED plugin=$PV latest=$PLAT\"\n    fi\n  fi",
+  ],
   [
     "```typescript\nTodoWrite({ todos: [\n  { content: \"테이블 생성\",   status: \"in_progress\", activeForm: \"테이블 만드는 중\" },\n  { content: \"환경변수 추가\", status: \"pending\",     activeForm: \"env 추가하는 중\" }\n]})\n```",
     "참고 항목: `테이블 생성`(진행 중) → `환경변수 추가`(대기). 인자 shape 은 host 가 노출한 도구 스키마를 그대로 따라요.",
@@ -146,6 +154,7 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
   ["claude mcp add", "codex mcp add"],
   ["Claude Desktop", "Codex"],
   ["Claude Code", "Codex"],
+  ["HOST=claude", "HOST=codex"],
   ["claude -p", "codex exec"],
   ["TodoWrite", "update_plan"],
   ["Claude", "Codex"],
@@ -423,7 +432,12 @@ const transformCodexHooks = (outDir: string): void => {
           }
           continue;
         }
-        const { shell: _shell, ...rest } = hook as CodexHookEntry & { shell?: string };
+        // timeout 은 Claude 판 전용이에요 — Claude 는 async 실행 중 timeout 을 무시하지만
+        // codex 는 async 훅에도 적용(기본 600s)하므로 5초면 apply 가 잘려요 (AP-26).
+        const { shell: _shell, timeout: _timeout, ...rest } = hook as CodexHookEntry & {
+          shell?: string;
+          timeout?: number;
+        };
         nextHooks.push({ ...rest, commandWindows: codexCommandWindows(scriptName) });
       }
       entry.hooks = nextHooks;

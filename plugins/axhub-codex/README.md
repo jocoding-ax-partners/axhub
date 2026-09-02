@@ -58,8 +58,9 @@ codex plugin add axhub-codex@axhub
 
 이 플러그인은 세션 시작 훅 4개와 프롬프트 훅 1개를 담아요. Codex 는 플러그인 훅을 **사용자가 신뢰하기 전에는 실행하지 않아요** — 설치 후 첫 대화형 세션에서 훅 목록과 신뢰 여부를 물어요.
 
-- **신뢰하면**: 자동 업데이트 확인(24시간 1회), Windows Git Bash 실행 계약 안내, 최신·버전 요청의 update-first 라우팅 가드, 플러그인 재시작 확인이 자동으로 동작해요.
+- **신뢰하면**: 자동 업데이트(24시간 1회, 뒤에서 조용히 확인·설치), Windows Git Bash 실행 계약 안내, 최신·버전 요청의 update-first 라우팅 가드, 플러그인 재시작 확인이 자동으로 동작해요.
 - **신뢰하지 않으면**: 위 4개 표면이 조용히 꺼져요. 스킬 자체는 훅 없이도 완결돼요 — 특히 `update` 스킬은 "업데이트해줘" 한마디로 훅과 무관하게 감지→적용→재시작 안내까지 끝까지 진행해요.
+- **훅 정의가 바뀐 릴리즈**: 훅 entry 자체가 바뀐 릴리즈(예: 자동 업데이트 훅을 백그라운드 `async` 로 바꾼 릴리즈)는 재설치 뒤 신뢰 확인이 한 번 더 뜰 수 있어요. wrapper 스크립트 본문만 바뀐 릴리즈는 재확인 없이 반영돼요. 자동 업데이트 훅은 뒤에서 `axhub update apply` 와 `codex plugin marketplace upgrade axhub` 를 묻지 않고 실행하니 신뢰 전에 `hooks/session-auto-update.sh` 를 한 번 읽어 보는 것을 권해요.
 - 훅이 신뢰하는 대상은 **훅 command(스크립트 경로)** 예요. 플러그인 업데이트로 훅 구성이 바뀌면 Codex 가 다시 신뢰를 물을 수 있어요 — 훅 스크립트 동작 변화는 CHANGELOG 에 명시해요.
 
 `codex exec` 자동화의 `--dangerously-bypass-hook-trust` 플래그는 세션의 모든 플러그인 훅 신뢰 검토를 우회하는 전역 플래그라 **권장하지 않아요**. axhub 의 headless 사용은 훅 없이 완결되고 파괴 작업은 dry-run 까지만 진행되므로 이 플래그가 필요 없어요.
@@ -128,7 +129,7 @@ axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 
 - 자체 인증·배포 로직을 재구현하지 않아요. CLI 를 **invoke** 하고 결과를 **분류·복구 안내**할 뿐이에요.
 - CLI 가 새 기능을 내면 자연어 트리거만 더하면 돼요 — `clarity` 브리지는 그것조차 자동이에요.
 
-세션 훅은 cheap bash 로만 좁게 들어가 있어요 — auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update`), Windows Git Bash 실행 계약 훅(끄기: `AXHUB_NO_WINDOWS_CONTRACT=1` 또는 `~/.axhub/config/no-windows-contract`), update-first 라우팅 가드와 실패 자동 리포트 계약을 합본으로 발행하는 상시 훅(각각 끄기: `AXHUB_NO_UPDATE_ROUTER=1`/`~/.axhub/config/no-update-router`, `AXHUB_NO_FEEDBACK_REPORT=1`/`~/.axhub/config/no-feedback-report`), 재시작 확인 훅이에요. 이 훅들은 명령을 실행하거나 앱 목록을 조회하지 않고 라우팅·계약 문맥만 추가해요. 최신·버전 요청 경로에서 사용자에게 보이는 첫 문장은 `현재 버전을 확인할게요.` 예요.
+세션 훅은 cheap bash 로만 좁게 들어가 있어요 — auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update`), Windows Git Bash 실행 계약 훅(끄기: `AXHUB_NO_WINDOWS_CONTRACT=1` 또는 `~/.axhub/config/no-windows-contract`), update-first 라우팅 가드와 실패 자동 리포트 계약을 합본으로 발행하는 상시 훅(각각 끄기: `AXHUB_NO_UPDATE_ROUTER=1`/`~/.axhub/config/no-update-router`, `AXHUB_NO_FEEDBACK_REPORT=1`/`~/.axhub/config/no-feedback-report`), 재시작 확인 훅이에요. auto-update 훅만 백그라운드(`async`)에서 `axhub update apply` 와 플러그인 갱신을 조용히 실행하고, 나머지 훅은 명령을 실행하거나 앱 목록을 조회하지 않고 라우팅·계약 문맥만 추가해요. 최신·버전 요청 경로에서 사용자에게 보이는 첫 문장은 `현재 버전을 확인할게요.` 예요.
 
 ---
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync, chmodSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, utimesSync, writeFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -224,118 +224,383 @@ function makeHome(): string {
   return mkdtempSync(join(tmpdir(), "axhub-hook-home-"));
 }
 
-function makeStubAxhubPath(): string {
+// ── AP-26 auto-update worker 하네스 ─────────────────────────────────────
+// worker 는 stub axhub/claude 를 PATH 에 두고 전경으로 실행해요 — async 여부는
+// harness 몫이라 스크립트는 끝까지 돌고 stdout(알림 JSON)을 돌려줘요. stub 은
+// STUB_* env 로 출력·exit 를 정하고 호출 인자를 STUB_CALLS 파일에 남겨요.
+const AXHUB_STUB = `#!/usr/bin/env bash
+[ -n "$STUB_CALLS" ] && echo "axhub $*" >> "$STUB_CALLS"
+case "$*" in
+  *--field-expr*) [ -n "$STUB_CHECK_EXIT" ] && exit "$STUB_CHECK_EXIT"; printf '%s\\n' "$STUB_CHECK_OUT" ;;
+  "update check --json") printf '%s\\n' "$STUB_CHECK_JSON" ;;
+  "update apply"*) exit "\${STUB_APPLY_EXIT:-0}" ;;
+esac
+exit 0
+`;
+const CLAUDE_STUB = `#!/usr/bin/env bash
+[ -n "$STUB_CALLS" ] && echo "claude $*" >> "$STUB_CALLS"
+case "$1 $2" in
+  "plugin list") printf '  ❯ axhub@axhub\\n    Version: 1.27.1\\n    Scope: %s\\n    Status: ✔ enabled\\n' "\${STUB_SCOPE:-user}" ;;
+  "plugin update") exit "\${STUB_PLUGIN_EXIT:-0}" ;;
+esac
+exit 0
+`;
+
+function makeStubBin(): string {
   const bin = mkdtempSync(join(tmpdir(), "axhub-stub-bin-"));
-  const stub = join(bin, "axhub");
-  writeFileSync(stub, "#!/bin/sh\nexit 0\n");
-  chmodSync(stub, 0o755);
+  for (const [name, body] of [["axhub", AXHUB_STUB], ["claude", CLAUDE_STUB]] as const) {
+    writeFileSync(join(bin, name), body);
+    chmodSync(join(bin, name), 0o755);
+  }
   return bin;
 }
 
-const STUB_BIN = makeStubAxhubPath();
+function makePluginRoot(version: string): string {
+  const root = mkdtempSync(join(tmpdir(), "axhub-plugin-root-"));
+  mkdirSync(join(root, ".claude-plugin"), { recursive: true });
+  writeFileSync(join(root, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "axhub", version }));
+  return root;
+}
+
+const STUB_BIN = makeStubBin();
 const SAFE_PATH = `${STUB_BIN}:/usr/bin:/bin`;
 const NO_AXHUB_PATH = "/usr/bin:/bin";
+const PLUGIN_ROOT = makePluginRoot("1.27.1");
 const CACHE_REL = join(".axhub", "cache", ".plugin-update-check");
 const MARKER_REL = join(".axhub", "cache", ".plugin-update-restart");
+const LOG_REL = join(".axhub", "cache", "auto-update.log");
+const HALT_REL = join(".axhub", "cache", ".auto-update-halt");
+const LOCK_REL = join(".axhub", "cache", ".auto-update.lock");
+const BOTH_UPDATES = "v0.38.0 true v0.39.0 false false true 1.28.0";
+const CLI_ONLY_UPDATE = "v0.38.0 true v0.39.0 false false false 1.27.1";
+const UP_TO_DATE = "v0.38.0 false v0.38.0 false false false 1.27.1";
 
 function daysAgo(days: number): Date {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }
 
-describe("auto-update 훅 (SessionStart entry 1)", () => {
-  test("캐시 없음 → context 발행 + 캐시 파일을 훅이 직접 생성해요 (touch-in-hook)", () => {
-    const home = makeHome();
-    const result = runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH });
-    expectEmit(result, "SessionStart", "auto-update-prompt.md");
-    expect(existsSync(join(home, CACHE_REL))).toBe(true);
+function minutesAgo(minutes: number): Date {
+  return new Date(Date.now() - minutes * 60 * 1000);
+}
+
+interface WorkerRun {
+  result: RunResult;
+  home: string;
+  calls: string[];
+  log: string;
+}
+
+function runWorker(env: Record<string, string>, home = makeHome()): WorkerRun {
+  const callsFile = join(home, "stub-calls");
+  writeFileSync(callsFile, ""); // 같은 home 재실행 시 이전 run 의 호출 기록이 섞이지 않게 비워요
+  const result = runScript(autoUpdateSh, "", {
+    HOME: home,
+    PATH: SAFE_PATH,
+    CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT,
+    STUB_CALLS: callsFile,
+    ...env,
+  });
+  const calls = existsSync(callsFile) ? readFileSync(callsFile, "utf8").trim().split("\n").filter(Boolean) : [];
+  const log = existsSync(join(home, LOG_REL)) ? readFileSync(join(home, LOG_REL), "utf8") : "";
+  return { result, home, calls, log };
+}
+
+const applyCalls = (calls: string[]): string[] => calls.filter((line) => line.startsWith("axhub update apply"));
+const claudeCalls = (calls: string[]): string[] => calls.filter((line) => line.startsWith("claude "));
+
+describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
+  test("hooks.json 은 entry 1 에만 async:true + timeout:5 를 달아요 (command 문자열 불변)", () => {
+    const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks) as Array<{
+      command: string;
+      async?: boolean;
+      timeout?: number;
+    }>;
+    expect(entries[0]!.async).toBe(true);
+    expect(entries[0]!.timeout).toBe(5);
+    for (const entry of entries.slice(1)) {
+      expect(entry.async).toBeUndefined();
+      expect(entry.timeout).toBeUndefined();
+    }
   });
 
-  test("fresh 캐시(24h 이내) → 침묵해요", () => {
+  test("hooks/ 에 에이전트 프롬프트 md 가 없어요 (KD3)", () => {
+    const mdFiles = readdirSync(join(REPO_ROOT, "hooks")).filter((name) => name.endsWith(".md"));
+    expect(mdFiles).toEqual([]);
+  });
+
+  test("캐시 없음 + CLI·플러그인 새 버전 → apply·plugin update 실행, marker·log·알림 JSON (AE1·AE2)", () => {
+    const { result, home, calls, log } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES, STUB_SCOPE: "project" });
+    expectEmit(result, "SessionStart", "axhub CLI 가 v0.38.0 → v0.39.0 로 자동 업데이트됐어요");
+    expect(result.stdout).toContain("버전 확인 명령은 실행하지 마세요");
+    expect(calls[0]).toContain("axhub update check --plugin-version 1.27.1 --field-expr");
+    expect(calls.slice(1)).toEqual([
+      "axhub update apply --execute --yes --json",
+      "claude plugin list",
+      "claude plugin marketplace update axhub",
+      "claude plugin update axhub@axhub --scope project",
+    ]);
+    expect(readFileSync(join(home, MARKER_REL), "utf8")).toBe("1.28.0|project");
+    expect(log).toContain("host=claude UPDATED cli=v0.38.0->v0.39.0 PLUGIN_UPDATED plugin=1.27.1->1.28.0 scope=project");
+    expect(existsSync(join(home, CACHE_REL))).toBe(true);
+    expect(existsSync(join(home, LOCK_REL))).toBe(false);
+  });
+
+  test("최신 상태 → 침묵, apply·plugin 호출 0, log 는 UP_TO_DATE 한 줄", () => {
+    const { result, home, calls, log } = runWorker({ STUB_CHECK_OUT: UP_TO_DATE });
+    expectSilent(result);
+    expect(calls).toHaveLength(1);
+    expect(log.trim().split("\n")).toHaveLength(1);
+    expect(log).toContain("UP_TO_DATE cli=v0.38.0 plugin=1.27.1");
+    expect(existsSync(join(home, MARKER_REL))).toBe(false);
+  });
+
+  test("fresh 캐시(24h 이내) → 즉시 침묵, stub 호출 0", () => {
     const home = makeHome();
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
     writeFileSync(join(home, CACHE_REL), "");
-    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH }));
+    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES }, home);
+    expectSilent(result);
+    expect(calls).toEqual([]);
+    expect(log).toBe("");
   });
 
-  test("stale 캐시(24h 초과) → 발행하고 캐시를 갱신해요", () => {
+  test("stale 캐시(24h 초과) → 진행하고 캐시 mtime 을 갱신해요", () => {
     const home = makeHome();
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
     const cache = join(home, CACHE_REL);
     writeFileSync(cache, "");
     utimesSync(cache, daysAgo(2), daysAgo(2));
-    expectEmit(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH }), "SessionStart", "auto-update-prompt.md");
+    const { result, calls } = runWorker({ STUB_CHECK_OUT: UP_TO_DATE }, home);
+    expectSilent(result);
+    expect(calls).toHaveLength(1);
+    expect(statSync(cache).mtimeMs).toBeGreaterThan(daysAgo(1).getTime());
   });
 
-  test("kill switch AXHUB_NO_AUTO_UPDATE → 침묵 + 캐시도 만들지 않아요", () => {
-    const home = makeHome();
-    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH, AXHUB_NO_AUTO_UPDATE: "1" }));
-    expect(existsSync(join(home, CACHE_REL))).toBe(false);
+  test("kill switch AXHUB_NO_AUTO_UPDATE → 침묵 + 캐시·lock·log·marker 전부 없음 (AE4)", () => {
+    const { result, home, calls } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES, AXHUB_NO_AUTO_UPDATE: "1" });
+    expectSilent(result);
+    expect(calls).toEqual([]);
+    for (const rel of [CACHE_REL, LOCK_REL, LOG_REL, MARKER_REL]) {
+      expect(existsSync(join(home, rel)), rel).toBe(false);
+    }
   });
 
-  test("marker kill switch no-auto-update → 침묵 + 캐시도 만들지 않아요", () => {
+  test("marker kill switch no-auto-update → 침묵 + 파일 생성 없음", () => {
     const home = makeHomeWithMarker("auto-update");
-    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH }));
+    const { result, calls } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES }, home);
+    expectSilent(result);
+    expect(calls).toEqual([]);
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
   });
 
-  test("axhub 바이너리 부재 → 침묵해요", () => {
-    const home = makeHome();
-    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: NO_AXHUB_PATH }));
+  test("axhub 바이너리 부재(3-경로 모두) → 침묵, 캐시 없음", () => {
+    const { result, home, calls } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES, PATH: NO_AXHUB_PATH });
+    expectSilent(result);
+    expect(calls).toEqual([]);
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
+  });
+
+  test("PATH 에 없어도 ~/.axhub/bin-path 위치 파일로 CLI 를 찾아요 (AP-17)", () => {
+    const home = makeHome();
+    mkdirSync(join(home, ".axhub"), { recursive: true });
+    writeFileSync(join(home, ".axhub", "bin-path"), `${join(STUB_BIN, "axhub")}\n`);
+    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: UP_TO_DATE, PATH: NO_AXHUB_PATH }, home);
+    expectSilent(result);
+    expect(calls).toHaveLength(1);
+    expect(log).toContain("UP_TO_DATE");
   });
 
   test("dev 가드 토폴로지 A: <repo>/plugins/axhub in-place 로딩 → 침묵해요", () => {
-    const home = makeHome();
     const repo = mkdtempSync(join(tmpdir(), "axhub-dev-repo-"));
     mkdirSync(join(repo, ".git"), { recursive: true });
     const pluginRoot = join(repo, "plugins", "axhub");
     mkdirSync(pluginRoot, { recursive: true });
-    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH, CLAUDE_PLUGIN_ROOT: pluginRoot }));
+    const { result, home, calls } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES, CLAUDE_PLUGIN_ROOT: pluginRoot });
+    expectSilent(result);
+    expect(calls).toEqual([]);
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
   });
 
   test("dev 가드 토폴로지 B: repo 루트 직접 로딩 (루트 plugin.json 레이아웃) → 침묵해요", () => {
-    const home = makeHome();
     const repo = mkdtempSync(join(tmpdir(), "axhub-dev-root-"));
     mkdirSync(join(repo, ".git"), { recursive: true });
-    expectSilent(runScript(autoUpdateSh, "", { HOME: home, PATH: SAFE_PATH, CLAUDE_PLUGIN_ROOT: repo }));
+    const { result, home, calls } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES, CLAUDE_PLUGIN_ROOT: repo });
+    expectSilent(result);
+    expect(calls).toEqual([]);
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
+  });
+
+  test("disabled=true(패키지 매니저 관리) → apply 미호출, log SKIP_DISABLED", () => {
+    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: "v0.38.0 true v0.39.0 true false false 1.27.1" });
+    expectSilent(result);
+    expect(applyCalls(calls)).toEqual([]);
+    expect(log).toContain("SKIP_DISABLED cli=v0.38.0 latest=v0.39.0");
+  });
+
+  test("is_downgrade=true(서버 롤백) → apply 미호출, log SKIP_DOWNGRADE", () => {
+    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: "v0.38.0 true v0.37.0 false true false 1.27.1" });
+    expectSilent(result);
+    expect(applyCalls(calls)).toEqual([]);
+    expect(log).toContain("SKIP_DOWNGRADE");
+  });
+
+  test("apply exit 66(cosign) → halt marker + 보안 알림 1회, 같은 버전은 재시도하지 않아요 (AE3)", () => {
+    const first = runWorker({ STUB_CHECK_OUT: CLI_ONLY_UPDATE, STUB_APPLY_EXIT: "66" });
+    expectEmit(first.result, "SessionStart", "보안 검증에 실패했어요");
+    expect(readFileSync(join(first.home, HALT_REL), "utf8")).toBe("v0.39.0|66");
+    expect(first.log).toContain("SECURITY_HALT latest=v0.39.0 exit=66");
+
+    // 다음 주기 — 캐시를 stale 로 돌리면 check 는 다시 하지만 apply 는 건너뛰고 침묵해요.
+    utimesSync(join(first.home, CACHE_REL), daysAgo(2), daysAgo(2));
+    const second = runWorker({ STUB_CHECK_OUT: CLI_ONLY_UPDATE, STUB_APPLY_EXIT: "66" }, first.home);
+    expectSilent(second.result);
+    expect(applyCalls(second.calls)).toEqual([]);
+    expect(second.log).toContain("SKIP_HALTED latest=v0.39.0");
+
+    // 새 latest 가 나오면 halt 를 지우고 다시 시도해요.
+    utimesSync(join(first.home, CACHE_REL), daysAgo(2), daysAgo(2));
+    const third = runWorker({ STUB_CHECK_OUT: "v0.38.0 true v0.40.0 false false false 1.27.1" }, first.home);
+    expectEmit(third.result, "SessionStart", "v0.38.0 → v0.40.0");
+    expect(existsSync(join(first.home, HALT_REL))).toBe(false);
+  });
+
+  test("apply 가 그 외 코드로 실패하면 log APPLY_FAILED 만 남기고 침묵해요", () => {
+    const { result, log } = runWorker({ STUB_CHECK_OUT: CLI_ONLY_UPDATE, STUB_APPLY_EXIT: "1" });
+    expectSilent(result);
+    expect(log).toContain("APPLY_FAILED exit=1 latest=v0.39.0");
+  });
+
+  test("check 실패(exit 1) → CHECK_FAILED, apply 미호출 — 침묵을 최신으로 읽지 않아요", () => {
+    const { result, calls, log } = runWorker({ STUB_CHECK_EXIT: "1" });
+    expectSilent(result);
+    expect(applyCalls(calls)).toEqual([]);
+    expect(log).toContain("CHECK_FAILED rc=1");
+  });
+
+  test("필드가 7개 미만이면 CHECK_FAILED 예요", () => {
+    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: "v0.38.0 true v0.39.0 false false false" });
+    expectSilent(result);
+    expect(applyCalls(calls)).toEqual([]);
+    expect(log).toContain("CHECK_FAILED");
+  });
+
+  test("구 CLI(--field-expr 없음, exit 64) → --json fallback 으로 CLI 만 apply 하고 플러그인은 미뤄요", () => {
+    const { result, calls, log } = runWorker({
+      STUB_CHECK_EXIT: "64",
+      STUB_CHECK_JSON:
+        '{"current":"v0.30.0","disabled":false,"has_update":true,"is_downgrade":false,"latest":"v0.39.0","plugin":{"current":"1.27.1","has_update":true,"latest":"1.28.0"}}',
+    });
+    expectEmit(result, "SessionStart", "v0.30.0 → v0.39.0");
+    expect(calls[1]).toBe("axhub update check --json");
+    expect(applyCalls(calls)).toHaveLength(1);
+    expect(claudeCalls(calls)).toEqual([]);
+    expect(log).toContain("UPDATED cli=v0.30.0->v0.39.0");
+  });
+
+  test("lock 이 살아 있으면(TTL 미만) 침묵 + 캐시 미touch + 호출 0 (AE5)", () => {
+    const home = makeHome();
+    mkdirSync(join(home, LOCK_REL), { recursive: true });
+    const { result, calls } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES }, home);
+    expectSilent(result);
+    expect(calls).toEqual([]);
+    expect(existsSync(join(home, CACHE_REL))).toBe(false);
+    expect(existsSync(join(home, LOCK_REL))).toBe(true);
+  });
+
+  test("lock TTL(30분) 초과 → 회수하고 진행해요", () => {
+    const home = makeHome();
+    mkdirSync(join(home, LOCK_REL), { recursive: true });
+    utimesSync(join(home, LOCK_REL), minutesAgo(45), minutesAgo(45));
+    const { result, calls } = runWorker({ STUB_CHECK_OUT: UP_TO_DATE }, home);
+    expectSilent(result);
+    expect(calls).toHaveLength(1);
+    expect(existsSync(join(home, LOCK_REL))).toBe(false);
+  });
+
+  test("plugin update 실패 → PLUGIN_FAILED, restart marker 없음", () => {
+    const { result, home, log } = runWorker({ STUB_CHECK_OUT: "v0.38.0 false v0.38.0 false false true 1.28.0", STUB_PLUGIN_EXIT: "1" });
+    expectSilent(result);
+    expect(log).toContain("PLUGIN_FAILED plugin=1.27.1 latest=1.28.0 scope=user");
+    expect(existsSync(join(home, MARKER_REL))).toBe(false);
+  });
+
+  test("host CLI(claude) 가 없으면 플러그인만 건너뛰어요", () => {
+    const bin = mkdtempSync(join(tmpdir(), "axhub-only-bin-"));
+    cpSync(join(STUB_BIN, "axhub"), join(bin, "axhub"));
+    const { result, log } = runWorker({ STUB_CHECK_OUT: "v0.38.0 false v0.38.0 false false true 1.28.0", PATH: `${bin}:/usr/bin:/bin` });
+    expectSilent(result);
+    expect(log).toContain("PLUGIN_SKIPPED reason=host_cli_missing latest=1.28.0");
+  });
+
+  test("log 가 200줄을 넘으면 앞을 잘라요", () => {
+    const home = makeHome();
+    mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
+    writeFileSync(join(home, LOG_REL), Array.from({ length: 205 }, (_, i) => `old line ${i}`).join("\n") + "\n");
+    const { log } = runWorker({ STUB_CHECK_OUT: UP_TO_DATE }, home);
+    const lines = log.trim().split("\n");
+    expect(lines).toHaveLength(200);
+    expect(lines[lines.length - 1]).toContain("UP_TO_DATE");
   });
 });
 
-describe("restart-confirm 훅 (SessionStart entry 4)", () => {
-  test("fresh marker → confirm prompt 지시를 발행해요", () => {
-    const home = makeHome();
-    mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
-    writeFileSync(join(home, MARKER_REL), "1.10.28");
-    expectEmit(runScript(restartConfirmSh, "", { HOME: home }), "SessionStart", "plugin-restart-confirm-prompt.md");
-  });
-
-  test("marker 없음 → 침묵해요", () => {
-    expectSilent(runScript(restartConfirmSh, "", { HOME: makeHome() }));
-  });
-
-  test("TTL(7일) 초과 marker → 침묵해요 (휴면)", () => {
+describe("restart-confirm 훅 (SessionStart entry 4 — AP-26)", () => {
+  function homeWithMarker(content: string, ageDays = 0): string {
     const home = makeHome();
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
     const marker = join(home, MARKER_REL);
-    writeFileSync(marker, "1.10.28");
-    utimesSync(marker, daysAgo(8), daysAgo(8));
+    writeFileSync(marker, content);
+    if (ageDays > 0) utimesSync(marker, daysAgo(ageDays), daysAgo(ageDays));
+    return home;
+  }
+
+  test("로드 버전 ≥ marker → 적용 확인 emit + marker 삭제 (AE2 후반)", () => {
+    const home = homeWithMarker("1.28.0|user");
+    const result = runScript(restartConfirmSh, "", { HOME: home, CLAUDE_PLUGIN_ROOT: makePluginRoot("1.28.0") });
+    expectEmit(result, "SessionStart", "플러그인 v1.28.0 적용을 확인했어요");
+    expect(existsSync(join(home, MARKER_REL))).toBe(false);
+  });
+
+  test("로드 버전 < marker → 재시작 안내 emit + marker 유지 (AE2 전반)", () => {
+    const home = homeWithMarker("1.28.0|user");
+    const result = runScript(restartConfirmSh, "", { HOME: home, CLAUDE_PLUGIN_ROOT: makePluginRoot("1.27.1") });
+    expectEmit(result, "SessionStart", "Claude Code 를 재시작하면 적용된다고");
+    expect(result.stdout).toContain("v1.28.0");
+    expect(existsSync(join(home, MARKER_REL))).toBe(true);
+  });
+
+  test("scope 없는 구 marker 도 버전만 읽고, semver 는 자리별 숫자로 비교해요 (1.30.0 ≥ 1.28.0)", () => {
+    const home = homeWithMarker("1.28.0");
+    const result = runScript(restartConfirmSh, "", { HOME: home, CLAUDE_PLUGIN_ROOT: makePluginRoot("1.30.0") });
+    expectEmit(result, "SessionStart", "플러그인 v1.30.0 적용을 확인했어요");
+    expect(existsSync(join(home, MARKER_REL))).toBe(false);
+  });
+
+  test("plugin.json 을 못 읽으면 판정 불가로 침묵하고 marker 를 둬요", () => {
+    const home = homeWithMarker("1.28.0|user");
     expectSilent(runScript(restartConfirmSh, "", { HOME: home }));
+    expect(existsSync(join(home, MARKER_REL))).toBe(true);
+  });
+
+  test("marker 없음 → 침묵해요", () => {
+    expectSilent(runScript(restartConfirmSh, "", { HOME: makeHome(), CLAUDE_PLUGIN_ROOT: makePluginRoot("1.28.0") }));
+  });
+
+  test("TTL(7일) 초과 marker → 침묵해요 (휴면)", () => {
+    const home = homeWithMarker("1.28.0|user", 8);
+    expectSilent(runScript(restartConfirmSh, "", { HOME: home, CLAUDE_PLUGIN_ROOT: makePluginRoot("1.28.0") }));
+    expect(existsSync(join(home, MARKER_REL))).toBe(true);
   });
 
   test("kill switch AXHUB_NO_AUTO_UPDATE → 침묵해요", () => {
-    const home = makeHome();
-    mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
-    writeFileSync(join(home, MARKER_REL), "1.10.28");
-    expectSilent(runScript(restartConfirmSh, "", { HOME: home, AXHUB_NO_AUTO_UPDATE: "1" }));
+    const home = homeWithMarker("1.28.0|user");
+    expectSilent(runScript(restartConfirmSh, "", { HOME: home, CLAUDE_PLUGIN_ROOT: makePluginRoot("1.28.0"), AXHUB_NO_AUTO_UPDATE: "1" }));
   });
 
   test("marker kill switch no-auto-update → 침묵해요 (auto-update 계열 공용)", () => {
     const home = makeHomeWithMarker("auto-update");
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
-    writeFileSync(join(home, MARKER_REL), "1.10.28");
-    expectSilent(runScript(restartConfirmSh, "", { HOME: home }));
+    writeFileSync(join(home, MARKER_REL), "1.28.0|user");
+    expectSilent(runScript(restartConfirmSh, "", { HOME: home, CLAUDE_PLUGIN_ROOT: makePluginRoot("1.28.0") }));
   });
 });
 
@@ -414,14 +679,19 @@ describe("AP-14 폴백 훅 (SessionStart entry 3)", () => {
 // 각 entry 의 기대 emit/침묵을 그대로 재현해요.
 const STAGED_PLUGIN_ROOT = mkdtempSync(join(tmpdir(), "axhub-staged-plugin-"));
 cpSync(join(REPO_ROOT, "hooks"), join(STAGED_PLUGIN_ROOT, "hooks"), { recursive: true });
+cpSync(join(REPO_ROOT, ".claude-plugin"), join(STAGED_PLUGIN_ROOT, ".claude-plugin"), { recursive: true });
 
 const runSsCommand = (index: number, env: Record<string, string> = {}): RunResult =>
   runInline(ssCommands[index]!, "", { CLAUDE_PLUGIN_ROOT: STAGED_PLUGIN_ROOT, ...env });
 
 describe("SessionStart 합성 command e2e (hooks.json command 문자열 실행)", () => {
-  test("entry 1 auto-update: 스테이징 루트 + 캐시 없음 → 운영 emit 이 재현돼요", () => {
+  test("entry 1 auto-update: 스테이징 루트 + 캐시 없음 + 새 버전 → 알림 emit 이 재현돼요 (AP-26)", () => {
     const home = makeHome();
-    expectEmit(runSsCommand(0, { HOME: home, PATH: SAFE_PATH }), "SessionStart", "auto-update-prompt.md");
+    expectEmit(
+      runSsCommand(0, { HOME: home, PATH: SAFE_PATH, STUB_CHECK_OUT: BOTH_UPDATES }),
+      "SessionStart",
+      "자동 업데이트됐어요",
+    );
     expect(existsSync(join(home, CACHE_REL))).toBe(true);
   });
 
@@ -440,11 +710,12 @@ describe("SessionStart 합성 command e2e (hooks.json command 문자열 실행)"
     expectEmit(runSsCommand(2), "SessionStart", "update-first routing guard is active for Code mode");
   });
 
-  test("entry 4 restart-confirm: fresh marker → confirm prompt 지시를 발행해요", () => {
+  test("entry 4 restart-confirm: fresh marker + 로드 버전이 더 높음 → 적용 확인을 발행해요 (AP-26)", () => {
     const home = makeHome();
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
     writeFileSync(join(home, MARKER_REL), "1.10.28");
-    expectEmit(runSsCommand(3, { HOME: home }), "SessionStart", "plugin-restart-confirm-prompt.md");
+    expectEmit(runSsCommand(3, { HOME: home }), "SessionStart", "적용을 확인했어요");
+    expect(existsSync(join(home, MARKER_REL))).toBe(false);
   });
 
   test("entry 5 feedback-contract: PATH 의 axhub 로 계약을 발행해요", () => {

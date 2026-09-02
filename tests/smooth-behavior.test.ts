@@ -673,12 +673,13 @@ describe("smooth behavior contracts", () => {
     expect(restartConfirm).toContain("no-auto-update");
     expect(restartConfirm).toContain(".plugin-update-restart");
     expect(restartConfirm).toContain("-mmin -10080");
-    expect(restartConfirm).toContain("plugin-restart-confirm-prompt.md");
+    // AP-26: 훅이 직접 판정해요 — 프롬프트 md 없이 로드된 plugin.json 버전을 비교해요.
+    expect(restartConfirm).toContain(".claude-plugin/plugin.json");
+    expect(restartConfirm).not.toContain("plugin-restart-confirm-prompt.md");
     // dev 가드는 이 entry 에 적용하지 않아요 — marker 는 머신 전역이라
     // 어느 세션의 확인도 유효해요 (eng review #1)
     expect(restartConfirm).not.toContain("../../.git");
-    // hook 은 읽기 전용: marker 삭제는 confirm prompt 몫, 바이너리 무접촉
-    expect(restartConfirm).not.toContain("rm -f");
+    // 바이너리 무접촉 — 적용 확인 뒤 marker 삭제만 해요
     expect(restartConfirm).not.toContain("command -v axhub");
   });
 

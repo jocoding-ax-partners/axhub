@@ -17,7 +17,9 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-auto-update.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-auto-update.sh\"",
+            "async": true,
+            "timeout": 5
           },
           {
             "type": "command",

@@ -115,7 +115,9 @@ describe("clean plugin bundle", () => {
     for (const wrapper of SESSION_WRAPPER_SCRIPTS) {
       expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", wrapper)), `missing marketplace wrapper: ${wrapper}`).toBe(true);
     }
-    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "plugin-restart-confirm-prompt.md"))).toBe(true);
+    // AP-26: 에이전트 프롬프트 md 는 번들에 없어요 — 훅 스크립트가 판정·적용을 소유해요.
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "plugin-restart-confirm-prompt.md"))).toBe(false);
+    expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "auto-update-prompt.md"))).toBe(false);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "node_modules"))).toBe(false);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, ".git"))).toBe(false);
   });
