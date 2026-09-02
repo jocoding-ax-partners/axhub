@@ -200,7 +200,7 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("`manifesting`, `manifested`, `gitted`, `pushed`, `Push`, `resumed`, `bootstraped`, `deploy-prep`, `in-flight`, `dry-run`, `token-gate`, `execute`, `production`, `terminal success`, `grep pipe`, `gitignore`, `gitignoring`, `gitting`, `checking`, `Build passed`, `Working tree clean`, or `Not ignored`");
     expect(deploy).toContain("Use `운영` for the user-facing environment");
     expect(deploy).toContain("Never write `User explicitly authorized`, `Proceeding`, `Push 성공`, or `Push failed`");
-    expect(deploy).toContain("Display the environment as `운영`, not `prod`, `production`, or raw profile values");
+    expect(deploy).toContain("The environment label comes from `STAGING_ENABLED`, never from `prod`, `production`, or raw profile values");
     expect(deploy).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
     expect(deploy).toContain("Markdown URL 링크 문법은 전부 금지");
     expect(deploy).toContain("AXHUB_GATE_POLL_ITERATIONS=0 axhub plugin-support token-gate");

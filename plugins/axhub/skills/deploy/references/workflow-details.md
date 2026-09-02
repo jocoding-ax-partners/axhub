@@ -139,7 +139,7 @@ if [ "$AXHUB_HEADLESS" = "1" ]; then
 fi
 ```
 
-Interactive preview shows exactly app, environment, branch, commit, and ETA. Normalize displayed slug with NFKC and warn if normalization changes it. The visible environment label is `운영`; do not show `prod`, `production`, or raw profile names in the card unless the user explicitly asks for CLI-level evidence. Ask approve, dry-run, or abort. Dry-run natural language such as "리허설", "테스트로", or "진짜 안 올리고" also sets `DEPLOY_DECISION=dry_run`.
+Interactive preview shows exactly app, environment, branch, commit, and ETA. Normalize displayed slug with NFKC and warn if normalization changes it. The visible environment label is `운영` when `STAGING_ENABLED` is false and `스테이징` when it is true (AP-25 — a staging opt-in app never builds straight into production); do not show `prod`, `production`, or raw profile names in the card unless the user explicitly asks for CLI-level evidence. Ask approve, dry-run, or abort. Dry-run natural language such as "리허설", "테스트로", or "진짜 안 올리고" also sets `DEPLOY_DECISION=dry_run`.
 
 User-visible prose and tool titles must translate workflow internals: `진행 중 배포` for in-flight work, `미리보기` for dry-run, `인증 상태 확인` for token-gate, `배포 실행` for execute, and `검증 성공` for terminal success. Do not show `deploy-prep`, `in-flight`, `dry-run`, `token-gate`, `execute`, `production`, `terminal success`, `gitignore`, `gitting`, `checking`, `Build passed`, `Working tree clean`, `Not ignored`, `User explicitly authorized`, `Proceeding`, or `Push 성공` in chat/tool titles/final tables unless the user asked for low-level debugging evidence.
 
@@ -217,7 +217,7 @@ axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" --wait --wait-interval 20s --wa
 
 Exit handling:
 
-- 0: terminal success; summarize in Korean with the verified live URL if available.
+- 0: terminal success; summarize in Korean with the verified live URL if available. Branch on the verify JSON `environment` first (AP-25): `staging` → 스테이징에만 반영됐고 운영에는 아직 반영되지 않았다고 말하고, 심사 신청 명령 `axhub publish --app "$APP_ID" --deployment-id "$DEPLOY_ID" --execute` 를 같은 블록에 안내해요 (승인은 Console Review, 승인 뒤 promote 자동, 신청은 사용자 요청 시에만 실행). `environment` 가 없거나 null 이면 `STAGING_ENABLED` 로 판단하고 운영으로 간주하지 않아요.
 - 6: non-terminal. `--wait` 경로에서는 예산을 다 쓰고도 끝나지 않은 상태라 같은 verify 를 자동 재실행하지 않고 재개 요약으로 끝내며 `DEPLOY_ID` 를 보존해요. fallback 경로에서만 keep the same `DEPLOY_ID` and continue the bounded verify loop automatically. 어느 쪽도 사용자에게 다시 상태 확인을 요청하지 않아요.
 - 7: terminal failure; say "배포가 실패했어요. 지금부터 원인 진단만 읽기 전용으로 확인할게요. 재배포나 롤백은 하지 않아요." Then hand off to `diagnosis`.
 - 5: unknown deployment id; stop without latest lookup.

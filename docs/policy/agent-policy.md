@@ -150,3 +150,10 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "SELECTED_GIT_BACKEND", "코드 저장 위치", "provider 선택이 명시되지"
 - 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/onboarding/SKILL.md
 - invariant(codex): "SELECTED_GIT_BACKEND", "코드 저장 위치", "provider 선택이 명시되지"
+
+## AP-25 배포 환경 표시 (스테이징을 운영으로 오인 금지)
+- 규칙: 스테이징 옵트인 앱(`apps get` 의 `staging_enabled=true` — spec 016)은 push/manual 배포가 스테이징에만 반영되고 운영은 심사 승인 뒤 promote 로만 바뀌어요. 그래서 배포 환경은 CLI profile 이 아니라 `staging_enabled` 로 판단해요. preview 카드의 환경 라벨은 `staging_enabled` 가 true 면 `스테이징`, 아니면 `운영` 이에요. verify 성공(exit 0) 뒤 성공 요약은 `deploy verify --json` 의 `environment` 를 읽어요 — `staging` 이면 "스테이징에 반영됐고 운영에는 아직 반영되지 않았어요" 와 다음 단계(심사 신청 `axhub publish --app <app> --deployment-id <id> --execute`, 승인은 Console Review, 승인 뒤 promote 자동)를 같은 성공 블록에서 안내하고 "운영 반영 완료" 라고 말하지 않아요. `environment` 가 없거나 null(구 CLI·앱 조회 실패)이면 운영으로 간주하지 않고 `apps get` 의 `staging_enabled` 로 같은 판단을 해요. 심사 신청은 사용자가 요청할 때만 실행해요.
+- 적용: skills/deploy/SKILL.md, skills/import/SKILL.md, skills/up/SKILL.md
+- invariant: "staging_enabled", "스테이징", "axhub publish --app"
+- 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/up/SKILL.md
+- invariant(codex): "staging_enabled", "스테이징", "axhub publish --app"

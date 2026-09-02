@@ -7,7 +7,7 @@
   "hooks/update-router.sh": "6a860a996bd8d908896c0ec96db500b5a5804eef78fcb3a9dc981685c21183b3",
   "hooks/session-update-router-guard.sh": "0040ef1d1bf1d18ba65c6ab3f9f6bee01da22a4d815597a014b55d6b8958e399",
   "hooks/session-feedback-contract.sh": "4c29cd717a09cc6eb6584085601566f9d91c18227cdf624c2ef745256fe498d8",
-  "skills/deploy/SKILL.md": "9eae304ed8d84ac1edd6a287f98d66e3f8e86e541260c94ca40ae268fc3abe9e",
+  "skills/deploy/SKILL.md": "933e2787e289dfa5b2a312c4f1e4a4a799bc21c69ef5ef426410acba7d18600a",
   "README.md": "0c3eaa482c5ff04430cbfa8aa7a1cd3fa80a67c934fac2227644ab87347d7c19",
   "POLICY.md": "2080b2664cd309ce6e5a27dcb91ec97ec24390c958e8edd7860611ddcb1b448a"
 }

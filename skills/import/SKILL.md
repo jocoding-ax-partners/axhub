@@ -279,6 +279,7 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 9. 성공 안내
 
 - docker/compose 성공: 공개 URL 을 평문 절대 URL 로 보여주고, 배포 확인이 끝났다고 말해요. 앱이 비공개라 로그인 없는 URL 요청이 로그인 화면으로 돌아오면, 배포 검증과 앱 본문 확인을 분리해 설명해요.
+- docker/compose 성공을 말하기 전에 최종 `deploy verify --json` 의 `environment` 를 먼저 읽어요 (AP-25). `staging` 이면 스테이징 옵트인(`staging_enabled=true`) 앱이라 스테이징에만 반영됐고 운영에는 아직 반영되지 않았다고 같은 성공 블록에서 말하고, 심사 신청 `axhub publish --app <app> --deployment-id <deployment-id> --execute`를 안내해요. "운영 반영 완료" 라고 말하지 않고, 심사 신청은 사용자 요청 시에만 실행해요. `environment` 가 없거나 null 이면 운영으로 간주하지 않고 `axhub apps get <app> --json` 의 `staging_enabled` 를 한 번 읽어 판단해요.
 - static 성공: 공개 URL 을 평문 절대 URL 로 보여주고, 정적 사이트 활성 릴리스 확인이 끝났다고 말해요. `access_note` 가 있으면 같은 성공 블록에서 "참고: ..." 형태로 함께 말해요.
 
 내부 id 는 필요할 때만 상태 이어보기에 쓰고 chat 에 raw 값으로 노출하지 않아요.
