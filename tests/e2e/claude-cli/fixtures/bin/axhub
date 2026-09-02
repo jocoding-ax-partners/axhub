@@ -263,6 +263,12 @@ JSON
             echo '{"error":{"code":"auth","subcode":"token_expired"}}'
             exit 4
             ;;
+          staging)
+            # AP-25: staging opt-in app — verified success that landed in staging only.
+            # Mirrors the real `deploy verify --json` flat report (environment/next_step).
+            echo '{"deployment_id":"'"${3:-dep-fixture}"'","status":"succeeded","terminal":true,"success":true,"url":null,"url_checked":false,"url_ok":null,"environment":"staging","staging_enabled":true,"production_live":false,"next_step":"review_request"}'
+            exit 0
+            ;;
           *)
             echo '{"id":"'"${3:-dep-fixture}"'","status":"live","url":"https://paydrop.axhub.ai"}'
             exit 0

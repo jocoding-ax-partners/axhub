@@ -118,7 +118,7 @@ axhub plugin-support deploy-prep --intent deploy --json
 axhub apps get "$APP_ID" --json
 ```
 
-top-level `git_backend.backend`와 `git_backend.source`, `deploy_method`만 읽어요. missing/malformed면 upload 전에 멈춰요. `deploy_method=static`이면 `deploy`의 static lane으로 양보해요. `git_backend.backend`가 `selfhosted`면 `deploy`의 self-hosted repository lane으로 양보하되, 사용자가 repositoryless upload를 명시한 경우만 아래 archive preview로 이어가요. `legacy_github` 또는 GitHub app도 아래로 이어가요.
+top-level `git_backend.backend`와 `git_backend.source`, `deploy_method`, `staging_enabled`만 읽어요. `staging_enabled`는 `STAGING_ENABLED`로 잡아요 (AP-25). missing/malformed면 upload 전에 멈춰요. `deploy_method=static`이면 `deploy`의 static lane으로 양보해요. `git_backend.backend`가 `selfhosted`면 `deploy`의 self-hosted repository lane으로 양보하되, 사용자가 repositoryless upload를 명시한 경우만 아래 archive preview로 이어가요. `legacy_github` 또는 GitHub app도 아래로 이어가요.
 
 ## 2단계 — 올릴 내용 미리보기
 
@@ -136,7 +136,7 @@ CLI 0.29.0 미만이면 이 명령이 unknown command 로 끝나요. 그때는 `
 
 ## 3단계 — 승인 (AP-12)
 
-interactive 에서는 preview 카드 하나가 **axhub 진입 확인**을 겸해요. 카드에 앱, 환경, 파일 수, 압축 크기, source 버전, 예상 소요를 보여주고 `axhub 로 지금 이 폴더를 올려서 배포할까요?` 를 한 번만 물어요. 환경은 `운영` 으로 표시하고 `prod`·`production` 같은 raw 값을 쓰지 않아요.
+interactive 에서는 preview 카드 하나가 **axhub 진입 확인**을 겸해요. 카드에 앱, 환경, 파일 수, 압축 크기, source 버전, 예상 소요를 보여주고 `axhub 로 지금 이 폴더를 올려서 배포할까요?` 를 한 번만 물어요. 환경은 `STAGING_ENABLED` 가 false 면 `운영`, true 면 `스테이징`으로 표시하고 `prod`·`production` 같은 raw 값을 쓰지 않아요.
 
 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. headless 는 dry-run preview 까지만 하고 `--execute` 로 넘어가지 않아요. slash 호출도 이 카드를 건너뛰지 못해요. 이 preview-confirm 은 `deploy` 와 같은 mutation 에 대한 같은 게이트이고, 소스만 달라요.
 
@@ -190,7 +190,7 @@ verify exit:
 
 | exit | 뜻 | 행동 |
 |---|---|---|
-| 0 | 최종 성공 | 한국어로 요약하고 접근 가능한 URL 을 평문으로 보여줘요. `url_checked=false` 면 `apps get` 으로 `access_url` 을 읽고 제한된 횟수의 HTTPS HEAD 재확인을 한 뒤에 열린다고 말해요. |
+| 0 | 최종 성공 | 한국어로 요약하고 접근 가능한 URL 을 평문으로 보여줘요. `url_checked=false` 면 `apps get` 으로 `access_url` 을 읽고 제한된 횟수의 HTTPS HEAD 재확인을 한 뒤에 열린다고 말해요. verify JSON 의 `environment` 가 `staging` 이면 스테이징에만 반영됐고 운영에는 아직 반영되지 않았다고 말하고 심사 신청 `axhub publish --app "$APP_ID" --deployment-id "$DEPLOY_ID" --execute` 를 같은 블록에 안내해요 (AP-25). `environment` 가 없거나 null 이면 `STAGING_ENABLED` 로 판단하고 운영으로 간주하지 않아요. |
 | 4 | 인증 만료 | auth 복구 문구를 써요. |
 | 5 | 알 수 없는 배포 id | 멈춰요. 최신 배포를 재탐색하지 않아요. |
 | 6 | 아직 진행 중 | 위 예산 규칙대로 처리해요. 새 승인 카드를 띄우지 않아요. |

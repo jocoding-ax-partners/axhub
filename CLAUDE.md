@@ -184,6 +184,7 @@ bun run release:tag
 
 - deploy 성공 선언은 `axhub deploy verify <deployment-id> --app <app>` **1회 실행으로만** 해요. deployment id 와 app scope 는 필수이고 latest 재탐색 경로는 금지예요 — verify exit 0 + 접근 가능 URL 확인 전까지 "배포 성공" 이라고 말하지 않아요.
 - **static 앱(deploy_method=static) 배포는 별도 lane** 이에요: 성공 선언을 `apps static deploy --execute` 의 `active_release_id`(activate 성공)로 해요 — static 은 deployment-record 가 아니라 release 라 `deploy verify` 가 404 예요. 위 verify 규칙은 deployment-record 배포(docker/compose)에만 적용돼요. deploy skill 이 resolve 직후 `apps get` 의 `deploy_method` 로 auto-detect 해 이 lane 으로 갈라요.
+- **스테이징 옵트인 앱(AP-25):** `apps get` 의 `staging_enabled=true` 면 배포는 스테이징에만 반영되고 운영은 심사 승인 뒤 promote 로만 바뀌어요. verify 성공 요약은 `deploy verify --json` 의 `environment` 로 갈라 `staging` 이면 운영 미반영과 다음 단계(심사 신청 `axhub publish --app <app> --deployment-id <id> --execute`)를 함께 안내하고 "운영 반영 완료" 라고 말하지 않아요. preview 카드 환경 라벨도 `staging_enabled` 로 `운영`/`스테이징` 을 골라요. `environment` 가 없거나 null 이면 운영으로 간주하지 않아요.
 
 ## Skill routing
 

@@ -133,7 +133,7 @@ After resolving an existing app, read the public app JSON exactly once:
 axhub apps get "$APP_ID" --no-input --json
 ```
 
-Use top-level `deploy_method`, `git_backend.backend`, and `git_backend.source` only. The backend values are `github|selfhosted`; source is `tenant_default|app_override|legacy_github`. Do not call C1 or Gitea directly and do not infer a backend from a remote URL. Only `deploy_method=static` enters static lane. Static lane uses `apps static deploy --execute` after its own dry-run preview and approval:
+Use top-level `deploy_method`, `git_backend.backend`, `git_backend.source`, and `staging_enabled` only. Bind `STAGING_ENABLED` from `staging_enabled` (AP-25: staging opt-in apps deploy to staging only; production moves via review approval + promote). The backend values are `github|selfhosted`; source is `tenant_default|app_override|legacy_github`. Do not call C1 or Gitea directly and do not infer a backend from a remote URL. Only `deploy_method=static` enters static lane. Static lane uses `apps static deploy --execute` after its own dry-run preview and approval:
 
 ```bash
 axhub apps static deploy --app "$APP_ID" --from-dir "$STATIC_DIR" --tenant "$AXHUB_TENANT" --dry-run
@@ -181,7 +181,7 @@ The existing GitHub behavior stays unchanged. `github_connected=false` and GitHu
 
 작업 트리가 dirty 하면 이 스킬은 첫 명령(`deploy-preview-summary`)에서 이미 멈춰 여기까지 오지 못해요. 그 경로는 사용자가 `up` 을 직접 부르는 것으로만 열려요.
 
-Preview card is interactive only and must show app, environment, branch, commit, and ETA. Display the environment as `운영`, not `prod`, `production`, or raw profile values, unless the user explicitly asked for exact CLI fields. Use `references/error-empathy-catalog.md` for the deploy-preview card and NFKC warning. Slash invocation does not skip this card.
+Preview card is interactive only and must show app, environment, branch, commit, and ETA. The environment label comes from `STAGING_ENABLED`, never from `prod`, `production`, or raw profile values: `운영` when false, `스테이징` when true. Use `references/error-empathy-catalog.md` for the deploy-preview card and NFKC warning. Slash invocation does not skip this card.
 
 Before showing the preview, make sure the commit is actually reachable from the remote branch that axhub will build. Normalize any short commit to the full local SHA (`git rev-parse "$COMMIT_SHA^{commit}"` or `git rev-parse HEAD`) and use the full SHA for remote containment and `axhub deploy create`. If the branch has an existing `origin` remote/upstream and local commits are ahead, push with `git push -u origin "HEAD:$BRANCH"` first, refresh `origin/<branch>`, and confirm `git merge-base --is-ancestor "$COMMIT_SHA" "origin/$BRANCH"` (or an equivalent remote containment check) before preview/create. Judge push success by exit code, not by stderr text such as harmless hook warnings. Never deploy a local-only commit SHA; if push or remote containment fails, stop before mutation and say the remote commit is not ready yet.
 
@@ -233,7 +233,7 @@ Do not end the response by asking the user to say `배포 상태 확인해줘`. 
 
 Verify exits:
 
-- `0`: terminal success. Summarize in Korean with verified URL if available.
+- `0`: terminal success. Summarize in Korean with verified URL if available. Verify JSON `environment` first (AP-25): `staging` → 스테이징에만 반영됐고 운영에는 아직 반영되지 않았어요 (never `운영 반영 완료`) + same block: 심사 신청 `axhub publish --app "$APP_ID" --deployment-id "$DEPLOY_ID" --execute`. 심사 신청은 사용자가 요청할 때만 실행해요. `environment` 가 없거나 null 이면 운영으로 간주하지 않고 `STAGING_ENABLED` 로 판단해요.
 - `6`: still running. `--wait` 경로에서는 10분 예산을 다 쓰고도 끝나지 않았다는 뜻이에요 — 같은 verify 를 자동 재실행하거나 새 승인 카드를 띄우지 않고, 실패 선언 없이 재개 요약으로 응답을 끝내며 `DEPLOY_ID` 를 보존해요. fallback 경로에서는 같은 `DEPLOY_ID` 로 폴링 예산 안에서 계속 확인하고, 사용자에게 다시 상태 확인을 요청하지 않아요.
 - `7`: terminal failure. Say "배포가 실패했어요. 지금부터 원인 진단만 읽기 전용으로 확인할게요. 재배포나 롤백은 하지 않아요." Then hand off to `diagnosis`.
 - `5`: unknown deployment id. Stop; do not search latest.
