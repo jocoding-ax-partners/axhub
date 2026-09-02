@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.27.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.27.0...v1.27.1) (2026-09-02)
+
+스테이징 옵트인 앱을 배포하면 스테이징에만 반영되고 운영은 심사 승인 뒤에 바뀌는데, 스킬이 preview 환경을 무조건 `운영` 으로 그리고 verify 성공을 운영 반영 완료로 요약해 사용자가 헤맸어요. 이제 deploy·import·up 스킬이 `apps get` 의 `staging_enabled` 로 환경 라벨을 가르고, `deploy verify --json` 의 `environment` 가 `staging` 이면 운영 미반영 사실과 심사 신청 명령을 같은 성공 블록에서 안내해요(AP-25). 구 CLI 에서는 `staging_enabled` fallback 으로 같은 판단을 해요.
+
+
+### Fixed
+
+* **skills:** 스테이징 배포를 운영 반영으로 오인하지 않아요 ([#486](https://github.com/jocoding-ax-partners/axhub/issues/486)) ([f546e67](https://github.com/jocoding-ax-partners/axhub/commit/f546e67fedd6e9178d78cb5679a403703772f2dc))
+
 ## [1.27.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.26.1...v1.27.0) (2026-09-01)
 
 새 앱을 시작할 때 GitHub와 Axhub self-hosted 저장소 중 어디에 코드를 둘지 먼저 선택해요. 선택한 backend는 bootstrap의 preview·state·execute·resume 전 구간에 고정되고, self-hosted 경로에서는 불필요한 GitHub 인증을 건너뛰어요. headless 환경에서는 선택값이 없으면 provider mutation 전에 멈추고 기존 앱은 저장된 backend를 그대로 쓰며, relay sync와 compose webhook의 책임 경계도 명확히 했어요.
