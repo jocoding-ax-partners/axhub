@@ -16,7 +16,7 @@ const GUARD_FILES = [
   "skills/import/SKILL.md",
   "skills/up/SKILL.md",
   "skills/update/SKILL.md",
-  "hooks/auto-update-prompt.md",
+  "hooks/session-auto-update.sh",
 ];
 
 // Guards that must name the canonical binary path, not just cite the contract.

@@ -9,7 +9,7 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 - axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 그 도구를 우선 사용하지 않아요. 버전·최신 확인이 같은 요청에 있으면 언제나 위의 `update` 스킬이 먼저 끝나요. 로그·환경변수·롤백·GitHub 재연결 같은 후속 운영 작업도 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요.
 - 앱 생성·배포·온보딩의 저장소 단계는 public CLI의 top-level `git_backend`를 먼저 확인해요. 기존 app은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh onboarding/bootstrap은 `axhub apps git-backend --tenant <tenant> --json`을 추천값으로만 읽은 뒤 GitHub와 Axhub self-hosted 중 사용자가 직접 고르게 해요. 같은 대화의 선택은 bootstrap에 전달하고, 선택 없는 headless에서는 저장소 mutation 전에 멈춰요. non-static selfhosted는 외부 저장소 계정 인증·device flow·GitHub App 설치 없이 clone→`git push` lane을 쓰고, static과 GitHub는 각 기존 lane을 유지해요.
 - 최신 확인 요청에는 아주 좁은 update-first 라우팅 가드가 라우팅 문맥만 추가해요. 이 가드는 SessionStart 합본 훅과 UserPromptSubmit match 로 동작하고, 명령을 실행하거나 앱 목록을 조회하지 않으며, `AXHUB_NO_UPDATE_ROUTER=1` 또는 `~/.axhub/config/no-update-router` 파일로 끌 수 있어요.
-- 세션 시작 때 도는 auto-update 훅은 24시간에 1회만 `axhub update check` 명령으로 새 버전이 있는지 확인해요. 실제 인터넷 연결은 훅 스크립트가 아니라 axhub CLI 가 해요.
+- 세션 시작 때 도는 auto-update 훅은 24시간에 1회만 뒤에서(백그라운드) `axhub update check` 명령으로 새 버전이 있는지 확인하고, 있으면 묻지 않고 `axhub update apply` 와 `codex plugin marketplace upgrade axhub`(로컬 marketplace 는 `codex plugin add axhub-codex`)로 조용히 설치해요. 실제 인터넷 연결은 axhub CLI 와 Codex 의 플러그인 명령이 해요. 세션 시작을 기다리게 하지 않아요.
 - Codex 는 플러그인 훅을 사용자가 신뢰하기 전에는 실행하지 않아요. 신뢰하지 않으면 위 훅 표면(자동 업데이트 확인·라우팅 가드·재시작 확인·Windows 계약 안내)은 조용히 꺼지고, 스킬은 훅 없이도 완결돼요 — 업데이트는 `update` 스킬을 직접 부르면 돼요.
 - `plugin list`와 exact `plugin download`는 현재 로그인 OAuth 또는 active broad PAT로 App-backed marketplace를 읽어요. 목록은 `plugin.current_servable_version` summary를 페이지 단위로 읽고 download 결과에서 `version_id`를 만들거나 보고하지 않아요. Download는 요청한 새 ZIP만 만들고 기존 파일을 덮어쓰거나 받은 code를 실행하지 않아요.
 - download 요청과 install 요청을 구분해요. `plugin install --host codex`는 offline preview 뒤 명시한 `--execute --yes`에서만 bounded ZIP metadata·실제 압축 해제 크기·identity를 검증하고 App/host lock과 crash recovery를 적용한 뒤 `~/.axhub/plugins/` 아래 private local marketplace를 Codex 공식 plugin CLI로 user scope 설치해요. 모든 `AXHUB_*` 환경은 Codex process에 전달하지 않아요.
@@ -18,14 +18,17 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 
 ## 로컬에 기록하는 파일 — 내 컴퓨터에 무엇을 남기나요
 - `~/.axhub/cache/.plugin-update-check-codex` — 업데이트를 너무 자주 확인하지 않도록 마지막 확인 시각을 남겨두는 표시 파일이에요.
+- `~/.axhub/cache/auto-update.log` — 자동 업데이트가 무엇을 했는지 한 줄씩 남기는 기록이에요 (최대 200줄). `.auto-update.lock/` 은 두 세션이 동시에 업데이트하지 않게 잠깐 잡는 잠금이고, `.plugin-update-restart-codex` 는 플러그인 새 버전을 받았으니 재시작하면 적용된다는 표시, `.auto-update-halt` 는 보안 검증에 실패한 버전을 다시 시도하지 않게 적어 두는 표시예요.
 - 기본 install root는 `~/.axhub/plugins/`이고, `AXHUB_PLUGIN_HOME`을 설정하면 그 absolute directory로 전체 tree가 이동해요. `<root>/<app-id>/<host>/marketplace/`에는 exact plugin code·manifest·install metadata를 보관하고, `<host>/.install.lock`은 같은 App/host의 동시 설치를 막아요.
 - Crash recovery 동안 `<host>/.marketplace-transaction.json`, `.marketplace-host-mutating.json`, `.marketplace-rollback-pending.json`, `.marketplace-host-installed.json`과 `.marketplace-staging-*`·`.marketplace-backup-*` directory가 남을 수 있어요. 다음 locked install이 journal에 따라 완료 또는 rollback한 뒤 이 임시 상태를 지워요.
 - `~/.axhub/cache/.plugin-update-restart-codex` — 플러그인 새 버전을 받은 뒤 재시작으로 적용됐는지 확인하기 위한 표시 파일이에요. update marker들은 시각·버전만 담고 Claude/Codex host별로 나눠 서로 덮어쓰지 않아요.
 
 ## 자동 업데이트와 끄는 법
-- axhub CLI 는 새 버전이 확인되면 자동으로 설치될 수 있어요. 플러그인 자체의 업데이트는 설치돼도 Codex 를 껐다 켜야 반영돼요.
-- 자동 설치를 원하지 않으면 환경변수(터미널에 설정해 두는 켜기/끄기 값)로 꺼요:
-  - `AXHUB_NO_AUTO_UPDATE=1` — 자동 설치 없이 새 버전이 있다고 알려주기만 해요.
+- axhub CLI 와 플러그인은 새 버전이 확인되면 묻지 않고 뒤에서 조용히 설치돼요. 설치가 끝나면 다음 답변 앞에 "axhub CLI 가 v0.38.0 → v0.39.0 로 자동 업데이트됐어요" 처럼 한 줄로만 알려요. 플러그인 자체의 업데이트는 받아 두었다가 Codex 를 껐다 켜야 반영되고, 재시작 뒤 첫 답변에서 적용됐다고 한 줄로 알려요.
+- 내려받은 파일의 서명 검증(누가 만든 파일인지 확인하는 절차)에 실패하면 설치하지 않고 한 번만 알려요. 그 버전은 다시 시도하지 않아요.
+- 자동 설치를 원하지 않으면 환경변수(터미널에 설정해 두는 켜기/끄기 값) 또는 파일로 꺼요. 둘 중 하나만 있으면 확인·설치·기록 어느 것도 하지 않아요:
+  - `AXHUB_NO_AUTO_UPDATE=1` 환경변수
+  - `~/.axhub/config/no-auto-update` 빈 파일 (환경변수가 앱에 전달되지 않는 GUI 실행에서도 통해요)
 - 훅을 신뢰하지 않았다면 자동 확인 자체가 돌지 않아요 — 이 경우 업데이트는 `update` 스킬("업데이트해줘")이 담당해요.
 
 ## AI 활용 기록 — Codex 판은 제공하지 않아요

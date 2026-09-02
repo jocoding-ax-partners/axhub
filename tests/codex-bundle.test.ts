@@ -262,17 +262,34 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     expect(reference).toContain("codex plugin add axhub-codex@axhub");
     expect(reference).toContain("marketplaceSource.sourceType");
 
-    const autoUpdatePrompt = readFileSync(join(outDir, "hooks", "auto-update-prompt.md"), "utf8");
-    expect(autoUpdatePrompt).toContain(".plugin-update-check-codex");
-    expect(autoUpdatePrompt).toContain(".plugin-update-restart-codex");
-    expect(autoUpdatePrompt).not.toContain("-codex-codex");
-    const restartPrompt = readFileSync(
-      join(outDir, "hooks", "plugin-restart-confirm-prompt.md"),
-      "utf8",
-    );
-    expect(restartPrompt).toContain(".plugin-update-restart-codex");
-    expect(restartPrompt).not.toContain("-codex-codex");
-    expect(/\.plugin-update-restart(?!-codex)/.test(restartPrompt)).toBe(false);
+    // AP-26: 에이전트 프롬프트 md 는 없고, async worker 가 codex 명령 블록을 소유해요.
+    expect(existsSync(join(outDir, "hooks", "auto-update-prompt.md"))).toBe(false);
+    expect(existsSync(join(outDir, "hooks", "plugin-restart-confirm-prompt.md"))).toBe(false);
+    const worker = readFileSync(join(outDir, "hooks", "session-auto-update.sh"), "utf8");
+    expect(worker).toContain("HOST=codex");
+    expect(worker).toContain("codex plugin marketplace upgrade axhub");
+    expect(worker).toContain("codex plugin add axhub-codex@axhub");
+    expect(worker).toContain(".plugin-update-check-codex");
+    expect(worker).toContain(".plugin-update-restart-codex");
+    expect(worker).not.toContain("-codex-codex");
+    expect(worker).not.toContain("--scope");
+    const restartConfirm = readFileSync(join(outDir, "hooks", "session-restart-confirm.sh"), "utf8");
+    expect(restartConfirm).toContain("Codex 를 재시작하면");
+    expect(restartConfirm).not.toContain("-codex-codex");
+  });
+
+  test("codex hooks.json keeps async on the auto-update worker but drops the Claude-only timeout (AP-26)", () => {
+    const hooksJson = JSON.parse(readFileSync(join(outDir, "hooks", "hooks.json"), "utf8")) as {
+      hooks: { SessionStart: Array<{ hooks: Array<Record<string, unknown>> }> };
+    };
+    const entries = hooksJson.hooks.SessionStart.flatMap((group) => group.hooks);
+    const worker = entries.find((entry) => String(entry.command).includes("session-auto-update.sh"));
+    expect(worker).toBeDefined();
+    expect(worker?.async).toBe(true);
+    expect(worker).not.toHaveProperty("timeout");
+    for (const entry of entries) {
+      expect(entry).not.toHaveProperty("shell");
+    }
   });
 
   test("SOURCE_HASHES pins match the current sources (KTD9)", async () => {
