@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.28.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.27.1...v1.28.0) (2026-09-02)
+
+세션 시작 때 도는 auto-update 훅이 이제 사용자에게 묻지 않고 뒤에서 조용히 axhub CLI 와 플러그인을 최신으로 맞춰요 — 훅 entry 를 Claude Code·Codex 가 지원하는 `async` 로 등록해 세션을 막지 않고, 에이전트가 읽던 프롬프트 대신 훅 스크립트가 직접 `axhub update apply` 와 플러그인 갱신을 실행하니 이 경로의 에이전트 명령과 권한 팝업이 사라졌어요(AP-26). 실제로 바뀐 게 있을 때만 다음 답변 앞에 한 줄로 알리고, 무엇을 했는지는 `~/.axhub/cache/auto-update.log` 에 남아요. Codex 판 공지: 훅 wrapper(`hooks/session-auto-update.sh`) 본문이 백그라운드에서 직접 업데이트를 적용하도록 바뀌었고 훅 entry 에 `async` 가 더해져 재설치 뒤 훅 신뢰 확인이 한 번 더 뜰 수 있어요 — 끄기는 그대로 `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update` 예요.
+
+
+### Added
+
+* **hooks:** 자동 업데이트를 묻지 않는 백그라운드 훅으로 바꿔요 ([#488](https://github.com/jocoding-ax-partners/axhub/issues/488)) ([89bc851](https://github.com/jocoding-ax-partners/axhub/commit/89bc85159412f712e9431b26c6c103caf0e3e5c9))
+
 ## [1.27.1](https://github.com/jocoding-ax-partners/axhub/compare/v1.27.0...v1.27.1) (2026-09-02)
 
 스테이징 옵트인 앱을 배포하면 스테이징에만 반영되고 운영은 심사 승인 뒤에 바뀌는데, 스킬이 preview 환경을 무조건 `운영` 으로 그리고 verify 성공을 운영 반영 완료로 요약해 사용자가 헤맸어요. 이제 deploy·import·up 스킬이 `apps get` 의 `staging_enabled` 로 환경 라벨을 가르고, `deploy verify --json` 의 `environment` 가 `staging` 이면 운영 미반영 사실과 심사 신청 명령을 같은 성공 블록에서 안내해요(AP-25). 구 CLI 에서는 `staging_enabled` fallback 으로 같은 판단을 해요.
