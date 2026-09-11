@@ -47,7 +47,7 @@ After `deploy-prep` resolves an existing `APP_ID`, read the public app JSON once
 axhub apps get "$APP_ID" --no-input --json
 ```
 
-Use top-level `deploy_method`, `git_backend.backend`, and `git_backend.source`. Only `deploy_method=static` enters the static lane. Non-static `selfhosted` enters the push branch below; non-static `github` and `legacy_github` preserve the existing GitHub/upload path. Never call C1 or Gitea directly and never infer backend from a remote URL.
+Use top-level `deploy_method`, `git_backend.backend`, and `git_backend.source`; keep `git_backend.backend` as `GIT_BACKEND` for the push step. Only `deploy_method=static` enters the static lane. Non-static `selfhosted` enters the push branch below; non-static `github` and `legacy_github` preserve the existing GitHub/upload path. Never call C1 or Gitea directly and never infer backend from a remote URL.
 
 1. Capability probe:
 
@@ -81,7 +81,7 @@ For `git_backend.backend=selfhosted`, do not inspect `github_connected`. If the 
 
 Treat that exact `data.destination` as the working directory for every subsequent repository-local command in this branch. Set the tool `cwd` to it for status/savepoint, `git rev-parse`, branch/commit work, push, fetch, and containment checks; do not run those commands in the original un-cloned folder. An explicit clone destination, when supplied, is authoritative because the CLI returns the same absolute path.
 
-After the common local savepoint and preview approval, `git push -u origin "HEAD:$BRANCH"` from that working directory is the deployment mutation. A successful push starts the webhook deployment, so do not run `deploy create` or the upload lane. Refresh `deploy-prep --refresh-in-flight` within AP-16's 30-check/10-minute budget until the exact deployment id appears, then use the common verify loop. A budget expiry is pending, not failure.
+Before the push, run `axhub --tenant <tenant> git setup --json` so the host-scoped credential helper is repaired every time; it keeps a valid PAT, so this costs no rotation. After the common local savepoint and preview approval, `git -c credential.interactive=false push -u origin "HEAD:$BRANCH"` from that working directory is the deployment mutation; `credential.interactive=false` makes a missing credential fail with an error instead of a console or Git Credential Manager prompt, which is what the credential retry branch needs, and it is a bare command (no environment assignment) so it fits the Desktop single-command contract. A successful push starts the webhook deployment, so do not run `deploy create` or the upload lane. Refresh `deploy-prep --refresh-in-flight` within AP-16's 30-check/10-minute budget until the exact deployment id appears, then use the common verify loop. A budget expiry is pending, not failure.
 
 The rest of this reference's containment/create/upload instructions are the GitHub branch unless they explicitly say common.
 
@@ -105,7 +105,12 @@ Before push, normalize the resolved commit to a full local SHA. GitHub additiona
 
 ```bash
 COMMIT_SHA=$(git rev-parse "${COMMIT_SHA:-HEAD}^{commit}")
-git push -u origin "HEAD:$BRANCH" >/dev/null 2>"$AXHUB_STDERR_TMP"
+if [ "$GIT_BACKEND" = "selfhosted" ]; then
+  # 자격증명이 없으면 콘솔·Git Credential Manager 창 대신 오류로 바로 실패해야 credential retry 분기가 돌아요.
+  git -c credential.interactive=false push -u origin "HEAD:$BRANCH" >/dev/null 2>"$AXHUB_STDERR_TMP"
+else
+  git push -u origin "HEAD:$BRANCH" >/dev/null 2>"$AXHUB_STDERR_TMP"
+fi
 PUSH_EXIT=$?
 git fetch origin "$BRANCH" >/dev/null 2>&1
 git merge-base --is-ancestor "$COMMIT_SHA" "origin/$BRANCH"

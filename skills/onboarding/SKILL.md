@@ -108,7 +108,7 @@ read command 실패나 missing/malformed `git_backend`만 provider 단계 전에
 persisted app 또는 fresh `SELECTED_GIT_BACKEND`가 GitHub인 경우에만 기존 GitHub surface를 사용해요. app `git_backend.source=legacy_github`도 이 branch예요. DETECT의 `github.install_url`을 한 줄로 보여주고 설치 gate 앞에 `axhub github accounts list --json`을 한 번 돌려요. exit 4 + `github_relogin_required`면 `github_link_missing`으로 처리해요.
 `github_link_missing`도 합성 값이라 GitHub branch의 3단계 연동 확인에서만 생기고 `github_app_missing`보다 먼저 처리해요.
 
-persisted `git_backend.backend=selfhosted` 또는 fresh `SELECTED_GIT_BACKEND=selfhosted`이고 CLI/auth gap이 닫혔으면 session당 한 번 `axhub git setup --json`으로 account·endpoint별 helper·30일 PAT를 준비해요. marker로 재실행을 막고 `github.install_url`을 숨기며 `github_link_missing`·`github_app_missing`을 처리하지 않아요. `references/github-app.md`를 건너뛰고 계정 로그인·App 설치 대사를 0회로 유지해요. tenant source는 `tenant|platform_default`예요.
+persisted `git_backend.backend=selfhosted` 또는 fresh `SELECTED_GIT_BACKEND=selfhosted`이고 CLI/auth gap이 닫혔으면 session당 한 번 `axhub --tenant <tenant> git setup --json`으로 account·endpoint별 helper·30일 PAT를 준비해요. marker로 재실행을 막고 `github.install_url`을 숨기며 `github_link_missing`·`github_app_missing`을 처리하지 않아요. `references/github-app.md`를 건너뛰고 계정 로그인·App 설치 대사를 0회로 유지해요. tenant source는 `tenant|platform_default`예요.
 
 ### 4. first_gap router
 

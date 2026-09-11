@@ -153,10 +153,15 @@ Deployment-record apps branch on the already-read `git_backend.backend` before r
 
 This lane starts only when the preceding `axhub apps get <app> --json` reports `git_backend.backend=selfhosted`. `tenant_default` and `app_override` use the same behavior. Never enter the upload/create fallback, call a GitHub command, or call Gitea API from this lane.
 
-If the current folder is not yet the resolved app's clone, prepare the endpoint-matched credential helper and run the public resolver instead of guessing the opaque repository address:
+이 lane은 `capabilities.self_hosted_git.git_setup_rotate`가 `true`여야 하고, 아니면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요. 폴더가 이미 clone이어도 push 전마다 아래 setup을 실행해요. host-scoped git config만 다시 써 Windows의 Git Credential Manager 창을 막고 유효한 PAT는 유지해요.
 
 ```bash
-axhub git setup
+axhub --tenant <tenant> git setup --json
+```
+
+If the current folder is not yet the resolved app's clone, run the public resolver instead of guessing the opaque repository address:
+
+```bash
 axhub repo clone <app> --json
 ```
 
@@ -165,12 +170,14 @@ clone 응답의 absolute `data.destination`을 사용해 이후 모든 local git
 After the usual local savepoint/branch readiness and the already-shown preview approval, push ordinary Git from that returned working directory. The webhook owns deployment creation:
 
 ```bash
-git push -u origin "HEAD:$BRANCH"
+git -c credential.interactive=false push -u origin "HEAD:$BRANCH"
 ```
+
+`credential.interactive=false`는 자격증명이 없을 때 프롬프트·창 대신 오류로 바로 실패하게 해요.
 
 After push exit 0, say only `변경 내용을 보냈어요. 자동 배포가 시작되는지 확인할게요.` webhook 자동 배포를 AP-16(30회/10분) 안에서 `deploy-prep --refresh-in-flight`로 확인하고 받은 exact deployment id를 verify해요. 예산 종료는 pending으로 보고하며 create/upload하지 않아요.
 
-credential missing/expired일 때만 `axhub git setup` 후 같은 push를 한 번 retry해요. hook/permission/capacity/5xx에는 쓰지 않고 credential output을 출력하지 않아요.
+push가 `told us to quit`·`axhub git credential:`·`unable to get password from user`·credential missing/expired로 실패할 때만 `axhub --tenant <tenant> git setup --rotate` 후 같은 push를 한 번 retry해요. hook/permission/capacity/5xx에는 쓰지 않고 credential output을 출력하지 않아요.
 
 ### GitHub and upload lanes
 

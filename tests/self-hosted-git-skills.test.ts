@@ -142,9 +142,37 @@ describe("spec 236 self-hosted git skill contracts", () => {
       expect(selfhosted, root).toContain("`data.destination`");
       expect(selfhosted, root).toContain("tool `cwd`");
       expect(selfhosted, root).toContain("same returned `data.destination` cwd");
-      expect(selfhosted, root).toContain("git push -u origin \"HEAD:$BRANCH\"");
+      expect(selfhosted, root).toContain('git -c credential.interactive=false push -u origin "HEAD:$BRANCH"');
       expect(selfhosted, root).toContain("webhook 자동 배포");
       expect(selfhosted, root).not.toContain("axhub up");
+    }
+  });
+
+  test("T145 credential: deploy repairs the git helper before every push and never lets git prompt", () => {
+    for (const root of SKILL_ROOTS) {
+      const deploy = readSkill(root, "deploy");
+      const selfhosted = sliceSection(deploy, "### Self-hosted repository lane", "### GitHub and upload lanes");
+      const setup = selfhosted.indexOf("axhub --tenant <tenant> git setup --json");
+      const push = selfhosted.indexOf("push -u origin");
+      expect(setup, root).toBeGreaterThanOrEqual(0);
+      expect(setup, root).toBeLessThan(push);
+      expect(selfhosted, root).not.toContain("If the current folder is not yet the resolved app's clone, prepare");
+      expect(selfhosted, root).toContain('git -c credential.interactive=false push -u origin "HEAD:$BRANCH"');
+      expect(selfhosted, root).not.toMatch(/GIT_TERMINAL_PROMPT=|GCM_INTERACTIVE=/);
+      expect(selfhosted, root).toContain("axhub --tenant <tenant> git setup --rotate");
+      expect(selfhosted, root).toContain("폴더가 이미 clone이어도 push 전마다");
+      expect(selfhosted, root).not.toContain("clone이 아닐 때만");
+      expect(selfhosted, root).toContain("told us to quit");
+      expect(selfhosted, root).toContain("unable to get password from user");
+      expect(selfhosted, root).toContain("`capabilities.self_hosted_git.git_setup_rotate`가 `true`여야 하고");
+      const globalGuard = deploy.slice(0, deploy.indexOf("### Self-hosted repository lane"));
+      expect(globalGuard, root).not.toContain("git_setup_rotate");
+      const details = readFileSync(join(ROOT, root, "deploy", "references", "workflow-details.md"), "utf8");
+      expect(details, root).toContain('git -c credential.interactive=false push -u origin "HEAD:$BRANCH"');
+      expect(details, root).not.toMatch(/GIT_TERMINAL_PROMPT=|GCM_INTERACTIVE=/);
+      expect(details, root).toContain('if [ "$GIT_BACKEND" = "selfhosted" ]; then');
+      expect(details, root).toContain("Before the push, run `axhub --tenant <tenant> git setup --json`");
+      expect(details, root).not.toContain("older CLIs rotate");
     }
   });
 
@@ -182,6 +210,7 @@ describe("spec 236 self-hosted git skill contracts", () => {
       expect(backendGate, root).toContain("tenant source는 `tenant|platform_default`");
       expect(backendGate, root).toContain("`github_link_missing`·`github_app_missing`을 처리하지 않아요");
       expect(backendGate, root).toContain("계정 로그인·App 설치 대사를 0회로 유지해요");
+      expect(backendGate, root).toContain("axhub --tenant <tenant> git setup --json");
     }
   });
 
