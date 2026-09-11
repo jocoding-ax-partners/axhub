@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.29.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.28.0...plugin-v1.29.0) (2026-09-11)
+
+예상 밖 CLI 실패를 자동 리포트할 때(AP-19) 에이전트가 쓰는 메시지 양식이 바뀌었어요. 첫 줄은 이슈 제목이 되는 "무엇이 어떻게 실패했는지" 한 문장이고, 그 아래에 `실행:`·`기대:`·`실제:`·`맥락:`·`재현:` 을 한 줄씩 적어요 — 개발팀이 이슈만 보고도 상황을 재구성할 수 있게요. axhub CLI 0.45.0 부터는 실패한 명령의 오류 분류·subcode·HTTP 상태·오류 메시지 한 줄도 자동으로 붙지만, 인자 값·토큰·환경 내용은 여전히 붙지 않아요. Codex 판 공지: 훅 wrapper(`hooks/session-always-on-codex.sh`)의 emit 문구만 바뀌었고 로직과 kill switch(`AXHUB_NO_FEEDBACK_REPORT=1` · `~/.axhub/config/no-feedback-report`)는 그대로예요.
+
+
+### Added
+
+* **hooks:** AP-19 리포트 메시지를 제목 한 줄 + 실행/기대/실제/맥락/재현 양식으로 안내해요 ([#36](https://github.com/jocoding-ax-partners/axhub-mono/pull/36)) ([746703d](https://github.com/jocoding-ax-partners/axhub-mono/commit/746703d0872d4a6593b053df68685290ba5263d6))
+
 ## [1.28.0](https://github.com/jocoding-ax-partners/axhub/compare/v1.27.1...v1.28.0) (2026-09-02)
 
 세션 시작 때 도는 auto-update 훅이 이제 사용자에게 묻지 않고 뒤에서 조용히 axhub CLI 와 플러그인을 최신으로 맞춰요 — 훅 entry 를 Claude Code·Codex 가 지원하는 `async` 로 등록해 세션을 막지 않고, 에이전트가 읽던 프롬프트 대신 훅 스크립트가 직접 `axhub update apply` 와 플러그인 갱신을 실행하니 이 경로의 에이전트 명령과 권한 팝업이 사라졌어요(AP-26). 실제로 바뀐 게 있을 때만 다음 답변 앞에 한 줄로 알리고, 무엇을 했는지는 `~/.axhub/cache/auto-update.log` 에 남아요. Codex 판 공지: 훅 wrapper(`hooks/session-auto-update.sh`) 본문이 백그라운드에서 직접 업데이트를 적용하도록 바뀌었고 훅 entry 에 `async` 가 더해져 재설치 뒤 훅 신뢰 확인이 한 번 더 뜰 수 있어요 — 끄기는 그대로 `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update` 예요.

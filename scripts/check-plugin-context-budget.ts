@@ -15,7 +15,10 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 // 실행 계약이 bootstrap/deploy/onboarding 세 본문에 들어간다. 이 지시는 reference로
 // 빼면 Desktop 권한 경계에서 조용히 유실되므로 본문에 유지하고, 실측 240,500B에
 // 기존과 같은 약 5,000B 여유를 둔다. per-skill 35,000B 게이트는 그대로 유지한다.
-export const DEFAULT_MAX_TOTAL_BYTES = 246_000;
+// 246_000 → 248_000: diagnosis 에 "docs 대조" 1단락(원인이 안 좁혀지면 docs.axhub.ai
+// llms-full 의 문제 해결 절을 한 번 읽는 지시). 실행 경로의 지시라 본문에 두며, 실측
+// 246,722B 에 약 1,300B 여유. per-skill 35,000B 게이트는 그대로 유지한다.
+export const DEFAULT_MAX_TOTAL_BYTES = 248_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
 export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {

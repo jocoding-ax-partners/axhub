@@ -36,3 +36,4 @@ CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 원본�
 - raw 출력이나 내부 id·exit code 를 사용자에게 보여주지 않아요. 빌드 실패 로그 tail 만 Visibility 예외를 따라요.
 - MCP 를 호출하거나 설치·설정하라고 내부 절차를 만들지 않아요.
 - `clarity` 처럼 전체 `--json-schema` 트리를 탐색해 임의 명령을 찾아 실행하지 않아요. 이 스킬의 표면은 CLI `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 뿐이에요.
+- 유일한 비-CLI 조회는 SKILL.md 의 **docs 대조** 한 번(`https://docs.axhub.ai/llms-full.ko.txt` 읽기 전용 fetch)이에요. 그 외 웹 탐색·다른 페이지 순회는 하지 않아요.

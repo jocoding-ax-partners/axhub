@@ -4,8 +4,8 @@
   "skills/update/references/post-update-continuation.md": "4b01d6176d925c7d1978f55522eb4a545d2ebb7f163dfdbd9fa76db138261e7e",
   "hooks/update-router.sh": "6a860a996bd8d908896c0ec96db500b5a5804eef78fcb3a9dc981685c21183b3",
   "hooks/session-update-router-guard.sh": "0040ef1d1bf1d18ba65c6ab3f9f6bee01da22a4d815597a014b55d6b8958e399",
-  "hooks/session-feedback-contract.sh": "4c29cd717a09cc6eb6584085601566f9d91c18227cdf624c2ef745256fe498d8",
+  "hooks/session-feedback-contract.sh": "818fffaae01c87e155668b1dae90930a7cefab198f5edf0f8f78646bacaf4e91",
   "skills/deploy/SKILL.md": "933e2787e289dfa5b2a312c4f1e4a4a799bc21c69ef5ef426410acba7d18600a",
   "README.md": "0b66328794f89722786f8e4dfae2fcca9ec4760161a9bb67c101166f3f9e4b18",
-  "POLICY.md": "ccfdf4b2ef76c79a07965ab30eb028b863d1b0063c456f8741df42fdcb2b5786"
+  "POLICY.md": "a98aed38ff00030b34f0506a7dba1b435514d65d02384cf6c17ef19a2485c14c"
 }
