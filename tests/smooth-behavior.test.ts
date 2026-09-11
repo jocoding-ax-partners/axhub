@@ -208,7 +208,7 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("Present this step as `인증 상태 확인`, not as token-gate");
     expect(deploy).toContain("NEVER commit, push, or add `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/`");
     expect(deploy).toContain("Never deploy a local-only commit SHA");
-    expect(deploy).toContain("git push -u origin \"HEAD:$BRANCH\"");
+    expect(deploy).toContain('git -c credential.interactive=false push -u origin "HEAD:$BRANCH"');
     expect(deploy).toContain("Judge push success by exit code");
     expect(deploy).toContain("Use a short deploy utterance like `현재 앱 배포해`");
     expect(deploy).toContain("NEVER call `axhub deploy create --execute` for a commit that is only local");

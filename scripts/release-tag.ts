@@ -22,7 +22,14 @@ const sh = (cmd: string, opts: { allowFail?: boolean } = {}): string => {
 
 const pkg = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as { version: string };
 const version = pkg.version;
-const tag = `v${version}`;
+// Step 1 이 .versionrc.json 의 tagPrefix(모노레포: plugin-v) 기준으로 lineage 를 잡으므로
+// tag 도 같은 prefix 로 만들어야 다음 bump 가 이 릴리스를 찾고 다른 컴포넌트 tag 와 안 겹쳐요.
+const versionrc = JSON.parse(readFileSync(join(REPO_ROOT, ".versionrc.json"), "utf8")) as {
+  tagPrefix?: string;
+  bumpFiles: Array<{ filename: string }>;
+};
+const tagPrefix = versionrc.tagPrefix ?? "v";
+const tag = `${tagPrefix}${version}`;
 
 const existing = sh(`git rev-parse --verify --quiet refs/tags/${tag}`, { allowFail: true });
 if (existing) {
@@ -62,14 +69,15 @@ if (status) {
 
 // U8 가드 — 릴리즈 amend 가 미검토 재생성물을 흡수하는 표면 차단이에요.
 // 태그 직전 HEAD diff(첫 부모 기준)는 bump 대상(.versionrc.json bumpFiles 전체)과
-// CHANGELOG.md 밖 파일을 포함하면 안 돼요.
-const versionrc = JSON.parse(readFileSync(join(REPO_ROOT, ".versionrc.json"), "utf8")) as {
-  bumpFiles: Array<{ filename: string }>;
-};
-const allowedReleaseFiles = new Set([
-  ...versionrc.bumpFiles.map((entry) => entry.filename),
-  "CHANGELOG.md",
-]);
+// CHANGELOG.md 밖 파일을 포함하면 안 돼요. `git diff --name-only` 는 cwd 와 무관하게
+// 저장소 루트 기준 경로를 내므로, 모노레포에서는 이 패키지 경로(예: clients/plugin/)를
+// 붙여 비교해요. 패키지 밖 파일도 그대로 잡혀요.
+const packagePrefix = sh("git rev-parse --show-prefix");
+const allowedReleaseFiles = new Set(
+  [...versionrc.bumpFiles.map((entry) => entry.filename), "CHANGELOG.md"].map(
+    (filename) => `${packagePrefix}${filename}`,
+  ),
+);
 const headDiffFiles = sh("git diff --name-only HEAD^1 HEAD")
   .split("\n")
   .filter((line) => line.length > 0);

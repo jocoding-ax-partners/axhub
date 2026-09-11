@@ -1,9 +1,14 @@
 {
   "name": "@jocoding-ax-partners/axhub-plugin-cc",
-  "version": "1.29.0",
+  "version": "1.30.0",
   "description": "axhub plugin — Korean-first app operations and plugin marketplace. 11 skills (onboarding/bootstrap/scaffold/plugins/deploy/up/import/development/diagnosis/clarity/update) call ax-hub-cli directly with preview-confirm and terminal verification.",
   "type": "module",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jocoding-ax-partners/axhub-mono.git",
+    "directory": "clients/plugin"
+  },
   "license": "Apache-2.0",
   "scripts": {
     "test": "bun test",

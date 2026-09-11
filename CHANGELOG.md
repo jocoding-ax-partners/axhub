@@ -4,6 +4,16 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.30.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.29.0...plugin-v1.30.0) (2026-09-11)
+
+Windows 에서 AXHub Git 으로 push 할 때 Git Credential Manager 의 아이디·비밀번호 창이 뜨던 남은 경로를 막아요. deploy 스킬의 self-hosted lane 은 `capabilities.self_hosted_git.git_setup_rotate` 를 알리는 axhub CLI 0.45.3 이상에서만 진행하고(구 CLI 는 업데이트를 안내하고 멈춰요, GitHub·static 배포는 그대로예요), 폴더가 이미 clone 이어도 push 전마다 `axhub --tenant <tenant> git setup --json` 을 실행해 옛 helper 설정을 고치면서 유효한 PAT 는 그대로 둬요. push 는 `git -c credential.interactive=false push` 로 실행해 자격증명이 없으면 창 대신 오류로 바로 실패하고, `told us to quit`·`unable to get password from user` 같은 자격증명 오류에서만 `git setup --rotate` 뒤 한 번 retry 해요. onboarding 스킬은 `git setup` 에 `--tenant` 를 넘겨 여러 tenant 사용자도 exit 64 없이 준비돼요. Codex 판 공지: 스킬 본문만 바뀌었고 훅은 그대로예요.
+
+
+### Fixed
+
+* **cli:** git setup 이 tenant 를 조용히 고르지 않고 --tenant 를 요구한다 ([#50](https://github.com/jocoding-ax-partners/axhub-mono/pull/50)) ([75d0114](https://github.com/jocoding-ax-partners/axhub-mono/commit/75d0114ff48db7e791738f87c02079f0c8100824))
+* **git:** Windows 에서 GCM 창이 뜨던 남은 경로를 막고 git PAT 수명주기를 바로잡는다 ([#52](https://github.com/jocoding-ax-partners/axhub-mono/pull/52)) ([ab523fa](https://github.com/jocoding-ax-partners/axhub-mono/commit/ab523fa57b324ffd72f8187707f90ae4453df04c))
+
 ## [1.29.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.28.0...plugin-v1.29.0) (2026-09-11)
 
 예상 밖 CLI 실패를 자동 리포트할 때(AP-19) 에이전트가 쓰는 메시지 양식이 바뀌었어요. 첫 줄은 이슈 제목이 되는 "무엇이 어떻게 실패했는지" 한 문장이고, 그 아래에 `실행:`·`기대:`·`실제:`·`맥락:`·`재현:` 을 한 줄씩 적어요 — 개발팀이 이슈만 보고도 상황을 재구성할 수 있게요. axhub CLI 0.45.0 부터는 실패한 명령의 오류 분류·subcode·HTTP 상태·오류 메시지 한 줄도 자동으로 붙지만, 인자 값·토큰·환경 내용은 여전히 붙지 않아요. Codex 판 공지: 훅 wrapper(`hooks/session-always-on-codex.sh`)의 emit 문구만 바뀌었고 로직과 kill switch(`AXHUB_NO_FEEDBACK_REPORT=1` · `~/.axhub/config/no-feedback-report`)는 그대로예요.
