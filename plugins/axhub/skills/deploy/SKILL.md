@@ -164,7 +164,9 @@ axhub repo clone <app> --json
 
 clone 응답의 absolute `data.destination`을 사용해 이후 모든 local git command의 tool `cwd`를 고정해요. retry도 same returned `data.destination` cwd에서 실행하며 원래 폴더나 추측 경로를 쓰지 않아요.
 
-After the usual local savepoint/branch readiness and the already-shown preview approval, push ordinary Git from that returned working directory. The webhook owns deployment creation:
+After savepoint/branch checks and preview approval, push from the returned cwd. The webhook creates the deployment:
+
+Before push, save full `git rev-parse HEAD` as `PUSHED_SHA` (no substitute/short SHA). With the same profile/tenant, baseline matching deployment IDs from `axhub deploy list --app <app-id> --all --json`; stop on read failure.
 
 ```bash
 git -c credential.interactive=false push -u origin "HEAD:$BRANCH"
@@ -172,7 +174,7 @@ git -c credential.interactive=false push -u origin "HEAD:$BRANCH"
 
 `credential.interactive=false`는 자격증명이 없을 때 프롬프트·창 대신 오류로 바로 실패하게 해요.
 
-After push exit 0, say only `변경 내용을 보냈어요. 자동 배포가 시작되는지 확인할게요.` webhook 자동 배포를 AP-16(30회/10분) 안에서 `deploy-prep --refresh-in-flight`로 확인하고 받은 exact deployment id를 verify해요. 예산 종료는 pending으로 보고하며 create/upload하지 않아요.
+After push exit 0, say only `변경 내용을 보냈어요. 자동 배포가 시작되는지 확인할게요.` webhook 자동 배포를 AP-16(30회/10분) 안에서 `axhub deploy list --app <app-id> --all --json`으로 확인해요. top-level `items`에서 `commit_sha == PUSHED_SHA`이고 push 전 baseline에 없는 exact deployment id만 선택해요. 상태 필터 없이 이미 성공·실패한 기록도 즉시 `axhub deploy verify <deployment-id> --app <app-id> --json`으로 확인하고 실패는 diagnosis로 보내요. 여러 기록이면 `created_at`이 가장 최신인 것을 선택하고 이후 같은 id만 verify해요. 조회 실패는 빈 목록으로 취급하지 않아요. 예산 종료는 pending으로 보고하며 create/upload하지 않아요.
 
 push가 `told us to quit`·`axhub git credential:`·`unable to get password from user`·credential missing/expired로 실패할 때만 `axhub --tenant <tenant> git setup --rotate` 후 같은 push를 한 번 retry해요. hook/permission/capacity/5xx에는 쓰지 않고 credential output을 출력하지 않아요.
 

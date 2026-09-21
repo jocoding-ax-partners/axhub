@@ -100,6 +100,13 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 <!-- gitnexus:end -->
 
+> **모노레포 안이다.** 이 앱은 `axhub-mono` 의 `clients/plugin/` 다.
+> 브랜치·커밋·워크트리 규칙과 앱 목록은 레포 루트의
+> [`CLAUDE.md`](../../CLAUDE.md) · [`README.md`](../../README.md) 를 따른다.
+> 브랜치는 `plugin/<spec번호>-<슬러그>` — **앱 접두사가 없으면 Spec Kit 이
+> 다른 앱의 번호를 집는다.** 도는 워크플로는 루트 `.github/workflows/` 의 것뿐이고,
+> 이 폴더의 `.github/` 는 원본 보관용이라 실행되지 않는다.
+
 # axhub plugin (diet 체제)
 
 > **정책 기준 문서:** 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 개발·운영 규칙은 `docs/policy/dev-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 기준이에요. 이 파일의 요약과 다르면 정책 문서를 따라요. 어긋남은 `tests/policy-parity.test.ts` 가 잡아요.
