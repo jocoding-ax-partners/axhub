@@ -4,6 +4,25 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.30.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.0...plugin-v1.30.1) (2026-09-21)
+
+Axhub Git에 push한 직후 자동 배포가 이미 끝났어도 결과를 놓치지 않아요. push 전에 전체 커밋 SHA와 기존 배포 ID를 기록하고, push 뒤에는 성공·실패 상태를 포함한 전체 목록에서 새 배포를 찾아 같은 ID로 검증해요. 이전 배포를 이번 결과로 오인하거나 조회 실패를 빈 목록으로 처리하지 않고, 대기 시간이 끝나도 중복 배포를 만들지 않아요. Claude Code와 Codex 번들에 같은 지침을 반영했으며 훅과 사용자 설정은 바뀌지 않아요.
+
+
+### Added
+
+* **relay:** 웹훅 창구에 스테이징 주소 추가 (spec 606) ([7a9b505](https://github.com/jocoding-ax-partners/axhub-mono/commit/7a9b5053ecccb9f7e6528587afde77dbd1065581))
+
+
+### Fixed
+
+* **plugin:** push 직후 완료된 배포도 정확히 추적 ([#412](https://github.com/jocoding-ax-partners/axhub-mono/issues/412)) ([70ab564](https://github.com/jocoding-ax-partners/axhub-mono/commit/70ab564189235203b121ca7acee67e4aac32442a))
+
+
+### Docs
+
+* 브랜치 규칙에 앱 접두사 — Spec Kit 번호 오염을 막는다 ([2d7e4fe](https://github.com/jocoding-ax-partners/axhub-mono/commit/2d7e4fe927113be214bf097cc948baff0f4d1f06))
+
 ## [1.30.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.29.0...plugin-v1.30.0) (2026-09-11)
 
 Windows 에서 AXHub Git 으로 push 할 때 Git Credential Manager 의 아이디·비밀번호 창이 뜨던 남은 경로를 막아요. deploy 스킬의 self-hosted lane 은 `capabilities.self_hosted_git.git_setup_rotate` 를 알리는 axhub CLI 0.45.3 이상에서만 진행하고(구 CLI 는 업데이트를 안내하고 멈춰요, GitHub·static 배포는 그대로예요), 폴더가 이미 clone 이어도 push 전마다 `axhub --tenant <tenant> git setup --json` 을 실행해 옛 helper 설정을 고치면서 유효한 PAT 는 그대로 둬요. push 는 `git -c credential.interactive=false push` 로 실행해 자격증명이 없으면 창 대신 오류로 바로 실패하고, `told us to quit`·`unable to get password from user` 같은 자격증명 오류에서만 `git setup --rotate` 뒤 한 번 retry 해요. onboarding 스킬은 `git setup` 에 `--tenant` 를 넘겨 여러 tenant 사용자도 exit 64 없이 준비돼요. Codex 판 공지: 스킬 본문만 바뀌었고 훅은 그대로예요.
