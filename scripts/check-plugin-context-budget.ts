@@ -18,7 +18,11 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 // 246_000 → 248_000: diagnosis 에 "docs 대조" 1단락(원인이 안 좁혀지면 docs.axhub.ai
 // llms-full 의 문제 해결 절을 한 번 읽는 지시). 실행 경로의 지시라 본문에 두며, 실측
 // 246,722B 에 약 1,300B 여유. per-skill 35,000B 게이트는 그대로 유지한다.
-export const DEFAULT_MAX_TOTAL_BYTES = 248_000;
+// 248_000 → 249_000: update 2단계에 서명 신원 브리지 1줄(#453 — 0.44.1 이하 CLI 는 옛
+// 서명 신원만 믿어 mono 가 서명한 최신을 exit 66 으로 막으므로 v0.44.2 를 먼저 받는
+// 지시). 실행 경로의 지시라 본문에 두며, 실측 248,477B 에 약 500B 여유. per-skill
+// 35,000B 게이트는 그대로 유지한다.
+export const DEFAULT_MAX_TOTAL_BYTES = 249_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
 export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {
