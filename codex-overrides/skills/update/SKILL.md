@@ -37,7 +37,7 @@ allows-dependency-execution: true
 
 **보이는 tool 제목 계약.** 셸/명령 도구를 부를 때 description/title/summary 는 아래 고정 한국어 라벨 중 하나만 써요. 라벨 안에 `axhub` 를 넣지 않아요. `axhubing CLI 설치 여부 확인` 처럼 제품명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요.
 
-**사용자에게 보이는 command allowlist.** 셸 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` (AP-17 경로 복구일 때만), `axhub update check ...`, `axhub update apply --execute --yes`, `axhub --version`, `codex plugin list --json`, `codex plugin marketplace upgrade axhub`, `codex plugin add axhub-codex@axhub`, `cat "<설치 루트>/.codex-plugin/plugin.json"` (0단계 4번 fallback 일 때만, 리터럴 절대경로). 각 command 는 단독으로 실행하고 stdin 이 열려 있지 않게 해요. `&&`, pipe, redirect, `grep`, `head`, `tail`, `sed`, `awk`, `bash -lc`, `sh -c` 로 묶거나 자르지 않아요. `codex plugin list --json` 이 성공한 경로에서는 플러그인 캐시의 `plugin.json` 파일을 직접 읽지 않아요 — 그때 플러그인 현재 버전은 정확히 `codex plugin list --json` 1회의 `installed` 배열에서 `axhub-codex@axhub` 항목으로만 내부 판독해요 (`available` 배열은 신뢰하지 않아요 — 빈 배열로 나와요). 출력이 길어도 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요.
+**사용자에게 보이는 command allowlist.** 셸 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` (AP-17 경로 복구일 때만), `axhub update check ...`, `axhub update apply --execute --yes`, `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub update apply --execute --yes` (2단계 브리지만), `axhub --version`, `codex plugin list --json`, `codex plugin marketplace upgrade axhub`, `codex plugin add axhub-codex@axhub`, `cat "<설치 루트>/.codex-plugin/plugin.json"` (0단계 4번 fallback 일 때만, 리터럴 절대경로). 각 command 는 단독으로 실행하고 stdin 이 열려 있지 않게 해요. `&&`, pipe, redirect, `grep`, `head`, `tail`, `sed`, `awk`, `bash -lc`, `sh -c` 로 묶거나 자르지 않아요. `codex plugin list --json` 이 성공한 경로에서는 플러그인 캐시의 `plugin.json` 파일을 직접 읽지 않아요 — 그때 플러그인 현재 버전은 정확히 `codex plugin list --json` 1회의 `installed` 배열에서 `axhub-codex@axhub` 항목으로만 내부 판독해요 (`available` 배열은 신뢰하지 않아요 — 빈 배열로 나와요). 출력이 길어도 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요.
 
 | 단계 | tool description/title/summary |
 | --- | --- |
@@ -97,6 +97,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 - **`has_update == true` 이고 안내-only 가 아님** → 알리고 바로 적용해요:
   1. 한 줄: `axhub 새 버전(v<current> → v<latest>)이 나왔어요. 지금 업데이트할게요…`
   2. 실행: `axhub update apply --execute --yes`
+     - `current` 가 v0.44.1 이하이고 `latest` 가 v0.44.2 보다 높으면(옛 서명 신원만 믿어 바로 받으면 exit 66) 먼저 정확히 `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub update apply --execute --yes` 로 v0.44.2 를 받고 위 명령을 실행해요. 서명 검증은 그대로이고, exit 는 둘 다 3번대로 갈라요.
   3. exit code 로 갈라요 (판정은 CLI 가 함):
      - **exit 0** → `axhub --version` 으로 재확인하고 한 줄: `axhub v<새 버전> 으로 업데이트됐어요.`
      - **exit 14 (digest mismatch — 변조 신호) / exit 66 (cosign_enforce_failed)** → **하드 스톱**. `보안 검증에 실패했어요. 강제로 진행하지 말고 회사 IT·보안팀에 알려주세요. 지금 버전은 그대로 써도 돼요.` 로 안내하고 멈춰요.

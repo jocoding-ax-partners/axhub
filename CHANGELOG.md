@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.30.2](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.1...plugin-v1.30.2) (2026-09-23)
+
+0.44.1 이하 axhub CLI 도 자동 업데이트로 다시 최신까지 올라가요. 이 CLI 들은 업데이트 서명을 옛 레포 신원으로만 확인해서 모노레포가 서명한 릴리스를 보안 검증 실패(exit 66)로 막았고, 플러그인은 릴리스마다 보안팀에 알리라는 안내만 남겼어요. 이제 자동 업데이트 훅과 update 스킬이 두 서명 신원을 모두 믿는 0.44.2 를 먼저 받고 같은 실행에서 최신까지 이어가요. 버전 포인터만 바꾸고 SHA256·서명 검증은 그대로예요. Codex 판 공지: 자동 업데이트 훅(`session-auto-update.sh`) 본문이 바뀌었고, 신뢰한 훅이라 재신뢰 없이 반영돼요.
+
+
+### Fixed
+
+* **plugin:** 0.44.1 이하 CLI 를 서명 신원 브리지(v0.44.2) 경유로 최신까지 올린다 ([#461](https://github.com/jocoding-ax-partners/axhub-mono/issues/461)) ([6d391f1](https://github.com/jocoding-ax-partners/axhub-mono/commit/6d391f1a66cd3fb9bd3fcb84b1c43b81fa653e96)), closes [#453](https://github.com/jocoding-ax-partners/axhub-mono/issues/453)
+
 ## [1.30.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.0...plugin-v1.30.1) (2026-09-21)
 
 Axhub Git에 push한 직후 자동 배포가 이미 끝났어도 결과를 놓치지 않아요. push 전에 전체 커밋 SHA와 기존 배포 ID를 기록하고, push 뒤에는 성공·실패 상태를 포함한 전체 목록에서 새 배포를 찾아 같은 ID로 검증해요. 이전 배포를 이번 결과로 오인하거나 조회 실패를 빈 목록으로 처리하지 않고, 대기 시간이 끝나도 중복 배포를 만들지 않아요. Claude Code와 Codex 번들에 같은 지침을 반영했으며 훅과 사용자 설정은 바뀌지 않아요.

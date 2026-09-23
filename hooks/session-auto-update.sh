@@ -86,35 +86,80 @@ if [ -z "$CUR" ] || [ -z "$LATEST" ] || [ -z "$PLAT" ]; then
   exit 0
 fi
 
+# semver 3자리 숫자 비교 — macOS sort 에 -V 가 없어요. 앞의 v 와 pre-release 꼬리는 떼요.
+ver_ge() {
+  local a="${1#v}" b="${2#v}" a1 a2 a3 b1 b2 b3
+  IFS=. read -r a1 a2 a3 <<EOT
+$a
+EOT
+  IFS=. read -r b1 b2 b3 <<EOT
+$b
+EOT
+  a1=${a1%%[!0-9]*}; a2=${a2%%[!0-9]*}; a3=${a3%%[!0-9]*}
+  b1=${b1%%[!0-9]*}; b2=${b2%%[!0-9]*}; b3=${b3%%[!0-9]*}
+  a1=${a1:-0}; a2=${a2:-0}; a3=${a3:-0}; b1=${b1:-0}; b2=${b2:-0}; b3=${b3:-0}
+  [ "$a1" -ne "$b1" ] && { [ "$a1" -gt "$b1" ]; return; }
+  [ "$a2" -ne "$b2" ] && { [ "$a2" -gt "$b2" ]; return; }
+  [ "$a3" -ge "$b3" ]
+}
+
+# 서명 신원 브리지 (#453) — 0.44.1 이하 CLI 는 옛 레포 서명만 믿어 mono 가 서명한
+# 최신을 exit 66 으로 막아요. 두 신원을 다 믿는 0.44.2 를 버전 포인터만 바꿔 먼저
+# 받고(자산·SHA256·cosign 검증은 그대로) 같은 run 에서 최신으로 이어요.
+BRIDGE=v0.44.2
+BRIDGE_FEED=https://cli.axhub.ai/identity-bridge
+
 # 2) CLI apply — disabled(패키지 매니저 관리)·downgrade(서버 롤백)·같은 버전의
 # 보안 halt 는 건너뛰어요. 판정은 exit 코드로만 해요.
 CLI_RESULT="UP_TO_DATE cli=$CUR"
 NOTICE=""
 if [ "$HAS" = true ]; then
+  # 브리지 경유면 halt 키에 경유를 붙여요 — 키가 latest 를 품어서, 브리지의 일시적
+  # 검증 실패도 새 latest 가 나오면 다시 시도해요.
+  VIA=""
+  if ! ver_ge "$CUR" "$BRIDGE" && ! ver_ge "$BRIDGE" "$LATEST"; then
+    VIA="$BRIDGE"
+  fi
+  KEY="$LATEST${VIA:+ via $VIA}"
   if [ "$DIS" = true ]; then
     CLI_RESULT="SKIP_DISABLED cli=$CUR latest=$LATEST"
   elif [ "$DOWN" = true ]; then
     CLI_RESULT="SKIP_DOWNGRADE cli=$CUR latest=$LATEST"
-  elif [ -f "$HALT" ] && [ "$(cut -d'|' -f1 "$HALT" 2>/dev/null)" = "$LATEST" ]; then
-    CLI_RESULT="SKIP_HALTED latest=$LATEST"
+  elif [ -f "$HALT" ] && [ "$(cut -d'|' -f1 "$HALT" 2>/dev/null)" = "$KEY" ]; then
+    CLI_RESULT="SKIP_HALTED latest=$LATEST${VIA:+ via=$VIA}"
   else
     rm -f "$HALT" 2>/dev/null
-    "$BIN" update apply --execute --yes --json >/dev/null 2>&1
-    ARC=$?
+    FROM="$CUR"
+    ARC=0
+    if [ -n "$VIA" ]; then
+      AXHUB_UPDATE_FEED_URL="$BRIDGE_FEED" "$BIN" update apply --execute --yes --json >/dev/null 2>&1
+      ARC=$?
+      [ "$ARC" -eq 0 ] && CUR="$VIA" && VIA="" && KEY="$LATEST"
+    fi
+    if [ "$ARC" -eq 0 ]; then
+      "$BIN" update apply --execute --yes --json >/dev/null 2>&1
+      ARC=$?
+      [ "$ARC" -eq 0 ] && CUR="$LATEST"
+    fi
     case "$ARC" in
       0)
-        CLI_RESULT="UPDATED cli=$CUR->$LATEST"
-        NOTICE="axhub CLI 가 $CUR → $LATEST 로 자동 업데이트됐어요."
+        CLI_RESULT="UPDATED cli=$FROM->$CUR"
+        NOTICE="axhub CLI 가 $FROM → $CUR 로 자동 업데이트됐어요."
         ;;
       14|66)
-        printf '%s|%s' "$LATEST" "$ARC" > "$HALT" 2>/dev/null
-        CLI_RESULT="SECURITY_HALT latest=$LATEST exit=$ARC"
+        printf '%s|%s' "$KEY" "$ARC" > "$HALT" 2>/dev/null
+        CLI_RESULT="SECURITY_HALT latest=$LATEST${VIA:+ via=$VIA} exit=$ARC"
         NOTICE="axhub CLI 업데이트의 보안 검증에 실패했어요. 강제로 진행하지 말고 회사 IT·보안팀에 알려주세요. 지금 버전은 그대로 써도 돼요."
         ;;
       *)
-        CLI_RESULT="APPLY_FAILED exit=$ARC latest=$LATEST"
+        CLI_RESULT="APPLY_FAILED exit=$ARC latest=$LATEST${VIA:+ via=$VIA}"
         ;;
     esac
+    # 브리지만 받고 멈춰도 CLI 는 바뀌었어요 — log 에 남기고, 보안 안내가 없으면 알려요.
+    if [ "$ARC" -ne 0 ] && [ "$CUR" != "$FROM" ]; then
+      CLI_RESULT="$CLI_RESULT cli=$FROM->$CUR"
+      [ -n "$NOTICE" ] || NOTICE="axhub CLI 가 $FROM → $CUR 로 자동 업데이트됐어요."
+    fi
   fi
 fi
 

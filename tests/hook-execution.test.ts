@@ -228,12 +228,14 @@ function makeHome(): string {
 // worker 는 stub axhub/claude 를 PATH 에 두고 전경으로 실행해요 — async 여부는
 // harness 몫이라 스크립트는 끝까지 돌고 stdout(알림 JSON)을 돌려줘요. stub 은
 // STUB_* env 로 출력·exit 를 정하고 호출 인자를 STUB_CALLS 파일에 남겨요.
+// 서명 신원 브리지 hop 은 AXHUB_UPDATE_FEED_URL 로 버전 포인터만 바꿔요 — 그 env 는
+// 호출 기록 앞머리에 남기고, exit 은 STUB_BRIDGE_APPLY_EXIT 로 따로 정해요.
 const AXHUB_STUB = `#!/usr/bin/env bash
-[ -n "$STUB_CALLS" ] && echo "axhub $*" >> "$STUB_CALLS"
+[ -n "$STUB_CALLS" ] && echo "\${AXHUB_UPDATE_FEED_URL:+AXHUB_UPDATE_FEED_URL=$AXHUB_UPDATE_FEED_URL }axhub $*" >> "$STUB_CALLS"
 case "$*" in
   *--field-expr*) [ -n "$STUB_CHECK_EXIT" ] && exit "$STUB_CHECK_EXIT"; printf '%s\\n' "$STUB_CHECK_OUT" ;;
   "update check --json") printf '%s\\n' "$STUB_CHECK_JSON" ;;
-  "update apply"*) exit "\${STUB_APPLY_EXIT:-0}" ;;
+  "update apply"*) [ -n "$AXHUB_UPDATE_FEED_URL" ] && exit "\${STUB_BRIDGE_APPLY_EXIT:-0}"; exit "\${STUB_APPLY_EXIT:-0}" ;;
 esac
 exit 0
 `;
@@ -462,6 +464,76 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
     const third = runWorker({ STUB_CHECK_OUT: "v0.38.0 true v0.40.0 false false false 1.27.1" }, first.home);
     expectEmit(third.result, "SessionStart", "v0.38.0 → v0.40.0");
     expect(existsSync(join(first.home, HALT_REL))).toBe(false);
+  });
+
+  // #453 서명 신원 브리지 — 0.44.1 이하는 옛 레포 서명만 믿어 mono 가 서명한 최신을
+  // exit 66 으로 막아요. 두 신원을 다 믿는 0.44.2 를 포인터로 먼저 받고 최신으로 이어요.
+  const PRE_BRIDGE_UPDATE = "v0.44.0 true v0.46.8 false false false 1.27.1";
+  const BRIDGE_APPLY =
+    "AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub update apply --execute --yes --json";
+  const PLAIN_APPLY = "axhub update apply --execute --yes --json";
+
+  test("0.44.1 이하 CLI → 브리지 포인터로 0.44.2 를 받고 같은 run 에서 최신까지 올려요 (#453)", () => {
+    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: PRE_BRIDGE_UPDATE });
+    expectEmit(result, "SessionStart", "axhub CLI 가 v0.44.0 → v0.46.8 로 자동 업데이트됐어요");
+    expect(calls.slice(1)).toEqual([BRIDGE_APPLY, PLAIN_APPLY]);
+    expect(log).toContain("UPDATED cli=v0.44.0->v0.46.8");
+  });
+
+  test("옛 신원 탓에 최신으로 halt 가 걸려 있어도 브리지는 목표가 달라 다시 시도해요 (#453 보고 상태)", () => {
+    const home = makeHome();
+    mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
+    writeFileSync(join(home, HALT_REL), "v0.46.8|66");
+    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: PRE_BRIDGE_UPDATE }, home);
+    expectEmit(result, "SessionStart", "v0.44.0 → v0.46.8");
+    expect(calls.slice(1)).toEqual([BRIDGE_APPLY, PLAIN_APPLY]);
+    expect(existsSync(join(home, HALT_REL))).toBe(false);
+    expect(log).toContain("UPDATED cli=v0.44.0->v0.46.8");
+  });
+
+  test("브리지가 보안 검증에 실패하면 경유 키로 halt 하고, 새 latest 가 나오면 브리지를 다시 시도해요", () => {
+    const first = runWorker({ STUB_CHECK_OUT: PRE_BRIDGE_UPDATE, STUB_BRIDGE_APPLY_EXIT: "66" });
+    expectEmit(first.result, "SessionStart", "보안 검증에 실패했어요");
+    expect(first.calls.slice(1)).toEqual([BRIDGE_APPLY]);
+    expect(readFileSync(join(first.home, HALT_REL), "utf8")).toBe("v0.46.8 via v0.44.2|66");
+    expect(first.log).toContain("SECURITY_HALT latest=v0.46.8 via=v0.44.2 exit=66");
+
+    utimesSync(join(first.home, CACHE_REL), daysAgo(2), daysAgo(2));
+    const second = runWorker({ STUB_CHECK_OUT: PRE_BRIDGE_UPDATE, STUB_BRIDGE_APPLY_EXIT: "66" }, first.home);
+    expectSilent(second.result);
+    expect(second.calls.slice(1)).toEqual([]);
+    expect(second.log).toContain("SKIP_HALTED latest=v0.46.8 via=v0.44.2");
+
+    // 브리지 목표는 고정이라, 키에 latest 가 없으면 일시적 실패 한 번에 영영 막혀요.
+    utimesSync(join(first.home, CACHE_REL), daysAgo(2), daysAgo(2));
+    const third = runWorker({ STUB_CHECK_OUT: "v0.44.0 true v0.46.9 false false false 1.27.1" }, first.home);
+    expectEmit(third.result, "SessionStart", "v0.44.0 → v0.46.9");
+    expect(third.calls.slice(1)).toEqual([BRIDGE_APPLY, PLAIN_APPLY]);
+    expect(existsSync(join(first.home, HALT_REL))).toBe(false);
+  });
+
+  test("브리지 뒤 최신 apply 가 실패하면 바뀐 CLI 버전을 log·알림에 사실대로 남겨요", () => {
+    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: PRE_BRIDGE_UPDATE, STUB_APPLY_EXIT: "1" });
+    expectEmit(result, "SessionStart", "axhub CLI 가 v0.44.0 → v0.44.2 로 자동 업데이트됐어요");
+    expect(calls.slice(1)).toEqual([BRIDGE_APPLY, PLAIN_APPLY]);
+    expect(log).toContain("APPLY_FAILED exit=1 latest=v0.46.8 cli=v0.44.0->v0.44.2");
+  });
+
+  test("브리지 뒤 최신이 보안 검증에 실패하면 최신 목표로 halt 해요", () => {
+    const { result, home, log } = runWorker({ STUB_CHECK_OUT: PRE_BRIDGE_UPDATE, STUB_APPLY_EXIT: "66" });
+    expectEmit(result, "SessionStart", "보안 검증에 실패했어요");
+    expect(readFileSync(join(home, HALT_REL), "utf8")).toBe("v0.46.8|66");
+    expect(log).toContain("SECURITY_HALT latest=v0.46.8 exit=66 cli=v0.44.0->v0.44.2");
+  });
+
+  test("현재가 0.44.2 이상이거나 최신이 0.44.2 이하면 브리지 없이 apply 1회예요", () => {
+    for (const out of [
+      "v0.44.2 true v0.46.8 false false false 1.27.1",
+      "v0.44.1 true v0.44.2 false false false 1.27.1",
+    ]) {
+      const { calls } = runWorker({ STUB_CHECK_OUT: out });
+      expect(calls.slice(1)).toEqual([PLAIN_APPLY]);
+    }
   });
 
   test("apply 가 그 외 코드로 실패하면 log APPLY_FAILED 만 남기고 침묵해요", () => {
