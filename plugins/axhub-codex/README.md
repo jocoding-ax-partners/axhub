@@ -87,7 +87,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 ## 🧩 11개 스킬
 
-`plugins`는 category=plugin인 일반 App의 exact version을 다운로드하거나 Codex에 설치해요. `download`는 검증된 ZIP만 저장하고, `axhub plugin install --host codex`는 offline preview 뒤 `--execute --yes`일 때만 archive 공격과 manifest identity를 검사하고 AxHub 관리 local marketplace를 Codex 공식 plugin CLI로 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 사용하며 성공은 `review_ready`·installable=false예요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
+`plugins`는 deploy_method=plugin인 일반 App의 exact version을 다운로드하거나 Codex에 설치해요. `download`는 검증된 ZIP만 저장하고, `axhub plugin install --host codex`는 offline preview 뒤 `--execute --yes`일 때만 archive 공격과 manifest identity를 검사하고 AxHub 관리 local marketplace를 Codex 공식 plugin CLI로 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 사용하며 성공은 `review_ready`·installable=false예요. 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
 
 | 스킬 | 언제 | 자연어 예시 |
 |------|------|-------------|

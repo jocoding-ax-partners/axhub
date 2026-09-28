@@ -1,6 +1,6 @@
 ---
 name: plugins
-description: 'axhub plugin marketplace 게시·목록·exact download·host install skill. "플러그인 올려줘", "plugin publish", "플러그인 목록 보여줘", "플러그인 1.2.0 내려 받아", "Claude에 설치해줘", "Codex에 설치해줘", "여러 스킬을 하나의 플러그인으로 올려"에 사용해요. Plugin은 category=plugin인 일반 App이고 App Console·Console Review를 써요. 앱 배포는 deploy, 앱 연결은 import, 업데이트는 update로 양보해요.'
+description: 'axhub plugin marketplace 게시·목록·exact download·host install skill. "플러그인 올려줘", "plugin publish", "플러그인 목록 보여줘", "플러그인 1.2.0 내려 받아", "Claude에 설치해줘", "Codex에 설치해줘", "여러 스킬을 하나의 플러그인으로 올려"에 사용해요. Plugin은 deploy_method=plugin인 일반 App이고 App Console·Console Review를 써요. 앱 배포는 deploy, 앱 연결은 import, 업데이트는 update로 양보해요.'
 examples:
   - utterance: "사용자들이 올린 플러그인 목록 보여줘"
     intent: "list app-backed marketplace plugins"
@@ -24,7 +24,7 @@ axhub 맥락 확인과 axhub 진입 확인 후 tenant marketplace 대상인지 �
 
 요청 mode의 public help(`axhub plugin list --help`·`axhub plugin download --help`·`axhub plugin install --help`·`axhub plugin publish --help`)가 없으면 update로 양보해요.
 
-UI는 `/discovery?category=plugin` → `/apps/<slug>`, owner는 `/apps/<slug>/console`, reviewer는 `/console/review`예요.
+UI는 `/discovery?type=plugin` → `/apps/<slug>`, owner는 `/apps/<slug>/console`, reviewer는 `/console/review`예요.
 
 
 ## 1. 목록

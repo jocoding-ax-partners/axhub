@@ -34,6 +34,7 @@ const REQUIRED_MUTATIONS = new Set([
   "app_select",
   "github_repo_create",
   "github_connect",
+  "selfhosted_repo_push",
   "first_deploy",
   "static_release",
 ]);

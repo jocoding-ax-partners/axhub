@@ -4,6 +4,24 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.30.4](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.3...plugin-v1.30.4) (2026-09-28)
+
+scaffold 로 새 앱을 시작할 때 GitHub 명령보다 먼저 코드 저장 위치를 정해요. 작업공간 추천값을 읽고, GitHub 이나 self-hosted 를 직접 말하지 않았으면 둘 중에서 물어봐요. self-hosted 를 고르면 GitHub 절차 없이 bootstrap 으로 넘어가요. 기존 코드 import 도 self-hosted 작업공간에서는 GitHub 저장소 이름을 요구하지 않고 axhub 저장소로 올려요. 이 경로는 axhub CLI 0.46.12 이상이 필요하고, 그보다 낮으면 import 가 CLI 업데이트를 먼저 안내해요.
+
+
+### Fixed
+
+* **plugin:** scaffold 를 먼저 타도 self-hosted git 을 쓸 수 있게 저장 위치를 먼저 정한다 ([#593](https://github.com/jocoding-ax-partners/axhub-mono/issues/593)) ([fe72c53](https://github.com/jocoding-ax-partners/axhub-mono/commit/fe72c53df77af323e0d8073d98e352da701c2b16)), closes [#575](https://github.com/jocoding-ax-partners/axhub-mono/issues/575) [#576](https://github.com/jocoding-ax-partners/axhub-mono/issues/576)
+
+## [1.30.3](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.2...plugin-v1.30.3) (2026-09-28)
+
+플러그인 App 은 이제 예약 카테고리 `plugin` 이 아니라 배포 방식(`deploy_method=plugin`)으로 구분하고, 카테고리는 일반 앱처럼 소유자가 골라요. `plugins` 스킬 안내와 스토어 링크를 여기에 맞춰 `/discovery?type=plugin` 으로 바꿨어요. 플러그인 목록은 axhub CLI 0.46.11 이상이 새 조회 방식으로 받아요.
+
+
+### Docs
+
+* **plugin:** plugins 스킬 안내를 deploy_method=plugin 기준으로 고친다 ([#570](https://github.com/jocoding-ax-partners/axhub-mono/issues/570)) ([15c1572](https://github.com/jocoding-ax-partners/axhub-mono/commit/15c1572e6ccb17a9e4314e62ef145e459dade3a8))
+
 ## [1.30.2](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.1...plugin-v1.30.2) (2026-09-23)
 
 0.44.1 이하 axhub CLI 도 자동 업데이트로 다시 최신까지 올라가요. 이 CLI 들은 업데이트 서명을 옛 레포 신원으로만 확인해서 모노레포가 서명한 릴리스를 보안 검증 실패(exit 66)로 막았고, 플러그인은 릴리스마다 보안팀에 알리라는 안내만 남겼어요. 이제 자동 업데이트 훅과 update 스킬이 두 서명 신원을 모두 믿는 0.44.2 를 먼저 받고 같은 실행에서 최신까지 이어가요. 버전 포인터만 바꾸고 SHA256·서명 검증은 그대로예요. Codex 판 공지: 자동 업데이트 훅(`session-auto-update.sh`) 본문이 바뀌었고, 신뢰한 훅이라 재신뢰 없이 반영돼요.

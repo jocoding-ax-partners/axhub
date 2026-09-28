@@ -22,7 +22,12 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 // 서명 신원만 믿어 mono 가 서명한 최신을 exit 66 으로 막으므로 v0.44.2 를 먼저 받는
 // 지시). 실행 경로의 지시라 본문에 두며, 실측 248,477B 에 약 500B 여유. per-skill
 // 35,000B 게이트는 그대로 유지한다.
-export const DEFAULT_MAX_TOTAL_BYTES = 249_000;
+// 249_000 → 252_000: spec 236 2차 — scaffold 의 코드 저장 위치 선판정(1.5단계,
+// selfhosted 면 GitHub 명령 없이 bootstrap 양보)과 import 의 selfhosted 경로
+// 계약(`--git-backend`·`selfhosted_repo_push`·capability gate). GitHub 명령보다
+// 먼저 읽혀야 하는 실행 경로 지시라 본문에 두며, 실측 251,448B 에 약 500B 여유.
+// per-skill 35,000B 게이트는 그대로 유지한다.
+export const DEFAULT_MAX_TOTAL_BYTES = 252_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
 export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {

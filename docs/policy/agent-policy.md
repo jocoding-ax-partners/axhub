@@ -128,7 +128,7 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "plugins/axhub-codex"
 
 ## AP-21 app-backed plugin marketplace
-- 규칙: `plugins` 스킬은 category=plugin인 일반 App의 canonical AppID·slug만 사용해 목록·exact download·host install·publish를 처리해요. 목록은 `plugin.current_servable_version` summary를 페이지 단위로 읽고 download 결과에는 version_id를 만들지 않아요. `axhub plugin install`은 download 요청과 구분해 exact version·`claude|codex` host를 고른 offline preview 뒤 새 승인에서만 `--execute --yes`를 붙여요. CLI는 traversal·symlink·duplicate path·archive bomb·manifest identity를 검사하고 AxHub secret을 host process에서 제거한 뒤 `~/.axhub/plugins/` local marketplace와 host 공식 plugin CLI로 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish execute는 `plugins:read` + `plugins:write` scoped PAT file·rights attestation·명시 승인만 허용해요. Gate 성공은 `review_ready`·installable=false이며 App Console 제출과 Console Review 승인 전에는 release 완료가 아니에요.
+- 규칙: `plugins` 스킬은 deploy_method=plugin인 일반 App의 canonical AppID·slug만 사용해 목록·exact download·host install·publish를 처리해요. 목록은 `plugin.current_servable_version` summary를 페이지 단위로 읽고 download 결과에는 version_id를 만들지 않아요. `axhub plugin install`은 download 요청과 구분해 exact version·`claude|codex` host를 고른 offline preview 뒤 새 승인에서만 `--execute --yes`를 붙여요. CLI는 traversal·symlink·duplicate path·archive bomb·manifest identity를 검사하고 AxHub secret을 host process에서 제거한 뒤 `~/.axhub/plugins/` local marketplace와 host 공식 plugin CLI로 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish execute는 `plugins:read` + `plugins:write` scoped PAT file·rights attestation·명시 승인만 허용해요. Gate 성공은 `review_ready`·installable=false이며 App Console 제출과 Console Review 승인 전에는 release 완료가 아니에요.
 - 적용: skills/plugins/SKILL.md, POLICY.md
 - invariant: "plugin.current_servable_version", "`version_id`를 만들거나 보고하지 않아요", "download 요청과 install 요청을 구분", "--execute --yes", "Publish execute에는 OAuth나 broad PAT 대신", "submit_plugin_version_for_review"
 
@@ -138,17 +138,17 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "active_release_id"
 
 ## AP-23 app git backend 선판정
-- 규칙: 저장소 provider 대사나 mutation보다 먼저 public CLI JSON으로 effective backend를 확인해요. resume/existing은 `axhub apps get <app> --json`, fresh bootstrap/onboarding은 read-only `axhub apps git-backend --tenant <tenant> --json`을 쓰고 app row를 먼저 만들지 않아요. 판정 입력은 top-level `git_backend.backend`·`git_backend.source`뿐이며 Gitea API·C1 HTTP·remote URL을 보지 않아요. selfhosted는 계정 연동·device flow·GitHub App 설치 대사를 노출하지 않고, non-static deploy는 `axhub repo clone` 뒤 일반 `git push`의 webhook deployment id를 exact verify해요. static은 기존 release lane, GitHub와 `legacy_github`는 기존 gate/upload/create 경로를 유지해요.
+- 규칙: 저장소 provider 대사나 mutation보다 먼저 public CLI JSON으로 effective backend를 확인해요. resume/existing은 `axhub apps get <app> --json`, fresh bootstrap/onboarding/scaffold는 read-only `axhub apps git-backend --tenant <tenant> --json`을 쓰고 app row를 먼저 만들지 않아요. 기존 코드 import는 `plugin-support import`가 같은 입력으로 경로를 정하고(`selfhosted_repo_push`) 읽기 실패면 GitHub로 추측하지 않아요. 판정 입력은 top-level `git_backend.backend`·`git_backend.source`뿐이며 Gitea API·C1 HTTP·remote URL을 보지 않아요. selfhosted는 계정 연동·device flow·GitHub App 설치 대사를 노출하지 않고(scaffold는 GitHub 명령 없이 bootstrap으로 양보), non-static deploy는 `axhub repo clone` 뒤 일반 `git push`의 webhook deployment id를 exact verify해요. static은 기존 release lane, GitHub와 `legacy_github`는 기존 gate/upload/create 경로를 유지해요.
 - 적용: skills/bootstrap/SKILL.md, skills/deploy/SKILL.md, skills/onboarding/SKILL.md
 - invariant: "axhub apps get <app> --json", "git_backend.backend=selfhosted"
 - 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/onboarding/SKILL.md
 - invariant(codex): "axhub apps get <app> --json", "git_backend.backend=selfhosted"
 
 ## AP-24 fresh git backend 명시 선택
-- 규칙: fresh onboarding/bootstrap의 tenant `git_backend`는 추천값일 뿐이에요. 사용자가 현재 대화에서 GitHub 또는 Axhub self-hosted를 명시하면 그대로 쓰고, 아니면 interactive 선택 card로 코드 저장 위치를 한 번 물어요. 선택은 `SELECTED_GIT_BACKEND`로 같은 대화의 onboarding→bootstrap에 전달하되 app 생성 전 persisted 값이라고 말하지 않아요. existing/resume app은 persisted backend를 재사용하고 다시 묻지 않아요. provider 선택이 명시되지 않은 headless는 provider mutation 전에 safe-stop해요. bootstrap의 preview·execute·resume와 모든 `init-resume put`에는 literal `--git-backend github|selfhosted`를 넣어요.
-- 적용: skills/bootstrap/SKILL.md, skills/onboarding/SKILL.md
+- 규칙: fresh onboarding/bootstrap/scaffold의 tenant `git_backend`는 추천값일 뿐이에요. 사용자가 현재 대화에서 GitHub 또는 Axhub self-hosted를 명시하면 그대로 쓰고, 아니면 interactive 선택 card로 코드 저장 위치를 한 번 물어요. 선택은 `SELECTED_GIT_BACKEND`로 같은 대화의 onboarding→bootstrap에 전달하되 app 생성 전 persisted 값이라고 말하지 않아요. existing/resume app은 persisted backend를 재사용하고 다시 묻지 않아요. provider 선택이 명시되지 않은 headless는 provider mutation 전에 safe-stop해요. bootstrap의 preview·execute·resume와 모든 `init-resume put`에는 literal `--git-backend github|selfhosted`를 넣어요.
+- 적용: skills/bootstrap/SKILL.md, skills/onboarding/SKILL.md, skills/scaffold/SKILL.md
 - invariant: "SELECTED_GIT_BACKEND", "코드 저장 위치", "provider 선택이 명시되지"
-- 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/onboarding/SKILL.md
+- 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/onboarding/SKILL.md, plugins/axhub-codex/skills/scaffold/SKILL.md
 - invariant(codex): "SELECTED_GIT_BACKEND", "코드 저장 위치", "provider 선택이 명시되지"
 
 ## AP-25 배포 환경 표시 (스테이징을 운영으로 오인 금지)
