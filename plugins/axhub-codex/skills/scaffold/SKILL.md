@@ -1,6 +1,6 @@
 ---
 name: scaffold
-description: '템플릿으로 시작하되 저장소는 사용자 GitHub 계정/조직 소유로 만들어요. 사용자 소유 GitHub 저장소를 명시하면 bootstrap보다 우선해요. 단 같은 요청에 Axhub self-hosted도 있으면 두 요구는 동시에 충족할 수 없으므로 코드 저장 위치를 먼저 선택하게 하고, self-hosted를 고르면 bootstrap으로 양보해요. Start directly with a Korean progress sentence; no preamble; no route/skill label. 저장소 소유 언급이 없으면 bootstrap으로, 이미 코드가 있는 폴더는 import로 양보해요. 흐름: 템플릿 내려받기 → placeholder 치환 → 사용자 GitHub 저장소 생성+push → origin 등록 → 확인 → 동의하면 import 인계. push 뒤 앱 생성·배포로 자동으로 이어가지 않아요.'
+description: '템플릿으로 시작하되 저장소는 사용자 GitHub 계정/조직 소유로 만들어요. 사용자 소유 GitHub 저장소를 명시하면 bootstrap보다 우선해요. 단 GitHub 명령 전에 tenant 추천값으로 코드 저장 위치를 먼저 정하고(GitHub 명시가 없으면 GitHub/Axhub self-hosted를 물어요), self-hosted면 GitHub 명령 없이 bootstrap으로 양보해요. Start directly with a Korean progress sentence; no preamble; no route/skill label. 저장소 소유 언급이 없으면 bootstrap으로, 이미 코드가 있는 폴더는 import로 양보해요. 흐름: 템플릿 내려받기 → placeholder 치환 → 사용자 GitHub 저장소 생성+push → origin 등록 → 확인 → 동의하면 import 인계. push 뒤 앱 생성·배포로 자동으로 이어가지 않아요.'
 allows-dependency-execution: false
 model: sonnet
 ---
@@ -15,7 +15,7 @@ model: sonnet
 
 bootstrap 과의 차이 하나뿐이에요: bootstrap 은 axhub 이 저장소를 만들어 주고(봇 소유 생성 — org 에서 주인 권한이 자동으로 안 붙을 수 있어요), 이 스킬은 **사용자 연동 계정으로 사용자의 계정/조직에** 저장소를 만들어요. 생성자가 곧 주인이라 그 권한 문제가 구조적으로 없어요. 저장소 생성만 CLI(`axhub github repo create`, v0.30.0+)가 하고 clone·커밋은 git 이에요. 앱 생성·연결·배포는 `import` 가 해요 — 이 스킬은 GitHub 쪽 준비까지만 소유하고, push 가 끝나면 이어갈지 한 번 물어본 뒤에만 넘겨요.
 
-명시적인 `Axhub self-hosted`와 `내 GitHub 계정/조직 소유 저장소`가 같은 요청에 있으면 두 요구는 동시에 충족할 수 없어요. 어떤 CLI도 실행하기 전에 `코드 저장 위치를 먼저 선택해 주세요.`라고 묻고 `Axhub self-hosted`와 `내 GitHub 계정/조직` 두 옵션을 보여줘요. selfhosted를 고르면 이 스킬을 시작하지 않고 선택값을 그대로 `bootstrap`에 넘겨요. GitHub 소유를 고른 경우에만 아래 순서를 진행해요.
+명시적인 `Axhub self-hosted`와 `내 GitHub 계정/조직 소유 저장소`가 같은 요청에 있으면 두 요구는 동시에 충족할 수 없어요. 그래서 GitHub 명령보다 먼저 1.5단계에서 코드 저장 위치를 정해요 — 저장소 소유 언급만으로는 GitHub로 정해지지 않아요. selfhosted면 GitHub 명령 없이 선택값을 그대로 `bootstrap`에 넘기고, GitHub일 때만 2단계부터 진행해요.
 
 **질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요(예: `진행` 이면 시작하고 `취소` 면 여기서 멈춰요). 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요. 비파괴 선택은 숫자·서수·라벨·앞글자 어느 쪽으로 답해도 알아듣고, 파괴 게이트만 canonical 문구를 그대로 받아요.
 
@@ -27,7 +27,21 @@ codex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 승인 방�
 
 ### 1. CLI·로그인 확인
 
-`axhub --version` 으로 CLI 존재 확인(AP-17). `axhub github repo --help` 가 unknown command 면 v0.30.0 미만이에요 — `update` 스킬로 보내고 멈춰요(다른 명령으로 대체하지 않아요). 로그인은 `axhub auth status --json` — 미로그인(exit 4)이면 `axhub auth login` 안내 후 이어가요.
+`axhub --version` 으로 CLI 존재 확인(AP-17). `axhub github repo --help` 가 unknown command 면 v0.30.0 미만이에요 — `update` 스킬로 보내고 멈춰요(다른 명령으로 대체하지 않아요). 로그인은 `axhub auth status --json` — 미로그인(exit 4)이면 `axhub auth login` 안내 후 이어가요. 이어서 `axhub plugin-support preflight --json` 의 `capabilities.self_hosted_git.apps_git_backend` 가 `true` 여야 해요 — 누락·malformed/false 면 GitHub 질문 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
+
+### 1.5 코드 저장 위치 (GitHub 명령 전 필수)
+
+Tool 제목 `앱 설정 확인`. tenant 는 `axhub plugin-support tenant-resolve --field-expr '.tenant // empty'` 값을 쓰고, 여럿이면 `새 앱을 어느 작업공간에 만들까요?` 로 물어요.
+
+```bash
+axhub apps git-backend --tenant <tenant> --json
+```
+
+top-level `git_backend.backend` 는 추천값이에요. 실패·malformed 면 GitHub 로 추측하지 않고 멈춰요.
+
+- 발화·같은 대화에 `GitHub`/`깃허브` 나 `self-hosted`/`셀프호스팅` 이 있으면 그 값이 `SELECTED_GIT_BACKEND` 예요. `내 계정`·`org`·`회사 저장소` 는 provider 명시가 아니에요.
+- 명시가 없거나 둘 다면 native Question/명시 텍스트 승인 card 로 `코드 저장 위치를 먼저 선택해 주세요.` 라고 묻고 `내 GitHub 계정/조직`·`Axhub self-hosted` 를 보여줘요(추천값에 `(추천)`, 반대 선택 허용). provider 선택이 명시되지 않은 headless 는 GitHub 명령 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
+- `SELECTED_GIT_BACKEND=selfhosted` 면 2단계 이후를 실행하지 않고 `저장소는 axhub에서 준비할게요.` 한 줄 뒤 `bootstrap` 에 선택값·tenant·정한 템플릿·앱 이름을 넘겨요 — bootstrap 이 다시 묻지 않고 `--git-backend selfhosted` 로 만들어요. GitHub 계정·device flow·App 설치 대사는 0회예요. github 일 때만 2단계로 가요.
 
 ### 2. GitHub 계정 연동 확인
 
@@ -41,7 +55,7 @@ axhub github accounts list --json
 
 ### 3. 질문 한 번에: 템플릿·이름·소유자
 
-명시 텍스트 승인 하나로 물어요 — 템플릿(`nextjs-axhub`·`vite-react-axhub`·`astro-axhub`), 앱 이름(slug·subdomain 은 이름에서 kebab-case 파생, 다르게 원하면 조정), 저장소 소유자(2단계 목록에서). 테넌트가 여럿이면 함께 물어요. 여기서 정한 slug·subdomain·tenant 가 5단계 치환 값이자 8단계 import 가 만들 앱의 값이에요 — 중간에 바꾸면 치환된 코드와 앱이 어긋나요.
+명시 텍스트 승인 하나로 물어요 — 템플릿(`nextjs-axhub`·`vite-react-axhub`·`astro-axhub`), 앱 이름(slug·subdomain 은 이름에서 kebab-case 파생, 다르게 원하면 조정), 저장소 소유자(2단계 목록에서). 여기서 정한 slug·subdomain 과 1.5단계 tenant 가 5단계 치환 값이자 8단계 import 가 만들 앱의 값이에요 — 중간에 바꾸면 치환된 코드와 앱이 어긋나요.
 
 ### 4. 템플릿 내려받기 (인증 불필요)
 
@@ -119,11 +133,12 @@ git -C "<target>" remote add origin "https://github.com/<owner>/<slug>.git"
 
 멈추기를 고르면 저장소 URL·로컬 폴더 경로·재개 문장(`이 폴더 axhub에 올려`)만 남기고 끝내요. 이때 다음 코드 변경을 올릴 때 쓸 `git push -u origin main` 한 줄도 같이 알려줘요 (7.5 에서 등록한 origin 에 upstream 을 붙이는 첫 push 예요). headless 에서는 묻지 않고 같은 자리에서 멈춰요.
 
-이어가기를 고른 경우에만 `import` 스킬을 호출해 앱 생성·GitHub 연결·첫 배포를 맡겨요. 3단계에서 정한 slug·subdomain·tenant 를 그대로 넘겨요. 연결이 끝나면 push 자동 배포도 그대로 살아나요 — 이 흐름은 저장소가 있으므로 `axhub up` 을 쓰지 않아요.
+이어가기를 고른 경우에만 `import` 스킬을 호출해 앱 생성·GitHub 연결·첫 배포를 맡겨요. 3단계에서 정한 slug·subdomain·tenant 와 `--git-backend github` 를 그대로 넘겨요 — 작업공간 기본값이 self-hosted 여도 이 앱은 방금 만든 GitHub 저장소를 써요. 연결이 끝나면 push 자동 배포도 그대로 살아나요 — 이 흐름은 저장소가 있으므로 `axhub up` 을 쓰지 않아요.
 
 ## NEVER
 
-- NEVER `apps bootstrap` 을 부르지 않아요 — 그건 axhub 소유 생성 경로예요. 여긴 `github repo create` + `import` 만 써요.
+- NEVER 이 스킬에서 `apps bootstrap` 을 부르지 않아요 — axhub 소유 생성 경로라 selfhosted 는 `bootstrap` 스킬에 넘겨요. 여긴 `github repo create` + `import` 만 써요.
+- NEVER 1.5단계 판정 전에 `axhub github ...` 를 실행하지 않아요.
 - NEVER 치환(5단계)을 건너뛰지 않아요 — 배포는 성공하고 로그인만 조용히 죽어요.
 - NEVER 이미 코드가 있는 폴더에 템플릿을 덮지 않아요 — 기존 코드는 import 소관이에요.
 - NEVER 토큰·인증 URL 을 제외한 device flow 진행 상황을 사용자에게 승인 완료 보고로 요구하지 않아요 — `--resume-last` 재개 계약을 따라요.

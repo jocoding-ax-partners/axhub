@@ -25,7 +25,7 @@ model: sonnet
 
 사용자 발화에 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`, `Express`, `Fastify`, `Nest`, `FastAPI`, `Flask`, `Django`, `Rails`, `Go 서버`, `Dockerfile` 처럼 기존 소스가 있음을 뜻하는 단서와 axhub 배포 의도가 함께 있으면 bootstrap 을 시작하지 않아요. CLI guard, preflight, 템플릿 목록 확인을 실행하기 전에 즉시 import 경계로 양보하고, chat 본문에서 `/axhub:bootstrap` 또는 bootstrap 선택 이유를 설명하지 않아요.
 
-creation path는 `axhub apps bootstrap` saga 하나뿐이에요. GitHub 차단 시 로컬 소스 배포만 예외예요. 사용자 계정/조직 소유 저장소 요청은 scaffold로 양보해요. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. GitHub branch에서 install-link 를 보여줬으면 재안내는 생략하지만 0-install gate 는 항상 실행해요.
+creation path는 `axhub apps bootstrap` saga 하나뿐이에요. GitHub 차단 시 로컬 소스 배포만 예외예요. 사용자 GitHub 계정/조직 저장소 요청만 scaffold로 양보해요. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. GitHub branch에서 install-link 를 보여줬으면 재안내는 생략하지만 0-install gate 는 항상 실행해요.
 
 ## Reference Loading Policy
 

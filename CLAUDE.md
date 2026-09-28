@@ -111,7 +111,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 > **정책 기준 문서:** 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 개발·운영 규칙은 `docs/policy/dev-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 기준이에요. 이 파일의 요약과 다르면 정책 문서를 따라요. 어긋남은 `tests/policy-parity.test.ts` 가 잡아요.
 
-axhub plugin은 instruction-only diet 뒤 현재 **11 skill** (`onboarding` / `bootstrap` / `scaffold` / `plugins` / `deploy` / `up` / `import` / `development` / `diagnosis` / `clarity` / `update`)을 제공해요. `plugins`는 사용자 명시 결정으로 추가됐고 category=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 담당해요. 게시자 관리는 App Console, 승인은 Console Review로 연결하고 판정·실행은 ax-hub-cli(`axhub`)에 둬요.
+axhub plugin은 instruction-only diet 뒤 현재 **11 skill** (`onboarding` / `bootstrap` / `scaffold` / `plugins` / `deploy` / `up` / `import` / `development` / `diagnosis` / `clarity` / `update`)을 제공해요. `plugins`는 사용자 명시 결정으로 추가됐고 deploy_method=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 담당해요. 게시자 관리는 App Console, 승인은 Console Review로 연결하고 판정·실행은 ax-hub-cli(`axhub`)에 둬요.
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
 
@@ -207,7 +207,7 @@ Key routing rules:
 - 처음 셋업·CLI 설치·로그인·환경 점검 → `onboarding`
 - 빈 디렉토리 새 앱 생성·템플릿·bootstrap saga → `bootstrap`
 - 사용자 소유 GitHub 저장소에서 새 앱 시작 → `scaffold`
-- category=plugin App 게시·목록·정확한 version 다운로드 → `plugins` (Discovery/App Console/Console Review canonical surface)
+- deploy_method=plugin App 게시·목록·정확한 version 다운로드 → `plugins` (Discovery/App Console/Console Review canonical surface)
 - 비어 있지 않은 기존 로컬 앱의 첫 axhub 연결·첫 배포 가져오기 → `import`
 - 배포 실행·preview-confirm·verify 기반 성공 선언 → `deploy` (static 앱은 deploy_method auto-detect 로 독립 static lane: dry-run→`--execute`→`active_release_id` 성공 선언)
 - GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려 배포 → `up` (커밋 상태를 게이트로 쓰지 않고 `deploy-prep` preflight + `axhub up --dry-run` preview 사용, static 앱은 deploy 로 양보)
@@ -218,7 +218,7 @@ Key routing rules:
 
 **모든 트리거 전제 (AP-11):** 위 규칙은 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요. 맥락 없는 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘")는 실행·안내로 밀어붙이지 않고 한 번 묻거나 종료하며 다른 axhub 스킬로 넘기지 않아요. bootstrap 은 preview-confirm 승인이 backstop 이라 frontmatter 게이트로만 적용해요.
 
-**앱 git backend 선판정 (AP-23):** resume/existing은 public `axhub apps get <app> --json`, fresh bootstrap/onboarding은 read-only `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 판정 입력으로 써요. selfhosted는 device flow·GitHub App 설치 대사를 노출하지 않고, non-static deploy는 `axhub repo clone` 뒤 일반 `git push`의 webhook deployment를 기다려요. static은 기존 release lane, GitHub·`legacy_github`는 기존 gate/upload/create 경로를 유지하며 C1/Gitea API를 직접 호출하지 않아요.
+**앱 git backend 선판정 (AP-23):** resume/existing은 public `axhub apps get <app> --json`, fresh bootstrap/onboarding/scaffold는 read-only `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 판정 입력으로 써요. 기존 코드 import는 `plugin-support import`가 같은 입력으로 경로를 정해요(`selfhosted_repo_push`). selfhosted는 device flow·GitHub App 설치 대사를 노출하지 않고, non-static deploy는 `axhub repo clone` 뒤 일반 `git push`의 webhook deployment를 기다려요. static은 기존 release lane, GitHub·`legacy_github`는 기존 gate/upload/create 경로를 유지하며 C1/Gitea API를 직접 호출하지 않아요.
 
 **codex 질문 프로토콜·fail-closed (AP-12 codex 판):** codex 판은 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형 + 추천안 `(추천)` + 답→행동 매핑을 쓰고, 질문한 턴은 도구 호출 없이 끝내요. 네이티브 선택 카드(`[features] default_mode_request_user_input`)가 켜진 세션에서 **빈 답변은 미승인**이고 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 이 규칙은 세 채널이 겹쳐 소유해요 — always-on 합본 훅(kill switch `AXHUB_NO_QUESTION_PROTOCOL` / `~/.axhub/config/no-question-protocol`), AP-12 정책, 그리고 실행 7스킬 본문의 첫 8,000B. 훅은 미신뢰 세션에서 조용히 꺼지고 본문은 8,000B에서 절단되니 실패 모드가 서로 달라요.
 

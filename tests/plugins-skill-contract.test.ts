@@ -27,7 +27,7 @@ describe("app-centric plugins skill contract", () => {
   });
 
   test("uses ordinary App routes and excludes retired plugin settings/admin surfaces", () => {
-    expect(source).toContain("/discovery?category=plugin");
+    expect(source).toContain("/discovery?type=plugin");
     expect(source).toContain("/apps/<slug>/console");
     expect(source).toContain("/console/review");
     expect(source).not.toContain("/settings/integrations/plugin");

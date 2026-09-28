@@ -101,7 +101,7 @@ CLI preview/execute 결과는 정확히 하나의 envelope shape 로 와야 해�
 
 닫힌 enum:
 
-- `required_mutations`: `manifest_create`, `manifest_migrate`, `manifest_repair`, `app_create`, `app_select`, `github_repo_create`, `github_connect`, `first_deploy`, `static_release`
+- `required_mutations`: `manifest_create`, `manifest_migrate`, `manifest_repair`, `app_create`, `app_select`, `github_repo_create`, `github_connect`, `selfhosted_repo_push`, `first_deploy`, `static_release`
 - `typed_failure`: `auth`, `version`, `manifest`, `git`, `repo`, `app`, `static`, `deploy`, `rate_limit`, `transport`
 - `owner`: `plugin`, `cli`, `backend`
 - `phase`: `preflight`, `detect`, `preview`, `approval`, `manifest`, `app`, `repo`, `git`, `deploy`, `verify`, `static`, `finalize`
@@ -119,6 +119,7 @@ Static 성공은 `active_release_id`, `verified === true`, `public_url`, `error 
 
 - `axhub plugin-support preflight --json` 의 `capabilities.import.supported !== true`
 - `capabilities.import.schemas` 에 `import/v1` 이 없음
+- `capabilities.import.selfhosted !== true` — 이 CLI 는 self-hosted 작업공간에서도 GitHub 저장소를 만들려 해서 `axhub CLI를 최신 버전으로 업데이트해 주세요.` 라고 안내해요
 - envelope 의 `schema_version` 이 `import/v1` 이 아님
 - 필수 field 가 없거나 타입이 맞지 않음
 - 닫힌 enum 밖 값이 있음
@@ -188,7 +189,9 @@ axhub plugin-support tenant-resolve --json
 
 사용자나 현재 컨텍스트에서 app slug, GitHub owner/repo, tenant 가 이미 정해졌으면 preview 부터 그대로 넘겨요. `--slug` 는 axhub 앱 slug, `--name` 은 표시 이름, `--repo` 는 GitHub 저장소예요. repo owner 를 별도 flag 로 만들지 말고 `--repo "$OWNER/$REPO"` 형태로 넘겨요.
 
-import helper 에 넘길 수 있는 옵션은 `--mode`, `--headless`, `--approved`, `--commit-manifest`, `--verify-wait`, `--app`, `--name`, `--slug`, `--repo`, `--repo-private`, `--repo-public`, `--branch`, `--from-dir`, `--installation-id`, `--tenant`, `--deploy-method`, `--json` 뿐이에요. 이 목록에 없는 옵션은 추론하거나 `--help`로 복구하지 않아요. 특히 사용자가 비공개 저장소를 원하면 정확히 `--repo-private` 를 쓰고, 존재하지 않는 `--private` 를 절대 붙이지 않아요. 실수로 unknown option 이 나오면 임의 옵션을 뺀 재시도나 `plugin-support import --help` 호출로 이어가지 말고 멈춰요. preview 와 execute 는 검증된 동일 옵션 집합을 유지해요.
+import helper 에 넘길 수 있는 옵션은 `--mode`, `--headless`, `--approved`, `--commit-manifest`, `--verify-wait`, `--app`, `--name`, `--slug`, `--repo`, `--repo-private`, `--repo-public`, `--branch`, `--from-dir`, `--installation-id`, `--tenant`, `--deploy-method`, `--git-backend`, `--json` 뿐이에요. 이 목록에 없는 옵션은 추론하거나 `--help`로 복구하지 않아요. 특히 사용자가 비공개 저장소를 원하면 정확히 `--repo-private` 를 쓰고, 존재하지 않는 `--private` 를 절대 붙이지 않아요. 실수로 unknown option 이 나오면 임의 옵션을 뺀 재시도나 `plugin-support import --help` 호출로 이어가지 말고 멈춰요. preview 와 execute 는 검증된 동일 옵션 집합을 유지해요.
+
+**코드 저장 위치 (AP-23).** CLI 가 기존 앱은 그 앱의 저장소 방식, 새 앱은 작업공간 기본값으로 경로를 정하고 읽기 실패면 GitHub 로 추측하지 않고 멈춰요. 사용자가 GitHub 또는 Axhub self-hosted 를 명시했을 때만 preview·execute 에 같은 `--git-backend github|selfhosted` 를 붙여요. `required_mutations` 에 `selfhosted_repo_push` 가 있으면 self-hosted 경로예요 — `--repo`·GitHub owner·App 설치·device flow 대사를 0회로 유지하고, 승인 카드에 요약의 `코드 저장 위치:` 줄을 그대로 보여줘요. 첫 배포는 push 로 자동 시작되고 성공 증거는 같은 `deployment` evidence 예요. origin·`--repo` 충돌은 error 의 `recovery_action` 을 그대로 안내해요. 아래 owner/repo 규칙은 GitHub 경로에만 적용돼요.
 
 GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 반드시 `$APP_SLUG` 와 정확히 같게 둬요. 날짜·숫자·QA suffix 를 추론으로 자르거나 정리하지 않아요. 예를 들어 app slug 가 `uqa-exp-public-11021-0708` 이고 owner 가 `realitsyourman` 이면 `--repo "realitsyourman/uqa-exp-public-11021-0708"` 이어야 하며 `--repo "realitsyourman/uqa-exp-public-11021"` 처럼 줄인 명령은 실행하지 말고 고쳐서 다시 호출해요.
 

@@ -273,3 +273,56 @@ describe("spec 236 self-hosted git skill contracts", () => {
     }
   });
 });
+
+describe("spec 236 2차: scaffold and import follow the code storage location", () => {
+  test("scaffold decides the storage location before any GitHub command", () => {
+    for (const root of SKILL_ROOTS) {
+      const scaffold = readSkill(root, "scaffold");
+      const gate = sliceSection(scaffold, "### 1.5 코드 저장 위치", "### 2. GitHub 계정 연동 확인");
+
+      expect(scaffold.indexOf("### 1.5 코드 저장 위치"), root).toBeLessThan(
+        scaffold.indexOf("axhub github accounts list --json"),
+      );
+      expect(scaffold, root).toContain("capabilities.self_hosted_git.apps_git_backend");
+      expect(gate, root).toContain("axhub apps git-backend --tenant <tenant> --json");
+      expect(gate, root).toContain("GitHub 로 추측하지 않고 멈춰요");
+      expect(gate, root).toContain("`코드 저장 위치를 먼저 선택해 주세요.`");
+      expect(gate, root).toContain("`내 계정`·`org`·`회사 저장소` 는 provider 명시가 아니에요");
+      expect(gate, root).toContain("provider 선택이 명시되지 않은 headless");
+      expect(gate, root).toContain("`SELECTED_GIT_BACKEND=selfhosted`");
+      expect(gate, root).toContain("`--git-backend selfhosted`");
+      expect(gate, root).toContain("GitHub 계정·device flow·App 설치 대사는 0회예요");
+      expect(gate, root).not.toContain("axhub github");
+      expect(scaffold, root).toContain("NEVER 1.5단계 판정 전에 `axhub github ...` 를 실행하지 않아요");
+    }
+  });
+
+  test("scaffold hands a GitHub-backed app to import even in a self-hosted tenant", () => {
+    for (const root of SKILL_ROOTS) {
+      const scaffold = readSkill(root, "scaffold");
+      const handoff = sliceSection(scaffold, "### 8. 여기서 한 번 멈춰요", "## NEVER");
+      expect(handoff, root).toContain("`--git-backend github`");
+    }
+  });
+
+  test("bootstrap does not bounce a self-hosted handoff back to scaffold", () => {
+    for (const root of SKILL_ROOTS) {
+      const bootstrap = readSkill(root, "bootstrap");
+      expect(bootstrap, root).toContain("사용자 GitHub 계정/조직 저장소 요청만 scaffold로 양보해요");
+      expect(bootstrap, root).not.toContain("사용자 계정/조직 소유 저장소 요청은 scaffold로 양보해요");
+    }
+  });
+
+  test("import carries the self-hosted lane contract and never guesses GitHub", () => {
+    for (const root of SKILL_ROOTS) {
+      const importSkill = readSkill(root, "import");
+      expect(importSkill, root).toContain("`selfhosted_repo_push`");
+      expect(importSkill, root).toContain("`--git-backend github|selfhosted`");
+      expect(importSkill, root).toContain("`--git-backend`, `--json` 뿐이에요");
+      expect(importSkill, root).toContain("`capabilities.import.selfhosted !== true`");
+      expect(importSkill, root).toContain("GitHub 로 추측하지 않고 멈춰요");
+      expect(importSkill, root).toContain("device flow 대사를 0회로 유지");
+      expect(importSkill, root).toContain("`코드 저장 위치:` 줄을 그대로 보여줘요");
+    }
+  });
+});
