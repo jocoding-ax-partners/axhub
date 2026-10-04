@@ -12,7 +12,7 @@ axhub apps templates list --tenant test --json
 
 The command above is a Desktop-visible shape: replace `test` with the selected tenant literal. Do not use `export`, `$AXHUB_TENANT`, command substitution, or multi-command shell glue in Codex-visible tool calls.
 
-The response envelope contains `data.items[]` with fields like `id`, `folder_name`, `name`, and `resource_tier`. `schema_version` and raw IDs are internal primitives; do not dump them to chat. The selected `--template` may be a returned `id` or a built-in alias (`react`, `nextjs`, `astro`) that corresponds to a returned item.
+The response envelope contains `data.items[]` with fields like `id`, `folder_name`, `name`, and `resource_tier`. `schema_version` and raw IDs are internal primitives; do not dump them to chat. The selected `--template` may be a returned `id` or a built-in alias (`nextjs`, `chatbot`) that corresponds to a returned item. Inactive templates are never returned, so an alias for a retired template (`react`, `astro`) does not resolve.
 
 Exit routing:
 
@@ -27,8 +27,9 @@ This is not a second registry. Attach descriptions only to items returned by bac
 | alias / folder | Use when |
 |---|---|
 | `nextjs` / `nextjs-axhub` | 쇼핑몰, 예약, 결제, 로그인, 관리자 화면처럼 화면과 기능이 함께 있는 웹서비스 |
-| `astro` / `astro-axhub` | 회사 소개, 랜딩 페이지, 블로그, 문서처럼 글과 이미지 중심이고 자주 바뀌지 않는 사이트 |
-| `react` / `react-axhub` | 로그인 뒤 쓰는 설정 화면, 입력 폼, 관리 화면처럼 버튼을 눌러 내용이 자주 바뀌는 화면 |
+| `chatbot` / `chatbot-axhub` | 사내 도우미, 상담, 규정·FAQ 질의응답처럼 AI 와 대화하는 화면. Codex API 키(`ANTHROPIC_API_KEY`)를 사용자가 직접 넣어야 대화가 돼요 — 키 없이도 배포는 되고 화면이 설정 안내를 보여줘요 |
+
+`chatbot-axhub` 로 만들었으면 11단계 결과 끝에 한 줄을 더해요: 대화하려면 키를 비밀값으로 넣고 다시 배포해야 한다는 것 — `printf %s "$ANTHROPIC_API_KEY" | axhub env set ANTHROPIC_API_KEY --app <slug> --secret --from-stdin --stage runtime` 다음 `axhub deploy create --app <slug> --execute`. 회사 AXRouter 를 쓰면 `ax-…` 키와 `ANTHROPIC_BASE_URL=https://axrouter.ai`(평문 `--plain`)를 넣어요. 키 값을 채팅에 붙여 달라고 하지 않아요.
 
 Unknown backend templates are not hidden. Show backend `name` and `folder_name`, then give neutral guidance like "이름을 보고 고르면 돼요. 잘 모르겠으면 먼저 Next.js 추천을 봐요."
 
@@ -42,13 +43,12 @@ Example visible chat shape, only when those templates exist in backend output:
 어떤 템플릿으로 시작할까요?
 
 1. Next.js 추천 - 쇼핑몰·예약·결제·로그인·관리자 화면
-2. Vite + React - 로그인 뒤 쓰는 설정·입력·관리 화면
-3. Astro - 회사 소개·랜딩 페이지·블로그·문서
+2. AI 챗봇 - 사내 도우미·상담·규정 질의응답 (Codex API 키 필요)
 
 번호나 템플릿 이름으로 답해 주세요.
 ```
 
-If the user's utterance already contains an exact alias/folder/name, use it without asking. Generic category or feature words such as "웹앱", "쇼핑몰", "사이트", "앱", "서비스", "예약", "주문", "preorder", "booking", "shop", "store", "dashboard", or "admin" are not exact template choices; show the picker unless the user named `Next.js`, `React`, `Astro`, or an exact backend template. Those words can make Next.js the recommended first option, but they never finalize `--template`. Recommendation wording such as "추천해줘", "알아서", "best option", or "recommend the best option" is not template approval; it only means place the best recommendation first, ask the picker, and wait for a reply. After the picker is visible, a reply like "추천대로" or "1번" can confirm the first recommendation. In subprocess/no TTY, do not auto-pick a template; safe default is `abort`.
+If the user's utterance already contains an exact alias/folder/name, use it without asking. Generic category or feature words such as "웹앱", "쇼핑몰", "사이트", "앱", "서비스", "예약", "주문", "preorder", "booking", "shop", "store", "dashboard", or "admin" are not exact template choices; show the picker unless the user named `Next.js`, `챗봇`/`chatbot`, or an exact backend template. Those words can make Next.js the recommended first option, but they never finalize `--template`. Recommendation wording such as "추천해줘", "알아서", "best option", or "recommend the best option" is not template approval; it only means place the best recommendation first, ask the picker, and wait for a reply. After the picker is visible, a reply like "추천대로" or "1번" can confirm the first recommendation. In subprocess/no TTY, do not auto-pick a template; safe default is `abort`.
 
 ## App Name
 

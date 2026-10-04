@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.30.5](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.4...plugin-v1.30.5) (2026-10-04)
+
+앱 템플릿이 Next.js 하나와 AI 챗봇으로 바뀐 걸 반영했어요. 새 앱을 만들 때 템플릿 고르기 카드에 Next.js 와 AI 챗봇이 나오고, 챗봇 앱을 만들면 마지막에 Anthropic 키(또는 회사 AXRouter 키)를 비밀값으로 넣고 다시 배포하는 법을 알려줘요. 기존 앱에 기능을 더할 때는 앱 폴더의 `AGENTS.md`·`AXHUB.md` 를 먼저 읽어서, 파일 저장·알림·웹훅처럼 axhub 가 이미 주는 기능은 설정으로 켜요. `--template chatbot` 별칭은 axhub CLI 0.46.13 이상에서 돼요.
+
+
+### Added
+
+* **template:** 템플릿을 Next.js 하나로 모으고 AI 챗봇 템플릿·axhub 활용 안내를 더한다 ([#739](https://github.com/jocoding-ax-partners/axhub-mono/issues/739)) ([dc10c93](https://github.com/jocoding-ax-partners/axhub-mono/commit/dc10c938b1f724bec3c271079b331bafc270266c))
+
 ## [1.30.4](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.3...plugin-v1.30.4) (2026-09-28)
 
 scaffold 로 새 앱을 시작할 때 GitHub 명령보다 먼저 코드 저장 위치를 정해요. 작업공간 추천값을 읽고, GitHub 이나 self-hosted 를 직접 말하지 않았으면 둘 중에서 물어봐요. self-hosted 를 고르면 GitHub 절차 없이 bootstrap 으로 넘어가요. 기존 코드 import 도 self-hosted 작업공간에서는 GitHub 저장소 이름을 요구하지 않고 axhub 저장소로 올려요. 이 경로는 axhub CLI 0.46.12 이상이 필요하고, 그보다 낮으면 import 가 CLI 업데이트를 먼저 안내해요.

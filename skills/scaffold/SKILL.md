@@ -56,7 +56,7 @@ axhub github accounts list --json
 
 ### 3. 질문 한 번에: 템플릿·이름·소유자
 
-AskUserQuestion 하나로 물어요 — 템플릿(`nextjs-axhub`·`vite-react-axhub`·`astro-axhub`), 앱 이름(slug·subdomain 은 이름에서 kebab-case 파생, 다르게 원하면 조정), 저장소 소유자(2단계 목록에서). 여기서 정한 slug·subdomain 과 1.5단계 tenant 가 5단계 치환 값이자 8단계 import 가 만들 앱의 값이에요 — 중간에 바꾸면 치환된 코드와 앱이 어긋나요.
+AskUserQuestion 하나로 물어요 — 템플릿(`nextjs-axhub`·`chatbot-axhub`), 앱 이름(slug·subdomain 은 이름에서 kebab-case 파생, 다르게 원하면 조정), 저장소 소유자(2단계 목록에서). 여기서 정한 slug·subdomain 과 1.5단계 tenant 가 5단계 치환 값이자 8단계 import 가 만들 앱의 값이에요 — 중간에 바꾸면 치환된 코드와 앱이 어긋나요.
 
 ### 4. 템플릿 내려받기 (인증 불필요)
 

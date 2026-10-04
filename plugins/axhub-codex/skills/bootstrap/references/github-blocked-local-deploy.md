@@ -36,7 +36,7 @@ GitHub backend의 bootstrap은 `--github-owner` 저장소 흐름을 유지해요
 **2. 코드 확보.** 폴더에 이미 배포할 코드가 있으면(루트에 `Dockerfile` 또는
 compose 파일) 그대로 써요. 없으면 공개 템플릿 저장소에서 받아요 — public 이라
 GitHub 인증·권한이 필요 없어요. 템플릿은 하위 폴더로 있고 이름이 4단계에서 고른
-template id 와 같아요 (`nextjs-axhub`, `vite-react-axhub`, `astro-axhub`).
+template id 와 같아요 (`nextjs-axhub`, `chatbot-axhub`).
 
 ```bash
 git clone --depth 1 --branch main https://github.com/jocoding-ax-partners/axhub-template.git <target>/.axhub-template
