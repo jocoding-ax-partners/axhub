@@ -63,7 +63,7 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "AI 활용 기록", "동의 없이 켜지 않아요"
 
 ## AP-11 비-axhub 맥락 라우팅 가드
-- 규칙: axhub 를 명시하지 않은 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘" 같은 generic 동사)는 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결 manifest·직전 axhub 작업)이 있을 때만 스킬이 진행해요. 맥락이 없으면 실행·안내로 밀어붙이지 않고 axhub 사용 의사를 한 번 묻거나 종료해요 — 다른 axhub 스킬로 넘기지도 않아요. 이미 preview-confirm 승인이 backstop 인 bootstrap 은 frontmatter 게이트로만 적용하고 본문 질문은 생략해요. headless 에서는 묻지 않고 멈춰요.
+- 규칙: axhub 를 명시하지 않은 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘" 같은 generic 동사)는 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결 manifest·직전 axhub 작업)이 있을 때만 스킬이 진행해요. 맥락이 없으면 실행·안내로 밀어붙이지 않고 axhub 사용 의사를 한 번 묻거나 종료해요 — 다른 axhub 스킬로 넘기지도 않아요. 배포할 곳을 말하지 않은 배포 발화만은 deploy 가 맥락 없이도 받아서, 이 "한 번 묻기"를 배포할 곳 카드로 해요 (AP-27). 이미 preview-confirm 승인이 backstop 인 bootstrap 은 frontmatter 게이트로만 적용하고 본문 질문은 생략해요. headless 에서는 묻지 않고 멈춰요.
 - 적용: skills/onboarding/SKILL.md, skills/bootstrap/SKILL.md, skills/plugins/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/clarity/SKILL.md, skills/up/SKILL.md, skills/update/SKILL.md
 - invariant: "axhub 맥락"
 
@@ -164,3 +164,17 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "묻지 않", "no-auto-update", "AXHUB_NO_AUTO_UPDATE"
 - 적용(codex): plugins/axhub-codex/hooks/session-auto-update.sh, plugins/axhub-codex/hooks/session-restart-confirm.sh, plugins/axhub-codex/POLICY.md
 - invariant(codex): "묻지 않", "no-auto-update", "AXHUB_NO_AUTO_UPDATE"
+
+## AP-27 배포할 곳 추천 카드 (다른 곳으로 알아서 배포 금지)
+- 규칙: 배포할 곳을 말하지 않은 배포 요청("배포해줘"·"올려줘")은 axhub 맥락이 없어도 deploy 스킬이 받아요. 폴더가 axhub 에 연결돼 있으면 기존 preview 카드가 그 확인을 겸하고, 연결돼 있지 않으면 선택 카드로 `어디에 배포할까요?` 를 한 번 물어요 — `axhub (추천)`·`다른 곳`. 사용자가 고르거나 배포할 곳을 직접 말하기 전에는 GitHub Pages·Vercel 같은 다른 배포를 알아서 시작하지 않아요. 교육 현장에서 배포 요청이 묻지 않고 GitHub Pages 로 나가 수강생마다 결과가 갈리던 문제를 막아요. 사용자가 다른 배포 대상을 직접 말하면 deploy 는 진입하지 않고, headless 에서는 묻지 않고 멈춰요.
+- 적용: skills/deploy/SKILL.md
+- invariant: "어디에 배포할까요?", "알아서 시작하지 않아요"
+- 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md
+- invariant(codex): "어디에 배포할까요?", "알아서 시작하지 않아요"
+
+## AP-28 배포 방식 추천 카드 (정적 자동 판정 확인)
+- 규칙: import 가 새 앱(`app_create`)의 배포 방식을 `static` 으로 자동 판정했고 사용자가 방식을 말하지 않았으면, 통합 승인 전에 선택 카드로 `어떤 방식으로 배포할까요?` 를 한 번 물어요 — `정적 사이트 (추천)`(axhub.page 주소)·`서버 앱`(axhub.dev 주소)·`취소`. 서버 앱은 CLI 가 실행 명령(`manifest_hints.start_cmd`)을 찾았을 때만 `--deploy-method docker` 로 preview 를 다시 받아 진행하고, 못 찾았으면 실행할 서버 코드가 없다고 알린 뒤 정적 사이트·취소로 다시 물어요. index.html 만 있는 폴더가 묻지 않고 axhub.page 정적 사이트로 배포돼 교육 흐름과 어긋나던 문제를 막아요. 판정은 CLI 몫이라 스킬이 재구현하지 않고, headless 에서는 묻지 않아요.
+- 적용: skills/import/SKILL.md
+- invariant: "어떤 방식으로 배포할까요?", "manifest_hints.start_cmd"
+- 적용(codex): plugins/axhub-codex/skills/import/SKILL.md
+- invariant(codex): "어떤 방식으로 배포할까요?", "manifest_hints.start_cmd"

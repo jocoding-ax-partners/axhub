@@ -82,6 +82,18 @@ describe("Claude Desktop live QA regressions", () => {
     expect(skill).toContain("axhub deploy verify <deployment-id> --app <app-id>");
   });
 
+  test("deploy without a named target asks where before any other host", () => {
+    const skill = read("skills/deploy/SKILL.md");
+    const frontmatter = skill.slice(0, skill.indexOf("---", 4));
+
+    expect(frontmatter).toContain("배포할 곳을 말하지 않은 배포 요청은 axhub 맥락이 없어도 이 스킬로 시작해");
+    expect(frontmatter).toContain("GitHub Pages 등으로 알아서 배포하지 않아요");
+    expect(frontmatter).not.toContain("axhub 맥락 없거나 다른 배포 대상이면 쓰지 않아요");
+    expect(skill).toContain("선택 카드로 `어디에 배포할까요?` 를 한 번만 물어요(`axhub (추천)`·`다른 곳`)");
+    expect(skill).toContain("GitHub Pages·Vercel 같은 다른 배포를 알아서 시작하지 않아요");
+    expect(skill).toContain("For `ignore`, interactive mode asks the same `어디에 배포할까요?` card");
+  });
+
   test("import ignore checks never append exit-code shell syntax", () => {
     const skill = read("skills/import/SKILL.md");
 

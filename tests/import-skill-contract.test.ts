@@ -137,6 +137,22 @@ describe("import skill contract", () => {
     expect(skill).not.toContain("커밋·push 하고 진행 (첫 배포부터 반영)");
   });
 
+  test("static auto-detection asks the deploy method before the single approval", () => {
+    const skill = readFileSync(join(REPO_ROOT, "skills", "import", "SKILL.md"), "utf8");
+    const methodCard = skill.indexOf("5-1. 배포 방식 카드");
+    const approval = skill.indexOf("6. 대화형 통합 승인 1회");
+    expect(methodCard).toBeGreaterThan(-1);
+    expect(methodCard).toBeLessThan(approval);
+
+    const section = skill.slice(methodCard, approval);
+    expect(section).toContain("`deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create`");
+    expect(section).toContain("`어떤 방식으로 배포할까요?`");
+    expect(section).toContain("`정적 사이트 (추천)`");
+    expect(section).toContain("`서버 앱`");
+    expect(section).toContain("`detected_state.manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker`");
+    expect(section).toContain("headless 는 묻지 않아요");
+  });
+
   test("local-only GitHub import includes commit choice in the single approval", () => {
     const skill = readImportSkill();
     expect(skill).toContain("local_only 앱은 아직 git remote 가 없을 수 있지만");

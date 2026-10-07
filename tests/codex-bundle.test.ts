@@ -349,9 +349,9 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       "--execute",
       "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
     ],
-    deploy: ["axhub apps get <app> --json", "git_backend.backend=selfhosted", "axhub repo clone <app>", "axhub로 지금 배포를 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
+    deploy: ["axhub apps get <app> --json", "git_backend.backend=selfhosted", "axhub repo clone <app>", "axhub로 지금 배포를 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "어디에 배포할까요?"],
     onboarding: ["axhub apps get <app> --json", "axhub apps git-backend --tenant <tenant> --json", "git_backend.backend=selfhosted", "첫 앱의 코드 저장 위치를 선택해 주세요.", "SELECTED_GIT_BACKEND", "provider 선택이 명시되지 않았으면"],
-    import: ["미리보기대로 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"],
+    import: ["미리보기대로 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "어떤 방식으로 배포할까요?"],
     scaffold: [
       "명시 텍스트 승인 1회",
       "미리 넣어 둔 문구",

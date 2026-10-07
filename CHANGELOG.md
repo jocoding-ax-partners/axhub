@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.30.6](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.5...plugin-v1.30.6) (2026-10-07)
+
+배포할 곳을 말하지 않고 "배포해줘" 라고만 하면, axhub 에 연결 안 된 폴더에서도 GitHub Pages 같은 다른 곳으로 알아서 배포하지 않고 `어디에 배포할까요?` 카드(axhub 추천)부터 보여줘요. 기존 앱을 가져올 때 HTML 만 있는 폴더처럼 정적 사이트로 판정되면 바로 axhub.page 로 올리지 않고 `어떤 방식으로 배포할까요?` 카드로 정적 사이트와 서버 앱 중에서 골라요. 서버 앱은 실행할 서버 코드가 있을 때만 고를 수 있어요.
+
+
+### Fixed
+
+* **plugin:** 배포할 곳·배포 방식을 묻지 않고 Pages 로 배포하던 흐름에 추천 카드를 띄운다 ([#843](https://github.com/jocoding-ax-partners/axhub-mono/issues/843)) ([109705c](https://github.com/jocoding-ax-partners/axhub-mono/commit/109705c31de56fba775cce001a9a62924a43aa65))
+
 ## [1.30.5](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.4...plugin-v1.30.5) (2026-10-04)
 
 앱 템플릿이 Next.js 하나와 AI 챗봇으로 바뀐 걸 반영했어요. 새 앱을 만들 때 템플릿 고르기 카드에 Next.js 와 AI 챗봇이 나오고, 챗봇 앱을 만들면 마지막에 Anthropic 키(또는 회사 AXRouter 키)를 비밀값으로 넣고 다시 배포하는 법을 알려줘요. 기존 앱에 기능을 더할 때는 앱 폴더의 `AGENTS.md`·`AXHUB.md` 를 먼저 읽어서, 파일 저장·알림·웹훅처럼 axhub 가 이미 주는 기능은 설정으로 켜요. `--template chatbot` 별칭은 axhub CLI 0.46.13 이상에서 돼요.
