@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: '연결된 앱의 현재 코드를 실제 AxHub에 배포하고 성공 여부까지 확인할 때 반드시 사용해요. 트리거: "배포해", "실제 AxHub에 배포", "성공 여부까지 확인", "같은 코드로 강제 재배포", "deploy". apps get의 git_backend로 selfhosted push와 기존 GitHub/upload 경로를 먼저 나누고 preview-confirm·exact deployment verify를 맡으며 apps status/curl로 대신하지 않아요. GitHub 없이 현재 폴더 소스를 그대로 올리는 요청은 up 으로 양보해요. 첫 연결은 import, 빈 폴더는 bootstrap, 실패 원인 진단은 diagnosis예요. axhub 맥락 없거나 다른 배포 대상이면 쓰지 않아요.'
+description: '연결된 앱의 현재 코드를 실제 AxHub에 배포하고 성공 여부까지 확인할 때 반드시 사용해요. 트리거: "배포해", "실제 AxHub에 배포", "성공 여부까지 확인", "같은 코드로 강제 재배포", "deploy". apps get의 git_backend로 selfhosted push와 기존 GitHub/upload 경로를 먼저 나누고 preview-confirm·exact deployment verify를 맡으며 apps status/curl로 대신하지 않아요. GitHub 없이 현재 폴더 소스를 그대로 올리는 요청은 up 으로 양보해요. 첫 연결은 import, 빈 폴더는 bootstrap, 실패 원인 진단은 diagnosis예요. 배포할 곳을 말하지 않은 배포 요청은 axhub 맥락이 없어도 이 스킬로 시작해 배포할 곳(axhub 추천)부터 물어요 — GitHub Pages 등으로 알아서 배포하지 않아요. 다른 배포 대상을 직접 말했을 때만 쓰지 않아요.'
 examples:
   - utterance: "paydrop 배포해"
     intent: "deploy current branch to axhub live"
@@ -38,7 +38,7 @@ axhub plugin-support deploy-preview-summary --user-utterance "<latest user sente
 
 이 첫 명령 전에는 설치·플러그인·앱·git·curl probe를 하지 않아요. 명시적 최신성 요청만 update 뒤 이 스킬로 돌아와요.
 
-정상 preview 면 axhub 프로젝트 확정이에요. Interactive 는 별도 진입 질문 없이 **preview card 하나가 axhub 진입 확인을 겸해요** (AP-12 통합 게이트): Korean stdout 을 preview card 로 보여주고 `axhub로 지금 배포를 진행할까요?` 질문과 기존 `진행`/`취소` 승인을 한 번만 받아요. `취소` 면 종료. (headless 는 AUQ 생략, dry-run) 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here. axhub 맥락(사용자의 axhub 언급·직전 axhub 작업)이 있으면 기존대로 안내해요: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`. axhub 맥락이 없으면 import/bootstrap 으로 넘기지 말고 "이 폴더는 axhub에 연결돼 있지 않아요. axhub로 배포하려는 거예요?" 를 한 번만 묻고, 아니라는 답이면 이 스킬을 종료해요. headless 에서는 묻지 않고 조용히 멈춰요.
+정상 preview 면 axhub 프로젝트 확정이에요. Interactive 는 별도 진입 질문 없이 **preview card 하나가 axhub 진입 확인을 겸해요** (AP-12 통합 게이트): Korean stdout 을 preview card 로 보여주고 `axhub로 지금 배포를 진행할까요?` 질문과 기존 `진행`/`취소` 승인을 한 번만 받아요. `취소` 면 종료. (headless 는 AUQ 생략, dry-run) 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here. axhub 맥락(사용자의 axhub 언급·직전 axhub 작업)이 있으면 기존대로 안내해요: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`. axhub 맥락이 없으면 바로 넘기지 말고 선택 카드로 `어디에 배포할까요?` 를 한 번만 물어요(`axhub (추천)`·`다른 곳`). `axhub` 면 위처럼 이어가고, `다른 곳` 이면 어디인지 묻고 끝내요. 사용자가 고르거나 배포할 곳을 말하기 전에는 GitHub Pages·Vercel 같은 다른 배포를 알아서 시작하지 않아요. headless 에서는 묻지 않고 조용히 멈춰요.
 
 For the initial Desktop preview, stop reading after this section unless approval is received. After approval, continue with the canonical workflow below and load `references/workflow-details.md` for branch detail.
 
@@ -111,7 +111,7 @@ If the user explicitly names another deployment target, stop axhub deploy before
 axhub plugin-support route-decision --user-utterance "<latest user sentence>" --field-expr '.decision // "axhub"'
 ```
 
-Only `axhub` continues to `deploy-prep`. Session carry-over evidence is route gate 통과 후에만 적용해서 다른 타깃으로 배포 의도를 훔치지 않아요. For `ignore`, interactive mode asks whether to deploy to axhub; headless stops safely.
+Only `axhub` continues to `deploy-prep`. Session carry-over evidence is route gate 통과 후에만 적용해서 다른 타깃으로 배포 의도를 훔치지 않아요. For `ignore`, interactive mode asks the same `어디에 배포할까요?` card; headless stops safely.
 
 Resolve live deployment inputs with:
 

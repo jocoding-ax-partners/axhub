@@ -27,7 +27,13 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 // 계약(`--git-backend`·`selfhosted_repo_push`·capability gate). GitHub 명령보다
 // 먼저 읽혀야 하는 실행 경로 지시라 본문에 두며, 실측 251,448B 에 약 500B 여유.
 // per-skill 35,000B 게이트는 그대로 유지한다.
-export const DEFAULT_MAX_TOTAL_BYTES = 252_000;
+// 252_000 → 254_000: 교육 현장에서 배포 요청이 묻지 않고 GitHub Pages 나 axhub
+// 정적 사이트(axhub.page)로 가던 문제 — deploy 의 배포할 곳 카드(`어디에 배포할까요?`)
+// 와 import 의 배포 방식 카드(`어떤 방식으로 배포할까요?`). 배포·가져오기 실행 전에
+// 읽혀야 하는 지시라 본문에 두며, 실측 253,000B(codex 번들 253,361B — import 승인
+// 게이트 요약에 같은 카드 1줄)에 약 600B 이상 여유. per-skill 35,000B 게이트는 그대로
+// 유지한다.
+export const DEFAULT_MAX_TOTAL_BYTES = 254_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
 export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {

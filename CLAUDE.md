@@ -119,15 +119,15 @@ Key routing rules:
 - 빈 디렉토리 새 앱 생성·템플릿·bootstrap saga → `bootstrap`
 - 사용자 소유 GitHub 저장소에서 새 앱 시작 → `scaffold`
 - deploy_method=plugin App 게시·목록·정확한 version 다운로드 → `plugins` (Discovery/App Console/Console Review canonical surface)
-- 비어 있지 않은 기존 로컬 앱의 첫 axhub 연결·첫 배포 가져오기 → `import`
-- 배포 실행·preview-confirm·verify 기반 성공 선언 → `deploy` (static 앱은 deploy_method auto-detect 로 독립 static lane: dry-run→`--execute`→`active_release_id` 성공 선언)
+- 비어 있지 않은 기존 로컬 앱의 첫 axhub 연결·첫 배포 가져오기 → `import` (새 앱이 static 으로 자동 판정되면 통합 승인 전에 `어떤 방식으로 배포할까요?` 카드로 정적 사이트·서버 앱을 골라요 — AP-28)
+- 배포 실행·preview-confirm·verify 기반 성공 선언 → `deploy` (static 앱은 deploy_method auto-detect 로 독립 static lane: dry-run→`--execute`→`active_release_id` 성공 선언). 배포할 곳을 말하지 않은 배포 요청은 axhub 맥락이 없어도 deploy 가 받아, 연결 안 된 폴더면 `어디에 배포할까요?` 카드(axhub 추천)부터 보여주고 GitHub Pages 같은 다른 곳으로 알아서 배포하지 않아요 — AP-27
 - GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려 배포 → `up` (커밋 상태를 게이트로 쓰지 않고 `deploy-prep` preflight + `axhub up --dry-run` preview 사용, static 앱은 deploy 로 양보)
 - 기존 앱에 실데이터 기반 기능(페이지·화면·대시보드·조회 엔드포인트·CRUD 화면) 코드 생성 → `development` (AP-5 read 기본, write 게이트 — 조회 도구는 읽기 전용이고 커넥터 자체는 쓰기 액션을 가질 수 있어요)
 - 배포 실패 원인 진단·해결 후보 요약 → `diagnosis` (읽기 전용, 재배포·롤백 직접 실행 금지)
 - axhub CLI·플러그인을 지금 최신 버전으로 업데이트(수동 on-demand) → `update`
 - axhub CLI 운영 명령(테이블/컬럼 생성·환경변수·로그·connector 연결·권한 확인/부여(대상별 read|write)·데이터 조회·롤백·상태)·모호한 axhub 발화 → `clarity` (axhub 명령 실행만, 버전 업데이트는 update·앱 코드 생성은 development·기존 앱 가져오기는 import·배포 실패 원인 진단은 diagnosis 양보)
 
-**모든 트리거 전제 (AP-11):** 위 규칙은 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요. 맥락 없는 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘")는 실행·안내로 밀어붙이지 않고 한 번 묻거나 종료하며 다른 axhub 스킬로 넘기지 않아요. bootstrap 은 preview-confirm 승인이 backstop 이라 frontmatter 게이트로만 적용해요.
+**모든 트리거 전제 (AP-11):** 위 규칙은 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요. 맥락 없는 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘")는 실행·안내로 밀어붙이지 않고 한 번 묻거나 종료하며 다른 axhub 스킬로 넘기지 않아요. 배포할 곳을 말하지 않은 배포 발화만은 deploy 가 받아 그 "한 번 묻기"를 배포할 곳 카드로 해요(AP-27). bootstrap 은 preview-confirm 승인이 backstop 이라 frontmatter 게이트로만 적용해요.
 
 **앱 git backend 선판정 (AP-23):** resume/existing은 public `axhub apps get <app> --json`, fresh bootstrap/onboarding/scaffold는 read-only `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 판정 입력으로 써요. 기존 코드 import는 `plugin-support import`가 같은 입력으로 경로를 정해요(`selfhosted_repo_push`). selfhosted는 device flow·GitHub App 설치 대사를 노출하지 않고, non-static deploy는 `axhub repo clone` 뒤 일반 `git push`의 webhook deployment를 기다려요. static은 기존 release lane, GitHub·`legacy_github`는 기존 gate/upload/create 경로를 유지하며 C1/Gitea API를 직접 호출하지 않아요.
 

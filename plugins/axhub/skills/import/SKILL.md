@@ -235,9 +235,13 @@ axhub --json plugin-support import --mode preview --headless
 새 앱 설정 파일이 필요하면, axhub.yaml 을 프로젝트 파일 근거로 자세히 작성할 예정이라고 한 줄로 같이 알려요.
 기존 axhub.yaml 복구가 필요하면, 문법이 깨져 있어서 CLI 가 가져오기 중 백업 파일을 남기고 안전한 최소 설정으로 복구한다고 한 줄로 같이 알려요. 이 경우 plugin 이 직접 덮어쓰지 않아요.
 
+5-1. 배포 방식 카드
+
+preview `deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create` 가 있는데 사용자가 배포 방식을 말하지 않았으면, 6 전에 선택 카드로 `어떤 방식으로 배포할까요?` 를 한 번 물어요. header `배포 방식`, 선택지 `정적 사이트 (추천)`(`HTML·빌드 결과만 올려요 · axhub.page 주소`), `서버 앱`(`서버 코드까지 실행해요 · axhub.dev 주소`), `취소`(`가져오기를 중단해요.`). 정적 사이트면 6으로 가요. 서버 앱이면 `detected_state.manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker` 로 preview 를 다시 받아 5·6 을 이어가고, 없으면 실행할 서버 코드가 없다고 한 줄로 말한 뒤 `정적 사이트 (추천)`·`취소` 로 다시 물어요. headless 는 묻지 않아요.
+
 6. 대화형 통합 승인 1회
 
-AskUserQuestion 은 preview 직후 딱 한 번 써요. 질문은 `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?` 처럼 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인과 manifest commit 동의를 모두 겸해요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
+AskUserQuestion 은 preview 직후(5-1 카드와 별개로) 딱 한 번 써요. 질문은 `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?` 처럼 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인과 manifest commit 동의를 모두 겸해요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
 
 - `capabilities.import.commit_manifest` 가 true 이고 GitHub 기반 첫 배포면 `설정도 반영하고 시작`, `커밋 없이 시작`, `먼저 수정할게요`, `취소` 네 옵션을 써요. 첫 옵션은 `--commit-manifest`, 둘째 옵션은 옵션 없는 execute 로 고정해요.
 - 그 외에는 `가져오기 시작`, `먼저 수정할게요`, `취소` 세 옵션만 써요.
