@@ -1,6 +1,6 @@
 # Deploy workflow detail reference
 
-Load this only after the top-level `deploy` skill has passed the activation boundary and the user approved the initial preview, or when a specific branch below is needed.
+Load this only after the top-level `deploy` skill has passed the activation boundary and `## 배포 전 맞추기` left nothing to ask, or when a specific branch below is needed.
 
 Codex 에서는 이 문서의 여러 줄 shell 블록을 실행하지 않아요. 블록은 논리·headless 설명용이에요. 모든 Desktop 권한 카드는 구체적인 값을 넣은 bare 명령 하나만 실행하고, 변수 대입·`eval`·`mktemp`·분기·pipe·redirect·`;`·`&&`·`||`·`echo`·`$?`를 금지해요. 앞선 JSON/tool 결과를 모델이 직접 읽어 다음 단일 명령의 literal 인자로 옮겨요.
 
@@ -65,9 +65,9 @@ Use top-level `deploy_method`, `git_backend.backend`, and `git_backend.source`; 
    axhub apps static deploy --app "$APP_ID" --from-dir "$STATIC_DIR" --tenant "$AXHUB_TENANT" --dry-run
    ```
 
-   Humanize file count/bytes and process as release create, upload, finalize, activate. Headless stops here. Interactive mode asks for approve, dry-run only, or abort.
+   Humanize file count/bytes and process as release create, upload, finalize, activate. A failed dry-run stops here. Redeploy does not ask (AP-12); dry-run only when the user asked for a rehearsal.
 
-4. Execute only after explicit approval:
+4. Execute after a successful dry-run:
 
    ```bash
    axhub apps static deploy --app "$APP_ID" --from-dir "$STATIC_DIR" --tenant "$AXHUB_TENANT" --execute
@@ -81,7 +81,7 @@ For `git_backend.backend=selfhosted`, do not inspect `github_connected`. If the 
 
 Treat that exact `data.destination` as the working directory for every subsequent repository-local command in this branch. Set the tool `cwd` to it for status/savepoint, `git rev-parse`, branch/commit work, push, fetch, and containment checks; do not run those commands in the original un-cloned folder. An explicit clone destination, when supplied, is authoritative because the CLI returns the same absolute path.
 
-Before the push, run `axhub --tenant <tenant> git setup --json` to repair the host-scoped helper without rotating a valid PAT. After savepoint and approval, capture `git rev-parse HEAD` as the full `PUSHED_SHA`. Read `axhub deploy list --app <app-id> --all --json` using the same profile/tenant and save the IDs in top-level `items` whose `commit_sha` exactly equals `PUSHED_SHA`; this baseline correlates discovery to the push without relying on local/server clock alignment. A failed baseline read stops before mutation. Push `git -c credential.interactive=false push -u origin "HEAD:$BRANCH"` from the clone cwd, with no environment assignment; credential absence fails instead of prompting. Preserve the baseline and SHA across the one permitted credential-recovery retry.
+Before the push, run `axhub --tenant <tenant> git setup --json` to repair the host-scoped helper without rotating a valid PAT. After savepoint and `## 배포 전 맞추기`, capture `git rev-parse HEAD` as the full `PUSHED_SHA`. Read `axhub deploy list --app <app-id> --all --json` using the same profile/tenant and save the IDs in top-level `items` whose `commit_sha` exactly equals `PUSHED_SHA`; this baseline correlates discovery to the push without relying on local/server clock alignment. A failed baseline read stops before mutation. Push `git -c credential.interactive=false push -u origin "HEAD:$BRANCH"` from the clone cwd, with no environment assignment; credential absence fails instead of prompting. Preserve the baseline and SHA across the one permitted credential-recovery retry.
 
 After push succeeds, repeat that all-status, all-pages list within AP-16's 30-check/10-minute budget. Select only a record with exact `commit_sha == PUSHED_SHA` and an ID absent from the baseline. Never select unrelated commits, shortened SHAs, or historical records; never filter out terminal statuses. If multiple records qualify, choose the newest `created_at`, then pin its ID. Immediately run `axhub deploy verify <deployment-id> --app <app-id> --json`: success follows the success rules, terminal failure hands off to diagnosis, and non-terminal state uses the common bounded verify loop with the same ID. A failed list is not an empty successful result. No match by budget expiry means pending, never create/upload. Do not use `deploy-prep --refresh-in-flight` for webhook discovery because it excludes completed deployments.
 
@@ -141,12 +141,11 @@ AXHUB_HEADLESS=0
 if ! [ -t 1 ] || [ -n "${CI:-}" ] || [ -n "${CODEX_NON_INTERACTIVE:-}" ]; then
   AXHUB_HEADLESS=1
 fi
-if [ "$AXHUB_HEADLESS" = "1" ]; then
-  DEPLOY_DECISION="dry_run"
-fi
 ```
 
-Interactive preview shows exactly app, environment, branch, commit, and ETA. Normalize displayed slug with NFKC and warn if normalization changes it. The visible environment label is `운영` when `STAGING_ENABLED` is false and `스테이징` when it is true (AP-25 — a staging opt-in app never builds straight into production); do not show `prod`, `production`, or raw profile names in the card unless the user explicitly asks for CLI-level evidence. Ask approve, dry-run, or abort. Dry-run natural language such as "리허설", "테스트로", or "진짜 안 올리고" also sets `DEPLOY_DECISION=dry_run`.
+Headless redeploy runs for real when `## 배포 전 맞추기` has nothing to ask, and stops before any change when it does (AP-12, AP-29).
+
+The progress line shows exactly app, environment, branch, commit, and ETA. Normalize displayed slug with NFKC and warn if normalization changes it. The visible environment label is `운영` when `STAGING_ENABLED` is false and `스테이징` when it is true (AP-25 — a staging opt-in app never builds straight into production); do not show `prod`, `production`, or raw profile names in the card unless the user explicitly asks for CLI-level evidence. Do not ask for approval. Dry-run natural language such as "리허설", "테스트로", or "진짜 안 올리고" also sets `DEPLOY_DECISION=dry_run`.
 
 User-visible prose and tool titles must translate workflow internals: `진행 중 배포` for in-flight work, `미리보기` for dry-run, `인증 상태 확인` for token-gate, `배포 실행` for execute, and `검증 성공` for terminal success. Do not show `deploy-prep`, `in-flight`, `dry-run`, `token-gate`, `execute`, `production`, `terminal success`, `gitignore`, `gitting`, `checking`, `Build passed`, `Working tree clean`, `Not ignored`, `User explicitly authorized`, `Proceeding`, or `Push 성공` in chat/tool titles/final tables unless the user asked for low-level debugging evidence.
 
@@ -200,9 +199,9 @@ Two guards, recovery entry only:
 
 Say one line and continue, not a question. No repo: `이 앱은 저장소 없이 소스를 올려서 배포해요.` Repo blocked: `GitHub 쪽이 막혀서, 지금 폴더의 소스를 그대로 올려서 배포할게요.` Then hand the lane to the `up` skill.
 
-The handoff happens **before** the preview card and approval, so nothing has mutated yet. Invoke `up` through the host's skill-invocation tool when one exists, carrying `APP_ID` and the reason (no repo / repo blocked). When no such tool exists, follow `skills/up/SKILL.md` from its step 2 in place — preview, approval, execute, and `axhub deploy verify`. Either way the deploy finishes inside this request; ending the response on the yield sentence alone leaves the user with nothing deployed. Do not restate the upload command here and do not treat this skill's preview card as the approval for it.
+The handoff happens before any deploy mutation. Invoke `up` through the host's skill-invocation tool when one exists, carrying `APP_ID` and the reason (no repo / repo blocked). When no such tool exists, follow `skills/up/SKILL.md` from its step 2 in place — preview, execute, and `axhub deploy verify`. Either way the deploy finishes inside this request; ending the response on the yield sentence alone leaves the user with nothing deployed. Do not restate the upload command here.
 
-A dirty working tree never reaches this point — `deploy-preview-summary` stops the run at the first command. That path opens only when the user calls `up` directly.
+A dirty working tree is committed by `## 배포 전 맞추기` before this point. Uploading the folder as-is opens only when the user calls `up` directly.
 
 ## Verify loop and diagnosis
 

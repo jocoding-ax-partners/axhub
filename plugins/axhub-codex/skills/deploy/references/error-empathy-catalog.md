@@ -297,7 +297,7 @@ hand-written UX guide covers every emitted key.
 
 # Deploy-Preview Card Template
 
-This is the 명시 텍스트 승인 card rendered by `skills/deploy/SKILL.md` step 3 before any destructive `axhub deploy create` is run.
+Since spec 681 a redeploy of an existing app does **not** ask with this card (AP-12, AP-29): render the card body below as a progress line only and skip the options. The options are kept for reference and for the rehearsal path the user asks for (`리허설`·`테스트로`).
 
 ## Card body (Korean, NFKC-normalized)
 

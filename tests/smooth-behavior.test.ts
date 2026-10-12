@@ -209,7 +209,7 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("NEVER commit, push, or add `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/`");
     expect(deploy).toContain("Never deploy a local-only commit SHA");
     expect(deploy).toContain('git -c credential.interactive=false push -u origin "HEAD:$BRANCH"');
-    expect(deploy).toContain("Judge push success by exit code");
+    expect(deploy).toContain("judge push by exit code");
     expect(deploy).toContain("Use a short deploy utterance like `현재 앱 배포해`");
     expect(deploy).toContain("NEVER call `axhub deploy create --execute` for a commit that is only local");
     expect(workflowDetails).toContain("AXHUB_GATE_POLL_ITERATIONS=0 axhub plugin-support token-gate");
@@ -501,12 +501,24 @@ describe("smooth behavior contracts", () => {
       expect(update).not.toContain(leakedUpdatePhrase);
     }
 
-    // AP-12 승인 fallback 사다리 — 4사본 공통 문장 전문을 fixture 로 잠가요
+    // AP-12 승인 fallback 사다리 — 새로 만드는 lane 의 공통 문장 전문을 fixture 로 잠가요
     // (bootstrap 사본은 bootstrap-ux-contract.test.ts 가 잠가요).
-    expect(deploy).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
     expect(importSkill).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
     expect(scaffold).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
-    expect(up).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    // 재배포 lane(deploy·up)은 승인 카드 대신 배포 전 맞추기를 해요 (AP-12·AP-29, spec 681).
+    for (const redeploy of [deploy, up]) {
+      expect(redeploy).not.toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+      expect(redeploy).toContain("승인 카드를 띄우지 않아요");
+      expect(redeploy).toContain("axhub deploy check --app");
+      expect(redeploy).toContain("capabilities.readiness.context_url");
+      expect(redeploy).toContain("--from-dotenv .env --only <이름,…> --execute");
+      expect(redeploy).toContain(".axhub/deploy-answers.json");
+      expect(redeploy).toContain("이렇게 맞춰서 올렸어요");
+      expect(redeploy).toContain("값을 대화로 받지 않");
+    }
+    // 웹훅 우회 방지: 설정값 등록·수정 커밋은 push 전에 끝나야 해요.
+    expect(deploy).toContain("반드시 push 전에 끝내요");
+    expect(deploy).not.toContain("axhub로 지금 배포를 진행할까요?");
     // headless 정의는 3-lane 사다리 정합 재작성본으로 잠가요 — 정의 문장이
     // `claude -p`·`codex exec` 병기 토큰을 포함해요. onboarding 은 D1 가드와
     // NEVER 목록 두 곳 모두에 병기 토큰이 남아야 해요.

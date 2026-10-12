@@ -21,20 +21,20 @@ model: sonnet
 
 절단이 있는 host 는 이 본문을 앞에서부터 일부만 읽어요. 아래 게이트는 뒤쪽 절차 설명이 잘려도 그대로 지켜요.
 
-1. 실행 승인 — preview 카드를 보여준 뒤 `axhub 로 지금 이 폴더를 올려서 배포할까요?` 로 한 번만 묻고, 이 승인 하나가 axhub 진입 확인을 겸해요. 승인 전에는 `--execute` 를 실행하지 않아요.
-2. 승인 방식 — 네이티브 선택 UI 가 없으면 같은 확인을 명시 텍스트 승인 1회로 받아요. preview 를 본 뒤 사용자가 새로 입력한 승인 문구만 유효하고, 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요.
-3. 빈 답변 = 미승인 — 선택 카드로 물은 경우 빈 답변이 돌아오면 미승인이에요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.
-4. 승인 채널이 없는 headless 에서는 dry-run 에서 멈춰요 — 승인을 조용히 건너뛰지 않아요.
-5. 미리보기는 `--dry-run`, 실행은 `--execute` 예요. 승인 전 명령에 `--execute` 를 쓰지 않아요.
+1. 이미 AXHub 에 있는 앱이라 승인 카드를 띄우지 않아요 (AP-12). `## 1.5단계 — 올리기 전 맞추기` 에서 물을 일이 없으면 그대로 올려요.
+2. 물을 일이 있으면 그것만 한 번 묻고, 답을 받기 전에는 `--execute` 를 실행하지 않아요. 선택 카드에 빈 답변이 돌아오면 답하지 않은 거예요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.
+3. headless 는 물을 일이 없으면 실제로 올리고, 하나라도 있으면 아무것도 바꾸지 않고 멈춰요.
+4. 사용자가 `리허설`·`테스트로` 라고 했을 때만 `--dry-run` 에서 멈춰요.
+5. 실행 전에 `--dry-run` 으로 올릴 내용을 먼저 확인해요. dry-run 이 실패하면 `--execute` 를 쓰지 않아요.
 6. 성공 선언 — 배포가 끝났다는 말은 `axhub deploy verify` 가 최종 성공을 돌려줄 때만 해요. 시작 명령의 출력·중간 상태·최근 배포 재탐색은 근거가 아니에요.
 
 **질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요(예: `진행` 이면 시작하고 `취소` 면 여기서 멈춰요). 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요. 비파괴 선택은 숫자·서수·라벨·앞글자 어느 쪽으로 답해도 알아듣고, 파괴 게이트만 canonical 문구를 그대로 받아요.
 
 **장기 대기.** codex 는 긴 명령을 최대 30초에 yield 하고 백그라운드 터미널로 넘겨요 — yield 는 실패도 완료도 아니에요. `deploy verify --wait` 가 yield 되면 같은 명령을 다시 실행하지 말고 같은 터미널을 빈 입력으로 폴링해 완주를 기다려요. 성공 선언 규칙은 그대로예요.
 
-## 승인 게이트 계약 (요약)
+## 질문 계약 (요약)
 
-codex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 승인 방식은 명시 텍스트 승인 1회예요 — preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구만 유효하고, 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요. 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. 선택 카드로 물은 경우 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.
+codex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 이미 AXHub 에 있는 앱의 재배포라 승인 질문 없이 진행하고(AP-12), 배포 전 맞추기의 묻는 일이 있을 때만 물어요. 답은 명시 텍스트 1회로 받고, 미리 넣어 둔 문구·유사 표현·무응답은 답이 아니에요. 선택 카드에 빈 답변이 돌아오면 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. headless 는 물을 일이 있으면 아무것도 바꾸지 않고 멈춰요.
 
 ## First Visible Sentence
 
@@ -59,8 +59,7 @@ codex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 승인 방�
 Headless 는 `codex exec`, CI, TTY 없음, 또는 사용자 확인 채널이 아예 없는 상태예요.
 
 - Headless = 명시 텍스트 승인 0회. 선택지를 렌더링하고 멈추지도 않아요.
-- Headless 안전 기본값은 dry-run 이에요. `--execute` 를 실행하지 않아요.
-- Headless 에서도 non-mutating CLI·auth·dry-run 확인은 실행해 자동 QA 가 실제 동작을 보게 해요.
+- 물을 일이 없으면 headless 도 실제로 올려요 (AP-12, AP-29). 물을 일이 있으면 아무것도 바꾸지 않고 물을 내용만 남기고 멈춰요.
 
 ## User-Facing Language
 
@@ -121,13 +120,24 @@ axhub apps get "$APP_ID" --json
 
 top-level `git_backend.backend`와 `git_backend.source`, `deploy_method`, `staging_enabled`만 읽어요. `staging_enabled`는 `STAGING_ENABLED`로 잡아요 (AP-25). missing/malformed면 upload 전에 멈춰요. `deploy_method=static`이면 `deploy`의 static lane으로 양보해요. `git_backend.backend`가 `selfhosted`면 `deploy`의 self-hosted repository lane으로 양보하되, 사용자가 repositoryless upload를 명시한 경우만 아래 archive preview로 이어가요. `legacy_github` 또는 GitHub app도 아래로 이어가요.
 
+## 1.5단계 — 올리기 전 맞추기 (AP-29)
+
+`deploy` 의 `## 배포 전 맞추기` 와 같은 흐름이고, 커밋·push 만 빼요. preflight 의 `capabilities.readiness.deploy_check` 가 false 면 `axhub CLI를 최신 버전으로 업데이트해 주세요.` 라고 하고 멈춰요.
+
+1. `axhub deploy check --app "$APP_ID" --json` (제목 `배포 전 확인`). 이 lane 은 커밋을 보내지 않으니 `commit_not_on_remote`·`uncommitted_changes` 는 보지 않아요.
+2. preflight 의 `capabilities.readiness.context_url` 문서를 한 번만 가져와요(제목 `배포 기준 확인`). 못 받으면 문서 없이 진행해요.
+3. 그 규칙으로 앱 코드를 보고, 빌드 단계가 있으면 로컬 빌드를 5분 안에서 한 번 돌려요. 실패하면 고치고 2번까지 다시 빌드해요. 그래도 실패하면 올리지 않고 무엇이 막혔는지 알려요. 테스트·예시·README 의 흔적은 문제가 아니에요.
+4. 물을 일은 둘뿐이에요 — `.env`·`.env.local` 에도 없는 필수 설정값(`<이름> 값을 앱 폴더 .env 에 넣어 주세요` 라고 부탁해요, 값을 대화로 받지 않아요)과 안 되는 6가지에 처음 해당한 것. 모아서 한 번 물어요. `.axhub/deploy-answers.json` 의 `keep` 에 있는 항목은 다시 묻지 않고, `그대로` 답은 거기에 더해요.
+5. 묻지 않고 맞춰요: `.env` 에 있는 필수 이름은 `axhub env set --app "$APP_ID" --from-dotenv .env --only <이름,…> --execute` 로 등록해요(`.env` 를 열거나 값을 출력하지 않아요). 포트·`0.0.0.0` 바인딩·상태 확인 경로·빌드 오류는 파일을 고쳐요. 고친 파일은 커밋하지 않고 그대로 올라가요.
+6. 맞춘 게 있으면 마지막 메시지를 정확히 `이렇게 맞춰서 올렸어요.` 로 시작하고, 맞춘 것과 결과 주소를 알려요.
+
 ## 2단계 — 올릴 내용 미리보기
 
 ```bash
 axhub up --app "$APP_ID" --path . --dry-run --json
 ```
 
-dry-run 은 앱 resolve·인증·네트워크 이전에 패킹만 하고 끝나요. 반환된 `target` 문자열에서 파일 수·압축 크기·source 버전을 읽어 preview 카드를 만들어요. 이 값은 **승인 시점의 스냅샷**이에요 — `--execute` 는 폴더를 다시 패킹하므로, 승인 뒤 파일을 고치면 카드와 다른 소스가 올라가요.
+dry-run 은 앱 resolve·인증·네트워크 이전에 패킹만 하고 끝나요. 반환된 `target` 문자열에서 파일 수·압축 크기·source 버전을 읽어 preview 카드를 만들어요. `--execute` 는 폴더를 다시 패킹하므로, 1.5단계의 수정은 이 미리보기 전에 끝내요.
 
 올라가는 것은 `.gitignore` 를 존중한 현재 폴더예요. `.git/`·`node_modules/`·`.venv/`·`__pycache__/`·`.env` 계열은 항상 빠지고 `.env.example` 류는 남아요. 커밋은 보내지 않고, 연결된 저장소가 있어도 건드리거나 끊지 않아요.
 
@@ -135,13 +145,9 @@ dry-run 은 앱 resolve·인증·네트워크 이전에 패킹만 하고 끝나�
 
 CLI 0.29.0 미만이면 이 명령이 unknown command 로 끝나요. 그때는 `update` 로 보내고 멈춰요 — `axhub deploy create` 로 대체하지 않아요. 로컬 커밋은 AxHub 가 저장소에서 찾지 못해 commit-not-found 로 실패해요.
 
-## 3단계 — 승인 (AP-12)
+## 3단계 — 올릴 내용 알리기 (AP-12)
 
-interactive 에서는 preview 카드 하나가 **axhub 진입 확인**을 겸해요. 카드에 앱, 환경, 파일 수, 압축 크기, source 버전, 예상 소요를 보여주고 `axhub 로 지금 이 폴더를 올려서 배포할까요?` 를 한 번만 물어요. 환경은 `STAGING_ENABLED` 가 false 면 `운영`, true 면 `스테이징`으로 표시하고 `prod`·`production` 같은 raw 값을 쓰지 않아요.
-
-명시 텍스트 승인 1회만 받아요. 승인 채널 없는 headless 에서는 execute하지 않아요 — 승인을 조용히 건너뛰지 않아요. headless 는 dry-run preview 까지만 하고 `--execute` 로 넘어가지 않아요. slash 호출도 이 카드를 건너뛰지 못해요. 이 preview-confirm 은 `deploy` 와 같은 mutation 에 대한 같은 게이트이고, 소스만 달라요.
-
-`취소` 면 종료해요.
+이미 AXHub 에 있는 앱이라 묻지 않아요. 앱, 환경, 파일 수, 압축 크기, source 버전, 예상 소요를 진행 안내로 보여주고 바로 4단계로 가요. 환경은 `STAGING_ENABLED` 가 false 면 `운영`, true 면 `스테이징`으로 표시하고 `prod`·`production` 같은 raw 값을 쓰지 않아요. 사용자가 `리허설`·`테스트로` 라고 했으면 여기서 멈춰요.
 
 안내 문구는 상황에 따라 갈라요:
 
@@ -151,15 +157,13 @@ interactive 에서는 preview 카드 하나가 **axhub 진입 확인**을 겸해
 
 ## 4단계 — 실행
 
-승인 뒤 인증 상태를 한 번 확인해요. 제목은 `인증 상태 확인` 으로 보여주고 token-gate 라는 말을 쓰지 않아요.
+실행 전에 인증 상태를 한 번 확인해요. 제목은 `인증 상태 확인` 으로 보여주고 token-gate 라는 말을 쓰지 않아요.
 
 ```bash
 AXHUB_GATE_POLL_ITERATIONS=0 axhub plugin-support token-gate
 ```
 
 exit 0 이면 계속하고, exit 65 면 auth 복구로 가요. `AXHUB_AUTH_BG_REFRESH=0` 이면 이 게이트를 건너뛰어요.
-
-승인과 실행 사이에 폴더가 바뀌었을 수 있으니 2단계 dry-run 을 한 번 더 돌려 source 버전을 카드 값과 대조해요. 다르면 실행하지 않고 `승인하신 뒤 폴더 내용이 바뀌었어요. 지금 올라갈 소스가 보여드린 것과 달라서 다시 확인할게요.` 로 2단계 preview 부터 다시 해요.
 
 그다음 실행해요:
 
@@ -194,7 +198,7 @@ verify exit:
 | 0 | 최종 성공 | 한국어로 요약하고 접근 가능한 URL 을 평문으로 보여줘요. `url_checked=false` 면 `apps get` 으로 `access_url` 을 읽고 제한된 횟수의 HTTPS HEAD 재확인을 한 뒤에 열린다고 말해요. verify JSON 의 `environment` 가 `staging` 이면 스테이징에만 반영됐고 운영에는 아직 반영되지 않았다고 말하고 심사 신청 `axhub publish --app "$APP_ID" --deployment-id "$DEPLOY_ID" --execute` 를 같은 블록에 안내해요 (AP-25). `environment` 가 없거나 null 이면 `STAGING_ENABLED` 로 판단하고 운영으로 간주하지 않아요. |
 | 4 | 인증 만료 | auth 복구 문구를 써요. |
 | 5 | 알 수 없는 배포 id | 멈춰요. 최신 배포를 재탐색하지 않아요. |
-| 6 | 아직 진행 중 | 위 예산 규칙대로 처리해요. 새 승인 카드를 띄우지 않아요. |
+| 6 | 아직 진행 중 | 위 예산 규칙대로 처리해요. 새 배포를 만들지 않아요. |
 | 7 | 최종 실패 | `배포가 실패했어요. 지금부터 원인 진단만 읽기 전용으로 확인할게요. 재배포나 롤백은 하지 않아요.` 뒤 `diagnosis` 로 인계해요. |
 
 `diagnosis` 인계는 같은 앱 식별자와 실패 근거를 유지하고, 재배포·롤백·새 배포 생성을 실행하지 않아요.

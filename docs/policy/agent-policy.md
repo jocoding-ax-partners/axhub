@@ -16,13 +16,13 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 적용: skills/deploy/SKILL.md, skills/up/SKILL.md
 - invariant: "axhub deploy verify"
 
-## AP-2 deploy preview-confirm gate
-- 규칙: 실제 배포를 실행하기 전에 무엇이 어떻게 배포되는지 미리보기(preview)를 보여주고 사용자 확인을 받아요. headless 에서는 실행하지 않고 dry-run/preview 로 멈춰요.
+## AP-2 배포 미리보기 (재배포는 진행 안내)
+- 규칙: 실제 배포를 실행하기 전에 무엇이 어떻게 배포되는지(앱·환경·브랜치·커밋 또는 올릴 파일) 보여줘요. 환경은 `STAGING_ENABLED` 로 `운영`/`스테이징` 을 골라요. 이미 AXHub 에 있는 앱의 재배포는 이 미리보기를 질문이 아닌 진행 안내로 보여주고 확인을 받지 않아요 — 맞출 일은 AP-29 가 맡고, 사용자가 리허설을 원할 때만 dry-run 에서 멈춰요. 새로 만드는 배포(생성·가져오기)의 확인은 AP-12 가 맡아요. (2026-10 spec 681 전에는 재배포도 preview-confirm 승인을 받았어요.)
 - 적용: skills/deploy/SKILL.md, skills/up/SKILL.md
-- invariant: "preview-confirm"
+- invariant: "STAGING_ENABLED", "승인 카드를 띄우지 않아요"
 
 ## AP-3 파괴적 변경 승인
-- 규칙: 삭제, 롤백(이전 버전으로 되돌리기), `--force`/`--yes`/`--execute` 같은 강제 실행 옵션이 붙는 명령(파괴적 명령 — 실행하면 되돌리기 어려운 변경)은 대화로 승인을 1회 받은 뒤에만 실행해요. 목록·상태·로그 같은 단순 조회는 확인 없이 바로 실행해요. headless 에서는 파괴적 명령을 실행하지 않고 preview/summary 로 멈춰요.
+- 규칙: 삭제, 롤백(이전 버전으로 되돌리기), `--force`/`--yes`/`--execute` 같은 강제 실행 옵션이 붙는 명령(파괴적 명령 — 실행하면 되돌리기 어려운 변경)은 대화로 승인을 1회 받은 뒤에만 실행해요. 목록·상태·로그 같은 단순 조회는 확인 없이 바로 실행해요. headless 에서는 파괴적 명령을 실행하지 않고 preview/summary 로 멈춰요. 이미 AXHub 에 있는 앱의 재배포(`deploy create --execute`·`up --execute`·`env set --from-dotenv --execute`)는 배포 이력으로 되돌릴 수 있어 이 승인의 예외이고 AP-12·AP-29 를 따라요.
 - 권한을 새로 주는 grant 생성(커넥터 대상별 `read`/`write` 부여 등)처럼 **남의 접근 범위를 넓히는 변경**도 같은 승인 게이트를 써요 — 나중에 회수할 수 있어도 조회는 아니라서, 부여 대상·레벨을 한국어로 보여준 뒤 승인을 받아요. 부여에 쓸 정확한 플래그는 문서 카탈로그가 아니라 그 leaf 의 라이브 `--help` 로 확정해요.
 - 적용: skills/clarity/SKILL.md
 - invariant: "파괴적 변경은 승인"
@@ -68,11 +68,11 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "axhub 맥락"
 
 ## AP-12 axhub 진입 확인 (preview 통합 게이트)
-- 규칙: axhub 프로젝트가 확정된 상태에서 배포·생성·가져오기·plugin App 게시를 실행하기 전에 interactive preview 승인 하나가 axhub 진입 확인을 겸해요. `plugins`의 목록·다운로드는 read-only/no-clobber라 별도 실행 승인을 요구하지 않고, publish만 rights attestation과 execute를 결합해요. headless publish는 preview에서 멈추고 어떤 lane에서도 승인을 조용히 건너뛰지 않아요.
+- 규칙: axhub 프로젝트가 확정된 상태에서 axhub 에 아직 없는 것을 새로 만드는 일(생성·가져오기·첫 연결·plugin App 게시)은 실행하기 전에 interactive preview 승인 하나가 axhub 진입 확인을 겸해요. 이미 AXHub 에 있는 앱의 재배포(`deploy`·`up`)는 이 승인을 받지 않아요 — AP-29 의 맞추기를 하고 물을 일이 있을 때만 그것을 물어요. 재배포는 배포 이력으로 되돌릴 수 있고, 답이 사실상 "응" 하나뿐인 확인은 막는 것 없이 마찰만 더해서예요(spec 681). headless 재배포는 물을 일이 없으면 실제로 배포하고, 있으면 아무것도 바꾸지 않고 멈춰요. `plugins`의 목록·다운로드는 read-only/no-clobber라 별도 실행 승인을 요구하지 않고, publish만 rights attestation과 execute를 결합해요. headless publish·생성은 preview에서 멈추고 어떤 lane에서도 승인을 조용히 건너뛰지 않아요.
 - host 별 승인 프리미티브: 네이티브 선택 UI 는 Claude 판의 프리미티브이고, Codex 판의 프리미티브는 명시 텍스트 승인 1회예요 — 유효 승인은 preview 를 본 뒤 사용자가 안내된 canonical 승인 문구를 byte-exact 로 입력한 경우만이에요. preview 전에 미리 넣어 둔 문구, 유사 표현, 무응답은 승인이 아니에요. 이 선주입 무효 조항은 실측 A/B(조항 없는 게이트는 선주입 문구를 3/3 승인으로 오인, 조항 있으면 3/3 정지)로 필수 확인됐고, codex 파생 번들의 승인 문안에 기계 잠금돼요.
-- 적용: skills/deploy/SKILL.md, skills/bootstrap/SKILL.md, skills/import/SKILL.md, skills/scaffold/SKILL.md, skills/plugins/SKILL.md, skills/up/SKILL.md
+- 적용: skills/bootstrap/SKILL.md, skills/import/SKILL.md, skills/scaffold/SKILL.md, skills/plugins/SKILL.md
 - invariant: "axhub 진입 확인", "승인을 조용히 건너뛰지 않아요"
-- 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/scaffold/SKILL.md, plugins/axhub-codex/skills/plugins/SKILL.md, plugins/axhub-codex/skills/up/SKILL.md
+- 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/scaffold/SKILL.md, plugins/axhub-codex/skills/plugins/SKILL.md
 - 빈 답변 fail-closed (codex): 네이티브 선택 카드가 켜진 세션에서 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 이 규칙은 훅·정책·skill 본문 세 채널이 겹쳐 소유해요 — 훅은 미신뢰 세션에서 조용히 꺼지고 본문은 8,000B 에서 절단되니 실패 모드가 서로 달라요.
 - invariant(codex): "미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"
 
@@ -178,3 +178,10 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "어떤 방식으로 배포할까요?", "manifest_hints.start_cmd"
 - 적용(codex): plugins/axhub-codex/skills/import/SKILL.md
 - invariant(codex): "어떤 방식으로 배포할까요?", "manifest_hints.start_cmd"
+
+## AP-29 배포 전 맞추기 (재배포는 묻지 않고 맞춰서 올림)
+- 규칙: 이미 AXHub 에 있는 앱을 다시 올릴 때(`deploy`·`up`) 승인 카드 대신 배포 전 맞추기를 해요. (1) CLI 확정 판정 `axhub deploy check --app <app> --json` 을 받고 (2) preflight 의 `capabilities.readiness.context_url` 배포 기준 문서를 한 번 읽고(못 받으면 문서 없이 진행) (3) 그 규칙으로 앱 코드를 보고 빌드 단계가 있으면 로컬 빌드를 한 번 돌려요 — 테스트·예시·README 흔적은 문제로 보지 않아요. 묻는 일은 셋뿐이에요: 어디서도 값을 찾을 수 없는 필수 설정값(값을 대화로 받지 않고 `.env` 에 넣어 달라고 부탁해요), 안 되는 6가지에 처음 해당한 것, 처음 올릴 때 새로 정해지는 것. 나머지 — `.env` 값 등록(`axhub env set --from-dotenv … --only … --execute`, AI 는 값을 읽지 않아요)·포트·`0.0.0.0` 바인딩·상태 확인 경로·빌드 오류 수정·커밋·push — 는 묻지 않고 해요. GitHub 에 연결된 앱은 push 하는 순간 자동 배포가 시작돼 CLI 검사를 거치지 않으므로, 설정값 등록과 수정 커밋을 반드시 push 전에 끝내요. "그대로" 답은 앱 폴더 `.axhub/deploy-answers.json` 의 `keep` 에 남겨 다음 배포에 다시 묻지 않고, 이 파일은 커밋하지 않아요. headless 는 물을 일이 하나라도 있으면 아무것도 바꾸지 않고 멈춰요. 끝나면 `이렇게 맞춰서 올렸어요` 와 맞춘 것을 알려요. preflight 에 `capabilities.readiness.deploy_check` 가 없는 구 CLI 면 업데이트를 안내하고 멈춰요.
+- 적용: skills/deploy/SKILL.md, skills/up/SKILL.md
+- invariant: "승인 카드를 띄우지 않아요", "--from-dotenv", "context_url", ".axhub/deploy-answers.json", "이렇게 맞춰서 올렸어요"
+- 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/up/SKILL.md
+- invariant(codex): "승인 카드를 띄우지 않아요", "--from-dotenv", "context_url", ".axhub/deploy-answers.json", "이렇게 맞춰서 올렸어요"

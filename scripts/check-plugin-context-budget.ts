@@ -33,7 +33,12 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 // 읽혀야 하는 지시라 본문에 두며, 실측 253,000B(codex 번들 253,361B — import 승인
 // 게이트 요약에 같은 카드 1줄)에 약 600B 이상 여유. per-skill 35,000B 게이트는 그대로
 // 유지한다.
-export const DEFAULT_MAX_TOTAL_BYTES = 254_000;
+// 254_000 → 259_000: spec 681 — 재배포(deploy·up)가 승인 카드 대신 배포 전 맞추기
+// (deploy check 판정·context_url 기준 문서·.env 등록·push 전 순서·묻는 일 셋·headless
+// 정지)를 해요. 승인 카드를 대신하는 실행 경로 지시라 본문에 두며, codex 8,000B
+// 절단선 안에 들어가야 해요. 실측 256,471B(codex 번들은 그보다 조금 큼)에 약 2,000B
+// 여유. per-skill 35,000B 게이트는 그대로 유지한다.
+export const DEFAULT_MAX_TOTAL_BYTES = 259_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
 export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {

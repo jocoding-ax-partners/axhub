@@ -225,10 +225,16 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
 
   test("approval ladder carries the pre-injection-invalid clause in all six execution skills", () => {
     // 실측 A/B: 이 조항 없이는 선주입 승인 문구가 실행으로 이어졌어요 (R6·AP-12).
-    for (const skill of ["deploy", "up", "bootstrap", "import", "scaffold", "plugins"] as const) {
+    for (const skill of ["bootstrap", "import", "scaffold", "plugins"] as const) {
       const source = readFileSync(join(outDir, "skills", skill, "SKILL.md"), "utf8");
       expect(source, skill).toContain("미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요");
       expect(source, skill).not.toContain("네이티브 선택 UI 가 있으면 그걸로 묻고");
+    }
+    // 재배포(deploy·up)는 승인 질문이 없지만(AP-12·AP-29, spec 681) 묻는 일의 답에도 같은 조항이 걸려요.
+    for (const skill of ["deploy", "up"] as const) {
+      const source = readFileSync(join(outDir, "skills", skill, "SKILL.md"), "utf8");
+      expect(source, skill).toContain("미리 넣어 둔 문구·유사 표현·무응답은 답이 아니에요");
+      expect(source, skill).not.toContain("승인 채널이 없는 headless 에서는 실행 없이 멈춰요");
     }
   });
 
@@ -349,7 +355,8 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       "--execute",
       "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
     ],
-    deploy: ["axhub apps get <app> --json", "git_backend.backend=selfhosted", "axhub repo clone <app>", "axhub로 지금 배포를 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "어디에 배포할까요?"],
+    // spec 681 — 재배포는 승인 카드 대신 배포 전 맞추기예요. 묻는 일·push 순서·headless 정지가 절단선 안에 있어야 해요.
+    deploy: ["axhub apps get <app> --json", "git_backend.backend=selfhosted", "axhub repo clone <app>", "승인 카드를 띄우지 않아요", "axhub deploy check --app", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "물을 내용만 남기고 멈춰요", "반드시 push 전에 끝내요", "어디에 배포할까요?"],
     onboarding: ["axhub apps get <app> --json", "axhub apps git-backend --tenant <tenant> --json", "git_backend.backend=selfhosted", "첫 앱의 코드 저장 위치를 선택해 주세요.", "SELECTED_GIT_BACKEND", "provider 선택이 명시되지 않았으면"],
     import: ["미리보기대로 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "어떤 방식으로 배포할까요?"],
     scaffold: [
@@ -362,7 +369,7 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       "SELECTED_GIT_BACKEND=selfhosted",
     ],
     plugins: ["artifact를 배포할 권리가 있음을 확인하고", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "--idempotency-key", "--execute"],
-    up: ["axhub 로 지금 이 폴더를 올려서 배포할까요?", "명시 텍스트 승인 1회", "미리 넣어 둔 문구", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "`GitHub 없이`만으로 repositoryless upload를 확정하지 않아요", "selfhosted app의 정상 배포는", "--execute", "axhub deploy verify"],
+    up: ["승인 카드를 띄우지 않아요", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "아무것도 바꾸지 않고 멈춰요", "`GitHub 없이`만으로 repositoryless upload를 확정하지 않아요", "selfhosted app의 정상 배포는", "--execute", "axhub deploy verify"],
     update: ["update apply --execute"],
   };
 

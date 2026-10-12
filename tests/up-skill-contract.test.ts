@@ -37,10 +37,11 @@ describe("up skill contract", () => {
     expect(body).toContain("`axhub deploy create` 로 대체하지 않아요");
   });
 
-  // AE3 — headless 안전 기본값은 dry-run 이고 실행으로 넘어가지 않아요.
-  test("AE3: headless 안전 기본값은 dry-run 이에요", () => {
-    expect(body).toContain("Headless 안전 기본값은 dry-run 이에요");
-    expect(body).toContain("`--execute` 를 실행하지 않아요");
+  // AE3 — 재배포라 headless 도 물을 일이 없으면 실제로 올리고, 있으면 아무것도 바꾸지 않아요 (AP-12·AP-29).
+  test("AE3: headless 는 물을 일이 있을 때만 멈춰요", () => {
+    expect(body).toContain("물을 일이 없으면 headless 도 실제로 올려요");
+    expect(body).toContain("물을 일이 있으면 아무것도 바꾸지 않고 물을 내용만 남기고 멈춰요");
+    expect(body).not.toContain("Headless 안전 기본값은 dry-run 이에요");
   });
 
   // 성공 선언은 verify 단독이에요 (AP-1).
@@ -60,15 +61,17 @@ describe("up skill contract", () => {
     const execute = "axhub up --app \"$APP_ID\" --path . --execute";
     expect(body).toContain(preview);
     expect(body).toContain(execute);
-    // 승인 절이 실행 명령보다 앞에 와야 해요.
-    const approvalAt = body.indexOf("## 3단계 — 승인");
+    // 맞추기(1.5단계)와 미리보기(2단계)가 실행 명령보다 앞에 와야 해요 — 승인 카드는
+    // 없지만(AP-12) 고친 파일과 올릴 내용 확인이 먼저예요 (AP-29).
+    const fixAt = body.indexOf("## 1.5단계 — 올리기 전 맞추기");
+    const previewAt = body.indexOf(preview);
     const executeAt = body.indexOf(execute);
-    expect(approvalAt).toBeGreaterThan(-1);
-    expect(executeAt).toBeGreaterThan(approvalAt);
-    // 승인 절 앞에는 --execute 를 쓰는 명령이 없어야 해요. 산문에서 --execute 를
-    // 언급하는 것(재패킹 경고)은 허용하고, 실행 명령만 금지해요.
-    const beforeApproval = body.slice(0, approvalAt);
-    expect(beforeApproval.match(/axhub up [^\n]*--execute/)).toBeNull();
+    expect(fixAt).toBeGreaterThan(-1);
+    expect(previewAt).toBeGreaterThan(fixAt);
+    expect(executeAt).toBeGreaterThan(previewAt);
+    // 미리보기 앞에는 --execute 를 쓰는 up 명령이 없어야 해요. 산문 언급은 허용해요.
+    const beforePreview = body.slice(0, previewAt);
+    expect(beforePreview.match(/axhub up [^\n]*--execute/)).toBeNull();
   });
 
   // dry-run 패킹 실패는 preview 를 만들지 않고 멈춰요.

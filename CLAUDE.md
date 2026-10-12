@@ -120,7 +120,7 @@ Key routing rules:
 - 사용자 소유 GitHub 저장소에서 새 앱 시작 → `scaffold`
 - deploy_method=plugin App 게시·목록·정확한 version 다운로드 → `plugins` (Discovery/App Console/Console Review canonical surface)
 - 비어 있지 않은 기존 로컬 앱의 첫 axhub 연결·첫 배포 가져오기 → `import` (새 앱이 static 으로 자동 판정되면 통합 승인 전에 `어떤 방식으로 배포할까요?` 카드로 정적 사이트·서버 앱을 골라요 — AP-28)
-- 배포 실행·preview-confirm·verify 기반 성공 선언 → `deploy` (static 앱은 deploy_method auto-detect 로 독립 static lane: dry-run→`--execute`→`active_release_id` 성공 선언). 배포할 곳을 말하지 않은 배포 요청은 axhub 맥락이 없어도 deploy 가 받아, 연결 안 된 폴더면 `어디에 배포할까요?` 카드(axhub 추천)부터 보여주고 GitHub Pages 같은 다른 곳으로 알아서 배포하지 않아요 — AP-27
+- 배포 실행·배포 전 맞추기(AP-29)·verify 기반 성공 선언 → `deploy` (static 앱은 deploy_method auto-detect 로 독립 static lane: dry-run→`--execute`→`active_release_id` 성공 선언). 배포할 곳을 말하지 않은 배포 요청은 axhub 맥락이 없어도 deploy 가 받아, 연결 안 된 폴더면 `어디에 배포할까요?` 카드(axhub 추천)부터 보여주고 GitHub Pages 같은 다른 곳으로 알아서 배포하지 않아요 — AP-27
 - GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려 배포 → `up` (커밋 상태를 게이트로 쓰지 않고 `deploy-prep` preflight + `axhub up --dry-run` preview 사용, static 앱은 deploy 로 양보)
 - 기존 앱에 실데이터 기반 기능(페이지·화면·대시보드·조회 엔드포인트·CRUD 화면) 코드 생성 → `development` (AP-5 read 기본, write 게이트 — 조회 도구는 읽기 전용이고 커넥터 자체는 쓰기 액션을 가질 수 있어요)
 - 배포 실패 원인 진단·해결 후보 요약 → `diagnosis` (읽기 전용, 재배포·롤백 직접 실행 금지)
@@ -133,6 +133,6 @@ Key routing rules:
 
 **codex 질문 프로토콜·fail-closed (AP-12 codex 판):** codex 판은 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형 + 추천안 `(추천)` + 답→행동 매핑을 쓰고, 질문한 턴은 도구 호출 없이 끝내요. 네이티브 선택 카드(`[features] default_mode_request_user_input`)가 켜진 세션에서 **빈 답변은 미승인**이고 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 이 규칙은 세 채널이 겹쳐 소유해요 — always-on 합본 훅(kill switch `AXHUB_NO_QUESTION_PROTOCOL` / `~/.axhub/config/no-question-protocol`), AP-12 정책, 그리고 실행 7스킬 본문의 첫 8,000B. 훅은 미신뢰 세션에서 조용히 꺼지고 본문은 8,000B에서 절단되니 실패 모드가 서로 달라요.
 
-**진입 확인 AUQ (AP-12):** axhub 프로젝트가 확정돼도 배포·생성·가져오기(deploy·bootstrap·import) 실행 전에 interactive 에서는 "axhub로 진행할까요?"를 AskUserQuestion 으로 한 번 더 확인해요("무엇을·어떻게"를 묻는 기존 preview 승인과 별개인 진입 게이트). deploy·import 는 preview 앞 별도 AUQ, bootstrap 은 기존 preview 승인에 통합(byte 예산 포화). headless 는 생략해요.
+**진입 확인 (AP-12):** 새로 만드는 일(bootstrap·import·scaffold·plugin 게시)은 interactive preview 승인 하나가 axhub 진입 확인을 겸해요. 이미 AXHub 에 있는 앱의 재배포(deploy·up)는 승인 카드 없이 **배포 전 맞추기(AP-29)** 를 해요 — `deploy check` 판정 + preflight `context_url` 기준 문서로 AI 검사·로컬 빌드, `.env` 값 등록(`env set --from-dotenv`)·코드 수정·커밋을 push 전에 끝내고(GitHub 연결 앱은 push 가 곧 자동 배포), 물을 일(값 없는 설정값·안 되는 6가지 첫 해당·첫 올리기의 새 이름)이 있을 때만 물어요. headless 는 물을 일이 없으면 실제로 배포하고 있으면 멈춰요. "그대로" 답은 `.axhub/deploy-answers.json`(커밋 안 함)에 남겨요.
 
 **Windows 실행 계약 (AP-13):** Windows 에선 axhub 명령을 Git Bash 전용으로 실행해요 (PowerShell 금지). PATH 는 수동 등록 대신 canonical 경로(`~/.axhub/bin/axhub`(.exe))로 `plugin-support repair-path` 를 실행해 영속 등록하고 같은 세션은 repair-path 의 bin_path 절대경로로 계속 진행해요(구 CLI 로 bin_path 가 없으면 새 터미널 안내, 새 터미널은 다음 세션용), `auth status` 는 `auth login` 한 그 셸에서 검증해요 — HOME 없는 PowerShell 의 "미로그인" 은 실패가 아니에요. 로그인은 단일 폴링 `axhub auth login --json` 1 회로 하고 background 재실행은 안 해요. 이 계약에 예외는 없어요 — 공식 설치 채널은 install.sh / install.ps1 뿐이고, npm/npx 의 `axhub`·`axhub-cli` 패키지는 이름 예약 스텁이라 설치·실행·안내에 쓰지 않아요.
