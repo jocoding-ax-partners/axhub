@@ -52,12 +52,7 @@ Claude Desktop 에서 현재 선택된 프로젝트가 이미 정확히 `APP_DIR
 
 ## 개발자 스택 지원 범위
 
-이 스킬은 Next.js 전용이 아니에요. CLI 의 `import/v1` 감지와 execute 증거를 기준으로 기존 개발자 앱을 가져오며, 대표적인 프론트·백엔드 스택을 지원해요.
-
-- 정적 프론트: Vite, Astro, React Scripts, Angular, Vue CLI, Parcel, Gatsby, Svelte 등 build-only 앱은 static 후보로 다뤄요.
-- Compose 기반 앱: `compose.yml`, `compose.yaml`, `docker-compose.yml`, `docker-compose.yaml` 이 있으면 compose 배포 후보로 다뤄요.
-- Dockerfile 보유 앱: 기존 Dockerfile 을 존중하고 새 Dockerfile 을 만들지 않아요.
-- Dockerfile 없는 백엔드 앱: CLI 가 근거 파일을 보고 Node, Python(FastAPI/Flask/Django), Go, Rust, Java(Maven/Gradle), PHP, Ruby(Rails/Rack), Deno, .NET 용 기본 Dockerfile 을 생성할 수 있어요.
+이 스킬은 Next.js 전용이 아니에요. CLI 의 `import/v1` 감지 기준으로 정적 프론트(Vite·Astro 등 build-only → static 후보), Compose 파일이 있는 앱(compose 후보), Dockerfile 보유 앱(기존 Dockerfile 존중), Dockerfile 없는 백엔드 앱(CLI 가 Node·Python·Go·Rust·Java·PHP·Ruby·Deno·.NET 기본 Dockerfile 생성)을 가져와요.
 
 스킬은 이 스택 판정을 직접 재구현하지 않아요. preview 의 `deploy_method`, `manifest_hints`, `required_mutations`, `safety_notes` 를 검증해서 보여주고, execute 는 CLI 가 한 번만 수행해요.
 
@@ -189,7 +184,7 @@ axhub plugin-support tenant-resolve --json
 
 사용자나 현재 컨텍스트에서 app slug, GitHub owner/repo, tenant 가 이미 정해졌으면 preview 부터 그대로 넘겨요. `--slug` 는 axhub 앱 slug, `--name` 은 표시 이름, `--repo` 는 GitHub 저장소예요. repo owner 를 별도 flag 로 만들지 말고 `--repo "$OWNER/$REPO"` 형태로 넘겨요.
 
-import helper 에 넘길 수 있는 옵션은 `--mode`, `--headless`, `--approved`, `--commit-manifest`, `--verify-wait`, `--app`, `--name`, `--slug`, `--repo`, `--repo-private`, `--repo-public`, `--branch`, `--from-dir`, `--installation-id`, `--tenant`, `--deploy-method`, `--idea`, `--git-backend`, `--json` 뿐이에요. `--idea <uuid>` 는 요청의 `아이디어 ID:` 줄 값이고 `capabilities.import.idea` 가 true 일 때만 써요. 이 목록에 없는 옵션은 추론하거나 `--help`로 복구하지 않아요. 특히 사용자가 비공개 저장소를 원하면 정확히 `--repo-private` 를 쓰고, 존재하지 않는 `--private` 를 절대 붙이지 않아요. 실수로 unknown option 이 나오면 임의 옵션을 뺀 재시도나 `plugin-support import --help` 호출로 이어가지 말고 멈춰요. preview 와 execute 는 검증된 동일 옵션 집합을 유지해요.
+import helper 에 넘길 수 있는 옵션은 `--mode`, `--headless`, `--approved`, `--commit-manifest`, `--verify-wait`, `--app`, `--name`, `--slug`, `--repo`, `--repo-private`, `--repo-public`, `--branch`, `--from-dir`, `--installation-id`, `--tenant`, `--deploy-method`, `--idea`, `--git-backend`, `--env-from-dotenv`, `--env-only`, `--json` 뿐이에요. `--env-from-dotenv`·`--env-only` 는 execute 에만 쓰고 `capabilities.import.env_from_dotenv` 가 true 일 때만 써요. `--idea <uuid>` 는 요청의 `아이디어 ID:` 줄 값이고 `capabilities.import.idea` 가 true 일 때만 써요. 이 목록에 없는 옵션은 추론하거나 `--help`로 복구하지 않아요. 특히 사용자가 비공개 저장소를 원하면 정확히 `--repo-private` 를 쓰고, 존재하지 않는 `--private` 를 절대 붙이지 않아요. 실수로 unknown option 이 나오면 임의 옵션을 뺀 재시도나 `plugin-support import --help` 호출로 이어가지 말고 멈춰요. preview 와 execute 는 검증된 동일 옵션 집합을 유지해요.
 
 **코드 저장 위치 (AP-23).** CLI 가 기존 앱은 그 앱의 저장소 방식, 새 앱은 작업공간 기본값으로 경로를 정하고 읽기 실패면 GitHub 로 추측하지 않고 멈춰요. 사용자가 GitHub 또는 Axhub self-hosted 를 명시했을 때만 preview·execute 에 같은 `--git-backend github|selfhosted` 를 붙여요. `required_mutations` 에 `selfhosted_repo_push` 가 있으면 self-hosted 경로예요 — `--repo`·GitHub owner·App 설치·device flow 대사를 0회로 유지하고, 승인 카드에 요약의 `코드 저장 위치:` 줄을 그대로 보여줘요. 첫 배포는 push 로 자동 시작되고 성공 증거는 같은 `deployment` evidence 예요. origin·`--repo` 충돌은 error 의 `recovery_action` 을 그대로 안내해요. 아래 owner/repo 규칙은 GitHub 경로에만 적용돼요.
 
@@ -197,7 +192,7 @@ GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 �
 
 단, static 앱은 CLI 가 GitHub repo 없이 `app_create/app_select → local build → static_release` 로 배포할 수 있어요. static lane 에서는 사용자가 명시적으로 "GitHub 저장소도 만들고 연결해줘" 라고 말하지 않는 한 `--repo` 를 붙이지 않아요. Docker/compose 같은 GitHub 기반 첫 배포에서만 `local_only` 새 repo 생성 전에 `--repo owner/name` 이 확정돼 있어야 해요.
 
-Docker/compose `local_only` 에서 새 GitHub repo 를 만들 때 owner 는 먼저 로컬 GitHub 계정과 맞춰요. `gh api user --jq .login` 으로 현재 `gh` 로그인 이름을 확인할 수 있으면 CLI 가 그 login 과 app slug 로 기본 repo 를 정해요. org owner 는 이미 그 org repo 를 직접 만들고 push 가능한 `origin` 이 있거나 사용자가 명시적으로 그 owner 를 지정했을 때만 써요. CLI 는 새 repo 생성 전에 owner mismatch 를 `typed_failure: git` 으로 막을 수 있어요. 이때는 같은 로컬 login owner 로 다시 preview/execute 하거나, org repo 를 직접 만들고 push 가능한 origin 에서 다시 실행해요.
+Docker/compose `local_only` 의 새 GitHub repo owner 는 로컬 `gh` 로그인과 맞춰요 — CLI 가 현재 `gh` 로그인과 app slug 로 repo 를 정하고, org owner 는 push 가능한 `origin` 이 있거나 사용자가 지정했을 때만 써요. owner 불일치는 CLI 가 `typed_failure: git` 으로 막아요.
 
 ```bash
 axhub --json plugin-support import --mode preview
@@ -239,6 +234,16 @@ axhub --json plugin-support import --mode preview --headless
 
 preview `deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create` 가 있는데 사용자가 배포 방식을 말하지 않았으면, 6 전에 선택 카드로 `어떤 방식으로 배포할까요?` 를 한 번 물어요. header `배포 방식`, 선택지 `정적 사이트 (추천)`(`HTML·빌드 결과만 올려요 · axhub.page 주소`), `서버 앱`(`서버 코드까지 실행해요 · axhub.dev 주소`), `취소`(`가져오기를 중단해요.`). 정적 사이트면 6으로 가요. 서버 앱이면 `detected_state.manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker` 로 preview 를 다시 받아 5·6 을 이어가고, 없으면 실행할 서버 코드가 없다고 한 줄로 말한 뒤 `정적 사이트 (추천)`·`취소` 로 다시 물어요. headless 는 묻지 않아요.
 
+5-2. 첫 올리기 점검 (AP-30)
+
+대화형이고 preflight 의 `capabilities.readiness.deploy_check`·`capabilities.import.env_from_dotenv` 가 true 일 때만 해요.
+
+1. `axhub deploy check --json`(`--app` 없이)과 preflight 의 `capabilities.readiness.context_url` 문서(한 번, 못 받으면 없이)를 받아 그 규칙으로 코드를 보고, 빌드가 있으면 로컬 빌드를 5분 안에서 한 번 돌려요. 테스트·예시·README 흔적은 문제가 아니에요.
+2. 필요한 설정값 이름을 코드 근거로 정하고 `axhub env set --app <앱 주소> --from-dotenv .env` 미리보기로 `.env` 에 있는 이름을 확인해요. `.env` 를 직접 열지 않아요.
+3. 6의 승인 카드 한 화면에 보여줘요 — 새 이름(앱 주소·저장소·작업공간), 물을 일, `이렇게 맞춰서 올릴게요` 목록(고칠 것·등록할 설정값 이름). 물을 일은 둘뿐이에요: `.env` 에도 없는 필수 설정값(값은 대화로 받지 않고 `.env` 에 넣어 달라고 부탁해요)과 안 되는 6가지에 해당한 것(문서의 대안과 `그대로 올리기`). 같은 AskUserQuestion 의 질문으로 한 번에 받아요.
+4. 승인 뒤 execute 전에 고칠 코드를 고쳐요. git 저장소가 이미 있으면 고친 파일을 `배포 전 맞추기` 로 커밋하고, origin 이 있으면 push 해요(아직 앱에 연결되지 않아 자동 배포는 없어요). `.env*`·키 파일은 커밋하지 않아요. 등록할 이름이 있으면 execute 에 `--env-from-dotenv .env --env-only <이름,…>` 을 붙여요 — 앱 생성 직후·첫 배포 전에 등록돼요. `그대로` 답은 `.axhub/deploy-answers.json` 의 `keep` 에 더해요.
+5. 성공하면 맞춘 게 있을 때 마지막 메시지를 정확히 `이렇게 맞춰서 올렸어요.` 로 시작해요.
+
 6. 대화형 통합 승인 1회
 
 AskUserQuestion 은 preview 직후(5-1 카드와 별개로) 딱 한 번 써요. 질문은 `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?` 처럼 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인과 manifest commit 동의를 모두 겸해요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
@@ -264,13 +269,10 @@ Claude Desktop 에서는 Monitor, background task, ScheduleWakeup, output 파일
 axhub --json plugin-support import --mode execute --approved
 ```
 
-preview 에 `--slug`, `--repo`, `--tenant`, `--name`, `--deploy-method`, `--from-dir`, `--branch` 같은 import 옵션을 넘겼다면 execute 에도 같은 값을 그대로 반복해요. static lane preview 에 `--repo` 를 넣지 않았다면 execute 에도 넣지 않아요. Docker/compose `local_only` 에서 `--repo owner/name` 이 없으면 CLI 가 현재 `gh` 로그인과 app slug 로 repo 를 정하고, owner 를 확인할 수 없으면 repo failure 로 멈춰요.
+preview 에 `--slug`, `--repo`, `--tenant`, `--name`, `--deploy-method`, `--from-dir`, `--branch` 같은 import 옵션을 넘겼다면 execute 에도 같은 값을 그대로 반복해요. static lane preview 에 `--repo` 를 넣지 않았다면 execute 에도 넣지 않아요.
 
 ```bash
 axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"
-
-# Docker/compose local_only 처럼 GitHub repo 가 필요한 경우에만:
-axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --repo-private --tenant "$TENANT"
 ```
 
 `설정도 반영하고 시작` 을 골랐으면 `--commit-manifest` 를 더해요. CLI 가 backend mutation 전에 axhub.yaml 을 커밋·push 해서 첫 배포에 반영해요.
@@ -281,7 +283,7 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 
 동일 승인으로 두 번 호출하지 않아요. execute 결과도 `import/v1` 로 다시 검증해요. push 실패는 `typed_failure: git` 으로 와요(아래 10의 git 행으로 안내).
 
-권한 복구 뒤 같은 import 를 재개할 때는 preview 가 `existing_axhub_app_repair` 를 줄 수 있어요. 이 경우에도 execute 는 CLI envelope 한 번으로 처리하고, 위 capability 규칙에 맞는 verify 한 번만 실행해요.
+권한 복구 뒤 재개(`existing_axhub_app_repair`)도 execute 한 번 + verify 한 번이에요.
 
 9. 성공 안내
 

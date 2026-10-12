@@ -341,3 +341,32 @@ describe("import skill contract", () => {
     expect(envelope).toMatchObject({ result: { evidence: null }, error: { typed_failure: "static", owner: "backend", phase: "static", message_ko: "정적 사이트 확인 증거가 부족해요. 공개 URL과 활성 릴리스 확인 뒤 다시 시도해요." } });
   });
 });
+
+// spec 681 FR-P03·FR-P09 (AP-30): 첫 올리기는 승인 전에 점검하고 확인 1회에 모아요.
+describe("첫 올리기 점검 (AP-30)", () => {
+  const skill = readFileSync(join(REPO_ROOT, "skills", "import", "SKILL.md"), "utf8");
+  const development = readFileSync(join(REPO_ROOT, "skills", "development", "SKILL.md"), "utf8");
+
+  test("점검은 미리보기 뒤·통합 승인 앞에 와요", () => {
+    const check = skill.indexOf("5-2. 첫 올리기 점검 (AP-30)");
+    const approval = skill.indexOf("6. 대화형 통합 승인 1회");
+    expect(check).toBeGreaterThan(skill.indexOf("5. Preview 카드 렌더링"));
+    expect(approval).toBeGreaterThan(check);
+    const block = skill.slice(check, approval);
+    expect(block).toContain("capabilities.import.env_from_dotenv");
+    expect(block).toContain("axhub deploy check --json");
+    expect(block).toContain("capabilities.readiness.context_url");
+    expect(block).toContain("승인 카드 한 화면");
+    expect(block).toContain("값은 대화로 받지 않고");
+    expect(block).toContain("--env-from-dotenv .env --env-only <이름,…>");
+    expect(block).toContain(".axhub/deploy-answers.json");
+    expect(block).toContain("이렇게 맞춰서 올렸어요.");
+  });
+
+  test("development 는 코드를 쓰기 전에 같은 기준 문서로 6가지를 피해요", () => {
+    const rule = development.indexOf("7.5. **AXHub 배포 기준 (AP-30).**");
+    expect(rule).toBeGreaterThan(-1);
+    expect(development.indexOf("9. **코드 생성")).toBeGreaterThan(rule);
+    expect(development).toContain("SQLite·파일 대신 AXHub DB");
+  });
+});

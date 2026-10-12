@@ -185,3 +185,10 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "승인 카드를 띄우지 않아요", "--from-dotenv", "context_url", ".axhub/deploy-answers.json", "이렇게 맞춰서 올렸어요"
 - 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/up/SKILL.md
 - invariant(codex): "승인 카드를 띄우지 않아요", "--from-dotenv", "context_url", ".axhub/deploy-answers.json", "이렇게 맞춰서 올렸어요"
+
+## AP-30 첫 올리기 점검·개발 중 배포 기준
+- 규칙: 처음 올리는 앱(`import`)은 preview 뒤 승인 전에 AP-29 와 같은 점검(`deploy check`·preflight `capabilities.readiness.context_url` 기준 문서·코드 검사·로컬 빌드 1회)을 하고, 승인 카드 한 화면에 새로 정해지는 것(앱 주소·저장소·작업공간)·물을 일(값을 찾을 수 없는 설정값, 안 되는 6가지에 해당한 것)·맞출 내용을 함께 보여줘요 — 확인은 1회예요. 승인 뒤 코드를 고쳐 커밋하고, `.env` 에 있는 설정값은 execute 의 `--env-from-dotenv .env --env-only <이름,…>` 로 넘겨 CLI 가 앱을 만든 직후·첫 배포 전에 등록해요(첫 배포가 설정값 누락으로 실패하지 않게). 앱 기능을 만드는 `development` 는 코드를 쓰기 전에 같은 기준 문서를 읽고 안 되는 6가지를 처음부터 피해요(예: 데이터 저장은 AXHub DB). 문서를 못 받으면 문서 없이 진행해요.
+- 적용: skills/import/SKILL.md, skills/development/SKILL.md
+- invariant: "capabilities.readiness.context_url", "안 되는 6가지", "AP-30"
+- 적용(codex): plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/development/SKILL.md
+- invariant(codex): "capabilities.readiness.context_url", "안 되는 6가지", "AP-30"
