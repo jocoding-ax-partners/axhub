@@ -318,7 +318,7 @@ describe("spec 236 2차: scaffold and import follow the code storage location", 
       const importSkill = readSkill(root, "import");
       expect(importSkill, root).toContain("`selfhosted_repo_push`");
       expect(importSkill, root).toContain("`--git-backend github|selfhosted`");
-      expect(importSkill, root).toContain("`--git-backend`, `--json` 뿐이에요");
+      expect(importSkill, root).toContain("`--git-backend`, `--env-from-dotenv`, `--env-only`, `--json` 뿐이에요");
       expect(importSkill, root).toContain("`capabilities.import.selfhosted !== true`");
       expect(importSkill, root).toContain("GitHub 로 추측하지 않고 멈춰요");
       expect(importSkill, root).toContain("device flow 대사를 0회로 유지");

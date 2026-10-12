@@ -119,7 +119,7 @@ Key routing rules:
 - 빈 디렉토리 새 앱 생성·템플릿·bootstrap saga → `bootstrap`
 - 사용자 소유 GitHub 저장소에서 새 앱 시작 → `scaffold`
 - deploy_method=plugin App 게시·목록·정확한 version 다운로드 → `plugins` (Discovery/App Console/Console Review canonical surface)
-- 비어 있지 않은 기존 로컬 앱의 첫 axhub 연결·첫 배포 가져오기 → `import` (새 앱이 static 으로 자동 판정되면 통합 승인 전에 `어떤 방식으로 배포할까요?` 카드로 정적 사이트·서버 앱을 골라요 — AP-28)
+- 비어 있지 않은 기존 로컬 앱의 첫 axhub 연결·첫 배포 가져오기 → `import` (승인 전 첫 올리기 점검 후 새 이름·물을 일·맞출 내용을 확인 1회에 모아요, `.env` 값은 `--env-from-dotenv` 로 첫 배포 전 등록 — AP-30; 새 앱이 static 으로 자동 판정되면 통합 승인 전에 `어떤 방식으로 배포할까요?` 카드로 정적 사이트·서버 앱을 골라요 — AP-28)
 - 배포 실행·배포 전 맞추기(AP-29)·verify 기반 성공 선언 → `deploy` (static 앱은 deploy_method auto-detect 로 독립 static lane: dry-run→`--execute`→`active_release_id` 성공 선언). 배포할 곳을 말하지 않은 배포 요청은 axhub 맥락이 없어도 deploy 가 받아, 연결 안 된 폴더면 `어디에 배포할까요?` 카드(axhub 추천)부터 보여주고 GitHub Pages 같은 다른 곳으로 알아서 배포하지 않아요 — AP-27
 - GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려 배포 → `up` (커밋 상태를 게이트로 쓰지 않고 `deploy-prep` preflight + `axhub up --dry-run` preview 사용, static 앱은 deploy 로 양보)
 - 기존 앱에 실데이터 기반 기능(페이지·화면·대시보드·조회 엔드포인트·CRUD 화면) 코드 생성 → `development` (AP-5 read 기본, write 게이트 — 조회 도구는 읽기 전용이고 커넥터 자체는 쓰기 액션을 가질 수 있어요)

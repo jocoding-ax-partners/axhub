@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.30.8](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.7...plugin-v1.30.8) (2026-10-12)
+
+기존 앱을 처음 axhub 에 올릴 때 미리 점검하고, 새로 정해지는 앱 주소·저장소·작업공간과 물어볼 것, 고칠 내용을 한 화면에서 한 번만 확인받아요. `.env` 에 있는 설정값은 앱을 만든 직후·첫 배포 전에 등록해서 첫 배포가 설정값 누락으로 실패하지 않아요. 앱 기능을 만들 때도 AXHub 에서 안 되는 방식(파일에 저장 같은)을 처음부터 피하고 AXHub DB 같은 대안을 써요. 첫 올리기 점검은 axhub CLI 0.46.18 이상에서 켜져요.
+
+
+### Added
+
+* **plugin:** 첫 올리기는 점검 후 확인 1회로 모으고 development 는 6가지를 피한다 (spec 681) ([#919](https://github.com/jocoding-ax-partners/axhub-mono/issues/919)) ([3e52774](https://github.com/jocoding-ax-partners/axhub-mono/commit/3e527749dbd2a81a8b891f4cbe5e0b79ca37b168))
+
 ## [1.30.7](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.6...plugin-v1.30.7) (2026-10-12)
 
 이미 AXHub 에 올린 앱을 다시 배포할 때 승인 카드를 띄우지 않아요. 배포 전에 앱이 AXHub 에서 뜰 수 있는지 확인하고, `.env` 에만 있는 설정값 등록·포트와 주소 수정·커밋·push 처럼 답이 정해진 일은 묻지 않고 맞춘 뒤 올리고 `이렇게 맞춰서 올렸어요.` 로 알려줘요. 값을 찾을 수 없는 설정값이나 AXHub 에서 안 되는 기능처럼 고르셔야 하는 것만 물어요. 설정값은 push 전에 등록해서 push 로 시작되는 자동 배포가 실패하지 않아요. 아이디어 카드에서 시작한 앱은 만들 때 그 아이디어에 연결돼요. 이 기능들은 axhub CLI 0.46.17 이상이 필요하고, 더 낮으면 업데이트부터 안내해요.
