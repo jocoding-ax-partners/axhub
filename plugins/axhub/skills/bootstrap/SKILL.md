@@ -169,7 +169,7 @@ axhub apps bootstrap --git-backend selfhosted --template nextjs-axhub --name bak
 axhub apps bootstrap --git-backend github --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --dry-run --json
 ```
 
-첫 명령은 selfhosted, 둘째는 GitHub예요. backend와 나머지 값을 literal로 바꾸고 preview의 template·slug·subdomain·repo·visibility만 한국어로 보여줘요. raw JSON/stderr는 숨겨요.
+`아이디어 ID: <uuid>` 줄이 있고 `capabilities.import.idea` 면 dry-run·execute 에 `--idea <uuid>`. backend와 나머지 값을 literal로 바꾸고 preview의 template·slug·subdomain·repo·visibility만 한국어로 보여줘요. raw JSON/stderr는 숨겨요.
 
 미리보기 뒤 확인 필수. 처음부터 "바로 올려줘", "배포까지 해줘", `deploy it for real`이라고 말했어도 그 말은 목표이지 execute 승인 토큰이 아니에요. 추천 허용일 뿐이에요. `--dry-run` preview 뒤 axhub 진입 확인: 정확히 `지금 만들고 배포까지 진행할까요?` 질문과 `진행`/`취소` 선택지를 보여줘요. 질문·선택지·설명은 의역하거나 새로 만들지 않아요. 사용자가 `진행`을 고른 뒤에만 `--execute` 를 호출해요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
 
@@ -187,7 +187,7 @@ axhub --no-input apps bootstrap --git-backend selfhosted --template nextjs-axhub
 axhub --no-input apps bootstrap --git-backend github --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --idempotency-key 00000000-0000-4000-8000-000000000000
 ```
 
-첫 명령은 selfhosted, 둘째는 GitHub 예시예요. 실행 때 예시 UUID는 `init-resume put` 반환 literal UUID로 바꾸고 Execute/resume 명령에는 `--json`을 붙이지 않아요.
+실행 때 예시 UUID는 `init-resume put` 반환 literal UUID로 바꾸고 Execute/resume 명령에는 `--json`을 붙이지 않아요.
 
 아래 계정 연동/device 처리는 GitHub branch 전용이에요. selfhosted에서는 시작하지 않아요. 연동된 계정이면 execute 는 device flow 없이 끝나요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 금지예요. CLI 가 pending 으로 끝나면 URL·코드를 본문에 쓰고, `device_flow_required_user_action` 에서 멈추거나 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요. `인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 또는 watch flag를 제거한 resume 명령으로 승인 반영을 확인해요.
 

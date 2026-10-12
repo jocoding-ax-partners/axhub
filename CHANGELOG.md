@@ -4,6 +4,16 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.30.7](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.6...plugin-v1.30.7) (2026-10-12)
+
+이미 AXHub 에 올린 앱을 다시 배포할 때 승인 카드를 띄우지 않아요. 배포 전에 앱이 AXHub 에서 뜰 수 있는지 확인하고, `.env` 에만 있는 설정값 등록·포트와 주소 수정·커밋·push 처럼 답이 정해진 일은 묻지 않고 맞춘 뒤 올리고 `이렇게 맞춰서 올렸어요.` 로 알려줘요. 값을 찾을 수 없는 설정값이나 AXHub 에서 안 되는 기능처럼 고르셔야 하는 것만 물어요. 설정값은 push 전에 등록해서 push 로 시작되는 자동 배포가 실패하지 않아요. 아이디어 카드에서 시작한 앱은 만들 때 그 아이디어에 연결돼요. 이 기능들은 axhub CLI 0.46.17 이상이 필요하고, 더 낮으면 업데이트부터 안내해요.
+
+
+### Added
+
+* **plugin:** bootstrap·import 가 아이디어 ID 줄을 --idea 로 넘긴다 (spec 676) ([#711](https://github.com/jocoding-ax-partners/axhub-mono/issues/711)) ([501fbd3](https://github.com/jocoding-ax-partners/axhub-mono/commit/501fbd338a994b57d8083cee13aaa751761f51a1))
+* **plugin:** 재배포는 승인 카드 없이 배포 전 맞추기를 하고 올린다 (spec 681) ([#913](https://github.com/jocoding-ax-partners/axhub-mono/issues/913)) ([f6c2574](https://github.com/jocoding-ax-partners/axhub-mono/commit/f6c2574db91036f64f335c68e435e42915787486))
+
 ## [1.30.6](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.5...plugin-v1.30.6) (2026-10-07)
 
 배포할 곳을 말하지 않고 "배포해줘" 라고만 하면, axhub 에 연결 안 된 폴더에서도 GitHub Pages 같은 다른 곳으로 알아서 배포하지 않고 `어디에 배포할까요?` 카드(axhub 추천)부터 보여줘요. 기존 앱을 가져올 때 HTML 만 있는 폴더처럼 정적 사이트로 판정되면 바로 axhub.page 로 올리지 않고 `어떤 방식으로 배포할까요?` 카드로 정적 사이트와 서버 앱 중에서 골라요. 서버 앱은 실행할 서버 코드가 있을 때만 고를 수 있어요.
