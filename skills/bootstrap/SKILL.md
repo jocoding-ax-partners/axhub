@@ -204,9 +204,9 @@ execute/status 가 `deployment_id` 와 빌드/실행중 상태를 주면, prefli
 
 Claude Desktop 에서 `앱 생성 진행`/`앱 생성 재시도` tool 이 `백그라운드 셸 실패` 로 끝나면 raw output dump 금지. workspace 밖 plugin cache reference 읽기 권한 프롬프트는 허용 요구 없이 생략. 복구 명령도 `rtk`, `curl`, `pwd`, `ls`, `find`, `cat` 같은 generic probe 로 빠지지 않아요. `axhub` CLI 상태 명령만 써요.
 
-1. 출력에서 `bootstrap_id` 를 확인할 수 있으면 `axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json`.
+1. 출력이나 오류 hint 에서 `bootstrap_id` 를 확인할 수 있으면 `axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json`. watch 의 exit 10 은 이미 접수됐다는 뜻이라 이 명령에 `--watch --watch-timeout 9m` 을 붙여 이어가고 `--execute` 는 다시 실행하지 않아요. `failed` 의 `error_code` 가 `interrupted`(서버 재시작으로 중단)면 앱·저장소가 남았을 수 있어 다시 만들기 전 `axhub apps get <app-slug> --tenant <tenant> --json` 으로 확인하고, `timeout`(시간 초과)이면 앱은 지워졌고 저장소는 남았을 수 있어요.
 2. 출력에서 `deployment_id` 를 확인할 수 있으면 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --app <app> --json`.
-3. 둘 다 없고 오류가 timeout/network 계열일 때만 같은 idempotency key 로 execute 를 한 번 재시도해요. 재시도는 최대 1회예요. 단 device flow 가 시작된 흔적(브라우저 device 화면, `device_code_issued`, 사용자가 코드 입력 화면을 봤다는 말)이 있으면 이 재시도를 쓰지 않아요 — AP-18 대로 `github link` fast path 로 코드를 먼저 보여주고 `--resume-last` 로만 이어가요.
+3. 둘 다 없으면 먼저 `axhub apps get <app-slug> --tenant <tenant> --json` 으로 앱이 생겼는지 확인해요 — idempotency key 로는 중복이 막히지 않아요. 앱이 없고 execute 요청 자체가 timeout/network 계열로 끝났을 때만 같은 key 로 execute 를 한 번 재시도하고, `bootstrap watch timed out` 은 이미 접수된 거라 재시도하지 않아요. 재시도는 최대 1회예요. 단 device flow 가 시작된 흔적(브라우저 device 화면, `device_code_issued`, 사용자가 코드 입력 화면을 봤다는 말)이 있으면 이 재시도를 쓰지 않아요 — AP-18 대로 `github link` fast path 로 코드를 먼저 보여주고 `--resume-last` 로만 이어가요.
 4. 나중에 상태 명령이 `succeeded` 를 반환하면 "앱 생성은 완료됐어요" 로 복구 보고하고, 새 앱을 다시 만들지 않아요.
 5. 실패 원인이 GitHub(권한·정책·미연동·device flow) 이면 여기서 멈추지 말고 **12단계**로 가요. org owner 를 바꾸거나 개인 계정으로 만들고 나중에 transfer 하라는 제안은 하지 않아요.
 
@@ -219,7 +219,7 @@ axhub --tenant <tenant> git setup --json
 axhub --tenant <tenant> repo clone <app-slug> --json
 ```
 
-`data.destination`을 모든 repository-local 후속 tool call의 `cwd`로 고정해요. 원래 CWD를 쓰거나 값 누락을 추측하면 실패예요.
+`data.destination`을 모든 repository-local 후속 tool call의 `cwd`로 고정해요. 원래 CWD를 쓰거나 값 누락을 추측하면 실패예요. Clone exit 9 follows its hint: `repository.credential_missing` → the hint's `next:` command as printed once, retry; a repeat → stop and report it with `axhub feedback`. `repository.destination_exists` → show the hint path; the user picks another path or empties it. `already_cloned: true` is success.
 
 GitHub는 `repo_full_name` hydrate를 유지해요. 새 폴더의 `.omc/` 같은 Desktop 메타데이터 때문에 `git clone ... .` 는 쓰지 않아요. clone/hydrate 명령 안에서는 raw `git`만 써요. `rtk git`, `grep`, `cut`, `awk`, `sed` 금지.
 

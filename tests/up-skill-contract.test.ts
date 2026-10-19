@@ -86,6 +86,25 @@ describe("up skill contract", () => {
     expect(body).toContain("이미 진행 중인 배포가 있어요");
   });
 
+  // #405·#387: probe 가 답하지 않았거나 앱 목록을 못 읽은 건 로그인 만료도 첫 배포도 아니에요.
+  // 첫 배포(import/bootstrap 양보)는 bootstrap_plan 이 있을 때뿐이에요.
+  test("probe 실패·목록 실패를 로그인 필요·첫 배포로 오판하지 않아요 (#405·#387)", () => {
+    const probeRow = body.indexOf("`probe_timeout`·`probe_no_output`·`cli_spawn_failed`");
+    const loginRow = body.indexOf("| `auth_ok` false");
+    expect(probeRow).toBeGreaterThan(-1);
+    expect(loginRow).toBeGreaterThan(probeRow);
+    expect(body).toContain("`preflight.auth_error_code`");
+    expect(body).toContain("`axhub auth status --json` 결과로만 로그인 여부를 판정");
+    // auth status 는 로그인됨이면 exit 0, 미로그인·만료면 exit 4 예요. 로그인됨이면 1단계부터 이어가요.
+    const probeLine = body.split("\n").find((line) => line.includes("`probe_timeout`·`probe_no_output`·`cli_spawn_failed`")) ?? "";
+    expect(probeLine).toContain("exit 0 이면 1단계를 한 번 더 실행해 이어가고");
+    expect(probeLine).toContain("exit 4 면 아래 `auth_ok` false 행대로 해요");
+    expect(body).toContain("axhub 서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요.");
+    expect(body).toContain("| `resolve.error` 가 `apps_list_parse_error` |");
+    expect(body).toContain("| `bootstrap_plan` 존재");
+    expect(body).not.toContain("`bootstrap_plan` 존재, 또는 `resolve.app_id` 없음");
+  });
+
   // static 앱은 성공 선언 경로가 달라 deploy 로 양보해요.
   test("static 앱은 deploy 의 static lane 으로 양보해요", () => {
     expect(body).toContain("deploy_method");

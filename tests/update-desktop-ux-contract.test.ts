@@ -289,3 +289,70 @@ describe("update Desktop UX contract", () => {
     expect(policy).toContain("`| head`, `2>/dev/null`, `grep`, `&&` 같은 shell 후처리는 붙이지 않아요");
   });
 });
+
+// #386: 0.46.10 미만 CLI 는 update apply 다운로드에 전역 timeout(기본 30s)을 총 데드라인으로 걸어
+// 느린 회선에서 exit 10 이 반복돼요. 그 경로의 재시도·재설치 안내와, `--execute` 없는 안내(=dry-run
+// 미리보기뿐인 no-op)가 남지 않게 source·codex override·onboarding 을 함께 잠가요.
+describe("update apply timeout and manual fallback (#386)", () => {
+  const sources: Record<string, string> = {
+    "skills/update/SKILL.md": readRepo("skills/update/SKILL.md"),
+    "codex-overrides/skills/update/SKILL.md": readRepo("codex-overrides/skills/update/SKILL.md"),
+  };
+  const RETRY = "axhub --timeout 10m update apply --execute --yes";
+  const BRIDGE_RETRY = `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge ${RETRY}`;
+  const REINSTALL = ["curl -fsSL https://cli.axhub.ai/install.sh | sh", "irm https://cli.axhub.ai/install.ps1 | iex"];
+
+  test("exit 10 은 실패한 hop 만 한 번 다시 받고, 그래도 안 되면 공식 재설치를 안내해요", () => {
+    for (const [path, body] of Object.entries(sources)) {
+      expect(body, path).toContain("**exit 10 (timeout)**");
+      expect(body, path).toContain(RETRY);
+      expect(body, path).toContain(BRIDGE_RETRY);
+      expect(body, path).toContain("v0.46.10 미만");
+      expect(body, path).toContain("600000ms");
+      for (const command of REINSTALL) expect(body, path).toContain(command);
+    }
+  });
+
+  test("재시도 명령은 사용자에게 보이는 command allowlist 안에 있어요", () => {
+    for (const [path, body] of Object.entries(sources)) {
+      const start = body.indexOf("allowlist.**");
+      const allowlist = body.slice(start, body.indexOf("\n", start));
+      expect(start, path).toBeGreaterThan(-1);
+      expect(allowlist, path).toContain(`\`${RETRY}\``);
+      expect(allowlist, path).toContain(`\`${BRIDGE_RETRY}\``);
+    }
+  });
+
+  test("수동 안내가 dry-run 미리보기만 하는 `axhub update apply` 로 끝나지 않아요", () => {
+    for (const [path, body] of Object.entries(sources)) {
+      expect(body, path).not.toContain("axhub update apply 를 직접 한 번 실행해 주세요");
+      expect(body, path).not.toContain("axhub update apply 로 직접 받거나");
+      expect(body, path).toContain("axhub update apply --execute --yes 를 직접 한 번 실행");
+    }
+  });
+
+  test("onboarding 업데이트도 서명 신원 브리지·exit 10·그 외 비-0 을 다뤄요", () => {
+    const onboarding = readRepo("skills/onboarding/references/install-channels-and-auth.md");
+    expect(onboarding).toContain("AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub update apply --execute --yes");
+    expect(onboarding).toContain("exit 10 timeout");
+    expect(onboarding).toContain(RETRY);
+    expect(onboarding).toContain("v0.46.10");
+    expect(onboarding).toContain("any other non-zero");
+    for (const command of REINSTALL) expect(onboarding).toContain(command);
+  });
+
+  // 명령 도구 기본 timeout(Claude Code Bash 2분)이 CLI 보다 먼저 끊으면 exit 10 이 나오지 않아 위 분기가
+  // 돌지 않아요. 0.46.10+ 의 아카이브 하한이 10분이라, 첫 apply·브리지 hop 도 처음부터 600000ms 로 실행해요.
+  test("첫 apply 와 브리지 hop 도 명령 도구 timeout 600000ms 로 실행해요", () => {
+    for (const [path, body] of Object.entries(sources)) {
+      const start = body.indexOf("2. 실행: `axhub update apply --execute --yes`");
+      const run = body.slice(start, body.indexOf("3. exit code 로 갈라요", start));
+      expect(start, path).toBeGreaterThan(-1);
+      expect(run, path).toContain("브리지 hop 까지 모든 apply 는 명령 도구 timeout 을 600000ms 로 올려 실행해요");
+    }
+    const onboarding = readRepo("skills/onboarding/references/install-channels-and-auth.md");
+    const apply = onboarding.slice(onboarding.indexOf("Apply command:"), onboarding.indexOf("Exit handling:"));
+    expect(apply).toContain("Run every apply hop");
+    expect(apply).toContain("600000ms");
+  });
+});

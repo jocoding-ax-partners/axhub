@@ -93,16 +93,18 @@ Headless 는 `claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, TTY 없�
 axhub plugin-support deploy-prep --intent deploy --json
 ```
 
-이 명령은 `deploy-preview-summary`와 같은 envelope를 커밋 게이트 없이 줘요. 결과에서 읽는 값은 `preflight.auth_ok`, `preflight.cli_too_old`, `preflight.capabilities`, `resolve.app_id`, `github_connected`, `in_flight_deploy`, `bootstrap_plan`이에요. `resolve.app_id`를 얻은 뒤 provider 판정은 별도 `apps get`의 top-level `git_backend`만 써요.
+이 명령은 `deploy-preview-summary`와 같은 envelope를 커밋 게이트 없이 줘요. 결과에서 읽는 값은 `preflight.auth_ok`, `preflight.auth_error_code`, `preflight.cli_too_old`, `preflight.capabilities`, `resolve.app_id`, `resolve.error`, `github_connected`, `in_flight_deploy`, `bootstrap_plan`이에요. `resolve.app_id`를 얻은 뒤 provider 판정은 별도 `apps get`의 top-level `git_backend`만 써요.
 
 분기:
 
 | 관찰 | 행동 |
 |---|---|
-| `auth_ok` false | `axhub 로그인이 필요해요.` 한 줄 뒤 auth 복구로 안내하고 멈춰요. |
+| `preflight.auth_error_code`(또는 `resolve.error` 의 `auth_` 뒤)가 `probe_timeout`·`probe_no_output`·`cli_spawn_failed`·`api`·`rate_limited`·`timeout`·`other` | 로그인 판정이 없을 뿐이에요. 로그인·`import` 안내 없이 1단계를 한 번 다시 실행하고, 같으면 `axhub auth status --json` 결과로만 로그인 여부를 판정해요 — exit 0 이면 1단계를 한 번 더 실행해 이어가고, exit 4 면 아래 `auth_ok` false 행대로 해요. 그 밖이거나 1단계가 또 같으면 `axhub 서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요.` 로 멈춰요. |
+| `auth_ok` false (위 경우가 아닐 때) | `axhub 로그인이 필요해요.` 한 줄 뒤 auth 복구로 안내하고 멈춰요. |
 | `cli_too_old` true | `update` 로 보내고 멈춰요. |
 | `resolve.error` 가 `app_ambiguous` | 앱 이름이 여러 개에 걸린다는 뜻이에요 — 앱이 없는 게 아니에요. 후보를 보여주고 어느 앱인지 한 번 물은 뒤 `--app` 에 그 값을 넣어 1단계를 다시 해요. `import`·`bootstrap` 으로 보내지 않아요. |
-| `bootstrap_plan` 존재, 또는 `resolve.app_id` 없음 (모호함이 아닐 때) | 앱이 아직 없다는 뜻이에요. 비어 있지 않은 폴더는 `import`, 빈 폴더는 `bootstrap` 으로 양보해요. |
+| `resolve.error` 가 `apps_list_parse_error` | 앱 목록을 읽지 못한 일시 실패예요 — 앱이 없는 게 아니에요. 1단계를 한 번 다시 실행하고, 같으면 `앱 목록을 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.` 로 멈춰요. `import`·`bootstrap` 으로 보내지 않아요. |
+| `bootstrap_plan` 존재 (`resolve.error` 가 `app_not_found`·`no_candidate_slug`) | 앱이 아직 없다는 뜻이에요. 비어 있지 않은 폴더는 `import`, 빈 폴더는 `bootstrap` 으로 양보해요. `bootstrap_plan` 없이 `resolve.app_id` 만 없으면 위 행들로 판정하고 첫 배포로 보지 않아요. |
 | `in_flight_deploy` 존재 | `이미 진행 중인 배포가 있어요. 그 배포를 계속 확인할게요.` 한 줄 뒤 `in_flight_deploy.id` 를 `DEPLOY_ID` 로 바인딩하고 5단계로 바로 가요. 새 배포를 시작하지 않아요 — `deploy-prep` 은 이 상태를 exit code 로 알리지 않으니 여기서 직접 막아요. |
 | exit 64 (`validation.quality_gate_failed`) | 품질 확인에서 막힌 항목이 있다는 뜻이에요. 실행하지 않고 사유를 한국어로 알린 뒤 멈춰요. |
 | 현재 폴더에 `axhub.yaml`·`apphub.yaml` 이 둘 다 없음 | `이 폴더에 axhub 매니페스트가 없어서 어떤 앱의 소스인지 확인할 수 없어요.` 로 멈추고 `import` 로 양보해요. `axhub up` 은 패킹 전에 매니페스트를 보지 않으니 이 확인은 여기서 해요. |
@@ -124,9 +126,9 @@ top-level `git_backend.backend`와 `git_backend.source`, `deploy_method`, `stagi
 `deploy` 의 `## 배포 전 맞추기` 와 같은 흐름이고, 커밋·push 만 빼요. preflight 의 `capabilities.readiness.deploy_check` 가 false 면 `axhub CLI를 최신 버전으로 업데이트해 주세요.` 라고 하고 멈춰요.
 
 1. `axhub deploy check --app "$APP_ID" --json` (제목 `배포 전 확인`). 이 lane 은 커밋을 보내지 않으니 `commit_not_on_remote`·`uncommitted_changes` 는 보지 않아요.
-2. preflight 의 `capabilities.readiness.context_url` 문서를 한 번만 가져와요(제목 `배포 기준 확인`). 못 받으면 문서 없이 진행해요.
+2. preflight 의 `capabilities.readiness.context_url` 문서를 한 번만 가져와요(제목 `배포 기준 확인`). 못 받으면 `../deploy/references/deploy-rules.md` 로 대신해요.
 3. 그 규칙으로 앱 코드를 보고, 빌드 단계가 있으면 로컬 빌드를 5분 안에서 한 번 돌려요. 실패하면 고치고 2번까지 다시 빌드해요. 그래도 실패하면 올리지 않고 무엇이 막혔는지 알려요. 테스트·예시·README 의 흔적은 문제가 아니에요.
-4. 물을 일은 둘뿐이에요 — `.env`·`.env.local` 에도 없는 필수 설정값(`<이름> 값을 앱 폴더 .env 에 넣어 주세요` 라고 부탁해요, 값을 대화로 받지 않아요)과 안 되는 6가지에 처음 해당한 것. 모아서 한 번 물어요. `.axhub/deploy-answers.json` 의 `keep` 에 있는 항목은 다시 묻지 않고, `그대로` 답은 거기에 더해요.
+4. 물을 일은 둘뿐이에요 — `.env`·`.env.local` 에도 없는 필수 설정값(`<이름> 값을 앱 폴더 .env 에 넣어 주세요` 라고 부탁해요, 값을 대화로 받지 않아요)과 안 되는 6가지·문서 `물어봄` 규칙에 처음 해당한 것. 모아서 한 번 물어요. `.axhub/deploy-answers.json` 의 `keep` 에 있는 항목은 다시 묻지 않고, `그대로` 답은 거기에 더해요.
 5. 묻지 않고 맞춰요: `.env` 에 있는 필수 이름은 `axhub env set --app "$APP_ID" --from-dotenv .env --only <이름,…> --execute` 로 등록해요(`.env` 를 열거나 값을 출력하지 않아요). 포트·`0.0.0.0` 바인딩·상태 확인 경로·빌드 오류는 파일을 고쳐요. 고친 파일은 커밋하지 않고 그대로 올라가요.
 6. 맞춘 게 있으면 마지막 메시지를 정확히 `이렇게 맞춰서 올렸어요.` 로 시작하고, 맞춘 것과 결과 주소를 알려요.
 

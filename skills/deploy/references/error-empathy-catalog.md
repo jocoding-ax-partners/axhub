@@ -77,9 +77,25 @@ hand-written UX guide covers every emitted key.
 
 **해결:** "다시 로그인해줘" 라고 하면 브라우저로 안내해요. 브라우저가 안 열리는 환경이면 헤드리스 토큰 안내로 이어가요.
 
+**예외:** deploy-prep·preflight 의 `auth_error_code` 가 `probe_timeout`·`probe_no_output`·`cli_spawn_failed`·`api`·`rate_limited`·`timeout`·`other` 면 로그인 만료가 아니에요 — 아래 `exit 4:auth.probe_failed` 항목을 써요.
+
 **예외:** subcode 가 `github_relogin_required` 면 axhub 로그인이 아니라 GitHub 계정 연동이 풀린 상태예요. 재로그인 대신 GitHub 재연동(device flow)으로 안내해요 — `axhub github link` 를 승인하고 같은 확인 명령을 다시 실행하면 저장된 연동이 이어져요. 코드를 놓쳤거나 만료돼서 승인을 못 했으면 같은 명령을 반복하지 않고 `axhub github link --fresh` 로 새 코드를 받아요 — 저장된 pending link 는 죽은 코드를 그대로 돌려줘요.
 
 **버튼:** ["다시 로그인", "토큰 파일로 로그인", "도와주세요"]
+
+---
+
+### exit 4:auth.probe_failed
+
+deploy-prep·preflight 가 exit 65 로 끝났는데 `auth_error_code`(없거나 `cli_runtime_error` 면 `resolve.error` 의 `auth_` 뒤)가 `probe_timeout`·`probe_no_output`·`cli_spawn_failed`(프로브가 답하지 않음)나 `api`·`rate_limited`·`timeout`·`other`(`auth status` 가 로그인 판정 없이 답함 — `/me` 429·5xx 또는 연결 실패)인 경우예요. `classify-exit` 도 이 상태를 이 키로 골라요.
+
+**감정:** 잠깐만요. 로그인 문제가 아니에요. 앱은 그대로예요.
+
+**원인:** axhub 서버가 늦게 답하거나 잠시 답하지 못해서 로그인 상태를 지금 확인하지 못했어요. 로그인이 풀린 게 아니라 확인을 못 한 거예요.
+
+**해결:** 같은 확인을 한 번 더 할게요. 그래도 안 되면 로그인 상태만 따로 확인하고, 그것도 안 되면 잠시 뒤 다시 시도해요. 다시 로그인하지 않아도 돼요.
+
+**버튼:** ["다시 확인하기", "잠시 뒤 다시", "도와주세요"]
 
 ---
 
@@ -90,6 +106,8 @@ hand-written UX guide covers every emitted key.
 **원인:** 그 이름의 앱/배포/API 가 회사 axhub 에 등록 안 돼 있어요. 오타이거나 다른 회사 계정의 앱일 수 있어요.
 
 **해결:** 가장 비슷한 후보를 보여줘요. 후보 중 하나를 고르거나 이름을 다시 입력하게 안내해요.
+
+**예외:** deploy-prep 의 `resolve.error` 가 `apps_list_parse_error` 면 이름을 못 찾은 게 아니라 목록을 못 읽은 거예요 — 아래 `exit 5:apps.list_unavailable` 항목을 써요.
 
 **버튼:** ["가장 유사한 거로", "앱 목록 보기", "다시 입력"]
 
@@ -128,6 +146,20 @@ hand-written UX guide covers every emitted key.
 **해결:** 비어 있지 않은 기존 앱이면 "기존 앱 가져와줘" 라고 말씀해 import 로 이어가요. 빈 디렉토리에서 새 템플릿을 시작하려면 "새 앱 만들어줘" 라고 말씀해주세요.
 
 **버튼:** ["기존 앱 가져오기", "새 앱 만들기", "앱 목록 보기"]
+
+---
+
+### exit 5:apps.list_unavailable
+
+deploy-prep 이 exit 67 로 끝났는데 `resolve.error` 가 `apps_list_parse_error` 인 경우예요. `classify-exit` 도 이 상태를 이 키로 골라요.
+
+**감정:** 잠깐만요. 앱이 없어진 게 아니에요.
+
+**원인:** 앱 목록을 읽는 중에 응답이 늦거나 끊겨서 목록을 확인하지 못했어요. 이름을 못 찾은 게 아니라 목록을 아직 못 본 거예요.
+
+**해결:** 목록을 한 번 더 읽어 볼게요. 그래도 안 되면 잠시 뒤 다시 시도해요. 새로 가져오기나 앱 만들기는 하지 않아요.
+
+**버튼:** ["다시 확인하기", "잠시 뒤 다시", "도와주세요"]
 
 ---
 
@@ -211,6 +243,8 @@ hand-written UX guide covers every emitted key.
 
 **해결:** "다시 로그인해줘" 라고 말씀하시면 브라우저로 안내드릴게요. (브라우저가 안 열리는 환경 — 예: GitHub Codespaces — 이시면 별도 안내드려요.)
 
+**예외:** `auth_error_code` 가 `probe_timeout`·`probe_no_output`·`cli_spawn_failed`·`api`·`rate_limited`·`timeout`·`other` 면 로그인 만료가 아니에요 — 위 `exit 4:auth.probe_failed` 항목을 써요.
+
 **버튼:** ["다시 로그인", "토큰 파일로 로그인 (헤드리스)", "도와주세요"]
 
 ---
@@ -278,6 +312,8 @@ hand-written UX guide covers every emitted key.
   ③ paydrop-staging
   ④ 위에 없어요 — 앱 목록 보기
 ```
+
+**예외:** `resolve.error` 가 `apps_list_parse_error` 면 이름을 못 찾은 게 아니라 목록을 못 읽은 거예요 — 위 `exit 5:apps.list_unavailable` 항목을 써요.
 
 **버튼:** ["가장 유사한 거로", "앱 목록 보기", "다시 입력"]
 

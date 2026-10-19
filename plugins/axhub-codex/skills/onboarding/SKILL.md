@@ -82,7 +82,7 @@ update_plan 가 host 에 있으면 checklist 를 갱신해요. 없으면 언급�
 주요 detect 필드는 parsing 전용이고 사용자-facing 문장·표·도구 제목에는 노출하지 않아요.
 
 ### 2. Git backend gate
-DETECT의 `first_gap`이 `cli_missing`·`cli_path_missing`·`cli_old`·`auth_missing` 중 하나면 이 단계의 나머지를 건너뛰고 4절의 해당 handler를 먼저 실행한 뒤 DETECT_ALL로 돌아와요. `cli_path_missing` 복구 후에는 반환된 absolute `bin_path`를 계속 사용해요. CLI·auth gap을 닫기 전에는 preflight와 backend read를 절대 실행하지 않아요.
+DETECT의 `first_gap`이 `cli_missing`·`cli_path_missing`·`cli_old`·`auth_missing`·`auth_unverified` 중 하나면 이 단계의 나머지를 건너뛰고 4절의 해당 handler를 먼저 실행한 뒤 DETECT_ALL로 돌아와요. `cli_path_missing` 복구 후에는 반환된 absolute `bin_path`를 계속 사용해요. CLI·auth gap을 닫기 전에는 preflight와 backend read를 절대 실행하지 않아요.
 
 
 DETECT 뒤 `axhub plugin-support preflight --json`을 한 번 실행해요. `capabilities.self_hosted_git.apps_git_backend`, `capabilities.self_hosted_git.app_git_backend`, `capabilities.self_hosted_git.git_setup`이 모두 `true`여야 하며, 누락·malformed/false면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
@@ -119,6 +119,7 @@ provider branch를 확정한 뒤 `EFFECTIVE_FIRST_GAP` 하나만 처리하고 �
 | `cli_path_missing` | detect 가 준 `cli_resolved_path`(없으면 canonical `"$HOME/.axhub/bin/axhub"`, Windows 는 `.exe`)로 `plugin-support repair-path --json` 실행 (bare `axhub` 는 이 상태에서 127); continue THIS session via the JSON `bin_path` absolute command; new terminal is next-session advice. |
 | `cli_old` | `axhub update check` / `axhub update apply --execute --yes --json`; load install reference. |
 | `auth_missing` | `axhub auth status`, refresh, or device login; load install reference. |
+| `auth_unverified` | No login verdict — login is unknown, not missing. No login copy: re-detect once, then `axhub auth status --json` decides; load install reference. |
 | `git_missing` | git install approval; load install reference. |
 | `node_missing` | node install approval; load install reference. |
 | `node_mismatch` | nvm/package-manager version correction approval; load install reference. |

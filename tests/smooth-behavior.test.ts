@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -527,6 +527,104 @@ describe("smooth behavior contracts", () => {
     expect(onboarding.split(CLAUDE.approvalGate.headlessCodexExecMention).length - 1).toBeGreaterThanOrEqual(2);
   });
 
+  // #405·#387: auth probe 가 답하지 않은 것(probe_timeout·probe_no_output·cli_spawn_failed)과
+  // 앱 목록을 못 읽은 것(apps_list_parse_error)은 로그인 만료도, 첫 배포(import)도, not-found 도
+  // 아니에요. 첫 배포 경계는 bootstrap_plan 하나예요.
+  test("probe 실패·목록 실패를 로그인 필요·첫 배포로 오판하지 않아요 (#405·#387)", () => {
+    const deploy = readRepo("skills/deploy/SKILL.md");
+    const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
+    const deployErrors = readRepo("skills/deploy/references/error-empathy-catalog.md");
+    const development = readRepo("skills/development/SKILL.md");
+    const gapStateMachine = readRepo("skills/onboarding/references/gap-state-machine.md");
+    const PROBE_CODES = ["probe_timeout", "probe_no_output", "cli_spawn_failed"];
+
+    // deploy 본문: preview 문구를 바로 따르지 않고 deploy-prep 판정으로 확정해요.
+    expect(deploy).toContain("Only `bootstrap_plan`");
+    expect(deploy).not.toContain("If `bootstrap_plan` is present or `app_id` is missing");
+    expect(deploy).toContain("`처음 배포라 앱 등록 준비`·로그인 문구는 바로 따르지 않고");
+    expect(deploy).not.toContain("`처음 배포라 앱 등록 준비` 면 첫 올리기라 `import` 몫이에요");
+    for (const code of [...PROBE_CODES, "apps_list_parse_error", "app_ambiguous", "axhub auth status --json"]) {
+      expect(deploy, code).toContain(code);
+    }
+    // 로그인 안내를 빼는 건 probe 3종뿐이에요 — 실제 로그아웃·만료(다른 auth 코드)는 auth recovery 예요.
+    // auth status 는 미로그인·만료를 exit 4 + error.code auth 로 내요(token_expired 같은 코드는 없어요).
+    expect(deploy).not.toContain("or a login prompt");
+    expect(deploy).toContain("`axhub auth status --json` decides (exit 0 continue, exit 4 login)");
+    expect(deploy).toContain("other `auth_` codes → auth recovery");
+    // preflight 의 auth 판정(CLI guard)도 같은 오판 경로예요 (#405 형제 경로).
+    const cliGuard = deploy.slice(deploy.indexOf("### CLI guard"), deploy.indexOf("### Routing and resolve"));
+    expect(cliGuard).toContain("`auth_error_code` probe 실패는 로그인 안내 없이");
+
+    // workflow-details: 첫 배포 경계와 재시도·판정 순서를 상세히 들고 있어요.
+    expect(workflowDetails).not.toContain("If `bootstrap_plan` is non-null or `app_id` cannot be resolved");
+    for (const phrase of [
+      ...PROBE_CODES,
+      "apps_list_parse_error",
+      "axhub auth status --json",
+      "axhub 서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요.",
+      "앱 목록을 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+      "`--refresh-in-flight` exit 65",
+      "exit 4 (`error.code` `auth`",
+      "is a real logout or expiry",
+    ]) {
+      expect(workflowDetails, phrase).toContain(phrase);
+    }
+    expect(workflowDetails).not.toContain("and not a login prompt");
+    expect(workflowDetails).not.toContain("`token_expired`/`not_logged_in`");
+
+    // 오류 카탈로그: classify-exit 가 이 두 경우에 내는 키(4:auth.probe_failed·5:apps.list_unavailable)와
+    // 같은 헤딩을 두고, 로그인 만료(exit 4·65)·not-found(exit 5·67) 항목은 그 키 항목으로 보내요.
+    const catalogSection = (heading: string): string => {
+      const start = deployErrors.indexOf(heading);
+      expect(start, heading).toBeGreaterThan(-1);
+      const rest = deployErrors.slice(start + heading.length);
+      const next = rest.search(/\n#{2,3} /);
+      return next === -1 ? rest : rest.slice(0, next);
+    };
+    expect(catalogSection("### exit 4:auth.probe_failed")).toContain("로그인 문제가 아니에요");
+    expect(catalogSection("### exit 5:apps.list_unavailable")).toContain("앱이 없어진 게 아니에요");
+    for (const heading of ["## exit 4 — auth required", "## exit 65 — auth required"]) {
+      expect(catalogSection(heading), heading).toContain("`exit 4:auth.probe_failed`");
+    }
+    for (const heading of ["## exit 5 — resource not found", "## exit 67 — resource not found"]) {
+      expect(catalogSection(heading), heading).toContain("`exit 5:apps.list_unavailable`");
+    }
+
+    // development·onboarding 도 auth_ok=false 를 전부 로그인 필요로 읽지 않고, auth status 를 exit 코드로 갈라요.
+    for (const source of [development, gapStateMachine]) {
+      for (const code of [...PROBE_CODES, "axhub auth status --json", "exit 4"]) {
+        expect(source, code).toContain(code);
+      }
+    }
+    expect(development).toContain("exit 0 이면 로그인된 거라 이어가고");
+    expect(gapStateMachine).toContain("exit 0 is logged in");
+  });
+
+  // #405·#387: `auth status` 가 답했어도 로그인 판정이 없으면 probe 실패와 같아요 — `/me` 가 429·5xx 였거나
+  // (`api`·`rate_limited`·`timeout`) 닿지 못했어요(`other`). CLI(prep_outcome::is_auth_probe_failure)가 이 넷을
+  // probe 3종과 함께 판정 없음으로 보니, 판정 없음 코드를 적은 줄은 일곱 코드를 다 적어야 로그인 안내로 새지 않아요.
+  test("판정 없음 코드 목록은 /me 429·5xx·연결 실패 코드까지 함께 적어요 (#405·#387)", () => {
+    const UNANSWERED_CODES = ["`api`", "`rate_limited`", "`timeout`", "`other`"];
+    const lists: string[] = [];
+    for (const file of readdirSync(join(REPO_ROOT, "skills"), { recursive: true, encoding: "utf8" })) {
+      if (!file.endsWith(".md")) continue;
+      for (const line of readRepo(join("skills", file)).split("\n")) {
+        if (line.includes("probe_timeout")) lists.push(`${file}: ${line}`);
+      }
+    }
+    // deploy·up·development 본문, deploy workflow-details·error-empathy-catalog, onboarding reference 두 개예요.
+    expect(lists.length).toBeGreaterThanOrEqual(11);
+    for (const entry of lists) {
+      for (const code of UNANSWERED_CODES) {
+        expect(entry, code).toContain(code);
+      }
+    }
+    // preflight 의 `--version` 이 실패하면(`cli_runtime_error`) 로그인 판정은 resolve 의 `auth_` 코드가 해요.
+    const details = readRepo("skills/deploy/references/workflow-details.md");
+    const envelope = details.slice(details.indexOf("## Deploy-prep envelope"), details.indexOf("## Target reconciliation"));
+    expect(envelope).toContain("`cli_runtime_error`");
+  });
+
   test("development skill follows the current SDK raw-db surface", () => {
     const development = readRepo("skills/development/SKILL.md") + readRepo("skills/development/references/sdk-db-surface.md");
     const connectorSafety = readRepo("skills/development/references/connector-safety.md");
@@ -724,9 +822,41 @@ describe("smooth behavior contracts", () => {
     // AP-19 invariants (agent-policy parity)
     expect(feedback).toContain("axhub feedback -m");
     expect(feedback).toContain("예상된 거절은 리포트하지 않아요");
-    // hook 은 계약 emit 만 해요: marker 삭제·업데이트·리포트 실행 없음
-    expect(feedback).not.toContain("rm -f");
-    expect(feedback).not.toContain("axhub update");
+    // #865: retryable·unavailable 일시 장애(site_offline)는 한 번 다시 시도한 뒤에만 리포트해요.
+    // #575·#576: plugin-support envelope 오류는 error.details 핵심을 `실제:` 줄에 옮겨 적어요.
+    // 정책 본문·요약도 같은 단서를 들고 있어야 해요 (invariant 줄은 그대로라 parity 가 못 잡아요).
+    const policy = readRepo("docs/policy/agent-policy.md");
+    const ap19 = policy.slice(policy.indexOf("## AP-19"), policy.indexOf("## AP-20"));
+    const claudeAp19 = readRepo("CLAUDE.md").split("## 예상 밖 CLI 실패 자동 리포트 hook (AP-19)")[1] ?? "";
+    for (const source of [feedback, ap19, claudeAp19]) {
+      expect(source).toContain("retryable");
+      expect(source).toContain("unavailable");
+      expect(source).toContain("site_offline");
+      expect(source).toContain("error.details");
+    }
+    // #336·#865: 커넥터 자체의 자격 증명 만료(exit 7 auth_expired)와 GET 이 아닌 invoke 를 사이트 agent 가
+    // 끝내지 못한 것(exit 7 connector_upstream_failed)은 운영 상태라 리포트하지 않아요. #909: route 404
+    // (backend_unimplemented)는 최신 CLI 로 올린 뒤에도 재현될 때만, #455: repository.url_missing(exit 9)은
+    // hint 대로 한 번 다시 시도해 반복될 때만 리포트해요. 셋이 같은 단서를 들고 있어야 해요.
+    const claudeAp19Section = claudeAp19.slice(0, claudeAp19.indexOf("\n## "));
+    for (const source of [feedback, ap19, claudeAp19Section]) {
+      for (const phrase of [
+        "auth_expired",
+        "connector_upstream_failed",
+        "backend_unimplemented",
+        "axhub update apply --execute --yes",
+        "repository.url_missing",
+      ]) {
+        expect(source, phrase).toContain(phrase);
+      }
+    }
+    // hook 은 계약 emit 만 해요: marker 삭제·업데이트·리포트 실행 없음. 계약 문안(JSON)은 명령을 안내할 수
+    // 있으니 그 밖의 셸 코드만 봐요.
+    const hookCode = feedback.replace(/'\{"continue":true[\s\S]*?\}\}'/, "''");
+    expect(hookCode).not.toBe(feedback);
+    expect(hookCode).not.toContain("rm -f");
+    expect(hookCode).not.toContain("axhub update");
+    expect(hookCode).not.toContain("axhub feedback");
   });
 
   test("update freshness prompt router hook is wired", () => {

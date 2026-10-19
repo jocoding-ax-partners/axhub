@@ -238,9 +238,9 @@ preview `deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create
 
 대화형이고 preflight 의 `capabilities.readiness.deploy_check`·`capabilities.import.env_from_dotenv` 가 true 일 때만 해요.
 
-1. `axhub deploy check --json`(`--app` 없이)과 preflight 의 `capabilities.readiness.context_url` 문서(한 번, 못 받으면 없이)를 받아 그 규칙으로 코드를 보고, 빌드가 있으면 로컬 빌드를 5분 안에서 한 번 돌려요. 테스트·예시·README 흔적은 문제가 아니에요.
+1. `axhub deploy check --json`(`--app` 없이)과 preflight 의 `capabilities.readiness.context_url` 문서(한 번, 없으면 `../deploy/references/deploy-rules.md`)를 받아 그 규칙으로 코드를 보고, 빌드가 있으면 로컬 빌드를 5분 안에서 한 번 돌려요. 테스트·예시·README 흔적은 문제 아니에요.
 2. 필요한 설정값 이름을 코드 근거로 정하고 `axhub env set --app <앱 주소> --from-dotenv .env` 미리보기로 `.env` 에 있는 이름을 확인해요. `.env` 를 직접 열지 않아요.
-3. 6의 승인 카드 한 화면에 보여줘요 — 새 이름(앱 주소·저장소·작업공간), 물을 일, `이렇게 맞춰서 올릴게요` 목록(고칠 것·등록할 설정값 이름). 물을 일은 둘뿐이에요: `.env` 에도 없는 필수 설정값(값은 대화로 받지 않고 `.env` 에 넣어 달라고 부탁해요)과 안 되는 6가지에 해당한 것(문서의 대안과 `그대로 올리기`). 같은 AskUserQuestion 의 질문으로 한 번에 받아요.
+3. 6의 승인 카드 한 화면에 보여줘요 — 새 이름(앱 주소·저장소·작업공간), 물을 일, `이렇게 맞춰서 올릴게요` 목록(고칠 것·등록할 설정값 이름). 물을 일은 둘뿐이에요: `.env` 에도 없는 필수 설정값(값은 대화로 받지 않고 `.env` 에 넣어 달라고 해요)과 안 되는 6가지·문서 `물어봄` 규칙에 해당한 것(문서 대안과 `그대로 올리기`). 같은 AskUserQuestion 의 질문으로 한 번에 받아요.
 4. 승인 뒤 execute 전에 고칠 코드를 고쳐요. git 저장소가 이미 있으면 고친 파일을 `배포 전 맞추기` 로 커밋하고, origin 이 있으면 push 해요(아직 앱에 연결되지 않아 자동 배포는 없어요). `.env*`·키 파일은 커밋하지 않아요. 등록할 이름이 있으면 execute 에 `--env-from-dotenv .env --env-only <이름,…>` 을 붙여요 — 앱 생성 직후·첫 배포 전에 등록돼요. `그대로` 답은 `.axhub/deploy-answers.json` 의 `keep` 에 더해요.
 5. 성공하면 맞춘 게 있을 때 마지막 메시지를 정확히 `이렇게 맞춰서 올렸어요.` 로 시작해요.
 
@@ -304,8 +304,8 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 | `manifest` | 앱 설정 파일을 정리해야 해요. CLI가 제안한 안전한 수정만 진행해요. |
 | `git` | Git/GitHub 연결이 준비되지 않았어요. recovery_action 을 따라요 — GitHub 인증 승인이 필요하다는 안내면 `axhub github link` 연동(승인 후 재실행하면 이어져요, 코드를 놓쳤거나 만료됐으면 `--fresh`)이 먼저고, 그 외에는 커밋·원격 연결·repo owner 를 확인해요. |
 | `repo` | GitHub 저장소 연결을 확인해야 해요. 권한이나 원격 저장소를 다시 볼게요. |
-| `app` | axhub 앱 생성 또는 선택에서 막혔어요. 앱 이름과 소유 권한을 확인해요. |
-| `static` | 정적 앱 처리에서 막혔어요. retryable=false 면 빌드 스크립트나 산출물 경로를 고친 뒤에만 다시 시도해요 — 재시도만으로는 결과가 안 바뀌어요. 그 외에는 공개 URL과 활성 릴리스를 확인해요. |
+| `app` | axhub 앱 생성 또는 선택에서 막혔어요. 앱 이름과 소유 권한을 확인해요. `code=app.subdomain_not_configured` 면 주소 없는 앱이에요 — 첫 운영 배포 뒤에는 바꿀 수 없으니 주소를 확인받고 승인 뒤 `axhub apps update <slug> --subdomain <주소> --tenant <t>` 로 정한 다음 같은 import 를 다시 실행해요(push 했다면 `axhub deploy list --app <slug> --tenant <t>` 로 자동 배포부터 봐요). |
+| `static` | 정적 앱 처리에서 막혔어요. `code=static.package_manager_missing`·`static.package_manager_spawn_failed` 면 패키지 매니저 문제예요 — recovery_action 의 설치는 사용자 동의를 받은 뒤에 하고(headless 는 안내만 하고 멈춰요) 같은 옵션으로 다시 실행해요. 빌드 스크립트는 고치지 않아요(AP-19 리포트 대상이 아니에요). 그 밖의 retryable=false 면 빌드 스크립트나 산출물 경로를 고친 뒤에만 다시 시도해요 — 재시도만으로는 결과가 안 바뀌어요. 그 외에는 공개 URL과 활성 릴리스를 확인해요. |
 | `deploy` | 첫 배포 확인에서 막혔어요. 실패로 끝났다면 `axhub deploy diagnose` 로 원인을 보고, 코드 원인이면 수정 커밋을 만든 뒤 다시 import 해요 — 같은 커밋 재실행은 같은 배포를 재사용해요. 진행 중이면 배포 상태만 다시 확인해요. |
 | `rate_limit` | 요청이 잠시 많아요. 조금 뒤 다시 시도해요. |
 | `transport` | 네트워크 연결이 불안정해요. 연결 상태를 확인한 뒤 다시 시도해요. |
@@ -316,8 +316,8 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 - deploy 는 ordinary redeploy 만 맡아요.
 - import 는 non-empty existing app first-connect flow 만 맡아요.
 - plugin 은 low-level CLI primitive 를 조합하지 않아요.
-- manifest 보강은 plugin 이 직접 authoring 하는 유일한 단계예요 — `manifest_create` 일 때만, 증거 있는 필드만, env 값 없이 작성하고 `axhub deploy --explain --json` 통과를 강제해요. 실패하면 최소 manifest 로 fallback 해요.
+- manifest 보강은 plugin 이 직접 authoring 하는 유일한 단계예요 — 규칙은 `## Manifest 보강` 그대로예요.
 - `manifest_repair` 는 CLI execute 가 처리해요. plugin 은 preview 에서 사용자에게 알리고, 직접 파일을 덮어쓰지 않아요.
-- commit+push 는 opt-in 이에요 — `capabilities.import.commit_manifest` true + GitHub 기반 첫 배포 + preview 통합 승인에서 `설정도 반영하고 시작` 선택이 모두 있을 때만 `--commit-manifest` 로 호출하고, 그 git 커밋·push 는 CLI 가(force 없이) 맡아요. local_only 는 remote 없음만으로 제외하지 않아요. capability 가 없으면 옵션을 제공하지 않아요. headless 에서는 없어요.
+- commit+push 는 opt-in 이에요 — 6에서 `설정도 반영하고 시작` 을 골랐을 때만 `--commit-manifest` 로 호출하고 커밋·push 는 CLI 가(force 없이) 맡아요. 조건은 6과 manifest-authoring 그대로예요.
 - malformed envelope, unknown schema, unknown enum, missing static URL, `verified !== true`, headless execute, approval bypass 는 모두 중단해요.
 - 성공을 말하기 전 항상 execute envelope 의 method-specific evidence 를 확인해요.

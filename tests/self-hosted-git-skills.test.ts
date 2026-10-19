@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
+import { DEFAULT_MAX_TOTAL_BYTES } from "../scripts/check-plugin-context-budget.ts";
+
 const ROOT = join(import.meta.dir, "..");
 const SKILL_ROOTS = ["skills", "plugins/axhub/skills", "plugins/axhub-codex/skills"] as const;
 const DIET = [
@@ -176,6 +178,132 @@ describe("spec 236 self-hosted git skill contracts", () => {
     }
   });
 
+  // #455: clone 실패가 타입 있는 exit 9 로 오고, 같은 저장소면 성공(already_cloned)이에요. 네 곳 모두 hint 대로 다뤄요.
+  test("clone results follow the hint: credential_missing, destination_exists, already_cloned (#455)", () => {
+    for (const root of SKILL_ROOTS) {
+      const bootstrap = readSkill(root, "bootstrap");
+      const clone = sliceSection(bootstrap, "### 10. Clone And Manifest", "### 11. Result");
+      const reference = readFileSync(join(ROOT, root, "bootstrap", "references", "bootstrap-and-local.md"), "utf8");
+      const deploy = readSkill(root, "deploy");
+      const selfhosted = sliceSection(deploy, "### Self-hosted repository lane", "### GitHub and upload lanes");
+      const details = readFileSync(join(ROOT, root, "deploy", "references", "workflow-details.md"), "utf8");
+      const branch = sliceSection(details, "## Self-hosted push branch", "## Git readiness");
+      for (const source of [clone, reference, selfhosted, branch]) {
+        expect(source, root).toContain("repository.credential_missing");
+        expect(source, root).toContain("repository.destination_exists");
+        expect(source, root).toContain("already_cloned: true");
+        // setup 뒤에도 credential_missing 이면 예상 밖 실패예요. exit 9 는 AP-19 의 '예상된 거절'이라
+        // 'report' 만으로는 리포트가 안 일어나니 axhub feedback 을 명시해요.
+        expect(source, root).toContain("axhub feedback");
+        // hint 의 `next:` 명령은 clone 이 고정한 --profile·--endpoint(쓴 경우 --config·--no-keychain)를 담아요.
+        // 스킬이 `axhub --tenant <tenant> git setup` 을 직접 조립하면 helper 가 읽지 않는 곳에 자격 증명을
+        // 저장해 credential_missing 이 되풀이될 수 있어요. CLI 계약대로 `next:` 명령을 적힌 그대로 실행해요.
+        const credential = source.slice(
+          source.indexOf("repository.credential_missing"),
+          source.indexOf("repository.destination_exists"),
+        );
+        expect(credential, root).toContain("`next:`");
+        expect(credential, root).toContain("as printed");
+        expect(credential, root).not.toContain("git setup");
+      }
+      // `next:` 가 없는 hint(자격 증명 저장소를 못 읽는 경우 등)는 setup 으로 풀리지 않아요.
+      expect(branch, root).toContain("without `next:`");
+      expect(reference, root).toContain("without `next:`");
+    }
+  });
+
+  // #832: 주소 없는 앱에 push 하면 webhook 이 조용히 건너뛰어 배포가 시작되지 않아요.
+  test("an app without an address sets it before the self-hosted push (#832)", () => {
+    for (const root of SKILL_ROOTS) {
+      const deploy = readSkill(root, "deploy");
+      const selfhosted = sliceSection(deploy, "### Self-hosted repository lane", "### GitHub and upload lanes");
+      // deploy check 항목 code 로 막아요 — `deploy.subdomain_not_configured` 는 error.subcode 예요.
+      const gate = selfhosted.indexOf("`subdomain_not_configured`");
+      expect(gate, root).toBeGreaterThan(-1);
+      expect(gate, root).toBeLessThan(selfhosted.indexOf("push -u origin"));
+      const recovery = sliceSection(deploy, "## Recovery Summary", "## NEVER");
+      expect(recovery, root).toContain("`subdomain_not_configured`");
+      expect(recovery, root).toContain("axhub apps update <app> --subdomain <address> --json");
+      const details = readFileSync(join(ROOT, root, "deploy", "references", "workflow-details.md"), "utf8");
+      expect(details, root).toContain("deploy.subdomain_not_configured");
+      expect(details, root).toContain("Headless never sets an address");
+    }
+  });
+
+  // #832: lane 보다 먼저 도는 `## 배포 전 맞추기` 의 ④ push 도 주소가 없으면 하지 않아요. 주소는 AP-29 의
+  // 맞출 일이 아니라 Recovery 질문이에요. 주소 없이 이미 원격에 올라간 커밋은 다시 push 하지 않아요 —
+  // webhook 은 그 push 를 건너뛰었지만, backend 의 code_repo_state_reconcile 이 매분 기본 브랜치 tip 에
+  // 배포가 없으면 놓친 webhook 을 다시 재생해서 주소를 정하면 1분 안에 배포가 생겨요. 그 배포를 deploy list 로
+  // 찾아 verify 해요. self-hosted 앱은 저장소 기본 브랜치만 배포해요 — git 연결 브랜치가 기본 브랜치로 고정이라
+  // 다른 브랜치 push 는 주소와 무관하게 webhook 이 건너뛰어요(branch split 은 플랫폼 앱 전용). 그래서 '다음 push 가
+  // 배포' 안내는 어느 경우에도 틀려요. `git ls-remote` 가 실패하면 기본 브랜치가 아니라고 보지 않고 reconcile
+  // 조회로 가요(최악이 pending 이에요).
+  test("the common pre-deploy push waits for the address, and a commit already on the remote is found via reconcile and verified (#832)", () => {
+    for (const root of SKILL_ROOTS) {
+      const deploy = readSkill(root, "deploy");
+      const prep = sliceSection(deploy, "## 배포 전 맞추기 (AP-29)", "## Headless Contract");
+      const fixes = sliceSection(prep, "5. **맞추기", "6. **배포**");
+      const gate = fixes.indexOf("`subdomain_not_configured` 항목이 fail 이면 push 하지 않고 Recovery Summary 대로 주소부터 정해요");
+      expect(gate, root).toBeGreaterThan(fixes.indexOf("④"));
+      expect(gate, root).toBeLessThan(fixes.indexOf("⑤"));
+      const recovery = sliceSection(deploy, "## Recovery Summary", "## NEVER");
+      expect(recovery, root).toContain("never re-push a commit already on the remote");
+      expect(recovery, root).toContain("reconcile");
+      expect(recovery, root).toContain("`deploy list`");
+      expect(recovery, root).not.toContain("next push deploys");
+      const details = readFileSync(join(ROOT, root, "deploy", "references", "workflow-details.md"), "utf8");
+      const routing = sliceSection(details, "## Error routing", "## Secondary commands");
+      const subdomain = sliceSection(routing, "`subdomain_not_configured`", "GitHub connection required");
+      expect(subdomain, root).not.toContain("never fires the webhook again");
+      expect(subdomain, root).toContain('git merge-base --is-ancestor "$PUSHED_SHA" "origin/$BRANCH"');
+      expect(subdomain, root).toContain("reconcile");
+      expect(subdomain, root).toContain("git ls-remote --symref origin HEAD");
+      expect(subdomain, root).toContain("axhub deploy list --app <app-id> --all --json");
+      // reconcile 은 PUSHED_SHA 가 아니라 원격 tip 을 배포해요. push 전 baseline 으로 빼면 먼저 생긴 행을 놓쳐요.
+      expect(subdomain, root).toContain('git rev-parse "origin/$BRANCH"');
+      expect(subdomain, root).toContain("no pre-push baseline exclusion");
+      expect(subdomain, root).toContain("axhub deploy verify <deployment-id> --app <app-id> --json");
+      expect(subdomain, root).toContain("Budget expiry is pending");
+      const otherBranch = subdomain.indexOf("not the default branch");
+      expect(otherBranch, root).toBeGreaterThan(-1);
+      expect(subdomain.indexOf("deploys only its repository default branch"), root).toBeGreaterThan(otherBranch);
+      expect(subdomain, root).toContain("regardless of the address");
+      expect(subdomain, root).not.toContain("next pushed commit deploys");
+      expect(subdomain, root).not.toContain("branch split");
+      const lsRemoteFailed = subdomain.indexOf("If `git ls-remote` fails");
+      expect(lsRemoteFailed, root).toBeGreaterThan(-1);
+      expect(subdomain.slice(lsRemoteFailed), root).toContain("`deploy list` lookup");
+    }
+    const policy = readFileSync(join(ROOT, "docs", "policy", "agent-policy.md"), "utf8");
+    const ap29 = sliceSection(policy, "## AP-29", "## AP-30");
+    expect(ap29).toContain("`subdomain_not_configured` 항목");
+  });
+
+  // #832: deploy check JSON 의 항목은 `data.checks[].code` 가 `subdomain_not_configured` 예요.
+  // `deploy.subdomain_not_configured` 는 맨 앞 실패의 `error.subcode` 로만 나와요. 항목 이름으로 쓰면
+  // checks[].code 에서 찾는 에이전트가 일치 항목을 못 찾아 통과로 볼 수 있어요. up 스킬도 항목 code 로 불러요.
+  test("deploy check names the item by its code and keeps deploy.subdomain_not_configured for error.subcode (#832)", () => {
+    const policy = readFileSync(join(ROOT, "docs", "policy", "agent-policy.md"), "utf8");
+    const sources: Array<[string, string]> = [["agent-policy AP-29", sliceSection(policy, "## AP-29", "## AP-30")]];
+    for (const root of SKILL_ROOTS) {
+      sources.push([`${root}/deploy/SKILL.md`, readSkill(root, "deploy")]);
+      sources.push([
+        `${root}/deploy/references/workflow-details.md`,
+        readFileSync(join(ROOT, root, "deploy", "references", "workflow-details.md"), "utf8"),
+      ]);
+    }
+    let subcodeMentions = 0;
+    for (const [name, text] of sources) {
+      for (const match of text.matchAll(/deploy\.subdomain_not_configured/g)) {
+        const at = match.index ?? 0;
+        expect(text.slice(Math.max(0, at - 24), at), `${name}: "${text.slice(Math.max(0, at - 60), at + 40)}"`).toContain("subcode");
+        subcodeMentions += 1;
+      }
+    }
+    // AP-29 와 세 사본의 workflow-details 는 subcode 를 함께 적어 출력과 대조할 수 있게 해요.
+    expect(subcodeMentions).toBeGreaterThanOrEqual(1 + SKILL_ROOTS.length);
+  });
+
   test("T145 negative: GitHub deploy remains intact and repository-less deploy delegates to up", () => {
     for (const root of SKILL_ROOTS) {
       const deploy = readSkill(root, "deploy");
@@ -259,7 +387,8 @@ describe("spec 236 self-hosted git skill contracts", () => {
     expect(agentPolicy).toContain("top-level `git_backend.backend`·`git_backend.source`");
     expect(agentPolicy).toContain("Gitea API·C1 HTTP·remote URL");
     expect(devPolicy).toContain("공개 skill 은 11개");
-    expect(devPolicy).toContain("SKILL.md 11개 합산 246,000B");
+    // DP-5 의 합산 예산은 게이트 상수와 같은 값이어야 해요 — 상수만 올리고 정책을 두면 기준 문서가 어긋나요.
+    expect(devPolicy).toContain(`SKILL.md 11개 합산 ${DEFAULT_MAX_TOTAL_BYTES.toLocaleString("en-US")}B`);
   });
 
   test("source and both generated surfaces keep the 11-skill diet", () => {

@@ -1,6 +1,6 @@
 # Install Channels And Auth
 
-Load this for `cli_missing`, `cli_path_missing`, `cli_old`, `auth_missing`, `git_missing`, `node_missing`, or `node_mismatch`. These flows all require interactive consent unless the operation is read-only.
+Load this for `cli_missing`, `cli_path_missing`, `cli_old`, `auth_missing`, `auth_unverified`, `git_missing`, `node_missing`, or `node_mismatch`. These flows all require interactive consent unless the operation is read-only.
 
 ## CLI Missing
 
@@ -87,12 +87,22 @@ Apply command:
 axhub update apply --execute --yes --json
 ```
 
+Run every apply hop (the bridge below included) with the shell tool timeout raised to 600000ms — a slow download can outlast the tool's default before the CLI itself reaches exit 10, and then the exit 10 branch below never runs.
+
+If `current` is v0.44.1 or older and `latest` is newer than v0.44.2, run the signature identity bridge first — that CLI trusts only the old signing identity and blocks the mono-signed latest with exit 66 (#453). Verification stays on; only the version pointer changes. When it exits 0, run the apply command above; branch any other exit as below:
+
+```bash
+AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub update apply --execute --yes --json
+```
+
 Exit handling:
 
 - exit 0 / `applied:true`: say updated, then re-detect.
 - exit 14 digest mismatch or exit 66 `cosign_enforce_failed`: hard stop. Tell the user not to force it and to contact IT/security.
 - exit 15 swap failed: do not auto-retry; suggest `설치 상태 진단해줘`.
 - exit 4 unauthenticated: ask the user to login again.
+- exit 10 timeout: the download did not finish in time. Rerun only the failed hop once, with the shell tool timeout raised to 600000ms. When `current` is below v0.46.10 its global 30s timeout caps the whole download, so add `--timeout 10m`: `axhub --timeout 10m update apply --execute --yes --json` (bridge hop: `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub --timeout 10m update apply --execute --yes --json`). v0.46.10+ reruns the same command. If it fails again, do not retry further; guide an official reinstall — macOS/Linux `curl -fsSL https://cli.axhub.ai/install.sh | sh`, Windows `irm https://cli.axhub.ai/install.ps1 | iex` — then re-detect.
+- any other non-zero: hide the raw error, tell the user to run `axhub update apply --execute --yes` once or reinstall with the official script above, and stop with `READY_WITH_USER_ACTION`.
 
 If update check includes `plugin.has_update:true`, mention marketplace `/plugin update` as an advisory only. Do not run plugin update in onboarding.
 
@@ -108,7 +118,8 @@ Cases:
 
 - `user_email` exists: show masked identity and re-detect.
 - `code: token_expired`: try `axhub auth refresh --json`; if `invalid_grant`, fall through to login.
-- `code: not_logged_in`: ask to login.
+- `code: not_logged_in`, or exit 4 with `error.code` `auth` (`Not logged in` — the current CLI reports a missing or expired login this way): ask to login.
+- exit 4 whose hint names `axhub auth login --force` (`/me` answered 403: the saved login is fresh but lacks a scope the CLI needs): ask to login and start the device flow below with `--force` — a plain `auth login` is a no-op on a fresh token.
 - any other `code`: give a natural recovery phrase and stop or re-detect when appropriate.
 
 Login prompt:
@@ -133,6 +144,8 @@ Start device flow:
 AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub auth login --json
 ```
 
+Add `--force` only when the hint said so (the 403 case above).
+
 The CLI should open the browser automatically, keep polling, and return the login result in the same command. Do not ask the user to open the URL manually or say an approval phrase while the command is running. Humanize only `verification_uri_complete` or `verification_uri` plus `user_code` if the command returns `browser_opened:false`, `device_flow_required_user_action`, `device_flow_pending`, or `device_code_expired`. Never echo internal `device_code`.
 
 Fallback handling:
@@ -141,6 +154,14 @@ Fallback handling:
 - `device_code_issued` with `browser_opened:false`: show the safe URL/code once and stop with `READY_WITH_USER_ACTION`.
 - `device_flow_pending`: wait the emitted `retry_after_secs` and retry the emitted `resume_command` until success or expiry; do not ask for a manual approval phrase. When the pending payload carries `user_code` (every cached `--resume-last`), re-show that code plus `verification_uri` on each retry — approval is what ends the loop, so a retry without the code is unactionable.
 - `device_code_expired`: start a fresh login once if the user still wants to continue.
+
+## Auth Unverified
+
+`auth_unverified` means `auth status` gave no login verdict (`auth_error_code` `probe_timeout`, `probe_no_output`, or `cli_spawn_failed` — the probe did not answer — or `api`, `rate_limited`, `timeout`, or `other` — `/me` answered 429·5xx or was never reached) — login is unknown, not missing. An older CLI reports the same state as `auth_missing` with those codes; treat it the same way. Show no login copy and do not open the login prompt. Re-detect once. If it repeats, run `axhub auth status --json` once:
+
+- exit 0: logged in. Auth is done for this session — take the next gap from that detect's `gaps` instead of re-running this handler.
+- exit 4 (`error.code` `auth`): not logged in or expired — handle it as `## Auth Missing`.
+- anything else (timeout, network, no output): stop with `axhub 서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요.` and `READY_WITH_USER_ACTION`.
 
 ## Git Missing
 
