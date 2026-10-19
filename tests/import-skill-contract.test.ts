@@ -85,14 +85,17 @@ const validateImportEnvelope = (value: unknown): { ok: boolean; reason?: string 
     return { ok: true };
   }
   if (!isRecord(evidence)) return { ok: false, reason: "bad evidence" };
+  // self-hosted 정적 앱은 저장소 push → webhook deployment 라 deployment 증거예요. 업로드 static 만 release 증거예요.
+  const selfhostedPush = (value.required_mutations as unknown[]).includes("selfhosted_repo_push");
+  const deploymentEvidence = value.deploy_method !== "static" || selfhostedPush;
   if (evidence.kind === "deployment") {
-    if (value.deploy_method === "static") return { ok: false, reason: "evidence method mismatch" };
+    if (!deploymentEvidence) return { ok: false, reason: "evidence method mismatch" };
     return isNonEmptyString(evidence.deployment_id) && evidence.verification_status === "success" && isNonEmptyString(evidence.public_url)
       ? { ok: true }
       : { ok: false, reason: "bad deployment evidence" };
   }
   if (evidence.kind === "static_release") {
-    if (value.deploy_method !== "static") return { ok: false, reason: "evidence method mismatch" };
+    if (deploymentEvidence) return { ok: false, reason: "evidence method mismatch" };
     return isNonEmptyString(evidence.active_release_id) && evidence.verified === true && isNonEmptyString(evidence.public_url)
       ? { ok: true }
       : { ok: false, reason: "bad static evidence" };
@@ -251,6 +254,8 @@ describe("import skill contract", () => {
           commit_manifest: true,
           early_return: true,
           verify_wait: true,
+          selfhosted: true,
+          selfhosted_static: true,
         },
       },
     });
@@ -280,6 +285,20 @@ describe("import skill contract", () => {
     const envelope = parseStdout(result.stdout);
     expect(validateImportEnvelope(envelope)).toMatchObject({ ok: true });
     expect(envelope).toMatchObject({ result: { evidence: { kind: "static_release", active_release_id: "rel-fixture", verified: true, public_url: "https://paydrop.axhub.dev" } } });
+  });
+  test("self-hosted static execute succeeds with webhook deployment evidence, not a static release", () => {
+    const { result } = runShim(["plugin-support", "import", "--mode", "execute", "--approved", "--json"], { AXHUB_FIXTURE_IMPORT: "selfhosted_static_success" });
+    expect(result.exitCode).toBe(0);
+    const envelope = parseStdout(result.stdout);
+    expect(validateImportEnvelope(envelope)).toMatchObject({ ok: true });
+    expect(envelope).toMatchObject({
+      deploy_method: "static",
+      required_mutations: ["manifest_create", "app_create", "selfhosted_repo_push", "first_deploy"],
+      result: { evidence: { kind: "deployment", deployment_id: "dep-fixture", verification_status: "success" } },
+    });
+
+    const staticRelease = parseStdout(runShim(["plugin-support", "import", "--mode", "execute", "--approved", "--json"], { AXHUB_FIXTURE_IMPORT: "selfhosted_static_with_static_evidence" }).result.stdout);
+    expect(validateImportEnvelope(staticRelease)).toMatchObject({ ok: false, reason: "evidence method mismatch" });
   });
   test("execute path uses one import invocation after approval", () => {
     const { result, caseDir } = runShim(["plugin-support", "import", "--mode", "execute", "--approved", "--json"], { AXHUB_FIXTURE_IMPORT: "execute_success" });

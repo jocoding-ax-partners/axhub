@@ -80,8 +80,8 @@ Headless 는 `codex exec`, CI, TTY 없음, 또는 사용자 확인 채널이 아
 |---|---|
 | 빈 폴더에서 새 앱 만들기 | `bootstrap` |
 | 앱이 아직 없거나 첫 연결·첫 배포 | `import` |
-| 저장소가 연결돼 있고 push 배포가 정상인 평시 배포, 또는 non-static selfhosted app의 저장소 배포 | `deploy` |
-| `deploy_method=static` 정적 파일 앱 | `deploy` 의 static lane |
+| 저장소가 연결돼 있고 push 배포가 정상인 평시 배포, 또는 selfhosted app(static 포함)의 저장소 배포 | `deploy` |
+| `deploy_method=static` 정적 파일 앱 | `deploy` (GitHub 은 static lane, selfhosted 는 저장소 push) |
 | CLI·플러그인 버전 업데이트 | `update` |
 | 배포 실패 원인 진단 | `diagnosis` |
 | 로그·환경변수·롤백·GitHub 재연결 | `clarity` |

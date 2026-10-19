@@ -128,7 +128,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 버전·최신 확인이 들어간 요청은 언제나 `update` 가 먼저 끝나요. 업데이트 뒤 같은 요청에 앱 현황 확인이 남아 있으면 존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 이어가요. 관련 앱을 고른 뒤에도 `axhub apps get <app> --json`, `axhub deploy list --app <app> --json` 처럼 실제 CLI 표면만 쓰고, 존재하지 않는 `axhub deployment list` 나 `| head`, `2>/dev/null`, `grep` 같은 shell 후처리를 붙이지 않아요. 로그·환경변수·롤백·GitHub 재연결 같은 후속 운영 작업도 `Tenant recent deployments`, `Deployment list`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요.
 
-앱 생성·배포·온보딩은 저장소 단계보다 먼저 public CLI의 top-level `git_backend`를 확인해요. resume/existing은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh bootstrap/onboarding은 read-only `axhub apps git-backend --tenant <tenant> --json`을 추천값으로 읽은 뒤 GitHub/Axhub self-hosted를 직접 선택해요. 같은 대화의 선택은 bootstrap의 모든 preview·state·execute에 `--git-backend`로 전달해요. non-static selfhosted면 계정 연동·device flow·GitHub App 설치를 건너뛰고 clone→`git push` webhook 배포를 기다려요. `GitHub 없이`만 말해도 selfhosted 정상 배포를 쓰며, `up`은 repositoryless upload를 명시한 경우만 맡아요.
+앱 생성·배포·온보딩은 저장소 단계보다 먼저 public CLI의 top-level `git_backend`를 확인해요. resume/existing은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh bootstrap/onboarding은 read-only `axhub apps git-backend --tenant <tenant> --json`을 추천값으로 읽은 뒤 GitHub/Axhub self-hosted를 직접 선택해요. 같은 대화의 선택은 bootstrap의 모든 preview·state·execute에 `--git-backend`로 전달해요. selfhosted면 정적 사이트를 포함해 계정 연동·device flow·GitHub App 설치를 건너뛰고 clone→`git push` webhook 배포를 기다려요. 앱 저장소에 아직 안 붙은 로컬 소스는 `import`가 그 저장소에 올려요. `GitHub 없이`만 말해도 selfhosted 정상 배포를 쓰며, `up`은 repositoryless upload를 명시한 경우만 맡아요.
 
 ## ✅ 대표 여정과 UX 샘플
 

@@ -55,7 +55,7 @@ After `deploy-prep` resolves an existing `APP_ID`, read the public app JSON once
 axhub apps get "$APP_ID" --no-input --json
 ```
 
-Use top-level `deploy_method`, `git_backend.backend`, and `git_backend.source`; keep `git_backend.backend` as `GIT_BACKEND` for the push step. Only `deploy_method=static` enters the static lane. Non-static `selfhosted` enters the push branch below; non-static `github` and `legacy_github` preserve the existing GitHub/upload path. Never call C1 or Gitea directly and never infer backend from a remote URL.
+Use top-level `deploy_method`, `git_backend.backend`, and `git_backend.source`; keep `git_backend.backend` as `GIT_BACKEND` for the push step. `selfhosted` — `deploy_method=static` included — enters the push branch below. Only `deploy_method=static` with `git_backend.backend=github` (source `legacy_github` included) enters the static upload lane (steps 1-4); non-static `github` and `legacy_github` preserve the existing GitHub/upload path. Never send a self-hosted static app to `apps static deploy`, never call C1 or Gitea directly, and never infer backend from a remote URL.
 
 1. Capability probe:
 
@@ -87,13 +87,20 @@ Use top-level `deploy_method`, `git_backend.backend`, and `git_backend.source`; 
 
 ## Self-hosted push branch
 
-For `git_backend.backend=selfhosted`, do not inspect `github_connected`. If the current folder is not the resolved app's clone, run `axhub repo clone <app> --json` first and require a successful envelope with a non-empty absolute `data.destination`. Use the CLI-resolved HTTPS remote and never synthesize the repository path or destination.
+For `git_backend.backend=selfhosted`, do not inspect `github_connected`. Decide the working folder first (CLI answers only, never a remote URL): a folder holding this app's local source is checked in place (`Local source folder` below); only an empty or unrelated folder runs `axhub repo clone <app> --json` and requires a successful envelope with a non-empty absolute `data.destination`. Use the CLI-resolved HTTPS remote and never synthesize the repository path or destination.
 
 Clone results follow the envelope, not git's (translated) stderr:
 
 - `already_cloned: true` (exit 0): the destination already holds this app's repository — success; continue with the returned `data.destination`.
 - exit 9 `repository.credential_missing`: the git helper had no credential. Run the command after the hint's `next:` once, exactly as printed with its quotes — it pins the clone's `--profile`/`--endpoint` (and `--config`/`--no-keychain` when used) so the credential lands where the helper reads it; never assemble a setup command yourself — then the same clone once. If it repeats after that, stop and report it with `axhub feedback` (a setup that does not fix it is not an expected rejection). A hint without `next:` (for example an unreadable credential store) is not fixed by setup: repair what its reason names, then retry the clone.
 - exit 9 `repository.destination_exists`: the folder exists and is not this app's clone. Show the absolute path from the hint and ask the user to pick another path or empty that folder; never delete or overwrite it yourself. Headless stops here.
+
+Local source folder: when the current folder holds this app's local project (deploy-prep resolved the app from its `axhub.yaml`, or it has the app's source files), run `axhub repo clone <app> . --json` with the folder itself as the explicit destination. The CLI never overwrites a non-empty folder:
+
+- `already_cloned: true`: this folder is the app's clone; `data.destination` is this folder. Continue here.
+- exit 9 `repository.destination_exists`: the local project is not attached to this app's repository — no `origin`, or an `origin` that is not this app's repository (typical for a static app previously deployed by upload, whose repository holds only the platform seed commit). Do not clone into another folder: pushing an empty clone abandons the local source and redeploys the seed commit. Do not edit `origin` yourself either. Hand off to `import` for this existing app with `--app <app>` (static: also `--deploy-method static`). Its CLI self-hosted lane attaches `origin`, joins the seed commit, pushes the local source, and returns the webhook deployment id that import verifies. In headless, stop and report that the folder needs `import`.
+
+Self-hosted static: `deploy_method=static` on `selfhosted` uses this branch and is deployment-record based, never `apps static deploy` or `active_release_id`. It additionally requires preflight `capabilities.import.selfhosted_static === true`; missing, malformed, or false → `axhub CLI를 최신 버전으로 업데이트해 주세요.` and stop — never fall back to the upload lane. The server builds from the pushed source: manifest `build.install`/`build.build`, else a lockfile-based install plus `npm run build` when `package.json` exists, then publishes `build.static_output_dir`. So before the commit and push, `## 배포 전 맞추기` makes the local `axhub.yaml` carry `build.deploy_method: static` and an explicit `build.static_output_dir` — the folder (relative to the app root) that holds `index.html` after the build: `.` when `index.html` sits at the project root, otherwise the real build output such as `dist`, `build`, or `out`. Without both the server does not take the static path. Commit that fix with the other fixes; build output folders need not be committed. Success is the webhook deployment id verified with `axhub deploy verify`.
 
 Treat that exact `data.destination` as the working directory for every subsequent repository-local command in this branch. Set the tool `cwd` to it for status/savepoint, `git rev-parse`, branch/commit work, push, fetch, and containment checks; do not run those commands in the original un-cloned folder. An explicit clone destination, when supplied, is authoritative because the CLI returns the same absolute path.
 

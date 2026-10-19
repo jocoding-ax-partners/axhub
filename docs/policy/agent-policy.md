@@ -12,7 +12,7 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - **preview / dry-run** — 실제로 실행하기 전에 "이렇게 될 거예요"를 미리 보여주는 단계예요.
 
 ## AP-1 deploy 성공 선언 (deployment-record lane)
-- 규칙: 일반 배포(deployment-record 방식 — 배포 한 건마다 기록 id 가 생기는 방식)의 성공은 그 id 에 대해 `axhub deploy verify` (배포가 정말 끝나서 접속 가능한지 확인하는 명령)가 최종 성공을 돌려줄 때만 선언해요. 배포 시작 명령의 화면 출력, 중간 상태 조회, watch 화면, "가장 최근 배포" 재검색 같은 간접 근거로는 성공이라고 말하지 않아요. 정적 파일 앱은 확인 경로가 달라서 AP-22 가 따로 맡아요 — 이 규칙은 deployment-record 배포에만 적용돼요.
+- 규칙: 일반 배포(deployment-record 방식 — 배포 한 건마다 기록 id 가 생기는 방식)의 성공은 그 id 에 대해 `axhub deploy verify` (배포가 정말 끝나서 접속 가능한지 확인하는 명령)가 최종 성공을 돌려줄 때만 선언해요. 배포 시작 명령의 화면 출력, 중간 상태 조회, watch 화면, "가장 최근 배포" 재검색 같은 간접 근거로는 성공이라고 말하지 않아요. 파일을 업로드하는 정적 파일 앱은 확인 경로가 달라서 AP-22 가 따로 맡아요 — 이 규칙은 deployment-record 배포에만 적용되고, Axhub self-hosted 저장소에 push 로 배포하는 정적 앱도 여기에 들어가요.
 - 적용: skills/deploy/SKILL.md, skills/up/SKILL.md
 - invariant: "axhub deploy verify"
 
@@ -133,12 +133,12 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "plugin.current_servable_version", "`version_id`를 만들거나 보고하지 않아요", "download 요청과 install 요청을 구분", "--execute --yes", "Publish execute에는 OAuth나 broad PAT 대신", "submit_plugin_version_for_review"
 
 ## AP-22 static 앱 성공 선언
-- 규칙: 정적 파일 앱(deploy_method=static — 서버 없이 파일만 올리는 방식)의 배포 성공은 activate 결과의 `active_release_id` (새 버전이 실제로 켜졌다는 표시)로 선언하고 `deploy verify` 는 부르지 않아요 — static 은 deployment-record 가 아니라 release 라 verify 가 404 예요. 이 규칙은 static lane 을 실제로 소유한 skill 에만 적용해요. AP-1 에서 떼어낸 이유는, 두 lane 의 성공 선언을 한 규칙에 묶어 두면 static lane 이 없는 skill 을 그 규칙에 넣을 수 없기 때문이에요.
+- 규칙: 파일을 업로드하는 정적 파일 앱(GitHub 작업공간의 deploy_method=static — 서버 없이 파일만 올리는 방식)의 배포 성공은 activate 결과의 `active_release_id` (새 버전이 실제로 켜졌다는 표시)로 선언하고 `deploy verify` 는 부르지 않아요 — 업로드 static 은 deployment-record 가 아니라 release 라 verify 가 404 예요. Axhub self-hosted 저장소의 정적 앱은 소스를 push 해 서버가 빌드하는 deployment-record 라 AP-1 을 따라요. 이 규칙은 static lane 을 실제로 소유한 skill 에만 적용해요. AP-1 에서 떼어낸 이유는, 두 lane 의 성공 선언을 한 규칙에 묶어 두면 static lane 이 없는 skill 을 그 규칙에 넣을 수 없기 때문이에요.
 - 적용: skills/deploy/SKILL.md
 - invariant: "active_release_id"
 
 ## AP-23 app git backend 선판정
-- 규칙: 저장소 provider 대사나 mutation보다 먼저 public CLI JSON으로 effective backend를 확인해요. resume/existing은 `axhub apps get <app> --json`, fresh bootstrap/onboarding/scaffold는 read-only `axhub apps git-backend --tenant <tenant> --json`을 쓰고 app row를 먼저 만들지 않아요. 기존 코드 import는 `plugin-support import`가 같은 입력으로 경로를 정하고(`selfhosted_repo_push`) 읽기 실패면 GitHub로 추측하지 않아요. 판정 입력은 top-level `git_backend.backend`·`git_backend.source`뿐이며 Gitea API·C1 HTTP·remote URL을 보지 않아요. selfhosted는 계정 연동·device flow·GitHub App 설치 대사를 노출하지 않고(scaffold는 GitHub 명령 없이 bootstrap으로 양보), non-static deploy는 `axhub repo clone` 뒤 일반 `git push`의 webhook deployment id를 exact verify해요. static은 기존 release lane, GitHub와 `legacy_github`는 기존 gate/upload/create 경로를 유지해요.
+- 규칙: 저장소 provider 대사나 mutation보다 먼저 public CLI JSON으로 effective backend를 확인해요. resume/existing은 `axhub apps get <app> --json`, fresh bootstrap/onboarding/scaffold는 read-only `axhub apps git-backend --tenant <tenant> --json`을 쓰고 app row를 먼저 만들지 않아요. 기존 코드 import는 `plugin-support import`가 같은 입력으로 경로를 정하고(`selfhosted_repo_push`) 읽기 실패면 GitHub로 추측하지 않아요. 판정 입력은 top-level `git_backend.backend`·`git_backend.source`뿐이며 Gitea API·C1 HTTP·remote URL을 보지 않아요. selfhosted는 계정 연동·device flow·GitHub App 설치 대사를 노출하지 않고(scaffold는 GitHub 명령 없이 bootstrap으로 양보), deploy는 static을 포함해 일반 `git push`의 webhook deployment id를 exact verify해요 — 빈·무관한 폴더만 `axhub repo clone`하고, 이 앱 저장소에 안 붙은 로컬 소스 폴더(`axhub repo clone <app> .`가 `repository.destination_exists`)는 clone 대신 `import`로 넘겨요. self-hosted static은 preflight `capabilities.import.selfhosted_static`이 true여야 하고 `axhub.yaml`에 `build.deploy_method: static`과 명시적 `build.static_output_dir`(루트면 `.`)을 둬요. GitHub와 `legacy_github`는 static upload lane을 포함해 기존 gate/upload/create 경로를 유지해요.
 - 적용: skills/bootstrap/SKILL.md, skills/deploy/SKILL.md, skills/onboarding/SKILL.md
 - invariant: "axhub apps get <app> --json", "git_backend.backend=selfhosted"
 - 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/onboarding/SKILL.md

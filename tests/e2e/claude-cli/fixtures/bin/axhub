@@ -62,7 +62,7 @@ case "${1:-}" in
       preflight)
         # preflight: token 은 아직 fine (deploy_expired 도 auth_ok=true).
         # raw stderr/exit-jargon 미노출 — JSON contract 만.
-        echo '{"cli_present":true,"cli_state":"ok","in_range":true,"cli_too_old":false,"cli_too_new":false,"auth_ok":true,"auth_error_code":null,"profile":"paydrop","capabilities":{"import":{"supported":true,"schemas":["import/v1"],"commit_manifest":true,"early_return":true,"verify_wait":true}}}'
+        echo '{"cli_present":true,"cli_state":"ok","in_range":true,"cli_too_old":false,"cli_too_new":false,"auth_ok":true,"auth_error_code":null,"profile":"paydrop","capabilities":{"import":{"supported":true,"schemas":["import/v1"],"commit_manifest":true,"early_return":true,"verify_wait":true,"selfhosted":true,"selfhosted_static":true}}}'
         exit 0
         ;;
       route-decision)
@@ -132,10 +132,15 @@ case "${1:-}" in
         else
           DEPLOY_METHOD="${AXHUB_FIXTURE_IMPORT_DEPLOY_METHOD:-static}"
         fi
+        REQUIRED_JSON='["manifest_create","app_create","github_connect","first_deploy"]'
         if [ "${AXHUB_FIXTURE_IMPORT:-}" = "static_with_deployment_evidence" ]; then
           DEPLOY_METHOD="static"
         elif [ "${AXHUB_FIXTURE_IMPORT:-}" = "docker_with_static_evidence" ]; then
           DEPLOY_METHOD="docker"
+        elif [ "${AXHUB_FIXTURE_IMPORT:-}" = "selfhosted_static_success" ] || [ "${AXHUB_FIXTURE_IMPORT:-}" = "selfhosted_static_with_static_evidence" ]; then
+          # self-hosted 정적 앱은 업로드가 아니라 저장소 push → webhook deployment 예요.
+          DEPLOY_METHOD="static"
+          REQUIRED_JSON='["manifest_create","app_create","selfhosted_repo_push","first_deploy"]'
         fi
         ERROR_JSON="null"
         EVIDENCE_JSON="null"
@@ -147,19 +152,19 @@ case "${1:-}" in
           EVIDENCE_JSON='{"kind":"static_release","active_release_id":"rel-fixture","verified":false,"public_url":"https://paydrop.axhub.dev"}'
         elif [ "${AXHUB_FIXTURE_IMPORT:-}" = "static_with_deployment_evidence" ]; then
           EVIDENCE_JSON='{"kind":"deployment","deployment_id":"dep-fixture","verification_status":"success","public_url":"https://paydrop.axhub.dev"}'
-        elif [ "${AXHUB_FIXTURE_IMPORT:-}" = "docker_with_static_evidence" ]; then
+        elif [ "${AXHUB_FIXTURE_IMPORT:-}" = "docker_with_static_evidence" ] || [ "${AXHUB_FIXTURE_IMPORT:-}" = "selfhosted_static_with_static_evidence" ]; then
           EVIDENCE_JSON='{"kind":"static_release","active_release_id":"rel-fixture","verified":true,"public_url":"https://paydrop.axhub.dev"}'
         elif [ "$MODE" = "execute" ] && [ "$APPROVED" != "true" ]; then
           ERROR_JSON='{"typed_failure":"app","owner":"plugin","retryable":false,"phase":"approval","mutation_performed":false,"recovery_action":"approve preview before execute","message_ko":"가져오기 전에 미리보기 승인이 필요해요.","details":null}'
         elif [ "$MODE" = "execute" ]; then
-          if [ "$DEPLOY_METHOD" = "static" ]; then
+          if [ "$DEPLOY_METHOD" = "static" ] && [ "$REQUIRED_JSON" = '["manifest_create","app_create","github_connect","first_deploy"]' ]; then
             EVIDENCE_JSON='{"kind":"static_release","active_release_id":"rel-fixture","verified":true,"public_url":"https://paydrop.axhub.dev"}'
           else
             EVIDENCE_JSON='{"kind":"deployment","deployment_id":"dep-fixture","verification_status":"success","public_url":"https://paydrop.axhub.dev"}'
           fi
         fi
         cat <<JSON
-{"schema_version":"$SCHEMA","mode":"$MODE","headless":$HEADLESS,"correlation_id":"fixture-correlation","detected_state":{"starting_state":"local_github_no_axhub_app","local_project":{"cwd_has_project_marker":true,"manifest_present":false,"manifest_app":null},"git":{"is_repo":true,"has_commit":true,"branch":"main","commit_sha":"abc1234","remote_repo":"jocoding/paydrop"},"axhub_app":{"app_id":null,"app_slug":null,"matched":false},"manifest":{"status":"missing","path":null}},"deploy_method":"$DEPLOY_METHOD","required_mutations":["manifest_create","app_create","github_connect","first_deploy"],"preview":{"title":"기존 앱 가져오기","summary":["현재 폴더를 axhub 앱으로 연결해요."],"mutations":["manifest_create","app_create","github_connect","first_deploy"],"safety_notes":["승인 전에는 변경하지 않아요."]},"approval":{"required":true,"approved":$APPROVED,"interactive_only":true},"result":{"evidence":$EVIDENCE_JSON},"error":$ERROR_JSON}
+{"schema_version":"$SCHEMA","mode":"$MODE","headless":$HEADLESS,"correlation_id":"fixture-correlation","detected_state":{"starting_state":"local_github_no_axhub_app","local_project":{"cwd_has_project_marker":true,"manifest_present":false,"manifest_app":null},"git":{"is_repo":true,"has_commit":true,"branch":"main","commit_sha":"abc1234","remote_repo":"jocoding/paydrop"},"axhub_app":{"app_id":null,"app_slug":null,"matched":false},"manifest":{"status":"missing","path":null}},"deploy_method":"$DEPLOY_METHOD","required_mutations":$REQUIRED_JSON,"preview":{"title":"기존 앱 가져오기","summary":["현재 폴더를 axhub 앱으로 연결해요."],"mutations":$REQUIRED_JSON,"safety_notes":["승인 전에는 변경하지 않아요."]},"approval":{"required":true,"approved":$APPROVED,"interactive_only":true},"result":{"evidence":$EVIDENCE_JSON},"error":$ERROR_JSON}
 JSON
         exit 0
         ;;

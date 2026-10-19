@@ -8,6 +8,11 @@ preflight 의 `capabilities.readiness.context_url` 문서(`https://docs.axhub.ai
 - `.env` 는 서버로 올라가지 않아요. 필요한 값은 `axhub env set --from-dotenv` 로 등록해요. `localhost`·사설 IP 값은 등록하지 않아요.
 - `PORT`·`DATABASE_URL`·`STORAGE_*`·`AXHUB_*` 는 AXHub 가 넣어 줘요 — 실행용으로 등록하지 않아요.
 
+## 정적 사이트 — 바로 고침
+
+- AXHub 저장소(self-hosted)에 push 해서 배포하는 정적 사이트는 `axhub.yaml` 에 `build.deploy_method: static` 과 `build.static_output_dir` 를 적어요. `static_output_dir` 는 빌드 뒤 `index.html` 이 있는 폴더예요 — 최상위에 있으면 `.`, 아니면 `dist`·`build`·`out` 처럼 실제 빌드 결과 폴더예요. 둘 중 하나라도 없으면 서버가 정적 사이트로 빌드하지 않아요.
+- 서버가 올라온 소스로 빌드해요(`build.install`·`build.build`, 없으면 lockfile 기준 설치와 `package.json` 이 있을 때 `npm run build`). 그래서 빌드 결과 폴더는 커밋하지 않아도 돼요.
+
 ## 데이터 — 물어봄
 
 - 서버 폴더(SQLite 파일, JSON 파일, `./uploads`)는 재배포·재시작·절전 때 처음 상태로 돌아가요. 데이터는 `database: engine: postgres`(`DATABASE_URL`), 파일은 `storage: enabled: true`(`STORAGE_*`)로 옮길지 물어요.

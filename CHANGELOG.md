@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.31.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.10...plugin-v1.31.0) (2026-10-19)
+
+Axhub 저장소를 쓰는 정적 앱도 소스를 Git에 push해서 배포해요. 웹 콘솔 저장소에서 코드와 커밋별 배포 결과를 확인할 수 있어요. 업로드로 배포하던 로컬 소스는 import로 저장소에 연결하고, 서버가 빌드한 배포 기록으로 성공을 확인해요. 이 경로를 지원하지 않는 CLI는 업데이트를 안내하며 업로드로 우회하지 않아요.
+
+### Added
+
+* **plugin:** self-hosted 정적 앱을 push 배포 경로로 보낸다 ([#1381](https://github.com/jocoding-ax-partners/axhub-mono/issues/1381)) ([0981d6b](https://github.com/jocoding-ax-partners/axhub-mono/commit/0981d6b64834fff5ac69e3da1b867008bcfb6760))
+
 ## [1.30.10](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.9...plugin-v1.30.10) (2026-10-19)
 
 회사가 AXRouter 연동을 켜 둔 경우에만 앱 AI 를 AXRouter 키로 붙이자고 안내하고, 꺼 둔 회사에서는 본인 AI 키를 넣게 해요. 바깥 고객 여럿의 데이터를 담는 앱에는 `database.roles` 로 DB 계정을 나누는 방법도 알려요.
