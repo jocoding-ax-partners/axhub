@@ -29,7 +29,7 @@ This is not a second registry. Attach descriptions only to items returned by bac
 | `nextjs` / `nextjs-axhub` | 쇼핑몰, 예약, 결제, 로그인, 관리자 화면처럼 화면과 기능이 함께 있는 웹서비스 |
 | `chatbot` / `chatbot-axhub` | 사내 도우미, 상담, 규정·FAQ 질의응답처럼 AI 와 대화하는 화면. Codex API 키(`ANTHROPIC_API_KEY`)를 사용자가 직접 넣어야 대화가 돼요 — 키 없이도 배포는 되고 화면이 설정 안내를 보여줘요 |
 
-`chatbot-axhub` 로 만들었으면 11단계 결과 끝에 한 줄을 더해요: 대화하려면 키를 비밀값으로 넣고 다시 배포해야 한다는 것 — `printf %s "$ANTHROPIC_API_KEY" | axhub env set ANTHROPIC_API_KEY --app <slug> --secret --from-stdin --stage runtime` 다음 `axhub deploy create --app <slug> --execute`. 회사 AXRouter 를 쓰면 `ax-…` 키와 `ANTHROPIC_BASE_URL=https://axrouter.ai`(평문 `--plain`)를 넣어요. 키 값을 채팅에 붙여 달라고 하지 않아요.
+`chatbot-axhub` 로 만들었으면 11단계 결과 끝에 한 줄을 더해요: 대화하려면 키를 비밀값으로 넣고 다시 배포해야 한다는 것 — `printf %s "$ANTHROPIC_API_KEY" | axhub env set ANTHROPIC_API_KEY --app <slug> --secret --from-stdin --stage runtime` 다음 `axhub deploy create --app <slug> --execute`. 회사 AXRouter 는 `axhub axrouter status --tenant <회사> --json` 의 `data.available` 이 `true` 일 때만 말해요 — 그때는 `ax-…` 키와 `ANTHROPIC_BASE_URL=https://axrouter.ai`(평문 `--plain`)도 쓸 수 있다고 알려요. `false`·확인 실패면 AXRouter 를 언급하지 않아요. 키 값을 채팅에 붙여 달라고 하지 않아요.
 
 Unknown backend templates are not hidden. Show backend `name` and `folder_name`, then give neutral guidance like "이름을 보고 고르면 돼요. 잘 모르겠으면 먼저 Next.js 추천을 봐요."
 

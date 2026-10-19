@@ -12,12 +12,13 @@ preflight 의 `capabilities.readiness.context_url` 문서(`https://docs.axhub.ai
 
 - 서버 폴더(SQLite 파일, JSON 파일, `./uploads`)는 재배포·재시작·절전 때 처음 상태로 돌아가요. 데이터는 `database: engine: postgres`(`DATABASE_URL`), 파일은 `storage: enabled: true`(`STORAGE_*`)로 옮길지 물어요.
 - AXHub DB 는 PostgreSQL 만이고 빈 상태로 시작해요. 테이블은 앱이 켜질 때 만들어요(바로 고침).
+- 바깥 고객 여럿의 데이터를 한 DB 에 담거나 자체 회원·비밀번호 표가 있는 앱은 `database.roles: [runtime, auth]` 로 계정을 나눠요(`DATABASE_URL_RUNTIME`·`DATABASE_URL_AUTH` 자동 주입, 권한·RLS 는 마이그레이션에서 `GRANT`, FORCE RLS 면 `owner_bypass_rls: true`). 자세히는 docs `features/data` 의 「DB 계정을 나눠 쓸 때」(알림).
 
 ## 네트워크 — 물어봄
 
 - 밖으로는 공인 인터넷의 TCP 443·80·465·587·993·995·22·3306·5432·6379·27017 만 나가요. 25 번 메일 발송, 그 밖의 포트, 사설 IP·`localhost` 의 다른 프로그램은 막혀요. 막힌 연결은 오류 없이 시간 초과로 끝나요.
 - 비공개 앱 주소로 오는 요청은 모두 AXHub 로그인을 거쳐요. 외부 서비스의 웹훅은 `axhub relay create --app <앱> --name <창구> --target-path <경로>` 로 만든 접수창구로 받고, 전달된 요청은 `AXHUB_RELAY_SIGNING_SECRET` 으로 확인해요.
-- AI 는 로컬 모델(Ollama 등) 대신 AXRouter(OpenAI 호환)로 불러요 — `axhub axrouter keys issue --name <이름>` 으로 키를 받아 `LLM_API_KEY`(비밀)·`LLM_BASE_URL=https://axrouter.ai/v1` 로 등록해요. 대화·임베딩·받아쓰기 모두 같은 주소예요.
+- AI 는 로컬 모델(Ollama 등) 대신 외부 API 로 불러요. 먼저 `axhub axrouter status --tenant <회사> --json` 의 `data.available` 을 봐요. `true` 일 때만 AXRouter(OpenAI 호환)를 권해요 — `axhub axrouter keys issue --name <이름>` 키를 `LLM_API_KEY`(비밀)·`LLM_BASE_URL=https://axrouter.ai/v1` 로 등록하고, 대화·임베딩·받아쓰기 모두 같은 주소예요. `false`·확인 실패면 AXRouter 를 말하지 않고 사용자 본인 키(`OPENAI_API_KEY`·`ANTHROPIC_API_KEY` 등)를 `axhub env set <키> --app <앱> --secret --from-stdin` 으로 넣게 해요.
 - 요청 본문은 50MB, 첫 응답은 120초까지예요. 큰 파일은 보관함에 바로 올리고, 오래 걸리는 일은 나누거나 흘려보내요.
 
 ## 리소스 — 알림

@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.30.10](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.9...plugin-v1.30.10) (2026-10-19)
+
+회사가 AXRouter 연동을 켜 둔 경우에만 앱 AI 를 AXRouter 키로 붙이자고 안내하고, 꺼 둔 회사에서는 본인 AI 키를 넣게 해요. 바깥 고객 여럿의 데이터를 담는 앱에는 `database.roles` 로 DB 계정을 나누는 방법도 알려요.
+
+
+### Fixed
+
+* **plugin:** AXRouter 키는 회사 연동이 켜졌을 때만 권하고 DB 계정 나누기를 안내한다 ([#1342](https://github.com/jocoding-ax-partners/axhub-mono/issues/1342)) ([d70137a](https://github.com/jocoding-ax-partners/axhub-mono/commit/d70137a3f6f5b5f0a304f267480e1d95b6c6a0ae))
+
 ## [1.30.9](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.8...plugin-v1.30.9) (2026-10-19)
 
 배포 기준 문서를 못 받아도 플러그인에 담긴 요약으로 배포 전 점검을 하고, 문서에 `물어봄` 으로 적힌 규칙도 미리 물어요. 로그인 확인이 응답하지 않거나 목록 조회가 실패했을 때 로그인 필요·첫 배포로 잘못 안내하지 않고, 일시 장애는 한 번 다시 시도한 뒤에만 리포트해요. 앱 만들기 확인 시간이 넘으면 다시 만들지 않고 이어서 지켜보며, CLI 업데이트는 느린 회선에서도 끊기지 않게 10분까지 기다려요.
