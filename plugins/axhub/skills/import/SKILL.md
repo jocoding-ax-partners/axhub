@@ -103,10 +103,10 @@ CLI preview/execute 결과는 정확히 하나의 envelope shape 로 와야 해�
 
 성공 증거:
 
-- docker/compose: `kind: "deployment"`, non-empty `deployment_id`, `verification_status: "success"`, non-empty `public_url`
-- static: `kind: "static_release"`, non-empty `active_release_id`, `verified: true`, non-empty `public_url`, optional non-empty `access_note`
+- docker/compose, self-hosted static(`selfhosted_repo_push`): `kind: "deployment"`, non-empty `deployment_id`, `verification_status: "success"`, non-empty `public_url`
+- 업로드 static: `kind: "static_release"`, non-empty `active_release_id`, `verified: true`, non-empty `public_url`, optional non-empty `access_note`
 
-Static 성공은 `active_release_id`, `verified === true`, `public_url`, `error === null` 이 모두 있어야 해요. 하나라도 없으면 `typed_failure: "static"` 으로 다뤄요. Static lane 에서는 deployment record `deploy verify` 를 대신 호출하지 않아요.
+두 경로 모두 `error === null` 이어야 해요. 업로드 static 은 위 release 증거가 빠지면 `typed_failure: "static"` 으로 다루고 `deploy verify` 로 대체하지 않아요. Self-hosted static 은 deployment 증거로 판정하며 `active_release_id`·`verified` 는 요구하지 않아요.
 
 ## Fail-closed 검증
 
@@ -115,6 +115,7 @@ Static 성공은 `active_release_id`, `verified === true`, `public_url`, `error 
 - `axhub plugin-support preflight --json` 의 `capabilities.import.supported !== true`
 - `capabilities.import.schemas` 에 `import/v1` 이 없음
 - `capabilities.import.selfhosted !== true` — 이 CLI 는 self-hosted 작업공간에서도 GitHub 저장소를 만들려 해서 `axhub CLI를 최신 버전으로 업데이트해 주세요.` 라고 안내해요
+- static 인 self-hosted 경로(`selfhosted_repo_push` 또는 `코드 저장 위치: axhub self-hosted`)인데 `capabilities.import.selfhosted_static !== true` 거나 `static_release` 가 있음 — 업로드로 보내지 않고 같은 업데이트 안내로 멈춰요
 - envelope 의 `schema_version` 이 `import/v1` 이 아님
 - 필수 field 가 없거나 타입이 맞지 않음
 - 닫힌 enum 밖 값이 있음
@@ -186,11 +187,11 @@ axhub plugin-support tenant-resolve --json
 
 import helper 에 넘길 수 있는 옵션은 `--mode`, `--headless`, `--approved`, `--commit-manifest`, `--verify-wait`, `--app`, `--name`, `--slug`, `--repo`, `--repo-private`, `--repo-public`, `--branch`, `--from-dir`, `--installation-id`, `--tenant`, `--deploy-method`, `--idea`, `--git-backend`, `--env-from-dotenv`, `--env-only`, `--json` 뿐이에요. `--env-from-dotenv`·`--env-only` 는 execute 에만 쓰고 `capabilities.import.env_from_dotenv` 가 true 일 때만 써요. `--idea <uuid>` 는 요청의 `아이디어 ID:` 줄 값이고 `capabilities.import.idea` 가 true 일 때만 써요. 이 목록에 없는 옵션은 추론하거나 `--help`로 복구하지 않아요. 특히 사용자가 비공개 저장소를 원하면 정확히 `--repo-private` 를 쓰고, 존재하지 않는 `--private` 를 절대 붙이지 않아요. 실수로 unknown option 이 나오면 임의 옵션을 뺀 재시도나 `plugin-support import --help` 호출로 이어가지 말고 멈춰요. preview 와 execute 는 검증된 동일 옵션 집합을 유지해요.
 
-**코드 저장 위치 (AP-23).** CLI 가 기존 앱은 그 앱의 저장소 방식, 새 앱은 작업공간 기본값으로 경로를 정하고 읽기 실패면 GitHub 로 추측하지 않고 멈춰요. 사용자가 GitHub 또는 Axhub self-hosted 를 명시했을 때만 preview·execute 에 같은 `--git-backend github|selfhosted` 를 붙여요. `required_mutations` 에 `selfhosted_repo_push` 가 있으면 self-hosted 경로예요 — `--repo`·GitHub owner·App 설치·device flow 대사를 0회로 유지하고, 승인 카드에 요약의 `코드 저장 위치:` 줄을 그대로 보여줘요. 첫 배포는 push 로 자동 시작되고 성공 증거는 같은 `deployment` evidence 예요. origin·`--repo` 충돌은 error 의 `recovery_action` 을 그대로 안내해요. 아래 owner/repo 규칙은 GitHub 경로에만 적용돼요.
+**코드 저장 위치 (AP-23).** CLI 가 기존 앱은 그 앱의 저장소 방식, 새 앱은 작업공간 기본값으로 경로를 정하고 읽기 실패면 GitHub 로 추측하지 않고 멈춰요. 사용자가 GitHub 또는 Axhub self-hosted 를 명시했을 때만 preview·execute 에 같은 `--git-backend github|selfhosted` 를 붙여요. `required_mutations` 에 `selfhosted_repo_push` 가 있으면 self-hosted 경로예요 — `--repo`·GitHub owner·App 설치·device flow 대사를 0회로 유지하고, 승인 카드에 요약의 `코드 저장 위치:` 줄을 그대로 보여줘요. 첫 배포는 push 로 자동 시작되고 성공 증거는 같은 `deployment` evidence 예요(static 도 같아요). deploy 가 넘긴 기존 앱은 preview·execute 에 `--app <app>`(static 이면 `--deploy-method static`)을 넘겨요. origin·`--repo` 충돌은 error 의 `recovery_action` 을 그대로 안내해요. 아래 owner/repo 규칙은 GitHub 경로에만 적용돼요.
 
 GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 반드시 `$APP_SLUG` 와 정확히 같게 둬요. 날짜·숫자·QA suffix 를 추론으로 자르거나 정리하지 않아요. 예를 들어 app slug 가 `uqa-exp-public-11021-0708` 이고 owner 가 `realitsyourman` 이면 `--repo "realitsyourman/uqa-exp-public-11021-0708"` 이어야 하며 `--repo "realitsyourman/uqa-exp-public-11021"` 처럼 줄인 명령은 실행하지 말고 고쳐서 다시 호출해요.
 
-단, static 앱은 CLI 가 GitHub repo 없이 `app_create/app_select → local build → static_release` 로 배포할 수 있어요. static lane 에서는 사용자가 명시적으로 "GitHub 저장소도 만들고 연결해줘" 라고 말하지 않는 한 `--repo` 를 붙이지 않아요. Docker/compose 같은 GitHub 기반 첫 배포에서만 `local_only` 새 repo 생성 전에 `--repo owner/name` 이 확정돼 있어야 해요.
+단, GitHub 작업공간의 static 앱은 CLI 가 GitHub repo 없이 `app_create/app_select → local build → static_release` 로 배포할 수 있어요. static lane 에서는 사용자가 명시적으로 "GitHub 저장소도 만들고 연결해줘" 라고 말하지 않는 한 `--repo` 를 붙이지 않아요. Docker/compose 같은 GitHub 기반 첫 배포에서만 `local_only` 새 repo 생성 전에 `--repo owner/name` 이 확정돼 있어야 해요.
 
 Docker/compose `local_only` 의 새 GitHub repo owner 는 로컬 `gh` 로그인과 맞춰요 — CLI 가 현재 `gh` 로그인과 app slug 로 repo 를 정하고, org owner 는 push 가능한 `origin` 이 있거나 사용자가 지정했을 때만 써요. owner 불일치는 CLI 가 `typed_failure: git` 으로 막아요.
 
@@ -287,9 +288,9 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 
 9. 성공 안내
 
-- docker/compose 성공: 공개 URL 을 평문 절대 URL 로 보여주고, 배포 확인이 끝났다고 말해요. 앱이 비공개라 로그인 없는 URL 요청이 로그인 화면으로 돌아오면, 배포 검증과 앱 본문 확인을 분리해 설명해요.
+- docker/compose·self-hosted static 성공: 공개 URL 을 평문 절대 URL 로 보여주고, 배포 확인이 끝났다고 말해요. 앱이 비공개라 로그인 없는 URL 요청이 로그인 화면으로 돌아오면, 배포 검증과 앱 본문 확인을 분리해 설명해요.
 - docker/compose 성공을 말하기 전에 최종 `deploy verify --json` 의 `environment` 를 먼저 읽어요 (AP-25). `staging` 이면 스테이징 옵트인(`staging_enabled=true`) 앱이라 스테이징에만 반영됐고 운영에는 아직 반영되지 않았다고 같은 성공 블록에서 말하고, 심사 신청 `axhub publish --app <app> --deployment-id <deployment-id> --execute`를 안내해요. "운영 반영 완료" 라고 말하지 않고, 심사 신청은 사용자 요청 시에만 실행해요. `environment` 가 없거나 null 이면 운영으로 간주하지 않고 `axhub apps get <app> --json` 의 `staging_enabled` 를 한 번 읽어 판단해요.
-- static 성공: 공개 URL 을 평문 절대 URL 로 보여주고, 정적 사이트 활성 릴리스 확인이 끝났다고 말해요. `access_note` 가 있으면 같은 성공 블록에서 "참고: ..." 형태로 함께 말해요.
+- 업로드 static 성공: 공개 URL 을 평문 절대 URL 로 보여주고, 정적 사이트 활성 릴리스 확인이 끝났다고 말해요. `access_note` 가 있으면 같은 성공 블록에서 "참고: ..." 형태로 함께 말해요.
 
 내부 id 는 필요할 때만 상태 이어보기에 쓰고 chat 에 raw 값으로 노출하지 않아요.
 
@@ -316,8 +317,4 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 - deploy 는 ordinary redeploy 만 맡아요.
 - import 는 non-empty existing app first-connect flow 만 맡아요.
 - plugin 은 low-level CLI primitive 를 조합하지 않아요.
-- manifest 보강은 plugin 이 직접 authoring 하는 유일한 단계예요 — 규칙은 `## Manifest 보강` 그대로예요.
-- `manifest_repair` 는 CLI execute 가 처리해요. plugin 은 preview 에서 사용자에게 알리고, 직접 파일을 덮어쓰지 않아요.
-- commit+push 는 opt-in 이에요 — 6에서 `설정도 반영하고 시작` 을 골랐을 때만 `--commit-manifest` 로 호출하고 커밋·push 는 CLI 가(force 없이) 맡아요. 조건은 6과 manifest-authoring 그대로예요.
 - malformed envelope, unknown schema, unknown enum, missing static URL, `verified !== true`, headless execute, approval bypass 는 모두 중단해요.
-- 성공을 말하기 전 항상 execute envelope 의 method-specific evidence 를 확인해요.

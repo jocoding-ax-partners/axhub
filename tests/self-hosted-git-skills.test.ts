@@ -455,3 +455,78 @@ describe("spec 236 2차: scaffold and import follow the code storage location", 
     }
   });
 });
+
+// self-hosted 작업공간의 static 앱은 업로드 release 가 아니라 앱 저장소 push → webhook deployment 예요.
+// 저장소에는 seed 커밋만 있어 업로드로 배포하던 로컬 소스를 clone 으로 버리면 seed 를 다시 배포해요.
+describe("self-hosted static deploys by git push", () => {
+  test("deploy routes self-hosted static to the push lane and only GitHub static to the upload lane", () => {
+    for (const root of SKILL_ROOTS) {
+      const deploy = readSkill(root, "deploy");
+      const staticBranch = sliceSection(deploy, "### Static branch", "### Deployment-record branch");
+      const selfhosted = sliceSection(deploy, "### Self-hosted repository lane", "### GitHub and upload lanes");
+      const never = deploy.slice(deploy.indexOf("## NEVER"));
+
+      expect(staticBranch, root).toContain("`selfhosted` apps (static too) use the self-hosted lane below");
+      expect(staticBranch, root).toContain("Only GitHub-backed `deploy_method=static` (`legacy_github` too) enters the static upload lane");
+      expect(selfhosted, root).toContain("`git_backend.backend=selfhosted`, static included");
+      expect(selfhosted, root).toContain("`apps static deploy`");
+      expect(selfhosted, root).toContain("static이면 `capabilities.import.selfhosted_static`도요");
+      expect(selfhosted, root).toContain("(upload 대체 금지)");
+      expect(never, root).toContain("Self-hosted static is deployment-record based");
+      expect(never, root).toContain("NEVER send non-static or `selfhosted` apps to the static upload lane");
+    }
+  });
+
+  test("an unattached local source folder goes to import instead of repo clone", () => {
+    for (const root of SKILL_ROOTS) {
+      const deploy = readSkill(root, "deploy");
+      const selfhosted = sliceSection(deploy, "### Self-hosted repository lane", "### GitHub and upload lanes");
+      const probe = selfhosted.indexOf("axhub repo clone <app> . --json");
+      expect(probe, root).toBeGreaterThan(-1);
+      const local = selfhosted.slice(probe);
+      expect(local, root).toContain("`already_cloned: true` → it is the clone; stay");
+      expect(local, root).toContain("`repository.destination_exists` → not attached");
+      expect(local, root).toContain("never clone elsewhere");
+      expect(local, root).toContain("Hand off to `import` with `--app <app>` (static: `--deploy-method static`)");
+      expect(selfhosted, root).toContain("Only an empty or unrelated folder clones");
+
+      const details = readFileSync(join(ROOT, root, "deploy", "references", "workflow-details.md"), "utf8");
+      const branch = sliceSection(details, "## Self-hosted push branch", "## Git readiness");
+      expect(branch, root).toContain("axhub repo clone <app> . --json");
+      expect(branch, root).toContain("Do not clone into another folder");
+      expect(branch, root).toContain("Hand off to `import` for this existing app with `--app <app>`");
+      expect(branch, root).not.toMatch(/git remote (add|set-url)/);
+    }
+  });
+
+  test("self-hosted static is gated and aligns axhub.yaml before the push", () => {
+    for (const root of SKILL_ROOTS) {
+      const deploy = readSkill(root, "deploy");
+      const fixes = sliceSection(deploy, "5. **맞추기", "6. **배포**");
+      expect(fixes, root).toContain("self-hosted static 은 `axhub.yaml` 의 `build.deploy_method: static`·`build.static_output_dir` 도");
+      expect(fixes.indexOf("build.static_output_dir"), root).toBeLessThan(fixes.indexOf("④"));
+
+      const details = readFileSync(join(ROOT, root, "deploy", "references", "workflow-details.md"), "utf8");
+      const branch = sliceSection(details, "## Self-hosted push branch", "## Git readiness");
+      expect(branch, root).toContain("`capabilities.import.selfhosted_static === true`");
+      expect(branch, root).toContain("never fall back to the upload lane");
+      expect(branch, root).toContain("`.` when `index.html` sits at the project root");
+      expect(branch, root).toContain("build output folders need not be committed");
+      const staticLane = sliceSection(details, "## App backend and static lane", "## Self-hosted push branch");
+      expect(staticLane, root).toContain("Only `deploy_method=static` with `git_backend.backend=github`");
+    }
+  });
+
+  test("import gates the self-hosted static push lane and writes an explicit output folder", () => {
+    for (const root of SKILL_ROOTS) {
+      const importSkill = readSkill(root, "import");
+      expect(importSkill, root).toContain("`capabilities.import.selfhosted_static !== true`");
+      expect(importSkill, root).toContain("업로드로 보내지 않고 같은 업데이트 안내로 멈춰요");
+      expect(importSkill, root).toContain("self-hosted static(`selfhosted_repo_push`): `kind: \"deployment\"`");
+      expect(importSkill, root).toContain("`--app <app>`(static 이면 `--deploy-method static`)");
+      const manifest = readFileSync(join(ROOT, root, "import", "references", "manifest-authoring.md"), "utf8");
+      expect(manifest, root).toContain("`static_output_dir` 를 항상 명시해요");
+      expect(manifest, root).toContain("`.` 를 그대로 적어요");
+    }
+  });
+});
