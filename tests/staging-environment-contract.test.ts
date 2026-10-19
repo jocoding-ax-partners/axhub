@@ -63,6 +63,37 @@ describe("staging environment contract (AP-25)", () => {
     expect(up).toMatch(/`environment` 가 없거나 null 이면 `STAGING_ENABLED` 로 판단하고 운영으로 간주하지 않아요/);
   });
 
+  // #909: 사용 전 심사 워크스페이스는 정적 release 의 activate 를 412 → exit 9 `staging_required` 로 막아요.
+  // 업로드·finalize 는 이미 끝났으니 다시 배포하지 않고 hint 의 stage 를 한 번 실행해 스테이징에 올려요.
+  // 심사 신청(`publish --static-release-id`)은 사용자가 요청할 때만이에요 (AP-25 와 같은 규칙).
+  test("static lane: staging_required 는 다시 배포하지 않고 hint 의 stage 뒤 요청할 때만 심사 신청해요 (#909)", () => {
+    const staticLane = details.slice(
+      details.indexOf("## App backend and static lane"),
+      details.indexOf("## Self-hosted push branch"),
+    );
+    const branch = staticLane.slice(staticLane.indexOf("`staging_required`"));
+    expect(branch).not.toBe(staticLane);
+    expect(branch).toContain("Do not rerun the deploy");
+    expect(branch).toContain("axhub apps static releases stage");
+    expect(branch).toContain("--static-release-id");
+    expect(branch).toContain("only when the user asks");
+    // deploy SKILL.md 의 static lane 은 그 분기를 reference 로 보내요.
+    const skillStatic = deploy.slice(deploy.indexOf("### Static branch"), deploy.indexOf("### Deployment-record branch"));
+    expect(skillStatic).toContain("`staging_required`");
+  });
+
+  // #909: deploy create 의 `staging_required` 는 운영이 심사로만 바뀌는데 스테이징이 꺼진 앱이에요. 스테이징을
+  // 켜면 이후 배포가 모두 스테이징으로 가니 먼저 묻고(headless 는 멈춰요), 켠 뒤 같은 배포를 다시 해요.
+  test("deploy create: staging_required 는 스테이징을 켤지 먼저 묻고 hint 대로 다시 배포해요 (#909)", () => {
+    const routing = details.slice(details.indexOf("## Error routing"), details.indexOf("## Secondary commands"));
+    const line = routing.split("\n").find((entry) => entry.includes("`staging_required`")) ?? "";
+    expect(line).toContain("deploy create");
+    expect(line).toContain("axhub deploy staging enable --app <app> --execute");
+    expect(line).toContain("Headless");
+    expect(line).toContain("--deployment-id");
+    expect(line).toContain("only when the user asks");
+  });
+
   test("fixture shim: staging verify 케이스가 environment=staging 과 review_request 를 내요", () => {
     const caseDir = mkdtempSync(join(tmpdir(), "axhub-staging-shim-"));
     const result = Bun.spawnSync({

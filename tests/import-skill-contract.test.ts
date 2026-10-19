@@ -370,3 +370,42 @@ describe("첫 올리기 점검 (AP-30)", () => {
     expect(development).toContain("SQLite·파일 대신 AXHub DB");
   });
 });
+
+// #830·#832: CLI 가 낸 typed 실패는 원인별로 복구가 달라요 — 패키지 매니저를 못 띄운 건 설치 뒤
+// 같은 옵션 재실행(빌드 스크립트 수정·AP-19 리포트 아님), 주소 없는 기존 앱은 주소를 확인받고 승인 뒤
+// apps update 후 같은 import 재실행. #757: manifest name 은 앱 slug 라야 deploy-prep 이 같은 앱을 찾아요.
+describe("import typed failure recovery (#830·#832·#757)", () => {
+  const skill = readFileSync(join(REPO_ROOT, "skills", "import", "SKILL.md"), "utf8");
+  const row = (name: string): string => skill.split("\n").find((line) => line.startsWith(`| \`${name}\` |`)) ?? "";
+
+  test("static: 패키지 매니저를 못 띄운 건 설치 뒤 같은 옵션으로 다시 실행해요", () => {
+    const staticRow = row("static");
+    expect(staticRow).toContain("static.package_manager_missing");
+    expect(staticRow).toContain("static.package_manager_spawn_failed");
+    // recovery_action 은 `npm install -g pnpm` 같은 전역 설치라 사용자 시스템을 바꿔요 — 동의 뒤에만 해요.
+    expect(staticRow).toContain("recovery_action 의 설치는 사용자 동의를 받은 뒤에 하고(headless 는 안내만 하고 멈춰요) 같은 옵션으로 다시 실행");
+    expect(staticRow).toContain("AP-19 리포트 대상이 아니에요");
+    // 빌드 스크립트·산출물 경로 수정 안내는 그 밖의 retryable=false 에만 남아요.
+    expect(staticRow.indexOf("static.package_manager_missing")).toBeLessThan(staticRow.indexOf("그 밖의 retryable=false"));
+  });
+
+  test("app: 주소 없는 기존 앱은 주소를 확인받고 승인 뒤 apps update 후 같은 import 를 다시 실행해요", () => {
+    const appRow = row("app");
+    expect(appRow).toContain("app.subdomain_not_configured");
+    expect(appRow).toContain("첫 운영 배포 뒤에는 바꿀 수 없으니");
+    expect(appRow).toContain("axhub apps update <slug> --subdomain <주소>");
+    expect(appRow).toContain("같은 import 를 다시 실행");
+    expect(appRow).toContain("axhub deploy list --app <slug>");
+    // slug 는 고른 작업공간 안에서 해석해야 해요. `--tenant` 가 없으면 활성 작업공간에서 다시 찾아
+    // 못 찾거나 같은 slug 의 다른 앱 주소를 바꿀 수 있어요 — CLI recovery_action 처럼 같은 `--tenant` 를 붙여요.
+    expect(appRow).toContain("axhub apps update <slug> --subdomain <주소> --tenant <t>");
+    expect(appRow).toContain("axhub deploy list --app <slug> --tenant <t>");
+  });
+
+  test("manifest name 은 표시 이름이 아니라 앱 slug 예요 (#757)", () => {
+    const authoring = readFileSync(join(REPO_ROOT, "skills", "import", "references", "manifest-authoring.md"), "utf8");
+    expect(authoring).not.toContain("`name`: 표시 이름(package.json name 또는 폴더 이름)");
+    expect(authoring).toContain("`name`: 이 import 의 앱 slug");
+    expect(authoring).toContain("`metadata.name`");
+  });
+});

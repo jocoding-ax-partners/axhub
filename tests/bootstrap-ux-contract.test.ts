@@ -53,7 +53,13 @@ describe("bootstrap desktop UX contract", () => {
     // 27_850 → 30_500: spec 236 T144 backend 선판정 + selfhosted no-owner
     // preview/execute/clone 경로를 본문에 둬요. 이 분기가 첫 8KB 밖 reference 에만
     // 있으면 Codex 절단과 Desktop reference 권한 양쪽에서 다시 GitHub gate로 빠져요.
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(30_500);
+    // 30_500 → 31_000: #455 후속 — 10단계 clone 결과(credential_missing·destination_exists·
+    // already_cloned) 처리. clone 은 fresh path 라 reference 를 읽지 않으니 본문에 있어야 해요.
+    // 31_000 → 31_600: #1008 — 9.1 복구에 watch timeout(exit 10)은 이미 접수된 bootstrap 이라
+    // `--execute` 를 다시 실행하지 않는 규칙, `interrupted`·`timeout` 실패 안내, execute 재시도 전
+    // `apps get` 확인(idempotency key 로는 중복이 막히지 않음)을 둬요. 9.1 은 reference 를 읽지
+    // 않는 복구 경로라 본문에 있어야 해요.
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(31_600);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");
@@ -210,6 +216,24 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("axhub deploy verify <deployment-id> --app <app>");
     expect(bootstrap).toContain("재시도는 최대 1회예요");
     expect(bootstrap).toContain("새 앱을 다시 만들지 않아요");
+    // #1008: watch timeout 은 이미 접수된 bootstrap 이에요. POST 는 멱등하지 않아서
+    // execute 를 다시 실행하면 saga 가 하나 더 생겨요 — id 로 이어 보기만 해요.
+    // agent 환경에서 bare `--watch` 는 스냅샷 1회로 강등돼서 `--watch-timeout` 을 같이 붙여요.
+    expect(bootstrap).toContain(
+      "watch 의 exit 10 은 이미 접수됐다는 뜻이라 이 명령에 `--watch --watch-timeout 9m` 을 붙여 이어가고",
+    );
+    expect(bootstrap).not.toContain("이 명령에 `--watch` 를 붙여");
+    expect(bootstrap).toContain("`--execute` 는 다시 실행하지 않아요");
+    // idempotency key 로는 중복이 막히지 않아서 execute 재시도 전에 앱이 생겼는지 먼저 봐요.
+    expect(bootstrap).toContain(
+      "둘 다 없으면 먼저 `axhub apps get <app-slug> --tenant <tenant> --json` 으로 앱이 생겼는지 확인해요",
+    );
+    expect(bootstrap).toContain("idempotency key 로는 중복이 막히지 않아요");
+    expect(bootstrap).toContain("앱이 없고 execute 요청 자체가 timeout/network 계열로 끝났을 때만");
+    expect(bootstrap).toContain("`bootstrap watch timed out` 은 이미 접수된 거라 재시도하지 않아요");
+    expect(bootstrap).not.toContain("둘 다 없고 오류가 timeout/network 계열일 때만");
+    expect(bootstrap).toContain("`interrupted`(서버 재시작으로 중단)면 앱·저장소가 남았을 수 있어");
+    expect(bootstrap).toContain("`timeout`(시간 초과)이면 앱은 지워졌고 저장소는 남았을 수 있어요");
   });
 
   test("keeps tenant internals out of desktop-visible workspace wording", () => {

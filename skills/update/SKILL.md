@@ -57,7 +57,7 @@ model: sonnet
 
 **보이는 tool 제목 계약.** Bash/명령 도구를 부를 때 description/title/summary 는 아래 고정 한국어 라벨 중 하나만 써요. 라벨 안에 `axhub` 를 넣지 않아요. `axhubing CLI 설치 여부 확인` 처럼 제품명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요.
 
-**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` (AP-17 경로 복구일 때만), `axhub update check ...`, `axhub update apply --execute --yes`, `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub update apply --execute --yes` (2단계 브리지만), `axhub --version`, `claude plugin list`, `claude plugin marketplace update axhub`, `claude plugin update axhub@axhub --scope <SCOPE>`. 각 command 는 단독으로 실행해요. `&&`, pipe, redirect, `grep`, `head`, `tail`, `sed`, `awk`, `bash -lc`, `sh -c` 로 묶거나 자르지 않아요. `command -v claude` 는 Desktop-visible command 로 쓰지 않아요. Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요. 캐시 경로가 작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요. 플러그인 현재 버전은 가능하면 **정확히 `claude plugin list` 만 실행한 출력**의 `axhub@axhub` 항목에서 내부 변수로만 읽고, 실패하면 플러그인 버전 비교는 생략해요. 이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요. `command -v claude && claude plugin list`, `claude plugin list 2>&1`, `claude plugin list 2>&1 | grep ...`, `sed`, `awk`, `head`, `tail`, command substitution, shell wrapper, file test, pipe, redirect, text filter, 파일 읽기 도구를 쓰지 않아요. 실행하려는 command 가 `claude plugin list 2>&1` 또는 `command -v claude && claude plugin list` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.** 출력이 길어도 전체 `claude plugin list` 결과를 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요. 플러그인 버전, 설치 scope, 다음 CLI 확인을 영어 내부 로그처럼 chat 에 쓰지 말고, 필요한 경우 `현재 플러그인 버전을 확인했어요.` 라고만 말해요. 버전과 설치 위치를 같은 문장에 섞지 않아요.
+**Desktop-visible command allowlist.** Bash/명령 도구로 사용자에게 보일 수 있는 command 는 아래 계열만 써요: `command -v axhub`, `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` (AP-17 경로 복구일 때만), `axhub update check ...`, `axhub update apply --execute --yes`, `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub update apply --execute --yes` (2단계 브리지만), `axhub --timeout 10m update apply --execute --yes`·`AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub --timeout 10m update apply --execute --yes` (2단계 exit 10 재시도만), `axhub --version`, `claude plugin list`, `claude plugin marketplace update axhub`, `claude plugin update axhub@axhub --scope <SCOPE>`. 각 command 는 단독으로 실행해요. `&&`, pipe, redirect, `grep`, `head`, `tail`, `sed`, `awk`, `bash -lc`, `sh -c` 로 묶거나 자르지 않아요. `command -v claude` 는 Desktop-visible command 로 쓰지 않아요. Claude Desktop 에서는 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 같은 플러그인 캐시 파일을 읽지 않아요. 캐시 경로가 작업 디렉토리 밖이라 초보자에게 불필요한 읽기 권한 팝업이 떠요. 플러그인 현재 버전은 가능하면 **정확히 `claude plugin list` 만 실행한 출력**의 `axhub@axhub` 항목에서 내부 변수로만 읽고, 실패하면 플러그인 버전 비교는 생략해요. 이 권한 카드의 Desktop-visible command 는 글자 하나도 더하지 말고 정확히 `claude plugin list` 예요. `command -v claude && claude plugin list`, `claude plugin list 2>&1`, `claude plugin list 2>&1 | grep ...`, `sed`, `awk`, `head`, `tail`, command substitution, shell wrapper, file test, pipe, redirect, text filter, 파일 읽기 도구를 쓰지 않아요. 실행하려는 command 가 `claude plugin list 2>&1` 또는 `command -v claude && claude plugin list` 로 떠오르면 **반드시 `claude plugin list` 로 바꿔요.** 출력이 길어도 전체 `claude plugin list` 결과를 도구 응답에서 내부적으로 읽고 사용자에게 echo 하지 않아요. 플러그인 버전, 설치 scope, 다음 CLI 확인을 영어 내부 로그처럼 chat 에 쓰지 말고, 필요한 경우 `현재 플러그인 버전을 확인했어요.` 라고만 말해요. 버전과 설치 위치를 같은 문장에 섞지 않아요.
 
 | 단계 | tool description/title/summary |
 | --- | --- |
@@ -125,18 +125,19 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 
 - **안내-only + `has_update == true`** → 한 줄 안내:
   - `disabled` → `axhub 는 패키지 매니저가 관리하는 설치예요. 패키지 매니저로 업그레이드해 주세요 (예: brew upgrade axhub).`
-  - `AXHUB_NO_AUTO_UPDATE` → `axhub 새 버전(v<latest>)이 있어요. AXHUB_NO_AUTO_UPDATE 설정이라 자동 적용은 안 해요 — axhub update apply 로 직접 받거나 플래그를 끄면 돼요.`
+  - `AXHUB_NO_AUTO_UPDATE` → `axhub 새 버전(v<latest>)이 있어요. AXHUB_NO_AUTO_UPDATE 설정이라 자동 적용은 안 해요 — axhub update apply --execute --yes 로 직접 받거나 플래그를 끄면 돼요.`
 - **`has_update == false`** → `axhub 는 이미 최신이에요 (v<current>).` 한 줄.
 - **`has_update == true` 이고 안내-only 가 아님** → 알리고 바로 적용해요:
   1. 한 줄: `axhub 새 버전(v<current> → v<latest>)이 나왔어요. 지금 업데이트할게요…`
-  2. 실행: `axhub update apply --execute --yes`
+  2. 실행: `axhub update apply --execute --yes` — 브리지 hop 까지 모든 apply 는 명령 도구 timeout 을 600000ms 로 올려 실행해요(도구 기본 timeout 에 먼저 끊기면 CLI 가 exit 10 을 내지 못해 아래 분기가 돌지 않아요).
      - `current` 가 v0.44.1 이하이고 `latest` 가 v0.44.2 보다 높으면(옛 서명 신원만 믿어 바로 받으면 exit 66) 먼저 정확히 `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub update apply --execute --yes` 로 v0.44.2 를 받고 위 명령을 실행해요. 서명 검증은 그대로이고, exit 는 둘 다 3번대로 갈라요.
   3. exit code 로 갈라요 (판정은 CLI 가 함):
      - **exit 0** → `axhub --version` 으로 재확인하고 한 줄: `axhub v<새 버전> 으로 업데이트됐어요.`
      - **exit 14 (digest mismatch — 변조 신호) / exit 66 (cosign_enforce_failed)** → **하드 스톱**. `보안 검증에 실패했어요. 강제로 진행하지 말고 회사 IT·보안팀에 알려주세요. 지금 버전은 그대로 써도 돼요.` 로 안내하고 멈춰요.
      - **exit 15 (swap failed)** → 자동 재시도하지 말고 `업데이트 적용 중 교체가 막혔어요. "설치 상태 진단해줘" 라고 말해 주세요.` 로 안내해요.
      - **exit 4 (미인증)** → `로그인이 필요해요. "다시 로그인해줘" 라고 말해 주세요.` 로 낮춰요.
-     - **그 외 비-0** → raw 에러는 숨기고 한 줄: `자동 업데이트가 안 됐어요. axhub update apply 를 직접 한 번 실행해 주세요.`
+     - **exit 10 (timeout)** → 받는 중에 시간이 다 된 거예요. 실패한 hop 만 명령 도구 timeout 을 600000ms 로 올려 한 번 더 실행해요. `current` 가 v0.46.10 미만이면(전역 timeout 30초가 다운로드 전체에 걸려요) `axhub --timeout 10m update apply --execute --yes`, 브리지 hop 이면 `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub --timeout 10m update apply --execute --yes` 로 바꿔 실행하고, v0.46.10 이상이면 같은 명령을 그대로 실행해요. 결과는 이 분기로 다시 가르되 또 exit 10 이면 더 재시도하지 않고 공식 설치 스크립트로 다시 설치하도록 안내해요 — macOS/Linux `curl -fsSL https://cli.axhub.ai/install.sh | sh`, Windows `irm https://cli.axhub.ai/install.ps1 | iex`.
+     - **그 외 비-0** → raw 에러는 숨기고 한 줄: `자동 업데이트가 안 됐어요. axhub update apply --execute --yes 를 직접 한 번 실행하거나, 안 되면 공식 설치 스크립트로 다시 설치해 주세요.`
 
 ---
 

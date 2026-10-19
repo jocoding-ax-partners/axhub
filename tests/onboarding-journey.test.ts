@@ -67,6 +67,40 @@ describe("onboarding representative journey", () => {
     expect(SKILL).toContain("`GitHub 계정 연동 확인하는 중이에요`");
   });
 
+  // #387: auth status 프로브가 답하지 않은 것(probe_timeout·probe_no_output·cli_spawn_failed)은
+  // 로그아웃이 아니에요. onboarding-detect 는 이걸 auth_missing 대신 auth_unverified 로 보고하니,
+  // 게이트·라우터·루프·완료 규칙·install reference 가 모두 그 gap 을 받아야 auth 를 닫기 전에
+  // preflight 로 새거나 로그인 카드를 띄우지 않아요.
+  test("an unanswered auth probe is its own gap (auth_unverified), never a login prompt (#387)", () => {
+    for (const set of [routerGaps, loopGaps, completionGaps]) {
+      expect(set.has("auth_unverified")).toBe(true);
+    }
+    expect(section(SKILL, "### 2. Git backend gate")).toContain("`auth_missing`·`auth_unverified`");
+    const routerRow =
+      section(SKILL, "### 4. first_gap router")
+        .split("\n")
+        .find((line) => line.startsWith("| `auth_unverified` |")) ?? "";
+    expect(routerRow).toContain("axhub auth status --json");
+    expect(routerRow).not.toContain("device login");
+    const loadFor = INSTALL.split("\n").find((line) => line.startsWith("Load this for")) ?? "";
+    expect(loadFor).toContain("`auth_unverified`");
+    const unverified = section(INSTALL, "## Auth Unverified");
+    for (const phrase of [
+      "probe_timeout",
+      "probe_no_output",
+      "cli_spawn_failed",
+      "axhub auth status --json",
+      "exit 4",
+      "axhub 서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요.",
+    ]) {
+      expect(unverified, phrase).toContain(phrase);
+    }
+    // 실제 미로그인은 exit 4 + error.code auth 예요 — auth_missing 의 로그인 분기가 그 신호를 받아야 해요.
+    expect(section(INSTALL, "## Auth Missing")).toContain("exit 4 with `error.code` `auth`");
+    // 구 CLI 는 같은 상태를 auth_missing 으로 보고해요 — 그때도 로그인 안내 없이 auth_unverified 처럼 다뤄요.
+    expect(GAPS).toContain("handle it as `auth_unverified`");
+  });
+
   test("github link is documented as a pre-auth step without promising permanence", () => {
     expect(GITHUB).toContain("## GitHub 계정 연동 (설치보다 먼저)");
     expect(GITHUB).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link");

@@ -229,9 +229,10 @@ function makeHome(): string {
 // harness 몫이라 스크립트는 끝까지 돌고 stdout(알림 JSON)을 돌려줘요. stub 은
 // STUB_* env 로 출력·exit 를 정하고 호출 인자를 STUB_CALLS 파일에 남겨요.
 // 서명 신원 브리지 hop 은 AXHUB_UPDATE_FEED_URL 로 버전 포인터만 바꿔요 — 그 env 는
-// 호출 기록 앞머리에 남기고, exit 은 STUB_BRIDGE_APPLY_EXIT 로 따로 정해요.
+// 호출 기록 앞머리에 남기고, exit 은 STUB_BRIDGE_APPLY_EXIT 로 따로 정해요. 0.46.10 미만
+// CLI 의 apply 에 붙는 AXHUB_TIMEOUT(#386)도 같은 앞머리에 남겨요.
 const AXHUB_STUB = `#!/usr/bin/env bash
-[ -n "$STUB_CALLS" ] && echo "\${AXHUB_UPDATE_FEED_URL:+AXHUB_UPDATE_FEED_URL=$AXHUB_UPDATE_FEED_URL }axhub $*" >> "$STUB_CALLS"
+[ -n "$STUB_CALLS" ] && echo "\${AXHUB_TIMEOUT:+AXHUB_TIMEOUT=$AXHUB_TIMEOUT }\${AXHUB_UPDATE_FEED_URL:+AXHUB_UPDATE_FEED_URL=$AXHUB_UPDATE_FEED_URL }axhub $*" >> "$STUB_CALLS"
 case "$*" in
   *--field-expr*) [ -n "$STUB_CHECK_EXIT" ] && exit "$STUB_CHECK_EXIT"; printf '%s\\n' "$STUB_CHECK_OUT" ;;
   "update check --json") printf '%s\\n' "$STUB_CHECK_JSON" ;;
@@ -307,7 +308,11 @@ function runWorker(env: Record<string, string>, home = makeHome()): WorkerRun {
   return { result, home, calls, log };
 }
 
-const applyCalls = (calls: string[]): string[] => calls.filter((line) => line.startsWith("axhub update apply"));
+const applyCalls = (calls: string[]): string[] => calls.filter((line) => line.includes("axhub update apply"));
+// 0.46.10 미만 CLI 는 apply 다운로드에 전역 timeout(기본 30s)을 총 데드라인으로 걸어요(#386) —
+// 그 CLI 로 받는 hop 에는 10분을 줘요. 0.46.10 이상은 그대로예요.
+const PLAIN_APPLY = "axhub update apply --execute --yes --json";
+const OLD_CLI_APPLY = `AXHUB_TIMEOUT=10m ${PLAIN_APPLY}`;
 const claudeCalls = (calls: string[]): string[] => calls.filter((line) => line.startsWith("claude "));
 
 describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
@@ -336,7 +341,7 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
     expect(result.stdout).toContain("버전 확인 명령은 실행하지 마세요");
     expect(calls[0]).toContain("axhub update check --plugin-version 1.27.1 --field-expr");
     expect(calls.slice(1)).toEqual([
-      "axhub update apply --execute --yes --json",
+      OLD_CLI_APPLY,
       "claude plugin list",
       "claude plugin marketplace update axhub",
       "claude plugin update axhub@axhub --scope project",
@@ -469,14 +474,38 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
   // #453 서명 신원 브리지 — 0.44.1 이하는 옛 레포 서명만 믿어 mono 가 서명한 최신을
   // exit 66 으로 막아요. 두 신원을 다 믿는 0.44.2 를 포인터로 먼저 받고 최신으로 이어요.
   const PRE_BRIDGE_UPDATE = "v0.44.0 true v0.46.8 false false false 1.27.1";
-  const BRIDGE_APPLY =
-    "AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub update apply --execute --yes --json";
-  const PLAIN_APPLY = "axhub update apply --execute --yes --json";
+  // 브리지·본 apply 를 받는 CLI(0.44.0 → 0.44.2)가 둘 다 0.46.10 미만이라 두 hop 모두 10분이에요.
+  const BRIDGE_APPLY = `AXHUB_TIMEOUT=10m AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge ${PLAIN_APPLY}`;
 
   test("0.44.1 이하 CLI → 브리지 포인터로 0.44.2 를 받고 같은 run 에서 최신까지 올려요 (#453)", () => {
     const { result, calls, log } = runWorker({ STUB_CHECK_OUT: PRE_BRIDGE_UPDATE });
     expectEmit(result, "SessionStart", "axhub CLI 가 v0.44.0 → v0.46.8 로 자동 업데이트됐어요");
-    expect(calls.slice(1)).toEqual([BRIDGE_APPLY, PLAIN_APPLY]);
+    expect(calls.slice(1)).toEqual([BRIDGE_APPLY, OLD_CLI_APPLY]);
+    expect(log).toContain("UPDATED cli=v0.44.0->v0.46.8");
+  });
+
+  test("0.46.10 미만 CLI 의 apply 에만 AXHUB_TIMEOUT=10m 을 붙이고 check 에는 붙이지 않아요 (#386)", () => {
+    const { calls, log } = runWorker({ STUB_CHECK_OUT: "v0.46.9 true v0.46.18 false false false 1.27.1" });
+    expect(calls[0]).toStartWith("axhub update check");
+    expect(calls.slice(1)).toEqual([OLD_CLI_APPLY]);
+    expect(log).toContain("UPDATED cli=v0.46.9->v0.46.18");
+  });
+
+  test("0.46.10 이상 CLI 는 아카이브에 10분 하한이 있어 timeout 을 붙이지 않아요 (#386)", () => {
+    const { calls } = runWorker({ STUB_CHECK_OUT: "v0.46.10 true v0.46.18 false false false 1.27.1" });
+    expect(calls.slice(1)).toEqual([PLAIN_APPLY]);
+  });
+
+  test("0.44.0 → 브리지 apply 와 본 apply 둘 다 AXHUB_TIMEOUT=10m 이에요 (#386·#453)", () => {
+    const { calls } = runWorker({ STUB_CHECK_OUT: "v0.44.0 true v0.46.18 false false false 1.27.1" });
+    expect(calls.slice(1)).toEqual([BRIDGE_APPLY, OLD_CLI_APPLY]);
+  });
+
+  // POSIX 모드 bash(POSIXLY_CORRECT 가 있거나 sh 로 실행)는 셸 함수 앞에 붙인 대입을 함수가 끝난 뒤에도
+  // 남겨요. 브리지 피드가 본 apply 까지 새면 0.44.2 를 다시 받고도 최신으로 올랐다고 log·알림을 남겨요.
+  test("POSIX 모드 bash 에서도 브리지 피드가 본 apply 로 새지 않아요 (#386·#453)", () => {
+    const { calls, log } = runWorker({ STUB_CHECK_OUT: PRE_BRIDGE_UPDATE, POSIXLY_CORRECT: "1" });
+    expect(calls.slice(1)).toEqual([BRIDGE_APPLY, OLD_CLI_APPLY]);
     expect(log).toContain("UPDATED cli=v0.44.0->v0.46.8");
   });
 
@@ -486,7 +515,7 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
     writeFileSync(join(home, HALT_REL), "v0.46.8|66");
     const { result, calls, log } = runWorker({ STUB_CHECK_OUT: PRE_BRIDGE_UPDATE }, home);
     expectEmit(result, "SessionStart", "v0.44.0 → v0.46.8");
-    expect(calls.slice(1)).toEqual([BRIDGE_APPLY, PLAIN_APPLY]);
+    expect(calls.slice(1)).toEqual([BRIDGE_APPLY, OLD_CLI_APPLY]);
     expect(existsSync(join(home, HALT_REL))).toBe(false);
     expect(log).toContain("UPDATED cli=v0.44.0->v0.46.8");
   });
@@ -508,14 +537,14 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
     utimesSync(join(first.home, CACHE_REL), daysAgo(2), daysAgo(2));
     const third = runWorker({ STUB_CHECK_OUT: "v0.44.0 true v0.46.9 false false false 1.27.1" }, first.home);
     expectEmit(third.result, "SessionStart", "v0.44.0 → v0.46.9");
-    expect(third.calls.slice(1)).toEqual([BRIDGE_APPLY, PLAIN_APPLY]);
+    expect(third.calls.slice(1)).toEqual([BRIDGE_APPLY, OLD_CLI_APPLY]);
     expect(existsSync(join(first.home, HALT_REL))).toBe(false);
   });
 
   test("브리지 뒤 최신 apply 가 실패하면 바뀐 CLI 버전을 log·알림에 사실대로 남겨요", () => {
     const { result, calls, log } = runWorker({ STUB_CHECK_OUT: PRE_BRIDGE_UPDATE, STUB_APPLY_EXIT: "1" });
     expectEmit(result, "SessionStart", "axhub CLI 가 v0.44.0 → v0.44.2 로 자동 업데이트됐어요");
-    expect(calls.slice(1)).toEqual([BRIDGE_APPLY, PLAIN_APPLY]);
+    expect(calls.slice(1)).toEqual([BRIDGE_APPLY, OLD_CLI_APPLY]);
     expect(log).toContain("APPLY_FAILED exit=1 latest=v0.46.8 cli=v0.44.0->v0.44.2");
   });
 
@@ -532,7 +561,7 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
       "v0.44.1 true v0.44.2 false false false 1.27.1",
     ]) {
       const { calls } = runWorker({ STUB_CHECK_OUT: out });
-      expect(calls.slice(1)).toEqual([PLAIN_APPLY]);
+      expect(calls.slice(1)).toEqual([OLD_CLI_APPLY]);
     }
   });
 
@@ -699,6 +728,47 @@ describe("AP-19 feedback 리포트 계약 훅 (SessionStart entry 5)", () => {
     const result = runScript(feedbackContractSh, "", { HOME: makeHome(), PATH: SAFE_PATH });
     expectEmit(result, "SessionStart", "axhub feedback -m");
     expect(result.stdout).toContain("예상된 거절은 리포트하지 않아요");
+  });
+
+  // #865: 502 site_offline 은 exit 7 이지만 retryable·unavailable 인 일시 장애예요 — 첫 시도에
+  // 리포트하지 않고, 쓰기는 다시 보내기 전에 반영 여부부터 봐요. #575·#576: plugin-support 내부
+  // 확인 명령의 실패는 자동 첨부되지 않으니 envelope details 를 `실제:` 줄에 옮겨 적어요.
+  test("일시 장애는 한 번 다시 시도한 뒤에만 리포트하고 envelope details 를 옮겨 적어요 (#865·#575)", () => {
+    const result = runScript(feedbackContractSh, "", { HOME: makeHome(), PATH: SAFE_PATH });
+    expectEmit(result, "SessionStart", "axhub feedback -m");
+    const context = (JSON.parse(result.stdout.trim()) as { hookSpecificOutput: { additionalContext: string } })
+      .hookSpecificOutput.additionalContext;
+    expect(context).toContain("error.retryable");
+    expect(context).toContain("error.backend_category 가 unavailable");
+    expect(context).toContain("site_offline");
+    expect(context).toContain("그래도 재현될 때만 리포트해요");
+    expect(context).toContain("반영 여부를 먼저 확인해요");
+    expect(context).toContain("error.details");
+    expect(context).toContain("request_id");
+  });
+
+  // #336·#865: exit 7 auth_expired 는 커넥터 자체의 자격 증명 만료(axhub 로그인과 무관, 테넌트 관리자가
+  // 재인증)이고, exit 7 connector_upstream_failed 는 사이트 agent 가 GET 이 아닌 invoke 를 끝내지 못한
+  // 운영 실패예요 — 둘 다 CLI 결함이 아니라 리포트하지 않아요. #909: route 404 의 backend_unimplemented 는
+  // CLI 를 최신으로 올린 뒤에도 재현될 때만, #455: exit 9 repository.url_missing 은 hint 대로 한 번 다시
+  // 시도해 반복될 때만 리포트해요(정상 가드 거절이 아니에요).
+  test("운영 상태는 리포트하지 않고, 버전 차이·backend 불일치는 업데이트·재시도 뒤에만 리포트해요 (#336·#865·#909·#455)", () => {
+    const result = runScript(feedbackContractSh, "", { HOME: makeHome(), PATH: SAFE_PATH });
+    expectEmit(result, "SessionStart", "axhub feedback -m");
+    const context = (JSON.parse(result.stdout.trim()) as { hookSpecificOutput: { additionalContext: string } })
+      .hookSpecificOutput.additionalContext;
+    const expected = context.slice(context.indexOf("예상된 거절은 리포트하지 않아요"));
+    expect(expected).toContain("exit 7 auth_expired");
+    expect(expected).toContain("axhub 로그인과 무관");
+    expect(expected).toContain("테넌트 관리자가 커넥터를 재인증");
+    expect(expected).toContain("exit 7 connector_upstream_failed");
+    expect(expected).toContain("반영 여부를 확인");
+    expect(expected).toContain("읽기용 POST");
+    expect(context).toContain("backend_unimplemented");
+    expect(context).toContain("axhub update apply --execute --yes");
+    expect(context).toContain("repository.url_missing");
+    // 진단은 인자 값을 모으지 않지만 오류 메시지 한 줄은 대상 이름·경로를 담을 수 있어요 (CLI feedback --help 와 같아요).
+    expect(context).toContain("인자 값은 수집하지 않지만");
   });
 
   test("PATH 에 없어도 위치 파일 ~/.axhub/bin-path 가 있으면 발행해요 (AP-17 3-경로)", () => {

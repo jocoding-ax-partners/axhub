@@ -12,6 +12,7 @@ DETECT_ALL(read-only)  <- axhub plugin-support onboarding-detect --json
   cli_path_missing     -> repair-path(canonical path) -> bin_path lane -> DETECT_ALL via bin_path
   cli_old              -> update check/apply approval -> DETECT_ALL
   auth_missing         -> auth status/refresh/login -> DETECT_ALL
+  auth_unverified      -> re-detect once -> auth status decides -> DETECT_ALL
   git_missing          -> git install approval -> DETECT_ALL
   node_missing         -> node install approval -> DETECT_ALL
   node_mismatch        -> node version correction approval -> DETECT_ALL
@@ -34,7 +35,8 @@ Filtering to `EFFECTIVE_FIRST_GAP` does not process another gap. Execute that on
 | `cli_missing` | `cli_present=false` | User installs official CLI, then detect reports `cli_present=true`. |
 | `cli_path_missing` | `cli_state=on_disk_not_on_path` or `cli_on_path=false` | canonical 경로로 부른 `repair-path` 가 repaired/already present 를 보고하면 같은 세션은 `bin_path` 절대경로로 이어가고 재감지도 `bin_path` 로 해요; 구 CLI(bin_path 없음)는 새 터미널 재실행으로 완료해요. |
 | `cli_old` | `cli_too_old=true` or `has_update=true` | update apply succeeds, or user stops with `READY_WITH_USER_ACTION`. |
-| `auth_missing` | `auth_ok=false` | refresh/login succeeds and re-detect is green. |
+| `auth_missing` | `auth_ok=false` | refresh/login succeeds and re-detect is green. An older CLI reports a missing login verdict (`auth_error_code` `probe_timeout`, `probe_no_output`, `cli_spawn_failed`, `api`, `rate_limited`, `timeout`, or `other`) here — handle it as `auth_unverified`, with no login copy. |
+| `auth_unverified` | `auth_ok=false` + `auth_error_code` `probe_timeout`·`probe_no_output`·`cli_spawn_failed`·`api`·`rate_limited`·`timeout`·`other` | `auth status` gave no login verdict (the probe did not answer, or `/me` answered 429·5xx or was never reached) — not a login gap: show no login copy and re-detect once. If it repeats, `axhub auth status --json` decides: exit 0 is logged in (auth is done for this session; take the next gap from `gaps`), exit 4 (`error.code` `auth`) goes to `auth_missing` handling, anything else stops with `axhub 서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요.` |
 | `git_missing` | `git_present=false` | git becomes present after user-approved install. |
 | `node_missing` | `node_present=false` | node becomes present after user-approved install. |
 | `node_mismatch` | `node_mismatch=true` | required version is active, or continue is degraded. |

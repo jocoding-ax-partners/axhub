@@ -60,7 +60,10 @@ describe("clean plugin bundle", () => {
       expect(result.exitCode, result.stderr.toString()).toBe(0);
       const stats = JSON.parse(result.stdout.toString()) as { bytes: number; files: number };
       expect(stats.files).toBeGreaterThan(8);
-      expect(stats.bytes).toBeLessThan(512 * 1024);
+      // 개발 산출물(node_modules·dist 등)이 섞이면 MB 단위로 커져요 — 이 상한은 그걸 잡는
+      // sanity 값이에요. 512 KiB → 544 KiB: cli-feedback 후속(#405·#387·#386·#830·#832·#455)의
+      // 스킬·reference 안내가 늘어 실측 약 527 KB 가 됐어요.
+      expect(stats.bytes).toBeLessThan(544 * 1024);
 
       expect(existsSync(join(outDir, ".claude-plugin", "plugin.json"))).toBe(true);
       expect(existsSync(join(outDir, "README.md"))).toBe(true);

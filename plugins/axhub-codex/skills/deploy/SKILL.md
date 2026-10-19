@@ -41,7 +41,7 @@ axhub plugin-support deploy-preview-summary --user-utterance "<latest user sente
 
 이 첫 명령 전에는 설치·플러그인·앱·git·curl probe를 하지 않아요. 명시적 최신성 요청만 update 뒤 이 스킬로 돌아와요.
 
-정상 preview(`다음을 실행할게요`)면 axhub 프로젝트 확정이고, 이미 AXHub 에 있는 앱의 재배포예요. **재배포는 승인 카드를 띄우지 않아요 (AP-12).** stdout 의 `진행할까요?` 는 묻지 않고, 아래 `## 배포 전 맞추기` 를 한 뒤 묻는 일이 없으면 그대로 배포해요. stdout 이 `커밋 안 된 변경` 이나 `배포 전에 맞출 것이 있어요` 로 exit 64 면 실패가 아니라 맞출 일이 있다는 뜻이라 같은 절로 가요. `처음 배포라 앱 등록 준비` 면 첫 올리기라 `import` 몫이에요. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here. axhub 맥락(사용자의 axhub 언급·직전 axhub 작업)이 있으면 기존대로 안내해요: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`. axhub 맥락이 없으면 바로 넘기지 말고 선택 카드로 `어디에 배포할까요?` 를 한 번만 물어요(`axhub (추천)`·`다른 곳`). `axhub` 면 위처럼 이어가고, `다른 곳` 이면 어디인지 묻고 끝내요. 사용자가 고르거나 배포할 곳을 말하기 전에는 GitHub Pages·Vercel 같은 다른 배포를 알아서 시작하지 않아요. headless 에서는 묻지 않고 조용히 멈춰요.
+정상 preview(`다음을 실행할게요`)면 axhub 프로젝트 확정이고, 이미 AXHub 에 있는 앱의 재배포예요. **재배포는 승인 카드를 띄우지 않아요 (AP-12).** stdout 의 `진행할까요?` 는 묻지 않고, 아래 `## 배포 전 맞추기` 를 한 뒤 묻는 일이 없으면 그대로 배포해요. stdout 이 `커밋 안 된 변경` 이나 `배포 전에 맞출 것이 있어요` 로 exit 64 면 실패가 아니라 맞출 일이 있다는 뜻이라 같은 절로 가요. `처음 배포라 앱 등록 준비`·로그인 문구는 바로 따르지 않고 아래 `deploy-prep` 판정으로 확정해요 — `import` 몫은 `bootstrap_plan` 이 있을 때뿐이에요. If stdout says `axhub 매니페스트(axhub.yaml)가 없어요.`, do not create files here. axhub 맥락(사용자의 axhub 언급·직전 axhub 작업)이 있으면 기존대로 안내해요: non-empty existing app -> `기존 앱 올려` / `import`; empty directory new template -> `새 앱 만들어줘` / `bootstrap`. axhub 맥락이 없으면 바로 넘기지 말고 선택 카드로 `어디에 배포할까요?` 를 한 번만 물어요(`axhub (추천)`·`다른 곳`). `axhub` 면 위처럼 이어가고, `다른 곳` 이면 어디인지 묻고 끝내요. 사용자가 고르거나 배포할 곳을 말하기 전에는 GitHub Pages·Vercel 같은 다른 배포를 알아서 시작하지 않아요. headless 에서는 묻지 않고 조용히 멈춰요.
 
 Then do `## 배포 전 맞추기` and the canonical workflow below (`references/workflow-details.md` for branch detail).
 
@@ -50,10 +50,10 @@ Then do `## 배포 전 맞추기` and the canonical workflow below (`references/
 preflight 의 `capabilities.readiness.deploy_check` 가 false 면 `axhub CLI를 최신 버전으로 업데이트해 주세요.` 하고 멈춰요. 핵심: 물을 일이 없으면 묻지 않고 배포하고, 있으면 그것만 물어요 — headless 는 아무것도 바꾸지 않고 물을 내용만 남기고 멈춰요. 설정값 등록과 수정 커밋은 반드시 push 전에 끝내요(GitHub 연결 앱은 push 가 곧 자동 배포).
 
 1. **판정** — `axhub deploy check --app <app> --json`(제목 `배포 전 확인`). `fail` 만 맞출 일이고 `unknown`·`info` 는 막지 않아요.
-2. **기준 문서** — preflight 의 `capabilities.readiness.context_url` 을 한 번만 가져와요(제목 `배포 기준 확인`, WebFetch 또는 `curl -fsSL`). 못 받으면 문서 없이 가요.
+2. **기준 문서** — preflight 의 `capabilities.readiness.context_url` 을 한 번만 가져와요(제목 `배포 기준 확인`, WebFetch 또는 `curl -fsSL`). 없으면 `references/deploy-rules.md` 를 봐요.
 3. **검사** — 그 규칙으로 앱 코드를 봐요. 테스트·예시·README 흔적은 문제가 아니고, 정적 앱은 서버 항목을 건너뛰어요. 빌드가 있으면 로컬 빌드를 5분 안에서 한 번(재배포는 의존성·설정·소스가 바뀐 때만) 돌리고, 실패하면 고쳐 2번까지 다시 해요. 그래도 실패하면 배포하지 않고 막힌 것을 알려요.
-4. **묻는 일은 셋뿐이에요** — (a) `.env`·`.env.local` 에도 없는 필수 설정값: 값을 대화로 받지 않고 `<이름> 값을 앱 폴더 .env 에 넣어 주세요` 라고 부탁한 뒤 1부터 다시 해요. (b) 안 되는 6가지에 처음 해당한 것: 문서의 대안과 `그대로 올리기` 중에서 골라요. (c) 처음 올릴 때 정할 것(`import` 몫). 모아서 한 번만 묻고, 빈 답변은 답이 아니라 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. `.axhub/deploy-answers.json` 의 `keep` 에 있는 항목은 다시 묻지 않고, `그대로` 답은 `{"rule","path","at"}` 로 `keep` 에 더해요(커밋 안 함).
-5. **맞추기 — 묻지 않고 이 순서로 해요.** ① `.env` 에 있는 이름은 `axhub env set --app <app> --from-dotenv .env --only <이름,…> --execute` 로 등록해요. `.env` 를 열거나 값을 출력하지 않아요. ② 포트·`0.0.0.0`·상태 확인 경로·빌드 오류·설정 파일을 고쳐요. ③ 고친 파일과 커밋 안 된 앱 변경을 `배포 전 맞추기` 로 커밋해요(`.env*`·키 파일·`.axhub/`·에이전트 폴더 제외). ④ 원격 브랜치로 push 해요(①~③ 뒤에만). ⑤ `deploy check` 로 다시 확인해요.
+4. **묻는 일은 셋뿐이에요** — (a) `.env`·`.env.local` 에도 없는 필수 설정값: 값을 대화로 받지 않고 `<이름> 값을 앱 폴더 .env 에 넣어 주세요` 라고 부탁한 뒤 1부터 다시 해요. (b) 안 되는 6가지·문서 `물어봄` 규칙에 처음 해당한 것: 문서의 대안과 `그대로 올리기` 중에서 골라요. (c) 처음 올릴 때 정할 것(`import` 몫). 모아서 한 번만 묻고, 빈 답변은 답이 아니라 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. `.axhub/deploy-answers.json` 의 `keep` 에 있는 항목은 다시 묻지 않고, `그대로` 답은 `{"rule","path","at"}` 로 `keep` 에 더해요(커밋 안 함).
+5. **맞추기 — 묻지 않고 이 순서로 해요.** ① `.env` 에 있는 이름은 `axhub env set --app <app> --from-dotenv .env --only <이름,…> --execute` 로 등록해요. `.env` 를 열거나 값을 출력하지 않아요. ② 포트·`0.0.0.0`·상태 확인 경로·빌드 오류·설정 파일을 고쳐요. ③ 고친 파일과 커밋 안 된 앱 변경을 `배포 전 맞추기` 로 커밋해요(`.env*`·키 파일·`.axhub/`·에이전트 폴더 제외). ④ 원격 브랜치로 push 해요(①~③ 뒤에만). `subdomain_not_configured` 항목이 fail 이면 push 하지 않고 Recovery Summary 대로 주소부터 정해요. ⑤ `deploy check` 로 다시 확인해요.
 6. **배포** — 승인 카드 없이 아래 workflow 로 배포해요(push 가 만든 배포를 status-first 로 먼저 보고, 없을 때만 create). headless 도 물을 일이 없으면 실제로 배포해요. `리허설`·`테스트로` 라고 했을 때만 dry-run 이에요.
 7. **마무리** — 맞춘 게 있으면 마지막 메시지를 정확히 `이렇게 맞춰서 올렸어요.` 로 시작하고, 맞춘 것(설정값 이름·고친 것·커밋)과 결과 주소를 알려요.
 
@@ -71,24 +71,13 @@ Headless means `codex exec`, CI, no TTY, or no user-confirmation channel at all 
 
 ## Tool Authority
 
-This skill is **CLI-only**. All deploy preview/create/verify/status/diagnosis routing must go through `axhub` CLI commands described below. Ignore MCP deployment mutation tools even when they are visible in the session.
+This skill is **CLI-only**. All deploy preview/create/verify/status/diagnosis routing must go through `axhub` CLI commands described below. Ignore MCP deployment mutation tools even when they are visible in the session; the MCP, advisor, subagent, and model-escalation bans are in `## NEVER`.
 
-- Do not call MCP tools such as `deployment_trigger` for deploy create.
-- Do not route deploy execution through advisor/server advisor/subagent helpers.
-- Do not escalate to another model/context to decide deployment. The CLI envelopes are the source of truth.
 - If MCP deployment tools are present but denied, that is not a blocker for this skill; continue with the CLI path or the headless dry-run contract.
 
 **Codex 단일 명령 계약.** 카드마다 한 bare 명령만 써요. 변수·분기·subshell·shell 연산·pipe·redirect·출력 가공 없이 이전 결과의 ID를 literal 인자로 넘겨요.
 
-Progress lines:
-
-- `[1/5] axhub 점검하는 중이에요`
-- `[2/5] 배포 대상 확인하는 중이에요`
-- `[3/5] 미리보기 보여줄게요`
-- `[4/5] 배포하는 중이에요`
-- `[5/5] 배포 결과 확인하는 중이에요`
-
-Final user message is a Korean one-line summary plus next action. Prefer natural phrases such as `다시 로그인해줘`, `기존 앱 올려`, or `새 앱 만들어줘`; do not tell a Desktop user to run deploy CLI commands. If a deployment is already running and a `DEPLOY_ID` is known, do not ask the user to request another status check; keep watching automatically with the verify loop or an actual scheduled follow-up.
+Progress lines and the final user message follow `references/user-facing-language.md`.
 
 ## Reference Loading
 
@@ -115,7 +104,7 @@ axhub plugin-support preflight --json
 
 `capabilities.self_hosted_git.app_git_backend`, `capabilities.self_hosted_git.git_setup`, `capabilities.self_hosted_git.repo_clone`이 모두 `true`여야 해요. 누락·malformed/false면 fallback 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
 
-command-not-found는 미설치가 아니에요. AP-17대로 `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json`의 `bin_path`로 이어가고 디스크에도 없을 때만 onboarding을 안내해요. auth missing/expired면 interactive login 전에 물어요.
+command-not-found는 미설치가 아니에요. AP-17대로 `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json`의 `bin_path`로 이어가고 디스크에도 없을 때만 onboarding을 안내해요. auth missing/expired면 interactive login 전에 물어요 — `auth_error_code` probe 실패는 로그인 안내 없이 아래 resolve 규칙대로 해요.
 
 ### Routing and resolve
 
@@ -137,7 +126,7 @@ The `deploy-prep` envelope is authoritative for `profile`, `endpoint`, `app_id`,
 
 If this skill was invoked as a handoff from another axhub skill after code changes, do **not** reuse the original feature prompt as `--user-utterance`; it may contain display text such as "QA banner" that looks like an app candidate. Use a short deploy utterance like `현재 앱 배포해` and rely on the current folder's axhub.yaml binding. If the current folder has a valid axhub.yaml and the latest deploy phrase does not explicitly name another app, the bound app slug wins over arbitrary words in prior chat.
 
-If `bootstrap_plan` is present or `app_id` is missing, stop before preview: non-empty first-connect belongs to import and empty new app creation to bootstrap. Defer empty branch/commit until after `apps get`: selfhosted may be an un-cloned app and must enter `repo clone`; GitHub with no repository enters upload; only a GitHub repo path with missing readiness stops for import.
+Only `bootstrap_plan` is first-run: stop before preview — non-empty folder → import, empty → bootstrap. A missing `app_id` without it is never first-run or not-found: `app_ambiguous` → ask among `matched_apps` slugs; `apps_list_parse_error` → rerun `deploy-prep` once; auth probe failure (`preflight.auth_error_code` or `resolve.error` `auth_` + `probe_timeout`/`probe_no_output`/`cli_spawn_failed`/`api`/`rate_limited`/`timeout`/`other`) → no login copy, rerun once, then `axhub auth status --json` decides (exit 0 continue, exit 4 login); other `auth_` codes → auth recovery. Stop copy, `--refresh-in-flight`: workflow-details `## Deploy-prep envelope`. Defer empty branch/commit until after `apps get`: an un-cloned selfhosted app enters `repo clone`; GitHub with no repository enters upload; only an unready GitHub repo path stops for import.
 
 ### Static branch
 
@@ -154,7 +143,7 @@ axhub apps static deploy --app "$APP_ID" --from-dir "$STATIC_DIR" --tenant "$AXH
 axhub apps static deploy --app "$APP_ID" --from-dir "$STATIC_DIR" --tenant "$AXHUB_TENANT" --execute
 ```
 
-Static success is `active_release_id` from activate plus public URL when available. Do not call `axhub deploy verify` in static lane.
+Static success is `active_release_id` from activate plus public URL when available; never `axhub deploy verify` here. Exit 9 `staging_required`: workflow-details.
 
 ### Deployment-record branch
 
@@ -164,7 +153,7 @@ Deployment-record apps branch on the already-read `git_backend.backend` before r
 
 This lane starts only when the preceding `axhub apps get <app> --json` reports `git_backend.backend=selfhosted`. `tenant_default` and `app_override` use the same behavior. Never enter the upload/create fallback, call a GitHub command, or call Gitea API from this lane.
 
-이 lane은 `capabilities.self_hosted_git.git_setup_rotate`가 `true`여야 하고, 아니면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요. 폴더가 이미 clone이어도 push 전마다 아래 setup을 실행해요. host-scoped git config만 다시 써 Windows의 Git Credential Manager 창을 막고 유효한 PAT는 유지해요.
+이 lane은 `capabilities.self_hosted_git.git_setup_rotate`가 `true`여야 하고, 아니면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요. 폴더가 이미 clone이어도 push 전마다 아래 setup을 실행해요.
 
 ```bash
 axhub --tenant <tenant> git setup --json
@@ -176,17 +165,15 @@ If the current folder is not yet the resolved app's clone, run the public resolv
 axhub repo clone <app> --json
 ```
 
-clone 응답의 absolute `data.destination`을 사용해 이후 모든 local git command의 tool `cwd`를 고정해요. retry도 same returned `data.destination` cwd에서 실행하며 원래 폴더나 추측 경로를 쓰지 않아요.
+clone 응답의 absolute `data.destination`을 사용해 이후 모든 local git command의 tool `cwd`를 고정해요. retry도 same returned `data.destination` cwd에서 실행하며 원래 폴더나 추측 경로를 쓰지 않아요. Clone exit 9 follows its hint: `repository.credential_missing` → the hint's `next:` command as printed once, retry; a repeat → stop and report it with `axhub feedback`. `repository.destination_exists` → show the hint path and let the user pick another path or empty it. `already_cloned: true` is success.
 
-After savepoint/branch checks and `## 배포 전 맞추기`, push from the returned cwd. The webhook creates the deployment:
+After savepoint/branch checks and `## 배포 전 맞추기` (never while `subdomain_not_configured` fails), push from the returned cwd. The webhook creates the deployment:
 
 Before push, save full `git rev-parse HEAD` as `PUSHED_SHA` (no substitute/short SHA). With the same profile/tenant, baseline matching deployment IDs from `axhub deploy list --app <app-id> --all --json`; stop on read failure.
 
 ```bash
 git -c credential.interactive=false push -u origin "HEAD:$BRANCH"
 ```
-
-`credential.interactive=false`는 자격증명이 없을 때 프롬프트·창 대신 오류로 바로 실패하게 해요.
 
 After push exit 0, say only `변경 내용을 보냈어요. 자동 배포가 시작되는지 확인할게요.` webhook 자동 배포를 AP-16(30회/10분) 안에서 `axhub deploy list --app <app-id> --all --json`으로 확인해요. top-level `items`에서 `commit_sha == PUSHED_SHA`이고 push 전 baseline에 없는 exact deployment id만 선택해요. 상태 필터 없이 이미 성공·실패한 기록도 즉시 `axhub deploy verify <deployment-id> --app <app-id> --json`으로 확인하고 실패는 diagnosis로 보내요. 여러 기록이면 `created_at`이 가장 최신인 것을 선택하고 이후 같은 id만 verify해요. 조회 실패는 빈 목록으로 취급하지 않아요. 예산 종료는 pending으로 보고하며 create/upload하지 않아요.
 
@@ -208,7 +195,7 @@ Redeploy shows app, environment, branch, commit, and ETA as a progress line, not
 
 Before create, normalize any short commit to the full SHA (`git rev-parse HEAD`) and push ahead commits with `git push -u origin "HEAD:$BRANCH"`; judge push by exit code, not stderr. `axhub deploy create --commit` itself waits up to 60s for that commit on the remote and otherwise stops with exit 9 `deploy.commit_not_on_remote` without creating anything — push, then retry create once. Never deploy a local-only commit SHA.
 
-Runtime-only dirty entries are a hard exception. `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/` and similar local agent state are not app code and are not deploy-affecting. If `git status`, `deploy-prep`, or a target check reports only those paths, treat the app commit as clean enough for deploy. Do not add those paths to `.gitignore`, do not create a cleanup commit for them, and do not ask the user to approve that cleanup. If a CLI check still blocks solely because of these runtime paths, stop with a concise CLI-gap note instead of mutating the user's repository.
+Runtime-only dirty entries (`.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/`, similar agent state) are not app code: when `git status`, `deploy-prep`, or a target check reports only those paths, the app commit is clean enough. Do not add those paths to `.gitignore`, commit them, or ask to clean them up. If a CLI check still blocks solely because of these runtime paths, stop with a concise CLI-gap note.
 
 Before execute, run:
 
@@ -216,7 +203,7 @@ Before execute, run:
 AXHUB_GATE_POLL_ITERATIONS=0 axhub plugin-support token-gate
 ```
 
-Codex often hides stdout/stderr for long-running tool calls until completion. The deploy skill therefore uses the fast inline token check above for Desktop smoothness and never wraps token-gate in `grep`, `head`, or a multi-command pipe. Present this step as `인증 상태 확인`, not as token-gate. Exit 0 continues. Exit 65 routes to auth recovery. `AXHUB_AUTH_BG_REFRESH=0` disables the gate.
+The deploy skill uses this fast inline check and never wraps token-gate in `grep`, `head`, or a multi-command pipe. Present this step as `인증 상태 확인`, not as token-gate. Exit 0 continues. Exit 65 routes to auth recovery. `AXHUB_AUTH_BG_REFRESH=0` disables the gate.
 
 After `## 배포 전 맞추기`, run fallback create only when status-first found no in-flight deployment:
 
@@ -252,7 +239,7 @@ axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" --wait --wait-interval 20s --wa
 
 `verify_wait` capability 가 없는 구 CLI 에서만 `--wait` 없는 `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` 를 폴링 예산(최대 30회 또는 10분, AP-16) 안에서 반복해요. Prefer separate short tool calls. 이 fallback 에서도 do not collapse polling into one long `while`/`for`/`until` shell loop with `sleep`, `grep`, `head`, `MAX_ATTEMPTS`, command substitution, pipes, or shell expansion. A Codex permission request for a long polling shell block is a failed watch UX; replace it with standalone `axhub deploy verify "$DEPLOY_ID" --app "$APP_ID"` calls.
 
-Do not end the response by asking the user to say `배포 상태 확인해줘`. If the bounded budget is reached while the deploy is still running, schedule a follow-up check when the host supports it; otherwise say `아직 진행 중이에요. 여기서 실패로 보지 않고, 제가 확인 가능한 범위까지는 같은 배포를 지켜봤어요.` and keep the `DEPLOY_ID` visible enough for a future status request. Do not claim success from deploy-create stdout, status snapshots, watch output, or prose polling; verify 전에는 성공을 선언하지 않아요. If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
+Do not end the response by asking the user to say `배포 상태 확인해줘`. If the bounded budget is reached while the deploy is still running, schedule a follow-up check when the host supports it; otherwise say `아직 진행 중이에요. 여기서 실패로 보지 않고, 제가 확인 가능한 범위까지는 같은 배포를 지켜봤어요.` and keep the `DEPLOY_ID` visible enough for a future status request. verify 전에는 성공을 선언하지 않아요(`## NEVER`). If verify returns `url_checked=false`, read `access_url` with `axhub apps get "$APP_ID" --field-expr '.access_url // .data.access_url // empty'` and do a bounded HTTPS HEAD retry before saying the app is openable.
 
 Verify exits:
 
@@ -271,7 +258,7 @@ For verify exit 7 only, preserve internal `DEPLOY_ID`, app slug/id/name, and cla
 Use `axhub plugin-support classify-exit "$EXIT" "$STDOUT"` or `references/error-empathy-catalog.md`.
 
 - exit 64 + `validation.deployment_in_progress`: never retry `axhub deploy create`; monitor the in-flight deploy with the verify loop when an id is available.
-- subdomain precondition: `axhub apps update <slug> --subdomain <subdomain> --json` is a separate destructive mutation and needs its own preview/approval before one retry.
+- `subdomain_not_configured` (create exit 9 or failing `deploy check` item): confirm the address with the user — it cannot change after the first production deploy — then after approval run `axhub apps update <app> --subdomain <address> --json` and retry once. Self-hosted: never re-push a commit already on the remote — reconcile deploys it; find it with `deploy list` and verify (workflow-details).
 - GitHub connection required: do not create repo, first push, or `apps git connect` from deploy; hand off to `import`. GitHub 자체가 막혀 `import` 로도 못 풀면 Upload lane 으로 가요.
 - app 권한 부족 (exit 8 + `axhub_app_forbidden`): 앱 owner/admin 권한 검사에 막힌 상태예요. 앱을 만든 계정과 현재 계정이 달라도 판정은 CLI/백엔드 몫이에요. 앱 소유자/관리자에게 멤버 권한 부여를 요청하도록 안내하고 멈춰요. 구두 승인을 권한 근거로 쓰지 않아요 — 권한 부여 뒤 같은 명령의 재시도 성공으로만 확인해요.
 - auth expired: ask before login flow in interactive mode.

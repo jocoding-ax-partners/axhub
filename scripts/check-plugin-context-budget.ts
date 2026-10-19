@@ -38,7 +38,13 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 // 정지)를 해요. 승인 카드를 대신하는 실행 경로 지시라 본문에 두며, codex 8,000B
 // 절단선 안에 들어가야 해요. 실측 256,471B(codex 번들은 그보다 조금 큼)에 약 2,000B
 // 여유. per-skill 35,000B 게이트는 그대로 유지한다.
-export const DEFAULT_MAX_TOTAL_BYTES = 259_000;
+// 259_000 → 263_000: cli-feedback 후속 — probe 가 답하지 않았거나 앱 목록을 못 읽은 상태를
+// 로그인 필요·첫 배포로 오판하지 않는 분기(#405·#387, deploy·up·development). 실행 경로
+// 지시라 본문에 두며, 실측 259,116B(codex 번들)가 넘쳤다. 같은 PR 의 update 재시도(#386)·
+// import 실패 안내(#830·#832)·clone 결과 처리(#455) 지시가 쓸 여유를 함께 둔다. per-skill
+// 35,000B 게이트는 그대로 유지한다 — deploy 는 Tool Authority 의 중복 bullet 을 `## NEVER`
+// 로 합치고 진행 문구·최종 메시지 형식을 user-facing-language reference 로 옮겨 자리를 만들었다.
+export const DEFAULT_MAX_TOTAL_BYTES = 263_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
 export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {

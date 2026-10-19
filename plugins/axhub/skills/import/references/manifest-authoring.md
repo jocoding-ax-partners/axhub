@@ -7,7 +7,7 @@ import SKILL 의 Manifest 보강 단계가 로드하는 내부 reference 예요.
 - **근거(grounding):** preview envelope 의 `detected_state.manifest_hints`(포트·health·build·start 와 그 출처)와 실제 프로젝트 파일만 봐요 — Dockerfile, docker-compose·compose, package.json(name·scripts·deps), requirements.txt·pyproject.toml·go.mod, 프레임워크 설정(next.config.\*, vite.config.\* 등), .env.example. 직접 근거가 있는 값만 적고, 불확실하면 비워요. 작고 정확한 manifest 가 크고 틀린 manifest 보다 나아요 — 비운 필드는 backend 가 자동 감지해요.
 - **채우는 필드(axhub.yaml 정규 스키마):**
   - `version: axhub/v1` (필수)
-  - `name`: 표시 이름(package.json name 또는 폴더 이름)
+  - `name`: 이 import 의 앱 slug 그대로(`--slug` 로 넘긴 값, 없으면 preview 가 정한 앱 slug). package.json name·폴더 이름 같은 표시 이름을 쓰지 않아요 — 배포 대상 찾기가 이 `name` 에서 만든 slug 로 앱을 찾아서, 실제 slug 와 어긋나면 다른 앱을 잡거나 못 찾아요. 표시 이름은 `metadata.name` 에 둘 수 있는데 운영 배포 때 앱 표시 이름으로 반영되니 `--name` 과 같은 값일 때만 적어요.
   - `runtime`: `port`, `health_path` (EXPOSE·HEALTHCHECK·compose·hints 근거)
   - `build`: `framework`, `install`, `build`, `start`, `dockerfile`, `compose_file`, `static_output_dir`, `deploy_method` (deploy_method 는 detect 가 정한 값을 그대로 써요)
   - `env`: `required`/`optional` 아래 `- name:`(+ 필요하면 `scope:`) — **키 이름만**

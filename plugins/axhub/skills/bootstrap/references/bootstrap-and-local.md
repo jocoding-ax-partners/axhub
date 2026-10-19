@@ -129,6 +129,8 @@ axhub --tenant <tenant> repo clone <app-slug> --json
 
 Read the clone envelope's `data.destination` absolute path and set it as every repository-local 후속 tool call의 `cwd`, including Manifest Slug Correction, scaffold/dependency checks, and `axhub deploy --explain`. Never process relative `axhub.yaml` from the original CWD. Missing or malformed `data.destination` is a fail-closed stop.
 
+Clone exit 9 follows its hint: `repository.credential_missing` → run the command after the hint's `next:` once, exactly as printed with its quotes (it pins the clone's profile and endpoint, so never assemble a setup command yourself), and retry the clone; if it repeats, stop and report it with `axhub feedback`. A hint without `next:` (for example an unreadable credential store) is not fixed by setup: repair what its reason names. `repository.destination_exists` → show the hint's absolute path and ask the user to pick another path or empty it; never delete it yourself. `already_cloned: true` is success with the same `data.destination`.
+
 Do not call Gitea or synthesize the `t-<tenant>/a-<app>` path. GitHub preserves the existing status `repo_full_name` hydrate path below. Claude Desktop may create `.omc/` in a newly added folder before the app code is cloned, so the GitHub path still uses `git init` + `fetch` + `reset --hard` instead of `git clone ... .`.
 Do not run `git clone ... .`; metadata-only folders require the existing GitHub hydrate sequence, and using clone here leads to extra `rtk ls -la` probes.
 

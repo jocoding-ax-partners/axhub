@@ -131,13 +131,25 @@ if [ "$HAS" = true ]; then
     rm -f "$HALT" 2>/dev/null
     FROM="$CUR"
     ARC=0
+    # 0.46.10 미만 CLI 는 아카이브 다운로드에 전역 timeout(기본 30s)을 총 데드라인으로 걸어
+    # 느린 회선에서 매번 exit 10 이에요(#386). 그 CLI 가 받는 hop(브리지·본 apply)에만 10분을
+    # 줘요. 0.46.10+ 는 아카이브에 10분 하한이 있고, 전역 timeout 을 늘리면 멈춤 감지만 길어져요.
+    APPLY_TIMEOUT=""
+    ver_ge "$CUR" v0.46.10 || APPLY_TIMEOUT=10m
+    # $1 = 브리지 피드(본 apply 는 빈 값). 대입은 함수 호출이 아니라 env 로 외부 명령에만 붙여요 —
+    # 함수 앞에 붙인 대입은 POSIX 모드 bash(POSIXLY_CORRECT·sh 실행)에서 함수가 끝난 뒤에도 남아
+    # 본 apply 까지 브리지 피드로 보내요.
+    cli_apply() {
+      env ${1:+AXHUB_UPDATE_FEED_URL="$1"} ${APPLY_TIMEOUT:+AXHUB_TIMEOUT="$APPLY_TIMEOUT"} \
+        "$BIN" update apply --execute --yes --json >/dev/null 2>&1
+    }
     if [ -n "$VIA" ]; then
-      AXHUB_UPDATE_FEED_URL="$BRIDGE_FEED" "$BIN" update apply --execute --yes --json >/dev/null 2>&1
+      cli_apply "$BRIDGE_FEED"
       ARC=$?
       [ "$ARC" -eq 0 ] && CUR="$VIA" && VIA="" && KEY="$LATEST"
     fi
     if [ "$ARC" -eq 0 ]; then
-      "$BIN" update apply --execute --yes --json >/dev/null 2>&1
+      cli_apply ""
       ARC=$?
       [ "$ARC" -eq 0 ] && CUR="$LATEST"
     fi

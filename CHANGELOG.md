@@ -4,6 +4,28 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.30.9](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.8...plugin-v1.30.9) (2026-10-19)
+
+배포 기준 문서를 못 받아도 플러그인에 담긴 요약으로 배포 전 점검을 하고, 문서에 `물어봄` 으로 적힌 규칙도 미리 물어요. 로그인 확인이 응답하지 않거나 목록 조회가 실패했을 때 로그인 필요·첫 배포로 잘못 안내하지 않고, 일시 장애는 한 번 다시 시도한 뒤에만 리포트해요. 앱 만들기 확인 시간이 넘으면 다시 만들지 않고 이어서 지켜보며, CLI 업데이트는 느린 회선에서도 끊기지 않게 10분까지 기다려요.
+
+
+
+### Fixed
+
+* **plugin:** probe 실패·목록 실패를 로그인 필요·첫 배포로 안내하지 않는다 ([#405](https://github.com/jocoding-ax-partners/axhub-mono/issues/405)) ([1e7607e](https://github.com/jocoding-ax-partners/axhub-mono/commit/1e7607e28353d12d77509770c7d0b5f418c31143)), closes [#387](https://github.com/jocoding-ax-partners/axhub-mono/issues/387)
+* **plugin:** scope 를 잃은 로그인·human 모드 심사 대기·up lane 재실행 규칙을 CLI 와 맞춘다 ([#387](https://github.com/jocoding-ax-partners/axhub-mono/issues/387) [#909](https://github.com/jocoding-ax-partners/axhub-mono/issues/909)) ([af5bdea](https://github.com/jocoding-ax-partners/axhub-mono/commit/af5bdea2a3d13f83549917eaacb1eb310c0851aa))
+* **plugin:** update apply 의 모든 hop 에 10분 도구 timeout 을 주고 훅 브리지 피드 누수를 막는다 ([#386](https://github.com/jocoding-ax-partners/axhub-mono/issues/386)) ([e591652](https://github.com/jocoding-ax-partners/axhub-mono/commit/e591652e86dae1d34d16f5f1957f9095876ab252))
+* **plugin:** 구 CLI 업데이트에 10분 timeout 을 주고 수동 안내가 dry-run 으로 끝나지 않게 한다 ([#386](https://github.com/jocoding-ax-partners/axhub-mono/issues/386)) ([198c507](https://github.com/jocoding-ax-partners/axhub-mono/commit/198c507a6b4013daf79c09f6e8d1838c49769f91))
+* **plugin:** 답하지 못한 auth 프로브를 auth_unverified 로 받고 실제 로그아웃만 로그인으로 보낸다 ([#405](https://github.com/jocoding-ax-partners/axhub-mono/issues/405)) ([bc10a43](https://github.com/jocoding-ax-partners/axhub-mono/commit/bc10a4371c28504fb6e181fbdcdccf2fb0ecc27e)), closes [#387](https://github.com/jocoding-ax-partners/axhub-mono/issues/387)
+* **plugin:** 로그인 판정 없음·운영 상태·심사 대기를 CLI 계약대로 다룬다 ([#405](https://github.com/jocoding-ax-partners/axhub-mono/issues/405) [#387](https://github.com/jocoding-ax-partners/axhub-mono/issues/387) [#336](https://github.com/jocoding-ax-partners/axhub-mono/issues/336) [#865](https://github.com/jocoding-ax-partners/axhub-mono/issues/865) [#909](https://github.com/jocoding-ax-partners/axhub-mono/issues/909) [#455](https://github.com/jocoding-ax-partners/axhub-mono/issues/455)) ([2ea3645](https://github.com/jocoding-ax-partners/axhub-mono/commit/2ea3645feacfb1d8d064e315b4bdcf707bf81d59))
+* **plugin:** 배포 기준 문서를 못 받아도 점검하고 문서의 '물어봄' 규칙도 묻는다 ([#1210](https://github.com/jocoding-ax-partners/axhub-mono/issues/1210)) ([f307cea](https://github.com/jocoding-ax-partners/axhub-mono/commit/f307ceaa5f6d7ed836e36f84a6e7e38636c1d1a2))
+* **plugin:** 배포 전 맞추기의 push 도 주소를 정한 뒤에만 하고 주소 없이 올라간 커밋은 기다리지 않는다 ([#832](https://github.com/jocoding-ax-partners/axhub-mono/issues/832)) ([890b63e](https://github.com/jocoding-ax-partners/axhub-mono/commit/890b63e8f33935a155f9e4185664524b12ec244d))
+* **plugin:** 일시 장애는 한 번 다시 시도한 뒤에만 리포트하고 envelope 오류 상세를 옮겨 적는다 ([#865](https://github.com/jocoding-ax-partners/axhub-mono/issues/865)) ([d30923c](https://github.com/jocoding-ax-partners/axhub-mono/commit/d30923c8d88f6929b174af0508b82cf0ce2c6e3c)), closes [#575](https://github.com/jocoding-ax-partners/axhub-mono/issues/575) [#576](https://github.com/jocoding-ax-partners/axhub-mono/issues/576)
+* **plugin:** 전역 패키지 매니저 설치는 동의 뒤에 하고 clone 반복 실패는 axhub feedback 으로 알린다 ([#830](https://github.com/jocoding-ax-partners/axhub-mono/issues/830)) ([78ba903](https://github.com/jocoding-ax-partners/axhub-mono/commit/78ba9034af19e44d48aaba58536e123cef6338bb)), closes [#455](https://github.com/jocoding-ax-partners/axhub-mono/issues/455)
+* **plugin:** 주소를 정한 뒤 원격에 이미 있는 self-hosted 커밋의 자동 배포를 찾아 확인한다 ([#832](https://github.com/jocoding-ax-partners/axhub-mono/issues/832) [#455](https://github.com/jocoding-ax-partners/axhub-mono/issues/455)) ([cd988ce](https://github.com/jocoding-ax-partners/axhub-mono/commit/cd988ce9ab8cf2556fb8c7cb370166e2d9970b5d))
+* **plugin:** 패키지 매니저 부재·주소 없는 앱·clone 결과를 원인대로 안내한다 ([#830](https://github.com/jocoding-ax-partners/axhub-mono/issues/830)) ([a9a743a](https://github.com/jocoding-ax-partners/axhub-mono/commit/a9a743a25ef46aff599977a2bd16f4e61626e614)), closes [#832](https://github.com/jocoding-ax-partners/axhub-mono/issues/832) [#455](https://github.com/jocoding-ax-partners/axhub-mono/issues/455) [#757](https://github.com/jocoding-ax-partners/axhub-mono/issues/757)
+* **repo:** CLI 피드백 [#974](https://github.com/jocoding-ax-partners/axhub-mono/issues/974)·[#1001](https://github.com/jocoding-ax-partners/axhub-mono/issues/1001)·[#1008](https://github.com/jocoding-ax-partners/axhub-mono/issues/1008)·[#1023](https://github.com/jocoding-ax-partners/axhub-mono/issues/1023) 원인 수정 ([#1054](https://github.com/jocoding-ax-partners/axhub-mono/issues/1054)) ([42b3c75](https://github.com/jocoding-ax-partners/axhub-mono/commit/42b3c75568e243226fd0a9d3882331800877243e)), closes [#832](https://github.com/jocoding-ax-partners/axhub-mono/issues/832) [#1018](https://github.com/jocoding-ax-partners/axhub-mono/issues/1018)
+
 ## [1.30.8](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.7...plugin-v1.30.8) (2026-10-12)
 
 기존 앱을 처음 axhub 에 올릴 때 미리 점검하고, 새로 정해지는 앱 주소·저장소·작업공간과 물어볼 것, 고칠 내용을 한 화면에서 한 번만 확인받아요. `.env` 에 있는 설정값은 앱을 만든 직후·첫 배포 전에 등록해서 첫 배포가 설정값 누락으로 실패하지 않아요. 앱 기능을 만들 때도 AXHub 에서 안 되는 방식(파일에 저장 같은)을 처음부터 피하고 AXHub DB 같은 대안을 써요. 첫 올리기 점검은 axhub CLI 0.46.18 이상에서 켜져요.

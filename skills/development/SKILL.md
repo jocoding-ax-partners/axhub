@@ -98,7 +98,8 @@ model: sonnet
 3. **stack 감지 (에이전트 판단).** 고정 표 대신 신호로 framework 를 판단해요 — `package.json`(next/vite/react), `pyproject.toml`/`requirements.txt`(fastapi/flask), `axhub.yaml` 힌트, 파일 구조. 이걸로 뒤의 규약 학습·verify 명령을 분기해요. **판단이 안 서는 미지원 stack 이면** "이 앱 스택은 아직 자동 코딩을 지원 안 해요" 로 degrade 하고 멈춰요.
 
 4. **auth 전제 인라인 안내.** discover 는 auth 에 의존해요. gap 이면 인라인으로 안내해요 (onboarding 위임 X).
-   - **미로그인**(`auth_ok=false`): "로그인이 필요해요 — `axhub auth login` 하거나 '온보딩'이라고 해주세요" 안내 후 완료되면 재확인.
+   - **확인 실패**(`auth_error_code` 가 `probe_timeout`·`probe_no_output`·`cli_spawn_failed`·`api`·`rate_limited`·`timeout`·`other`): 로그인 판정이 없을 뿐이에요. 로그인 안내 없이 이때만 preflight 를 한 번 더 실행하고, 같으면 `axhub auth status --json` 으로만 판정해요 — exit 0 이면 로그인된 거라 이어가고, exit 4 면 아래 미로그인으로 가요. 그 밖이면 "axhub 서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요" 로 멈춰요.
+   - **미로그인**(`auth_ok=false`, 위 경우가 아닐 때): "로그인이 필요해요 — `axhub auth login`(hint 가 `--force` 를 말하면 그대로) 하거나 '온보딩'이라고 해주세요" 안내 후 완료되면 재확인.
    - MCP 서버 등록은 안내하지 않아요 — `mcp__axhub__*` 도구가 없으면 아래 6단계의 **CLI fallback** 으로 그대로 진행해요.
 
 5. **SDK/DB 표면 확인 (현재 SDK 우선).** 데이터 접근 코드를 짜기 전에 [references/sdk-db-surface.md](references/sdk-db-surface.md) 의 5단계 절을 읽고 현재 앱의 실제 DB/connector 패턴과 설치된 SDK 표면을 확인해요 — legacy `/data` typed DSL(`defineSchema`, `where` 등)은 생성하지 않고, 기존 앱 코드의 데이터 접근 패턴이 런타임 authority 예요. CRUD/DB 기능이면 `get_recipe`를 최대 한 번 호출하고 인자는 정확히 `app_id`, `recipe_id`, 선택 `framework`, `preferred_table`만 써요. 기본 recipe id 는 정확히 `dynamic-db-crud`예요. `recipe`, `tenant`, `schema` 키를 만들거나 실패 뒤 키 모양을 바꿔 반복하지 않아요. 웹훅 받기는 relay 표면이라 `get_recipe` 아니라 **5b 절**.
@@ -112,7 +113,7 @@ model: sonnet
 
 7. **앱 규약 학습 (구조·스타일·런타임 데이터 패턴).** 앱 루트에 `AGENTS.md`·`AXHUB.md` 가 있으면 먼저 읽어요 — axhub 템플릿 앱의 규약과 플랫폼 기능(파일 저장·알림/메일·웹훅 relay·공개 범위 등) 켜는 법이 있어요. 거기 있는 기능은 새 패키지·외부 서비스로 다시 만들지 않아요. 생성 코드가 brittle 하지 않게 기존 앱의 규약을 읽어요 — 라우팅/페이지 구조, auth 모델, 데이터-레이어 위치와 호출 방식, 스타일(컴포넌트·디자인 토큰), 빌드 도구. 데이터 접근은 5단계에서 확인한 현재 SDK/DB 표면을 넘지 않고, 앱이 이미 쓰는 런타임 DB/connector 패턴을 우선해요. stack(3단계)에 맞춰 관련 파일을 grep·read 해요.
 
-7.5. **AXHub 배포 기준 (AP-30).** preflight 의 `capabilities.readiness.context_url` 문서를 한 번만 읽고(못 받으면 건너뛰어요) 그 규칙대로 코드를 써요. 안 되는 6가지(내 컴퓨터 파일·프로그램, 사내 시스템 직결, 앱 안에서 AI 모델 직접 실행, 웹이 아닌 앱, 엑셀·한글 프로그램 조작, 입력을 파일로 저장)를 처음부터 피하고 문서의 대안을 써요 — 예: 데이터 저장은 SQLite·파일 대신 AXHub DB. 서버는 `PORT` 를 읽고 `0.0.0.0` 에서 열어요. 요청이 이 6가지에 걸리면 코드를 쓰기 전에 대안을 한 줄로 알려요.
+7.5. **AXHub 배포 기준 (AP-30).** preflight 의 `capabilities.readiness.context_url` 문서를 한 번만 읽고(못 받으면 `../deploy/references/deploy-rules.md`) 그 규칙대로 코드를 써요. 안 되는 6가지(내 컴퓨터 파일·프로그램, 사내 시스템 직결, 앱 안에서 AI 모델 직접 실행, 웹이 아닌 앱, 엑셀·한글 프로그램 조작, 입력을 파일로 저장)를 처음부터 피하고 문서의 대안을 써요 — 예: 데이터 저장은 SQLite·파일 대신 AXHub DB. 서버는 `PORT` 를 읽고 `0.0.0.0` 에서 열어요. 요청이 이 6가지에 걸리면 코드를 쓰기 전에 대안을 한 줄로 알려요.
 
 8. **기능 계획 + 미리보기 + 확인.** 요청된 페이지·화면·API route·검색·필터·탭·폼·CRUD·UI 개선을 기존 앱 규약에 맞춰 설계하고, 데이터 기반 기능이면 **E1 실데이터 미리보기**(샘플 cap + **PII 마스킹**)와 함께 한국어로 보여준 뒤 확인받아요. PII·secret·규제 데이터로 보이면 마스킹하고, raw 샘플은 생성 코드/테스트/로그에 절대 안 써요.
 

@@ -14,4 +14,14 @@ When a technical check fails or needs recovery, translate it before showing it. 
 
 Do not narrate approval state in English. Never write `User explicitly authorized`, `Proceeding`, `Push 성공`, or `Push failed`. Use `사용자가 배포와 원격 반영을 요청했으니 계속 진행해요`, `원격 반영 성공`, or `원격 반영 실패` instead.
 
+Progress lines:
+
+- `[1/5] axhub 점검하는 중이에요`
+- `[2/5] 배포 대상 확인하는 중이에요`
+- `[3/5] 미리보기 보여줄게요`
+- `[4/5] 배포하는 중이에요`
+- `[5/5] 배포 결과 확인하는 중이에요`
+
+Final user message is a Korean one-line summary plus next action. Prefer natural phrases such as `다시 로그인해줘`, `기존 앱 올려`, or `새 앱 만들어줘`; do not tell a Desktop user to run deploy CLI commands. If a deployment is already running and a `DEPLOY_ID` is known, do not ask the user to request another status check; keep watching automatically with the verify loop or an actual scheduled follow-up.
+
 When shell output is noisy, capture it in temp files or summarize after the command. Do not pipe important axhub commands through `grep`, `head`, or similar filters in a way that can change the command exit code or hide a long-running helper. If cosmetic filtering is truly needed, preserve and inspect the original command exit code first.
