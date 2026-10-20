@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.32.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.0...plugin-v1.32.1) (2026-10-20)
+
+CLI 설치 안내에서 리눅스를 뺐어요. CLI 는 macOS 와 Windows 용으로만 나오는데, 온보딩과 업데이트 스킬이 리눅스에도 설치 스크립트를 안내해 설치가 오류로 끝났어요. 이제 리눅스 사용자에게는 지원하지 않는다고 바로 알려요.
+
+
+### Fixed
+
+* **plugin:** stop offering the CLI install script on Linux
+
 ## [1.32.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.31.1...plugin-v1.32.0) (2026-10-20)
 
 처음 배포할 때 나오는 질문마다 (추천)을 첫 번째에 두고, 파일·DB 이름 대신 결과로 쉽게 물어요. 온보딩에서 고른 코드 저장 위치를 기억해 첫 배포 때 다시 묻지 않아요. 진행 안내와 배포 완료 보고도 개발 용어 없이 주소와 다음 할 일만 알려요.

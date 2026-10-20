@@ -105,7 +105,7 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
      - **exit 14 (digest mismatch — 변조 신호) / exit 66 (cosign_enforce_failed)** → **하드 스톱**. `보안 검증에 실패했어요. 강제로 진행하지 말고 회사 IT·보안팀에 알려주세요. 지금 버전은 그대로 써도 돼요.` 로 안내하고 멈춰요.
      - **exit 15 (swap failed)** → 자동 재시도하지 말고 `업데이트 적용 중 교체가 막혔어요. "설치 상태 진단해줘" 라고 말해 주세요.` 로 안내해요.
      - **exit 4 (미인증)** → `로그인이 필요해요. "다시 로그인해줘" 라고 말해 주세요.` 로 낮춰요.
-     - **exit 10 (timeout)** → 받는 중에 시간이 다 된 거예요. 실패한 hop 만 명령 도구 timeout 을 600000ms 로 올려 한 번 더 실행해요. `current` 가 v0.46.10 미만이면(전역 timeout 30초가 다운로드 전체에 걸려요) `axhub --timeout 10m update apply --execute --yes`, 브리지 hop 이면 `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub --timeout 10m update apply --execute --yes` 로 바꿔 실행하고, v0.46.10 이상이면 같은 명령을 그대로 실행해요. 결과는 이 분기로 다시 가르되 또 exit 10 이면 더 재시도하지 않고 공식 설치 스크립트로 다시 설치하도록 안내해요 — macOS/Linux `curl -fsSL https://cli.axhub.ai/install.sh | sh`, Windows `irm https://cli.axhub.ai/install.ps1 | iex`.
+     - **exit 10 (timeout)** → 받는 중에 시간이 다 된 거예요. 실패한 hop 만 명령 도구 timeout 을 600000ms 로 올려 한 번 더 실행해요. `current` 가 v0.46.10 미만이면(전역 timeout 30초가 다운로드 전체에 걸려요) `axhub --timeout 10m update apply --execute --yes`, 브리지 hop 이면 `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub --timeout 10m update apply --execute --yes` 로 바꿔 실행하고, v0.46.10 이상이면 같은 명령을 그대로 실행해요. 결과는 이 분기로 다시 가르되 또 exit 10 이면 더 재시도하지 않고 공식 설치 스크립트로 다시 설치하도록 안내해요 — macOS `curl -fsSL https://cli.axhub.ai/install.sh | sh`, Windows `irm https://cli.axhub.ai/install.ps1 | iex`.
      - **그 외 비-0** → raw 에러는 숨기고 한 줄: `자동 업데이트가 안 됐어요. axhub update apply --execute --yes 를 직접 한 번 실행하거나, 안 되면 공식 설치 스크립트로 다시 설치해 주세요.`
 
 ---

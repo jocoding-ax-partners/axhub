@@ -22,7 +22,7 @@ Ask before install. If the user chooses later, stop with `READY_WITH_USER_ACTION
 
 Official channels:
 
-- macOS/Linux: `curl -fsSL https://cli.axhub.ai/install.sh | sh`
+- macOS: `curl -fsSL https://cli.axhub.ai/install.sh | sh` (Linux has no CLI build; tell the user only macOS and Windows are supported)
 - Windows: `irm https://cli.axhub.ai/install.ps1 | iex`
 
 위 두 스크립트가 유일한 설치 채널이에요. npm/npx 로는 절대 설치·실행하지 않아요 — npm 의 `axhub`/`axhub-cli` 패키지는 이름 예약용 스텁이라 실행하면 실패해요.
@@ -101,7 +101,7 @@ Exit handling:
 - exit 14 digest mismatch or exit 66 `cosign_enforce_failed`: hard stop. Tell the user not to force it and to contact IT/security.
 - exit 15 swap failed: do not auto-retry; suggest `설치 상태 진단해줘`.
 - exit 4 unauthenticated: ask the user to login again.
-- exit 10 timeout: the download did not finish in time. Rerun only the failed hop once, with the shell tool timeout raised to 600000ms. When `current` is below v0.46.10 its global 30s timeout caps the whole download, so add `--timeout 10m`: `axhub --timeout 10m update apply --execute --yes --json` (bridge hop: `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub --timeout 10m update apply --execute --yes --json`). v0.46.10+ reruns the same command. If it fails again, do not retry further; guide an official reinstall — macOS/Linux `curl -fsSL https://cli.axhub.ai/install.sh | sh`, Windows `irm https://cli.axhub.ai/install.ps1 | iex` — then re-detect.
+- exit 10 timeout: the download did not finish in time. Rerun only the failed hop once, with the shell tool timeout raised to 600000ms. When `current` is below v0.46.10 its global 30s timeout caps the whole download, so add `--timeout 10m`: `axhub --timeout 10m update apply --execute --yes --json` (bridge hop: `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge axhub --timeout 10m update apply --execute --yes --json`). v0.46.10+ reruns the same command. If it fails again, do not retry further; guide an official reinstall — macOS `curl -fsSL https://cli.axhub.ai/install.sh | sh`, Windows `irm https://cli.axhub.ai/install.ps1 | iex` — then re-detect.
 - any other non-zero: hide the raw error, tell the user to run `axhub update apply --execute --yes` once or reinstall with the official script above, and stop with `READY_WITH_USER_ACTION`.
 
 If update check includes `plugin.has_update:true`, mention marketplace `/plugin update` as an advisory only. Do not run plugin update in onboarding.
