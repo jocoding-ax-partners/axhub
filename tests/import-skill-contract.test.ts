@@ -130,14 +130,23 @@ describe("import skill contract", () => {
   test("preview approval carries the commit choice without a second question", () => {
     const skill = readImportSkill();
     expect(skill).toContain("## AskUserQuestion JSON 안전 규칙");
-    expect(skill).toContain("question: `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?`");
-    expect(skill).toContain("option 1 label: `설정도 반영하고 시작`");
-    expect(skill).toContain("option 2 label: `커밋 없이 시작`");
-    expect(skill).toContain("option 3 label: `먼저 수정할게요`");
-    expect(skill).toContain("option 4 label: `취소`");
+    expect(skill).toContain("question: `지금 이대로 axhub에 올려서 인터넷 주소를 만들까요?`");
+    expect(skill).toContain("option 1 label: `올리기 (추천)`");
+    expect(skill).toContain("option 2 label: `설정은 나중에 올리기`");
+    expect(skill).toContain("option 3 label: `먼저 고칠게요`");
+    expect(skill).toContain("option 4 label: `그만두기`");
     expect(skill).toContain("manifest 검증 뒤에는 다시 묻지 않아요");
     expect(skill).not.toContain("axhub.yaml을 커밋하고 푸시할까요?");
     expect(skill).not.toContain("커밋·push 하고 진행 (첫 배포부터 반영)");
+  });
+
+  test("first-deploy copy speaks in outcomes, not files or commits", () => {
+    const skill = readImportSkill();
+    expect(skill).toContain("사용자 지침에 다른 보고 양식(특이사항·수정·결과 등)이 있어도 이 요약은 아래 형태로 쓰고");
+    expect(skill).toContain("`첫 배포가 끝났어요. 주소: https://...`");
+    expect(skill).toContain("통합 승인 질문 바로 앞 요약도 결과로만 써요");
+    expect(skill).not.toContain("axhub.yaml 을 프로젝트 파일 근거로 자세히 작성할 예정이라고");
+    expect(skill).not.toContain("운영 URL: https://");
   });
 
   test("static auto-detection asks the deploy method before the single approval", () => {
@@ -150,8 +159,12 @@ describe("import skill contract", () => {
     const section = skill.slice(methodCard, approval);
     expect(section).toContain("`deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create`");
     expect(section).toContain("`어떤 방식으로 배포할까요?`");
-    expect(section).toContain("`정적 사이트 (추천)`");
-    expect(section).toContain("`서버 앱`");
+    expect(section).toContain("`정적 사이트 (추천)`(`HTML·빌드 결과만 올려요`)");
+    expect(section).toContain("`서버 앱`(`서버 코드까지 실행해요`)");
+    // 서버 앱 주소는 작업공간 종류(회사 `{sub}.{tenant}.axhub.ai`·개인 `{sub}.axhub.app`)로
+    // 갈리고 preview 는 그 종류를 알려주지 않아요. `axhub.dev` 는 스테이징이라 어느 쪽도 아니에요.
+    expect(section).toContain("주소 도메인은 적지 않아요");
+    expect(section).not.toMatch(/axhub\.(dev|ai|app|page)/);
     expect(section).toContain("`detected_state.manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker`");
     expect(section).toContain("headless 는 묻지 않아요");
   });
@@ -161,7 +174,7 @@ describe("import skill contract", () => {
     expect(skill).toContain("local_only 앱은 아직 git remote 가 없을 수 있지만");
     expect(skill).toContain("remote 없음만으로 이 선택지를 빼지 않아요");
     expect(skill).not.toContain("git remote 가 있으면 커밋 동의");
-    expect(skill).toContain("`설정도 반영하고 시작` 을 골랐으면 검증 뒤 다시 묻지 않고");
+    expect(skill).toContain("`올리기` 를 골랐으면 검증 뒤 다시 묻지 않고");
   });
 
   test("uses the exact import option contract and never invents private", () => {

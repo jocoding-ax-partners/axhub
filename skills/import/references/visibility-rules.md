@@ -29,12 +29,16 @@ Claude Desktop 이 Bash 내용에서 자동 제목을 만들 때도 같은 규�
 
 진행 문구도 사용자 언어로 번역해요. `앱 slug 미확정` 대신 `앱 이름이 아직 정해지지 않아 package.json 이름으로 확인할게요`, `manifest_create 있으니` 대신 `앱 설정 파일이 필요해서 프로젝트 파일 근거로 작성할게요`, `git remote 아직 없음` 대신 `원격 저장소가 아직 없어 새 저장소 생성 경로로 진행해요`, `execute 호출한다` 대신 `가져오기를 실행할게요`, `import 지원 확인됐다` 대신 `가져오기 기능을 사용할 수 있어요`, `preview 진행` 대신 `미리보기를 확인할게요`, `Envelope 정상` 대신 `응답 형식 확인이 끝났어요`, `deployment verification: success` 대신 `첫 배포 검증 성공`, `raw endpoint`/`raw 엔드포인트` 대신 `원문 응답`, `public으로` 대신 `공개 접근으로` 라고 말해요.
 
-최종 성공 요약은 아래 형태를 벗어나지 않아요. 괄호 안에 raw status 를 붙이지 않아요.
+최종 성공 요약은 아래 형태를 벗어나지 않아요. 괄호 안에 raw status 를 붙이지 않아요. 사용자 지침에 다른 보고 양식(특이사항·수정·결과 등)이 있어도 이 요약은 아래 형태로 쓰고, 파일·폴더·브랜치·커밋·경로·포트·상태 확인 경로 이름(`axhub.yaml`, `Dockerfile`, `main`, 커밋 해시, `/healthz` 등)과 우리가 고친 내부 과정은 쓰지 않아요. 사용자에게 필요한 건 주소, 바로 열리는지, 꺼진 기능과 켜는 말뿐이에요.
 
-- `<스택> 앱 <앱 이름>을 axhub 앱으로 가져왔어요.`
-- `GitHub 저장소를 생성하고 연결했어요.`
-- `첫 배포 검증이 끝났어요. 운영 URL: https://...`
+- `<앱 이름>을 axhub에 올렸어요.`
+- GitHub 경로일 때만 `GitHub 저장소를 만들어 연결했어요.`
+- `첫 배포가 끝났어요. 주소: https://...`
+- 공개 앱이면 `로그인 없이 누구나 바로 열 수 있어요.`
 - 비공개 앱이면 `배포 검증은 끝났지만, 비공개 접근 제어 때문에 로그인 없는 요청으로는 앱 본문을 직접 확인하지 못했어요.`
+- 설정값이 없어 꺼진 기능이 있으면 `<기능>은 꺼져 있어요. 켜려면 "환경변수 추가해줘"라고 말해 주세요.`
+- 데이터가 다시 배포하면 처음 상태로 돌아가는 앱이면 그 사실을 한 줄로 알려요.
+- 마지막 줄은 `코드를 고친 뒤 다시 올릴 때는 "배포해"라고 말하면 돼요.`
 
 최종 성공 요약에서도 URL 은 반드시 평문 절대 URL 로만 보여줘요. `배포 URL: [https://...](...)`, `[열기](https://...)` 같은 Markdown 링크 문법을 쓰지 않아요.
 
@@ -46,15 +50,19 @@ Claude Desktop 이 Bash 내용에서 자동 제목을 만들 때도 같은 규�
 
 Claude Desktop 에서는 AskUserQuestion 을 raw JSON 문자열이나 수동 `\uXXXX` escape 로 만들지 않아요. native Question/AskUserQuestion tool 입력에는 평문 UTF-8 문자열만 넣고, question/header/label/description 은 짧게 써요. 한글 escape 가 깨지면 `InputValidationError` 가 사용자 화면에 그대로 보이므로, 질문을 길게 풀어 쓰거나 괄호가 긴 선택지를 만들지 않아요.
 
+통합 승인 질문 바로 앞 요약도 결과로만 써요 — 앱 이름과 주소가 어떻게 생기는지, 무엇이 올라가는지, 무엇이 꺼진 채 올라가는지. `axhub.yaml 작성`, `/healthz 상태 확인 경로`, 포트, 빌드·시작 명령, `미리보기`, `가져오기` 같은 말은 쓰지 않아요.
+
 GitHub 기반 첫 배포에서 commit manifest capability 가 있으면 preview 통합 승인에 아래 exact copy 만 써요. manifest 검증 뒤에는 다시 묻지 않아요.
 
-- header: `가져오기 확인`
-- question: `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?`
-- option 1 label: `설정도 반영하고 시작`
-- option 1 description: `첫 배포에 설정을 반영해요.`
-- option 2 label: `커밋 없이 시작`
-- option 2 description: `다음 배포부터 반영해요.`
-- option 3 label: `먼저 수정할게요`
-- option 3 description: `실행하지 않고 대화로 돌아가요.`
-- option 4 label: `취소`
-- option 4 description: `가져오기를 중단해요.`
+- header: `올리기 확인`
+- question: `지금 이대로 axhub에 올려서 인터넷 주소를 만들까요?`
+- option 1 label: `올리기 (추천)`
+- option 1 description: `내 앱을 올리고 열어 볼 수 있는 주소를 만들어요.`
+- option 2 label: `설정은 나중에 올리기`
+- option 2 description: `앱 설정은 다음 배포부터 반영돼요.`
+- option 3 label: `먼저 고칠게요`
+- option 3 description: `아무것도 올리지 않고 대화로 돌아가요.`
+- option 4 label: `그만두기`
+- option 4 description: `올리지 않고 끝내요.`
+
+그 밖의 경로는 같은 header·question 에 option 1·3·4 만 써요.

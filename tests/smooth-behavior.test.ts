@@ -279,7 +279,7 @@ describe("smooth behavior contracts", () => {
     expect(importSkill).toContain("`raw endpoint`/`raw 엔드포인트` 대신 `원문 응답`");
     expect(importSkill).toContain("`public으로` 대신 `공개 접근으로`");
     expect(importSkill).toContain("최종 성공 요약은 아래 형태를 벗어나지 않아요");
-    expect(importSkill).toContain("`첫 배포 검증이 끝났어요. 운영 URL: https://...`");
+    expect(importSkill).toContain("`첫 배포가 끝났어요. 주소: https://...`");
     expect(importSkill).toContain("비공개 접근 제어 때문에 로그인 없는 요청으로는 앱 본문을 직접 확인하지 못했어요");
     expect(importSkill).toContain("비공개 앱에서 로그인 없는 HTTP 요청이 axhub 로그인 화면 HTML 을 200 으로 돌려주면");
     expect(importSkill).toContain("그건 앱의 `/healthz` 또는 루트 응답 검증이 아니에요");

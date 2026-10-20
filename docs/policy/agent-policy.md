@@ -173,11 +173,11 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant(codex): "어디에 배포할까요?", "알아서 시작하지 않아요"
 
 ## AP-28 배포 방식 추천 카드 (정적 자동 판정 확인)
-- 규칙: import 가 새 앱(`app_create`)의 배포 방식을 `static` 으로 자동 판정했고 사용자가 방식을 말하지 않았으면, 통합 승인 전에 선택 카드로 `어떤 방식으로 배포할까요?` 를 한 번 물어요 — `정적 사이트 (추천)`(axhub.page 주소)·`서버 앱`(axhub.dev 주소)·`취소`. 서버 앱은 CLI 가 실행 명령(`manifest_hints.start_cmd`)을 찾았을 때만 `--deploy-method docker` 로 preview 를 다시 받아 진행하고, 못 찾았으면 실행할 서버 코드가 없다고 알린 뒤 정적 사이트·취소로 다시 물어요. index.html 만 있는 폴더가 묻지 않고 axhub.page 정적 사이트로 배포돼 교육 흐름과 어긋나던 문제를 막아요. 판정은 CLI 몫이라 스킬이 재구현하지 않고, headless 에서는 묻지 않아요.
+- 규칙: import 가 새 앱(`app_create`)의 배포 방식을 `static` 으로 자동 판정했고 사용자가 방식을 말하지 않았으면, 통합 승인 전에 선택 카드로 `어떤 방식으로 배포할까요?` 를 한 번 물어요 — `정적 사이트 (추천)`·`서버 앱`·`취소`. 선택지에 주소 도메인은 적지 않아요 — 서버 앱 주소는 회사 작업공간이면 `{sub}.{tenant}.axhub.ai`, 개인 작업공간이면 `{sub}.axhub.app` 인데 preview 가 작업공간 종류를 알려주지 않아서, 한 도메인을 적으면 틀린 주소를 약속하게 돼요. 서버 앱은 CLI 가 실행 명령(`manifest_hints.start_cmd`)을 찾았을 때만 `--deploy-method docker` 로 preview 를 다시 받아 진행하고, 못 찾았으면 실행할 서버 코드가 없다고 알린 뒤 정적 사이트·취소로 다시 물어요. index.html 만 있는 폴더가 묻지 않고 axhub.page 정적 사이트로 배포돼 교육 흐름과 어긋나던 문제를 막아요. 판정은 CLI 몫이라 스킬이 재구현하지 않고, headless 에서는 묻지 않아요.
 - 적용: skills/import/SKILL.md
-- invariant: "어떤 방식으로 배포할까요?", "manifest_hints.start_cmd"
+- invariant: "어떤 방식으로 배포할까요?", "manifest_hints.start_cmd", "주소 도메인은 적지 않아요"
 - 적용(codex): plugins/axhub-codex/skills/import/SKILL.md
-- invariant(codex): "어떤 방식으로 배포할까요?", "manifest_hints.start_cmd"
+- invariant(codex): "어떤 방식으로 배포할까요?", "manifest_hints.start_cmd", "주소 도메인은 적지 않아요"
 
 ## AP-29 배포 전 맞추기 (재배포는 묻지 않고 맞춰서 올림)
 - 규칙: 이미 AXHub 에 있는 앱을 다시 올릴 때(`deploy`·`up`) 승인 카드 대신 배포 전 맞추기를 해요. (1) CLI 확정 판정 `axhub deploy check --app <app> --json` 을 받고 (2) preflight 의 `capabilities.readiness.context_url` 배포 기준 문서를 한 번 읽고(못 받으면 deploy 의 `references/deploy-rules.md` 요약으로 대신) (3) 그 규칙으로 앱 코드를 보고 빌드 단계가 있으면 로컬 빌드를 한 번 돌려요 — 테스트·예시·README 흔적은 문제로 보지 않아요. 묻는 일은 셋뿐이에요: 어디서도 값을 찾을 수 없는 필수 설정값(값을 대화로 받지 않고 `.env` 에 넣어 달라고 부탁해요), 안 되는 6가지나 문서의 `물어봄` 규칙(외부 DB·메일·웹훅·AI 등)에 처음 해당한 것, 처음 올릴 때 새로 정해지는 것. 나머지 — `.env` 값 등록(`axhub env set --from-dotenv … --only … --execute`, AI 는 값을 읽지 않아요)·포트·`0.0.0.0` 바인딩·상태 확인 경로·빌드 오류 수정·커밋·push — 는 묻지 않고 해요. GitHub 에 연결된 앱은 push 하는 순간 자동 배포가 시작돼 CLI 검사를 거치지 않으므로, 설정값 등록과 수정 커밋을 반드시 push 전에 끝내요. 접속 주소가 없는 앱(`deploy check` 의 `subdomain_not_configured` 항목, 이때 `error.subcode` 는 `deploy.subdomain_not_configured`)은 push 해도 배포가 시작되지 않아요 — 주소는 첫 운영 배포 뒤 바꿀 수 없어 맞출 일이 아니라 따로 확인받아 정하는 일이고(위 셋과 별개인 복구 질문), 정하기 전에는 push 하지 않아요. "그대로" 답은 앱 폴더 `.axhub/deploy-answers.json` 의 `keep` 에 남겨 다음 배포에 다시 묻지 않고, 이 파일은 커밋하지 않아요. headless 는 물을 일이 하나라도 있으면 아무것도 바꾸지 않고 멈춰요. 끝나면 `이렇게 맞춰서 올렸어요` 와 맞춘 것을 알려요. preflight 에 `capabilities.readiness.deploy_check` 가 없는 구 CLI 면 업데이트를 안내하고 멈춰요.

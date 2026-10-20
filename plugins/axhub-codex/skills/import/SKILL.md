@@ -19,7 +19,7 @@ model: sonnet
 
 codex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 아래 게이트는 뒤쪽 절차 설명이 잘려도 그대로 지켜요.
 
-1. 가져오기 승인 — import preview 를 보여준 뒤 `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?` 로 한 번만 묻고, 이 승인 하나가 axhub 진입 확인을 겸해요. 승인 전에는 `--execute` 를 실행하지 않아요.
+1. 가져오기 승인 — import preview 를 보여준 뒤 `지금 이대로 axhub에 올려서 인터넷 주소를 만들까요?` 로 한 번만 묻고, 이 승인 하나가 axhub 진입 확인을 겸해요. 승인 전에는 `--execute` 를 실행하지 않아요.
 2. 승인 방식 — 같은 확인을 명시 텍스트 승인 1회로 받아요. preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구만 유효하고, 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요. 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
 3. 빈 답변 = 미승인 — 선택 카드로 물은 경우 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.
 4. 배포 방식 — preview 가 새 앱(`app_create`)을 `static` 으로 자동 판정했고 사용자가 방식을 말하지 않았으면, 1 전에 `어떤 방식으로 배포할까요?` 를 먼저 물어요 — `정적 사이트 (추천)`·`서버 앱`·`취소`. 서버 앱은 `manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker` 로 preview 를 다시 받아요.
@@ -223,7 +223,7 @@ axhub --json plugin-support import --mode preview --headless
 
 5. Preview 카드 렌더링
 
-사용자에게는 아래 항목만 보여줘요.
+사용자에게는 아래 항목만 결과로 보여줘요(파일·경로·명령 이름 없이).
 
 - 앱 이름 또는 추정 이름
 - 감지된 상태 요약
@@ -231,35 +231,35 @@ axhub --json plugin-support import --mode preview --headless
 - 배포 방식
 - 안전 메모
 
-새 앱 설정 파일이 필요하면, axhub.yaml 을 프로젝트 파일 근거로 자세히 작성할 예정이라고 한 줄로 같이 알려요.
-기존 axhub.yaml 복구가 필요하면, 문법이 깨져 있어서 CLI 가 가져오기 중 백업 파일을 남기고 안전한 최소 설정으로 복구한다고 한 줄로 같이 알려요. 이 경우 plugin 이 직접 덮어쓰지 않아요.
+새 앱 설정이 필요하면 프로젝트에 맞춰 만들어 함께 올린다고 한 줄로 알려요.
+기존 앱 설정이 깨져 있으면 CLI 가 백업을 남기고 최소 설정으로 복구한다고 한 줄로 알려요. 이 경우 plugin 이 직접 덮어쓰지 않아요.
 
 5-1. 배포 방식 카드
 
-preview `deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create` 가 있는데 사용자가 배포 방식을 말하지 않았으면, 6 전에 선택 카드로 `어떤 방식으로 배포할까요?` 를 한 번 물어요. header `배포 방식`, 선택지 `정적 사이트 (추천)`(`HTML·빌드 결과만 올려요 · axhub.page 주소`), `서버 앱`(`서버 코드까지 실행해요 · axhub.dev 주소`), `취소`(`가져오기를 중단해요.`). 정적 사이트면 6으로 가요. 서버 앱이면 `detected_state.manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker` 로 preview 를 다시 받아 5·6 을 이어가고, 없으면 실행할 서버 코드가 없다고 한 줄로 말한 뒤 `정적 사이트 (추천)`·`취소` 로 다시 물어요. headless 는 묻지 않아요.
+preview `deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create` 가 있는데 사용자가 배포 방식을 말하지 않았으면, 6 전에 선택 카드로 `어떤 방식으로 배포할까요?` 를 한 번 물어요. header `배포 방식`, 선택지 `정적 사이트 (추천)`(`HTML·빌드 결과만 올려요`), `서버 앱`(`서버 코드까지 실행해요`), `그만두기`(`올리지 않고 끝내요.`). 주소 도메인은 적지 않아요. 정적 사이트면 6으로 가요. 서버 앱이면 `detected_state.manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker` 로 preview 를 다시 받아 5·6 을 이어가고, 없으면 실행할 서버 코드가 없다고 한 줄로 말한 뒤 `정적 사이트 (추천)`·`그만두기` 로 다시 물어요. headless 는 묻지 않아요.
 
 5-2. 첫 올리기 점검 (AP-30)
 
 대화형이고 preflight 의 `capabilities.readiness.deploy_check`·`capabilities.import.env_from_dotenv` 가 true 일 때만 해요.
 
-1. `axhub deploy check --json`(`--app` 없이)과 preflight 의 `capabilities.readiness.context_url` 문서(한 번, 없으면 `../deploy/references/deploy-rules.md`)를 받아 그 규칙으로 코드를 보고, 빌드가 있으면 로컬 빌드를 5분 안에서 한 번 돌려요. 테스트·예시·README 흔적은 문제 아니에요.
+1. `axhub deploy check --json`(`--app` 없이)과 preflight 의 `capabilities.readiness.context_url` 문서(한 번, 없으면 `../deploy/references/deploy-rules.md`)를 받아 그 규칙으로 코드를 보고, 빌드가 있으면 로컬 빌드를 5분 안에서 한 번 돌려요. 테스트 흔적은 문제 아니에요.
 2. 필요한 설정값 이름을 코드 근거로 정하고 `axhub env set --app <앱 주소> --from-dotenv .env` 미리보기로 `.env` 에 있는 이름을 확인해요. `.env` 를 직접 열지 않아요.
-3. 6의 승인 카드 한 화면에 보여줘요 — 새 이름(앱 주소·저장소·작업공간), 물을 일, `이렇게 맞춰서 올릴게요` 목록(고칠 것·등록할 설정값 이름). 물을 일은 둘뿐이에요: `.env` 에도 없는 필수 설정값(값은 대화로 받지 않고 `.env` 에 넣어 달라고 해요)과 안 되는 6가지·문서 `물어봄` 규칙에 해당한 것(문서 대안과 `그대로 올리기`). 같은 명시 텍스트 승인 의 질문으로 한 번에 받아요.
+3. 6의 승인 카드 한 화면에 보여줘요 — 새 이름(앱 주소·저장소·작업공간), 물을 일, `이렇게 맞춰서 올릴게요` 목록(고칠 것·등록할 설정값 이름). 물을 일은 둘뿐이에요: `.env` 에도 없는 필수 설정값(값은 대화로 받지 않고 `.env` 에 넣어 달라고 해요)과 안 되는 6가지·문서 `물어봄` 규칙에 해당한 것(문서 대안과 `그대로 올리기`). 한 명시 텍스트 승인 으로 받고 첫 선택지에 `(추천)`.
 4. 승인 뒤 execute 전에 고칠 코드를 고쳐요. git 저장소가 이미 있으면 고친 파일을 `배포 전 맞추기` 로 커밋하고, origin 이 있으면 push 해요(아직 앱에 연결되지 않아 자동 배포는 없어요). `.env*`·키 파일은 커밋하지 않아요. 등록할 이름이 있으면 execute 에 `--env-from-dotenv .env --env-only <이름,…>` 을 붙여요 — 앱 생성 직후·첫 배포 전에 등록돼요. `그대로` 답은 `.axhub/deploy-answers.json` 의 `keep` 에 더해요.
 5. 성공하면 맞춘 게 있을 때 마지막 메시지를 정확히 `이렇게 맞춰서 올렸어요.` 로 시작해요.
 
 6. 대화형 통합 승인 1회
 
-명시 텍스트 승인 은 preview 직후(5-1 카드와 별개로) 딱 한 번 써요. 질문은 `이 앱을 axhub에 가져와서 미리보기대로 진행할까요?` 처럼 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인과 manifest commit 동의를 모두 겸해요. 명시 텍스트 승인 1회만 받아요. 승인 채널 없는 headless 에서는 execute하지 않아요 — 승인을 조용히 건너뛰지 않아요.
+명시 텍스트 승인 은 preview 직후(5-1 카드와 별개로) 딱 한 번 써요. 질문은 `지금 이대로 axhub에 올려서 인터넷 주소를 만들까요?` 로 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인과 manifest commit 동의를 모두 겸해요. 명시 텍스트 승인 1회만 받아요. 승인 채널 없는 headless 에서는 execute하지 않아요 — 승인을 조용히 건너뛰지 않아요.
 
-- `capabilities.import.commit_manifest` 가 true 이고 GitHub 기반 첫 배포면 `설정도 반영하고 시작`, `커밋 없이 시작`, `먼저 수정할게요`, `취소` 네 옵션을 써요. 첫 옵션은 `--commit-manifest`, 둘째 옵션은 옵션 없는 execute 로 고정해요.
-- 그 외에는 `가져오기 시작`, `먼저 수정할게요`, `취소` 세 옵션만 써요.
+- `capabilities.import.commit_manifest` 가 true 이고 GitHub 기반 첫 배포면 `올리기 (추천)`, `설정은 나중에 올리기`, `먼저 고칠게요`, `그만두기` 네 옵션을 써요. 첫 옵션은 `--commit-manifest`, 둘째 옵션은 옵션 없는 execute 로 고정해요.
+- 그 외에는 `올리기 (추천)`, `먼저 고칠게요`, `그만두기` 세 옵션만 써요.
 
 승인 선택 뒤에는 manifest 작성·검증 결과가 예상과 달라도 커밋 질문이나 같은 가져오기 질문을 다시 띄우지 않아요. 실행 가능한 첫째/둘째 옵션 외에는 execute 를 호출하지 않아요.
 
 7. axhub.yaml 보강 (manifest_create 일 때만)
 
-통합 승인 직후, execute 전에 진행해요. `required_mutations` 에 `manifest_create` 가 있을 때만 위 `## Manifest 보강` 규칙대로 프로젝트 파일 근거로 axhub.yaml 을 작성하고 `axhub deploy --explain --json` 로 검증해요. `manifest_create` 가 없거나 headless 면 이 단계를 건너뛰어요. `설정도 반영하고 시작` 을 골랐다면 검증 통과 뒤 질문 없이 `--commit-manifest` 를 쓰고, `커밋 없이 시작` 이면 질문 없이 그 옵션을 빼요. local_only 라서 아직 git remote 가 없어도 통합 승인에서 선택한 값을 그대로 유지해요.
+통합 승인 직후, execute 전에 진행해요. `required_mutations` 에 `manifest_create` 가 있을 때만 위 `## Manifest 보강` 규칙대로 프로젝트 파일 근거로 axhub.yaml 을 작성하고 `axhub deploy --explain --json` 로 검증해요. `manifest_create` 가 없거나 headless 면 이 단계를 건너뛰어요. `올리기` 를 골랐다면 검증 통과 뒤 질문 없이 `--commit-manifest` 를 쓰고, `설정은 나중에 올리기` 면 질문 없이 그 옵션을 빼요. local_only 라서 아직 git remote 가 없어도 통합 승인에서 선택한 값을 그대로 유지해요.
 
 8. Execute 호출
 
@@ -267,7 +267,7 @@ preview `deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create
 
 Codex 에서는 background task, output 파일 읽기, `for`/`while`/`until`, `sleep`, command substitution, pipe, `grep`, `head`, `status=` 같은 shell 폴링을 쓰지 않아요. 첫 verify 가 exit 6 또는 timeout 이면 성공이라고 말하지 않고, 같은 명령을 자동 재실행하거나 새 승인 카드를 띄우지 않은 채 현재 진행 중이며 나중에 같은 ID로 이어볼 수 있다고 요약해요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못해도 execute 를 다시 실행하지 않아요.
 
-`커밋 없이 시작` 이거나 commit+push capability 가 없는 경우:
+`설정은 나중에 올리기` 거나 commit+push capability 가 없는 경우:
 
 ```bash
 axhub --json plugin-support import --mode execute --approved
@@ -279,7 +279,7 @@ preview 에 `--slug`, `--repo`, `--tenant`, `--name`, `--deploy-method`, `--from
 axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"
 ```
 
-`설정도 반영하고 시작` 을 골랐으면 `--commit-manifest` 를 더해요. CLI 가 backend mutation 전에 axhub.yaml 을 커밋·push 해서 첫 배포에 반영해요.
+`올리기` 를 골랐으면 `--commit-manifest` 를 더해요. CLI 가 backend mutation 전에 axhub.yaml 을 커밋·push 해서 첫 배포에 반영해요.
 
 ```bash
 axhub --json plugin-support import --mode execute --approved --commit-manifest

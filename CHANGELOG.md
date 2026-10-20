@@ -4,6 +4,29 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.32.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.31.1...plugin-v1.32.0) (2026-10-20)
+
+처음 배포할 때 나오는 질문마다 (추천)을 첫 번째에 두고, 파일·DB 이름 대신 결과로 쉽게 물어요. 온보딩에서 고른 코드 저장 위치를 기억해 첫 배포 때 다시 묻지 않아요. 진행 안내와 배포 완료 보고도 개발 용어 없이 주소와 다음 할 일만 알려요.
+
+
+### Added
+
+* **plugin:** recommend first and ask in outcomes for the first deploy ([f790f0f](https://github.com/jocoding-ax-partners/axhub-mono/commit/f790f0f43c9ea2b240ec57892ec5f87e8eb486a7))
+
+
+### Fixed
+
+* **plugin:** speak in outcomes on the first upload and its report ([23c5acd](https://github.com/jocoding-ax-partners/axhub-mono/commit/23c5acd6c4e0e3875eecc2951e3963297451bf49))
+
+## [1.31.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.31.0...plugin-v1.31.1) (2026-10-20)
+
+기존 앱을 가져올 때 배포 방식 카드가 서버 앱의 주소와 접근 방식을 정확히 안내해요. Claude Code와 Codex 번들에 같은 안내를 담아 서버 앱을 정적 파일처럼 설명하지 않도록 바로잡았어요.
+
+
+### Fixed
+
+* **plugin:** 배포 방식 카드의 서버 앱 주소 안내를 바로잡는다 ([#1369](https://github.com/jocoding-ax-partners/axhub-mono/issues/1369)) ([57183e6](https://github.com/jocoding-ax-partners/axhub-mono/commit/57183e64ba5f121802942a5c1f092eea13f7ffd6))
+
 ## [1.31.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.30.10...plugin-v1.31.0) (2026-10-19)
 
 Axhub 저장소를 쓰는 정적 앱도 소스를 Git에 push해서 배포해요. 웹 콘솔 저장소에서 코드와 커밋별 배포 결과를 확인할 수 있어요. 업로드로 배포하던 로컬 소스는 import로 저장소에 연결하고, 서버가 빌드한 배포 기록으로 성공을 확인해요. 이 경로를 지원하지 않는 CLI는 업데이트를 안내하며 업로드로 우회하지 않아요.

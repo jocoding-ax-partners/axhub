@@ -102,6 +102,30 @@ describe("Claude Desktop live QA regressions", () => {
     expect(skill).toContain("ignore 규칙을 바꾼 때만 사후 1회 재검증");
   });
 
+  test("import deploy-method card never promises a server app domain", () => {
+    // AP-28 카드가 `서버 앱` 을 `axhub.dev 주소` 로 안내했지만 axhub.dev 는 스테이징이에요.
+    // 서버 앱 주소는 회사 작업공간 `{sub}.{tenant}.axhub.ai`·개인 작업공간 `{sub}.axhub.app` 으로
+    // 갈리고 preview 는 작업공간 종류를 알려주지 않아서, 소스와 두 번들 모두 도메인을 적지 않아요.
+    for (const path of [
+      "skills/import/SKILL.md",
+      "plugins/axhub/skills/import/SKILL.md",
+      "plugins/axhub-codex/skills/import/SKILL.md",
+    ]) {
+      const skill = read(path);
+      const card = skill.slice(skill.indexOf("5-1. 배포 방식 카드"), skill.indexOf("5-2. 첫 올리기 점검"));
+
+      expect(card, path).toContain("`어떤 방식으로 배포할까요?`");
+      expect(card, path).toContain("`서버 앱`(`서버 코드까지 실행해요`)");
+      expect(card, path).toContain("주소 도메인은 적지 않아요");
+      expect(card, path).not.toMatch(/axhub\.(dev|ai|app|page)/);
+    }
+
+    const policy = read("docs/policy/agent-policy.md");
+    const ap28 = policy.slice(policy.indexOf("## AP-28 "), policy.indexOf("## AP-29 "));
+    expect(ap28).not.toContain("axhub.dev");
+    expect(ap28).toContain("회사 작업공간이면 `{sub}.{tenant}.axhub.ai`, 개인 작업공간이면 `{sub}.axhub.app`");
+  });
+
   test("import completion recovery never guesses a remote app from the local folder", () => {
     const skill = read("skills/import/SKILL.md");
     const frontmatter = skill.slice(0, skill.indexOf("---", 4));

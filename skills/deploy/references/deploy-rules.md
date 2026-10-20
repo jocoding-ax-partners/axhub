@@ -15,7 +15,7 @@ preflight 의 `capabilities.readiness.context_url` 문서(`https://docs.axhub.ai
 
 ## 데이터 — 물어봄
 
-- 서버 폴더(SQLite 파일, JSON 파일, `./uploads`)는 재배포·재시작·절전 때 처음 상태로 돌아가요. 데이터는 `database: engine: postgres`(`DATABASE_URL`), 파일은 `storage: enabled: true`(`STORAGE_*`)로 옮길지 물어요.
+- 서버 폴더(SQLite 파일, JSON 파일, `./uploads`)는 재배포·재시작·절전 때 처음 상태로 돌아가요. 데이터는 `database: engine: postgres`(`DATABASE_URL`), 파일은 `storage: enabled: true`(`STORAGE_*`)로 옮길지 물어요. 사용자에게는 `다시 배포해도 내용이 남게 바꾸기 (추천)`·`그대로 올리기`처럼 결과로 묻고 DB·파일 이름은 말하지 않아요.
 - AXHub DB 는 PostgreSQL 만이고 빈 상태로 시작해요. 테이블은 앱이 켜질 때 만들어요(바로 고침).
 - 바깥 고객 여럿의 데이터를 한 DB 에 담거나 자체 회원·비밀번호 표가 있는 앱은 `database.roles: [runtime, auth]` 로 계정을 나눠요(`DATABASE_URL_RUNTIME`·`DATABASE_URL_AUTH` 자동 주입, 권한·RLS 는 마이그레이션에서 `GRANT`, FORCE RLS 면 `owner_bypass_rls: true`). 자세히는 docs `features/data` 의 「DB 계정을 나눠 쓸 때」(알림).
 

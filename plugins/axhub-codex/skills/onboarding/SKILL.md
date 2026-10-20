@@ -33,7 +33,7 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 
 ## Core Contract
 
-1. **Single source of truth.** gap 순서는 `axhub plugin-support onboarding-detect --json`을 써요. app target이 있으면 `axhub apps get <app> --json`의 persisted backend를 그대로 쓰고 다시 묻지 않아요. fresh tenant는 `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`를 추천값으로만 읽고 사용자가 확정한 `SELECTED_GIT_BACKEND`를 써요. 선택이 없으면 정확히 `첫 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`·`Axhub self-hosted`를 보여줘요. Gitea API·C1 HTTP·remote URL은 보지 않아요.
+1. **Single source of truth.** gap 순서는 `axhub plugin-support onboarding-detect --json`을 써요. app target이 있으면 `axhub apps get <app> --json`의 persisted backend를 그대로 쓰고 다시 묻지 않아요. fresh tenant는 `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`를 추천값으로만 읽고, `remembered`가 있으면 그 값을, 없으면 사용자가 확정한 `SELECTED_GIT_BACKEND`를 써요. 선택이 없으면 정확히 `첫 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`·`Axhub self-hosted`를 보여줘요. Gitea API·C1 HTTP·remote URL은 보지 않아요.
 2. **Detect-first loop.** `detect -> backend 선택/판정 -> EFFECTIVE_FIRST_GAP 하나 처리 -> 재감지`를 반복해요. 선택된 selfhosted에서는 provider 전용 gaps를 action 없이 필터링하고 첫 applicable gap 하나만 처리해요.
 3. **Headless safety.** 순수 subprocess/headless/CI에서는 명시 텍스트 승인을 생략해요. provider 선택이 명시되지 않았으면 provider mutation 전에 `SAFE_STOP_NONINTERACTIVE`로 멈추고, install/update/auth/bootstrap/deps mutation, git/node system install, node version switch, browser open을 자동 실행하지 않아요.
 4. **No automatic bootstrap.** 빈 폴더나 manifest 없는 폴더를 발견해도 bootstrap을 자동 실행하지 않아요. `no_manifest_empty`는 안내 후 Ready card로 가요.
@@ -46,7 +46,7 @@ References 는 이 스킬의 일부예요. 명령 의미를 바꾸지 말고, to
 ## Progress
 
 각 단계 시작에는 사용자가 멈춘 것으로 오해하지 않게 한국어 한 줄만 말해요. raw JSON, secret, internal id, full stderr 는 chat 에 넣지 않아요.
-사용자에게 보이는 문장과 Bash/tool call 제목은 한국어로만 써요. `first_gap`, `gaps`, `cli_state`, `auth_error_code` 같은 detect 필드명이나 enum 값은 내부 라우팅용으로만 읽고, chat 에 그대로 출력하지 않아요. "빈 폴더라 자동으로 만들지 않았어요"처럼 사람 말로 바꿔요.
+사용자에게 보이는 문장·도구 사이 짧은 혼잣말·Bash/tool call 제목은 한국어로만 써요(`Now the backend gate: preflight.` 같은 영어 금지). `first_gap`, `gaps`, `cli_state`, `auth_error_code` 같은 detect 필드명이나 enum 값은 내부 라우팅용으로만 읽고, chat 에 그대로 출력하지 않아요. "빈 폴더라 자동으로 만들지 않았어요"처럼 사람 말로 바꿔요.
 
 사용자에게 보이는 모든 URL은 평문 `https://...` 절대 URL로만 써요. 앱 URL과, GitHub branch에서만 필요한 install/device URL을 Markdown 링크로 감싸지 않아요.
 
@@ -96,9 +96,9 @@ axhub apps git-backend --tenant <tenant> --json
 
 top-level `git_backend.backend`·`git_backend.source`만 읽어요. app target이 있으면 `git_backend.backend=selfhosted`를 포함한 persisted app backend를 `SELECTED_GIT_BACKEND`로 고정하고 코드 저장 위치를 다시 묻지 않아요. `git_backend.source=legacy_github`는 GitHub로 고정해요.
 
-fresh tenant 응답은 추천값이에요. 사용자가 최초 발화나 현재 대화에서 GitHub/selfhosted를 이미 명시했다면 그 값을 `SELECTED_GIT_BACKEND`로 써요. 아니면 native Question/명시 텍스트 승인 card로 정확히 `첫 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. tenant 추천값은 추천 옵션으로 표시하되 반대 선택도 허용해요. card가 안 보일 때만 같은 질문을 chat text로 물어요.
+fresh tenant 응답은 추천값이에요. 응답에 `remembered`가 있으면 그 값을 `SELECTED_GIT_BACKEND`로 쓰고 묻지 않아요. 사용자가 최초 발화나 현재 대화에서 GitHub/selfhosted를 이미 명시했다면 그 값을 `SELECTED_GIT_BACKEND`로 써요. 아니면 native Question/명시 텍스트 승인 card로 정확히 `첫 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. tenant 추천값을 첫 옵션에 두고 label 끝에 `(추천)`을 붙이되 반대 선택도 허용해요. card가 안 보일 때만 같은 질문을 chat text로 물어요.
 
-선택값은 이 대화가 끝날 때까지 유지해요. 같은 대화의 bootstrap이 이어지면 다시 묻지 않고 `--git-backend <SELECTED_GIT_BACKEND>`로 전달해요. 아직 app이 없으므로 새 세션의 persisted 설정이라고 주장하지 않아요. headless에서 provider 선택이 명시되지 않았으면 provider mutation 전에 `SAFE_STOP_NONINTERACTIVE`로 멈추고 두 선택지와 재개 문장만 보여줘요.
+고르면 `axhub apps git-backend --tenant <tenant> --remember <SELECTED_GIT_BACKEND> --json`으로 기억해요 — 다음 세션의 첫 import가 같은 저장 위치로 가요. `--remember`를 모르는 구 CLI면 이 대화 안에서만 유지하고 새 세션 설정이라고 주장하지 않아요. 같은 대화의 bootstrap이 이어지면 다시 묻지 않고 `--git-backend <SELECTED_GIT_BACKEND>`로 전달해요. headless에서 provider 선택이 명시되지 않았으면 provider mutation 전에 `SAFE_STOP_NONINTERACTIVE`로 멈추고 두 선택지와 재개 문장만 보여줘요.
 
 read command 실패나 missing/malformed `git_backend`만 provider 단계 전에 중단 사유예요. app row를 먼저 만들거나 GitHub를 platform default로 추측하거나 tenant C1/Gitea를 직접 호출하지 않아요.
 
