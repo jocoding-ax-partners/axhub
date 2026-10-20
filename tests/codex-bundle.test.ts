@@ -358,7 +358,7 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     // spec 681 — 재배포는 승인 카드 대신 배포 전 맞추기예요. 묻는 일·push 순서·headless 정지가 절단선 안에 있어야 해요.
     deploy: ["axhub apps get <app> --json", "git_backend.backend=selfhosted", "axhub repo clone <app>", "승인 카드를 띄우지 않아요", "axhub deploy check --app", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "물을 내용만 남기고 멈춰요", "반드시 push 전에 끝내요", "어디에 배포할까요?"],
     onboarding: ["axhub apps get <app> --json", "axhub apps git-backend --tenant <tenant> --json", "git_backend.backend=selfhosted", "첫 앱의 코드 저장 위치를 선택해 주세요.", "SELECTED_GIT_BACKEND", "provider 선택이 명시되지 않았으면"],
-    import: ["미리보기대로 진행할까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "어떤 방식으로 배포할까요?"],
+    import: ["인터넷 주소를 만들까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "어떤 방식으로 배포할까요?"],
     scaffold: [
       "명시 텍스트 승인 1회",
       "미리 넣어 둔 문구",
