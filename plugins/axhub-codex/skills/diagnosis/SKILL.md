@@ -17,13 +17,13 @@ model: sonnet
 
 발화에 axhub 언급이 없고 대화에 axhub 맥락(현재 폴더의 axhub 연결·직전 axhub 작업)도 없으면 — 배포 실패가 다른 플랫폼일 수 있으면 — 진단을 시작하기 전에 어느 플랫폼 배포인지 한 번만 확인하고, axhub 가 아니면 종료해요. headless 에서는 묻지 않고 멈춰요.
 
-진단 결과는 두 층으로 나눠요. `deploy` 에서 방금 실패한 배포 id 를 넘긴 경우에는 그 **실패한 배포 한 건의 status** 를 먼저 읽고, status 의 시작·종료 시각으로 좁힌 **그 시간대 앱 로그**를 함께 본 뒤(`deploy logs` 는 CLI 계약상 배포 한 건이 아니라 앱 단위 로그예요), 현재 라이브 롤아웃 상태를 별도로 확인해요. 사용자가 앱만 주고 실패 배포 id 가 없으면 앱의 **현재 라이브 롤아웃 상태**를 진단해요. 그래서 "현재 라이브는 정상"이어도 방금 배포가 실패했을 수 있다는 한계를 사용자에게 정직하게 전달해요.
+진단 결과는 두 층으로 나눠요. `deploy` 에서 방금 실패한 배포 id 를 넘긴 경우에는 그 **실패한 배포 한 건의 status** 를 먼저 읽고, status 의 시작·종료 시각으로 좁힌 **그 시간대 앱 로그**를 함께 본 뒤, 현재 라이브 롤아웃 상태를 별도로 확인해요. 사용자가 앱만 주고 실패 배포 id 가 없으면 앱의 **현재 라이브 롤아웃 상태**를 진단해요. 그래서 "현재 라이브는 정상"이어도 방금 배포가 실패했을 수 있다는 한계를 사용자에게 정직하게 전달해요.
 
 ## 핵심 책임
 
 - **CLI 전용이에요.** MCP `deployment_diagnosis` 같은 deployment MCP 도구가 보여도 호출하지 않아요. 진단 표면은 `axhub deploy status`, `axhub deploy logs`, `axhub deploy diagnose` 만 써요.
 - 영어로 "Diagnose failed deployment ..."처럼 물어도 이 스킬이에요. MCP `App list`, `App get`, `deployment_diagnosis` 같은 도구만으로 진단을 대신하지 않아요.
-- 방금 실패한 배포 id 가 있으면 `axhub deploy status <deployment-id> --json` 으로 terminal failure 와 시작·종료 시각을 확인하고, 앱 식별자가 있으면 그 시각으로 계산한 시간창을 붙여 `axhub deploy logs --app <앱> --since <시작> --until <종료> --json --limit 100` 으로 그 시간대 앱 로그를 읽어요. deployment id 를 positional 로 넘겨도 CLI 는 앱 단위 로그를 돌려주므로, 시간창 없이 읽은 로그를 그 배포의 로그라고 말하지 않아요. raw 로그는 사용자에게 그대로 붙이지 않고 원인군만 요약해요.
+- 방금 실패한 배포 id 가 있으면 `axhub deploy status <deployment-id> --json` 으로 terminal failure·시작·종료 시각·`target_environment` 를 확인하고, 앱 식별자가 있으면 그 시간창을 붙여 `axhub deploy logs --app <앱> --since <시작> --until <종료> --json --limit 100` 으로 그 시간대 앱 로그를 읽어요. `--environment` 를 빼면 운영 로그라 `target_environment` 가 `staging` 이면 `--environment staging` 을 붙여요. 시간창 없이 읽은 로그를 그 배포의 로그라고 말하지 않고, raw 로그는 그대로 붙이지 않고 원인군만 요약해요.
 - 빌드 실패에는 `deploy status --json` 최상위와 `deploy diagnose` 응답 service 에 `build_log_tail`(백엔드가 secret 마스킹·절단을 끝낸 빌드 로그 끝부분)이 실릴 수 있어요. 이 필드는 Visibility 예외를 따라 사용자에게 보여주고, 원인 요약의 근거로 써요. 필드가 없으면(구 CLI·기능 이전 배포·비-빌드 실패) 기존처럼 원인군 요약만 해요.
 - 앱 단위 현재 상태는 공개 CLI `axhub deploy diagnose` 로 받아요. CLI 원본 출력은 redact 가 안 돼 있어서 스킬이 직접 가려요.
 - CLI 표면이 없으면 `진단을 못 했어요` 로 끝내요.
@@ -98,7 +98,7 @@ Codex QA처럼 사용자가 한 문장 안에 "진단하고 복구까지 해줘"
      axhub deploy logs --app <앱> --since <시작> --until <종료> --json --limit 100
      ```
 
-     `deploy logs` 는 앱 단위 로그예요 — 시간창으로 좁혀도 요약은 "그 배포 시간대의 앱 로그"로 정직하게 말해요.
+     `deploy logs` 는 앱 단위 로그예요 — 시간창으로 좁혀도 요약은 "그 배포 시간대의 앱 로그"로 정직하게 말해요. staging 배포면 `--environment staging` 을 붙여요.
 
      각 tool 제목은 `실패 배포 상태 확인`, `실패 배포 로그 확인` 으로 쓰고 반드시 별도 카드로 실행해요.
 

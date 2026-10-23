@@ -65,14 +65,14 @@ Do not attach `--watch` or `--watch-timeout` to the first execute. If execute re
 
 Use `axhub --no-input apps bootstrap` for execute and resume. Claude Desktop may run shell tools through a PTY, so stdout can look interactive to the CLI; `--no-input` forces the agent device-flow branch that prints the code envelope and exits instead of waiting invisibly.
 
-If execute returns before deployment reaches a terminal state, the known `deployment_id` becomes an owned watch. preflight 의 `capabilities.import.verify_wait` 가 true 면 `배포 상태 확인` 제목으로 `axhub deploy verify <deployment-id> --app <app-slug> --wait --wait-interval 20s --wait-timeout 10m --json` 를 정확히 한 번 호출해 CLI 안에서 기다리고, 같은 명령을 연달아 재호출하지 않아요 — 대기 수단 없이 같은 exit 6 을 화면에 쌓는 연타 폴링은 UX 실패예요. capability 가 없는 구 CLI 에서만 아래 status fallback 을 써요. Never poll deployment status with a shell loop, Claude Desktop Monitor, ScheduleWakeup, or any background watcher. Run one direct `axhub deploy status <deployment-id> --tenant <tenant> --json` command per check, with a user-facing title like `배포 상태 확인`. If it is still running, say it is still building and issue another separate direct status command in the same Desktop response when the UI can run another tool call; do not express the wait as `sleep`, `until`, `while`, a pipe, or a compound shell block. A Desktop permission request containing `until axhub deploy status`, `while`, `sleep`, `grep`, `head`, or a pipe is a failed watch UX and must be replaced with standalone status calls. Do not end the response by telling the user to check later. Do not claim "I'll automatically check again in 90 seconds" unless you actually run a follow-up tool call in this same Desktop session. Do not parse JSON with `grep`, `head`, `tail`, `cut`, `awk`, `sed`, or `jq` in Desktop-visible commands; read the tool output JSON directly.
+If execute returns before deployment reaches a terminal state, the known `deployment_id` becomes an owned watch. preflight 의 `capabilities.import.verify_wait` 가 true 면 `배포 상태 확인` 제목으로 `axhub deploy verify <deployment-id> --app <app-slug> --wait --wait-interval 20s --wait-timeout 9m --json` 를 정확히 한 번 호출해 CLI 안에서 기다리고, 같은 명령을 연달아 재호출하지 않아요 — 대기 수단 없이 같은 exit 6 을 화면에 쌓는 연타 폴링은 UX 실패예요. 명령 도구 timeout 을 600000ms 로 올려 실행해요(CLI 대기 9분이 도구 한도 안에서 끝나요). exit 6·10 이나 도구 timeout 으로 끊기면 실패로 말하지 않고, 재개 요약과 같은 verify 명령 한 줄만 남겨요 — deployment id 를 보존하고 다른 후속 명령은 덧붙이지 않아요. capability 가 없는 구 CLI 에서만 아래 status fallback 을 써요. Never poll deployment status with a shell loop, Claude Desktop Monitor, ScheduleWakeup, or any background watcher. Run one direct `axhub deploy status <deployment-id> --tenant <tenant> --json` command per check, with a user-facing title like `배포 상태 확인`. If it is still running, say it is still building and issue another separate direct status command in the same Desktop response when the UI can run another tool call; do not express the wait as `sleep`, `until`, `while`, a pipe, or a compound shell block. A Desktop permission request containing `until axhub deploy status`, `while`, `sleep`, `grep`, `head`, or a pipe is a failed watch UX and must be replaced with standalone status calls. Do not end the response by telling the user to check later. Do not claim "I'll automatically check again in 90 seconds" unless you actually run a follow-up tool call in this same Desktop session. Do not parse JSON with `grep`, `head`, `tail`, `cut`, `awk`, `sed`, or `jq` in Desktop-visible commands; read the tool output JSON directly.
 
 Do not report final success while the deployment status is building/running/pending. Phrases such as `완벽해요`, `앱이 생성되었습니다`, `배포 완료`, or URL-later handoffs are final-result language and are only allowed after terminal deploy success plus verify success. Once status is terminal success, run one direct `axhub deploy verify <deployment-id> --app <app-slug> --json` command. If verify says still building, continue the same watch. If terminal failure or verify failure is returned, summarize briefly and route to diagnosis; do not call the app complete.
 
-If the watch cannot finish in the current Desktop response, fetch bootstrap id with the same idempotency key and then use one direct status command. Do not use CLI watch flags from Claude Desktop:
+If the bootstrap itself is still running (no `deployment_id` yet), follow SKILL.md 9.1: run one direct status command with the real `bootstrap_id` from the execute/status output and the selected tenant. That status command may carry the CLI's own bounded wait — `--watch` together with `--watch-timeout 9m` (a bare `--watch` degrades to one snapshot in an agent context), with the command tool timeout raised to 600000ms. A watch exit 10 means the bootstrap was already accepted: continue with the same status command and never re-run `--execute`. Only the first execute and the first Desktop resume stay free of watch flags.
 
 ```bash
-axhub apps bootstrap-status 11111111-1111-4111-8111-111111111111 --tenant test --json
+axhub apps bootstrap-status 11111111-1111-4111-8111-111111111111 --tenant test --watch --watch-timeout 9m --json
 ```
 
 Use the real `bootstrap_id` from the previous JSON/status output instead of the sample UUID.
@@ -112,7 +112,7 @@ In fallback mode, resume the cached flow yourself after `retry_after_secs` or a 
 axhub --no-input apps bootstrap --git-backend github --template nextjs-axhub --name bakery-preorder --slug bakery-preorder --repo-name bakery-preorder --subdomain bakery-preorder --github-owner realitsyourman --tenant test --execute --resume-last --idempotency-key 00000000-0000-4000-8000-000000000000
 ```
 
-While an outstanding code exists, never run fresh `bootstrap --execute` without `--resume-last`; it can issue a new code and invalidate the user's approved one. If response remains `device_code_pending`, respect `retry_after_secs` and retry `--resume-last` until success or expiry. If code expired, start Step 7 execute again to issue a fresh challenge.
+While an outstanding code exists, never run fresh `bootstrap --execute` without `--resume-last`; it can issue a new code and invalidate the user's approved one. If response remains `device_code_pending`, respect `retry_after_secs` and retry `--resume-last` until success or expiry. If code expired, start the Step 9 execute again to issue a fresh challenge.
 
 A `device_code_pending` payload carries `user_code`, `verification_uri`, and `expires_at` whenever the resume came from the local cache. Re-show the two body lines (`인증 URL:` / `입력 코드:`) from those fields on every pending retry, not only on the first `device_code_issued`. The user approving is the only thing that ends this loop, so a retry that reports "still pending" without the code leaves them nothing to act on. Older CLIs omit those fields; then keep retrying without re-showing.
 
@@ -148,10 +148,9 @@ if [ -d .git ]; then
 else
   git init -q -b main
   git remote add origin "https://github.com/${REPO}.git"
-  git fetch origin --quiet --depth=1
-  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo main)
-  git reset --hard "origin/$DEFAULT_BRANCH"
-  git branch --set-upstream-to="origin/$DEFAULT_BRANCH" "$DEFAULT_BRANCH" 2>/dev/null || true
+  git fetch origin main --quiet --depth=1
+  git reset --hard FETCH_HEAD
+  git branch --set-upstream-to=origin/main main 2>/dev/null || true
 fi
 ```
 

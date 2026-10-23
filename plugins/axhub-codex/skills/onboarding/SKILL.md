@@ -77,7 +77,7 @@ update_plan 가 host 에 있으면 checklist 를 갱신해요. 없으면 언급�
 4. location 파일도 없거나 가리킨 파일이 없으면 `test -f "$HOME/.axhub/bin/axhub"` 와 `test -f "$HOME/.axhub/bin/axhub.exe"` 를 각각 필요할 때만 별도 call 로 확인해요.
 5. PATH 에서 찾은 바이너리의 detect 출력이 비었으면 내부적으로 `doctor_gap` fallback 으로 처리해요. PATH 밖 파일만 확인됐으면 내부적으로 `cli_path_missing`, 어디에도 없으면 `cli_missing` 으로 처리해요. fallback JSON 을 만들기 위한 `echo` 명령은 실행하지 않아요.
 
-이 단계의 command string 에 `if`/`elif`, `$()`, `&&`/`||`, `;`, pipe, redirect, 변수 대입을 넣지 않아요. Desktop 에 `Contains shell syntax ... cannot be statically analyzed` 권한 카드가 뜨는 명령은 실패예요. 반환된 절대경로를 직접 실행하는 방식이 기존 `AXHUB_BIN` pin 역할을 대신해 PATH/HOME 차이의 오탐을 막아요. `command -v axhub` 는 실패했지만 location 파일(`~/.axhub/bin-path` — CLI 0.24.8+ 가 자기 설치 위치를 기록)이 가리키는 파일이나 canonical install dir(`~/.axhub/bin/axhub` 또는 `.exe`)에 파일이 있으면 재설치가 아니라 `cli_path_missing` 이에요 — 새 세션이 부모 앱의 stale PATH 를 물려받아도 재설치를 권하지 않아요. location 파일 덕에 CARGO_HOME 등 커스텀 설치 위치도 인식돼요. 이 branch 에서는 detect 를 부르지 않아요. 열린 세션이 PATH 를 못 읽는 상태라 같은 gap 을 반복할 수 있기 때문이에요.
+이 단계의 command string 에 `if`/`elif`, `$()`, `&&`/`||`, `;`, pipe, redirect, 변수 대입을 넣지 않아요. Desktop 에 `Contains shell syntax ... cannot be statically analyzed` 권한 카드가 뜨는 명령은 실패예요. 반환된 절대경로를 직접 실행해 `AXHUB_BIN` pin 을 대신해요. `command -v axhub` 는 실패했지만 location 파일(`~/.axhub/bin-path` — CLI 0.24.8+ 가 자기 설치 위치를 기록)이 가리키는 파일이나 canonical install dir(`~/.axhub/bin/axhub` 또는 `.exe`)에 파일이 있으면 재설치가 아니라 `cli_path_missing` 이에요. 이 branch 에서는 detect 를 부르지 않아요. 열린 세션이 PATH 를 못 읽는 상태라 같은 gap 을 반복할 수 있기 때문이에요.
 
 주요 detect 필드는 parsing 전용이고 사용자-facing 문장·표·도구 제목에는 노출하지 않아요.
 
@@ -87,7 +87,7 @@ DETECT의 `first_gap`이 `cli_missing`·`cli_path_missing`·`cli_old`·`auth_mis
 
 DETECT 뒤 `axhub plugin-support preflight --json`을 한 번 실행해요. `capabilities.self_hosted_git.apps_git_backend`, `capabilities.self_hosted_git.app_git_backend`, `capabilities.self_hosted_git.git_setup`이 모두 `true`여야 하며, 누락·malformed/false면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
 
-app target이 있으면 첫 command, fresh tenant면 둘째를 Tool 제목 `앱 설정 확인`으로 한 번 실행해요. 확인된 literal tenant만 써요.
+app target 은 `axhub plugin-support resolve --json` 의 `app_id` 예요(`app_ambiguous` 면 `matched_apps[]` 에서 고르게 하고, 그 밖의 `error` 면 fresh). `<tenant>` 는 `axhub plugin-support tenant-resolve --json` 의 `tenant`, `needs_pick:true` 면 `candidates[]` 에서 고른 `slug` 예요. app target이면 첫 command, fresh면 둘째를 Tool 제목 `앱 설정 확인`으로 한 번 실행해요.
 
 ```bash
 axhub apps get <app> --json
@@ -98,9 +98,9 @@ top-level `git_backend.backend`·`git_backend.source`만 읽어요. app target�
 
 fresh tenant 응답은 추천값이에요. 응답에 `remembered`가 있으면 그 값을 `SELECTED_GIT_BACKEND`로 쓰고 묻지 않아요. 사용자가 최초 발화나 현재 대화에서 GitHub/selfhosted를 이미 명시했다면 그 값을 `SELECTED_GIT_BACKEND`로 써요. 아니면 native Question/명시 텍스트 승인 card로 정확히 `첫 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. tenant 추천값을 첫 옵션에 두고 label 끝에 `(추천)`을 붙이되 반대 선택도 허용해요. card가 안 보일 때만 같은 질문을 chat text로 물어요.
 
-고르면 `axhub apps git-backend --tenant <tenant> --remember <SELECTED_GIT_BACKEND> --json`으로 기억해요 — 다음 세션의 첫 import가 같은 저장 위치로 가요. `--remember`를 모르는 구 CLI면 이 대화 안에서만 유지하고 새 세션 설정이라고 주장하지 않아요. 같은 대화의 bootstrap이 이어지면 다시 묻지 않고 `--git-backend <SELECTED_GIT_BACKEND>`로 전달해요. headless에서 provider 선택이 명시되지 않았으면 provider mutation 전에 `SAFE_STOP_NONINTERACTIVE`로 멈추고 두 선택지와 재개 문장만 보여줘요.
+고르면 `axhub apps git-backend --tenant <tenant> --remember <SELECTED_GIT_BACKEND> --json`으로 기억해요 — 다음 세션의 import·bootstrap·scaffold가 같은 저장 위치로 가요. `--remember`를 모르는 구 CLI면 이 대화 안에서만 유지하고 새 세션 설정이라고 주장하지 않아요. 같은 대화의 bootstrap이 이어지면 다시 묻지 않고 `--git-backend <SELECTED_GIT_BACKEND>`로 전달해요. headless에서 provider 선택이 명시되지 않았으면 provider mutation 전에 `SAFE_STOP_NONINTERACTIVE`로 멈추고 두 선택지와 재개 문장만 보여줘요.
 
-read command 실패나 missing/malformed `git_backend`만 provider 단계 전에 중단 사유예요. app row를 먼저 만들거나 GitHub를 platform default로 추측하거나 tenant C1/Gitea를 직접 호출하지 않아요.
+read 실패·malformed `git_backend`면 provider 단계 전에 멈추고, app row 선생성·GitHub 추측·C1/Gitea 직접 호출은 하지 않아요.
 
 ### 3. Repository provider surface
 
@@ -134,7 +134,7 @@ provider branch를 확정한 뒤 `EFFECTIVE_FIRST_GAP` 하나만 처리하고 �
 
 If the selected handler needs a prompt but D1 safe-stop mode is active, do not execute the mutation. Return `SAFE_STOP_NONINTERACTIVE` with the exact manual command or natural phrase. Filtering provider-only gaps is selection, not a second action; never execute two gap handlers from one detect result.
 
-`cli_path_missing` 은 CLI 가 디스크에 있는데 현재 셸 PATH 에 없는 상태예요. 이미 열린 세션의 PATH 는 밖에서 못 고치므로(OS 설계), repair-path 뒤에 `command -v axhub` 재감지를 반복하지 말고(무한 루프 방지) **repair-path JSON 의 `bin_path` 절대경로로 남은 온보딩 명령을 그대로 이어가요** (예: `"<bin_path>" auth status --json`). detect 의 `cli_resolved_path` 도 같은 절대경로예요. 남은 gap 재감지가 필요하면 `"<bin_path>" plugin-support onboarding-detect --json` 으로 실행하고, 결과에 `cli_path_missing`/`cli_on_path:false` 가 다시 보여도 이미 처리된 것으로 간주하고 다음 gap 으로 넘어가요. `bin_path` 가 없는 구 CLI 면 기존대로 `READY_WITH_USER_ACTION` 으로 "PATH 준비됐어요. 새 터미널을 열고 거기서 Codex 를 실행해 온보딩을 다시 불러 주세요" 라고 안내해요. 새 터미널·VS Code 앱 재시작 안내는 마무리 카드에 보조 문구로 한 번만 붙여요.
+`cli_path_missing` 은 CLI 가 디스크에 있는데 현재 셸 PATH 에 없는 상태예요. repair-path 뒤에 `command -v axhub` 재감지를 반복하지 말고(무한 루프 방지) **repair-path JSON 의 `bin_path` 절대경로로 남은 온보딩 명령을 그대로 이어가요** (예: `"<bin_path>" auth status --json`). detect 의 `cli_resolved_path` 도 같은 절대경로예요. 남은 gap 재감지가 필요하면 `"<bin_path>" plugin-support onboarding-detect --json` 으로 실행하고, 결과에 `cli_path_missing`/`cli_on_path:false` 가 다시 보여도 이미 처리된 것으로 간주하고 다음 gap 으로 넘어가요. `bin_path` 가 없는 구 CLI 면 기존대로 `READY_WITH_USER_ACTION` 으로 "PATH 준비됐어요. 새 터미널을 열고 거기서 Codex 를 실행해 온보딩을 다시 불러 주세요" 라고 안내해요. 새 터미널·VS Code 앱 재시작 안내는 마무리 카드에 보조 문구로 한 번만 붙여요.
 
 ### 5. Telemetry opt-in and Ready card
 

@@ -22,7 +22,7 @@ allows-dependency-execution: true
 
 사용자가 직접 **axhub CLI 와 플러그인을 지금 최신으로** 맞추려는 요청이에요. 사용자가 명시적으로 요청한 순간에만 버전 확인과 적용을 진행해요:
 
-- **항상 즉시 확인** — 사용자가 부른 수동 실행이라 바로 버전을 확인해요.
+- **바로 확인** — 사용자가 부른 수동 실행이라 바로 버전을 확인해요. CLI 의 `--json` 확인은 feed 를 최대 1시간 캐시해서, 그 안에 막 나온 릴리스는 다음 확인에 보여요.
 - **최신이어도 결과 보고** — "이미 최신이에요 (CLI vX, plugin vY)" 처럼 결과를 한 줄로 알려요. 사용자가 물었으니 답을 줘요.
 
 전 과정 best-effort·비차단이에요. 실패·구 CLI·네트워크 오류면 raw 에러를 숨기고 한 줄만 안내한 뒤 멈춰요.
@@ -61,9 +61,7 @@ allows-dependency-execution: true
    - 이 lane 에서도 reference 는 읽지 않아요. 결과 카드와 재시작 안내는 §3·§4 와 똑같이 써요.
    - 사용자에게 목록 실패를 설명하지 않아요. `확인 불가`, `설정 오류`, `설정 복구 후 다시 확인` 같은 문장은 이 lane 에서 쓰지 않아요 — 버전을 읽었으면 평소처럼 결과만 알려줘요.
 
-**`disabled` 와 `AXHUB_NO_AUTO_UPDATE` — 둘 다 존중해요 (자동 적용 안 함, 안내만).**
-- `disabled`(패키지 매니저가 관리하는 설치) → CLI 가 자기를 교체할 수 없어요. 패키지 매니저 업그레이드를 **안내만** 해요.
-- `AXHUB_NO_AUTO_UPDATE` → 문서화된 update kill switch 예요. 새 버전이 있어도 적용하지 않고 **안내만** 해요 (사용자가 직접 불러도요 — 잠긴·CI 환경에서 의도치 않은 binary swap 을 막아요). 받으려면 플래그를 끄거나 안내된 명령을 직접 실행하면 돼요.
+**`disabled` 는 존중해요 (안내만).** `disabled` 는 업데이트 확인을 끈 설정(`AXHUB_DISABLE_AUTOUPDATE` 또는 `~/.axhub/config/disable-autoupdate`)이고, 이때 CLI 는 `latest` 를 비우고 plugin block 을 내지 않아요. `AXHUB_NO_AUTO_UPDATE`·`~/.axhub/config/no-auto-update` 는 백그라운드 자동 업데이트 훅만 꺼요 — 끈 상태의 업데이트 경로가 이 스킬이라(POLICY.md) 평소대로 적용해요.
 
 ---
 
@@ -81,19 +79,18 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
   - (있으면) 플러그인: `plugin: { current, latest, has_update }`
   - `is_downgrade` 는 optional 필드 — 부재(구 CLI 응답)는 false 로 취급해요.
 - 호출이 실패하거나 JSON 이 비면 (구 CLI·네트워크 실패) 한 줄 안내 후 멈춰요: `버전 확인을 못 했어요. 잠시 뒤 다시 시도해 주세요.`
+- `feed_error` 가 있거나 `disabled` 가 아닌데 `latest` 가 비면 CLI 최신 여부를 모르는 거예요 — `has_update == false` 를 최신으로 읽지 않고 CLI 는 위 문구로 말한 뒤, plugin block 이 있으면 플러그인 단계는 이어가요.
 
 ---
 
 ## 2. CLI 업데이트
 
-먼저 **안내-only 조건**을 봐요: `disabled == true` (패키지 매니저 관리 설치) 또는 `AXHUB_NO_AUTO_UPDATE` 설정 또는 `is_downgrade == true` (서버 롤백 배포 — 자동 다운그레이드는 하지 않아요). 하나라도 참이면 적용하지 않고 안내만 해요.
+먼저 **안내-only 조건**을 봐요: `disabled == true` (업데이트 확인 꺼짐) 또는 `is_downgrade == true` (서버 롤백 배포 — 자동 다운그레이드는 하지 않아요). 하나라도 참이면 적용하지 않고 안내만 해요.
 
 사용자가 명시적으로 `플러그인만` 업데이트하고 CLI 는 건드리지 말라고 했으면 `has_update` 여부와 무관하게 `axhub update apply` 를 실행하지 않아요. read-only check 결과만 내부에 보존하고 플러그인 단계로 바로 이어가요. 이 제외 요청을 이유로 플러그인 업데이트까지 멈추면 실패예요.
 
-- **안내-only + `has_update == true`** → 한 줄 안내:
-  - `disabled` → `axhub 는 패키지 매니저가 관리하는 설치예요. 패키지 매니저로 업그레이드해 주세요 (예: brew upgrade axhub).`
-  - `AXHUB_NO_AUTO_UPDATE` → `axhub 새 버전(v<latest>)이 있어요. AXHUB_NO_AUTO_UPDATE 설정이라 자동 적용은 안 해요 — axhub update apply --execute --yes 로 직접 받거나 플래그를 끄면 돼요.`
-- **`has_update == false`** → `axhub 는 이미 최신이에요 (v<current>).` 한 줄.
+- **`disabled == true`** → `axhub 업데이트 확인이 꺼져 있어요 (AXHUB_DISABLE_AUTOUPDATE 또는 ~/.axhub/config/disable-autoupdate). 받으려면 axhub update apply --execute --yes 를 직접 실행해 주세요.` 한 줄.
+- **`has_update == false`** (확인 실패가 아닐 때) → `axhub 는 이미 최신이에요 (v<current>).` 한 줄.
 - **`has_update == true` 이고 안내-only 가 아님** → 알리고 바로 적용해요:
   1. 한 줄: `axhub 새 버전(v<current> → v<latest>)이 나왔어요. 지금 업데이트할게요…`
   2. 실행: `axhub update apply --execute --yes` — 브리지 hop 까지 모든 apply 는 명령 도구 timeout 을 600000ms 로 올려 실행해요(도구 기본 timeout 에 먼저 끊기면 CLI 가 exit 10 을 내지 못해 아래 분기가 돌지 않아요).
@@ -122,8 +119,8 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 
 ```text
 업데이트 결과
-  • CLI: <이미 최신 v X | v X → v Y 업데이트됨 | 패키지 매니저 관리 — 수동 | 업데이트 보류(AXHUB_NO_AUTO_UPDATE) — 수동 | 실패 — 수동 안내>
-  • 플러그인: <이미 최신 vX | vX -> vY 받음 (재시작 필요) | 업데이트 보류(AXHUB_NO_AUTO_UPDATE) — 수동 | 확인 불가 — 수동>
+  • CLI: <이미 최신 v X | v X → v Y 업데이트됨 | 업데이트 확인 꺼짐 — 수동 | 확인 실패 — 다시 시도 | 실패 — 수동 안내>
+  • 플러그인: <이미 최신 vX | vX -> vY 받음 (재시작 필요) | 확인 불가 — 수동>
 ```
 
 확인·비교 결과를 설명하는 영어 디버그 문장이나 raw 확인 줄은 쓰지 않아요. 최종 결과 카드는 위처럼 한국어 항목만 쓰고, 플러그인을 새로 받았으면 `플러그인: vX -> vY 받음 (재시작 필요)` 형태와 재시작 안내만 남겨요.
@@ -150,8 +147,8 @@ axhub update check --plugin-version <PLUGIN_VERSION> --json
 ## NEVER
 
 - NEVER `command -v axhub` 실패 상태에서 재설치를 시도하지 말아요 — 설치는 onboarding 소관이라 안내만 하고 멈춰요.
-- NEVER `disabled == true` 인데 `axhub update apply` 를 실행하지 말아요 — 패키지 매니저 관리 설치는 자기 교체가 안 돼요.
-- NEVER `AXHUB_NO_AUTO_UPDATE` 가 설정됐는데 자동 적용하지 말아요 — 문서화된 update kill switch 라, 사용자가 직접 불러도 안내만 해요.
+- NEVER `disabled == true` 인데 `axhub update apply` 를 실행하지 말아요 — 사용자가 끈 업데이트 확인이라 안내만 해요.
+- NEVER `feed_error`·빈 `latest` 를 "이미 최신" 으로 말하지 말아요 — 확인하지 못한 거예요.
 - NEVER exit 14/66 (보안 검증 실패) 을 무시하고 강제 진행하지 말아요. 하드 스톱이에요.
 - NEVER raw JSON·stderr·내부 device/installation id 를 chat 에 출력하지 말아요.
 - NEVER 플러그인 업데이트를 받고도 재시작 안내를 빼먹지 말아요 — 재시작 전엔 새 버전이 안 떠요.

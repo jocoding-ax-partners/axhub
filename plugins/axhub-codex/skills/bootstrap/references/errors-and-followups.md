@@ -53,7 +53,7 @@ Then offer concise natural next actions:
 
 Never show raw JSON/stderr unless `AXHUB_INIT_VERBOSE=1`. Map failures:
 
-- `conflict` / `ambiguous_installation` / CLI exit 9: show install_url if available, ask owner again with the GitHub account picker, then retry Step 7 with the same idempotency key and `--github-owner "$GITHUB_OWNER"`. In non-interactive mode, retry only if `AXHUB_GITHUB_OWNER` exists; otherwise stop with `취소`.
+- `conflict` / `ambiguous_installation` / CLI exit 9: show install_url if available, ask owner again with the GitHub account picker, then retry the Step 9 execute with the same idempotency key and `--github-owner "$GITHUB_OWNER"`. In non-interactive mode, retry only if `AXHUB_GITHUB_OWNER` exists; otherwise stop with `취소`.
 - `github.installation_missing` / `github.repo_create_failed`: say `GitHub 연결 다시 해줘` and preserve resume phrase.
 - `validation.template_not_found`: go back to backend template list.
 - `validation.slug_collision`: go back to app name/slug once.

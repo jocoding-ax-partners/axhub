@@ -10,8 +10,8 @@
 
 ## Direct update
 
-- CLI 응답에 plugin block 이 없으면 구 CLI이므로 이 단계를 생략해요.
-- `AXHUB_NO_AUTO_UPDATE` 면 적용하지 않고 `axhub 플러그인 새 버전(v<latest>)이 있어요. AXHUB_NO_AUTO_UPDATE 설정이라 자동 적용은 안 해요 — 안내된 명령으로 직접 받거나 플래그를 끄면 돼요.`라고 안내해요.
+- CLI 응답에 plugin block 이 없으면 구 CLI 이거나 `disabled`(업데이트 확인 꺼짐)라 이 단계를 생략하고, 결과 카드 플러그인 줄은 `확인 불가 — 수동` 이에요.
+- `AXHUB_NO_AUTO_UPDATE`·`~/.axhub/config/no-auto-update` 는 백그라운드 자동 업데이트 훅만 꺼요 — 사용자가 부른 이 단계는 그대로 적용해요.
 - 업데이트가 필요하고 적용 가능하면 아래 순서로 처리해요.
 
 1. `axhub 플러그인 새 버전(v<current> → v<latest>)이 나왔어요. 지금 받을게요…`라고 말해요.

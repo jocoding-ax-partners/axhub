@@ -172,7 +172,7 @@ describe("smooth behavior contracts", () => {
     expect(deploy).toContain("NEVER call `axhub deploy watch`");
     expect(deploy).toContain("bounded `axhub deploy verify \"$DEPLOY_ID\" --app \"$APP_ID\"` loop");
     // AP-16 대기 수단 우선: verify 연타 폴링 대신 CLI 내부 대기 단일 호출.
-    expect(deploy).toContain("--wait --wait-interval 20s --wait-timeout 10m --json");
+    expect(deploy).toContain("--wait --wait-interval 20s --wait-timeout 9m --json");
     expect(deploy).toContain("권한 카드 한 번으로 끝나는");
     expect(deploy).toContain("연타 폴링은 UX 실패예요");
     expect(deploy).toContain("capabilities.import.verify_wait");
@@ -244,7 +244,7 @@ describe("smooth behavior contracts", () => {
     expect(importSkill).toContain("axhub --json plugin-support import --mode execute --approved");
     expect(importSkill).toContain('axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"');
     expect(importSkill).toContain("권한 카드 한 번으로 끝나는");
-    expect(importSkill).toContain("--wait --wait-interval 20s --wait-timeout 10m --json");
+    expect(importSkill).toContain("--wait --wait-interval 20s --wait-timeout 9m --json");
     expect(importSkill).toContain("GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 반드시 `$APP_SLUG` 와 정확히 같게 둬요");
     expect(importSkill).toContain("같은 verify 를 반복 호출하거나");
     expect(importSkill).toContain("existing_axhub_app_repair");

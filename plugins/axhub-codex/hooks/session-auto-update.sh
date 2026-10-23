@@ -13,7 +13,8 @@
 HOST=codex
 [ -n "$AXHUB_NO_AUTO_UPDATE" ] && exit 0
 [ -f "$HOME/.axhub/config/no-auto-update" ] && exit 0
-{ [ -e "${CLAUDE_PLUGIN_ROOT}/../../.git" ] || [ -e "${CLAUDE_PLUGIN_ROOT}/.git" ]; } && exit 0
+# dev 가드 — 번들이 싣지 않는 scripts/ 로 판정해요 (모노레포는 ../../.git 이 없어요).
+{ [ -e "${CLAUDE_PLUGIN_ROOT}/../../scripts/build-plugin-bundle.ts" ] || [ -e "${CLAUDE_PLUGIN_ROOT}/scripts/build-plugin-bundle.ts" ]; } && exit 0
 
 BIN=""
 if command -v axhub >/dev/null 2>&1; then
@@ -60,8 +61,8 @@ log_line() {
   fi
 }
 
-# 1) 버전 확인 1회 — --field-expr 로 공백 구분 7필드 한 줄을 받아요.
-FIELDS='[.current,.has_update,.latest,.disabled,.is_downgrade,.plugin.has_update,.plugin.latest]|map(tostring)|join(" ")'
+# 1) 버전 확인 1회 — `|` 구분 7필드예요. 공백 구분은 빈 latest(disabled·feed 장애)가 접혀 밀려요.
+FIELDS='[.current,.has_update,.latest,.disabled,.is_downgrade,.plugin.has_update,.plugin.latest]|map(tostring)|join("|")'
 if [ -n "$PV" ]; then
   OUT=$("$BIN" update check --plugin-version "$PV" --field-expr "$FIELDS" 2>/dev/null); RC=$?
 else
@@ -71,16 +72,17 @@ if [ "$RC" -eq 64 ]; then
   # 구 CLI (--field-expr 없음): --json 원문에서 top-level 만 뽑고 플러그인은 다음 주기로 미뤄요.
   RAW=$("$BIN" update check --json 2>/dev/null | tr -d '\n\r ' | sed 's/"plugin":{[^}]*}//')
   json_field() { printf '%s' "$RAW" | sed -n "s/.*\"$1\":\"\{0,1\}\([^\",}]*\)\"\{0,1\}.*/\1/p"; }
-  OUT="$(json_field current) $(json_field has_update) $(json_field latest) $(json_field disabled) $(json_field is_downgrade) false -"
+  OUT="$(json_field current)|$(json_field has_update)|$(json_field latest)|$(json_field disabled)|$(json_field is_downgrade)|false|-"
   RC=0
 fi
 CUR=""; HAS=""; LATEST=""; DIS=""; DOWN=""; PHAS=""; PLAT=""
 if [ "$RC" -eq 0 ]; then
-  read -r CUR HAS LATEST DIS DOWN PHAS PLAT <<EOT
+  IFS='|' read -r CUR HAS LATEST DIS DOWN PHAS PLAT <<EOT
 $OUT
 EOT
 fi
-if [ -z "$CUR" ] || [ -z "$LATEST" ] || [ -z "$PLAT" ]; then
+# plugin 블록이 없어도 7번째 필드는 "null" 이라 PLAT 가 비면 필드가 모자란 거예요.
+if [ -z "$CUR" ] || [ -z "$PLAT" ]; then
   # 침묵을 최신으로 읽지 않아요 — 실패는 log 에 남기고 다음 주기에 다시 봐요.
   log_line "CHECK_FAILED rc=$RC"
   exit 0
@@ -109,11 +111,15 @@ EOT
 BRIDGE=v0.44.2
 BRIDGE_FEED=https://cli.axhub.ai/identity-bridge
 
-# 2) CLI apply — disabled(패키지 매니저 관리)·downgrade(서버 롤백)·같은 버전의
-# 보안 halt 는 건너뛰어요. 판정은 exit 코드로만 해요.
+# 2) CLI apply — disabled·feed 장애(빈 latest)·downgrade·같은 버전 보안 halt 는 건너뛰고,
+# 플러그인 단계는 이어가요. 판정은 exit 코드로만 해요.
 CLI_RESULT="UP_TO_DATE cli=$CUR"
 NOTICE=""
-if [ "$HAS" = true ]; then
+if [ "$DIS" = true ]; then
+  CLI_RESULT="SKIP_DISABLED cli=$CUR"
+elif [ -z "$LATEST" ]; then
+  CLI_RESULT="CHECK_FAILED cli=$CUR reason=cli_feed"
+elif [ "$HAS" = true ]; then
   # 브리지 경유면 halt 키에 경유를 붙여요 — 키가 latest 를 품어서, 브리지의 일시적
   # 검증 실패도 새 latest 가 나오면 다시 시도해요.
   VIA=""
@@ -121,9 +127,7 @@ if [ "$HAS" = true ]; then
     VIA="$BRIDGE"
   fi
   KEY="$LATEST${VIA:+ via $VIA}"
-  if [ "$DIS" = true ]; then
-    CLI_RESULT="SKIP_DISABLED cli=$CUR latest=$LATEST"
-  elif [ "$DOWN" = true ]; then
+  if [ "$DOWN" = true ]; then
     CLI_RESULT="SKIP_DOWNGRADE cli=$CUR latest=$LATEST"
   elif [ -f "$HALT" ] && [ "$(cut -d'|' -f1 "$HALT" 2>/dev/null)" = "$KEY" ]; then
     CLI_RESULT="SKIP_HALTED latest=$LATEST${VIA:+ via=$VIA}"

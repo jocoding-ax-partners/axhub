@@ -1,13 +1,17 @@
 #!/usr/bin/env bun
 // Release Step 2/2 — narrative 검증 후 tag 생성 + push.
 // Step 1 (`bun run release`) 는 .versionrc.json `skip.tag=true` 로 bump+commit
-// 만 생성해요. 사람이 CHANGELOG narrative 추가 + `git commit --amend -a` 한 후
-// 본 스크립트로 tag 를 amended HEAD 에 생성해요. 옛 flow 의 "tag 가 amend
-// 전 commit 가리켜서 release.yml 이 narrative 빈 채로 fire" 버그 회귀 방지용.
+// 만 생성해요. 사람이 CHANGELOG narrative 추가 + `git commit --amend -a` 후 PR 을
+// main 에 머지하고, 머지된 main 에서 본 스크립트로 release commit 에 tag 를 만들어요.
+// tag 가 narrative 없는 commit 을 가리키면 `plugin · release` 가 빈 릴리스 노트를
+// 만들어서 막아요. tag push 로 도는 워크플로는 없어요 — 미러·릴리스는 끝에 출력하는
+// 명령으로 손으로 실행해요 (docs/policy/dev-policy.md DP-4).
 
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { extractChangelogSection } from "./changelog-section.ts";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 
@@ -39,15 +43,13 @@ if (existing) {
 }
 
 const changelog = readFileSync(join(REPO_ROOT, "CHANGELOG.md"), "utf8");
-const escapedVersion = version.replace(/\./g, "\\.");
-const sectionRe = new RegExp(`^## \\[${escapedVersion}\\][^\\n]*\\n([\\s\\S]*?)(?=^## \\[|\\Z)`, "m");
-const match = changelog.match(sectionRe);
-if (!match) {
+const section = extractChangelogSection(changelog, version);
+if (section === null) {
   console.error(`[release:tag] CHANGELOG.md 에 '## [${version}]' 섹션 없어요.`);
   process.exit(1);
 }
 
-const body = match[1].trim();
+const body = section.trim();
 const bodyWithoutAutoSections = body
   .split("\n")
   .filter((line) => !/^### (Added|Fixed|Changed|Docs|Performance)/.test(line) && !/^\* /.test(line))
@@ -97,4 +99,7 @@ console.log(`[release:tag] git push origin main + ${tag} 실행해요.`);
 sh("git push origin main");
 sh(`git push origin ${tag}`);
 
-console.log(`[release:tag] 완료. release.yml 이 ${tag} push 로 fire 돼서 release body + Slack narrative 가 정상이에요.`);
+console.log(`[release:tag] 완료. tag push 로 도는 워크플로는 없어요 — 아래 순서로 실행해야 사용자에게 나가요 (docs/policy/dev-policy.md DP-4).`);
+console.log(`  1. gh workflow run repo-mirror.yml --ref ${tag} -f target=plugin -f dry_run=true`);
+console.log(`  2. gh workflow run repo-mirror.yml --ref ${tag} -f target=plugin -f dry_run=false   # 로그에 'axhub: 머지 완료' 확인`);
+console.log(`  3. gh workflow run plugin-release.yml -f tag=${tag}   # 미러 머지 뒤 mono GitHub release + Slack`);

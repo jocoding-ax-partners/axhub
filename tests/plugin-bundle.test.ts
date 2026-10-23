@@ -62,8 +62,11 @@ describe("clean plugin bundle", () => {
       expect(stats.files).toBeGreaterThan(8);
       // 개발 산출물(node_modules·dist 등)이 섞이면 MB 단위로 커져요 — 이 상한은 그걸 잡는
       // sanity 값이에요. 512 KiB → 544 KiB: cli-feedback 후속(#405·#387·#386·#830·#832·#455)의
-      // 스킬·reference 안내가 늘어 실측 약 527 KB 가 됐어요.
-      expect(stats.bytes).toBeLessThan(544 * 1024);
+      // 스킬·reference 안내가 늘어 실측 약 527 KB 가 됐어요. 544 KiB → 576 KiB: WP-I1
+      // (P1-13·P2-33~P3-47) 의 skill·reference 안내(verify 대기 timeout, update 판정, 작업공간
+      // 선택·scaffold placeholder reference 등)로 약 12 KB 늘었고, WP-H 가
+      // skills/plugins/references/publish.md 를 더해요.
+      expect(stats.bytes).toBeLessThan(576 * 1024);
 
       expect(existsSync(join(outDir, ".claude-plugin", "plugin.json"))).toBe(true);
       expect(existsSync(join(outDir, "README.md"))).toBe(true);

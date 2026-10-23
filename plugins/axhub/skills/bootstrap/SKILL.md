@@ -14,7 +14,6 @@ model: sonnet
 새 앱 생성과 배포 목표는 받은 상태예요. execute 승인은 별도라서 아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행하고, `진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요.
 인증 전: 기존=`axhub apps get <app> --json`; resume=`state.git_backend` 우선(없을 때만 app lookup); fresh=`axhub apps git-backend --tenant <tenant> --json` 추천 뒤 `GitHub`/`Axhub self-hosted` 선택. dry-run·state·execute=`--git-backend github|selfhosted`. `git_backend.backend=selfhosted`는 GitHub 계정·device flow·App·owner 질문 0회.
 
-
 중단 뒤 이어질 때도 CLI 명령이 하나도 실행되지 않았다면 fresh path 를 그대로 시작해요. 다시 시작 문구를 요구하지 않아요.
 
 `If you need an app name or template, choose a reasonable one yourself`, `choose whatever is reasonable`, `pick the best template/name`, `deploy it for real`, `put it online`, `do it for real` 는 목표·추천 허용일 뿐이에요. 템플릿 선택 카드, 앱 이름 확인 카드, dry-run 뒤 `진행` 확인은 절대 생략하지 않아요.
@@ -37,7 +36,7 @@ creation path는 `axhub apps bootstrap` saga 하나뿐이에요. GitHub 차단 �
 - Tool/Bash 제목은 한국어 명사구로 쓰고 반드시 한글로 시작해요. 제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목, `실행 중 명령`, `명령 실행` 금지.
 - 제목: `CLI 준비 확인`, `작업공간 확인`, `앱 설정 확인`, `템플릿 목록 확인`, `저장소 계정 확인`, `앱 이름 확인`, `앱 주소 확인`, `앱 생성 미리보기`, `계정 인증 시작`, `인증 확인`, `앱 생성 상태 확인`, `배포 상태 확인`, `검증 확인`.
 - `rtk` 같은 개발자 전용 CLI 래퍼는 이 skill 에서 절대 쓰지 않아요. `pwd`, `ls`, `find`, `cat`, `curl` 같은 generic shell probe 대신 `axhub` CLI 표면만 써요.
-- Desktop-visible command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수, `export`, command substitution, semicolon chain 없이 literal flag 로 넣어요. execute/resume 명령에는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` 을 붙이지 않아요 — 이 prefix 가 붙으면 CLI 가 코드를 돌려주는 대신 블로킹 폴링으로 들어가서 tool call 이 끝나지 않고, 사용자는 빈 GitHub 코드 화면만 봐요. 이 prefix 는 즉시 끝나는 `github link` fast path 에서만 써요.
+- Desktop-visible command 는 한 tool call 에 하나의 직접 CLI 호출만 넣어요. 이미 고른 값은 shell 변수, `export`, command substitution, semicolon chain 없이 literal flag 로 넣어요. execute/resume 명령에는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1` 을 붙이지 않아요 — 블로킹 폴링으로 tool call 이 안 끝나요. 이 prefix 는 즉시 끝나는 `github link` fast path 에서만 써요.
 - 배포 상태 대기/확인도 예외가 아니에요: `Monitor`, `ScheduleWakeup`, background watch 와 `for`, `while`, `until`, `sleep`, `grep`, `head`, `tail`, `cut`, `awk`, `sed`, `jq` polling/파싱 금지. CLI 내부 대기인 `deploy verify --wait` 는 이 금지에 걸리지 않고 오히려 우선이에요. fallback 으로 상태를 다시 볼 때는 별도 tool call 로 `axhub deploy status <deployment-id> --tenant <tenant> --json` 한 명령만 실행. `until axhub ... | grep ...`, `axhub ... | head ...` 같은 권한 요청창이 뜨는 긴 shell watch 는 UX 실패예요. 성공/실패 판정은 shell text parsing 이 아니라 tool output JSON 을 읽어서 해요. deployment id 를 알면 terminal/verify 완료 전 응답을 끝내지 않아요. 단, 상태 확인 tool call 의 폴링 예산은 최대 30회 또는 10분(AP-16)이에요 — 예산에 먼저 닿으면 실패 선언 없이 `아직 진행 중이에요` 와 재개 명령(`axhub deploy status <deployment-id> --tenant <tenant> --json`)을 남기는 재개 요약으로 응답을 끝내고 deployment id 를 보존해요. 이 예산 종료가 앞 규칙의 유일한 예외예요.
 - Echo 금지: `bootstrap_id`, `deployment_id`, `idempotency_key`, `device_code`.
 - 사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL; Markdown URL 링크 문법은 전부 금지; 도메인-only target 금지: `[https://x](https://x)`, `[열기](https://x)`, `<https://x>`.
@@ -50,12 +49,12 @@ creation path는 `axhub apps bootstrap` saga 하나뿐이에요. GitHub 차단 �
 실제 순서:
 
 1. CLI guard: `axhub plugin-support preflight --json`.
-2. Resume/workspace: `axhub plugin-support init-resume route --json`, then `axhub plugin-support tenant-resolve --field-expr '.tenant // empty'`.
+2. Resume/workspace: `axhub plugin-support init-resume route --json`, then `axhub plugin-support tenant-resolve --json`.
 3. Template registry: `axhub apps templates list --tenant <tenant-slug> --json`.
 4. Template picker: backend registry 에 있는 값만 고르고, native 질문 card 로 먼저 물어요.
 5. App name: 앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요.
-6. Git backend: persisted 선택을 재사용하거나 tenant 추천값에서 확정해요. selfhosted는 GitHub App gate를 건너뛰고, GitHub만 `axhub github accounts list --json`를 실행해요.
-7. Availability check: `axhub apps check-availability --tenant <tenant> --slug <app-slug> --subdomain <app-slug> --json`.
+6. Git backend: persisted·`remembered` 선택을 재사용하거나 tenant 추천값에서 확정해요. selfhosted는 GitHub App gate를 건너뛰고, GitHub만 `axhub github accounts list --json`를 실행해요.
+7. Availability check: 7단계 명령으로 slug·subdomain 확인.
 8. Dry-run preview: backend에 맞는 `axhub apps bootstrap ... --dry-run --json`.
 9. Preview confirmation: 사용자가 `진행`을 고른 뒤에만 execute 해요.
 10. Execute saga: backend에 맞는 `axhub --no-input apps bootstrap ... --execute --idempotency-key <literal>`.
@@ -75,7 +74,7 @@ preflight의 `capabilities.self_hosted_git.apps_git_backend`와 `capabilities.se
 
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
 
-command not found 여도 곧바로 onboarding 으로 돌리지 않아요 — 낡은 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS 에서도 흔해요. 같은 제목으로 `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` 을 한 번 더 실행하고, 나온 `bin_path`(없으면 그 canonical 경로)로 preflight 부터 다시 실행해요. 그 명령까지 파일 없음이면 onboarding 안내 후 stop. `plugin-support` unknown/빈 출력이면 update 안내 후 stop, 정상 JSON 이면 계속해요. raw stderr 는 보여주지 않아요. shell 에서 CLI 버전 숫자를 직접 파싱·비교하지 않아요.
+command not found 여도 곧바로 onboarding 으로 돌리지 않아요. 같은 제목으로 `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` 을 한 번 더 실행하고, 나온 `bin_path`(없으면 그 canonical 경로)로 preflight 부터 다시 실행해요. 그 명령까지 파일 없음이면 onboarding 안내 후 stop. `plugin-support` unknown/빈 출력이면 update 안내 후 stop, 정상 JSON 이면 계속해요. raw stderr 는 보여주지 않아요.
 
 ### 2. Resume And Workspace
 
@@ -86,14 +85,13 @@ axhub plugin-support init-resume route --json
 ```
 `watch_status`/`resume_last`: `state.git_backend` 우선; 없을 때만 `axhub apps get <app> --json`, 실패면 중단. selfhosted는 ownerless status/resume, GitHub/`legacy_github`만 emitted command.
 
-
-`watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 새 폴더/새 앱 요청이거나 `새로 시작`이면 이전 상태를 무시하고 template 질문으로 이어가요. fresh 이면 reference 를 읽지 않아요.
+`watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 새 폴더/새 앱 요청이거나 `새로 시작`이면 이전 상태를 무시하고 template 질문으로 이어가요.
 
 ```bash
-axhub plugin-support tenant-resolve --field-expr '.tenant // empty'
+axhub plugin-support tenant-resolve --json
 ```
 
-반환된 tenant slug 는 `--tenant <literal>` 로 넘겨요. 사용자에게는 tenant/테넌트라고 말하지 말고 `작업공간`이라고 말해요. 여러 작업공간이면 `새 앱을 어느 작업공간에 만들까요?`라고 물어요. 선택한 값은 `.axhub/state/tenant.json` 같은 로컬 파일로 저장하지 않아요.
+`needs_pick:false` 면 `tenant`, `true` 면 `candidates[]` 로 `새 앱을 어느 작업공간에 만들까요?`라고 물어 고른 `slug` 를 `--tenant <literal>` 로 넘겨요(같은 대화에서 고른 값 우선). 사용자에게는 tenant/테넌트라고 말하지 말고 `작업공간`이라고 말해요. 선택한 값은 `.axhub/state/tenant.json` 같은 로컬 파일로 저장하지 않아요. resume state 엔 작업공간이 없어 status/resume 명령에도 이 값을 `--tenant` 로 붙이고, 못 찾으면(exit 5·8) 다른 `candidates` 를 다 본 뒤에만 새로 시작해요.
 
 ### 3. Template Registry
 
@@ -134,9 +132,9 @@ axhub apps get <app> --json
 axhub apps git-backend --tenant <tenant> --json
 ```
 
-top-level `git_backend.backend`·`git_backend.source`만 읽어요. app source는 `tenant_default|app_override|legacy_github`, tenant 응답 source는 `tenant|platform_default`예요. Gitea/C1/remote는 보지 않고 실패·malformed면 멈춰요.
+top-level `git_backend.backend`·`git_backend.source`·`remembered`만 읽어요. app source는 `tenant_default|app_override|legacy_github`, tenant 응답 source는 `tenant|platform_default`예요. Gitea/C1/remote는 보지 않고 실패·malformed면 멈춰요.
 
-발화나 같은 대화에 backend가 있으면 쓰고, 없으면 native Question/AskUserQuestion card로 `이 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. 추천과 다른 선택도 허용해요. provider 선택이 명시되지 않은 headless는 mutation 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
+발화나 같은 대화에 backend가 있으면 쓰고, 다음은 `remembered`(onboarding 이 `--remember` 로 남긴 값), 없으면 native Question/AskUserQuestion card로 `이 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. 추천과 다른 선택도 허용해요. provider 선택이 명시되지 않은 headless는 mutation 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
 
 `SELECTED_GIT_BACKEND`를 dry-run, `init-resume put`, execute에 `--git-backend github|selfhosted`로 넣어요.
 
@@ -198,7 +196,7 @@ axhub --no-input apps bootstrap --git-backend github --template nextjs-axhub --n
 
 **코드가 안 보인 채 execute 가 끝났을 때 (AP-18).** 출력 없이 실패·거부·중단됐는데 브라우저 device 화면이 열렸으면 같은 `--execute` 를 절대 다시 실행하지 않아요 — 새 device code 를 발급해 사용자가 보고 있는 코드를 무효로 만들어요. 즉시 끝나는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link`(제목 `계정 인증 시작`)로 코드를 받아 위 두 줄을 본문에 먼저 쓰고, 같은 turn 에 `인증 확인` 단일 `axhub github accounts list --json` 뒤 `--resume-last` 로 이어가요. 코드를 보여주기 전에 `인증 확인` 을 먼저 실행하거나, 코드만 보여주고 응답을 끝내면 실패예요. 단 그 코드를 놓쳤거나 만료됐으면 fast path 를 반복하지 않고 `github link --fresh` 로 새 코드를 받아 두 줄을 다시 써요 — 저장된 pending link 는 죽은 코드를 그대로 돌려줘요. 유효한 코드가 화면에 있으면 붙이지 않아요(무효가 돼요).
 
-execute/status 가 `deployment_id` 와 빌드/실행중 상태를 주면, preflight 의 `capabilities.import.verify_wait` 가 true 일 때 **권한 카드 한 번으로 끝나는** `axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 10m --json` 를 정확히 한 번 호출해 terminal 까지 봐요. `--wait` 가 성공·실패·예산 제한(최대 30회 또는 10분, AP-16)까지 책임지므로 같은 verify 나 `배포 상태 확인` 을 연달아 호출하지 않아요 — 대기 수단 없이 같은 exit 6 을 화면에 쌓는 연타 폴링은 UX 실패예요. capability 가 없는 구 CLI 에서만 `배포 상태 확인` tool call 을 폴링 예산 안에서 반복하고 성공 뒤 `axhub deploy verify <deployment-id> --app <app> --json` 를 실행해요. 예산에 닿으면 재개 요약으로 끝내요. verify 성공 전 최종 성공 문구 금지, `잠시 후 확인해보세요` 로 끝내기 금지.
+execute/status 가 `deployment_id` 와 빌드/실행중 상태를 주면, preflight 의 `capabilities.import.verify_wait` 가 true 일 때 `axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 9m --json` 를 정확히 한 번 호출해 terminal 까지 봐요. 명령 도구 timeout 을 600000ms 로 올려 실행해요(CLI 대기 9분이 도구 한도 안에서 끝나요). 같은 verify 나 `배포 상태 확인` 을 연달아 호출하지 않아요 — 대기 수단 없이 같은 exit 6 을 화면에 쌓는 연타 폴링은 UX 실패예요. exit 6·10 이나 도구 timeout 으로 끊기면 실패로 말하지 않고, 재개 요약과 같은 verify 명령 한 줄만 남겨요(deployment id 보존). capability 가 없는 구 CLI 에서만 `배포 상태 확인` tool call 을 폴링 예산 안에서 반복하고 성공 뒤 `axhub deploy verify <deployment-id> --app <app> --json` 를 실행해요. 예산에 닿으면 재개 요약으로 끝내요. verify 성공 전 최종 성공 문구 금지, `잠시 후 확인해보세요` 로 끝내기 금지.
 
 ### 9.1 Desktop Error Recovery
 
@@ -229,7 +227,7 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 
 `<target>`/`<repo>`은 literal이에요. target 채운 뒤 추가 `rtk ls`, `ls`, `find`, `cat` probe 금지. GitHub fetch 권한 실패는 **12단계**로 가요.
 
-성공하면 확정한 repository `cwd`에서 `axhub deploy --explain --json`을 실행해요. 외부 reference 권한은 요구하지 말고 확보한 값·CLI로 마무리해요.
+성공하면 확정한 repository `cwd`에서 `axhub deploy --explain --json`을 실행해요.
 
 ### 11. Result
 
@@ -239,26 +237,22 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 
 ### 12. GitHub 이 막혔을 때 — 로컬 소스로 배포
 
-어느 지점이든 GitHub 때문에 못 나가면 빈손으로 돌려보내지 않아요. 일시적 실패
-(네트워크·타임아웃·5xx)는 그 단계를 한 번만 재시도하고, 그래도 막히면 **묻지 않고**
-아래를 그대로 해요. 이 절차는 본문만으로 완결돼요 — reference 는 plugin cache 라
-읽기 권한 프롬프트가 뜨므로, 읽히면 좋고 못 읽어도 여기서 끝냅니다.
+어느 지점이든 GitHub 때문에 못 나가면 빈손으로 돌려보내지 않아요. 일시적 실패(네트워크·타임아웃·5xx)는 그 단계를 한 번만 재시도해요. 설치 계정 0개는 이 갈래가 아니라 6단계 설치 확인(`GitHub App 설치를 끝냈을까요?`)이고, headless 는 만들거나 배포하지 않고 이유와 재개 문장만 남기고 멈춰요. reference 를 못 읽어도 이 본문만으로 끝내요.
 
-1. 한 줄 알리고 바로 진행: `GitHub 연결에 실패해서 우선 로컬 소스로 배포할게요. GitHub 는 이후 다시 연결할 수 있어요` (저장소는 있는데 권한만 없으면 `권한이 풀리면 평소대로 push 배포를 쓸 수 있어요`)
-2. 앱이 이미 있는지 확인해요 — saga 가 조금이라도 돌았으면 앱만 만들어졌을 수 있어요. `axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json` 또는 `axhub apps get <app-slug> --tenant <tenant> --json`. 있으면 3 을 건너뛰고 slug 는 확인된 값을 써요.
-3. 앱이 없으면 주소 확인(7단계) 후 만들어요 — `axhub apps create --tenant <tenant> --name <이름> --slug <slug> --subdomain <slug> --deploy-method docker --resource-tier XS`
+1. 한 줄 알려요: `GitHub 연결에 실패해서 우선 로컬 소스로 배포할게요. GitHub 는 이후 다시 연결할 수 있어요` (저장소는 있는데 권한만 없으면 `권한이 풀리면 평소대로 push 배포를 쓸 수 있어요`)
+2. 앱이 이미 있는지 확인해요(saga 가 앱만 만들었을 수 있어요) — `axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json` 또는 `axhub apps get <app-slug> --tenant <tenant> --json`. 있으면 3 을 건너뛰고 slug 는 확인된 값을 써요.
+3. 앱이 없으면 주소 확인(7단계) 뒤 템플릿·이름·slug·작업공간과 저장소 없이 만든다는 점을 보여주고, 8단계와 같은 `지금 만들고 배포까지 진행할까요?`(`진행`/`취소`)에 `진행`을 받은 뒤에만 만들어요 — `axhub apps create --tenant <tenant> --name <이름> --slug <slug> --subdomain <slug> --deploy-method docker --resource-tier XS`
 4. 코드가 폴더에 없으면 공개 템플릿에서 받아요(인증 불필요) — `git clone --depth 1 --branch main https://github.com/jocoding-ax-partners/axhub-template.git <target>/.axhub-template` → `cp -R <target>/.axhub-template/<template-id>/. <target>/` → `rm -rf <target>/.axhub-template`. 지우는 경로는 정확히 그 임시 폴더 하나뿐이에요.
-5. **placeholder 치환 (템플릿을 받았을 때 필수).** 정상 bootstrap 은 서버가 push 전에 치환하지만 이 갈래는 그 단계가 없어요. 건너뛰면 앱이 `'{{API_BASE}}'` 라는 글자 그대로 API 를 불러 **로그인·데이터 연동만 조용히 죽어요**(화면은 떠요). `grep -rl '{{' <target>` 로 찾은 파일들의 6개 토큰을 전부 바꿔요 — `{{APP_SLUG}}`→slug · `{{APP_SUBDOMAIN}}`→subdomain · `{{APP_NAME}}`→앱 이름 · `{{TENANT}}`→테넌트 slug · `{{API_BASE}}`→CLI 가 쓰는 API 주소(prod `https://axhub.ai`) · `{{APP_ORIGIN}}`→`apps get` 의 `access_url`. `axhub.yaml` 의 `name:` 도 앱 slug 로 바꿔요.
+5. **placeholder 치환 (템플릿을 받았을 때 필수).** 서버 치환 단계가 없는 갈래라 건너뛰면 **로그인·데이터 연동만 조용히 죽어요**. `grep -rl '{{' <target>` 로 찾은 파일들의 6개 토큰을 전부 바꿔요 — `{{APP_SLUG}}`→slug · `{{APP_NAME}}`→앱 이름 · `{{TENANT}}`→작업공간 slug(`tenant` 가 id 면 `axhub auth status --json` `tenants[]` 의 `tenant_slug`) · `{{API_BASE}}`→CLI 가 쓰는 API 주소(prod `https://api.axhub.ai`) · `{{APP_SUBDOMAIN}}`·`{{APP_ORIGIN}}`→`apps get` 의 `subdomain`·`access_url`. `axhub.yaml` 의 `name:` 도 앱 slug 로 바꿔요.
 6. 배포는 `up` 소유 — Skill 도구로 호출하거나, 없으면 `skills/up/SKILL.md` 2단계부터 여기서 수행해요(앱만 만들고 끝내지 않아요)
 7. 결과 확인은 11단계 그대로. clone 단계는 건너뛴 상태예요.
 
-상세·주의점은 [`references/github-blocked-local-deploy.md`](references/github-blocked-local-deploy.md)
-에 있어요(compose 는 루트 `Dockerfile` 이 같이 있으면 docker 로 해석되는 함정 포함).
+상세는 `references/github-blocked-local-deploy.md` 예요(루트 `Dockerfile`+compose 함정 포함).
 
 ## NEVER
 
 - NEVER GitHub App 미설치 상태에서 bootstrap dry-run/execute.
-- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회. **단 12단계(GitHub 차단)의 세 조건을 전부 충족한 경우만 예외**예요 — 그때도 이 스킬은 `apps create` 만 쓰고 배포는 `up` 으로 양보해요.
+- NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회. **단 12단계(GitHub 차단)에서 `진행` 확인을 받은 경우만 예외**예요 — 그때도 이 스킬은 `apps create` 만 쓰고 배포는 `up` 으로 양보해요.
 - NEVER remote `templates.json` / 폐기된 fetch-template 사용.
 - NEVER subprocess/headless 에서 template/app name 임의 선택.
 - NEVER `--execute` 를 `--dry-run` 미리보기와 사용자 확인 없이 호출.

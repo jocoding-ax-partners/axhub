@@ -49,7 +49,7 @@
     }
   ],
   "scripts": {
-    "postchangelog": "echo '\\n[release step 1/2 완료] CHANGELOG bump commit 생성됨 (tag 미생성).\\n\\n다음:\\n  1. CHANGELOG.md 의 ## [신버전] 섹션 아래에 해요체 narrative paragraph 추가\\n  2. git commit --amend --no-edit -a  (narrative 를 bump commit 에 흡수)\\n  3. bun run release:tag  (HEAD 에 tag 생성 + push --tags)\\n\\nrelease.yml 은 step 3 의 tag push 가 narrative 포함된 commit 가리킬 때 fire 돼서 GitHub release body 가 비지 않아요.'"
+    "postchangelog": "echo '\\n[release step 1/2 완료] CHANGELOG bump commit 생성됨 (tag 미생성).\\n\\n다음:\\n  1. CHANGELOG.md 의 ## [신버전] 섹션 아래에 해요체 narrative paragraph 추가\\n  2. git commit --amend --no-edit -a  (narrative 를 bump commit 에 흡수) → PR 을 올려 main 에 머지\\n  3. 머지된 main 에서 bun run release:tag  (release commit 에 plugin-vX.Y.Z tag 생성 + push)\\n  4. gh workflow run repo-mirror.yml --ref <tag> -f target=plugin -f dry_run=true → 같은 명령을 dry_run=false 로  (공개 레포 main 반영)\\n  5. gh workflow run plugin-release.yml -f tag=<tag>  (mono GitHub release + Slack)\\n\\ntag push 로 도는 워크플로는 없어요. 4 의 미러가 머지되기 전에는 사용자에게 아무것도 나가지 않아요 (docs/policy/dev-policy.md DP-4).'"
   },
   "skip": {
     "commit": false,

@@ -20,9 +20,9 @@ model: sonnet
 
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
 
-bootstrap 과의 차이 하나뿐이에요: bootstrap 은 axhub 이 저장소를 만들어 주고(봇 소유 생성 — org 에서 주인 권한이 자동으로 안 붙을 수 있어요), 이 스킬은 **사용자 연동 계정으로 사용자의 계정/조직에** 저장소를 만들어요. 생성자가 곧 주인이라 그 권한 문제가 구조적으로 없어요. 저장소 생성만 CLI(`axhub github repo create`, v0.30.0+)가 하고 clone·커밋은 git 이에요. 앱 생성·연결·배포는 `import` 가 해요 — 이 스킬은 GitHub 쪽 준비까지만 소유하고, push 가 끝나면 이어갈지 한 번 물어본 뒤에만 넘겨요.
+bootstrap 과의 차이는 하나예요: bootstrap 은 axhub 이 저장소를 만들고(org 에서 주인 권한이 안 붙을 수 있어요), 이 스킬은 **사용자 연동 계정으로 사용자의 계정/조직에** 만들어요. 저장소 생성만 CLI(`axhub github repo create`, v0.30.0+)가 하고 clone·커밋은 git, 앱 생성·연결·배포는 `import` 예요 — push 뒤 이어갈지 한 번 물어본 뒤에만 넘겨요.
 
-명시적인 `Axhub self-hosted`와 `내 GitHub 계정/조직 소유 저장소`가 같은 요청에 있으면 두 요구는 동시에 충족할 수 없어요. 그래서 GitHub 명령보다 먼저 1.5단계에서 코드 저장 위치를 정해요 — 저장소 소유 언급만으로는 GitHub로 정해지지 않아요. selfhosted면 GitHub 명령 없이 선택값을 그대로 `bootstrap`에 넘기고, GitHub일 때만 2단계부터 진행해요.
+명시적인 `Axhub self-hosted`와 `내 GitHub 계정/조직 소유 저장소`가 같은 요청에 있으면 두 요구는 동시에 충족할 수 없어요. 그래서 GitHub 명령보다 먼저 1.5단계에서 코드 저장 위치를 정해요 — 저장소 소유 언급만으로는 GitHub로 정해지지 않아요.
 
 ## 순서
 
@@ -32,7 +32,7 @@ bootstrap 과의 차이 하나뿐이에요: bootstrap 은 axhub 이 저장소를
 
 ### 1.5 코드 저장 위치 (GitHub 명령 전 필수)
 
-Tool 제목 `앱 설정 확인`. tenant 는 `axhub plugin-support tenant-resolve --field-expr '.tenant // empty'` 값을 쓰고, 여럿이면 `새 앱을 어느 작업공간에 만들까요?` 로 물어요.
+Tool 제목 `앱 설정 확인`. 작업공간은 `axhub plugin-support tenant-resolve --json` 으로 정해요 — `needs_pick:true` 면 `candidates[]` 로 `새 앱을 어느 작업공간에 만들까요?` 를 물어 고른 `slug`, 아니면 `tenant` 가 `<tenant>` 예요(치환용 slug·종류는 [`references/placeholders.md`](references/placeholders.md)).
 
 ```bash
 axhub apps git-backend --tenant <tenant> --json
@@ -40,9 +40,9 @@ axhub apps git-backend --tenant <tenant> --json
 
 top-level `git_backend.backend` 는 추천값이에요. 실패·malformed 면 GitHub 로 추측하지 않고 멈춰요.
 
-- 발화·같은 대화에 `GitHub`/`깃허브` 나 `self-hosted`/`셀프호스팅` 이 있으면 그 값이 `SELECTED_GIT_BACKEND` 예요. `내 계정`·`org`·`회사 저장소` 는 provider 명시가 아니에요.
-- 명시가 없거나 둘 다면 native Question/AskUserQuestion card 로 `코드 저장 위치를 먼저 선택해 주세요.` 라고 묻고 `내 GitHub 계정/조직`·`Axhub self-hosted` 를 보여줘요(추천값에 `(추천)`, 반대 선택 허용). provider 선택이 명시되지 않은 headless 는 GitHub 명령 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
-- `SELECTED_GIT_BACKEND=selfhosted` 면 2단계 이후를 실행하지 않고 `저장소는 axhub에서 준비할게요.` 한 줄 뒤 `bootstrap` 에 선택값·tenant·정한 템플릿·앱 이름을 넘겨요 — bootstrap 이 다시 묻지 않고 `--git-backend selfhosted` 로 만들어요. GitHub 계정·device flow·App 설치 대사는 0회예요. github 일 때만 2단계로 가요.
+- 발화·같은 대화에 `GitHub`/`깃허브` 나 `self-hosted`/`셀프호스팅` 이 있으면 그 값이, 없으면 응답의 `remembered`(onboarding 이 기억한 값)가 `SELECTED_GIT_BACKEND` 예요. `내 계정`·`org`·`회사 저장소` 는 provider 명시가 아니에요.
+- 그래도 없거나 둘 다 명시면 native Question/AskUserQuestion card 로 `코드 저장 위치를 먼저 선택해 주세요.` 라고 묻고 `내 GitHub 계정/조직`·`Axhub self-hosted` 를 보여줘요(추천값에 `(추천)`, 반대 선택 허용). provider 선택이 명시되지 않은 headless 는 GitHub 명령 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
+- `SELECTED_GIT_BACKEND=selfhosted` 면 2단계 이후를 실행하지 않고 `저장소는 axhub에서 준비할게요.` 한 줄 뒤 `bootstrap` 에 선택값·작업공간만 넘겨요 — 템플릿·앱 이름은 아직 안 정했으니 bootstrap 이 묻고, backend 는 묻지 않고 `--git-backend selfhosted` 로 만들어요. GitHub 계정·device flow·App 설치 대사는 0회예요. github 일 때만 2단계로 가요.
 
 ### 2. GitHub 계정 연동 확인
 
@@ -56,7 +56,7 @@ axhub github accounts list --json
 
 ### 3. 질문 한 번에: 템플릿·이름·소유자
 
-AskUserQuestion 하나로 물어요 — 템플릿(`nextjs-axhub`·`chatbot-axhub`), 앱 이름(slug·subdomain 은 이름에서 kebab-case 파생, 다르게 원하면 조정), 저장소 소유자(2단계 목록에서). 여기서 정한 slug·subdomain 과 1.5단계 tenant 가 5단계 치환 값이자 8단계 import 가 만들 앱의 값이에요 — 중간에 바꾸면 치환된 코드와 앱이 어긋나요.
+AskUserQuestion 하나로 물어요 — 템플릿(`nextjs-axhub`·`chatbot-axhub`), 앱 이름(slug 는 이름에서 kebab-case 파생, subdomain 은 slug 그대로 — import 가 `--subdomain <slug>` 로 만들어서 따로 고르지 않아요), 저장소 소유자(2단계 목록에서). 여기서 정한 slug 와 1.5단계 작업공간이 5단계 치환 값이자 8단계 import 가 만들 앱의 값이에요 — 중간에 바꾸면 치환된 코드와 앱이 어긋나요.
 
 ### 4. 템플릿 내려받기 (인증 불필요)
 
@@ -78,13 +78,16 @@ rm -rf -- "<target>/.axhub-template"
 
 ### 5. placeholder 치환 (필수)
 
-서버 bootstrap 은 push 전에 치환하지만 이 흐름엔 서버가 없어요. 건너뛰면 앱이 `'{{API_BASE}}'` 라는 글자 그대로 API 를 불러 **로그인·데이터 연동만 조용히 죽어요**(화면은 떠요). `grep -rl -- '{{' "<target>"` 로 찾은 canonical target 내부 regular file 전부(README 포함)에서 6개 토큰을 편집 도구로 바꿔요 — symlink는 따라가지 않고, `sed -i` 는 macOS/GNU 문법이 갈려서 안 써요.
+서버 치환이 없는 흐름이라 건너뛰면 **로그인·데이터 연동만 조용히 죽어요**(화면은 떠요). `grep -rl -- '{{' "<target>"` 로 찾은 canonical target 내부 regular file 전부(README 포함)에서 토큰을 편집 도구로 바꿔요 — symlink는 따라가지 않고, `sed -i` 는 macOS/GNU 문법이 갈려서 안 써요. 값의 출처는 [`references/placeholders.md`](references/placeholders.md) 예요.
 
 | 토큰 | 값 |
 |---|---|
-| `{{APP_SLUG}}` / `{{APP_SUBDOMAIN}}` / `{{APP_NAME}}` / `{{TENANT}}` | 3단계에서 정한 값 |
-| `{{API_BASE}}` | CLI 가 쓰는 API 주소 (prod `https://axhub.ai`) |
-| `{{APP_ORIGIN}}` | `https://<subdomain>.<tenant>.axhub.ai` (서버와 같은 조립식) |
+| `{{APP_SLUG}}` / `{{APP_SUBDOMAIN}}` / `{{APP_NAME}}` | 3단계 slug / slug / 이름 |
+| `{{TENANT}}` | 작업공간 slug |
+| `{{API_BASE}}` | CLI 가 쓰는 API 주소 (prod `https://api.axhub.ai`) |
+| `{{APP_ORIGIN}}` | 회사 작업공간 `https://<slug>.<작업공간 slug>.axhub.ai` (서버 AppHost) |
+
+개인 작업공간은 서버가 주소를 만들어서 `{{APP_SUBDOMAIN}}`·`{{APP_ORIGIN}}` 을 8단계 import 뒤에 채워요.
 
 `axhub.yaml` 의 `name:` 도 slug 로 바꿔요.
 
@@ -99,24 +102,25 @@ git -C "<target>" init -q -b main && git -C "<target>" add -A && git -C "<target
 미리보기 먼저(기본이 dry-run), 사용자 승인 후 `--execute`. 승인 문구는 다른 스킬과 같은 `진행`/`취소` 로 고정해요 — 미리보기 끝에 `지금 저장소를 만들고 코드를 올릴까요? 진행 또는 취소 로 답해 주세요.` 를 그대로 쓰고 매번 새 문구를 지어내지 않아요. 승인 문구를 굵게 강조하지 않아요 — `** 진행 **` 처럼 별표 안쪽에 공백이 들어가면 별표가 그대로 노출돼요.
 
 ```bash
-axhub github repo create --owner "<owner>" --name "<slug>" --push "<target>" --execute
+axhub github repo create --owner "<owner>" --name "<slug>" --push "<target>"
+axhub github repo create --owner "<owner>" --name "<slug>" --execute
 ```
 
-기본 private 이에요(공개를 원하면 `--public`). 토큰은 CLI 가 env 로만 다뤄서 채팅·히스토리에 안 남아요. device flow pending 으로 끝나면 URL·코드 두 줄을 보여주고 `--resume-last` 로 이어가요. `name already exists` 는 다른 이름을 물어요 — 기존 저장소에 덮어 push 하지 않아요.
+첫 줄이 미리보기예요(기본 private, 공개는 `--public`). 승인 뒤 둘째 줄로 `--push` 없이 먼저 만들어요. `already_existed:true` 면 기존 저장소라 push 하지 말고 다른 저장소 이름을 물어요(`--name`·7.5 origin 만 바뀌어요). `false` 일 때만 `--push "<target>"` 를 붙여 다시 실행해요(이번 `true` 는 방금 만든 저장소예요). `저장소는 만들어졌는데 push 가 실패했어요` 면 git 오류 한 줄·저장소 URL 을 보여주고 한 번만 다시 해요. device flow pending 이면 URL·코드 두 줄 뒤 `--resume-last` 로 이어가요.
 
 ### 7.5. origin 등록 (push 성공 직후 필수)
 
-CLI 는 토큰이 `.git/config` 에 박히지 않게 원격 URL 을 인자로 직접 넘겨 push 해요 — 그래서 push 는 되지만 로컬에 named remote 가 남지 않아요. 이 등록을 빼먹으면 사용자의 **다음 `git push` 가 곧바로 `'origin' does not appear to be a git repository` 로 실패**하고, 저장소 연결 뒤 살아나는 push 자동 배포도 쓸 수 없어요.
+CLI 는 원격 URL 을 인자로 직접 넘겨 push 해서 로컬에 named remote 가 남지 않아요. 빼먹으면 사용자의 **다음 `git push` 가 `'origin' does not appear to be a git repository` 로 실패**해요.
 
 ```bash
 git -C "<target>" remote add origin "https://github.com/<owner>/<slug>.git"
 ```
 
-이 폴더는 6단계에서 방금 `git init` 한 상태라 `origin` 이 이미 있을 수 없어요 — 존재 확인 분기를 만들지 않아요. upstream 은 여기서 붙이지 않고, 사용자의 첫 push 때 `git push -u origin main` 으로 붙이면 돼요. 8단계 안내에 그 문장을 포함해요.
+6단계에서 방금 `git init` 한 폴더라 `origin` 존재 확인 분기는 만들지 않아요. upstream 은 사용자의 첫 `git push -u origin main` 때 붙어요(8단계 안내에 포함).
 
 ### 8. 여기서 한 번 멈춰요 (import 인계 확인)
 
-7단계까지가 이 스킬의 기본 완료선이에요. push 가 끝나면 **묻지 않고 이어가지 않아요** — 저장소 주소를 평문 절대 URL 로 보여주고 AskUserQuestion 한 번으로 axhub 진입 확인을 해요. 사용자가 처음에 "배포까지 해줘" 라고 말했더라도 여기서 한 번은 물어요. 저장소 생성과 앱 배포는 되돌리는 비용이 달라서, 한 번의 승인으로 묶지 않아요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
+7단계까지가 이 스킬의 기본 완료선이에요. push 가 끝나면 **묻지 않고 이어가지 않아요** — 저장소 주소를 평문 절대 URL 로 보여주고 AskUserQuestion 한 번으로 axhub 진입 확인을 해요. 사용자가 처음에 "배포까지 해줘" 라고 말했더라도 여기서 한 번은 물어요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
 
 ```json
 {
@@ -132,18 +136,19 @@ git -C "<target>" remote add origin "https://github.com/<owner>/<slug>.git"
 }
 ```
 
-멈추기를 고르면 저장소 URL·로컬 폴더 경로·재개 문장(`이 폴더 axhub에 올려`)만 남기고 끝내요. 이때 다음 코드 변경을 올릴 때 쓸 `git push -u origin main` 한 줄도 같이 알려줘요 (7.5 에서 등록한 origin 에 upstream 을 붙이는 첫 push 예요). headless 에서는 묻지 않고 같은 자리에서 멈춰요.
+멈추기를 고르면 저장소 URL·로컬 폴더 경로·재개 문장(`이 폴더 axhub에 올려`)과 다음 변경을 올릴 `git push -u origin main` 한 줄만 남기고 끝내요(개인 작업공간은 남은 두 토큰도). headless 에서는 묻지 않고 같은 자리에서 멈춰요.
 
-이어가기를 고른 경우에만 `import` 스킬을 호출해 앱 생성·GitHub 연결·첫 배포를 맡겨요. 3단계에서 정한 slug·subdomain·tenant 와 `--git-backend github` 를 그대로 넘겨요 — 작업공간 기본값이 self-hosted 여도 이 앱은 방금 만든 GitHub 저장소를 써요. 연결이 끝나면 push 자동 배포도 그대로 살아나요 — 이 흐름은 저장소가 있으므로 `axhub up` 을 쓰지 않아요.
+이어가기를 고른 경우에만 `import` 스킬을 호출해 앱 생성·GitHub 연결·첫 배포를 맡겨요. 3단계에서 정한 slug·subdomain·작업공간과 `--git-backend github` 를 그대로 넘겨요 — 작업공간 기본값이 self-hosted 여도 이 앱은 방금 만든 GitHub 저장소를 써요. 연결이 끝나면 push 자동 배포도 그대로 살아나요 — 이 흐름은 저장소가 있으므로 `axhub up` 을 쓰지 않아요. 개인 작업공간이면 import 뒤 남은 두 토큰을 reference 대로 채워 push 해요.
 
 ## NEVER
 
 - NEVER 이 스킬에서 `apps bootstrap` 을 부르지 않아요 — axhub 소유 생성 경로라 selfhosted 는 `bootstrap` 스킬에 넘겨요. 여긴 `github repo create` + `import` 만 써요.
 - NEVER 1.5단계 판정 전에 `axhub github ...` 를 실행하지 않아요.
-- NEVER 치환(5단계)을 건너뛰지 않아요 — 배포는 성공하고 로그인만 조용히 죽어요.
+- NEVER 치환(5단계)을 건너뛰지 않아요.
 - NEVER 이미 코드가 있는 폴더에 템플릿을 덮지 않아요 — 기존 코드는 import 소관이에요.
 - NEVER 토큰·인증 URL 을 제외한 device flow 진행 상황을 사용자에게 승인 완료 보고로 요구하지 않아요 — `--resume-last` 재개 계약을 따라요.
 - NEVER `--execute` 를 미리보기·승인 없이 붙이지 않아요.
 - NEVER push 직후 확인 없이 `import` 로 넘어가지 않아요 — 첫 발화에 "배포까지" 가 있어도 8단계 질문은 생략하지 않아요.
-- NEVER push 성공 뒤 `origin` 등록(7.5)을 건너뛰지 않아요 — CLI 가 URL 직접 push 라 remote 를 안 남겨서, 빼먹으면 사용자의 다음 `git push` 가 실패해요.
-- NEVER 연동 계정 목록에 없는 owner 로 진행하지 않아요 — App 미설치 조직은 생성이 되더라도 이후 연결(`VerifyInstallation`)이 404 로 죽어요.
+- NEVER 첫 `--execute` 에 `--push` 를 붙이거나, 첫 실행이 `already_existed:true` 로 답한 저장소에 push·강제 push 하지 않아요 — CLI 는 같은 이름 저장소를 실패 없이 재사용해요.
+- NEVER push 성공 뒤 `origin` 등록(7.5)을 건너뛰지 않아요.
+- NEVER 연동 계정 목록에 없는 owner 로 진행하지 않아요 — 이후 연결(`VerifyInstallation`)이 404 로 죽어요.

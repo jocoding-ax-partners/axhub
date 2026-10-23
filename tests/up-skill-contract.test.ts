@@ -51,7 +51,7 @@ describe("up skill contract", () => {
     // AP-16 폴링 예산이 verify 루프에 걸려 있어요.
     expect(body).toContain("폴링 예산");
     expect(body).toContain("최대 30회 또는 10분");
-    expect(body).toContain("--wait --wait-interval 20s --wait-timeout 10m");
+    expect(body).toContain("--wait --wait-interval 20s --wait-timeout 9m");
   });
 
   // Silent-pass 차단 — 2단계 명령의 --dry-run 을 --execute 로 뒤집으면 승인 전

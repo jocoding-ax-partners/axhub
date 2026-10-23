@@ -69,7 +69,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - **공개 표면만.** `axhub plugin-support ...` (hidden 그룹) 는 plugin 내부 프로토콜이라 이 스킬의 탐색·실행 대상이 아니에요.
 - **내 접근 가능 범위는 grant 기준.** 사용자가 "내가 조회 가능한", "내가 접근 가능한", "connected 된", "연결된 connector"처럼 **본인 범위**를 물으면 반드시 공개 명령 `axhub connectors mine` 으로 확인해요. tenant-admin 전체 카탈로그인 `axhub connectors list` / `--enabled-only` 결과를 "내가 조회 가능한 connector" 로 요약하지 말아요.
 - **읽기와 쓰기는 다른 질문이에요.** "내가 올릴 수 있어?", "쓰기 권한 있어?", "여기 파일 넣을 수 있어?" 처럼 **바꾸는 쪽**을 물으면 `axhub authz grants mine` 으로 확인해요. 응답의 `scope_resource_paths` 가 닿는 대상이고 `scope_levels` 가 대상별로 어디까지인지(`read` | `write`) 예요. 커넥터 목록만 보고 "접근 가능하니 올릴 수도 있다" 고 답하지 말아요 — 목록에 있어도 그 대상이 `read` 면 못 올려요. 반대로 `scope_levels` 가 비어 있으면 대상을 안 나눈 권한이라 프리셋이 정해요.
-- **권한 부여도 여기예요.** "OO 에게 업로드 권한 줘" 처럼 남에게 권한을 새로 주는 요청은 `authz grants` 계열 leaf 의 라이브 `--help` 로 대상·레벨 플래그(`--scope`, `--level <대상>=read|write`)를 확정한 뒤, 접근을 넓히는 변경이라 승인 1회 받고 실행해요.
+- **권한 부여도 여기예요.** "OO 에게 업로드 권한 줘" 는 hidden leaf `authz grants create` 예요 — schema·`--help` 목록에 없어도 `axhub authz grants create --help` 로 대상·레벨 플래그(`--scope`, `--level <대상>=read|write`)를 확정하고 `set-scope` 로 대신하지 않아요. 접근을 넓히는 변경이라 승인 1회 받고 실행해요.
 - **지어내지 않기.** 탐색으로 못 찾은 기능은 "axhub 에 그 기능은 없어요" 라고 정직하게 말하고, 가장 가까운 명령을 제안해요.
 
 **대표 정직성 계약.** `clarity` 는 hidden `plugin-support` 를 탐색하지 않아요. 공개 `--json-schema` / `--help` 트리에서 맞는 leaf 를 찾지 못하면 존재하지 않는 명령을 만들지 말고, "axhub 에 그 기능은 없어요" + 가장 가까운 공개 명령만 말해요. 로그·환경변수·롤백·테이블·connector grant 처럼 대표 여정 뒤 작업은 이 경로로 이어가요.
@@ -129,7 +129,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
    - 사용법 오류(exit 64) → Step 3b 로 돌아가 그 명령의 `--help` 를 다시 읽고 인자를 고쳐 1회 재시도, 그래도 실패하면 정직하게 설명.
    - 그 외 → 원인을 한국어로 풀어 설명하고 다음 행동을 제안. raw stderr 는 노출하지 않아요.
 
-6. **기능 부재 처리.** 두 단계 깊이까지 탐색해도 맞는 명령이 없으면: "axhub 에 그 기능은 없어요. 가장 가까운 건 `axhub <근접 명령>` 인데 이걸로 할까요?" — 존재하지 않는 명령을 만들어 실행하지 않아요.
+6. **기능 부재 처리.** 두 단계 깊이까지 탐색해도 맞는 명령이 없으면(hidden `authz grants create` 는 예외): "axhub 에 그 기능은 없어요. 가장 가까운 건 `axhub <근접 명령>` 인데 이걸로 할까요?" — 존재하지 않는 명령을 만들어 실행하지 않아요.
 
 ## 경계
 

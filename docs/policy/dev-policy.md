@@ -15,10 +15,21 @@ repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 
 - 11개 SKILL.md 의 frontmatter 는 `tests/frontmatter.test.ts` 로 검증해요. `name`·`description` 은 Claude 가 어떤 스킬을 쓸지 고르는 기준(라우팅 표면)이라 깨지면 스킬이 아예 선택되지 않을 수 있어요.
 
 ## DP-4 release flow
-- `commit-and-tag-version` 도구 기반 3단계로 릴리즈해요:
-  1. `bun run release` — 버전 숫자 올리기(bump) + 커밋 (버전 표식인 tag 는 아직 안 만듦)
-  2. CHANGELOG 에 해요체 1-3 문장으로 변경 요약(narrative)을 추가한 뒤 `git commit --amend --no-edit -a` (직전 커밋에 합치기)
-  3. `bun run release:tag` — tag 생성 + push
+- 코드 정본은 `axhub-mono` 의 `clients/plugin/` 이고, 사용자는 공개 레포 `jocoding-ax-partners/axhub` 의 main 을 읽어요 (Claude·Codex marketplace, `axhub update check` 의 플러그인 최신 판정). tag push 로 도는 워크플로는 없어요 — 공개 레포 동기화와 GitHub release 는 아래 순서대로 mono 워크플로를 손으로 실행해야 나가요.
+  1. origin/main 에서 딴 `plugin/` 브랜치의 `clients/plugin` 에서 `bun run release` — 버전 숫자 올리기(bump) + 커밋 (버전 표식인 tag 는 아직 안 만듦)
+  2. CHANGELOG 에 해요체 1-3 문장으로 변경 요약(narrative)을 추가한 뒤 `git commit --amend --no-edit -a` (직전 커밋에 합치기) → PR 을 올려 main 에 머지
+  3. 머지된 main 을 받아 `bun run release:tag` — release commit 에 `plugin-vX.Y.Z` tag(`.versionrc.json` 의 `tagPrefix`)를 만들고 push. 이 push 로 도는 워크플로는 없어요
+  4. `repo · mirror(public)` 을 그 tag 기준으로 실행해 공개 레포 main 에 PR 로 넣고 바로 머지해요. 먼저 `dry_run=true` 로 바뀔 파일 목록을 보고 `dry_run=false` 로 다시 실행해요. `--ref` 를 tag 로 줘야 tag 뒤에 머지된 미출시 변경이 섞이지 않아요.
+     ```bash
+     gh workflow run repo-mirror.yml --ref plugin-vX.Y.Z -f target=plugin -f dry_run=true
+     gh workflow run repo-mirror.yml --ref plugin-vX.Y.Z -f target=plugin -f dry_run=false
+     ```
+     실행 로그에 `axhub: 머지 완료` 가 있어야 사용자에게 나간 거예요. `Sync subtrees to public repos` 잡이 skipped 면(`vars.MIRROR_ENABLED` 가 `true` 가 아님) 아무것도 나가지 않았어요.
+  5. `plugin · release` 를 실행해 mono 에 GitHub release(본문 = CHANGELOG 섹션)를 만들고 Slack 에 알려요. Slack 공지가 `/plugin update axhub@axhub` 를 안내하니 4단계 머지를 확인한 뒤에 실행해요.
+     ```bash
+     gh workflow run plugin-release.yml -f tag=plugin-vX.Y.Z
+     ```
+- 미러는 내용만 맞추고 tag 를 넘기지 않아요. 그래서 공개 레포에는 tag·GitHub release 가 생기지 않고 공개 레포의 `.github/workflows/release.yml` 도 돌지 않아요. 릴리스 기록은 mono 의 `plugin-vX.Y.Z` release 예요.
 
 ## DP-5 quality gates
 머지 전에 반드시 통과해야 하는 자동·수동 검사 목록이에요:

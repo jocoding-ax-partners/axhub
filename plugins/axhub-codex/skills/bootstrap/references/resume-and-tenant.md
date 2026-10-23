@@ -29,7 +29,7 @@ Before showing the resume question or running either `args.status_command` or `a
   axhub apps git-backend --tenant <tenant> --json
   ```
 
-Missing/malformed `git_backend` or the selected legacy read's failure stops fail-closed before any emitted command. If `git_backend.backend=selfhosted`, discard a stale provider-auth `resume_last` route and never execute its emitted command. If a bootstrap id exists, continue through the backend-neutral status path; otherwise rebuild the ownerless selfhosted resume from stored template/name/slug/tenant/idempotency values and the resolved backend. Do not surface GitHub/device/install copy. Only confirmed `github` or `legacy_github` may execute a provider-auth resume command.
+Missing/malformed `git_backend` or the selected legacy read's failure stops fail-closed before any emitted command. If `git_backend.backend=selfhosted`, discard a stale provider-auth `resume_last` route and never execute its emitted command. If a bootstrap id exists, continue through the backend-neutral status path; otherwise rebuild the ownerless selfhosted resume from stored template/name/slug/idempotency values, the Tenant Resolve L1 workspace (the state stores no workspace), and the resolved backend. Do not surface GitHub/device/install copy. Only confirmed `github` or `legacy_github` may execute a provider-auth resume command.
 
 After this check, if route is `watch_status` or `resume_last` and `clone_done=false`, ask:
 
@@ -48,9 +48,16 @@ Non-interactive/D1 safe default is `새로 시작`. Do not echo raw `bootstrap_i
 
 If the user chooses resume, use the route enum only after the backend check above. Do not reconstruct raw IDs except for the ownerless selfhosted resume described above.
 
-- `watch_status`: run `args.status_command`. Current shape is `axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json`.
-- `resume_last`: use `args.resume_command` as the base argv, but never run it verbatim. Its `--git-backend` value must match persisted authority; current state already emits it, while legacy state must append the resolved `--git-backend <github|selfhosted>` without asking again. Append `--tenant "$AXHUB_TENANT"` only when `$AXHUB_TENANT` is set and the base command lacks tenant context. For Desktop device-flow recovery, strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume so stdout is visible. Do not use background watchers or output-file reads as the resume control plane. Current shape should be `axhub apps bootstrap --git-backend "$GIT_BACKEND" --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$AXHUB_TENANT" --execute --resume-last --idempotency-key "$IDEMPOTENCY_KEY"`.
-- stale/broken/fresh: say "이전 기록을 찾지 못해서 새로 시작할게요." and continue to template registry.
+Workspace carry: the resume state (`.axhub/init-resume.json`) stores no workspace, and neither emitted command carries `--tenant`. Without it the CLI uses the first active membership, so a bootstrap started in another workspace answers 404 (exit 5) and looks missing. Before running either command, resolve the workspace with Tenant Resolve L1 below and append it as a literal `--tenant <tenant>` flag — `apps bootstrap-status` and `apps bootstrap` both accept it. When Tenant Resolve L1 returns `needs_pick:true`:
+
+- `watch_status`: do not ask yet. Check each `candidates[].slug` in turn with one direct `axhub apps bootstrap-status <bootstrap-id> --tenant <slug> --json` call (no watch flags) until one answers, then continue in that workspace.
+- `resume_last`: no bootstrap exists yet, so ask the Tenant Picker L2 question and append the chosen `slug`.
+
+Then run the route:
+
+- `watch_status`: run `args.status_command` with `--tenant <tenant>` appended, with the command tool timeout raised to 600000ms (the CLI waits up to 9m). Current shape is `axhub apps bootstrap-status "$BOOTSTRAP_ID" --watch --watch-timeout 9m --json`.
+- `resume_last`: use `args.resume_command` as the base argv, but never run it verbatim. Its `--git-backend` value must match persisted authority; current state already emits it, while legacy state must append the resolved `--git-backend <github|selfhosted>` without asking again. Always append `--tenant <tenant>` from the workspace carry above; the base command never has it. For Desktop device-flow recovery, strip `--watch --watch-timeout <value>` and `--json` from the first Desktop resume so stdout is visible. Do not use background watchers or output-file reads as the resume control plane. Current shape should be `axhub apps bootstrap --git-backend "$GIT_BACKEND" --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --tenant "$TENANT" --execute --resume-last --idempotency-key "$IDEMPOTENCY_KEY"`.
+- stale/broken/fresh: say "이전 기록을 찾지 못해서 새로 시작할게요." and continue to template registry. A status 404 (exit 5) or exit 8 counts as not found only after every `candidates[].slug` was checked as above; with one workspace, that one check is enough.
 
 ## Resume Device-Flow Recovery
 
@@ -65,25 +72,24 @@ axhub github accounts list --json
 Only when the selected GitHub owner is confirmed installed (`installed=true` or `installation_id`) may the skill run one recovery execute using the same template/name/slug/subdomain/github-owner/repo-name/idempotency-key, without `--resume-last`:
 
 ```bash
-AXHUB_TENANT="${AXHUB_TENANT:-$(axhub plugin-support tenant-resolve --field-expr '.tenant // empty' 2>/dev/null || true)}"
-axhub --no-input apps bootstrap --git-backend github --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --github-owner "$GITHUB_OWNER" --repo-name "$APP_SLUG" --repo-private --tenant "$AXHUB_TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY"
+axhub --no-input apps bootstrap --git-backend github --template "$TEMPLATE" --name "$APP_NAME" --slug "$APP_SLUG" --subdomain "$SUBDOMAIN" --github-owner "$GITHUB_OWNER" --repo-name "$APP_SLUG" --repo-private --tenant "$TENANT" --execute --idempotency-key "$IDEMPOTENCY_KEY"
 ```
 
-If `device_code_pending` remains, respect `retry_after_secs` and retry the emitted `resume_command` until success or expiry. Every pending payload from a cached resume carries `user_code` + `verification_uri`; re-show them in the body on each retry so the user always has something to approve. Do not ask the user to say an approval phrase in chat; the CLI resume result is the only completion signal. If owner installation is not confirmed, do not run fresh execute; show the install URL once and stop with the GitHub App install resume phrase.
+`$TENANT` is the workspace from the workspace carry above, written as a literal. If `device_code_pending` remains, respect `retry_after_secs` and retry the emitted `resume_command` (with the same `--tenant`) until success or expiry. Every pending payload from a cached resume carries `user_code` + `verification_uri`; re-show them in the body on each retry so the user always has something to approve. Do not ask the user to say an approval phrase in chat; the CLI resume result is the only completion signal. If owner installation is not confirmed, do not run fresh execute; show the install URL once and stop with the GitHub App install resume phrase.
 
 ## Tenant Resolve L1
 
 `axhub plugin-support tenant-resolve` owns risky tenant logic. The skill is a thin resolver and cache reader. Explicit `AXHUB_TENANT` wins. Otherwise call once and use the resolved tenant as a literal value in later commands. In Codex, the visible tool title for this command must be `앱 설정 확인`; never use `tenanting 확인`, `tenant 확인`, `테넌트 확인`, or `tenant-resolve`.
 
 ```bash
-axhub plugin-support tenant-resolve --field-expr '.tenant // empty'
+axhub plugin-support tenant-resolve --json
 ```
 
-If the command returns one tenant value, carry it as a literal `--tenant <slug>` value. If the resolver output says multiple tenants need a pick, ask the picker from the resolver/preflight candidates and carry the chosen value as the same literal `--tenant <slug>` value. User-facing text must call these `작업공간`, not `tenant` or `테넌트`. If no tenant can be resolved, check preflight `auth_ok` and `current_team_id`, then guide with `다시 로그인해줘`.
+Read `{tenant, source, needs_pick, candidates[]}`. With `needs_pick:false` and a non-empty `tenant`, carry `tenant` as the literal `--tenant <tenant>` value — it is usually the workspace id, which `--tenant` accepts; where a slug is required (the `{{TENANT}}` placeholder), take `tenant_slug` from the row with the same `tenant_id` in `axhub auth status --json` `tenants[]`. With `needs_pick:true`, `tenant` is empty: ask Tenant Picker L2 from `candidates[]` (`{id, slug, name}`) and carry the chosen `slug` as the same literal `--tenant <slug>` value. Never reduce the output to the `tenant` field alone; with several workspaces it is an empty string and hides `needs_pick`. User-facing text must call these `작업공간`, not `tenant` or `테넌트`. If `tenant` and `candidates` are both empty, guide with `다시 로그인해줘`.
 
 ## Tenant Picker L2
 
-Only when the resolver/preflight output says multiple tenants need a pick and the host is interactive TTY, ask once. The surrounding chat sentence should be "작업공간이 여러 개 있어요. 어디에 만들지 골라주세요." Do not say "테넌트가 2개 있어요." or "어떤 tenant 로 진행할까요?"
+Only when `needs_pick:true` and the host is interactive TTY, ask once. The surrounding chat sentence should be "작업공간이 여러 개 있어요. 어디에 만들지 골라주세요." Do not say "테넌트가 2개 있어요." or "어떤 tenant 로 진행할까요?"
 
 ```json
 {
@@ -92,18 +98,18 @@ Only when the resolver/preflight output says multiple tenants need a pick and th
     "header": "작업공간",
     "multiSelect": false,
     "options": [
-      {"label": "<workspace name/slug/id>", "description": "이 작업공간에 앱을 만들어요"}
+      {"label": "<candidates[].name>", "description": "이 작업공간에 앱을 만들어요"}
     ]
   }]
 }
 ```
 
-Do not write `.axhub/state/tenant.json` from Codex. Do not use `mkdir`, `printf`, redirection, timestamp commands, or shell glue to persist the choice. In non-interactive/D1, use the CLI resolver's first-candidate fallback when it is explicitly returned; otherwise leave tenant empty for login guidance.
+Do not write `.axhub/state/tenant.json` from Codex. Do not use `mkdir`, `printf`, redirection, timestamp commands, or shell glue to persist the choice. In non-interactive/D1 with `needs_pick:true`, do not pick a workspace: stop before any mutation and leave the workspace list with the resume phrase.
 
 ## Fence Re-Read
 
 Every later command fence should use the literal tenant already selected in the current conversation. If the value is genuinely missing, re-run the direct resolver command:
 
 ```bash
-axhub plugin-support tenant-resolve --field-expr '.tenant // empty'
+axhub plugin-support tenant-resolve --json
 ```

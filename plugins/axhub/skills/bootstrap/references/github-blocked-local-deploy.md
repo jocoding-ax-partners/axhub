@@ -3,14 +3,14 @@
 bootstrap 12단계의 GitHub-only 복구 본문이에요. `axhub apps get <app> --json` 또는 fresh의 `axhub apps git-backend --tenant <tenant> --json`에서 `git_backend.backend=selfhosted`가 확인되면 이 파일을 읽거나 이 fallback으로 오지 않아요.
 
 GitHub backend의 bootstrap은 `--github-owner` 저장소 흐름을 유지해요. 그 경로가 막히면 빈손으로 돌려보내는 대신 코드를 확보해 그대로 올려서 배포해요.
-**묻지 않고 진행하고**, 무엇이 달라지는지는 하고 나서 알려줘요.
+앱을 새로 만들 때는 SKILL.md 8단계와 같은 `지금 만들고 배포까지 진행할까요?` 확인을 받은 뒤에만 만들고(5단계), 무엇이 달라지는지는 그 확인 전에 알려줘요.
 
 ## 언제 오나 — 단계가 아니라 원인으로
 
 어느 지점이든 GitHub 때문에 못 나가면 와요. 지점을 열거하면 새 실패 자리가
 생길 때 빈틈이 생겨요. 자주 보는 모양(이게 전부는 아니에요):
 
-- 6단계 gate: 설치 계정 0개, `github_relogin_required`, device flow 거부·만료·중단
+- 6단계 gate: `github_relogin_required` 재연동 실패, device flow 거부·만료·중단. 설치 계정 0개는 여기로 오지 않아요 — `templates-and-github.md` 의 Zero Installed Accounts gate 대로 설치를 묻고, `취소`·headless 면 멈춰요
 - 9단계 execute: 저장소 생성이 org 권한·정책으로 거부, 계정 미연결로 saga 미시작
 - 10단계 clone: `git fetch` 가 권한으로 실패(404 / permission denied). org 저장소는 우리 봇이 만들어 **주인에게 권한이 자동으로 안 붙는 경우**가 있어요
 
@@ -21,11 +21,11 @@ GitHub backend의 bootstrap은 `--github-owner` 저장소 흐름을 유지해요
    - `bootstrap_id` 를 알면: `axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json`
    - 모르면: `axhub apps get <app-slug> --tenant <tenant> --json`
 
-공통 조건: D1 safe-stop 모드가 아니에요 (앱 생성·배포는 mutation).
+공통 조건: D1 safe-stop 모드가 아니에요 (앱 생성·배포는 mutation). headless 면 아무것도 만들거나 배포하지 않고 막힌 이유와 재개 문장만 남기고 멈춰요.
 
 ## 절차
 
-**1. 한 줄로 알리고 바로 진행** (질문 아니에요).
+**1. 한 줄로 알려요** (확인은 5단계 앱 생성 직전에 받아요).
 
 되돌릴 수 있다는 걸 **이 줄에서** 같이 말해요. 사후 고지까지 미루면 사용자는 배포가
 끝날 때까지 저장소를 영영 못 쓰는 줄 알아요.
@@ -65,11 +65,13 @@ push 전에 6개 토큰을 텍스트 치환하고 `axhub.yaml` 의 `name:` 을 s
 | 토큰 | 값 |
 |---|---|
 | `{{APP_SLUG}}` | 앱 slug |
-| `{{APP_SUBDOMAIN}}` | subdomain |
 | `{{APP_NAME}}` | 앱 이름 |
-| `{{TENANT}}` | 테넌트 slug |
-| `{{API_BASE}}` | CLI 가 쓰는 API 주소 (prod `https://axhub.ai`) |
+| `{{TENANT}}` | 작업공간 slug — `tenant-resolve` 의 `tenant` 가 id 면 `axhub auth status --json` 의 `tenants[]` 에서 같은 `tenant_id` 의 `tenant_slug` |
+| `{{API_BASE}}` | CLI 가 쓰는 API 주소 (prod `https://api.axhub.ai`) |
+| `{{APP_SUBDOMAIN}}` | `axhub apps get <slug> --tenant <tenant> --json` 의 `subdomain` |
 | `{{APP_ORIGIN}}` | `axhub apps get <slug> --tenant <tenant> --json` 의 `access_url` |
+
+`{{APP_SUBDOMAIN}}`·`{{APP_ORIGIN}}` 은 4·5단계로 앱을 확보한 뒤 그 앱 값으로 바꿔요 — 개인 작업공간은 주소를 서버가 만들어서 slug 로 짐작하면 틀려요.
 
 `grep -rl '{{' <target>` 로 대상 파일을 찾아(README 포함 전부) 편집 도구로
 치환해요 — `sed -i` 는 macOS/GNU 문법이 갈려서 안 써요. 마지막으로
@@ -85,7 +87,7 @@ compose 의 `build:` 가 그 폴더를 가리켜야 해요. 어기면 build 단�
 **4. 앱 확보.** 이미 있으면 5 를 건너뛰고 6 으로 가고, slug 는 확인한 값을 그대로
 써요. 없으면 앱 주소 확인(7단계 availability check)부터 하고 이어가요.
 
-**5. 앱 생성** (tool 제목 `앱 만들기`, 앱이 없을 때만):
+**5. 앱 생성** (tool 제목 `앱 만들기`, 앱이 없을 때만). `apps create` 는 dry-run 없이 바로 만들고, 개인 작업공간이면 만들자마자 인터넷에 공개돼요. 그래서 먼저 템플릿·앱 이름·slug·작업공간과 저장소 없이 만든다는 점을 미리보기로 보여주고 SKILL.md 8단계와 같은 `지금 만들고 배포까지 진행할까요?`(`진행`/`취소`)를 물어요. `진행` 을 고른 뒤에만 아래를 실행하고, `취소` 면 아무것도 만들지 않고 멈춰요.
 
 ```bash
 axhub apps create --tenant test --name bakery-preorder --slug bakery-preorder --subdomain bakery-preorder --deploy-method docker --resource-tier XS
@@ -113,6 +115,7 @@ axhub apps create --tenant test --name bakery-preorder --slug bakery-preorder --
 ## NEVER
 
 - NEVER 앱이 있는지 확인하지 않고 새로 만들지 않아요 — saga 가 조금이라도 돌았으면 앱만 만들어졌을 수 있어요. 같은 이름으로 또 만들면 주소가 충돌하고 요금 자원이 두 배가 돼요.
+- NEVER `지금 만들고 배포까지 진행할까요?` 에 `진행` 을 받기 전이나 headless 에서 `apps create` 를 실행하지 않아요 — dry-run 이 없어 바로 과금 앱이 생기고, 개인 작업공간이면 바로 공개돼요.
 - NEVER 권한 실패(404)를 "저장소가 없다" 로 보고하지 않아요 — private 은 권한이 없으면 404 로 보여요.
 - NEVER `<target>/.axhub-template` 외의 경로를 지우지 않아요.
 - NEVER 템플릿을 공개 저장소가 아닌 곳에서 받거나 사용자 저장소로 push 하지 않아요.

@@ -44,4 +44,4 @@ bun run plugin:bundle  # clean local plugin bundle 생성
 - NEVER 최소 CLI 기능 게이트를 우회하지 말아요.
 - NEVER Claude Code local plugin 을 repo 루트에서 직접 설치/검증하지 말아요 — `bun run plugin:bundle` 후 `dist/axhub-plugin` clean bundle 을 써요.
 - NEVER deploy 성공 선언(docker/compose·self-hosted static deployment-record lane)을 `axhub deploy verify <deployment-id> --app <app>` 1회 실행 없이 — deployment id 와 app scope 필수, latest 재탐색 금지. GitHub 작업공간의 static 앱(deploy_method=static)은 별도 upload lane 이라 `deploy verify` 가 404 라서 `active_release_id`(activate 성공)로 선언해요.
-- NEVER release 를 manual `vim package.json` + `git tag` 로 — `bun run release` → narrative amend → `bun run release:tag` 3단계 flow (단순화된 postbump) 만 써요.
+- NEVER release 를 manual `vim package.json` + `git tag` 로 — `bun run release` → narrative amend → PR 머지 → `bun run release:tag` 3단계 flow (단순화된 postbump) 만 써요. tag push 로 도는 워크플로는 없어서, 그 뒤 `repo · mirror(public)`(`target=plugin`, dry-run 먼저) → `plugin · release` 를 손으로 실행해야 사용자에게 나가요 (`docs/policy/dev-policy.md` DP-4).

@@ -187,7 +187,7 @@ deploy-prep 이 exit 67 로 끝났는데 `resolve.error` 가 `apps_list_parse_er
 
 ---
 
-### exit 64 + `validation.deployment_in_progress`
+### exit 9 + `already_exists` — 진행 중인 배포 (구 CLI: exit 64 + `validation.deployment_in_progress`)
 
 **감정:** 앱은 안전해요. 다른 배포가 먼저 진행 중이에요.
 
