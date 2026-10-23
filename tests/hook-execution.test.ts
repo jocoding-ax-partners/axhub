@@ -81,7 +81,7 @@ function runInline(command: string, stdin: string, env: Record<string, string> =
 
 // SessionStart wrapper 는 운영 위임 형태 그대로 `bash "<path>"` 로 실행해요.
 // CLAUDE_PLUGIN_ROOT 는 인라인 시절과 동일하게 기본 미설정이에요 — repo
-// checkout 의 .git 이 dev 가드를 오발동시키지 않게 하고, dev 가드 양성
+// checkout 의 scripts/build-plugin-bundle.ts 가 dev 가드를 오발동시키지 않게 하고, dev 가드 양성
 // 케이스는 각 테스트가 명시적으로 env 를 줘요.
 function runScript(scriptPath: string, stdin: string, env: Record<string, string> = {}): RunResult {
   return runBash(["bash", scriptPath], stdin, baseEnv(env));
@@ -180,6 +180,37 @@ describe("update-router (UserPromptSubmit entry 1 → hooks/update-router.sh)", 
   test("marker kill switch no-update-router 가 있으면 침묵해요", () => {
     expectSilent(runUpdateRouter(promptPayload("axhub 업데이트해줘"), { HOME: makeHomeWithMarker("update-router") }));
   });
+
+  // P2-33: `버전`·`업데이트`·`update` 부분 문자열 매칭이 롤백·env 변경 발화를 update 로
+  // 가로채 요청하지 않은 `update apply`·`claude plugin update` 를 먼저 돌렸어요.
+  test("P2-33 회귀 잠금: 롤백·환경변수 업데이트·env/apps update 운영 발화엔 침묵해요", () => {
+    for (const prompt of [
+      "axhub 이전 버전으로 롤백해줘",
+      "axhub 환경변수 DATABASE_URL 업데이트해줘",
+      "axhub env update API_KEY 해줘",
+      "axhub apps update --subdomain shop 해줘",
+      "axhub 최신 배포 롤백해줘",
+      "axhub 최신 배포 로그 보여줘",
+      "axhub 버전 2 앱으로 배포해줘",
+    ]) {
+      expectSilent(runUpdateRouter(promptPayload(prompt)));
+    }
+  });
+
+  test("P2-33: 좁힌 freshness 표현(CLI·플러그인 업데이트·버전 확인·영어)엔 계속 발동해요", () => {
+    for (const prompt of [
+      "axhub CLI 업데이트해줘",
+      "axhub 플러그인 업데이트해줘",
+      "axhub 버전 확인해줘",
+      "axhub 업데이트 있어?",
+      "axhub 최신이야?",
+      "is axhub up to date?",
+      "update axhub please",
+      "axhub update check",
+    ]) {
+      expectEmit(runUpdateRouter(promptPayload(prompt)), "UserPromptSubmit", "[axhub update router]");
+    }
+  });
 });
 
 describe("UserPromptSubmit 라우터 diet (update 단독)", () => {
@@ -234,7 +265,7 @@ function makeHome(): string {
 const AXHUB_STUB = `#!/usr/bin/env bash
 [ -n "$STUB_CALLS" ] && echo "\${AXHUB_TIMEOUT:+AXHUB_TIMEOUT=$AXHUB_TIMEOUT }\${AXHUB_UPDATE_FEED_URL:+AXHUB_UPDATE_FEED_URL=$AXHUB_UPDATE_FEED_URL }axhub $*" >> "$STUB_CALLS"
 case "$*" in
-  *--field-expr*) [ -n "$STUB_CHECK_EXIT" ] && exit "$STUB_CHECK_EXIT"; printf '%s\\n' "$STUB_CHECK_OUT" ;;
+  *--field-expr*) [ -n "$STUB_CHECK_EXIT" ] && exit "$STUB_CHECK_EXIT"; sep=$(printf '%s' "$*" | sed -n 's/.*join("\\(.\\)").*/\\1/p'); out=\${STUB_CHECK_OUT// /|}; printf '%s\\n' "\${out//|/\${sep:-|}}" ;;
   "update check --json") printf '%s\\n' "$STUB_CHECK_JSON" ;;
   "update apply"*) [ -n "$AXHUB_UPDATE_FEED_URL" ] && exit "\${STUB_BRIDGE_APPLY_EXIT:-0}"; exit "\${STUB_APPLY_EXIT:-0}" ;;
 esac
@@ -244,7 +275,8 @@ const CLAUDE_STUB = `#!/usr/bin/env bash
 [ -n "$STUB_CALLS" ] && echo "claude $*" >> "$STUB_CALLS"
 case "$1 $2" in
   "plugin list") printf '  ❯ axhub@axhub\\n    Version: 1.27.1\\n    Scope: %s\\n    Status: ✔ enabled\\n' "\${STUB_SCOPE:-user}" ;;
-  "plugin update") exit "\${STUB_PLUGIN_EXIT:-0}" ;;
+  "plugin marketplace") exit "\${STUB_MARKETPLACE_EXIT:-0}" ;;
+  "plugin update") [ "\${STUB_PLUGIN_EXIT:-0}" = 0 ] && printf '{"command":"update","outcome":"ok","plugin":"axhub@axhub","updateOutcome":"%s"}\\n' "\${STUB_UPDATE_OUTCOME:-updated}"; exit "\${STUB_PLUGIN_EXIT:-0}" ;;
 esac
 exit 0
 `;
@@ -344,7 +376,7 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
       OLD_CLI_APPLY,
       "claude plugin list",
       "claude plugin marketplace update axhub",
-      "claude plugin update axhub@axhub --scope project",
+      "claude plugin update axhub@axhub --scope project --json",
     ]);
     expect(readFileSync(join(home, MARKER_REL), "utf8")).toBe("1.28.0|project");
     expect(log).toContain("host=claude UPDATED cli=v0.38.0->v0.39.0 PLUGIN_UPDATED plugin=1.27.1->1.28.0 scope=project");
@@ -417,10 +449,17 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
     expect(log).toContain("UP_TO_DATE");
   });
 
-  test("dev 가드 토폴로지 A: <repo>/plugins/axhub in-place 로딩 → 침묵해요", () => {
-    const repo = mkdtempSync(join(tmpdir(), "axhub-dev-repo-"));
-    mkdirSync(join(repo, ".git"), { recursive: true });
-    const pluginRoot = join(repo, "plugins", "axhub");
+  // dev 가드는 소스 트리에만 있는 번들러(scripts/build-plugin-bundle.ts)로 판정해요 — 번들은
+  // scripts/ 를 싣지 않아요.
+  function makeSourceTree(prefix: string): string {
+    const root = mkdtempSync(join(tmpdir(), prefix));
+    mkdirSync(join(root, "scripts"), { recursive: true });
+    writeFileSync(join(root, "scripts", "build-plugin-bundle.ts"), "");
+    return root;
+  }
+
+  test("dev 가드 토폴로지 A: <source>/plugins/axhub in-place 로딩 → 침묵해요", () => {
+    const pluginRoot = join(makeSourceTree("axhub-dev-repo-"), "plugins", "axhub");
     mkdirSync(pluginRoot, { recursive: true });
     const { result, home, calls } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES, CLAUDE_PLUGIN_ROOT: pluginRoot });
     expectSilent(result);
@@ -428,20 +467,61 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
   });
 
-  test("dev 가드 토폴로지 B: repo 루트 직접 로딩 (루트 plugin.json 레이아웃) → 침묵해요", () => {
-    const repo = mkdtempSync(join(tmpdir(), "axhub-dev-root-"));
-    mkdirSync(join(repo, ".git"), { recursive: true });
-    const { result, home, calls } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES, CLAUDE_PLUGIN_ROOT: repo });
+  test("dev 가드 토폴로지 B: 소스 루트 직접 로딩 (루트 plugin.json 레이아웃) → 침묵해요", () => {
+    const { result, home, calls } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES, CLAUDE_PLUGIN_ROOT: makeSourceTree("axhub-dev-root-") });
     expectSilent(result);
     expect(calls).toEqual([]);
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
   });
 
-  test("disabled=true(패키지 매니저 관리) → apply 미호출, log SKIP_DISABLED", () => {
-    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: "v0.38.0 true v0.39.0 true false false 1.27.1" });
+  // P3-33: 모노레포에선 .git 이 레포·worktree 루트에만 있어 <mono>/clients/plugin/{plugins/axhub,
+  // dist/axhub-plugin} 의 ../../.git 이 없어요 — 옛 가드는 메인테이너 세션에서 실제 self-update 를 돌렸어요.
+  test("P3-33 dev 가드 모노레포 토폴로지: clients/plugin/{plugins/axhub,dist/axhub-plugin} 로딩 → 침묵해요", () => {
+    const mono = mkdtempSync(join(tmpdir(), "axhub-dev-mono-"));
+    mkdirSync(join(mono, ".git"), { recursive: true });
+    const pluginSource = join(mono, "clients", "plugin");
+    mkdirSync(join(pluginSource, "scripts"), { recursive: true });
+    writeFileSync(join(pluginSource, "scripts", "build-plugin-bundle.ts"), "");
+    for (const rel of [join("plugins", "axhub"), join("dist", "axhub-plugin")]) {
+      const pluginRoot = join(pluginSource, rel);
+      mkdirSync(pluginRoot, { recursive: true });
+      const { result, home, calls } = runWorker({ STUB_CHECK_OUT: BOTH_UPDATES, CLAUDE_PLUGIN_ROOT: pluginRoot });
+      expectSilent(result);
+      expect(calls, rel).toEqual([]);
+      expect(existsSync(join(home, CACHE_REL)), rel).toBe(false);
+    }
+  });
+
+  test("P3-33: 사용자 캐시 배치는 상위에 .git 이 있어도(dotfiles 관리) 가드에 걸리지 않아요", () => {
+    const claudeHome = mkdtempSync(join(tmpdir(), "axhub-dotfiles-claude-"));
+    mkdirSync(join(claudeHome, ".git"), { recursive: true });
+    const pluginRoot = join(claudeHome, "plugins", "cache", "axhub", "axhub", "1.27.1");
+    mkdirSync(join(pluginRoot, ".claude-plugin"), { recursive: true });
+    writeFileSync(join(pluginRoot, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "axhub", version: "1.27.1" }));
+    const { calls, log } = runWorker({ STUB_CHECK_OUT: UP_TO_DATE, CLAUDE_PLUGIN_ROOT: pluginRoot });
+    expect(calls).toHaveLength(1);
+    expect(log).toContain("UP_TO_DATE");
+  });
+
+  // P3-32: 실제 CLI 는 disabled(AXHUB_DISABLE_AUTOUPDATE·disable-autoupdate marker)일 때
+  // latest:"" · has_update:false · plugin 없음을 내요(update.rs run_check). 공백 join 은 빈
+  // latest 를 접어 CHECK_FAILED 로 떨어졌고, 옛 stub(disabled+has_update)은 낼 수 없는 형태였어요.
+  test("P3-32 disabled=true 실제 출력 형태(빈 latest·plugin null) → apply 미호출, log SKIP_DISABLED", () => {
+    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: "v0.46.18|false||true|false|null|null" });
     expectSilent(result);
     expect(applyCalls(calls)).toEqual([]);
-    expect(log).toContain("SKIP_DISABLED cli=v0.38.0 latest=v0.39.0");
+    expect(claudeCalls(calls)).toEqual([]);
+    expect(log).toContain("SKIP_DISABLED cli=v0.46.18 plugin=1.27.1");
+    expect(log).not.toContain("CHECK_FAILED");
+  });
+
+  test("P3-32 CLI feed 장애(빈 latest)여도 유효한 plugin.has_update 면 플러그인은 갱신해요", () => {
+    const { result, home, calls, log } = runWorker({ STUB_CHECK_OUT: "v0.49.4|false||false|false|true|1.33.0" });
+    expectSilent(result);
+    expect(applyCalls(calls)).toEqual([]);
+    expect(claudeCalls(calls)).toContain("claude plugin update axhub@axhub --scope user --json");
+    expect(log).toContain("CHECK_FAILED cli=v0.49.4 reason=cli_feed PLUGIN_UPDATED plugin=1.27.1->1.33.0 scope=user");
+    expect(readFileSync(join(home, MARKER_REL), "utf8")).toBe("1.33.0|user");
   });
 
   test("is_downgrade=true(서버 롤백) → apply 미호출, log SKIP_DOWNGRADE", () => {
@@ -579,7 +659,7 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
   });
 
   test("필드가 7개 미만이면 CHECK_FAILED 예요", () => {
-    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: "v0.38.0 true v0.39.0 false false false" });
+    const { result, calls, log } = runWorker({ STUB_CHECK_OUT: "v0.38.0|true|v0.39.0|false|false|false" });
     expectSilent(result);
     expect(applyCalls(calls)).toEqual([]);
     expect(log).toContain("CHECK_FAILED");
@@ -622,6 +702,28 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
     const { result, home, log } = runWorker({ STUB_CHECK_OUT: "v0.38.0 false v0.38.0 false false true 1.28.0", STUB_PLUGIN_EXIT: "1" });
     expectSilent(result);
     expect(log).toContain("PLUGIN_FAILED plugin=1.27.1 latest=1.28.0 scope=user");
+    expect(existsSync(join(home, MARKER_REL))).toBe(false);
+  });
+
+  // P3-36: `claude plugin update` 는 updated 뿐 아니라 up_to_date·skipped 도 exit 0 이에요
+  // (--json 의 updateOutcome 으로만 갈려요). 낡은 카탈로그의 "already at the latest version" 을
+  // 성공으로 읽으면 marker 가 남아 세션마다 재시작 안내가 나와요.
+  test("P3-36 plugin update 가 up_to_date(exit 0)면 marker 없이 PLUGIN_SKIPPED 예요", () => {
+    const { result, home, log } = runWorker({ STUB_CHECK_OUT: "v0.38.0 false v0.38.0 false false true 1.28.0", STUB_UPDATE_OUTCOME: "up_to_date" });
+    expectSilent(result);
+    expect(log).toContain("PLUGIN_SKIPPED reason=not_updated plugin=1.27.1 latest=1.28.0 scope=user marketplace=ok");
+    expect(existsSync(join(home, MARKER_REL))).toBe(false);
+  });
+
+  test("P3-36 marketplace 새로고침 실패 + 낡은 카탈로그(up_to_date) → marker 없음, log 에 marketplace=failed", () => {
+    const { result, home, calls, log } = runWorker({
+      STUB_CHECK_OUT: "v0.38.0 false v0.38.0 false false true 1.28.0",
+      STUB_MARKETPLACE_EXIT: "1",
+      STUB_UPDATE_OUTCOME: "up_to_date",
+    });
+    expectSilent(result);
+    expect(claudeCalls(calls)).toContain("claude plugin update axhub@axhub --scope user --json");
+    expect(log).toContain("PLUGIN_SKIPPED reason=not_updated plugin=1.27.1 latest=1.28.0 scope=user marketplace=failed");
     expect(existsSync(join(home, MARKER_REL))).toBe(false);
   });
 
@@ -816,8 +918,8 @@ describe("AP-14 폴백 훅 (SessionStart entry 3)", () => {
 
 // hooks.json 의 SessionStart command 문자열 자체를 `bash -c` 로 실행해요 —
 // wrapper 파일 직접 실행(runScript)이 못 보는 `${CLAUDE_PLUGIN_ROOT}` 치환
-// 경계를 잠가요. repo 루트를 그대로 쓰면 .git 때문에 entry 1 dev 가드가
-// 끼어드니, .git 없는 스테이징 번들 루트(운영 플러그인 캐시 배치와 동형)로
+// 경계를 잠가요. repo 루트를 그대로 쓰면 scripts/build-plugin-bundle.ts 때문에 entry 1 dev
+// 가드가 끼어드니, scripts/ 없는 스테이징 번들 루트(운영 플러그인 캐시 배치와 동형)로
 // 각 entry 의 기대 emit/침묵을 그대로 재현해요.
 const STAGED_PLUGIN_ROOT = mkdtempSync(join(tmpdir(), "axhub-staged-plugin-"));
 cpSync(join(REPO_ROOT, "hooks"), join(STAGED_PLUGIN_ROOT, "hooks"), { recursive: true });

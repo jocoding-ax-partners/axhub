@@ -40,7 +40,7 @@ AI 활용 기록은 내 Codex 프롬프트·응답·툴콜 내용을 팀 워크�
 Use `VIBE_READY` only when checked items are actually green.
 
 ```text
-axhub 온보딩 완료예요. [VIBE_READY]
+axhub 온보딩 완료예요.
   ✓ CLI v<CLI_VERSION>
   ✓ 로그인 <masked-email>
   ✓ git v<GIT_VERSION>

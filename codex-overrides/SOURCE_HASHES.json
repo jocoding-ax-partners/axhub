@@ -1,11 +1,11 @@
 {
-  "skills/update/SKILL.md": "022d1e1d682f1c03952d7974d77d28d587ae9831f554543a763d3691810c172f",
-  "skills/update/references/plugin-update.md": "8856f7c19093506ac0b9c4151d7df16265c6a29853e85f211f7b47d36196e361",
+  "skills/update/SKILL.md": "a1fa3bcacd32b1d5dffd3535d99d94733c486a389c1e0d0a30c72c65f5462f79",
+  "skills/update/references/plugin-update.md": "1b92ca0e431fb503b297ceac43d496ffb96f63292d3f69b17cdec47b5e74f8f2",
   "skills/update/references/post-update-continuation.md": "4b01d6176d925c7d1978f55522eb4a545d2ebb7f163dfdbd9fa76db138261e7e",
-  "hooks/update-router.sh": "6a860a996bd8d908896c0ec96db500b5a5804eef78fcb3a9dc981685c21183b3",
+  "hooks/update-router.sh": "cb2217eea357a15b08cdc2c3f06bde24b7d568829d13711e5d7e0ea5ccfe2160",
   "hooks/session-update-router-guard.sh": "0040ef1d1bf1d18ba65c6ab3f9f6bee01da22a4d815597a014b55d6b8958e399",
   "hooks/session-feedback-contract.sh": "97de6c654a00dc4a7bec0b22082e92290f38206fd37cc42e85afe5d23f735845",
-  "skills/deploy/SKILL.md": "69b001f84ef41879e0d5770066f8eb216305f0f6688a5641586ced998df08da9",
-  "README.md": "43e768a255336aa35acef99342af628eb334a6007312a840a5a4948b588050b8",
+  "skills/deploy/SKILL.md": "bf9e0362f6dadeb695c68f7b2847883e697ca038a150b08d794d459bc4f570d7",
+  "README.md": "b5aded9b38088084eca66b1c82c5f40e4a5bac6352386cf5a034949d7ff29ab8",
   "POLICY.md": "7fd2d00b3bddb6e7bf73e6f9024d664c2df068180d93fc5dfacc594c302203ff"
 }

@@ -211,7 +211,8 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("axhub apps bootstrap-status");
     expect(bootstrap).toContain("axhub deploy status <deployment-id>");
     // AP-16 대기 수단 우선: status 연타 폴링 대신 CLI 내부 대기 단일 호출.
-    expect(bootstrap).toContain("--wait --wait-interval 20s --wait-timeout 10m --json");
+    expect(bootstrap).toContain("--wait --wait-interval 20s --wait-timeout 9m --json");
+    expect(bootstrap).not.toContain("--wait-timeout 10m");
     expect(bootstrap).toContain("연타 폴링은 UX 실패예요");
     expect(bootstrap).toContain("axhub deploy verify <deployment-id> --app <app>");
     expect(bootstrap).toContain("재시도는 최대 1회예요");
@@ -470,7 +471,13 @@ describe("bootstrap desktop UX contract", () => {
     expect(localReference).toContain("run one direct `axhub deploy verify <deployment-id> --app <app-slug> --json` command");
     expect(localReference).toContain("Do not claim \"I'll automatically check again in 90 seconds\"");
     expect(localReference).toContain("Do not parse JSON with `grep`, `head`, `tail`, `cut`, `awk`, `sed`, or `jq` in Desktop-visible commands");
-    expect(localReference).not.toContain("--watch --watch-timeout 9m");
+    // bootstrap-status 의 CLI 내부 대기(`--watch --watch-timeout 9m`)는 SKILL.md 9.1 과 같아요.
+    // watch flag 금지는 첫 execute·첫 Desktop resume 에만 걸려요.
+    expect(localReference).toContain(
+      "axhub apps bootstrap-status 11111111-1111-4111-8111-111111111111 --tenant test --watch --watch-timeout 9m --json",
+    );
+    expect(localReference).toContain("Only the first execute and the first Desktop resume stay free of watch flags");
+    expect(localReference).not.toContain("Do not use CLI watch flags from Claude Desktop");
     expect(localReference).not.toContain("you can check the URL later");
     expect(localReference).not.toContain("for i in $(seq");
     expect(localReference).not.toContain("grep -o '\"status\"");

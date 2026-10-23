@@ -121,7 +121,7 @@ describe("import skill contract", () => {
     expect(skill).toContain("Monitor, background task, ScheduleWakeup, output 파일 읽기");
     expect(skill).toContain("`for`/`while`/`until`, `sleep`, command substitution, pipe, `grep`, `head`, `status=`");
     expect(skill).toContain("`capabilities.import.early_return` 과 `capabilities.import.verify_wait` 가 모두 true");
-    expect(skill).toContain("axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 10m --json");
+    expect(skill).toContain("axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 9m --json");
     expect(skill).toContain("내부 폴링 예산은 최대 30회 또는 10분(AP-16)");
     expect(skill).toContain("정확히 한 번 호출");
     expect(skill).toContain("같은 verify 를 반복 호출하거나 `axhub apps get`, `deploy list`, `deploy status` 같은 사후 확인을 덧붙이지 않아요");

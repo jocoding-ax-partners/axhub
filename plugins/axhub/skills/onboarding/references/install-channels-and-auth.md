@@ -52,7 +52,7 @@ Do not invent another PATH search. The CLI owns candidate paths, shell rc backup
 
 ## CLI Old Or Update Available
 
-This plugin needs ax-hub-cli v0.20.0+ because `plugin-support` is inside the CLI (`plugin-support import`·`deploy diagnose` 표면까지 쓰는 import·diagnosis 는 v0.21.3+ 예요). Use public update commands, not retired helper summaries.
+This plugin needs ax-hub-cli v0.21.3+ because `plugin-support` (with `plugin-support import`·`deploy diagnose`) is inside the CLI. Use public update commands, not retired helper summaries.
 
 ```bash
 PLUGIN_VER=$(grep -o '"version"[^,]*' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null | head -1 | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')
@@ -117,8 +117,7 @@ axhub auth status --json
 Cases:
 
 - `user_email` exists: show masked identity and re-detect.
-- `code: token_expired`: try `axhub auth refresh --json`; if `invalid_grant`, fall through to login.
-- `code: not_logged_in`, or exit 4 with `error.code` `auth` (`Not logged in` — the current CLI reports a missing or expired login this way): ask to login.
+- exit 4 with `error.code` `auth` and no subcode (`Not logged in` — the CLI reports a missing and an expired login the same way; it has no separate expired or not-logged-in code): ask to login.
 - exit 4 whose hint names `axhub auth login --force` (`/me` answered 403: the saved login is fresh but lacks a scope the CLI needs): ask to login and start the device flow below with `--force` — a plain `auth login` is a no-op on a fresh token.
 - any other `code`: give a natural recovery phrase and stop or re-detect when appropriate.
 
@@ -146,13 +145,13 @@ AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub auth login --json
 
 Add `--force` only when the hint said so (the 403 case above).
 
-The CLI should open the browser automatically, keep polling, and return the login result in the same command. Do not ask the user to open the URL manually or say an approval phrase while the command is running. Humanize only `verification_uri_complete` or `verification_uri` plus `user_code` if the command returns `browser_opened:false`, `device_flow_required_user_action`, `device_flow_pending`, or `device_code_expired`. Never echo internal `device_code`.
+The CLI should open the browser automatically, keep polling, and return the login result in the same command. Do not ask the user to open the URL manually or say an approval phrase while the command is running. Humanize only `verification_uri_complete` or `verification_uri` plus `user_code` if the command returns `browser_opened:false`, `device_flow_required_user_action`, a `device_code_pending` event, or `device_code_expired`. Never echo internal `device_code`.
 
 Fallback handling:
 
 - `device_code_issued` with `auto_poll:true` and final success: re-detect immediately.
 - `device_code_issued` with `browser_opened:false`: show the safe URL/code once and stop with `READY_WITH_USER_ACTION`.
-- `device_flow_pending`: wait the emitted `retry_after_secs` and retry the emitted `resume_command` until success or expiry; do not ask for a manual approval phrase. When the pending payload carries `user_code` (every cached `--resume-last`), re-show that code plus `verification_uri` on each retry — approval is what ends the loop, so a retry without the code is unactionable.
+- `device_code_pending` event (the run then exits with subcode `device_flow_pending`): wait the event's `retry_after_secs` and retry its `resume_command` until success or expiry; do not ask for a manual approval phrase. When the event carries `user_code` (every cached `--resume-last`), re-show that code plus `verification_uri` on each retry — approval is what ends the loop, so a retry without the code is unactionable.
 - `device_code_expired`: start a fresh login once if the user still wants to continue.
 
 ## Auth Unverified

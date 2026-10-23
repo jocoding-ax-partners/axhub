@@ -93,7 +93,7 @@ Headless 는 `claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, TTY 없�
 axhub plugin-support deploy-prep --intent deploy --json
 ```
 
-이 명령은 `deploy-preview-summary`와 같은 envelope를 커밋 게이트 없이 줘요. 결과에서 읽는 값은 `preflight.auth_ok`, `preflight.auth_error_code`, `preflight.cli_too_old`, `preflight.capabilities`, `resolve.app_id`, `resolve.error`, `github_connected`, `in_flight_deploy`, `bootstrap_plan`이에요. `resolve.app_id`를 얻은 뒤 provider 판정은 별도 `apps get`의 top-level `git_backend`만 써요.
+결과에서 읽는 값은 `preflight.auth_ok`, `preflight.auth_error_code`, `preflight.cli_too_old`, `preflight.capabilities`, `resolve.app_id`, `resolve.app_kind`, `resolve.error`, `github_connected`, `in_flight_deploy`, `bootstrap_plan`이에요. `resolve.app_id`를 얻은 뒤 provider 판정은 별도 `apps get`의 top-level `git_backend`만 써요.
 
 분기:
 
@@ -102,9 +102,10 @@ axhub plugin-support deploy-prep --intent deploy --json
 | `preflight.auth_error_code`(또는 `resolve.error` 의 `auth_` 뒤)가 `probe_timeout`·`probe_no_output`·`cli_spawn_failed`·`api`·`rate_limited`·`timeout`·`other` | 로그인 판정이 없을 뿐이에요. 로그인·`import` 안내 없이 1단계를 한 번 다시 실행하고, 같으면 `axhub auth status --json` 결과로만 로그인 여부를 판정해요 — exit 0 이면 1단계를 한 번 더 실행해 이어가고, exit 4 면 아래 `auth_ok` false 행대로 해요. 그 밖이거나 1단계가 또 같으면 `axhub 서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요.` 로 멈춰요. |
 | `auth_ok` false (위 경우가 아닐 때) | `axhub 로그인이 필요해요.` 한 줄 뒤 auth 복구로 안내하고 멈춰요. |
 | `cli_too_old` true | `update` 로 보내고 멈춰요. |
-| `resolve.error` 가 `app_ambiguous` | 앱 이름이 여러 개에 걸린다는 뜻이에요 — 앱이 없는 게 아니에요. 후보를 보여주고 어느 앱인지 한 번 물은 뒤 `--app` 에 그 값을 넣어 1단계를 다시 해요. `import`·`bootstrap` 으로 보내지 않아요. |
+| `resolve.error` 가 `app_ambiguous` | 앱 이름이 여러 개에 걸린다는 뜻이에요 — 앱이 없는 게 아니에요. `resolve.matched_apps` 의 slug 를 보여주고 한 번 물은 뒤 고른 항목의 `id` 를 `APP_ID` 로 두고 다음 단계로 가요(`deploy-prep` 은 `--app` 을 받지 않아 다시 돌리지 않아요). `import`·`bootstrap` 으로 보내지 않아요. |
 | `resolve.error` 가 `apps_list_parse_error` | 앱 목록을 읽지 못한 일시 실패예요 — 앱이 없는 게 아니에요. 1단계를 한 번 다시 실행하고, 같으면 `앱 목록을 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.` 로 멈춰요. `import`·`bootstrap` 으로 보내지 않아요. |
 | `bootstrap_plan` 존재 (`resolve.error` 가 `app_not_found`·`no_candidate_slug`) | 앱이 아직 없다는 뜻이에요. 비어 있지 않은 폴더는 `import`, 빈 폴더는 `bootstrap` 으로 양보해요. `bootstrap_plan` 없이 `resolve.app_id` 만 없으면 위 행들로 판정하고 첫 배포로 보지 않아요. |
+| `resolve.app_kind` 가 `platform` | `axhub up` 은 테넌트 앱 전용이라 실행하지 않고 `deploy` 의 GitHub lane 으로 양보해요. |
 | `in_flight_deploy` 존재 | `이미 진행 중인 배포가 있어요. 그 배포를 계속 확인할게요.` 한 줄 뒤 `in_flight_deploy.id` 를 `DEPLOY_ID` 로 바인딩하고 5단계로 바로 가요. 새 배포를 시작하지 않아요 — `deploy-prep` 은 이 상태를 exit code 로 알리지 않으니 여기서 직접 막아요. |
 | exit 64 (`validation.quality_gate_failed`) | 품질 확인에서 막힌 항목이 있다는 뜻이에요. 실행하지 않고 사유를 한국어로 알린 뒤 멈춰요. |
 | 현재 폴더에 `axhub.yaml`·`apphub.yaml` 이 둘 다 없음 | `이 폴더에 axhub 매니페스트가 없어서 어떤 앱의 소스인지 확인할 수 없어요.` 로 멈추고 `import` 로 양보해요. `axhub up` 은 패킹 전에 매니페스트를 보지 않으니 이 확인은 여기서 해요. |
@@ -129,7 +130,7 @@ top-level `git_backend.backend`와 `git_backend.source`, `deploy_method`, `stagi
 2. preflight 의 `capabilities.readiness.context_url` 문서를 한 번만 가져와요(제목 `배포 기준 확인`). 못 받으면 `../deploy/references/deploy-rules.md` 로 대신해요.
 3. 그 규칙으로 앱 코드를 보고, 빌드 단계가 있으면 로컬 빌드를 5분 안에서 한 번 돌려요. 실패하면 고치고 2번까지 다시 빌드해요. 그래도 실패하면 올리지 않고 무엇이 막혔는지 알려요. 테스트·예시·README 의 흔적은 문제가 아니에요.
 4. 물을 일은 둘뿐이에요 — `.env`·`.env.local` 에도 없는 필수 설정값(`<이름> 값을 앱 폴더 .env 에 넣어 주세요` 라고 부탁해요, 값을 대화로 받지 않아요)과 안 되는 6가지·문서 `물어봄` 규칙에 처음 해당한 것. 모아서 한 번 물어요. `.axhub/deploy-answers.json` 의 `keep` 에 있는 항목은 다시 묻지 않고, `그대로` 답은 거기에 더해요.
-5. 묻지 않고 맞춰요: `.env` 에 있는 필수 이름은 `axhub env set --app "$APP_ID" --from-dotenv .env --only <이름,…> --execute` 로 등록해요(`.env` 를 열거나 값을 출력하지 않아요). 포트·`0.0.0.0` 바인딩·상태 확인 경로·빌드 오류는 파일을 고쳐요. 고친 파일은 커밋하지 않고 그대로 올라가요.
+5. 묻지 않고 맞춰요: 필수 이름 중 `.env.local` 에 있는 것은 `--from-dotenv .env.local`, 나머지는 `axhub env set --app "$APP_ID" --from-dotenv .env --only <이름,…> --execute` 로 등록해요(파일을 열거나 값을 출력하지 않아요). 포트·`0.0.0.0` 바인딩·상태 확인 경로·빌드 오류는 파일을 고쳐요. 고친 파일은 커밋하지 않고 그대로 올라가요.
 6. 맞춘 게 있으면 마지막 메시지를 정확히 `이렇게 맞춰서 올렸어요.` 로 시작하고, 맞춘 것과 결과 주소를 알려요.
 
 ## 2단계 — 올릴 내용 미리보기
@@ -140,11 +141,11 @@ axhub up --app "$APP_ID" --path . --dry-run --json
 
 dry-run 은 앱 resolve·인증·네트워크 이전에 패킹만 하고 끝나요. 반환된 `target` 문자열에서 파일 수·압축 크기·source 버전을 읽어 preview 카드를 만들어요. `--execute` 는 폴더를 다시 패킹하므로, 1.5단계의 수정은 이 미리보기 전에 끝내요.
 
-올라가는 것은 `.gitignore` 를 존중한 현재 폴더예요. `.git/`·`node_modules/`·`.venv/`·`__pycache__/`·`.env` 계열은 항상 빠지고 `.env.example` 류는 남아요. 커밋은 보내지 않고, 연결된 저장소가 있어도 건드리거나 끊지 않아요.
+올라가는 것은 `.gitignore` 를 존중한 현재 폴더예요. `.git/`·`node_modules/`·`.venv/`·`__pycache__/`·`.env` 계열은 항상 빠지고 `.env.example` 류는 남아요.
 
 **dry-run 이 실패하면 preview 카드를 만들지 않아요.** 업로드 상한 초과, 단일 파일 상한 초과, 제외 규칙으로 파일 0개, `--path` 폴더 없음 — 어느 경우든 CLI 가 준 한국어 사유를 그대로 전한 뒤 멈춰요. 재시도하거나 `--execute` 로 넘어가지 않아요.
 
-CLI 0.29.0 미만이면 이 명령이 unknown command 로 끝나요. 그때는 `update` 로 보내고 멈춰요 — `axhub deploy create` 로 대체하지 않아요. 로컬 커밋은 AxHub 가 저장소에서 찾지 못해 commit-not-found 로 실패해요.
+CLI 0.29.0 미만이면 이 명령이 unknown command 로 끝나요. 그때는 `update` 로 보내고 멈춰요 — `axhub deploy create` 로 대체하지 않아요.
 
 ## 3단계 — 올릴 내용 알리기 (AP-12)
 
@@ -172,9 +173,9 @@ exit 0 이면 계속하고, exit 65 면 auth 복구로 가요. `AXHUB_AUTH_BG_RE
 axhub up --app "$APP_ID" --path . --execute --field-expr '.id // .deployment_id // empty'
 ```
 
-**이 명령은 실패로 보여도 다시 실행하지 않아요.** 폴더가 크면 업로드가 도구 타임아웃보다 오래 걸려, 배포는 이미 시작됐는데 출력만 잘려 돌아올 수 있어요. 그때 재실행하면 같은 소스로 프로덕션 배포가 하나 더 생겨요. 출력이 잘리거나 타임아웃이면 `deploy list --app "$APP_ID"` 로 방금 만들어진 배포가 있는지 먼저 확인하고, 있으면 그 id 를 `DEPLOY_ID` 로 써요. exit 64 에 `deployment_in_progress` 가 있으면 실패가 아니라 진행 중이라는 뜻이라 5단계로 가요.
+**이 명령은 실패로 보여도 다시 실행하지 않아요.** 큰 폴더는 업로드가 도구 타임아웃보다 오래 걸려 배포는 시작됐는데 출력만 잘릴 수 있고, 재실행하면 같은 소스로 프로덕션 배포가 하나 더 생겨요. 출력이 잘리거나 타임아웃이거나 exit 9 `already_exists`(진행 중 배포, 구 CLI 는 exit 64 `deployment_in_progress`)면 `axhub plugin-support deploy-prep --refresh-in-flight --json` 한 번의 `in_flight_deploy.id` 로 5단계를 해요.
 
-결과 모양이 `deploy create` 와 같아서 이후 단계는 저장소 배포와 동일해요. `DEPLOY_ID` 는 이 출력 또는 1단계의 `in_flight_deploy.id` 에서만 바인딩해요. id 를 못 받으면 성공을 선언하지 않고 `배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. 자동으로 지켜볼 id 가 없어 여기서 멈출게요.` 라고 말한 뒤 멈춰요.
+결과 모양이 `deploy create` 와 같아서 이후 단계는 저장소 배포와 동일해요. `DEPLOY_ID` 는 이 출력, 1단계의 `in_flight_deploy.id`, 위 `--refresh-in-flight` 의 `in_flight_deploy.id` 셋에서만 바인딩해요. id 를 못 받으면 성공을 선언하지 않고 `배포 시작은 확인했지만 결과 확인 id 를 못 받았어요. 자동으로 지켜볼 id 가 없어 여기서 멈출게요.` 라고 말한 뒤 멈춰요.
 
 ## 5단계 — 성공 확인
 
@@ -183,12 +184,12 @@ axhub up --app "$APP_ID" --path . --execute --field-expr '.id // .deployment_id 
 preflight 의 `capabilities.import.verify_wait` 가 true 면 **권한 카드 한 번으로 끝나는** 단일 대기 호출을 정확히 한 번만 실행해요:
 
 ```bash
-axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" --wait --wait-interval 20s --wait-timeout 10m --json
+axhub deploy verify "$DEPLOY_ID" --app "$APP_ID" --wait --wait-interval 20s --wait-timeout 9m --json
 ```
 
-호출 직전에 `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` 한 줄만 남겨요. 이 한 호출이 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `apps get`·`deploy list`·`deploy status` 같은 사후 확인을 덧붙이지 않아요.
+호출 직전에 `아직 빌드 중이에요. 같은 배포를 계속 확인할게요.` 한 줄만 남기고, 명령 도구 timeout 을 600000ms 로 올려 실행해요(CLI 대기 9분이 도구 한도 안에서 끝나요). 이 한 호출이 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `apps get`·`deploy list`·`deploy status` 같은 사후 확인을 덧붙이지 않아요.
 
-`verify_wait` capability 가 없는 구 CLI 에서만 `--wait` 없는 개별 호출을 반복해요. 이때도 스킬 레벨 **폴링 예산**이 적용돼요 — **최대 30회 또는 10분** 중 먼저 닿는 쪽까지만이에요. `sleep`·shell loop·pipe·command substitution 으로 묶지 않고 독립 tool call 로 실행해요. 짧은 독립 호출 사이에는 host 가 지원하면 실제 대기 수단(예약 재확인)을 써요. 대기 수단이 없으면 30회를 연달아 쓰지 말고 확인 가능한 횟수까지만 하고 재개 요약으로 끝내요.
+`verify_wait` capability 가 없는 구 CLI 에서만 `--wait` 없는 개별 호출을 독립 tool call 로 반복해요 — 스킬 레벨 **폴링 예산** **최대 30회 또는 10분** 안에서, `sleep`·shell loop·pipe·command substitution 없이요. 대기 수단(예약 재확인)이 없으면 30회를 연달아 쓰지 말고 확인 가능한 횟수까지만 하고 재개 요약으로 끝내요.
 
 예산에 닿으면 실패로 선언하지 않아요. `아직 진행 중이에요. 여기서 실패로 보지 않고, 제가 확인 가능한 범위까지는 같은 배포를 지켜봤어요.` 로 재개 요약을 남기고 `DEPLOY_ID` 를 보존해요. 사용자에게 다시 상태 확인을 요청하지 않아요.
 
@@ -199,7 +200,7 @@ verify exit:
 | 0 | 최종 성공 | 한국어로 요약하고 접근 가능한 URL 을 평문으로 보여줘요. `url_checked=false` 면 `apps get` 으로 `access_url` 을 읽고 제한된 횟수의 HTTPS HEAD 재확인을 한 뒤에 열린다고 말해요. verify JSON 의 `environment` 가 `staging` 이면 스테이징에만 반영됐고 운영에는 아직 반영되지 않았다고 말하고 심사 신청 `axhub publish --app "$APP_ID" --deployment-id "$DEPLOY_ID" --execute` 를 같은 블록에 안내해요 (AP-25). `environment` 가 없거나 null 이면 `STAGING_ENABLED` 로 판단하고 운영으로 간주하지 않아요. |
 | 4 | 인증 만료 | auth 복구 문구를 써요. |
 | 5 | 알 수 없는 배포 id | 멈춰요. 최신 배포를 재탐색하지 않아요. |
-| 6 | 아직 진행 중 | 위 예산 규칙대로 처리해요. 새 배포를 만들지 않아요. |
+| 6·10·도구 timeout 끊김 | 아직 진행 중 | 실패가 아니에요. `--wait` 경로는 재개 요약과 같은 verify 명령 한 줄로 끝내고, fallback 은 위 예산대로 해요. 새 배포를 만들지 않아요. |
 | 7 | 최종 실패 | `배포가 실패했어요. 지금부터 원인 진단만 읽기 전용으로 확인할게요. 재배포나 롤백은 하지 않아요.` 뒤 `diagnosis` 로 인계해요. |
 
 `diagnosis` 인계는 같은 앱 식별자와 실패 근거를 유지하고, 재배포·롤백·새 배포 생성을 실행하지 않아요.
@@ -217,8 +218,8 @@ verify exit:
 - `axhub plugin-support deploy-preview-summary` / `deploy-approved-run` 호출 금지 — 커밋 게이트가 이 lane 을 잘못 막아요.
 - 커밋 생성·`git add`·`git push`·`.gitignore` 수정 금지. 사용자의 저장소를 대신 정리하지 않아요.
 - `axhub deploy create` 로 대체 금지. 로컬 커밋은 저장소에서 찾을 수 없어요.
-- `axhub up --execute` 재실행 금지 — 같은 소스라도 새 프로덕션 배포가 하나 더 생겨요.
-- `axhub deploy watch` / `deploy status --watch` 호출 금지 — Desktop·non-TTY 에서 저하돼요.
+- `axhub up --execute` 재실행 금지.
+- `axhub deploy watch` / `deploy status --watch` 호출 금지.
 - MCP 배포 mutation 도구 호출 금지.
 - verify 전 성공 선언 금지.
 

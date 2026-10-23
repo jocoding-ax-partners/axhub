@@ -32,14 +32,14 @@ axhub plugin은 instruction-only diet 뒤 현재 **11 skill** (`onboarding` / `b
 
 diet 가 제거한 hook 중 **auto-update SessionStart 훅 1개**만 `hooks/` 로 재도입했어요. AP-26 부터는 에이전트 프롬프트 없이 **훅 스크립트(`hooks/session-auto-update.sh`)가 `"async": true` 백그라운드 worker 로 직접 확인·적용**해요 — 사용자에게 묻지 않고, 세션을 막지 않고, 에이전트 명령·권한 팝업이 0개예요. Claude Code 가 `hooks/hooks.json` 을 자동 발견해요 — plugin.json 선언은 불필요해요.
 
-- **실행 모델:** hooks.json entry 1 이 `"async": true, "timeout": 5` 예요. async 를 아는 호스트는 비차단으로 돌리고 실행 중 timeout 을 적용하지 않아요 (Claude Code hooks reference "Run hooks in the background"). 끝나면 stdout JSON 의 `additionalContext` 만 **같은 세션의 다음 턴**에 에이전트에게 전달돼요 — 사용자 화면 노출 없음. async 를 모르는 구 호스트는 동기 훅으로 취급해 5초에 취소하므로 세션 시작 지연이 5초를 넘지 않아요 (apply 는 atomic swap 이라 중간 취소가 안전). `-p` headless 세션은 teardown 때 async 훅을 kill 해요 — 그 회차는 잃고 lock TTL 뒤 재시도해요(수용). 훅 계열 중 유일하게 네트워크·바이너리 교체를 하는 예외이고, 다른 전경 훅은 여전히 네트워크 0 이에요.
+- **실행 모델:** hooks.json entry 1 이 `"async": true, "timeout": 5` 예요. async 를 아는 호스트는 비차단으로 돌리고 실행 중 timeout 을 적용하지 않아요 (Claude Code hooks reference "Run hooks in the background"). 끝나면 stdout JSON 의 `additionalContext` 만 **같은 세션의 다음 턴**에 에이전트에게 전달돼요 — 사용자 화면 노출 없음. async 를 모르는 구 호스트는 동기 훅으로 취급해 5초에 취소하므로 세션 시작 지연이 5초를 넘지 않아요 (apply 는 atomic swap 이라 중간 취소가 안전). `-p` headless 세션은 teardown 때 async 훅을 kill 해요 — throttle 캐시는 lock 을 잡은 직후 이미 갱신돼서, 그 회차(구 호스트의 5초 취소도 같아요)는 잃고 24h 뒤 다음 주기에 재시도해요(수용). 훅 계열 중 유일하게 네트워크·바이너리 교체를 하는 예외이고, 다른 전경 훅은 여전히 네트워크 0 이에요.
 - **gate (worker 첫 수 ms):** kill switch → dev 가드 → CLI 3-경로(AP-17: `command -v axhub` → `~/.axhub/bin-path` → `~/.axhub/bin/axhub`(.exe), 찾은 절대경로로 직접 실행) → `~/.axhub/cache/.plugin-update-check` mtime 24h throttle → `~/.axhub/cache/.auto-update.lock/` `mkdir` 원자 lock(30분 TTL 회수, 못 잡으면 캐시 미touch). 해당 없으면 출력 없이 exit 0.
-- **dev 가드:** `${CLAUDE_PLUGIN_ROOT}/../../.git` 또는 `${CLAUDE_PLUGIN_ROOT}/.git` 이 있으면(레포 체크아웃 in-place 로딩·레포 루트 직접 로딩·dist 검증) auto-update 를 조용히 skip 해요 — 메인테이너 세션 노이즈 방지. end user 는 `~/.claude/plugins/cache/...` 경로라 무영향이에요.
-- **판정:** `axhub update check --plugin-version <plugin.json version> --field-expr '[.current,.has_update,.latest,.disabled,.is_downgrade,.plugin.has_update,.plugin.latest]|map(tostring)|join(" ")'` 1회로 공백 구분 7필드를 받아요 (jq·sed 없음). `--field-expr` 를 모르는 구 CLI(exit 64)는 `--json` 원문에서 top-level 만 뽑아 CLI 만 올리고 플러그인은 다음 주기로 미뤄요. 실패·필드 부족은 `CHECK_FAILED` 로 log 하고 멈춰요 — 침묵을 최신으로 읽지 않아요.
+- **dev 가드:** 소스 트리에만 있는 번들러 `${CLAUDE_PLUGIN_ROOT}/../../scripts/build-plugin-bundle.ts` 또는 `${CLAUDE_PLUGIN_ROOT}/scripts/build-plugin-bundle.ts` 가 있으면(`plugins/axhub`·`dist/axhub-plugin` in-place 로딩·레포 루트 직접 로딩) auto-update 를 조용히 skip 해요 — 메인테이너 세션 노이즈 방지. 모노레포에선 `.git` 이 레포·worktree 루트에만 있어 `.git` 으로는 판정하지 않아요. 번들은 `scripts/` 를 싣지 않아 end user 의 `~/.claude/plugins/cache/...` 경로는 무영향이에요.
+- **판정:** `axhub update check --plugin-version <plugin.json version> --field-expr '[.current,.has_update,.latest,.disabled,.is_downgrade,.plugin.has_update,.plugin.latest]|map(tostring)|join("|")'` 1회로 `|` 구분 7필드를 받아 `IFS='|' read` 로 읽어요 (jq·sed 없음). 공백 구분은 CLI 가 disabled·feed 장애 때 내는 빈 `latest` 를 기본 IFS 가 접어 필드가 밀려요. `disabled` 면 `SKIP_DISABLED`, `latest` 가 비면(feed 장애) CLI 쪽만 `CHECK_FAILED reason=cli_feed` 로 남기고 플러그인 단계는 이어가요. `--field-expr` 를 모르는 구 CLI(exit 64)는 `--json` 원문에서 top-level 만 뽑아 CLI 만 올리고 플러그인은 다음 주기로 미뤄요. 실패·필드 부족은 `CHECK_FAILED` 로 log 하고 멈춰요 — 침묵을 최신으로 읽지 않아요.
 - **CLI 업데이트:** `has_update && !disabled && !is_downgrade` 이고 halt marker 의 버전이 `latest` 와 다르면 `axhub update apply --execute --yes --json` 을 실행해요(즉시 반영, 판정은 exit 코드). exit 14/66(digest·cosign) → `~/.axhub/cache/.auto-update-halt`(`<latest>|<exit>`, 브리지 경유면 `<latest> via v0.44.2|<exit>`)를 쓰고 같은 버전은 재시도하지 않아요. 새 `latest` 가 나오면 halt 를 지우고 다시 시도해요.
 - **서명 신원 브리지 (#453):** 현재 CLI 가 0.44.1 이하이고 `latest` 가 0.44.2 보다 높으면 목표는 먼저 0.44.2 예요. 이 CLI 들은 옛 레포 서명만 믿어 mono 가 서명한 최신을 exit 66 으로 막아요. 그래서 `AXHUB_UPDATE_FEED_URL=https://cli.axhub.ai/identity-bridge` 로 버전 포인터만 바꿔 두 서명을 다 믿는 0.44.2 를 받고(자산·SHA256·cosign 검증은 그대로), 같은 run 에서 최신으로 이어요. 포인터는 CLI 릴리스 워크플로가 매번 게시해요(`clients/cli/scripts/identity-bridge.sh`). 브리지만 받고 멈추면 log 에 `cli=<이전>-><0.44.2>` 를 덧붙이고 그 변경을 알려요.
 - **apply timeout (#386):** 현재 CLI 가 0.46.10 미만이면 브리지·본 apply 둘 다 `AXHUB_TIMEOUT=10m` 을 붙여요 — 이 CLI 들은 전역 timeout(기본 30초)을 아카이브 다운로드 전체에 걸어 느린 회선에서 exit 10 이 반복돼요. 0.46.10 이상은 아카이브에 10분 하한이 있고 전역 timeout 을 늘리면 멈춤 감지만 길어져서 그대로예요.
-- **플러그인 업데이트:** `plugin.has_update` 면 `claude plugin list` 로 scope 감지(기본 user) → `claude plugin marketplace update axhub`(실패 무시) → `claude plugin update axhub@axhub --scope <scope>` — **재시작해야 반영**돼요. 성공 시 marker(`~/.axhub/cache/.plugin-update-restart`, 내용=받은 버전|scope)를 기록해요. `claude` 가 PATH 에 없으면 플러그인만 건너뛰고 log 에 남겨요.
+- **플러그인 업데이트:** `plugin.has_update` 면 `claude plugin list` 로 scope 감지(기본 user) → `claude plugin marketplace update axhub`(실패해도 계속, log 에 `marketplace=failed`) → `claude plugin update axhub@axhub --scope <scope> --json` — **재시작해야 반영**돼요. exit 0 은 `updateOutcome` 이 `updated`·`up_to_date`·`skipped` 모두라서, `updated` 일 때만 marker(`~/.axhub/cache/.plugin-update-restart`, 내용=받은 버전|scope)를 기록하고 나머지는 `PLUGIN_SKIPPED reason=not_updated` 예요 — 낡은 카탈로그의 "already at the latest version" 으로 재시작 안내가 반복되지 않아요. `claude` 가 PATH 에 없으면 플러그인만 건너뛰고 log 에 남겨요.
 - **알림:** 실제로 바뀐 게 있을 때만 worker 가 종료 직전 suppressed JSON 1회를 내요 — "axhub CLI 가 vA → vB 로 자동 업데이트됐어요" 또는 보안 검증 실패 한 줄("강제로 진행하지 말고 회사 IT·보안팀에 알려주세요"). 에이전트는 다음 응답 앞머리에 그 한 줄만 말하고 버전 확인 명령을 실행하지 않아요. 최신이면 출력이 없어요.
 - **관측:** `~/.axhub/cache/auto-update.log` 에 run 당 1줄(`<UTC ts> host=<claude|codex> <RESULT> k=v…`, 200줄 상한). 결과 어휘: `UP_TO_DATE`·`UPDATED`·`CHECK_FAILED`·`APPLY_FAILED`·`SECURITY_HALT`·`SKIP_HALTED`·`SKIP_DISABLED`·`SKIP_DOWNGRADE`·`PLUGIN_UPDATED`·`PLUGIN_FAILED`·`PLUGIN_SKIPPED`.
 - **재시작 확인 훅 (4번째 entry, 동기):** SessionStart 가 marker(7일 TTL, mtime)를 감지하면 `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` 의 `version`(이 세션이 실제 로드한 버전) ≥ marker 버전이면 "플러그인 v<x> 적용을 확인했어요" 한 줄을 emit 하고 marker 를 삭제해요. 낮으면 "재시작하면 적용돼요" 한 줄만 emit 하고 marker 를 둬요. `claude plugin list` 는 실행하지 않아요(에이전트 명령 0). dev 가드는 이 entry 에 적용하지 않아요 — marker 는 머신 전역이라 어느 세션의 확인도 유효해요.
@@ -61,7 +61,7 @@ auto-update 와 나란히 SessionStart 훅이 하나 더 있어요 (`hooks/hooks
 
 SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이트 요청에만 라우팅 문맥을 추가해요. Claude Desktop Code 모드에서 `Finding tools`, 전역 `App list (axhub)` 같은 App/MCP 도구, 일반 shell probe 가 먼저 잡히는 것을 막기 위한 guard 예요.
 
-- SessionStart fallback 은 새 Code 세션에 update-first 규칙을 먼저 깔아요. UserPromptSubmit match(`hooks/update-router.sh`)는 훅 입력 JSON 전체가 아니라 **사용자 프롬프트(`"prompt":` 필드 이후 구간)에** `axhub`(대소문자 4-변형)와 최신성 키워드(`최신`, `버전`, `업데이트`, `latest`, `up to date`, `version check`, `update`, `upgrade`)가 함께 있을 때만 `hookSpecificOutput.additionalContext` 를 emit 하고, `"prompt":` 키 부재 시 fail-closed 로 침묵해요. 모든 훅 출력은 `suppressOutput: true` JSON 이라 사용자 화면에 노출되지 않아요 — `systemMessage` 와 plain stdout 은 쓰지 않아요.
+- SessionStart fallback 은 새 Code 세션에 update-first 규칙을 먼저 깔아요. UserPromptSubmit match(`hooks/update-router.sh`)는 훅 입력 JSON 전체가 아니라 **사용자 프롬프트(`"prompt":` 필드 이후 구간)에** `axhub`(대소문자 4-변형)와 좁힌 최신성 표현(`최신인지`·`최신 버전`·`버전 확인`·`업데이트 확인`·`axhub 업데이트`·`CLI 업데이트`·`플러그인 업데이트`·`up to date`·`version check`·`update axhub`·`axhub update` 등)이 함께 있을 때만 `hookSpecificOutput.additionalContext` 를 emit 하고, `"prompt":` 키 부재 시 fail-closed 로 침묵해요. `버전`·`업데이트`·`update` 단독은 매칭하지 않고, 롤백·`이전 버전`·`env update`·`apps update` 가 보이면 먼저 침묵해요 — 오탐은 요청하지 않은 CLI·플러그인 교체이고 미탐은 frontmatter 라우팅으로 떨어져요. 모든 훅 출력은 `suppressOutput: true` JSON 이라 사용자 화면에 노출되지 않아요 — `systemMessage` 와 plain stdout 은 쓰지 않아요.
 - 명령 실행·네트워크·앱 목록 조회를 하지 않아요. `update` 스킬 우선, 첫 visible assistant text `현재 버전을 확인할게요.`, App/MCP 도구 선행 금지만 주입해요.
 - update 뒤 같은 원문에 앱 현황 확인이 남으면 존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 시작해요. `| head`, `2>/dev/null`, `grep`, `sed`, `awk` 같은 shell 후처리는 붙이지 않아요.
 - **끄기:** `AXHUB_NO_UPDATE_ROUTER=1` 또는 `~/.axhub/config/no-update-router`.
@@ -92,18 +92,25 @@ SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이�
 - `bun run plugin:bundle` — `.claude`, `.omx`, `node_modules`, 인덱스 DB 같은 개발 산출물이 빠진 clean local plugin bundle 을 만들어요. 로컬 Claude Code 검증은 repo 루트가 아니라 `dist/axhub-plugin` 을 써요.
 - 실제 ax-hub-cli 구현/schema parity/release 는 이 plugin repo 범위 밖 follow-up 으로 남겨요.
 
-## Release flow (commit-and-tag-version, 단순화)
+## Release flow (commit-and-tag-version, 단순화 + 수동 미러)
 
-plugin 릴리즈는 `commit-and-tag-version` 기반 3단계 flow 를 유지하되 postbump 이 단순해졌어요 (codegen:version·release:check·5-binary build·bin/ add 전부 제거).
+plugin 릴리즈는 `commit-and-tag-version` 기반 3단계로 bump·tag 를 만들고(postbump 는 단순화 — codegen:version·release:check·5-binary build·bin/ add 전부 제거), 공개 레포 동기화와 GitHub release 는 mono 워크플로를 손으로 실행해요. tag push 로 도는 워크플로는 없어요. 기준 절차는 `docs/policy/dev-policy.md` DP-4 예요.
 
 ```bash
-# step 1 — bump + commit (tag 미생성)
+# step 1 — plugin/ 브랜치에서 bump + commit (tag 미생성)
 bun run release
-# step 2 — CHANGELOG narrative (해요체 1-3 문장) 추가 후 amend
+# step 2 — CHANGELOG narrative (해요체 1-3 문장) 추가 후 amend → PR 머지
 git commit --amend --no-edit -a
-# step 3 — tag 생성 + push
+# step 3 — 머지된 main 에서 plugin-vX.Y.Z tag 생성 + push
 bun run release:tag
+# step 4 — 공개 레포 main 으로 미러 (dry-run 확인 후 실제 실행, 로그에 `axhub: 머지 완료`)
+gh workflow run repo-mirror.yml --ref plugin-vX.Y.Z -f target=plugin -f dry_run=true
+gh workflow run repo-mirror.yml --ref plugin-vX.Y.Z -f target=plugin -f dry_run=false
+# step 5 — 미러 머지 확인 뒤 mono GitHub release + Slack 공지
+gh workflow run plugin-release.yml -f tag=plugin-vX.Y.Z
 ```
+
+사용자는 공개 레포 main 을 읽으므로 step 4 전에는 아무에게도 나가지 않아요. 미러는 tag 를 넘기지 않아서 공개 레포에는 tag·GitHub release 가 생기지 않아요.
 
 ## deploy 성공 선언 규칙
 

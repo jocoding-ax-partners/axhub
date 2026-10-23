@@ -6,9 +6,9 @@
 
 다음 **구체 근거**가 지금 대화 컨텍스트에 실제로 보일 때만 "했다" 로 판정해요:
 
-- **리소스 조회:** `connector_query` / `connector_resources` / `row_list` / `table_list` 같은 도구의 실제 결과가 이 대화에 있음.
-- **온보딩 완료:** 이 대화에 온보딩 Ready card(`VIBE_READY`) 출력이 있음.
-- **배포 준비 점검 완료 (development→deploy):** 이 대화에 development 의 `[8/9] 배포 준비 점검` 결과(생성코드가 쓰는 테이블·env 확인)가 보임 → deploy 는 "배포 직전 선택 점검(infer-tables-env)" 명시 텍스트 승인 을 건너뛰고 safe default 로 바로 배포를 이어가요.
+- **리소스 조회:** `connector_query` / `connector_resources` / `raw_table_list` / `raw_row_list` / `row_list` / `table_list` 같은 도구의 실제 결과가 이 대화에 있음.
+- **온보딩 완료:** 이 대화에 온보딩 Ready card(첫 줄 `axhub 온보딩 완료예요.`) 출력이 있음.
+- **배포 준비 점검 완료 (development→deploy):** 이 대화에 development 의 `[8/9] 배포 준비 점검` 결과(생성코드가 쓰는 테이블·env 확인)가 보임 → deploy 의 `## 배포 전 맞추기`(AP-29)는 그대로 해요 — 판정(`deploy check`)·묻는 일·`.env` 등록은 이 점검으로 대신하지 않아요. 그 점검 뒤 의존성·설정·소스가 바뀌지 않았으면 3단계(검사)의 로컬 빌드만 다시 돌리지 않아요.
 
 근거가 안 보이면 "안 했다" 로 보고 콜드(평소) 동작으로 가요. 짐작으로 판정하지 않아요.
 

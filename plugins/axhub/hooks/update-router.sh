@@ -6,7 +6,8 @@ set -euo pipefail
 # │                    또는 marker ~/.axhub/config/no-update-router)→ exit 0│
 # │             ─▶ [2] "prompt": 키 추출 — 부재 시 fail-closed   → exit 0  │
 # │             ─▶ [3] axhub 토큰 (axhub|Axhub|AxHub|AXHUB)      → exit 0  │
-# │             ─▶ [4] freshness 키워드 → additionalContext 발행           │
+# │             ─▶ [4] 롤백·env/apps update 운영 발화              → exit 0  │
+# │             ─▶ [5] 좁힌 freshness 표현 → additionalContext 발행        │
 # └─────────────────────────────────────────────────────────────────────────┘
 # [2] 근거: UserPromptSubmit stdin 은 session_id → transcript_path → cwd →
 # permission_mode → hook_event_name → prompt 를 담아요 (공식 문서 예시 순서,
@@ -37,8 +38,19 @@ case "$prompt_part" in
   *) exit 0 ;;
 esac
 
+# [4]·[5] 단독 `버전`·`업데이트`·`update` 는 롤백·env 변경에도 나와 요청 없는 교체를 일으켜요 —
+# 오탐은 binary swap, 미탐은 frontmatter 라우팅이라 좁게 매칭해요.
 case "$prompt_part" in
-  *최신*|*버전*|*업데이트*|*latest*|*"up to date"*|*"version check"*|*update*|*upgrade*)
+  *롤백*|*"이전 버전"*|*"예전 버전"*|*되돌*|*rollback*|*"env update"*|*"apps update"*) exit 0 ;;
+esac
+
+case "$prompt_part" in
+  *최신인*|*최신이*|*"최신 맞"*|*"최신 버전"*|*최신버전*|*최신으로*|*최신화*|*"최신 상태"*|\
+  *"버전 확인"*|*"버전 체크"*|*"버전 알려"*|*"버전 뭐"*|*"버전이 뭐"*|*"몇 버전"*|*버전업*|\
+  *"업데이트 확인"*|*"업데이트 체크"*|*"업데이트 있"*|*"CLI 업데이트"*|*"cli 업데이트"*|*"플러그인 업데이트"*|\
+  *"axhub 업데이트"*|*"Axhub 업데이트"*|*"AxHub 업데이트"*|*"AXHUB 업데이트"*|\
+  *"latest version"*|*"up to date"*|*"version check"*|*"update check"*|\
+  *"update axhub"*|*"upgrade axhub"*|*"axhub update"*|*"Axhub update"*|*"axhub upgrade"*|*"Axhub upgrade"*)
     cat <<'JSON'
 {"continue":true,"suppressOutput":true,"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"[axhub update router] The current user prompt asks about axhub freshness/update. Before Finding tools, any axhub App/MCP tool, app list/status tool, shell version probe, clarity, bootstrap, deploy, /oh-my-claudecode:autopilot, unrelated plugin mode, or generic Code-mode handling, invoke the axhub update skill. The first visible assistant body must be exactly: 현재 버전을 확인할게요. Finish update first, then continue any remaining app status/create/deploy/GitHub reconnect-device-code request in the same conversation. Once you say 업데이트 확인은 끝났어요, do not run command-v, axhub --version, claude plugin list, plugin-location checks, or version probes again for the remaining app-status flow. For GitHub reconnect/device-code after update, apply the axhub clarity device-flow contract inline; do not invoke /axhub:clarity or show a failing skill badge; never run axhub git_connection_status, axhub github status, axhub --help | grep, shell pipes, or generic status probes; use exactly AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link then axhub github accounts list --json; when the earlier device code was lost or expired, use AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --fresh instead, never while a valid code is still on screen, with tenant option only when already known, shell tool titles and descriptions exactly 계정 인증 시작 and 인증 확인. The assistant body must print exactly two normal chat lines with the URL in inline code: 인증 URL: `https://github.com/login/device` and 입력 코드: <USER_CODE>; never print the URL as a bare auto-link or Markdown link such as [https://github.com/login/device](github.com/login/device). Do not finish after showing the code, after pending text, or after telling the user to approve; continue to 인증 확인 in the same assistant turn, and never wait for the user to say 승인했어 or 배포 상태 확인해줘. For plugin version lookup, the visible command is exactly claude plugin list; never claude plugin list 2>&1 or any redirected variant. For app status overview after update, allowed visible commands are exactly axhub apps --help then axhub apps list --json. If folder/current conversation/latest list clearly identifies a related app, do not ask which app; continue with CLI-only axhub apps get <app> --json and axhub deploy list --app <app> --json before any summary. Never call Claude Desktop axhub App/MCP tools such as Deployment list (axhub), App get (axhub), or Tenant recent deployments (axhub). Never run nonexistent singular axhub app list or axhub deployment list. Never run command -v axhub && axhub --version, command -v claude && claude plugin list, or claude plugin list 2>&1 | grep. Never add sleep, &&, pipes, redirects, head, tail, grep, sed, awk, bash -lc, sh -c, or 2>/dev/null."}}
 JSON

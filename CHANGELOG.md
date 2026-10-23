@@ -4,6 +4,17 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.32.2](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.1...plugin-v1.32.2) (2026-10-23)
+
+배포 스킬이 비밀 환경변수를 넣을 때 `printf` 파이프나 `--value-file` 임시 파일만 쓰게 바꿨어요. 파이프 없이 `--from-stdin` 을 안내해서 에이전트가 값을 대화형 세션에 쓰고 끝내지 못해 30초 뒤 같은 명령을 반복했어요. 플랫폼 기본앱은 `axhub admin apps get` 과 GitHub 배포만 쓰고 `up` 업로드로 보내지 않으며, 배포 확인 대기 시간도 CLI 와 맞췄어요.
+
+
+### Fixed
+
+* **plugin:** 비밀값은 파이프·`--value-file` 로 넣고, `resolve.app_kind` 가 `platform` 이면 `admin apps get`·GitHub lane 만 써요 ([#1726](https://github.com/jocoding-ax-partners/axhub-mono/issues/1726), [#1728](https://github.com/jocoding-ax-partners/axhub-mono/issues/1728), [#1774](https://github.com/jocoding-ax-partners/axhub-mono/pull/1774))
+* **plugin:** skill·hook CLI drift 정리와 deploy verify 대기 timeout 맞춤 ([#1738](https://github.com/jocoding-ax-partners/axhub-mono/issues/1738)) ([a7fabbd](https://github.com/jocoding-ax-partners/axhub-mono/commit/a7fabbdf6143d7ee8d29bc5f29b83ce6950ad087))
+* **repo:** 플러그인 수동 미러·릴리스 절차 문서화와 plugin-ci CLAUDE.md 필터 수정 ([#1731](https://github.com/jocoding-ax-partners/axhub-mono/issues/1731)) ([8b100aa](https://github.com/jocoding-ax-partners/axhub-mono/commit/8b100aab4ee27f739b78d62993af170f0d2f4563))
+
 ## [1.32.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.0...plugin-v1.32.1) (2026-10-20)
 
 CLI 설치 안내에서 리눅스를 뺐어요. CLI 는 macOS 와 Windows 용으로만 나오는데, 온보딩과 업데이트 스킬이 리눅스에도 설치 스크립트를 안내해 설치가 오류로 끝났어요. 이제 리눅스 사용자에게는 지원하지 않는다고 바로 알려요.

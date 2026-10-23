@@ -236,7 +236,7 @@ axhub --json plugin-support import --mode preview --headless
 
 5-1. 배포 방식 카드
 
-preview `deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create` 가 있는데 사용자가 배포 방식을 말하지 않았으면, 6 전에 선택 카드로 `어떤 방식으로 배포할까요?` 를 한 번 물어요. header `배포 방식`, 선택지 `정적 사이트 (추천)`(`HTML·빌드 결과만 올려요`), `서버 앱`(`서버 코드까지 실행해요`), `그만두기`(`올리지 않고 끝내요.`). 주소 도메인은 적지 않아요. 정적 사이트면 6으로 가요. 서버 앱이면 `detected_state.manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker` 로 preview 를 다시 받아 5·6 을 이어가고, 없으면 실행할 서버 코드가 없다고 한 줄로 말한 뒤 `정적 사이트 (추천)`·`그만두기` 로 다시 물어요. headless 는 묻지 않아요.
+preview `deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create` 가 있는데 사용자가 배포 방식을 말하지 않았고 `axhub.yaml`(없으면 `apphub.yaml`)이 `build.deploy_method`·`deploy.method` 를 선언하지 않았으면, 6 전에 선택 카드로 `어떤 방식으로 배포할까요?` 를 한 번 물어요. header `배포 방식`, 선택지 `정적 사이트 (추천)`(`HTML·빌드 결과만 올려요`), `서버 앱`(`서버 코드까지 실행해요`), `그만두기`(`올리지 않고 끝내요.`). 주소 도메인은 적지 않아요. 정적 사이트면 6으로 가요. 서버 앱이면 `detected_state.manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker` 로 preview 를 다시 받아 5·6 을 이어가고, 없으면 실행할 서버 코드가 없다고 한 줄로 말한 뒤 `정적 사이트 (추천)`·`그만두기` 로 다시 물어요. headless 는 묻지 않아요.
 
 5-2. 첫 올리기 점검 (AP-30)
 
@@ -263,9 +263,9 @@ preview `deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create
 
 8. Execute 호출
 
-대화형 승인 직후 한 번만 호출해요. preflight 의 `capabilities.import.early_return` 과 `capabilities.import.verify_wait` 가 모두 true 일 때만 execute 에 `--verify-wait none` 을 붙여요 — execute 는 첫 배포 생성과 deployment id 확보까지만 반환하고, 이어서 **권한 카드 한 번으로 끝나는** `axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 10m --json` 를 정확히 한 번 호출해요. 이 한 호출의 내부 폴링 예산은 최대 30회 또는 10분(AP-16)이고, `--wait` 가 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `axhub apps get`, `deploy list`, `deploy status` 같은 사후 확인을 덧붙이지 않아요. 둘 중 capability 하나라도 없으면 `--verify-wait none` 을 빼서 execute 가 동기 검증을 끝내게 하고, 반환된 정확한 deployment id 로 일반 `axhub deploy verify <deployment-id> --app <app> --json` 를 최종 증거용으로 정확히 한 번만 호출해요.
+대화형 승인 직후 한 번만 호출해요. preflight 의 `capabilities.import.early_return` 과 `capabilities.import.verify_wait` 가 모두 true 일 때만 execute 에 `--verify-wait none` 을 붙여요 — execute 는 첫 배포 생성과 deployment id 확보까지만 반환하고, 이어서 **권한 카드 한 번으로 끝나는** `axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 9m --json` 를 명령 도구 timeout 600000ms 로 정확히 한 번 호출해요. 이 한 호출의 내부 폴링 예산은 최대 30회 또는 10분(AP-16)이고, `--wait` 가 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `axhub apps get`, `deploy list`, `deploy status` 같은 사후 확인을 덧붙이지 않아요. 둘 중 capability 하나라도 없으면 `--verify-wait none` 을 빼서 execute 가 동기 검증을 끝내게 하고, 반환된 정확한 deployment id 로 일반 `axhub deploy verify <deployment-id> --app <app> --json` 를 최종 증거용으로 정확히 한 번만 호출해요.
 
-Codex 에서는 background task, output 파일 읽기, `for`/`while`/`until`, `sleep`, command substitution, pipe, `grep`, `head`, `status=` 같은 shell 폴링을 쓰지 않아요. 첫 verify 가 exit 6 또는 timeout 이면 성공이라고 말하지 않고, 같은 명령을 자동 재실행하거나 새 승인 카드를 띄우지 않은 채 현재 진행 중이며 나중에 같은 ID로 이어볼 수 있다고 요약해요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못해도 execute 를 다시 실행하지 않아요.
+Codex 에서는 background task, output 파일 읽기, `for`/`while`/`until`, `sleep`, command substitution, pipe, `grep`, `head`, `status=` 같은 shell 폴링을 쓰지 않아요. 첫 verify 가 exit 6·10 이거나 도구 timeout 으로 끊기면 성공이라고 말하지 않고, 같은 명령을 자동 재실행하거나 새 승인 카드를 띄우지 않은 채 재개 요약과 같은 verify 명령 한 줄만 남겨요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못해도 execute 를 다시 실행하지 않아요.
 
 `설정은 나중에 올리기` 거나 commit+push capability 가 없는 경우:
 
