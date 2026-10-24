@@ -4,6 +4,20 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.32.3](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.2...plugin-v1.32.3) (2026-10-24)
+
+회사 플러그인 스킬을 CLI 0.50.0 의 게시 흐름에 맞췄어요. 업로드가 끝나면 바로 설치할 수 있는 것처럼 안내하던 것을 고쳐, 업로드 뒤에는 `axhub plugin submit` 으로 게시 심사를 신청하고 `axhub plugin manage status --app` 으로 진행 상황과 다음 할 일을 보게 했어요. 스킬을 쓰기 전에 CLI 가 0.50.0 이상인지 확인하고, 아니면 업데이트를 먼저 안내해요. PAT 를 다시 받아야 할 때는 토큰을 화면에 띄우지 않는 `axhub auth pat issue --use` 만 안내하고, 설치 전에는 제공 버전과 위험 검사 결과를 보여 줘요.
+
+
+### Fixed
+
+* **plugin:** plugins skill 게시 계약·0.50.0 가드·PAT 복구 안내 정리 ([#1742](https://github.com/jocoding-ax-partners/axhub-mono/issues/1742)) ([11ebc80](https://github.com/jocoding-ax-partners/axhub-mono/commit/11ebc802afa3c627b07db2685ec8c670614850b8))
+
+
+### Docs
+
+* **repo:** 플러그인 마켓플레이스 사고 기록·후속 정리 ([#1823](https://github.com/jocoding-ax-partners/axhub-mono/issues/1823)) ([8da24f7](https://github.com/jocoding-ax-partners/axhub-mono/commit/8da24f7c4d07a0a9d2143c868594fe4ddf38794b))
+
 ## [1.32.2](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.1...plugin-v1.32.2) (2026-10-23)
 
 배포 스킬이 비밀 환경변수를 넣을 때 `printf` 파이프나 `--value-file` 임시 파일만 쓰게 바꿨어요. 파이프 없이 `--from-stdin` 을 안내해서 에이전트가 값을 대화형 세션에 쓰고 끝내지 못해 30초 뒤 같은 명령을 반복했어요. 플랫폼 기본앱은 `axhub admin apps get` 과 GitHub 배포만 쓰고 `up` 업로드로 보내지 않으며, 배포 확인 대기 시간도 CLI 와 맞췄어요.
