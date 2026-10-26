@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.32.4](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.3...plugin-v1.32.4) (2026-10-26)
+
+회사 플러그인을 올릴 때 PAT 를 먼저 발급하라고 안내하지 않아요. 로그인한 채로 바로 게시하고, CLI 0.51.0 부터는 게시용 권한을 CLI 가 알아서 준비해요. 로그인이 필요하거나 예전 CLI 라서 발급이 필요할 때만 CLI 가 알려 준 다음 단계를 그대로 따라요.
+
+
+### Fixed
+
+* **plugin:** 게시 전 PAT 선발급 안내를 없애고 next_action 을 따른다 ([#1859](https://github.com/jocoding-ax-partners/axhub-mono/issues/1859)) ([290c9b6](https://github.com/jocoding-ax-partners/axhub-mono/commit/290c9b6c527930632a1f82c237c312355a14bc1b))
+
 ## [1.32.3](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.2...plugin-v1.32.3) (2026-10-24)
 
 회사 플러그인 스킬을 CLI 0.50.0 의 게시 흐름에 맞췄어요. 업로드가 끝나면 바로 설치할 수 있는 것처럼 안내하던 것을 고쳐, 업로드 뒤에는 `axhub plugin submit` 으로 게시 심사를 신청하고 `axhub plugin manage status --app` 으로 진행 상황과 다음 할 일을 보게 했어요. 스킬을 쓰기 전에 CLI 가 0.50.0 이상인지 확인하고, 아니면 업데이트를 먼저 안내해요. PAT 를 다시 받아야 할 때는 토큰을 화면에 띄우지 않는 `axhub auth pat issue --use` 만 안내하고, 설치 전에는 제공 버전과 위험 검사 결과를 보여 줘요.

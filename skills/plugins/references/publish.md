@@ -1,4 +1,4 @@
-# plugins 게시 실행·게시 심사·상태·PAT 복구
+# plugins 게시 실행·게시 심사·상태·인증 복구
 
 SKILL.md §6 의 publish 승인(새 `진행`)을 받은 뒤에만 §1 을 실행해요. 플러그인 버전 심사는 "게시 심사", 앱 visibility 심사는 "공개범위 변경 심사"라고만 불러요. 모든 명령은 CLI 0.50.0 이상(SKILL.md CLI 가드)을 전제로 해요.
 
@@ -81,18 +81,21 @@ axhub plugin manage status \
 - `wait_for_ingest`·`wait_for_publish`, 그리고 `gate_running`: 같은 명령에 `--watch --watch-timeout 5m` 을 붙여 한 번만 다시 봐요. exit 10·`plugin_status_watch_timeout` 이면 이어 볼 명령만 남기고 멈춰요. 같은 명령을 반복 호출하지 않아요.
 - 사람 결정을 기다리는 `admin_pending`·`other_version_in_review`·`gate_slow`: watch 하지 않고 나중에 볼 status 명령만 알려줘요.
 
-## 4. PAT 복구
+## 4. 인증 복구
 
-publish·submit·status가 exit 4 나 `plugin_pat_required` 로 끝나면 로그인 문제가 아니에요. 이 명령들은 OAuth를 받지 않으니 `auth login`·onboarding으로 보내지 않아요. scoped PAT 발급은 새 자격증명을 만드는 일이라 사용자에게 한 번 확인받은 뒤 아래 명령만 실행해요. `--use` 는 PAT를 keychain에 저장하고 활성 자격증명으로 쓰며 token을 화면에 내지 않아요.
+게시 전에 PAT를 미리 발급하지 않아요. 로그인한 상태로 §1 을 실행하면 CLI가 게시용 `plugins:read` + `plugins:write` scoped PAT를 알아서 준비·갱신하고 token을 화면에 내지 않아요. publish가 exit 4·`plugin_pat_required` 로 끝나면 `error.details.next_action.action` 에 맞는 것 하나만 해요. 다른 action이면 PAT를 짐작해 발급하지 않고 CLI 안내를 그대로 보여주고 멈춰요.
+
+- `login`: 로그인이 없어요. 사용자에게 `axhub auth login` 을 직접 실행해 브라우저에서 로그인해 달라고 하고, 끝났다고 답하면 같은 Idempotency-Key·payload로 원래 명령을 다시 실행해요. 이때는 PAT를 발급하지 않아요.
+- `issue_plugin_pat`: CLI가 게시용 PAT를 자동으로 준비하지 못했어요(이전 CLI이거나 준비 실패). scoped PAT 발급은 새 자격증명을 만드는 일이라 사용자에게 한 번 확인받은 뒤 `next_action.command` 를 고치지 않고 그대로 실행해요. 보통 아래 명령이고, `--use` 는 PAT를 keychain에 저장하고 활성 자격증명으로 쓰며 token을 화면에 내지 않아요.
 
 ```bash
 axhub auth pat issue --scopes plugins:read,plugins:write --tenant-id "<tenant-UUID>" --use
 ```
 
-- 그 뒤 같은 Idempotency-Key·payload로 원래 명령을 다시 실행해요. tenant UUID는 PAT 발급 전에 `axhub auth status --json` 의 `tenants[].tenant_id` 에서 얻어요.
+- 발급이 끝나면 같은 Idempotency-Key·payload로 원래 명령을 다시 실행해요. `next_action.command` 가 비어 있을 때만 tenant UUID를 `axhub auth status --json` 의 `tenants[].tenant_id` 에서 얻어 위 명령을 써요.
 - 사람이 repo 밖에 직접 만들어 둔 PAT 파일이 있다고 말한 경우에만 `--api-key-file "<path>"` 를 붙여요. agent가 token 값을 화면에 내거나 파일로 만들지 않아요.
-- 404·403이나 `plugin_tenant_uuid_required` 면 `--tenant` 를 PAT를 발급한 tenant UUID로 맞춰 다시 실행해요.
-- 게시를 마치고 배포 같은 다른 axhub 작업으로 돌아가면 `axhub auth pat unset` 으로 이 PAT를 활성 자격증명에서 내려요.
+- 404·403이나 `plugin_tenant_uuid_required` 면 `--tenant` 를 게시할 tenant UUID(`issue_plugin_pat` 로 발급했다면 그 PAT의 tenant UUID)로 맞춰 다시 실행해요.
+- `issue_plugin_pat` 로 PAT를 활성화했다면 게시를 마치고 배포 같은 다른 axhub 작업으로 돌아갈 때 `axhub auth pat unset` 으로 이 PAT를 활성 자격증명에서 내려요.
 
 ## 5. host marketplace 연결
 
