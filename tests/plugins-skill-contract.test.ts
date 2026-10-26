@@ -47,6 +47,12 @@ const NON_ACTION_FIELDS: Record<string, true> = {
   install_name: true,
   request_id: true,
 };
+// 부록 B 밖의 복구 action 이에요 — CLI `plugin publish --execute` 가 `plugin_pat_required`
+// 와 함께 내요(로그인 없음 → `login`, 게시용 PAT 자동 준비 불가 → `issue_plugin_pat`).
+const PUBLISH_RECOVERY_ACTIONS: Record<string, true> = {
+  login: true,
+  issue_plugin_pat: true,
+};
 
 // reference 의 ```bash 블록 안 axhub 명령을 줄 이음(`\`)을 풀어 한 줄씩 모아요.
 const referenceCommands = [...reference.matchAll(/```bash\n([\s\S]*?)```/g)]
@@ -177,15 +183,15 @@ describe("app-centric plugins skill contract", () => {
     expect(reference).toContain("`surface=app_console` 의 `url` 을 사람에게 넘겨요");
   });
 
-  test("names only Appendix B next_action actions", () => {
+  test("names only Appendix B and publish-recovery next_action actions", () => {
     const used = [...skillText.matchAll(/`([^`\n]+)`/g)]
       .map((match) => match[1])
       .filter((token) => ACTION_LIKE.test(token) && !NON_ACTION_FIELDS[token]);
     expect(used.length).toBeGreaterThan(0);
     for (const action of used) {
-      expect(APPENDIX_B_ACTIONS.has(action), action).toBe(true);
+      expect(APPENDIX_B_ACTIONS.has(action) || PUBLISH_RECOVERY_ACTIONS[action] === true, action).toBe(true);
     }
-    for (const retired of ["submit_publication_review", "inspect_gate_rejection_and_publish_new_version", "issue_plugin_pat"]) {
+    for (const retired of ["submit_publication_review", "inspect_gate_rejection_and_publish_new_version"]) {
       expect(skillText, retired).not.toContain(retired);
     }
   });
@@ -209,11 +215,26 @@ describe("app-centric plugins skill contract", () => {
     expect(source.match(/네이티브 선택 UI 가 있으면 그걸로 묻고/g)?.length).toBe(2);
   });
 
-  test("recovers a missing publish PAT with a stored scoped PAT, never a printed token (P2-31, DX12)", () => {
-    expect(source).toContain("exit 4·`plugin_pat_required`는 `auth login`·onboarding이 아니라 publish.md의 PAT 복구로 풀어요");
-    expect(reference).toContain(
+  test("publishes while signed in and follows plugin_pat_required next_action, never a printed token (P2-31, DX12)", () => {
+    // 게시 전 선제 PAT 발급은 없어요 — 로그인한 채 실행하고, CLI가 게시용 PAT를 준비해요.
+    expect(source).toContain("PAT를 미리 발급하지 않고 로그인한 채 실행하며");
+    expect(source).toContain("`plugin_pat_required`면 publish.md §4대로 `next_action`을 따라요");
+    expect(reference).toContain("게시 전에 PAT를 미리 발급하지 않아요");
+    const recovery = reference.slice(reference.indexOf("## 4. 인증 복구"), reference.indexOf("## 5. "));
+    expect(recovery).toContain("`plugin_pat_required`");
+    expect(recovery).toContain("`error.details.next_action.action`");
+    // 두 action 을 모두 다뤄요: login → 사용자가 `axhub auth login` 뒤 재실행, issue_plugin_pat → 안내 명령 그대로.
+    expect(recovery).toContain("- `login`: ");
+    expect(recovery).toContain("`axhub auth login`");
+    expect(recovery).toContain("- `issue_plugin_pat`: ");
+    expect(recovery).toContain("`next_action.command` 를 고치지 않고 그대로 실행해요");
+    expect(recovery).toContain(
       'axhub auth pat issue --scopes plugins:read,plugins:write --tenant-id "<tenant-UUID>" --use',
     );
+    // PAT 발급 명령은 issue_plugin_pat 복구 안에만 있어요.
+    expect(skillText.split("auth pat issue").length).toBe(recovery.split("auth pat issue").length);
+    expect(recovery.indexOf("- `issue_plugin_pat`: ")).toBeLessThan(recovery.indexOf("auth pat issue"));
+    expect(reference).not.toContain("`auth login`·onboarding으로 보내지 않아요");
     expect(skillText).not.toContain("--show-token");
     for (const line of skillText.split("\n").filter((line) => line.includes("auth pat issue"))) {
       expect(line, line).toContain("--use");
@@ -223,8 +244,7 @@ describe("app-centric plugins skill contract", () => {
     for (const line of apiKeyFileLines) {
       expect(line, line).toContain("사람이 repo 밖에 직접 만들어 둔 PAT 파일");
     }
-    expect(reference).toContain("`auth login`·onboarding으로 보내지 않아요");
-    expect(reference).toContain("`axhub auth pat unset`");
+    expect(recovery).toContain("`axhub auth pat unset`");
   });
 
   test("keeps tenant handling explicit for scoped PATs (P3-31)", () => {

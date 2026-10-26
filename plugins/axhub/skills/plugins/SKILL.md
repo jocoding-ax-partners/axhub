@@ -88,7 +88,7 @@ axhub plugin publish "<path>" --app "<slug-or-UUID>" --release-version "<new-sem
 
 ## 6. PAT·approval
 
-Publish execute에는 OAuth나 broad PAT 대신 `plugins:read` + `plugins:write` scoped PAT만 쓰고(submit·status도) token을 출력하지 않아요. exit 4·`plugin_pat_required`는 `auth login`·onboarding이 아니라 publish.md의 PAT 복구로 풀어요.
+Publish execute에는 OAuth나 broad PAT 대신 `plugins:read` + `plugins:write` scoped PAT가 쓰여요. PAT를 미리 발급하지 않고 로그인한 채 실행하며 token을 출력하지 않아요. `plugin_pat_required`면 publish.md §4대로 `next_action`을 따라요.
 
 Publish 승인 문구는 `이 artifact를 배포할 권리가 있음을 확인하고, 미리보기대로 plugin App version을 업로드한 뒤 게시 심사를 신청할까요? 진행 또는 취소 로 답해 주세요.`예요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 새 `진행`만 승인이고 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요.
 
