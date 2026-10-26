@@ -71,6 +71,7 @@ codex plugin add axhub-codex@axhub
 ## 💬 첫 세션에서 알아둘 것
 
 - 첫 axhub 명령에서 네트워크 접근 승인을 한 번 물어요 — 허용해야 axhub 백엔드에 닿아요.
+- 홈 폴더에 쓰는 명령(`axhub auth login`, `axhub git setup`, `axhub plugin-support repair-path`)은 Codex 샌드박스 밖에서 실행해야 해서, 처음 한 번 권한 상승 승인을 물어요 — 허용해야 로그인 정보·git 자격증명·PATH 가 저장돼요. 샌드박스 안에서 막히면 실패 리포트를 보내지 않고 같은 명령을 권한 상승으로 한 번 다시 실행해요. 권한 상승으로도 막히면 안내된 경로의 소유자·권한을 고쳐 주세요.
 - 선택지를 고를 때 번호를 타이핑하는 대신 카드로 받고 싶으면 `~/.codex/config.toml` 의 `[features]` 에 `default_mode_request_user_input = true` 한 줄을 더하면 돼요. 설정을 대신 바꾸지는 않아요.
 - 네이티브 선택 카드가 켜진 세션에서 빈 답변이 돌아오면 승인하지 않은 것으로 봐요 — 자리를 잠깐 비운 사이에 카드가 자동으로 닫혀도 그대로 진행하지 않고 다시 물어요. 카드가 열려 있는 동안에도 실행 단계로 넘어가지 않아요.
 - 승인 채널이 없는 headless(`codex exec`·CI)에서는 실행하지 않고 멈춰요.

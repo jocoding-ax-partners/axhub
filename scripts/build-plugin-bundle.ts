@@ -126,7 +126,7 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
   ["`실행됨 명령 N개`, `TaskOutput 사용함`, tool 카드,", "`실행됨 명령 N개`, tool 카드,"],
   [
     "## Reference Loading\n\n이 top-level 파일은",
-    "## Codex 첫 세션 안내\n\n- 첫 axhub 명령에서 네트워크 접근 승인을 한 번 물어요 — 허용해야 axhub 백엔드에 닿아요.\n- 시작 시 훅 신뢰를 묻는데, 신뢰하지 않으면 자동 업데이트·라우팅 가드가 조용히 꺼져요. `/hooks` 에서 언제든 다시 켤 수 있어요.\n- 선택 카드로 답하고 싶으면 `~/.codex/config.toml` 의 `[features]` 에 `default_mode_request_user_input = true` 한 줄을 더하면 돼요. 켠 경우 빈 답변은 미승인으로 처리돼요. 설정을 대신 바꾸지는 않아요.\n\n## Reference Loading\n\n이 top-level 파일은",
+    "## Codex 첫 세션 안내\n\n- 첫 axhub 명령에서 네트워크 접근 승인을 한 번 물어요 — 허용해야 axhub 백엔드에 닿아요.\n- 홈 폴더에 쓰는 명령(로그인·git 설정·PATH)이 샌드박스에서 막히면 그 명령만 권한 상승으로 한 번 다시 실행하고 리포트하지 않아요.\n- 시작 시 훅 신뢰를 묻는데, 신뢰하지 않으면 자동 업데이트·라우팅 가드가 조용히 꺼져요. `/hooks` 에서 언제든 다시 켤 수 있어요.\n- 선택 카드로 답하고 싶으면 `~/.codex/config.toml` 의 `[features]` 에 `default_mode_request_user_input = true` 한 줄을 더하면 돼요. 켠 경우 빈 답변은 미승인으로 처리돼요. 설정을 대신 바꾸지는 않아요.\n\n## Reference Loading\n\n이 top-level 파일은",
   ],
   ["[ -n \"${CLAUDE_NON_INTERACTIVE:-}\" ]", "[ -n \"${CODEX_NON_INTERACTIVE:-}\" ]"],
   ["claude plugin marketplace update", "codex plugin marketplace upgrade"],

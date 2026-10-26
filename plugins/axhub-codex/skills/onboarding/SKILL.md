@@ -16,6 +16,7 @@ model: sonnet
 ## Codex 첫 세션 안내
 
 - 첫 axhub 명령에서 네트워크 접근 승인을 한 번 물어요 — 허용해야 axhub 백엔드에 닿아요.
+- 홈 폴더에 쓰는 명령(로그인·git 설정·PATH)이 샌드박스에서 막히면 그 명령만 권한 상승으로 한 번 다시 실행하고 리포트하지 않아요.
 - 시작 시 훅 신뢰를 묻는데, 신뢰하지 않으면 자동 업데이트·라우팅 가드가 조용히 꺼져요. `/hooks` 에서 언제든 다시 켤 수 있어요.
 - 선택 카드로 답하고 싶으면 `~/.codex/config.toml` 의 `[features]` 에 `default_mode_request_user_input = true` 한 줄을 더하면 돼요. 켠 경우 빈 답변은 미승인으로 처리돼요. 설정을 대신 바꾸지는 않아요.
 
@@ -107,7 +108,7 @@ read 실패·malformed `git_backend`면 provider 단계 전에 멈추고, app ro
 persisted app 또는 fresh `SELECTED_GIT_BACKEND`가 GitHub인 경우에만 기존 GitHub surface를 사용해요. app `git_backend.source=legacy_github`도 이 branch예요. DETECT의 `github.install_url`을 한 줄로 보여주고 설치 gate 앞에 `axhub github accounts list --json`을 한 번 돌려요. exit 4 + `github_relogin_required`면 `github_link_missing`으로 처리해요.
 `github_link_missing`도 합성 값이라 GitHub branch의 3단계 연동 확인에서만 생기고 `github_app_missing`보다 먼저 처리해요.
 
-persisted `git_backend.backend=selfhosted` 또는 fresh `SELECTED_GIT_BACKEND=selfhosted`이고 CLI/auth gap이 닫혔으면 session당 한 번 `axhub --tenant <tenant> git setup --json`으로 account·endpoint별 helper·30일 PAT를 준비해요. marker로 재실행을 막고 `github.install_url`을 숨기며 `github_link_missing`·`github_app_missing`을 처리하지 않아요. `references/github-app.md`를 건너뛰고 계정 로그인·App 설치 대사를 0회로 유지해요. tenant source는 `tenant|platform_default`예요.
+persisted `git_backend.backend=selfhosted` 또는 fresh `SELECTED_GIT_BACKEND=selfhosted`이고 CLI/auth gap이 닫혔으면 session당 한 번 `axhub --tenant <tenant> git setup --json`으로 account·endpoint별 helper·30일 PAT를 준비해요(에이전트 샌드박스면 처음부터 권한 상승으로, `local.write_denied`면 리포트 없이 샌드박스 안일 때만 권한 상승 재실행 1회, 아니면 경로 소유자 수정 안내). marker로 재실행을 막고 `github.install_url`을 숨기며 `github_link_missing`·`github_app_missing`을 처리하지 않아요. `references/github-app.md`를 건너뛰고 계정 로그인·App 설치 대사를 0회로 유지해요. tenant source는 `tenant|platform_default`예요.
 
 ### 4. first_gap router
 
@@ -134,7 +135,7 @@ provider branch를 확정한 뒤 `EFFECTIVE_FIRST_GAP` 하나만 처리하고 �
 
 If the selected handler needs a prompt but D1 safe-stop mode is active, do not execute the mutation. Return `SAFE_STOP_NONINTERACTIVE` with the exact manual command or natural phrase. Filtering provider-only gaps is selection, not a second action; never execute two gap handlers from one detect result.
 
-`cli_path_missing` 은 CLI 가 디스크에 있는데 현재 셸 PATH 에 없는 상태예요. repair-path 뒤에 `command -v axhub` 재감지를 반복하지 말고(무한 루프 방지) **repair-path JSON 의 `bin_path` 절대경로로 남은 온보딩 명령을 그대로 이어가요** (예: `"<bin_path>" auth status --json`). detect 의 `cli_resolved_path` 도 같은 절대경로예요. 남은 gap 재감지가 필요하면 `"<bin_path>" plugin-support onboarding-detect --json` 으로 실행하고, 결과에 `cli_path_missing`/`cli_on_path:false` 가 다시 보여도 이미 처리된 것으로 간주하고 다음 gap 으로 넘어가요. `bin_path` 가 없는 구 CLI 면 기존대로 `READY_WITH_USER_ACTION` 으로 "PATH 준비됐어요. 새 터미널을 열고 거기서 Codex 를 실행해 온보딩을 다시 불러 주세요" 라고 안내해요. 새 터미널·VS Code 앱 재시작 안내는 마무리 카드에 보조 문구로 한 번만 붙여요.
+`cli_path_missing`: CLI 가 디스크에 있고 셸 PATH 에만 없어요 — bare `axhub` 실패는 미설치가 아니에요. repair-path 뒤 `command -v axhub` 재감지를 반복하지 말고(무한 루프 방지) **JSON 의 `bin_path` 절대경로로 남은 온보딩 명령을 이어가요** (예: `"<bin_path>" auth status --json`). `error`(exit 0, 예: 샌드박스 `write_denied`)가 와도 `bin_path` 가 있으면 막힘이 아니에요. 재감지는 `"<bin_path>" plugin-support onboarding-detect --json` 으로 하고 `cli_path_missing` 이 다시 보여도 처리된 것으로 보고 다음 gap 으로 가요. `bin_path` 없는 구 CLI 면 `READY_WITH_USER_ACTION` 으로 새 터미널에서 온보딩을 다시 불러 달라고 해요. 새 터미널·앱 재시작 안내는 마무리 카드에 한 번만 붙여요.
 
 ### 5. Telemetry opt-in and Ready card
 

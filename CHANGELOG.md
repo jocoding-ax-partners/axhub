@@ -4,6 +4,17 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.32.5](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.4...plugin-v1.32.5) (2026-10-26)
+
+Codex 같은 에이전트 샌드박스가 홈 폴더 쓰기를 막아 로그인·git 설정·PATH 복구가 실패하면, 리포트를 남기지 않고 그 명령만 권한 상승으로 한 번 다시 실행해요. 이미 샌드박스 밖에서 실행했는데도 막혔다면 그 경로의 소유자와 권한을 고치도록 안내해요. 정적 앱을 가져오거나 배포한 뒤에는 아직 열리지 않은 주소나 인증서를 발급 중인 주소를 완료된 것처럼 보여 주지 않아요. 주소 충돌로 게시가 막히면 서브도메인을 바꾸거나 새 앱을 만드는 방법을 안내해요. CLI 0.51.1 과 함께 쓰는 것을 기준으로 맞췄어요.
+
+
+### Fixed
+
+* **plugin:** `local.write_denied`(exit 64)는 샌드박스 안에서만 권한 상승으로 한 번 다시 실행하고 리포트하지 않아요. `repair-path` 가 쓰기 거절을 돌려주면 `manual_line` 을 그대로 안내해요(AP-31) ([#1847](https://github.com/jocoding-ax-partners/axhub-mono/issues/1847), [#1848](https://github.com/jocoding-ax-partners/axhub-mono/issues/1848), [#1869](https://github.com/jocoding-ax-partners/axhub-mono/pull/1869))
+* **plugin:** import·deploy 가 `public_url_pending`·`tls_ready`·`tls_pending` 을 읽어 준비 중인 정적 주소를 완료로 알리지 않고, 주소를 다시 물으면 `apps static site get` 을 읽어요 ([#1735](https://github.com/jocoding-ax-partners/axhub-mono/issues/1735), [#1737](https://github.com/jocoding-ax-partners/axhub-mono/issues/1737), [#1869](https://github.com/jocoding-ax-partners/axhub-mono/pull/1869))
+* **plugin:** 정적 주소 충돌은 verify 의 `failure_hint` 를 기준으로, 첫 게시 전이면 서브도메인 변경 후 한 번 다시 배포하고 잠겼으면 새 앱으로 복구해요 ([#1844](https://github.com/jocoding-ax-partners/axhub-mono/issues/1844), [#1869](https://github.com/jocoding-ax-partners/axhub-mono/pull/1869))
+
 ## [1.32.4](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.3...plugin-v1.32.4) (2026-10-26)
 
 회사 플러그인을 올릴 때 PAT 를 먼저 발급하라고 안내하지 않아요. 로그인한 채로 바로 게시하고, CLI 0.51.0 부터는 게시용 권한을 CLI 가 알아서 준비해요. 로그인이 필요하거나 예전 CLI 라서 발급이 필요할 때만 CLI 가 알려 준 다음 단계를 그대로 따라요.
