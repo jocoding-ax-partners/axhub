@@ -41,11 +41,14 @@ If detect says the CLI exists but is not on PATH (`cli_state: on_disk_not_on_pat
 
 bare `axhub` 는 이 상태(현재 셸 PATH 미포함)에선 127 로 실패해요 — detect 픽스처가 준 `cli_resolved_path`(location 파일 `~/.axhub/bin-path` 유래)를 그대로 쓰고, 없으면 canonical on-disk 경로로 호출해요 (Windows Git Bash 는 `"$HOME/.axhub/bin/axhub.exe"`). detect 가 PATH 위 CLI 로 `on_disk_not_on_path` 를 보고한 드문 sub-case 에선 bare 호출도 돼요. 세션을 새로 열 때마다 이 상태가 반복되는 건 부모 앱(VS Code·데스크톱 앱)이 예전 PATH 를 들고 있어서예요 — 재설치 대상이 아니라 이 lane 으로 매번 그대로 이어가면 되고, 부모 앱을 재시작하면 그때부터 bare `axhub` 로 잡혀요.
 
-Interpret `{repaired, already_present, disabled, shell_rc, backup_path, bin_path, current_session_stale, session_hint}`:
+repair-path 는 셸 rc(`~/.zshrc` 등)와 `~/.axhub/bin-path` 를 고쳐 써요. 에이전트 샌드박스(Codex workspace-write 등) 안이면 처음부터 권한 상승(샌드박스 밖)으로 실행해요 (AP-31).
+
+Interpret `{repaired, already_present, disabled, shell_rc, backup_path, bin_path, current_session_stale, session_hint, error, error_code, manual_line, sandbox}`:
 
 - `repaired:true` 또는 `already_present:true` + `current_session_stale:true`: 영속 등록은 끝났지만 이 세션은 못 봐요 — 이미 열린 셸의 PATH 는 밖에서 못 고쳐요(OS 설계). **남은 온보딩 명령을 `bin_path` 절대경로로 그대로 이어가요** (예: `"<bin_path>" auth status --json`). 안내는 한 번만 붙여요: "새 터미널부터는 `axhub` 로 짧게 쓸 수 있어요 (VS Code 통합터미널은 앱 재시작)." 사용자가 이 터미널을 직접 고치고 싶어 하면 `session_hint` 에서 셸에 맞는 한 줄만 보여줘요.
 - `already_present:true` + `current_session_stale:false`: re-detect immediately.
 - `disabled:true`: show one manual PATH instruction and stop with user action.
+- `error` 가 있음(`repaired:false`, exit 0) + `bin_path` 있음: 막힘이 아니에요 — 리포트·재설치·재감지 루프 없이 **남은 온보딩 명령을 `bin_path` 절대경로로 그대로 이어가요**. `error_code: "write_denied"` 는 셸 rc 쓰기가 막힌 것이고(`sandbox: true` 면 에이전트 샌드박스), `"io_error"` 는 그 밖의 파일 오류예요. 사용자가 PATH 를 영구 등록하고 싶다고 할 때만 `manual_line` 한 줄을 셸 rc 에 넣으라고 보여줘요(샌드박스였다면 권한 상승으로 같은 repair-path 를 한 번 다시 실행해도 돼요). `bin_path` 도 없으면 detect 의 `cli_resolved_path`(없으면 canonical 경로)로 이어가요.
 - 구 CLI(새 필드 없음): repair 후 "PATH 를 고쳐뒀어요. 새 터미널을 열고 `온보딩 계속` 이라고 말해 주세요." 로 멈춰요. 재감지 루프 금지는 동일해요.
 
 Do not invent another PATH search. The CLI owns candidate paths, shell rc backup, and mutation. detect 의 `cli_resolved_path` 도 같은 절대경로 escape hatch 예요.
@@ -136,6 +139,8 @@ Login prompt:
   }]
 }
 ```
+
+`auth login` 은 홈 폴더(`~/.config/axhub`)에 로그인 정보를 써요 — 에이전트 샌드박스 안이면 처음부터 권한 상승(샌드박스 밖)으로 실행하고, subcode `local.write_denied`·`Operation not permitted` 면(리포트 아님) 샌드박스 안일 때만 권한 상승으로 한 번 다시 실행하고, 아니면 그 경로 소유자를 고치도록 안내해요.
 
 Start device flow:
 

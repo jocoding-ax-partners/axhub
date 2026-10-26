@@ -220,18 +220,18 @@ Codex 에서 `앱 생성 진행`/`앱 생성 재시도` tool 이 `백그라운�
 2. 출력에서 `deployment_id` 를 확인할 수 있으면 `axhub deploy status <deployment-id> --tenant <tenant> --json` 및 `axhub deploy verify <deployment-id> --app <app> --json`.
 3. 둘 다 없으면 먼저 `axhub apps get <app-slug> --tenant <tenant> --json` 으로 앱이 생겼는지 확인해요 — idempotency key 로는 중복이 막히지 않아요. 앱이 없고 execute 요청 자체가 timeout/network 계열로 끝났을 때만 같은 key 로 execute 를 한 번 재시도하고, `bootstrap watch timed out` 은 이미 접수된 거라 재시도하지 않아요. 재시도는 최대 1회예요. 단 device flow 가 시작된 흔적(브라우저 device 화면, `device_code_issued`, 사용자가 코드 입력 화면을 봤다는 말)이 있으면 이 재시도를 쓰지 않아요 — AP-18 대로 `github link` fast path 로 코드를 먼저 보여주고 `--resume-last` 로만 이어가요.
 4. 나중에 상태 명령이 `succeeded` 를 반환하면 "앱 생성은 완료됐어요" 로 복구 보고하고, 새 앱을 다시 만들지 않아요.
-5. 실패 원인이 GitHub(권한·정책·미연동·device flow) 이면 여기서 멈추지 말고 **12단계**로 가요. org owner 를 바꾸거나 개인 계정으로 만들고 나중에 transfer 하라는 제안은 하지 않아요.
+5. 실패 원인이 GitHub(권한·정책·미연동·device flow) 이면 여기서 멈추지 말고 **12단계**로 가요. owner 변경·나중 transfer 제안은 하지 않아요.
 
 ### 10. Clone And Manifest
 
-selfhosted는 Gitea API·remote URL을 추측하지 않고 선택한 literal tenant를 두 명령에 그대로 써요.
+selfhosted는 Gitea API·remote URL을 추측하지 않고 선택한 literal tenant를 두 명령에 그대로 써요. Sandbox: `git setup` escalated; `local.write_denied` (no AP-19 report): sandboxed → rerun escalated once, else fix path owner.
 
 ```bash
 axhub --tenant <tenant> git setup --json
 axhub --tenant <tenant> repo clone <app-slug> --json
 ```
 
-`data.destination`을 모든 repository-local 후속 tool call의 `cwd`로 고정해요. 원래 CWD를 쓰거나 값 누락을 추측하면 실패예요. Clone exit 9 follows its hint: `repository.credential_missing` → the hint's `next:` command as printed once, retry; a repeat → stop and report it with `axhub feedback`. `repository.destination_exists` → show the hint path; the user picks another path or empties it. `already_cloned: true` is success.
+`data.destination`을 모든 repository-local 후속 tool call의 `cwd`로 고정해요. 원래 CWD·추측값 금지예요. Clone exit 9 follows its hint: `repository.credential_missing` → the hint's `next:` command as printed once, retry; a repeat → stop and report it with `axhub feedback`. `repository.destination_exists` → show the hint path; the user picks another path or empties it. `already_cloned: true` is success.
 
 GitHub는 `repo_full_name` hydrate를 유지해요. 새 폴더의 `.omc/` 같은 Desktop 메타데이터 때문에 `git clone ... .` 는 쓰지 않아요. clone/hydrate 명령 안에서는 raw `git`만 써요. `rtk git`, `grep`, `cut`, `awk`, `sed` 금지.
 

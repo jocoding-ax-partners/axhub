@@ -12,7 +12,7 @@ Claude Desktop 같은 긴 QA 대화에서 이전 답변에 금지 문구가 보�
 
 - `schema_version`, `mode`, `headless`, `correlation_id`
 - `detected_state`, `starting_state`, `required_mutations`, `approval`
-- `deployment_id`, `active_release_id`, `verification_status`, `public_url`, optional `access_note` evidence field
+- `deployment_id`, `active_release_id`, `verification_status`, `public_url`, optional `access_note` evidence field, `public_url_pending`, `tls_ready`, `tls_pending`, `tls_hint`
 - `typed_failure`, `owner`, `phase`, `mutation_performed`, `retryable`
 - `request_id`, `stdout`, `stderr`, `command_argv`, raw JSON body
 - `manifest_create`, `manifest_migrate`, `manifest_repair`, `deployment`, `static_release`
@@ -39,6 +39,11 @@ Claude Desktop 이 Bash 내용에서 자동 제목을 만들 때도 같은 규�
 - 설정값이 없어 꺼진 기능이 있으면 `<기능>은 꺼져 있어요. 켜려면 "환경변수 추가해줘"라고 말해 주세요.`
 - 데이터가 다시 배포하면 처음 상태로 돌아가는 앱이면 그 사실을 한 줄로 알려요.
 - 마지막 줄은 `코드를 고친 뒤 다시 올릴 때는 "배포해"라고 말하면 돼요.`
+
+정적 앱 주소·인증서(AP-22):
+
+- `첫 배포가 끝났어요. 주소: https://...` 의 주소는 비어 있지 않은 정적 사이트 주소만 써요. evidence `public_url` 이 비어 있으면 주소를 추측하거나 앱 도메인 주소(`*.axhub.app` 등)로 대신하지 않고 SKILL 9 대로 `apps static site get` 을 한 번 읽어요. 그래도 비어 있거나 exit 5 면 주소 줄 대신 `주소는 사이트 준비가 끝나면 나와요.` 라고 쓰고, 나중에 주소를 물어도 `apps get` 의 `access_url` 이 아니라 이 명령을 다시 읽어요.
+- `tls_pending: true`(또는 `tls_ready: false`)면 성공은 그대로이고, 주소 줄 바로 아래에 `보안 인증서(HTTPS)를 발급하는 중이라 2~3분 뒤부터 열려요. 그 전에 보이는 인증서 경고는 배포 실패가 아니에요.` 를 붙여요. `tls_hint` 는 그대로 복사하지 않고 같은 뜻으로만 써요.
 
 최종 성공 요약에서도 URL 은 반드시 평문 절대 URL 로만 보여줘요. `배포 URL: [https://...](...)`, `[열기](https://...)` 같은 Markdown 링크 문법을 쓰지 않아요.
 
