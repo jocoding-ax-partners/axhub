@@ -30,9 +30,9 @@ axhub plugin은 instruction-only diet 뒤 현재 **11 skill** (`onboarding` / `b
 
 ## 자동 업데이트 hook
 
-diet 가 제거한 hook 중 **auto-update SessionStart 훅 1개**만 `hooks/` 로 재도입했어요. AP-26 부터는 에이전트 프롬프트 없이 **훅 스크립트(`hooks/session-auto-update.sh`)가 `"async": true` 백그라운드 worker 로 직접 확인·적용**해요 — 사용자에게 묻지 않고, 세션을 막지 않고, 에이전트 명령·권한 팝업이 0개예요. Claude Code 가 `hooks/hooks.json` 을 자동 발견해요 — plugin.json 선언은 불필요해요.
+기존 auto-update SessionStart 훅은 AP-26에 따라 에이전트 프롬프트 없이 **훅 스크립트(`hooks/session-auto-update.sh`)가 `"async": true` 백그라운드 worker 로 직접 확인·적용**해요 — 사용자에게 묻지 않고, 세션을 막지 않고, 에이전트 명령·권한 팝업이 0개예요. Claude Code 가 `hooks/hooks.json` 을 자동 발견해요 — plugin.json 선언은 불필요해요. 조직 정책 동기 hook(AP-32)은 별도 예외이며 기존 업데이트 동작은 바꾸지 않아요.
 
-- **실행 모델:** hooks.json entry 1 이 `"async": true, "timeout": 5` 예요. async 를 아는 호스트는 비차단으로 돌리고 실행 중 timeout 을 적용하지 않아요 (Claude Code hooks reference "Run hooks in the background"). 끝나면 stdout JSON 의 `additionalContext` 만 **같은 세션의 다음 턴**에 에이전트에게 전달돼요 — 사용자 화면 노출 없음. async 를 모르는 구 호스트는 동기 훅으로 취급해 5초에 취소하므로 세션 시작 지연이 5초를 넘지 않아요 (apply 는 atomic swap 이라 중간 취소가 안전). `-p` headless 세션은 teardown 때 async 훅을 kill 해요 — throttle 캐시는 lock 을 잡은 직후 이미 갱신돼서, 그 회차(구 호스트의 5초 취소도 같아요)는 잃고 24h 뒤 다음 주기에 재시도해요(수용). 훅 계열 중 유일하게 네트워크·바이너리 교체를 하는 예외이고, 다른 전경 훅은 여전히 네트워크 0 이에요.
+- **실행 모델:** hooks.json entry 1 이 `"async": true, "timeout": 5` 예요. async 를 아는 호스트는 비차단으로 돌리고 실행 중 timeout 을 적용하지 않아요 (Claude Code hooks reference "Run hooks in the background"). 끝나면 stdout JSON 의 `additionalContext` 만 **같은 세션의 다음 턴**에 에이전트에게 전달돼요 — 사용자 화면 노출 없음. async 를 모르는 구 호스트는 동기 훅으로 취급해 5초에 취소하므로 세션 시작 지연이 5초를 넘지 않아요 (apply 는 atomic swap 이라 중간 취소가 안전). `-p` headless 세션은 teardown 때 async 훅을 kill 해요 — throttle 캐시는 lock 을 잡은 직후 이미 갱신돼서, 그 회차(구 호스트의 5초 취소도 같아요)는 잃고 24h 뒤 다음 주기에 재시도해요(수용). 바이너리 교체는 이 훅만 허용하고, 전경 네트워크는 AP-32 조직 정책 동기 조회만 별도 허용해요.
 - **gate (worker 첫 수 ms):** kill switch → dev 가드 → CLI 3-경로(AP-17: `command -v axhub` → `~/.axhub/bin-path` → `~/.axhub/bin/axhub`(.exe), 찾은 절대경로로 직접 실행) → `~/.axhub/cache/.plugin-update-check` mtime 24h throttle → `~/.axhub/cache/.auto-update.lock/` `mkdir` 원자 lock(30분 TTL 회수, 못 잡으면 캐시 미touch). 해당 없으면 출력 없이 exit 0.
 - **dev 가드:** 소스 트리에만 있는 번들러 `${CLAUDE_PLUGIN_ROOT}/../../scripts/build-plugin-bundle.ts` 또는 `${CLAUDE_PLUGIN_ROOT}/scripts/build-plugin-bundle.ts` 가 있으면(`plugins/axhub`·`dist/axhub-plugin` in-place 로딩·레포 루트 직접 로딩) auto-update 를 조용히 skip 해요 — 메인테이너 세션 노이즈 방지. 모노레포에선 `.git` 이 레포·worktree 루트에만 있어 `.git` 으로는 판정하지 않아요. 번들은 `scripts/` 를 싣지 않아 end user 의 `~/.claude/plugins/cache/...` 경로는 무영향이에요.
 - **판정:** `axhub update check --plugin-version <plugin.json version> --field-expr '[.current,.has_update,.latest,.disabled,.is_downgrade,.plugin.has_update,.plugin.latest]|map(tostring)|join("|")'` 1회로 `|` 구분 7필드를 받아 `IFS='|' read` 로 읽어요 (jq·sed 없음). 공백 구분은 CLI 가 disabled·feed 장애 때 내는 빈 `latest` 를 기본 IFS 가 접어 필드가 밀려요. `disabled` 면 `SKIP_DISABLED`, `latest` 가 비면(feed 장애) CLI 쪽만 `CHECK_FAILED reason=cli_feed` 로 남기고 플러그인 단계는 이어가요. `--field-expr` 를 모르는 구 CLI(exit 64)는 `--json` 원문에서 top-level 만 뽑아 CLI 만 올리고 플러그인은 다음 주기로 미뤄요. 실패·필드 부족은 `CHECK_FAILED` 로 log 하고 멈춰요 — 침묵을 최신으로 읽지 않아요.
@@ -73,6 +73,15 @@ SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이�
 - hook 은 CLI 존재만 봐요 (AP-17 의 3-경로: `command -v axhub` → `~/.axhub/bin-path` → canonical `~/.axhub/bin/axhub`(.exe)) — 네트워크·바이너리 실행·marker 접촉 없음, 못 찾으면 즉시 exit 0.
 - **끄기:** `AXHUB_NO_FEEDBACK_REPORT=1` 또는 `~/.axhub/config/no-feedback-report`.
 - 규칙 본체는 `docs/policy/agent-policy.md` 의 AP-19 가 소유해요 (parity 적용: `hooks/session-feedback-contract.sh`, `CLAUDE.md`, `POLICY.md`). 사용자 공개는 `POLICY.md` 의 "실패 자동 리포트" 섹션이 담당해요.
+
+## 조직 정책 동기 hook (AP-32)
+
+- diet·AP-26·DP-6의 좁은 예외로 `hooks/policy-context.sh`가 명시 argv `SessionStart` 또는 `UserPromptSubmit`을 받아 같은 `axhub plugin-support policy-context`를 호출해요. `policy-context --adapt <event>`는 같은 CLI의 offline strict JSON parser/host adapter이며 새 skill·helper 바이너리·jq/node/python 의존은 없어요.
+- SessionStart는 `startup|resume|clear|compact`, UserPromptSubmit은 동기 freshness gate예요. 둘 다 `timeout: 2`, 후자만 `onFailure: block`이에요. 원래 helper의 schema_version 1 단일 JSON(`verified|skip|blocked`)을 검증하며 구 CLI·잘못된 JSON을 성공 문맥으로 넘기지 않아요.
+- 정확한 `AXHUB_NO_POLICY_SYNC=1` 또는 `~/.axhub/config/no-policy-sync` 존재 중 하나면 자동 sync를 꺼요(OR). 그 외 env 값은 끄지 않아요. 미연결은 CLI 없이 skip하지만 손상·읽기 실패 binding은 skip하지 않아요.
+- 매 prompt 인증된 서버 조회 뒤 development 본문만 현재 조직/revision·대체/철회 안내와 함께 재제공해요. TTL·last-emitted로 생략하거나 stale cache로 계속하지 않아요. 배포 준비는 opt-out과 무관하게 deployment 정책을 명시 조회하고 실패하면 준비를 중단해요.
+- 전체 2초 안에 최신 확인을 못 하면 연결 프로젝트의 prompt를 차단해요. 채팅 밖 terminal에서 인증·연결·네트워크를 복구한 뒤 수동 재전송해요. 자동 재개·입력 복원을 약속하지 않아요.
+- 자동 hook 최소 Claude Code 2.1.295, 실제 host 검증 2.1.312예요. Codex는 manual-only(정책 hook 제외), Desktop Code mode는 미검증이에요. AI 전달·cache·복구 상세는 `POLICY.md`의 조직 정책 항목을 따라요.
 
 ## CLI 호출 표면
 

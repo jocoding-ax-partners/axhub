@@ -176,9 +176,11 @@ preview 와 첫 승인보다 먼저 아래 읽기 전용 resolver 를 정확히 
 axhub plugin-support tenant-resolve --json
 ```
 
-반환된 `tenant` 가 비어 있지 않으면 그 값을 이후 preview 와 execute 모두에 literal `--tenant <slug>` 로 넘겨요. `needs_pick: true` 면 후보를 사용자에게 `작업공간`이라고만 부르고, `앱을 어느 작업공간에 만들까요?`를 승인 전에 한 번 물은 뒤 선택한 slug 를 같은 literal 로 유지해요. 사용자-facing 문구에 `tenant` 또는 `테넌트`를 쓰지 않아요.
+반환된 `tenant`가 있으면 preview·execute에 같은 literal `--tenant <slug>`를 넘겨요. `needs_pick:true`면 승인 전에 `앱을 어느 작업공간에 만들까요?`를 1회 물어 고른 slug를 유지해요. 사용자에게는 tenant/테넌트 대신 `작업공간`이라고만 해요.
 
-여러 작업공간이 있는 상태에서 `--tenant` 없는 execute 를 먼저 호출해 오류를 낸 뒤 `axhub tenants list`, `axhub tenant list`, `--help | grep`로 복구하지 않아요. 작업공간 선택 전에는 preview 승인이나 execute mutation을 시작하지 않아요. 이 순서가 깨지면 동일 가져오기 승인을 다시 받게 되어 Desktop deadlock UX예요.
+선택 전 preview 승인·execute 금지. `--tenant` 없이 execute 후 `axhub tenants list`·`axhub tenant list`·`--help | grep` 복구 금지.
+
+**첫 변경 전 정책 gate:** 기존 앱은 exact `axhub apps get <app ID> --json`의 `tenant_id`, 새 앱은 `axhub tenants get <선택한 slug> --json`의 `data.id`로 `axhub tenants developer-policy get --tenant <UUID> --json`을 실행해요. 실패하면 manifest·env·앱 생성·push·execute 전 중단해요. 적용·복구는 `../deploy/references/workflow-details.md`의 조직 정책 계약을 따라요.
 
 3. Preview envelope 요청
 

@@ -109,9 +109,9 @@ describe("import skill contract", () => {
     expect(skill).toContain("2. 작업공간 확정");
     expect(skill).toContain("axhub plugin-support tenant-resolve --json");
     expect(skill).toContain("앱을 어느 작업공간에 만들까요?");
-    expect(skill).toContain("사용자-facing 문구에 `tenant` 또는 `테넌트`를 쓰지 않아요");
-    expect(skill).toContain("`--tenant` 없는 execute 를 먼저 호출해 오류를 낸 뒤");
-    expect(skill).toContain("작업공간 선택 전에는 preview 승인이나 execute mutation을 시작하지 않아요");
+    expect(skill).toMatch(/사용자에게는 tenant\/테넌트 대신 `작업공간`이라고만/);
+    expect(skill).toMatch(/`--tenant` 없이 execute 후.*`axhub tenants list`.*복구 금지/);
+    expect(skill).toMatch(/선택 전 preview 승인·execute 금지/);
   });
 
   test("uses standalone Desktop commands and one bounded verify invocation", () => {

@@ -76,6 +76,16 @@ codex plugin add axhub-codex@axhub
 - 네이티브 선택 카드가 켜진 세션에서 빈 답변이 돌아오면 승인하지 않은 것으로 봐요 — 자리를 잠깐 비운 사이에 카드가 자동으로 닫혀도 그대로 진행하지 않고 다시 물어요. 카드가 열려 있는 동안에도 실행 단계로 넘어가지 않아요.
 - 승인 채널이 없는 headless(`codex exec`·CI)에서는 실행하지 않고 멈춰요.
 
+## 조직 정책 — manual-only
+
+Codex 번들에는 조직 정책 자동 hook·wrapper를 싣지 않아요. 기존 훅을 신뢰해도 매 prompt 최신 조회·문맥 전달·차단을 제공하지 않아요. 필요할 때 `axhub tenants developer-policy get --tenant <uuid> --json`으로 현재 게시본을 명시 조회해요. 이 조회는 AI 전달 ACK가 아니에요.
+
+`axhub tenants developer-policy bind --tenant <uuid> --project <path>`와 `status --json`으로 명시 연결을 관리할 수 있지만 자동 hook 활성화를 뜻하지 않아요. `.axhub/state/developer-policy.json`은 origin/tenant/schema만 담고 Git/worktree 경계를 넘지 않아요. 조회 인증·cache는 기존 CLI가 맡아요.
+
+자동 sync opt-out은 정확한 `AXHUB_NO_POLICY_SYNC=1` 또는 `~/.axhub/config/no-policy-sync` 존재의 OR이며 명시 get·배포 준비에는 적용하지 않아요. 배포 준비는 deployment 정책을 명시 조회하고 실패하면 멈춰요. unset/withdrawn은 정상 진행하고 서버 권한·승인·기존 사용자 확인은 유지해요.
+
+고객 정책 정본은 서버 게시본이고 `POLICY.md`는 plugin 행동 설명이에요. 정책은 사용자가 선택한 AI 서비스에 전달될 수 있으며 게시마다 관리자가 이를 확인해요. 모델 준수나 이전 대화 회수는 보장하지 않아요. Claude 자동 hook 최소 2.1.295·실제 host 검증 2.1.312와 Codex 지원은 별개이며 Desktop Code mode는 미검증이에요.
+
 ## 📋 준비물
 
 - **Codex CLI ≥ 0.147.0** (최종 검증: 0.149.0)

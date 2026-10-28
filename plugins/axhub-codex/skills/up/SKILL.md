@@ -111,7 +111,9 @@ axhub plugin-support deploy-prep --intent deploy --json
 | exit 64 (`validation.quality_gate_failed`) | 품질 확인에서 막힌 항목이 있다는 뜻이에요. 실행하지 않고 사유를 한국어로 알린 뒤 멈춰요. |
 | 현재 폴더에 `axhub.yaml`·`apphub.yaml` 이 둘 다 없음 | `이 폴더에 axhub 매니페스트가 없어서 어떤 앱의 소스인지 확인할 수 없어요.` 로 멈추고 `import` 로 양보해요. `axhub up` 은 패킹 전에 매니페스트를 보지 않으니 이 확인은 여기서 해요. |
 
-`APP_ID` 는 `resolve.app_id` 로 바인딩해요. tenant 와 profile 은 플래그로 넘기지 않아요 — CLI 가 `AXHUB_TENANT`·`AXHUB_PROFILE` 환경변수를 직접 읽어요. 셸 변수로만 잡아 둔 값은 넘어가지 않으니, 명시 스코프가 필요하면 그 환경변수를 설정해요.
+`APP_ID=resolve.app_id`예요. tenant/profile 플래그 대신 CLI가 읽는 `AXHUB_TENANT`·`AXHUB_PROFILE` 환경변수로 명시 스코프를 전달해요. export 안 된 셸 변수는 전달되지 않아요.
+
+**첫 변경 전 정책 gate:** 최신 top-level `developer_policy`를 `../deploy/references/workflow-details.md`의 조직 정책 계약대로 확인해요. 실패·누락·malformed면 env·코드·upload 전 중단해요. opt-out/cache 우회 금지; `context_url`·서버 권한·승인은 유지해요. 대상 변경 시 exact `axhub apps get <app ID> --json`의 `tenant_id`로 `axhub tenants developer-policy get --tenant <tenant_id> --json`을 새로 조회해요.
 
 ### deploy method와 Git backend 확인
 
@@ -125,13 +127,13 @@ top-level `git_backend.backend`와 `git_backend.source`, `deploy_method`, `stagi
 
 ## 1.5단계 — 올리기 전 맞추기 (AP-29)
 
-`deploy` 의 `## 배포 전 맞추기` 와 같은 흐름이고, 커밋·push 만 빼요. preflight 의 `capabilities.readiness.deploy_check` 가 false 면 `axhub CLI를 최신 버전으로 업데이트해 주세요.` 라고 하고 멈춰요.
+`deploy`의 준비 흐름에서 commit·push만 빼요. preflight `capabilities.readiness.deploy_check:false`면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`로 멈춰요.
 
 1. `axhub deploy check --app "$APP_ID" --json` (제목 `배포 전 확인`). 이 lane 은 커밋을 보내지 않으니 `commit_not_on_remote`·`uncommitted_changes` 는 보지 않아요.
 2. preflight 의 `capabilities.readiness.context_url` 문서를 한 번만 가져와요(제목 `배포 기준 확인`). 못 받으면 `../deploy/references/deploy-rules.md` 로 대신해요.
-3. 그 규칙으로 앱 코드를 보고, 빌드 단계가 있으면 로컬 빌드를 5분 안에서 한 번 돌려요. 실패하면 고치고 2번까지 다시 빌드해요. 그래도 실패하면 올리지 않고 무엇이 막혔는지 알려요. 테스트·예시·README 의 흔적은 문제가 아니에요.
-4. 물을 일은 둘뿐이에요 — `.env`·`.env.local` 에도 없는 필수 설정값(`<이름> 값을 앱 폴더 .env 에 넣어 주세요` 라고 부탁해요, 값을 대화로 받지 않아요)과 안 되는 6가지·문서 `물어봄` 규칙에 처음 해당한 것. 모아서 한 번 물어요. `.axhub/deploy-answers.json` 의 `keep` 에 있는 항목은 다시 묻지 않고, `그대로` 답은 거기에 더해요.
-5. 묻지 않고 맞춰요: 필수 이름 중 `.env.local` 에 있는 것은 `--from-dotenv .env.local`, 나머지는 `axhub env set --app "$APP_ID" --from-dotenv .env --only <이름,…> --execute` 로 등록해요(파일을 열거나 값을 출력하지 않아요). 포트·`0.0.0.0` 바인딩·상태 확인 경로·빌드 오류는 파일을 고쳐요. 고친 파일은 커밋하지 않고 그대로 올라가요.
+3. 기준대로 코드를 검사해요(테스트·예시·README 흔적 제외). 빌드가 있으면 5분 안에 1회, 실패 수정·재빌드는 2회까지예요. 계속 실패하면 업로드 없이 원인을 알려요.
+4. 질문은 둘뿐: `.env`·`.env.local`에도 없는 필수값(`<이름> 값을 앱 폴더 .env 에 넣어 주세요`, 채팅 수집 금지), 안 되는 6가지·문서 `물어봄` 최초 해당. 모아서 1회 묻고 `.axhub/deploy-answers.json`의 `keep`은 재질문 없이 `그대로` 답을 추가해요.
+5. 묻지 않고 `.env.local`의 필수 이름부터 `--from-dotenv .env.local`, 나머지는 `axhub env set --app "$APP_ID" --from-dotenv .env --only <이름,…> --execute`로 등록해요(파일 열기·값 출력 금지). 포트·`0.0.0.0`·상태 경로·빌드 오류는 수정하고 커밋 없이 올려요.
 6. 맞춘 게 있으면 마지막 메시지를 정확히 `이렇게 맞춰서 올렸어요.` 로 시작하고, 맞춘 것과 결과 주소를 알려요.
 
 ## 2단계 — 올릴 내용 미리보기

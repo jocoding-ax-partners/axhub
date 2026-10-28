@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { HOST_EXPECTATIONS, SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
+import { HOST_EXPECTATIONS, POLICY_WRAPPER_SCRIPT, SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
@@ -513,10 +513,10 @@ describe("smooth behavior contracts", () => {
       expect(redeploy).toContain("--from-dotenv .env --only <이름,…> --execute");
       expect(redeploy).toContain(".axhub/deploy-answers.json");
       expect(redeploy).toContain("이렇게 맞춰서 올렸어요");
-      expect(redeploy).toContain("값을 대화로 받지 않");
+      expect(redeploy).toMatch(/값을 대화로 받지 않|채팅(?:으로 값)? 수집 금지/);
     }
     // 웹훅 우회 방지: 설정값 등록·수정 커밋은 push 전에 끝나야 해요.
-    expect(deploy).toContain("반드시 push 전에 끝내요");
+    expect(deploy).toMatch(/GitHub push보다 env·수정 커밋이 먼저/);
     expect(deploy).not.toContain("axhub로 지금 배포를 진행할까요?");
     // headless 정의는 3-lane 사다리 정합 재작성본으로 잠가요 — 정의 문장이
     // `claude -p`·`codex exec` 병기 토큰을 포함해요. onboarding 은 D1 가드와
@@ -748,20 +748,20 @@ describe("smooth behavior contracts", () => {
     }
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-    expect(entries).toHaveLength(5);
+    expect(entries).toHaveLength(SESSION_WRAPPER_SCRIPTS.length + 1);
 
     // KTD6: 인라인 command 는 hooks/session-*.sh wrapper 로 추출됐어요 —
     // hooks.json 은 update-router 와 같은 bare 위임만 갖고, 계약 본문은
     // wrapper 스크립트가 소유해요 (codex 훅 trust hash 재신뢰 스팸 방지 구조).
     // wrapper 파일명 목록은 fixture 의 SESSION_WRAPPER_SCRIPTS 가 단일 소유해요.
-    entries.forEach((entry, index) => {
+    entries.slice(0, SESSION_WRAPPER_SCRIPTS.length).forEach((entry, index) => {
       expect(entry.type).toBe("command");
       expect(entry.shell).toBe("bash");
       expect(entry.command).toBe(CLAUDE.surface.hookWrapperCommand(SESSION_WRAPPER_SCRIPTS[index]));
     });
 
-    // every SessionStart hook injects context invisibly: suppressed JSON only,
-    // never plain echo stdout and never a user-facing systemMessage banner
+    // 기존 update/feedback wrapper의 invisible context 계약은 그대로 유지해요.
+    // 정책 wrapper는 실패 안내를 포함하는 CLI adapter를 별도로 사용해요.
     for (const wrapper of SESSION_WRAPPER_SCRIPTS) {
       const script = readRepo(`hooks/${wrapper}`);
       expect(script).toContain("suppressOutput");
@@ -790,6 +790,33 @@ describe("smooth behavior contracts", () => {
     expect(restartConfirm).not.toContain("../../.git");
     // 바이너리 무접촉 — 적용 확인 뒤 marker 삭제만 해요
     expect(restartConfirm).not.toContain("command -v axhub");
+  });
+
+  test("policy hooks append explicit events with a bounded prompt failure gate", () => {
+    const hooksFile = readJson<{
+      hooks: Record<string, Array<{ matcher?: string; hooks: Array<{
+        type: string; command: string; timeout?: number; onFailure?: string;
+      }> }>>;
+    }>("hooks/hooks.json");
+    for (const event of ["SessionStart", "UserPromptSubmit"]) {
+      const groups = hooksFile.hooks[event];
+      const policyGroups = groups.filter((group) =>
+        group.hooks.some((hook) => hook.command.includes(POLICY_WRAPPER_SCRIPT)),
+      );
+      expect(policyGroups).toHaveLength(1);
+      expect(groups[groups.length - 1]).toBe(policyGroups[0]);
+      expect(policyGroups[0].hooks).toHaveLength(1);
+      const hook = policyGroups[0].hooks[0];
+      expect(hook.type).toBe("command");
+      expect(hook.command).toBe(`${CLAUDE.surface.hookWrapperCommand(POLICY_WRAPPER_SCRIPT)} ${event}`);
+      expect(hook.timeout).toBe(2);
+      if (event === "SessionStart") {
+        expect(policyGroups[0].matcher).toBe("startup|resume|clear|compact");
+        expect(hook.onFailure).toBeUndefined();
+      } else {
+        expect(hook.onFailure).toBe("block");
+      }
+    }
   });
 
   test("AP-19 feedback auto-report contract hook is wired", () => {
@@ -872,7 +899,7 @@ describe("smooth behavior contracts", () => {
     }
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.UserPromptSubmit.flatMap((group) => group.hooks);
-    expect(entries).toHaveLength(1);
+    expect(entries).toHaveLength(2);
 
     // update 라우터는 hooks/update-router.sh 로 추출됐어요 — hooks.json 은
     // 형제 라우터와 같은 bare 위임만 갖고, kill switch(env·marker)와 계약

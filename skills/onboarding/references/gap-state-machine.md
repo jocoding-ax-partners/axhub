@@ -28,6 +28,10 @@ DETECT_ALL(read-only)  <- axhub plugin-support onboarding-detect --json
 
 Filtering to `EFFECTIVE_FIRST_GAP` does not process another gap. Execute that one action, then re-detect; never execute two handlers from the same JSON.
 
+### 정책 연결
+
+detector의 읽기 전용 gap loop와 별개예요. CLI/auth 복구 뒤 SKILL의 exact app bind를 실행해요. manifest·tenant-resolve·전체 앱 목록은 tenant 근거가 아니며 fresh는 앱 생성·인증 조회 전까지 unbound예요. platform tenant도 추측하지 않아요. 충돌은 사용자 교체 결정 없이 `--force`하지 않고, 실패는 `READY_WITH_USER_ACTION`으로 알려요. bind는 인증된 정책 읽기 뒤 origin/tenant/schema만 저장해요. 실패 code·Codex/manual·terminal 복구는 [공통 조직 정책 계약](../../deploy/references/workflow-details.md#조직-정책-계약)을 따라요.
+
 ## Gap Completion Rules
 
 | gap id | Detection cue | Completion rule |

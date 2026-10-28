@@ -15,7 +15,7 @@
  */
 
 /**
- * hooks.json 의 SessionStart entry 순서와 1:1 인 wrapper 스크립트 파일명이에요.
+ * hooks.json 의 기존 SessionStart entry 5개 순서와 1:1 인 wrapper 파일명이에요.
  * hook-execution·smooth-behavior·plugin-bundle(2지점) 이 이 단일 목록을
  * 소비해요 — 파일명·순서 변경은 여기 한 곳에서만 해요.
  */
@@ -26,6 +26,10 @@ export const SESSION_WRAPPER_SCRIPTS = [
   "session-restart-confirm.sh",
   "session-feedback-contract.sh",
 ] as const;
+
+// 정책 wrapper는 두 event의 명시적 argv를 받아 CLI adapter에 위임해요.
+// 기존 update wrapper의 suppressed-context 계약과는 별도로 검증해요.
+export const POLICY_WRAPPER_SCRIPT = "policy-context.sh";
 
 export interface HostExpectations {
   /** host 표면 토큰 — 명령·env 변수·경로 조각 단위 */

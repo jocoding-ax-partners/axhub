@@ -36,9 +36,9 @@ codex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 아래 네 
 
 빈 디렉토리 axhub 템플릿 앱 + 첫 배포 전용이에요. axhub 맥락 없는 일반 앱 작업은 맡지 않아요. 비어 있지 않은 기존 로컬 앱·가져오기·"이 폴더 올려줘" 요청은 `import` 스킬로 넘겨요.
 
-사용자 발화에 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`, `Express`, `Fastify`, `Nest`, `FastAPI`, `Flask`, `Django`, `Rails`, `Go 서버`, `Dockerfile` 처럼 기존 소스가 있음을 뜻하는 단서와 axhub 배포 의도가 함께 있으면 bootstrap 을 시작하지 않아요. CLI guard, preflight, 템플릿 목록 확인을 실행하기 전에 즉시 import 경계로 양보하고, chat 본문에서 `/axhub:bootstrap` 또는 bootstrap 선택 이유를 설명하지 않아요.
+axhub 배포 의도와 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`, `Express`, `Fastify`, `Nest`, `FastAPI`, `Flask`, `Django`, `Rails`, `Go 서버`, `Dockerfile` 등 기존 소스 단서가 함께 있으면 CLI guard·preflight·템플릿 조회 전에 즉시 import로 넘겨요. 사용자 GitHub 계정/조직 저장소 요청만 scaffold로 양보해요.
 
-creation path는 `axhub apps bootstrap` saga 하나뿐이에요. GitHub 차단 시 로컬 소스 배포만 예외예요. 사용자 GitHub 계정/조직 저장소 요청만 scaffold로 양보해요. 같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. GitHub branch에서 install-link 를 보여줬으면 재안내는 생략하지만 0-install gate 는 항상 실행해요.
+같은 대화 맥락 이어받기: 이미 본 것만. infer-tables-env 분석은 scaffold 코드뿐 아니라 실제 조회 근거도 봐요. 리소스를 지어내지 않아요; carry-over 를 주장하지 않아요. GitHub branch에서 install-link 를 보여줬으면 재안내는 생략하지만 0-install gate 는 항상 실행해요.
 
 ## Reference Loading Policy
 
@@ -88,7 +88,7 @@ preflight의 `capabilities.self_hosted_git.apps_git_backend`와 `capabilities.se
 
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
 
-command not found 여도 곧바로 onboarding 으로 돌리지 않아요. 같은 제목으로 `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` 을 한 번 더 실행하고, 나온 `bin_path`(없으면 그 canonical 경로)로 preflight 부터 다시 실행해요. 그 명령까지 파일 없음이면 onboarding 안내 후 stop. `plugin-support` unknown/빈 출력이면 update 안내 후 stop, 정상 JSON 이면 계속해요. raw stderr 는 보여주지 않아요.
+command not found 여도 곧바로 onboarding 으로 돌리지 않아요. `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` 후 반환된 `bin_path`로 preflight부터 재개해요. canonical 파일도 없을 때만 onboarding. `plugin-support` unknown/빈 출력이면 update 안내 후 stop, 정상 JSON이면 계속해요. raw stderr 노출 금지.
 
 ### 2. Resume And Workspace
 
@@ -105,7 +105,9 @@ axhub plugin-support init-resume route --json
 axhub plugin-support tenant-resolve --json
 ```
 
-`needs_pick:false` 면 `tenant`, `true` 면 `candidates[]` 로 `새 앱을 어느 작업공간에 만들까요?`라고 물어 고른 `slug` 를 `--tenant <literal>` 로 넘겨요(같은 대화에서 고른 값 우선). 사용자에게는 tenant/테넌트라고 말하지 말고 `작업공간`이라고 말해요. 선택한 값은 `.axhub/state/tenant.json` 같은 로컬 파일로 저장하지 않아요. resume state 엔 작업공간이 없어 status/resume 명령에도 이 값을 `--tenant` 로 붙이고, 못 찾으면(exit 5·8) 다른 `candidates` 를 다 본 뒤에만 새로 시작해요.
+`needs_pick:false`면 `tenant`, `true`면 `candidates[]`에서 `새 앱을 어느 작업공간에 만들까요?`로 고른 `slug`를 literal `--tenant`로 넘겨요(현재 대화 선택 우선). 사용자에게는 `작업공간`으로만 불러요. `.axhub/state/tenant.json` 등 로컬 저장 금지. resume state에는 없으므로 status/resume에도 같은 `--tenant`를 붙여요. exit 5·8이면 다른 `candidates`를 모두 확인한 뒤에만 새로 시작해요.
+
+**첫 변경 전 정책 gate:** `axhub tenants get <선택한 slug> --json`의 인증된 `data.id`로 `axhub tenants developer-policy get --tenant <UUID> --json`을 실행해 최신 `deployment_markdown`을 적용해요. `unset`·`withdrawn`은 정상 빈 안내; 실패·누락·malformed면 앱 생성·env·push·execute 전 중단해요. opt-out/cache 우회 금지, 기존 승인·서버 권한은 유지해요. 작업공간 변경 시 다시 조회해요. 생성 뒤 exact app 연결은 onboarding에 맡겨요.
 
 ### 3. Template Registry
 

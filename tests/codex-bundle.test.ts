@@ -136,6 +136,35 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     expect(existsSync(join(outDir, "hooks", "session-feedback-contract.sh"))).toBe(false);
   });
 
+  test("manual-only policy removes both event entries and wrapper without removing update hooks", () => {
+    type Hook = { command: string; async?: boolean; timeout?: number; onFailure?: string };
+    type Hooks = { hooks: Record<string, Array<{ matcher?: string; hooks: Hook[] }>> };
+    const source = JSON.parse(readFileSync(join(REPO_ROOT, "hooks", "hooks.json"), "utf8")) as Hooks;
+    const bundled = JSON.parse(readFileSync(join(outDir, "hooks", "hooks.json"), "utf8")) as Hooks;
+    for (const event of ["SessionStart", "UserPromptSubmit"]) {
+      expect(source.hooks[event].flatMap((group) => group.hooks)
+        .filter((hook) => hook.command.includes("policy-context.sh"))).toHaveLength(1);
+      expect(bundled.hooks[event].every((group) => group.hooks.length > 0)).toBe(true);
+      expect(bundled.hooks[event].flatMap((group) => group.hooks)
+        .filter((hook) => hook.command.includes("policy-context.sh"))).toHaveLength(0);
+    }
+    expect(existsSync(join(outDir, "hooks", "policy-context.sh"))).toBe(false);
+    const sessionHooks = bundled.hooks.SessionStart.flatMap((group) => group.hooks);
+    expect(sessionHooks.map((hook) => hook.command)).toEqual([
+      'bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-auto-update.sh"',
+      'bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-windows-contract.sh"',
+      'bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-always-on-codex.sh"',
+      'bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-restart-confirm.sh"',
+    ]);
+    expect(sessionHooks[0].async).toBe(true);
+    expect(sessionHooks[0].timeout).toBeUndefined();
+    const promptHooks = bundled.hooks.UserPromptSubmit.flatMap((group) => group.hooks);
+    expect(promptHooks.map((hook) => hook.command)).toEqual([
+      'bash "${CLAUDE_PLUGIN_ROOT}/hooks/update-router.sh"',
+    ]);
+    expect(promptHooks[0].onFailure).toBeUndefined();
+  });
+
   test("merged always-on wrapper preserves every kill-switch branch and emits one JSON", () => {
     const script = join(outDir, "hooks", "session-always-on-codex.sh");
     const syntax = Bun.spawnSync({ cmd: ["bash", "-n", script], stdout: "pipe", stderr: "pipe" });
@@ -356,7 +385,17 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
     ],
     // spec 681 — 재배포는 승인 카드 대신 배포 전 맞추기예요. 묻는 일·push 순서·headless 정지가 절단선 안에 있어야 해요.
-    deploy: ["axhub apps get <app> --json", "git_backend.backend=selfhosted", "axhub repo clone <app>", "승인 카드를 띄우지 않아요", "axhub deploy check --app", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "물을 내용만 남기고 멈춰요", "반드시 push 전에 끝내요", "어디에 배포할까요?"],
+    deploy: [
+      "axhub apps get <app> --json",
+      "git_backend.backend=selfhosted",
+      "axhub repo clone <app>",
+      "승인 카드를 띄우지 않아요",
+      "axhub deploy check --app",
+      "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
+      "headless 는 물을 일이 있으면 아무것도 바꾸지 않고 멈춰요.",
+      "자동 배포되는 GitHub push보다 env·수정 커밋이 먼저예요.",
+      "어디에 배포할까요?",
+    ],
     onboarding: ["axhub apps get <app> --json", "axhub apps git-backend --tenant <tenant> --json", "git_backend.backend=selfhosted", "첫 앱의 코드 저장 위치를 선택해 주세요.", "SELECTED_GIT_BACKEND", "provider 선택이 명시되지 않았으면"],
     import: ["인터넷 주소를 만들까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "어떤 방식으로 배포할까요?"],
     scaffold: [
@@ -381,8 +420,8 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
         const offset = buf.indexOf(Buffer.from(gate, "utf8"));
         if (offset < 0) {
           failures.push(`${skill}: gate string absent — "${gate}"`);
-        } else if (offset >= CODEX_SKILL_PROMPT_LIMIT) {
-          failures.push(`${skill}: "${gate}" @${offset}B (limit ${CODEX_SKILL_PROMPT_LIMIT})`);
+        } else if (offset + Buffer.byteLength(gate, "utf8") > CODEX_SKILL_PROMPT_LIMIT) {
+          failures.push(`${skill}: "${gate}" @${offset}B ends after limit ${CODEX_SKILL_PROMPT_LIMIT}`);
         }
       }
     }
