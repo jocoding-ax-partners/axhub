@@ -23,6 +23,15 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 - Crash recovery 동안 `<host>/.marketplace-transaction.json`, `.marketplace-host-mutating.json`, `.marketplace-rollback-pending.json`, `.marketplace-host-installed.json`과 `.marketplace-staging-*`·`.marketplace-backup-*` directory가 남을 수 있어요. 다음 locked install이 journal에 따라 완료 또는 rollback한 뒤 이 임시 상태를 지워요.
 - `~/.axhub/cache/.plugin-update-restart-codex` — 플러그인 새 버전을 받은 뒤 재시작으로 적용됐는지 확인하기 위한 표시 파일이에요. update marker들은 시각·버전만 담고 Claude/Codex host별로 나눠 서로 덮어쓰지 않아요.
 
+## 조직 정책 — manual-only
+- 이 `POLICY.md`는 plugin 행동 설명이며 고객 조직 정책 데이터 파일이 아니에요. 고객 정책 정본은 서버 게시본이에요.
+- Codex 번들에는 조직 정책 자동 hook·wrapper가 없어요. 훅 신뢰 후에도 매 prompt 최신 조회·문맥 전달·실패 차단을 보장하지 않아요. 필요할 때 `axhub tenants developer-policy get --tenant <uuid> --json`으로 명시 조회해요. get 성공은 host 전달 ACK가 아니에요.
+- 명시 binding `.axhub/state/developer-policy.json`에는 origin/tenant/schema만 저장하며 credential은 없어요. Git/worktree 경계를 넘지 않고 신뢰된 CLI profile/endpoint와 origin 일치를 확인해요. 인증 주체·origin·tenant·schema별 private cache를 쓰더라도 서버 인증·최신 확인을 생략하거나 오래된 본문으로 실패를 덮지 않아요.
+- 자동 sync opt-out은 정확한 `AXHUB_NO_POLICY_SYNC=1` 또는 `~/.axhub/config/no-policy-sync` 존재의 OR예요. 명시 get·배포 준비는 opt-out과 무관해요. 배포 준비에서 deployment 정책 조회가 실패하면 멈추고 unset/withdrawn이면 진행해요. 서버 권한·승인·기존 사용자 확인을 대체하지 않아요.
+- 인증 실패는 terminal에서 CLI profile·권한을 확인하고 필요하면 `axhub auth login --force`로 복구해요. keychain-only 로그인과 비대화형 credential backend는 다를 수 있고 저장 방식 변경은 먼저 알려요.
+- 정책은 사용자가 선택한 AI 서비스에 전달될 수 있어 관리자가 게시마다 확인해요. provider 승인·모델 준수·이전 대화 원문 회수는 보장하지 않아요. AI 활용 기록 수집 옵트인과 별개예요. 정책 본문·prompt·token·credential URL은 진단 로그에 남기지 않아요.
+- Claude 자동 hook 최소 2.1.295·실제 host 검증 2.1.312는 Codex 자동 지원 근거가 아니에요. Desktop Code mode도 미검증이에요. 기존 Codex 업데이트 훅 동작은 그대로 유지해요.
+
 ## 자동 업데이트와 끄는 법
 - axhub CLI 와 플러그인은 새 버전이 확인되면 묻지 않고 뒤에서 조용히 설치돼요. 설치가 끝나면 다음 답변 앞에 "axhub CLI 가 v0.38.0 → v0.39.0 로 자동 업데이트됐어요" 처럼 한 줄로만 알려요. 플러그인 자체의 업데이트는 받아 두었다가 Codex 를 껐다 켜야 반영되고, 재시작 뒤 첫 답변에서 적용됐다고 한 줄로 알려요.
 - 내려받은 파일의 서명 검증(누가 만든 파일인지 확인하는 절차)에 실패하면 설치하지 않고 한 번만 알려요. 그 버전은 다시 시도하지 않아요.

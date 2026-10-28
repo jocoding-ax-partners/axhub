@@ -144,15 +144,15 @@ describe("onboarding representative journey", () => {
   test("fresh onboarding asks for a Git backend and carries the selected value into bootstrap", () => {
     const backendGate = section(SKILL, "### 2. Git backend gate");
 
-    expect(backendGate).toContain("fresh tenant 응답은 추천값");
+    expect(backendGate).toMatch(/tenant 추천.*첫 옵션.*반대 선택도 허용/);
     expect(backendGate).toContain("첫 앱의 코드 저장 위치를 선택해 주세요.");
     expect(backendGate).toContain("native Question/AskUserQuestion card");
-    expect(backendGate).toContain("`GitHub`와 `Axhub self-hosted`");
+    expect(backendGate).toMatch(/`GitHub`(?:와 |·)`Axhub self-hosted`/);
     expect(backendGate).toContain("SELECTED_GIT_BACKEND");
-    expect(backendGate).toContain("같은 대화의 bootstrap");
-    expect(backendGate).toContain("`--git-backend <SELECTED_GIT_BACKEND>`");
-    expect(backendGate).toContain("persisted app backend를 `SELECTED_GIT_BACKEND`로 고정");
-    expect(backendGate).toContain("코드 저장 위치를 다시 묻지 않아요");
+    expect(backendGate).toMatch(/bootstrap에는 재질문 없이 `--git-backend <SELECTED_GIT_BACKEND>`로 넘겨/);
+    expect(backendGate).toMatch(/app target의 persisted backend.*`SELECTED_GIT_BACKEND`로 고정하고 재질문하지 않/);
+    expect(backendGate).toContain("axhub apps git-backend --tenant <tenant> --remember <SELECTED_GIT_BACKEND> --json");
+    expect(backendGate).toMatch(/fresh는 `remembered`.*명시 GitHub\/selfhosted 선택.*다시 묻지 않/);
   });
 
   test("provider choice fails closed headlessly and selfhosted filters to one applicable gap", () => {

@@ -396,6 +396,9 @@ const transformCodexHooks = (outDir: string): void => {
     rmSync(join(hooksDir, name), { force: true });
   }
 
+  // 정책 자동 hook은 Codex에서 검증되지 않았으므로 manual-only로 남겨요.
+  rmSync(join(hooksDir, "policy-context.sh"), { force: true });
+
   // 3) update-router.sh(UserPromptSubmit) 의 컨텍스트를 codex 문안으로 재작성해요 —
   //    게이트 파이프라인(kill switch → prompt 키 → axhub 토큰 → 키워드)은 그대로예요.
   const routerPath = join(hooksDir, "update-router.sh");
@@ -417,11 +420,12 @@ const transformCodexHooks = (outDir: string): void => {
   //    대체된 entry 를 합본 entry 로 교체해요.
   const hooksJsonPath = join(hooksDir, "hooks.json");
   const hooksJson = JSON.parse(readFileSync(hooksJsonPath, "utf8")) as HooksJson;
-  for (const eventEntries of Object.values(hooksJson.hooks)) {
+  for (const [eventName, eventEntries] of Object.entries(hooksJson.hooks)) {
     for (const entry of eventEntries) {
       const nextHooks: CodexHookEntry[] = [];
       for (const hook of entry.hooks) {
         const scriptName = wrapperScriptName(hook.command);
+        if (scriptName === "policy-context.sh") continue;
         if (CODEX_SUPERSEDED_WRAPPERS.has(scriptName)) {
           if (scriptName === "session-update-router-guard.sh") {
             nextHooks.push({
@@ -442,6 +446,7 @@ const transformCodexHooks = (outDir: string): void => {
       }
       entry.hooks = nextHooks;
     }
+    hooksJson.hooks[eventName] = eventEntries.filter((entry) => entry.hooks.length > 0);
   }
   writeFileSync(hooksJsonPath, `${JSON.stringify(hooksJson, null, 2)}\n`);
 };

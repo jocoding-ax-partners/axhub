@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } 
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 
-import { SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
+import { POLICY_WRAPPER_SCRIPT, SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const MARKETPLACE_BUNDLE_DIR = join(REPO_ROOT, "plugins", "axhub");
@@ -65,8 +65,12 @@ describe("clean plugin bundle", () => {
       // 스킬·reference 안내가 늘어 실측 약 527 KB 가 됐어요. 544 KiB → 576 KiB: WP-I1
       // (P1-13·P2-33~P3-47) 의 skill·reference 안내(verify 대기 timeout, update 판정, 작업공간
       // 선택·scaffold placeholder reference 등)로 약 12 KB 늘었고, WP-H 가
-      // skills/plugins/references/publish.md 를 더해요.
-      expect(stats.bytes).toBeLessThan(576 * 1024);
+      // skills/plugins/references/publish.md 를 더해요. 576 KiB → 592 KiB: 조직 정책 runtime
+      // 추가 후 소스 실측 595,038B(54 files), HEAD 대비 +15,274B예요. POLICY +5,863B,
+      // README +3,237B, policy wrapper +3,231B, deploy reference +1,695B, onboarding
+      // reference +657B, hook wiring +587B, 나머지 prompt 순증 +4B이며 개발 산출물은 없어요.
+      // 필수 배포 자산의 총량만 수용해요. prompt 총량·per-skill·8,000B gate 상한은 그대로예요.
+      expect(stats.bytes).toBeLessThan(592 * 1024);
 
       expect(existsSync(join(outDir, ".claude-plugin", "plugin.json"))).toBe(true);
       expect(existsSync(join(outDir, "README.md"))).toBe(true);
@@ -78,6 +82,12 @@ describe("clean plugin bundle", () => {
       for (const wrapper of SESSION_WRAPPER_SCRIPTS) {
         expect(existsSync(join(outDir, "hooks", wrapper)), `missing bundled wrapper: ${wrapper}`).toBe(true);
       }
+      expect(readFileSync(join(outDir, "hooks", POLICY_WRAPPER_SCRIPT), "utf8")).toBe(
+        readFileSync(join(REPO_ROOT, "hooks", POLICY_WRAPPER_SCRIPT), "utf8"),
+      );
+      expect(readFileSync(join(outDir, "hooks", "hooks.json"), "utf8")).toBe(
+        readFileSync(join(REPO_ROOT, "hooks", "hooks.json"), "utf8"),
+      );
       expect(existsSync(join(outDir, "hooks", "import-router.sh"))).toBe(false);
       expect(existsSync(join(outDir, "hooks", "clarity-router.sh"))).toBe(false);
       expect(existsSync(join(outDir, "hooks", "status-resume-router.sh"))).toBe(false);
@@ -121,6 +131,12 @@ describe("clean plugin bundle", () => {
     for (const wrapper of SESSION_WRAPPER_SCRIPTS) {
       expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", wrapper)), `missing marketplace wrapper: ${wrapper}`).toBe(true);
     }
+    expect(readFileSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", POLICY_WRAPPER_SCRIPT), "utf8")).toBe(
+      readFileSync(join(REPO_ROOT, "hooks", POLICY_WRAPPER_SCRIPT), "utf8"),
+    );
+    expect(readFileSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "hooks.json"), "utf8")).toBe(
+      readFileSync(join(REPO_ROOT, "hooks", "hooks.json"), "utf8"),
+    );
     // AP-26: 에이전트 프롬프트 md 는 번들에 없어요 — 훅 스크립트가 판정·적용을 소유해요.
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "plugin-restart-confirm-prompt.md"))).toBe(false);
     expect(existsSync(join(MARKETPLACE_BUNDLE_DIR, "hooks", "auto-update-prompt.md"))).toBe(false);

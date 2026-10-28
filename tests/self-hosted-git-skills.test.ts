@@ -243,9 +243,10 @@ describe("spec 236 self-hosted git skill contracts", () => {
       const deploy = readSkill(root, "deploy");
       const prep = sliceSection(deploy, "## 배포 전 맞추기 (AP-29)", "## Headless Contract");
       const fixes = sliceSection(prep, "5. **맞추기", "6. **배포**");
-      const gate = fixes.indexOf("`subdomain_not_configured` 항목이 fail 이면 push 하지 않고 Recovery Summary 대로 주소부터 정해요");
-      expect(gate, root).toBeGreaterThan(fixes.indexOf("④"));
-      expect(gate, root).toBeLessThan(fixes.indexOf("⑤"));
+      expect(fixes, root).toMatch(/subdomain_not_configured(?::fail`|` 항목이 fail).*push (?:대신|하지 않고).*Recovery Summary.*주소부터/);
+      // The address guard must qualify the push step, before the next check.
+      const pushStep = sliceSection(fixes, "④", "⑤");
+      expect(pushStep, root).toContain("subdomain_not_configured");
       const recovery = sliceSection(deploy, "## Recovery Summary", "## NEVER");
       expect(recovery, root).toContain("never re-push a commit already on the remote");
       expect(recovery, root).toContain("reconcile");
@@ -325,14 +326,14 @@ describe("spec 236 self-hosted git skill contracts", () => {
       expect(backendGate, root).toContain("CLI·auth gap을 닫기 전에는 preflight와 backend read를 절대 실행하지 않아요");
       expect(backendGate, root).toContain("axhub apps get <app> --json");
       expect(backendGate, root).toContain("axhub apps git-backend --tenant <tenant> --json");
-      expect(backendGate, root).toContain("fresh tenant 응답은 추천값");
+      expect(backendGate, root).toMatch(/tenant 추천.*첫 옵션.*반대 선택도 허용/);
       expect(backendGate, root).toContain("첫 앱의 코드 저장 위치를 선택해 주세요.");
       expect(backendGate, root).toContain(
         root === "plugins/axhub-codex/skills"
           ? "native Question/명시 텍스트 승인 card"
           : "native Question/AskUserQuestion card",
       );
-      expect(backendGate, root).toContain("`GitHub`와 `Axhub self-hosted`");
+      expect(backendGate, root).toMatch(/`GitHub`(?:와 |·)`Axhub self-hosted`/);
       expect(backendGate, root).toContain("SELECTED_GIT_BACKEND");
       expect(backendGate, root).toContain("`git_backend.backend=selfhosted`");
       expect(backendGate, root).toContain("tenant source는 `tenant|platform_default`");
@@ -503,7 +504,7 @@ describe("self-hosted static deploys by git push", () => {
     for (const root of SKILL_ROOTS) {
       const deploy = readSkill(root, "deploy");
       const fixes = sliceSection(deploy, "5. **맞추기", "6. **배포**");
-      expect(fixes, root).toContain("self-hosted static 은 `axhub.yaml` 의 `build.deploy_method: static`·`build.static_output_dir` 도");
+      expect(fixes, root).toMatch(/self-hosted static\s*은 `axhub.yaml`\s*의 `build.deploy_method: static`·`build.static_output_dir`\s*도/);
       expect(fixes.indexOf("build.static_output_dir"), root).toBeLessThan(fixes.indexOf("④"));
 
       const details = readFileSync(join(ROOT, root, "deploy", "references", "workflow-details.md"), "utf8");

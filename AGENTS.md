@@ -15,7 +15,7 @@ The monorepo is indexed by CodeGraph (`codegraph_*` MCP tools, server `codegraph
 
 이 repo는 axhub plugin이에요. 현재 공개 surface는 **11 skill** (`onboarding` / `bootstrap` / `scaffold` / `plugins` / `deploy` / `up` / `import` / `development` / `diagnosis` / `clarity` / `update`)이에요. `plugins`는 deploy_method=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 맡고, 게시자 관리는 App Console, 승인은 Console Review로 연결해요. plugin은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli(`axhub` 바이너리)를 호출해요.
 
-제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인. 훅은 cheap bash guard 로 제한해요: auto-update, onboarding resume, Windows 실행 계약, update-first Code-mode router guard 만 허용돼요.
+제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인. 기존 cheap bash guard 외에 조직 정책 동기 hook만 diet 예외로 허용해요(AP-32·DP-6). `policy-context` 조회와 `policy-context --adapt <event>` strict parser는 같은 `axhub` CLI가 소유하고 새 skill·helper 바이너리·jq/node/python 의존은 추가하지 않아요.
 
 ## skill 이 CLI 를 부르는 법
 
@@ -39,7 +39,7 @@ bun run plugin:bundle  # clean local plugin bundle 생성
 
 ## Never Do
 
-- NEVER helper 바이너리 (`crates/axhub-helpers`) 나 hook / NL routing / scaffold 인프라 재추가 — diet 결정 위반.
+- NEVER 승인된 hook 예외(AP-26·AP-32) 밖의 hook / helper 바이너리 (`crates/axhub-helpers`) / NL routing / scaffold 인프라 재추가 — diet 결정 위반.
 - NEVER 명시적 결정 없이 skill을 추가하지 않아요 — `scaffold`·`plugins`·`up`은 사용자 명시 결정으로 추가됐고 현재 11 skill 체제를 유지해요.
 - NEVER 최소 CLI 기능 게이트를 우회하지 말아요.
 - NEVER Claude Code local plugin 을 repo 루트에서 직접 설치/검증하지 말아요 — `bun run plugin:bundle` 후 `dist/axhub-plugin` clean bundle 을 써요.

@@ -3,13 +3,13 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { HOST_EXPECTATIONS, SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
+import { HOST_EXPECTATIONS, POLICY_WRAPPER_SCRIPT, SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
 
 // 훅 bash 를 실제로 실행하는 하네스예요 — 문자열 계약 테스트가 못 잡는 의미
 // 회귀(F1: whole-JSON 매칭 오탐)를 잠가요. 합성 payload 는 공식 문서 예시
 // 스키마를 미러링해요 (code.claude.com/docs/en/hooks — session_id →
 // transcript_path → cwd → permission_mode → hook_event_name → prompt).
-// SessionStart 5개 entry 는 hooks/session-*.sh wrapper 로 추출됐어요 (KTD6) —
+// 기존 SessionStart 5개 entry 는 hooks/session-*.sh wrapper 로 추출됐어요 (KTD6) —
 // wrapper 는 운영과 동일하게 `bash "<path>"` 로 실행하고, wrapper 본문은 인라인
 // 시절과 같은 plain bash 의미를 유지해요 (set -u 주입 금지). spawn timeout 은
 // 성능 assert 가 아니라 deadlock 가드예요.
@@ -27,7 +27,7 @@ const upsCommands = hooksFile.hooks.UserPromptSubmit.flatMap((group) => group.ho
 const ssCommands = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks).map((h) => h.command);
 const updateRouterCmd = upsCommands[0]!;
 
-// hooks.json 의 SessionStart entry 순서와 1:1 인 wrapper 파일 목록은
+// hooks.json 의 기존 SessionStart entry 5개 순서와 1:1 인 wrapper 파일 목록은
 // fixtures/host-expectations.ts 의 SESSION_WRAPPER_SCRIPTS 가 단일 소유해요.
 const wrapperPath = (name: (typeof SESSION_WRAPPER_SCRIPTS)[number]): string => join(REPO_ROOT, "hooks", name);
 const autoUpdateSh = wrapperPath("session-auto-update.sh");
@@ -220,9 +220,11 @@ describe("UserPromptSubmit 라우터 diet (update 단독)", () => {
     }
   });
 
-  test("UserPromptSubmit 표면은 update 라우터 1개뿐이에요 (AGENTS diet 허용 목록)", () => {
-    expect(upsCommands).toHaveLength(1);
-    expect(upsCommands[0]).toContain("update-router.sh");
+  test("UserPromptSubmit은 기존 update 라우터 뒤 정책 freshness gate를 추가해요", () => {
+    expect(upsCommands).toEqual([
+      HOST_EXPECTATIONS.claude.surface.hookWrapperCommand("update-router.sh"),
+      `${HOST_EXPECTATIONS.claude.surface.hookWrapperCommand(POLICY_WRAPPER_SCRIPT)} UserPromptSubmit`,
+    ]);
   });
 
   test("제거된 라우터 스크립트는 hooks/ 에 존재하지 않아요", () => {
@@ -243,8 +245,11 @@ describe("UserPromptSubmit 라우터 diet (update 단독)", () => {
 // ── SessionStart 훅 ──────────────────────────────────────────────────────
 
 describe("SessionStart wrapper 위임 (KTD6: 인라인 command → hooks/session-*.sh)", () => {
-  test("5개 entry 가 순서대로 각 wrapper 파일로 bare 위임해요 — 실행 대상과 hooks.json 이 일치해요", () => {
-    expect(ssCommands).toEqual(SESSION_WRAPPER_SCRIPTS.map((name) => HOST_EXPECTATIONS.claude.surface.hookWrapperCommand(name)));
+  test("기존 5개 wrapper 순서를 유지하고 정책 SessionStart를 마지막에 위임해요", () => {
+    expect(ssCommands).toEqual([
+      ...SESSION_WRAPPER_SCRIPTS.map((name) => HOST_EXPECTATIONS.claude.surface.hookWrapperCommand(name)),
+      `${HOST_EXPECTATIONS.claude.surface.hookWrapperCommand(POLICY_WRAPPER_SCRIPT)} SessionStart`,
+    ]);
     for (const name of SESSION_WRAPPER_SCRIPTS) {
       expect(existsSync(wrapperPath(name))).toBe(true);
     }
@@ -347,18 +352,26 @@ const PLAIN_APPLY = "axhub update apply --execute --yes --json";
 const OLD_CLI_APPLY = `AXHUB_TIMEOUT=10m ${PLAIN_APPLY}`;
 const claudeCalls = (calls: string[]): string[] => calls.filter((line) => line.startsWith("claude "));
 
-describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
-  test("hooks.json 은 entry 1 에만 async:true + timeout:5 를 달아요 (command 문자열 불변)", () => {
+describe("auto-update worker (SessionStart, async — AP-26)", () => {
+  test("auto-update worker 만 비동기로 실행하고 정책 context 는 동기 timeout 을 유지해요", () => {
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks) as Array<{
       command: string;
       async?: boolean;
       timeout?: number;
     }>;
-    expect(entries[0]!.async).toBe(true);
-    expect(entries[0]!.timeout).toBe(5);
-    for (const entry of entries.slice(1)) {
+    const workerCommand = 'bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-auto-update.sh"';
+    const policyCommand = 'bash "${CLAUDE_PLUGIN_ROOT}/hooks/policy-context.sh" SessionStart';
+    const workers = entries.filter((entry) => entry.command === workerCommand);
+    const policies = entries.filter((entry) => entry.command === policyCommand);
+    expect(workers).toHaveLength(1);
+    expect(policies).toHaveLength(1);
+    expect(workers[0]!.async).toBe(true);
+    expect(workers[0]!.timeout).toBe(5);
+    expect(policies[0]!.async).toBeUndefined();
+    expect(policies[0]!.timeout).toBe(2);
+    for (const entry of entries.filter((entry) => entry.command !== workerCommand)) {
       expect(entry.async).toBeUndefined();
-      expect(entry.timeout).toBeUndefined();
+      if (entry.command !== policyCommand) expect(entry.timeout).toBeUndefined();
     }
   });
 

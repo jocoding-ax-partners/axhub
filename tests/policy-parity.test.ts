@@ -127,3 +127,47 @@ describe("agent policy parity", () => {
     }
   });
 });
+
+describe("organization policy documentation boundary", () => {
+  test("AP-32 keeps automatic and manual-only host contracts explicit", () => {
+    const rule = parseRules(readFileSync(POLICY_PATH, "utf8")).find((item) => item.id === "AP-32");
+    expect(rule).toBeDefined();
+    expect(rule?.files).toEqual(["CLAUDE.md", "README.md", "POLICY.md"]);
+    expect(rule?.codexFiles).toEqual(["codex-overrides/README.md", "codex-overrides/POLICY.md"]);
+  });
+
+  test("public host docs disclose opt-out, explicit reads, and customer-policy boundary", () => {
+    for (const file of ["README.md", "POLICY.md", "codex-overrides/README.md", "codex-overrides/POLICY.md"]) {
+      const content = readFileSync(join(REPO_ROOT, file), "utf8");
+      for (const phrase of [
+        "AXHUB_NO_POLICY_SYNC=1",
+        "~/.axhub/config/no-policy-sync",
+        "OR",
+        "axhub tenants developer-policy get",
+        "opt-out",
+        "서버",
+        "게시본",
+        "plugin 행동 설명",
+        "사용자가 선택한 AI 서비스",
+        "manual-only",
+        "Desktop Code mode",
+        "미검증",
+      ]) {
+        expect(content.includes(phrase), `${file}: missing ${phrase}`).toBe(true);
+      }
+    }
+  });
+
+  test("maintainer docs retain the same-CLI adapter exception without restoring helper binaries", () => {
+    for (const file of ["AGENTS.md", "CLAUDE.md", "docs/policy/agent-policy.md", "docs/policy/dev-policy.md"]) {
+      const content = readFileSync(join(REPO_ROOT, file), "utf8");
+      expect(content).toContain("policy-context --adapt <event>");
+      expect(content).toContain("helper 바이너리");
+      expect(content).toContain("예외");
+    }
+    for (const file of ["CLAUDE.md", "docs/policy/agent-policy.md"]) {
+      const content = readFileSync(join(REPO_ROOT, file), "utf8");
+      expect(content).not.toContain("다른 전경 훅은 여전히 네트워크 0");
+    }
+  });
+});

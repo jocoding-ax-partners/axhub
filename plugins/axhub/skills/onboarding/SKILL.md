@@ -88,18 +88,20 @@ DETECT의 `first_gap`이 `cli_missing`·`cli_path_missing`·`cli_old`·`auth_mis
 
 DETECT 뒤 `axhub plugin-support preflight --json`을 한 번 실행해요. `capabilities.self_hosted_git.apps_git_backend`, `capabilities.self_hosted_git.app_git_backend`, `capabilities.self_hosted_git.git_setup`이 모두 `true`여야 하며, 누락·malformed/false면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
 
-app target 은 `axhub plugin-support resolve --json` 의 `app_id` 예요(`app_ambiguous` 면 `matched_apps[]` 에서 고르게 하고, 그 밖의 `error` 면 fresh). `<tenant>` 는 `axhub plugin-support tenant-resolve --json` 의 `tenant`, `needs_pick:true` 면 `candidates[]` 에서 고른 `slug` 예요. app target이면 첫 command, fresh면 둘째를 Tool 제목 `앱 설정 확인`으로 한 번 실행해요.
+app은 `axhub plugin-support resolve --json`의 `app_id`예요(`app_ambiguous`는 `matched_apps[]` 선택, 다른 error는 fresh). `<tenant>`는 `axhub plugin-support tenant-resolve --json`의 `tenant` 또는 `needs_pick:true`일 때 고른 `candidates[].slug`예요. `앱 설정 확인` 제목으로 app이면 첫 명령, fresh면 둘째를 1회 실행해요.
 
 ```bash
 axhub apps get <app> --json
 axhub apps git-backend --tenant <tenant> --json
 ```
 
-top-level `git_backend.backend`·`git_backend.source`만 읽어요. app target이 있으면 `git_backend.backend=selfhosted`를 포함한 persisted app backend를 `SELECTED_GIT_BACKEND`로 고정하고 코드 저장 위치를 다시 묻지 않아요. `git_backend.source=legacy_github`는 GitHub로 고정해요.
+top-level `git_backend.backend`·`git_backend.source`만 읽어요. app target의 persisted backend(`selfhosted` 포함)를 `SELECTED_GIT_BACKEND`로 고정하고 재질문하지 않아요. `source=legacy_github`는 GitHub예요.
 
-fresh tenant 응답은 추천값이에요. 응답에 `remembered`가 있으면 그 값을 `SELECTED_GIT_BACKEND`로 쓰고 묻지 않아요. 사용자가 최초 발화나 현재 대화에서 GitHub/selfhosted를 이미 명시했다면 그 값을 `SELECTED_GIT_BACKEND`로 써요. 아니면 native Question/AskUserQuestion card로 정확히 `첫 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. tenant 추천값을 첫 옵션에 두고 label 끝에 `(추천)`을 붙이되 반대 선택도 허용해요. card가 안 보일 때만 같은 질문을 chat text로 물어요.
+**조직 정책:** 인증된 exact `axhub apps get <app> --json`의 `tenant_id`로만 `axhub tenants developer-policy bind --tenant <tenant_id> --project <현재 프로젝트 절대경로>`를 실행해요. 자동 `--force` 금지, 실패는 완료 아님. AI 전달 가능성을 알리고, fresh/platform의 tenant를 추측하지 않아요. 상세·복구는 `references/gap-state-machine.md`의 정책 연결 절을 따라요.
 
-고르면 `axhub apps git-backend --tenant <tenant> --remember <SELECTED_GIT_BACKEND> --json`으로 기억해요 — 다음 세션의 import·bootstrap·scaffold가 같은 저장 위치로 가요. `--remember`를 모르는 구 CLI면 이 대화 안에서만 유지하고 새 세션 설정이라고 주장하지 않아요. 같은 대화의 bootstrap이 이어지면 다시 묻지 않고 `--git-backend <SELECTED_GIT_BACKEND>`로 전달해요. headless에서 provider 선택이 명시되지 않았으면 provider mutation 전에 `SAFE_STOP_NONINTERACTIVE`로 멈추고 두 선택지와 재개 문장만 보여줘요.
+fresh는 `remembered`, 현재 대화의 명시 GitHub/selfhosted 선택 순으로 `SELECTED_GIT_BACKEND`를 정하고 다시 묻지 않아요. 둘 다 없으면 native Question/AskUserQuestion card로 `첫 앱의 코드 저장 위치를 선택해 주세요.`를 물어요. `GitHub`·`Axhub self-hosted` 중 tenant 추천을 첫 옵션+`(추천)`으로 두되 반대 선택도 허용해요. card가 안 보일 때만 chat text로 물어요.
+
+선택 뒤 `axhub apps git-backend --tenant <tenant> --remember <SELECTED_GIT_BACKEND> --json`으로 다음 세션 import·bootstrap·scaffold용으로 기억해요. 구 CLI가 `--remember`를 모르면 현재 대화만 유지해요. 이어지는 bootstrap에는 재질문 없이 `--git-backend <SELECTED_GIT_BACKEND>`로 넘겨요. headless에서 미선택이면 provider 변경 전 `SAFE_STOP_NONINTERACTIVE`로 멈추고 두 선택지·재개 문장만 보여줘요.
 
 read 실패·malformed `git_backend`면 provider 단계 전에 멈추고, app row 선생성·GitHub 추측·C1/Gitea 직접 호출은 하지 않아요.
 

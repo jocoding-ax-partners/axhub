@@ -1,6 +1,6 @@
 # axhub plugin 정책
 
-axhub Claude Code plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 하지 않는지 공개하는 문서예요. 어려운 용어는 처음 나올 때 괄호로 풀어 썼어요.
+axhub Claude Code plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 하지 않는지 공개하는 문서예요. 어려운 용어는 처음 나올 때 괄호로 풀어 썼어요. 이 `POLICY.md`는 plugin 행동 설명이며 고객 조직 정책 데이터 파일이 아니에요. 고객 정책 정본은 서버의 현재 게시본이에요.
 
 ## 네트워크 접근 — 인터넷에 언제 연결하나요
 - 스킬(플러그인이 상황별로 꺼내 쓰는 기능 단위)과 훅(세션이 시작될 때 자동으로 도는 점검)은 기본적으로 `axhub` CLI(터미널에서 쓰는 axhub 명령 도구)를 통해 인터넷에 접근해요. 플러그인이 그 밖의 곳에 몰래 접속하지 않아요.
@@ -21,6 +21,24 @@ axhub Claude Code plugin 이 사용자의 컴퓨터에서 무엇을 하고 무�
 - 기본 install root는 `~/.axhub/plugins/`이고, `AXHUB_PLUGIN_HOME`을 설정하면 그 absolute directory로 전체 tree가 이동해요. `<root>/<app-id>/<host>/marketplace/`에는 exact plugin code·manifest·install metadata를 보관하고, `<host>/.install.lock`은 같은 App/host의 동시 설치를 막아요.
 - Crash recovery 동안 `<host>/.marketplace-transaction.json`, `.marketplace-host-mutating.json`, `.marketplace-rollback-pending.json`, `.marketplace-host-installed.json`과 `.marketplace-staging-*`·`.marketplace-backup-*` directory가 남을 수 있어요. 다음 locked install이 journal에 따라 완료 또는 rollback한 뒤 이 임시 상태를 지워요.
 - `~/.claude/settings.json` — AI 활용 기록을 켜기로 선택한 경우에만 axhub CLI 가 이 파일에 수집 설정을 추가해요. 자세한 내용은 아래 "AI 활용 기록" 항목을 봐요.
+
+## 조직 정책 자동 동기화
+- 자동 hook은 Claude Code 2.1.295 이상이 필요하고 실제 host 검증 버전은 2.1.312예요. hook 활성·명시 프로젝트 연결·자동 sync 활성 조건에서 동작해요. Codex는 manual-only로 정책 hook을 제외하며 Desktop Code mode는 미검증이에요.
+- SessionStart(`startup|resume|clear|compact`)는 초기 문맥을 제공해요. UserPromptSubmit은 매 prompt마다 인증된 현재 게시본을 동기 조회한 뒤 development 본문만 조직/revision·이전 안내 대체·철회 안내와 함께 다시 제공해요. deployment 본문은 prompt 문맥에 넣지 않아요.
+- `.axhub/state/developer-policy.json`에는 연결 origin/tenant/schema만 저장해요. credential은 없고 Git/worktree 경계를 넘지 않는 가장 가까운 명시 binding만 읽어요. `bind --tenant <uuid> --project <path>`는 인증된 조회 후 연결하며 교체에는 `--force`가 필요해요. app manifest의 이름·8시간 tenant cache로 연결을 추측하지 않아요.
+- HTTP 목적지는 신뢰된 CLI profile/endpoint에서 정하고 binding origin은 일치 확인만 해요. 불일치·redirect로 다른 주소에 credential을 보내지 않아요. 기존 OAuth/PAT/profile 우선순위를 따르며 hook은 로그인 창·keychain 승인창을 자동으로 열지 않아요.
+- private cache는 origin+인증 주체+tenant+schema로 나눠 ETag/revision/body를 한 record로 보관하고 atomic write해요. 매번 서버에서 인증·권한·최신 여부를 확인하며 TTL로 조회를 생략하지 않아요. 304는 요청 당시 고정한 cache snapshot만 쓰고 유효 cache가 없으면 남은 시간 안에 무조건 GET을 최대 1회 해요. 오래된 cache로 실패를 덮지 않아요. 최신 200 뒤 disk write만 실패하면 메모리 본문을 제공할 수 있어요.
+- 정확한 `AXHUB_NO_POLICY_SYNC=1` 또는 `~/.axhub/config/no-policy-sync` 파일 존재가 자동 sync를 꺼요(OR). 다른 env 값은 끄지 않아요. 다시 켜려면 두 원인을 모두 해제해요. CLI가 없고 wrapper의 실행 디렉터리가 확실히 미연결이면 skip하지만 손상·읽기 실패·불확실한 binding은 차단해요. 구 CLI의 최종 exit 64도 실행 디렉터리가 확실히 미연결인 경우만 조용히 skip하고, 연결된 경우 `UNSUPPORTED`로 차단해요. 구 CLI는 다른 host payload cwd를 검증할 수 없다는 호환성 한계가 있어요. 지원 helper는 실행 디렉터리가 미연결이어도 payload cwd를 검증하며 다른 오류를 숨기지 않아요.
+- 전체 wrapper 시작부터 종료까지 2초 제한이며 UserPromptSubmit은 `onFailure: block`으로 최신 확인 실패 시 해당 prompt를 차단해요. 일반 network/429 자동 retry는 없고 OAuth refresh 최대 1회·cache 복구 GET 최대 1회도 같은 deadline 안에서만 해요. helper는 동기 OTLP export를 하지 않고 정책 본문·prompt·token·credential URL을 로그에 남기지 않아요.
+- 배포 준비는 opt-out과 무관하게 최신 deployment 정책을 명시 조회해요. 실패하면 client 준비를 중단하고 unset/withdrawn이면 진행해요. 기존 플랫폼 context_url·서버 권한·승인·사용자 확인은 유지하며 자연어 self-check를 서버 강제 정책으로 표시하지 않아요.
+- 관리자는 게시마다 사용자가 선택한 AI 서비스에 정책이 전달될 수 있음을 확인해요. 이 확인은 provider 승인·allowlist나 AI 전달 ACK가 아니에요. 정책 전달과 모델 준수는 다르고 실행 중 응답 중단·기존 코드 자동 수정·이전 대화 원문 회수를 보장하지 않아요.
+
+### 정책 동기화 복구
+- 채팅 밖 terminal에서 `axhub tenants developer-policy status --json`으로 profile·binding source 표시(절대 경로 아님)·모든 disabled 원인·capability·last checked/emitted를 보고, `axhub tenants developer-policy get --tenant <uuid> --json`으로 명시 조회해요. status는 서버에 접속하지 않는 로컬 진단이며 get 성공과 emitted 표시도 host 전달 ACK가 아니에요.
+- `POLICY_AUTH_REQUIRED`·`ACCESS_DENIED`는 인증·조직 권한을 복구해요. OAuth는 필요할 때 `axhub auth login --force`로 다시 로그인하되 hook과 같은 credential backend를 확인해요. keychain-only 성공만으로 file-backed 비대화형 인증 성공을 판단하지 않아요. 저장 방식 변경은 먼저 알려요.
+- `BINDING_CONFLICT`는 profile/origin과 명시 연결을 바로잡고, `NETWORK`·`DEADLINE`·`RATE_LIMITED`는 연결 또는 안내된 대기 시간을 확인해요. `CACHE_UNUSABLE`·`PROTOCOL`·`INTERNAL`은 정제된 진단과 CLI 상태를 확인하며 `UNSUPPORTED`는 CLI/host 기능을 업데이트해요. 본문이나 credential을 오류 보고에 붙이지 않아요.
+- 차단 오류의 선택적 `error.context`에는 확인된 안전한 `profile`·`tenant_id`·고정 `binding_source`(`project:.axhub/state/developer-policy.json`)와 서버 `X-Request-ID`에서 실제 받은 `request_id`만 담아요. 모르는 값은 생략하며 adapter는 고정 복구 문구와 검증된 진단만 표시해요. 문의할 때 이 정제된 정보만 복사하고 raw 응답·절대 경로·비밀값은 붙이지 마세요.
+- 복구 뒤 사용자가 수동 재전송해요. 차단은 대기열이 아니고 자동 재개·입력 복원을 약속하지 않아요. 자동 sync를 끄거나 `axhub tenants developer-policy unbind --project <path>`로 연결을 해제할 수도 있지만 명시 get·배포 준비의 조회는 계속해요.
 
 ## 자동 업데이트와 끄는 법
 - axhub CLI 와 플러그인은 새 버전이 확인되면 묻지 않고 뒤에서 조용히 설치돼요. 설치가 끝나면 다음 답변 앞에 "axhub CLI 가 v0.38.0 → v0.39.0 로 자동 업데이트됐어요" 처럼 한 줄로만 알려요. 플러그인 자체의 업데이트는 받아 두었다가 Claude Code 를 껐다 켜야 반영되고, 재시작 뒤 첫 답변에서 적용됐다고 한 줄로 알려요.
@@ -53,7 +71,7 @@ axhub Claude Code plugin 이 사용자의 컴퓨터에서 무엇을 하고 무�
 - 비밀번호·토큰 같은 인증 정보(credential)는 파일이나 로그에 남기지 않아요.
 
 ## Codex 지원 — 같은 정책이 적용돼요
-- axhub 는 OpenAI Codex CLI(≥ 0.147.0, 최종 검증 0.148.0)용 파생 번들(`axhub-codex`)도 제공해요. 이 문서의 정책(네트워크 접근·파괴적 작업 승인·실패 자동 리포트·kill switch)은 Codex 판에도 동일하게 적용되고, Codex 판 번들에는 이 문서의 Codex 판이 함께 실려요.
+- axhub 는 OpenAI Codex CLI(≥ 0.147.0, 최종 검증 0.148.0)용 파생 번들(`axhub-codex`)도 제공해요. 네트워크 접근·파괴적 작업 승인·실패 자동 리포트·kill switch 정책은 Codex 판에도 적용돼요. 다만 조직 정책 자동 hook은 제외하고 manual-only로 제공하며, Codex 판 번들에는 이 차이를 설명한 정책 문서가 함께 실려요.
 - Codex 는 플러그인 훅을 사용자가 신뢰하기 전에는 실행하지 않아요 — 신뢰 전에는 자동 업데이트 확인이 돌지 않고, 업데이트는 `update` 스킬을 직접 부르면 돼요. Codex 가 신뢰하는 대상은 훅 command(스크립트 경로)이고, wrapper 스크립트 내용은 플러그인 업데이트로 재신뢰 확인 없이 갱신돼요 — wrapper 동작 변경은 CHANGELOG 에 명시해요.
 - Codex 판의 로컬 표시 파일은 `-codex` 붙은 별도 파일(`~/.axhub/cache/.plugin-update-check-codex` 등)을 써서 Claude 판과 확인 주기를 나눠요. 모든 kill switch(`AXHUB_NO_AUTO_UPDATE` 등)는 동일하게 동작해요.
 - AI 활용 기록(선택 수집) 옵트인은 Claude 판 전용이에요 — Codex 판 플러그인은 이 수집 설정을 만들거나 바꾸지 않아요.

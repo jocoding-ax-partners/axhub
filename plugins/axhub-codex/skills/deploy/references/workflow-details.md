@@ -31,6 +31,15 @@ eval "$(axhub plugin-support deploy-prep --intent deploy --user-utterance "$ARGS
 
 The same logical envelope must drive in-flight, status-first, and create. Reuse the first JSON when practical; if field extraction is repeated, do not let the values diverge semantically.
 
+### 조직 정책 계약
+
+5개 진입점(onboarding/deploy/up/bootstrap/import)의 공통 계약이에요. 첫 변경 전에 읽어요.
+- `deploy-prep`의 top-level `developer_policy`는 매 준비(`--refresh-in-flight` 포함)마다 최신이어야 해요. `outcome:verified`에는 인증된 exact app의 `tenant_id`·`revision`·`state`·`deployment_markdown`이 필요해요. `outcome:not_applicable, reason:platform_app`은 인증된 platform 분류일 때만 허용하고 up은 deploy로 양보해요.
+- 명시 `get`도 최신 `deployment_markdown`을 적용해요. `unset`·`withdrawn`은 정상 빈 안내예요. opt-out·이전 prep cache로 조회를 생략하지 않아요. 기존 `context_url`·서버 권한·심사·preview 승인·사용자 확인은 그대로예요. client 안내를 서버 강제로 표시하지 않아요.
+- `outcome:blocked`의 `code`, 누락·malformed·구 CLI/server·조회 실패면 env·로컬 수정·commit·push·upload·앱 생성·execute 전에 멈춰요. 대상은 유지하고 앱 없음으로 바꾸지 않아요.
+- 선택으로 대상이 바뀌면 `axhub apps get <app ID> --json`의 인증된 `tenant_id`로 `axhub tenants developer-policy get --tenant <tenant_id> --json`을 다시 실행해요. manifest·기억된 작업공간·목록 일치로 UUID를 추측하지 않아요.
+- hook 실패 code별 terminal 복구·credential backend·retry 한도·수동 재전송·status 필드·전달 ACK 한계는 [POLICY.md 정책 동기화 복구](../../../POLICY.md#정책-동기화-복구)를 따라요. Codex는 manual-only이며 자동 hook 성공으로 해석하지 않아요. Desktop Code mode도 자동 동기화를 보장하지 않아요.
+
 Quality gate failure stops by default. Only a non-null `bootstrap_plan` is the first-run boundary — the lookup finished and found no app (`resolve.error` `app_not_found` or `no_candidate_slug`): stop and hand off to import/bootstrap. A missing `app_id` without it is not first-run and not "app not found"; it is a login prompt only for a real auth failure (last auth bullet below). Decide it from these envelope fields before using `classify-exit` or the catalog; their plain exit 65/67 copy (login expired, name not found) fits only that real auth failure and a real not-found:
 
 - `app_ambiguous`: several apps matched. Show the `matched_apps` slugs (never numeric ids), ask which app, and continue with that app. Never import/bootstrap.

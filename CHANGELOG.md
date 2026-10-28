@@ -4,6 +4,16 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.33.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.5...plugin-v1.33.0) (2026-10-28)
+
+관리자가 게시한 회사 개발 가이드를 연결된 프로젝트의 다음 프롬프트부터 받아요. 같은 대화에서도 최신 정책을 확인하며, 확인이 실패하면 오래된 내용을 대신 쓰지 않고 해당 프롬프트를 차단해요. 안내에 따라 채팅 밖 terminal에서 인증이나 연결을 복구한 뒤 프롬프트를 직접 다시 보내세요. 공개된 CLI 0.54.0과 조직 정책 API를 지원하는 서버가 필요해요. 정책 전달은 AI의 준수나 서버 권한 강제를 보장하지 않아요.
+
+### Added
+
+- 명시 연결 프로젝트에서 조직 개발 가이드를 매 prompt에 조회하는 동기 정책 hook을 추가해요. Claude Code 최소 2.1.295·실제 host 검증 2.1.312를 기준으로 최신 확인 실패나 2초 제한 초과 시 prompt를 차단하고, 채팅 밖 복구 뒤 수동 재전송을 안내해요. SessionStart의 startup/resume/clear/compact에도 초기 문맥을 제공해요.
+- 기존 `axhub` CLI의 정책 조회와 offline strict parser/host adapter를 사용해 새 skill·helper 바이너리·runtime 의존을 추가하지 않아요. 정확한 `AXHUB_NO_POLICY_SYNC=1` 또는 `~/.axhub/config/no-policy-sync` 존재로 자동 sync를 끌 수 있지만 명시 get·배포 준비의 deployment 정책 조회는 유지해요.
+- 공개 정책에 binding·cache·인증·사용자 선택 AI 서비스로의 전달 범위를 설명해요. Codex는 정책 hook 없는 manual-only이고 Desktop Code mode는 미검증이에요. 기존 자동 업데이트 동작과 prompt context byte 예산은 유지해요. 정책 wrapper·안내가 추가되어 aggregate runtime bundle 상한은 576KiB에서 592KiB로 조정해요.
+
 ## [1.32.5](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.4...plugin-v1.32.5) (2026-10-26)
 
 Codex 같은 에이전트 샌드박스가 홈 폴더 쓰기를 막아 로그인·git 설정·PATH 복구가 실패하면, 리포트를 남기지 않고 그 명령만 권한 상승으로 한 번 다시 실행해요. 이미 샌드박스 밖에서 실행했는데도 막혔다면 그 경로의 소유자와 권한을 고치도록 안내해요. 정적 앱을 가져오거나 배포한 뒤에는 아직 열리지 않은 주소나 인증서를 발급 중인 주소를 완료된 것처럼 보여 주지 않아요. 주소 충돌로 게시가 막히면 서브도메인을 바꾸거나 새 앱을 만드는 방법을 안내해요. CLI 0.51.1 과 함께 쓰는 것을 기준으로 맞췄어요.

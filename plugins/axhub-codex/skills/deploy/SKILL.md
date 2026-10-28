@@ -47,14 +47,16 @@ Then do `## 배포 전 맞추기` and the canonical workflow below (`references/
 
 ## 배포 전 맞추기 (AP-29)
 
-preflight 의 `capabilities.readiness.deploy_check` 가 false 면 `axhub CLI를 최신 버전으로 업데이트해 주세요.` 하고 멈춰요. 핵심: 물을 일이 없으면 묻지 않고 배포하고, 있으면 그것만 물어요 — headless 는 아무것도 바꾸지 않고 물을 내용만 남기고 멈춰요. 설정값 등록과 수정 커밋은 반드시 push 전에 끝내요(GitHub 연결 앱은 push 가 곧 자동 배포).
+preflight `capabilities.readiness.deploy_check:false`면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`로 중단해요. 질문 없으면 배포, 있으면 그것만 물어요(headless는 변경 없이 질문 요약). 자동 배포되는 GitHub push보다 env·수정 커밋이 먼저예요.
+
+**첫 변경 전 정책 gate:** `deploy-prep`의 최신 top-level `developer_policy`를 `references/workflow-details.md`의 조직 정책 계약대로 확인해요. 실패·누락·malformed면 env·코드·commit·push·upload 전 중단해요. opt-out/cache 우회 금지; `context_url`·서버 권한·승인은 유지해요.
 
 1. **판정** — `axhub deploy check --app <app> --json`(제목 `배포 전 확인`). `fail` 만 맞출 일이고 `unknown`·`info` 는 막지 않아요.
 2. **기준 문서** — preflight 의 `capabilities.readiness.context_url` 을 한 번만 가져와요(제목 `배포 기준 확인`, WebFetch 또는 `curl -fsSL`). 없으면 `references/deploy-rules.md` 를 봐요.
-3. **검사** — 그 규칙으로 앱 코드를 봐요. 테스트·예시·README 흔적은 문제가 아니고, 정적 앱은 서버 항목을 건너뛰어요. 빌드가 있으면 로컬 빌드를 5분 안에서 한 번(재배포는 의존성·설정·소스가 바뀐 때만) 돌리고, 실패하면 고쳐 2번까지 다시 해요. 그래도 실패하면 배포하지 않고 막힌 것을 알려요.
-4. **묻는 일은 셋뿐이에요** — (a) `.env`·`.env.local` 에도 없는 필수 설정값: 값을 대화로 받지 않고 `<이름> 값을 앱 폴더 .env 에 넣어 주세요` 라고 부탁한 뒤 1부터 다시 해요. (b) 안 되는 6가지·문서 `물어봄` 규칙에 처음 해당한 것: 문서의 대안과 `그대로 올리기` 중에서 골라요. (c) 처음 올릴 때 정할 것(`import` 몫). 모아서 한 번만 묻고, 빈 답변은 답이 아니라 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. `.axhub/deploy-answers.json` 의 `keep` 에 있는 항목은 다시 묻지 않고, `그대로` 답은 `{"rule","path","at"}` 로 `keep` 에 더해요(커밋 안 함).
-5. **맞추기 — 묻지 않고 이 순서로 해요.** ① `.env.local` 에 있는 이름은 `--from-dotenv .env.local`, 나머지는 `axhub env set --app <app> --from-dotenv .env --only <이름,…> --execute` 로 등록해요(`.env.local` 우선). 파일을 열거나 값을 출력하지 않아요. ② 포트·`0.0.0.0`·상태 확인 경로·빌드 오류·설정 파일을 고쳐요(self-hosted static 은 `axhub.yaml` 의 `build.deploy_method: static`·`build.static_output_dir` 도 — 빌드 뒤 `index.html` 폴더, 루트면 `.`). ③ 고친 파일과 커밋 안 된 앱 변경을 `배포 전 맞추기` 로 커밋해요(`.env*`·키 파일·`.axhub/`·에이전트 폴더 제외). ④ 원격 브랜치로 push 해요(①~③ 뒤에만, self-hosted 는 lane 의 폴더 확인 뒤). `subdomain_not_configured` 항목이 fail 이면 push 하지 않고 Recovery Summary 대로 주소부터 정해요. ⑤ `deploy check` 로 다시 확인해요.
-6. **배포** — 승인 카드 없이 아래 workflow 로 배포해요(push 가 만든 배포를 status-first 로 먼저 보고, 없을 때만 create). headless 도 물을 일이 없으면 실제로 배포해요. `리허설`·`테스트로` 라고 했을 때만 dry-run 이에요.
+3. **검사** — 기준대로 코드를 봐요(테스트·예시·README 흔적 제외, static은 서버 항목 제외). 빌드는 5분 내 1회(재배포는 의존성·설정·소스 변경 시), 실패 수정·재시도 2회까지. 계속 실패하면 배포 없이 원인을 알려요.
+4. **묻는 일은 셋뿐이에요** — (a) `.env`·`.env.local`에도 없는 필수값: `<이름> 값을 앱 폴더 .env 에 넣어 주세요`로 요청하고 1부터 재개해요(채팅으로 값 수집 금지). (b) 안 되는 6가지·문서 `물어봄`에 처음 해당: 대안/`그대로 올리기` 선택. (c) 첫 배포 설정(`import` 담당). 모아서 1회 묻고 빈 답은 다시 물어요. 열린 카드 중 실행 금지. `.axhub/deploy-answers.json`의 `keep` 항목은 재질문 없이, `그대로`는 `{"rule","path","at"}`를 추가해요(커밋 금지).
+5. **맞추기 — 묻지 않고 순서대로.** ① `.env.local` 이름부터 `--from-dotenv .env.local`, 나머지는 `axhub env set --app <app> --from-dotenv .env --only <이름,…> --execute`로 등록해요. 파일 열기·값 출력 금지. ② 포트·`0.0.0.0`·상태 경로·빌드·설정을 수정해요(self-hosted static은 `axhub.yaml`의 `build.deploy_method: static`·`build.static_output_dir`도: 빌드 후 `index.html` 폴더, 루트는 `.`). ③ 수정·미커밋 앱 변경을 `배포 전 맞추기`로 커밋해요(`.env*`·키·`.axhub/`·에이전트 폴더 제외). ④ 원격 브랜치 push(self-hosted는 lane의 폴더 확인 뒤). 단, `subdomain_not_configured:fail`이면 push 대신 Recovery Summary로 주소부터 정해요. ⑤ `deploy check` 재확인.
+6. **배포** — 승인 카드 없이 아래 workflow로 진행해요. push 배포를 status-first로 보고 없을 때만 create해요. headless도 물을 일이 없으면 실행하고 `리허설`·`테스트로`일 때만 dry-run이에요.
 7. **마무리** — 맞춘 게 있으면 마지막 메시지를 정확히 `이렇게 맞춰서 올렸어요.` 로 시작하고, 맞춘 것(설정값 이름·고친 것·커밋)과 결과 주소를 알려요.
 
 ## Headless Contract

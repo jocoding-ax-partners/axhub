@@ -99,11 +99,10 @@ describe("bootstrap desktop UX contract", () => {
     const scopeSection = bootstrap.slice(bootstrap.indexOf("## Scope"), bootstrap.indexOf("## Reference Loading Policy"));
 
     expect(bootstrap).toContain("never use for \"기존 앱\", \"기존 Express 서버 앱\", \"이미 만든 앱\", \"작업 폴더는 /path\"");
-    expect(scopeSection).toContain("사용자 발화에 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`");
+    expect(scopeSection).toContain("`기존`, `이미 만든`, `작업 폴더`, `이 폴더`");
     expect(scopeSection).toContain("`Express`, `Fastify`, `Nest`, `FastAPI`, `Flask`, `Django`, `Rails`, `Go 서버`, `Dockerfile`");
-    expect(scopeSection).toContain("기존 소스가 있음을 뜻하는 단서");
-    expect(scopeSection).toContain("CLI guard, preflight, 템플릿 목록 확인을 실행하기 전에 즉시 import 경계로 양보");
-    expect(scopeSection).toContain("chat 본문에서 `/axhub:bootstrap` 또는 bootstrap 선택 이유를 설명하지 않아요");
+    expect(scopeSection).toMatch(/axhub 배포 의도.*기존 소스 단서가 함께 있으면.*CLI guard·preflight·템플릿 조회 전에 즉시 import로 넘겨/);
+    expect(bootstrap).toContain("스킬 선택 이유, route label, `axhub:bootstrap 스킬 호출한다` 금지");
   });
 
   test("hides internal routing labels from users", () => {
@@ -187,12 +186,20 @@ describe("bootstrap desktop UX contract", () => {
     const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
 
     expect(bootstrap).toContain("정상 fresh path 에서는 reference 파일을 읽지 않아요");
-    expect(bootstrap).toContain("선택한 값은 `.axhub/state/tenant.json` 같은 로컬 파일로 저장하지 않아요");
+    expect(bootstrap).toMatch(/`\.axhub\/state\/tenant\.json`.*로컬 저장 금지/);
     expect(bootstrap).toContain("이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문");
     expect(bootstrap).toContain("execute/status/verify/result 까지 진행");
     expect(bootstrap).not.toContain("registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요");
     expect(bootstrap).not.toContain("references/bootstrap-and-local.md");
     expect(bootstrap).not.toContain("../deploy/references/session-carryover.md");
+    // Fresh bootstrap must apply policy without opening the shared deploy reference.
+    const policyGate = bootstrap.split("**첫 변경 전 정책 gate:**")[1]!.split("### 3. Template Registry")[0]!;
+    expect(policyGate).not.toContain("references/");
+    expect(policyGate).toContain("deployment_markdown");
+    expect(policyGate).toContain("실패·누락·malformed");
+    expect(policyGate).toContain("앱 생성·env·push·execute 전 중단");
+    expect(policyGate).toContain("opt-out/cache 우회 금지");
+    expect(policyGate).toContain("작업공간 변경 시 다시 조회");
     expect(resumeReference).toContain(CLAUDE.bootstrapSkill.noTenantFileWrite);
     expect(resumeReference).not.toContain("TENANT_CACHE=");
     expect(resumeReference).not.toContain("mkdir -p \"$(dirname \"$TENANT_CACHE\")\"");
@@ -242,7 +249,7 @@ describe("bootstrap desktop UX contract", () => {
     const resumeReference = readRepo("skills/bootstrap/references/resume-and-tenant.md");
 
     expect(bootstrap).toContain("Tool 제목은 `작업공간 확인` 또는 `앱 설정 확인`을 써요");
-    expect(bootstrap).toContain("사용자에게는 tenant/테넌트라고 말하지 말고 `작업공간`이라고 말해요");
+    expect(bootstrap).toMatch(/사용자에게는 `작업공간`으로만 불러/);
     expect(bootstrap).toContain("`새 앱을 어느 작업공간에 만들까요?`");
     expect(resumeReference).toContain("visible tool title for this command must be `앱 설정 확인`");
     expect(resumeReference).toContain("User-facing text must call these `작업공간`, not `tenant` or `테넌트`");
@@ -374,7 +381,7 @@ describe("bootstrap desktop UX contract", () => {
     const contract = readBootstrapContract() + "\n" + readRepo("skills/clarity/SKILL.md");
 
     expect(contract).toContain("`어느 템플릿` 대신 반드시 `어떤 템플릿으로 시작할까요?`");
-    expect(contract).toContain("`작업공간`이라고 말해요");
+    expect(contract).toContain("`새 앱을 어느 작업공간에 만들까요?`");
     expect(contract).toContain("`가장 빠른 시작`");
     expect(contract).not.toContain("앱 이륨");
     expect(contract).not.toContain("앱 이맄");

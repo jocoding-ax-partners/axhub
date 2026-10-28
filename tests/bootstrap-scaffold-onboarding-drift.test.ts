@@ -79,9 +79,7 @@ describe("bootstrap/scaffold/onboarding skill-CLI drift", () => {
       // `.tenant // empty` 는 여러 작업공간에서 빈 문자열을 내고 needs_pick 을 숨겨요.
       expect(doc, name).not.toContain("tenant // empty");
     }
-    expect(BOOTSTRAP).toContain(
-      "`needs_pick:false` 면 `tenant`, `true` 면 `candidates[]` 로 `새 앱을 어느 작업공간에 만들까요?`라고 물어 고른 `slug`",
-    );
+    expect(BOOTSTRAP).toMatch(/`needs_pick:false`\s*면 `tenant`, `true`\s*면 `candidates\[\]`.*`새 앱을 어느 작업공간에 만들까요\?`.*고른 `slug`.*literal `--tenant`/);
     expect(SCAFFOLD).toContain("`needs_pick:true` 면 `candidates[]` 로 `새 앱을 어느 작업공간에 만들까요?` 를 물어 고른 `slug`");
     // preflight `current_team_id` 는 항상 null 이라 근거가 될 수 없어요.
     expect(RESUME).not.toContain("current_team_id");
@@ -125,8 +123,8 @@ describe("bootstrap/scaffold/onboarding skill-CLI drift", () => {
 
   test("P2-46 resume carries the chosen workspace and checks every candidate before starting over", () => {
     // init-resume state 와 그 status/resume 명령에는 작업공간이 없어요. skill 이 literal `--tenant` 를 붙여요.
-    expect(BOOTSTRAP).toContain("resume state 엔 작업공간이 없어 status/resume 명령에도 이 값을 `--tenant` 로 붙이고");
-    expect(BOOTSTRAP).toContain("못 찾으면(exit 5·8) 다른 `candidates` 를 다 본 뒤에만 새로 시작해요");
+    expect(BOOTSTRAP).toMatch(/resume state에는 없으므로 status\/resume에도 같은 `--tenant`를 붙여/);
+    expect(BOOTSTRAP).toMatch(/exit 5·8이면 다른 `candidates`를 모두 확인한 뒤에만 새로 시작/);
     expect(RESUME).toContain("the resume state (`.axhub/init-resume.json`) stores no workspace");
     expect(RESUME).toContain("append it as a literal `--tenant <tenant>` flag");
     expect(RESUME).toContain("- `watch_status`: run `args.status_command` with `--tenant <tenant>` appended");
@@ -155,8 +153,8 @@ describe("bootstrap/scaffold/onboarding skill-CLI drift", () => {
   test("P3-38 onboarding defines where <app> and <tenant> come from", () => {
     const gate = section(ONBOARDING, "### 2. Git backend gate", "### 3. Repository provider surface");
 
-    expect(gate).toContain("app target 은 `axhub plugin-support resolve --json` 의 `app_id` 예요");
-    expect(gate).toContain("`<tenant>` 는 `axhub plugin-support tenant-resolve --json` 의 `tenant`, `needs_pick:true` 면 `candidates[]` 에서 고른 `slug` 예요");
+    expect(gate).toMatch(/app은 `axhub plugin-support resolve --json`의 `app_id`/);
+    expect(gate).toMatch(/`<tenant>`는 `axhub plugin-support tenant-resolve --json`의 `tenant`.*`needs_pick:true`.*고른 `candidates\[\]\.slug`/);
     // CLI·auth gap 과 preflight 뒤, backend read 앞에서 출처를 정해요.
     expect(gate.indexOf("axhub plugin-support preflight --json")).toBeLessThan(gate.indexOf("axhub plugin-support resolve --json"));
     expect(gate.indexOf("axhub plugin-support resolve --json")).toBeLessThan(gate.indexOf("axhub apps get <app> --json"));
@@ -228,7 +226,7 @@ describe("bootstrap/scaffold/onboarding skill-CLI drift", () => {
     expect(storage).toContain("템플릿·앱 이름은 아직 안 정했으니 bootstrap 이 묻고");
     expect(storage).not.toContain("정한 템플릿·앱 이름을 넘겨요");
 
-    expect(ONBOARDING).toContain("다음 세션의 import·bootstrap·scaffold가 같은 저장 위치로 가요");
+    expect(ONBOARDING).toMatch(/--remember <SELECTED_GIT_BACKEND> --json`.*다음 세션 import·bootstrap·scaffold.*기억/);
   });
 
   test("P1-13 bootstrap verify --wait fits the host tool timeout and ends interruptions with a resume summary", () => {
