@@ -64,7 +64,7 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");
     expect(bootstrap).toContain("start the visible response with a Korean progress sentence");
-    expect(bootstrap).toContain("아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행");
+    expect(bootstrap).toContain("아래 순서대로 CLI 확인과 앱 이름 질문까지 바로 진행");
     expect(bootstrap).toContain("`진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요");
     expect(bootstrap).toContain("`Using axhub:bootstrap skill`");
     expect(bootstrap).toContain("`matches new app + deploy request`");
@@ -88,10 +88,11 @@ describe("bootstrap desktop UX contract", () => {
     expect(frontmatter).not.toContain("Please make my first app");
     expect(frontmatter).not.toContain("deploy it to the internet");
     expect(frontmatter).not.toContain("put it online");
-    expect(bootstrap).toContain("아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행");
+    expect(bootstrap).toContain("아래 순서대로 CLI 확인과 앱 이름 질문까지 바로 진행");
     expect(bootstrap).toContain("If you need an app name or template, choose a reasonable one yourself");
     expect(bootstrap).toContain("deploy it for real");
-    expect(bootstrap).toContain("템플릿 선택 카드, 앱 이름 확인 카드, dry-run 뒤 `진행` 확인은 절대 생략하지 않아요");
+    expect(bootstrap).toContain("앱 이름 확인 카드, dry-run 뒤 `진행` 확인은 절대 생략하지 않아요");
+    expect(bootstrap).toContain("템플릿은 `nextjs-axhub` 하나라 묻지 않아요");
   });
 
   test("refuses existing backend app imports before bootstrap preflight", () => {
@@ -187,7 +188,7 @@ describe("bootstrap desktop UX contract", () => {
 
     expect(bootstrap).toContain("정상 fresh path 에서는 reference 파일을 읽지 않아요");
     expect(bootstrap).toMatch(/`\.axhub\/state\/tenant\.json`.*로컬 저장 금지/);
-    expect(bootstrap).toContain("이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문");
+    expect(bootstrap).toContain("이 본문만으로 CLI guard, 작업공간 선택, app-name 질문");
     expect(bootstrap).toContain("execute/status/verify/result 까지 진행");
     expect(bootstrap).not.toContain("registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요");
     expect(bootstrap).not.toContain("references/bootstrap-and-local.md");
@@ -304,30 +305,22 @@ describe("bootstrap desktop UX contract", () => {
     expect(resumeStateCommands.some((command) => command.includes("--git-backend github"))).toBe(true);
   });
 
-  test("asks for template when the user only gives a generic app category", () => {
+  test("uses the single nextjs-axhub template without a template question", () => {
     const bootstrap = readBootstrap();
     const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
+    const scaffold = readRepo("skills/scaffold/SKILL.md");
+    const contract = readBootstrapContract() + "\n" + scaffold + "\n" + readRepo("skills/clarity/SKILL.md");
 
-    expect(bootstrap).toContain("일반 장르·기능 단어는 exact template 선택이 아니에요");
-    expect(bootstrap).toContain("template 선택을 native Question/AskUserQuestion card 로 먼저 물어요");
-    expect(bootstrap).toContain("card 가 렌더링되지 않거나 선택지가 보이지 않는 경우에만");
-    expect(bootstrap).toContain("`preorder`");
-    expect(bootstrap).toContain("추천 순서를 정하는 근거일 뿐 선택 확정이 아니며");
-    expect(bootstrap).toContain("`--template ... --dry-run` 은 템플릿 질문 답변을 받은 뒤에만 실행해요");
-    expect(templateReference).toContain("use a native Question/AskUserQuestion card first for backend template selection");
-    expect(templateReference).toContain("text fallback only when the card does not render choices");
-    expect(templateReference).toContain("번호나 템플릿 이름으로 답해 주세요.");
-    expect(templateReference).toContain("Generic category or feature words");
-    expect(templateReference).toContain("are not exact template choices");
-    expect(templateReference).toContain("Those words can make Next.js the recommended first option");
-    expect(templateReference).toContain("they never finalize `--template`");
-    expect(bootstrap).toContain("`recommend the best option` 처럼 말해도 그 말은 추천을 원한다는 뜻");
-    expect(bootstrap).toContain("`choose whatever is reasonable`");
-    expect(bootstrap).toContain("`pick the best template/name`");
-    expect(bootstrap).toContain("반드시 `어떤 템플릿으로 시작할까요?` 질문을 보여주고 답을 기다려요");
-    expect(templateReference).toContain("Recommendation wording such as");
-    expect(templateReference).toContain("is not template approval");
-    expect(templateReference).not.toContain("Ask in normal chat text instead");
+    expect(bootstrap).toContain("4. Template: 묻지 않고 `nextjs-axhub` 로 정해요.");
+    expect(bootstrap).toContain("템플릿 선택 질문·카드 없이 dry-run·execute 에 `--template nextjs-axhub` 를 써요");
+    expect(bootstrap).toContain("챗봇·AI 대화·사내 도우미처럼 용도가 다른 요청도 같은 템플릿으로 만들어요");
+    expect(templateReference).toContain("Bootstrap never asks a template question and never shows a template card");
+    expect(templateReference).toContain("If `nextjs-axhub` is missing from the registry output, stop before dry-run");
+    expect(scaffold).toContain("템플릿은 `nextjs-axhub` 하나라 묻지 않아요");
+    expect(scaffold).toContain('cp -R "<target>/.axhub-template/nextjs-axhub/." "<target>/"');
+    expect(contract).not.toContain("어떤 템플릿으로 시작할까요?");
+    expect(contract).not.toContain("chatbot-axhub");
+    expect(contract).not.toContain("<template-id>");
   });
 
   test("confirms app name before freezing slug for new bootstrap apps", () => {
@@ -363,7 +356,6 @@ describe("bootstrap desktop UX contract", () => {
     const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
     const clarity = readRepo("skills/clarity/SKILL.md");
 
-    expect(bootstrap).toContain("섞인 요청에서 update/clarity 가 먼저 처리됐어도 template 은 여기서만 확정");
     expect(bootstrap).toContain("콘셉트·slug·이름 질문 답은 추천 힌트일 뿐");
     expect(bootstrap).toContain("추천 후보로만 쓰고");
     expect(templateReference).toContain("Pre-bootstrap answers to concept or slug questions are not confirmation");
@@ -374,15 +366,13 @@ describe("bootstrap desktop UX contract", () => {
     expect(clarity).toContain("질문 `새로 만들 예약 웹사이트, 어떤 컨셉으로 할까요?`");
     expect(clarity).toContain("선택지 `네일샵 예약`, `사진관 예약`, `애견미용 예약`, `피아노 레슨 예약`");
     expect(clarity).toContain("추천 후보는 bootstrap 이 묻고 clarity 는 만들지 않아요");
-    expect(clarity).toContain("bootstrap 이 `어떤 템플릿으로 시작할까요?` 와 `앱 이름을 무엇으로 할까요?` 카드를 묻게 해요");
+    expect(clarity).toContain("bootstrap 이 `앱 이름을 무엇으로 할까요?` 카드를 묻게 해요");
   });
 
   test("blocks typoed Korean prompt copy observed in desktop bootstrap QA", () => {
     const contract = readBootstrapContract() + "\n" + readRepo("skills/clarity/SKILL.md");
 
-    expect(contract).toContain("`어느 템플릿` 대신 반드시 `어떤 템플릿으로 시작할까요?`");
     expect(contract).toContain("`새 앱을 어느 작업공간에 만들까요?`");
-    expect(contract).toContain("`가장 빠른 시작`");
     expect(contract).not.toContain("앱 이륨");
     expect(contract).not.toContain("앱 이맄");
     expect(contract).not.toContain("뱰른");
@@ -401,17 +391,15 @@ describe("bootstrap desktop UX contract", () => {
     expect(contract).toContain("진행하지 않고 멈춰요");
   });
 
-  test("chooses template and app name before checking the GitHub owner", () => {
+  test("confirms the app name before checking the GitHub owner", () => {
     const bootstrap = readBootstrap();
     const templateReference = readRepo("skills/bootstrap/references/templates-and-github.md");
 
     const workflow = bootstrap.slice(bootstrap.indexOf("실제 순서:"), bootstrap.indexOf("Slash command"));
-    expect(workflow.indexOf("Template picker")).toBeGreaterThanOrEqual(0);
     expect(workflow.indexOf("App name")).toBeGreaterThanOrEqual(0);
     expect(workflow.indexOf("GitHub App gate")).toBeGreaterThanOrEqual(0);
-    expect(workflow.indexOf("Template picker")).toBeLessThan(workflow.indexOf("GitHub App gate"));
     expect(workflow.indexOf("App name")).toBeLessThan(workflow.indexOf("GitHub App gate"));
-    expect(templateReference).toContain("Ask for template and app name before the GitHub App gate");
+    expect(templateReference).toContain("Ask for the app name before the GitHub App gate");
   });
 
   test("checks app address availability before bootstrap dry-run preview", () => {

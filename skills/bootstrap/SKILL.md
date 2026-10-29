@@ -11,12 +11,12 @@ model: sonnet
 
 첫 visible 응답은 반드시 한국어 진행 문장. 스킬 선택 이유, route label, `axhub:bootstrap 스킬 호출한다` 금지. Claude Desktop 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요. 금지문: `Using axhub:bootstrap skill`, `matches new app + deploy request`, `axhub의 새 앱 생성 스킬`, `스킬을 사용하겠습니다`.
 
-새 앱 생성과 배포 목표는 받은 상태예요. execute 승인은 별도라서 아래 순서대로 CLI 확인과 템플릿 질문까지 바로 진행하고, `진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요.
+새 앱 생성과 배포 목표는 받은 상태예요. execute 승인은 별도라서 아래 순서대로 CLI 확인과 앱 이름 질문까지 바로 진행하고, `진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요.
 인증 전: 기존=`axhub apps get <app> --json`; resume=`state.git_backend` 우선(없을 때만 app lookup); fresh=`axhub apps git-backend --tenant <tenant> --json` 추천 뒤 `GitHub`/`Axhub self-hosted` 선택. dry-run·state·execute=`--git-backend github|selfhosted`. `git_backend.backend=selfhosted`는 GitHub 계정·device flow·App·owner 질문 0회.
 
 중단 뒤 이어질 때도 CLI 명령이 하나도 실행되지 않았다면 fresh path 를 그대로 시작해요. 다시 시작 문구를 요구하지 않아요.
 
-`If you need an app name or template, choose a reasonable one yourself`, `choose whatever is reasonable`, `pick the best template/name`, `deploy it for real`, `put it online`, `do it for real` 는 목표·추천 허용일 뿐이에요. 템플릿 선택 카드, 앱 이름 확인 카드, dry-run 뒤 `진행` 확인은 절대 생략하지 않아요.
+`If you need an app name or template, choose a reasonable one yourself`, `choose whatever is reasonable`, `pick the best template/name`, `deploy it for real`, `put it online`, `do it for real` 는 목표·추천 허용일 뿐이에요. 앱 이름 확인 카드, dry-run 뒤 `진행` 확인은 절대 생략하지 않아요. 템플릿은 `nextjs-axhub` 하나라 묻지 않아요.
 
 ## Scope
 
@@ -28,7 +28,7 @@ axhub 배포 의도와 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`,
 
 ## Reference Loading Policy
 
-정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, template/app-name 질문, backend gate, backend별 preview와 execute/status/verify/result 까지 진행해요. plugin cache 파일 읽기를 복구 조건으로 삼지 않아요.
+정상 fresh path 에서는 reference 파일을 읽지 않아요. 이 본문만으로 CLI guard, 작업공간 선택, app-name 질문, backend gate, backend별 preview와 execute/status/verify/result 까지 진행해요. plugin cache 파일 읽기를 복구 조건으로 삼지 않아요.
 
 ## Visibility
 
@@ -51,7 +51,7 @@ axhub 배포 의도와 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`,
 1. CLI guard: `axhub plugin-support preflight --json`.
 2. Resume/workspace: `axhub plugin-support init-resume route --json`, then `axhub plugin-support tenant-resolve --json`.
 3. Template registry: `axhub apps templates list --tenant <tenant-slug> --json`.
-4. Template picker: backend registry 에 있는 값만 고르고, native 질문 card 로 먼저 물어요.
+4. Template: 묻지 않고 `nextjs-axhub` 로 정해요.
 5. App name: 앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요.
 6. Git backend: persisted·`remembered` 선택을 재사용하거나 tenant 추천값에서 확정해요. selfhosted는 GitHub App gate를 건너뛰고, GitHub만 `axhub github accounts list --json`를 실행해요.
 7. Availability check: 7단계 명령으로 slug·subdomain 확인.
@@ -85,7 +85,7 @@ axhub plugin-support init-resume route --json
 ```
 `watch_status`/`resume_last`: `state.git_backend` 우선; 없을 때만 `axhub apps get <app> --json`, 실패면 중단. selfhosted는 ownerless status/resume, GitHub/`legacy_github`만 emitted command.
 
-`watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 새 폴더/새 앱 요청이거나 `새로 시작`이면 이전 상태를 무시하고 template 질문으로 이어가요.
+`watch_status` 또는 `resume_last` 이고 `clone_done=false` 면 이어서 할지 물어요. 새 폴더/새 앱 요청이거나 `새로 시작`이면 이전 상태를 무시하고 앱 이름 질문으로 이어가요.
 
 ```bash
 axhub plugin-support tenant-resolve --json
@@ -103,17 +103,13 @@ Tool 제목은 `템플릿 목록 확인`을 써요.
 axhub apps templates list --tenant test --json
 ```
 
-실제 Desktop-visible command 에서는 확정된 tenant literal 로 바꿔요.
+실제 Desktop-visible command 에서는 확정된 tenant literal 로 바꿔요. 목록은 `nextjs-axhub` 가 있는지만 봐요 — 없으면 앱을 만들지 않고 `새 앱 템플릿을 찾지 못했어요. 잠시 뒤 다시 시도해 주세요.` 라고 알리고 멈춰요.
 
-### 4. Template Picker
+### 4. Template
 
-Claude Desktop 에서는 template 선택을 native Question/AskUserQuestion card 로 먼저 물어요. 제목 `템플릿 선택`, 질문 `어떤 템플릿으로 시작할까요?`; backend 실제 template 만 보여줘요. 3개 초과면 추천 3개, card 가 렌더링되지 않거나 선택지가 보이지 않는 경우에만 chat fallback.
+템플릿은 `nextjs-axhub` 하나예요. 템플릿 선택 질문·카드 없이 dry-run·execute 에 `--template nextjs-axhub` 를 써요. 목록에 다른 template 이 함께 보여도 고르지 않아요.
 
-섞인 요청에서 update/clarity 가 먼저 처리됐어도 template 은 여기서만 확정해요. 이전 콘셉트·slug·이름 질문 답은 추천 힌트일 뿐이에요.
-
-`웹앱`, `쇼핑몰`, `예약`, `preorder`, `booking`, `shop`, `dashboard`, `admin` 같은 일반 장르·기능 단어는 exact template 선택이 아니에요. 추천 순서를 정하는 근거일 뿐 선택 확정이 아니며, `--template ... --dry-run` 은 템플릿 질문 답변을 받은 뒤에만 실행해요.
-
-`추천해줘`, `알아서`, `best option`, `recommend the best option` 처럼 말해도 그 말은 추천을 원한다는 뜻이지 선택 확정이 아니에요. 1번 추천은 가능하지만 반드시 `어떤 템플릿으로 시작할까요?` 질문을 보여주고 답을 기다려요. 질문 뒤 `추천대로`, `1번`, template 이름 답변이면 확정.
+챗봇·AI 대화·사내 도우미처럼 용도가 다른 요청도 같은 템플릿으로 만들어요. 그 기능은 앱을 만든 뒤 development 로 붙여요. preview 에는 `Next.js` 로 보여줘요.
 
 ### 5. App Name
 
@@ -121,7 +117,7 @@ Claude Desktop 에서는 template 선택을 native Question/AskUserQuestion card
 
 `추천 이름으로 해줘`, `알아서 이름 지어줘`, `use the recommended name` 은 앱 이름 질문이 먼저 보인 뒤의 답변일 때만 확정으로 봐요. 아직이면 추천 이름을 제안하고 `앱 이름을 무엇으로 할까요?` 로 확인해요.
 
-다른 스킬/일반 채팅의 이름·slug 답은 추천 후보로만 쓰고 `앱 이름 확인` card 를 다시 보여줘요. 선택지 설명은 짧고 검수된 한국어만 써요: `기존 앱들과 겹치지 않는 새 콘셉트`, `예약 폼과 시간 선택에 적합`, `정적 페이지 중심이면 가까운 구조`, `가볍고 빠른 시작`, `진행하지 않고 멈춰요`. 오타·비문 금지.
+섞인 요청에서 update/clarity 가 먼저 처리됐어도 이전 콘셉트·slug·이름 질문 답은 추천 힌트일 뿐이에요. 다른 스킬/일반 채팅의 이름·slug 답은 추천 후보로만 쓰고 `앱 이름 확인` card 를 다시 보여줘요. 선택지 설명은 짧고 검수된 한국어만 써요: `기존 앱들과 겹치지 않는 새 콘셉트`, `예약 폼과 시간 선택에 적합`, `정적 페이지 중심이면 가까운 구조`, `가볍고 빠른 시작`, `진행하지 않고 멈춰요`. 오타·비문 금지.
 
 repo name 과 subdomain 은 명시 입력이 없으면 app slug 로 맞춰요. dry-run 과 execute 모두 `--repo-name <app-slug>` 및 `--subdomain <app-slug>` 를 붙여요.
 
@@ -244,7 +240,7 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 1. 한 줄 알려요: `GitHub 연결에 실패해서 우선 로컬 소스로 배포할게요. GitHub 는 이후 다시 연결할 수 있어요` (저장소는 있는데 권한만 없으면 `권한이 풀리면 평소대로 push 배포를 쓸 수 있어요`)
 2. 앱이 이미 있는지 확인해요(saga 가 앱만 만들었을 수 있어요) — `axhub apps bootstrap-status <bootstrap-id> --tenant <tenant> --json` 또는 `axhub apps get <app-slug> --tenant <tenant> --json`. 있으면 3 을 건너뛰고 slug 는 확인된 값을 써요.
 3. 앱이 없으면 주소 확인(7단계) 뒤 템플릿·이름·slug·작업공간과 저장소 없이 만든다는 점을 보여주고, 8단계와 같은 `지금 만들고 배포까지 진행할까요?`(`진행`/`취소`)에 `진행`을 받은 뒤에만 만들어요 — `axhub apps create --tenant <tenant> --name <이름> --slug <slug> --subdomain <slug> --deploy-method docker --resource-tier XS`
-4. 코드가 폴더에 없으면 공개 템플릿에서 받아요(인증 불필요) — `git clone --depth 1 --branch main https://github.com/jocoding-ax-partners/axhub-template.git <target>/.axhub-template` → `cp -R <target>/.axhub-template/<template-id>/. <target>/` → `rm -rf <target>/.axhub-template`. 지우는 경로는 정확히 그 임시 폴더 하나뿐이에요.
+4. 코드가 폴더에 없으면 공개 템플릿에서 받아요(인증 불필요) — `git clone --depth 1 --branch main https://github.com/jocoding-ax-partners/axhub-template.git <target>/.axhub-template` → `cp -R <target>/.axhub-template/nextjs-axhub/. <target>/` → `rm -rf <target>/.axhub-template`. 지우는 경로는 정확히 그 임시 폴더 하나뿐이에요.
 5. **placeholder 치환 (템플릿을 받았을 때 필수).** 서버 치환 단계가 없는 갈래라 건너뛰면 **로그인·데이터 연동만 조용히 죽어요**. `grep -rl '{{' <target>` 로 찾은 파일들의 6개 토큰을 전부 바꿔요 — `{{APP_SLUG}}`→slug · `{{APP_NAME}}`→앱 이름 · `{{TENANT}}`→작업공간 slug(`tenant` 가 id 면 `axhub auth status --json` `tenants[]` 의 `tenant_slug`) · `{{API_BASE}}`→CLI 가 쓰는 API 주소(prod `https://api.axhub.ai`) · `{{APP_SUBDOMAIN}}`·`{{APP_ORIGIN}}`→`apps get` 의 `subdomain`·`access_url`. `axhub.yaml` 의 `name:` 도 앱 slug 로 바꿔요.
 6. 배포는 `up` 소유 — Skill 도구로 호출하거나, 없으면 `skills/up/SKILL.md` 2단계부터 여기서 수행해요(앱만 만들고 끝내지 않아요)
 7. 결과 확인은 11단계 그대로. clone 단계는 건너뛴 상태예요.
@@ -256,7 +252,7 @@ git -C <target> init -q -b main && (git -C <target> remote add origin https://gi
 - NEVER GitHub App 미설치 상태에서 bootstrap dry-run/execute.
 - NEVER `axhub init`, `axhub init --from-template`, `axhub apps create`, `axhub deploy create` 로 우회. **단 12단계(GitHub 차단)에서 `진행` 확인을 받은 경우만 예외**예요 — 그때도 이 스킬은 `apps create` 만 쓰고 배포는 `up` 으로 양보해요.
 - NEVER remote `templates.json` / 폐기된 fetch-template 사용.
-- NEVER subprocess/headless 에서 template/app name 임의 선택.
+- NEVER subprocess/headless 에서 app name 임의 선택.
 - NEVER `--execute` 를 `--dry-run` 미리보기와 사용자 확인 없이 호출.
 - NEVER auth 만료를 template 조회 실패로 오해.
 - NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채 사용자를 빈 GitHub code 입력 화면에 남겨두지 않아요.
