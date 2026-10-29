@@ -59,7 +59,10 @@ describe("bootstrap desktop UX contract", () => {
     // `--execute` 를 다시 실행하지 않는 규칙, `interrupted`·`timeout` 실패 안내, execute 재시도 전
     // `apps get` 확인(idempotency key 로는 중복이 막히지 않음)을 둬요. 9.1 은 reference 를 읽지
     // 않는 복구 경로라 본문에 있어야 해요.
-    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(31_600);
+    // 31_600 → 33_300: spec 706 — 6단계가 서버의 코드 저장 위치 판정(`git_backend.decision`:
+    // use·ask·link_github, 내 GitHub 계정 질문, `--git-choice`)을 따라요. fresh 경로라 reference
+    // 를 읽지 않으니 본문에 있어야 해요. 판정이 없는 구 서버 규칙은 그대로 남겼어요.
+    expect(Buffer.byteLength(bootstrap, "utf8")).toBeLessThanOrEqual(33_300);
     expect(bootstrap).toContain("## Fast Start");
     expect(bootstrap).toContain("Do not explain the skill match");
     expect(bootstrap).toContain("do not mention axhub:bootstrap in chat");

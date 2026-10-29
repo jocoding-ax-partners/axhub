@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.35.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.34.0...plugin-v1.35.0) (2026-10-29)
+
+새 앱 코드를 어디에 저장할지 회사 설정과 내 GitHub 연결 상태대로 정해요. 회사가 한 곳만 허용하면 묻지 않고 거기로 만들고, 둘 다 허용하면 GitHub 를 연결한 사람에게만 어디에 저장할지 물어요. GitHub 만 허용하는 회사에서 연결이 없으면 GitHub 연결부터 안내해요. CLI 0.55.0 이상이 필요해요.
+
+
+### Added
+
+* **plugin:** 회사의 코드 저장 위치 판정을 따른다 (spec 706) ([#2068](https://github.com/jocoding-ax-partners/axhub-mono/issues/2068)) ([352f526](https://github.com/jocoding-ax-partners/axhub-mono/commit/352f52676562c177610fde2251f04af3121c34eb))
+
 ## [1.34.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.33.0...plugin-v1.34.0) (2026-10-29)
 
 새 앱을 만들 때 템플릿을 묻지 않아요. 템플릿이 Next.js 하나로 통일돼 바로 앱 이름 확인으로 넘어가고, 챗봇 같은 용도도 같은 템플릿으로 만든 뒤 기능을 붙여요. 배포 기준 요약에는 새로 열린 외부 포트 9443 을 더했어요.

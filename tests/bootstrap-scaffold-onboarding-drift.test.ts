@@ -214,7 +214,8 @@ describe("bootstrap/scaffold/onboarding skill-CLI drift", () => {
   test("P3-44 bootstrap and scaffold reuse the backend onboarding remembered", () => {
     const backendGate = section(BOOTSTRAP, "### 6. Git Backend Gate", "### 7. Availability Check");
 
-    expect(BOOTSTRAP).toContain("6. Git backend: persisted·`remembered` 선택을 재사용");
+    // spec 706: `remembered` 는 서버 판정(`decision`)이 없는 구 서버에서만 쓰여요.
+    expect(BOOTSTRAP).toContain("6. Git backend: persisted 선택을 재사용하거나 서버 `decision` 을 따라요(구 서버는 persisted·`remembered` 선택을 재사용");
     expect(backendGate).toContain("`git_backend.source`·`remembered`만 읽어요");
     expect(backendGate).toContain("다음은 `remembered`(onboarding 이 `--remember` 로 남긴 값)");
     expect(backendGate.indexOf("`remembered`(onboarding")).toBeLessThan(backendGate.indexOf("이 앱의 코드 저장 위치를 선택해 주세요."));

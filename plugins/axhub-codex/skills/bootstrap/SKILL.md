@@ -14,7 +14,7 @@ model: sonnet
 첫 visible 응답은 반드시 한국어 진행 문장. 스킬 선택 이유, route label, `axhub:bootstrap 스킬 호출한다` 금지. Codex 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요. 금지문: `Using axhub:bootstrap skill`, `matches new app + deploy request`, `axhub의 새 앱 생성 스킬`, `스킬을 사용하겠습니다`.
 
 새 앱 생성과 배포 목표는 받은 상태예요. execute 승인은 별도라서 아래 순서대로 CLI 확인과 앱 이름 질문까지 바로 진행하고, `진행해줘라고 말해` 같은 일반 안내만 남기고 멈추지 않아요.
-인증 전: 기존=`axhub apps get <app> --json`; resume=`state.git_backend` 우선(없을 때만 app lookup); fresh=`axhub apps git-backend --tenant <tenant> --json` 추천 뒤 `GitHub`/`Axhub self-hosted` 선택. dry-run·state·execute=`--git-backend github|selfhosted`. `git_backend.backend=selfhosted`는 GitHub 계정·device flow·App·owner 질문 0회.
+인증 전: 기존=`axhub apps get <app> --json`; resume=`state.git_backend` 우선(없을 때만 app lookup); fresh=`axhub apps git-backend --tenant <tenant> --json` 의 `decision` 을 따르고(없는 구 서버만 추천 뒤 `GitHub`/`Axhub self-hosted` 선택), dry-run·execute=`--git-choice <key>`(구 서버 `--git-backend github|selfhosted`), state=`--git-backend`. `git_backend.backend=selfhosted`는 GitHub 계정·device flow·App·owner 질문 0회.
 
 중단 뒤 이어질 때도 CLI 명령이 하나도 실행되지 않았다면 fresh path 를 그대로 시작해요. 다시 시작 문구를 요구하지 않아요.
 
@@ -67,7 +67,7 @@ axhub 배포 의도와 `기존`, `이미 만든`, `작업 폴더`, `이 폴더`,
 3. Template registry: `axhub apps templates list --tenant <tenant-slug> --json`.
 4. Template: 묻지 않고 `nextjs-axhub` 로 정해요.
 5. App name: 앱 이름이 발화에서 유추되더라도 새 앱 생성에서는 한 번 확인해요.
-6. Git backend: persisted·`remembered` 선택을 재사용하거나 tenant 추천값에서 확정해요. selfhosted는 GitHub App gate를 건너뛰고, GitHub만 `axhub github accounts list --json`를 실행해요.
+6. Git backend: persisted 선택을 재사용하거나 서버 `decision` 을 따라요(구 서버는 persisted·`remembered` 선택을 재사용하거나 tenant 추천값에서 확정해요). selfhosted는 GitHub App gate를 건너뛰고, GitHub만 `axhub github accounts list --json`를 실행해요.
 7. Availability check: 7단계 명령으로 slug·subdomain 확인.
 8. Dry-run preview: backend에 맞는 `axhub apps bootstrap ... --dry-run --json`.
 9. Preview confirmation: 사용자가 `진행`을 고른 뒤에만 execute 해요.
@@ -84,7 +84,7 @@ Tool 제목은 `CLI 준비 확인`을 써요.
 axhub plugin-support preflight --json
 ```
 
-preflight의 `capabilities.self_hosted_git.apps_git_backend`와 `capabilities.self_hosted_git.app_git_backend`가 모두 `true`여야 backend 판정을 시작해요. 누락·malformed/false면 GitHub 질문과 mutation 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
+preflight의 `capabilities.self_hosted_git.apps_git_backend`·`capabilities.self_hosted_git.app_git_backend`·`capabilities.self_hosted_git.git_policy_decision`이 모두 `true`여야 backend 판정을 시작해요. 누락·malformed/false면 GitHub 질문과 mutation 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
 
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
 
@@ -146,6 +146,15 @@ axhub apps git-backend --tenant <tenant> --json
 
 top-level `git_backend.backend`·`git_backend.source`·`remembered`만 읽어요. app source는 `tenant_default|app_override|legacy_github`, tenant 응답 source는 `tenant|platform_default`예요. Gitea/C1/remote는 보지 않고 실패·malformed면 멈춰요.
 
+**서버 판정 (spec 706).** 응답에 `git_backend.decision` 이 있으면 fresh 저장 위치는 그것만 따르고 아래 구 서버 규칙·`remembered`·추천값은 쓰지 않아요.
+- `next_action=use`: 묻지 않고 `options` 하나의 `key` 를 써요.
+- `ask`: native Question/명시 텍스트 승인 card 하나로 정확히 `코드를 어디에 저장할까요?` — `options` 순서·`recommended` 그대로 `Axhub 저장소`·`회사 GitHub (<owner>)`·`내 GitHub`(추천에 `(추천)`).
+- `link_github`: 9단계 AP-18 fast path 로 연결하고 다시 조회해요. 거절하면 `이 회사는 새 앱 코드를 GitHub에만 저장해요. GitHub를 연결하면 이어서 진행할게요.` 로 멈춰요.
+- `내 GitHub` 의 `owners` 가 둘 이상일 때만 `어느 GitHub 계정에 둘까요?`(`owners` 순서, 넷까지, 직접 입력도 `owners` 안).
+- 발화가 말한 저장 위치는 그 key 가 `options` 에 있을 때만 묻지 않고 쓰고, 없으면 바꾸지 않고 멈춰요(회사 GitHub 면 `회사 GitHub가 연결돼 있지 않거나, 이 GitHub 계정이 그 조직 구성원이 아니에요.`). 단 GitHub 인데 `github_linked=false`·`mode≠selfhosted_only` 면 `link_github` 처럼 연결 후 다시 조회해요.
+
+dry-run·execute 는 `--git-backend` 자리에 `--git-choice <key>`, 내 GitHub 이면 `--github-owner <login>` 을 넣어요(owner·installation 을 지어내지 않아요). `SELECTED_GIT_BACKEND`·`init-resume put` 은 그 option 의 `backend` 예요. 고른 GitHub 은 owner picker·accounts 조회 없이 가고 `installed=false` 계정만 App 설치 안내로 가요. headless `ask` 는 mutation 전에 선택지·재개 문장만 보여주고 멈춰요. `decision` 이 없는 구 서버만 아래 규칙이에요.
+
 발화나 같은 대화에 backend가 있으면 쓰고, 다음은 `remembered`(onboarding 이 `--remember` 로 남긴 값), 없으면 native Question/명시 텍스트 승인 card로 `이 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. 추천과 다른 선택도 허용해요. provider 선택이 명시되지 않은 headless는 mutation 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
 
 `SELECTED_GIT_BACKEND`를 dry-run, `init-resume put`, execute에 `--git-backend github|selfhosted`로 넣어요.
@@ -199,7 +208,7 @@ axhub --no-input apps bootstrap --git-backend github --template nextjs-axhub --n
 
 실행 때 예시 UUID는 `init-resume put` 반환 literal UUID로 바꾸고 Execute/resume 명령에는 `--json`을 붙이지 않아요.
 
-아래 계정 연동/device 처리는 GitHub branch 전용이에요. selfhosted에서는 시작하지 않아요. 연동된 계정이면 execute 는 device flow 없이 끝나요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 금지예요. CLI 가 pending 으로 끝나면 URL·코드를 본문에 쓰고, `device_flow_required_user_action` 에서 멈추거나 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요. `인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 또는 watch flag를 제거한 resume 명령으로 승인 반영을 확인해요.
+아래 계정 연동/device 처리는 GitHub branch 전용이에요. selfhosted에서는 시작하지 않아요. 연동된 계정이면 execute 는 device flow 없이 끝나요. 새 CLI execute 가 코드 없이 exit 4 `github_relogin_required` 면 AP-18 fast path 로 연결한 뒤 같은 `--execute` 를 다시 실행해요. 첫 execute/resume 에 `--watch`/`--watch-timeout` 금지예요. CLI 가 pending 으로 끝나면 URL·코드를 본문에 쓰고, `device_flow_required_user_action` 에서 멈추거나 사용자에게 승인 완료를 채팅으로 알려 달라고 쓰지 않아요. `인증 확인` 제목의 단일 `axhub github accounts list --tenant <tenant> --json` 또는 watch flag를 제거한 resume 명령으로 승인 반영을 확인해요.
 
 본문 두 줄 형식(URL 부분만 inline code span):
 

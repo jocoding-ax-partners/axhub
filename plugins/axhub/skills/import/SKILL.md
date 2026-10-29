@@ -22,7 +22,7 @@ model: sonnet
 
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
 
-비어 있지 않은 로컬 앱을 axhub 앱으로 가져와 앱 설정, GitHub 연결, 첫 배포 증거까지 한 번에 정리해요. 이 스킬은 판단·실행 로직을 거의 직접 갖지 않아요. `axhub plugin-support import` 가 내보내는 `import/v1` envelope 를 검증하고, 사람이 이해할 수 있는 미리보기와 복구 문구를 렌더링해요. 딱 하나 예외로, 새 앱 설정 파일이 필요한 경우 프로젝트 파일 근거로 axhub.yaml 을 풍부하게 작성하고 `axhub deploy --explain --json` 으로 같은 파서가 읽는지 검증하는 보강 단계만 직접 맡아요. 그 외 모든 변경 판정·실행은 CLI 가 해요.
+비어 있지 않은 로컬 앱을 axhub 앱으로 가져와 앱 설정, GitHub 연결, 첫 배포 증거까지 한 번에 정리해요. 변경 판정·실행은 CLI 가 하고, 스킬은 `axhub plugin-support import` 의 `import/v1` envelope 를 검증해 미리보기·복구 문구를 보여줘요. 예외는 새 앱 설정 파일이 필요할 때 axhub.yaml 을 프로젝트 파일 근거로 작성하고 `axhub deploy --explain --json` 으로 같은 파서가 읽는지 검증하는 보강 단계 하나예요.
 
 ## 라우팅 경계
 
@@ -52,17 +52,11 @@ Claude Desktop 에서 현재 선택된 프로젝트가 이미 정확히 `APP_DIR
 
 ## 개발자 스택 지원 범위
 
-이 스킬은 Next.js 전용이 아니에요. 정적 프론트·Compose·Dockerfile 보유·Dockerfile 없는 백엔드(CLI 가 기본 Dockerfile 생성) 판정은 CLI `import/v1` 가 하고, 스킬은 preview 의 `deploy_method`, `manifest_hints`, `required_mutations`, `safety_notes` 를 검증해 보여줘요.
+Next.js 전용이 아니에요. 정적·Compose·Dockerfile·Dockerfile 없는 백엔드(CLI 가 기본 Dockerfile 생성) 판정은 CLI `import/v1` 가 하고, 스킬은 preview 를 검증해 보여줘요.
 
 ## 첫 문장
 
-대화형에서 이 스킬이 시작되면 첫 visible chat sentence 는 정확히 이렇게 시작해요.
-
-```text
-기존 앱을 axhub에 가져올 준비를 확인할게요.
-```
-
-첫 visible chat sentence 는 반드시 정확히 `기존 앱을 axhub에 가져올 준비를 확인할게요.` 로 시작하고, 그 앞에는 공백·설명·스킬 선택 이유를 포함해 어떤 문장도 쓰지 않아요.
+대화형에서 첫 visible chat sentence 는 반드시 정확히 `기존 앱을 axhub에 가져올 준비를 확인할게요.` 로 시작하고, 그 앞에는 공백·설명·스킬 선택 이유를 포함해 어떤 문장도 쓰지 않아요.
 
 import preview 정상이면 axhub 가져오기 대상 확정이에요. Interactive 는 별도 진입 질문 없이 아래 6의 preview 승인 AskUserQuestion **하나가 axhub 진입 확인을 겸해요** — 질문 문구에 axhub 대상임을 명시해요 (AP-12 통합 게이트). (headless 는 이 AUQ 생략)
 
@@ -112,7 +106,7 @@ CLI preview/execute 결과는 정확히 하나의 envelope shape 로 와야 해�
 
 - `axhub plugin-support preflight --json` 의 `capabilities.import.supported !== true`
 - `capabilities.import.schemas` 에 `import/v1` 이 없음
-- `capabilities.import.selfhosted !== true` — 이 CLI 는 self-hosted 작업공간에서도 GitHub 저장소를 만들려 해서 `axhub CLI를 최신 버전으로 업데이트해 주세요.` 라고 안내해요
+- `capabilities.import.selfhosted !== true`·`capabilities.self_hosted_git.git_policy_decision !== true` — 이 CLI 는 self-hosted 작업공간에서도 GitHub 저장소를 만들려 해서 `axhub CLI를 최신 버전으로 업데이트해 주세요.` 라고 안내해요
 - static 인 self-hosted 경로(`selfhosted_repo_push` 또는 `코드 저장 위치: axhub self-hosted`)인데 `capabilities.import.selfhosted_static !== true` 거나 `static_release` 가 있음 — 업로드로 보내지 않고 같은 업데이트 안내로 멈춰요
 - envelope 의 `schema_version` 이 `import/v1` 이 아님
 - 필수 field 가 없거나 타입이 맞지 않음
@@ -185,9 +179,9 @@ axhub plugin-support tenant-resolve --json
 
 사용자나 현재 컨텍스트에서 app slug, GitHub owner/repo, tenant 가 이미 정해졌으면 preview 부터 그대로 넘겨요. `--slug` 는 axhub 앱 slug, `--name` 은 표시 이름, `--repo` 는 GitHub 저장소예요. repo owner 를 별도 flag 로 만들지 말고 `--repo "$OWNER/$REPO"` 형태로 넘겨요.
 
-import helper 에 넘길 수 있는 옵션은 `--mode`, `--headless`, `--approved`, `--commit-manifest`, `--verify-wait`, `--app`, `--name`, `--slug`, `--repo`, `--repo-private`, `--repo-public`, `--branch`, `--from-dir`, `--installation-id`, `--tenant`, `--deploy-method`, `--idea`, `--git-backend`, `--env-from-dotenv`, `--env-only`, `--json` 뿐이에요. `--env-from-dotenv`·`--env-only` 는 execute 에만 쓰고 `capabilities.import.env_from_dotenv` 가 true 일 때만 써요. `--idea <uuid>` 는 요청의 `아이디어 ID:` 줄 값이고 `capabilities.import.idea` 가 true 일 때만 써요. 이 목록에 없는 옵션은 추론하거나 `--help`로 복구하지 않아요. 특히 사용자가 비공개 저장소를 원하면 정확히 `--repo-private` 를 쓰고, 존재하지 않는 `--private` 를 절대 붙이지 않아요. 실수로 unknown option 이 나오면 임의 옵션을 뺀 재시도나 `plugin-support import --help` 호출로 이어가지 말고 멈춰요. preview 와 execute 는 검증된 동일 옵션 집합을 유지해요.
+import helper 에 넘길 수 있는 옵션은 `--mode`, `--headless`, `--approved`, `--commit-manifest`, `--verify-wait`, `--app`, `--name`, `--slug`, `--repo`, `--repo-private`, `--repo-public`, `--branch`, `--from-dir`, `--installation-id`, `--tenant`, `--deploy-method`, `--idea`, `--git-choice`, `--github-owner`, `--git-backend`, `--env-from-dotenv`, `--env-only`, `--json` 뿐이에요. `--env-from-dotenv`·`--env-only` 는 execute 에만 쓰고 `capabilities.import.env_from_dotenv` 가 true 일 때만 써요. `--idea <uuid>` 는 요청의 `아이디어 ID:` 줄 값이고 `capabilities.import.idea` 가 true 일 때만 써요. 이 목록에 없는 옵션은 추론하거나 `--help`로 복구하지 않아요. 특히 사용자가 비공개 저장소를 원하면 정확히 `--repo-private` 를 쓰고, 존재하지 않는 `--private` 를 절대 붙이지 않아요. 실수로 unknown option 이 나오면 임의 옵션을 뺀 재시도나 `plugin-support import --help` 호출로 이어가지 말고 멈춰요. preview 와 execute 는 검증된 동일 옵션 집합을 유지해요.
 
-**코드 저장 위치 (AP-23).** CLI 가 기존 앱은 그 앱의 저장소 방식, 새 앱은 작업공간 기본값으로 경로를 정하고 읽기 실패면 GitHub 로 추측하지 않고 멈춰요. 사용자가 GitHub 또는 Axhub self-hosted 를 명시했을 때만 preview·execute 에 같은 `--git-backend github|selfhosted` 를 붙여요. `required_mutations` 에 `selfhosted_repo_push` 가 있으면 self-hosted 경로예요 — `--repo`·GitHub owner·App 설치·device flow 대사를 0회로 유지하고, 승인 카드에 요약의 `코드 저장 위치:` 줄을 그대로 보여줘요. 첫 배포는 push 로 자동 시작되고 성공 증거는 같은 `deployment` evidence 예요(static 도 같아요). deploy 가 넘긴 기존 앱은 preview·execute 에 `--app <app>`(static 이면 `--deploy-method static`)을 넘겨요. origin·`--repo` 충돌은 error 의 `recovery_action` 을 그대로 안내해요. 아래 owner/repo 규칙은 GitHub 경로에만 적용돼요.
+**코드 저장 위치 (AP-23).** CLI 가 기존 앱은 그 앱의 저장소 방식, 새 앱은 서버 판정(구 서버는 작업공간 기본값)으로 경로를 정하고 읽기 실패면 GitHub 로 추측하지 않고 멈춰요. 사용자가 GitHub 또는 Axhub self-hosted 를 명시했을 때만 preview·execute 에 같은 `--git-backend github|selfhosted` 를 붙여요. 고를 게 남은 새 앱은 preview 가 mutation 0 `error`(`code=git_choice_required`·`github_owner_required`·`github_link_required`)로 멈춰요 — `recovery_action` 대로 bootstrap 6단계 질문을 하거나 AP-18 로 연결한 뒤 그 플래그를 preview·execute 에 붙여요. `required_mutations` 에 `selfhosted_repo_push` 가 있으면 self-hosted 경로예요 — `--repo`·GitHub owner·App 설치·device flow 대사를 0회로 유지하고, 승인 카드에 요약의 `코드 저장 위치:` 줄을 그대로 보여줘요. 첫 배포는 push 로 자동 시작되고 성공 증거는 같은 `deployment` evidence 예요(static 도 같아요). deploy 가 넘긴 기존 앱은 preview·execute 에 `--app <app>`(static 이면 `--deploy-method static`)을 넘겨요. origin·`--repo` 충돌은 error 의 `recovery_action` 을 그대로 안내해요. 아래 owner/repo 규칙은 GitHub 경로에만 적용돼요.
 
 GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 반드시 `$APP_SLUG` 와 정확히 같게 둬요. 날짜·숫자·QA suffix 를 추론으로 자르거나 정리하지 않아요. 예를 들어 app slug 가 `uqa-exp-public-11021-0708` 이고 owner 가 `realitsyourman` 이면 `--repo "realitsyourman/uqa-exp-public-11021-0708"` 이어야 하며 `--repo "realitsyourman/uqa-exp-public-11021"` 처럼 줄인 명령은 실행하지 말고 고쳐서 다시 호출해요.
 

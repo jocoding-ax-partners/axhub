@@ -86,7 +86,7 @@ update_plan 가 host 에 있으면 checklist 를 갱신해요. 없으면 언급�
 DETECT의 `first_gap`이 `cli_missing`·`cli_path_missing`·`cli_old`·`auth_missing`·`auth_unverified` 중 하나면 이 단계의 나머지를 건너뛰고 4절의 해당 handler를 먼저 실행한 뒤 DETECT_ALL로 돌아와요. `cli_path_missing` 복구 후에는 반환된 absolute `bin_path`를 계속 사용해요. CLI·auth gap을 닫기 전에는 preflight와 backend read를 절대 실행하지 않아요.
 
 
-DETECT 뒤 `axhub plugin-support preflight --json`을 한 번 실행해요. `capabilities.self_hosted_git.apps_git_backend`, `capabilities.self_hosted_git.app_git_backend`, `capabilities.self_hosted_git.git_setup`이 모두 `true`여야 하며, 누락·malformed/false면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
+DETECT 뒤 `axhub plugin-support preflight --json`을 한 번 실행해요. `capabilities.self_hosted_git.apps_git_backend`, `capabilities.self_hosted_git.app_git_backend`, `capabilities.self_hosted_git.git_setup`, `capabilities.self_hosted_git.git_policy_decision`이 모두 `true`여야 하며, 누락·malformed/false면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
 
 app은 `axhub plugin-support resolve --json`의 `app_id`예요(`app_ambiguous`는 `matched_apps[]` 선택, 다른 error는 fresh). `<tenant>`는 `axhub plugin-support tenant-resolve --json`의 `tenant` 또는 `needs_pick:true`일 때 고른 `candidates[].slug`예요. `앱 설정 확인` 제목으로 app이면 첫 명령, fresh면 둘째를 1회 실행해요.
 
@@ -98,6 +98,8 @@ axhub apps git-backend --tenant <tenant> --json
 top-level `git_backend.backend`·`git_backend.source`만 읽어요. app target의 persisted backend(`selfhosted` 포함)를 `SELECTED_GIT_BACKEND`로 고정하고 재질문하지 않아요. `source=legacy_github`는 GitHub예요.
 
 **조직 정책:** 인증된 exact `axhub apps get <app> --json`의 `tenant_id`로만 `axhub tenants developer-policy bind --tenant <tenant_id> --project <현재 프로젝트 절대경로>`를 실행해요. 자동 `--force` 금지, 실패는 완료 아님. AI 전달 가능성을 알리고, fresh/platform의 tenant를 추측하지 않아요. 상세·복구는 `references/gap-state-machine.md`의 정책 연결 절을 따라요.
+
+**서버 판정 (spec 706).** fresh 응답에 `git_backend.decision` 이 있으면 그것만 따르고 아래 `remembered`·추천·`--remember` 는 쓰지 않아요. `use` 면 묻지 않고 넘어가요(사용자가 GitHub 를 말했는데 `github_linked=false`·`mode≠selfhosted_only` 면 `link_github` 와 같아요). `ask` 면 정확히 `코드를 어디에 저장할까요?` 를 bootstrap 6단계와 같은 선택지·순서로 물어요. 고른(또는 하나뿐인) option 의 `backend` 가 `SELECTED_GIT_BACKEND` 이고 `key`·내 GitHub 계정은 같은 대화의 bootstrap 에 그대로 넘겨 다시 묻지 않게 해요. Ready card 의 저장 위치 줄도 그 option 이에요. `link_github` 면 `SELECTED_GIT_BACKEND=github` 로 3단계 GitHub branch 에 가서 `github_link_missing` 으로 연결한 뒤 다시 읽어요. `decision` 이 없는 구 서버만 아래 규칙이에요.
 
 fresh는 `remembered`, 현재 대화의 명시 GitHub/selfhosted 선택 순으로 `SELECTED_GIT_BACKEND`를 정하고 다시 묻지 않아요. 둘 다 없으면 native Question/명시 텍스트 승인 card로 `첫 앱의 코드 저장 위치를 선택해 주세요.`를 물어요. `GitHub`·`Axhub self-hosted` 중 tenant 추천을 첫 옵션+`(추천)`으로 두되 반대 선택도 허용해요. card가 안 보일 때만 chat text로 물어요.
 

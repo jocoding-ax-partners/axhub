@@ -531,3 +531,76 @@ describe("self-hosted static deploys by git push", () => {
     }
   });
 });
+
+// spec 706: 서버가 회사 모드로 정한 저장 위치(`git_backend.decision`)를 플러그인은 따르기만 해요.
+// 판정이 없는 구 서버 규칙(추천값·`remembered`·GitHub/Axhub self-hosted 질문)은 그 뒤에 남아요.
+describe("spec 706: skills follow the server code storage decision", () => {
+  test("bootstrap follows use/ask/link_github before the old-server question", () => {
+    for (const root of SKILL_ROOTS) {
+      const bootstrap = readSkill(root, "bootstrap");
+      const gate = sliceSection(bootstrap, "### 6. Git Backend Gate", "### 7. Availability Check");
+      expect(bootstrap, root).toContain("capabilities.self_hosted_git.git_policy_decision");
+      expect(gate, root).toContain("`git_backend.decision`");
+      expect(gate, root).toContain("`next_action=use`: 묻지 않고");
+      expect(gate, root).toContain("정확히 `코드를 어디에 저장할까요?`");
+      expect(gate, root).toContain("`Axhub 저장소`·`회사 GitHub (<owner>)`·`내 GitHub`");
+      expect(gate, root).toContain("`어느 GitHub 계정에 둘까요?`");
+      expect(gate, root).toContain("`이 회사는 새 앱 코드를 GitHub에만 저장해요. GitHub를 연결하면 이어서 진행할게요.`");
+      expect(gate, root).toContain("`회사 GitHub가 연결돼 있지 않거나, 이 GitHub 계정이 그 조직 구성원이 아니에요.`");
+      expect(gate, root).toContain("`--git-choice <key>`");
+      expect(gate, root).toContain("`--github-owner <login>`");
+      expect(gate, root).toContain("owner·installation 을 지어내지 않아요");
+      expect(gate.indexOf("`git_backend.decision`"), root).toBeLessThan(gate.indexOf("이 앱의 코드 저장 위치를 선택해 주세요."));
+      // 둘 다 쓰는 회사에서 연결이 없는 사람이 GitHub 를 말하면 멈추지 않고 연결부터 시켜요.
+      expect(gate, root).toContain("GitHub 인데 `github_linked=false`·`mode≠selfhosted_only` 면 `link_github` 처럼 연결 후 다시 조회해요");
+    }
+  });
+
+  test("onboarding skips the question when the company decided and hands the pick to bootstrap", () => {
+    for (const root of SKILL_ROOTS) {
+      const onboarding = readSkill(root, "onboarding");
+      const gate = sliceSection(onboarding, "### 2. Git backend gate", "### 4. first_gap router");
+      expect(gate, root).toContain("capabilities.self_hosted_git.git_policy_decision");
+      expect(gate, root).toContain("`git_backend.decision`");
+      expect(gate, root).toContain("`use` 면 묻지 않고 넘어가요");
+      expect(gate, root).toContain("`코드를 어디에 저장할까요?`");
+      expect(gate, root).toContain("`--remember` 는 쓰지 않아요");
+      expect(gate, root).toContain("`github_link_missing` 으로 연결한 뒤 다시 읽어요");
+      expect(gate, root).toContain("`github_linked=false`·`mode≠selfhosted_only` 면 `link_github` 와 같아요");
+      expect(gate.indexOf("`git_backend.decision`"), root).toBeLessThan(gate.indexOf("첫 앱의 코드 저장 위치를 선택해 주세요."));
+    }
+  });
+
+  test("scaffold proceeds only when the decision offers the person's own GitHub", () => {
+    for (const root of SKILL_ROOTS) {
+      const scaffold = readSkill(root, "scaffold");
+      const gate = sliceSection(scaffold, "### 1.5 코드 저장 위치", "### 2. GitHub 계정 연동 확인");
+      const handoff = sliceSection(scaffold, "### 8. 여기서 한 번 멈춰요", "## NEVER");
+      expect(scaffold, root).toContain("capabilities.self_hosted_git.git_policy_decision");
+      expect(gate, root).toContain("`github_personal`");
+      expect(gate, root).toContain("`이 회사는 새 앱 코드를 내 GitHub 저장소에 둘 수 없어요.`");
+      expect(gate, root).toContain("`github_linked=false`·`git_backend.mode≠selfhosted_only` 면 bootstrap 9단계 AP-18 fast path 로 연결");
+      expect(gate.indexOf("AP-18 fast path"), root).toBeLessThan(gate.indexOf("둘 수 없어요"));
+      expect(gate, root).toContain("`--git-choice selfhosted`");
+      expect(handoff, root).toContain("`--git-choice github_personal --github-owner <3단계 소유자>`");
+    }
+  });
+
+  test("import asks only when the CLI preview stops for a storage pick", () => {
+    for (const root of SKILL_ROOTS) {
+      const importSkill = readSkill(root, "import");
+      expect(importSkill, root).toContain("`capabilities.self_hosted_git.git_policy_decision !== true`");
+      expect(importSkill, root).toContain("`--git-choice`, `--github-owner`, `--git-backend`");
+      expect(importSkill, root).toContain("`code=git_choice_required`·`github_owner_required`·`github_link_required`");
+      expect(importSkill, root).toContain("`recovery_action` 대로 bootstrap 6단계 질문");
+    }
+  });
+
+  test("no skill tells a selfhosted-only or unlinked person that a GitHub account is required", () => {
+    for (const root of SKILL_ROOTS) {
+      for (const name of ["bootstrap", "import", "scaffold", "onboarding"]) {
+        expect(readSkill(root, name), `${root}/${name}`).not.toContain("GitHub 계정이 필요해요");
+      }
+    }
+  });
+});
