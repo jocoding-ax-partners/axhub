@@ -27,7 +27,7 @@ codex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 승인 방�
 
 ### 1. CLI·로그인 확인
 
-`axhub --version` 으로 CLI 존재 확인(AP-17). `axhub github repo --help` 가 unknown command 면 v0.30.0 미만이에요 — `update` 스킬로 보내고 멈춰요(다른 명령으로 대체하지 않아요). 로그인은 `axhub auth status --json` — 미로그인(exit 4)이면 `axhub auth login` 안내 후 이어가요. 이어서 `axhub plugin-support preflight --json` 의 `capabilities.self_hosted_git.apps_git_backend` 가 `true` 여야 해요 — 누락·malformed/false 면 GitHub 질문 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
+`axhub --version` 으로 CLI 존재 확인(AP-17). `axhub github repo --help` 가 unknown command 면 v0.30.0 미만이에요 — `update` 스킬로 보내고 멈춰요(다른 명령으로 대체하지 않아요). 로그인은 `axhub auth status --json` — 미로그인(exit 4)이면 `axhub auth login` 안내 후 이어가요. 이어서 `axhub plugin-support preflight --json` 의 `capabilities.self_hosted_git.apps_git_backend`·`capabilities.self_hosted_git.git_policy_decision` 이 `true` 여야 해요 — 누락·malformed/false 면 GitHub 질문 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
 
 ### 1.5 코드 저장 위치 (GitHub 명령 전 필수)
 
@@ -38,6 +38,11 @@ axhub apps git-backend --tenant <tenant> --json
 ```
 
 top-level `git_backend.backend` 는 추천값이에요. 실패·malformed 면 GitHub 로 추측하지 않고 멈춰요.
+
+**서버 판정 (spec 706).** 응답에 `git_backend.decision` 이 있으면 그것만 따르고 아래 구 서버 규칙은 쓰지 않아요.
+- `options` 에 `github_personal` 이 있으면 묻지 않고 2단계로 가요(발화가 Axhub 저장소를 말했고 `selfhosted` 가 있으면 아래 selfhosted 양보와 같게 `bootstrap` 에 `--git-choice selfhosted` 로 넘겨요). 3단계 소유자 후보는 그 `owners` 에도 있는 계정만이에요.
+- `github_personal` 이 없어도 `next_action=link_github` 이거나 `github_linked=false`·`git_backend.mode≠selfhosted_only` 면 bootstrap 9단계 AP-18 fast path 로 연결한 뒤 위 조회를 다시 해요(둘 다 쓰는 회사는 연결한 사람에게만 GitHub 를 줘요).
+- 그래도 `github_personal` 이 없으면(무조건 Axhub 저장소 회사) GitHub 명령 없이 `이 회사는 새 앱 코드를 내 GitHub 저장소에 둘 수 없어요.` 라고 알리고 멈춰요. `selfhosted` 가 있으면 `Axhub 저장소로 만들려면 말해 주세요.` 를 덧붙여요.
 
 - 발화·같은 대화에 `GitHub`/`깃허브` 나 `self-hosted`/`셀프호스팅` 이 있으면 그 값이, 없으면 응답의 `remembered`(onboarding 이 기억한 값)가 `SELECTED_GIT_BACKEND` 예요. `내 계정`·`org`·`회사 저장소` 는 provider 명시가 아니에요.
 - 그래도 없거나 둘 다 명시면 native Question/명시 텍스트 승인 card 로 `코드 저장 위치를 먼저 선택해 주세요.` 라고 묻고 `내 GitHub 계정/조직`·`Axhub self-hosted` 를 보여줘요(추천값에 `(추천)`, 반대 선택 허용). provider 선택이 명시되지 않은 headless 는 GitHub 명령 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
@@ -137,7 +142,7 @@ git -C "<target>" remote add origin "https://github.com/<owner>/<slug>.git"
 
 멈추기를 고르면 저장소 URL·로컬 폴더 경로·재개 문장(`이 폴더 axhub에 올려`)과 다음 변경을 올릴 `git push -u origin main` 한 줄만 남기고 끝내요(개인 작업공간은 남은 두 토큰도). headless 에서는 묻지 않고 같은 자리에서 멈춰요.
 
-이어가기를 고른 경우에만 `import` 스킬을 호출해 앱 생성·GitHub 연결·첫 배포를 맡겨요. 3단계에서 정한 slug·subdomain·작업공간과 `--git-backend github` 를 그대로 넘겨요 — 작업공간 기본값이 self-hosted 여도 이 앱은 방금 만든 GitHub 저장소를 써요. 연결이 끝나면 push 자동 배포도 그대로 살아나요 — 이 흐름은 저장소가 있으므로 `axhub up` 을 쓰지 않아요. 개인 작업공간이면 import 뒤 남은 두 토큰을 reference 대로 채워 push 해요.
+이어가기를 고른 경우에만 `import` 스킬을 호출해 앱 생성·GitHub 연결·첫 배포를 맡겨요. 3단계에서 정한 slug·subdomain·작업공간과 `--git-backend github` 를 그대로 넘겨요(1.5단계 판정이 있었으면 대신 `--git-choice github_personal --github-owner <3단계 소유자>`) — 작업공간 기본값이 self-hosted 여도 이 앱은 방금 만든 GitHub 저장소를 써요. 연결이 끝나면 push 자동 배포도 그대로 살아나요 — 이 흐름은 저장소가 있으므로 `axhub up` 을 쓰지 않아요. 개인 작업공간이면 import 뒤 남은 두 토큰을 reference 대로 채워 push 해요.
 
 ## NEVER
 

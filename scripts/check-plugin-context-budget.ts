@@ -44,7 +44,12 @@ export const DEFAULT_MAX_SKILL_BYTES = 35_000;
 // import 실패 안내(#830·#832)·clone 결과 처리(#455) 지시가 쓸 여유를 함께 둔다. per-skill
 // 35,000B 게이트는 그대로 유지한다 — deploy 는 Tool Authority 의 중복 bullet 을 `## NEVER`
 // 로 합치고 진행 문구·최종 메시지 형식을 user-facing-language reference 로 옮겨 자리를 만들었다.
-export const DEFAULT_MAX_TOTAL_BYTES = 263_000;
+// 263_000 → 267_000: spec 706 — 회사의 코드 저장 위치 판정(`git_backend.decision`)을 따르는
+// 분기(bootstrap 6·onboarding 2·scaffold 1.5·import 저장 위치 멈춤)와 `git_policy_decision`
+// CLI 가드. 앱을 만들기 전 fresh 경로라 본문에 두며, 판정이 없는 구 서버 규칙은 그대로 남겼다.
+// 실측 265,620B(codex 번들)에 약 1,400B 여유. per-skill 35,000B 게이트는 그대로 유지한다 —
+// import 는 도입 문단·스택 범위 문단·첫 문장 중복을 줄여 codex 번들 34,939B 로 맞췄다.
+export const DEFAULT_MAX_TOTAL_BYTES = 267_000;
 export const DEFAULT_MAX_ALWAYS_ON_TOKENS = 2_500;
 export const DEFAULT_MAX_OTHER_ON_INVOKE_TOKENS = 8_000;
 export const DEFAULT_MAX_ON_INVOKE_TOKENS_BY_COMPONENT: Record<string, number> = {
