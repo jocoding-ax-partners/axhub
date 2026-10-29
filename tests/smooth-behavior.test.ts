@@ -131,7 +131,7 @@ describe("smooth behavior contracts", () => {
 
     expect(bootstrap).toContain("axhub apps bootstrap");
     expect(bootstrap).toContain("## Fast Start");
-    expect(bootstrap).toContain("CLI 확인과 템플릿 질문까지 바로 진행");
+    expect(bootstrap).toContain("CLI 확인과 앱 이름 질문까지 바로 진행");
     expect(bootstrap).toContain("raw JSON/stderr");
     expect(bootstrap).toContain("비어 있지 않은 기존 로컬 앱");
     expect(bootstrap).toContain("`import` 스킬로 넘겨요");

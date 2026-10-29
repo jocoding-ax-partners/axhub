@@ -4,6 +4,19 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.34.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.33.0...plugin-v1.34.0) (2026-10-29)
+
+새 앱을 만들 때 템플릿을 묻지 않아요. 템플릿이 Next.js 하나로 통일돼 바로 앱 이름 확인으로 넘어가고, 챗봇 같은 용도도 같은 템플릿으로 만든 뒤 기능을 붙여요. 배포 기준 요약에는 새로 열린 외부 포트 9443 을 더했어요.
+
+### Added
+
+* **plugin:** 새 앱을 만들 때 템플릿을 묻지 않는다 ([12e9f11](https://github.com/jocoding-ax-partners/axhub-mono/commit/12e9f115ef0fb1aaed4bbc6f0e99c3e4b4a7ea3d))
+
+
+### Fixed
+
+* **plugin:** 배포 기준 요약의 외부 포트 목록에 9443 추가 ([7de1213](https://github.com/jocoding-ax-partners/axhub-mono/commit/7de1213e5ba9b27ab19993ceb046fedb77a2d208)), closes [#2028](https://github.com/jocoding-ax-partners/axhub-mono/issues/2028)
+
 ## [1.33.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.32.5...plugin-v1.33.0) (2026-10-28)
 
 관리자가 게시한 회사 개발 가이드를 연결된 프로젝트의 다음 프롬프트부터 받아요. 같은 대화에서도 최신 정책을 확인하며, 확인이 실패하면 오래된 내용을 대신 쓰지 않고 해당 프롬프트를 차단해요. 안내에 따라 채팅 밖 terminal에서 인증이나 연결을 복구한 뒤 프롬프트를 직접 다시 보내세요. 공개된 CLI 0.54.0과 조직 정책 API를 지원하는 서버가 필요해요. 정책 전달은 AI의 준수나 서버 권한 강제를 보장하지 않아요.

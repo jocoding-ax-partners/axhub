@@ -221,9 +221,9 @@ describe("bootstrap/scaffold/onboarding skill-CLI drift", () => {
 
     const storage = section(SCAFFOLD, "### 1.5 코드 저장 위치", "### 2. GitHub 계정 연동 확인");
     expect(storage).toContain("없으면 응답의 `remembered`(onboarding 이 기억한 값)가 `SELECTED_GIT_BACKEND` 예요");
-    // 1.5단계에서는 템플릿·앱 이름을 아직 정하지 않았어요.
+    // 1.5단계에서는 앱 이름을 아직 정하지 않았어요.
     expect(storage).toContain("`bootstrap` 에 선택값·작업공간만 넘겨요");
-    expect(storage).toContain("템플릿·앱 이름은 아직 안 정했으니 bootstrap 이 묻고");
+    expect(storage).toContain("앱 이름은 아직 안 정했으니 bootstrap 이 묻고");
     expect(storage).not.toContain("정한 템플릿·앱 이름을 넘겨요");
 
     expect(ONBOARDING).toMatch(/--remember <SELECTED_GIT_BACKEND> --json`.*다음 세션 import·bootstrap·scaffold.*기억/);

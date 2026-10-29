@@ -378,7 +378,7 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       "`--git-backend github|selfhosted`",
       "resume=`state.git_backend` 우선",
       "GitHub 계정·device flow·App·owner 질문 0회",
-      "어떤 템플릿으로 시작할까요?",
+      "`--template nextjs-axhub`",
       "앱 이름을 무엇으로 할까요?",
       "지금 만들고 배포까지 진행할까요?",
       "--execute",

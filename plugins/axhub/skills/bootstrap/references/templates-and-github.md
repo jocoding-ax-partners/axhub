@@ -12,7 +12,7 @@ axhub apps templates list --tenant test --json
 
 The command above is a Desktop-visible shape: replace `test` with the selected tenant literal. Do not use `export`, `$AXHUB_TENANT`, command substitution, or multi-command shell glue in Claude Desktop-visible tool calls.
 
-The response envelope contains `data.items[]` with fields like `id`, `folder_name`, `name`, and `resource_tier`. `schema_version` and raw IDs are internal primitives; do not dump them to chat. The selected `--template` may be a returned `id` or a built-in alias (`nextjs`, `chatbot`) that corresponds to a returned item. Inactive templates are never returned, so an alias for a retired template (`react`, `astro`) does not resolve.
+The response envelope contains `data.items[]` with fields like `id`, `folder_name`, `name`, and `resource_tier`. `schema_version` and raw IDs are internal primitives; do not dump them to chat. Bootstrap only checks that `nextjs-axhub` is returned. Inactive templates are never returned, so an alias for a retired template (`react`, `astro`, `chatbot`) does not resolve.
 
 Exit routing:
 
@@ -20,35 +20,9 @@ Exit routing:
 - exit 8/tenant unresolved: use `axhub profile current --json` guidance and ask for login/profile fix.
 - other abnormal exit: say `설치 상태 진단해줘` can inspect.
 
-## Template Descriptions
+## Template
 
-This is not a second registry. Attach descriptions only to items returned by backend:
-
-| alias / folder | Use when |
-|---|---|
-| `nextjs` / `nextjs-axhub` | 쇼핑몰, 예약, 결제, 로그인, 관리자 화면처럼 화면과 기능이 함께 있는 웹서비스 |
-| `chatbot` / `chatbot-axhub` | 사내 도우미, 상담, 규정·FAQ 질의응답처럼 AI 와 대화하는 화면. Claude API 키(`ANTHROPIC_API_KEY`)를 사용자가 직접 넣어야 대화가 돼요 — 키 없이도 배포는 되고 화면이 설정 안내를 보여줘요 |
-
-`chatbot-axhub` 로 만들었으면 11단계 결과 끝에 한 줄을 더해요: 대화하려면 키를 비밀값으로 넣고 다시 배포해야 한다는 것 — `printf %s "$ANTHROPIC_API_KEY" | axhub env set ANTHROPIC_API_KEY --app <slug> --secret --from-stdin --stage runtime` 다음 `axhub deploy create --app <slug> --execute`. 회사 AXRouter 는 `axhub axrouter status --tenant <회사> --json` 의 `data.available` 이 `true` 일 때만 말해요 — 그때는 `ax-…` 키와 `ANTHROPIC_BASE_URL=https://axrouter.ai`(평문 `--plain`)도 쓸 수 있다고 알려요. `false`·확인 실패면 AXRouter 를 언급하지 않아요. 키 값을 채팅에 붙여 달라고 하지 않아요.
-
-Unknown backend templates are not hidden. Show backend `name` and `folder_name`, then give neutral guidance like "이름을 보고 고르면 돼요. 잘 모르겠으면 먼저 Next.js 추천을 봐요."
-
-In Claude Desktop, use a native Question/AskUserQuestion card first for backend template selection. Earlier dynamic cards sometimes rendered poorly, but current Desktop QA showed normal chat fallback can leave the prompt box disabled after the question; the smoother path is native card first, text fallback only when the card does not render choices. Every choice must map to a real backend template. Do not add generic `Other`, `직접 고르기`, or `취소` choices to the template picker. If there are more than 3 templates, put the best 3 actual recommendations in the card and show the full text list nearby; free-text fallback must match exact alias/folder/name before starting saga.
-
-If update/clarity or ordinary chat ran earlier in the same mixed request, ignore any ad-hoc concept/name/slug question that was not issued by bootstrap itself. Treat those answers only as recommendation hints. The first authoritative template confirmation must still be the bootstrap card with the exact Korean question `어떤 템플릿으로 시작할까요?`. `어느 템플릿` 대신 반드시 `어떤 템플릿으로 시작할까요?` 를 쓰고, descriptions should use natural Korean such as `가장 빠른 시작`; do not use typoed or over-casual phrasing.
-
-Example visible chat shape, only when those templates exist in backend output:
-
-```text
-어떤 템플릿으로 시작할까요?
-
-1. Next.js 추천 - 쇼핑몰·예약·결제·로그인·관리자 화면
-2. AI 챗봇 - 사내 도우미·상담·규정 질의응답 (Claude API 키 필요)
-
-번호나 템플릿 이름으로 답해 주세요.
-```
-
-If the user's utterance already contains an exact alias/folder/name, use it without asking. Generic category or feature words such as "웹앱", "쇼핑몰", "사이트", "앱", "서비스", "예약", "주문", "preorder", "booking", "shop", "store", "dashboard", or "admin" are not exact template choices; show the picker unless the user named `Next.js`, `챗봇`/`chatbot`, or an exact backend template. Those words can make Next.js the recommended first option, but they never finalize `--template`. Recommendation wording such as "추천해줘", "알아서", "best option", or "recommend the best option" is not template approval; it only means place the best recommendation first, ask the picker, and wait for a reply. After the picker is visible, a reply like "추천대로" or "1번" can confirm the first recommendation. In subprocess/no TTY, do not auto-pick a template; safe default is `abort`.
+There is one template: `nextjs-axhub`. Bootstrap never asks a template question and never shows a template card — it passes `--template nextjs-axhub` to dry-run and execute. Ignore any other item the registry returns. Requests for a chatbot, AI chat, or an in-house assistant also start from `nextjs-axhub`; that feature is added after creation through development. If `nextjs-axhub` is missing from the registry output, stop before dry-run with `새 앱 템플릿을 찾지 못했어요. 잠시 뒤 다시 시도해 주세요.`
 
 ## App Name
 
@@ -80,9 +54,9 @@ When `git_backend.backend=github` or `git_backend.source=legacy_github`, preserv
 
 ## GitHub App Gate
 
-Ask for template and app name before the GitHub App gate. This gate exists to confirm the repository owner for dry-run/execute, so do not run it before the user has seen the template picker and app-name confirmation.
+Ask for the app name before the GitHub App gate. This gate exists to confirm the repository owner for dry-run/execute, so do not run it before the user has seen the app-name confirmation.
 
-After templates are readable and template/app name are confirmed, check GitHub App installation/account state:
+After templates are readable and the app name is confirmed, check GitHub App installation/account state:
 
 ```bash
 axhub github accounts list --json

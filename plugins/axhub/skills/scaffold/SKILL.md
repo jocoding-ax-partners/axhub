@@ -42,7 +42,7 @@ top-level `git_backend.backend` 는 추천값이에요. 실패·malformed 면 Gi
 
 - 발화·같은 대화에 `GitHub`/`깃허브` 나 `self-hosted`/`셀프호스팅` 이 있으면 그 값이, 없으면 응답의 `remembered`(onboarding 이 기억한 값)가 `SELECTED_GIT_BACKEND` 예요. `내 계정`·`org`·`회사 저장소` 는 provider 명시가 아니에요.
 - 그래도 없거나 둘 다 명시면 native Question/AskUserQuestion card 로 `코드 저장 위치를 먼저 선택해 주세요.` 라고 묻고 `내 GitHub 계정/조직`·`Axhub self-hosted` 를 보여줘요(추천값에 `(추천)`, 반대 선택 허용). provider 선택이 명시되지 않은 headless 는 GitHub 명령 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
-- `SELECTED_GIT_BACKEND=selfhosted` 면 2단계 이후를 실행하지 않고 `저장소는 axhub에서 준비할게요.` 한 줄 뒤 `bootstrap` 에 선택값·작업공간만 넘겨요 — 템플릿·앱 이름은 아직 안 정했으니 bootstrap 이 묻고, backend 는 묻지 않고 `--git-backend selfhosted` 로 만들어요. GitHub 계정·device flow·App 설치 대사는 0회예요. github 일 때만 2단계로 가요.
+- `SELECTED_GIT_BACKEND=selfhosted` 면 2단계 이후를 실행하지 않고 `저장소는 axhub에서 준비할게요.` 한 줄 뒤 `bootstrap` 에 선택값·작업공간만 넘겨요 — 앱 이름은 아직 안 정했으니 bootstrap 이 묻고, backend 는 묻지 않고 `--git-backend selfhosted` 로 만들어요. GitHub 계정·device flow·App 설치 대사는 0회예요. github 일 때만 2단계로 가요.
 
 ### 2. GitHub 계정 연동 확인
 
@@ -54,9 +54,9 @@ axhub github accounts list --json
 
 정상 응답이면 연동돼 있는 거예요. `github_relogin_required` 면 `axhub github link` 로 연동해요(코드 두 줄 형식·재개·코드 유실 시 `--fresh` 재발급은 bootstrap 9단계 계약 그대로). 응답의 계정 목록이 3단계 owner 후보예요 — **GitHub App 이 설치된 계정/조직만** 후보로 보여줘요. 원하는 조직이 목록에 없으면 그 조직에 App 설치가 먼저예요(설치 링크 안내 후 재확인).
 
-### 3. 질문 한 번에: 템플릿·이름·소유자
+### 3. 질문 한 번에: 이름·소유자
 
-AskUserQuestion 하나로 물어요 — 템플릿(`nextjs-axhub`·`chatbot-axhub`), 앱 이름(slug 는 이름에서 kebab-case 파생, subdomain 은 slug 그대로 — import 가 `--subdomain <slug>` 로 만들어서 따로 고르지 않아요), 저장소 소유자(2단계 목록에서). 여기서 정한 slug 와 1.5단계 작업공간이 5단계 치환 값이자 8단계 import 가 만들 앱의 값이에요 — 중간에 바꾸면 치환된 코드와 앱이 어긋나요.
+AskUserQuestion 하나로 물어요 — 앱 이름(slug 는 이름에서 kebab-case 파생, subdomain 은 slug 그대로 — import 가 `--subdomain <slug>` 로 만들어서 따로 고르지 않아요), 저장소 소유자(2단계 목록에서). 템플릿은 `nextjs-axhub` 하나라 묻지 않아요. 여기서 정한 slug 와 1.5단계 작업공간이 5단계 치환 값이자 8단계 import 가 만들 앱의 값이에요 — 중간에 바꾸면 치환된 코드와 앱이 어긋나요.
 
 ### 4. 템플릿 내려받기 (인증 불필요)
 
@@ -67,7 +67,7 @@ git clone --depth 1 --branch main -- https://github.com/jocoding-ax-partners/axh
 ```
 
 ```bash
-cp -R "<target>/.axhub-template/<template-id>/." "<target>/"
+cp -R "<target>/.axhub-template/nextjs-axhub/." "<target>/"
 ```
 
 ```bash
