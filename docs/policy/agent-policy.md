@@ -204,8 +204,8 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-32 조직 정책 동기 문맥
 - 규칙: 명시 연결 프로젝트에서 SessionStart(`startup|resume|clear|compact`)와 매 UserPromptSubmit에 인증된 현재 게시본을 조회해 development 본문만 재제공해요. 조직/revision과 이전 문맥 대체·철회를 명시하고, 저장소 지시와 충돌하면 사용자에게 알려요. 정책 전달은 모델 준수나 서버 보안 강제가 아니에요.
-- diet·AP-26·DP-6의 좁은 예외예요. wrapper는 opt-out·binding 존재·CLI 탐색만 맡고 조회·인증·cache와 strict JSON 검증은 같은 CLI의 `policy-context` / `policy-context --adapt <event>`가 맡아요. 새 skill·helper 바이너리·runtime은 추가하지 않아요.
-- 정확한 `AXHUB_NO_POLICY_SYNC=1` 또는 `~/.axhub/config/no-policy-sync` 존재가 OR로 자동 sync를 꺼요. 미연결은 skip, 손상 binding·구 CLI·인증·통신·protocol 실패는 연결 프로젝트에서 차단해요. 총 2초, UserPromptSubmit `onFailure: block`이며 SessionStart는 최종 freshness gate가 아니에요. 채팅 밖에서 복구한 뒤 수동 재전송해요.
+- diet·AP-26·DP-6의 좁은 예외예요. wrapper는 opt-out·binding 존재·CLI 탐색만 맡고 `policy-context --hook <event>` 한 프로세스가 인증된 GET과 strict host 응답 생성을 맡아요. `policy-context --adapt <event>`는 offline parser 표면으로 유지하지만 hook은 별도 실행하지 않아요. 정책 본문 cache·별도 `/me`·새 skill·helper 바이너리·runtime은 추가하지 않아요.
+- 정확한 `AXHUB_NO_POLICY_SYNC=1` 또는 `~/.axhub/config/no-policy-sync` 존재가 OR로 자동 sync를 꺼요. 미연결은 skip, 손상 binding·구 CLI·인증·통신·protocol 실패는 연결 프로젝트에서 차단해요. CLI 내부 5초와 기동 여유 포함 host 전체 10초를 분리해요. UserPromptSubmit `onFailure: block`이며 SessionStart는 최종 freshness gate가 아니에요. 채팅 밖에서 복구한 뒤 수동 재전송해요.
 - 배포 준비는 opt-out과 무관하게 deployment 게시본을 명시 조회하고 실패하면 멈춰요. 기존 context_url·서버 권한·승인·사용자 확인을 대체하지 않아요. 고객 정책은 서버 게시본이 정본이며 공개 `POLICY.md`는 plugin 행동 설명으로 유지해요.
 - 자동 hook 최소 Claude Code 2.1.295, 실제 host 검증 2.1.312예요. Codex는 manual-only, Desktop Code mode는 미검증이에요. 게시마다 사용자 선택 AI 서비스로의 전달을 확인하며 provider 승인이나 전달 ACK로 해석하지 않아요.
 - 적용: CLAUDE.md, README.md, POLICY.md

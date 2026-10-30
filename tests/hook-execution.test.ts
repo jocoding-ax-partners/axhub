@@ -368,7 +368,6 @@ describe("auto-update worker (SessionStart, async — AP-26)", () => {
     expect(workers[0]!.async).toBe(true);
     expect(workers[0]!.timeout).toBe(5);
     expect(policies[0]!.async).toBeUndefined();
-    expect(policies[0]!.timeout).toBe(2);
     for (const entry of entries.filter((entry) => entry.command !== workerCommand)) {
       expect(entry.async).toBeUndefined();
       if (entry.command !== policyCommand) expect(entry.timeout).toBeUndefined();

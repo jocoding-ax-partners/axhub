@@ -214,12 +214,12 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요.
 
 - **지원:** 자동 hook 최소 Claude Code 2.1.295, 실제 host 검증 2.1.312예요. hook 활성·명시 binding·자동 sync 활성 조건이 필요해요. Codex는 manual-only(정책 hook 제외), Desktop Code mode는 미검증이에요.
 - **연결:** `axhub tenants developer-policy bind --tenant <uuid> --project <path>`로 인증된 조직을 연결하고 `axhub tenants developer-policy status --json`으로 상태를 봐요. 변경은 명시 `--force`, 해제는 `axhub tenants developer-policy unbind --project <path>`예요. `.axhub/state/developer-policy.json`에는 origin/tenant/schema만 저장하고 credential은 넣지 않아요. Git/worktree 경계를 넘지 않는 가장 가까운 명시 연결만 쓰며 app 이름이나 8시간 tenant cache로 조직을 추측하지 않아요.
-- **조회:** SessionStart(`startup|resume|clear|compact`)는 초기 문맥이고 UserPromptSubmit이 동기 최신 확인을 맡아요. 매번 서버 인증·조건부 GET 뒤 development 본문만 다시 제공해요. deployment 본문은 prompt에 넣지 않아요. 인증 주체·origin·tenant·schema별 cache는 stale fallback이 아니며 TTL로 조회를 생략하지 않아요.
+- **조회:** SessionStart(`startup|resume|clear|compact`)는 초기 문맥이고 UserPromptSubmit이 동기 최신 확인을 맡아요. CLI 한 프로세스가 인증된 현재 게시본을 GET 한 번으로 읽고 development 본문만 다시 제공해요. deployment 본문은 prompt에 넣지 않아요. 별도 `/me` 조회와 정책 본문 cache는 사용하지 않으며 TTL·stale fallback으로 최신 확인을 생략하지 않아요.
 - **끄기:** 정확한 `AXHUB_NO_POLICY_SYNC=1` 또는 `~/.axhub/config/no-policy-sync` 존재 중 하나면 자동 sync를 꺼요(OR). `0`·`true`는 끄지 않으며 다시 켤 때는 두 원인을 모두 해제해요. 명시 `axhub tenants developer-policy get --tenant <uuid> --json`과 배포 준비의 deployment 정책 조회는 opt-out과 무관해요. 배포 정책 조회 실패는 준비를 중단하고 unset/withdrawn은 정상 진행해요.
-- **복구:** 연결 프로젝트에서 CLI 누락·구버전·깨진 binding·인증·통신 실패나 총 2초 제한 초과면 prompt가 차단돼요. 채팅 밖 terminal에서 status와 명시 get으로 원인을 확인하고 연결·CLI·네트워크를 고쳐요. OAuth 재로그인이 필요하면 `axhub auth login --force`를 쓰되 hook과 같은 credential backend인지 확인해요. keychain-only 로그인 성공만으로 비대화형 인증 복구를 판단하지 않고 저장 방식 변경은 먼저 알려요. 복구 뒤 사용자가 수동 재전송해요. 대기열·자동 재개·입력 복원을 약속하지 않아요.
+- **복구:** 연결 프로젝트에서 CLI 누락·구버전·깨진 binding·인증·통신 실패면 prompt가 차단돼요. CLI 내부 처리는 최대 5초, 기동 여유를 포함한 host 전체 제한은 10초예요. 이 hook은 CLI 0.55.1 이상이 필요하므로 CLI를 먼저 업데이트해요. 채팅 밖 terminal에서 status와 명시 get으로 원인을 확인하고 연결·CLI·네트워크를 고쳐요. OAuth 재로그인이 필요하면 `axhub auth login --force`를 쓰되 hook과 같은 credential backend인지 확인해요. keychain-only 로그인 성공만으로 비대화형 인증 복구를 판단하지 않고 저장 방식 변경은 먼저 알려요. 복구 뒤 사용자가 수동 재전송해요. 대기열·자동 재개·입력 복원을 약속하지 않아요.
 - **공유 범위:** 정책은 사용자가 선택한 AI 서비스로 전달될 수 있어 게시마다 관리자가 이를 확인해요. 이는 provider 승인이나 모델 준수 보장이 아니에요. 철회는 새 문맥으로 알리지만 이전 대화 원문을 회수하지 않아요. status의 last checked/emitted도 host 전달 ACK가 아니에요.
 
-상세 cache·인증·복구 계약은 [POLICY.md](./POLICY.md#조직-정책-자동-동기화)에 있어요. 새 skill·helper 바이너리 없이 기존 `axhub` CLI가 조회와 offline strict parser/host adapter를 맡으며 자동 업데이트는 그대로 유지해요.
+상세 인증·복구 계약은 [POLICY.md](./POLICY.md#조직-정책-자동-동기화)에 있어요. 새 skill·helper 바이너리 없이 기존 `axhub` CLI가 조회와 strict host 응답 생성을 맡으며 자동 업데이트는 그대로 유지해요.
 
 ## 🔒 안전과 신뢰
 

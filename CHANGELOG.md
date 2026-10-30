@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.35.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.35.0...plugin-v1.35.1) (2026-10-30)
+
+정책 확인 hook이 CLI를 두 번 실행하던 경로를 한 번으로 줄이고, CLI 내부 처리 5초와 host 전체 10초를 분리했어요. 매번 인증된 최신 정책을 확인하며 실패 시 차단은 유지해요. CLI 0.55.1 이상을 먼저 업데이트한 뒤 Claude 앱을 다시 시작하면 적용돼요.
+
+### Fixed
+
+* **plugin:** 정책 hook의 중복 기동과 timeout 충돌 수정 ([593b46e](https://github.com/jocoding-ax-partners/axhub-mono/commit/593b46e5c99a987775080fa694820df2aaf538f9))
+
 ## [1.35.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.34.0...plugin-v1.35.0) (2026-10-29)
 
 새 앱 코드를 어디에 저장할지 회사 설정과 내 GitHub 연결 상태대로 정해요. 회사가 한 곳만 허용하면 묻지 않고 거기로 만들고, 둘 다 허용하면 GitHub 를 연결한 사람에게만 어디에 저장할지 물어요. GitHub 만 허용하는 회사에서 연결이 없으면 GitHub 연결부터 안내해요. CLI 0.55.0 이상이 필요해요.

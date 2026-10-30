@@ -80,7 +80,7 @@ codex plugin add axhub-codex@axhub
 
 Codex 번들에는 조직 정책 자동 hook·wrapper를 싣지 않아요. 기존 훅을 신뢰해도 매 prompt 최신 조회·문맥 전달·차단을 제공하지 않아요. 필요할 때 `axhub tenants developer-policy get --tenant <uuid> --json`으로 현재 게시본을 명시 조회해요. 이 조회는 AI 전달 ACK가 아니에요.
 
-`axhub tenants developer-policy bind --tenant <uuid> --project <path>`와 `status --json`으로 명시 연결을 관리할 수 있지만 자동 hook 활성화를 뜻하지 않아요. `.axhub/state/developer-policy.json`은 origin/tenant/schema만 담고 Git/worktree 경계를 넘지 않아요. 조회 인증·cache는 기존 CLI가 맡아요.
+`axhub tenants developer-policy bind --tenant <uuid> --project <path>`와 `status --json`으로 명시 연결을 관리할 수 있지만 자동 hook 활성화를 뜻하지 않아요. `.axhub/state/developer-policy.json`은 origin/tenant/schema만 담고 Git/worktree 경계를 넘지 않아요. 기존 CLI가 인증된 현재 게시본을 조회하며 정책 본문 cache는 사용하지 않아요.
 
 자동 sync opt-out은 정확한 `AXHUB_NO_POLICY_SYNC=1` 또는 `~/.axhub/config/no-policy-sync` 존재의 OR이며 명시 get·배포 준비에는 적용하지 않아요. 배포 준비는 deployment 정책을 명시 조회하고 실패하면 멈춰요. unset/withdrawn은 정상 진행하고 서버 권한·승인·기존 사용자 확인은 유지해요.
 

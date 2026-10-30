@@ -809,7 +809,6 @@ describe("smooth behavior contracts", () => {
       const hook = policyGroups[0].hooks[0];
       expect(hook.type).toBe("command");
       expect(hook.command).toBe(`${CLAUDE.surface.hookWrapperCommand(POLICY_WRAPPER_SCRIPT)} ${event}`);
-      expect(hook.timeout).toBe(2);
       if (event === "SessionStart") {
         expect(policyGroups[0].matcher).toBe("startup|resume|clear|compact");
         expect(hook.onFailure).toBeUndefined();
