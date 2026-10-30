@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.36.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.35.1...plugin-v1.36.0) (2026-10-30)
+
+대회 배포 마감 중인 팀 앱이면 배포하지 않고, 대회 이름과 함께 「운영진이 배포를 다시 열면 배포할 수 있어요」라고 알려요. 지금까지는 push 뒤 10분을 기다리다 원인을 모른 채 끝났어요. CLI 0.55.2 이상에서 배포 전 점검이 이 상태를 알려 줘요.
+
+### Added
+
+* **plugin:** 대회 배포 마감 중이면 배포하지 않고 이유를 알린다 (spec 709) ([#2194](https://github.com/jocoding-ax-partners/axhub-mono/issues/2194)) ([6273c53](https://github.com/jocoding-ax-partners/axhub-mono/commit/6273c53481d6c84dfd27782265c58a4b73571bf2))
+
 ## [1.35.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.35.0...plugin-v1.35.1) (2026-10-30)
 
 정책 확인 hook이 CLI를 두 번 실행하던 경로를 한 번으로 줄이고, CLI 내부 처리 5초와 host 전체 10초를 분리했어요. 매번 인증된 최신 정책을 확인하며 실패 시 차단은 유지해요. CLI 0.55.1 이상을 먼저 업데이트한 뒤 Claude 앱을 다시 시작하면 적용돼요.
