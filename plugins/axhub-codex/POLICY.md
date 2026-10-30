@@ -26,7 +26,7 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 ## 조직 정책 — manual-only
 - 이 `POLICY.md`는 plugin 행동 설명이며 고객 조직 정책 데이터 파일이 아니에요. 고객 정책 정본은 서버 게시본이에요.
 - Codex 번들에는 조직 정책 자동 hook·wrapper가 없어요. 훅 신뢰 후에도 매 prompt 최신 조회·문맥 전달·실패 차단을 보장하지 않아요. 필요할 때 `axhub tenants developer-policy get --tenant <uuid> --json`으로 명시 조회해요. get 성공은 host 전달 ACK가 아니에요.
-- 명시 binding `.axhub/state/developer-policy.json`에는 origin/tenant/schema만 저장하며 credential은 없어요. Git/worktree 경계를 넘지 않고 신뢰된 CLI profile/endpoint와 origin 일치를 확인해요. 인증 주체·origin·tenant·schema별 private cache를 쓰더라도 서버 인증·최신 확인을 생략하거나 오래된 본문으로 실패를 덮지 않아요.
+- 명시 binding `.axhub/state/developer-policy.json`에는 origin/tenant/schema만 저장하며 credential은 없어요. Git/worktree 경계를 넘지 않고 신뢰된 CLI profile/endpoint와 origin 일치를 확인해요. 기존 CLI가 매번 인증된 현재 게시본을 GET 한 번으로 읽으며 정책 본문 cache나 별도 `/me` 조회는 사용하지 않아요. 오래된 본문으로 실패를 덮지 않아요.
 - 자동 sync opt-out은 정확한 `AXHUB_NO_POLICY_SYNC=1` 또는 `~/.axhub/config/no-policy-sync` 존재의 OR예요. 명시 get·배포 준비는 opt-out과 무관해요. 배포 준비에서 deployment 정책 조회가 실패하면 멈추고 unset/withdrawn이면 진행해요. 서버 권한·승인·기존 사용자 확인을 대체하지 않아요.
 - 인증 실패는 terminal에서 CLI profile·권한을 확인하고 필요하면 `axhub auth login --force`로 복구해요. keychain-only 로그인과 비대화형 credential backend는 다를 수 있고 저장 방식 변경은 먼저 알려요.
 - 정책은 사용자가 선택한 AI 서비스에 전달될 수 있어 관리자가 게시마다 확인해요. provider 승인·모델 준수·이전 대화 원문 회수는 보장하지 않아요. AI 활용 기록 수집 옵트인과 별개예요. 정책 본문·prompt·token·credential URL은 진단 로그에 남기지 않아요.

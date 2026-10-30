@@ -15,7 +15,7 @@ The monorepo is indexed by CodeGraph (`codegraph_*` MCP tools, server `codegraph
 
 이 repo는 axhub plugin이에요. 현재 공개 surface는 **11 skill** (`onboarding` / `bootstrap` / `scaffold` / `plugins` / `deploy` / `up` / `import` / `development` / `diagnosis` / `clarity` / `update`)이에요. `plugins`는 deploy_method=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 맡고, 게시자 관리는 App Console, 승인은 Console Review로 연결해요. plugin은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli(`axhub` 바이너리)를 호출해요.
 
-제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인. 기존 cheap bash guard 외에 조직 정책 동기 hook만 diet 예외로 허용해요(AP-32·DP-6). `policy-context` 조회와 `policy-context --adapt <event>` strict parser는 같은 `axhub` CLI가 소유하고 새 skill·helper 바이너리·jq/node/python 의존은 추가하지 않아요.
+제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인. 기존 cheap bash guard 외에 조직 정책 동기 hook만 diet 예외로 허용해요(AP-32·DP-6). `policy-context --hook <event>` 한 프로세스가 인증된 최신 조회와 strict host 응답 생성을 맡아요. `policy-context --adapt <event>` offline parser는 기존 CLI 표면으로 유지해요. 새 skill·helper 바이너리·jq/node/python 의존은 추가하지 않아요.
 
 ## skill 이 CLI 를 부르는 법
 

@@ -16,7 +16,7 @@
             "type": "command",
             "shell": "bash",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/policy-context.sh\" UserPromptSubmit",
-            "timeout": 2,
+            "timeout": 10,
             "onFailure": "block"
           }
         ]
@@ -61,7 +61,7 @@
             "type": "command",
             "shell": "bash",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/policy-context.sh\" SessionStart",
-            "timeout": 2
+            "timeout": 10
           }
         ]
       }

@@ -76,11 +76,11 @@ SessionStart fallback 과 UserPromptSubmit match 가 최신·버전·업데이�
 
 ## 조직 정책 동기 hook (AP-32)
 
-- diet·AP-26·DP-6의 좁은 예외로 `hooks/policy-context.sh`가 명시 argv `SessionStart` 또는 `UserPromptSubmit`을 받아 같은 `axhub plugin-support policy-context`를 호출해요. `policy-context --adapt <event>`는 같은 CLI의 offline strict JSON parser/host adapter이며 새 skill·helper 바이너리·jq/node/python 의존은 없어요.
-- SessionStart는 `startup|resume|clear|compact`, UserPromptSubmit은 동기 freshness gate예요. 둘 다 `timeout: 2`, 후자만 `onFailure: block`이에요. 원래 helper의 schema_version 1 단일 JSON(`verified|skip|blocked`)을 검증하며 구 CLI·잘못된 JSON을 성공 문맥으로 넘기지 않아요.
+- diet·AP-26·DP-6의 좁은 예외로 `hooks/policy-context.sh`가 명시 argv `SessionStart` 또는 `UserPromptSubmit`을 받아 `axhub --timeout 5s plugin-support policy-context --hook <event>`를 한 번 호출해요. 같은 프로세스에서 조회·strict host 응답 생성을 끝내요. `policy-context --adapt <event>`는 기존 CLI의 offline strict parser 표면이며 hook은 더 이상 이를 별도 실행하지 않아요. 새 skill·helper 바이너리·jq/node/python 의존은 없어요.
+- SessionStart는 `startup|resume|clear|compact`, UserPromptSubmit은 동기 freshness gate예요. 둘 다 `timeout: 10`, 후자만 `onFailure: block`이에요. CLI 내부 제한은 5초로 기동 여유를 분리하며 구 CLI·잘못된 JSON을 성공 문맥으로 넘기지 않아요.
 - 정확한 `AXHUB_NO_POLICY_SYNC=1` 또는 `~/.axhub/config/no-policy-sync` 존재 중 하나면 자동 sync를 꺼요(OR). 그 외 env 값은 끄지 않아요. 미연결은 CLI 없이 skip하지만 손상·읽기 실패 binding은 skip하지 않아요.
-- 매 prompt 인증된 서버 조회 뒤 development 본문만 현재 조직/revision·대체/철회 안내와 함께 재제공해요. TTL·last-emitted로 생략하거나 stale cache로 계속하지 않아요. 배포 준비는 opt-out과 무관하게 deployment 정책을 명시 조회하고 실패하면 준비를 중단해요.
-- 전체 2초 안에 최신 확인을 못 하면 연결 프로젝트의 prompt를 차단해요. 채팅 밖 terminal에서 인증·연결·네트워크를 복구한 뒤 수동 재전송해요. 자동 재개·입력 복원을 약속하지 않아요.
+- 매 prompt 인증된 서버 조회 한 번 뒤 development 본문만 현재 조직/revision·대체/철회 안내와 함께 재제공해요. 별도 `/me`와 정책 본문 cache를 사용하지 않으며 TTL·last-emitted·stale cache로 생략하지 않아요. 배포 준비는 opt-out과 무관하게 deployment 정책을 명시 조회하고 실패하면 준비를 중단해요.
+- 최신 확인 실패 시 연결 프로젝트의 prompt를 차단해요. CLI 0.55.1 이상을 먼저 배포한 뒤 plugin을 업데이트해요. 채팅 밖 terminal에서 인증·연결·네트워크를 복구한 뒤 수동 재전송해요. 자동 재개·입력 복원을 약속하지 않아요.
 - 자동 hook 최소 Claude Code 2.1.295, 실제 host 검증 2.1.312예요. Codex는 manual-only(정책 hook 제외), Desktop Code mode는 미검증이에요. AI 전달·cache·복구 상세는 `POLICY.md`의 조직 정책 항목을 따라요.
 
 ## CLI 호출 표면

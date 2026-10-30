@@ -41,7 +41,7 @@ repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 
 - 대표 여정 회귀 — 첫 셋업의 GitHub/Axhub self-hosted 명시 선택 → 같은 선택의 앱 생성 → backend별 배포 → 상태 확인 경로를 문서·skill 본문·fixture 계약으로 같은 방향에 맞춰요.
 
 ## DP-6 hidden 표면 계약
-- `axhub plugin-support <cmd>` 는 plugin 내부 숨김 명령이라 외부 안정성을 보장하지 않아요. 기존 skill 호출 외에 조직 정책 hook의 `axhub plugin-support policy-context`와 같은 CLI의 `policy-context --adapt <event>`만 좁게 허용해요. 전자는 인증된 조회·cache, 후자는 네트워크 없는 strict parser/host adapter를 맡아요. 별도 helper 바이너리나 jq/node/python 설치를 요구하지 않아요.
+- `axhub plugin-support <cmd>` 는 plugin 내부 숨김 명령이라 외부 안정성을 보장하지 않아요. 조직 정책 hook은 `axhub --timeout 5s plugin-support policy-context --hook <event>`로 인증된 최신 GET과 strict host 응답 생성을 한 번에 끝내요. `policy-context --adapt <event>`는 기존 offline strict parser 표면으로 유지해요. 정책 본문 cache나 별도 helper 바이너리·jq/node/python 설치는 요구하지 않아요.
 - 어긋남을 막는 안전장치는 세 겹이에요. ① repo 안 fixture(shim) 계약 테스트 — plugin 이 기대하는 형식을 고정하지만 **실제 CLI 를 실행하진 않아요**. ② nightly 실 CLI 계약 스냅샷(`.github/workflows/cli-contract-nightly.yml` + `tests/cli-contract.test.ts`) — 최신 배포 CLI 를 설치해 onboarding-detect 스키마(`first_gap` null 완료 포함)·preflight exit 계약·deploy logs/verify/diagnose 표면을 검증해 cross-repo drift 를 잡아요. ③ skill 이 시작할 때 이 명령이 실제로 동작하는지 먼저 확인하는 사전 점검(preflight 게이트, agent-policy AP-6)이에요.
 - clarity 는 hidden 표면을 쓰지 않아요 (agent-policy AP-9).
 
@@ -49,7 +49,7 @@ repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 
 - bundle 에 무엇이 들어가는지는 `scripts/build-plugin-bundle.ts` 의 `ROOT_FILES`(`README.md`, `LICENSE`, `POLICY.md`) + `ROOT_DIRS`(`.claude-plugin/`, `skills/`, `hooks/`) 목록이 기준이에요.
 - `docs/`, `tests/`, `scripts/` 같은 개발 산출물은 배포 꾸러미에 포함하지 않아요. 검증은 `bun run plugin:bundle` + `tests/plugin-bundle.test.ts` 가 해요.
 - codex 번들(`plugins/axhub-codex/`)은 같은 스크립트의 `--host codex` 가 파생 생성해요 (`bun run plugin:bundle:codex:marketplace`, 양쪽 한 번에는 `plugin:bundle:all`). 파생 번들은 직접 수정하지 않고(AP-20), fresh build 와 커밋 번들의 byte 동일성은 `tests/codex-bundle.test.ts` 의 drift 테스트가 강제해요.
-- Codex에는 조직 정책 자동 hook과 그 wrapper를 싣지 않아요(manual-only). Claude SessionStart·UserPromptSubmit entry는 기존 entry 뒤에 추가하고 update 동작은 보존해요. 정적 policy parity는 문안 일치만 보며 wrapper 행동·실제 host 전달·2초 차단은 별도 검증해요.
+- Codex에는 조직 정책 자동 hook과 그 wrapper를 싣지 않아요(manual-only). Claude SessionStart·UserPromptSubmit entry는 기존 entry 뒤에 추가하고 update 동작은 보존해요. 정적 policy parity는 문안 일치만 보며 wrapper 행동·실제 host 전달·CLI 내부 5초와 host 전체 10초 제한은 별도 검증해요.
 
 ## DP-8 codex compat matrix — 의존 내부 거동
 - codex 지원의 최소 버전은 Codex CLI ≥ 0.147.0 이고, 지원 문구는 "≥ 0.147.0 (최종 검증: <버전>)" 형식이에요. 최종 검증 버전은 격리 QA 를 실제 수행한 버전으로 갱신해요 — 현재 최종 검증: **0.148.0** (2026-08-19 U1 실측).

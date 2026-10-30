@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The host's two-second timeout covers guards and both CLI processes. No logs,
-# login, repair-path, policy parsing, or cache writes belong in this wrapper.
+# The host allows ten seconds for shell/CLI startup and a five-second policy
+# check. No login, repair, policy parsing, or cache writes belong here.
 set -o pipefail
 
 [ "${AXHUB_NO_POLICY_SYNC:-}" = "1" ] && exit 0
@@ -59,22 +59,11 @@ if [ -z "$BIN" ]; then
   fail UNSUPPORTED
 fi
 
-# The existing CLI's offline adapter strictly validates one bounded v1 object
-# through EOF before producing host JSON. Concurrent startup leaves headroom
-# for adaptation within the host deadline; the request gets at most 1500ms.
-OUTPUT=$(
-  {
-    "$BIN" --timeout 1500ms plugin-support policy-context 2>/dev/null
-    STATUS=$?
-    if [ "$STATUS" != 0 ]; then
-      CODE=INTERNAL
-      [ "$STATUS" = 64 ] && CODE=UNSUPPORTED
-      printf '{"schema_version":1,"outcome":"blocked","error":{"code":"%s","message":"Policy sync failed.","recovery":"Run axhub tenants developer-policy status --json in a terminal; repair or update the CLI, then resend."}}\n' "$CODE"
-    fi
-  } | "$BIN" plugin-support policy-context --adapt "$EVENT" 2>/dev/null
-)
+# One CLI process fetches the authenticated current policy and strictly adapts
+# it to the host protocol. Never fall back to stale policy after a failure.
+OUTPUT=$("$BIN" --timeout 5s plugin-support policy-context --hook "$EVENT" 2>/dev/null)
 STATUS=$?
-# Only an unsupported adapter gets the missing-CLI unbound exception. New CLI
+# Only an unsupported CLI gets the missing-CLI unbound exception. New CLI
 # protocol/auth/network failures must never be hidden by process-cwd evidence.
 if [ "$STATUS" = 64 ]; then
   [ "$BOUND" = 0 ] && exit 0
