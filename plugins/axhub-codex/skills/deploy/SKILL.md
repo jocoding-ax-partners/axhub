@@ -49,8 +49,6 @@ Then do `## 배포 전 맞추기` and the canonical workflow below (`references/
 
 preflight `capabilities.readiness.deploy_check:false`면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`로 중단해요. 질문 없으면 배포, 있으면 그것만 물어요(headless는 변경 없이 질문 요약). 자동 배포되는 GitHub push보다 env·수정 커밋이 먼저예요.
 
-**첫 변경 전 정책 gate:** `deploy-prep`의 최신 top-level `developer_policy`를 `references/workflow-details.md`의 조직 정책 계약대로 확인해요. 실패·누락·malformed면 env·코드·commit·push·upload 전 중단해요. opt-out/cache 우회 금지; `context_url`·서버 권한·승인은 유지해요.
-
 1. **판정** — `axhub deploy check --app <app> --json`(제목 `배포 전 확인`). `fail` 만 맞출 일이고 `unknown`·`info` 는 막지 않아요. `handling: stop`(대회 배포 마감)은 맞출 수 없어요 — 아무것도 바꾸거나 커밋·push·create 하지 말고 그 `message` 를 그대로 전하고 멈춰요.
 2. **기준 문서** — preflight 의 `capabilities.readiness.context_url` 을 한 번만 가져와요(제목 `배포 기준 확인`, WebFetch 또는 `curl -fsSL`). 없으면 `references/deploy-rules.md` 를 봐요.
 3. **검사** — 기준대로 코드를 봐요(테스트·예시·README 흔적 제외, static은 서버 항목 제외). 빌드는 5분 내 1회(재배포는 의존성·설정·소스 변경 시), 실패 수정·재시도 2회까지. 계속 실패하면 배포 없이 원인을 알려요.

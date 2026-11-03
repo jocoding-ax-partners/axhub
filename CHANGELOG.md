@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.37.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.36.2...plugin-v1.37.0) (2026-11-03)
+
+메시지를 보낼 때마다 회사 「AI 개발 규칙」을 서버에서 확인하던 기능을 뺐어요. 확인이 실패하면 메시지가 `AXHub policy sync` 오류로 막히던 문제가 사라져요. CLI 업데이트 없이 이 버전만으로 적용되고, 막힘을 피하려고 만든 `~/.axhub/config/no-policy-sync` 파일은 지워도 돼요.
+
+### Changed
+
+* **plugin:** 조직 개발 정책 hook과 스킬 안내를 걷어낸다 ([6da3a48](https://github.com/jocoding-ax-partners/axhub-mono/commit/6da3a48803141c2132672f413ae5965349d82962))
+
 ## [1.36.2](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.36.1...plugin-v1.36.2) (2026-11-03)
 
 앱을 처음 올릴 때 `axhub.yaml` 에 빠른 빌드(`build.speed: fast`)를 마음대로 적지 않아요. 빠른 빌드는 분당 40원이라, 빌드를 빠르게 해 달라고 직접 말할 때만 비용을 알리고 적어요. CLI 0.57.0 이 필요해요.

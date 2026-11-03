@@ -136,35 +136,6 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     expect(existsSync(join(outDir, "hooks", "session-feedback-contract.sh"))).toBe(false);
   });
 
-  test("manual-only policy removes both event entries and wrapper without removing update hooks", () => {
-    type Hook = { command: string; async?: boolean; timeout?: number; onFailure?: string };
-    type Hooks = { hooks: Record<string, Array<{ matcher?: string; hooks: Hook[] }>> };
-    const source = JSON.parse(readFileSync(join(REPO_ROOT, "hooks", "hooks.json"), "utf8")) as Hooks;
-    const bundled = JSON.parse(readFileSync(join(outDir, "hooks", "hooks.json"), "utf8")) as Hooks;
-    for (const event of ["SessionStart", "UserPromptSubmit"]) {
-      expect(source.hooks[event].flatMap((group) => group.hooks)
-        .filter((hook) => hook.command.includes("policy-context.sh"))).toHaveLength(1);
-      expect(bundled.hooks[event].every((group) => group.hooks.length > 0)).toBe(true);
-      expect(bundled.hooks[event].flatMap((group) => group.hooks)
-        .filter((hook) => hook.command.includes("policy-context.sh"))).toHaveLength(0);
-    }
-    expect(existsSync(join(outDir, "hooks", "policy-context.sh"))).toBe(false);
-    const sessionHooks = bundled.hooks.SessionStart.flatMap((group) => group.hooks);
-    expect(sessionHooks.map((hook) => hook.command)).toEqual([
-      'bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-auto-update.sh"',
-      'bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-windows-contract.sh"',
-      'bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-always-on-codex.sh"',
-      'bash "${CLAUDE_PLUGIN_ROOT}/hooks/session-restart-confirm.sh"',
-    ]);
-    expect(sessionHooks[0].async).toBe(true);
-    expect(sessionHooks[0].timeout).toBeUndefined();
-    const promptHooks = bundled.hooks.UserPromptSubmit.flatMap((group) => group.hooks);
-    expect(promptHooks.map((hook) => hook.command)).toEqual([
-      'bash "${CLAUDE_PLUGIN_ROOT}/hooks/update-router.sh"',
-    ]);
-    expect(promptHooks[0].onFailure).toBeUndefined();
-  });
-
   test("merged always-on wrapper preserves every kill-switch branch and emits one JSON", () => {
     const script = join(outDir, "hooks", "session-always-on-codex.sh");
     const syntax = Bun.spawnSync({ cmd: ["bash", "-n", script], stdout: "pipe", stderr: "pipe" });
