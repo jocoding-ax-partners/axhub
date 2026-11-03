@@ -171,8 +171,6 @@ axhub plugin-support tenant-resolve --json
 
 선택 전 preview 승인·execute 금지. `--tenant` 없이 execute 후 `axhub tenants list`·`axhub tenant list`·`--help | grep` 복구 금지.
 
-**첫 변경 전 정책 gate:** 기존 앱은 exact `axhub apps get <app ID> --json`의 `tenant_id`, 새 앱은 `axhub tenants get <선택한 slug> --json`의 `data.id`로 `axhub tenants developer-policy get --tenant <UUID> --json`을 실행해요. 실패하면 manifest·env·앱 생성·push·execute 전 중단해요. 적용·복구는 `../deploy/references/workflow-details.md`의 조직 정책 계약을 따라요.
-
 3. Preview envelope 요청
 
 아직 안 읽었다면 resume을 1회 읽어요. 유효한 `app_id`는 preview의 literal `--app <app_id>`로 넘기고, 없을 때만 옵션 없이 호출해요. resume ID는 폴더·manifest·preflight 이름보다 우선해요.

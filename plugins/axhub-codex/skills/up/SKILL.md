@@ -113,8 +113,6 @@ axhub plugin-support deploy-prep --intent deploy --json
 
 `APP_ID=resolve.app_id`예요. tenant/profile 플래그 대신 CLI가 읽는 `AXHUB_TENANT`·`AXHUB_PROFILE` 환경변수로 명시 스코프를 전달해요. export 안 된 셸 변수는 전달되지 않아요.
 
-**첫 변경 전 정책 gate:** 최신 top-level `developer_policy`를 `../deploy/references/workflow-details.md`의 조직 정책 계약대로 확인해요. 실패·누락·malformed면 env·코드·upload 전 중단해요. opt-out/cache 우회 금지; `context_url`·서버 권한·승인은 유지해요. 대상 변경 시 exact `axhub apps get <app ID> --json`의 `tenant_id`로 `axhub tenants developer-policy get --tenant <tenant_id> --json`을 새로 조회해요.
-
 ### deploy method와 Git backend 확인
 
 `APP_ID`를 잡은 직후 한 번만 실행해요:

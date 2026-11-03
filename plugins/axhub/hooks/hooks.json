@@ -9,17 +9,6 @@
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/update-router.sh\""
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/policy-context.sh\" UserPromptSubmit",
-            "timeout": 10,
-            "onFailure": "block"
-          }
-        ]
       }
     ],
     "SessionStart": [
@@ -51,17 +40,6 @@
             "type": "command",
             "shell": "bash",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-feedback-contract.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "startup|resume|clear|compact",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/policy-context.sh\" SessionStart",
-            "timeout": 10
           }
         ]
       }

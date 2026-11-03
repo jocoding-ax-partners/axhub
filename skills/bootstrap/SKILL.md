@@ -93,8 +93,6 @@ axhub plugin-support tenant-resolve --json
 
 `needs_pick:false`면 `tenant`, `true`면 `candidates[]`에서 `새 앱을 어느 작업공간에 만들까요?`로 고른 `slug`를 literal `--tenant`로 넘겨요(현재 대화 선택 우선). 사용자에게는 `작업공간`으로만 불러요. `.axhub/state/tenant.json` 등 로컬 저장 금지. resume state에는 없으므로 status/resume에도 같은 `--tenant`를 붙여요. exit 5·8이면 다른 `candidates`를 모두 확인한 뒤에만 새로 시작해요.
 
-**첫 변경 전 정책 gate:** `axhub tenants get <선택한 slug> --json`의 인증된 `data.id`로 `axhub tenants developer-policy get --tenant <UUID> --json`을 실행해 최신 `deployment_markdown`을 적용해요. `unset`·`withdrawn`은 정상 빈 안내; 실패·누락·malformed면 앱 생성·env·push·execute 전 중단해요. opt-out/cache 우회 금지, 기존 승인·서버 권한은 유지해요. 작업공간 변경 시 다시 조회해요. 생성 뒤 exact app 연결은 onboarding에 맡겨요.
-
 ### 3. Template Registry
 
 Tool 제목은 `템플릿 목록 확인`을 써요.

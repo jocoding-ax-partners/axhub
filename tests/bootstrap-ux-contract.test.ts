@@ -196,14 +196,6 @@ describe("bootstrap desktop UX contract", () => {
     expect(bootstrap).not.toContain("registry 설명과 AskUserQuestion shape 는 `references/templates-and-github.md` 를 읽어요");
     expect(bootstrap).not.toContain("references/bootstrap-and-local.md");
     expect(bootstrap).not.toContain("../deploy/references/session-carryover.md");
-    // Fresh bootstrap must apply policy without opening the shared deploy reference.
-    const policyGate = bootstrap.split("**첫 변경 전 정책 gate:**")[1]!.split("### 3. Template Registry")[0]!;
-    expect(policyGate).not.toContain("references/");
-    expect(policyGate).toContain("deployment_markdown");
-    expect(policyGate).toContain("실패·누락·malformed");
-    expect(policyGate).toContain("앱 생성·env·push·execute 전 중단");
-    expect(policyGate).toContain("opt-out/cache 우회 금지");
-    expect(policyGate).toContain("작업공간 변경 시 다시 조회");
     expect(resumeReference).toContain(CLAUDE.bootstrapSkill.noTenantFileWrite);
     expect(resumeReference).not.toContain("TENANT_CACHE=");
     expect(resumeReference).not.toContain("mkdir -p \"$(dirname \"$TENANT_CACHE\")\"");
