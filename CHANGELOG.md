@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.36.2](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.36.1...plugin-v1.36.2) (2026-11-03)
+
+앱을 처음 올릴 때 `axhub.yaml` 에 빠른 빌드(`build.speed: fast`)를 마음대로 적지 않아요. 빠른 빌드는 분당 40원이라, 빌드를 빠르게 해 달라고 직접 말할 때만 비용을 알리고 적어요. CLI 0.57.0 이 필요해요.
+
+### Docs
+
+* **plugin:** import 가 build.speed 를 사용자 요청 때만 적게 한다 (spec 716) ([fcee6db](https://github.com/jocoding-ax-partners/axhub-mono/commit/fcee6db67f48dbf83d11bf7ad2b789db496c5c97))
+
 ## [1.36.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.36.0...plugin-v1.36.1) (2026-11-03)
 
 앱 삭제를 콘솔과 같은 말로 안내해요. 「앱 삭제」는 30일 안에 `axhub apps reactivate` 로 되돌릴 수 있고, 지금 바로 지우려면 삭제한 앱에 `axhub apps purge` 를 써요. 잠깐 멈추려면 절전(`axhub apps sleep`)이나 일시정지(`axhub apps suspend`)를 골라요. CLI 0.56.0 이 필요하고, 옛 CLI 면 먼저 업데이트로 안내해요.

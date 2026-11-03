@@ -11,6 +11,7 @@ import SKILL 의 Manifest 보강 단계가 로드하는 내부 reference 예요.
   - `runtime`: `port`, `health_path` (EXPOSE·HEALTHCHECK·compose·hints 근거)
   - `build`: `framework`, `install`, `build`, `start`, `dockerfile`, `compose_file`, `static_output_dir`, `deploy_method` (deploy_method 는 detect 가 정한 값을 그대로 써요)
   - self-hosted 작업공간(preview 에 `selfhosted_repo_push`)의 `deploy_method: static` 은 `static_output_dir` 를 항상 명시해요 — 빌드 뒤 `index.html` 이 있는 폴더(앱 루트 기준)이고, 최상위에 `index.html` 이 있는 순수 HTML 사이트면 `.` 를 그대로 적어요. 서버가 push 된 소스로 빌드(`install`·`build`, 없으면 lockfile 기준 설치와 `package.json` 이 있을 때 `npm run build`)한 뒤 이 폴더를 올리므로, 이 값이 없으면 정적 사이트 경로를 타지 않아요. 빌드 결과 폴더는 커밋하지 않아도 돼요. GitHub 작업공간의 업로드 static 은 근거가 있을 때만 적는 기존 규칙 그대로예요.
+  - `build.speed` 는 **적지 않아요.** `fast` 는 8코어 빌드 머신을 쓰고 빌드 시간이 분당 40원(보통 20원)으로 청구돼 비용이 바뀌어요. 사용자가 빌드를 빠르게 해 달라고 직접 말했을 때만 비용을 한 줄로 알리고 `speed: fast` 를 적어요(CLI 0.57.0 이상 — 그 전 CLI 는 모르는 키로 막아요).
   - `env`: `required`/`optional` 아래 `- name:`(+ 필요하면 `scope:`) — **키 이름만**
   - `database`: `engine` (분명히 감지될 때만)
   - `storage`: `enabled` (파일 스토리지가 분명히 필요할 때만 — S3 SDK·파일 업로드 의존성 등 직접 근거가 있을 때만 `enabled: true`, 아니면 비워요)
