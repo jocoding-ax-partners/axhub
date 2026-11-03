@@ -4,6 +4,14 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.36.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.36.0...plugin-v1.36.1) (2026-11-03)
+
+앱 삭제를 콘솔과 같은 말로 안내해요. 「앱 삭제」는 30일 안에 `axhub apps reactivate` 로 되돌릴 수 있고, 지금 바로 지우려면 삭제한 앱에 `axhub apps purge` 를 써요. 잠깐 멈추려면 절전(`axhub apps sleep`)이나 일시정지(`axhub apps suspend`)를 골라요. CLI 0.56.0 이 필요하고, 옛 CLI 면 먼저 업데이트로 안내해요.
+
+### Docs
+
+* **plugin:** 앱 삭제·바로 삭제·절전·일시정지 안내를 새 CLI 에 맞춘다 ([#2250](https://github.com/jocoding-ax-partners/axhub-mono/issues/2250)) ([c532c63](https://github.com/jocoding-ax-partners/axhub-mono/commit/c532c63ca8e096d498f6eb932b35dfecfdb0c386))
+
 ## [1.36.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.35.1...plugin-v1.36.0) (2026-10-30)
 
 대회 배포 마감 중인 팀 앱이면 배포하지 않고, 대회 이름과 함께 「운영진이 배포를 다시 열면 배포할 수 있어요」라고 알려요. 지금까지는 push 뒤 10분을 기다리다 원인을 모른 채 끝났어요. CLI 0.55.2 이상에서 배포 전 점검이 이 상태를 알려 줘요.
