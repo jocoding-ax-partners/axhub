@@ -4,7 +4,7 @@
     "diagnosis": "배포 실패 원인을 읽기 전용으로 진단하고 6가지 결과 카테고리로 요약. 재배포·롤백 직접 실행 금지.",
     "deploy": "새 배포·재배포·배포 검증 실행. 배포 검증이 terminal failure 로 끝나면 diagnosis 로 읽기 전용 handoff",
     "clarity": "로그 조회·롤백·운영 명령 실행",
-    "update": "CLI·플러그인 버전 업데이트"
+    "setup": "CLI·플러그인 버전 업데이트"
   },
   "cases": [
     { "utterance": "배포 실패 원인 진단해줘", "expected": "diagnosis", "why": "실패 원인 진단을 명시" },
@@ -20,7 +20,7 @@
     { "utterance": "배포 상태 확인해줘", "expected": "deploy", "why": "일반 배포 상태 조회는 deploy verify/watch 계열" },
     { "utterance": "로그 보여줘", "expected": "clarity", "why": "로그 조회" },
     { "utterance": "이전 버전으로 롤백해줘", "expected": "clarity", "why": "롤백 운영 명령" },
-    { "utterance": "업데이트해줘", "expected": "update", "why": "버전 업데이트" },
+    { "utterance": "업데이트해줘", "expected": "setup", "why": "버전 업데이트" },
     { "utterance": "왜 배포가 죽었어", "context": "axhub 무관, 다른 플랫폼 배포", "expected": "none", "why": "AP-11 — 다른 플랫폼 배포 실패면 어느 플랫폼인지 한 번 묻고 axhub 아니면 종료" }
   ]
 }

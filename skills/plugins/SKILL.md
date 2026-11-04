@@ -1,6 +1,6 @@
 ---
 name: plugins
-description: 'axhub plugin marketplace 게시·목록·exact download·host install skill. "플러그인 올려줘", "plugin publish", "플러그인 심사 상태", "플러그인 목록 보여줘", "플러그인 1.2.0 내려 받아", "Claude에 설치해줘", "Codex에 설치해줘", "여러 스킬을 하나의 플러그인으로 올려"에 사용해요. Plugin은 deploy_method=plugin인 일반 App이고 App Console·Console Review를 써요. 앱 배포는 deploy, 앱 연결은 import, 업데이트는 update로 양보해요.'
+description: 'axhub plugin marketplace 게시·목록·exact download·host install skill. "플러그인 올려줘", "plugin publish", "플러그인 심사 상태", "플러그인 목록 보여줘", "플러그인 1.2.0 내려 받아", "Claude에 설치해줘", "Codex에 설치해줘", "여러 스킬을 하나의 플러그인으로 올려"에 사용해요. Plugin은 deploy_method=plugin인 일반 App이고 App Console·Console Review를 써요. 앱 배포는 deploy, 앱 연결은 import, 업데이트는 setup으로 양보해요.'
 examples:
   - utterance: "사용자들이 올린 플러그인 목록 보여줘"
     intent: "list app-backed marketplace plugins"
@@ -20,9 +20,9 @@ axhub 맥락 확인과 axhub 진입 확인 후 tenant marketplace 대상인지 �
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-> **CLI 경로(AP-17):** bare `axhub` 실패는 미설치가 아니에요. `command -v` → `~/.axhub/bin-path` → `~/.axhub/bin/axhub`(.exe) 순으로 찾고 발견한 절대경로로 `plugin-support repair-path --json`을 실행해요. 이후 명령은 반환된 `bin_path`를 쓰고, `bin_path`가 없으면 앞에서 발견한 절대경로로 이어가요. 세 경로 모두 없을 때만 onboarding으로 양보해요. `cargo run`, `target/debug/axhub`, curl·직접 API 우회는 금지예요.
+> **CLI 경로(AP-17):** bare `axhub` 실패는 미설치가 아니에요. `command -v` → `~/.axhub/bin-path` → `~/.axhub/bin/axhub`(.exe) 순으로 찾고 발견한 절대경로로 `plugin-support repair-path --json`을 실행해요. 이후 명령은 반환된 `bin_path`를 쓰고, `bin_path`가 없으면 앞에서 발견한 절대경로로 이어가요. 세 경로 모두 없을 때만 setup 으로 양보해요. `cargo run`, `target/debug/axhub`, curl·직접 API 우회는 금지예요.
 
-**CLI 가드(0.50.0+):** 모든 mode 전에 `axhub plugin submit --help` 성공과 `axhub plugin publish --help`의 `--submit`을 확인해요. 없으면 실행하지 않고 `axhub CLI 0.50.0 이상이 필요해요 — axhub update apply --execute --yes 로 올린 뒤 다시 요청해 주세요.`라고 말하고 update로 양보해요.
+**CLI 가드(0.50.0+):** 모든 mode 전에 `axhub plugin submit --help` 성공과 `axhub plugin publish --help`의 `--submit`을 확인해요. 없으면 실행하지 않고 `axhub CLI 0.50.0 이상이 필요해요 — axhub update apply --execute --yes 로 올린 뒤 다시 요청해 주세요.`라고 말하고 setup으로 양보해요.
 
 **Tenant:** 목록의 `--tenant`를 download·install에도 그대로 붙여요. scoped PAT와 publish·submit·status는 tenant UUID(`axhub auth status --json`의 `tenants[].tenant_id`)만 써요. `plugin_tenant_uuid_required`면 UUID로 다시 실행해요.
 

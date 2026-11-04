@@ -278,7 +278,7 @@ describe("app-centric plugins skill contract", () => {
     expect(guardText).toContain("`axhub plugin publish --help`의 `--submit`");
     expect(guardText).toContain("axhub update apply --execute --yes");
     expect(guardText).toContain("0.50.0 이상이 필요해요");
-    expect(guardText).toContain("update로 양보해요");
+    expect(guardText).toContain("setup으로 양보해요");
     expect(source).not.toContain("요청 mode의 public help");
   });
 
@@ -286,7 +286,7 @@ describe("app-centric plugins skill contract", () => {
     expect(source).toContain("이후 명령은 반환된 `bin_path`");
     expect(source).toContain("`cargo run`, `target/debug/axhub`");
     expect(source).toContain("`bin_path`가 없으면 앞에서 발견한 절대경로");
-    expect(source).toContain("세 경로 모두 없을 때만 onboarding");
+    expect(source).toContain("세 경로 모두 없을 때만 setup");
     expect(source).toContain("plugin-support repair-path --json");
     expect(source).toContain("Windows 실행 계약 (AP-13)");
     expect(source).toContain("axhub 명령은 Git Bash 전용으로 실행해요");

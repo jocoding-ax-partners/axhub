@@ -287,7 +287,7 @@ describe("bootstrap desktop UX contract", () => {
       .filter((line) => line.startsWith("axhub plugin-support init-resume put "));
 
     expect(bootstrap).toContain("provider 선택이 명시되지 않은 headless");
-    expect(bootstrap).toContain("같은 대화의 onboarding 선택을 재사용");
+    expect(bootstrap).toContain("같은 대화에서 이미 고른 저장 위치를 재사용");
     expect(bootstrapCommands.length).toBeGreaterThanOrEqual(5);
     for (const command of bootstrapCommands) {
       expect(command).toMatch(/--git-backend (github|selfhosted)/);

@@ -4,13 +4,11 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 
 ## 네트워크 접근 — 인터넷에 언제 연결하나요
 - 스킬(플러그인이 상황별로 꺼내 쓰는 기능 단위)과 훅(세션이 시작될 때 자동으로 도는 점검)은 기본적으로 `axhub` CLI(터미널에서 쓰는 axhub 명령 도구)를 통해 인터넷에 접근해요. 플러그인이 그 밖의 곳에 몰래 접속하지 않아요.
-- "axhub가 최신인지", "axhub가 진짜 최신인지 먼저 확인", "up to date"처럼 버전 확인이 들어간 요청은 가장 먼저 `update` 스킬로 처리해요. 이때 `axhub --version`, `npm list`, `grep`/pipe 같은 일반 shell 확인, 앱 상태 조회를 먼저 실행하지 않아요. 사용자에게 보이는 첫 문장은 `현재 버전을 확인할게요.` 예요.
-- 업데이트 뒤 같은 요청 안에 앱 현황 확인이 남아 있으면 존재하지 않는 `axhub app list` 를 추측하지 않고, plural `axhub apps` 표면을 help 로 확인한 뒤 정확히 `axhub apps list --json` 같은 읽기 전용 명령으로 이어가요. 이 앱 상태 흐름에 들어간 뒤에는 설치·버전·플러그인 probe 를 다시 실행하지 않아요. 현재 폴더명·대화 맥락·가장 최근 목록으로 관련 앱이 하나로 좁혀지면 사용자에게 어느 앱을 볼지 묻지 말고 `axhub apps get <app> --json`, `axhub deploy list --app <app> --json` 까지 바로 실행해요. 존재하지 않는 `axhub deployment list` 나 `| head`, `2>/dev/null`, `grep`, `&&` 같은 shell 후처리는 붙이지 않아요.
-- axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 그 도구를 우선 사용하지 않아요. 버전·최신 확인이 같은 요청에 있으면 언제나 위의 `update` 스킬이 먼저 끝나요. 로그·환경변수·롤백·GitHub 재연결 같은 후속 운영 작업도 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요.
-- 앱 생성·배포·온보딩의 저장소 단계는 public CLI의 top-level `git_backend`를 먼저 확인해요. 기존 app은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh onboarding/bootstrap은 `axhub apps git-backend --tenant <tenant> --json`의 회사 판정(`decision`)을 따라요 — 회사가 정한 곳이면 묻지 않고, 둘 다 쓰는 회사에서 GitHub를 연결한 사람에게만 저장 위치를 물어요. 판정이 없는 구 서버에서는 추천값으로만 읽은 뒤 GitHub와 Axhub self-hosted 중 사용자가 직접 고르게 해요. 같은 대화의 선택은 bootstrap에 전달하고, 선택 없는 headless에서는 저장소 mutation 전에 멈춰요. selfhosted는 정적 사이트를 포함해 외부 저장소 계정 인증·device flow·GitHub App 설치 없이 `git push` lane을 쓰고(앱 저장소에 안 붙은 로컬 소스는 `import`가 올려요), GitHub는 정적 사이트 업로드를 포함해 각 기존 lane을 유지해요.
-- 최신 확인 요청에는 아주 좁은 update-first 라우팅 가드가 라우팅 문맥만 추가해요. 이 가드는 SessionStart 합본 훅과 UserPromptSubmit match 로 동작하고, 명령을 실행하거나 앱 목록을 조회하지 않으며, `AXHUB_NO_UPDATE_ROUTER=1` 또는 `~/.axhub/config/no-update-router` 파일로 끌 수 있어요.
+- 버전 확인·업데이트·처음 셋업 요청은 `setup` 스킬이 처리해요. `axhub update check --json` 으로 새 버전을 확인하고, 있으면 `axhub update apply` 로 올려요. 플러그인은 스킬이 직접 바꾸지 않고, 지금 쓰는 AI 앱의 플러그인 화면에서 업데이트하도록 안내해요.
+- axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 그 도구를 우선 사용하지 않아요. 로그·환경변수·롤백·GitHub 재연결 같은 후속 운영 작업도 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요.
+- 앱 생성·배포의 저장소 단계는 public CLI의 top-level `git_backend`를 먼저 확인해요. 기존 app은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh bootstrap/scaffold는 `axhub apps git-backend --tenant <tenant> --json`의 회사 판정(`decision`)을 따라요 — 회사가 정한 곳이면 묻지 않고, 둘 다 쓰는 회사에서 GitHub를 연결한 사람에게만 저장 위치를 물어요. 판정이 없는 구 서버에서는 추천값으로만 읽은 뒤 GitHub와 Axhub self-hosted 중 사용자가 직접 고르게 해요. 같은 대화의 선택은 bootstrap에 전달하고, 선택 없는 headless에서는 저장소 mutation 전에 멈춰요. selfhosted는 정적 사이트를 포함해 외부 저장소 계정 인증·device flow·GitHub App 설치 없이 `git push` lane을 쓰고(앱 저장소에 안 붙은 로컬 소스는 `import`가 올려요), GitHub는 정적 사이트 업로드를 포함해 각 기존 lane을 유지해요.
 - 세션 시작 때 도는 auto-update 훅은 24시간에 1회만 뒤에서(백그라운드) `axhub update check` 명령으로 새 버전이 있는지 확인하고, 있으면 묻지 않고 `axhub update apply` 와 `codex plugin marketplace upgrade axhub`(로컬 marketplace 는 `codex plugin add axhub-codex`)로 조용히 설치해요. 실제 인터넷 연결은 axhub CLI 와 Codex 의 플러그인 명령이 해요. 세션 시작을 기다리게 하지 않아요.
-- Codex 는 플러그인 훅을 사용자가 신뢰하기 전에는 실행하지 않아요. 신뢰하지 않으면 위 훅 표면(자동 업데이트 확인·라우팅 가드·재시작 확인·Windows 계약 안내)은 조용히 꺼지고, 스킬은 훅 없이도 완결돼요 — 업데이트는 `update` 스킬을 직접 부르면 돼요.
+- Codex 는 플러그인 훅을 사용자가 신뢰하기 전에는 실행하지 않아요. 신뢰하지 않으면 위 훅 표면(자동 업데이트 확인·재시작 확인·Windows 계약 안내·질문 프로토콜과 실패 리포트 계약)은 조용히 꺼지고, 스킬은 훅 없이도 완결돼요 — CLI 업데이트는 `setup` 스킬을 직접 부르면 돼요.
 - `plugin list`와 exact `plugin download`는 현재 로그인 OAuth 또는 active broad PAT로 App-backed marketplace를 읽어요. 목록은 `plugin.current_servable_version` summary를 페이지 단위로 읽고 download 결과에서 `version_id`를 만들거나 보고하지 않아요. Download는 요청한 새 ZIP만 만들고 기존 파일을 덮어쓰거나 받은 code를 실행하지 않아요.
 - download 요청과 install 요청을 구분해요. `plugin install --host codex`는 offline preview 뒤 명시한 `--execute --yes`에서만 bounded ZIP metadata·실제 압축 해제 크기·identity를 검증하고 App/host lock과 crash recovery를 적용한 뒤 `~/.axhub/plugins/` 아래 private local marketplace를 Codex 공식 plugin CLI로 user scope 설치해요. 모든 `AXHUB_*` 환경은 Codex process에 전달하지 않아요.
 - `up` 스킬은 사용자가 `저장소 없이`·`레포 없이`·`지금 폴더 그대로 업로드`를 명시했을 때만 현재 폴더를 올려요. `GitHub 없이`만 말한 selfhosted app은 정상 clone→push 배포를 써요. `up`은 커밋을 만들거나 push 하지 않고 연결된 저장소도 건드리지 않으며, `.gitignore`를 존중하고 `.git/`·`node_modules/`·`.env` 계열을 빼요. 이미 AXHub 에 있는 앱이라 파일 수·크기·소스 버전을 보여 주고 묻지 않고 올려요.
@@ -29,10 +27,10 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 - 자동 설치를 원하지 않으면 환경변수(터미널에 설정해 두는 켜기/끄기 값) 또는 파일로 꺼요. 둘 중 하나만 있으면 확인·설치·기록 어느 것도 하지 않아요:
   - `AXHUB_NO_AUTO_UPDATE=1` 환경변수
   - `~/.axhub/config/no-auto-update` 빈 파일 (환경변수가 앱에 전달되지 않는 GUI 실행에서도 통해요)
-- 훅을 신뢰하지 않았다면 자동 확인 자체가 돌지 않아요 — 이 경우 업데이트는 `update` 스킬("업데이트해줘")이 담당해요.
+- 훅을 신뢰하지 않았다면 자동 확인 자체가 돌지 않아요 — 이 경우 CLI 업데이트는 `setup` 스킬("axhub 업데이트해줘")이 담당해요.
 
 ## AI 활용 기록 — Codex 판은 제공하지 않아요
-- 워크스페이스 AI 활용 기록(프롬프트·응답 수집 기능)의 온보딩 옵트인은 Claude 판 전용 기능이에요. Codex 판 플러그인은 이 수집 설정을 만들거나 바꾸지 않아요.
+- Codex 판 플러그인은 워크스페이스 AI 활용 기록(프롬프트·응답 수집 기능)의 수집 설정을 묻거나 만들거나 바꾸지 않아요.
 
 ## 실패 자동 리포트 — CLI 문제는 조용히 개발팀에 전달돼요
 - axhub CLI 가 설계된 동작 밖으로 실패하면(비정상 종료, 깨진 출력 같은 CLI 자체의 문제) 에이전트가 `axhub feedback -m <실패 요약>` 명령으로 개발팀의 비공개 이슈함에 문제를 알려요. 요약은 첫 줄에 무엇이 어떻게 실패했는지 한 문장, 아래에 실행한 명령·기대·실제 결과·맥락·재현 여부를 적은 것이고, CLI 는 실패한 명령의 경로·플래그 이름·종료 코드·오류 분류·오류 메시지 한 줄을 함께 붙여요 — 인자 값·토큰·환경 내용은 붙이지 않아요. 작업 흐름을 멈추지 않고, 전송 성공 여부를 따로 묻거나 알리지 않아요.

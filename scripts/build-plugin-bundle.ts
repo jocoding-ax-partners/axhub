@@ -166,11 +166,8 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
 ];
 
 const CODEX_TEXT_EXTENSIONS = new Set([".md", ".sh", ".json"]);
-// AP-14 fallback + AP-19 는 합본 wrapper 하나로 대체돼요 (trust 표면 축소).
-const CODEX_SUPERSEDED_WRAPPERS = new Set([
-  "session-update-router-guard.sh",
-  "session-feedback-contract.sh",
-]);
+// 질문 프로토콜 + AP-19 는 합본 wrapper 하나로 대체돼요 (trust 표면 축소).
+const CODEX_SUPERSEDED_WRAPPERS = new Set(["session-feedback-contract.sh"]);
 const CODEX_MERGED_WRAPPER = "session-always-on-codex.sh";
 // codex-overrides 에서 번들 경로로 mirror-copy 하지 않는 예약 자산이에요.
 const CODEX_OVERRIDE_RESERVED = new Set(["routing", "SOURCE_HASHES.json"]);
@@ -355,17 +352,15 @@ const wrapperScriptName = (command: string): string => {
 const transformCodexHooks = (outDir: string): void => {
   const hooksDir = join(outDir, "hooks");
 
-  // 1) 합본 wrapper 생성 — AP-14 fallback 문안은 override 가, AP-19 문안은 소스
+  // 1) 합본 wrapper 생성 — 질문 프로토콜 문안은 override 가, AP-19 문안은 소스
   //    wrapper 가 소유해요. kill switch 2계층(env·marker)과 AP-17 CLI 존재 게이트를
   //    분기별로 보존하고 JSON 은 한 번만 emit 해요.
   const feedbackSource = readFileSync(join(hooksDir, "session-feedback-contract.sh"), "utf8");
   const feedbackContext = extractAdditionalContext(feedbackSource, "session-feedback-contract.sh");
-  const routerContext = readOverrideContext("update-first.md");
   const questionContext = readOverrideContext("question-protocol.md");
-  // 3 블록 × 각자의 kill switch → 비어 있지 않은 조합마다 JSON 을 미리 만들어
+  // 블록마다 각자의 kill switch → 비어 있지 않은 조합마다 JSON 을 미리 만들어
   // if/elif 로 emit 해요. bash 안에서 JSON 을 조립하지 않아 이스케이프 사고가 없어요.
   const blocks = [
-    { flag: "R", context: routerContext },
     { flag: "Q", context: questionContext },
     { flag: "F", context: feedbackContext },
   ] as const;
@@ -382,10 +377,9 @@ const transformCodexHooks = (outDir: string): void => {
   }
   const mergedScript = [
     "#!/usr/bin/env bash",
-    "# codex SessionStart 합본 훅이에요 — AP-14 update-first fallback + 질문 프로토콜 + AP-19 실패 리포트.",
+    "# codex SessionStart 합본 훅이에요 — 질문 프로토콜 + AP-19 실패 리포트.",
     "# transform 이 생성해요. 문안은 codex-overrides/hooks/context/ 와 소스 wrapper 가 소유해요.",
-    "R=1; Q=1; F=1",
-    '[ -n "$AXHUB_NO_UPDATE_ROUTER" ] && R=0; [ -f "$HOME/.axhub/config/no-update-router" ] && R=0',
+    "Q=1; F=1",
     '[ -n "$AXHUB_NO_QUESTION_PROTOCOL" ] && Q=0; [ -f "$HOME/.axhub/config/no-question-protocol" ] && Q=0',
     '[ -n "$AXHUB_NO_FEEDBACK_REPORT" ] && F=0; [ -f "$HOME/.axhub/config/no-feedback-report" ] && F=0',
     'if [ "$F" = 1 ]; then command -v axhub >/dev/null 2>&1 || [ -f "$HOME/.axhub/bin-path" ] || [ -f "$HOME/.axhub/bin/axhub" ] || [ -f "$HOME/.axhub/bin/axhub.exe" ] || F=0; fi',
@@ -395,29 +389,12 @@ const transformCodexHooks = (outDir: string): void => {
   ].join("\n");
   writeFileSync(join(hooksDir, CODEX_MERGED_WRAPPER), mergedScript);
 
-  // 2) 대체된 wrapper 2개 제거.
+  // 2) 대체된 wrapper 제거.
   for (const name of CODEX_SUPERSEDED_WRAPPERS) {
     rmSync(join(hooksDir, name), { force: true });
   }
 
-  // 3) update-router.sh(UserPromptSubmit) 의 컨텍스트를 codex 문안으로 재작성해요 —
-  //    게이트 파이프라인(kill switch → prompt 키 → axhub 토큰 → 키워드)은 그대로예요.
-  const routerPath = join(hooksDir, "update-router.sh");
-  const routerSource = readFileSync(routerPath, "utf8");
-  const routerJsonMatch = routerSource.match(/^\{"continue":true.*\}\}$/m);
-  if (!routerJsonMatch) throw new Error("cannot find update-router.sh hook JSON line");
-  const routerOverride = readOverrideContext("update-router.md");
-  const rewrittenRouter = routerSource.replace(
-    routerJsonMatch[0],
-    JSON.stringify({
-      continue: true,
-      suppressOutput: true,
-      hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: routerOverride },
-    }),
-  );
-  writeFileSync(routerPath, rewrittenRouter);
-
-  // 4) hooks.json 재작성 — shell 키 제거(U1-(c): 런타임 무시), commandWindows 추가,
+  // 3) hooks.json 재작성 — shell 키 제거(U1-(c): 런타임 무시), commandWindows 추가,
   //    대체된 entry 를 합본 entry 로 교체해요.
   const hooksJsonPath = join(hooksDir, "hooks.json");
   const hooksJson = JSON.parse(readFileSync(hooksJsonPath, "utf8")) as HooksJson;
@@ -427,7 +404,7 @@ const transformCodexHooks = (outDir: string): void => {
       for (const hook of entry.hooks) {
         const scriptName = wrapperScriptName(hook.command);
         if (CODEX_SUPERSEDED_WRAPPERS.has(scriptName)) {
-          if (scriptName === "session-update-router-guard.sh") {
+          if (scriptName === "session-feedback-contract.sh") {
             nextHooks.push({
               type: "command",
               command: `bash "\${CLAUDE_PLUGIN_ROOT}/hooks/${CODEX_MERGED_WRAPPER}"`,

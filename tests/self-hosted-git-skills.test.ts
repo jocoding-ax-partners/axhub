@@ -7,7 +7,7 @@ import { DEFAULT_MAX_TOTAL_BYTES } from "../scripts/check-plugin-context-budget.
 const ROOT = join(import.meta.dir, "..");
 const SKILL_ROOTS = ["skills", "plugins/axhub/skills", "plugins/axhub-codex/skills"] as const;
 const DIET = [
-  "onboarding",
+  "setup",
   "bootstrap",
   "scaffold",
   "plugins",
@@ -17,7 +17,6 @@ const DIET = [
   "development",
   "diagnosis",
   "clarity",
-  "update",
 ] as const;
 
 const readSkill = (root: (typeof SKILL_ROOTS)[number], skill: string): string =>
@@ -89,21 +88,17 @@ describe("spec 236 self-hosted git skill contracts", () => {
     }
   });
 
-  test("new selfhosted surfaces are capability-gated and old CLIs route to update", () => {
+  test("new selfhosted surfaces are capability-gated and old CLIs are told to update", () => {
     for (const root of SKILL_ROOTS) {
       const bootstrap = readSkill(root, "bootstrap");
       const deploy = readSkill(root, "deploy");
-      const onboarding = readSkill(root, "onboarding");
 
       expect(bootstrap, root).toContain("capabilities.self_hosted_git.apps_git_backend");
       expect(bootstrap, root).toContain("capabilities.self_hosted_git.app_git_backend");
       expect(deploy, root).toContain("capabilities.self_hosted_git.app_git_backend");
       expect(deploy, root).toContain("capabilities.self_hosted_git.git_setup");
       expect(deploy, root).toContain("capabilities.self_hosted_git.repo_clone");
-      expect(onboarding, root).toContain("capabilities.self_hosted_git.apps_git_backend");
-      expect(onboarding, root).toContain("capabilities.self_hosted_git.app_git_backend");
-      expect(onboarding, root).toContain("capabilities.self_hosted_git.git_setup");
-      for (const skill of [bootstrap, deploy, onboarding]) {
+      for (const skill of [bootstrap, deploy]) {
         expect(skill, root).toContain("axhub CLI를 최신 버전으로 업데이트해 주세요.");
         expect(skill, root).toContain("malformed/false");
       }
@@ -315,43 +310,7 @@ describe("spec 236 self-hosted git skill contracts", () => {
       expect(github, root).toContain("github_connected");
     }
   });
-  test("T146 positive: fresh onboarding asks once and selected selfhosted suppresses provider auth", () => {
-    for (const root of SKILL_ROOTS) {
-      const onboarding = readSkill(root, "onboarding");
-      const backendGate = sliceSection(onboarding, "### 2. Git backend gate", "### 4. first_gap router");
 
-      const cliReadiness = backendGate.indexOf("`cli_missing`·`cli_path_missing`·`cli_old`·`auth_missing`");
-      expect(cliReadiness, root).toBeGreaterThanOrEqual(0);
-      expect(cliReadiness, root).toBeLessThan(backendGate.indexOf("axhub plugin-support preflight --json"));
-      expect(backendGate, root).toContain("CLI·auth gap을 닫기 전에는 preflight와 backend read를 절대 실행하지 않아요");
-      expect(backendGate, root).toContain("axhub apps get <app> --json");
-      expect(backendGate, root).toContain("axhub apps git-backend --tenant <tenant> --json");
-      expect(backendGate, root).toMatch(/tenant 추천.*첫 옵션.*반대 선택도 허용/);
-      expect(backendGate, root).toContain("첫 앱의 코드 저장 위치를 선택해 주세요.");
-      expect(backendGate, root).toContain(
-        root === "plugins/axhub-codex/skills"
-          ? "native Question/명시 텍스트 승인 card"
-          : "native Question/AskUserQuestion card",
-      );
-      expect(backendGate, root).toMatch(/`GitHub`(?:와 |·)`Axhub self-hosted`/);
-      expect(backendGate, root).toContain("SELECTED_GIT_BACKEND");
-      expect(backendGate, root).toContain("`git_backend.backend=selfhosted`");
-      expect(backendGate, root).toContain("tenant source는 `tenant|platform_default`");
-      expect(backendGate, root).toContain("`github_link_missing`·`github_app_missing`을 처리하지 않아요");
-      expect(backendGate, root).toContain("계정 로그인·App 설치 대사를 0회로 유지해요");
-      expect(backendGate, root).toContain("axhub --tenant <tenant> git setup --json");
-    }
-  });
-
-  test("T146 negative: selected GitHub onboarding keeps account linking and App installation", () => {
-    for (const root of SKILL_ROOTS) {
-      const onboarding = readSkill(root, "onboarding");
-      expect(onboarding, root).toContain("SELECTED_GIT_BACKEND");
-      expect(onboarding, root).toContain("axhub github accounts list --json");
-      expect(onboarding, root).toContain("github_link_missing");
-      expect(onboarding, root).toContain("github_app_missing");
-    }
-  });
 
   test("related routes do not confuse selfhosted Git with repositoryless upload or GitHub scaffold", () => {
     for (const root of SKILL_ROOTS) {
@@ -370,29 +329,27 @@ describe("spec 236 self-hosted git skill contracts", () => {
     for (const root of SKILL_ROOTS) {
       const bootstrap = readSkill(root, "bootstrap");
       const deploy = readSkill(root, "deploy");
-      const readyCard = readFileSync(join(ROOT, root, "onboarding", "references", "ready-card.md"), "utf8");
       const visibleCopy = [
         bootstrap.match(/selfhosted 사용자-facing 대사는 `([^`]+)`/)?.[1],
         deploy.match(/After push exit 0, say only `([^`]+)`/)?.[1],
-        readyCard.match(/For selfhosted, render only `([^`]+)`/)?.[1],
       ];
       expect(visibleCopy.every(Boolean), root).toBe(true);
       expect(visibleCopy.join("\n"), root).not.toMatch(forbidden);
     }
   });
 
-  test("policy pins CLI-only backend selection and the 11-skill diet", () => {
+  test("policy pins CLI-only backend selection and the 10-skill diet", () => {
     const agentPolicy = readFileSync(join(ROOT, "docs", "policy", "agent-policy.md"), "utf8");
     const devPolicy = readFileSync(join(ROOT, "docs", "policy", "dev-policy.md"), "utf8");
     expect(agentPolicy).toContain("## AP-23 app git backend 선판정");
     expect(agentPolicy).toContain("top-level `git_backend.backend`·`git_backend.source`");
     expect(agentPolicy).toContain("Gitea API·C1 HTTP·remote URL");
-    expect(devPolicy).toContain("공개 skill 은 11개");
+    expect(devPolicy).toContain("공개 skill 은 10개");
     // DP-5 의 합산 예산은 게이트 상수와 같은 값이어야 해요 — 상수만 올리고 정책을 두면 기준 문서가 어긋나요.
-    expect(devPolicy).toContain(`SKILL.md 11개 합산 ${DEFAULT_MAX_TOTAL_BYTES.toLocaleString("en-US")}B`);
+    expect(devPolicy).toContain(`SKILL.md 10개 합산 ${DEFAULT_MAX_TOTAL_BYTES.toLocaleString("en-US")}B`);
   });
 
-  test("source and both generated surfaces keep the 11-skill diet", () => {
+  test("source and both generated surfaces keep the 10-skill diet", () => {
     const expected = [...DIET].sort();
     for (const root of SKILL_ROOTS) {
       const actual = readdirSync(join(ROOT, root), { withFileTypes: true })
@@ -556,20 +513,6 @@ describe("spec 706: skills follow the server code storage decision", () => {
     }
   });
 
-  test("onboarding skips the question when the company decided and hands the pick to bootstrap", () => {
-    for (const root of SKILL_ROOTS) {
-      const onboarding = readSkill(root, "onboarding");
-      const gate = sliceSection(onboarding, "### 2. Git backend gate", "### 4. first_gap router");
-      expect(gate, root).toContain("capabilities.self_hosted_git.git_policy_decision");
-      expect(gate, root).toContain("`git_backend.decision`");
-      expect(gate, root).toContain("`use` 면 묻지 않고 넘어가요");
-      expect(gate, root).toContain("`코드를 어디에 저장할까요?`");
-      expect(gate, root).toContain("`--remember` 는 쓰지 않아요");
-      expect(gate, root).toContain("`github_link_missing` 으로 연결한 뒤 다시 읽어요");
-      expect(gate, root).toContain("`github_linked=false`·`mode≠selfhosted_only` 면 `link_github` 와 같아요");
-      expect(gate.indexOf("`git_backend.decision`"), root).toBeLessThan(gate.indexOf("첫 앱의 코드 저장 위치를 선택해 주세요."));
-    }
-  });
 
   test("scaffold proceeds only when the decision offers the person's own GitHub", () => {
     for (const root of SKILL_ROOTS) {
@@ -598,7 +541,7 @@ describe("spec 706: skills follow the server code storage decision", () => {
 
   test("no skill tells a selfhosted-only or unlinked person that a GitHub account is required", () => {
     for (const root of SKILL_ROOTS) {
-      for (const name of ["bootstrap", "import", "scaffold", "onboarding"]) {
+      for (const name of ["bootstrap", "import", "scaffold"]) {
         expect(readSkill(root, name), `${root}/${name}`).not.toContain("GitHub 계정이 필요해요");
       }
     }

@@ -29,11 +29,11 @@ describe("up skill contract", () => {
     expect(body).toContain("커밋을 만들거나 push 하지 않");
   });
 
-  // AE2 — 구 CLI 는 update 로 보내고 deploy create 로 대체하지 않아요.
-  test("AE2: 구 CLI unknown-command 는 update 로 보내고 deploy create 로 대체하지 않아요", () => {
+  // AE2 — 구 CLI 는 setup 으로 보내고 deploy create 로 대체하지 않아요.
+  test("AE2: 구 CLI unknown-command 는 setup 으로 보내고 deploy create 로 대체하지 않아요", () => {
     expect(body).toContain("0.29.0");
     expect(body).toContain("unknown command");
-    expect(body).toMatch(/`update` 로 보내고 멈춰요/);
+    expect(body).toMatch(/`setup` 으로 보내고 멈춰요/);
     expect(body).toContain("`axhub deploy create` 로 대체하지 않아요");
   });
 

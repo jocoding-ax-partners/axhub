@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.38.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.37.1...plugin-v1.38.0) (2026-11-04)
+
+"axhub 셋업해줘"·"axhub 업데이트해줘"·"로그인해줘" 가 새 setup 스킬 하나로 가요. CLI 설치·버전·로그인·회사·git 설치를 차례로 점검하고 빠진 것만 채운 뒤 결과 표로 끝내요. 예전 onboarding·update 스킬과, 상관없는 메시지에도 끼어들던 업데이트 안내 훅은 뺐어요.
+
+
+### Added
+
+* **plugin:** onboarding·update 를 setup 스킬 하나로 합치고 업데이트 라우터 훅을 뺀다 ([feb7560](https://github.com/jocoding-ax-partners/axhub-mono/commit/feb75600d76b06a0a43559dfc60fb63a413b5c52))
+
 ## [1.37.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.37.0...plugin-v1.37.1) (2026-11-04)
 
 Windows 에서 Codex 를 쓰면 메시지마다 `Hook failed` 가 4개씩 뜨던 문제가 사라져요. Windows 의 Codex 는 훅을 PowerShell 5.1 로 실행하는데 훅 명령이 그 문법에 맞지 않았어요. 이제 Windows Codex 에선 훅을 조용히 건너뛰고, Mac·Linux 와 Claude 는 그대로예요.

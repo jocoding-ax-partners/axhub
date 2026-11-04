@@ -34,47 +34,6 @@ describe("P1-13·DX26 deploy verify --wait 는 host 도구 timeout 안에서 끝
   });
 });
 
-describe("P2-34·P3-48·P3-49 update 스킬은 CLI check 출력을 실제 의미대로 읽어요", () => {
-  const SKILLS = ["skills/update/SKILL.md", "codex-overrides/skills/update/SKILL.md"];
-
-  test("P2-34 disabled 는 업데이트 확인 꺼짐이고 brew·패키지 매니저 안내가 없어요", () => {
-    for (const path of SKILLS) {
-      const body = read(path);
-      expect(body, path).toContain("AXHUB_DISABLE_AUTOUPDATE");
-      expect(body, path).toContain("~/.axhub/config/disable-autoupdate");
-      expect(body, path).not.toContain("brew upgrade");
-      expect(body, path).not.toContain("패키지 매니저가 관리하는 설치");
-    }
-  });
-
-  test("P2-34 feed_error·빈 latest 는 이미 최신이 아니라 확인 실패예요", () => {
-    for (const path of SKILLS) {
-      const body = read(path);
-      expect(body, path).toContain("`feed_error` 가 있거나 `disabled` 가 아닌데 `latest` 가 비면");
-      expect(body, path).toContain("`has_update == false` 를 최신으로 읽지 않고");
-      expect(body, path).toContain("NEVER `feed_error`·빈 `latest` 를 \"이미 최신\" 으로 말하지 말아요");
-    }
-  });
-
-  test("P3-48 AXHUB_NO_AUTO_UPDATE 는 백그라운드 훅만 꺼요 — POLICY.md 의 '끈 상태에서도 update 스킬로 업데이트' 와 일치해요", () => {
-    expect(read("POLICY.md")).toContain("끈 상태에서 업데이트하려면");
-    for (const path of [...SKILLS, "skills/update/references/plugin-update.md", "codex-overrides/skills/update/references/plugin-update.md"]) {
-      const body = read(path);
-      expect(body, path).toContain("백그라운드 자동 업데이트 훅만 꺼요");
-      expect(body, path).not.toContain("AXHUB_NO_AUTO_UPDATE 설정이라 자동 적용은 안 해요");
-      expect(body, path).not.toContain("업데이트 보류(AXHUB_NO_AUTO_UPDATE)");
-    }
-  });
-
-  test("P3-49 '항상 즉시 확인' 대신 --json 의 1시간 캐시를 밝혀요", () => {
-    for (const path of SKILLS) {
-      const body = read(path);
-      expect(body, path).not.toContain("항상 즉시 확인");
-      expect(body, path).toContain("feed 를 최대 1시간 캐시해서");
-    }
-  });
-});
-
 describe("P2-35 배포 전 맞추기는 .env.local 에만 있는 이름도 등록해요", () => {
   test("deploy·up 은 .env.local 이름을 --from-dotenv .env.local 로 등록해요", () => {
     for (const path of ["skills/deploy/SKILL.md", "skills/up/SKILL.md"]) {

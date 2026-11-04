@@ -15,7 +15,6 @@ const GUARD_FILES = [
   "skills/diagnosis/SKILL.md",
   "skills/import/SKILL.md",
   "skills/up/SKILL.md",
-  "skills/update/SKILL.md",
   "hooks/session-auto-update.sh",
 ];
 
@@ -25,7 +24,6 @@ const REPAIR_PATH_FILES = [
   "skills/clarity/SKILL.md",
   "skills/deploy/SKILL.md",
   "skills/development/SKILL.md",
-  "skills/update/SKILL.md",
 ];
 
 describe("CLI path resolution contract (AP-17)", () => {
@@ -39,7 +37,7 @@ describe("CLI path resolution contract (AP-17)", () => {
     }
   });
 
-  test("guards resolve the on-disk binary before handing off to onboarding", () => {
+  test("guards resolve the on-disk binary before handing off to setup", () => {
     for (const file of REPAIR_PATH_FILES) {
       const content = readRepo(file);
 
@@ -48,18 +46,11 @@ describe("CLI path resolution contract (AP-17)", () => {
     }
   });
 
-  test("bootstrap CLI guard runs the repair-path leaf command before any onboarding handoff", () => {
+  test("bootstrap CLI guard runs the repair-path leaf command before any setup handoff", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
 
     expect(bootstrap).toContain(`${CANONICAL_BIN} plugin-support repair-path --json`);
-    expect(bootstrap).toContain("command not found 여도 곧바로 onboarding 으로 돌리지 않아요");
-    expect(bootstrap).not.toContain("command not found 이면 onboarding 안내 후 stop");
-  });
-
-  test("update keeps repair-path inside its desktop-visible command allowlist", () => {
-    const update = readRepo("skills/update/SKILL.md");
-
-    expect(update).toContain(`${CANONICAL_BIN} plugin-support repair-path --json`);
-    expect(update).not.toContain("`command -v axhub` 가 실패하면 멈춰요");
+    expect(bootstrap).toContain("command not found 여도 곧바로 setup 으로 돌리지 않아요");
+    expect(bootstrap).not.toContain("command not found 이면 setup 안내 후 stop");
   });
 });

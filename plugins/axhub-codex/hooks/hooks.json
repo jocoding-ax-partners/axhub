@@ -1,16 +1,5 @@
 {
   "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/update-router.sh\"",
-            "commandWindows": "exit 0"
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "hooks": [
@@ -27,12 +16,12 @@
           },
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-always-on-codex.sh\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-restart-confirm.sh\"",
             "commandWindows": "exit 0"
           },
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-restart-confirm.sh\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-always-on-codex.sh\"",
             "commandWindows": "exit 0"
           }
         ]
