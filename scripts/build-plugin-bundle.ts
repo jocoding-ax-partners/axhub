@@ -339,8 +339,12 @@ interface HooksJson {
   hooks: Record<string, Array<{ matcher?: string; hooks: CodexHookEntry[] }>>;
 }
 
-const codexCommandWindows = (scriptName: string): string =>
-  `where bash >nul 2>nul && bash "\${CLAUDE_PLUGIN_ROOT}/hooks/${scriptName}" || cd .`;
+// Windows 의 codex 는 commandWindows 를 cmd 가 아니라 Windows PowerShell 5.1 로 바로 실행해요
+// (2026-11-03 실측: 훅 프로세스 부모 powershell.exe). 5.1 은 `&&`·`||` 를 몰라 파서 오류로
+// exit 1 이 나서 메시지마다 Hook failed 가 떴어요. 훅 스크립트는 bash 전용이라 PowerShell 에서
+// 돌릴 방법이 없고 WSL bash 로도 못 돌려서, Windows 에선 cmd·PowerShell 둘 다에서 도는 `exit 0`
+// 으로 조용히 건너뛰어요. 지금도 Windows 에선 훅이 한 번도 성공하지 못해 잃는 기능은 없어요.
+const CODEX_COMMAND_WINDOWS = "exit 0";
 
 const wrapperScriptName = (command: string): string => {
   const match = command.match(/hooks\/([A-Za-z0-9._-]+\.sh)/);
@@ -427,7 +431,7 @@ const transformCodexHooks = (outDir: string): void => {
             nextHooks.push({
               type: "command",
               command: `bash "\${CLAUDE_PLUGIN_ROOT}/hooks/${CODEX_MERGED_WRAPPER}"`,
-              commandWindows: codexCommandWindows(CODEX_MERGED_WRAPPER),
+              commandWindows: CODEX_COMMAND_WINDOWS,
             });
           }
           continue;
@@ -438,7 +442,7 @@ const transformCodexHooks = (outDir: string): void => {
           shell?: string;
           timeout?: number;
         };
-        nextHooks.push({ ...rest, commandWindows: codexCommandWindows(scriptName) });
+        nextHooks.push({ ...rest, commandWindows: CODEX_COMMAND_WINDOWS });
       }
       entry.hooks = nextHooks;
     }

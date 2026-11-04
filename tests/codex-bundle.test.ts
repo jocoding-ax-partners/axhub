@@ -122,9 +122,10 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
           expect(script, hook.command).toBeDefined();
           // U1-(p) 확정: PLUGIN_ROOT·CLAUDE_PLUGIN_ROOT 둘 다 주입 — 호환 env 유지.
           expect(hook.command).toContain("${CLAUDE_PLUGIN_ROOT}");
-          expect(hook.commandWindows).toBe(
-            `where bash >nul 2>nul && bash "\${CLAUDE_PLUGIN_ROOT}/hooks/${script}" || cd .`,
-          );
+          // Windows codex 는 commandWindows 를 PowerShell 5.1 로 실행해요 — `&&`·`||` 는 파서
+          // 오류(exit 1)라 Hook failed 가 떠요. bash 훅은 Windows 에서 조용히 건너뛰어요.
+          expect(hook.commandWindows).toBe("exit 0");
+          expect(hook.commandWindows).not.toMatch(/&&|\|\|/);
         }
       }
     }

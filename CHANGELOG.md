@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.37.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.37.0...plugin-v1.37.1) (2026-11-04)
+
+Windows 에서 Codex 를 쓰면 메시지마다 `Hook failed` 가 4개씩 뜨던 문제가 사라져요. Windows 의 Codex 는 훅을 PowerShell 5.1 로 실행하는데 훅 명령이 그 문법에 맞지 않았어요. 이제 Windows Codex 에선 훅을 조용히 건너뛰고, Mac·Linux 와 Claude 는 그대로예요.
+
+
+### Fixed
+
+* **plugin:** Windows Codex 훅이 Hook failed 를 띄우지 않게 바로 끝낸다 ([27f218c](https://github.com/jocoding-ax-partners/axhub-mono/commit/27f218c4c25cb93515192012b02969de9e2eed5c))
+
 ## [1.37.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.36.2...plugin-v1.37.0) (2026-11-03)
 
 메시지를 보낼 때마다 회사 「AI 개발 규칙」을 서버에서 확인하던 기능을 뺐어요. 확인이 실패하면 메시지가 `AXHub policy sync` 오류로 막히던 문제가 사라져요. CLI 업데이트 없이 이 버전만으로 적용되고, 막힘을 피하려고 만든 `~/.axhub/config/no-policy-sync` 파일은 지워도 돼요.
