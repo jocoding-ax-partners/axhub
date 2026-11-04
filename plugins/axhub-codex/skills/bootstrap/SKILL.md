@@ -86,9 +86,9 @@ axhub plugin-support preflight --json
 
 preflight의 `capabilities.self_hosted_git.apps_git_backend`·`capabilities.self_hosted_git.app_git_backend`·`capabilities.self_hosted_git.git_policy_decision`이 모두 `true`여야 backend 판정을 시작해요. 누락·malformed/false면 GitHub 질문과 mutation 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
 
-> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
-command not found 여도 곧바로 onboarding 으로 돌리지 않아요. `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` 후 반환된 `bin_path`로 preflight부터 재개해요. canonical 파일도 없을 때만 onboarding. `plugin-support` unknown/빈 출력이면 update 안내 후 stop, 정상 JSON이면 계속해요. raw stderr 노출 금지.
+command not found 여도 곧바로 setup 으로 돌리지 않아요. `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json` 후 반환된 `bin_path`로 preflight부터 재개해요. canonical 파일도 없을 때만 setup. `plugin-support` unknown/빈 출력이면 update 안내 후 stop, 정상 JSON이면 계속해요. raw stderr 노출 금지.
 
 ### 2. Resume And Workspace
 
@@ -135,7 +135,7 @@ repo name 과 subdomain 은 명시 입력이 없으면 app slug 로 맞춰요. d
 
 ### 6. Git Backend Gate
 
-provider 대사 전 resume/기존은 persisted app choice, fresh tenant backend는 추천값이며 app row를 만들지 않아요. 같은 대화의 onboarding 선택을 재사용하고 backend 질문을 반복하지 않아요.
+provider 대사 전 resume/기존은 persisted app choice, fresh tenant backend는 추천값이며 app row를 만들지 않아요. 같은 대화에서 이미 고른 저장 위치를 재사용하고 backend 질문을 반복하지 않아요.
 
 ```bash
 axhub apps get <app> --json
@@ -153,7 +153,7 @@ top-level `git_backend.backend`·`git_backend.source`·`remembered`만 읽어요
 
 dry-run·execute 는 `--git-backend` 자리에 `--git-choice <key>`, 내 GitHub 이면 `--github-owner <login>` 을 넣어요(owner·installation 을 지어내지 않아요). `SELECTED_GIT_BACKEND`·`init-resume put` 은 그 option 의 `backend` 예요. 고른 GitHub 은 owner picker·accounts 조회 없이 가고 `installed=false` 계정만 App 설치 안내로 가요. headless `ask` 는 mutation 전에 선택지·재개 문장만 보여주고 멈춰요. `decision` 이 없는 구 서버만 아래 규칙이에요.
 
-발화나 같은 대화에 backend가 있으면 쓰고, 다음은 `remembered`(onboarding 이 `--remember` 로 남긴 값), 없으면 native Question/명시 텍스트 승인 card로 `이 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. 추천과 다른 선택도 허용해요. provider 선택이 명시되지 않은 headless는 mutation 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
+발화나 같은 대화에 backend가 있으면 쓰고, 다음은 `remembered`(이전에 `--remember` 로 남긴 값), 없으면 native Question/명시 텍스트 승인 card로 `이 앱의 코드 저장 위치를 선택해 주세요.`라고 묻고 `GitHub`와 `Axhub self-hosted`를 보여줘요. 추천과 다른 선택도 허용해요. provider 선택이 명시되지 않은 headless는 mutation 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
 
 `SELECTED_GIT_BACKEND`를 dry-run, `init-resume put`, execute에 `--git-backend github|selfhosted`로 넣어요.
 

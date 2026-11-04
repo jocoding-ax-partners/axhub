@@ -18,7 +18,7 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 이 스킬은 이미 axhub에 연결된 앱의 **명시적인 repositoryless local-source 배포**를 맡아요. 소스는 Git 커밋이 아니라 지금 폴더를 tar.gz로 묶은 아카이브이고, 그 뒤 단계(빌드·스캔·기동·verify)는 저장소 배포와 같은 파이프라인이에요. selfhosted app의 정상 배포는 이 lane이 아니라 `deploy`의 clone→push lane이에요.
 
@@ -81,7 +81,7 @@ Headless 는 `claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, TTY 없�
 | 앱이 아직 없거나 첫 연결·첫 배포 | `import` |
 | 저장소가 연결돼 있고 push 배포가 정상인 평시 배포, 또는 selfhosted app(static 포함)의 저장소 배포 | `deploy` |
 | `deploy_method=static` 정적 파일 앱 | `deploy` (GitHub 은 static lane, selfhosted 는 저장소 push) |
-| CLI·플러그인 버전 업데이트 | `update` |
+| CLI·플러그인 버전 업데이트 | `setup` |
 | 배포 실패 원인 진단 | `diagnosis` |
 | 로그·환경변수·롤백·GitHub 재연결 | `clarity` |
 
@@ -101,7 +101,7 @@ axhub plugin-support deploy-prep --intent deploy --json
 |---|---|
 | `preflight.auth_error_code`(또는 `resolve.error` 의 `auth_` 뒤)가 `probe_timeout`·`probe_no_output`·`cli_spawn_failed`·`api`·`rate_limited`·`timeout`·`other` | 로그인 판정이 없을 뿐이에요. 로그인·`import` 안내 없이 1단계를 한 번 다시 실행하고, 같으면 `axhub auth status --json` 결과로만 로그인 여부를 판정해요 — exit 0 이면 1단계를 한 번 더 실행해 이어가고, exit 4 면 아래 `auth_ok` false 행대로 해요. 그 밖이거나 1단계가 또 같으면 `axhub 서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요.` 로 멈춰요. |
 | `auth_ok` false (위 경우가 아닐 때) | `axhub 로그인이 필요해요.` 한 줄 뒤 auth 복구로 안내하고 멈춰요. |
-| `cli_too_old` true | `update` 로 보내고 멈춰요. |
+| `cli_too_old` true | `setup` 으로 보내고 멈춰요. |
 | `resolve.error` 가 `app_ambiguous` | 앱 이름이 여러 개에 걸린다는 뜻이에요 — 앱이 없는 게 아니에요. `resolve.matched_apps` 의 slug 를 보여주고 한 번 물은 뒤 고른 항목의 `id` 를 `APP_ID` 로 두고 다음 단계로 가요(`deploy-prep` 은 `--app` 을 받지 않아 다시 돌리지 않아요). `import`·`bootstrap` 으로 보내지 않아요. |
 | `resolve.error` 가 `apps_list_parse_error` | 앱 목록을 읽지 못한 일시 실패예요 — 앱이 없는 게 아니에요. 1단계를 한 번 다시 실행하고, 같으면 `앱 목록을 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.` 로 멈춰요. `import`·`bootstrap` 으로 보내지 않아요. |
 | `bootstrap_plan` 존재 (`resolve.error` 가 `app_not_found`·`no_candidate_slug`) | 앱이 아직 없다는 뜻이에요. 비어 있지 않은 폴더는 `import`, 빈 폴더는 `bootstrap` 으로 양보해요. `bootstrap_plan` 없이 `resolve.app_id` 만 없으면 위 행들로 판정하고 첫 배포로 보지 않아요. |
@@ -145,7 +145,7 @@ dry-run 은 앱 resolve·인증·네트워크 이전에 패킹만 하고 끝나�
 
 **dry-run 이 실패하면 preview 카드를 만들지 않아요.** 업로드 상한 초과, 단일 파일 상한 초과, 제외 규칙으로 파일 0개, `--path` 폴더 없음 — 어느 경우든 CLI 가 준 한국어 사유를 그대로 전한 뒤 멈춰요. 재시도하거나 `--execute` 로 넘어가지 않아요.
 
-CLI 0.29.0 미만이면 이 명령이 unknown command 로 끝나요. 그때는 `update` 로 보내고 멈춰요 — `axhub deploy create` 로 대체하지 않아요.
+CLI 0.29.0 미만이면 이 명령이 unknown command 로 끝나요. 그때는 `setup` 으로 보내고 멈춰요 — `axhub deploy create` 로 대체하지 않아요.
 
 ## 3단계 — 올릴 내용 알리기 (AP-12)
 

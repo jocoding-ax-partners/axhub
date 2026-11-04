@@ -12,13 +12,13 @@ description: '요청하신 운영 명령을 확인할게요. Use for "axhub 로�
 
 ## Do not invoke / route guard
 
-최신성·버전·업데이트가 보이면 이 스킬이 아니에요. `최신`, `버전`, `업데이트`, `latest`, `up to date`, `version check`, `freshness` 가 있으면 앱 상태·새 앱 생성·배포가 함께 있어도 먼저 `update` 가 끝나야 해요. 이미 `/axhub:clarity` 배지가 뜬 뒤 이 문서를 읽었다면 `Using /axhub:clarity...` 같은 문장을 쓰거나 명령을 실행하지 말고, 첫 visible assistant text 를 정확히 `현재 버전을 확인할게요.` 로 둔 뒤 update 계약으로 양보해요.
+최신성·버전·업데이트가 보이면 이 스킬이 아니에요. `최신`, `버전`, `업데이트`, `latest`, `up to date`, `version check`, `freshness` 가 있으면 앱 상태·새 앱 생성·배포가 함께 있어도 먼저 `setup` 이 끝나야 해요. 이미 `/axhub:clarity` 배지가 뜬 뒤 이 문서를 읽었다면 `Using /axhub:clarity...` 같은 문장을 쓰거나 명령을 실행하지 말고, 첫 visible assistant text 를 정확히 `현재 버전을 확인할게요.` 로 둔 뒤 setup 으로 양보해요.
 
-앱 상태 overview, "내 앱들이 지금 어떤 상태인지도 알아서 봐줘", 새 앱 생성, bootstrap, import, deploy 가 보이면 clarity 가 아니에요. 특히 `command -v axhub && axhub --version`, `Checking axhub CLI installation and version`, `MCP tools to check axhub status and your apps` 로 시작하면 실패예요. 그런 경우 앱 상태 조회나 CLI probe 를 시작하지 말고 담당 스킬(update/bootstrap/import/deploy)로 양보해요.
+앱 상태 overview, "내 앱들이 지금 어떤 상태인지도 알아서 봐줘", 새 앱 생성, bootstrap, import, deploy 가 보이면 clarity 가 아니에요. 특히 `command -v axhub && axhub --version`, `Checking axhub CLI installation and version`, `MCP tools to check axhub status and your apps` 로 시작하면 실패예요. 그런 경우 앱 상태 조회나 CLI probe 를 시작하지 말고 담당 스킬(setup/bootstrap/import/deploy)로 양보해요.
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 이 스킬은 axhub CLI 운영 명령 브리지예요. 로그, 환경변수, 롤백, 테이블/컬럼/데이터, connector grant, GitHub 재연결처럼 명시된 운영 명령만 처리해요. 작업→명령 카탈로그는 없어요 — **매번 라이브 CLI 의 `--help` 트리를 탐색**해 맞는 명령을 찾고, 조회 명령은 바로 실행하되 파괴적 변경은 승인 뒤 실행해요.
 
@@ -52,13 +52,13 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - device flow fast path 에서는 shell loop, background watcher, persistent monitor 를 쓰지 않아요. `while true`, `sleep`, `grep`, command substitution, 임시 로그 파일 저장/재읽기, `Monitor 사용` 권한 카드가 뜨는 명령은 실패예요. device flow 시작은 `계정 인증 시작` 단일 CLI 호출 하나로 처리하고, CLI stdout/stderr 에서 URL과 코드를 바로 읽어요.
 - device flow fast path 에서는 다른 사전 점검을 건너뛰어요. 사용자가 지금 필요한 건 코드와 브라우저 승인이라서, 권한 팝업이나 사전 안내로 앞단을 늦추지 않아요.
 - Claude Desktop 에서 `axhub github link` 를 실행할 때는 자동 브라우저 열기와 agent-safe 흐름을 위해 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>` 형태로 실행해요.
-- **코드 유실·만료는 `--fresh` 로 재발급해요.** `github link` 는 저장된 pending device link 를 그대로 이어 줘서, 코드를 놓쳤거나 만료된 뒤 같은 명령을 다시 실행하면 이미 죽은 코드가 그대로 돌아와요 — 사용자가 아무리 승인해도 영영 안 풀려요. 코드를 못 봤다·사라졌다·만료됐다는 신호가 있거나 같은 코드로 `인증 확인` 이 계속 pending 이면 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --fresh` 로 새 코드를 발급받아 두 줄을 다시 보여줘요. 사용자가 지금 보고 있는 코드가 아직 유효하면 `--fresh` 를 붙이지 않아요 — 그 코드가 무효가 돼요. `--fresh` 가 unknown flag(exit 64)로 거부되면 구 CLI 라서 그런 거예요. 플래그 없이 한 번만 다시 실행하고 update 스킬로 CLI 를 올리도록 안내해요.
+- **코드 유실·만료는 `--fresh` 로 재발급해요.** `github link` 는 저장된 pending device link 를 그대로 이어 줘서, 코드를 놓쳤거나 만료된 뒤 같은 명령을 다시 실행하면 이미 죽은 코드가 그대로 돌아와요 — 사용자가 아무리 승인해도 영영 안 풀려요. 코드를 못 봤다·사라졌다·만료됐다는 신호가 있거나 같은 코드로 `인증 확인` 이 계속 pending 이면 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --fresh` 로 새 코드를 발급받아 두 줄을 다시 보여줘요. 사용자가 지금 보고 있는 코드가 아직 유효하면 `--fresh` 를 붙이지 않아요 — 그 코드가 무효가 돼요. `--fresh` 가 unknown flag(exit 64)로 거부되면 구 CLI 라서 그런 거예요. 플래그 없이 한 번만 다시 실행하고 setup 스킬로 CLI 를 올리도록 안내해요.
 - device flow 를 시작하는 Bash/tool call 제목과 description 은 모두 정확히 `계정 인증 시작` 으로 직접 채워요. 자동 제목이나 description 에 제품명, `axhub GitHub device flow 인증 시작`, `GitHub 인증 시작`, 영어 단어, 설명 문장이 붙어 보이면 같은 명령이라도 이 제목과 description 으로 고쳐 다시 호출해요.
 - 로그를 짧게 폴링해서 URL과 입력 코드를 찾고, 발견 즉시 일반 채팅 본문에 URL과 입력 코드를 다시 써요. device-flow URL 은 Claude Desktop 이 자동 링크로 바꾸지 못하도록 URL 부분만 inline code span 으로 써요. `[https://github.com/login/device](https://github.com/login/device)`, `[https://github.com/login/device](github.com/login/device)`, `[GitHub 열기](https://github.com/login/device)`, `<https://github.com/login/device>`, bare `https://github.com/login/device` 같은 링크/자동링크 형태는 모두 금지예요. 반드시 `인증 URL: \`https://github.com/login/device\`` 와 `입력 코드: <USER_CODE>` 두 줄을 일반 채팅 본문에 그대로 보여줘요.
 - 입력 코드를 찾았으면 승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출해요. `실행됨 명령 N개`, `TaskOutput 사용함`, tool 카드, 접힌 로그만 남기고 응답을 끝내면 실패예요.
 - 코드를 명령 출력이나 로그 읽기 결과 안에만 남기지 않아요. Claude Desktop 에서는 tool 출력이 접혀 보일 수 있으므로, 최종 요약이나 다음 안내 문장에도 사용자가 입력할 코드를 한 번 더 써요.
 - 자동 브라우저 열기는 입력 코드가 포함된 직접 URL을 우선 열 수 있어요. 사용자가 "승인했어"라고 다시 말하게 하지 않아요. 코드 표시 뒤 assistant 응답을 끝내지 말고, `계정 인증 시작` command 뒤 같은 assistant turn 에서 title 과 description 이 모두 정확히 `인증 확인` 인 단일 `axhub github accounts list --json` 조회까지 이어가요. tenant 가 이미 명확할 때만 `axhub github accounts list --tenant <tenant> --json` 를 써요. CLI 가 pending 으로 끝나도 `sleep`, `&&`, shell loop, watcher 로 감시하지 말고 같은 단일 확인 조회로 연결 반영 여부를 확인해요.
-- 브라우저가 성공 화면인데 계정 연결이 아직 반영되지 않았으면 같은 leaf 명령을 한 번만 더 실행할 수 있어요. 그래도 pending 이면 현재 결과와 다음에 확인할 명령을 짧게 안내하고 멈춰요. 승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요. 승인했는데도 `not authenticated` 가 계속 반복되면 보고 있는 코드가 이미 죽은 경우가 흔해요 — 위 `--fresh` 재발급을 한 번 먼저 쓰고, 그래도 같으면 CLI 가 pending 연동 재개를 지원하지 않는 구버전일 수 있으니 update 스킬로 CLI 를 먼저 올린 뒤 다시 시도하도록 안내해요.
+- 브라우저가 성공 화면인데 계정 연결이 아직 반영되지 않았으면 같은 leaf 명령을 한 번만 더 실행할 수 있어요. 그래도 pending 이면 현재 결과와 다음에 확인할 명령을 짧게 안내하고 멈춰요. 승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요. 승인했는데도 `not authenticated` 가 계속 반복되면 보고 있는 코드가 이미 죽은 경우가 흔해요 — 위 `--fresh` 재발급을 한 번 먼저 쓰고, 그래도 같으면 CLI 가 pending 연동 재개를 지원하지 않는 구버전일 수 있으니 setup 스킬로 CLI 를 먼저 올린 뒤 다시 시도하도록 안내해요.
 - device_code 같은 내부 교환용 값은 절대 쓰지 않아요. 사용자에게 필요한 건 verification URL 과 `user_code` 뿐이에요.
 
 ## 원칙
@@ -70,7 +70,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 - **내 접근 가능 범위는 grant 기준.** 사용자가 "내가 조회 가능한", "내가 접근 가능한", "connected 된", "연결된 connector"처럼 **본인 범위**를 물으면 반드시 공개 명령 `axhub connectors mine` 으로 확인해요. tenant-admin 전체 카탈로그인 `axhub connectors list` / `--enabled-only` 결과를 "내가 조회 가능한 connector" 로 요약하지 말아요.
 - **읽기와 쓰기는 다른 질문이에요.** "내가 올릴 수 있어?", "쓰기 권한 있어?", "여기 파일 넣을 수 있어?" 처럼 **바꾸는 쪽**을 물으면 `axhub authz grants mine` 으로 확인해요. 응답의 `scope_resource_paths` 가 닿는 대상이고 `scope_levels` 가 대상별로 어디까지인지(`read` | `write`) 예요. 커넥터 목록만 보고 "접근 가능하니 올릴 수도 있다" 고 답하지 말아요 — 목록에 있어도 그 대상이 `read` 면 못 올려요. 반대로 `scope_levels` 가 비어 있으면 대상을 안 나눈 권한이라 프리셋이 정해요.
 - **권한 부여도 여기예요.** "OO 에게 업로드 권한 줘" 는 hidden leaf `authz grants create` 예요 — schema·`--help` 목록에 없어도 `axhub authz grants create --help` 로 대상·레벨 플래그(`--scope`, `--level <대상>=read|write`)를 확정하고 `set-scope` 로 대신하지 않아요. 접근을 넓히는 변경이라 승인 1회 받고 실행해요.
-- **삭제·멈추기 구분.** 「앱 삭제」=`axhub apps delete`(30일 안 `axhub apps reactivate` 로 되돌림), 바로 지우기=`axhub apps purge`(삭제된 앱만), 멈추기=절전 `axhub apps sleep`(방문하면 깨어남) 또는 일시정지 `axhub apps suspend`(`axhub apps resume` 으로 다시 시작). 모호하면 물어요. `apps delete --help` 에 `reactivate` 가 없으면 구 CLI 라 update 로 보내요.
+- **삭제·멈추기 구분.** 「앱 삭제」=`axhub apps delete`(30일 안 `axhub apps reactivate` 로 되돌림), 바로 지우기=`axhub apps purge`(삭제된 앱만), 멈추기=절전 `axhub apps sleep`(방문하면 깨어남) 또는 일시정지 `axhub apps suspend`(`axhub apps resume` 으로 다시 시작). 모호하면 물어요. `apps delete --help` 에 `reactivate` 가 없으면 구 CLI 라 setup 으로 보내요.
 - **지어내지 않기.** 탐색으로 못 찾은 기능은 "axhub 에 그 기능은 없어요" 라고 정직하게 말하고, 가장 가까운 명령을 제안해요.
 
 **대표 정직성 계약.** `clarity` 는 hidden `plugin-support` 를 탐색하지 않아요. 공개 `--json-schema` / `--help` 트리에서 맞는 leaf 를 찾지 못하면 존재하지 않는 명령을 만들지 말고, "axhub 에 그 기능은 없어요" + 가장 가까운 공개 명령만 말해요. 로그·환경변수·롤백·테이블·connector grant 처럼 대표 여정 뒤 작업은 이 경로로 이어가요.
@@ -81,7 +81,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 
 ## Workflow
 
-1. **첫 명령.** 제목·description 이 정확히 `명령 찾기`인 Step 3의 bare schema 탐색으로 시작해요. 그 결과가 command-not-found면 바로 넘기지 않고 AP-17 경로 계약대로 `"$HOME/.axhub/bin/axhub"` 로 `plugin-support repair-path --json` 을 한 번 실행해 그 절대경로로 이어가요. 디스크에도 없을 때만 "axhub CLI 가 아직 없네요. 온보딩부터 진행할게요"라고 말하고 onboarding으로 넘겨요.
+1. **첫 명령.** 제목·description 이 정확히 `명령 찾기`인 Step 3의 bare schema 탐색으로 시작해요. 그 결과가 command-not-found면 바로 넘기지 않고 AP-17 경로 계약대로 `"$HOME/.axhub/bin/axhub"` 로 `plugin-support repair-path --json` 을 한 번 실행해 그 절대경로로 이어가요. 디스크에도 없을 때만 "axhub CLI 가 아직 없네요. 셋업부터 진행할게요"라고 말하고 setup 으로 넘겨요.
 
 2. **명시된 운영 작업 확인.** 사용자가 요청한 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 작업의 핵심 동사·명사를 잡아요. 후보 leaf 가 여럿이면 한 번만 짧게 되물어요 — 단, 되묻기는 마지막 수단이고 대개는 다음 탐색으로 스스로 판별해요.
 
@@ -136,13 +136,13 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 
 | 요청 | 담당 |
 |---|---|
-| 처음 셋업·CLI 설치·로그인부터 | onboarding |
+| 처음 셋업·CLI 설치·로그인·업데이트 | setup |
 | 빈 디렉토리 새 앱 만들기·템플릿·스캐폴드 | bootstrap |
 | 기존 로컬 앱 첫 axhub 연결·첫 배포 가져오기 | import |
 | 배포 실행·배포 검증 | deploy |
 | 기존 앱 화면·페이지·대시보드·엔드포인트 코드 생성 | development |
 | 배포 실패 원인 진단·해결 후보 요약 | diagnosis |
-| CLI·플러그인 관리 | update |
+| CLI·플러그인 관리 | setup |
 | 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 | **clarity (이 스킬)** |
 
 경계가 섞여 오면(예: "배포하고 로그 봐줘") 배포는 deploy 에 양보하고 로그 부분만 이 스킬이 이어받아요.

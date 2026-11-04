@@ -1,16 +1,5 @@
 {
   "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/update-router.sh\""
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "hooks": [
@@ -25,11 +14,6 @@
             "type": "command",
             "shell": "bash",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-windows-contract.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-update-router-guard.sh\""
           },
           {
             "type": "command",

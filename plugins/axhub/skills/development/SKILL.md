@@ -24,7 +24,7 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 이미 만들어진 axhub 앱에 **기능 코드 추가·수정**을 해요. 실데이터(connector·table)를 기반으로 한 페이지·엔드포인트뿐 아니라 todo priority/filter/search, tabs, forms, CRUD, UI/page/API route 개선처럼 기존 앱의 동작과 화면을 바꾸는 요청도 포함해요. 데이터가 필요한 기능은 추측하지 않고 진짜 스키마에 맞춰 grounding 하고, 데이터 입력·수정(CRUD) 화면과 (옵트인·게이트 하의) 테이블 생성도 만들어요 (`references/write-gate.md`).
 
@@ -91,13 +91,13 @@ model: sonnet
    ```bash
    axhub plugin-support preflight --json
    ```
-   Claude Desktop tool 제목은 정확히 `axhub·앱 점검`으로 지정하고 영어 자동 제목을 쓰지 않아요. 이 명령을 정확히 한 번만 호출해요. command-not-found 면 AP-17 경로 계약대로 `"$HOME/.axhub/bin/axhub"` 로 `plugin-support repair-path --json` 을 실행해 그 절대경로로 이어가고, 디스크에도 없을 때만 온보딩 안내 후 멈추고, exit 2·빈 출력·capability 부족이면 업데이트 안내 후 멈춰요. 정상 JSON 의 `auth_ok` 등을 tool 결과에서 직접 읽어요. development 요청에서 별도 `axhub update check`, `command -v`, `axhub --version`을 실행하지 않아요. 최신성 요청은 update 스킬 소관이에요.
+   Claude Desktop tool 제목은 정확히 `axhub·앱 점검`으로 지정하고 영어 자동 제목을 쓰지 않아요. 이 명령을 정확히 한 번만 호출해요. command-not-found 면 AP-17 경로 계약대로 `"$HOME/.axhub/bin/axhub"` 로 `plugin-support repair-path --json` 을 실행해 그 절대경로로 이어가고, 디스크에도 없을 때만 셋업 안내 후 멈추고, exit 2·빈 출력·capability 부족이면 업데이트 안내 후 멈춰요. 정상 JSON 의 `auth_ok` 등을 tool 결과에서 직접 읽어요. development 요청에서 별도 `axhub update check`, `command -v`, `axhub --version`을 실행하지 않아요. 최신성 요청은 setup 스킬 소관이에요.
 
 2. **앱 게이트 + 앱 바인딩 확정.** 현재 폴더가 axhub 앱인지 확인해요 (`axhub.yaml`/clone 된 repo). **앱이 없으면 코딩하지 않고** "먼저 앱이 필요해요 — `앱 만들어줘` 라고 하면 만들어 드려요" 한 줄 안내 후 멈춰요 (bootstrap 소관, 자동 위임 안 함). `axhub.yaml` 의 `name` 은 로컬 프로젝트 이름일 수 있으므로 원격 앱 slug 로 단정하지 않아요. 타깃은 같은 대화에서 검증된 app id/slug → `.axhub/import-resume.json` 또는 bootstrap resume 의 `app_id` → origin 저장소 이름 순으로 좁히고, id 가 있으면 bare `axhub apps get <app-id> --json` 한 번으로 검증해요. 이 근거가 없으면 manifest name 을 후보로 한 번 검증하고, 실패하면 `apps list`, `--help`, pipe 탐색으로 복구하지 말고 앱을 한 번 물어요. **검증된 타깃 앱 = 이 폴더의 바인딩**이며 development 는 이 폴더가 묶인 앱에만 코드를 만들어요. 사용자가 다른 앱을 가리키면 코드를 생성하지 말고 올바른 앱 폴더로 이동하도록 안내해요.
 
 3. **stack 감지 (에이전트 판단).** 고정 표 대신 신호로 framework 를 판단해요 — `package.json`(next/vite/react), `pyproject.toml`/`requirements.txt`(fastapi/flask), `axhub.yaml` 힌트, 파일 구조. 이걸로 뒤의 규약 학습·verify 명령을 분기해요. **판단이 안 서는 미지원 stack 이면** "이 앱 스택은 아직 자동 코딩을 지원 안 해요" 로 degrade 하고 멈춰요.
 
-4. **auth 전제 인라인 안내.** discover 는 auth 에 의존해요. gap 이면 인라인으로 안내해요 (onboarding 위임 X).
+4. **auth 전제 인라인 안내.** discover 는 auth 에 의존해요. gap 이면 인라인으로 안내해요 (setup 위임 X).
    - **확인 실패**(`auth_error_code` 가 `probe_timeout`·`probe_no_output`·`cli_spawn_failed`·`api`·`rate_limited`·`timeout`·`other`): 로그인 판정이 없을 뿐이에요. 로그인 안내 없이 이때만 preflight 를 한 번 더 실행하고, 같으면 `axhub auth status --json` 으로만 판정해요 — exit 0 이면 로그인된 거라 이어가고, exit 4 면 아래 미로그인으로 가요. 그 밖이면 "axhub 서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요" 로 멈춰요.
    - **미로그인**(`auth_ok=false`, 위 경우가 아닐 때): "로그인이 필요해요 — `axhub auth login`(hint 가 `--force` 를 말하면 그대로) 하거나 '온보딩'이라고 해주세요" 안내 후 완료되면 재확인.
    - MCP 서버 등록은 안내하지 않아요 — `mcp__axhub__*` 도구가 없으면 아래 6단계의 **CLI fallback** 으로 그대로 진행해요.
@@ -117,7 +117,7 @@ model: sonnet
 
 8. **기능 계획 + 미리보기 + 확인.** 요청된 페이지·화면·API route·검색·필터·탭·폼·CRUD·UI 개선을 기존 앱 규약에 맞춰 설계하고, 데이터 기반 기능이면 **E1 실데이터 미리보기**(샘플 cap + **PII 마스킹**)와 함께 한국어로 보여준 뒤 확인받아요. PII·secret·규제 데이터로 보이면 마스킹하고, raw 샘플은 생성 코드/테스트/로그에 절대 안 써요.
 
-9. **코드 생성 (기능 — 기존 패턴 우선, read 기본, write 게이트).** 데이터-레이어 코드는 5단계에서 확인한 현재 표면과 7단계 앱 규약에 맞춰요. 검색·필터·탭·폼·CRUD·UI/page/API route 개선은 기존 컴포넌트·라우팅·상태관리 패턴을 우선 재사용해요. 앱 런타임 CRUD는 기존 앱의 DB/connector/서버 라우트 패턴을 사용하고, 제거된 SDK data-plane DSL 을 새로 만들지 않아요. 데이터 read 는 쿼리 파라미터화·식별자 sanitize·표시값 escape. **write 면 `references/write-gate.md`** 를 따라요 — (a) 런타임 CRUD 코드(form/mutation: validation·파라미터화 write·중복제출 방지·실패 롤백·write 상태 UI)는 기본이고, (b) 기능이 새 테이블/컬럼을 필요로 하면 **게이트 옵트인**(가용성 확인 → 존재 우선 check-then-create → preview-confirm AUQ → headless 무변경 → partial-failure 복구)으로만 스키마를 생성해요. **의존성**: 가능하면 기존 앱 의존성만 써요. 신규 라이브러리(chart/form 등)가 꼭 필요하면 기존 앱 manifest+lockfile 이 있을 때만, 명시 확인 후 `--ignore-scripts` 로 설치해요 (onboarding 의존성 계약 재사용).
+9. **코드 생성 (기능 — 기존 패턴 우선, read 기본, write 게이트).** 데이터-레이어 코드는 5단계에서 확인한 현재 표면과 7단계 앱 규약에 맞춰요. 검색·필터·탭·폼·CRUD·UI/page/API route 개선은 기존 컴포넌트·라우팅·상태관리 패턴을 우선 재사용해요. 앱 런타임 CRUD는 기존 앱의 DB/connector/서버 라우트 패턴을 사용하고, 제거된 SDK data-plane DSL 을 새로 만들지 않아요. 데이터 read 는 쿼리 파라미터화·식별자 sanitize·표시값 escape. **write 면 `references/write-gate.md`** 를 따라요 — (a) 런타임 CRUD 코드(form/mutation: validation·파라미터화 write·중복제출 방지·실패 롤백·write 상태 UI)는 기본이고, (b) 기능이 새 테이블/컬럼을 필요로 하면 **게이트 옵트인**(가용성 확인 → 존재 우선 check-then-create → preview-confirm AUQ → headless 무변경 → partial-failure 복구)으로만 스키마를 생성해요. **의존성**: 가능하면 기존 앱 의존성만 써요. 신규 라이브러리(chart/form 등)가 꼭 필요하면 기존 앱 manifest+lockfile 이 있을 때만, 명시 확인 후 `--ignore-scripts` 로 설치해요 (setup 의존성 계약 재사용).
 
 10. **UI 상태 보강 (E2).** read 화면이면 **empty/error/loading** 3상태를 항상 만들고, 기존 앱 컴포넌트·디자인 토큰에 맞춰 스타일을 정합해요. 큰 결과는 페이지네이션을 넣어요.
 

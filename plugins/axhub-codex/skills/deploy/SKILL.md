@@ -11,7 +11,7 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 Redeploy an already-connected axhub app: fix what blocks it, deploy without an approval card, and verify. First-connect/import and new-app/bootstrap flows do not run here.
 
@@ -100,7 +100,7 @@ axhub plugin-support preflight --json
 
 `capabilities.self_hosted_git.app_git_backend`, `capabilities.self_hosted_git.git_setup`, `capabilities.self_hosted_git.repo_clone`이 모두 `true`여야 해요. 누락·malformed/false면 fallback 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
 
-command-not-found는 미설치가 아니에요. AP-17대로 `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json`의 `bin_path`로 이어가고 디스크에도 없을 때만 onboarding을 안내해요. auth missing/expired면 interactive login 전에 물어요 — `auth_error_code` probe 실패는 로그인 안내 없이 아래 resolve 규칙대로 해요.
+command-not-found는 미설치가 아니에요. AP-17대로 `"$HOME/.axhub/bin/axhub" plugin-support repair-path --json`의 `bin_path`로 이어가고 디스크에도 없을 때만 setup 을 안내해요. auth missing/expired면 interactive login 전에 물어요 — `auth_error_code` probe 실패는 로그인 안내 없이 아래 resolve 규칙대로 해요.
 
 ### Routing and resolve
 

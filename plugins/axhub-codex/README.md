@@ -6,7 +6,7 @@
 
 코드를 직접 짜는 대신, "내 앱 배포해" 한마디로 앱 lifecycle 전체를 안전하게 굴려요.
 
-**상태**: 11 SKILL (onboarding · bootstrap · scaffold · plugins · deploy · up · import · development · diagnosis · clarity · update) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download) · Codex CLI ≥ 0.147.0
+**상태**: 10 SKILL (setup · bootstrap · scaffold · plugins · deploy · up · import · development · diagnosis · clarity) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download) · Codex CLI ≥ 0.147.0
 
 </div>
 
@@ -56,10 +56,10 @@ codex plugin add axhub-codex@axhub
 
 ## 🔐 훅 신뢰 — 설치 후 꼭 한 번 확인해요
 
-이 플러그인은 세션 시작 훅 4개와 프롬프트 훅 1개를 담아요. Codex 는 플러그인 훅을 **사용자가 신뢰하기 전에는 실행하지 않아요** — 설치 후 첫 대화형 세션에서 훅 목록과 신뢰 여부를 물어요.
+이 플러그인은 세션 시작 훅 4개를 담아요. Codex 는 플러그인 훅을 **사용자가 신뢰하기 전에는 실행하지 않아요** — 설치 후 첫 대화형 세션에서 훅 목록과 신뢰 여부를 물어요.
 
-- **신뢰하면**: 자동 업데이트(24시간 1회, 뒤에서 조용히 확인·설치), Windows Git Bash 실행 계약 안내, 최신·버전 요청의 update-first 라우팅 가드, 플러그인 재시작 확인이 자동으로 동작해요.
-- **신뢰하지 않으면**: 위 4개 표면이 조용히 꺼져요. 스킬 자체는 훅 없이도 완결돼요 — 특히 `update` 스킬은 "업데이트해줘" 한마디로 훅과 무관하게 감지→적용→재시작 안내까지 끝까지 진행해요.
+- **신뢰하면**: 자동 업데이트(24시간 1회, 뒤에서 조용히 확인·설치), Windows Git Bash 실행 계약 안내, 질문 프로토콜과 실패 자동 리포트 계약, 플러그인 재시작 확인이 자동으로 동작해요.
+- **신뢰하지 않으면**: 위 4개 표면이 조용히 꺼져요. 스킬 자체는 훅 없이도 완결돼요 — CLI 업데이트는 "axhub 업데이트해줘" 한마디로 `setup` 스킬이 훅과 무관하게 확인·적용해요.
 - **훅 정의가 바뀐 릴리즈**: 훅 entry 자체가 바뀐 릴리즈(예: 자동 업데이트 훅을 백그라운드 `async` 로 바꾼 릴리즈)는 재설치 뒤 신뢰 확인이 한 번 더 뜰 수 있어요. wrapper 스크립트 본문만 바뀐 릴리즈는 재확인 없이 반영돼요. 자동 업데이트 훅은 뒤에서 `axhub update apply` 와 `codex plugin marketplace upgrade axhub` 를 묻지 않고 실행하니 신뢰 전에 `hooks/session-auto-update.sh` 를 한 번 읽어 보는 것을 권해요.
 - 훅이 신뢰하는 대상은 **훅 command(스크립트 경로)** 예요. 플러그인 업데이트로 훅 구성이 바뀌면 Codex 가 다시 신뢰를 물을 수 있어요 — 훅 스크립트 동작 변화는 CHANGELOG 에 명시해요.
 
@@ -79,20 +79,20 @@ codex plugin add axhub-codex@axhub
 ## 📋 준비물
 
 - **Codex CLI ≥ 0.147.0** (최종 검증: 0.149.0)
-- **axhub CLI** — `plugins`는 version 추측 대신 필요한 `axhub plugin list|download|install|publish --help`가 성공할 때만 진행해요. 기능이 없으면 `update`로 보내고 우회하지 않아요.
+- **axhub CLI** — `plugins`는 version 추측 대신 필요한 `axhub plugin list|download|install|publish --help`가 성공할 때만 진행해요. 기능이 없으면 `setup`으로 보내고 우회하지 않아요.
 - **axhub SaaS 계정** + scope (회사 admin 이 발급)
 
 headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인증·TLS·토큰 저장은 모두 CLI 가 담당하고, 플러그인은 별도 바이너리를 동봉하지 않아요.
 
 ---
 
-## 🧩 11개 스킬
+## 🧩 10개 스킬
 
 `plugins`는 deploy_method=plugin인 일반 App의 exact version을 다운로드하거나 Codex에 설치해요. `download`는 검증된 ZIP만 저장하고, `axhub plugin install --host codex`는 offline preview 뒤 `--execute --yes`일 때만 archive 공격과 manifest identity를 검사하고 AxHub 관리 local marketplace를 Codex 공식 plugin CLI로 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish·submit execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 사용해요. 성공은 `publish --submit`이면 `review_submitted`·installable=false, 업로드만 했으면 `upload_complete`·installable=false이고 다음 단계는 `axhub plugin submit`(게시 심사 신청)이에요. 결과 알림은 없어서 `axhub plugin manage status --app <app>`로 확인하고, 이후 owner는 App Console, reviewer는 Console Review를 사용해요. 이 흐름은 axhub CLI 0.50.0 이상이 필요해요.
 
 | 스킬 | 언제 | 자연어 예시 |
 |------|------|-------------|
-| `onboarding` | 처음 셋업 | "처음인데 셋업해줘", "온보딩", "뭐부터 하면 돼" |
+| `setup` | 셋업·CLI 설치·업데이트·로그인 점검 | "처음인데 셋업해줘", "axhub 업데이트해줘", "로그인해줘" |
 | `bootstrap` | 새 앱 생성 | "결제 앱 만들어줘", "프로젝트 초기화해줘", "Next.js 앱 만들어줘" |
 | `scaffold` | 템플릿 + 내 계정 저장소 | "내 계정에 레포 만들어서 새 앱 시작해줘" |
 | `plugins` | plugin App 게시·목록·다운로드·Codex 설치 | "플러그인 목록 보여줘", "1.2.0 내려 받아", "Codex에 설치해줘", "여러 스킬을 하나로 올려줘" |
@@ -102,13 +102,12 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 | `development` | 기존 앱에 실데이터 기능 코딩 | "내 connector 데이터로 대시보드 만들어줘", "유저 목록 페이지 만들어줘" |
 | `diagnosis` | 배포 실패 원인 진단 | "배포 실패 원인 진단해줘", "왜 배포가 죽었어" |
 | `clarity` | 공개 CLI 운영 브리지 | "환경변수 설정해줘", "로그 보여줘", "롤백해줘", "GitHub 계정 다시 연결해줘" |
-| `update` | CLI·플러그인 최신화 | "업데이트해줘", "axhub 최신 버전으로", "플러그인 업데이트해줘" |
 
 `clarity` 브리지는 정해진 명령 목록을 들고 있지 않아요. `axhub --help` 트리를 라이브로 탐색해 맞는 명령을 찾고 바로 실행해요 — CLI 가 새 명령을 추가해도 플러그인 수정 없이 따라가요. 단, 배포 실패 원인을 명시적으로 묻는 요청은 `diagnosis` 가 맡고 raw 로그 대신 여섯 가지 결과로 요약해요.
 
-axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 버전·최신 확인이 들어간 요청은 언제나 `update` 가 먼저 끝나요. 업데이트 뒤 같은 요청에 앱 현황 확인이 남아 있으면 존재하지 않는 `axhub app list` 단수 명령을 추측하지 않고 `axhub apps --help` 로 plural 표면을 확인한 뒤 정확히 `axhub apps list --json` 읽기 전용 명령으로 이어가요.
+axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 버전·최신 확인은 `setup` 이 맡아요.
 
-앱 생성·배포·온보딩은 저장소 단계보다 먼저 public CLI의 top-level `git_backend`를 확인해요. resume/existing은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh bootstrap/onboarding은 read-only `axhub apps git-backend --tenant <tenant> --json`의 회사 판정(`decision`)을 따라요 — 회사가 정한 곳이면 묻지 않고, GitHub를 연결한 사람에게만 저장 위치를 물어 preview·execute에 `--git-choice`로 넘겨요(판정이 없는 구 서버는 추천값을 본 뒤 GitHub/Axhub self-hosted를 직접 선택하고 `--git-backend`로 전달해요). selfhosted면 정적 사이트를 포함해 계정 연동·device flow·GitHub App 설치를 건너뛰고 clone→`git push` webhook 배포를 기다려요. 앱 저장소에 아직 안 붙은 로컬 소스는 `import`가 그 저장소에 올려요. `GitHub 없이`만 말해도 selfhosted 정상 배포를 쓰며, `up`은 repositoryless upload를 명시한 경우만 맡아요.
+앱 생성·배포는 저장소 단계보다 먼저 public CLI의 top-level `git_backend`를 확인해요. resume/existing은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh bootstrap/scaffold는 read-only `axhub apps git-backend --tenant <tenant> --json`의 회사 판정(`decision`)을 따라요 — 회사가 정한 곳이면 묻지 않고, GitHub를 연결한 사람에게만 저장 위치를 물어 preview·execute에 `--git-choice`로 넘겨요(판정이 없는 구 서버는 추천값을 본 뒤 GitHub/Axhub self-hosted를 직접 선택하고 `--git-backend`로 전달해요). selfhosted면 정적 사이트를 포함해 계정 연동·device flow·GitHub App 설치를 건너뛰고 clone→`git push` webhook 배포를 기다려요. 앱 저장소에 아직 안 붙은 로컬 소스는 `import`가 그 저장소에 올려요. `GitHub 없이`만 말해도 selfhosted 정상 배포를 쓰며, `up`은 repositoryless upload를 명시한 경우만 맡아요.
 
 카탈로그에 스킬이 안 보일 때(다른 플러그인·스킬이 많아 컨텍스트 예산이 넘치면 Codex 가 설명을 줄이거나 생략할 수 있어요)는 스킬 이름을 명시해 부르면 돼요 — 예: `$axhub-codex:deploy` 처럼 명시 멘션으로요. 또 등록해 둔 다른 marketplace 경로가 깨져 있으면 플러그인 목록 자체가 실패할 수 있어요 — `codex plugin marketplace list` 로 등록 상태를 정리해요.
 
@@ -116,7 +115,7 @@ axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 
 
 ## ✅ 대표 여정
 
-대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. `onboarding`에서 고른 GitHub/Axhub self-hosted 값을 같은 대화의 `bootstrap`이 재사용하고, `deploy`는 persisted backend에 맞는 lane을 실행한 뒤 exact deployment id를 verify해요. 이후 운영 작업은 `clarity`가 공개 CLI 표면에서 처리해요.
+대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. `setup`이 CLI·로그인을 준비하면 `bootstrap`이 GitHub/Axhub self-hosted 저장 위치를 정해 앱을 만들고, `deploy`는 persisted backend에 맞는 lane을 실행한 뒤 exact deployment id를 verify해요. 이후 운영 작업은 `clarity`가 공개 CLI 표면에서 처리해요.
 
 ---
 
@@ -130,7 +129,7 @@ axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 
 - 자체 인증·배포 로직을 재구현하지 않아요. CLI 를 **invoke** 하고 결과를 **분류·복구 안내**할 뿐이에요.
 - CLI 가 새 기능을 내면 자연어 트리거만 더하면 돼요 — `clarity` 브리지는 그것조차 자동이에요.
 
-세션 훅은 cheap bash 로만 좁게 들어가 있어요 — auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update`), Windows Git Bash 실행 계약 훅(끄기: `AXHUB_NO_WINDOWS_CONTRACT=1` 또는 `~/.axhub/config/no-windows-contract`), update-first 라우팅 가드와 실패 자동 리포트 계약을 합본으로 발행하는 상시 훅(각각 끄기: `AXHUB_NO_UPDATE_ROUTER=1`/`~/.axhub/config/no-update-router`, `AXHUB_NO_FEEDBACK_REPORT=1`/`~/.axhub/config/no-feedback-report`), 재시작 확인 훅이에요. auto-update 훅만 백그라운드(`async`)에서 `axhub update apply` 와 플러그인 갱신을 조용히 실행하고, 나머지 훅은 명령을 실행하거나 앱 목록을 조회하지 않고 라우팅·계약 문맥만 추가해요. 최신·버전 요청 경로에서 사용자에게 보이는 첫 문장은 `현재 버전을 확인할게요.` 예요.
+세션 훅은 cheap bash 로만 좁게 들어가 있어요 — auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update`), Windows Git Bash 실행 계약 훅(끄기: `AXHUB_NO_WINDOWS_CONTRACT=1` 또는 `~/.axhub/config/no-windows-contract`), 질문 프로토콜과 실패 자동 리포트 계약을 합본으로 발행하는 상시 훅(각각 끄기: `AXHUB_NO_QUESTION_PROTOCOL=1`/`~/.axhub/config/no-question-protocol`, `AXHUB_NO_FEEDBACK_REPORT=1`/`~/.axhub/config/no-feedback-report`), 재시작 확인 훅이에요. auto-update 훅만 백그라운드(`async`)에서 `axhub update apply` 와 플러그인 갱신을 조용히 실행하고, 나머지 훅은 명령을 실행하거나 앱 목록을 조회하지 않고 계약 문맥만 추가해요.
 
 ---
 

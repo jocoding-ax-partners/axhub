@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// bootstrap·scaffold·onboarding skill 이 ax-hub-cli 실제 계약과 어긋났던 지점(WP-I1)을
+// bootstrap·scaffold skill 이 ax-hub-cli 실제 계약과 어긋났던 지점(WP-I1)을
 // 문자열 계약으로 잠가요. 각 test 는 결함 ID 하나를 맡아요.
 
 const ROOT = join(import.meta.dir, "..");
@@ -10,14 +10,11 @@ const read = (path: string): string => readFileSync(join(ROOT, path), "utf8");
 
 const BOOTSTRAP = read("skills/bootstrap/SKILL.md");
 const SCAFFOLD = read("skills/scaffold/SKILL.md");
-const ONBOARDING = read("skills/onboarding/SKILL.md");
 const LOCAL = read("skills/bootstrap/references/bootstrap-and-local.md");
 const ERRORS = read("skills/bootstrap/references/errors-and-followups.md");
 const BLOCKED = read("skills/bootstrap/references/github-blocked-local-deploy.md");
 const RESUME = read("skills/bootstrap/references/resume-and-tenant.md");
 const PLACEHOLDERS = read("skills/scaffold/references/placeholders.md");
-const READY_CARD = read("skills/onboarding/references/ready-card.md");
-const INSTALL = read("skills/onboarding/references/install-channels-and-auth.md");
 
 const section = (doc: string, start: string, end: string): string => {
   const from = doc.indexOf(start);
@@ -27,7 +24,7 @@ const section = (doc: string, start: string, end: string): string => {
   return doc.slice(from, to);
 };
 
-describe("bootstrap/scaffold/onboarding skill-CLI drift", () => {
+describe("bootstrap/scaffold skill-CLI drift", () => {
   test("P2-39 scaffold placeholders follow the server: tenant slug, slug subdomain, AppHost origin", () => {
     const pick = section(SCAFFOLD, "### 3. 질문 한 번에", "### 4. 템플릿 내려받기");
     const substitution = section(SCAFFOLD, "### 5. placeholder 치환", "### 6. 커밋");
@@ -150,42 +147,6 @@ describe("bootstrap/scaffold/onboarding skill-CLI drift", () => {
     }
   });
 
-  test("P3-38 onboarding defines where <app> and <tenant> come from", () => {
-    const gate = section(ONBOARDING, "### 2. Git backend gate", "### 3. Repository provider surface");
-
-    expect(gate).toMatch(/app은 `axhub plugin-support resolve --json`의 `app_id`/);
-    expect(gate).toMatch(/`<tenant>`는 `axhub plugin-support tenant-resolve --json`의 `tenant`.*`needs_pick:true`.*고른 `candidates\[\]\.slug`/);
-    // CLI·auth gap 과 preflight 뒤, backend read 앞에서 출처를 정해요.
-    expect(gate.indexOf("axhub plugin-support preflight --json")).toBeLessThan(gate.indexOf("axhub plugin-support resolve --json"));
-    expect(gate.indexOf("axhub plugin-support resolve --json")).toBeLessThan(gate.indexOf("axhub apps get <app> --json"));
-  });
-
-  test("P3-39 the onboarding ready-card template prints no internal state tag", () => {
-    const card = section(READY_CARD, "## VIBE_READY Card", "## Degraded Cards");
-    const template = section(card, "```text", "\n```");
-
-    expect(template).toContain("axhub 온보딩 완료예요.\n");
-    expect(template).not.toContain("[VIBE_READY]");
-    expect(READY_CARD).not.toContain("[VIBE_READY]");
-    // 내부 상태 이름은 heading·규칙에 남아요.
-    expect(READY_CARD).toContain("VIBE_READY");
-  });
-
-  test("P3-40 onboarding auth reference matches the CLI auth contract", () => {
-    const authMissing = section(INSTALL, "## Auth Missing", "## Auth Unverified");
-
-    // 만료·미로그인은 subcode 없는 exit 4 `auth` 하나예요.
-    expect(authMissing).toContain("exit 4 with `error.code` `auth` and no subcode");
-    expect(authMissing).not.toContain("`code: token_expired`");
-    expect(authMissing).not.toContain("`code: not_logged_in`");
-    // pending 이벤트 이름은 `device_code_pending` 이고, `device_flow_pending` 은 종료 subcode 예요.
-    expect(authMissing).toContain("- `device_code_pending` event (the run then exits with subcode `device_flow_pending`)");
-    expect(authMissing).not.toContain("- `device_flow_pending`:");
-    // AGENTS.md 의 최소 표면과 같아요.
-    expect(INSTALL).toContain("This plugin needs ax-hub-cli v0.21.3+");
-    expect(INSTALL).not.toContain("v0.20.0+");
-  });
-
   test("P3-41 bootstrap references agree with SKILL.md on clone, watch flags, and step numbers", () => {
     // clone: SKILL.md 10단계 one-liner 처럼 main 을 직접 fetch 하고 FETCH_HEAD 로 맞춰요.
     expect(BOOTSTRAP).toContain("fetch origin main --quiet --depth=1");
@@ -211,23 +172,21 @@ describe("bootstrap/scaffold/onboarding skill-CLI drift", () => {
     }
   });
 
-  test("P3-44 bootstrap and scaffold reuse the backend onboarding remembered", () => {
+  test("P3-44 bootstrap and scaffold reuse a remembered backend", () => {
     const backendGate = section(BOOTSTRAP, "### 6. Git Backend Gate", "### 7. Availability Check");
 
     // spec 706: `remembered` 는 서버 판정(`decision`)이 없는 구 서버에서만 쓰여요.
     expect(BOOTSTRAP).toContain("6. Git backend: persisted 선택을 재사용하거나 서버 `decision` 을 따라요(구 서버는 persisted·`remembered` 선택을 재사용");
     expect(backendGate).toContain("`git_backend.source`·`remembered`만 읽어요");
-    expect(backendGate).toContain("다음은 `remembered`(onboarding 이 `--remember` 로 남긴 값)");
-    expect(backendGate.indexOf("`remembered`(onboarding")).toBeLessThan(backendGate.indexOf("이 앱의 코드 저장 위치를 선택해 주세요."));
+    expect(backendGate).toContain("다음은 `remembered`(이전에 `--remember` 로 남긴 값)");
+    expect(backendGate.indexOf("`remembered`(이전에")).toBeLessThan(backendGate.indexOf("이 앱의 코드 저장 위치를 선택해 주세요."));
 
     const storage = section(SCAFFOLD, "### 1.5 코드 저장 위치", "### 2. GitHub 계정 연동 확인");
-    expect(storage).toContain("없으면 응답의 `remembered`(onboarding 이 기억한 값)가 `SELECTED_GIT_BACKEND` 예요");
+    expect(storage).toContain("없으면 응답의 `remembered`(이전에 기억한 값)가 `SELECTED_GIT_BACKEND` 예요");
     // 1.5단계에서는 앱 이름을 아직 정하지 않았어요.
     expect(storage).toContain("`bootstrap` 에 선택값·작업공간만 넘겨요");
     expect(storage).toContain("앱 이름은 아직 안 정했으니 bootstrap 이 묻고");
     expect(storage).not.toContain("정한 템플릿·앱 이름을 넘겨요");
-
-    expect(ONBOARDING).toMatch(/--remember <SELECTED_GIT_BACKEND> --json`.*다음 세션 import·bootstrap·scaffold.*기억/);
   });
 
   test("P1-13 bootstrap verify --wait fits the host tool timeout and ends interruptions with a resume summary", () => {

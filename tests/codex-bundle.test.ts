@@ -7,7 +7,7 @@ import { CODEX_SUBSTITUTIONS } from "../scripts/build-plugin-bundle";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const SKILLS = [
-  "onboarding",
+  "setup",
   "bootstrap",
   "scaffold",
   "plugins",
@@ -17,7 +17,6 @@ const SKILLS = [
   "development",
   "diagnosis",
   "clarity",
-  "update",
 ] as const;
 
 // R8 — codex 번들 전 텍스트 파일에서 Claude-호스트 문자열 0건이 계약이에요
@@ -130,10 +129,8 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       }
     }
     expect(hooksRaw).toContain("session-always-on-codex.sh");
-    expect(hooksRaw).not.toContain("session-update-router-guard.sh");
     expect(hooksRaw).not.toContain("session-feedback-contract.sh");
     expect(existsSync(join(outDir, "hooks", "session-always-on-codex.sh"))).toBe(true);
-    expect(existsSync(join(outDir, "hooks", "session-update-router-guard.sh"))).toBe(false);
     expect(existsSync(join(outDir, "hooks", "session-feedback-contract.sh"))).toBe(false);
   });
 
@@ -145,74 +142,30 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     const env = { ...process.env, HOME: tempRoot };
     const bothKilled = Bun.spawnSync({
       cmd: ["bash", script],
-      env: {
-        ...env,
-        AXHUB_NO_UPDATE_ROUTER: "1",
-        AXHUB_NO_QUESTION_PROTOCOL: "1",
-        AXHUB_NO_FEEDBACK_REPORT: "1",
-      },
-      stdout: "pipe",
-    });
-    expect(bothKilled.stdout.toString()).toBe("");
-
-    const routerOnly = Bun.spawnSync({
-      cmd: ["bash", script],
       env: { ...env, AXHUB_NO_QUESTION_PROTOCOL: "1", AXHUB_NO_FEEDBACK_REPORT: "1" },
       stdout: "pipe",
     });
-    const routerPayload = JSON.parse(routerOnly.stdout.toString()) as {
-      continue: boolean;
-      suppressOutput: boolean;
-      hookSpecificOutput: { hookEventName: string; additionalContext: string };
-    };
-    expect(routerPayload.continue).toBe(true);
-    expect(routerPayload.suppressOutput).toBe(true);
-    expect(routerPayload.hookSpecificOutput.hookEventName).toBe("SessionStart");
-    expect(routerPayload.hookSpecificOutput.additionalContext).toContain("update-first routing guard");
-    expect(routerPayload.hookSpecificOutput.additionalContext).toContain("codex plugin list");
+    expect(bothKilled.stdout.toString()).toBe("");
 
     // U5/KTD6: 질문 프로토콜은 기본 on 이고, 훅이 꺼진 세션에서도 skill 본문·정책이
     // 같은 fail-closed 규칙을 들고 있어요 (3채널 중복 소유).
     const questionOnly = Bun.spawnSync({
       cmd: ["bash", script],
-      env: { ...env, AXHUB_NO_UPDATE_ROUTER: "1", AXHUB_NO_FEEDBACK_REPORT: "1" },
+      env: { ...env, AXHUB_NO_FEEDBACK_REPORT: "1" },
       stdout: "pipe",
     });
     const questionPayload = JSON.parse(questionOnly.stdout.toString()) as {
-      hookSpecificOutput: { additionalContext: string };
+      continue: boolean;
+      suppressOutput: boolean;
+      hookSpecificOutput: { hookEventName: string; additionalContext: string };
     };
+    expect(questionPayload.continue).toBe(true);
+    expect(questionPayload.suppressOutput).toBe(true);
+    expect(questionPayload.hookSpecificOutput.hookEventName).toBe("SessionStart");
     expect(questionPayload.hookSpecificOutput.additionalContext).toContain(
       "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
     );
-    expect(questionPayload.hookSpecificOutput.additionalContext).not.toContain(
-      "update-first routing guard",
-    );
-  });
-
-  test("update-router.sh keeps the gate pipeline and emits the codex context", () => {
-    const script = join(outDir, "hooks", "update-router.sh");
-    const source = readFileSync(script, "utf8");
-    expect(source).toContain("AXHUB_NO_UPDATE_ROUTER");
-    expect(source).toContain('*\\"prompt\\":*');
-
-    const run = (stdin: string, env: Record<string, string | undefined> = {}) =>
-      Bun.spawnSync({
-        cmd: ["bash", script],
-        env: { ...process.env, HOME: tempRoot, ...env },
-        stdin: Buffer.from(stdin),
-        stdout: "pipe",
-      }).stdout.toString();
-
-    // fail-closed: prompt 키 부재 → 침묵.
-    expect(run('{"cwd":"/tmp/axhub-project 업데이트"}')).toBe("");
-    const fired = run('{"prompt":"axhub 최신 버전으로 업데이트해줘"}');
-    const payload = JSON.parse(fired) as {
-      hookSpecificOutput: { hookEventName: string; additionalContext: string };
-    };
-    expect(payload.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
-    expect(payload.hookSpecificOutput.additionalContext).toContain("[axhub update router]");
-    expect(payload.hookSpecificOutput.additionalContext).toContain("codex plugin list");
-    expect(payload.hookSpecificOutput.additionalContext).not.toContain("claude plugin list");
+    expect(questionPayload.hookSpecificOutput.additionalContext).not.toContain("AP-19");
   });
 
   test("state markers are host-suffixed (KTD5)", () => {
@@ -253,22 +206,7 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     }
   });
 
-  test("update lane override owns the codex apply flow (R4)", () => {
-    const skill = readFileSync(join(outDir, "skills", "update", "SKILL.md"), "utf8");
-    expect(skill).toContain("axhub update check --plugin-version");
-    expect(skill).toContain("codex plugin list --json");
-    expect(skill).toContain("현재 버전을 확인할게요.");
-    expect(skill).toContain("받았어요. Codex 를 재시작하면 새 버전이 적용돼요.");
-    expect(skill).not.toContain("--scope");
-
-    const reference = readFileSync(
-      join(outDir, "skills", "update", "references", "plugin-update.md"),
-      "utf8",
-    );
-    expect(reference).toContain("codex plugin marketplace upgrade axhub");
-    expect(reference).toContain("codex plugin add axhub-codex@axhub");
-    expect(reference).toContain("marketplaceSource.sourceType");
-
+  test("auto-update worker owns the codex plugin update commands (AP-26)", () => {
     // AP-26: 에이전트 프롬프트 md 는 없고, async worker 가 codex 명령 블록을 소유해요.
     expect(existsSync(join(outDir, "hooks", "auto-update-prompt.md"))).toBe(false);
     expect(existsSync(join(outDir, "hooks", "plugin-restart-confirm-prompt.md"))).toBe(false);
@@ -368,7 +306,6 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       "자동 배포되는 GitHub push보다 env·수정 커밋이 먼저예요.",
       "어디에 배포할까요?",
     ],
-    onboarding: ["axhub apps get <app> --json", "axhub apps git-backend --tenant <tenant> --json", "git_backend.backend=selfhosted", "첫 앱의 코드 저장 위치를 선택해 주세요.", "SELECTED_GIT_BACKEND", "provider 선택이 명시되지 않았으면"],
     import: ["인터넷 주소를 만들까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "어떤 방식으로 배포할까요?"],
     scaffold: [
       "명시 텍스트 승인 1회",
@@ -381,7 +318,6 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     ],
     plugins: ["artifact를 배포할 권리가 있음을 확인하고", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "--idempotency-key", "--execute"],
     up: ["승인 카드를 띄우지 않아요", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "아무것도 바꾸지 않고 멈춰요", "`GitHub 없이`만으로 repositoryless upload를 확정하지 않아요", "selfhosted app의 정상 배포는", "--execute", "axhub deploy verify"],
-    update: ["update apply --execute"],
   };
 
   test("approval and backend gates sit inside the codex 8,000B truncation window (R2)", () => {

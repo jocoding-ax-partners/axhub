@@ -11,7 +11,7 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 비어 있지 않은 로컬 앱을 axhub 앱으로 가져와 앱 설정, GitHub 연결, 첫 배포 증거까지 한 번에 정리해요. 변경 판정·실행은 CLI 가 하고, 스킬은 `axhub plugin-support import` 의 `import/v1` envelope 를 검증해 미리보기·복구 문구를 보여줘요. 예외는 새 앱 설정 파일이 필요할 때 axhub.yaml 을 프로젝트 파일 근거로 작성하고 `axhub deploy --explain --json` 으로 같은 파서가 읽는지 검증하는 보강 단계 하나예요.
 

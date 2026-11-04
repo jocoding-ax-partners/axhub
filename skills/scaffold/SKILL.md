@@ -18,7 +18,7 @@ model: sonnet
 
 > **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
 
-> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 onboarding 을 안내해요.
+> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 bootstrap 과의 차이는 하나예요: bootstrap 은 axhub 이 저장소를 만들고(org 에서 주인 권한이 안 붙을 수 있어요), 이 스킬은 **사용자 연동 계정으로 사용자의 계정/조직에** 만들어요. 저장소 생성만 CLI(`axhub github repo create`, v0.30.0+)가 하고 clone·커밋은 git, 앱 생성·연결·배포는 `import` 예요 — push 뒤 이어갈지 한 번 물어본 뒤에만 넘겨요.
 
@@ -28,7 +28,7 @@ bootstrap 과의 차이는 하나예요: bootstrap 은 axhub 이 저장소를 �
 
 ### 1. CLI·로그인 확인
 
-`axhub --version` 으로 CLI 존재 확인(AP-17). `axhub github repo --help` 가 unknown command 면 v0.30.0 미만이에요 — `update` 스킬로 보내고 멈춰요(다른 명령으로 대체하지 않아요). 로그인은 `axhub auth status --json` — 미로그인(exit 4)이면 `axhub auth login` 안내 후 이어가요. 이어서 `axhub plugin-support preflight --json` 의 `capabilities.self_hosted_git.apps_git_backend`·`capabilities.self_hosted_git.git_policy_decision` 이 `true` 여야 해요 — 누락·malformed/false 면 GitHub 질문 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
+`axhub --version` 으로 CLI 존재 확인(AP-17). `axhub github repo --help` 가 unknown command 면 v0.30.0 미만이에요 — `setup` 스킬로 보내고 멈춰요(다른 명령으로 대체하지 않아요). 로그인은 `axhub auth status --json` — 미로그인(exit 4)이면 `axhub auth login` 안내 후 이어가요. 이어서 `axhub plugin-support preflight --json` 의 `capabilities.self_hosted_git.apps_git_backend`·`capabilities.self_hosted_git.git_policy_decision` 이 `true` 여야 해요 — 누락·malformed/false 면 GitHub 질문 없이 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요.
 
 ### 1.5 코드 저장 위치 (GitHub 명령 전 필수)
 
@@ -45,7 +45,7 @@ top-level `git_backend.backend` 는 추천값이에요. 실패·malformed 면 Gi
 - `github_personal` 이 없어도 `next_action=link_github` 이거나 `github_linked=false`·`git_backend.mode≠selfhosted_only` 면 bootstrap 9단계 AP-18 fast path 로 연결한 뒤 위 조회를 다시 해요(둘 다 쓰는 회사는 연결한 사람에게만 GitHub 를 줘요).
 - 그래도 `github_personal` 이 없으면(무조건 Axhub 저장소 회사) GitHub 명령 없이 `이 회사는 새 앱 코드를 내 GitHub 저장소에 둘 수 없어요.` 라고 알리고 멈춰요. `selfhosted` 가 있으면 `Axhub 저장소로 만들려면 말해 주세요.` 를 덧붙여요.
 
-- 발화·같은 대화에 `GitHub`/`깃허브` 나 `self-hosted`/`셀프호스팅` 이 있으면 그 값이, 없으면 응답의 `remembered`(onboarding 이 기억한 값)가 `SELECTED_GIT_BACKEND` 예요. `내 계정`·`org`·`회사 저장소` 는 provider 명시가 아니에요.
+- 발화·같은 대화에 `GitHub`/`깃허브` 나 `self-hosted`/`셀프호스팅` 이 있으면 그 값이, 없으면 응답의 `remembered`(이전에 기억한 값)가 `SELECTED_GIT_BACKEND` 예요. `내 계정`·`org`·`회사 저장소` 는 provider 명시가 아니에요.
 - 그래도 없거나 둘 다 명시면 native Question/AskUserQuestion card 로 `코드 저장 위치를 먼저 선택해 주세요.` 라고 묻고 `내 GitHub 계정/조직`·`Axhub self-hosted` 를 보여줘요(추천값에 `(추천)`, 반대 선택 허용). provider 선택이 명시되지 않은 headless 는 GitHub 명령 전에 두 선택지와 재개 문장만 보여주고 멈춰요.
 - `SELECTED_GIT_BACKEND=selfhosted` 면 2단계 이후를 실행하지 않고 `저장소는 axhub에서 준비할게요.` 한 줄 뒤 `bootstrap` 에 선택값·작업공간만 넘겨요 — 앱 이름은 아직 안 정했으니 bootstrap 이 묻고, backend 는 묻지 않고 `--git-backend selfhosted` 로 만들어요. GitHub 계정·device flow·App 설치 대사는 0회예요. github 일 때만 2단계로 가요.
 
