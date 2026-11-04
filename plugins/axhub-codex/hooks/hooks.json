@@ -6,7 +6,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/update-router.sh\"",
-            "commandWindows": "where bash >nul 2>nul && bash \"${CLAUDE_PLUGIN_ROOT}/hooks/update-router.sh\" || cd ."
+            "commandWindows": "exit 0"
           }
         ]
       }
@@ -18,22 +18,22 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-auto-update.sh\"",
             "async": true,
-            "commandWindows": "where bash >nul 2>nul && bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-auto-update.sh\" || cd ."
+            "commandWindows": "exit 0"
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-windows-contract.sh\"",
-            "commandWindows": "where bash >nul 2>nul && bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-windows-contract.sh\" || cd ."
+            "commandWindows": "exit 0"
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-always-on-codex.sh\"",
-            "commandWindows": "where bash >nul 2>nul && bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-always-on-codex.sh\" || cd ."
+            "commandWindows": "exit 0"
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-restart-confirm.sh\"",
-            "commandWindows": "where bash >nul 2>nul && bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-restart-confirm.sh\" || cd ."
+            "commandWindows": "exit 0"
           }
         ]
       }
