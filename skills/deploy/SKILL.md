@@ -14,8 +14,6 @@ model: sonnet
 
 # Deploy via axhub
 
-> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
-
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 Redeploy an already-connected axhub app: fix what blocks it, deploy without an approval card, and verify. First-connect/import and new-app/bootstrap flows do not run here.
@@ -146,7 +144,7 @@ Deployment-record apps branch on the already-read `git_backend.backend` before r
 
 This lane starts only when the preceding `axhub apps get <app> --json` reports `git_backend.backend=selfhosted`, static included. `tenant_default` and `app_override` use the same behavior. Never enter the upload/create fallback or `apps static deploy`, call a GitHub command, or call Gitea API from this lane.
 
-이 lane은 `capabilities.self_hosted_git.git_setup_rotate`가 `true`여야 하고 static이면 `capabilities.import.selfhosted_static`도요. 아니면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요(upload 대체 금지). 폴더가 이미 clone이어도 push 전마다 아래 setup을 실행해요 — unless it already succeeded earlier in this session (push reuses the stored credential). In an agent sandbox (Codex) run setup escalated from the start. `local.write_denied`/`Operation not permitted` (clone too) is no AP-19 report: sandboxed → rerun once escalated; else (hint `check that you own`) ask the user to fix that path's owner.
+이 lane은 `capabilities.self_hosted_git.git_setup_rotate`가 `true`여야 하고 static이면 `capabilities.import.selfhosted_static`도요. 아니면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`라고 안내하고 멈춰요(upload 대체 금지). 폴더가 이미 clone이어도 push 전마다 아래 setup을 실행해요 — unless it already succeeded earlier in this session (push reuses the stored credential). In an agent sandbox (Codex) run setup escalated from the start. `local.write_denied`/`Operation not permitted` (clone too): sandboxed → rerun once escalated; else (hint `check that you own`) ask the user to fix that path's owner.
 
 ```bash
 axhub --tenant <tenant> git setup --json

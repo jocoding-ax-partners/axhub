@@ -8,7 +8,7 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 - axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 그 도구를 우선 사용하지 않아요. 로그·환경변수·롤백·GitHub 재연결 같은 후속 운영 작업도 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요.
 - 앱 생성·배포의 저장소 단계는 public CLI의 top-level `git_backend`를 먼저 확인해요. 기존 app은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh bootstrap/scaffold는 `axhub apps git-backend --tenant <tenant> --json`의 회사 판정(`decision`)을 따라요 — 회사가 정한 곳이면 묻지 않고, 둘 다 쓰는 회사에서 GitHub를 연결한 사람에게만 저장 위치를 물어요. 판정이 없는 구 서버에서는 추천값으로만 읽은 뒤 GitHub와 Axhub self-hosted 중 사용자가 직접 고르게 해요. 같은 대화의 선택은 bootstrap에 전달하고, 선택 없는 headless에서는 저장소 mutation 전에 멈춰요. selfhosted는 정적 사이트를 포함해 외부 저장소 계정 인증·device flow·GitHub App 설치 없이 `git push` lane을 쓰고(앱 저장소에 안 붙은 로컬 소스는 `import`가 올려요), GitHub는 정적 사이트 업로드를 포함해 각 기존 lane을 유지해요.
 - 세션 시작 때 도는 auto-update 훅은 24시간에 1회만 뒤에서(백그라운드) `axhub update check` 명령으로 새 버전이 있는지 확인하고, 있으면 묻지 않고 `axhub update apply` 와 `codex plugin marketplace upgrade axhub`(로컬 marketplace 는 `codex plugin add axhub-codex`)로 조용히 설치해요. 실제 인터넷 연결은 axhub CLI 와 Codex 의 플러그인 명령이 해요. 세션 시작을 기다리게 하지 않아요.
-- Codex 는 플러그인 훅을 사용자가 신뢰하기 전에는 실행하지 않아요. 신뢰하지 않으면 위 훅 표면(자동 업데이트 확인·재시작 확인·Windows 계약 안내·질문 프로토콜과 실패 리포트 계약)은 조용히 꺼지고, 스킬은 훅 없이도 완결돼요 — CLI 업데이트는 `setup` 스킬을 직접 부르면 돼요.
+- Codex 는 플러그인 훅을 사용자가 신뢰하기 전에는 실행하지 않아요. 신뢰하지 않으면 위 훅 표면(자동 업데이트 확인·재시작 확인)은 조용히 꺼지고, 스킬은 훅 없이도 완결돼요 — CLI 업데이트는 `setup` 스킬을 직접 부르면 돼요.
 - `plugin list`와 exact `plugin download`는 현재 로그인 OAuth 또는 active broad PAT로 App-backed marketplace를 읽어요. 목록은 `plugin.current_servable_version` summary를 페이지 단위로 읽고 download 결과에서 `version_id`를 만들거나 보고하지 않아요. Download는 요청한 새 ZIP만 만들고 기존 파일을 덮어쓰거나 받은 code를 실행하지 않아요.
 - download 요청과 install 요청을 구분해요. `plugin install --host codex`는 offline preview 뒤 명시한 `--execute --yes`에서만 bounded ZIP metadata·실제 압축 해제 크기·identity를 검증하고 App/host lock과 crash recovery를 적용한 뒤 `~/.axhub/plugins/` 아래 private local marketplace를 Codex 공식 plugin CLI로 user scope 설치해요. 모든 `AXHUB_*` 환경은 Codex process에 전달하지 않아요.
 - `up` 스킬은 사용자가 `저장소 없이`·`레포 없이`·`지금 폴더 그대로 업로드`를 명시했을 때만 현재 폴더를 올려요. `GitHub 없이`만 말한 selfhosted app은 정상 clone→push 배포를 써요. `up`은 커밋을 만들거나 push 하지 않고 연결된 저장소도 건드리지 않으며, `.gitignore`를 존중하고 `.git/`·`node_modules/`·`.env` 계열을 빼요. 이미 AXHub 에 있는 앱이라 파일 수·크기·소스 버전을 보여 주고 묻지 않고 올려요.
@@ -32,10 +32,9 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 ## AI 활용 기록 — Codex 판은 제공하지 않아요
 - Codex 판 플러그인은 워크스페이스 AI 활용 기록(프롬프트·응답 수집 기능)의 수집 설정을 묻거나 만들거나 바꾸지 않아요.
 
-## 실패 자동 리포트 — CLI 문제는 조용히 개발팀에 전달돼요
-- axhub CLI 가 설계된 동작 밖으로 실패하면(비정상 종료, 깨진 출력 같은 CLI 자체의 문제) 에이전트가 `axhub feedback -m <실패 요약>` 명령으로 개발팀의 비공개 이슈함에 문제를 알려요. 요약은 첫 줄에 무엇이 어떻게 실패했는지 한 문장, 아래에 실행한 명령·기대·실제 결과·맥락·재현 여부를 적은 것이고, CLI 는 실패한 명령의 경로·플래그 이름·종료 코드·오류 분류·오류 메시지 한 줄을 함께 붙여요 — 인자 값·토큰·환경 내용은 붙이지 않아요. 작업 흐름을 멈추지 않고, 전송 성공 여부를 따로 묻거나 알리지 않아요.
-- 자동으로 붙는 진단은 실행한 명령 이름·플래그 이름·종료 코드·CLI 버전 같은 최소 정보뿐이에요 — 입력한 값·파일 내용·인증 정보는 수집하지 않아요. 예상된 거절은 리포트하지 않아요 — 로그인 필요, 사용법 오류, 확인 절차 거절처럼 CLI 가 설계대로 막은 경우는 보내지 않아요.
-- 끄기: `AXHUB_NO_FEEDBACK_REPORT=1` 환경변수 또는 `~/.axhub/config/no-feedback-report` 파일을 만들어요.
+## CLI 문제 리포트 — 정해진 단계에서만 보내요
+- 세션마다 CLI 실패를 자동으로 리포트하지 않아요. 스킬이 정해 둔 일부 단계(예: 저장소 자격 증명 오류가 안내대로 다시 해도 반복될 때)에서만 에이전트가 `axhub feedback -m <실패 요약>` 명령으로 개발팀의 비공개 이슈함에 문제를 알려요.
+- 함께 붙는 진단은 실행한 명령 이름·플래그 이름·종료 코드·오류 분류·오류 메시지 한 줄 같은 최소 정보뿐이에요 — 입력한 값·파일 내용·인증 정보는 수집하지 않아요.
 
 ## 파괴적 작업 승인 — 되돌리기 어려운 일은 먼저 물어봐요
 - 삭제, 롤백(이전 버전으로 되돌리기), `--force`/`--execute` 같은 강제 실행 옵션이 붙는 변경은 항상 사용자에게 먼저 보여주고 **명시 텍스트 승인**(안내된 승인 문구를 사용자가 그대로 입력)을 받은 뒤에만 실행해요.

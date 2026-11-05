@@ -79,7 +79,7 @@ codex plugin marketplace add https://github.com/jocoding-ax-partners/axhub
 codex plugin add axhub-codex@axhub
 ```
 
-- **훅 신뢰를 한 번 확인해요** — 설치 후 첫 대화형 세션에서 Codex 가 플러그인 훅(세션 시작 4개)의 신뢰 여부를 물어요. 신뢰하지 않으면 자동 업데이트 확인·재시작 확인·Windows 계약 안내·질문 프로토콜과 실패 자동 리포트 계약 4개 표면이 조용히 꺼져요 — 스킬 자체는 훅 없이도 완결되고, CLI 업데이트는 "axhub 업데이트해줘" 한마디로 `setup` 스킬이 처리해요.
+- **훅 신뢰를 한 번 확인해요** — 설치 후 첫 대화형 세션에서 Codex 가 플러그인 훅(세션 시작 2개)의 신뢰 여부를 물어요. 신뢰하지 않으면 자동 업데이트 확인·재시작 확인 2개 표면이 조용히 꺼져요 — 스킬 자체는 훅 없이도 완결되고, CLI 업데이트는 "axhub 업데이트해줘" 한마디로 `setup` 스킬이 처리해요.
 - Codex 가 신뢰하는 대상은 **훅 command(스크립트 경로)** 예요. wrapper 스크립트 내용은 플러그인 업데이트로 재신뢰 프롬프트 없이 갱신돼요 — wrapper 로직 변경은 CHANGELOG 에 명시해요.
 - 플러그인 업데이트는 설치돼도 **Codex 를 재시작해야 반영**돼요.
 - `codex exec` 자동화의 `--dangerously-bypass-hook-trust` 는 세션 전체 플러그인의 훅 신뢰 검토를 우회하는 전역 플래그라 권장하지 않아요 — axhub 의 headless 사용은 훅 없이 완결되고 파괴 작업은 preview 까지만 진행돼요.
@@ -178,7 +178,7 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요.
 - 자체 인증·배포 로직을 재구현하지 않아요. CLI 를 **invoke** 하고 결과를 **분류·복구 안내**할 뿐이에요.
 - CLI 가 새 기능을 내면 자연어 트리거만 더하면 돼요 — `clarity` 브리지는 그것조차 자동이에요.
 
-이전에는 플러그인이 Rust helper 바이너리·hook·NL 라우팅 코퍼스를 동봉했지만, v1 다이어트에서 전부 제거하고 `ax-hub-cli` 직접 호출로 전환했어요. 흡수된 helper 표면은 CLI 의 hidden `axhub plugin-support <cmd>` 그룹으로 옮겼어요. 이후 cheap bash 훅만 아주 좁게 다시 들어왔어요 — 세션 시작 때 백그라운드(`async`)에서 CLI·플러그인 업데이트를 묻지 않고 확인·설치하는 auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update`), 플러그인 업데이트 뒤 적용을 확인하는 재시작 확인 훅, Windows Git Bash 실행 계약 훅(끄기: `AXHUB_NO_WINDOWS_CONTRACT=1` 또는 `~/.axhub/config/no-windows-contract`), 예상 밖 CLI 실패 자동 리포트 계약 훅(끄기: `AXHUB_NO_FEEDBACK_REPORT=1` 또는 `~/.axhub/config/no-feedback-report`)이에요.
+이전에는 플러그인이 Rust helper 바이너리·hook·NL 라우팅 코퍼스를 동봉했지만, v1 다이어트에서 전부 제거하고 `ax-hub-cli` 직접 호출로 전환했어요. 흡수된 helper 표면은 CLI 의 hidden `axhub plugin-support <cmd>` 그룹으로 옮겼어요. 이후 cheap bash 훅만 아주 좁게 다시 들어왔어요 — 세션 시작 때 백그라운드(`async`)에서 CLI·플러그인 업데이트를 묻지 않고 확인·설치하는 auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update`), 플러그인 업데이트 뒤 적용을 확인하는 재시작 확인 훅(같은 끄기 스위치를 써요) 두 개예요.
 
 ---
 

@@ -9,8 +9,6 @@ model: sonnet
 
 # Import Existing App
 
-> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
-
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 비어 있지 않은 로컬 앱을 axhub 앱으로 가져와 앱 설정, GitHub 연결, 첫 배포 증거까지 한 번에 정리해요. 변경 판정·실행은 CLI 가 하고, 스킬은 `axhub plugin-support import` 의 `import/v1` envelope 를 검증해 미리보기·복구 문구를 보여줘요. 예외는 새 앱 설정 파일이 필요할 때 axhub.yaml 을 프로젝트 파일 근거로 작성하고 `axhub deploy --explain --json` 으로 같은 파서가 읽는지 검증하는 보강 단계 하나예요.
@@ -255,7 +253,7 @@ preview `deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create
 
 8. Execute 호출
 
-대화형 승인 직후 한 번만 호출해요. Self-hosted(`selfhosted_repo_push`) execute writes git credentials under `$HOME`: in an agent sandbox run it escalated from the start; `local.write_denied` is no AP-19 report — follow `recovery_action`. preflight 의 `capabilities.import.early_return` 과 `capabilities.import.verify_wait` 가 모두 true 일 때만 execute 에 `--verify-wait none` 을 붙여요 — execute 는 첫 배포 생성과 deployment id 확보까지만 반환하고, 이어서 **권한 카드 한 번으로 끝나는** `axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 9m --json` 를 명령 도구 timeout 600000ms 로 정확히 한 번 호출해요. 이 한 호출의 내부 폴링 예산은 최대 30회 또는 10분(AP-16)이고, `--wait` 가 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `axhub apps get`, `deploy list`, `deploy status` 같은 사후 확인을 덧붙이지 않아요(9 의 static 주소 1회만 예외). 둘 중 capability 하나라도 없으면 `--verify-wait none` 을 빼서 execute 가 동기 검증을 끝내게 하고, 반환된 정확한 deployment id 로 일반 `axhub deploy verify <deployment-id> --app <app> --json` 를 최종 증거용으로 정확히 한 번만 호출해요.
+대화형 승인 직후 한 번만 호출해요. Self-hosted(`selfhosted_repo_push`) execute writes git credentials under `$HOME`: in an agent sandbox run it escalated from the start; `local.write_denied` → follow `recovery_action`. preflight 의 `capabilities.import.early_return` 과 `capabilities.import.verify_wait` 가 모두 true 일 때만 execute 에 `--verify-wait none` 을 붙여요 — execute 는 첫 배포 생성과 deployment id 확보까지만 반환하고, 이어서 **권한 카드 한 번으로 끝나는** `axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 9m --json` 를 명령 도구 timeout 600000ms 로 정확히 한 번 호출해요. 이 한 호출의 내부 폴링 예산은 최대 30회 또는 10분(AP-16)이고, `--wait` 가 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `axhub apps get`, `deploy list`, `deploy status` 같은 사후 확인을 덧붙이지 않아요(9 의 static 주소 1회만 예외). 둘 중 capability 하나라도 없으면 `--verify-wait none` 을 빼서 execute 가 동기 검증을 끝내게 하고, 반환된 정확한 deployment id 로 일반 `axhub deploy verify <deployment-id> --app <app> --json` 를 최종 증거용으로 정확히 한 번만 호출해요.
 
 Codex 에서는 background task, output 파일 읽기, `for`/`while`/`until`, `sleep`, command substitution, pipe, `grep`, `head`, `status=` 같은 shell 폴링을 쓰지 않아요. 첫 verify 가 exit 6·10 이거나 도구 timeout 으로 끊기면 성공이라고 말하지 않고, 같은 명령을 자동 재실행하거나 새 승인 카드를 띄우지 않은 채 재개 요약과 같은 verify 명령 한 줄만 남겨요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못해도 execute 를 다시 실행하지 않아요.
 
@@ -302,7 +300,7 @@ axhub --json plugin-support import --mode execute --approved --commit-manifest
 | `git` | Git/GitHub 연결이 준비되지 않았어요. recovery_action 을 따라요 — GitHub 인증 승인이 필요하다는 안내면 `axhub github link` 연동(승인 후 재실행하면 이어져요, 코드를 놓쳤거나 만료됐으면 `--fresh`)이 먼저고, 그 외에는 커밋·원격 연결·repo owner 를 확인해요. `subcode=local.write_denied` 면 recovery_action 만 따르고 리포트하지 않아요. |
 | `repo` | GitHub 저장소 연결을 확인해야 해요. 권한이나 원격 저장소를 다시 볼게요. |
 | `app` | axhub 앱 생성 또는 선택에서 막혔어요. 앱 이름과 소유 권한을 확인해요. `code=app.subdomain_not_configured` 면 주소 없는 앱이에요 — 첫 운영 배포 뒤에는 바꿀 수 없으니 주소를 확인받고 승인 뒤 `axhub apps update <slug> --subdomain <주소> --tenant <t>` 로 정한 다음 같은 import 를 다시 실행해요(push 했다면 `axhub deploy list --app <slug> --tenant <t>` 로 자동 배포부터 봐요). |
-| `static` | 정적 앱 처리에서 막혔어요. `code=static.package_manager_missing`·`static.package_manager_spawn_failed` 면 패키지 매니저 문제예요 — recovery_action 의 설치는 사용자 동의를 받은 뒤에 하고(headless 는 안내만 하고 멈춰요) 같은 옵션으로 다시 실행해요. 빌드 스크립트는 고치지 않아요(AP-19 리포트 대상이 아니에요). 그 밖의 retryable=false 면 빌드 스크립트나 산출물 경로를 고친 뒤에만 다시 시도해요 — 재시도만으로는 결과가 안 바뀌어요. 그 외에는 공개 URL과 활성 릴리스를 확인해요. |
+| `static` | 정적 앱 처리에서 막혔어요. `code=static.package_manager_missing`·`static.package_manager_spawn_failed` 면 패키지 매니저 문제예요 — recovery_action 의 설치는 사용자 동의를 받은 뒤에 하고(headless 는 안내만 하고 멈춰요) 같은 옵션으로 다시 실행해요. 빌드 스크립트는 고치지 않아요. 그 밖의 retryable=false 면 빌드 스크립트나 산출물 경로를 고친 뒤에만 다시 시도해요 — 재시도만으로는 결과가 안 바뀌어요. 그 외에는 공개 URL과 활성 릴리스를 확인해요. |
 | `deploy` | 첫 배포 확인에서 막혔어요. recovery_action·verify `failure_hint` 가 주소 충돌이면 같은 import 를 다시 하지 않고 그 안내를 승인 뒤 따라요(`apps update` 엔 `--tenant <t>`, 새 앱은 다른 `--slug`) — 재배포는 `deploy` 로 한 번(빈 커밋 push). 그 밖에 실패로 끝났다면 `axhub deploy diagnose` 로 원인을 보고, 코드 원인이면 수정 커밋을 만든 뒤 다시 import 해요 — 같은 커밋 재실행은 같은 배포를 재사용해요. 진행 중이면 배포 상태만 다시 확인해요. |
 | `rate_limit` | 요청이 잠시 많아요. 조금 뒤 다시 시도해요. |
 | `transport` | 네트워크 연결이 불안정해요. 연결 상태를 확인한 뒤 다시 시도해요. |

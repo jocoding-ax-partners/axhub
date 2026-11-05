@@ -76,9 +76,9 @@ describe("real CLI contract snapshot (AXHUB_REAL_CLI=1)", () => {
     expect(res.stdout.toLowerCase()).toContain("accounts");
   });
 
-  t("feedback 표면 (AP-19, hidden): 탑재된 CLI 면 -m 단일 인자 + --dry-run 계약", () => {
+  t("feedback 표면 (hidden): 탑재된 CLI 면 -m 단일 인자 + --dry-run 계약", () => {
     // hidden 명령이라 구/미배포 CLI 에는 없어요 — 부재(비 0 exit)는 계약 위반이
-    // 아니라 skip 이에요 (AP-19 는 best-effort, 조용한 실패가 곧 가용성 게이트).
+    // 아니라 skip 이에요 (feedback 은 best-effort 예요).
     const res = run(["feedback", "--help"]);
     if (res.exitCode !== 0) return;
     expect(res.stdout).toContain("-m");

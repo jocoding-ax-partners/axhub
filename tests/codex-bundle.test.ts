@@ -108,7 +108,7 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     expect("hooks" in codexPlugin).toBe(false);
   });
 
-  test("hooks.json drops shell keys, adds commandWindows, swaps merged always-on entry", () => {
+  test("hooks.json drops shell keys and adds commandWindows", () => {
     const hooksRaw = readFileSync(join(outDir, "hooks", "hooks.json"), "utf8");
     expect(hooksRaw).not.toContain('"shell"');
     const hooksJson = JSON.parse(hooksRaw) as {
@@ -128,44 +128,6 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
         }
       }
     }
-    expect(hooksRaw).toContain("session-always-on-codex.sh");
-    expect(hooksRaw).not.toContain("session-feedback-contract.sh");
-    expect(existsSync(join(outDir, "hooks", "session-always-on-codex.sh"))).toBe(true);
-    expect(existsSync(join(outDir, "hooks", "session-feedback-contract.sh"))).toBe(false);
-  });
-
-  test("merged always-on wrapper preserves every kill-switch branch and emits one JSON", () => {
-    const script = join(outDir, "hooks", "session-always-on-codex.sh");
-    const syntax = Bun.spawnSync({ cmd: ["bash", "-n", script], stdout: "pipe", stderr: "pipe" });
-    expect(syntax.exitCode, syntax.stderr.toString()).toBe(0);
-
-    const env = { ...process.env, HOME: tempRoot };
-    const bothKilled = Bun.spawnSync({
-      cmd: ["bash", script],
-      env: { ...env, AXHUB_NO_QUESTION_PROTOCOL: "1", AXHUB_NO_FEEDBACK_REPORT: "1" },
-      stdout: "pipe",
-    });
-    expect(bothKilled.stdout.toString()).toBe("");
-
-    // U5/KTD6: 질문 프로토콜은 기본 on 이고, 훅이 꺼진 세션에서도 skill 본문·정책이
-    // 같은 fail-closed 규칙을 들고 있어요 (3채널 중복 소유).
-    const questionOnly = Bun.spawnSync({
-      cmd: ["bash", script],
-      env: { ...env, AXHUB_NO_FEEDBACK_REPORT: "1" },
-      stdout: "pipe",
-    });
-    const questionPayload = JSON.parse(questionOnly.stdout.toString()) as {
-      continue: boolean;
-      suppressOutput: boolean;
-      hookSpecificOutput: { hookEventName: string; additionalContext: string };
-    };
-    expect(questionPayload.continue).toBe(true);
-    expect(questionPayload.suppressOutput).toBe(true);
-    expect(questionPayload.hookSpecificOutput.hookEventName).toBe("SessionStart");
-    expect(questionPayload.hookSpecificOutput.additionalContext).toContain(
-      "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
-    );
-    expect(questionPayload.hookSpecificOutput.additionalContext).not.toContain("AP-19");
   });
 
   test("state markers are host-suffixed (KTD5)", () => {

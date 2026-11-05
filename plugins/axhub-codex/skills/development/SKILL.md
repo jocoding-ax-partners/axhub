@@ -9,8 +9,6 @@ model: sonnet
 
 # Development (기존 axhub 앱 기능 코딩)
 
-> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
-
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 이미 만들어진 axhub 앱에 **기능 코드 추가·수정**을 해요. 실데이터(connector·table)를 기반으로 한 페이지·엔드포인트뿐 아니라 todo priority/filter/search, tabs, forms, CRUD, UI/page/API route 개선처럼 기존 앱의 동작과 화면을 바꾸는 요청도 포함해요. 데이터가 필요한 기능은 추측하지 않고 진짜 스키마에 맞춰 grounding 하고, 데이터 입력·수정(CRUD) 화면과 (옵트인·게이트 하의) 테이블 생성도 만들어요 (`references/write-gate.md`).

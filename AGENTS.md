@@ -15,7 +15,7 @@ The monorepo is indexed by CodeGraph (`codegraph_*` MCP tools, server `codegraph
 
 이 repo는 axhub plugin이에요. 현재 공개 surface는 **10 skill** (`setup` / `bootstrap` / `scaffold` / `plugins` / `deploy` / `up` / `import` / `development` / `diagnosis` / `clarity`)이에요. `setup` 은 CLI 설치·버전 업데이트·로그인·회사·git 점검을 맡아요. `plugins`는 deploy_method=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 맡고, 게시자 관리는 App Console, 승인은 Console Review로 연결해요. plugin은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli(`axhub` 바이너리)를 호출해요.
 
-제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인. 훅은 cheap bash guard 로 제한해요: auto-update(백그라운드)·재시작 확인, Windows 실행 계약, 실패 자동 리포트 계약만 허용돼요.
+제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인. 훅은 cheap bash guard 로 제한해요: auto-update(백그라운드)·재시작 확인만 허용돼요.
 
 ## skill 이 CLI 를 부르는 법
 

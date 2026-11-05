@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.38.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.38.0...plugin-v1.38.1) (2026-11-05)
+
+Windows 의 Claude Code 에 지금과 맞지 않는 안내("PowerShell 금지" 등)를 넣던 훅과, axhub 를 쓰지 않는 세션에도 긴 규칙을 넣던 실패 리포트 훅을 뺐어요. 스킬에 남아 있던 같은 Windows 안내도 지웠어요. 이제 세션 시작 훅은 자동 업데이트와 재시작 확인 두 개예요.
+
+
+### Fixed
+
+* **plugin:** 낡은 Windows 안내 훅과 실패 리포트 훅을 빼고 스킬의 같은 안내도 지운다 ([5eda479](https://github.com/jocoding-ax-partners/axhub-mono/commit/5eda4793665dede459cb820ae9a413490cfe7eb1))
+
 ## [1.38.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.37.1...plugin-v1.38.0) (2026-11-04)
 
 "axhub 셋업해줘"·"axhub 업데이트해줘"·"로그인해줘" 가 새 setup 스킬 하나로 가요. CLI 설치·버전·로그인·회사·git 설치를 차례로 점검하고 빠진 것만 채운 뒤 결과 표로 끝내요. 예전 onboarding·update 스킬과, 상관없는 메시지에도 끼어들던 업데이트 안내 훅은 뺐어요.

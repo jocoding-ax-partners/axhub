@@ -9,8 +9,6 @@ model: sonnet
 
 # Deploy local source via axhub up
 
-> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
-
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 이 스킬은 이미 axhub에 연결된 앱의 **명시적인 repositoryless local-source 배포**를 맡아요. 소스는 Git 커밋이 아니라 지금 폴더를 tar.gz로 묶은 아카이브이고, 그 뒤 단계(빌드·스캔·기동·verify)는 저장소 배포와 같은 파이프라인이에요. selfhosted app의 정상 배포는 이 lane이 아니라 `deploy`의 clone→push lane이에요.

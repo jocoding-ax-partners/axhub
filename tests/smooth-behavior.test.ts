@@ -631,7 +631,7 @@ describe("smooth behavior contracts", () => {
     }
     const hooksFile = readJson<HooksFile>("hooks/hooks.json");
     const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-    expect(entries).toHaveLength(4);
+    expect(entries).toHaveLength(2);
 
     // KTD6: 인라인 command 는 hooks/session-*.sh wrapper 로 추출됐어요 —
     // hooks.json 은 bare 위임만 갖고, 계약 본문은
@@ -659,7 +659,7 @@ describe("smooth behavior contracts", () => {
       }
     }
 
-    // 3번째 entry: 플러그인 업데이트 재시작 확인 (restart-confirm)
+    // 2번째 entry: 플러그인 업데이트 재시작 확인 (restart-confirm)
     const restartConfirm = readRepo("hooks/session-restart-confirm.sh");
     expect(restartConfirm).toContain("AXHUB_NO_AUTO_UPDATE");
     expect(restartConfirm).toContain("no-auto-update");
@@ -673,101 +673,6 @@ describe("smooth behavior contracts", () => {
     expect(restartConfirm).not.toContain("../../.git");
     // 바이너리 무접촉 — 적용 확인 뒤 marker 삭제만 해요
     expect(restartConfirm).not.toContain("command -v axhub");
-  });
-
-  test("AP-19 feedback auto-report contract hook is wired", () => {
-    interface HookEntry {
-      type: string;
-      shell?: string;
-      command: string;
-    }
-    interface HooksFile {
-      hooks: { SessionStart: Array<{ hooks: HookEntry[] }> };
-    }
-    const hooksFile = readJson<HooksFile>("hooks/hooks.json");
-    const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-
-    const feedbackEntry = entries[3];
-    expect(feedbackEntry.type).toBe("command");
-    expect(feedbackEntry.shell).toBe("bash");
-    expect(feedbackEntry.command).toBe(CLAUDE.surface.hookWrapperCommand("session-feedback-contract.sh"));
-
-    // 계약 본문은 wrapper 스크립트가 소유해요 (KTD6 추출)
-    const feedback = readRepo("hooks/session-feedback-contract.sh");
-    // kill switch: env + marker counterpart (repo-wide 훅 계약)
-    expect(feedback).toContain("AXHUB_NO_FEEDBACK_REPORT");
-    expect(feedback).toContain("no-feedback-report");
-    // CLI 존재 가드는 AP-17 의 3-경로만 봐요 — 네트워크·바이너리 실행 없음
-    expect(feedback).toContain("command -v axhub");
-    expect(feedback).toContain(".axhub/bin-path");
-    expect(feedback).toContain(".axhub/bin/axhub");
-    // AP-19 invariants (agent-policy parity)
-    expect(feedback).toContain("axhub feedback -m");
-    expect(feedback).toContain("예상된 거절은 리포트하지 않아요");
-    // #865: retryable·unavailable 일시 장애(site_offline)는 한 번 다시 시도한 뒤에만 리포트해요.
-    // #575·#576: plugin-support envelope 오류는 error.details 핵심을 `실제:` 줄에 옮겨 적어요.
-    // 정책 본문·요약도 같은 단서를 들고 있어야 해요 (invariant 줄은 그대로라 parity 가 못 잡아요).
-    const policy = readRepo("docs/policy/agent-policy.md");
-    const ap19 = policy.slice(policy.indexOf("## AP-19"), policy.indexOf("## AP-20"));
-    const claudeAp19 = readRepo("CLAUDE.md").split("## 예상 밖 CLI 실패 자동 리포트 hook (AP-19)")[1] ?? "";
-    for (const source of [feedback, ap19, claudeAp19]) {
-      expect(source).toContain("retryable");
-      expect(source).toContain("unavailable");
-      expect(source).toContain("site_offline");
-      expect(source).toContain("error.details");
-    }
-    // #336·#865: 커넥터 자체의 자격 증명 만료(exit 7 auth_expired)와 GET 이 아닌 invoke 를 사이트 agent 가
-    // 끝내지 못한 것(exit 7 connector_upstream_failed)은 운영 상태라 리포트하지 않아요. #909: route 404
-    // (backend_unimplemented)는 최신 CLI 로 올린 뒤에도 재현될 때만, #455: repository.url_missing(exit 9)은
-    // hint 대로 한 번 다시 시도해 반복될 때만 리포트해요. 셋이 같은 단서를 들고 있어야 해요.
-    const claudeAp19Section = claudeAp19.slice(0, claudeAp19.indexOf("\n## "));
-    for (const source of [feedback, ap19, claudeAp19Section]) {
-      for (const phrase of [
-        "auth_expired",
-        "connector_upstream_failed",
-        "backend_unimplemented",
-        "axhub update apply --execute --yes",
-        "repository.url_missing",
-      ]) {
-        expect(source, phrase).toContain(phrase);
-      }
-    }
-    // hook 은 계약 emit 만 해요: marker 삭제·업데이트·리포트 실행 없음. 계약 문안(JSON)은 명령을 안내할 수
-    // 있으니 그 밖의 셸 코드만 봐요.
-    const hookCode = feedback.replace(/'\{"continue":true[\s\S]*?\}\}'/, "''");
-    expect(hookCode).not.toBe(feedback);
-    expect(hookCode).not.toContain("rm -f");
-    expect(hookCode).not.toContain("axhub update");
-    expect(hookCode).not.toContain("axhub feedback");
-  });
-
-  test("AP-13 Windows execution contract hook is wired", () => {
-    interface HookEntry {
-      type: string;
-      shell?: string;
-      command: string;
-    }
-    interface HooksFile {
-      hooks: { SessionStart: Array<{ hooks: HookEntry[] }> };
-    }
-    const hooksFile = readJson<HooksFile>("hooks/hooks.json");
-    const entries = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks);
-
-    const windowsEntry = entries[1];
-    expect(windowsEntry.type).toBe("command");
-    expect(windowsEntry.shell).toBe("bash");
-    expect(windowsEntry.command).toBe(CLAUDE.surface.hookWrapperCommand("session-windows-contract.sh"));
-
-    // AP-13 계약 본문은 wrapper 스크립트가 소유해요 (KTD6 추출)
-    const windows = readRepo("hooks/session-windows-contract.sh");
-    // Windows-only guard + killswitch
-    expect(windows).toContain("AXHUB_NO_WINDOWS_CONTRACT");
-    expect(windows).toContain("Windows_NT");
-    // emits the Git Bash execution contract (invariant with agent-policy AP-13)
-    expect(windows).toContain("Git Bash 전용");
-    expect(windows).toContain("PowerShell");
-    // read-only / non-blocking: only echoes, never deletes markers
-    expect(windows).not.toContain("rm -f");
   });
 
   test("import frontmatter starts directly and avoids preamble leaks", () => {

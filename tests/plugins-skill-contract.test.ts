@@ -282,14 +282,13 @@ describe("app-centric plugins skill contract", () => {
     expect(source).not.toContain("요청 mode의 public help");
   });
 
-  test("keeps AP-17 continuation and the Windows contract", () => {
+  test("keeps AP-17 continuation", () => {
     expect(source).toContain("이후 명령은 반환된 `bin_path`");
     expect(source).toContain("`cargo run`, `target/debug/axhub`");
     expect(source).toContain("`bin_path`가 없으면 앞에서 발견한 절대경로");
     expect(source).toContain("세 경로 모두 없을 때만 setup");
     expect(source).toContain("plugin-support repair-path --json");
-    expect(source).toContain("Windows 실행 계약 (AP-13)");
-    expect(source).toContain("axhub 명령은 Git Bash 전용으로 실행해요");
+    expect(source).not.toContain("PowerShell 금지");
   });
 
   test("references publish.md from SKILL.md and keeps it host-neutral", () => {

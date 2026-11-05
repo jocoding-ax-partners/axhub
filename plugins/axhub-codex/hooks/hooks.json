@@ -11,17 +11,7 @@
           },
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-windows-contract.sh\"",
-            "commandWindows": "exit 0"
-          },
-          {
-            "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-restart-confirm.sh\"",
-            "commandWindows": "exit 0"
-          },
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-always-on-codex.sh\"",
             "commandWindows": "exit 0"
           }
         ]
