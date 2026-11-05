@@ -187,8 +187,8 @@ describe("spec 236 self-hosted git skill contracts", () => {
         expect(source, root).toContain("repository.credential_missing");
         expect(source, root).toContain("repository.destination_exists");
         expect(source, root).toContain("already_cloned: true");
-        // setup 뒤에도 credential_missing 이면 예상 밖 실패예요. exit 9 는 AP-19 의 '예상된 거절'이라
-        // 'report' 만으로는 리포트가 안 일어나니 axhub feedback 을 명시해요.
+        // setup 뒤에도 credential_missing 이면 예상 밖 실패예요. 'report' 만으로는 리포트가 안 일어나니
+        // axhub feedback 을 명시해요.
         expect(source, root).toContain("axhub feedback");
         // hint 의 `next:` 명령은 clone 이 고정한 --profile·--endpoint(쓴 경우 --config·--no-keychain)를 담아요.
         // 스킬이 `axhub --tenant <tenant> git setup` 을 직접 조립하면 helper 가 읽지 않는 곳에 자격 증명을

@@ -56,10 +56,10 @@ codex plugin add axhub-codex@axhub
 
 ## 🔐 훅 신뢰 — 설치 후 꼭 한 번 확인해요
 
-이 플러그인은 세션 시작 훅 4개를 담아요. Codex 는 플러그인 훅을 **사용자가 신뢰하기 전에는 실행하지 않아요** — 설치 후 첫 대화형 세션에서 훅 목록과 신뢰 여부를 물어요.
+이 플러그인은 세션 시작 훅 2개를 담아요. Codex 는 플러그인 훅을 **사용자가 신뢰하기 전에는 실행하지 않아요** — 설치 후 첫 대화형 세션에서 훅 목록과 신뢰 여부를 물어요.
 
-- **신뢰하면**: 자동 업데이트(24시간 1회, 뒤에서 조용히 확인·설치), Windows Git Bash 실행 계약 안내, 질문 프로토콜과 실패 자동 리포트 계약, 플러그인 재시작 확인이 자동으로 동작해요.
-- **신뢰하지 않으면**: 위 4개 표면이 조용히 꺼져요. 스킬 자체는 훅 없이도 완결돼요 — CLI 업데이트는 "axhub 업데이트해줘" 한마디로 `setup` 스킬이 훅과 무관하게 확인·적용해요.
+- **신뢰하면**: 자동 업데이트(24시간 1회, 뒤에서 조용히 확인·설치)와 플러그인 재시작 확인이 자동으로 동작해요.
+- **신뢰하지 않으면**: 위 2개 표면이 조용히 꺼져요. 스킬 자체는 훅 없이도 완결돼요 — CLI 업데이트는 "axhub 업데이트해줘" 한마디로 `setup` 스킬이 훅과 무관하게 확인·적용해요.
 - **훅 정의가 바뀐 릴리즈**: 훅 entry 자체가 바뀐 릴리즈(예: 자동 업데이트 훅을 백그라운드 `async` 로 바꾼 릴리즈)는 재설치 뒤 신뢰 확인이 한 번 더 뜰 수 있어요. wrapper 스크립트 본문만 바뀐 릴리즈는 재확인 없이 반영돼요. 자동 업데이트 훅은 뒤에서 `axhub update apply` 와 `codex plugin marketplace upgrade axhub` 를 묻지 않고 실행하니 신뢰 전에 `hooks/session-auto-update.sh` 를 한 번 읽어 보는 것을 권해요.
 - 훅이 신뢰하는 대상은 **훅 command(스크립트 경로)** 예요. 플러그인 업데이트로 훅 구성이 바뀌면 Codex 가 다시 신뢰를 물을 수 있어요 — 훅 스크립트 동작 변화는 CHANGELOG 에 명시해요.
 
@@ -71,7 +71,7 @@ codex plugin add axhub-codex@axhub
 ## 💬 첫 세션에서 알아둘 것
 
 - 첫 axhub 명령에서 네트워크 접근 승인을 한 번 물어요 — 허용해야 axhub 백엔드에 닿아요.
-- 홈 폴더에 쓰는 명령(`axhub auth login`, `axhub git setup`, `axhub plugin-support repair-path`)은 Codex 샌드박스 밖에서 실행해야 해서, 처음 한 번 권한 상승 승인을 물어요 — 허용해야 로그인 정보·git 자격증명·PATH 가 저장돼요. 샌드박스 안에서 막히면 실패 리포트를 보내지 않고 같은 명령을 권한 상승으로 한 번 다시 실행해요. 권한 상승으로도 막히면 안내된 경로의 소유자·권한을 고쳐 주세요.
+- 홈 폴더에 쓰는 명령(`axhub auth login`, `axhub git setup`, `axhub plugin-support repair-path`)은 Codex 샌드박스 밖에서 실행해야 해서, 처음 한 번 권한 상승 승인을 물어요 — 허용해야 로그인 정보·git 자격증명·PATH 가 저장돼요. 샌드박스 안에서 막히면 같은 명령을 권한 상승으로 한 번 다시 실행해요. 권한 상승으로도 막히면 안내된 경로의 소유자·권한을 고쳐 주세요.
 - 선택지를 고를 때 번호를 타이핑하는 대신 카드로 받고 싶으면 `~/.codex/config.toml` 의 `[features]` 에 `default_mode_request_user_input = true` 한 줄을 더하면 돼요. 설정을 대신 바꾸지는 않아요.
 - 네이티브 선택 카드가 켜진 세션에서 빈 답변이 돌아오면 승인하지 않은 것으로 봐요 — 자리를 잠깐 비운 사이에 카드가 자동으로 닫혀도 그대로 진행하지 않고 다시 물어요. 카드가 열려 있는 동안에도 실행 단계로 넘어가지 않아요.
 - 승인 채널이 없는 headless(`codex exec`·CI)에서는 실행하지 않고 멈춰요.
@@ -129,7 +129,7 @@ axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 
 - 자체 인증·배포 로직을 재구현하지 않아요. CLI 를 **invoke** 하고 결과를 **분류·복구 안내**할 뿐이에요.
 - CLI 가 새 기능을 내면 자연어 트리거만 더하면 돼요 — `clarity` 브리지는 그것조차 자동이에요.
 
-세션 훅은 cheap bash 로만 좁게 들어가 있어요 — auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update`), Windows Git Bash 실행 계약 훅(끄기: `AXHUB_NO_WINDOWS_CONTRACT=1` 또는 `~/.axhub/config/no-windows-contract`), 질문 프로토콜과 실패 자동 리포트 계약을 합본으로 발행하는 상시 훅(각각 끄기: `AXHUB_NO_QUESTION_PROTOCOL=1`/`~/.axhub/config/no-question-protocol`, `AXHUB_NO_FEEDBACK_REPORT=1`/`~/.axhub/config/no-feedback-report`), 재시작 확인 훅이에요. auto-update 훅만 백그라운드(`async`)에서 `axhub update apply` 와 플러그인 갱신을 조용히 실행하고, 나머지 훅은 명령을 실행하거나 앱 목록을 조회하지 않고 계약 문맥만 추가해요.
+세션 훅은 cheap bash 로만 좁게 들어가 있어요 — auto-update 훅과 재시작 확인 훅 두 개이고, 둘 다 `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update` 로 꺼져요. auto-update 훅만 백그라운드(`async`)에서 `axhub update apply` 와 플러그인 갱신을 조용히 실행하고, 재시작 확인 훅은 명령을 실행하지 않고 적용 확인 한 줄만 추가해요.
 
 ---
 

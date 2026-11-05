@@ -7,7 +7,7 @@ import { HOST_EXPECTATIONS, SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expe
 
 // 훅 bash 를 실제로 실행하는 하네스예요 — 문자열 계약 테스트가 못 잡는 의미
 // 회귀를 잠가요.
-// SessionStart 4개 entry 는 hooks/session-*.sh wrapper 로 추출됐어요 (KTD6) —
+// SessionStart 2개 entry 는 hooks/session-*.sh wrapper 로 추출됐어요 (KTD6) —
 // wrapper 는 운영과 동일하게 `bash "<path>"` 로 실행하고, wrapper 본문은 인라인
 // 시절과 같은 plain bash 의미를 유지해요 (set -u 주입 금지). spawn timeout 은
 // 성능 assert 가 아니라 deadlock 가드예요.
@@ -26,9 +26,7 @@ const ssCommands = hooksFile.hooks.SessionStart.flatMap((group) => group.hooks).
 // fixtures/host-expectations.ts 의 SESSION_WRAPPER_SCRIPTS 가 단일 소유해요.
 const wrapperPath = (name: (typeof SESSION_WRAPPER_SCRIPTS)[number]): string => join(REPO_ROOT, "hooks", name);
 const autoUpdateSh = wrapperPath("session-auto-update.sh");
-const windowsContractSh = wrapperPath("session-windows-contract.sh");
 const restartConfirmSh = wrapperPath("session-restart-confirm.sh");
-const feedbackContractSh = wrapperPath("session-feedback-contract.sh");
 
 interface RunResult {
   stdout: string;
@@ -103,7 +101,7 @@ function expectEmit(result: RunResult, eventName: string, marker: string): void 
 // ── SessionStart 훅 ──────────────────────────────────────────────────────
 
 describe("SessionStart wrapper 위임 (KTD6: 인라인 command → hooks/session-*.sh)", () => {
-  test("4개 entry 가 순서대로 각 wrapper 파일로 bare 위임해요 — 실행 대상과 hooks.json 이 일치해요", () => {
+  test("2개 entry 가 순서대로 각 wrapper 파일로 bare 위임해요 — 실행 대상과 hooks.json 이 일치해요", () => {
     expect(ssCommands).toEqual(SESSION_WRAPPER_SCRIPTS.map((name) => HOST_EXPECTATIONS.claude.surface.hookWrapperCommand(name)));
     for (const name of SESSION_WRAPPER_SCRIPTS) {
       expect(existsSync(wrapperPath(name))).toBe(true);
@@ -606,7 +604,7 @@ describe("auto-update worker (SessionStart entry 1, async — AP-26)", () => {
   });
 });
 
-describe("restart-confirm 훅 (SessionStart entry 3 — AP-26)", () => {
+describe("restart-confirm 훅 (SessionStart entry 2 — AP-26)", () => {
   function homeWithMarker(content: string, ageDays = 0): string {
     const home = makeHome();
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
@@ -667,99 +665,6 @@ describe("restart-confirm 훅 (SessionStart entry 3 — AP-26)", () => {
   });
 });
 
-describe("AP-13 Windows 계약 훅 (SessionStart entry 2)", () => {
-  test("OS=Windows_NT → 계약을 발행해요", () => {
-    expectEmit(runScript(windowsContractSh, "", { OS: "Windows_NT" }), "SessionStart", "Git Bash");
-  });
-
-  test("non-Windows(OS 미설정) → 침묵해요", () => {
-    expectSilent(runScript(windowsContractSh, ""));
-  });
-
-  test("kill switch AXHUB_NO_WINDOWS_CONTRACT → 침묵해요", () => {
-    expectSilent(runScript(windowsContractSh, "", { OS: "Windows_NT", AXHUB_NO_WINDOWS_CONTRACT: "1" }));
-  });
-
-  test("marker kill switch no-windows-contract → 침묵해요", () => {
-    expectSilent(runScript(windowsContractSh, "", { OS: "Windows_NT", HOME: makeHomeWithMarker("windows-contract") }));
-  });
-});
-
-describe("AP-19 feedback 리포트 계약 훅 (SessionStart entry 4)", () => {
-  test("PATH 에 axhub 존재 → 계약을 발행해요", () => {
-    const result = runScript(feedbackContractSh, "", { HOME: makeHome(), PATH: SAFE_PATH });
-    expectEmit(result, "SessionStart", "axhub feedback -m");
-    expect(result.stdout).toContain("예상된 거절은 리포트하지 않아요");
-  });
-
-  // #865: 502 site_offline 은 exit 7 이지만 retryable·unavailable 인 일시 장애예요 — 첫 시도에
-  // 리포트하지 않고, 쓰기는 다시 보내기 전에 반영 여부부터 봐요. #575·#576: plugin-support 내부
-  // 확인 명령의 실패는 자동 첨부되지 않으니 envelope details 를 `실제:` 줄에 옮겨 적어요.
-  test("일시 장애는 한 번 다시 시도한 뒤에만 리포트하고 envelope details 를 옮겨 적어요 (#865·#575)", () => {
-    const result = runScript(feedbackContractSh, "", { HOME: makeHome(), PATH: SAFE_PATH });
-    expectEmit(result, "SessionStart", "axhub feedback -m");
-    const context = (JSON.parse(result.stdout.trim()) as { hookSpecificOutput: { additionalContext: string } })
-      .hookSpecificOutput.additionalContext;
-    expect(context).toContain("error.retryable");
-    expect(context).toContain("error.backend_category 가 unavailable");
-    expect(context).toContain("site_offline");
-    expect(context).toContain("그래도 재현될 때만 리포트해요");
-    expect(context).toContain("반영 여부를 먼저 확인해요");
-    expect(context).toContain("error.details");
-    expect(context).toContain("request_id");
-  });
-
-  // #336·#865: exit 7 auth_expired 는 커넥터 자체의 자격 증명 만료(axhub 로그인과 무관, 테넌트 관리자가
-  // 재인증)이고, exit 7 connector_upstream_failed 는 사이트 agent 가 GET 이 아닌 invoke 를 끝내지 못한
-  // 운영 실패예요 — 둘 다 CLI 결함이 아니라 리포트하지 않아요. #909: route 404 의 backend_unimplemented 는
-  // CLI 를 최신으로 올린 뒤에도 재현될 때만, #455: exit 9 repository.url_missing 은 hint 대로 한 번 다시
-  // 시도해 반복될 때만 리포트해요(정상 가드 거절이 아니에요).
-  test("운영 상태는 리포트하지 않고, 버전 차이·backend 불일치는 업데이트·재시도 뒤에만 리포트해요 (#336·#865·#909·#455)", () => {
-    const result = runScript(feedbackContractSh, "", { HOME: makeHome(), PATH: SAFE_PATH });
-    expectEmit(result, "SessionStart", "axhub feedback -m");
-    const context = (JSON.parse(result.stdout.trim()) as { hookSpecificOutput: { additionalContext: string } })
-      .hookSpecificOutput.additionalContext;
-    const expected = context.slice(context.indexOf("예상된 거절은 리포트하지 않아요"));
-    expect(expected).toContain("exit 7 auth_expired");
-    expect(expected).toContain("axhub 로그인과 무관");
-    expect(expected).toContain("테넌트 관리자가 커넥터를 재인증");
-    expect(expected).toContain("exit 7 connector_upstream_failed");
-    expect(expected).toContain("반영 여부를 확인");
-    expect(expected).toContain("읽기용 POST");
-    expect(context).toContain("backend_unimplemented");
-    expect(context).toContain("axhub update apply --execute --yes");
-    expect(context).toContain("repository.url_missing");
-    // 진단은 인자 값을 모으지 않지만 오류 메시지 한 줄은 대상 이름·경로를 담을 수 있어요 (CLI feedback --help 와 같아요).
-    expect(context).toContain("인자 값은 수집하지 않지만");
-  });
-
-  test("PATH 에 없어도 위치 파일 ~/.axhub/bin-path 가 있으면 발행해요 (AP-17 3-경로)", () => {
-    const home = makeHome();
-    mkdirSync(join(home, ".axhub"), { recursive: true });
-    writeFileSync(join(home, ".axhub", "bin-path"), "/opt/axhub/bin/axhub");
-    expectEmit(runScript(feedbackContractSh, "", { HOME: home, PATH: NO_AXHUB_PATH }), "SessionStart", "axhub feedback -m");
-  });
-
-  test("canonical ~/.axhub/bin/axhub 만 있어도 발행해요 (AP-17 3-경로)", () => {
-    const home = makeHome();
-    mkdirSync(join(home, ".axhub", "bin"), { recursive: true });
-    writeFileSync(join(home, ".axhub", "bin", "axhub"), "");
-    expectEmit(runScript(feedbackContractSh, "", { HOME: home, PATH: NO_AXHUB_PATH }), "SessionStart", "axhub feedback -m");
-  });
-
-  test("CLI 가 3-경로 어디에도 없으면 침묵해요", () => {
-    expectSilent(runScript(feedbackContractSh, "", { HOME: makeHome(), PATH: NO_AXHUB_PATH }));
-  });
-
-  test("kill switch AXHUB_NO_FEEDBACK_REPORT → 침묵해요", () => {
-    expectSilent(runScript(feedbackContractSh, "", { HOME: makeHome(), PATH: SAFE_PATH, AXHUB_NO_FEEDBACK_REPORT: "1" }));
-  });
-
-  test("marker kill switch no-feedback-report → 침묵해요", () => {
-    expectSilent(runScript(feedbackContractSh, "", { HOME: makeHomeWithMarker("feedback-report"), PATH: SAFE_PATH }));
-  });
-});
-
 // ── hooks.json 합성 command e2e (plugin-root env 치환 경계) ──────────────
 
 // hooks.json 의 SessionStart command 문자열 자체를 `bash -c` 로 실행해요 —
@@ -791,26 +696,17 @@ describe("SessionStart 합성 command e2e (hooks.json command 문자열 실행)"
     expect(existsSync(join(home, CACHE_REL))).toBe(false);
   });
 
-  test("entry 2 windows-contract: OS=Windows_NT → 발행, 미설정(non-Windows skip) → 침묵해요", () => {
-    expectEmit(runSsCommand(1, { OS: "Windows_NT" }), "SessionStart", "Git Bash");
-    expectSilent(runSsCommand(1));
-  });
-
-  test("entry 3 restart-confirm: fresh marker + 로드 버전이 더 높음 → 적용 확인을 발행해요 (AP-26)", () => {
+  test("entry 2 restart-confirm: fresh marker + 로드 버전이 더 높음 → 적용 확인을 발행해요 (AP-26)", () => {
     const home = makeHome();
     mkdirSync(join(home, ".axhub", "cache"), { recursive: true });
     writeFileSync(join(home, MARKER_REL), "1.10.28");
-    expectEmit(runSsCommand(2, { HOME: home }), "SessionStart", "적용을 확인했어요");
+    expectEmit(runSsCommand(1, { HOME: home }), "SessionStart", "적용을 확인했어요");
     expect(existsSync(join(home, MARKER_REL))).toBe(false);
-  });
-
-  test("entry 4 feedback-contract: PATH 의 axhub 로 계약을 발행해요", () => {
-    expectEmit(runSsCommand(3, { HOME: makeHome(), PATH: SAFE_PATH }), "SessionStart", "axhub feedback -m");
   });
 });
 
 describe("CLAUDE_PLUGIN_ROOT 미설정 경계 (omitted-root)", () => {
-  test("env 미설정이면 4개 entry 모두 exit 127 + stdout 무JSON 으로 소실돼요 (현행 거동 문서화)", () => {
+  test("env 미설정이면 2개 entry 모두 exit 127 + stdout 무JSON 으로 소실돼요 (현행 거동 문서화)", () => {
     // 조용한 소실이 현행 계약이에요 — Claude·Codex 둘 다 env 주입 실측 확인, U1-(p) 재확인 예정.
     for (const command of ssCommands) {
       const result = runInline(command, "");

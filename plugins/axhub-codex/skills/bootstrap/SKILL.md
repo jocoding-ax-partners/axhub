@@ -229,7 +229,7 @@ Codex 에서 `앱 생성 진행`/`앱 생성 재시도` tool 이 `백그라운�
 
 ### 10. Clone And Manifest
 
-selfhosted는 Gitea API·remote URL을 추측하지 않고 선택한 literal tenant를 두 명령에 그대로 써요. Sandbox: `git setup` escalated; `local.write_denied` (no AP-19 report): sandboxed → rerun escalated once, else fix path owner.
+selfhosted는 Gitea API·remote URL을 추측하지 않고 선택한 literal tenant를 두 명령에 그대로 써요. Sandbox: `git setup` escalated; `local.write_denied`: sandboxed → rerun escalated once, else fix path owner.
 
 ```bash
 axhub --tenant <tenant> git setup --json

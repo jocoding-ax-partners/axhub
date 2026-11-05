@@ -9,8 +9,6 @@ model: sonnet
 
 # Scaffold — 템플릿으로 시작, 저장소는 내 소유
 
-> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
-
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 bootstrap 과의 차이는 하나예요: bootstrap 은 axhub 이 저장소를 만들고(org 에서 주인 권한이 안 붙을 수 있어요), 이 스킬은 **사용자 연동 계정으로 사용자의 계정/조직에** 만들어요. 저장소 생성만 CLI(`axhub github repo create`, v0.30.0+)가 하고 clone·커밋은 git, 앱 생성·연결·배포는 `import` 예요 — push 뒤 이어갈지 한 번 물어본 뒤에만 넘겨요.

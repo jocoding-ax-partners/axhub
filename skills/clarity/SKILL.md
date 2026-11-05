@@ -16,8 +16,6 @@ description: '요청하신 운영 명령을 확인할게요. Use for "axhub 로�
 
 앱 상태 overview, "내 앱들이 지금 어떤 상태인지도 알아서 봐줘", 새 앱 생성, bootstrap, import, deploy 가 보이면 clarity 가 아니에요. 특히 `command -v axhub && axhub --version`, `Checking axhub CLI installation and version`, `MCP tools to check axhub status and your apps` 로 시작하면 실패예요. 그런 경우 앱 상태 조회나 CLI probe 를 시작하지 말고 담당 스킬(setup/bootstrap/import/deploy)로 양보해요.
 
-> **Windows 실행 계약 (AP-13):** axhub 명령은 Git Bash 전용으로 실행해요. PowerShell 금지, PATH 는 `axhub plugin-support repair-path`, `auth status` 는 `auth login` 한 그 셸에서 검증해요.
-
 > **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
 
 이 스킬은 axhub CLI 운영 명령 브리지예요. 로그, 환경변수, 롤백, 테이블/컬럼/데이터, connector grant, GitHub 재연결처럼 명시된 운영 명령만 처리해요. 작업→명령 카탈로그는 없어요 — **매번 라이브 CLI 의 `--help` 트리를 탐색**해 맞는 명령을 찾고, 조회 명령은 바로 실행하되 파괴적 변경은 승인 뒤 실행해요.

@@ -1,6 +1,5 @@
 {
-  "hooks/session-feedback-contract.sh": "db7ca7863a6144eeaf8b773027e67a0dd46e6d46fe344056226ee55cfa2ac05a",
-  "skills/deploy/SKILL.md": "6d342740fe8e5d86a273c8b5d7d66634c2e216bc0513daac0ce8e130a977f28d",
-  "README.md": "bbb9bf28bcd55123324d25cd3d2c398b47ecf367fb41cff424128c17ac14bef9",
-  "POLICY.md": "300f980659e2c2cb222f69e62022b0a8f5448442490a91299f0a448f56baceac"
+  "skills/deploy/SKILL.md": "97f5000015addb71f6fccba5d6e024dd5928663031b0bebb8fc861c5b987a893",
+  "README.md": "69202ba0712489b68bb6cee3bd11cce2cc6026988ea5a2eec5d1d47391998b36",
+  "POLICY.md": "ea24e0d14f6eb2dde2639e7a935e93a0e5f43b532ba4543a31702be2e5719d4f"
 }

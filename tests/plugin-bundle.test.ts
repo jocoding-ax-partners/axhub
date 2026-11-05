@@ -73,7 +73,7 @@ describe("clean plugin bundle", () => {
       expect(existsSync(join(outDir, "LICENSE"))).toBe(true);
       expect(existsSync(join(outDir, "POLICY.md"))).toBe(true);
       expect(existsSync(join(outDir, "hooks", "hooks.json"))).toBe(true);
-      // KTD6: SessionStart 인라인 command 를 추출한 wrapper 4개도 번들에 실려요
+      // KTD6: SessionStart 인라인 command 를 추출한 wrapper 2개도 번들에 실려요
       for (const wrapper of SESSION_WRAPPER_SCRIPTS) {
         expect(existsSync(join(outDir, "hooks", wrapper)), `missing bundled wrapper: ${wrapper}`).toBe(true);
       }

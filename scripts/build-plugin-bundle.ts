@@ -166,9 +166,6 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
 ];
 
 const CODEX_TEXT_EXTENSIONS = new Set([".md", ".sh", ".json"]);
-// 질문 프로토콜 + AP-19 는 합본 wrapper 하나로 대체돼요 (trust 표면 축소).
-const CODEX_SUPERSEDED_WRAPPERS = new Set(["session-feedback-contract.sh"]);
-const CODEX_MERGED_WRAPPER = "session-always-on-codex.sh";
 // codex-overrides 에서 번들 경로로 mirror-copy 하지 않는 예약 자산이에요.
 const CODEX_OVERRIDE_RESERVED = new Set(["routing", "SOURCE_HASHES.json"]);
 const CODEX_OVERRIDE_RESERVED_HOOK_DIRS = new Set(["context"]);
@@ -296,35 +293,6 @@ const applyCodexSubstitutions = (outDir: string): void => {
   }
 };
 
-const shellQuote = (value: string): string => `'${value.replaceAll("'", `'\\''`)}'`;
-
-const suppressedSessionStartJson = (additionalContext: string): string =>
-  JSON.stringify({
-    continue: true,
-    suppressOutput: true,
-    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext },
-  });
-
-const readOverrideContext = (name: string): string => {
-  const path = join(CODEX_OVERRIDES_DIR, "hooks", "context", name);
-  const text = readFileSync(path, "utf8").trim();
-  if (!text) throw new Error(`empty codex override context: ${relative(REPO_ROOT, path)}`);
-  return text;
-};
-
-// 소스 wrapper 의 printf JSON 에서 additionalContext 원문을 추출해요 — 문안의
-// 소유자는 소스 스크립트라 transform 이 하드코딩하지 않아요.
-const extractAdditionalContext = (scriptSource: string, scriptName: string): string => {
-  const match = scriptSource.match(/\{"continue":true[\s\S]*?\}\}/);
-  if (!match) throw new Error(`cannot find hook JSON in ${scriptName}`);
-  const parsed = JSON.parse(match[0]) as {
-    hookSpecificOutput?: { additionalContext?: string };
-  };
-  const context = parsed.hookSpecificOutput?.additionalContext;
-  if (!context) throw new Error(`missing additionalContext in ${scriptName}`);
-  return context;
-};
-
 interface CodexHookEntry {
   type: string;
   command: string;
@@ -343,76 +311,16 @@ interface HooksJson {
 // 으로 조용히 건너뛰어요. 지금도 Windows 에선 훅이 한 번도 성공하지 못해 잃는 기능은 없어요.
 const CODEX_COMMAND_WINDOWS = "exit 0";
 
-const wrapperScriptName = (command: string): string => {
-  const match = command.match(/hooks\/([A-Za-z0-9._-]+\.sh)/);
-  if (!match) throw new Error(`cannot derive wrapper script from command: ${command}`);
-  return match[1];
-};
-
 const transformCodexHooks = (outDir: string): void => {
   const hooksDir = join(outDir, "hooks");
 
-  // 1) 합본 wrapper 생성 — 질문 프로토콜 문안은 override 가, AP-19 문안은 소스
-  //    wrapper 가 소유해요. kill switch 2계층(env·marker)과 AP-17 CLI 존재 게이트를
-  //    분기별로 보존하고 JSON 은 한 번만 emit 해요.
-  const feedbackSource = readFileSync(join(hooksDir, "session-feedback-contract.sh"), "utf8");
-  const feedbackContext = extractAdditionalContext(feedbackSource, "session-feedback-contract.sh");
-  const questionContext = readOverrideContext("question-protocol.md");
-  // 블록마다 각자의 kill switch → 비어 있지 않은 조합마다 JSON 을 미리 만들어
-  // if/elif 로 emit 해요. bash 안에서 JSON 을 조립하지 않아 이스케이프 사고가 없어요.
-  const blocks = [
-    { flag: "Q", context: questionContext },
-    { flag: "F", context: feedbackContext },
-  ] as const;
-  const branches: string[] = [];
-  for (let mask = (1 << blocks.length) - 1; mask >= 1; mask -= 1) {
-    const on = blocks.filter((_, idx) => (mask >> (blocks.length - 1 - idx)) & 1);
-    const cond = on.map((b) => `[ "$${b.flag}" = 1 ]`).join(" && ");
-    const off = blocks.filter((b) => !on.includes(b)).map((b) => `[ "$${b.flag}" = 0 ]`);
-    const guard = [cond, ...off].join(" && ");
-    const json = suppressedSessionStartJson(on.map((b) => b.context).join("\n\n"));
-    branches.push(
-      `${branches.length === 0 ? "if" : "elif"} ${guard}; then printf '%s\\n' ${shellQuote(json)}`,
-    );
-  }
-  const mergedScript = [
-    "#!/usr/bin/env bash",
-    "# codex SessionStart 합본 훅이에요 — 질문 프로토콜 + AP-19 실패 리포트.",
-    "# transform 이 생성해요. 문안은 codex-overrides/hooks/context/ 와 소스 wrapper 가 소유해요.",
-    "Q=1; F=1",
-    '[ -n "$AXHUB_NO_QUESTION_PROTOCOL" ] && Q=0; [ -f "$HOME/.axhub/config/no-question-protocol" ] && Q=0',
-    '[ -n "$AXHUB_NO_FEEDBACK_REPORT" ] && F=0; [ -f "$HOME/.axhub/config/no-feedback-report" ] && F=0',
-    'if [ "$F" = 1 ]; then command -v axhub >/dev/null 2>&1 || [ -f "$HOME/.axhub/bin-path" ] || [ -f "$HOME/.axhub/bin/axhub" ] || [ -f "$HOME/.axhub/bin/axhub.exe" ] || F=0; fi',
-    ...branches,
-    "fi",
-    "",
-  ].join("\n");
-  writeFileSync(join(hooksDir, CODEX_MERGED_WRAPPER), mergedScript);
-
-  // 2) 대체된 wrapper 제거.
-  for (const name of CODEX_SUPERSEDED_WRAPPERS) {
-    rmSync(join(hooksDir, name), { force: true });
-  }
-
-  // 3) hooks.json 재작성 — shell 키 제거(U1-(c): 런타임 무시), commandWindows 추가,
-  //    대체된 entry 를 합본 entry 로 교체해요.
+  // hooks.json 재작성 — shell 키 제거(U1-(c): 런타임 무시), commandWindows 추가.
   const hooksJsonPath = join(hooksDir, "hooks.json");
   const hooksJson = JSON.parse(readFileSync(hooksJsonPath, "utf8")) as HooksJson;
   for (const eventEntries of Object.values(hooksJson.hooks)) {
     for (const entry of eventEntries) {
       const nextHooks: CodexHookEntry[] = [];
       for (const hook of entry.hooks) {
-        const scriptName = wrapperScriptName(hook.command);
-        if (CODEX_SUPERSEDED_WRAPPERS.has(scriptName)) {
-          if (scriptName === "session-feedback-contract.sh") {
-            nextHooks.push({
-              type: "command",
-              command: `bash "\${CLAUDE_PLUGIN_ROOT}/hooks/${CODEX_MERGED_WRAPPER}"`,
-              commandWindows: CODEX_COMMAND_WINDOWS,
-            });
-          }
-          continue;
-        }
         // timeout 은 Claude 판 전용이에요 — Claude 는 async 실행 중 timeout 을 무시하지만
         // codex 는 async 훅에도 적용(기본 600s)하므로 5초면 apply 가 잘려요 (AP-26).
         const { shell: _shell, timeout: _timeout, ...rest } = hook as CodexHookEntry & {

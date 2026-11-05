@@ -404,7 +404,7 @@ describe("첫 올리기 점검 (AP-30)", () => {
 });
 
 // #830·#832: CLI 가 낸 typed 실패는 원인별로 복구가 달라요 — 패키지 매니저를 못 띄운 건 설치 뒤
-// 같은 옵션 재실행(빌드 스크립트 수정·AP-19 리포트 아님), 주소 없는 기존 앱은 주소를 확인받고 승인 뒤
+// 같은 옵션 재실행(빌드 스크립트 수정 아님), 주소 없는 기존 앱은 주소를 확인받고 승인 뒤
 // apps update 후 같은 import 재실행. #757: manifest name 은 앱 slug 라야 deploy-prep 이 같은 앱을 찾아요.
 describe("import typed failure recovery (#830·#832·#757)", () => {
   const skill = readFileSync(join(REPO_ROOT, "skills", "import", "SKILL.md"), "utf8");
@@ -416,7 +416,6 @@ describe("import typed failure recovery (#830·#832·#757)", () => {
     expect(staticRow).toContain("static.package_manager_spawn_failed");
     // recovery_action 은 `npm install -g pnpm` 같은 전역 설치라 사용자 시스템을 바꿔요 — 동의 뒤에만 해요.
     expect(staticRow).toContain("recovery_action 의 설치는 사용자 동의를 받은 뒤에 하고(headless 는 안내만 하고 멈춰요) 같은 옵션으로 다시 실행");
-    expect(staticRow).toContain("AP-19 리포트 대상이 아니에요");
     // 빌드 스크립트·산출물 경로 수정 안내는 그 밖의 retryable=false 에만 남아요.
     expect(staticRow.indexOf("static.package_manager_missing")).toBeLessThan(staticRow.indexOf("그 밖의 retryable=false"));
   });

@@ -20,9 +20,7 @@
  */
 export const SESSION_WRAPPER_SCRIPTS = [
   "session-auto-update.sh",
-  "session-windows-contract.sh",
   "session-restart-confirm.sh",
-  "session-feedback-contract.sh",
 ] as const;
 
 export interface HostExpectations {
