@@ -7,8 +7,8 @@ const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "
 
 const CANONICAL_BIN = '"$HOME/.axhub/bin/axhub"';
 
+// bootstrap 은 preflight 가 안 되면 setup 으로 보내고, 경로 해석·repair-path 는 setup 이 맡아요 (AP-17 정책 참고).
 const GUARD_FILES = [
-  "skills/bootstrap/SKILL.md",
   "skills/clarity/SKILL.md",
   "skills/deploy/SKILL.md",
   "skills/development/SKILL.md",
@@ -20,7 +20,6 @@ const GUARD_FILES = [
 
 // Guards that must name the canonical binary path, not just cite the contract.
 const REPAIR_PATH_FILES = [
-  "skills/bootstrap/SKILL.md",
   "skills/clarity/SKILL.md",
   "skills/deploy/SKILL.md",
   "skills/development/SKILL.md",
@@ -44,13 +43,5 @@ describe("CLI path resolution contract (AP-17)", () => {
       expect(content, file).toContain(CANONICAL_BIN);
       expect(content, file).toContain("plugin-support repair-path --json");
     }
-  });
-
-  test("bootstrap CLI guard runs the repair-path leaf command before any setup handoff", () => {
-    const bootstrap = readRepo("skills/bootstrap/SKILL.md");
-
-    expect(bootstrap).toContain(`${CANONICAL_BIN} plugin-support repair-path --json`);
-    expect(bootstrap).toContain("command not found 여도 곧바로 setup 으로 돌리지 않아요");
-    expect(bootstrap).not.toContain("command not found 이면 setup 안내 후 stop");
   });
 });

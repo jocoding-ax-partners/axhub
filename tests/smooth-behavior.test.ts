@@ -34,7 +34,7 @@ const runShim = (args: string[], env: Record<string, string> = {}) => {
 };
 
 describe("smooth behavior contracts", () => {
-  test("public metadata advertises the ten official skills", () => {
+  test("public metadata advertises the nine official skills", () => {
     const packageJson = readJson<PackageLike>("package.json");
     const pluginJson = readJson<PackageLike>(".claude-plugin/plugin.json");
     const marketplace = readJson<MarketplaceLike>(".claude-plugin/marketplace.json");
@@ -53,7 +53,7 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("Import priority is strict");
       expect(description).not.toContain("현재 버전을 확인할게요");
     }
-    expect(descriptions.join("\n")).toContain("setup/bootstrap/scaffold/plugins/deploy/up/import/development/diagnosis/clarity");
+    expect(descriptions.join("\n")).toContain("setup/bootstrap/plugins/deploy/up/import/development/diagnosis/clarity");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {
@@ -98,49 +98,20 @@ describe("smooth behavior contracts", () => {
       readRepo("skills/import/SKILL.md") +
       readRepo("skills/import/references/visibility-rules.md") +
       readRepo("skills/import/references/manifest-authoring.md");
-    const scaffold = readRepo("skills/scaffold/SKILL.md");
     const up = readRepo("skills/up/SKILL.md");
-    const bootstrapAndLocal = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
     const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
     const deployErrors = readRepo("skills/deploy/references/error-empathy-catalog.md");
 
+    // bootstrap(옛 scaffold 통합판): 기존 폴더는 import 로, 주소 확인 뒤 dry-run, 공개는 execute 신청, 내부 이름 비노출.
     expect(bootstrap).toContain("axhub apps bootstrap");
-    expect(bootstrap).toContain("## Fast Start");
-    expect(bootstrap).toContain("CLI 확인과 앱 이름 질문까지 바로 진행");
-    expect(bootstrap).toContain("raw JSON/stderr");
-    expect(bootstrap).toContain("비어 있지 않은 기존 로컬 앱");
-    expect(bootstrap).toContain("`import` 스킬로 넘겨요");
-    expect(bootstrap).toContain("idempotency key 는 OS별 UUID 생성 명령으로 만들지 말고");
-    expect(bootstrap).toContain("`axhub plugin-support init-resume put` 에 생성을 맡겨요");
-    expect(bootstrapAndLocal).toContain("APP_SLUG=\"$APP_SLUG\" perl -0pi");
-    expect(bootstrap).toContain("url_checked=false");
-    expect(bootstrap).toContain("axhub apps check-availability --tenant <tenant> --slug <app-slug> --subdomain <app-slug> --json");
-    expect(bootstrap).toContain("Tool 제목은 `앱 주소 확인`");
-    expect(bootstrap).toContain("dry-run preview 전 pre-preview guard");
-    expect(bootstrap).toContain("slug 또는 subdomain 중 하나라도 unavailable 이면 bootstrap dry-run/execute 금지");
-    expect(bootstrap).toContain("내부 라벨 노출 금지");
-    expect(bootstrap).toContain("제품명·명령어·영어 단어에 `ing`/`ed` 를 붙인 제목");
-    expect(bootstrap).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
-    expect(bootstrap).toContain("Markdown URL 링크 문법은 전부 금지");
-    expect(bootstrap).toContain("[https://x](https://x)`, `[열기](https://x)`, `<https://x>`");
-    expect(bootstrap).toContain("다른 플러그인/워크플로 상태를 정리하지 않아요");
-    expect(bootstrap).toContain("외부 자동화·취소·state 정리 도구를 부르지 않고");
-    expect(bootstrap).toContain("chat/tool/progress 에 다른 플러그인 이름, 자동화 정리 문구");
-    // 역방향 계열 — fixture 값이어도 not.toContain 은 여기 명시적으로 남겨요.
+    expect(bootstrap).toContain("이미 코드가 있는 폴더는 import 로 가요");
+    expect(bootstrap).toContain("axhub apps check-availability --tenant <회사> --slug <slug> --subdomain <slug> --json");
+    expect(bootstrap.indexOf("apps check-availability")).toBeLessThan(bootstrap.indexOf("--dry-run --json"));
+    expect(bootstrap).toContain("axhub publish --app <slug> --visibility public --execute --json");
+    expect(bootstrap).not.toContain("--visibility public --dry-run");
+    expect(bootstrap).toContain("사용자에게 보이는 문장에는 내부 명령 이름이나 상태 코드를 쓰지 않아요");
     expect(bootstrap).not.toContain(CLAUDE.forbidden.externalAutomationSkill);
     expect(bootstrap).not.toContain(CLAUDE.forbidden.externalAutomationPlugin);
-    expect(bootstrap).toContain('axhub publish --app "$APP_SLUG" --visibility public --execute --json');
-    expect(bootstrap).toContain("publish dry-run 을 먼저 호출하지 않고");
-    expect(bootstrap).toContain("`Dry-run 기본값` 같은 내부 CLI dry-run semantics");
-    expect(bootstrap).toContain("NEVER GitHub device flow code 를 긴 watch tool 안에 숨긴 채");
-    expect(bootstrap).toContain("승인 완료를 채팅으로 알려 달라고 쓰지 않아요");
-    expect(bootstrapAndLocal).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
-    expect(bootstrapAndLocal).toContain("axhub --no-input apps bootstrap");
-    expect(bootstrapAndLocal).toContain("auto_poll");
-    expect(bootstrapAndLocal).toContain("Never leave the user staring at an empty GitHub code-entry screen with no code");
-    expect(bootstrapAndLocal).toContain("따로 `승인했어`라고 말하지 않아도 돼요");
-    expect(bootstrapAndLocal).toContain("do not end the response asking the user to report approval");
-    expect(bootstrapAndLocal).not.toContain("브라우저에서 승인한 다음 \"승인했어\"");
 
     expect(deploy).toContain("axhub deploy verify <deployment-id> --app <app>");
     expect(deploy).toContain("axhub deploy verify \"$DEPLOY_ID\" --app \"$APP_ID\"");
@@ -390,9 +361,8 @@ describe("smooth behavior contracts", () => {
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
 
     // AP-12 승인 fallback 사다리 — 새로 만드는 lane 의 공통 문장 전문을 fixture 로 잠가요
-    // (bootstrap 사본은 bootstrap-ux-contract.test.ts 가 잠가요).
+    // (bootstrap 은 자기 문장 `지금 만들고 배포까지 진행할까요?` 를 쓰고 bootstrap-ux-contract.test.ts 가 잠가요).
     expect(importSkill).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
-    expect(scaffold).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
     // 재배포 lane(deploy·up)은 승인 카드 대신 배포 전 맞추기를 해요 (AP-12·AP-29, spec 681).
     for (const redeploy of [deploy, up]) {
       expect(redeploy).not.toContain(CLAUDE.approvalGate.approvalFallbackSentence);
@@ -590,24 +560,9 @@ describe("smooth behavior contracts", () => {
     expect(carryover).toContain("owner-pick");
     expect(carryover).toContain("0-install gate");
 
-    // bootstrap: evidence-gated carry-over + shared-contract include.
-    expect(bootstrap).toContain("같은 대화 맥락 이어받기");
-    expect(bootstrap).toContain("이미 본 것만");
-    expect(bootstrap).toContain("## Reference Loading Policy");
+    // bootstrap(옛 scaffold 통합판)은 carry-over 문단 없이 이미 된 단계만 건너뛰어요 — 공유 계약을 끌어오지 않아요.
     expect(bootstrap).not.toContain("../deploy/references/session-carryover.md");
-    expect(bootstrap).not.toContain("references/bootstrap-and-local.md");
-    // E4: infer-tables-env also weighs actually-queried resources.
-    expect(bootstrap).toContain("infer-tables-env 분석은 scaffold 코드뿐 아니라");
-    // Confabulation negative guard (PR-gating proxy for the nightly behavioral case):
-    // with no evidence, bootstrap must go cold and never invent a resource.
-    expect(bootstrap).toContain("리소스를 지어내지 않아요");
-    expect(bootstrap).toContain("carry-over 를 주장하지 않아요");
-    // M2: gate relaxation suppresses re-narration only, never the gate.
-    expect(bootstrap).toContain("install-link 를 보여줬으면 재안내는 생략");
-    expect(bootstrap).toContain("0-install gate 는 항상 실행해요");
-
-    const bootstrapAndLocal = readRepo("skills/bootstrap/references/bootstrap-and-local.md");
-    expect(bootstrapAndLocal).toContain(".data.repo_full_name // .data.status.repo_full_name // empty");
+    expect(bootstrap).toContain("이미 된 단계는 건너뛰어요");
 
     // deploy: carry-over applies only AFTER the route gate (no vercel hijack).
     expect(deploy).toContain("route gate 통과 후에만 적용해서 다른 타깃");
