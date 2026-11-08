@@ -61,17 +61,9 @@ export interface HostExpectations {
   developmentSkill: {
     desktopCodeMode: string;
   };
-  /** bootstrap skill(SKILL.md + references) 의 host 결합 기대 문장 */
-  bootstrapSkill: {
-    nativeBadgeNoRepeat: string;
-    desktopMetadataFolders: string;
-    noTenantFileWrite: string;
-    nameConfirmBeforeFinalize: string;
-    desktopWatcherBan: string;
-  };
   /** 승인 fallback 사다리·headless 정의(AP-12, 4스킬 공통) 의 계약 문장 */
   approvalGate: {
-    /** bootstrap·deploy·import·scaffold 4사본 공통 fallback 사다리 문장 전문 */
+    /** import 승인 fallback 사다리 문장 전문 (bootstrap·scaffold 통합 뒤엔 import 만 써요) */
     approvalFallbackSentence: string;
     /** deploy Headless Contract 의 정의 문장 (3-lane 사다리 정합 재작성본) */
     headlessDefinitionDeploy: string;
@@ -105,13 +97,6 @@ export const HOST_EXPECTATIONS: Record<"claude", HostExpectations> = {
     },
     developmentSkill: {
       desktopCodeMode: "Claude Desktop Code 모드",
-    },
-    bootstrapSkill: {
-      nativeBadgeNoRepeat: "Claude Desktop 이 이미 `/axhub:bootstrap` native badge 를 보여줘도 chat 본문에서 반복하지 않아요",
-      desktopMetadataFolders: "Claude Desktop may create `.omc/`",
-      noTenantFileWrite: "Do not write `.axhub/state/tenant.json` from Claude Desktop",
-      nameConfirmBeforeFinalize: "Do not finalize the name before one user-facing confirmation in Claude Desktop",
-      desktopWatcherBan: "Claude Desktop Monitor, ScheduleWakeup, or any background watcher",
     },
     approvalGate: {
       approvalFallbackSentence:

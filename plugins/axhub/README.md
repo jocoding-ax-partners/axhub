@@ -11,7 +11,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
-**상태**: 10 SKILL (setup · bootstrap · scaffold · plugins · deploy · up · import · development · diagnosis · clarity) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download)
+**상태**: 9 SKILL (setup · bootstrap · plugins · deploy · up · import · development · diagnosis · clarity) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download)
 
 </div>
 
@@ -22,7 +22,7 @@
 - [🤔 axhub 가 뭔가요?](#-axhub-가-뭔가요)
 - [⚡ 빠른 시작](#-빠른-시작)
 - [📋 준비물](#-준비물)
-- [🧩 10개 스킬](#-10개-스킬)
+- [🧩 9개 스킬](#-9개-스킬)
 - [✅ 대표 여정과 UX 샘플](#-대표-여정과-ux-샘플)
 - [💬 자연어로 할 수 있는 일](#-자연어로-할-수-있는-일)
 - [🧭 핵심 철학](#-핵심-철학)
@@ -106,15 +106,14 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 ---
 
-## 🧩 10개 스킬
+## 🧩 9개 스킬
 
-플러그인은 10개 스킬을 담아요. `plugins`는 deploy_method=plugin인 일반 App을 찾고 exact version을 다운로드하거나 Claude Code·Codex에 설치해요. `download`는 검증된 새 ZIP만 저장하고, `install`은 offline preview 뒤 `--execute --yes`를 명시한 경우에만 archive 공격과 manifest identity를 검사하고 AxHub 관리 local marketplace와 host 공식 plugin CLI로 user scope에 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish·submit execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 사용해요. 성공은 `publish --submit`이면 `review_submitted`·installable=false, 업로드만 했으면 `upload_complete`·installable=false이고 다음 단계는 `axhub plugin submit`(게시 심사 신청)이에요. 결과 알림은 없어서 `axhub plugin manage status --app <app>`로 확인하고, 이후 owner는 App Console, reviewer는 Console Review를 사용해요. 이 흐름은 axhub CLI 0.50.0 이상이 필요해요.
+플러그인은 9개 스킬을 담아요. `plugins`는 deploy_method=plugin인 일반 App을 찾고 exact version을 다운로드하거나 Claude Code·Codex에 설치해요. `download`는 검증된 새 ZIP만 저장하고, `install`은 offline preview 뒤 `--execute --yes`를 명시한 경우에만 archive 공격과 manifest identity를 검사하고 AxHub 관리 local marketplace와 host 공식 plugin CLI로 user scope에 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish·submit execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 사용해요. 성공은 `publish --submit`이면 `review_submitted`·installable=false, 업로드만 했으면 `upload_complete`·installable=false이고 다음 단계는 `axhub plugin submit`(게시 심사 신청)이에요. 결과 알림은 없어서 `axhub plugin manage status --app <app>`로 확인하고, 이후 owner는 App Console, reviewer는 Console Review를 사용해요. 이 흐름은 axhub CLI 0.50.0 이상이 필요해요.
 
 | 스킬 | 언제 | 자연어 예시 |
 |------|------|-------------|
 | `setup` | 셋업·CLI 설치·업데이트·로그인 점검 | "처음인데 셋업해줘", "axhub 업데이트해줘", "로그인해줘" |
-| `bootstrap` | 새 앱 생성 | "결제 앱 만들어줘", "프로젝트 초기화해줘", "Next.js 앱 만들어줘" |
-| `scaffold` | 사용자 GitHub 저장소에서 새 앱 시작 | "내 계정에 레포 만들어서 시작", "회사 org에 저장소 파고 새 앱 만들어줘" |
+| `bootstrap` | 새 앱 생성 (Axhub 저장소·내 GitHub·회사 GitHub 조직) | "결제 앱 만들어줘", "내 깃허브에 새 앱 만들어줘", "회사 org에 저장소 파고 새 앱 만들어줘" |
 | `plugins` | plugin App 게시·목록·다운로드·host 설치 | "플러그인 목록 보여줘", "1.2.0 내려 받아", "Claude에 설치해줘", "여러 스킬을 하나로 올려줘" |
 | `deploy` | 현재 브랜치 배포 | "배포해", "ship 해줘", "프로덕션에 올려" |
 | `up` | 명시적인 repositoryless 로컬 폴더 배포 | "저장소 없이 배포해", "이 폴더 그대로 올려줘", "소스 올려서 배포" |
@@ -127,7 +126,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 버전·최신 확인은 `setup` 이 맡아요. 로그·환경변수·롤백·GitHub 재연결 같은 후속 운영 작업도 `Tenant recent deployments`, `Deployment list`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요.
 
-앱 생성·배포는 저장소 단계보다 먼저 public CLI의 top-level `git_backend`를 확인해요. resume/existing은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh bootstrap/scaffold는 read-only `axhub apps git-backend --tenant <tenant> --json`의 회사 판정(`decision`)을 따라요 — 회사가 정한 곳이면 묻지 않고, GitHub를 연결한 사람에게만 저장 위치를 물어 preview·execute에 `--git-choice`로 넘겨요(판정이 없는 구 서버는 추천값을 본 뒤 GitHub/Axhub self-hosted를 직접 선택하고 `--git-backend`로 전달해요). selfhosted면 정적 사이트를 포함해 계정 연동·device flow·GitHub App 설치를 건너뛰고 clone→`git push` webhook 배포를 기다려요. 앱 저장소에 아직 안 붙은 로컬 소스는 `import`가 그 저장소에 올려요. `GitHub 없이`만 말해도 selfhosted 정상 배포를 쓰며, `up`은 repositoryless upload를 명시한 경우만 맡아요.
+앱 생성·배포는 저장소 단계보다 먼저 public CLI의 top-level `git_backend`를 확인해요. resume/existing은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh bootstrap은 read-only `axhub apps git-backend --tenant <tenant> --json`의 회사 판정(`decision`)을 따라요 — 회사가 정한 곳이면 묻지 않고, GitHub를 연결한 사람에게만 저장 위치를 물어 preview·execute에 `--git-choice`로 넘겨요. 판정을 모르는 구 CLI는 업데이트로 보내요. selfhosted면 정적 사이트를 포함해 계정 연동·device flow·GitHub App 설치를 건너뛰고 clone→`git push` webhook 배포를 기다려요. 앱 저장소에 아직 안 붙은 로컬 소스는 `import`가 그 저장소에 올려요. `GitHub 없이`만 말해도 selfhosted 정상 배포를 쓰며, `up`은 repositoryless upload를 명시한 경우만 맡아요.
 
 ## ✅ 대표 여정과 UX 샘플
 
@@ -202,7 +201,7 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요.
 [verify]      axhub deploy verify <deployment-id> --app <app>  →  exit 0 일 때만 "배포 성공" 선언
 ```
 
-4개 레이어로 보면: **① 사용자(한국어)** → **② Claude Code (10 skills)** → **③ ax-hub-cli (axhub 바이너리 — plugin-support 그룹 + 공개 표면)** → **④ axhub-api backend**.
+4개 레이어로 보면: **① 사용자(한국어)** → **② Claude Code (9 skills)** → **③ ax-hub-cli (axhub 바이너리 — plugin-support 그룹 + 공개 표면)** → **④ axhub-api backend**.
 
 ---
 

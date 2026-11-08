@@ -63,35 +63,39 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "AI 활용 기록", "동의 없이 켜지지 않아요"
 
 ## AP-11 비-axhub 맥락 라우팅 가드
-- 규칙: axhub 를 명시하지 않은 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘" 같은 generic 동사)는 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결 manifest·직전 axhub 작업)이 있을 때만 스킬이 진행해요. 맥락이 없으면 실행·안내로 밀어붙이지 않고 axhub 사용 의사를 한 번 묻거나 종료해요 — 다른 axhub 스킬로 넘기지도 않아요. 배포할 곳을 말하지 않은 배포 발화만은 deploy 가 맥락 없이도 받아서, 이 "한 번 묻기"를 배포할 곳 카드로 해요 (AP-27). 이미 preview-confirm 승인이 backstop 인 bootstrap 은 frontmatter 게이트로만 적용하고 본문 질문은 생략해요. headless 에서는 묻지 않고 멈춰요.
-- 적용: skills/bootstrap/SKILL.md, skills/plugins/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/clarity/SKILL.md, skills/up/SKILL.md
+- 규칙: axhub 를 명시하지 않은 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘" 같은 generic 동사)는 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결 manifest·직전 axhub 작업)이 있을 때만 스킬이 진행해요. 맥락이 없으면 실행·안내로 밀어붙이지 않고 axhub 사용 의사를 한 번 묻거나 종료해요 — 다른 axhub 스킬로 넘기지도 않아요. 배포할 곳을 말하지 않은 배포 발화만은 deploy 가 맥락 없이도 받아서, 이 "한 번 묻기"를 배포할 곳 카드로 해요 (AP-27). 이미 preview-confirm 승인(`지금 만들고 배포까지 진행할까요?`)이 backstop 인 bootstrap 은 frontmatter 게이트로만 적용하고 본문 질문은 생략해요 — 그래서 아래 invariant 검사 대상에서 빠져요. headless 에서는 묻지 않고 멈춰요.
+- 적용: skills/plugins/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/clarity/SKILL.md, skills/up/SKILL.md
 - invariant: "axhub 맥락"
 
 ## AP-12 axhub 진입 확인 (preview 통합 게이트)
 - 규칙: axhub 프로젝트가 확정된 상태에서 axhub 에 아직 없는 것을 새로 만드는 일(생성·가져오기·첫 연결·plugin App 게시)은 실행하기 전에 interactive preview 승인 하나가 axhub 진입 확인을 겸해요. 이미 AXHub 에 있는 앱의 재배포(`deploy`·`up`)는 이 승인을 받지 않아요 — AP-29 의 맞추기를 하고 물을 일이 있을 때만 그것을 물어요. 재배포는 배포 이력으로 되돌릴 수 있고, 답이 사실상 "응" 하나뿐인 확인은 막는 것 없이 마찰만 더해서예요(spec 681). headless 재배포는 물을 일이 없으면 실제로 배포하고, 있으면 아무것도 바꾸지 않고 멈춰요. `plugins`의 목록·다운로드는 read-only/no-clobber라 별도 실행 승인을 요구하지 않고, publish만 rights attestation과 execute를 결합해요. headless publish·생성은 preview에서 멈추고 어떤 lane에서도 승인을 조용히 건너뛰지 않아요.
 - host 별 승인 프리미티브: 네이티브 선택 UI 는 Claude 판의 프리미티브이고, Codex 판의 프리미티브는 명시 텍스트 승인 1회예요 — 유효 승인은 preview 를 본 뒤 사용자가 안내된 canonical 승인 문구를 byte-exact 로 입력한 경우만이에요. preview 전에 미리 넣어 둔 문구, 유사 표현, 무응답은 승인이 아니에요. 이 선주입 무효 조항은 실측 A/B(조항 없는 게이트는 선주입 문구를 3/3 승인으로 오인, 조항 있으면 3/3 정지)로 필수 확인됐고, codex 파생 번들의 승인 문안에 기계 잠금돼요.
-- 적용: skills/bootstrap/SKILL.md, skills/import/SKILL.md, skills/scaffold/SKILL.md, skills/plugins/SKILL.md
+- bootstrap: 승인 질문 `지금 만들고 배포까지 진행할까요?` 와 headless 정지(물어야 할 게 생긴 순간 아무것도 만들지 않고 멈춤)를 본문 자기 문장으로 둬요. 공용 invariant 문구는 없어서 아래 적용 목록에서 빠지고, codex 판 invariant 로 검사해요.
+- 적용: skills/import/SKILL.md, skills/plugins/SKILL.md
 - invariant: "axhub 진입 확인", "승인을 조용히 건너뛰지 않아요"
-- 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/scaffold/SKILL.md, plugins/axhub-codex/skills/plugins/SKILL.md
+- 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/plugins/SKILL.md
 - 빈 답변 fail-closed (codex): 네이티브 선택 카드가 켜진 세션에서 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 이 규칙은 정책과 실행 스킬 본문의 첫 8,000B 두 채널이 겹쳐 소유해요 — 본문은 8,000B 에서 절단되니 규칙은 그 안에 둬요.
 - invariant(codex): "미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요"
 
 ## AP-16 상태 폴링 예산
 - 규칙: 배포·생성 상태를 반복 확인하는 tool call(`deploy status`·`deploy verify`·`apps bootstrap-status` 재호출)은 한 요청당 폴링 예산 **최대 30회 또는 10분** 중 먼저 닿는 쪽까지만 반복해요. 예산에 닿으면 실패로 선언하지 않고 "아직 진행 중이에요" 와 이어서 확인할 명령을 안내하는 재개 요약으로 응답을 끝내며, deployment id/bootstrap id 는 그 안내에 보존해요. 이 예산 종료는 "terminal 전 응답 종료 금지" 규칙의 유일한 예외예요. CLI 자체의 `--watch` 상한과 별개로, 스킬 레벨 반복에는 항상 이 예산이 적용돼요.
 - 대기 수단 우선: preflight 가 `capabilities.import.verify_wait` 를 true 로 보고하면 스킬 레벨 반복 대신 `deploy verify --wait --wait-interval 20s --wait-timeout 9m` 단일 호출로 이 예산을 CLI 안에서 소화해요. 이 호출은 명령 도구 timeout 을 600000ms 로 올려 실행해요 — 도구 기본 timeout(2분)에 먼저 끊기면 CLI 가 판정 exit 를 돌려주지 못하고, CLI 대기 9분은 도구 최대 10분 안에서 끝나요. exit 6·10 이나 도구 timeout 끊김은 실패가 아니라 재개 요약과 같은 verify 명령 한 줄로 끝내요. 스킬은 `sleep`·shell loop 를 쓸 수 없으므로 대기 수단 없이 같은 명령을 연달아 호출하면 30회 예산이 몇 초 만에 소진되고, 사용자 화면에는 같은 exit 6 이 실패한 명령처럼 도배돼요. 반복 호출은 그 capability 가 없는 구 CLI 의 fallback 이에요.
-- 적용: skills/bootstrap/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md, skills/up/SKILL.md
+- bootstrap: 반복 호출 없이 `apps bootstrap-status --watch --watch-timeout 9m` 과 `deploy verify --wait` 단일 호출(명령 시간 제한 10분)로 기다리고, exit 6·10 은 실패가 아니라 같은 명령으로 다시 확인할 수 있다고 알리고 끝내요. 반복 폴링이 없어서 아래 적용 목록에서 빠져요.
+- 적용: skills/deploy/SKILL.md, skills/import/SKILL.md, skills/up/SKILL.md
 - invariant: "폴링 예산", "최대 30회 또는 10분", "--wait --wait-interval 20s --wait-timeout 9m", "600000ms"
 
 ## AP-17 CLI 경로 해석 (설치 여부 오판 금지)
 - 규칙: bare `axhub` 호출 실패(command not found·exit 127)는 미설치 판정 근거가 아니에요. 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 오래된 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요. 모든 스킬의 CLI 가드는 (1) `command -v axhub`, (2) 위치 파일 `~/.axhub/bin-path`(CLI 0.24.8+ 가 자기 설치 위치를 기록), (3) canonical 경로 `~/.axhub/bin/axhub`(Windows Git Bash 는 `.exe`) 순서로 실행 파일을 찾아요. 디스크에서 찾으면 재설치·setup 으로 돌려보내지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤, 같은 세션의 남은 명령은 반환된 `bin_path` 절대경로로 이어가요 (이미 열린 셸의 PATH 는 OS 설계상 밖에서 못 고쳐요). 구 CLI 라 `bin_path` 가 없으면 찾은 절대경로를 그대로 써요. 세 경로 모두에서 실행 파일을 못 찾을 때만 미설치로 보고 setup 을 안내해요.
 - repair-path 오류 결과: `repair-path --json` 이 `repaired:false` 와 `error` 를 돌려줘도(예: 샌드박스가 셸 rc 쓰기를 막은 `error_code: "write_denied"`, `sandbox: true`) `bin_path` 가 있으면 막힘이 아니에요 — 리포트·재설치 없이 그 절대경로로 남은 명령을 이어가요. exit 는 0 이에요(fail-open). 사용자가 PATH 를 영구 등록하고 싶다고 할 때만 `manual_line`(셸 rc 에 넣을 정확한 한 줄)을 알려 줘요. `bin_path` 까지 없을 때만 위 3-경로 탐색으로 찾은 절대경로를 그대로 써요.
-- 적용: skills/bootstrap/SKILL.md, skills/scaffold/SKILL.md, skills/plugins/SKILL.md, skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/import/SKILL.md, skills/up/SKILL.md, hooks/session-auto-update.sh, CLAUDE.md
+- bootstrap: preflight 가 안 되면 setup 으로 보내고 멈춰요 — 경로 해석·`repair-path` 는 setup 이 맡아서 아래 적용 목록에서 빠져요.
+- 적용: skills/plugins/SKILL.md, skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/import/SKILL.md, skills/up/SKILL.md, hooks/session-auto-update.sh, CLAUDE.md
 - invariant: "bare `axhub` 실패는 미설치가 아니에요", "repair-path"
 
 ## AP-18 device flow 코드 선노출
 - 규칙: GitHub device flow 가 필요한 순간에는 코드 노출이 사용자 행동의 전부예요. 코드를 몇 분씩 도는 saga 명령(`apps bootstrap --execute` 등) 안에만 두지 않아요 — 그 tool call 이 실패·거부·중단되면 stdout 이 사라져 사용자는 브라우저의 빈 코드 입력 화면만 보게 돼요. 코드가 안 보인 채 saga 가 끝나면 같은 `--execute` 를 다시 실행하지 않아요 — 새 device code 가 발급돼 이미 받은 코드가 무효가 돼요. 대신 즉시 끝나는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link` 로 코드를 받아 본문에 `인증 URL:` 과 `입력 코드:` 두 줄로 먼저 노출하고, 승인 확인 뒤 `--resume-last` 로 이어가요. 재시도 구간도 같아요 — `--resume-last` 의 `device_code_pending` 응답은 `user_code`·`verification_uri`·`expires_at` 을 실어 주므로 재시도마다 그 두 줄을 다시 써요. 승인만이 이 루프를 끝내니, 코드 없이 `아직 대기 중` 만 반복하는 재시도는 사용자가 할 수 있는 일이 없어요. 이 필드가 없는 구 CLI 에서는 재노출을 건너뛰고 재시도만 이어가요.
 - 코드 유실·만료 재발급: `github link` 는 저장된 pending device link 를 그대로 이어 줘요 — 사용자가 코드를 놓쳤거나 코드가 만료된 뒤 같은 명령을 다시 실행하면 이미 죽은 코드가 그대로 돌아와서, 아무리 승인해도 연동이 영영 안 풀려요. 코드를 못 봤다·사라졌다·만료됐다는 신호가 있거나 같은 코드로 승인 확인이 계속 pending 이면 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --fresh` 로 새 코드를 발급해 두 줄을 다시 써요. 반대로 사용자가 지금 보고 있는 코드가 아직 유효하면 `--fresh` 를 붙이지 않아요 — 그 플래그가 그 코드를 무효로 만들어요. `--fresh` 를 모르는 구 CLI 는 exit 64(사용법)로 거부하니 플래그 없이 한 번만 다시 실행하고 setup 스킬로 CLI 업그레이드를 안내해요.
-- 적용: skills/bootstrap/SKILL.md, skills/clarity/SKILL.md
+- bootstrap: saga 밖에서 `axhub github link --json` 으로 코드를 먼저 받아 `https://github.com/login/device 에서 코드 <코드> 를 입력해 주세요.` 로 알리고, `axhub github link --wait-approval 90s --json` 으로 기다리며, 만료되면 `--fresh` 로 새로 받아요. 문구가 달라 아래 적용 목록에서 빠져요.
+- 적용: skills/clarity/SKILL.md
 - invariant: "입력 코드:", "github link", "github link --fresh"
 
 ## AP-15 앱 소유자·계정 불일치 비판정
@@ -118,18 +122,18 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "active_release_id"
 
 ## AP-23 app git backend 선판정
-- 규칙: 저장소 provider 대사나 mutation보다 먼저 public CLI JSON으로 effective backend를 확인해요. resume/existing은 `axhub apps get <app> --json`, fresh bootstrap/scaffold는 read-only `axhub apps git-backend --tenant <tenant> --json`을 쓰고 app row를 먼저 만들지 않아요. 기존 코드 import는 `plugin-support import`가 같은 입력으로 경로를 정하고(`selfhosted_repo_push`) 읽기 실패면 GitHub로 추측하지 않아요. 판정 입력은 top-level `git_backend.backend`·`git_backend.source`뿐이며(fresh 는 서버가 주는 `git_backend.decision` 도 — AP-24) Gitea API·C1 HTTP·remote URL을 보지 않아요. selfhosted는 계정 연동·device flow·GitHub App 설치 대사를 노출하지 않고(scaffold는 GitHub 명령 없이 bootstrap으로 양보), deploy는 static을 포함해 일반 `git push`의 webhook deployment id를 exact verify해요 — 빈·무관한 폴더만 `axhub repo clone`하고, 이 앱 저장소에 안 붙은 로컬 소스 폴더(`axhub repo clone <app> .`가 `repository.destination_exists`)는 clone 대신 `import`로 넘겨요. self-hosted static은 preflight `capabilities.import.selfhosted_static`이 true여야 하고 `axhub.yaml`에 `build.deploy_method: static`과 명시적 `build.static_output_dir`(루트면 `.`)을 둬요. GitHub와 `legacy_github`는 static upload lane을 포함해 기존 gate/upload/create 경로를 유지해요.
-- 적용: skills/bootstrap/SKILL.md, skills/deploy/SKILL.md
+- 규칙: 저장소 provider 대사나 mutation보다 먼저 public CLI JSON으로 effective backend를 확인해요. resume/existing은 `axhub apps get <app> --json`, fresh bootstrap은 read-only `axhub apps git-backend --tenant <tenant> --json`을 쓰고 app row를 먼저 만들지 않아요(fresh 판정 문구는 AP-24 가 검사해요). 기존 코드 import는 `plugin-support import`가 같은 입력으로 경로를 정하고(`selfhosted_repo_push`) 읽기 실패면 GitHub로 추측하지 않아요. 판정 입력은 top-level `git_backend.backend`·`git_backend.source`뿐이며(fresh 는 서버가 주는 `git_backend.decision` 도 — AP-24) Gitea API·C1 HTTP·remote URL을 보지 않아요. selfhosted는 계정 연동·device flow·GitHub App 설치 대사를 노출하지 않고, deploy는 static을 포함해 일반 `git push`의 webhook deployment id를 exact verify해요 — 빈·무관한 폴더만 `axhub repo clone`하고, 이 앱 저장소에 안 붙은 로컬 소스 폴더(`axhub repo clone <app> .`가 `repository.destination_exists`)는 clone 대신 `import`로 넘겨요. self-hosted static은 preflight `capabilities.import.selfhosted_static`이 true여야 하고 `axhub.yaml`에 `build.deploy_method: static`과 명시적 `build.static_output_dir`(루트면 `.`)을 둬요. GitHub와 `legacy_github`는 static upload lane을 포함해 기존 gate/upload/create 경로를 유지해요.
+- 적용: skills/deploy/SKILL.md
 - invariant: "axhub apps get <app> --json", "git_backend.backend=selfhosted"
-- 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/deploy/SKILL.md
+- 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md
 - invariant(codex): "axhub apps get <app> --json", "git_backend.backend=selfhosted"
 
 ## AP-24 fresh git backend 명시 선택
-- 규칙: 서버가 `git_backend.decision`(spec 706 — 회사 모드 무조건 Axhub 저장소·무조건 GitHub·둘 다)을 주면 fresh 저장 위치는 그 판정만 따라요. `use` 는 묻지 않고, `ask`(둘 다 모드에서 GitHub 를 연결한 사람)만 `코드를 어디에 저장할까요?` 를 `options` 순서·`recommended` 그대로 묻고, `link_github` 는 `axhub github link` 로 연결한 뒤 다시 읽어요. 내 GitHub 계정이 둘 이상일 때만 `어느 GitHub 계정에 둘까요?` 를 물어요. 고른 key 는 preview·execute 에 `--git-choice <key>`(+`--github-owner`)로 넘기고 `remembered`·추천값은 쓰지 않아요. 판정에 없는 저장 위치를 말하면 바꾸지 않고 멈춰요. preflight `capabilities.self_hosted_git.git_policy_decision` 이 없는 CLI 는 업데이트로 보내요. 판정이 없는 구 서버에서만 아래가 적용돼요: fresh bootstrap/scaffold의 tenant `git_backend`는 추천값일 뿐이에요. 사용자가 현재 대화에서 GitHub 또는 Axhub self-hosted를 명시하면 그대로 쓰고, 아니면 interactive 선택 card로 코드 저장 위치를 한 번 물어요. 선택은 `SELECTED_GIT_BACKEND`로 같은 대화의 scaffold→bootstrap에 전달하되 app 생성 전 persisted 값이라고 말하지 않아요. existing/resume app은 persisted backend를 재사용하고 다시 묻지 않아요. provider 선택이 명시되지 않은 headless는 provider mutation 전에 safe-stop해요. bootstrap의 preview·execute·resume와 모든 `init-resume put`에는 literal `--git-backend github|selfhosted`를 넣어요.
-- 적용: skills/bootstrap/SKILL.md, skills/scaffold/SKILL.md
-- invariant: "SELECTED_GIT_BACKEND", "코드 저장 위치", "provider 선택이 명시되지", "`git_backend.decision`", "git_policy_decision"
-- 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/scaffold/SKILL.md
-- invariant(codex): "SELECTED_GIT_BACKEND", "코드 저장 위치", "provider 선택이 명시되지", "`git_backend.decision`", "git_policy_decision"
+- 규칙: 서버가 `git_backend.decision`(spec 706 — 회사 모드 무조건 Axhub 저장소·무조건 GitHub·둘 다)을 주면 fresh 저장 위치는 그 판정만 따라요. `use` 는 묻지 않고, `ask`(둘 다 모드에서 GitHub 를 연결한 사람)만 `코드를 어디에 저장할까요?` 를 `options` 순서·`recommended` 그대로 묻고, `link_github` 는 `axhub github link` 로 연결한 뒤 다시 읽어요. 내 GitHub 계정이 둘 이상일 때만 `어느 GitHub 계정에 둘까요?` 를 물어요. 고른 key 는 preview·execute 에 `--git-choice <key>`(+`--github-owner`)로 넘기고 `remembered`·추천값은 쓰지 않아요. 판정에 없는 저장 위치를 말하면 바꾸지 않고 멈춰요. preflight `capabilities.self_hosted_git.git_policy_decision` 이 없는 CLI 는 업데이트로 보내요. 물어야 하는데 답할 수 없는 headless 는 아무것도 만들지 않고 멈춰요. 판정이 없는 구 서버용 `--git-backend` 분기와 `SELECTED_GIT_BACKEND`·`init-resume` 이어하기는 2026-11 bootstrap·scaffold 통합 때 없앴어요 — 이어 하기는 같은 이름의 내 앱이 이미 있으면 생성 단계를 건너뛰는 것으로 대신해요.
+- 적용: skills/bootstrap/SKILL.md
+- invariant: "`git_backend.decision`", "git_policy_decision", "코드를 어디에 저장할까요?", "--git-choice"
+- 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md
+- invariant(codex): "`git_backend.decision`", "git_policy_decision", "코드를 어디에 저장할까요?", "--git-choice"
 
 ## AP-25 배포 환경 표시 (스테이징을 운영으로 오인 금지)
 - 규칙: 스테이징 옵트인 앱(`apps get` 의 `staging_enabled=true` — spec 016)은 push/manual 배포가 스테이징에만 반영되고 운영은 심사 승인 뒤 promote 로만 바뀌어요. 그래서 배포 환경은 CLI profile 이 아니라 `staging_enabled` 로 판단해요. preview 카드의 환경 라벨은 `staging_enabled` 가 true 면 `스테이징`, 아니면 `운영` 이에요. verify 성공(exit 0) 뒤 성공 요약은 `deploy verify --json` 의 `environment` 를 읽어요 — `staging` 이면 "스테이징에 반영됐고 운영에는 아직 반영되지 않았어요" 와 다음 단계(심사 신청 `axhub publish --app <app> --deployment-id <id> --execute`, 승인은 Console Review, 승인 뒤 promote 자동)를 같은 성공 블록에서 안내하고 "운영 반영 완료" 라고 말하지 않아요. `environment` 가 없거나 null(구 CLI·앱 조회 실패)이면 운영으로 간주하지 않고 `apps get` 의 `staging_enabled` 로 같은 판단을 해요. 심사 신청은 사용자가 요청할 때만 실행해요.
@@ -175,5 +179,6 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-31 에이전트 샌드박스 쓰기 거절
 - 규칙: 홈 폴더(`$HOME`) 아래를 쓰는 명령 — `auth login`, `axhub --tenant <tenant> git setup --json`, `plugin-support repair-path --json`, self-hosted `plugin-support import --mode execute`(안에서 git setup 을 해요) — 은 에이전트 샌드박스(Codex workspace-write 등) 안이면 첫 실행부터 권한 상승(샌드박스 밖)으로 실행해요. `repo clone` 은 `git setup` 이 저장한 자격증명을 읽고 대상 폴더에만 써서 미리 권한 상승하지 않아요. subcode `local.write_denied`(exit 64, 구 CLI 는 exit 1 `Operation not permitted`)는 CLI 버그가 아니라 예상된 거절이에요. 샌드박스 안에서 막혔을 때만(hint 가 에이전트 샌드박스를 말해요, `CODEX_SANDBOX`·`CODEX_SANDBOX_NETWORK_DISABLED` 설정) 같은 명령을 권한 상승으로 한 번만 다시 실행해요 — 샌드박스 안 재실행은 다시 거절돼요. 이미 권한 상승이었거나 hint 에 `check that you own <path>` 가 있으면 재실행하지 않고, 그 경로의 소유자·권한(예: `sudo axhub` 가 남긴 파일)을 고치도록 사용자에게 안내해요. hint 앞에 맥락(`failed to save PAT: cannot write <path>: …`)이 붙을 수 있어 시작 문구가 아니라 subcode 로 판정해요. import 는 `recovery_action` 이 이 구분을 담아요. 같은 세션에서 `git setup` 이 이미 성공했으면 push 전에 다시 하지 않아요(push 는 저장된 자격증명을 읽기만 해요).
-- 적용: skills/bootstrap/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md
+- bootstrap: 에이전트 샌드박스 안이면 `git setup` 을 처음부터 권한 상승으로 실행한다고만 적고 subcode 재시도 규칙은 두지 않아서 아래 적용 목록에서 빠져요.
+- 적용: skills/deploy/SKILL.md, skills/import/SKILL.md
 - invariant: "local.write_denied"

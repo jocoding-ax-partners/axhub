@@ -24,23 +24,18 @@ describe("github link --fresh reissue contract", () => {
     expect(clarity).toContain("위 `--fresh` 재발급을 한 번 먼저 쓰고");
   });
 
-  test("bootstrap AP-18 fast path reissues instead of replaying a dead code", () => {
+  test("bootstrap reissues an expired code with --fresh instead of replaying it", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
 
-    expect(bootstrap).toContain("`github link --fresh`");
-    expect(bootstrap).toContain("저장된 pending link 는 죽은 코드를 그대로 돌려줘요");
-    expect(bootstrap).toContain("유효한 코드가 화면에 있으면 붙이지 않아요");
-    // 구 CLI(exit 64) fallback 은 본문 byte 캡 때문에 reference 가 소유해요
-    const errors = readRepo("skills/bootstrap/references/errors-and-followups.md");
-    expect(errors).toContain("`--fresh` 가 exit 64 로 거부되면 그 플래그를 모르는 구 CLI 라");
+    // bootstrap 은 saga 밖에서 `github link --json` 으로 코드를 먼저 받고, 만료면 `--fresh` 로 새로 받아요.
+    expect(bootstrap).toContain("axhub github link --json");
+    expect(bootstrap).toContain("코드가 만료됐으면 `--fresh` 로 새로 받아요");
   });
 
   test("github_relogin_required lanes point at the reissue instead of a bare retry", () => {
     for (const path of [
       "skills/deploy/references/error-empathy-catalog.md",
-      "skills/bootstrap/references/errors-and-followups.md",
-      "skills/bootstrap/references/templates-and-github.md",
-      "skills/scaffold/SKILL.md",
+      "skills/bootstrap/SKILL.md",
       "skills/import/SKILL.md",
     ]) {
       expect(readRepo(path), path).toContain("--fresh");

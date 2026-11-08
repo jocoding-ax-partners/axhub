@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.39.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.38.1...plugin-v1.39.0) (2026-11-08)
+
+새 앱 만들기가 bootstrap 스킬 하나로 합쳐졌어요. 회사의 코드 저장 위치 정책을 먼저 보고, Axhub 저장소·내 GitHub·회사 GitHub 조직 중 회사가 허용한 곳에 앱을 만들어 첫 배포까지 확인해요. GitHub 은 고른 사람에게만 계정 연결·앱 설치를 안내하고, 예전 scaffold 스킬은 없앴어요. axhub CLI 0.55.0 이상이 필요해요.
+
+
+### Added
+
+* **plugin:** 새 앱 만들기를 bootstrap 하나로 합치고 회사 정책을 먼저 본다 ([33cff83](https://github.com/jocoding-ax-partners/axhub-mono/commit/33cff83324094ab9a02a7631819917cc3034ac05))
+
 ## [1.38.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.38.0...plugin-v1.38.1) (2026-11-05)
 
 Windows 의 Claude Code 에 지금과 맞지 않는 안내("PowerShell 금지" 등)를 넣던 훅과, axhub 를 쓰지 않는 세션에도 긴 규칙을 넣던 실패 리포트 훅을 뺐어요. 스킬에 남아 있던 같은 Windows 안내도 지웠어요. 이제 세션 시작 훅은 자동 업데이트와 재시작 확인 두 개예요.

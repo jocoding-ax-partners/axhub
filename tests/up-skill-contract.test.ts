@@ -126,7 +126,6 @@ describe("up skill contract", () => {
       "skills/deploy/SKILL.md",
       "skills/deploy/references/workflow-details.md",
       "skills/bootstrap/SKILL.md",
-      "skills/bootstrap/references/github-blocked-local-deploy.md",
     ]) {
       const text = readRepo(path);
       expect(text, path).not.toMatch(/axhub up [^\n]*--execute/);

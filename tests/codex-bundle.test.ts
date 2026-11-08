@@ -9,7 +9,6 @@ const REPO_ROOT = join(import.meta.dir, "..");
 const SKILLS = [
   "setup",
   "bootstrap",
-  "scaffold",
   "plugins",
   "deploy",
   "up",
@@ -139,9 +138,9 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     expect(/\.plugin-update-restart(?!-codex)/.test(restartConfirm)).toBe(false);
   });
 
-  test("approval ladder carries the pre-injection-invalid clause in all six execution skills", () => {
+  test("approval ladder carries the pre-injection-invalid clause in all five execution skills", () => {
     // 실측 A/B: 이 조항 없이는 선주입 승인 문구가 실행으로 이어졌어요 (R6·AP-12).
-    for (const skill of ["bootstrap", "import", "scaffold", "plugins"] as const) {
+    for (const skill of ["bootstrap", "import", "plugins"] as const) {
       const source = readFileSync(join(outDir, "skills", skill, "SKILL.md"), "utf8");
       expect(source, skill).toContain("미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요");
       expect(source, skill).not.toContain("네이티브 선택 UI 가 있으면 그걸로 묻고");
@@ -242,15 +241,14 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
   // 존재 assert 로는 이걸 못 잡아서, 게이트 문자열의 byte offset 을 직접 계약으로 고정해요.
   const CODEX_SKILL_PROMPT_LIMIT = 8_000;
   const GATE_STRINGS: Record<string, readonly string[]> = {
+    // 옛 scaffold 를 합친 판 — 회사 판정(git-backend)·앱 권한(features)·이름·승인·execute 가 절단선 안에 있어야 해요.
     bootstrap: [
-      "axhub apps get <app> --json",
-      "axhub apps git-backend --tenant <tenant> --json",
-      "git_backend.backend=selfhosted",
-      "`GitHub`/`Axhub self-hosted`",
-      "`--git-backend github|selfhosted`",
-      "resume=`state.git_backend` 우선",
-      "GitHub 계정·device flow·App·owner 질문 0회",
-      "`--template nextjs-axhub`",
+      "미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요",
+      "axhub tenants features --tenant <회사> --json",
+      "axhub apps git-backend --tenant <회사> --json",
+      "`git_backend.decision`",
+      "--git-choice <key>",
+      "--template nextjs-axhub",
       "앱 이름을 무엇으로 할까요?",
       "지금 만들고 배포까지 진행할까요?",
       "--execute",
@@ -269,15 +267,6 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       "어디에 배포할까요?",
     ],
     import: ["인터넷 주소를 만들까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "어떤 방식으로 배포할까요?"],
-    scaffold: [
-      "명시 텍스트 승인 1회",
-      "미리 넣어 둔 문구",
-      "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
-      "두 요구는 동시에 충족할 수 없어요",
-      "코드 저장 위치를 먼저 선택",
-      "axhub apps git-backend --tenant <tenant> --json",
-      "SELECTED_GIT_BACKEND=selfhosted",
-    ],
     plugins: ["artifact를 배포할 권리가 있음을 확인하고", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "--idempotency-key", "--execute"],
     up: ["승인 카드를 띄우지 않아요", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "아무것도 바꾸지 않고 멈춰요", "`GitHub 없이`만으로 repositoryless upload를 확정하지 않아요", "selfhosted app의 정상 배포는", "--execute", "axhub deploy verify"],
   };
