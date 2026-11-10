@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.42.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.41.0...plugin-v1.42.0) (2026-11-10)
+
+배포는 이제 항상 커밋해서 올려요. "지금 폴더 그대로 올려줘"라고 해도 바뀐 코드를 커밋하고 그렇게 했다고 알려 줘서, 운영 코드와 저장소가 어긋나지 않아요. 저장소 없이 폴더 업로드로만 배포해 온 옛 앱은 Axhub 저장소로 옮길지 먼저 묻고, 옮긴 뒤 이 폴더를 커밋해서 첫 배포까지 해요. 사용자가 바꾼 코드는 그 내용 그대로 커밋 메시지를 달아요. 저장소 옮기기 안내는 axhub CLI 0.63.0 이상에서 나와요.
+
+
+### Fixed
+
+* **plugin:** 배포는 항상 커밋해서 올리고 저장소 없는 앱은 Axhub 저장소로 옮기게 한다 ([a367d49](https://github.com/jocoding-ax-partners/axhub-mono/commit/a367d49b16952187cf38b26d14d5a3c78466309f))
+
 ## [1.41.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.40.1...plugin-v1.41.0) (2026-11-10)
 
 배포·폴더 그대로 올리기·실패 원인 진단을 배포 스킬 하나로 합쳤어요. "배포해줘" 하면 바뀐 코드를 axhub 기준 문서로 점검하고 맞춘 뒤, 앱이 Axhub 저장소인지 GitHub 인지와 상관없이 같은 방법으로 올려요. 배포가 실패하면 같은 흐름 안에서 상태·로그를 보고 원인을 설명하고, "왜 실패했어"처럼 원인만 물으면 아무것도 바꾸지 않아요. 정적 앱에 서버가 필요하면 서버 앱으로 바꿀지 물어요. 스킬은 7개가 됐고(up·diagnosis 는 배포로 합쳐짐), axhub CLI 0.62.0 이상이 필요해요.

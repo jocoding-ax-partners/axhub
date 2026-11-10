@@ -116,11 +116,11 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "plugin.current_servable_version", "`version_id`를 만들거나 보고하지 않아요", "download 요청과 install 요청을 구분", "--execute --yes", "Publish execute에는 OAuth나 broad PAT 대신", "PAT를 미리 발급하지 않", "submit_plugin_version_for_review", "upload_complete", "axhub plugin submit"
 
 ## AP-23 올리는 길은 CLI 가 골라요 (deploy push)
-- 규칙: 이미 있는 앱의 배포는 저장 위치(Axhub 저장소·GitHub·정적 사이트·폴더 업로드)별 길을 스킬이 판정하지 않고 `axhub deploy push` 가 골라요 — 저장 위치 판정·배포 번호 찾기·기다리기는 CLI 몫이에요. 스킬은 Gitea API·C1 HTTP·remote URL 을 보지 않아요. 앱 이름만 말했고 폴더가 비어 있으면 `axhub repo clone <앱> . --json` 으로 받고, 이 앱 저장소에 안 붙은 로컬 소스 폴더는 clone 대신 import 로 보내고 멈춰요. 커밋 안 된 변경은 맞추기에서 커밋하고, 사용자가 "지금 폴더 그대로"라고 했을 때만 `--working-tree` 를 붙여요. (2026-11 전에는 스킬이 `apps get` 의 `git_backend` 로 selfhosted push·GitHub·static upload 길을 직접 나눴고, 저장소 없이 올리는 길은 up 스킬이 맡았어요.) 새 앱의 저장 위치 판정은 AP-24 가 맡아요.
+- 규칙: 이미 있는 앱의 배포는 저장 위치(Axhub 저장소·GitHub·정적 사이트)별 길을 스킬이 판정하지 않고 `axhub deploy push` 가 골라요 — 저장 위치 판정·배포 번호 찾기·기다리기는 CLI 몫이에요. 스킬은 Gitea API·C1 HTTP·remote URL 을 보지 않아요. 앱 이름만 말했고 폴더가 비어 있으면 `axhub repo clone <앱> . --json` 으로 받고, 이 앱 저장소에 안 붙은 로컬 소스 폴더는 clone 대신 import 로 보내고 멈춰요. 커밋 안 된 변경은 맞추기에서 커밋하고, "지금 폴더 그대로"라고 해도 커밋해서 올려요(저장소와 운영 코드가 어긋나지 않게 업로드 배포는 쓰지 않아요). 저장소 없는 옛 앱은 Axhub 저장소로 옮길지 물어요. (2026-11 전에는 스킬이 `apps get` 의 `git_backend` 로 selfhosted push·GitHub·static upload 길을 직접 나눴고, 저장소 없이 올리는 길은 up 스킬이 맡았어요.) 새 앱의 저장 위치 판정은 AP-24 가 맡아요.
 - 적용: skills/deploy/SKILL.md
-- invariant: "axhub repo clone <앱> . --json", "import 로 보내고 멈춰요", "--working-tree"
+- invariant: "axhub repo clone <앱> . --json", "import 로 보내고 멈춰요", "커밋해서 올리고 커밋했다고 알려요", "Axhub 저장소로 옮길지 묻고"
 - 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md
-- invariant(codex): "axhub repo clone <앱> . --json", "import 로 보내고 멈춰요", "--working-tree"
+- invariant(codex): "axhub repo clone <앱> . --json", "import 로 보내고 멈춰요", "커밋해서 올리고 커밋했다고 알려요", "Axhub 저장소로 옮길지 묻고"
 
 ## AP-24 fresh git backend 명시 선택
 - 규칙: 서버가 `git_backend.decision`(spec 706 — 회사 모드 무조건 Axhub 저장소·무조건 GitHub·둘 다)을 주면 fresh 저장 위치는 그 판정만 따라요. `use` 는 묻지 않고, `ask`(둘 다 모드에서 GitHub 를 연결한 사람)만 `코드를 어디에 저장할까요?` 를 `options` 순서·`recommended` 그대로 묻고, `link_github` 는 `axhub github link` 로 연결한 뒤 다시 읽어요. 내 GitHub 계정이 둘 이상일 때만 `어느 GitHub 계정에 둘까요?` 를 물어요. 고른 key 는 preview·execute 에 `--git-choice <key>`(+`--github-owner`)로 넘기고 `remembered`·추천값은 쓰지 않아요. 판정에 없는 저장 위치를 말하면 바꾸지 않고 멈춰요. preflight `capabilities.self_hosted_git.git_policy_decision` 이 없는 CLI 는 업데이트로 보내요. 물어야 하는데 답할 수 없는 headless 는 아무것도 만들지 않고 멈춰요. 판정이 없는 구 서버용 `--git-backend` 분기와 `SELECTED_GIT_BACKEND`·`init-resume` 이어하기는 2026-11 bootstrap·scaffold 통합 때 없앴어요 — 이어 하기는 같은 이름의 내 앱이 이미 있으면 생성 단계를 건너뛰는 것으로 대신해요.
