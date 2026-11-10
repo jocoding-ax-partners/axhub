@@ -266,7 +266,18 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       "자동 배포되는 GitHub push보다 env·수정 커밋이 먼저예요.",
       "어디에 배포할까요?",
     ],
-    import: ["인터넷 주소를 만들까요?", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "어떤 방식으로 배포할까요?"],
+    // 2026-11 개편판 — 회사 판정·확인 한 번·빈 답 미승인·execute 한 번·대기·headless 정지가 절단선 안에 있어야 해요.
+    import: [
+      "미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요",
+      "명시 텍스트 승인 1회",
+      "capabilities.self_hosted_git.git_policy_decision",
+      "--git-choice <key>",
+      "지금 이대로 고쳐서 axhub 에 올릴까요?",
+      "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
+      "--mode execute --approved --commit-manifest --verify-wait none",
+      "--wait --wait-timeout 9m",
+      "`--headless` 미리보기와 요약까지만",
+    ],
     plugins: ["artifact를 배포할 권리가 있음을 확인하고", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "--idempotency-key", "--execute"],
     up: ["승인 카드를 띄우지 않아요", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "아무것도 바꾸지 않고 멈춰요", "`GitHub 없이`만으로 repositoryless upload를 확정하지 않아요", "selfhosted app의 정상 배포는", "--execute", "axhub deploy verify"],
   };

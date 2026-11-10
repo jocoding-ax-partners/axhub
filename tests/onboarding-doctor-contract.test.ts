@@ -10,15 +10,13 @@ const LEGACY_SHIM = join(REPO_ROOT, "tests", "e2e", "claude-cli", "fixtures", "b
 const TOP_LEVEL_FIELDS = ["cards", "code_agent", "completed", "first_gap", "no_gap", "outcome", "profile", "schema_version", "total"];
 const CODE_AGENT_FIELDS = ["kind", "label", "plugin_installed", "version"];
 const CARD_FIELDS = ["action_id", "id", "label", "safety", "state"];
-const CARD_IDS = ["cli", "tools", "agent", "plugin", "auth", "github_link", "github_app"] as const;
+const CARD_IDS = ["cli", "tools", "agent", "plugin", "auth"] as const;
 const CARD_STATES: Record<string, true> = { completed: true, active: true, pending: true, blocked: true, unknown: true };
 const ACTION_IDS: Record<string, true> = {
   install_git: true,
   install_node: true,
   agent_install: true,
   auth_login: true,
-  github_link: true,
-  github_app_install: true,
 };
 const SAFETY_LEVELS: Record<string, true> = { none: true, auto_safe: true, user_present: true };
 const OUTCOMES: Record<string, true> = { ok: true, broken: true, unknown: true, prerequisite_blocked: true };
@@ -130,7 +128,7 @@ const actionableProfile = (cardId: (typeof CARD_IDS)[number], actionId: string, 
 };
 
 describe("onboarding doctor external JSON contract", () => {
-  test("profile-only fixture pins the seven-card prerequisite contract", () => {
+  test("profile-only fixture pins the five-card prerequisite contract", () => {
     const profile = readProfileFixture() as JsonObject;
 
     expect(validateDoctorProfile(profile)).toEqual({ ok: true });
@@ -149,8 +147,8 @@ describe("onboarding doctor external JSON contract", () => {
       schema_version: "onboarding-doctor/v1",
       profile: "axhub",
       outcome: "prerequisite_blocked",
-      completed: 5,
-      total: 7,
+      completed: 3,
+      total: 5,
     });
     expect(findForbiddenKey(profile)).toBeUndefined();
     for (const gap of LEGACY_GAPS) expect(JSON.stringify(profile)).not.toContain(gap);
@@ -162,8 +160,6 @@ describe("onboarding doctor external JSON contract", () => {
       ["tools", "install_node", "auto_safe"],
       ["plugin", "agent_install", "auto_safe"],
       ["auth", "auth_login", "user_present"],
-      ["github_link", "github_link", "user_present"],
-      ["github_app", "github_app_install", "user_present"],
     ];
     for (const [cardId, actionId, safety] of validActions) {
       expect(validateDoctorProfile(actionableProfile(cardId, actionId, safety))).toEqual({ ok: true });

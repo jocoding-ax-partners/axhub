@@ -94,10 +94,7 @@ describe("smooth behavior contracts", () => {
     const clarity = readRepo("skills/clarity/SKILL.md") + readRepo("skills/clarity/references/execution-guardrails.md");
     const clarityFrontmatter = clarity.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
     const diagnosis = readRepo("skills/diagnosis/SKILL.md") + readRepo("skills/diagnosis/references/output-contract.md");
-    const importSkill =
-      readRepo("skills/import/SKILL.md") +
-      readRepo("skills/import/references/visibility-rules.md") +
-      readRepo("skills/import/references/manifest-authoring.md");
+    const importSkill = readRepo("skills/import/SKILL.md");
     const up = readRepo("skills/up/SKILL.md");
     const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
     const deployErrors = readRepo("skills/deploy/references/error-empathy-catalog.md");
@@ -184,53 +181,14 @@ describe("smooth behavior contracts", () => {
     expect(deployErrors).toContain("진행 중인 그 배포를 제가 계속 확인할게요");
     expect(deployErrors).not.toContain("말씀하시면 끝날 때까지");
 
+    // import(2026-11 개편판): 미리보기 → 확인 한 번 → execute 한 번 → verify 대기. 옛 표시 규칙 목록
+    // (도구 제목·URL 표기·첫 문장 고정·내부 용어 치환 예시·비공개 앱 본문 검증)은 의도적으로 뺐어요.
     expect(importSkill).toContain("axhub --json plugin-support import --mode preview");
-    expect(importSkill).toContain('axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT"');
-    expect(importSkill).toContain("static lane 에서는 사용자가 명시적으로");
-    expect(importSkill).toContain("axhub --json plugin-support import --mode execute --approved");
-    expect(importSkill).toContain('axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"');
-    expect(importSkill).toContain("권한 카드 한 번으로 끝나는");
-    expect(importSkill).toContain("--wait --wait-interval 20s --wait-timeout 9m --json");
-    expect(importSkill).toContain("GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 반드시 `$APP_SLUG` 와 정확히 같게 둬요");
-    expect(importSkill).toContain("같은 verify 를 반복 호출하거나");
-    expect(importSkill).toContain("existing_axhub_app_repair");
-    expect(importSkill).toContain("CLI 가 현재 `gh` 로그인과 app slug 로 repo 를 정하고");
-    expect(importSkill).toContain("capabilities.import.schemas");
-    expect(importSkill).toContain("고친 뒤에만 다시 시도해요");
-    expect(importSkill).toContain("raw JSON body");
-    expect(importSkill).toContain("low-level 명령을 조합해서 우회하지 않아요");
+    expect(importSkill).toContain("--mode execute --approved --commit-manifest --verify-wait none");
     expect(importSkill).toContain("axhub deploy --explain --json");
-    expect(importSkill).toContain("사용자에게 보이는 Bash/tool call 제목은 한국어 명사구로만");
-    expect(importSkill).toContain("`importing`, `imported`, `manifested`, `gitted`, `pushed`, `raw JSON`, `token-gate`, `manifest_create`, `verification_status`, `deployment`, `execute`, `git remote`, `curl`");
-    expect(importSkill).toContain("`.omc/`, `.claude/`, `.codex/`, `.serena/` 같은 런타임 상태는 제외");
-    expect(importSkill).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
-    expect(importSkill).toContain("Markdown URL 링크 문법은 전부 금지");
-    expect(importSkill).toContain("[https://...](https://...)`, `[열기](https://...)`, `<https://...>`");
-    expect(importSkill).toContain("첫 visible chat sentence 는 반드시 정확히 `기존 앱을 axhub에 가져올 준비를 확인할게요.` 로 시작");
-    expect(importSkill).toContain("그 앞에는 공백·설명·스킬 선택 이유를 포함해 어떤 문장도 쓰지 않아요");
-    expect(importSkill).toContain("스킬 선택 이유, route label, slash command label 을 절대 설명하지 않아요");
-    expect(importSkill).toContain("`/axhub:import`, `axhub:import`, `import 스킬`, `스킬을 사용할게요`, `스킬 호출`");
-    expect(importSkill).toContain("`앱 slug 미확정` 대신 `앱 이름이 아직 정해지지 않아 package.json 이름으로 확인할게요`");
-    expect(importSkill).toContain("`manifest_create 있으니` 대신 `앱 설정 파일이 필요해서 프로젝트 파일 근거로 작성할게요`");
-    expect(importSkill).toContain("`git remote 아직 없음` 대신 `원격 저장소가 아직 없어 새 저장소 생성 경로로 진행해요`");
-    expect(importSkill).toContain("`execute 호출한다` 대신 `가져오기를 실행할게요`");
-    expect(importSkill).toContain("`Envelope`, `preview`, `import 지원`, `deployment verification`, `success`, `raw endpoint`, `raw 엔드포인트`, `public`, `HTML, 200`");
-    expect(importSkill).toContain("이미 발견된 버그 예시");
-    expect(importSkill).toContain("같은 대화 안에서 재시도하거나 이어서 import 할 때도 이전 표현을 재사용하지 말고");
-    expect(importSkill).toContain("`Port 8080, /healthz 확인. preview 진행.`, `git remote 없음`, `execute 실행한다`, `deployment verification: success`, `HTML, 200`");
-    expect(importSkill).toContain("`import 지원 확인됐다` 대신 `가져오기 기능을 사용할 수 있어요`");
-    expect(importSkill).toContain("`preview 진행` 대신 `미리보기를 확인할게요`");
-    expect(importSkill).toContain("`Envelope 정상` 대신 `응답 형식 확인이 끝났어요`");
-    expect(importSkill).toContain("`deployment verification: success` 대신 `첫 배포 검증 성공`");
-    expect(importSkill).toContain("`raw endpoint`/`raw 엔드포인트` 대신 `원문 응답`");
-    expect(importSkill).toContain("`public으로` 대신 `공개 접근으로`");
-    expect(importSkill).toContain("최종 성공 요약은 아래 형태를 벗어나지 않아요");
-    expect(importSkill).toContain("`첫 배포가 끝났어요. 주소: https://...`");
-    expect(importSkill).toContain("비공개 접근 제어 때문에 로그인 없는 요청으로는 앱 본문을 직접 확인하지 못했어요");
-    expect(importSkill).toContain("비공개 앱에서 로그인 없는 HTTP 요청이 axhub 로그인 화면 HTML 을 200 으로 돌려주면");
-    expect(importSkill).toContain("그건 앱의 `/healthz` 또는 루트 응답 검증이 아니에요");
-    expect(importSkill).toContain("`/healthz HTTP 200 확인`이라고 쓰지 않아요");
-    expect(importSkill).toContain("body 가 axhub 로그인 포털이면 실패한 본문 검증으로 취급");
+    expect(importSkill).toContain("--wait --wait-timeout 9m --json");
+    expect(importSkill).toContain("실행은 한 번만 해요");
+    expect(importSkill).toContain("사용자에게 보이는 문장에는 내부 명령 이름이나 상태 코드를 쓰지 않아요");
     expect(importSkill).not.toContain("axhub manifest validate");
     expect(clarity).toContain("공개 표면만");
     expect(clarity).toContain("plugin-support");
@@ -360,9 +318,11 @@ describe("smooth behavior contracts", () => {
     const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
 
-    // AP-12 승인 fallback 사다리 — 새로 만드는 lane 의 공통 문장 전문을 fixture 로 잠가요
-    // (bootstrap 은 자기 문장 `지금 만들고 배포까지 진행할까요?` 를 쓰고 bootstrap-ux-contract.test.ts 가 잠가요).
-    expect(importSkill).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    // AP-12 승인 fallback 사다리 — 새로 만드는 lane(plugins 게시)의 공통 문장 전문을 fixture 로 잠가요
+    // (bootstrap·import 는 자기 문장 `지금 만들고 배포까지 진행할까요?`·`지금 이대로 고쳐서 axhub 에 올릴까요?` 를
+    // 쓰고 bootstrap-ux-contract·import-skill-contract 테스트가 잠가요).
+    expect(readRepo("skills/plugins/SKILL.md")).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    expect(importSkill).toContain("\"지금 이대로 고쳐서 axhub 에 올릴까요?\"(올리기 / 그만두기)");
     // 재배포 lane(deploy·up)은 승인 카드 대신 배포 전 맞추기를 해요 (AP-12·AP-29, spec 681).
     for (const redeploy of [deploy, up]) {
       expect(redeploy).not.toContain(CLAUDE.approvalGate.approvalFallbackSentence);
@@ -380,7 +340,7 @@ describe("smooth behavior contracts", () => {
     // headless 정의는 3-lane 사다리 정합 재작성본으로 잠가요 — 정의 문장이
     // `claude -p`·`codex exec` 병기 토큰을 포함해요.
     expect(deploy).toContain(CLAUDE.approvalGate.headlessDefinitionDeploy);
-    expect(importSkill).toContain(CLAUDE.approvalGate.headlessDefinitionImport);
+    expect(importSkill).toContain("질문에 답할 수 없는 실행(headless)이면 `--headless` 미리보기와 요약까지만 하고");
   });
 
   // #405·#387: auth probe 가 답하지 않은 것(probe_timeout·probe_no_output·cli_spawn_failed)과
@@ -630,19 +590,15 @@ describe("smooth behavior contracts", () => {
     expect(restartConfirm).not.toContain("command -v axhub");
   });
 
-  test("import frontmatter starts directly and avoids preamble leaks", () => {
-    const importSkill =
-      readRepo("skills/import/SKILL.md") +
-      readRepo("skills/import/references/visibility-rules.md") +
-      readRepo("skills/import/references/manifest-authoring.md");
+  // 첫 문장 고정 문구("기존 앱을 axhub에 가져올 준비를 확인할게요.")는 2026-11 import 개편 때 뺐어요.
+  test("import frontmatter routes existing code here without preamble leaks", () => {
+    const importSkill = readRepo("skills/import/SKILL.md");
     const importFrontmatter = importSkill.match(/^---\n([\s\S]*?)\n---/)?.[1];
     expect(importFrontmatter, "import SKILL frontmatter not found").not.toBeNull();
     const importDescription = importFrontmatter?.match(/^description:\s*'([^']*)'/m)?.[1];
     expect(importDescription, "import description not found in frontmatter").toBeDefined();
-    expect(importDescription?.split(".")[0]).toBe("기존 앱을 axhub에 가져올 준비를 확인할게요");
-    expect(importDescription).toContain("스킬 실행 전 사용자 문장 0개");
-    expect(importDescription).toContain("do not explain why this path was chosen");
-    expect(importDescription).toContain("route/skill label");
+    expect(importDescription?.startsWith("다른 곳에서 만든 앱(이미 코드가 있는 폴더)을 axhub 에 맞게 고쳐서")).toBe(true);
+    expect(importDescription).toContain("빈 폴더 새 앱은 bootstrap, 이미 올린 앱 재배포는 deploy 예요");
     expect(importDescription).not.toContain("스킬을 사용");
     expect(importDescription).not.toContain("사용하겠습니다");
     expect(importDescription).not.toContain("axhub:import 스킬");

@@ -63,12 +63,10 @@ export interface HostExpectations {
   };
   /** 승인 fallback 사다리·headless 정의(AP-12, 4스킬 공통) 의 계약 문장 */
   approvalGate: {
-    /** import 승인 fallback 사다리 문장 전문 (bootstrap·scaffold 통합 뒤엔 import 만 써요) */
+    /** 승인 fallback 사다리 문장 전문 (bootstrap·import 개편 뒤엔 plugins 게시만 써요) */
     approvalFallbackSentence: string;
     /** deploy Headless Contract 의 정의 문장 (3-lane 사다리 정합 재작성본) */
     headlessDefinitionDeploy: string;
-    /** import Headless rule 의 정의 문장 (3-lane 사다리 정합 재작성본) */
-    headlessDefinitionImport: string;
   };
 }
 
@@ -103,8 +101,6 @@ export const HOST_EXPECTATIONS: Record<"claude", HostExpectations> = {
         "네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.",
       headlessDefinitionDeploy:
         "Headless means `claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, no TTY, or no user-confirmation channel at all — neither native choice UI nor explicit text approval is available.",
-      headlessDefinitionImport:
-        "`claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, TTY 없음, 네이티브 선택 UI 와 명시 텍스트 승인이 둘 다 불가한 상태(사용자 확인 채널 자체가 없음)는 headless 예요.",
     },
   },
   // codex 열 추가 지점: 위 타입을 Record<"claude" | "codex", HostExpectations> 로

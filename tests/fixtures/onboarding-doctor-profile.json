@@ -4,8 +4,8 @@
   "outcome": "prerequisite_blocked",
   "no_gap": false,
   "first_gap": null,
-  "completed": 5,
-  "total": 7,
+  "completed": 3,
+  "total": 5,
   "code_agent": {
     "kind": null,
     "label": null,
@@ -45,20 +45,6 @@
       "id": "auth",
       "state": "completed",
       "label": "AXHub 로그인",
-      "action_id": null,
-      "safety": "none"
-    },
-    {
-      "id": "github_link",
-      "state": "completed",
-      "label": "GitHub 연결",
-      "action_id": null,
-      "safety": "none"
-    },
-    {
-      "id": "github_app",
-      "state": "completed",
-      "label": "GitHub App",
       "action_id": null,
       "safety": "none"
     }

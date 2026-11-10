@@ -125,7 +125,7 @@ top-level `git_backend.backend`와 `git_backend.source`, `deploy_method`, `stagi
 `deploy`의 준비 흐름에서 commit·push만 빼요. preflight `capabilities.readiness.deploy_check:false`면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`로 멈춰요.
 
 1. `axhub deploy check --app "$APP_ID" --json` (제목 `배포 전 확인`). 이 lane 은 커밋을 보내지 않으니 `commit_not_on_remote`·`uncommitted_changes` 는 보지 않아요.
-2. preflight 의 `capabilities.readiness.context_url` 문서를 한 번만 가져와요(제목 `배포 기준 확인`). 못 받으면 `../deploy/references/deploy-rules.md` 로 대신해요.
+2. preflight 의 `capabilities.readiness.context_url` 문서를 `curl -fsSL` 로 원문 그대로 한 번만 가져와요(제목 `배포 기준 확인`). 못 받으면 `../deploy/references/deploy-rules.md` 로 대신해요.
 3. 기준대로 코드를 검사해요(테스트·예시·README 흔적 제외). 빌드가 있으면 5분 안에 1회, 실패 수정·재빌드는 2회까지예요. 계속 실패하면 업로드 없이 원인을 알려요.
 4. 질문은 둘뿐: `.env`·`.env.local`에도 없는 필수값(`<이름> 값을 앱 폴더 .env 에 넣어 주세요`, 채팅 수집 금지), 안 되는 6가지·문서 `물어봄` 최초 해당. 모아서 1회 묻고 `.axhub/deploy-answers.json`의 `keep`은 재질문 없이 `그대로` 답을 추가해요.
 5. 묻지 않고 `.env.local`의 필수 이름부터 `--from-dotenv .env.local`, 나머지는 `axhub env set --app "$APP_ID" --from-dotenv .env --only <이름,…> --execute`로 등록해요(파일 열기·값 출력 금지). 포트·`0.0.0.0`·상태 경로·빌드 오류는 수정하고 커밋 없이 올려요.

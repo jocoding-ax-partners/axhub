@@ -8,7 +8,7 @@ const REPO_ROOT = join(import.meta.dir, "..");
 const read = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
 
 const VERIFY_WAIT = "--wait --wait-interval 20s --wait-timeout 9m --json";
-const VERIFY_WAIT_SKILLS = ["skills/deploy/SKILL.md", "skills/import/SKILL.md", "skills/up/SKILL.md", "skills/deploy/references/workflow-details.md"];
+const VERIFY_WAIT_SKILLS = ["skills/deploy/SKILL.md", "skills/up/SKILL.md", "skills/deploy/references/workflow-details.md"];
 
 describe("P1-13·DX26 deploy verify --wait 는 host 도구 timeout 안에서 끝나요", () => {
   // Claude Code Bash 기본 timeout 은 2분, 최대 600000ms 예요. 10분 CLI 대기는 도구가 먼저 끊어
@@ -27,10 +27,19 @@ describe("P1-13·DX26 deploy verify --wait 는 host 도구 timeout 안에서 끝
     expect(deploy).toContain("`6`·`10`·도구 timeout 끊김");
     expect(deploy).toContain("재개 요약과 같은 verify `--wait` 명령 한 줄");
     expect(read("skills/up/SKILL.md")).toContain("| 6·10·도구 timeout 끊김 |");
-    expect(read("skills/import/SKILL.md")).toContain("exit 6·10 이거나 도구 timeout 으로 끊기면");
     expect(read("skills/deploy/references/workflow-details.md")).toContain("6, 10(CLI timeout), or the command tool cutting the call");
     const policy = read("docs/policy/agent-policy.md");
     expect(policy).toContain('"--wait --wait-interval 20s --wait-timeout 9m", "600000ms"');
+  });
+
+  // import·bootstrap 은 bootstrap 개편 형식대로 `--wait --wait-timeout 9m` 한 번과 "명령 시간 제한 10분" 으로 적어요.
+  test("import 도 9분 대기 한 번이고 시간 안에 안 끝난 건 실패가 아니에요", () => {
+    const body = read("skills/import/SKILL.md");
+    expect(body).toContain("--wait --wait-timeout 9m --json");
+    expect(body).toContain("(명령 시간 제한 10분)");
+    expect(body).not.toContain("--wait-timeout 10m");
+    expect(body).toContain("시간 안에 안 끝난 건(exit 6·10) 실패가 아니에요");
+    expect(body).toContain("기다리다 끊기면 다시 실행하지 말고 같은 확인 명령으로 이어가요");
   });
 });
 
@@ -96,12 +105,6 @@ describe("P2-44·P2-45·P3-42 up 의 재실행·진행 중 배포·id 출처", (
   test("P3-42 DEPLOY_ID 출처 규칙이 하나예요 — deploy list 로 고르지 않아요", () => {
     expect(up).toContain("셋에서만 바인딩해요");
     expect(up).not.toContain("`deploy list --app \"$APP_ID\"` 로 방금 만들어진 배포가 있는지");
-  });
-});
-
-describe("P3-43 import 배포 방식 카드는 manifest 가 선언한 방식이면 묻지 않아요", () => {
-  test("axhub.yaml 이 deploy_method 를 선언하면 --deploy-method 로 다시 받지 않아요", () => {
-    expect(read("skills/import/SKILL.md")).toContain("`build.deploy_method`·`deploy.method` 를 선언하지 않았으면");
   });
 });
 

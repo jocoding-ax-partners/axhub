@@ -47,12 +47,11 @@ describe("staging environment contract (AP-25)", () => {
     expect(deploy).toContain("심사 신청은 사용자가 요청할 때만 실행해요");
   });
 
-  test("import: 성공 안내가 environment=staging 을 운영 반영으로 말하지 않아요", () => {
-    expect(importSkill).toContain("최종 `deploy verify --json` 의 `environment` 를 먼저 읽어요");
-    expect(importSkill).toContain("스테이징에만 반영됐고 운영에는 아직 반영되지 않았다고 같은 성공 블록에서 말하고");
-    expect(importSkill).toContain("axhub publish --app <app> --deployment-id <deployment-id> --execute");
-    expect(importSkill).toContain('"운영 반영 완료" 라고 말하지 않고');
-    expect(importSkill).toMatch(/`environment` 가 없거나 null 이면[^\n]*`staging_enabled` 를 한 번 읽어/);
+  // 2026-11 import 개편: 결과 표의 주소 줄이 스테이징이면 운영 반영은 심사 뒤라고 적어요.
+  // `environment` 분기·심사 신청 명령 안내는 그 개편 때 뺐어요 (AP-25 정책의 import 줄 참고).
+  test("import: 결과 표가 스테이징 배포를 운영 반영으로 말하지 않아요", () => {
+    expect(importSkill).toContain("| 주소 | `apps get` 의 `access_url` (스테이징이면 운영 반영은 심사 뒤) |");
+    expect(importSkill).toContain("확인하지 못한 항목은 됐다고 표시하지 않아요");
   });
 
   test("up: 환경 라벨과 verify 성공 요약이 같은 규칙을 따라요", () => {

@@ -1,310 +1,80 @@
 ---
 name: import
-description: '기존 앱을 axhub에 가져올 준비를 확인할게요. Use this before bootstrap for any existing/local-folder app import or first deploy: "기존 앱", "기존 Express 서버 앱", "이미 만든 앱", "작업 폴더는 /path", "이 폴더 axhub에 올려", "이 앱을 axhub에 올려", "가져오기가 잘 끝났는지 확인", "중단된 가져오기 이어서 마무리", "import existing app". Start directly with that Korean sentence; no preamble; do not explain why this path was chosen or expose a route/skill label. 스킬 실행 전 사용자 문장 0개. 기존 앱의 첫 연결·첫 배포와 resume 완료 확인을 맡겨요. Broad stack: Express/Fastify/Nest/FastAPI/Flask/Django/Rails/Go/Rust/Java/PHP/.NET. 빈 폴더는 bootstrap, 재배포는 deploy로 양보해요. 이미 연결된 앱을 GitHub 없이 지금 폴더 소스로 올려 배포("이 폴더 그대로 올려줘", "GitHub 없이 배포해")하는 건 up으로 양보해요.'
+description: '다른 곳에서 만든 앱(이미 코드가 있는 폴더)을 axhub 에 맞게 고쳐서 처음 올리고 첫 배포까지 해요. "이 폴더 axhub 에 올려줘", "기존 앱 올려줘", "Lovable·Bolt·Vercel 에서 만든 거 axhub 에 올려줘" 같은 요청에 써요. 빈 폴더 새 앱은 bootstrap, 이미 올린 앱 재배포는 deploy 예요.'
 allows-dependency-execution: false
 model: sonnet
 ---
 > 이 본문이 중간에 끊겨 보이면 설치 경로의 이 SKILL.md 원문을 열어 전체 절차를 확인한 뒤 진행해요.
 
 
-# Import Existing App
-
-> **CLI 경로 계약 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 가 있으면 그 절대경로로 `plugin-support repair-path --json` 을 실행하고 반환된 `bin_path` 절대경로로 이 세션을 이어가요. 셋 다 없을 때만 setup 을 안내해요.
-
-비어 있지 않은 로컬 앱을 axhub 앱으로 가져와 앱 설정, GitHub 연결, 첫 배포 증거까지 한 번에 정리해요. 변경 판정·실행은 CLI 가 하고, 스킬은 `axhub plugin-support import` 의 `import/v1` envelope 를 검증해 미리보기·복구 문구를 보여줘요. 예외는 새 앱 설정 파일이 필요할 때 axhub.yaml 을 프로젝트 파일 근거로 작성하고 `axhub deploy --explain --json` 으로 같은 파서가 읽는지 검증하는 보강 단계 하나예요.
-
-## 승인 게이트 계약 (요약)
-
-codex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 아래 게이트는 뒤쪽 절차 설명이 잘려도 그대로 지켜요.
-
-1. 가져오기 승인 — import preview 를 보여준 뒤 `지금 이대로 axhub에 올려서 인터넷 주소를 만들까요?` 로 한 번만 묻고, 이 승인 하나가 axhub 진입 확인을 겸해요. 승인 전에는 `--execute` 를 실행하지 않아요.
-2. 승인 방식 — 같은 확인을 명시 텍스트 승인 1회로 받아요. preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구만 유효하고, 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요. 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.
-3. 빈 답변 = 미승인 — 선택 카드로 물은 경우 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.
-4. 배포 방식 — preview 가 새 앱(`app_create`)을 `static` 으로 자동 판정했고 사용자가 방식을 말하지 않았으면, 1 전에 `어떤 방식으로 배포할까요?` 를 먼저 물어요 — `정적 사이트 (추천)`·`서버 앱`·`취소`. 서버 앱은 `manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker` 로 preview 를 다시 받아요.
-5. 첫 올리기 점검 (AP-30) — 승인 카드에 새로 정해지는 것·물을 일·맞출 내용을 함께 보여줘요. `.env` 에 있는 설정값은 execute 에 `--env-from-dotenv .env --env-only <이름,…>` 을 붙여 첫 배포 전에 등록해요.
+다른 곳에서 만든 앱을 axhub 에 맞게 고쳐서 처음 올리고, 첫 배포를 확인한 뒤 결과 표로 끝내요.
+axhub 에 올리면 axhub 가 주는 것을 써요: DB 는 axhub PostgreSQL, 파일은 보관함, 로그인은 axhub 로그인, 서버는 axhub 가 띄우는 앱이에요.
 
 **질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요(예: `진행` 이면 시작하고 `취소` 면 여기서 멈춰요). 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요. 비파괴 선택은 숫자·서수·라벨·앞글자 어느 쪽으로 답해도 알아듣고, 파괴 게이트만 canonical 문구를 그대로 받아요.
 
-## 라우팅 경계
-
-- `import`: 현재 폴더가 비어 있지 않고 기존 앱 소스가 있는 상태에서 axhub 앱으로 처음 가져오는 요청.
-- `bootstrap`: 빈 디렉토리에서 axhub 템플릿 앱을 새로 만드는 요청.
-- `deploy`: 이미 axhub 앱과 manifest 가 연결된 앱을 다시 배포하는 요청.
-- `development`: 기존 앱 안에 화면, 대시보드, CRUD 같은 기능 코드를 새로 쓰는 요청.
-- `clarity`: 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 같은 명시된 axhub 운영 명령.
-
-`import` 는 `deploy` 를 감싸지 않아요. 첫 연결·첫 배포 준비는 import, 이후 반복 배포는 deploy 가 맡아요.
-
-발화에 axhub 언급이 없고 대화에도 axhub 맥락(직전 axhub 작업)이 없으면 — 예를 들어 "이 폴더 올려" 를 GitHub push 로 뜻할 수 있으면 — manifest 를 만들기 전에 "axhub에 연결하려는 거예요?" 를 한 번만 묻고, 아니라는 답이면 종료해요. headless 에서는 묻지 않고 멈춰요.
-
-## 작업 폴더 실행 계약
-
-사용자가 `작업 폴더`, `폴더`, `경로`, `디렉토리` 로 앱 경로를 지정하면 그 절대 경로를 `APP_DIR` 로 고정해요. 현재 Codex workspace 가 상위 폴더이거나 다른 폴더여도, 모든 import 관련 `axhub`, `git`, `npm`, build, manifest 검증 명령은 반드시 `APP_DIR` 안에서 실행해요. tool 이 cwd 를 지정할 수 없거나 권한 카드에 cwd 가 따로 보이지 않으면 명령 앞에 실제 절대 경로를 넣은 `cd "<absolute APP_DIR>" &&` 를 붙여요. 권한 카드에는 `$APP_DIR` 변수를 그대로 쓰지 말고 사용자가 준 실제 경로를 따옴표로 넣어요.
-
-Codex 에서 현재 선택된 프로젝트가 이미 정확히 `APP_DIR` 이면 `cd ... &&` 를 붙이지 않고 **한 카드에 한 개의 bare 명령만** 실행해요. 먼저 tool 의 cwd 지정 기능을 쓰고, 현재 프로젝트도 다르고 cwd 지정도 불가능할 때만 `cd "<absolute APP_DIR>" && <single command>` 를 마지막 수단으로 써요. 같은 폴더를 매번 `cd` 하는 compound shell 은 명령마다 새 권한 카드를 만들 수 있으므로 Desktop 매끄러움 실패예요.
-
-`APP_DIR` 이 정해진 뒤에는 workspace root 에서 `axhub --json plugin-support import`, `axhub deploy --explain --json`, `git check-ignore`, `git status`, `npm run build` 를 실행하지 않아요. preview 가 통과했더라도 권한 카드 명령이 bare `axhub ...`, bare `git ...`, bare `npm ...` 로 시작하거나 실제 절대 경로가 들어간 `cd "<absolute APP_DIR>" &&` 또는 동등한 cwd 지정이 보이지 않으면 실행하지 말고 같은 명령을 `APP_DIR` 기준으로 다시 호출해요.
-
-사용자가 앱 경로를 말하지 않았고 현재 workspace 가 실제 앱 폴더인지 확실하지 않으면, preview 전에 앱 폴더를 먼저 확인해요.
-
-## Desktop 도구 제목 hard rule
-
-모든 Bash/tool call 제목·progress title 은 한국어 명사구로 직접 정해요. Codex 자동 제목에 맡기지 않아요. 특히 `Expressing ...`, `Expressed ...`, `FastAPIing ...`, `axhubed ...` 처럼 제품명·스택명을 영어 동사처럼 만든 제목은 절대 쓰지 않아요. 파일 확인은 `서버 설정 확인`, `작업 폴더 파일 확인`, `package.json 확인`, 설정 파일 검증은 `앱 설정 파일 검증`, 가져오기 실행은 `가져오기 실행` 처럼 써요. 스택 이름은 본문 설명에만 써요.
-
-## 개발자 스택 지원 범위
-
-Next.js 전용이 아니에요. 정적·Compose·Dockerfile·Dockerfile 없는 백엔드(CLI 가 기본 Dockerfile 생성) 판정은 CLI `import/v1` 가 하고, 스킬은 preview 를 검증해 보여줘요.
-
-## 첫 문장
-
-대화형에서 첫 visible chat sentence 는 반드시 정확히 `기존 앱을 axhub에 가져올 준비를 확인할게요.` 로 시작하고, 그 앞에는 공백·설명·스킬 선택 이유를 포함해 어떤 문장도 쓰지 않아요.
-
-import preview 정상이면 axhub 가져오기 대상 확정이에요. Interactive 는 별도 진입 질문 없이 아래 6의 preview 승인 명시 텍스트 승인 **하나가 axhub 진입 확인을 겸해요** — 질문 문구에 axhub 대상임을 명시해요 (AP-12 통합 게이트). (headless 는 이 명시 텍스트 승인 생략)
-
-## 명시 텍스트 승인 JSON 안전 규칙
-
-명시 텍스트 승인 입력은 평문 UTF-8 만 쓰고 raw JSON/수동 escape 를 만들지 않아요. preview 승인과 commit 선택을 합친 exact copy 는 [references/visibility-rules.md](references/visibility-rules.md) 의 명시 텍스트 승인 절을 그대로 써요.
-
-## Vibe Coder Visibility Rules
-
-이 섹션은 workflow 보다 우선해요. 사용자-facing 문구·tool 제목을 쓰기 전에 [references/visibility-rules.md](references/visibility-rules.md) 를 읽고 그대로 따라요. 핵심: 내부 field name·영어 진행어·스킬/route 라벨 금지, tool 제목은 한국어 명사구만, URL 은 평문 절대 URL 만, 비공개 앱 로그인 화면 200 은 본문 검증이 아니에요.
-
-## import/v1 envelope 계약
-
-CLI preview/execute 결과는 정확히 하나의 envelope shape 로 와야 해요.
-
-필수 top-level field:
-
-- `schema_version`: `import/v1` 만 허용해요.
-- `mode`: `preview` 또는 `execute`.
-- `headless`: true 면 mutation 금지, preview semantics 만 허용해요.
-- `correlation_id`: 내부 추적용. 사용자 chat 에 노출하지 않아요.
-- `detected_state.starting_state`: `local_github_no_axhub_app`, `local_only`, `existing_axhub_app_repair` 중 하나.
-- `deploy_method`: `docker`, `compose`, `static` 중 하나.
-- `required_mutations[]`: 닫힌 enum 만 허용해요.
-- `preview`: 사용자가 이해할 title, summary, mutations, safety_notes.
-- `approval`: `required`, `approved`, `interactive_only` 를 포함해요.
-- `result.evidence`: preview 에서는 null, execute 성공 후에만 채워요.
-- `error`: null 또는 정해진 error object.
-
-닫힌 enum:
-
-- `required_mutations`: `manifest_create`, `manifest_migrate`, `manifest_repair`, `app_create`, `app_select`, `github_repo_create`, `github_connect`, `selfhosted_repo_push`, `first_deploy`, `static_release`
-- `typed_failure`: `auth`, `version`, `manifest`, `git`, `repo`, `app`, `static`, `deploy`, `rate_limit`, `transport`
-- `owner`: `plugin`, `cli`, `backend`
-- `phase`: `preflight`, `detect`, `preview`, `approval`, `manifest`, `app`, `repo`, `git`, `deploy`, `verify`, `static`, `finalize`
-
-성공 증거:
-
-- docker/compose, self-hosted static(`selfhosted_repo_push`): `kind: "deployment"`, non-empty `deployment_id`, `verification_status: "success"`, non-empty `public_url`
-- 업로드 static: `kind: "static_release"`, non-empty `active_release_id`, `verified: true`, non-empty `public_url`, optional non-empty `access_note`
-
-두 경로 모두 `error === null` 이어야 해요. 업로드 static 은 위 release 증거가 빠지면 `typed_failure: "static"` 으로 다루고 `deploy verify` 로 대체하지 않아요. Self-hosted static 은 deployment 증거로 판정하며 `active_release_id`·`verified` 는 요구하지 않아요.
-
-## Fail-closed 검증
-
-스킬은 envelope 를 받은 뒤 아래 조건이면 즉시 멈춰요.
-
-- `axhub plugin-support preflight --json` 의 `capabilities.import.supported !== true`
-- `capabilities.import.schemas` 에 `import/v1` 이 없음
-- `capabilities.import.selfhosted !== true`·`capabilities.self_hosted_git.git_policy_decision !== true` — 이 CLI 는 self-hosted 작업공간에서도 GitHub 저장소를 만들려 해서 `axhub CLI를 최신 버전으로 업데이트해 주세요.` 라고 안내해요
-- static 인 self-hosted 경로(`selfhosted_repo_push` 또는 `코드 저장 위치: axhub self-hosted`)인데 `capabilities.import.selfhosted_static !== true` 거나 `static_release` 가 있음 — 업로드로 보내지 않고 같은 업데이트 안내로 멈춰요
-- envelope 의 `schema_version` 이 `import/v1` 이 아님
-- 필수 field 가 없거나 타입이 맞지 않음
-- 닫힌 enum 밖 값이 있음
-- `error` object 가 누락 field 또는 알 수 없는 owner/phase/failure 를 가짐
-- preview 가 headless 에서 mutation 가능하다고 말함
-- execute 가 대화형 승인 없이 진행되려 함
-- success evidence 가 deploy method 와 맞지 않음
-
-멈출 때도 low-level 명령을 조합해서 우회하지 않아요. `apps create`, `apps git connect`, `deploy create`, static release 명령을 plugin 이 직접 이어붙이지 않아요.
-
-## Headless rule
-
-`codex exec`, CI, TTY 없음, 네이티브 선택 UI 와 명시 텍스트 승인이 둘 다 불가한 상태(사용자 확인 채널 자체가 없음)는 headless 예요.
-
-- 명시 텍스트 승인 0회.
-- `axhub --json plugin-support import --mode preview --headless` 만 호출해요.
-- `--mode execute` 를 호출하지 않아요.
-- preview 결과를 한국어 요약으로 보여주고, 실제 가져오기는 대화형에서 다시 실행하라고 안내해요.
-
-## Manifest 보강
-
-`required_mutations` 에 `manifest_create` 가 있고 대화형일 때만, execute 전에 axhub.yaml 을 프로젝트 파일 근거로 풍부하게 작성해요 — 이 스킬이 직접 authoring 하는 유일한 단계예요. 실행 시점이 오면 [references/manifest-authoring.md](references/manifest-authoring.md) 를 읽고 그 규칙대로 진행해요(실파일 근거·정규 필드만·env 값 금지·`axhub deploy --explain --json` 검증 게이트, commit+push 는 `capabilities.import.commit_manifest` + 승인에서 고른 동의가 있을 때만). headless 에서는 실행하지 않아요.
-
-Desktop ignore 확인은 bare `git check-ignore -q axhub.yaml` 1회예요. exit 0/1을 tool 결과로 읽고 `$?`, `echo`, 변수, shell 연산자를 붙이지 않아요. ignore 규칙을 바꾼 때만 사후 1회 재검증해요.
-
-## Workflow
-
-1. CLI 가드와 capability 확인
-
-아래 Workflow 명령 예시는 모두 tool cwd 가 `APP_DIR` 로 지정된 bare 명령이에요. Desktop 카드에는 shell 연산·출력 가공을 붙이지 않아요.
-
-완료/재개 시 폴더명·manifest `name`·preflight `current_app`을 원격 slug로 추론하거나 `apps get/list`, `deploy list/status`로 우회하지 않아요. 아래 resume 식별자를 써요.
-
-```bash
-axhub plugin-support preflight --json
-```
-
-이 명령이 command not found 로 끝나면 미설치로 판정하지 않아요 — AP-17 경로 계약대로 `~/.axhub/bin-path` 나 `~/.axhub/bin/axhub`(.exe) 로 `plugin-support repair-path --json` 을 실행한 뒤 같은 절대경로로 이 preflight 를 다시 실행해요.
-
-`capabilities.import.supported` 가 true 이고 `capabilities.import.schemas` 에 `import/v1` 이 있어야 해요. 아니면 업데이트 안내 후 멈춰요.
-
-1.5. 완료 확인 short-circuit
-
-완료 확인 요청이면 작업공간/preview 전에 `.axhub/import-resume.json`을 1회 읽어요. 유효한 `app_id`와 `deployment_id`가 있으면 다음 bare 명령을 1회 실행해요.
-
-```bash
-axhub deploy verify <deployment-id> --app <app-id> --json
-```
-
-성공이면 완료를 안내하고 preview/승인/execute/추가 조회 없이 끝내요. `not_found` 또는 식별자 없음만 일반 흐름으로 가고, 다른 실패는 성공이라 하지 않고 멈춰요. 새 가져오기에는 적용하지 않아요.
-
-2. 작업공간 확정
-
-preview 와 첫 승인보다 먼저 아래 읽기 전용 resolver 를 정확히 한 번 실행해요.
-
-```bash
-axhub plugin-support tenant-resolve --json
-```
-
-반환된 `tenant`가 있으면 preview·execute에 같은 literal `--tenant <slug>`를 넘겨요. `needs_pick:true`면 승인 전에 `앱을 어느 작업공간에 만들까요?`를 1회 물어 고른 slug를 유지해요. 사용자에게는 tenant/테넌트 대신 `작업공간`이라고만 해요.
-
-선택 전 preview 승인·execute 금지. `--tenant` 없이 execute 후 `axhub tenants list`·`axhub tenant list`·`--help | grep` 복구 금지.
-
-3. Preview envelope 요청
-
-아직 안 읽었다면 resume을 1회 읽어요. 유효한 `app_id`는 preview의 literal `--app <app_id>`로 넘기고, 없을 때만 옵션 없이 호출해요. resume ID는 폴더·manifest·preflight 이름보다 우선해요.
-
-사용자나 현재 컨텍스트에서 app slug, GitHub owner/repo, tenant 가 이미 정해졌으면 preview 부터 그대로 넘겨요. `--slug` 는 axhub 앱 slug, `--name` 은 표시 이름, `--repo` 는 GitHub 저장소예요. repo owner 를 별도 flag 로 만들지 말고 `--repo "$OWNER/$REPO"` 형태로 넘겨요.
-
-import helper 에 넘길 수 있는 옵션은 `--mode`, `--headless`, `--approved`, `--commit-manifest`, `--verify-wait`, `--app`, `--name`, `--slug`, `--repo`, `--repo-private`, `--repo-public`, `--branch`, `--from-dir`, `--installation-id`, `--tenant`, `--deploy-method`, `--idea`, `--git-choice`, `--github-owner`, `--git-backend`, `--env-from-dotenv`, `--env-only`, `--json` 뿐이에요. `--env-from-dotenv`·`--env-only` 는 execute 에만 쓰고 `capabilities.import.env_from_dotenv` 가 true 일 때만 써요. `--idea <uuid>` 는 요청의 `아이디어 ID:` 줄 값이고 `capabilities.import.idea` 가 true 일 때만 써요. 이 목록에 없는 옵션은 추론하거나 `--help`로 복구하지 않아요. 특히 사용자가 비공개 저장소를 원하면 정확히 `--repo-private` 를 쓰고, 존재하지 않는 `--private` 를 절대 붙이지 않아요. 실수로 unknown option 이 나오면 임의 옵션을 뺀 재시도나 `plugin-support import --help` 호출로 이어가지 말고 멈춰요. preview 와 execute 는 검증된 동일 옵션 집합을 유지해요.
-
-**코드 저장 위치 (AP-23).** CLI 가 기존 앱은 그 앱의 저장소 방식, 새 앱은 서버 판정(구 서버는 작업공간 기본값)으로 경로를 정하고 읽기 실패면 GitHub 로 추측하지 않고 멈춰요. 사용자가 GitHub 또는 Axhub self-hosted 를 명시했을 때만 preview·execute 에 같은 `--git-backend github|selfhosted` 를 붙여요. 고를 게 남은 새 앱은 preview 가 mutation 0 `error`(`code=git_choice_required`·`github_owner_required`·`github_link_required`)로 멈춰요 — `recovery_action` 대로 bootstrap 3단계 저장 위치 질문을 하거나 4단계처럼 GitHub 를 연결한 뒤 그 플래그를 preview·execute 에 붙여요. `required_mutations` 에 `selfhosted_repo_push` 가 있으면 self-hosted 경로예요 — `--repo`·GitHub owner·App 설치·device flow 대사를 0회로 유지하고, 승인 카드에 요약의 `코드 저장 위치:` 줄을 그대로 보여줘요. 첫 배포는 push 로 자동 시작되고 성공 증거는 같은 `deployment` evidence 예요(static 도 같아요). deploy 가 넘긴 기존 앱은 preview·execute 에 `--app <app>`(static 이면 `--deploy-method static`)을 넘겨요. origin·`--repo` 충돌은 error 의 `recovery_action` 을 그대로 안내해요. 아래 owner/repo 규칙은 GitHub 경로에만 적용돼요.
-
-GitHub owner 만 명시되고 repo 이름이 따로 없으면 `$REPO_NAME` 은 반드시 `$APP_SLUG` 와 정확히 같게 둬요. 날짜·숫자·QA suffix 를 추론으로 자르거나 정리하지 않아요. 예를 들어 app slug 가 `uqa-exp-public-11021-0708` 이고 owner 가 `realitsyourman` 이면 `--repo "realitsyourman/uqa-exp-public-11021-0708"` 이어야 하며 `--repo "realitsyourman/uqa-exp-public-11021"` 처럼 줄인 명령은 실행하지 말고 고쳐서 다시 호출해요.
-
-단, GitHub 작업공간의 static 앱은 CLI 가 GitHub repo 없이 `app_create/app_select → local build → static_release` 로 배포할 수 있어요. static lane 에서는 사용자가 명시적으로 "GitHub 저장소도 만들고 연결해줘" 라고 말하지 않는 한 `--repo` 를 붙이지 않아요. Docker/compose 같은 GitHub 기반 첫 배포에서만 `local_only` 새 repo 생성 전에 `--repo owner/name` 이 확정돼 있어야 해요.
-
-Docker/compose `local_only` 의 새 GitHub repo owner 는 로컬 `gh` 로그인과 맞춰요 — CLI 가 현재 `gh` 로그인과 app slug 로 repo 를 정하고, org owner 는 push 가능한 `origin` 이 있거나 사용자가 지정했을 때만 써요. owner 불일치는 CLI 가 `typed_failure: git` 으로 막아요.
-
-```bash
-axhub --json plugin-support import --mode preview
-```
-
-예시:
-
-```bash
-axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --tenant "$TENANT"
-
-# Docker/compose local_only 처럼 GitHub repo 가 필요한 경우에만:
-axhub --json plugin-support import --mode preview --slug "$APP_SLUG" --repo "$GITHUB_OWNER/$REPO_NAME" --repo-private --tenant "$TENANT"
-```
-
-headless 에서는 이렇게 호출해요.
-
-```bash
-axhub --json plugin-support import --mode preview --headless
-```
-
-4. Envelope 검증
-
-`import/v1` schema, closed enum, `error`, `approval`, success evidence shape 를 fail-closed 로 확인해요. raw JSON 은 chat 에 붙이지 않아요.
-
-5. Preview 카드 렌더링
-
-사용자에게는 아래 항목만 결과로 보여줘요(파일·경로·명령 이름 없이).
-
-- 앱 이름 또는 추정 이름
-- 감지된 상태 요약
-- 진행할 변경 요약
-- 배포 방식
-- 안전 메모
-
-새 앱 설정이 필요하면 프로젝트에 맞춰 만들어 함께 올린다고 한 줄로 알려요.
-기존 앱 설정이 깨져 있으면 CLI 가 백업을 남기고 최소 설정으로 복구한다고 한 줄로 알려요. 이 경우 plugin 이 직접 덮어쓰지 않아요.
-
-5-1. 배포 방식 카드
-
-preview `deploy_method` 가 `static` 이고 `required_mutations` 에 `app_create` 가 있는데 사용자가 배포 방식을 말하지 않았고 `axhub.yaml`(없으면 `apphub.yaml`)이 `build.deploy_method`·`deploy.method` 를 선언하지 않았으면, 6 전에 선택 카드로 `어떤 방식으로 배포할까요?` 를 한 번 물어요. header `배포 방식`, 선택지 `정적 사이트 (추천)`(`HTML·빌드 결과만 올려요`), `서버 앱`(`서버 코드까지 실행해요`), `그만두기`(`올리지 않고 끝내요.`). 주소 도메인은 적지 않아요. 정적 사이트면 6으로 가요. 서버 앱이면 `detected_state.manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker` 로 preview 를 다시 받아 5·6 을 이어가고, 없으면 실행할 서버 코드가 없다고 한 줄로 말한 뒤 `정적 사이트 (추천)`·`그만두기` 로 다시 물어요. headless 는 묻지 않아요.
-
-5-2. 첫 올리기 점검 (AP-30)
-
-대화형이고 preflight 의 `capabilities.readiness.deploy_check`·`capabilities.import.env_from_dotenv` 가 true 일 때만 해요.
-
-1. `axhub deploy check --json`(`--app` 없이)과 preflight 의 `capabilities.readiness.context_url` 문서(한 번, 없으면 `../deploy/references/deploy-rules.md`)를 받아 그 규칙으로 코드를 보고, 빌드가 있으면 로컬 빌드를 5분 안에서 한 번 돌려요. 테스트 흔적은 문제 아니에요.
-2. 필요한 설정값 이름을 코드 근거로 정하고 `axhub env set --app <앱 주소> --from-dotenv .env` 미리보기로 `.env` 에 있는 이름을 확인해요. `.env` 를 직접 열지 않아요.
-3. 6의 승인 카드 한 화면에 보여줘요 — 새 이름(앱 주소·저장소·작업공간), 물을 일, `이렇게 맞춰서 올릴게요` 목록(고칠 것·등록할 설정값 이름). 물을 일은 둘뿐이에요: `.env` 에도 없는 필수 설정값(값은 대화로 받지 않고 `.env` 에 넣어 달라고 해요)과 안 되는 6가지·문서 `물어봄` 규칙에 해당한 것(문서 대안과 `그대로 올리기`). 한 명시 텍스트 승인 으로 받고 첫 선택지에 `(추천)`.
-4. 승인 뒤 execute 전에 고칠 코드를 고쳐요. git 저장소가 이미 있으면 고친 파일을 `배포 전 맞추기` 로 커밋하고, origin 이 있으면 push 해요(아직 앱에 연결되지 않아 자동 배포는 없어요). `.env*`·키 파일은 커밋하지 않아요. 등록할 이름이 있으면 execute 에 `--env-from-dotenv .env --env-only <이름,…>` 을 붙여요 — 앱 생성 직후·첫 배포 전에 등록돼요. `그대로` 답은 `.axhub/deploy-answers.json` 의 `keep` 에 더해요.
-5. 성공하면 맞춘 게 있을 때 마지막 메시지를 정확히 `이렇게 맞춰서 올렸어요.` 로 시작해요.
-
-6. 대화형 통합 승인 1회
-
-명시 텍스트 승인 은 preview 직후(5-1 카드와 별개로) 딱 한 번 써요. 질문은 `지금 이대로 axhub에 올려서 인터넷 주소를 만들까요?` 로 axhub 대상임을 명시해요 — 이 질문 하나가 axhub 진입 확인과 manifest commit 동의를 모두 겸해요. 명시 텍스트 승인 1회만 받아요. 승인 채널 없는 headless 에서는 execute하지 않아요 — 승인을 조용히 건너뛰지 않아요.
-
-- `capabilities.import.commit_manifest` 가 true 이고 GitHub 기반 첫 배포면 `올리기 (추천)`, `설정은 나중에 올리기`, `먼저 고칠게요`, `그만두기` 네 옵션을 써요. 첫 옵션은 `--commit-manifest`, 둘째 옵션은 옵션 없는 execute 로 고정해요.
-- 그 외에는 `올리기 (추천)`, `먼저 고칠게요`, `그만두기` 세 옵션만 써요.
-
-승인 선택 뒤에는 manifest 작성·검증 결과가 예상과 달라도 커밋 질문이나 같은 가져오기 질문을 다시 띄우지 않아요. 실행 가능한 첫째/둘째 옵션 외에는 execute 를 호출하지 않아요.
-
-7. axhub.yaml 보강 (manifest_create 일 때만)
-
-통합 승인 직후, execute 전에 진행해요. `required_mutations` 에 `manifest_create` 가 있을 때만 위 `## Manifest 보강` 규칙대로 프로젝트 파일 근거로 axhub.yaml 을 작성하고 `axhub deploy --explain --json` 로 검증해요. `manifest_create` 가 없거나 headless 면 이 단계를 건너뛰어요. `올리기` 를 골랐다면 검증 통과 뒤 질문 없이 `--commit-manifest` 를 쓰고, `설정은 나중에 올리기` 면 질문 없이 그 옵션을 빼요. local_only 라서 아직 git remote 가 없어도 통합 승인에서 선택한 값을 그대로 유지해요.
-
-8. Execute 호출
-
-대화형 승인 직후 한 번만 호출해요. Self-hosted(`selfhosted_repo_push`) execute writes git credentials under `$HOME`: in an agent sandbox run it escalated from the start; `local.write_denied` → follow `recovery_action`. preflight 의 `capabilities.import.early_return` 과 `capabilities.import.verify_wait` 가 모두 true 일 때만 execute 에 `--verify-wait none` 을 붙여요 — execute 는 첫 배포 생성과 deployment id 확보까지만 반환하고, 이어서 **권한 카드 한 번으로 끝나는** `axhub deploy verify <deployment-id> --app <app> --wait --wait-interval 20s --wait-timeout 9m --json` 를 명령 도구 timeout 600000ms 로 정확히 한 번 호출해요. 이 한 호출의 내부 폴링 예산은 최대 30회 또는 10분(AP-16)이고, `--wait` 가 성공·실패·예산 제한까지 책임지므로 같은 verify 를 반복 호출하거나 `axhub apps get`, `deploy list`, `deploy status` 같은 사후 확인을 덧붙이지 않아요(9 의 static 주소 1회만 예외). 둘 중 capability 하나라도 없으면 `--verify-wait none` 을 빼서 execute 가 동기 검증을 끝내게 하고, 반환된 정확한 deployment id 로 일반 `axhub deploy verify <deployment-id> --app <app> --json` 를 최종 증거용으로 정확히 한 번만 호출해요.
-
-Codex 에서는 background task, output 파일 읽기, `for`/`while`/`until`, `sleep`, command substitution, pipe, `grep`, `head`, `status=` 같은 shell 폴링을 쓰지 않아요. 첫 verify 가 exit 6·10 이거나 도구 timeout 으로 끊기면 성공이라고 말하지 않고, 같은 명령을 자동 재실행하거나 새 승인 카드를 띄우지 않은 채 재개 요약과 같은 verify 명령 한 줄만 남겨요. UI 에 "실행 중"이 남아 있는데 실제 `axhub` 프로세스가 없거나 output 을 회수하지 못해도 execute 를 다시 실행하지 않아요.
-
-`설정은 나중에 올리기` 거나 commit+push capability 가 없는 경우:
-
-```bash
-axhub --json plugin-support import --mode execute --approved
-```
-
-preview 에 `--slug`, `--repo`, `--tenant`, `--name`, `--deploy-method`, `--from-dir`, `--branch` 같은 import 옵션을 넘겼다면 execute 에도 같은 값을 그대로 반복해요. static lane preview 에 `--repo` 를 넣지 않았다면 execute 에도 넣지 않아요.
-
-```bash
-axhub --json plugin-support import --mode execute --approved --slug "$APP_SLUG" --tenant "$TENANT"
-```
-
-`올리기` 를 골랐으면 `--commit-manifest` 를 더해요. CLI 가 backend mutation 전에 axhub.yaml 을 커밋·push 해서 첫 배포에 반영해요.
-
-```bash
-axhub --json plugin-support import --mode execute --approved --commit-manifest
-```
-
-동일 승인으로 두 번 호출하지 않아요. execute 결과도 `import/v1` 로 다시 검증해요. push 실패는 `typed_failure: git` 으로 와요(아래 10의 git 행으로 안내).
-
-권한 복구 뒤 재개(`existing_axhub_app_repair`)도 execute 한 번 + verify 한 번이에요.
-
-9. 성공 안내
-
-- docker/compose·self-hosted static 성공: 공개 URL 을 평문 절대 URL 로 보여주고, 배포 확인이 끝났다고 말해요. 앱이 비공개라 로그인 없는 URL 요청이 로그인 화면으로 돌아오면, 배포 검증과 앱 본문 확인을 분리해 설명해요.
-- static (both lanes, AP-22): show only a non-empty static site URL; `public_url_pending: true` or early return → after verify succeeds read `data.public_url`/`data.tls_ready` once from `axhub apps static site get --app <app> --tenant <t> --json` (exit 5 = still pending). `tls_pending: true`/`tls_ready: false` is still success + the certificate line (visibility-rules `정적 앱 주소·인증서`).
-- docker/compose 성공을 말하기 전에 최종 `deploy verify --json` 의 `environment` 를 먼저 읽어요 (AP-25). `staging` 이면 스테이징 옵트인(`staging_enabled=true`) 앱이라 스테이징에만 반영됐고 운영에는 아직 반영되지 않았다고 같은 성공 블록에서 말하고, 심사 신청 `axhub publish --app <app> --deployment-id <deployment-id> --execute`를 안내해요. "운영 반영 완료" 라고 말하지 않고, 심사 신청은 사용자 요청 시에만 실행해요. `environment` 가 없거나 null 이면 운영으로 간주하지 않고 `axhub apps get <app> --json` 의 `staging_enabled` 를 한 번 읽어 판단해요.
-- 업로드 static 성공: 정적 사이트 활성 릴리스 확인이 끝났다고 말하고, `access_note` 가 있으면 "참고: ..." 로 함께 말해요.
-
-내부 id 는 필요할 때만 상태 이어보기에 쓰고 chat 에 raw 값으로 노출하지 않아요.
-
-10. 실패 안내
-
-`error.message_ko` 를 우선 쓰되, raw field 를 그대로 복사하지 않아요. `recovery_action` 은 한국어 행동 문장으로 바꿔요.
-
-| typed_failure | 사용자 문구 |
+## 승인 게이트 계약 (요약)
+
+codex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 승인 방식은 명시 텍스트 승인 1회예요 — preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구만 유효하고, 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요. 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. 선택 카드로 물은 경우 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.
+
+## 순서
+
+### 0. 올릴 수 있나
+- 사용자가 말한 앱 폴더에서 모든 명령을 실행해요. GitHub 주소면 `git clone` 으로 받고, 압축 파일이면 풀어서 써요. 폴더가 비어 있으면 bootstrap 으로 보내고 멈춰요.
+- `axhub plugin-support preflight --json` 으로 확인해요. 안 되면 setup 스킬로 보내고 멈춰요. `capabilities.import.supported`·`capabilities.self_hosted_git.git_policy_decision` 이 true 가 아니면 CLI 를 업데이트해 달라고 하고 멈춰요.
+- `axhub plugin-support tenant-resolve --json` 으로 작업공간을 정해요. `needs_pick` 이 true 면 "앱을 어느 작업공간에 올릴까요?"로 `candidates` 중에서 골라요.
+- 앱 서비스 권한·저장 위치·GitHub 연결은 bootstrap 스킬 3·4단계와 똑같이 해요.
+
+### 1. 숙지
+- preflight 의 `capabilities.readiness.context_url` 문서를 `curl -fsSL <주소>` 로 한 번 원문 그대로 받아 읽어요. 요약해 주는 웹 읽기 도구는 쓰지 않아요. 규칙별 처리(바로 고침·물어봄·알림)의 기준이에요.
+- DB·파일 저장·로그인·웹훅처럼 기능을 바꿔야 하면 `https://docs.axhub.ai/llms.txt` 목차에서 그 기능 문서를 찾아 같은 방법으로 읽어요.
+
+### 2. 비교
+- `axhub --json plugin-support import --mode preview --tenant <작업공간> --git-choice <key>` 로 CLI 판정(배포 방식·할 일·추정 이름)을 받아요. 내 GitHub 이면 `--github-owner <계정>`, deploy 에서 넘어온 앱이면 `--app <앱>` 을 붙여요.
+- `axhub deploy check --json` 과 기준 문서로 코드를 봐요.
+- 다른 서비스에 기대는 부분을 찾아요: Supabase·Firebase 같은 외부 DB·로그인, Vercel·Netlify 전용 함수, 고정 포트, 서버 폴더 저장. 외부 DB·로그인은 그대로 연결하지 않고 axhub 것으로 바꾸기(추천)·그대로 쓰기를 물어요.
+- 빌드가 있으면 로컬에서 5분 안에 한 번 돌려 봐요.
+- 찾은 것을 넷으로 나눠요: 바로 고칠 것, 물을 것, axhub 에서 안 되는 것, 사용자가 직접 할 일.
+
+### 3. 안내와 확인
+- 한 화면에 보여줘요: 앱 이름(추천 이름)·주소·저장 위치·배포 방식, 바로 고칠 것, 물을 것, 안 되는 것, 사용자가 직접 할 일.
+- 안 되는 것(로컬 AI 모델 실행 등)은 "axhub 에서는 안 돼요"라고 먼저 분명히 말하고 기준 문서의 대안을 보여줘요. 대안이 없으면 그 기능을 빼고 올릴지 물어요.
+- 바꾸면 달라지는 것(서버 코드가 필요해짐·기존 데이터 옮기기)도 알려요.
+- `.env` 에 없는 필수 설정값은 값을 채팅으로 받지 않고 `.env` 에 넣어 달라고 해요.
+- 물을 것을 모아 한 번에 묻고 "지금 이대로 고쳐서 axhub 에 올릴까요?"(올리기 / 그만두기)를 물어요. "바로 해줘"라는 말은 승인이 아니에요.
+- 선택 카드에 빈 답변이 돌아오면 답하지 않은 거예요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.
+
+### 4. 고치기
+- 기준 문서의 고치는 법대로 고쳐요. 못 바꾸는 건 지어내지 않고 알려요.
+- git 저장소가 아니면 `git init` 부터 해요. 한 덩어리를 고칠 때마다 `배포 전 맞추기` 로 커밋해서, 끊겨도 다시 부르면 이어가요. `.env*`·키 파일·에이전트 폴더는 커밋하지 않아요.
+- 배포 설정 파일이 없으면 프로젝트 파일을 근거로 `axhub.yaml` 을 만들고(`name` 은 앱 주소 이름) `axhub deploy --explain --json` 으로 확인해요.
+- 고치다가 새로 물을 일이 생기면 그것만 물어요.
+
+### 5. 다시 비교
+- `axhub deploy check --json` 과 로컬 빌드를 다시 돌려요. 통과해야 올려요. 안 되면 4번으로 돌아가고, 두 번 고쳐도 안 되면 고친 데까지 커밋하고 원인을 알린 뒤 멈춰요.
+
+### 6. 올리기
+- 미리보기와 같은 옵션에 `--mode execute --approved --commit-manifest --verify-wait none` 을 붙여 한 번만 실행해요. 등록할 설정값이 있으면 `--env-from-dotenv .env --env-only <이름,…>` 을 붙여요.
+- 끝나면 `axhub deploy verify <deployment_id> --app <앱> --wait --wait-timeout 9m --json` 으로 확인해요(명령 시간 제한 10분).
+- 정적 사이트가 `active_release_id` 로 끝나면 확인 없이 그 주소로 끝내요.
+- 실행은 한 번만 해요. 기다리다 끊기면 다시 실행하지 말고 같은 확인 명령으로 이어가요.
+- 시간 안에 안 끝난 건(exit 6·10) 실패가 아니에요. 같은 명령으로 다시 확인할 수 있다고 알리고 끝내요. 배포가 실패하면 diagnosis 스킬로 원인을 봐요.
+
+## 끝
+결과만 표로 보여주고 끝내요.
+
+| 항목 | 상태 |
 |---|---|
-| `auth` | 로그인이 필요해요. 다시 로그인한 뒤 이어갈게요. |
-| `version` | axhub CLI가 import 기능을 아직 지원하지 않아요. 업데이트한 뒤 다시 시도해요. |
-| `manifest` | 앱 설정 파일을 정리해야 해요. CLI가 제안한 안전한 수정만 진행해요. |
-| `git` | Git/GitHub 연결이 준비되지 않았어요. recovery_action 을 따라요 — GitHub 인증 승인이 필요하다는 안내면 `axhub github link` 연동(승인 후 재실행하면 이어져요, 코드를 놓쳤거나 만료됐으면 `--fresh`)이 먼저고, 그 외에는 커밋·원격 연결·repo owner 를 확인해요. `subcode=local.write_denied` 면 recovery_action 만 따르고 리포트하지 않아요. |
-| `repo` | GitHub 저장소 연결을 확인해야 해요. 권한이나 원격 저장소를 다시 볼게요. |
-| `app` | axhub 앱 생성 또는 선택에서 막혔어요. 앱 이름과 소유 권한을 확인해요. `code=app.subdomain_not_configured` 면 주소 없는 앱이에요 — 첫 운영 배포 뒤에는 바꿀 수 없으니 주소를 확인받고 승인 뒤 `axhub apps update <slug> --subdomain <주소> --tenant <t>` 로 정한 다음 같은 import 를 다시 실행해요(push 했다면 `axhub deploy list --app <slug> --tenant <t>` 로 자동 배포부터 봐요). |
-| `static` | 정적 앱 처리에서 막혔어요. `code=static.package_manager_missing`·`static.package_manager_spawn_failed` 면 패키지 매니저 문제예요 — recovery_action 의 설치는 사용자 동의를 받은 뒤에 하고(headless 는 안내만 하고 멈춰요) 같은 옵션으로 다시 실행해요. 빌드 스크립트는 고치지 않아요. 그 밖의 retryable=false 면 빌드 스크립트나 산출물 경로를 고친 뒤에만 다시 시도해요 — 재시도만으로는 결과가 안 바뀌어요. 그 외에는 공개 URL과 활성 릴리스를 확인해요. |
-| `deploy` | 첫 배포 확인에서 막혔어요. recovery_action·verify `failure_hint` 가 주소 충돌이면 같은 import 를 다시 하지 않고 그 안내를 승인 뒤 따라요(`apps update` 엔 `--tenant <t>`, 새 앱은 다른 `--slug`) — 재배포는 `deploy` 로 한 번(빈 커밋 push). 그 밖에 실패로 끝났다면 `axhub deploy diagnose` 로 원인을 보고, 코드 원인이면 수정 커밋을 만든 뒤 다시 import 해요 — 같은 커밋 재실행은 같은 배포를 재사용해요. 진행 중이면 배포 상태만 다시 확인해요. |
-| `rate_limit` | 요청이 잠시 많아요. 조금 뒤 다시 시도해요. |
-| `transport` | 네트워크 연결이 불안정해요. 연결 상태를 확인한 뒤 다시 시도해요. |
+| 앱 | 이름 |
+| 주소 | `apps get` 의 `access_url` (스테이징이면 운영 반영은 심사 뒤) |
+| 저장 위치 | Axhub 저장소 · GitHub 저장소 |
+| 맞춘 것 | 고친 것 · 등록한 설정값 이름 |
+| 배포 | 성공 · 진행 중 · 실패 |
+| 직접 할 일 | 외부 로그인 허용 주소에 새 주소 넣기 등, 없으면 없음 |
 
-## Regression guard
+확인하지 못한 항목은 됐다고 표시하지 않아요.
 
-- malformed envelope, unknown schema, unknown enum, missing static URL(`public_url_pending` 제외), `verified !== true`, headless execute, approval bypass 는 모두 중단해요.
+## 알아둘 것
+- 질문에 답할 수 없는 실행(headless)이면 `--headless` 미리보기와 요약까지만 하고 바꾸지 않고 멈춰요.
+- 에이전트 샌드박스 안이면 Axhub 저장소로 올리는 실행은 홈 폴더에 git 자격증명을 써야 해서 처음부터 권한 상승으로 실행해요. 그래도 `local.write_denied` 가 나오면 `recovery_action` 대로 해요.
+- CLI 가 오류를 내면 `message_ko`·`recovery_action` 을 쉬운 말로 설명하고 어떻게 할지 물어요.
+- 사용자에게 보이는 문장에는 내부 명령 이름이나 상태 코드를 쓰지 않아요.

@@ -91,10 +91,6 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
     "`CI` 가 있음, `CODEX_NON_INTERACTIVE` 가 있음, `codex exec` 같은 subprocess/headless 호출임",
   ],
   [
-    "Claude Desktop 에서는 Monitor, background task, ScheduleWakeup, output 파일 읽기,",
-    "Codex 에서는 background task, output 파일 읽기,",
-  ],
-  [
     "Prefer separate short tool calls or an actual ScheduleWakeup.",
     "Prefer separate short tool calls.",
   ],
@@ -106,10 +102,6 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
   ["[ -n \"${CLAUDE_NON_INTERACTIVE:-}\" ]", "[ -n \"${CODEX_NON_INTERACTIVE:-}\" ]"],
   ["claude plugin marketplace update", "codex plugin marketplace upgrade"],
   ["`Monitor 사용` 권한 카드가 뜨는 명령은 실패예요.", "백그라운드 감시 권한 카드가 뜨는 명령은 실패예요."],
-  [
-    "## 라우팅 경계\n\n- `import`: 현재 폴더가",
-    "## 승인 게이트 계약 (요약)\n\ncodex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 아래 게이트는 뒤쪽 절차 설명이 잘려도 그대로 지켜요.\n\n1. 가져오기 승인 — import preview 를 보여준 뒤 `지금 이대로 axhub에 올려서 인터넷 주소를 만들까요?` 로 한 번만 묻고, 이 승인 하나가 axhub 진입 확인을 겸해요. 승인 전에는 `--execute` 를 실행하지 않아요.\n2. 승인 방식 — 같은 확인을 명시 텍스트 승인 1회로 받아요. preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구만 유효하고, 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요. 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.\n3. 빈 답변 = 미승인 — 선택 카드로 물은 경우 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.\n4. 배포 방식 — preview 가 새 앱(`app_create`)을 `static` 으로 자동 판정했고 사용자가 방식을 말하지 않았으면, 1 전에 `어떤 방식으로 배포할까요?` 를 먼저 물어요 — `정적 사이트 (추천)`·`서버 앱`·`취소`. 서버 앱은 `manifest_hints.start_cmd` 가 있을 때만 `--deploy-method docker` 로 preview 를 다시 받아요.\n5. 첫 올리기 점검 (AP-30) — 승인 카드에 새로 정해지는 것·물을 일·맞출 내용을 함께 보여줘요. `.env` 에 있는 설정값은 execute 에 `--env-from-dotenv .env --env-only <이름,…>` 을 붙여 첫 배포 전에 등록해요.\n\n**질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요(예: `진행` 이면 시작하고 `취소` 면 여기서 멈춰요). 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요. 비파괴 선택은 숫자·서수·라벨·앞글자 어느 쪽으로 답해도 알아듣고, 파괴 게이트만 canonical 문구를 그대로 받아요.\n\n## 라우팅 경계\n\n- `import`: 현재 폴더가",
-  ],
   [
     "## First Visible Sentence",
     "**질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요(예: `진행` 이면 시작하고 `취소` 면 여기서 멈춰요). 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요. 비파괴 선택은 숫자·서수·라벨·앞글자 어느 쪽으로 답해도 알아듣고, 파괴 게이트만 canonical 문구를 그대로 받아요.\n\n**장기 대기.** codex 는 긴 명령을 최대 30초에 yield 하고 백그라운드 터미널로 넘겨요 — yield 는 실패도 완료도 아니에요. `deploy verify --wait` 가 yield 되면 같은 명령을 다시 실행하지 말고 같은 터미널을 빈 입력으로 폴링해 완주를 기다려요. 성공 선언 규칙은 그대로예요.\n\n## 질문 계약 (요약)\n\ncodex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 이미 AXHub 에 있는 앱의 재배포라 승인 질문 없이 진행하고(AP-12), 배포 전 맞추기의 묻는 일이 있을 때만 물어요. 답은 명시 텍스트 1회로 받고, 미리 넣어 둔 문구·유사 표현·무응답은 답이 아니에요. 선택 카드에 빈 답변이 돌아오면 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. headless 는 물을 일이 있으면 아무것도 바꾸지 않고 멈춰요.\n\n## First Visible Sentence",
@@ -129,7 +121,8 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
   ["claude -p", "codex exec"],
   ["TodoWrite", "update_plan"],
   ["Claude", "Codex"],
-  // bootstrap(옛 scaffold 와 합친 판) 의 승인 게이트 요약이에요 — codex 8,000B 절단선 안에 들어가요.
+  // bootstrap(옛 scaffold 와 합친 판)·import(2026-11 개편판)·setup 이 같은 `## 순서` 앞에 받는 승인 게이트 요약이에요
+  // — codex 8,000B 절단선 안에 들어가요.
   [
     "## 순서",
     "**질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요(예: `진행` 이면 시작하고 `취소` 면 여기서 멈춰요). 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요. 비파괴 선택은 숫자·서수·라벨·앞글자 어느 쪽으로 답해도 알아듣고, 파괴 게이트만 canonical 문구를 그대로 받아요.\n\n## 승인 게이트 계약 (요약)\n\ncodex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 승인 방식은 명시 텍스트 승인 1회예요 — preview 를 본 뒤 사용자가 새로 입력한 canonical 승인 문구만 유효하고, 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요. 승인 채널이 없는 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. 선택 카드로 물은 경우 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.\n\n## 순서",

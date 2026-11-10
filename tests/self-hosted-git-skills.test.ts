@@ -310,16 +310,17 @@ describe("spec 236 2차: import follows the code storage location", () => {
     }
   });
 
-  test("import carries the self-hosted lane contract and never guesses GitHub", () => {
+  // 2026-11 import 개편: 저장 위치는 bootstrap 3·4단계와 같은 정책으로 정하고 고른 key 를 CLI 에 넘겨요.
+  // 옛 `--git-backend` 분기·`capabilities.import.selfhosted` 가드·`코드 저장 위치:` 줄은 의도적으로 뺐어요.
+  test("import follows bootstrap's storage policy and hands the pick to the CLI", () => {
     for (const root of SKILL_ROOTS) {
       const importSkill = readSkill(root, "import");
-      expect(importSkill, root).toContain("`selfhosted_repo_push`");
-      expect(importSkill, root).toContain("`--git-backend github|selfhosted`");
-      expect(importSkill, root).toContain("`--git-backend`, `--env-from-dotenv`, `--env-only`, `--json` 뿐이에요");
-      expect(importSkill, root).toContain("`capabilities.import.selfhosted !== true`");
-      expect(importSkill, root).toContain("GitHub 로 추측하지 않고 멈춰요");
-      expect(importSkill, root).toContain("device flow 대사를 0회로 유지");
-      expect(importSkill, root).toContain("`코드 저장 위치:` 줄을 그대로 보여줘요");
+      expect(importSkill, root).toContain("`capabilities.self_hosted_git.git_policy_decision`");
+      expect(importSkill, root).toContain("앱 서비스 권한·저장 위치·GitHub 연결은 bootstrap 스킬 3·4단계와 똑같이 해요");
+      expect(importSkill, root).toContain("--git-choice <key>");
+      expect(importSkill, root).toContain("`--github-owner <계정>`");
+      expect(importSkill, root).not.toContain("--git-backend");
+      expect(importSkill, root).toContain("Axhub 저장소로 올리는 실행은 홈 폴더에 git 자격증명을 써야 해서 처음부터 권한 상승으로 실행해요");
     }
   });
 });
@@ -385,18 +386,6 @@ describe("self-hosted static deploys by git push", () => {
     }
   });
 
-  test("import gates the self-hosted static push lane and writes an explicit output folder", () => {
-    for (const root of SKILL_ROOTS) {
-      const importSkill = readSkill(root, "import");
-      expect(importSkill, root).toContain("`capabilities.import.selfhosted_static !== true`");
-      expect(importSkill, root).toContain("업로드로 보내지 않고 같은 업데이트 안내로 멈춰요");
-      expect(importSkill, root).toContain("self-hosted static(`selfhosted_repo_push`): `kind: \"deployment\"`");
-      expect(importSkill, root).toContain("`--app <app>`(static 이면 `--deploy-method static`)");
-      const manifest = readFileSync(join(ROOT, root, "import", "references", "manifest-authoring.md"), "utf8");
-      expect(manifest, root).toContain("`static_output_dir` 를 항상 명시해요");
-      expect(manifest, root).toContain("`.` 를 그대로 적어요");
-    }
-  });
 });
 
 // spec 706: 서버가 회사 모드로 정한 저장 위치(`git_backend.decision`)를 플러그인은 따르기만 해요.
@@ -416,16 +405,6 @@ describe("spec 706: skills follow the server code storage decision", () => {
       expect(gate, root).toContain("`app_platform.enabled` 가 false 면");
       expect(bootstrap, root).toContain("axhub apps bootstrap --git-choice <key>");
       expect(bootstrap, root).not.toContain("--git-backend");
-    }
-  });
-
-  test("import asks only when the CLI preview stops for a storage pick", () => {
-    for (const root of SKILL_ROOTS) {
-      const importSkill = readSkill(root, "import");
-      expect(importSkill, root).toContain("`capabilities.self_hosted_git.git_policy_decision !== true`");
-      expect(importSkill, root).toContain("`--git-choice`, `--github-owner`, `--git-backend`");
-      expect(importSkill, root).toContain("`code=git_choice_required`·`github_owner_required`·`github_link_required`");
-      expect(importSkill, root).toContain("`recovery_action` 대로 bootstrap 3단계 저장 위치 질문");
     }
   });
 
