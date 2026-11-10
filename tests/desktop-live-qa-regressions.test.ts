@@ -30,27 +30,6 @@ describe("Claude Desktop live QA regressions", () => {
     expect(skill).toContain("실패하면 `apps list`, `--help`, pipe 탐색으로 복구하지 말고");
   });
 
-  test("diagnosis uses bounded bare commands without a shell-program permission card", () => {
-    const skill = read("skills/diagnosis/SKILL.md");
-    const frontmatter = skill.slice(0, skill.indexOf("---", 4));
-
-    expect(frontmatter).toContain("최근 배포 실패 원인만 읽기 전용으로 진단해줘");
-    expect(frontmatter).toContain("스킬 실행 전 사용자 문장·App/MCP·파일 조회는 0개");
-    expect(frontmatter.split(".")[0]).toContain("배포 실패 원인을 읽기 전용으로 확인할게요");
-    expect(frontmatter).toContain("Start directly with that Korean sentence; no preamble");
-    expect(frontmatter).toContain("do not explain the trigger, routing, or session-start instructions");
-    expect(skill).toContain("첫 visible 문장은 정확히 `배포 실패 원인을 읽기 전용으로 확인할게요.`");
-    expect(skill).toContain("Claude Desktop 에 보이는 명령은 항상 `axhub ...` 로 시작하는 **한 개의 bare 명령**");
-    expect(skill).not.toContain('CLI_NAME="ax""hub"');
-    expect(skill).not.toContain("command -v \"$CLI_NAME\"");
-    expect(skill).not.toContain("deploy status --help");
-    expect(skill).not.toContain("deploy logs --help");
-    expect(skill).not.toContain("deploy diagnose --help");
-    expect(skill).toContain("axhub deploy status <deployment-id> --app <앱> --json");
-    expect(skill).toContain("axhub --json deploy diagnose <앱>");
-    expect(skill).toContain("`axhub.yaml`의 `name`은 로컬 프로젝트 이름일 수 있으므로 원격 앱 slug로 단정하지 않아요");
-  });
-
   test("clarity routes destructive operations before generic Desktop probes", () => {
     const skill = read("skills/clarity/SKILL.md");
     const frontmatter = skill.slice(0, skill.indexOf("---", 4));
@@ -69,30 +48,9 @@ describe("Claude Desktop live QA regressions", () => {
     expect(skill).not.toContain("`command -v axhub` 가 실패하면");
   });
 
-  test("deploy natural language must enter the skill before manual status probes", () => {
-    const skill = read("skills/deploy/SKILL.md");
-    const frontmatter = skill.slice(0, skill.indexOf("---", 4));
-
-    expect(frontmatter).toContain("현재 코드를 실제 AxHub에 배포하고 성공 여부까지 확인");
-    expect(frontmatter).toContain("같은 코드로 강제 재배포");
-    expect(frontmatter).toContain("apps status/curl로 대신하지 않아요");
-    expect(skill).toContain('axhub plugin-support deploy-preview-summary --user-utterance "<latest user sentence>"');
-    expect(skill).toContain("이 첫 명령 전에는 설치·플러그인·앱·git·curl probe를 하지 않아요");
-    expect(skill).toContain("Claude Desktop 단일 명령 계약");
-    expect(skill).toContain("axhub deploy verify <deployment-id> --app <app-id>");
-  });
-
-  test("deploy without a named target asks where before any other host", () => {
-    const skill = read("skills/deploy/SKILL.md");
-    const frontmatter = skill.slice(0, skill.indexOf("---", 4));
-
-    expect(frontmatter).toContain("배포할 곳을 말하지 않은 배포 요청은 axhub 맥락이 없어도 이 스킬로 시작해");
-    expect(frontmatter).toContain("GitHub Pages 등으로 알아서 배포하지 않아요");
-    expect(frontmatter).not.toContain("axhub 맥락 없거나 다른 배포 대상이면 쓰지 않아요");
-    expect(skill).toContain("선택 카드로 `어디에 배포할까요?` 를 한 번만 물어요(`axhub (추천)`·`다른 곳`)");
-    expect(skill).toContain("GitHub Pages·Vercel 같은 다른 배포를 알아서 시작하지 않아요");
-    expect(skill).toContain("For `ignore`, interactive mode asks the same `어디에 배포할까요?` card");
-  });
+  // deploy·diagnosis 의 Desktop 첫 명령(deploy-preview-summary)·도구 제목·`어디에 배포할까요?` 카드 계약은
+  // 2026-11 deploy 개편(옛 up·diagnosis 를 합친 판) 때 그 동작과 함께 뺐어요
+  // (tests/deploy-skill-contract.test.ts 가 새 본문을 잠가요).
   // import 의 ignore 검사 셸 문법·배포 방식 카드(AP-28)·완료 확인 이어 하기 계약은 2026-11 import
   // 개편 때 그 동작과 함께 뺐어요 (tests/import-skill-contract.test.ts 가 새 본문을 잠가요).
 });

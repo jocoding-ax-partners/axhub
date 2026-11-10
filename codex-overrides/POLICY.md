@@ -6,12 +6,12 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 - 스킬(플러그인이 상황별로 꺼내 쓰는 기능 단위)과 훅(세션이 시작될 때 자동으로 도는 점검)은 기본적으로 `axhub` CLI(터미널에서 쓰는 axhub 명령 도구)를 통해 인터넷에 접근해요. 플러그인이 그 밖의 곳에 몰래 접속하지 않아요.
 - 버전 확인·업데이트·처음 셋업 요청은 `setup` 스킬이 처리해요. `axhub update check --json` 으로 새 버전을 확인하고, 있으면 `axhub update apply` 로 올려요. 플러그인은 스킬이 직접 바꾸지 않고, 지금 쓰는 AI 앱의 플러그인 화면에서 업데이트하도록 안내해요.
 - axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 그 도구를 우선 사용하지 않아요. 로그·환경변수·롤백·GitHub 재연결 같은 후속 운영 작업도 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요.
-- 앱 생성·배포의 저장소 단계는 public CLI의 top-level `git_backend`를 먼저 확인해요. 기존 app은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh bootstrap은 `axhub apps git-backend --tenant <tenant> --json`의 회사 판정(`decision`)을 따라요 — 회사가 정한 곳이면 묻지 않고, 둘 다 쓰는 회사에서 GitHub를 연결한 사람에게만 저장 위치를 물어요. 판정을 모르는 구 CLI는 업데이트로 보내고, 물어야 하는데 답할 수 없는 headless에서는 아무것도 만들지 않고 멈춰요. selfhosted는 정적 사이트를 포함해 외부 저장소 계정 인증·device flow·GitHub App 설치 없이 `git push` lane을 쓰고(앱 저장소에 안 붙은 로컬 소스는 `import`가 올려요), GitHub는 정적 사이트 업로드를 포함해 각 기존 lane을 유지해요.
+- 새 앱 생성의 저장소 단계는 public CLI의 top-level `git_backend`를 먼저 확인해요. fresh bootstrap은 `axhub apps git-backend --tenant <tenant> --json`의 회사 판정(`decision`)을 따라요 — 회사가 정한 곳이면 묻지 않고, 둘 다 쓰는 회사에서 GitHub를 연결한 사람에게만 저장 위치를 물어요. 판정을 모르는 구 CLI는 업데이트로 보내고, 물어야 하는데 답할 수 없는 headless에서는 아무것도 만들지 않고 멈춰요. 이미 있는 앱의 배포는 저장 위치(Axhub 저장소·GitHub·정적 사이트·폴더 업로드)별 길을 axhub CLI(`axhub deploy push`)가 골라요. 앱 저장소에 안 붙은 로컬 소스는 `import`가 올려요.
 - 세션 시작 때 도는 auto-update 훅은 24시간에 1회만 뒤에서(백그라운드) `axhub update check` 명령으로 새 버전이 있는지 확인하고, 있으면 묻지 않고 `axhub update apply` 와 `codex plugin marketplace upgrade axhub`(로컬 marketplace 는 `codex plugin add axhub-codex`)로 조용히 설치해요. 실제 인터넷 연결은 axhub CLI 와 Codex 의 플러그인 명령이 해요. 세션 시작을 기다리게 하지 않아요.
 - Codex 는 플러그인 훅을 사용자가 신뢰하기 전에는 실행하지 않아요. 신뢰하지 않으면 위 훅 표면(자동 업데이트 확인·재시작 확인)은 조용히 꺼지고, 스킬은 훅 없이도 완결돼요 — CLI 업데이트는 `setup` 스킬을 직접 부르면 돼요.
 - `plugin list`와 exact `plugin download`는 현재 로그인 OAuth 또는 active broad PAT로 App-backed marketplace를 읽어요. 목록은 `plugin.current_servable_version` summary를 페이지 단위로 읽고 download 결과에서 `version_id`를 만들거나 보고하지 않아요. Download는 요청한 새 ZIP만 만들고 기존 파일을 덮어쓰거나 받은 code를 실행하지 않아요.
 - download 요청과 install 요청을 구분해요. `plugin install --host codex`는 offline preview 뒤 명시한 `--execute --yes`에서만 bounded ZIP metadata·실제 압축 해제 크기·identity를 검증하고 App/host lock과 crash recovery를 적용한 뒤 `~/.axhub/plugins/` 아래 private local marketplace를 Codex 공식 plugin CLI로 user scope 설치해요. 모든 `AXHUB_*` 환경은 Codex process에 전달하지 않아요.
-- `up` 스킬은 사용자가 `저장소 없이`·`레포 없이`·`지금 폴더 그대로 업로드`를 명시했을 때만 현재 폴더를 올려요. `GitHub 없이`만 말한 selfhosted app은 정상 clone→push 배포를 써요. `up`은 커밋을 만들거나 push 하지 않고 연결된 저장소도 건드리지 않으며, `.gitignore`를 존중하고 `.git/`·`node_modules/`·`.env` 계열을 빼요. 이미 AXHub 에 있는 앱이라 파일 수·크기·소스 버전을 보여 주고 묻지 않고 올려요.
+- `deploy` 스킬은 사용자가 `지금 폴더 그대로`라고 했을 때만 커밋하지 않은 작업 폴더를 그대로 올려요. 그 밖에는 고친 것을 항목마다 커밋한 뒤 올리고, `.env` 계열·키 파일·에이전트 폴더는 커밋하지 않아요. 배포 실패 원인만 물으면 아무것도 바꾸지 않고 원인만 알려 드리고, 롤백·이전 배포 다시 올리기는 말씀하실 때만 해요.
 - `plugin publish`는 `--execute`가 없으면 network·auth가 없는 offline preview예요. Publish execute에는 OAuth나 broad PAT 대신 `plugins:read` + `plugins:write` scoped PAT·권리 확인·명시 승인을 모두 요구해요. PAT를 미리 발급하지 않아요 — 로그인돼 있으면 CLI가 이 PAT를 알아서 준비하고, `plugin_pat_required`면 CLI `next_action`대로 `axhub auth login`을 안내하거나 안내된 `axhub auth pat issue … --use`만 실행하며 token을 화면에 내지 않아요. 성공은 `upload_complete`·installable=false(`--submit`을 붙이면 `review_submitted`·installable=false)이고, 게시 심사 신청은 `submit_plugin_version_for_review` 다음 동작인 `axhub plugin submit`이에요. 결과는 `axhub plugin manage status --app <app>`로 확인하고, 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
 
 ## 로컬에 기록하는 파일 — 내 컴퓨터에 무엇을 남기나요
@@ -44,8 +44,8 @@ axhub Codex plugin 이 사용자의 컴퓨터에서 무엇을 하고 무엇을 �
 
 선택지를 고를 때 번호를 타이핑하는 대신 카드로 받고 싶으면 `~/.codex/config.toml` 의 `[features]` 에 `default_mode_request_user_input = true` 한 줄을 더하면 돼요. 설정을 대신 바꾸지는 않아요.
 
-- 예외 — 이미 AXHub 에 있는 앱을 다시 올리는 배포(재배포)는 묻지 않고 진행해요. 배포 이력으로 언제든 되돌릴 수 있어서예요. 대신 올리기 전에 앱이 AXHub 에서 뜰 수 있는지 확인하고, 막히는 것은 고쳐서 올린 뒤 `이렇게 맞춰서 올렸어요` 로 무엇을 고쳤는지 알려요. 값을 찾을 수 없는 설정값이나 AXHub 에서 안 되는 기능처럼 고르셔야 하는 것만 물어요. 자동 실행 환경에서도 물을 것이 없으면 재배포를 실행하고, 물을 것이 있으면 아무것도 바꾸지 않고 멈춰요.
-- 배포 전에 앱 폴더의 `.env` 값을 앱 설정값으로 등록할 때는 값을 화면·로그·대화에 내보내지 않아요. 내 컴퓨터 주소(`localhost`·사설 IP)를 가리키는 값과 AXHub 가 넣어 주는 값은 등록하지 않아요. "그대로 올리기"로 답한 항목은 앱 폴더의 `.axhub/deploy-answers.json` 에만 적어 두고 저장소에 커밋하지 않아요.
+- 예외 — 이미 AXHub 에 있는 앱을 다시 올리는 배포(재배포)는 묻지 않고 진행해요. 배포 이력으로 언제든 되돌릴 수 있어서예요. 대신 올리기 전에 앱이 AXHub 에서 뜰 수 있는지 확인하고, 막히는 것은 고쳐서 올린 뒤 결과 표로 무엇을 맞췄는지 알려요. AXHub 에서 안 되는 기능이나 되돌릴 수 없는 배포 방식 전환처럼 고르셔야 하는 것만 물어요. 질문에 답할 수 없는 자동 실행 환경에서는 미리보기와 요약까지만 하고 아무것도 바꾸지 않고 멈춰요.
+- 배포 전에 앱 폴더의 `.env` 값을 앱 설정값으로 등록할 때는 값을 화면·로그·대화에 내보내지 않고, 값을 채팅으로 받지 않아요. 예시 값(`your-`·`xxx` 등)은 등록하지 않아요. 내 컴퓨터 주소(`localhost`·사설 IP)를 가리키는 값과 AXHub 가 넣어 주는 값은 등록하지 않아요.
 
 ## 데이터 범위 — 어디까지 볼 수 있나요
 - axhub MCP 도구는 로그인 인증(OAuth)으로 확인된 내 계정 범위(tenant) 안의 데이터만 다뤄요. 다른 사람이나 다른 조직의 데이터는 보이지 않아요.

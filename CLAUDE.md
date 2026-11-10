@@ -22,7 +22,7 @@ The monorepo is indexed by CodeGraph (`codegraph_*` MCP tools, server `codegraph
 
 > **정책 기준 문서:** 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 개발·운영 규칙은 `docs/policy/dev-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 기준이에요. 이 파일의 요약과 다르면 정책 문서를 따라요. 어긋남은 `tests/policy-parity.test.ts` 가 잡아요.
 
-axhub plugin은 instruction-only diet 뒤 현재 **9 skill** (`setup` / `bootstrap` / `plugins` / `deploy` / `up` / `import` / `development` / `diagnosis` / `clarity`)을 제공해요. `setup` 은 옛 `onboarding`·`update` 를 합친 점검 스킬이에요 (CLI 설치·버전 업데이트·로그인·회사·git). `plugins`는 사용자 명시 결정으로 추가됐고 deploy_method=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 담당해요. 게시자 관리는 App Console, 승인은 Console Review로 연결하고 판정·실행은 ax-hub-cli(`axhub`)에 둬요.
+axhub plugin은 instruction-only diet 뒤 현재 **7 skill** (`setup` / `bootstrap` / `plugins` / `deploy` / `import` / `development` / `clarity`)을 제공해요. `deploy` 는 옛 `up`(지금 폴더 그대로 올리기)·`diagnosis`(배포 실패 원인 진단)를 합친 스킬이에요. `setup` 은 옛 `onboarding`·`update` 를 합친 점검 스킬이에요 (CLI 설치·버전 업데이트·로그인·회사·git). `plugins`는 사용자 명시 결정으로 추가됐고 deploy_method=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 담당해요. 게시자 관리는 App Console, 승인은 Console Review로 연결하고 판정·실행은 ax-hub-cli(`axhub`)에 둬요.
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
 
@@ -51,18 +51,18 @@ diet 가 제거한 hook 중 **auto-update SessionStart 훅 1개**만 `hooks/` �
 
 ## CLI 호출 표면
 
-- skill 들은 흡수된 helper 표면을 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 (`clarity` skill 은 예외 — 공개 표면만 탐색·실행, `diagnosis` skill 은 CLI 전용 — MCP `deployment_diagnosis` 가 보여도 호출하지 않고 공개 `axhub deploy status`/`deploy logs`/`deploy diagnose` 만 써요) — 예: `axhub plugin-support onboarding-detect`, `axhub plugin-support preflight`, `axhub plugin-support deploy-prep`. hidden 명령은 외부 무보증이지만 계약 parity 테스트 + 최소 CLI 버전 게이트로 plugin 과 동기화돼요.
-- 사용자 가치가 있는 공개 표면은 `axhub deploy verify <deployment-id> --app <app>`, `axhub deploy diagnose`, `axhub plugin publish <path>` 예요.
+- skill 들은 흡수된 helper 표면을 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 (`clarity` skill 은 예외 — 공개 표면만 탐색·실행, `deploy` skill 의 실패 진단은 공개 `axhub deploy status`/`deploy logs`/`deploy diagnose` 만 써요) — 예: `axhub plugin-support onboarding-detect`, `axhub plugin-support preflight`, `axhub plugin-support deploy-prep`. hidden 명령은 외부 무보증이지만 계약 parity 테스트 + 최소 CLI 버전 게이트로 plugin 과 동기화돼요.
+- 사용자 가치가 있는 공개 표면은 `axhub deploy push --app <app>`, `axhub deploy verify <deployment-id> --app <app>`, `axhub deploy diagnose`, `axhub plugin publish <path>` 예요.
 
 ## 최소 CLI 버전 게이트
 
-- bootstrap·deploy skill은 `plugin-support` 기능(preflight)으로 최소 표면 **0.21.3+**를 확인하고, bootstrap은 preflight `capabilities.self_hosted_git.git_policy_decision` 이 없으면 CLI 업데이트로 보내요. plugins는 version을 추측하지 않고 필요한 `axhub plugin list|download|publish --help` 성공을 가드해요. clarity 의 앱 삭제·절전은 `axhub apps delete --help` 의 30일 되돌리기(`reactivate`) 안내로 새 CLI 인지 가드해요. CLI가 없거나 기능이 없으면 멈추고 setup으로 보내며 우회하지 않아요.
+- bootstrap·deploy skill은 `plugin-support` 기능(preflight)으로 최소 표면 **0.21.3+**를 확인하고, bootstrap은 preflight `capabilities.self_hosted_git.git_policy_decision`, deploy는 `capabilities.deploy.push` 가 없으면 CLI 업데이트로 보내요. plugins는 version을 추측하지 않고 필요한 `axhub plugin list|download|publish --help` 성공을 가드해요. clarity 의 앱 삭제·절전은 `axhub apps delete --help` 의 30일 되돌리기(`reactivate`) 안내로 새 CLI 인지 가드해요. CLI가 없거나 기능이 없으면 멈추고 setup으로 보내며 우회하지 않아요.
 - **CLI 경로 해석 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 낡은 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요. 모든 skill 의 CLI 가드는 `command -v axhub` → 위치 파일 `~/.axhub/bin-path` → canonical `~/.axhub/bin/axhub`(.exe) 순으로 찾고, 디스크에 있으면 재설치·setup 으로 돌리지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤 같은 세션은 반환된 `bin_path` 절대경로로 이어가요. 세 경로 모두에서 못 찾을 때만 setup 을 안내해요.
 
 ## 살아남은 quality gate
 
 - `bun run lint:tone --strict` — 모든 한글 텍스트 해요체 0 err (금지: 합니다 / 입니다 / 드립니다 / 당신).
-- frontmatter validity check — 9 skill의 SKILL.md frontmatter 유효성.
+- frontmatter validity check — 7 skill의 SKILL.md frontmatter 유효성.
 - 대표 여정 회귀 — 첫 셋업 → 앱 생성 → 배포 → 상태 확인 경로를 문서·skill 본문·fixture 계약으로 같은 방향에 맞춰요.
 - `bun run plugin:bundle` — `.claude`, `.omx`, `node_modules`, 인덱스 DB 같은 개발 산출물이 빠진 clean local plugin bundle 을 만들어요. 로컬 Claude Code 검증은 repo 루트가 아니라 `dist/axhub-plugin` 을 써요.
 - 실제 ax-hub-cli 구현/schema parity/release 는 이 plugin repo 범위 밖 follow-up 으로 남겨요.
@@ -89,30 +89,27 @@ gh workflow run plugin-release.yml -f tag=plugin-vX.Y.Z
 
 ## deploy 성공 선언 규칙
 
-- deploy 성공 선언은 `axhub deploy verify <deployment-id> --app <app>` **1회 실행으로만** 해요. deployment id 와 app scope 는 필수이고 latest 재탐색 경로는 금지예요 — verify exit 0 + 접근 가능 URL 확인 전까지 "배포 성공" 이라고 말하지 않아요.
-- **GitHub 작업공간의 static 앱(deploy_method=static) 배포는 별도 upload lane** 이에요: 성공 선언을 `apps static deploy --execute` 의 `active_release_id`(activate 성공)로 해요 — 업로드 static 은 deployment-record 가 아니라 release 라 `deploy verify` 가 404 예요. 위 verify 규칙은 deployment-record 배포(docker/compose, 그리고 self-hosted static)에 적용돼요. deploy skill 이 resolve 직후 `apps get` 의 `deploy_method`·`git_backend` 로 auto-detect 해 이 lane 으로 갈라요.
-- **self-hosted static 앱:** `git_backend.backend=selfhosted` 이면 static 도 소스를 앱의 Axhub 저장소에 `git push` 하고 webhook deployment 를 `axhub deploy verify` 로 확인해요(서버가 manifest install/build 로 빌드 → `build.static_output_dir` 게시). preflight `capabilities.import.selfhosted_static` 이 없으면 업데이트로 보내고 업로드 lane 으로 대신하지 않아요. push 전 `axhub.yaml` 에 `build.deploy_method: static` 과 명시적 `build.static_output_dir`(빌드 뒤 index.html 폴더, 루트면 `.`)를 맞춰요. 앱 저장소에 안 붙은 로컬 소스 폴더(업로드로 배포하던 static 앱이 흔해요)는 `repo clone` 대신 `import` 로 넘겨 CLI 가 origin 연결·seed 커밋 합치기·push 를 해요.
-- **스테이징 옵트인 앱(AP-25):** `apps get` 의 `staging_enabled=true` 면 배포는 스테이징에만 반영되고 운영은 심사 승인 뒤 promote 로만 바뀌어요. verify 성공 요약은 `deploy verify --json` 의 `environment` 로 갈라 `staging` 이면 운영 미반영과 다음 단계(심사 신청 `axhub publish --app <app> --deployment-id <id> --execute`)를 함께 안내하고 "운영 반영 완료" 라고 말하지 않아요. preview 카드 환경 라벨도 `staging_enabled` 로 `운영`/`스테이징` 을 골라요. `environment` 가 없거나 null 이면 운영으로 간주하지 않아요.
+- deploy 성공 선언은 CLI 의 최종 결과로만 해요 — `axhub deploy push --app <app> --execute --wait` 가 같은 배포 번호로 끝까지 기다린 결과, 또는 끝나지 않았거나(exit 6·10, `status` 가 `started`·`running`) 기다리다 끊겼을 때 다시 올리지 않고 이어 부르는 `axhub deploy verify <deployment-id> --app <app> --wait --wait-timeout 9m` 의 결과예요. latest 재탐색 경로는 금지이고, 확인하지 못한 항목은 됐다고 표시하지 않아요.
+- **올리는 길은 CLI 가 골라요 (AP-23):** 저장 위치(Axhub 저장소·GitHub·정적 사이트·폴더 업로드)별 길·배포 번호 찾기·기다리기는 `axhub deploy push` 몫이에요(preflight `capabilities.deploy.push`, CLI 0.62.0+). 2026-11 전에는 스킬이 `apps get` 의 `deploy_method`·`git_backend` 로 selfhosted push·GitHub·static upload lane 을 직접 나눴어요. 사용자가 "지금 폴더 그대로"라고 했을 때만 `--working-tree` 를 붙이고, 앱 저장소에 안 붙은 로컬 소스 폴더는 `import` 로 넘겨요.
+- **스테이징 옵트인 앱(AP-25):** 배포 결과의 `environment` 가 `staging` 이면 스테이징에만 반영됐고 운영은 심사 뒤라고 알리고 "운영 반영 완료" 라고 말하지 않아요. 심사 신청은 사용자가 요청할 때만 해요.
 
 ## Skill routing
 
-이 repo의 공개 plugin surface는 `setup` / `bootstrap` / `plugins` / `deploy` / `up` / `import` / `development` / `diagnosis` / `clarity` 아홉 스킬이에요.
+이 repo의 공개 plugin surface는 `setup` / `bootstrap` / `plugins` / `deploy` / `import` / `development` / `clarity` 일곱 스킬이에요.
 
 Key routing rules:
 - 처음 셋업·CLI 설치·버전 확인/업데이트·로그인·환경 점검 → `setup` (점검 결과 표로 끝내고 앱 생성·배포로 이어가지 않아요 — AP-8)
 - 템플릿으로 새 앱 생성·첫 배포(코드 저장 위치는 회사 판정대로 Axhub 저장소·내 GitHub·회사 GitHub 조직) → `bootstrap`
 - deploy_method=plugin App 게시·목록·정확한 version 다운로드 → `plugins` (Discovery/App Console/Console Review canonical surface)
 - 비어 있지 않은 기존 로컬 앱의 첫 axhub 연결·첫 배포 가져오기 → `import` (올릴 수 있나 → 기준 문서 `curl -fsSL` 원문 숙지 → 비교 → 안내와 확인 1회(올리기 / 그만두기) → 덩어리마다 커밋하며 고치기 → 다시 비교 → execute 한 번·`deploy verify --wait` → 결과 표. `.env` 값은 `--env-from-dotenv` 로 첫 배포 전 등록 — AP-30)
-- 배포 실행·배포 전 맞추기(AP-29)·verify 기반 성공 선언 → `deploy` (GitHub 작업공간의 static 앱은 deploy_method auto-detect 로 독립 static upload lane: dry-run→`--execute`→`active_release_id` 성공 선언, self-hosted static 은 push→verify). 배포할 곳을 말하지 않은 배포 요청은 axhub 맥락이 없어도 deploy 가 받아, 연결 안 된 폴더면 `어디에 배포할까요?` 카드(axhub 추천)부터 보여주고 GitHub Pages 같은 다른 곳으로 알아서 배포하지 않아요 — AP-27
-- GitHub 저장소 없이 지금 폴더의 소스를 그대로 올려 배포 → `up` (커밋 상태를 게이트로 쓰지 않고 `deploy-prep` preflight + `axhub up --dry-run` preview 사용, static 앱은 deploy 로 양보)
+- 이미 axhub 에 있는 앱의 배포·지금 폴더 그대로 올리기·배포 실패 원인 진단 → `deploy` (대상 → 기준 문서 `curl -fsSL` 원문 숙지 → 점검 → 맞추기(승인 카드 없음, 항목마다 커밋, `env set --from-dotenv`) → `deploy push` 미리보기 → `--execute --wait` 한 번 → 결과 표. 원인만 물으면 실패 진단만 하고 아무것도 바꾸지 않아요 — AP-4. 다른 배포 서비스를 말했으면 하지 않고 멈춰요 — AP-27)
 - 기존 앱에 실데이터 기반 기능(페이지·화면·대시보드·조회 엔드포인트·CRUD 화면) 코드 생성 → `development` (AP-5 read 기본, write 게이트 — 조회 도구는 읽기 전용이고 커넥터 자체는 쓰기 액션을 가질 수 있어요)
-- 배포 실패 원인 진단·해결 후보 요약 → `diagnosis` (읽기 전용, 재배포·롤백 직접 실행 금지)
-- axhub CLI 운영 명령(테이블/컬럼 생성·환경변수·로그·connector 연결·권한 확인/부여(대상별 read|write)·데이터 조회·롤백·상태)·모호한 axhub 발화 → `clarity` (axhub 명령 실행만, 버전 업데이트는 setup·앱 코드 생성은 development·기존 앱 가져오기는 import·배포 실패 원인 진단은 diagnosis 양보)
+- axhub CLI 운영 명령(테이블/컬럼 생성·환경변수·로그·connector 연결·권한 확인/부여(대상별 read|write)·데이터 조회·롤백·상태)·모호한 axhub 발화 → `clarity` (axhub 명령 실행만, 버전 업데이트는 setup·앱 코드 생성은 development·기존 앱 가져오기는 import·배포 실패 원인 진단은 deploy 양보)
 
-**모든 트리거 전제 (AP-11):** 위 규칙은 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요. 맥락 없는 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘")는 실행·안내로 밀어붙이지 않고 한 번 묻거나 종료하며 다른 axhub 스킬로 넘기지 않아요. 배포할 곳을 말하지 않은 배포 발화만은 deploy 가 받아 그 "한 번 묻기"를 배포할 곳 카드로 해요(AP-27). bootstrap·import 는 preview-confirm 승인이 backstop 이라 frontmatter 게이트로만 적용해요.
+**모든 트리거 전제 (AP-11):** 위 규칙은 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요. 맥락 없는 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘")는 실행·안내로 밀어붙이지 않고 한 번 묻거나 종료하며 다른 axhub 스킬로 넘기지 않아요. bootstrap·import 는 preview-confirm 승인이 backstop 이라, deploy 는 `deploy-prep` 이 처음 올리는 폴더(`bootstrap_plan`)를 import·bootstrap 으로 돌려보내서 frontmatter 게이트로만 적용해요.
 
-**앱 git backend 선판정 (AP-23):** resume/existing은 public `axhub apps get <app> --json`, fresh bootstrap은 read-only `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 판정 입력으로 써요(서버가 `decision` 을 주면 그 판정을 따르고 `--git-choice` 로 넘겨요 — AP-24, spec 706). 기존 코드 import는 bootstrap 과 같은 회사 판정으로 고른 `--git-choice` 를 `plugin-support import` 에 넘기고 CLI 가 경로를 정해요(`selfhosted_repo_push`, static 포함). selfhosted는 device flow·GitHub App 설치 대사를 노출하지 않고, deploy는 static을 포함해 빈·무관한 폴더만 `axhub repo clone` 뒤 일반 `git push`의 webhook deployment를 기다리며, 앱 저장소에 안 붙은 로컬 소스 폴더는 `import`로 넘겨요. GitHub·`legacy_github`는 static upload lane을 포함해 기존 gate/upload/create 경로를 유지하며 C1/Gitea API를 직접 호출하지 않아요.
+**앱 git backend 선판정 (AP-24):** fresh bootstrap은 read-only `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 판정 입력으로 써요(서버가 `decision` 을 주면 그 판정을 따르고 `--git-choice` 로 넘겨요 — spec 706). 기존 코드 import는 bootstrap 과 같은 회사 판정으로 고른 `--git-choice` 를 `plugin-support import` 에 넘기고 CLI 가 경로를 정해요(`selfhosted_repo_push`, static 포함). selfhosted는 device flow·GitHub App 설치 대사를 노출하지 않아요. 이미 있는 앱의 배포 길은 `deploy push` 가 골라요(AP-23) — deploy 는 빈 폴더만 `axhub repo clone` 하고 앱 저장소에 안 붙은 로컬 소스 폴더는 `import`로 넘기며 C1/Gitea API를 직접 호출하지 않아요.
 
-**codex 질문 프로토콜·fail-closed (AP-12 codex 판):** codex 판은 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형 + 추천안 `(추천)` + 답→행동 매핑을 쓰고, 질문한 턴은 도구 호출 없이 끝내요. 네이티브 선택 카드(`[features] default_mode_request_user_input`)가 켜진 세션에서 **빈 답변은 미승인**이고 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 이 규칙은 두 채널이 겹쳐 소유해요 — AP-12 정책, 그리고 실행 6스킬 본문의 첫 8,000B(본문은 8,000B에서 절단되니 규칙은 그 안에 둬요).
+**codex 질문 프로토콜·fail-closed (AP-12 codex 판):** codex 판은 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형 + 추천안 `(추천)` + 답→행동 매핑을 쓰고, 질문한 턴은 도구 호출 없이 끝내요. 네이티브 선택 카드(`[features] default_mode_request_user_input`)가 켜진 세션에서 **빈 답변은 미승인**이고 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 이 규칙은 두 채널이 겹쳐 소유해요 — AP-12 정책, 그리고 실행 스킬 본문의 첫 8,000B(본문은 8,000B에서 절단되니 규칙은 그 안에 둬요).
 
-**진입 확인 (AP-12):** 새로 만드는 일(bootstrap·import·plugin 게시)은 interactive preview 승인 하나가 axhub 진입 확인을 겸해요. 이미 AXHub 에 있는 앱의 재배포(deploy·up)는 승인 카드 없이 **배포 전 맞추기(AP-29)** 를 해요 — `deploy check` 판정 + preflight `context_url` 기준 문서로 AI 검사·로컬 빌드, `.env` 값 등록(`env set --from-dotenv`)·코드 수정·커밋을 push 전에 끝내고(GitHub 연결 앱은 push 가 곧 자동 배포), 물을 일(값 없는 설정값·안 되는 6가지나 문서 `물어봄` 규칙 첫 해당·첫 올리기의 새 이름)이 있을 때만 물어요. headless 는 물을 일이 없으면 실제로 배포하고 있으면 멈춰요. "그대로" 답은 `.axhub/deploy-answers.json`(커밋 안 함)에 남겨요.
+**진입 확인 (AP-12):** 새로 만드는 일(bootstrap·import·plugin 게시)은 interactive preview 승인 하나가 axhub 진입 확인을 겸해요. 이미 AXHub 에 있는 앱의 재배포(deploy)는 승인 카드 없이 **배포 전 맞추기(AP-29)** 를 해요 — preflight `context_url` 기준 문서와 `deploy check` 로 점검·로컬 빌드를 하고, 고칠 것은 항목마다 `배포 전 맞추기: <항목>` 으로 커밋하고, 새 설정값은 `env set --from-dotenv` 로 등록한 뒤 `deploy push` 로 올려요. 물을 것(안 되는 것의 대안·되돌릴 수 없는 서버 앱 전환 등)이 있을 때만 모아서 한 번에 물어요. headless 는 미리보기와 요약까지만 하고 바꾸지 않고 멈춰요.

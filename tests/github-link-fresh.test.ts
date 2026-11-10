@@ -33,12 +33,8 @@ describe("github link --fresh reissue contract", () => {
   });
 
   test("github_relogin_required lanes point at the reissue instead of a bare retry", () => {
-    for (const path of [
-      "skills/deploy/references/error-empathy-catalog.md",
-      "skills/bootstrap/SKILL.md",
-    ]) {
-      expect(readRepo(path), path).toContain("--fresh");
-    }
+    // deploy 는 2026-11 개편 때 GitHub 재연결 안내를 빼고 CLI 의 `recovery_action`·`next` 를 따라요.
+    expect(readRepo("skills/bootstrap/SKILL.md")).toContain("--fresh");
     // import 는 GitHub 연결을 bootstrap 3·4단계와 똑같이 해요 — 코드 재발급은 그 절차를 따라요.
     expect(readRepo("skills/import/SKILL.md")).toContain("GitHub 연결은 bootstrap 스킬 3·4단계와 똑같이 해요");
   });

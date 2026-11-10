@@ -4,6 +4,21 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.41.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.40.1...plugin-v1.41.0) (2026-11-10)
+
+배포·폴더 그대로 올리기·실패 원인 진단을 배포 스킬 하나로 합쳤어요. "배포해줘" 하면 바뀐 코드를 axhub 기준 문서로 점검하고 맞춘 뒤, 앱이 Axhub 저장소인지 GitHub 인지와 상관없이 같은 방법으로 올려요. 배포가 실패하면 같은 흐름 안에서 상태·로그를 보고 원인을 설명하고, "왜 실패했어"처럼 원인만 물으면 아무것도 바꾸지 않아요. 정적 앱에 서버가 필요하면 서버 앱으로 바꿀지 물어요. 스킬은 7개가 됐고(up·diagnosis 는 배포로 합쳐짐), axhub CLI 0.62.0 이상이 필요해요.
+
+
+### Fixed
+
+* **plugin:** 배포 번호를 모르면 최근 배포 목록에서 찾게 한다 ([857e852](https://github.com/jocoding-ax-partners/axhub-mono/commit/857e852b80cc6152cb1c181d4f387f38127958db))
+* **plugin:** 배포 스킬 대상 확인·스테이징 로그 한 줄과 README 스킬 수를 바로잡는다 ([80b67a4](https://github.com/jocoding-ax-partners/axhub-mono/commit/80b67a41fb2310042656918e5dd63430940f62a5))
+
+
+### Changed
+
+* **plugin:** up·diagnosis 스킬을 deploy 하나로 합친다 ([dd34069](https://github.com/jocoding-ax-partners/axhub-mono/commit/dd340694b445eedaf077f3ea9c727a32cf67a0b9))
+
 ## [1.40.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.40.0...plugin-v1.40.1) (2026-11-10)
 
 기존 앱 가져오기를 실제로 써 보며 나온 문제를 고쳤어요. 같은 이름의 다른 앱이 있으면 새 이름을 제안하고, 빌드 전에 의존성을 설치하고, `.env` 의 기존 값을 지우지 않아요. 예시 값은 설정값으로 등록하지 않고 직접 할 일로 알려 주고, 고칠 것 한 항목마다 커밋해서 중간에 끊겨도 이어갈 수 있어요. 이름 충돌 안내는 axhub CLI 0.60.3 이상에서 나와요.

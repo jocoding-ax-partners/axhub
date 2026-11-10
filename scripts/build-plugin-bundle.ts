@@ -102,15 +102,17 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
   ["[ -n \"${CLAUDE_NON_INTERACTIVE:-}\" ]", "[ -n \"${CODEX_NON_INTERACTIVE:-}\" ]"],
   ["claude plugin marketplace update", "codex plugin marketplace upgrade"],
   ["`Monitor 사용` 권한 카드가 뜨는 명령은 실패예요.", "백그라운드 감시 권한 카드가 뜨는 명령은 실패예요."],
-  [
-    "## First Visible Sentence",
-    "**질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요(예: `진행` 이면 시작하고 `취소` 면 여기서 멈춰요). 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요. 비파괴 선택은 숫자·서수·라벨·앞글자 어느 쪽으로 답해도 알아듣고, 파괴 게이트만 canonical 문구를 그대로 받아요.\n\n**장기 대기.** codex 는 긴 명령을 최대 30초에 yield 하고 백그라운드 터미널로 넘겨요 — yield 는 실패도 완료도 아니에요. `deploy verify --wait` 가 yield 되면 같은 명령을 다시 실행하지 말고 같은 터미널을 빈 입력으로 폴링해 완주를 기다려요. 성공 선언 규칙은 그대로예요.\n\n## 질문 계약 (요약)\n\ncodex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 이미 AXHub 에 있는 앱의 재배포라 승인 질문 없이 진행하고(AP-12), 배포 전 맞추기의 묻는 일이 있을 때만 물어요. 답은 명시 텍스트 1회로 받고, 미리 넣어 둔 문구·유사 표현·무응답은 답이 아니에요. 선택 카드에 빈 답변이 돌아오면 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. headless 는 물을 일이 있으면 아무것도 바꾸지 않고 멈춰요.\n\n## First Visible Sentence",
-  ],
   ["`claude -p`·`codex exec`", "`codex exec`"],
   ["Claude Desktop Code 모드", "Codex"],
   [".plugin-update-restart", ".plugin-update-restart-codex"],
   ["claude plugin update", "codex plugin marketplace upgrade"],
   [".plugin-update-check", ".plugin-update-check-codex"],
+  // deploy(2026-11 개편판, 옛 up·diagnosis 를 합친 판)는 승인 질문이 없는 재배포라 아래 `## 순서` 승인 게이트
+  // 요약을 받지 않고(applyCodexSubstitutions 가 deploy 의 `## 순서` 를 보존해요) 이 질문 계약 요약을 받아요.
+  [
+    "스킬은 맞추기와 실패 진단을 맡아요.",
+    "스킬은 맞추기와 실패 진단을 맡아요.\n\n**질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요. 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요.\n\n**장기 대기.** codex 는 긴 명령을 최대 30초에 yield 하고 백그라운드 터미널로 넘겨요 — yield 는 실패도 완료도 아니에요. `deploy push --execute --wait`·`deploy verify --wait` 가 yield 되면 같은 명령을 다시 실행하지 말고 같은 터미널을 빈 입력으로 폴링해 완주를 기다려요.\n\n## 질문 계약 (요약)\n\ncodex 는 이 본문을 파일 앞에서부터 8,000B 만 읽어요. 이미 axhub 에 있는 앱의 배포라 승인 질문 없이 진행하고, 물을 것이 있을 때만 물어요. 답은 명시 텍스트 1회로 받고, 미리 넣어 둔 문구·유사 표현·무응답은 답이 아니에요. 선택 카드에 빈 답변이 돌아오면 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.",
+  ],
   ["claude plugin list", "codex plugin list"],
   ["command -v claude", "command -v codex"],
   ["AskUserQuestion", "명시 텍스트 승인"],
@@ -240,6 +242,11 @@ const applyCodexOverrides = (outDir: string): void => {
   }
 };
 
+// deploy 는 승인 질문이 없는 재배포라 `## 순서` 앞 승인 게이트 요약을 받지 않아요 — 대신 자기 질문 계약
+// 요약을 받아요(CODEX_SUBSTITUTIONS 의 deploy 항목).
+const DEPLOY_ORDER_HEADING = "\n## 순서\n";
+const PRESERVED_DEPLOY_ORDER_HEADING = "\n__AXHUB_PRESERVED_DEPLOY_ORDER_HEADING__\n";
+
 const applyCodexSubstitutions = (outDir: string): void => {
   const claudeHostTrigger = "Claude에 설치해줘";
   const preservedTrigger = "__AXHUB_PRESERVED_CLAUDE_HOST_TRIGGER__";
@@ -247,13 +254,16 @@ const applyCodexSubstitutions = (outDir: string): void => {
     if (!CODEX_TEXT_EXTENSIONS.has(extname(file))) continue;
     const original = readFileSync(file, "utf8");
     const isPluginsSkill = file.endsWith(join("skills", "plugins", "SKILL.md"));
+    const isDeploySkill = file.endsWith(join("skills", "deploy", "SKILL.md"));
     let next = isPluginsSkill
       ? original.replaceAll(claudeHostTrigger, preservedTrigger)
       : original;
+    if (isDeploySkill) next = next.replaceAll(DEPLOY_ORDER_HEADING, PRESERVED_DEPLOY_ORDER_HEADING);
     for (const [from, to] of CODEX_SUBSTITUTIONS) {
       next = next.replaceAll(from, to);
     }
     if (isPluginsSkill) next = next.replaceAll(preservedTrigger, claudeHostTrigger);
+    if (isDeploySkill) next = next.replaceAll(PRESERVED_DEPLOY_ORDER_HEADING, DEPLOY_ORDER_HEADING);
     if (next !== original) writeFileSync(file, next);
   }
 };

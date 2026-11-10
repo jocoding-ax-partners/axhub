@@ -22,7 +22,7 @@ describe("Desktop UX contract", () => {
       // 소유해요 — 아래 다른 테스트들이 그 표면을 잠가요.
       expect(description.length).toBeLessThanOrEqual(320);
       expect(description).toContain("ax-hub-cli");
-      expect(description).toContain("setup/bootstrap/plugins/deploy/up/import/development/diagnosis/clarity");
+      expect(description).toContain("setup/bootstrap/plugins/deploy/import/development/clarity");
       expect(description).not.toContain("Import priority is strict");
       expect(description).not.toContain("Routing priority is strict");
       expect(description).not.toContain("현재 버전을 확인할게요");

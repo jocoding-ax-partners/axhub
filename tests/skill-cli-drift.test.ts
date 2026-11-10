@@ -7,29 +7,18 @@ import { join } from "node:path";
 const REPO_ROOT = join(import.meta.dir, "..");
 const read = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8");
 
-const VERIFY_WAIT = "--wait --wait-interval 20s --wait-timeout 9m --json";
-const VERIFY_WAIT_SKILLS = ["skills/deploy/SKILL.md", "skills/up/SKILL.md", "skills/deploy/references/workflow-details.md"];
-
 describe("P1-13·DX26 deploy verify --wait 는 host 도구 timeout 안에서 끝나요", () => {
   // Claude Code Bash 기본 timeout 은 2분, 최대 600000ms 예요. 10분 CLI 대기는 도구가 먼저 끊어
-  // verify 가 exit 0/6/7 을 돌려주지 못했어요.
-  test("CLI 대기는 9분이고 명령 도구 timeout 600000ms 지시가 함께 있어요", () => {
-    for (const path of VERIFY_WAIT_SKILLS) {
-      const body = read(path);
-      expect(body, path).toContain(VERIFY_WAIT);
-      expect(body, path).not.toContain("--wait-timeout 10m");
-      expect(body, path).toContain("600000ms");
-    }
-  });
-
-  test("exit 6·10·도구 timeout 끊김은 실패가 아니라 재개 요약과 같은 verify 명령 한 줄이에요", () => {
+  // verify 가 exit 0/6/7 을 돌려주지 못했어요. 2026-11 deploy 개편판은 import 처럼 `--wait-timeout 9m` 과
+  // "명령 시간 제한 10분" 으로 적어요(옛 `--wait-interval 20s`·`600000ms` 문구·재개 요약 표는 뺐어요).
+  test("deploy 는 push 대기 한 번 뒤 끊기면 다시 올리지 않고 9분 verify 로 이어가요", () => {
     const deploy = read("skills/deploy/SKILL.md");
-    expect(deploy).toContain("`6`·`10`·도구 timeout 끊김");
-    expect(deploy).toContain("재개 요약과 같은 verify `--wait` 명령 한 줄");
-    expect(read("skills/up/SKILL.md")).toContain("| 6·10·도구 timeout 끊김 |");
-    expect(read("skills/deploy/references/workflow-details.md")).toContain("6, 10(CLI timeout), or the command tool cutting the call");
+    expect(deploy).toContain("`--execute --wait` 를 붙여 한 번만 실행해요(명령 시간 제한 10분)");
+    expect(deploy).toContain("--wait --wait-timeout 9m --json");
+    expect(deploy).not.toContain("--wait-timeout 10m");
+    expect(deploy).toContain("기다리다 끊기면 실패가 아니에요. 다시 올리지 말고");
     const policy = read("docs/policy/agent-policy.md");
-    expect(policy).toContain('"--wait --wait-interval 20s --wait-timeout 9m", "600000ms"');
+    expect(policy).toContain('"--wait --wait-timeout 9m --json", "명령 시간 제한 10분"');
   });
 
   // import·bootstrap 은 bootstrap 개편 형식대로 `--wait --wait-timeout 9m` 한 번과 "명령 시간 제한 10분" 으로 적어요.
@@ -40,26 +29,6 @@ describe("P1-13·DX26 deploy verify --wait 는 host 도구 timeout 안에서 끝
     expect(body).not.toContain("--wait-timeout 10m");
     expect(body).toContain("시간 안에 안 끝난 건(exit 6·10) 실패가 아니에요");
     expect(body).toContain("기다리다 끊기면 다시 실행하지 말고 같은 확인 명령으로 이어가요");
-  });
-});
-
-describe("P2-35 배포 전 맞추기는 .env.local 에만 있는 이름도 등록해요", () => {
-  test("deploy·up 은 .env.local 이름을 --from-dotenv .env.local 로 등록해요", () => {
-    for (const path of ["skills/deploy/SKILL.md", "skills/up/SKILL.md"]) {
-      const body = read(path);
-      expect(body, path).toContain("`--from-dotenv .env.local`");
-      expect(body, path).toContain("--from-dotenv .env --only <이름,…> --execute");
-    }
-  });
-});
-
-describe("P2-36 staging 배포 진단은 staging 로그를 읽어요", () => {
-  test("logs 호출은 target_environment 가 staging 이면 --environment staging 을 붙여요", () => {
-    for (const path of ["skills/diagnosis/SKILL.md", "skills/deploy/SKILL.md", "skills/deploy/references/workflow-details.md"]) {
-      const body = read(path);
-      expect(body, path).toContain("`target_environment`");
-      expect(body, path).toContain("`--environment staging`");
-    }
   });
 });
 
@@ -85,49 +54,9 @@ describe("P2-38 development 는 raw Postgres 테이블로 존재를 확인해요
   });
 });
 
-describe("P2-44·P2-45·P3-42 up 의 재실행·진행 중 배포·id 출처", () => {
-  const up = read("skills/up/SKILL.md");
-
-  test("P2-44 app_ambiguous 뒤 deploy-prep 을 --app 으로 다시 돌리지 않아요", () => {
-    expect(up).toContain("`resolve.matched_apps`");
-    expect(up).not.toContain("`--app` 에 그 값을 넣어 1단계를 다시 해요");
-  });
-
-  test("P2-45 진행 중 배포는 exit 9 already_exists 로 오고 in-flight id 로 verify 해요", () => {
-    expect(up).toContain("exit 9 `already_exists`");
-    expect(up).toContain("axhub plugin-support deploy-prep --refresh-in-flight --json");
-    const deploy = read("skills/deploy/SKILL.md");
-    expect(deploy).toContain("exit 9 + `already_exists`");
-    expect(deploy).toContain("NEVER retry `axhub deploy create` on exit 9 `already_exists` or exit 64.");
-    expect(read("skills/deploy/references/workflow-details.md")).toContain("On exit 9 with `already_exists`");
-  });
-
-  test("P3-42 DEPLOY_ID 출처 규칙이 하나예요 — deploy list 로 고르지 않아요", () => {
-    expect(up).toContain("셋에서만 바인딩해요");
-    expect(up).not.toContain("`deploy list --app \"$APP_ID\"` 로 방금 만들어진 배포가 있는지");
-  });
-});
-
-describe("P3-45·P3-46·P3-47 deploy reference drift", () => {
-  const details = read("skills/deploy/references/workflow-details.md");
-
-  test("P3-45 create field-expr 는 SKILL.md 와 같은 envelope-safe 식이에요", () => {
-    expect(details).not.toContain("--field-expr '.id // .deployment_id // empty'");
-    expect(details).toContain("--execute --field-expr '.data.id // .data.deployment_id // .id // .deployment_id // empty'");
-  });
-
-  test("P3-46 deploy list 에 없는 created_at 으로 고르지 않아요", () => {
-    expect(details).not.toContain("choose the newest `created_at`");
-    expect(read("skills/deploy/SKILL.md")).not.toContain("`created_at`이 가장 최신");
-  });
-
-  test("P3-47 session-carryover 는 없는 deploy 단계를 가리키지 않아요", () => {
-    const carryover = read("skills/deploy/references/session-carryover.md");
-    expect(carryover).not.toContain("infer-tables-env) AskUserQuestion");
-    expect(carryover).toContain("`## 배포 전 맞추기`(AP-29)는 그대로 해요");
-    expect(read("skills/development/references/sdk-db-surface.md")).not.toContain("사전 점검 질문이 **중복되지 않게**");
-  });
-});
+// P2-35(.env.local 등록)·P2-36(staging 로그 --environment)·P2-44·P2-45·P3-42(up 의 재실행·진행 중 배포·id 출처)·
+// P3-45·P3-46·P3-47(deploy reference) 는 2026-11 deploy 개편 때 옛 deploy 본문·up·diagnosis·references 와 함께
+// 뺐어요. 배포 번호 찾기·진행 중 배포 대기는 CLI `deploy push` 가 맡아요.
 
 describe("P3-37 auto-update 문서는 실제 재시도 주기를 말해요", () => {
   test("headless 회차 유실은 lock TTL 이 아니라 24h 뒤 재시도예요", () => {

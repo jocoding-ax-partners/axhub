@@ -6,7 +6,7 @@
 
 코드를 직접 짜는 대신, "내 앱 배포해" 한마디로 앱 lifecycle 전체를 안전하게 굴려요.
 
-**상태**: 9 SKILL (setup · bootstrap · plugins · deploy · up · import · development · diagnosis · clarity) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download) · Codex CLI ≥ 0.147.0
+**상태**: 7 SKILL (setup · bootstrap · plugins · deploy · import · development · clarity) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download) · Codex CLI ≥ 0.147.0
 
 </div>
 
@@ -86,7 +86,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 
 ---
 
-## 🧩 9개 스킬
+## 🧩 7개 스킬
 
 `plugins`는 deploy_method=plugin인 일반 App의 exact version을 다운로드하거나 Codex에 설치해요. `download`는 검증된 ZIP만 저장하고, `axhub plugin install --host codex`는 offline preview 뒤 `--execute --yes`일 때만 archive 공격과 manifest identity를 검사하고 AxHub 관리 local marketplace를 Codex 공식 plugin CLI로 설치해요. 목록·다운로드·설치는 OAuth 또는 broad PAT, publish·submit execute만 `plugins:read` + `plugins:write` scoped PAT와 권리 확인을 사용해요. 성공은 `publish --submit`이면 `review_submitted`·installable=false, 업로드만 했으면 `upload_complete`·installable=false이고 다음 단계는 `axhub plugin submit`(게시 심사 신청)이에요. 결과 알림은 없어서 `axhub plugin manage status --app <app>`로 확인하고, 이후 owner는 App Console, reviewer는 Console Review를 사용해요. 이 흐름은 axhub CLI 0.50.0 이상이 필요해요.
 
@@ -95,14 +95,12 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 | `setup` | 셋업·CLI 설치·업데이트·로그인 점검 | "처음인데 셋업해줘", "axhub 업데이트해줘", "로그인해줘" |
 | `bootstrap` | 새 앱 생성 (Axhub 저장소·내 GitHub·회사 GitHub 조직) | "결제 앱 만들어줘", "내 깃허브에 새 앱 만들어줘", "회사 org에 저장소 파고 새 앱 만들어줘" |
 | `plugins` | plugin App 게시·목록·다운로드·Codex 설치 | "플러그인 목록 보여줘", "1.2.0 내려 받아", "Codex에 설치해줘", "여러 스킬을 하나로 올려줘" |
-| `deploy` | 현재 브랜치 배포 | "배포해", "ship 해줘", "프로덕션에 올려" |
-| `up` | 명시적인 repositoryless 로컬 폴더 배포 | "저장소 없이 배포해", "이 폴더 그대로 올려줘", "소스 올려서 배포" |
+| `deploy` | 배포·폴더 그대로 올리기·실패 원인 진단 | "배포해", "이 폴더 그대로 올려줘", "왜 배포가 실패했어" |
 | `import` | 기존 로컬 앱 가져오기 | "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app" |
 | `development` | 기존 앱에 실데이터 기능 코딩 | "내 connector 데이터로 대시보드 만들어줘", "유저 목록 페이지 만들어줘" |
-| `diagnosis` | 배포 실패 원인 진단 | "배포 실패 원인 진단해줘", "왜 배포가 죽었어" |
 | `clarity` | 공개 CLI 운영 브리지 | "환경변수 설정해줘", "로그 보여줘", "롤백해줘", "GitHub 계정 다시 연결해줘" |
 
-`clarity` 브리지는 정해진 명령 목록을 들고 있지 않아요. `axhub --help` 트리를 라이브로 탐색해 맞는 명령을 찾고 바로 실행해요 — CLI 가 새 명령을 추가해도 플러그인 수정 없이 따라가요. 단, 배포 실패 원인을 명시적으로 묻는 요청은 `diagnosis` 가 맡고 raw 로그 대신 여섯 가지 결과로 요약해요.
+`clarity` 브리지는 정해진 명령 목록을 들고 있지 않아요. `axhub --help` 트리를 라이브로 탐색해 맞는 명령을 찾고 바로 실행해요 — CLI 가 새 명령을 추가해도 플러그인 수정 없이 따라가요. 단, 배포 실패 원인을 묻는 요청은 `deploy` 가 맡아요.
 
 axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 버전·최신 확인은 `setup` 이 맡아요.
 
