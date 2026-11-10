@@ -112,7 +112,7 @@ describe("bootstrap contract (bootstrap·scaffold 통합판)", () => {
     expect(BOOTSTRAP).not.toContain("--visibility public --dry-run");
     expect(BOOTSTRAP).toContain("결과만 표로 보여주고 끝내요");
     expect(BOOTSTRAP).toContain("확인하지 못한 항목은 됐다고 표시하지 않아요");
-    expect(BOOTSTRAP).toContain("다음에 할 일은 추천하지 않아요");
+    expect(BOOTSTRAP).not.toContain("다음에 할 일은 추천하지 않아요");
     expect(BOOTSTRAP).toContain("사용자에게 보이는 문장에는 내부 명령 이름이나 상태 코드를 쓰지 않아요");
     expect(BOOTSTRAP).not.toContain(CLAUDE.forbidden.externalAutomationSkill);
     expect(BOOTSTRAP).not.toContain(CLAUDE.forbidden.externalAutomationPlugin);

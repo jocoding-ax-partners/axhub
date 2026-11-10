@@ -44,7 +44,8 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-7 skill 양보 라우팅
 - 규칙: 각 스킬은 자기 담당 밖의 요청을 그 일을 맡은 스킬로 넘겨요(양보). 요청이 섞여 있으면 자기 몫만 끝내고 나머지는 담당 스킬로 넘겨요. 예를 들어 진단 중에 재배포가 필요해지면 진단은 여기서 끝내고 배포는 deploy 스킬이 이어받아요.
-- 적용: skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/import/SKILL.md, skills/up/SKILL.md
+- import: 빈 폴더는 bootstrap, CLI 점검 실패는 setup, 배포 실패는 diagnosis 로 보내지만 `양보` 라는 낱말을 쓰지 않아서 아래 적용 목록에서 빠져요.
+- 적용: skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/up/SKILL.md
 - invariant: "양보"
 
 ## AP-8 setup 자동 bootstrap 금지
@@ -64,14 +65,16 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-11 비-axhub 맥락 라우팅 가드
 - 규칙: axhub 를 명시하지 않은 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘" 같은 generic 동사)는 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결 manifest·직전 axhub 작업)이 있을 때만 스킬이 진행해요. 맥락이 없으면 실행·안내로 밀어붙이지 않고 axhub 사용 의사를 한 번 묻거나 종료해요 — 다른 axhub 스킬로 넘기지도 않아요. 배포할 곳을 말하지 않은 배포 발화만은 deploy 가 맥락 없이도 받아서, 이 "한 번 묻기"를 배포할 곳 카드로 해요 (AP-27). 이미 preview-confirm 승인(`지금 만들고 배포까지 진행할까요?`)이 backstop 인 bootstrap 은 frontmatter 게이트로만 적용하고 본문 질문은 생략해요 — 그래서 아래 invariant 검사 대상에서 빠져요. headless 에서는 묻지 않고 멈춰요.
-- 적용: skills/plugins/SKILL.md, skills/deploy/SKILL.md, skills/import/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/clarity/SKILL.md, skills/up/SKILL.md
+- import: frontmatter 가 기존 앱을 axhub 에 올리는 발화로만 받고, 확인 한 번(`지금 이대로 고쳐서 axhub 에 올릴까요?`)이 backstop 이라 bootstrap 처럼 frontmatter 게이트로만 적용해요 — 그래서 아래 적용 목록에서 빠져요.
+- 적용: skills/plugins/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/clarity/SKILL.md, skills/up/SKILL.md
 - invariant: "axhub 맥락"
 
 ## AP-12 axhub 진입 확인 (preview 통합 게이트)
 - 규칙: axhub 프로젝트가 확정된 상태에서 axhub 에 아직 없는 것을 새로 만드는 일(생성·가져오기·첫 연결·plugin App 게시)은 실행하기 전에 interactive preview 승인 하나가 axhub 진입 확인을 겸해요. 이미 AXHub 에 있는 앱의 재배포(`deploy`·`up`)는 이 승인을 받지 않아요 — AP-29 의 맞추기를 하고 물을 일이 있을 때만 그것을 물어요. 재배포는 배포 이력으로 되돌릴 수 있고, 답이 사실상 "응" 하나뿐인 확인은 막는 것 없이 마찰만 더해서예요(spec 681). headless 재배포는 물을 일이 없으면 실제로 배포하고, 있으면 아무것도 바꾸지 않고 멈춰요. `plugins`의 목록·다운로드는 read-only/no-clobber라 별도 실행 승인을 요구하지 않고, publish만 rights attestation과 execute를 결합해요. headless publish·생성은 preview에서 멈추고 어떤 lane에서도 승인을 조용히 건너뛰지 않아요.
 - host 별 승인 프리미티브: 네이티브 선택 UI 는 Claude 판의 프리미티브이고, Codex 판의 프리미티브는 명시 텍스트 승인 1회예요 — 유효 승인은 preview 를 본 뒤 사용자가 안내된 canonical 승인 문구를 byte-exact 로 입력한 경우만이에요. preview 전에 미리 넣어 둔 문구, 유사 표현, 무응답은 승인이 아니에요. 이 선주입 무효 조항은 실측 A/B(조항 없는 게이트는 선주입 문구를 3/3 승인으로 오인, 조항 있으면 3/3 정지)로 필수 확인됐고, codex 파생 번들의 승인 문안에 기계 잠금돼요.
 - bootstrap: 승인 질문 `지금 만들고 배포까지 진행할까요?` 와 headless 정지(물어야 할 게 생긴 순간 아무것도 만들지 않고 멈춤)를 본문 자기 문장으로 둬요. 공용 invariant 문구는 없어서 아래 적용 목록에서 빠지고, codex 판 invariant 로 검사해요.
-- 적용: skills/import/SKILL.md, skills/plugins/SKILL.md
+- import: 확인 질문 `지금 이대로 고쳐서 axhub 에 올릴까요?`(올리기 / 그만두기)·빈 답 미승인·headless 는 `--headless` 미리보기까지만 하고 바꾸지 않고 멈춤을 본문 자기 문장으로 둬요. 공용 invariant 문구는 없어서 아래 적용 목록에서 빠지고, codex 판 invariant 로 검사해요.
+- 적용: skills/plugins/SKILL.md
 - invariant: "axhub 진입 확인", "승인을 조용히 건너뛰지 않아요"
 - 적용(codex): plugins/axhub-codex/skills/bootstrap/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/plugins/SKILL.md
 - 빈 답변 fail-closed (codex): 네이티브 선택 카드가 켜진 세션에서 빈 답변이 돌아오면 미승인이에요 — 카드가 자동 해제된 것이므로 실행하지 않고 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 이 규칙은 정책과 실행 스킬 본문의 첫 8,000B 두 채널이 겹쳐 소유해요 — 본문은 8,000B 에서 절단되니 규칙은 그 안에 둬요.
@@ -81,14 +84,15 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 규칙: 배포·생성 상태를 반복 확인하는 tool call(`deploy status`·`deploy verify`·`apps bootstrap-status` 재호출)은 한 요청당 폴링 예산 **최대 30회 또는 10분** 중 먼저 닿는 쪽까지만 반복해요. 예산에 닿으면 실패로 선언하지 않고 "아직 진행 중이에요" 와 이어서 확인할 명령을 안내하는 재개 요약으로 응답을 끝내며, deployment id/bootstrap id 는 그 안내에 보존해요. 이 예산 종료는 "terminal 전 응답 종료 금지" 규칙의 유일한 예외예요. CLI 자체의 `--watch` 상한과 별개로, 스킬 레벨 반복에는 항상 이 예산이 적용돼요.
 - 대기 수단 우선: preflight 가 `capabilities.import.verify_wait` 를 true 로 보고하면 스킬 레벨 반복 대신 `deploy verify --wait --wait-interval 20s --wait-timeout 9m` 단일 호출로 이 예산을 CLI 안에서 소화해요. 이 호출은 명령 도구 timeout 을 600000ms 로 올려 실행해요 — 도구 기본 timeout(2분)에 먼저 끊기면 CLI 가 판정 exit 를 돌려주지 못하고, CLI 대기 9분은 도구 최대 10분 안에서 끝나요. exit 6·10 이나 도구 timeout 끊김은 실패가 아니라 재개 요약과 같은 verify 명령 한 줄로 끝내요. 스킬은 `sleep`·shell loop 를 쓸 수 없으므로 대기 수단 없이 같은 명령을 연달아 호출하면 30회 예산이 몇 초 만에 소진되고, 사용자 화면에는 같은 exit 6 이 실패한 명령처럼 도배돼요. 반복 호출은 그 capability 가 없는 구 CLI 의 fallback 이에요.
 - bootstrap: 반복 호출 없이 `apps bootstrap-status --watch --watch-timeout 9m` 과 `deploy verify --wait` 단일 호출(명령 시간 제한 10분)로 기다리고, exit 6·10 은 실패가 아니라 같은 명령으로 다시 확인할 수 있다고 알리고 끝내요. 반복 폴링이 없어서 아래 적용 목록에서 빠져요.
-- 적용: skills/deploy/SKILL.md, skills/import/SKILL.md, skills/up/SKILL.md
+- import: execute 한 번 뒤 `deploy verify --wait --wait-timeout 9m` 단일 호출(명령 시간 제한 10분)로 기다리고, 끊기면 다시 실행하지 않고 같은 확인 명령으로 이어가며, exit 6·10 은 실패가 아니라 같은 명령으로 다시 확인할 수 있다고 알리고 끝내요. 반복 폴링이 없어서 아래 적용 목록에서 빠져요.
+- 적용: skills/deploy/SKILL.md, skills/up/SKILL.md
 - invariant: "폴링 예산", "최대 30회 또는 10분", "--wait --wait-interval 20s --wait-timeout 9m", "600000ms"
 
 ## AP-17 CLI 경로 해석 (설치 여부 오판 금지)
 - 규칙: bare `axhub` 호출 실패(command not found·exit 127)는 미설치 판정 근거가 아니에요. 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 오래된 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요. 모든 스킬의 CLI 가드는 (1) `command -v axhub`, (2) 위치 파일 `~/.axhub/bin-path`(CLI 0.24.8+ 가 자기 설치 위치를 기록), (3) canonical 경로 `~/.axhub/bin/axhub`(Windows Git Bash 는 `.exe`) 순서로 실행 파일을 찾아요. 디스크에서 찾으면 재설치·setup 으로 돌려보내지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤, 같은 세션의 남은 명령은 반환된 `bin_path` 절대경로로 이어가요 (이미 열린 셸의 PATH 는 OS 설계상 밖에서 못 고쳐요). 구 CLI 라 `bin_path` 가 없으면 찾은 절대경로를 그대로 써요. 세 경로 모두에서 실행 파일을 못 찾을 때만 미설치로 보고 setup 을 안내해요.
 - repair-path 오류 결과: `repair-path --json` 이 `repaired:false` 와 `error` 를 돌려줘도(예: 샌드박스가 셸 rc 쓰기를 막은 `error_code: "write_denied"`, `sandbox: true`) `bin_path` 가 있으면 막힘이 아니에요 — 리포트·재설치 없이 그 절대경로로 남은 명령을 이어가요. exit 는 0 이에요(fail-open). 사용자가 PATH 를 영구 등록하고 싶다고 할 때만 `manual_line`(셸 rc 에 넣을 정확한 한 줄)을 알려 줘요. `bin_path` 까지 없을 때만 위 3-경로 탐색으로 찾은 절대경로를 그대로 써요.
-- bootstrap: preflight 가 안 되면 setup 으로 보내고 멈춰요 — 경로 해석·`repair-path` 는 setup 이 맡아서 아래 적용 목록에서 빠져요.
-- 적용: skills/plugins/SKILL.md, skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/import/SKILL.md, skills/up/SKILL.md, hooks/session-auto-update.sh, CLAUDE.md
+- bootstrap·import: preflight 가 안 되면 setup 으로 보내고 멈춰요 — 경로 해석·`repair-path` 는 setup 이 맡아서 아래 적용 목록에서 빠져요.
+- 적용: skills/plugins/SKILL.md, skills/clarity/SKILL.md, skills/deploy/SKILL.md, skills/development/SKILL.md, skills/diagnosis/SKILL.md, skills/up/SKILL.md, hooks/session-auto-update.sh, CLAUDE.md
 - invariant: "bare `axhub` 실패는 미설치가 아니에요", "repair-path"
 
 ## AP-18 device flow 코드 선노출
@@ -118,7 +122,8 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 규칙: 파일을 업로드하는 정적 파일 앱(GitHub 작업공간의 deploy_method=static — 서버 없이 파일만 올리는 방식)의 배포 성공은 activate 결과의 `active_release_id` (새 버전이 실제로 켜졌다는 표시)로 선언하고 `deploy verify` 는 부르지 않아요 — 업로드 static 은 deployment-record 가 아니라 release 라 verify 가 404 예요. Axhub self-hosted 저장소의 정적 앱은 소스를 push 해 서버가 빌드하는 deployment-record 라 AP-1 을 따라요. 이 규칙은 static lane 을 실제로 소유한 skill 에만 적용해요. AP-1 에서 떼어낸 이유는, 두 lane 의 성공 선언을 한 규칙에 묶어 두면 static lane 이 없는 skill 을 그 규칙에 넣을 수 없기 때문이에요.
 - 주소·인증서: static 앱(두 lane 모두)의 성공 안내는 비어 있지 않은 정적 사이트 주소만 최종 주소로 보여줘요 — 사이트가 아직 없을 때의 앱 도메인 주소(`*.axhub.app` 등)는 정적 앱 주소가 아니에요. self-hosted static 은 verify 성공 뒤(import 는 evidence 가 `public_url_pending: true` 이거나 `--verify-wait none` early return 일 때) `axhub apps static site get --app <app> --tenant <t> --json` 을 한 번 읽어 `data.public_url`·`data.tls_ready` 를 써요 — 첫 게시 전 404(exit 5)는 실패가 아니라 아직 준비 중이에요. 나중에 주소를 물어도 `apps get` 의 `access_url` 이 아니라 이 명령을 다시 읽어요. `tls_ready: false`·`tls_pending: true` 는 실패가 아니라 HTTPS 인증서 발급 중(약 2~3분)이에요 — 그 사이 브라우저 인증서 경고를 배포 실패로 보지 말고 잠시 뒤 열린다고 안내해요.
 - 주소 충돌: static 배포가 다른 앱(삭제 뒤 30일 안이라 되돌릴 수 있는 앱 포함)이 쥔 주소(`apply.static_host_taken`, 구 서버는 `apply.static_release_failed` + detail `app_static_sites_host_key`)나 영구 삭제 뒤 격리 기간(기본 7일) 중인 주소(`apply.static_host_quarantined`, 구 서버 detail `static host quarantined`)로 실패하면 같은 배포를 다시 하지 않아요 — 재시도로는 안 풀려요. 분기는 `deploy verify --json` 의 `failure_hint` 가 null 이 아닌지로 해요(verify 에는 실패 code 가 없어요; `deploy status --json` 은 `failure_reason.code`/`detail` 과 같은 `failure_hint` 를 함께 줘요). import 는 `recovery_action` 을 따라요. 첫 게시 전이라 주소를 바꿀 수 있으면 다른 주소를 제안해 승인 뒤 `axhub apps update <app> --subdomain <new>` 로 바꾸고 한 번만 다시 배포해요 — self-hosted 는 실패한 커밋이 이미 원격에 있어 push 할 게 없으니 승인받은 빈 커밋(`git commit --allow-empty`)을 push 해 새 배포를 만들어요. 주소가 잠겼으면(412 `subdomain_locked`, 또는 주소를 자동 생성하는 workspace) 승인 뒤 다른 주소로 새 앱을 만들어요(격리 중인 주소는 격리 기간이 끝난 뒤 다시 배포해도 돼요).
-- 적용: skills/deploy/SKILL.md, skills/import/SKILL.md
+- import: 배포는 `plugin-support import --mode execute` 한 번이 맡고 본문은 `deploy verify --wait` 확인과 CLI `message_ko`·`recovery_action` 안내만 둬요. 업로드 static 의 `active_release_id`·정적 사이트 주소·주소 충돌 처리를 본문에 따로 적지 않아서 아래 적용 목록에서 빠져요.
+- 적용: skills/deploy/SKILL.md
 - invariant: "active_release_id"
 
 ## AP-23 app git backend 선판정
@@ -137,9 +142,10 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 
 ## AP-25 배포 환경 표시 (스테이징을 운영으로 오인 금지)
 - 규칙: 스테이징 옵트인 앱(`apps get` 의 `staging_enabled=true` — spec 016)은 push/manual 배포가 스테이징에만 반영되고 운영은 심사 승인 뒤 promote 로만 바뀌어요. 그래서 배포 환경은 CLI profile 이 아니라 `staging_enabled` 로 판단해요. preview 카드의 환경 라벨은 `staging_enabled` 가 true 면 `스테이징`, 아니면 `운영` 이에요. verify 성공(exit 0) 뒤 성공 요약은 `deploy verify --json` 의 `environment` 를 읽어요 — `staging` 이면 "스테이징에 반영됐고 운영에는 아직 반영되지 않았어요" 와 다음 단계(심사 신청 `axhub publish --app <app> --deployment-id <id> --execute`, 승인은 Console Review, 승인 뒤 promote 자동)를 같은 성공 블록에서 안내하고 "운영 반영 완료" 라고 말하지 않아요. `environment` 가 없거나 null(구 CLI·앱 조회 실패)이면 운영으로 간주하지 않고 `apps get` 의 `staging_enabled` 로 같은 판단을 해요. 심사 신청은 사용자가 요청할 때만 실행해요.
-- 적용: skills/deploy/SKILL.md, skills/import/SKILL.md, skills/up/SKILL.md
+- import: 결과 표의 주소 줄에 `(스테이징이면 운영 반영은 심사 뒤)` 로만 적고 `environment` 분기·심사 신청 명령 안내는 두지 않아서 아래 적용 목록(공용·codex)에서 빠져요. 확인하지 못한 항목은 됐다고 표시하지 않아요.
+- 적용: skills/deploy/SKILL.md, skills/up/SKILL.md
 - invariant: "staging_enabled", "스테이징", "axhub publish --app"
-- 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/up/SKILL.md
+- 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md, plugins/axhub-codex/skills/up/SKILL.md
 - invariant(codex): "staging_enabled", "스테이징", "axhub publish --app"
 
 ## AP-26 조용한 백그라운드 자동 업데이트 (묻지 않음)
@@ -156,13 +162,6 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - 적용(codex): plugins/axhub-codex/skills/deploy/SKILL.md
 - invariant(codex): "어디에 배포할까요?", "알아서 시작하지 않아요"
 
-## AP-28 배포 방식 추천 카드 (정적 자동 판정 확인)
-- 규칙: import 가 새 앱(`app_create`)의 배포 방식을 `static` 으로 자동 판정했고 사용자가 방식을 말하지 않았으면, 통합 승인 전에 선택 카드로 `어떤 방식으로 배포할까요?` 를 한 번 물어요 — `정적 사이트 (추천)`·`서버 앱`·`취소`. 선택지에 주소 도메인은 적지 않아요 — 서버 앱 주소는 회사 작업공간이면 `{sub}.{tenant}.axhub.ai`, 개인 작업공간이면 `{sub}.axhub.app` 인데 preview 가 작업공간 종류를 알려주지 않아서, 한 도메인을 적으면 틀린 주소를 약속하게 돼요. 서버 앱은 CLI 가 실행 명령(`manifest_hints.start_cmd`)을 찾았을 때만 `--deploy-method docker` 로 preview 를 다시 받아 진행하고, 못 찾았으면 실행할 서버 코드가 없다고 알린 뒤 정적 사이트·취소로 다시 물어요. index.html 만 있는 폴더가 묻지 않고 axhub.page 정적 사이트로 배포돼 교육 흐름과 어긋나던 문제를 막아요. 판정은 CLI 몫이라 스킬이 재구현하지 않고, headless 에서는 묻지 않아요.
-- 적용: skills/import/SKILL.md
-- invariant: "어떤 방식으로 배포할까요?", "manifest_hints.start_cmd", "주소 도메인은 적지 않아요"
-- 적용(codex): plugins/axhub-codex/skills/import/SKILL.md
-- invariant(codex): "어떤 방식으로 배포할까요?", "manifest_hints.start_cmd", "주소 도메인은 적지 않아요"
-
 ## AP-29 배포 전 맞추기 (재배포는 묻지 않고 맞춰서 올림)
 - 규칙: 이미 AXHub 에 있는 앱을 다시 올릴 때(`deploy`·`up`) 승인 카드 대신 배포 전 맞추기를 해요. (1) CLI 확정 판정 `axhub deploy check --app <app> --json` 을 받고 (2) preflight 의 `capabilities.readiness.context_url` 배포 기준 문서를 한 번 읽고(못 받으면 deploy 의 `references/deploy-rules.md` 요약으로 대신) (3) 그 규칙으로 앱 코드를 보고 빌드 단계가 있으면 로컬 빌드를 한 번 돌려요 — 테스트·예시·README 흔적은 문제로 보지 않아요. 묻는 일은 셋뿐이에요: 어디서도 값을 찾을 수 없는 필수 설정값(값을 대화로 받지 않고 `.env` 에 넣어 달라고 부탁해요), 안 되는 6가지나 문서의 `물어봄` 규칙(외부 DB·메일·웹훅·AI 등)에 처음 해당한 것, 처음 올릴 때 새로 정해지는 것. 나머지 — `.env` 값 등록(`axhub env set --from-dotenv … --only … --execute`, AI 는 값을 읽지 않아요)·포트·`0.0.0.0` 바인딩·상태 확인 경로·빌드 오류 수정·커밋·push — 는 묻지 않고 해요. GitHub 에 연결된 앱은 push 하는 순간 자동 배포가 시작돼 CLI 검사를 거치지 않으므로, 설정값 등록과 수정 커밋을 반드시 push 전에 끝내요. 접속 주소가 없는 앱(`deploy check` 의 `subdomain_not_configured` 항목, 이때 `error.subcode` 는 `deploy.subdomain_not_configured`)은 push 해도 배포가 시작되지 않아요 — 주소는 첫 운영 배포 뒤 바꿀 수 없어 맞출 일이 아니라 따로 확인받아 정하는 일이고(위 셋과 별개인 복구 질문), 정하기 전에는 push 하지 않아요. "그대로" 답은 앱 폴더 `.axhub/deploy-answers.json` 의 `keep` 에 남겨 다음 배포에 다시 묻지 않고, 이 파일은 커밋하지 않아요. headless 는 물을 일이 하나라도 있으면 아무것도 바꾸지 않고 멈춰요. 끝나면 `이렇게 맞춰서 올렸어요` 와 맞춘 것을 알려요. preflight 에 `capabilities.readiness.deploy_check` 가 없는 구 CLI 면 업데이트를 안내하고 멈춰요.
 - 적용: skills/deploy/SKILL.md, skills/up/SKILL.md
@@ -171,11 +170,11 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant(codex): "승인 카드를 띄우지 않아요", "--from-dotenv", "context_url", ".axhub/deploy-answers.json", "이렇게 맞춰서 올렸어요"
 
 ## AP-30 첫 올리기 점검·개발 중 배포 기준
-- 규칙: 처음 올리는 앱(`import`)은 preview 뒤 승인 전에 AP-29 와 같은 점검(`deploy check`·preflight `capabilities.readiness.context_url` 기준 문서·코드 검사·로컬 빌드 1회)을 하고, 승인 카드 한 화면에 새로 정해지는 것(앱 주소·저장소·작업공간)·물을 일(값을 찾을 수 없는 설정값, 안 되는 6가지나 문서의 `물어봄` 규칙에 해당한 것)·맞출 내용을 함께 보여줘요 — 확인은 1회예요. 승인 뒤 코드를 고쳐 커밋하고, `.env` 에 있는 설정값은 execute 의 `--env-from-dotenv .env --env-only <이름,…>` 로 넘겨 CLI 가 앱을 만든 직후·첫 배포 전에 등록해요(첫 배포가 설정값 누락으로 실패하지 않게). 앱 기능을 만드는 `development` 는 코드를 쓰기 전에 같은 기준 문서를 읽고 안 되는 6가지를 처음부터 피해요(예: 데이터 저장은 AXHub DB). 문서를 못 받으면 같은 요약 파일로 대신해요.
+- 규칙: 처음 올리는 앱(`import`)은 확인 전에 AP-29 와 같은 점검을 해요 — preflight `capabilities.readiness.context_url` 기준 문서를 `curl -fsSL` 로 원문 그대로 한 번 읽고(요약하는 웹 읽기 도구는 쓰지 않아요, 기능 문서는 `https://docs.axhub.ai/llms.txt` 목차로 찾아요), CLI 미리보기·`deploy check`·다른 서비스 의존(외부 DB·로그인 등) 찾기·로컬 빌드 1회 뒤 찾은 것을 바로 고칠 것·물을 것·사용자가 직접 할 일로 나눠요. 한 화면에 앱 이름·주소·저장 위치·배포 방식과 그 셋을 보여주고 물을 것을 모아 확인은 1회예요(올리기 / 그만두기). 외부 DB·로그인은 그대로 연결하지 않고 axhub 것으로 바꾸기(추천)·그대로 쓰기를 물어요. 확인 뒤 덩어리마다 커밋하며 고치고, 다시 비교(`deploy check`·로컬 빌드)를 통과해야 올려요. `.env` 에 있는 설정값은 execute 의 `--env-from-dotenv .env --env-only <이름,…>` 로 넘겨 CLI 가 앱을 만든 직후·첫 배포 전에 등록해요(첫 배포가 설정값 누락으로 실패하지 않게). 앱 기능을 만드는 `development` 는 코드를 쓰기 전에 같은 기준 문서를 같은 방법으로 읽고 안 되는 6가지를 처음부터 피해요(예: 데이터 저장은 AXHub DB). development 는 문서를 못 받으면 같은 요약 파일로 대신해요.
 - 적용: skills/import/SKILL.md, skills/development/SKILL.md
-- invariant: "capabilities.readiness.context_url", "안 되는 6가지", "AP-30"
+- invariant: "capabilities.readiness.context_url", "curl -fsSL"
 - 적용(codex): plugins/axhub-codex/skills/import/SKILL.md, plugins/axhub-codex/skills/development/SKILL.md
-- invariant(codex): "capabilities.readiness.context_url", "안 되는 6가지", "AP-30"
+- invariant(codex): "capabilities.readiness.context_url", "curl -fsSL"
 
 ## AP-31 에이전트 샌드박스 쓰기 거절
 - 규칙: 홈 폴더(`$HOME`) 아래를 쓰는 명령 — `auth login`, `axhub --tenant <tenant> git setup --json`, `plugin-support repair-path --json`, self-hosted `plugin-support import --mode execute`(안에서 git setup 을 해요) — 은 에이전트 샌드박스(Codex workspace-write 등) 안이면 첫 실행부터 권한 상승(샌드박스 밖)으로 실행해요. `repo clone` 은 `git setup` 이 저장한 자격증명을 읽고 대상 폴더에만 써서 미리 권한 상승하지 않아요. subcode `local.write_denied`(exit 64, 구 CLI 는 exit 1 `Operation not permitted`)는 CLI 버그가 아니라 예상된 거절이에요. 샌드박스 안에서 막혔을 때만(hint 가 에이전트 샌드박스를 말해요, `CODEX_SANDBOX`·`CODEX_SANDBOX_NETWORK_DISABLED` 설정) 같은 명령을 권한 상승으로 한 번만 다시 실행해요 — 샌드박스 안 재실행은 다시 거절돼요. 이미 권한 상승이었거나 hint 에 `check that you own <path>` 가 있으면 재실행하지 않고, 그 경로의 소유자·권한(예: `sudo axhub` 가 남긴 파일)을 고치도록 사용자에게 안내해요. hint 앞에 맥락(`failed to save PAT: cannot write <path>: …`)이 붙을 수 있어 시작 문구가 아니라 subcode 로 판정해요. import 는 `recovery_action` 이 이 구분을 담아요. 같은 세션에서 `git setup` 이 이미 성공했으면 push 전에 다시 하지 않아요(push 는 저장된 자격증명을 읽기만 해요).

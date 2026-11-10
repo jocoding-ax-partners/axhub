@@ -45,7 +45,7 @@ Then do `## 배포 전 맞추기` and the canonical workflow below (`references/
 preflight `capabilities.readiness.deploy_check:false`면 `axhub CLI를 최신 버전으로 업데이트해 주세요.`로 중단해요. 질문 없으면 배포, 있으면 그것만 물어요(headless는 변경 없이 질문 요약). 자동 배포되는 GitHub push보다 env·수정 커밋이 먼저예요.
 
 1. **판정** — `axhub deploy check --app <app> --json`(제목 `배포 전 확인`). `fail` 만 맞출 일이고 `unknown`·`info` 는 막지 않아요. `handling: stop`(대회 배포 마감)은 맞출 수 없어요 — 아무것도 바꾸거나 커밋·push·create 하지 말고 그 `message` 를 그대로 전하고 멈춰요.
-2. **기준 문서** — preflight 의 `capabilities.readiness.context_url` 을 한 번만 가져와요(제목 `배포 기준 확인`, WebFetch 또는 `curl -fsSL`). 없으면 `references/deploy-rules.md` 를 봐요.
+2. **기준 문서** — preflight 의 `capabilities.readiness.context_url` 을 한 번만 가져와요(제목 `배포 기준 확인`, 요약 없이 원문 그대로 `curl -fsSL`). 없으면 `references/deploy-rules.md` 를 봐요.
 3. **검사** — 기준대로 코드를 봐요(테스트·예시·README 흔적 제외, static은 서버 항목 제외). 빌드는 5분 내 1회(재배포는 의존성·설정·소스 변경 시), 실패 수정·재시도 2회까지. 계속 실패하면 배포 없이 원인을 알려요.
 4. **묻는 일은 셋뿐이에요** — (a) `.env`·`.env.local`에도 없는 필수값: `<이름> 값을 앱 폴더 .env 에 넣어 주세요`로 요청하고 1부터 재개해요(채팅으로 값 수집 금지). (b) 안 되는 6가지·문서 `물어봄`에 처음 해당: 대안/`그대로 올리기` 선택. (c) 첫 배포 설정(`import` 담당). 모아서 1회 묻고 빈 답은 다시 물어요. 열린 카드 중 실행 금지. `.axhub/deploy-answers.json`의 `keep` 항목은 재질문 없이, `그대로`는 `{"rule","path","at"}`를 추가해요(커밋 금지).
 5. **맞추기 — 묻지 않고 순서대로.** ① `.env.local` 이름부터 `--from-dotenv .env.local`, 나머지는 `axhub env set --app <app> --from-dotenv .env --only <이름,…> --execute`로 등록해요. 파일 열기·값 출력 금지. ② 포트·`0.0.0.0`·상태 경로·빌드·설정을 수정해요(self-hosted static은 `axhub.yaml`의 `build.deploy_method: static`·`build.static_output_dir`도: 빌드 후 `index.html` 폴더, 루트는 `.`). ③ 수정·미커밋 앱 변경을 `배포 전 맞추기`로 커밋해요(`.env*`·키·`.axhub/`·에이전트 폴더 제외). ④ 원격 브랜치 push(self-hosted는 lane의 폴더 확인 뒤). 단, `subdomain_not_configured:fail`이면 push 대신 Recovery Summary로 주소부터 정해요. ⑤ `deploy check` 재확인.

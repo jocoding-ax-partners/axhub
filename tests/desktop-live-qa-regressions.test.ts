@@ -93,52 +93,6 @@ describe("Claude Desktop live QA regressions", () => {
     expect(skill).toContain("GitHub Pages·Vercel 같은 다른 배포를 알아서 시작하지 않아요");
     expect(skill).toContain("For `ignore`, interactive mode asks the same `어디에 배포할까요?` card");
   });
-
-  test("import ignore checks never append exit-code shell syntax", () => {
-    const skill = read("skills/import/SKILL.md");
-
-    expect(skill).toContain("bare `git check-ignore -q axhub.yaml` 1회");
-    expect(skill).toContain("exit 0/1을 tool 결과로 읽고");
-    expect(skill).toContain("ignore 규칙을 바꾼 때만 사후 1회 재검증");
-  });
-
-  test("import deploy-method card never promises a server app domain", () => {
-    // AP-28 카드가 `서버 앱` 을 `axhub.dev 주소` 로 안내했지만 axhub.dev 는 스테이징이에요.
-    // 서버 앱 주소는 회사 작업공간 `{sub}.{tenant}.axhub.ai`·개인 작업공간 `{sub}.axhub.app` 으로
-    // 갈리고 preview 는 작업공간 종류를 알려주지 않아서, 소스와 두 번들 모두 도메인을 적지 않아요.
-    for (const path of [
-      "skills/import/SKILL.md",
-      "plugins/axhub/skills/import/SKILL.md",
-      "plugins/axhub-codex/skills/import/SKILL.md",
-    ]) {
-      const skill = read(path);
-      const card = skill.slice(skill.indexOf("5-1. 배포 방식 카드"), skill.indexOf("5-2. 첫 올리기 점검"));
-
-      expect(card, path).toContain("`어떤 방식으로 배포할까요?`");
-      expect(card, path).toContain("`서버 앱`(`서버 코드까지 실행해요`)");
-      expect(card, path).toContain("주소 도메인은 적지 않아요");
-      expect(card, path).not.toMatch(/axhub\.(dev|ai|app|page)/);
-    }
-
-    const policy = read("docs/policy/agent-policy.md");
-    const ap28 = policy.slice(policy.indexOf("## AP-28 "), policy.indexOf("## AP-29 "));
-    expect(ap28).not.toContain("axhub.dev");
-    expect(ap28).toContain("회사 작업공간이면 `{sub}.{tenant}.axhub.ai`, 개인 작업공간이면 `{sub}.axhub.app`");
-  });
-
-  test("import completion recovery never guesses a remote app from the local folder", () => {
-    const skill = read("skills/import/SKILL.md");
-    const frontmatter = skill.slice(0, skill.indexOf("---", 4));
-
-    expect(frontmatter).toContain("가져오기가 잘 끝났는지 확인");
-    expect(frontmatter).toContain("중단된 가져오기 이어서 마무리");
-    expect(frontmatter).toContain("Start directly with that Korean sentence; no preamble");
-    expect(skill).toContain("폴더명·manifest `name`·preflight `current_app`을 원격 slug로 추론");
-    expect(skill).toContain("`apps get/list`, `deploy list/status`로 우회하지 않아요");
-    expect(skill).toContain("완료 확인 short-circuit");
-    expect(skill).toContain("작업공간/preview 전에 `.axhub/import-resume.json`을 1회 읽어요");
-    expect(skill).toContain("axhub deploy verify <deployment-id> --app <app-id> --json");
-    expect(skill).toContain("preview/승인/execute/추가 조회 없이 끝내요");
-    expect(skill).toContain("preview의 literal `--app <app_id>`로 넘기고");
-  });
+  // import 의 ignore 검사 셸 문법·배포 방식 카드(AP-28)·완료 확인 이어 하기 계약은 2026-11 import
+  // 개편 때 그 동작과 함께 뺐어요 (tests/import-skill-contract.test.ts 가 새 본문을 잠가요).
 });

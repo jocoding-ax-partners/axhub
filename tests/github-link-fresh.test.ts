@@ -36,9 +36,10 @@ describe("github link --fresh reissue contract", () => {
     for (const path of [
       "skills/deploy/references/error-empathy-catalog.md",
       "skills/bootstrap/SKILL.md",
-      "skills/import/SKILL.md",
     ]) {
       expect(readRepo(path), path).toContain("--fresh");
     }
+    // import 는 GitHub 연결을 bootstrap 3·4단계와 똑같이 해요 — 코드 재발급은 그 절차를 따라요.
+    expect(readRepo("skills/import/SKILL.md")).toContain("GitHub 연결은 bootstrap 스킬 3·4단계와 똑같이 해요");
   });
 });

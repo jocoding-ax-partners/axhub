@@ -4,6 +4,22 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.40.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.39.0...plugin-v1.40.0) (2026-11-10)
+
+다른 곳(Lovable·Bolt·Vercel·Supabase 등)에서 만든 앱을 axhub 에 올리는 import 스킬을 새로 썼어요. 회사 정책을 먼저 보고, axhub 배포 기준 문서를 읽은 뒤 지금 코드와 비교해 바로 고칠 것·물을 것·axhub 에서 안 되는 것·직접 할 일을 한 화면에 보여 줘요. 외부 DB·로그인은 그대로 연결하지 않고 axhub DB·로그인으로 바꿀지 묻고, 승인 뒤 고쳐서 다시 점검한 다음 한 번에 올려요. 기준 문서는 원문 그대로 읽고 기능 문서는 docs 목차에서 페이지 단위로 찾아요. 새 앱 만들기에서는 아이디어 ID 연결을 뺐어요.
+
+
+### Added
+
+* **plugin:** bootstrap 에서 아이디어 ID 연결을 뺀다 ([c286637](https://github.com/jocoding-ax-partners/axhub-mono/commit/c286637602f76e3b19eab1aa7f301c341a69971e))
+* **plugin:** 기존 앱 가져오기를 알리고 고쳐서 올리는 흐름으로 다시 쓴다 ([8b0e10d](https://github.com/jocoding-ax-partners/axhub-mono/commit/8b0e10d9001cdd0166edc4d4f1b8846c56980d52))
+* **plugin:** 안 되는 것을 확인 화면에 분명히 알리고 추천 금지 문장을 뺀다 ([c2a743a](https://github.com/jocoding-ax-partners/axhub-mono/commit/c2a743ac601d8706613d81832f1a7cccd04aea61))
+
+
+### Fixed
+
+* **cli:** 설치 점검에서 GitHub 항목을 뺀다 ([#2381](https://github.com/jocoding-ax-partners/axhub-mono/issues/2381)) ([e420248](https://github.com/jocoding-ax-partners/axhub-mono/commit/e420248e5774b56ab9486960c0bf419f99b8854f))
+
 ## [1.39.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.38.1...plugin-v1.39.0) (2026-11-08)
 
 새 앱 만들기가 bootstrap 스킬 하나로 합쳐졌어요. 회사의 코드 저장 위치 정책을 먼저 보고, Axhub 저장소·내 GitHub·회사 GitHub 조직 중 회사가 허용한 곳에 앱을 만들어 첫 배포까지 확인해요. GitHub 은 고른 사람에게만 계정 연결·앱 설치를 안내하고, 예전 scaffold 스킬은 없앴어요. axhub CLI 0.55.0 이상이 필요해요.

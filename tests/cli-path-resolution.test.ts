@@ -7,13 +7,12 @@ const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "
 
 const CANONICAL_BIN = '"$HOME/.axhub/bin/axhub"';
 
-// bootstrap 은 preflight 가 안 되면 setup 으로 보내고, 경로 해석·repair-path 는 setup 이 맡아요 (AP-17 정책 참고).
+// bootstrap·import 는 preflight 가 안 되면 setup 으로 보내고, 경로 해석·repair-path 는 setup 이 맡아요 (AP-17 정책 참고).
 const GUARD_FILES = [
   "skills/clarity/SKILL.md",
   "skills/deploy/SKILL.md",
   "skills/development/SKILL.md",
   "skills/diagnosis/SKILL.md",
-  "skills/import/SKILL.md",
   "skills/up/SKILL.md",
   "hooks/session-auto-update.sh",
 ];
