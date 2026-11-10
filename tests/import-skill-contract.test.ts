@@ -74,7 +74,7 @@ describe("import skill contract (2026-11 개편판)", () => {
     const gate = sectionOf("### 0. 올릴 수 있나", "### 1. 숙지");
     expect(gate).toContain("폴더가 비어 있으면 bootstrap 으로 보내고 멈춰요");
     expect(gate).toContain("안 되면 setup 스킬로 보내고 멈춰요");
-    expect(gate).toContain("`capabilities.import.supported`·`capabilities.self_hosted_git.git_policy_decision`");
+    expect(gate).toContain("`capabilities.self_hosted_git.git_policy_decision` 이 true 가 아니면");
     expect(gate).toContain("\"앱을 어느 작업공간에 올릴까요?\"");
     expect(gate).toContain("앱 서비스 권한·저장 위치·GitHub 연결은 bootstrap 스킬 3·4단계와 똑같이 해요");
   });
@@ -84,7 +84,7 @@ describe("import skill contract (2026-11 개편판)", () => {
     expect(learn).toContain("`capabilities.readiness.context_url`");
     expect(learn).toContain("`curl -fsSL <주소>` 로 한 번 원문 그대로 받아 읽어요");
     expect(learn).toContain("요약해 주는 웹 읽기 도구는 쓰지 않아요");
-    expect(learn).toContain("`https://docs.axhub.ai/llms.txt` 목차에서 그 기능 문서를 찾아");
+    expect(learn).toContain("`https://docs.axhub.ai/llms.txt` 목차에서 그 기능 문서(`.md`)를 찾아");
     expect(IMPORT).not.toContain("WebFetch");
   });
 
@@ -103,7 +103,7 @@ describe("import skill contract (2026-11 개편판)", () => {
   test("3: asks once, never takes values over chat, and treats an empty answer as no approval", () => {
     const confirm = sectionOf("### 3. 안내와 확인", "### 4. 고치기");
     expect(confirm).toContain("한 화면에 보여줘요");
-    expect(confirm).toContain("값을 채팅으로 받지 않고 `.env` 에 넣어 달라고 해요");
+    expect(confirm).toContain("필수 값은 채팅으로 받지 않고 `.env` 에 넣어 달라고 해요");
     expect(confirm).toContain("물을 것을 모아 한 번에 묻고 \"지금 이대로 고쳐서 axhub 에 올릴까요?\"(올리기 / 그만두기)를 물어요");
     expect(confirm).toContain("\"바로 해줘\"라는 말은 승인이 아니에요");
     expect(confirm).toContain("선택 카드에 빈 답변이 돌아오면 답하지 않은 거예요");
@@ -116,7 +116,7 @@ describe("import skill contract (2026-11 개편판)", () => {
   test("4: fixes by the reference doc and commits each chunk so a rerun resumes", () => {
     const fix = sectionOf("### 4. 고치기", "### 5. 다시 비교");
     expect(fix).toContain("git 저장소가 아니면 `git init` 부터 해요");
-    expect(fix).toContain("한 덩어리를 고칠 때마다 `배포 전 맞추기` 로 커밋해서, 끊겨도 다시 부르면 이어가요");
+    expect(fix).toContain("고칠 것을 한 항목씩 끝낼 때마다 `배포 전 맞추기: <항목>` 으로 커밋해서, 끊겨도 다시 부르면 이어가요");
     expect(fix).toContain("`.env*`·키 파일·에이전트 폴더는 커밋하지 않아요");
     expect(fix).toContain("`axhub.yaml` 을 만들고(`name` 은 앱 주소 이름) `axhub deploy --explain --json` 으로 확인해요");
     expect(fix).toContain("못 바꾸는 건 지어내지 않고 알려요");
@@ -132,7 +132,7 @@ describe("import skill contract (2026-11 개편판)", () => {
 
   test("6: executes once, waits with one bounded verify, and exit 6·10 is not a failure", () => {
     const upload = sectionOf("### 6. 올리기", "## 끝");
-    expect(upload).toContain("`--mode execute --approved --commit-manifest --verify-wait none` 을 붙여 한 번만 실행해요");
+    expect(upload).toContain("`--mode execute --approved --commit-manifest --verify-wait none` 을 붙여 실행해요");
     expect(upload).toContain("`--env-from-dotenv .env --env-only <이름,…>`");
     expect(upload).toContain("`axhub deploy verify <deployment_id> --app <앱> --wait --wait-timeout 9m --json` 으로 확인해요(명령 시간 제한 10분)");
     expect(upload).toContain("기다리다 끊기면 다시 실행하지 말고 같은 확인 명령으로 이어가요");
@@ -155,12 +155,24 @@ describe("import skill contract (2026-11 개편판)", () => {
     expect(IMPORT).toContain("\"axhub 에서는 안 돼요\"라고 먼저 분명히 말하고 기준 문서의 대안을 보여줘요");
   });
 
+  test("polish (1.40 실증): name collision, deps before build, keep .env, no example values", () => {
+    // 이름만 같은 기존 앱은 다른 앱 — CLI 0.60.3 의 app.slug_taken 을 새 이름으로 받는다.
+    expect(IMPORT).toContain("미리보기가 `app.slug_taken` 이면 이름만 같은 다른 앱이에요");
+    expect(IMPORT).toContain("같은 앱이라고 사용자가 확인했을 때만 `--app` 을 써요");
+    // Codex 실측: 의존성 없이 빌드해 tsc 를 못 찾았다.
+    expect(IMPORT).toContain("빌드가 있으면 의존성을 설치하고 로컬에서 5분 안에 한 번 돌려 봐요");
+    // Claude 실측: 사용자 .env 를 통째로 바꿨다.
+    expect(IMPORT).toContain("`.env` 의 기존 값은 지우지 않아요");
+    // Codex 실측: 예시 값을 진짜 설정값으로 등록하고 직접 할 일을 비웠다.
+    expect(IMPORT).toContain("예시 값(`your-`·`xxx` 등)은 등록하지 않고 직접 할 일에 적어요");
+  });
+
   test("headless stops at the preview without changing anything", () => {
     expect(IMPORT).toContain("질문에 답할 수 없는 실행(headless)이면 `--headless` 미리보기와 요약까지만 하고 바꾸지 않고 멈춰요");
   });
 
   test("sandbox, CLI errors, and visible copy stay plain", () => {
-    expect(IMPORT).toContain("처음부터 권한 상승으로 실행해요");
+    expect(IMPORT).toContain("처음부터 권한 상승으로 해요");
     expect(IMPORT).toContain("`local.write_denied`");
     expect(IMPORT).toContain("`message_ko`·`recovery_action` 을 쉬운 말로 설명하고 어떻게 할지 물어요");
     expect(IMPORT).toContain("사용자에게 보이는 문장에는 내부 명령 이름이나 상태 코드를 쓰지 않아요");

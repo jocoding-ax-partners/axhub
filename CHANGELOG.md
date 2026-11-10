@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.40.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.40.0...plugin-v1.40.1) (2026-11-10)
+
+기존 앱 가져오기를 실제로 써 보며 나온 문제를 고쳤어요. 같은 이름의 다른 앱이 있으면 새 이름을 제안하고, 빌드 전에 의존성을 설치하고, `.env` 의 기존 값을 지우지 않아요. 예시 값은 설정값으로 등록하지 않고 직접 할 일로 알려 주고, 고칠 것 한 항목마다 커밋해서 중간에 끊겨도 이어갈 수 있어요. 이름 충돌 안내는 axhub CLI 0.60.3 이상에서 나와요.
+
+
+### Fixed
+
+* **plugin:** 가져오기 실증에서 나온 이름 충돌·의존성·.env·예시 값·커밋 단위를 바로잡는다 ([006d13e](https://github.com/jocoding-ax-partners/axhub-mono/commit/006d13e95447a55b3be7665966891c3ff55d0687))
+
 ## [1.40.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.39.0...plugin-v1.40.0) (2026-11-10)
 
 다른 곳(Lovable·Bolt·Vercel·Supabase 등)에서 만든 앱을 axhub 에 올리는 import 스킬을 새로 썼어요. 회사 정책을 먼저 보고, axhub 배포 기준 문서를 읽은 뒤 지금 코드와 비교해 바로 고칠 것·물을 것·axhub 에서 안 되는 것·직접 할 일을 한 화면에 보여 줘요. 외부 DB·로그인은 그대로 연결하지 않고 axhub DB·로그인으로 바꿀지 묻고, 승인 뒤 고쳐서 다시 점검한 다음 한 번에 올려요. 기준 문서는 원문 그대로 읽고 기능 문서는 docs 목차에서 페이지 단위로 찾아요. 새 앱 만들기에서는 아이디어 ID 연결을 뺐어요.
