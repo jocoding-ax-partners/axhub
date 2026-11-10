@@ -79,7 +79,7 @@ describe("spec 236 self-hosted git skill contracts", () => {
   test("deploy leaves the storage path to the CLI and only clones into an empty folder", () => {
     for (const root of SKILL_ROOTS) {
       const deploy = readSkill(root, "deploy");
-      expect(deploy, root).toContain("올리는 길(Axhub 저장소·GitHub·정적 사이트·폴더 업로드)은 CLI 가 골라요");
+      expect(deploy, root).toContain("올리는 길(Axhub 저장소·GitHub·정적 사이트)은 CLI 가 골라요");
       expect(deploy, root).toContain("앱 이름만 말했고 폴더가 비어 있으면 `axhub repo clone <앱> . --json` 으로 받아요");
       expect(deploy, root).toContain("이 폴더가 앱 저장소에 안 붙어 있다면 import 로 보내고 멈춰요");
       expect(deploy, root).not.toContain("git_backend");

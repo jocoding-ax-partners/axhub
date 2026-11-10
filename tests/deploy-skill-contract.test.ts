@@ -53,7 +53,7 @@ describe("deploy skill contract (2026-11 개편판)", () => {
     expect(FRONTMATTER).toContain("\"이 폴더 그대로 올려줘\"");
     expect(FRONTMATTER).toContain("\"왜 배포 실패했어\"");
     expect(FRONTMATTER).toContain("처음 올리는 폴더는 import, 빈 폴더 새 앱은 bootstrap 이에요");
-    expect(FRONTMATTER).toContain('intent: "deploy the working tree as is"');
+    expect(FRONTMATTER).toContain('intent: "commit the current folder and deploy"');
     expect(FRONTMATTER).toContain('intent: "diagnose a failed deployment"');
     expect(FRONTMATTER).toContain('intent: "yield to import"');
   });
@@ -132,7 +132,10 @@ describe("deploy skill contract (2026-11 개편판)", () => {
   test("4: preview first, follow blocked, execute once with --wait, resume with verify instead of re-pushing", () => {
     const push = sectionOf("### 4. 올리기", "### 5. 실패하면");
     expect(push).toContain("`axhub deploy push --app <앱> --json` 으로 미리보기를 받아요. `blocked` 가 있으면 `next` 대로 해요");
-    expect(push).toContain("사용자가 \"지금 폴더 그대로\"라고 했을 때만 `--working-tree` 를 붙여요");
+    expect(push).toContain("\"지금 폴더 그대로\"라고 해도 커밋해서 올리고 커밋했다고 알려요");
+    // CLI 0.63: 저장소 있는 앱은 업로드하지 않아요. 저장소 없는 옛 앱은 Axhub 저장소로 옮기도록 유도해요.
+    expect(push).not.toContain("--working-tree");
+    expect(push).toContain("저장소 없는 앱이면 Axhub 저장소로 옮길지 묻고");
     expect(push).toContain("이 폴더가 앱 저장소에 안 붙어 있다면 import 로 보내고 멈춰요");
     expect(push).toContain("막힌 게 없으면 같은 명령에 `--execute --wait` 를 붙여 한 번만 실행해요(명령 시간 제한 10분)");
     expect(push).toContain("기다리다 끊기면 실패가 아니에요. 다시 올리지 말고 `axhub deploy verify <deployment_id> --app <앱> --wait --wait-timeout 9m --json` 으로 이어가요");
