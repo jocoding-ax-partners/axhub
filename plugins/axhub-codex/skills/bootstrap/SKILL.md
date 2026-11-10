@@ -66,7 +66,7 @@ Axhub 저장소면 건너뛰어요. GitHub 연결·앱 설치 이야기는 꺼�
 ### 9. 배포 확인
 - `axhub deploy verify <deployment_id> --app <slug> --wait --json` 으로 확인해요(명령 시간 제한 10분).
 - 시간 안에 안 끝난 건(exit 6·10) 실패가 아니에요. 같은 명령으로 다시 확인할 수 있다고 알리고 끝내요.
-- 배포가 실패하면 diagnosis 스킬로 원인을 봐요.
+- 배포가 실패하면 deploy 스킬로 원인을 봐요.
 - 사용자가 처음에 공개까지 원했으면 `axhub publish --app <slug> --visibility public --execute --json` 으로 공개 신청해요.
 
 ## 끝

@@ -16,7 +16,7 @@ clarity SKILL 이 로드하는 내부 reference 예요. 탐색·실행 단계에
 - ❌ "OO 에게 업로드 권한 줘" 같은 **부여** 요청을 `grants mine` 조회로 답하고 끝내기 — 남의 권한을 새로 주는 건 grant 생성(`authz grants create`)이에요. 이 leaf 는 CLI 에서 hidden 이라 `--json-schema`·`axhub authz grants --help` 에 안 보여요 — 탐색에서 안 보인다고 "기능 없음" 으로 말하거나 `set-scope`(기존 grant 의 scope 를 통째로 교체)로 대신하지 말고, `axhub authz grants create --help` 로 대상(`--scope`)·레벨(`--level <대상>=read|write`)·필수 플래그를 확정해요(문서 카탈로그로 대신하지 않아요). 접근을 넓히는 변경이라 조회처럼 바로 실행하지 않고 승인 1회를 받아요.
 - ❌ 못 찾은 기능을 비슷한 명령으로 조용히 대체 실행 — 정직하게 부재를 알리고 가장 가까운 명령을 "제안"만 해요 (무단 실행 금지).
 - ❌ `plugin-support` hidden 표면을 탐색·실행 (공개 표면만 원칙 위반).
-- ❌ deploy/bootstrap/import/setup/development/diagnosis 담당 의도를 가로채기 (경계표 위반 — 해당 의도는 양보). 특히 기존 앱 첫 연결은 import, 앱 코드(페이지·화면·대시보드·엔드포인트) 생성은 development, 배포 실패 원인 진단은 diagnosis 양보 — clarity 는 axhub 명령 실행만 해요.
+- ❌ deploy/bootstrap/import/setup/development 담당 의도를 가로채기 (경계표 위반 — 해당 의도는 양보). 특히 기존 앱 첫 연결은 import, 앱 코드(페이지·화면·대시보드·엔드포인트) 생성은 development, 배포 실패 원인 진단은 deploy 양보 — clarity 는 axhub 명령 실행만 해요.
 - ❌ Codex 에 노출된 `axhub` App/MCP 도구 호출 — read-only 라도 쓰지 않아요. clarity 는 항상 CLI help gate 뒤 `axhub` 명령으로 실행해요.
 - ❌ 읽기 전용 leaf CLI 를 `> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution 같은 shell wrapper 로 감싸기 — Codex 사용자에게 불필요한 권한 팝업과 임시 파일 흔적이 생겨요. 단일 `axhub ... --json` 호출을 실행하고 tool 결과를 assistant 내부에서 해석해요.
 - ❌ `읽는 중 <랜덤>.txt`, `Read /tmp/...`, `파일 읽기` 같은 임시 출력 파일 재읽기 — 사용자는 단일 조회를 기대하므로, 파일 읽기 팝업/단계가 보이면 실패예요. 더 좁은 CLI 조회로 다시 실행해요.

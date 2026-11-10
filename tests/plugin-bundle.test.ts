@@ -7,7 +7,7 @@ import { SESSION_WRAPPER_SCRIPTS } from "./fixtures/host-expectations";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const MARKETPLACE_BUNDLE_DIR = join(REPO_ROOT, "plugins", "axhub");
-const SKILLS = ["setup", "bootstrap", "plugins", "deploy", "up", "import", "development", "diagnosis", "clarity"] as const;
+const SKILLS = ["setup", "bootstrap", "plugins", "deploy", "import", "development", "clarity"] as const;
 const FORBIDDEN_PARTS = new Set([
   ".DS_Store",
   ".axhub-state",

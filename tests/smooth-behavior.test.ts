@@ -34,7 +34,7 @@ const runShim = (args: string[], env: Record<string, string> = {}) => {
 };
 
 describe("smooth behavior contracts", () => {
-  test("public metadata advertises the nine official skills", () => {
+  test("public metadata advertises the seven official skills", () => {
     const packageJson = readJson<PackageLike>("package.json");
     const pluginJson = readJson<PackageLike>(".claude-plugin/plugin.json");
     const marketplace = readJson<MarketplaceLike>(".claude-plugin/marketplace.json");
@@ -53,7 +53,7 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("Import priority is strict");
       expect(description).not.toContain("현재 버전을 확인할게요");
     }
-    expect(descriptions.join("\n")).toContain("setup/bootstrap/plugins/deploy/up/import/development/diagnosis/clarity");
+    expect(descriptions.join("\n")).toContain("setup/bootstrap/plugins/deploy/import/development/clarity");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {
@@ -90,14 +90,10 @@ describe("smooth behavior contracts", () => {
 
   test("skills encode the required guard boundaries", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
-    const deploy = readRepo("skills/deploy/SKILL.md") + readRepo("skills/deploy/references/user-facing-language.md");
+    const deploy = readRepo("skills/deploy/SKILL.md");
     const clarity = readRepo("skills/clarity/SKILL.md") + readRepo("skills/clarity/references/execution-guardrails.md");
     const clarityFrontmatter = clarity.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
-    const diagnosis = readRepo("skills/diagnosis/SKILL.md") + readRepo("skills/diagnosis/references/output-contract.md");
     const importSkill = readRepo("skills/import/SKILL.md");
-    const up = readRepo("skills/up/SKILL.md");
-    const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
-    const deployErrors = readRepo("skills/deploy/references/error-empathy-catalog.md");
 
     // bootstrap(옛 scaffold 통합판): 기존 폴더는 import 로, 주소 확인 뒤 dry-run, 공개는 execute 신청, 내부 이름 비노출.
     expect(bootstrap).toContain("axhub apps bootstrap");
@@ -110,76 +106,18 @@ describe("smooth behavior contracts", () => {
     expect(bootstrap).not.toContain(CLAUDE.forbidden.externalAutomationSkill);
     expect(bootstrap).not.toContain(CLAUDE.forbidden.externalAutomationPlugin);
 
-    expect(deploy).toContain("axhub deploy verify <deployment-id> --app <app>");
-    expect(deploy).toContain("axhub deploy verify \"$DEPLOY_ID\" --app \"$APP_ID\"");
-    expect(deploy).toContain("NEVER call `axhub deploy watch`");
-    expect(deploy).toContain("bounded `axhub deploy verify \"$DEPLOY_ID\" --app \"$APP_ID\"` loop");
-    // AP-16 대기 수단 우선: verify 연타 폴링 대신 CLI 내부 대기 단일 호출.
-    expect(deploy).toContain("--wait --wait-interval 20s --wait-timeout 9m --json");
-    expect(deploy).toContain("권한 카드 한 번으로 끝나는");
-    expect(deploy).toContain("연타 폴링은 UX 실패예요");
-    expect(deploy).toContain("capabilities.import.verify_wait");
-    expect(deploy).toContain("exit 6");
-    expect(deploy).toContain("exit 7");
-    expect(deploy).toContain("계속 확인할게요");
-    expect(deploy).toContain("Do not add those paths to `.gitignore`");
-    expect(deploy).toContain("If a CLI check still blocks solely because of these runtime paths");
-    expect(deploy).toContain("do not collapse polling into one long `while`/`for`/`until` shell loop");
-    expect(deploy).toContain("Do not end the response by asking the user to say `배포 상태 확인해줘`");
-    expect(deploy).toContain("ScheduleWakeup");
-    expect(deploy).not.toContain("suggest `배포 상태 확인해줘`");
-    expect(deploy).not.toContain("'배포 상태 확인해줘'라고 말하면 이어서 볼게요");
-    expect(deploy).toContain("성공을 선언하지 않아요");
-    expect(deploy).not.toContain("deploy-approved-run");
-    expect(deploy).toContain(".data.id // .data.deployment_id // .id // .deployment_id // empty");
-    expect(deploy).toContain("canonical workflow");
-    expect(deploy).toContain("diagnosis");
-    expect(deploy).toContain("Deploy failure → diagnosis handoff");
-    expect(deploy).toContain("재배포나 롤백은 하지 않아요");
-    expect(deploy).toContain("axhub deploy logs --app");
+    // deploy(2026-11 개편판, 옛 up·diagnosis 를 합친 판): 올리는 길·배포 번호·기다리기는 CLI `deploy push` 가 맡아요.
+    // 옛 표시 규칙 목록(도구 제목·URL 표기·token-gate·verify 반복 루프·push 판정·환경 라벨·진단 6분류)은 의도적으로
+    // 뺐어요 — 새 본문 계약은 tests/deploy-skill-contract.test.ts 가 잠가요.
+    expect(deploy).toContain("axhub deploy push --app <앱> --json");
+    expect(deploy).toContain("axhub deploy verify <deployment_id> --app <앱> --wait --wait-timeout 9m --json");
+    expect(deploy).toContain("같은 배포를 새로 만들어 다시 시도하지 않아요");
+    expect(deploy).toContain("axhub deploy logs --app <앱>");
     expect(deploy).toContain("axhub --json deploy diagnose <앱>");
-    expect(deploy).not.toContain("deployment_diagnosis if callable");
-    expect(deploy).toContain("User-visible Bash/tool call titles must be Korean noun phrases only");
-    expect(deploy).toContain("`manifesting`, `manifested`, `gitted`, `pushed`, `Push`, `resumed`, `bootstraped`, `deploy-prep`, `in-flight`, `dry-run`, `token-gate`, `execute`, `production`, `terminal success`, `grep pipe`, `gitignore`, `gitignoring`, `gitting`, `checking`, `Build passed`, `Working tree clean`, or `Not ignored`");
-    expect(deploy).toContain("Use `운영` for the user-facing environment");
-    expect(deploy).toContain("Never write `User explicitly authorized`, `Proceeding`, `Push 성공`, or `Push failed`");
-    expect(deploy).toContain("The environment label comes from `STAGING_ENABLED`, never from `prod`, `production`, or raw profile values");
-    expect(deploy).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
-    expect(deploy).toContain("Markdown URL 링크 문법은 전부 금지");
-    expect(deploy).toContain("AXHUB_GATE_POLL_ITERATIONS=0 axhub plugin-support token-gate");
-    expect(deploy).toContain("never wraps token-gate in `grep`, `head`, or a multi-command pipe");
-    expect(deploy).toContain("Present this step as `인증 상태 확인`, not as token-gate");
-    expect(deploy).toContain("NEVER commit, push, or add `.omc/`, `.claude/`, `.codex/`, `.serena/`, `.omx/`, `.omo/`");
-    expect(deploy).toContain("Never deploy a local-only commit SHA");
-    expect(deploy).toContain('git -c credential.interactive=false push -u origin "HEAD:$BRANCH"');
-    expect(deploy).toContain("judge push by exit code");
-    expect(deploy).toContain("Use a short deploy utterance like `현재 앱 배포해`");
-    expect(deploy).toContain("NEVER call `axhub deploy create --execute` for a commit that is only local");
-    expect(workflowDetails).toContain("AXHUB_GATE_POLL_ITERATIONS=0 axhub plugin-support token-gate");
-    expect(workflowDetails).toContain("Do not pipe token-gate through `grep`, `head`, or a combined dry-run pipeline");
-    expect(workflowDetails).toContain("The visible environment label is `운영`");
-    expect(workflowDetails).toContain("Do not show `deploy-prep`, `in-flight`, `dry-run`, `token-gate`, `execute`, `production`, `terminal success`, `gitignore`, `gitting`, `checking`, `Build passed`, `Working tree clean`, `Not ignored`, `User explicitly authorized`, `Proceeding`, or `Push 성공`");
-    expect(workflowDetails).toContain("':(exclude).serena'");
-    expect(workflowDetails).toContain("':(exclude).omx'");
-    expect(workflowDetails).toContain("':(exclude).omo'");
-    expect(workflowDetails).toContain("If deploy-prep or another target check still reports only those runtime paths");
-    expect(workflowDetails).toContain("Do not combine polling into one long `while`/`for` shell loop");
-    expect(workflowDetails).toContain("do not collapse polling into one long `while`/`for`/`until` shell loop");
-    expect(workflowDetails).toContain(CLAUDE.deploySkill.desktopPermissionWatchFail);
-    expect(workflowDetails).toContain("COMMIT_SHA=$(git rev-parse \"${COMMIT_SHA:-HEAD}^{commit}\")");
-    expect(workflowDetails).toContain("git push -u origin \"HEAD:$BRANCH\"");
-    expect(workflowDetails).toContain("Judge push success by `PUSH_EXIT`, not by stderr text");
-    expect(workflowDetails).toContain("git merge-base --is-ancestor \"$COMMIT_SHA\" \"origin/$BRANCH\"");
-    expect(workflowDetails).toContain("Never run `axhub deploy create --execute` for a local-only commit");
-    expect(workflowDetails).toContain("Do not call `axhub deploy watch`");
-    expect(workflowDetails).toContain("Do not substitute `axhub deploy watch`");
-    expect(workflowDetails).toContain("Do not end by asking the user to say `배포 상태 확인해줘`");
-    expect(workflowDetails).toContain("continue the bounded verify loop automatically");
-    expect(workflowDetails).not.toContain("invite \"배포 상태 확인해줘\"");
-    expect(workflowDetails).toContain("axhub deploy logs --app");
-    expect(deployErrors).toContain("제가 같은 배포를 계속 확인할게요");
-    expect(deployErrors).toContain("진행 중인 그 배포를 제가 계속 확인할게요");
-    expect(deployErrors).not.toContain("말씀하시면 끝날 때까지");
+    expect(deploy).toContain("사용자에게 보이는 문장에는 내부 명령 이름이나 상태 코드를 쓰지 않아요");
+    expect(deploy).not.toContain("axhub deploy watch");
+    expect(deploy).not.toContain("deployment_diagnosis");
+
 
     // import(2026-11 개편판): 미리보기 → 확인 한 번 → execute 한 번 → verify 대기. 옛 표시 규칙 목록
     // (도구 제목·URL 표기·첫 문장 고정·내부 용어 치환 예시·비공개 앱 본문 검증)은 의도적으로 뺐어요.
@@ -242,7 +180,7 @@ describe("smooth behavior contracts", () => {
     expect(clarity).toContain("axhub 에 그 기능은 없어요");
     expect(clarity).toContain("schema/help/실행 명령에 `2>/dev/null | head -c 2000`, `| grep`, `| jq`, `bash -lc` 같은 shell 후처리 붙이기");
     expect(clarity).toContain("출력 축소는 더 좁은 `--field-expr` 로만");
-    expect(clarity).toContain("diagnosis");
+    expect(clarity).not.toContain("diagnosis");
     expect(clarity).toContain("배포 실패 원인 진단");
     expect(clarity).toContain("본인 범위");
     expect(clarity).toContain("axhub connectors mine");
@@ -257,64 +195,6 @@ describe("smooth behavior contracts", () => {
     const clarityCodeBlocksForShell = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
     expect(clarityCodeBlocksForShell.join("\n")).not.toContain("2>/dev/null");
     expect(clarityCodeBlocksForShell.join("\n")).not.toContain("head -c");
-    expect(diagnosis).toContain("axhub deploy diagnose");
-    expect(diagnosis).toContain("diagnose failed deployment <id> for app <slug>");
-    expect(diagnosis).toContain("Diagnose failed deployment 96728617 for app my-app");
-    expect(diagnosis).toContain("why did my deploy fail?");
-    expect(diagnosis).toContain("방금 배포된 앱 혹시 실패 원인 같은 거 있으면 진단해줘");
-    expect(diagnosis).toContain("재배포는 하지 말고 원인만 봐줘");
-    expect(diagnosis).toContain("`혹시 실패 원인 같은 거 있으면`, `원인만 봐줘`, `재배포는 하지 말고` 같은 조건부·소극적 표현도 실패 원인 진단 의도");
-    expect(diagnosis).toContain("실패 배포 id 없이 \"혹시 실패 원인 있으면\"처럼 물었고 현재 라이브가 정상이면 `정상이에요` 로 끝내고");
-    expect(diagnosis).toContain("영어 실패 배포 진단 요청도 반드시 이 스킬로 라우팅");
-    expect(diagnosis).toContain("axhub deploy status <deployment-id>");
-    expect(diagnosis).toContain("axhub deploy logs --app");
-    expect(diagnosis).toContain("CLI 전용");
-    expect(diagnosis).toContain("MCP `deployment_diagnosis` 같은 deployment MCP 도구가 보여도 호출하지 않아요");
-    expect(diagnosis).toContain("MCP `App list`, `App get`, `deployment_diagnosis` 같은 도구만으로 진단을 대신하지 않아요");
-    expect(diagnosis).toContain("사용자에게 보이는 진행 문구와 Bash/tool call 제목은 한국어로만");
-    expect(diagnosis).toContain("CLI 표면 확인");
-    expect(diagnosis).toContain("실패 배포 상태 확인");
-    expect(diagnosis).toContain("실패 배포 로그 확인");
-    expect(diagnosis).toContain("각 CLI 확인은 별도 tool 로 실행해요");
-    expect(diagnosis).not.toContain("실패 배포 상태·로그 확인");
-    expect(diagnosis).toContain("현재 라이브 상태 확인");
-    expect(diagnosis).toContain("Bash/명령 tool 을 호출할 때 description/title/summary 필드는 반드시 위 고정 문구 중 하나로 직접 채워요");
-    expect(diagnosis).toContain("도구가 자동으로 제목을 만들도록 비워두지 말고");
-    expect(diagnosis).toContain("`axhubing CLI 확인` 같은 자동 생성 제목이 보이면 같은 명령이라도 `CLI 표면 확인` 으로 제목을 고쳐서 호출해요");
-    expect(diagnosis).toContain("`axhubing`, `axhubed`, `diagnosing`, `checking` 처럼");
-    expect(diagnosis).toContain("`axhubed CLI 확인` 대신 `현재 라이브 상태 확인`");
-    expect(diagnosis).toContain("도구 제목에는 제품명 `axhub` 자체도 넣지 않아요");
-    expect(diagnosis).not.toContain('CLI_NAME="ax""hub"');
-    expect(diagnosis).not.toContain('CLI_BIN="$(command -v "$CLI_NAME" || true)"');
-    expect(diagnosis).not.toContain("deploy status --help");
-    expect(diagnosis).not.toContain("deploy logs --help");
-    expect(diagnosis).not.toContain("deploy diagnose --help");
-    expect(diagnosis).toContain("한 개의 bare 명령");
-    expect(diagnosis).toContain("axhub deploy status <deployment-id> --app <앱> --json");
-    expect(diagnosis).toContain("axhub --json deploy diagnose <앱>");
-    expect(diagnosis).toContain("사용자에게 보이는 문장에서는 영어 진행 문장을 쓰지 않아요");
-    expect(diagnosis).toContain("`Read-only` 도 쓰지 말고 `읽기 전용`");
-    expect(diagnosis).toContain("명령 이름(`axhub deploy status`, `status/logs/diagnose`)은 필요할 때만 짧게 허용");
-    expect(diagnosis).toContain("description/title/summary 도 정확히 `현재 라이브 상태 확인`");
-    expect(diagnosis).toContain("중간 요약과 최종 메시지에서 raw category/stage/code 이름을 그대로 쓰지 않아요");
-    expect(diagnosis).toContain("`configuration`, `auth`, `build`, `infrastructure`, `timeout`, `resolve`, `backend_unimplemented`, `commit_not_found`");
-    expect(diagnosis).toContain('"배포할 버전 찾기"');
-    expect(diagnosis).toContain("`실패 배포(96728617)` 처럼 일부만 보여주는 것도 금지");
-    expect(diagnosis).toContain("항상 \"방금 실패한 배포\" 또는 \"이 실패한 배포\" 라고 말해요");
-    expect(diagnosis).toContain("`healthy: true`, `healthy=false`, `applicable=false`, `services[]`, `reason.category`");
-    expect(diagnosis).toContain("raw 필드명·불리언");
-    expect(diagnosis).toContain("정상이에요");
-    expect(diagnosis).toContain("진단 대상이 아니에요");
-    expect(diagnosis).toContain("해결 후보가 있어요");
-    expect(diagnosis).toContain("대상을 못 찾았어요");
-    expect(diagnosis).toContain("로그인/권한이 필요해요");
-    expect(diagnosis).toContain("진단을 못 했어요");
-    expect(diagnosis).toContain("재배포·롤백");
-    expect(diagnosis).toContain("직접 실행하지 않아요");
-    expect(diagnosis).not.toContain("MCP `deployment_diagnosis` 를 1순위");
-    expect(diagnosis).not.toContain("CLI-only diagnosis");
-    expect(diagnosis).not.toContain("Check CLI surface first");
-    expect(diagnosis).not.toContain("Checking axhub CLI availability");
     const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
     expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
 
@@ -323,87 +203,32 @@ describe("smooth behavior contracts", () => {
     // 쓰고 bootstrap-ux-contract·import-skill-contract 테스트가 잠가요).
     expect(readRepo("skills/plugins/SKILL.md")).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
     expect(importSkill).toContain("\"지금 이대로 고쳐서 axhub 에 올릴까요?\"(올리기 / 그만두기)");
-    // 재배포 lane(deploy·up)은 승인 카드 대신 배포 전 맞추기를 해요 (AP-12·AP-29, spec 681).
-    for (const redeploy of [deploy, up]) {
-      expect(redeploy).not.toContain(CLAUDE.approvalGate.approvalFallbackSentence);
-      expect(redeploy).toContain("승인 카드를 띄우지 않아요");
-      expect(redeploy).toContain("axhub deploy check --app");
-      expect(redeploy).toContain("capabilities.readiness.context_url");
-      expect(redeploy).toContain("--from-dotenv .env --only <이름,…> --execute");
-      expect(redeploy).toContain(".axhub/deploy-answers.json");
-      expect(redeploy).toContain("이렇게 맞춰서 올렸어요");
-      expect(redeploy).toMatch(/값을 대화로 받지 않|채팅(?:으로 값)? 수집 금지/);
-    }
-    // 웹훅 우회 방지: 설정값 등록·수정 커밋은 push 전에 끝나야 해요.
-    expect(deploy).toMatch(/GitHub push보다 env·수정 커밋이 먼저/);
+    // 재배포 lane(deploy)은 승인 카드 대신 배포 전 맞추기를 해요 (AP-12·AP-29, spec 681).
+    expect(deploy).not.toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    expect(deploy).toContain("승인 카드는 띄우지 않아요");
+    expect(deploy).toContain("`axhub deploy check --json`");
+    expect(deploy).toContain("capabilities.readiness.context_url");
+    expect(deploy).toContain("--from-dotenv .env --only <이름,…> --execute");
+    expect(deploy).toContain("값은 채팅으로 받지 않고");
+    // 3번 맞추기(커밋·설정값 등록)가 4번 올리기보다 먼저예요 — GitHub 연결 앱은 push 가 곧 자동 배포예요.
+    expect(deploy.indexOf("### 3. 맞추기")).toBeLessThan(deploy.indexOf("### 4. 올리기"));
     expect(deploy).not.toContain("axhub로 지금 배포를 진행할까요?");
-    // headless 정의는 3-lane 사다리 정합 재작성본으로 잠가요 — 정의 문장이
-    // `claude -p`·`codex exec` 병기 토큰을 포함해요.
-    expect(deploy).toContain(CLAUDE.approvalGate.headlessDefinitionDeploy);
+    expect(deploy).toContain("질문에 답할 수 없는 실행(headless)이면 미리보기와 요약까지만 하고 바꾸지 않고 멈춰요");
     expect(importSkill).toContain("질문에 답할 수 없는 실행(headless)이면 `--headless` 미리보기와 요약까지만 하고");
   });
 
   // #405·#387: auth probe 가 답하지 않은 것(probe_timeout·probe_no_output·cli_spawn_failed)과
   // 앱 목록을 못 읽은 것(apps_list_parse_error)은 로그인 만료도, 첫 배포(import)도, not-found 도
   // 아니에요. 첫 배포 경계는 bootstrap_plan 하나예요.
+  // 2026-11 deploy 개편 때 deploy 의 auth·목록 판정 분기와 workflow-details·오류 카탈로그는 빠졌어요 — deploy 는
+  // `deploy-prep` 의 `bootstrap_plan` 만 첫 배포 경계로 보고, 오류는 CLI 의 `message_ko`·`recovery_action`·`next` 를 따라요.
   test("probe 실패·목록 실패를 로그인 필요·첫 배포로 오판하지 않아요 (#405·#387)", () => {
     const deploy = readRepo("skills/deploy/SKILL.md");
-    const workflowDetails = readRepo("skills/deploy/references/workflow-details.md");
-    const deployErrors = readRepo("skills/deploy/references/error-empathy-catalog.md");
     const development = readRepo("skills/development/SKILL.md");
     const PROBE_CODES = ["probe_timeout", "probe_no_output", "cli_spawn_failed"];
 
-    // deploy 본문: preview 문구를 바로 따르지 않고 deploy-prep 판정으로 확정해요.
-    expect(deploy).toContain("Only `bootstrap_plan`");
-    expect(deploy).not.toContain("If `bootstrap_plan` is present or `app_id` is missing");
-    expect(deploy).toContain("`처음 배포라 앱 등록 준비`·로그인 문구는 바로 따르지 않고");
-    expect(deploy).not.toContain("`처음 배포라 앱 등록 준비` 면 첫 올리기라 `import` 몫이에요");
-    for (const code of [...PROBE_CODES, "apps_list_parse_error", "app_ambiguous", "axhub auth status --json"]) {
-      expect(deploy, code).toContain(code);
-    }
-    // 로그인 안내를 빼는 건 probe 3종뿐이에요 — 실제 로그아웃·만료(다른 auth 코드)는 auth recovery 예요.
-    // auth status 는 미로그인·만료를 exit 4 + error.code auth 로 내요(token_expired 같은 코드는 없어요).
-    expect(deploy).not.toContain("or a login prompt");
-    expect(deploy).toContain("`axhub auth status --json` decides (exit 0 continue, exit 4 login)");
-    expect(deploy).toContain("other `auth_` codes → auth recovery");
-    // preflight 의 auth 판정(CLI guard)도 같은 오판 경로예요 (#405 형제 경로).
-    const cliGuard = deploy.slice(deploy.indexOf("### CLI guard"), deploy.indexOf("### Routing and resolve"));
-    expect(cliGuard).toContain("`auth_error_code` probe 실패는 로그인 안내 없이");
-
-    // workflow-details: 첫 배포 경계와 재시도·판정 순서를 상세히 들고 있어요.
-    expect(workflowDetails).not.toContain("If `bootstrap_plan` is non-null or `app_id` cannot be resolved");
-    for (const phrase of [
-      ...PROBE_CODES,
-      "apps_list_parse_error",
-      "axhub auth status --json",
-      "axhub 서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요.",
-      "앱 목록을 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
-      "`--refresh-in-flight` exit 65",
-      "exit 4 (`error.code` `auth`",
-      "is a real logout or expiry",
-    ]) {
-      expect(workflowDetails, phrase).toContain(phrase);
-    }
-    expect(workflowDetails).not.toContain("and not a login prompt");
-    expect(workflowDetails).not.toContain("`token_expired`/`not_logged_in`");
-
-    // 오류 카탈로그: classify-exit 가 이 두 경우에 내는 키(4:auth.probe_failed·5:apps.list_unavailable)와
-    // 같은 헤딩을 두고, 로그인 만료(exit 4·65)·not-found(exit 5·67) 항목은 그 키 항목으로 보내요.
-    const catalogSection = (heading: string): string => {
-      const start = deployErrors.indexOf(heading);
-      expect(start, heading).toBeGreaterThan(-1);
-      const rest = deployErrors.slice(start + heading.length);
-      const next = rest.search(/\n#{2,3} /);
-      return next === -1 ? rest : rest.slice(0, next);
-    };
-    expect(catalogSection("### exit 4:auth.probe_failed")).toContain("로그인 문제가 아니에요");
-    expect(catalogSection("### exit 5:apps.list_unavailable")).toContain("앱이 없어진 게 아니에요");
-    for (const heading of ["## exit 4 — auth required", "## exit 65 — auth required"]) {
-      expect(catalogSection(heading), heading).toContain("`exit 4:auth.probe_failed`");
-    }
-    for (const heading of ["## exit 5 — resource not found", "## exit 67 — resource not found"]) {
-      expect(catalogSection(heading), heading).toContain("`exit 5:apps.list_unavailable`");
-    }
+    expect(deploy).toContain("`bootstrap_plan` 이 있으면 처음 올리는 폴더예요");
+    expect(deploy).toContain("`message_ko`·`recovery_action`·`next` 를 쉬운 말로 설명하고 어떻게 할지 물어요");
 
     // development 도 auth_ok=false 를 전부 로그인 필요로 읽지 않고, auth status 를 exit 코드로 갈라요.
     for (const code of [...PROBE_CODES, "axhub auth status --json", "exit 4"]) {
@@ -424,17 +249,13 @@ describe("smooth behavior contracts", () => {
         if (line.includes("probe_timeout")) lists.push(`${file}: ${line}`);
       }
     }
-    // deploy·up·development 본문, deploy workflow-details·error-empathy-catalog 예요.
-    expect(lists.length).toBeGreaterThanOrEqual(8);
+    // development 본문이에요 (deploy·up 본문과 deploy reference 의 목록은 2026-11 deploy 개편 때 빠졌어요).
+    expect(lists.length).toBeGreaterThanOrEqual(1);
     for (const entry of lists) {
       for (const code of UNANSWERED_CODES) {
         expect(entry, code).toContain(code);
       }
     }
-    // preflight 의 `--version` 이 실패하면(`cli_runtime_error`) 로그인 판정은 resolve 의 `auth_` 코드가 해요.
-    const details = readRepo("skills/deploy/references/workflow-details.md");
-    const envelope = details.slice(details.indexOf("## Deploy-prep envelope"), details.indexOf("## Target reconciliation"));
-    expect(envelope).toContain("`cli_runtime_error`");
   });
 
   test("development skill follows the current SDK raw-db surface", () => {
@@ -502,31 +323,14 @@ describe("smooth behavior contracts", () => {
     expect(JSON.parse(failed.stdout.toString())).toMatchObject({ id: "dep-123", status: "failed" });
   });
 
+  // deploy 의 공유 carry-over 계약(references/session-carryover.md)은 2026-11 deploy 개편 때 빠졌어요.
   test("session carry-over handoff contract is wired (Phase 1, instruction-first)", () => {
-    const carryover = readRepo("skills/deploy/references/session-carryover.md");
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
-    const deploy = readRepo("skills/deploy/SKILL.md") + readRepo("skills/deploy/references/user-facing-language.md");
     const clarity = readRepo("skills/clarity/SKILL.md") + readRepo("skills/clarity/references/execution-guardrails.md");
 
-    // Shared single-source contract carries all four elements (DRY).
-    expect(carryover).toContain("감지 휴리스틱");
-    expect(carryover).toContain("Confabulation 가드");
-    expect(carryover).toContain("마찰 억제 범위");
-    expect(carryover).toContain("D1 헤드리스 가드");
-    // Confabulation default: no evidence -> stay silent, never invent.
-    expect(carryover).toContain("조회한 적 없으면 carry-over 침묵");
-    // Friction suppression must never bypass correctness gates.
-    expect(carryover).toContain("accounts list");
-    expect(carryover).toContain("owner-pick");
-    expect(carryover).toContain("0-install gate");
-
-    // bootstrap(옛 scaffold 통합판)은 carry-over 문단 없이 이미 된 단계만 건너뛰어요 — 공유 계약을 끌어오지 않아요.
-    expect(bootstrap).not.toContain("../deploy/references/session-carryover.md");
+    // bootstrap(옛 scaffold 통합판)은 carry-over 문단 없이 이미 된 단계만 건너뛰어요.
+    expect(bootstrap).not.toContain("session-carryover.md");
     expect(bootstrap).toContain("이미 된 단계는 건너뛰어요");
-
-    // deploy: carry-over applies only AFTER the route gate (no vercel hijack).
-    expect(deploy).toContain("route gate 통과 후에만 적용해서 다른 타깃");
-    expect(deploy).toContain("references/session-carryover.md");
 
     // clarity: pure-prose continuation, stays out of plugin-support.
     expect(clarity).toContain("## 다음 단계 이어주기");

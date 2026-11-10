@@ -17,34 +17,16 @@ const read = (relative: string): string => readFileSync(join(REPO_ROOT, relative
 
 describe("staging environment contract (AP-25)", () => {
   const deploy = read("skills/deploy/SKILL.md");
-  const details = read("skills/deploy/references/workflow-details.md");
-  const language = read("skills/deploy/references/user-facing-language.md");
   const importSkill = read("skills/import/SKILL.md");
-  const up = read("skills/up/SKILL.md");
 
-  test("deploy: apps get 에서 staging_enabled 를 읽어 STAGING_ENABLED 로 잡아요", () => {
-    expect(deploy).toContain("`git_backend.source`, and `staging_enabled` only");
-    expect(deploy).toContain("Bind `STAGING_ENABLED` from `staging_enabled`");
-  });
-
-  test("deploy: preview 환경 라벨은 staging_enabled 로 운영/스테이징을 갈라요", () => {
-    expect(deploy).toContain("`운영` when false, `스테이징` when true");
-    // 옛 규칙(무조건 `운영`)이 되살아나면 실패해요.
-    expect(deploy).not.toContain("Display the environment as `운영`, not `prod`");
-    expect(details).toContain("`운영` when `STAGING_ENABLED` is false and `스테이징` when it is true");
-    expect(details).not.toContain("The visible environment label is `운영`;");
-    expect(language).toContain("`스테이징` for a staging opt-in app (`staging_enabled=true`");
-  });
-
-  test("deploy: verify exit 0 은 environment 로 갈라 스테이징이면 심사 신청을 안내해요", () => {
-    for (const body of [deploy, details]) {
-      expect(body).toContain("운영에는 아직 반영되지 않았");
-      expect(body).toContain('axhub publish --app "$APP_ID" --deployment-id "$DEPLOY_ID" --execute');
-      // null/부재는 운영이 아니라 "알 수 없음" — STAGING_ENABLED 로 되돌아가요.
-      expect(body).toMatch(/`environment` 가 없거나 null 이면[^\n]*운영으로 간주하지 않/);
-    }
-    expect(deploy).toContain("never `운영 반영 완료`");
-    expect(deploy).toContain("심사 신청은 사용자가 요청할 때만 실행해요");
+  // 2026-11 deploy 개편(옛 up 을 합친 판): 저장 위치·정적 사이트별 길과 배포 번호는 CLI `deploy push` 가 맡고,
+  // 스킬은 배포 결과의 `environment` 로 스테이징을 갈라 알려요. `apps get` 의 `staging_enabled`·`STAGING_ENABLED`
+  // 라벨, 심사 신청 명령 안내, static lane 의 `staging_required` 분기(#909)는 그 개편 때 옛 본문과 함께 뺐어요.
+  test("deploy: 결과의 environment 가 staging 이면 운영은 심사 뒤라고 알려요", () => {
+    expect(deploy).toContain("`environment` 가 `staging` 이면 스테이징에만 반영됐고 운영은 심사 뒤라고 알려요");
+    expect(deploy).toContain("| 주소 | `url` (스테이징이면 운영 반영은 심사 뒤) |");
+    expect(deploy).toContain("확인하지 못한 항목은 됐다고 표시하지 않아요");
+    expect(deploy).not.toContain("운영 반영 완료");
   });
 
   // 2026-11 import 개편: 결과 표의 주소 줄이 스테이징이면 운영 반영은 심사 뒤라고 적어요.
@@ -52,45 +34,6 @@ describe("staging environment contract (AP-25)", () => {
   test("import: 결과 표가 스테이징 배포를 운영 반영으로 말하지 않아요", () => {
     expect(importSkill).toContain("| 주소 | `apps get` 의 `access_url` (스테이징이면 운영 반영은 심사 뒤) |");
     expect(importSkill).toContain("확인하지 못한 항목은 됐다고 표시하지 않아요");
-  });
-
-  test("up: 환경 라벨과 verify 성공 요약이 같은 규칙을 따라요", () => {
-    expect(up).toContain("`deploy_method`, `staging_enabled`만 읽어요");
-    expect(up).toContain("`STAGING_ENABLED` 가 false 면 `운영`, true 면 `스테이징`");
-    expect(up).not.toContain("환경은 `운영` 으로 표시하고");
-    expect(up).toContain('axhub publish --app "$APP_ID" --deployment-id "$DEPLOY_ID" --execute');
-    expect(up).toMatch(/`environment` 가 없거나 null 이면 `STAGING_ENABLED` 로 판단하고 운영으로 간주하지 않아요/);
-  });
-
-  // #909: 사용 전 심사 워크스페이스는 정적 release 의 activate 를 412 → exit 9 `staging_required` 로 막아요.
-  // 업로드·finalize 는 이미 끝났으니 다시 배포하지 않고 hint 의 stage 를 한 번 실행해 스테이징에 올려요.
-  // 심사 신청(`publish --static-release-id`)은 사용자가 요청할 때만이에요 (AP-25 와 같은 규칙).
-  test("static lane: staging_required 는 다시 배포하지 않고 hint 의 stage 뒤 요청할 때만 심사 신청해요 (#909)", () => {
-    const staticLane = details.slice(
-      details.indexOf("## App backend and static lane"),
-      details.indexOf("## Self-hosted push branch"),
-    );
-    const branch = staticLane.slice(staticLane.indexOf("`staging_required`"));
-    expect(branch).not.toBe(staticLane);
-    expect(branch).toContain("Do not rerun the deploy");
-    expect(branch).toContain("axhub apps static releases stage");
-    expect(branch).toContain("--static-release-id");
-    expect(branch).toContain("only when the user asks");
-    // deploy SKILL.md 의 static lane 은 그 분기를 reference 로 보내요.
-    const skillStatic = deploy.slice(deploy.indexOf("### Static branch"), deploy.indexOf("### Deployment-record branch"));
-    expect(skillStatic).toContain("`staging_required`");
-  });
-
-  // #909: deploy create 의 `staging_required` 는 운영이 심사로만 바뀌는데 스테이징이 꺼진 앱이에요. 스테이징을
-  // 켜면 이후 배포가 모두 스테이징으로 가니 먼저 묻고(headless 는 멈춰요), 켠 뒤 같은 배포를 다시 해요.
-  test("deploy create: staging_required 는 스테이징을 켤지 먼저 묻고 hint 대로 다시 배포해요 (#909)", () => {
-    const routing = details.slice(details.indexOf("## Error routing"), details.indexOf("## Secondary commands"));
-    const line = routing.split("\n").find((entry) => entry.includes("`staging_required`")) ?? "";
-    expect(line).toContain("deploy create");
-    expect(line).toContain("axhub deploy staging enable --app <app> --execute");
-    expect(line).toContain("Headless");
-    expect(line).toContain("--deployment-id");
-    expect(line).toContain("only when the user asks");
   });
 
   test("fixture shim: staging verify 케이스가 environment=staging 과 review_request 를 내요", () => {

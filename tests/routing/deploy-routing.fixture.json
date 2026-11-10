@@ -1,20 +1,41 @@
 {
-  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). deploy 는 이미 axhub 에 연결된 앱의 재배포·상태 확인을 맡고, AP-27 로 배포할 곳을 말하지 않은 배포 요청은 axhub 맥락이 없어도 진입해 연결 안 된 폴더면 '어디에 배포할까요?'(axhub 추천) 카드부터 보여줘요 — GitHub Pages 등으로 알아서 배포하지 않아요. 다른 배포 대상을 직접 말한 발화는 진입하지 않아요.",
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). deploy 는 이미 axhub 에 있는 앱의 배포(맞추기·올리기·확인)와 배포 실패 원인 진단을 맡아요. 2026-11 개편 때 옛 up(저장소 없이 지금 폴더 그대로 올리기)과 diagnosis(실패 원인 진단)를 합쳤어요 — 올리는 길은 CLI `deploy push` 가 고르고, 원인만 물으면 deploy 가 아무것도 바꾸지 않고 진단만 해요. 처음 올리는 폴더는 import, 빈 폴더 새 앱은 bootstrap 이에요. 다른 배포 대상을 직접 말한 발화는 진입하지 않아요.",
   "boundary": {
-    "deploy": "이미 연결된 axhub 앱의 재배포·배포 상태 확인 (preview-confirm gate). 배포할 곳을 말하지 않은 배포 요청은 맥락 없이도 진입해 배포할 곳 카드부터 (AP-27).",
+    "deploy": "이미 axhub 에 있는 앱의 배포·지금 폴더 그대로 올리기·배포 실패 원인 진단 (원인만 물으면 바꾸지 않음)",
     "import": "비어 있지 않은 기존 로컬 앱 첫 연결·첫 배포",
     "bootstrap": "빈 디렉토리 새 앱 생성",
-    "diagnosis": "배포 실패 원인 읽기 전용 진단",
-    "none": "다른 배포 대상을 직접 말한 발화 — axhub deploy 가 진입하지 않음 (AP-11·AP-27)"
+    "clarity": "로그 조회·롤백·운영 명령 실행",
+    "setup": "CLI·플러그인 버전 업데이트",
+    "none": "다른 배포 대상을 직접 말한 발화·axhub 무관한 배포 실패 — axhub deploy 가 진입하지 않음 (AP-11)"
   },
   "cases": [
     { "utterance": "배포해", "context": "axhub.yaml 연결된 앱 폴더", "expected": "deploy", "why": "axhub 맥락 있는 ordinary 재배포" },
     { "utterance": "paydrop 배포해", "expected": "deploy", "why": "앱 이름 명시 배포" },
     { "utterance": "프로덕션에 올려줘", "context": "axhub.yaml 연결된 앱 폴더", "expected": "deploy", "why": "human 배포 발화 + axhub 맥락" },
-    { "utterance": "배포해", "context": "axhub 맥락 없는 일반 프로젝트(axhub.yaml 없음, axhub 무언급)", "expected": "deploy", "why": "AP-27 — 배포할 곳을 말하지 않았으니 맥락 없이도 진입해 '어디에 배포할까요?'(axhub 추천) 카드부터. GitHub Pages 등으로 알아서 배포하지 않음" },
-    { "utterance": "vercel에 배포해", "expected": "none", "why": "다른 배포 대상 명시 — axhub deploy 아님" },
-    { "utterance": "GitHub Pages에 올려줘", "expected": "none", "why": "다른 배포 대상 명시 — 사용자가 직접 고른 곳이라 axhub 카드를 띄우지 않음" },
+    { "utterance": "다시 배포해줘", "expected": "deploy", "why": "재배포 실행" },
+    { "utterance": "서버 앱으로 바꿔서 배포해줘", "context": "axhub.yaml 연결된 정적 앱 폴더", "expected": "deploy", "why": "배포 방식 전환은 deploy 3번 맞추기가 되돌릴 수 없다고 알리고 물어요" },
+    { "utterance": "이 폴더 그대로 올려줘", "context": "axhub.yaml 연결된 앱 폴더", "expected": "deploy", "why": "옛 up — 지금 폴더 그대로 올리기는 deploy push --working-tree" },
+    { "utterance": "커밋 말고 지금 폴더 그대로 올려줘", "context": "axhub.yaml 연결된 앱 폴더, 커밋하지 않은 변경 있음", "expected": "deploy", "why": "옛 up — 커밋 상태는 게이트가 아니에요" },
+    { "utterance": "저장소 없이 이 폴더 그대로 올려줘", "context": "axhub.yaml 연결된 앱 폴더, GitHub 미연결", "expected": "deploy", "why": "옛 up — 올리는 길은 CLI 가 골라요" },
+    { "utterance": "GitHub 없이 배포해줘", "context": "axhub.yaml 연결된 앱 폴더", "expected": "deploy", "why": "옛 up — 저장 위치와 상관없이 deploy push 하나로 올려요" },
+    { "utterance": "소스 올려서 배포해줘", "context": "axhub.yaml 연결된 앱 폴더", "expected": "deploy", "why": "옛 up — 폴더 업로드도 deploy push 가 골라요" },
+    { "utterance": "왜 배포 실패했어", "expected": "deploy", "why": "옛 diagnosis — 원인만 물으면 5번(실패하면)만 하고 아무것도 바꾸지 않아요" },
+    { "utterance": "방금 배포 왜 실패했어?", "expected": "deploy", "why": "옛 diagnosis — 최근 배포 실패 원인 질문" },
+    { "utterance": "배포 실패 원인 진단해줘", "expected": "deploy", "why": "옛 diagnosis — 실패 원인 진단을 명시" },
+    { "utterance": "왜 배포가 죽었어", "expected": "deploy", "why": "옛 diagnosis — 배포 실패 원인을 묻는 표현" },
+    { "utterance": "방금 배포된 앱 혹시 실패 원인 같은 거 있으면 진단해줘. 재배포는 하지 말고 원인만 봐줘.", "expected": "deploy", "why": "옛 diagnosis — 조건부 표현이어도 원인 진단이고 바꾸지 않아요" },
+    { "utterance": "why did my deploy fail?", "expected": "deploy", "why": "옛 diagnosis — 영어 배포 실패 원인 질문" },
+    { "utterance": "diagnose deployment failure", "expected": "deploy", "why": "옛 diagnosis — 영어 배포 실패 진단 발화" },
+    { "utterance": "왜 실패했는지 보고 고쳐서 다시 배포해줘", "expected": "deploy", "why": "원인을 본 뒤 고칠지 묻고, 그러자고 하면 2번부터 다시 해요" },
+    { "utterance": "로그 보여줘", "context": "axhub.yaml 연결된 앱 폴더", "expected": "clarity", "why": "실패 원인을 묻지 않은 로그 조회" },
+    { "utterance": "이전 버전으로 롤백해줘", "expected": "clarity", "why": "롤백 운영 명령" },
+    { "utterance": "업데이트해줘", "expected": "setup", "why": "버전 업데이트" },
+    { "utterance": "이 폴더 axhub 에 처음 올려줘", "context": "코드는 있으나 axhub.yaml 없음 (앱 미연결)", "expected": "import", "why": "처음 올리는 폴더는 import — deploy-prep 의 bootstrap_plan 으로도 import 로 보내요" },
+    { "utterance": "첫 배포 준비해줘", "context": "비어 있지 않은 기존 로컬 앱, axhub 첫 연결", "expected": "import", "why": "첫 연결은 deploy 아님" },
+    { "utterance": "새 앱 만들어줘", "context": "빈 디렉토리", "expected": "bootstrap", "why": "빈 폴더 새 앱 생성" },
+    { "utterance": "vercel에 배포해", "expected": "none", "why": "다른 배포 대상 명시 — deploy 0번에서 하지 않고 멈춰요" },
+    { "utterance": "GitHub Pages에 올려줘", "expected": "none", "why": "다른 배포 대상 명시" },
     { "utterance": "AWS에 올려줘", "expected": "none", "why": "다른 플랫폼 명시" },
-    { "utterance": "첫 배포 준비해줘", "context": "비어 있지 않은 기존 로컬 앱, axhub 첫 연결", "expected": "import", "why": "첫 연결은 deploy 아님" }
+    { "utterance": "왜 배포가 죽었어", "context": "axhub 무관, 다른 플랫폼 배포", "expected": "none", "why": "AP-11 — 다른 플랫폼 배포 실패면 axhub 아니면 종료" }
   ]
 }

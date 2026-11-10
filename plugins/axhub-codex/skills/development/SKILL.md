@@ -98,7 +98,7 @@ model: sonnet
 
 7. **앱 규약 학습 (구조·스타일·런타임 데이터 패턴).** 앱 루트에 `AGENTS.md`·`AXHUB.md` 가 있으면 먼저 읽어요 — axhub 템플릿 앱의 규약과 플랫폼 기능(파일 저장·알림/메일·웹훅 relay·공개 범위 등) 켜는 법이 있어요. 거기 있는 기능은 새 패키지·외부 서비스로 다시 만들지 않아요. 생성 코드가 brittle 하지 않게 기존 앱의 규약을 읽어요 — 라우팅/페이지 구조, auth 모델, 데이터-레이어 위치와 호출 방식, 스타일(컴포넌트·디자인 토큰), 빌드 도구. 데이터 접근은 5단계에서 확인한 현재 SDK/DB 표면을 넘지 않고, 앱이 이미 쓰는 런타임 DB/connector 패턴을 우선해요. stack(3단계)에 맞춰 관련 파일을 grep·read 해요.
 
-7.5. **AXHub 배포 기준 (AP-30).** preflight 의 `capabilities.readiness.context_url` 문서를 `curl -fsSL` 로 원문 그대로 한 번만 읽고(못 받으면 `../deploy/references/deploy-rules.md`) 그 규칙대로 코드를 써요. 안 되는 6가지(내 컴퓨터 파일·프로그램, 사내 시스템 직결, 앱 안에서 AI 모델 직접 실행, 웹이 아닌 앱, 엑셀·한글 프로그램 조작, 입력을 파일로 저장)를 처음부터 피하고 문서의 대안을 써요 — 예: 데이터 저장은 SQLite·파일 대신 AXHub DB. 서버는 `PORT` 를 읽고 `0.0.0.0` 에서 열어요. 요청이 이 6가지에 걸리면 코드를 쓰기 전에 대안을 한 줄로 알려요.
+7.5. **AXHub 배포 기준 (AP-30).** preflight 의 `capabilities.readiness.context_url` 문서를 `curl -fsSL` 로 원문 그대로 한 번만 읽고 그 규칙대로 코드를 써요. 안 되는 6가지(내 컴퓨터 파일·프로그램, 사내 시스템 직결, 앱 안에서 AI 모델 직접 실행, 웹이 아닌 앱, 엑셀·한글 프로그램 조작, 입력을 파일로 저장)를 처음부터 피하고 문서의 대안을 써요 — 예: 데이터 저장은 SQLite·파일 대신 AXHub DB. 서버는 `PORT` 를 읽고 `0.0.0.0` 에서 열어요. 요청이 이 6가지에 걸리면 코드를 쓰기 전에 대안을 한 줄로 알려요.
 
 8. **기능 계획 + 미리보기 + 확인.** 요청된 페이지·화면·API route·검색·필터·탭·폼·CRUD·UI 개선을 기존 앱 규약에 맞춰 설계하고, 데이터 기반 기능이면 **E1 실데이터 미리보기**(샘플 cap + **PII 마스킹**)와 함께 한국어로 보여준 뒤 확인받아요. PII·secret·규제 데이터로 보이면 마스킹하고, raw 샘플은 생성 코드/테스트/로그에 절대 안 써요.
 
@@ -110,7 +110,7 @@ model: sonnet
 
 11.5. **배포 준비 점검 (infer-tables-env 연계).** verify 통과 후 deploy 핸드오프 전에 방금 생성한 코드가 참조하는 테이블·환경변수를 스캔해 빠진 게 있는지 확인해요 (비차단 코드 분석). 상세 분기 — 빠진 테이블 → `references/write-gate.md` (b) 게이트, 빠진 env → clarity 안내(자동 설정 금지), headless 무변경 기본, "배포 준비 점검 완료" carry-over — 는 [references/sdk-db-surface.md](references/sdk-db-surface.md) 의 11.5 절을 그대로 따라요.
 
-12. **deploy 핸드오프.** 배포는 development 가 직접 안 하고 **deploy skill 을 호출**해요 (중복 배포 로직 금지). 사용자가 같은 요청에서 배포까지 명시했다면 `현재 앱 배포해`처럼 짧은 handoff utterance 로 deploy 를 호출해요. 원래 기능 요청 문장 전체(예: "QA banner 추가")를 deploy 의 `--user-utterance` 로 넘기지 않아요. 기능 문구가 앱 후보로 잘못 매칭될 수 있기 때문이에요. 사용자가 배포를 명시하지 않았다면 "이제 배포할까요?" 로 같은 대화 맥락을 이어줘요 (carry-over: `../deploy/references/session-carryover.md`).
+12. **deploy 핸드오프.** 배포는 development 가 직접 안 하고 **deploy skill 을 호출**해요 (중복 배포 로직 금지). 사용자가 같은 요청에서 배포까지 명시했다면 `현재 앱 배포해`처럼 짧은 handoff utterance 로 deploy 를 호출해요. 원래 기능 요청 문장 전체(예: "QA banner 추가")를 deploy 의 `--user-utterance` 로 넘기지 않아요. 기능 문구가 앱 후보로 잘못 매칭될 수 있기 때문이에요. 사용자가 배포를 명시하지 않았다면 "이제 배포할까요?" 로 같은 대화 맥락을 이어줘요.
 
 ## NEVER
 

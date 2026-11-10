@@ -48,10 +48,6 @@ export interface HostExpectations {
   readme: {
     desktopCliOnly: string;
   };
-  /** deploy skill references 의 host 결합 기대 문장 */
-  deploySkill: {
-    desktopPermissionWatchFail: string;
-  };
   /** clarity skill 의 host 결합 기대 문장 */
   claritySkill: {
     desktopAutolinkGuard: string;
@@ -65,8 +61,6 @@ export interface HostExpectations {
   approvalGate: {
     /** 승인 fallback 사다리 문장 전문 (bootstrap·import 개편 뒤엔 plugins 게시만 써요) */
     approvalFallbackSentence: string;
-    /** deploy Headless Contract 의 정의 문장 (3-lane 사다리 정합 재작성본) */
-    headlessDefinitionDeploy: string;
   };
 }
 
@@ -86,9 +80,6 @@ export const HOST_EXPECTATIONS: Record<"claude", HostExpectations> = {
     readme: {
       desktopCliOnly: "Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only",
     },
-    deploySkill: {
-      desktopPermissionWatchFail: "A Claude Desktop permission request for a long polling shell block is a failed watch UX",
-    },
     claritySkill: {
       desktopAutolinkGuard: "device-flow URL 은 Claude Desktop 이 자동 링크로 바꾸지 못하도록 URL 부분만 inline code span 으로 써요",
       desktopAppToolExposure: "Claude Desktop 에 노출된 `axhub` App/MCP 도구 호출",
@@ -99,8 +90,6 @@ export const HOST_EXPECTATIONS: Record<"claude", HostExpectations> = {
     approvalGate: {
       approvalFallbackSentence:
         "네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.",
-      headlessDefinitionDeploy:
-        "Headless means `claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, no TTY, or no user-confirmation channel at all — neither native choice UI nor explicit text approval is available.",
     },
   },
   // codex 열 추가 지점: 위 타입을 Record<"claude" | "codex", HostExpectations> 로

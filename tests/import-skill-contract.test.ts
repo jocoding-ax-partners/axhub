@@ -137,7 +137,7 @@ describe("import skill contract (2026-11 개편판)", () => {
     expect(upload).toContain("`axhub deploy verify <deployment_id> --app <앱> --wait --wait-timeout 9m --json` 으로 확인해요(명령 시간 제한 10분)");
     expect(upload).toContain("기다리다 끊기면 다시 실행하지 말고 같은 확인 명령으로 이어가요");
     expect(upload).toContain("시간 안에 안 끝난 건(exit 6·10) 실패가 아니에요");
-    expect(upload).toContain("배포가 실패하면 diagnosis 스킬로 원인을 봐요");
+    expect(upload).toContain("배포가 실패하면 deploy 스킬로 원인을 봐요");
     expect(IMPORT).not.toContain("--wait-timeout 10m");
   });
 

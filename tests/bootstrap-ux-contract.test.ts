@@ -104,7 +104,7 @@ describe("bootstrap contract (bootstrap·scaffold 통합판)", () => {
     );
     expect(BOOTSTRAP).toContain("axhub deploy verify <deployment_id> --app <slug> --wait --json");
     expect(BOOTSTRAP).toContain("시간 안에 안 끝난 건(exit 6·10) 실패가 아니에요");
-    expect(BOOTSTRAP).toContain("배포가 실패하면 diagnosis 스킬로 원인을 봐요");
+    expect(BOOTSTRAP).toContain("배포가 실패하면 deploy 스킬로 원인을 봐요");
   });
 
   test("publishes only when asked, ends with the result table, and hides internals", () => {
