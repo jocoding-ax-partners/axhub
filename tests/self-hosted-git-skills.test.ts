@@ -320,7 +320,7 @@ describe("spec 236 2차: import follows the code storage location", () => {
       expect(importSkill, root).toContain("--git-choice <key>");
       expect(importSkill, root).toContain("`--github-owner <계정>`");
       expect(importSkill, root).not.toContain("--git-backend");
-      expect(importSkill, root).toContain("Axhub 저장소로 올리는 실행은 홈 폴더에 git 자격증명을 써야 해서 처음부터 권한 상승으로 실행해요");
+      expect(importSkill, root).toContain("Axhub 저장소로 올리는 실행은 처음부터 권한 상승으로 해요");
     }
   });
 });
