@@ -13,7 +13,7 @@ The monorepo is indexed by CodeGraph (`codegraph_*` MCP tools, server `codegraph
 
 # axhub plugin (diet 체제)
 
-이 repo는 axhub plugin이에요. 현재 공개 surface는 **7 skill** (`setup` / `bootstrap` / `plugins` / `deploy` / `import` / `development` / `clarity`)이에요. `setup` 은 CLI 설치·버전 업데이트·로그인·회사·git 점검을 맡아요. `deploy` 는 이미 있는 앱의 배포·지금 폴더 그대로 올리기·배포 실패 원인 진단을 맡아요(옛 `up`·`diagnosis` 를 합쳤어요). `plugins`는 deploy_method=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 맡고, 게시자 관리는 App Console, 승인은 Console Review로 연결해요. plugin은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli(`axhub` 바이너리)를 호출해요.
+이 repo는 axhub plugin이에요. 현재 공개 surface는 **7 skill** (`setup` / `bootstrap` / `plugins` / `deploy` / `import` / `development` / `operate`)이에요. `setup` 은 CLI 설치·버전 업데이트·로그인·회사·git 점검을 맡아요. GitHub 다시 연결은 `operate`, 첫 연결은 `bootstrap` 이 맡아요. `deploy` 는 이미 있는 앱의 배포·지금 폴더 그대로 올리기·배포 실패 원인 진단을 맡아요(옛 `up`·`diagnosis` 를 합쳤어요). `operate` 는 이미 있는 앱과 회사의 운영 명령(로그·앱 정보·앱 DB 조회·환경변수·롤백·삭제·권한)을 CLI 에서 찾아 실행해요(옛 `clarity`). `plugins`는 deploy_method=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 맡고, 게시자 관리는 App Console, 승인은 Console Review로 연결해요. plugin은 판정·실행 로직을 직접 갖지 않고 ax-hub-cli(`axhub` 바이너리)를 호출해요.
 
 제거된 시스템 (재추가 금지): Rust helper 바이너리 (`crates/axhub-helpers`), 범용 NL routing corpus, scaffold / skill-doctor / lint:keywords 인프라, cosign 멀티-바이너리 릴리즈 파이프라인. 훅은 cheap bash guard 로 제한해요: auto-update(백그라운드)·재시작 확인만 허용돼요.
 
@@ -21,7 +21,7 @@ The monorepo is indexed by CodeGraph (`codegraph_*` MCP tools, server `codegraph
 
 - 흡수된 helper 표면은 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 — 예: `onboarding-detect`, `preflight`, `deploy-prep`.
 - 공개 검증·진단 표면은 `axhub deploy verify <deployment-id> --app <app>` 와 `axhub deploy diagnose` 예요.
-- bootstrap·deploy skill은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면 v0.21.3+를 가드하고, bootstrap은 preflight `capabilities.self_hosted_git.git_policy_decision`, deploy는 `capabilities.deploy.push` 가 없으면 CLI 업데이트로 보내요. plugins는 version 추측 대신 필요한 `axhub plugin list|download|publish --help` 성공을 가드하고, clarity 의 앱 삭제·절전은 `axhub apps delete --help` 의 30일 되돌리기(`reactivate`) 안내로 새 CLI 인지 가드하고, 기능이 없으면 `setup`으로 보내며 우회하지 않아요.
+- bootstrap·deploy skill은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면 v0.21.3+를 가드하고, bootstrap은 preflight `capabilities.self_hosted_git.git_policy_decision`, deploy는 `capabilities.deploy.push` 가 없으면 CLI 업데이트로 보내요. plugins는 version 추측 대신 필요한 `axhub plugin list|download|publish --help` 성공을 가드하고, operate 는 preflight 로 CLI 를 확인하고 실행 전 고른 명령의 `--help` 를 읽어 거기 있는 인자·플래그만 쓰고, 기능이 없으면 `setup`으로 보내며 우회하지 않아요.
 - 저장소 provider 판정은 fresh bootstrap에서 read-only `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 써요. 기존 코드 import는 bootstrap과 같은 회사 판정으로 고른 `--git-choice`를 `plugin-support import`에 넘기고 CLI가 경로를 정해요. 이미 있는 앱의 배포는 저장 위치(Axhub 저장소·GitHub·정적 사이트·폴더 업로드)별 길을 `axhub deploy push`가 골라요 — deploy는 빈 폴더만 `axhub repo clone`하고 저장소에 안 붙은 로컬 소스 폴더는 `import`로 넘기며 Gitea API를 직접 호출하지 않아요.
 
 ## 변경 검증

@@ -1,0 +1,34 @@
+{
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). operate(2026-11 전 이름 clarity)는 이미 axhub 에 있는 앱과 회사의 운영 요청(로그·앱 이름·아이콘·앱 DB 조회·환경변수·롤백·삭제·권한·내 커넥터)을 지금 CLI 의 --json-schema·--help 로 명령을 찾아 실행해요. 배포·배포 실패 원인(deploy)·앱 코드(development)·새 앱(bootstrap)·설치·업데이트(setup)와 헷갈리지 않아야 해요. skill frontmatter description/examples(Codex 는 codex-overrides/routing/descriptions.json)를 고칠 때 아래 발화의 정답 skill 이 유지되는지 dry-run 으로 확인해요. AP-11 로 axhub 연결·언급이 없는 일반 프로젝트의 로그·env 발화는 진입하지 않아요.",
+  "boundary": {
+    "operate": "이미 axhub 에 있는 앱과 회사의 운영 명령(내 앱 상태·로그·앱 정보·GitHub 다시 연결·앱 DB 조회·환경변수·롤백·삭제·절전·권한·내 커넥터). 조회는 바로, 바꾸는 명령은 미리보기 → 한 번 묻고 → --execute.",
+    "deploy": "바뀐 코드 배포·배포 실패 원인",
+    "development": "앱 코드 — 기능 추가·회사 데이터(커넥터)로 화면 만들기",
+    "bootstrap": "새 앱 만들기",
+    "setup": "CLI 설치·버전 업데이트·로그인",
+    "none": "AP-11 — axhub 맥락 없는 일반 프로젝트의 로그·env·DB 발화는 진입하지 않고 일반 작업에 맡김"
+  },
+  "cases": [
+    { "utterance": "로그 보여줘", "context": "axhub 연결된 앱 폴더", "expected": "operate", "why": "앱 로그 조회" },
+    { "utterance": "앱 이름이랑 아이콘 바꿔줘", "context": "axhub 연결된 앱 폴더", "expected": "operate", "why": "앱 정보 변경은 CLI 운영 명령 — 코드가 아니에요" },
+    { "utterance": "앱 DB 에서 이번 주 주문 몇 건인지 봐줘", "context": "axhub 연결된 앱 폴더", "expected": "operate", "why": "앱 DB 조회 SQL — 화면을 만드는 게 아니에요" },
+    { "utterance": "환경변수 바꿔줘", "context": "axhub 연결된 앱 폴더", "expected": "operate", "why": "환경변수 변경 — 값은 .env 에서 읽어요" },
+    { "utterance": "어제 버전으로 되돌려줘", "context": "axhub 연결된 앱 폴더", "expected": "operate", "why": "롤백 운영 명령 — 새로 배포하는 게 아니에요" },
+    { "utterance": "앱 삭제해줘", "context": "axhub 맥락", "expected": "operate", "why": "삭제는 운영 문서로 뜻(삭제·절전·일시정지 차이)을 확인하고 미리보기 뒤 한 번 물어요" },
+    { "utterance": "지원팀한테 그 폴더 업로드 권한 줘", "context": "axhub 맥락", "expected": "operate", "why": "권한 부여 — 남의 접근 범위를 넓히는 바꾸는 명령이라 미리보기 뒤 한 번 물어요" },
+    { "utterance": "내가 쓸 수 있는 커넥터 뭐 있어?", "context": "axhub 맥락", "expected": "operate", "why": "내 범위 질문 — connectors mine 으로 답하고 회사 전체 목록으로 대신하지 않아요" },
+    { "utterance": "나 그 폴더에 파일 올릴 수 있어?", "context": "axhub 맥락 + 커넥터 grant 있음", "expected": "operate", "why": "바꿀 수 있는지는 authz grants mine 으로 판단" },
+    { "utterance": "배포해줘", "context": "axhub 연결된 앱 폴더", "expected": "deploy", "why": "배포는 deploy" },
+    { "utterance": "왜 배포 실패했어", "context": "axhub 연결된 앱 폴더", "expected": "deploy", "why": "배포 실패 원인은 로그를 봐도 deploy 몫" },
+    { "utterance": "현재 앱 상태 확인해줘", "context": "axhub 맥락", "expected": "operate", "why": "앱 상태 조회는 운영 조회 — 배포 실패 원인을 묻는 건 deploy" },
+    { "utterance": "할 일에 마감일 추가해줘", "context": "axhub 연결된 앱 폴더", "expected": "development", "why": "앱 기능 코드" },
+    { "utterance": "회사 데이터로 대시보드 만들어줘", "context": "axhub 연결된 앱 폴더", "expected": "development", "why": "커넥터 데이터로 화면을 만드는 건 코드 — 커넥터 목록만 묻는 건 operate" },
+    { "utterance": "새 앱 만들어줘", "context": "빈 폴더", "expected": "bootstrap", "why": "새 앱" },
+    { "utterance": "axhub 업데이트해줘", "context": "axhub 맥락", "expected": "setup", "why": "CLI 버전 업데이트는 setup — 앱 운영이 아니에요" },
+    { "utterance": "내 앱들 지금 상태 어때?", "context": "axhub 맥락", "expected": "operate", "why": "내 앱 목록·상태 조회 — 바로 실행하는 운영 조회" },
+    { "utterance": "GitHub 다시 연결해줘", "context": "axhub 맥락", "expected": "operate", "why": "GitHub 다시 연결은 CLI 명령(github link)으로 하는 운영 — 첫 연결은 bootstrap 4번, setup 은 GitHub 연결을 하지 않아요" },
+    { "utterance": "reconnect my GitHub account", "context": "axhub 맥락", "expected": "operate", "why": "영어 GitHub 다시 연결 발화" },
+    { "utterance": "로그 보여줘", "context": "axhub 무관 일반 프로젝트(axhub 연결·언급 없음)", "expected": "none", "why": "AP-11 — 일반 프로젝트 로그 요청, axhub 명령 탐색을 시작하지 않아요" },
+    { "utterance": "환경변수 좀 정리해줘", "context": "axhub 무관 일반 프로젝트", "expected": "none", "why": "AP-11 — 일반 .env 작업" }
+  ]
+}

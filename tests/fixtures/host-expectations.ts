@@ -48,11 +48,6 @@ export interface HostExpectations {
   readme: {
     desktopCliOnly: string;
   };
-  /** clarity skill 의 host 결합 기대 문장 */
-  claritySkill: {
-    desktopAutolinkGuard: string;
-    desktopAppToolExposure: string;
-  };
   /** 승인 fallback 사다리·headless 정의(AP-12, 4스킬 공통) 의 계약 문장 */
   approvalGate: {
     /** 승인 fallback 사다리 문장 전문 (bootstrap·import 개편 뒤엔 plugins 게시만 써요) */
@@ -75,10 +70,6 @@ export const HOST_EXPECTATIONS: Record<"claude", HostExpectations> = {
     },
     readme: {
       desktopCliOnly: "Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only",
-    },
-    claritySkill: {
-      desktopAutolinkGuard: "device-flow URL 은 Claude Desktop 이 자동 링크로 바꾸지 못하도록 URL 부분만 inline code span 으로 써요",
-      desktopAppToolExposure: "Claude Desktop 에 노출된 `axhub` App/MCP 도구 호출",
     },
     approvalGate: {
       approvalFallbackSentence:

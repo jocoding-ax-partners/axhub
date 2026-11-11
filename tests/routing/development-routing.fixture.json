@@ -1,8 +1,8 @@
 {
-  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). skill frontmatter description/examples(Codex 는 codex-overrides/routing/descriptions.json)를 고칠 때 아래 발화의 정답 skill 이 유지되는지 dry-run 으로 확인해요. 핵심 경계: development=이미 axhub 에 있는 앱의 기능 추가·수정(회사 데이터 화면 포함, 배포 안 함), clarity=axhub 운영 명령 실행(코드 안 짬), bootstrap=새 앱, import=다른 곳에서 만든 폴더 첫 올리기, deploy=배포.",
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). skill frontmatter description/examples(Codex 는 codex-overrides/routing/descriptions.json)를 고칠 때 아래 발화의 정답 skill 이 유지되는지 dry-run 으로 확인해요. 핵심 경계: development=이미 axhub 에 있는 앱의 기능 추가·수정(회사 데이터 화면 포함, 배포 안 함), operate(옛 clarity)=이미 있는 앱과 회사의 운영 명령 실행(코드 안 짬), bootstrap=새 앱, import=다른 곳에서 만든 폴더 첫 올리기, deploy=배포.",
   "boundary": {
     "development": "이미 axhub 에 있는 앱에 기능을 추가하거나 고쳐요 — 화면·검색·탭·폼·필드 추가와 회사 데이터(커넥터)로 만드는 대시보드. 기능에 필요하면 앱 DB 테이블도 만들지만 먼저 물어요. 로컬 확인 뒤 결과 표로 끝내고 배포는 안 해요",
-    "clarity": "axhub 운영 명령(로그·환경변수·롤백·테이블만 만들기·데이터 조회·커넥터 권한) — 코드 안 짬",
+    "operate": "axhub 운영 명령(로그·앱 이름·아이콘·환경변수·롤백·테이블만 만들기·앱 DB 조회·내 커넥터·권한) — 코드 안 짬",
     "bootstrap": "앱이 없을 때 템플릿으로 새 앱 만들기",
     "import": "다른 곳에서 만든 코드가 있는 폴더를 axhub 에 처음 올리기",
     "deploy": "이미 axhub 에 있는 앱의 배포·배포 실패 원인"
@@ -20,10 +20,12 @@
     { "utterance": "새 앱 만들어줘", "context": "빈 폴더", "expected": "bootstrap", "why": "앱이 없으면 새 앱 만들기" },
     { "utterance": "이 폴더 axhub 에 올려줘", "context": "다른 곳에서 만든 코드가 있는 폴더", "expected": "import", "why": "처음 올리기 — 기능 개발 아님" },
     { "utterance": "배포해줘", "context": "axhub 앱 폴더", "expected": "deploy", "why": "배포는 development 가 하지 않아요" },
-    { "utterance": "로그 보여줘", "context": "axhub 앱 폴더", "expected": "clarity", "why": "운영 명령 — 코드 안 짬" },
-    { "utterance": "환경변수 설정해줘", "context": "axhub 앱 폴더", "expected": "clarity", "why": "운영 명령 — 코드 안 짬" },
-    { "utterance": "테이블 만들어줘", "context": "axhub 앱 폴더", "expected": "clarity", "why": "테이블만 만드는 운영 명령 (기능 코드 아님)" },
-    { "utterance": "조회 가능한 리소스 조회해줘", "context": "axhub 앱 폴더", "expected": "clarity", "why": "커넥터 목록 조회만 — 코드 안 짬" },
+    { "utterance": "로그 보여줘", "context": "axhub 앱 폴더", "expected": "operate", "why": "운영 명령 — 코드 안 짬" },
+    { "utterance": "환경변수 설정해줘", "context": "axhub 앱 폴더", "expected": "operate", "why": "운영 명령 — 코드 안 짬" },
+    { "utterance": "테이블 만들어줘", "context": "axhub 앱 폴더", "expected": "operate", "why": "테이블만 만드는 운영 명령 (기능 코드 아님)" },
+    { "utterance": "조회 가능한 리소스 조회해줘", "context": "axhub 앱 폴더", "expected": "operate", "why": "커넥터 목록 조회만 — 코드 안 짬" },
+    { "utterance": "앱 이름이랑 아이콘 바꿔줘", "context": "axhub 앱 폴더", "expected": "operate", "why": "앱 정보는 CLI 운영 명령으로 바꿔요 — 코드 안 짬" },
+    { "utterance": "앱 DB 에서 이번 주 주문 몇 건인지 봐줘", "context": "axhub 앱 폴더", "expected": "operate", "why": "앱 DB 조회만 — 화면을 만드는 게 아니에요" },
     { "utterance": "유저 목록 페이지 만들어줘", "context": "axhub 무관 일반 웹 프로젝트(axhub.yaml·앱 저장소 없음, axhub 언급 없음)", "expected": "none", "why": "AP-11 — axhub 앱이 아니면 일반 코딩에 맡겨요 (다른 axhub 스킬로도 안 넘김)" }
   ]
 }

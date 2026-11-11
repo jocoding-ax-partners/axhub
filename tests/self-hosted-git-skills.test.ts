@@ -13,7 +13,7 @@ const DIET = [
   "deploy",
   "import",
   "development",
-  "clarity",
+  "operate",
 ] as const;
 
 const readSkill = (root: (typeof SKILL_ROOTS)[number], skill: string): string =>

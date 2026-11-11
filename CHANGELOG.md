@@ -4,6 +4,22 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.44.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.43.0...plugin-v1.44.0) (2026-11-11)
+
+운영 스킬(옛 clarity)을 operate 로 짧게 다시 썼어요. 로그, 앱 이름·소개·아이콘, 앱 DB 조회, 환경변수, 되돌리기, 절전·일시정지·삭제, 권한, 내 커넥터, GitHub 다시 연결을 맡아요. 명령은 외우지 않고 지금 CLI 에 물어 찾고, 결과가 큰 일은 운영 문서를 원문으로 읽고 해요. 정확히 말한 되돌릴 수 있는 바꾸기는 바로 하고, 삭제·일시정지·되돌리기·앱 DB 쓰기·권한 주기는 미리보기를 보여주고 한 번 물어요. "멈춰줘"처럼 비슷한 일이 여럿이면 하나를 고르지 않고 차이를 보여주고 물어요. 브라우저 승인이 필요한 명령은 주소와 코드를 채팅에 바로 보여주고 한 번만 기다려요. setup 은 이 컴퓨터 준비(설치·로그인·환경 점검)만 봐요.
+
+
+### Changed
+
+* **plugin:** 운영 스킬을 operate 로 다시 쓰고 이름·정책·라우팅·테스트·Codex 번들을 맞춘다 ([b3260db](https://github.com/jocoding-ax-partners/axhub-mono/commit/b3260db1618f35f70a08ba9f1e585a44cac7fdd6))
+
+
+### Fixed
+
+* **plugin:** 운영 스킬이 숨겨진 관리자 명령(권한 주기)을 --help 로 확인하게 한다 ([17224b1](https://github.com/jocoding-ax-partners/axhub-mono/commit/17224b1dcc6487b43975f83f99aabafe3704b9d2))
+* **plugin:** 운영 스킬의 묻는 기준을 되돌릴 수 있는지로 나누고 비슷한 일은 고르지 않고 묻게 한다 ([73d61fe](https://github.com/jocoding-ax-partners/axhub-mono/commit/73d61feb8b76ccbef2fa7ff479ad2eb17a329ffb))
+* **plugin:** GitHub 다시 연결은 운영 스킬이 맡고 setup 은 이 컴퓨터 준비만 보게 한다 ([a876e5f](https://github.com/jocoding-ax-partners/axhub-mono/commit/a876e5f9fb3be43f54c50ee3d73af7ef3890603d))
+
 ## [1.43.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.42.0...plugin-v1.43.0) (2026-11-11)
 
 앱에 기능을 더하는 개발 스킬을 짧게 다시 썼어요. axhub 기준 문서와 기능 문서를 원문으로 읽고, 회사 데이터가 필요하면 앱의 작업공간에서 커넥터의 실제 테이블을 확인한 뒤 만들어요. 계획을 보여주고 묻지 않고 바로 만들며, 데이터 쓰기처럼 되돌리기 어려운 일만 먼저 물어요. 배포 스킬은 Axhub 저장소에 git 명령을 직접 쓰기 전에 인증부터 챙겨서, 저장소를 받거나 합칠 때 403 으로 막히지 않아요.

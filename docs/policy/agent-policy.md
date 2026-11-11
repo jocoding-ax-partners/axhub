@@ -24,8 +24,9 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 ## AP-3 파괴적 변경 승인
 - 규칙: 삭제, 롤백(이전 버전으로 되돌리기), `--force`/`--yes`/`--execute` 같은 강제 실행 옵션이 붙는 명령(파괴적 명령 — 실행하면 되돌리기 어려운 변경)은 대화로 승인을 1회 받은 뒤에만 실행해요. 목록·상태·로그 같은 단순 조회는 확인 없이 바로 실행해요. headless 에서는 파괴적 명령을 실행하지 않고 preview/summary 로 멈춰요. 이미 AXHub 에 있는 앱의 재배포(`deploy push --execute`·`env set --from-dotenv --execute`)는 배포 이력으로 되돌릴 수 있어 이 승인의 예외이고 AP-12·AP-29 를 따라요. 되돌릴 수 없는 배포 방식 전환(`apps deploy-method --to docker`)은 deploy 가 "서버 앱으로 바꾸면 되돌릴 수 없어요"라고 알리고 물어요(AP-29).
 - 권한을 새로 주는 grant 생성(커넥터 대상별 `read`/`write` 부여 등)처럼 **남의 접근 범위를 넓히는 변경**도 같은 승인 게이트를 써요 — 나중에 회수할 수 있어도 조회는 아니라서, 부여 대상·레벨을 한국어로 보여준 뒤 승인을 받아요. 부여에 쓸 정확한 플래그는 문서 카탈로그가 아니라 그 leaf 의 라이브 `--help` 로 확정해요.
-- 적용: skills/clarity/SKILL.md
-- invariant: "파괴적 변경은 승인"
+- operate: 바꾸는 명령은 실행 플래그 없이 미리보기를 먼저 받아요. 사용자가 정확히 말한 되돌릴 수 있는 바꾸기(이름·소개·아이콘·환경변수 추가 등)는 미리보기가 요청과 같으면 바로 실행하고, 삭제·일시정지·롤백·앱 DB 쓰기·권한 주기처럼 되돌리기 어렵거나 영향이 큰 일, 또는 모호한 요청은 한 번 물은 뒤 `--execute`(필요하면 `--yes`)로 실행해요. 되돌릴 수 없으면 그 사실을 먼저 말해요. headless 에서는 어떤 바꾸기도 미리보기까지만 해요(11-11 실측: Claude 가 "확인을 받을 수 없어서" 바로 적용한 걸 바로잡음). (2026-11 전 이름은 clarity 였고 invariant 는 "파괴적 변경은 승인" 이었어요.)
+- 적용: skills/operate/SKILL.md
+- invariant: "먼저 미리보기(실행 플래그 없이)", "한 번 물은 뒤 `--execute`", "되돌릴 수 없으면 그 사실을 먼저 말해요", "바꾸는 명령은 어떤 것이든 미리보기까지만 해요"
 
 ## AP-4 배포 실패 원인 진단 (원인만 물으면 바꾸지 않음)
 - 규칙: 배포 실패 원인 진단은 deploy 스킬이 맡아요(2026-11 에 옛 diagnosis 스킬을 합쳤어요). 사용자가 원인만 물으면 진단만 하고 아무것도 바꾸지 않아요 — 실패 단계·시각(`deploy status`), 그 시간대 로그(`deploy logs`), 지금 떠 있는지(`deploy diagnose`)를 보고 원인을 쉬운 말로 한두 줄로 설명해요. 로그의 비밀값·토큰은 가려요. 코드로 고칠 수 있으면 고칠지 묻고, 그러자고 할 때만 맞추기부터 다시 해요. 롤백·이전 배포 다시 올리기는 사용자가 말할 때만 해요.
@@ -43,22 +44,23 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant: "plugin-support preflight"
 
 ## AP-7 skill 양보 라우팅
-- 규칙: 각 스킬은 자기 담당 밖의 요청을 그 일을 맡은 스킬로 넘겨요(양보). 요청이 섞여 있으면 자기 몫만 끝내고 나머지는 담당 스킬로 넘겨요. 예를 들어 "배포하고 로그 봐줘"면 배포는 deploy 스킬이 이어받고 로그만 clarity 가 봐요.
+- 규칙: 각 스킬은 자기 담당 밖의 요청을 그 일을 맡은 스킬로 넘겨요(양보). 요청이 섞여 있으면 자기 몫만 끝내고 나머지는 담당 스킬로 넘겨요. 예를 들어 "배포하고 로그 봐줘"면 배포는 deploy 스킬이 이어받고 로그만 operate 가 봐요.
 - import: 빈 폴더는 bootstrap, CLI 점검 실패는 setup, 배포 실패는 deploy 로 보내지만 `양보` 라는 낱말을 쓰지 않아서 아래 적용 목록에서 빠져요.
 - deploy: 처음 올리는 폴더는 import, 빈 폴더는 bootstrap, CLI 점검 실패는 setup 으로 보내고 멈추지만 `양보` 라는 낱말을 쓰지 않아서 아래 적용 목록에서 빠져요.
 - development: 빈 폴더는 bootstrap, 다른 곳에서 만든 코드는 import, CLI 점검 실패는 setup 으로 보내고 멈추고, 같은 요청에서 배포까지 말했으면 deploy 로 이어가요. `양보` 라는 낱말을 쓰지 않아서 아래 적용 목록에서 빠져요 (2026-11 개편 전에는 들어 있었어요).
-- 적용: skills/clarity/SKILL.md
-- invariant: "양보"
+- operate: 배포·실패 원인은 deploy, 앱 코드는 development, 새 앱은 bootstrap, 설치·업데이트·로그인은 setup 에 넘기고 운영 부분만 해요. 2026-11 개편 전(clarity)에는 invariant 가 "양보" 였어요.
+- 적용: skills/operate/SKILL.md
+- invariant: "섞여 오면 그 부분은 넘기고 운영 부분만 해요"
 
 ## AP-8 setup 자동 bootstrap 금지
 - 규칙: setup(CLI 설치·버전 업데이트·로그인·회사·git 점검) 스킬은 빈 폴더나 앱 설정 파일(manifest)이 없는 폴더를 발견해도 새 앱 생성(bootstrap)이나 배포를 자동으로 실행하지 않아요. 점검 결과 표로 끝내고, 다음 행동은 사용자가 정해요.
 - 적용: skills/setup/SKILL.md
 - invariant: "앱 만들기·배포는 하지 않아요"
 
-## AP-9 clarity 공개 표면만
-- 규칙: clarity 스킬은 숨김 내부 명령 그룹(`axhub plugin-support` — plugin 전용 통로라 예고 없이 바뀔 수 있는 명령들)을 탐색하거나 실행하지 않아요. 누구나 `--help` 로 볼 수 있는 공개 명령 표면(`--json-schema`/`--help`)만 사용해요.
-- 적용: skills/clarity/SKILL.md
-- invariant: "공개 표면만"
+## AP-9 operate 운영은 공개 표면만
+- 규칙: operate 스킬(2026-11 전 이름 clarity)은 시작할 때 `axhub plugin-support preflight` 로 CLI 를 확인하는 것 말고는 숨김 내부 명령 그룹(`axhub plugin-support` — plugin 전용 통로라 예고 없이 바뀔 수 있는 명령들)을 운영에 쓰지 않아요. 명령은 누구나 볼 수 있는 공개 명령 표면(`--json-schema`/`--help`)에서 찾아요.
+- 적용: skills/operate/SKILL.md
+- invariant: "`axhub plugin-support` 명령은 운영에 쓰지 않아요", "--json-schema --field-expr"
 
 ## AP-10 telemetry 옵트인
 - 규칙: AI 활용 기록(`axhub axrouter` — 내 Claude Code 프롬프트·응답·툴콜을 팀 워크스페이스로 보내는 수집 기능)은 스킬이 묻거나 켜지 않아요. 사용자가 `axhub axrouter monitor` 로 직접 켜고, 워크스페이스 콘솔 동의 없이는 켜지지 않아요. (setup 이 onboarding 을 대체하기 전에는 onboarding 마무리에서 한 번 물었어요.)
@@ -70,7 +72,8 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - import: frontmatter 가 기존 앱을 axhub 에 올리는 발화로만 받고, 확인 한 번(`지금 이대로 고쳐서 axhub 에 올릴까요?`)이 backstop 이라 bootstrap 처럼 frontmatter 게이트로만 적용해요 — 그래서 아래 적용 목록에서 빠져요.
 - deploy: frontmatter 가 이미 axhub 에 있는 앱의 배포·실패 원인 발화로만 받고, `deploy-prep` 이 앱을 정해 처음 올리는 폴더(`bootstrap_plan`)면 import·bootstrap 으로 보내고 멈춰요. 다른 배포 서비스를 말했으면 하지 않고 멈춰요(AP-27). 본문 질문이 없어서 아래 적용 목록에서 빠져요.
 - development: frontmatter 가 이미 axhub 에 있는 앱의 기능 요청으로만 받고, 0단계에서 현재 폴더가 axhub 앱(`axhub.yaml` 이나 앱 저장소)이 아니면 코드를 쓰지 않고 멈춰요. 본문에 `axhub 맥락` 문구가 없어서 아래 적용 목록에서 빠져요 (2026-11 개편 전에는 들어 있었어요).
-- 적용: skills/plugins/SKILL.md, skills/clarity/SKILL.md
+- operate: frontmatter 가 이미 axhub 에 있는 앱과 회사의 운영 요청으로만 받고, 바꾸는 명령은 미리보기 뒤 한 번 묻는 것이 backstop 이라 frontmatter 게이트로만 적용해요. 본문에 `axhub 맥락` 문구가 없어서 아래 적용 목록에서 빠져요 (2026-11 개편 전 clarity 일 때는 들어 있었어요).
+- 적용: skills/plugins/SKILL.md
 - invariant: "axhub 맥락"
 
 ## AP-12 axhub 진입 확인 (preview 통합 게이트)
@@ -95,16 +98,17 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 ## AP-17 CLI 경로 해석 (설치 여부 오판 금지)
 - 규칙: bare `axhub` 호출 실패(command not found·exit 127)는 미설치 판정 근거가 아니에요. 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 오래된 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요. 모든 스킬의 CLI 가드는 (1) `command -v axhub`, (2) 위치 파일 `~/.axhub/bin-path`(CLI 0.24.8+ 가 자기 설치 위치를 기록), (3) canonical 경로 `~/.axhub/bin/axhub`(Windows Git Bash 는 `.exe`) 순서로 실행 파일을 찾아요. 디스크에서 찾으면 재설치·setup 으로 돌려보내지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤, 같은 세션의 남은 명령은 반환된 `bin_path` 절대경로로 이어가요 (이미 열린 셸의 PATH 는 OS 설계상 밖에서 못 고쳐요). 구 CLI 라 `bin_path` 가 없으면 찾은 절대경로를 그대로 써요. 세 경로 모두에서 실행 파일을 못 찾을 때만 미설치로 보고 setup 을 안내해요.
 - repair-path 오류 결과: `repair-path --json` 이 `repaired:false` 와 `error` 를 돌려줘도(예: 샌드박스가 셸 rc 쓰기를 막은 `error_code: "write_denied"`, `sandbox: true`) `bin_path` 가 있으면 막힘이 아니에요 — 리포트·재설치 없이 그 절대경로로 남은 명령을 이어가요. exit 는 0 이에요(fail-open). 사용자가 PATH 를 영구 등록하고 싶다고 할 때만 `manual_line`(셸 rc 에 넣을 정확한 한 줄)을 알려 줘요. `bin_path` 까지 없을 때만 위 3-경로 탐색으로 찾은 절대경로를 그대로 써요.
-- bootstrap·import·deploy·development: preflight 가 안 되면 setup 으로 보내고 멈춰요 — 경로 해석·`repair-path` 는 setup 이 맡아서 아래 적용 목록에서 빠져요.
-- 적용: skills/plugins/SKILL.md, skills/clarity/SKILL.md, hooks/session-auto-update.sh, CLAUDE.md
+- bootstrap·import·deploy·development·operate: preflight 가 안 되면 setup 으로 보내고 멈춰요 — 경로 해석·`repair-path` 는 setup 이 맡아서 아래 적용 목록에서 빠져요 (operate 는 2026-11 개편 전 clarity 일 때 들어 있었어요).
+- 적용: skills/plugins/SKILL.md, hooks/session-auto-update.sh, CLAUDE.md
 - invariant: "bare `axhub` 실패는 미설치가 아니에요", "repair-path"
 
 ## AP-18 device flow 코드 선노출
 - 규칙: GitHub device flow 가 필요한 순간에는 코드 노출이 사용자 행동의 전부예요. 코드를 몇 분씩 도는 saga 명령(`apps bootstrap --execute` 등) 안에만 두지 않아요 — 그 tool call 이 실패·거부·중단되면 stdout 이 사라져 사용자는 브라우저의 빈 코드 입력 화면만 보게 돼요. 코드가 안 보인 채 saga 가 끝나면 같은 `--execute` 를 다시 실행하지 않아요 — 새 device code 가 발급돼 이미 받은 코드가 무효가 돼요. 대신 즉시 끝나는 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link` 로 코드를 받아 본문에 `인증 URL:` 과 `입력 코드:` 두 줄로 먼저 노출하고, 승인 확인 뒤 `--resume-last` 로 이어가요. 재시도 구간도 같아요 — `--resume-last` 의 `device_code_pending` 응답은 `user_code`·`verification_uri`·`expires_at` 을 실어 주므로 재시도마다 그 두 줄을 다시 써요. 승인만이 이 루프를 끝내니, 코드 없이 `아직 대기 중` 만 반복하는 재시도는 사용자가 할 수 있는 일이 없어요. 이 필드가 없는 구 CLI 에서는 재노출을 건너뛰고 재시도만 이어가요.
 - 코드 유실·만료 재발급: `github link` 는 저장된 pending device link 를 그대로 이어 줘요 — 사용자가 코드를 놓쳤거나 코드가 만료된 뒤 같은 명령을 다시 실행하면 이미 죽은 코드가 그대로 돌아와서, 아무리 승인해도 연동이 영영 안 풀려요. 코드를 못 봤다·사라졌다·만료됐다는 신호가 있거나 같은 코드로 승인 확인이 계속 pending 이면 `AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --fresh` 로 새 코드를 발급해 두 줄을 다시 써요. 반대로 사용자가 지금 보고 있는 코드가 아직 유효하면 `--fresh` 를 붙이지 않아요 — 그 플래그가 그 코드를 무효로 만들어요. `--fresh` 를 모르는 구 CLI 는 exit 64(사용법)로 거부하니 플래그 없이 한 번만 다시 실행하고 setup 스킬로 CLI 업그레이드를 안내해요.
-- bootstrap: saga 밖에서 `axhub github link --json` 으로 코드를 먼저 받아 `https://github.com/login/device 에서 코드 <코드> 를 입력해 주세요.` 로 알리고, `axhub github link --wait-approval 90s --json` 으로 기다리며, 만료되면 `--fresh` 로 새로 받아요. 문구가 달라 아래 적용 목록에서 빠져요.
-- 적용: skills/clarity/SKILL.md
-- invariant: "입력 코드:", "github link", "github link --fresh"
+- bootstrap: saga 밖에서 `axhub github link --json` 으로 코드를 먼저 받아 `https://github.com/login/device 에서 코드 <코드> 를 입력해 주세요.` 로 알리고, `axhub github link --wait-approval 90s --json` 으로 기다리며, 만료되면 `--fresh` 로 새로 받아요.
+- operate: 사용자가 직접 "GitHub 다시 연결해줘"라고 하면 operate 가 CLI 명령(`axhub github link`)으로 처리해요(옛 clarity Device Flow 절의 정본). 출력의 주소와 입력 코드를 채팅 본문에 바로 보여주고, 승인은 `--wait-approval 90s` 로 한 번만 기다리고, 그래도 없으면 "승인하고 알려 주세요"라고 하고 멈추고, 만료됐으면 `--fresh` 로 새로 받아요. 첫 연결은 bootstrap 4번("GitHub 일 때만")이 맡고, 배포·가져오기 중 끊기면 그 스킬이 CLI 의 `recovery_action` 대로 해요. setup 은 GitHub 연결을 하지 않아요.
+- 적용: skills/operate/SKILL.md, skills/bootstrap/SKILL.md
+- invariant: "github link", "--wait-approval 90s", "--fresh"
 
 ## AP-20 host-derivation (claude-first 소스)
 - 규칙: 스킬·훅·정책 문안의 source of truth 는 claude-first 단일 트리(`skills/`·`hooks/`·루트 문서)예요. codex 표면은 `scripts/build-plugin-bundle.ts` 의 `--host codex` transform(치환 테이블 `CODEX_SUBSTITUTIONS` + `codex-overrides/` 스왑)이 소유하고, 파생 번들(`plugins/axhub-codex/`)은 생성물이라 직접 수정하지 않아요 — 고칠 것은 소스나 override 를 고치고 재생성해요. 소스에 host-종속 문안(제품명·host 명령·host UI 언급)을 새로 추가할 때는 같은 변경에서 치환 테이블 또는 override 를 갱신할 의무가 있어요 — codex 번들 FORBIDDEN 게이트(`tests/codex-bundle.test.ts`)가 누락을 잡아요. wrapper 훅 스크립트의 로직 변경은 CHANGELOG 에 명시해요 — codex 의 훅 신뢰 대상이 command(스크립트 경로)라 wrapper 본문 갱신은 재신뢰 프롬프트 없이 배포되기 때문이에요 (KTD6).

@@ -1,6 +1,6 @@
 ---
 name: development
-description: "이미 axhub 에 있는 앱에 기능을 추가하거나 고칠 때 써요. 회사 데이터(커넥터)로 화면·대시보드를 만드는 요청도 맡아요. 트리거: \"할 일에 마감일 추가해줘\", \"검색 탭 만들어줘\", \"유저 목록 페이지 만들어줘\", \"회사 주문 데이터로 매출 대시보드 만들어줘\", \"build a dashboard from my connector data\", \"add a feature to my axhub app\". 코드를 만들고 로컬에서 확인까지 하고 배포는 하지 않아요. 앱이 없으면 bootstrap, 다른 곳에서 만든 폴더를 처음 올리면 import, 배포는 deploy, 로그·환경변수 보기나 테이블만 만들기 같은 axhub 운영 명령은 clarity 예요. axhub 앱이 아닌 일반 프로젝트에는 쓰지 않아요."
+description: "이미 axhub 에 있는 앱에 기능을 추가하거나 고칠 때 써요. 회사 데이터(커넥터)로 화면·대시보드를 만드는 요청도 맡아요. 트리거: \"할 일에 마감일 추가해줘\", \"검색 탭 만들어줘\", \"유저 목록 페이지 만들어줘\", \"회사 주문 데이터로 매출 대시보드 만들어줘\", \"build a dashboard from my connector data\", \"add a feature to my axhub app\". 코드를 만들고 로컬에서 확인까지 하고 배포는 하지 않아요. 앱이 없으면 bootstrap, 다른 곳에서 만든 폴더를 처음 올리면 import, 배포는 deploy, 로그·환경변수 보기나 테이블만 만들기 같은 axhub 운영 명령은 operate 예요. axhub 앱이 아닌 일반 프로젝트에는 쓰지 않아요."
 allows-dependency-execution: true
 model: sonnet
 ---

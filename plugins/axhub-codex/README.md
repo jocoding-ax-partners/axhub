@@ -6,7 +6,7 @@
 
 코드를 직접 짜는 대신, "내 앱 배포해" 한마디로 앱 lifecycle 전체를 안전하게 굴려요.
 
-**상태**: 7 SKILL (setup · bootstrap · plugins · deploy · import · development · clarity) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download) · Codex CLI ≥ 0.147.0
+**상태**: 7 SKILL (setup · bootstrap · plugins · deploy · import · development · operate) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download) · Codex CLI ≥ 0.147.0
 
 </div>
 
@@ -98,9 +98,9 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 | `deploy` | 배포·실패 원인 진단 (커밋해서 올려요) | "배포해", "다시 배포해줘", "왜 배포가 실패했어" |
 | `import` | 기존 로컬 앱 가져오기 | "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app" |
 | `development` | 이미 axhub 에 있는 앱에 기능 추가·수정 (회사 데이터 화면 포함, 배포는 안 함) | "할 일에 마감일 추가해줘", "회사 주문 데이터로 매출 대시보드 만들어줘" |
-| `clarity` | 공개 CLI 운영 브리지 | "환경변수 설정해줘", "로그 보여줘", "롤백해줘", "GitHub 계정 다시 연결해줘" |
+| `operate` | 이미 있는 앱과 회사 운영 (로그·앱 정보·앱 DB 조회·환경변수·롤백·삭제·권한·GitHub 다시 연결 — 첫 연결은 `bootstrap`) | "로그 보여줘", "앱 이름·아이콘 바꿔줘", "앱 DB 에서 주문 몇 건인지 봐줘", "어제 버전으로 되돌려줘", "OO 에게 권한 줘", "GitHub 다시 연결해줘" |
 
-`clarity` 브리지는 정해진 명령 목록을 들고 있지 않아요. `axhub --help` 트리를 라이브로 탐색해 맞는 명령을 찾고 바로 실행해요 — CLI 가 새 명령을 추가해도 플러그인 수정 없이 따라가요. 단, 배포 실패 원인을 묻는 요청은 `deploy` 가 맡아요.
+`operate` 는 정해진 명령 목록을 들고 있지 않아요. 지금 CLI 의 `--json-schema` 에서 필요한 부분만 잘라 맞는 명령을 찾고, `--help` 를 읽은 뒤 실행해요 — CLI 가 새 명령을 추가해도 플러그인 수정 없이 따라가요. 조회는 바로 하고, 바꾸는 명령은 미리보기를 보여주고 한 번 물은 뒤 실행해요. 배포와 배포 실패 원인은 `deploy` 가 맡아요. (2026-11 전 이름은 `clarity` 예요.)
 
 axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 버전·최신 확인은 `setup` 이 맡아요.
 
@@ -112,7 +112,7 @@ axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 
 
 ## ✅ 대표 여정
 
-대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. `setup`이 CLI·로그인을 준비하면 `bootstrap`이 GitHub/Axhub self-hosted 저장 위치를 정해 앱을 만들고, `deploy`는 persisted backend에 맞는 lane을 실행한 뒤 exact deployment id를 verify해요. 이후 운영 작업은 `clarity`가 공개 CLI 표면에서 처리해요.
+대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. `setup`이 CLI·로그인을 준비하면 `bootstrap`이 GitHub/Axhub self-hosted 저장 위치를 정해 앱을 만들고, `deploy`는 persisted backend에 맞는 lane을 실행한 뒤 exact deployment id를 verify해요. 이후 운영 작업은 `operate`가 공개 CLI 표면에서 처리해요.
 
 ---
 
@@ -124,7 +124,7 @@ axhub MCP/App 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 
 
 - backend(`axhub-api`)나 MCP 를 **직접 호출하지 않아요**. 항상 `ax-hub-cli` 를 거쳐요.
 - 자체 인증·배포 로직을 재구현하지 않아요. CLI 를 **invoke** 하고 결과를 **분류·복구 안내**할 뿐이에요.
-- CLI 가 새 기능을 내면 자연어 트리거만 더하면 돼요 — `clarity` 브리지는 그것조차 자동이에요.
+- CLI 가 새 기능을 내면 자연어 트리거만 더하면 돼요 — `operate` 는 그것조차 자동이에요.
 
 세션 훅은 cheap bash 로만 좁게 들어가 있어요 — auto-update 훅과 재시작 확인 훅 두 개이고, 둘 다 `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update` 로 꺼져요. auto-update 훅만 백그라운드(`async`)에서 `axhub update apply` 와 플러그인 갱신을 조용히 실행하고, 재시작 확인 훅은 명령을 실행하지 않고 적용 확인 한 줄만 추가해요.
 

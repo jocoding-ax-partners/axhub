@@ -207,15 +207,19 @@ describe("development 라우팅", () => {
     expect(expectedFor("새 앱 만들어줘")).toEqual(["bootstrap"]);
     expect(expectedFor("이 폴더 axhub 에 올려줘")).toEqual(["import"]);
     expect(expectedFor("배포해줘")).toEqual(["deploy"]);
-    for (const utterance of ["로그 보여줘", "환경변수 설정해줘", "테이블 만들어줘"]) {
-      expect(expectedFor(utterance), utterance).toEqual(["clarity"]);
+    for (const utterance of [
+      "로그 보여줘",
+      "환경변수 설정해줘",
+      "테이블 만들어줘",
+      "앱 이름이랑 아이콘 바꿔줘",
+      "앱 DB 에서 이번 주 주문 몇 건인지 봐줘",
+    ]) {
+      expect(expectedFor(utterance), utterance).toEqual(["operate"]);
     }
   });
 
   test("다른 스킬 경계표가 기능 추가·수정을 development 로 보내요", () => {
-    expect(readRepo("skills/clarity/SKILL.md")).toContain(
-      "| 기존 앱 기능 추가·수정(화면·검색·폼·회사 데이터 대시보드 코드) | development |",
-    );
+    expect(readRepo("skills/operate/SKILL.md")).toContain("앱 코드는 development");
     const codexDescriptions = JSON.parse(readRepo("codex-overrides/routing/descriptions.json")) as Record<string, string>;
     const codex = codexDescriptions.development ?? "";
     for (const needle of [
@@ -226,7 +230,7 @@ describe("development 라우팅", () => {
       "앱이 없으면 bootstrap",
       "다른 곳에서 만든 폴더를 처음 올리면 import",
       "배포는 deploy",
-      "테이블만 만들기 같은 axhub 운영 명령은 clarity",
+      "테이블만 만들기 같은 axhub 운영 명령은 operate",
     ]) {
       expect(codex, needle).toContain(needle);
     }
