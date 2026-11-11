@@ -138,7 +138,7 @@ GitHub 연결처럼 OAuth device flow 가 열리는 명령은 코드 표시가 �
 | 빈 디렉토리 새 앱 만들기·템플릿·스캐폴드 | bootstrap |
 | 기존 로컬 앱 첫 axhub 연결·첫 배포 가져오기 | import |
 | 배포 실행·배포 검증·배포 실패 원인 진단 | deploy |
-| 기존 앱 화면·페이지·대시보드·엔드포인트 코드 생성 | development |
+| 기존 앱 기능 추가·수정(화면·검색·폼·회사 데이터 대시보드 코드) | development |
 | CLI·플러그인 관리 | setup |
 | 로그·환경변수·롤백·테이블/컬럼/데이터·connector grant·GitHub 재연결 | **clarity (이 스킬)** |
 

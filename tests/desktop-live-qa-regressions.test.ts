@@ -6,29 +6,8 @@ const ROOT = join(import.meta.dir, "..");
 const read = (path: string): string => readFileSync(join(ROOT, path), "utf8");
 
 describe("Claude Desktop live QA regressions", () => {
-  test("development starts with one analyzable preflight and uses the exact recipe contract", () => {
-    const skill = read("skills/development/SKILL.md");
-
-    expect(skill).toContain("Claude Desktop 단일 명령 계약");
-    expect(skill).toContain("axhub plugin-support preflight --json");
-    expect(skill).toContain("Claude Desktop tool 제목은 정확히 `axhub·앱 점검`");
-    expect(skill).not.toContain("PREFLIGHT_JSON=$(axhub plugin-support preflight");
-    expect(skill).not.toContain("if ! command -v axhub");
-    expect(skill).toContain("development 요청에서 별도 `axhub update check`, `command -v`, `axhub --version`을 실행하지 않아요");
-    expect(skill).toContain("`app_id`, `recipe_id`, 선택 `framework`, `preferred_table`");
-    expect(skill).toContain("`dynamic-db-crud`");
-    expect(skill).toContain("`recipe`, `tenant`, `schema` 키를 만들거나 실패 뒤 키 모양을 바꿔 반복하지 않아요");
-    expect(skill).toContain("플러그인 캐시를 탐색하지 않고 reference 링크만 읽어요");
-  });
-
-  test("development binds the imported app id instead of guessing axhub.yaml name", () => {
-    const skill = read("skills/development/SKILL.md");
-
-    expect(skill).toContain("`axhub.yaml` 의 `name` 은 로컬 프로젝트 이름일 수 있으므로 원격 앱 slug 로 단정하지 않아요");
-    expect(skill).toContain("`.axhub/import-resume.json`");
-    expect(skill).toContain("bare `axhub apps get <app-id> --json`");
-    expect(skill).toContain("실패하면 `apps list`, `--help`, pipe 탐색으로 복구하지 말고");
-  });
+  // development 의 Desktop 단일 명령 계약·도구 제목·`get_recipe` 인자 계약·`.axhub/import-resume.json` 앱 바인딩은
+  // 2026-11 development 개편 때 MCP 도구 체인과 함께 뺐어요 (tests/development-skill-contract.test.ts 가 새 본문을 잠가요).
 
   test("clarity routes destructive operations before generic Desktop probes", () => {
     const skill = read("skills/clarity/SKILL.md");

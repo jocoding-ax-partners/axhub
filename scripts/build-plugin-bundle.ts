@@ -67,6 +67,15 @@ interface BundleStats {
 }
 
 // ── codex 파생 상수 (KTD1·KTD5·KTD7·KTD11, U5) ──────────────────────────────
+// deploy·development 처럼 새로 만드는 일의 승인 질문이 없는 스킬이 `## 순서` 승인 게이트 요약 대신 받는
+// 질문 계약 요약이에요 — 물을 것의 답에도 선주입 무효 조항이 걸려요 (AP-12).
+const CODEX_QUESTION_STYLE =
+  "**질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요. 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요.";
+const CODEX_QUESTION_CONTRACT =
+  "## 질문 계약 (요약)\n\n답은 명시 텍스트 1회로 받고, 미리 넣어 둔 문구·유사 표현·무응답은 답이 아니에요. 선택 카드에 빈 답변이 돌아오면 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.";
+export const CODEX_QUESTION_CONTRACT_HEADING = "## 질문 계약 (요약)";
+export const CODEX_APPROVAL_GATE_HEADING = "## 승인 게이트 계약 (요약)";
+
 // 치환은 longest-first 가 계약이에요 — 병기 구문 전체를 먼저 소비해 이중 적용을
 // 막아요 (tests/codex-bundle.test.ts 가 정렬을 assert 해요).
 export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: string]> = [
@@ -96,14 +105,18 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
   ],
   ["`claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, ", "`codex exec`, CI, "],
   ["(`claude -p` / CI / `$CLAUDE_NON_INTERACTIVE` / no TTY)", "(`codex exec` / CI / no TTY)"],
-  ["`ScheduleWakeup`, 내부 task 이름, 브라우저/preview 도구 이름을", "내부 task 이름, 브라우저/preview 도구 이름을"],
+  // development(2026-11 개편판)는 되돌리기 어려운 일만 묻는 스킬이라 deploy 처럼 `## 순서` 를 보존하고
+  // 질문 계약 요약을 받아요. 기준 문장이 바뀌면 buildBundle 의 필수 주입 검사가 빌드를 멈춰요.
+  [
+    "다른 서비스(Supabase·Firebase·직접 만든 로그인 등)를 새로 끌어오지 않아요.",
+    `다른 서비스(Supabase·Firebase·직접 만든 로그인 등)를 새로 끌어오지 않아요.\n\n${CODEX_QUESTION_STYLE}\n\n${CODEX_QUESTION_CONTRACT}`,
+  ],
   ["`claude -p`·CI·`$CLAUDE_NON_INTERACTIVE`·TTY 없음", "`codex exec`·CI·TTY 없음"],
   ["`실행됨 명령 N개`, `TaskOutput 사용함`, tool 카드,", "`실행됨 명령 N개`, tool 카드,"],
   ["[ -n \"${CLAUDE_NON_INTERACTIVE:-}\" ]", "[ -n \"${CODEX_NON_INTERACTIVE:-}\" ]"],
   ["claude plugin marketplace update", "codex plugin marketplace upgrade"],
   ["`Monitor 사용` 권한 카드가 뜨는 명령은 실패예요.", "백그라운드 감시 권한 카드가 뜨는 명령은 실패예요."],
   ["`claude -p`·`codex exec`", "`codex exec`"],
-  ["Claude Desktop Code 모드", "Codex"],
   [".plugin-update-restart", ".plugin-update-restart-codex"],
   ["claude plugin update", "codex plugin marketplace upgrade"],
   [".plugin-update-check", ".plugin-update-check-codex"],
@@ -111,7 +124,7 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
   // 요약을 받지 않고(applyCodexSubstitutions 가 deploy 의 `## 순서` 를 보존해요) 이 질문 계약 요약을 받아요.
   [
     "스킬은 맞추기와 실패 진단을 맡아요.",
-    "스킬은 맞추기와 실패 진단을 맡아요.\n\n**질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요. 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요.\n\n**장기 대기.** codex 는 긴 명령을 최대 30초에 yield 하고 백그라운드 터미널로 넘겨요 — yield 는 실패도 완료도 아니에요. `deploy push --execute --wait`·`deploy verify --wait` 가 yield 되면 같은 명령을 다시 실행하지 말고 같은 터미널을 빈 입력으로 폴링해 완주를 기다려요.\n\n## 질문 계약 (요약)\n\n답은 명시 텍스트 1회로 받고, 미리 넣어 둔 문구·유사 표현·무응답은 답이 아니에요. 선택 카드에 빈 답변이 돌아오면 다시 물어요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요.",
+    `스킬은 맞추기와 실패 진단을 맡아요.\n\n${CODEX_QUESTION_STYLE}\n\n**장기 대기.** 긴 명령이 30초에 yield 되는 건 실패도 완료도 아니에요. \`deploy push --execute --wait\`·\`deploy verify --wait\` 가 yield 되면 같은 명령을 다시 실행하지 말고 같은 터미널을 빈 입력으로 폴링해 완주를 기다려요.\n\n${CODEX_QUESTION_CONTRACT}`,
   ],
   ["claude plugin list", "codex plugin list"],
   ["command -v claude", "command -v codex"],
@@ -242,10 +255,20 @@ const applyCodexOverrides = (outDir: string): void => {
   }
 };
 
-// deploy 는 승인 질문이 없는 재배포라 `## 순서` 앞 승인 게이트 요약을 받지 않아요 — 대신 자기 질문 계약
-// 요약을 받아요(CODEX_SUBSTITUTIONS 의 deploy 항목).
-const DEPLOY_ORDER_HEADING = "\n## 순서\n";
-const PRESERVED_DEPLOY_ORDER_HEADING = "\n__AXHUB_PRESERVED_DEPLOY_ORDER_HEADING__\n";
+// deploy(승인 질문이 없는 재배포)·development(되돌리기 어려운 일만 묻는 기능 개발)는 `## 순서` 앞 승인 게이트
+// 요약을 받지 않아요 — 대신 자기 질문 계약 요약을 받아요(CODEX_SUBSTITUTIONS 의 deploy·development 항목).
+const ORDER_HEADING = "\n## 순서\n";
+const PRESERVED_ORDER_HEADING = "\n__AXHUB_PRESERVED_ORDER_HEADING__\n";
+const QUESTION_CONTRACT_SKILLS = new Set(["deploy", "development"]);
+
+// 기준 문장이 바뀌어 주입이 조용히 빠지는 일을 막아요 — 이 표의 스킬은 codex 판에 그 요약이 꼭 있어야 해요.
+export const CODEX_REQUIRED_SUMMARIES: Readonly<Record<string, string>> = {
+  bootstrap: CODEX_APPROVAL_GATE_HEADING,
+  import: CODEX_APPROVAL_GATE_HEADING,
+  setup: CODEX_APPROVAL_GATE_HEADING,
+  deploy: CODEX_QUESTION_CONTRACT_HEADING,
+  development: CODEX_QUESTION_CONTRACT_HEADING,
+};
 
 const applyCodexSubstitutions = (outDir: string): void => {
   const claudeHostTrigger = "Claude에 설치해줘";
@@ -254,17 +277,29 @@ const applyCodexSubstitutions = (outDir: string): void => {
     if (!CODEX_TEXT_EXTENSIONS.has(extname(file))) continue;
     const original = readFileSync(file, "utf8");
     const isPluginsSkill = file.endsWith(join("skills", "plugins", "SKILL.md"));
-    const isDeploySkill = file.endsWith(join("skills", "deploy", "SKILL.md"));
+    const keepsOrderHeading = [...QUESTION_CONTRACT_SKILLS].some((skill) =>
+      file.endsWith(join("skills", skill, "SKILL.md")),
+    );
     let next = isPluginsSkill
       ? original.replaceAll(claudeHostTrigger, preservedTrigger)
       : original;
-    if (isDeploySkill) next = next.replaceAll(DEPLOY_ORDER_HEADING, PRESERVED_DEPLOY_ORDER_HEADING);
+    if (keepsOrderHeading) next = next.replaceAll(ORDER_HEADING, PRESERVED_ORDER_HEADING);
     for (const [from, to] of CODEX_SUBSTITUTIONS) {
       next = next.replaceAll(from, to);
     }
     if (isPluginsSkill) next = next.replaceAll(preservedTrigger, claudeHostTrigger);
-    if (isDeploySkill) next = next.replaceAll(PRESERVED_DEPLOY_ORDER_HEADING, DEPLOY_ORDER_HEADING);
+    if (keepsOrderHeading) next = next.replaceAll(PRESERVED_ORDER_HEADING, ORDER_HEADING);
     if (next !== original) writeFileSync(file, next);
+  }
+  for (const [skill, heading] of Object.entries(CODEX_REQUIRED_SUMMARIES)) {
+    const path = join(outDir, "skills", skill, "SKILL.md");
+    const body = readFileSync(path, "utf8");
+    if (!body.includes(heading)) {
+      throw new Error(`codex ${skill} 에 "${heading}" 주입이 빠졌어요 — 치환 기준 문장이 바뀌었는지 확인해요`);
+    }
+    if (QUESTION_CONTRACT_SKILLS.has(skill) && body.includes(CODEX_APPROVAL_GATE_HEADING)) {
+      throw new Error(`codex ${skill} 에 승인 게이트 요약이 들어갔어요 — 질문 계약 요약만 받아야 해요`);
+    }
   }
 };
 

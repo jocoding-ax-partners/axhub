@@ -90,7 +90,7 @@ gh workflow run plugin-release.yml -f tag=plugin-vX.Y.Z
 ## deploy 성공 선언 규칙
 
 - deploy 성공 선언은 CLI 의 최종 결과로만 해요 — `axhub deploy push --app <app> --execute --wait` 가 같은 배포 번호로 끝까지 기다린 결과, 또는 끝나지 않았거나(exit 6·10, `status` 가 `started`·`running`) 기다리다 끊겼을 때 다시 올리지 않고 이어 부르는 `axhub deploy verify <deployment-id> --app <app> --wait --wait-timeout 9m` 의 결과예요. latest 재탐색 경로는 금지이고, 확인하지 못한 항목은 됐다고 표시하지 않아요.
-- **올리는 길은 CLI 가 골라요 (AP-23):** 저장 위치(Axhub 저장소·GitHub·정적 사이트·폴더 업로드)별 길·배포 번호 찾기·기다리기는 `axhub deploy push` 몫이에요(preflight `capabilities.deploy.push`, CLI 0.62.0+). 2026-11 전에는 스킬이 `apps get` 의 `deploy_method`·`git_backend` 로 selfhosted push·GitHub·static upload lane 을 직접 나눴어요. 사용자가 "지금 폴더 그대로"라고 했을 때만 `--working-tree` 를 붙이고, 앱 저장소에 안 붙은 로컬 소스 폴더는 `import` 로 넘겨요.
+- **올리는 길은 CLI 가 골라요 (AP-23):** 저장 위치(Axhub 저장소·GitHub·정적 사이트)별 길·배포 번호 찾기·기다리기는 `axhub deploy push` 몫이에요(preflight `capabilities.deploy.push`, CLI 0.62.0+). 2026-11 전에는 스킬이 `apps get` 의 `deploy_method`·`git_backend` 로 selfhosted push·GitHub·static upload lane 을 직접 나눴어요. "지금 폴더 그대로"라고 해도 커밋해서 올리고(업로드 배포 없음, CLI 0.63.0), 저장소 없는 옛 앱은 Axhub 저장소로 옮길지 물어요. 앱 저장소에 안 붙은 로컬 소스 폴더는 `import` 로 넘겨요.
 - **스테이징 옵트인 앱(AP-25):** 배포 결과의 `environment` 가 `staging` 이면 스테이징에만 반영됐고 운영은 심사 뒤라고 알리고 "운영 반영 완료" 라고 말하지 않아요. 심사 신청은 사용자가 요청할 때만 해요.
 
 ## Skill routing
@@ -102,8 +102,8 @@ Key routing rules:
 - 템플릿으로 새 앱 생성·첫 배포(코드 저장 위치는 회사 판정대로 Axhub 저장소·내 GitHub·회사 GitHub 조직) → `bootstrap`
 - deploy_method=plugin App 게시·목록·정확한 version 다운로드 → `plugins` (Discovery/App Console/Console Review canonical surface)
 - 비어 있지 않은 기존 로컬 앱의 첫 axhub 연결·첫 배포 가져오기 → `import` (올릴 수 있나 → 기준 문서 `curl -fsSL` 원문 숙지 → 비교 → 안내와 확인 1회(올리기 / 그만두기) → 덩어리마다 커밋하며 고치기 → 다시 비교 → execute 한 번·`deploy verify --wait` → 결과 표. `.env` 값은 `--env-from-dotenv` 로 첫 배포 전 등록 — AP-30)
-- 이미 axhub 에 있는 앱의 배포·지금 폴더 그대로 올리기·배포 실패 원인 진단 → `deploy` (대상 → 기준 문서 `curl -fsSL` 원문 숙지 → 점검 → 맞추기(승인 카드 없음, 항목마다 커밋, `env set --from-dotenv`) → `deploy push` 미리보기 → `--execute --wait` 한 번 → 결과 표. 원인만 물으면 실패 진단만 하고 아무것도 바꾸지 않아요 — AP-4. 다른 배포 서비스를 말했으면 하지 않고 멈춰요 — AP-27)
-- 기존 앱에 실데이터 기반 기능(페이지·화면·대시보드·조회 엔드포인트·CRUD 화면) 코드 생성 → `development` (AP-5 read 기본, write 게이트 — 조회 도구는 읽기 전용이고 커넥터 자체는 쓰기 액션을 가질 수 있어요)
+- 이미 axhub 에 있는 앱의 배포·배포 실패 원인 진단 → `deploy` (대상 → 기준 문서 `curl -fsSL` 원문 숙지 → 점검 → 맞추기(승인 카드 없음, 항목마다 커밋, `env set --from-dotenv`) → `deploy push` 미리보기 → `--execute --wait` 한 번 → 결과 표. 원인만 물으면 실패 진단만 하고 아무것도 바꾸지 않아요 — AP-4. 다른 배포 서비스를 말했으면 하지 않고 멈춰요 — AP-27)
+- 이미 axhub 에 있는 앱의 기능 추가·수정(화면·검색·폼·회사 데이터(커넥터) 대시보드 등) → `development` (앱 확인 → 기준 문서 `curl -fsSL` 원문·`AGENTS.md`·llms.txt 기능 문서 숙지 → 회사 데이터는 쓸 때만 `axhub connectors mine`·`resources` 로 실제 구조 확인 → 계획 두세 줄 보여주고 바로 만들기(되돌리기 어려운 일만 물음 — AP-5) → 빌드·검사·로컬 확인 → 결과 표. 배포는 하지 않아요)
 - axhub CLI 운영 명령(테이블/컬럼 생성·환경변수·로그·connector 연결·권한 확인/부여(대상별 read|write)·데이터 조회·롤백·상태)·모호한 axhub 발화 → `clarity` (axhub 명령 실행만, 버전 업데이트는 setup·앱 코드 생성은 development·기존 앱 가져오기는 import·배포 실패 원인 진단은 deploy 양보)
 
 **모든 트리거 전제 (AP-11):** 위 규칙은 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요. 맥락 없는 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘")는 실행·안내로 밀어붙이지 않고 한 번 묻거나 종료하며 다른 axhub 스킬로 넘기지 않아요. bootstrap·import 는 preview-confirm 승인이 backstop 이라, deploy 는 `deploy-prep` 이 처음 올리는 폴더(`bootstrap_plan`)를 import·bootstrap 으로 돌려보내서 frontmatter 게이트로만 적용해요.

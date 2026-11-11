@@ -43,16 +43,8 @@ describe("P2-37 clarity 는 hidden 이지만 지원되는 grant 생성 leaf 를 
   });
 });
 
-describe("P2-38 development 는 raw Postgres 테이블로 존재를 확인해요", () => {
-  test("존재 확인은 raw_table_list·tables db-list 가 먼저이고 table_list 는 legacy managed 앱 전용이에요", () => {
-    const gate = read("skills/development/references/write-gate.md");
-    expect(gate).toContain("`raw_table_list({app_id})`");
-    expect(gate).toContain("axhub tables db-list --app <app> --json");
-    expect(gate).not.toContain("1. **존재 우선**: 정확한 `app_id`로 `table_list({app_id})`를 한 번 호출해");
-    expect(read("skills/development/references/sdk-db-surface.md")).toContain("코드가 참조하는데 `raw_table_list`");
-    expect(read("skills/development/SKILL.md")).toContain("`raw_table_list({app_id})`·`raw_row_list` 가 먼저예요");
-  });
-});
+// P2-38(development 의 raw_table_list 존재 확인)은 2026-11 development 개편 때 MCP 도구 체인·references/write-gate.md 와
+// 함께 뺐어요. 회사 데이터 구조는 `axhub connectors mine`·`resources`, 앱 DB 는 `axhub db` 로 봐요.
 
 // P2-35(.env.local 등록)·P2-36(staging 로그 --environment)·P2-44·P2-45·P3-42(up 의 재실행·진행 중 배포·id 출처)·
 // P3-45·P3-46·P3-47(deploy reference) 는 2026-11 deploy 개편 때 옛 deploy 본문·up·diagnosis·references 와 함께

@@ -222,19 +222,16 @@ describe("smooth behavior contracts", () => {
   // 아니에요. 첫 배포 경계는 bootstrap_plan 하나예요.
   // 2026-11 deploy 개편 때 deploy 의 auth·목록 판정 분기와 workflow-details·오류 카탈로그는 빠졌어요 — deploy 는
   // `deploy-prep` 의 `bootstrap_plan` 만 첫 배포 경계로 보고, 오류는 CLI 의 `message_ko`·`recovery_action`·`next` 를 따라요.
+  // 2026-11 development 개편 때 development 의 auth 판정 분기도 빠졌어요 — preflight 가 안 되면 setup 으로 보내고,
+  // 오류는 CLI 의 `message_ko`·`recovery_action` 을 따라요.
   test("probe 실패·목록 실패를 로그인 필요·첫 배포로 오판하지 않아요 (#405·#387)", () => {
     const deploy = readRepo("skills/deploy/SKILL.md");
     const development = readRepo("skills/development/SKILL.md");
-    const PROBE_CODES = ["probe_timeout", "probe_no_output", "cli_spawn_failed"];
 
     expect(deploy).toContain("`bootstrap_plan` 이 있으면 처음 올리는 폴더예요");
     expect(deploy).toContain("`message_ko`·`recovery_action`·`next` 를 쉬운 말로 설명하고 어떻게 할지 물어요");
-
-    // development 도 auth_ok=false 를 전부 로그인 필요로 읽지 않고, auth status 를 exit 코드로 갈라요.
-    for (const code of [...PROBE_CODES, "axhub auth status --json", "exit 4"]) {
-      expect(development, code).toContain(code);
-    }
-    expect(development).toContain("exit 0 이면 로그인된 거라 이어가고");
+    expect(development).toContain("안 되면 setup 스킬로 보내고 멈춰요");
+    expect(development).toContain("`message_ko`·`recovery_action` 을 쉬운 말로 설명하고 어떻게 할지 물어요");
   });
 
   // #405·#387: `auth status` 가 답했어도 로그인 판정이 없으면 probe 실패와 같아요 — `/me` 가 429·5xx 였거나
@@ -249,8 +246,8 @@ describe("smooth behavior contracts", () => {
         if (line.includes("probe_timeout")) lists.push(`${file}: ${line}`);
       }
     }
-    // development 본문이에요 (deploy·up 본문과 deploy reference 의 목록은 2026-11 deploy 개편 때 빠졌어요).
-    expect(lists.length).toBeGreaterThanOrEqual(1);
+    // 지금은 이 목록을 적은 스킬이 없어요 (deploy·up 본문과 deploy reference 의 목록은 2026-11 deploy 개편 때,
+    // development 본문의 목록은 2026-11 development 개편 때 빠졌어요). 다시 적으면 일곱 코드를 다 적어야 해요.
     for (const entry of lists) {
       for (const code of UNANSWERED_CODES) {
         expect(entry, code).toContain(code);
@@ -258,45 +255,9 @@ describe("smooth behavior contracts", () => {
     }
   });
 
-  test("development skill follows the current SDK raw-db surface", () => {
-    const development = readRepo("skills/development/SKILL.md") + readRepo("skills/development/references/sdk-db-surface.md");
-    const connectorSafety = readRepo("skills/development/references/connector-safety.md");
-    const writeGate = readRepo("skills/development/references/write-gate.md");
-
-    expect(development).toContain("legacy `/data` 데이터플레인");
-    expect(development).toContain("sdk.apps.rawDb.tables(appId)");
-    expect(development).toContain("sdk.apps.rawDb.tableRows(appId, table");
-    expect(development).toContain("제거된 SDK data-plane API");
-    expect(development).toContain("기능 코드 추가·수정");
-    expect(development).toContain("todo priority/filter/search, tabs, forms, CRUD, UI/page/API route 개선");
-    expect(development).toContain("기능이 connector/table/DB 데이터를 쓰면");
-    expect(development).toContain("순수 UI 정리, todo priority/filter/search, tabs, forms, API route 리팩터");
-    expect(development).toContain("사용자에게 보이는 설명·툴 제목·중간 메모는 한국어로만");
-    expect(development).toContain("optional 파일·설정 확인은 없어도 정상인 경우 실패처럼 보이면 안 돼요");
-    expect(development).toContain("Desktop preview/issue check guard");
-    expect(development).toContain(CLAUDE.developmentSkill.desktopCodeMode);
-    expect(development).toContain("preview 확인은 `lint`/`build` 통과 뒤 한 번만");
-    expect(development).toContain("Next `1 Issue` 배지·overlay 가 보이면 최대 1회만");
-    expect(development).toContain("preview/issue 확인에 90초 이상 쓰지 않아요");
-    expect(development).toContain("`ScheduleWakeup`, 내부 task 이름, 브라우저/preview 도구 이름을 chat 에 쓰지 않아요");
-    expect(development).toContain("장시간 overlay 탐색으로 사용자를 기다리게 하지 않아요");
-    expect(connectorSafety).toContain("legacy data-plane DSL 은 제거");
-    expect(writeGate).toContain("legacy data-plane write DSL 은 새로 만들지 않아요");
-
-    const retiredExamples = [
-      "sdk_search (MANDATORY",
-      "MCP 가 authority",
-      'import { AxHubClient, defineSchema, where }',
-      'sdk.tenant("test").app("uqa152-node-fix").data.table',
-      "data.table(Products)",
-      "`where(...).isNotNull()`",
-      "`data.table(\"<name>\", schema)`",
-      "Now the file's read",
-    ];
-    for (const retiredExample of retiredExamples) {
-      expect(development).not.toContain(retiredExample);
-    }
-  });
+  // development 의 옛 SDK raw-db 표면·Desktop preview 가드·진행 문구 계약은 2026-11 development 개편 때 뺐어요 —
+  // SDK 6.0.0 에서 옛 `/data` API 가 빠졌고 사용법은 docs 의 기능 문서가 맡아요
+  // (tests/development-skill-contract.test.ts 가 새 본문을 잠가요).
 
   test("fixture exposes onboarding detect-first contracts", () => {
     const missing = runShim(["plugin-support", "onboarding-detect", "--json"], { AXHUB_FIXTURE_ONBOARDING: "cli_missing" });

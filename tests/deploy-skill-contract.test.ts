@@ -150,7 +150,10 @@ describe("deploy skill contract (2026-11 개편판)", () => {
     expect(failure).toContain("`axhub deploy status <deployment_id> --app <앱> --json` 으로 실패 단계와 시각을 보고");
     expect(failure).toContain("`axhub deploy logs --app <앱> --since <시작> --until <끝> --json --limit 100`");
     expect(failure).toContain("`axhub --json deploy diagnose <앱>`");
-    expect(failure).toContain("원인을 쉬운 말로 한두 줄로 설명해요");
+    expect(failure).toContain("원인을 쉬운 말로 설명해요");
+    // 11-11 교육(gbgh): AI 가 deploy push 밖에서 git clone·fetch 를 바로 해 403 이 났어요. 직접 git 을 쓸 땐 인증부터 해요.
+    expect(DEPLOY).toContain("Axhub 저장소에 git 명령(clone·pull 등)을 직접 쓰려면 `axhub git setup --json` 부터 해요");
+    expect(CODEX_DEPLOY).toContain("`axhub git setup --json` 부터 해요");
     expect(failure).toContain("로그의 비밀값·토큰은 가려요");
     expect(failure).toContain("코드로 고칠 수 있으면 고칠지 묻고, 그러자고 하면 2번부터 한 번 더 해요");
     expect(failure).toContain("롤백·이전 배포 다시 올리기는 사용자가 말할 때만 해요");
