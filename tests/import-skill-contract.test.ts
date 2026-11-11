@@ -190,11 +190,12 @@ describe("import skill contract (2026-11 개편판)", () => {
 describe("배포 기준 문서 (AP-30)", () => {
   const development = readRepo("skills/development/SKILL.md");
 
-  test("development 는 코드를 쓰기 전에 같은 기준 문서로 6가지를 피해요", () => {
-    const rule = development.indexOf("7.5. **AXHub 배포 기준 (AP-30).**");
+  // 2026-11 development 개편 뒤에는 안 되는 것 목록을 본문에 적지 않고 기준 문서 원문을 읽어 따라요.
+  test("development 는 코드를 쓰기 전에 같은 기준 문서를 읽어요", () => {
+    const rule = development.indexOf("### 1. 숙지");
     expect(rule).toBeGreaterThan(-1);
-    expect(development.indexOf("9. **코드 생성")).toBeGreaterThan(rule);
-    expect(development).toContain("`curl -fsSL` 로 원문 그대로 한 번만 읽고");
-    expect(development).toContain("SQLite·파일 대신 AXHub DB");
+    expect(development.indexOf("### 4. 만들기")).toBeGreaterThan(rule);
+    expect(development).toContain("`capabilities.readiness.context_url` 문서를 `curl -fsSL <주소>` 로 한 번 원문 그대로 받아 읽어요");
+    expect(development).toContain("\"axhub 에서는 안 돼요\"라고 먼저 말하고 기준 문서의 대안을 보여줘요");
   });
 });

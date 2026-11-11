@@ -12,7 +12,7 @@ model: sonnet
 
 **질문 방식.** 선택지를 번호 메뉴로 출력하지 않아요 — 한 문장 확인형으로 묻고, 추천안을 먼저 두고 `(추천)` 을 붙여요. 질문 메시지 안에 답→행동 매핑을 같이 써요. 질문한 턴은 도구 호출 없이 끝내고 답을 기다려요.
 
-**장기 대기.** codex 는 긴 명령을 최대 30초에 yield 하고 백그라운드 터미널로 넘겨요 — yield 는 실패도 완료도 아니에요. `deploy push --execute --wait`·`deploy verify --wait` 가 yield 되면 같은 명령을 다시 실행하지 말고 같은 터미널을 빈 입력으로 폴링해 완주를 기다려요.
+**장기 대기.** 긴 명령이 30초에 yield 되는 건 실패도 완료도 아니에요. `deploy push --execute --wait`·`deploy verify --wait` 가 yield 되면 같은 명령을 다시 실행하지 말고 같은 터미널을 빈 입력으로 폴링해 완주를 기다려요.
 
 ## 질문 계약 (요약)
 
@@ -41,7 +41,7 @@ model: sonnet
 ### 3. 맞추기
 - 이미 있는 앱의 배포라 승인 카드는 띄우지 않아요. 물을 것이 있을 때만 모아서 한 번에 물어요.
 - 안 되는 것은 "axhub 에서는 안 돼요"라고 먼저 말하고 기준 문서의 대안을 보여줘요.
-- 정적 앱인데 서버 코드가 필요하면 "서버 앱으로 바꾸면 되돌릴 수 없어요"라고 알리고 물어요. 바꾸기로 하면 `axhub apps deploy-method --app <앱> --to docker --execute --yes`(서비스가 여럿이면 `compose`) 를 실행해요.
+- 정적 앱인데 서버 코드가 필요하면 "서버 앱으로 바꾸면 되돌릴 수 없어요"라고 알리고 물어요. 바꾸기로 하면 `axhub apps deploy-method --app <앱> --to docker --execute --yes` 를 실행해요(여러 서비스면 `compose`).
 - 고칠 것을 한 항목씩 끝낼 때마다 `배포 전 맞추기: <항목>` 으로 커밋해요. 사용자가 바꾼 코드는 그 내용으로 따로 커밋해요. `.env*`·키 파일·에이전트 폴더는 커밋하지 않아요.
 - 새 설정값은 `axhub env set --app <앱> --from-dotenv .env --only <이름,…> --execute` 로 등록해요. 값은 채팅으로 받지 않고, 예시 값(`your-`·`xxx` 등)은 등록하지 않고 직접 할 일에 적어요. `.env` 의 기존 값은 지우지 않아요.
 - 고친 뒤 2번 점검을 다시 해요. 두 번 고쳐도 안 되면 고친 데까지 커밋하고 원인을 알린 뒤 멈춰요.
@@ -56,9 +56,9 @@ model: sonnet
 - `environment` 가 `staging` 이면 스테이징에만 반영됐고 운영은 심사 뒤라고 알려요.
 
 ### 5. 실패하면
-- 배포 번호를 모르면 `axhub deploy list --app <앱> --json` 의 최근 배포에서 찾아요.
+- 배포 번호를 모르면 `axhub deploy list --app <앱> --json` 에서 찾아요.
 - `axhub deploy status <deployment_id> --app <앱> --json` 으로 실패 단계와 시각을 보고, 그 시간대 로그를 `axhub deploy logs --app <앱> --since <시작> --until <끝> --json --limit 100` 으로 봐요(스테이징 배포면 `--environment staging`). 앱이 지금 떠 있는지는 `axhub --json deploy diagnose <앱>` 으로 봐요.
-- 원인을 쉬운 말로 한두 줄로 설명해요. 로그의 비밀값·토큰은 가려요.
+- 원인을 쉬운 말로 설명해요. 로그의 비밀값·토큰은 가려요.
 - 코드로 고칠 수 있으면 고칠지 묻고, 그러자고 하면 2번부터 한 번 더 해요. 롤백·이전 배포 다시 올리기는 사용자가 말할 때만 해요.
 
 ## 끝
@@ -76,6 +76,7 @@ model: sonnet
 
 ## 알아둘 것
 - 질문에 답할 수 없는 실행(headless)이면 미리보기와 요약까지만 하고 바꾸지 않고 멈춰요.
+- Axhub 저장소에 git 명령(clone·pull 등)을 직접 쓰려면 `axhub git setup --json` 부터 해요.
 - 에이전트 샌드박스 안이면 Axhub 저장소로 올리는 실행은 처음부터 권한 상승으로 해요. `local.write_denied` 면 `recovery_action` 대로 해요.
 - CLI 가 오류를 내면 `message_ko`·`recovery_action`·`next` 를 쉬운 말로 설명하고 어떻게 할지 물어요. 같은 배포를 새로 만들어 다시 시도하지 않아요.
 - 사용자에게 보이는 문장에는 내부 명령 이름이나 상태 코드를 쓰지 않아요.

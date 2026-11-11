@@ -4,6 +4,22 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.43.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.42.0...plugin-v1.43.0) (2026-11-11)
+
+앱에 기능을 더하는 개발 스킬을 짧게 다시 썼어요. axhub 기준 문서와 기능 문서를 원문으로 읽고, 회사 데이터가 필요하면 앱의 작업공간에서 커넥터의 실제 테이블을 확인한 뒤 만들어요. 계획을 보여주고 묻지 않고 바로 만들며, 데이터 쓰기처럼 되돌리기 어려운 일만 먼저 물어요. 배포 스킬은 Axhub 저장소에 git 명령을 직접 쓰기 전에 인증부터 챙겨서, 저장소를 받거나 합칠 때 403 으로 막히지 않아요.
+
+
+### Fixed
+
+* **plugin:** 개발 계획을 보여준 뒤 진행할지 묻지 않고 만든다고 분명히 쓴다 ([089282a](https://github.com/jocoding-ax-partners/axhub-mono/commit/089282a301dc3c1609f54a1c5092956a9d01baab))
+* **plugin:** 개발 스킬에 쿼리 파라미터·escape 를, 배포 스킬에 직접 git 전 인증 한 줄을 넣는다 ([b6555c6](https://github.com/jocoding-ax-partners/axhub-mono/commit/b6555c6b4da37b97eacc26838d36400762276edc))
+* **plugin:** 개발 스킬이 커넥터를 앱의 작업공간에서 찾게 한다 ([9ac2400](https://github.com/jocoding-ax-partners/axhub-mono/commit/9ac240002f1a941a8f5771bf601865843676f04a))
+
+
+### Changed
+
+* **plugin:** 개발 스킬 개편에 맞춰 참고 문서·정책·라우팅·테스트·Codex 번들을 정리한다 ([89d4a98](https://github.com/jocoding-ax-partners/axhub-mono/commit/89d4a98085e21d41bfe4887cc6c11776a3630acd))
+
 ## [1.42.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.41.0...plugin-v1.42.0) (2026-11-10)
 
 배포는 이제 항상 커밋해서 올려요. "지금 폴더 그대로 올려줘"라고 해도 바뀐 코드를 커밋하고 그렇게 했다고 알려 줘서, 운영 코드와 저장소가 어긋나지 않아요. 저장소 없이 폴더 업로드로만 배포해 온 옛 앱은 Axhub 저장소로 옮길지 먼저 묻고, 옮긴 뒤 이 폴더를 커밋해서 첫 배포까지 해요. 사용자가 바꾼 코드는 그 내용 그대로 커밋 메시지를 달아요. 저장소 옮기기 안내는 axhub CLI 0.63.0 이상에서 나와요.
