@@ -11,7 +11,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://docs.claude.com/en/docs/claude-code)
 [![homepage](https://img.shields.io/badge/homepage-axhub.ai-orange)](https://axhub.ai)
 
-**상태**: 7 SKILL (setup · bootstrap · plugins · deploy · import · development · clarity) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download)
+**상태**: 7 SKILL (setup · bootstrap · plugins · deploy · import · development · operate) · ax-hub-cli 직접 호출 (`plugins`는 app-backed marketplace 게시·목록·exact download)
 
 </div>
 
@@ -118,17 +118,17 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 | `deploy` | 배포·실패 원인 진단 (커밋해서 올려요) | "배포해", "다시 배포해줘", "왜 배포가 실패했어" |
 | `import` | 기존 로컬 앱 가져오기 | "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app" |
 | `development` | 이미 axhub 에 있는 앱에 기능 추가·수정 (회사 데이터 화면 포함, 배포는 안 함) | "할 일에 마감일 추가해줘", "검색 탭 만들어줘", "회사 주문 데이터로 매출 대시보드 만들어줘" |
-| `clarity` | 공개 CLI 운영 브리지 | "환경변수 설정해줘", "로그 보여줘", "롤백해줘", "GitHub 계정 다시 연결해줘" |
+| `operate` | 이미 있는 앱과 회사 운영 (로그·앱 정보·앱 DB 조회·환경변수·롤백·삭제·권한·GitHub 다시 연결 — 첫 연결은 `bootstrap`) | "로그 보여줘", "앱 이름·아이콘 바꿔줘", "앱 DB 에서 주문 몇 건인지 봐줘", "어제 버전으로 되돌려줘", "OO 에게 권한 줘", "GitHub 다시 연결해줘" |
 
-`clarity` 브리지는 정해진 명령 목록을 들고 있지 않아요. `axhub --help` 트리를 라이브로 탐색해 맞는 명령을 찾고 바로 실행해요 — CLI 가 새 명령을 추가해도 플러그인 수정 없이 따라가요. 단, 배포 실패 원인을 묻는 요청은 `deploy` 가 맡아요.
+`operate` 는 정해진 명령 목록을 들고 있지 않아요. 지금 CLI 의 `--json-schema` 에서 필요한 부분만 잘라 맞는 명령을 찾고, `--help` 를 읽은 뒤 실행해요 — CLI 가 새 명령을 추가해도 플러그인 수정 없이 따라가요. 조회는 바로 하고, 바꾸는 명령은 미리보기를 보여주고 한 번 물은 뒤 실행해요. 배포와 배포 실패 원인은 `deploy` 가 맡아요. (2026-11 전 이름은 `clarity` 예요.)
 
-Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 버전·최신 확인은 `setup` 이 맡아요. 로그·환경변수·롤백·GitHub 재연결 같은 후속 운영 작업도 `Tenant recent deployments`, `Deployment list`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요.
+Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only 예요. 버전·최신 확인은 `setup` 이 맡아요. 로그·환경변수·롤백·GitHub 다시 연결 같은 후속 운영 작업도 `Tenant recent deployments`, `Deployment list`, `App list`, `App get` 같은 App/MCP 도구 권한 팝업으로 빠지지 않고 CLI 계약을 따라요.
 
 앱 생성·배포는 저장소 단계보다 먼저 public CLI의 top-level `git_backend`를 확인해요. resume/existing은 `axhub apps get <app> --json`의 persisted 값을 쓰고, fresh bootstrap은 read-only `axhub apps git-backend --tenant <tenant> --json`의 회사 판정(`decision`)을 따라요 — 회사가 정한 곳이면 묻지 않고, GitHub를 연결한 사람에게만 저장 위치를 물어 preview·execute에 `--git-choice`로 넘겨요. 판정을 모르는 구 CLI는 업데이트로 보내요. selfhosted면 정적 사이트를 포함해 계정 연동·device flow·GitHub App 설치를 건너뛰고 clone→`git push` webhook 배포를 기다려요. 앱 저장소에 아직 안 붙은 로컬 소스는 `import`가 그 저장소에 올려요. `GitHub 없이`만 말해도 selfhosted 정상 배포를 쓰며, `up`은 repositoryless upload를 명시한 경우만 맡아요.
 
 ## ✅ 대표 여정과 UX 샘플
 
-대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. `setup`이 CLI·로그인을 준비하면 `bootstrap`이 GitHub/Axhub self-hosted 저장 위치를 정해 앱을 만들고, `deploy`는 persisted backend에 맞는 lane을 실행한 뒤 exact deployment id를 verify해요. 이후 운영 작업은 `clarity`가 공개 CLI 표면에서 처리해요.
+대표 성공 여정은 **첫 셋업 → 앱 생성 → 배포 → 상태 확인**이에요. `setup`이 CLI·로그인을 준비하면 `bootstrap`이 GitHub/Axhub self-hosted 저장 위치를 정해 앱을 만들고, `deploy`는 persisted backend에 맞는 lane을 실행한 뒤 exact deployment id를 verify해요. 이후 운영 작업은 `operate`가 공개 CLI 표면에서 처리해요.
 
 | 대표 단계 | 담당 스킬 | 확인 계약 |
 |---|---|---|
@@ -147,7 +147,7 @@ Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 
 
 ## 💬 자연어로 할 수 있는 일
 
-명령어를 외울 필요 없어요. plugin App 게시·목록·다운로드는 `plugins`, 셋업·CLI 최신 확인은 `setup`, 앱 운영 명령은 `clarity`가 맡아요.
+명령어를 외울 필요 없어요. plugin App 게시·목록·다운로드는 `plugins`, 셋업·CLI 최신 확인은 `setup`, 앱 운영 명령은 `operate`가 맡아요.
 
 - **배포하고 운영하기** — "내 앱 배포해", "방금 배포 어떻게 됐어?", "빌드 로그 보여줘", "이전 버전으로 되돌려줘"
 - **배포 실패 진단** — "배포 실패 원인 진단해줘", "왜 배포가 죽었어?", "이 앱 배포 실패 진단해줘"
@@ -173,7 +173,7 @@ axhub 플러그인의 모든 설계는 한 문장으로 요약돼요.
 
 - backend(`axhub-api`)나 MCP 를 **직접 호출하지 않아요**. 항상 `ax-hub-cli` 를 거쳐요.
 - 자체 인증·배포 로직을 재구현하지 않아요. CLI 를 **invoke** 하고 결과를 **분류·복구 안내**할 뿐이에요.
-- CLI 가 새 기능을 내면 자연어 트리거만 더하면 돼요 — `clarity` 브리지는 그것조차 자동이에요.
+- CLI 가 새 기능을 내면 자연어 트리거만 더하면 돼요 — `operate` 는 그것조차 자동이에요.
 
 이전에는 플러그인이 Rust helper 바이너리·hook·NL 라우팅 코퍼스를 동봉했지만, v1 다이어트에서 전부 제거하고 `ax-hub-cli` 직접 호출로 전환했어요. 흡수된 helper 표면은 CLI 의 hidden `axhub plugin-support <cmd>` 그룹으로 옮겼어요. 이후 cheap bash 훅만 아주 좁게 다시 들어왔어요 — 세션 시작 때 백그라운드(`async`)에서 CLI·플러그인 업데이트를 묻지 않고 확인·설치하는 auto-update 훅(끄기: `AXHUB_NO_AUTO_UPDATE=1` 또는 `~/.axhub/config/no-auto-update`), 플러그인 업데이트 뒤 적용을 확인하는 재시작 확인 훅(같은 끄기 스위치를 써요) 두 개예요.
 

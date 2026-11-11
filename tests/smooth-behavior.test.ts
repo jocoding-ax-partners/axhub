@@ -53,7 +53,7 @@ describe("smooth behavior contracts", () => {
       expect(description).not.toContain("Import priority is strict");
       expect(description).not.toContain("현재 버전을 확인할게요");
     }
-    expect(descriptions.join("\n")).toContain("setup/bootstrap/plugins/deploy/import/development/clarity");
+    expect(descriptions.join("\n")).toContain("setup/bootstrap/plugins/deploy/import/development/operate");
   });
 
   test("docs carry representative journey and exactly three Korean UX samples", () => {
@@ -91,8 +91,6 @@ describe("smooth behavior contracts", () => {
   test("skills encode the required guard boundaries", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
     const deploy = readRepo("skills/deploy/SKILL.md");
-    const clarity = readRepo("skills/clarity/SKILL.md") + readRepo("skills/clarity/references/execution-guardrails.md");
-    const clarityFrontmatter = clarity.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
     const importSkill = readRepo("skills/import/SKILL.md");
 
     // bootstrap(옛 scaffold 통합판): 기존 폴더는 import 로, 주소 확인 뒤 dry-run, 공개는 execute 신청, 내부 이름 비노출.
@@ -128,75 +126,9 @@ describe("smooth behavior contracts", () => {
     expect(importSkill).toContain("실행은 한 번만 해요");
     expect(importSkill).toContain("사용자에게 보이는 문장에는 내부 명령 이름이나 상태 코드를 쓰지 않아요");
     expect(importSkill).not.toContain("axhub manifest validate");
-    expect(clarity).toContain("공개 표면만");
-    expect(clarity).toContain("plugin-support");
-    expect(clarity).toContain("탐색·실행 대상이 아니에요");
-    expect(clarity).toContain("로그, 환경변수, 롤백, 테이블/컬럼/데이터, connector grant, GitHub 재연결");
-    expect(clarity).toContain("**CLI-only.**");
-    expect(clarity).toContain("Bash/명령 도구로 실행하는 `axhub` CLI 만 사용");
-    expect(clarity).toContain("read-only 조회라도 MCP/App tool 로 빠지면");
-    expect(clarity).toContain("**Desktop-visible command allowlist.**");
-    expect(clarity).toContain("탐색(`--json-schema`), 사용법 확인(`--help`), 실행(`--json`) 모두 공통");
-    expect(clarity).toContain("`bash -lc`, `sh -c`, `| head`, `| grep`, `| sed`, `| awk`, shell pipe");
-    expect(clarity).toContain("`2>`, `&>`, `;`, `&&`, `||`, `echo`, `cat`, `wc`, `tee`, `xargs`, `jq`, `python`, `node`, `perl`, `mktemp`");
-    expect(clarity).toContain("`--field-expr` 문자열 내부의 `|` 는 허용되지만 shell pipe 로 출력 후처리하면 실패");
-    expect(clarity).toContain("출력이 크면 `head -c` 로 자르지 말고 더 좁은 `--field-expr` 경로");
-    expect(clarity).toContain("Use the axhub clarity skill");
-    expect(clarity).toContain("Show logs for <app>");
-    expect(clarity).toContain("set an environment variable");
-    expect(clarity).toContain("reconnect my GitHub account with axhub");
-    expect(clarity).toContain("GitHub device code");
-    expect(clarity).toContain("사용자가 아래처럼 영어로 직접 clarity 를 지목해도 이 스킬을 실행");
-    expect(clarity).toContain("직전 답변을 재사용해서 끝내지 말고");
-    expect(clarityFrontmatter).not.toContain("disable-model-invocation");
-    expect(clarity).toContain("frontmatter description 라우팅으로 자연어에서도 이 스킬이 직접 받아요");
-    expect(clarity).toContain("slash 명령이 실패한 직후라도 자연어 요청은 독립된 새 요청으로 취급");
-    expect(clarity).toContain("`스킬 가이드가 반환됐네요`");
-    expect(clarity).toContain("메타 설명을 사용자에게 말하지 않아요");
-    expect(clarity).toContain("첫 visible 문장은 사용자가 요청한 일을 바로 하는 말");
-    expect(clarity).toContain("새 앱 생성을 clarity 가 직접 질문");
-    expect(clarity).toContain("concept/name/slug/template 추천 질문을 만들지 않아요");
-    expect(clarity).toContain("question 제목 `예약 사이트 컨셉`");
-    expect(clarity).toContain("질문 `새로 만들 예약 웹사이트, 어떤 컨셉으로 할까요?`");
-    expect(clarity).toContain("추천 후보는 bootstrap 이 묻고 clarity 는 만들지 않아요");
-    expect(clarity).not.toContain("operational-lookups.md");
-    expect(clarity).not.toContain("show a read-only axhub overview");
-    expect(clarity).not.toContain("is production healthy?");
-    expect(clarity).toContain("AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --tenant <tenant>");
-    expect(clarity).toContain("shell loop, background watcher, persistent monitor 를 쓰지 않아요");
-    expect(clarity).toContain("`Monitor 사용` 권한 카드가 뜨는 명령은 실패");
-    expect(clarity).toContain("device flow fast path 에서는 다른 사전 점검을 건너뛰어요");
-    expect(clarity).toContain("device flow 를 시작하는 Bash/tool call 제목과 description 은 모두 정확히 `계정 인증 시작`");
-    expect(clarity).toContain("사용자에게 보이는 모든 URL 은 평문 `https://...` 절대 URL");
-    expect(clarity).toContain("Markdown URL 링크 문법은 전부 금지");
-    expect(clarity).toContain(CLAUDE.claritySkill.desktopAutolinkGuard);
-    expect(clarity).toContain("[https://github.com/login/device](https://github.com/login/device)`, `[https://github.com/login/device](github.com/login/device)`, `[GitHub 열기](https://github.com/login/device)`, `<https://github.com/login/device>`, bare `https://github.com/login/device` 같은 링크/자동링크 형태는 모두 금지");
-    expect(clarity).toContain("bare `https://github.com/login/device` 같은 링크/자동링크 형태는 모두 금지");
-    expect(clarity).toContain("인증 URL: \\`https://github.com/login/device\\`");
-    expect(clarity).toContain("입력 코드: <USER_CODE>");
-    expect(clarity).toContain("승인 확인이나 계정 목록 조회를 시작하기 전에 먼저 assistant 본문 문장으로 URL과 코드를 노출");
-    expect(clarity).toContain("title 과 description 이 모두 정확히 `인증 확인` 인 단일 `axhub github accounts list --json` 조회");
-    expect(clarity).toContain("승인 확인용 `while true ... accounts list ... sleep ...` 루프나 persistent monitor 는 쓰지 않아요");
-    expect(clarity).toContain("axhub 에 그 기능은 없어요");
-    expect(clarity).toContain("schema/help/실행 명령에 `2>/dev/null | head -c 2000`, `| grep`, `| jq`, `bash -lc` 같은 shell 후처리 붙이기");
-    expect(clarity).toContain("출력 축소는 더 좁은 `--field-expr` 로만");
-    expect(clarity).not.toContain("diagnosis");
-    expect(clarity).toContain("배포 실패 원인 진단");
-    expect(clarity).toContain("본인 범위");
-    expect(clarity).toContain("axhub connectors mine");
-    expect(clarity).toContain("tenant-admin 전체 카탈로그");
-    expect(clarity).toContain('`connectors list` / `--enabled-only` tenant-admin 전체 목록을 "내가 조회 가능한 커넥터" 로 표현');
-    expect(clarity).toContain(CLAUDE.claritySkill.desktopAppToolExposure);
-    expect(clarity).toContain("clarity 는 항상 CLI help gate 뒤 `axhub` 명령으로 실행해요");
-    expect(clarity).toContain("읽기 전용 leaf CLI 를 `> /tmp/...`, `2>&1`, `;`, `&&`, `||`, `echo`, `wc`, `jq`, `cat`, `mktemp`, command substitution 같은 shell wrapper 로 감싸기");
-    expect(clarity).toContain("단일 `axhub ... --json` 호출을 실행하고 tool 결과를 assistant 내부에서 해석");
-    expect(clarity).toContain("`읽는 중 <랜덤>.txt`, `Read /tmp/...`, `파일 읽기` 같은 임시 출력 파일 재읽기");
-    expect(clarity).toContain("파일 읽기 팝업/단계가 보이면 실패");
-    const clarityCodeBlocksForShell = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
-    expect(clarityCodeBlocksForShell.join("\n")).not.toContain("2>/dev/null");
-    expect(clarityCodeBlocksForShell.join("\n")).not.toContain("head -c");
-    const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
-    expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
+    // operate(옛 clarity, 2026-11 운영 스킬 개편판)의 옛 표시 규칙 목록(첫 문장·도구 제목 고정·Desktop 단일 명령 allowlist·
+    // MCP 금지·영어 직접 지목·device flow 코드 표시·새 앱 질문 금지)은 의도적으로 뺐어요 — 새 본문 계약은
+    // tests/operate-skill-contract.test.ts 가 잠가요.
 
     // AP-12 승인 fallback 사다리 — 새로 만드는 lane(plugins 게시)의 공통 문장 전문을 fixture 로 잠가요
     // (bootstrap·import 는 자기 문장 `지금 만들고 배포까지 진행할까요?`·`지금 이대로 고쳐서 axhub 에 올릴까요?` 를
@@ -287,17 +219,16 @@ describe("smooth behavior contracts", () => {
   // deploy 의 공유 carry-over 계약(references/session-carryover.md)은 2026-11 deploy 개편 때 빠졌어요.
   test("session carry-over handoff contract is wired (Phase 1, instruction-first)", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");
-    const clarity = readRepo("skills/clarity/SKILL.md") + readRepo("skills/clarity/references/execution-guardrails.md");
+    const operate = readRepo("skills/operate/SKILL.md");
 
     // bootstrap(옛 scaffold 통합판)은 carry-over 문단 없이 이미 된 단계만 건너뛰어요.
     expect(bootstrap).not.toContain("session-carryover.md");
     expect(bootstrap).toContain("이미 된 단계는 건너뛰어요");
 
-    // clarity: pure-prose continuation, stays out of plugin-support.
-    expect(clarity).toContain("## 다음 단계 이어주기");
-    expect(clarity).toContain("이걸로 대시보드 만들어줘");
-    const clarityCodeBlocks = clarity.match(/```(?:bash|sh)?\n[\s\S]*?```/g) ?? [];
-    expect(clarityCodeBlocks.join("\n")).not.toContain("axhub plugin-support");
+    // operate(옛 clarity): 결과가 다음 일로 이어지면 한 줄로 알려주는 순수 안내예요. 운영에 plugin-support 를 쓰지 않아요.
+    expect(operate).toContain("결과가 다음 일로 이어지면 한 줄로 알려줘요");
+    expect(operate).toContain("'대시보드 만들어줘'라고 하면 돼요");
+    expect(operate).toContain("`axhub plugin-support` 명령은 운영에 쓰지 않아요");
   });
 
   test("SessionStart hooks are wired", () => {

@@ -1,9 +1,9 @@
 {
-  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). setup 은 axhub 를 쓸 준비(CLI 설치·버전 업데이트·로그인·회사·git)를 점검하고 빠진 것만 채워요. 앱 만들기·배포는 하지 않아요. 옛 onboarding(첫 셋업)·update(최신 확인·업데이트) 경계를 함께 맡아요. clarity 가 한때 '업데이트 확인'을 소유했던 confusable 경계라 운영 명령·롤백 guard 를 둬요. AP-11 로 발화에 axhub 언급이 없고 대화에도 axhub 맥락이 없으면 일반 프로젝트 셋업·다른 도구 업데이트로 오인하지 않아요.",
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). setup 은 axhub 를 쓸 준비(CLI 설치·버전 업데이트·로그인·회사·git)를 점검하고 빠진 것만 채워요. 앱 만들기·배포는 하지 않아요. 옛 onboarding(첫 셋업)·update(최신 확인·업데이트) 경계를 함께 맡아요. 운영 스킬(operate, 옛 clarity)이 한때 '업데이트 확인'을 소유했던 confusable 경계라 운영 명령·롤백 guard 를 둬요. AP-11 로 발화에 axhub 언급이 없고 대화에도 axhub 맥락이 없으면 일반 프로젝트 셋업·다른 도구 업데이트로 오인하지 않아요.",
   "boundary": {
-    "setup": "axhub CLI 설치·버전 업데이트·로그인·회사·git 점검. axhub 맥락 필요.",
+    "setup": "axhub CLI 설치·버전 업데이트·로그인·회사·git 점검. GitHub 계정 연결은 하지 않아요. axhub 맥락 필요.",
     "bootstrap": "빈 디렉토리 새 앱 생성 (setup 은 앱을 만들지 않음)",
-    "clarity": "axhub CLI 운영 명령(env·로그·롤백·테이블·connector grant·GitHub 재연결) — 버전 업데이트는 setup 양보",
+    "operate": "이미 있는 앱과 회사의 운영 명령(env·로그·롤백·테이블·커넥터·권한) — 버전 업데이트는 setup 양보",
     "deploy": "이미 연결된 앱의 ordinary redeploy",
     "none": "AP-11 — axhub 맥락 없는 일반 셋업·업데이트 발화는 한 번 묻거나 종료"
   },
@@ -15,10 +15,12 @@
     { "utterance": "업데이트해줘", "context": "axhub 맥락(현재 폴더 axhub 연결·대화의 axhub 언급·직전 axhub 작업)", "expected": "setup", "why": "axhub 맥락 있는 CLI·플러그인 최신화" },
     { "utterance": "axhub 최신 버전으로 맞춰줘", "expected": "setup", "why": "버전 업데이트" },
     { "utterance": "axhub가 최신인지 확인하고, 아니면 최신으로 업데이트해줘", "expected": "setup", "why": "빈 폴더라도 프로젝트 상태 조회가 아니라 CLI·플러그인 최신화" },
-    { "utterance": "플러그인 업데이트해줘", "context": "axhub 맥락", "expected": "setup", "why": "플러그인 최신화 안내 — clarity 는 axhub 명령만 다뤄요" },
+    { "utterance": "플러그인 업데이트해줘", "context": "axhub 맥락", "expected": "setup", "why": "플러그인 최신화 안내 — operate 는 앱·회사 운영 명령만 다뤄요" },
     { "utterance": "update axhub", "expected": "setup", "why": "영어 업데이트 발화" },
-    { "utterance": "환경변수 설정해줘", "context": "axhub 연결된 앱 폴더", "expected": "clarity", "why": "axhub env 운영 명령 (버전 업데이트 아님)" },
-    { "utterance": "이전 버전으로 롤백해줘", "context": "axhub 연결된 앱 폴더", "expected": "clarity", "why": "배포 롤백 — 최신화(setup)와 구분되는 운영 명령" },
+    { "utterance": "GitHub 다시 연결해줘", "context": "axhub 맥락", "expected": "operate", "why": "GitHub 다시 연결은 operate (첫 연결은 bootstrap 4번) — setup 은 이 컴퓨터 준비(CLI·로그인·git)만 봐요" },
+    { "utterance": "reconnect my GitHub account", "context": "axhub 맥락", "expected": "operate", "why": "영어 GitHub 다시 연결 발화" },
+    { "utterance": "환경변수 설정해줘", "context": "axhub 연결된 앱 폴더", "expected": "operate", "why": "axhub env 운영 명령 (버전 업데이트 아님)" },
+    { "utterance": "이전 버전으로 롤백해줘", "context": "axhub 연결된 앱 폴더", "expected": "operate", "why": "배포 롤백 — 최신화(setup)와 구분되는 운영 명령" },
     { "utterance": "배포해줘", "context": "axhub 연결된 앱 폴더", "expected": "deploy", "why": "배포 실행" },
     { "utterance": "새 앱 만들어줘", "context": "빈 디렉토리", "expected": "bootstrap", "why": "새 앱 생성은 bootstrap (setup 은 앱을 만들지 않음)" },
     { "utterance": "셋업해줘", "context": "axhub 무관 일반 프로젝트(axhub 언급·흔적 없음)", "expected": "none", "why": "AP-11 — 'axhub 셋업을 말하는 거예요?' 한 번 묻고, 아니면 종료 (일반 프로젝트 셋업으로 오인 금지)" },

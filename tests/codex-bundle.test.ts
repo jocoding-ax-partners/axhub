@@ -13,7 +13,7 @@ const SKILLS = [
   "deploy",
   "import",
   "development",
-  "clarity",
+  "operate",
 ] as const;
 
 // R8 — codex 번들 전 텍스트 파일에서 Claude-호스트 문자열 0건이 계약이에요
@@ -159,6 +159,13 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     expect(development).not.toContain("## 승인 게이트 계약 (요약)");
     expect(development).not.toContain("__AXHUB_PRESERVED_ORDER_HEADING__");
     expect(development).toContain("\n## 순서\n");
+    // operate(2026-11 개편판, 옛 clarity)도 바꾸는 명령만 미리보기 뒤 한 번 묻는 스킬이라 같은 질문 계약 요약을 받아요.
+    const operate = readFileSync(join(outDir, "skills", "operate", "SKILL.md"), "utf8");
+    expect(operate).toContain("미리 넣어 둔 문구·유사 표현·무응답은 답이 아니에요");
+    expect(operate).toContain("## 질문 계약 (요약)");
+    expect(operate).not.toContain("## 승인 게이트 계약 (요약)");
+    expect(operate).not.toContain("__AXHUB_PRESERVED_ORDER_HEADING__");
+    expect(operate).toContain("\n## 순서\n");
   });
 
   test("the build refuses a bundle whose required summary injection went missing", () => {
@@ -169,6 +176,7 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
     }
     expect(CODEX_REQUIRED_SUMMARIES.development).toBe("## 질문 계약 (요약)");
     expect(CODEX_REQUIRED_SUMMARIES.deploy).toBe("## 질문 계약 (요약)");
+    expect(CODEX_REQUIRED_SUMMARIES.operate).toBe("## 질문 계약 (요약)");
   });
 
   test("skills drop frontmatter examples and carry the truncation self-recovery line", () => {
@@ -325,6 +333,30 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       "키·비밀값은 코드에 쓰지 않고 `.env` 에서 읽어요",
       "배포는 하지 않아요",
       "질문에 답할 수 없는 실행(headless)이면 계획까지만 보여주고 바꾸지 않고 멈춰요",
+    ],
+    // 2026-11 개편판(옛 clarity) — 본문 전체가 절단선 안에 들어가야 해요. 그중 안전 문장을 잠가요: 질문 계약·CLI 가드·
+    // 앱의 작업공간·결과가 큰 일은 운영 문서 원문·스키마 슬라이스·--help 먼저·내 범위 명령·없는 기능은 없다고·지어내지 않기·
+    // 미리보기 → 한 번 묻기 → execute·되돌릴 수 없으면 먼저 말하기·앱 DB 쓰기 SQL·값은 .env·headless 정지·숨김 명령 금지·비밀값.
+    operate: [
+      "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
+      "미리 넣어 둔 문구·유사 표현·무응답은 답이 아니에요",
+      "axhub plugin-support preflight --json",
+      "`--tenant` 로 붙여요",
+      "`curl -fsSL` 로 원문 그대로 읽고",
+      "axhub --json-schema --field-expr",
+      "전체를 통째로 읽지 않아요",
+      "`--help` 를 실행 전에 한 번 읽고",
+      "axhub connectors mine",
+      "axhub authz grants mine",
+      "axhub 에 그 기능은 없어요",
+      "없는 명령을 지어내지 않아요",
+      "한 번 물은 뒤 `--execute`",
+      "되돌릴 수 없으면 그 사실을 먼저 말해요",
+      "앱 DB 에 쓰는 SQL(INSERT·UPDATE·DELETE·테이블 변경)은 묻는 쪽이에요",
+      "채팅으로 받지 않고 `.env` 에서 읽게 해요",
+      "바꾸는 명령은 어떤 것이든 미리보기까지만 해요",
+      "`axhub plugin-support` 명령은 운영에 쓰지 않아요",
+      "내부 id·raw 출력·비밀값을 쓰지 않아요",
     ],
     plugins: ["artifact를 배포할 권리가 있음을 확인하고", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "--idempotency-key", "--execute"],
   };

@@ -88,10 +88,6 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
     "  if ! command -v codex >/dev/null 2>&1; then\n    PLUGIN_RESULT=\"PLUGIN_SKIPPED reason=host_cli_missing latest=$PLAT\"\n  else\n    if codex plugin marketplace upgrade axhub >/dev/null 2>&1 || codex plugin add axhub-codex@axhub >/dev/null 2>&1; then\n      printf '%s' \"$PLAT\" > \"$RESTART_MARKER\" 2>/dev/null\n      PLUGIN_RESULT=\"PLUGIN_UPDATED plugin=$PV->$PLAT\"\n    else\n      PLUGIN_RESULT=\"PLUGIN_FAILED plugin=$PV latest=$PLAT\"\n    fi\n  fi",
   ],
   [
-    "```typescript\nTodoWrite({ todos: [\n  { content: \"테이블 생성\",   status: \"in_progress\", activeForm: \"테이블 만드는 중\" },\n  { content: \"환경변수 추가\", status: \"pending\",     activeForm: \"env 추가하는 중\" }\n]})\n```",
-    "참고 항목: `테이블 생성`(진행 중) → `환경변수 추가`(대기). 인자 shape 은 host 가 노출한 도구 스키마를 그대로 따라요.",
-  ],
-  [
     "네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.",
     "명시 텍스트 승인 1회만 받아요. 승인 채널 없는 headless 에서는 execute하지 않아요 — 승인을 조용히 건너뛰지 않아요.",
   ],
@@ -112,10 +108,14 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
     `다른 서비스(Supabase·Firebase·직접 만든 로그인 등)를 새로 끌어오지 않아요.\n\n${CODEX_QUESTION_STYLE}\n\n${CODEX_QUESTION_CONTRACT}`,
   ],
   ["`claude -p`·CI·`$CLAUDE_NON_INTERACTIVE`·TTY 없음", "`codex exec`·CI·TTY 없음"],
-  ["`실행됨 명령 N개`, `TaskOutput 사용함`, tool 카드,", "`실행됨 명령 N개`, tool 카드,"],
   ["[ -n \"${CLAUDE_NON_INTERACTIVE:-}\" ]", "[ -n \"${CODEX_NON_INTERACTIVE:-}\" ]"],
   ["claude plugin marketplace update", "codex plugin marketplace upgrade"],
-  ["`Monitor 사용` 권한 카드가 뜨는 명령은 실패예요.", "백그라운드 감시 권한 카드가 뜨는 명령은 실패예요."],
+  // operate(2026-11 개편판, 옛 clarity)는 바꾸는 명령만 미리보기 뒤 한 번 묻는 스킬이라 deploy·development 처럼
+  // `## 순서` 를 보존하고 질문 계약 요약을 받아요. 기준 문장이 바뀌면 buildBundle 의 필수 주입 검사가 빌드를 멈춰요.
+  [
+    "무엇이 있는지와 쓰는 법은 항상 지금 CLI 에 물어요.",
+    `무엇이 있는지와 쓰는 법은 항상 지금 CLI 에 물어요.\n\n${CODEX_QUESTION_STYLE}\n\n${CODEX_QUESTION_CONTRACT}`,
+  ],
   ["`claude -p`·`codex exec`", "`codex exec`"],
   [".plugin-update-restart", ".plugin-update-restart-codex"],
   ["claude plugin update", "codex plugin marketplace upgrade"],
@@ -255,11 +255,11 @@ const applyCodexOverrides = (outDir: string): void => {
   }
 };
 
-// deploy(승인 질문이 없는 재배포)·development(되돌리기 어려운 일만 묻는 기능 개발)는 `## 순서` 앞 승인 게이트
-// 요약을 받지 않아요 — 대신 자기 질문 계약 요약을 받아요(CODEX_SUBSTITUTIONS 의 deploy·development 항목).
+// deploy(승인 질문이 없는 재배포)·development(되돌리기 어려운 일만 묻는 기능 개발)·operate(바꾸는 명령만 한 번 묻는 운영)는
+// `## 순서` 앞 승인 게이트 요약을 받지 않아요 — 대신 자기 질문 계약 요약을 받아요(CODEX_SUBSTITUTIONS 의 deploy·development·operate 항목).
 const ORDER_HEADING = "\n## 순서\n";
 const PRESERVED_ORDER_HEADING = "\n__AXHUB_PRESERVED_ORDER_HEADING__\n";
-const QUESTION_CONTRACT_SKILLS = new Set(["deploy", "development"]);
+const QUESTION_CONTRACT_SKILLS = new Set(["deploy", "development", "operate"]);
 
 // 기준 문장이 바뀌어 주입이 조용히 빠지는 일을 막아요 — 이 표의 스킬은 codex 판에 그 요약이 꼭 있어야 해요.
 export const CODEX_REQUIRED_SUMMARIES: Readonly<Record<string, string>> = {
@@ -268,6 +268,7 @@ export const CODEX_REQUIRED_SUMMARIES: Readonly<Record<string, string>> = {
   setup: CODEX_APPROVAL_GATE_HEADING,
   deploy: CODEX_QUESTION_CONTRACT_HEADING,
   development: CODEX_QUESTION_CONTRACT_HEADING,
+  operate: CODEX_QUESTION_CONTRACT_HEADING,
 };
 
 const applyCodexSubstitutions = (outDir: string): void => {

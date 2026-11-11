@@ -3,7 +3,7 @@
 repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 개발·운영 규칙을 한곳에 모은 기준 문서예요. README·CLAUDE.md 에 다르게 적혀 있으면 이 문서를 따라요. 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 각각 기준 문서예요.
 
 ## DP-1 diet 체제 — skill 추가 기준
-- diet 체제는 스킬 수를 최소로 유지하는 방침이에요. 공개 skill 은 7개(setup/bootstrap/plugins/deploy/import/development/clarity)를 유지해요. `setup` 은 옛 `onboarding`(첫 셋업)과 `update`(최신 확인·업데이트)를 하나로 합친 점검 스킬이고, `bootstrap` 은 옛 `scaffold`(사용자 GitHub 저장소로 시작)를 합쳐 Axhub 저장소·내 GitHub·회사 GitHub 조직을 모두 맡아요. `deploy` 는 옛 `up`(저장소 없이 지금 폴더 그대로 올리기)과 `diagnosis`(배포 실패 원인 진단)를 합쳤어요 — 올리는 길은 CLI `axhub deploy push` 가 골라요.
+- diet 체제는 스킬 수를 최소로 유지하는 방침이에요. 공개 skill 은 7개(setup/bootstrap/plugins/deploy/import/development/operate)를 유지해요. `setup` 은 옛 `onboarding`(첫 셋업)과 `update`(최신 확인·업데이트)를 하나로 합친 점검 스킬이고, `bootstrap` 은 옛 `scaffold`(사용자 GitHub 저장소로 시작)를 합쳐 Axhub 저장소·내 GitHub·회사 GitHub 조직을 모두 맡아요. `deploy` 는 옛 `up`(저장소 없이 지금 폴더 그대로 올리기)과 `diagnosis`(배포 실패 원인 진단)를 합쳤어요 — 올리는 길은 CLI `axhub deploy push` 가 골라요.
 - 새 skill은 기존 skill의 경계·양보 규칙으로 연결할 수 없는 사용자 의도가 반복될 때만 추가해요. CLI 가 판정·실행을 맡을 수 있는 일은 스킬을 나누지 않고 기존 스킬에서 CLI 를 불러요 — 저장 위치별 배포 길을 CLI `deploy push` 가 맡게 되면서 `up`·`diagnosis` 를 `deploy` 에 합쳤어요.
 - 판정·실행 로직은 plugin 안에 두지 않고 ax-hub-cli 에 둬요. 라우팅 품질은 외부 corpus(라우팅 학습용 예문 모음)가 아니라 frontmatter(SKILL.md 맨 위의 메타데이터 블록)의 `description`·`examples` 에 투자해요.
 
@@ -42,7 +42,7 @@ repo 기여자(이 저장소의 코드와 문서를 고치는 사람)를 위한 
 ## DP-6 hidden 표면 계약
 - `axhub plugin-support <cmd>` 는 이 plugin 의 skill 들만 쓰라고 만든 숨김 명령이에요. 일반 사용자용 명령이 아니라서 도움말에도 안 나오고, 예고 없이 바뀌거나 사라질 수 있어요. 그래서 skill 밖에서는 쓰지 않아요.
 - 어긋남을 막는 안전장치는 세 겹이에요. ① repo 안 fixture(shim) 계약 테스트 — plugin 이 기대하는 형식을 고정하지만 **실제 CLI 를 실행하진 않아요**. ② nightly 실 CLI 계약 스냅샷(`.github/workflows/cli-contract-nightly.yml` + `tests/cli-contract.test.ts`) — 최신 배포 CLI 를 설치해 onboarding-detect 스키마(`first_gap` null 완료 포함)·preflight exit 계약·deploy logs/verify/diagnose 표면을 검증해 cross-repo drift 를 잡아요. ③ skill 이 시작할 때 이 명령이 실제로 동작하는지 먼저 확인하는 사전 점검(preflight 게이트, agent-policy AP-6)이에요.
-- clarity 는 hidden 표면을 쓰지 않아요 (agent-policy AP-9).
+- operate 는 preflight 확인 말고는 hidden 표면을 운영에 쓰지 않아요 (agent-policy AP-9).
 
 ## DP-7 bundle 규칙
 - bundle 에 무엇이 들어가는지는 `scripts/build-plugin-bundle.ts` 의 `ROOT_FILES`(`README.md`, `LICENSE`, `POLICY.md`) + `ROOT_DIRS`(`.claude-plugin/`, `skills/`, `hooks/`) 목록이 기준이에요.

@@ -9,20 +9,20 @@ const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "
 // 그대로 이어 줘서 이미 죽은 코드가 돌아오고, 사용자가 승인해도 연동이 안 풀렸어요.
 // CLI 는 `--fresh`(saved pending 폐기 + 새 코드 발급)로 풀었는데 plugin 계약에는
 // 반영이 없었어요. 아래 lane 전부에 재발급 경로가 살아 있어야 해요.
-const FRESH_COMMAND = "AXHUB_DEVICE_FLOW_AUTO_OPEN=1 axhub --no-input github link --fresh";
 
 describe("github link --fresh reissue contract", () => {
-  test("clarity reconnect lane reissues a lost or expired code", () => {
-    const clarity = readRepo("skills/clarity/SKILL.md");
+  // GitHub 다시 연결은 2026-11 운영 스킬 개편(clarity → operate) 뒤에도 operate 가 맡아요 — 첫 연결은 bootstrap 4번 (AP-18).
+  test("operate reconnect lane shows the code, waits once and reissues an expired code", () => {
+    const operate = readRepo("skills/operate/SKILL.md");
 
-    expect(clarity).toContain(FRESH_COMMAND);
-    expect(clarity).toContain("저장된 pending device link 를 그대로 이어 줘서");
-    // 유효한 코드를 보고 있는 사용자의 코드를 무효화하지 않는 반대 방향 가드
-    expect(clarity).toContain("지금 보고 있는 코드가 아직 유효하면 `--fresh` 를 붙이지 않아요");
-    expect(clarity).toContain("unknown flag(exit 64)");
-    // 죽은 코드를 구 CLI 오진으로 흘려보내지 않아요
-    expect(clarity).toContain("위 `--fresh` 재발급을 한 번 먼저 쓰고");
+    expect(operate).toContain("GitHub 다시 연결 `axhub github link`");
+    expect(operate).toContain("출력의 주소와 입력 코드를 채팅 본문에 바로 보여주고");
+    expect(operate).toContain("승인은 한 번만(`--wait-approval 90s`) 기다려요");
+    expect(operate).toContain("코드가 만료됐으면 `--fresh` 로 새로 받아요");
+    // setup 은 이 컴퓨터 준비(CLI·로그인·git)만 보고 GitHub 연결을 하지 않아요.
+    expect(readRepo("skills/setup/SKILL.md")).not.toContain("github link");
   });
+
 
   test("bootstrap reissues an expired code with --fresh instead of replaying it", () => {
     const bootstrap = readRepo("skills/bootstrap/SKILL.md");

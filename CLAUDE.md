@@ -22,7 +22,7 @@ The monorepo is indexed by CodeGraph (`codegraph_*` MCP tools, server `codegraph
 
 > **정책 기준 문서:** 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 개발·운영 규칙은 `docs/policy/dev-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 기준이에요. 이 파일의 요약과 다르면 정책 문서를 따라요. 어긋남은 `tests/policy-parity.test.ts` 가 잡아요.
 
-axhub plugin은 instruction-only diet 뒤 현재 **7 skill** (`setup` / `bootstrap` / `plugins` / `deploy` / `import` / `development` / `clarity`)을 제공해요. `deploy` 는 옛 `up`(지금 폴더 그대로 올리기)·`diagnosis`(배포 실패 원인 진단)를 합친 스킬이에요. `setup` 은 옛 `onboarding`·`update` 를 합친 점검 스킬이에요 (CLI 설치·버전 업데이트·로그인·회사·git). `plugins`는 사용자 명시 결정으로 추가됐고 deploy_method=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 담당해요. 게시자 관리는 App Console, 승인은 Console Review로 연결하고 판정·실행은 ax-hub-cli(`axhub`)에 둬요.
+axhub plugin은 instruction-only diet 뒤 현재 **7 skill** (`setup` / `bootstrap` / `plugins` / `deploy` / `import` / `development` / `operate`)을 제공해요. `deploy` 는 옛 `up`(지금 폴더 그대로 올리기)·`diagnosis`(배포 실패 원인 진단)를 합친 스킬이에요. `setup` 은 옛 `onboarding`·`update` 를 합친 점검 스킬이에요 (CLI 설치·버전 업데이트·로그인·회사·git). `operate` 는 옛 `clarity` 의 새 이름이에요 — 이미 있는 앱과 회사의 운영 명령을 맡아요. `plugins`는 사용자 명시 결정으로 추가됐고 deploy_method=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 담당해요. 게시자 관리는 App Console, 승인은 Console Review로 연결하고 판정·실행은 ax-hub-cli(`axhub`)에 둬요.
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
 
@@ -51,12 +51,12 @@ diet 가 제거한 hook 중 **auto-update SessionStart 훅 1개**만 `hooks/` �
 
 ## CLI 호출 표면
 
-- skill 들은 흡수된 helper 표면을 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 (`clarity` skill 은 예외 — 공개 표면만 탐색·실행, `deploy` skill 의 실패 진단은 공개 `axhub deploy status`/`deploy logs`/`deploy diagnose` 만 써요) — 예: `axhub plugin-support onboarding-detect`, `axhub plugin-support preflight`, `axhub plugin-support deploy-prep`. hidden 명령은 외부 무보증이지만 계약 parity 테스트 + 최소 CLI 버전 게이트로 plugin 과 동기화돼요.
+- skill 들은 흡수된 helper 표면을 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 (`operate` skill 은 예외 — preflight 확인 뒤 운영은 공개 표면만 탐색·실행, `deploy` skill 의 실패 진단은 공개 `axhub deploy status`/`deploy logs`/`deploy diagnose` 만 써요) — 예: `axhub plugin-support onboarding-detect`, `axhub plugin-support preflight`, `axhub plugin-support deploy-prep`. hidden 명령은 외부 무보증이지만 계약 parity 테스트 + 최소 CLI 버전 게이트로 plugin 과 동기화돼요.
 - 사용자 가치가 있는 공개 표면은 `axhub deploy push --app <app>`, `axhub deploy verify <deployment-id> --app <app>`, `axhub deploy diagnose`, `axhub plugin publish <path>` 예요.
 
 ## 최소 CLI 버전 게이트
 
-- bootstrap·deploy skill은 `plugin-support` 기능(preflight)으로 최소 표면 **0.21.3+**를 확인하고, bootstrap은 preflight `capabilities.self_hosted_git.git_policy_decision`, deploy는 `capabilities.deploy.push` 가 없으면 CLI 업데이트로 보내요. plugins는 version을 추측하지 않고 필요한 `axhub plugin list|download|publish --help` 성공을 가드해요. clarity 의 앱 삭제·절전은 `axhub apps delete --help` 의 30일 되돌리기(`reactivate`) 안내로 새 CLI 인지 가드해요. CLI가 없거나 기능이 없으면 멈추고 setup으로 보내며 우회하지 않아요.
+- bootstrap·deploy skill은 `plugin-support` 기능(preflight)으로 최소 표면 **0.21.3+**를 확인하고, bootstrap은 preflight `capabilities.self_hosted_git.git_policy_decision`, deploy는 `capabilities.deploy.push` 가 없으면 CLI 업데이트로 보내요. plugins는 version을 추측하지 않고 필요한 `axhub plugin list|download|publish --help` 성공을 가드해요. operate 는 preflight 로 CLI 를 확인하고, 실행 전 고른 명령의 `--help` 를 읽어 거기 있는 인자·플래그만 써요. CLI가 없거나 기능이 없으면 멈추고 setup으로 보내며 우회하지 않아요.
 - **CLI 경로 해석 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 낡은 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요. 모든 skill 의 CLI 가드는 `command -v axhub` → 위치 파일 `~/.axhub/bin-path` → canonical `~/.axhub/bin/axhub`(.exe) 순으로 찾고, 디스크에 있으면 재설치·setup 으로 돌리지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤 같은 세션은 반환된 `bin_path` 절대경로로 이어가요. 세 경로 모두에서 못 찾을 때만 setup 을 안내해요.
 
 ## 살아남은 quality gate
@@ -95,7 +95,7 @@ gh workflow run plugin-release.yml -f tag=plugin-vX.Y.Z
 
 ## Skill routing
 
-이 repo의 공개 plugin surface는 `setup` / `bootstrap` / `plugins` / `deploy` / `import` / `development` / `clarity` 일곱 스킬이에요.
+이 repo의 공개 plugin surface는 `setup` / `bootstrap` / `plugins` / `deploy` / `import` / `development` / `operate` 일곱 스킬이에요.
 
 Key routing rules:
 - 처음 셋업·CLI 설치·버전 확인/업데이트·로그인·환경 점검 → `setup` (점검 결과 표로 끝내고 앱 생성·배포로 이어가지 않아요 — AP-8)
@@ -104,7 +104,7 @@ Key routing rules:
 - 비어 있지 않은 기존 로컬 앱의 첫 axhub 연결·첫 배포 가져오기 → `import` (올릴 수 있나 → 기준 문서 `curl -fsSL` 원문 숙지 → 비교 → 안내와 확인 1회(올리기 / 그만두기) → 덩어리마다 커밋하며 고치기 → 다시 비교 → execute 한 번·`deploy verify --wait` → 결과 표. `.env` 값은 `--env-from-dotenv` 로 첫 배포 전 등록 — AP-30)
 - 이미 axhub 에 있는 앱의 배포·배포 실패 원인 진단 → `deploy` (대상 → 기준 문서 `curl -fsSL` 원문 숙지 → 점검 → 맞추기(승인 카드 없음, 항목마다 커밋, `env set --from-dotenv`) → `deploy push` 미리보기 → `--execute --wait` 한 번 → 결과 표. 원인만 물으면 실패 진단만 하고 아무것도 바꾸지 않아요 — AP-4. 다른 배포 서비스를 말했으면 하지 않고 멈춰요 — AP-27)
 - 이미 axhub 에 있는 앱의 기능 추가·수정(화면·검색·폼·회사 데이터(커넥터) 대시보드 등) → `development` (앱 확인 → 기준 문서 `curl -fsSL` 원문·`AGENTS.md`·llms.txt 기능 문서 숙지 → 회사 데이터는 쓸 때만 `axhub connectors mine`·`resources` 로 실제 구조 확인 → 계획 두세 줄 보여주고 바로 만들기(되돌리기 어려운 일만 물음 — AP-5) → 빌드·검사·로컬 확인 → 결과 표. 배포는 하지 않아요)
-- axhub CLI 운영 명령(테이블/컬럼 생성·환경변수·로그·connector 연결·권한 확인/부여(대상별 read|write)·데이터 조회·롤백·상태)·모호한 axhub 발화 → `clarity` (axhub 명령 실행만, 버전 업데이트는 setup·앱 코드 생성은 development·기존 앱 가져오기는 import·배포 실패 원인 진단은 deploy 양보)
+- 이미 axhub 에 있는 앱과 회사의 운영 명령(로그·앱 이름·아이콘 같은 앱 정보·앱 DB 조회·환경변수·롤백·삭제·절전·권한 확인/부여·내 커넥터·GitHub 다시 연결(첫 연결은 bootstrap)) → `operate` (확인(preflight·`--tenant`) → 바꾸는 일은 llms.txt 운영 문서 `curl -fsSL` 원문으로 뜻 확인·비슷한 일은 차이를 보여주고 물음 → `--json-schema --field-expr` 로 좁혀 명령 찾기·`--help` 먼저 → 조회는 바로, 바꾸는 명령은 미리보기 → 한 번 묻고 → `--execute`. 없는 기능은 "axhub 에 그 기능은 없어요". 배포·실패 원인은 deploy, 앱 코드는 development, 새 앱은 bootstrap, 설치·업데이트·로그인은 setup 에 넘겨요 — 2026-11 전 이름은 `clarity`)
 
 **모든 트리거 전제 (AP-11):** 위 규칙은 axhub 맥락(대화의 axhub 언급·현재 폴더의 axhub 연결·직전 axhub 작업)이 있을 때만 유효해요. 맥락 없는 일반 발화("배포해"·"업데이트해줘"·"로그 보여줘")는 실행·안내로 밀어붙이지 않고 한 번 묻거나 종료하며 다른 axhub 스킬로 넘기지 않아요. bootstrap·import 는 preview-confirm 승인이 backstop 이라, deploy 는 `deploy-prep` 이 처음 올리는 폴더(`bootstrap_plan`)를 import·bootstrap 으로 돌려보내서 frontmatter 게이트로만 적용해요.
 

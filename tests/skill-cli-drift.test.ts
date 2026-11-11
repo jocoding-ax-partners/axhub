@@ -32,16 +32,8 @@ describe("P1-13·DX26 deploy verify --wait 는 host 도구 timeout 안에서 끝
   });
 });
 
-describe("P2-37 clarity 는 hidden 이지만 지원되는 grant 생성 leaf 를 직접 확정해요", () => {
-  test("authz grants create 를 이름으로 확정하고 set-scope 로 대신하지 않아요", () => {
-    for (const path of ["skills/clarity/SKILL.md", "skills/clarity/references/execution-guardrails.md"]) {
-      const body = read(path);
-      expect(body, path).toContain("axhub authz grants create --help");
-      expect(body, path).toContain("`set-scope`");
-    }
-    expect(read("skills/clarity/SKILL.md")).toContain("(hidden `authz grants create` 는 예외)");
-  });
-});
+// P2-37(clarity 가 hidden `authz grants create` leaf 를 이름으로 확정)은 2026-11 운영 스킬 개편(clarity → operate) 때 뺐어요.
+// operate 는 `--json-schema`·`--help` 에 보이는 명령만 쓰고, 찾지 못하면 "axhub 에 그 기능은 없어요"라고 말해요.
 
 // P2-38(development 의 raw_table_list 존재 확인)은 2026-11 development 개편 때 MCP 도구 체인·references/write-gate.md 와
 // 함께 뺐어요. 회사 데이터 구조는 `axhub connectors mine`·`resources`, 앱 DB 는 `axhub db` 로 봐요.

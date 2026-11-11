@@ -198,8 +198,8 @@ describe("deploy 가 옛 up·diagnosis 자리를 맡아요", () => {
   test("다른 스킬이 실패 원인 진단을 deploy 로 보내요", () => {
     expect(readRepo("skills/bootstrap/SKILL.md")).toContain("배포가 실패하면 deploy 스킬로 원인을 봐요");
     expect(readRepo("skills/import/SKILL.md")).toContain("배포가 실패하면 deploy 스킬로 원인을 봐요");
-    expect(readRepo("skills/clarity/SKILL.md")).toContain("| 배포 실행·배포 검증·배포 실패 원인 진단 | deploy |");
-    for (const skill of ["setup", "bootstrap", "plugins", "import", "development", "clarity"]) {
+    expect(readRepo("skills/operate/SKILL.md")).toContain("배포·배포 실패 원인은 deploy");
+    for (const skill of ["setup", "bootstrap", "plugins", "import", "development", "operate"]) {
       const body = readRepo(`skills/${skill}/SKILL.md`);
       expect(body, skill).not.toMatch(/\bdiagnosis\b/);
       expect(body, skill).not.toContain("`up`");
