@@ -12,6 +12,7 @@ axhub Claude Code plugin 이 사용자의 컴퓨터에서 무엇을 하고 무�
 - download 요청과 install 요청을 구분해요. `plugin install`은 offline preview 뒤 사용자가 host·exact version을 보고 승인한 `--execute --yes`에서만 동작해요. CLI가 bounded ZIP metadata·실제 압축 해제 크기·경로·symlink·manifest identity를 검증하고 App/host lock과 crash recovery를 적용한 뒤 `~/.axhub/plugins/` 아래 private local marketplace를 Claude Code 또는 Codex의 공식 plugin CLI로 user scope 설치해요. 모든 `AXHUB_*` 환경은 host process에 전달하지 않아요.
 - `deploy` 스킬은 사용자가 `지금 폴더 그대로`라고 했을 때만 커밋하지 않은 작업 폴더를 그대로 올려요. 그 밖에는 고친 것을 항목마다 커밋한 뒤 올리고, `.env` 계열·키 파일·에이전트 폴더는 커밋하지 않아요. 배포 실패 원인만 물으면 아무것도 바꾸지 않고 원인만 알려 드리고, 롤백·이전 배포 다시 올리기는 말씀하실 때만 해요.
 - `plugin publish`는 `--execute`가 없으면 network·auth가 없는 offline preview예요. Publish execute에는 OAuth나 broad PAT 대신 `plugins:read` + `plugins:write` scoped PAT·권리 확인·명시 승인을 모두 요구해요. PAT를 미리 발급하지 않아요 — 로그인돼 있으면 CLI가 이 PAT를 알아서 준비하고, `plugin_pat_required`면 CLI `next_action`대로 `axhub auth login`을 안내하거나 안내된 `axhub auth pat issue … --use`만 실행하며 token을 화면에 내지 않아요. 성공은 `upload_complete`·installable=false(`--submit`을 붙이면 `review_submitted`·installable=false)이고, 게시 심사 신청은 `submit_plugin_version_for_review` 다음 동작인 `axhub plugin submit`이에요. 결과는 `axhub plugin manage status --app <app>`로 확인하고, 이후 owner는 App Console, reviewer는 Console Review를 사용해요.
+- `plugin delist`는 내가 올린 플러그인을 회사 마켓플레이스에서 내려요. `--execute --yes`가 없으면 미리보기만 하고, 스킬은 미리보기를 보여주고 한 번 물은 뒤에만 실행해요. 이미 설치한 곳은 그대로 남아요.
 
 ## 로컬에 기록하는 파일 — 내 컴퓨터에 무엇을 남기나요
 - `~/.axhub/cache/.plugin-update-check` — 업데이트를 너무 자주 확인하지 않도록 마지막 확인 시각을 남겨두는 표시 파일이에요.

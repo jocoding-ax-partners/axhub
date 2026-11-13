@@ -130,13 +130,18 @@ describe("smooth behavior contracts", () => {
     // MCP 금지·영어 직접 지목·device flow 코드 표시·새 앱 질문 금지)은 의도적으로 뺐어요 — 새 본문 계약은
     // tests/operate-skill-contract.test.ts 가 잠가요.
 
-    // AP-12 승인 fallback 사다리 — 새로 만드는 lane(plugins 게시)의 공통 문장 전문을 fixture 로 잠가요
-    // (bootstrap·import 는 자기 문장 `지금 만들고 배포까지 진행할까요?`·`지금 이대로 고쳐서 axhub 에 올릴까요?` 를
-    // 쓰고 bootstrap-ux-contract·import-skill-contract 테스트가 잠가요).
-    expect(readRepo("skills/plugins/SKILL.md")).toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    // AP-12 — 새로 만드는 lane 은 미리보기 뒤 한 번 묻고 실행해요. bootstrap·import 는 자기 문장
+    // `지금 만들고 배포까지 진행할까요?`·`지금 이대로 고쳐서 axhub 에 올릴까요?` 를 쓰고 bootstrap-ux-contract·
+    // import-skill-contract 테스트가 잠가요. plugins(2026-11 개편판)는 옛 네이티브 선택 UI 사다리 문장 대신 설치·올리기·내리기를
+    // 한 번 묻고 실행하고, headless 는 미리보기까지만 해요 — 본문 계약은 tests/plugins-skill-contract.test.ts 가 잠가요.
+    const plugins = readRepo("skills/plugins/SKILL.md");
+    expect(plugins).toContain("한 번 물은 뒤 `--execute --yes` 로 설치하고");
+    expect(plugins).toContain("`--attest-distribution-rights --execute --submit` 로 올려요");
+    expect(plugins).toContain("설치·올리기·내리기는 미리보기까지만 해요");
+    expect(plugins).not.toContain("네이티브 선택 UI");
     expect(importSkill).toContain("\"지금 이대로 고쳐서 axhub 에 올릴까요?\"(올리기 / 그만두기)");
     // 재배포 lane(deploy)은 승인 카드 대신 배포 전 맞추기를 해요 (AP-12·AP-29, spec 681).
-    expect(deploy).not.toContain(CLAUDE.approvalGate.approvalFallbackSentence);
+    expect(deploy).not.toContain("네이티브 선택 UI");
     expect(deploy).toContain("승인 카드는 띄우지 않아요");
     expect(deploy).toContain("`axhub deploy check --json`");
     expect(deploy).toContain("capabilities.readiness.context_url");

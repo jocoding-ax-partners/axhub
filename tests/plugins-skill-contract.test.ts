@@ -2,327 +2,267 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+// plugins 는 0 확인 → 1 찾기·받기 → 2 설치 → 3 올리기 → 4 상태·내리기 → 5 실패하면 → 끝 → 알아둘 것 순서의 단일 SKILL.md 예요.
+// 2026-11 개편 때 "짧고 목표 중심, 판단은 CLI 사실 + AI, 맥락은 docs" 로 다시 썼어요.
+// 옛 판의 AP-17 CLI 경로 찾기 3단계(지금은 preflight 실패 → setup), CLI 0.50.0 버전 가드(지금은 명령별 `--help`),
+// 상태 17개와 next_action 대응표(지금은 CLI 의 `headline`·`next_action`), PAT 발급·로그인 복구 절차, 콘솔 주소 목록,
+// 승인 카드 문구 세부(Codex 질문 프로토콜은 번들 빌드가 주입), references/publish.md 는 의도적으로 뺐어요.
+// 새로 더한 것은 내리기(`plugin delist`)예요.
+
 const ROOT = join(import.meta.dir, "..");
-const REFERENCE_PATH = join("skills", "plugins", "references", "publish.md");
-const source = readFileSync(join(ROOT, "skills", "plugins", "SKILL.md"), "utf8");
-const reference = readFileSync(join(ROOT, REFERENCE_PATH), "utf8");
-const skillText = `${source}\n${reference}`;
-const claudeBundle = readFileSync(join(ROOT, "plugins", "axhub", "skills", "plugins", "SKILL.md"), "utf8");
-const codexBundle = readFileSync(join(ROOT, "plugins", "axhub-codex", "skills", "plugins", "SKILL.md"), "utf8");
-const readme = readFileSync(join(ROOT, "README.md"), "utf8");
-const codexReadme = readFileSync(join(ROOT, "codex-overrides", "README.md"), "utf8");
-const changelog = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8");
-const policy = readFileSync(join(ROOT, "POLICY.md"), "utf8");
-const codexPolicy = readFileSync(join(ROOT, "codex-overrides", "POLICY.md"), "utf8");
-const agentPolicy = readFileSync(join(ROOT, "docs", "policy", "agent-policy.md"), "utf8");
+const readRepo = (path: string): string => readFileSync(join(ROOT, path), "utf8");
+const SKILL = readRepo("skills/plugins/SKILL.md");
+const FRONTMATTER = SKILL.slice(0, SKILL.indexOf("\n---\n", 4));
+const CLAUDE_BUNDLE = readRepo("plugins/axhub/skills/plugins/SKILL.md");
+const CODEX_BUNDLE = readRepo("plugins/axhub-codex/skills/plugins/SKILL.md");
 
-// 부록 B "CLI next_action" 열 — CLI `plugin manage status --app` 가 내는 state 와
-// 같은 first-match 순서예요. skill 은 이 표를 그대로 옮겨야 해요.
-const APPENDIX_B: ReadonlyArray<readonly [state: string, action: string]> = [
-  ["takedown", "none"],
-  ["delisted", "publish_new_version"],
-  ["apply_failed", "contact_support"],
-  ["visibility_limited", "request_visibility_review"],
-  ["servable", "install_plugin"],
-  ["applying", "wait_for_publish"],
-  ["ingest_failed", "fix_and_publish_new_version"],
-  ["gate_blocked_secret", "fix_and_publish_new_version"],
-  ["gate_blocked", "review_gate_findings"],
-  ["rejected", "fix_and_publish_new_version"],
-  ["closed", "submit_plugin_version_for_review"],
-  ["gate_slow", "wait_for_review"],
-  ["gate_running", "wait_for_review"],
-  ["admin_pending", "wait_for_review"],
-  ["other_version_in_review", "wait_for_review"],
-  ["uploading", "wait_for_ingest"],
-  ["not_submitted", "submit_plugin_version_for_review"],
-];
-const APPENDIX_B_ACTIONS = new Set(APPENDIX_B.map(([, action]) => action));
-// 동사형 접두사를 가진 backtick 식별자는 next_action 이름으로 읽혀요. 아래는
-// 같은 접두사를 쓰지만 action 이 아닌 응답 필드·상태 값이에요.
-const ACTION_LIKE = /^(?:none|(?:submit|publish|fix|review|request|install|wait|contact|inspect|issue)_[a-z_]+)$/;
-const NON_ACTION_FIELDS: Record<string, true> = {
-  review_submitted: true,
-  review_request_id: true,
-  install_name: true,
-  request_id: true,
-};
-// 부록 B 밖의 복구 action 이에요 — CLI `plugin publish --execute` 가 `plugin_pat_required`
-// 와 함께 내요(로그인 없음 → `login`, 게시용 PAT 자동 준비 불가 → `issue_plugin_pat`).
-const PUBLISH_RECOVERY_ACTIONS: Record<string, true> = {
-  login: true,
-  issue_plugin_pat: true,
+const sectionOf = (start: string, end: string): string => {
+  const from = SKILL.indexOf(start);
+  const to = SKILL.indexOf(end, from + start.length);
+  expect(from, `missing section start: ${start}`).toBeGreaterThanOrEqual(0);
+  expect(to, `missing section end: ${end}`).toBeGreaterThan(from);
+  return SKILL.slice(from, to);
 };
 
-// reference 의 ```bash 블록 안 axhub 명령을 줄 이음(`\`)을 풀어 한 줄씩 모아요.
-const referenceCommands = [...reference.matchAll(/```bash\n([\s\S]*?)```/g)]
-  .flatMap((match) => match[1].replace(/\\\n\s*/g, "").split("\n"))
-  .map((line) => line.trim())
-  .filter((line) => line.startsWith("axhub "));
+// 순서 계약: 앞 문자열이 뒤 문자열보다 먼저 나와야 해요.
+const expectOrder = (text: string, ...needles: string[]): void => {
+  const offsets = needles.map((needle) => {
+    const offset = text.indexOf(needle);
+    expect(offset, `missing: ${needle}`).toBeGreaterThanOrEqual(0);
+    return offset;
+  });
+  for (let i = 1; i < offsets.length; i += 1) {
+    expect(offsets[i - 1], `${needles[i - 1]} → ${needles[i]}`).toBeLessThan(offsets[i]);
+  }
+};
 
-describe("app-centric plugins skill contract", () => {
-  test("owns list, exact download, host install, and publish while yielding app deployment", () => {
-    for (const trigger of [
+describe("plugins skill contract (2026-11 개편판)", () => {
+  test("stays one compact SKILL.md without references", () => {
+    expect(FRONTMATTER).toContain("name: plugins");
+    expect(SKILL).not.toContain("references/");
+    for (const root of ["skills", "plugins/axhub/skills", "plugins/axhub-codex/skills"]) {
+      expect(existsSync(join(ROOT, root, "plugins", "references")), `${root}/plugins/references`).toBe(false);
+    }
+    expect(CLAUDE_BUNDLE).toBe(SKILL);
+    expect(Buffer.byteLength(CODEX_BUNDLE, "utf8")).toBeLessThanOrEqual(8_000);
+  });
+
+  test("frontmatter takes company marketplace requests and yields deploy, bootstrap and setup", () => {
+    expect(FRONTMATTER).toContain("회사 플러그인 마켓플레이스에서 플러그인을 찾고, Claude Code·Codex 에 설치하고, 내 플러그인을 올려 게시 심사를 신청해요");
+    for (const utterance of [
       "플러그인 목록 보여줘",
-      "플러그인 1.2.0 내려 받아",
-      "Claude에 설치해줘",
-      "플러그인으로 올려",
-      "플러그인 심사 상태",
+      "OO 플러그인 설치해줘",
+      "OO 1.2.0 받아줘",
+      "이 스킬 플러그인으로 올려줘",
+      "플러그인 심사 어떻게 됐어?",
+      "회사 마켓플레이스 연결해줘",
+      "플러그인 내려줘",
     ]) {
-      expect(source, trigger).toContain(trigger);
+      expect(FRONTMATTER, utterance).toContain(`"${utterance}"`);
     }
-    expect(source).toContain("앱 배포는 deploy");
+    expect(FRONTMATTER).toContain("앱 배포는 deploy, 새 앱은 bootstrap, axhub 플러그인 자체 업데이트는 setup 이에요");
+    expect(FRONTMATTER).toContain('intent: "yield to deploy"');
   });
 
-  test("uses ordinary App routes and excludes retired plugin settings/admin surfaces", () => {
-    expect(source).toContain("/discovery?type=plugin");
-    expect(source).toContain("/apps/<slug>/console");
-    expect(source).toContain("/console/review");
-    expect(skillText).not.toContain("/settings/integrations/plugin");
-    expect(skillText).not.toContain("plugin admin");
+  test("asks the live CLI for commands and reads the marketplace docs verbatim", () => {
+    expect(SKILL).toContain("명령은 지금 CLI 에 묻고, 제공 조건·자동 검수·내리기와 회수의 뜻은 문서 원문으로 읽어요");
   });
 
-  test("lists paginated plugin Apps with the final nested version summary", () => {
-    expect(source).toContain("axhub plugin list --page 1 --per-page 20 --json");
-    expect(source).toContain("pagination.page/per_page/total");
-    expect(source).toContain("`next_cursor`는 생략돼요");
-    expect(source).toContain("plugin.current_servable_version");
-    expect(source).toContain("summary object");
-    expect(source).toContain("`owner`를 publisher로 바꿔 부르지 않아요");
-    expect(source).toContain("한 번에 전량 fetch하지 않아요");
-  });
-
-  test("keeps headless read-only list and exact download available", () => {
-    expect(source).toContain("headless에서도 목록·exact download는 실행해요");
-    expect(source).toContain("install·publish execute만 preview에서 멈춰요");
-    expect(source).not.toContain("tenant marketplace 대상인지 판정하고 headless면 멈춰요");
-  });
-
-  test("downloads one immutable semver with verified no-clobber output", () => {
-    expect(source).toContain('axhub plugin download \\\n  --app "<slug-or-UUID>" \\\n  --version "<exact-semver>"');
-    expect(source).toContain("`latest`·생략 version·mutable name-only download는 금지예요");
-    expect(source).toContain("size·SHA-256 검증 → atomic no-clobber");
-    expect(source).toContain("app_id·app_slug·install_name·version·output·size_bytes·sha256");
-    expect(source).toContain("`version_id`를 만들거나 보고하지 않아요");
-    expect(source).toContain("받은 code를 자동 실행하거나 unzip하지 않고");
-  });
-
-  test("installs one exact version through the official Claude or Codex plugin CLI", () => {
-    expect(source).toContain('axhub plugin install \\\n  --app "<slug-or-UUID>" \\\n  --version "<exact-semver>" \\\n  --host "<claude|codex>"');
-    expect(source).toContain("--execute --yes");
-    expect(source).toContain("traversal·symlink·duplicate path·archive bomb");
-    expect(source).toContain("AxHub 관리 local marketplace");
-    expect(source).toContain("host 공식 plugin CLI");
-    expect(source).toContain("status=installed");
-    expect(source).toContain("restart_required=true");
-    expect(source).toContain("download 요청과 install 요청을 구분");
-    expect(source).toContain("네이티브 선택 UI 가 있으면 그걸로 묻고");
-    expect(source).toContain("없으면 같은 확인을 명시 텍스트 승인 1회로 받고");
-  });
-
-  test("shows the served version and risk inventory before install approval without claiming verification (P2-30)", () => {
-    const install = source.slice(source.indexOf("## 3. Host install"), source.indexOf("## 4. Publish input"));
-    const riskSummary = install.indexOf("`plugin.risk_inventory`");
-    const question = install.indexOf("user scope에 설치할까요?");
-    expect(install).toContain('axhub plugin list --q "<slug>" --json');
-    expect(install).toContain("`plugin.current_servable_version.version`");
-    expect(riskSummary).toBeGreaterThanOrEqual(0);
-    expect(riskSummary).toBeLessThan(question);
-    expect(install).toContain("`검사 안 됨`");
-    expect(install).toContain("`없음`이 아니에요");
-    expect(skillText).not.toContain("검증된");
-  });
-
-  test("publishes, submits for 게시 심사, and treats only servable as installable (P1-2)", () => {
-    expect(source).toContain('axhub plugin publish "<path>" --app "<slug-or-UUID>" --release-version "<new-semver>" --json');
-    expect(source).toContain("canonical `--app <slug|UUID>`");
-    expect(source).toContain("`review_submitted`/`upload_complete` + `installable=false`");
-    expect(source).toContain("`axhub plugin submit`(next_action `submit_plugin_version_for_review`)");
-    expect(source).toContain('axhub plugin manage status --app "<app>" --json');
-    expect(source).toContain("`servable`일 때만 §3으로 설치해요");
-    expect(source).toContain("UUID v4 `--idempotency-key`를 고정해 `--attest-distribution-rights --execute --submit` 한 번");
-    expect(source).toContain("업로드한 뒤 게시 심사를 신청할까요?");
-    for (const stale of ["review_ready", "review-ready", "`published`/`installable=true`"]) {
-      expect(skillText, stale).not.toContain(stale);
-    }
-
-    const publish = referenceCommands.find((command) => command.startsWith("axhub plugin publish"));
-    expect(publish).toBeDefined();
-    for (const flag of ['--idempotency-key "<UUID-v4>"', "--attest-distribution-rights", "--execute", "--submit", "--json"]) {
-      expect(publish, flag).toContain(flag);
-    }
-    const submit = referenceCommands.find((command) => command.startsWith("axhub plugin submit"));
-    expect(submit).toBe(
-      'axhub plugin submit --tenant "<tenant-UUID>" --app "<slug-or-UUID>" --release-version "<semver>" --execute --json',
+  test("runs the steps in order 0 → 5 and ends with a short result", () => {
+    expectOrder(
+      SKILL,
+      "### 0. 확인",
+      "### 1. 찾기·받기",
+      "### 2. 설치",
+      "### 3. 올리기",
+      "### 4. 상태·내리기",
+      "### 5. 실패하면",
+      "## 끝",
+      "## 알아둘 것",
     );
-    expect(reference).toContain("`data.status=review_submitted` + `installable=false`");
-    expect(reference).toContain("`data.status=upload_complete` + `installable=false`");
-    expect(reference).toContain("`already_submitted=true`");
-    expect(reference).toContain("publish를 다시 실행하지 말고 `next_action.command` 의 submit만 다시 실행해요");
-    expect(reference).toContain("`plugin_version_not_ready`");
-    expect(reference).toContain("`--wait` 는 업로드 처리만 기다려요");
-    expect(reference).toContain("결과 알림은 없어요");
-    expect(reference).toContain("App Console에서 관리하고 Console Review에서 승인돼");
   });
 
-  test("maps every Appendix B state to its canonical next_action (DS1, DX16)", () => {
-    const table = reference
-      .split("\n")
-      .filter((line) => line.startsWith("| `"))
-      .map((line) => {
-        const cells = line.split("|").map((cell) => cell.trim().replace(/`/g, ""));
-        return [cells[1], cells[3]];
-      });
-    expect(table).toEqual(APPENDIX_B.map(([state, action]) => [state, action]));
-    const status = referenceCommands.find((command) => command.startsWith("axhub plugin manage status"));
-    expect(status).toBe(
-      'axhub plugin manage status --tenant "<tenant-UUID>" --app "<slug-or-UUID>" --release-version "<semver>" --json',
-    );
-    expect(reference).toContain("`--watch --watch-timeout 5m`");
-    expect(reference).toContain("같은 명령을 반복 호출하지 않아요");
-    expect(reference).toContain("`surface=app_console` 의 `url` 을 사람에게 넘겨요");
+  test("0 확인: preflight 실패는 setup, --tenant, 올리기·연결·내리기는 문서 원문, --help 먼저", () => {
+    const step = sectionOf("### 0. 확인", "### 1. 찾기·받기");
+    expect(step).toContain("`axhub plugin-support preflight --json` 으로 확인해요. 안 되면 setup 으로 보내고 멈춰요");
+    expect(step).toContain("작업공간이 여럿이면 `--tenant` 를 붙여요");
+    expect(step).toContain("회사 UUID(`axhub auth status --json` 의 `tenants[].tenant_id`)");
+    expect(step).toContain("`https://docs.axhub.ai/llms.txt` 의 「회사 플러그인 빠른 시작」·「회사 플러그인 마켓플레이스」를 `curl -fsSL` 로 원문 그대로 읽고 해요");
+    expect(step).toContain("쓰기 전에 그 명령의 `--help` 를 읽고, 거기 있는 인자만 써요");
   });
 
-  test("names only Appendix B and publish-recovery next_action actions", () => {
-    const used = [...skillText.matchAll(/`([^`\n]+)`/g)]
-      .map((match) => match[1])
-      .filter((token) => ACTION_LIKE.test(token) && !NON_ACTION_FIELDS[token]);
-    expect(used.length).toBeGreaterThan(0);
-    for (const action of used) {
-      expect(APPENDIX_B_ACTIONS.has(action) || PUBLISH_RECOVERY_ACTIONS[action] === true, action).toBe(true);
-    }
-    for (const retired of ["submit_publication_review", "inspect_gate_rejection_and_publish_new_version"]) {
-      expect(skillText, retired).not.toContain(retired);
-    }
+  test("1 찾기·받기: 목록은 좁혀 보고, 받기는 정확한 버전만 새 파일로", () => {
+    const step = sectionOf("### 1. 찾기·받기", "### 2. 설치");
+    expect(step).toContain("`axhub plugin list --json` 을 검색어·페이지로 좁혀 봐요");
+    expect(step).toContain("받기는 정확한 버전만 새 파일로 받아요(`plugin download --app --version --output`)");
   });
 
-  test("uses one term for each review kind (DS4)", () => {
-    expect(source).toContain("게시 심사");
-    expect(reference).toContain("공개범위 변경 심사");
-    expect(skillText).not.toContain("공개 신청");
+  test("2 설치: 미리보기와 위험 요약 → 한 번 묻고 → --execute --yes, 마켓플레이스 연결도 한 번 물어요", () => {
+    const step = sectionOf("### 2. 설치", "### 3. 올리기");
+    expect(step).toContain("플러그인·정확한 버전·도구(claude 또는 codex) 하나를 정해요. 도구를 모르면 물어요");
+    expect(step).toContain("미리보기(`plugin install … --json`)와 목록의 위험 요약(hooks·MCP·실행 파일 수)을 보여줘요");
+    expect(step).toContain("설치하려는 버전이 지금 제공 중인 버전과 다르면 함께 알려요");
+    expect(step).toContain("한 번 물은 뒤 `--execute --yes` 로 설치하고, 그 도구를 다시 시작하라고 알려요");
+    expect(step).toContain("30일짜리 읽기 키를 저장하는 일이라 한 번 물어요");
+    expectOrder(step, "미리보기(`plugin install … --json`)", "위험 요약", "한 번 물은 뒤 `--execute --yes`");
   });
 
-  test("keeps preview, rights, auth boundaries, idempotency, and artifact-secret gates", () => {
-    expect(source).toContain("network=false");
-    expect(source).toContain("OAuth 또는 active broad PAT");
-    expect(source).toContain("Publish execute에는 OAuth나 broad PAT 대신");
-    expect(source).toContain("plugins:read` + `plugins:write");
-    expect(reference).toContain('--idempotency-key "<UUID-v4>"');
-    expect(reference).toContain("retry는 같은 key·payload로만 해요");
-    expect(source).toContain("artifact를 배포할 권리가 있음을 확인하고");
-    expect(source).toContain("미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요");
-    expect(source).toContain("`.env`, `*.pem`, `*.key`, `id_rsa*`");
-    expect(source.match(/네이티브 선택 UI 가 있으면 그걸로 묻고/g)?.length).toBe(2);
+  test("3 올리기: 미리보기 → 권리 확인 질문 → --attest-distribution-rights --execute --submit, 같은 멱등 키, 신청만 실패면 submit", () => {
+    const step = sectionOf("### 3. 올리기", "### 4. 상태·내리기");
+    expect(step).toContain("SKILL.md 하나(이름·버전), 플러그인 폴더(`.claude-plugin/plugin.json`), 이미 있는 플러그인의 새 버전(`--app` + 새 버전)");
+    expect(step).toContain("남이 만든 플러그인을 새로 재배포하면 `--third-party` 를 붙여요");
+    expect(step).toContain("`plugin publish <경로> --json` 미리보기로 파일·크기·위험 요약을 보여줘요");
+    expect(step).toContain("비밀 파일(`.env`·`*.pem`·`*.key`·`id_rsa*`)이 있으면 빼 달라고 해요");
+    expect(step).toContain("\"이 플러그인을 배포할 권리가 있음을 확인하고, 올린 뒤 게시 심사를 신청할까요?\"라고 한 번 묻고");
+    expect(step).toContain("`--attest-distribution-rights --execute --submit` 로 올려요");
+    expect(step).toContain("다시 시도할 때는 같은 `--idempotency-key` 를 써요");
+    expect(step).toContain("올리기는 됐는데 신청만 안 됐으면 `plugin submit` 으로 신청만 해요");
+    expect(step).toContain("\"결과 알림은 없어요. `plugin manage status` 로 확인해요\"");
+    expectOrder(step, "`plugin publish <경로> --json` 미리보기", "배포할 권리가 있음을 확인하고", "--attest-distribution-rights --execute --submit");
   });
 
-  test("publishes while signed in and follows plugin_pat_required next_action, never a printed token (P2-31, DX12)", () => {
-    // 게시 전 선제 PAT 발급은 없어요 — 로그인한 채 실행하고, CLI가 게시용 PAT를 준비해요.
-    expect(source).toContain("PAT를 미리 발급하지 않고 로그인한 채 실행하며");
-    expect(source).toContain("`plugin_pat_required`면 publish.md §4대로 `next_action`을 따라요");
-    expect(reference).toContain("게시 전에 PAT를 미리 발급하지 않아요");
-    const recovery = reference.slice(reference.indexOf("## 4. 인증 복구"), reference.indexOf("## 5. "));
-    expect(recovery).toContain("`plugin_pat_required`");
-    expect(recovery).toContain("`error.details.next_action.action`");
-    // 두 action 을 모두 다뤄요: login → 사용자가 `axhub auth login` 뒤 재실행, issue_plugin_pat → 안내 명령 그대로.
-    expect(recovery).toContain("- `login`: ");
-    expect(recovery).toContain("`axhub auth login`");
-    expect(recovery).toContain("- `issue_plugin_pat`: ");
-    expect(recovery).toContain("`next_action.command` 를 고치지 않고 그대로 실행해요");
-    expect(recovery).toContain(
-      'axhub auth pat issue --scopes plugins:read,plugins:write --tenant-id "<tenant-UUID>" --use',
-    );
-    // PAT 발급 명령은 issue_plugin_pat 복구 안에만 있어요.
-    expect(skillText.split("auth pat issue").length).toBe(recovery.split("auth pat issue").length);
-    expect(recovery.indexOf("- `issue_plugin_pat`: ")).toBeLessThan(recovery.indexOf("auth pat issue"));
-    expect(reference).not.toContain("`auth login`·onboarding으로 보내지 않아요");
-    expect(skillText).not.toContain("--show-token");
-    for (const line of skillText.split("\n").filter((line) => line.includes("auth pat issue"))) {
-      expect(line, line).toContain("--use");
-    }
-    const apiKeyFileLines = skillText.split("\n").filter((line) => line.includes("--api-key-file"));
-    expect(apiKeyFileLines.length).toBeGreaterThan(0);
-    for (const line of apiKeyFileLines) {
-      expect(line, line).toContain("사람이 repo 밖에 직접 만들어 둔 PAT 파일");
-    }
-    expect(recovery).toContain("`axhub auth pat unset`");
+  test("4 상태·내리기: headline·next_action, --watch 한 번, delist 는 미리보기 → 한 번 묻고 실행", () => {
+    const step = sectionOf("### 4. 상태·내리기", "### 5. 실패하면");
+    expect(step).toContain("`plugin manage status --app … --release-version … --json` 으로 먼저 한 번 보고, `headline` 과 `next_action` 을 쉬운 말로 알려줘요");
+    expect(step).toContain("업로드 처리·자동 검수 중일 때만 `--watch` 로 한 번(5분) 기다려요");
+    expect(step).toContain("사람의 결정을 기다리는 상태면 기다리지 않고 나중에 볼 명령만 알려줘요");
+    expect(step).toContain("내리기는 `plugin delist` 미리보기를 보여주고 한 번 물은 뒤 실행해요");
   });
 
-  test("keeps tenant handling explicit for scoped PATs (P3-31)", () => {
-    expect(source).toContain("목록의 `--tenant`를 download·install에도 그대로 붙여요");
-    expect(source).toContain("`tenants[].tenant_id`");
-    expect(source).toContain("`plugin_tenant_uuid_required`면 UUID로 다시 실행해요");
-    const mutatingOrStatus = referenceCommands.filter((command) =>
-      /^axhub plugin (publish|submit|manage status)\b/.test(command),
-    );
-    expect(mutatingOrStatus.length).toBe(3);
-    for (const command of mutatingOrStatus) {
-      expect(command, command).toContain('--tenant "<tenant-UUID>"');
+  test("5 실패하면: message_ko·next_action 대로, 키 직접 발급은 next_action 일 때만, 끝나면 pat unset", () => {
+    const step = sectionOf("### 5. 실패하면", "## 끝");
+    expect(step).toContain("출력의 `message_ko`·`next_action` 대로 해요");
+    expect(step).toContain("게시용 키는 CLI 가 준비하고, 직접 발급은 `next_action` 이 그렇게 말할 때만 한 번 물은 뒤 해요");
+    expect(step).toContain("`axhub auth pat unset` 으로 내려요");
+  });
+
+  test("끝: 한두 줄 결과, 목록은 표, 다음 일은 한 줄", () => {
+    const end = sectionOf("## 끝", "## 알아둘 것");
+    expect(end).toContain("무엇을 했고 결과가 어떤지 한두 줄로 말해요. 목록은 표로 보여줘요");
+    expect(end).toContain("\"승인되면 '설치해줘'라고 하면 돼요.\"");
+  });
+
+  test("알아둘 것: headless 는 미리보기까지, 받기≠설치, 검사 안 됨≠없음, servable 일 때만 설치 가능, 심사 용어, 키 숨기기", () => {
+    const notes = SKILL.slice(SKILL.indexOf("## 알아둘 것"));
+    expect(notes).toContain("질문에 답할 수 없는 실행(headless)이면 목록·받기·상태만 하고, 설치·올리기·내리기는 미리보기까지만 해요");
+    expect(notes).toContain("받아 달라는 요청을 설치 허락으로 보지 않아요. 받은 코드를 풀거나 실행하지 않아요");
+    expect(notes).toContain("위험 요약이 비어 있으면 \"검사 안 됨\", 조회가 실패하면 \"확인 못 함\"이에요. \"없음\"이라고 하지 않아요");
+    expect(notes).toContain("업로드가 끝났거나 심사를 신청한 것은 아직 설치할 수 없어요. `servable` 일 때만 \"설치할 수 있어요\"라고 해요");
+    expect(notes).toContain("플러그인 버전 심사는 \"게시 심사\", 앱 공개범위 심사는 \"공개범위 변경 심사\"예요. 섞어 부르지 않아요");
+    expect(notes).toContain("`next_action` 의 주소만 넘기고 CLI 로 대신하지 않아요");
+    expect(notes).toContain("반려된 버전을 같은 버전으로 다시 신청(`--reason`)하는 건 사용자가 고를 때만 해요");
+    expect(notes).toContain("보안 회수는 운영팀이 하는 일이라 문서 안내만 해요");
+    expect(notes).toContain("키(token) 값은 화면에 내지 않아요");
+  });
+
+  test("옛 판의 경로 찾기·버전 가드·상태표·PAT 절차·콘솔 주소는 다시 들어오지 않아요", () => {
+    for (const retired of [
+      "bare `axhub` 실패는 미설치가 아니에요",
+      "repair-path",
+      "0.50.0",
+      "axhub update apply",
+      "| `takedown`",
+      "issue_plugin_pat",
+      "auth pat issue",
+      "--show-token",
+      "/discovery?type=plugin",
+      "/console/review",
+      "네이티브 선택 UI",
+      "review_ready",
+      "공개 신청",
+    ]) {
+      expect(SKILL, retired).not.toContain(retired);
     }
   });
 
-  test("connects a hosted marketplace through the credential helper without tokens in URLs (DX13)", () => {
-    expect(source).toContain("host marketplace 연결 요청은 publish.md §5를 따라요");
-    expect(reference).toContain('axhub --tenant "<tenant>" git setup --marketplace --json');
-    expect(reference).toContain("GIT_TERMINAL_PROMPT=0 git ls-remote");
-    expect(reference).toContain("`add_commands`");
-    expect(reference).toContain("`marketplace_url` 에 token을 넣거나");
+  test("codex 판은 승인 게이트 요약을 받고 본문 전체가 8,000B 안에 들어가요", () => {
+    expect(CODEX_BUNDLE).toContain("## 승인 게이트 계약 (요약)");
+    expect(CODEX_BUNDLE).toContain("미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요");
+    expect(CODEX_BUNDLE).toContain("카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요");
+    expect(CODEX_BUNDLE).not.toContain("## 질문 계약 (요약)");
+    expect(CODEX_BUNDLE).not.toContain("examples:");
+    // 도구 이름은 소문자 인자라 치환되지 않아요.
+    expect(CODEX_BUNDLE).toContain("도구(claude 또는 codex)");
+    expect(CODEX_BUNDLE).toContain("키(token) 값은 화면에 내지 않아요");
   });
+});
 
-  test("guards the 0.50.0 CLI surface by capability and names the update command (P2-29, DX11)", () => {
-    const guard = source.indexOf("**CLI 가드(0.50.0+):**");
-    expect(guard).toBeGreaterThanOrEqual(0);
-    expect(guard).toBeLessThan(source.indexOf("## 1. 목록"));
-    const guardText = source.slice(guard, source.indexOf("\n", guard));
-    expect(guardText).toContain("모든 mode 전에");
-    expect(guardText).toContain("`axhub plugin submit --help` 성공");
-    expect(guardText).toContain("`axhub plugin publish --help`의 `--submit`");
-    expect(guardText).toContain("axhub update apply --execute --yes");
-    expect(guardText).toContain("0.50.0 이상이 필요해요");
-    expect(guardText).toContain("setup으로 양보해요");
-    expect(source).not.toContain("요청 mode의 public help");
-  });
-
-  test("keeps AP-17 continuation", () => {
-    expect(source).toContain("이후 명령은 반환된 `bin_path`");
-    expect(source).toContain("`cargo run`, `target/debug/axhub`");
-    expect(source).toContain("`bin_path`가 없으면 앞에서 발견한 절대경로");
-    expect(source).toContain("세 경로 모두 없을 때만 setup");
-    expect(source).toContain("plugin-support repair-path --json");
-    expect(source).not.toContain("PowerShell 금지");
-  });
-
-  test("references publish.md from SKILL.md and keeps it host-neutral", () => {
-    expect(existsSync(join(ROOT, REFERENCE_PATH))).toBe(true);
-    expect(source).toContain("[references/publish.md](references/publish.md)");
-    for (const hostSpecific of ["claude plugin", "Claude Code", "Claude Desktop"]) {
-      expect(reference, hostSpecific).not.toContain(hostSpecific);
+describe("plugins 라우팅", () => {
+  test("라우팅 fixture 가 마켓플레이스 요청은 plugins, 배포·새 앱·플러그인 자체 업데이트는 각 스킬로 보내요", () => {
+    const fixture = JSON.parse(readRepo("tests/routing/plugins-routing.fixture.json")) as {
+      cases: Array<{ utterance: string; expected: string }>;
+    };
+    const expectedFor = (utterance: string): string[] =>
+      fixture.cases.filter((entry) => entry.utterance === utterance).map((entry) => entry.expected);
+    for (const utterance of [
+      "회사 플러그인 목록 보여줘",
+      "scaffold 1.23.0 을 Claude 에 설치해줘",
+      "scaffold 1.23.0 이 폴더에 받아줘",
+      "이 폴더 스킬들 하나의 플러그인으로 올려줘",
+      "내 플러그인 심사 어떻게 됐어?",
+      "회사 마켓플레이스 연결해줘",
+      "플러그인 내려줘",
+    ]) {
+      expect(expectedFor(utterance), utterance).toEqual(["plugins"]);
     }
+    expect(expectedFor("배포해줘")).toEqual(["deploy"]);
+    expect(expectedFor("새 앱 만들어줘")).toEqual(["bootstrap"]);
+    expect(expectedFor("axhub 플러그인 업데이트해줘")).toEqual(["setup"]);
   });
 
-  test("keeps public and policy sources on the final auth and review contract", () => {
-    for (const document of [readme, codexReadme, changelog, policy, codexPolicy, agentPolicy]) {
+  test("codex description 이 마켓플레이스 트리거를 들고 배포·새 앱·자체 업데이트를 넘겨요", () => {
+    const codexDescriptions = JSON.parse(readRepo("codex-overrides/routing/descriptions.json")) as Record<string, string>;
+    const codex = codexDescriptions.plugins ?? "";
+    for (const needle of [
+      "\"플러그인 목록 보여줘\"",
+      "\"OO 플러그인 설치해줘\"",
+      "\"OO 1.2.0 받아줘\"",
+      "\"이 스킬 플러그인으로 올려줘\"",
+      "\"플러그인 심사 어떻게 됐어?\"",
+      "\"회사 마켓플레이스 연결해줘\"",
+      "\"플러그인 내려줘\"",
+      "앱 배포는 deploy, 새 앱은 bootstrap, axhub 플러그인 자체 업데이트는 setup 이에요",
+    ]) {
+      expect(codex, needle).toContain(needle);
+    }
+    // 소스 description 의 "Claude Code·Codex" 가 일반 치환으로 "Codex·Codex" 가 되지 않게 override 해요.
+    expect(CODEX_BUNDLE).toContain(`description: ${JSON.stringify(codex)}`);
+    expect(CODEX_BUNDLE).not.toContain("Codex·Codex");
+  });
+});
+
+describe("plugins 공개 문서·정책", () => {
+  const readme = readRepo("README.md");
+  const codexReadme = readRepo("codex-overrides/README.md");
+  const policy = readRepo("POLICY.md");
+  const codexPolicy = readRepo("codex-overrides/POLICY.md");
+  const agentPolicy = readRepo("docs/policy/agent-policy.md");
+
+  test("README·POLICY 는 App Console·Console Review·scoped PAT·게시 심사 계약을 유지해요", () => {
+    for (const document of [readme, codexReadme, policy, codexPolicy]) {
       expect(document).toContain("App Console");
       expect(document).toContain("Console Review");
       expect(document).toContain("plugins:read");
-      expect(document).not.toContain("/settings/integrations/plugin");
-      expect(document).not.toContain("plugin admin");
-    }
-    for (const document of [readme, codexReadme, policy, codexPolicy, agentPolicy]) {
       expect(document).toContain("plugin install");
       expect(document).toContain("upload_complete");
       expect(document).toContain("review_submitted");
       expect(document).toContain("axhub plugin submit");
       expect(document).toContain("axhub plugin manage status");
+      expect(document).not.toContain("/settings/integrations/plugin");
+      expect(document).not.toContain("plugin admin");
       expect(document).not.toContain("review_ready");
       expect(document).not.toContain("--show-token");
+      expect(document).not.toContain("references/publish.md");
     }
-    expect(policy).toContain("~/.axhub/plugins/");
-    expect(codexPolicy).toContain("~/.axhub/plugins/");
-    expect(agentPolicy).toContain("download 요청과 install 요청을 구분");
-    expect(agentPolicy).toContain("AP-21 app-backed plugin marketplace");
+    for (const document of [policy, codexPolicy]) {
+      expect(document).toContain("~/.axhub/plugins/");
+      expect(document).toContain("`plugin delist`는 내가 올린 플러그인을 회사 마켓플레이스에서 내려요");
+    }
+    expect(agentPolicy).toContain("## AP-21 app-backed plugin marketplace");
+    expect(agentPolicy).toContain("받아 달라는 요청을 설치 허락으로 보지 않으며");
   });
 
-  test("discloses every persistent and recoverable install-state path", () => {
+  test("POLICY 는 설치 상태 경로를 모두 공개해요", () => {
     for (const document of [policy, codexPolicy]) {
       for (const path of [
         "<host>/.install.lock",
@@ -336,31 +276,6 @@ describe("app-centric plugins skill contract", () => {
       ]) {
         expect(document, path).toContain(path);
       }
-    }
-  });
-
-  test("generated bundles stay synced and complete under Codex 8KB", () => {
-    expect(claudeBundle).toBe(source);
-    for (const bundle of ["axhub", "axhub-codex"]) {
-      const bundled = join(ROOT, "plugins", bundle, REFERENCE_PATH);
-      expect(existsSync(bundled), bundled).toBe(true);
-      expect(readFileSync(bundled, "utf8"), bundled).toBe(reference);
-    }
-    expect(Buffer.byteLength(codexBundle, "utf8")).toBeLessThan(8_000);
-    expect(codexBundle).not.toContain("네이티브 선택 UI");
-    expect(codexBundle).toContain("Claude에 설치해줘");
-    expect(codexBundle).toContain("Codex에 설치해줘");
-    for (const sentinel of [
-      "plugin list",
-      "plugin download",
-      "plugin install",
-      "upload_complete",
-      "review_submitted",
-      "axhub plugin submit --help",
-      "submit_plugin_version_for_review",
-      "[references/publish.md](references/publish.md)",
-    ]) {
-      expect(codexBundle, sentinel).toContain(sentinel);
     }
   });
 });

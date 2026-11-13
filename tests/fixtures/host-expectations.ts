@@ -48,11 +48,6 @@ export interface HostExpectations {
   readme: {
     desktopCliOnly: string;
   };
-  /** 승인 fallback 사다리·headless 정의(AP-12, 4스킬 공통) 의 계약 문장 */
-  approvalGate: {
-    /** 승인 fallback 사다리 문장 전문 (bootstrap·import 개편 뒤엔 plugins 게시만 써요) */
-    approvalFallbackSentence: string;
-  };
 }
 
 export const HOST_EXPECTATIONS: Record<"claude", HostExpectations> = {
@@ -70,10 +65,6 @@ export const HOST_EXPECTATIONS: Record<"claude", HostExpectations> = {
     },
     readme: {
       desktopCliOnly: "Claude Desktop 에 axhub App/MCP 도구가 같이 보여도 플러그인 스킬 흐름은 CLI-only",
-    },
-    approvalGate: {
-      approvalFallbackSentence:
-        "네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.",
     },
   },
   // codex 열 추가 지점: 위 타입을 Record<"claude" | "codex", HostExpectations> 로
