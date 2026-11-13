@@ -97,7 +97,7 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
   ],
   ["`claude -p`·`codex exec`, CI, `$CLAUDE_NON_INTERACTIVE`, ", "`codex exec`, CI, "],
   ["(`claude -p` / CI / `$CLAUDE_NON_INTERACTIVE` / no TTY)", "(`codex exec` / CI / no TTY)"],
-  // development(2026-11 개편판)는 되돌리기 어려운 일만 묻는 스킬이라 deploy 처럼 `## 순서` 를 보존하고
+  // development(2026-11 개편판)는 묻는 일이 드문 스킬이라 deploy 처럼 `## 순서` 를 보존하고
   // 질문 계약 요약을 받아요. 기준 문장이 바뀌면 buildBundle 의 필수 주입 검사가 빌드를 멈춰요.
   [
     "다른 서비스(Supabase·Firebase·직접 만든 로그인 등)를 새로 끌어오지 않아요.",
@@ -251,7 +251,7 @@ const applyCodexOverrides = (outDir: string): void => {
   }
 };
 
-// deploy(승인 질문이 없는 재배포)·development(되돌리기 어려운 일만 묻는 기능 개발)·operate(바꾸는 명령만 한 번 묻는 운영)는
+// deploy(승인 질문이 없는 재배포)·development(묻지 않고 바로 만드는 기능 개발)·operate(바꾸는 명령만 한 번 묻는 운영)는
 // `## 순서` 앞 승인 게이트 요약을 받지 않아요 — 대신 자기 질문 계약 요약을 받아요(CODEX_SUBSTITUTIONS 의 deploy·development·operate 항목).
 const ORDER_HEADING = "\n## 순서\n";
 const PRESERVED_ORDER_HEADING = "\n__AXHUB_PRESERVED_ORDER_HEADING__\n";

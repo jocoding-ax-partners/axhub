@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.45.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.45.0...plugin-v1.45.1) (2026-11-13)
+
+개발 스킬이 계획을 보여준 뒤 "테이블 만들어도 될까요?"처럼 멈추던 줄을 뺐어요. 테이블·컬럼을 어떻게 바꿀지는 개발 판단이라 에이전트가 정하고, 새로 생기는 테이블·칸은 결과 표의 "배포 때 필요한 것"에 적어 알려줘요.
+
+
+### Fixed
+
+* **plugin:** 개발 스킬의 '먼저 묻기' 목록을 빼고 개발 판단은 에이전트에게 맡긴다 ([82e514a](https://github.com/jocoding-ax-partners/axhub-mono/commit/82e514a9adfdeeb0ff1191388f36544b4c17fd27))
+
 ## [1.45.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.44.0...plugin-v1.45.0) (2026-11-13)
 
 플러그인 스킬(plugins)을 짧게 다시 썼어요. 회사 플러그인 찾기·정확한 버전 받기·Claude Code/Codex 설치·올리기와 게시 심사 신청·심사 상태·마켓플레이스 연결을 맡고, 플러그인 내리기를 새로 더했어요. 명령은 지금 CLI 에 묻고, 제공 조건·자동 검수·내리기와 회수의 뜻은 문서 원문으로 읽어요. 설치·올리기·내리기는 미리보기를 보여주고 한 번 묻고, 심사 상태는 먼저 한 번 보고 서버가 처리 중일 때만 기다려요.
