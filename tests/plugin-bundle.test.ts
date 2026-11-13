@@ -65,7 +65,7 @@ describe("clean plugin bundle", () => {
       // 스킬·reference 안내가 늘어 실측 약 527 KB 가 됐어요. 544 KiB → 576 KiB: WP-I1
       // (P1-13·P2-33~P3-47) 의 skill·reference 안내(verify 대기 timeout, update 판정, 작업공간
       // 선택·scaffold placeholder reference 등)로 약 12 KB 늘었고, WP-H 가
-      // skills/plugins/references/publish.md 를 더해요.
+      // skills/plugins/references/publish.md 를 더했어요(2026-11 plugins 개편 때 다시 뺐어요).
       expect(stats.bytes).toBeLessThan(576 * 1024);
 
       expect(existsSync(join(outDir, ".claude-plugin", "plugin.json"))).toBe(true);

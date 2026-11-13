@@ -1,101 +1,70 @@
 ---
 name: plugins
-description: 'axhub plugin marketplace 게시·목록·exact download·host install skill. "플러그인 올려줘", "plugin publish", "플러그인 심사 상태", "플러그인 목록 보여줘", "플러그인 1.2.0 내려 받아", "Claude에 설치해줘", "Codex에 설치해줘", "여러 스킬을 하나의 플러그인으로 올려"에 사용해요. Plugin은 deploy_method=plugin인 일반 App이고 App Console·Console Review를 써요. 앱 배포는 deploy, 앱 연결은 import, 업데이트는 setup으로 양보해요.'
+description: '회사 플러그인 마켓플레이스에서 플러그인을 찾고, Claude Code·Codex 에 설치하고, 내 플러그인을 올려 게시 심사를 신청해요. "플러그인 목록 보여줘", "OO 플러그인 설치해줘", "OO 1.2.0 받아줘", "이 스킬 플러그인으로 올려줘", "플러그인 심사 어떻게 됐어?", "회사 마켓플레이스 연결해줘", "플러그인 내려줘" 같은 요청에 써요. 앱 배포는 deploy, 새 앱은 bootstrap, axhub 플러그인 자체 업데이트는 setup 이에요.'
 examples:
-  - utterance: "사용자들이 올린 플러그인 목록 보여줘"
-    intent: "list app-backed marketplace plugins"
-  - utterance: "scaffold 플러그인 1.23.0을 이 폴더에 받아줘"
-    intent: "download one exact immutable plugin version"
-  - utterance: "scaffold 1.23.0을 Claude에 설치해줘"
+  - utterance: "회사 플러그인 목록 보여줘"
+    intent: "list company marketplace plugins"
+  - utterance: "scaffold 1.23.0 을 Claude 에 설치해줘"
     intent: "install one exact plugin version into Claude Code"
-  - utterance: "이 폴더의 여러 스킬을 하나의 플러그인으로 올려줘"
-    intent: "publish a multi-skill plugin app"
-  - utterance: "앱 배포해줘"
+  - utterance: "scaffold 1.23.0 이 폴더에 받아줘"
+    intent: "download one exact plugin version"
+  - utterance: "이 폴더 스킬들 하나의 플러그인으로 올려줘"
+    intent: "publish a plugin and request its publication review"
+  - utterance: "내 플러그인 심사 어떻게 됐어?"
+    intent: "show plugin publication status"
+  - utterance: "배포해줘"
     intent: "yield to deploy"
 allows-dependency-execution: false
 model: sonnet
 ---
 
-axhub 맥락 확인과 axhub 진입 확인 후 tenant marketplace 대상인지 판정해요. headless에서도 목록·exact download는 실행해요. install·publish execute만 preview에서 멈춰요.
+회사 플러그인을 찾고, 설치하고, 올려 게시 심사까지 신청하고, 결과를 표로 끝내요.
+명령은 지금 CLI 에 묻고, 제공 조건·자동 검수·내리기와 회수의 뜻은 문서 원문으로 읽어요.
 
-> **CLI 경로(AP-17):** bare `axhub` 실패는 미설치가 아니에요. `command -v` → `~/.axhub/bin-path` → `~/.axhub/bin/axhub`(.exe) 순으로 찾고 발견한 절대경로로 `plugin-support repair-path --json`을 실행해요. 이후 명령은 반환된 `bin_path`를 쓰고, `bin_path`가 없으면 앞에서 발견한 절대경로로 이어가요. 세 경로 모두 없을 때만 setup 으로 양보해요. `cargo run`, `target/debug/axhub`, curl·직접 API 우회는 금지예요.
+## 순서
 
-**CLI 가드(0.50.0+):** 모든 mode 전에 `axhub plugin submit --help` 성공과 `axhub plugin publish --help`의 `--submit`을 확인해요. 없으면 실행하지 않고 `axhub CLI 0.50.0 이상이 필요해요 — axhub update apply --execute --yes 로 올린 뒤 다시 요청해 주세요.`라고 말하고 setup으로 양보해요.
+### 0. 확인
+- `axhub plugin-support preflight --json` 으로 확인해요. 안 되면 setup 으로 보내고 멈춰요.
+- 작업공간이 여럿이면 `--tenant` 를 붙여요. 올리기·심사 상태는 회사 UUID(`axhub auth status --json` 의 `tenants[].tenant_id`)를 써요.
+- 올리기·마켓플레이스 연결·내리기는 `https://docs.axhub.ai/llms.txt` 의 「회사 플러그인 빠른 시작」·「회사 플러그인 마켓플레이스」를 `curl -fsSL` 로 원문 그대로 읽고 해요.
+- 쓰기 전에 그 명령의 `--help` 를 읽고, 거기 있는 인자만 써요.
 
-**Tenant:** 목록의 `--tenant`를 download·install에도 그대로 붙여요. scoped PAT와 publish·submit·status는 tenant UUID(`axhub auth status --json`의 `tenants[].tenant_id`)만 써요. `plugin_tenant_uuid_required`면 UUID로 다시 실행해요.
+### 1. 찾기·받기
+- 목록은 `axhub plugin list --json` 을 검색어·페이지로 좁혀 봐요.
+- 받기는 정확한 버전만 새 파일로 받아요(`plugin download --app --version --output`).
 
-UI는 `/discovery?type=plugin` → `/apps/<slug>`, owner는 `/apps/<slug>/console`, reviewer는 `/console/review`예요.
+### 2. 설치
+- 플러그인·정확한 버전·도구(claude 또는 codex) 하나를 정해요. 도구를 모르면 물어요.
+- 미리보기(`plugin install … --json`)와 목록의 위험 요약(hooks·MCP·실행 파일 수)을 보여줘요. 설치하려는 버전이 지금 제공 중인 버전과 다르면 함께 알려요.
+- 한 번 물은 뒤 `--execute --yes` 로 설치하고, 그 도구를 다시 시작하라고 알려요.
+- 마켓플레이스 연결은 문서 「회사 마켓플레이스 연결하기」대로 하고, 30일짜리 읽기 키를 저장하는 일이라 한 번 물어요.
 
-## 1. 목록
+### 3. 올리기
+- 무엇을 올리는지 정해요: SKILL.md 하나(이름·버전), 플러그인 폴더(`.claude-plugin/plugin.json`), 이미 있는 플러그인의 새 버전(`--app` + 새 버전). 남이 만든 플러그인을 새로 재배포하면 `--third-party` 를 붙여요.
+- `plugin publish <경로> --json` 미리보기로 파일·크기·위험 요약을 보여줘요. 비밀 파일(`.env`·`*.pem`·`*.key`·`id_rsa*`)이 있으면 빼 달라고 해요.
+- "이 플러그인을 배포할 권리가 있음을 확인하고, 올린 뒤 게시 심사를 신청할까요?"라고 한 번 묻고, `--attest-distribution-rights --execute --submit` 로 올려요. 다시 시도할 때는 같은 `--idempotency-key` 를 써요.
+- 올리기는 됐는데 신청만 안 됐으면 `plugin submit` 으로 신청만 해요.
+- 끝나면 "결과 알림은 없어요. `plugin manage status` 로 확인해요"라고 알려요.
 
-첫 문장은 `플러그인 목록을 불러올게요.`예요.
+### 4. 상태·내리기
+- `plugin manage status --app … --release-version … --json` 으로 먼저 한 번 보고, `headline` 과 `next_action` 을 쉬운 말로 알려줘요.
+- 업로드 처리·자동 검수 중일 때만 `--watch` 로 한 번(5분) 기다려요. 관리자 승인처럼 사람의 결정을 기다리는 상태면 기다리지 않고 나중에 볼 명령만 알려줘요.
+- 내리기는 `plugin delist` 미리보기를 보여주고 한 번 물은 뒤 실행해요.
 
-```bash
-axhub plugin list --page 1 --per-page 20 --json
-```
+### 5. 실패하면
+- 출력의 `message_ko`·`next_action` 대로 해요. 게시용 키는 CLI 가 준비하고, 직접 발급은 `next_action` 이 그렇게 말할 때만 한 번 물은 뒤 해요.
+- 게시용 키를 켰으면 끝나고 다른 axhub 작업으로 돌아가기 전에 `axhub auth pat unset` 으로 내려요.
 
-목록·다운로드·설치는 OAuth 또는 active broad PAT를 써요. `--q`, 페이지네이션을 적용하고 `data`와 `pagination.page/per_page/total`만 읽으며 `next_cursor`는 생략돼요. 한 번에 전량 fetch하지 않아요. App identity·owner·install_name·installable·상태와 선택 `plugin.current_servable_version` summary object를 보고 `owner`를 publisher로 바꿔 부르지 않아요.
-## 2. Exact download
+## 끝
+무엇을 했고 결과가 어떤지 한두 줄로 말해요. 목록은 표로 보여줘요. 다음 일이 있으면 한 줄로 알려줘요. 예: 심사 신청 → "승인되면 '설치해줘'라고 하면 돼요."
 
-출력은 새 canonical `.zip` path예요. 기존 파일·symlink면 중단하고 `latest`·생략 version·mutable name-only download는 금지예요.
-
-```bash
-axhub plugin download \
-  --app "<slug-or-UUID>" \
-  --version "<exact-semver>" \
-  --output "<new-file.zip>" \
-  --json
-```
-
-CLI가 size·SHA-256 검증 → atomic no-clobber 저장해요. app_id·app_slug·install_name·version·output·size_bytes·sha256만 보고하고 `version_id`를 만들거나 보고하지 않아요. 받은 code를 자동 실행하거나 unzip하지 않고 명시적 install 요청만 §3으로 이어가요.
-## 3. Host install
-
-첫 문장은 `설치할 플러그인·버전·host를 확인할게요.`예요. download 요청과 install 요청을 구분하고, exact App·SemVer와 `claude|codex` host 하나를 고른 뒤 offline preview를 실행해요.
-
-```bash
-axhub plugin install \
-  --app "<slug-or-UUID>" \
-  --version "<exact-semver>" \
-  --host "<claude|codex>" \
-  --json
-```
-
-승인 전에 `axhub plugin list --q "<slug>" --json` 항목의 `plugin.current_servable_version.version`·`plugin.risk_inventory`(hooks·MCP·bin 수)를 보여주고 요청 버전과 다르면 알려요. 값이 없으면 `검사 안 됨`, 조회 실패면 `확인 못 함`이지 `없음`이 아니에요.
-
-`mode=preview`, `network=false`, `auth=false`를 보여줘요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. 질문은 `<name> <version>을 <host> user scope에 설치할까요? 진행 또는 취소로 답해 주세요.`예요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요. 새 `진행` 뒤에만 `--execute --yes`를 붙여요. CLI가 traversal·symlink·duplicate path·archive bomb·manifest mismatch를 차단하고 AxHub 관리 local marketplace와 host 공식 plugin CLI로 설치해요.
-
-`status=installed`, identity·host·scope=user·SHA·marketplace_root·`restart_required=true`를 확인해 host 재시작을 안내해요. host 실패면 성공이라 하지 않아요. host marketplace 연결 요청은 publish.md §5를 따라요.
-
-## 4. Publish input
-
-첫 문장은 `플러그인 게시 입력과 CLI 기능을 확인할게요.`예요. standalone은 `SKILL.md` + `--name` + `--release-version`, directory는 root `.claude-plugin/plugin.json`, 기존 App version은 canonical `--app <slug|UUID>` + 새 SemVer가 필요해요. Preview에 `.env`, `*.pem`, `*.key`, `id_rsa*`나 secret/build output이 있으면 execute를 금지해요.
-## 5. Publish offline preview
-
-```bash
-# 신규 standalone
-axhub plugin publish "<SKILL.md>" --name "<name>" --release-version "<semver>" --json
-
-# 신규 directory
-axhub plugin publish "<plugin-root>" --json
-
-# 기존 plugin App의 새 version
-axhub plugin publish "<path>" --app "<slug-or-UUID>" --release-version "<new-semver>" --json
-```
-
-신규 제3자 재배포는 `--third-party`를 유지해요. `data.mode=preview`, `network=false`, `auth=false`, files·SHA·size·risk_inventory를 보여줘요.
-
-## 6. PAT·approval
-
-Publish execute에는 OAuth나 broad PAT 대신 `plugins:read` + `plugins:write` scoped PAT가 쓰여요. PAT를 미리 발급하지 않고 로그인한 채 실행하며 token을 출력하지 않아요. `plugin_pat_required`면 publish.md §4대로 `next_action`을 따라요.
-
-Publish 승인 문구는 `이 artifact를 배포할 권리가 있음을 확인하고, 미리보기대로 plugin App version을 업로드한 뒤 게시 심사를 신청할까요? 진행 또는 취소 로 답해 주세요.`예요. 네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요. 카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요. 새 `진행`만 승인이고 미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요.
-
-## 7. 실행·게시 심사·상태
-
-승인 뒤 [references/publish.md](references/publish.md)를 읽고 그대로 실행해요: 첫 게시는 UUID v4 `--idempotency-key`를 고정해 `--attest-distribution-rights --execute --submit` 한 번, 성공은 `review_submitted`/`upload_complete` + `installable=false`, 이미 올린 버전은 `axhub plugin submit`(next_action `submit_plugin_version_for_review`), 상태는 `axhub plugin manage status --app "<app>" --json`이에요. `servable`일 때만 §3으로 설치해요.
-
-## NEVER
-
-- NEVER download 요청을 install 승인으로 보거나 host를 추측하지 않아요.
-- NEVER preview·권리 확인·명시 승인 없이 execute/attest하지 않아요.
-- NEVER `upload_complete`·`review_submitted`·rejected·failed를 installable로 선언하거나 받은 plugin code를 자동 실행하지 않아요.
+## 알아둘 것
+- 질문에 답할 수 없는 실행(headless)이면 목록·받기·상태만 하고, 설치·올리기·내리기는 미리보기까지만 해요.
+- 받아 달라는 요청을 설치 허락으로 보지 않아요. 받은 코드를 풀거나 실행하지 않아요.
+- 위험 요약이 비어 있으면 "검사 안 됨", 조회가 실패하면 "확인 못 함"이에요. "없음"이라고 하지 않아요.
+- 업로드가 끝났거나 심사를 신청한 것은 아직 설치할 수 없어요. `servable` 일 때만 "설치할 수 있어요"라고 해요.
+- 플러그인 버전 심사는 "게시 심사", 앱 공개범위 심사는 "공개범위 변경 심사"예요. 섞어 부르지 않아요.
+- 검수 결과 보고 사유 적기, 공개범위 변경 심사처럼 콘솔에서 사람이 할 일은 `next_action` 의 주소만 넘기고 CLI 로 대신하지 않아요.
+- 반려된 버전을 같은 버전으로 다시 신청(`--reason`)하는 건 사용자가 고를 때만 해요. 운영팀 문의(`axhub feedback`)도 원할 때만 보내요.
+- 보안 회수는 운영팀이 하는 일이라 문서 안내만 해요.
+- 키(token) 값은 화면에 내지 않아요.

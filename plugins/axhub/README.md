@@ -68,7 +68,7 @@ Claude Code 프롬프트에 아래를 순서대로 입력해요.
 내 paydrop 앱 배포해
 ```
 
-> axhub CLI가 없거나 필요한 기능이 없으면 관련 스킬이 멈추고 업데이트(`setup`)를 안내해요. `plugins`는 `axhub plugin list|download|publish --help`를 mode별 기능 게이트로 확인해요.
+> axhub CLI가 없거나 필요한 기능이 없으면 관련 스킬이 멈추고 업데이트(`setup`)를 안내해요. `plugins`는 `axhub plugin-support preflight`로 CLI를 확인하고, 쓰는 명령마다 `--help`를 먼저 읽어 거기 있는 인자만 써요.
 
 ### OpenAI Codex 에서 쓰기
 
@@ -99,7 +99,7 @@ codex plugin add axhub-codex@axhub
 ## 📋 준비물
 
 - **Claude Code** 최신 버전
-- **axhub CLI** — `plugins`는 version 추측 대신 필요한 `axhub plugin list|download|install|publish --help`가 성공할 때만 진행해요. 기능이 없으면 `setup`으로 보내고 source build·직접 API로 우회하지 않아요.
+- **axhub CLI** — `plugins`는 version 추측 대신 preflight와 쓰는 명령의 `--help`가 성공할 때만 진행해요. 안 되면 `setup`으로 보내고 source build·직접 API로 우회하지 않아요.
 - **axhub SaaS 계정** + scope (회사 admin 이 발급)
 
 headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인증·TLS·토큰 저장은 모두 CLI 가 담당하고, 플러그인은 별도 바이너리를 동봉하지 않아요.
@@ -114,7 +114,7 @@ headless(CI 등)에서는 axhub CLI 가 `AXHUB_TOKEN` env 로 인증해요. 인�
 |------|------|-------------|
 | `setup` | 셋업·CLI 설치·업데이트·로그인 점검 | "처음인데 셋업해줘", "axhub 업데이트해줘", "로그인해줘" |
 | `bootstrap` | 새 앱 생성 (Axhub 저장소·내 GitHub·회사 GitHub 조직) | "결제 앱 만들어줘", "내 깃허브에 새 앱 만들어줘", "회사 org에 저장소 파고 새 앱 만들어줘" |
-| `plugins` | plugin App 게시·목록·다운로드·host 설치 | "플러그인 목록 보여줘", "1.2.0 내려 받아", "Claude에 설치해줘", "여러 스킬을 하나로 올려줘" |
+| `plugins` | 회사 플러그인 찾기·받기·host 설치·올리기와 게시 심사·내리기 | "플러그인 목록 보여줘", "OO 1.2.0 받아줘", "OO 1.2.0 Claude에 설치해줘", "이 스킬 플러그인으로 올려줘", "플러그인 내려줘" |
 | `deploy` | 배포·실패 원인 진단 (커밋해서 올려요) | "배포해", "다시 배포해줘", "왜 배포가 실패했어" |
 | `import` | 기존 로컬 앱 가져오기 | "기존 앱 올려", "이 폴더 axhub에 올려", "import existing app" |
 | `development` | 이미 axhub 에 있는 앱에 기능 추가·수정 (회사 데이터 화면 포함, 배포는 안 함) | "할 일에 마감일 추가해줘", "검색 탭 만들어줘", "회사 주문 데이터로 매출 대시보드 만들어줘" |

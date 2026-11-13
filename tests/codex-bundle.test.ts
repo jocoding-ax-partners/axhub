@@ -358,7 +358,24 @@ describe("codex bundle transform (U5 게이트 골격 — 본체는 U8)", () => 
       "`axhub plugin-support` 명령은 운영에 쓰지 않아요",
       "내부 id·raw 출력·비밀값을 쓰지 않아요",
     ],
-    plugins: ["artifact를 배포할 권리가 있음을 확인하고", "명시 텍스트 승인 1회", "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요", "--idempotency-key", "--execute"],
+    // 2026-11 개편판 — 본문 전체가 절단선 안에 들어가요. 그중 안전 문장을 잠가요: 승인 게이트 요약·CLI 가드·설치는 한 번 묻고 실행·
+    // 권리 확인 뒤 올리기·같은 멱등 키·내리기도 한 번 묻기·headless 는 미리보기까지·받기≠설치·servable 일 때만 설치 가능·키 내리기·키 값 숨기기.
+    plugins: [
+      "명시 텍스트 승인 1회",
+      "미리 넣어 둔 문구·유사 표현·무응답은 승인이 아니에요",
+      "카드가 열려 있는 동안에는 실행 단계로 넘어가지 않아요",
+      "axhub plugin-support preflight --json",
+      "한 번 물은 뒤 `--execute --yes`",
+      "배포할 권리가 있음을 확인하고",
+      "--attest-distribution-rights --execute --submit",
+      "같은 `--idempotency-key`",
+      "한 번 물은 뒤 실행해요",
+      "axhub auth pat unset",
+      "설치·올리기·내리기는 미리보기까지만 해요",
+      "받아 달라는 요청을 설치 허락으로 보지 않아요",
+      "`servable` 일 때만",
+      "키(token) 값은 화면에 내지 않아요",
+    ],
   };
 
   test("approval and backend gates sit inside the codex 8,000B truncation window (R2)", () => {

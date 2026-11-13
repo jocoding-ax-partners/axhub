@@ -4,6 +4,20 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.45.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.44.0...plugin-v1.45.0) (2026-11-13)
+
+플러그인 스킬(plugins)을 짧게 다시 썼어요. 회사 플러그인 찾기·정확한 버전 받기·Claude Code/Codex 설치·올리기와 게시 심사 신청·심사 상태·마켓플레이스 연결을 맡고, 플러그인 내리기를 새로 더했어요. 명령은 지금 CLI 에 묻고, 제공 조건·자동 검수·내리기와 회수의 뜻은 문서 원문으로 읽어요. 설치·올리기·내리기는 미리보기를 보여주고 한 번 묻고, 심사 상태는 먼저 한 번 보고 서버가 처리 중일 때만 기다려요.
+
+
+### Changed
+
+* **plugin:** 플러그인 스킬을 짧게 다시 쓰고 내리기를 더한다 ([2b8c08e](https://github.com/jocoding-ax-partners/axhub-mono/commit/2b8c08e521522a233b41a416f4aefe6ebe4f2350))
+
+
+### Fixed
+
+* **plugin:** 플러그인 상태는 먼저 한 번 보고 서버 처리 중일 때만 기다린다 ([90cd5df](https://github.com/jocoding-ax-partners/axhub-mono/commit/90cd5df4ca15ed29685014b6058a3a3ec7fdfa8c))
+
 ## [1.44.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.43.0...plugin-v1.44.0) (2026-11-11)
 
 운영 스킬(옛 clarity)을 operate 로 짧게 다시 썼어요. 로그, 앱 이름·소개·아이콘, 앱 DB 조회, 환경변수, 되돌리기, 절전·일시정지·삭제, 권한, 내 커넥터, GitHub 다시 연결을 맡아요. 명령은 외우지 않고 지금 CLI 에 물어 찾고, 결과가 큰 일은 운영 문서를 원문으로 읽고 해요. 정확히 말한 되돌릴 수 있는 바꾸기는 바로 하고, 삭제·일시정지·되돌리기·앱 DB 쓰기·권한 주기는 미리보기를 보여주고 한 번 물어요. "멈춰줘"처럼 비슷한 일이 여럿이면 하나를 고르지 않고 차이를 보여주고 물어요. 브라우저 승인이 필요한 명령은 주소와 코드를 채팅에 바로 보여주고 한 번만 기다려요. setup 은 이 컴퓨터 준비(설치·로그인·환경 점검)만 봐요.

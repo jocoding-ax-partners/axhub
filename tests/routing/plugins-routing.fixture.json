@@ -1,0 +1,21 @@
+{
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). plugins 는 회사 플러그인 마켓플레이스에서 플러그인을 찾고(목록), 정확한 버전을 받고, Claude Code·Codex 에 설치하고, 내 플러그인을 올려 게시 심사를 신청하고, 심사 상태를 보고, 마켓플레이스를 연결하고, 내 플러그인을 내려요. 앱 배포(deploy)·새 앱(bootstrap)·axhub 플러그인 자체 업데이트(setup)와 헷갈리지 않아야 해요. skill frontmatter description/examples(Codex 는 codex-overrides/routing/descriptions.json)를 고칠 때 아래 발화의 정답 skill 이 유지되는지 dry-run 으로 확인해요.",
+  "boundary": {
+    "plugins": "회사 플러그인 마켓플레이스 — 목록·정확한 버전 받기·Claude Code/Codex 설치·올리기와 게시 심사 신청·심사 상태·마켓플레이스 연결·내리기. 설치·올리기·내리기는 미리보기 → 한 번 묻고 → 실행.",
+    "deploy": "이미 axhub 에 있는 앱의 배포·배포 실패 원인",
+    "bootstrap": "새 앱 만들기",
+    "setup": "CLI 설치·버전 업데이트·로그인, axhub 플러그인 자체 업데이트"
+  },
+  "cases": [
+    { "utterance": "회사 플러그인 목록 보여줘", "context": "axhub 맥락", "expected": "plugins", "why": "마켓플레이스 목록 조회" },
+    { "utterance": "scaffold 1.23.0 을 Claude 에 설치해줘", "context": "axhub 맥락", "expected": "plugins", "why": "정확한 버전을 한 도구에 설치 — 미리보기와 위험 요약 뒤 한 번 물어요" },
+    { "utterance": "scaffold 1.23.0 이 폴더에 받아줘", "context": "axhub 맥락", "expected": "plugins", "why": "정확한 버전 받기 — 설치 허락이 아니에요" },
+    { "utterance": "이 폴더 스킬들 하나의 플러그인으로 올려줘", "context": "axhub 맥락", "expected": "plugins", "why": "올리기와 게시 심사 신청 — 배포 권리 확인을 한 번 물어요" },
+    { "utterance": "내 플러그인 심사 어떻게 됐어?", "context": "axhub 맥락", "expected": "plugins", "why": "게시 심사 상태 — plugin manage status 의 headline·next_action" },
+    { "utterance": "회사 마켓플레이스 연결해줘", "context": "axhub 맥락", "expected": "plugins", "why": "Claude Code·Codex 에 회사 마켓플레이스 연결 — 읽기 키를 저장하는 일이라 한 번 물어요" },
+    { "utterance": "플러그인 내려줘", "context": "axhub 맥락 + 내가 올린 플러그인", "expected": "plugins", "why": "내리기 — plugin delist 미리보기 뒤 한 번 물어요" },
+    { "utterance": "배포해줘", "context": "axhub 연결된 앱 폴더", "expected": "deploy", "why": "앱 배포는 플러그인 게시가 아니에요" },
+    { "utterance": "새 앱 만들어줘", "context": "axhub 맥락, 빈 폴더", "expected": "bootstrap", "why": "새 앱 만들기" },
+    { "utterance": "axhub 플러그인 업데이트해줘", "context": "axhub 맥락", "expected": "setup", "why": "axhub 플러그인 자체 최신화는 회사 마켓플레이스 플러그인이 아니에요" }
+  ]
+}

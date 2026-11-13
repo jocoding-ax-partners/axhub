@@ -22,7 +22,7 @@ The monorepo is indexed by CodeGraph (`codegraph_*` MCP tools, server `codegraph
 
 > **정책 기준 문서:** 에이전트 행동 규칙은 `docs/policy/agent-policy.md`, 개발·운영 규칙은 `docs/policy/dev-policy.md`, 사용자 공개 정책은 `POLICY.md` 가 기준이에요. 이 파일의 요약과 다르면 정책 문서를 따라요. 어긋남은 `tests/policy-parity.test.ts` 가 잡아요.
 
-axhub plugin은 instruction-only diet 뒤 현재 **7 skill** (`setup` / `bootstrap` / `plugins` / `deploy` / `import` / `development` / `operate`)을 제공해요. `deploy` 는 옛 `up`(지금 폴더 그대로 올리기)·`diagnosis`(배포 실패 원인 진단)를 합친 스킬이에요. `setup` 은 옛 `onboarding`·`update` 를 합친 점검 스킬이에요 (CLI 설치·버전 업데이트·로그인·회사·git). `operate` 는 옛 `clarity` 의 새 이름이에요 — 이미 있는 앱과 회사의 운영 명령을 맡아요. `plugins`는 사용자 명시 결정으로 추가됐고 deploy_method=plugin인 일반 App의 게시·목록·정확한 version 다운로드를 담당해요. 게시자 관리는 App Console, 승인은 Console Review로 연결하고 판정·실행은 ax-hub-cli(`axhub`)에 둬요.
+axhub plugin은 instruction-only diet 뒤 현재 **7 skill** (`setup` / `bootstrap` / `plugins` / `deploy` / `import` / `development` / `operate`)을 제공해요. `deploy` 는 옛 `up`(지금 폴더 그대로 올리기)·`diagnosis`(배포 실패 원인 진단)를 합친 스킬이에요. `setup` 은 옛 `onboarding`·`update` 를 합친 점검 스킬이에요 (CLI 설치·버전 업데이트·로그인·회사·git). `operate` 는 옛 `clarity` 의 새 이름이에요 — 이미 있는 앱과 회사의 운영 명령을 맡아요. `plugins`는 사용자 명시 결정으로 추가됐고 deploy_method=plugin인 일반 App(회사 플러그인)의 찾기·정확한 버전 받기·설치·올리기와 게시 심사 신청·내리기를 담당해요. 게시자 관리는 App Console, 승인은 Console Review로 연결하고 판정·실행은 ax-hub-cli(`axhub`)에 둬요.
 
 이 instruction-only diet (단일 SKILL.md 본문 + 라이브 `--help` 디스커버리 + corpus 없는 frontmatter 라우팅 + 작은 N skill) 은 외부 prior art 와 정합해요 — Supabase 의 공식 agent-skills (https://github.com/supabase/agent-skills) 도 같은 패턴(소수 skill · `--help` 디스커버리 · corpus 없는 frontmatter 라우팅)을 채택했어요. 그래서 라우팅 품질은 외부 corpus 가 아니라 frontmatter `description`·`examples` 에 투자해요.
 
@@ -56,7 +56,7 @@ diet 가 제거한 hook 중 **auto-update SessionStart 훅 1개**만 `hooks/` �
 
 ## 최소 CLI 버전 게이트
 
-- bootstrap·deploy skill은 `plugin-support` 기능(preflight)으로 최소 표면 **0.21.3+**를 확인하고, bootstrap은 preflight `capabilities.self_hosted_git.git_policy_decision`, deploy는 `capabilities.deploy.push` 가 없으면 CLI 업데이트로 보내요. plugins는 version을 추측하지 않고 필요한 `axhub plugin list|download|publish --help` 성공을 가드해요. operate 는 preflight 로 CLI 를 확인하고, 실행 전 고른 명령의 `--help` 를 읽어 거기 있는 인자·플래그만 써요. CLI가 없거나 기능이 없으면 멈추고 setup으로 보내며 우회하지 않아요.
+- bootstrap·deploy skill은 `plugin-support` 기능(preflight)으로 최소 표면 **0.21.3+**를 확인하고, bootstrap은 preflight `capabilities.self_hosted_git.git_policy_decision`, deploy는 `capabilities.deploy.push` 가 없으면 CLI 업데이트로 보내요. plugins는 version을 추측하지 않고 preflight 로 CLI 를 확인한 뒤 쓰는 명령마다 `--help` 를 먼저 읽어 거기 있는 인자만 써요. operate 는 preflight 로 CLI 를 확인하고, 실행 전 고른 명령의 `--help` 를 읽어 거기 있는 인자·플래그만 써요. CLI가 없거나 기능이 없으면 멈추고 setup으로 보내며 우회하지 않아요.
 - **CLI 경로 해석 (AP-17):** bare `axhub` 실패는 미설치가 아니에요 — 부모 앱(Claude Desktop·VS Code·터미널 앱)이 물려준 낡은 PATH 때문에 설치된 CLI 를 못 찾는 상태가 macOS·Linux·Windows 모두에서 흔해요. 모든 skill 의 CLI 가드는 `command -v axhub` → 위치 파일 `~/.axhub/bin-path` → canonical `~/.axhub/bin/axhub`(.exe) 순으로 찾고, 디스크에 있으면 재설치·setup 으로 돌리지 않고 그 절대경로로 `plugin-support repair-path --json` 을 실행해 영속 PATH 를 고친 뒤 같은 세션은 반환된 `bin_path` 절대경로로 이어가요. 세 경로 모두에서 못 찾을 때만 setup 을 안내해요.
 
 ## 살아남은 quality gate
@@ -100,7 +100,7 @@ gh workflow run plugin-release.yml -f tag=plugin-vX.Y.Z
 Key routing rules:
 - 처음 셋업·CLI 설치·버전 확인/업데이트·로그인·환경 점검 → `setup` (점검 결과 표로 끝내고 앱 생성·배포로 이어가지 않아요 — AP-8)
 - 템플릿으로 새 앱 생성·첫 배포(코드 저장 위치는 회사 판정대로 Axhub 저장소·내 GitHub·회사 GitHub 조직) → `bootstrap`
-- deploy_method=plugin App 게시·목록·정확한 version 다운로드 → `plugins` (Discovery/App Console/Console Review canonical surface)
+- 회사 플러그인 마켓플레이스(deploy_method=plugin App) 찾기·정확한 버전 받기·Claude Code/Codex 설치·올리기와 게시 심사 신청·심사 상태·마켓플레이스 연결·내리기 → `plugins` (확인(preflight·`--tenant`, 올리기·연결·내리기는 llms.txt 「회사 플러그인 빠른 시작」·「회사 플러그인 마켓플레이스」 `curl -fsSL` 원문, `--help` 먼저) → 설치는 미리보기·위험 요약 → 한 번 묻고 `--execute --yes`, 올리기는 미리보기 → 권리 확인 질문 → `--attest-distribution-rights --execute --submit`(같은 `--idempotency-key`), 상태는 `plugin manage status` 의 `headline`·`next_action`, 내리기는 `plugin delist` 미리보기 → 묻고 실행. 업로드·심사 신청은 아직 설치 가능이 아니에요(`servable` 일 때만). 앱 배포는 deploy, 새 앱은 bootstrap, axhub 플러그인 자체 업데이트는 setup)
 - 비어 있지 않은 기존 로컬 앱의 첫 axhub 연결·첫 배포 가져오기 → `import` (올릴 수 있나 → 기준 문서 `curl -fsSL` 원문 숙지 → 비교 → 안내와 확인 1회(올리기 / 그만두기) → 덩어리마다 커밋하며 고치기 → 다시 비교 → execute 한 번·`deploy verify --wait` → 결과 표. `.env` 값은 `--env-from-dotenv` 로 첫 배포 전 등록 — AP-30)
 - 이미 axhub 에 있는 앱의 배포·배포 실패 원인 진단 → `deploy` (대상 → 기준 문서 `curl -fsSL` 원문 숙지 → 점검 → 맞추기(승인 카드 없음, 항목마다 커밋, `env set --from-dotenv`) → `deploy push` 미리보기 → `--execute --wait` 한 번 → 결과 표. 원인만 물으면 실패 진단만 하고 아무것도 바꾸지 않아요 — AP-4. 다른 배포 서비스를 말했으면 하지 않고 멈춰요 — AP-27)
 - 이미 axhub 에 있는 앱의 기능 추가·수정(화면·검색·폼·회사 데이터(커넥터) 대시보드 등) → `development` (앱 확인 → 기준 문서 `curl -fsSL` 원문·`AGENTS.md`·llms.txt 기능 문서 숙지 → 회사 데이터는 쓸 때만 `axhub connectors mine`·`resources` 로 실제 구조 확인 → 계획 두세 줄 보여주고 바로 만들기(되돌리기 어려운 일만 물음 — AP-5) → 빌드·검사·로컬 확인 → 결과 표. 배포는 하지 않아요)

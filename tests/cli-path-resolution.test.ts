@@ -7,10 +7,10 @@ const readRepo = (path: string): string => readFileSync(join(REPO_ROOT, path), "
 
 const CANONICAL_BIN = '"$HOME/.axhub/bin/axhub"';
 
-// bootstrap·import·deploy·development·operate 는 preflight 가 안 되면 setup 으로 보내고, 경로 해석·repair-path 는 setup 이
-// 맡아요 (AP-17 정책 참고). development 는 2026-11 개편 때, operate(옛 clarity)는 2026-11 운영 스킬 개편 때 이 목록에서 빠졌어요.
+// bootstrap·import·deploy·development·operate·plugins 는 preflight 가 안 되면 setup 으로 보내고, 경로 해석·repair-path 는 setup 이
+// 맡아요 (AP-17 정책 참고). development 는 2026-11 개편 때, operate(옛 clarity)는 2026-11 운영 스킬 개편 때,
+// plugins 는 2026-11 플러그인 스킬 개편 때 이 목록에서 빠졌어요.
 const GUARD_FILES = [
-  "skills/plugins/SKILL.md",
   "hooks/session-auto-update.sh",
 ];
 
@@ -22,7 +22,6 @@ const CANONICAL_BIN_FILES = [
 // setup 은 다른 스킬이 보낸 PATH 문제를 repair-path 로 고쳐요.
 const REPAIR_PATH_FILES = [
   "skills/setup/SKILL.md",
-  "skills/plugins/SKILL.md",
 ];
 
 describe("CLI path resolution contract (AP-17)", () => {

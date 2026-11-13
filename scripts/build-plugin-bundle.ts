@@ -88,10 +88,6 @@ export const CODEX_SUBSTITUTIONS: ReadonlyArray<readonly [from: string, to: stri
     "  if ! command -v codex >/dev/null 2>&1; then\n    PLUGIN_RESULT=\"PLUGIN_SKIPPED reason=host_cli_missing latest=$PLAT\"\n  else\n    if codex plugin marketplace upgrade axhub >/dev/null 2>&1 || codex plugin add axhub-codex@axhub >/dev/null 2>&1; then\n      printf '%s' \"$PLAT\" > \"$RESTART_MARKER\" 2>/dev/null\n      PLUGIN_RESULT=\"PLUGIN_UPDATED plugin=$PV->$PLAT\"\n    else\n      PLUGIN_RESULT=\"PLUGIN_FAILED plugin=$PV latest=$PLAT\"\n    fi\n  fi",
   ],
   [
-    "네이티브 선택 UI 가 있으면 그걸로 묻고, 없으면 같은 확인을 명시 텍스트 승인 1회로 받고, 둘 다 불가한 headless 에서는 실행 없이 멈춰요 — 승인을 조용히 건너뛰지 않아요.",
-    "명시 텍스트 승인 1회만 받아요. 승인 채널 없는 headless 에서는 execute하지 않아요 — 승인을 조용히 건너뛰지 않아요.",
-  ],
-  [
     "`CI` 가 있음, `CLAUDE_NON_INTERACTIVE` 가 있음, `claude -p`·`codex exec` 같은 subprocess/headless 호출임",
     "`CI` 가 있음, `CODEX_NON_INTERACTIVE` 가 있음, `codex exec` 같은 subprocess/headless 호출임",
   ],
@@ -265,6 +261,7 @@ const QUESTION_CONTRACT_SKILLS = new Set(["deploy", "development", "operate"]);
 export const CODEX_REQUIRED_SUMMARIES: Readonly<Record<string, string>> = {
   bootstrap: CODEX_APPROVAL_GATE_HEADING,
   import: CODEX_APPROVAL_GATE_HEADING,
+  plugins: CODEX_APPROVAL_GATE_HEADING,
   setup: CODEX_APPROVAL_GATE_HEADING,
   deploy: CODEX_QUESTION_CONTRACT_HEADING,
   development: CODEX_QUESTION_CONTRACT_HEADING,
@@ -272,23 +269,17 @@ export const CODEX_REQUIRED_SUMMARIES: Readonly<Record<string, string>> = {
 };
 
 const applyCodexSubstitutions = (outDir: string): void => {
-  const claudeHostTrigger = "Claude에 설치해줘";
-  const preservedTrigger = "__AXHUB_PRESERVED_CLAUDE_HOST_TRIGGER__";
   for (const file of walkFiles(outDir)) {
     if (!CODEX_TEXT_EXTENSIONS.has(extname(file))) continue;
     const original = readFileSync(file, "utf8");
-    const isPluginsSkill = file.endsWith(join("skills", "plugins", "SKILL.md"));
     const keepsOrderHeading = [...QUESTION_CONTRACT_SKILLS].some((skill) =>
       file.endsWith(join("skills", skill, "SKILL.md")),
     );
-    let next = isPluginsSkill
-      ? original.replaceAll(claudeHostTrigger, preservedTrigger)
-      : original;
+    let next = original;
     if (keepsOrderHeading) next = next.replaceAll(ORDER_HEADING, PRESERVED_ORDER_HEADING);
     for (const [from, to] of CODEX_SUBSTITUTIONS) {
       next = next.replaceAll(from, to);
     }
-    if (isPluginsSkill) next = next.replaceAll(preservedTrigger, claudeHostTrigger);
     if (keepsOrderHeading) next = next.replaceAll(PRESERVED_ORDER_HEADING, ORDER_HEADING);
     if (next !== original) writeFileSync(file, next);
   }
