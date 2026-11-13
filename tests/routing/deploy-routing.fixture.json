@@ -1,5 +1,5 @@
 {
-  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). deploy 는 이미 axhub 에 있는 앱의 배포(맞추기·올리기·확인)와 배포 실패 원인 진단을 맡아요. 2026-11 개편 때 옛 up(저장소 없이 지금 폴더 그대로 올리기)과 diagnosis(실패 원인 진단)를 합쳤어요 — 올리는 길은 CLI `deploy push` 가 고르고, 원인만 물으면 deploy 가 아무것도 바꾸지 않고 진단만 해요. 처음 올리는 폴더는 import, 빈 폴더 새 앱은 bootstrap 이에요. 다른 배포 대상을 직접 말한 발화는 진입하지 않아요.",
+  "_doc": "라우팅 회귀 계약 — frontmatter 라우팅이라 코드 assert 불가(LLM 판정). deploy 는 이미 axhub 에 있는 앱의 배포(맞추기·올리기·확인)와 배포 실패 원인 진단을 맡아요. 2026-11 개편 때 옛 up(저장소 없이 지금 폴더 그대로 올리기 — 지금은 없어진 길)과 diagnosis(실패 원인 진단)를 합쳤어요 — 올리는 길은 CLI `deploy push` 가 고르고, 원인만 물으면 deploy 가 아무것도 바꾸지 않고 진단만 해요. 처음 올리는 폴더는 import, 빈 폴더 새 앱은 bootstrap 이에요. 다른 배포 대상을 직접 말한 발화는 진입하지 않아요.",
   "boundary": {
     "deploy": "이미 axhub 에 있는 앱의 배포·지금 폴더 그대로 올리기·배포 실패 원인 진단 (원인만 물으면 바꾸지 않음)",
     "import": "비어 있지 않은 기존 로컬 앱 첫 연결·첫 배포",
@@ -18,7 +18,7 @@
     { "utterance": "커밋 말고 지금 폴더 그대로 올려줘", "context": "axhub.yaml 연결된 앱 폴더, 커밋하지 않은 변경 있음", "expected": "deploy", "why": "옛 up — 커밋해서 올리고 커밋했다고 알려요" },
     { "utterance": "저장소 없이 이 폴더 그대로 올려줘", "context": "axhub.yaml 연결된 앱 폴더, GitHub 미연결", "expected": "deploy", "why": "옛 up — 저장소 없는 앱은 Axhub 저장소로 옮길지 물어요" },
     { "utterance": "GitHub 없이 배포해줘", "context": "axhub.yaml 연결된 앱 폴더", "expected": "deploy", "why": "옛 up — 저장 위치와 상관없이 deploy push 하나로 올려요" },
-    { "utterance": "소스 올려서 배포해줘", "context": "axhub.yaml 연결된 앱 폴더", "expected": "deploy", "why": "옛 up — 폴더 업로드도 deploy push 가 골라요" },
+    { "utterance": "소스 올려서 배포해줘", "context": "axhub.yaml 연결된 앱 폴더", "expected": "deploy", "why": "옛 up — 폴더 업로드는 없어요, 커밋해서 deploy push" },
     { "utterance": "왜 배포 실패했어", "expected": "deploy", "why": "옛 diagnosis — 원인만 물으면 5번(실패하면)만 하고 아무것도 바꾸지 않아요" },
     { "utterance": "방금 배포 왜 실패했어?", "expected": "deploy", "why": "옛 diagnosis — 최근 배포 실패 원인 질문" },
     { "utterance": "배포 실패 원인 진단해줘", "expected": "deploy", "why": "옛 diagnosis — 실패 원인 진단을 명시" },

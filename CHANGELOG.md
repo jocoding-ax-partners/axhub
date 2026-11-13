@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.45.2](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.45.1...plugin-v1.45.2) (2026-11-13)
+
+폴더를 저장소 없이 바로 올리는 배포가 axhub 에서 없어져서, 안내에 남아 있던 그 설명을 뺐어요. 배포는 항상 커밋한 코드를 저장소로 올리고, 저장소 없는 옛 앱은 Axhub 저장소로 옮긴 뒤 올려요. 스킬 동작은 1.42.0 부터 이미 이렇게 돌아서 바뀌는 건 안내 문구뿐이에요.
+
+
+### Fixed
+
+* **plugin:** 남아 있던 폴더 업로드 배포 안내를 없앤다 ([80faf4e](https://github.com/jocoding-ax-partners/axhub-mono/commit/80faf4ef94b39d330814b4b267229d9d6aedeacc))
+
 ## [1.45.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.45.0...plugin-v1.45.1) (2026-11-13)
 
 개발 스킬이 계획을 보여준 뒤 "테이블 만들어도 될까요?"처럼 멈추던 줄을 뺐어요. 테이블·컬럼을 어떻게 바꿀지는 개발 판단이라 에이전트가 정하고, 새로 생기는 테이블·칸은 결과 표의 "배포 때 필요한 것"에 적어 알려줘요.

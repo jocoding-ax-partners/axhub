@@ -22,7 +22,7 @@ The monorepo is indexed by CodeGraph (`codegraph_*` MCP tools, server `codegraph
 - 흡수된 helper 표면은 `axhub plugin-support <cmd>` (hidden 그룹) 로 호출해요 — 예: `onboarding-detect`, `preflight`, `deploy-prep`.
 - 공개 검증·진단 표면은 `axhub deploy verify <deployment-id> --app <app>` 와 `axhub deploy diagnose` 예요.
 - bootstrap·deploy skill은 시작 시 `axhub` 존재와 `plugin-support` 기능(preflight)을 확인해 최소 표면 v0.21.3+를 가드하고, bootstrap은 preflight `capabilities.self_hosted_git.git_policy_decision`, deploy는 `capabilities.deploy.push` 가 없으면 CLI 업데이트로 보내요. plugins는 version 추측 대신 preflight 로 CLI 를 확인한 뒤 쓰는 명령마다 `--help` 를 먼저 읽어 거기 있는 인자만 쓰고, operate 는 preflight 로 CLI 를 확인하고 실행 전 고른 명령의 `--help` 를 읽어 거기 있는 인자·플래그만 쓰고, 기능이 없으면 `setup`으로 보내며 우회하지 않아요.
-- 저장소 provider 판정은 fresh bootstrap에서 read-only `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 써요. 기존 코드 import는 bootstrap과 같은 회사 판정으로 고른 `--git-choice`를 `plugin-support import`에 넘기고 CLI가 경로를 정해요. 이미 있는 앱의 배포는 저장 위치(Axhub 저장소·GitHub·정적 사이트·폴더 업로드)별 길을 `axhub deploy push`가 골라요 — deploy는 빈 폴더만 `axhub repo clone`하고 저장소에 안 붙은 로컬 소스 폴더는 `import`로 넘기며 Gitea API를 직접 호출하지 않아요.
+- 저장소 provider 판정은 fresh bootstrap에서 read-only `axhub apps git-backend --tenant <tenant> --json`의 top-level `git_backend`만 써요. 기존 코드 import는 bootstrap과 같은 회사 판정으로 고른 `--git-choice`를 `plugin-support import`에 넘기고 CLI가 경로를 정해요. 이미 있는 앱의 배포는 저장 위치(Axhub 저장소·GitHub·정적 사이트)별 길을 `axhub deploy push`가 골라요 — deploy는 빈 폴더만 `axhub repo clone`하고 저장소에 안 붙은 로컬 소스 폴더는 `import`로 넘기며 Gitea API를 직접 호출하지 않아요.
 
 ## 변경 검증
 
