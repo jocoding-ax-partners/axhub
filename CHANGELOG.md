@@ -4,6 +4,15 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.45.3](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.45.2...plugin-v1.45.3) (2026-11-16)
+
+setup 스킬이 설치 페이지 안내(setup.md)와 같은 CLI 설치 명령을 써요. 설치가 실패하면 출력의 에러 코드를 쉬운 말로 풀어 주고, Git·Node.js 는 setup.md 와 같은 방식으로 빠진 것만 설치해요.
+
+
+### Fixed
+
+* 설치 경로를 설치 페이지 하나로 모으고 최신 모델 보안 거절을 막는다 ([#2552](https://github.com/jocoding-ax-partners/axhub-mono/issues/2552)) ([24dd19d](https://github.com/jocoding-ax-partners/axhub-mono/commit/24dd19da968ba249ff76b6c68c290f0b3b2c4722))
+
 ## [1.45.2](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.45.1...plugin-v1.45.2) (2026-11-13)
 
 폴더를 저장소 없이 바로 올리는 배포가 axhub 에서 없어져서, 안내에 남아 있던 그 설명을 뺐어요. 배포는 항상 커밋한 코드를 저장소로 올리고, 저장소 없는 옛 앱은 Axhub 저장소로 옮긴 뒤 올려요. 스킬 동작은 1.42.0 부터 이미 이렇게 돌아서 바뀌는 건 안내 문구뿐이에요.

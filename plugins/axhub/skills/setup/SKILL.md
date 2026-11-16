@@ -1,6 +1,6 @@
 ---
 name: setup
-description: 'axhub 를 쓸 준비가 됐는지 점검하고 빠진 것을 채워요. CLI 설치·버전·로그인·회사·git 설치를 차례로 확인해요. "셋업해줘", "처음인데", "온보딩", "시작하기", "axhub 설치", "로그인해줘", "axhub 최신이야?", "axhub 업데이트해줘", "버전 확인", "환경 점검", "setup", "update axhub" 같은 요청에 써요. 앱 만들기·배포는 하지 않아요.'
+description: 'axhub 를 쓸 준비가 됐는지 점검하고 빠진 것을 채워요. CLI 설치·버전·로그인·회사·git·Node.js 설치를 차례로 확인해요. "셋업해줘", "처음인데", "온보딩", "시작하기", "axhub 설치", "로그인해줘", "axhub 최신이야?", "axhub 업데이트해줘", "버전 확인", "환경 점검", "setup", "update axhub" 같은 요청에 써요. 앱 만들기·배포는 하지 않아요.'
 examples:
   - utterance: "axhub 셋업해줘"
     intent: "check and fix the axhub environment"
@@ -24,10 +24,11 @@ axhub 를 쓸 수 있는 상태인지 차례로 확인하고, 빠진 것만 채�
 ### 1. CLI
 - `axhub --version` 으로 확인해요.
 - 안 되면 `~/.axhub/bin/axhub` (Windows 는 `~/.axhub/bin/axhub.exe`) 가 있는지 봐요. 있으면 그 전체 경로로 `plugin-support repair-path --json` 을 실행하고, 결과의 `bin_path` 로 남은 명령을 이어가요.
-- 정말 없으면 설치해요. 받은 스크립트는 실행 뒤 지워요.
+- 정말 없으면 설치해요. 설치 페이지의 안내(https://axhub.ai/setup.md 「1. CLI 설치」)와 같은 명령이에요. 받은 스크립트는 실행 뒤 지워요. 시간 제한은 300초 이상으로 잡아요.
   - macOS · Linux: `curl -fsSL https://cli.axhub.ai/install.sh -o ~/axhub-install.sh && sh ~/axhub-install.sh; rm ~/axhub-install.sh`
   - Windows PowerShell: `irm https://cli.axhub.ai/install.ps1 -OutFile "$env:USERPROFILE\axhub-install.ps1"` 다음 `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\axhub-install.ps1"` 다음 `Remove-Item "$env:USERPROFILE\axhub-install.ps1"`
   - Windows Git Bash: `curl -fsSL https://cli.axhub.ai/install.ps1 -o ~/axhub-install.ps1` 다음 `powershell -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w ~/axhub-install.ps1)"` 다음 `rm ~/axhub-install.ps1`
+  - 실패하면 출력의 `AXHUB_INSTALL_ERROR code=` 를 쉬운 말로 설명해요. 회사망 차단(`network_blocked`·`tls_intercepted`·`checksum_mismatch`)이면 다시 받지 말고 IT 에 `cli.axhub.ai`·`api.axhub.ai`·`axhub.ai` 허용을 요청하라고 안내해요.
 - 설치 직후에는 PATH 에 아직 없을 수 있어요. 그때는 위 전체 경로로 실행해요.
 - npm 의 `axhub`·`axhub-cli` 는 이름만 맡아 둔 빈 패키지예요. 설치는 위 공식 설치 스크립트로만 해요.
 
@@ -48,11 +49,13 @@ axhub 를 쓸 수 있는 상태인지 차례로 확인하고, 빠진 것만 채�
 ### 4. 회사
 - `axhub tenants list --json` 으로 소속 회사를 보여줘요. 고르게 하지는 않아요.
 
-### 5. git
-- `git --version` 으로 확인해요. 앱을 만들고 배포하려면 git 이 있어야 해요.
-- 없으면 설치해도 되는지 묻고, 좋다고 하면 설치해요.
-  - macOS: `xcode-select --install` (설치 창에서 [설치]를 눌러 달라고 알려요)
-  - Windows: `winget install --id Git.Git -e --source winget`
+### 5. git · Node.js
+- `git --version`, `node --version` 으로 확인해요. 앱을 만들고 배포하려면 둘 다 있어야 해요.
+- 없으면 설치해도 되는지 묻고, 좋다고 하면 빠진 것만 설치해요.
+  - `axhub plugin-support dep-bootstrap --dep git --json --no-input`
+  - `axhub plugin-support dep-bootstrap --dep node --json --no-input`
+- 설치는 됐는데 여전히 안 보이면, AI 앱을 껐다 켜 달라고 안내해요.
+- 실패하면(회사 보안 정책일 수 있어요) 회사 IT 에 Git(또는 Node.js 20 이상) 설치를 요청하라고 안내해요.
 - 저장소 자격 증명(`git setup`)은 여기서 만들지 않아요. 앱을 만들거나 배포할 때 고른 회사로 만들어요.
 
 ## 끝
@@ -63,7 +66,7 @@ axhub 를 쓸 수 있는 상태인지 차례로 확인하고, 빠진 것만 채�
 | axhub CLI | 버전 |
 | 로그인 | 계정 |
 | 회사 | 소속 회사 |
-| git | 버전 또는 없음 |
+| git · Node.js | 버전 또는 없음 |
 
 확인하지 못한 항목은 됐다고 표시하지 않아요.
 
