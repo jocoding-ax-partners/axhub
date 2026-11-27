@@ -4,6 +4,23 @@ All notable changes to the axhub Claude Code plugin will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows [Semantic Versioning](https://semver.org/).
 
 
+## [1.46.1](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.46.0...plugin-v1.46.1) (2026-11-27)
+
+배포 뒤 사용 전 심사의 AI 보안 검토에 걸리면 무엇이 문제이고 어떻게 고치는지 알려 주고, 고쳐서 다시 배포하자고 해요. 사유를 적어 관리자에게 넘길지는 더 묻지 않아요 — 서버에서 그 길이 없어졌어요.
+
+### Fixed
+
+* **plugin:** 배포 뒤 AI 검토에 걸리면 고쳐 다시 배포만 안내한다 ([#2624](https://github.com/jocoding-ax-partners/axhub-mono/issues/2624)) ([72c3ec0](https://github.com/jocoding-ax-partners/axhub-mono/commit/72c3ec0e70bc6bb944f5bcfa8253f37a007335c9))
+
+## [1.46.0](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.45.3...plugin-v1.46.0) (2026-11-18)
+
+배포가 끝나면 사용 전 심사의 AI 보안 검토 결과를 확인해요. 걸렸으면 무엇이 문제이고 어떻게 고치는지 알려 주고, 고칠지 사유를 적어 관리자에게 넘길지 물어요. 검토를 마치지 못한 버전은 다시 배포하자고 해요. CLI 0.66.0 이상에서 켜져요.
+
+
+### Features
+
+* deploy 스킬이 배포 뒤 사용 전 심사의 AI 검토 결과를 확인한다 ([#2580](https://github.com/jocoding-ax-partners/axhub-mono/issues/2580)) ([f4aad60](https://github.com/jocoding-ax-partners/axhub-mono/commit/f4aad60a4c96ac615491620fcb6c3a8f7b481a41))
+
 ## [1.45.3](https://github.com/jocoding-ax-partners/axhub-mono/compare/plugin-v1.45.2...plugin-v1.45.3) (2026-11-16)
 
 setup 스킬이 설치 페이지 안내(setup.md)와 같은 CLI 설치 명령을 써요. 설치가 실패하면 출력의 에러 코드를 쉬운 말로 풀어 주고, Git·Node.js 는 setup.md 와 같은 방식으로 빠진 것만 설치해요.
