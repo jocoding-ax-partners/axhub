@@ -141,6 +141,15 @@ describe("deploy skill contract (2026-11 개편판)", () => {
     expect(push).toContain("기다리다 끊기면 실패가 아니에요. 다시 올리지 말고 `axhub deploy verify <deployment_id> --app <앱> --wait --wait-timeout 9m --json` 으로 이어가요");
     expect(push).toContain("(`status` 가 `started`·`running`, exit 6·10)");
     expect(push).toContain("`environment` 가 `staging` 이면 스테이징에만 반영됐고 운영은 심사 뒤라고 알려요");
+    // spec 732: 사용 전 심사 회사에서 AI 보안 검토에 걸린 버전은 관리자에게 가지 않고 주인에게 돌아와요.
+    expect(push).toContain("`capabilities.deploy.review_gate` 가 true 면 `axhub review gate --app <앱> --wait --json` 을 봐요");
+    // 사유 적고 넘기기는 없앴어요(2026-11-26) — 걸리면 고쳐서 다시 배포만 해요.
+    expect(push).toContain("`returned` 면 `findings`·`recommendation` 을 알리고 고쳐서 다시 배포하자고 해요(2번부터 다시)");
+    expect(DEPLOY).not.toContain("사유를 적어 넘길지");
+    expect(DEPLOY).not.toContain("review proceed");
+    expect(CODEX_DEPLOY).not.toContain("review proceed");
+    expect(push).toContain("`unchecked` 면 검토를 못 마쳐 `next_steps` 대로 다시 배포하자고 해요");
+    expect(CODEX_DEPLOY).toContain("axhub review gate --app <앱> --wait --json");
     expect(DEPLOY).not.toContain("--wait-timeout 10m");
     expect(DEPLOY).not.toContain("axhub deploy create");
   });

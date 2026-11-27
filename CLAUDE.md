@@ -91,7 +91,7 @@ gh workflow run plugin-release.yml -f tag=plugin-vX.Y.Z
 
 - deploy 성공 선언은 CLI 의 최종 결과로만 해요 — `axhub deploy push --app <app> --execute --wait` 가 같은 배포 번호로 끝까지 기다린 결과, 또는 끝나지 않았거나(exit 6·10, `status` 가 `started`·`running`) 기다리다 끊겼을 때 다시 올리지 않고 이어 부르는 `axhub deploy verify <deployment-id> --app <app> --wait --wait-timeout 9m` 의 결과예요. latest 재탐색 경로는 금지이고, 확인하지 못한 항목은 됐다고 표시하지 않아요.
 - **올리는 길은 CLI 가 골라요 (AP-23):** 저장 위치(Axhub 저장소·GitHub·정적 사이트)별 길·배포 번호 찾기·기다리기는 `axhub deploy push` 몫이에요(preflight `capabilities.deploy.push`, CLI 0.62.0+). 2026-11 전에는 스킬이 `apps get` 의 `deploy_method`·`git_backend` 로 selfhosted push·GitHub·static upload lane 을 직접 나눴어요. "지금 폴더 그대로"라고 해도 커밋해서 올리고(업로드 배포 없음, CLI 0.63.0), 저장소 없는 옛 앱은 Axhub 저장소로 옮길지 물어요. 앱 저장소에 안 붙은 로컬 소스 폴더는 `import` 로 넘겨요.
-- **스테이징 옵트인 앱(AP-25):** 배포 결과의 `environment` 가 `staging` 이면 스테이징에만 반영됐고 운영은 심사 뒤라고 알리고 "운영 반영 완료" 라고 말하지 않아요. 심사 신청은 사용자가 요청할 때만 해요.
+- **스테이징 옵트인 앱(AP-25):** 배포 결과의 `environment` 가 `staging` 이면 스테이징에만 반영됐고 운영은 심사 뒤라고 알리고 "운영 반영 완료" 라고 말하지 않아요. 심사 신청은 사용자가 요청할 때만 해요. 사용 전 심사 회사는 배포 성공 뒤 `axhub review gate --app <app> --wait --json` 으로 AI 보안 검토 결과를 보고, `returned`(관리자에게 안 간 버전)면 소견을 알리고 고쳐서 다시 배포하자고 하고(사유 적고 넘기기는 없앴어요 — 서버 409 `pre_use_override_removed`), `unchecked`(검토를 마치지 못함)면 다시 배포하자고만 해요(spec 732, preflight `capabilities.deploy.review_gate`).
 
 ## Skill routing
 

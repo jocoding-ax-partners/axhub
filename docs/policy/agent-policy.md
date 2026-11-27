@@ -138,7 +138,7 @@ axhub plugin 스킬들이 지켜야 하는 행동 규칙을 한곳에 모은 기
 - invariant(codex): "`git_backend.decision`", "git_policy_decision", "코드를 어디에 저장할까요?", "--git-choice"
 
 ## AP-25 배포 환경 표시 (스테이징을 운영으로 오인 금지)
-- 규칙: 스테이징 옵트인 앱(spec 016)은 배포가 스테이징에만 반영되고 운영은 심사 승인 뒤 promote 로만 바뀌어요. 그래서 배포 결과의 환경은 CLI profile 이 아니라 배포 결과의 `environment` 로 판단해요 — `staging` 이면 스테이징에만 반영됐고 운영은 심사 뒤라고 알리고 "운영 반영 완료" 라고 말하지 않아요. 결과 표의 주소 줄에도 스테이징이면 운영 반영은 심사 뒤라고 적어요. 심사 신청은 사용자가 요청할 때만 실행해요.
+- 규칙: 스테이징 옵트인 앱(spec 016)은 배포가 스테이징에만 반영되고 운영은 심사 승인 뒤 promote 로만 바뀌어요. 그래서 배포 결과의 환경은 CLI profile 이 아니라 배포 결과의 `environment` 로 판단해요 — `staging` 이면 스테이징에만 반영됐고 운영은 심사 뒤라고 알리고 "운영 반영 완료" 라고 말하지 않아요. 결과 표의 주소 줄에도 스테이징이면 운영 반영은 심사 뒤라고 적어요. 심사 신청은 사용자가 요청할 때만 실행해요. 사용 전 심사 회사(backend spec 677)에서는 서버가 심사를 대신 내고 AI 보안 검토가 먼저 봐요(spec 732) — 배포가 성공하면 `axhub review gate --app <앱> --wait --json` 으로 확인하고, `returned` 면 걸린 소견과 권장 조치를 알리고 고쳐서 다시 배포하자고 해요. 사유를 적어 관리자에게 넘기는 길은 2026-11-26 에 없앴어요(서버가 409 `pre_use_override_removed` 로 거절) — `axhub review proceed` 를 쓰지 않아요. `unchecked`(검토를 마치지 못함 — 검수 장애·크레딧·시한)는 관리자에게 가지 않았으니 다시 배포하자고만 해요.
 - import: 결과 표의 주소 줄에 `(스테이징이면 운영 반영은 심사 뒤)` 로만 적고 `environment` 분기는 두지 않아서 아래 적용 목록(공용·codex)에서 빠져요. 확인하지 못한 항목은 됐다고 표시하지 않아요.
 - 적용: skills/deploy/SKILL.md
 - invariant: "`environment` 가 `staging` 이면", "운영은 심사 뒤"
